@@ -1,0 +1,539 @@
+좋아. **코덱스(클로드)에게 바로 넘겨서 “그대로 만들게” 할 수 있는 초장문 개발자 메뉴얼**로 정리했어.
+윈도우/리눅스 전용 10키 VSRG, **최상 저지윈도우 15.5ms** + **LR2풍 간접미스(POOR)** 포함.
+아래 문서에는 **목표→규격→데이터→판정알고리즘→스레드/오디오→테스트/검증**까지 전부 들어있어.
+
+---
+
+# 📘 TenRiff(10K) 개발 메뉴얼 — Codex Build Spec (Win/Linux)
+
+## 0) 철학 / 품질 목표
+
+* **결정론(Determinism)**: 동일 입력 차트와 동일 입력 이벤트 → 항상 동일 판정/스코어.
+* **오디오가 왕(Audio-Driven)**: 오디오 출력 타임라인 `T_audio`를 절대 시간 기준으로 사용. 렌더/입력은 종속.
+* **저지연(End-to-End < 20ms)**: 오디오 버퍼 5~10ms, 입력큐/판정 < 2ms, 렌더 영향 최소.
+* **안전한 허용(Two Modes)**: `strict`(규격 위반 시 실패) + `tolerant`(자동 보정+경고).
+
+---
+
+## 1) 대상 플랫폼 / 빌드
+
+* **OS**: Windows 10+ / Linux (x86_64)
+* **언어**: C++17
+* **빌드**: CMake 3.20+
+* **그래픽/윈도**: SDL2 + OpenGL(2D 텍스처 배치)
+* **오디오**: miniaudio (WASAPI/ALSA)
+* **리소스**: stb_image, stb_truetype, dr_libs(필요 시)
+* **테스트**: doctest(유닛), 파일 골든 비교
+* **툴**: `osu2rga`(외부 .osu → 내부 .rga.json 컨버터)
+
+프로젝트 트리(권장):
+
+```
+TenRiff/
+  CMakeLists.txt
+  external/ (miniaudio, sdl2, stb, json)
+  assets/
+    skins/default/...
+    sfx/hit.wav ...
+  src/
+    main.cpp
+    audio/...
+    input/...
+    chart/...
+    judge/...
+    render/...
+    game/...
+    util/...
+  tools/
+    osu2rga/   # .osu -> .rga.json 컨버터 (별도 타깃)
+  tests/
+    unit/
+    golden/
+```
+
+---
+
+## 2) 차트 포맷 / 컨버터
+
+### 2.1 내부 포맷 `.rga.json` (표준 스키마)
+
+```json
+{
+  "meta": {
+    "format": "rga-1",
+    "title": "string",
+    "artist": "string",
+    "creator": "string",
+    "source": "osu",
+    "mode": "mania",
+    "keys": 10,
+    "audio": "song.ogg",
+    "offset_ms": 0,
+    "preview_ms": 0,
+    "tags": [],
+    "meter_default": 4
+  },
+  "timing": [
+    {"t": 0, "bpm": 180.0, "meter": 4}
+  ],
+  "sv": [
+    {"t": 0, "mult": 1.0, "vol": 60},
+    {"t": 15000, "mult": 1.25, "vol": 50}
+  ],
+  "notes": [
+    {"t": 1200, "lane": 1, "type": "tap"},
+    {"t": 1320, "lane": 2, "type": "hold", "len": 480}
+  ],
+  "events": {
+    "kiai": [],
+    "breaks": [],
+    "bg": []
+  },
+  "diagnostics": { "warnings": [], "fixes": [] }
+}
+```
+
+* **시간 단위**: ms 정수(라운딩 규칙 고정; §6.4).
+* **SV**: 배수 `mult`로 정규화(엔진에서 즉시 사용).
+* **LN**: `type:"hold"`, 길이 `len`(ms).
+
+### 2.2 외부 `.osu(mania)` → `.rga.json` 컨버터 (`tools/osu2rga`)
+
+* 섹션: `[General][Metadata][Difficulty][TimingPoints][HitObjects]`
+* **키 수**: `Difficulty.CircleSize` → `keys`
+* **타이밍**:
+
+  * `uninherited=1` → BPM: `bpm = 60000/beatLength`
+  * `uninherited=0` → SV:  `mult = -100/beatLength` (보통 음수)
+* **x→lane**: `lane = clamp(1..keys, floor(x / (512/keys)) + 1)` (x=512는 마지막 레인)
+* **LN**: `type&128` → `objectParams`에서 `endTime` 파싱(구버전 `time2`도 허용)
+* **라운딩**: half-away-from-zero(§6.4)
+* **SV 없으면**: `(t=0, mult=1.0)` 삽입(옵션)
+
+CLI:
+
+```
+osu2rga in.osu -o out.rga.json [--strict|--tolerant] [--pretty]
+```
+
+Exit code: 0 OK / 1 parse error / 2 semantic invalid
+
+---
+
+## 3) 오디오/입력/렌더 스레드 모델
+
+### 3.1 오디오가 마스터
+
+* **마스터 클록**: miniaudio 콜백에서 산출되는 현재 재생 시간 `T_audio_ms`.
+* **판정**: **오디오 스레드**에서 수행. 입력 이벤트는 lock-free 큐로 전달되어 `T_audio` 기준으로 판정.
+
+### 3.2 스레드 역할
+
+* **AudioThread(우선순위↑)**: 판정/히트사운드/게이지/스코어 업데이트(결정론 핵심).
+* **MainThread**: SDL 입력 이벤트 수집 → `RingBuffer<KeyEvent>` push, OpenGL 렌더.
+* **LoaderThread(선택)**: 오디오/텍스처 비동기 로딩.
+
+### 3.3 입력 이벤트 구조
+
+```cpp
+struct KeyEvent {
+  uint8_t lane;   // 1..10
+  bool down;      // true=keydown, false=keyup
+  int64_t t_sys;  // 시스템 타임스탬프(ms)
+};
+```
+
+* AudioThread에서 소비 시 `t_sys`를 `T_audio` 축으로 변환(초기엔 동일 취급, 이후 캘리브레이션 가능).
+
+---
+
+## 4) 저지(판정) 스펙 — **최상 윈도우 15.5ms** + LR2풍 간접미스
+
+### 4.1 저지 윈도우(기본값, Rate=1.0)
+
+* **PGREAT** (최상): `|Δ| ≤ 15.5 ms`
+* **GREAT**        : `|Δ| ≤ 31.0 ms`
+* **GOOD**         : `|Δ| ≤ 55.0 ms`
+* **BAD**          : `|Δ| ≤ 80.0 ms`
+* **POOR**         : 그 외 전부 (미스/간접미스)
+
+> **Rate 보정**: 실시간 윈도우 = `base / rate`
+> 예: Rate 1.20x → PGREAT = 12.9 ms
+
+> (선택) 비대칭: early를 약간 더 빡빡하게 설정 가능(예: PGREAT early 14 / late 17), 처음엔 **대칭** 권장.
+
+### 4.2 간접미스(POOR) 정의 — LR2 감각
+
+다음 상황은 전부 **POOR**:
+
+* **유령 입력(ghost)**: 해당 레인에 BAD 창 내 대응 노트 없음.
+* **빗맞춤(near miss)**: 같은 레인의 최전방 미소비 노트와 `|Δ| > BAD`.
+* **잘못된 레인**: 틀린 레인 입력으로는 어떤 노트도 매칭되지 않음.
+* **LN 유지 실패**: 홀드 중 그레이스 초과 이탈(§4.4).
+
+### 4.3 TAP 할당 규칙(결정론)
+
+* 입력 1회 → 같은 레인의 **가장 앞 미소비 노트** **1개만** 후보.
+* **할당 창** `W_assign = BAD_window`. `|Δ| > W_assign` → 즉시 **POOR**.
+* 레인 크로스 매칭 금지(다른 레인 노트 고려 X).
+
+### 4.4 롱노트(LN)
+
+* **헤드**: TAP과 동일 판정(Δ→PGREAT/GREAT/GOOD/BAD/POOR), 성공 시 `holding[lane]=true`.
+* **유지**:
+
+  * **그레이스 20ms**: 순간 손 뗌 허용.
+  * **연속 이탈 50ms** 이상이면 **POOR 1회**(콤보 끊김). 다시 누르면 유지 재개(추가 페널티 없음).
+* **테일(릴리즈)**: TAP과 동일 판정. 조기/지연 릴리즈 모두 Δ로 판정, 범위 밖이면 **POOR**.
+* **테일 없이 끝나는 LN**(비정상): tolerant 모드에서 테일없이 종료 시점에 근접하면 GOOD/BAD로 보정 가능(권장: drop 또는 강경 오류).
+
+### 4.5 안티-매시(난타 방지)
+
+* **POOR 발생 직후 레인 마스크**: `mask_ms = 30ms` 동안 **같은 레인 추가 입력 무시**.
+* 같은 프레임(동일 ms)에 같은 레인 다중 키다운 → **첫 입력만 유효**.
+
+### 4.6 스코어/콤보/게이지
+
+| 저지     |   점수 | 콤보 | 라이프(예시) |
+| ------ | ---: | -: | ------: |
+| PGREAT | 1000 | +1 |    +0.6 |
+| GREAT  |  920 | +1 |    +0.4 |
+| GOOD   |  700 | +1 |    +0.1 |
+| BAD    |  100 |  0 |    -0.6 |
+| POOR   |    0 |  0 |    -1.2 |
+
+* **LN 가중**: **헤드 50% / 테일 50%** (합산이 표 점수).
+* **콤보**: BAD/POOR에서 끊김. (LN 이탈 POOR도 콤보 끊김)
+* **정확도/통계**: 평균 Δ(ms), 표준편차, MaxCombo, hitcount 테이블, FAST/SLOW(Δ 부호).
+
+---
+
+## 5) 오디오/판정 루프 의사코드
+
+### 5.1 오디오 콜백 개요
+
+```cpp
+void audioTick(int64_t T_audio_ms) {
+  // 0) 출력 버퍼 생성/클리어 (miniaudio 콜백 파라미터 기반)
+  mixBegin();
+
+  // 1) 입력 큐 소비 (오디오 기준으로 정렬/버퍼링)
+  consumeKeyEventsUpTo(T_audio_ms + INPUT_LOOKAHEAD_MS);
+
+  // 2) 레인별 처리
+  for (int lane=1; lane<=10; ++lane) {
+    if (maskUntil[lane] > T_audio_ms) continue; // 안티-매시 마스크
+
+    while (hasPendingKey(lane)) {
+      auto e = popPendingKey(lane);  // {down, t_event}
+      if (e.down) handleKeyDown(lane, e.t_event);
+      else        handleKeyUp(lane,   e.t_event);
+    }
+    checkHoldIntegrity(lane, T_audio_ms); // LN 유지 감시
+  }
+
+  // 3) 히트사운드/판정 사운드 믹스
+  mixSfxForFrame(T_audio_ms);
+
+  // 4) 출력
+  mixEnd();
+}
+```
+
+### 5.2 핵심 핸들러
+
+```cpp
+void handleKeyDown(int lane, int64 t) {
+  Note* n = peekFrontNote(lane);     // 소비되지 않은 최전방 노트
+  if (!n) { issuePOOR(lane,"ghost"); mask(lane,t); return; }
+
+  int64 delta = t - n->time;         // Δ = 입력시각 - 노트시각
+  if (llabs(delta) <= BAD_w_ms) {
+    auto j = judgeFromDelta(delta);  // PGREAT/GREAT/GOOD/BAD
+    consumeNoteHead(n, j);           // 스코어/콤보/게이지 업데이트
+  } else {
+    issuePOOR(lane,"near-miss"); mask(lane,t);
+  }
+}
+
+void handleKeyUp(int lane, int64 t) {
+  if (isHoldingLN(lane)) {
+    Note* n = currentHold[lane];
+    int64 delta = t - n->end;
+    if (llabs(delta) <= BAD_w_ms) consumeNoteTail(n, judgeFromDelta(delta));
+    else issuePOOR(lane,"release-miss");
+    holding[lane] = false;
+  } else {
+    // 옵션: 홀드 중이 아닌데 키업은 무시 (POOR로 보지 않음 권장)
+  }
+}
+
+void checkHoldIntegrity(int lane, int64 T) {
+  if (!isHoldingLN(lane)) return;
+  if (!isKeyDown(lane)) {
+    if (!graceActive[lane]) { graceActive[lane]=true; graceUntil[lane]=T+20; }
+    if (T > graceUntil[lane]) {
+      if (!breakStarted[lane]) { breakStarted[lane]=true; breakSince[lane]=T; }
+      if ((T - breakSince[lane]) >= 50) {
+        issuePOOR(lane,"hold-break");  // 한 번만 페널티
+        breakStarted[lane] = false;
+      }
+    }
+  } else {
+    graceActive[lane]=false; breakStarted[lane]=false;
+  }
+}
+
+inline void mask(int lane, int64 t) { maskUntil[lane] = t + 30; }
+```
+
+### 5.3 Δ→저지 매핑
+
+```cpp
+Judgement judgeFromDelta(int64 delta_ms) {
+  int64 a = llabs(delta_ms);
+  if (a <= PGREAT_w) return PGREAT;
+  if (a <= GREAT_w)  return GREAT;
+  if (a <= GOOD_w)   return GOOD;
+  if (a <= BAD_w)    return BAD;
+  return POOR;
+}
+```
+
+> **Rate 적용**: `PGREAT_w = round(PGREAT_base / rate)` 등 모든 윈도우에 실시간 반영.
+
+---
+
+## 6) 시간/라운딩/정규화 규칙
+
+### 6.1 시간은 ms 정수
+
+* 내부 모든 타임스탬프는 **int64 ms**.
+* 부동소수 연산은 **최종 시점**에만 정수화.
+
+### 6.2 정렬/안정성
+
+* 노트/타이밍/SV는 항상 `(t asc, stable)` 정렬.
+* 동일 시각 다중 항목 처리 순서 고정(BPM→SV, 앞 노트 우선).
+
+### 6.3 오프셋/레이트
+
+* 곡 오프셋 `offset_ms` → 전역 이동.
+* **Rate**: 재생 속도와 **저지 윈도우** 모두에 적용(윈도우 = `base / rate`).
+
+### 6.4 라운딩: half-away-from-zero
+
+```text
+round_ms(x):
+  x>=0 ? floor(x+0.5) : ceil(x-0.5)
+```
+
+* ±0.5 경계에서 항상 절대값 큰 쪽으로.
+
+---
+
+## 7) 렌더/스킨(얇게)
+
+* **OpenGL 2D**: 레인/노트/판정 이펙트 텍스처 배치.
+* **Draw calls**: 프레임당 1~3 유지 목표.
+* **스킨**: PNG 시트 + `skin.json`(좌표/스케일/이펙트 지속ms).
+* **VSync**: 기본 OFF(판정에 영향 X). 옵션으로 켤 수 있음.
+
+---
+
+## 8) 설정/키맵/옵션
+
+`config.json`(기본):
+
+```json
+{
+  "audio": { "rate":48000, "frames":128, "periods":3, "exclusive":true },
+  "input": { "backend":"sdl2", "debounce_ms":0 },
+  "judge": { "pg":15.5, "gr":31.0, "gd":55.0, "bd":80.0,
+             "hold_grace":20, "hold_break":50, "mask":30 },
+  "video": { "vsync":false, "fps_limit":0 },
+  "keys": { "lane1":"D","lane2":"F","lane3":"J","lane4":"K","lane5":"Space",
+            "lane6":"H","lane7":"U","lane8":"I","lane9":"O","lane10":"L" }
+}
+```
+
+* 런타임에서 Rate/HS/GR/미러/랜덤은 후속 추가(저지 윈도우와 분리 적용).
+
+---
+
+## 9) 테스트/검증 전략
+
+### 9.1 유닛 테스트(최소 16세트)
+
+1. **라운딩**: ±0.5/±1.5 케이스 검증(half-away).
+2. **x→lane**: 10K, x=0/511/512 경계.
+3. **타이밍**: BPM/SV 파싱, `mult=-100/beatLength` 정확도.
+4. **SV 없음**: t=0 mult=1.0 삽입(옵션) 확인.
+5. **LN 파싱**: `endTime:` vs `time2` 양식 둘 다.
+6. **LN len≤0**: strict=에러, tolerant=보정 또는 drop.
+7. **동일시각 BPM+SV**: BPM→SV 순서 보장.
+8. **TAP 저지**: Δ→PG/GR/GD/BD/POOR 경계 정확.
+9. **간접미스**: BAD창 밖 유령입력 → POOR.
+10. **안티-매시**: POOR 직후 동일 레인 반복 입력 무시.
+11. **LN 유지**: 20ms 그레이스, 50ms 이탈 시 1회 POOR.
+12. **LN 릴리즈**: Δ 판정 정확/범위 밖 POOR.
+13. **콤보/게이지**: BAD/POOR 시 콤보 끊김/게이지 감소.
+14. **Rate 보정**: rate=1.2에서 윈도우 축소 정상 동작.
+15. **정렬 안정**: 동일 시각 다중 노트 소비 순서 결정.
+16. **대용량**: 100k 노트 처리 시간/메모리 상한 테스트(성능 스모크).
+
+### 9.2 골든 테스트(파일 비교)
+
+* `.osu → .rga.json` 변환 결과를 골든과 byte-level 비교(Pretty 제외).
+* 미리 준비한 맵 20+개(다중 BPM/SV/LN)로 회귀 테스트.
+
+### 9.3 수동 QA
+
+* 오디오 프리셋(48k/128f/periods=3)에서 글리치 없이 재생.
+* NKRO 동시치기(5~10키) 입력 누락 없음.
+* Win: WASAPI Exclusive/Shared 전환, Linux: ALSA/Pulse 비교.
+
+---
+
+## 10) 오류/진단/로깅
+
+* **레벨**: INFO/WARN/ERROR
+* **예시 메시지**
+
+  * `E100 Missing BPM timing point (Strict). Use --tolerant to insert bpm=120 at t=0.`
+  * `E210 Invalid SV (beatLength=0) at line 324. Replaced with mult=1.0 (tolerant).`
+  * `E310 Hold length <= 0 at line 978 (start=1320,end=1319). Dropped.`
+  * `W401 Volume 0 clamped to 1.`
+  * `W420 Tap+Hold collision at t=500,lane=3. Kept Hold.`
+
+---
+
+## 11) 구현 핸드북 — Codex 작업 단위
+
+### Phase A — 공통 유틸/스레드·큐
+
+* Lock-free `RingBuffer<KeyEvent>` (SPSC)
+* 시간 유틸: `now_ms()`, 라운딩, Δ도우미
+
+### Phase B — 오디오 초기화(miniaudio)
+
+* 48k/128f/periods=2~3, Exclusive 우선(폴백 포함)
+* 콜백 골격 + 내부 믹서(히트사운드)
+
+### Phase C — 입력(SDL2)
+
+* 키다운/업 이벤트 수집 → `RingBuffer` push
+* 키맵 로딩/저장
+
+### Phase D — 차트/인덱서
+
+* `.rga.json` 로딩(zero-copy 지향)
+* 시간 정렬/이진 탐색 API (`window(t0,t1)`)
+
+### Phase E — 판정 커널
+
+* 상수/윈도우 구조체(동적 Rate 반영)
+* TAP/LN/LN유지/릴리즈/안티매시/콤보/게이지
+* Δ→저지 함수를 테이블화
+
+### Phase F — 렌더(간단)
+
+* 레인/노트/판정 이펙트 텍스처
+* HUD(콤보/정확도/게이지)
+
+### Phase G — 툴: `osu2rga`
+
+* 섹션 스캔/파서
+* BPM/SV/X→lane/LN 변환
+* strict/tolerant/pretty/diag 옵션
+
+### Phase H — 테스트
+
+* doctest 16세트 + 골든 비교
+* CI 스크립트(CMake + ctest)
+
+---
+
+## 12) 상수 모음 (초기 기본값)
+
+```txt
+Judge windows (ms) @ rate=1.0
+  PGREAT 15.5
+  GREAT  31.0
+  GOOD   55.0
+  BAD    80.0
+  POOR   else
+
+LN
+  hold_grace 20
+  hold_break 50
+
+Anti-mash
+  lane_mask 30
+
+Assign
+  W_assign = BAD_window
+
+Score (per head/tail for LN = 50/50)
+  PGREAT 1000
+  GREAT   920
+  GOOD    700
+  BAD     100
+  POOR      0
+
+Life delta (example)
+  +0.6 +0.4 +0.1 -0.6 -1.2
+```
+
+---
+
+## 13) 예시: 라운딩/배정/저지 동작 검증 스냅샷
+
+입력:
+
+```
+note(t=1000,lane=1 tap)
+input keydown lane1 at 984.6ms  -> Δ=-15.4 => PGREAT
+input keydown lane1 at 1015.6ms -> Δ= +15.6 => GREAT (경계 초과)
+input keydown lane1 at 1085.2ms -> Δ= +85.2 => POOR (BAD 밖)
+```
+
+라운딩:
+
+* 내부 판정은 **실수 Δ**로 비교해도 되고, 최종 리플레이/로그에는 반올림된 `t`를 남겨도 좋음. (게임 판정은 float Δ, 로깅은 int64 t)
+
+---
+
+## 14) 성능/지연 프리셋 제안
+
+* **Windows**: WASAPI Exclusive 시도 → 실패 시 공유 48k/128f/periods=3
+* **Linux**: ALSA direct(가능 시) → Pulse 폴백
+* **렌더**: VSync OFF, FPS 제한 없음(옵션)
+
+---
+
+## 15) 보안/안전/자원
+
+* 외부 파일 경로 sanitize(`..` 차단).
+* 오디오/이미지 디코더 입력 크기 상한.
+* 컨버터는 입력 라인 스트리밍(대형 파일 안전).
+
+---
+
+## 16) 수락 기준(최종 체크리스트)
+
+* [ ] 유닛 16/16, 골든 20/20 통과
+* [ ] 동일 입력에 대해 결정론 보장(리플레이 재생 일치)
+* [ ] 오디오 글리치 무(48k/128f/periods=3)
+* [ ] NKRO 동시치기 누락 없음
+* [ ] Rate 변경 시 윈도우/판정 동기 반영
+* [ ] 간접미스/안티매시 규칙 기대대로 동작
+* [ ] LN 유지/그레이스/브레이크 로직 확인
+* [ ] Win/Linux 양측 빌드·실행 OK
+
+---
+
+이 문서 그대로 코덱스에 **Phase A → H** 순서로 던지면,
+컨버터/판정커널/오디오/입력/렌더까지 **하나씩 붙여가며 완성**할 수 있어.
+
+필요하면 나는 **CMake 스캐폴드 + 오디오/입력/판정 스텁 코드**까지 한 번에 뽑아줄 수도 있어. 준비되면 “코드 스타터 킷” 버전으로도 바로 이어갈게 🔧🎵
