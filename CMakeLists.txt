@@ -9,6 +9,7 @@ option(TENRIFF_ENABLE_TESTS "Build TenRiff unit tests" ON)
 
 add_library(tenriff_chart
     src/chart/BmsParser.cpp
+    src/chart/BmsChartNorm.cpp
     src/chart/NoteLaneMapping.cpp
 )
 
@@ -29,6 +30,7 @@ if(TENRIFF_ENABLE_TESTS)
     enable_testing()
     add_executable(bms_parser_tests
         tests/unit/test_bms_parser.cpp
+        tests/unit/test_bms_normalizer.cpp
         tests/unit/test_note_lane_mapping.cpp
     )
     target_include_directories(bms_parser_tests
