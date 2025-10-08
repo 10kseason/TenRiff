@@ -5,9 +5,9 @@
 - Core BMS parser handling headers, dictionaries, and measure commands with strict/tolerant modes.
 - Configurable channel-to-lane mapping defaulting to the combined 1P+2P 10-key layout.
 - BMS chart normalization stage generating measure timings and sorted events with fractional #MEASURE support.
+- Scheduling/timeline stage translating normalized events into absolute timing with BPM/STOP handling.
 
 ## TODO / Next Steps
-- Build the scheduling/timeline stage that converts normalized events into absolute timing.
 - Flesh out audio/input/render subsystems per the development manual once chart pipeline is ready.
 
 ## Working Agreements

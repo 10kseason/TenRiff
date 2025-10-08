@@ -119,6 +119,7 @@ bool BmsNormalizationResult::success() const {
 BmsNormalizationResult BmsChartNormalizer::normalize(const BmsChart& chart) const {
     BmsNormalizationResult result;
     result.chart.lane_mapping = chart.lane_mapping;
+    result.chart.base_bpm = chart.base_bpm;
 
     int max_measure = 0;
     for (const auto& command : chart.commands) {

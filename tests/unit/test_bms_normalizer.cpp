@@ -26,6 +26,7 @@ TEST_CASE("normalizes measures and note events with scaling") {
     BmsNormalizationResult result = normalizer.normalize(chart);
 
     CHECK(result.success());
+    CHECK(std::abs(result.chart.base_bpm - chart.base_bpm) < 1e-6);
     CHECK(result.chart.measures.size() == 2u);
     CHECK(std::abs(result.chart.measures[0].start - 0.0) < 1e-6);
     CHECK(std::abs(result.chart.measures[0].length - 1.5) < 1e-6);
