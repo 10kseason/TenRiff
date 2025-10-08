@@ -43,6 +43,7 @@ struct BmsNormalizedChart {
     std::vector<BmsMeasureTiming> measures;
     std::vector<BmsNormalizedEvent> events;
     NoteLaneMapping lane_mapping;
+    double base_bpm = 0.0;
 };
 
 struct BmsNormalizationMessage {
