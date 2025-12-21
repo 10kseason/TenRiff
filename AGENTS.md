@@ -7,11 +7,12 @@
 - BMS chart normalization stage generating measure timings and sorted events with fractional #MEASURE support.
 - Scheduling/timeline stage translating normalized events into absolute timing with BPM/STOP handling.
 - Gameplay utility layer with SpeedManager (rate/HS calculations) and GaugeManager implementing the auto-shift gauge spec.
+- Initial osu!mania loader capturing mode/key count, timing points, and columnized notes with validation helpers.
 
 ## TODO / Next Steps
 - Flesh out audio/input/render subsystems per the development manual once chart pipeline is ready.
 - Track staged implementation roadmap in `docs/roadmap.md` (Audio master clock → full song loop → key remap/8K-10K → FR/SR random → launcher).
-- Extend chart support beyond BMS by adding an osu! mania loader that feeds the shared normalization/scheduling pipeline.
+- Hook the osu!mania loader into the shared normalization/scheduling pipeline and expose format selection in song select.
 
 ## Working Agreements
 - When you complete or significantly advance a task, update the Completed/TODO lists so the next agent has accurate context.
