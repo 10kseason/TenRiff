@@ -6,6 +6,7 @@
 - Configurable channel-to-lane mapping defaulting to the combined 1P+2P 10-key layout.
 - BMS chart normalization stage generating measure timings and sorted events with fractional #MEASURE support.
 - Scheduling/timeline stage translating normalized events into absolute timing with BPM/STOP handling.
+- Gameplay utility layer with SpeedManager (rate/HS calculations) and GaugeManager implementing the auto-shift gauge spec.
 
 ## TODO / Next Steps
 - Flesh out audio/input/render subsystems per the development manual once chart pipeline is ready.
