@@ -34,11 +34,22 @@ target_include_directories(tenriff_game
 
 target_compile_features(tenriff_game PUBLIC cxx_std_17)
 
+add_library(tenriff_runtime
+    src/timing/ClockSync.cpp
+)
+
+target_include_directories(tenriff_runtime
+    PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
+)
+
+target_compile_features(tenriff_runtime PUBLIC cxx_std_17)
+
 add_executable(tenriff
     src/main.cpp
 )
 
-target_link_libraries(tenriff PRIVATE tenriff_chart tenriff_game)
+target_link_libraries(tenriff PRIVATE tenriff_chart tenriff_game tenriff_runtime)
 
 if(TENRIFF_ENABLE_TESTS)
     enable_testing()
@@ -50,12 +61,13 @@ if(TENRIFF_ENABLE_TESTS)
         tests/unit/test_speed_manager.cpp
         tests/unit/test_gauge_manager.cpp
         tests/unit/test_osu_mania_loader.cpp
+        tests/unit/test_clock_sync.cpp
     )
     target_include_directories(bms_parser_tests
         PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/external
             ${CMAKE_CURRENT_SOURCE_DIR}/src
     )
-    target_link_libraries(bms_parser_tests PRIVATE tenriff_chart tenriff_game)
+    target_link_libraries(bms_parser_tests PRIVATE tenriff_chart tenriff_game tenriff_runtime)
     add_test(NAME bms_parser_tests COMMAND bms_parser_tests)
 endif()

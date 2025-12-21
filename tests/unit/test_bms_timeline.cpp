@@ -10,7 +10,7 @@ using tenriff::chart::BmsChartNormalizer;
 using tenriff::chart::BmsNormalizedEventType;
 using tenriff::chart::BmsTimelineBuilder;
 
-TEST_CASE("timeline builder converts normalized events to seconds") {
+TEST_CASE("timeline builder converts normalized events to samples") {
     BmsChart chart;
     chart.base_bpm = 120.0;
     chart.bpm["40"] = 150.0;
@@ -28,7 +28,7 @@ TEST_CASE("timeline builder converts normalized events to seconds") {
     }
 
     BmsTimelineBuilder builder;
-    auto timeline = builder.build(normalization.chart);
+    auto timeline = builder.build(normalization.chart, 48000);
 
     bool timeline_success = timeline.success();
     CHECK(timeline_success);
@@ -39,15 +39,15 @@ TEST_CASE("timeline builder converts normalized events to seconds") {
     }
 
     CHECK(timeline.timeline.events[0].event.type == BmsNormalizedEventType::Note);
-    CHECK(std::abs(timeline.timeline.events[0].time - 0.0) < 1e-6);
+    CHECK(timeline.timeline.events[0].time_samples == 0);
 
     CHECK(timeline.timeline.events[1].event.type == BmsNormalizedEventType::BpmChange);
-    CHECK(std::abs(timeline.timeline.events[1].time - 2.0) < 1e-6);
+    CHECK(timeline.timeline.events[1].time_samples == 96000);
 
     CHECK(timeline.timeline.events[2].event.type == BmsNormalizedEventType::Note);
-    CHECK(std::abs(timeline.timeline.events[2].time - 2.4) < 1e-6);
+    CHECK(timeline.timeline.events[2].time_samples == 115200);
 
-    CHECK(std::abs(timeline.timeline.duration - 3.6) < 1e-6);
+    CHECK(timeline.timeline.duration_samples == 172800);
 }
 
 TEST_CASE("timeline builder applies stop durations after event groups") {
@@ -68,7 +68,7 @@ TEST_CASE("timeline builder applies stop durations after event groups") {
     }
 
     BmsTimelineBuilder builder;
-    auto timeline = builder.build(normalization.chart);
+    auto timeline = builder.build(normalization.chart, 48000);
 
     bool timeline_success = timeline.success();
     CHECK(timeline_success);
@@ -79,15 +79,15 @@ TEST_CASE("timeline builder applies stop durations after event groups") {
     }
 
     CHECK(timeline.timeline.events[0].event.type == BmsNormalizedEventType::Stop);
-    CHECK(std::abs(timeline.timeline.events[0].time - 0.0) < 1e-6);
+    CHECK(timeline.timeline.events[0].time_samples == 0);
 
     CHECK(timeline.timeline.events[1].event.type == BmsNormalizedEventType::Note);
-    CHECK(std::abs(timeline.timeline.events[1].time - 0.0) < 1e-6);
+    CHECK(timeline.timeline.events[1].time_samples == 0);
 
     CHECK(timeline.timeline.events[2].event.type == BmsNormalizedEventType::Note);
-    CHECK(std::abs(timeline.timeline.events[2].time - 3.0) < 1e-6);
+    CHECK(timeline.timeline.events[2].time_samples == 144000);
 
-    CHECK(std::abs(timeline.timeline.duration - 5.0) < 1e-6);
+    CHECK(timeline.timeline.duration_samples == 240000);
 }
 
 TEST_CASE("timeline builder reports errors for non-positive bpm during advance") {
@@ -105,7 +105,27 @@ TEST_CASE("timeline builder reports errors for non-positive bpm during advance")
     chart.events.push_back(event);
 
     BmsTimelineBuilder builder;
-    auto result = builder.build(chart);
+    auto result = builder.build(chart, 48000);
+
+    CHECK_FALSE(result.success());
+    CHECK_FALSE(result.messages.empty());
+}
+
+TEST_CASE("timeline builder rejects non-positive sample rates") {
+    BmsChart chart;
+    chart.base_bpm = 120.0;
+    chart.commands.push_back({0, "11", "0100"});
+
+    BmsChartNormalizer normalizer;
+    auto normalization = normalizer.normalize(chart);
+    bool normalization_success = normalization.success();
+    CHECK(normalization_success);
+    if (!normalization_success) {
+        return;
+    }
+
+    BmsTimelineBuilder builder;
+    auto result = builder.build(normalization.chart, 0);
 
     CHECK_FALSE(result.success());
     CHECK_FALSE(result.messages.empty());

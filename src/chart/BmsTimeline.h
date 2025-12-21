@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <string>
 #include <vector>
 
@@ -9,11 +10,11 @@ namespace tenriff::chart {
 
 struct BmsScheduledEvent {
     BmsNormalizedEvent event;
-    double time = 0.0;
+    int64_t time_samples = 0;
 };
 
 struct BmsTimeline {
-    double duration = 0.0;
+    int64_t duration_samples = 0;
     std::vector<BmsScheduledEvent> events;
 };
 
@@ -32,7 +33,7 @@ struct BmsTimelineResult {
 
 class BmsTimelineBuilder {
 public:
-    BmsTimelineResult build(const BmsNormalizedChart& chart) const;
+    BmsTimelineResult build(const BmsNormalizedChart& chart, int sample_rate_hz) const;
 };
 
 }  // namespace tenriff::chart

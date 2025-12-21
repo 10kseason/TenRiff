@@ -1,0 +1,14 @@
+{
+  "bindings": {
+    "lane1": "D",
+    "lane2": "F",
+    "lane3": "J",
+    "lane4": "K",
+    "lane5": "Space",
+    "lane6": "H",
+    "lane7": "U",
+    "lane8": "I",
+    "lane9": "O",
+    "lane10": "L"
+  }
+}

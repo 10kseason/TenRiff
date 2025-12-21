@@ -45,12 +45,20 @@ bool BmsTimelineResult::success() const {
     });
 }
 
-BmsTimelineResult BmsTimelineBuilder::build(const BmsNormalizedChart& chart) const {
+BmsTimelineResult BmsTimelineBuilder::build(const BmsNormalizedChart& chart, int sample_rate_hz) const {
     BmsTimelineResult result;
+
+    if (sample_rate_hz <= 0) {
+        add_message(result.messages, BmsParseSeverity::Error, 0,
+                    "Sample rate must be a positive integer.");
+        return result;
+    }
+
+    double sample_rate = static_cast<double>(sample_rate_hz);
 
     double current_bpm = chart.base_bpm;
     double current_position = 0.0;
-    double current_time = 0.0;
+    double current_time_samples = 0.0;
 
     const auto& events = chart.events;
     std::size_t index = 0;
@@ -70,7 +78,8 @@ BmsTimelineResult BmsTimelineBuilder::build(const BmsNormalizedChart& chart) con
                             "Encountered non-positive BPM while advancing the timeline.");
                 break;
             }
-            current_time += seconds_from_position_delta(delta_position, current_bpm);
+            double delta_time_seconds = seconds_from_position_delta(delta_position, current_bpm);
+            current_time_samples += delta_time_seconds * sample_rate;
             current_position = group_position;
         }
 
@@ -80,7 +89,8 @@ BmsTimelineResult BmsTimelineBuilder::build(const BmsNormalizedChart& chart) con
         }
 
         for (std::size_t i = index; i < group_end; ++i) {
-            result.timeline.events.push_back(BmsScheduledEvent{events[i], current_time});
+            result.timeline.events.push_back(
+                BmsScheduledEvent{events[i], static_cast<int64_t>(std::llround(current_time_samples))});
         }
 
         double stop_accumulated = 0.0;
@@ -120,7 +130,7 @@ BmsTimelineResult BmsTimelineBuilder::build(const BmsNormalizedChart& chart) con
             }
         }
 
-        current_time += stop_accumulated;
+        current_time_samples += stop_accumulated * sample_rate;
         index = group_end;
     }
 
@@ -135,12 +145,13 @@ BmsTimelineResult BmsTimelineBuilder::build(const BmsNormalizedChart& chart) con
             add_message(result.messages, BmsParseSeverity::Error, static_cast<int>(chart.measures.size()) - 1,
                         "Cannot determine chart duration because BPM is not positive.");
         } else {
-            current_time += seconds_from_position_delta(remaining, current_bpm);
+            double delta_time_seconds = seconds_from_position_delta(remaining, current_bpm);
+            current_time_samples += delta_time_seconds * sample_rate;
             current_position = chart_end_position;
         }
     }
 
-    result.timeline.duration = current_time;
+    result.timeline.duration_samples = static_cast<int64_t>(std::llround(current_time_samples));
     return result;
 }
 
