@@ -16,6 +16,11 @@ TenRiff는 BMS/리듬게임 chart 파이프라인과 런처를 목표로 하는 
 - 자세한 구현 로드맵은 `docs/roadmap.md`에서 확인하고 동기화합니다.
 - 인풋렉 최소화를 위한 구현 보완 아이디어는 `docs/latency.md`에서 확인할 수 있습니다.
 
+## 런처 부트스트랩 (초기 버전)
+- 루트 폴더에 `launch_linux.sh`, `launch_win.bat`를 추가했습니다. 두 스크립트 모두 현재 폴더 기준으로 `assets/`, `songs/`, `profiles/default/`를 점검하고, 기본 설정/키맵을 자동 생성한 뒤 TenRiff 실행 파일을 `--songs ./songs --profile default`로 실행합니다.
+- `profiles/default/config.json`, `profiles/default/keymap.json`는 배포 시 포함되며, 삭제되어도 스크립트가 동일한 내용을 다시 생성합니다.
+- 비어 있는 `songs/` 폴더는 경고만 띄우고 실행은 계속됩니다. 실행 실패 시 로그(`logs/run.log`) 뒤쪽을 자동으로 보여주며, 종료 코드 10~13을 사람이 읽기 쉬운 메시지로 매핑합니다.
+
 ## 시작하기
 1. 의존성을 설치한 뒤 CMake로 빌드하세요.
 2. 테스트는 doctest 기반으로 구성되어 있으니, 관련 타깃을 실행해 검증할 수 있습니다.

@@ -5,6 +5,7 @@ This roadmap captures the recommended high-level order for building out the game
 ## 0) Fix the skeleton and master clock
 - Treat **AudioThread as the master clock** for all timing-sensitive work.
 - **InputThread** should timestamp events from RawInput/evdev and push them into an SPSC queue.
+- Normalize chart timelines into **sample positions (int64)** so the audio thread can consume deterministic timestamps.
 - **Render** only consumes snapshots to draw; judgements/scores are finalized on the audio side.
 
 ## 1) Make a full song playable end-to-end
