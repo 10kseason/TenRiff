@@ -8,9 +8,19 @@ This roadmap captures the recommended high-level order for building out the game
 - Normalize chart timelines into **sample positions (int64)** so the audio thread can consume deterministic timestamps.
 - **Render** only consumes snapshots to draw; judgements/scores are finalized on the audio side.
 
+## 0.5) Harden the low-latency loop
+- Implement one backend end-to-end (WASAPI/ALSA) with device padding exposure and explicit `buffer_start_samples` computation so the mixer works in the playback buffer domain.
+- Fortify ClockSync with outlier rejection, sliding-window EMA updates, reset hooks on device changes/underruns, and monotonic clamping to prevent regressions during drift or spikes.
+- In AudioThread, pop inputs, convert to sample time, and branch late/normal/future for keysound placement so late inputs still make sound and future ones are staged.
+- Express judgement windows in samples, add HUD counters for callback budget/late inputs/xruns, and scale windows appropriately when rate is adjustable.
+- Capture replays as sample-time input traces `{keycode, up/down, press_sample}` to enable deterministic reproduction of latency bugs.
+
 ## 1) Make a full song playable end-to-end
+- Keep the audio backend running from the menu with silent callbacks so the master clock is stable before gameplay.
+- Stand up the UI state machine: **Title → Song Select → Play → Result** with InputThread/SPSC ingestion everywhere.
+- Add an async SongIndexerThread plus cached index (mtime/hash) so Song Select stays responsive while scanning.
 - Minimal BMS loader (essential channels only) → note scheduling → judgement → result screen.
-- Keep UI simple: **Title → Song Select → Play → Result** flow only.
+- Use the audio engine to schedule preview audio (no UI-thread playback) and preload keysounds during Song Select.
 
 ## 1.5) Support both BMS and osu! beatmaps
 - Add an osu! beatmap (mania) loader alongside BMS, sharing the normalized event model.

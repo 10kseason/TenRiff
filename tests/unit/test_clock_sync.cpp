@@ -37,7 +37,9 @@ TEST_CASE("SPSCQueue preserves order and drops when full") {
 }
 
 TEST_CASE("ClockSync estimates slope and intercept for input to audio mapping") {
-    tenriff::timing::ClockSync sync(4);
+    tenriff::timing::ClockSyncConfig config{};
+    config.max_samples = 4;
+    tenriff::timing::ClockSync sync(config);
     sync.add_sample(0, 0);
     sync.add_sample(1'000'000'000, 48000);
 
@@ -50,7 +52,9 @@ TEST_CASE("ClockSync estimates slope and intercept for input to audio mapping") 
 }
 
 TEST_CASE("ClockSync drops oldest samples when exceeding capacity") {
-    tenriff::timing::ClockSync sync(2);
+    tenriff::timing::ClockSyncConfig config{};
+    config.max_samples = 2;
+    tenriff::timing::ClockSync sync(config);
     sync.add_sample(0, 0);
     sync.add_sample(1'000'000'000, 48000);
     sync.add_sample(2'000'000'000, 96050);
@@ -61,5 +65,63 @@ TEST_CASE("ClockSync drops oldest samples when exceeding capacity") {
         return;
     }
     CHECK(*mapped > 70000);
+}
+
+TEST_CASE("ClockSync clamps regressions that would move backwards") {
+    tenriff::timing::ClockSync sync;
+    sync.add_sample(0, 0);
+    sync.add_sample(1'000'000'000, 48000);
+
+    auto first = sync.input_to_audio_samples(1'000'000'000);
+    CHECK(first.has_value());
+    if (!first.has_value()) {
+        return;
+    }
+    CHECK(*first == 48000);
+
+    // Even if a caller requests an older timestamp, the output should remain monotonic.
+    auto second = sync.input_to_audio_samples(500'000'000);
+    CHECK(second.has_value());
+    if (!second.has_value()) {
+        return;
+    }
+    CHECK(*second == *first);
+}
+
+TEST_CASE("ClockSync rejects outliers while keeping a stable fit") {
+    tenriff::timing::ClockSyncConfig config{};
+    config.max_samples = 8;
+    config.ema_alpha = 0.5;
+    config.mad_floor_samples = 8.0;
+    config.min_outlier_samples = 3;
+    tenriff::timing::ClockSync sync(config);
+
+    for (int i = 0; i < 4; ++i) {
+        sync.add_sample(static_cast<int64_t>(i) * 1'000'000'000LL, i * 48000);
+    }
+
+    // Outlier: wildly incorrect audio sample value for the given input time.
+    sync.add_sample(4'000'000'000LL, 1'000'000);
+
+    auto mapped = sync.input_to_audio_samples(4'000'000'000LL);
+    CHECK(mapped.has_value());
+    if (!mapped.has_value()) {
+        return;
+    }
+
+    // With the outlier ignored, slope should stay near 48k samples/sec.
+    CHECK(*mapped > 180000);
+    CHECK(*mapped < 210000);
+}
+
+TEST_CASE("ClockSync reset clears accumulated state") {
+    tenriff::timing::ClockSync sync;
+    sync.add_sample(0, 0);
+    sync.add_sample(1'000'000'000, 48000);
+    CHECK(sync.has_estimate());
+
+    sync.reset();
+    CHECK_FALSE(sync.has_estimate());
+    CHECK_FALSE(sync.input_to_audio_samples(500'000'000).has_value());
 }
 
