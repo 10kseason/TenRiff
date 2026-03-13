@@ -58,7 +58,7 @@ TenRiff는 Windows GUI 기반 BMS-first 리듬게임 런타임/런처 프로젝�
 프로젝트는 사용 가능한 상태지만 완전히 마감된 제품은 아닙니다.
 
 - Windows GUI가 메인 경로입니다.
-- Linux는 [`Baepoks-Linuxs/TenRiff-0.5.0-linux-preview`](Baepoks-Linuxs/TenRiff-0.5.0-linux-preview) 수준의 preview만 존재합니다.
+- Linux GUI/audio/input 백엔드는 아직 완성되지 않았습니다.
 - 일부 GUI 경로는 빌드/테스트 위주로 검증되어 있고, 실기 수동 검증은 계속 남아 있습니다.
 - 오래된 설계 문서와 현재 구현이 일부 다를 수 있으므로, 현재 동작 기준 문서는 반드시 [`docs/current-state.md`](docs/current-state.md)를 우선 봐야 합니다.
 
@@ -74,12 +74,10 @@ TenRiff는 Windows GUI 기반 BMS-first 리듬게임 런타임/런처 프로젝�
 - `config/`: 기본 전역 설정
 - `profiles/`: 런타임 프로필 설정/키맵/로컬 결과
 - `songs/`: 차트 루트
-- `Baepoks/`: 배포 스테이징 결과물
-- `opensource-Tenriff-source/`: 공개용 소스 스테이징 결과물
 
 ### 2. Release 빌드
 
-Windows 기준 권장 배포 빌드 예시는 다음과 같습니다.
+Windows 기준 기본 빌드 예시는 다음과 같습니다.
 
 ```powershell
 cmake -S . -B build-dist -G "Visual Studio 17 2022" -A x64
@@ -119,29 +117,6 @@ TenRiff는 전역 설정과 프로필 설정을 분리합니다.
 - result export: `profiles/<name>/results/*.json`
 
 설정 구조를 자세히 보려면 [`docs/config.md`](docs/config.md)를 읽는 것이 가장 빠릅니다.
-
-## 배포 패키지와 공개 소스 패키지
-
-현재 워크스페이스에는 두 가지 스테이징 산출물이 있습니다.
-
-### Windows 배포 패키지
-
-- 경로: [`Baepoks/TenRiff-0.7.5`](Baepoks/TenRiff-0.7.5)
-- 성격: no-songs 바이너리 배포
-- 포함:
-  - `TenRiff.exe`
-  - `config/config.json`
-  - 빈 `songs/`
-  - `lib/*.lib`
-  - `LICENSE`
-
-### 공개 소스 패키지
-
-- 경로: [`opensource-Tenriff-source/TenRiff-0.7.5-source`](opensource-Tenriff-source/TenRiff-0.7.5-source)
-- 성격: source-only/public handoff용 스냅샷
-- 포함/제외 기준:
-  - [`opensource-Tenriff-source/SOURCE_PACKAGE_SCOPE.txt`](opensource-Tenriff-source/SOURCE_PACKAGE_SCOPE.txt)
-  - [`opensource-Tenriff-source/README_SOURCE_PACKAGE.md`](opensource-Tenriff-source/README_SOURCE_PACKAGE.md)
 
 ## 문서 읽는 순서
 
