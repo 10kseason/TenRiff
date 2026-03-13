@@ -4,6 +4,7 @@ Included in versioned source bundles:
 - AGENTS.md
 - CMakeLists.txt
 - .gitignore
+- LICENSE
 - README.md
 - README_SOURCE_PACKAGE.md
 - launch_win.bat
@@ -38,3 +39,4 @@ Excluded from versioned source bundles:
 Notes:
 - The source bundle is intended to contain code, docs, config, and tests needed to inspect or rebuild the project.
 - Local caches, packaged binaries, user profiles, and private working files are intentionally excluded.
+- The repository license is MIT and should be shipped with both source and binary distributions.

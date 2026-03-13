@@ -58,7 +58,7 @@ TenRiff는 Windows GUI 기반 BMS-first 리듬게임 런타임/런처 프로젝�
 프로젝트는 사용 가능한 상태지만 완전히 마감된 제품은 아닙니다.
 
 - Windows GUI가 메인 경로입니다.
-- Linux는 [`Baepoks-Linuxs/TenRiff-0.5.0-linux-preview`] 수준의 preview만 존재합니다.
+- Linux는 [`Baepoks-Linuxs/TenRiff-0.5.0-linux-preview`](Baepoks-Linuxs/TenRiff-0.5.0-linux-preview) 수준의 preview만 존재합니다.
 - 일부 GUI 경로는 빌드/테스트 위주로 검증되어 있고, 실기 수동 검증은 계속 남아 있습니다.
 - 오래된 설계 문서와 현재 구현이 일부 다를 수 있으므로, 현재 동작 기준 문서는 반드시 [`docs/current-state.md`](docs/current-state.md)를 우선 봐야 합니다.
 
