@@ -2,6 +2,19 @@
 
 The main menu must honor the same low-latency philosophy as gameplay: audio runs as the master clock, inputs are timestamped off-thread, and rendering only consumes snapshots. This blueprint captures the rules and implementation order so menu work does not reintroduce input lag.
 
+## 현재 구현 상태(Windows 메뉴 UI)
+- `MenuApp`는 **InputThread(폴링)** → **SPSC 큐** → **메뉴 상태 머신** → **RenderThread(D3D11 윈도우 렌더)** 흐름으로 동작한다.
+- `SongIndexerThread`가 백그라운드에서 곡 인덱스를 생성하고 `<songs>/.tenriff/song_index.json`에 캐시한다.
+- 메뉴에서 오디오/그래픽/인풋/모드 설정을 변경하면 프로필 설정 파일에 저장된다.
+- 플레이 시작 시에는 현재 구현상 메뉴 스레드를 중지하고 `GameSession`을 별도로 실행한다.
+- **Windows 메뉴 UI는 D3D11 + Direct2D/DirectWrite 기반**으로 타이틀/곡선택(시안 레이아웃)과 기타 설정 화면(리스트 UI)을 렌더링한다.
+- 입력 키 요약:
+  - Title: `↑/↓` 이동, `Enter` 선택(PLAY/EDIT/OPTIONS/EXIT), `Esc` 종료
+  - Song Select: `↑/↓` 곡 이동, `←/→` 좌측 메뉴 포커스 전환, `Enter` 선택/플레이, `A/G/I/M/K` 설정 진입, `Esc` 뒤로
+  - Settings/Mode: `↑/↓` 항목 이동, `←/→` 값 변경, `Enter/Esc` 복귀
+  - Keymap: `↑/↓` 선택, `Enter` 바인딩 캡처, `A` 저장, `R` 리셋, `F2` NKRO 테스트, `Esc` 복귀
+  - Result: `Enter`로만 곡 선택 복귀
+
 ## Non-negotiable rules
 - **Keep the audio device open from the menu.** Initialize the audio backend on menu entry and run silent callbacks (zero buffers) so `playhead_samples`/`buffer_start_samples` stay valid before gameplay begins. Avoid reopening devices when starting a song to prevent warm-up jitter.
 - **Menu input uses InputThread + SPSC only.** Consume UI actions from the same RawInput/evdev ingestion path. Never let the render/UI event loop timestamp inputs directly.
@@ -47,7 +60,7 @@ Put these on the first page so users see latency-critical toggles immediately:
 
 ## Result screen hygiene
 - Show results immediately; run replay/log saves as background jobs with a "Saving…" indicator.
-- Replays store `{keycode, up/down, press_sample}` so latency bugs can be reproduced deterministically.
+- Replays store `{lane, state, sample}` so latency bugs can be reproduced deterministically.
 
 ## Recommended implementation order
 1) Pick UI framework (e.g., SDL + ImGui or custom) ensuring input/timing remain under the existing pipeline.

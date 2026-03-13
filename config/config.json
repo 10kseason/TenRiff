@@ -1,0 +1,85 @@
+{
+  "audio": {
+    "rate": 44100,
+    "frames": 256,
+    "periods": 3,
+    "exclusive": true,
+    "use_mmcss": true,
+    "affinity": -1,
+    "preset": "high",
+    "bms_keysound_policy": "follow",
+    "volume": 1.0,
+    "bgm_volume": 0.75,
+    "keysound_volume": 1.0
+  },
+  "input": {
+    "backend": "polling",
+    "rawinput": true,
+    "use_qpc": true,
+    "grab": false,
+    "queue_size": 2048,
+    "polling_hz": 1000
+  },
+  "judge": {
+    "pg": 15.5,
+    "gr": 31.0,
+    "gd": 55.0,
+    "bd": 80.0,
+    "hold_grace": 20,
+    "hold_break": 50,
+    "mask": 30
+  },
+  "speed": {
+    "rate": 1.0,
+    "hispeed": 3.0,
+    "target_scroll_bps": 380
+  },
+  "gauge": {
+    "auto_shift": true,
+    "refill_normal": 15.911,
+    "refill_easy": 23.866,
+    "shift_cooldown_ms": 2000,
+    "delta": {
+      "hard": {"PG": 0.191, "GR": 0.127, "GD": 0.032, "BD": -1.414, "PR": -2.828},
+      "normal": {"PG": 0.334, "GR": 0.223, "GD": 0.056, "BD": -1.081, "PR": -2.175},
+      "easy": {"PG": 0.477, "GR": 0.318, "GD": 0.080, "BD": -0.754, "PR": -1.508}
+    }
+  },
+  "graphics": {
+    "display_mode": "borderless",
+    "resolution": "native",
+    "vsync": true,
+    "refresh_hz": 1050,
+    "performance_overlay": false
+  },
+  "mode": {
+    "format": "bms",
+    "key_mode": "10k",
+    "gauge": "normal",
+    "random": "off",
+    "random_seed": 0,
+    "enable_osu_charts": false
+  },
+  "ui": {
+    "result_tail_ms": 500,
+    "require_enter_to_exit": true
+  },
+  "skin": {
+    "judgement_line_position": 0.82,
+    "note_width_scale": 1.0,
+    "note_height_scale": 1.0,
+    "lane_colors": {
+      "4k": ["ice", "azure", "azure", "ice"],
+      "5k": ["ice", "azure", "gold", "azure", "ice"],
+      "6k": ["ice", "azure", "ice", "ice", "azure", "ice"],
+      "7k": ["ice", "azure", "ice", "gold", "ice", "azure", "ice"],
+      "8k": ["ice", "azure", "ice", "teal", "teal", "ice", "azure", "ice"],
+      "9k": ["ice", "azure", "ice", "teal", "gold", "teal", "ice", "azure", "ice"],
+      "10k": ["ice", "azure", "ice", "azure", "ice", "ice", "azure", "ice", "azure", "ice"]
+    }
+  },
+  "offsets": {
+    "input": 0.0,
+    "visual": 0.0
+  }
+}
