@@ -80,18 +80,18 @@ std::optional<double> parse_measure_length(std::string_view token, std::string& 
     return value;
 }
 
-std::optional<int> parse_int_base36(std::string_view token) {
+std::optional<int> parse_int_base16(std::string_view token) {
     if (token.empty()) {
         return std::nullopt;
     }
     int value = 0;
     for (char ch : token) {
-        value *= 36;
+        value *= 16;
         if (ch >= '0' && ch <= '9') {
             value += ch - '0';
-        } else if (ch >= 'A' && ch <= 'Z') {
+        } else if (ch >= 'A' && ch <= 'F') {
             value += 10 + (ch - 'A');
-        } else if (ch >= 'a' && ch <= 'z') {
+        } else if (ch >= 'a' && ch <= 'f') {
             value += 10 + (ch - 'a');
         } else {
             return std::nullopt;
@@ -171,11 +171,6 @@ BmsNormalizationResult BmsChartNormalizer::normalize(const BmsChart& chart) cons
         if (lookup != chart.bpm.end()) {
             return lookup->second;
         }
-        // As a fallback, interpret as base-36 encoded integer BPM.
-        auto parsed_base36 = parse_int_base36(token);
-        if (parsed_base36.has_value()) {
-            return static_cast<double>(parsed_base36.value());
-        }
         return std::nullopt;
     };
 
@@ -233,8 +228,22 @@ BmsNormalizationResult BmsChartNormalizer::normalize(const BmsChart& chart) cons
             if (command.channel == "01") {
                 event.type = BmsNormalizedEventType::Bgm;
             } else if (command.channel == "03") {
+                event.type = BmsNormalizedEventType::BpmChange;
+                auto bpm_value = parse_int_base16(normalized_token);
+                if (!bpm_value.has_value()) {
+                    add_message(result.messages, BmsParseSeverity::Error, command.measure,
+                                "BPM channel 03 token must be valid hexadecimal: '" + normalized_token + "'.");
+                    continue;
+                }
+                if (bpm_value.value() <= 0) {
+                    add_message(result.messages, BmsParseSeverity::Error, command.measure,
+                                "BPM channel 03 value must be positive: '" + normalized_token + "'.");
+                    continue;
+                }
+                event.value = static_cast<double>(bpm_value.value());
+            } else if (command.channel == "04" || command.channel == "07") {
                 event.type = BmsNormalizedEventType::Bga;
-            } else if (command.channel == "04") {
+            } else if (command.channel == "06") {
                 event.type = BmsNormalizedEventType::Poor;
             } else if (command.channel == "08") {
                 event.type = BmsNormalizedEventType::BpmChange;

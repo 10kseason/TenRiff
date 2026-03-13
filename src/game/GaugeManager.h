@@ -26,12 +26,12 @@ struct GaugeDeltaTable {
 
 struct GaugeConfig {
     bool auto_shift = true;
-    double refill_normal = 20.0;
-    double refill_easy = 30.0;
+    double refill_normal = 15.911;
+    double refill_easy = 23.866;
     double shift_cooldown_ms = 2000.0;
-    GaugeDeltaTable hard{0.24, 0.16, 0.04, -1.125, -2.25};
-    GaugeDeltaTable normal{0.42, 0.28, 0.07, -0.86, -1.73};
-    GaugeDeltaTable easy{0.60, 0.40, 0.10, -0.60, -1.20};
+    GaugeDeltaTable hard{0.191, 0.127, 0.032, -1.414, -2.828};
+    GaugeDeltaTable normal{0.334, 0.223, 0.056, -1.081, -2.175};
+    GaugeDeltaTable easy{0.477, 0.318, 0.080, -0.754, -1.508};
 };
 
 struct GaugeState {
@@ -55,12 +55,13 @@ public:
     [[nodiscard]] GaugeState initialState(GaugeType type) const noexcept;
 
     GaugeResult applyJudgement(GaugeState& state, Judgement judgement, double time_ms) const;
+    GaugeResult applyJudgementWeighted(GaugeState& state, Judgement judgement, double time_ms, double weight) const;
 
 private:
     [[nodiscard]] GaugeDeltaTable tableFor(GaugeType type) const noexcept;
+    [[nodiscard]] double deltaFor(GaugeType type, Judgement judgement) const noexcept;
 
     GaugeConfig config_;
 };
 
 }  // namespace tenriff::game
-

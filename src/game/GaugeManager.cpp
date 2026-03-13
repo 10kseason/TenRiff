@@ -44,32 +44,18 @@ GaugeDeltaTable GaugeManager::tableFor(GaugeType type) const noexcept {
 }
 
 GaugeResult GaugeManager::applyJudgement(GaugeState& state, Judgement judgement, double time_ms) const {
+    return applyJudgementWeighted(state, judgement, time_ms, 1.0);
+}
+
+GaugeResult GaugeManager::applyJudgementWeighted(GaugeState& state, Judgement judgement, double time_ms,
+                                                 double weight) const {
     GaugeResult result{};
     if (state.game_over) {
         result.game_over = true;
         return result;
     }
 
-    auto table = tableFor(state.type);
-    double delta = 0.0;
-    switch (judgement) {
-    case Judgement::PG:
-        delta = table.pg;
-        break;
-    case Judgement::GR:
-        delta = table.gr;
-        break;
-    case Judgement::GD:
-        delta = table.gd;
-        break;
-    case Judgement::BD:
-        delta = table.bd;
-        break;
-    case Judgement::PR:
-        delta = table.pr;
-        break;
-    }
-
+    double delta = deltaFor(state.type, judgement) * weight;
     state.value = std::clamp(state.value + delta, kMinGauge, kMaxGauge);
 
     if (state.cooldown_until_ms > time_ms) {
@@ -104,5 +90,21 @@ GaugeResult GaugeManager::applyJudgement(GaugeState& state, Judgement judgement,
     return result;
 }
 
-}  // namespace tenriff::game
+double GaugeManager::deltaFor(GaugeType type, Judgement judgement) const noexcept {
+    auto table = tableFor(type);
+    switch (judgement) {
+    case Judgement::PG:
+        return table.pg;
+    case Judgement::GR:
+        return table.gr;
+    case Judgement::GD:
+        return table.gd;
+    case Judgement::BD:
+        return table.bd;
+    case Judgement::PR:
+        return table.pr;
+    }
+    return 0.0;
+}
 
+}  // namespace tenriff::game

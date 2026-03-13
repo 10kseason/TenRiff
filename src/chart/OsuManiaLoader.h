@@ -35,8 +35,10 @@ struct OsuManiaNote {
 struct OsuManiaChart {
     int key_count = 0;
     double base_bpm = 0.0;
+    double overall_difficulty = 8.0;
     std::string title;
     std::string artist;
+    std::string audio_filename;
     std::vector<OsuManiaTimingPoint> timing_points;
     std::vector<OsuManiaNote> notes;
 };

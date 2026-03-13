@@ -24,14 +24,23 @@ std::string trim(std::string_view view) {
     return std::string(view.substr(begin, end - begin));
 }
 
+void to_upper_ascii(std::string& value) {
+    std::transform(value.begin(), value.end(), value.begin(), [](unsigned char ch) {
+        if (ch >= 'a' && ch <= 'z') {
+            return static_cast<char>(ch - ('a' - 'A'));
+        }
+        return static_cast<char>(ch);
+    });
+}
+
 bool parse_int(std::string_view view, int& out) {
-    view = trim(view);
-    if (view.empty()) {
+    std::string trimmed = trim(view);  // Store in stable string
+    if (trimmed.empty()) {
         return false;
     }
     int value = 0;
-    auto first = view.data();
-    auto last = view.data() + view.size();
+    auto first = trimmed.data();
+    auto last = trimmed.data() + trimmed.size();
     auto result = std::from_chars(first, last, value);
     if (result.ec != std::errc() || result.ptr != last) {
         return false;
@@ -41,21 +50,16 @@ bool parse_int(std::string_view view, int& out) {
 }
 
 bool parse_double(std::string_view view, double& out) {
-    view = trim(view);
-    if (view.empty()) {
+    std::string trimmed = trim(view);  // Store in stable string
+    if (trimmed.empty()) {
         return false;
     }
     double value = 0.0;
-    auto first = view.data();
-    auto last = view.data() + view.size();
-    std::string buffer(first, last);
-    try {
-        size_t consumed = 0;
-        value = std::stod(buffer, &consumed);
-        if (consumed != buffer.size()) {
-            return false;
-        }
-    } catch (...) {
+    std::istringstream ss(trimmed);
+    ss.imbue(std::locale::classic());  // Locale-independent parsing
+    ss >> value;
+    // Check for complete consumption: no failure AND no remaining characters.
+    if (ss.fail() || ss.peek() != std::char_traits<char>::eof()) {
         return false;
     }
     out = value;
@@ -127,17 +131,19 @@ OsuManiaParseResult OsuManiaLoader::parse(std::string_view content) const {
 
         if (trimmed.front() == '[' && trimmed.back() == ']') {
             current_section = trimmed.substr(1, trimmed.size() - 2);
+            to_upper_ascii(current_section);  // Case-insensitive section matching
             continue;
         }
 
-        if (current_section == "General") {
+        if (current_section == "GENERAL") {
             auto sep = trimmed.find(':');
             if (sep == std::string::npos) {
                 continue;
             }
             std::string key = trim(trimmed.substr(0, sep));
+            to_upper_ascii(key);  // Case-insensitive key matching
             std::string value = trim(trimmed.substr(sep + 1));
-            if (key == "Mode") {
+            if (key == "MODE") {
                 mode_found = true;
                 int mode = 0;
                 if (!parse_int(value, mode)) {
@@ -151,45 +157,57 @@ OsuManiaParseResult OsuManiaLoader::parse(std::string_view content) const {
                 } else {
                     mode_valid = true;
                 }
+            } else if (key == "AUDIOFILENAME") {
+                result.chart.audio_filename = value;
             }
             continue;
         }
 
-        if (current_section == "Difficulty") {
+        if (current_section == "DIFFICULTY") {
             auto sep = trimmed.find(':');
             if (sep == std::string::npos) {
                 continue;
             }
             std::string key = trim(trimmed.substr(0, sep));
+            to_upper_ascii(key);  // Case-insensitive key matching
             std::string value = trim(trimmed.substr(sep + 1));
-            if (key == "KeyCount") {
+            if (key == "KEYCOUNT" || key == "CIRCLESIZE") {
                 int keys = 0;
                 if (!parse_int(value, keys) || keys <= 0) {
                     add_message(result.messages, OsuParseSeverity::Error, line_number,
-                                "KeyCount must be a positive integer.");
+                                "KeyCount/CircleSize must be a positive integer.");
                     continue;
                 }
                 result.chart.key_count = keys;
+            } else if (key == "OVERALLDIFFICULTY") {
+                double od = 0.0;
+                if (!parse_double(value, od)) {
+                    add_message(result.messages, OsuParseSeverity::Warning, line_number,
+                                "Failed to parse OverallDifficulty value.");
+                } else {
+                    result.chart.overall_difficulty = od;
+                }
             }
             continue;
         }
 
-        if (current_section == "Metadata") {
+        if (current_section == "METADATA") {
             auto sep = trimmed.find(':');
             if (sep == std::string::npos) {
                 continue;
             }
             std::string key = trim(trimmed.substr(0, sep));
+            to_upper_ascii(key);  // Case-insensitive key matching
             std::string value = trim(trimmed.substr(sep + 1));
-            if (key == "Title") {
+            if (key == "TITLE") {
                 result.chart.title = value;
-            } else if (key == "Artist") {
+            } else if (key == "ARTIST") {
                 result.chart.artist = value;
             }
             continue;
         }
 
-        if (current_section == "TimingPoints") {
+        if (current_section == "TIMINGPOINTS") {
             std::stringstream timing_line(trimmed);
             std::string token;
             std::vector<std::string> tokens;
@@ -233,7 +251,7 @@ OsuManiaParseResult OsuManiaLoader::parse(std::string_view content) const {
             continue;
         }
 
-        if (current_section == "HitObjects") {
+        if (current_section == "HITOBJECTS") {
             std::stringstream hit_line(trimmed);
             std::string token;
             std::vector<std::string> tokens;
@@ -310,7 +328,7 @@ OsuManiaParseResult OsuManiaLoader::parse(std::string_view content) const {
     }
 
     if (result.chart.key_count <= 0) {
-        add_message(result.messages, OsuParseSeverity::Error, 0, "KeyCount was not specified.");
+        add_message(result.messages, OsuParseSeverity::Error, 0, "KeyCount/CircleSize was not specified.");
     }
 
     return result;

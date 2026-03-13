@@ -1,0 +1,40 @@
+TenRiff 0.7.5 open-source source package scope
+
+Included in versioned source bundles:
+- AGENTS.md
+- CMakeLists.txt
+- .gitignore
+- README.md
+- README_SOURCE_PACKAGE.md
+- launch_win.bat
+- launch_linux.sh
+- config/
+- docs/
+- external/
+- src/
+- tests/
+
+Excluded from versioned source bundles:
+- build/
+- build-*/
+- build_*/
+- Baepoks/
+- Baepoks-Linuxs/
+- opensource-Tenriff-source/TenRiff-0.7.5-source/
+- .codex-memory/
+- .claude/
+- .codex_tmp_skills/
+- .tenriff/
+- profiles/
+- songs/
+- logs/
+- replay_export_test.json
+- result_export_test.json
+- WORK_STATUS.txt
+- Memory for ai and Human Worker.txt
+- P_DA.bme
+- 10k-calc/
+
+Notes:
+- The source bundle is intended to contain code, docs, config, and tests needed to inspect or rebuild the project.
+- Local caches, packaged binaries, user profiles, and private working files are intentionally excluded.
