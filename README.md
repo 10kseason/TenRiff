@@ -134,18 +134,7 @@ README는 입문 설명만 담당합니다. 세부 내용은 아래 순서로 �
    - 플레이 루프와 데이터 흐름
 6. [`docs/roadmap.md`](docs/roadmap.md)
    - 중장기 작업 방향
-
-## 코드 작업자용 참고
-
-프로젝트를 수정하거나 이어서 작업하는 경우 아래 파일들이 중요합니다.
-
-- [`AGENTS.md`](AGENTS.md)
-  - 최근 완료 항목과 작업 규칙
-- [`.codex-memory/tenriff/state/project_state.md`](.codex-memory/tenriff/state/project_state.md)
-  - 다음 작업자가 빠르게 맥락을 이어받기 위한 durable state
-- [`.codex-memory/tenriff/state/open_loops.md`](.codex-memory/tenriff/state/open_loops.md)
-  - 아직 직접 검증이 남은 항목
-
+   
 ## 현재 문서 해석 규칙
 
 설계 문서와 실제 코드가 다르게 보일 수 있습니다. 이 경우 우선순위는 다음과 같습니다.
