@@ -1,28 +1,191 @@
 # TenRiff
 
-TenRiff는 BMS/리듬게임 chart 파이프라인과 런처를 목표로 하는 프로젝트입니다. 현재는 파싱과 타이밍 계산을 비롯한 핵심 로직을 먼저 구현하고 있으며, 이후 오디오·입력·렌더링 서브시스템 및 런처 기능을 단계적으로 확장할 예정입니다.
+TenRiff는 Windows GUI 기반 BMS-first 리듬게임 런타임/런처 프로젝트입니다. 목표는 실사용 가능한 BMS 플레이 환경을 중심으로, 저지먼트/오디오/입력/렌더링 파이프라인을 직접 제어하는 독립 실행형 리듬게임 클라이언트를 만드는 것입니다. 현재 기준 릴리스 라인은 `0.7.5`이며, MIT 라이선스를 사용합니다.
 
-## 진행 현황
-- ✅ CMake 기반 기본 프로젝트 구조와 doctest 테스트 하네스 구축.
-- ✅ BMS 파서: 헤더, 딕셔너리, 마디 명령을 엄격/관대 모드로 처리하며, #MEASURE 분수 지원을 포함한 노멀라이즈 단계 구현.
-- ✅ 타임라인 스케줄링: BPM/STOP을 반영한 절대 타이밍 생성 및 1P+2P 10키 기본 채널 매핑.
-- ✅ 게임플레이 유틸리티: 속도 계산용 `SpeedManager`, 오토 시프트 게이지 스펙을 따르는 `GaugeManager` 구현.
-- ✅ osu!mania 로더: 모드/키 수, 타이밍 포인트, 컬럼별 노트 검증을 포함한 로더 작성.
-- ⏳ TODO: 오디오 마스터 클럭 → 풀 송 루프 → 키 리맵/8K-10K → FR/SR 랜덤 → 런처 순으로 로드맵 진행.
-- ⏳ TODO: osu!mania 로더를 공통 노멀라이즈/스케줄링 파이프라인에 연결하고 곡 선택에서 포맷 선택 노출.
+이 README는 "프로젝트를 처음 열었을 때 무엇을 보면 되는지"를 설명하는 입문 문서입니다. 더 자세한 현재 동작, 설정 구조, 설계 문서는 [`docs/README.md`](docs/README.md)부터 이어서 읽는 구조를 기준으로 작성했습니다.
 
-## 개발 가이드 요약
-- 주요 작업을 완료하거나 크게 진전시켰다면 `AGENTS.md`의 Completed/TODO 항목도 함께 갱신해 주세요.
-- 자세한 구현 로드맵은 `docs/roadmap.md`에서 확인하고 동기화합니다.
-- 인풋렉 최소화를 위한 구현 보완 아이디어는 `docs/latency.md`에서 확인할 수 있습니다.
+## 프로젝트 한눈에 보기
 
-## 런처 부트스트랩 (초기 버전)
-- 루트 폴더에 `launch_linux.sh`, `launch_win.bat`를 추가했습니다. 두 스크립트 모두 현재 폴더 기준으로 `assets/`, `songs/`, `profiles/default/`를 점검하고, 기본 설정/키맵을 자동 생성한 뒤 TenRiff 실행 파일을 `--songs ./songs --profile default`로 실행합니다.
-- `profiles/default/config.json`, `profiles/default/keymap.json`는 배포 시 포함되며, 삭제되어도 스크립트가 동일한 내용을 다시 생성합니다.
-- 비어 있는 `songs/` 폴더는 경고만 띄우고 실행은 계속됩니다. 실행 실패 시 로그(`logs/run.log`) 뒤쪽을 자동으로 보여주며, 종료 코드 10~13을 사람이 읽기 쉬운 메시지로 매핑합니다.
+- 기본 타깃 플랫폼: Windows
+- 기본 차트 표면: BMS-first
+- 선택 지원 차트: `.osu` osu!mania 4K~10K
+- 그래픽 경로: D3D11 + Direct2D/DirectWrite
+- 오디오 경로: WASAPI
+- 입력 경로: RawInput 또는 고주사율 polling
+- 라이선스: [MIT](LICENSE)
 
-## 시작하기
-1. 의존성을 설치한 뒤 CMake로 빌드하세요.
-2. 테스트는 doctest 기반으로 구성되어 있으니, 관련 타깃을 실행해 검증할 수 있습니다.
+## 지금 가능한 것
 
-프로젝트 진행 상황은 위의 목록을 따라 계속 갱신합니다.
+현재 코드베이스는 "메뉴가 뜨고, 곡을 고르고, 차트를 로드하고, 플레이하고, 결과와 로컬 기록을 남기는" 수준까지 올라와 있습니다.
+
+- BMS 파서/노멀라이저/타임라인 처리
+  - 헤더, 딕셔너리, 마디 명령
+  - `#MEASURE` 분수 처리
+  - `#LNOBJ`, LN 채널(`51`-`55`, `61`-`65`) 처리
+  - CP932(Shift-JIS) 기반 레거시 BMS 텍스트 대응
+- BMS 오디오 처리
+  - WAV 우선 디코드
+  - Windows Media Foundation OGG/MP3 fallback
+  - 필요 시 `ffmpeg.exe` fallback
+  - keysound 모드 `follow / autoplay / ignore`
+- Song Select
+  - 캐시 우선 로드
+  - `F5` 강제 재인덱싱
+  - 검색, 키수 필터, 난이도 필터
+  - `LV ASC/DESC`, `TITLE A-Z/Z-A` 정렬
+  - 외부 폴더/BMS drag-and-drop
+  - recent source 저장/재열기
+  - `BMS / OSU / All` 필터
+- Gameplay / HUD
+  - 실시간 HUD
+  - staged chart loading progress
+  - gameplay loading 중 `Esc` cancel
+  - display offset
+  - performance overlay
+  - note head/tail bitmap cache + static playfield command-list cache
+- 옵션 / 스킨
+  - Hi-Speed, Rate, gauge, audio, input, graphics 설정
+  - `Skins` 화면에서 판정선 위치, 노트 가로/세로 크기
+  - `5K~10K` lane color 편집 + 실시간 프리뷰
+- 결과 / 로컬 기록
+  - 결과 화면
+  - replay/result JSON export
+  - 곡별 로컬 기록 누적
+  - 클리어 우선 best record 판정
+
+## 아직 제한되는 것
+
+프로젝트는 사용 가능한 상태지만 완전히 마감된 제품은 아닙니다.
+
+- Windows GUI가 메인 경로입니다.
+- Linux는 [`Baepoks-Linuxs/TenRiff-0.5.0-linux-preview`](Baepoks-Linuxs/TenRiff-0.5.0-linux-preview) 수준의 preview만 존재합니다.
+- 일부 GUI 경로는 빌드/테스트 위주로 검증되어 있고, 실기 수동 검증은 계속 남아 있습니다.
+- 오래된 설계 문서와 현재 구현이 일부 다를 수 있으므로, 현재 동작 기준 문서는 반드시 [`docs/current-state.md`](docs/current-state.md)를 우선 봐야 합니다.
+
+## 빠른 시작
+
+### 1. 저장소 구조 준비
+
+일반적으로 아래 디렉터리를 기준으로 사용합니다.
+
+- `src/`: 실제 런타임/게임 코드
+- `tests/`: unit/smoke 테스트
+- `docs/`: 현재 상태 및 설계 문서
+- `config/`: 기본 전역 설정
+- `profiles/`: 런타임 프로필 설정/키맵/로컬 결과
+- `songs/`: 차트 루트
+- `Baepoks/`: 배포 스테이징 결과물
+- `opensource-Tenriff-source/`: 공개용 소스 스테이징 결과물
+
+### 2. Release 빌드
+
+Windows 기준 권장 배포 빌드 예시는 다음과 같습니다.
+
+```powershell
+cmake -S . -B build-dist -G "Visual Studio 17 2022" -A x64
+cmake --build build-dist --config Release --target tenriff
+cmake --build build-dist --config Release --target bms_parser_tests
+```
+
+### 3. 테스트 실행
+
+```powershell
+.\build-dist\Release\bms_parser_tests.exe
+```
+
+### 4. 실행
+
+직접 실행:
+
+```powershell
+.\build-dist\Release\TenRiff.exe --songs .\songs --profile default
+```
+
+런처 스크립트 사용:
+
+```powershell
+.\launch_win.bat
+```
+
+## 설정과 런타임 데이터
+
+TenRiff는 전역 설정과 프로필 설정을 분리합니다.
+
+- 전역 설정: `config/config.json`
+- 프로필 설정: `profiles/<name>/config.json`
+- 키맵: `profiles/<name>/keymap.json`
+- 곡 인덱스 캐시: `songs/.tenriff/song_index.json`
+- replay export: `profiles/<name>/replays/*.json`
+- result export: `profiles/<name>/results/*.json`
+
+설정 구조를 자세히 보려면 [`docs/config.md`](docs/config.md)를 읽는 것이 가장 빠릅니다.
+
+## 배포 패키지와 공개 소스 패키지
+
+현재 워크스페이스에는 두 가지 스테이징 산출물이 있습니다.
+
+### Windows 배포 패키지
+
+- 경로: [`Baepoks/TenRiff-0.7.5`](Baepoks/TenRiff-0.7.5)
+- 성격: no-songs 바이너리 배포
+- 포함:
+  - `TenRiff.exe`
+  - `config/config.json`
+  - 빈 `songs/`
+  - `lib/*.lib`
+  - `LICENSE`
+
+### 공개 소스 패키지
+
+- 경로: [`opensource-Tenriff-source/TenRiff-0.7.5-source`](opensource-Tenriff-source/TenRiff-0.7.5-source)
+- 성격: source-only/public handoff용 스냅샷
+- 포함/제외 기준:
+  - [`opensource-Tenriff-source/SOURCE_PACKAGE_SCOPE.txt`](opensource-Tenriff-source/SOURCE_PACKAGE_SCOPE.txt)
+  - [`opensource-Tenriff-source/README_SOURCE_PACKAGE.md`](opensource-Tenriff-source/README_SOURCE_PACKAGE.md)
+
+## 문서 읽는 순서
+
+README는 입문 설명만 담당합니다. 세부 내용은 아래 순서로 읽는 것이 가장 효율적입니다.
+
+1. [`docs/README.md`](docs/README.md)
+   - 전체 문서 맵
+2. [`docs/current-state.md`](docs/current-state.md)
+   - 지금 실제로 무엇이 동작하는지
+3. [`docs/config.md`](docs/config.md)
+   - 설정/프로필/키맵 구조
+4. [`docs/menu.md`](docs/menu.md)
+   - 메뉴/상태머신/곡 선택 흐름
+5. [`docs/core-loop.md`](docs/core-loop.md)
+   - 플레이 루프와 데이터 흐름
+6. [`docs/roadmap.md`](docs/roadmap.md)
+   - 중장기 작업 방향
+
+## 코드 작업자용 참고
+
+프로젝트를 수정하거나 이어서 작업하는 경우 아래 파일들이 중요합니다.
+
+- [`AGENTS.md`](AGENTS.md)
+  - 최근 완료 항목과 작업 규칙
+- [`.codex-memory/tenriff/state/project_state.md`](.codex-memory/tenriff/state/project_state.md)
+  - 다음 작업자가 빠르게 맥락을 이어받기 위한 durable state
+- [`.codex-memory/tenriff/state/open_loops.md`](.codex-memory/tenriff/state/open_loops.md)
+  - 아직 직접 검증이 남은 항목
+
+## 현재 문서 해석 규칙
+
+설계 문서와 실제 코드가 다르게 보일 수 있습니다. 이 경우 우선순위는 다음과 같습니다.
+
+1. 현재 코드
+2. [`docs/current-state.md`](docs/current-state.md)
+3. [`AGENTS.md`](AGENTS.md)
+4. `.codex-memory/tenriff/state/*`
+5. 오래된 설계 문서
+
+즉, "현재 동작"을 판단할 때는 오래된 설계보다 현재 상태 문서를 우선해야 합니다.
+
+## 다음으로 읽을 문서
+
+- 설정이 궁금하면 [`docs/config.md`](docs/config.md)
+- 메뉴 흐름이 궁금하면 [`docs/menu.md`](docs/menu.md)
+- 플레이 루프가 궁금하면 [`docs/core-loop.md`](docs/core-loop.md)
+- 전체 상태를 빠르게 파악하려면 [`docs/current-state.md`](docs/current-state.md)
