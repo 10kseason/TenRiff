@@ -48,6 +48,7 @@ namespace {
 
 constexpr int64_t kLookaheadMs = 4;
 constexpr int64_t kHudRefreshMs = 8;
+constexpr int64_t kGameplayStartCountdownSeconds = 3;
 constexpr int64_t kHudLookaheadMs = 2200;
 constexpr int64_t kHudPastMs = 180;
 constexpr double kHudRenderSlackMs = 24.0;
@@ -1135,6 +1136,10 @@ bool GameSession::initialize(const CommandLineOptions& options) {
     finished_.store(false, std::memory_order_release);
     user_aborted_.store(false, std::memory_order_release);
     last_audio_sample_.store(0, std::memory_order_release);
+    countdown_active_ = false;
+    countdown_value_ = 0;
+    countdown_started_ns_ = 0;
+    gameplay_started_ = false;
 
     future_events_ = {};
     tone_voices_.clear();
@@ -1145,6 +1150,8 @@ bool GameSession::initialize(const CommandLineOptions& options) {
     chart_audio_load_queue_.clear();
     chart_audio_active_until_samples_.reset();
     pending_input_events_.clear();
+    hidden_hit_note_ids_.clear();
+    active_holds_buffer_.clear();
     next_chart_audio_event_ = 0;
     startup_preload_budget_bytes_ = 0;
     runtime_chart_audio_budget_bytes_ = 0;
@@ -1406,6 +1413,11 @@ bool GameSession::initialize(const CommandLineOptions& options) {
     }
 
     chart_ = std::move(chart_result.chart);
+    for (std::size_t i = 0; i < chart_.notes.size(); ++i) {
+        chart_.notes[i].note_id = i;
+    }
+    hidden_hit_note_ids_.assign(chart_.notes.size(), 0);
+    active_holds_buffer_.clear();
     key_to_lane_.clear();
     config::KeymapManager keymap_manager_runtime;
     const std::string active_key_mode =
@@ -1444,16 +1456,67 @@ bool GameSession::initialize(const CommandLineOptions& options) {
         return false;
     }
 
-    if (audio_thread_.start() != audio::AudioResult::Success) {
-        return false;
-    }
-
+    countdown_active_ = true;
+    countdown_value_ = static_cast<int>(kGameplayStartCountdownSeconds);
     report_loading_progress(100, "Ready");
     return true;
 }
 
 void GameSession::run() {
     auto next_hud_tick = std::chrono::steady_clock::now();
+
+    if (countdown_active_ && !stop_requested_.load(std::memory_order_acquire)) {
+        countdown_started_ns_ = timing::HighResClock::now_ns();
+        const int64_t countdown_duration_ns = kGameplayStartCountdownSeconds * 1'000'000'000LL;
+        while (!stop_requested_.load(std::memory_order_acquire)) {
+            if (finished_.load(std::memory_order_acquire)) {
+                break;
+            }
+
+            process_countdown_input_queue();
+            if (finished_.load(std::memory_order_acquire) || stop_requested_.load(std::memory_order_acquire)) {
+                break;
+            }
+
+            const int64_t now_ns = timing::HighResClock::now_ns();
+            const int64_t elapsed_ns = std::max<int64_t>(0, now_ns - countdown_started_ns_);
+            const int64_t remaining_ns = std::max<int64_t>(0, countdown_duration_ns - elapsed_ns);
+            if (remaining_ns <= 0) {
+                countdown_active_ = false;
+                countdown_value_ = 0;
+                break;
+            }
+
+            countdown_value_ = std::clamp(
+                static_cast<int>((remaining_ns + 999'999'999LL) / 1'000'000'000LL),
+                1,
+                static_cast<int>(kGameplayStartCountdownSeconds));
+
+            const auto now = std::chrono::steady_clock::now();
+            if (now >= next_hud_tick) {
+                if (hud_callback_) {
+                    hud_callback_(hud_snapshot());
+                }
+                next_hud_tick += std::chrono::milliseconds(kHudRefreshMs);
+                if (next_hud_tick < now) {
+                    next_hud_tick = now + std::chrono::milliseconds(kHudRefreshMs);
+                }
+            }
+
+            std::this_thread::sleep_for(std::chrono::milliseconds(2));
+        }
+    }
+
+    if (!stop_requested_.load(std::memory_order_acquire) && !finished_.load(std::memory_order_acquire)) {
+        if (audio_thread_.start() != audio::AudioResult::Success) {
+            std::cerr << "[error] Failed to start gameplay audio." << std::endl;
+            stop_requested_.store(true, std::memory_order_release);
+            finished_.store(true, std::memory_order_release);
+        } else {
+            gameplay_started_ = true;
+        }
+    }
+
     while (!stop_requested_.load(std::memory_order_acquire)) {
         if (finished_.load(std::memory_order_acquire)) {
             break;
@@ -1529,6 +1592,8 @@ GameSession::HudSnapshot GameSession::hud_snapshot() {
     snapshot.current_sample = last_audio_sample_.load(std::memory_order_acquire);
     snapshot.sample_rate = sample_rate_;
     snapshot.snapshot_time_ns = timing::HighResClock::now_ns();
+    snapshot.countdown_active = countdown_active_;
+    snapshot.countdown_value = countdown_value_;
 
     {
         std::lock_guard<std::mutex> lock(engine_mutex_);
@@ -1557,6 +1622,7 @@ GameSession::HudSnapshot GameSession::hud_snapshot() {
         snapshot.has_feedback = feedback.has_value;
         snapshot.feedback_judgement = feedback.judgement;
         snapshot.feedback_delta_ms = feedback.delta_ms;
+        engine_->collect_active_holds(active_holds_buffer_);
         snapshot.lane_activity.fill(0.0f);
         snapshot.lane_activity_count = std::min<std::size_t>(lane_activity_.size(), kGameplayHudMaxLanes);
         std::copy_n(lane_activity_.begin(), snapshot.lane_activity_count, snapshot.lane_activity.begin());
@@ -1599,6 +1665,9 @@ GameSession::HudSnapshot GameSession::hud_snapshot() {
     snapshot.note_count = 0;
     for (std::size_t i = hud_scan_start_; i < chart_.notes.size(); ++i) {
         const auto& note = chart_.notes[i];
+        if (note.note_id < hidden_hit_note_ids_.size() && hidden_hit_note_ids_[note.note_id] != 0) {
+            continue;
+        }
         if (note.start_sample > snapshot.current_sample + expanded_window.lookahead_samples) {
             break;
         }
@@ -1611,11 +1680,44 @@ GameSession::HudSnapshot GameSession::hud_snapshot() {
         hud_note.start_sample = note.start_sample;
         hud_note.tail_sample = note_visible_end_sample(note);
         hud_note.hold = note.end_sample.has_value();
+        hud_note.head_visible = true;
         snapshot.notes[snapshot.note_count++] = hud_note;
         if (snapshot.note_count >= kGameplayHudMaxNotes) {
             break;
         }
     }
+
+    for (const auto& hold : active_holds_buffer_) {
+        if (snapshot.note_count >= kGameplayHudMaxNotes) {
+            break;
+        }
+        if (hold.lane <= 0 || hold.lane > snapshot.lane_count) {
+            continue;
+        }
+        if (hold.end_sample < snapshot.current_sample - expanded_window.past_samples) {
+            continue;
+        }
+
+        HudNote hud_note;
+        hud_note.lane = hold.lane;
+        hud_note.start_sample = snapshot.current_sample;
+        hud_note.tail_sample = std::max(hold.end_sample, snapshot.current_sample);
+        hud_note.hold = true;
+        hud_note.head_visible = false;
+        snapshot.notes[snapshot.note_count++] = hud_note;
+    }
+
+    std::sort(snapshot.notes.begin(),
+              snapshot.notes.begin() + static_cast<std::ptrdiff_t>(snapshot.note_count),
+              [](const HudNote& lhs, const HudNote& rhs) {
+                  if (lhs.start_sample != rhs.start_sample) {
+                      return lhs.start_sample < rhs.start_sample;
+                  }
+                  if (lhs.tail_sample != rhs.tail_sample) {
+                      return lhs.tail_sample < rhs.tail_sample;
+                  }
+                  return lhs.lane < rhs.lane;
+              });
 
     return snapshot;
 }
@@ -2150,7 +2252,7 @@ void GameSession::shutdown() {
     audio_thread_.stop();
     input_thread_.stop();
     stop_chart_audio_workers();
-    if (engine_) {
+    if (engine_ && gameplay_started_) {
         {
             std::lock_guard<std::mutex> lock(engine_mutex_);
             result_.stats = engine_->stats();
@@ -2220,6 +2322,10 @@ void GameSession::shutdown() {
         }
     }
     engine_.reset();
+    countdown_active_ = false;
+    countdown_value_ = 0;
+    countdown_started_ns_ = 0;
+    gameplay_started_ = false;
     tone_voices_.clear();
     chart_audio_assets_.clear();
     chart_audio_events_.clear();
@@ -2239,6 +2345,8 @@ void GameSession::shutdown() {
     chart_ = {};
     lane_activity_.clear();
     lane_pressed_.clear();
+    hidden_hit_note_ids_.clear();
+    active_holds_buffer_.clear();
     hud_scan_start_ = 0;
     hud_callback_ = nullptr;
 }
@@ -2296,6 +2404,22 @@ void GameSession::audio_callback(float* output, uint32_t frames, int64_t buffer_
     last_audio_sample_.store(buffer_start_samples + static_cast<int64_t>(frames), std::memory_order_release);
 }
 
+void GameSession::process_countdown_input_queue() {
+    while (true) {
+        auto maybe_event = input_thread_.queue().pop();
+        if (!maybe_event.has_value()) {
+            break;
+        }
+        if (handle_control_input(*maybe_event) &&
+            finished_.load(std::memory_order_acquire)) {
+            return;
+        }
+    }
+
+    std::fill(lane_pressed_.begin(), lane_pressed_.end(), 0);
+    std::fill(lane_activity_.begin(), lane_activity_.end(), 0.0f);
+}
+
 bool GameSession::handle_control_input(const input::InputEvent& event) {
     if (event.state == input::InputState::Pressed) {
         if (f5_keycode_ != 0 && event.keycode == f5_keycode_) {
@@ -2345,6 +2469,9 @@ void GameSession::dispatch_lane_input(int lane, input::InputState state, int64_t
 
     auto hit_note = engine_->handle_input(lane, state, sample);
     if (state == input::InputState::Pressed && hit_note.has_value()) {
+        if (hit_note->note_id < hidden_hit_note_ids_.size()) {
+            hidden_hit_note_ids_[hit_note->note_id] = 1;
+        }
         schedule_note_keysound(hit_note.value(), sample);
     }
 }

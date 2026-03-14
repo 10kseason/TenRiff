@@ -53,6 +53,11 @@ struct LiveJudgementFeedback {
     int64_t sample = 0;
 };
 
+struct ActiveHoldView {
+    int lane = 0;
+    int64_t end_sample = 0;
+};
+
 class GameplayEngine {
 public:
     GameplayEngine(const GameplayChart& chart, const GameplayConfig& config);
@@ -68,6 +73,7 @@ public:
     [[nodiscard]] const game::GaugeState& gauge_state() const { return gauge_state_; }
     [[nodiscard]] const ReplayTrace& replay() const { return replay_; }
     [[nodiscard]] const LiveJudgementFeedback& live_feedback() const { return live_feedback_; }
+    void collect_active_holds(std::vector<ActiveHoldView>& out) const;
 
     [[nodiscard]] int lane_count() const { return lane_count_; }
     [[nodiscard]] int64_t duration_samples() const { return duration_samples_; }

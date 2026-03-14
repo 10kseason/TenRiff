@@ -36,6 +36,7 @@ public:
         int64_t start_sample = 0;
         int64_t tail_sample = 0;
         bool hold = false;
+        bool head_visible = true;
     };
 
     struct HudSnapshot {
@@ -43,6 +44,8 @@ public:
         bool finished = false;
         bool game_over = false;
         bool user_aborted = false;
+        bool countdown_active = false;
+        int countdown_value = 0;
 
         int lane_count = 10;
         int64_t current_sample = 0;
@@ -185,6 +188,7 @@ private:
     };
 
     void audio_callback(float* output, uint32_t frames, int64_t buffer_start_samples);
+    void process_countdown_input_queue();
     void process_future_events(int64_t buffer_end_samples, int64_t lookahead_samples);
     void process_input_queue(int64_t buffer_start_samples, int64_t buffer_end_samples, int64_t lookahead_samples);
     [[nodiscard]] bool handle_control_input(const input::InputEvent& event);
@@ -236,6 +240,8 @@ private:
     std::atomic<bool> finished_{false};
     std::atomic<bool> user_aborted_{false};
     std::atomic<int64_t> last_audio_sample_{0};
+    bool countdown_active_ = false;
+    int countdown_value_ = 0;
     uint32_t escape_keycode_ = 0;
     uint32_t f3_keycode_ = 0;
     uint32_t f4_keycode_ = 0;
@@ -246,6 +252,8 @@ private:
     int sample_rate_ = 48000;
     std::size_t next_guide_note_index_ = 0;
     std::size_t hud_scan_start_ = 0;
+    int64_t countdown_started_ns_ = 0;
+    bool gameplay_started_ = false;
 
     FutureQueue future_events_{};
     std::vector<ToneVoice> tone_voices_;
@@ -258,6 +266,8 @@ private:
     std::vector<std::thread> chart_audio_loader_threads_;
     std::unique_ptr<std::atomic<int64_t>[]> chart_audio_active_until_samples_;
     std::vector<BufferedLaneInput> pending_input_events_;
+    std::vector<uint8_t> hidden_hit_note_ids_;
+    std::vector<gameplay::ActiveHoldView> active_holds_buffer_;
     std::size_t next_chart_audio_event_ = 0;
     std::uint64_t startup_preload_budget_bytes_ = 0;
     std::uint64_t runtime_chart_audio_budget_bytes_ = 0;

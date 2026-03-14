@@ -25,8 +25,11 @@
 #endif
 
 #include "app/GameSession.h"
+#include "app/GraphicsTiming.h"
 #include "app/MemoryDiagnostics.h"
 #include "app/RuntimeConfigMigration.h"
+#include "chart/BmsParser.h"
+#include "chart/OsuManiaLoader.h"
 #include "config/SimpleJson.h"
 #include "config/KeycodeMap.h"
 #include "timing/HighResClock.h"
@@ -37,9 +40,7 @@ namespace tenriff::app {
 namespace {
 
 constexpr int kSnapshotSongCount = 10;
-constexpr int kRefreshHzMin = 60;
-constexpr int kRefreshHzMax = 1050;
-constexpr int kMenuRefreshHzCap = 300;
+constexpr int kSongSelectVisibleCardCount = 5;
 constexpr int kRefreshHzStep = 10;
 constexpr double kVisualOffsetMin = -500.0;
 constexpr double kVisualOffsetMax = 500.0;
@@ -61,9 +62,42 @@ constexpr double kHiSpeedStep = 0.25;
 constexpr int kSeedMin = 0;
 constexpr int kSeedMax = 9999;
 constexpr int64_t kKeymapCaptureTimeoutNs = 5'000'000'000LL;
+constexpr int64_t kSongSelectRepeatInitialDelayNs = 250'000'000LL;
+constexpr int64_t kSongSelectRepeatIntervalNs = 45'000'000LL;
 constexpr std::size_t kRecentSongSourceLimit = 12;
 
 const int kPollingOptions[] = {1000, 2000, 4000, 8000};
+
+int detect_active_monitor_refresh_hz(int fallback_hz) {
+#ifdef _WIN32
+    HMONITOR monitor = nullptr;
+    const HWND foreground_window = GetForegroundWindow();
+    if (foreground_window && IsWindow(foreground_window)) {
+        monitor = MonitorFromWindow(foreground_window, MONITOR_DEFAULTTONEAREST);
+    }
+
+    if (!monitor) {
+        POINT point{0, 0};
+        if (!GetCursorPos(&point)) {
+            return clamp_graphics_refresh_hz(fallback_hz);
+        }
+        monitor = MonitorFromPoint(point, MONITOR_DEFAULTTONEAREST);
+    }
+    MONITORINFOEXW monitor_info{};
+    monitor_info.cbSize = sizeof(monitor_info);
+    if (!GetMonitorInfoW(monitor, &monitor_info)) {
+        return clamp_graphics_refresh_hz(fallback_hz);
+    }
+
+    DEVMODEW mode{};
+    mode.dmSize = sizeof(mode);
+    if (EnumDisplaySettingsW(monitor_info.szDevice, ENUM_CURRENT_SETTINGS, &mode) &&
+        mode.dmDisplayFrequency > 0) {
+        return clamp_graphics_refresh_hz(static_cast<int>(mode.dmDisplayFrequency));
+    }
+#endif
+    return clamp_graphics_refresh_hz(fallback_hz);
+}
 
 std::filesystem::path path_from_utf8(std::string_view value) {
     try {
@@ -397,14 +431,15 @@ std::string cycle_runtime_key_mode(std::string_view current, int direction, bool
 
 std::string normalize_skin_edit_mode(std::string value) {
     value = config::normalize_skin_mode_token(value);
-    if (value == "5k" || value == "6k" || value == "7k" || value == "8k" || value == "9k" || value == "10k") {
+    if (value == "4k" || value == "5k" || value == "6k" || value == "7k" || value == "8k" ||
+        value == "9k" || value == "10k") {
         return value;
     }
     return "10k";
 }
 
 std::string cycle_skin_edit_mode(std::string_view current, int direction) {
-    static constexpr const char* kSkinModes[] = {"5k", "6k", "7k", "8k", "9k", "10k"};
+    static constexpr const char* kSkinModes[] = {"4k", "5k", "6k", "7k", "8k", "9k", "10k"};
     const int option_count = static_cast<int>(sizeof(kSkinModes) / sizeof(kSkinModes[0]));
     std::string normalized = normalize_skin_edit_mode(std::string(current));
     int index = option_count - 1;
@@ -543,6 +578,16 @@ std::string to_lower_ascii(std::string value) {
     std::transform(value.begin(), value.end(), value.begin(), [](unsigned char ch) {
         if (ch >= static_cast<unsigned char>('A') && ch <= static_cast<unsigned char>('Z')) {
             return static_cast<char>(ch - static_cast<unsigned char>('A') + static_cast<unsigned char>('a'));
+        }
+        return static_cast<char>(ch);
+    });
+    return value;
+}
+
+std::string to_upper_ascii(std::string value) {
+    std::transform(value.begin(), value.end(), value.begin(), [](unsigned char ch) {
+        if (ch >= static_cast<unsigned char>('a') && ch <= static_cast<unsigned char>('z')) {
+            return static_cast<char>(ch - static_cast<unsigned char>('a') + static_cast<unsigned char>('A'));
         }
         return static_cast<char>(ch);
     });
@@ -918,6 +963,251 @@ std::string normalize_song_source_path(const std::string& raw_path) {
         candidate = candidate.lexically_normal();
     }
     return candidate.u8string();
+}
+
+std::string trim_copy(std::string_view value) {
+    std::size_t begin = 0;
+    std::size_t end = value.size();
+    while (begin < end && std::isspace(static_cast<unsigned char>(value[begin])) != 0) {
+        ++begin;
+    }
+    while (end > begin && std::isspace(static_cast<unsigned char>(value[end - 1])) != 0) {
+        --end;
+    }
+    return std::string(value.substr(begin, end - begin));
+}
+
+std::string normalize_asset_reference(std::string value) {
+    value = trim_copy(value);
+    if (value.size() >= 2) {
+        const char first = value.front();
+        const char last = value.back();
+        if ((first == '"' && last == '"') || (first == '\'' && last == '\'')) {
+            value = trim_copy(std::string_view(value).substr(1, value.size() - 2));
+        }
+    }
+    return value;
+}
+
+bool is_preview_image_extension(std::string_view ext) {
+    return ext == ".png" || ext == ".jpg" || ext == ".jpeg" || ext == ".bmp" ||
+           ext == ".gif" || ext == ".tif" || ext == ".tiff" || ext == ".webp";
+}
+
+std::string normalize_asset_lookup_key(std::string value) {
+    std::replace(value.begin(), value.end(), '\\', '/');
+    return to_lower_ascii(std::move(value));
+}
+
+std::filesystem::path normalize_resolved_preview_path(const std::filesystem::path& path) {
+    namespace fs = std::filesystem;
+    std::error_code ec;
+    fs::path normalized = path;
+    if (!normalized.is_absolute()) {
+        const fs::path absolute = fs::absolute(normalized, ec);
+        if (!ec && !absolute.empty()) {
+            normalized = absolute;
+        } else {
+            ec.clear();
+        }
+    }
+
+    const fs::path canonical = fs::weakly_canonical(normalized, ec);
+    if (!ec && !canonical.empty()) {
+        return canonical;
+    }
+    return normalized.lexically_normal();
+}
+
+struct PreviewAssetLookupIndex {
+    bool built = false;
+    std::unordered_map<std::string, std::filesystem::path> by_relative;
+    std::unordered_map<std::string, std::filesystem::path> by_filename;
+};
+
+void build_preview_asset_lookup(const std::filesystem::path& chart_path, PreviewAssetLookupIndex& lookup) {
+    if (lookup.built) {
+        return;
+    }
+    lookup.built = true;
+    lookup.by_relative.clear();
+    lookup.by_filename.clear();
+
+    namespace fs = std::filesystem;
+    const fs::path root = chart_path.parent_path();
+    if (root.empty()) {
+        return;
+    }
+
+    std::error_code ec;
+    fs::directory_options options = fs::directory_options::skip_permission_denied;
+    fs::recursive_directory_iterator it(root, options, ec);
+    fs::recursive_directory_iterator end;
+    while (it != end) {
+        if (ec) {
+            ec.clear();
+            it.increment(ec);
+            continue;
+        }
+        const fs::directory_entry& entry = *it;
+        if (!entry.is_regular_file(ec)) {
+            ec.clear();
+            it.increment(ec);
+            continue;
+        }
+        ec.clear();
+
+        const std::string ext = to_lower_ascii(entry.path().extension().u8string());
+        if (!is_preview_image_extension(ext)) {
+            it.increment(ec);
+            continue;
+        }
+
+        const fs::path full = normalize_resolved_preview_path(entry.path());
+        fs::path relative = fs::relative(full, root, ec);
+        if (ec || relative.empty()) {
+            ec.clear();
+            relative = full.lexically_relative(root);
+        }
+        if (!relative.empty()) {
+            lookup.by_relative.emplace(normalize_asset_lookup_key(relative.generic_u8string()), full);
+        }
+        lookup.by_filename.emplace(normalize_asset_lookup_key(full.filename().u8string()), full);
+        it.increment(ec);
+    }
+}
+
+std::optional<std::filesystem::path> lookup_preview_asset_candidate(const std::filesystem::path& chart_path,
+                                                                    const std::filesystem::path& ref_path,
+                                                                    PreviewAssetLookupIndex& lookup) {
+    namespace fs = std::filesystem;
+    const fs::path direct = ref_path.is_absolute()
+                                ? ref_path.lexically_normal()
+                                : (chart_path.parent_path() / ref_path).lexically_normal();
+    std::error_code ec;
+    if (!direct.empty() && fs::exists(direct, ec) && !ec &&
+        is_preview_image_extension(to_lower_ascii(direct.extension().u8string()))) {
+        return normalize_resolved_preview_path(direct);
+    }
+
+    build_preview_asset_lookup(chart_path, lookup);
+
+    const std::string relative_key = normalize_asset_lookup_key(ref_path.generic_u8string());
+    auto relative_it = lookup.by_relative.find(relative_key);
+    if (relative_it != lookup.by_relative.end()) {
+        return relative_it->second;
+    }
+
+    const std::string file_key = normalize_asset_lookup_key(ref_path.filename().u8string());
+    auto file_it = lookup.by_filename.find(file_key);
+    if (file_it != lookup.by_filename.end()) {
+        return file_it->second;
+    }
+
+    return std::nullopt;
+}
+
+std::vector<std::filesystem::path> build_preview_reference_candidates(const std::string& reference) {
+    namespace fs = std::filesystem;
+    static constexpr std::string_view kPreviewExts[] = {
+        ".png", ".jpg", ".jpeg", ".bmp", ".gif", ".tif", ".tiff", ".webp",
+    };
+
+    const std::string normalized = normalize_asset_reference(reference);
+#ifdef _WIN32
+    fs::path ref_path = fs::u8path(normalized);
+#else
+    fs::path ref_path(normalized);
+#endif
+
+    std::vector<fs::path> candidates;
+    std::unordered_set<std::string> seen;
+    auto push_candidate = [&](const fs::path& candidate) {
+        const std::string key = normalize_asset_lookup_key(candidate.generic_u8string());
+        if (seen.emplace(key).second) {
+            candidates.push_back(candidate);
+        }
+    };
+
+    push_candidate(ref_path);
+
+    const std::string ext = to_lower_ascii(ref_path.extension().u8string());
+    if (ext.empty()) {
+        for (std::string_view preview_ext : kPreviewExts) {
+            fs::path candidate = ref_path;
+            candidate += preview_ext;
+            push_candidate(candidate);
+        }
+    } else if (is_preview_image_extension(ext)) {
+        for (std::string_view preview_ext : kPreviewExts) {
+            if (preview_ext == ext) {
+                continue;
+            }
+            fs::path candidate = ref_path;
+            candidate.replace_extension(preview_ext);
+            push_candidate(candidate);
+        }
+    }
+
+    return candidates;
+}
+
+std::optional<std::filesystem::path> resolve_preview_asset_path(const std::filesystem::path& chart_path,
+                                                                const std::string& reference) {
+    PreviewAssetLookupIndex lookup;
+    for (const auto& candidate : build_preview_reference_candidates(reference)) {
+        if (auto resolved = lookup_preview_asset_candidate(chart_path, candidate, lookup); resolved.has_value()) {
+            return resolved;
+        }
+    }
+    return std::nullopt;
+}
+
+std::vector<std::string> collect_bms_preview_references(const chart::BmsChart& chart) {
+    std::vector<std::string> references;
+    std::unordered_set<std::string> seen;
+    auto append_reference = [&](std::string value) {
+        value = normalize_asset_reference(std::move(value));
+        if (value.empty()) {
+            return;
+        }
+        const std::string key = normalize_asset_lookup_key(value);
+        if (seen.emplace(key).second) {
+            references.push_back(std::move(value));
+        }
+    };
+
+    for (std::string_view header_key : {"STAGEFILE", "BACKBMP"}) {
+        auto header_it = chart.headers.find(std::string(header_key));
+        if (header_it != chart.headers.end()) {
+            append_reference(header_it->second);
+        }
+    }
+
+    auto append_bga_references = [&](std::string_view channel) {
+        for (const auto& command : chart.commands) {
+            if (command.channel != channel) {
+                continue;
+            }
+            for (std::size_t i = 0; i + 1 < command.data.size(); i += 2) {
+                std::string slot = command.data.substr(i, 2);
+                if (slot == "00") {
+                    continue;
+                }
+                slot = to_upper_ascii(std::move(slot));
+                auto bmp_it = chart.bmp.find(slot);
+                if (bmp_it == chart.bmp.end()) {
+                    continue;
+                }
+                append_reference(bmp_it->second);
+            }
+        }
+    };
+
+    for (std::string_view channel : {"04", "07", "06"}) {
+        append_bga_references(channel);
+    }
+    return references;
 }
 
 std::string song_source_display_name(const std::string& raw_path) {
@@ -1421,7 +1711,8 @@ bool MenuApp::initialize(const CommandLineOptions& options) {
     if (config_result.used_defaults || migrated_config) {
         config_loader.save_profile(profile_dir_, config_);
     }
-    config_.graphics.refresh_hz = clamp_int(config_.graphics.refresh_hz, kRefreshHzMin, kRefreshHzMax);
+    config_.graphics.refresh_hz =
+        clamp_int(config_.graphics.refresh_hz, kGraphicsRefreshHzMin, kGraphicsRefreshHzMax);
     config_.graphics.resolution = normalize_resolution_preset(config_.graphics.resolution);
 
     config::KeymapManager keymap_manager;
@@ -1439,6 +1730,8 @@ bool MenuApp::initialize(const CommandLineOptions& options) {
     key_down_ = config::KeycodeMap::to_keycode("Down").value_or(0);
     key_left_ = config::KeycodeMap::to_keycode("Left").value_or(0);
     key_right_ = config::KeycodeMap::to_keycode("Right").value_or(0);
+    key_page_up_ = config::KeycodeMap::to_keycode("PageUp").value_or(0);
+    key_page_down_ = config::KeycodeMap::to_keycode("PageDown").value_or(0);
     key_enter_ = config::KeycodeMap::to_keycode("Enter").value_or(0);
     key_escape_ = config::KeycodeMap::to_keycode("Esc").value_or(0);
     key_backspace_ = config::KeycodeMap::to_keycode("Backspace").value_or(0);
@@ -1549,6 +1842,7 @@ void MenuApp::run() {
         }
 
         update_keymap_capture_timeout();
+        update_song_select_repeat();
 
         if (screen_ == Screen::SongSelect && song_indexer_.is_running()) {
             const int64_t now_ns = timing::HighResClock::now_ns();
@@ -1665,16 +1959,31 @@ void MenuApp::restart_render_thread() {
 render::RenderConfig MenuApp::current_render_config() const {
     render::RenderConfig render_config;
     render_config.vsync = config_.graphics.vsync;
-    render_config.fps_limit = effective_refresh_hz();
+    render_config.fps_limit = effective_render_fps_limit();
     return render_config;
 }
 
 int MenuApp::effective_refresh_hz() const {
-    const int configured = clamp_int(config_.graphics.refresh_hz, kRefreshHzMin, kRefreshHzMax);
-    if (screen_ == Screen::Gameplay) {
-        return configured;
-    }
-    return std::min(configured, kMenuRefreshHzCap);
+    return effective_configured_refresh_hz(config_.graphics.refresh_hz,
+                                           screen_ == Screen::Gameplay);
+}
+
+int MenuApp::effective_present_refresh_hz() const {
+    const int detected_monitor_refresh_hz =
+        detect_active_monitor_refresh_hz(config_.graphics.refresh_hz);
+    return ::tenriff::app::effective_present_refresh_hz(config_.graphics.vsync,
+                                                        config_.graphics.refresh_hz,
+                                                        detected_monitor_refresh_hz,
+                                                        screen_ == Screen::Gameplay);
+}
+
+int MenuApp::effective_render_fps_limit() const {
+    const int detected_monitor_refresh_hz =
+        detect_active_monitor_refresh_hz(config_.graphics.refresh_hz);
+    return ::tenriff::app::effective_render_fps_limit(config_.graphics.vsync,
+                                                      config_.graphics.refresh_hz,
+                                                      detected_monitor_refresh_hz,
+                                                      screen_ == Screen::Gameplay);
 }
 
 render::MenuWindowConfig MenuApp::current_window_config() const {
@@ -1683,7 +1992,7 @@ render::MenuWindowConfig MenuApp::current_window_config() const {
     window_config.title = "TenRiff";
     window_config.display_mode = config_.graphics.display_mode;
     window_config.vsync = config_.graphics.vsync;
-    window_config.refresh_hz = effective_refresh_hz();
+    window_config.refresh_hz = effective_present_refresh_hz();
     window_config.width = width;
     window_config.height = height;
     return window_config;
@@ -1885,24 +2194,7 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
     if (event.kind == render::MenuHitTargetKind::MouseWheel) {
         if (screen_ == Screen::SongSelect && event.wheel_steps != 0) {
             song_select_focus_ = SongSelectFocus::SongList;
-            if (song_select_view_ == SongSelectView::Sources) {
-                if (!config_.ui.recent_song_sources.empty()) {
-                    selected_source_ = clamp_int(selected_source_ - event.wheel_steps,
-                                                 0,
-                                                 static_cast<int>(config_.ui.recent_song_sources.size() - 1));
-                    publish_snapshot();
-                }
-            } else if (song_select_view_ == SongSelectView::Records) {
-                rebuild_current_song_record_indices();
-                if (!current_song_record_indices_.empty()) {
-                    selected_record_ = clamp_int(selected_record_ - event.wheel_steps,
-                                                 0,
-                                                 static_cast<int>(current_song_record_indices_.size() - 1));
-                    publish_snapshot();
-                }
-            } else if (visible_song_count() > 0) {
-                selected_song_ =
-                    clamp_int(selected_song_ - event.wheel_steps, 0, static_cast<int>(visible_song_count() - 1));
+            if (move_song_select_selection(-event.wheel_steps)) {
                 publish_snapshot();
             }
         }
@@ -2213,26 +2505,21 @@ void MenuApp::handle_song_select_input(uint32_t keycode) {
         publish_snapshot();
         return;
     }
+    if (keycode == key_page_up_ || keycode == key_page_down_) {
+        song_select_focus_ = SongSelectFocus::SongList;
+        const int delta = (keycode == key_page_up_) ? -kSongSelectVisibleCardCount : kSongSelectVisibleCardCount;
+        if (move_song_select_selection(delta)) {
+            publish_snapshot();
+        }
+        return;
+    }
     if (keycode == key_up_) {
         if (song_select_focus_ == SongSelectFocus::LeftNav) {
             song_select_nav_cursor_ = clamp_int(song_select_nav_cursor_ - 1, 0, 5);
             publish_snapshot();
             return;
         }
-        if (song_select_view_ == SongSelectView::Sources) {
-            if (!config_.ui.recent_song_sources.empty()) {
-                selected_source_ = clamp_int(selected_source_ - 1, 0,
-                                             static_cast<int>(config_.ui.recent_song_sources.size() - 1));
-                publish_snapshot();
-            }
-        } else if (song_select_view_ == SongSelectView::Records) {
-            if (!current_song_record_indices_.empty()) {
-                selected_record_ = clamp_int(selected_record_ - 1, 0,
-                                             static_cast<int>(current_song_record_indices_.size() - 1));
-                publish_snapshot();
-            }
-        } else if (visible_song_count() > 0) {
-            selected_song_ = clamp_int(selected_song_ - 1, 0, static_cast<int>(visible_song_count() - 1));
+        if (move_song_select_selection(-1)) {
             publish_snapshot();
         }
         return;
@@ -2243,20 +2530,7 @@ void MenuApp::handle_song_select_input(uint32_t keycode) {
             publish_snapshot();
             return;
         }
-        if (song_select_view_ == SongSelectView::Sources) {
-            if (!config_.ui.recent_song_sources.empty()) {
-                selected_source_ = clamp_int(selected_source_ + 1, 0,
-                                             static_cast<int>(config_.ui.recent_song_sources.size() - 1));
-                publish_snapshot();
-            }
-        } else if (song_select_view_ == SongSelectView::Records) {
-            if (!current_song_record_indices_.empty()) {
-                selected_record_ = clamp_int(selected_record_ + 1, 0,
-                                             static_cast<int>(current_song_record_indices_.size() - 1));
-                publish_snapshot();
-            }
-        } else if (visible_song_count() > 0) {
-            selected_song_ = clamp_int(selected_song_ + 1, 0, static_cast<int>(visible_song_count() - 1));
+        if (move_song_select_selection(1)) {
             publish_snapshot();
         }
         return;
@@ -2466,6 +2740,41 @@ void MenuApp::handle_song_browser_input(uint32_t keycode) {
     }
 }
 
+bool MenuApp::move_song_select_selection(int delta) {
+    if (delta == 0) {
+        return false;
+    }
+
+    if (song_select_view_ == SongSelectView::Sources) {
+        if (config_.ui.recent_song_sources.empty()) {
+            return false;
+        }
+        const int previous = selected_source_;
+        selected_source_ = clamp_int(selected_source_ + delta, 0,
+                                     static_cast<int>(config_.ui.recent_song_sources.size() - 1));
+        return selected_source_ != previous;
+    }
+
+    if (song_select_view_ == SongSelectView::Records) {
+        rebuild_current_song_record_indices();
+        if (current_song_record_indices_.empty()) {
+            return false;
+        }
+        const int previous = selected_record_;
+        selected_record_ = clamp_int(selected_record_ + delta, 0,
+                                     static_cast<int>(current_song_record_indices_.size() - 1));
+        return selected_record_ != previous;
+    }
+
+    if (visible_song_count() == 0) {
+        return false;
+    }
+
+    const int previous = selected_song_;
+    selected_song_ = clamp_int(selected_song_ + delta, 0, static_cast<int>(visible_song_count() - 1));
+    return selected_song_ != previous;
+}
+
 void MenuApp::handle_audio_settings_input(uint32_t keycode) {
     const int item_count = 6;
     if (keycode == key_up_) {
@@ -2569,7 +2878,7 @@ void MenuApp::handle_graphics_settings_input(uint32_t keycode) {
     if (settings_cursor_ == 2 && (keycode == key_left_ || keycode == key_right_)) {
         const int direction = (keycode == key_left_) ? -1 : 1;
         int next_value = config_.graphics.refresh_hz + direction * kRefreshHzStep;
-        next_value = clamp_int(next_value, kRefreshHzMin, kRefreshHzMax);
+        next_value = clamp_int(next_value, kGraphicsRefreshHzMin, kGraphicsRefreshHzMax);
         config_.graphics.refresh_hz = next_value;
         graphics_dirty_ = true;
         publish_snapshot();
@@ -2957,6 +3266,8 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target, uin
     target.revision = gameplay_hud_.revision;
     target.active = gameplay_hud_.active;
     target.loading = gameplay_hud_.loading;
+    target.countdown_active = gameplay_hud_.countdown_active;
+    target.countdown_value = gameplay_hud_.countdown_value;
     target.loading_percent = gameplay_hud_.loading_percent;
     target.loading_stage = gameplay_hud_.loading_stage;
     target.lane_count = clamp_int(gameplay_hud_.lane_count, 1, static_cast<int>(kGameplayHudMaxLanes));
@@ -3020,6 +3331,7 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target, uin
         out_note.start_sample = note.start_sample;
         out_note.tail_sample = note.tail_sample;
         out_note.hold = note.hold;
+        out_note.head_visible = note.head_visible;
         target.notes[i] = out_note;
     }
 
@@ -3188,7 +3500,7 @@ void MenuApp::publish_snapshot() {
             const int total_sources = static_cast<int>(config_.ui.recent_song_sources.size());
             if (total_sources > 0) {
                 selected_source_ = clamp_int(selected_source_, 0, total_sources - 1);
-                constexpr int visible = 5;
+                constexpr int visible = kSongSelectVisibleCardCount;
                 int start = std::max(0, selected_source_ - (visible / 2));
                 const int max_start = std::max(0, total_sources - visible);
                 start = std::min(start, max_start);
@@ -3227,7 +3539,7 @@ void MenuApp::publish_snapshot() {
         } else if (render.song_select.showing_records) {
             const int total = static_cast<int>(current_song_record_indices_.size());
             if (total > 0) {
-                constexpr int visible = 5;
+                constexpr int visible = kSongSelectVisibleCardCount;
                 selected_record_ = clamp_int(selected_record_, 0, total - 1);
                 int start = std::max(0, selected_record_ - (visible / 2));
                 const int max_start = std::max(0, total - visible);
@@ -3252,7 +3564,7 @@ void MenuApp::publish_snapshot() {
         } else {
             const int total = static_cast<int>(visible_song_count());
             if (total > 0) {
-                constexpr int visible = 5;
+                constexpr int visible = kSongSelectVisibleCardCount;
                 int start = std::max(0, selected_song_ - (visible / 2));
                 const int max_start = std::max(0, total - visible);
                 start = std::min(start, max_start);
@@ -3276,6 +3588,20 @@ void MenuApp::publish_snapshot() {
                     card.selected = (i == selected_song_);
                     render.song_select.songs.push_back(std::move(card));
                 }
+            }
+        }
+
+        if (!render.song_select.showing_sources) {
+            if (const SongEntry* entry = (selected_song_ >= 0)
+                                             ? visible_song_entry(static_cast<std::size_t>(selected_song_))
+                                             : nullptr) {
+                render.song_select.selected_song_title = song_title_for_ui(*entry);
+                render.song_select.selected_song_artist = song_artist_for_ui(*entry);
+                render.song_select.selected_song_detail = safe_ui_text_or_placeholder(
+                    key_mode_label(std::to_string(std::max(1, entry->key_count)) + "k") + " " +
+                        format_label(to_lower_ascii(entry->format)),
+                    "-");
+                render.song_select.selected_song_background_path = selected_song_background_preview_path();
             }
         }
 
@@ -3580,7 +3906,7 @@ void MenuApp::publish_snapshot() {
                     config::skin_color_rgb(preview_lane_colors[static_cast<std::size_t>(lane)]);
             }
 
-            render.generic.notes.push_back("Key Mode switches the editable 5K-10K lane layout.");
+            render.generic.notes.push_back("Key Mode switches the editable 4K-10K lane layout.");
             render.generic.notes.push_back("Target Lane selects which lane color the Lane Color row edits.");
             render.generic.notes.push_back("The preview updates immediately with the current colors, judge line, and note size.");
         } else if (screen_ == Screen::SettingsInput) {
@@ -3772,12 +4098,53 @@ void MenuApp::render_snapshot(const MenuSnapshot& snapshot) {
 void MenuApp::update_pressed_keys(const input::InputEvent& event) {
     if (event.state == input::InputState::Pressed) {
         pressed_keys_.insert(event.keycode);
+        if (screen_ == Screen::SongSelect && is_song_select_repeat_key(event.keycode)) {
+            song_select_repeat_key_ = event.keycode;
+            song_select_repeat_next_ns_ =
+                timing::HighResClock::now_ns() + kSongSelectRepeatInitialDelayNs;
+        }
     } else {
         pressed_keys_.erase(event.keycode);
+        if (event.keycode == song_select_repeat_key_) {
+            reset_song_select_repeat();
+        }
     }
     if (screen_ == Screen::KeymapTest) {
         publish_snapshot();
     }
+}
+
+void MenuApp::update_song_select_repeat() {
+    if (screen_ != Screen::SongSelect) {
+        reset_song_select_repeat();
+        return;
+    }
+    if (song_select_repeat_key_ == 0 || !is_song_select_repeat_key(song_select_repeat_key_)) {
+        reset_song_select_repeat();
+        return;
+    }
+    if (pressed_keys_.find(song_select_repeat_key_) == pressed_keys_.end()) {
+        reset_song_select_repeat();
+        return;
+    }
+
+    const int64_t now_ns = timing::HighResClock::now_ns();
+    if (now_ns < song_select_repeat_next_ns_) {
+        return;
+    }
+
+    handle_song_select_input(song_select_repeat_key_);
+    song_select_repeat_next_ns_ = now_ns + kSongSelectRepeatIntervalNs;
+}
+
+void MenuApp::reset_song_select_repeat() {
+    song_select_repeat_key_ = 0;
+    song_select_repeat_next_ns_ = 0;
+}
+
+bool MenuApp::is_song_select_repeat_key(uint32_t keycode) const {
+    return keycode == key_up_ || keycode == key_down_ ||
+           keycode == key_page_up_ || keycode == key_page_down_;
 }
 
 void MenuApp::update_keymap_capture_timeout() {
@@ -4187,22 +4554,100 @@ bool MenuApp::open_selected_record_result() {
     return true;
 }
 
-void MenuApp::launch_selected_song() {
-    const SongEntry* entry = (selected_song_ >= 0) ? visible_song_entry(static_cast<std::size_t>(selected_song_))
-                                                   : nullptr;
+std::string MenuApp::selected_song_absolute_path() const {
+    if (selected_song_ < 0) {
+        return {};
+    }
+    const SongEntry* entry = visible_song_entry(static_cast<std::size_t>(selected_song_));
     if (!entry) {
-        return;
+        return {};
     }
 
-    std::filesystem::path candidate = path_from_utf8(entry->path);
+    namespace fs = std::filesystem;
+    fs::path candidate = path_from_utf8(entry->path);
     if (!candidate.is_absolute()) {
-        std::filesystem::path rooted = path_from_utf8(songs_path_) / candidate;
+        fs::path rooted = path_from_utf8(songs_path_) / candidate;
         std::error_code ec;
-        if (std::filesystem::exists(rooted, ec)) {
+        if (fs::exists(rooted, ec) && !ec) {
             candidate = std::move(rooted);
         }
     }
-    launch_gameplay(candidate.u8string());
+
+    std::error_code ec;
+    const fs::path canonical = fs::weakly_canonical(candidate, ec);
+    if (!ec && !canonical.empty()) {
+        candidate = canonical;
+    } else {
+        ec.clear();
+        candidate = candidate.lexically_normal();
+    }
+    return candidate.u8string();
+}
+
+std::string MenuApp::selected_song_background_preview_path() {
+    const SongEntry* entry = (selected_song_ >= 0) ? visible_song_entry(static_cast<std::size_t>(selected_song_))
+                                                   : nullptr;
+    if (!entry) {
+        return {};
+    }
+
+    const std::string chart_path = selected_song_absolute_path();
+    if (chart_path.empty()) {
+        return {};
+    }
+
+    const std::string cache_key = normalize_path_key(path_from_utf8(chart_path));
+    if (!cache_key.empty()) {
+        auto cached = song_background_preview_cache_.find(cache_key);
+        if (cached != song_background_preview_cache_.end()) {
+            return cached->second;
+        }
+    }
+
+    namespace fs = std::filesystem;
+    const fs::path chart_fs_path = path_from_utf8(chart_path);
+    const std::string chart_ext = to_lower_ascii(chart_fs_path.extension().u8string());
+    std::string resolved_path;
+
+    if (chart_ext == ".osu") {
+        std::ifstream file(chart_fs_path, std::ios::binary);
+        if (file) {
+            std::ostringstream buffer;
+            buffer << file.rdbuf();
+            chart::OsuManiaLoader loader;
+            const auto parsed = loader.parse(buffer.str());
+            if (!parsed.chart.background_filename.empty()) {
+                if (auto preview = resolve_preview_asset_path(chart_fs_path, parsed.chart.background_filename);
+                    preview.has_value()) {
+                    resolved_path = preview->u8string();
+                }
+            }
+        }
+    } else if (is_bms_chart_extension(chart_ext)) {
+        chart::BmsParser parser;
+        chart::BmsParserOptions options;
+        options.tolerant = true;
+        const auto parsed = parser.parseFile(chart_path, options);
+        for (const auto& preview_reference : collect_bms_preview_references(parsed.chart)) {
+            if (auto preview = resolve_preview_asset_path(chart_fs_path, preview_reference); preview.has_value()) {
+                resolved_path = preview->u8string();
+                break;
+            }
+        }
+    }
+
+    if (!cache_key.empty()) {
+        song_background_preview_cache_[cache_key] = resolved_path;
+    }
+    return resolved_path;
+}
+
+void MenuApp::launch_selected_song() {
+    const std::string chart_path = selected_song_absolute_path();
+    if (chart_path.empty()) {
+        return;
+    }
+    launch_gameplay(chart_path);
 }
 
 void MenuApp::launch_gameplay(const std::string& chart_path) {
@@ -4256,6 +4701,8 @@ void MenuApp::launch_gameplay(const std::string& chart_path) {
         gameplay_hud_.finished = hud.finished;
         gameplay_hud_.game_over = hud.game_over;
         gameplay_hud_.user_aborted = hud.user_aborted;
+        gameplay_hud_.countdown_active = hud.countdown_active;
+        gameplay_hud_.countdown_value = hud.countdown_value;
         gameplay_hud_.lane_count = hud.lane_count;
         gameplay_hud_.current_sample = hud.current_sample;
         gameplay_hud_.duration_samples = hud.duration_samples;
@@ -4284,6 +4731,7 @@ void MenuApp::launch_gameplay(const std::string& chart_path) {
             out.start_sample = hud.notes[i].start_sample;
             out.tail_sample = hud.notes[i].tail_sample;
             out.hold = hud.notes[i].hold;
+            out.head_visible = hud.notes[i].head_visible;
             gameplay_hud_.notes[i] = out;
         }
         ++gameplay_hud_.revision;
@@ -4414,6 +4862,7 @@ std::string MenuApp::format_song_line(std::size_t index) const {
 
 void MenuApp::update_song_list(SongIndex index) {
     std::string selected_path = selected_song_path();
+    song_background_preview_cache_.clear();
     indexed_songs_ = std::move(index.entries);
     for (auto& entry : indexed_songs_) {
         entry.title = safe_ui_text(entry.title);

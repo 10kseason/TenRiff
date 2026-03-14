@@ -22,6 +22,7 @@ struct NoteEvent {
     int64_t start_sample = 0;
     std::optional<int64_t> end_sample;  // Hold note end sample if present.
     std::size_t audio_asset_id = kInvalidAudioAssetId;
+    std::size_t note_id = 0;
 };
 
 struct AudioCueEvent {

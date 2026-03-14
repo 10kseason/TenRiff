@@ -100,6 +100,7 @@ struct AssetLookupIndex {
     bool built = false;
     std::unordered_map<std::string, std::filesystem::path> by_relative;
     std::unordered_map<std::string, std::filesystem::path> by_filename;
+    std::vector<std::filesystem::path> audio_files;
 };
 
 void build_asset_lookup(const std::filesystem::path& chart_path, AssetLookupIndex& lookup) {
@@ -109,6 +110,7 @@ void build_asset_lookup(const std::filesystem::path& chart_path, AssetLookupInde
     lookup.built = true;
     lookup.by_relative.clear();
     lookup.by_filename.clear();
+    lookup.audio_files.clear();
 
     namespace fs = std::filesystem;
     const fs::path root = chart_path.parent_path();
@@ -152,6 +154,9 @@ void build_asset_lookup(const std::filesystem::path& chart_path, AssetLookupInde
 
         const std::string file_key = to_lower(full.filename().u8string());
         lookup.by_filename.emplace(file_key, full);
+        if (is_audio_extension(to_lower(full.extension().u8string()))) {
+            lookup.audio_files.push_back(full);
+        }
 
         it.increment(ec);
     }
@@ -253,6 +258,83 @@ std::optional<std::filesystem::path> resolve_asset_path_with_fallback(const std:
             return resolved;
         }
     }
+    return std::nullopt;
+}
+
+int audio_extension_priority(std::string_view ext) {
+    if (ext == ".ogg") {
+        return 0;
+    }
+    if (ext == ".wav") {
+        return 1;
+    }
+    if (ext == ".wave") {
+        return 2;
+    }
+    if (ext == ".mp3") {
+        return 3;
+    }
+    return 4;
+}
+
+std::optional<std::filesystem::path> choose_preferred_audio_path(std::vector<std::filesystem::path> candidates) {
+    if (candidates.empty()) {
+        return std::nullopt;
+    }
+
+    std::stable_sort(candidates.begin(), candidates.end(), [](const std::filesystem::path& lhs,
+                                                              const std::filesystem::path& rhs) {
+        const int lhs_priority = audio_extension_priority(to_lower(lhs.extension().u8string()));
+        const int rhs_priority = audio_extension_priority(to_lower(rhs.extension().u8string()));
+        if (lhs_priority != rhs_priority) {
+            return lhs_priority < rhs_priority;
+        }
+        return lhs.generic_u8string() < rhs.generic_u8string();
+    });
+    return candidates.front();
+}
+
+std::optional<std::filesystem::path> resolve_osu_main_audio_path(const std::filesystem::path& chart_path,
+                                                                 std::string_view audio_filename,
+                                                                 AssetLookupIndex& lookup) {
+    const std::string audio_ref = normalize_asset_reference(std::string(audio_filename));
+    if (!audio_ref.empty()) {
+        if (auto resolved = resolve_asset_path_with_fallback(chart_path, audio_ref, lookup); resolved.has_value()) {
+            return resolved;
+        }
+    }
+
+    namespace fs = std::filesystem;
+    const std::string stem = chart_path.stem().u8string();
+    if (!stem.empty()) {
+        for (std::string_view ext : {".ogg", ".wav", ".wave", ".mp3"}) {
+            if (auto resolved = lookup_asset_path_candidate(chart_path, fs::path(stem + std::string(ext)), lookup);
+                resolved.has_value()) {
+                return resolved;
+            }
+        }
+    }
+
+    build_asset_lookup(chart_path, lookup);
+    if (lookup.audio_files.empty()) {
+        return std::nullopt;
+    }
+
+    std::vector<fs::path> matching_stem;
+    matching_stem.reserve(lookup.audio_files.size());
+    for (const auto& candidate : lookup.audio_files) {
+        if (to_lower(candidate.stem().u8string()) == to_lower(stem)) {
+            matching_stem.push_back(candidate);
+        }
+    }
+    if (auto resolved = choose_preferred_audio_path(std::move(matching_stem)); resolved.has_value()) {
+        return resolved;
+    }
+
+    if (lookup.audio_files.size() == 1u) {
+        return lookup.audio_files.front();
+    }
+
     return std::nullopt;
 }
 
@@ -401,16 +483,14 @@ ChartLoadResult ChartLoader::load(const std::string& path,
 
         result.chart = gameplay::from_osu_mania(parse_result.chart, sample_rate, rate);
         const std::string audio_ref = normalize_asset_reference(parse_result.chart.audio_filename);
-        if (!audio_ref.empty()) {
-            auto resolved = resolve_asset_path_with_fallback(file_path, audio_ref, asset_lookup);
-            if (resolved.has_value()) {
-                gameplay::AudioCueEvent cue;
-                cue.start_sample = 0;
-                cue.asset_id = result.chart.intern_audio_asset(resolved->u8string());
-                result.chart.audio_cues.push_back(std::move(cue));
-            } else {
-                result.messages.push_back("Main audio file not found: " + audio_ref);
-            }
+        auto resolved = resolve_osu_main_audio_path(file_path, parse_result.chart.audio_filename, asset_lookup);
+        if (resolved.has_value()) {
+            gameplay::AudioCueEvent cue;
+            cue.start_sample = 0;
+            cue.asset_id = result.chart.intern_audio_asset(resolved->u8string());
+            result.chart.audio_cues.push_back(std::move(cue));
+        } else if (!audio_ref.empty()) {
+            result.messages.push_back("Main audio file not found: " + audio_ref);
         }
 
         result.format = ChartFormat::OsuMania;

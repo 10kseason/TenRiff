@@ -55,7 +55,7 @@ bool is_osu_extension(std::string_view ext) {
 bool is_menu_song_entry(const SongEntry& entry, const SongIndexOptions& options) {
     const std::string format = to_lower(entry.format);
     if (format == "bms") {
-        return entry.key_count == 10;
+        return entry.key_count >= 4 && entry.key_count <= 10;
     }
     if (options.include_osu && format == "osu") {
         return entry.key_count >= 4 && entry.key_count <= 10;
@@ -185,6 +185,11 @@ std::string relative_path_string(const std::filesystem::path& root, const std::f
 }
 
 std::optional<chart::OsuDifficultyMetrics> calculate_bms_10k_difficulty(const chart::BmsChart& parsed_chart) {
+    const int key_count = parsed_chart.declared_key_count > 0 ? parsed_chart.declared_key_count : 10;
+    if (key_count != 10) {
+        return std::nullopt;
+    }
+
     chart::BmsChartNormalizer normalizer;
     auto normalized = normalizer.normalize(parsed_chart);
     if (!normalized.success()) {
@@ -228,7 +233,6 @@ SongEntry build_bms_entry(std::string relative_path,
     entry.path = std::move(relative_path);
     entry.format = "bms";
     entry.mtime = mtime;
-    entry.key_count = 10;
 
     chart::BmsParser parser;
     auto parsed = parser.parseFile(full_path.u8string());
@@ -237,6 +241,8 @@ SongEntry build_bms_entry(std::string relative_path,
         entry.title = fallback_title(full_path);
         return entry;
     }
+
+    entry.key_count = parsed.chart.declared_key_count > 0 ? parsed.chart.declared_key_count : 10;
 
     auto title_it = parsed.chart.headers.find("TITLE");
     if (title_it != parsed.chart.headers.end()) {

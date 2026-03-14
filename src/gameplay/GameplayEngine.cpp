@@ -105,6 +105,21 @@ void GameplayEngine::advance(int64_t current_sample) {
     finalize_if_done(current_sample);
 }
 
+void GameplayEngine::collect_active_holds(std::vector<ActiveHoldView>& out) const {
+    out.clear();
+    out.reserve(lanes_.size());
+    for (std::size_t lane_index = 0; lane_index < lanes_.size(); ++lane_index) {
+        const auto& lane = lanes_[lane_index];
+        if (!lane.hold.has_value()) {
+            continue;
+        }
+        out.push_back(ActiveHoldView{
+            static_cast<int>(lane_index) + 1,
+            lane.hold->end_sample,
+        });
+    }
+}
+
 void GameplayEngine::apply_judgement(game::Judgement judgement, double delta_ms, int64_t sample,
                                      double weight, bool breaks_combo) {
     live_feedback_.has_value = true;

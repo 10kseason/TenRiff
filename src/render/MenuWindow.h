@@ -101,6 +101,10 @@ struct SongSelectData {
     std::string selected_source_path;
     int selected_source_song_count = -1;
     bool selected_source_active = false;
+    std::string selected_song_title;
+    std::string selected_song_artist;
+    std::string selected_song_detail;
+    std::string selected_song_background_path;
     std::string browser_summary;
     std::string sort_summary;
 
@@ -181,6 +185,7 @@ struct GameplayNoteData {
     int64_t start_sample = 0;
     int64_t tail_sample = 0;
     bool hold = false;
+    bool head_visible = true;
 };
 
 struct GameplayHudData {
@@ -189,6 +194,8 @@ struct GameplayHudData {
     uint64_t revision = 0;
     bool active = false;
     bool loading = false;
+    bool countdown_active = false;
+    int countdown_value = 0;
     int loading_percent = 0;
     std::string loading_stage;
 
@@ -334,6 +341,8 @@ private:
     void update_brushes();
     void invalidate_gameplay_note_sprite_cache();
     [[nodiscard]] bool ensure_gameplay_note_sprites(const GameplayHudData& data);
+    void invalidate_song_select_preview_cache();
+    [[nodiscard]] bool ensure_song_select_preview_bitmap(const SongSelectData& data);
     void invalidate_gameplay_static_cache();
     [[nodiscard]] bool ensure_gameplay_static_cache(const GameplayHudData& data);
     [[nodiscard]] bool recreate_targets();
@@ -414,12 +423,18 @@ private:
         std::array<uint32_t, kGameplayHudMaxLanes> lane_colors{};
     };
 
+    struct SongSelectPreviewCache {
+        std::string path{};
+        bool attempted = false;
+    };
+
     struct D2DResources;
     std::unique_ptr<D2DResources> d2d_;
     PerformanceOverlayCache performance_overlay_cache_{};
     GameplayHudCache gameplay_hud_cache_{};
     GameplayStaticCache gameplay_static_cache_{};
     GameplayNoteSpriteCache gameplay_note_sprite_cache_{};
+    SongSelectPreviewCache song_select_preview_cache_{};
 };
 
 }  // namespace tenriff::render

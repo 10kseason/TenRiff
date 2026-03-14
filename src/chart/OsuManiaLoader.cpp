@@ -66,6 +66,35 @@ bool parse_double(std::string_view view, double& out) {
     return true;
 }
 
+std::vector<std::string> split_csv_fields(std::string_view line) {
+    std::vector<std::string> fields;
+    std::string current;
+    bool in_quotes = false;
+    for (char ch : line) {
+        if (ch == '"') {
+            in_quotes = !in_quotes;
+            current.push_back(ch);
+            continue;
+        }
+        if (ch == ',' && !in_quotes) {
+            fields.push_back(trim(current));
+            current.clear();
+            continue;
+        }
+        current.push_back(ch);
+    }
+    fields.push_back(trim(current));
+    return fields;
+}
+
+std::string normalize_event_asset_field(std::string_view view) {
+    std::string value = trim(view);
+    if (value.size() >= 2 && value.front() == '"' && value.back() == '"') {
+        value = trim(std::string_view(value).substr(1, value.size() - 2));
+    }
+    return value;
+}
+
 void add_message(std::vector<OsuParseMessage>& messages, OsuParseSeverity severity, std::size_t line,
                  std::string text) {
     messages.push_back(OsuParseMessage{severity, line, std::move(text)});
@@ -203,6 +232,19 @@ OsuManiaParseResult OsuManiaLoader::parse(std::string_view content) const {
                 result.chart.title = value;
             } else if (key == "ARTIST") {
                 result.chart.artist = value;
+            }
+            continue;
+        }
+
+        if (current_section == "EVENTS") {
+            const std::vector<std::string> tokens = split_csv_fields(trimmed);
+            if (tokens.size() >= 3) {
+                std::string event_type = trim(tokens[0]);
+                to_upper_ascii(event_type);
+                if ((event_type == "0" || event_type == "BACKGROUND") &&
+                    result.chart.background_filename.empty()) {
+                    result.chart.background_filename = normalize_event_asset_field(tokens[2]);
+                }
             }
             continue;
         }

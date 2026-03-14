@@ -90,6 +90,7 @@ private:
             int64_t start_sample = 0;
             int64_t tail_sample = 0;
             bool hold = false;
+            bool head_visible = true;
         };
 
         bool active = false;
@@ -97,6 +98,8 @@ private:
         bool game_over = false;
         bool user_aborted = false;
         bool loading = false;
+        bool countdown_active = false;
+        int countdown_value = 0;
         int loading_percent = 0;
         std::string loading_stage;
 
@@ -136,6 +139,8 @@ private:
     void restart_render_thread();
     void apply_runtime_graphics_config();
     [[nodiscard]] int effective_refresh_hz() const;
+    [[nodiscard]] int effective_present_refresh_hz() const;
+    [[nodiscard]] int effective_render_fps_limit() const;
     [[nodiscard]] render::RenderConfig current_render_config() const;
     [[nodiscard]] render::MenuWindowConfig current_window_config() const;
 
@@ -161,6 +166,9 @@ private:
     void render_snapshot(const MenuSnapshot& snapshot);
     void update_keymap_capture_timeout();
     void update_pressed_keys(const input::InputEvent& event);
+    void update_song_select_repeat();
+    void reset_song_select_repeat();
+    [[nodiscard]] bool is_song_select_repeat_key(uint32_t keycode) const;
 
     void launch_gameplay(const std::string& chart_path);
     void launch_selected_song();
@@ -185,6 +193,9 @@ private:
     [[nodiscard]] const struct LocalPlayRecord* current_selected_record() const;
     [[nodiscard]] bool open_selected_record_result();
     [[nodiscard]] const ReplaySummary* replay_summary_for_path(const std::string& path);
+    [[nodiscard]] bool move_song_select_selection(int delta);
+    [[nodiscard]] std::string selected_song_absolute_path() const;
+    [[nodiscard]] std::string selected_song_background_preview_path();
 
     [[nodiscard]] std::string screen_title() const;
     [[nodiscard]] const SongEntry* visible_song_entry(std::size_t visible_index) const;
@@ -325,16 +336,21 @@ private:
     std::unordered_map<std::string, std::vector<std::size_t>> chart_play_record_indices_{};
     std::vector<std::size_t> current_song_record_indices_{};
     std::unordered_map<std::string, ReplaySummary> replay_summary_cache_{};
+    std::unordered_map<std::string, std::string> song_background_preview_cache_{};
 
     std::string song_search_query_{};
     int song_key_filter_ = 0;
     int song_level_min_filter_ = 0;
     int song_level_max_filter_ = 0;
+    uint32_t song_select_repeat_key_ = 0;
+    int64_t song_select_repeat_next_ns_ = 0;
 
     uint32_t key_up_ = 0;
     uint32_t key_down_ = 0;
     uint32_t key_left_ = 0;
     uint32_t key_right_ = 0;
+    uint32_t key_page_up_ = 0;
+    uint32_t key_page_down_ = 0;
     uint32_t key_enter_ = 0;
     uint32_t key_escape_ = 0;
     uint32_t key_backspace_ = 0;

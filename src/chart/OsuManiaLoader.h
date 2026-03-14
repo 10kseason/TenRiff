@@ -39,6 +39,7 @@ struct OsuManiaChart {
     std::string title;
     std::string artist;
     std::string audio_filename;
+    std::string background_filename;
     std::vector<OsuManiaTimingPoint> timing_points;
     std::vector<OsuManiaNote> notes;
 };

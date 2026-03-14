@@ -158,7 +158,10 @@ BmsGameplayBuildResult build_bms_gameplay_chart(const chart::BmsTimeline& timeli
         return lhs.sequence < rhs.sequence;
     });
 
-    result.chart.lane_count = max_lane > 0 ? max_lane : 10;
+    result.chart.lane_count = std::max(max_lane, parsed_chart.declared_key_count);
+    if (result.chart.lane_count <= 0) {
+        result.chart.lane_count = 10;
+    }
     result.chart.duration_samples = std::max<int64_t>(0, scale_samples(timeline.duration_samples, rate));
     result.chart.notes.reserve(entries.size());
     result.note_object_ids.reserve(entries.size());

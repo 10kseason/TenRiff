@@ -30,6 +30,7 @@
 #include <d3d11.h>
 #include <dwrite.h>
 #include <dxgi1_5.h>
+#include <wincodec.h>
 #include <wrl/client.h>
 
 #include <objbase.h>
@@ -89,6 +90,10 @@ float gameplay_note_draw_width(float lane_width, double note_width_scale) {
     return std::clamp(base_note_width * clamp_gameplay_note_width_scale(note_width_scale),
                       16.0f,
                       std::max(16.0f, safe_lane_width - 4.0f));
+}
+
+float gameplay_field_y(float field_top, float field_height, double normalized_y) {
+    return field_top + field_height * static_cast<float>(normalized_y);
 }
 
 struct MonitorDisplayInfo {
@@ -458,6 +463,31 @@ LRESULT CALLBACK menu_window_proc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lpa
     return DefWindowProcW(hwnd, msg, wparam, lparam);
 }
 
+void configure_low_latency_presentation(IDXGIDevice* dxgi_device, IDXGISwapChain1* swap_chain) {
+    if (swap_chain) {
+        Microsoft::WRL::ComPtr<IDXGISwapChain2> swap_chain2;
+        if (SUCCEEDED(swap_chain->QueryInterface(IID_PPV_ARGS(&swap_chain2))) && swap_chain2) {
+            const HRESULT hr = swap_chain2->SetMaximumFrameLatency(1);
+            if (FAILED(hr)) {
+                std::cerr << "[MenuWindow] IDXGISwapChain2::SetMaximumFrameLatency(1) failed hr=0x"
+                          << std::hex << static_cast<unsigned long>(hr) << std::dec << std::endl;
+            }
+            return;
+        }
+    }
+
+    if (dxgi_device) {
+        Microsoft::WRL::ComPtr<IDXGIDevice1> dxgi_device1;
+        if (SUCCEEDED(dxgi_device->QueryInterface(IID_PPV_ARGS(&dxgi_device1))) && dxgi_device1) {
+            const HRESULT hr = dxgi_device1->SetMaximumFrameLatency(1);
+            if (FAILED(hr)) {
+                std::cerr << "[MenuWindow] IDXGIDevice1::SetMaximumFrameLatency(1) failed hr=0x"
+                          << std::hex << static_cast<unsigned long>(hr) << std::dec << std::endl;
+            }
+        }
+    }
+}
+
 }  // namespace
 
 struct MenuWindow::D2DResources {
@@ -469,6 +499,7 @@ struct MenuWindow::D2DResources {
     Microsoft::WRL::ComPtr<ID2D1DeviceContext> d2d_context;
     Microsoft::WRL::ComPtr<ID2D1Bitmap1> d2d_target;
     Microsoft::WRL::ComPtr<IDWriteFactory> dwrite_factory;
+    Microsoft::WRL::ComPtr<IWICImagingFactory> wic_factory;
     Microsoft::WRL::ComPtr<IDWriteTextFormat> title_format;
     Microsoft::WRL::ComPtr<IDWriteTextFormat> body_format;
     Microsoft::WRL::ComPtr<IDWriteTextFormat> mono_format;
@@ -496,6 +527,7 @@ struct MenuWindow::D2DResources {
     Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> note_hold_brush;
     std::array<Microsoft::WRL::ComPtr<ID2D1Bitmap>, kGameplayHudMaxLanes> lane_note_head_bitmaps{};
     std::array<Microsoft::WRL::ComPtr<ID2D1Bitmap>, kGameplayHudMaxLanes> lane_note_tail_bitmaps{};
+    Microsoft::WRL::ComPtr<ID2D1Bitmap> song_select_preview_bitmap;
     Microsoft::WRL::ComPtr<ID2D1GradientStopCollection> glow_stops;
     Microsoft::WRL::ComPtr<ID2D1RadialGradientBrush> glow_brush;
     Microsoft::WRL::ComPtr<ID2D1GradientStopCollection> logo_stops;
@@ -704,6 +736,75 @@ bool MenuWindow::ensure_gameplay_note_sprites(const GameplayHudData& data) {
     return true;
 }
 
+void MenuWindow::invalidate_song_select_preview_cache() {
+    song_select_preview_cache_ = {};
+    if (d2d_) {
+        d2d_->song_select_preview_bitmap.Reset();
+    }
+}
+
+bool MenuWindow::ensure_song_select_preview_bitmap(const SongSelectData& data) {
+    if (!d2d_ || !d2d_->d2d_context || !d2d_->wic_factory) {
+        invalidate_song_select_preview_cache();
+        return false;
+    }
+
+    const std::string path = data.selected_song_background_path;
+    if (path.empty()) {
+        invalidate_song_select_preview_cache();
+        return false;
+    }
+
+    if (song_select_preview_cache_.attempted && song_select_preview_cache_.path == path) {
+        return d2d_->song_select_preview_bitmap.Get() != nullptr;
+    }
+
+    invalidate_song_select_preview_cache();
+    song_select_preview_cache_.path = path;
+    song_select_preview_cache_.attempted = true;
+
+    const std::wstring wide_path = util::path_from_utf8_lossy(path).native();
+    Microsoft::WRL::ComPtr<IWICBitmapDecoder> decoder;
+    const HRESULT decoder_hr = d2d_->wic_factory->CreateDecoderFromFilename(
+        wide_path.c_str(),
+        nullptr,
+        GENERIC_READ,
+        WICDecodeMetadataCacheOnLoad,
+        &decoder);
+    if (FAILED(decoder_hr) || !decoder) {
+        return false;
+    }
+
+    Microsoft::WRL::ComPtr<IWICBitmapFrameDecode> frame;
+    if (FAILED(decoder->GetFrame(0, &frame)) || !frame) {
+        return false;
+    }
+
+    Microsoft::WRL::ComPtr<IWICFormatConverter> converter;
+    if (FAILED(d2d_->wic_factory->CreateFormatConverter(&converter)) || !converter) {
+        return false;
+    }
+
+    const HRESULT convert_hr = converter->Initialize(frame.Get(),
+                                                     GUID_WICPixelFormat32bppPBGRA,
+                                                     WICBitmapDitherTypeNone,
+                                                     nullptr,
+                                                     0.0f,
+                                                     WICBitmapPaletteTypeCustom);
+    if (FAILED(convert_hr)) {
+        return false;
+    }
+
+    Microsoft::WRL::ComPtr<ID2D1Bitmap> bitmap;
+    const HRESULT bitmap_hr = d2d_->d2d_context->CreateBitmapFromWicBitmap(converter.Get(), nullptr, &bitmap);
+    if (FAILED(bitmap_hr) || !bitmap) {
+        return false;
+    }
+
+    d2d_->song_select_preview_bitmap = std::move(bitmap);
+    return true;
+}
+
 void MenuWindow::invalidate_gameplay_static_cache() {
     gameplay_static_cache_ = {};
     if (d2d_) {
@@ -765,7 +866,7 @@ bool MenuWindow::ensure_gameplay_static_cache(const GameplayHudData& data) {
     }
 
     if (d2d_->accent_brush) {
-        const float hit_line_y = kGameplayFieldTop + field_height * static_cast<float>(judgement_line_position);
+        const float hit_line_y = gameplay_field_y(kGameplayFieldTop, field_height, judgement_line_position);
         ctx->DrawLine(D2D1::Point2F(kGameplayFieldLeft, hit_line_y), D2D1::Point2F(kGameplayFieldRight, hit_line_y),
                       d2d_->accent_brush.Get(), 2.2f);
     }
@@ -876,6 +977,7 @@ void MenuWindow::on_file_drop(std::string path) {
 void MenuWindow::shutdown() {
     destroy_window();
     invalidate_gameplay_note_sprite_cache();
+    invalidate_song_select_preview_cache();
     invalidate_gameplay_static_cache();
 
     if (d2d_) {
@@ -926,6 +1028,7 @@ void MenuWindow::shutdown() {
         d2d_->body_format.Reset();
         d2d_->title_format.Reset();
         d2d_->dwrite_factory.Reset();
+        d2d_->wic_factory.Reset();
         d2d_->d2d_target.Reset();
         d2d_->d2d_context.Reset();
         d2d_->d2d_device.Reset();
@@ -1096,6 +1199,7 @@ bool MenuWindow::initialize(const MenuWindowConfig& config) {
                                                nullptr, nullptr, &d2d_->swap_chain))) {
         return fail_fatal("Failed to create DXGI swap chain.");
     }
+    configure_low_latency_presentation(dxgi_device.Get(), d2d_->swap_chain.Get());
 
     fullscreen_ = false;
     if (config.display_mode == "fullscreen") {
@@ -1127,6 +1231,13 @@ bool MenuWindow::initialize(const MenuWindowConfig& config) {
                                    __uuidof(IDWriteFactory),
                                    reinterpret_cast<IUnknown**>(d2d_->dwrite_factory.GetAddressOf())))) {
         return fail_fatal("Failed to create DirectWrite factory.");
+    }
+
+    const HRESULT wic_hr = CoCreateInstance(CLSID_WICImagingFactory, nullptr, CLSCTX_INPROC_SERVER,
+                                            IID_PPV_ARGS(&d2d_->wic_factory));
+    if (FAILED(wic_hr)) {
+        std::cerr << "[MenuWindow::initialize] WIC factory unavailable hr=0x"
+                  << std::hex << static_cast<unsigned long>(wic_hr) << std::dec << std::endl;
     }
 
     d2d_->dwrite_factory->CreateTextFormat(L"Bahnschrift", nullptr,
@@ -1679,7 +1790,9 @@ void MenuWindow::draw(const MenuRenderData& data) {
             const int lane_count = std::clamp(preview.lane_count, 1, static_cast<int>(kGameplayHudMaxLanes));
             const float lane_width = (field_right - field_left) / static_cast<float>(lane_count);
             const float hit_line_y =
-                field_top + field_height * static_cast<float>(clamp_gameplay_judgement_line(preview.judgement_line_position));
+                gameplay_field_y(field_top,
+                                 field_height,
+                                 clamp_gameplay_judgement_line(preview.judgement_line_position));
             const float note_width = gameplay_note_draw_width(lane_width, preview.note_width_scale);
             const float head_half_h = 11.0f * clamp_gameplay_note_height_scale(preview.note_height_scale);
             const float tail_half_h = 9.0f * clamp_gameplay_note_height_scale(preview.note_height_scale);
@@ -2296,7 +2409,7 @@ void MenuWindow::draw(const MenuRenderData& data) {
             d2d_->title_format->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_LEADING);
         }
 
-        const D2D1_RECT_F right_rect = D2D1::RectF(1320.0f, 300.0f, 1800.0f, 820.0f);
+        const D2D1_RECT_F right_rect = D2D1::RectF(1320.0f, 220.0f, 1800.0f, 930.0f);
         const D2D1_ROUNDED_RECT right_rr = D2D1::RoundedRect(right_rect, 18.0f, 18.0f);
         if (d2d_->panel_brush) {
             ctx->FillRoundedRectangle(right_rr, d2d_->panel_brush.Get());
@@ -2434,14 +2547,88 @@ void MenuWindow::draw(const MenuRenderData& data) {
                               d2d_->body_format.Get(), replay_meta_rect, d2d_->muted_brush.Get());
             }
         } else {
-            const std::wstring rank_w = to_wide(data.song_select.rank.empty() ? std::string("--") : data.song_select.rank);
-            if (d2d_->rank_format && header_brush) {
-                const D2D1_RECT_F rank_rect = D2D1::RectF(right_rect.left, right_rect.top + 10.0f,
-                                                         right_rect.right, right_rect.top + 140.0f);
-                ctx->DrawText(rank_w.c_str(), static_cast<UINT32>(rank_w.size()),
-                              d2d_->rank_format.Get(), rank_rect, header_brush);
+            const D2D1_RECT_F preview_rect =
+                D2D1::RectF(right_rect.left + 24.0f, right_rect.top + 24.0f, right_rect.right - 24.0f, right_rect.top + 260.0f);
+            const D2D1_ROUNDED_RECT preview_rr = D2D1::RoundedRect(preview_rect, 16.0f, 16.0f);
+            if (d2d_->card_brush) {
+                d2d_->card_brush->SetOpacity(0.92f);
+                ctx->FillRoundedRectangle(preview_rr, d2d_->card_brush.Get());
+                d2d_->card_brush->SetOpacity(1.0f);
+            }
+            if (ensure_song_select_preview_bitmap(data.song_select) && d2d_->song_select_preview_bitmap) {
+                const D2D1_SIZE_F bitmap_size = d2d_->song_select_preview_bitmap->GetSize();
+                D2D1_RECT_F source_rect = D2D1::RectF(0.0f, 0.0f, bitmap_size.width, bitmap_size.height);
+                const float preview_width = preview_rect.right - preview_rect.left;
+                const float preview_height = preview_rect.bottom - preview_rect.top;
+                const float preview_aspect = preview_width / std::max(1.0f, preview_height);
+                const float bitmap_aspect = bitmap_size.width / std::max(1.0f, bitmap_size.height);
+                if (bitmap_aspect > preview_aspect) {
+                    const float cropped_width = bitmap_size.height * preview_aspect;
+                    const float offset = (bitmap_size.width - cropped_width) * 0.5f;
+                    source_rect.left = offset;
+                    source_rect.right = offset + cropped_width;
+                } else if (bitmap_aspect < preview_aspect) {
+                    const float cropped_height = bitmap_size.width / preview_aspect;
+                    const float offset = (bitmap_size.height - cropped_height) * 0.5f;
+                    source_rect.top = offset;
+                    source_rect.bottom = offset + cropped_height;
+                }
+                ctx->DrawBitmap(d2d_->song_select_preview_bitmap.Get(),
+                                preview_rect,
+                                0.96f,
+                                D2D1_BITMAP_INTERPOLATION_MODE_LINEAR,
+                                &source_rect);
+            } else if (d2d_->accent_brush) {
+                const D2D1_COLOR_F color = jacket_color(data.song_select.selected_song_title);
+                d2d_->accent_brush->SetColor(color);
+                d2d_->accent_brush->SetOpacity(0.80f);
+                ctx->FillRoundedRectangle(preview_rr, d2d_->accent_brush.Get());
+                d2d_->accent_brush->SetOpacity(1.0f);
+                d2d_->accent_brush->SetColor(D2D1::ColorF(0x6EE7F2));
+                if (d2d_->title_format && d2d_->text_brush) {
+                    const std::wstring empty_preview_w = L"NO BG PREVIEW";
+                    ctx->DrawText(empty_preview_w.c_str(), static_cast<UINT32>(empty_preview_w.size()),
+                                  d2d_->title_format.Get(), preview_rect, d2d_->text_brush.Get());
+                }
+            }
+            if (d2d_->button_border_brush) {
+                ctx->DrawRoundedRectangle(preview_rr, d2d_->button_border_brush.Get(), 1.4f);
             }
 
+            if (d2d_->body_format && d2d_->muted_brush) {
+                const std::wstring preview_label_w = L"CHART PREVIEW";
+                const D2D1_RECT_F preview_label_rect =
+                    D2D1::RectF(preview_rect.left + 16.0f, preview_rect.top + 10.0f, preview_rect.right - 16.0f, preview_rect.top + 36.0f);
+                ctx->DrawText(preview_label_w.c_str(), static_cast<UINT32>(preview_label_w.size()),
+                              d2d_->body_format.Get(), preview_label_rect, d2d_->muted_brush.Get());
+            }
+
+            if (d2d_->song_title_format && d2d_->text_brush) {
+                const std::wstring title_w =
+                    to_wide_with_placeholder(data.song_select.selected_song_title, "<invalid title>", "selected-song-title");
+                const D2D1_RECT_F title_rect =
+                    D2D1::RectF(right_rect.left + 24.0f, preview_rect.bottom + 20.0f, right_rect.right - 24.0f, preview_rect.bottom + 70.0f);
+                ctx->DrawText(title_w.c_str(), static_cast<UINT32>(title_w.size()),
+                              d2d_->song_title_format.Get(), title_rect, d2d_->text_brush.Get());
+            }
+            if (d2d_->song_artist_format && d2d_->muted_brush) {
+                const std::wstring artist_w =
+                    to_wide_with_placeholder(data.song_select.selected_song_artist, "<invalid artist>", "selected-song-artist");
+                const D2D1_RECT_F artist_rect =
+                    D2D1::RectF(right_rect.left + 24.0f, preview_rect.bottom + 66.0f, right_rect.right - 24.0f, preview_rect.bottom + 100.0f);
+                ctx->DrawText(artist_w.c_str(), static_cast<UINT32>(artist_w.size()),
+                              d2d_->song_artist_format.Get(), artist_rect, d2d_->muted_brush.Get());
+            }
+            if (d2d_->body_format && d2d_->muted_brush) {
+                const std::wstring detail_w = to_wide(data.song_select.selected_song_detail);
+                const D2D1_RECT_F detail_rect =
+                    D2D1::RectF(right_rect.left + 24.0f, preview_rect.bottom + 96.0f, right_rect.right - 24.0f, preview_rect.bottom + 126.0f);
+                ctx->DrawText(detail_w.c_str(), static_cast<UINT32>(detail_w.size()),
+                              d2d_->body_format.Get(), detail_rect, d2d_->muted_brush.Get());
+            }
+
+            stats_y = preview_rect.bottom + 146.0f;
+            draw_stat_text_row("RANK", data.song_select.rank.empty() ? std::string("--") : data.song_select.rank);
             draw_stat_text_row("SORT", data.song_select.sort_summary);
             draw_stat_text_row("FILTER", data.song_select.browser_summary);
             draw_stat_row("BEST", data.song_select.best_score);
@@ -2455,10 +2642,10 @@ void MenuWindow::draw(const MenuRenderData& data) {
 
         if (d2d_->hud_format && d2d_->muted_brush) {
             const std::wstring hint_w = data.song_select.showing_sources
-                                            ? L"ENTER  OPEN     F2  BROWSE     ESC  BACK"
+                                            ? L"ENTER  OPEN     PGUP/PGDN  JUMP     ESC  BACK"
                                             : (data.song_select.showing_records
-                                                   ? L"ENTER  VIEW RESULT     BACKSPACE  SONGS     ESC  BACK"
-                                                   : L"ENTER  SELECT     BROWSE  SEARCH/FILTER     BACKSPACE  SOURCES");
+                                                   ? L"ENTER  VIEW RESULT     PGUP/PGDN  JUMP     ESC  BACK"
+                                                   : L"ENTER  SELECT     PGUP/PGDN  JUMP     BACKSPACE  SOURCES");
             const D2D1_RECT_F hint_rect = D2D1::RectF(right_rect.left + 10.0f, right_rect.bottom - 60.0f,
                                                      right_rect.right - 10.0f, right_rect.bottom - 18.0f);
             d2d_->hud_format->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_CENTER);
@@ -3023,6 +3210,63 @@ void MenuWindow::draw(const MenuRenderData& data) {
             return;
         }
 
+        if (data.gameplay.countdown_active) {
+            if (d2d_->gameplay_static_command_list) {
+                ctx->DrawImage(d2d_->gameplay_static_command_list.Get());
+            }
+
+            const D2D1_RECT_F panel_rect = D2D1::RectF(700.0f, 300.0f, 1220.0f, 760.0f);
+            const D2D1_ROUNDED_RECT panel_rr = D2D1::RoundedRect(panel_rect, 28.0f, 28.0f);
+            if (d2d_->panel_brush) {
+                d2d_->panel_brush->SetOpacity(0.90f);
+                ctx->FillRoundedRectangle(panel_rr, d2d_->panel_brush.Get());
+                d2d_->panel_brush->SetOpacity(1.0f);
+            }
+            if (d2d_->accent_brush) {
+                ctx->DrawRoundedRectangle(panel_rr, d2d_->accent_brush.Get(), 1.8f);
+            }
+
+            if (d2d_->body_format && d2d_->muted_brush) {
+                d2d_->body_format->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_CENTER);
+                const std::wstring ready_w = L"GET READY";
+                ctx->DrawText(ready_w.c_str(), static_cast<UINT32>(ready_w.size()),
+                              d2d_->body_format.Get(),
+                              D2D1::RectF(panel_rect.left + 24.0f, panel_rect.top + 30.0f,
+                                          panel_rect.right - 24.0f, panel_rect.top + 76.0f),
+                              d2d_->muted_brush.Get());
+                d2d_->body_format->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_LEADING);
+            }
+
+            ID2D1Brush* countdown_brush = d2d_->logo_brush
+                                              ? static_cast<ID2D1Brush*>(d2d_->logo_brush.Get())
+                                              : static_cast<ID2D1Brush*>(d2d_->accent_brush.Get());
+            if (d2d_->logo_brush) {
+                set_brush_points(d2d_->logo_brush.Get(), panel_rect);
+            }
+            if (d2d_->rank_format && countdown_brush) {
+                const std::wstring countdown_w =
+                    to_wide(std::to_string(std::max(1, data.gameplay.countdown_value)));
+                ctx->DrawText(countdown_w.c_str(), static_cast<UINT32>(countdown_w.size()),
+                              d2d_->rank_format.Get(),
+                              D2D1::RectF(panel_rect.left + 24.0f, panel_rect.top + 86.0f,
+                                          panel_rect.right - 24.0f, panel_rect.top + 270.0f),
+                              countdown_brush);
+            }
+
+            if (d2d_->title_format && d2d_->text_brush) {
+                d2d_->title_format->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_CENTER);
+                const std::wstring start_w = L"START";
+                ctx->DrawText(start_w.c_str(), static_cast<UINT32>(start_w.size()),
+                              d2d_->title_format.Get(),
+                              D2D1::RectF(panel_rect.left + 24.0f, panel_rect.bottom - 132.0f,
+                                          panel_rect.right - 24.0f, panel_rect.bottom - 64.0f),
+                              d2d_->text_brush.Get());
+                d2d_->title_format->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_LEADING);
+            }
+
+            return;
+        }
+
         if (d2d_->title_format && d2d_->text_brush) {
             const D2D1_RECT_F score_rect =
                 D2D1::RectF(kBaseWidth - 700.0f, header_top, kBaseWidth - 90.0f, header_top + 52.0f);
@@ -3060,6 +3304,7 @@ void MenuWindow::draw(const MenuRenderData& data) {
         const float field_height = field_bottom - field_top;
         const int lane_count = std::clamp(data.gameplay.lane_count, 1, static_cast<int>(kGameplayHudMaxLanes));
         const float lane_width = (field_right - field_left) / static_cast<float>(lane_count);
+        const float hit_line_y = gameplay_field_y(field_top, field_height, judgement_line_position);
         if (d2d_->gameplay_static_command_list) {
             ctx->DrawImage(d2d_->gameplay_static_command_list.Get());
         }
@@ -3073,8 +3318,8 @@ void MenuWindow::draw(const MenuRenderData& data) {
             const float note_width = gameplay_note_draw_width(lane_width, note_width_scale);
             const float x0 = lane_center - note_width * 0.5f;
             const float x1 = lane_center + note_width * 0.5f;
-            const float y = field_top + sample_to_y(note.start_sample) * field_height;
-            const float tail_y = field_top + sample_to_y(note.tail_sample) * field_height;
+            const float y = gameplay_field_y(field_top, field_height, sample_to_y(note.start_sample));
+            const float tail_y = gameplay_field_y(field_top, field_height, sample_to_y(note.tail_sample));
             const float head_half_h = 11.0f * note_height_scale;
             const float tail_half_h = 9.0f * note_height_scale;
             uint32_t lane_color = 0xF6F8FF;
@@ -3100,7 +3345,7 @@ void MenuWindow::draw(const MenuRenderData& data) {
 
             if (note.hold && note_hold_fill) {
                 const float body_top = std::min(y, tail_y) + tail_half_h;
-                const float body_bottom = std::max(y, tail_y) - head_half_h;
+                const float body_bottom = std::max(y, tail_y) - (note.head_visible ? head_half_h : 0.0f);
                 const float hold_half_width = std::max(4.0f, note_width * 0.30f);
                 const D2D1_RECT_F hold_body =
                     D2D1::RectF(lane_center - hold_half_width, body_top, lane_center + hold_half_width, body_bottom);
@@ -3123,14 +3368,16 @@ void MenuWindow::draw(const MenuRenderData& data) {
             }
 
             const D2D1_RECT_F note_rect = D2D1::RectF(x0, y - head_half_h, x1, y + head_half_h);
-            if (note_head_bitmap) {
-                ctx->DrawBitmap(note_head_bitmap, note_rect, 1.0f, D2D1_BITMAP_INTERPOLATION_MODE_LINEAR);
-            } else {
-                if (note_fill) {
-                    ctx->FillRectangle(note_rect, note_fill);
-                }
-                if (note_border) {
-                    ctx->DrawRectangle(note_rect, note_border, 1.3f);
+            if (note.head_visible) {
+                if (note_head_bitmap) {
+                    ctx->DrawBitmap(note_head_bitmap, note_rect, 1.0f, D2D1_BITMAP_INTERPOLATION_MODE_LINEAR);
+                } else {
+                    if (note_fill) {
+                        ctx->FillRectangle(note_rect, note_fill);
+                    }
+                    if (note_border) {
+                        ctx->DrawRectangle(note_rect, note_border, 1.3f);
+                    }
                 }
             }
         }
@@ -3148,9 +3395,12 @@ void MenuWindow::draw(const MenuRenderData& data) {
                 const float note_width = gameplay_note_draw_width(lane_width, note_width_scale);
                 const float x0 = lane_center - note_width * 0.5f;
                 const float x1 = lane_center + note_width * 0.5f;
-                const float glow_h = 12.0f + 18.0f * activity;
+                const float glow_half_h = 8.0f + 14.0f * activity;
                 const D2D1_RECT_F glow_rect =
-                    D2D1::RectF(x0, field_bottom - glow_h - 4.0f, x1, field_bottom - 4.0f);
+                    D2D1::RectF(x0,
+                                std::max(field_top + 2.0f, hit_line_y - glow_half_h),
+                                x1,
+                                std::min(field_bottom - 2.0f, hit_line_y + glow_half_h));
                 d2d_->accent_brush->SetOpacity(0.12f + 0.38f * activity);
                 ctx->FillRectangle(glow_rect, d2d_->accent_brush.Get());
                 d2d_->accent_brush->SetOpacity(1.0f);
@@ -3491,6 +3741,7 @@ bool MenuWindow::recreate_targets() {
     }
 
     invalidate_gameplay_note_sprite_cache();
+    invalidate_song_select_preview_cache();
     invalidate_gameplay_static_cache();
     d2d_->d2d_context->SetTarget(nullptr);
     d2d_->d2d_target.Reset();

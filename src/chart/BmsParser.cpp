@@ -10,6 +10,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <system_error>
+#include <unordered_set>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -259,6 +260,124 @@ std::string parse_header_value(std::string_view tail) {
     return value;
 }
 
+std::string normalize_mode_token(std::string_view token) {
+    std::string normalized;
+    normalized.reserve(token.size());
+    for (unsigned char ch : token) {
+        if (std::isspace(ch) != 0 || ch == '_' || ch == '-') {
+            continue;
+        }
+        if (ch >= 'a' && ch <= 'z') {
+            normalized.push_back(static_cast<char>(ch - ('a' - 'A')));
+        } else {
+            normalized.push_back(static_cast<char>(ch));
+        }
+    }
+    return normalized;
+}
+
+int key_count_from_mode_token(std::string_view token) {
+    const std::string normalized = normalize_mode_token(token);
+    if (normalized == "4K" || normalized == "4KEY" || normalized == "4KEYS" || normalized == "KEYS4") {
+        return 4;
+    }
+    if (normalized == "5K" || normalized == "5KEY" || normalized == "5KEYS" || normalized == "KEYS5") {
+        return 5;
+    }
+    if (normalized == "6K" || normalized == "6KEY" || normalized == "6KEYS" || normalized == "KEYS6") {
+        return 6;
+    }
+    if (normalized == "7K" || normalized == "7KEY" || normalized == "7KEYS" || normalized == "KEYS7") {
+        return 7;
+    }
+    if (normalized == "8K" || normalized == "8KEY" || normalized == "8KEYS" || normalized == "KEYS8") {
+        return 8;
+    }
+    if (normalized == "9K" || normalized == "9KEY" || normalized == "9KEYS" || normalized == "KEYS9") {
+        return 9;
+    }
+    if (normalized == "10K" || normalized == "10KEY" || normalized == "10KEYS" || normalized == "KEYS10") {
+        return 10;
+    }
+    return 0;
+}
+
+int detect_declared_key_count(const BmsChart& chart) {
+    for (const auto& [key, value] : chart.headers) {
+        if (const int from_key = key_count_from_mode_token(key); from_key > 0) {
+            return from_key;
+        }
+        const std::string normalized_key = normalize_mode_token(key);
+        if (normalized_key == "PLAYMODE" || normalized_key == "KEYMODE") {
+            if (const int from_value = key_count_from_mode_token(value); from_value > 0) {
+                return from_value;
+            }
+        }
+    }
+    return 0;
+}
+
+bool is_note_lane_channel(std::string_view channel) {
+    if (channel.size() != 2) {
+        return false;
+    }
+    return channel[0] == '1' || channel[0] == '2' || channel[0] == '5' || channel[0] == '6';
+}
+
+std::string canonical_lane_channel(std::string_view channel) {
+    std::string normalized(channel);
+    to_upper_ascii(normalized);
+    if (normalized.size() != 2) {
+        return {};
+    }
+    if (normalized[0] == '5') {
+        normalized[0] = '1';
+    } else if (normalized[0] == '6') {
+        normalized[0] = '2';
+    }
+    return normalized;
+}
+
+NoteLaneMapping build_compact_lane_mapping(const BmsChart& chart) {
+    std::vector<std::string> lane_channels;
+    std::unordered_set<std::string> seen;
+    lane_channels.reserve(chart.commands.size());
+
+    for (const auto& command : chart.commands) {
+        if (!is_note_lane_channel(command.channel)) {
+            continue;
+        }
+        const std::string canonical = canonical_lane_channel(command.channel);
+        if (canonical.empty()) {
+            continue;
+        }
+        if (seen.emplace(canonical).second) {
+            lane_channels.push_back(canonical);
+        }
+    }
+
+    std::sort(lane_channels.begin(), lane_channels.end());
+
+    std::unordered_map<std::string, std::size_t> mapping;
+    mapping.reserve(lane_channels.size() * 2u);
+    for (std::size_t index = 0; index < lane_channels.size(); ++index) {
+        const std::size_t lane = index + 1;
+        const std::string& canonical = lane_channels[index];
+        mapping[canonical] = lane;
+
+        std::string long_note_channel = canonical;
+        if (long_note_channel[0] == '1') {
+            long_note_channel[0] = '5';
+            mapping[long_note_channel] = lane;
+        } else if (long_note_channel[0] == '2') {
+            long_note_channel[0] = '6';
+            mapping[long_note_channel] = lane;
+        }
+    }
+
+    return mapping.empty() ? NoteLaneMapping::TenKeyDualPlayerDefault() : NoteLaneMapping(std::move(mapping));
+}
+
 }  // namespace
 
 bool BmsParseResult::success() const {
@@ -425,6 +544,11 @@ BmsParseResult BmsParser::parse(std::string_view content, const BmsParserOptions
 
         // Unknown header; store it for completeness.
         result.chart.headers[key] = value;
+    }
+
+    result.chart.declared_key_count = detect_declared_key_count(result.chart);
+    if (result.chart.declared_key_count > 0) {
+        result.chart.lane_mapping = build_compact_lane_mapping(result.chart);
     }
 
     return result;

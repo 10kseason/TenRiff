@@ -41,6 +41,7 @@ struct BmsChart {
     std::unordered_map<std::string, double> bpm;
     std::unordered_map<std::string, double> stop;
     double base_bpm = 0.0;
+    int declared_key_count = 0;
     std::vector<BmsMeasureCommand> commands;
     NoteLaneMapping lane_mapping = NoteLaneMapping::TenKeyDualPlayerDefault();
 };
