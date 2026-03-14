@@ -39,6 +39,7 @@ enum class MenuHitTargetKind {
     None,
     MouseWheel,
     FileDrop,
+    SongScrollbar,
     TitleButton,
     SongNavButton,
     SongCard,
@@ -107,6 +108,10 @@ struct SongSelectData {
     std::string selected_song_background_path;
     std::string browser_summary;
     std::string sort_summary;
+    int list_total_count = 0;
+    int list_visible_count = 0;
+    int list_window_start = 0;
+    int list_selected_index = -1;
 
     bool indexing = false;
     int indexing_percent = -1;
@@ -207,8 +212,12 @@ struct GameplayHudData {
     int64_t lookahead_samples = 0;
     int64_t past_samples = 0;
     double judgement_line_position = 0.82;
+    double combo_position = 0.24;
     double note_width_scale = 1.0;
     double note_height_scale = 1.0;
+    double hold_body_width_scale = 0.60;
+    bool note_border_enabled = true;
+    std::string note_shape = "rect";
     double visual_offset_ms = 0.0;
 
     double bpm = 0.0;
@@ -265,8 +274,12 @@ struct SkinPreviewData {
     int lane_count = 0;
     int selected_lane = -1;
     double judgement_line_position = 0.82;
+    double combo_position = 0.24;
     double note_width_scale = 1.0;
     double note_height_scale = 1.0;
+    double hold_body_width_scale = 0.60;
+    bool note_border_enabled = true;
+    std::string note_shape = "rect";
     std::array<uint32_t, kGameplayHudMaxLanes> lane_colors{};
 };
 
@@ -319,11 +332,14 @@ public:
     void shutdown();
     void request_close();
     void queue_resize(unsigned int width, unsigned int height);
+    void on_mouse_button_down(int window_x, int window_y);
     void on_mouse_click(int window_x, int window_y, bool double_click);
+    void on_mouse_move(int window_x, int window_y);
     void on_mouse_wheel(int wheel_delta);
     void on_file_drop(std::string path);
 
     [[nodiscard]] std::optional<MenuClickEvent> poll_click_event();
+    [[nodiscard]] bool cursor_hidden() const { return cursor_hidden_; }
 
     [[nodiscard]] bool should_close() const { return should_close_.load(std::memory_order_acquire); }
     [[nodiscard]] bool init_done() const { return init_done_.load(std::memory_order_acquire); }
@@ -347,8 +363,12 @@ private:
     [[nodiscard]] bool ensure_gameplay_static_cache(const GameplayHudData& data);
     [[nodiscard]] bool recreate_targets();
     [[nodiscard]] bool is_input_foreground() const;
+    void update_cursor_visibility(bool hidden);
     void resize_swap_chain(unsigned int width, unsigned int height);
     void push_click_event(MenuClickEvent event);
+    void clear_song_scrollbar_state();
+    [[nodiscard]] bool translate_window_point(int window_x, int window_y, float* out_x, float* out_y) const;
+    [[nodiscard]] int song_scrollbar_target_index(float y, float drag_offset, int selected_offset) const;
 
     std::mutex config_mutex_;
     MenuWindowConfig config_{};
@@ -367,6 +387,7 @@ private:
     unsigned int pending_height_ = 0;
     unsigned int swap_chain_flags_ = 0;
     bool suppress_next_left_button_up_ = false;
+    bool cursor_hidden_ = false;
 
     void* hwnd_ = nullptr;
     unsigned int width_ = 0;
@@ -392,6 +413,7 @@ private:
     struct PerformanceOverlayCache {
         uint64_t graph_revision = 0;
         uint64_t metrics_revision = 0;
+        bool compact_layout = false;
         float graph_ceiling_ms = 16.67f;
         float avg_line_ratio = 0.0f;
         std::wstring sample_text{};
@@ -420,12 +442,28 @@ private:
 
     struct GameplayNoteSpriteCache {
         int lane_count = 0;
+        bool note_border_enabled = true;
+        std::string note_shape = "rect";
         std::array<uint32_t, kGameplayHudMaxLanes> lane_colors{};
     };
 
     struct SongSelectPreviewCache {
         std::string path{};
         bool attempted = false;
+    };
+
+    struct SongScrollbarState {
+        bool visible = false;
+        float left = 0.0f;
+        float top = 0.0f;
+        float right = 0.0f;
+        float bottom = 0.0f;
+        float thumb_top = 0.0f;
+        float thumb_bottom = 0.0f;
+        int total_count = 0;
+        int visible_count = 0;
+        int window_start = 0;
+        int selected_index = -1;
     };
 
     struct D2DResources;
@@ -435,6 +473,11 @@ private:
     GameplayStaticCache gameplay_static_cache_{};
     GameplayNoteSpriteCache gameplay_note_sprite_cache_{};
     SongSelectPreviewCache song_select_preview_cache_{};
+    SongScrollbarState song_scrollbar_state_{};
+    bool song_scroll_drag_active_ = false;
+    float song_scroll_drag_offset_y_ = 0.0f;
+    int song_scroll_drag_selected_offset_ = 0;
+    int song_scroll_drag_last_index_ = -1;
 };
 
 }  // namespace tenriff::render

@@ -22,6 +22,7 @@ enum class KeyMode {
     Keys8,
     Keys9,
     Keys10,
+    Keys16,
 };
 
 enum class GaugeMode {

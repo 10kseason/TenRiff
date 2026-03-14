@@ -32,6 +32,34 @@ struct RenderPerformanceSnapshot {
     std::array<float, kPerformanceGraphSamples> frame_times_ms{};
 };
 
+class PerformanceTracker {
+public:
+    void reset();
+    void record_frame_start_ns(int64_t frame_start_ns);
+    [[nodiscard]] const RenderPerformanceSnapshot& snapshot() const { return snapshot_cache_; }
+
+private:
+    struct FrameSample {
+        double frame_ms = 0.0;
+        int64_t frame_start_ns = 0;
+    };
+
+    void refresh_graph_snapshot();
+    void recompute_snapshot();
+
+    std::deque<FrameSample> frame_history_{};
+    std::array<float, kPerformanceGraphSamples> graph_history_ms_{};
+    std::size_t graph_history_start_ = 0;
+    std::size_t graph_history_count_ = 0;
+    RenderPerformanceSnapshot snapshot_cache_{};
+    uint64_t next_graph_revision_ = 0;
+    uint64_t next_metrics_revision_ = 0;
+    int64_t last_graph_refresh_ns_ = 0;
+    int64_t last_metrics_refresh_ns_ = 0;
+    int64_t last_frame_start_ns_ = 0;
+    bool has_last_frame_start_ = false;
+};
+
 class RenderThread {
 public:
     using RenderCallback = std::function<void()>;
@@ -54,15 +82,7 @@ public:
     [[nodiscard]] bool is_running() const { return is_running_.load(std::memory_order_acquire); }
 
 private:
-    struct FrameSample {
-        double frame_ms = 0.0;
-        int64_t frame_start_ns = 0;
-    };
-
     void reset_performance_tracking();
-    void record_frame_interval(int64_t frame_interval_ns, int64_t frame_start_ns);
-    void refresh_graph_snapshot_locked();
-    void recompute_performance_snapshot_locked();
     [[nodiscard]] RenderConfig current_config() const;
     void thread_main();
 
@@ -75,15 +95,7 @@ private:
     std::atomic<bool> should_stop_{false};
     mutable std::mutex config_mutex_{};
     mutable std::mutex performance_mutex_{};
-    std::deque<FrameSample> frame_history_{};
-    std::array<float, kPerformanceGraphSamples> graph_history_ms_{};
-    std::size_t graph_history_start_ = 0;
-    std::size_t graph_history_count_ = 0;
-    RenderPerformanceSnapshot performance_snapshot_cache_{};
-    uint64_t next_graph_revision_ = 0;
-    uint64_t next_metrics_revision_ = 0;
-    int64_t last_graph_refresh_ns_ = 0;
-    int64_t last_metrics_refresh_ns_ = 0;
+    PerformanceTracker performance_tracker_{};
 };
 
 }  // namespace tenriff::render

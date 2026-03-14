@@ -86,6 +86,7 @@ GameplayChart from_osu_mania(const chart::OsuManiaChart& chart_data, int sample_
         note.start_sample = ms_to_samples(static_cast<double>(note_data.start_time_ms), sample_rate, rate);
         if (note_data.end_time_ms.has_value()) {
             note.end_sample = ms_to_samples(static_cast<double>(note_data.end_time_ms.value()), sample_rate, rate);
+            note.release_required = true;
         }
         chart.notes.push_back(note);
         max_sample = std::max(max_sample, note.end_sample.value_or(note.start_sample));

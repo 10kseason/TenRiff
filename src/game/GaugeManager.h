@@ -26,18 +26,16 @@ struct GaugeDeltaTable {
 
 struct GaugeConfig {
     bool auto_shift = true;
-    double refill_normal = 15.911;
-    double refill_easy = 23.866;
-    double shift_cooldown_ms = 2000.0;
-    GaugeDeltaTable hard{0.191, 0.127, 0.032, -1.414, -2.828};
-    GaugeDeltaTable normal{0.334, 0.223, 0.056, -1.081, -2.175};
-    GaugeDeltaTable easy{0.477, 0.318, 0.080, -0.754, -1.508};
+    double hard_to_normal_threshold = 66.0;
+    double normal_to_easy_threshold = 33.0;
+    GaugeDeltaTable hard{0.13752, 0.09144, 0.02304, -1.94425, -3.88850};
+    GaugeDeltaTable normal{0.23123, 0.15438, 0.03877, -1.54583, -3.11025};
+    GaugeDeltaTable easy{0.30664, 0.20443, 0.05143, -1.16116, -2.32232};
 };
 
 struct GaugeState {
     GaugeType type = GaugeType::Normal;
     double value = 50.0;  // 0..100
-    double cooldown_until_ms = 0.0;
     bool game_over = false;
 };
 

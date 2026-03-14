@@ -12,6 +12,7 @@ struct SongEntry {
     std::string title;
     std::string artist;
     std::string format;
+    std::string layout_label;
     int key_count = 0;
     int level = 0;
     double rating = 0.0;

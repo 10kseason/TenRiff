@@ -26,7 +26,6 @@ GaugeState GaugeManager::initialState(GaugeType type) const noexcept {
         state.value = 30.0;
         break;
     }
-    state.cooldown_until_ms = 0.0;
     state.game_over = false;
     return state;
 }
@@ -49,6 +48,7 @@ GaugeResult GaugeManager::applyJudgement(GaugeState& state, Judgement judgement,
 
 GaugeResult GaugeManager::applyJudgementWeighted(GaugeState& state, Judgement judgement, double time_ms,
                                                  double weight) const {
+    static_cast<void>(time_ms);
     GaugeResult result{};
     if (state.game_over) {
         result.game_over = true;
@@ -58,31 +58,21 @@ GaugeResult GaugeManager::applyJudgementWeighted(GaugeState& state, Judgement ju
     double delta = deltaFor(state.type, judgement) * weight;
     state.value = std::clamp(state.value + delta, kMinGauge, kMaxGauge);
 
-    if (state.cooldown_until_ms > time_ms) {
-        return result;
-    }
-
-    if (state.value > 0.0) {
-        return result;
-    }
-
     if (!config_.auto_shift) {
-        state.game_over = true;
-        result.game_over = true;
+        if (state.value <= 0.0) {
+            state.game_over = true;
+            result.game_over = true;
+        }
         return result;
     }
 
-    if (state.type == GaugeType::Hard) {
+    if (state.type == GaugeType::Hard && state.value <= config_.hard_to_normal_threshold) {
         state.type = GaugeType::Normal;
-        state.value = config_.refill_normal;
-        state.cooldown_until_ms = time_ms + config_.shift_cooldown_ms;
         result.downshifted = true;
-    } else if (state.type == GaugeType::Normal) {
+    } else if (state.type == GaugeType::Normal && state.value <= config_.normal_to_easy_threshold) {
         state.type = GaugeType::Easy;
-        state.value = config_.refill_easy;
-        state.cooldown_until_ms = time_ms + config_.shift_cooldown_ms;
         result.downshifted = true;
-    } else {
+    } else if (state.type == GaugeType::Easy && state.value <= 0.0) {
         state.game_over = true;
         result.game_over = true;
     }

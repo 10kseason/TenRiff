@@ -29,6 +29,11 @@ std::string to_upper_ascii(std::string value) {
     return value;
 }
 
+bool is_charge_note_lnmode(std::string_view value) {
+    const std::string token = trim_copy(value);
+    return token == "2";
+}
+
 int64_t scale_samples(int64_t samples, double rate) {
     if (rate <= 0.0 || !std::isfinite(rate)) {
         return samples;
@@ -71,6 +76,13 @@ BmsGameplayBuildResult build_bms_gameplay_chart(const chart::BmsTimeline& timeli
         }
         return to_upper_ascii(trim_copy(it->second));
     }();
+    const bool release_required = [&parsed_chart]() {
+        auto it = parsed_chart.headers.find("LNMODE");
+        if (it == parsed_chart.headers.end()) {
+            return false;
+        }
+        return is_charge_note_lnmode(it->second);
+    }();
 
     int max_lane = 0;
     std::size_t sequence = 0;
@@ -95,6 +107,7 @@ BmsGameplayBuildResult build_bms_gameplay_chart(const chart::BmsTimeline& timeli
                     entry.note.lane = lane;
                     entry.note.start_sample = pending_it->second.start_sample;
                     entry.note.end_sample = sample;
+                    entry.note.release_required = release_required;
                     entry.object_id = pending_it->second.object_id;
                     entry.sequence = pending_it->second.sequence;
                     entries.push_back(std::move(entry));
@@ -123,6 +136,7 @@ BmsGameplayBuildResult build_bms_gameplay_chart(const chart::BmsTimeline& timeli
             auto& note = entries[last_it->second].note;
             if (!note.end_sample.has_value() && sample > note.start_sample) {
                 note.end_sample = sample;
+                note.release_required = release_required;
             }
             last_normal_note_by_lane.erase(last_it);
             continue;

@@ -27,7 +27,7 @@ namespace tenriff::app {
 
 namespace {
 
-constexpr int kSongIndexVersion = 4;
+constexpr int kSongIndexVersion = 7;
 
 std::filesystem::path path_from_utf8(std::string_view value) {
     try {
@@ -52,10 +52,14 @@ bool is_osu_extension(std::string_view ext) {
     return ext == ".osu";
 }
 
+bool is_menu_bms_key_count(int key_count) {
+    return (key_count >= 4 && key_count <= 10) || key_count == 16;
+}
+
 bool is_menu_song_entry(const SongEntry& entry, const SongIndexOptions& options) {
     const std::string format = to_lower(entry.format);
     if (format == "bms") {
-        return entry.key_count >= 4 && entry.key_count <= 10;
+        return is_menu_bms_key_count(entry.key_count);
     }
     if (options.include_osu && format == "osu") {
         return entry.key_count >= 4 && entry.key_count <= 10;
@@ -184,9 +188,9 @@ std::string relative_path_string(const std::filesystem::path& root, const std::f
     return relative.generic_u8string();
 }
 
-std::optional<chart::OsuDifficultyMetrics> calculate_bms_10k_difficulty(const chart::BmsChart& parsed_chart) {
+std::optional<chart::OsuDifficultyMetrics> calculate_bms_difficulty(const chart::BmsChart& parsed_chart) {
     const int key_count = parsed_chart.declared_key_count > 0 ? parsed_chart.declared_key_count : 10;
-    if (key_count != 10) {
+    if (key_count < 4 || key_count > 10) {
         return std::nullopt;
     }
 
@@ -208,13 +212,13 @@ std::optional<chart::OsuDifficultyMetrics> calculate_bms_10k_difficulty(const ch
     }
 
     chart::OsuManiaChart difficulty_chart;
-    difficulty_chart.key_count = 10;
+    difficulty_chart.key_count = key_count;
     difficulty_chart.base_bpm = parsed_chart.base_bpm;
     difficulty_chart.overall_difficulty = 8.0;
     difficulty_chart.notes.reserve(built_chart.chart.notes.size());
     for (const auto& note : built_chart.chart.notes) {
         chart::OsuManiaNote converted;
-        converted.column = std::clamp(note.lane - 1, 0, 9);
+        converted.column = std::clamp(note.lane - 1, 0, key_count - 1);
         converted.start_time_ms = note.start_sample;
         if (note.end_sample.has_value()) {
             converted.end_time_ms = note.end_sample.value();
@@ -222,7 +226,7 @@ std::optional<chart::OsuDifficultyMetrics> calculate_bms_10k_difficulty(const ch
         difficulty_chart.notes.push_back(std::move(converted));
     }
 
-    return chart::calculate_osu_10k_difficulty(difficulty_chart);
+    return chart::calculate_osu_mania_difficulty(difficulty_chart);
 }
 
 SongEntry build_bms_entry(std::string relative_path,
@@ -243,6 +247,7 @@ SongEntry build_bms_entry(std::string relative_path,
     }
 
     entry.key_count = parsed.chart.declared_key_count > 0 ? parsed.chart.declared_key_count : 10;
+    entry.layout_label = util::sanitize_ui_text(parsed.chart.layout_label);
 
     auto title_it = parsed.chart.headers.find("TITLE");
     if (title_it != parsed.chart.headers.end()) {
@@ -267,7 +272,7 @@ SongEntry build_bms_entry(std::string relative_path,
 
     entry.bpm = parsed.chart.base_bpm;
     const int metadata_level = entry.level;
-    auto difficulty = calculate_bms_10k_difficulty(parsed.chart);
+    auto difficulty = calculate_bms_difficulty(parsed.chart);
     if (difficulty.has_value() && difficulty->note_count > 0) {
         entry.level = difficulty->revive_level;
         entry.rating = difficulty->circus_rating;
@@ -318,12 +323,10 @@ SongEntry build_osu_entry(std::string relative_path,
     entry.artist = util::sanitize_ui_text(parsed.chart.artist);
     entry.bpm = parsed.chart.base_bpm;
 
-    if (parsed.chart.key_count == 10) {
-        const auto difficulty = chart::calculate_osu_10k_difficulty(parsed.chart);
-        if (difficulty.note_count > 0) {
-            entry.level = difficulty.revive_level;
-            entry.rating = difficulty.circus_rating;
-        }
+    const auto difficulty = chart::calculate_osu_mania_difficulty(parsed.chart);
+    if (difficulty.note_count > 0) {
+        entry.level = difficulty.revive_level;
+        entry.rating = difficulty.circus_rating;
     }
     return entry;
 }
@@ -804,6 +807,12 @@ private:
                     return false;
                 }
                 entry.format = util::sanitize_ui_text(value.value());
+            } else if (*key == "layout_label") {
+                auto value = parse_string();
+                if (!value.has_value()) {
+                    return false;
+                }
+                entry.layout_label = util::sanitize_ui_text(value.value());
             } else if (*key == "key_count") {
                 auto value = parse_number();
                 if (!value.has_value()) {
@@ -919,6 +928,8 @@ bool save_song_index(const std::string& path,
         write_json_string(file, entry.artist);
         file << ",\"format\":";
         write_json_string(file, entry.format);
+        file << ",\"layout_label\":";
+        write_json_string(file, entry.layout_label);
         file << ",\"key_count\":" << entry.key_count;
         file << ",\"level\":" << entry.level;
         file << ",\"rating\":" << entry.rating;

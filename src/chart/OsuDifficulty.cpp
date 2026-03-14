@@ -190,19 +190,55 @@ double clamp_positive(double value, double minimum) {
     return std::max(value, minimum);
 }
 
+double normalized_lane_distance(int key_count, std::size_t column_i, std::size_t column_j) {
+    const int safe_key_count = std::max(1, key_count);
+    if (safe_key_count <= 1) {
+        return 0.0;
+    }
+    const double distance = static_cast<double>(
+        std::abs(static_cast<int>(column_i) - static_cast<int>(column_j)));
+    return distance / static_cast<double>(safe_key_count - 1);
+}
+
+double weighted_nps_weight(int key_count, std::size_t column_i, std::size_t column_j) {
+    if (key_count == 10 && column_i < 10 && column_j < 10) {
+        return kWeightedNpsMatrix[column_i][column_j];
+    }
+
+    const double normalized = normalized_lane_distance(key_count, column_i, column_j);
+    const double weight =
+        1.20 - (1.02 * normalized) + ((column_i == column_j) ? 0.0 : (0.08 * (1.0 - normalized)));
+    return std::clamp(weight, 0.12, 1.20);
+}
+
+double visual_distance_weight(int key_count, std::size_t column_i, std::size_t column_j) {
+    if (key_count == 10 && column_i < 10 && column_j < 10) {
+        return kVisualDistanceMatrix[column_i][column_j];
+    }
+
+    const double normalized = normalized_lane_distance(key_count, column_i, column_j);
+    const double center = static_cast<double>(std::max(0, key_count - 1)) * 0.5;
+    const double side_i = static_cast<double>(column_i) - center;
+    const double side_j = static_cast<double>(column_j) - center;
+    const bool crosses_center = (side_i < 0.0 && side_j > 0.0) || (side_i > 0.0 && side_j < 0.0);
+    const double center_penalty = crosses_center ? 0.35 : 0.0;
+    return std::clamp(1.0 + (2.0 * normalized) + center_penalty, 1.0, 3.0);
+}
+
 }  // namespace
 
-OsuDifficultyMetrics calculate_osu_10k_difficulty(const OsuManiaChart& chart) {
+OsuDifficultyMetrics calculate_osu_mania_difficulty(const OsuManiaChart& chart) {
     OsuDifficultyMetrics metrics;
-    if (chart.key_count != 10) {
+    const int key_count = std::clamp(chart.key_count, 1, 10);
+    if (key_count < 4 || key_count > 10) {
         return metrics;
     }
 
     std::vector<DifficultyNote> notes;
     notes.reserve(chart.notes.size() * 2);
-    std::array<std::vector<HoldInterval>, 10> holds_by_column;
+    std::vector<std::vector<HoldInterval>> holds_by_column(static_cast<std::size_t>(key_count));
     for (const auto& note : chart.notes) {
-        const int column = std::clamp(note.column, 0, 9) + 1;
+        const int column = std::clamp(note.column, 0, key_count - 1) + 1;
         if (note.end_time_ms.has_value() && note.end_time_ms.value() > note.start_time_ms) {
             const double start_seconds = static_cast<double>(note.start_time_ms) / 1000.0;
             const double end_seconds = static_cast<double>(note.end_time_ms.value()) / 1000.0;
@@ -241,7 +277,7 @@ OsuDifficultyMetrics calculate_osu_10k_difficulty(const OsuManiaChart& chart) {
         std::max(notes.back().time_seconds - notes.front().time_seconds, 1.0);
     const std::size_t note_count = notes.size();
 
-    std::array<std::vector<std::size_t>, 10> line_note_indices;
+    std::vector<std::vector<std::size_t>> line_note_indices(static_cast<std::size_t>(key_count));
     std::vector<std::size_t> timing_order(note_count, 0);
     for (std::size_t i = 0; i < note_count; ++i) {
         const std::size_t column_index = static_cast<std::size_t>(notes[i].column - 1);
@@ -311,7 +347,7 @@ OsuDifficultyMetrics calculate_osu_10k_difficulty(const OsuManiaChart& chart) {
 
             const double time_weight = 1.0 - (abs_dt_ms / kTimeWindowMs);
             const std::size_t column_j = static_cast<std::size_t>(notes[j].column - 1);
-            const double column_weight = kWeightedNpsMatrix[column_i][column_j];
+            const double column_weight = weighted_nps_weight(key_count, column_i, column_j);
             const double tail_weight =
                 (j != i && notes[j].type == DifficultyNoteType::HoldEnd) ? hold_end_weights[j] : 1.0;
             const double weighted = column_weight * tail_weight * time_weight;
@@ -335,7 +371,7 @@ OsuDifficultyMetrics calculate_osu_10k_difficulty(const OsuManiaChart& chart) {
             }
             const double dt_abs_ms = std::abs((time_seconds - notes[j].time_seconds) * 1000.0);
             const std::size_t column_j = static_cast<std::size_t>(notes[j].column - 1);
-            const double visual_distance = kVisualDistanceMatrix[column_i][column_j];
+            const double visual_distance = visual_distance_weight(key_count, column_i, column_j);
             const double type_distance =
                 kTypeDistanceMatrix[static_cast<std::size_t>(note_type_index(notes[i].type))]
                                    [static_cast<std::size_t>(note_type_index(notes[j].type))];
@@ -409,7 +445,7 @@ OsuDifficultyMetrics calculate_osu_10k_difficulty(const OsuManiaChart& chart) {
             if (overlap_distance <= 0.0) {
                 continue;
             }
-            ldb += kWeightedNpsMatrix[column_i][column_j] * overlap_distance;
+            ldb += weighted_nps_weight(key_count, column_i, column_j) * overlap_distance;
             ldbd += overlap_distance;
         }
         ldb_values[i] = ldb;
@@ -422,7 +458,7 @@ OsuDifficultyMetrics calculate_osu_10k_difficulty(const OsuManiaChart& chart) {
         std::array<double, 4> accumulated{{0.0, 0.0, 0.0, 0.0}};
     };
 
-    std::array<ColumnJackState, 10> jack_state{};
+    std::vector<ColumnJackState> jack_state(static_cast<std::size_t>(key_count));
     std::vector<double> note_jack_score(note_count, 0.0);
     std::vector<double> note_jack_acc(note_count, 0.0);
     const double overall_difficulty = chart.overall_difficulty > 0.0 ? chart.overall_difficulty : 8.0;
@@ -553,6 +589,10 @@ OsuDifficultyMetrics calculate_osu_10k_difficulty(const OsuManiaChart& chart) {
     metrics.average_nps = static_cast<double>(note_count) / duration_seconds;
     metrics.note_count = static_cast<int>(note_count);
     return metrics;
+}
+
+OsuDifficultyMetrics calculate_osu_10k_difficulty(const OsuManiaChart& chart) {
+    return calculate_osu_mania_difficulty(chart);
 }
 
 }  // namespace tenriff::chart

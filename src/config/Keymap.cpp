@@ -45,6 +45,8 @@ const std::unordered_map<std::string, std::vector<std::string>>& default_mode_bi
         {"8k", {"W", "E", "R", "V", "M", "I", "O", "P"}},
         {"9k", {"A", "S", "D", "F", "Space", "H", "J", "K", "L"}},
         {"10k", {"Q", "W", "E", "R", "V", "M", "I", "O", "P", "LBracket"}},
+        {"16k", {"Q", "W", "E", "R", "A", "S", "D", "F",
+                 "U", "I", "O", "P", "J", "K", "L", "Semicolon"}},
     };
     return kBindings;
 }
@@ -93,15 +95,18 @@ std::string KeymapManager::normalize_mode_token(std::string_view key_mode) const
     if (normalized == "10" || normalized == "10key" || normalized == "keys10") {
         return "10k";
     }
+    if (normalized == "16" || normalized == "16key" || normalized == "keys16") {
+        return "16k";
+    }
     if (normalized == "4k" || normalized == "5k" || normalized == "6k" || normalized == "7k" ||
-        normalized == "8k" || normalized == "9k" || normalized == "10k") {
+        normalized == "8k" || normalized == "9k" || normalized == "10k" || normalized == "16k") {
         return normalized;
     }
     return "10k";
 }
 
 std::vector<std::string> KeymapManager::supported_mode_tokens() const {
-    return {"4k", "5k", "6k", "7k", "8k", "9k", "10k"};
+    return {"4k", "5k", "6k", "7k", "8k", "9k", "10k", "16k"};
 }
 
 std::vector<std::string> KeymapManager::lane_ids_for_mode(std::string_view key_mode) const {

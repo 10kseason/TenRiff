@@ -29,6 +29,7 @@ int target_lane_count(KeyMode mode) {
         case KeyMode::Keys8: return 8;
         case KeyMode::Keys9: return 9;
         case KeyMode::Keys10: return 10;
+        case KeyMode::Keys16: return 16;
         case KeyMode::Auto: default: return 0;
     }
 }

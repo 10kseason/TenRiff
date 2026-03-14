@@ -326,8 +326,11 @@ private:
     uint64_t snapshot_version_ = 0;
     uint64_t rendered_snapshot_version_ = 0;
     uint64_t rendered_gameplay_hud_version_ = 0;
+    uint64_t gameplay_performance_last_revision_ = 0;
+    bool gameplay_performance_active_ = false;
     bool render_cache_ready_ = false;
     render::MenuRenderData render_cache_{};
+    render::PerformanceTracker gameplay_performance_tracker_{};
 
     std::unordered_set<uint32_t> pressed_keys_{};
     std::vector<std::string> keymap_lanes_{};

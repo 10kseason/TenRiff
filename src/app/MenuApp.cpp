@@ -46,6 +46,7 @@ constexpr double kVisualOffsetMin = -500.0;
 constexpr double kVisualOffsetMax = 500.0;
 constexpr double kVisualOffsetStep = 5.0;
 constexpr double kJudgementLinePositionStep = 0.01;
+constexpr double kComboPositionStep = 0.02;
 constexpr double kNoteSizeScaleStep = 0.05;
 constexpr double kVolumeMin = 0.0;
 constexpr double kVolumeMax = 1.0;
@@ -294,10 +295,43 @@ std::string format_signed_offset_ms(double value) {
 }
 
 std::string display_label(const std::string& mode) {
+    if (mode == "windowed") {
+        return "Windowed";
+    }
     if (mode == "fullscreen") {
         return "Fullscreen";
     }
     return "Borderless";
+}
+
+std::string normalize_display_mode(std::string value) {
+    std::transform(value.begin(), value.end(), value.begin(), [](unsigned char ch) {
+        return static_cast<char>(std::tolower(ch));
+    });
+    if (value == "windowed" || value == "fullscreen") {
+        return value;
+    }
+    return "borderless";
+}
+
+std::string cycle_display_mode(std::string current, int direction) {
+    static constexpr const char* kDisplayModes[] = {"borderless", "windowed", "fullscreen"};
+    const int option_count = static_cast<int>(sizeof(kDisplayModes) / sizeof(kDisplayModes[0]));
+    current = normalize_display_mode(std::move(current));
+    int current_index = 0;
+    for (int i = 0; i < option_count; ++i) {
+        if (current == kDisplayModes[i]) {
+            current_index = i;
+            break;
+        }
+    }
+    current_index += direction;
+    if (current_index < 0) {
+        current_index = option_count - 1;
+    } else if (current_index >= option_count) {
+        current_index = 0;
+    }
+    return kDisplayModes[current_index];
 }
 
 std::string normalize_resolution_preset(std::string value) {
@@ -390,21 +424,35 @@ std::string key_mode_label(const std::string& value) {
     if (value == "10k") {
         return "10K";
     }
+    if (value == "16k") {
+        return "16K";
+    }
     return "Auto";
+}
+
+std::string song_layout_label(const SongEntry& entry) {
+    if (!entry.layout_label.empty()) {
+        return entry.layout_label;
+    }
+    return key_mode_label(std::to_string(std::max(1, entry.key_count)) + "k");
+}
+
+std::string song_detail_label(const SongEntry& entry) {
+    return song_layout_label(entry) + " " + format_label(to_lower_ascii(entry.format));
 }
 
 std::string normalize_runtime_key_mode(std::string value) {
     value = to_lower_ascii(std::move(value));
     if (value == "4k" || value == "5k" || value == "6k" || value == "7k" || value == "8k" ||
-        value == "9k" || value == "10k") {
+        value == "9k" || value == "10k" || value == "16k") {
         return value;
     }
     return "auto";
 }
 
 std::string cycle_runtime_key_mode(std::string_view current, int direction, bool allow_auto) {
-    static constexpr const char* kAutoModes[] = {"auto", "4k", "5k", "6k", "7k", "8k", "9k", "10k"};
-    static constexpr const char* kConcreteModes[] = {"4k", "5k", "6k", "7k", "8k", "9k", "10k"};
+    static constexpr const char* kAutoModes[] = {"auto", "4k", "5k", "6k", "7k", "8k", "9k", "10k", "16k"};
+    static constexpr const char* kConcreteModes[] = {"4k", "5k", "6k", "7k", "8k", "9k", "10k", "16k"};
     const auto* options = allow_auto ? kAutoModes : kConcreteModes;
     const int option_count = allow_auto ? static_cast<int>(sizeof(kAutoModes) / sizeof(kAutoModes[0]))
                                         : static_cast<int>(sizeof(kConcreteModes) / sizeof(kConcreteModes[0]));
@@ -432,14 +480,14 @@ std::string cycle_runtime_key_mode(std::string_view current, int direction, bool
 std::string normalize_skin_edit_mode(std::string value) {
     value = config::normalize_skin_mode_token(value);
     if (value == "4k" || value == "5k" || value == "6k" || value == "7k" || value == "8k" ||
-        value == "9k" || value == "10k") {
+        value == "9k" || value == "10k" || value == "16k") {
         return value;
     }
     return "10k";
 }
 
 std::string cycle_skin_edit_mode(std::string_view current, int direction) {
-    static constexpr const char* kSkinModes[] = {"4k", "5k", "6k", "7k", "8k", "9k", "10k"};
+    static constexpr const char* kSkinModes[] = {"4k", "5k", "6k", "7k", "8k", "9k", "10k", "16k"};
     const int option_count = static_cast<int>(sizeof(kSkinModes) / sizeof(kSkinModes[0]));
     std::string normalized = normalize_skin_edit_mode(std::string(current));
     int index = option_count - 1;
@@ -474,6 +522,9 @@ int lane_count_for_skin_mode(std::string_view key_mode) {
     }
     if (normalized == "9k") {
         return 9;
+    }
+    if (normalized == "16k") {
+        return 16;
     }
     if (normalized == "4k") {
         return 4;
@@ -770,6 +821,25 @@ std::string key_filter_label(int key_filter) {
     return key_filter <= 0 ? "All Keys" : key_mode_label(std::to_string(key_filter) + "k");
 }
 
+int cycle_key_filter_value(int key_filter, int direction) {
+    static constexpr int kKeyFilters[] = {0, 4, 5, 6, 7, 8, 9, 10, 16};
+    const int option_count = static_cast<int>(sizeof(kKeyFilters) / sizeof(kKeyFilters[0]));
+    int index = 0;
+    for (int i = 0; i < option_count; ++i) {
+        if (key_filter == kKeyFilters[i]) {
+            index = i;
+            break;
+        }
+    }
+    index += direction;
+    if (index < 0) {
+        index = option_count - 1;
+    } else if (index >= option_count) {
+        index = 0;
+    }
+    return kKeyFilters[index];
+}
+
 std::string level_filter_label(int level_min, int level_max) {
     if (level_min <= 0 && level_max <= 0) {
         return "All Levels";
@@ -860,9 +930,7 @@ std::string browser_summary_label(std::string_view query, int key_filter, int le
     if (!query.empty()) {
         parts.push_back("Q " + safe_ui_text(query));
     }
-    if (key_filter > 0) {
-        parts.push_back(key_mode_label(std::to_string(key_filter) + "k"));
-    }
+    static_cast<void>(key_filter);
     if (level_min > 0 || level_max > 0) {
         parts.push_back(level_filter_label(level_min, level_max));
     }
@@ -2200,6 +2268,33 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
         }
         return;
     }
+    if (event.kind == render::MenuHitTargetKind::SongScrollbar) {
+        if (screen_ != Screen::SongSelect) {
+            return;
+        }
+        song_select_focus_ = SongSelectFocus::SongList;
+        if (song_select_view_ == SongSelectView::Sources) {
+            if (!config_.ui.recent_song_sources.empty()) {
+                selected_source_ = clamp_int(event.index, 0, static_cast<int>(config_.ui.recent_song_sources.size() - 1));
+                publish_snapshot();
+            }
+            return;
+        }
+        if (song_select_view_ == SongSelectView::Records) {
+            rebuild_current_song_record_indices();
+            if (!current_song_record_indices_.empty()) {
+                selected_record_ =
+                    clamp_int(event.index, 0, static_cast<int>(current_song_record_indices_.size() - 1));
+                publish_snapshot();
+            }
+            return;
+        }
+        if (visible_song_count() > 0) {
+            selected_song_ = clamp_int(event.index, 0, static_cast<int>(visible_song_count() - 1));
+            publish_snapshot();
+        }
+        return;
+    }
     if (event.kind == render::MenuHitTargetKind::FileDrop) {
         auto dropped_source = normalize_dropped_song_source(event.path);
         if (!dropped_source.has_value()) {
@@ -2238,7 +2333,7 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
                 return;
             }
             song_select_focus_ = SongSelectFocus::LeftNav;
-            song_select_nav_cursor_ = clamp_int(event.index, 0, 5);
+            song_select_nav_cursor_ = clamp_int(event.index, 0, 6);
             publish_snapshot();
             if (event.part == render::MenuHitPart::Activate) {
                 handle_song_select_input(key_enter_);
@@ -2337,7 +2432,7 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
             handle_song_browser_input(action_key);
             return;
         case Screen::SettingsSkins:
-            settings_cursor_ = clamp_int(event.index, 0, 6);
+            settings_cursor_ = clamp_int(event.index, 0, 10);
             handle_skins_settings_input(action_key);
             return;
         case Screen::SettingsInput:
@@ -2515,7 +2610,7 @@ void MenuApp::handle_song_select_input(uint32_t keycode) {
     }
     if (keycode == key_up_) {
         if (song_select_focus_ == SongSelectFocus::LeftNav) {
-            song_select_nav_cursor_ = clamp_int(song_select_nav_cursor_ - 1, 0, 5);
+            song_select_nav_cursor_ = clamp_int(song_select_nav_cursor_ - 1, 0, 6);
             publish_snapshot();
             return;
         }
@@ -2526,7 +2621,7 @@ void MenuApp::handle_song_select_input(uint32_t keycode) {
     }
     if (keycode == key_down_) {
         if (song_select_focus_ == SongSelectFocus::LeftNav) {
-            song_select_nav_cursor_ = clamp_int(song_select_nav_cursor_ + 1, 0, 5);
+            song_select_nav_cursor_ = clamp_int(song_select_nav_cursor_ + 1, 0, 6);
             publish_snapshot();
             return;
         }
@@ -2555,18 +2650,26 @@ void MenuApp::handle_song_select_input(uint32_t keycode) {
                     publish_snapshot();
                     return;
                 case 3:
+                    song_key_filter_ = cycle_key_filter_value(song_key_filter_, 1);
+                    song_select_view_ = SongSelectView::Songs;
+                    rebuild_visible_song_list();
+                    rebuild_current_song_record_indices();
+                    song_select_focus_ = SongSelectFocus::SongList;
+                    publish_snapshot();
+                    return;
+                case 4:
                     submenu_return_screen_ = Screen::SongSelect;
                     screen_ = Screen::SongBrowser;
                     settings_cursor_ = 0;
                     publish_snapshot();
                     return;
-                case 4:
+                case 5:
                     submenu_return_screen_ = Screen::SongSelect;
                     screen_ = Screen::ModeSelect;
                     settings_cursor_ = 0;
                     publish_snapshot();
                     return;
-                case 5:
+                case 6:
                     song_select_view_ = SongSelectView::Records;
                     selected_record_ = 0;
                     song_select_focus_ = SongSelectFocus::SongList;
@@ -2649,22 +2752,8 @@ void MenuApp::handle_song_browser_input(uint32_t keycode) {
     };
 
     if (settings_cursor_ == 1 && (keycode == key_left_ || keycode == key_right_)) {
-        static constexpr int kKeyFilters[] = {0, 4, 5, 6, 7, 8, 9, 10};
         const int direction = (keycode == key_left_) ? -1 : 1;
-        int index = 0;
-        for (int i = 0; i < static_cast<int>(sizeof(kKeyFilters) / sizeof(kKeyFilters[0])); ++i) {
-            if (song_key_filter_ == kKeyFilters[i]) {
-                index = i;
-                break;
-            }
-        }
-        index += direction;
-        if (index < 0) {
-            index = static_cast<int>(sizeof(kKeyFilters) / sizeof(kKeyFilters[0])) - 1;
-        } else if (index >= static_cast<int>(sizeof(kKeyFilters) / sizeof(kKeyFilters[0]))) {
-            index = 0;
-        }
-        song_key_filter_ = kKeyFilters[index];
+        song_key_filter_ = cycle_key_filter_value(song_key_filter_, direction);
         apply_filter_refresh();
         return;
     }
@@ -2863,7 +2952,8 @@ void MenuApp::handle_graphics_settings_input(uint32_t keycode) {
     }
 
     if (settings_cursor_ == 0 && (keycode == key_left_ || keycode == key_right_)) {
-        config_.graphics.display_mode = (config_.graphics.display_mode == "borderless") ? "fullscreen" : "borderless";
+        const int direction = (keycode == key_left_) ? -1 : 1;
+        config_.graphics.display_mode = cycle_display_mode(config_.graphics.display_mode, direction);
         graphics_dirty_ = true;
         publish_snapshot();
         return;
@@ -2923,7 +3013,7 @@ void MenuApp::handle_graphics_settings_input(uint32_t keycode) {
 }
 
 void MenuApp::handle_skins_settings_input(uint32_t keycode) {
-    const int item_count = 7;
+    const int item_count = 11;
     if (keycode == key_up_) {
         settings_cursor_ = clamp_int(settings_cursor_ - 1, 0, item_count - 1);
         publish_snapshot();
@@ -2982,6 +3072,19 @@ void MenuApp::handle_skins_settings_input(uint32_t keycode) {
         return;
     }
     if (settings_cursor_ == 3 && (keycode == key_left_ || keycode == key_right_)) {
+        config_.skin.note_shape =
+            (config::normalize_skin_note_shape_token(config_.skin.note_shape) == "circle") ? "rect" : "circle";
+        skin_dirty_ = true;
+        publish_snapshot();
+        return;
+    }
+    if (settings_cursor_ == 4 && (keycode == key_left_ || keycode == key_right_)) {
+        config_.skin.note_border_enabled = !config_.skin.note_border_enabled;
+        skin_dirty_ = true;
+        publish_snapshot();
+        return;
+    }
+    if (settings_cursor_ == 5 && (keycode == key_left_ || keycode == key_right_)) {
         const int direction = (keycode == key_left_) ? -1 : 1;
         config_.skin.judgement_line_position = clamp_step_value(
             config_.skin.judgement_line_position + static_cast<double>(direction) * kJudgementLinePositionStep,
@@ -2990,7 +3093,7 @@ void MenuApp::handle_skins_settings_input(uint32_t keycode) {
         publish_snapshot();
         return;
     }
-    if (settings_cursor_ == 4 && (keycode == key_left_ || keycode == key_right_)) {
+    if (settings_cursor_ == 6 && (keycode == key_left_ || keycode == key_right_)) {
         const int direction = (keycode == key_left_) ? -1 : 1;
         config_.skin.note_width_scale = clamp_step_value(
             config_.skin.note_width_scale + static_cast<double>(direction) * kNoteSizeScaleStep,
@@ -2999,11 +3102,29 @@ void MenuApp::handle_skins_settings_input(uint32_t keycode) {
         publish_snapshot();
         return;
     }
-    if (settings_cursor_ == 5 && (keycode == key_left_ || keycode == key_right_)) {
+    if (settings_cursor_ == 7 && (keycode == key_left_ || keycode == key_right_)) {
+        const int direction = (keycode == key_left_) ? -1 : 1;
+        config_.skin.hold_body_width_scale = clamp_step_value(
+            config_.skin.hold_body_width_scale + static_cast<double>(direction) * kNoteSizeScaleStep,
+            config::kHoldBodyWidthScaleMin, config::kHoldBodyWidthScaleMax, kNoteSizeScaleStep);
+        skin_dirty_ = true;
+        publish_snapshot();
+        return;
+    }
+    if (settings_cursor_ == 8 && (keycode == key_left_ || keycode == key_right_)) {
         const int direction = (keycode == key_left_) ? -1 : 1;
         config_.skin.note_height_scale = clamp_step_value(
             config_.skin.note_height_scale + static_cast<double>(direction) * kNoteSizeScaleStep,
             config::kNoteHeightScaleMin, config::kNoteHeightScaleMax, kNoteSizeScaleStep);
+        skin_dirty_ = true;
+        publish_snapshot();
+        return;
+    }
+    if (settings_cursor_ == 9 && (keycode == key_left_ || keycode == key_right_)) {
+        const int direction = (keycode == key_left_) ? -1 : 1;
+        config_.skin.combo_position = clamp_step_value(
+            config_.skin.combo_position + static_cast<double>(direction) * kComboPositionStep,
+            config::kComboPositionMin, config::kComboPositionMax, kComboPositionStep);
         skin_dirty_ = true;
         publish_snapshot();
         return;
@@ -3281,6 +3402,10 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target, uin
         config_.skin.judgement_line_position,
         config::kJudgementLinePositionMin,
         config::kJudgementLinePositionMax);
+    target.combo_position = std::clamp(
+        config_.skin.combo_position,
+        config::kComboPositionMin,
+        config::kComboPositionMax);
     target.note_width_scale = std::clamp(
         config_.skin.note_width_scale,
         config::kNoteWidthScaleMin,
@@ -3289,6 +3414,12 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target, uin
         config_.skin.note_height_scale,
         config::kNoteHeightScaleMin,
         config::kNoteHeightScaleMax);
+    target.hold_body_width_scale = std::clamp(
+        config_.skin.hold_body_width_scale,
+        config::kHoldBodyWidthScaleMin,
+        config::kHoldBodyWidthScaleMax);
+    target.note_border_enabled = config_.skin.note_border_enabled;
+    target.note_shape = config::normalize_skin_note_shape_token(config_.skin.note_shape);
     target.visual_offset_ms = std::clamp(config_.visual_offset_ms, kVisualOffsetMin, kVisualOffsetMax);
     target.rate = gameplay_hud_.rate;
     target.hispeed = gameplay_hud_.hispeed;
@@ -3489,10 +3620,11 @@ void MenuApp::publish_snapshot() {
                                        : "A-Z"},
             render::MenuButtonData{"SOURCES", "D", song_select_nav_cursor_ == 2,
                                     render.song_select.showing_sources ? "ACTIVE" : source_detail},
-            render::MenuButtonData{"BROWSE", "F", song_select_nav_cursor_ == 3, browser_detail},
-            render::MenuButtonData{"MOD", "M", song_select_nav_cursor_ == 4,
+            render::MenuButtonData{"KEY", "K", song_select_nav_cursor_ == 3, key_filter_label(song_key_filter_)},
+            render::MenuButtonData{"BROWSE", "F", song_select_nav_cursor_ == 4, browser_detail},
+            render::MenuButtonData{"MOD", "M", song_select_nav_cursor_ == 5,
                                     format_multiplier(config_.speed.rate) + " / HS " + format_decimal(config_.speed.hi_speed)},
-            render::MenuButtonData{"RECORDS", "R", song_select_nav_cursor_ == 5,
+            render::MenuButtonData{"RECORDS", "R", song_select_nav_cursor_ == 6,
                                    render.song_select.showing_records ? "ACTIVE" : records_detail},
         };
 
@@ -3505,6 +3637,10 @@ void MenuApp::publish_snapshot() {
                 const int max_start = std::max(0, total_sources - visible);
                 start = std::min(start, max_start);
                 const int end = std::min(total_sources, start + visible);
+                render.song_select.list_total_count = total_sources;
+                render.song_select.list_visible_count = end - start;
+                render.song_select.list_window_start = start;
+                render.song_select.list_selected_index = selected_source_;
 
                 for (int i = start; i < end; ++i) {
                     const std::string& source_path = config_.ui.recent_song_sources[static_cast<std::size_t>(i)];
@@ -3545,6 +3681,10 @@ void MenuApp::publish_snapshot() {
                 const int max_start = std::max(0, total - visible);
                 start = std::min(start, max_start);
                 const int end = std::min(total, start + visible);
+                render.song_select.list_total_count = total;
+                render.song_select.list_visible_count = end - start;
+                render.song_select.list_window_start = start;
+                render.song_select.list_selected_index = selected_record_;
 
                 for (int i = start; i < end; ++i) {
                     const LocalPlayRecord& record =
@@ -3569,6 +3709,10 @@ void MenuApp::publish_snapshot() {
                 const int max_start = std::max(0, total - visible);
                 start = std::min(start, max_start);
                 const int end = std::min(total, start + visible);
+                render.song_select.list_total_count = total;
+                render.song_select.list_visible_count = end - start;
+                render.song_select.list_window_start = start;
+                render.song_select.list_selected_index = selected_song_;
 
                 for (int i = start; i < end; ++i) {
                     const SongEntry* entry = visible_song_entry(static_cast<std::size_t>(i));
@@ -3578,10 +3722,7 @@ void MenuApp::publish_snapshot() {
                     render::SongCardData card;
                     card.title = song_title_for_ui(*entry);
                     card.artist = song_artist_for_ui(*entry);
-                    card.detail = safe_ui_text_or_placeholder(
-                        key_mode_label(std::to_string(std::max(1, entry->key_count)) + "k") + " " +
-                            format_label(to_lower_ascii(entry->format)),
-                        "<invalid detail>");
+                    card.detail = safe_ui_text_or_placeholder(song_detail_label(*entry), "<invalid detail>");
                     card.level = entry->level;
                     card.rating = entry->rating;
                     card.song_index = i;
@@ -3597,10 +3738,7 @@ void MenuApp::publish_snapshot() {
                                              : nullptr) {
                 render.song_select.selected_song_title = song_title_for_ui(*entry);
                 render.song_select.selected_song_artist = song_artist_for_ui(*entry);
-                render.song_select.selected_song_detail = safe_ui_text_or_placeholder(
-                    key_mode_label(std::to_string(std::max(1, entry->key_count)) + "k") + " " +
-                        format_label(to_lower_ascii(entry->format)),
-                    "-");
+                render.song_select.selected_song_detail = safe_ui_text_or_placeholder(song_detail_label(*entry), "-");
                 render.song_select.selected_song_background_path = selected_song_background_preview_path();
             }
         }
@@ -3681,7 +3819,7 @@ void MenuApp::publish_snapshot() {
 
         render.generic.notes.push_back("Search matches title, artist, and chart path.");
         render.generic.notes.push_back("Use letters/numbers/space on the Search row. Backspace deletes, Delete clears.");
-        render.generic.notes.push_back("Key Filter supports All plus 4K through 10K.");
+        render.generic.notes.push_back("Key Filter supports All plus 4K through 10K and 16K. Song Select also has a quick KEY toggle.");
         render.generic.notes.push_back("Difficulty filters apply to indexed LV values only.");
         render.generic.notes.push_back("Sort order stays available from Song Select: LEVEL toggles ASC/DESC, TITLE toggles A-Z/Z-A.");
     } else if (screen_ == Screen::Gameplay) {
@@ -3883,13 +4021,21 @@ void MenuApp::publish_snapshot() {
             add_row("Lane Color",
                     config::skin_color_label(preview_lane_colors[static_cast<std::size_t>(skin_edit_lane_)]),
                     settings_cursor_ == 2, render::MenuHitTargetKind::SettingsRow, 2, false, true);
-            add_row("Judge Line", format_percent(config_.skin.judgement_line_position), settings_cursor_ == 3,
+            add_row("Note Shape", config::skin_note_shape_label(config_.skin.note_shape), settings_cursor_ == 3,
                     render::MenuHitTargetKind::SettingsRow, 3, false, true);
-            add_row("Note Width", format_percent(config_.skin.note_width_scale), settings_cursor_ == 4,
+            add_row("Note Border", on_off(config_.skin.note_border_enabled), settings_cursor_ == 4,
                     render::MenuHitTargetKind::SettingsRow, 4, false, true);
-            add_row("Note Height", format_percent(config_.skin.note_height_scale), settings_cursor_ == 5,
+            add_row("Judge Line", format_percent(config_.skin.judgement_line_position), settings_cursor_ == 5,
                     render::MenuHitTargetKind::SettingsRow, 5, false, true);
-            add_row("Back", "", settings_cursor_ == 6, render::MenuHitTargetKind::SettingsRow, 6, true, false);
+            add_row("Note Width", format_percent(config_.skin.note_width_scale), settings_cursor_ == 6,
+                    render::MenuHitTargetKind::SettingsRow, 6, false, true);
+            add_row("LN Body Width", format_percent(config_.skin.hold_body_width_scale), settings_cursor_ == 7,
+                    render::MenuHitTargetKind::SettingsRow, 7, false, true);
+            add_row("Note Height", format_percent(config_.skin.note_height_scale), settings_cursor_ == 8,
+                    render::MenuHitTargetKind::SettingsRow, 8, false, true);
+            add_row("Combo Y", format_percent(config_.skin.combo_position), settings_cursor_ == 9,
+                    render::MenuHitTargetKind::SettingsRow, 9, false, true);
+            add_row("Back", "", settings_cursor_ == 10, render::MenuHitTargetKind::SettingsRow, 10, true, false);
 
             render.generic.skin_preview.visible = true;
             render.generic.skin_preview.mode_label = key_mode_label(skin_edit_mode_);
@@ -3898,17 +4044,22 @@ void MenuApp::publish_snapshot() {
             render.generic.skin_preview.lane_count = lane_count;
             render.generic.skin_preview.selected_lane = skin_edit_lane_ + 1;
             render.generic.skin_preview.judgement_line_position = config_.skin.judgement_line_position;
+            render.generic.skin_preview.combo_position = config_.skin.combo_position;
             render.generic.skin_preview.note_width_scale = config_.skin.note_width_scale;
             render.generic.skin_preview.note_height_scale = config_.skin.note_height_scale;
+            render.generic.skin_preview.hold_body_width_scale = config_.skin.hold_body_width_scale;
+            render.generic.skin_preview.note_border_enabled = config_.skin.note_border_enabled;
+            render.generic.skin_preview.note_shape = config_.skin.note_shape;
             render.generic.skin_preview.lane_colors.fill(0);
             for (int lane = 0; lane < lane_count && lane < static_cast<int>(kGameplayHudMaxLanes); ++lane) {
                 render.generic.skin_preview.lane_colors[static_cast<std::size_t>(lane)] =
                     config::skin_color_rgb(preview_lane_colors[static_cast<std::size_t>(lane)]);
             }
 
-            render.generic.notes.push_back("Key Mode switches the editable 4K-10K lane layout.");
+            render.generic.notes.push_back("Key Mode switches the editable 4K-10K and 16K lane layout.");
             render.generic.notes.push_back("Target Lane selects which lane color the Lane Color row edits.");
-            render.generic.notes.push_back("The preview updates immediately with the current colors, judge line, and note size.");
+            render.generic.notes.push_back("Note Shape toggles between the existing rect skin and the new circle skin.");
+            render.generic.notes.push_back("The preview updates immediately with colors, combo position, judge line, and note style.");
         } else if (screen_ == Screen::SettingsInput) {
             add_row("Polling Hz", std::to_string(config_.input.polling_hz), settings_cursor_ == 0,
                     render::MenuHitTargetKind::SettingsRow, 0, false, true);
@@ -3936,7 +4087,7 @@ void MenuApp::publish_snapshot() {
             add_row("Back", "", settings_cursor_ == 8, render::MenuHitTargetKind::SettingsRow, 8, true, false);
             render.generic.notes.push_back("OSU Charts adds 4K-10K .osu beatmaps to song indexing and runtime loading.");
             render.generic.notes.push_back("Chart Filter switches the visible library between BMS, OSU, or All.");
-            render.generic.notes.push_back("Key Mode selects Auto or a preferred osu lane mode from 4K through 10K.");
+            render.generic.notes.push_back("Key Mode selects Auto plus 4K-10K/16K runtime layouts; osu charts still top out at 10K.");
             render.generic.notes.push_back("Back saves the toggle/filter and refreshes the song library cache when needed.");
         } else if (screen_ == Screen::Keymap) {
             config::KeymapManager keymap_manager;
@@ -3967,7 +4118,7 @@ void MenuApp::publish_snapshot() {
             add_row("Reset", "", false, render::MenuHitTargetKind::KeymapButton, 1, !keymap_capture_active_, false);
             add_row("NKRO Test", "", false, render::MenuHitTargetKind::KeymapButton, 2, !keymap_capture_active_, false);
             add_row("Back", "", false, render::MenuHitTargetKind::KeymapButton, 3, !keymap_capture_active_, false);
-            render.generic.notes.push_back("Left/Right on Key Mode selects which 4K-10K layout you are editing.");
+            render.generic.notes.push_back("Left/Right on Key Mode selects which 4K-10K or 16K layout you are editing.");
             render.generic.notes.push_back("Enter binds the selected lane. A=Save  R=Reset  F2=NKRO Test  Esc=Back");
         } else if (screen_ == Screen::KeymapConfirm) {
             render.generic.notes.push_back("Duplicate binding detected.");
@@ -4043,7 +4194,7 @@ void MenuApp::publish_snapshot() {
 
 void MenuApp::render_tick() {
     const bool show_performance_overlay = config_.graphics.performance_overlay;
-    const render::RenderPerformanceSnapshot perf_snapshot =
+    render::RenderPerformanceSnapshot perf_snapshot =
         show_performance_overlay ? render_thread_.performance_snapshot() : render::RenderPerformanceSnapshot{};
     bool snapshot_changed = false;
 
@@ -4071,9 +4222,30 @@ void MenuApp::render_tick() {
 
     if (render_cache_.kind == render::MenuScreenKind::GameplayHud) {
         uint64_t gameplay_revision = 0;
+        int64_t gameplay_snapshot_time_ns = 0;
+        bool gameplay_perf_active = false;
         {
             std::lock_guard<std::mutex> lock(gameplay_hud_mutex_);
             gameplay_revision = gameplay_hud_.revision;
+            gameplay_snapshot_time_ns = gameplay_hud_.snapshot_time_ns;
+            gameplay_perf_active = gameplay_hud_.active && !gameplay_hud_.loading;
+        }
+        if (gameplay_perf_active) {
+            if (!gameplay_performance_active_) {
+                gameplay_performance_tracker_.reset();
+                gameplay_performance_last_revision_ = 0;
+                gameplay_performance_active_ = true;
+            }
+            if (gameplay_snapshot_time_ns > 0 && gameplay_revision != 0 &&
+                gameplay_revision != gameplay_performance_last_revision_) {
+                gameplay_performance_tracker_.record_frame_start_ns(gameplay_snapshot_time_ns);
+                gameplay_performance_last_revision_ = gameplay_revision;
+            }
+            perf_snapshot = gameplay_performance_tracker_.snapshot();
+        } else if (gameplay_performance_active_) {
+            gameplay_performance_tracker_.reset();
+            gameplay_performance_last_revision_ = 0;
+            gameplay_performance_active_ = false;
         }
         if (snapshot_changed || rendered_gameplay_hud_version_ != gameplay_revision) {
             populate_gameplay_render_data(render_cache_.gameplay, &gameplay_revision);
@@ -4086,6 +4258,11 @@ void MenuApp::render_tick() {
             rendered_gameplay_hud_version_ = gameplay_revision;
         }
     } else {
+        if (gameplay_performance_active_) {
+            gameplay_performance_tracker_.reset();
+            gameplay_performance_last_revision_ = 0;
+            gameplay_performance_active_ = false;
+        }
         rendered_gameplay_hud_version_ = 0;
     }
     menu_window_.render(render_cache_);

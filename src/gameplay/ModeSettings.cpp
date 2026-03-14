@@ -21,6 +21,7 @@ std::string to_string(KeyMode mode) {
         case KeyMode::Keys8: return "8K";
         case KeyMode::Keys9: return "9K";
         case KeyMode::Keys10: return "10K";
+        case KeyMode::Keys16: return "16K";
         case KeyMode::Auto: default: return "AUTO";
     }
 }
@@ -98,6 +99,9 @@ std::optional<KeyMode> parse_key_mode(std::string_view token) {
     }
     if (normalized == "10K" || normalized == "10KEY" || normalized == "KEYS10") {
         return KeyMode::Keys10;
+    }
+    if (normalized == "16K" || normalized == "16KEY" || normalized == "KEYS16") {
+        return KeyMode::Keys16;
     }
     return std::nullopt;
 }

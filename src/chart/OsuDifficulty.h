@@ -13,5 +13,6 @@ struct OsuDifficultyMetrics {
 };
 
 [[nodiscard]] OsuDifficultyMetrics calculate_osu_10k_difficulty(const OsuManiaChart& chart);
+[[nodiscard]] OsuDifficultyMetrics calculate_osu_mania_difficulty(const OsuManiaChart& chart);
 
 }  // namespace tenriff::chart

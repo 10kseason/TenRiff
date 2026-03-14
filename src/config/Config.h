@@ -18,12 +18,18 @@ inline constexpr double kNoteWidthScaleMin = 0.50;
 inline constexpr double kNoteWidthScaleMax = 1.40;
 inline constexpr double kNoteHeightScaleMin = 0.50;
 inline constexpr double kNoteHeightScaleMax = 2.00;
+inline constexpr double kHoldBodyWidthScaleMin = 0.50;
+inline constexpr double kHoldBodyWidthScaleMax = 1.20;
+inline constexpr double kHoldBodyWidthScaleDefault = 0.60;
+inline constexpr double kComboPositionMin = 0.10;
+inline constexpr double kComboPositionMax = 0.78;
+inline constexpr double kComboPositionDefault = 0.24;
 
 struct JudgeConfig {
     double pg_ms = 15.5;
     double gr_ms = 31.0;
     double gd_ms = 55.0;
-    double bd_ms = 80.0;
+    double bd_ms = 200.0;
     double hold_grace_ms = 20.0;
     double hold_break_ms = 50.0;
     double mask_ms = 30.0;
@@ -59,9 +65,13 @@ struct UiConfig {
 };
 
 struct SkinConfig {
+    std::string note_shape = "rect";
+    bool note_border_enabled = true;
     double judgement_line_position = kJudgementLinePositionDefault;
+    double combo_position = kComboPositionDefault;
     double note_width_scale = 1.0;
     double note_height_scale = 1.0;
+    double hold_body_width_scale = kHoldBodyWidthScaleDefault;
     std::unordered_map<std::string, std::vector<std::string>> lane_colors;
 };
 
@@ -122,6 +132,8 @@ public:
 [[nodiscard]] std::vector<std::string> supported_skin_mode_tokens();
 [[nodiscard]] std::vector<std::string> supported_skin_color_tokens();
 [[nodiscard]] std::string normalize_skin_color_token(std::string_view token);
+[[nodiscard]] std::string normalize_skin_note_shape_token(std::string_view token);
+[[nodiscard]] std::string skin_note_shape_label(std::string_view token);
 [[nodiscard]] std::string skin_color_label(std::string_view token);
 [[nodiscard]] uint32_t skin_color_rgb(std::string_view token);
 [[nodiscard]] std::vector<std::string> default_skin_lane_colors(std::string_view key_mode);

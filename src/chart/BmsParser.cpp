@@ -1,6 +1,7 @@
 #include "chart/BmsParser.h"
 
 #include <algorithm>
+#include <array>
 #include <cctype>
 #include <charconv>
 #include <filesystem>
@@ -299,10 +300,16 @@ int key_count_from_mode_token(std::string_view token) {
     if (normalized == "10K" || normalized == "10KEY" || normalized == "10KEYS" || normalized == "KEYS10") {
         return 10;
     }
+    if (normalized == "16K" || normalized == "16KEY" || normalized == "16KEYS" || normalized == "KEYS16") {
+        return 16;
+    }
     return 0;
 }
 
-int detect_declared_key_count(const BmsChart& chart) {
+bool is_note_lane_channel(std::string_view channel);
+std::string canonical_lane_channel(std::string_view channel);
+
+int detect_explicit_key_count(const BmsChart& chart) {
     for (const auto& [key, value] : chart.headers) {
         if (const int from_key = key_count_from_mode_token(key); from_key > 0) {
             return from_key;
@@ -315,6 +322,223 @@ int detect_declared_key_count(const BmsChart& chart) {
         }
     }
     return 0;
+}
+
+std::vector<std::string> collect_lane_channels(const BmsChart& chart) {
+    std::vector<std::string> lane_channels;
+    std::unordered_set<std::string> seen;
+    lane_channels.reserve(chart.commands.size());
+
+    for (const auto& command : chart.commands) {
+        if (!is_note_lane_channel(command.channel)) {
+            continue;
+        }
+        const std::string canonical = canonical_lane_channel(command.channel);
+        if (canonical.empty()) {
+            continue;
+        }
+        if (seen.emplace(canonical).second) {
+            lane_channels.push_back(canonical);
+        }
+    }
+
+    std::sort(lane_channels.begin(), lane_channels.end());
+    return lane_channels;
+}
+
+bool contains_channel(const std::vector<std::string>& lane_channels, std::string_view channel) {
+    return std::find(lane_channels.begin(), lane_channels.end(), channel) != lane_channels.end();
+}
+
+bool matches_only_allowed_channels(const std::vector<std::string>& lane_channels,
+                                   std::initializer_list<std::string_view> allowed) {
+    for (const auto& channel : lane_channels) {
+        bool matched = false;
+        for (std::string_view allowed_channel : allowed) {
+            if (channel == allowed_channel) {
+                matched = true;
+                break;
+            }
+        }
+        if (!matched) {
+            return false;
+        }
+    }
+    return !lane_channels.empty();
+}
+
+bool is_player_one_header(const BmsChart& chart) {
+    auto it = chart.headers.find("PLAYER");
+    if (it == chart.headers.end()) {
+        return false;
+    }
+    return trim(it->second) == "1";
+}
+
+struct DeclaredLayout {
+    int key_count = 0;
+    std::string layout_label;
+    std::vector<std::string> canonical_channels;
+};
+
+template <std::size_t N>
+int template_position(std::string_view channel, const std::array<std::string_view, N>& channels) {
+    int index = 1;
+    for (const std::string_view candidate : channels) {
+        if (candidate == channel) {
+            return index;
+        }
+        ++index;
+    }
+    return 0;
+}
+
+template <std::size_t N>
+int highest_template_position(const std::vector<std::string>& lane_channels,
+                              const std::array<std::string_view, N>& channels) {
+    int highest = 0;
+    for (const auto& channel : lane_channels) {
+        highest = (std::max)(highest, template_position(channel, channels));
+    }
+    return highest;
+}
+
+template <std::size_t N>
+bool matches_only_allowed_channels(const std::vector<std::string>& lane_channels,
+                                   const std::array<std::string_view, N>& allowed) {
+    for (const auto& channel : lane_channels) {
+        bool matched = false;
+        for (const std::string_view allowed_channel : allowed) {
+            if (channel == allowed_channel) {
+                matched = true;
+                break;
+            }
+        }
+        if (!matched) {
+            return false;
+        }
+    }
+    return !lane_channels.empty();
+}
+
+bool contains_any_channel(const std::vector<std::string>& lane_channels,
+                          std::initializer_list<std::string_view> allowed) {
+    for (std::string_view allowed_channel : allowed) {
+        if (contains_channel(lane_channels, allowed_channel)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+DeclaredLayout detect_declared_layout(const BmsChart& chart, std::string_view source_extension = {}) {
+    static constexpr std::array<std::string_view, 6> kSpFiveTemplate = {"11", "12", "13", "14", "15", "16"};
+    static constexpr std::array<std::string_view, 8> kSpSevenTemplate = {"11", "12", "13", "14", "15", "16", "18", "19"};
+    static constexpr std::array<std::string_view, 10> kDpTenTemplate = {"11", "12", "13", "14", "15",
+                                                                        "21", "22", "23", "24", "25"};
+    static constexpr std::array<std::string_view, 16> kDpFourteenPlusTwoTemplate = {"11", "12", "13", "14", "15", "16", "18", "19",
+                                                                                    "21", "22", "23", "24", "25", "26", "28", "29"};
+    static constexpr std::array<std::string_view, 9> kPmsNativeTemplate = {"11", "12", "13", "14", "15", "22", "23", "24", "25"};
+    static constexpr std::array<std::string_view, 9> kPmsBmeTemplate = {"11", "12", "13", "14", "15", "16", "17", "18", "19"};
+
+    const int explicit_key_count = detect_explicit_key_count(chart);
+    const auto lane_channels = collect_lane_channels(chart);
+    const bool has_two_player_channels = std::any_of(lane_channels.begin(), lane_channels.end(),
+                                                     [](const std::string& channel) {
+                                                         return !channel.empty() && channel[0] == '2';
+                                                     });
+    const bool is_pms_source = source_extension == ".pms";
+    const bool uses_sp5_channels =
+        matches_only_allowed_channels(lane_channels, kSpFiveTemplate) &&
+        contains_channel(lane_channels, "16");
+    const bool uses_sp7_channels =
+        matches_only_allowed_channels(lane_channels, kSpSevenTemplate) &&
+        (contains_channel(lane_channels, "18") || contains_channel(lane_channels, "19"));
+    const bool uses_pms_native_channels =
+        matches_only_allowed_channels(lane_channels, kPmsNativeTemplate) &&
+        (contains_any_channel(lane_channels, {"22", "23", "24", "25"}) || is_pms_source || explicit_key_count == 9);
+    const bool uses_pms_bme_channels =
+        matches_only_allowed_channels(lane_channels, kPmsBmeTemplate) &&
+        (contains_any_channel(lane_channels, {"16", "17", "18", "19"}) || is_pms_source || explicit_key_count == 9);
+    const bool uses_dp14_plus_two_channels =
+        has_two_player_channels &&
+        matches_only_allowed_channels(lane_channels, kDpFourteenPlusTwoTemplate) &&
+        contains_any_channel(lane_channels, {"16", "18", "19"}) &&
+        contains_any_channel(lane_channels, {"26", "28", "29"});
+    const bool fits_standard_sp_five = matches_only_allowed_channels(lane_channels, kSpFiveTemplate);
+    const bool fits_standard_sp_seven = matches_only_allowed_channels(lane_channels, kSpSevenTemplate);
+    const bool fits_standard_dp_ten = has_two_player_channels &&
+                                      matches_only_allowed_channels(lane_channels, kDpTenTemplate);
+    const bool fits_standard_dp_fourteen_plus_two = has_two_player_channels &&
+                                                    matches_only_allowed_channels(lane_channels, kDpFourteenPlusTwoTemplate);
+
+    if (!has_two_player_channels) {
+        if (explicit_key_count == 5 && uses_sp5_channels) {
+            return DeclaredLayout{6, "5+1 SP", {"11", "12", "13", "14", "15", "16"}};
+        }
+        if (explicit_key_count == 7 && uses_sp7_channels) {
+            return DeclaredLayout{8, "7+1 SP", {"11", "12", "13", "14", "15", "16", "18", "19"}};
+        }
+    }
+
+    if ((explicit_key_count == 9 || is_pms_source) && uses_pms_native_channels) {
+        return DeclaredLayout{9, "PMS 9K", {"11", "12", "13", "14", "15", "22", "23", "24", "25"}};
+    }
+    if ((explicit_key_count == 9 || is_pms_source) && uses_pms_bme_channels) {
+        return DeclaredLayout{9, "PMS 9K", {"11", "12", "13", "14", "15", "16", "17", "18", "19"}};
+    }
+    if ((explicit_key_count == 16 || uses_dp14_plus_two_channels) && uses_dp14_plus_two_channels) {
+        return DeclaredLayout{16, "14+2 DP", {"11", "12", "13", "14", "15", "16", "18", "19",
+                                              "21", "22", "23", "24", "25", "26", "28", "29"}};
+    }
+
+    if (explicit_key_count > 0) {
+        return DeclaredLayout{explicit_key_count, {}, {}};
+    }
+
+    if ((is_player_one_header(chart) || !has_two_player_channels) && !has_two_player_channels) {
+        if (uses_sp7_channels) {
+            return DeclaredLayout{8, "7+1 SP", {"11", "12", "13", "14", "15", "16", "18", "19"}};
+        }
+        if (uses_sp5_channels) {
+            return DeclaredLayout{6, "5+1 SP", {"11", "12", "13", "14", "15", "16"}};
+        }
+    }
+
+    if (!has_two_player_channels && fits_standard_sp_seven &&
+        contains_any_channel(lane_channels, {"18", "19"})) {
+        return DeclaredLayout{8, "7+1 SP", std::vector<std::string>(kSpSevenTemplate.begin(), kSpSevenTemplate.end())};
+    }
+    if (!has_two_player_channels && fits_standard_sp_five && contains_channel(lane_channels, "16")) {
+        return DeclaredLayout{6, "5+1 SP", std::vector<std::string>(kSpFiveTemplate.begin(), kSpFiveTemplate.end())};
+    }
+    if (fits_standard_dp_fourteen_plus_two &&
+        contains_any_channel(lane_channels, {"16", "18", "19", "26", "28", "29"})) {
+        return DeclaredLayout{
+            16,
+            "14+2 DP",
+            std::vector<std::string>(kDpFourteenPlusTwoTemplate.begin(), kDpFourteenPlusTwoTemplate.end()),
+        };
+    }
+    if (fits_standard_dp_ten) {
+        return DeclaredLayout{10, {}, std::vector<std::string>(kDpTenTemplate.begin(), kDpTenTemplate.end())};
+    }
+    static constexpr std::array<std::string_view, 5> kSingleFiveTemplate = {"11", "12", "13", "14", "15"};
+    if (!has_two_player_channels && matches_only_allowed_channels(lane_channels, kSingleFiveTemplate)) {
+        const int inferred_key_count = highest_template_position(lane_channels, kSingleFiveTemplate);
+        if (inferred_key_count >= 4) {
+            return DeclaredLayout{inferred_key_count, {}, {}};
+        }
+    }
+
+    if (!lane_channels.empty()) {
+        const int inferred_key_count = static_cast<int>(lane_channels.size());
+        if (inferred_key_count >= 4 && inferred_key_count <= 16) {
+            return DeclaredLayout{inferred_key_count, {}, {}};
+        }
+    }
+
+    return {};
 }
 
 bool is_note_lane_channel(std::string_view channel) {
@@ -338,26 +562,7 @@ std::string canonical_lane_channel(std::string_view channel) {
     return normalized;
 }
 
-NoteLaneMapping build_compact_lane_mapping(const BmsChart& chart) {
-    std::vector<std::string> lane_channels;
-    std::unordered_set<std::string> seen;
-    lane_channels.reserve(chart.commands.size());
-
-    for (const auto& command : chart.commands) {
-        if (!is_note_lane_channel(command.channel)) {
-            continue;
-        }
-        const std::string canonical = canonical_lane_channel(command.channel);
-        if (canonical.empty()) {
-            continue;
-        }
-        if (seen.emplace(canonical).second) {
-            lane_channels.push_back(canonical);
-        }
-    }
-
-    std::sort(lane_channels.begin(), lane_channels.end());
-
+NoteLaneMapping build_ordered_lane_mapping(const std::vector<std::string>& lane_channels) {
     std::unordered_map<std::string, std::size_t> mapping;
     mapping.reserve(lane_channels.size() * 2u);
     for (std::size_t index = 0; index < lane_channels.size(); ++index) {
@@ -376,6 +581,24 @@ NoteLaneMapping build_compact_lane_mapping(const BmsChart& chart) {
     }
 
     return mapping.empty() ? NoteLaneMapping::TenKeyDualPlayerDefault() : NoteLaneMapping(std::move(mapping));
+}
+
+NoteLaneMapping build_compact_lane_mapping(const BmsChart& chart) {
+    return build_ordered_lane_mapping(collect_lane_channels(chart));
+}
+
+NoteLaneMapping build_lane_mapping(const BmsChart& chart, const DeclaredLayout& declared_layout) {
+    if (!declared_layout.canonical_channels.empty()) {
+        return build_ordered_lane_mapping(declared_layout.canonical_channels);
+    }
+    return build_compact_lane_mapping(chart);
+}
+
+std::string lower_extension(std::string value) {
+    std::transform(value.begin(), value.end(), value.begin(), [](unsigned char ch) {
+        return static_cast<char>(std::tolower(ch));
+    });
+    return value;
 }
 
 }  // namespace
@@ -546,9 +769,11 @@ BmsParseResult BmsParser::parse(std::string_view content, const BmsParserOptions
         result.chart.headers[key] = value;
     }
 
-    result.chart.declared_key_count = detect_declared_key_count(result.chart);
+    const DeclaredLayout declared_layout = detect_declared_layout(result.chart);
+    result.chart.declared_key_count = declared_layout.key_count;
+    result.chart.layout_label = declared_layout.layout_label;
     if (result.chart.declared_key_count > 0) {
-        result.chart.lane_mapping = build_compact_lane_mapping(result.chart);
+        result.chart.lane_mapping = build_lane_mapping(result.chart, declared_layout);
     }
 
     return result;
@@ -573,7 +798,15 @@ BmsParseResult BmsParser::parseFile(const std::string& path, const BmsParserOpti
     }
     std::ostringstream buffer;
     buffer << file.rdbuf();
-    return parse(buffer.str(), options);
+    BmsParseResult result = parse(buffer.str(), options);
+    const std::string extension = lower_extension(std::filesystem::path(std::filesystem::u8path(path)).extension().u8string());
+    const DeclaredLayout declared_layout = detect_declared_layout(result.chart, extension);
+    result.chart.declared_key_count = declared_layout.key_count;
+    result.chart.layout_label = declared_layout.layout_label;
+    if (result.chart.declared_key_count > 0) {
+        result.chart.lane_mapping = build_lane_mapping(result.chart, declared_layout);
+    }
+    return result;
 }
 
 }  // namespace tenriff::chart

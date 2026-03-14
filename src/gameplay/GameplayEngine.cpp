@@ -169,6 +169,7 @@ std::optional<NoteEvent> GameplayEngine::try_hit_note(LaneState& lane, int64_t i
         if (note.end_sample.has_value()) {
             HoldState hold;
             hold.end_sample = note.end_sample.value();
+            hold.release_required = note.release_required;
             lane.hold = hold;
         }
 
@@ -211,15 +212,29 @@ void GameplayEngine::update_hold(LaneState& lane, int64_t current_sample) {
             return;
         }
 
-        int64_t delta_samples = hold.release_sample - hold.end_sample;
-        auto judgement = classify_judgement(delta_samples);
-        if (judgement == game::Judgement::PR) {
-            judgement = game::Judgement::BD;
+        if (hold.release_required) {
+            int64_t delta_samples = hold.release_sample - hold.end_sample;
+            auto judgement = classify_judgement(delta_samples);
+            if (judgement == game::Judgement::PR) {
+                judgement = game::Judgement::BD;
+            }
+            double delta_ms = static_cast<double>(delta_samples) * 1000.0 / static_cast<double>(sample_rate_);
+            bool breaks_combo = (judgement == game::Judgement::BD);
+            apply_judgement(judgement, delta_ms, hold.release_sample, 0.5, breaks_combo);
+            lane.hold.reset();
+            return;
         }
-        double delta_ms = static_cast<double>(delta_samples) * 1000.0 / static_cast<double>(sample_rate_);
-        bool breaks_combo = (judgement == game::Judgement::BD);
-        apply_judgement(judgement, delta_ms, hold.release_sample, 0.5, breaks_combo);
-        lane.hold.reset();
+    }
+
+    if (hold.release_required) {
+        if (current_sample > hold.end_sample + windows_.bd) {
+            apply_judgement(game::Judgement::BD,
+                            std::numeric_limits<double>::quiet_NaN(),
+                            hold.end_sample + windows_.bd,
+                            0.5,
+                            true);
+            lane.hold.reset();
+        }
         return;
     }
 
@@ -234,6 +249,7 @@ void GameplayEngine::update_hold(LaneState& lane, int64_t current_sample) {
 }
 
 void GameplayEngine::finalize_if_done(int64_t current_sample) {
+    static_cast<void>(current_sample);
     bool all_done = true;
     for (const auto& lane : lanes_) {
         if (lane.next_index < lane.notes.size()) {
@@ -246,7 +262,7 @@ void GameplayEngine::finalize_if_done(int64_t current_sample) {
         }
     }
 
-    if (all_done && current_sample >= duration_samples_) {
+    if (all_done) {
         finished_ = true;
     }
 }

@@ -1,6 +1,7 @@
 #include "app/RuntimeConfigMigration.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cctype>
 #include <string>
 #include <string_view>
@@ -30,8 +31,12 @@ bool is_valid_chart_filter(std::string_view value) {
 bool is_valid_osu_key_mode(std::string_view value) {
     const std::string token = to_lower_copy(value);
     return token.empty() || token == "auto" || token == "4k" || token == "5k" || token == "6k" ||
-           token == "7k" || token == "8k" || token == "9k" || token == "10k";
+           token == "7k" || token == "8k" || token == "9k" || token == "10k" || token == "16k";
 }
+
+constexpr double kLegacyBadWindowMs = 80.0;
+constexpr double kCurrentBadWindowMs = 200.0;
+constexpr double kJudgeWindowToleranceMs = 0.001;
 
 }  // namespace
 
@@ -59,6 +64,10 @@ bool migrate_bms_first_runtime_config(config::RuntimeConfig& config) {
     }
     if (!is_valid_bms_keysound_policy(config.audio_ui.bms_keysound_policy)) {
         config.audio_ui.bms_keysound_policy = "follow";
+        changed = true;
+    }
+    if (std::abs(config.judge.bd_ms - kLegacyBadWindowMs) <= kJudgeWindowToleranceMs) {
+        config.judge.bd_ms = kCurrentBadWindowMs;
         changed = true;
     }
 

@@ -21,6 +21,7 @@ struct NoteEvent {
     int lane = 0;  // 1-based lane index.
     int64_t start_sample = 0;
     std::optional<int64_t> end_sample;  // Hold note end sample if present.
+    bool release_required = false;      // Tail uses release timing judgement when true.
     std::size_t audio_asset_id = kInvalidAudioAssetId;
     std::size_t note_id = 0;
 };

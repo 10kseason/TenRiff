@@ -1,4 +1,5 @@
 #include "app/GameSession.h"
+#include "app/ChartAudioPlayback.h"
 #include "app/ChartAudioStreaming.h"
 #include "app/MemoryDiagnostics.h"
 
@@ -77,6 +78,7 @@ int target_lane_count(gameplay::KeyMode mode) {
         case gameplay::KeyMode::Keys8: return 8;
         case gameplay::KeyMode::Keys9: return 9;
         case gameplay::KeyMode::Keys10: return 10;
+        case gameplay::KeyMode::Keys16: return 16;
         case gameplay::KeyMode::Auto: default: return 0;
     }
 }
@@ -98,6 +100,7 @@ gameplay::KeyMode key_mode_for_lane_count(int lane_count) {
         case 8: return gameplay::KeyMode::Keys8;
         case 9: return gameplay::KeyMode::Keys9;
         case 10: return gameplay::KeyMode::Keys10;
+        case 16: return gameplay::KeyMode::Keys16;
         default: return gameplay::KeyMode::Auto;
     }
 }
@@ -1859,12 +1862,14 @@ bool GameSession::prepare_chart_audio() {
         }
         const auto& asset = chart_audio_assets_[event.asset_id];
         auto samples = std::atomic_load_explicit(&asset.clip.samples, std::memory_order_acquire);
-        const int64_t clip_frames = (samples && !samples->empty())
-                                        ? static_cast<int64_t>(samples->size() / 2u)
-                                        : static_cast<int64_t>(asset.estimated_decoded_bytes /
-                                                               (2u * sizeof(float)));
-        if (clip_frames > 0) {
-            max_sample = std::max(max_sample, event.start_sample + clip_frames);
+        const int64_t source_frames = (samples && !samples->empty())
+                                          ? static_cast<int64_t>(samples->size() / 2u)
+                                          : static_cast<int64_t>(asset.estimated_decoded_bytes /
+                                                                 (2u * sizeof(float)));
+        const int64_t playback_frames =
+            chart_audio_playback_duration_frames(source_frames, config_.speed.rate);
+        if (playback_frames > 0) {
+            max_sample = std::max(max_sample, event.start_sample + playback_frames);
         }
     }
 
@@ -2190,8 +2195,12 @@ void GameSession::mix_chart_audio(float* output, uint32_t frames, int64_t buffer
         const auto& asset = chart_audio_assets_[voice.asset_id];
         auto samples = std::atomic_load_explicit(&asset.clip.samples, std::memory_order_acquire);
         if (!samples || samples->empty()) {
-            const int64_t estimated_frames = static_cast<int64_t>(asset.estimated_decoded_bytes / (2u * sizeof(float)));
-            if (estimated_frames > 0 && voice.start_sample + estimated_frames <= buffer_start_samples) {
+            const int64_t estimated_source_frames =
+                static_cast<int64_t>(asset.estimated_decoded_bytes / (2u * sizeof(float)));
+            const int64_t estimated_playback_frames =
+                chart_audio_playback_duration_frames(estimated_source_frames, config_.speed.rate);
+            if (estimated_playback_frames > 0 &&
+                voice.start_sample + estimated_playback_frames <= buffer_start_samples) {
                 chart_audio_voices_.erase(chart_audio_voices_.begin() + static_cast<std::ptrdiff_t>(i));
                 continue;
             }
@@ -2199,8 +2208,10 @@ void GameSession::mix_chart_audio(float* output, uint32_t frames, int64_t buffer
             continue;
         }
 
-        const int64_t clip_frames = static_cast<int64_t>(samples->size() / 2u);
-        const int64_t active_until = voice.start_sample + clip_frames;
+        const int64_t source_frames = static_cast<int64_t>(samples->size() / 2u);
+        const int64_t playback_frames =
+            chart_audio_playback_duration_frames(source_frames, config_.speed.rate);
+        const int64_t active_until = voice.start_sample + playback_frames;
         if (chart_audio_active_until_samples_) {
             auto& slot = chart_audio_active_until_samples_[voice.asset_id];
             int64_t observed = slot.load(std::memory_order_acquire);
@@ -2209,25 +2220,20 @@ void GameSession::mix_chart_audio(float* output, uint32_t frames, int64_t buffer
             }
         }
 
-        const int64_t clip_end = voice.start_sample + clip_frames;
+        const int64_t clip_end = voice.start_sample + playback_frames;
         if (clip_end <= buffer_start_samples) {
             chart_audio_voices_.erase(chart_audio_voices_.begin() + static_cast<std::ptrdiff_t>(i));
             continue;
         }
 
-        const int64_t output_start = std::max<int64_t>(0, voice.start_sample - buffer_start_samples);
-        const int64_t clip_start = std::max<int64_t>(0, buffer_start_samples - voice.start_sample);
-        const int64_t output_capacity = static_cast<int64_t>(frames) - output_start;
-        const int64_t clip_capacity = clip_frames - clip_start;
-        const int64_t mix_frames = std::max<int64_t>(0, std::min(output_capacity, clip_capacity));
         const float gain = (voice.kind == ChartAudioEvent::Kind::Keysound) ? keysound_gain : bgm_gain;
-
-        for (int64_t frame = 0; frame < mix_frames; ++frame) {
-            const std::size_t out_idx = static_cast<std::size_t>(output_start + frame) * 2;
-            const std::size_t clip_idx = static_cast<std::size_t>(clip_start + frame) * 2;
-            output[out_idx] += (*samples)[clip_idx] * gain;
-            output[out_idx + 1] += (*samples)[clip_idx + 1] * gain;
-        }
+        (void)mix_chart_audio_clip_linear(*samples,
+                                          voice.start_sample,
+                                          config_.speed.rate,
+                                          gain,
+                                          output,
+                                          frames,
+                                          buffer_start_samples);
 
         if (clip_end <= buffer_end_samples) {
             chart_audio_voices_.erase(chart_audio_voices_.begin() + static_cast<std::ptrdiff_t>(i));

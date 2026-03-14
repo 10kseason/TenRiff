@@ -24,6 +24,7 @@ struct JudgeWindowSamples {
 
 struct HoldState {
     int64_t end_sample = 0;
+    bool release_required = false;
     bool broken = false;
     bool release_active = false;
     int64_t release_sample = 0;

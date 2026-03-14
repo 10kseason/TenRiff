@@ -69,6 +69,9 @@ int lane_count_for_skin_mode_token(std::string_view key_mode) {
     if (normalized == "9k") {
         return 9;
     }
+    if (normalized == "16k") {
+        return 16;
+    }
     return 10;
 }
 
@@ -81,17 +84,24 @@ const std::unordered_map<std::string, std::vector<std::string>>& default_skin_la
         {"8k", {"ice", "azure", "ice", "teal", "teal", "ice", "azure", "ice"}},
         {"9k", {"ice", "azure", "ice", "teal", "gold", "teal", "ice", "azure", "ice"}},
         {"10k", {"ice", "azure", "ice", "azure", "ice", "ice", "azure", "ice", "azure", "ice"}},
+        {"16k", {"ice", "azure", "ice", "azure", "ice", "gold", "teal", "ice",
+                 "ice", "teal", "gold", "ice", "azure", "ice", "azure", "ice"}},
     };
     return kDefaults;
 }
 
 void sanitize_skin_config(SkinConfig& skin) {
+    skin.note_shape = normalize_skin_note_shape_token(skin.note_shape);
     skin.judgement_line_position = std::clamp(
         skin.judgement_line_position, kJudgementLinePositionMin, kJudgementLinePositionMax);
+    skin.combo_position = std::clamp(
+        skin.combo_position, kComboPositionMin, kComboPositionMax);
     skin.note_width_scale = std::clamp(
         skin.note_width_scale, kNoteWidthScaleMin, kNoteWidthScaleMax);
     skin.note_height_scale = std::clamp(
         skin.note_height_scale, kNoteHeightScaleMin, kNoteHeightScaleMax);
+    skin.hold_body_width_scale = std::clamp(
+        skin.hold_body_width_scale, kHoldBodyWidthScaleMin, kHoldBodyWidthScaleMax);
 
     std::unordered_map<std::string, std::vector<std::string>> sanitized_lane_colors;
     for (const auto& mode : supported_skin_mode_tokens()) {
@@ -148,6 +158,16 @@ std::string normalize_resolution_preset(std::string value) {
         return value;
     }
     return "native";
+}
+
+std::string normalize_display_mode(std::string value) {
+    std::transform(value.begin(), value.end(), value.begin(), [](unsigned char ch) {
+        return static_cast<char>(std::tolower(ch));
+    });
+    if (value == "fullscreen" || value == "windowed") {
+        return value;
+    }
+    return "borderless";
 }
 
 int sanitize_refresh_hz(int value, std::vector<std::string>& warnings) {
@@ -268,9 +288,12 @@ void apply_config_object(const JsonObject& root, RuntimeConfig& config) {
 
     if (auto* gauge = get_object(root, "gauge")) {
         config.gauge.auto_shift = get_bool(*gauge, "auto_shift", config.gauge.auto_shift);
-        config.gauge.refill_normal = get_number(*gauge, "refill_normal", config.gauge.refill_normal);
-        config.gauge.refill_easy = get_number(*gauge, "refill_easy", config.gauge.refill_easy);
-        config.gauge.shift_cooldown_ms = get_number(*gauge, "shift_cooldown_ms", config.gauge.shift_cooldown_ms);
+        config.gauge.hard_to_normal_threshold = std::clamp(
+            get_number(*gauge, "hard_to_normal_threshold", config.gauge.hard_to_normal_threshold),
+            0.0, 100.0);
+        config.gauge.normal_to_easy_threshold = std::clamp(
+            get_number(*gauge, "normal_to_easy_threshold", config.gauge.normal_to_easy_threshold),
+            0.0, 100.0);
 
         if (auto* delta = get_object(*gauge, "delta")) {
             if (auto* hard = get_object(*delta, "hard")) {
@@ -298,7 +321,8 @@ void apply_config_object(const JsonObject& root, RuntimeConfig& config) {
     }
 
     if (auto* graphics = get_object(root, "graphics")) {
-        config.graphics.display_mode = get_string(*graphics, "display_mode", config.graphics.display_mode);
+        config.graphics.display_mode =
+            normalize_display_mode(get_string(*graphics, "display_mode", config.graphics.display_mode));
         config.graphics.resolution =
             normalize_resolution_preset(get_string(*graphics, "resolution", config.graphics.resolution));
         config.graphics.vsync = get_bool(*graphics, "vsync", config.graphics.vsync);
@@ -333,15 +357,25 @@ void apply_config_object(const JsonObject& root, RuntimeConfig& config) {
     }
 
     if (auto* skin = get_object(root, "skin")) {
+        config.skin.note_shape =
+            normalize_skin_note_shape_token(get_string(*skin, "note_shape", config.skin.note_shape));
+        config.skin.note_border_enabled =
+            get_bool(*skin, "note_border_enabled", config.skin.note_border_enabled);
         config.skin.judgement_line_position = std::clamp(
             get_number(*skin, "judgement_line_position", config.skin.judgement_line_position),
             kJudgementLinePositionMin, kJudgementLinePositionMax);
+        config.skin.combo_position = std::clamp(
+            get_number(*skin, "combo_position", config.skin.combo_position),
+            kComboPositionMin, kComboPositionMax);
         config.skin.note_width_scale = std::clamp(
             get_number(*skin, "note_width_scale", config.skin.note_width_scale),
             kNoteWidthScaleMin, kNoteWidthScaleMax);
         config.skin.note_height_scale = std::clamp(
             get_number(*skin, "note_height_scale", config.skin.note_height_scale),
             kNoteHeightScaleMin, kNoteHeightScaleMax);
+        config.skin.hold_body_width_scale = std::clamp(
+            get_number(*skin, "hold_body_width_scale", config.skin.hold_body_width_scale),
+            kHoldBodyWidthScaleMin, kHoldBodyWidthScaleMax);
         if (const auto* lane_colors = get_object(*skin, "lane_colors")) {
             for (const auto& [mode, value] : *lane_colors) {
                 const auto* array = value.as_array();
@@ -444,9 +478,8 @@ JsonValue build_json_root(const RuntimeConfig& config) {
 
     JsonObject gauge;
     gauge.emplace("auto_shift", JsonValue{config.gauge.auto_shift});
-    gauge.emplace("refill_normal", JsonValue{config.gauge.refill_normal});
-    gauge.emplace("refill_easy", JsonValue{config.gauge.refill_easy});
-    gauge.emplace("shift_cooldown_ms", JsonValue{config.gauge.shift_cooldown_ms});
+    gauge.emplace("hard_to_normal_threshold", JsonValue{config.gauge.hard_to_normal_threshold});
+    gauge.emplace("normal_to_easy_threshold", JsonValue{config.gauge.normal_to_easy_threshold});
 
     JsonObject delta;
     JsonObject hard;
@@ -477,7 +510,7 @@ JsonValue build_json_root(const RuntimeConfig& config) {
     root.emplace("gauge", JsonValue{std::move(gauge)});
 
     JsonObject graphics;
-    graphics.emplace("display_mode", JsonValue{config.graphics.display_mode});
+    graphics.emplace("display_mode", JsonValue{normalize_display_mode(config.graphics.display_mode)});
     graphics.emplace("resolution", JsonValue{config.graphics.resolution});
     graphics.emplace("vsync", JsonValue{config.graphics.vsync});
     graphics.emplace("refresh_hz", JsonValue{static_cast<double>(config.graphics.refresh_hz)});
@@ -506,9 +539,13 @@ JsonValue build_json_root(const RuntimeConfig& config) {
     root.emplace("ui", JsonValue{std::move(ui)});
 
     JsonObject skin;
+    skin.emplace("note_shape", JsonValue{normalize_skin_note_shape_token(config.skin.note_shape)});
+    skin.emplace("note_border_enabled", JsonValue{config.skin.note_border_enabled});
     skin.emplace("judgement_line_position", JsonValue{config.skin.judgement_line_position});
+    skin.emplace("combo_position", JsonValue{config.skin.combo_position});
     skin.emplace("note_width_scale", JsonValue{config.skin.note_width_scale});
     skin.emplace("note_height_scale", JsonValue{config.skin.note_height_scale});
+    skin.emplace("hold_body_width_scale", JsonValue{config.skin.hold_body_width_scale});
     JsonObject lane_colors;
     for (const auto& mode : supported_skin_mode_tokens()) {
         JsonArray colors;
@@ -555,15 +592,18 @@ std::string normalize_skin_mode_token(std::string_view key_mode) {
     if (normalized == "10" || normalized == "10key" || normalized == "keys10") {
         return "10k";
     }
+    if (normalized == "16" || normalized == "16key" || normalized == "keys16") {
+        return "16k";
+    }
     if (normalized == "4k" || normalized == "5k" || normalized == "6k" || normalized == "7k" ||
-        normalized == "8k" || normalized == "9k" || normalized == "10k") {
+        normalized == "8k" || normalized == "9k" || normalized == "10k" || normalized == "16k") {
         return normalized;
     }
     return "10k";
 }
 
 std::vector<std::string> supported_skin_mode_tokens() {
-    return {"4k", "5k", "6k", "7k", "8k", "9k", "10k"};
+    return {"4k", "5k", "6k", "7k", "8k", "9k", "10k", "16k"};
 }
 
 std::vector<std::string> supported_skin_color_tokens() {
@@ -583,6 +623,22 @@ std::string normalize_skin_color_token(std::string_view token) {
         }
     }
     return "ice";
+}
+
+std::string normalize_skin_note_shape_token(std::string_view token) {
+    const std::string normalized = to_lower_ascii(std::string(token));
+    if (normalized == "circle") {
+        return "circle";
+    }
+    return "rect";
+}
+
+std::string skin_note_shape_label(std::string_view token) {
+    const std::string normalized = normalize_skin_note_shape_token(token);
+    if (normalized == "circle") {
+        return "Circle";
+    }
+    return "Rect";
 }
 
 std::string skin_color_label(std::string_view token) {
