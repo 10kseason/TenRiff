@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(TenRiff VERSION 0.7.5 LANGUAGES CXX)
+project(TenRiff VERSION 0.7.6 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -68,6 +68,7 @@ add_library(tenriff_core
     src/app/BmsGameplayBuilder.cpp
     src/app/ChartLoader.cpp
     src/app/CommandLine.cpp
+    src/app/GraphicsTiming.cpp
     src/app/ModeResolver.cpp
     src/app/RuntimeConfigMigration.cpp
     src/app/SongIndex.cpp
@@ -186,6 +187,7 @@ if(TENRIFF_ENABLE_TESTS)
         tests/unit/test_song_select_state.cpp
         tests/unit/test_config.cpp
         tests/unit/test_game_session_hud.cpp
+        tests/unit/test_graphics_timing.cpp
         tests/unit/test_utf8_compat.cpp
     )
     target_include_directories(bms_parser_tests

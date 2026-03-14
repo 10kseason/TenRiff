@@ -3,7 +3,7 @@
 이 문서는 다음 에이전트나 새 작업자가 가장 먼저 읽어야 하는 현재 상태 문서입니다. 목표는 "지금 이 프로젝트가 무엇이고, 어디를 보면 되고, 무엇이 아직 미검증인지"를 빠르게 파악하게 하는 것입니다.
 
 ## Baseline
-- 현재 릴리스 라인은 `0.7.5`
+- 현재 릴리스 라인은 `0.7.6`
 - Windows GUI 빌드가 메인 타깃
 - Linux는 `Baepoks-Linuxs/TenRiff-0.5.0-linux-preview` 수준의 preview만 존재
 - 기본 표면은 BMS-first
@@ -27,6 +27,11 @@
 
 ## What Works Now
 - BMS parser/normalizer/timeline이 실팩 호환 위주로 강화됨
+- BMS explicit key headers:
+  - `#4K`
+  - `#6K`
+  - `#8K`
+  - header가 있으면 해당 키수 기준 compact lane mapping 적용
 - BMS keysound:
   - `follow`
   - `autoplay`
@@ -53,7 +58,8 @@
 - Graphics:
   - resolution preset (`720p`, `1080p`, `qhd`, `native`)
   - `refresh_hz` (`60..1050`, 기본 `1050`)
-  - menu effective cap `300`, gameplay effective cap `1050`
+  - VSync off: menu effective cap `300`, gameplay configured target 최대 `1050`
+  - VSync on: present refresh는 active monitor Hz를 따라가고 render pacing은 `monitor_hz * 2`를 목표로 함 (`1050` clamp)
   - `visual_offset_ms`
   - `performance_overlay`
 - Gameplay performance:
@@ -83,11 +89,11 @@
 
 ## Runtime / Packaging Rules
 - 새 사용자 프로필은 자동 생성
-- 배포 패키지는 `Baepoks/TenRiff-0.7.5`
+- 배포 패키지는 `Baepoks/TenRiff-0.7.6`
 - 배포 패키지에는 `Songs`를 넣지 않음
 - 배포 업데이트 요청 시 built artifacts만 `Baepoks/`에 넣는 규칙
 - source-only/public handoff 요청 시 먼저 include/exclude 리스트를 작성하는 것이 사용자 선호
-- 공개 소스 패키지는 `opensource-Tenriff-source/TenRiff-0.7.5-source`처럼 버전별로 별도 스테이징
+- 공개 소스 패키지는 `opensource-Tenriff-source/TenRiff-0.7.6-source`처럼 버전별로 별도 스테이징
 
 ## Config / Profile Reality
 - 실제 기본값은 `config/config.json`

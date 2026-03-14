@@ -197,6 +197,33 @@ TEST_CASE("song scan computes 10k-calc difficulty for BMS entries") {
     CHECK(by_path.at("dense.bms").level >= by_path.at("sparse.bms").level);
 }
 
+TEST_CASE("song scan exposes BMS charts with explicit 4K headers") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+
+    write_file(temp.path / "fourk.bms",
+               "#TITLE Four Key\n"
+               "#ARTIST Composer\n"
+               "#PLAYLEVEL 7\n"
+               "#BPM 150\n"
+               "#4K\n"
+               "#00111:01\n"
+               "#00112:01\n"
+               "#00114:01\n"
+               "#00115:01\n");
+
+    std::vector<std::string> warnings;
+    SongIndex index = scan_songs(temp.path.u8string(), nullptr, warnings);
+
+    REQUIRE(index.entries.size() == 1u);
+    CHECK(warnings.empty());
+    CHECK(index.entries.front().format == "bms");
+    CHECK(index.entries.front().key_count == 4);
+    CHECK(index.entries.front().level == 7);
+    CHECK(index.entries.front().rating == doctest::Approx(0.0));
+}
+
 TEST_CASE("song scan supports UTF-8 song roots") {
     TempDirGuard temp;
     temp.path = make_temp_dir();

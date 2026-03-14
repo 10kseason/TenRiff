@@ -183,6 +183,41 @@ TEST_CASE("accepts colon-delimited header assignments") {
     CHECK_EQ(result.chart.stop.at("BB"), 96.0);
 }
 
+TEST_CASE("compact lane mapping follows explicit BMS key headers") {
+    const char* data =
+        "#TITLE Four Key Example\n"
+        "#4K\n"
+        "#00111:01\n"
+        "#00112:01\n"
+        "#00114:01\n"
+        "#00115:01\n"
+        "#00154:0101\n";
+
+    BmsParser parser;
+    auto result = parser.parse(data);
+
+    CHECK(result.success());
+    CHECK_EQ(result.chart.declared_key_count, 4);
+    CHECK(result.chart.headers.count("4K") == 1u);
+
+    auto lane11 = result.chart.lane_mapping.laneForChannel("11");
+    auto lane12 = result.chart.lane_mapping.laneForChannel("12");
+    auto lane14 = result.chart.lane_mapping.laneForChannel("14");
+    auto lane15 = result.chart.lane_mapping.laneForChannel("15");
+    auto lane54 = result.chart.lane_mapping.laneForChannel("54");
+
+    REQUIRE(lane11.has_value());
+    REQUIRE(lane12.has_value());
+    REQUIRE(lane14.has_value());
+    REQUIRE(lane15.has_value());
+    REQUIRE(lane54.has_value());
+    CHECK_EQ(lane11.value(), 1);
+    CHECK_EQ(lane12.value(), 2);
+    CHECK_EQ(lane14.value(), 3);
+    CHECK_EQ(lane15.value(), 4);
+    CHECK_EQ(lane54.value(), 3);
+}
+
 TEST_CASE("parseFile decodes CP932 BMS headers and asset references to UTF-8") {
 #ifndef _WIN32
     return;

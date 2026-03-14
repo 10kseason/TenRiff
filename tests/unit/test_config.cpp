@@ -256,6 +256,7 @@ TEST_CASE("config save and load preserve skin gameplay settings") {
     config.skin.judgement_line_position = 0.76;
     config.skin.note_width_scale = 1.15;
     config.skin.note_height_scale = 1.35;
+    config.skin.lane_colors["4k"] = {"rose", "gold", "gold", "rose"};
     config.skin.lane_colors["5k"] = {"rose", "mint", "gold", "azure", "ice"};
 
     std::string error;
@@ -267,6 +268,11 @@ TEST_CASE("config save and load preserve skin gameplay settings") {
     CHECK(result.config.skin.judgement_line_position == doctest::Approx(0.76));
     CHECK(result.config.skin.note_width_scale == doctest::Approx(1.15));
     CHECK(result.config.skin.note_height_scale == doctest::Approx(1.35));
+    const auto saved_4k = tenriff::config::resolved_skin_lane_colors(result.config.skin, "4k");
+    REQUIRE(saved_4k.size() == 4u);
+    CHECK(saved_4k[0] == "rose");
+    CHECK(saved_4k[1] == "gold");
+    CHECK(saved_4k[3] == "rose");
     const auto saved_5k = tenriff::config::resolved_skin_lane_colors(result.config.skin, "5k");
     REQUIRE(saved_5k.size() == 5u);
     CHECK(saved_5k[0] == "rose");

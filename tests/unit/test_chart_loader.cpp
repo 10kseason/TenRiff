@@ -300,6 +300,80 @@ TEST_CASE("chart loader loads osu!mania charts when the option is enabled") {
     CHECK(chart_audio_path(result.chart, result.chart.audio_cues.front().asset_id) == audio_path.u8string());
 }
 
+TEST_CASE("chart loader falls back to osu sibling ogg when AudioFilename is missing") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+
+    const auto chart_path = temp.path / "fallback_audio.osu";
+    const auto audio_path = temp.path / "fallback_audio.ogg";
+    {
+        std::ofstream chart_file(chart_path, std::ios::binary);
+        REQUIRE(chart_file.good());
+        chart_file << "osu file format v14\n"
+                      "[General]\n"
+                      "Mode:3\n"
+                      "[Metadata]\n"
+                      "Title:Fallback Audio\n"
+                      "[Difficulty]\n"
+                      "CircleSize:4\n"
+                      "[TimingPoints]\n"
+                      "0,500,4,0,0,100,1,0\n"
+                      "[HitObjects]\n"
+                      "0,0,0,1,0,0:0:0:0:\n";
+    }
+    {
+        std::ofstream audio_file(audio_path, std::ios::binary);
+        REQUIRE(audio_file.good());
+        audio_file << "OggS";
+    }
+
+    ChartLoader loader;
+    ChartLoadResult result = loader.load(chart_path.u8string(), 48000, 1.0, "ignore", true);
+
+    CHECK(result.success());
+    CHECK(result.format == ChartFormat::OsuMania);
+    REQUIRE(result.chart.audio_cues.size() == 1u);
+    CHECK(chart_audio_path(result.chart, result.chart.audio_cues.front().asset_id) == audio_path.u8string());
+}
+
+TEST_CASE("chart loader falls back to the only osu audio file when AudioFilename is missing") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+
+    const auto chart_path = temp.path / "single_audio.osu";
+    const auto audio_path = temp.path / "music.wav";
+    {
+        std::ofstream chart_file(chart_path, std::ios::binary);
+        REQUIRE(chart_file.good());
+        chart_file << "osu file format v14\n"
+                      "[General]\n"
+                      "Mode:3\n"
+                      "[Metadata]\n"
+                      "Title:Single Audio\n"
+                      "[Difficulty]\n"
+                      "CircleSize:4\n"
+                      "[TimingPoints]\n"
+                      "0,500,4,0,0,100,1,0\n"
+                      "[HitObjects]\n"
+                      "0,0,0,1,0,0:0:0:0:\n";
+    }
+    {
+        std::ofstream audio_file(audio_path, std::ios::binary);
+        REQUIRE(audio_file.good());
+        audio_file << "RIFF";
+    }
+
+    ChartLoader loader;
+    ChartLoadResult result = loader.load(chart_path.u8string(), 48000, 1.0, "ignore", true);
+
+    CHECK(result.success());
+    CHECK(result.format == ChartFormat::OsuMania);
+    REQUIRE(result.chart.audio_cues.size() == 1u);
+    CHECK(chart_audio_path(result.chart, result.chart.audio_cues.front().asset_id) == audio_path.u8string());
+}
+
 TEST_CASE("chart loader keeps non-10K osu!mania lane counts when enabled") {
     TempDirGuard temp;
     temp.path = make_temp_dir();
@@ -359,6 +433,49 @@ TEST_CASE("chart loader accepts common BMS separator lines and header values con
     CHECK(result.format == ChartFormat::Bms);
     CHECK(result.chart.lane_count >= 1);
     CHECK(result.chart.notes.size() == 1u);
+}
+
+TEST_CASE("chart loader compacts BMS lanes for explicit 4K, 6K, and 8K header charts") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+
+    ChartLoader loader;
+    struct CaseData {
+        const char* filename;
+        const char* header;
+        int lane_count;
+        const char* body;
+    };
+
+    const CaseData cases[] = {
+        {"fourk_header.bms", "#4K", 4, "#00111:01\n#00112:01\n#00114:01\n#00115:01\n"},
+        {"sixk_header.bms", "#6K", 6, "#00111:01\n#00112:01\n#00113:01\n#00114:01\n#00115:01\n#00118:01\n"},
+        {"eightk_header.bms", "#8K", 8,
+         "#00111:01\n#00112:01\n#00113:01\n#00114:01\n#00115:01\n#00118:01\n#00119:01\n#00121:01\n"},
+    };
+
+    for (const auto& case_data : cases) {
+        const auto chart_path = temp.path / case_data.filename;
+        {
+            std::ofstream chart_file(chart_path, std::ios::binary);
+            REQUIRE(chart_file.good());
+            chart_file << "#TITLE Explicit Key Header\n"
+                          "#BPM 120\n"
+                       << case_data.header << "\n"
+                       << case_data.body;
+        }
+
+        ChartLoadResult result = loader.load(chart_path.u8string(), 48000, 1.0, "ignore");
+
+        CHECK(result.success());
+        CHECK(result.format == ChartFormat::Bms);
+        CHECK(result.chart.lane_count == case_data.lane_count);
+        REQUIRE(result.chart.notes.size() == static_cast<std::size_t>(case_data.lane_count));
+        for (int lane = 0; lane < case_data.lane_count; ++lane) {
+            CHECK(result.chart.notes[static_cast<std::size_t>(lane)].lane == lane + 1);
+        }
+    }
 }
 
 TEST_CASE("chart loader builds hold notes from BMS long-note channels") {

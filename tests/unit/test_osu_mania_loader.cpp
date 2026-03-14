@@ -118,3 +118,25 @@ KeyCount:10
     CHECK(result.success());
     CHECK(result.chart.key_count == 10);
 }
+
+TEST_CASE("osu!mania loader parses background image from events") {
+    const char* content = R"(osu file format v14
+[General]
+Mode:3
+[Metadata]
+Title:Preview Test
+[Difficulty]
+CircleSize:4
+[Events]
+//Background and Video events
+0,0,"bgs/cover image.jpg",0,0
+[HitObjects]
+64,192,0,1,0,0:0:0:0:
+)";
+
+    OsuManiaLoader loader;
+    OsuManiaParseResult result = loader.parse(content);
+
+    CHECK(result.success());
+    CHECK(result.chart.background_filename == "bgs/cover image.jpg");
+}

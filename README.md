@@ -1,6 +1,6 @@
 # TenRiff
 
-TenRiff는 Windows GUI 기반 BMS-first 리듬게임 런타임/런처 프로젝트입니다. 목표는 실사용 가능한 BMS 플레이 환경을 중심으로, 저지먼트/오디오/입력/렌더링 파이프라인을 직접 제어하는 독립 실행형 리듬게임 클라이언트를 만드는 것입니다. 현재 기준 릴리스 라인은 `0.7.5`이며, MIT 라이선스를 사용합니다.
+TenRiff는 Windows GUI 기반 BMS-first 리듬게임 런타임/런처 프로젝트입니다. 목표는 실사용 가능한 BMS 플레이 환경을 중심으로, 저지먼트/오디오/입력/렌더링 파이프라인을 직접 제어하는 독립 실행형 리듬게임 클라이언트를 만드는 것입니다. 현재 기준 릴리스 라인은 `0.7.6`이며, MIT 라이선스를 사용합니다.
 
 이 README는 "프로젝트를 처음 열었을 때 무엇을 보면 되는지"를 설명하는 입문 문서입니다. 더 자세한 현재 동작, 설정 구조, 설계 문서는 [`docs/README.md`](docs/README.md)부터 이어서 읽는 구조를 기준으로 작성했습니다.
 
@@ -21,6 +21,7 @@ TenRiff는 Windows GUI 기반 BMS-first 리듬게임 런타임/런처 프로젝�
 - BMS 파서/노멀라이저/타임라인 처리
   - 헤더, 딕셔너리, 마디 명령
   - `#MEASURE` 분수 처리
+  - `#4K / #6K / #8K` header가 있으면 해당 키수로 compact lane mapping
   - `#LNOBJ`, LN 채널(`51`-`55`, `61`-`65`) 처리
   - CP932(Shift-JIS) 기반 레거시 BMS 텍스트 대응
 - BMS 오디오 처리
@@ -134,16 +135,15 @@ README는 입문 설명만 담당합니다. 세부 내용은 아래 순서로 �
    - 플레이 루프와 데이터 흐름
 6. [`docs/roadmap.md`](docs/roadmap.md)
    - 중장기 작업 방향
-   
+
 ## 현재 문서 해석 규칙
 
 설계 문서와 실제 코드가 다르게 보일 수 있습니다. 이 경우 우선순위는 다음과 같습니다.
 
 1. 현재 코드
 2. [`docs/current-state.md`](docs/current-state.md)
-3. [`AGENTS.md`](AGENTS.md)
-4. `.codex-memory/tenriff/state/*`
-5. 오래된 설계 문서
+3. [`docs/config.md`](docs/config.md)
+4. 오래된 설계 문서
 
 즉, "현재 동작"을 판단할 때는 오래된 설계보다 현재 상태 문서를 우선해야 합니다.
 

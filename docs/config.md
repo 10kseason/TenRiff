@@ -73,7 +73,9 @@
 - `refresh_hz` (int)
   - `60..1050` 범위로 clamp
   - 기본값은 `1050`
-  - menu는 effective cap `300`, gameplay는 configured target을 최대 `1050`까지 사용
+  - `vsync=false`일 때만 직접적인 FPS cap 역할을 함
+  - `vsync=false`면 menu는 effective cap `300`, gameplay는 configured target을 최대 `1050`까지 사용
+  - `vsync=true`면 present refresh는 active monitor Hz를 따르고, render pacing은 `monitor_hz * 2`를 목표로 함 (`1050` clamp)
 - `performance_overlay` (bool)
 
 ### `mode`
