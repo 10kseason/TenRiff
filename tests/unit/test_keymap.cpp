@@ -51,7 +51,7 @@ void write_file(const std::filesystem::path& path, const std::string& content) {
 
 }  // namespace
 
-TEST_CASE("default keymap exposes separate mode bindings from 4K through 10K") {
+TEST_CASE("default keymap exposes separate mode bindings from 4K through 16K") {
     tenriff::config::KeymapManager manager;
     const auto keymap = manager.default_keymap();
 
@@ -60,8 +60,10 @@ TEST_CASE("default keymap exposes separate mode bindings from 4K through 10K") {
     CHECK(keymap.mode_bindings.count("7k") == 1u);
     CHECK(keymap.mode_bindings.count("8k") == 1u);
     CHECK(keymap.mode_bindings.count("10k") == 1u);
+    CHECK(keymap.mode_bindings.count("16k") == 1u);
     CHECK(manager.lane_ids_for_mode("4k").size() == 4u);
     CHECK(manager.lane_ids_for_mode("9k").size() == 9u);
+    CHECK(manager.lane_ids_for_mode("16k").size() == 16u);
     CHECK(manager.bindings_for_mode(keymap, "4k").at("lane4") == "Semicolon");
     CHECK(manager.bindings_for_mode(keymap, "5k").at("lane3") == "K");
     CHECK(manager.bindings_for_mode(keymap, "7k").at("lane4") == "M");
@@ -69,6 +71,9 @@ TEST_CASE("default keymap exposes separate mode bindings from 4K through 10K") {
     CHECK(manager.bindings_for_mode(keymap, "10k").at("lane1") == "Q");
     CHECK(manager.bindings_for_mode(keymap, "10k").at("lane5") == "V");
     CHECK(manager.bindings_for_mode(keymap, "10k").at("lane10") == "LBracket");
+    CHECK(manager.bindings_for_mode(keymap, "16k").at("lane8") == "F");
+    CHECK(manager.bindings_for_mode(keymap, "16k").at("lane9") == "U");
+    CHECK(manager.bindings_for_mode(keymap, "16k").at("lane16") == "Semicolon");
 }
 
 TEST_CASE("keymap save and load preserve per-mode bindings") {
@@ -86,6 +91,7 @@ TEST_CASE("keymap save and load preserve per-mode bindings") {
     keymap.mode_bindings["4k"]["lane1"] = "A";
     keymap.mode_bindings["4k"]["lane4"] = "Semicolon";
     keymap.mode_bindings["7k"]["lane4"] = "Enter";
+    keymap.mode_bindings["16k"]["lane16"] = "Apostrophe";
 
     std::string error;
     REQUIRE(manager.save_profile("profiles/test", keymap, &error));
@@ -96,6 +102,7 @@ TEST_CASE("keymap save and load preserve per-mode bindings") {
     CHECK(manager.bindings_for_mode(result.keymap, "4k").at("lane1") == "A");
     CHECK(manager.bindings_for_mode(result.keymap, "4k").at("lane4") == "Semicolon");
     CHECK(manager.bindings_for_mode(result.keymap, "7k").at("lane4") == "Enter");
+    CHECK(manager.bindings_for_mode(result.keymap, "16k").at("lane16") == "Apostrophe");
     CHECK(manager.bindings_for_mode(result.keymap, "10k").at("lane5") == "V");
 }
 

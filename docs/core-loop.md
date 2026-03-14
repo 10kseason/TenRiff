@@ -21,14 +21,16 @@
 - `gameplay/GameplayEngine.*`
   - 판정 윈도우( PG/GR/GD/BD )와 마스크(30ms) 적용
   - POOR 발생 시 레인 마스크 적용
-  - **Hold 규칙**: 조기 릴리즈는 BAD, 릴리즈 타이밍은 일반 판정 윈도우로 평가(헤드/테일 50:50)
+  - **Hold 규칙**: 조기 릴리즈는 BAD
+  - **Hold Tail 규칙**: osu!mania hold와 BMS `#LNMODE 2` charge note만 릴리즈 타이밍을 일반 판정 윈도우로 평가(헤드/테일 50:50)
+  - 일반 BMS long note는 끝까지 유지하면 tail이 자동 처리되고, tail release timing 판정은 사용하지 않음
   - 결과 통계(콤보, 판정 카운트, 평균/표준편차) 수집
 - `app/GameSession.*`
   - CLI 옵션 → 설정 적용 → 차트 로드 → 입력/오디오 스레드 시작
   - 오디오 콜백에서 입력 큐 소비 + 판정 갱신
 
 ## 판정 관련 초기 정책(확인 필요)
-- **Hold Tail 판정**은 릴리즈 타이밍을 그대로 판정하고, 조기 릴리즈는 BAD 처리
+- **Hold Tail 판정**은 osu!mania hold와 BMS `#LNMODE 2` charge note에만 적용되며, 조기 릴리즈는 BAD 처리
 
 ## 향후 연결 예정
 - 메뉴 상태 머신(Title/SongSelect/Gameplay/Result)

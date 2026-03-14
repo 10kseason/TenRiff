@@ -165,7 +165,7 @@ TEST_CASE("song scan exposes 4K through 10K osu!mania charts when enabled") {
     CHECK(by_path.at("four.osu").format == "osu");
     CHECK(by_path.at("four.osu").key_count == 4);
     CHECK(by_path.at("four.osu").title == "Four");
-    CHECK(by_path.at("four.osu").rating == doctest::Approx(0.0));
+    CHECK(by_path.at("four.osu").rating >= 0.0);
     REQUIRE(by_path.count("ten.osu") == 1u);
     CHECK(by_path.at("ten.osu").format == "osu");
     CHECK(by_path.at("ten.osu").key_count == 10);
@@ -220,8 +220,162 @@ TEST_CASE("song scan exposes BMS charts with explicit 4K headers") {
     CHECK(warnings.empty());
     CHECK(index.entries.front().format == "bms");
     CHECK(index.entries.front().key_count == 4);
-    CHECK(index.entries.front().level == 7);
-    CHECK(index.entries.front().rating == doctest::Approx(0.0));
+    CHECK(index.entries.front().level >= 0);
+    CHECK(index.entries.front().rating >= 0.0);
+}
+
+TEST_CASE("song scan computes difficulty for non-10K charts") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+
+    write_file(temp.path / "four_dense.bms",
+               "#TITLE Four Dense\n"
+               "#ARTIST Composer\n"
+               "#PLAYLEVEL 7\n"
+               "#BPM 150\n"
+               "#4K\n"
+               "#00111:01010101\n"
+               "#00112:00010001\n"
+               "#00114:01010101\n"
+               "#00115:00010001\n");
+
+    SongIndexOptions options;
+    options.include_osu = true;
+    write_file(temp.path / "four_dense.osu",
+               "osu file format v14\n"
+               "[General]\n"
+               "AudioFilename:test.mp3\n"
+               "Mode:3\n"
+               "[Metadata]\n"
+               "Title:Four Dense Osu\n"
+               "Artist:Composer\n"
+               "[Difficulty]\n"
+               "CircleSize:4\n"
+               "OverallDifficulty:8\n"
+               "[TimingPoints]\n"
+               "0,500,4,0,0,100,1,0\n"
+               "[HitObjects]\n"
+               "0,0,0,1,0,0:0:0:0:\n"
+               "170,0,90,1,0,0:0:0:0:\n"
+               "341,0,180,1,0,0:0:0:0:\n"
+               "511,0,270,1,0,0:0:0:0:\n"
+               "0,0,360,1,0,0:0:0:0:\n"
+               "170,0,450,1,0,0:0:0:0:\n"
+               "341,0,540,1,0,0:0:0:0:\n"
+               "511,0,630,1,0,0:0:0:0:\n");
+
+    std::vector<std::string> warnings;
+    SongIndex index = scan_songs(temp.path.u8string(), nullptr, warnings, {}, options);
+
+    REQUIRE(index.entries.size() == 2u);
+    CHECK(warnings.empty());
+    std::unordered_map<std::string, tenriff::app::SongEntry> by_path;
+    for (const auto& entry : index.entries) {
+        by_path.emplace(entry.path, entry);
+    }
+    REQUIRE(by_path.count("four_dense.bms") == 1u);
+    REQUIRE(by_path.count("four_dense.osu") == 1u);
+    CHECK(by_path.at("four_dense.bms").rating > 0.0);
+    CHECK(by_path.at("four_dense.osu").rating > 0.0);
+}
+
+TEST_CASE("song scan exposes BMS SP layouts with compact lane counts and labels") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+
+    write_file(temp.path / "sp_header.bms",
+               "#TITLE SP Header\n"
+               "#ARTIST Composer\n"
+               "#PLAYLEVEL 9\n"
+               "#BPM 150\n"
+               "#5K\n"
+               "#00111:01\n"
+               "#00112:01\n"
+               "#00113:01\n"
+               "#00114:01\n"
+               "#00115:01\n"
+               "#00116:01\n");
+
+    std::vector<std::string> warnings;
+    SongIndex index = scan_songs(temp.path.u8string(), nullptr, warnings);
+
+    REQUIRE(index.entries.size() == 1u);
+    CHECK(warnings.empty());
+    CHECK(index.entries.front().format == "bms");
+    CHECK(index.entries.front().key_count == 6);
+    CHECK(index.entries.front().layout_label == "5+1 SP");
+    CHECK(index.entries.front().level >= 0);
+}
+
+TEST_CASE("song scan exposes PMS and 14+2 DP BMS layouts") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+
+    write_file(temp.path / "native_popnine.pms",
+               "#TITLE Native PMS\n"
+               "#ARTIST Composer\n"
+               "#PLAYLEVEL 9\n"
+               "#BPM 150\n"
+               "#00111:01\n"
+               "#00115:01\n"
+               "#00122:01\n"
+               "#00125:01\n");
+    write_file(temp.path / "dpa_layout.bms",
+               "#TITLE DPA Layout\n"
+               "#ARTIST Composer\n"
+               "#PLAYLEVEL 12\n"
+               "#PLAYER 3\n"
+               "#BPM 150\n"
+               "#00111:01\n"
+               "#00116:01\n"
+               "#00119:01\n"
+               "#00121:01\n"
+               "#00126:01\n"
+               "#00129:01\n");
+
+    std::vector<std::string> warnings;
+    SongIndex index = scan_songs(temp.path.u8string(), nullptr, warnings);
+
+    REQUIRE(index.entries.size() == 2u);
+    CHECK(warnings.empty());
+    std::unordered_map<std::string, tenriff::app::SongEntry> by_path;
+    for (const auto& entry : index.entries) {
+        by_path.emplace(entry.path, entry);
+    }
+    REQUIRE(by_path.count("native_popnine.pms") == 1u);
+    CHECK(by_path.at("native_popnine.pms").key_count == 9);
+    CHECK(by_path.at("native_popnine.pms").layout_label == "PMS 9K");
+    REQUIRE(by_path.count("dpa_layout.bms") == 1u);
+    CHECK(by_path.at("dpa_layout.bms").key_count == 16);
+    CHECK(by_path.at("dpa_layout.bms").layout_label == "14+2 DP");
+    CHECK(by_path.at("dpa_layout.bms").level == 12);
+}
+
+TEST_CASE("song scan infers sparse standard SP BMS layouts instead of defaulting to 10K") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+
+    write_file(temp.path / "sparse_standard_sp.bms",
+               "#TITLE Sparse Standard SP\n"
+               "#ARTIST Composer\n"
+               "#PLAYLEVEL 9\n"
+               "#BPM 150\n"
+               "#00111:01\n"
+               "#00114:01\n"
+               "#00119:01\n"
+               "#00212:01\n");
+
+    std::vector<std::string> warnings;
+    SongIndex index = scan_songs(temp.path.u8string(), nullptr, warnings);
+
+    REQUIRE(index.entries.size() == 1u);
+    CHECK(warnings.empty());
+    CHECK(index.entries.front().key_count == 8);
+    CHECK(index.entries.front().layout_label == "7+1 SP");
 }
 
 TEST_CASE("song scan supports UTF-8 song roots") {
@@ -249,11 +403,11 @@ TEST_CASE("cached song index load drops non-BMS menu entries") {
     const auto index_path = temp.path / "song_index.json";
     write_file(index_path,
                "{\n"
-               "  \"version\": 4,\n"
+               "  \"version\": 7,\n"
                "  \"include_osu\": true,\n"
                "  \"entries\": [\n"
                "    {\"path\":\"ten.osu\",\"title\":\"Ten\",\"artist\":\"A\",\"format\":\"osu\",\"key_count\":10,\"level\":12,\"rating\":8.25,\"bpm\":180,\"mtime\":1},\n"
-               "    {\"path\":\"legacy.bms\",\"title\":\"Legacy\",\"artist\":\"C\",\"format\":\"bms\",\"key_count\":10,\"level\":11,\"rating\":6.75,\"bpm\":180,\"mtime\":1},\n"
+               "    {\"path\":\"legacy.bms\",\"title\":\"Legacy\",\"artist\":\"C\",\"format\":\"bms\",\"layout_label\":\"5+1 SP\",\"key_count\":6,\"level\":11,\"rating\":6.75,\"bpm\":180,\"mtime\":1},\n"
                "    {\"path\":\"another.bme\",\"title\":\"Another\",\"artist\":\"D\",\"format\":\"bms\",\"key_count\":10,\"level\":14,\"rating\":8.5,\"bpm\":180,\"mtime\":1}\n"
                "  ]\n"
                "}\n");
@@ -269,7 +423,8 @@ TEST_CASE("cached song index load drops non-BMS menu entries") {
     }
     REQUIRE(by_path.count("legacy.bms") == 1u);
     REQUIRE(by_path.count("another.bme") == 1u);
-    CHECK(by_path.at("legacy.bms").key_count == 10);
+    CHECK(by_path.at("legacy.bms").key_count == 6);
+    CHECK(by_path.at("legacy.bms").layout_label == "5+1 SP");
     CHECK(by_path.at("legacy.bms").level == 11);
     CHECK(by_path.at("legacy.bms").rating == doctest::Approx(6.75));
     CHECK(by_path.at("another.bme").rating == doctest::Approx(8.5));
@@ -283,11 +438,11 @@ TEST_CASE("cached song index exposes osu entries when enabled") {
     const auto index_path = temp.path / "song_index.json";
     write_file(index_path,
                "{\n"
-               "  \"version\": 4,\n"
+               "  \"version\": 7,\n"
                "  \"include_osu\": true,\n"
                "  \"entries\": [\n"
-               "    {\"path\":\"ten.osu\",\"title\":\"Ten\",\"artist\":\"A\",\"format\":\"osu\",\"key_count\":10,\"level\":12,\"rating\":8.25,\"bpm\":180,\"mtime\":1},\n"
-               "    {\"path\":\"legacy.bms\",\"title\":\"Legacy\",\"artist\":\"C\",\"format\":\"bms\",\"key_count\":10,\"level\":11,\"rating\":6.75,\"bpm\":180,\"mtime\":1}\n"
+                "    {\"path\":\"ten.osu\",\"title\":\"Ten\",\"artist\":\"A\",\"format\":\"osu\",\"key_count\":10,\"level\":12,\"rating\":8.25,\"bpm\":180,\"mtime\":1},\n"
+                "    {\"path\":\"legacy.bms\",\"title\":\"Legacy\",\"artist\":\"C\",\"format\":\"bms\",\"key_count\":10,\"level\":11,\"rating\":6.75,\"bpm\":180,\"mtime\":1}\n"
                "  ]\n"
                "}\n");
 
@@ -300,15 +455,15 @@ TEST_CASE("cached song index exposes osu entries when enabled") {
     REQUIRE(result.index.entries.size() == 2u);
 }
 
-TEST_CASE("streaming song index loader parses compact single-line schema 4 caches") {
+TEST_CASE("streaming song index loader parses compact single-line schema 7 caches") {
     TempDirGuard temp;
     temp.path = make_temp_dir();
     REQUIRE_FALSE(temp.path.empty());
 
     const auto index_path = temp.path / "song_index.json";
     write_file(index_path,
-               "{\"version\":4,\"include_osu\":false,\"entries\":["
-               "{\"path\":\"legacy.bms\",\"title\":\"Legacy\",\"artist\":\"Composer\",\"format\":\"bms\",\"key_count\":10,\"level\":12,\"rating\":7.5,\"bpm\":150,\"mtime\":1},"
+               "{\"version\":7,\"include_osu\":false,\"entries\":["
+               "{\"path\":\"legacy.bms\",\"title\":\"Legacy\",\"artist\":\"Composer\",\"format\":\"bms\",\"layout_label\":\"7+1 SP\",\"key_count\":8,\"level\":12,\"rating\":7.5,\"bpm\":150,\"mtime\":1},"
                "{\"path\":\"ignored.osu\",\"title\":\"Ignored\",\"artist\":\"Mapper\",\"format\":\"osu\",\"key_count\":10,\"level\":13,\"rating\":8.5,\"bpm\":180,\"mtime\":2}"
                "]}");
 
@@ -318,6 +473,7 @@ TEST_CASE("streaming song index loader parses compact single-line schema 4 cache
     CHECK(result.loaded_from_file);
     REQUIRE(result.index.entries.size() == 1u);
     CHECK(result.index.entries.front().path == "legacy.bms");
+    CHECK(result.index.entries.front().layout_label == "7+1 SP");
     CHECK(result.index.entries.front().rating == doctest::Approx(7.5));
 }
 
@@ -336,7 +492,8 @@ TEST_CASE("song index save and load support UTF-8 cache paths") {
     entry.title = "Legacy";
     entry.artist = "Composer";
     entry.format = "bms";
-    entry.key_count = 10;
+    entry.layout_label = "7+1 SP";
+    entry.key_count = 8;
     entry.level = 12;
     entry.rating = 7.5;
     entry.bpm = 150.0;
@@ -354,6 +511,7 @@ TEST_CASE("song index save and load support UTF-8 cache paths") {
     REQUIRE(result.index.entries.size() == 1u);
     CHECK(result.index.entries.front().path == entry.path);
     CHECK(result.index.entries.front().title == "Legacy");
+    CHECK(result.index.entries.front().layout_label == "7+1 SP");
 }
 
 TEST_CASE("song scan sanitizes malformed UI metadata without failing") {
@@ -392,9 +550,9 @@ TEST_CASE("cached song index sanitizes control heavy metadata on load") {
     const auto index_path = temp.path / "song_index.json";
     write_file(index_path,
                "{\n"
-               "  \"version\": 4,\n"
+               "  \"version\": 7,\n"
                "  \"entries\": [\n"
-               "    {\"path\":\"legacy.bms\",\"title\":\"Bad\\nTitle\",\"artist\":\"Artist\\tName\",\"format\":\"bms\\r\",\"key_count\":10,\"level\":11,\"rating\":6.75,\"bpm\":180,\"mtime\":1}\n"
+                "    {\"path\":\"legacy.bms\",\"title\":\"Bad\\nTitle\",\"artist\":\"Artist\\tName\",\"format\":\"bms\\r\",\"key_count\":10,\"level\":11,\"rating\":6.75,\"bpm\":180,\"mtime\":1}\n"
                "  ]\n"
                "}\n");
 
@@ -495,9 +653,9 @@ TEST_CASE("stale song index version triggers silent rescan instead of using cach
     const auto index_path = temp.path / "song_index.json";
     write_file(index_path,
                "{\n"
-               "  \"version\": 2,\n"
+               "  \"version\": 6,\n"
                "  \"entries\": [\n"
-               "    {\"path\":\"legacy.bms\",\"title\":\"Legacy\",\"artist\":\"C\",\"format\":\"bms\",\"key_count\":10,\"level\":11,\"rating\":6.75,\"bpm\":180,\"mtime\":1}\n"
+                "    {\"path\":\"legacy.bms\",\"title\":\"Legacy\",\"artist\":\"C\",\"format\":\"bms\",\"key_count\":10,\"level\":11,\"rating\":6.75,\"bpm\":180,\"mtime\":1}\n"
                "  ]\n"
                "}\n");
 

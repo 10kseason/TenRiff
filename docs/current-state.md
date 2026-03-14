@@ -31,7 +31,9 @@
   - `#4K`
   - `#6K`
   - `#8K`
-  - header가 있으면 해당 키수 기준 compact lane mapping 적용
+  - `5+1 SP`
+  - `7+1 SP`
+  - header가 있거나 SP 패턴이 감지되면 해당 키수 기준 compact lane mapping 적용
 - BMS keysound:
   - `follow`
   - `autoplay`
@@ -39,6 +41,8 @@
 - BMS long note:
   - LN channel (`51`-`55`, `61`-`65`)
   - `#LNOBJ`
+  - `#LNMODE 2` charge note는 tail release timing 판정 사용
+  - 일반 BMS LN은 끝까지 유지 시 tail auto-clear
 - BMS audio decode:
   - WAV native first
   - Windows Media Foundation OGG/MP3 fallback
@@ -47,6 +51,7 @@
   - 캐시 우선 로드
   - `F5` 강제 재인덱싱
   - 마우스 휠 이동
+  - 좌측 `KEY` 빠른 필터 토글
   - 외부 폴더/BMS drag-and-drop
   - recent source 저장/재열기
   - BMS / OSU / All 필터
@@ -54,7 +59,17 @@
 - osu!mania:
   - 4K~10K 로드/실행
   - 키모드별 별도 keymap
-  - 10K chart만 native difficulty 계산
+  - 4K~10K chart difficulty 계산
+- Skins / Gameplay feel:
+  - `rect` / `circle` note shape
+  - note border on/off
+  - combo Y 조절
+  - judge line / note width / note height / LN body width 조절
+  - 미래 노트 상단 진입 easing
+  - 마지막 판정 노트 처리 직후 플레이 종료
+- Judge:
+  - 기본 `BAD` 범위는 `200ms`
+  - tail release timing은 osu hold와 BMS `#LNMODE 2` charge note에만 적용
 - Graphics:
   - resolution preset (`720p`, `1080p`, `qhd`, `native`)
   - `refresh_hz` (`60..1050`, 기본 `1050`)
@@ -84,8 +99,9 @@
   - 처리된 candidate 즉시 해제
   - cache save는 giant JSON tree 대신 streaming write
 - cache schema:
-  - `version = 4`
+  - `version = 5`
   - `include_osu` 포함
+  - optional `layout_label` 포함
 
 ## Runtime / Packaging Rules
 - 새 사용자 프로필은 자동 생성

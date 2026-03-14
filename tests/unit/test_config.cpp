@@ -63,10 +63,22 @@ TEST_CASE("config defaults prefer 44100 Hz audio") {
     CHECK(config.mode.format == "bms");
     CHECK_FALSE(config.mode.enable_osu_charts);
     CHECK(config.graphics.resolution == "native");
+    CHECK(config.graphics.display_mode == "borderless");
     CHECK(config.graphics.refresh_hz == 1050);
-    CHECK(config.gauge.refill_normal == doctest::Approx(15.911));
-    CHECK(config.gauge.normal.pg == doctest::Approx(0.334));
-    CHECK(config.gauge.normal.pr == doctest::Approx(-2.175));
+    CHECK(config.gauge.hard_to_normal_threshold == doctest::Approx(66.0));
+    CHECK(config.gauge.normal_to_easy_threshold == doctest::Approx(33.0));
+    CHECK(config.gauge.hard.pg == doctest::Approx(0.13752));
+    CHECK(config.gauge.hard.pr == doctest::Approx(-3.88850));
+    CHECK(config.gauge.normal.pg == doctest::Approx(0.23123));
+    CHECK(config.gauge.normal.pr == doctest::Approx(-3.11025));
+    CHECK(config.gauge.easy.pg == doctest::Approx(0.30664));
+    CHECK(config.gauge.easy.pr == doctest::Approx(-2.32232));
+    CHECK(config.judge.bd_ms == doctest::Approx(200.0));
+    CHECK(config.skin.note_shape == "rect");
+    CHECK(config.skin.note_border_enabled);
+    CHECK(config.skin.combo_position == doctest::Approx(tenriff::config::kComboPositionDefault));
+    CHECK(config.skin.hold_body_width_scale == doctest::Approx(0.60));
+    CHECK(tenriff::config::resolved_skin_lane_colors(config.skin, "16k").size() == 16u);
 }
 
 TEST_CASE("audio presets do not override explicit sample rate") {
@@ -147,6 +159,7 @@ TEST_CASE("config save and load preserve graphics display settings") {
 
     ConfigLoader loader;
     auto config = loader.defaults();
+    config.graphics.display_mode = "windowed";
     config.graphics.resolution = "qhd";
     config.graphics.refresh_hz = 240;
     config.graphics.performance_overlay = true;
@@ -157,6 +170,7 @@ TEST_CASE("config save and load preserve graphics display settings") {
 
     const auto result = loader.load_profile("profiles/test");
     REQUIRE(result.success());
+    CHECK(result.config.graphics.display_mode == "windowed");
     CHECK(result.config.graphics.resolution == "qhd");
     CHECK(result.config.graphics.refresh_hz == 240);
     CHECK(result.config.graphics.performance_overlay);
@@ -172,6 +186,7 @@ TEST_CASE("config clamps refresh_hz and normalizes invalid resolution preset") {
     write_file(temp.path / "config" / "config.json",
                "{\n"
                "  \"graphics\": {\n"
+               "    \"display_mode\": \"floating\",\n"
                "    \"resolution\": \"weird\",\n"
                "    \"refresh_hz\": 5000\n"
                "  }\n"
@@ -187,6 +202,7 @@ TEST_CASE("config clamps refresh_hz and normalizes invalid resolution preset") {
     const auto result = loader.load_profile("profiles/test");
 
     REQUIRE(result.success());
+    CHECK(result.config.graphics.display_mode == "borderless");
     CHECK(result.config.graphics.resolution == "native");
     CHECK(result.config.graphics.refresh_hz == 1050);
 }
@@ -253,11 +269,17 @@ TEST_CASE("config save and load preserve skin gameplay settings") {
 
     ConfigLoader loader;
     auto config = loader.defaults();
+    config.skin.note_shape = "circle";
+    config.skin.note_border_enabled = false;
     config.skin.judgement_line_position = 0.76;
+    config.skin.combo_position = 0.52;
     config.skin.note_width_scale = 1.15;
+    config.skin.hold_body_width_scale = 1.10;
     config.skin.note_height_scale = 1.35;
     config.skin.lane_colors["4k"] = {"rose", "gold", "gold", "rose"};
     config.skin.lane_colors["5k"] = {"rose", "mint", "gold", "azure", "ice"};
+    config.skin.lane_colors["16k"] = {"rose", "mint", "gold", "azure", "ice", "teal", "violet", "orange",
+                                      "orange", "violet", "teal", "ice", "azure", "gold", "mint", "rose"};
 
     std::string error;
     REQUIRE(loader.save_profile("profiles/test", config, &error));
@@ -265,8 +287,12 @@ TEST_CASE("config save and load preserve skin gameplay settings") {
 
     const auto result = loader.load_profile("profiles/test");
     REQUIRE(result.success());
+    CHECK(result.config.skin.note_shape == "circle");
+    CHECK_FALSE(result.config.skin.note_border_enabled);
     CHECK(result.config.skin.judgement_line_position == doctest::Approx(0.76));
+    CHECK(result.config.skin.combo_position == doctest::Approx(0.52));
     CHECK(result.config.skin.note_width_scale == doctest::Approx(1.15));
+    CHECK(result.config.skin.hold_body_width_scale == doctest::Approx(1.10));
     CHECK(result.config.skin.note_height_scale == doctest::Approx(1.35));
     const auto saved_4k = tenriff::config::resolved_skin_lane_colors(result.config.skin, "4k");
     REQUIRE(saved_4k.size() == 4u);
@@ -278,6 +304,11 @@ TEST_CASE("config save and load preserve skin gameplay settings") {
     CHECK(saved_5k[0] == "rose");
     CHECK(saved_5k[1] == "mint");
     CHECK(saved_5k[2] == "gold");
+    const auto saved_16k = tenriff::config::resolved_skin_lane_colors(result.config.skin, "16k");
+    REQUIRE(saved_16k.size() == 16u);
+    CHECK(saved_16k[0] == "rose");
+    CHECK(saved_16k[7] == "orange");
+    CHECK(saved_16k[15] == "rose");
 }
 
 TEST_CASE("config clamps skin gameplay settings into supported range") {
@@ -290,8 +321,12 @@ TEST_CASE("config clamps skin gameplay settings into supported range") {
     write_file(temp.path / "config" / "config.json",
                "{\n"
                "  \"skin\": {\n"
+               "    \"note_shape\": \"hexagon\",\n"
+               "    \"note_border_enabled\": false,\n"
                "    \"judgement_line_position\": 1.5,\n"
+               "    \"combo_position\": 9.0,\n"
                "    \"note_width_scale\": 9.0,\n"
+               "    \"hold_body_width_scale\": 9.0,\n"
                "    \"note_height_scale\": 0.1,\n"
                "    \"lane_colors\": {\n"
                "      \"5k\": [\"badtoken\", \"azure\"],\n"
@@ -310,9 +345,13 @@ TEST_CASE("config clamps skin gameplay settings into supported range") {
     const auto result = loader.load_profile("profiles/test");
 
     REQUIRE(result.success());
+    CHECK(result.config.skin.note_shape == "rect");
+    CHECK_FALSE(result.config.skin.note_border_enabled);
     CHECK(result.config.skin.judgement_line_position ==
           doctest::Approx(tenriff::config::kJudgementLinePositionMax));
+    CHECK(result.config.skin.combo_position == doctest::Approx(tenriff::config::kComboPositionMax));
     CHECK(result.config.skin.note_width_scale == doctest::Approx(tenriff::config::kNoteWidthScaleMax));
+    CHECK(result.config.skin.hold_body_width_scale == doctest::Approx(tenriff::config::kHoldBodyWidthScaleMax));
     CHECK(result.config.skin.note_height_scale == doctest::Approx(tenriff::config::kNoteHeightScaleMin));
     const auto clamped_5k = tenriff::config::resolved_skin_lane_colors(result.config.skin, "5k");
     REQUIRE(clamped_5k.size() == 5u);
@@ -381,6 +420,17 @@ TEST_CASE("runtime migration preserves valid enabled osu chart filters") {
     CHECK(config.mode.enable_osu_charts);
     CHECK(config.mode.format == "osu");
     CHECK(config.mode.key_mode == "7k");
+}
+
+TEST_CASE("runtime migration upgrades the legacy bad judge window default to 200ms") {
+    ConfigLoader loader;
+    auto config = loader.defaults();
+    config.judge.bd_ms = 80.0;
+
+    const bool changed = tenriff::app::migrate_bms_first_runtime_config(config);
+
+    CHECK(changed);
+    CHECK(config.judge.bd_ms == doctest::Approx(200.0));
 }
 
 TEST_CASE("config normalizes invalid keysound policy to follow") {

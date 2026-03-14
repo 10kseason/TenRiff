@@ -24,7 +24,7 @@
     "pg": 15.5,
     "gr": 31.0,
     "gd": 55.0,
-    "bd": 80.0,
+    "bd": 200.0,
     "hold_grace": 20,
     "hold_break": 50,
     "mask": 30
@@ -36,13 +36,12 @@
   },
   "gauge": {
     "auto_shift": true,
-    "refill_normal": 15.911,
-    "refill_easy": 23.866,
-    "shift_cooldown_ms": 2000,
+    "hard_to_normal_threshold": 66.0,
+    "normal_to_easy_threshold": 33.0,
     "delta": {
-      "hard": {"PG": 0.191, "GR": 0.127, "GD": 0.032, "BD": -1.414, "PR": -2.828},
-      "normal": {"PG": 0.334, "GR": 0.223, "GD": 0.056, "BD": -1.081, "PR": -2.175},
-      "easy": {"PG": 0.477, "GR": 0.318, "GD": 0.080, "BD": -0.754, "PR": -1.508}
+      "hard": {"PG": 0.13752, "GR": 0.09144, "GD": 0.02304, "BD": -1.94425, "PR": -3.88850},
+      "normal": {"PG": 0.23123, "GR": 0.15438, "GD": 0.03877, "BD": -1.54583, "PR": -3.11025},
+      "easy": {"PG": 0.30664, "GR": 0.20443, "GD": 0.05143, "BD": -1.16116, "PR": -2.32232}
     }
   },
   "graphics": {
@@ -65,8 +64,12 @@
     "require_enter_to_exit": true
   },
   "skin": {
+    "note_shape": "rect",
+    "note_border_enabled": true,
     "judgement_line_position": 0.82,
+    "combo_position": 0.24,
     "note_width_scale": 1.0,
+    "hold_body_width_scale": 0.6,
     "note_height_scale": 1.0,
     "lane_colors": {
       "4k": ["ice", "azure", "azure", "ice"],
@@ -75,7 +78,8 @@
       "7k": ["ice", "azure", "ice", "gold", "ice", "azure", "ice"],
       "8k": ["ice", "azure", "ice", "teal", "teal", "ice", "azure", "ice"],
       "9k": ["ice", "azure", "ice", "teal", "gold", "teal", "ice", "azure", "ice"],
-      "10k": ["ice", "azure", "ice", "azure", "ice", "ice", "azure", "ice", "azure", "ice"]
+      "10k": ["ice", "azure", "ice", "azure", "ice", "ice", "azure", "ice", "azure", "ice"],
+      "16k": ["ice", "azure", "ice", "azure", "ice", "gold", "teal", "ice", "ice", "teal", "gold", "ice", "azure", "ice", "azure", "ice"]
     }
   },
   "offsets": {

@@ -296,6 +296,8 @@ TEST_CASE("chart loader loads osu!mania charts when the option is enabled") {
     CHECK(result.messages.empty());
     REQUIRE(result.chart.notes.size() == 2u);
     CHECK(result.chart.lane_count == 10);
+    CHECK_FALSE(result.chart.notes[0].release_required);
+    CHECK(result.chart.notes[1].release_required);
     REQUIRE(result.chart.audio_cues.size() == 1u);
     CHECK(chart_audio_path(result.chart, result.chart.audio_cues.front().asset_id) == audio_path.u8string());
 }
@@ -478,6 +480,180 @@ TEST_CASE("chart loader compacts BMS lanes for explicit 4K, 6K, and 8K header ch
     }
 }
 
+TEST_CASE("chart loader compacts BMS lanes for explicit 5+1 and 7+1 SP charts") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+
+    ChartLoader loader;
+    struct CaseData {
+        const char* filename;
+        const char* header;
+        int lane_count;
+        const char* body;
+    };
+
+    const CaseData cases[] = {
+        {"five_plus_one_sp.bms", "#5K", 6,
+         "#00111:01\n#00112:01\n#00113:01\n#00114:01\n#00115:01\n#00116:01\n"},
+        {"seven_plus_one_sp.bms", "#7K", 8,
+         "#00111:01\n#00112:01\n#00113:01\n#00114:01\n#00115:01\n#00116:01\n#00118:01\n#00119:01\n"},
+    };
+
+    for (const auto& case_data : cases) {
+        const auto chart_path = temp.path / case_data.filename;
+        {
+            std::ofstream chart_file(chart_path, std::ios::binary);
+            REQUIRE(chart_file.good());
+            chart_file << "#TITLE SP Header\n"
+                          "#BPM 120\n"
+                       << case_data.header << "\n"
+                       << case_data.body;
+        }
+
+        ChartLoadResult result = loader.load(chart_path.u8string(), 48000, 1.0, "ignore");
+
+        CHECK(result.success());
+        CHECK(result.format == ChartFormat::Bms);
+        CHECK(result.chart.lane_count == case_data.lane_count);
+        REQUIRE(result.chart.notes.size() == static_cast<std::size_t>(case_data.lane_count));
+        for (int lane = 0; lane < case_data.lane_count; ++lane) {
+            CHECK(result.chart.notes[static_cast<std::size_t>(lane)].lane == lane + 1);
+        }
+    }
+}
+
+TEST_CASE("chart loader auto-detects headerless player-one 5+1 SP charts") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+
+    const auto chart_path = temp.path / "headerless_sp.bms";
+    {
+        std::ofstream chart_file(chart_path, std::ios::binary);
+        REQUIRE(chart_file.good());
+        chart_file << "#TITLE Headerless SP\n"
+                      "#PLAYER 1\n"
+                      "#BPM 120\n"
+                      "#00111:01\n"
+                      "#00112:01\n"
+                      "#00113:01\n"
+                      "#00114:01\n"
+                      "#00115:01\n"
+                      "#00116:01\n";
+    }
+
+    ChartLoader loader;
+    ChartLoadResult result = loader.load(chart_path.u8string(), 48000, 1.0, "ignore");
+
+    CHECK(result.success());
+    CHECK(result.format == ChartFormat::Bms);
+    CHECK(result.chart.lane_count == 6);
+    REQUIRE(result.chart.notes.size() == 6u);
+    for (int lane = 0; lane < 6; ++lane) {
+        CHECK(result.chart.notes[static_cast<std::size_t>(lane)].lane == lane + 1);
+    }
+}
+
+TEST_CASE("chart loader auto-detects headerless player-one 7+1 SP charts") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+
+    const auto chart_path = temp.path / "headerless_seven_sp.bms";
+    {
+        std::ofstream chart_file(chart_path, std::ios::binary);
+        REQUIRE(chart_file.good());
+        chart_file << "#TITLE Headerless Seven SP\n"
+                      "#PLAYER 1\n"
+                      "#BPM 120\n"
+                      "#00111:01\n"
+                      "#00112:01\n"
+                      "#00113:01\n"
+                      "#00114:01\n"
+                      "#00115:01\n"
+                      "#00116:01\n"
+                      "#00118:01\n"
+                      "#00119:01\n";
+    }
+
+    ChartLoader loader;
+    ChartLoadResult result = loader.load(chart_path.u8string(), 48000, 1.0, "ignore");
+
+    CHECK(result.success());
+    CHECK(result.format == ChartFormat::Bms);
+    CHECK(result.chart.lane_count == 8);
+    REQUIRE(result.chart.notes.size() == 8u);
+    for (int lane = 0; lane < 8; ++lane) {
+        CHECK(result.chart.notes[static_cast<std::size_t>(lane)].lane == lane + 1);
+    }
+}
+
+TEST_CASE("chart loader maps pms extension charts to 9 lanes") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+
+    const auto chart_path = temp.path / "native_popnine.pms";
+    {
+        std::ofstream chart_file(chart_path, std::ios::binary);
+        REQUIRE(chart_file.good());
+        chart_file << "#TITLE Native PMS\n"
+                      "#BPM 120\n"
+                      "#00111:01\n"
+                      "#00115:01\n"
+                      "#00122:01\n"
+                      "#00125:01\n";
+    }
+
+    ChartLoader loader;
+    ChartLoadResult result = loader.load(chart_path.u8string(), 48000, 1.0, "ignore");
+
+    CHECK(result.success());
+    CHECK(result.format == ChartFormat::Bms);
+    CHECK(result.chart.lane_count == 9);
+    REQUIRE(result.chart.notes.size() == 4u);
+    CHECK(result.chart.notes[0].lane == 1);
+    CHECK(result.chart.notes[1].lane == 5);
+    CHECK(result.chart.notes[2].lane == 6);
+    CHECK(result.chart.notes[3].lane == 9);
+}
+
+TEST_CASE("chart loader preserves 14+2 DP lane positions") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+
+    const auto chart_path = temp.path / "dpa_layout.bms";
+    {
+        std::ofstream chart_file(chart_path, std::ios::binary);
+        REQUIRE(chart_file.good());
+        chart_file << "#TITLE DPA Layout\n"
+                      "#PLAYER 3\n"
+                      "#BPM 120\n"
+                      "#00111:01\n"
+                      "#00116:01\n"
+                      "#00119:01\n"
+                      "#00121:01\n"
+                      "#00126:01\n"
+                      "#00129:01\n";
+    }
+
+    ChartLoader loader;
+    ChartLoadResult result = loader.load(chart_path.u8string(), 48000, 1.0, "ignore");
+
+    CHECK(result.success());
+    CHECK(result.format == ChartFormat::Bms);
+    CHECK(result.chart.lane_count == 16);
+    REQUIRE(result.chart.notes.size() == 6u);
+    CHECK(result.chart.notes[0].lane == 1);
+    CHECK(result.chart.notes[1].lane == 6);
+    CHECK(result.chart.notes[2].lane == 8);
+    CHECK(result.chart.notes[3].lane == 9);
+    CHECK(result.chart.notes[4].lane == 14);
+    CHECK(result.chart.notes[5].lane == 16);
+}
+
 TEST_CASE("chart loader builds hold notes from BMS long-note channels") {
     TempDirGuard temp;
     temp.path = make_temp_dir();
@@ -500,6 +676,7 @@ TEST_CASE("chart loader builds hold notes from BMS long-note channels") {
     REQUIRE(result.chart.notes.size() == 1u);
     CHECK(result.chart.notes.front().lane == 1);
     CHECK(result.chart.notes.front().end_sample.has_value());
+    CHECK_FALSE(result.chart.notes.front().release_required);
     CHECK(result.chart.notes.front().end_sample.value() > result.chart.notes.front().start_sample);
 }
 
@@ -526,7 +703,59 @@ TEST_CASE("chart loader builds hold notes from BMS LNOBJ markers") {
     REQUIRE(result.chart.notes.size() == 1u);
     CHECK(result.chart.notes.front().lane == 1);
     CHECK(result.chart.notes.front().end_sample.has_value());
+    CHECK_FALSE(result.chart.notes.front().release_required);
     CHECK(result.chart.notes.front().end_sample.value() > result.chart.notes.front().start_sample);
+}
+
+TEST_CASE("chart loader enables release judgement for BMS LNMODE 2 long-note channels") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+
+    const auto chart_path = temp.path / "charge_long_channel.bms";
+    {
+        std::ofstream chart_file(chart_path, std::ios::binary);
+        REQUIRE(chart_file.good());
+        chart_file << "#TITLE Charge Long Channel\n"
+                      "#BPM 120\n"
+                      "#LNMODE 2\n"
+                      "#00151:0101\n";
+    }
+
+    ChartLoader loader;
+    ChartLoadResult result = loader.load(chart_path.u8string(), 48000, 1.0, "ignore");
+
+    CHECK(result.success());
+    CHECK(result.messages.empty());
+    REQUIRE(result.chart.notes.size() == 1u);
+    CHECK(result.chart.notes.front().end_sample.has_value());
+    CHECK(result.chart.notes.front().release_required);
+}
+
+TEST_CASE("chart loader enables release judgement for BMS LNMODE 2 LNOBJ holds") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+
+    const auto chart_path = temp.path / "charge_lnobj.bms";
+    {
+        std::ofstream chart_file(chart_path, std::ios::binary);
+        REQUIRE(chart_file.good());
+        chart_file << "#TITLE Charge LNOBJ\n"
+                      "#BPM 120\n"
+                      "#LNMODE 2\n"
+                      "#LNOBJ AA\n"
+                      "#00111:01AA\n";
+    }
+
+    ChartLoader loader;
+    ChartLoadResult result = loader.load(chart_path.u8string(), 48000, 1.0, "ignore");
+
+    CHECK(result.success());
+    CHECK(result.messages.empty());
+    REQUIRE(result.chart.notes.size() == 1u);
+    CHECK(result.chart.notes.front().end_sample.has_value());
+    CHECK(result.chart.notes.front().release_required);
 }
 
 TEST_CASE("chart loader attaches BMS note keysounds when follow policy is enabled") {

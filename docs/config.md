@@ -47,6 +47,7 @@
 
 ### `judge`
 - `pg`, `gr`, `gd`, `bd` (double, ms)
+- 기본 `bd`는 `200ms`
 - `hold_grace` (double, ms)
 - `hold_break` (double, ms)
 - `mask` (double, ms)
@@ -58,15 +59,19 @@
 
 ### `gauge`
 - `auto_shift` (bool)
-- `refill_normal`, `refill_easy` (double)
-- `shift_cooldown_ms` (double)
+- `hard_to_normal_threshold` (double)
+  - Hard 게이지가 이 값 이하로 내려가면 즉시 Normal로 한 단계 시프트
+- `normal_to_easy_threshold` (double)
+  - Normal 게이지가 이 값 이하로 내려가면 즉시 Easy로 한 단계 시프트
+- 한 judgement에서 최대 한 단계만 내려가고, 다시 위 단계로 복귀하지 않음
 - `delta`
   - `hard`, `normal`, `easy`
   - 각 안에 `PG`, `GR`, `GD`, `BD`, `PR`
 
 ### `graphics`
 - `display_mode` (string)
-  - `borderless | fullscreen`
+  - `borderless | windowed | fullscreen`
+  - `windowed`는 제목줄이 있는 고정 크기 창이며 이동 가능
 - `resolution` (string)
   - `native | 720p | 1080p | qhd`
 - `vsync` (bool)
@@ -101,13 +106,24 @@
   - 최근 외부/내부 song source 목록
 
 ### `skin`
+- `note_shape` (string)
+  - `rect | circle`
+- `note_border_enabled` (bool)
 - `judgement_line_position` (double)
   - gameplay 판정선의 세로 위치 비율
   - `0.55..0.86` 범위로 clamp
   - 기본값은 `0.82`
+- `combo_position` (double)
+  - gameplay 필드 내부 콤보 표시의 세로 위치 비율
+  - `0.10..0.78` 범위로 clamp
+  - 기본값은 `0.24`
 - `note_width_scale` (double)
   - 노트 머리/꼬리 가로 배율
   - `0.50..1.40` 범위로 clamp
+- `hold_body_width_scale` (double)
+  - 롱노트 몸통 가로 배율
+  - `0.50..1.20` 범위로 clamp
+  - 실제 렌더 계산은 `max(4.0f, note_width * 0.5f * scale)` 기준
 - `note_height_scale` (double)
   - 노트 머리/꼬리 세로 배율
   - `0.50..2.00` 범위로 clamp

@@ -77,7 +77,7 @@ TEST_CASE("Super Random avoids overlapping lanes") {
     CHECK_FALSE(has_lane_overlap(result.chart));
 }
 
-TEST_CASE("key mode parser accepts 4K through 10K") {
+TEST_CASE("key mode parser accepts 4K through 16K") {
     using tenriff::gameplay::KeyMode;
     using tenriff::gameplay::parse_key_mode;
 
@@ -95,4 +95,6 @@ TEST_CASE("key mode parser accepts 4K through 10K") {
     CHECK(parse_key_mode("9k").value() == KeyMode::Keys9);
     REQUIRE(parse_key_mode("10k").has_value());
     CHECK(parse_key_mode("10k").value() == KeyMode::Keys10);
+    REQUIRE(parse_key_mode("16k").has_value());
+    CHECK(parse_key_mode("16k").value() == KeyMode::Keys16);
 }

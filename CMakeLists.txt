@@ -182,12 +182,14 @@ if(TENRIFF_ENABLE_TESTS)
         tests/unit/test_replay_export.cpp
         tests/unit/test_chart_loader.cpp
         tests/unit/test_chart_audio_streaming.cpp
+        tests/unit/test_chart_audio_playback.cpp
         tests/unit/test_osu_difficulty.cpp
         tests/unit/test_song_index.cpp
         tests/unit/test_song_select_state.cpp
         tests/unit/test_config.cpp
         tests/unit/test_game_session_hud.cpp
         tests/unit/test_graphics_timing.cpp
+        tests/unit/test_render_performance.cpp
         tests/unit/test_utf8_compat.cpp
     )
     target_include_directories(bms_parser_tests

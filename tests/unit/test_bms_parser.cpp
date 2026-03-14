@@ -218,6 +218,182 @@ TEST_CASE("compact lane mapping follows explicit BMS key headers") {
     CHECK_EQ(lane54.value(), 3);
 }
 
+TEST_CASE("parser detects explicit 5+1 SP layout and stores label") {
+    const char* data =
+        "#TITLE Five Plus Scratch\n"
+        "#5K\n"
+        "#00111:01\n"
+        "#00112:01\n"
+        "#00113:01\n"
+        "#00114:01\n"
+        "#00115:01\n"
+        "#00116:01\n";
+
+    BmsParser parser;
+    auto result = parser.parse(data);
+
+    CHECK(result.success());
+    CHECK_EQ(result.chart.declared_key_count, 6);
+    CHECK_EQ(result.chart.layout_label, "5+1 SP");
+    for (int lane = 1; lane <= 6; ++lane) {
+        const std::string channel = (lane < 6) ? ("1" + std::to_string(lane)) : "16";
+        auto mapped_lane = result.chart.lane_mapping.laneForChannel(channel);
+        REQUIRE(mapped_lane.has_value());
+        CHECK_EQ(mapped_lane.value(), lane);
+    }
+}
+
+TEST_CASE("parser detects explicit 7+1 SP layout and stores label") {
+    const char* data =
+        "#TITLE Seven Plus Scratch\n"
+        "#7K\n"
+        "#00111:01\n"
+        "#00112:01\n"
+        "#00113:01\n"
+        "#00114:01\n"
+        "#00115:01\n"
+        "#00116:01\n"
+        "#00118:01\n"
+        "#00119:01\n";
+
+    BmsParser parser;
+    auto result = parser.parse(data);
+
+    CHECK(result.success());
+    CHECK_EQ(result.chart.declared_key_count, 8);
+    CHECK_EQ(result.chart.layout_label, "7+1 SP");
+    for (const std::pair<const char*, int> lane_case : {std::pair{"11", 1}, {"12", 2}, {"13", 3}, {"14", 4},
+                                                         {"15", 5}, {"16", 6}, {"18", 7}, {"19", 8}}) {
+        auto mapped_lane = result.chart.lane_mapping.laneForChannel(lane_case.first);
+        REQUIRE(mapped_lane.has_value());
+        CHECK_EQ(mapped_lane.value(), lane_case.second);
+    }
+}
+
+TEST_CASE("parser auto-detects headerless player-one 5+1 SP layout") {
+    const char* data =
+        "#TITLE Headerless SP\n"
+        "#PLAYER 1\n"
+        "#00111:01\n"
+        "#00112:01\n"
+        "#00113:01\n"
+        "#00114:01\n"
+        "#00115:01\n"
+        "#00116:01\n";
+
+    BmsParser parser;
+    auto result = parser.parse(data);
+
+    CHECK(result.success());
+    CHECK_EQ(result.chart.declared_key_count, 6);
+    CHECK_EQ(result.chart.layout_label, "5+1 SP");
+}
+
+TEST_CASE("parser auto-detects headerless player-one 7+1 SP layout") {
+    const char* data =
+        "#TITLE Headerless Seven SP\n"
+        "#PLAYER 1\n"
+        "#00111:01\n"
+        "#00112:01\n"
+        "#00113:01\n"
+        "#00114:01\n"
+        "#00115:01\n"
+        "#00116:01\n"
+        "#00118:01\n"
+        "#00119:01\n";
+
+    BmsParser parser;
+    auto result = parser.parse(data);
+
+    CHECK(result.success());
+    CHECK_EQ(result.chart.declared_key_count, 8);
+    CHECK_EQ(result.chart.layout_label, "7+1 SP");
+    for (const std::pair<const char*, int> lane_case : {std::pair{"11", 1}, {"12", 2}, {"13", 3}, {"14", 4},
+                                                         {"15", 5}, {"16", 6}, {"18", 7}, {"19", 8}}) {
+        auto mapped_lane = result.chart.lane_mapping.laneForChannel(lane_case.first);
+        REQUIRE(mapped_lane.has_value());
+        CHECK_EQ(mapped_lane.value(), lane_case.second);
+    }
+}
+
+TEST_CASE("parser auto-detects headerless player-three 14+2 DP layout") {
+    const char* data =
+        "#TITLE Headerless DP\n"
+        "#PLAYER 3\n"
+        "#00111:01\n"
+        "#00116:01\n"
+        "#00119:01\n"
+        "#00121:01\n"
+        "#00126:01\n"
+        "#00129:01\n";
+
+    BmsParser parser;
+    auto result = parser.parse(data);
+
+    CHECK(result.success());
+    CHECK_EQ(result.chart.declared_key_count, 16);
+    CHECK_EQ(result.chart.layout_label, "14+2 DP");
+    for (const std::pair<const char*, int> lane_case : {std::pair{"11", 1}, {"16", 6}, {"19", 8},
+                                                         {"21", 9}, {"26", 14}, {"29", 16}}) {
+        auto mapped_lane = result.chart.lane_mapping.laneForChannel(lane_case.first);
+        REQUIRE(mapped_lane.has_value());
+        CHECK_EQ(mapped_lane.value(), lane_case.second);
+    }
+}
+
+TEST_CASE("parser infers sparse standard SP charts without falling back to 10K") {
+    const char* data =
+        "#TITLE Sparse Standard SP\n"
+        "#00111:01\n"
+        "#00114:01\n"
+        "#00119:01\n";
+
+    BmsParser parser;
+    auto result = parser.parse(data);
+
+    CHECK(result.success());
+    CHECK_EQ(result.chart.declared_key_count, 8);
+    CHECK_EQ(result.chart.layout_label, "7+1 SP");
+    auto lane11 = result.chart.lane_mapping.laneForChannel("11");
+    auto lane14 = result.chart.lane_mapping.laneForChannel("14");
+    auto lane19 = result.chart.lane_mapping.laneForChannel("19");
+    REQUIRE(lane11.has_value());
+    REQUIRE(lane14.has_value());
+    REQUIRE(lane19.has_value());
+    CHECK_EQ(lane11.value(), 1);
+    CHECK_EQ(lane14.value(), 4);
+    CHECK_EQ(lane19.value(), 8);
+}
+
+TEST_CASE("parseFile infers PMS 9K layout from pms extension") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+
+    const auto chart_path = temp.path / "popnine.pms";
+    {
+        std::ofstream chart_file(chart_path, std::ios::binary);
+        REQUIRE(chart_file.good());
+        chart_file << "#TITLE PMS Nine\n"
+                      "#00111:01\n"
+                      "#00115:01\n"
+                      "#00122:01\n"
+                      "#00125:01\n";
+    }
+
+    BmsParser parser;
+    auto result = parser.parseFile(chart_path.u8string());
+
+    CHECK(result.success());
+    CHECK_EQ(result.chart.declared_key_count, 9);
+    CHECK_EQ(result.chart.layout_label, "PMS 9K");
+    for (const std::pair<const char*, int> lane_case : {std::pair{"11", 1}, {"15", 5}, {"22", 6}, {"25", 9}}) {
+        auto mapped_lane = result.chart.lane_mapping.laneForChannel(lane_case.first);
+        REQUIRE(mapped_lane.has_value());
+        CHECK_EQ(mapped_lane.value(), lane_case.second);
+    }
+}
+
 TEST_CASE("parseFile decodes CP932 BMS headers and asset references to UTF-8") {
 #ifndef _WIN32
     return;
