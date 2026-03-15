@@ -37,6 +37,46 @@ bool is_valid_osu_key_mode(std::string_view value) {
 constexpr double kLegacyBadWindowMs = 80.0;
 constexpr double kCurrentBadWindowMs = 200.0;
 constexpr double kJudgeWindowToleranceMs = 0.001;
+constexpr double kGaugeDeltaTolerance = 0.00001;
+
+using tenriff::game::GaugeDeltaTable;
+
+constexpr GaugeDeltaTable kLegacyHardGauge{0.13752, 0.09144, 0.02304, -1.94425, -3.88850};
+constexpr GaugeDeltaTable kLegacyNormalGauge{0.23123, 0.15438, 0.03877, -1.54583, -3.11025};
+constexpr GaugeDeltaTable kLegacyEasyGauge{0.30664, 0.20443, 0.05143, -1.16116, -2.32232};
+
+constexpr GaugeDeltaTable kPreviousHardGauge{0.06120, 0.04069, 0.01025, -2.33310, -4.27735};
+constexpr GaugeDeltaTable kPreviousNormalGauge{0.10290, 0.06870, 0.01725, -1.85500, -3.42128};
+constexpr GaugeDeltaTable kPreviousEasyGauge{0.13645, 0.09097, 0.02289, -1.39339, -2.55455};
+
+constexpr GaugeDeltaTable kPriorHardGauge{0.01576, 0.01048, 0.00264, -3.84962, -7.05763};
+constexpr GaugeDeltaTable kPriorNormalGauge{0.02650, 0.01769, 0.00444, -3.06075, -5.64511};
+constexpr GaugeDeltaTable kPriorEasyGauge{0.03514, 0.02342, 0.00589, -2.29909, -4.21501};
+
+constexpr GaugeDeltaTable kCurrentHardGauge{0.01576, 0.01048, 0.00264, -8.84962, -7.05763};
+constexpr GaugeDeltaTable kCurrentNormalGauge{0.02650, 0.01769, 0.00444, -5.56075, -5.64511};
+constexpr GaugeDeltaTable kCurrentEasyGauge{0.03514, 0.02342, 0.00589, -4.04909, -4.21501};
+
+bool migrate_gauge_delta(double& value, double legacy_value, double current_value) {
+    if (std::abs(value - current_value) <= kGaugeDeltaTolerance) {
+        return false;
+    }
+    if (std::abs(value - legacy_value) > kGaugeDeltaTolerance) {
+        return false;
+    }
+    value = current_value;
+    return true;
+}
+
+bool migrate_gauge_table(GaugeDeltaTable& value, const GaugeDeltaTable& legacy, const GaugeDeltaTable& current) {
+    bool changed = false;
+    changed = migrate_gauge_delta(value.pg, legacy.pg, current.pg) || changed;
+    changed = migrate_gauge_delta(value.gr, legacy.gr, current.gr) || changed;
+    changed = migrate_gauge_delta(value.gd, legacy.gd, current.gd) || changed;
+    changed = migrate_gauge_delta(value.bd, legacy.bd, current.bd) || changed;
+    changed = migrate_gauge_delta(value.pr, legacy.pr, current.pr) || changed;
+    return changed;
+}
 
 }  // namespace
 
@@ -70,6 +110,15 @@ bool migrate_bms_first_runtime_config(config::RuntimeConfig& config) {
         config.judge.bd_ms = kCurrentBadWindowMs;
         changed = true;
     }
+    changed = migrate_gauge_table(config.gauge.hard, kLegacyHardGauge, kCurrentHardGauge) || changed;
+    changed = migrate_gauge_table(config.gauge.normal, kLegacyNormalGauge, kCurrentNormalGauge) || changed;
+    changed = migrate_gauge_table(config.gauge.easy, kLegacyEasyGauge, kCurrentEasyGauge) || changed;
+    changed = migrate_gauge_table(config.gauge.hard, kPreviousHardGauge, kCurrentHardGauge) || changed;
+    changed = migrate_gauge_table(config.gauge.normal, kPreviousNormalGauge, kCurrentNormalGauge) || changed;
+    changed = migrate_gauge_table(config.gauge.easy, kPreviousEasyGauge, kCurrentEasyGauge) || changed;
+    changed = migrate_gauge_table(config.gauge.hard, kPriorHardGauge, kCurrentHardGauge) || changed;
+    changed = migrate_gauge_table(config.gauge.normal, kPriorNormalGauge, kCurrentNormalGauge) || changed;
+    changed = migrate_gauge_table(config.gauge.easy, kPriorEasyGauge, kCurrentEasyGauge) || changed;
 
     return changed;
 }

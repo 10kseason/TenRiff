@@ -122,6 +122,7 @@ void GameplayEngine::collect_active_holds(std::vector<ActiveHoldView>& out) cons
 
 void GameplayEngine::apply_judgement(game::Judgement judgement, double delta_ms, int64_t sample,
                                      double weight, bool breaks_combo) {
+    static_cast<void>(weight);
     live_feedback_.has_value = true;
     live_feedback_.judgement = judgement;
     live_feedback_.delta_ms = std::isfinite(delta_ms) ? delta_ms : 0.0;
@@ -129,7 +130,7 @@ void GameplayEngine::apply_judgement(game::Judgement judgement, double delta_ms,
 
     double time_ms = samples_to_ms(sample);
     auto previous_type = gauge_state_.type;
-    auto result = gauge_manager_.applyJudgementWeighted(gauge_state_, judgement, time_ms, weight);
+    auto result = gauge_manager_.applyJudgement(gauge_state_, judgement, time_ms);
 
     stats_.record_judgement(judgement, delta_ms, breaks_combo);
     stats_.record_gauge_sample(sample, gauge_state_.value);

@@ -543,6 +543,20 @@ std::vector<std::string>& editable_skin_lane_colors(config::SkinConfig& skin, st
     return colors;
 }
 
+double& editable_skin_note_width_scale(config::SkinConfig& skin, std::string_view key_mode) {
+    const std::string normalized = config::normalize_skin_mode_token(key_mode);
+    auto& scale = skin.note_width_scales[normalized];
+    scale = config::resolved_skin_note_width_scale(skin, normalized);
+    return scale;
+}
+
+double& editable_skin_note_height_scale(config::SkinConfig& skin, std::string_view key_mode) {
+    const std::string normalized = config::normalize_skin_mode_token(key_mode);
+    auto& scale = skin.note_height_scales[normalized];
+    scale = config::resolved_skin_note_height_scale(skin, normalized);
+    return scale;
+}
+
 std::string gauge_label(const std::string& value) {
     if (value == "hard") {
         return "Hard";
@@ -3095,8 +3109,9 @@ void MenuApp::handle_skins_settings_input(uint32_t keycode) {
     }
     if (settings_cursor_ == 6 && (keycode == key_left_ || keycode == key_right_)) {
         const int direction = (keycode == key_left_) ? -1 : 1;
-        config_.skin.note_width_scale = clamp_step_value(
-            config_.skin.note_width_scale + static_cast<double>(direction) * kNoteSizeScaleStep,
+        auto& note_width_scale = editable_skin_note_width_scale(config_.skin, skin_edit_mode_);
+        note_width_scale = clamp_step_value(
+            note_width_scale + static_cast<double>(direction) * kNoteSizeScaleStep,
             config::kNoteWidthScaleMin, config::kNoteWidthScaleMax, kNoteSizeScaleStep);
         skin_dirty_ = true;
         publish_snapshot();
@@ -3113,8 +3128,9 @@ void MenuApp::handle_skins_settings_input(uint32_t keycode) {
     }
     if (settings_cursor_ == 8 && (keycode == key_left_ || keycode == key_right_)) {
         const int direction = (keycode == key_left_) ? -1 : 1;
-        config_.skin.note_height_scale = clamp_step_value(
-            config_.skin.note_height_scale + static_cast<double>(direction) * kNoteSizeScaleStep,
+        auto& note_height_scale = editable_skin_note_height_scale(config_.skin, skin_edit_mode_);
+        note_height_scale = clamp_step_value(
+            note_height_scale + static_cast<double>(direction) * kNoteSizeScaleStep,
             config::kNoteHeightScaleMin, config::kNoteHeightScaleMax, kNoteSizeScaleStep);
         skin_dirty_ = true;
         publish_snapshot();
@@ -3406,12 +3422,13 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target, uin
         config_.skin.combo_position,
         config::kComboPositionMin,
         config::kComboPositionMax);
+    const std::string skin_mode = std::to_string(target.lane_count) + "k";
     target.note_width_scale = std::clamp(
-        config_.skin.note_width_scale,
+        config::resolved_skin_note_width_scale(config_.skin, skin_mode),
         config::kNoteWidthScaleMin,
         config::kNoteWidthScaleMax);
     target.note_height_scale = std::clamp(
-        config_.skin.note_height_scale,
+        config::resolved_skin_note_height_scale(config_.skin, skin_mode),
         config::kNoteHeightScaleMin,
         config::kNoteHeightScaleMax);
     target.hold_body_width_scale = std::clamp(
@@ -3447,7 +3464,6 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target, uin
 
     target.lane_color_count = 0;
     target.lane_colors.fill(0);
-    const std::string skin_mode = std::to_string(target.lane_count) + "k";
     const auto lane_colors = config::resolved_skin_lane_colors(config_.skin, skin_mode);
     target.lane_color_count = std::min<std::size_t>(lane_colors.size(), static_cast<std::size_t>(target.lane_count));
     for (std::size_t i = 0; i < target.lane_color_count; ++i) {
@@ -4012,6 +4028,8 @@ void MenuApp::publish_snapshot() {
             const int lane_count = lane_count_for_skin_mode(skin_edit_mode_);
             skin_edit_lane_ = clamp_int(skin_edit_lane_, 0, lane_count - 1);
             const auto preview_lane_colors = config::resolved_skin_lane_colors(config_.skin, skin_edit_mode_);
+            const double preview_note_width_scale = config::resolved_skin_note_width_scale(config_.skin, skin_edit_mode_);
+            const double preview_note_height_scale = config::resolved_skin_note_height_scale(config_.skin, skin_edit_mode_);
 
             add_row("Key Mode", key_mode_label(skin_edit_mode_), settings_cursor_ == 0,
                     render::MenuHitTargetKind::SettingsRow, 0, false, true);
@@ -4027,11 +4045,11 @@ void MenuApp::publish_snapshot() {
                     render::MenuHitTargetKind::SettingsRow, 4, false, true);
             add_row("Judge Line", format_percent(config_.skin.judgement_line_position), settings_cursor_ == 5,
                     render::MenuHitTargetKind::SettingsRow, 5, false, true);
-            add_row("Note Width", format_percent(config_.skin.note_width_scale), settings_cursor_ == 6,
+            add_row("Note Width", format_percent(preview_note_width_scale), settings_cursor_ == 6,
                     render::MenuHitTargetKind::SettingsRow, 6, false, true);
             add_row("LN Body Width", format_percent(config_.skin.hold_body_width_scale), settings_cursor_ == 7,
                     render::MenuHitTargetKind::SettingsRow, 7, false, true);
-            add_row("Note Height", format_percent(config_.skin.note_height_scale), settings_cursor_ == 8,
+            add_row("Note Height", format_percent(preview_note_height_scale), settings_cursor_ == 8,
                     render::MenuHitTargetKind::SettingsRow, 8, false, true);
             add_row("Combo Y", format_percent(config_.skin.combo_position), settings_cursor_ == 9,
                     render::MenuHitTargetKind::SettingsRow, 9, false, true);
@@ -4045,8 +4063,8 @@ void MenuApp::publish_snapshot() {
             render.generic.skin_preview.selected_lane = skin_edit_lane_ + 1;
             render.generic.skin_preview.judgement_line_position = config_.skin.judgement_line_position;
             render.generic.skin_preview.combo_position = config_.skin.combo_position;
-            render.generic.skin_preview.note_width_scale = config_.skin.note_width_scale;
-            render.generic.skin_preview.note_height_scale = config_.skin.note_height_scale;
+            render.generic.skin_preview.note_width_scale = preview_note_width_scale;
+            render.generic.skin_preview.note_height_scale = preview_note_height_scale;
             render.generic.skin_preview.hold_body_width_scale = config_.skin.hold_body_width_scale;
             render.generic.skin_preview.note_border_enabled = config_.skin.note_border_enabled;
             render.generic.skin_preview.note_shape = config_.skin.note_shape;

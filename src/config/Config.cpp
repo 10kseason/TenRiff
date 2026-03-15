@@ -1,6 +1,7 @@
 #include "config/Config.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cctype>
 #include <filesystem>
 #include <fstream>
@@ -103,10 +104,33 @@ void sanitize_skin_config(SkinConfig& skin) {
     skin.hold_body_width_scale = std::clamp(
         skin.hold_body_width_scale, kHoldBodyWidthScaleMin, kHoldBodyWidthScaleMax);
 
+    const auto& supported_modes = supported_skin_mode_tokens();
+    std::unordered_map<std::string, double> sanitized_note_width_scales;
+    std::unordered_map<std::string, double> sanitized_note_height_scales;
     std::unordered_map<std::string, std::vector<std::string>> sanitized_lane_colors;
-    for (const auto& mode : supported_skin_mode_tokens()) {
+    for (const auto& [mode, value] : skin.note_width_scales) {
+        const std::string normalized = normalize_skin_mode_token(mode);
+        if (!std::isfinite(value) ||
+            std::find(supported_modes.begin(), supported_modes.end(), normalized) == supported_modes.end()) {
+            continue;
+        }
+        sanitized_note_width_scales[normalized] =
+            std::clamp(value, kNoteWidthScaleMin, kNoteWidthScaleMax);
+    }
+    for (const auto& [mode, value] : skin.note_height_scales) {
+        const std::string normalized = normalize_skin_mode_token(mode);
+        if (!std::isfinite(value) ||
+            std::find(supported_modes.begin(), supported_modes.end(), normalized) == supported_modes.end()) {
+            continue;
+        }
+        sanitized_note_height_scales[normalized] =
+            std::clamp(value, kNoteHeightScaleMin, kNoteHeightScaleMax);
+    }
+    for (const auto& mode : supported_modes) {
         sanitized_lane_colors.emplace(mode, resolved_skin_lane_colors(skin, mode));
     }
+    skin.note_width_scales = std::move(sanitized_note_width_scales);
+    skin.note_height_scales = std::move(sanitized_note_height_scales);
     skin.lane_colors = std::move(sanitized_lane_colors);
 }
 
@@ -376,6 +400,24 @@ void apply_config_object(const JsonObject& root, RuntimeConfig& config) {
         config.skin.hold_body_width_scale = std::clamp(
             get_number(*skin, "hold_body_width_scale", config.skin.hold_body_width_scale),
             kHoldBodyWidthScaleMin, kHoldBodyWidthScaleMax);
+        if (const auto* note_width_scales = get_object(*skin, "note_width_scales")) {
+            for (const auto& [mode, value] : *note_width_scales) {
+                if (!value.is_number()) {
+                    continue;
+                }
+                config.skin.note_width_scales[normalize_skin_mode_token(mode)] =
+                    std::clamp(value.as_number(config.skin.note_width_scale), kNoteWidthScaleMin, kNoteWidthScaleMax);
+            }
+        }
+        if (const auto* note_height_scales = get_object(*skin, "note_height_scales")) {
+            for (const auto& [mode, value] : *note_height_scales) {
+                if (!value.is_number()) {
+                    continue;
+                }
+                config.skin.note_height_scales[normalize_skin_mode_token(mode)] =
+                    std::clamp(value.as_number(config.skin.note_height_scale), kNoteHeightScaleMin, kNoteHeightScaleMax);
+            }
+        }
         if (const auto* lane_colors = get_object(*skin, "lane_colors")) {
             for (const auto& [mode, value] : *lane_colors) {
                 const auto* array = value.as_array();
@@ -546,6 +588,14 @@ JsonValue build_json_root(const RuntimeConfig& config) {
     skin.emplace("note_width_scale", JsonValue{config.skin.note_width_scale});
     skin.emplace("note_height_scale", JsonValue{config.skin.note_height_scale});
     skin.emplace("hold_body_width_scale", JsonValue{config.skin.hold_body_width_scale});
+    JsonObject note_width_scales;
+    JsonObject note_height_scales;
+    for (const auto& mode : supported_skin_mode_tokens()) {
+        note_width_scales.emplace(mode, JsonValue{resolved_skin_note_width_scale(config.skin, mode)});
+        note_height_scales.emplace(mode, JsonValue{resolved_skin_note_height_scale(config.skin, mode)});
+    }
+    skin.emplace("note_width_scales", JsonValue{std::move(note_width_scales)});
+    skin.emplace("note_height_scales", JsonValue{std::move(note_height_scales)});
     JsonObject lane_colors;
     for (const auto& mode : supported_skin_mode_tokens()) {
         JsonArray colors;
@@ -659,6 +709,26 @@ uint32_t skin_color_rgb(std::string_view token) {
         }
     }
     return 0xF6F8FF;
+}
+
+double resolved_skin_note_width_scale(const SkinConfig& skin, std::string_view key_mode) {
+    const std::string normalized = normalize_skin_mode_token(key_mode);
+    double resolved = std::clamp(skin.note_width_scale, kNoteWidthScaleMin, kNoteWidthScaleMax);
+    const auto it = skin.note_width_scales.find(normalized);
+    if (it == skin.note_width_scales.end() || !std::isfinite(it->second)) {
+        return resolved;
+    }
+    return std::clamp(it->second, kNoteWidthScaleMin, kNoteWidthScaleMax);
+}
+
+double resolved_skin_note_height_scale(const SkinConfig& skin, std::string_view key_mode) {
+    const std::string normalized = normalize_skin_mode_token(key_mode);
+    double resolved = std::clamp(skin.note_height_scale, kNoteHeightScaleMin, kNoteHeightScaleMax);
+    const auto it = skin.note_height_scales.find(normalized);
+    if (it == skin.note_height_scales.end() || !std::isfinite(it->second)) {
+        return resolved;
+    }
+    return std::clamp(it->second, kNoteHeightScaleMin, kNoteHeightScaleMax);
 }
 
 std::vector<std::string> default_skin_lane_colors(std::string_view key_mode) {

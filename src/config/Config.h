@@ -72,6 +72,8 @@ struct SkinConfig {
     double note_width_scale = 1.0;
     double note_height_scale = 1.0;
     double hold_body_width_scale = kHoldBodyWidthScaleDefault;
+    std::unordered_map<std::string, double> note_width_scales;
+    std::unordered_map<std::string, double> note_height_scales;
     std::unordered_map<std::string, std::vector<std::string>> lane_colors;
 };
 
@@ -136,6 +138,8 @@ public:
 [[nodiscard]] std::string skin_note_shape_label(std::string_view token);
 [[nodiscard]] std::string skin_color_label(std::string_view token);
 [[nodiscard]] uint32_t skin_color_rgb(std::string_view token);
+[[nodiscard]] double resolved_skin_note_width_scale(const SkinConfig& skin, std::string_view key_mode);
+[[nodiscard]] double resolved_skin_note_height_scale(const SkinConfig& skin, std::string_view key_mode);
 [[nodiscard]] std::vector<std::string> default_skin_lane_colors(std::string_view key_mode);
 [[nodiscard]] std::vector<std::string> resolved_skin_lane_colors(const SkinConfig& skin, std::string_view key_mode);
 

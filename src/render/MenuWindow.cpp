@@ -123,6 +123,45 @@ float gameplay_note_draw_width(float lane_width, double note_width_scale) {
                       std::max(16.0f, safe_lane_width - 4.0f));
 }
 
+struct GameplayFieldLayout {
+    float left = 0.0f;
+    float right = 0.0f;
+    float top = 0.0f;
+    float bottom = 0.0f;
+    float width = 0.0f;
+    float height = 0.0f;
+    float lane_width = 0.0f;
+    float note_width = 16.0f;
+};
+
+GameplayFieldLayout build_gameplay_field_layout(float bounds_left,
+                                                float bounds_right,
+                                                float top,
+                                                float bottom,
+                                                int lane_count,
+                                                double note_width_scale) {
+    const int clamped_lane_count = std::max(1, lane_count);
+    const float bounds_width = std::max(160.0f, bounds_right - bounds_left);
+    const float base_lane_width = bounds_width / static_cast<float>(clamped_lane_count);
+    const float default_note_width = gameplay_note_draw_width(base_lane_width, 1.0);
+    const float desired_note_width = gameplay_note_draw_width(base_lane_width, note_width_scale);
+    const float shrink_ratio =
+        (default_note_width > 1.0f) ? std::clamp(desired_note_width / default_note_width, 0.35f, 1.0f) : 1.0f;
+    const float field_width = bounds_width * shrink_ratio;
+    const float center_x = (bounds_left + bounds_right) * 0.5f;
+
+    GameplayFieldLayout layout;
+    layout.left = center_x - field_width * 0.5f;
+    layout.right = center_x + field_width * 0.5f;
+    layout.top = top;
+    layout.bottom = bottom;
+    layout.width = field_width;
+    layout.height = std::max(1.0f, bottom - top);
+    layout.lane_width = field_width / static_cast<float>(clamped_lane_count);
+    layout.note_width = std::min(desired_note_width, std::max(16.0f, layout.lane_width - 4.0f));
+    return layout;
+}
+
 float gameplay_field_y(float field_top, float field_height, double normalized_y) {
     return field_top + field_height * static_cast<float>(normalized_y);
 }
@@ -464,10 +503,12 @@ void draw_note_primitive(ID2D1RenderTarget* target,
                                  : D2D1_ANTIALIAS_MODE_ALIASED);
 
     if (normalized_shape == "circle") {
+        const float diameter = std::max(2.0f, std::min(rect.right - rect.left, rect.bottom - rect.top) - 2.0f);
+        const float radius = diameter * 0.5f;
         const D2D1_ELLIPSE ellipse = D2D1::Ellipse(
             D2D1::Point2F((rect.left + rect.right) * 0.5f, (rect.top + rect.bottom) * 0.5f),
-            std::max(1.0f, (rect.right - rect.left) * 0.5f - 1.0f),
-            std::max(1.0f, (rect.bottom - rect.top) * 0.5f - 1.0f));
+            radius,
+            radius);
         target->FillEllipse(ellipse, fill);
         if (draw_border && border) {
             target->DrawEllipse(ellipse, border, border_width);
@@ -780,6 +821,10 @@ bool MenuWindow::ensure_gameplay_note_sprites(const GameplayHudData& data) {
     const int lane_count = std::clamp(data.lane_count, 1, static_cast<int>(kGameplayHudMaxLanes));
     const bool note_border_enabled = data.note_border_enabled;
     const std::string note_shape = normalize_gameplay_note_shape(data.note_shape);
+    if (note_shape == "circle") {
+        invalidate_gameplay_note_sprite_cache();
+        return false;
+    }
     bool cache_valid =
         gameplay_note_sprite_cache_.lane_count == lane_count &&
         gameplay_note_sprite_cache_.note_border_enabled == note_border_enabled &&
@@ -958,12 +1003,14 @@ void MenuWindow::invalidate_gameplay_static_cache() {
 bool MenuWindow::ensure_gameplay_static_cache(const GameplayHudData& data) {
     const int lane_count = std::clamp(data.lane_count, 1, static_cast<int>(kGameplayHudMaxLanes));
     const double judgement_line_position = clamp_gameplay_judgement_line(data.judgement_line_position);
+    const float note_width_scale = clamp_gameplay_note_width_scale(data.note_width_scale);
     if (!d2d_ || !d2d_->d2d_context || !d2d_->d2d_target) {
         return false;
     }
     if (d2d_->gameplay_static_command_list &&
         gameplay_static_cache_.lane_count == lane_count &&
-        std::abs(gameplay_static_cache_.judgement_line_position - judgement_line_position) < 1e-6) {
+        std::abs(gameplay_static_cache_.judgement_line_position - judgement_line_position) < 1e-6 &&
+        std::abs(gameplay_static_cache_.note_width_scale - note_width_scale) < 1e-6) {
         return true;
     }
 
@@ -980,9 +1027,11 @@ bool MenuWindow::ensure_gameplay_static_cache(const GameplayHudData& data) {
     const D2D1_ANTIALIAS_MODE saved_antialias = ctx->GetAntialiasMode();
     ctx->SetAntialiasMode(D2D1_ANTIALIAS_MODE_ALIASED);
 
-    const float field_height = kGameplayFieldBottom - kGameplayFieldTop;
+    const GameplayFieldLayout field_layout = build_gameplay_field_layout(
+        kGameplayFieldLeft, kGameplayFieldRight, kGameplayFieldTop, kGameplayFieldBottom, lane_count, note_width_scale);
+    const float field_height = field_layout.height;
     const D2D1_RECT_F field_rect =
-        D2D1::RectF(kGameplayFieldLeft, kGameplayFieldTop, kGameplayFieldRight, kGameplayFieldBottom);
+        D2D1::RectF(field_layout.left, field_layout.top, field_layout.right, field_layout.bottom);
     const D2D1_ROUNDED_RECT field_rr = D2D1::RoundedRect(field_rect, 16.0f, 16.0f);
     if (d2d_->panel_brush) {
         ctx->FillRoundedRectangle(field_rr, d2d_->panel_brush.Get());
@@ -991,26 +1040,26 @@ bool MenuWindow::ensure_gameplay_static_cache(const GameplayHudData& data) {
         ctx->DrawRoundedRectangle(field_rr, d2d_->button_border_brush.Get(), 1.4f);
     }
 
-    const float lane_width = (kGameplayFieldRight - kGameplayFieldLeft) / static_cast<float>(lane_count);
+    const float lane_width = field_layout.lane_width;
     for (int lane = 0; lane < lane_count; ++lane) {
-        const float x0 = kGameplayFieldLeft + static_cast<float>(lane) * lane_width;
+        const float x0 = field_layout.left + static_cast<float>(lane) * lane_width;
         const float x1 = x0 + lane_width;
         const D2D1_RECT_F lane_rect =
-            D2D1::RectF(x0 + 2.0f, kGameplayFieldTop + 2.0f, x1 - 2.0f, kGameplayFieldBottom - 2.0f);
+            D2D1::RectF(x0 + 2.0f, field_layout.top + 2.0f, x1 - 2.0f, field_layout.bottom - 2.0f);
         if (d2d_->card_brush) {
             d2d_->card_brush->SetOpacity((lane % 2 == 0) ? 0.38f : 0.28f);
             ctx->FillRectangle(lane_rect, d2d_->card_brush.Get());
             d2d_->card_brush->SetOpacity(1.0f);
         }
         if (d2d_->button_border_brush) {
-            ctx->DrawLine(D2D1::Point2F(x1, kGameplayFieldTop), D2D1::Point2F(x1, kGameplayFieldBottom),
+            ctx->DrawLine(D2D1::Point2F(x1, field_layout.top), D2D1::Point2F(x1, field_layout.bottom),
                           d2d_->button_border_brush.Get(), 1.0f);
         }
     }
 
     if (d2d_->accent_brush) {
-        const float hit_line_y = gameplay_field_y(kGameplayFieldTop, field_height, judgement_line_position);
-        ctx->DrawLine(D2D1::Point2F(kGameplayFieldLeft, hit_line_y), D2D1::Point2F(kGameplayFieldRight, hit_line_y),
+        const float hit_line_y = gameplay_field_y(field_layout.top, field_height, judgement_line_position);
+        ctx->DrawLine(D2D1::Point2F(field_layout.left, hit_line_y), D2D1::Point2F(field_layout.right, hit_line_y),
                       d2d_->accent_brush.Get(), 2.2f);
     }
 
@@ -1038,6 +1087,7 @@ bool MenuWindow::ensure_gameplay_static_cache(const GameplayHudData& data) {
     d2d_->gameplay_static_command_list = std::move(command_list);
     gameplay_static_cache_.lane_count = lane_count;
     gameplay_static_cache_.judgement_line_position = judgement_line_position;
+    gameplay_static_cache_.note_width_scale = note_width_scale;
     return true;
 }
 
@@ -2116,18 +2166,27 @@ void MenuWindow::draw(const MenuRenderData& data) {
                               d2d_->muted_brush.Get());
             }
 
-            const float field_left = rect.left + 28.0f;
-            const float field_right = rect.right - 28.0f;
+            const float preview_bounds_left = rect.left + 28.0f;
+            const float preview_bounds_right = rect.right - 28.0f;
             const float field_top = rect.top + 132.0f;
             const float field_bottom = rect.bottom - 152.0f;
-            const float field_height = field_bottom - field_top;
             const int lane_count = std::clamp(preview.lane_count, 1, static_cast<int>(kGameplayHudMaxLanes));
-            const float lane_width = (field_right - field_left) / static_cast<float>(lane_count);
+            const GameplayFieldLayout field_layout = build_gameplay_field_layout(
+                preview_bounds_left,
+                preview_bounds_right,
+                field_top,
+                field_bottom,
+                lane_count,
+                preview.note_width_scale);
+            const float field_height = field_layout.height;
+            const float field_left = field_layout.left;
+            const float field_right = field_layout.right;
+            const float lane_width = field_layout.lane_width;
             const float hit_line_y =
-                gameplay_field_y(field_top,
+                gameplay_field_y(field_layout.top,
                                  field_height,
                                  clamp_gameplay_judgement_line(preview.judgement_line_position));
-            const float note_width = gameplay_note_draw_width(lane_width, preview.note_width_scale);
+            const float note_width = field_layout.note_width;
             const float head_half_h = 11.0f * clamp_gameplay_note_height_scale(preview.note_height_scale);
             const float tail_half_h = 9.0f * clamp_gameplay_note_height_scale(preview.note_height_scale);
             const float hold_body_width_scale =
@@ -2137,7 +2196,9 @@ void MenuWindow::draw(const MenuRenderData& data) {
             const bool note_border_enabled = preview.note_border_enabled;
 
             const D2D1_ROUNDED_RECT field_rr =
-                D2D1::RoundedRect(D2D1::RectF(field_left, field_top, field_right, field_bottom), 14.0f, 14.0f);
+                D2D1::RoundedRect(D2D1::RectF(field_left, field_layout.top, field_right, field_layout.bottom),
+                                  14.0f,
+                                  14.0f);
             if (d2d_->card_brush) {
                 ctx->FillRoundedRectangle(field_rr, d2d_->card_brush.Get());
             }
@@ -2151,11 +2212,14 @@ void MenuWindow::draw(const MenuRenderData& data) {
                 const uint32_t rgb = preview.lane_colors[static_cast<std::size_t>(lane)];
                 if (d2d_->note_fill_brush) {
                     d2d_->note_fill_brush->SetColor(gameplay_lane_preview_fill(rgb, lane + 1 == preview.selected_lane));
-                    ctx->FillRectangle(D2D1::RectF(x0 + 2.0f, field_top + 2.0f, x1 - 2.0f, field_bottom - 2.0f),
+                    ctx->FillRectangle(D2D1::RectF(x0 + 2.0f,
+                                                   field_layout.top + 2.0f,
+                                                   x1 - 2.0f,
+                                                   field_layout.bottom - 2.0f),
                                        d2d_->note_fill_brush.Get());
                 }
                 if (d2d_->button_border_brush) {
-                    ctx->DrawLine(D2D1::Point2F(x1, field_top), D2D1::Point2F(x1, field_bottom),
+                    ctx->DrawLine(D2D1::Point2F(x1, field_layout.top), D2D1::Point2F(x1, field_layout.bottom),
                                   d2d_->button_border_brush.Get(), 1.0f);
                 }
             }
@@ -2170,7 +2234,8 @@ void MenuWindow::draw(const MenuRenderData& data) {
                 const float lane_center = field_left + (static_cast<float>(lane) + 0.5f) * lane_width;
                 const float x0 = lane_center - note_width * 0.5f;
                 const float x1 = lane_center + note_width * 0.5f;
-                const float y = field_top + field_height * (0.16f + 0.09f * static_cast<float>((lane + 1) % 4));
+                const float y =
+                    field_layout.top + field_height * (0.16f + 0.09f * static_cast<float>((lane + 1) % 4));
                 if (d2d_->note_fill_brush) {
                     d2d_->note_fill_brush->SetColor(gameplay_note_fill_color(rgb));
                 }
@@ -2182,7 +2247,8 @@ void MenuWindow::draw(const MenuRenderData& data) {
                 }
 
                 if (lane + 1 == preview.selected_lane && d2d_->note_hold_brush) {
-                    const float tail_y = std::min(field_bottom - 20.0f, hit_line_y + field_height * 0.12f);
+                    const float tail_y =
+                        std::min(field_layout.bottom - 20.0f, hit_line_y + field_height * 0.12f);
                     const float hold_half_width = std::max(4.0f, note_width * 0.5f * hold_body_width_scale);
                     const D2D1_RECT_F hold_rect =
                         D2D1::RectF(lane_center - hold_half_width, y + tail_half_h, lane_center + hold_half_width, tail_y - head_half_h);
@@ -2206,7 +2272,7 @@ void MenuWindow::draw(const MenuRenderData& data) {
 
             if (d2d_->header_format && d2d_->accent_brush) {
                 const std::wstring combo_w = L"123";
-                const float combo_y = gameplay_field_y(field_top, field_height, combo_position);
+                const float combo_y = gameplay_field_y(field_layout.top, field_height, combo_position);
                 const D2D1_RECT_F combo_rect =
                     D2D1::RectF(field_left, combo_y - 40.0f, field_right, combo_y + 40.0f);
                 ctx->DrawText(combo_w.c_str(), static_cast<UINT32>(combo_w.size()),
@@ -3713,13 +3779,21 @@ void MenuWindow::draw(const MenuRenderData& data) {
             d2d_->hud_format->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_LEADING);
         }
 
-        const float field_left = kGameplayFieldLeft;
-        const float field_right = kGameplayFieldRight;
-        const float field_top = kGameplayFieldTop;
-        const float field_bottom = kGameplayFieldBottom;
-        const float field_height = field_bottom - field_top;
         const int lane_count = std::clamp(data.gameplay.lane_count, 1, static_cast<int>(kGameplayHudMaxLanes));
-        const float lane_width = (field_right - field_left) / static_cast<float>(lane_count);
+        const GameplayFieldLayout field_layout = build_gameplay_field_layout(
+            kGameplayFieldLeft,
+            kGameplayFieldRight,
+            kGameplayFieldTop,
+            kGameplayFieldBottom,
+            lane_count,
+            note_width_scale);
+        const float field_left = field_layout.left;
+        const float field_right = field_layout.right;
+        const float field_top = field_layout.top;
+        const float field_bottom = field_layout.bottom;
+        const float field_height = field_layout.height;
+        const float lane_width = field_layout.lane_width;
+        const float note_width = field_layout.note_width;
         const float hit_line_y = gameplay_field_y(field_top, field_height, judgement_line_position);
         if (d2d_->gameplay_static_command_list) {
             ctx->DrawImage(d2d_->gameplay_static_command_list.Get());
@@ -3731,7 +3805,6 @@ void MenuWindow::draw(const MenuRenderData& data) {
             const auto& note = data.gameplay.notes[note_index];
             const int lane = std::clamp(note.lane, 1, lane_count);
             const float lane_center = field_left + (static_cast<float>(lane) - 0.5f) * lane_width;
-            const float note_width = gameplay_note_draw_width(lane_width, note_width_scale);
             const float x0 = lane_center - note_width * 0.5f;
             const float x1 = lane_center + note_width * 0.5f;
             const float y = gameplay_field_y(field_top, field_height, sample_to_y(note.start_sample));
@@ -3813,7 +3886,6 @@ void MenuWindow::draw(const MenuRenderData& data) {
                     continue;
                 }
                 const float lane_center = field_left + (static_cast<float>(lane) + 0.5f) * lane_width;
-                const float note_width = gameplay_note_draw_width(lane_width, note_width_scale);
                 const float x0 = lane_center - note_width * 0.5f;
                 const float x1 = lane_center + note_width * 0.5f;
                 const float glow_half_h = 8.0f + 14.0f * activity;
