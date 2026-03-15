@@ -67,15 +67,21 @@ TEST_CASE("config defaults prefer 44100 Hz audio") {
     CHECK(config.graphics.refresh_hz == 1050);
     CHECK(config.gauge.hard_to_normal_threshold == doctest::Approx(66.0));
     CHECK(config.gauge.normal_to_easy_threshold == doctest::Approx(33.0));
-    CHECK(config.gauge.hard.pg == doctest::Approx(0.01576));
-    CHECK(config.gauge.hard.bd == doctest::Approx(-8.84962));
-    CHECK(config.gauge.hard.pr == doctest::Approx(-7.05763));
-    CHECK(config.gauge.normal.pg == doctest::Approx(0.02650));
-    CHECK(config.gauge.normal.bd == doctest::Approx(-5.56075));
-    CHECK(config.gauge.normal.pr == doctest::Approx(-5.64511));
-    CHECK(config.gauge.easy.pg == doctest::Approx(0.03514));
-    CHECK(config.gauge.easy.bd == doctest::Approx(-4.04909));
-    CHECK(config.gauge.easy.pr == doctest::Approx(-4.21501));
+    CHECK(config.gauge.hard.pg == doctest::Approx(0.03666667));
+    CHECK(config.gauge.hard.gr == doctest::Approx(0.02444444));
+    CHECK(config.gauge.hard.gd == doctest::Approx(0.00611111));
+    CHECK(config.gauge.hard.bd == doctest::Approx(-5.50000));
+    CHECK(config.gauge.hard.pr == doctest::Approx(-7.50000));
+    CHECK(config.gauge.normal.pg == doctest::Approx(0.05238095));
+    CHECK(config.gauge.normal.gr == doctest::Approx(0.03492063));
+    CHECK(config.gauge.normal.gd == doctest::Approx(0.00873016));
+    CHECK(config.gauge.normal.bd == doctest::Approx(-5.50000));
+    CHECK(config.gauge.normal.pr == doctest::Approx(-7.50000));
+    CHECK(config.gauge.easy.pg == doctest::Approx(0.10000000));
+    CHECK(config.gauge.easy.gr == doctest::Approx(0.06666667));
+    CHECK(config.gauge.easy.gd == doctest::Approx(0.01666667));
+    CHECK(config.gauge.easy.bd == doctest::Approx(-5.50000));
+    CHECK(config.gauge.easy.pr == doctest::Approx(-7.50000));
     CHECK(config.judge.bd_ms == doctest::Approx(200.0));
     CHECK(config.skin.note_shape == "rect");
     CHECK(config.skin.note_border_enabled);
@@ -472,18 +478,24 @@ TEST_CASE("runtime migration upgrades legacy default gauge deltas to the harsher
     const bool changed = tenriff::app::migrate_bms_first_runtime_config(config);
 
     CHECK(changed);
-    CHECK(config.gauge.hard.pg == doctest::Approx(0.01576));
-    CHECK(config.gauge.hard.bd == doctest::Approx(-8.84962));
-    CHECK(config.gauge.hard.pr == doctest::Approx(-7.05763));
-    CHECK(config.gauge.normal.pg == doctest::Approx(0.02650));
-    CHECK(config.gauge.normal.bd == doctest::Approx(-5.56075));
-    CHECK(config.gauge.normal.pr == doctest::Approx(-5.64511));
-    CHECK(config.gauge.easy.pg == doctest::Approx(0.03514));
-    CHECK(config.gauge.easy.bd == doctest::Approx(-4.04909));
-    CHECK(config.gauge.easy.pr == doctest::Approx(-4.21501));
+    CHECK(config.gauge.hard.pg == doctest::Approx(0.03666667));
+    CHECK(config.gauge.hard.gr == doctest::Approx(0.02444444));
+    CHECK(config.gauge.hard.gd == doctest::Approx(0.00611111));
+    CHECK(config.gauge.hard.bd == doctest::Approx(-5.50000));
+    CHECK(config.gauge.hard.pr == doctest::Approx(-7.50000));
+    CHECK(config.gauge.normal.pg == doctest::Approx(0.05238095));
+    CHECK(config.gauge.normal.gr == doctest::Approx(0.03492063));
+    CHECK(config.gauge.normal.gd == doctest::Approx(0.00873016));
+    CHECK(config.gauge.normal.bd == doctest::Approx(-5.50000));
+    CHECK(config.gauge.normal.pr == doctest::Approx(-7.50000));
+    CHECK(config.gauge.easy.pg == doctest::Approx(0.10000000));
+    CHECK(config.gauge.easy.gr == doctest::Approx(0.06666667));
+    CHECK(config.gauge.easy.gd == doctest::Approx(0.01666667));
+    CHECK(config.gauge.easy.bd == doctest::Approx(-5.50000));
+    CHECK(config.gauge.easy.pr == doctest::Approx(-7.50000));
 }
 
-TEST_CASE("runtime migration upgrades the previous gauge defaults to the latest recovery table") {
+TEST_CASE("runtime migration upgrades the previous gauge defaults to the latest recovery and bd/pr losses") {
     ConfigLoader loader;
     auto config = loader.defaults();
     config.gauge.hard = {0.06120, 0.04069, 0.01025, -2.33310, -4.27735};
@@ -493,24 +505,24 @@ TEST_CASE("runtime migration upgrades the previous gauge defaults to the latest 
     const bool changed = tenriff::app::migrate_bms_first_runtime_config(config);
 
     CHECK(changed);
-    CHECK(config.gauge.hard.pg == doctest::Approx(0.01576));
-    CHECK(config.gauge.hard.gr == doctest::Approx(0.01048));
-    CHECK(config.gauge.hard.gd == doctest::Approx(0.00264));
-    CHECK(config.gauge.hard.bd == doctest::Approx(-8.84962));
-    CHECK(config.gauge.hard.pr == doctest::Approx(-7.05763));
-    CHECK(config.gauge.normal.pg == doctest::Approx(0.02650));
-    CHECK(config.gauge.normal.gr == doctest::Approx(0.01769));
-    CHECK(config.gauge.normal.gd == doctest::Approx(0.00444));
-    CHECK(config.gauge.normal.bd == doctest::Approx(-5.56075));
-    CHECK(config.gauge.normal.pr == doctest::Approx(-5.64511));
-    CHECK(config.gauge.easy.pg == doctest::Approx(0.03514));
-    CHECK(config.gauge.easy.gr == doctest::Approx(0.02342));
-    CHECK(config.gauge.easy.gd == doctest::Approx(0.00589));
-    CHECK(config.gauge.easy.bd == doctest::Approx(-4.04909));
-    CHECK(config.gauge.easy.pr == doctest::Approx(-4.21501));
+    CHECK(config.gauge.hard.pg == doctest::Approx(0.03666667));
+    CHECK(config.gauge.hard.gr == doctest::Approx(0.02444444));
+    CHECK(config.gauge.hard.gd == doctest::Approx(0.00611111));
+    CHECK(config.gauge.hard.bd == doctest::Approx(-5.50000));
+    CHECK(config.gauge.hard.pr == doctest::Approx(-7.50000));
+    CHECK(config.gauge.normal.pg == doctest::Approx(0.05238095));
+    CHECK(config.gauge.normal.gr == doctest::Approx(0.03492063));
+    CHECK(config.gauge.normal.gd == doctest::Approx(0.00873016));
+    CHECK(config.gauge.normal.bd == doctest::Approx(-5.50000));
+    CHECK(config.gauge.normal.pr == doctest::Approx(-7.50000));
+    CHECK(config.gauge.easy.pg == doctest::Approx(0.10000000));
+    CHECK(config.gauge.easy.gr == doctest::Approx(0.06666667));
+    CHECK(config.gauge.easy.gd == doctest::Approx(0.01666667));
+    CHECK(config.gauge.easy.bd == doctest::Approx(-5.50000));
+    CHECK(config.gauge.easy.pr == doctest::Approx(-7.50000));
 }
 
-TEST_CASE("runtime migration upgrades the immediate prior gauge defaults to the latest harsher penalties") {
+TEST_CASE("runtime migration upgrades the immediate prior gauge defaults to the latest recovery and bd/pr losses") {
     ConfigLoader loader;
     auto config = loader.defaults();
     config.gauge.hard = {0.01576, 0.01048, 0.00264, -3.84962, -7.05763};
@@ -520,12 +532,54 @@ TEST_CASE("runtime migration upgrades the immediate prior gauge defaults to the 
     const bool changed = tenriff::app::migrate_bms_first_runtime_config(config);
 
     CHECK(changed);
-    CHECK(config.gauge.hard.bd == doctest::Approx(-8.84962));
-    CHECK(config.gauge.hard.pr == doctest::Approx(-7.05763));
-    CHECK(config.gauge.normal.bd == doctest::Approx(-5.56075));
-    CHECK(config.gauge.normal.pr == doctest::Approx(-5.64511));
-    CHECK(config.gauge.easy.bd == doctest::Approx(-4.04909));
-    CHECK(config.gauge.easy.pr == doctest::Approx(-4.21501));
+    CHECK(config.gauge.hard.bd == doctest::Approx(-5.50000));
+    CHECK(config.gauge.hard.pr == doctest::Approx(-7.50000));
+    CHECK(config.gauge.normal.bd == doctest::Approx(-5.50000));
+    CHECK(config.gauge.normal.pr == doctest::Approx(-7.50000));
+    CHECK(config.gauge.easy.bd == doctest::Approx(-5.50000));
+    CHECK(config.gauge.easy.pr == doctest::Approx(-7.50000));
+}
+
+TEST_CASE("runtime migration upgrades the last shipped gauge defaults to the latest recovery and bd/pr losses") {
+    ConfigLoader loader;
+    auto config = loader.defaults();
+    config.gauge.hard = {0.01576, 0.01048, 0.00264, -8.84962, -7.05763};
+    config.gauge.normal = {0.02650, 0.01769, 0.00444, -5.56075, -5.64511};
+    config.gauge.easy = {0.03514, 0.02342, 0.00589, -4.04909, -4.21501};
+
+    const bool changed = tenriff::app::migrate_bms_first_runtime_config(config);
+
+    CHECK(changed);
+    CHECK(config.gauge.hard.pg == doctest::Approx(0.03666667));
+    CHECK(config.gauge.normal.pg == doctest::Approx(0.05238095));
+    CHECK(config.gauge.easy.pg == doctest::Approx(0.10000000));
+    CHECK(config.gauge.hard.bd == doctest::Approx(-5.50000));
+    CHECK(config.gauge.hard.pr == doctest::Approx(-7.50000));
+    CHECK(config.gauge.normal.bd == doctest::Approx(-5.50000));
+    CHECK(config.gauge.normal.pr == doctest::Approx(-7.50000));
+    CHECK(config.gauge.easy.bd == doctest::Approx(-5.50000));
+    CHECK(config.gauge.easy.pr == doctest::Approx(-7.50000));
+}
+
+TEST_CASE("runtime migration upgrades the interim bd/pr-only gauge defaults to the latest recovery table") {
+    ConfigLoader loader;
+    auto config = loader.defaults();
+    config.gauge.hard = {0.01576, 0.01048, 0.00264, -5.50000, -7.50000};
+    config.gauge.normal = {0.02650, 0.01769, 0.00444, -5.50000, -7.50000};
+    config.gauge.easy = {0.03514, 0.02342, 0.00589, -5.50000, -7.50000};
+
+    const bool changed = tenriff::app::migrate_bms_first_runtime_config(config);
+
+    CHECK(changed);
+    CHECK(config.gauge.hard.pg == doctest::Approx(0.03666667));
+    CHECK(config.gauge.hard.gr == doctest::Approx(0.02444444));
+    CHECK(config.gauge.hard.gd == doctest::Approx(0.00611111));
+    CHECK(config.gauge.normal.pg == doctest::Approx(0.05238095));
+    CHECK(config.gauge.normal.gr == doctest::Approx(0.03492063));
+    CHECK(config.gauge.normal.gd == doctest::Approx(0.00873016));
+    CHECK(config.gauge.easy.pg == doctest::Approx(0.10000000));
+    CHECK(config.gauge.easy.gr == doctest::Approx(0.06666667));
+    CHECK(config.gauge.easy.gd == doctest::Approx(0.01666667));
 }
 
 TEST_CASE("config normalizes invalid keysound policy to follow") {

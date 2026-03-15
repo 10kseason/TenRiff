@@ -21,10 +21,34 @@ TEST_CASE("gauge applies judgement deltas and clamps") {
 
     auto result = manager.applyJudgement(state, Judgement::PG, 0.0);
     CHECK_FALSE(result.downshifted);
-    CHECK(almost_equal(state.value, 50.02650));
+    CHECK(almost_equal(state.value, 50.05238095));
 
     result = manager.applyJudgement(state, Judgement::BD, 0.0);
-    CHECK(almost_equal(state.value, 44.46575));
+    CHECK(almost_equal(state.value, 44.55238095));
+}
+
+TEST_CASE("default PG recovery matches requested count-to-5.5 ratios") {
+    tenriff::game::GaugeConfig config;
+    config.auto_shift = false;
+    GaugeManager manager(config);
+
+    GaugeState easy{GaugeType::Easy, 0.0, false};
+    for (int i = 0; i < 55; ++i) {
+        manager.applyJudgement(easy, Judgement::PG, 0.0);
+    }
+    CHECK(almost_equal(easy.value, 5.5, 1e-6));
+
+    GaugeState normal{GaugeType::Normal, 0.0, false};
+    for (int i = 0; i < 105; ++i) {
+        manager.applyJudgement(normal, Judgement::PG, 0.0);
+    }
+    CHECK(almost_equal(normal.value, 5.5, 1e-5));
+
+    GaugeState hard{GaugeType::Hard, 0.0, false};
+    for (int i = 0; i < 150; ++i) {
+        manager.applyJudgement(hard, Judgement::PG, 0.0);
+    }
+    CHECK(almost_equal(hard.value, 5.5, 1e-5));
 }
 
 TEST_CASE("gauge downshifts at thresholds without refill and does not upshift") {
@@ -35,12 +59,12 @@ TEST_CASE("gauge downshifts at thresholds without refill and does not upshift") 
     auto result = manager.applyJudgement(state, Judgement::PR, 1000.0);
     CHECK(result.downshifted);
     CHECK(state.type == GaugeType::Normal);
-    CHECK(almost_equal(state.value, 59.04237));
+    CHECK(almost_equal(state.value, 58.60000));
 
     result = manager.applyJudgement(state, Judgement::PG, 2000.0);
     CHECK_FALSE(result.downshifted);
     CHECK(state.type == GaugeType::Normal);
-    CHECK(almost_equal(state.value, 59.06887));
+    CHECK(almost_equal(state.value, 58.65238095));
 }
 
 TEST_CASE("gauge normal downshifts to easy at the lower threshold") {
@@ -51,7 +75,7 @@ TEST_CASE("gauge normal downshifts to easy at the lower threshold") {
     auto result = manager.applyJudgement(state, Judgement::PR, 0.0);
     CHECK(result.downshifted);
     CHECK(state.type == GaugeType::Easy);
-    CHECK(almost_equal(state.value, 27.45489));
+    CHECK(almost_equal(state.value, 25.60000));
 }
 
 TEST_CASE("gauge downshifts by at most one step per judgement") {
@@ -63,7 +87,7 @@ TEST_CASE("gauge downshifts by at most one step per judgement") {
     CHECK(result.downshifted);
     CHECK_FALSE(result.game_over);
     CHECK(state.type == GaugeType::Normal);
-    CHECK(almost_equal(state.value, 26.94237));
+    CHECK(almost_equal(state.value, 26.50000));
 }
 
 TEST_CASE("easy gauge triggers game over on empty") {
