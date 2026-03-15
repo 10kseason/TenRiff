@@ -104,6 +104,28 @@ TEST_CASE("gameplay engine auto-clears standard hold tails without release timin
     CHECK(engine.stats().counts.bd == 0);
 }
 
+TEST_CASE("gameplay engine gauge uses absolute hold judgements without half-weight scaling") {
+    GameplayChart chart;
+    chart.lane_count = 1;
+    chart.duration_samples = 3000;
+    chart.notes.push_back(NoteEvent{1, 1000, 2000});
+
+    GameplayConfig config;
+    config.sample_rate = 1000;
+    config.rate = 1.0;
+    config.judge.pg_ms = 10.0;
+    config.judge.gr_ms = 20.0;
+    config.judge.gd_ms = 30.0;
+    config.judge.bd_ms = 40.0;
+
+    GameplayEngine engine(chart, config);
+    (void)engine.handle_input(1, InputState::Pressed, 1000);
+    engine.advance(2500);
+
+    CHECK(engine.stats().counts.pg == 2);
+    CHECK(engine.gauge_state().value == doctest::Approx(50.05300));
+}
+
 TEST_CASE("gameplay engine marks early hold release as bad") {
     GameplayChart chart;
     chart.lane_count = 1;

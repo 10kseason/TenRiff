@@ -67,12 +67,15 @@ TEST_CASE("config defaults prefer 44100 Hz audio") {
     CHECK(config.graphics.refresh_hz == 1050);
     CHECK(config.gauge.hard_to_normal_threshold == doctest::Approx(66.0));
     CHECK(config.gauge.normal_to_easy_threshold == doctest::Approx(33.0));
-    CHECK(config.gauge.hard.pg == doctest::Approx(0.13752));
-    CHECK(config.gauge.hard.pr == doctest::Approx(-3.88850));
-    CHECK(config.gauge.normal.pg == doctest::Approx(0.23123));
-    CHECK(config.gauge.normal.pr == doctest::Approx(-3.11025));
-    CHECK(config.gauge.easy.pg == doctest::Approx(0.30664));
-    CHECK(config.gauge.easy.pr == doctest::Approx(-2.32232));
+    CHECK(config.gauge.hard.pg == doctest::Approx(0.01576));
+    CHECK(config.gauge.hard.bd == doctest::Approx(-8.84962));
+    CHECK(config.gauge.hard.pr == doctest::Approx(-7.05763));
+    CHECK(config.gauge.normal.pg == doctest::Approx(0.02650));
+    CHECK(config.gauge.normal.bd == doctest::Approx(-5.56075));
+    CHECK(config.gauge.normal.pr == doctest::Approx(-5.64511));
+    CHECK(config.gauge.easy.pg == doctest::Approx(0.03514));
+    CHECK(config.gauge.easy.bd == doctest::Approx(-4.04909));
+    CHECK(config.gauge.easy.pr == doctest::Approx(-4.21501));
     CHECK(config.judge.bd_ms == doctest::Approx(200.0));
     CHECK(config.skin.note_shape == "rect");
     CHECK(config.skin.note_border_enabled);
@@ -276,6 +279,10 @@ TEST_CASE("config save and load preserve skin gameplay settings") {
     config.skin.note_width_scale = 1.15;
     config.skin.hold_body_width_scale = 1.10;
     config.skin.note_height_scale = 1.35;
+    config.skin.note_width_scales["4k"] = 0.85;
+    config.skin.note_width_scales["16k"] = 0.65;
+    config.skin.note_height_scales["4k"] = 1.20;
+    config.skin.note_height_scales["16k"] = 1.70;
     config.skin.lane_colors["4k"] = {"rose", "gold", "gold", "rose"};
     config.skin.lane_colors["5k"] = {"rose", "mint", "gold", "azure", "ice"};
     config.skin.lane_colors["16k"] = {"rose", "mint", "gold", "azure", "ice", "teal", "violet", "orange",
@@ -294,6 +301,12 @@ TEST_CASE("config save and load preserve skin gameplay settings") {
     CHECK(result.config.skin.note_width_scale == doctest::Approx(1.15));
     CHECK(result.config.skin.hold_body_width_scale == doctest::Approx(1.10));
     CHECK(result.config.skin.note_height_scale == doctest::Approx(1.35));
+    CHECK(tenriff::config::resolved_skin_note_width_scale(result.config.skin, "4k") == doctest::Approx(0.85));
+    CHECK(tenriff::config::resolved_skin_note_width_scale(result.config.skin, "16k") == doctest::Approx(0.65));
+    CHECK(tenriff::config::resolved_skin_note_width_scale(result.config.skin, "10k") == doctest::Approx(1.15));
+    CHECK(tenriff::config::resolved_skin_note_height_scale(result.config.skin, "4k") == doctest::Approx(1.20));
+    CHECK(tenriff::config::resolved_skin_note_height_scale(result.config.skin, "16k") == doctest::Approx(1.70));
+    CHECK(tenriff::config::resolved_skin_note_height_scale(result.config.skin, "10k") == doctest::Approx(1.35));
     const auto saved_4k = tenriff::config::resolved_skin_lane_colors(result.config.skin, "4k");
     REQUIRE(saved_4k.size() == 4u);
     CHECK(saved_4k[0] == "rose");
@@ -328,6 +341,14 @@ TEST_CASE("config clamps skin gameplay settings into supported range") {
                "    \"note_width_scale\": 9.0,\n"
                "    \"hold_body_width_scale\": 9.0,\n"
                "    \"note_height_scale\": 0.1,\n"
+               "    \"note_width_scales\": {\n"
+               "      \"4k\": 0.1,\n"
+               "      \"16k\": 9.0\n"
+               "    },\n"
+               "    \"note_height_scales\": {\n"
+               "      \"5k\": 0.1,\n"
+               "      \"16k\": 9.0\n"
+               "    },\n"
                "    \"lane_colors\": {\n"
                "      \"5k\": [\"badtoken\", \"azure\"],\n"
                "      \"10k\": [\"rose\", \"mint\", \"gold\", \"azure\", \"ice\", \"ice\", \"azure\", \"gold\", \"mint\", \"rose\"]\n"
@@ -353,6 +374,14 @@ TEST_CASE("config clamps skin gameplay settings into supported range") {
     CHECK(result.config.skin.note_width_scale == doctest::Approx(tenriff::config::kNoteWidthScaleMax));
     CHECK(result.config.skin.hold_body_width_scale == doctest::Approx(tenriff::config::kHoldBodyWidthScaleMax));
     CHECK(result.config.skin.note_height_scale == doctest::Approx(tenriff::config::kNoteHeightScaleMin));
+    CHECK(tenriff::config::resolved_skin_note_width_scale(result.config.skin, "4k") ==
+          doctest::Approx(tenriff::config::kNoteWidthScaleMin));
+    CHECK(tenriff::config::resolved_skin_note_width_scale(result.config.skin, "16k") ==
+          doctest::Approx(tenriff::config::kNoteWidthScaleMax));
+    CHECK(tenriff::config::resolved_skin_note_height_scale(result.config.skin, "5k") ==
+          doctest::Approx(tenriff::config::kNoteHeightScaleMin));
+    CHECK(tenriff::config::resolved_skin_note_height_scale(result.config.skin, "16k") ==
+          doctest::Approx(tenriff::config::kNoteHeightScaleMax));
     const auto clamped_5k = tenriff::config::resolved_skin_lane_colors(result.config.skin, "5k");
     REQUIRE(clamped_5k.size() == 5u);
     CHECK(clamped_5k[0] == "ice");
@@ -431,6 +460,72 @@ TEST_CASE("runtime migration upgrades the legacy bad judge window default to 200
 
     CHECK(changed);
     CHECK(config.judge.bd_ms == doctest::Approx(200.0));
+}
+
+TEST_CASE("runtime migration upgrades legacy default gauge deltas to the harsher table") {
+    ConfigLoader loader;
+    auto config = loader.defaults();
+    config.gauge.hard = {0.13752, 0.09144, 0.02304, -1.94425, -3.88850};
+    config.gauge.normal = {0.23123, 0.15438, 0.03877, -1.54583, -3.11025};
+    config.gauge.easy = {0.30664, 0.20443, 0.05143, -1.16116, -2.32232};
+
+    const bool changed = tenriff::app::migrate_bms_first_runtime_config(config);
+
+    CHECK(changed);
+    CHECK(config.gauge.hard.pg == doctest::Approx(0.01576));
+    CHECK(config.gauge.hard.bd == doctest::Approx(-8.84962));
+    CHECK(config.gauge.hard.pr == doctest::Approx(-7.05763));
+    CHECK(config.gauge.normal.pg == doctest::Approx(0.02650));
+    CHECK(config.gauge.normal.bd == doctest::Approx(-5.56075));
+    CHECK(config.gauge.normal.pr == doctest::Approx(-5.64511));
+    CHECK(config.gauge.easy.pg == doctest::Approx(0.03514));
+    CHECK(config.gauge.easy.bd == doctest::Approx(-4.04909));
+    CHECK(config.gauge.easy.pr == doctest::Approx(-4.21501));
+}
+
+TEST_CASE("runtime migration upgrades the previous gauge defaults to the latest recovery table") {
+    ConfigLoader loader;
+    auto config = loader.defaults();
+    config.gauge.hard = {0.06120, 0.04069, 0.01025, -2.33310, -4.27735};
+    config.gauge.normal = {0.10290, 0.06870, 0.01725, -1.85500, -3.42128};
+    config.gauge.easy = {0.13645, 0.09097, 0.02289, -1.39339, -2.55455};
+
+    const bool changed = tenriff::app::migrate_bms_first_runtime_config(config);
+
+    CHECK(changed);
+    CHECK(config.gauge.hard.pg == doctest::Approx(0.01576));
+    CHECK(config.gauge.hard.gr == doctest::Approx(0.01048));
+    CHECK(config.gauge.hard.gd == doctest::Approx(0.00264));
+    CHECK(config.gauge.hard.bd == doctest::Approx(-8.84962));
+    CHECK(config.gauge.hard.pr == doctest::Approx(-7.05763));
+    CHECK(config.gauge.normal.pg == doctest::Approx(0.02650));
+    CHECK(config.gauge.normal.gr == doctest::Approx(0.01769));
+    CHECK(config.gauge.normal.gd == doctest::Approx(0.00444));
+    CHECK(config.gauge.normal.bd == doctest::Approx(-5.56075));
+    CHECK(config.gauge.normal.pr == doctest::Approx(-5.64511));
+    CHECK(config.gauge.easy.pg == doctest::Approx(0.03514));
+    CHECK(config.gauge.easy.gr == doctest::Approx(0.02342));
+    CHECK(config.gauge.easy.gd == doctest::Approx(0.00589));
+    CHECK(config.gauge.easy.bd == doctest::Approx(-4.04909));
+    CHECK(config.gauge.easy.pr == doctest::Approx(-4.21501));
+}
+
+TEST_CASE("runtime migration upgrades the immediate prior gauge defaults to the latest harsher penalties") {
+    ConfigLoader loader;
+    auto config = loader.defaults();
+    config.gauge.hard = {0.01576, 0.01048, 0.00264, -3.84962, -7.05763};
+    config.gauge.normal = {0.02650, 0.01769, 0.00444, -3.06075, -5.64511};
+    config.gauge.easy = {0.03514, 0.02342, 0.00589, -2.29909, -4.21501};
+
+    const bool changed = tenriff::app::migrate_bms_first_runtime_config(config);
+
+    CHECK(changed);
+    CHECK(config.gauge.hard.bd == doctest::Approx(-8.84962));
+    CHECK(config.gauge.hard.pr == doctest::Approx(-7.05763));
+    CHECK(config.gauge.normal.bd == doctest::Approx(-5.56075));
+    CHECK(config.gauge.normal.pr == doctest::Approx(-5.64511));
+    CHECK(config.gauge.easy.bd == doctest::Approx(-4.04909));
+    CHECK(config.gauge.easy.pr == doctest::Approx(-4.21501));
 }
 
 TEST_CASE("config normalizes invalid keysound policy to follow") {

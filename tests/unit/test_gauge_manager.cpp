@@ -21,10 +21,10 @@ TEST_CASE("gauge applies judgement deltas and clamps") {
 
     auto result = manager.applyJudgement(state, Judgement::PG, 0.0);
     CHECK_FALSE(result.downshifted);
-    CHECK(almost_equal(state.value, 50.23123));
+    CHECK(almost_equal(state.value, 50.02650));
 
     result = manager.applyJudgement(state, Judgement::BD, 0.0);
-    CHECK(almost_equal(state.value, 48.6854));
+    CHECK(almost_equal(state.value, 44.46575));
 }
 
 TEST_CASE("gauge downshifts at thresholds without refill and does not upshift") {
@@ -35,12 +35,12 @@ TEST_CASE("gauge downshifts at thresholds without refill and does not upshift") 
     auto result = manager.applyJudgement(state, Judgement::PR, 1000.0);
     CHECK(result.downshifted);
     CHECK(state.type == GaugeType::Normal);
-    CHECK(almost_equal(state.value, 62.2115));
+    CHECK(almost_equal(state.value, 59.04237));
 
     result = manager.applyJudgement(state, Judgement::PG, 2000.0);
     CHECK_FALSE(result.downshifted);
     CHECK(state.type == GaugeType::Normal);
-    CHECK(almost_equal(state.value, 62.44273));
+    CHECK(almost_equal(state.value, 59.06887));
 }
 
 TEST_CASE("gauge normal downshifts to easy at the lower threshold") {
@@ -51,7 +51,7 @@ TEST_CASE("gauge normal downshifts to easy at the lower threshold") {
     auto result = manager.applyJudgement(state, Judgement::PR, 0.0);
     CHECK(result.downshifted);
     CHECK(state.type == GaugeType::Easy);
-    CHECK(almost_equal(state.value, 29.98975));
+    CHECK(almost_equal(state.value, 27.45489));
 }
 
 TEST_CASE("gauge downshifts by at most one step per judgement") {
@@ -63,7 +63,7 @@ TEST_CASE("gauge downshifts by at most one step per judgement") {
     CHECK(result.downshifted);
     CHECK_FALSE(result.game_over);
     CHECK(state.type == GaugeType::Normal);
-    CHECK(almost_equal(state.value, 30.1115));
+    CHECK(almost_equal(state.value, 26.94237));
 }
 
 TEST_CASE("easy gauge triggers game over on empty") {
