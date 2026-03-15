@@ -439,6 +439,7 @@ private:
         int lane_count = 0;
         double judgement_line_position = 0.82;
         double note_width_scale = 1.0;
+        double note_height_scale = 1.0;
     };
 
     struct GameplayNoteSpriteCache {

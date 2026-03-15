@@ -28,9 +28,9 @@ struct GaugeConfig {
     bool auto_shift = true;
     double hard_to_normal_threshold = 66.0;
     double normal_to_easy_threshold = 33.0;
-    GaugeDeltaTable hard{0.01576, 0.01048, 0.00264, -8.84962, -7.05763};
-    GaugeDeltaTable normal{0.02650, 0.01769, 0.00444, -5.56075, -5.64511};
-    GaugeDeltaTable easy{0.03514, 0.02342, 0.00589, -4.04909, -4.21501};
+    GaugeDeltaTable hard{0.03666667, 0.02444444, 0.00611111, -5.50000, -7.50000};
+    GaugeDeltaTable normal{0.05238095, 0.03492063, 0.00873016, -5.50000, -7.50000};
+    GaugeDeltaTable easy{0.10000000, 0.06666667, 0.01666667, -5.50000, -7.50000};
 };
 
 struct GaugeState {

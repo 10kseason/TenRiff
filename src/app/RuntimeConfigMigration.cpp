@@ -53,9 +53,17 @@ constexpr GaugeDeltaTable kPriorHardGauge{0.01576, 0.01048, 0.00264, -3.84962, -
 constexpr GaugeDeltaTable kPriorNormalGauge{0.02650, 0.01769, 0.00444, -3.06075, -5.64511};
 constexpr GaugeDeltaTable kPriorEasyGauge{0.03514, 0.02342, 0.00589, -2.29909, -4.21501};
 
-constexpr GaugeDeltaTable kCurrentHardGauge{0.01576, 0.01048, 0.00264, -8.84962, -7.05763};
-constexpr GaugeDeltaTable kCurrentNormalGauge{0.02650, 0.01769, 0.00444, -5.56075, -5.64511};
-constexpr GaugeDeltaTable kCurrentEasyGauge{0.03514, 0.02342, 0.00589, -4.04909, -4.21501};
+constexpr GaugeDeltaTable kFormerCurrentHardGauge{0.01576, 0.01048, 0.00264, -8.84962, -7.05763};
+constexpr GaugeDeltaTable kFormerCurrentNormalGauge{0.02650, 0.01769, 0.00444, -5.56075, -5.64511};
+constexpr GaugeDeltaTable kFormerCurrentEasyGauge{0.03514, 0.02342, 0.00589, -4.04909, -4.21501};
+
+constexpr GaugeDeltaTable kInterimHardGauge{0.01576, 0.01048, 0.00264, -5.50000, -7.50000};
+constexpr GaugeDeltaTable kInterimNormalGauge{0.02650, 0.01769, 0.00444, -5.50000, -7.50000};
+constexpr GaugeDeltaTable kInterimEasyGauge{0.03514, 0.02342, 0.00589, -5.50000, -7.50000};
+
+constexpr GaugeDeltaTable kCurrentHardGauge{0.03666667, 0.02444444, 0.00611111, -5.50000, -7.50000};
+constexpr GaugeDeltaTable kCurrentNormalGauge{0.05238095, 0.03492063, 0.00873016, -5.50000, -7.50000};
+constexpr GaugeDeltaTable kCurrentEasyGauge{0.10000000, 0.06666667, 0.01666667, -5.50000, -7.50000};
 
 bool migrate_gauge_delta(double& value, double legacy_value, double current_value) {
     if (std::abs(value - current_value) <= kGaugeDeltaTolerance) {
@@ -119,6 +127,12 @@ bool migrate_bms_first_runtime_config(config::RuntimeConfig& config) {
     changed = migrate_gauge_table(config.gauge.hard, kPriorHardGauge, kCurrentHardGauge) || changed;
     changed = migrate_gauge_table(config.gauge.normal, kPriorNormalGauge, kCurrentNormalGauge) || changed;
     changed = migrate_gauge_table(config.gauge.easy, kPriorEasyGauge, kCurrentEasyGauge) || changed;
+    changed = migrate_gauge_table(config.gauge.hard, kFormerCurrentHardGauge, kCurrentHardGauge) || changed;
+    changed = migrate_gauge_table(config.gauge.normal, kFormerCurrentNormalGauge, kCurrentNormalGauge) || changed;
+    changed = migrate_gauge_table(config.gauge.easy, kFormerCurrentEasyGauge, kCurrentEasyGauge) || changed;
+    changed = migrate_gauge_table(config.gauge.hard, kInterimHardGauge, kCurrentHardGauge) || changed;
+    changed = migrate_gauge_table(config.gauge.normal, kInterimNormalGauge, kCurrentNormalGauge) || changed;
+    changed = migrate_gauge_table(config.gauge.easy, kInterimEasyGauge, kCurrentEasyGauge) || changed;
 
     return changed;
 }

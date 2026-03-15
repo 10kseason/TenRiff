@@ -90,6 +90,14 @@ float clamp_gameplay_note_height_scale(double value) {
     return static_cast<float>(std::clamp(value, kGameplayNoteHeightScaleMin, kGameplayNoteHeightScaleMax));
 }
 
+float gameplay_note_head_half_height(double note_height_scale) {
+    return 11.0f * clamp_gameplay_note_height_scale(note_height_scale);
+}
+
+float gameplay_note_tail_half_height(double note_height_scale) {
+    return 9.0f * clamp_gameplay_note_height_scale(note_height_scale);
+}
+
 float clamp_gameplay_hold_body_width_scale(double value) {
     if (!std::isfinite(value)) {
         return static_cast<float>(kGameplayHoldBodyWidthScaleDefault);
@@ -160,6 +168,16 @@ GameplayFieldLayout build_gameplay_field_layout(float bounds_left,
     layout.lane_width = field_width / static_cast<float>(clamped_lane_count);
     layout.note_width = std::min(desired_note_width, std::max(16.0f, layout.lane_width - 4.0f));
     return layout;
+}
+
+D2D1_RECT_F gameplay_judgement_line_rect(const GameplayFieldLayout& field_layout,
+                                         float hit_line_y,
+                                         double note_height_scale) {
+    const float half_h = gameplay_note_head_half_height(note_height_scale);
+    return D2D1::RectF(field_layout.left,
+                       std::max(field_layout.top + 2.0f, hit_line_y - half_h),
+                       field_layout.right,
+                       std::min(field_layout.bottom - 2.0f, hit_line_y + half_h));
 }
 
 float gameplay_field_y(float field_top, float field_height, double normalized_y) {
@@ -671,6 +689,7 @@ struct MenuWindow::D2DResources {
     Microsoft::WRL::ComPtr<IDWriteTextFormat> stats_value_format;
     Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> text_brush;
     Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> accent_brush;
+    Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> judgement_line_brush;
     Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> muted_brush;
     Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> card_brush;
     Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> panel_brush;
@@ -1004,13 +1023,15 @@ bool MenuWindow::ensure_gameplay_static_cache(const GameplayHudData& data) {
     const int lane_count = std::clamp(data.lane_count, 1, static_cast<int>(kGameplayHudMaxLanes));
     const double judgement_line_position = clamp_gameplay_judgement_line(data.judgement_line_position);
     const float note_width_scale = clamp_gameplay_note_width_scale(data.note_width_scale);
+    const float note_height_scale = clamp_gameplay_note_height_scale(data.note_height_scale);
     if (!d2d_ || !d2d_->d2d_context || !d2d_->d2d_target) {
         return false;
     }
     if (d2d_->gameplay_static_command_list &&
         gameplay_static_cache_.lane_count == lane_count &&
         std::abs(gameplay_static_cache_.judgement_line_position - judgement_line_position) < 1e-6 &&
-        std::abs(gameplay_static_cache_.note_width_scale - note_width_scale) < 1e-6) {
+        std::abs(gameplay_static_cache_.note_width_scale - note_width_scale) < 1e-6 &&
+        std::abs(gameplay_static_cache_.note_height_scale - note_height_scale) < 1e-6) {
         return true;
     }
 
@@ -1057,10 +1078,12 @@ bool MenuWindow::ensure_gameplay_static_cache(const GameplayHudData& data) {
         }
     }
 
-    if (d2d_->accent_brush) {
+    if (d2d_->judgement_line_brush) {
         const float hit_line_y = gameplay_field_y(field_layout.top, field_height, judgement_line_position);
+        const D2D1_RECT_F hit_line_rect = gameplay_judgement_line_rect(field_layout, hit_line_y, note_height_scale);
+        ctx->FillRectangle(hit_line_rect, d2d_->judgement_line_brush.Get());
         ctx->DrawLine(D2D1::Point2F(field_layout.left, hit_line_y), D2D1::Point2F(field_layout.right, hit_line_y),
-                      d2d_->accent_brush.Get(), 2.2f);
+                      d2d_->judgement_line_brush.Get(), 1.6f);
     }
 
     const D2D1_RECT_F gauge_frame = D2D1::RectF(kGameplayGaugeLeft,
@@ -1088,6 +1111,7 @@ bool MenuWindow::ensure_gameplay_static_cache(const GameplayHudData& data) {
     gameplay_static_cache_.lane_count = lane_count;
     gameplay_static_cache_.judgement_line_position = judgement_line_position;
     gameplay_static_cache_.note_width_scale = note_width_scale;
+    gameplay_static_cache_.note_height_scale = note_height_scale;
     return true;
 }
 
@@ -1334,6 +1358,7 @@ void MenuWindow::shutdown() {
         d2d_->panel_brush.Reset();
         d2d_->card_brush.Reset();
         d2d_->muted_brush.Reset();
+        d2d_->judgement_line_brush.Reset();
         d2d_->accent_brush.Reset();
         d2d_->text_brush.Reset();
         d2d_->stats_value_format.Reset();
@@ -2187,8 +2212,8 @@ void MenuWindow::draw(const MenuRenderData& data) {
                                  field_height,
                                  clamp_gameplay_judgement_line(preview.judgement_line_position));
             const float note_width = field_layout.note_width;
-            const float head_half_h = 11.0f * clamp_gameplay_note_height_scale(preview.note_height_scale);
-            const float tail_half_h = 9.0f * clamp_gameplay_note_height_scale(preview.note_height_scale);
+            const float head_half_h = gameplay_note_head_half_height(preview.note_height_scale);
+            const float tail_half_h = gameplay_note_tail_half_height(preview.note_height_scale);
             const float hold_body_width_scale =
                 clamp_gameplay_hold_body_width_scale(preview.hold_body_width_scale);
             const double combo_position = clamp_gameplay_combo_position(preview.combo_position);
@@ -2224,9 +2249,12 @@ void MenuWindow::draw(const MenuRenderData& data) {
                 }
             }
 
-            if (d2d_->accent_brush) {
+            if (d2d_->judgement_line_brush) {
+                const D2D1_RECT_F hit_line_rect =
+                    gameplay_judgement_line_rect(field_layout, hit_line_y, preview.note_height_scale);
+                ctx->FillRectangle(hit_line_rect, d2d_->judgement_line_brush.Get());
                 ctx->DrawLine(D2D1::Point2F(field_left, hit_line_y), D2D1::Point2F(field_right, hit_line_y),
-                              d2d_->accent_brush.Get(), 2.0f);
+                              d2d_->judgement_line_brush.Get(), 1.4f);
             }
 
             for (int lane = 0; lane < lane_count; ++lane) {
@@ -2234,8 +2262,10 @@ void MenuWindow::draw(const MenuRenderData& data) {
                 const float lane_center = field_left + (static_cast<float>(lane) + 0.5f) * lane_width;
                 const float x0 = lane_center - note_width * 0.5f;
                 const float x1 = lane_center + note_width * 0.5f;
-                const float y =
+                const float default_y =
                     field_layout.top + field_height * (0.16f + 0.09f * static_cast<float>((lane + 1) % 4));
+                const bool draw_selected_hold_preview = (lane + 1 == preview.selected_lane) && d2d_->note_hold_brush;
+                const float y = draw_selected_hold_preview ? hit_line_y : default_y;
                 if (d2d_->note_fill_brush) {
                     d2d_->note_fill_brush->SetColor(gameplay_note_fill_color(rgb));
                 }
@@ -2246,12 +2276,15 @@ void MenuWindow::draw(const MenuRenderData& data) {
                     d2d_->note_hold_brush->SetColor(gameplay_note_hold_color(rgb));
                 }
 
-                if (lane + 1 == preview.selected_lane && d2d_->note_hold_brush) {
+                if (draw_selected_hold_preview) {
                     const float tail_y =
-                        std::min(field_layout.bottom - 20.0f, hit_line_y + field_height * 0.12f);
+                        std::max(field_layout.top + 20.0f, hit_line_y - field_height * 0.18f);
                     const float hold_half_width = std::max(4.0f, note_width * 0.5f * hold_body_width_scale);
                     const D2D1_RECT_F hold_rect =
-                        D2D1::RectF(lane_center - hold_half_width, y + tail_half_h, lane_center + hold_half_width, tail_y - head_half_h);
+                        D2D1::RectF(lane_center - hold_half_width,
+                                    tail_y + tail_half_h,
+                                    lane_center + hold_half_width,
+                                    y - head_half_h);
                     if (hold_rect.bottom > hold_rect.top) {
                         ctx->FillRectangle(hold_rect, d2d_->note_hold_brush.Get());
                     }
@@ -3597,8 +3630,6 @@ void MenuWindow::draw(const MenuRenderData& data) {
             std::string feedback_text;
             if (data.gameplay.has_feedback) {
                 feedback_text = data.gameplay.feedback;
-                feedback_text += (data.gameplay.feedback_delta_ms >= 0.0) ? "  SLOW " : "  FAST ";
-                feedback_text += format_decimal(std::abs(data.gameplay.feedback_delta_ms), 1) + "ms";
             } else {
                 feedback_text = "READY";
             }
@@ -3809,8 +3840,8 @@ void MenuWindow::draw(const MenuRenderData& data) {
             const float x1 = lane_center + note_width * 0.5f;
             const float y = gameplay_field_y(field_top, field_height, sample_to_y(note.start_sample));
             const float tail_y = gameplay_field_y(field_top, field_height, sample_to_y(note.tail_sample));
-            const float head_half_h = 11.0f * note_height_scale;
-            const float tail_half_h = 9.0f * note_height_scale;
+            const float head_half_h = gameplay_note_head_half_height(note_height_scale);
+            const float tail_half_h = gameplay_note_tail_half_height(note_height_scale);
             uint32_t lane_color = 0xF6F8FF;
             if (static_cast<std::size_t>(lane - 1) < data.gameplay.lane_color_count) {
                 lane_color = data.gameplay.lane_colors[static_cast<std::size_t>(lane - 1)];
@@ -3947,14 +3978,42 @@ void MenuWindow::draw(const MenuRenderData& data) {
             } else if (data.gameplay.feedback == "BD" || data.gameplay.feedback == "PR") {
                 judge_color = D2D1::ColorF(0xFF6B6B);
             }
+            const bool show_timing_indicator =
+                data.gameplay.has_feedback &&
+                data.gameplay.feedback != "PG" &&
+                std::abs(data.gameplay.feedback_delta_ms) >= 0.05;
+            const bool timing_fast = show_timing_indicator && data.gameplay.feedback_delta_ms < 0.0;
+            const bool timing_slow = show_timing_indicator && data.gameplay.feedback_delta_ms > 0.0;
+            const float feedback_center_x = (field_left + field_right) * 0.5f;
+            const float feedback_top = field_bottom + 22.0f;
+            const float feedback_bottom = field_bottom + 72.0f;
             d2d_->text_brush->SetColor(judge_color);
             const D2D1_RECT_F feedback_rect =
-                D2D1::RectF(field_left, field_bottom + 22.0f, field_right, field_bottom + 72.0f);
+                show_timing_indicator
+                    ? D2D1::RectF(feedback_center_x - 170.0f, feedback_top, feedback_center_x + 170.0f, feedback_bottom)
+                    : D2D1::RectF(field_left, feedback_top, field_right, feedback_bottom);
             d2d_->title_format->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_CENTER);
             ctx->DrawText(gameplay_hud_cache_.feedback_text.c_str(),
                           static_cast<UINT32>(gameplay_hud_cache_.feedback_text.size()),
                           d2d_->title_format.Get(), feedback_rect, d2d_->text_brush.Get());
             d2d_->title_format->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_LEADING);
+            if (show_timing_indicator && d2d_->body_format) {
+                constexpr wchar_t kFastIndicatorText[] = L"\uBE60\uB984";
+                constexpr wchar_t kSlowIndicatorText[] = L"\uB290\uB9BC";
+                const D2D1_RECT_F fast_rect =
+                    D2D1::RectF(field_left + 28.0f, feedback_top + 4.0f, feedback_center_x - 188.0f, feedback_bottom);
+                const D2D1_RECT_F slow_rect =
+                    D2D1::RectF(feedback_center_x + 188.0f, feedback_top + 4.0f, field_right - 28.0f, feedback_bottom);
+
+                d2d_->body_format->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_TRAILING);
+                d2d_->text_brush->SetColor(D2D1::ColorF(0x5DA9FF, timing_fast ? 0.82f : 0.28f));
+                ctx->DrawText(kFastIndicatorText, 2, d2d_->body_format.Get(), fast_rect, d2d_->text_brush.Get());
+
+                d2d_->body_format->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_LEADING);
+                d2d_->text_brush->SetColor(D2D1::ColorF(0xFF5A6B, timing_slow ? 0.82f : 0.28f));
+                ctx->DrawText(kSlowIndicatorText, 2, d2d_->body_format.Get(), slow_rect, d2d_->text_brush.Get());
+                d2d_->body_format->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_LEADING);
+            }
             d2d_->text_brush->SetColor(D2D1::ColorF(0xE8ECF1));
         }
 
@@ -4162,6 +4221,7 @@ void MenuWindow::update_brushes() {
     auto* ctx = d2d_->d2d_context.Get();
     ctx->CreateSolidColorBrush(D2D1::ColorF(0xE8ECF1), &d2d_->text_brush);
     ctx->CreateSolidColorBrush(D2D1::ColorF(0x6EE7F2), &d2d_->accent_brush);
+    ctx->CreateSolidColorBrush(D2D1::ColorF(0xFF4D6D, 0.38f), &d2d_->judgement_line_brush);
     ctx->CreateSolidColorBrush(D2D1::ColorF(0x9AA3AD), &d2d_->muted_brush);
     ctx->CreateSolidColorBrush(D2D1::ColorF(0x1F2130), &d2d_->card_brush);
     ctx->CreateSolidColorBrush(D2D1::ColorF(0x14141C, 0.72f), &d2d_->panel_brush);
