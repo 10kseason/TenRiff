@@ -2,6 +2,13 @@
 
 TenRiff의 사용자/배포 관점에서 의미 있는 변경만 간단히 기록합니다.
 
+## [0.7.9] - 2026-03-16
+
+### Changed
+- 대용량/외부 BMS 폴더를 불러올 때 song source 내부에 `.tenriff/song_index.json`을 쓰지 않도록 song index cache를 profile-local 경로(`profiles/<name>/.tenriff/song-index/<source-hash>.json`)로 이동
+- 기존 song source 내부 legacy cache가 있으면 읽기만 하고 새 profile-local cache로 안전하게 마이그레이션
+- 배포판과 공개 소스 번들 릴리스 라인을 `0.7.9`로 승격
+
 ## [0.7.8] - 2026-03-16
 
 ### Added
@@ -10,6 +17,7 @@ TenRiff의 사용자/배포 관점에서 의미 있는 변경만 간단히 기�
 ### Changed
 - 간접미스(auto-miss) 판정 시점을 별도 `judge.indirect_miss` 설정으로 분리하고 기본값을 `500ms`로 완화
 - 배포판과 공개 소스 번들 릴리스 라인을 `0.7.8`로 승격
+- 외부 BMS 폴더 안에 song index cache를 쓰지 않도록 캐시 저장 위치를 profile-local 경로로 이동
 
 ## [0.7.7] - 2026-03-16
 

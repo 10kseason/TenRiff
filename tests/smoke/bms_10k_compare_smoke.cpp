@@ -205,9 +205,10 @@ std::optional<fs::path> resolve_songs_root(const Options& options, const char* a
     std::error_code ec;
     const fs::path cwd = fs::current_path(ec);
     const fs::path exe_dir = executable_directory(argv0);
-    const std::array<fs::path, 5> candidates = {
+    const std::array<fs::path, 6> candidates = {
         (cwd / "build" / "Release" / "Songs").lexically_normal(),
         (exe_dir / "Songs").lexically_normal(),
+        (cwd / "Baepoks" / "TenRiff-0.7.9" / "songs").lexically_normal(),
         (cwd / "Baepoks" / "TenRiff-0.7.8" / "songs").lexically_normal(),
         (cwd / "Baepoks" / "TenRiff-0.7.7" / "songs").lexically_normal(),
         (cwd / "Baepoks" / "TenRiff-0.7.6" / "songs").lexically_normal(),

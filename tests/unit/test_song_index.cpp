@@ -15,9 +15,11 @@ using tenriff::app::SongIndexLoadResult;
 using tenriff::app::SongIndexOptions;
 using tenriff::app::SongIndexProgress;
 using tenriff::app::SongIndexProgressStage;
+using tenriff::app::legacy_song_index_cache_path_for_source;
+using tenriff::app::load_song_index;
 using tenriff::app::save_song_index;
 using tenriff::app::scan_songs;
-using tenriff::app::load_song_index;
+using tenriff::app::song_index_cache_path_for_source;
 
 namespace {
 
@@ -49,6 +51,17 @@ void write_file(const std::filesystem::path& path, const std::string& content) {
     std::ofstream out(path, std::ios::binary);
     REQUIRE(out.good());
     out << content;
+}
+
+bool path_has_prefix(const std::filesystem::path& path, const std::filesystem::path& prefix) {
+    auto path_it = path.begin();
+    auto prefix_it = prefix.begin();
+    for (; prefix_it != prefix.end(); ++prefix_it, ++path_it) {
+        if (path_it == path.end() || *path_it != *prefix_it) {
+            return false;
+        }
+    }
+    return true;
 }
 
 std::string minimal_bms_chart(const std::string& title, int playlevel) {
@@ -514,6 +527,46 @@ TEST_CASE("song index save and load support UTF-8 cache paths") {
     CHECK(result.index.entries.front().path == entry.path);
     CHECK(result.index.entries.front().title == "Legacy");
     CHECK(result.index.entries.front().layout_label == "7+1 SP");
+}
+
+TEST_CASE("song index cache stays profile-local and does not create cache folders in the song source") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+
+    const auto profile_root = temp.path / "profiles" / "default";
+    const auto songs_root = temp.path / "HugeLibrary";
+    std::filesystem::create_directories(profile_root);
+    std::filesystem::create_directories(songs_root);
+
+    const auto cache_path = std::filesystem::path(
+        song_index_cache_path_for_source(profile_root.u8string(), songs_root.u8string()));
+    const auto legacy_path = std::filesystem::path(legacy_song_index_cache_path_for_source(songs_root.u8string()));
+
+    CHECK(path_has_prefix(cache_path, profile_root));
+    CHECK_FALSE(path_has_prefix(cache_path, songs_root));
+    CHECK(cache_path != legacy_path);
+    CHECK(cache_path.parent_path().filename() == "song-index");
+
+    SongIndex index;
+    tenriff::app::SongEntry entry;
+    entry.path = "chart.bms";
+    entry.title = "Title";
+    entry.artist = "Artist";
+    entry.format = "bms";
+    entry.layout_label = "10K BMS";
+    entry.key_count = 10;
+    entry.level = 12;
+    entry.rating = 4.5;
+    entry.bpm = 150.0;
+    entry.mtime = 1;
+    index.entries.push_back(entry);
+
+    std::string error;
+    REQUIRE(save_song_index(cache_path.u8string(), index, {}, &error));
+    CHECK(error.empty());
+    CHECK(std::filesystem::exists(cache_path));
+    CHECK_FALSE(std::filesystem::exists(songs_root / ".tenriff"));
 }
 
 TEST_CASE("song scan sanitizes malformed UI metadata without failing") {

@@ -1,4 +1,4 @@
-TenRiff 0.7.8 open-source source package scope
+TenRiff 0.7.9 open-source source package scope
 
 Included in versioned source bundles:
 - AGENTS.md
@@ -23,7 +23,7 @@ Excluded from versioned source bundles:
 - build_*/
 - Baepoks/
 - Baepoks-Linuxs/
-- opensource-Tenriff-source/TenRiff-0.7.8-source/
+- opensource-Tenriff-source/TenRiff-0.7.9-source/
 - .codex-memory/
 - .claude/
 - .codex_tmp_skills/

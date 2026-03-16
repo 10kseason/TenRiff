@@ -3,7 +3,7 @@
 이 문서는 다음 에이전트나 새 작업자가 가장 먼저 읽어야 하는 현재 상태 문서입니다. 목표는 "지금 이 프로젝트가 무엇이고, 어디를 보면 되고, 무엇이 아직 미검증인지"를 빠르게 파악하게 하는 것입니다.
 
 ## Baseline
-- 현재 릴리스 라인은 `0.7.8`
+- 현재 릴리스 라인은 `0.7.9`
 - Windows GUI 빌드가 메인 타깃
 - Linux는 `Baepoks-Linuxs/TenRiff-0.5.0-linux-preview` 수준의 preview만 존재
 - 기본 표면은 BMS-first
@@ -87,7 +87,7 @@
   - gameplay loading 중 `Esc` cancel
 
 ## Song Indexing Model
-- Song source 전환 시 `.tenriff/song_index.json` 캐시를 먼저 읽음
+- Song source 전환 시 profile-local `profiles/<name>/.tenriff/song-index/<source-hash>.json` 캐시를 먼저 읽음
 - 캐시가 없거나 무효하면 백그라운드 인덱싱 시작
 - 인덱싱 stage:
   - `SCANNING FILES`
@@ -105,11 +105,11 @@
 
 ## Runtime / Packaging Rules
 - 새 사용자 프로필은 자동 생성
-- 배포 패키지는 `Baepoks/TenRiff-0.7.8`
+- 배포 패키지는 `Baepoks/TenRiff-0.7.9`
 - 배포 패키지에는 `Songs`를 넣지 않음
 - 배포 업데이트 요청 시 built artifacts만 `Baepoks/`에 넣는 규칙
 - source-only/public handoff 요청 시 먼저 include/exclude 리스트를 작성하는 것이 사용자 선호
-- 공개 소스 패키지는 `opensource-Tenriff-source/TenRiff-0.7.8-source`처럼 버전별로 별도 스테이징
+- 공개 소스 패키지는 `opensource-Tenriff-source/TenRiff-0.7.9-source`처럼 버전별로 별도 스테이징
 
 ## Config / Profile Reality
 - 실제 기본값은 `config/config.json`
