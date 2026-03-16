@@ -68,9 +68,12 @@ constexpr GaugeDeltaTable kInterimHardGauge{0.01576, 0.01048, 0.00264, -5.50000,
 constexpr GaugeDeltaTable kInterimNormalGauge{0.02650, 0.01769, 0.00444, -5.50000, -7.50000};
 constexpr GaugeDeltaTable kInterimEasyGauge{0.03514, 0.02342, 0.00589, -5.50000, -7.50000};
 
+constexpr GaugeDeltaTable kFormerPenaltyNormalGauge{0.05238095, 0.03492063, 0.00873016, -5.50000, -7.50000};
+constexpr GaugeDeltaTable kFormerPenaltyEasyGauge{0.10000000, 0.06666667, 0.01666667, -5.50000, -7.50000};
+
 constexpr GaugeDeltaTable kCurrentHardGauge{0.03666667, 0.02444444, 0.00611111, -5.50000, -7.50000};
-constexpr GaugeDeltaTable kCurrentNormalGauge{0.05238095, 0.03492063, 0.00873016, -5.50000, -7.50000};
-constexpr GaugeDeltaTable kCurrentEasyGauge{0.10000000, 0.06666667, 0.01666667, -5.50000, -7.50000};
+constexpr GaugeDeltaTable kCurrentNormalGauge{0.05238095, 0.03492063, 0.00873016, -2.75000, -3.75000};
+constexpr GaugeDeltaTable kCurrentEasyGauge{0.10000000, 0.06666667, 0.01666667, -2.06250, -2.81250};
 
 bool migrate_gauge_delta(double& value, double legacy_value, double current_value) {
     if (std::abs(value - current_value) <= kGaugeDeltaTolerance) {
@@ -152,6 +155,8 @@ bool migrate_bms_first_runtime_config(config::RuntimeConfig& config) {
     changed = migrate_gauge_table(config.gauge.hard, kInterimHardGauge, kCurrentHardGauge) || changed;
     changed = migrate_gauge_table(config.gauge.normal, kInterimNormalGauge, kCurrentNormalGauge) || changed;
     changed = migrate_gauge_table(config.gauge.easy, kInterimEasyGauge, kCurrentEasyGauge) || changed;
+    changed = migrate_gauge_table(config.gauge.normal, kFormerPenaltyNormalGauge, kCurrentNormalGauge) || changed;
+    changed = migrate_gauge_table(config.gauge.easy, kFormerPenaltyEasyGauge, kCurrentEasyGauge) || changed;
 
     return changed;
 }

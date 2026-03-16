@@ -29,8 +29,8 @@ struct GaugeConfig {
     double hard_to_normal_threshold = 66.0;
     double normal_to_easy_threshold = 33.0;
     GaugeDeltaTable hard{0.03666667, 0.02444444, 0.00611111, -5.50000, -7.50000};
-    GaugeDeltaTable normal{0.05238095, 0.03492063, 0.00873016, -5.50000, -7.50000};
-    GaugeDeltaTable easy{0.10000000, 0.06666667, 0.01666667, -5.50000, -7.50000};
+    GaugeDeltaTable normal{0.05238095, 0.03492063, 0.00873016, -2.75000, -3.75000};
+    GaugeDeltaTable easy{0.10000000, 0.06666667, 0.01666667, -2.06250, -2.81250};
 };
 
 struct GaugeState {
