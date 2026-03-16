@@ -17,6 +17,7 @@ struct JudgeWindowSamples {
     int64_t gr = 0;
     int64_t gd = 0;
     int64_t bd = 0;
+    int64_t indirect_miss = 0;
     int64_t hold_grace = 0;
     int64_t hold_break = 0;
     int64_t mask = 0;

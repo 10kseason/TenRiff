@@ -299,9 +299,11 @@ void apply_config_object(const JsonObject& root, RuntimeConfig& config) {
         config.judge.gr_ms = get_number(*judge, "gr", config.judge.gr_ms);
         config.judge.gd_ms = get_number(*judge, "gd", config.judge.gd_ms);
         config.judge.bd_ms = get_number(*judge, "bd", config.judge.bd_ms);
+        config.judge.indirect_miss_ms = get_number(*judge, "indirect_miss", config.judge.indirect_miss_ms);
         config.judge.hold_grace_ms = get_number(*judge, "hold_grace", config.judge.hold_grace_ms);
         config.judge.hold_break_ms = get_number(*judge, "hold_break", config.judge.hold_break_ms);
         config.judge.mask_ms = get_number(*judge, "mask", config.judge.mask_ms);
+        config.judge.indirect_miss_ms = std::max(config.judge.indirect_miss_ms, config.judge.bd_ms);
     }
 
     if (auto* speed = get_object(root, "speed")) {
@@ -507,6 +509,7 @@ JsonValue build_json_root(const RuntimeConfig& config) {
     judge.emplace("gr", JsonValue{config.judge.gr_ms});
     judge.emplace("gd", JsonValue{config.judge.gd_ms});
     judge.emplace("bd", JsonValue{config.judge.bd_ms});
+    judge.emplace("indirect_miss", JsonValue{std::max(config.judge.indirect_miss_ms, config.judge.bd_ms)});
     judge.emplace("hold_grace", JsonValue{config.judge.hold_grace_ms});
     judge.emplace("hold_break", JsonValue{config.judge.hold_break_ms});
     judge.emplace("mask", JsonValue{config.judge.mask_ms});

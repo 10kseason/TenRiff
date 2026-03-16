@@ -2595,7 +2595,7 @@ void GameSession::process_future_events(int64_t buffer_end_samples, int64_t look
 void GameSession::process_input_queue(int64_t buffer_start_samples, int64_t buffer_end_samples,
                                       int64_t lookahead_samples) {
     // If input falls well behind the current audio cursor, replaying every stale edge can spike the mix callback.
-    const double stale_window_ms = std::max(kInputBacklogCatchupFloorMs, config_.judge.bd_ms);
+    const double stale_window_ms = std::max(kInputBacklogCatchupFloorMs, config_.judge.indirect_miss_ms);
     const int64_t stale_before_sample = buffer_start_samples - ms_to_samples(stale_window_ms, sample_rate_);
     std::array<BufferedLaneInput, kGameplayHudMaxLanes> stale_lane_inputs{};
     std::array<uint8_t, kGameplayHudMaxLanes> stale_lane_present{};
