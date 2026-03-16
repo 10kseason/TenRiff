@@ -14,6 +14,7 @@ TenRiff는 Windows GUI 기반 BMS-first 리듬게임 런타임/런처 프로젝�
 - 입력 경로: RawInput 또는 고주사율 polling
 - 라이선스: [MIT](LICENSE)
 - 서드파티 고지: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
+- 릴리스 변경 이력: [CHANGELOG.md](CHANGELOG.md)
 
 ## 지금 가능한 것
 
@@ -129,13 +130,15 @@ README는 입문 설명만 담당합니다. 세부 내용은 아래 순서로 �
    - 전체 문서 맵
 2. [`docs/current-state.md`](docs/current-state.md)
    - 지금 실제로 무엇이 동작하는지
-3. [`docs/config.md`](docs/config.md)
+3. [`docs/gameplay-guide.md`](docs/gameplay-guide.md)
+   - 실제 플레이 기준의 시작 방법, 기본 조작, HUD/판정/결과 화면 설명
+4. [`docs/config.md`](docs/config.md)
    - 설정/프로필/키맵 구조
-4. [`docs/menu.md`](docs/menu.md)
+5. [`docs/menu.md`](docs/menu.md)
    - 메뉴/상태머신/곡 선택 흐름
-5. [`docs/core-loop.md`](docs/core-loop.md)
+6. [`docs/core-loop.md`](docs/core-loop.md)
    - 플레이 루프와 데이터 흐름
-6. [`docs/roadmap.md`](docs/roadmap.md)
+7. [`docs/roadmap.md`](docs/roadmap.md)
    - 중장기 작업 방향
 
 ## 현재 문서 해석 규칙
@@ -151,6 +154,7 @@ README는 입문 설명만 담당합니다. 세부 내용은 아래 순서로 �
 
 ## 다음으로 읽을 문서
 
+- 실제 플레이 방법이 궁금하면 [`docs/gameplay-guide.md`](docs/gameplay-guide.md)
 - 설정이 궁금하면 [`docs/config.md`](docs/config.md)
 - 메뉴 흐름이 궁금하면 [`docs/menu.md`](docs/menu.md)
 - 플레이 루프가 궁금하면 [`docs/core-loop.md`](docs/core-loop.md)

@@ -5,13 +5,15 @@
 ## Recommended Reading Order
 1. `docs/current-state.md`
    - 현재 제품 상태, 핵심 서브시스템, 검증된 명령, 남은 수동 검증 항목
-2. `docs/config.md`
+2. `docs/gameplay-guide.md`
+   - 실제 플레이 기준의 시작 방법, 곡 선택, 조작, HUD, 판정, 결과 화면 안내
+3. `docs/config.md`
    - 실제 설정/프로필/키맵 구조
-3. `docs/menu.md`
+4. `docs/menu.md`
    - 메뉴/상태머신/곡 선택 흐름
-4. `docs/core-loop.md`
+5. `docs/core-loop.md`
    - 플레이 루프와 데이터 흐름
-5. `docs/roadmap.md`
+6. `docs/roadmap.md`
    - 중장기 작업 방향
 
 ## Which Docs Are Source Of Truth
