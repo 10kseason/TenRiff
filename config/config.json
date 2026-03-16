@@ -25,8 +25,8 @@
     "pg": 15.5,
     "gr": 31.0,
     "gd": 55.0,
-    "bd": 200.0,
-    "indirect_miss": 500.0,
+    "bd": 80.0,
+    "indirect_miss": 215.0,
     "hold_grace": 35,
     "hold_break": 100,
     "mask": 30

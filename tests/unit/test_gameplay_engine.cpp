@@ -403,12 +403,12 @@ TEST_CASE("gameplay engine delays indirect miss until the indirect miss window")
     config.judge.gr_ms = 20.0;
     config.judge.gd_ms = 30.0;
     config.judge.bd_ms = 40.0;
-    config.judge.indirect_miss_ms = 500.0;
+    config.judge.indirect_miss_ms = 215.0;
 
     GameplayEngine engine(chart, config);
-    engine.advance(1499);
+    engine.advance(1215);
     CHECK(engine.stats().counts.pr == 0);
 
-    engine.advance(1501);
+    engine.advance(1216);
     CHECK(engine.stats().counts.pr == 1);
 }

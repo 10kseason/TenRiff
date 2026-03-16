@@ -68,7 +68,8 @@
   - 미래 노트 상단 진입 easing
   - 마지막 판정 노트 처리 직후 플레이 종료
 - Judge:
-  - 기본 `BAD` 범위는 `200ms`
+  - 기본 `BAD` 범위는 `80ms`
+  - 기본 간접 미스 범위는 `215ms`
   - tail release timing은 osu hold와 BMS `#LNMODE 2` charge note에만 적용
 - Graphics:
   - resolution preset (`720p`, `1080p`, `qhd`, `native`)

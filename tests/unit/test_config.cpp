@@ -84,8 +84,8 @@ TEST_CASE("config defaults prefer 44100 Hz audio") {
     CHECK(config.gauge.easy.gd == doctest::Approx(0.01666667));
     CHECK(config.gauge.easy.bd == doctest::Approx(-2.06250));
     CHECK(config.gauge.easy.pr == doctest::Approx(-2.81250));
-    CHECK(config.judge.bd_ms == doctest::Approx(200.0));
-    CHECK(config.judge.indirect_miss_ms == doctest::Approx(500.0));
+    CHECK(config.judge.bd_ms == doctest::Approx(80.0));
+    CHECK(config.judge.indirect_miss_ms == doctest::Approx(215.0));
     CHECK(config.judge.hold_grace_ms == doctest::Approx(35.0));
     CHECK(config.judge.hold_break_ms == doctest::Approx(100.0));
     CHECK(config.skin.note_shape == "rect");
@@ -510,15 +510,17 @@ TEST_CASE("runtime migration preserves valid enabled osu chart filters") {
     CHECK(config.mode.key_mode == "7k");
 }
 
-TEST_CASE("runtime migration upgrades the legacy bad judge window default to 200ms") {
+TEST_CASE("runtime migration upgrades the previous judge window defaults to bad 80ms and indirect miss 215ms") {
     ConfigLoader loader;
     auto config = loader.defaults();
-    config.judge.bd_ms = 80.0;
+    config.judge.bd_ms = 200.0;
+    config.judge.indirect_miss_ms = 500.0;
 
     const bool changed = tenriff::app::migrate_bms_first_runtime_config(config);
 
     CHECK(changed);
-    CHECK(config.judge.bd_ms == doctest::Approx(200.0));
+    CHECK(config.judge.bd_ms == doctest::Approx(80.0));
+    CHECK(config.judge.indirect_miss_ms == doctest::Approx(215.0));
 }
 
 TEST_CASE("runtime migration upgrades legacy default gauge deltas to the harsher table") {
