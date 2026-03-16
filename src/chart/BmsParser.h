@@ -14,6 +14,9 @@ namespace tenriff::chart {
 
 struct BmsParserOptions {
     bool tolerant = false;
+    bool retain_wav_bmp = true;
+    bool retain_unknown_headers = true;
+    bool retain_nonessential_commands = true;
 };
 
 enum class BmsParseSeverity {

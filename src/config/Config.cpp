@@ -194,6 +194,14 @@ std::string normalize_display_mode(std::string value) {
     return "borderless";
 }
 
+std::string normalize_song_index_profile(std::string value) {
+    value = to_lower_ascii(std::move(value));
+    if (value == "fast" || value == "performance") {
+        return "fast";
+    }
+    return "safe";
+}
+
 int sanitize_refresh_hz(int value, std::vector<std::string>& warnings) {
     if (value >= kRefreshHzMin && value <= kRefreshHzMax) {
         return value;
@@ -368,6 +376,8 @@ void apply_config_object(const JsonObject& root, RuntimeConfig& config) {
         config.mode.random = get_string(*mode, "random", config.mode.random);
         config.mode.random_seed = static_cast<uint32_t>(get_number(*mode, "random_seed", config.mode.random_seed));
         config.mode.enable_osu_charts = get_bool(*mode, "enable_osu_charts", config.mode.enable_osu_charts);
+        config.mode.song_index_profile =
+            normalize_song_index_profile(get_string(*mode, "song_index_profile", config.mode.song_index_profile));
     }
 
     if (auto* ui = get_object(root, "ui")) {
@@ -569,6 +579,7 @@ JsonValue build_json_root(const RuntimeConfig& config) {
     mode.emplace("random", JsonValue{config.mode.random});
     mode.emplace("random_seed", JsonValue{static_cast<double>(config.mode.random_seed)});
     mode.emplace("enable_osu_charts", JsonValue{config.mode.enable_osu_charts});
+    mode.emplace("song_index_profile", JsonValue{normalize_song_index_profile(config.mode.song_index_profile)});
     root.emplace("mode", JsonValue{std::move(mode)});
 
     JsonObject ui;
@@ -653,6 +664,10 @@ std::string normalize_skin_mode_token(std::string_view key_mode) {
         return normalized;
     }
     return "10k";
+}
+
+std::string normalize_song_index_profile_token(std::string_view token) {
+    return normalize_song_index_profile(std::string(token));
 }
 
 std::vector<std::string> supported_skin_mode_tokens() {
@@ -807,6 +822,7 @@ RuntimeConfig ConfigLoader::defaults() const {
     config.mode.random = "off";
     config.mode.random_seed = 0;
     config.mode.enable_osu_charts = false;
+    config.mode.song_index_profile = "safe";
 
     config.ui.result_tail_ms = 500.0;
     config.ui.require_enter_to_exit = true;

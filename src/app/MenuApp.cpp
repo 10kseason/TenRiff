@@ -463,6 +463,33 @@ std::string key_mode_label(const std::string& value) {
     return "Auto";
 }
 
+std::string song_index_profile_label(const std::string& value) {
+    const std::string normalized = config::normalize_song_index_profile_token(value);
+    if (normalized == "fast") {
+        return "Fast";
+    }
+    return "Safe";
+}
+
+std::string cycle_song_index_profile(std::string current, int direction) {
+    static constexpr const char* kProfiles[] = {"safe", "fast"};
+    current = config::normalize_song_index_profile_token(current);
+    int current_index = 0;
+    for (int i = 0; i < static_cast<int>(sizeof(kProfiles) / sizeof(kProfiles[0])); ++i) {
+        if (current == kProfiles[i]) {
+            current_index = i;
+            break;
+        }
+    }
+    current_index += direction;
+    if (current_index < 0) {
+        current_index = static_cast<int>(sizeof(kProfiles) / sizeof(kProfiles[0])) - 1;
+    } else if (current_index >= static_cast<int>(sizeof(kProfiles) / sizeof(kProfiles[0]))) {
+        current_index = 0;
+    }
+    return kProfiles[current_index];
+}
+
 std::string song_layout_label(const SongEntry& entry) {
     if (!entry.layout_label.empty()) {
         return entry.layout_label;
@@ -2259,7 +2286,11 @@ void MenuApp::switch_song_source(const std::string& new_songs_path, bool force_r
     const std::string legacy_cache_path = legacy_song_index_cache_path_for_source(songs_path_);
     last_indexer_snapshot_ns_ = 0;
     song_indexer_.stop();
-    const SongIndexOptions index_options{config_.mode.enable_osu_charts};
+    SongIndexOptions index_options;
+    index_options.include_osu = config_.mode.enable_osu_charts;
+    index_options.profile = (config::normalize_song_index_profile_token(config_.mode.song_index_profile) == "fast")
+                                ? SongIndexProfile::Fast
+                                : SongIndexProfile::Safe;
 
     log_memory_phase("MenuApp",
                      "cache-load-before",
@@ -3301,7 +3332,7 @@ void MenuApp::handle_input_settings_input(uint32_t keycode) {
 }
 
 void MenuApp::handle_mode_settings_input(uint32_t keycode) {
-    const int item_count = 9;
+    const int item_count = 10;
     if (keycode == key_up_) {
         settings_cursor_ = clamp_int(settings_cursor_ - 1, 0, item_count - 1);
         publish_snapshot();
@@ -3329,6 +3360,9 @@ void MenuApp::handle_mode_settings_input(uint32_t keycode) {
             mode_library_dirty_ = true;
             rebuild_visible_song_list();
         } else if (settings_cursor_ == 1) {
+            config_.mode.song_index_profile = cycle_song_index_profile(config_.mode.song_index_profile, direction);
+            mode_dirty_ = true;
+        } else if (settings_cursor_ == 2) {
             if (!config_.mode.enable_osu_charts) {
                 config_.mode.format = "bms";
             } else {
@@ -3336,14 +3370,14 @@ void MenuApp::handle_mode_settings_input(uint32_t keycode) {
             }
             mode_dirty_ = true;
             rebuild_visible_song_list();
-        } else if (settings_cursor_ == 2) {
+        } else if (settings_cursor_ == 3) {
             if (!config_.mode.enable_osu_charts) {
                 config_.mode.key_mode = "10k";
             } else {
                 config_.mode.key_mode = cycle_runtime_key_mode(config_.mode.key_mode, direction, true);
             }
             mode_dirty_ = true;
-        } else if (settings_cursor_ == 3) {
+        } else if (settings_cursor_ == 4) {
             if (config_.mode.gauge == "normal") {
                 config_.mode.gauge = (direction > 0) ? "hard" : "easy";
             } else if (config_.mode.gauge == "hard") {
@@ -3352,7 +3386,7 @@ void MenuApp::handle_mode_settings_input(uint32_t keycode) {
                 config_.mode.gauge = (direction > 0) ? "normal" : "hard";
             }
             mode_dirty_ = true;
-        } else if (settings_cursor_ == 4) {
+        } else if (settings_cursor_ == 5) {
             if (config_.mode.random == "off") {
                 config_.mode.random = (direction > 0) ? "fr" : "sr";
             } else if (config_.mode.random == "fr") {
@@ -3361,16 +3395,16 @@ void MenuApp::handle_mode_settings_input(uint32_t keycode) {
                 config_.mode.random = (direction > 0) ? "off" : "fr";
             }
             mode_dirty_ = true;
-        } else if (settings_cursor_ == 5) {
+        } else if (settings_cursor_ == 6) {
             int next_value = static_cast<int>(config_.mode.random_seed) + direction;
             next_value = clamp_int(next_value, kSeedMin, kSeedMax);
             config_.mode.random_seed = static_cast<uint32_t>(next_value);
             mode_dirty_ = true;
-        } else if (settings_cursor_ == 6) {
+        } else if (settings_cursor_ == 7) {
             config_.speed.rate = clamp_step_value(config_.speed.rate + static_cast<double>(direction) * kRateStep,
                                                   kRateMin, kRateMax, kRateStep);
             mode_dirty_ = true;
-        } else if (settings_cursor_ == 7) {
+        } else if (settings_cursor_ == 8) {
             config_.speed.hi_speed = clamp_step_value(
                 config_.speed.hi_speed + static_cast<double>(direction) * kHiSpeedStep,
                 kHiSpeedMin, kHiSpeedMax, kHiSpeedStep);
@@ -4200,24 +4234,28 @@ void MenuApp::publish_snapshot() {
         } else if (screen_ == Screen::ModeSelect) {
             add_row("OSU Charts", on_off(config_.mode.enable_osu_charts), settings_cursor_ == 0,
                     render::MenuHitTargetKind::SettingsRow, 0, false, true);
+            add_row("Indexing",
+                    song_index_profile_label(config_.mode.song_index_profile),
+                    settings_cursor_ == 1, render::MenuHitTargetKind::SettingsRow, 1, false, true);
             add_row("Chart Filter",
                     config_.mode.enable_osu_charts ? format_label(config_.mode.format) : std::string("BMS"),
-                    settings_cursor_ == 1, render::MenuHitTargetKind::SettingsRow, 1, false, true);
+                    settings_cursor_ == 2, render::MenuHitTargetKind::SettingsRow, 2, false, true);
             add_row("Key Mode",
                     config_.mode.enable_osu_charts ? key_mode_label(config_.mode.key_mode) : std::string("10K"),
-                    settings_cursor_ == 2, render::MenuHitTargetKind::SettingsRow, 2, false, true);
-            add_row("Gauge", gauge_label(config_.mode.gauge), settings_cursor_ == 3,
-                    render::MenuHitTargetKind::SettingsRow, 3, false, true);
-            add_row("Random", random_label(config_.mode.random), settings_cursor_ == 4,
+                    settings_cursor_ == 3, render::MenuHitTargetKind::SettingsRow, 3, false, true);
+            add_row("Gauge", gauge_label(config_.mode.gauge), settings_cursor_ == 4,
                     render::MenuHitTargetKind::SettingsRow, 4, false, true);
-            add_row("Random Seed", std::to_string(config_.mode.random_seed), settings_cursor_ == 5,
+            add_row("Random", random_label(config_.mode.random), settings_cursor_ == 5,
                     render::MenuHitTargetKind::SettingsRow, 5, false, true);
-            add_row("Rate", format_multiplier(config_.speed.rate), settings_cursor_ == 6,
+            add_row("Random Seed", std::to_string(config_.mode.random_seed), settings_cursor_ == 6,
                     render::MenuHitTargetKind::SettingsRow, 6, false, true);
-            add_row("Hi-Speed", format_decimal(config_.speed.hi_speed), settings_cursor_ == 7,
+            add_row("Rate", format_multiplier(config_.speed.rate), settings_cursor_ == 7,
                     render::MenuHitTargetKind::SettingsRow, 7, false, true);
-            add_row("Back", "", settings_cursor_ == 8, render::MenuHitTargetKind::SettingsRow, 8, true, false);
+            add_row("Hi-Speed", format_decimal(config_.speed.hi_speed), settings_cursor_ == 8,
+                    render::MenuHitTargetKind::SettingsRow, 8, false, true);
+            add_row("Back", "", settings_cursor_ == 9, render::MenuHitTargetKind::SettingsRow, 9, true, false);
             render.generic.notes.push_back("OSU Charts adds 4K-10K .osu beatmaps to song indexing and runtime loading.");
+            render.generic.notes.push_back("Indexing Safe keeps RAM low for large scans; Fast uses more RAM for quicker rescans on 32GB+ PCs.");
             render.generic.notes.push_back("Chart Filter switches the visible library between BMS, OSU, or All.");
             render.generic.notes.push_back("Key Mode selects Auto plus 4K-10K/16K runtime layouts; osu charts still top out at 10K.");
             render.generic.notes.push_back("Back saves the toggle/filter and refreshes the song library cache when needed.");

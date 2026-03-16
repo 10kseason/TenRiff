@@ -9,6 +9,11 @@
 
 namespace tenriff::app {
 
+enum class SongIndexProfile {
+    Safe,
+    Fast,
+};
+
 struct SongEntry {
     std::string path;
     std::string title;
@@ -28,6 +33,7 @@ struct SongIndex {
 
 struct SongIndexOptions {
     bool include_osu = false;
+    SongIndexProfile profile = SongIndexProfile::Safe;
 };
 
 enum class SongIndexProgressStage {

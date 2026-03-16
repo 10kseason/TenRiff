@@ -8,6 +8,8 @@
 #include <filesystem>
 #include <fstream>
 #include <iomanip>
+#include <limits>
+#include <malloc.h>
 #include <mutex>
 #include <optional>
 #include <sstream>
@@ -23,6 +25,10 @@
 #include "chart/OsuManiaLoader.h"
 #include "config/SimpleJson.h"
 #include "util/Utf8Compat.h"
+
+#ifdef _WIN32
+#include <windows.h>
+#endif
 
 namespace tenriff::app {
 
@@ -443,7 +449,11 @@ SongEntry build_bms_entry(std::string relative_path,
     entry.mtime = mtime;
 
     chart::BmsParser parser;
-    auto parsed = parser.parseFile(full_path.u8string());
+    chart::BmsParserOptions parser_options;
+    parser_options.retain_wav_bmp = false;
+    parser_options.retain_unknown_headers = false;
+    parser_options.retain_nonessential_commands = false;
+    auto parsed = parser.parseFile(full_path.u8string(), parser_options);
     if (!parsed.success()) {
         warnings.push_back("Failed to parse BMS: " + entry.path);
         entry.title = fallback_title(full_path);
@@ -589,6 +599,24 @@ SongIndexMemorySnapshot query_song_index_memory_snapshot() {
     return snapshot;
 }
 
+void trim_song_index_process_memory() {
+#ifdef _WIN32
+    _heapmin();
+    SetProcessWorkingSetSize(GetCurrentProcess(), static_cast<SIZE_T>(-1), static_cast<SIZE_T>(-1));
+#endif
+}
+
+bool should_trim_song_index_process_memory(SongIndexProfile profile, int processed, int total) {
+    if (processed <= 0) {
+        return false;
+    }
+    const int trim_interval = (profile == SongIndexProfile::Fast) ? 2048 : 512;
+    if ((processed % trim_interval) == 0) {
+        return true;
+    }
+    return total > 0 && processed >= total;
+}
+
 void publish_progress(const SongIndexProgressCallback& progress,
                       SongIndexProgressStage stage,
                       int processed,
@@ -597,6 +625,199 @@ void publish_progress(const SongIndexProgressCallback& progress,
         return;
     }
     progress(SongIndexProgress{stage, processed, total});
+}
+
+int clamp_progress_count(std::uint64_t value) {
+    return static_cast<int>((std::min)(value, static_cast<std::uint64_t>((std::numeric_limits<int>::max)())));
+}
+
+struct SongIndexCandidate {
+    std::filesystem::path full_path;
+    std::string relative_path;
+    int64_t mtime = 0;
+};
+
+bool enumerate_song_candidates(const std::filesystem::path& root_dir,
+                               bool include_osu,
+                               std::vector<std::string>* warnings,
+                               const std::function<void(SongIndexCandidate&&)>& on_candidate,
+                               std::uint64_t* out_candidate_count = nullptr,
+                               const SongIndexProgressCallback& progress = {}) {
+    namespace fs = std::filesystem;
+
+    std::error_code ec;
+    fs::directory_options scan_options = fs::directory_options::skip_permission_denied;
+    fs::recursive_directory_iterator it(root_dir, scan_options, ec);
+    fs::recursive_directory_iterator end;
+
+    std::uint64_t discovered = 0;
+    if (progress) {
+        publish_progress(progress, SongIndexProgressStage::ScanningFiles, 0, -1);
+    }
+
+    while (it != end) {
+        if (ec) {
+            if (warnings) {
+                warnings->push_back("Song scan skipped entry: " + ec.message());
+            }
+            ec.clear();
+            it.increment(ec);
+            continue;
+        }
+
+        const fs::directory_entry& entry = *it;
+        if (entry.is_directory(ec)) {
+            if (!ec && entry.path().filename() == ".tenriff") {
+                it.disable_recursion_pending();
+            }
+            ec.clear();
+            it.increment(ec);
+            continue;
+        }
+        if (ec) {
+            if (warnings) {
+                warnings->push_back("Song scan skipped entry: " + ec.message());
+            }
+            ec.clear();
+            it.increment(ec);
+            continue;
+        }
+
+        if (!entry.is_regular_file(ec)) {
+            ec.clear();
+            it.increment(ec);
+            continue;
+        }
+        ec.clear();
+
+        const std::string ext = to_lower(entry.path().extension().u8string());
+        if (!is_bms_extension(ext) && !(include_osu && is_osu_extension(ext))) {
+            it.increment(ec);
+            continue;
+        }
+
+        SongIndexCandidate candidate;
+        candidate.full_path = entry.path();
+        candidate.relative_path = relative_path_string(root_dir, candidate.full_path);
+        auto mtime = entry.last_write_time(ec);
+        if (!ec) {
+            candidate.mtime = file_time_seconds(mtime);
+        } else {
+            ec.clear();
+        }
+
+        ++discovered;
+        if (progress && ((discovered % 256u) == 0u)) {
+            publish_progress(progress, SongIndexProgressStage::ScanningFiles, clamp_progress_count(discovered), -1);
+        }
+        on_candidate(std::move(candidate));
+        it.increment(ec);
+    }
+
+    if (out_candidate_count) {
+        *out_candidate_count = discovered;
+    }
+    return true;
+}
+
+void process_song_index_batch(std::vector<SongIndexCandidate>& batch,
+                              const std::unordered_map<std::string_view, const SongEntry*>& cached,
+                              std::vector<std::string>& warnings,
+                              SongIndex& result,
+                              const SongIndexOptions& options,
+                              std::atomic<int>& processed,
+                              int total_hint,
+                              unsigned reported_threads,
+                              const SongIndexProgressCallback& progress) {
+    if (batch.empty()) {
+        return;
+    }
+
+    const auto budget = choose_song_index_work_budget(
+        options.profile,
+        reported_threads,
+        batch.size(),
+        query_song_index_memory_snapshot());
+    const std::size_t batch_size = batch.size();
+    const std::size_t worker_count = std::min<std::size_t>(budget.worker_count, batch_size);
+
+    std::vector<SongEntry> batch_entries(batch_size);
+    std::vector<uint8_t> batch_valid(batch_size, 0);
+    std::vector<std::vector<std::string>> worker_warnings(worker_count);
+    std::atomic<std::size_t> next_index{0};
+
+    auto worker = [&](std::size_t worker_slot) {
+        auto& local_warnings = worker_warnings[worker_slot];
+        std::vector<std::string> item_warnings;
+        for (;;) {
+            const std::size_t batch_index = next_index.fetch_add(1, std::memory_order_relaxed);
+            if (batch_index >= batch_size) {
+                break;
+            }
+
+            const auto& candidate = batch[batch_index];
+            SongEntry entry;
+            auto cached_it = cached.find(candidate.relative_path);
+            if (cached_it != cached.end() && cached_it->second->mtime == candidate.mtime &&
+                !needs_difficulty_refresh(*cached_it->second)) {
+                entry = *cached_it->second;
+            } else {
+                item_warnings.clear();
+                const std::string ext = to_lower(candidate.full_path.extension().u8string());
+                if (is_osu_extension(ext)) {
+                    entry = build_osu_entry(candidate.relative_path, candidate.full_path, candidate.mtime, item_warnings);
+                } else {
+                    entry = build_bms_entry(candidate.relative_path, candidate.full_path, candidate.mtime, item_warnings);
+                }
+                if (!item_warnings.empty()) {
+                    local_warnings.insert(local_warnings.end(), item_warnings.begin(), item_warnings.end());
+                }
+            }
+
+            batch_valid[batch_index] =
+                (!entry.path.empty() && is_menu_song_entry(entry, options)) ? static_cast<uint8_t>(1u)
+                                                                            : static_cast<uint8_t>(0u);
+            batch_entries[batch_index] = std::move(entry);
+
+            const int current = processed.fetch_add(1, std::memory_order_relaxed) + 1;
+            if (current == total_hint || (current % 32) == 0) {
+                publish_progress(progress, SongIndexProgressStage::BuildingMetadata, current, total_hint);
+            }
+        }
+    };
+
+    std::vector<std::thread> workers;
+    workers.reserve(worker_count > 0 ? worker_count - 1 : 0);
+    for (std::size_t i = 1; i < worker_count; ++i) {
+        workers.emplace_back(worker, i);
+    }
+    worker(0);
+    for (auto& th : workers) {
+        if (th.joinable()) {
+            th.join();
+        }
+    }
+
+    for (const auto& local_warnings : worker_warnings) {
+        if (!local_warnings.empty()) {
+            warnings.insert(warnings.end(), local_warnings.begin(), local_warnings.end());
+        }
+    }
+
+    std::size_t valid_count = 0;
+    for (uint8_t valid : batch_valid) {
+        valid_count += (valid != 0u) ? 1u : 0u;
+    }
+    if (valid_count > 0) {
+        result.entries.reserve(result.entries.size() + valid_count);
+        for (std::size_t i = 0; i < batch_size; ++i) {
+            if (batch_valid[i] != 0u) {
+                result.entries.push_back(std::move(batch_entries[i]));
+            }
+        }
+    }
+
+    batch.clear();
 }
 
 void write_json_string(std::ostream& out, std::string_view value) {
@@ -1231,172 +1452,62 @@ SongIndex scan_songs(const std::string& root_path,
         }
     }
 
-    struct Candidate {
-        fs::path full_path;
-        std::string relative_path;
-        int64_t mtime = 0;
-    };
+    std::uint64_t total_candidates_u64 = 0;
+    enumerate_song_candidates(root_dir, options.include_osu, nullptr, [](SongIndexCandidate&&) {}, &total_candidates_u64, progress);
+    const int total = clamp_progress_count(total_candidates_u64);
+    publish_progress(progress, SongIndexProgressStage::BuildingMetadata, 0, total);
 
-    std::vector<Candidate> candidates;
-    fs::directory_options scan_options = fs::directory_options::skip_permission_denied;
-    fs::recursive_directory_iterator it(root_dir, scan_options, ec);
-    fs::recursive_directory_iterator end;
-    publish_progress(progress, SongIndexProgressStage::ScanningFiles, 0, -1);
-    int discovered = 0;
-    while (it != end) {
-        if (ec) {
-            warnings.push_back("Song scan skipped entry: " + ec.message());
-            ec.clear();
-            it.increment(ec);
-            continue;
-        }
-
-        const fs::directory_entry& entry = *it;
-        if (entry.is_directory(ec)) {
-            if (!ec && entry.path().filename() == ".tenriff") {
-                it.disable_recursion_pending();
-            }
-            ec.clear();
-            it.increment(ec);
-            continue;
-        }
-        if (ec) {
-            ec.clear();
-            it.increment(ec);
-            continue;
-        }
-
-        if (!entry.is_regular_file(ec)) {
-            ec.clear();
-            it.increment(ec);
-            continue;
-        }
-        ec.clear();
-
-        auto ext = to_lower(entry.path().extension().u8string());
-        if (!is_bms_extension(ext) && !(options.include_osu && is_osu_extension(ext))) {
-            it.increment(ec);
-            continue;
-        }
-
-        Candidate candidate;
-        candidate.full_path = entry.path();
-        candidate.relative_path = relative_path_string(root_dir, candidate.full_path);
-        auto mtime = entry.last_write_time(ec);
-        if (!ec) {
-            candidate.mtime = file_time_seconds(mtime);
-        } else {
-            ec.clear();
-            candidate.mtime = 0;
-        }
-        candidates.push_back(std::move(candidate));
-        ++discovered;
-        if ((discovered % 256) == 0) {
-            publish_progress(progress, SongIndexProgressStage::ScanningFiles, discovered, -1);
-        }
-
-        it.increment(ec);
-    }
-
-    publish_progress(progress, SongIndexProgressStage::BuildingMetadata, 0, static_cast<int>(candidates.size()));
-
-    const int total = static_cast<int>(candidates.size());
     result.entries.clear();
-    if (!candidates.empty()) {
+    if (total_candidates_u64 > 0) {
         const unsigned hc = std::thread::hardware_concurrency();
         std::atomic<int> processed{0};
-        std::size_t offset = 0;
-        while (offset < candidates.size()) {
-            const auto budget = choose_song_index_work_budget(
-                hc,
-                candidates.size() - offset,
-                query_song_index_memory_snapshot());
-            const std::size_t batch_size = std::min<std::size_t>(budget.batch_size, candidates.size() - offset);
-            const std::size_t worker_count = std::min<std::size_t>(budget.worker_count, batch_size);
+        const std::size_t total_candidates =
+            static_cast<std::size_t>((std::min)(total_candidates_u64,
+                                                static_cast<std::uint64_t>((std::numeric_limits<std::size_t>::max)())));
+        const auto initial_budget = choose_song_index_work_budget(
+            options.profile,
+            hc,
+            (total_candidates > 0) ? total_candidates : 1u,
+            query_song_index_memory_snapshot());
+        std::size_t batch_limit = std::clamp<std::size_t>(initial_budget.batch_size, initial_budget.worker_count, 64u);
+        std::vector<SongIndexCandidate> batch;
+        batch.reserve(batch_limit);
 
-            std::vector<SongEntry> batch_entries(batch_size);
-            std::vector<uint8_t> batch_valid(batch_size, 0);
-            std::vector<std::vector<std::string>> worker_warnings(worker_count);
-            std::atomic<std::size_t> next_index{0};
-
-            auto worker = [&](std::size_t worker_slot) {
-                auto& local_warnings = worker_warnings[worker_slot];
-                std::vector<std::string> item_warnings;
-                for (;;) {
-                    const std::size_t batch_index = next_index.fetch_add(1, std::memory_order_relaxed);
-                    if (batch_index >= batch_size) {
-                        break;
+        enumerate_song_candidates(
+            root_dir,
+            options.include_osu,
+            &warnings,
+            [&](SongIndexCandidate&& candidate) {
+                batch.push_back(std::move(candidate));
+                if (batch.size() >= batch_limit) {
+                    process_song_index_batch(batch, cached, warnings, result, options, processed, total, hc, progress);
+                    const int processed_now = processed.load(std::memory_order_acquire);
+                    if (should_trim_song_index_process_memory(options.profile, processed_now, total)) {
+                        trim_song_index_process_memory();
                     }
-
-                    const auto& candidate = candidates[offset + batch_index];
-                    SongEntry entry;
-                    auto cached_it = cached.find(candidate.relative_path);
-                    if (cached_it != cached.end() && cached_it->second->mtime == candidate.mtime &&
-                        !needs_difficulty_refresh(*cached_it->second)) {
-                        entry = *cached_it->second;
-                    } else {
-                        item_warnings.clear();
-                        const std::string ext = to_lower(candidate.full_path.extension().u8string());
-                        if (is_osu_extension(ext)) {
-                            entry = build_osu_entry(candidate.relative_path, candidate.full_path, candidate.mtime, item_warnings);
-                        } else {
-                            entry = build_bms_entry(candidate.relative_path, candidate.full_path, candidate.mtime, item_warnings);
-                        }
-                        if (!item_warnings.empty()) {
-                            local_warnings.insert(local_warnings.end(), item_warnings.begin(), item_warnings.end());
-                        }
-                    }
-
-                    batch_valid[batch_index] =
-                        (!entry.path.empty() && is_menu_song_entry(entry, options)) ? static_cast<uint8_t>(1u)
-                                                                                    : static_cast<uint8_t>(0u);
-                    batch_entries[batch_index] = std::move(entry);
-
-                    const int current = processed.fetch_add(1, std::memory_order_relaxed) + 1;
-                    if (current == total || (current % 32) == 0) {
-                        publish_progress(progress, SongIndexProgressStage::BuildingMetadata, current, total);
+                    const std::uint64_t remaining_u64 =
+                        (total_candidates_u64 > static_cast<std::uint64_t>(processed_now))
+                            ? (total_candidates_u64 - static_cast<std::uint64_t>(processed_now))
+                            : 1u;
+                    const auto next_budget = choose_song_index_work_budget(
+                        options.profile,
+                        hc,
+                        static_cast<std::size_t>((std::min)(
+                            remaining_u64, static_cast<std::uint64_t>((std::numeric_limits<std::size_t>::max)()))),
+                        query_song_index_memory_snapshot());
+                    batch_limit = std::clamp<std::size_t>(next_budget.batch_size, next_budget.worker_count, 64u);
+                    if (batch.capacity() < batch_limit) {
+                        batch.reserve(batch_limit);
                     }
                 }
-            };
+            });
 
-            std::vector<std::thread> workers;
-            workers.reserve(worker_count > 0 ? worker_count - 1 : 0);
-            for (std::size_t i = 1; i < worker_count; ++i) {
-                workers.emplace_back(worker, i);
-            }
-            worker(0);
-            for (auto& th : workers) {
-                if (th.joinable()) {
-                    th.join();
-                }
-            }
-
-            for (const auto& local_warnings : worker_warnings) {
-                if (!local_warnings.empty()) {
-                    warnings.insert(warnings.end(), local_warnings.begin(), local_warnings.end());
-                }
-            }
-
-            std::size_t valid_count = 0;
-            for (uint8_t valid : batch_valid) {
-                valid_count += (valid != 0u) ? 1u : 0u;
-            }
-            if (valid_count > 0) {
-                result.entries.reserve(result.entries.size() + valid_count);
-                for (std::size_t i = 0; i < batch_size; ++i) {
-                    if (batch_valid[i] != 0u) {
-                        result.entries.push_back(std::move(batch_entries[i]));
-                    }
-                }
-            }
-
-            for (std::size_t i = 0; i < batch_size; ++i) {
-                candidates[offset + i] = Candidate{};
-            }
-            offset += batch_size;
+        process_song_index_batch(batch, cached, warnings, result, options, processed, total, hc, progress);
+        const int processed_now = processed.load(std::memory_order_acquire);
+        if (should_trim_song_index_process_memory(options.profile, processed_now, total)) {
+            trim_song_index_process_memory();
         }
     }
-    std::vector<Candidate>().swap(candidates);
 
     std::sort(result.entries.begin(), result.entries.end(), [](const SongEntry& lhs, const SongEntry& rhs) {
         const auto lhs_title = to_lower(lhs.title);

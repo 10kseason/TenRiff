@@ -306,6 +306,25 @@ int key_count_from_mode_token(std::string_view token) {
     return 0;
 }
 
+bool should_store_index_header(std::string_view key) {
+    if (key == "BPM" || key == "PLAYER" || key == "GENRE" || key == "TITLE" || key == "ARTIST" ||
+        key == "PLAYLEVEL" || key == "RANK" || key == "TOTAL" || key == "VOLWAV" || key == "LNOBJ") {
+        return true;
+    }
+    if (key_count_from_mode_token(key) > 0) {
+        return true;
+    }
+    const std::string normalized_key = normalize_mode_token(key);
+    return normalized_key == "PLAYMODE" || normalized_key == "KEYMODE";
+}
+
+bool should_retain_command_for_index(std::string_view channel) {
+    if (channel == "02" || channel == "03" || channel == "08" || channel == "09") {
+        return true;
+    }
+    return channel.size() == 2 && (channel[0] == '1' || channel[0] == '2' || channel[0] == '5' || channel[0] == '6');
+}
+
 bool is_note_lane_channel(std::string_view channel);
 std::string canonical_lane_channel(std::string_view channel);
 
@@ -688,7 +707,9 @@ BmsParseResult BmsParser::parse(std::string_view content, const BmsParserOptions
                 }
             }
 
-            result.chart.commands.push_back(BmsMeasureCommand{measure_index, channel_token, data});
+            if (options.retain_nonessential_commands || should_retain_command_for_index(channel_token)) {
+                result.chart.commands.push_back(BmsMeasureCommand{measure_index, channel_token, data});
+            }
             continue;
         }
 
@@ -719,7 +740,9 @@ BmsParseResult BmsParser::parse(std::string_view content, const BmsParserOptions
                             "#WAV entry missing identifier.");
                 continue;
             }
-            result.chart.wav[slot] = value;
+            if (options.retain_wav_bmp) {
+                result.chart.wav[slot] = value;
+            }
             continue;
         }
 
@@ -730,7 +753,9 @@ BmsParseResult BmsParser::parse(std::string_view content, const BmsParserOptions
                             "#BMP entry missing identifier.");
                 continue;
             }
-            result.chart.bmp[slot] = value;
+            if (options.retain_wav_bmp) {
+                result.chart.bmp[slot] = value;
+            }
             continue;
         }
 
@@ -765,8 +790,9 @@ BmsParseResult BmsParser::parse(std::string_view content, const BmsParserOptions
             continue;
         }
 
-        // Unknown header; store it for completeness.
-        result.chart.headers[key] = value;
+        if (options.retain_unknown_headers || should_store_index_header(key)) {
+            result.chart.headers[key] = value;
+        }
     }
 
     const DeclaredLayout declared_layout = detect_declared_layout(result.chart);

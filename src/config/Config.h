@@ -94,6 +94,7 @@ struct ModeConfig {
     std::string random = "off";
     uint32_t random_seed = 0;
     bool enable_osu_charts = false;
+    std::string song_index_profile = "safe";
 };
 
 struct RuntimeConfig {
@@ -132,6 +133,7 @@ public:
 };
 
 [[nodiscard]] std::string normalize_skin_mode_token(std::string_view key_mode);
+[[nodiscard]] std::string normalize_song_index_profile_token(std::string_view token);
 [[nodiscard]] std::vector<std::string> supported_skin_mode_tokens();
 [[nodiscard]] std::vector<std::string> supported_skin_color_tokens();
 [[nodiscard]] std::string normalize_skin_color_token(std::string_view token);
