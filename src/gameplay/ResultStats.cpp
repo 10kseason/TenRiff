@@ -1,5 +1,6 @@
 #include "gameplay/ResultStats.h"
 
+#include <algorithm>
 #include <cmath>
 
 namespace tenriff::gameplay {
@@ -33,6 +34,11 @@ void ResultStats::record_judgement(game::Judgement judgement, double delta_ms, b
 
 void ResultStats::record_note_total(int count) {
     total_notes = count;
+    gauge_history.clear();
+    shifts.clear();
+    const std::size_t reserve_count = static_cast<std::size_t>(std::max(0, count)) * 2u;
+    gauge_history.reserve((std::max)(reserve_count, static_cast<std::size_t>(32)));
+    shifts.reserve(4);
 }
 
 void ResultStats::record_gauge_sample(int64_t sample, double value) {

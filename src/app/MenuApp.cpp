@@ -70,6 +70,7 @@ constexpr int64_t kSongSelectRepeatIntervalNs = 45'000'000LL;
 constexpr std::size_t kRecentSongSourceLimit = 12;
 
 const int kPollingOptions[] = {1000, 2000, 4000, 8000};
+const int kDebounceMsOptions[] = {0, 2, 4, 6, 8, 10, 12};
 
 int detect_active_monitor_refresh_hz(int fallback_hz) {
 #ifdef _WIN32
@@ -254,10 +255,17 @@ std::string browse_for_folder(const std::string& title) {
 
 int next_option_index(const int* options, int count, int current, int direction) {
     int index = 0;
+    int best_distance = count > 0 ? std::abs(options[0] - current) : 0;
     for (int i = 0; i < count; ++i) {
         if (options[i] == current) {
             index = i;
+            best_distance = 0;
             break;
+        }
+        const int distance = std::abs(options[i] - current);
+        if (distance < best_distance) {
+            best_distance = distance;
+            index = i;
         }
     }
     index += direction;
@@ -2082,6 +2090,8 @@ void MenuApp::start_menu_threads() {
     input_config.raw_input.input_sink = true;
     input_config.raw_input.no_legacy = true;
     input_config.polling_hz = config_.input.polling_hz;
+    input_config.key_state.debounce_window_ns =
+        std::max<int64_t>(0, static_cast<int64_t>(std::llround(config_.input.debounce_ms * 1'000'000.0)));
 
     if (!input_thread_.initialize(input_config)) {
         std::cerr << "[error] Failed to initialize input thread." << std::endl;
@@ -2128,6 +2138,8 @@ void MenuApp::restart_input_thread() {
     input_config.raw_input.input_sink = true;
     input_config.raw_input.no_legacy = true;
     input_config.polling_hz = config_.input.polling_hz;
+    input_config.key_state.debounce_window_ns =
+        std::max<int64_t>(0, static_cast<int64_t>(std::llround(config_.input.debounce_ms * 1'000'000.0)));
     if (!input_thread_.initialize(input_config)) {
         std::cerr << "[error] Failed to reinitialize input thread." << std::endl;
         return;
@@ -3293,7 +3305,7 @@ void MenuApp::handle_skins_settings_input(uint32_t keycode) {
 }
 
 void MenuApp::handle_input_settings_input(uint32_t keycode) {
-    const int item_count = 2;
+    const int item_count = 3;
     if (keycode == key_up_) {
         settings_cursor_ = clamp_int(settings_cursor_ - 1, 0, item_count - 1);
         publish_snapshot();
@@ -3310,6 +3322,17 @@ void MenuApp::handle_input_settings_input(uint32_t keycode) {
         const int option_count = static_cast<int>(sizeof(kPollingOptions) / sizeof(kPollingOptions[0]));
         const int next_index = next_option_index(kPollingOptions, option_count, config_.input.polling_hz, direction);
         config_.input.polling_hz = kPollingOptions[next_index];
+        input_dirty_ = true;
+        publish_snapshot();
+        return;
+    }
+
+    if (settings_cursor_ == 1 && (keycode == key_left_ || keycode == key_right_)) {
+        const int direction = (keycode == key_left_) ? -1 : 1;
+        const int option_count = static_cast<int>(sizeof(kDebounceMsOptions) / sizeof(kDebounceMsOptions[0]));
+        const int current = static_cast<int>(std::llround(config_.input.debounce_ms));
+        const int next_index = next_option_index(kDebounceMsOptions, option_count, current, direction);
+        config_.input.debounce_ms = static_cast<double>(kDebounceMsOptions[next_index]);
         input_dirty_ = true;
         publish_snapshot();
         return;
@@ -4229,7 +4252,10 @@ void MenuApp::publish_snapshot() {
         } else if (screen_ == Screen::SettingsInput) {
             add_row("Polling Hz", std::to_string(config_.input.polling_hz), settings_cursor_ == 0,
                     render::MenuHitTargetKind::SettingsRow, 0, false, true);
-            add_row("Back", "", settings_cursor_ == 1, render::MenuHitTargetKind::SettingsRow, 1, true, false);
+            add_row("Debounce", format_decimal(config_.input.debounce_ms) + " ms", settings_cursor_ == 1,
+                    render::MenuHitTargetKind::SettingsRow, 1, false, true);
+            add_row("Back", "", settings_cursor_ == 2, render::MenuHitTargetKind::SettingsRow, 2, true, false);
+            render.generic.notes.push_back("Debounce filters duplicate switch chatter on a single key before gameplay sees it.");
             render.generic.notes.push_back("Left/Right or click +/- to change. Back saves and returns.");
         } else if (screen_ == Screen::ModeSelect) {
             add_row("OSU Charts", on_off(config_.mode.enable_osu_charts), settings_cursor_ == 0,

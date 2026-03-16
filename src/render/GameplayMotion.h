@@ -28,6 +28,28 @@ struct GameplayMotionDiagnostics {
     double buffer_ms = 0.0;
 };
 
+inline double compute_gameplay_note_y_normalized(int64_t sample,
+                                                 int64_t display_sample,
+                                                 int64_t lookahead_samples,
+                                                 int64_t past_samples,
+                                                 double judgement_line_position) {
+    const double clamped_judgement_line = std::clamp(judgement_line_position, 0.0, 1.0);
+    const double delta = static_cast<double>(sample - display_sample);
+    if (delta >= 0.0) {
+        if (lookahead_samples <= 0) {
+            return clamped_judgement_line;
+        }
+        const double t = std::clamp(delta / static_cast<double>(lookahead_samples), 0.0, 1.0);
+        return std::clamp(clamped_judgement_line * (1.0 - t), 0.0, 1.0);
+    }
+
+    if (past_samples <= 0) {
+        return clamped_judgement_line;
+    }
+    const double t = std::clamp((-delta) / static_cast<double>(past_samples), 0.0, 1.0);
+    return std::clamp(clamped_judgement_line + t * (1.0 - clamped_judgement_line), 0.0, 1.0);
+}
+
 inline int64_t gameplay_extrapolation_limit_samples(int sample_rate, uint32_t audio_buffer_frames) {
     if (sample_rate <= 0) {
         return 0;

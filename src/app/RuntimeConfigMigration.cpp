@@ -36,7 +36,14 @@ bool is_valid_osu_key_mode(std::string_view value) {
 
 constexpr double kLegacyBadWindowMs = 80.0;
 constexpr double kCurrentBadWindowMs = 200.0;
+constexpr double kLegacyHoldGraceMs = 20.0;
+constexpr double kCurrentHoldGraceMs = 35.0;
+constexpr double kLegacyHoldBreakMs = 50.0;
+constexpr double kCurrentHoldBreakMs = 100.0;
+constexpr double kLegacyInputDebounceMs = 5.0;
+constexpr double kCurrentInputDebounceMs = 8.0;
 constexpr double kJudgeWindowToleranceMs = 0.001;
+constexpr double kInputDebounceToleranceMs = 0.001;
 constexpr double kGaugeDeltaTolerance = 0.00001;
 
 using tenriff::game::GaugeDeltaTable;
@@ -116,6 +123,18 @@ bool migrate_bms_first_runtime_config(config::RuntimeConfig& config) {
     }
     if (std::abs(config.judge.bd_ms - kLegacyBadWindowMs) <= kJudgeWindowToleranceMs) {
         config.judge.bd_ms = kCurrentBadWindowMs;
+        changed = true;
+    }
+    if (std::abs(config.judge.hold_grace_ms - kLegacyHoldGraceMs) <= kJudgeWindowToleranceMs) {
+        config.judge.hold_grace_ms = kCurrentHoldGraceMs;
+        changed = true;
+    }
+    if (std::abs(config.judge.hold_break_ms - kLegacyHoldBreakMs) <= kJudgeWindowToleranceMs) {
+        config.judge.hold_break_ms = kCurrentHoldBreakMs;
+        changed = true;
+    }
+    if (std::abs(config.input.debounce_ms - kLegacyInputDebounceMs) <= kInputDebounceToleranceMs) {
+        config.input.debounce_ms = kCurrentInputDebounceMs;
         changed = true;
     }
     changed = migrate_gauge_table(config.gauge.hard, kLegacyHardGauge, kCurrentHardGauge) || changed;

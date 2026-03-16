@@ -18,6 +18,8 @@ constexpr double kMasterVolumeMin = 0.0;
 constexpr double kMasterVolumeMax = 1.0;
 constexpr double kChartMixVolumeMin = 0.0;
 constexpr double kChartMixVolumeMax = 2.0;
+constexpr double kInputDebounceWindowMin = 0.0;
+constexpr double kInputDebounceWindowMax = 25.0;
 constexpr double kVisualOffsetMin = -500.0;
 constexpr double kVisualOffsetMax = 500.0;
 constexpr int kRefreshHzMin = 60;
@@ -245,6 +247,17 @@ int sanitize_polling_hz(int value, std::vector<std::string>& warnings) {
     return 1000;
 }
 
+double sanitize_input_debounce_ms(double value, std::vector<std::string>& warnings) {
+    if (std::isfinite(value) && value >= kInputDebounceWindowMin && value <= kInputDebounceWindowMax) {
+        return value;
+    }
+    warnings.push_back("input.debounce_ms must be between 0 and 25; clamping into range.");
+    if (!std::isfinite(value)) {
+        return 8.0;
+    }
+    return std::clamp(value, kInputDebounceWindowMin, kInputDebounceWindowMax);
+}
+
 void apply_audio_preset(RuntimeConfig& config) {
     if (config.audio_ui.preset == "basic") {
         config.audio.frames_per_buffer = 256;
@@ -300,6 +313,7 @@ void apply_config_object(const JsonObject& root, RuntimeConfig& config) {
         config.input.grab = get_bool(*input, "grab", config.input.grab);
         config.input.queue_size = static_cast<std::size_t>(get_number(*input, "queue_size", config.input.queue_size));
         config.input.polling_hz = static_cast<int>(get_number(*input, "polling_hz", config.input.polling_hz));
+        config.input.debounce_ms = get_number(*input, "debounce_ms", config.input.debounce_ms);
     }
 
     if (auto* judge = get_object(root, "judge")) {
@@ -312,6 +326,7 @@ void apply_config_object(const JsonObject& root, RuntimeConfig& config) {
         config.judge.hold_break_ms = get_number(*judge, "hold_break", config.judge.hold_break_ms);
         config.judge.mask_ms = get_number(*judge, "mask", config.judge.mask_ms);
         config.judge.indirect_miss_ms = std::max(config.judge.indirect_miss_ms, config.judge.bd_ms);
+        config.judge.hold_break_ms = std::max(config.judge.hold_break_ms, config.judge.hold_grace_ms);
     }
 
     if (auto* speed = get_object(root, "speed")) {
@@ -512,6 +527,7 @@ JsonValue build_json_root(const RuntimeConfig& config) {
     input.emplace("grab", JsonValue{config.input.grab});
     input.emplace("queue_size", JsonValue{static_cast<double>(config.input.queue_size)});
     input.emplace("polling_hz", JsonValue{static_cast<double>(config.input.polling_hz)});
+    input.emplace("debounce_ms", JsonValue{config.input.debounce_ms});
     root.emplace("input", JsonValue{std::move(input)});
 
     JsonObject judge;
@@ -521,7 +537,7 @@ JsonValue build_json_root(const RuntimeConfig& config) {
     judge.emplace("bd", JsonValue{config.judge.bd_ms});
     judge.emplace("indirect_miss", JsonValue{std::max(config.judge.indirect_miss_ms, config.judge.bd_ms)});
     judge.emplace("hold_grace", JsonValue{config.judge.hold_grace_ms});
-    judge.emplace("hold_break", JsonValue{config.judge.hold_break_ms});
+    judge.emplace("hold_break", JsonValue{std::max(config.judge.hold_break_ms, config.judge.hold_grace_ms)});
     judge.emplace("mask", JsonValue{config.judge.mask_ms});
     root.emplace("judge", JsonValue{std::move(judge)});
 
@@ -802,6 +818,7 @@ RuntimeConfig ConfigLoader::defaults() const {
     config.input.grab = false;
     config.input.queue_size = 2048;
     config.input.polling_hz = 1000;
+    config.input.debounce_ms = 8.0;
 
     config.judge = {};
     config.speed.rate = 1.0;
@@ -855,6 +872,7 @@ ConfigLoadResult ConfigLoader::load_profile(std::string_view profile_dir) const 
 
     apply_audio_preset(result.config);
     result.config.input.polling_hz = sanitize_polling_hz(result.config.input.polling_hz, result.warnings);
+    result.config.input.debounce_ms = sanitize_input_debounce_ms(result.config.input.debounce_ms, result.warnings);
     result.config.graphics.refresh_hz = sanitize_refresh_hz(result.config.graphics.refresh_hz, result.warnings);
     result.config.graphics.resolution = normalize_resolution_preset(result.config.graphics.resolution);
     return result;

@@ -204,21 +204,22 @@ void GameplayEngine::update_hold(LaneState& lane, int64_t current_sample) {
     }
 
     auto& hold = *lane.hold;
+    const int64_t hold_timeout = std::max<int64_t>(windows_.hold_break, windows_.hold_grace);
 
     if (hold.release_active) {
-        if (hold.release_sample < hold.end_sample) {
-            apply_judgement(game::Judgement::BD, std::numeric_limits<double>::quiet_NaN(), hold.release_sample, 0.5,
-                            true);
+        if (hold.release_required) {
+            const int64_t delta_samples = quantize_hold_tail_delta(hold.release_sample - hold.end_sample);
+            const auto judgement = classify_hold_tail_judgement(delta_samples);
+            double delta_ms = static_cast<double>(delta_samples) * 1000.0 / static_cast<double>(sample_rate_);
+            bool breaks_combo = (judgement == game::Judgement::BD);
+            apply_judgement(judgement, delta_ms, hold.release_sample, 0.5, breaks_combo);
             lane.hold.reset();
             return;
         }
 
-        if (hold.release_required) {
-            int64_t delta_samples = hold.release_sample - hold.end_sample;
-            auto judgement = classify_judgement(delta_samples);
-            if (judgement == game::Judgement::PR) {
-                judgement = game::Judgement::BD;
-            }
+        if (current_sample >= hold.end_sample) {
+            const int64_t delta_samples = quantize_hold_tail_delta(hold.release_sample - hold.end_sample);
+            const auto judgement = classify_hold_tail_judgement(delta_samples);
             double delta_ms = static_cast<double>(delta_samples) * 1000.0 / static_cast<double>(sample_rate_);
             bool breaks_combo = (judgement == game::Judgement::BD);
             apply_judgement(judgement, delta_ms, hold.release_sample, 0.5, breaks_combo);
@@ -228,10 +229,10 @@ void GameplayEngine::update_hold(LaneState& lane, int64_t current_sample) {
     }
 
     if (hold.release_required) {
-        if (current_sample > hold.end_sample + windows_.bd) {
+        if (current_sample > hold.end_sample + hold_timeout) {
             apply_judgement(game::Judgement::BD,
                             std::numeric_limits<double>::quiet_NaN(),
-                            hold.end_sample + windows_.bd,
+                            hold.end_sample + hold_timeout,
                             0.5,
                             true);
             lane.hold.reset();
@@ -241,9 +242,12 @@ void GameplayEngine::update_hold(LaneState& lane, int64_t current_sample) {
 
     if (current_sample >= hold.end_sample) {
         if (!hold.broken) {
-            int64_t delta_samples = 0;
-            auto judgement = classify_judgement(delta_samples);
-            apply_judgement(judgement, 0.0, hold.end_sample, 0.5, false);
+            const int64_t delta_samples =
+                hold.release_active ? quantize_hold_tail_delta(hold.release_sample - hold.end_sample) : 0;
+            const auto judgement = classify_hold_tail_judgement(delta_samples);
+            const double delta_ms = static_cast<double>(delta_samples) * 1000.0 / static_cast<double>(sample_rate_);
+            const bool breaks_combo = (judgement == game::Judgement::BD);
+            apply_judgement(judgement, delta_ms, hold.end_sample, 0.5, breaks_combo);
         }
         lane.hold.reset();
     }
@@ -321,6 +325,24 @@ game::Judgement GameplayEngine::classify_judgement(int64_t delta_samples) const 
         return game::Judgement::BD;
     }
     return game::Judgement::PR;
+}
+
+game::Judgement GameplayEngine::classify_hold_tail_judgement(int64_t delta_samples) const {
+    const int64_t abs_delta = std::abs(delta_samples);
+    if (abs_delta <= windows_.hold_grace) {
+        return game::Judgement::PG;
+    }
+    if (abs_delta <= windows_.hold_break) {
+        return game::Judgement::GR;
+    }
+    return game::Judgement::BD;
+}
+
+int64_t GameplayEngine::quantize_hold_tail_delta(int64_t delta_samples) const {
+    if (std::abs(delta_samples) <= windows_.hold_grace) {
+        return 0;
+    }
+    return delta_samples;
 }
 
 double GameplayEngine::samples_to_ms(int64_t samples) const {

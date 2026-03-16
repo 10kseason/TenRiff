@@ -48,14 +48,12 @@ constexpr float kBaseHeight = 1080.0f;
 constexpr wchar_t kWindowClassName[] = L"TenRiffMenuWindow";
 constexpr float kGameplayFieldLeft = 470.0f;
 constexpr float kGameplayFieldRight = 1450.0f;
-constexpr float kGameplayFieldTop = 140.0f;
-constexpr float kGameplayFieldBottom = 980.0f;
+constexpr float kGameplayFieldTop = 0.0f;
+constexpr float kGameplayFieldBottom = kBaseHeight;
 constexpr float kGameplayGaugeLeft = 1510.0f;
 constexpr float kGameplayGaugeTop = 210.0f;
 constexpr float kGameplayGaugeBottom = 910.0f;
 constexpr float kGameplayGaugeWidth = 46.0f;
-constexpr double kGameplayYTop = 0.08;
-constexpr double kGameplayYBottom = 0.90;
 constexpr double kGameplayJudgementLineMin = 0.55;
 constexpr double kGameplayJudgementLineMax = 0.86;
 constexpr double kGameplayJudgementLineDefault = 0.82;
@@ -3646,34 +3644,62 @@ void MenuWindow::draw(const MenuRenderData& data) {
         const int64_t display_sample = motion_diagnostics.display_sample;
 
         auto sample_to_y = [&](int64_t sample) -> float {
-            const double delta = static_cast<double>(sample - display_sample);
-            if (delta >= 0.0) {
-                if (data.gameplay.lookahead_samples <= 0) {
-                    return static_cast<float>(judgement_line_position);
-                }
-                constexpr double kEntryBandFraction = 0.12;
-                const double normalized =
-                    std::clamp(delta / static_cast<double>(data.gameplay.lookahead_samples), 0.0, 1.0);
-                const double main_fraction = 1.0 - kEntryBandFraction;
-                if (normalized >= main_fraction) {
-                    const double band_progress =
-                        std::clamp((1.0 - normalized) / std::max(0.0001, kEntryBandFraction), 0.0, 1.0);
-                    const double eased = band_progress * band_progress * (3.0 - 2.0 * band_progress);
-                    const double y = eased * kGameplayYTop;
-                    return static_cast<float>(std::clamp(y, 0.0, kGameplayYBottom));
-                }
+            return static_cast<float>(compute_gameplay_note_y_normalized(sample,
+                                                                         display_sample,
+                                                                         data.gameplay.lookahead_samples,
+                                                                         data.gameplay.past_samples,
+                                                                         judgement_line_position));
+        };
 
-                const double main_t = std::clamp(normalized / std::max(0.0001, main_fraction), 0.0, 1.0);
-                const double y = judgement_line_position - main_t * (judgement_line_position - kGameplayYTop);
-                return static_cast<float>(std::clamp(y, kGameplayYTop, kGameplayYBottom));
+        auto draw_gameplay_header = [&]() {
+            if (d2d_->title_format && d2d_->text_brush) {
+                const D2D1_RECT_F title_rect =
+                    D2D1::RectF(header_left, header_top, header_right * 0.60f, header_top + 52.0f);
+                ctx->DrawText(gameplay_hud_cache_.title_text.c_str(),
+                              static_cast<UINT32>(gameplay_hud_cache_.title_text.size()),
+                              d2d_->title_format.Get(), title_rect, d2d_->text_brush.Get());
             }
-
-            if (data.gameplay.past_samples <= 0) {
-                return static_cast<float>(judgement_line_position);
+            if (d2d_->body_format && d2d_->muted_brush) {
+                const D2D1_RECT_F artist_rect =
+                    D2D1::RectF(header_left, header_top + 46.0f, header_right * 0.60f, header_top + 84.0f);
+                ctx->DrawText(gameplay_hud_cache_.artist_text.c_str(),
+                              static_cast<UINT32>(gameplay_hud_cache_.artist_text.size()),
+                              d2d_->body_format.Get(), artist_rect, d2d_->muted_brush.Get());
             }
-            const double t = std::clamp((-delta) / static_cast<double>(data.gameplay.past_samples), 0.0, 1.0);
-            const double y = judgement_line_position + t * (kGameplayYBottom - judgement_line_position);
-            return static_cast<float>(std::clamp(y, kGameplayYTop, kGameplayYBottom));
+            if (d2d_->hud_format && d2d_->muted_brush) {
+                const D2D1_RECT_F speed_rect =
+                    D2D1::RectF(header_left, header_top + 82.0f, header_right * 0.68f, header_top + 118.0f);
+                ctx->DrawText(gameplay_hud_cache_.speed_text.c_str(),
+                              static_cast<UINT32>(gameplay_hud_cache_.speed_text.size()),
+                              d2d_->hud_format.Get(), speed_rect, d2d_->muted_brush.Get());
+            }
+            if (d2d_->title_format && d2d_->text_brush) {
+                const D2D1_RECT_F score_rect =
+                    D2D1::RectF(kBaseWidth - 700.0f, header_top, kBaseWidth - 90.0f, header_top + 52.0f);
+                d2d_->title_format->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_TRAILING);
+                ctx->DrawText(gameplay_hud_cache_.score_text.c_str(),
+                              static_cast<UINT32>(gameplay_hud_cache_.score_text.size()),
+                              d2d_->title_format.Get(), score_rect, d2d_->text_brush.Get());
+                d2d_->title_format->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_LEADING);
+            }
+            if (d2d_->body_format && d2d_->text_brush) {
+                const D2D1_RECT_F combo_rect =
+                    D2D1::RectF(kBaseWidth - 780.0f, header_top + 52.0f, kBaseWidth - 90.0f, header_top + 84.0f);
+                d2d_->body_format->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_TRAILING);
+                ctx->DrawText(gameplay_hud_cache_.combo_text.c_str(),
+                              static_cast<UINT32>(gameplay_hud_cache_.combo_text.size()),
+                              d2d_->body_format.Get(), combo_rect, d2d_->text_brush.Get());
+                d2d_->body_format->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_LEADING);
+            }
+            if (d2d_->hud_format && d2d_->muted_brush) {
+                const D2D1_RECT_F judge_stats_rect =
+                    D2D1::RectF(kBaseWidth - 780.0f, header_top + 82.0f, kBaseWidth - 90.0f, header_top + 116.0f);
+                d2d_->hud_format->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_TRAILING);
+                ctx->DrawText(gameplay_hud_cache_.judge_stats_text.c_str(),
+                              static_cast<UINT32>(gameplay_hud_cache_.judge_stats_text.size()),
+                              d2d_->hud_format.Get(), judge_stats_rect, d2d_->muted_brush.Get());
+                d2d_->hud_format->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_LEADING);
+            }
         };
 
         if (gameplay_hud_cache_.text_revision != data.gameplay.text_revision) {
@@ -3712,29 +3738,8 @@ void MenuWindow::draw(const MenuRenderData& data) {
             gameplay_hud_cache_.text_revision = data.gameplay.text_revision;
         }
 
-        if (d2d_->title_format && d2d_->text_brush) {
-            const D2D1_RECT_F title_rect =
-                D2D1::RectF(header_left, header_top, header_right * 0.60f, header_top + 52.0f);
-            ctx->DrawText(gameplay_hud_cache_.title_text.c_str(),
-                          static_cast<UINT32>(gameplay_hud_cache_.title_text.size()),
-                          d2d_->title_format.Get(), title_rect, d2d_->text_brush.Get());
-        }
-        if (d2d_->body_format && d2d_->muted_brush) {
-            const D2D1_RECT_F artist_rect =
-                D2D1::RectF(header_left, header_top + 46.0f, header_right * 0.60f, header_top + 84.0f);
-            ctx->DrawText(gameplay_hud_cache_.artist_text.c_str(),
-                          static_cast<UINT32>(gameplay_hud_cache_.artist_text.size()),
-                          d2d_->body_format.Get(), artist_rect, d2d_->muted_brush.Get());
-        }
-        if (d2d_->hud_format && d2d_->muted_brush) {
-            const D2D1_RECT_F speed_rect =
-                D2D1::RectF(header_left, header_top + 82.0f, header_right * 0.68f, header_top + 118.0f);
-            ctx->DrawText(gameplay_hud_cache_.speed_text.c_str(),
-                          static_cast<UINT32>(gameplay_hud_cache_.speed_text.size()),
-                          d2d_->hud_format.Get(), speed_rect, d2d_->muted_brush.Get());
-        }
-
         if (data.gameplay.loading && !data.gameplay.active) {
+            draw_gameplay_header();
             const D2D1_RECT_F panel_rect = D2D1::RectF(620.0f, 360.0f, 1300.0f, 620.0f);
             const D2D1_ROUNDED_RECT panel_rr = D2D1::RoundedRect(panel_rect, 24.0f, 24.0f);
             if (d2d_->panel_brush) {
@@ -3802,6 +3807,7 @@ void MenuWindow::draw(const MenuRenderData& data) {
             if (d2d_->gameplay_static_command_list) {
                 ctx->DrawImage(d2d_->gameplay_static_command_list.Get());
             }
+            draw_gameplay_header();
 
             const D2D1_RECT_F panel_rect = D2D1::RectF(700.0f, 300.0f, 1220.0f, 760.0f);
             const D2D1_ROUNDED_RECT panel_rr = D2D1::RoundedRect(panel_rect, 28.0f, 28.0f);
@@ -3853,36 +3859,6 @@ void MenuWindow::draw(const MenuRenderData& data) {
             }
 
             return;
-        }
-
-        if (d2d_->title_format && d2d_->text_brush) {
-            const D2D1_RECT_F score_rect =
-                D2D1::RectF(kBaseWidth - 700.0f, header_top, kBaseWidth - 90.0f, header_top + 52.0f);
-            d2d_->title_format->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_TRAILING);
-            ctx->DrawText(gameplay_hud_cache_.score_text.c_str(),
-                          static_cast<UINT32>(gameplay_hud_cache_.score_text.size()),
-                          d2d_->title_format.Get(), score_rect, d2d_->text_brush.Get());
-            d2d_->title_format->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_LEADING);
-        }
-
-        if (d2d_->body_format && d2d_->text_brush) {
-            const D2D1_RECT_F combo_rect =
-                D2D1::RectF(kBaseWidth - 780.0f, header_top + 52.0f, kBaseWidth - 90.0f, header_top + 84.0f);
-            d2d_->body_format->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_TRAILING);
-            ctx->DrawText(gameplay_hud_cache_.combo_text.c_str(),
-                          static_cast<UINT32>(gameplay_hud_cache_.combo_text.size()),
-                          d2d_->body_format.Get(), combo_rect, d2d_->text_brush.Get());
-            d2d_->body_format->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_LEADING);
-        }
-
-        if (d2d_->hud_format && d2d_->muted_brush) {
-            const D2D1_RECT_F judge_stats_rect =
-                D2D1::RectF(kBaseWidth - 780.0f, header_top + 82.0f, kBaseWidth - 90.0f, header_top + 116.0f);
-            d2d_->hud_format->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_TRAILING);
-            ctx->DrawText(gameplay_hud_cache_.judge_stats_text.c_str(),
-                          static_cast<UINT32>(gameplay_hud_cache_.judge_stats_text.size()),
-                          d2d_->hud_format.Get(), judge_stats_rect, d2d_->muted_brush.Get());
-            d2d_->hud_format->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_LEADING);
         }
 
         const int lane_count = std::clamp(data.gameplay.lane_count, 1, static_cast<int>(kGameplayHudMaxLanes));
@@ -3982,6 +3958,8 @@ void MenuWindow::draw(const MenuRenderData& data) {
             ctx->DrawText(combo_overlay_w.c_str(), static_cast<UINT32>(combo_overlay_w.size()),
                           d2d_->header_format.Get(), combo_overlay_rect, d2d_->accent_brush.Get());
         }
+
+        draw_gameplay_header();
 
         if (d2d_->accent_brush && data.gameplay.lane_activity_count > 0) {
             const std::size_t count =

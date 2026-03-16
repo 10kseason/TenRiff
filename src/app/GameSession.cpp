@@ -1312,6 +1312,8 @@ bool GameSession::initialize(const CommandLineOptions& options) {
     input_config.raw_input.input_sink = true;
     input_config.raw_input.no_legacy = true;
     input_config.polling_hz = config_.input.polling_hz;
+    input_config.key_state.debounce_window_ns =
+        std::max<int64_t>(0, static_cast<int64_t>(std::llround(config_.input.debounce_ms * 1'000'000.0)));
 
     if (!input_thread_.initialize(input_config)) {
         return false;
@@ -1506,6 +1508,7 @@ bool GameSession::initialize(const CommandLineOptions& options) {
     next_guide_note_index_ = 0;
     hud_scan_start_ = 0;
     tone_voices_.reserve(std::max<std::size_t>(64, chart_.notes.size() / 8));
+    chart_audio_voices_.reserve(std::max<std::size_t>(128, chart_.notes.size() / 16));
     lane_activity_.assign(static_cast<std::size_t>(std::max(1, chart_.lane_count)), 0.0f);
     lane_pressed_.assign(static_cast<std::size_t>(std::max(1, chart_.lane_count)), 0);
 
@@ -2262,10 +2265,10 @@ void GameSession::mix_chart_audio(float* output, uint32_t frames, int64_t buffer
     const float bgm_gain = static_cast<float>(std::clamp(config_.audio_ui.bgm_volume, 0.0, 2.0));
     const float keysound_gain = static_cast<float>(std::clamp(config_.audio_ui.keysound_volume, 0.0, 2.0));
     const int64_t buffer_end_samples = buffer_start_samples + static_cast<int64_t>(frames);
-    for (std::size_t i = 0; i < chart_audio_voices_.size();) {
-        const auto& voice = chart_audio_voices_[i];
+    std::size_t write_index = 0;
+    for (std::size_t i = 0; i < chart_audio_voices_.size(); ++i) {
+        const auto voice = chart_audio_voices_[i];
         if (voice.asset_id >= chart_audio_assets_.size()) {
-            chart_audio_voices_.erase(chart_audio_voices_.begin() + static_cast<std::ptrdiff_t>(i));
             continue;
         }
 
@@ -2278,10 +2281,9 @@ void GameSession::mix_chart_audio(float* output, uint32_t frames, int64_t buffer
                 chart_audio_playback_duration_frames(estimated_source_frames, config_.speed.rate);
             if (estimated_playback_frames > 0 &&
                 voice.start_sample + estimated_playback_frames <= buffer_start_samples) {
-                chart_audio_voices_.erase(chart_audio_voices_.begin() + static_cast<std::ptrdiff_t>(i));
                 continue;
             }
-            ++i;
+            chart_audio_voices_[write_index++] = voice;
             continue;
         }
 
@@ -2299,7 +2301,6 @@ void GameSession::mix_chart_audio(float* output, uint32_t frames, int64_t buffer
 
         const int64_t clip_end = voice.start_sample + playback_frames;
         if (clip_end <= buffer_start_samples) {
-            chart_audio_voices_.erase(chart_audio_voices_.begin() + static_cast<std::ptrdiff_t>(i));
             continue;
         }
 
@@ -2313,11 +2314,11 @@ void GameSession::mix_chart_audio(float* output, uint32_t frames, int64_t buffer
                                           buffer_start_samples);
 
         if (clip_end <= buffer_end_samples) {
-            chart_audio_voices_.erase(chart_audio_voices_.begin() + static_cast<std::ptrdiff_t>(i));
-        } else {
-            ++i;
+            continue;
         }
+        chart_audio_voices_[write_index++] = voice;
     }
+    chart_audio_voices_.resize(write_index);
 }
 
 void GameSession::clamp_output(float* output, uint32_t frames, float master_gain) {
@@ -2710,10 +2711,10 @@ void GameSession::mix_tones(float* output, uint32_t frames, int64_t buffer_start
     }
 
     const int64_t buffer_end_samples = buffer_start_samples + static_cast<int64_t>(frames);
-    for (std::size_t i = 0; i < tone_voices_.size();) {
-        auto& voice = tone_voices_[i];
+    std::size_t write_index = 0;
+    for (std::size_t i = 0; i < tone_voices_.size(); ++i) {
+        auto voice = tone_voices_[i];
         if (voice.end_sample <= buffer_start_samples) {
-            tone_voices_.erase(tone_voices_.begin() + static_cast<std::ptrdiff_t>(i));
             continue;
         }
 
@@ -2740,11 +2741,11 @@ void GameSession::mix_tones(float* output, uint32_t frames, int64_t buffer_start
         }
 
         if (voice.end_sample <= buffer_end_samples) {
-            tone_voices_.erase(tone_voices_.begin() + static_cast<std::ptrdiff_t>(i));
-        } else {
-            ++i;
+            continue;
         }
+        tone_voices_[write_index++] = voice;
     }
+    tone_voices_.resize(write_index);
 
     const std::size_t sample_count = static_cast<std::size_t>(frames) * 2;
     for (std::size_t i = 0; i < sample_count; ++i) {

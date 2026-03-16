@@ -31,8 +31,8 @@ struct JudgeConfig {
     double gd_ms = 55.0;
     double bd_ms = 200.0;
     double indirect_miss_ms = 500.0;
-    double hold_grace_ms = 20.0;
-    double hold_break_ms = 50.0;
+    double hold_grace_ms = 35.0;
+    double hold_break_ms = 100.0;
     double mask_ms = 30.0;
 };
 
@@ -85,6 +85,7 @@ struct InputConfig {
     bool grab = false;
     std::size_t queue_size = 2048;
     int polling_hz = 1000;
+    double debounce_ms = 8.0;
 };
 
 struct ModeConfig {
