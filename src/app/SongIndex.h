@@ -1,8 +1,10 @@
 #pragma once
 
 #include <cstdint>
+#include <filesystem>
 #include <functional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace tenriff::app {
@@ -51,6 +53,9 @@ struct SongIndexLoadResult {
 
 using SongIndexProgressCallback = std::function<void(const SongIndexProgress&)>;
 
+[[nodiscard]] std::string song_index_cache_path_for_source(std::string_view profile_root,
+                                                           std::string_view source_root);
+[[nodiscard]] std::string legacy_song_index_cache_path_for_source(std::string_view source_root);
 SongIndexLoadResult load_song_index(const std::string& path, const SongIndexOptions& options = {});
 bool save_song_index(const std::string& path,
                      const SongIndex& index,

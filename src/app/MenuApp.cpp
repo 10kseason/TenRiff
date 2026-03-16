@@ -155,6 +155,37 @@ std::string song_index_stage_label(SongIndexProgressStage stage) {
     }
 }
 
+SongIndexLoadResult load_song_index_from_available_cache(const std::string& primary_cache_path,
+                                                         const std::string& legacy_cache_path,
+                                                         const SongIndexOptions& options) {
+    SongIndexLoadResult primary_result = load_song_index(primary_cache_path, options);
+    if (primary_result.success() && primary_result.loaded_from_file) {
+        return primary_result;
+    }
+
+    if (legacy_cache_path.empty() || legacy_cache_path == primary_cache_path) {
+        return primary_result;
+    }
+
+    SongIndexLoadResult legacy_result = load_song_index(legacy_cache_path, options);
+    if (!legacy_result.success() || !legacy_result.loaded_from_file) {
+        return primary_result;
+    }
+
+    if (!primary_result.error.empty()) {
+        legacy_result.warnings.push_back("Primary profile-local song index cache ignored: " + primary_result.error);
+    }
+
+    std::string migrate_error;
+    if (!save_song_index(primary_cache_path, legacy_result.index, options, &migrate_error)) {
+        legacy_result.warnings.push_back(
+            "Loaded legacy song index cache but failed to migrate it to profile-local storage: " + migrate_error);
+    } else {
+        legacy_result.warnings.push_back("Loaded legacy song index cache and migrated it to profile-local storage.");
+    }
+    return legacy_result;
+}
+
 std::string on_off(bool value) {
     return value ? "On" : "Off";
 }
@@ -1848,9 +1879,7 @@ bool MenuApp::initialize(const CommandLineOptions& options) {
 
     const std::filesystem::path profile_dir = path_from_utf8("profiles") / path_from_utf8(options.profile);
     profile_dir_ = profile_dir.u8string();
-
-    const std::filesystem::path songs_dir = path_from_utf8(songs_path_);
-    cache_path_ = (songs_dir / ".tenriff" / "song_index.json").u8string();
+    cache_path_ = song_index_cache_path_for_source(profile_dir_, songs_path_);
 
     config::ConfigLoader config_loader;
     auto config_result = config_loader.load_profile(profile_dir_);
@@ -2226,7 +2255,8 @@ void MenuApp::switch_song_source(const std::string& new_songs_path, bool force_r
     songs_path_ = normalized_source.empty() ? new_songs_path : normalized_source;
     song_select_view_ = SongSelectView::Songs;
     const bool source_history_changed = remember_song_source(songs_path_);
-    cache_path_ = (path_from_utf8(songs_path_) / ".tenriff" / "song_index.json").u8string();
+    cache_path_ = song_index_cache_path_for_source(profile_dir_, songs_path_);
+    const std::string legacy_cache_path = legacy_song_index_cache_path_for_source(songs_path_);
     last_indexer_snapshot_ns_ = 0;
     song_indexer_.stop();
     const SongIndexOptions index_options{config_.mode.enable_osu_charts};
@@ -2235,7 +2265,7 @@ void MenuApp::switch_song_source(const std::string& new_songs_path, bool force_r
                      "cache-load-before",
                      query_process_memory_snapshot(),
                      "source=" + safe_ui_text_or_placeholder(songs_path_, "<invalid path>"));
-    auto cache_result = load_song_index(cache_path_, index_options);
+    auto cache_result = load_song_index_from_available_cache(cache_path_, legacy_cache_path, index_options);
     if (cache_result.success() && cache_result.loaded_from_file) {
         const int cached_count = static_cast<int>(cache_result.index.entries.size());
         update_song_list(std::move(cache_result.index));

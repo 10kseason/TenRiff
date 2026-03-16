@@ -7,6 +7,7 @@
 #include <cmath>
 #include <filesystem>
 #include <fstream>
+#include <iomanip>
 #include <mutex>
 #include <optional>
 #include <sstream>
@@ -42,6 +43,48 @@ std::string to_lower(std::string value) {
         return static_cast<char>(std::tolower(ch));
     });
     return value;
+}
+
+std::string normalize_cache_key_path(std::string_view value) {
+    std::filesystem::path raw_path = path_from_utf8(value);
+    if (raw_path.empty()) {
+        return {};
+    }
+    try {
+        std::error_code ec;
+        std::filesystem::path normalized = raw_path;
+        const std::filesystem::path absolute = std::filesystem::absolute(normalized, ec);
+        if (!ec && !absolute.empty()) {
+            normalized = absolute;
+        } else {
+            ec.clear();
+        }
+
+        const std::filesystem::path canonical = std::filesystem::weakly_canonical(normalized, ec);
+        if (!ec && !canonical.empty()) {
+            normalized = canonical;
+        } else {
+            normalized = normalized.lexically_normal();
+        }
+        return to_lower(normalized.generic_u8string());
+    } catch (...) {
+        return {};
+    }
+}
+
+std::uint64_t fnv1a_64(std::string_view value) {
+    std::uint64_t hash = 14695981039346656037ull;
+    for (unsigned char ch : value) {
+        hash ^= static_cast<std::uint64_t>(ch);
+        hash *= 1099511628211ull;
+    }
+    return hash;
+}
+
+std::string hex_u64(std::uint64_t value) {
+    std::ostringstream out;
+    out << std::hex << std::nouppercase << std::setfill('0') << std::setw(16) << value;
+    return out.str();
 }
 
 std::string trim_copy(std::string_view value) {
@@ -1028,6 +1071,33 @@ private:
 
 }  // namespace
 
+std::string song_index_cache_path_for_source(std::string_view profile_root, std::string_view source_root) {
+    const std::filesystem::path profile_path = path_from_utf8(profile_root);
+    if (profile_path.empty()) {
+        return {};
+    }
+
+    std::string cache_key = normalize_cache_key_path(source_root);
+    if (cache_key.empty()) {
+        cache_key = std::string(source_root);
+    }
+    if (cache_key.empty()) {
+        cache_key = "default-song-source";
+    }
+
+    const std::filesystem::path cache_path =
+        profile_path / ".tenriff" / "song-index" / (hex_u64(fnv1a_64(cache_key)) + ".json");
+    return cache_path.u8string();
+}
+
+std::string legacy_song_index_cache_path_for_source(std::string_view source_root) {
+    const std::filesystem::path source_path = path_from_utf8(source_root);
+    if (source_path.empty()) {
+        return {};
+    }
+    return (source_path / ".tenriff" / "song_index.json").u8string();
+}
+
 SongIndexLoadResult load_song_index(const std::string& path, const SongIndexOptions& options) {
     SongIndexLoadResult result;
     std::ifstream file(path_from_utf8(path), std::ios::binary);
@@ -1059,7 +1129,27 @@ bool save_song_index(const std::string& path,
                      const SongIndexOptions& options,
                      std::string* error,
                      SongIndexProgressCallback progress) {
-    std::ofstream file(path_from_utf8(path), std::ios::binary);
+    const std::filesystem::path file_path = path_from_utf8(path);
+    if (file_path.empty()) {
+        if (error) {
+            *error = "Failed to resolve song index path.";
+        }
+        return false;
+    }
+
+    std::error_code ec;
+    const std::filesystem::path parent_path = file_path.parent_path();
+    if (!parent_path.empty()) {
+        std::filesystem::create_directories(parent_path, ec);
+        if (ec) {
+            if (error) {
+                *error = "Failed to create song index cache directory: " + ec.message();
+            }
+            return false;
+        }
+    }
+
+    std::ofstream file(file_path, std::ios::binary);
     if (!file) {
         if (error) {
             *error = "Failed to write song index.";
