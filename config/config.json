@@ -25,6 +25,7 @@
     "gr": 31.0,
     "gd": 55.0,
     "bd": 200.0,
+    "indirect_miss": 500.0,
     "hold_grace": 20,
     "hold_break": 50,
     "mask": 30

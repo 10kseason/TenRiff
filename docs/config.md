@@ -48,6 +48,10 @@
 ### `judge`
 - `pg`, `gr`, `gd`, `bd` (double, ms)
 - 기본 `bd`는 `200ms`
+- `indirect_miss` (double, ms)
+  - 입력이 전혀 들어오지 않았을 때 노트를 자동 미스로 처리하는 간접 미스 기준
+  - 기본값은 `500ms`
+  - 직접 입력 판정 폭(`bd`)과는 별도로 동작하지만, 내부적으로는 항상 `bd` 이상으로 유지됨
 - `hold_grace` (double, ms)
 - `hold_break` (double, ms)
 - `mask` (double, ms)

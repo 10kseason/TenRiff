@@ -83,11 +83,35 @@ TEST_CASE("config defaults prefer 44100 Hz audio") {
     CHECK(config.gauge.easy.bd == doctest::Approx(-5.50000));
     CHECK(config.gauge.easy.pr == doctest::Approx(-7.50000));
     CHECK(config.judge.bd_ms == doctest::Approx(200.0));
+    CHECK(config.judge.indirect_miss_ms == doctest::Approx(500.0));
     CHECK(config.skin.note_shape == "rect");
     CHECK(config.skin.note_border_enabled);
     CHECK(config.skin.combo_position == doctest::Approx(tenriff::config::kComboPositionDefault));
     CHECK(config.skin.hold_body_width_scale == doctest::Approx(0.60));
     CHECK(tenriff::config::resolved_skin_lane_colors(config.skin, "16k").size() == 16u);
+}
+
+TEST_CASE("config save and load preserve indirect miss setting") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+
+    CurrentPathGuard cwd;
+    std::error_code ec;
+    std::filesystem::current_path(temp.path, ec);
+    REQUIRE_FALSE(static_cast<bool>(ec));
+
+    ConfigLoader loader;
+    auto config = loader.defaults();
+    config.judge.indirect_miss_ms = 640.0;
+
+    std::string error;
+    REQUIRE(loader.save_profile("profiles/test", config, &error));
+    CHECK(error.empty());
+
+    const auto result = loader.load_profile("profiles/test");
+    REQUIRE(result.success());
+    CHECK(result.config.judge.indirect_miss_ms == doctest::Approx(640.0));
 }
 
 TEST_CASE("audio presets do not override explicit sample rate") {

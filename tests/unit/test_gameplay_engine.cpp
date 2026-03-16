@@ -300,3 +300,26 @@ TEST_CASE("gameplay engine finishes as soon as the final judged note is cleared"
     CHECK(engine.is_finished());
     CHECK_FALSE(engine.is_game_over());
 }
+
+TEST_CASE("gameplay engine delays indirect miss until the indirect miss window") {
+    GameplayChart chart;
+    chart.lane_count = 1;
+    chart.duration_samples = 4000;
+    chart.notes.push_back(NoteEvent{1, 1000, std::nullopt});
+
+    GameplayConfig config;
+    config.sample_rate = 1000;
+    config.rate = 1.0;
+    config.judge.pg_ms = 10.0;
+    config.judge.gr_ms = 20.0;
+    config.judge.gd_ms = 30.0;
+    config.judge.bd_ms = 40.0;
+    config.judge.indirect_miss_ms = 500.0;
+
+    GameplayEngine engine(chart, config);
+    engine.advance(1499);
+    CHECK(engine.stats().counts.pr == 0);
+
+    engine.advance(1501);
+    CHECK(engine.stats().counts.pr == 1);
+}
