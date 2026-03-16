@@ -100,6 +100,10 @@
   - `off | fr | sr`
 - `random_seed` (int)
 - `enable_osu_charts` (bool)
+- `song_index_profile` (string)
+  - `safe | fast`
+  - `safe`는 대형 라이브러리에서 RAM high-water를 우선 줄이는 기본값
+  - `fast`는 32GB+ 환경에서 더 높은 worker/batch budget으로 재스캔 속도를 높이는 선택값
 
 ### `ui`
 - `result_tail_ms` (double)

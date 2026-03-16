@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(TenRiff VERSION 0.7.9 LANGUAGES CXX)
+project(TenRiff VERSION 0.8.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -174,6 +174,15 @@ if(TENRIFF_ENABLE_TESTS)
             ${CMAKE_CURRENT_SOURCE_DIR}/src
     )
     target_link_libraries(bms_10k_compare_smoke PRIVATE tenriff_core)
+
+    add_executable(song_index_benchmark
+        tests/smoke/song_index_benchmark.cpp
+    )
+    target_include_directories(song_index_benchmark
+        PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/src
+    )
+    target_link_libraries(song_index_benchmark PRIVATE tenriff_core)
 
     add_executable(bms_parser_tests
         tests/unit/test_bms_parser.cpp

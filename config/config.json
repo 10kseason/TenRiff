@@ -58,7 +58,8 @@
     "gauge": "normal",
     "random": "off",
     "random_seed": 0,
-    "enable_osu_charts": false
+    "enable_osu_charts": false,
+    "song_index_profile": "safe"
   },
   "ui": {
     "result_tail_ms": 500,

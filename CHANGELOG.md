@@ -2,6 +2,22 @@
 
 TenRiff의 사용자/배포 관점에서 의미 있는 변경만 간단히 기록합니다.
 
+## [0.8.0] - 2026-03-16
+
+### Added
+- 대형 라이브러리용 song indexing 프로파일 `mode.song_index_profile` 추가: 기본 `safe`, 선택 `fast`
+
+### Changed
+- song indexing을 전후 2-pass enumerate + small batch 처리로 재구성해 후보 파일 전체 적재를 제거
+- 인덱싱용 BMS 파서는 `WAV/BMP`, 대부분의 unknown header, 비필수 measure command를 건너뛰는 저메모리 경로를 사용
+- 대형 scan에서는 더 보수적인 worker/batch budget과 주기적 heap/working-set trim을 적용해 RAM high-water를 크게 낮춤
+- Mode Settings에서 `Indexing` row로 `Safe/Fast` 프로파일을 직접 선택 가능
+- 배포판과 공개 소스 번들 릴리스 라인을 `0.8.0`으로 승격
+
+### Verified
+- `D:\Stellaverse (2025-12-14)` full-index 실측에서 `46,636` candidate 기준 safe profile peak 메모리가 약 `working set 453MB / private 524MB` 수준으로 완주 확인
+- 같은 라이브러리 1024-chart sample 기준 fast profile이 safe profile 대비 약 `2.05x` 빠른 metadata throughput 확인
+
 ## [0.7.9] - 2026-03-16
 
 ### Changed

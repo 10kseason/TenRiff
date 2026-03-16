@@ -183,6 +183,42 @@ TEST_CASE("accepts colon-delimited header assignments") {
     CHECK_EQ(result.chart.stop.at("BB"), 96.0);
 }
 
+TEST_CASE("index parser mode skips heavy asset maps and nonessential commands") {
+    const char* data =
+        "#TITLE Index Mode\n"
+        "#ARTIST Composer\n"
+        "#LNOBJ AA\n"
+        "#SUBARTIST Guest\n"
+        "#WAV01 kick.wav\n"
+        "#BMP01 stage.png\n"
+        "#00101:01\n"
+        "#00104:01\n"
+        "#00111:01\n"
+        "#00103:0A\n"
+        "#00108:AA\n"
+        "#00109:BB\n";
+
+    BmsParser parser;
+    BmsParserOptions options;
+    options.retain_wav_bmp = false;
+    options.retain_unknown_headers = false;
+    options.retain_nonessential_commands = false;
+    auto result = parser.parse(data, options);
+
+    CHECK(result.success());
+    CHECK_EQ(result.chart.headers.at("TITLE"), "Index Mode");
+    CHECK_EQ(result.chart.headers.at("ARTIST"), "Composer");
+    CHECK_EQ(result.chart.headers.at("LNOBJ"), "AA");
+    CHECK(result.chart.headers.count("SUBARTIST") == 0u);
+    CHECK(result.chart.wav.empty());
+    CHECK(result.chart.bmp.empty());
+    REQUIRE(result.chart.commands.size() == 4u);
+    CHECK_EQ(result.chart.commands[0].channel, "11");
+    CHECK_EQ(result.chart.commands[1].channel, "03");
+    CHECK_EQ(result.chart.commands[2].channel, "08");
+    CHECK_EQ(result.chart.commands[3].channel, "09");
+}
+
 TEST_CASE("compact lane mapping follows explicit BMS key headers") {
     const char* data =
         "#TITLE Four Key Example\n"

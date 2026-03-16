@@ -623,6 +623,7 @@ TEST_CASE("cached song index sanitizes control heavy metadata on load") {
 
 TEST_CASE("song index budget leaves RAM reserve under low memory") {
     const auto budget = tenriff::app::choose_song_index_work_budget(
+        tenriff::app::SongIndexProfile::Safe,
         16,
         5000,
         tenriff::app::SongIndexMemorySnapshot{
@@ -632,7 +633,23 @@ TEST_CASE("song index budget leaves RAM reserve under low memory") {
     CHECK(budget.reserve_bytes >= 768ull * 1024ull * 1024ull);
     CHECK(budget.headroom_bytes < 512ull * 1024ull * 1024ull);
     CHECK(budget.worker_count < 16u);
+    CHECK(budget.worker_count <= 2u);
     CHECK(budget.batch_size >= budget.worker_count);
+    CHECK(budget.batch_size <= 64u);
+}
+
+TEST_CASE("song index fast profile allows more work than safe profile when memory is plentiful") {
+    const tenriff::app::SongIndexMemorySnapshot memory{
+        24ull * 1024ull * 1024ull * 1024ull,
+        32ull * 1024ull * 1024ull * 1024ull};
+    const auto safe_budget = tenriff::app::choose_song_index_work_budget(
+        tenriff::app::SongIndexProfile::Safe, 16, 50000, memory);
+    const auto fast_budget = tenriff::app::choose_song_index_work_budget(
+        tenriff::app::SongIndexProfile::Fast, 16, 50000, memory);
+
+    CHECK(fast_budget.worker_count >= safe_budget.worker_count);
+    CHECK(fast_budget.batch_size >= safe_budget.batch_size);
+    CHECK(fast_budget.reserve_bytes <= safe_budget.reserve_bytes);
 }
 
 TEST_CASE("song scan progress reports scanning and metadata stages") {

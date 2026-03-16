@@ -62,6 +62,7 @@ TEST_CASE("config defaults prefer 44100 Hz audio") {
     CHECK(config.audio_ui.keysound_volume == doctest::Approx(1.0));
     CHECK(config.mode.format == "bms");
     CHECK_FALSE(config.mode.enable_osu_charts);
+    CHECK(config.mode.song_index_profile == "safe");
     CHECK(config.graphics.resolution == "native");
     CHECK(config.graphics.display_mode == "borderless");
     CHECK(config.graphics.refresh_hz == 1050);
@@ -164,6 +165,7 @@ TEST_CASE("config save and load preserve volume and speed settings") {
     config.speed.hi_speed = 4.75;
     config.mode.enable_osu_charts = true;
     config.mode.format = "osu";
+    config.mode.song_index_profile = "fast";
 
     std::string error;
     REQUIRE(loader.save_profile("profiles/test", config, &error));
@@ -178,6 +180,7 @@ TEST_CASE("config save and load preserve volume and speed settings") {
     CHECK(result.config.speed.hi_speed == doctest::Approx(4.75));
     CHECK(result.config.mode.enable_osu_charts);
     CHECK(result.config.mode.format == "osu");
+    CHECK(result.config.mode.song_index_profile == "fast");
 }
 
 TEST_CASE("config save and load preserve graphics display settings") {

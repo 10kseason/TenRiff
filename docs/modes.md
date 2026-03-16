@@ -12,7 +12,8 @@
   "key_mode": "auto",
   "gauge": "normal",
   "random": "off",
-  "random_seed": 0
+  "random_seed": 0,
+  "song_index_profile": "safe"
 }
 ```
 
@@ -22,6 +23,9 @@
 - `gauge`: `normal | hard | easy`
 - `random`: `off | fr | sr`
 - `random_seed`: 랜덤 고정 시드 (0도 고정 값으로 취급)
+- `song_index_profile`: `safe | fast`
+  - `safe`: large-library RAM high-water를 우선 낮추는 기본값
+  - `fast`: 32GB+ 환경에서 더 빠른 재인덱싱을 노리는 선택값
 
 ## 랜덤 규칙
 - **FR(Full Random)**: 레인 전체를 랜덤 **퍼뮤테이션**으로 치환

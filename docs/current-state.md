@@ -3,7 +3,7 @@
 이 문서는 다음 에이전트나 새 작업자가 가장 먼저 읽어야 하는 현재 상태 문서입니다. 목표는 "지금 이 프로젝트가 무엇이고, 어디를 보면 되고, 무엇이 아직 미검증인지"를 빠르게 파악하게 하는 것입니다.
 
 ## Baseline
-- 현재 릴리스 라인은 `0.7.9`
+- 현재 릴리스 라인은 `0.8.0`
 - Windows GUI 빌드가 메인 타깃
 - Linux는 `Baepoks-Linuxs/TenRiff-0.5.0-linux-preview` 수준의 preview만 존재
 - 기본 표면은 BMS-first
@@ -89,15 +89,23 @@
 ## Song Indexing Model
 - Song source 전환 시 profile-local `profiles/<name>/.tenriff/song-index/<source-hash>.json` 캐시를 먼저 읽음
 - 캐시가 없거나 무효하면 백그라운드 인덱싱 시작
+- indexing profile:
+  - `safe` 기본값
+  - `fast` 선택값
+  - Mode Settings의 `Indexing` row와 `config.mode.song_index_profile`로 제어
 - 인덱싱 stage:
   - `SCANNING FILES`
   - `BUILDING METADATA`
   - `WRITING CACHE`
 - 대형 라이브러리용 메모리 하드닝:
-  - RAM-aware worker/batch budget
-  - batch 단위로 metadata build
-  - 처리된 candidate 즉시 해제
+  - 2-pass enumerate + small batch metadata build
+  - `safe` profile은 대형 scan에서 1-worker 중심 budget과 촘촘한 heap trim으로 RAM high-water를 우선 관리
+  - 인덱싱용 BMS parse는 asset map/불필요 header/비필수 command를 생략하는 저메모리 경로 사용
   - cache save는 giant JSON tree 대신 streaming write
+- 실측:
+  - `D:\Stellaverse (2025-12-14)` safe full-index 기준 `46,636` candidate / `46,602` indexed entries
+  - peak memory 약 `working set 453MB`, `private 524MB`
+  - 같은 라이브러리 1024-chart sample에서 fast profile throughput은 safe 대비 약 `2.05x`
 - cache schema:
   - `version = 5`
   - `include_osu` 포함
@@ -105,11 +113,11 @@
 
 ## Runtime / Packaging Rules
 - 새 사용자 프로필은 자동 생성
-- 배포 패키지는 `Baepoks/TenRiff-0.7.9`
+- 배포 패키지는 `Baepoks/TenRiff-0.8.0`
 - 배포 패키지에는 `Songs`를 넣지 않음
 - 배포 업데이트 요청 시 built artifacts만 `Baepoks/`에 넣는 규칙
 - source-only/public handoff 요청 시 먼저 include/exclude 리스트를 작성하는 것이 사용자 선호
-- 공개 소스 패키지는 `opensource-Tenriff-source/TenRiff-0.7.9-source`처럼 버전별로 별도 스테이징
+- 공개 소스 패키지는 `opensource-Tenriff-source/TenRiff-0.8.0-source`처럼 버전별로 별도 스테이징
 
 ## Config / Profile Reality
 - 실제 기본값은 `config/config.json`
@@ -141,7 +149,7 @@
 
 ## Still Manual-Validation Heavy
 - Song Select fast-scroll crash repro on real CJK-heavy library
-- 300GB+ BMS source에서 indexing RAM/commit 실제 측정
+- fast profile의 장시간 full-index RAM/commit 재검증
 - gameplay low-FPS/0.1%/0.01% low 확인
 - OBS/Discord/Game Bar와 graphics live-apply 공존 확인
 - drag-and-drop / external Korean-path sources GUI 확인
