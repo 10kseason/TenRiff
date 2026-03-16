@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "app/CommandLine.h"
+#include "app/GameplayHudRevisions.h"
 #include "app/SongSelectState.h"
 #include "GameplayHudLimits.h"
 #include "app/SongIndex.h"
@@ -107,7 +108,9 @@ private:
         int64_t current_sample = 0;
         int64_t duration_samples = 0;
         int sample_rate = 48000;
-        int64_t snapshot_time_ns = 0;
+        int64_t audio_sample_time_ns = 0;
+        int64_t hud_publish_time_ns = 0;
+        uint32_t audio_buffer_frames = 0;
         int64_t lookahead_samples = 0;
         int64_t past_samples = 0;
 
@@ -124,7 +127,8 @@ private:
         bool has_feedback = false;
         game::Judgement feedback = game::Judgement::PR;
         double feedback_delta_ms = 0.0;
-        uint64_t revision = 0;
+        uint64_t motion_revision = 0;
+        uint64_t text_revision = 0;
 
         std::size_t lane_activity_count = 0;
         std::array<float, kGameplayHudMaxLanes> lane_activity{};
@@ -143,6 +147,9 @@ private:
     [[nodiscard]] int effective_render_fps_limit() const;
     [[nodiscard]] render::RenderConfig current_render_config() const;
     [[nodiscard]] render::MenuWindowConfig current_window_config() const;
+    [[nodiscard]] static GameplayHudRevisionInput gameplay_hud_revision_input(const GameplayHudState& state);
+    static void advance_gameplay_hud_revisions(GameplayHudState& state, bool motion_changed, bool text_changed);
+    static void reset_gameplay_hud_state(GameplayHudState& state, bool preserve_loading = false);
 
     void handle_input_event(const input::InputEvent& event);
     void handle_menu_click(const render::MenuClickEvent& event);
@@ -187,7 +194,9 @@ private:
     void rebuild_visible_song_list(const std::string* selected_path = nullptr);
     void rebuild_current_song_record_indices();
     void sync_song_select_state();
-    void populate_gameplay_render_data(render::GameplayHudData& target, uint64_t* out_revision = nullptr);
+    void populate_gameplay_render_data(render::GameplayHudData& target,
+                                       uint64_t* out_motion_revision = nullptr,
+                                       uint64_t* out_text_revision = nullptr);
     void update_gameplay_loading_state(int percent, std::string_view stage);
     void refresh_keymap_lane_list();
     [[nodiscard]] const struct LocalPlayRecord* current_selected_record() const;
@@ -325,8 +334,9 @@ private:
     MenuSnapshot snapshot_{};
     uint64_t snapshot_version_ = 0;
     uint64_t rendered_snapshot_version_ = 0;
-    uint64_t rendered_gameplay_hud_version_ = 0;
-    uint64_t gameplay_performance_last_revision_ = 0;
+    uint64_t rendered_gameplay_motion_version_ = 0;
+    uint64_t rendered_gameplay_text_version_ = 0;
+    uint64_t gameplay_performance_last_motion_revision_ = 0;
     bool gameplay_performance_active_ = false;
     bool render_cache_ready_ = false;
     render::MenuRenderData render_cache_{};

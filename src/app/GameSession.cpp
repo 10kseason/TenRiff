@@ -2,6 +2,7 @@
 #include "app/ChartAudioPlayback.h"
 #include "app/ChartAudioStreaming.h"
 #include "app/MemoryDiagnostics.h"
+#include "audio/OggVorbisDecoder.h"
 
 #ifdef _WIN32
 #ifndef NOMINMAX
@@ -380,6 +381,8 @@ bool resample_stereo_linear(const std::vector<float>& source,
 }
 
 bool decode_wav_stereo_resampled(const std::string& path, int target_sample_rate, std::vector<float>& out,
+                                 std::string* error);
+bool decode_ogg_stereo_resampled(const std::string& path, int target_sample_rate, std::vector<float>& out,
                                  std::string* error);
 
 #ifdef _WIN32
@@ -767,6 +770,29 @@ std::optional<int> probe_audio_sample_rate(const std::string& path, std::string*
     if (ext == ".wav" || ext == ".wave") {
         return probe_wav_sample_rate(path, error);
     }
+    if (ext == ".ogg") {
+        std::string ogg_error;
+        auto sample_rate = audio::probe_ogg_vorbis_sample_rate(path, &ogg_error);
+        if (sample_rate.has_value()) {
+            return sample_rate;
+        }
+#ifdef _WIN32
+        std::string mf_error;
+        sample_rate = probe_mf_sample_rate(path, &mf_error);
+        if (sample_rate.has_value()) {
+            return sample_rate;
+        }
+        if (error) {
+            *error = ogg_error + " | MF fallback: " + mf_error;
+        }
+        return std::nullopt;
+#else
+        if (error) {
+            *error = ogg_error;
+        }
+        return std::nullopt;
+#endif
+    }
 
 #ifdef _WIN32
     return probe_mf_sample_rate(path, error);
@@ -967,6 +993,16 @@ bool decode_wav_stereo_resampled(const std::string& path, int target_sample_rate
     return resample_stereo_linear(source, static_cast<int>(info.sample_rate), target_sample_rate, out, error);
 }
 
+bool decode_ogg_stereo_resampled(const std::string& path, int target_sample_rate, std::vector<float>& out,
+                                 std::string* error) {
+    int source_sample_rate = 0;
+    std::vector<float> source;
+    if (!audio::decode_ogg_vorbis_stereo(path, &source_sample_rate, source, error)) {
+        return false;
+    }
+    return resample_stereo_linear(source, source_sample_rate, target_sample_rate, out, error);
+}
+
 bool decode_audio_stereo_resampled(const std::string& path, int target_sample_rate, std::vector<float>& out,
                                    std::string* error) {
     namespace fs = std::filesystem;
@@ -998,6 +1034,28 @@ bool decode_audio_stereo_resampled(const std::string& path, int target_sample_ra
 #else
         if (error) {
             *error = wav_error;
+        }
+        return false;
+#endif
+    }
+
+    if (ext == ".ogg") {
+        std::string ogg_error;
+        if (decode_ogg_stereo_resampled(path, target_sample_rate, out, &ogg_error)) {
+            return true;
+        }
+#ifdef _WIN32
+        std::string mf_error;
+        if (decode_mf_stereo_resampled(path, target_sample_rate, out, &mf_error)) {
+            return true;
+        }
+        if (error) {
+            *error = ogg_error + " | MF fallback: " + mf_error;
+        }
+        return false;
+#else
+        if (error) {
+            *error = ogg_error;
         }
         return false;
 #endif
@@ -1139,6 +1197,8 @@ bool GameSession::initialize(const CommandLineOptions& options) {
     finished_.store(false, std::memory_order_release);
     user_aborted_.store(false, std::memory_order_release);
     last_audio_sample_.store(0, std::memory_order_release);
+    audio_timing_sequence_.store(0, std::memory_order_release);
+    last_audio_timing_ = {};
     countdown_active_ = false;
     countdown_value_ = 0;
     countdown_started_ns_ = 0;
@@ -1592,11 +1652,28 @@ GameSession::HudSnapshot GameSession::hud_snapshot() {
     HudSnapshot snapshot;
     snapshot.finished = finished_.load(std::memory_order_acquire);
     snapshot.user_aborted = user_aborted_.load(std::memory_order_acquire);
-    snapshot.current_sample = last_audio_sample_.load(std::memory_order_acquire);
     snapshot.sample_rate = sample_rate_;
-    snapshot.snapshot_time_ns = timing::HighResClock::now_ns();
+    snapshot.hud_publish_time_ns = timing::HighResClock::now_ns();
     snapshot.countdown_active = countdown_active_;
     snapshot.countdown_value = countdown_value_;
+
+    for (;;) {
+        const uint64_t begin = audio_timing_sequence_.load(std::memory_order_acquire);
+        if ((begin & 1u) != 0u) {
+            continue;
+        }
+
+        const AudioTimingState timing = last_audio_timing_;
+        const uint64_t end = audio_timing_sequence_.load(std::memory_order_acquire);
+        if (begin != end) {
+            continue;
+        }
+
+        snapshot.current_sample = timing.sample;
+        snapshot.audio_sample_time_ns = timing.time_ns;
+        snapshot.audio_buffer_frames = timing.buffer_frames;
+        break;
+    }
 
     {
         std::lock_guard<std::mutex> lock(engine_mutex_);
@@ -2407,7 +2484,14 @@ void GameSession::audio_callback(float* output, uint32_t frames, int64_t buffer_
         clamp_output(output, frames, master_gain);
     }
 
-    last_audio_sample_.store(buffer_start_samples + static_cast<int64_t>(frames), std::memory_order_release);
+    const int64_t committed_sample = buffer_start_samples + static_cast<int64_t>(frames);
+    const int64_t committed_time_ns = timing::HighResClock::now_ns();
+    audio_timing_sequence_.fetch_add(1, std::memory_order_acq_rel);
+    last_audio_timing_.sample = committed_sample;
+    last_audio_timing_.time_ns = committed_time_ns;
+    last_audio_timing_.buffer_frames = frames;
+    audio_timing_sequence_.fetch_add(1, std::memory_order_release);
+    last_audio_sample_.store(committed_sample, std::memory_order_release);
 }
 
 void GameSession::process_countdown_input_queue() {

@@ -44,6 +44,18 @@ std::string to_lower(std::string value) {
     return value;
 }
 
+std::string trim_copy(std::string_view value) {
+    std::size_t begin = 0;
+    std::size_t end = value.size();
+    while (begin < end && std::isspace(static_cast<unsigned char>(value[begin])) != 0) {
+        ++begin;
+    }
+    while (end > begin && std::isspace(static_cast<unsigned char>(value[end - 1])) != 0) {
+        --end;
+    }
+    return std::string(value.substr(begin, end - begin));
+}
+
 bool is_bms_extension(std::string_view ext) {
     return ext == ".bms" || ext == ".bme" || ext == ".bml" || ext == ".pms";
 }
@@ -108,6 +120,74 @@ void to_upper_ascii(std::string& value) {
         }
         return static_cast<char>(ch);
     });
+}
+
+std::string canonical_bms_note_channel(std::string_view channel) {
+    std::string normalized = trim_copy(channel);
+    to_upper_ascii(normalized);
+    if (normalized.size() != 2) {
+        return {};
+    }
+    if (normalized[0] == '5') {
+        normalized[0] = '1';
+    } else if (normalized[0] == '6') {
+        normalized[0] = '2';
+    }
+    return normalized;
+}
+
+bool is_bms_long_note_channel(std::string_view channel) {
+    return channel.size() == 2 && (channel[0] == '5' || channel[0] == '6');
+}
+
+const std::vector<std::string>& difficulty_lane_order(std::string_view layout_label) {
+    static const std::vector<std::string> kEmpty;
+    static const std::vector<std::string> k5p1 = {"16", "11", "12", "13", "14", "15"};
+    static const std::vector<std::string> k7p1 = {"16", "11", "12", "13", "14", "15", "18", "19"};
+    static const std::vector<std::string> k10p2 = {"16", "11", "12", "13", "14", "15", "21", "22", "23", "24", "25", "26"};
+    static const std::vector<std::string> k14p2 = {"16", "11", "12", "13", "14", "15", "18", "19",
+                                                    "21", "22", "23", "24", "25", "28", "29", "26"};
+    static const std::vector<std::string> kPms = {"11", "12", "13", "14", "15", "22", "23", "24", "25"};
+
+    const std::string layout = util::sanitize_ui_text(std::string(layout_label));
+    if (layout == "5+1 SP") {
+        return k5p1;
+    }
+    if (layout == "7+1 SP") {
+        return k7p1;
+    }
+    if (layout == "10+2 DP") {
+        return k10p2;
+    }
+    if (layout == "14+2 DP") {
+        return k14p2;
+    }
+    if (layout == "PMS 9K") {
+        return kPms;
+    }
+    return kEmpty;
+}
+
+std::optional<int> difficulty_lane_for_channel(const chart::BmsChart& parsed_chart, std::string_view channel) {
+    const auto& order = difficulty_lane_order(parsed_chart.layout_label);
+    const std::string canonical = canonical_bms_note_channel(channel);
+    if (canonical.empty()) {
+        return std::nullopt;
+    }
+
+    if (!order.empty()) {
+        const auto it = std::find(order.begin(), order.end(), canonical);
+        if (it == order.end()) {
+            return std::nullopt;
+        }
+        return static_cast<int>(std::distance(order.begin(), it));
+    }
+
+    const auto lane = parsed_chart.lane_mapping.laneForChannel(canonical);
+    if (!lane.has_value()) {
+        return std::nullopt;
+    }
+    return static_cast<int>(lane.value() - 1);
 }
 
 struct OsuMenuProbe {
@@ -190,7 +270,7 @@ std::string relative_path_string(const std::filesystem::path& root, const std::f
 
 std::optional<chart::OsuDifficultyMetrics> calculate_bms_difficulty(const chart::BmsChart& parsed_chart) {
     const int key_count = parsed_chart.declared_key_count > 0 ? parsed_chart.declared_key_count : 10;
-    if (key_count < 4 || key_count > 10) {
+    if (key_count < 4 || (key_count > 10 && key_count != 16)) {
         return std::nullopt;
     }
 
@@ -206,27 +286,108 @@ std::optional<chart::OsuDifficultyMetrics> calculate_bms_difficulty(const chart:
         return std::nullopt;
     }
 
-    const auto built_chart = build_bms_gameplay_chart(timeline.timeline, parsed_chart, 1.0);
-    if (built_chart.chart.notes.empty()) {
-        return std::nullopt;
-    }
-
     chart::OsuManiaChart difficulty_chart;
     difficulty_chart.key_count = key_count;
     difficulty_chart.base_bpm = parsed_chart.base_bpm;
     difficulty_chart.overall_difficulty = 8.0;
-    difficulty_chart.notes.reserve(built_chart.chart.notes.size());
-    for (const auto& note : built_chart.chart.notes) {
-        chart::OsuManiaNote converted;
-        converted.column = std::clamp(note.lane - 1, 0, key_count - 1);
-        converted.start_time_ms = note.start_sample;
-        if (note.end_sample.has_value()) {
-            converted.end_time_ms = note.end_sample.value();
+
+    struct PendingLongNote {
+        int column = 0;
+        int64_t start_time_ms = 0;
+    };
+
+    const std::string lnobj = [&parsed_chart]() {
+        auto it = parsed_chart.headers.find("LNOBJ");
+        if (it == parsed_chart.headers.end()) {
+            return std::string{};
         }
-        difficulty_chart.notes.push_back(std::move(converted));
+        std::string value = trim_copy(it->second);
+        to_upper_ascii(value);
+        return value;
+    }();
+
+    std::unordered_map<int, PendingLongNote> pending_long_notes;
+    std::unordered_map<int, std::size_t> last_normal_note_by_column;
+    difficulty_chart.notes.reserve(timeline.timeline.events.size());
+    for (const auto& scheduled : timeline.timeline.events) {
+        if (scheduled.event.type != chart::BmsNormalizedEventType::Note) {
+            continue;
+        }
+
+        const auto column = difficulty_lane_for_channel(parsed_chart, scheduled.event.channel);
+        if (!column.has_value()) {
+            continue;
+        }
+
+        const int64_t time_ms = std::max<int64_t>(0, scheduled.time_samples);
+        std::string object_id = trim_copy(scheduled.event.object_id);
+        to_upper_ascii(object_id);
+
+        if (is_bms_long_note_channel(scheduled.event.channel)) {
+            auto pending_it = pending_long_notes.find(*column);
+            if (pending_it == pending_long_notes.end()) {
+                pending_long_notes.emplace(*column, PendingLongNote{*column, time_ms});
+            } else {
+                if (time_ms > pending_it->second.start_time_ms) {
+                    difficulty_chart.notes.push_back(
+                        chart::OsuManiaNote{*column, pending_it->second.start_time_ms, time_ms, 0});
+                } else {
+                    difficulty_chart.notes.push_back(
+                        chart::OsuManiaNote{*column, pending_it->second.start_time_ms, std::nullopt, 0});
+                }
+                pending_long_notes.erase(pending_it);
+            }
+            continue;
+        }
+
+        if (!lnobj.empty() && object_id == lnobj) {
+            auto last_it = last_normal_note_by_column.find(*column);
+            if (last_it != last_normal_note_by_column.end() && last_it->second < difficulty_chart.notes.size()) {
+                auto& note = difficulty_chart.notes[last_it->second];
+                if (!note.end_time_ms.has_value() && time_ms > note.start_time_ms) {
+                    note.end_time_ms = time_ms;
+                }
+                last_normal_note_by_column.erase(last_it);
+            }
+            continue;
+        }
+
+        last_normal_note_by_column[*column] = difficulty_chart.notes.size();
+        difficulty_chart.notes.push_back(chart::OsuManiaNote{*column, time_ms, std::nullopt, 0});
     }
 
-    return chart::calculate_osu_mania_difficulty(difficulty_chart);
+    for (const auto& [column, pending] : pending_long_notes) {
+        difficulty_chart.notes.push_back(chart::OsuManiaNote{column, pending.start_time_ms, std::nullopt, 0});
+    }
+
+    std::sort(difficulty_chart.notes.begin(), difficulty_chart.notes.end(), [](const chart::OsuManiaNote& lhs,
+                                                                               const chart::OsuManiaNote& rhs) {
+        if (lhs.start_time_ms != rhs.start_time_ms) {
+            return lhs.start_time_ms < rhs.start_time_ms;
+        }
+        return lhs.column < rhs.column;
+    });
+
+    if (difficulty_chart.notes.empty()) {
+        return std::nullopt;
+    }
+
+    chart::ManiaDifficultyOptions options;
+    options.preset = chart::DifficultyPreset::QwilightBmsEz;
+    const std::string layout = util::sanitize_ui_text(parsed_chart.layout_label);
+    if (layout == "5+1 SP") {
+        options.mode_name = "5+1";
+    } else if (layout == "7+1 SP") {
+        options.mode_name = "7+1";
+    } else if (layout == "14+2 DP") {
+        options.mode_name = "DP16";
+    } else if (layout == "10+2 DP") {
+        options.mode_name = "DP12";
+    } else if (layout == "PMS 9K") {
+        options.mode_name = "9K";
+    }
+
+    return chart::calculate_osu_mania_difficulty(difficulty_chart, options);
 }
 
 SongEntry build_bms_entry(std::string relative_path,

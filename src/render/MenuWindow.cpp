@@ -35,6 +35,7 @@
 
 #include <objbase.h>
 
+#include "render/GameplayMotion.h"
 #include "timing/HighResClock.h"
 #include "util/Utf8Compat.h"
 
@@ -1882,9 +1883,14 @@ void MenuWindow::draw(const MenuRenderData& data) {
         }
 
         const bool compact_overlay = data.kind == MenuScreenKind::SongSelect;
+        const bool gameplay_metrics_visible =
+            data.performance.gameplay_metrics_visible && !compact_overlay;
         const D2D1_RECT_F panel_rect = compact_overlay
                                            ? D2D1::RectF(kBaseWidth - 438.0f, 22.0f, kBaseWidth - 24.0f, 208.0f)
-                                           : D2D1::RectF(kBaseWidth - 470.0f, 44.0f, kBaseWidth - 44.0f, 432.0f);
+                                           : D2D1::RectF(kBaseWidth - 470.0f,
+                                                         44.0f,
+                                                         kBaseWidth - 44.0f,
+                                                         gameplay_metrics_visible ? 592.0f : 432.0f);
         const D2D1_ROUNDED_RECT panel_rr = D2D1::RoundedRect(panel_rect, 20.0f, 20.0f);
         if (d2d_->panel_brush) {
             d2d_->panel_brush->SetOpacity(0.88f);
@@ -1910,6 +1916,9 @@ void MenuWindow::draw(const MenuRenderData& data) {
             performance_overlay_cache_.compact_layout != compact_overlay;
         const bool metrics_changed =
             graph_changed || performance_overlay_cache_.metrics_revision != data.performance.metrics_revision;
+        const bool gameplay_metrics_changed =
+            performance_overlay_cache_.gameplay_metrics_visible != gameplay_metrics_visible ||
+            performance_overlay_cache_.gameplay_metrics_revision != data.performance.gameplay_metrics_revision;
 
         const D2D1_RECT_F graph_rect = compact_overlay
                                            ? D2D1::RectF(panel_rect.left + 20.0f, panel_rect.top + 52.0f,
@@ -1989,6 +1998,20 @@ void MenuWindow::draw(const MenuRenderData& data) {
                     to_wide(format_decimal(row_values[i], (i == 0) ? 2 : 1));
             }
             performance_overlay_cache_.metrics_revision = data.performance.metrics_revision;
+        }
+        if (gameplay_metrics_changed) {
+            const double gameplay_values[] = {
+                data.performance.gameplay_audio_age_ms,
+                data.performance.gameplay_hud_delta_ms,
+                data.performance.gameplay_extrapolated_ms,
+                data.performance.gameplay_buffer_ms,
+            };
+            for (int i = 0; i < 4; ++i) {
+                performance_overlay_cache_.gameplay_value_texts[static_cast<std::size_t>(i)] =
+                    to_wide(format_decimal(gameplay_values[i], 2));
+            }
+            performance_overlay_cache_.gameplay_metrics_visible = gameplay_metrics_visible;
+            performance_overlay_cache_.gameplay_metrics_revision = data.performance.gameplay_metrics_revision;
         }
 
         if (d2d_->mono_format && d2d_->muted_brush) {
@@ -2109,6 +2132,12 @@ void MenuWindow::draw(const MenuRenderData& data) {
             L"0.1% FPS",
             L"0.01% FPS",
         };
+        constexpr const wchar_t* kGameplayTimingLabels[] = {
+            L"AUDIO AGE",
+            L"HUD DELTA",
+            L"EXTRAP",
+            L"BUFFER",
+        };
 
         const float stats_top = graph_rect.bottom + 18.0f;
         const float row_height = 33.0f;
@@ -2126,6 +2155,53 @@ void MenuWindow::draw(const MenuRenderData& data) {
                 const std::wstring& value_text = performance_overlay_cache_.value_texts[static_cast<std::size_t>(i)];
                 ctx->DrawText(value_text.c_str(), static_cast<UINT32>(value_text.size()),
                               d2d_->stats_value_format.Get(), value_rect, d2d_->text_brush.Get());
+            }
+        }
+
+        if (!gameplay_metrics_visible) {
+            return;
+        }
+
+        const float section_top = stats_top + row_height * 5.0f + 18.0f;
+        if (d2d_->button_border_brush) {
+            d2d_->button_border_brush->SetOpacity(0.55f);
+            ctx->DrawLine(D2D1::Point2F(panel_rect.left + 24.0f, section_top - 8.0f),
+                          D2D1::Point2F(panel_rect.right - 24.0f, section_top - 8.0f),
+                          d2d_->button_border_brush.Get(),
+                          1.0f);
+            d2d_->button_border_brush->SetOpacity(1.0f);
+        }
+        if (d2d_->body_format && d2d_->text_brush) {
+            const std::wstring gameplay_title_w = L"GAMEPLAY TIMING";
+            ctx->DrawText(gameplay_title_w.c_str(),
+                          static_cast<UINT32>(gameplay_title_w.size()),
+                          d2d_->body_format.Get(),
+                          D2D1::RectF(panel_rect.left + 24.0f, section_top, panel_rect.right - 24.0f, section_top + 28.0f),
+                          d2d_->text_brush.Get());
+        }
+
+        const float gameplay_rows_top = section_top + 30.0f;
+        for (int i = 0; i < 4; ++i) {
+            const float top = gameplay_rows_top + row_height * static_cast<float>(i);
+            const D2D1_RECT_F label_rect =
+                D2D1::RectF(panel_rect.left + 24.0f, top, panel_rect.left + 170.0f, top + row_height);
+            const D2D1_RECT_F value_rect =
+                D2D1::RectF(panel_rect.left + 180.0f, top, panel_rect.right - 24.0f, top + row_height);
+            if (d2d_->stats_label_format && d2d_->muted_brush) {
+                ctx->DrawText(kGameplayTimingLabels[i],
+                              static_cast<UINT32>(wcslen(kGameplayTimingLabels[i])),
+                              d2d_->stats_label_format.Get(),
+                              label_rect,
+                              d2d_->muted_brush.Get());
+            }
+            if (d2d_->stats_value_format && d2d_->text_brush) {
+                const std::wstring& value_text =
+                    performance_overlay_cache_.gameplay_value_texts[static_cast<std::size_t>(i)];
+                ctx->DrawText(value_text.c_str(),
+                              static_cast<UINT32>(value_text.size()),
+                              d2d_->stats_value_format.Get(),
+                              value_rect,
+                              d2d_->text_brush.Get());
             }
         }
     };
@@ -3554,21 +3630,20 @@ void MenuWindow::draw(const MenuRenderData& data) {
         const bool note_border_enabled = data.gameplay.note_border_enabled;
         const std::string note_shape = normalize_gameplay_note_shape(data.gameplay.note_shape);
 
-        int64_t display_sample = data.gameplay.current_sample;
-        if (data.gameplay.sample_rate > 0 && data.gameplay.snapshot_time_ns > 0 &&
-            !data.gameplay.finished && !data.gameplay.game_over) {
-            const int64_t now_ns = timing::HighResClock::now_ns();
-            const int64_t elapsed_ns = std::max<int64_t>(0, now_ns - data.gameplay.snapshot_time_ns);
-            const double advanced_samples =
-                static_cast<double>(elapsed_ns) * static_cast<double>(data.gameplay.sample_rate) / 1'000'000'000.0;
-            display_sample += static_cast<int64_t>(std::llround(advanced_samples));
-            display_sample += static_cast<int64_t>(std::llround(
-                data.gameplay.visual_offset_ms * static_cast<double>(data.gameplay.sample_rate) / 1000.0));
-            display_sample = std::max<int64_t>(0, display_sample);
-            if (data.gameplay.duration_samples > 0) {
-                display_sample = std::min(display_sample, data.gameplay.duration_samples);
-            }
-        }
+        const GameplayMotionDiagnostics motion_diagnostics = compute_gameplay_motion_diagnostics(
+            GameplayMotionState{
+                data.gameplay.current_sample,
+                data.gameplay.duration_samples,
+                data.gameplay.sample_rate,
+                data.gameplay.audio_sample_time_ns,
+                0,
+                data.gameplay.audio_buffer_frames,
+                data.gameplay.visual_offset_ms,
+                data.gameplay.finished,
+                data.gameplay.game_over,
+            },
+            timing::HighResClock::now_ns());
+        const int64_t display_sample = motion_diagnostics.display_sample;
 
         auto sample_to_y = [&](int64_t sample) -> float {
             const double delta = static_cast<double>(sample - display_sample);
@@ -3601,7 +3676,7 @@ void MenuWindow::draw(const MenuRenderData& data) {
             return static_cast<float>(std::clamp(y, kGameplayYTop, kGameplayYBottom));
         };
 
-        if (gameplay_hud_cache_.revision != data.gameplay.revision) {
+        if (gameplay_hud_cache_.text_revision != data.gameplay.text_revision) {
             const std::string title = data.gameplay.title.empty() ? "Unknown Track" : data.gameplay.title;
             const std::string artist = data.gameplay.artist.empty() ? "Unknown Artist" : data.gameplay.artist;
             gameplay_hud_cache_.title_text = to_wide(title);
@@ -3634,7 +3709,7 @@ void MenuWindow::draw(const MenuRenderData& data) {
                 feedback_text = "READY";
             }
             gameplay_hud_cache_.feedback_text = to_wide(feedback_text);
-            gameplay_hud_cache_.revision = data.gameplay.revision;
+            gameplay_hud_cache_.text_revision = data.gameplay.text_revision;
         }
 
         if (d2d_->title_format && d2d_->text_brush) {

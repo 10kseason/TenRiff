@@ -1,8 +1,20 @@
 #pragma once
 
+#include <string>
+
 #include "chart/OsuManiaLoader.h"
 
 namespace tenriff::chart {
+
+enum class DifficultyPreset {
+    OsuInterpolated,
+    QwilightBmsEz,
+};
+
+struct ManiaDifficultyOptions {
+    DifficultyPreset preset = DifficultyPreset::OsuInterpolated;
+    std::string mode_name;
+};
 
 struct OsuDifficultyMetrics {
     double circus_rating = 0.0;
@@ -13,6 +25,8 @@ struct OsuDifficultyMetrics {
 };
 
 [[nodiscard]] OsuDifficultyMetrics calculate_osu_10k_difficulty(const OsuManiaChart& chart);
+[[nodiscard]] OsuDifficultyMetrics calculate_osu_mania_difficulty(const OsuManiaChart& chart,
+                                                                  const ManiaDifficultyOptions& options);
 [[nodiscard]] OsuDifficultyMetrics calculate_osu_mania_difficulty(const OsuManiaChart& chart);
 
 }  // namespace tenriff::chart

@@ -51,7 +51,9 @@ public:
         int64_t current_sample = 0;
         int64_t duration_samples = 0;
         int sample_rate = 48000;
-        int64_t snapshot_time_ns = 0;
+        int64_t audio_sample_time_ns = 0;
+        int64_t hud_publish_time_ns = 0;
+        uint32_t audio_buffer_frames = 0;
         int64_t lookahead_samples = 0;
         int64_t past_samples = 0;
 
@@ -187,6 +189,12 @@ private:
         int64_t sample = 0;
     };
 
+    struct AudioTimingState {
+        int64_t sample = 0;
+        int64_t time_ns = 0;
+        uint32_t buffer_frames = 0;
+    };
+
     void audio_callback(float* output, uint32_t frames, int64_t buffer_start_samples);
     void process_countdown_input_queue();
     void process_future_events(int64_t buffer_end_samples, int64_t lookahead_samples);
@@ -240,6 +248,8 @@ private:
     std::atomic<bool> finished_{false};
     std::atomic<bool> user_aborted_{false};
     std::atomic<int64_t> last_audio_sample_{0};
+    std::atomic<uint64_t> audio_timing_sequence_{0};
+    AudioTimingState last_audio_timing_{};
     bool countdown_active_ = false;
     int countdown_value_ = 0;
     uint32_t escape_keycode_ = 0;

@@ -196,7 +196,8 @@ struct GameplayNoteData {
 struct GameplayHudData {
     std::string title;
     std::string artist;
-    uint64_t revision = 0;
+    uint64_t motion_revision = 0;
+    uint64_t text_revision = 0;
     bool active = false;
     bool loading = false;
     bool countdown_active = false;
@@ -208,7 +209,8 @@ struct GameplayHudData {
     int64_t current_sample = 0;
     int64_t duration_samples = 0;
     int sample_rate = 48000;
-    int64_t snapshot_time_ns = 0;
+    int64_t audio_sample_time_ns = 0;
+    uint32_t audio_buffer_frames = 0;
     int64_t lookahead_samples = 0;
     int64_t past_samples = 0;
     double judgement_line_position = 0.82;
@@ -297,6 +299,12 @@ struct PerformanceOverlayData {
     std::size_t graph_sample_count = 0;
     uint64_t graph_revision = 0;
     uint64_t metrics_revision = 0;
+    bool gameplay_metrics_visible = false;
+    uint64_t gameplay_metrics_revision = 0;
+    double gameplay_audio_age_ms = 0.0;
+    double gameplay_hud_delta_ms = 0.0;
+    double gameplay_extrapolated_ms = 0.0;
+    double gameplay_buffer_ms = 0.0;
     double average_frame_ms = 0.0;
     double average_fps = 0.0;
     double max_fps = 0.0;
@@ -413,17 +421,20 @@ private:
     struct PerformanceOverlayCache {
         uint64_t graph_revision = 0;
         uint64_t metrics_revision = 0;
+        uint64_t gameplay_metrics_revision = 0;
         bool compact_layout = false;
+        bool gameplay_metrics_visible = false;
         float graph_ceiling_ms = 16.67f;
         float avg_line_ratio = 0.0f;
         std::wstring sample_text{};
         std::wstring top_label_text{};
         std::wstring avg_label_text{};
         std::array<std::wstring, 5> value_texts{};
+        std::array<std::wstring, 4> gameplay_value_texts{};
     };
 
     struct GameplayHudCache {
-        uint64_t revision = 0;
+        uint64_t text_revision = 0;
         std::wstring title_text{};
         std::wstring artist_text{};
         std::wstring speed_text{};

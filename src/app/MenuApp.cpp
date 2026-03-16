@@ -25,6 +25,7 @@
 #endif
 
 #include "app/GameSession.h"
+#include "app/GameplayHudRevisions.h"
 #include "app/GraphicsTiming.h"
 #include "app/MemoryDiagnostics.h"
 #include "app/RuntimeConfigMigration.h"
@@ -32,6 +33,7 @@
 #include "chart/OsuManiaLoader.h"
 #include "config/SimpleJson.h"
 #include "config/KeycodeMap.h"
+#include "render/GameplayMotion.h"
 #include "timing/HighResClock.h"
 #include "util/Utf8Compat.h"
 
@@ -1764,6 +1766,74 @@ bool is_better_record(int64_t candidate_score,
 
 MenuApp::MenuApp() = default;
 
+GameplayHudRevisionInput MenuApp::gameplay_hud_revision_input(const GameplayHudState& state) {
+    GameplayHudRevisionInput input;
+    input.active = state.active;
+    input.finished = state.finished;
+    input.game_over = state.game_over;
+    input.user_aborted = state.user_aborted;
+    input.loading = state.loading;
+    input.countdown_active = state.countdown_active;
+    input.countdown_value = state.countdown_value;
+    input.loading_percent = state.loading_percent;
+    input.loading_stage = state.loading_stage;
+    input.lane_count = state.lane_count;
+    input.current_sample = state.current_sample;
+    input.duration_samples = state.duration_samples;
+    input.sample_rate = state.sample_rate;
+    input.audio_sample_time_ns = state.audio_sample_time_ns;
+    input.audio_buffer_frames = state.audio_buffer_frames;
+    input.lookahead_samples = state.lookahead_samples;
+    input.past_samples = state.past_samples;
+    input.combo = state.combo;
+    input.max_combo = state.max_combo;
+    input.counts = state.counts;
+    input.gauge = state.gauge;
+    input.gauge_type = state.gauge_type;
+    input.rate = state.rate;
+    input.hispeed = state.hispeed;
+    input.has_feedback = state.has_feedback;
+    input.feedback = state.feedback;
+    input.feedback_delta_ms = state.feedback_delta_ms;
+    input.lane_activity_count = state.lane_activity_count;
+    std::copy_n(state.lane_activity.begin(), state.lane_activity_count, input.lane_activity.begin());
+    input.note_count = state.note_count;
+    for (std::size_t i = 0; i < state.note_count; ++i) {
+        input.notes[i] = GameplayHudRevisionNote{
+            state.notes[i].lane,
+            state.notes[i].start_sample,
+            state.notes[i].tail_sample,
+            state.notes[i].hold,
+            state.notes[i].head_visible,
+        };
+    }
+    return input;
+}
+
+void MenuApp::advance_gameplay_hud_revisions(GameplayHudState& state, bool motion_changed, bool text_changed) {
+    if (motion_changed) {
+        ++state.motion_revision;
+    }
+    if (text_changed) {
+        ++state.text_revision;
+    }
+}
+
+void MenuApp::reset_gameplay_hud_state(GameplayHudState& state, bool preserve_loading) {
+    const uint64_t next_motion_revision = state.motion_revision + 1;
+    const uint64_t next_text_revision = state.text_revision + 1;
+    const bool loading = preserve_loading ? state.loading : false;
+    const int loading_percent = preserve_loading ? state.loading_percent : 0;
+    const std::string loading_stage = preserve_loading ? state.loading_stage : std::string{};
+
+    state = {};
+    state.loading = loading;
+    state.loading_percent = loading_percent;
+    state.loading_stage = loading_stage;
+    state.motion_revision = next_motion_revision;
+    state.text_revision = next_text_revision;
+}
+
 MenuApp::~MenuApp() {
     shutdown();
 }
@@ -3397,10 +3467,13 @@ void MenuApp::handle_result_input(uint32_t keycode) {
     }
 }
 
-void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target, uint64_t* out_revision) {
+void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
+                                            uint64_t* out_motion_revision,
+                                            uint64_t* out_text_revision) {
     std::lock_guard<std::mutex> lock(gameplay_hud_mutex_);
 
-    target.revision = gameplay_hud_.revision;
+    target.motion_revision = gameplay_hud_.motion_revision;
+    target.text_revision = gameplay_hud_.text_revision;
     target.active = gameplay_hud_.active;
     target.loading = gameplay_hud_.loading;
     target.countdown_active = gameplay_hud_.countdown_active;
@@ -3411,7 +3484,8 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target, uin
     target.current_sample = gameplay_hud_.current_sample;
     target.duration_samples = gameplay_hud_.duration_samples;
     target.sample_rate = gameplay_hud_.sample_rate;
-    target.snapshot_time_ns = gameplay_hud_.snapshot_time_ns;
+    target.audio_sample_time_ns = gameplay_hud_.audio_sample_time_ns;
+    target.audio_buffer_frames = gameplay_hud_.audio_buffer_frames;
     target.lookahead_samples = gameplay_hud_.lookahead_samples;
     target.past_samples = gameplay_hud_.past_samples;
     target.judgement_line_position = std::clamp(
@@ -3501,18 +3575,28 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target, uin
         target.accuracy = 0.0;
     }
 
-    if (out_revision) {
-        *out_revision = gameplay_hud_.revision;
+    if (out_motion_revision) {
+        *out_motion_revision = gameplay_hud_.motion_revision;
+    }
+    if (out_text_revision) {
+        *out_text_revision = gameplay_hud_.text_revision;
     }
 }
 
 void MenuApp::update_gameplay_loading_state(int percent, std::string_view stage) {
     {
         std::lock_guard<std::mutex> lock(gameplay_hud_mutex_);
-        gameplay_hud_.loading = true;
-        gameplay_hud_.loading_percent = clamp_int(percent, 0, 100);
-        gameplay_hud_.loading_stage = std::string(stage);
-        ++gameplay_hud_.revision;
+        const GameplayHudRevisionInput previous = gameplay_hud_revision_input(gameplay_hud_);
+        GameplayHudRevisionInput next = previous;
+        next.loading = true;
+        next.loading_percent = clamp_int(percent, 0, 100);
+        next.loading_stage = std::string(stage);
+        const GameplayHudRevisionFlags diff = diff_gameplay_hud_revisions(previous, next);
+
+        gameplay_hud_.loading = next.loading;
+        gameplay_hud_.loading_percent = next.loading_percent;
+        gameplay_hud_.loading_stage = next.loading_stage;
+        advance_gameplay_hud_revisions(gameplay_hud_, diff.motion_changed, false);
     }
     publish_snapshot();
 }
@@ -4225,64 +4309,112 @@ void MenuApp::render_tick() {
             snapshot_changed = true;
         }
         render_cache_.performance.visible = show_performance_overlay;
-        render_cache_.performance.valid = perf_snapshot.valid;
-        render_cache_.performance.sample_count = perf_snapshot.sample_count;
-        render_cache_.performance.graph_sample_count = perf_snapshot.graph_sample_count;
-        render_cache_.performance.graph_revision = perf_snapshot.graph_revision;
-        render_cache_.performance.metrics_revision = perf_snapshot.metrics_revision;
-        render_cache_.performance.average_frame_ms = perf_snapshot.average_frame_ms;
-        render_cache_.performance.average_fps = perf_snapshot.average_fps;
-        render_cache_.performance.max_fps = perf_snapshot.max_fps;
-        render_cache_.performance.fps_0_1_low = perf_snapshot.fps_0_1_low;
-        render_cache_.performance.fps_0_01_low = perf_snapshot.fps_0_01_low;
-        render_cache_.performance.frame_times_ms = perf_snapshot.frame_times_ms;
     }
 
     if (render_cache_.kind == render::MenuScreenKind::GameplayHud) {
-        uint64_t gameplay_revision = 0;
-        int64_t gameplay_snapshot_time_ns = 0;
+        uint64_t gameplay_motion_revision = 0;
+        uint64_t gameplay_text_revision = 0;
+        int64_t gameplay_hud_publish_time_ns = 0;
         bool gameplay_perf_active = false;
         {
             std::lock_guard<std::mutex> lock(gameplay_hud_mutex_);
-            gameplay_revision = gameplay_hud_.revision;
-            gameplay_snapshot_time_ns = gameplay_hud_.snapshot_time_ns;
+            gameplay_motion_revision = gameplay_hud_.motion_revision;
+            gameplay_text_revision = gameplay_hud_.text_revision;
+            gameplay_hud_publish_time_ns = gameplay_hud_.hud_publish_time_ns;
             gameplay_perf_active = gameplay_hud_.active && !gameplay_hud_.loading;
         }
         if (gameplay_perf_active) {
             if (!gameplay_performance_active_) {
                 gameplay_performance_tracker_.reset();
-                gameplay_performance_last_revision_ = 0;
+                gameplay_performance_last_motion_revision_ = 0;
                 gameplay_performance_active_ = true;
             }
-            if (gameplay_snapshot_time_ns > 0 && gameplay_revision != 0 &&
-                gameplay_revision != gameplay_performance_last_revision_) {
-                gameplay_performance_tracker_.record_frame_start_ns(gameplay_snapshot_time_ns);
-                gameplay_performance_last_revision_ = gameplay_revision;
+            if (gameplay_hud_publish_time_ns > 0 && gameplay_motion_revision != 0 &&
+                gameplay_motion_revision != gameplay_performance_last_motion_revision_) {
+                gameplay_performance_tracker_.record_frame_start_ns(gameplay_hud_publish_time_ns);
+                gameplay_performance_last_motion_revision_ = gameplay_motion_revision;
             }
             perf_snapshot = gameplay_performance_tracker_.snapshot();
         } else if (gameplay_performance_active_) {
             gameplay_performance_tracker_.reset();
-            gameplay_performance_last_revision_ = 0;
+            gameplay_performance_last_motion_revision_ = 0;
             gameplay_performance_active_ = false;
         }
-        if (snapshot_changed || rendered_gameplay_hud_version_ != gameplay_revision) {
-            populate_gameplay_render_data(render_cache_.gameplay, &gameplay_revision);
+        if (snapshot_changed ||
+            rendered_gameplay_motion_version_ != gameplay_motion_revision ||
+            rendered_gameplay_text_version_ != gameplay_text_revision) {
+            populate_gameplay_render_data(render_cache_.gameplay,
+                                          &gameplay_motion_revision,
+                                          &gameplay_text_revision);
             if (render_cache_.gameplay.bpm > 0.0 && render_cache_.gameplay.rate > 0.0) {
                 render_cache_.gameplay.scroll_speed =
                     (render_cache_.gameplay.bpm * render_cache_.gameplay.hispeed) / render_cache_.gameplay.rate;
             } else {
                 render_cache_.gameplay.scroll_speed = 0.0;
             }
-            rendered_gameplay_hud_version_ = gameplay_revision;
+            rendered_gameplay_motion_version_ = gameplay_motion_revision;
+            rendered_gameplay_text_version_ = gameplay_text_revision;
+        }
+
+        const bool had_gameplay_metrics_visible = render_cache_.performance.gameplay_metrics_visible;
+        render_cache_.performance.gameplay_metrics_visible = gameplay_perf_active;
+        if (gameplay_perf_active) {
+            const uint64_t gameplay_metrics_revision = (perf_snapshot.metrics_revision != 0) ? perf_snapshot.metrics_revision : 1;
+            if (!had_gameplay_metrics_visible ||
+                render_cache_.performance.gameplay_metrics_revision != gameplay_metrics_revision) {
+                const auto diagnostics = render::compute_gameplay_motion_diagnostics(
+                    render::GameplayMotionState{
+                        render_cache_.gameplay.current_sample,
+                        render_cache_.gameplay.duration_samples,
+                        render_cache_.gameplay.sample_rate,
+                        render_cache_.gameplay.audio_sample_time_ns,
+                        gameplay_hud_publish_time_ns,
+                        render_cache_.gameplay.audio_buffer_frames,
+                        render_cache_.gameplay.visual_offset_ms,
+                        render_cache_.gameplay.finished,
+                        render_cache_.gameplay.game_over,
+                    },
+                    timing::HighResClock::now_ns());
+                render_cache_.performance.gameplay_audio_age_ms = diagnostics.audio_age_ms;
+                render_cache_.performance.gameplay_hud_delta_ms = diagnostics.hud_delta_ms;
+                render_cache_.performance.gameplay_extrapolated_ms = diagnostics.extrapolated_ms;
+                render_cache_.performance.gameplay_buffer_ms = diagnostics.buffer_ms;
+                render_cache_.performance.gameplay_metrics_revision = gameplay_metrics_revision;
+            }
+        } else {
+            render_cache_.performance.gameplay_metrics_revision = 0;
+            render_cache_.performance.gameplay_audio_age_ms = 0.0;
+            render_cache_.performance.gameplay_hud_delta_ms = 0.0;
+            render_cache_.performance.gameplay_extrapolated_ms = 0.0;
+            render_cache_.performance.gameplay_buffer_ms = 0.0;
         }
     } else {
         if (gameplay_performance_active_) {
             gameplay_performance_tracker_.reset();
-            gameplay_performance_last_revision_ = 0;
+            gameplay_performance_last_motion_revision_ = 0;
             gameplay_performance_active_ = false;
         }
-        rendered_gameplay_hud_version_ = 0;
+        render_cache_.performance.gameplay_metrics_visible = false;
+        render_cache_.performance.gameplay_metrics_revision = 0;
+        render_cache_.performance.gameplay_audio_age_ms = 0.0;
+        render_cache_.performance.gameplay_hud_delta_ms = 0.0;
+        render_cache_.performance.gameplay_extrapolated_ms = 0.0;
+        render_cache_.performance.gameplay_buffer_ms = 0.0;
+        rendered_gameplay_motion_version_ = 0;
+        rendered_gameplay_text_version_ = 0;
     }
+
+    render_cache_.performance.valid = perf_snapshot.valid;
+    render_cache_.performance.sample_count = perf_snapshot.sample_count;
+    render_cache_.performance.graph_sample_count = perf_snapshot.graph_sample_count;
+    render_cache_.performance.graph_revision = perf_snapshot.graph_revision;
+    render_cache_.performance.metrics_revision = perf_snapshot.metrics_revision;
+    render_cache_.performance.average_frame_ms = perf_snapshot.average_frame_ms;
+    render_cache_.performance.average_fps = perf_snapshot.average_fps;
+    render_cache_.performance.max_fps = perf_snapshot.max_fps;
+    render_cache_.performance.fps_0_1_low = perf_snapshot.fps_0_1_low;
+    render_cache_.performance.fps_0_01_low = perf_snapshot.fps_0_01_low;
+    render_cache_.performance.frame_times_ms = perf_snapshot.frame_times_ms;
     menu_window_.render(render_cache_);
 }
 
@@ -4862,11 +4994,10 @@ void MenuApp::launch_gameplay(const std::string& chart_path) {
     apply_runtime_graphics_config();
     {
         std::lock_guard<std::mutex> lock(gameplay_hud_mutex_);
-        gameplay_hud_ = {};
+        reset_gameplay_hud_state(gameplay_hud_);
         gameplay_hud_.loading = true;
         gameplay_hud_.loading_percent = 0;
         gameplay_hud_.loading_stage = "Preparing gameplay";
-        ++gameplay_hud_.revision;
     }
     publish_snapshot();
 
@@ -4889,6 +5020,50 @@ void MenuApp::launch_gameplay(const std::string& chart_path) {
 #endif
     session.set_hud_callback([this](const GameSession::HudSnapshot& hud) {
         std::lock_guard<std::mutex> lock(gameplay_hud_mutex_);
+        const GameplayHudRevisionInput previous = gameplay_hud_revision_input(gameplay_hud_);
+        GameplayHudRevisionInput next = previous;
+        next.loading = false;
+        next.loading_percent = 100;
+        next.loading_stage = "Ready";
+        next.active = hud.active;
+        next.finished = hud.finished;
+        next.game_over = hud.game_over;
+        next.user_aborted = hud.user_aborted;
+        next.countdown_active = hud.countdown_active;
+        next.countdown_value = hud.countdown_value;
+        next.lane_count = hud.lane_count;
+        next.current_sample = hud.current_sample;
+        next.duration_samples = hud.duration_samples;
+        next.sample_rate = hud.sample_rate;
+        next.audio_sample_time_ns = hud.audio_sample_time_ns;
+        next.audio_buffer_frames = hud.audio_buffer_frames;
+        next.lookahead_samples = hud.lookahead_samples;
+        next.past_samples = hud.past_samples;
+        next.combo = hud.combo;
+        next.max_combo = hud.max_combo;
+        next.counts = hud.counts;
+        next.gauge = hud.gauge;
+        next.gauge_type = hud.gauge_type;
+        next.rate = hud.rate;
+        next.hispeed = hud.hispeed;
+        next.has_feedback = hud.has_feedback;
+        next.feedback = hud.feedback_judgement;
+        next.feedback_delta_ms = hud.feedback_delta_ms;
+        next.lane_activity_count = hud.lane_activity_count;
+        next.lane_activity.fill(0.0f);
+        std::copy_n(hud.lane_activity.begin(), hud.lane_activity_count, next.lane_activity.begin());
+        next.note_count = hud.note_count;
+        for (std::size_t i = 0; i < hud.note_count; ++i) {
+            next.notes[i] = GameplayHudRevisionNote{
+                hud.notes[i].lane,
+                hud.notes[i].start_sample,
+                hud.notes[i].tail_sample,
+                hud.notes[i].hold,
+                hud.notes[i].head_visible,
+            };
+        }
+        const GameplayHudRevisionFlags diff = diff_gameplay_hud_revisions(previous, next);
+
         gameplay_hud_.loading = false;
         gameplay_hud_.loading_percent = 100;
         gameplay_hud_.loading_stage = "Ready";
@@ -4902,7 +5077,9 @@ void MenuApp::launch_gameplay(const std::string& chart_path) {
         gameplay_hud_.current_sample = hud.current_sample;
         gameplay_hud_.duration_samples = hud.duration_samples;
         gameplay_hud_.sample_rate = hud.sample_rate;
-        gameplay_hud_.snapshot_time_ns = hud.snapshot_time_ns;
+        gameplay_hud_.audio_sample_time_ns = hud.audio_sample_time_ns;
+        gameplay_hud_.hud_publish_time_ns = hud.hud_publish_time_ns;
+        gameplay_hud_.audio_buffer_frames = hud.audio_buffer_frames;
         gameplay_hud_.lookahead_samples = hud.lookahead_samples;
         gameplay_hud_.past_samples = hud.past_samples;
         gameplay_hud_.combo = hud.combo;
@@ -4929,7 +5106,7 @@ void MenuApp::launch_gameplay(const std::string& chart_path) {
             out.head_visible = hud.notes[i].head_visible;
             gameplay_hud_.notes[i] = out;
         }
-        ++gameplay_hud_.revision;
+        advance_gameplay_hud_revisions(gameplay_hud_, diff.motion_changed, diff.text_changed);
     });
 
     CommandLineOptions play_options = options_;
@@ -4944,8 +5121,7 @@ void MenuApp::launch_gameplay(const std::string& chart_path) {
         restart_audio_thread();
         {
             std::lock_guard<std::mutex> lock(gameplay_hud_mutex_);
-            gameplay_hud_ = {};
-            ++gameplay_hud_.revision;
+            reset_gameplay_hud_state(gameplay_hud_);
         }
         screen_ = Screen::SongSelect;
         apply_runtime_graphics_config();
@@ -4978,8 +5154,7 @@ void MenuApp::launch_gameplay(const std::string& chart_path) {
     apply_runtime_graphics_config();
     {
         std::lock_guard<std::mutex> lock(gameplay_hud_mutex_);
-        gameplay_hud_ = {};
-        ++gameplay_hud_.revision;
+        reset_gameplay_hud_state(gameplay_hud_);
     }
     publish_snapshot();
 }
