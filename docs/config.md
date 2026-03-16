@@ -44,6 +44,10 @@
 - `queue_size` (int)
 - `polling_hz` (int)
   - `1000 | 2000 | 4000 | 8000`
+- `debounce_ms` (double)
+  - 같은 키에서 매우 짧게 튀는 up/down 채터링을 런타임 전에 걸러내는 입력 디바운스 시간
+  - `0..25` 범위로 clamp
+  - 기본값은 `8ms`
 
 ### `judge`
 - `pg`, `gr`, `gd`, `bd` (double, ms)
@@ -53,7 +57,11 @@
   - 기본값은 `500ms`
   - 직접 입력 판정 폭(`bd`)과는 별도로 동작하지만, 내부적으로는 항상 `bd` 이상으로 유지됨
 - `hold_grace` (double, ms)
+  - 롱노트 tail release를 `PG`로 보는 전용 허용창
 - `hold_break` (double, ms)
+  - 롱노트 tail release를 `GR`까지 허용하는 마지막 창
+  - 이 범위를 벗어나면 `BD`
+  - 내부적으로 항상 `hold_grace` 이상으로 유지됨
 - `mask` (double, ms)
 
 ### `speed`

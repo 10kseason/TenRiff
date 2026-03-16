@@ -50,7 +50,7 @@ Put these on the first page so users see latency-critical toggles immediately:
 
 ## Key remap and NKRO test
 - Capture the **next input event** from InputThread to bind keys; never block by polling the render loop.
-- Keep a per-key state machine (UP/DOWN) so duplicate DOWNs while DOWN and UPs while UP are dropped; collapse down→up→down chatter within ~5 ms.
+- Keep a per-key state machine (UP/DOWN) so duplicate DOWNs while DOWN and UPs while UP are dropped; collapse down→up→down chatter within the configured debounce window (default `8 ms`).
 - NKRO test shows current pressed set and highlights ghosting/missing keys in real time using the same input events.
 
 ## Transition into gameplay without lag spikes

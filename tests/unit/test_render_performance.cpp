@@ -115,4 +115,15 @@ TEST_CASE("gameplay motion stops extrapolating after gameplay finishes") {
     CHECK(diagnostics.display_sample == 2406);
 }
 
+TEST_CASE("gameplay note y mapping spans the full field from top to bottom") {
+    const double judge_line = 0.82;
+
+    CHECK(tenriff::render::compute_gameplay_note_y_normalized(1000, 1000, 2200, 180, judge_line) ==
+          doctest::Approx(judge_line));
+    CHECK(tenriff::render::compute_gameplay_note_y_normalized(3200, 1000, 2200, 180, judge_line) ==
+          doctest::Approx(0.0));
+    CHECK(tenriff::render::compute_gameplay_note_y_normalized(820, 1000, 2200, 180, judge_line) ==
+          doctest::Approx(1.0));
+}
+
 }  // namespace

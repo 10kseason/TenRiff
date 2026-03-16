@@ -60,6 +60,7 @@ TEST_CASE("config defaults prefer 44100 Hz audio") {
     CHECK(config.audio_ui.preset == "high");
     CHECK(config.audio_ui.bgm_volume == doctest::Approx(0.75));
     CHECK(config.audio_ui.keysound_volume == doctest::Approx(1.0));
+    CHECK(config.input.debounce_ms == doctest::Approx(8.0));
     CHECK(config.mode.format == "bms");
     CHECK_FALSE(config.mode.enable_osu_charts);
     CHECK(config.mode.song_index_profile == "safe");
@@ -85,6 +86,8 @@ TEST_CASE("config defaults prefer 44100 Hz audio") {
     CHECK(config.gauge.easy.pr == doctest::Approx(-7.50000));
     CHECK(config.judge.bd_ms == doctest::Approx(200.0));
     CHECK(config.judge.indirect_miss_ms == doctest::Approx(500.0));
+    CHECK(config.judge.hold_grace_ms == doctest::Approx(35.0));
+    CHECK(config.judge.hold_break_ms == doctest::Approx(100.0));
     CHECK(config.skin.note_shape == "rect");
     CHECK(config.skin.note_border_enabled);
     CHECK(config.skin.combo_position == doctest::Approx(tenriff::config::kComboPositionDefault));
@@ -113,6 +116,29 @@ TEST_CASE("config save and load preserve indirect miss setting") {
     const auto result = loader.load_profile("profiles/test");
     REQUIRE(result.success());
     CHECK(result.config.judge.indirect_miss_ms == doctest::Approx(640.0));
+}
+
+TEST_CASE("config save and load preserve input debounce setting") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+
+    CurrentPathGuard cwd;
+    std::error_code ec;
+    std::filesystem::current_path(temp.path, ec);
+    REQUIRE_FALSE(static_cast<bool>(ec));
+
+    ConfigLoader loader;
+    auto config = loader.defaults();
+    config.input.debounce_ms = 12.0;
+
+    std::string error;
+    REQUIRE(loader.save_profile("profiles/test", config, &error));
+    CHECK(error.empty());
+
+    const auto result = loader.load_profile("profiles/test");
+    REQUIRE(result.success());
+    CHECK(result.config.input.debounce_ms == doctest::Approx(12.0));
 }
 
 TEST_CASE("audio presets do not override explicit sample rate") {
@@ -634,4 +660,19 @@ TEST_CASE("config normalizes invalid keysound policy to follow") {
 
     REQUIRE(result.success());
     CHECK(result.config.audio_ui.bms_keysound_policy == "follow");
+}
+
+TEST_CASE("runtime migration upgrades legacy hold and debounce defaults") {
+    ConfigLoader loader;
+    auto config = loader.defaults();
+    config.judge.hold_grace_ms = 20.0;
+    config.judge.hold_break_ms = 50.0;
+    config.input.debounce_ms = 5.0;
+
+    const bool changed = tenriff::app::migrate_bms_first_runtime_config(config);
+
+    CHECK(changed);
+    CHECK(config.judge.hold_grace_ms == doctest::Approx(35.0));
+    CHECK(config.judge.hold_break_ms == doctest::Approx(100.0));
+    CHECK(config.input.debounce_ms == doctest::Approx(8.0));
 }

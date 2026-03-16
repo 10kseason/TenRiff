@@ -18,7 +18,8 @@
     "use_qpc": true,
     "grab": false,
     "queue_size": 2048,
-    "polling_hz": 1000
+    "polling_hz": 1000,
+    "debounce_ms": 8.0
   },
   "judge": {
     "pg": 15.5,
@@ -26,8 +27,8 @@
     "gd": 55.0,
     "bd": 200.0,
     "indirect_miss": 500.0,
-    "hold_grace": 20,
-    "hold_break": 50,
+    "hold_grace": 35,
+    "hold_break": 100,
     "mask": 30
   },
   "speed": {
