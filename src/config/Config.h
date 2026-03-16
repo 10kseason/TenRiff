@@ -29,8 +29,8 @@ struct JudgeConfig {
     double pg_ms = 15.5;
     double gr_ms = 31.0;
     double gd_ms = 55.0;
-    double bd_ms = 200.0;
-    double indirect_miss_ms = 500.0;
+    double bd_ms = 80.0;
+    double indirect_miss_ms = 215.0;
     double hold_grace_ms = 35.0;
     double hold_break_ms = 100.0;
     double mask_ms = 30.0;

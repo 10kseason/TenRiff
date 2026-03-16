@@ -34,8 +34,10 @@ bool is_valid_osu_key_mode(std::string_view value) {
            token == "7k" || token == "8k" || token == "9k" || token == "10k" || token == "16k";
 }
 
-constexpr double kLegacyBadWindowMs = 80.0;
-constexpr double kCurrentBadWindowMs = 200.0;
+constexpr double kPreviousBadWindowMs = 200.0;
+constexpr double kCurrentBadWindowMs = 80.0;
+constexpr double kPreviousIndirectMissWindowMs = 500.0;
+constexpr double kCurrentIndirectMissWindowMs = 215.0;
 constexpr double kLegacyHoldGraceMs = 20.0;
 constexpr double kCurrentHoldGraceMs = 35.0;
 constexpr double kLegacyHoldBreakMs = 50.0;
@@ -124,8 +126,12 @@ bool migrate_bms_first_runtime_config(config::RuntimeConfig& config) {
         config.audio_ui.bms_keysound_policy = "follow";
         changed = true;
     }
-    if (std::abs(config.judge.bd_ms - kLegacyBadWindowMs) <= kJudgeWindowToleranceMs) {
+    if (std::abs(config.judge.bd_ms - kPreviousBadWindowMs) <= kJudgeWindowToleranceMs) {
         config.judge.bd_ms = kCurrentBadWindowMs;
+        changed = true;
+    }
+    if (std::abs(config.judge.indirect_miss_ms - kPreviousIndirectMissWindowMs) <= kJudgeWindowToleranceMs) {
+        config.judge.indirect_miss_ms = kCurrentIndirectMissWindowMs;
         changed = true;
     }
     if (std::abs(config.judge.hold_grace_ms - kLegacyHoldGraceMs) <= kJudgeWindowToleranceMs) {
@@ -157,6 +163,11 @@ bool migrate_bms_first_runtime_config(config::RuntimeConfig& config) {
     changed = migrate_gauge_table(config.gauge.easy, kInterimEasyGauge, kCurrentEasyGauge) || changed;
     changed = migrate_gauge_table(config.gauge.normal, kFormerPenaltyNormalGauge, kCurrentNormalGauge) || changed;
     changed = migrate_gauge_table(config.gauge.easy, kFormerPenaltyEasyGauge, kCurrentEasyGauge) || changed;
+    const double clamped_indirect_miss_ms = std::max(config.judge.indirect_miss_ms, config.judge.bd_ms);
+    if (std::abs(clamped_indirect_miss_ms - config.judge.indirect_miss_ms) > kJudgeWindowToleranceMs) {
+        config.judge.indirect_miss_ms = clamped_indirect_miss_ms;
+        changed = true;
+    }
 
     return changed;
 }
