@@ -1,6 +1,6 @@
 # TenRiff
 
-TenRiff는 Windows GUI 기반 BMS-first 리듬게임 런타임/런처 프로젝트입니다. 목표는 실사용 가능한 BMS 플레이 환경을 중심으로, 저지먼트/오디오/입력/렌더링 파이프라인을 직접 제어하는 독립 실행형 리듬게임 클라이언트를 만드는 것입니다. 현재 기준 릴리스 라인은 `0.7.7`이며, MIT 라이선스를 사용합니다.
+TenRiff는 Windows GUI 기반 BMS-first 리듬게임 런타임/런처 프로젝트입니다. 목표는 실사용 가능한 BMS 플레이 환경을 중심으로, 저지먼트/오디오/입력/렌더링 파이프라인을 직접 제어하는 독립 실행형 리듬게임 클라이언트를 만드는 것입니다. 현재 기준 릴리스 라인은 `0.7.7`이며, MIT 라이선스를 사용합니다. 번들된 서드파티 고지는 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)에 정리합니다.
 
 이 README는 "프로젝트를 처음 열었을 때 무엇을 보면 되는지"를 설명하는 입문 문서입니다. 더 자세한 현재 동작, 설정 구조, 설계 문서는 [`docs/README.md`](docs/README.md)부터 이어서 읽는 구조를 기준으로 작성했습니다.
 
@@ -13,6 +13,7 @@ TenRiff는 Windows GUI 기반 BMS-first 리듬게임 런타임/런처 프로젝�
 - 오디오 경로: WASAPI
 - 입력 경로: RawInput 또는 고주사율 polling
 - 라이선스: [MIT](LICENSE)
+- 서드파티 고지: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
 
 ## 지금 가능한 것
 
@@ -25,8 +26,9 @@ TenRiff는 Windows GUI 기반 BMS-first 리듬게임 런타임/런처 프로젝�
   - `#LNOBJ`, LN 채널(`51`-`55`, `61`-`65`) 처리
   - CP932(Shift-JIS) 기반 레거시 BMS 텍스트 대응
 - BMS 오디오 처리
-  - WAV 우선 디코드
-  - Windows Media Foundation OGG/MP3 fallback
+  - WAV 자체 디코드
+  - OGG 자체 Vorbis 디코드(`stb_vorbis`) 우선, 필요 시 Windows Media Foundation fallback
+  - MP3는 Windows Media Foundation fallback
   - 필요 시 `ffmpeg.exe` fallback
   - keysound 모드 `follow / autoplay / ignore`
 - Song Select

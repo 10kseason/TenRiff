@@ -1,6 +1,9 @@
 # TenRiff Agent Notes
 
 ## Completed
+- Difficulty calculation now ports the full local `10k-calc/new_calc.py` flow into C++ instead of a reduced approximation, including layout-specific matrix selection, Qwilight BMS EZ preset handling, and BMS lane-order alignment for scratch layouts such as `5+1 SP`, `7+1 SP`, and `14+2 DP`.
+- Added direct Python-vs-C++ validation for the difficulty port: doctest coverage now calls the local `10k-calc` reference on representative fixtures, and a new `bms_10k_compare_smoke` runner compares random real-world BMS charts against the Python calculator to check rating/level drift on actual song packs.
+- The staged `0.7.7` Windows distribution payload and curated open-source source bundle were refreshed again after the full `10k-calc` port and verification pass, so `Baepoks\TenRiff-0.7.7*` and `opensource-Tenriff-source\TenRiff-0.7.7-source*` now match the latest runtime/source state.
 - Initial CMake project scaffolding with doctest harness.
 - Core BMS parser handling headers, dictionaries, and measure commands with strict/tolerant modes.
 - Configurable channel-to-lane mapping defaulting to the combined 1P+2P 10-key layout.

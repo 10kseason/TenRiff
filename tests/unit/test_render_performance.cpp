@@ -1,5 +1,6 @@
 #include "doctest/doctest.h"
 
+#include "render/GameplayMotion.h"
 #include "render/RenderPacing.h"
 #include "render/RenderThread.h"
 
@@ -73,6 +74,45 @@ TEST_CASE("render pacing advances to the next aligned deadline after overruns") 
     CHECK(tenriff::render::advance_frame_deadline_ns(1'000, 100, 1'050) == 1'100);
     CHECK(tenriff::render::advance_frame_deadline_ns(1'000, 100, 1'299) == 1'300);
     CHECK(tenriff::render::advance_frame_deadline_ns(1'000, 100, 1'300) == 1'400);
+}
+
+TEST_CASE("gameplay motion extrapolates from audio sample time and clamps stale HUD drift") {
+    tenriff::render::GameplayMotionState state;
+    state.current_sample = 1000;
+    state.duration_samples = 5000;
+    state.sample_rate = 1000;
+    state.audio_sample_time_ns = 1'000'000'000LL;
+    state.hud_publish_time_ns = 1'008'000'000LL;
+    state.audio_buffer_frames = 10;
+    state.visual_offset_ms = 5.0;
+
+    const auto diagnostics =
+        tenriff::render::compute_gameplay_motion_diagnostics(state, 1'050'000'000LL);
+
+    CHECK(diagnostics.audio_age_ms == doctest::Approx(50.0));
+    CHECK(diagnostics.hud_delta_ms == doctest::Approx(8.0));
+    CHECK(diagnostics.buffer_ms == doctest::Approx(10.0));
+    CHECK(diagnostics.extrapolation_limit_samples == 24);
+    CHECK(diagnostics.extrapolated_samples == 24);
+    CHECK(diagnostics.extrapolated_ms == doctest::Approx(24.0));
+    CHECK(diagnostics.display_sample == 1029);
+}
+
+TEST_CASE("gameplay motion stops extrapolating after gameplay finishes") {
+    tenriff::render::GameplayMotionState state;
+    state.current_sample = 2400;
+    state.duration_samples = 3000;
+    state.sample_rate = 1000;
+    state.audio_sample_time_ns = 1'000'000'000LL;
+    state.audio_buffer_frames = 12;
+    state.visual_offset_ms = 6.0;
+    state.finished = true;
+
+    const auto diagnostics =
+        tenriff::render::compute_gameplay_motion_diagnostics(state, 1'080'000'000LL);
+
+    CHECK(diagnostics.extrapolated_samples == 0);
+    CHECK(diagnostics.display_sample == 2406);
 }
 
 }  // namespace

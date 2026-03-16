@@ -306,7 +306,8 @@ TEST_CASE("song scan exposes BMS SP layouts with compact lane counts and labels"
     CHECK(index.entries.front().format == "bms");
     CHECK(index.entries.front().key_count == 6);
     CHECK(index.entries.front().layout_label == "5+1 SP");
-    CHECK(index.entries.front().level >= 0);
+    CHECK(index.entries.front().level == 2);
+    CHECK(index.entries.front().rating == doctest::Approx(1.473446353));
 }
 
 TEST_CASE("song scan exposes PMS and 14+2 DP BMS layouts") {
@@ -351,7 +352,8 @@ TEST_CASE("song scan exposes PMS and 14+2 DP BMS layouts") {
     REQUIRE(by_path.count("dpa_layout.bms") == 1u);
     CHECK(by_path.at("dpa_layout.bms").key_count == 16);
     CHECK(by_path.at("dpa_layout.bms").layout_label == "14+2 DP");
-    CHECK(by_path.at("dpa_layout.bms").level == 12);
+    CHECK(by_path.at("dpa_layout.bms").level == 3);
+    CHECK(by_path.at("dpa_layout.bms").rating == doctest::Approx(1.578062082));
 }
 
 TEST_CASE("song scan infers sparse standard SP BMS layouts instead of defaulting to 10K") {

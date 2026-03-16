@@ -2,6 +2,7 @@
 
 #include <optional>
 
+#include "app/GameplayHudRevisions.h"
 #include "app/GameplayHudWindow.h"
 #include "gameplay/GameplayChart.h"
 
@@ -44,4 +45,44 @@ TEST_CASE("negative display offset keeps past notes alive longer in the HUD") {
 
     CHECK(window.past_samples == 354);
     CHECK(window.lookahead_samples == 2224);
+}
+
+TEST_CASE("gameplay hud revisions ignore sample-only updates for text caches") {
+    tenriff::app::GameplayHudRevisionInput previous;
+    previous.current_sample = 1200;
+    previous.audio_sample_time_ns = 10'000'000LL;
+    previous.audio_buffer_frames = 256;
+    previous.note_count = 1;
+    previous.notes[0] = {1, 1300, 1300, false, true};
+
+    auto next = previous;
+    next.current_sample = 1216;
+    next.audio_sample_time_ns = 12'000'000LL;
+
+    const auto diff = tenriff::app::diff_gameplay_hud_revisions(previous, next);
+    CHECK(diff.motion_changed);
+    CHECK_FALSE(diff.text_changed);
+}
+
+TEST_CASE("gameplay hud revisions bump text caches for score and feedback changes") {
+    tenriff::app::GameplayHudRevisionInput previous;
+    previous.combo = 7;
+    previous.max_combo = 19;
+    previous.counts.pg = 5;
+    previous.gauge = 48.0;
+    previous.gauge_type = tenriff::game::GaugeType::Normal;
+    previous.rate = 1.0;
+    previous.hispeed = 3.5;
+    previous.has_feedback = true;
+    previous.feedback = tenriff::game::Judgement::GR;
+
+    auto next = previous;
+    next.combo = 8;
+    next.max_combo = 20;
+    next.counts.pg = 6;
+    next.gauge = 49.5;
+    next.feedback = tenriff::game::Judgement::PG;
+
+    const auto diff = tenriff::app::diff_gameplay_hud_revisions(previous, next);
+    CHECK(diff.text_changed);
 }

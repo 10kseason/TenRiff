@@ -94,12 +94,14 @@ if(WIN32)
     add_library(tenriff_audio
         src/audio/WasapiBackend.cpp
         src/audio/AudioThread.cpp
+        src/audio/OggVorbisDecoder.cpp
         src/input/RawInputHandler.cpp
         src/input/InputThread.cpp
     )
 
     target_include_directories(tenriff_audio
         PUBLIC
+            ${CMAKE_CURRENT_SOURCE_DIR}/external
             ${CMAKE_CURRENT_SOURCE_DIR}/src
     )
 
@@ -164,6 +166,15 @@ if(TENRIFF_ENABLE_TESTS)
     )
     target_link_libraries(bms_realworld_smoke PRIVATE tenriff_core)
 
+    add_executable(bms_10k_compare_smoke
+        tests/smoke/bms_10k_compare_smoke.cpp
+    )
+    target_include_directories(bms_10k_compare_smoke
+        PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/src
+    )
+    target_link_libraries(bms_10k_compare_smoke PRIVATE tenriff_core)
+
     add_executable(bms_parser_tests
         tests/unit/test_bms_parser.cpp
         tests/unit/test_bms_normalizer.cpp
@@ -183,6 +194,8 @@ if(TENRIFF_ENABLE_TESTS)
         tests/unit/test_chart_loader.cpp
         tests/unit/test_chart_audio_streaming.cpp
         tests/unit/test_chart_audio_playback.cpp
+        tests/unit/test_ogg_vorbis_decoder.cpp
+        tests/unit/test_10k_calc_consistency.cpp
         tests/unit/test_osu_difficulty.cpp
         tests/unit/test_song_index.cpp
         tests/unit/test_song_select_state.cpp
