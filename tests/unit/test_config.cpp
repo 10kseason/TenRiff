@@ -66,6 +66,7 @@ TEST_CASE("config defaults prefer 44100 Hz audio") {
     CHECK(config.mode.song_index_profile == "safe");
     CHECK(config.graphics.resolution == "native");
     CHECK(config.graphics.display_mode == "borderless");
+    CHECK_FALSE(config.graphics.vsync);
     CHECK(config.graphics.refresh_hz == 1050);
     CHECK(config.gauge.hard_to_normal_threshold == doctest::Approx(66.0));
     CHECK(config.gauge.normal_to_easy_threshold == doctest::Approx(33.0));
@@ -84,18 +85,22 @@ TEST_CASE("config defaults prefer 44100 Hz audio") {
     CHECK(config.gauge.easy.gd == doctest::Approx(0.01666667));
     CHECK(config.gauge.easy.bd == doctest::Approx(-2.06250));
     CHECK(config.gauge.easy.pr == doctest::Approx(-2.81250));
-    CHECK(config.judge.bd_ms == doctest::Approx(80.0));
-    CHECK(config.judge.indirect_miss_ms == doctest::Approx(215.0));
-    CHECK(config.judge.hold_grace_ms == doctest::Approx(35.0));
-    CHECK(config.judge.hold_break_ms == doctest::Approx(100.0));
+    CHECK(config.judge.bd_ms == doctest::Approx(210.0));
+    CHECK(config.judge.indirect_miss_ms == doctest::Approx(210.0));
+    CHECK(config.judge.hold_grace_ms == doctest::Approx(45.0));
+    CHECK(config.judge.hold_break_ms == doctest::Approx(120.0));
     CHECK(config.skin.note_shape == "rect");
+    CHECK(config.skin.source == "native");
+    CHECK(config.skin.osu_skin_name.empty());
     CHECK(config.skin.note_border_enabled);
     CHECK(config.skin.combo_position == doctest::Approx(tenriff::config::kComboPositionDefault));
+    CHECK(config.skin.note_height_scale == doctest::Approx(1.80));
     CHECK(config.skin.hold_body_width_scale == doctest::Approx(0.60));
+    CHECK(config.ui.result_tail_ms == doctest::Approx(3000.0));
     CHECK(tenriff::config::resolved_skin_lane_colors(config.skin, "16k").size() == 16u);
 }
 
-TEST_CASE("config save and load preserve indirect miss setting") {
+TEST_CASE("config load folds deprecated indirect miss into the bad window") {
     TempDirGuard temp;
     temp.path = make_temp_dir();
     REQUIRE_FALSE(temp.path.empty());
@@ -107,6 +112,7 @@ TEST_CASE("config save and load preserve indirect miss setting") {
 
     ConfigLoader loader;
     auto config = loader.defaults();
+    config.judge.bd_ms = 310.0;
     config.judge.indirect_miss_ms = 640.0;
 
     std::string error;
@@ -115,7 +121,8 @@ TEST_CASE("config save and load preserve indirect miss setting") {
 
     const auto result = loader.load_profile("profiles/test");
     REQUIRE(result.success());
-    CHECK(result.config.judge.indirect_miss_ms == doctest::Approx(640.0));
+    CHECK(result.config.judge.bd_ms == doctest::Approx(310.0));
+    CHECK(result.config.judge.indirect_miss_ms == doctest::Approx(310.0));
 }
 
 TEST_CASE("config save and load preserve input debounce setting") {
@@ -223,6 +230,7 @@ TEST_CASE("config save and load preserve graphics display settings") {
     auto config = loader.defaults();
     config.graphics.display_mode = "windowed";
     config.graphics.resolution = "qhd";
+    config.graphics.vsync = true;
     config.graphics.refresh_hz = 240;
     config.graphics.performance_overlay = true;
 
@@ -234,8 +242,34 @@ TEST_CASE("config save and load preserve graphics display settings") {
     REQUIRE(result.success());
     CHECK(result.config.graphics.display_mode == "windowed");
     CHECK(result.config.graphics.resolution == "qhd");
+    CHECK(result.config.graphics.vsync);
     CHECK(result.config.graphics.refresh_hz == 240);
     CHECK(result.config.graphics.performance_overlay);
+}
+
+TEST_CASE("config save and load preserve osu skin selection") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+
+    CurrentPathGuard cwd;
+    std::error_code ec;
+    std::filesystem::current_path(temp.path, ec);
+    REQUIRE_FALSE(static_cast<bool>(ec));
+
+    ConfigLoader loader;
+    auto config = loader.defaults();
+    config.skin.source = "osu";
+    config.skin.osu_skin_name = "Happy";
+
+    std::string error;
+    REQUIRE(loader.save_profile("profiles/test", config, &error));
+    CHECK(error.empty());
+
+    const auto result = loader.load_profile("profiles/test");
+    REQUIRE(result.success());
+    CHECK(result.config.skin.source == "osu");
+    CHECK(result.config.skin.osu_skin_name == "Happy");
 }
 
 TEST_CASE("config clamps refresh_hz and normalizes invalid resolution preset") {
@@ -510,17 +544,17 @@ TEST_CASE("runtime migration preserves valid enabled osu chart filters") {
     CHECK(config.mode.key_mode == "7k");
 }
 
-TEST_CASE("runtime migration upgrades the previous judge window defaults to bad 80ms and indirect miss 215ms") {
+TEST_CASE("runtime migration upgrades old judge defaults into the current bad-only window") {
     ConfigLoader loader;
     auto config = loader.defaults();
-    config.judge.bd_ms = 200.0;
+    config.judge.bd_ms = 95.0;
     config.judge.indirect_miss_ms = 500.0;
 
     const bool changed = tenriff::app::migrate_bms_first_runtime_config(config);
 
     CHECK(changed);
-    CHECK(config.judge.bd_ms == doctest::Approx(80.0));
-    CHECK(config.judge.indirect_miss_ms == doctest::Approx(215.0));
+    CHECK(config.judge.bd_ms == doctest::Approx(210.0));
+    CHECK(config.judge.indirect_miss_ms == doctest::Approx(210.0));
 }
 
 TEST_CASE("runtime migration upgrades legacy default gauge deltas to the harsher table") {
@@ -692,7 +726,48 @@ TEST_CASE("runtime migration upgrades legacy hold and debounce defaults") {
     const bool changed = tenriff::app::migrate_bms_first_runtime_config(config);
 
     CHECK(changed);
-    CHECK(config.judge.hold_grace_ms == doctest::Approx(35.0));
-    CHECK(config.judge.hold_break_ms == doctest::Approx(100.0));
+    CHECK(config.judge.hold_grace_ms == doctest::Approx(45.0));
+    CHECK(config.judge.hold_break_ms == doctest::Approx(120.0));
     CHECK(config.input.debounce_ms == doctest::Approx(8.0));
+}
+
+TEST_CASE("runtime migration upgrades the old default note height scale to 180 percent") {
+    ConfigLoader loader;
+    auto config = loader.defaults();
+    config.skin.note_height_scale = 1.0;
+    config.skin.note_height_scales["10k"] = 1.0;
+    config.skin.note_height_scales["16k"] = 1.0;
+
+    const bool changed = tenriff::app::migrate_bms_first_runtime_config(config);
+
+    CHECK(changed);
+    CHECK(config.skin.note_height_scale == doctest::Approx(1.80));
+    CHECK(config.skin.note_height_scales["10k"] == doctest::Approx(1.80));
+    CHECK(config.skin.note_height_scales["16k"] == doctest::Approx(1.80));
+}
+
+TEST_CASE("runtime migration upgrades the old result tail default to three seconds") {
+    ConfigLoader loader;
+    auto config = loader.defaults();
+    config.ui.result_tail_ms = 500.0;
+
+    const bool changed = tenriff::app::migrate_bms_first_runtime_config(config);
+
+    CHECK(changed);
+    CHECK(config.ui.result_tail_ms == doctest::Approx(3000.0));
+}
+
+TEST_CASE("runtime migration flips the old default vsync preset to off") {
+    ConfigLoader loader;
+    auto config = loader.defaults();
+    config.graphics.display_mode = "borderless";
+    config.graphics.resolution = "native";
+    config.graphics.vsync = true;
+    config.graphics.refresh_hz = 1050;
+    config.graphics.performance_overlay = false;
+
+    const bool changed = tenriff::app::migrate_bms_first_runtime_config(config);
+
+    CHECK(changed);
+    CHECK_FALSE(config.graphics.vsync);
 }

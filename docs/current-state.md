@@ -4,6 +4,7 @@
 
 ## Baseline
 - 현재 릴리스 라인은 `0.8.0`
+- 후속 작업의 기준선 문서는 `docs/baseline-0.8.0.md`
 - Windows GUI 빌드가 메인 타깃
 - Linux는 `Baepoks-Linuxs/TenRiff-0.5.0-linux-preview` 수준의 preview만 존재
 - 기본 표면은 BMS-first

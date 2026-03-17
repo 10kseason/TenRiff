@@ -1,6 +1,7 @@
 # TenRiff Agent Notes
 
 ## Completed
+- The staged `0.8.0` Windows distribution payload and curated open-source source bundle were refreshed again after the latest judgement-window retune, so `Baepoks\TenRiff-0.8.0*` and `opensource-Tenriff-source\TenRiff-0.8.0-source*` now match the current runtime/source state with `BAD=80ms` and `indirect_miss=215ms`.
 - Large-library song indexing now has two explicit profiles: default `safe` mode keeps RAM low with streaming candidate enumeration, low-memory BMS parse, conservative worker/batch budgets, and periodic heap trimming, while optional `fast` mode raises the work budget for 32GB+ rescans.
 - Real-world safe-profile benchmarking on `D:\Stellaverse (2025-12-14)` now completes `46,636` candidate scans at roughly `453MB` peak working set / `524MB` peak private memory, replacing the earlier multi-GB high-water behavior.
 - The staged `0.8.0` Windows distribution payload and curated open-source source bundle now track the large-library indexing hardening and profile toggle, so `Baepoks\TenRiff-0.8.0*` and `opensource-Tenriff-source\TenRiff-0.8.0-source*` are the active delivery line.

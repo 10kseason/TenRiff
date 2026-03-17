@@ -256,6 +256,7 @@ TEST_CASE("gameplay engine marks unreleased charge hold tails as bad after the t
     config.judge.gr_ms = 20.0;
     config.judge.gd_ms = 30.0;
     config.judge.bd_ms = 40.0;
+    config.judge.hold_grace_ms = 0.0;
     config.judge.hold_break_ms = 40.0;
 
     GameplayEngine engine(chart, config);
@@ -390,7 +391,7 @@ TEST_CASE("gameplay engine finishes as soon as the final judged note is cleared"
     CHECK_FALSE(engine.is_game_over());
 }
 
-TEST_CASE("gameplay engine delays indirect miss until the indirect miss window") {
+TEST_CASE("gameplay engine auto-misses once the bad window is exceeded") {
     GameplayChart chart;
     chart.lane_count = 1;
     chart.duration_samples = 4000;
@@ -403,12 +404,11 @@ TEST_CASE("gameplay engine delays indirect miss until the indirect miss window")
     config.judge.gr_ms = 20.0;
     config.judge.gd_ms = 30.0;
     config.judge.bd_ms = 40.0;
-    config.judge.indirect_miss_ms = 215.0;
 
     GameplayEngine engine(chart, config);
-    engine.advance(1215);
+    engine.advance(1040);
     CHECK(engine.stats().counts.pr == 0);
 
-    engine.advance(1216);
+    engine.advance(1041);
     CHECK(engine.stats().counts.pr == 1);
 }

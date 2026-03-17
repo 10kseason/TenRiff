@@ -70,6 +70,7 @@ add_library(tenriff_core
     src/app/CommandLine.cpp
     src/app/GraphicsTiming.cpp
     src/app/ModeResolver.cpp
+    src/app/OsuSkin.cpp
     src/app/RuntimeConfigMigration.cpp
     src/app/SongIndex.cpp
     src/app/SongIndexerThread.cpp
@@ -133,6 +134,7 @@ if(WIN32)
             tenriff_core
             tenriff_audio
             d3d11
+            d3dcompiler
             dxgi
             d2d1
             dwrite
@@ -209,6 +211,7 @@ if(TENRIFF_ENABLE_TESTS)
         tests/unit/test_song_index.cpp
         tests/unit/test_song_select_state.cpp
         tests/unit/test_config.cpp
+        tests/unit/test_osu_skin.cpp
         tests/unit/test_game_session_hud.cpp
         tests/unit/test_graphics_timing.cpp
         tests/unit/test_render_performance.cpp

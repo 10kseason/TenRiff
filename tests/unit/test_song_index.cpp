@@ -717,6 +717,48 @@ TEST_CASE("song index save reports streaming cache progress") {
     CHECK(std::get<2>(events.back()) == 3);
 }
 
+TEST_CASE("song scan skips oversized metadata charts instead of stalling the batch") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+
+    std::string oversized_chart;
+    oversized_chart.reserve(9u * 1024u * 1024u);
+    oversized_chart.append("#TITLE Oversized\n#ARTIST Composer\n#PLAYLEVEL 12\n");
+    oversized_chart.append(9u * 1024u * 1024u, 'A');
+    write_file(temp.path / "oversized.bms", oversized_chart);
+
+    std::vector<std::string> warnings;
+    SongIndex index = scan_songs(temp.path.u8string(), nullptr, warnings);
+
+    CHECK(index.entries.empty());
+    REQUIRE_FALSE(warnings.empty());
+    CHECK(warnings.front().find("Skipped oversized metadata chart file") != std::string::npos);
+}
+
+TEST_CASE("song index save cancellation removes the partial cache file") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+
+    SongIndex index;
+    index.entries.push_back({"one.bms", "One", "Artist", "bms", "", 10, 10, 1.0, 150.0, 1});
+
+    const auto index_path = temp.path / "song_index.json";
+    std::string error;
+    const bool saved = save_song_index(
+        index_path.u8string(),
+        index,
+        {},
+        &error,
+        {},
+        []() { return true; });
+
+    CHECK_FALSE(saved);
+    CHECK(error == "Song index save canceled.");
+    CHECK_FALSE(std::filesystem::exists(index_path));
+}
+
 TEST_CASE("stale song index version triggers silent rescan instead of using cached entries") {
     TempDirGuard temp;
     temp.path = make_temp_dir();

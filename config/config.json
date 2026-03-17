@@ -25,10 +25,9 @@
     "pg": 15.5,
     "gr": 31.0,
     "gd": 55.0,
-    "bd": 80.0,
-    "indirect_miss": 215.0,
-    "hold_grace": 35,
-    "hold_break": 100,
+    "bd": 210.0,
+    "hold_grace": 45,
+    "hold_break": 120,
     "mask": 30
   },
   "speed": {
@@ -49,7 +48,7 @@
   "graphics": {
     "display_mode": "borderless",
     "resolution": "native",
-    "vsync": true,
+    "vsync": false,
     "refresh_hz": 1050,
     "performance_overlay": false
   },
@@ -63,7 +62,7 @@
     "song_index_profile": "safe"
   },
   "ui": {
-    "result_tail_ms": 500,
+    "result_tail_ms": 3000,
     "require_enter_to_exit": true
   },
   "skin": {
@@ -73,7 +72,7 @@
     "combo_position": 0.24,
     "note_width_scale": 1.0,
     "hold_body_width_scale": 0.6,
-    "note_height_scale": 1.0,
+    "note_height_scale": 1.8,
     "lane_colors": {
       "4k": ["ice", "azure", "azure", "ice"],
       "5k": ["ice", "azure", "gold", "azure", "ice"],

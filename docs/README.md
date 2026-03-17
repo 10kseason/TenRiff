@@ -5,20 +5,24 @@
 ## Recommended Reading Order
 1. `docs/current-state.md`
    - 현재 제품 상태, 핵심 서브시스템, 검증된 명령, 남은 수동 검증 항목
-2. `docs/gameplay-guide.md`
+2. `docs/baseline-0.8.0.md`
+   - 현재 작업을 어디서부터 쌓아야 하는지 정하는 `0.8.0` 기준선 문서
+3. `docs/gameplay-guide.md`
    - 실제 플레이 기준의 시작 방법, 곡 선택, 조작, HUD, 판정, 결과 화면 안내
-3. `docs/config.md`
+4. `docs/config.md`
    - 실제 설정/프로필/키맵 구조
-4. `docs/menu.md`
+5. `docs/menu.md`
    - 메뉴/상태머신/곡 선택 흐름
-5. `docs/core-loop.md`
+6. `docs/core-loop.md`
    - 플레이 루프와 데이터 흐름
-6. `docs/roadmap.md`
+7. `docs/roadmap.md`
    - 중장기 작업 방향
 
 ## Which Docs Are Source Of Truth
 - `docs/current-state.md`
   - 현재 구현 상태의 요약 문서
+- `docs/baseline-0.8.0.md`
+  - 후속 작업이 유지해야 하는 `0.8.0` 기준선 문서
 - `docs/config.md`
   - 실제 `config/config.json`, `profiles/<name>/config.json`, `keymap.json` 기준
 
@@ -32,4 +36,5 @@
 
 ## Practical Rule
 - 현재 동작을 확인할 때는 `docs/current-state.md`를 우선 봅니다.
+- 어떤 기준선 위에서 작업을 쌓는지 정할 때는 `docs/baseline-0.8.0.md`를 같이 봅니다.
 - 오래된 설계와 현재 코드가 다를 수 있으므로, 충돌하면 현재 코드는 `docs/current-state.md`, `docs/config.md` 순으로 해석합니다.
