@@ -15,6 +15,7 @@ struct OsuManiaSkinDefinition {
     std::vector<std::string> hold_tail_images;
     std::vector<std::string> key_images;
     std::vector<std::string> key_pressed_images;
+    std::vector<float> lane_divider_widths;
 };
 
 [[nodiscard]] std::string find_default_osu_skin_test_root();

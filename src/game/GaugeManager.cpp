@@ -92,7 +92,7 @@ double GaugeManager::deltaFor(GaugeType type, Judgement judgement) const noexcep
     case Judgement::BD:
         return table.bd;
     case Judgement::PR:
-        return table.pr;
+        return table.bd;
     }
     return 0.0;
 }

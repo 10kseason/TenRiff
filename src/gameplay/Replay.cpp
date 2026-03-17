@@ -29,7 +29,6 @@ config::JsonValue build_counts_json(const JudgementCounts& counts) {
     obj.emplace("gr", config::JsonValue{static_cast<double>(counts.gr)});
     obj.emplace("gd", config::JsonValue{static_cast<double>(counts.gd)});
     obj.emplace("bd", config::JsonValue{static_cast<double>(counts.bd)});
-    obj.emplace("pr", config::JsonValue{static_cast<double>(counts.pr)});
     return config::JsonValue{std::move(obj)};
 }
 

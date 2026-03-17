@@ -11,7 +11,7 @@ void ResultStats::record_judgement(game::Judgement judgement, double delta_ms, b
         case game::Judgement::GR: ++counts.gr; break;
         case game::Judgement::GD: ++counts.gd; break;
         case game::Judgement::BD: ++counts.bd; break;
-        case game::Judgement::PR: ++counts.pr; break;
+        case game::Judgement::PR: ++counts.bd; break;
     }
 
     if (breaks_combo) {

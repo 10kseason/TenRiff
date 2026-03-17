@@ -104,12 +104,15 @@ void sanitize_skin_config(SkinConfig& skin) {
         skin.note_width_scale, kNoteWidthScaleMin, kNoteWidthScaleMax);
     skin.note_height_scale = std::clamp(
         skin.note_height_scale, kNoteHeightScaleMin, kNoteHeightScaleMax);
+    skin.lane_divider_width_scale = std::clamp(
+        skin.lane_divider_width_scale, kLaneDividerWidthScaleMin, kLaneDividerWidthScaleMax);
     skin.hold_body_width_scale = std::clamp(
         skin.hold_body_width_scale, kHoldBodyWidthScaleMin, kHoldBodyWidthScaleMax);
 
     const auto& supported_modes = supported_skin_mode_tokens();
     std::unordered_map<std::string, double> sanitized_note_width_scales;
     std::unordered_map<std::string, double> sanitized_note_height_scales;
+    std::unordered_map<std::string, double> sanitized_lane_divider_width_scales;
     std::unordered_map<std::string, std::vector<std::string>> sanitized_lane_colors;
     for (const auto& [mode, value] : skin.note_width_scales) {
         const std::string normalized = normalize_skin_mode_token(mode);
@@ -129,11 +132,21 @@ void sanitize_skin_config(SkinConfig& skin) {
         sanitized_note_height_scales[normalized] =
             std::clamp(value, kNoteHeightScaleMin, kNoteHeightScaleMax);
     }
+    for (const auto& [mode, value] : skin.lane_divider_width_scales) {
+        const std::string normalized = normalize_skin_mode_token(mode);
+        if (!std::isfinite(value) ||
+            std::find(supported_modes.begin(), supported_modes.end(), normalized) == supported_modes.end()) {
+            continue;
+        }
+        sanitized_lane_divider_width_scales[normalized] =
+            std::clamp(value, kLaneDividerWidthScaleMin, kLaneDividerWidthScaleMax);
+    }
     for (const auto& mode : supported_modes) {
         sanitized_lane_colors.emplace(mode, resolved_skin_lane_colors(skin, mode));
     }
     skin.note_width_scales = std::move(sanitized_note_width_scales);
     skin.note_height_scales = std::move(sanitized_note_height_scales);
+    skin.lane_divider_width_scales = std::move(sanitized_lane_divider_width_scales);
     skin.lane_colors = std::move(sanitized_lane_colors);
 }
 
@@ -351,21 +364,21 @@ void apply_config_object(const JsonObject& root, RuntimeConfig& config) {
                 config.gauge.hard.gr = get_number(*hard, "GR", config.gauge.hard.gr);
                 config.gauge.hard.gd = get_number(*hard, "GD", config.gauge.hard.gd);
                 config.gauge.hard.bd = get_number(*hard, "BD", config.gauge.hard.bd);
-                config.gauge.hard.pr = get_number(*hard, "PR", config.gauge.hard.pr);
+                config.gauge.hard.pr = config.gauge.hard.bd;
             }
             if (auto* normal = get_object(*delta, "normal")) {
                 config.gauge.normal.pg = get_number(*normal, "PG", config.gauge.normal.pg);
                 config.gauge.normal.gr = get_number(*normal, "GR", config.gauge.normal.gr);
                 config.gauge.normal.gd = get_number(*normal, "GD", config.gauge.normal.gd);
                 config.gauge.normal.bd = get_number(*normal, "BD", config.gauge.normal.bd);
-                config.gauge.normal.pr = get_number(*normal, "PR", config.gauge.normal.pr);
+                config.gauge.normal.pr = config.gauge.normal.bd;
             }
             if (auto* easy = get_object(*delta, "easy")) {
                 config.gauge.easy.pg = get_number(*easy, "PG", config.gauge.easy.pg);
                 config.gauge.easy.gr = get_number(*easy, "GR", config.gauge.easy.gr);
                 config.gauge.easy.gd = get_number(*easy, "GD", config.gauge.easy.gd);
                 config.gauge.easy.bd = get_number(*easy, "BD", config.gauge.easy.bd);
-                config.gauge.easy.pr = get_number(*easy, "PR", config.gauge.easy.pr);
+                config.gauge.easy.pr = config.gauge.easy.bd;
             }
         }
     }
@@ -429,6 +442,9 @@ void apply_config_object(const JsonObject& root, RuntimeConfig& config) {
         config.skin.note_height_scale = std::clamp(
             get_number(*skin, "note_height_scale", config.skin.note_height_scale),
             kNoteHeightScaleMin, kNoteHeightScaleMax);
+        config.skin.lane_divider_width_scale = std::clamp(
+            get_number(*skin, "lane_divider_width_scale", config.skin.lane_divider_width_scale),
+            kLaneDividerWidthScaleMin, kLaneDividerWidthScaleMax);
         config.skin.hold_body_width_scale = std::clamp(
             get_number(*skin, "hold_body_width_scale", config.skin.hold_body_width_scale),
             kHoldBodyWidthScaleMin, kHoldBodyWidthScaleMax);
@@ -448,6 +464,17 @@ void apply_config_object(const JsonObject& root, RuntimeConfig& config) {
                 }
                 config.skin.note_height_scales[normalize_skin_mode_token(mode)] =
                     std::clamp(value.as_number(config.skin.note_height_scale), kNoteHeightScaleMin, kNoteHeightScaleMax);
+            }
+        }
+        if (const auto* lane_divider_width_scales = get_object(*skin, "lane_divider_width_scales")) {
+            for (const auto& [mode, value] : *lane_divider_width_scales) {
+                if (!value.is_number()) {
+                    continue;
+                }
+                config.skin.lane_divider_width_scales[normalize_skin_mode_token(mode)] = std::clamp(
+                    value.as_number(config.skin.lane_divider_width_scale),
+                    kLaneDividerWidthScaleMin,
+                    kLaneDividerWidthScaleMax);
             }
         }
         if (const auto* lane_colors = get_object(*skin, "lane_colors")) {
@@ -562,7 +589,6 @@ JsonValue build_json_root(const RuntimeConfig& config) {
     hard.emplace("GR", JsonValue{config.gauge.hard.gr});
     hard.emplace("GD", JsonValue{config.gauge.hard.gd});
     hard.emplace("BD", JsonValue{config.gauge.hard.bd});
-    hard.emplace("PR", JsonValue{config.gauge.hard.pr});
     delta.emplace("hard", JsonValue{std::move(hard)});
 
     JsonObject normal;
@@ -570,7 +596,6 @@ JsonValue build_json_root(const RuntimeConfig& config) {
     normal.emplace("GR", JsonValue{config.gauge.normal.gr});
     normal.emplace("GD", JsonValue{config.gauge.normal.gd});
     normal.emplace("BD", JsonValue{config.gauge.normal.bd});
-    normal.emplace("PR", JsonValue{config.gauge.normal.pr});
     delta.emplace("normal", JsonValue{std::move(normal)});
 
     JsonObject easy;
@@ -578,7 +603,6 @@ JsonValue build_json_root(const RuntimeConfig& config) {
     easy.emplace("GR", JsonValue{config.gauge.easy.gr});
     easy.emplace("GD", JsonValue{config.gauge.easy.gd});
     easy.emplace("BD", JsonValue{config.gauge.easy.bd});
-    easy.emplace("PR", JsonValue{config.gauge.easy.pr});
     delta.emplace("easy", JsonValue{std::move(easy)});
 
     gauge.emplace("delta", JsonValue{std::move(delta)});
@@ -623,15 +647,19 @@ JsonValue build_json_root(const RuntimeConfig& config) {
     skin.emplace("combo_position", JsonValue{config.skin.combo_position});
     skin.emplace("note_width_scale", JsonValue{config.skin.note_width_scale});
     skin.emplace("note_height_scale", JsonValue{config.skin.note_height_scale});
+    skin.emplace("lane_divider_width_scale", JsonValue{config.skin.lane_divider_width_scale});
     skin.emplace("hold_body_width_scale", JsonValue{config.skin.hold_body_width_scale});
     JsonObject note_width_scales;
     JsonObject note_height_scales;
+    JsonObject lane_divider_width_scales;
     for (const auto& mode : supported_skin_mode_tokens()) {
         note_width_scales.emplace(mode, JsonValue{resolved_skin_note_width_scale(config.skin, mode)});
         note_height_scales.emplace(mode, JsonValue{resolved_skin_note_height_scale(config.skin, mode)});
+        lane_divider_width_scales.emplace(mode, JsonValue{resolved_skin_lane_divider_width_scale(config.skin, mode)});
     }
     skin.emplace("note_width_scales", JsonValue{std::move(note_width_scales)});
     skin.emplace("note_height_scales", JsonValue{std::move(note_height_scales)});
+    skin.emplace("lane_divider_width_scales", JsonValue{std::move(lane_divider_width_scales)});
     JsonObject lane_colors;
     for (const auto& mode : supported_skin_mode_tokens()) {
         JsonArray colors;
@@ -777,6 +805,19 @@ double resolved_skin_note_height_scale(const SkinConfig& skin, std::string_view 
         return resolved;
     }
     return std::clamp(it->second, kNoteHeightScaleMin, kNoteHeightScaleMax);
+}
+
+double resolved_skin_lane_divider_width_scale(const SkinConfig& skin, std::string_view key_mode) {
+    const std::string normalized = normalize_skin_mode_token(key_mode);
+    double resolved = std::clamp(
+        skin.lane_divider_width_scale,
+        kLaneDividerWidthScaleMin,
+        kLaneDividerWidthScaleMax);
+    const auto it = skin.lane_divider_width_scales.find(normalized);
+    if (it == skin.lane_divider_width_scales.end() || !std::isfinite(it->second)) {
+        return resolved;
+    }
+    return std::clamp(it->second, kLaneDividerWidthScaleMin, kLaneDividerWidthScaleMax);
 }
 
 std::vector<std::string> default_skin_lane_colors(std::string_view key_mode) {

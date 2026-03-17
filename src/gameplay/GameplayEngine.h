@@ -49,7 +49,7 @@ struct GameplayConfig {
 
 struct LiveJudgementFeedback {
     bool has_value = false;
-    game::Judgement judgement = game::Judgement::PR;
+    game::Judgement judgement = game::Judgement::BD;
     double delta_ms = 0.0;
     int64_t sample = 0;
 };
@@ -82,7 +82,7 @@ public:
 private:
     void apply_judgement(game::Judgement judgement, double delta_ms, int64_t sample, double weight, bool breaks_combo);
     [[nodiscard]] std::optional<NoteEvent> try_hit_note(LaneState& lane, int64_t input_sample);
-    void apply_poor(int64_t sample);
+    void apply_bad_miss(int64_t sample);
     void update_miss(LaneState& lane, int64_t current_sample);
     void update_hold(LaneState& lane, int64_t current_sample);
     void finalize_if_done(int64_t current_sample);

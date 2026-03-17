@@ -82,6 +82,7 @@ struct SongCardData {
     std::string title;
     std::string artist;
     std::string detail;
+    std::string background_path;
     int level = 0;
     double rating = 0.0;
     int song_index = -1;
@@ -99,6 +100,7 @@ struct SongSelectData {
     bool showing_records = false;
     std::string current_source_name;
     std::string current_source_path;
+    std::string index_profile_label;
     std::string selected_source_name;
     std::string selected_source_path;
     int selected_source_song_count = -1;
@@ -109,6 +111,10 @@ struct SongSelectData {
     std::string selected_song_background_path;
     std::string browser_summary;
     std::string sort_summary;
+    std::string primary_hint;
+    std::string secondary_hint;
+    std::string empty_title;
+    std::string empty_message;
     int list_total_count = 0;
     int list_visible_count = 0;
     int list_window_start = 0;
@@ -218,6 +224,7 @@ struct GameplayHudData {
     double combo_position = 0.24;
     double note_width_scale = 1.0;
     double note_height_scale = 1.8;
+    double lane_divider_width_scale = 1.0;
     double hold_body_width_scale = 0.60;
     bool note_border_enabled = true;
     std::string note_shape = "rect";
@@ -283,6 +290,7 @@ struct SkinPreviewData {
     double combo_position = 0.24;
     double note_width_scale = 1.0;
     double note_height_scale = 1.8;
+    double lane_divider_width_scale = 1.0;
     double hold_body_width_scale = 0.60;
     bool note_border_enabled = true;
     std::string note_shape = "rect";
@@ -294,6 +302,13 @@ struct GenericMenuData {
     std::vector<MenuRowData> rows;
     std::vector<std::string> notes;
     SkinPreviewData skin_preview;
+};
+
+struct HelpOverlayData {
+    bool visible = false;
+    std::string title;
+    std::vector<std::string> lines;
+    std::string footer;
 };
 
 struct PerformanceOverlayData {
@@ -323,6 +338,7 @@ struct MenuRenderData {
     std::string screen_title;
     std::vector<std::string> lines;
     GenericMenuData generic;
+    HelpOverlayData help_overlay;
 
     TitleMenuData title;
     SongSelectData song_select;
@@ -375,6 +391,7 @@ private:
     [[nodiscard]] bool ensure_gameplay_note_sprites(const GameplayHudData& data);
     void invalidate_song_select_preview_cache();
     [[nodiscard]] bool ensure_song_select_preview_bitmap(const SongSelectData& data);
+    void clear_song_card_preview_cache();
     void invalidate_gameplay_static_cache();
     [[nodiscard]] bool ensure_gameplay_static_cache(const GameplayHudData& data);
     [[nodiscard]] bool recreate_targets();
@@ -460,6 +477,9 @@ private:
         double judgement_line_position = 0.82;
         double note_width_scale = 1.0;
         double note_height_scale = 1.8;
+        double lane_divider_width_scale = 1.0;
+        std::size_t lane_divider_width_count = 0;
+        std::array<float, kGameplayHudMaxLanes> lane_divider_widths{};
     };
 
     struct GameplayNoteSpriteCache {
@@ -470,6 +490,8 @@ private:
         std::string osu_skin_root;
         std::string osu_skin_name;
         bool using_osu_skin_assets = false;
+        std::size_t lane_divider_width_count = 0;
+        std::array<float, kGameplayHudMaxLanes> lane_divider_widths{};
         std::array<uint32_t, kGameplayHudMaxLanes> lane_colors{};
     };
 

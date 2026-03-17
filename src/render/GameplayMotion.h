@@ -53,6 +53,12 @@ inline double compute_gameplay_note_y_normalized(int64_t sample,
     return std::clamp(clamped_judgement_line + t * (1.0 - clamped_judgement_line), 0.0, 1.0);
 }
 
+inline bool should_render_gameplay_note(int64_t start_sample, bool head_visible, int64_t display_sample) {
+    // Regular notes should disappear as soon as their head passes the judgement line.
+    // Active-hold synthetic tails keep head_visible=false so their body can stay anchored until release/end.
+    return !head_visible || start_sample >= display_sample;
+}
+
 inline int64_t gameplay_extrapolation_limit_samples(int sample_rate, uint32_t audio_buffer_frames) {
     if (sample_rate <= 0) {
         return 0;

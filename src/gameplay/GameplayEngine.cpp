@@ -70,7 +70,7 @@ std::optional<NoteEvent> GameplayEngine::handle_input(int lane, input::InputStat
         }
         auto hit_note = try_hit_note(lane_state, input_sample);
         if (!hit_note.has_value()) {
-            apply_poor(input_sample);
+            apply_bad_miss(input_sample);
             lane_state.mask_until = input_sample + windows_.mask;
             return std::nullopt;
         }
@@ -150,7 +150,7 @@ std::optional<NoteEvent> GameplayEngine::try_hit_note(LaneState& lane, int64_t i
         int64_t delta_samples = input_sample - note.start_sample;
 
         if (delta_samples > windows_.bd) {
-            apply_poor(note.start_sample);
+            apply_bad_miss(note.start_sample);
             lane.mask_until = note.start_sample + windows_.mask;
             ++lane.next_index;
             continue;
@@ -162,7 +162,7 @@ std::optional<NoteEvent> GameplayEngine::try_hit_note(LaneState& lane, int64_t i
 
         auto judgement = classify_judgement(delta_samples);
         double delta_ms = static_cast<double>(delta_samples) * 1000.0 / static_cast<double>(sample_rate_);
-        bool breaks_combo = (judgement == game::Judgement::BD || judgement == game::Judgement::PR);
+        bool breaks_combo = (judgement == game::Judgement::BD);
 
         double weight = note.end_sample.has_value() ? 0.5 : 1.0;
         apply_judgement(judgement, delta_ms, input_sample, weight, breaks_combo);
@@ -182,8 +182,8 @@ std::optional<NoteEvent> GameplayEngine::try_hit_note(LaneState& lane, int64_t i
     return std::nullopt;
 }
 
-void GameplayEngine::apply_poor(int64_t sample) {
-    apply_judgement(game::Judgement::PR, std::numeric_limits<double>::quiet_NaN(), sample, 1.0, true);
+void GameplayEngine::apply_bad_miss(int64_t sample) {
+    apply_judgement(game::Judgement::BD, std::numeric_limits<double>::quiet_NaN(), sample, 1.0, true);
 }
 
 void GameplayEngine::update_miss(LaneState& lane, int64_t current_sample) {
@@ -192,7 +192,7 @@ void GameplayEngine::update_miss(LaneState& lane, int64_t current_sample) {
         if (current_sample <= note.start_sample + windows_.bd) {
             break;
         }
-        apply_poor(note.start_sample);
+        apply_bad_miss(note.start_sample);
         lane.mask_until = note.start_sample + windows_.mask;
         ++lane.next_index;
     }
@@ -204,7 +204,7 @@ void GameplayEngine::update_hold(LaneState& lane, int64_t current_sample) {
     }
 
     auto& hold = *lane.hold;
-    const int64_t hold_timeout = std::max<int64_t>(windows_.hold_break, windows_.hold_grace);
+    const int64_t hold_timeout = windows_.hold_break;
 
     if (hold.release_active) {
         if (hold.release_required) {
@@ -323,7 +323,7 @@ game::Judgement GameplayEngine::classify_judgement(int64_t delta_samples) const 
     if (abs_delta <= windows_.bd) {
         return game::Judgement::BD;
     }
-    return game::Judgement::PR;
+    return game::Judgement::BD;
 }
 
 game::Judgement GameplayEngine::classify_hold_tail_judgement(int64_t delta_samples) const {

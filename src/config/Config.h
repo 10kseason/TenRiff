@@ -18,6 +18,9 @@ inline constexpr double kNoteWidthScaleMin = 0.50;
 inline constexpr double kNoteWidthScaleMax = 1.40;
 inline constexpr double kNoteHeightScaleMin = 0.50;
 inline constexpr double kNoteHeightScaleMax = 4.00;
+inline constexpr double kLaneDividerWidthScaleMin = 0.00;
+inline constexpr double kLaneDividerWidthScaleMax = 2.00;
+inline constexpr double kLaneDividerWidthScaleDefault = 1.00;
 inline constexpr double kHoldBodyWidthScaleMin = 0.50;
 inline constexpr double kHoldBodyWidthScaleMax = 1.20;
 inline constexpr double kHoldBodyWidthScaleDefault = 0.60;
@@ -28,11 +31,11 @@ inline constexpr double kComboPositionDefault = 0.24;
 struct JudgeConfig {
     double pg_ms = 15.5;
     double gr_ms = 31.0;
-    double gd_ms = 55.0;
-    double bd_ms = 210.0;
-    double indirect_miss_ms = 210.0;
-    double hold_grace_ms = 45.0;
-    double hold_break_ms = 120.0;
+    double gd_ms = 75.0;
+    double bd_ms = 340.0;
+    double indirect_miss_ms = 340.0;
+    double hold_grace_ms = 80.0;
+    double hold_break_ms = 200.0;
     double mask_ms = 30.0;
 };
 
@@ -74,9 +77,11 @@ struct SkinConfig {
     double combo_position = kComboPositionDefault;
     double note_width_scale = 1.0;
     double note_height_scale = 1.8;
+    double lane_divider_width_scale = kLaneDividerWidthScaleDefault;
     double hold_body_width_scale = kHoldBodyWidthScaleDefault;
     std::unordered_map<std::string, double> note_width_scales;
     std::unordered_map<std::string, double> note_height_scales;
+    std::unordered_map<std::string, double> lane_divider_width_scales;
     std::unordered_map<std::string, std::vector<std::string>> lane_colors;
 };
 
@@ -147,6 +152,7 @@ public:
 [[nodiscard]] uint32_t skin_color_rgb(std::string_view token);
 [[nodiscard]] double resolved_skin_note_width_scale(const SkinConfig& skin, std::string_view key_mode);
 [[nodiscard]] double resolved_skin_note_height_scale(const SkinConfig& skin, std::string_view key_mode);
+[[nodiscard]] double resolved_skin_lane_divider_width_scale(const SkinConfig& skin, std::string_view key_mode);
 [[nodiscard]] std::vector<std::string> default_skin_lane_colors(std::string_view key_mode);
 [[nodiscard]] std::vector<std::string> resolved_skin_lane_colors(const SkinConfig& skin, std::string_view key_mode);
 

@@ -52,6 +52,7 @@ constexpr double kVisualOffsetStep = 5.0;
 constexpr double kJudgementLinePositionStep = 0.01;
 constexpr double kComboPositionStep = 0.02;
 constexpr double kNoteSizeScaleStep = 0.05;
+constexpr double kLaneDividerScaleStep = 0.05;
 constexpr double kVolumeMin = 0.0;
 constexpr double kVolumeMax = 1.0;
 constexpr double kVolumeStep = 0.05;
@@ -634,6 +635,13 @@ double& editable_skin_note_height_scale(config::SkinConfig& skin, std::string_vi
     return scale;
 }
 
+double& editable_skin_lane_divider_width_scale(config::SkinConfig& skin, std::string_view key_mode) {
+    const std::string normalized = config::normalize_skin_mode_token(key_mode);
+    auto& scale = skin.lane_divider_width_scales[normalized];
+    scale = config::resolved_skin_lane_divider_width_scale(skin, normalized);
+    return scale;
+}
+
 std::string gauge_label(const std::string& value) {
     if (value == "hard") {
         return "Hard";
@@ -670,7 +678,7 @@ std::string judgement_label(game::Judgement judgement) {
         case game::Judgement::GD: return "G";
         case game::Judgement::BD: return "BAD";
         case game::Judgement::PR:
-        default: return "POOR";
+        default: return "BAD";
     }
 }
 
@@ -1485,7 +1493,7 @@ std::string song_source_display_name(const std::string& raw_path) {
 }
 
 int judged_total(const gameplay::JudgementCounts& counts) {
-    return counts.pg + counts.gr + counts.gd + counts.bd + counts.pr;
+    return counts.pg + counts.gr + counts.gd + counts.bd;
 }
 
 double calculate_accuracy(const gameplay::ResultStats& stats) {
@@ -1505,7 +1513,6 @@ int64_t calculate_score(const gameplay::ResultStats& stats) {
                     static_cast<int64_t>(stats.counts.gr) * 700 +
                     static_cast<int64_t>(stats.counts.gd) * 300;
     score -= static_cast<int64_t>(stats.counts.bd) * 200;
-    score -= static_cast<int64_t>(stats.counts.pr) * 500;
     return std::max<int64_t>(0, score);
 }
 
@@ -1529,7 +1536,7 @@ std::string calculate_rank(const gameplay::ResultStats& stats, bool game_over) {
         return "--";
     }
     const double accuracy = calculate_accuracy(stats);
-    if (accuracy >= 99.0 && stats.counts.pr == 0 && stats.counts.bd == 0) {
+    if (accuracy >= 99.0 && stats.counts.bd == 0) {
         return "SS";
     }
     if (accuracy >= 95.0) {
@@ -1796,7 +1803,8 @@ std::optional<ParsedResultRecord> parse_result_file(const std::filesystem::path&
         out.stats.counts.gr = read_json_int(*counts_obj, "gr", 0);
         out.stats.counts.gd = read_json_int(*counts_obj, "gd", 0);
         out.stats.counts.bd = read_json_int(*counts_obj, "bd", 0);
-        out.stats.counts.pr = read_json_int(*counts_obj, "pr", 0);
+        out.stats.counts.bd += read_json_int(*counts_obj, "pr", 0);
+        out.stats.counts.pr = 0;
     }
     out.stats.max_combo = read_json_int(*stats_obj, "max_combo", 0);
     out.stats.total_notes = read_json_int(*stats_obj, "total_notes", 0);
@@ -2026,6 +2034,7 @@ bool MenuApp::initialize(const CommandLineOptions& options) {
     }
     config_ = config_result.config;
     const bool migrated_config = migrate_bms_first_runtime_config(config_);
+    first_run_profile_ = config_result.used_defaults;
 
     if (config_result.used_defaults || migrated_config) {
         config_loader.save_profile(profile_dir_, config_);
@@ -2045,6 +2054,7 @@ bool MenuApp::initialize(const CommandLineOptions& options) {
     if (keymap_result.used_defaults) {
         keymap_manager.save_profile(profile_dir_, keymap_);
     }
+    first_run_profile_ = first_run_profile_ || keymap_result.used_defaults;
 
     key_up_ = config::KeycodeMap::to_keycode("Up").value_or(0);
     key_down_ = config::KeycodeMap::to_keycode("Down").value_or(0);
@@ -2062,6 +2072,7 @@ bool MenuApp::initialize(const CommandLineOptions& options) {
     key_m_ = config::KeycodeMap::to_keycode("M").value_or(0);
     key_k_ = config::KeycodeMap::to_keycode("K").value_or(0);
     key_r_ = config::KeycodeMap::to_keycode("R").value_or(0);
+    key_f1_ = config::KeycodeMap::to_keycode("F1").value_or(0);
     key_f2_ = config::KeycodeMap::to_keycode("F2").value_or(0);
     key_f5_ = config::KeycodeMap::to_keycode("F5").value_or(0);
 
@@ -2093,6 +2104,10 @@ bool MenuApp::initialize(const CommandLineOptions& options) {
     }
 
     switch_song_source(initial_song_source, false);
+    if (first_run_profile_) {
+        screen_ = Screen::QuickSetup;
+        settings_cursor_ = 0;
+    }
 
     start_menu_threads();
     publish_snapshot();
@@ -2462,7 +2477,23 @@ void MenuApp::handle_input_event(const input::InputEvent& event) {
         return;
     }
 
+    if (screen_ != Screen::Gameplay && key_f1_ != 0 && event.keycode == key_f1_) {
+        help_overlay_visible_ = !help_overlay_visible_;
+        publish_snapshot();
+        return;
+    }
+    if (help_overlay_visible_) {
+        if (event.keycode == key_escape_ || event.keycode == key_backspace_) {
+            help_overlay_visible_ = false;
+            publish_snapshot();
+        }
+        return;
+    }
+
     switch (screen_) {
+        case Screen::QuickSetup:
+            handle_quick_setup_input(event.keycode);
+            break;
         case Screen::Title:
             handle_title_input(event.keycode);
             break;
@@ -2514,6 +2545,11 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
     if (screen_ == Screen::Gameplay) {
         return;
     }
+    if (help_overlay_visible_) {
+        help_overlay_visible_ = false;
+        publish_snapshot();
+        return;
+    }
     if (screen_ == Screen::Keymap && keymap_capture_active_) {
         return;
     }
@@ -2525,6 +2561,39 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
             song_select_focus_ = SongSelectFocus::SongList;
             if (move_song_select_selection(-event.wheel_steps)) {
                 publish_snapshot();
+            }
+        } else if (event.wheel_steps != 0) {
+            const uint32_t direction_key = event.wheel_steps > 0 ? key_up_ : key_down_;
+            const int steps = std::abs(event.wheel_steps);
+            for (int i = 0; i < steps; ++i) {
+                switch (screen_) {
+                    case Screen::QuickSetup:
+                        handle_quick_setup_input(direction_key);
+                        break;
+                    case Screen::OptionsHub:
+                        handle_options_hub_input(direction_key);
+                        break;
+                    case Screen::SongBrowser:
+                        handle_song_browser_input(direction_key);
+                        break;
+                    case Screen::SettingsAudio:
+                        handle_audio_settings_input(direction_key);
+                        break;
+                    case Screen::SettingsGraphics:
+                        handle_graphics_settings_input(direction_key);
+                        break;
+                    case Screen::SettingsSkins:
+                        handle_skins_settings_input(direction_key);
+                        break;
+                    case Screen::SettingsInput:
+                        handle_input_settings_input(direction_key);
+                        break;
+                    case Screen::ModeSelect:
+                        handle_mode_settings_input(direction_key);
+                        break;
+                    default:
+                        break;
+                }
             }
         }
         return;
@@ -2573,6 +2642,10 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
             return;
         }
         switch_song_source(dropped_source.value(), false);
+        if (screen_ == Screen::QuickSetup) {
+            publish_snapshot();
+            return;
+        }
         screen_ = Screen::SongSelect;
         song_select_focus_ = SongSelectFocus::SongList;
         song_select_view_ = SongSelectView::Songs;
@@ -2702,6 +2775,10 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
                                     : (event.part == render::MenuHitPart::Decrement ? key_left_ : key_enter_);
 
     switch (screen_) {
+        case Screen::QuickSetup:
+            settings_cursor_ = clamp_int(event.index, 0, 6);
+            handle_quick_setup_input(action_key);
+            return;
         case Screen::SettingsAudio:
             settings_cursor_ = clamp_int(event.index, 0, 5);
             handle_audio_settings_input(action_key);
@@ -2747,10 +2824,55 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
     }
 }
 
+void MenuApp::open_keymap_screen(Screen return_screen) {
+    submenu_return_screen_ = return_screen;
+    working_keymap_ = keymap_;
+    {
+        config::KeymapManager keymap_manager;
+        keymap_edit_mode_ = keymap_manager.normalize_mode_token(config_.mode.key_mode);
+    }
+    refresh_keymap_lane_list();
+    keymap_cursor_ = 0;
+    keymap_dirty_ = false;
+    keymap_capture_active_ = false;
+    keymap_pending_lane_.clear();
+    keymap_pending_key_.clear();
+    keymap_duplicate_lane_.clear();
+    screen_ = Screen::Keymap;
+}
+
+bool MenuApp::handle_settings_shortcut(uint32_t keycode, Screen return_screen) {
+    auto open_settings = [&](Screen target) {
+        submenu_return_screen_ = return_screen;
+        screen_ = target;
+        settings_cursor_ = 0;
+    };
+
+    if (keycode == key_a_) {
+        open_settings(Screen::SettingsAudio);
+    } else if (keycode == key_g_) {
+        open_settings(Screen::SettingsGraphics);
+    } else if (keycode == key_i_) {
+        open_settings(Screen::SettingsInput);
+    } else if (keycode == key_m_) {
+        open_settings(Screen::ModeSelect);
+    } else if (keycode == key_k_) {
+        open_keymap_screen(return_screen);
+    } else {
+        return false;
+    }
+
+    publish_snapshot();
+    return true;
+}
+
 void MenuApp::handle_title_input(uint32_t keycode) {
     if (keycode == key_f5_) {
         refresh_song_source(true);
         publish_snapshot();
+        return;
+    }
+    if (handle_settings_shortcut(keycode, Screen::Title)) {
         return;
     }
     if (keycode == key_up_) {
@@ -2787,6 +2909,97 @@ void MenuApp::handle_title_input(uint32_t keycode) {
     }
     if (keycode == key_escape_) {
         exit_requested_.store(true, std::memory_order_release);
+    }
+}
+
+void MenuApp::handle_quick_setup_input(uint32_t keycode) {
+    constexpr int item_count = 7;
+    if (keycode == key_up_) {
+        settings_cursor_ = clamp_int(settings_cursor_ - 1, 0, item_count - 1);
+        publish_snapshot();
+        return;
+    }
+    if (keycode == key_down_) {
+        settings_cursor_ = clamp_int(settings_cursor_ + 1, 0, item_count - 1);
+        publish_snapshot();
+        return;
+    }
+
+#ifdef _WIN32
+    if ((keycode == key_enter_ && settings_cursor_ == 0) || keycode == key_f2_) {
+        std::string new_path = browse_for_folder("Select Songs Folder");
+        if (!new_path.empty()) {
+            switch_song_source(new_path, false);
+            publish_snapshot();
+        }
+        return;
+    }
+#endif
+
+    if (keycode == key_left_ || keycode == key_right_) {
+        const int direction = (keycode == key_left_) ? -1 : 1;
+        if (settings_cursor_ == 1) {
+            if (config_.mode.gauge == "normal") {
+                config_.mode.gauge = (direction > 0) ? "hard" : "easy";
+            } else if (config_.mode.gauge == "hard") {
+                config_.mode.gauge = (direction > 0) ? "easy" : "normal";
+            } else {
+                config_.mode.gauge = (direction > 0) ? "normal" : "hard";
+            }
+            persist_runtime_config();
+            publish_snapshot();
+            return;
+        }
+        if (settings_cursor_ == 2) {
+            config_.speed.rate = clamp_step_value(config_.speed.rate + static_cast<double>(direction) * kRateStep,
+                                                  kRateMin, kRateMax, kRateStep);
+            persist_runtime_config();
+            publish_snapshot();
+            return;
+        }
+        if (settings_cursor_ == 3) {
+            config_.visual_offset_ms = clamp_step_value(
+                config_.visual_offset_ms + static_cast<double>(direction) * kVisualOffsetStep,
+                kVisualOffsetMin,
+                kVisualOffsetMax,
+                kVisualOffsetStep);
+            apply_runtime_graphics_config();
+            persist_runtime_config();
+            publish_snapshot();
+            return;
+        }
+        if (settings_cursor_ == 4) {
+            config_.audio_ui.bms_keysound_policy =
+                cycle_bms_keysound_policy(config_.audio_ui.bms_keysound_policy, direction);
+            persist_runtime_config();
+            publish_snapshot();
+            return;
+        }
+    }
+
+    if (keycode == key_enter_) {
+        if (settings_cursor_ == 5) {
+            first_run_profile_ = false;
+            screen_ = Screen::SongSelect;
+            song_select_focus_ = SongSelectFocus::SongList;
+            persist_runtime_config();
+            publish_snapshot();
+            return;
+        }
+        if (settings_cursor_ == 6) {
+            first_run_profile_ = false;
+            screen_ = Screen::Title;
+            persist_runtime_config();
+            publish_snapshot();
+            return;
+        }
+    }
+
+    if (keycode == key_escape_ || keycode == key_backspace_) {
+        first_run_profile_ = false;
+        screen_ = Screen::Title;
+        persist_runtime_config();
+        publish_snapshot();
     }
 }
 
@@ -2836,20 +3049,7 @@ void MenuApp::handle_options_hub_input(uint32_t keycode) {
                 settings_cursor_ = 0;
                 break;
             case 5:
-                submenu_return_screen_ = return_screen;
-                working_keymap_ = keymap_;
-                {
-                    config::KeymapManager keymap_manager;
-                    keymap_edit_mode_ = keymap_manager.normalize_mode_token(config_.mode.key_mode);
-                }
-                refresh_keymap_lane_list();
-                keymap_cursor_ = 0;
-                keymap_dirty_ = false;
-                keymap_capture_active_ = false;
-                keymap_pending_lane_.clear();
-                keymap_pending_key_.clear();
-                keymap_duplicate_lane_.clear();
-                screen_ = Screen::Keymap;
+                open_keymap_screen(return_screen);
                 break;
             default:
                 screen_ = return_screen;
@@ -2876,6 +3076,25 @@ void MenuApp::handle_song_select_input(uint32_t keycode) {
     sync_song_select_state();
     rebuild_current_song_record_indices();
 
+    if (keycode == key_f5_) {
+        refresh_song_source(true);
+        publish_snapshot();
+        return;
+    }
+#ifdef _WIN32
+    if (keycode == key_f2_) {
+        std::string new_path = browse_for_folder("Select Songs Folder");
+        if (!new_path.empty()) {
+            switch_song_source(new_path, false);
+            song_select_view_ = SongSelectView::Songs;
+            publish_snapshot();
+        }
+        return;
+    }
+#endif
+    if (handle_settings_shortcut(keycode, Screen::SongSelect)) {
+        return;
+    }
     if (keycode == key_left_) {
         song_select_focus_ = SongSelectFocus::LeftNav;
         publish_snapshot();
@@ -2989,17 +3208,6 @@ void MenuApp::handle_song_select_input(uint32_t keycode) {
         }
         return;
     }
-#ifdef _WIN32
-    if (keycode == key_f2_) {
-        std::string new_path = browse_for_folder("Select Songs Folder");
-        if (!new_path.empty()) {
-            switch_song_source(new_path, false);
-            song_select_view_ = SongSelectView::Songs;
-            publish_snapshot();
-        }
-        return;
-    }
-#endif
     if (keycode == key_backspace_) {
         if (song_select_view_ == SongSelectView::Records) {
             song_select_view_ = SongSelectView::Songs;
@@ -3309,7 +3517,7 @@ void MenuApp::handle_graphics_settings_input(uint32_t keycode) {
 }
 
 void MenuApp::handle_skins_settings_input(uint32_t keycode) {
-    const int item_count = 14;
+    const int item_count = 15;
     if (keycode == key_up_) {
         settings_cursor_ = clamp_int(settings_cursor_ - 1, 0, item_count - 1);
         publish_snapshot();
@@ -3442,6 +3650,17 @@ void MenuApp::handle_skins_settings_input(uint32_t keycode) {
     }
     if (settings_cursor_ == 10 && (keycode == key_left_ || keycode == key_right_)) {
         const int direction = (keycode == key_left_) ? -1 : 1;
+        auto& lane_divider_width_scale =
+            editable_skin_lane_divider_width_scale(config_.skin, skin_edit_mode_);
+        lane_divider_width_scale = clamp_step_value(
+            lane_divider_width_scale + static_cast<double>(direction) * kLaneDividerScaleStep,
+            config::kLaneDividerWidthScaleMin, config::kLaneDividerWidthScaleMax, kLaneDividerScaleStep);
+        skin_dirty_ = true;
+        publish_snapshot();
+        return;
+    }
+    if (settings_cursor_ == 11 && (keycode == key_left_ || keycode == key_right_)) {
+        const int direction = (keycode == key_left_) ? -1 : 1;
         config_.skin.hold_body_width_scale = clamp_step_value(
             config_.skin.hold_body_width_scale + static_cast<double>(direction) * kNoteSizeScaleStep,
             config::kHoldBodyWidthScaleMin, config::kHoldBodyWidthScaleMax, kNoteSizeScaleStep);
@@ -3449,7 +3668,7 @@ void MenuApp::handle_skins_settings_input(uint32_t keycode) {
         publish_snapshot();
         return;
     }
-    if (settings_cursor_ == 11 && (keycode == key_left_ || keycode == key_right_)) {
+    if (settings_cursor_ == 12 && (keycode == key_left_ || keycode == key_right_)) {
         const int direction = (keycode == key_left_) ? -1 : 1;
         auto& note_height_scale = editable_skin_note_height_scale(config_.skin, skin_edit_mode_);
         note_height_scale = clamp_step_value(
@@ -3459,7 +3678,7 @@ void MenuApp::handle_skins_settings_input(uint32_t keycode) {
         publish_snapshot();
         return;
     }
-    if (settings_cursor_ == 12 && (keycode == key_left_ || keycode == key_right_)) {
+    if (settings_cursor_ == 13 && (keycode == key_left_ || keycode == key_right_)) {
         const int direction = (keycode == key_left_) ? -1 : 1;
         config_.skin.combo_position = clamp_step_value(
             config_.skin.combo_position + static_cast<double>(direction) * kComboPositionStep,
@@ -3902,6 +4121,10 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
         config::resolved_skin_note_height_scale(config_.skin, skin_mode),
         config::kNoteHeightScaleMin,
         config::kNoteHeightScaleMax);
+    target.lane_divider_width_scale = std::clamp(
+        config::resolved_skin_lane_divider_width_scale(config_.skin, skin_mode),
+        config::kLaneDividerWidthScaleMin,
+        config::kLaneDividerWidthScaleMax);
     target.hold_body_width_scale = std::clamp(
         config_.skin.hold_body_width_scale,
         config::kHoldBodyWidthScaleMin,
@@ -3920,10 +4143,8 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
     target.gr = gameplay_hud_.counts.gr;
     target.gd = gameplay_hud_.counts.gd;
     target.bd = gameplay_hud_.counts.bd;
-    target.pr = gameplay_hud_.counts.pr;
     target.total_notes = gameplay_hud_.counts.pg + gameplay_hud_.counts.gr +
-                         gameplay_hud_.counts.gd + gameplay_hud_.counts.bd +
-                         gameplay_hud_.counts.pr;
+                         gameplay_hud_.counts.gd + gameplay_hud_.counts.bd;
     target.gauge = gameplay_hud_.gauge;
     target.gauge_label = gauge_type_label(gameplay_hud_.gauge_type);
     target.has_feedback = gameplay_hud_.has_feedback;
@@ -3960,11 +4181,10 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
                     static_cast<int64_t>(gameplay_hud_.counts.gr) * 700 +
                     static_cast<int64_t>(gameplay_hud_.counts.gd) * 300;
     score -= static_cast<int64_t>(gameplay_hud_.counts.bd) * 200;
-    score -= static_cast<int64_t>(gameplay_hud_.counts.pr) * 500;
     target.score = std::max<int64_t>(0, score);
 
     const int judged_total = gameplay_hud_.counts.pg + gameplay_hud_.counts.gr + gameplay_hud_.counts.gd +
-                             gameplay_hud_.counts.bd + gameplay_hud_.counts.pr;
+                             gameplay_hud_.counts.bd;
     if (judged_total > 0) {
         const double weighted = gameplay_hud_.counts.pg * 1.0 +
                                 gameplay_hud_.counts.gr * 0.80 +
@@ -4033,7 +4253,50 @@ void MenuApp::publish_snapshot() {
     rebuild_current_song_record_indices();
     const LocalPlayRecord* selected_record = current_selected_record();
 
-    if (screen_ == Screen::Title) {
+    if (screen_ == Screen::QuickSetup) {
+        render.kind = render::MenuScreenKind::GenericList;
+        render.generic.heading = "Quick Setup";
+        auto add_row = [&](std::string label,
+                           std::string value,
+                           bool selected,
+                           render::MenuHitTargetKind kind,
+                           int index,
+                           bool activatable,
+                           bool adjustable) {
+            render::MenuRowData row;
+            row.label = std::move(label);
+            row.value = std::move(value);
+            row.selected = selected;
+            row.target_kind = kind;
+            row.row_index = index;
+            row.activatable = activatable;
+            row.adjustable = adjustable;
+            row.decrement_enabled = adjustable;
+            row.increment_enabled = adjustable;
+            render.generic.rows.push_back(std::move(row));
+        };
+
+        add_row("Songs Folder",
+                safe_ui_text(song_source_display_name(songs_path_), "Choose Folder"),
+                settings_cursor_ == 0, render::MenuHitTargetKind::SettingsRow, 0, true, false);
+        add_row("Gauge", gauge_label(config_.mode.gauge), settings_cursor_ == 1,
+                render::MenuHitTargetKind::SettingsRow, 1, false, true);
+        add_row("Rate", format_multiplier(config_.speed.rate), settings_cursor_ == 2,
+                render::MenuHitTargetKind::SettingsRow, 2, false, true);
+        add_row("Display Offset", format_signed_offset_ms(config_.visual_offset_ms), settings_cursor_ == 3,
+                render::MenuHitTargetKind::SettingsRow, 3, false, true);
+        add_row("BMS Keysound", keysound_policy_label(config_.audio_ui.bms_keysound_policy), settings_cursor_ == 4,
+                render::MenuHitTargetKind::SettingsRow, 4, false, true);
+        add_row("Continue to Song Select", "", settings_cursor_ == 5,
+                render::MenuHitTargetKind::SettingsRow, 5, true, false);
+        add_row("Skip to Title", "", settings_cursor_ == 6,
+                render::MenuHitTargetKind::SettingsRow, 6, true, false);
+
+        render.generic.notes.push_back("First launch detected. TenRiff already created a default profile and default keymap.");
+        render.generic.notes.push_back("Recommended start: Gauge Normal, Rate 1.00x, Display Offset 0ms, BMS Keysound Follow.");
+        render.generic.notes.push_back("Songs Folder opens a picker on Enter or F2. You can also drag and drop a folder later.");
+        render.generic.notes.push_back("These values stay editable later from Song Select: A=Audio  G=Graphics  I=Input  M=Mode  K=Keymap.");
+    } else if (screen_ == Screen::Title) {
         render.kind = render::MenuScreenKind::TitleMenu;
         render.title.profile = options_.profile;
         render.title.track = current_track();
@@ -4048,6 +4311,8 @@ void MenuApp::publish_snapshot() {
             "UP / DOWN or mouse to move",
             "ENTER or double-click to open",
             "F5 refreshes the current song source",
+            "A/G/I/M/K jumps straight to Audio, Graphics, Input, Mode, Keymap",
+            "F1 opens the control help overlay",
             "ESC exits from the title menu",
         };
     } else if (screen_ == Screen::SongSelect) {
@@ -4065,11 +4330,24 @@ void MenuApp::publish_snapshot() {
              (current_best.has_value ? current_best.best_score : 0));
         render.song_select.current_source_name = safe_ui_text(song_source_display_name(songs_path_), "Songs");
         render.song_select.current_source_path = safe_ui_text_or_placeholder(songs_path_, "<invalid path>");
+        render.song_select.index_profile_label = song_index_profile_label(config_.mode.song_index_profile);
         render.song_select.browser_summary = browser_summary_label(song_search_query_,
                                                                    song_key_filter_,
                                                                    song_level_min_filter_,
                                                                    song_level_max_filter_);
         render.song_select.sort_summary = song_sort_detail_label(song_sort_mode_);
+        render.song_select.primary_hint =
+            render.song_select.showing_sources
+                ? "UP/DOWN or wheel  MOVE     ENTER / dbl-click  OPEN SOURCE     PGUP/PGDN  PAGE"
+                : (render.song_select.showing_records
+                       ? "UP/DOWN or wheel  MOVE     ENTER / dbl-click  OPEN RESULT     PGUP/PGDN  PAGE"
+                       : "UP/DOWN or wheel  MOVE     ENTER / dbl-click  PLAY     PGUP/PGDN  PAGE");
+        render.song_select.secondary_hint =
+            render.song_select.showing_sources
+                ? "LEFT/RIGHT  NAV FOCUS     BACKSPACE  SONGS     F2  BROWSE     F5  REINDEX     F1  HELP"
+                : (render.song_select.showing_records
+                       ? "LEFT/RIGHT  NAV FOCUS     BACKSPACE  SONGS     ESC  TITLE     F1  HELP"
+                       : "LEFT/RIGHT  NAV FOCUS     BACKSPACE  SOURCES     A/G/I/M/K  SETTINGS     F5  REINDEX     F1  HELP");
 
         const std::string source_detail =
             std::to_string(render.song_select.source_count) + " ROOT" +
@@ -4179,6 +4457,11 @@ void MenuApp::publish_snapshot() {
                         normalize_path_key(path_from_utf8(selected_source)) ==
                         normalize_path_key(path_from_utf8(songs_path_));
             }
+            if (total_sources == 0) {
+                render.song_select.empty_title = "NO SONG SOURCES";
+                render.song_select.empty_message =
+                    "Press F2 to choose a folder, or drag and drop one onto the window.";
+            }
         } else if (render.song_select.showing_records) {
             const int total = static_cast<int>(current_song_record_indices_.size());
             if (total > 0) {
@@ -4208,6 +4491,11 @@ void MenuApp::publish_snapshot() {
                     render.song_select.songs.push_back(std::move(card));
                 }
             }
+            if (total == 0) {
+                render.song_select.empty_title = "NO LOCAL RECORDS";
+                render.song_select.empty_message =
+                    "Play a chart first. Saved results and replays will appear here.";
+            }
         } else {
             const int total = static_cast<int>(visible_song_count());
             if (total > 0) {
@@ -4230,11 +4518,28 @@ void MenuApp::publish_snapshot() {
                     card.title = song_title_for_ui(*entry);
                     card.artist = song_artist_for_ui(*entry);
                     card.detail = safe_ui_text_or_placeholder(song_detail_label(*entry), "<invalid detail>");
+                    card.background_path = song_background_preview_path_for_entry(*entry);
                     card.level = entry->level;
                     card.rating = entry->rating;
                     card.song_index = i;
                     card.selected = (i == selected_song_);
                     render.song_select.songs.push_back(std::move(card));
+                }
+            }
+            if (total == 0) {
+                if (!song_search_query_.empty() || song_key_filter_ > 0 || song_level_min_filter_ > 0 ||
+                    song_level_max_filter_ > 0) {
+                    render.song_select.empty_title = "NO CHARTS MATCH";
+                    render.song_select.empty_message =
+                        "Clear filters in Browse or switch the active source to see more charts.";
+                } else if (render.song_select.indexing) {
+                    render.song_select.empty_title = "BUILDING LIBRARY";
+                    render.song_select.empty_message =
+                        "The current source is still indexing. You can keep browsing while scan progress updates above.";
+                } else {
+                    render.song_select.empty_title = "NO CHARTS INDEXED";
+                    render.song_select.empty_message =
+                        "Press F5 to scan the current source, or use F2 / drag-and-drop to point TenRiff at a songs folder.";
                 }
             }
         }
@@ -4375,7 +4680,7 @@ void MenuApp::publish_snapshot() {
             render.result.great = last_result_.counts.gr;
             render.result.good = last_result_.counts.gd;
             render.result.bad = last_result_.counts.bd;
-            render.result.miss = last_result_.counts.pr;
+            render.result.miss = 0;
             render.result.mean_delta_ms = last_result_.mean_delta_ms;
             render.result.stddev_delta_ms = last_result_.stddev_delta_ms();
             render.result.shift_count = static_cast<int>(last_result_.shifts.size());
@@ -4444,6 +4749,16 @@ void MenuApp::publish_snapshot() {
                                               short_gauge_type_label(shift.from) + "->" +
                                                   short_gauge_type_label(shift.to)});
             }
+            std::stable_sort(render.result.gauge_points.begin(),
+                             render.result.gauge_points.end(),
+                             [](const render::ResultGaugePoint& lhs, const render::ResultGaugePoint& rhs) {
+                                 return lhs.position < rhs.position;
+                             });
+            std::stable_sort(render.result.gauge_shifts.begin(),
+                             render.result.gauge_shifts.end(),
+                             [](const render::ResultShiftMarker& lhs, const render::ResultShiftMarker& rhs) {
+                                 return lhs.position < rhs.position;
+                             });
         }
     } else {
         render.kind = render::MenuScreenKind::GenericList;
@@ -4477,6 +4792,7 @@ void MenuApp::publish_snapshot() {
             add_row("Keymap", "", options_cursor_ == 5, render::MenuHitTargetKind::OptionsItem, 5, true, false);
             add_row("Back", "", options_cursor_ == 6, render::MenuHitTargetKind::OptionsItem, 6, true, false);
             render.generic.notes.push_back("Up/Down to move, Enter to select, Esc to return.");
+            render.generic.notes.push_back("A/G/I/M/K also jumps directly into Audio, Graphics, Input, Mode, and Keymap.");
         } else if (screen_ == Screen::EditStub) {
             render.generic.notes.push_back("Editor is not implemented yet.");
             add_row("Back", "", true, render::MenuHitTargetKind::SettingsRow, 0, true, false);
@@ -4521,6 +4837,8 @@ void MenuApp::publish_snapshot() {
             const auto preview_lane_colors = config::resolved_skin_lane_colors(config_.skin, skin_edit_mode_);
             const double preview_note_width_scale = config::resolved_skin_note_width_scale(config_.skin, skin_edit_mode_);
             const double preview_note_height_scale = config::resolved_skin_note_height_scale(config_.skin, skin_edit_mode_);
+            const double preview_lane_divider_width_scale =
+                config::resolved_skin_lane_divider_width_scale(config_.skin, skin_edit_mode_);
             const std::string active_skin_source = config::normalize_skin_source_token(config_.skin.source);
             const std::string osu_skin_value =
                 available_osu_skin_names_.empty()
@@ -4550,13 +4868,15 @@ void MenuApp::publish_snapshot() {
                     render::MenuHitTargetKind::SettingsRow, 8, false, true);
             add_row("Note Width", format_percent(preview_note_width_scale), settings_cursor_ == 9,
                     render::MenuHitTargetKind::SettingsRow, 9, false, true);
-            add_row("LN Body Width", format_percent(config_.skin.hold_body_width_scale), settings_cursor_ == 10,
+            add_row("Divider Width", format_percent(preview_lane_divider_width_scale), settings_cursor_ == 10,
                     render::MenuHitTargetKind::SettingsRow, 10, false, true);
-            add_row("Note Height", format_percent(preview_note_height_scale), settings_cursor_ == 11,
+            add_row("LN Body Width", format_percent(config_.skin.hold_body_width_scale), settings_cursor_ == 11,
                     render::MenuHitTargetKind::SettingsRow, 11, false, true);
-            add_row("Combo Y", format_percent(config_.skin.combo_position), settings_cursor_ == 12,
+            add_row("Note Height", format_percent(preview_note_height_scale), settings_cursor_ == 12,
                     render::MenuHitTargetKind::SettingsRow, 12, false, true);
-            add_row("Back", "", settings_cursor_ == 13, render::MenuHitTargetKind::SettingsRow, 13, true, false);
+            add_row("Combo Y", format_percent(config_.skin.combo_position), settings_cursor_ == 13,
+                    render::MenuHitTargetKind::SettingsRow, 13, false, true);
+            add_row("Back", "", settings_cursor_ == 14, render::MenuHitTargetKind::SettingsRow, 14, true, false);
 
             render.generic.skin_preview.visible = true;
             render.generic.skin_preview.mode_label = key_mode_label(skin_edit_mode_);
@@ -4568,6 +4888,7 @@ void MenuApp::publish_snapshot() {
             render.generic.skin_preview.combo_position = config_.skin.combo_position;
             render.generic.skin_preview.note_width_scale = preview_note_width_scale;
             render.generic.skin_preview.note_height_scale = preview_note_height_scale;
+            render.generic.skin_preview.lane_divider_width_scale = preview_lane_divider_width_scale;
             render.generic.skin_preview.hold_body_width_scale = config_.skin.hold_body_width_scale;
             render.generic.skin_preview.note_border_enabled = config_.skin.note_border_enabled;
             render.generic.skin_preview.note_shape = config_.skin.note_shape;
@@ -4581,6 +4902,7 @@ void MenuApp::publish_snapshot() {
             render.generic.notes.push_back("OSU Skin scans imported profile skins first, then build/Release/test-skins-osu as a fallback test root.");
             render.generic.notes.push_back("Import OSU Skin opens a folder picker. You can also drag and drop a skin folder onto this screen.");
             render.generic.notes.push_back("Imported osu skins affect gameplay note, LN, and key art. Native rows still drive the preview and fallback skin.");
+            render.generic.notes.push_back("Divider Width scales native lane separators and multiplies osu!mania ColumnLineWidth when the imported skin provides it.");
             render.generic.notes.push_back("Key Mode and Target Lane still edit the native fallback palette and sizing per layout.");
         } else if (screen_ == Screen::SettingsInput) {
             add_row("Polling Hz", std::to_string(config_.input.polling_hz), settings_cursor_ == 0,
@@ -4689,8 +5011,7 @@ void MenuApp::publish_snapshot() {
                 render.generic.notes.push_back("Judgements: PG " + std::to_string(last_result_.counts.pg) +
                                                " GR " + std::to_string(last_result_.counts.gr) +
                                                " G " + std::to_string(last_result_.counts.gd) +
-                                               " BAD " + std::to_string(last_result_.counts.bd) +
-                                               " POOR " + std::to_string(last_result_.counts.pr));
+                                               " BAD " + std::to_string(last_result_.counts.bd));
                 render.generic.notes.push_back("Timing: mean " +
                                                std::to_string(static_cast<int>(last_result_.mean_delta_ms)) +
                                                "ms  stddev " +
@@ -4713,6 +5034,7 @@ void MenuApp::publish_snapshot() {
         }
     }
 
+    populate_help_overlay(render.help_overlay);
     snapshot.render = std::move(render);
     {
         std::lock_guard<std::mutex> lock(snapshot_mutex_);
@@ -5067,7 +5389,7 @@ void MenuApp::reload_chart_best_results() {
         candidate.great = parsed->stats.counts.gr;
         candidate.good = parsed->stats.counts.gd;
         candidate.bad = parsed->stats.counts.bd;
-        candidate.miss = parsed->stats.counts.pr;
+        candidate.miss = 0;
         candidate.created_utc = parsed->created_utc;
         const int candidate_judged = judged_total(parsed->stats.counts);
         const int candidate_clear_priority =
@@ -5092,7 +5414,7 @@ void MenuApp::reload_chart_best_results() {
         record.great = parsed->stats.counts.gr;
         record.good = parsed->stats.counts.gd;
         record.bad = parsed->stats.counts.bd;
-        record.miss = parsed->stats.counts.pr;
+        record.miss = 0;
         record.mean_delta_ms = parsed->stats.mean_delta_ms;
         record.stddev_delta_ms = parsed->stats.stddev_delta_ms();
         const std::size_t record_index = local_play_records_.size();
@@ -5317,8 +5639,12 @@ std::string MenuApp::selected_song_absolute_path() const {
         return {};
     }
 
+    return song_absolute_path(*entry);
+}
+
+std::string MenuApp::song_absolute_path(const SongEntry& entry) const {
     namespace fs = std::filesystem;
-    fs::path candidate = path_from_utf8(entry->path);
+    fs::path candidate = path_from_utf8(entry.path);
     if (!candidate.is_absolute()) {
         fs::path rooted = path_from_utf8(songs_path_) / candidate;
         std::error_code ec;
@@ -5338,14 +5664,8 @@ std::string MenuApp::selected_song_absolute_path() const {
     return candidate.u8string();
 }
 
-std::string MenuApp::selected_song_background_preview_path() {
-    const SongEntry* entry = (selected_song_ >= 0) ? visible_song_entry(static_cast<std::size_t>(selected_song_))
-                                                   : nullptr;
-    if (!entry) {
-        return {};
-    }
-
-    const std::string chart_path = selected_song_absolute_path();
+std::string MenuApp::song_background_preview_path_for_entry(const SongEntry& entry) {
+    const std::string chart_path = song_absolute_path(entry);
     if (chart_path.empty()) {
         return {};
     }
@@ -5394,6 +5714,15 @@ std::string MenuApp::selected_song_background_preview_path() {
         song_background_preview_cache_[cache_key] = resolved_path;
     }
     return resolved_path;
+}
+
+std::string MenuApp::selected_song_background_preview_path() {
+    const SongEntry* entry = (selected_song_ >= 0) ? visible_song_entry(static_cast<std::size_t>(selected_song_))
+                                                   : nullptr;
+    if (!entry) {
+        return {};
+    }
+    return song_background_preview_path_for_entry(*entry);
 }
 
 void MenuApp::launch_selected_song() {
@@ -5594,6 +5923,7 @@ void MenuApp::launch_gameplay(const std::string& chart_path) {
 
 std::string MenuApp::screen_title() const {
     switch (screen_) {
+        case Screen::QuickSetup: return "Quick Setup";
         case Screen::Title: return "Title";
         case Screen::OptionsHub: return "Options";
         case Screen::EditStub: return "Edit";
@@ -5617,6 +5947,150 @@ std::string MenuApp::screen_title() const {
         case Screen::KeymapTest: return "NKRO Test";
         case Screen::Result: return "Result";
         default: return "Menu";
+    }
+}
+
+void MenuApp::populate_help_overlay(render::HelpOverlayData& target) const {
+    target.visible = help_overlay_visible_ && screen_ != Screen::Gameplay;
+    if (!target.visible) {
+        return;
+    }
+
+    switch (screen_) {
+        case Screen::QuickSetup:
+            target.title = "Quick Setup";
+            target.lines = {
+                "TenRiff already created a default profile and default keymap for this first launch.",
+                "Songs Folder opens a picker on Enter or F2. You can also drag and drop a folder later.",
+                "Recommended starting values are Gauge Normal, Rate 1.00x, Display Offset 0ms, and BMS Keysound Follow.",
+                "Left / Right changes the highlighted setting. Continue saves the current values and opens Song Select.",
+            };
+            target.footer = "Esc or Backspace skips to the title screen. Press F1 again to close help.";
+            return;
+        case Screen::Title:
+            target.title = "Title Controls";
+            target.lines = {
+                "Up / Down or the mouse selects PLAY, EDIT, OPTIONS, or EXIT.",
+                "Enter or double-click opens the selected button.",
+                "F5 refreshes the current song source before you enter Song Select.",
+                "A / G / I / M / K jumps straight to Audio, Graphics, Input, Mode, and Keymap.",
+            };
+            target.footer = "Esc exits TenRiff. Press F1 again to close help.";
+            return;
+        case Screen::SongSelect:
+            target.title = "Song Select Controls";
+            target.lines = {
+                "Up / Down or the mouse wheel moves through the current list. PgUp / PgDn jumps by a page.",
+                "Left / Right switches focus between the left navigation rail and the song list.",
+                "Enter selects the focused item. Double-click on a song launches it immediately.",
+                "Backspace jumps to Sources or back to Songs. Esc returns to the title screen.",
+                "F2 chooses a new songs folder. F5 refreshes the active source.",
+                "Safe indexing lowers RAM use for very large libraries. Fast rescans quicker on high-memory PCs.",
+                "A / G / I / M / K opens Audio, Graphics, Input, Mode, and Keymap from Song Select.",
+            };
+            target.footer = "Current source, filter, sort, and indexing profile stay visible on the Song Select screen.";
+            return;
+        case Screen::SongBrowser:
+            target.title = "Browse Help";
+            target.lines = {
+                "Search matches title, artist, and chart path.",
+                "Up / Down or the mouse wheel moves the selection. Long lists now show a scrollbar on the right.",
+                "Type while Search is selected. Backspace deletes one character. Delete clears the whole query.",
+                "Left / Right adjusts key and difficulty filters. Enter activates Clear Filters or Back.",
+            };
+            target.footer = "Esc or Backspace returns to Song Select. Press F1 again to close help.";
+            return;
+        case Screen::SettingsAudio:
+            target.title = "Audio Settings";
+            target.lines = {
+                "Up / Down or the mouse wheel selects a row. Long lists show a scrollbar on the right.",
+                "Left / Right or the +/- buttons changes the current value.",
+                "Follow keeps note keysounds tied to your hits. Autoplay mixes them into background audio instead.",
+                "Esc or Backspace saves the current values and returns.",
+            };
+            target.footer = "A later return to Song Select keeps these values live.";
+            return;
+        case Screen::SettingsGraphics:
+            target.title = "Graphics Settings";
+            target.lines = {
+                "Up / Down or the mouse wheel selects a row. Long lists show a scrollbar on the right.",
+                "Display, Resolution, Refresh Hz, and VSync apply live while you adjust them.",
+                "Display Offset shifts visuals only. Positive values draw notes earlier without moving judgement.",
+                "Esc or Backspace saves and returns.",
+            };
+            target.footer = "Use this screen when notes feel visually early or late on your display.";
+            return;
+        case Screen::SettingsSkins:
+            target.title = "Skin Settings";
+            target.lines = {
+                "Up / Down or the mouse wheel selects a row. Long skin lists now scroll with a right-side scrollbar.",
+                "Skin Source swaps between the native vector skin and imported osu!mania assets.",
+                "Import OSU Skin opens a folder picker. Drag-and-drop also works on this screen.",
+                "The right preview shows the native fallback lane colors and sizing per layout.",
+            };
+            target.footer = "Esc or Backspace saves and returns.";
+            return;
+        case Screen::SettingsInput:
+            target.title = "Input Settings";
+            target.lines = {
+                "Up / Down or the mouse wheel selects a row.",
+                "Polling Hz changes how often keyboard state is sampled.",
+                "Debounce filters switch chatter before gameplay receives duplicate presses.",
+                "Esc or Backspace saves and returns.",
+            };
+            target.footer = "Input changes apply after the input thread restarts when you leave the screen.";
+            return;
+        case Screen::ModeSelect:
+            target.title = "Mode Settings";
+            target.lines = {
+                "Up / Down or the mouse wheel selects a row. Long lists show a scrollbar on the right.",
+                "Gauge, Random, Rate, and Hi-Speed change the play feel for the next song.",
+                "Indexing Safe minimizes RAM for huge libraries. Fast spends more RAM to speed up rescans.",
+                "Chart Filter decides whether Song Select shows BMS, OSU, or both when OSU indexing is enabled.",
+            };
+            target.footer = "Esc or Backspace saves and refreshes the library if needed.";
+            return;
+        case Screen::Keymap:
+            target.title = "Keymap Help";
+            target.lines = {
+                "Up / Down selects a lane. Enter starts key capture for that lane.",
+                "Left / Right on Key Mode switches which 4K-10K or 16K layout you are editing.",
+                "A saves, R resets, F2 opens NKRO Test, and Esc returns.",
+            };
+            target.footer = "Duplicate lane bindings are allowed.";
+            return;
+        case Screen::KeymapTest:
+            target.title = "NKRO Test";
+            target.lines = {
+                "Press multiple keys together to verify rollover and ghosting behavior.",
+                "Highlighted lanes show which mapped keys TenRiff is currently receiving.",
+            };
+            target.footer = "Esc or Backspace returns to Keymap.";
+            return;
+        case Screen::Result:
+            target.title = "Result Screen";
+            target.lines = {
+                "This panel shows the saved score, timing spread, gauge trace, and export file names for the run.",
+                "Enter, Esc, and Backspace all return to Song Select.",
+            };
+            target.footer = "Back and confirm are intentionally mirrored here for faster recovery after each song.";
+            return;
+        case Screen::OptionsHub:
+            target.title = "Options Hub";
+            target.lines = {
+                "Enter opens Audio, Graphics, Skins, Input, Mode, or Keymap.",
+                "A / G / I / M / K jumps directly to the most common settings screens.",
+            };
+            target.footer = "Esc or Backspace returns to the previous screen.";
+            return;
+        default:
+            target.title = "Controls";
+            target.lines = {
+                "Up / Down selects items. Left / Right changes adjustable values.",
+                "Enter confirms the focused action. Esc or Backspace returns.",
+            };
+            target.footer = "Press F1 again to close help.";
+            return;
     }
 }
 

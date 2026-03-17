@@ -36,11 +36,16 @@ bool is_valid_osu_key_mode(std::string_view value) {
 
 constexpr double kLegacyBadWindowMs = 200.0;
 constexpr double kPreviousBadWindowMs = 95.0;
-constexpr double kCurrentBadWindowMs = 210.0;
+constexpr double kPreviousCurrentBadWindowMs = 210.0;
+constexpr double kLegacyGoodWindowMs = 55.0;
+constexpr double kCurrentGoodWindowMs = 75.0;
+constexpr double kCurrentBadWindowMs = 340.0;
 constexpr double kLegacyHoldGraceMs = 20.0;
-constexpr double kCurrentHoldGraceMs = 45.0;
+constexpr double kPreviousCurrentHoldGraceMs = 45.0;
+constexpr double kCurrentHoldGraceMs = 80.0;
 constexpr double kLegacyHoldBreakMs = 50.0;
-constexpr double kCurrentHoldBreakMs = 120.0;
+constexpr double kPreviousCurrentHoldBreakMs = 120.0;
+constexpr double kCurrentHoldBreakMs = 200.0;
 constexpr double kLegacyInputDebounceMs = 5.0;
 constexpr double kCurrentInputDebounceMs = 8.0;
 constexpr double kLegacyResultTailMs = 500.0;
@@ -79,9 +84,9 @@ constexpr GaugeDeltaTable kInterimEasyGauge{0.03514, 0.02342, 0.00589, -5.50000,
 constexpr GaugeDeltaTable kFormerPenaltyNormalGauge{0.05238095, 0.03492063, 0.00873016, -5.50000, -7.50000};
 constexpr GaugeDeltaTable kFormerPenaltyEasyGauge{0.10000000, 0.06666667, 0.01666667, -5.50000, -7.50000};
 
-constexpr GaugeDeltaTable kCurrentHardGauge{0.03666667, 0.02444444, 0.00611111, -5.50000, -7.50000};
-constexpr GaugeDeltaTable kCurrentNormalGauge{0.05238095, 0.03492063, 0.00873016, -2.75000, -3.75000};
-constexpr GaugeDeltaTable kCurrentEasyGauge{0.10000000, 0.06666667, 0.01666667, -2.06250, -2.81250};
+constexpr GaugeDeltaTable kCurrentHardGauge{0.03666667, 0.02444444, 0.00611111, -5.50000, -5.50000};
+constexpr GaugeDeltaTable kCurrentNormalGauge{0.05238095, 0.03492063, 0.00873016, -2.75000, -2.75000};
+constexpr GaugeDeltaTable kCurrentEasyGauge{0.10000000, 0.06666667, 0.01666667, -2.06250, -2.06250};
 
 bool migrate_gauge_delta(double& value, double legacy_value, double current_value) {
     if (std::abs(value - current_value) <= kGaugeDeltaTolerance) {
@@ -141,15 +146,22 @@ bool migrate_bms_first_runtime_config(config::RuntimeConfig& config) {
         changed = true;
     }
     if (std::abs(config.judge.bd_ms - kLegacyBadWindowMs) <= kJudgeWindowToleranceMs ||
-        std::abs(config.judge.bd_ms - kPreviousBadWindowMs) <= kJudgeWindowToleranceMs) {
+        std::abs(config.judge.bd_ms - kPreviousBadWindowMs) <= kJudgeWindowToleranceMs ||
+        std::abs(config.judge.bd_ms - kPreviousCurrentBadWindowMs) <= kJudgeWindowToleranceMs) {
         config.judge.bd_ms = kCurrentBadWindowMs;
         changed = true;
     }
-    if (std::abs(config.judge.hold_grace_ms - kLegacyHoldGraceMs) <= kJudgeWindowToleranceMs) {
+    if (std::abs(config.judge.gd_ms - kLegacyGoodWindowMs) <= kJudgeWindowToleranceMs) {
+        config.judge.gd_ms = kCurrentGoodWindowMs;
+        changed = true;
+    }
+    if (std::abs(config.judge.hold_grace_ms - kLegacyHoldGraceMs) <= kJudgeWindowToleranceMs ||
+        std::abs(config.judge.hold_grace_ms - kPreviousCurrentHoldGraceMs) <= kJudgeWindowToleranceMs) {
         config.judge.hold_grace_ms = kCurrentHoldGraceMs;
         changed = true;
     }
-    if (std::abs(config.judge.hold_break_ms - kLegacyHoldBreakMs) <= kJudgeWindowToleranceMs) {
+    if (std::abs(config.judge.hold_break_ms - kLegacyHoldBreakMs) <= kJudgeWindowToleranceMs ||
+        std::abs(config.judge.hold_break_ms - kPreviousCurrentHoldBreakMs) <= kJudgeWindowToleranceMs) {
         config.judge.hold_break_ms = kCurrentHoldBreakMs;
         changed = true;
     }

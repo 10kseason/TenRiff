@@ -44,6 +44,7 @@ private:
     struct ReplaySummary;
 
     enum class Screen {
+        QuickSetup,
         Title,
         OptionsHub,
         EditStub,
@@ -125,7 +126,7 @@ private:
         double hispeed = 3.0;
 
         bool has_feedback = false;
-        game::Judgement feedback = game::Judgement::PR;
+        game::Judgement feedback = game::Judgement::BD;
         double feedback_delta_ms = 0.0;
         uint64_t motion_revision = 0;
         uint64_t text_revision = 0;
@@ -153,6 +154,7 @@ private:
 
     void handle_input_event(const input::InputEvent& event);
     void handle_menu_click(const render::MenuClickEvent& event);
+    void handle_quick_setup_input(uint32_t keycode);
     void handle_title_input(uint32_t keycode);
     void handle_options_hub_input(uint32_t keycode);
     void handle_edit_stub_input(uint32_t keycode);
@@ -205,8 +207,13 @@ private:
     [[nodiscard]] bool open_selected_record_result();
     [[nodiscard]] const ReplaySummary* replay_summary_for_path(const std::string& path);
     [[nodiscard]] bool move_song_select_selection(int delta);
+    [[nodiscard]] bool handle_settings_shortcut(uint32_t keycode, Screen return_screen);
+    [[nodiscard]] std::string song_absolute_path(const SongEntry& entry) const;
+    [[nodiscard]] std::string song_background_preview_path_for_entry(const SongEntry& entry);
     [[nodiscard]] std::string selected_song_absolute_path() const;
     [[nodiscard]] std::string selected_song_background_preview_path();
+    void open_keymap_screen(Screen return_screen);
+    void populate_help_overlay(render::HelpOverlayData& target) const;
 
     [[nodiscard]] std::string screen_title() const;
     [[nodiscard]] const SongEntry* visible_song_entry(std::size_t visible_index) const;
@@ -310,6 +317,8 @@ private:
     std::string keymap_pending_lane_;
     std::string keymap_pending_key_;
     std::string keymap_duplicate_lane_;
+    bool first_run_profile_ = false;
+    bool help_overlay_visible_ = false;
     std::string available_osu_skin_root_;
     std::vector<std::string> available_osu_skin_names_{};
     std::unordered_map<std::string, std::string> available_osu_skin_roots_by_name_{};
@@ -379,6 +388,7 @@ private:
     uint32_t key_m_ = 0;
     uint32_t key_k_ = 0;
     uint32_t key_r_ = 0;
+    uint32_t key_f1_ = 0;
     uint32_t key_f2_ = 0;
     uint32_t key_f5_ = 0;
 };

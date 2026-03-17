@@ -1,6 +1,7 @@
 #include "app/OsuSkin.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cctype>
 #include <filesystem>
 #include <fstream>
@@ -212,6 +213,67 @@ const ManiaSection* find_exact_section(const std::unordered_map<int, ManiaSectio
     return &it->second;
 }
 
+std::vector<float> parse_number_csv(std::string_view value) {
+    std::vector<float> numbers;
+    std::size_t start = 0;
+    while (start <= value.size()) {
+        const std::size_t comma = value.find(',', start);
+        const std::size_t end = (comma == std::string_view::npos) ? value.size() : comma;
+        const std::string token = trim_copy(value.substr(start, end - start));
+        if (!token.empty()) {
+            try {
+                const float parsed = std::stof(token);
+                if (std::isfinite(parsed)) {
+                    numbers.push_back(std::max(0.0f, parsed));
+                }
+            } catch (...) {
+            }
+        }
+        if (comma == std::string_view::npos) {
+            break;
+        }
+        start = comma + 1;
+    }
+    return numbers;
+}
+
+std::vector<float> resolve_lane_divider_widths(const ManiaSection& section, int keys) {
+    if (keys <= 1) {
+        return {};
+    }
+    const auto it = section.values.find("columnlinewidth");
+    if (it == section.values.end()) {
+        return {};
+    }
+    const std::vector<float> parsed = parse_number_csv(it->second);
+    if (parsed.empty()) {
+        return {};
+    }
+
+    const std::size_t internal_count = static_cast<std::size_t>(keys - 1);
+    std::vector<float> widths(internal_count, 0.0f);
+    if (parsed.size() == 1u) {
+        std::fill(widths.begin(), widths.end(), parsed.front());
+        return widths;
+    }
+    if (parsed.size() == static_cast<std::size_t>(keys + 1)) {
+        for (std::size_t divider = 0; divider < internal_count; ++divider) {
+            widths[divider] = parsed[divider + 1];
+        }
+        return widths;
+    }
+    if (parsed.size() >= internal_count) {
+        for (std::size_t divider = 0; divider < internal_count; ++divider) {
+            widths[divider] = parsed[divider];
+        }
+        return widths;
+    }
+    for (std::size_t divider = 0; divider < parsed.size(); ++divider) {
+        widths[divider] = parsed[divider];
+    }
+    return widths;
+}
+
 std::vector<std::string> fallback_lane_families(int keys) {
     switch (keys) {
         case 4: return {"1", "2", "2", "1"};
@@ -329,8 +391,10 @@ OsuManiaSkinDefinition resolve_osu_mania_skin(std::string_view root_utf8,
     definition.hold_tail_images.resize(lane_count);
     definition.key_images.resize(lane_count);
     definition.key_pressed_images.resize(lane_count);
+    definition.lane_divider_widths.clear();
 
     if (section != nullptr) {
+        definition.lane_divider_widths = resolve_lane_divider_widths(*section, definition.keys);
         for (std::size_t lane = 0; lane < lane_count; ++lane) {
             const std::string lane_suffix = std::to_string(lane);
             const std::string note_image_key = "noteimage" + lane_suffix;

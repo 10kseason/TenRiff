@@ -68,7 +68,7 @@ public:
         double hispeed = 3.0;
 
         bool has_feedback = false;
-        game::Judgement feedback_judgement = game::Judgement::PR;
+        game::Judgement feedback_judgement = game::Judgement::BD;
         double feedback_delta_ms = 0.0;
 
         std::size_t lane_activity_count = 0;
