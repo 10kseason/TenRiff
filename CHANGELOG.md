@@ -2,6 +2,21 @@
 
 TenRiff의 사용자/배포 관점에서 의미 있는 변경만 간단히 기록합니다.
 
+## [0.9.4] - 2026-03-18
+
+### Added
+- `mode.key_mode`에 `none` 옵션을 추가해 차트의 원래 키 수와 패턴 레이아웃을 그대로 따르는 native 경로를 노출
+- `tools/build_with_retry.ps1`와 패키징 재시도 로직으로 Windows Defender/안티바이러스가 `TenRiff.exe`를 잠그는 동안에도 빌드/배포 재시도를 자동화
+
+### Changed
+- Mode Settings에서 BMS-only 상태여도 `Key Mode`를 `none` 포함 전체 런타임 키모드로 바꿀 수 있게 하고, 설정/마이그레이션 기본값도 `10k` 강제 대신 `none` 기반으로 정리
+- 결과 화면 복귀 직후 메뉴 BGM 장치 충돌이 나던 경로를 줄이기 위해 gameplay 세션 종료 시 WASAPI/input 자원을 실제 `shutdown()`까지 수행하도록 조정
+- 메뉴 BGM 재생 실패가 날 때 같은 파일을 프레임마다 다시 열어 경고를 도배하던 동작을 짧은 재시도 쿨다운으로 완화
+
+### Packaged
+- Windows 배포 스테이징과 공개 소스 스테이징을 `0.9.4` 기준으로 새로 생성
+- 공개 소스 zip과 Windows 배포 zip을 `0.9.4` 기준으로 다시 생성
+
 ## [0.9.3] - 2026-03-18
 
 ### Added

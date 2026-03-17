@@ -1,4 +1,4 @@
-TenRiff 0.9.1 open-source source package scope
+TenRiff 0.9.4 open-source source package scope
 
 Included in versioned source bundles:
 - CHANGELOG.md
@@ -6,6 +6,8 @@ Included in versioned source bundles:
 - .gitignore
 - LICENSE
 - README.md
+- README.en.md
+- README.zh-CN.md
 - README_SOURCE_PACKAGE.md
 - THIRD_PARTY_NOTICES.md
 - launch_win.bat

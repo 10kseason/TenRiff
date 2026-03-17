@@ -568,13 +568,13 @@ TEST_CASE("config save and load preserve recent song sources") {
     CHECK(result.config.ui.recent_song_sources[1] == "D:/Songs/PackA");
 }
 
-TEST_CASE("bms-first runtime migration keeps valid keysound modes while forcing bms 10k") {
+TEST_CASE("bms-first runtime migration keeps valid keysound modes while forcing only the bms filter") {
     ConfigLoader loader;
     auto config = loader.defaults();
     config.audio_ui.preset = "basic";
     config.audio_ui.bms_keysound_policy = "autoplay";
     config.mode.format = "osu";
-    config.mode.key_mode = "7k";
+    config.mode.key_mode = "none";
 
     const bool changed = tenriff::app::migrate_bms_first_runtime_config(config);
 
@@ -582,7 +582,7 @@ TEST_CASE("bms-first runtime migration keeps valid keysound modes while forcing 
     CHECK(config.audio_ui.preset == "basic");
     CHECK(config.audio_ui.bms_keysound_policy == "autoplay");
     CHECK(config.mode.format == "bms");
-    CHECK(config.mode.key_mode == "10k");
+    CHECK(config.mode.key_mode == "none");
 }
 
 TEST_CASE("runtime migration preserves valid enabled osu chart filters") {
@@ -598,6 +598,19 @@ TEST_CASE("runtime migration preserves valid enabled osu chart filters") {
     CHECK(config.mode.enable_osu_charts);
     CHECK(config.mode.format == "osu");
     CHECK(config.mode.key_mode == "7k");
+}
+
+TEST_CASE("runtime migration replaces invalid key mode tokens with none") {
+    ConfigLoader loader;
+    auto config = loader.defaults();
+    config.mode.enable_osu_charts = false;
+    config.mode.key_mode = "mystery";
+
+    const bool changed = tenriff::app::migrate_bms_first_runtime_config(config);
+
+    CHECK(changed);
+    CHECK(config.mode.format == "bms");
+    CHECK(config.mode.key_mode == "none");
 }
 
 TEST_CASE("runtime migration upgrades old judge defaults into the current bad-only window") {

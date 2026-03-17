@@ -54,7 +54,7 @@
   },
   "mode": {
     "format": "bms",
-    "key_mode": "10k",
+    "key_mode": "none",
     "gauge": "normal",
     "random": "off",
     "random_seed": 0,

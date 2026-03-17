@@ -103,7 +103,8 @@
   - `bms | osu | auto`
   - `auto`는 실질적으로 `All`
 - `key_mode` (string)
-  - `auto | 4k | 5k | 6k | 7k | 8k | 9k | 10k`
+  - `none | auto | 4k | 5k | 6k | 7k | 8k | 9k | 10k | 16k`
+  - `none`은 차트 원래 키 수를 그대로 사용
 - `gauge` (string)
   - `normal | hard | easy`
 - `random` (string)

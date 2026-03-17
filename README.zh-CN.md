@@ -2,9 +2,9 @@
 
 Language: [한국어](README.md) | [English](README.en.md) | 简体中文
 
-TenRiff 是一个以 BMS-first 为核心的 Windows GUI 节奏游戏运行时 / 启动器项目。它的目标是构建一个可独立运行的节奏游戏客户端，并直接控制判定、音频、输入和渲染管线，以提供可实际游玩的 BMS 环境。当前项目版本为 `0.9.3`，项目整体使用 MIT 许可证。随项目分发的第三方组件说明见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
+TenRiff 是一个以 BMS-first 为核心的 Windows GUI 节奏游戏运行时 / 启动器项目。它的目标是构建一个可独立运行的节奏游戏客户端，并直接控制判定、音频、输入和渲染管线，以提供可实际游玩的 BMS 环境。当前项目版本为 `0.9.4`，项目整体使用 MIT 许可证。随项目分发的第三方组件说明见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
 
-这份 README 是面向首次阅读者的入门文档。关于当前实际行为、当前 `0.9.3` 项目状态、`0.8.0` 基准、配置结构以及设计文档，请继续阅读 [docs/README.md](docs/README.md)。
+这份 README 是面向首次阅读者的入门文档。关于当前实际行为、当前 `0.9.4` 项目状态、`0.8.0` 基准、配置结构以及设计文档，请继续阅读 [docs/README.md](docs/README.md)。
 
 ## 项目概览
 
@@ -100,6 +100,12 @@ Windows 下的典型构建命令：
 cmake -S . -B build-dist -G "Visual Studio 17 2022" -A x64
 cmake --build build-dist --config Release --target tenriff
 cmake --build build-dist --config Release --target bms_parser_tests
+```
+
+如果 Windows Defender 或其他杀毒软件会暂时锁住 `TenRiff.exe`，可以改用下面的重试包装脚本。
+
+```powershell
+.\tools\build_with_retry.ps1 -BuildDir build-dist -Config Release -Targets tenriff,bms_parser_tests
 ```
 
 ### 3. 运行测试

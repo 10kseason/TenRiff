@@ -278,6 +278,32 @@ TEST_CASE("mode manager safely combines key mode, super random, full long notes,
     }
 }
 
+TEST_CASE("mode manager keeps the original lane count when key mode is none") {
+    tenriff::gameplay::GameplayChart chart = make_hold_mix_chart(7);
+
+    tenriff::config::ModeConfig mode;
+    mode.key_mode = "none";
+    mode.random = "off";
+
+    const auto result = tenriff::app::manage_modes(
+        chart,
+        tenriff::app::ChartFormat::Bms,
+        mode,
+        make_judge_config(),
+        1.0,
+        175.0,
+        44100);
+
+    CHECK(result.chart.lane_count == 7);
+    CHECK(result.settings.key_mode == tenriff::gameplay::KeyMode::Auto);
+    REQUIRE(result.chart.notes.size() == chart.notes.size());
+    for (std::size_t i = 0; i < chart.notes.size(); ++i) {
+        CHECK(result.chart.notes[i].lane == chart.notes[i].lane);
+        CHECK(result.chart.notes[i].start_sample == chart.notes[i].start_sample);
+        CHECK(result.chart.notes[i].end_sample == chart.notes[i].end_sample);
+    }
+}
+
 TEST_CASE("mode manager resolves key mode with full short notes and removes redundant no-ln-release") {
     tenriff::gameplay::GameplayChart chart = make_hold_mix_chart(8);
 

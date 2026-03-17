@@ -11,6 +11,7 @@
 using tenriff::config::parse_json;
 using tenriff::gameplay::ReplayEvent;
 using tenriff::gameplay::ReplayFile;
+using tenriff::gameplay::load_replay_json;
 using tenriff::gameplay::ResultFile;
 using tenriff::gameplay::save_replay_json;
 using tenriff::gameplay::save_result_json;
@@ -47,6 +48,10 @@ TEST_CASE("replay export writes JSON with trace events") {
     replay.rate_multiplier = 0.75;
     replay.score_multiplier = 0.75;
     replay.final_score = 1234;
+    replay.mode.key_mode = "6k";
+    replay.mode.random = "super_random";
+    replay.mode.random_seed = 4123;
+    replay.mode.gauge = "easy";
 
     replay.trace.sample_rate = 48000;
     replay.trace.rate = 1.0;
@@ -93,6 +98,14 @@ TEST_CASE("replay export writes JSON with trace events") {
     CHECK(root->find("rate_multiplier")->second.as_number() == doctest::Approx(0.75));
     CHECK(root->find("score_multiplier")->second.as_number() == doctest::Approx(0.75));
     CHECK(root->find("final_score")->second.as_number() == doctest::Approx(1234.0));
+    auto mode_it = root->find("mode");
+    REQUIRE(mode_it != root->end());
+    const auto* mode = mode_it->second.as_object();
+    REQUIRE(mode != nullptr);
+    CHECK(mode->find("key_mode")->second.as_string() == "6k");
+    CHECK(mode->find("random")->second.as_string() == "super_random");
+    CHECK(mode->find("random_seed")->second.as_number() == doctest::Approx(4123.0));
+    CHECK(mode->find("gauge")->second.as_string() == "easy");
 
     auto parsed_replay = tenriff::app::menu_records::parse_replay_file(path, nullptr);
     REQUIRE(parsed_replay.has_value());
@@ -101,6 +114,19 @@ TEST_CASE("replay export writes JSON with trace events") {
     CHECK(parsed_replay->score_multiplier == doctest::Approx(0.75));
     CHECK(parsed_replay->raw_score == 1645);
     CHECK(parsed_replay->final_score == 1234);
+
+    auto loaded_replay = load_replay_json(path.string());
+    REQUIRE(loaded_replay.success());
+    REQUIRE(loaded_replay.replay.has_value());
+    CHECK(loaded_replay.replay->mode.key_mode == "6k");
+    CHECK(loaded_replay.replay->mode.random == "super_random");
+    REQUIRE(loaded_replay.replay->mode.random_seed.has_value());
+    CHECK(loaded_replay.replay->mode.random_seed.value() == 4123);
+    CHECK(loaded_replay.replay->mode.gauge == "easy");
+    CHECK(loaded_replay.replay->trace.events.size() == 2u);
+    CHECK(loaded_replay.replay->trace.events[0].lane == 1);
+    CHECK(loaded_replay.replay->trace.events[0].state == InputState::Pressed);
+    CHECK(loaded_replay.replay->trace.events[1].state == InputState::Released);
 
     std::error_code ec;
     std::filesystem::remove(path, ec);
@@ -222,6 +248,45 @@ TEST_CASE("legacy replay parsing falls back to derived final score") {
     CHECK(parsed->score_multiplier == doctest::Approx(1.0));
     CHECK(parsed->raw_score == 1500);
     CHECK(parsed->final_score == 1500);
+
+    std::error_code ec;
+    std::filesystem::remove(path, ec);
+}
+
+TEST_CASE("legacy replay loading succeeds without embedded mode metadata") {
+    const std::filesystem::path path = "legacy_replay_loader_test.json";
+    write_file(path,
+               "{\n"
+               "  \"chart_path\": \"Songs/test.bms\",\n"
+               "  \"chart_format\": \"bms\",\n"
+               "  \"created_utc\": \"20250101_000000Z\",\n"
+               "  \"sample_rate\": 48000,\n"
+               "  \"rate\": 1.0,\n"
+               "  \"trace\": {\n"
+               "    \"sample_rate\": 48000,\n"
+               "    \"rate\": 1.0,\n"
+               "    \"lane_count\": 4,\n"
+               "    \"duration_samples\": 123456,\n"
+               "    \"events\": [\n"
+               "      {\"sample\": 100, \"lane\": 1, \"state\": \"down\"},\n"
+               "      {\"sample\": 220, \"lane\": 1, \"state\": \"up\"}\n"
+               "    ]\n"
+               "  },\n"
+               "  \"stats\": {\n"
+               "    \"counts\": {\"pg\": 2, \"gr\": 1, \"bd\": 0},\n"
+               "    \"raw_score\": 2700\n"
+               "  }\n"
+               "}\n");
+
+    auto loaded = load_replay_json(path.string());
+    REQUIRE(loaded.success());
+    REQUIRE(loaded.replay.has_value());
+    CHECK(loaded.replay->mode.key_mode.empty());
+    CHECK(loaded.replay->mode.random.empty());
+    CHECK_FALSE(loaded.replay->mode.random_seed.has_value());
+    CHECK(loaded.replay->trace.lane_count == 4);
+    CHECK(loaded.replay->trace.events.size() == 2u);
+    CHECK(loaded.replay->final_score == 2700);
 
     std::error_code ec;
     std::filesystem::remove(path, ec);

@@ -9,7 +9,7 @@
 ```json
 "mode": {
   "format": "auto",
-  "key_mode": "auto",
+  "key_mode": "none",
   "gauge": "normal",
   "random": "off",
   "random_seed": 0,
@@ -19,7 +19,7 @@
 
 ## 모드 의미
 - `format`: `auto | bms | osu`
-- `key_mode`: `auto | 7k | 8k | 10k`
+- `key_mode`: `none | auto | 4k | 5k | 6k | 7k | 8k | 9k | 10k | 16k`
 - `gauge`: `normal | hard | easy`
 - `random`: `off | fr | sr`
 - `random_seed`: 랜덤 고정 시드 (0도 고정 값으로 취급)
@@ -35,9 +35,9 @@
   - 후보 레인이 없을 경우 원래 레인을 유지하며 경고를 기록
 
 ## 키모드 처리
-- `auto`는 차트 레인 수를 그대로 사용
-- `7k/8k/10k`는 레인 수를 맞추되, **감소 시 범위를 벗어난 노트는 드롭**
-- 증가(예: 10k → 7k) 외의 복잡한 레인 매핑은 추후 확장 예정
+- `none`은 차트 레인 수와 기본 패턴 레이아웃을 그대로 사용
+- `auto`는 legacy alias로 남아 있으며 현재는 `none`과 같은 동작
+- `4k..16k`는 N2NC 기반 lane remap으로 키 수를 맞춤
 
 ## 구현 위치
 - 모드 파싱: `src/gameplay/ModeSettings.*`, `src/app/ModeResolver.*`
