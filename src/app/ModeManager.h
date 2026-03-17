@@ -54,6 +54,8 @@ struct ModeManagerResult {
                                              ChartFormat chart_format,
                                              const config::ModeConfig& config,
                                              const config::JudgeConfig& judge,
-                                             double rate);
+                                             double rate,
+                                             double base_bpm = 0.0,
+                                             int sample_rate = 0);
 
 }  // namespace tenriff::app

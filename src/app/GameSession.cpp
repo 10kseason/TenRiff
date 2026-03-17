@@ -1398,7 +1398,13 @@ bool GameSession::initialize(const CommandLineOptions& options) {
     }
 
     const ModeManagerResult mode_result =
-        manage_modes(chart_result.chart, chart_result.format, config_.mode, config_.judge, config_.speed.rate);
+        manage_modes(chart_result.chart,
+                     chart_result.format,
+                     config_.mode,
+                     config_.judge,
+                     config_.speed.rate,
+                     chart_result.base_bpm,
+                     sample_rate_);
     for (const auto& warning : mode_result.warnings) {
         std::cerr << "[warn] " << warning << std::endl;
     }

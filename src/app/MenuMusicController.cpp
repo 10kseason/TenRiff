@@ -88,11 +88,9 @@ void MenuMusicController::play_looping_file(const std::string& path, double gain
         return;
     }
 
-    if (requested_path_ == path) {
+    if (requested_path_ == path && open_) {
         gain_ = clamped_gain;
-        if (open_) {
-            apply_gain_locked();
-        }
+        apply_gain_locked();
         return;
     }
 

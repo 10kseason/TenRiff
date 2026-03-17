@@ -346,7 +346,9 @@ ModeManagerResult manage_modes(const gameplay::GameplayChart& chart,
                                ChartFormat chart_format,
                                const config::ModeConfig& config,
                                const config::JudgeConfig& judge,
-                               double rate) {
+                               double rate,
+                               double base_bpm,
+                               int sample_rate) {
     ModeManagerResult result;
     result.chart = chart;
     result.judge = judge;
@@ -373,7 +375,7 @@ ModeManagerResult manage_modes(const gameplay::GameplayChart& chart,
         }
     }
 
-    const auto applied = gameplay::apply_mode_settings(result.chart, result.settings);
+    const auto applied = gameplay::apply_mode_settings(result.chart, result.settings, {base_bpm, sample_rate});
     result.chart = applied.chart;
     result.warnings.insert(result.warnings.end(), applied.warnings.begin(), applied.warnings.end());
 

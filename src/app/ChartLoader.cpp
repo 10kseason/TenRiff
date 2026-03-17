@@ -482,6 +482,7 @@ ChartLoadResult ChartLoader::load(const std::string& path,
         }
 
         result.chart = gameplay::from_osu_mania(parse_result.chart, sample_rate, rate);
+        result.base_bpm = parse_result.chart.base_bpm;
         const std::string audio_ref = normalize_asset_reference(parse_result.chart.audio_filename);
         auto resolved = resolve_osu_main_audio_path(file_path, parse_result.chart.audio_filename, asset_lookup);
         if (resolved.has_value()) {
@@ -528,6 +529,7 @@ ChartLoadResult ChartLoader::load(const std::string& path,
 
     auto built_chart = build_bms_gameplay_chart(timeline_result.timeline, parse_result.chart, rate);
     result.chart = std::move(built_chart.chart);
+    result.base_bpm = parse_result.chart.base_bpm;
     result.messages.insert(result.messages.end(), built_chart.messages.begin(), built_chart.messages.end());
     const BmsKeysoundPolicy keysound_policy = parse_bms_keysound_policy(bms_keysound_policy);
     std::unordered_map<std::string, std::optional<std::string>> resolved_wav_cache;
