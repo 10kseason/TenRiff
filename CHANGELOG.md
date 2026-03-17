@@ -2,6 +2,31 @@
 
 TenRiff의 사용자/배포 관점에서 의미 있는 변경만 간단히 기록합니다.
 
+## [0.9.3] - 2026-03-18
+
+### Added
+- BMS 실차트 기준 `key_mode` 조합 스모크(`bms_mode_smoke`)와 `N2NC` 비교 스모크를 통해 리팩터 이후 차트 변환/모드 조합 회귀를 더 넓게 검증
+- 비정상 종료 시 `logs/crash-*.log`를 남기는 Windows 크래시 로거를 추가해 추후 사용자 로그 수집/분석 경로를 마련
+
+### Changed
+- `mode.key_mode`의 `N2NC` 포팅 품질을 원본 `krrcream-Toolkit` 흐름에 더 가깝게 맞춰 note delta와 변환 shape 차이를 크게 줄임
+- BMS에서 `key_mode`를 `SR/FR/full_short/full_long/judge` 등 다른 모드와 함께 써도 정렬/overlap이 깨지지 않도록 후처리와 회귀 테스트를 보강
+- CMake, README, 현재 상태 문서, 패키지 스코프를 `0.9.3` 기준으로 정렬하고 공개 소스 번들에 `README.en.md`, `README.zh-CN.md`를 포함하도록 패키징 스크립트를 갱신
+
+### Packaged
+- Windows 배포 스테이징과 공개 소스 스테이징을 `0.9.3` 기준으로 새로 생성
+- 공개 소스 zip과 Windows 배포 zip을 `0.9.3` 기준으로 다시 생성
+
+## [0.9.2] - 2026-03-18
+
+### Added
+- 영문 README(`README.en.md`)와 중국어 README(`README.zh-CN.md`)를 추가하고 루트 README에 언어 링크를 연결
+
+### Changed
+- CMake 프로젝트 버전과 루트/문서 메타데이터를 `0.9.2` 기준으로 정렬
+- `mode.key_mode` 변환과 메뉴 BGM 수정 이후 현재 코드 상태를 반영하도록 현재 상태/README 문구를 갱신
+- `MenuApp::publish_snapshot()`가 Song Select 렌더 데이터를 직접 조립하던 중복 블록 대신 기존 `populate_song_select_render_data(...)` 헬퍼를 다시 사용하도록 정리
+
 ## [0.9.1] - 2026-03-17
 
 ### Changed

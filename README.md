@@ -1,8 +1,10 @@
 # TenRiff
 
-TenRiff는 Windows GUI 기반 BMS-first 리듬게임 런타임/런처 프로젝트입니다. 목표는 실사용 가능한 BMS 플레이 환경을 중심으로, 저지먼트/오디오/입력/렌더링 파이프라인을 직접 제어하는 독립 실행형 리듬게임 클라이언트를 만드는 것입니다. 현재 기준 공개 릴리스 라인은 `0.9.1`이며, MIT 라이선스를 사용합니다. 번들된 서드파티 고지는 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)에 정리합니다.
+Language: Korean | [English](README.en.md) | [简体中文](README.zh-CN.md)
 
-이 README는 "프로젝트를 처음 열었을 때 무엇을 보면 되는지"를 설명하는 입문 문서입니다. 더 자세한 현재 동작, 현재 `0.9.1` 릴리스 상태, `0.8.0` 기준선, 설정 구조, 설계 문서는 [`docs/README.md`](docs/README.md)부터 이어서 읽는 구조를 기준으로 작성했습니다.
+TenRiff는 Windows GUI 기반 BMS-first 리듬게임 런타임/런처 프로젝트입니다. 목표는 실사용 가능한 BMS 플레이 환경을 중심으로, 저지먼트/오디오/입력/렌더링 파이프라인을 직접 제어하는 독립 실행형 리듬게임 클라이언트를 만드는 것입니다. 현재 프로젝트 버전은 `0.9.3`이며, MIT 라이선스를 사용합니다. 번들된 서드파티 고지는 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)에 정리합니다.
+
+이 README는 "프로젝트를 처음 열었을 때 무엇을 보면 되는지"를 설명하는 입문 문서입니다. 더 자세한 현재 동작, 현재 `0.9.3` 프로젝트 상태, `0.8.0` 기준선, 설정 구조, 설계 문서는 [`docs/README.md`](docs/README.md)부터 이어서 읽는 구조를 기준으로 작성했습니다.
 
 ## 프로젝트 한눈에 보기
 
@@ -15,6 +17,17 @@ TenRiff는 Windows GUI 기반 BMS-first 리듬게임 런타임/런처 프로젝�
 - 라이선스: [MIT](LICENSE)
 - 서드파티 고지: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
 - 릴리스 변경 이력: [CHANGELOG.md](CHANGELOG.md)
+
+## Credits / Attribution
+
+TenRiff의 현재 키모드 컨버터 구현은 `krrcream-Toolkit`의 N2NC 아이디어와 코드를 바탕으로 한 적응/포팅을 포함합니다.
+
+- 원본 프로젝트: <https://github.com/krrcream/krrcream-Toolkit>
+- 반영 범위: `Tools/N2NC/N2NC.cs` 기반 키모드 변환 로직을 TenRiff의 C++ `GameplayChart` 구조로 이식
+- 현재 TenRiff 구현 위치: `src/gameplay/KeyModeConverter.*`
+- 라이선스/출처 고지: [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)
+
+가능한 한 원저작자 `krrcream`과 원본 툴킷에 대한 출처를 유지하며, TenRiff 쪽 변경/통합 내용은 별도로 명시합니다.
 
 ## 지금 가능한 것
 
@@ -119,6 +132,8 @@ TenRiff는 전역 설정과 프로필 설정을 분리합니다.
 - 곡 인덱스 캐시: `profiles/<name>/.tenriff/song-index/<source-hash>.json`
 - replay export: `profiles/<name>/replays/*.json`
 - result export: `profiles/<name>/results/*.json`
+- 런타임 로그: `logs/run.log`
+- 크래시 로그: `logs/crash-*.log`
 
 설정 구조를 자세히 보려면 [`docs/config.md`](docs/config.md)를 읽는 것이 가장 빠릅니다.
 

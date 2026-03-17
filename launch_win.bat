@@ -90,5 +90,5 @@ if "%ERR_CODE%"=="10" echo [E] Audio initialization failed. Check device access 
 if "%ERR_CODE%"=="11" echo [E] Missing runtime resources. Check config, profiles, and songs paths.
 if "%ERR_CODE%"=="12" echo [E] Fatal BMS parse error. Check the log file.
 if "%ERR_CODE%"=="13" echo [E] Renderer initialization failed. Check the GPU driver or environment.
-if %ERR_CODE% GEQ 14 echo [E] Unknown error code %ERR_CODE%. Attach logs\run.log for debugging.
+if %ERR_CODE% GEQ 14 echo [E] Unknown error code %ERR_CODE%. Attach logs\run.log and logs\crash-*.log for debugging.
 goto :eof

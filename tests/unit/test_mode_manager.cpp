@@ -1,3 +1,6 @@
+#include <algorithm>
+#include <limits>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -8,11 +11,72 @@
 
 namespace {
 
+struct Span {
+    int lane = 0;
+    int64_t start = 0;
+    int64_t end = 0;
+};
+
 bool contains_warning(const std::vector<std::string>& warnings, std::string_view needle) {
     for (const auto& warning : warnings) {
         if (warning.find(needle) != std::string::npos) {
             return true;
         }
+    }
+    return false;
+}
+
+bool contains_token(const std::vector<std::string>& tokens, std::string_view needle) {
+    return std::find(tokens.begin(), tokens.end(), std::string(needle)) != tokens.end();
+}
+
+void append_note(tenriff::gameplay::GameplayChart& chart,
+                 int lane,
+                 int64_t start_sample,
+                 std::optional<int64_t> end_sample = std::nullopt,
+                 bool release_required = false) {
+    tenriff::gameplay::NoteEvent note;
+    note.lane = lane;
+    note.start_sample = start_sample;
+    note.end_sample = end_sample;
+    note.release_required = release_required;
+    chart.notes.push_back(note);
+    chart.duration_samples = std::max(chart.duration_samples, note.end_sample.value_or(note.start_sample));
+}
+
+bool has_lane_overlap(const tenriff::gameplay::GameplayChart& chart) {
+    const int lane_count = chart.lane_count;
+    if (lane_count <= 0) {
+        return false;
+    }
+
+    std::vector<Span> spans;
+    spans.reserve(chart.notes.size());
+    for (const auto& note : chart.notes) {
+        int64_t end = note.end_sample.value_or(note.start_sample);
+        if (end < note.start_sample) {
+            end = note.start_sample;
+        }
+        spans.push_back({note.lane, note.start_sample, end});
+    }
+
+    std::sort(spans.begin(), spans.end(), [](const Span& lhs, const Span& rhs) {
+        if (lhs.start == rhs.start) {
+            return lhs.end < rhs.end;
+        }
+        return lhs.start < rhs.start;
+    });
+
+    std::vector<int64_t> lane_end(static_cast<std::size_t>(lane_count), std::numeric_limits<int64_t>::min());
+    for (const auto& span : spans) {
+        if (span.lane <= 0 || span.lane > lane_count) {
+            continue;
+        }
+        const auto index = static_cast<std::size_t>(span.lane - 1);
+        if (span.start <= lane_end[index]) {
+            return true;
+        }
+        lane_end[index] = std::max(lane_end[index], span.end);
     }
     return false;
 }
@@ -27,6 +91,35 @@ tenriff::config::JudgeConfig make_judge_config() {
     judge.hold_break_ms = 40.0;
     judge.mask_ms = 30.0;
     return judge;
+}
+
+tenriff::gameplay::GameplayChart make_dense_tap_chart(int lane_count) {
+    tenriff::gameplay::GameplayChart chart;
+    chart.lane_count = lane_count;
+    chart.duration_samples = 1400;
+
+    for (int lane = 1; lane <= lane_count; ++lane) {
+        append_note(chart, lane, 100);
+        append_note(chart, lane, 520 + lane * 7);
+        append_note(chart, lane, 980 + lane * 5);
+    }
+
+    return chart;
+}
+
+tenriff::gameplay::GameplayChart make_hold_mix_chart(int lane_count) {
+    tenriff::gameplay::GameplayChart chart;
+    chart.lane_count = lane_count;
+    chart.duration_samples = 1200;
+
+    append_note(chart, 1, 100, 260, true);
+    append_note(chart, std::max(2, lane_count / 2), 140);
+    append_note(chart, std::max(2, lane_count / 2), 420, 620, true);
+    append_note(chart, lane_count, 680);
+    append_note(chart, std::max(1, lane_count - 1), 760, 1040, false);
+    append_note(chart, 2, 930);
+
+    return chart;
 }
 
 }  // namespace
@@ -148,4 +241,204 @@ TEST_CASE("mode manager scales judge windows without touching the mask window") 
     CHECK(hard.judge.hold_grace_ms == doctest::Approx(17.0));
     CHECK(hard.judge.hold_break_ms == doctest::Approx(34.0));
     CHECK(hard.judge.mask_ms == doctest::Approx(30.0));
+}
+
+TEST_CASE("mode manager safely combines key mode, super random, full long notes, and judge hard") {
+    tenriff::gameplay::GameplayChart chart = make_dense_tap_chart(8);
+
+    tenriff::config::ModeConfig mode;
+    mode.key_mode = "4k";
+    mode.random = "super_random";
+    mode.random_seed = 2024;
+    mode.mods = {"full_long_notes", "judge_hard"};
+
+    const auto result = tenriff::app::manage_modes(
+        chart,
+        tenriff::app::ChartFormat::Bms,
+        mode,
+        make_judge_config(),
+        1.0,
+        180.0,
+        44100);
+
+    CHECK(result.chart.lane_count == 4);
+    CHECK_FALSE(result.chart.notes.empty());
+    CHECK_FALSE(has_lane_overlap(result.chart));
+    CHECK(contains_token(result.active_mods, "full_long_notes"));
+    CHECK(contains_token(result.active_mods, "judge_hard"));
+    CHECK(result.judge_window_scale == doctest::Approx(0.85));
+    CHECK(result.judge.pg_ms == doctest::Approx(8.5));
+
+    for (const auto& note : result.chart.notes) {
+        CHECK(note.lane >= 1);
+        CHECK(note.lane <= 4);
+        REQUIRE(note.end_sample.has_value());
+        CHECK(note.end_sample.value() > note.start_sample);
+        CHECK_FALSE(note.release_required);
+    }
+}
+
+TEST_CASE("mode manager resolves key mode with full short notes and removes redundant no-ln-release") {
+    tenriff::gameplay::GameplayChart chart = make_hold_mix_chart(8);
+
+    tenriff::config::ModeConfig mode;
+    mode.key_mode = "4k";
+    mode.random = "full_random";
+    mode.random_seed = 77;
+    mode.mods = {"no_ln_release", "full_short_notes"};
+
+    const auto result = tenriff::app::manage_modes(
+        chart,
+        tenriff::app::ChartFormat::Bms,
+        mode,
+        make_judge_config(),
+        0.95,
+        180.0,
+        44100);
+
+    CHECK(result.chart.lane_count == 4);
+    REQUIRE(result.active_mods.size() == 1u);
+    CHECK(result.active_mods[0] == "full_short_notes");
+    CHECK(contains_warning(result.warnings, "removed because"));
+    CHECK(result.rate_multiplier == doctest::Approx(0.75));
+    CHECK(result.mod_multiplier == doctest::Approx(0.50));
+    CHECK(result.final_multiplier == doctest::Approx(0.50));
+    CHECK_FALSE(has_lane_overlap(result.chart));
+
+    for (const auto& note : result.chart.notes) {
+        CHECK(note.lane >= 1);
+        CHECK(note.lane <= 4);
+        CHECK_FALSE(note.end_sample.has_value());
+        CHECK_FALSE(note.release_required);
+    }
+}
+
+TEST_CASE("mode manager ignores mismatched osu key mode while still applying compatible mods") {
+    tenriff::gameplay::GameplayChart chart = make_hold_mix_chart(7);
+
+    tenriff::config::ModeConfig mode;
+    mode.key_mode = "10k";
+    mode.mods = {"no_ln_release", "judge_easy"};
+
+    const auto result = tenriff::app::manage_modes(
+        chart,
+        tenriff::app::ChartFormat::OsuMania,
+        mode,
+        make_judge_config(),
+        1.0,
+        175.0,
+        44100);
+
+    CHECK(contains_warning(result.warnings, "does not match the selected osu!mania chart"));
+    CHECK(result.chart.lane_count == 7);
+    CHECK(result.settings.key_mode == tenriff::gameplay::KeyMode::Keys7);
+    CHECK(contains_token(result.active_mods, "no_ln_release"));
+    CHECK(contains_token(result.active_mods, "judge_easy"));
+    CHECK(result.judge_window_scale == doctest::Approx(1.25));
+    CHECK(result.judge.pg_ms == doctest::Approx(12.5));
+
+    bool saw_hold = false;
+    for (const auto& note : result.chart.notes) {
+        CHECK(note.lane >= 1);
+        CHECK(note.lane <= 7);
+        if (note.end_sample.has_value()) {
+            saw_hold = true;
+            CHECK_FALSE(note.release_required);
+        }
+    }
+    CHECK(saw_hold);
+}
+
+TEST_CASE("mode manager handles empty charts with key mode and mods without crashing") {
+    tenriff::gameplay::GameplayChart chart;
+
+    tenriff::config::ModeConfig mode;
+    mode.key_mode = "4k";
+    mode.random = "super_random";
+    mode.random_seed = 1;
+    mode.mods = {"full_long_notes", "judge_hard"};
+
+    const auto result = tenriff::app::manage_modes(
+        chart,
+        tenriff::app::ChartFormat::Bms,
+        mode,
+        make_judge_config(),
+        1.0,
+        180.0,
+        44100);
+
+    CHECK(result.chart.lane_count == 4);
+    CHECK(result.chart.notes.empty());
+    CHECK(contains_token(result.active_mods, "full_long_notes"));
+    CHECK(contains_token(result.active_mods, "judge_hard"));
+    CHECK(result.judge_window_scale == doctest::Approx(0.85));
+}
+
+TEST_CASE("mode manager key mode combo matrix preserves chart invariants") {
+    struct Scenario {
+        tenriff::gameplay::GameplayChart chart;
+        std::string key_mode;
+        std::string random;
+        std::vector<std::string> mods;
+        int expected_lane_count = 0;
+        double expected_judge_scale = 1.0;
+    };
+
+    const std::vector<Scenario> scenarios = {
+        {make_dense_tap_chart(8), "4k", "off", {}, 4, 1.0},
+        {make_dense_tap_chart(8), "4k", "super_random", {"full_long_notes"}, 4, 1.0},
+        {make_hold_mix_chart(8), "4k", "full_random", {"full_short_notes"}, 4, 1.0},
+        {make_hold_mix_chart(8), "6k", "super_random", {"no_ln_release", "judge_hard"}, 6, 0.85},
+        {make_dense_tap_chart(4), "16k", "off", {"judge_easy"}, 16, 1.25}
+    };
+
+    for (const auto& scenario : scenarios) {
+        tenriff::config::ModeConfig mode;
+        mode.key_mode = scenario.key_mode;
+        mode.random = scenario.random;
+        mode.random_seed = 4040;
+        mode.mods = scenario.mods;
+
+        const auto result = tenriff::app::manage_modes(
+            scenario.chart,
+            tenriff::app::ChartFormat::Bms,
+            mode,
+            make_judge_config(),
+            1.0,
+            180.0,
+            44100);
+
+        CHECK(result.chart.lane_count == scenario.expected_lane_count);
+        CHECK(result.judge_window_scale == doctest::Approx(scenario.expected_judge_scale));
+        CHECK_FALSE(has_lane_overlap(result.chart));
+
+        for (const auto& note : result.chart.notes) {
+            CHECK(note.lane >= 1);
+            CHECK(note.lane <= scenario.expected_lane_count);
+        }
+
+        if (contains_token(result.active_mods, "full_short_notes")) {
+            for (const auto& note : result.chart.notes) {
+                CHECK_FALSE(note.end_sample.has_value());
+                CHECK_FALSE(note.release_required);
+            }
+        }
+
+        if (contains_token(result.active_mods, "full_long_notes")) {
+            for (const auto& note : result.chart.notes) {
+                REQUIRE(note.end_sample.has_value());
+                CHECK(note.end_sample.value() > note.start_sample);
+                CHECK_FALSE(note.release_required);
+            }
+        }
+
+        if (contains_token(result.active_mods, "no_ln_release") &&
+            !contains_token(result.active_mods, "full_short_notes")) {
+            for (const auto& note : result.chart.notes) {
+                if (note.end_sample.has_value()) {
+                    CHECK_FALSE(note.release_required);
+                }
+            }
+        }
+    }
 }

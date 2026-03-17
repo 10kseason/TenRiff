@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(TenRiff VERSION 0.9.1 LANGUAGES CXX)
+project(TenRiff VERSION 0.9.3 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -61,6 +61,7 @@ add_library(tenriff_core
     src/input/KeyStateTracker.cpp
     src/gameplay/GameplayChart.cpp
     src/gameplay/GameplayEngine.cpp
+    src/gameplay/KeyModeConverter.cpp
     src/gameplay/ModeApplier.cpp
     src/gameplay/ModeSettings.cpp
     src/gameplay/ResultStats.cpp
@@ -68,6 +69,7 @@ add_library(tenriff_core
     src/app/BmsGameplayBuilder.cpp
     src/app/ChartLoader.cpp
     src/app/CommandLine.cpp
+    src/app/CrashLogger.cpp
     src/app/GraphicsTiming.cpp
     src/app/MenuRecordUtils.cpp
     src/app/MenuSongUtils.cpp
@@ -95,6 +97,11 @@ target_link_libraries(tenriff_core
 
 # Audio and input subsystem (Windows-specific for now).
 if(WIN32)
+    target_link_libraries(tenriff_core
+        PUBLIC
+            dbghelp
+    )
+
     add_library(tenriff_audio
         src/audio/WasapiBackend.cpp
         src/audio/AudioThread.cpp
@@ -173,6 +180,15 @@ if(TENRIFF_ENABLE_TESTS)
     )
     target_link_libraries(bms_realworld_smoke PRIVATE tenriff_core)
 
+    add_executable(bms_mode_smoke
+        tests/smoke/bms_mode_smoke.cpp
+    )
+    target_include_directories(bms_mode_smoke
+        PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/src
+    )
+    target_link_libraries(bms_mode_smoke PRIVATE tenriff_core)
+
     add_executable(bms_10k_compare_smoke
         tests/smoke/bms_10k_compare_smoke.cpp
     )
@@ -190,6 +206,15 @@ if(TENRIFF_ENABLE_TESTS)
             ${CMAKE_CURRENT_SOURCE_DIR}/src
     )
     target_link_libraries(song_index_benchmark PRIVATE tenriff_core)
+
+    add_executable(n2nc_compare_smoke
+        tests/smoke/n2nc_compare_smoke.cpp
+    )
+    target_include_directories(n2nc_compare_smoke
+        PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/src
+    )
+    target_link_libraries(n2nc_compare_smoke PRIVATE tenriff_core)
 
     add_executable(bms_parser_tests
         tests/unit/test_bms_parser.cpp

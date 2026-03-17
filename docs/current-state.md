@@ -3,7 +3,7 @@
 이 문서는 다음 에이전트나 새 작업자가 가장 먼저 읽어야 하는 현재 상태 문서입니다. 목표는 "지금 이 프로젝트가 무엇이고, 어디를 보면 되고, 무엇이 아직 미검증인지"를 빠르게 파악하게 하는 것입니다.
 
 ## Baseline
-- 현재 릴리스 라인은 `0.9.1`
+- 현재 프로젝트 버전은 `0.9.3`
 - 후속 작업의 기준선 문서는 `docs/baseline-0.8.0.md`
 - Windows GUI 빌드가 메인 타깃
 - Linux는 `Baepoks-Linuxs/TenRiff-0.5.0-linux-preview` 수준의 preview만 존재
@@ -61,6 +61,7 @@
   - 4K~10K 로드/실행
   - 키모드별 별도 keymap
   - 4K~10K chart difficulty 계산
+  - `mode.key_mode`는 N2NC 스타일 lane remap 기반으로 키수를 변환
 - Skins / Gameplay feel:
   - `rect` / `circle` note shape
   - note border on/off
@@ -118,12 +119,12 @@
 
 ## Runtime / Packaging Rules
 - 새 사용자 프로필은 자동 생성
-- 배포 패키지는 `Baepoks/TenRiff-0.9.1`
+- 마지막으로 스테이징된 배포 패키지는 `Baepoks/TenRiff-0.9.3`
 - 배포 패키지에는 `Songs`를 넣지 않음
 - 배포 패키지는 메뉴 BGM용 `Mainmusic/` 런타임 자산을 함께 포함
 - 배포 업데이트 요청 시 built artifacts만 `Baepoks/`에 넣는 규칙
 - source-only/public handoff 요청 시 먼저 include/exclude 리스트를 작성하는 것이 사용자 선호
-- 공개 소스 패키지는 `opensource-Tenriff-source/TenRiff-0.9.1-source`처럼 버전별로 별도 스테이징
+- 마지막으로 스테이징된 공개 소스 패키지는 `opensource-Tenriff-source/TenRiff-0.9.3-source`처럼 버전별로 별도 스테이징
 
 ## Config / Profile Reality
 - 실제 기본값은 `config/config.json`
