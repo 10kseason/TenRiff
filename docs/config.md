@@ -51,17 +51,19 @@
 
 ### `judge`
 - `pg`, `gr`, `gd`, `bd` (double, ms)
-- 기본 `bd`는 `80ms`
+- 기본 `gd`는 `75ms`
+- 기본 `bd`는 `340ms`
 - `indirect_miss` (double, ms)
   - 입력이 전혀 들어오지 않았을 때 노트를 자동 미스로 처리하는 간접 미스 기준
-  - 기본값은 `215ms`
-  - 직접 입력 판정 폭(`bd`)과는 별도로 동작하지만, 내부적으로는 항상 `bd` 이상으로 유지됨
+  - 현재 런타임에서는 저장값과 무관하게 항상 `bd`와 같은 값으로 접힘
 - `hold_grace` (double, ms)
   - 롱노트 tail release를 `PG`로 보는 전용 허용창
+  - 기본값은 `80ms`
 - `hold_break` (double, ms)
   - 롱노트 tail release를 `GR`까지 허용하는 마지막 창
   - 이 범위를 벗어나면 `BD`
   - 내부적으로 항상 `hold_grace` 이상으로 유지됨
+  - 기본값은 `200ms`
 - `mask` (double, ms)
 
 ### `speed`
@@ -122,6 +124,10 @@
   - 최근 외부/내부 song source 목록
 
 ### `skin`
+- `source` (string)
+  - `native | osu`
+- `osu_skin_name` (string)
+  - imported osu!mania skin name
 - `note_shape` (string)
   - `rect | circle`
 - `note_border_enabled` (bool)
@@ -136,16 +142,26 @@
 - `note_width_scale` (double)
   - 노트 머리/꼬리 가로 배율
   - `0.50..1.40` 범위로 clamp
+- `note_height_scale` (double)
+  - 노트 머리/꼬리 세로 배율
+  - `0.50..4.00` 범위로 clamp
+- `lane_divider_width_scale` (double)
+  - lane 사이 separator 선의 기본 배율
+  - `0.00..2.00` 범위로 clamp
+  - native skin은 기본 `1px` divider에 곱하고, osu skin은 `ColumnLineWidth`를 읽었을 때 그 값에 곱함
 - `hold_body_width_scale` (double)
   - 롱노트 몸통 가로 배율
   - `0.50..1.20` 범위로 clamp
   - 실제 렌더 계산은 `max(4.0f, note_width * 0.5f * scale)` 기준
-- `note_height_scale` (double)
-  - 노트 머리/꼬리 세로 배율
-  - `0.50..2.00` 범위로 clamp
+- `note_width_scales` (object)
+  - key mode별 `note_width_scale` override
+- `note_height_scales` (object)
+  - key mode별 `note_height_scale` override
+- `lane_divider_width_scales` (object)
+  - key mode별 `lane_divider_width_scale` override
 - `lane_colors` (object)
   - key mode별 lane 색상 팔레트
-  - 현재 기본/저장 대상 mode는 `4k..10k`, UI 편집 화면은 `5k..10k`
+  - 현재 기본/저장 대상 mode는 `4k..10k`, `16k`
   - 각 mode 값은 lane 수만큼의 string array
   - 지원 토큰:
     `ice`, `azure`, `gold`, `mint`, `rose`, `violet`, `orange`, `teal`

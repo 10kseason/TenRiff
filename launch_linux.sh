@@ -57,10 +57,10 @@ if [[ ! -f "$CONFIG_DIR/config.json" ]]; then
   "judge": {
     "pg": 15.5,
     "gr": 31.0,
-    "gd": 55.0,
-    "bd": 80.0,
-    "hold_grace": 20,
-    "hold_break": 50,
+    "gd": 75.0,
+    "bd": 340.0,
+    "hold_grace": 80,
+    "hold_break": 200,
     "mask": 30
   },
   "speed": {

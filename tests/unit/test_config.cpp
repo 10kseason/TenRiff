@@ -74,27 +74,29 @@ TEST_CASE("config defaults prefer 44100 Hz audio") {
     CHECK(config.gauge.hard.gr == doctest::Approx(0.02444444));
     CHECK(config.gauge.hard.gd == doctest::Approx(0.00611111));
     CHECK(config.gauge.hard.bd == doctest::Approx(-5.50000));
-    CHECK(config.gauge.hard.pr == doctest::Approx(-7.50000));
+    CHECK(config.gauge.hard.pr == doctest::Approx(-5.50000));
     CHECK(config.gauge.normal.pg == doctest::Approx(0.05238095));
     CHECK(config.gauge.normal.gr == doctest::Approx(0.03492063));
     CHECK(config.gauge.normal.gd == doctest::Approx(0.00873016));
     CHECK(config.gauge.normal.bd == doctest::Approx(-2.75000));
-    CHECK(config.gauge.normal.pr == doctest::Approx(-3.75000));
+    CHECK(config.gauge.normal.pr == doctest::Approx(-2.75000));
     CHECK(config.gauge.easy.pg == doctest::Approx(0.10000000));
     CHECK(config.gauge.easy.gr == doctest::Approx(0.06666667));
     CHECK(config.gauge.easy.gd == doctest::Approx(0.01666667));
     CHECK(config.gauge.easy.bd == doctest::Approx(-2.06250));
-    CHECK(config.gauge.easy.pr == doctest::Approx(-2.81250));
-    CHECK(config.judge.bd_ms == doctest::Approx(210.0));
-    CHECK(config.judge.indirect_miss_ms == doctest::Approx(210.0));
-    CHECK(config.judge.hold_grace_ms == doctest::Approx(45.0));
-    CHECK(config.judge.hold_break_ms == doctest::Approx(120.0));
+    CHECK(config.gauge.easy.pr == doctest::Approx(-2.06250));
+    CHECK(config.judge.gd_ms == doctest::Approx(75.0));
+    CHECK(config.judge.bd_ms == doctest::Approx(340.0));
+    CHECK(config.judge.indirect_miss_ms == doctest::Approx(340.0));
+    CHECK(config.judge.hold_grace_ms == doctest::Approx(80.0));
+    CHECK(config.judge.hold_break_ms == doctest::Approx(200.0));
     CHECK(config.skin.note_shape == "rect");
     CHECK(config.skin.source == "native");
     CHECK(config.skin.osu_skin_name.empty());
     CHECK(config.skin.note_border_enabled);
     CHECK(config.skin.combo_position == doctest::Approx(tenriff::config::kComboPositionDefault));
     CHECK(config.skin.note_height_scale == doctest::Approx(1.80));
+    CHECK(config.skin.lane_divider_width_scale == doctest::Approx(1.0));
     CHECK(config.skin.hold_body_width_scale == doctest::Approx(0.60));
     CHECK(config.ui.result_tail_ms == doctest::Approx(3000.0));
     CHECK(tenriff::config::resolved_skin_lane_colors(config.skin, "16k").size() == 16u);
@@ -270,6 +272,32 @@ TEST_CASE("config save and load preserve osu skin selection") {
     REQUIRE(result.success());
     CHECK(result.config.skin.source == "osu");
     CHECK(result.config.skin.osu_skin_name == "Happy");
+}
+
+TEST_CASE("config save and load preserve lane divider width scaling") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+
+    CurrentPathGuard cwd;
+    std::error_code ec;
+    std::filesystem::current_path(temp.path, ec);
+    REQUIRE_FALSE(static_cast<bool>(ec));
+
+    ConfigLoader loader;
+    auto config = loader.defaults();
+    config.skin.lane_divider_width_scale = 0.75;
+    config.skin.lane_divider_width_scales["10k"] = 1.35;
+
+    std::string error;
+    REQUIRE(loader.save_profile("profiles/test", config, &error));
+    CHECK(error.empty());
+
+    const auto result = loader.load_profile("profiles/test");
+    REQUIRE(result.success());
+    CHECK(result.config.skin.lane_divider_width_scale == doctest::Approx(0.75));
+    CHECK(tenriff::config::resolved_skin_lane_divider_width_scale(result.config.skin, "10k") == doctest::Approx(1.35));
+    CHECK(tenriff::config::resolved_skin_lane_divider_width_scale(result.config.skin, "7k") == doctest::Approx(0.75));
 }
 
 TEST_CASE("config clamps refresh_hz and normalizes invalid resolution preset") {
@@ -547,14 +575,16 @@ TEST_CASE("runtime migration preserves valid enabled osu chart filters") {
 TEST_CASE("runtime migration upgrades old judge defaults into the current bad-only window") {
     ConfigLoader loader;
     auto config = loader.defaults();
+    config.judge.gd_ms = 55.0;
     config.judge.bd_ms = 95.0;
     config.judge.indirect_miss_ms = 500.0;
 
     const bool changed = tenriff::app::migrate_bms_first_runtime_config(config);
 
     CHECK(changed);
-    CHECK(config.judge.bd_ms == doctest::Approx(210.0));
-    CHECK(config.judge.indirect_miss_ms == doctest::Approx(210.0));
+    CHECK(config.judge.gd_ms == doctest::Approx(75.0));
+    CHECK(config.judge.bd_ms == doctest::Approx(340.0));
+    CHECK(config.judge.indirect_miss_ms == doctest::Approx(340.0));
 }
 
 TEST_CASE("runtime migration upgrades legacy default gauge deltas to the harsher table") {
@@ -571,17 +601,17 @@ TEST_CASE("runtime migration upgrades legacy default gauge deltas to the harsher
     CHECK(config.gauge.hard.gr == doctest::Approx(0.02444444));
     CHECK(config.gauge.hard.gd == doctest::Approx(0.00611111));
     CHECK(config.gauge.hard.bd == doctest::Approx(-5.50000));
-    CHECK(config.gauge.hard.pr == doctest::Approx(-7.50000));
+    CHECK(config.gauge.hard.pr == doctest::Approx(-5.50000));
     CHECK(config.gauge.normal.pg == doctest::Approx(0.05238095));
     CHECK(config.gauge.normal.gr == doctest::Approx(0.03492063));
     CHECK(config.gauge.normal.gd == doctest::Approx(0.00873016));
     CHECK(config.gauge.normal.bd == doctest::Approx(-2.75000));
-    CHECK(config.gauge.normal.pr == doctest::Approx(-3.75000));
+    CHECK(config.gauge.normal.pr == doctest::Approx(-2.75000));
     CHECK(config.gauge.easy.pg == doctest::Approx(0.10000000));
     CHECK(config.gauge.easy.gr == doctest::Approx(0.06666667));
     CHECK(config.gauge.easy.gd == doctest::Approx(0.01666667));
     CHECK(config.gauge.easy.bd == doctest::Approx(-2.06250));
-    CHECK(config.gauge.easy.pr == doctest::Approx(-2.81250));
+    CHECK(config.gauge.easy.pr == doctest::Approx(-2.06250));
 }
 
 TEST_CASE("runtime migration upgrades the previous gauge defaults to the latest recovery and bd/pr losses") {
@@ -598,17 +628,17 @@ TEST_CASE("runtime migration upgrades the previous gauge defaults to the latest 
     CHECK(config.gauge.hard.gr == doctest::Approx(0.02444444));
     CHECK(config.gauge.hard.gd == doctest::Approx(0.00611111));
     CHECK(config.gauge.hard.bd == doctest::Approx(-5.50000));
-    CHECK(config.gauge.hard.pr == doctest::Approx(-7.50000));
+    CHECK(config.gauge.hard.pr == doctest::Approx(-5.50000));
     CHECK(config.gauge.normal.pg == doctest::Approx(0.05238095));
     CHECK(config.gauge.normal.gr == doctest::Approx(0.03492063));
     CHECK(config.gauge.normal.gd == doctest::Approx(0.00873016));
     CHECK(config.gauge.normal.bd == doctest::Approx(-2.75000));
-    CHECK(config.gauge.normal.pr == doctest::Approx(-3.75000));
+    CHECK(config.gauge.normal.pr == doctest::Approx(-2.75000));
     CHECK(config.gauge.easy.pg == doctest::Approx(0.10000000));
     CHECK(config.gauge.easy.gr == doctest::Approx(0.06666667));
     CHECK(config.gauge.easy.gd == doctest::Approx(0.01666667));
     CHECK(config.gauge.easy.bd == doctest::Approx(-2.06250));
-    CHECK(config.gauge.easy.pr == doctest::Approx(-2.81250));
+    CHECK(config.gauge.easy.pr == doctest::Approx(-2.06250));
 }
 
 TEST_CASE("runtime migration upgrades the immediate prior gauge defaults to the latest recovery and bd/pr losses") {
@@ -622,11 +652,11 @@ TEST_CASE("runtime migration upgrades the immediate prior gauge defaults to the 
 
     CHECK(changed);
     CHECK(config.gauge.hard.bd == doctest::Approx(-5.50000));
-    CHECK(config.gauge.hard.pr == doctest::Approx(-7.50000));
+    CHECK(config.gauge.hard.pr == doctest::Approx(-5.50000));
     CHECK(config.gauge.normal.bd == doctest::Approx(-2.75000));
-    CHECK(config.gauge.normal.pr == doctest::Approx(-3.75000));
+    CHECK(config.gauge.normal.pr == doctest::Approx(-2.75000));
     CHECK(config.gauge.easy.bd == doctest::Approx(-2.06250));
-    CHECK(config.gauge.easy.pr == doctest::Approx(-2.81250));
+    CHECK(config.gauge.easy.pr == doctest::Approx(-2.06250));
 }
 
 TEST_CASE("runtime migration upgrades the last shipped gauge defaults to the latest recovery and bd/pr losses") {
@@ -643,11 +673,11 @@ TEST_CASE("runtime migration upgrades the last shipped gauge defaults to the lat
     CHECK(config.gauge.normal.pg == doctest::Approx(0.05238095));
     CHECK(config.gauge.easy.pg == doctest::Approx(0.10000000));
     CHECK(config.gauge.hard.bd == doctest::Approx(-5.50000));
-    CHECK(config.gauge.hard.pr == doctest::Approx(-7.50000));
+    CHECK(config.gauge.hard.pr == doctest::Approx(-5.50000));
     CHECK(config.gauge.normal.bd == doctest::Approx(-2.75000));
-    CHECK(config.gauge.normal.pr == doctest::Approx(-3.75000));
+    CHECK(config.gauge.normal.pr == doctest::Approx(-2.75000));
     CHECK(config.gauge.easy.bd == doctest::Approx(-2.06250));
-    CHECK(config.gauge.easy.pr == doctest::Approx(-2.81250));
+    CHECK(config.gauge.easy.pr == doctest::Approx(-2.06250));
 }
 
 TEST_CASE("runtime migration upgrades the interim bd/pr-only gauge defaults to the latest recovery table") {
@@ -682,11 +712,11 @@ TEST_CASE("runtime migration upgrades the immediate prior shared normal and easy
 
     CHECK(changed);
     CHECK(config.gauge.hard.bd == doctest::Approx(-5.50000));
-    CHECK(config.gauge.hard.pr == doctest::Approx(-7.50000));
+    CHECK(config.gauge.hard.pr == doctest::Approx(-5.50000));
     CHECK(config.gauge.normal.bd == doctest::Approx(-2.75000));
-    CHECK(config.gauge.normal.pr == doctest::Approx(-3.75000));
+    CHECK(config.gauge.normal.pr == doctest::Approx(-2.75000));
     CHECK(config.gauge.easy.bd == doctest::Approx(-2.06250));
-    CHECK(config.gauge.easy.pr == doctest::Approx(-2.81250));
+    CHECK(config.gauge.easy.pr == doctest::Approx(-2.06250));
 }
 
 TEST_CASE("config normalizes invalid keysound policy to follow") {
@@ -726,8 +756,8 @@ TEST_CASE("runtime migration upgrades legacy hold and debounce defaults") {
     const bool changed = tenriff::app::migrate_bms_first_runtime_config(config);
 
     CHECK(changed);
-    CHECK(config.judge.hold_grace_ms == doctest::Approx(45.0));
-    CHECK(config.judge.hold_break_ms == doctest::Approx(120.0));
+    CHECK(config.judge.hold_grace_ms == doctest::Approx(80.0));
+    CHECK(config.judge.hold_break_ms == doctest::Approx(200.0));
     CHECK(config.input.debounce_ms == doctest::Approx(8.0));
 }
 

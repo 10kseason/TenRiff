@@ -2,6 +2,31 @@
 
 TenRiff의 사용자/배포 관점에서 의미 있는 변경만 간단히 기록합니다.
 
+## [0.8.8] - 2026-03-17
+
+### Changed
+- 기본 `GOOD` 판정 범위를 `75ms`로 상향하고, 이전 기본값 `55ms`를 쓰는 프로필은 런타임 migration으로 자동 승격
+- Linux preview launcher의 기본 judge preset도 현재 기본값(`GOOD 75 / BAD 340 / hold 80/200`)으로 정렬
+- 공개/오픈소스 릴리스 메타데이터를 `0.8.8` 기준으로 정렬
+
+### Packaged
+- 공개 소스 번들 스테이징 경로를 `opensource-Tenriff-source/TenRiff-0.8.8-source`로 갱신
+- Windows 배포 스테이징과 공개 소스 zip을 `0.8.8` 기준으로 다시 생성
+
+## [0.8.6] - 2026-03-17
+
+### Added
+- Skin Settings에 key-mode별 `Divider Width` 조절 추가
+- osu!mania skin의 `ColumnLineWidth`를 읽어 gameplay lane divider 폭에 반영
+
+### Changed
+- gameplay static playfield와 skin preview가 lane divider 폭 변경을 캐시 키로 추적하도록 보강
+- 공개/오픈소스 릴리스 메타데이터를 `0.8.6` 기준으로 정렬
+
+### Packaged
+- 공개 소스 번들 스테이징 경로를 `opensource-Tenriff-source/TenRiff-0.8.6-source`로 갱신
+- Windows 배포 스테이징과 공개 소스 zip을 `0.8.6` 기준으로 다시 생성
+
 ## [0.8.5] - 2026-03-17
 
 ### Changed

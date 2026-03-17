@@ -144,3 +144,24 @@ TEST_CASE("osu skin resolver falls back to standard mania family assets") {
     CHECK_FALSE(resolved.key_images[0].empty());
     CHECK_FALSE(resolved.key_pressed_images[0].empty());
 }
+
+TEST_CASE("osu skin resolver imports mania column line widths as internal lane dividers") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+
+    const auto root = temp.path / "skins";
+    const auto skin = root / "DividerSkin";
+    std::filesystem::create_directories(skin);
+    write_file(skin / "skin.ini",
+               "[Mania]\n"
+               "Keys: 4\n"
+               "ColumnLineWidth: 0,1.5,2.5,3.5,0\n");
+
+    const auto resolved = tenriff::app::resolve_osu_mania_skin(root.u8string(), "DividerSkin", 4);
+    REQUIRE(resolved.found);
+    REQUIRE(resolved.lane_divider_widths.size() == 3u);
+    CHECK(resolved.lane_divider_widths[0] == doctest::Approx(1.5f));
+    CHECK(resolved.lane_divider_widths[1] == doctest::Approx(2.5f));
+    CHECK(resolved.lane_divider_widths[2] == doctest::Approx(3.5f));
+}

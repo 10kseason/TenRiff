@@ -32,7 +32,7 @@ TEST_CASE("gameplay engine scores a basic hit") {
     CHECK(engine.stats().max_combo == 1);
 }
 
-TEST_CASE("gameplay engine treats ghost input as poor") {
+TEST_CASE("gameplay engine treats ghost input as bad") {
     GameplayChart chart;
     chart.lane_count = 1;
     chart.duration_samples = 2000;
@@ -49,7 +49,7 @@ TEST_CASE("gameplay engine treats ghost input as poor") {
     GameplayEngine engine(chart, config);
     (void)engine.handle_input(1, InputState::Pressed, 100);
 
-    CHECK(engine.stats().counts.pr == 1);
+    CHECK(engine.stats().counts.bd == 1);
     CHECK(engine.stats().combo == 0);
 }
 
@@ -317,7 +317,6 @@ TEST_CASE("gameplay engine catch-up sync does not score ghost presses") {
     CHECK(engine.stats().counts.gr == 0);
     CHECK(engine.stats().counts.gd == 0);
     CHECK(engine.stats().counts.bd == 0);
-    CHECK(engine.stats().counts.pr == 0);
 }
 
 TEST_CASE("gameplay engine catch-up sync preserves stale hold release timing") {
@@ -407,8 +406,8 @@ TEST_CASE("gameplay engine auto-misses once the bad window is exceeded") {
 
     GameplayEngine engine(chart, config);
     engine.advance(1040);
-    CHECK(engine.stats().counts.pr == 0);
+    CHECK(engine.stats().counts.bd == 0);
 
     engine.advance(1041);
-    CHECK(engine.stats().counts.pr == 1);
+    CHECK(engine.stats().counts.bd == 1);
 }

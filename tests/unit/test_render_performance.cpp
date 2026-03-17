@@ -126,4 +126,10 @@ TEST_CASE("gameplay note y mapping eases notes in from slightly above the field"
           doctest::Approx(1.0));
 }
 
+TEST_CASE("gameplay rendering cuts regular notes once the head passes the judgement line") {
+    CHECK(tenriff::render::should_render_gameplay_note(1000, true, 1000));
+    CHECK_FALSE(tenriff::render::should_render_gameplay_note(999, true, 1000));
+    CHECK(tenriff::render::should_render_gameplay_note(999, false, 1000));
+}
+
 }  // namespace

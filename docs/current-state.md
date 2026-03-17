@@ -3,7 +3,7 @@
 이 문서는 다음 에이전트나 새 작업자가 가장 먼저 읽어야 하는 현재 상태 문서입니다. 목표는 "지금 이 프로젝트가 무엇이고, 어디를 보면 되고, 무엇이 아직 미검증인지"를 빠르게 파악하게 하는 것입니다.
 
 ## Baseline
-- 현재 릴리스 라인은 `0.8.5`
+- 현재 릴리스 라인은 `0.8.8`
 - 후속 작업의 기준선 문서는 `docs/baseline-0.8.0.md`
 - Windows GUI 빌드가 메인 타깃
 - Linux는 `Baepoks-Linuxs/TenRiff-0.5.0-linux-preview` 수준의 preview만 존재
@@ -65,12 +65,15 @@
   - `rect` / `circle` note shape
   - note border on/off
   - combo Y 조절
-  - judge line / note width / note height / LN body width 조절
+  - judge line / note width / divider width / note height / LN body width 조절
+  - osu!mania `ColumnLineWidth`를 읽어 lane divider 폭에 반영
   - 미래 노트 상단 진입 easing
   - 마지막 판정 노트 처리 직후 플레이 종료
 - Judge:
-  - 기본 `BAD` 범위는 `80ms`
-  - 기본 간접 미스 범위는 `215ms`
+  - 기본 `GOOD` 범위는 `75ms`
+  - 기본 `BAD` 범위는 `340ms`
+  - 간접 미스(auto-miss)는 별도 `POOR` 없이 `BAD`로 접힘
+  - 간접 미스 범위도 내부적으로 `BAD`와 같은 `340ms`
   - tail release timing은 osu hold와 BMS `#LNMODE 2` charge note에만 적용
 - Graphics:
   - resolution preset (`720p`, `1080p`, `qhd`, `native`)
@@ -115,11 +118,11 @@
 
 ## Runtime / Packaging Rules
 - 새 사용자 프로필은 자동 생성
-- 배포 패키지는 `Baepoks/TenRiff-0.8.5`
+- 배포 패키지는 `Baepoks/TenRiff-0.8.8`
 - 배포 패키지에는 `Songs`를 넣지 않음
 - 배포 업데이트 요청 시 built artifacts만 `Baepoks/`에 넣는 규칙
 - source-only/public handoff 요청 시 먼저 include/exclude 리스트를 작성하는 것이 사용자 선호
-- 공개 소스 패키지는 `opensource-Tenriff-source/TenRiff-0.8.5-source`처럼 버전별로 별도 스테이징
+- 공개 소스 패키지는 `opensource-Tenriff-source/TenRiff-0.8.8-source`처럼 버전별로 별도 스테이징
 
 ## Config / Profile Reality
 - 실제 기본값은 `config/config.json`

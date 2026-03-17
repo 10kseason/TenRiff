@@ -1,4 +1,4 @@
-TenRiff 0.8.5 open-source source package scope
+TenRiff 0.8.8 open-source source package scope
 
 Included in versioned source bundles:
 - CHANGELOG.md

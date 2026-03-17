@@ -56,9 +56,10 @@ TEST_CASE("default gauge penalties follow the requested hard-normal-easy ratios"
     const auto& config = manager.config();
 
     CHECK(almost_equal(config.normal.bd, config.hard.bd * 0.5));
-    CHECK(almost_equal(config.normal.pr, config.hard.pr * 0.5));
     CHECK(almost_equal(config.easy.bd, config.normal.bd * 0.75));
-    CHECK(almost_equal(config.easy.pr, config.normal.pr * 0.75));
+    CHECK(almost_equal(config.hard.pr, config.hard.bd));
+    CHECK(almost_equal(config.normal.pr, config.normal.bd));
+    CHECK(almost_equal(config.easy.pr, config.easy.bd));
 }
 
 TEST_CASE("gauge downshifts at thresholds without refill and does not upshift") {
@@ -66,15 +67,15 @@ TEST_CASE("gauge downshifts at thresholds without refill and does not upshift") 
     auto state = manager.initialState(GaugeType::Hard);
     state.value = 66.1;
 
-    auto result = manager.applyJudgement(state, Judgement::PR, 1000.0);
+    auto result = manager.applyJudgement(state, Judgement::BD, 1000.0);
     CHECK(result.downshifted);
     CHECK(state.type == GaugeType::Normal);
-    CHECK(almost_equal(state.value, 58.60000));
+    CHECK(almost_equal(state.value, 60.60000));
 
     result = manager.applyJudgement(state, Judgement::PG, 2000.0);
     CHECK_FALSE(result.downshifted);
     CHECK(state.type == GaugeType::Normal);
-    CHECK(almost_equal(state.value, 58.65238095));
+    CHECK(almost_equal(state.value, 60.65238095));
 }
 
 TEST_CASE("gauge normal downshifts to easy at the lower threshold") {
@@ -82,10 +83,10 @@ TEST_CASE("gauge normal downshifts to easy at the lower threshold") {
     auto state = manager.initialState(GaugeType::Normal);
     state.value = 33.1;
 
-    auto result = manager.applyJudgement(state, Judgement::PR, 0.0);
+    auto result = manager.applyJudgement(state, Judgement::BD, 0.0);
     CHECK(result.downshifted);
     CHECK(state.type == GaugeType::Easy);
-    CHECK(almost_equal(state.value, 29.35000));
+    CHECK(almost_equal(state.value, 30.35000));
 }
 
 TEST_CASE("gauge downshifts by at most one step per judgement") {
@@ -93,11 +94,11 @@ TEST_CASE("gauge downshifts by at most one step per judgement") {
     auto state = manager.initialState(GaugeType::Hard);
     state.value = 34.0;
 
-    auto result = manager.applyJudgement(state, Judgement::PR, 0.0);
+    auto result = manager.applyJudgement(state, Judgement::BD, 0.0);
     CHECK(result.downshifted);
     CHECK_FALSE(result.game_over);
     CHECK(state.type == GaugeType::Normal);
-    CHECK(almost_equal(state.value, 26.50000));
+    CHECK(almost_equal(state.value, 28.50000));
 }
 
 TEST_CASE("easy gauge triggers game over on empty") {
@@ -105,7 +106,7 @@ TEST_CASE("easy gauge triggers game over on empty") {
     auto state = manager.initialState(GaugeType::Easy);
     state.value = 0.05;
 
-    auto result = manager.applyJudgement(state, Judgement::PR, 5000.0);
+    auto result = manager.applyJudgement(state, Judgement::BD, 5000.0);
     CHECK(result.game_over);
     CHECK(state.game_over);
 }
@@ -118,7 +119,7 @@ TEST_CASE("auto shift can be disabled to fail immediately") {
     auto state = manager.initialState(GaugeType::Hard);
     state.value = 0.1;
 
-    auto result = manager.applyJudgement(state, Judgement::PR, 0.0);
+    auto result = manager.applyJudgement(state, Judgement::BD, 0.0);
     CHECK(result.game_over);
     CHECK(state.game_over);
     CHECK(state.type == GaugeType::Hard);
