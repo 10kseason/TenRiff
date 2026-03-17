@@ -4,6 +4,7 @@
 #include <fstream>
 #include <sstream>
 
+#include "app/MenuRecordUtils.h"
 #include "config/SimpleJson.h"
 #include "gameplay/Replay.h"
 
@@ -25,6 +26,13 @@ std::string read_file(const std::filesystem::path& path) {
     return buffer.str();
 }
 
+void write_file(const std::filesystem::path& path, const std::string& content) {
+    std::ofstream file(path, std::ios::binary);
+    REQUIRE(file);
+    file << content;
+    REQUIRE(file.good());
+}
+
 }  // namespace
 
 TEST_CASE("replay export writes JSON with trace events") {
@@ -35,6 +43,10 @@ TEST_CASE("replay export writes JSON with trace events") {
     replay.sample_rate = 48000;
     replay.rate = 1.0;
     replay.input_offset_ms = -2.5;
+    replay.mods = {"judge_easy", "no_ln_release"};
+    replay.rate_multiplier = 0.75;
+    replay.score_multiplier = 0.75;
+    replay.final_score = 1234;
 
     replay.trace.sample_rate = 48000;
     replay.trace.rate = 1.0;
@@ -46,6 +58,7 @@ TEST_CASE("replay export writes JSON with trace events") {
     replay.stats.counts.pg = 1;
     replay.stats.max_combo = 1;
     replay.stats.total_notes = 1;
+    replay.stats.raw_score = 1645;
     replay.stats.mean_delta_ms = 1.25;
 
     const std::filesystem::path path = "replay_export_test.json";
@@ -69,6 +82,26 @@ TEST_CASE("replay export writes JSON with trace events") {
     REQUIRE(events != nullptr);
     CHECK(events->size() == 2);
 
+    auto mods_it = root->find("mods");
+    REQUIRE(mods_it != root->end());
+    const auto* mods = mods_it->second.as_array();
+    REQUIRE(mods != nullptr);
+    REQUIRE(mods->size() == 2u);
+    CHECK((*mods)[0].as_string() == "judge_easy");
+    CHECK((*mods)[1].as_string() == "no_ln_release");
+
+    CHECK(root->find("rate_multiplier")->second.as_number() == doctest::Approx(0.75));
+    CHECK(root->find("score_multiplier")->second.as_number() == doctest::Approx(0.75));
+    CHECK(root->find("final_score")->second.as_number() == doctest::Approx(1234.0));
+
+    auto parsed_replay = tenriff::app::menu_records::parse_replay_file(path, nullptr);
+    REQUIRE(parsed_replay.has_value());
+    CHECK(parsed_replay->mods.size() == 2u);
+    CHECK(parsed_replay->rate_multiplier == doctest::Approx(0.75));
+    CHECK(parsed_replay->score_multiplier == doctest::Approx(0.75));
+    CHECK(parsed_replay->raw_score == 1645);
+    CHECK(parsed_replay->final_score == 1234);
+
     std::error_code ec;
     std::filesystem::remove(path, ec);
 }
@@ -84,9 +117,14 @@ TEST_CASE("result export writes JSON with replay reference") {
     result.sample_rate = 48000;
     result.rate = 1.0;
     result.game_over = false;
+    result.mods = {"full_short_notes"};
+    result.rate_multiplier = 1.05;
+    result.score_multiplier = 0.50;
+    result.final_score = 900;
     result.stats.counts.pg = 5;
     result.stats.max_combo = 5;
     result.stats.total_notes = 5;
+    result.stats.raw_score = 1800;
 
     const std::filesystem::path path = "result_export_test.json";
     auto exported = save_result_json(path.string(), result);
@@ -113,6 +151,77 @@ TEST_CASE("result export writes JSON with replay reference") {
     auto game_over_it = root->find("game_over");
     REQUIRE(game_over_it != root->end());
     CHECK(game_over_it->second.as_bool(true) == result.game_over);
+
+    auto parsed_result = tenriff::app::menu_records::parse_result_file(path, nullptr);
+    REQUIRE(parsed_result.has_value());
+    CHECK(parsed_result->mods.size() == 1u);
+    CHECK(parsed_result->mods[0] == "full_short_notes");
+    CHECK(parsed_result->stats.raw_score == 1800);
+    CHECK(parsed_result->rate_multiplier == doctest::Approx(1.05));
+    CHECK(parsed_result->score_multiplier == doctest::Approx(0.50));
+    CHECK(parsed_result->final_score == 900);
+
+    std::error_code ec;
+    std::filesystem::remove(path, ec);
+}
+
+TEST_CASE("legacy result parsing falls back to derived score metadata") {
+    const std::filesystem::path path = "legacy_result_test.json";
+    write_file(path,
+               "{\n"
+               "  \"chart_path\": \"Songs/test.bms\",\n"
+               "  \"chart_format\": \"bms\",\n"
+               "  \"created_utc\": \"20250101_000000Z\",\n"
+               "  \"clear_status\": \"CLEAR\",\n"
+               "  \"final_gauge\": \"normal\",\n"
+               "  \"game_over\": false,\n"
+               "  \"stats\": {\n"
+               "    \"counts\": {\"pg\": 1, \"gr\": 1, \"gd\": 1, \"bd\": 1},\n"
+               "    \"max_combo\": 3,\n"
+               "    \"total_notes\": 4\n"
+               "  }\n"
+               "}\n");
+
+    auto parsed = tenriff::app::menu_records::parse_result_file(path, nullptr);
+    REQUIRE(parsed.has_value());
+    CHECK(parsed->mods.empty());
+    CHECK(parsed->rate_multiplier == doctest::Approx(1.0));
+    CHECK(parsed->score_multiplier == doctest::Approx(1.0));
+    CHECK(parsed->stats.raw_score == 1800);
+    CHECK(parsed->final_score == 1800);
+
+    std::error_code ec;
+    std::filesystem::remove(path, ec);
+}
+
+TEST_CASE("legacy replay parsing falls back to derived final score") {
+    const std::filesystem::path path = "legacy_replay_test.json";
+    write_file(path,
+               "{\n"
+               "  \"chart_path\": \"Songs/test.bms\",\n"
+               "  \"chart_format\": \"bms\",\n"
+               "  \"created_utc\": \"20250101_000000Z\",\n"
+               "  \"sample_rate\": 48000,\n"
+               "  \"rate\": 1.0,\n"
+               "  \"trace\": {\n"
+               "    \"sample_rate\": 48000,\n"
+               "    \"rate\": 1.0,\n"
+               "    \"lane_count\": 10,\n"
+               "    \"duration_samples\": 123456,\n"
+               "    \"events\": [{\"sample\": 100, \"lane\": 1, \"state\": \"down\"}]\n"
+               "  },\n"
+               "  \"stats\": {\n"
+               "    \"counts\": {\"pg\": 1, \"gr\": 1, \"bd\": 1}\n"
+               "  }\n"
+               "}\n");
+
+    auto parsed = tenriff::app::menu_records::parse_replay_file(path, nullptr);
+    REQUIRE(parsed.has_value());
+    CHECK(parsed->mods.empty());
+    CHECK(parsed->rate_multiplier == doctest::Approx(1.0));
+    CHECK(parsed->score_multiplier == doctest::Approx(1.0));
+    CHECK(parsed->raw_score == 1500);
+    CHECK(parsed->final_score == 1500);
 
     std::error_code ec;
     std::filesystem::remove(path, ec);

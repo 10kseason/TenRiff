@@ -186,6 +186,59 @@ TEST_CASE("song scan exposes 4K through 10K osu!mania charts when enabled") {
     CHECK(by_path.at("ten.osu").rating >= 0.0);
 }
 
+TEST_CASE("song scan keeps chart names for BMS subtitles and osu versions") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+
+    write_file(temp.path / "named_chart.bms",
+               "#TITLE Named Song\n"
+               "#SUBTITLE Another\n"
+               "#ARTIST Composer\n"
+               "#PLAYLEVEL 10\n"
+               "#BPM 150\n"
+               "#00111:01\n");
+    write_file(temp.path / "named_chart.osu",
+               "osu file format v14\n"
+               "[General]\n"
+               "AudioFilename:test.mp3\n"
+               "Mode:3\n"
+               "[Metadata]\n"
+               "Title:Named Osu\n"
+               "TitleUnicode:네임드 오수\n"
+               "Artist:Composer\n"
+               "ArtistUnicode:작곡가\n"
+               "Version:MX\n"
+               "[Difficulty]\n"
+               "CircleSize:4\n"
+               "[TimingPoints]\n"
+               "0,500,4,0,0,100,1,0\n"
+               "[HitObjects]\n"
+               "0,0,0,1,0,0:0:0:0:\n"
+               "511,0,500,1,0,0:0:0:0:\n");
+
+    SongIndexOptions options;
+    options.include_osu = true;
+    std::vector<std::string> warnings;
+    SongIndex index = scan_songs(temp.path.u8string(), nullptr, warnings, {}, options);
+
+    REQUIRE(index.entries.size() == 2u);
+    CHECK(warnings.empty());
+
+    std::unordered_map<std::string, tenriff::app::SongEntry> by_path;
+    for (const auto& entry : index.entries) {
+        by_path.emplace(entry.path, entry);
+    }
+
+    REQUIRE(by_path.count("named_chart.bms") == 1u);
+    CHECK(by_path.at("named_chart.bms").chart_name == "Another");
+
+    REQUIRE(by_path.count("named_chart.osu") == 1u);
+    CHECK(by_path.at("named_chart.osu").title == std::string(u8"네임드 오수"));
+    CHECK(by_path.at("named_chart.osu").artist == std::string(u8"작곡가"));
+    CHECK(by_path.at("named_chart.osu").chart_name == "MX");
+}
+
 TEST_CASE("song scan computes 10k-calc difficulty for BMS entries") {
     TempDirGuard temp;
     temp.path = make_temp_dir();
@@ -418,11 +471,11 @@ TEST_CASE("cached song index load drops non-BMS menu entries") {
     const auto index_path = temp.path / "song_index.json";
     write_file(index_path,
                "{\n"
-               "  \"version\": 7,\n"
+               "  \"version\": 8,\n"
                "  \"include_osu\": true,\n"
                "  \"entries\": [\n"
-               "    {\"path\":\"ten.osu\",\"title\":\"Ten\",\"artist\":\"A\",\"format\":\"osu\",\"key_count\":10,\"level\":12,\"rating\":8.25,\"bpm\":180,\"mtime\":1},\n"
-               "    {\"path\":\"legacy.bms\",\"title\":\"Legacy\",\"artist\":\"C\",\"format\":\"bms\",\"layout_label\":\"5+1 SP\",\"key_count\":6,\"level\":11,\"rating\":6.75,\"bpm\":180,\"mtime\":1},\n"
+               "    {\"path\":\"ten.osu\",\"title\":\"Ten\",\"artist\":\"A\",\"chart_name\":\"MX\",\"format\":\"osu\",\"key_count\":10,\"level\":12,\"rating\":8.25,\"bpm\":180,\"mtime\":1},\n"
+               "    {\"path\":\"legacy.bms\",\"title\":\"Legacy\",\"artist\":\"C\",\"chart_name\":\"Another\",\"format\":\"bms\",\"layout_label\":\"5+1 SP\",\"key_count\":6,\"level\":11,\"rating\":6.75,\"bpm\":180,\"mtime\":1},\n"
                "    {\"path\":\"another.bme\",\"title\":\"Another\",\"artist\":\"D\",\"format\":\"bms\",\"key_count\":10,\"level\":14,\"rating\":8.5,\"bpm\":180,\"mtime\":1}\n"
                "  ]\n"
                "}\n");
@@ -440,6 +493,7 @@ TEST_CASE("cached song index load drops non-BMS menu entries") {
     REQUIRE(by_path.count("another.bme") == 1u);
     CHECK(by_path.at("legacy.bms").key_count == 6);
     CHECK(by_path.at("legacy.bms").layout_label == "5+1 SP");
+    CHECK(by_path.at("legacy.bms").chart_name == "Another");
     CHECK(by_path.at("legacy.bms").level == 11);
     CHECK(by_path.at("legacy.bms").rating == doctest::Approx(6.75));
     CHECK(by_path.at("another.bme").rating == doctest::Approx(8.5));
@@ -453,10 +507,10 @@ TEST_CASE("cached song index exposes osu entries when enabled") {
     const auto index_path = temp.path / "song_index.json";
     write_file(index_path,
                "{\n"
-               "  \"version\": 7,\n"
+               "  \"version\": 8,\n"
                "  \"include_osu\": true,\n"
                "  \"entries\": [\n"
-                "    {\"path\":\"ten.osu\",\"title\":\"Ten\",\"artist\":\"A\",\"format\":\"osu\",\"key_count\":10,\"level\":12,\"rating\":8.25,\"bpm\":180,\"mtime\":1},\n"
+                "    {\"path\":\"ten.osu\",\"title\":\"Ten\",\"artist\":\"A\",\"chart_name\":\"MX\",\"format\":\"osu\",\"key_count\":10,\"level\":12,\"rating\":8.25,\"bpm\":180,\"mtime\":1},\n"
                 "    {\"path\":\"legacy.bms\",\"title\":\"Legacy\",\"artist\":\"C\",\"format\":\"bms\",\"key_count\":10,\"level\":11,\"rating\":6.75,\"bpm\":180,\"mtime\":1}\n"
                "  ]\n"
                "}\n");
@@ -470,15 +524,15 @@ TEST_CASE("cached song index exposes osu entries when enabled") {
     REQUIRE(result.index.entries.size() == 2u);
 }
 
-TEST_CASE("streaming song index loader parses compact single-line schema 7 caches") {
+TEST_CASE("streaming song index loader parses compact single-line schema 8 caches") {
     TempDirGuard temp;
     temp.path = make_temp_dir();
     REQUIRE_FALSE(temp.path.empty());
 
     const auto index_path = temp.path / "song_index.json";
     write_file(index_path,
-               "{\"version\":7,\"include_osu\":false,\"entries\":["
-               "{\"path\":\"legacy.bms\",\"title\":\"Legacy\",\"artist\":\"Composer\",\"format\":\"bms\",\"layout_label\":\"7+1 SP\",\"key_count\":8,\"level\":12,\"rating\":7.5,\"bpm\":150,\"mtime\":1},"
+               "{\"version\":8,\"include_osu\":false,\"entries\":["
+               "{\"path\":\"legacy.bms\",\"title\":\"Legacy\",\"artist\":\"Composer\",\"chart_name\":\"Hyper\",\"format\":\"bms\",\"layout_label\":\"7+1 SP\",\"key_count\":8,\"level\":12,\"rating\":7.5,\"bpm\":150,\"mtime\":1},"
                "{\"path\":\"ignored.osu\",\"title\":\"Ignored\",\"artist\":\"Mapper\",\"format\":\"osu\",\"key_count\":10,\"level\":13,\"rating\":8.5,\"bpm\":180,\"mtime\":2}"
                "]}");
 
@@ -488,6 +542,7 @@ TEST_CASE("streaming song index loader parses compact single-line schema 7 cache
     CHECK(result.loaded_from_file);
     REQUIRE(result.index.entries.size() == 1u);
     CHECK(result.index.entries.front().path == "legacy.bms");
+    CHECK(result.index.entries.front().chart_name == "Hyper");
     CHECK(result.index.entries.front().layout_label == "7+1 SP");
     CHECK(result.index.entries.front().rating == doctest::Approx(7.5));
 }
@@ -506,6 +561,7 @@ TEST_CASE("song index save and load support UTF-8 cache paths") {
     entry.path = std::filesystem::u8path(u8"테스트.bms").u8string();
     entry.title = "Legacy";
     entry.artist = "Composer";
+    entry.chart_name = "Another";
     entry.format = "bms";
     entry.layout_label = "7+1 SP";
     entry.key_count = 8;
@@ -526,6 +582,7 @@ TEST_CASE("song index save and load support UTF-8 cache paths") {
     REQUIRE(result.index.entries.size() == 1u);
     CHECK(result.index.entries.front().path == entry.path);
     CHECK(result.index.entries.front().title == "Legacy");
+    CHECK(result.index.entries.front().chart_name == "Another");
     CHECK(result.index.entries.front().layout_label == "7+1 SP");
 }
 
@@ -553,6 +610,7 @@ TEST_CASE("song index cache stays profile-local and does not create cache folder
     entry.path = "chart.bms";
     entry.title = "Title";
     entry.artist = "Artist";
+    entry.chart_name = "Hyper";
     entry.format = "bms";
     entry.layout_label = "10K BMS";
     entry.key_count = 10;
@@ -605,9 +663,9 @@ TEST_CASE("cached song index sanitizes control heavy metadata on load") {
     const auto index_path = temp.path / "song_index.json";
     write_file(index_path,
                "{\n"
-               "  \"version\": 7,\n"
+               "  \"version\": 8,\n"
                "  \"entries\": [\n"
-                "    {\"path\":\"legacy.bms\",\"title\":\"Bad\\nTitle\",\"artist\":\"Artist\\tName\",\"format\":\"bms\\r\",\"key_count\":10,\"level\":11,\"rating\":6.75,\"bpm\":180,\"mtime\":1}\n"
+                "    {\"path\":\"legacy.bms\",\"title\":\"Bad\\nTitle\",\"artist\":\"Artist\\tName\",\"chart_name\":\"Hyper\\r\",\"format\":\"bms\\r\",\"key_count\":10,\"level\":11,\"rating\":6.75,\"bpm\":180,\"mtime\":1}\n"
                "  ]\n"
                "}\n");
 
@@ -618,6 +676,7 @@ TEST_CASE("cached song index sanitizes control heavy metadata on load") {
     REQUIRE(result.index.entries.size() == 1u);
     CHECK(result.index.entries.front().title == "Bad Title");
     CHECK(result.index.entries.front().artist == "Artist Name");
+    CHECK(result.index.entries.front().chart_name == "Hyper");
     CHECK(result.index.entries.front().format == "bms");
 }
 
@@ -742,7 +801,7 @@ TEST_CASE("song index save cancellation removes the partial cache file") {
     REQUIRE_FALSE(temp.path.empty());
 
     SongIndex index;
-    index.entries.push_back({"one.bms", "One", "Artist", "bms", "", 10, 10, 1.0, 150.0, 1});
+    index.entries.push_back({"one.bms", "One", "Artist", "Hyper", "bms", "", 10, 10, 1.0, 150.0, 1});
 
     const auto index_path = temp.path / "song_index.json";
     std::string error;

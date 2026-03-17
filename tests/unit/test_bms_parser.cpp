@@ -187,6 +187,8 @@ TEST_CASE("index parser mode skips heavy asset maps and nonessential commands") 
     const char* data =
         "#TITLE Index Mode\n"
         "#ARTIST Composer\n"
+        "#SUBTITLE Another\n"
+        "#DIFFICULTY 4\n"
         "#LNOBJ AA\n"
         "#SUBARTIST Guest\n"
         "#WAV01 kick.wav\n"
@@ -208,6 +210,8 @@ TEST_CASE("index parser mode skips heavy asset maps and nonessential commands") 
     CHECK(result.success());
     CHECK_EQ(result.chart.headers.at("TITLE"), "Index Mode");
     CHECK_EQ(result.chart.headers.at("ARTIST"), "Composer");
+    CHECK_EQ(result.chart.headers.at("SUBTITLE"), "Another");
+    CHECK_EQ(result.chart.headers.at("DIFFICULTY"), "4");
     CHECK_EQ(result.chart.headers.at("LNOBJ"), "AA");
     CHECK(result.chart.headers.count("SUBARTIST") == 0u);
     CHECK(result.chart.wav.empty());

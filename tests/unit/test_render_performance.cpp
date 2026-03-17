@@ -132,4 +132,14 @@ TEST_CASE("gameplay rendering cuts regular notes once the head passes the judgem
     CHECK(tenriff::render::should_render_gameplay_note(999, false, 1000));
 }
 
+TEST_CASE("active hold synthetic notes stay anchored to the judgement line") {
+    CHECK_FALSE(tenriff::render::gameplay_note_anchors_to_judgement_line(false, true));
+    CHECK_FALSE(tenriff::render::gameplay_note_anchors_to_judgement_line(true, true));
+    CHECK(tenriff::render::gameplay_note_anchors_to_judgement_line(true, false));
+
+    CHECK(tenriff::render::gameplay_note_render_sample(1000, false, true, 1024) == 1000);
+    CHECK(tenriff::render::gameplay_note_render_sample(1000, true, true, 1024) == 1000);
+    CHECK(tenriff::render::gameplay_note_render_sample(1000, true, false, 1024) == 1024);
+}
+
 }  // namespace

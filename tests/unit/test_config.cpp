@@ -94,6 +94,7 @@ TEST_CASE("config defaults prefer 44100 Hz audio") {
     CHECK(config.skin.source == "native");
     CHECK(config.skin.osu_skin_name.empty());
     CHECK(config.skin.note_border_enabled);
+    CHECK_FALSE(config.skin.preserve_note_image_aspect_ratio);
     CHECK(config.skin.combo_position == doctest::Approx(tenriff::config::kComboPositionDefault));
     CHECK(config.skin.note_height_scale == doctest::Approx(1.80));
     CHECK(config.skin.lane_divider_width_scale == doctest::Approx(1.0));
@@ -216,6 +217,31 @@ TEST_CASE("config save and load preserve volume and speed settings") {
     CHECK(result.config.mode.enable_osu_charts);
     CHECK(result.config.mode.format == "osu");
     CHECK(result.config.mode.song_index_profile == "fast");
+}
+
+TEST_CASE("config save and load normalize mode mods") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+
+    CurrentPathGuard cwd;
+    std::error_code ec;
+    std::filesystem::current_path(temp.path, ec);
+    REQUIRE_FALSE(static_cast<bool>(ec));
+
+    ConfigLoader loader;
+    auto config = loader.defaults();
+    config.mode.mods = {"judge_hard", "Judge Easy", "no_ln_release", "full_short_notes", "judge_easy", "mystery"};
+
+    std::string error;
+    REQUIRE(loader.save_profile("profiles/test", config, &error));
+    CHECK(error.empty());
+
+    const auto result = loader.load_profile("profiles/test");
+    REQUIRE(result.success());
+    REQUIRE(result.config.mode.mods.size() == 2u);
+    CHECK(result.config.mode.mods[0] == "judge_easy");
+    CHECK(result.config.mode.mods[1] == "full_short_notes");
 }
 
 TEST_CASE("config save and load preserve graphics display settings") {
@@ -395,6 +421,7 @@ TEST_CASE("config save and load preserve skin gameplay settings") {
     auto config = loader.defaults();
     config.skin.note_shape = "circle";
     config.skin.note_border_enabled = false;
+    config.skin.preserve_note_image_aspect_ratio = true;
     config.skin.judgement_line_position = 0.76;
     config.skin.combo_position = 0.52;
     config.skin.note_width_scale = 1.15;
@@ -417,6 +444,7 @@ TEST_CASE("config save and load preserve skin gameplay settings") {
     REQUIRE(result.success());
     CHECK(result.config.skin.note_shape == "circle");
     CHECK_FALSE(result.config.skin.note_border_enabled);
+    CHECK(result.config.skin.preserve_note_image_aspect_ratio);
     CHECK(result.config.skin.judgement_line_position == doctest::Approx(0.76));
     CHECK(result.config.skin.combo_position == doctest::Approx(0.52));
     CHECK(result.config.skin.note_width_scale == doctest::Approx(1.15));

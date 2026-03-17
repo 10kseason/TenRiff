@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(TenRiff VERSION 0.8.8 LANGUAGES CXX)
+project(TenRiff VERSION 0.9.1 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -69,6 +69,9 @@ add_library(tenriff_core
     src/app/ChartLoader.cpp
     src/app/CommandLine.cpp
     src/app/GraphicsTiming.cpp
+    src/app/MenuRecordUtils.cpp
+    src/app/MenuSongUtils.cpp
+    src/app/ModeManager.cpp
     src/app/ModeResolver.cpp
     src/app/OsuSkin.cpp
     src/app/RuntimeConfigMigration.cpp
@@ -117,6 +120,7 @@ if(WIN32)
     )
 
     add_library(tenriff_app
+        src/app/MenuMusicController.cpp
         src/app/GameSession.cpp
         src/app/MenuApp.cpp
         src/render/MenuWindow.cpp
@@ -142,6 +146,7 @@ if(WIN32)
             mfplat
             mfreadwrite
             mfuuid
+            winmm
     )
 endif()
 
@@ -200,6 +205,7 @@ if(TENRIFF_ENABLE_TESTS)
         tests/unit/test_keymap.cpp
         tests/unit/test_simple_json.cpp
         tests/unit/test_mode_applier.cpp
+        tests/unit/test_mode_manager.cpp
         tests/unit/test_gameplay_engine.cpp
         tests/unit/test_replay_export.cpp
         tests/unit/test_chart_loader.cpp

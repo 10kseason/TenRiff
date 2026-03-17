@@ -1,5 +1,6 @@
 #include "doctest/doctest.h"
 
+#include "app/ModeManager.h"
 #include "gameplay/GameplayEngine.h"
 
 using tenriff::gameplay::GameplayChart;
@@ -51,6 +52,30 @@ TEST_CASE("gameplay engine treats ghost input as bad") {
 
     CHECK(engine.stats().counts.bd == 1);
     CHECK(engine.stats().combo == 0);
+}
+
+TEST_CASE("gameplay engine raw score keeps earlier penalties after later hits") {
+    GameplayChart chart;
+    chart.lane_count = 1;
+    chart.duration_samples = 2000;
+    chart.notes.push_back(NoteEvent{1, 1000, std::nullopt});
+
+    GameplayConfig config;
+    config.sample_rate = 1000;
+    config.rate = 1.0;
+    config.judge.pg_ms = 10.0;
+    config.judge.gr_ms = 20.0;
+    config.judge.gd_ms = 30.0;
+    config.judge.bd_ms = 40.0;
+
+    GameplayEngine engine(chart, config);
+    (void)engine.handle_input(1, InputState::Pressed, 100);
+    (void)engine.handle_input(1, InputState::Pressed, 1000);
+    engine.advance(1500);
+
+    CHECK(engine.stats().counts.bd == 1);
+    CHECK(engine.stats().counts.pg == 1);
+    CHECK(engine.stats().raw_score == 800);
 }
 
 TEST_CASE("gameplay engine scores hold tail based on release timing") {
@@ -164,6 +189,7 @@ TEST_CASE("gameplay engine auto-clears standard hold tails without release timin
 
     CHECK(engine.stats().counts.pg == 2);
     CHECK(engine.stats().counts.bd == 0);
+    CHECK(engine.stats().raw_score == 1000);
 }
 
 TEST_CASE("gameplay engine gauge uses absolute hold judgements without half-weight scaling") {
@@ -410,4 +436,117 @@ TEST_CASE("gameplay engine auto-misses once the bad window is exceeded") {
 
     engine.advance(1041);
     CHECK(engine.stats().counts.bd == 1);
+}
+
+TEST_CASE("judge easy mod expands charge hold tail windows during gameplay") {
+    GameplayChart chart;
+    chart.lane_count = 1;
+    chart.duration_samples = 3000;
+    NoteEvent note;
+    note.lane = 1;
+    note.start_sample = 1000;
+    note.end_sample = 2000;
+    note.release_required = true;
+    chart.notes.push_back(note);
+
+    tenriff::config::ModeConfig mode;
+    mode.mods = {"judge_easy"};
+
+    tenriff::config::JudgeConfig judge;
+    judge.pg_ms = 10.0;
+    judge.gr_ms = 20.0;
+    judge.gd_ms = 30.0;
+    judge.bd_ms = 40.0;
+    judge.hold_grace_ms = 20.0;
+    judge.hold_break_ms = 40.0;
+
+    const auto mode_result =
+        tenriff::app::manage_modes(chart, tenriff::app::ChartFormat::Bms, mode, judge, 1.0);
+
+    GameplayConfig config;
+    config.sample_rate = 1000;
+    config.rate = 1.0;
+    config.judge = mode_result.judge;
+
+    GameplayEngine engine(mode_result.chart, config);
+    (void)engine.handle_input(1, InputState::Pressed, 1000);
+    (void)engine.handle_input(1, InputState::Released, 2024);
+    engine.advance(2500);
+
+    CHECK(engine.stats().counts.pg == 2);
+    CHECK(engine.stats().counts.gr == 0);
+}
+
+TEST_CASE("judge hard mod shrinks charge hold tail windows during gameplay") {
+    GameplayChart chart;
+    chart.lane_count = 1;
+    chart.duration_samples = 3000;
+    NoteEvent note;
+    note.lane = 1;
+    note.start_sample = 1000;
+    note.end_sample = 2000;
+    note.release_required = true;
+    chart.notes.push_back(note);
+
+    tenriff::config::ModeConfig mode;
+    mode.mods = {"judge_hard"};
+
+    tenriff::config::JudgeConfig judge;
+    judge.pg_ms = 10.0;
+    judge.gr_ms = 20.0;
+    judge.gd_ms = 30.0;
+    judge.bd_ms = 40.0;
+    judge.hold_grace_ms = 20.0;
+    judge.hold_break_ms = 40.0;
+
+    const auto mode_result =
+        tenriff::app::manage_modes(chart, tenriff::app::ChartFormat::Bms, mode, judge, 1.0);
+
+    GameplayConfig config;
+    config.sample_rate = 1000;
+    config.rate = 1.0;
+    config.judge = mode_result.judge;
+
+    GameplayEngine engine(mode_result.chart, config);
+    (void)engine.handle_input(1, InputState::Pressed, 1000);
+    (void)engine.handle_input(1, InputState::Released, 2018);
+    engine.advance(2500);
+
+    CHECK(engine.stats().counts.pg == 1);
+    CHECK(engine.stats().counts.gr == 1);
+}
+
+TEST_CASE("full long notes preserve raw score potential during gameplay") {
+    GameplayChart chart;
+    chart.lane_count = 1;
+    chart.duration_samples = 2000;
+    chart.notes.push_back(NoteEvent{1, 1000, std::nullopt});
+
+    tenriff::config::ModeConfig mode;
+    mode.mods = {"full_long_notes"};
+
+    const auto mode_result = tenriff::app::manage_modes(
+        chart,
+        tenriff::app::ChartFormat::Bms,
+        mode,
+        tenriff::config::JudgeConfig{},
+        1.0);
+
+    REQUIRE(mode_result.chart.notes.size() == 1u);
+    REQUIRE(mode_result.chart.notes[0].end_sample.has_value());
+
+    GameplayConfig config;
+    config.sample_rate = 1000;
+    config.rate = 1.0;
+    config.judge.pg_ms = 10.0;
+    config.judge.gr_ms = 20.0;
+    config.judge.gd_ms = 30.0;
+    config.judge.bd_ms = 40.0;
+
+    GameplayEngine engine(mode_result.chart, config);
+    (void)engine.handle_input(1, InputState::Pressed, 1000);
+    engine.advance(2500);
+
+    CHECK(engine.stats().counts.pg == 2);
+    CHECK(engine.stats().raw_score == 1000);
 }

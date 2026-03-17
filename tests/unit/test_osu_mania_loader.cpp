@@ -14,7 +14,10 @@ TEST_CASE("osu!mania loader parses base metadata and notes") {
 Mode:3
 [Metadata]
 Title:Test Song
+TitleUnicode:테스트 곡
 Artist:Composer
+ArtistUnicode:작곡가
+Version:MX
 [Difficulty]
 CircleSize:4
 OverallDifficulty:7.5
@@ -33,7 +36,10 @@ OverallDifficulty:7.5
     CHECK(result.chart.key_count == 4);
     CHECK(std::abs(result.chart.overall_difficulty - 7.5) <= 1e-6);
     CHECK(result.chart.title == "Test Song");
+    CHECK(result.chart.title_unicode == std::string(u8"테스트 곡"));
     CHECK(result.chart.artist == "Composer");
+    CHECK(result.chart.artist_unicode == std::string(u8"작곡가"));
+    CHECK(result.chart.version == "MX");
     CHECK(result.chart.timing_points.size() == 1);
     if (result.chart.timing_points.size() != 1) {
         return;

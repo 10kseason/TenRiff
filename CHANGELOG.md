@@ -2,6 +2,29 @@
 
 TenRiff의 사용자/배포 관점에서 의미 있는 변경만 간단히 기록합니다.
 
+## [0.9.1] - 2026-03-17
+
+### Changed
+- `ModeManager` 기반 모드 정규화/차트 변환/점수 배율 계산 리팩터가 들어간 현재 런타임 상태로 공개 릴리스 메타데이터를 `0.9.1` 기준으로 정렬
+
+### Packaged
+- 공개 소스 번들 스테이징 경로를 `opensource-Tenriff-source/TenRiff-0.9.1-source`로 갱신
+- Windows 배포 스테이징과 공개 소스 zip을 `0.9.1` 기준으로 다시 생성
+
+## [0.9.0] - 2026-03-17
+
+### Added
+- BMS는 `SUBTITLE`/`DIFFICULTY`, osu!mania는 `Version`/`TitleUnicode`/`ArtistUnicode`를 활용해 차분명과 표시 메타데이터를 더 정확히 보존
+- Title/Song Select 메뉴 화면에서 `Mainmusic/` 배경 음악을 재생하고, 공개 배포판도 해당 런타임 자산을 함께 포함
+
+### Changed
+- osu skin import가 현재 활성 스킨 소스를 강제로 `osu`로 덮어쓰지 않도록 조정해 native/osu 토글 고정을 해소
+- 공개/오픈소스 릴리스 메타데이터를 `0.9.0` 기준으로 정렬
+
+### Packaged
+- 공개 소스 번들 스테이징 경로를 `opensource-Tenriff-source/TenRiff-0.9.0-source`로 갱신
+- Windows 배포 스테이징과 공개 소스 zip을 `0.9.0` 기준으로 다시 생성
+
 ## [0.8.8] - 2026-03-17
 
 ### Changed
