@@ -4,10 +4,27 @@
 #include <limits>
 #include <numeric>
 #include <random>
+#include <utility>
+
+#include "gameplay/KeyModeConverter.h"
 
 namespace tenriff::gameplay {
 
 namespace {
+
+void sort_notes_for_gameplay(GameplayChart& chart) {
+    std::stable_sort(chart.notes.begin(), chart.notes.end(), [](const NoteEvent& lhs, const NoteEvent& rhs) {
+        if (lhs.start_sample != rhs.start_sample) {
+            return lhs.start_sample < rhs.start_sample;
+        }
+        if (lhs.lane != rhs.lane) {
+            return lhs.lane < rhs.lane;
+        }
+        const int64_t lhs_end = lhs.end_sample.value_or(lhs.start_sample);
+        const int64_t rhs_end = rhs.end_sample.value_or(rhs.start_sample);
+        return lhs_end < rhs_end;
+    });
+}
 
 int resolve_lane_count(const GameplayChart& chart) {
     int lane_count = chart.lane_count;
@@ -38,6 +55,63 @@ uint32_t normalize_seed(uint32_t seed) {
     return seed;
 }
 
+KeyModeConverterOptions default_converter_options(int source_lane_count,
+                                                  int target_lane_count,
+                                                  uint32_t seed,
+                                                  const ModeApplyContext& context) {
+    KeyModeConverterOptions options;
+    options.target_lane_count = target_lane_count;
+    options.seed = normalize_seed(seed);
+    options.base_bpm = context.base_bpm;
+    options.sample_rate = context.sample_rate;
+
+    if (target_lane_count >= 8 && target_lane_count > source_lane_count && source_lane_count <= 7) {
+        options.max_keys = std::max(1, source_lane_count);
+        options.min_keys = std::max(1, source_lane_count);
+        options.transform_speed_slot = 2;
+        return options;
+    }
+
+    if (target_lane_count <= 4) {
+        options.max_keys = target_lane_count;
+        options.min_keys = target_lane_count;
+        options.transform_speed_slot = 2;
+        return options;
+    }
+
+    if (target_lane_count <= 6) {
+        options.max_keys = target_lane_count;
+        options.min_keys = std::min(target_lane_count, 4);
+        options.transform_speed_slot = 2;
+        return options;
+    }
+
+    options.max_keys = std::min(target_lane_count, 8);
+    options.min_keys = 2;
+    options.transform_speed_slot = 4;
+    return options;
+}
+
+void apply_legacy_key_mode_fallback(GameplayChart& chart,
+                                    int target_count,
+                                    std::vector<std::string>& warnings) {
+    if (target_count <= 0 || target_count == chart.lane_count) {
+        return;
+    }
+
+    if (target_count < chart.lane_count) {
+        auto& notes = chart.notes;
+        notes.erase(std::remove_if(notes.begin(), notes.end(), [target_count](const NoteEvent& note) {
+            return note.lane > target_count;
+        }), notes.end());
+        chart.lane_count = target_count;
+        warnings.push_back("Key mode fallback dropped notes outside the target lane range.");
+        return;
+    }
+
+    warnings.push_back("Key mode fallback kept the original lane count.");
+}
+
 void apply_full_random(GameplayChart& chart, uint32_t seed) {
     const int lane_count = chart.lane_count;
     if (lane_count <= 0) {
@@ -55,6 +129,8 @@ void apply_full_random(GameplayChart& chart, uint32_t seed) {
         }
         note.lane = permutation[static_cast<std::size_t>(note.lane - 1)];
     }
+
+    sort_notes_for_gameplay(chart);
 }
 
 void apply_super_random(GameplayChart& chart, uint32_t seed, std::vector<std::string>& warnings) {
@@ -119,6 +195,8 @@ void apply_super_random(GameplayChart& chart, uint32_t seed, std::vector<std::st
         lane_end[lane_index] = std::max(lane_end[lane_index], span.end);
     }
 
+    sort_notes_for_gameplay(chart);
+
     if (fallback_count > 0) {
         warnings.push_back("SR fallback: overlapping notes could not be fully avoided (count=" +
                            std::to_string(fallback_count) + ").");
@@ -127,22 +205,25 @@ void apply_super_random(GameplayChart& chart, uint32_t seed, std::vector<std::st
 
 }  // namespace
 
-ModeApplyResult apply_mode_settings(const GameplayChart& chart, const ModeSettings& settings) {
+ModeApplyResult apply_mode_settings(const GameplayChart& chart,
+                                    const ModeSettings& settings,
+                                    const ModeApplyContext& context) {
     ModeApplyResult result;
     result.chart = chart;
     result.chart.lane_count = resolve_lane_count(chart);
 
     const int target_count = target_lane_count(settings.key_mode);
     if (target_count > 0 && target_count != result.chart.lane_count) {
-        if (target_count < result.chart.lane_count) {
-            auto& notes = result.chart.notes;
-            notes.erase(std::remove_if(notes.begin(), notes.end(), [target_count](const NoteEvent& note) {
-                return note.lane > target_count;
-            }), notes.end());
-            result.chart.lane_count = target_count;
-            result.warnings.push_back("Key mode reduces lanes; notes outside range were dropped.");
+        auto converted = convert_key_mode_chart(result.chart,
+                                                default_converter_options(result.chart.lane_count,
+                                                                          target_count,
+                                                                          settings.random_seed,
+                                                                          context));
+        result.warnings.insert(result.warnings.end(), converted.warnings.begin(), converted.warnings.end());
+        if (converted.converted) {
+            result.chart = std::move(converted.chart);
         } else {
-            result.warnings.push_back("Key mode exceeds chart lanes; keeping original lanes.");
+            apply_legacy_key_mode_fallback(result.chart, target_count, result.warnings);
         }
     }
 
