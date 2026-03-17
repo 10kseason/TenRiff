@@ -42,6 +42,7 @@ struct GameplayHudRevisionInput {
     int combo = 0;
     int max_combo = 0;
     gameplay::JudgementCounts counts;
+    int64_t score = 0;
 
     double gauge = 0.0;
     game::GaugeType gauge_type = game::GaugeType::Normal;
@@ -100,6 +101,7 @@ inline GameplayHudRevisionFlags diff_gameplay_hud_revisions(const GameplayHudRev
         previous.counts.gr != next.counts.gr ||
         previous.counts.gd != next.counts.gd ||
         previous.counts.bd != next.counts.bd ||
+        previous.score != next.score ||
         previous.gauge != next.gauge ||
         previous.gauge_type != next.gauge_type ||
         previous.rate != next.rate ||

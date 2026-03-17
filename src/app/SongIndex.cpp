@@ -34,7 +34,7 @@ namespace tenriff::app {
 
 namespace {
 
-constexpr int kSongIndexVersion = 7;
+constexpr int kSongIndexVersion = 8;
 constexpr std::uintmax_t kMaxMetadataChartFileBytes = 8u * 1024u * 1024u;
 
 bool cancel_requested(const SongIndexCancelCallback& cancel) {
@@ -108,6 +108,55 @@ std::string trim_copy(std::string_view value) {
         --end;
     }
     return std::string(value.substr(begin, end - begin));
+}
+
+std::string sanitized_metadata_text(std::string_view value) {
+    return util::sanitize_ui_text(trim_copy(value));
+}
+
+std::string preferred_osu_metadata_text(std::string_view primary, std::string_view unicode) {
+    std::string preferred = sanitized_metadata_text(unicode);
+    if (!preferred.empty()) {
+        return preferred;
+    }
+    return sanitized_metadata_text(primary);
+}
+
+std::string bms_chart_name_from_headers(const chart::BmsChart& parsed_chart) {
+    auto subtitle_it = parsed_chart.headers.find("SUBTITLE");
+    if (subtitle_it != parsed_chart.headers.end()) {
+        std::string subtitle = sanitized_metadata_text(subtitle_it->second);
+        if (!subtitle.empty()) {
+            return subtitle;
+        }
+    }
+
+    auto difficulty_it = parsed_chart.headers.find("DIFFICULTY");
+    if (difficulty_it == parsed_chart.headers.end()) {
+        return {};
+    }
+
+    std::string difficulty = sanitized_metadata_text(difficulty_it->second);
+    if (difficulty.empty()) {
+        return {};
+    }
+
+    if (difficulty == "1") {
+        return "Beginner";
+    }
+    if (difficulty == "2") {
+        return "Normal";
+    }
+    if (difficulty == "3") {
+        return "Hyper";
+    }
+    if (difficulty == "4") {
+        return "Another";
+    }
+    if (difficulty == "5") {
+        return "Insane";
+    }
+    return difficulty;
 }
 
 bool is_bms_extension(std::string_view ext) {
@@ -501,6 +550,7 @@ SongEntry build_bms_entry(std::string relative_path,
     if (artist_it != parsed.chart.headers.end()) {
         entry.artist = util::sanitize_ui_text(artist_it->second);
     }
+    entry.chart_name = bms_chart_name_from_headers(parsed.chart);
 
     auto level_it = parsed.chart.headers.find("PLAYLEVEL");
     if (level_it != parsed.chart.headers.end()) {
@@ -567,8 +617,12 @@ SongEntry build_osu_entry(std::string relative_path,
     }
 
     entry.key_count = parsed.chart.key_count;
-    entry.title = parsed.chart.title.empty() ? fallback_title(full_path) : util::sanitize_ui_text(parsed.chart.title);
-    entry.artist = util::sanitize_ui_text(parsed.chart.artist);
+    entry.title = preferred_osu_metadata_text(parsed.chart.title, parsed.chart.title_unicode);
+    if (entry.title.empty()) {
+        entry.title = fallback_title(full_path);
+    }
+    entry.artist = preferred_osu_metadata_text(parsed.chart.artist, parsed.chart.artist_unicode);
+    entry.chart_name = sanitized_metadata_text(parsed.chart.version);
     entry.bpm = parsed.chart.base_bpm;
 
     const auto difficulty = chart::calculate_osu_mania_difficulty(parsed.chart);
@@ -1274,6 +1328,12 @@ private:
                     return false;
                 }
                 entry.artist = util::sanitize_ui_text(value.value());
+            } else if (*key == "chart_name") {
+                auto value = parse_string();
+                if (!value.has_value()) {
+                    return false;
+                }
+                entry.chart_name = util::sanitize_ui_text(value.value());
             } else if (*key == "format") {
                 auto value = parse_string();
                 if (!value.has_value()) {
@@ -1466,6 +1526,8 @@ bool save_song_index(const std::string& path,
         write_json_string(file, entry.title);
         file << ",\"artist\":";
         write_json_string(file, entry.artist);
+        file << ",\"chart_name\":";
+        write_json_string(file, entry.chart_name);
         file << ",\"format\":";
         write_json_string(file, entry.format);
         file << ",\"layout_label\":";

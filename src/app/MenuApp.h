@@ -12,6 +12,7 @@
 
 #include "app/CommandLine.h"
 #include "app/GameplayHudRevisions.h"
+#include "app/MenuMusicController.h"
 #include "app/SongSelectState.h"
 #include "GameplayHudLimits.h"
 #include "app/SongIndex.h"
@@ -40,6 +41,7 @@ public:
     [[nodiscard]] int exit_code() const { return exit_code_; }
 
 private:
+    struct BestResultRecord;
     struct LocalPlayRecord;
     struct ReplaySummary;
 
@@ -56,6 +58,7 @@ private:
         SettingsSkins,
         SettingsInput,
         ModeSelect,
+        ModeMods,
         Keymap,
         KeymapConfirm,
         KeymapTest,
@@ -118,6 +121,7 @@ private:
         int combo = 0;
         int max_combo = 0;
         gameplay::JudgementCounts counts;
+        int64_t score = 0;
 
         double gauge = 0.0;
         game::GaugeType gauge_type = game::GaugeType::Normal;
@@ -165,12 +169,25 @@ private:
     void handle_skins_settings_input(uint32_t keycode);
     void handle_input_settings_input(uint32_t keycode);
     void handle_mode_settings_input(uint32_t keycode);
+    void handle_mode_mods_input(uint32_t keycode);
     void handle_keymap_input(uint32_t keycode);
     void handle_keymap_confirm_input(uint32_t keycode);
     void handle_keymap_test_input(uint32_t keycode);
     void handle_result_input(uint32_t keycode);
 
     void publish_snapshot();
+    [[nodiscard]] std::string current_track_label() const;
+    void populate_quick_setup_render_data(render::MenuRenderData& render);
+    void populate_title_render_data(render::MenuRenderData& render,
+                                    const std::string& current_track,
+                                    const BestResultRecord& current_best);
+    void populate_song_select_render_data(render::MenuRenderData& render,
+                                          const std::string& current_track,
+                                          const BestResultRecord& current_best,
+                                          const LocalPlayRecord* selected_record);
+    void populate_song_browser_render_data(render::MenuRenderData& render);
+    void populate_result_render_data(render::MenuRenderData& render, const std::string& current_track);
+    void populate_generic_screen_render_data(render::MenuRenderData& render);
     void render_tick();
     void render_snapshot(const MenuSnapshot& snapshot);
     void update_keymap_capture_timeout();
@@ -212,6 +229,7 @@ private:
     [[nodiscard]] std::string song_background_preview_path_for_entry(const SongEntry& entry);
     [[nodiscard]] std::string selected_song_absolute_path() const;
     [[nodiscard]] std::string selected_song_background_preview_path();
+    void sync_menu_music();
     void open_keymap_screen(Screen return_screen);
     void populate_help_overlay(render::HelpOverlayData& target) const;
 
@@ -224,6 +242,8 @@ private:
         std::string rank = "--";
         int64_t best_score = 0;
         std::string clear_status = "FAILED";
+        std::string final_gauge = "normal";
+        bool game_over = true;
         int max_combo = 0;
         int perfect = 0;
         int great = 0;
@@ -243,6 +263,10 @@ private:
         std::string clear_status = "FAILED";
         std::string final_gauge = "normal";
         bool game_over = true;
+        std::vector<std::string> mods;
+        double rate_multiplier = 1.0;
+        double score_multiplier = 1.0;
+        int64_t raw_score = 0;
         int64_t score = 0;
         double accuracy = 0.0;
         int max_combo = 0;
@@ -266,6 +290,10 @@ private:
         int64_t duration_samples = 0;
         double rate = 1.0;
         double input_offset_ms = 0.0;
+        std::vector<std::string> mods;
+        double rate_multiplier = 1.0;
+        double score_multiplier = 1.0;
+        int64_t final_score = 0;
         std::string error;
     };
 
@@ -287,6 +315,10 @@ private:
     std::string last_replay_path_;
     std::string last_result_path_;
     std::vector<std::string> last_export_warnings_;
+    std::vector<std::string> last_result_mods_{};
+    double last_result_rate_multiplier_ = 1.0;
+    double last_result_score_multiplier_ = 1.0;
+    int64_t last_result_final_score_ = 0;
     double last_chart_bpm_ = 0.0;
     GameplayHudState gameplay_hud_{};
 
@@ -340,6 +372,7 @@ private:
 
     input::InputThread input_thread_{};
     audio::AudioThread audio_thread_{};
+    MenuMusicController menu_music_{};
     render::RenderThread render_thread_{};
     render::MenuWindow menu_window_{};
 

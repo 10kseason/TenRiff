@@ -29,11 +29,11 @@
 #include "app/GameplayHudRevisions.h"
 #include "app/GraphicsTiming.h"
 #include "app/MemoryDiagnostics.h"
+#include "app/ModeManager.h"
+#include "app/MenuRecordUtils.h"
+#include "app/MenuSongUtils.h"
 #include "app/OsuSkin.h"
 #include "app/RuntimeConfigMigration.h"
-#include "chart/BmsParser.h"
-#include "chart/OsuManiaLoader.h"
-#include "config/SimpleJson.h"
 #include "config/KeycodeMap.h"
 #include "render/GameplayMotion.h"
 #include "timing/HighResClock.h"
@@ -112,6 +112,63 @@ std::filesystem::path path_from_utf8(std::string_view value) {
     } catch (...) {
         return {};
     }
+}
+
+#ifdef _WIN32
+std::optional<std::filesystem::path> executable_directory_path() {
+    wchar_t buffer[32768] = {};
+    const DWORD length = GetModuleFileNameW(nullptr, buffer, static_cast<DWORD>(sizeof(buffer) / sizeof(buffer[0])));
+    if (length == 0 || length >= (sizeof(buffer) / sizeof(buffer[0]))) {
+        return std::nullopt;
+    }
+    return std::filesystem::path(buffer).parent_path();
+}
+#endif
+
+std::string resolve_menu_music_file_path(std::string_view filename) {
+    if (filename.empty()) {
+        return {};
+    }
+
+    namespace fs = std::filesystem;
+    std::vector<fs::path> roots;
+    auto push_root = [&](const fs::path& root) {
+        if (root.empty() || std::find(roots.begin(), roots.end(), root) != roots.end()) {
+            return;
+        }
+        roots.push_back(root);
+    };
+
+    std::error_code ec;
+    const fs::path current = fs::current_path(ec);
+    if (!ec && !current.empty()) {
+        push_root(current);
+        push_root(current.parent_path());
+        push_root(current.parent_path().parent_path());
+    }
+
+#ifdef _WIN32
+    if (auto exe_dir = executable_directory_path(); exe_dir.has_value()) {
+        push_root(*exe_dir);
+        push_root(exe_dir->parent_path());
+        push_root(exe_dir->parent_path().parent_path());
+    }
+#endif
+
+    for (const auto& root : roots) {
+        const fs::path candidate = root / "Mainmusic" / path_from_utf8(filename);
+        ec.clear();
+        if (!fs::is_regular_file(candidate, ec)) {
+            continue;
+        }
+
+        const fs::path canonical = fs::weakly_canonical(candidate, ec);
+        if (!ec && !canonical.empty()) {
+            return canonical.u8string();
+        }
+        return candidate.lexically_normal().u8string();
+    }
+    return {};
 }
 
 std::string safe_ui_text(std::string_view value, std::string_view fallback = {}) {
@@ -196,6 +253,27 @@ std::string on_off(bool value) {
 
 int clamp_int(int value, int min_value, int max_value) {
     return std::max(min_value, std::min(max_value, value));
+}
+
+void append_menu_row(render::GenericMenuData& menu,
+                     std::string label,
+                     std::string value,
+                     bool selected,
+                     render::MenuHitTargetKind target_kind,
+                     int row_index,
+                     bool activatable,
+                     bool adjustable) {
+    render::MenuRowData row;
+    row.label = std::move(label);
+    row.value = std::move(value);
+    row.selected = selected;
+    row.activatable = activatable;
+    row.adjustable = adjustable;
+    row.increment_enabled = adjustable;
+    row.decrement_enabled = adjustable;
+    row.target_kind = target_kind;
+    row.row_index = row_index;
+    menu.rows.push_back(std::move(row));
 }
 
 #ifdef _WIN32
@@ -325,6 +403,43 @@ std::string format_decimal(double value) {
     stream.precision(2);
     stream << value;
     return stream.str();
+}
+
+std::string mode_score_summary(const std::vector<std::string>& mods, double rate) {
+    return mode_mod_summary(mods) + " / " + format_multiplier(final_score_multiplier(mods, rate));
+}
+
+std::vector<std::string> cycle_mode_mod_category(const std::vector<std::string>& active_mods,
+                                                 const ModeModCategoryDescriptor& category,
+                                                 int direction) {
+    std::vector<std::string> normalized = normalize_mode_mod_tokens(active_mods);
+    int current_index = 0;
+    for (std::size_t i = 0; i < category.mods.size(); ++i) {
+        if (std::find(normalized.begin(), normalized.end(), std::string(category.mods[i]->token)) != normalized.end()) {
+            current_index = static_cast<int>(i) + 1;
+            break;
+        }
+    }
+
+    const int option_count = static_cast<int>(category.mods.size()) + 1;
+    int next_index = current_index + direction;
+    if (next_index < 0) {
+        next_index = option_count - 1;
+    } else if (next_index >= option_count) {
+        next_index = 0;
+    }
+
+    normalized.erase(std::remove_if(normalized.begin(),
+                                    normalized.end(),
+                                    [&](const std::string& token) {
+                                        const auto* descriptor = find_mode_mod_descriptor(token);
+                                        return descriptor && descriptor->category_token == category.token;
+                                    }),
+                     normalized.end());
+    if (next_index > 0) {
+        normalized.push_back(std::string(category.mods[static_cast<std::size_t>(next_index - 1)]->token));
+    }
+    return normalize_mode_mod_tokens(normalized);
 }
 
 std::string format_signed_offset_ms(double value) {
@@ -509,7 +624,12 @@ std::string song_layout_label(const SongEntry& entry) {
 }
 
 std::string song_detail_label(const SongEntry& entry) {
-    return song_layout_label(entry) + " " + format_label(to_lower_ascii(entry.format));
+    std::string detail = song_layout_label(entry) + " " + format_label(to_lower_ascii(entry.format));
+    const std::string chart_name = safe_ui_text(entry.chart_name);
+    if (!chart_name.empty()) {
+        detail += " / " + chart_name;
+    }
+    return detail;
 }
 
 std::string normalize_runtime_key_mode(std::string value) {
@@ -728,16 +848,6 @@ std::string to_lower_ascii(std::string value) {
     std::transform(value.begin(), value.end(), value.begin(), [](unsigned char ch) {
         if (ch >= static_cast<unsigned char>('A') && ch <= static_cast<unsigned char>('Z')) {
             return static_cast<char>(ch - static_cast<unsigned char>('A') + static_cast<unsigned char>('a'));
-        }
-        return static_cast<char>(ch);
-    });
-    return value;
-}
-
-std::string to_upper_ascii(std::string value) {
-    std::transform(value.begin(), value.end(), value.begin(), [](unsigned char ch) {
-        if (ch >= static_cast<unsigned char>('a') && ch <= static_cast<unsigned char>('z')) {
-            return static_cast<char>(ch - static_cast<unsigned char>('a') + static_cast<unsigned char>('A'));
         }
         return static_cast<char>(ch);
     });
@@ -982,48 +1092,6 @@ MenuApp::SongSortMode toggle_title_sort(MenuApp::SongSortMode mode) {
     return MenuApp::SongSortMode::TitleAsc;
 }
 
-int clear_status_priority(std::string_view clear_status, bool game_over, std::string_view final_gauge) {
-    const std::string status = to_lower_ascii(std::string(clear_status));
-    if (game_over || status.find("fail") != std::string::npos) {
-        return 0;
-    }
-    const std::string gauge = to_lower_ascii(std::string(final_gauge));
-    if (status.find("hard") != std::string::npos || gauge == "hard") {
-        return 3;
-    }
-    if (status.find("easy") != std::string::npos || gauge == "easy") {
-        return 1;
-    }
-    return 2;
-}
-
-std::string normalized_clear_status(std::string_view clear_status, bool game_over, std::string_view final_gauge) {
-    const std::string status = safe_ui_text(clear_status);
-    if (!status.empty()) {
-        return status;
-    }
-    if (game_over) {
-        return "FAILED";
-    }
-    const std::string gauge = to_lower_ascii(std::string(final_gauge));
-    if (gauge == "hard") {
-        return "HARD CLEAR";
-    }
-    if (gauge == "easy") {
-        return "EASY CLEAR";
-    }
-    return "CLEAR";
-}
-
-std::string compact_timestamp_label(std::string_view created_utc) {
-    std::string value(created_utc);
-    if (value.size() >= 16 && value[8] == '_' && value.back() == 'Z') {
-        return value.substr(0, 4) + "-" + value.substr(4, 2) + "-" + value.substr(6, 2) + " " +
-               value.substr(9, 2) + ":" + value.substr(11, 2) + ":" + value.substr(13, 2) + " UTC";
-    }
-    return safe_ui_text_or_placeholder(created_utc, "-");
-}
-
 std::string browser_summary_label(std::string_view query, int key_filter, int level_min, int level_max) {
     std::vector<std::string> parts;
     if (!query.empty()) {
@@ -1063,73 +1131,6 @@ std::optional<char> search_character_from_keycode(uint32_t keycode) {
     if (name == "LBracket") return '[';
     if (name == "RBracket") return ']';
     return std::nullopt;
-}
-
-bool is_bms_chart_extension(std::string_view ext) {
-    return ext == ".bms" || ext == ".bme" || ext == ".bml" || ext == ".pms";
-}
-
-bool is_supported_chart_extension(std::string_view ext) {
-    return is_bms_chart_extension(ext) || ext == ".osu";
-}
-
-std::optional<std::string> normalize_dropped_song_source(const std::string& raw_path) {
-    namespace fs = std::filesystem;
-    if (raw_path.empty()) {
-        return std::nullopt;
-    }
-
-    fs::path candidate = path_from_utf8(raw_path);
-    std::error_code ec;
-    const fs::path canonical = fs::weakly_canonical(candidate, ec);
-    if (!ec && !canonical.empty()) {
-        candidate = canonical;
-    } else {
-        ec.clear();
-        candidate = candidate.lexically_normal();
-    }
-
-    if (fs::is_directory(candidate, ec)) {
-        return candidate.u8string();
-    }
-    ec.clear();
-
-    if (fs::is_regular_file(candidate, ec) &&
-        is_supported_chart_extension(to_lower_ascii(candidate.extension().u8string()))) {
-        const fs::path parent = candidate.parent_path();
-        if (!parent.empty()) {
-            return parent.u8string();
-        }
-    }
-
-    return std::nullopt;
-}
-
-std::string normalize_song_source_path(const std::string& raw_path) {
-    namespace fs = std::filesystem;
-    if (raw_path.empty()) {
-        return {};
-    }
-
-    fs::path candidate = path_from_utf8(raw_path);
-    std::error_code ec;
-    if (!candidate.is_absolute()) {
-        const fs::path absolute = fs::absolute(candidate, ec);
-        if (!ec && !absolute.empty()) {
-            candidate = absolute;
-        } else {
-            ec.clear();
-        }
-    }
-
-    const fs::path canonical = fs::weakly_canonical(candidate, ec);
-    if (!ec && !canonical.empty()) {
-        candidate = canonical;
-    } else {
-        ec.clear();
-        candidate = candidate.lexically_normal();
-    }
-    return candidate.u8string();
 }
 
 std::string normalize_filesystem_display_name(std::string value) {
@@ -1226,334 +1227,6 @@ std::optional<std::string> pick_folder_dialog_utf8() {
 }
 #endif
 
-std::string trim_copy(std::string_view value) {
-    std::size_t begin = 0;
-    std::size_t end = value.size();
-    while (begin < end && std::isspace(static_cast<unsigned char>(value[begin])) != 0) {
-        ++begin;
-    }
-    while (end > begin && std::isspace(static_cast<unsigned char>(value[end - 1])) != 0) {
-        --end;
-    }
-    return std::string(value.substr(begin, end - begin));
-}
-
-std::string normalize_asset_reference(std::string value) {
-    value = trim_copy(value);
-    if (value.size() >= 2) {
-        const char first = value.front();
-        const char last = value.back();
-        if ((first == '"' && last == '"') || (first == '\'' && last == '\'')) {
-            value = trim_copy(std::string_view(value).substr(1, value.size() - 2));
-        }
-    }
-    return value;
-}
-
-bool is_preview_image_extension(std::string_view ext) {
-    return ext == ".png" || ext == ".jpg" || ext == ".jpeg" || ext == ".bmp" ||
-           ext == ".gif" || ext == ".tif" || ext == ".tiff" || ext == ".webp";
-}
-
-std::string normalize_asset_lookup_key(std::string value) {
-    std::replace(value.begin(), value.end(), '\\', '/');
-    return to_lower_ascii(std::move(value));
-}
-
-std::filesystem::path normalize_resolved_preview_path(const std::filesystem::path& path) {
-    namespace fs = std::filesystem;
-    std::error_code ec;
-    fs::path normalized = path;
-    if (!normalized.is_absolute()) {
-        const fs::path absolute = fs::absolute(normalized, ec);
-        if (!ec && !absolute.empty()) {
-            normalized = absolute;
-        } else {
-            ec.clear();
-        }
-    }
-
-    const fs::path canonical = fs::weakly_canonical(normalized, ec);
-    if (!ec && !canonical.empty()) {
-        return canonical;
-    }
-    return normalized.lexically_normal();
-}
-
-struct PreviewAssetLookupIndex {
-    bool built = false;
-    std::unordered_map<std::string, std::filesystem::path> by_relative;
-    std::unordered_map<std::string, std::filesystem::path> by_filename;
-};
-
-void build_preview_asset_lookup(const std::filesystem::path& chart_path, PreviewAssetLookupIndex& lookup) {
-    if (lookup.built) {
-        return;
-    }
-    lookup.built = true;
-    lookup.by_relative.clear();
-    lookup.by_filename.clear();
-
-    namespace fs = std::filesystem;
-    const fs::path root = chart_path.parent_path();
-    if (root.empty()) {
-        return;
-    }
-
-    std::error_code ec;
-    fs::directory_options options = fs::directory_options::skip_permission_denied;
-    fs::recursive_directory_iterator it(root, options, ec);
-    fs::recursive_directory_iterator end;
-    while (it != end) {
-        if (ec) {
-            ec.clear();
-            it.increment(ec);
-            continue;
-        }
-        const fs::directory_entry& entry = *it;
-        if (!entry.is_regular_file(ec)) {
-            ec.clear();
-            it.increment(ec);
-            continue;
-        }
-        ec.clear();
-
-        const std::string ext = to_lower_ascii(entry.path().extension().u8string());
-        if (!is_preview_image_extension(ext)) {
-            it.increment(ec);
-            continue;
-        }
-
-        const fs::path full = normalize_resolved_preview_path(entry.path());
-        fs::path relative = fs::relative(full, root, ec);
-        if (ec || relative.empty()) {
-            ec.clear();
-            relative = full.lexically_relative(root);
-        }
-        if (!relative.empty()) {
-            lookup.by_relative.emplace(normalize_asset_lookup_key(relative.generic_u8string()), full);
-        }
-        lookup.by_filename.emplace(normalize_asset_lookup_key(full.filename().u8string()), full);
-        it.increment(ec);
-    }
-}
-
-std::optional<std::filesystem::path> lookup_preview_asset_candidate(const std::filesystem::path& chart_path,
-                                                                    const std::filesystem::path& ref_path,
-                                                                    PreviewAssetLookupIndex& lookup) {
-    namespace fs = std::filesystem;
-    const fs::path direct = ref_path.is_absolute()
-                                ? ref_path.lexically_normal()
-                                : (chart_path.parent_path() / ref_path).lexically_normal();
-    std::error_code ec;
-    if (!direct.empty() && fs::exists(direct, ec) && !ec &&
-        is_preview_image_extension(to_lower_ascii(direct.extension().u8string()))) {
-        return normalize_resolved_preview_path(direct);
-    }
-
-    build_preview_asset_lookup(chart_path, lookup);
-
-    const std::string relative_key = normalize_asset_lookup_key(ref_path.generic_u8string());
-    auto relative_it = lookup.by_relative.find(relative_key);
-    if (relative_it != lookup.by_relative.end()) {
-        return relative_it->second;
-    }
-
-    const std::string file_key = normalize_asset_lookup_key(ref_path.filename().u8string());
-    auto file_it = lookup.by_filename.find(file_key);
-    if (file_it != lookup.by_filename.end()) {
-        return file_it->second;
-    }
-
-    return std::nullopt;
-}
-
-std::vector<std::filesystem::path> build_preview_reference_candidates(const std::string& reference) {
-    namespace fs = std::filesystem;
-    static constexpr std::string_view kPreviewExts[] = {
-        ".png", ".jpg", ".jpeg", ".bmp", ".gif", ".tif", ".tiff", ".webp",
-    };
-
-    const std::string normalized = normalize_asset_reference(reference);
-#ifdef _WIN32
-    fs::path ref_path = fs::u8path(normalized);
-#else
-    fs::path ref_path(normalized);
-#endif
-
-    std::vector<fs::path> candidates;
-    std::unordered_set<std::string> seen;
-    auto push_candidate = [&](const fs::path& candidate) {
-        const std::string key = normalize_asset_lookup_key(candidate.generic_u8string());
-        if (seen.emplace(key).second) {
-            candidates.push_back(candidate);
-        }
-    };
-
-    push_candidate(ref_path);
-
-    const std::string ext = to_lower_ascii(ref_path.extension().u8string());
-    if (ext.empty()) {
-        for (std::string_view preview_ext : kPreviewExts) {
-            fs::path candidate = ref_path;
-            candidate += preview_ext;
-            push_candidate(candidate);
-        }
-    } else if (is_preview_image_extension(ext)) {
-        for (std::string_view preview_ext : kPreviewExts) {
-            if (preview_ext == ext) {
-                continue;
-            }
-            fs::path candidate = ref_path;
-            candidate.replace_extension(preview_ext);
-            push_candidate(candidate);
-        }
-    }
-
-    return candidates;
-}
-
-std::optional<std::filesystem::path> resolve_preview_asset_path(const std::filesystem::path& chart_path,
-                                                                const std::string& reference) {
-    PreviewAssetLookupIndex lookup;
-    for (const auto& candidate : build_preview_reference_candidates(reference)) {
-        if (auto resolved = lookup_preview_asset_candidate(chart_path, candidate, lookup); resolved.has_value()) {
-            return resolved;
-        }
-    }
-    return std::nullopt;
-}
-
-std::vector<std::string> collect_bms_preview_references(const chart::BmsChart& chart) {
-    std::vector<std::string> references;
-    std::unordered_set<std::string> seen;
-    auto append_reference = [&](std::string value) {
-        value = normalize_asset_reference(std::move(value));
-        if (value.empty()) {
-            return;
-        }
-        const std::string key = normalize_asset_lookup_key(value);
-        if (seen.emplace(key).second) {
-            references.push_back(std::move(value));
-        }
-    };
-
-    for (std::string_view header_key : {"STAGEFILE", "BACKBMP"}) {
-        auto header_it = chart.headers.find(std::string(header_key));
-        if (header_it != chart.headers.end()) {
-            append_reference(header_it->second);
-        }
-    }
-
-    auto append_bga_references = [&](std::string_view channel) {
-        for (const auto& command : chart.commands) {
-            if (command.channel != channel) {
-                continue;
-            }
-            for (std::size_t i = 0; i + 1 < command.data.size(); i += 2) {
-                std::string slot = command.data.substr(i, 2);
-                if (slot == "00") {
-                    continue;
-                }
-                slot = to_upper_ascii(std::move(slot));
-                auto bmp_it = chart.bmp.find(slot);
-                if (bmp_it == chart.bmp.end()) {
-                    continue;
-                }
-                append_reference(bmp_it->second);
-            }
-        }
-    };
-
-    for (std::string_view channel : {"04", "07", "06"}) {
-        append_bga_references(channel);
-    }
-    return references;
-}
-
-std::string song_source_display_name(const std::string& raw_path) {
-    namespace fs = std::filesystem;
-    if (raw_path.empty()) {
-        return "Songs";
-    }
-
-    fs::path source_path = path_from_utf8(raw_path);
-    try {
-        source_path = source_path.lexically_normal();
-        if (!source_path.filename().empty()) {
-            return safe_ui_text(source_path.filename().u8string(), "Songs");
-        }
-        if (!source_path.root_name().empty()) {
-            return safe_ui_text(source_path.root_name().u8string(), "Songs");
-        }
-        return safe_ui_text(source_path.u8string(), "Songs");
-    } catch (...) {
-        return "Songs";
-    }
-}
-
-int judged_total(const gameplay::JudgementCounts& counts) {
-    return counts.pg + counts.gr + counts.gd + counts.bd;
-}
-
-double calculate_accuracy(const gameplay::ResultStats& stats) {
-    const int judged = judged_total(stats.counts);
-    if (judged <= 0) {
-        return 0.0;
-    }
-    const double weighted = static_cast<double>(stats.counts.pg) +
-                            static_cast<double>(stats.counts.gr) * 0.80 +
-                            static_cast<double>(stats.counts.gd) * 0.50 +
-                            static_cast<double>(stats.counts.bd) * 0.20;
-    return std::clamp(weighted / static_cast<double>(judged) * 100.0, 0.0, 100.0);
-}
-
-int64_t calculate_score(const gameplay::ResultStats& stats) {
-    int64_t score = static_cast<int64_t>(stats.counts.pg) * 1000 +
-                    static_cast<int64_t>(stats.counts.gr) * 700 +
-                    static_cast<int64_t>(stats.counts.gd) * 300;
-    score -= static_cast<int64_t>(stats.counts.bd) * 200;
-    return std::max<int64_t>(0, score);
-}
-
-bool infer_game_over(const gameplay::ResultStats& stats) {
-    const int judged = judged_total(stats.counts);
-    if (judged <= 0) {
-        return true;
-    }
-    if (stats.total_notes > 0 && judged < stats.total_notes) {
-        return true;
-    }
-    return false;
-}
-
-std::string calculate_rank(const gameplay::ResultStats& stats, bool game_over) {
-    if (game_over) {
-        return "F";
-    }
-    const int judged = judged_total(stats.counts);
-    if (judged <= 0) {
-        return "--";
-    }
-    const double accuracy = calculate_accuracy(stats);
-    if (accuracy >= 99.0 && stats.counts.bd == 0) {
-        return "SS";
-    }
-    if (accuracy >= 95.0) {
-        return "S";
-    }
-    if (accuracy >= 90.0) {
-        return "A";
-    }
-    if (accuracy >= 80.0) {
-        return "B";
-    }
-    if (accuracy >= 70.0) {
-        return "C";
-    }
-    return "D";
-}
-
 game::GaugeType gauge_type_from_mode_string(std::string_view value) {
     if (value == "hard") {
         return game::GaugeType::Hard;
@@ -1591,354 +1264,6 @@ std::string filename_only(const std::string& path) {
     return path_from_utf8(path).filename().u8string();
 }
 
-const config::JsonValue* find_json_value(const config::JsonObject& root, std::string_view key) {
-    auto it = root.find(std::string(key));
-    if (it == root.end()) {
-        return nullptr;
-    }
-    return &it->second;
-}
-
-const config::JsonObject* find_json_object(const config::JsonObject& root, std::string_view key) {
-    const auto* value = find_json_value(root, key);
-    if (!value) {
-        return nullptr;
-    }
-    return value->as_object();
-}
-
-int read_json_int(const config::JsonObject& root, std::string_view key, int fallback) {
-    const auto* value = find_json_value(root, key);
-    if (!value) {
-        return fallback;
-    }
-    return static_cast<int>(std::llround(value->as_number(static_cast<double>(fallback))));
-}
-
-std::string read_json_string(const config::JsonObject& root, std::string_view key, std::string fallback = {}) {
-    const auto* value = find_json_value(root, key);
-    if (!value) {
-        return fallback;
-    }
-    return safe_ui_text(value->as_string(std::move(fallback)));
-}
-
-bool read_json_bool(const config::JsonObject& root, std::string_view key, bool fallback) {
-    const auto* value = find_json_value(root, key);
-    if (!value) {
-        return fallback;
-    }
-    return value->as_bool(fallback);
-}
-
-double read_json_number(const config::JsonObject& root, std::string_view key, double fallback) {
-    const auto* value = find_json_value(root, key);
-    if (!value) {
-        return fallback;
-    }
-    return value->as_number(fallback);
-}
-
-std::string normalize_path_key(const std::filesystem::path& raw_path) {
-    if (raw_path.empty()) {
-        return {};
-    }
-    try {
-        std::error_code ec;
-        std::filesystem::path normalized = raw_path;
-        if (normalized.is_absolute()) {
-            const std::filesystem::path canonical = std::filesystem::weakly_canonical(normalized, ec);
-            if (!ec && !canonical.empty()) {
-                normalized = canonical;
-            } else {
-                ec.clear();
-                normalized = normalized.lexically_normal();
-            }
-        } else {
-            normalized = normalized.lexically_normal();
-        }
-        return to_lower_ascii(normalized.generic_u8string());
-    } catch (...) {
-        return {};
-    }
-}
-
-void append_unique_key(std::vector<std::string>& keys, const std::string& key) {
-    if (key.empty()) {
-        return;
-    }
-    if (std::find(keys.begin(), keys.end(), key) == keys.end()) {
-        keys.push_back(key);
-    }
-}
-
-bool relative_points_outside_root(const std::filesystem::path& relative) {
-    if (relative.empty()) {
-        return true;
-    }
-    const auto first = relative.begin();
-    if (first == relative.end()) {
-        return true;
-    }
-    return *first == "..";
-}
-
-std::vector<std::string> build_chart_path_keys(const std::string& chart_path, const std::string& songs_root) {
-    namespace fs = std::filesystem;
-    std::vector<std::string> keys;
-    if (chart_path.empty()) {
-        return keys;
-    }
-
-    const fs::path raw = path_from_utf8(chart_path);
-    if (raw.empty()) {
-        return keys;
-    }
-    append_unique_key(keys, normalize_path_key(raw));
-
-    if (songs_root.empty()) {
-        return keys;
-    }
-
-    try {
-        std::error_code ec;
-        fs::path root = path_from_utf8(songs_root);
-        if (root.empty()) {
-            return keys;
-        }
-        const fs::path root_canonical = fs::weakly_canonical(root, ec);
-        if (!ec && !root_canonical.empty()) {
-            root = root_canonical;
-        } else {
-            ec.clear();
-            root = root.lexically_normal();
-        }
-
-        if (raw.is_absolute()) {
-            fs::path absolute = raw;
-            const fs::path absolute_canonical = fs::weakly_canonical(absolute, ec);
-            if (!ec && !absolute_canonical.empty()) {
-                absolute = absolute_canonical;
-            } else {
-                ec.clear();
-                absolute = absolute.lexically_normal();
-            }
-            const fs::path relative = absolute.lexically_relative(root);
-            if (!relative_points_outside_root(relative)) {
-                append_unique_key(keys, normalize_path_key(relative));
-            }
-        } else {
-            append_unique_key(keys, normalize_path_key(root / raw));
-        }
-    } catch (...) {
-    }
-
-    return keys;
-}
-
-struct ParsedResultRecord {
-    std::string chart_path;
-    std::string chart_format;
-    std::string created_utc;
-    std::string replay_path;
-    std::string clear_status;
-    std::string final_gauge;
-    gameplay::ResultStats stats;
-    bool game_over = false;
-};
-
-std::optional<ParsedResultRecord> parse_result_file(const std::filesystem::path& path, std::string* error) {
-    std::ifstream file(path, std::ios::binary);
-    if (!file) {
-        if (error) {
-            *error = "Failed to open result JSON.";
-        }
-        return std::nullopt;
-    }
-
-    std::ostringstream buffer;
-    buffer << file.rdbuf();
-
-    auto parsed = config::parse_json(buffer.str());
-    if (!parsed.success() || !parsed.root.has_value()) {
-        if (error) {
-            *error = parsed.error.empty() ? "Failed to parse result JSON." : parsed.error;
-        }
-        return std::nullopt;
-    }
-
-    const auto* root = parsed.root->as_object();
-    if (!root) {
-        if (error) {
-            *error = "Result JSON root must be an object.";
-        }
-        return std::nullopt;
-    }
-
-    const auto* stats_obj = find_json_object(*root, "stats");
-    if (!stats_obj) {
-        if (error) {
-            *error = "Result JSON missing stats object.";
-        }
-        return std::nullopt;
-    }
-
-    ParsedResultRecord out;
-    out.chart_path = read_json_string(*root, "chart_path");
-    out.chart_format = read_json_string(*root, "chart_format");
-    out.created_utc = read_json_string(*root, "created_utc");
-    out.replay_path = read_json_string(*root, "replay_path");
-    out.clear_status = read_json_string(*root, "clear_status");
-    out.final_gauge = read_json_string(*root, "final_gauge");
-    if (out.chart_path.empty()) {
-        if (error) {
-            *error = "Result JSON missing chart_path.";
-        }
-        return std::nullopt;
-    }
-
-    const auto* counts_obj = find_json_object(*stats_obj, "counts");
-    if (counts_obj) {
-        out.stats.counts.pg = read_json_int(*counts_obj, "pg", 0);
-        out.stats.counts.gr = read_json_int(*counts_obj, "gr", 0);
-        out.stats.counts.gd = read_json_int(*counts_obj, "gd", 0);
-        out.stats.counts.bd = read_json_int(*counts_obj, "bd", 0);
-        out.stats.counts.bd += read_json_int(*counts_obj, "pr", 0);
-        out.stats.counts.pr = 0;
-    }
-    out.stats.max_combo = read_json_int(*stats_obj, "max_combo", 0);
-    out.stats.total_notes = read_json_int(*stats_obj, "total_notes", 0);
-    out.stats.mean_delta_ms = read_json_number(*stats_obj, "mean_delta_ms", 0.0);
-    const double stddev_delta_ms = read_json_number(*stats_obj, "stddev_delta_ms", 0.0);
-
-    if (const auto* gauge_history = find_json_value(*stats_obj, "gauge_history")) {
-        if (const auto* values = gauge_history->as_array()) {
-            out.stats.gauge_history.reserve(values->size());
-            for (const auto& value : *values) {
-                const auto* item = value.as_object();
-                if (!item) {
-                    continue;
-                }
-                out.stats.gauge_history.push_back(gameplay::GaugeSample{
-                    static_cast<int64_t>(std::llround(read_json_number(*item, "sample", 0.0))),
-                    read_json_number(*item, "value", 0.0),
-                });
-            }
-        }
-    }
-    if (const auto* shifts = find_json_value(*stats_obj, "shifts")) {
-        if (const auto* values = shifts->as_array()) {
-            out.stats.shifts.reserve(values->size());
-            for (const auto& value : *values) {
-                const auto* item = value.as_object();
-                if (!item) {
-                    continue;
-                }
-                out.stats.shifts.push_back(gameplay::ShiftEvent{
-                    static_cast<int64_t>(std::llround(read_json_number(*item, "sample", 0.0))),
-                    gauge_type_from_mode_string(read_json_string(*item, "from", "normal")),
-                    gauge_type_from_mode_string(read_json_string(*item, "to", "normal")),
-                });
-            }
-        }
-    }
-
-    const int judged = judged_total(out.stats.counts);
-    if (out.stats.total_notes <= 0) {
-        out.stats.total_notes = judged;
-    }
-    out.stats.delta_samples = judged;
-    if (out.stats.delta_samples > 1) {
-        out.stats.m2_delta_ms = stddev_delta_ms * stddev_delta_ms *
-                                static_cast<double>(out.stats.delta_samples - 1);
-    }
-    out.game_over = read_json_bool(*root, "game_over", infer_game_over(out.stats));
-    out.clear_status = normalized_clear_status(out.clear_status, out.game_over, out.final_gauge);
-    return out;
-}
-
-struct ParsedReplayRecord {
-    int sample_rate = 0;
-    int lane_count = 0;
-    int event_count = 0;
-    int64_t duration_samples = 0;
-    double rate = 1.0;
-    double input_offset_ms = 0.0;
-};
-
-std::optional<ParsedReplayRecord> parse_replay_file(const std::filesystem::path& path, std::string* error) {
-    std::ifstream file(path, std::ios::binary);
-    if (!file) {
-        if (error) {
-            *error = "Failed to open replay JSON.";
-        }
-        return std::nullopt;
-    }
-
-    std::ostringstream buffer;
-    buffer << file.rdbuf();
-    auto parsed = config::parse_json(buffer.str());
-    if (!parsed.success() || !parsed.root.has_value()) {
-        if (error) {
-            *error = parsed.error.empty() ? "Failed to parse replay JSON." : parsed.error;
-        }
-        return std::nullopt;
-    }
-
-    const auto* root = parsed.root->as_object();
-    if (!root) {
-        if (error) {
-            *error = "Replay JSON root must be an object.";
-        }
-        return std::nullopt;
-    }
-    const auto* trace = find_json_object(*root, "trace");
-    if (!trace) {
-        if (error) {
-            *error = "Replay JSON missing trace object.";
-        }
-        return std::nullopt;
-    }
-
-    ParsedReplayRecord out;
-    out.sample_rate = read_json_int(*root, "sample_rate", read_json_int(*trace, "sample_rate", 0));
-    out.rate = read_json_number(*root, "rate", read_json_number(*trace, "rate", 1.0));
-    out.input_offset_ms = read_json_number(*root, "input_offset_ms", 0.0);
-    out.lane_count = read_json_int(*trace, "lane_count", 0);
-    out.duration_samples = static_cast<int64_t>(std::llround(read_json_number(*trace, "duration_samples", 0.0)));
-    if (const auto* events = find_json_value(*trace, "events")) {
-        if (const auto* values = events->as_array()) {
-            out.event_count = static_cast<int>(values->size());
-        }
-    }
-    return out;
-}
-
-bool is_better_record(int64_t candidate_score,
-                      int candidate_clear_priority,
-                      int candidate_combo,
-                      int candidate_judged,
-                      std::string_view candidate_created,
-                      int64_t current_score,
-                      int current_clear_priority,
-                      int current_combo,
-                      int current_judged,
-                      std::string_view current_created) {
-    if (candidate_clear_priority != current_clear_priority) {
-        return candidate_clear_priority > current_clear_priority;
-    }
-    if (candidate_score != current_score) {
-        return candidate_score > current_score;
-    }
-    if (candidate_combo != current_combo) {
-        return candidate_combo > current_combo;
-    }
-    if (candidate_judged != current_judged) {
-        return candidate_judged > current_judged;
-    }
-    return candidate_created > current_created;
-}
-
 }  // namespace
 
 MenuApp::MenuApp() = default;
@@ -1965,6 +1290,7 @@ GameplayHudRevisionInput MenuApp::gameplay_hud_revision_input(const GameplayHudS
     input.combo = state.combo;
     input.max_combo = state.max_combo;
     input.counts = state.counts;
+    input.score = state.score;
     input.gauge = state.gauge;
     input.gauge_type = state.gauge_type;
     input.rate = state.rate;
@@ -2018,7 +1344,7 @@ MenuApp::~MenuApp() {
 bool MenuApp::initialize(const CommandLineOptions& options) {
     exit_code_ = 0;
     options_ = options;
-    songs_path_ = normalize_song_source_path(options.songs_path);
+    songs_path_ = menu_songs::normalize_song_source_path(options.songs_path);
     if (songs_path_.empty()) {
         songs_path_ = options.songs_path;
     }
@@ -2087,7 +1413,7 @@ bool MenuApp::initialize(const CommandLineOptions& options) {
         std::error_code ec;
         const auto active_path = path_from_utf8(config_.ui.active_song_source);
         if (std::filesystem::is_directory(active_path, ec)) {
-            initial_song_source = normalize_song_source_path(config_.ui.active_song_source);
+            initial_song_source = menu_songs::normalize_song_source_path(config_.ui.active_song_source);
         }
     } else {
         for (const auto& recent_source : config_.ui.recent_song_sources) {
@@ -2097,7 +1423,7 @@ bool MenuApp::initialize(const CommandLineOptions& options) {
             std::error_code ec;
             const auto recent_path = path_from_utf8(recent_source);
             if (std::filesystem::is_directory(recent_path, ec)) {
-                initial_song_source = normalize_song_source_path(recent_source);
+                initial_song_source = menu_songs::normalize_song_source_path(recent_source);
                 break;
             }
         }
@@ -2244,6 +1570,7 @@ void MenuApp::start_menu_threads() {
 
 void MenuApp::stop_menu_threads() {
     render_thread_.stop();
+    menu_music_.stop();
     audio_thread_.stop();
     input_thread_.stop();
 }
@@ -2343,22 +1670,22 @@ void MenuApp::apply_runtime_graphics_config() {
 }
 
 bool MenuApp::remember_song_source(const std::string& source_path) {
-    const std::string normalized = normalize_song_source_path(source_path);
+    const std::string normalized = menu_songs::normalize_song_source_path(source_path);
     if (normalized.empty()) {
         return false;
     }
 
-    const std::string normalized_key = normalize_path_key(path_from_utf8(normalized));
+    const std::string normalized_key = menu_songs::normalize_path_key(path_from_utf8(normalized));
     std::vector<std::string> updated_sources;
     updated_sources.reserve(std::min<std::size_t>(config_.ui.recent_song_sources.size() + 1, kRecentSongSourceLimit));
     updated_sources.push_back(normalized);
 
     for (const auto& existing : config_.ui.recent_song_sources) {
-        const std::string normalized_existing = normalize_song_source_path(existing);
+        const std::string normalized_existing = menu_songs::normalize_song_source_path(existing);
         if (normalized_existing.empty()) {
             continue;
         }
-        if (normalize_path_key(path_from_utf8(normalized_existing)) == normalized_key) {
+        if (menu_songs::normalize_path_key(path_from_utf8(normalized_existing)) == normalized_key) {
             continue;
         }
         updated_sources.push_back(normalized_existing);
@@ -2409,7 +1736,7 @@ void MenuApp::switch_song_source(const std::string& new_songs_path, bool force_r
         return;
     }
 
-    const std::string normalized_source = normalize_song_source_path(new_songs_path);
+    const std::string normalized_source = menu_songs::normalize_song_source_path(new_songs_path);
     songs_path_ = normalized_source.empty() ? new_songs_path : normalized_source;
     song_select_view_ = SongSelectView::Songs;
     const bool source_history_changed = remember_song_source(songs_path_);
@@ -2431,10 +1758,10 @@ void MenuApp::switch_song_source(const std::string& new_songs_path, bool force_r
     if (cache_result.success() && cache_result.loaded_from_file) {
         const int cached_count = static_cast<int>(cache_result.index.entries.size());
         update_song_list(std::move(cache_result.index));
-        source_song_counts_[normalize_path_key(path_from_utf8(songs_path_))] = cached_count;
+        source_song_counts_[menu_songs::normalize_path_key(path_from_utf8(songs_path_))] = cached_count;
     } else {
         update_song_list(SongIndex{});
-        source_song_counts_[normalize_path_key(path_from_utf8(songs_path_))] = 0;
+        source_song_counts_[menu_songs::normalize_path_key(path_from_utf8(songs_path_))] = 0;
         if (!cache_result.error.empty()) {
             std::cerr << "[warn] " << cache_result.error << std::endl;
         }
@@ -2526,6 +1853,9 @@ void MenuApp::handle_input_event(const input::InputEvent& event) {
         case Screen::ModeSelect:
             handle_mode_settings_input(event.keycode);
             break;
+        case Screen::ModeMods:
+            handle_mode_mods_input(event.keycode);
+            break;
         case Screen::Keymap:
             handle_keymap_input(event.keycode);
             break;
@@ -2591,6 +1921,9 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
                     case Screen::ModeSelect:
                         handle_mode_settings_input(direction_key);
                         break;
+                    case Screen::ModeMods:
+                        handle_mode_mods_input(direction_key);
+                        break;
                     default:
                         break;
                 }
@@ -2635,7 +1968,7 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
             publish_snapshot();
             return;
         }
-        auto dropped_source = normalize_dropped_song_source(event.path);
+        auto dropped_source = menu_songs::normalize_dropped_song_source(event.path);
         if (!dropped_source.has_value()) {
             std::cerr << "[warn] Ignored dropped path (expected a folder or supported chart file): " << event.path
                       << std::endl;
@@ -2800,8 +2133,12 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
             handle_input_settings_input(action_key);
             return;
         case Screen::ModeSelect:
-            settings_cursor_ = clamp_int(event.index, 0, 8);
+            settings_cursor_ = clamp_int(event.index, 0, 10);
             handle_mode_settings_input(action_key);
+            return;
+        case Screen::ModeMods:
+            settings_cursor_ = clamp_int(event.index, 0, static_cast<int>(mode_mod_categories().size()));
+            handle_mode_mods_input(action_key);
             return;
         case Screen::EditStub:
             handle_edit_stub_input(key_enter_);
@@ -3517,7 +2854,7 @@ void MenuApp::handle_graphics_settings_input(uint32_t keycode) {
 }
 
 void MenuApp::handle_skins_settings_input(uint32_t keycode) {
-    const int item_count = 15;
+    const int item_count = 16;
     if (keycode == key_up_) {
         settings_cursor_ = clamp_int(settings_cursor_ - 1, 0, item_count - 1);
         publish_snapshot();
@@ -3630,6 +2967,12 @@ void MenuApp::handle_skins_settings_input(uint32_t keycode) {
         return;
     }
     if (settings_cursor_ == 8 && (keycode == key_left_ || keycode == key_right_)) {
+        config_.skin.preserve_note_image_aspect_ratio = !config_.skin.preserve_note_image_aspect_ratio;
+        skin_dirty_ = true;
+        publish_snapshot();
+        return;
+    }
+    if (settings_cursor_ == 9 && (keycode == key_left_ || keycode == key_right_)) {
         const int direction = (keycode == key_left_) ? -1 : 1;
         config_.skin.judgement_line_position = clamp_step_value(
             config_.skin.judgement_line_position + static_cast<double>(direction) * kJudgementLinePositionStep,
@@ -3638,7 +2981,7 @@ void MenuApp::handle_skins_settings_input(uint32_t keycode) {
         publish_snapshot();
         return;
     }
-    if (settings_cursor_ == 9 && (keycode == key_left_ || keycode == key_right_)) {
+    if (settings_cursor_ == 10 && (keycode == key_left_ || keycode == key_right_)) {
         const int direction = (keycode == key_left_) ? -1 : 1;
         auto& note_width_scale = editable_skin_note_width_scale(config_.skin, skin_edit_mode_);
         note_width_scale = clamp_step_value(
@@ -3648,7 +2991,7 @@ void MenuApp::handle_skins_settings_input(uint32_t keycode) {
         publish_snapshot();
         return;
     }
-    if (settings_cursor_ == 10 && (keycode == key_left_ || keycode == key_right_)) {
+    if (settings_cursor_ == 11 && (keycode == key_left_ || keycode == key_right_)) {
         const int direction = (keycode == key_left_) ? -1 : 1;
         auto& lane_divider_width_scale =
             editable_skin_lane_divider_width_scale(config_.skin, skin_edit_mode_);
@@ -3659,7 +3002,7 @@ void MenuApp::handle_skins_settings_input(uint32_t keycode) {
         publish_snapshot();
         return;
     }
-    if (settings_cursor_ == 11 && (keycode == key_left_ || keycode == key_right_)) {
+    if (settings_cursor_ == 12 && (keycode == key_left_ || keycode == key_right_)) {
         const int direction = (keycode == key_left_) ? -1 : 1;
         config_.skin.hold_body_width_scale = clamp_step_value(
             config_.skin.hold_body_width_scale + static_cast<double>(direction) * kNoteSizeScaleStep,
@@ -3668,7 +3011,7 @@ void MenuApp::handle_skins_settings_input(uint32_t keycode) {
         publish_snapshot();
         return;
     }
-    if (settings_cursor_ == 12 && (keycode == key_left_ || keycode == key_right_)) {
+    if (settings_cursor_ == 13 && (keycode == key_left_ || keycode == key_right_)) {
         const int direction = (keycode == key_left_) ? -1 : 1;
         auto& note_height_scale = editable_skin_note_height_scale(config_.skin, skin_edit_mode_);
         note_height_scale = clamp_step_value(
@@ -3678,7 +3021,7 @@ void MenuApp::handle_skins_settings_input(uint32_t keycode) {
         publish_snapshot();
         return;
     }
-    if (settings_cursor_ == 13 && (keycode == key_left_ || keycode == key_right_)) {
+    if (settings_cursor_ == 14 && (keycode == key_left_ || keycode == key_right_)) {
         const int direction = (keycode == key_left_) ? -1 : 1;
         config_.skin.combo_position = clamp_step_value(
             config_.skin.combo_position + static_cast<double>(direction) * kComboPositionStep,
@@ -3756,7 +3099,7 @@ void MenuApp::handle_input_settings_input(uint32_t keycode) {
 }
 
 void MenuApp::handle_mode_settings_input(uint32_t keycode) {
-    const int item_count = 10;
+    const int item_count = 11;
     if (keycode == key_up_) {
         settings_cursor_ = clamp_int(settings_cursor_ - 1, 0, item_count - 1);
         publish_snapshot();
@@ -3825,10 +3168,13 @@ void MenuApp::handle_mode_settings_input(uint32_t keycode) {
             config_.mode.random_seed = static_cast<uint32_t>(next_value);
             mode_dirty_ = true;
         } else if (settings_cursor_ == 7) {
+            publish_snapshot();
+            return;
+        } else if (settings_cursor_ == 8) {
             config_.speed.rate = clamp_step_value(config_.speed.rate + static_cast<double>(direction) * kRateStep,
                                                   kRateMin, kRateMax, kRateStep);
             mode_dirty_ = true;
-        } else if (settings_cursor_ == 8) {
+        } else if (settings_cursor_ == 9) {
             config_.speed.hi_speed = clamp_step_value(
                 config_.speed.hi_speed + static_cast<double>(direction) * kHiSpeedStep,
                 kHiSpeedMin, kHiSpeedMax, kHiSpeedStep);
@@ -3839,6 +3185,12 @@ void MenuApp::handle_mode_settings_input(uint32_t keycode) {
     }
 
     if (keycode == key_enter_ || keycode == key_escape_ || keycode == key_backspace_) {
+        if (keycode == key_enter_ && settings_cursor_ == 7) {
+            screen_ = Screen::ModeMods;
+            settings_cursor_ = 0;
+            publish_snapshot();
+            return;
+        }
         screen_ = submenu_return_screen_;
         settings_cursor_ = 0;
         if (mode_dirty_) {
@@ -3853,6 +3205,35 @@ void MenuApp::handle_mode_settings_input(uint32_t keycode) {
             mode_dirty_ = false;
             mode_library_dirty_ = false;
         }
+        publish_snapshot();
+    }
+}
+
+void MenuApp::handle_mode_mods_input(uint32_t keycode) {
+    const auto& categories = mode_mod_categories();
+    const int item_count = static_cast<int>(categories.size()) + 1;
+    if (keycode == key_up_) {
+        settings_cursor_ = clamp_int(settings_cursor_ - 1, 0, item_count - 1);
+        publish_snapshot();
+        return;
+    }
+    if (keycode == key_down_) {
+        settings_cursor_ = clamp_int(settings_cursor_ + 1, 0, item_count - 1);
+        publish_snapshot();
+        return;
+    }
+
+    if ((keycode == key_left_ || keycode == key_right_) && settings_cursor_ < static_cast<int>(categories.size())) {
+        const int direction = (keycode == key_left_) ? -1 : 1;
+        config_.mode.mods = cycle_mode_mod_category(config_.mode.mods, categories[static_cast<std::size_t>(settings_cursor_)], direction);
+        mode_dirty_ = true;
+        publish_snapshot();
+        return;
+    }
+
+    if (keycode == key_enter_ || keycode == key_escape_ || keycode == key_backspace_) {
+        screen_ = Screen::ModeSelect;
+        settings_cursor_ = 7;
         publish_snapshot();
     }
 }
@@ -4001,7 +3382,7 @@ void MenuApp::refresh_available_osu_skins() {
 bool MenuApp::import_osu_skin_path(std::string_view source_path) {
     namespace fs = std::filesystem;
 
-    const std::string normalized_source = normalize_song_source_path(std::string(source_path));
+    const std::string normalized_source = menu_songs::normalize_song_source_path(std::string(source_path));
     if (normalized_source.empty()) {
         return false;
     }
@@ -4021,7 +3402,7 @@ bool MenuApp::import_osu_skin_path(std::string_view source_path) {
 
     int imported_count = 0;
     auto import_single_skin = [&](const fs::path& skin_dir) -> bool {
-        const std::string source_skin_path = normalize_song_source_path(skin_dir.u8string());
+        const std::string source_skin_path = menu_songs::normalize_song_source_path(skin_dir.u8string());
         if (source_skin_path.empty() || !is_osu_skin_directory(source_skin_path)) {
             return false;
         }
@@ -4037,7 +3418,6 @@ bool MenuApp::import_osu_skin_path(std::string_view source_path) {
         if (!source_canonical.empty() &&
             !import_root_canonical.empty() &&
             source_canonical.parent_path() == import_root_canonical) {
-            config_.skin.source = "osu";
             config_.skin.osu_skin_name = source_canonical.filename().u8string();
             ++imported_count;
             return true;
@@ -4061,7 +3441,6 @@ bool MenuApp::import_osu_skin_path(std::string_view source_path) {
             return false;
         }
 
-        config_.skin.source = "osu";
         config_.skin.osu_skin_name = destination.filename().u8string();
         ++imported_count;
         return true;
@@ -4131,6 +3510,7 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
         config::kHoldBodyWidthScaleMax);
     target.note_border_enabled = config_.skin.note_border_enabled;
     target.note_shape = config::normalize_skin_note_shape_token(config_.skin.note_shape);
+    target.preserve_note_image_aspect_ratio = config_.skin.preserve_note_image_aspect_ratio;
     target.skin_source = config::normalize_skin_source_token(config_.skin.source);
     target.osu_skin_root = available_osu_skin_root_;
     target.osu_skin_name = config_.skin.osu_skin_name;
@@ -4176,12 +3556,7 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
         out_note.head_visible = note.head_visible;
         target.notes[i] = out_note;
     }
-
-    int64_t score = static_cast<int64_t>(gameplay_hud_.counts.pg) * 1000 +
-                    static_cast<int64_t>(gameplay_hud_.counts.gr) * 700 +
-                    static_cast<int64_t>(gameplay_hud_.counts.gd) * 300;
-    score -= static_cast<int64_t>(gameplay_hud_.counts.bd) * 200;
-    target.score = std::max<int64_t>(0, score);
+    target.score = gameplay_hud_.score;
 
     const int judged_total = gameplay_hud_.counts.pg + gameplay_hud_.counts.gr + gameplay_hud_.counts.gd +
                              gameplay_hud_.counts.bd;
@@ -4221,104 +3596,932 @@ void MenuApp::update_gameplay_loading_state(int percent, std::string_view stage)
     publish_snapshot();
 }
 
+std::string MenuApp::current_track_label() const {
+    if (screen_ == Screen::SongSelect && song_select_view_ == SongSelectView::Sources &&
+        !config_.ui.recent_song_sources.empty() &&
+        selected_source_ >= 0 &&
+        selected_source_ < static_cast<int>(config_.ui.recent_song_sources.size())) {
+        return menu_songs::song_source_display_name(
+            config_.ui.recent_song_sources[static_cast<std::size_t>(selected_source_)]);
+    }
+    if (selected_song_ >= 0 && selected_song_ < static_cast<int>(visible_song_count())) {
+        if (const SongEntry* entry = visible_song_entry(static_cast<std::size_t>(selected_song_))) {
+            return song_title_for_ui(*entry);
+        }
+    }
+    if (!last_chart_title_.empty()) {
+        return safe_ui_text(last_chart_title_, "-");
+    }
+    return "-";
+}
+
+void MenuApp::sync_menu_music() {
+    if (screen_ == Screen::Gameplay) {
+        menu_music_.stop();
+        return;
+    }
+
+    const bool song_select_context =
+        screen_ == Screen::SongSelect ||
+        screen_ == Screen::SongBrowser ||
+        screen_ == Screen::Result ||
+        ((screen_ == Screen::OptionsHub ||
+          screen_ == Screen::SettingsAudio ||
+          screen_ == Screen::SettingsGraphics ||
+          screen_ == Screen::SettingsSkins ||
+          screen_ == Screen::SettingsInput ||
+          screen_ == Screen::ModeSelect ||
+          screen_ == Screen::ModeMods ||
+          screen_ == Screen::Keymap ||
+          screen_ == Screen::KeymapConfirm ||
+          screen_ == Screen::KeymapTest) &&
+         submenu_return_screen_ == Screen::SongSelect);
+
+    const std::string filename = song_select_context ? "Song Selecte.mp3" : "Main Menu.mp3";
+    const std::string music_path = resolve_menu_music_file_path(filename);
+    if (music_path.empty()) {
+        menu_music_.stop();
+        return;
+    }
+
+    const double gain = std::clamp(config_.audio_ui.master_volume * config_.audio_ui.bgm_volume, 0.0, 1.0);
+    menu_music_.play_looping_file(music_path, gain);
+}
+
+void MenuApp::populate_quick_setup_render_data(render::MenuRenderData& render) {
+    render.kind = render::MenuScreenKind::GenericList;
+    render.generic.heading = "Quick Setup";
+
+    append_menu_row(render.generic,
+                    "Songs Folder",
+                    safe_ui_text(menu_songs::song_source_display_name(songs_path_), "Choose Folder"),
+                    settings_cursor_ == 0,
+                    render::MenuHitTargetKind::SettingsRow,
+                    0,
+                    true,
+                    false);
+    append_menu_row(render.generic,
+                    "Gauge",
+                    gauge_label(config_.mode.gauge),
+                    settings_cursor_ == 1,
+                    render::MenuHitTargetKind::SettingsRow,
+                    1,
+                    false,
+                    true);
+    append_menu_row(render.generic,
+                    "Rate",
+                    format_multiplier(config_.speed.rate),
+                    settings_cursor_ == 2,
+                    render::MenuHitTargetKind::SettingsRow,
+                    2,
+                    false,
+                    true);
+    append_menu_row(render.generic,
+                    "Display Offset",
+                    format_signed_offset_ms(config_.visual_offset_ms),
+                    settings_cursor_ == 3,
+                    render::MenuHitTargetKind::SettingsRow,
+                    3,
+                    false,
+                    true);
+    append_menu_row(render.generic,
+                    "BMS Keysound",
+                    keysound_policy_label(config_.audio_ui.bms_keysound_policy),
+                    settings_cursor_ == 4,
+                    render::MenuHitTargetKind::SettingsRow,
+                    4,
+                    false,
+                    true);
+    append_menu_row(render.generic,
+                    "Continue to Song Select",
+                    "",
+                    settings_cursor_ == 5,
+                    render::MenuHitTargetKind::SettingsRow,
+                    5,
+                    true,
+                    false);
+    append_menu_row(render.generic,
+                    "Skip to Title",
+                    "",
+                    settings_cursor_ == 6,
+                    render::MenuHitTargetKind::SettingsRow,
+                    6,
+                    true,
+                    false);
+
+    render.generic.notes.push_back("First launch detected. TenRiff already created a default profile and default keymap.");
+    render.generic.notes.push_back("Recommended start: Gauge Normal, Rate 1.00x, Display Offset 0ms, BMS Keysound Follow.");
+    render.generic.notes.push_back("Songs Folder opens a picker on Enter or F2. You can also drag and drop a folder later.");
+    render.generic.notes.push_back("These values stay editable later from Song Select: A=Audio  G=Graphics  I=Input  M=Mode  K=Keymap.");
+}
+
+void MenuApp::populate_title_render_data(render::MenuRenderData& render,
+                                         const std::string& current_track,
+                                         const MenuApp::BestResultRecord& current_best) {
+    render.kind = render::MenuScreenKind::TitleMenu;
+    render.title.profile = options_.profile;
+    render.title.track = current_track;
+    render.title.high_score = current_best.has_value ? current_best.best_score : 0;
+    render.title.buttons = {
+        render::MenuButtonData{"PLAY", u8"▶", title_cursor_ == 0},
+        render::MenuButtonData{"EDIT", u8"✎", title_cursor_ == 1},
+        render::MenuButtonData{"OPTIONS", u8"⚙", title_cursor_ == 2},
+        render::MenuButtonData{"EXIT", u8"⏻", title_cursor_ == 3},
+    };
+    render.title.guides = {
+        "UP / DOWN or mouse to move",
+        "ENTER or double-click to open",
+        "F5 refreshes the current song source",
+        "A/G/I/M/K jumps straight to Audio, Graphics, Input, Mode, Keymap",
+        "F1 opens the control help overlay",
+        "ESC exits from the title menu",
+    };
+}
+
+void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
+                                               const std::string& current_track,
+                                               const MenuApp::BestResultRecord& current_best,
+                                               const MenuApp::LocalPlayRecord* selected_record) {
+    render.kind = render::MenuScreenKind::SongSelect;
+    render.song_select.profile = options_.profile;
+    render.song_select.track = current_track;
+    render.song_select.song_count = static_cast<int>(visible_song_count());
+    render.song_select.source_count = static_cast<int>(config_.ui.recent_song_sources.size());
+    render.song_select.record_count = static_cast<int>(current_song_record_indices_.size());
+    render.song_select.showing_sources = (song_select_view_ == SongSelectView::Sources);
+    render.song_select.showing_records = (song_select_view_ == SongSelectView::Records);
+    render.song_select.high_score =
+        render.song_select.showing_sources ? 0 :
+        (render.song_select.showing_records && selected_record ? selected_record->score :
+         (current_best.has_value ? current_best.best_score : 0));
+    render.song_select.current_source_name =
+        safe_ui_text(menu_songs::song_source_display_name(songs_path_), "Songs");
+    render.song_select.current_source_path = safe_ui_text_or_placeholder(songs_path_, "<invalid path>");
+    render.song_select.index_profile_label = song_index_profile_label(config_.mode.song_index_profile);
+    render.song_select.browser_summary = browser_summary_label(song_search_query_,
+                                                               song_key_filter_,
+                                                               song_level_min_filter_,
+                                                               song_level_max_filter_);
+    render.song_select.sort_summary = song_sort_detail_label(song_sort_mode_);
+    render.song_select.primary_hint =
+        render.song_select.showing_sources
+            ? "UP/DOWN or wheel  MOVE     ENTER / dbl-click  OPEN SOURCE     PGUP/PGDN  PAGE"
+            : (render.song_select.showing_records
+                   ? "UP/DOWN or wheel  MOVE     ENTER / dbl-click  OPEN RESULT     PGUP/PGDN  PAGE"
+                   : "UP/DOWN or wheel  MOVE     ENTER / dbl-click  PLAY     PGUP/PGDN  PAGE");
+    render.song_select.secondary_hint =
+        render.song_select.showing_sources
+            ? "LEFT/RIGHT  NAV FOCUS     BACKSPACE  SONGS     F2  BROWSE     F5  REINDEX     F1  HELP"
+            : (render.song_select.showing_records
+                   ? "LEFT/RIGHT  NAV FOCUS     BACKSPACE  SONGS     ESC  TITLE     F1  HELP"
+                   : "LEFT/RIGHT  NAV FOCUS     BACKSPACE  SOURCES     A/G/I/M/K  SETTINGS     F5  REINDEX     F1  HELP");
+
+    const std::string source_detail =
+        std::to_string(render.song_select.source_count) + " ROOT" +
+        (render.song_select.source_count == 1 ? "" : "S");
+    const std::string browser_detail = render.song_select.browser_summary;
+    const std::string records_detail =
+        (render.song_select.record_count > 0)
+            ? (std::to_string(render.song_select.record_count) + " PLAYS")
+            : std::string("NO PLAYS");
+
+    render.song_select.indexing = song_indexer_.is_running();
+    if (render.song_select.indexing) {
+        const auto progress = song_indexer_.progress();
+        render.song_select.indexing_stage = song_index_stage_label(progress.stage);
+        render.song_select.indexing_processed = std::max(0, progress.processed);
+        render.song_select.indexing_total = progress.total;
+        if (progress.total > 0) {
+            const int processed = std::max(0, std::min(progress.processed, progress.total));
+            const int percent = static_cast<int>(std::llround(
+                100.0 * static_cast<double>(processed) / static_cast<double>(progress.total)));
+            render.song_select.indexing_percent = percent;
+
+            const int remaining = progress.total - processed;
+            const int64_t now_ns = timing::HighResClock::now_ns();
+            const int64_t elapsed_ns = (progress.started_ns > 0 && now_ns > progress.started_ns)
+                                           ? (now_ns - progress.started_ns)
+                                           : 0;
+            if (remaining > 0 && processed > 0 && elapsed_ns > 0) {
+                const double elapsed_sec = static_cast<double>(elapsed_ns) / 1'000'000'000.0;
+                const double eta_sec =
+                    elapsed_sec * static_cast<double>(remaining) / static_cast<double>(processed);
+                render.song_select.indexing_eta =
+                    format_eta_seconds(static_cast<int64_t>(std::llround(eta_sec)));
+            }
+        } else if (progress.total == 0) {
+            render.song_select.indexing_percent = 0;
+            render.song_select.indexing_eta = "0s";
+        } else {
+            render.song_select.indexing_percent = -1;
+            render.song_select.indexing_eta.clear();
+        }
+    }
+
+    render.song_select.left_nav = {
+        render::MenuButtonData{"LEVEL", "L", song_select_nav_cursor_ == 0,
+                               (song_sort_mode_ == SongSortMode::DifficultyAsc ||
+                                song_sort_mode_ == SongSortMode::DifficultyDesc)
+                                   ? song_sort_detail_label(song_sort_mode_)
+                                   : "LV ASC"},
+        render::MenuButtonData{"TITLE", "T", song_select_nav_cursor_ == 1,
+                               (song_sort_mode_ == SongSortMode::TitleAsc ||
+                                song_sort_mode_ == SongSortMode::TitleDesc)
+                                   ? song_sort_detail_label(song_sort_mode_)
+                                   : "A-Z"},
+        render::MenuButtonData{"SOURCES", "D", song_select_nav_cursor_ == 2,
+                               render.song_select.showing_sources ? "ACTIVE" : source_detail},
+        render::MenuButtonData{"KEY", "K", song_select_nav_cursor_ == 3, key_filter_label(song_key_filter_)},
+        render::MenuButtonData{"BROWSE", "F", song_select_nav_cursor_ == 4, browser_detail},
+        render::MenuButtonData{"MOD", "M", song_select_nav_cursor_ == 5,
+                               format_multiplier(config_.speed.rate) + " / HS " +
+                                   format_decimal(config_.speed.hi_speed)},
+        render::MenuButtonData{"OPTIONS", "O", song_select_nav_cursor_ == 6, "AUDIO / GFX"},
+        render::MenuButtonData{"RECORDS", "R", song_select_nav_cursor_ == 7,
+                               render.song_select.showing_records ? "ACTIVE" : records_detail},
+    };
+
+    if (render.song_select.showing_sources) {
+        const int total_sources = static_cast<int>(config_.ui.recent_song_sources.size());
+        if (total_sources > 0) {
+            selected_source_ = clamp_int(selected_source_, 0, total_sources - 1);
+            constexpr int visible = kSongSelectVisibleCardCount;
+            int start = std::max(0, selected_source_ - (visible / 2));
+            const int max_start = std::max(0, total_sources - visible);
+            start = std::min(start, max_start);
+            const int end = std::min(total_sources, start + visible);
+            render.song_select.list_total_count = total_sources;
+            render.song_select.list_visible_count = end - start;
+            render.song_select.list_window_start = start;
+            render.song_select.list_selected_index = selected_source_;
+
+            for (int i = start; i < end; ++i) {
+                const std::string& source_path = config_.ui.recent_song_sources[static_cast<std::size_t>(i)];
+                render::SongCardData card;
+                card.title = safe_ui_text(menu_songs::song_source_display_name(source_path), "<invalid title>");
+                card.artist = safe_ui_text_or_placeholder(source_path, "<invalid artist>");
+                const auto count_it =
+                    source_song_counts_.find(menu_songs::normalize_path_key(path_from_utf8(source_path)));
+                card.level = (count_it != source_song_counts_.end()) ? count_it->second : 0;
+                card.song_index = i;
+                card.selected = (i == selected_source_);
+                card.detail = safe_ui_text((menu_songs::normalize_path_key(path_from_utf8(source_path)) ==
+                                            menu_songs::normalize_path_key(path_from_utf8(songs_path_)))
+                                               ? "CURRENT SOURCE"
+                                               : "RECENT SOURCE");
+                render.song_select.songs.push_back(std::move(card));
+            }
+
+            const std::string& selected_source =
+                config_.ui.recent_song_sources[static_cast<std::size_t>(selected_source_)];
+            render.song_select.selected_source_name =
+                safe_ui_text(menu_songs::song_source_display_name(selected_source), "Songs");
+            render.song_select.selected_source_path =
+                safe_ui_text_or_placeholder(selected_source, "<invalid path>");
+            const auto count_it =
+                source_song_counts_.find(menu_songs::normalize_path_key(path_from_utf8(selected_source)));
+            render.song_select.selected_source_song_count =
+                (count_it != source_song_counts_.end()) ? count_it->second : -1;
+            render.song_select.selected_source_active =
+                menu_songs::normalize_path_key(path_from_utf8(selected_source)) ==
+                menu_songs::normalize_path_key(path_from_utf8(songs_path_));
+        }
+        if (total_sources == 0) {
+            render.song_select.empty_title = "NO SONG SOURCES";
+            render.song_select.empty_message =
+                "Press F2 to choose a folder, or drag and drop one onto the window.";
+        }
+    } else if (render.song_select.showing_records) {
+        const int total = static_cast<int>(current_song_record_indices_.size());
+        if (total > 0) {
+            constexpr int visible = kSongSelectVisibleCardCount;
+            selected_record_ = clamp_int(selected_record_, 0, total - 1);
+            int start = std::max(0, selected_record_ - (visible / 2));
+            const int max_start = std::max(0, total - visible);
+            start = std::min(start, max_start);
+            const int end = std::min(total, start + visible);
+            render.song_select.list_total_count = total;
+            render.song_select.list_visible_count = end - start;
+            render.song_select.list_window_start = start;
+            render.song_select.list_selected_index = selected_record_;
+
+            for (int i = start; i < end; ++i) {
+                const LocalPlayRecord& record =
+                    local_play_records_[current_song_record_indices_[static_cast<std::size_t>(i)]];
+                render::SongCardData card;
+                card.title = menu_records::compact_timestamp_label(record.created_utc);
+                card.artist = record.clear_status + "  " + record.rank + "  SCORE " +
+                              format_int_with_commas(record.score);
+                card.detail = record.replay_path.empty()
+                                  ? "RESULT ONLY"
+                                  : "REPLAY " + filename_only(record.replay_path);
+                card.song_index = i;
+                card.selected = (i == selected_record_);
+                render.song_select.songs.push_back(std::move(card));
+            }
+        }
+        if (total == 0) {
+            render.song_select.empty_title = "NO LOCAL RECORDS";
+            render.song_select.empty_message =
+                "Play a chart first. Saved results and replays will appear here.";
+        }
+    } else {
+        const int total = static_cast<int>(visible_song_count());
+        if (total > 0) {
+            constexpr int visible = kSongSelectVisibleCardCount;
+            int start = std::max(0, selected_song_ - (visible / 2));
+            const int max_start = std::max(0, total - visible);
+            start = std::min(start, max_start);
+            const int end = std::min(total, start + visible);
+            render.song_select.list_total_count = total;
+            render.song_select.list_visible_count = end - start;
+            render.song_select.list_window_start = start;
+            render.song_select.list_selected_index = selected_song_;
+
+            for (int i = start; i < end; ++i) {
+                const SongEntry* entry = visible_song_entry(static_cast<std::size_t>(i));
+                if (!entry) {
+                    continue;
+                }
+                render::SongCardData card;
+                card.title = song_title_for_ui(*entry);
+                card.artist = song_artist_for_ui(*entry);
+                card.detail = safe_ui_text_or_placeholder(song_detail_label(*entry), "<invalid detail>");
+                card.background_path = song_background_preview_path_for_entry(*entry);
+                card.level = entry->level;
+                card.rating = entry->rating;
+                card.song_index = i;
+                card.selected = (i == selected_song_);
+                render.song_select.songs.push_back(std::move(card));
+            }
+        }
+        if (total == 0) {
+            if (!song_search_query_.empty() || song_key_filter_ > 0 || song_level_min_filter_ > 0 ||
+                song_level_max_filter_ > 0) {
+                render.song_select.empty_title = "NO CHARTS MATCH";
+                render.song_select.empty_message =
+                    "Clear filters in Browse or switch the active source to see more charts.";
+            } else if (render.song_select.indexing) {
+                render.song_select.empty_title = "BUILDING LIBRARY";
+                render.song_select.empty_message =
+                    "The current source is still indexing. You can keep browsing while scan progress updates above.";
+            } else {
+                render.song_select.empty_title = "NO CHARTS INDEXED";
+                render.song_select.empty_message =
+                    "Press F5 to scan the current source, or use F2 / drag-and-drop to point TenRiff at a songs folder.";
+            }
+        }
+    }
+
+    if (!render.song_select.showing_sources) {
+        if (const SongEntry* entry = (selected_song_ >= 0)
+                                         ? visible_song_entry(static_cast<std::size_t>(selected_song_))
+                                         : nullptr) {
+            render.song_select.selected_song_title = song_title_for_ui(*entry);
+            render.song_select.selected_song_artist = song_artist_for_ui(*entry);
+            render.song_select.selected_song_detail = safe_ui_text_or_placeholder(song_detail_label(*entry), "-");
+            render.song_select.selected_song_background_path = selected_song_background_preview_path();
+        }
+    }
+
+    if (render.song_select.showing_records) {
+        if (selected_record) {
+            render.song_select.rank = selected_record->rank;
+            render.song_select.best_score = selected_record->score;
+            render.song_select.max_combo = selected_record->max_combo;
+            render.song_select.perfect = selected_record->perfect;
+            render.song_select.great = selected_record->great;
+            render.song_select.good = selected_record->good;
+            render.song_select.bad = selected_record->bad;
+            render.song_select.miss = selected_record->miss;
+            render.song_select.accuracy = selected_record->accuracy;
+            render.song_select.selected_record_created_utc =
+                menu_records::compact_timestamp_label(selected_record->created_utc);
+            render.song_select.selected_record_status = selected_record->clear_status;
+            render.song_select.selected_record_replay_file = filename_only(selected_record->replay_path);
+            if (const ReplaySummary* replay = replay_summary_for_path(selected_record->replay_path)) {
+                render.song_select.selected_record_replay_lane_count = replay->lane_count;
+                render.song_select.selected_record_replay_event_count = replay->event_count;
+                if (!replay->exists) {
+                    render.song_select.selected_record_replay_detail = "Replay missing";
+                } else if (!replay->error.empty()) {
+                    render.song_select.selected_record_replay_detail = "Replay parse warning";
+                } else {
+                    render.song_select.selected_record_replay_detail =
+                        format_multiplier(replay->rate) + " / " +
+                        format_signed_offset_ms(replay->input_offset_ms);
+                }
+            } else {
+                render.song_select.selected_record_replay_detail = "No replay";
+            }
+        }
+    } else if (!render.song_select.showing_sources) {
+        render.song_select.rank = current_best.has_value ? current_best.rank : "--";
+        render.song_select.best_score = current_best.has_value ? current_best.best_score : 0;
+        render.song_select.max_combo = current_best.has_value ? current_best.max_combo : 0;
+        render.song_select.perfect = current_best.has_value ? current_best.perfect : 0;
+        render.song_select.great = current_best.has_value ? current_best.great : 0;
+        render.song_select.good = current_best.has_value ? current_best.good : 0;
+        render.song_select.bad = current_best.has_value ? current_best.bad : 0;
+        render.song_select.miss = current_best.has_value ? current_best.miss : 0;
+    }
+}
+
+void MenuApp::populate_song_browser_render_data(render::MenuRenderData& render) {
+    render.kind = render::MenuScreenKind::GenericList;
+
+    append_menu_row(render.generic,
+                    "Search",
+                    song_search_query_.empty() ? std::string("<type to search>") : song_search_query_,
+                    settings_cursor_ == 0,
+                    render::MenuHitTargetKind::SettingsRow,
+                    0,
+                    true,
+                    false);
+    append_menu_row(render.generic,
+                    "Key Filter",
+                    key_filter_label(song_key_filter_),
+                    settings_cursor_ == 1,
+                    render::MenuHitTargetKind::SettingsRow,
+                    1,
+                    false,
+                    true);
+    append_menu_row(render.generic,
+                    "Difficulty Min",
+                    song_level_min_filter_ > 0 ? std::to_string(song_level_min_filter_) : "Any",
+                    settings_cursor_ == 2,
+                    render::MenuHitTargetKind::SettingsRow,
+                    2,
+                    false,
+                    true);
+    append_menu_row(render.generic,
+                    "Difficulty Max",
+                    song_level_max_filter_ > 0 ? std::to_string(song_level_max_filter_) : "Any",
+                    settings_cursor_ == 3,
+                    render::MenuHitTargetKind::SettingsRow,
+                    3,
+                    false,
+                    true);
+    append_menu_row(render.generic,
+                    "Clear Filters",
+                    "",
+                    settings_cursor_ == 4,
+                    render::MenuHitTargetKind::SettingsRow,
+                    4,
+                    true,
+                    false);
+    append_menu_row(render.generic,
+                    "Back",
+                    "",
+                    settings_cursor_ == 5,
+                    render::MenuHitTargetKind::SettingsRow,
+                    5,
+                    true,
+                    false);
+
+    render.generic.notes.push_back("Search matches title, artist, and chart path.");
+    render.generic.notes.push_back("Use letters/numbers/space on the Search row. Backspace deletes, Delete clears.");
+    render.generic.notes.push_back("Key Filter supports All plus 4K through 10K and 16K. Song Select also has a quick KEY toggle.");
+    render.generic.notes.push_back("Difficulty filters apply to indexed LV values only.");
+    render.generic.notes.push_back("Sort order stays available from Song Select: LEVEL toggles ASC/DESC, TITLE toggles A-Z/Z-A.");
+}
+
+void MenuApp::populate_result_render_data(render::MenuRenderData& render, const std::string& current_track) {
+    render.kind = render::MenuScreenKind::ResultScreen;
+    render.result.profile = options_.profile;
+    render.result.track = last_chart_title_.empty() ? current_track : last_chart_title_;
+    render.result.title = last_chart_title_.empty() ? "Unknown Chart" : last_chart_title_;
+    render.result.artist = last_chart_artist_;
+
+    if (!has_result_) {
+        render.result.notes.push_back("No result data is available for this run.");
+        render.result.notes.push_back("Press Enter or Esc to return to Song Select.");
+        return;
+    }
+
+    const int judged = menu_records::judged_total(last_result_.counts);
+    const int total_notes = (last_result_.total_notes > 0) ? last_result_.total_notes : judged;
+    const double accuracy = menu_records::calculate_accuracy(last_result_);
+
+    game::GaugeType final_gauge_type = gauge_type_from_mode_string(config_.mode.gauge);
+    if (!last_result_.shifts.empty()) {
+        final_gauge_type = last_result_.shifts.back().to;
+    }
+
+    render.result.rank = menu_records::calculate_rank(last_result_, last_game_over_);
+    render.result.status = last_game_over_ ? "GAME OVER" : "CLEAR";
+    render.result.gauge_label = gauge_type_label(final_gauge_type);
+    render.result.score = last_result_final_score_;
+    render.result.accuracy = accuracy;
+    render.result.gauge_value =
+        last_result_.gauge_history.empty() ? 0.0 : last_result_.gauge_history.back().value;
+    render.result.max_combo = last_result_.max_combo;
+    render.result.total_notes = total_notes;
+    render.result.judged_notes = judged;
+    render.result.perfect = last_result_.counts.pg;
+    render.result.great = last_result_.counts.gr;
+    render.result.good = last_result_.counts.gd;
+    render.result.bad = last_result_.counts.bd;
+    render.result.miss = 0;
+    render.result.mean_delta_ms = last_result_.mean_delta_ms;
+    render.result.stddev_delta_ms = last_result_.stddev_delta_ms();
+    render.result.shift_count = static_cast<int>(last_result_.shifts.size());
+    render.result.export_warning_count = static_cast<int>(last_export_warnings_.size());
+    render.result.replay_file = filename_only(last_replay_path_);
+    render.result.result_file = filename_only(last_result_path_);
+
+    if (!render.result.replay_file.empty()) {
+        render.result.notes.push_back("Replay: " + render.result.replay_file);
+    }
+    if (!render.result.result_file.empty()) {
+        render.result.notes.push_back("Result: " + render.result.result_file);
+    }
+    render.result.notes.push_back("Score x" + format_decimal(last_result_score_multiplier_));
+    if (last_result_rate_multiplier_ != 1.0) {
+        render.result.notes.push_back("Rate score x" + format_decimal(last_result_rate_multiplier_));
+    }
+    render.result.notes.push_back("Mods: " + mode_mod_summary(last_result_mods_));
+    render.result.notes.push_back("Timing center " + format_signed_ms(last_result_.mean_delta_ms) +
+                                  "  spread " + format_decimal(render.result.stddev_delta_ms) + "ms");
+    if (!last_export_warnings_.empty()) {
+        render.result.notes.push_back("Export warnings: " + std::to_string(last_export_warnings_.size()));
+        const std::size_t preview_count = std::min<std::size_t>(2, last_export_warnings_.size());
+        for (std::size_t i = 0; i < preview_count; ++i) {
+            render.result.notes.push_back(last_export_warnings_[i]);
+        }
+    }
+
+    int64_t graph_end_sample = 1;
+    for (const auto& sample : last_result_.gauge_history) {
+        graph_end_sample = std::max(graph_end_sample, sample.sample);
+    }
+    for (const auto& shift : last_result_.shifts) {
+        graph_end_sample = std::max(graph_end_sample, shift.sample);
+    }
+
+    const std::size_t gauge_count = last_result_.gauge_history.size();
+    std::size_t gauge_stride = 1;
+    if (gauge_count > 240) {
+        gauge_stride = (gauge_count + 239) / 240;
+    }
+
+    for (std::size_t i = 0; i < gauge_count; i += gauge_stride) {
+        const auto& sample = last_result_.gauge_history[i];
+        const float position = (gauge_count == 1)
+                                   ? 1.0f
+                                   : static_cast<float>(
+                                         std::clamp(static_cast<double>(sample.sample) /
+                                                        static_cast<double>(graph_end_sample),
+                                                    0.0, 1.0));
+        const float value = static_cast<float>(std::clamp(sample.value / 100.0, 0.0, 1.0));
+        render.result.gauge_points.push_back(render::ResultGaugePoint{position, value});
+    }
+    if (gauge_count > 1) {
+        const auto& last_sample = last_result_.gauge_history.back();
+        const float last_position = static_cast<float>(
+            std::clamp(static_cast<double>(last_sample.sample) / static_cast<double>(graph_end_sample),
+                       0.0, 1.0));
+        const float last_value = static_cast<float>(std::clamp(last_sample.value / 100.0, 0.0, 1.0));
+        if (render.result.gauge_points.empty() ||
+            render.result.gauge_points.back().position != last_position) {
+            render.result.gauge_points.push_back(render::ResultGaugePoint{last_position, last_value});
+        }
+    }
+
+            for (const auto& shift : last_result_.shifts) {
+                const double shift_ratio = static_cast<double>(shift.sample) / static_cast<double>(graph_end_sample);
+                const double clamped_shift_ratio =
+                    shift_ratio < 0.0 ? 0.0 : (shift_ratio > 1.0 ? 1.0 : shift_ratio);
+                const float position = static_cast<float>(clamped_shift_ratio);
+                render.result.gauge_shifts.push_back(
+                    render::ResultShiftMarker{position,
+                                              short_gauge_type_label(shift.from) + "->" +
+                                          short_gauge_type_label(shift.to)});
+    }
+    std::stable_sort(render.result.gauge_points.begin(),
+                     render.result.gauge_points.end(),
+                     [](const render::ResultGaugePoint& lhs, const render::ResultGaugePoint& rhs) {
+                         return lhs.position < rhs.position;
+                     });
+    std::stable_sort(render.result.gauge_shifts.begin(),
+                     render.result.gauge_shifts.end(),
+                     [](const render::ResultShiftMarker& lhs, const render::ResultShiftMarker& rhs) {
+                         return lhs.position < rhs.position;
+                     });
+}
+
+void MenuApp::populate_generic_screen_render_data(render::MenuRenderData& render) {
+    render.kind = render::MenuScreenKind::GenericList;
+    render.generic.heading = screen_title();
+
+    if (screen_ == Screen::OptionsHub) {
+        append_menu_row(render.generic, "Audio", "", options_cursor_ == 0, render::MenuHitTargetKind::OptionsItem, 0, true, false);
+        append_menu_row(render.generic, "Graphics", "", options_cursor_ == 1, render::MenuHitTargetKind::OptionsItem, 1, true, false);
+        append_menu_row(render.generic, "Skins", "", options_cursor_ == 2, render::MenuHitTargetKind::OptionsItem, 2, true, false);
+        append_menu_row(render.generic, "Input", "", options_cursor_ == 3, render::MenuHitTargetKind::OptionsItem, 3, true, false);
+        append_menu_row(render.generic, "Mode", "", options_cursor_ == 4, render::MenuHitTargetKind::OptionsItem, 4, true, false);
+        append_menu_row(render.generic, "Keymap", "", options_cursor_ == 5, render::MenuHitTargetKind::OptionsItem, 5, true, false);
+        append_menu_row(render.generic, "Back", "", options_cursor_ == 6, render::MenuHitTargetKind::OptionsItem, 6, true, false);
+        render.generic.notes.push_back("Up/Down to move, Enter to select, Esc to return.");
+        render.generic.notes.push_back("A/G/I/M/K also jumps directly into Audio, Graphics, Input, Mode, and Keymap.");
+    } else if (screen_ == Screen::EditStub) {
+        render.generic.notes.push_back("Editor is not implemented yet.");
+        append_menu_row(render.generic, "Back", "", true, render::MenuHitTargetKind::SettingsRow, 0, true, false);
+    } else if (screen_ == Screen::SettingsAudio) {
+        append_menu_row(render.generic, "Preset", preset_label(config_.audio_ui.preset), settings_cursor_ == 0,
+                        render::MenuHitTargetKind::SettingsRow, 0, false, true);
+        append_menu_row(render.generic, "Keysound Mode", keysound_policy_label(config_.audio_ui.bms_keysound_policy), settings_cursor_ == 1,
+                        render::MenuHitTargetKind::SettingsRow, 1, false, true);
+        append_menu_row(render.generic, "Master Volume", format_percent(config_.audio_ui.master_volume), settings_cursor_ == 2,
+                        render::MenuHitTargetKind::SettingsRow, 2, false, true);
+        append_menu_row(render.generic, "BGM Volume", format_percent(config_.audio_ui.bgm_volume), settings_cursor_ == 3,
+                        render::MenuHitTargetKind::SettingsRow, 3, false, true);
+        append_menu_row(render.generic, "Keysound Volume", format_percent(config_.audio_ui.keysound_volume), settings_cursor_ == 4,
+                        render::MenuHitTargetKind::SettingsRow, 4, false, true);
+        append_menu_row(render.generic, "Back", "", settings_cursor_ == 5, render::MenuHitTargetKind::SettingsRow, 5, true, false);
+        render.generic.notes.push_back("Follow: note hits trigger keysounds. Autoplay: note keysounds are mixed into background audio.");
+        render.generic.notes.push_back("Off: skip note keysounds. Autoplay mode routes note keysounds through BGM volume.");
+        render.generic.notes.push_back("Left/Right or click +/- to change. Back saves and returns.");
+    } else if (screen_ == Screen::SettingsGraphics) {
+        append_menu_row(render.generic, "Display", display_label(config_.graphics.display_mode), settings_cursor_ == 0,
+                        render::MenuHitTargetKind::SettingsRow, 0, false, true);
+        append_menu_row(render.generic, "Resolution", resolution_label(config_.graphics.resolution), settings_cursor_ == 1,
+                        render::MenuHitTargetKind::SettingsRow, 1, false, true);
+        append_menu_row(render.generic, "Refresh Hz", std::to_string(config_.graphics.refresh_hz), settings_cursor_ == 2,
+                        render::MenuHitTargetKind::SettingsRow, 2, false, true);
+        append_menu_row(render.generic, "VSync", on_off(config_.graphics.vsync), settings_cursor_ == 3,
+                        render::MenuHitTargetKind::SettingsRow, 3, false, true);
+        append_menu_row(render.generic, "Performance HUD", on_off(config_.graphics.performance_overlay), settings_cursor_ == 4,
+                        render::MenuHitTargetKind::SettingsRow, 4, false, true);
+        append_menu_row(render.generic, "Display Offset", format_signed_offset_ms(config_.visual_offset_ms), settings_cursor_ == 5,
+                        render::MenuHitTargetKind::SettingsRow, 5, false, true);
+        append_menu_row(render.generic, "Back", "", settings_cursor_ == 6, render::MenuHitTargetKind::SettingsRow, 6, true, false);
+        render.generic.notes.push_back("Performance HUD shows frame graph, AVG ms/FPS, 0.1%/0.01% lows, and max FPS.");
+        render.generic.notes.push_back("Resolution cycles 720p, 1080p, QHD, or the current monitor native size. Refresh Hz ranges from 60 to 1050.");
+        render.generic.notes.push_back("Menu rendering is capped at 300 Hz. Gameplay uses the configured value up to 1050 Hz.");
+        render.generic.notes.push_back("Display Offset shifts only visuals from -500ms to +500ms. Positive values draw notes earlier.");
+        render.generic.notes.push_back("Display, Resolution, Refresh Hz, and VSync apply immediately. Back saves and returns.");
+    } else if (screen_ == Screen::SettingsSkins) {
+        skin_edit_mode_ = normalize_skin_edit_mode(skin_edit_mode_);
+        const int lane_count = lane_count_for_skin_mode(skin_edit_mode_);
+        skin_edit_lane_ = clamp_int(skin_edit_lane_, 0, lane_count - 1);
+        const auto preview_lane_colors = config::resolved_skin_lane_colors(config_.skin, skin_edit_mode_);
+        const double preview_note_width_scale = config::resolved_skin_note_width_scale(config_.skin, skin_edit_mode_);
+        const double preview_note_height_scale = config::resolved_skin_note_height_scale(config_.skin, skin_edit_mode_);
+        const double preview_lane_divider_width_scale =
+            config::resolved_skin_lane_divider_width_scale(config_.skin, skin_edit_mode_);
+        const std::string active_skin_source = config::normalize_skin_source_token(config_.skin.source);
+        const std::string osu_skin_value =
+            available_osu_skin_names_.empty()
+                ? std::string("Not Found")
+                : (config_.skin.osu_skin_name.empty() ? available_osu_skin_names_.front()
+                                                      : config_.skin.osu_skin_name);
+
+        append_menu_row(render.generic, "Skin Source", skin_source_label(active_skin_source), settings_cursor_ == 0,
+                        render::MenuHitTargetKind::SettingsRow, 0, false, true);
+        append_menu_row(render.generic, "OSU Skin", osu_skin_value, settings_cursor_ == 1,
+                        render::MenuHitTargetKind::SettingsRow, 1, false, true);
+        append_menu_row(render.generic, "Import OSU Skin", "Open Folder", settings_cursor_ == 2,
+                        render::MenuHitTargetKind::SettingsRow, 2, true, false);
+        append_menu_row(render.generic, "Key Mode", key_mode_label(skin_edit_mode_), settings_cursor_ == 3,
+                        render::MenuHitTargetKind::SettingsRow, 3, false, true);
+        append_menu_row(render.generic, "Target Lane",
+                        lane_display_label(skin_edit_lane_) + " / " + std::to_string(lane_count),
+                        settings_cursor_ == 4, render::MenuHitTargetKind::SettingsRow, 4, false, true);
+        append_menu_row(render.generic, "Lane Color",
+                        config::skin_color_label(preview_lane_colors[static_cast<std::size_t>(skin_edit_lane_)]),
+                        settings_cursor_ == 5, render::MenuHitTargetKind::SettingsRow, 5, false, true);
+        append_menu_row(render.generic, "Note Shape", config::skin_note_shape_label(config_.skin.note_shape), settings_cursor_ == 6,
+                        render::MenuHitTargetKind::SettingsRow, 6, false, true);
+        append_menu_row(render.generic, "Note Border", on_off(config_.skin.note_border_enabled), settings_cursor_ == 7,
+                        render::MenuHitTargetKind::SettingsRow, 7, false, true);
+        append_menu_row(render.generic, "Image Aspect", on_off(config_.skin.preserve_note_image_aspect_ratio),
+                        settings_cursor_ == 8, render::MenuHitTargetKind::SettingsRow, 8, false, true);
+        append_menu_row(render.generic, "Judge Line", format_percent(config_.skin.judgement_line_position), settings_cursor_ == 9,
+                        render::MenuHitTargetKind::SettingsRow, 9, false, true);
+        append_menu_row(render.generic, "Note Width", format_percent(preview_note_width_scale), settings_cursor_ == 10,
+                        render::MenuHitTargetKind::SettingsRow, 10, false, true);
+        append_menu_row(render.generic, "Divider Width", format_percent(preview_lane_divider_width_scale), settings_cursor_ == 11,
+                        render::MenuHitTargetKind::SettingsRow, 11, false, true);
+        append_menu_row(render.generic, "LN Body Width", format_percent(config_.skin.hold_body_width_scale), settings_cursor_ == 12,
+                        render::MenuHitTargetKind::SettingsRow, 12, false, true);
+        append_menu_row(render.generic, "Note Height", format_percent(preview_note_height_scale), settings_cursor_ == 13,
+                        render::MenuHitTargetKind::SettingsRow, 13, false, true);
+        append_menu_row(render.generic, "Combo Y", format_percent(config_.skin.combo_position), settings_cursor_ == 14,
+                        render::MenuHitTargetKind::SettingsRow, 14, false, true);
+        append_menu_row(render.generic, "Back", "", settings_cursor_ == 15, render::MenuHitTargetKind::SettingsRow, 15, true, false);
+
+        render.generic.skin_preview.visible = true;
+        render.generic.skin_preview.mode_label = key_mode_label(skin_edit_mode_);
+        render.generic.skin_preview.selected_color_label =
+            config::skin_color_label(preview_lane_colors[static_cast<std::size_t>(skin_edit_lane_)]);
+        render.generic.skin_preview.lane_count = lane_count;
+        render.generic.skin_preview.selected_lane = skin_edit_lane_ + 1;
+        render.generic.skin_preview.judgement_line_position = config_.skin.judgement_line_position;
+        render.generic.skin_preview.combo_position = config_.skin.combo_position;
+        render.generic.skin_preview.note_width_scale = preview_note_width_scale;
+        render.generic.skin_preview.note_height_scale = preview_note_height_scale;
+        render.generic.skin_preview.lane_divider_width_scale = preview_lane_divider_width_scale;
+        render.generic.skin_preview.hold_body_width_scale = config_.skin.hold_body_width_scale;
+        render.generic.skin_preview.note_border_enabled = config_.skin.note_border_enabled;
+        render.generic.skin_preview.note_shape = config_.skin.note_shape;
+        render.generic.skin_preview.lane_colors.fill(0);
+        for (int lane = 0; lane < lane_count && lane < static_cast<int>(kGameplayHudMaxLanes); ++lane) {
+            render.generic.skin_preview.lane_colors[static_cast<std::size_t>(lane)] =
+                config::skin_color_rgb(preview_lane_colors[static_cast<std::size_t>(lane)]);
+        }
+
+        render.generic.notes.push_back("Skin Source switches between the native vector skin and imported osu!mania PNG assets.");
+        render.generic.notes.push_back("OSU Skin scans imported profile skins first, then build/Release/test-skins-osu as a fallback test root.");
+        render.generic.notes.push_back("Import OSU Skin opens a folder picker. You can also drag and drop a skin folder onto this screen.");
+        render.generic.notes.push_back("Imported osu skins affect gameplay note, LN, and key art. Native rows still drive the preview and fallback skin.");
+        render.generic.notes.push_back("Image Aspect keeps imported head and tail art from stretching to the gameplay note box.");
+        render.generic.notes.push_back("Divider Width scales native lane separators and multiplies osu!mania ColumnLineWidth when the imported skin provides it.");
+        render.generic.notes.push_back("Key Mode and Target Lane still edit the native fallback palette and sizing per layout.");
+    } else if (screen_ == Screen::SettingsInput) {
+        append_menu_row(render.generic, "Polling Hz", std::to_string(config_.input.polling_hz), settings_cursor_ == 0,
+                        render::MenuHitTargetKind::SettingsRow, 0, false, true);
+        append_menu_row(render.generic, "Debounce", format_decimal(config_.input.debounce_ms) + " ms", settings_cursor_ == 1,
+                        render::MenuHitTargetKind::SettingsRow, 1, false, true);
+        append_menu_row(render.generic, "Back", "", settings_cursor_ == 2, render::MenuHitTargetKind::SettingsRow, 2, true, false);
+        render.generic.notes.push_back("Debounce filters duplicate switch chatter on a single key before gameplay sees it.");
+        render.generic.notes.push_back("Left/Right or click +/- to change. Back saves and returns.");
+    } else if (screen_ == Screen::ModeSelect) {
+        append_menu_row(render.generic, "OSU Charts", on_off(config_.mode.enable_osu_charts), settings_cursor_ == 0,
+                        render::MenuHitTargetKind::SettingsRow, 0, false, true);
+        append_menu_row(render.generic, "Indexing",
+                        song_index_profile_label(config_.mode.song_index_profile),
+                        settings_cursor_ == 1, render::MenuHitTargetKind::SettingsRow, 1, false, true);
+        append_menu_row(render.generic, "Chart Filter",
+                        config_.mode.enable_osu_charts ? format_label(config_.mode.format) : std::string("BMS"),
+                        settings_cursor_ == 2, render::MenuHitTargetKind::SettingsRow, 2, false, true);
+        append_menu_row(render.generic, "Key Mode",
+                        config_.mode.enable_osu_charts ? key_mode_label(config_.mode.key_mode) : std::string("10K"),
+                        settings_cursor_ == 3, render::MenuHitTargetKind::SettingsRow, 3, false, true);
+        append_menu_row(render.generic, "Gauge", gauge_label(config_.mode.gauge), settings_cursor_ == 4,
+                        render::MenuHitTargetKind::SettingsRow, 4, false, true);
+        append_menu_row(render.generic, "Random", random_label(config_.mode.random), settings_cursor_ == 5,
+                        render::MenuHitTargetKind::SettingsRow, 5, false, true);
+        append_menu_row(render.generic, "Random Seed", std::to_string(config_.mode.random_seed), settings_cursor_ == 6,
+                        render::MenuHitTargetKind::SettingsRow, 6, false, true);
+        append_menu_row(render.generic, "Mods", mode_score_summary(config_.mode.mods, config_.speed.rate),
+                        settings_cursor_ == 7, render::MenuHitTargetKind::SettingsRow, 7, true, false);
+        append_menu_row(render.generic, "Rate", format_multiplier(config_.speed.rate), settings_cursor_ == 8,
+                        render::MenuHitTargetKind::SettingsRow, 8, false, true);
+        append_menu_row(render.generic, "Hi-Speed", format_decimal(config_.speed.hi_speed), settings_cursor_ == 9,
+                        render::MenuHitTargetKind::SettingsRow, 9, false, true);
+        append_menu_row(render.generic, "Back", "", settings_cursor_ == 10, render::MenuHitTargetKind::SettingsRow, 10, true, false);
+        render.generic.notes.push_back("OSU Charts adds 4K-10K .osu beatmaps to song indexing and runtime loading.");
+        render.generic.notes.push_back("Indexing Safe keeps RAM low for large scans; Fast uses more RAM for quicker rescans on 32GB+ PCs.");
+        render.generic.notes.push_back("Chart Filter switches the visible library between BMS, OSU, or All.");
+        render.generic.notes.push_back("Key Mode selects Auto plus 4K-10K/16K runtime layouts; osu charts still top out at 10K.");
+        render.generic.notes.push_back("Mods opens the registry-backed Mod Manager and shows the current score multiplier.");
+        render.generic.notes.push_back("Back saves the toggle/filter and refreshes the song library cache when needed.");
+    } else if (screen_ == Screen::ModeMods) {
+        const auto& categories = mode_mod_categories();
+        for (std::size_t i = 0; i < categories.size(); ++i) {
+            append_menu_row(render.generic,
+                            std::string(categories[i].label),
+                            mode_mod_category_value(categories[i].token, config_.mode.mods),
+                            settings_cursor_ == static_cast<int>(i),
+                            render::MenuHitTargetKind::SettingsRow,
+                            static_cast<int>(i),
+                            false,
+                            true);
+        }
+        append_menu_row(render.generic,
+                        "Back",
+                        "",
+                        settings_cursor_ == static_cast<int>(categories.size()),
+                        render::MenuHitTargetKind::SettingsRow,
+                        static_cast<int>(categories.size()),
+                        true,
+                        false);
+        render.generic.notes.push_back("Final score uses the lowest multiplier between active mods and the current Rate.");
+        render.generic.notes.push_back("Current: " + mode_score_summary(config_.mode.mods, config_.speed.rate));
+        std::vector<std::string> mod_warnings;
+        (void)normalize_mode_mod_tokens(config_.mode.mods, &mod_warnings);
+        for (const auto& warning : mod_warnings) {
+            render.generic.notes.push_back(warning);
+        }
+    } else if (screen_ == Screen::Keymap) {
+        config::KeymapManager keymap_manager;
+        const auto current_bindings = keymap_manager.bindings_for_mode(working_keymap_, keymap_edit_mode_);
+        append_menu_row(render.generic, "Key Mode", key_mode_label(keymap_edit_mode_), keymap_cursor_ == 0,
+                        render::MenuHitTargetKind::None, 0, false, false);
+        for (std::size_t i = 0; i < keymap_lanes_.size(); ++i) {
+            const std::string& lane = keymap_lanes_[i];
+            const auto it = current_bindings.find(lane);
+            std::string key_name = (it == current_bindings.end() || it->second.empty())
+                                       ? "Unassigned"
+                                       : it->second;
+            if (keymap_capture_active_ && static_cast<int>(i) + 1 == keymap_cursor_) {
+                key_name += " [waiting]";
+            }
+            append_menu_row(render.generic, lane, key_name, static_cast<int>(i) + 1 == keymap_cursor_,
+                            render::MenuHitTargetKind::None, static_cast<int>(i) + 1, false, false);
+        }
+        if (keymap_capture_active_) {
+            const int64_t now_ns = timing::HighResClock::now_ns();
+            const int64_t remaining_ns = std::max<int64_t>(0, keymap_capture_deadline_ns_ - now_ns);
+            const int remaining_ms = static_cast<int>(remaining_ns / 1'000'000);
+            render.generic.notes.push_back("Capture timeout: " + std::to_string(remaining_ms) + "ms");
+            render.generic.notes.push_back("Press any keyboard key. Delete cancels capture.");
+            render.generic.notes.push_back("Duplicate lane bindings are allowed.");
+        }
+        append_menu_row(render.generic, "Save", "", false, render::MenuHitTargetKind::KeymapButton, 0, !keymap_capture_active_, false);
+        append_menu_row(render.generic, "Reset", "", false, render::MenuHitTargetKind::KeymapButton, 1, !keymap_capture_active_, false);
+        append_menu_row(render.generic, "NKRO Test", "", false, render::MenuHitTargetKind::KeymapButton, 2, !keymap_capture_active_, false);
+        append_menu_row(render.generic, "Back", "", false, render::MenuHitTargetKind::KeymapButton, 3, !keymap_capture_active_, false);
+        render.generic.notes.push_back("Left/Right on Key Mode selects which 4K-10K or 16K layout you are editing.");
+        render.generic.notes.push_back("Enter binds the selected lane. A=Save  R=Reset  F2=NKRO Test  Esc=Back");
+    } else if (screen_ == Screen::KeymapConfirm) {
+        render.generic.notes.push_back("Duplicate binding detected.");
+        render.generic.notes.push_back("Key: " + keymap_pending_key_);
+        render.generic.notes.push_back("Already used by: " + keymap_duplicate_lane_);
+        append_menu_row(render.generic, "Replace Existing Binding", "", true, render::MenuHitTargetKind::SettingsRow, 0, true, false);
+        append_menu_row(render.generic, "Cancel", "", false, render::MenuHitTargetKind::SettingsRow, 1, true, false);
+    } else if (screen_ == Screen::KeymapTest) {
+        render.generic.notes.push_back("NKRO Test (press multiple keys)");
+        config::KeymapManager keymap_manager;
+        const auto current_bindings = keymap_manager.bindings_for_mode(working_keymap_, keymap_edit_mode_);
+        for (std::size_t i = 0; i < keymap_lanes_.size(); ++i) {
+            const std::string& lane = keymap_lanes_[i];
+            const auto it = current_bindings.find(lane);
+            const std::string key_name = (it == current_bindings.end() || it->second.empty())
+                                             ? "Unassigned"
+                                             : it->second;
+            bool down = false;
+            if (!key_name.empty()) {
+                auto keycode = config::KeycodeMap::to_keycode(key_name);
+                if (keycode.has_value()) {
+                    down = (pressed_keys_.find(keycode.value()) != pressed_keys_.end());
+                }
+            }
+            append_menu_row(render.generic, lane, key_name + (down ? " [DOWN]" : ""), down,
+                            render::MenuHitTargetKind::None, static_cast<int>(i), false, false);
+        }
+        append_menu_row(render.generic, "Back", "", true, render::MenuHitTargetKind::SettingsRow, 0, true, false);
+    } else if (screen_ == Screen::Result) {
+        if (!has_result_) {
+            render.generic.notes.push_back("No result data.");
+        } else {
+            append_menu_row(render.generic, "Chart", last_chart_title_.empty() ? "Unknown" : last_chart_title_, false,
+                            render::MenuHitTargetKind::None, 0, false, false);
+            append_menu_row(render.generic, "Status", last_game_over_ ? "Game Over" : "Clear", false,
+                            render::MenuHitTargetKind::None, 1, false, false);
+            append_menu_row(render.generic, "Max Combo", std::to_string(last_result_.max_combo), false,
+                            render::MenuHitTargetKind::None, 2, false, false);
+            render.generic.notes.push_back("Judgements: PG " + std::to_string(last_result_.counts.pg) +
+                                           " GR " + std::to_string(last_result_.counts.gr) +
+                                           " G " + std::to_string(last_result_.counts.gd) +
+                                           " BAD " + std::to_string(last_result_.counts.bd));
+            render.generic.notes.push_back("Timing: mean " +
+                                           std::to_string(static_cast<int>(last_result_.mean_delta_ms)) +
+                                           "ms  stddev " +
+                                           std::to_string(static_cast<int>(last_result_.stddev_delta_ms())) + "ms");
+            render.generic.notes.push_back("Gauge shifts: " + std::to_string(last_result_.shifts.size()));
+            if (!last_replay_path_.empty()) {
+                render.generic.notes.push_back(
+                    "Replay: " + path_from_utf8(last_replay_path_).filename().u8string());
+            }
+            if (!last_result_path_.empty()) {
+                render.generic.notes.push_back(
+                    "Result file: " + path_from_utf8(last_result_path_).filename().u8string());
+            }
+            if (!last_export_warnings_.empty()) {
+                render.generic.notes.push_back("Export warnings: " +
+                                               std::to_string(last_export_warnings_.size()));
+            }
+        }
+        append_menu_row(render.generic, "Back to Song Select", "", true, render::MenuHitTargetKind::SettingsRow, 0, true, false);
+    }
+}
+
 void MenuApp::publish_snapshot() {
     if (screen_ == Screen::SongSelect) {
         sync_song_select_state();
     }
+    sync_menu_music();
 
     MenuSnapshot snapshot;
     render::MenuRenderData render;
     render.screen_title = screen_title();
     render.performance.visible = config_.graphics.performance_overlay;
 
-    auto current_track = [&]() -> std::string {
-        if (screen_ == Screen::SongSelect && song_select_view_ == SongSelectView::Sources &&
-            !config_.ui.recent_song_sources.empty() &&
-            selected_source_ >= 0 &&
-            selected_source_ < static_cast<int>(config_.ui.recent_song_sources.size())) {
-            return song_source_display_name(
-                config_.ui.recent_song_sources[static_cast<std::size_t>(selected_source_)]);
-        }
-        if (selected_song_ >= 0 && selected_song_ < static_cast<int>(visible_song_count())) {
-            if (const SongEntry* entry = visible_song_entry(static_cast<std::size_t>(selected_song_))) {
-                return song_title_for_ui(*entry);
-            }
-        }
-        if (!last_chart_title_.empty()) {
-            return safe_ui_text(last_chart_title_, "-");
-        }
-        return "-";
-    };
+    const std::string current_track = current_track_label();
     const BestResultRecord current_best = current_song_best_result();
     rebuild_current_song_record_indices();
     const LocalPlayRecord* selected_record = current_selected_record();
 
     if (screen_ == Screen::QuickSetup) {
-        render.kind = render::MenuScreenKind::GenericList;
-        render.generic.heading = "Quick Setup";
-        auto add_row = [&](std::string label,
-                           std::string value,
-                           bool selected,
-                           render::MenuHitTargetKind kind,
-                           int index,
-                           bool activatable,
-                           bool adjustable) {
-            render::MenuRowData row;
-            row.label = std::move(label);
-            row.value = std::move(value);
-            row.selected = selected;
-            row.target_kind = kind;
-            row.row_index = index;
-            row.activatable = activatable;
-            row.adjustable = adjustable;
-            row.decrement_enabled = adjustable;
-            row.increment_enabled = adjustable;
-            render.generic.rows.push_back(std::move(row));
-        };
-
-        add_row("Songs Folder",
-                safe_ui_text(song_source_display_name(songs_path_), "Choose Folder"),
-                settings_cursor_ == 0, render::MenuHitTargetKind::SettingsRow, 0, true, false);
-        add_row("Gauge", gauge_label(config_.mode.gauge), settings_cursor_ == 1,
-                render::MenuHitTargetKind::SettingsRow, 1, false, true);
-        add_row("Rate", format_multiplier(config_.speed.rate), settings_cursor_ == 2,
-                render::MenuHitTargetKind::SettingsRow, 2, false, true);
-        add_row("Display Offset", format_signed_offset_ms(config_.visual_offset_ms), settings_cursor_ == 3,
-                render::MenuHitTargetKind::SettingsRow, 3, false, true);
-        add_row("BMS Keysound", keysound_policy_label(config_.audio_ui.bms_keysound_policy), settings_cursor_ == 4,
-                render::MenuHitTargetKind::SettingsRow, 4, false, true);
-        add_row("Continue to Song Select", "", settings_cursor_ == 5,
-                render::MenuHitTargetKind::SettingsRow, 5, true, false);
-        add_row("Skip to Title", "", settings_cursor_ == 6,
-                render::MenuHitTargetKind::SettingsRow, 6, true, false);
-
-        render.generic.notes.push_back("First launch detected. TenRiff already created a default profile and default keymap.");
-        render.generic.notes.push_back("Recommended start: Gauge Normal, Rate 1.00x, Display Offset 0ms, BMS Keysound Follow.");
-        render.generic.notes.push_back("Songs Folder opens a picker on Enter or F2. You can also drag and drop a folder later.");
-        render.generic.notes.push_back("These values stay editable later from Song Select: A=Audio  G=Graphics  I=Input  M=Mode  K=Keymap.");
+        populate_quick_setup_render_data(render);
     } else if (screen_ == Screen::Title) {
-        render.kind = render::MenuScreenKind::TitleMenu;
-        render.title.profile = options_.profile;
-        render.title.track = current_track();
-        render.title.high_score = current_best.has_value ? current_best.best_score : 0;
-        render.title.buttons = {
-            render::MenuButtonData{"PLAY", u8"▶", title_cursor_ == 0},
-            render::MenuButtonData{"EDIT", u8"✎", title_cursor_ == 1},
-            render::MenuButtonData{"OPTIONS", u8"⚙", title_cursor_ == 2},
-            render::MenuButtonData{"EXIT", u8"⏻", title_cursor_ == 3},
-        };
-        render.title.guides = {
-            "UP / DOWN or mouse to move",
-            "ENTER or double-click to open",
-            "F5 refreshes the current song source",
-            "A/G/I/M/K jumps straight to Audio, Graphics, Input, Mode, Keymap",
-            "F1 opens the control help overlay",
-            "ESC exits from the title menu",
-        };
+        populate_title_render_data(render, current_track, current_best);
     } else if (screen_ == Screen::SongSelect) {
         render.kind = render::MenuScreenKind::SongSelect;
         render.song_select.profile = options_.profile;
-        render.song_select.track = current_track();
+        render.song_select.track = current_track;
         render.song_select.song_count = static_cast<int>(visible_song_count());
         render.song_select.source_count = static_cast<int>(config_.ui.recent_song_sources.size());
         render.song_select.record_count = static_cast<int>(current_song_record_indices_.size());
@@ -4328,7 +4531,8 @@ void MenuApp::publish_snapshot() {
             render.song_select.showing_sources ? 0 :
             (render.song_select.showing_records && selected_record ? selected_record->score :
              (current_best.has_value ? current_best.best_score : 0));
-        render.song_select.current_source_name = safe_ui_text(song_source_display_name(songs_path_), "Songs");
+        render.song_select.current_source_name =
+            safe_ui_text(menu_songs::song_source_display_name(songs_path_), "Songs");
         render.song_select.current_source_path = safe_ui_text_or_placeholder(songs_path_, "<invalid path>");
         render.song_select.index_profile_label = song_index_profile_label(config_.mode.song_index_profile);
         render.song_select.browser_summary = browser_summary_label(song_search_query_,
@@ -4353,27 +4557,28 @@ void MenuApp::publish_snapshot() {
             std::to_string(render.song_select.source_count) + " ROOT" +
             (render.song_select.source_count == 1 ? "" : "S");
         const std::string browser_detail = render.song_select.browser_summary;
-        const std::string records_detail =
-            (render.song_select.record_count > 0)
-                ? (std::to_string(render.song_select.record_count) + " PLAYS")
-                : std::string("NO PLAYS");
+        std::string records_detail = "NO PLAYS";
+        if (render.song_select.record_count > 0) {
+            records_detail = std::to_string(render.song_select.record_count) + " PLAYS";
+        }
 
         render.song_select.indexing = song_indexer_.is_running();
         if (render.song_select.indexing) {
-            const auto progress = song_indexer_.progress();
-            render.song_select.indexing_stage = song_index_stage_label(progress.stage);
-            render.song_select.indexing_processed = std::max(0, progress.processed);
-            render.song_select.indexing_total = progress.total;
-            if (progress.total > 0) {
-                const int processed = std::max(0, std::min(progress.processed, progress.total));
-                const int percent = static_cast<int>(std::llround(
-                    100.0 * static_cast<double>(processed) / static_cast<double>(progress.total)));
+            const auto index_progress = song_indexer_.progress();
+            render.song_select.indexing_stage = song_index_stage_label(index_progress.stage);
+            render.song_select.indexing_processed = std::max(0, index_progress.processed);
+            render.song_select.indexing_total = index_progress.total;
+            if (index_progress.total > 0) {
+                const int processed = std::max(0, std::min(index_progress.processed, index_progress.total));
+                const double percent_ratio =
+                    100.0 * static_cast<double>(processed) / static_cast<double>(index_progress.total);
+                const int percent = static_cast<int>(std::llround(percent_ratio));
                 render.song_select.indexing_percent = percent;
 
-                const int remaining = progress.total - processed;
+                const int remaining = index_progress.total - processed;
                 const int64_t now_ns = timing::HighResClock::now_ns();
-                const int64_t elapsed_ns = (progress.started_ns > 0 && now_ns > progress.started_ns)
-                                               ? (now_ns - progress.started_ns)
+                const int64_t elapsed_ns = (index_progress.started_ns > 0 && now_ns > index_progress.started_ns)
+                                               ? (now_ns - index_progress.started_ns)
                                                : 0;
                 if (remaining > 0 && processed > 0 && elapsed_ns > 0) {
                     const double elapsed_sec = static_cast<double>(elapsed_ns) / 1'000'000'000.0;
@@ -4382,7 +4587,7 @@ void MenuApp::publish_snapshot() {
                     render.song_select.indexing_eta =
                         format_eta_seconds(static_cast<int64_t>(std::llround(eta_sec)));
                 }
-            } else if (progress.total == 0) {
+            } else if (index_progress.total == 0) {
                 render.song_select.indexing_percent = 0;
                 render.song_select.indexing_eta = "0s";
             } else {
@@ -4430,14 +4635,15 @@ void MenuApp::publish_snapshot() {
                 for (int i = start; i < end; ++i) {
                     const std::string& source_path = config_.ui.recent_song_sources[static_cast<std::size_t>(i)];
                     render::SongCardData card;
-                    card.title = safe_ui_text(song_source_display_name(source_path), "<invalid title>");
+                    card.title = safe_ui_text(menu_songs::song_source_display_name(source_path), "<invalid title>");
                     card.artist = safe_ui_text_or_placeholder(source_path, "<invalid artist>");
-                    const auto count_it = source_song_counts_.find(normalize_path_key(path_from_utf8(source_path)));
+                    const auto count_it =
+                        source_song_counts_.find(menu_songs::normalize_path_key(path_from_utf8(source_path)));
                     card.level = (count_it != source_song_counts_.end()) ? count_it->second : 0;
                     card.song_index = i;
                     card.selected = (i == selected_source_);
-                    card.detail = safe_ui_text((normalize_path_key(path_from_utf8(source_path)) ==
-                                                normalize_path_key(path_from_utf8(songs_path_)))
+                    card.detail = safe_ui_text((menu_songs::normalize_path_key(path_from_utf8(source_path)) ==
+                                                menu_songs::normalize_path_key(path_from_utf8(songs_path_)))
                                                    ? "CURRENT SOURCE"
                                                    : "RECENT SOURCE");
                     render.song_select.songs.push_back(std::move(card));
@@ -4446,16 +4652,16 @@ void MenuApp::publish_snapshot() {
                 const std::string& selected_source =
                     config_.ui.recent_song_sources[static_cast<std::size_t>(selected_source_)];
                 render.song_select.selected_source_name =
-                    safe_ui_text(song_source_display_name(selected_source), "Songs");
+                    safe_ui_text(menu_songs::song_source_display_name(selected_source), "Songs");
                 render.song_select.selected_source_path =
                     safe_ui_text_or_placeholder(selected_source, "<invalid path>");
                 const auto count_it =
-                    source_song_counts_.find(normalize_path_key(path_from_utf8(selected_source)));
+                    source_song_counts_.find(menu_songs::normalize_path_key(path_from_utf8(selected_source)));
                 render.song_select.selected_source_song_count =
                     (count_it != source_song_counts_.end()) ? count_it->second : -1;
                     render.song_select.selected_source_active =
-                        normalize_path_key(path_from_utf8(selected_source)) ==
-                        normalize_path_key(path_from_utf8(songs_path_));
+                        menu_songs::normalize_path_key(path_from_utf8(selected_source)) ==
+                        menu_songs::normalize_path_key(path_from_utf8(songs_path_));
             }
             if (total_sources == 0) {
                 render.song_select.empty_title = "NO SONG SOURCES";
@@ -4480,7 +4686,7 @@ void MenuApp::publish_snapshot() {
                     const LocalPlayRecord& record =
                         local_play_records_[current_song_record_indices_[static_cast<std::size_t>(i)]];
                     render::SongCardData card;
-                    card.title = compact_timestamp_label(record.created_utc);
+                    card.title = menu_records::compact_timestamp_label(record.created_utc);
                     card.artist = record.clear_status + "  " + record.rank + "  SCORE " +
                                   format_int_with_commas(record.score);
                     card.detail = record.replay_path.empty()
@@ -4566,7 +4772,8 @@ void MenuApp::publish_snapshot() {
                 render.song_select.bad = selected_record->bad;
                 render.song_select.miss = selected_record->miss;
                 render.song_select.accuracy = selected_record->accuracy;
-                render.song_select.selected_record_created_utc = compact_timestamp_label(selected_record->created_utc);
+                render.song_select.selected_record_created_utc =
+                    menu_records::compact_timestamp_label(selected_record->created_utc);
                 render.song_select.selected_record_status = selected_record->clear_status;
                 render.song_select.selected_record_replay_file = filename_only(selected_record->replay_path);
                 if (const ReplaySummary* replay = replay_summary_for_path(selected_record->replay_path)) {
@@ -4596,44 +4803,7 @@ void MenuApp::publish_snapshot() {
             render.song_select.miss = current_best.has_value ? current_best.miss : 0;
         }
     } else if (screen_ == Screen::SongBrowser) {
-        render.kind = render::MenuScreenKind::GenericList;
-        auto add_row = [&](std::string label,
-                           std::string value,
-                           bool selected,
-                           render::MenuHitTargetKind kind,
-                           int index,
-                           bool activatable,
-                           bool adjustable) {
-            render::MenuRowData row;
-            row.label = std::move(label);
-            row.value = std::move(value);
-            row.selected = selected;
-            row.target_kind = kind;
-            row.row_index = index;
-            row.activatable = activatable;
-            row.adjustable = adjustable;
-            row.decrement_enabled = adjustable;
-            row.increment_enabled = adjustable;
-            render.generic.rows.push_back(std::move(row));
-        };
-
-        add_row("Search",
-                song_search_query_.empty() ? std::string("<type to search>") : song_search_query_,
-                settings_cursor_ == 0, render::MenuHitTargetKind::SettingsRow, 0, true, false);
-        add_row("Key Filter", key_filter_label(song_key_filter_), settings_cursor_ == 1,
-                render::MenuHitTargetKind::SettingsRow, 1, false, true);
-        add_row("Difficulty Min", song_level_min_filter_ > 0 ? std::to_string(song_level_min_filter_) : "Any",
-                settings_cursor_ == 2, render::MenuHitTargetKind::SettingsRow, 2, false, true);
-        add_row("Difficulty Max", song_level_max_filter_ > 0 ? std::to_string(song_level_max_filter_) : "Any",
-                settings_cursor_ == 3, render::MenuHitTargetKind::SettingsRow, 3, false, true);
-        add_row("Clear Filters", "", settings_cursor_ == 4, render::MenuHitTargetKind::SettingsRow, 4, true, false);
-        add_row("Back", "", settings_cursor_ == 5, render::MenuHitTargetKind::SettingsRow, 5, true, false);
-
-        render.generic.notes.push_back("Search matches title, artist, and chart path.");
-        render.generic.notes.push_back("Use letters/numbers/space on the Search row. Backspace deletes, Delete clears.");
-        render.generic.notes.push_back("Key Filter supports All plus 4K through 10K and 16K. Song Select also has a quick KEY toggle.");
-        render.generic.notes.push_back("Difficulty filters apply to indexed LV values only.");
-        render.generic.notes.push_back("Sort order stays available from Song Select: LEVEL toggles ASC/DESC, TITLE toggles A-Z/Z-A.");
+        populate_song_browser_render_data(render);
     } else if (screen_ == Screen::Gameplay) {
         render.kind = render::MenuScreenKind::GameplayHud;
         render.gameplay.title = last_chart_title_;
@@ -4646,392 +4816,9 @@ void MenuApp::publish_snapshot() {
             render.gameplay.scroll_speed = 0.0;
         }
     } else if (screen_ == Screen::Result) {
-        render.kind = render::MenuScreenKind::ResultScreen;
-        render.result.profile = options_.profile;
-        render.result.track = last_chart_title_.empty() ? current_track() : last_chart_title_;
-        render.result.title = last_chart_title_.empty() ? "Unknown Chart" : last_chart_title_;
-        render.result.artist = last_chart_artist_;
-
-        if (!has_result_) {
-            render.result.notes.push_back("No result data is available for this run.");
-            render.result.notes.push_back("Press Enter or Esc to return to Song Select.");
-        } else {
-            const int judged = judged_total(last_result_.counts);
-            const int total_notes = (last_result_.total_notes > 0) ? last_result_.total_notes : judged;
-            const int64_t score = calculate_score(last_result_);
-            const double accuracy = calculate_accuracy(last_result_);
-
-            game::GaugeType final_gauge_type = gauge_type_from_mode_string(config_.mode.gauge);
-            if (!last_result_.shifts.empty()) {
-                final_gauge_type = last_result_.shifts.back().to;
-            }
-
-            render.result.rank = calculate_rank(last_result_, last_game_over_);
-            render.result.status = last_game_over_ ? "GAME OVER" : "CLEAR";
-            render.result.gauge_label = gauge_type_label(final_gauge_type);
-            render.result.score = score;
-            render.result.accuracy = accuracy;
-            render.result.gauge_value =
-                last_result_.gauge_history.empty() ? 0.0 : last_result_.gauge_history.back().value;
-            render.result.max_combo = last_result_.max_combo;
-            render.result.total_notes = total_notes;
-            render.result.judged_notes = judged;
-            render.result.perfect = last_result_.counts.pg;
-            render.result.great = last_result_.counts.gr;
-            render.result.good = last_result_.counts.gd;
-            render.result.bad = last_result_.counts.bd;
-            render.result.miss = 0;
-            render.result.mean_delta_ms = last_result_.mean_delta_ms;
-            render.result.stddev_delta_ms = last_result_.stddev_delta_ms();
-            render.result.shift_count = static_cast<int>(last_result_.shifts.size());
-            render.result.export_warning_count = static_cast<int>(last_export_warnings_.size());
-            render.result.replay_file = filename_only(last_replay_path_);
-            render.result.result_file = filename_only(last_result_path_);
-
-            if (!render.result.replay_file.empty()) {
-                render.result.notes.push_back("Replay: " + render.result.replay_file);
-            }
-            if (!render.result.result_file.empty()) {
-                render.result.notes.push_back("Result: " + render.result.result_file);
-            }
-            render.result.notes.push_back("Timing center " + format_signed_ms(last_result_.mean_delta_ms) +
-                                          "  spread " + format_decimal(render.result.stddev_delta_ms) + "ms");
-            if (!last_export_warnings_.empty()) {
-                render.result.notes.push_back("Export warnings: " + std::to_string(last_export_warnings_.size()));
-                const std::size_t preview_count = std::min<std::size_t>(2, last_export_warnings_.size());
-                for (std::size_t i = 0; i < preview_count; ++i) {
-                    render.result.notes.push_back(last_export_warnings_[i]);
-                }
-            }
-
-            int64_t graph_end_sample = 1;
-            for (const auto& sample : last_result_.gauge_history) {
-                graph_end_sample = std::max(graph_end_sample, sample.sample);
-            }
-            for (const auto& shift : last_result_.shifts) {
-                graph_end_sample = std::max(graph_end_sample, shift.sample);
-            }
-
-            const std::size_t gauge_count = last_result_.gauge_history.size();
-            std::size_t gauge_stride = 1;
-            if (gauge_count > 240) {
-                gauge_stride = (gauge_count + 239) / 240;
-            }
-
-            for (std::size_t i = 0; i < gauge_count; i += gauge_stride) {
-                const auto& sample = last_result_.gauge_history[i];
-                const float position = (gauge_count == 1)
-                                           ? 1.0f
-                                           : static_cast<float>(
-                                                 std::clamp(static_cast<double>(sample.sample) /
-                                                                static_cast<double>(graph_end_sample),
-                                                            0.0, 1.0));
-                const float value = static_cast<float>(std::clamp(sample.value / 100.0, 0.0, 1.0));
-                render.result.gauge_points.push_back(render::ResultGaugePoint{position, value});
-            }
-            if (gauge_count > 1) {
-                const auto& last_sample = last_result_.gauge_history.back();
-                const float last_position = static_cast<float>(
-                    std::clamp(static_cast<double>(last_sample.sample) / static_cast<double>(graph_end_sample),
-                               0.0, 1.0));
-                const float last_value = static_cast<float>(std::clamp(last_sample.value / 100.0, 0.0, 1.0));
-                if (render.result.gauge_points.empty() ||
-                    render.result.gauge_points.back().position != last_position) {
-                    render.result.gauge_points.push_back(render::ResultGaugePoint{last_position, last_value});
-                }
-            }
-
-            for (const auto& shift : last_result_.shifts) {
-                const float position = static_cast<float>(
-                    std::clamp(static_cast<double>(shift.sample) / static_cast<double>(graph_end_sample), 0.0, 1.0));
-                render.result.gauge_shifts.push_back(
-                    render::ResultShiftMarker{position,
-                                              short_gauge_type_label(shift.from) + "->" +
-                                                  short_gauge_type_label(shift.to)});
-            }
-            std::stable_sort(render.result.gauge_points.begin(),
-                             render.result.gauge_points.end(),
-                             [](const render::ResultGaugePoint& lhs, const render::ResultGaugePoint& rhs) {
-                                 return lhs.position < rhs.position;
-                             });
-            std::stable_sort(render.result.gauge_shifts.begin(),
-                             render.result.gauge_shifts.end(),
-                             [](const render::ResultShiftMarker& lhs, const render::ResultShiftMarker& rhs) {
-                                 return lhs.position < rhs.position;
-                             });
-        }
+        populate_result_render_data(render, current_track);
     } else {
-        render.kind = render::MenuScreenKind::GenericList;
-        render.generic.heading = screen_title();
-        auto add_row = [&](std::string label,
-                           std::string value,
-                           bool selected,
-                           render::MenuHitTargetKind target_kind,
-                           int row_index,
-                           bool activatable,
-                           bool adjustable) {
-            render::MenuRowData row;
-            row.label = std::move(label);
-            row.value = std::move(value);
-            row.selected = selected;
-            row.target_kind = target_kind;
-            row.row_index = row_index;
-            row.activatable = activatable;
-            row.adjustable = adjustable;
-            row.decrement_enabled = adjustable;
-            row.increment_enabled = adjustable;
-            render.generic.rows.push_back(std::move(row));
-        };
-
-        if (screen_ == Screen::OptionsHub) {
-            add_row("Audio", "", options_cursor_ == 0, render::MenuHitTargetKind::OptionsItem, 0, true, false);
-            add_row("Graphics", "", options_cursor_ == 1, render::MenuHitTargetKind::OptionsItem, 1, true, false);
-            add_row("Skins", "", options_cursor_ == 2, render::MenuHitTargetKind::OptionsItem, 2, true, false);
-            add_row("Input", "", options_cursor_ == 3, render::MenuHitTargetKind::OptionsItem, 3, true, false);
-            add_row("Mode", "", options_cursor_ == 4, render::MenuHitTargetKind::OptionsItem, 4, true, false);
-            add_row("Keymap", "", options_cursor_ == 5, render::MenuHitTargetKind::OptionsItem, 5, true, false);
-            add_row("Back", "", options_cursor_ == 6, render::MenuHitTargetKind::OptionsItem, 6, true, false);
-            render.generic.notes.push_back("Up/Down to move, Enter to select, Esc to return.");
-            render.generic.notes.push_back("A/G/I/M/K also jumps directly into Audio, Graphics, Input, Mode, and Keymap.");
-        } else if (screen_ == Screen::EditStub) {
-            render.generic.notes.push_back("Editor is not implemented yet.");
-            add_row("Back", "", true, render::MenuHitTargetKind::SettingsRow, 0, true, false);
-        } else if (screen_ == Screen::SettingsAudio) {
-            add_row("Preset", preset_label(config_.audio_ui.preset), settings_cursor_ == 0,
-                    render::MenuHitTargetKind::SettingsRow, 0, false, true);
-            add_row("Keysound Mode", keysound_policy_label(config_.audio_ui.bms_keysound_policy), settings_cursor_ == 1,
-                    render::MenuHitTargetKind::SettingsRow, 1, false, true);
-            add_row("Master Volume", format_percent(config_.audio_ui.master_volume), settings_cursor_ == 2,
-                    render::MenuHitTargetKind::SettingsRow, 2, false, true);
-            add_row("BGM Volume", format_percent(config_.audio_ui.bgm_volume), settings_cursor_ == 3,
-                    render::MenuHitTargetKind::SettingsRow, 3, false, true);
-            add_row("Keysound Volume", format_percent(config_.audio_ui.keysound_volume), settings_cursor_ == 4,
-                    render::MenuHitTargetKind::SettingsRow, 4, false, true);
-            add_row("Back", "", settings_cursor_ == 5, render::MenuHitTargetKind::SettingsRow, 5, true, false);
-            render.generic.notes.push_back("Follow: note hits trigger keysounds. Autoplay: note keysounds are mixed into background audio.");
-            render.generic.notes.push_back("Off: skip note keysounds. Autoplay mode routes note keysounds through BGM volume.");
-            render.generic.notes.push_back("Left/Right or click +/- to change. Back saves and returns.");
-        } else if (screen_ == Screen::SettingsGraphics) {
-            add_row("Display", display_label(config_.graphics.display_mode), settings_cursor_ == 0,
-                    render::MenuHitTargetKind::SettingsRow, 0, false, true);
-            add_row("Resolution", resolution_label(config_.graphics.resolution), settings_cursor_ == 1,
-                    render::MenuHitTargetKind::SettingsRow, 1, false, true);
-            add_row("Refresh Hz", std::to_string(config_.graphics.refresh_hz), settings_cursor_ == 2,
-                    render::MenuHitTargetKind::SettingsRow, 2, false, true);
-            add_row("VSync", on_off(config_.graphics.vsync), settings_cursor_ == 3,
-                    render::MenuHitTargetKind::SettingsRow, 3, false, true);
-            add_row("Performance HUD", on_off(config_.graphics.performance_overlay), settings_cursor_ == 4,
-                    render::MenuHitTargetKind::SettingsRow, 4, false, true);
-            add_row("Display Offset", format_signed_offset_ms(config_.visual_offset_ms), settings_cursor_ == 5,
-                    render::MenuHitTargetKind::SettingsRow, 5, false, true);
-            add_row("Back", "", settings_cursor_ == 6, render::MenuHitTargetKind::SettingsRow, 6, true, false);
-            render.generic.notes.push_back("Performance HUD shows frame graph, AVG ms/FPS, 0.1%/0.01% lows, and max FPS.");
-            render.generic.notes.push_back("Resolution cycles 720p, 1080p, QHD, or the current monitor native size. Refresh Hz ranges from 60 to 1050.");
-            render.generic.notes.push_back("Menu rendering is capped at 300 Hz. Gameplay uses the configured value up to 1050 Hz.");
-            render.generic.notes.push_back("Display Offset shifts only visuals from -500ms to +500ms. Positive values draw notes earlier.");
-            render.generic.notes.push_back("Display, Resolution, Refresh Hz, and VSync apply immediately. Back saves and returns.");
-        } else if (screen_ == Screen::SettingsSkins) {
-            skin_edit_mode_ = normalize_skin_edit_mode(skin_edit_mode_);
-            const int lane_count = lane_count_for_skin_mode(skin_edit_mode_);
-            skin_edit_lane_ = clamp_int(skin_edit_lane_, 0, lane_count - 1);
-            const auto preview_lane_colors = config::resolved_skin_lane_colors(config_.skin, skin_edit_mode_);
-            const double preview_note_width_scale = config::resolved_skin_note_width_scale(config_.skin, skin_edit_mode_);
-            const double preview_note_height_scale = config::resolved_skin_note_height_scale(config_.skin, skin_edit_mode_);
-            const double preview_lane_divider_width_scale =
-                config::resolved_skin_lane_divider_width_scale(config_.skin, skin_edit_mode_);
-            const std::string active_skin_source = config::normalize_skin_source_token(config_.skin.source);
-            const std::string osu_skin_value =
-                available_osu_skin_names_.empty()
-                    ? std::string("Not Found")
-                    : (config_.skin.osu_skin_name.empty() ? available_osu_skin_names_.front()
-                                                          : config_.skin.osu_skin_name);
-
-            add_row("Skin Source", skin_source_label(active_skin_source), settings_cursor_ == 0,
-                    render::MenuHitTargetKind::SettingsRow, 0, false, true);
-            add_row("OSU Skin", osu_skin_value, settings_cursor_ == 1,
-                    render::MenuHitTargetKind::SettingsRow, 1, false, true);
-            add_row("Import OSU Skin", "Open Folder", settings_cursor_ == 2,
-                    render::MenuHitTargetKind::SettingsRow, 2, true, false);
-            add_row("Key Mode", key_mode_label(skin_edit_mode_), settings_cursor_ == 3,
-                    render::MenuHitTargetKind::SettingsRow, 3, false, true);
-            add_row("Target Lane",
-                    lane_display_label(skin_edit_lane_) + " / " + std::to_string(lane_count),
-                    settings_cursor_ == 4, render::MenuHitTargetKind::SettingsRow, 4, false, true);
-            add_row("Lane Color",
-                    config::skin_color_label(preview_lane_colors[static_cast<std::size_t>(skin_edit_lane_)]),
-                    settings_cursor_ == 5, render::MenuHitTargetKind::SettingsRow, 5, false, true);
-            add_row("Note Shape", config::skin_note_shape_label(config_.skin.note_shape), settings_cursor_ == 6,
-                    render::MenuHitTargetKind::SettingsRow, 6, false, true);
-            add_row("Note Border", on_off(config_.skin.note_border_enabled), settings_cursor_ == 7,
-                    render::MenuHitTargetKind::SettingsRow, 7, false, true);
-            add_row("Judge Line", format_percent(config_.skin.judgement_line_position), settings_cursor_ == 8,
-                    render::MenuHitTargetKind::SettingsRow, 8, false, true);
-            add_row("Note Width", format_percent(preview_note_width_scale), settings_cursor_ == 9,
-                    render::MenuHitTargetKind::SettingsRow, 9, false, true);
-            add_row("Divider Width", format_percent(preview_lane_divider_width_scale), settings_cursor_ == 10,
-                    render::MenuHitTargetKind::SettingsRow, 10, false, true);
-            add_row("LN Body Width", format_percent(config_.skin.hold_body_width_scale), settings_cursor_ == 11,
-                    render::MenuHitTargetKind::SettingsRow, 11, false, true);
-            add_row("Note Height", format_percent(preview_note_height_scale), settings_cursor_ == 12,
-                    render::MenuHitTargetKind::SettingsRow, 12, false, true);
-            add_row("Combo Y", format_percent(config_.skin.combo_position), settings_cursor_ == 13,
-                    render::MenuHitTargetKind::SettingsRow, 13, false, true);
-            add_row("Back", "", settings_cursor_ == 14, render::MenuHitTargetKind::SettingsRow, 14, true, false);
-
-            render.generic.skin_preview.visible = true;
-            render.generic.skin_preview.mode_label = key_mode_label(skin_edit_mode_);
-            render.generic.skin_preview.selected_color_label =
-                config::skin_color_label(preview_lane_colors[static_cast<std::size_t>(skin_edit_lane_)]);
-            render.generic.skin_preview.lane_count = lane_count;
-            render.generic.skin_preview.selected_lane = skin_edit_lane_ + 1;
-            render.generic.skin_preview.judgement_line_position = config_.skin.judgement_line_position;
-            render.generic.skin_preview.combo_position = config_.skin.combo_position;
-            render.generic.skin_preview.note_width_scale = preview_note_width_scale;
-            render.generic.skin_preview.note_height_scale = preview_note_height_scale;
-            render.generic.skin_preview.lane_divider_width_scale = preview_lane_divider_width_scale;
-            render.generic.skin_preview.hold_body_width_scale = config_.skin.hold_body_width_scale;
-            render.generic.skin_preview.note_border_enabled = config_.skin.note_border_enabled;
-            render.generic.skin_preview.note_shape = config_.skin.note_shape;
-            render.generic.skin_preview.lane_colors.fill(0);
-            for (int lane = 0; lane < lane_count && lane < static_cast<int>(kGameplayHudMaxLanes); ++lane) {
-                render.generic.skin_preview.lane_colors[static_cast<std::size_t>(lane)] =
-                    config::skin_color_rgb(preview_lane_colors[static_cast<std::size_t>(lane)]);
-            }
-
-            render.generic.notes.push_back("Skin Source switches between the native vector skin and imported osu!mania PNG assets.");
-            render.generic.notes.push_back("OSU Skin scans imported profile skins first, then build/Release/test-skins-osu as a fallback test root.");
-            render.generic.notes.push_back("Import OSU Skin opens a folder picker. You can also drag and drop a skin folder onto this screen.");
-            render.generic.notes.push_back("Imported osu skins affect gameplay note, LN, and key art. Native rows still drive the preview and fallback skin.");
-            render.generic.notes.push_back("Divider Width scales native lane separators and multiplies osu!mania ColumnLineWidth when the imported skin provides it.");
-            render.generic.notes.push_back("Key Mode and Target Lane still edit the native fallback palette and sizing per layout.");
-        } else if (screen_ == Screen::SettingsInput) {
-            add_row("Polling Hz", std::to_string(config_.input.polling_hz), settings_cursor_ == 0,
-                    render::MenuHitTargetKind::SettingsRow, 0, false, true);
-            add_row("Debounce", format_decimal(config_.input.debounce_ms) + " ms", settings_cursor_ == 1,
-                    render::MenuHitTargetKind::SettingsRow, 1, false, true);
-            add_row("Back", "", settings_cursor_ == 2, render::MenuHitTargetKind::SettingsRow, 2, true, false);
-            render.generic.notes.push_back("Debounce filters duplicate switch chatter on a single key before gameplay sees it.");
-            render.generic.notes.push_back("Left/Right or click +/- to change. Back saves and returns.");
-        } else if (screen_ == Screen::ModeSelect) {
-            add_row("OSU Charts", on_off(config_.mode.enable_osu_charts), settings_cursor_ == 0,
-                    render::MenuHitTargetKind::SettingsRow, 0, false, true);
-            add_row("Indexing",
-                    song_index_profile_label(config_.mode.song_index_profile),
-                    settings_cursor_ == 1, render::MenuHitTargetKind::SettingsRow, 1, false, true);
-            add_row("Chart Filter",
-                    config_.mode.enable_osu_charts ? format_label(config_.mode.format) : std::string("BMS"),
-                    settings_cursor_ == 2, render::MenuHitTargetKind::SettingsRow, 2, false, true);
-            add_row("Key Mode",
-                    config_.mode.enable_osu_charts ? key_mode_label(config_.mode.key_mode) : std::string("10K"),
-                    settings_cursor_ == 3, render::MenuHitTargetKind::SettingsRow, 3, false, true);
-            add_row("Gauge", gauge_label(config_.mode.gauge), settings_cursor_ == 4,
-                    render::MenuHitTargetKind::SettingsRow, 4, false, true);
-            add_row("Random", random_label(config_.mode.random), settings_cursor_ == 5,
-                    render::MenuHitTargetKind::SettingsRow, 5, false, true);
-            add_row("Random Seed", std::to_string(config_.mode.random_seed), settings_cursor_ == 6,
-                    render::MenuHitTargetKind::SettingsRow, 6, false, true);
-            add_row("Rate", format_multiplier(config_.speed.rate), settings_cursor_ == 7,
-                    render::MenuHitTargetKind::SettingsRow, 7, false, true);
-            add_row("Hi-Speed", format_decimal(config_.speed.hi_speed), settings_cursor_ == 8,
-                    render::MenuHitTargetKind::SettingsRow, 8, false, true);
-            add_row("Back", "", settings_cursor_ == 9, render::MenuHitTargetKind::SettingsRow, 9, true, false);
-            render.generic.notes.push_back("OSU Charts adds 4K-10K .osu beatmaps to song indexing and runtime loading.");
-            render.generic.notes.push_back("Indexing Safe keeps RAM low for large scans; Fast uses more RAM for quicker rescans on 32GB+ PCs.");
-            render.generic.notes.push_back("Chart Filter switches the visible library between BMS, OSU, or All.");
-            render.generic.notes.push_back("Key Mode selects Auto plus 4K-10K/16K runtime layouts; osu charts still top out at 10K.");
-            render.generic.notes.push_back("Back saves the toggle/filter and refreshes the song library cache when needed.");
-        } else if (screen_ == Screen::Keymap) {
-            config::KeymapManager keymap_manager;
-            const auto current_bindings = keymap_manager.bindings_for_mode(working_keymap_, keymap_edit_mode_);
-            add_row("Key Mode", key_mode_label(keymap_edit_mode_), keymap_cursor_ == 0,
-                    render::MenuHitTargetKind::None, 0, false, false);
-            for (std::size_t i = 0; i < keymap_lanes_.size(); ++i) {
-                const std::string& lane = keymap_lanes_[i];
-                const auto it = current_bindings.find(lane);
-                std::string key_name = (it == current_bindings.end() || it->second.empty())
-                                           ? "Unassigned"
-                                           : it->second;
-                if (keymap_capture_active_ && static_cast<int>(i) + 1 == keymap_cursor_) {
-                    key_name += " [waiting]";
-                }
-                add_row(lane, key_name, static_cast<int>(i) + 1 == keymap_cursor_,
-                        render::MenuHitTargetKind::None, static_cast<int>(i) + 1, false, false);
-            }
-            if (keymap_capture_active_) {
-                const int64_t now_ns = timing::HighResClock::now_ns();
-                const int64_t remaining_ns = std::max<int64_t>(0, keymap_capture_deadline_ns_ - now_ns);
-                const int remaining_ms = static_cast<int>(remaining_ns / 1'000'000);
-                render.generic.notes.push_back("Capture timeout: " + std::to_string(remaining_ms) + "ms");
-                render.generic.notes.push_back("Press any keyboard key. Delete cancels capture.");
-                render.generic.notes.push_back("Duplicate lane bindings are allowed.");
-            }
-            add_row("Save", "", false, render::MenuHitTargetKind::KeymapButton, 0, !keymap_capture_active_, false);
-            add_row("Reset", "", false, render::MenuHitTargetKind::KeymapButton, 1, !keymap_capture_active_, false);
-            add_row("NKRO Test", "", false, render::MenuHitTargetKind::KeymapButton, 2, !keymap_capture_active_, false);
-            add_row("Back", "", false, render::MenuHitTargetKind::KeymapButton, 3, !keymap_capture_active_, false);
-            render.generic.notes.push_back("Left/Right on Key Mode selects which 4K-10K or 16K layout you are editing.");
-            render.generic.notes.push_back("Enter binds the selected lane. A=Save  R=Reset  F2=NKRO Test  Esc=Back");
-        } else if (screen_ == Screen::KeymapConfirm) {
-            render.generic.notes.push_back("Duplicate binding detected.");
-            render.generic.notes.push_back("Key: " + keymap_pending_key_);
-            render.generic.notes.push_back("Already used by: " + keymap_duplicate_lane_);
-            add_row("Replace Existing Binding", "", true, render::MenuHitTargetKind::SettingsRow, 0, true, false);
-            add_row("Cancel", "", false, render::MenuHitTargetKind::SettingsRow, 1, true, false);
-        } else if (screen_ == Screen::KeymapTest) {
-            render.generic.notes.push_back("NKRO Test (press multiple keys)");
-            config::KeymapManager keymap_manager;
-            const auto current_bindings = keymap_manager.bindings_for_mode(working_keymap_, keymap_edit_mode_);
-            for (std::size_t i = 0; i < keymap_lanes_.size(); ++i) {
-                const std::string& lane = keymap_lanes_[i];
-                const auto it = current_bindings.find(lane);
-                const std::string key_name = (it == current_bindings.end() || it->second.empty())
-                                                 ? "Unassigned"
-                                                 : it->second;
-                bool down = false;
-                if (!key_name.empty()) {
-                    auto keycode = config::KeycodeMap::to_keycode(key_name);
-                    if (keycode.has_value()) {
-                        down = (pressed_keys_.find(keycode.value()) != pressed_keys_.end());
-                    }
-                }
-                add_row(lane, key_name + (down ? " [DOWN]" : ""), down,
-                        render::MenuHitTargetKind::None, static_cast<int>(i), false, false);
-            }
-            add_row("Back", "", true, render::MenuHitTargetKind::SettingsRow, 0, true, false);
-        } else if (screen_ == Screen::Result) {
-            if (!has_result_) {
-                render.generic.notes.push_back("No result data.");
-            } else {
-                add_row("Chart", last_chart_title_.empty() ? "Unknown" : last_chart_title_, false,
-                        render::MenuHitTargetKind::None, 0, false, false);
-                add_row("Status", last_game_over_ ? "Game Over" : "Clear", false,
-                        render::MenuHitTargetKind::None, 1, false, false);
-                add_row("Max Combo", std::to_string(last_result_.max_combo), false,
-                        render::MenuHitTargetKind::None, 2, false, false);
-                render.generic.notes.push_back("Judgements: PG " + std::to_string(last_result_.counts.pg) +
-                                               " GR " + std::to_string(last_result_.counts.gr) +
-                                               " G " + std::to_string(last_result_.counts.gd) +
-                                               " BAD " + std::to_string(last_result_.counts.bd));
-                render.generic.notes.push_back("Timing: mean " +
-                                               std::to_string(static_cast<int>(last_result_.mean_delta_ms)) +
-                                               "ms  stddev " +
-                                               std::to_string(static_cast<int>(last_result_.stddev_delta_ms())) + "ms");
-                render.generic.notes.push_back("Gauge shifts: " + std::to_string(last_result_.shifts.size()));
-                if (!last_replay_path_.empty()) {
-                    render.generic.notes.push_back(
-                        "Replay: " + path_from_utf8(last_replay_path_).filename().u8string());
-                }
-                if (!last_result_path_.empty()) {
-                    render.generic.notes.push_back(
-                        "Result file: " + path_from_utf8(last_result_path_).filename().u8string());
-                }
-                if (!last_export_warnings_.empty()) {
-                    render.generic.notes.push_back("Export warnings: " +
-                                                   std::to_string(last_export_warnings_.size()));
-                }
-            }
-            add_row("Back to Song Select", "", true, render::MenuHitTargetKind::SettingsRow, 0, true, false);
-        }
+        populate_generic_screen_render_data(render);
     }
 
     populate_help_overlay(render.help_overlay);
@@ -5369,7 +5156,7 @@ void MenuApp::reload_chart_best_results() {
         }
 
         std::string parse_error;
-        auto parsed = parse_result_file(entry.path(), &parse_error);
+        auto parsed = menu_records::parse_result_file(entry.path(), &parse_error);
         if (!parsed.has_value()) {
             if (!parse_error.empty()) {
                 std::cerr << "[warn] Failed to parse result file " << entry.path().u8string()
@@ -5381,9 +5168,11 @@ void MenuApp::reload_chart_best_results() {
 
         BestResultRecord candidate;
         candidate.has_value = true;
-        candidate.rank = calculate_rank(parsed->stats, parsed->game_over);
-        candidate.best_score = calculate_score(parsed->stats);
+        candidate.rank = menu_records::calculate_rank(parsed->stats, parsed->game_over);
+        candidate.best_score = parsed->final_score;
         candidate.clear_status = parsed->clear_status;
+        candidate.final_gauge = parsed->final_gauge;
+        candidate.game_over = parsed->game_over;
         candidate.max_combo = parsed->stats.max_combo;
         candidate.perfect = parsed->stats.counts.pg;
         candidate.great = parsed->stats.counts.gr;
@@ -5391,9 +5180,9 @@ void MenuApp::reload_chart_best_results() {
         candidate.bad = parsed->stats.counts.bd;
         candidate.miss = 0;
         candidate.created_utc = parsed->created_utc;
-        const int candidate_judged = judged_total(parsed->stats.counts);
+        const int candidate_judged = menu_records::judged_total(parsed->stats.counts);
         const int candidate_clear_priority =
-            clear_status_priority(parsed->clear_status, parsed->game_over, parsed->final_gauge);
+            menu_records::clear_status_priority(parsed->clear_status, parsed->game_over, parsed->final_gauge);
 
         LocalPlayRecord record;
         record.chart_path = parsed->chart_path;
@@ -5405,8 +5194,12 @@ void MenuApp::reload_chart_best_results() {
         record.clear_status = parsed->clear_status;
         record.final_gauge = parsed->final_gauge;
         record.game_over = parsed->game_over;
+        record.mods = parsed->mods;
+        record.rate_multiplier = parsed->rate_multiplier;
+        record.score_multiplier = parsed->score_multiplier;
+        record.raw_score = parsed->stats.raw_score;
         record.score = candidate.best_score;
-        record.accuracy = calculate_accuracy(parsed->stats);
+        record.accuracy = menu_records::calculate_accuracy(parsed->stats);
         record.max_combo = parsed->stats.max_combo;
         record.total_notes = parsed->stats.total_notes;
         record.judged_notes = candidate_judged;
@@ -5420,7 +5213,7 @@ void MenuApp::reload_chart_best_results() {
         const std::size_t record_index = local_play_records_.size();
         local_play_records_.push_back(record);
 
-        for (const auto& key : build_chart_path_keys(parsed->chart_path, songs_path_)) {
+        for (const auto& key : menu_songs::build_chart_path_keys(parsed->chart_path, songs_path_)) {
             chart_play_record_indices_[key].push_back(record_index);
             auto existing = chart_best_results_.find(key);
             if (existing == chart_best_results_.end()) {
@@ -5431,17 +5224,19 @@ void MenuApp::reload_chart_best_results() {
             const int existing_judged = existing->second.perfect + existing->second.great + existing->second.good +
                                         existing->second.bad + existing->second.miss;
             const int existing_clear_priority =
-                clear_status_priority(existing->second.clear_status, false, std::string_view{});
-            if (is_better_record(candidate.best_score,
-                                 candidate_clear_priority,
-                                 candidate.max_combo,
-                                 candidate_judged,
-                                 candidate.created_utc,
-                                 existing->second.best_score,
-                                 existing_clear_priority,
-                                 existing->second.max_combo,
-                                 existing_judged,
-                                 existing->second.created_utc)) {
+                menu_records::clear_status_priority(existing->second.clear_status,
+                                                    existing->second.game_over,
+                                                    existing->second.final_gauge);
+            if (menu_records::is_better_record(candidate.best_score,
+                                               candidate_clear_priority,
+                                               candidate.max_combo,
+                                               candidate_judged,
+                                               candidate.created_utc,
+                                               existing->second.best_score,
+                                               existing_clear_priority,
+                                               existing->second.max_combo,
+                                               existing_judged,
+                                               existing->second.created_utc)) {
                 existing->second = candidate;
             }
         }
@@ -5463,7 +5258,7 @@ void MenuApp::rebuild_current_song_record_indices() {
     }
 
     std::unordered_set<std::size_t> seen;
-    for (const auto& key : build_chart_path_keys(entry->path, songs_path_)) {
+    for (const auto& key : menu_songs::build_chart_path_keys(entry->path, songs_path_)) {
         auto found = chart_play_record_indices_.find(key);
         if (found == chart_play_record_indices_.end()) {
             continue;
@@ -5479,8 +5274,10 @@ void MenuApp::rebuild_current_song_record_indices() {
                      [this](std::size_t lhs_index, std::size_t rhs_index) {
                          const auto& lhs = local_play_records_[lhs_index];
                          const auto& rhs = local_play_records_[rhs_index];
-                         const int lhs_clear = clear_status_priority(lhs.clear_status, lhs.game_over, lhs.final_gauge);
-                         const int rhs_clear = clear_status_priority(rhs.clear_status, rhs.game_over, rhs.final_gauge);
+                         const int lhs_clear =
+                             menu_records::clear_status_priority(lhs.clear_status, lhs.game_over, lhs.final_gauge);
+                         const int rhs_clear =
+                             menu_records::clear_status_priority(rhs.clear_status, rhs.game_over, rhs.final_gauge);
                          if (lhs_clear != rhs_clear) {
                              return lhs_clear > rhs_clear;
                          }
@@ -5530,7 +5327,7 @@ const MenuApp::ReplaySummary* MenuApp::replay_summary_for_path(const std::string
     summary.exists = std::filesystem::exists(path_from_utf8(path), ec) && !ec;
     if (summary.exists) {
         std::string parse_error;
-        auto parsed = parse_replay_file(path_from_utf8(path), &parse_error);
+        auto parsed = menu_records::parse_replay_file(path_from_utf8(path), &parse_error);
         if (parsed.has_value()) {
             summary.sample_rate = parsed->sample_rate;
             summary.lane_count = parsed->lane_count;
@@ -5538,6 +5335,10 @@ const MenuApp::ReplaySummary* MenuApp::replay_summary_for_path(const std::string
             summary.duration_samples = parsed->duration_samples;
             summary.rate = parsed->rate;
             summary.input_offset_ms = parsed->input_offset_ms;
+            summary.mods = parsed->mods;
+            summary.rate_multiplier = parsed->rate_multiplier;
+            summary.score_multiplier = parsed->score_multiplier;
+            summary.final_score = parsed->final_score;
         } else {
             summary.error = parse_error;
         }
@@ -5561,7 +5362,7 @@ MenuApp::BestResultRecord MenuApp::current_song_best_result() const {
     }
 
     try {
-        for (const auto& key : build_chart_path_keys(entry->path, songs_path_)) {
+        for (const auto& key : menu_songs::build_chart_path_keys(entry->path, songs_path_)) {
             auto found = chart_best_results_.find(key);
             if (found == chart_best_results_.end()) {
                 continue;
@@ -5574,16 +5375,20 @@ MenuApp::BestResultRecord MenuApp::current_song_best_result() const {
             const int best_judged = best.perfect + best.great + best.good + best.bad + best.miss;
             const int found_judged = found->second.perfect + found->second.great + found->second.good +
                                      found->second.bad + found->second.miss;
-            if (is_better_record(found->second.best_score,
-                                 clear_status_priority(found->second.clear_status, false, std::string_view{}),
-                                 found->second.max_combo,
-                                 found_judged,
-                                 found->second.created_utc,
-                                 best.best_score,
-                                 clear_status_priority(best.clear_status, false, std::string_view{}),
-                                 best.max_combo,
-                                 best_judged,
-                                 best.created_utc)) {
+            if (menu_records::is_better_record(found->second.best_score,
+                                               menu_records::clear_status_priority(found->second.clear_status,
+                                                                                   found->second.game_over,
+                                                                                   found->second.final_gauge),
+                                               found->second.max_combo,
+                                               found_judged,
+                                               found->second.created_utc,
+                                               best.best_score,
+                                               menu_records::clear_status_priority(best.clear_status,
+                                                                                   best.game_over,
+                                                                                   best.final_gauge),
+                                               best.max_combo,
+                                               best_judged,
+                                               best.created_utc)) {
                 best = found->second;
             }
         }
@@ -5601,7 +5406,7 @@ bool MenuApp::open_selected_record_result() {
     }
 
     std::string parse_error;
-    auto parsed = parse_result_file(path_from_utf8(record->result_path), &parse_error);
+    auto parsed = menu_records::parse_result_file(path_from_utf8(record->result_path), &parse_error);
     if (!parsed.has_value()) {
         if (!parse_error.empty()) {
             std::cerr << "[warn] Failed to open saved result " << record->result_path
@@ -5613,6 +5418,10 @@ bool MenuApp::open_selected_record_result() {
     last_result_ = parsed->stats;
     last_game_over_ = parsed->game_over;
     has_result_ = true;
+    last_result_mods_ = parsed->mods;
+    last_result_rate_multiplier_ = parsed->rate_multiplier;
+    last_result_score_multiplier_ = parsed->score_multiplier;
+    last_result_final_score_ = parsed->final_score;
     last_replay_path_ = record->replay_path;
     last_result_path_ = record->result_path;
     last_export_warnings_.clear();
@@ -5670,7 +5479,7 @@ std::string MenuApp::song_background_preview_path_for_entry(const SongEntry& ent
         return {};
     }
 
-    const std::string cache_key = normalize_path_key(path_from_utf8(chart_path));
+    const std::string cache_key = menu_songs::normalize_path_key(path_from_utf8(chart_path));
     if (!cache_key.empty()) {
         auto cached = song_background_preview_cache_.find(cache_key);
         if (cached != song_background_preview_cache_.end()) {
@@ -5678,37 +5487,7 @@ std::string MenuApp::song_background_preview_path_for_entry(const SongEntry& ent
         }
     }
 
-    namespace fs = std::filesystem;
-    const fs::path chart_fs_path = path_from_utf8(chart_path);
-    const std::string chart_ext = to_lower_ascii(chart_fs_path.extension().u8string());
-    std::string resolved_path;
-
-    if (chart_ext == ".osu") {
-        std::ifstream file(chart_fs_path, std::ios::binary);
-        if (file) {
-            std::ostringstream buffer;
-            buffer << file.rdbuf();
-            chart::OsuManiaLoader loader;
-            const auto parsed = loader.parse(buffer.str());
-            if (!parsed.chart.background_filename.empty()) {
-                if (auto preview = resolve_preview_asset_path(chart_fs_path, parsed.chart.background_filename);
-                    preview.has_value()) {
-                    resolved_path = preview->u8string();
-                }
-            }
-        }
-    } else if (is_bms_chart_extension(chart_ext)) {
-        chart::BmsParser parser;
-        chart::BmsParserOptions options;
-        options.tolerant = true;
-        const auto parsed = parser.parseFile(chart_path, options);
-        for (const auto& preview_reference : collect_bms_preview_references(parsed.chart)) {
-            if (auto preview = resolve_preview_asset_path(chart_fs_path, preview_reference); preview.has_value()) {
-                resolved_path = preview->u8string();
-                break;
-            }
-        }
-    }
+    const std::string resolved_path = menu_songs::resolve_song_background_preview_path(chart_path);
 
     if (!cache_key.empty()) {
         song_background_preview_cache_[cache_key] = resolved_path;
@@ -5798,6 +5577,7 @@ void MenuApp::launch_gameplay(const std::string& chart_path) {
         next.combo = hud.combo;
         next.max_combo = hud.max_combo;
         next.counts = hud.counts;
+        next.score = hud.score;
         next.gauge = hud.gauge;
         next.gauge_type = hud.gauge_type;
         next.rate = hud.rate;
@@ -5841,6 +5621,7 @@ void MenuApp::launch_gameplay(const std::string& chart_path) {
         gameplay_hud_.combo = hud.combo;
         gameplay_hud_.max_combo = hud.max_combo;
         gameplay_hud_.counts = hud.counts;
+        gameplay_hud_.score = hud.score;
         gameplay_hud_.gauge = hud.gauge;
         gameplay_hud_.gauge_type = hud.gauge_type;
         gameplay_hud_.rate = hud.rate;
@@ -5901,6 +5682,10 @@ void MenuApp::launch_gameplay(const std::string& chart_path) {
         last_result_ = result.stats;
         last_game_over_ = result.game_over;
         has_result_ = true;
+        last_result_mods_ = result.mods;
+        last_result_rate_multiplier_ = result.rate_multiplier;
+        last_result_score_multiplier_ = result.score_multiplier;
+        last_result_final_score_ = result.final_score;
         last_replay_path_ = result.replay_path;
         last_result_path_ = result.result_path;
         last_export_warnings_ = result.export_warnings;
@@ -5908,6 +5693,10 @@ void MenuApp::launch_gameplay(const std::string& chart_path) {
         screen_ = Screen::Result;
     } else {
         has_result_ = false;
+        last_result_mods_.clear();
+        last_result_rate_multiplier_ = 1.0;
+        last_result_score_multiplier_ = 1.0;
+        last_result_final_score_ = 0;
         last_replay_path_.clear();
         last_result_path_.clear();
         last_export_warnings_.clear();
@@ -5942,6 +5731,7 @@ std::string MenuApp::screen_title() const {
         case Screen::SettingsSkins: return "Skin Settings";
         case Screen::SettingsInput: return "Input Settings";
         case Screen::ModeSelect: return "Mode Select";
+        case Screen::ModeMods: return "Mod Manager";
         case Screen::Keymap: return "Keymap";
         case Screen::KeymapConfirm: return "Keymap Confirm";
         case Screen::KeymapTest: return "NKRO Test";
@@ -6026,6 +5816,7 @@ void MenuApp::populate_help_overlay(render::HelpOverlayData& target) const {
                 "Up / Down or the mouse wheel selects a row. Long skin lists now scroll with a right-side scrollbar.",
                 "Skin Source swaps between the native vector skin and imported osu!mania assets.",
                 "Import OSU Skin opens a folder picker. Drag-and-drop also works on this screen.",
+                "Image Aspect keeps imported note heads and tails from stretching to the gameplay note box.",
                 "The right preview shows the native fallback lane colors and sizing per layout.",
             };
             target.footer = "Esc or Backspace saves and returns.";
@@ -6044,11 +5835,21 @@ void MenuApp::populate_help_overlay(render::HelpOverlayData& target) const {
             target.title = "Mode Settings";
             target.lines = {
                 "Up / Down or the mouse wheel selects a row. Long lists show a scrollbar on the right.",
-                "Gauge, Random, Rate, and Hi-Speed change the play feel for the next song.",
+                "Gauge, Random, Mods, Rate, and Hi-Speed change the play feel for the next song.",
                 "Indexing Safe minimizes RAM for huge libraries. Fast spends more RAM to speed up rescans.",
                 "Chart Filter decides whether Song Select shows BMS, OSU, or both when OSU indexing is enabled.",
+                "Enter on Mods opens the registry-backed Mod Manager for score-multiplier presets.",
             };
             target.footer = "Esc or Backspace saves and refreshes the library if needed.";
+            return;
+        case Screen::ModeMods:
+            target.title = "Mod Manager";
+            target.lines = {
+                "Up / Down selects a mod category. Left / Right cycles Off and the registered preset for that category.",
+                "Judge Window, Note Structure, and Hold Rule normalize to one active preset per category.",
+                "Final score uses the lowest multiplier between the current Rate and all active mods.",
+            };
+            target.footer = "Enter, Esc, or Backspace returns to Mode Settings.";
             return;
         case Screen::Keymap:
             target.title = "Keymap Help";
@@ -6198,7 +5999,7 @@ void MenuApp::rebuild_visible_song_list(const std::string* selected_path) {
         selected_song_ = 0;
         sync_song_select_state();
         if (!songs_path_.empty()) {
-            source_song_counts_[normalize_path_key(path_from_utf8(songs_path_))] = 0;
+            source_song_counts_[menu_songs::normalize_path_key(path_from_utf8(songs_path_))] = 0;
         }
         return;
     }
@@ -6214,7 +6015,7 @@ void MenuApp::rebuild_visible_song_list(const std::string* selected_path) {
     sync_song_select_state();
     rebuild_current_song_record_indices();
 
-    source_song_counts_[normalize_path_key(path_from_utf8(songs_path_))] =
+    source_song_counts_[menu_songs::normalize_path_key(path_from_utf8(songs_path_))] =
         static_cast<int>(visible_song_count());
     log_memory_phase("MenuApp",
                      "visible-list-rebuilt",

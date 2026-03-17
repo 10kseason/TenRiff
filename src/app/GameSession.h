@@ -60,6 +60,7 @@ public:
         int combo = 0;
         int max_combo = 0;
         gameplay::JudgementCounts counts;
+        int64_t score = 0;
 
         double gauge = 0.0;
         game::GaugeType gauge_type = game::GaugeType::Normal;
@@ -92,6 +93,10 @@ public:
         bool game_over = false;
         bool finished = false;
         gameplay::ResultStats stats;
+        std::vector<std::string> mods;
+        double rate_multiplier = 1.0;
+        double score_multiplier = 1.0;
+        int64_t final_score = 0;
         std::string replay_path;
         std::string result_path;
         std::vector<std::string> export_warnings;
@@ -238,6 +243,9 @@ private:
     std::string chart_path_;
     ChartFormat chart_format_ = ChartFormat::Unknown;
     gameplay::GameplayChart chart_;
+    std::vector<std::string> active_mods_{};
+    double rate_multiplier_ = 1.0;
+    double score_multiplier_ = 1.0;
 
     std::unique_ptr<gameplay::GameplayEngine> engine_;
     std::mutex engine_mutex_;

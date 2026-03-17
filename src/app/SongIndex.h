@@ -18,6 +18,7 @@ struct SongEntry {
     std::string path;
     std::string title;
     std::string artist;
+    std::string chart_name;
     std::string format;
     std::string layout_label;
     int key_count = 0;

@@ -37,11 +37,10 @@
 #include <thread>
 #include <unordered_set>
 
-#include "app/ModeResolver.h"
+#include "app/ModeManager.h"
 #include "app/GameplayHudWindow.h"
 #include "app/RuntimeConfigMigration.h"
 #include "config/Keymap.h"
-#include "gameplay/ModeApplier.h"
 #include "timing/HighResClock.h"
 
 namespace tenriff::app {
@@ -73,42 +72,6 @@ constexpr int64_t kHispeedRepeatInitialDelayMs = 180;
 constexpr int64_t kHispeedRepeatIntervalMs = 45;
 constexpr std::size_t kMaxToneVoices = 256;
 constexpr double kTwoPi = 6.28318530717958647692;
-
-int target_lane_count(gameplay::KeyMode mode) {
-    switch (mode) {
-        case gameplay::KeyMode::Keys4: return 4;
-        case gameplay::KeyMode::Keys5: return 5;
-        case gameplay::KeyMode::Keys6: return 6;
-        case gameplay::KeyMode::Keys7: return 7;
-        case gameplay::KeyMode::Keys8: return 8;
-        case gameplay::KeyMode::Keys9: return 9;
-        case gameplay::KeyMode::Keys10: return 10;
-        case gameplay::KeyMode::Keys16: return 16;
-        case gameplay::KeyMode::Auto: default: return 0;
-    }
-}
-
-gameplay::ChartFormatMode chart_format_mode_for_chart(ChartFormat format) {
-    switch (format) {
-        case ChartFormat::Bms: return gameplay::ChartFormatMode::Bms;
-        case ChartFormat::OsuMania: return gameplay::ChartFormatMode::Osu;
-        case ChartFormat::Unknown: default: return gameplay::ChartFormatMode::Auto;
-    }
-}
-
-gameplay::KeyMode key_mode_for_lane_count(int lane_count) {
-    switch (lane_count) {
-        case 4: return gameplay::KeyMode::Keys4;
-        case 5: return gameplay::KeyMode::Keys5;
-        case 6: return gameplay::KeyMode::Keys6;
-        case 7: return gameplay::KeyMode::Keys7;
-        case 8: return gameplay::KeyMode::Keys8;
-        case 9: return gameplay::KeyMode::Keys9;
-        case 10: return gameplay::KeyMode::Keys10;
-        case 16: return gameplay::KeyMode::Keys16;
-        default: return gameplay::KeyMode::Auto;
-    }
-}
 
 int64_t ms_to_samples(double ms, int sample_rate) {
     if (sample_rate <= 0) {
@@ -1217,6 +1180,9 @@ bool GameSession::initialize(const CommandLineOptions& options) {
     result_transition_sample_ = 0;
     result_transition_pending_ = false;
     gameplay_started_ = false;
+    active_mods_.clear();
+    rate_multiplier_ = 1.0;
+    score_multiplier_ = 1.0;
 
     future_events_ = {};
     tone_voices_.clear();
@@ -1431,44 +1397,16 @@ bool GameSession::initialize(const CommandLineOptions& options) {
         return false;
     }
 
-    auto mode_result = resolve_mode_settings(config_.mode);
+    const ModeManagerResult mode_result =
+        manage_modes(chart_result.chart, chart_result.format, config_.mode, config_.judge, config_.speed.rate);
     for (const auto& warning : mode_result.warnings) {
         std::cerr << "[warn] " << warning << std::endl;
     }
 
-    if (mode_result.settings.format == gameplay::ChartFormatMode::Bms &&
-        chart_result.format != ChartFormat::Bms) {
-        std::cerr << "[warn] mode.format=BMS does not match the selected chart. Using detected chart format instead."
-                  << std::endl;
-        mode_result.settings.format = chart_format_mode_for_chart(chart_result.format);
-    }
-    if (mode_result.settings.format == gameplay::ChartFormatMode::Osu &&
-        chart_result.format != ChartFormat::OsuMania) {
-        std::cerr << "[warn] mode.format=OSU does not match the selected chart. Using detected chart format instead."
-                  << std::endl;
-        mode_result.settings.format = chart_format_mode_for_chart(chart_result.format);
-    }
-
-    if (chart_result.format == ChartFormat::OsuMania) {
-        const int chart_lane_count = std::max(1, chart_result.chart.lane_count);
-        const int configured_lane_count = target_lane_count(mode_result.settings.key_mode);
-        if (configured_lane_count > 0 && configured_lane_count != chart_lane_count) {
-            std::cerr << "[warn] mode.key_mode does not match the selected osu!mania chart. "
-                      << "Using the chart lane count instead." << std::endl;
-            mode_result.settings.key_mode = key_mode_for_lane_count(chart_lane_count);
-        }
-    }
-
-    auto applied = gameplay::apply_mode_settings(chart_result.chart, mode_result.settings);
-    for (const auto& warning : applied.warnings) {
-        std::cerr << "[warn] " << warning << std::endl;
-    }
-    chart_result.chart = std::move(applied.chart);
-
     gameplay::GameplayConfig gameplay_config;
     gameplay_config.sample_rate = sample_rate_;
     gameplay_config.rate = config_.speed.rate;
-    gameplay_config.judge = config_.judge;
+    gameplay_config.judge = mode_result.judge;
     gameplay_config.gauge = config_.gauge;
     gameplay_config.input_offset_ms = config_.input_offset_ms;
     switch (mode_result.settings.gauge) {
@@ -1490,7 +1428,11 @@ bool GameSession::initialize(const CommandLineOptions& options) {
         }
     }
 
-    chart_ = std::move(chart_result.chart);
+    active_mods_ = mode_result.active_mods;
+    rate_multiplier_ = mode_result.rate_multiplier;
+    score_multiplier_ = mode_result.final_multiplier;
+
+    chart_ = mode_result.chart;
     offset_gameplay_chart_samples(chart_, ms_to_samples(static_cast<double>(kGameplayStartLeadInMs), sample_rate_));
     for (std::size_t i = 0; i < chart_.notes.size(); ++i) {
         chart_.notes[i].note_id = i;
@@ -1710,6 +1652,9 @@ GameSession::HudSnapshot GameSession::hud_snapshot() {
         snapshot.combo = stats.combo;
         snapshot.max_combo = stats.max_combo;
         snapshot.counts = stats.counts;
+        snapshot.score = std::max<int64_t>(
+            0,
+            static_cast<int64_t>(std::llround(static_cast<double>(stats.raw_score) * score_multiplier_)));
 
         const auto& gauge_state = engine_->gauge_state();
         snapshot.gauge = gauge_state.value;
@@ -2401,6 +2346,13 @@ void GameSession::shutdown() {
             result_.game_over = engine_->is_game_over();
             result_.finished = engine_->is_finished();
         }
+        result_.mods = active_mods_;
+        result_.rate_multiplier = rate_multiplier_;
+        result_.score_multiplier = score_multiplier_;
+        result_.final_score = std::max<int64_t>(
+            0,
+            static_cast<int64_t>(std::llround(static_cast<double>(result_.stats.raw_score) *
+                                              result_.score_multiplier)));
         result_.has_value = true;
 
         const std::string created_utc = utc_timestamp_compact();
@@ -2418,6 +2370,10 @@ void GameSession::shutdown() {
         replay.sample_rate = sample_rate_;
         replay.rate = replay.trace.rate;
         replay.input_offset_ms = config_.input_offset_ms;
+        replay.mods = result_.mods;
+        replay.rate_multiplier = result_.rate_multiplier;
+        replay.score_multiplier = result_.score_multiplier;
+        replay.final_score = result_.final_score;
         replay.stats = result_.stats;
 
         auto replay_export = gameplay::save_replay_json(replay_path.u8string(), replay);
@@ -2446,6 +2402,10 @@ void GameSession::shutdown() {
         exported_result.sample_rate = sample_rate_;
         exported_result.rate = replay.rate;
         exported_result.game_over = result_.game_over;
+        exported_result.mods = result_.mods;
+        exported_result.rate_multiplier = result_.rate_multiplier;
+        exported_result.score_multiplier = result_.score_multiplier;
+        exported_result.final_score = result_.final_score;
         exported_result.stats = result_.stats;
 
         auto result_export = gameplay::save_result_json(result_path.u8string(), exported_result);
@@ -2491,6 +2451,9 @@ void GameSession::shutdown() {
     chart_audio_steady_state_logged_ = false;
     synthetic_tones_enabled_.store(true, std::memory_order_release);
     chart_ = {};
+    active_mods_.clear();
+    rate_multiplier_ = 1.0;
+    score_multiplier_ = 1.0;
     lane_activity_.clear();
     hidden_hit_note_ids_.clear();
     active_holds_buffer_.clear();
