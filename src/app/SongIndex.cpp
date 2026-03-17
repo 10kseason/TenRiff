@@ -35,6 +35,11 @@ namespace tenriff::app {
 namespace {
 
 constexpr int kSongIndexVersion = 7;
+constexpr std::uintmax_t kMaxMetadataChartFileBytes = 8u * 1024u * 1024u;
+
+bool cancel_requested(const SongIndexCancelCallback& cancel) {
+    return cancel && cancel();
+}
 
 std::filesystem::path path_from_utf8(std::string_view value) {
     try {
@@ -147,6 +152,21 @@ std::string fallback_title(const std::filesystem::path& path) {
     } catch (...) {
         return {};
     }
+}
+
+bool ensure_metadata_chart_size_supported(const std::filesystem::path& path, std::string* error = nullptr) {
+    std::error_code ec;
+    const auto bytes = std::filesystem::file_size(path, ec);
+    if (ec) {
+        return true;
+    }
+    if (bytes <= kMaxMetadataChartFileBytes) {
+        return true;
+    }
+    if (error) {
+        *error = "Skipped oversized metadata chart file (" + std::to_string(bytes) + " bytes)";
+    }
+    return false;
 }
 
 std::string read_text_file(const std::filesystem::path& path, std::string* error = nullptr) {
@@ -448,6 +468,13 @@ SongEntry build_bms_entry(std::string relative_path,
     entry.format = "bms";
     entry.mtime = mtime;
 
+    std::string size_error;
+    if (!ensure_metadata_chart_size_supported(full_path, &size_error)) {
+        warnings.push_back(size_error + ": " + entry.path);
+        entry.title = fallback_title(full_path);
+        return entry;
+    }
+
     chart::BmsParser parser;
     chart::BmsParserOptions parser_options;
     parser_options.retain_wav_bmp = false;
@@ -504,6 +531,13 @@ SongEntry build_osu_entry(std::string relative_path,
     entry.path = std::move(relative_path);
     entry.format = "osu";
     entry.mtime = mtime;
+
+    std::string size_error;
+    if (!ensure_metadata_chart_size_supported(full_path, &size_error)) {
+        warnings.push_back(size_error + ": " + entry.path);
+        entry.title = fallback_title(full_path);
+        return entry;
+    }
 
     std::string read_error;
     const std::string content = read_text_file(full_path, &read_error);
@@ -642,7 +676,8 @@ bool enumerate_song_candidates(const std::filesystem::path& root_dir,
                                std::vector<std::string>* warnings,
                                const std::function<void(SongIndexCandidate&&)>& on_candidate,
                                std::uint64_t* out_candidate_count = nullptr,
-                               const SongIndexProgressCallback& progress = {}) {
+                               const SongIndexProgressCallback& progress = {},
+                               const SongIndexCancelCallback& cancel = {}) {
     namespace fs = std::filesystem;
 
     std::error_code ec;
@@ -656,6 +691,12 @@ bool enumerate_song_candidates(const std::filesystem::path& root_dir,
     }
 
     while (it != end) {
+        if (cancel_requested(cancel)) {
+            if (out_candidate_count) {
+                *out_candidate_count = discovered;
+            }
+            return false;
+        }
         if (ec) {
             if (warnings) {
                 warnings->push_back("Song scan skipped entry: " + ec.message());
@@ -728,7 +769,8 @@ void process_song_index_batch(std::vector<SongIndexCandidate>& batch,
                               std::atomic<int>& processed,
                               int total_hint,
                               unsigned reported_threads,
-                              const SongIndexProgressCallback& progress) {
+                              const SongIndexProgressCallback& progress,
+                              const SongIndexCancelCallback& cancel) {
     if (batch.empty()) {
         return;
     }
@@ -750,6 +792,9 @@ void process_song_index_batch(std::vector<SongIndexCandidate>& batch,
         auto& local_warnings = worker_warnings[worker_slot];
         std::vector<std::string> item_warnings;
         for (;;) {
+            if (cancel_requested(cancel)) {
+                break;
+            }
             const std::size_t batch_index = next_index.fetch_add(1, std::memory_order_relaxed);
             if (batch_index >= batch_size) {
                 break;
@@ -782,6 +827,9 @@ void process_song_index_batch(std::vector<SongIndexCandidate>& batch,
             const int current = processed.fetch_add(1, std::memory_order_relaxed) + 1;
             if (current == total_hint || (current % 32) == 0) {
                 publish_progress(progress, SongIndexProgressStage::BuildingMetadata, current, total_hint);
+            }
+            if (cancel_requested(cancel)) {
+                break;
             }
         }
     };
@@ -1349,7 +1397,8 @@ bool save_song_index(const std::string& path,
                      const SongIndex& index,
                      const SongIndexOptions& options,
                      std::string* error,
-                     SongIndexProgressCallback progress) {
+                     SongIndexProgressCallback progress,
+                     SongIndexCancelCallback cancel) {
     const std::filesystem::path file_path = path_from_utf8(path);
     if (file_path.empty()) {
         if (error) {
@@ -1381,12 +1430,31 @@ bool save_song_index(const std::string& path,
     const int total = static_cast<int>(index.entries.size());
     publish_progress(progress, SongIndexProgressStage::SavingCache, 0, total);
 
+    if (cancel_requested(cancel)) {
+        std::error_code remove_ec;
+        file.close();
+        std::filesystem::remove(file_path, remove_ec);
+        if (error) {
+            *error = "Song index save canceled.";
+        }
+        return false;
+    }
+
     file << "{\n";
     file << "  \"version\": " << kSongIndexVersion << ",\n";
     file << "  \"include_osu\": " << (options.include_osu ? "true" : "false") << ",\n";
     file << "  \"entries\": [\n";
 
     for (std::size_t i = 0; i < index.entries.size(); ++i) {
+        if (cancel_requested(cancel)) {
+            std::error_code remove_ec;
+            file.close();
+            std::filesystem::remove(file_path, remove_ec);
+            if (error) {
+                *error = "Song index save canceled.";
+            }
+            return false;
+        }
         const auto& entry = index.entries[i];
         if (i != 0) {
             file << ",\n";
@@ -1433,7 +1501,8 @@ SongIndex scan_songs(const std::string& root_path,
                      const SongIndex* cache,
                      std::vector<std::string>& warnings,
                      SongIndexProgressCallback progress,
-                     const SongIndexOptions& options) {
+                     const SongIndexOptions& options,
+                     SongIndexCancelCallback cancel) {
     SongIndex result;
     namespace fs = std::filesystem;
 
@@ -1441,6 +1510,10 @@ SongIndex scan_songs(const std::string& root_path,
     const fs::path root_dir = path_from_utf8(root_path);
     if (!fs::exists(root_dir, ec) || !fs::is_directory(root_dir, ec)) {
         warnings.push_back("Songs path not found: " + root_path);
+        return result;
+    }
+
+    if (cancel_requested(cancel)) {
         return result;
     }
 
@@ -1453,7 +1526,11 @@ SongIndex scan_songs(const std::string& root_path,
     }
 
     std::uint64_t total_candidates_u64 = 0;
-    enumerate_song_candidates(root_dir, options.include_osu, nullptr, [](SongIndexCandidate&&) {}, &total_candidates_u64, progress);
+    const bool count_completed = enumerate_song_candidates(
+        root_dir, options.include_osu, nullptr, [](SongIndexCandidate&&) {}, &total_candidates_u64, progress, cancel);
+    if (!count_completed || cancel_requested(cancel)) {
+        return result;
+    }
     const int total = clamp_progress_count(total_candidates_u64);
     publish_progress(progress, SongIndexProgressStage::BuildingMetadata, 0, total);
 
@@ -1480,7 +1557,8 @@ SongIndex scan_songs(const std::string& root_path,
             [&](SongIndexCandidate&& candidate) {
                 batch.push_back(std::move(candidate));
                 if (batch.size() >= batch_limit) {
-                    process_song_index_batch(batch, cached, warnings, result, options, processed, total, hc, progress);
+                    process_song_index_batch(batch, cached, warnings, result, options, processed, total, hc, progress,
+                                             cancel);
                     const int processed_now = processed.load(std::memory_order_acquire);
                     if (should_trim_song_index_process_memory(options.profile, processed_now, total)) {
                         trim_song_index_process_memory();
@@ -1500,13 +1578,24 @@ SongIndex scan_songs(const std::string& root_path,
                         batch.reserve(batch_limit);
                     }
                 }
-            });
+            },
+            nullptr,
+            {},
+            cancel);
 
-        process_song_index_batch(batch, cached, warnings, result, options, processed, total, hc, progress);
+        if (cancel_requested(cancel)) {
+            return result;
+        }
+
+        process_song_index_batch(batch, cached, warnings, result, options, processed, total, hc, progress, cancel);
         const int processed_now = processed.load(std::memory_order_acquire);
         if (should_trim_song_index_process_memory(options.profile, processed_now, total)) {
             trim_song_index_process_memory();
         }
+    }
+
+    if (cancel_requested(cancel)) {
+        return result;
     }
 
     std::sort(result.entries.begin(), result.entries.end(), [](const SongEntry& lhs, const SongEntry& rhs) {
@@ -1518,7 +1607,9 @@ SongIndex scan_songs(const std::string& root_path,
         return lhs_title < rhs_title;
     });
 
-    publish_progress(progress, SongIndexProgressStage::BuildingMetadata, total, total);
+    if (!cancel_requested(cancel)) {
+        publish_progress(progress, SongIndexProgressStage::BuildingMetadata, total, total);
+    }
 
     return result;
 }

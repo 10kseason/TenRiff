@@ -199,6 +199,8 @@ private:
                                        uint64_t* out_text_revision = nullptr);
     void update_gameplay_loading_state(int percent, std::string_view stage);
     void refresh_keymap_lane_list();
+    void refresh_available_osu_skins();
+    [[nodiscard]] bool import_osu_skin_path(std::string_view source_path);
     [[nodiscard]] const struct LocalPlayRecord* current_selected_record() const;
     [[nodiscard]] bool open_selected_record_result();
     [[nodiscard]] const ReplaySummary* replay_summary_for_path(const std::string& path);
@@ -308,6 +310,9 @@ private:
     std::string keymap_pending_lane_;
     std::string keymap_pending_key_;
     std::string keymap_duplicate_lane_;
+    std::string available_osu_skin_root_;
+    std::vector<std::string> available_osu_skin_names_{};
+    std::unordered_map<std::string, std::string> available_osu_skin_roots_by_name_{};
 
     bool has_result_ = false;
     bool last_game_over_ = false;

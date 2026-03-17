@@ -21,7 +21,7 @@ namespace tenriff::render {
 struct MenuWindowConfig {
     std::string title = "TenRiff";
     std::string display_mode = "borderless";
-    bool vsync = true;
+    bool vsync = false;
     int refresh_hz = 1050;
     int width = 1280;
     int height = 720;
@@ -75,6 +75,7 @@ struct TitleMenuData {
     std::string track;
     int64_t high_score = 0;
     std::vector<MenuButtonData> buttons;
+    std::vector<std::string> guides;
 };
 
 struct SongCardData {
@@ -216,10 +217,13 @@ struct GameplayHudData {
     double judgement_line_position = 0.82;
     double combo_position = 0.24;
     double note_width_scale = 1.0;
-    double note_height_scale = 1.0;
+    double note_height_scale = 1.8;
     double hold_body_width_scale = 0.60;
     bool note_border_enabled = true;
     std::string note_shape = "rect";
+    std::string skin_source = "native";
+    std::string osu_skin_root;
+    std::string osu_skin_name;
     double visual_offset_ms = 0.0;
 
     double bpm = 0.0;
@@ -278,7 +282,7 @@ struct SkinPreviewData {
     double judgement_line_position = 0.82;
     double combo_position = 0.24;
     double note_width_scale = 1.0;
-    double note_height_scale = 1.0;
+    double note_height_scale = 1.8;
     double hold_body_width_scale = 0.60;
     bool note_border_enabled = true;
     std::string note_shape = "rect";
@@ -342,6 +346,7 @@ public:
     void queue_resize(unsigned int width, unsigned int height);
     void on_mouse_button_down(int window_x, int window_y);
     void on_mouse_click(int window_x, int window_y, bool double_click);
+    void on_mouse_secondary_click(int window_x, int window_y);
     void on_mouse_move(int window_x, int window_y);
     void on_mouse_wheel(int wheel_delta);
     void on_file_drop(std::string path);
@@ -363,6 +368,9 @@ private:
     void apply_pending_config();
     void update_layout();
     void update_brushes();
+    void invalidate_menu_scene_target();
+    [[nodiscard]] bool ensure_menu_scene_resources();
+    [[nodiscard]] bool render_menu_scene(MenuScreenKind kind, int64_t now_ns);
     void invalidate_gameplay_note_sprite_cache();
     [[nodiscard]] bool ensure_gameplay_note_sprites(const GameplayHudData& data);
     void invalidate_song_select_preview_cache();
@@ -389,6 +397,7 @@ private:
     std::atomic<bool> init_success_{false};
     std::atomic<bool> fatal_error_{false};
     bool fullscreen_ = false;
+    bool fullscreen_restore_pending_ = false;
     bool com_initialized_ = false;
     bool resize_pending_ = false;
     unsigned int pending_width_ = 0;
@@ -450,13 +459,17 @@ private:
         int lane_count = 0;
         double judgement_line_position = 0.82;
         double note_width_scale = 1.0;
-        double note_height_scale = 1.0;
+        double note_height_scale = 1.8;
     };
 
     struct GameplayNoteSpriteCache {
         int lane_count = 0;
         bool note_border_enabled = true;
         std::string note_shape = "rect";
+        std::string skin_source = "native";
+        std::string osu_skin_root;
+        std::string osu_skin_name;
+        bool using_osu_skin_assets = false;
         std::array<uint32_t, kGameplayHudMaxLanes> lane_colors{};
     };
 

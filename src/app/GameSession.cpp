@@ -51,8 +51,10 @@ namespace {
 constexpr int64_t kLookaheadMs = 4;
 constexpr int64_t kHudRefreshMs = 8;
 constexpr int64_t kGameplayStartCountdownSeconds = 3;
+constexpr int64_t kGameplayStartLeadInMs = 3000;
 constexpr int64_t kHudLookaheadMs = 2200;
 constexpr int64_t kHudPastMs = 180;
+constexpr double kHudFeedbackDisplayMs = 240.0;
 constexpr double kHudRenderSlackMs = 24.0;
 constexpr double kGuideToneMs = 28.0;
 constexpr double kHitToneMs = 44.0;
@@ -67,6 +69,8 @@ constexpr double kHispeedMin = 0.50;
 constexpr double kHispeedMax = 50.00;
 constexpr double kHispeedStep = 0.25;
 constexpr double kHispeedStepCoarse = 10.0;
+constexpr int64_t kHispeedRepeatInitialDelayMs = 180;
+constexpr int64_t kHispeedRepeatIntervalMs = 45;
 constexpr std::size_t kMaxToneVoices = 256;
 constexpr double kTwoPi = 6.28318530717958647692;
 
@@ -111,6 +115,10 @@ int64_t ms_to_samples(double ms, int sample_rate) {
         return 0;
     }
     return static_cast<int64_t>(std::llround(ms * static_cast<double>(sample_rate) / 1000.0));
+}
+
+int64_t ms_to_ns(int64_t ms) {
+    return ms * 1'000'000LL;
 }
 
 int64_t note_visible_end_sample(const gameplay::NoteEvent& note) {
@@ -1202,6 +1210,12 @@ bool GameSession::initialize(const CommandLineOptions& options) {
     countdown_active_ = false;
     countdown_value_ = 0;
     countdown_started_ns_ = 0;
+    hispeed_decrease_held_ = false;
+    hispeed_increase_held_ = false;
+    hispeed_decrease_next_repeat_ns_ = 0;
+    hispeed_increase_next_repeat_ns_ = 0;
+    result_transition_sample_ = 0;
+    result_transition_pending_ = false;
     gameplay_started_ = false;
 
     future_events_ = {};
@@ -1229,7 +1243,6 @@ bool GameSession::initialize(const CommandLineOptions& options) {
     hud_scan_start_ = 0;
     chart_ = {};
     lane_activity_.clear();
-    lane_pressed_.clear();
     pending_input_events_.reserve(64);
     last_loading_percent_ = -1;
     last_loading_stage_.clear();
@@ -1310,7 +1323,7 @@ bool GameSession::initialize(const CommandLineOptions& options) {
                                                   : input::InputBackend::Polling;
     input_config.raw_input.register_keyboard = config_.input.rawinput;
     input_config.raw_input.input_sink = true;
-    input_config.raw_input.no_legacy = true;
+    input_config.raw_input.no_legacy = false;
     input_config.polling_hz = config_.input.polling_hz;
     input_config.key_state.debounce_window_ns =
         std::max<int64_t>(0, static_cast<int64_t>(std::llround(config_.input.debounce_ms * 1'000'000.0)));
@@ -1478,6 +1491,7 @@ bool GameSession::initialize(const CommandLineOptions& options) {
     }
 
     chart_ = std::move(chart_result.chart);
+    offset_gameplay_chart_samples(chart_, ms_to_samples(static_cast<double>(kGameplayStartLeadInMs), sample_rate_));
     for (std::size_t i = 0; i < chart_.notes.size(); ++i) {
         chart_.notes[i].note_id = i;
     }
@@ -1510,7 +1524,6 @@ bool GameSession::initialize(const CommandLineOptions& options) {
     tone_voices_.reserve(std::max<std::size_t>(64, chart_.notes.size() / 8));
     chart_audio_voices_.reserve(std::max<std::size_t>(128, chart_.notes.size() / 16));
     lane_activity_.assign(static_cast<std::size_t>(std::max(1, chart_.lane_count)), 0.0f);
-    lane_pressed_.assign(static_cast<std::size_t>(std::max(1, chart_.lane_count)), 0);
 
     engine_ = std::make_unique<gameplay::GameplayEngine>(chart_, gameplay_config);
     report_loading_progress(96, "Starting gameplay");
@@ -1543,6 +1556,7 @@ void GameSession::run() {
             if (finished_.load(std::memory_order_acquire) || stop_requested_.load(std::memory_order_acquire)) {
                 break;
             }
+            service_hispeed_repeat(timing::HighResClock::now_ns());
 
             const int64_t now_ns = timing::HighResClock::now_ns();
             const int64_t elapsed_ns = std::max<int64_t>(0, now_ns - countdown_started_ns_);
@@ -1702,9 +1716,12 @@ GameSession::HudSnapshot GameSession::hud_snapshot() {
         snapshot.gauge_type = gauge_state.type;
 
         const auto& feedback = engine_->live_feedback();
-        snapshot.has_feedback = feedback.has_value;
+        const int64_t feedback_display_samples = ms_to_samples(kHudFeedbackDisplayMs, sample_rate_);
+        const int64_t feedback_age_samples =
+            feedback.has_value ? std::max<int64_t>(0, snapshot.current_sample - feedback.sample) : 0;
+        snapshot.has_feedback = feedback.has_value && feedback_age_samples <= feedback_display_samples;
         snapshot.feedback_judgement = feedback.judgement;
-        snapshot.feedback_delta_ms = feedback.delta_ms;
+        snapshot.feedback_delta_ms = snapshot.has_feedback ? feedback.delta_ms : 0.0;
         engine_->collect_active_holds(active_holds_buffer_);
         snapshot.lane_activity.fill(0.0f);
         snapshot.lane_activity_count = std::min<std::size_t>(lane_activity_.size(), kGameplayHudMaxLanes);
@@ -1816,6 +1833,47 @@ void GameSession::adjust_hispeed(double delta) {
     double next = std::clamp(config_.speed.hi_speed + delta, kHispeedMin, kHispeedMax);
     next = std::round(next * 100.0) / 100.0;
     config_.speed.hi_speed = next;
+}
+
+void GameSession::update_hispeed_repeat_state(uint32_t keycode, input::InputState state, int64_t event_time_ns) {
+    const int64_t safe_event_time_ns = (event_time_ns > 0) ? event_time_ns : timing::HighResClock::now_ns();
+    auto update_repeat = [&](bool* held, int64_t* next_repeat_ns, double delta) {
+        if (!held || !next_repeat_ns) {
+            return;
+        }
+        if (state == input::InputState::Pressed) {
+            adjust_hispeed(delta);
+            *held = true;
+            *next_repeat_ns = safe_event_time_ns + ms_to_ns(kHispeedRepeatInitialDelayMs);
+        } else {
+            *held = false;
+            *next_repeat_ns = 0;
+        }
+    };
+
+    if (f3_keycode_ != 0 && keycode == f3_keycode_) {
+        update_repeat(&hispeed_decrease_held_, &hispeed_decrease_next_repeat_ns_, -kHispeedStep);
+        return;
+    }
+    if (f4_keycode_ != 0 && keycode == f4_keycode_) {
+        update_repeat(&hispeed_increase_held_, &hispeed_increase_next_repeat_ns_, kHispeedStep);
+    }
+}
+
+void GameSession::service_hispeed_repeat(int64_t now_ns) {
+    const int64_t safe_now_ns = (now_ns > 0) ? now_ns : timing::HighResClock::now_ns();
+    while (hispeed_decrease_held_ &&
+           hispeed_decrease_next_repeat_ns_ > 0 &&
+           safe_now_ns >= hispeed_decrease_next_repeat_ns_) {
+        adjust_hispeed(-kHispeedStep);
+        hispeed_decrease_next_repeat_ns_ += ms_to_ns(kHispeedRepeatIntervalMs);
+    }
+    while (hispeed_increase_held_ &&
+           hispeed_increase_next_repeat_ns_ > 0 &&
+           safe_now_ns >= hispeed_increase_next_repeat_ns_) {
+        adjust_hispeed(kHispeedStep);
+        hispeed_increase_next_repeat_ns_ += ms_to_ns(kHispeedRepeatIntervalMs);
+    }
 }
 
 bool GameSession::prepare_chart_audio() {
@@ -2409,6 +2467,12 @@ void GameSession::shutdown() {
     countdown_active_ = false;
     countdown_value_ = 0;
     countdown_started_ns_ = 0;
+    hispeed_decrease_held_ = false;
+    hispeed_increase_held_ = false;
+    hispeed_decrease_next_repeat_ns_ = 0;
+    hispeed_increase_next_repeat_ns_ = 0;
+    result_transition_sample_ = 0;
+    result_transition_pending_ = false;
     gameplay_started_ = false;
     tone_voices_.clear();
     chart_audio_assets_.clear();
@@ -2428,7 +2492,6 @@ void GameSession::shutdown() {
     synthetic_tones_enabled_.store(true, std::memory_order_release);
     chart_ = {};
     lane_activity_.clear();
-    lane_pressed_.clear();
     hidden_hit_note_ids_.clear();
     active_holds_buffer_.clear();
     hud_scan_start_ = 0;
@@ -2456,23 +2519,32 @@ void GameSession::audio_callback(float* output, uint32_t frames, int64_t buffer_
         schedule_note_guides(buffer_start_samples, buffer_end_samples);
         process_future_events(buffer_end_samples, lookahead_samples);
         process_input_queue(buffer_start_samples, buffer_end_samples, lookahead_samples);
+        service_hispeed_repeat(now_ns);
         engine_->advance(buffer_end_samples);
 
         if (!lane_activity_.empty() && sample_rate_ > 0) {
             const float decay = static_cast<float>(static_cast<double>(frames) * 5.0 /
                                                    static_cast<double>(sample_rate_));
-            for (std::size_t lane = 0; lane < lane_activity_.size(); ++lane) {
-                if (lane < lane_pressed_.size() && lane_pressed_[lane] != 0) {
-                    lane_activity_[lane] = 1.0f;
-                } else {
-                    lane_activity_[lane] = std::max(0.0f, lane_activity_[lane] - decay);
-                }
+            for (float& activity : lane_activity_) {
+                activity = std::max(0.0f, activity - decay);
             }
         }
 
-        if (engine_->is_finished() || engine_->is_game_over() ||
-            stop_requested_.load(std::memory_order_acquire)) {
+        if (stop_requested_.load(std::memory_order_acquire) || engine_->is_game_over()) {
             finished_.store(true, std::memory_order_release);
+        } else if (engine_->is_finished()) {
+            if (!result_transition_pending_) {
+                const int64_t tail_samples =
+                    ms_to_samples(std::max(0.0, config_.ui.result_tail_ms), sample_rate_);
+                result_transition_sample_ = buffer_end_samples + tail_samples;
+                result_transition_pending_ = true;
+            }
+            if (buffer_end_samples >= result_transition_sample_) {
+                finished_.store(true, std::memory_order_release);
+            }
+        } else {
+            result_transition_pending_ = false;
+            result_transition_sample_ = 0;
         }
     }
 
@@ -2507,11 +2579,15 @@ void GameSession::process_countdown_input_queue() {
         }
     }
 
-    std::fill(lane_pressed_.begin(), lane_pressed_.end(), 0);
     std::fill(lane_activity_.begin(), lane_activity_.end(), 0.0f);
 }
 
 bool GameSession::handle_control_input(const input::InputEvent& event) {
+    if ((f3_keycode_ != 0 && event.keycode == f3_keycode_) ||
+        (f4_keycode_ != 0 && event.keycode == f4_keycode_)) {
+        update_hispeed_repeat_state(event.keycode, event.state, event.input_time_ns);
+        return true;
+    }
     if (event.state == input::InputState::Pressed) {
         if (f5_keycode_ != 0 && event.keycode == f5_keycode_) {
             adjust_hispeed(-kHispeedStepCoarse);
@@ -2519,14 +2595,6 @@ bool GameSession::handle_control_input(const input::InputEvent& event) {
         }
         if (f6_keycode_ != 0 && event.keycode == f6_keycode_) {
             adjust_hispeed(kHispeedStepCoarse);
-            return true;
-        }
-        if (f3_keycode_ != 0 && event.keycode == f3_keycode_) {
-            adjust_hispeed(-kHispeedStep);
-            return true;
-        }
-        if (f4_keycode_ != 0 && event.keycode == f4_keycode_) {
-            adjust_hispeed(kHispeedStep);
             return true;
         }
     }
@@ -2541,15 +2609,20 @@ bool GameSession::handle_control_input(const input::InputEvent& event) {
 }
 
 void GameSession::update_lane_feedback(int lane, input::InputState state) {
+    static_cast<void>(state);
     const int lane_index = lane - 1;
-    if (lane_index < 0 || lane_index >= static_cast<int>(lane_pressed_.size())) {
+    if (lane_index < 0 || lane_index >= static_cast<int>(lane_activity_.size())) {
+        return;
+    }
+}
+
+void GameSession::trigger_lane_hit_effect(int lane) {
+    const int lane_index = lane - 1;
+    if (lane_index < 0 || lane_index >= static_cast<int>(lane_activity_.size())) {
         return;
     }
 
-    lane_pressed_[static_cast<std::size_t>(lane_index)] = (state == input::InputState::Pressed) ? 1 : 0;
-    if (state == input::InputState::Pressed && lane_index < static_cast<int>(lane_activity_.size())) {
-        lane_activity_[static_cast<std::size_t>(lane_index)] = 1.0f;
-    }
+    lane_activity_[static_cast<std::size_t>(lane_index)] = 1.0f;
 }
 
 void GameSession::dispatch_lane_input(int lane, input::InputState state, int64_t sample) {
@@ -2560,6 +2633,7 @@ void GameSession::dispatch_lane_input(int lane, input::InputState state, int64_t
 
     auto hit_note = engine_->handle_input(lane, state, sample);
     if (state == input::InputState::Pressed && hit_note.has_value()) {
+        trigger_lane_hit_effect(lane);
         if (hit_note->note_id < hidden_hit_note_ids_.size()) {
             hidden_hit_note_ids_[hit_note->note_id] = 1;
         }
@@ -2596,7 +2670,7 @@ void GameSession::process_future_events(int64_t buffer_end_samples, int64_t look
 void GameSession::process_input_queue(int64_t buffer_start_samples, int64_t buffer_end_samples,
                                       int64_t lookahead_samples) {
     // If input falls well behind the current audio cursor, replaying every stale edge can spike the mix callback.
-    const double stale_window_ms = std::max(kInputBacklogCatchupFloorMs, config_.judge.indirect_miss_ms);
+    const double stale_window_ms = std::max(kInputBacklogCatchupFloorMs, config_.judge.bd_ms);
     const int64_t stale_before_sample = buffer_start_samples - ms_to_samples(stale_window_ms, sample_rate_);
     std::array<BufferedLaneInput, kGameplayHudMaxLanes> stale_lane_inputs{};
     std::array<uint8_t, kGameplayHudMaxLanes> stale_lane_present{};

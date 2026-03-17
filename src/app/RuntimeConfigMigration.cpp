@@ -34,19 +34,25 @@ bool is_valid_osu_key_mode(std::string_view value) {
            token == "7k" || token == "8k" || token == "9k" || token == "10k" || token == "16k";
 }
 
-constexpr double kPreviousBadWindowMs = 200.0;
-constexpr double kCurrentBadWindowMs = 80.0;
-constexpr double kPreviousIndirectMissWindowMs = 500.0;
-constexpr double kCurrentIndirectMissWindowMs = 215.0;
+constexpr double kLegacyBadWindowMs = 200.0;
+constexpr double kPreviousBadWindowMs = 95.0;
+constexpr double kCurrentBadWindowMs = 210.0;
 constexpr double kLegacyHoldGraceMs = 20.0;
-constexpr double kCurrentHoldGraceMs = 35.0;
+constexpr double kCurrentHoldGraceMs = 45.0;
 constexpr double kLegacyHoldBreakMs = 50.0;
-constexpr double kCurrentHoldBreakMs = 100.0;
+constexpr double kCurrentHoldBreakMs = 120.0;
 constexpr double kLegacyInputDebounceMs = 5.0;
 constexpr double kCurrentInputDebounceMs = 8.0;
+constexpr double kLegacyResultTailMs = 500.0;
+constexpr double kCurrentResultTailMs = 3000.0;
+constexpr int kLegacyGraphicsRefreshHz = 1050;
+constexpr double kLegacyNoteHeightScale = 1.0;
+constexpr double kCurrentNoteHeightScale = 1.8;
 constexpr double kJudgeWindowToleranceMs = 0.001;
 constexpr double kInputDebounceToleranceMs = 0.001;
+constexpr double kResultTailToleranceMs = 0.001;
 constexpr double kGaugeDeltaTolerance = 0.00001;
+constexpr double kSkinScaleTolerance = 0.00001;
 
 using tenriff::game::GaugeDeltaTable;
 
@@ -98,6 +104,14 @@ bool migrate_gauge_table(GaugeDeltaTable& value, const GaugeDeltaTable& legacy, 
     return changed;
 }
 
+bool matches_legacy_default_graphics(const config::RuntimeConfig& config) {
+    return to_lower_copy(config.graphics.display_mode) == "borderless" &&
+           to_lower_copy(config.graphics.resolution) == "native" &&
+           config.graphics.vsync &&
+           config.graphics.refresh_hz == kLegacyGraphicsRefreshHz &&
+           !config.graphics.performance_overlay;
+}
+
 }  // namespace
 
 bool migrate_bms_first_runtime_config(config::RuntimeConfig& config) {
@@ -126,12 +140,9 @@ bool migrate_bms_first_runtime_config(config::RuntimeConfig& config) {
         config.audio_ui.bms_keysound_policy = "follow";
         changed = true;
     }
-    if (std::abs(config.judge.bd_ms - kPreviousBadWindowMs) <= kJudgeWindowToleranceMs) {
+    if (std::abs(config.judge.bd_ms - kLegacyBadWindowMs) <= kJudgeWindowToleranceMs ||
+        std::abs(config.judge.bd_ms - kPreviousBadWindowMs) <= kJudgeWindowToleranceMs) {
         config.judge.bd_ms = kCurrentBadWindowMs;
-        changed = true;
-    }
-    if (std::abs(config.judge.indirect_miss_ms - kPreviousIndirectMissWindowMs) <= kJudgeWindowToleranceMs) {
-        config.judge.indirect_miss_ms = kCurrentIndirectMissWindowMs;
         changed = true;
     }
     if (std::abs(config.judge.hold_grace_ms - kLegacyHoldGraceMs) <= kJudgeWindowToleranceMs) {
@@ -144,6 +155,25 @@ bool migrate_bms_first_runtime_config(config::RuntimeConfig& config) {
     }
     if (std::abs(config.input.debounce_ms - kLegacyInputDebounceMs) <= kInputDebounceToleranceMs) {
         config.input.debounce_ms = kCurrentInputDebounceMs;
+        changed = true;
+    }
+    if (std::abs(config.ui.result_tail_ms - kLegacyResultTailMs) <= kResultTailToleranceMs) {
+        config.ui.result_tail_ms = kCurrentResultTailMs;
+        changed = true;
+    }
+    if (std::abs(config.skin.note_height_scale - kLegacyNoteHeightScale) <= kSkinScaleTolerance) {
+        config.skin.note_height_scale = kCurrentNoteHeightScale;
+        changed = true;
+    }
+    for (auto& [mode, value] : config.skin.note_height_scales) {
+        static_cast<void>(mode);
+        if (std::abs(value - kLegacyNoteHeightScale) <= kSkinScaleTolerance) {
+            value = kCurrentNoteHeightScale;
+            changed = true;
+        }
+    }
+    if (matches_legacy_default_graphics(config)) {
+        config.graphics.vsync = false;
         changed = true;
     }
     changed = migrate_gauge_table(config.gauge.hard, kLegacyHardGauge, kCurrentHardGauge) || changed;
@@ -163,9 +193,8 @@ bool migrate_bms_first_runtime_config(config::RuntimeConfig& config) {
     changed = migrate_gauge_table(config.gauge.easy, kInterimEasyGauge, kCurrentEasyGauge) || changed;
     changed = migrate_gauge_table(config.gauge.normal, kFormerPenaltyNormalGauge, kCurrentNormalGauge) || changed;
     changed = migrate_gauge_table(config.gauge.easy, kFormerPenaltyEasyGauge, kCurrentEasyGauge) || changed;
-    const double clamped_indirect_miss_ms = std::max(config.judge.indirect_miss_ms, config.judge.bd_ms);
-    if (std::abs(clamped_indirect_miss_ms - config.judge.indirect_miss_ms) > kJudgeWindowToleranceMs) {
-        config.judge.indirect_miss_ms = clamped_indirect_miss_ms;
+    if (std::abs(config.judge.indirect_miss_ms - config.judge.bd_ms) > kJudgeWindowToleranceMs) {
+        config.judge.indirect_miss_ms = config.judge.bd_ms;
         changed = true;
     }
 

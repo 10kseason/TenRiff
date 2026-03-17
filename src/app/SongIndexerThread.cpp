@@ -31,6 +31,12 @@ bool SongIndexerThread::start(const std::string& songs_path,
     progress_processed_.store(0, std::memory_order_release);
     progress_stage_.store(static_cast<int>(SongIndexProgressStage::ScanningFiles), std::memory_order_release);
     progress_started_ns_.store(timing::HighResClock::now_ns(), std::memory_order_release);
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        result_ = {};
+        warnings_.clear();
+        has_result_ = false;
+    }
     is_running_.store(true, std::memory_order_release);
     thread_ = std::thread(&SongIndexerThread::thread_main, this, songs_path, cache_path, options);
     return true;
@@ -40,6 +46,12 @@ void SongIndexerThread::stop() {
     should_stop_.store(true, std::memory_order_release);
     if (thread_.joinable()) {
         thread_.join();
+    }
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        result_ = {};
+        warnings_.clear();
+        has_result_ = false;
     }
     is_running_.store(false, std::memory_order_release);
 }
@@ -69,6 +81,9 @@ bool SongIndexerThread::poll_result(SongIndex& out, std::vector<std::string>& wa
 void SongIndexerThread::thread_main(std::string songs_path, std::string cache_path, SongIndexOptions options) {
     std::vector<std::string> warnings;
     SongIndex index;
+    const auto stop_requested = [this]() {
+        return should_stop_.load(std::memory_order_acquire);
+    };
 
     try {
         SongIndexLoadResult cache_result = load_song_index(cache_path, options);
@@ -87,7 +102,13 @@ void SongIndexerThread::thread_main(std::string songs_path, std::string cache_pa
                                progress_total_.store(update.total, std::memory_order_release);
                                progress_processed_.store(update.processed, std::memory_order_release);
                            },
-                           options);
+                           options,
+                           stop_requested);
+
+        if (stop_requested()) {
+            is_running_.store(false, std::memory_order_release);
+            return;
+        }
 
         std::error_code ec;
         const std::filesystem::path songs_root =
@@ -116,7 +137,12 @@ void SongIndexerThread::thread_main(std::string songs_path, std::string cache_pa
                                          progress_stage_.store(static_cast<int>(update.stage), std::memory_order_release);
                                          progress_total_.store(update.total, std::memory_order_release);
                                          progress_processed_.store(update.processed, std::memory_order_release);
-                                     })) {
+                                     },
+                                     stop_requested)) {
+                    if (stop_requested()) {
+                        is_running_.store(false, std::memory_order_release);
+                        return;
+                    }
                     warnings.push_back(save_error);
                 }
             }
@@ -127,7 +153,7 @@ void SongIndexerThread::thread_main(std::string songs_path, std::string cache_pa
         warnings.push_back("Song indexer exception: unknown.");
     }
 
-    {
+    if (!stop_requested()) {
         std::lock_guard<std::mutex> lock(mutex_);
         result_ = std::move(index);
         warnings_ = std::move(warnings);

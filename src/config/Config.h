@@ -17,7 +17,7 @@ inline constexpr double kJudgementLinePositionDefault = 0.82;
 inline constexpr double kNoteWidthScaleMin = 0.50;
 inline constexpr double kNoteWidthScaleMax = 1.40;
 inline constexpr double kNoteHeightScaleMin = 0.50;
-inline constexpr double kNoteHeightScaleMax = 2.00;
+inline constexpr double kNoteHeightScaleMax = 4.00;
 inline constexpr double kHoldBodyWidthScaleMin = 0.50;
 inline constexpr double kHoldBodyWidthScaleMax = 1.20;
 inline constexpr double kHoldBodyWidthScaleDefault = 0.60;
@@ -29,10 +29,10 @@ struct JudgeConfig {
     double pg_ms = 15.5;
     double gr_ms = 31.0;
     double gd_ms = 55.0;
-    double bd_ms = 80.0;
-    double indirect_miss_ms = 215.0;
-    double hold_grace_ms = 35.0;
-    double hold_break_ms = 100.0;
+    double bd_ms = 210.0;
+    double indirect_miss_ms = 210.0;
+    double hold_grace_ms = 45.0;
+    double hold_break_ms = 120.0;
     double mask_ms = 30.0;
 };
 
@@ -45,7 +45,7 @@ struct SpeedConfig {
 struct GraphicsConfig {
     std::string display_mode = "borderless";
     std::string resolution = "native";
-    bool vsync = true;
+    bool vsync = false;
     int refresh_hz = 1050;
     bool performance_overlay = false;
 };
@@ -66,12 +66,14 @@ struct UiConfig {
 };
 
 struct SkinConfig {
+    std::string source = "native";
+    std::string osu_skin_name;
     std::string note_shape = "rect";
     bool note_border_enabled = true;
     double judgement_line_position = kJudgementLinePositionDefault;
     double combo_position = kComboPositionDefault;
     double note_width_scale = 1.0;
-    double note_height_scale = 1.0;
+    double note_height_scale = 1.8;
     double hold_body_width_scale = kHoldBodyWidthScaleDefault;
     std::unordered_map<std::string, double> note_width_scales;
     std::unordered_map<std::string, double> note_height_scales;
@@ -137,6 +139,7 @@ public:
 [[nodiscard]] std::string normalize_song_index_profile_token(std::string_view token);
 [[nodiscard]] std::vector<std::string> supported_skin_mode_tokens();
 [[nodiscard]] std::vector<std::string> supported_skin_color_tokens();
+[[nodiscard]] std::string normalize_skin_source_token(std::string_view token);
 [[nodiscard]] std::string normalize_skin_color_token(std::string_view token);
 [[nodiscard]] std::string normalize_skin_note_shape_token(std::string_view token);
 [[nodiscard]] std::string skin_note_shape_label(std::string_view token);

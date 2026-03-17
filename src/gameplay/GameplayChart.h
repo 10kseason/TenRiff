@@ -42,6 +42,8 @@ struct GameplayChart {
     [[nodiscard]] const std::string* audio_asset_path(std::size_t asset_id) const;
 };
 
+void offset_gameplay_chart_samples(GameplayChart& chart, int64_t sample_offset);
+
 GameplayChart from_bms_timeline(const chart::BmsTimeline& timeline, double rate);
 GameplayChart from_osu_mania(const chart::OsuManiaChart& chart, int sample_rate, double rate);
 

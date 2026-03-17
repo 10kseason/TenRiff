@@ -22,12 +22,14 @@
 #include <windows.h>
 #include <shlobj.h>
 #include <shobjidl.h>
+#include <wrl/client.h>
 #endif
 
 #include "app/GameSession.h"
 #include "app/GameplayHudRevisions.h"
 #include "app/GraphicsTiming.h"
 #include "app/MemoryDiagnostics.h"
+#include "app/OsuSkin.h"
 #include "app/RuntimeConfigMigration.h"
 #include "chart/BmsParser.h"
 #include "chart/OsuManiaLoader.h"
@@ -604,6 +606,13 @@ std::string lane_display_label(int lane_index) {
     return "Lane " + std::to_string(std::max(1, lane_index + 1));
 }
 
+std::string skin_source_label(std::string_view value) {
+    if (config::normalize_skin_source_token(value) == "osu") {
+        return "osu!mania";
+    }
+    return "Native";
+}
+
 std::vector<std::string>& editable_skin_lane_colors(config::SkinConfig& skin, std::string_view key_mode) {
     const std::string normalized = config::normalize_skin_mode_token(key_mode);
     auto& colors = skin.lane_colors[normalized];
@@ -658,10 +667,10 @@ std::string judgement_label(game::Judgement judgement) {
     switch (judgement) {
         case game::Judgement::PG: return "PG";
         case game::Judgement::GR: return "GR";
-        case game::Judgement::GD: return "GD";
-        case game::Judgement::BD: return "BD";
+        case game::Judgement::GD: return "G";
+        case game::Judgement::BD: return "BAD";
         case game::Judgement::PR:
-        default: return "PR";
+        default: return "POOR";
     }
 }
 
@@ -1114,6 +1123,100 @@ std::string normalize_song_source_path(const std::string& raw_path) {
     }
     return candidate.u8string();
 }
+
+std::string normalize_filesystem_display_name(std::string value) {
+    value = util::sanitize_ui_text(value);
+    if (value.empty()) {
+        return "Imported Skin";
+    }
+    for (char& ch : value) {
+        switch (ch) {
+            case '<':
+            case '>':
+            case ':':
+            case '"':
+            case '/':
+            case '\\':
+            case '|':
+            case '?':
+            case '*':
+                ch = '_';
+                break;
+            default:
+                break;
+        }
+    }
+    while (!value.empty() && (value.back() == ' ' || value.back() == '.')) {
+        value.pop_back();
+    }
+    return value.empty() ? "Imported Skin" : value;
+}
+
+std::filesystem::path osu_skin_import_root_path(std::string_view profile_dir) {
+    return path_from_utf8(profile_dir) / "skins" / "osu";
+}
+
+#ifdef _WIN32
+std::optional<std::string> pick_folder_dialog_utf8() {
+    const HRESULT init_hr = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
+    const bool should_uninitialize = SUCCEEDED(init_hr);
+    Microsoft::WRL::ComPtr<IFileOpenDialog> dialog;
+    const HRESULT create_hr = CoCreateInstance(CLSID_FileOpenDialog,
+                                               nullptr,
+                                               CLSCTX_INPROC_SERVER,
+                                               IID_PPV_ARGS(&dialog));
+    if (FAILED(create_hr) || !dialog) {
+        if (should_uninitialize) {
+            CoUninitialize();
+        }
+        return std::nullopt;
+    }
+
+    DWORD options = 0;
+    if (FAILED(dialog->GetOptions(&options))) {
+        if (should_uninitialize) {
+            CoUninitialize();
+        }
+        return std::nullopt;
+    }
+    if (FAILED(dialog->SetOptions(options | FOS_PICKFOLDERS | FOS_FORCEFILESYSTEM | FOS_PATHMUSTEXIST))) {
+        if (should_uninitialize) {
+            CoUninitialize();
+        }
+        return std::nullopt;
+    }
+    if (FAILED(dialog->Show(nullptr))) {
+        if (should_uninitialize) {
+            CoUninitialize();
+        }
+        return std::nullopt;
+    }
+
+    Microsoft::WRL::ComPtr<IShellItem> item;
+    if (FAILED(dialog->GetResult(&item)) || !item) {
+        if (should_uninitialize) {
+            CoUninitialize();
+        }
+        return std::nullopt;
+    }
+
+    PWSTR folder_path = nullptr;
+    if (FAILED(item->GetDisplayName(SIGDN_FILESYSPATH, &folder_path)) || folder_path == nullptr) {
+        if (should_uninitialize) {
+            CoUninitialize();
+        }
+        return std::nullopt;
+    }
+
+    const std::wstring wide_path(folder_path);
+    CoTaskMemFree(folder_path);
+    const std::string utf8_path = util::utf8_from_wide_lossy(wide_path);
+    if (should_uninitialize) {
+        CoUninitialize();
+    }
+    return utf8_path;
+}
+#endif
 
 std::string trim_copy(std::string_view value) {
     std::size_t begin = 0;
@@ -1930,6 +2033,7 @@ bool MenuApp::initialize(const CommandLineOptions& options) {
     config_.graphics.refresh_hz =
         clamp_int(config_.graphics.refresh_hz, kGraphicsRefreshHzMin, kGraphicsRefreshHzMax);
     config_.graphics.resolution = normalize_resolution_preset(config_.graphics.resolution);
+    refresh_available_osu_skins();
 
     config::KeymapManager keymap_manager;
     auto keymap_result = keymap_manager.load_profile(profile_dir_);
@@ -2088,7 +2192,7 @@ void MenuApp::start_menu_threads() {
                                                   : input::InputBackend::Polling;
     input_config.raw_input.register_keyboard = config_.input.rawinput;
     input_config.raw_input.input_sink = true;
-    input_config.raw_input.no_legacy = true;
+    input_config.raw_input.no_legacy = false;
     input_config.polling_hz = config_.input.polling_hz;
     input_config.key_state.debounce_window_ns =
         std::max<int64_t>(0, static_cast<int64_t>(std::llround(config_.input.debounce_ms * 1'000'000.0)));
@@ -2136,7 +2240,7 @@ void MenuApp::restart_input_thread() {
                                                   : input::InputBackend::Polling;
     input_config.raw_input.register_keyboard = config_.input.rawinput;
     input_config.raw_input.input_sink = true;
-    input_config.raw_input.no_legacy = true;
+    input_config.raw_input.no_legacy = false;
     input_config.polling_hz = config_.input.polling_hz;
     input_config.key_state.debounce_window_ns =
         std::max<int64_t>(0, static_cast<int64_t>(std::llround(config_.input.debounce_ms * 1'000'000.0)));
@@ -2453,6 +2557,15 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
         return;
     }
     if (event.kind == render::MenuHitTargetKind::FileDrop) {
+        if (screen_ == Screen::SettingsSkins) {
+            if (!import_osu_skin_path(event.path)) {
+                std::cerr << "[warn] Ignored dropped path (expected an osu!mania skin folder or a folder containing skins): "
+                          << event.path << std::endl;
+                return;
+            }
+            publish_snapshot();
+            return;
+        }
         auto dropped_source = normalize_dropped_song_source(event.path);
         if (!dropped_source.has_value()) {
             std::cerr << "[warn] Ignored dropped path (expected a folder or supported chart file): " << event.path
@@ -2475,11 +2588,21 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
             if (screen_ != Screen::Title) {
                 return;
             }
+            if (event.part == render::MenuHitPart::Decrement) {
+                title_cursor_ = clamp_int(event.index - 1, 0, 3);
+                publish_snapshot();
+                return;
+            }
             title_cursor_ = clamp_int(event.index, 0, 3);
             handle_title_input(key_enter_);
             return;
         case render::MenuHitTargetKind::OptionsItem:
             if (screen_ != Screen::OptionsHub) {
+                return;
+            }
+            if (event.part == render::MenuHitPart::Decrement) {
+                options_cursor_ = clamp_int(event.index - 1, 0, 6);
+                publish_snapshot();
                 return;
             }
             options_cursor_ = clamp_int(event.index, 0, 6);
@@ -2490,7 +2613,10 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
                 return;
             }
             song_select_focus_ = SongSelectFocus::LeftNav;
-            song_select_nav_cursor_ = clamp_int(event.index, 0, 6);
+            song_select_nav_cursor_ = clamp_int(
+                (event.part == render::MenuHitPart::Decrement) ? (event.index - 1) : event.index,
+                0,
+                7);
             publish_snapshot();
             if (event.part == render::MenuHitPart::Activate) {
                 handle_song_select_input(key_enter_);
@@ -2589,7 +2715,7 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
             handle_song_browser_input(action_key);
             return;
         case Screen::SettingsSkins:
-            settings_cursor_ = clamp_int(event.index, 0, 10);
+            settings_cursor_ = clamp_int(event.index, 0, 13);
             handle_skins_settings_input(action_key);
             return;
         case Screen::SettingsInput:
@@ -2650,6 +2776,7 @@ void MenuApp::handle_title_input(uint32_t keycode) {
             return;
         }
         if (title_cursor_ == 2) {
+            submenu_return_screen_ = Screen::Title;
             screen_ = Screen::OptionsHub;
             options_cursor_ = 0;
             publish_snapshot();
@@ -2665,6 +2792,7 @@ void MenuApp::handle_title_input(uint32_t keycode) {
 
 void MenuApp::handle_options_hub_input(uint32_t keycode) {
     constexpr int item_count = 7;
+    const Screen return_screen = submenu_return_screen_;
     if (keycode == key_up_) {
         options_cursor_ = clamp_int(options_cursor_ - 1, 0, item_count - 1);
         publish_snapshot();
@@ -2679,35 +2807,36 @@ void MenuApp::handle_options_hub_input(uint32_t keycode) {
     if (keycode == key_enter_) {
         switch (options_cursor_) {
             case 0:
-                submenu_return_screen_ = Screen::Title;
+                submenu_return_screen_ = return_screen;
                 screen_ = Screen::SettingsAudio;
                 settings_cursor_ = 0;
                 break;
             case 1:
-                submenu_return_screen_ = Screen::Title;
+                submenu_return_screen_ = return_screen;
                 screen_ = Screen::SettingsGraphics;
                 settings_cursor_ = 0;
                 break;
             case 2:
-                submenu_return_screen_ = Screen::Title;
+                submenu_return_screen_ = return_screen;
                 screen_ = Screen::SettingsSkins;
                 settings_cursor_ = 0;
                 skin_dirty_ = false;
                 skin_edit_mode_ = normalize_skin_edit_mode(config_.mode.key_mode);
                 skin_edit_lane_ = 0;
+                refresh_available_osu_skins();
                 break;
             case 3:
-                submenu_return_screen_ = Screen::Title;
+                submenu_return_screen_ = return_screen;
                 screen_ = Screen::SettingsInput;
                 settings_cursor_ = 0;
                 break;
             case 4:
-                submenu_return_screen_ = Screen::Title;
+                submenu_return_screen_ = return_screen;
                 screen_ = Screen::ModeSelect;
                 settings_cursor_ = 0;
                 break;
             case 5:
-                submenu_return_screen_ = Screen::Title;
+                submenu_return_screen_ = return_screen;
                 working_keymap_ = keymap_;
                 {
                     config::KeymapManager keymap_manager;
@@ -2723,7 +2852,7 @@ void MenuApp::handle_options_hub_input(uint32_t keycode) {
                 screen_ = Screen::Keymap;
                 break;
             default:
-                screen_ = Screen::Title;
+                screen_ = return_screen;
                 break;
         }
         publish_snapshot();
@@ -2731,7 +2860,7 @@ void MenuApp::handle_options_hub_input(uint32_t keycode) {
     }
 
     if (keycode == key_escape_ || keycode == key_backspace_) {
-        screen_ = Screen::Title;
+        screen_ = return_screen;
         publish_snapshot();
     }
 }
@@ -2767,7 +2896,7 @@ void MenuApp::handle_song_select_input(uint32_t keycode) {
     }
     if (keycode == key_up_) {
         if (song_select_focus_ == SongSelectFocus::LeftNav) {
-            song_select_nav_cursor_ = clamp_int(song_select_nav_cursor_ - 1, 0, 6);
+            song_select_nav_cursor_ = clamp_int(song_select_nav_cursor_ - 1, 0, 7);
             publish_snapshot();
             return;
         }
@@ -2778,7 +2907,7 @@ void MenuApp::handle_song_select_input(uint32_t keycode) {
     }
     if (keycode == key_down_) {
         if (song_select_focus_ == SongSelectFocus::LeftNav) {
-            song_select_nav_cursor_ = clamp_int(song_select_nav_cursor_ + 1, 0, 6);
+            song_select_nav_cursor_ = clamp_int(song_select_nav_cursor_ + 1, 0, 7);
             publish_snapshot();
             return;
         }
@@ -2827,6 +2956,12 @@ void MenuApp::handle_song_select_input(uint32_t keycode) {
                     publish_snapshot();
                     return;
                 case 6:
+                    submenu_return_screen_ = Screen::SongSelect;
+                    screen_ = Screen::OptionsHub;
+                    options_cursor_ = 0;
+                    publish_snapshot();
+                    return;
+                case 7:
                     song_select_view_ = SongSelectView::Records;
                     selected_record_ = 0;
                     song_select_focus_ = SongSelectFocus::SongList;
@@ -3112,6 +3247,7 @@ void MenuApp::handle_graphics_settings_input(uint32_t keycode) {
         const int direction = (keycode == key_left_) ? -1 : 1;
         config_.graphics.display_mode = cycle_display_mode(config_.graphics.display_mode, direction);
         graphics_dirty_ = true;
+        apply_runtime_graphics_config();
         publish_snapshot();
         return;
     }
@@ -3119,6 +3255,7 @@ void MenuApp::handle_graphics_settings_input(uint32_t keycode) {
         const int direction = (keycode == key_left_) ? -1 : 1;
         config_.graphics.resolution = cycle_resolution_preset(config_.graphics.resolution, direction);
         graphics_dirty_ = true;
+        apply_runtime_graphics_config();
         publish_snapshot();
         return;
     }
@@ -3128,12 +3265,14 @@ void MenuApp::handle_graphics_settings_input(uint32_t keycode) {
         next_value = clamp_int(next_value, kGraphicsRefreshHzMin, kGraphicsRefreshHzMax);
         config_.graphics.refresh_hz = next_value;
         graphics_dirty_ = true;
+        apply_runtime_graphics_config();
         publish_snapshot();
         return;
     }
     if (settings_cursor_ == 3 && (keycode == key_left_ || keycode == key_right_)) {
         config_.graphics.vsync = !config_.graphics.vsync;
         graphics_dirty_ = true;
+        apply_runtime_graphics_config();
         publish_snapshot();
         return;
     }
@@ -3170,7 +3309,7 @@ void MenuApp::handle_graphics_settings_input(uint32_t keycode) {
 }
 
 void MenuApp::handle_skins_settings_input(uint32_t keycode) {
-    const int item_count = 11;
+    const int item_count = 14;
     if (keycode == key_up_) {
         settings_cursor_ = clamp_int(settings_cursor_ - 1, 0, item_count - 1);
         publish_snapshot();
@@ -3183,6 +3322,47 @@ void MenuApp::handle_skins_settings_input(uint32_t keycode) {
     }
 
     if (settings_cursor_ == 0 && (keycode == key_left_ || keycode == key_right_)) {
+        config_.skin.source =
+            (config::normalize_skin_source_token(config_.skin.source) == "osu") ? "native" : "osu";
+        refresh_available_osu_skins();
+        skin_dirty_ = true;
+        publish_snapshot();
+        return;
+    }
+    if (settings_cursor_ == 1 && (keycode == key_left_ || keycode == key_right_)) {
+        if (!available_osu_skin_names_.empty()) {
+            int current_index = 0;
+            for (int i = 0; i < static_cast<int>(available_osu_skin_names_.size()); ++i) {
+                if (available_osu_skin_names_[static_cast<std::size_t>(i)] == config_.skin.osu_skin_name) {
+                    current_index = i;
+                    break;
+                }
+            }
+            current_index += (keycode == key_left_) ? -1 : 1;
+            if (current_index < 0) {
+                current_index = static_cast<int>(available_osu_skin_names_.size()) - 1;
+            } else if (current_index >= static_cast<int>(available_osu_skin_names_.size())) {
+                current_index = 0;
+            }
+            config_.skin.osu_skin_name = available_osu_skin_names_[static_cast<std::size_t>(current_index)];
+            refresh_available_osu_skins();
+            skin_dirty_ = true;
+        }
+        publish_snapshot();
+        return;
+    }
+    if (settings_cursor_ == 2 && keycode == key_enter_) {
+#ifdef _WIN32
+        if (auto picked_folder = pick_folder_dialog_utf8(); picked_folder.has_value()) {
+            if (!import_osu_skin_path(*picked_folder)) {
+                std::cerr << "[warn] Selected folder is not an osu!mania skin folder: " << *picked_folder << std::endl;
+            }
+            publish_snapshot();
+        }
+#endif
+        return;
+    }
+    if (settings_cursor_ == 3 && (keycode == key_left_ || keycode == key_right_)) {
         const int direction = (keycode == key_left_) ? -1 : 1;
         skin_edit_mode_ = cycle_skin_edit_mode(skin_edit_mode_, direction);
         skin_edit_lane_ = clamp_int(skin_edit_lane_, 0, lane_count_for_skin_mode(skin_edit_mode_) - 1);
@@ -3191,7 +3371,7 @@ void MenuApp::handle_skins_settings_input(uint32_t keycode) {
         publish_snapshot();
         return;
     }
-    if (settings_cursor_ == 1 && (keycode == key_left_ || keycode == key_right_)) {
+    if (settings_cursor_ == 4 && (keycode == key_left_ || keycode == key_right_)) {
         const int direction = (keycode == key_left_) ? -1 : 1;
         const int lane_count = lane_count_for_skin_mode(skin_edit_mode_);
         int next_lane = skin_edit_lane_ + direction;
@@ -3204,7 +3384,7 @@ void MenuApp::handle_skins_settings_input(uint32_t keycode) {
         publish_snapshot();
         return;
     }
-    if (settings_cursor_ == 2 && (keycode == key_left_ || keycode == key_right_)) {
+    if (settings_cursor_ == 5 && (keycode == key_left_ || keycode == key_right_)) {
         const int direction = (keycode == key_left_) ? -1 : 1;
         auto& lane_colors = editable_skin_lane_colors(config_.skin, skin_edit_mode_);
         const auto palette = config::supported_skin_color_tokens();
@@ -3228,20 +3408,20 @@ void MenuApp::handle_skins_settings_input(uint32_t keycode) {
         publish_snapshot();
         return;
     }
-    if (settings_cursor_ == 3 && (keycode == key_left_ || keycode == key_right_)) {
+    if (settings_cursor_ == 6 && (keycode == key_left_ || keycode == key_right_)) {
         config_.skin.note_shape =
             (config::normalize_skin_note_shape_token(config_.skin.note_shape) == "circle") ? "rect" : "circle";
         skin_dirty_ = true;
         publish_snapshot();
         return;
     }
-    if (settings_cursor_ == 4 && (keycode == key_left_ || keycode == key_right_)) {
+    if (settings_cursor_ == 7 && (keycode == key_left_ || keycode == key_right_)) {
         config_.skin.note_border_enabled = !config_.skin.note_border_enabled;
         skin_dirty_ = true;
         publish_snapshot();
         return;
     }
-    if (settings_cursor_ == 5 && (keycode == key_left_ || keycode == key_right_)) {
+    if (settings_cursor_ == 8 && (keycode == key_left_ || keycode == key_right_)) {
         const int direction = (keycode == key_left_) ? -1 : 1;
         config_.skin.judgement_line_position = clamp_step_value(
             config_.skin.judgement_line_position + static_cast<double>(direction) * kJudgementLinePositionStep,
@@ -3250,7 +3430,7 @@ void MenuApp::handle_skins_settings_input(uint32_t keycode) {
         publish_snapshot();
         return;
     }
-    if (settings_cursor_ == 6 && (keycode == key_left_ || keycode == key_right_)) {
+    if (settings_cursor_ == 9 && (keycode == key_left_ || keycode == key_right_)) {
         const int direction = (keycode == key_left_) ? -1 : 1;
         auto& note_width_scale = editable_skin_note_width_scale(config_.skin, skin_edit_mode_);
         note_width_scale = clamp_step_value(
@@ -3260,7 +3440,7 @@ void MenuApp::handle_skins_settings_input(uint32_t keycode) {
         publish_snapshot();
         return;
     }
-    if (settings_cursor_ == 7 && (keycode == key_left_ || keycode == key_right_)) {
+    if (settings_cursor_ == 10 && (keycode == key_left_ || keycode == key_right_)) {
         const int direction = (keycode == key_left_) ? -1 : 1;
         config_.skin.hold_body_width_scale = clamp_step_value(
             config_.skin.hold_body_width_scale + static_cast<double>(direction) * kNoteSizeScaleStep,
@@ -3269,7 +3449,7 @@ void MenuApp::handle_skins_settings_input(uint32_t keycode) {
         publish_snapshot();
         return;
     }
-    if (settings_cursor_ == 8 && (keycode == key_left_ || keycode == key_right_)) {
+    if (settings_cursor_ == 11 && (keycode == key_left_ || keycode == key_right_)) {
         const int direction = (keycode == key_left_) ? -1 : 1;
         auto& note_height_scale = editable_skin_note_height_scale(config_.skin, skin_edit_mode_);
         note_height_scale = clamp_step_value(
@@ -3279,7 +3459,7 @@ void MenuApp::handle_skins_settings_input(uint32_t keycode) {
         publish_snapshot();
         return;
     }
-    if (settings_cursor_ == 9 && (keycode == key_left_ || keycode == key_right_)) {
+    if (settings_cursor_ == 12 && (keycode == key_left_ || keycode == key_right_)) {
         const int direction = (keycode == key_left_) ? -1 : 1;
         config_.skin.combo_position = clamp_step_value(
             config_.skin.combo_position + static_cast<double>(direction) * kComboPositionStep,
@@ -3289,7 +3469,9 @@ void MenuApp::handle_skins_settings_input(uint32_t keycode) {
         return;
     }
 
-    if (keycode == key_enter_ || keycode == key_escape_ || keycode == key_backspace_) {
+    if ((keycode == key_enter_ && settings_cursor_ == item_count - 1) ||
+        keycode == key_escape_ ||
+        keycode == key_backspace_) {
         screen_ = submenu_return_screen_;
         settings_cursor_ = 0;
         if (skin_dirty_) {
@@ -3554,6 +3736,134 @@ void MenuApp::handle_result_input(uint32_t keycode) {
     }
 }
 
+void MenuApp::refresh_available_osu_skins() {
+    available_osu_skin_root_.clear();
+    available_osu_skin_names_.clear();
+    available_osu_skin_roots_by_name_.clear();
+
+    auto add_skin_root = [&](const std::string& root, bool prefer_existing) {
+        if (root.empty()) {
+            return;
+        }
+        const auto names = list_osu_skin_names(root);
+        for (const auto& name : names) {
+            const auto it = available_osu_skin_roots_by_name_.find(name);
+            if (it == available_osu_skin_roots_by_name_.end()) {
+                available_osu_skin_names_.push_back(name);
+                available_osu_skin_roots_by_name_[name] = root;
+            } else if (!prefer_existing) {
+                it->second = root;
+            }
+        }
+    };
+
+    add_skin_root(osu_skin_import_root_path(profile_dir_).u8string(), false);
+    add_skin_root(find_default_osu_skin_test_root(), true);
+    std::sort(available_osu_skin_names_.begin(), available_osu_skin_names_.end());
+
+    if (available_osu_skin_names_.empty()) {
+        config_.skin.osu_skin_name.clear();
+        return;
+    }
+    if (config_.skin.osu_skin_name.empty() ||
+        std::find(available_osu_skin_names_.begin(),
+                  available_osu_skin_names_.end(),
+                  config_.skin.osu_skin_name) == available_osu_skin_names_.end()) {
+        config_.skin.osu_skin_name = available_osu_skin_names_.front();
+    }
+    const auto root_it = available_osu_skin_roots_by_name_.find(config_.skin.osu_skin_name);
+    if (root_it != available_osu_skin_roots_by_name_.end()) {
+        available_osu_skin_root_ = root_it->second;
+    } else {
+        available_osu_skin_root_.clear();
+    }
+}
+
+bool MenuApp::import_osu_skin_path(std::string_view source_path) {
+    namespace fs = std::filesystem;
+
+    const std::string normalized_source = normalize_song_source_path(std::string(source_path));
+    if (normalized_source.empty()) {
+        return false;
+    }
+
+    const fs::path source = path_from_utf8(normalized_source);
+    std::error_code ec;
+    if (!fs::is_directory(source, ec)) {
+        return false;
+    }
+
+    const fs::path import_root = osu_skin_import_root_path(profile_dir_);
+    fs::create_directories(import_root, ec);
+    if (ec) {
+        std::cerr << "[warn] Failed to create osu skin import root: " << import_root.u8string() << std::endl;
+        return false;
+    }
+
+    int imported_count = 0;
+    auto import_single_skin = [&](const fs::path& skin_dir) -> bool {
+        const std::string source_skin_path = normalize_song_source_path(skin_dir.u8string());
+        if (source_skin_path.empty() || !is_osu_skin_directory(source_skin_path)) {
+            return false;
+        }
+
+        const std::string base_name = normalize_filesystem_display_name(skin_dir.filename().u8string());
+        fs::path destination = import_root / path_from_utf8(base_name);
+        std::error_code path_ec;
+        const fs::path source_canonical = fs::weakly_canonical(skin_dir, path_ec);
+        path_ec.clear();
+        const fs::path import_root_canonical = fs::weakly_canonical(import_root, path_ec);
+        path_ec.clear();
+
+        if (!source_canonical.empty() &&
+            !import_root_canonical.empty() &&
+            source_canonical.parent_path() == import_root_canonical) {
+            config_.skin.source = "osu";
+            config_.skin.osu_skin_name = source_canonical.filename().u8string();
+            ++imported_count;
+            return true;
+        }
+
+        int suffix = 2;
+        while (fs::exists(destination, ec)) {
+            if (!ec) {
+                destination = import_root / path_from_utf8(base_name + " (" + std::to_string(suffix) + ")");
+                ++suffix;
+                continue;
+            }
+            ec.clear();
+            return false;
+        }
+
+        fs::copy(skin_dir, destination, fs::copy_options::recursive, ec);
+        if (ec) {
+            std::cerr << "[warn] Failed to import osu skin: " << skin_dir.u8string()
+                      << " -> " << destination.u8string() << std::endl;
+            return false;
+        }
+
+        config_.skin.source = "osu";
+        config_.skin.osu_skin_name = destination.filename().u8string();
+        ++imported_count;
+        return true;
+    };
+
+    bool imported = import_single_skin(source);
+    if (!imported) {
+        for (const auto& skin_name : list_osu_skin_names(normalized_source)) {
+            imported |= import_single_skin(source / path_from_utf8(skin_name));
+        }
+    }
+    if (!imported) {
+        return false;
+    }
+
+    refresh_available_osu_skins();
+    skin_dirty_ = true;
+    std::cerr << "[info] Imported " << imported_count << " osu skin(s)." << std::endl;
+    return true;
+}
+
 void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
                                             uint64_t* out_motion_revision,
                                             uint64_t* out_text_revision) {
@@ -3598,6 +3908,9 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
         config::kHoldBodyWidthScaleMax);
     target.note_border_enabled = config_.skin.note_border_enabled;
     target.note_shape = config::normalize_skin_note_shape_token(config_.skin.note_shape);
+    target.skin_source = config::normalize_skin_source_token(config_.skin.source);
+    target.osu_skin_root = available_osu_skin_root_;
+    target.osu_skin_name = config_.skin.osu_skin_name;
     target.visual_offset_ms = std::clamp(config_.visual_offset_ms, kVisualOffsetMin, kVisualOffsetMax);
     target.rate = gameplay_hud_.rate;
     target.hispeed = gameplay_hud_.hispeed;
@@ -3731,6 +4044,12 @@ void MenuApp::publish_snapshot() {
             render::MenuButtonData{"OPTIONS", u8"⚙", title_cursor_ == 2},
             render::MenuButtonData{"EXIT", u8"⏻", title_cursor_ == 3},
         };
+        render.title.guides = {
+            "UP / DOWN or mouse to move",
+            "ENTER or double-click to open",
+            "F5 refreshes the current song source",
+            "ESC exits from the title menu",
+        };
     } else if (screen_ == Screen::SongSelect) {
         render.kind = render::MenuScreenKind::SongSelect;
         render.song_select.profile = options_.profile;
@@ -3811,7 +4130,8 @@ void MenuApp::publish_snapshot() {
             render::MenuButtonData{"BROWSE", "F", song_select_nav_cursor_ == 4, browser_detail},
             render::MenuButtonData{"MOD", "M", song_select_nav_cursor_ == 5,
                                     format_multiplier(config_.speed.rate) + " / HS " + format_decimal(config_.speed.hi_speed)},
-            render::MenuButtonData{"RECORDS", "R", song_select_nav_cursor_ == 6,
+            render::MenuButtonData{"OPTIONS", "O", song_select_nav_cursor_ == 6, "AUDIO / GFX"},
+            render::MenuButtonData{"RECORDS", "R", song_select_nav_cursor_ == 7,
                                    render.song_select.showing_records ? "ACTIVE" : records_detail},
         };
 
@@ -4193,7 +4513,7 @@ void MenuApp::publish_snapshot() {
             render.generic.notes.push_back("Resolution cycles 720p, 1080p, QHD, or the current monitor native size. Refresh Hz ranges from 60 to 1050.");
             render.generic.notes.push_back("Menu rendering is capped at 300 Hz. Gameplay uses the configured value up to 1050 Hz.");
             render.generic.notes.push_back("Display Offset shifts only visuals from -500ms to +500ms. Positive values draw notes earlier.");
-            render.generic.notes.push_back("Left/Right or click +/- to change. Back saves and returns.");
+            render.generic.notes.push_back("Display, Resolution, Refresh Hz, and VSync apply immediately. Back saves and returns.");
         } else if (screen_ == Screen::SettingsSkins) {
             skin_edit_mode_ = normalize_skin_edit_mode(skin_edit_mode_);
             const int lane_count = lane_count_for_skin_mode(skin_edit_mode_);
@@ -4201,30 +4521,42 @@ void MenuApp::publish_snapshot() {
             const auto preview_lane_colors = config::resolved_skin_lane_colors(config_.skin, skin_edit_mode_);
             const double preview_note_width_scale = config::resolved_skin_note_width_scale(config_.skin, skin_edit_mode_);
             const double preview_note_height_scale = config::resolved_skin_note_height_scale(config_.skin, skin_edit_mode_);
+            const std::string active_skin_source = config::normalize_skin_source_token(config_.skin.source);
+            const std::string osu_skin_value =
+                available_osu_skin_names_.empty()
+                    ? std::string("Not Found")
+                    : (config_.skin.osu_skin_name.empty() ? available_osu_skin_names_.front()
+                                                          : config_.skin.osu_skin_name);
 
-            add_row("Key Mode", key_mode_label(skin_edit_mode_), settings_cursor_ == 0,
+            add_row("Skin Source", skin_source_label(active_skin_source), settings_cursor_ == 0,
                     render::MenuHitTargetKind::SettingsRow, 0, false, true);
+            add_row("OSU Skin", osu_skin_value, settings_cursor_ == 1,
+                    render::MenuHitTargetKind::SettingsRow, 1, false, true);
+            add_row("Import OSU Skin", "Open Folder", settings_cursor_ == 2,
+                    render::MenuHitTargetKind::SettingsRow, 2, true, false);
+            add_row("Key Mode", key_mode_label(skin_edit_mode_), settings_cursor_ == 3,
+                    render::MenuHitTargetKind::SettingsRow, 3, false, true);
             add_row("Target Lane",
                     lane_display_label(skin_edit_lane_) + " / " + std::to_string(lane_count),
-                    settings_cursor_ == 1, render::MenuHitTargetKind::SettingsRow, 1, false, true);
+                    settings_cursor_ == 4, render::MenuHitTargetKind::SettingsRow, 4, false, true);
             add_row("Lane Color",
                     config::skin_color_label(preview_lane_colors[static_cast<std::size_t>(skin_edit_lane_)]),
-                    settings_cursor_ == 2, render::MenuHitTargetKind::SettingsRow, 2, false, true);
-            add_row("Note Shape", config::skin_note_shape_label(config_.skin.note_shape), settings_cursor_ == 3,
-                    render::MenuHitTargetKind::SettingsRow, 3, false, true);
-            add_row("Note Border", on_off(config_.skin.note_border_enabled), settings_cursor_ == 4,
-                    render::MenuHitTargetKind::SettingsRow, 4, false, true);
-            add_row("Judge Line", format_percent(config_.skin.judgement_line_position), settings_cursor_ == 5,
-                    render::MenuHitTargetKind::SettingsRow, 5, false, true);
-            add_row("Note Width", format_percent(preview_note_width_scale), settings_cursor_ == 6,
+                    settings_cursor_ == 5, render::MenuHitTargetKind::SettingsRow, 5, false, true);
+            add_row("Note Shape", config::skin_note_shape_label(config_.skin.note_shape), settings_cursor_ == 6,
                     render::MenuHitTargetKind::SettingsRow, 6, false, true);
-            add_row("LN Body Width", format_percent(config_.skin.hold_body_width_scale), settings_cursor_ == 7,
+            add_row("Note Border", on_off(config_.skin.note_border_enabled), settings_cursor_ == 7,
                     render::MenuHitTargetKind::SettingsRow, 7, false, true);
-            add_row("Note Height", format_percent(preview_note_height_scale), settings_cursor_ == 8,
+            add_row("Judge Line", format_percent(config_.skin.judgement_line_position), settings_cursor_ == 8,
                     render::MenuHitTargetKind::SettingsRow, 8, false, true);
-            add_row("Combo Y", format_percent(config_.skin.combo_position), settings_cursor_ == 9,
+            add_row("Note Width", format_percent(preview_note_width_scale), settings_cursor_ == 9,
                     render::MenuHitTargetKind::SettingsRow, 9, false, true);
-            add_row("Back", "", settings_cursor_ == 10, render::MenuHitTargetKind::SettingsRow, 10, true, false);
+            add_row("LN Body Width", format_percent(config_.skin.hold_body_width_scale), settings_cursor_ == 10,
+                    render::MenuHitTargetKind::SettingsRow, 10, false, true);
+            add_row("Note Height", format_percent(preview_note_height_scale), settings_cursor_ == 11,
+                    render::MenuHitTargetKind::SettingsRow, 11, false, true);
+            add_row("Combo Y", format_percent(config_.skin.combo_position), settings_cursor_ == 12,
+                    render::MenuHitTargetKind::SettingsRow, 12, false, true);
+            add_row("Back", "", settings_cursor_ == 13, render::MenuHitTargetKind::SettingsRow, 13, true, false);
 
             render.generic.skin_preview.visible = true;
             render.generic.skin_preview.mode_label = key_mode_label(skin_edit_mode_);
@@ -4245,10 +4577,11 @@ void MenuApp::publish_snapshot() {
                     config::skin_color_rgb(preview_lane_colors[static_cast<std::size_t>(lane)]);
             }
 
-            render.generic.notes.push_back("Key Mode switches the editable 4K-10K and 16K lane layout.");
-            render.generic.notes.push_back("Target Lane selects which lane color the Lane Color row edits.");
-            render.generic.notes.push_back("Note Shape toggles between the existing rect skin and the new circle skin.");
-            render.generic.notes.push_back("The preview updates immediately with colors, combo position, judge line, and note style.");
+            render.generic.notes.push_back("Skin Source switches between the native vector skin and imported osu!mania PNG assets.");
+            render.generic.notes.push_back("OSU Skin scans imported profile skins first, then build/Release/test-skins-osu as a fallback test root.");
+            render.generic.notes.push_back("Import OSU Skin opens a folder picker. You can also drag and drop a skin folder onto this screen.");
+            render.generic.notes.push_back("Imported osu skins affect gameplay note, LN, and key art. Native rows still drive the preview and fallback skin.");
+            render.generic.notes.push_back("Key Mode and Target Lane still edit the native fallback palette and sizing per layout.");
         } else if (screen_ == Screen::SettingsInput) {
             add_row("Polling Hz", std::to_string(config_.input.polling_hz), settings_cursor_ == 0,
                     render::MenuHitTargetKind::SettingsRow, 0, false, true);
@@ -4355,9 +4688,9 @@ void MenuApp::publish_snapshot() {
                         render::MenuHitTargetKind::None, 2, false, false);
                 render.generic.notes.push_back("Judgements: PG " + std::to_string(last_result_.counts.pg) +
                                                " GR " + std::to_string(last_result_.counts.gr) +
-                                               " GD " + std::to_string(last_result_.counts.gd) +
-                                               " BD " + std::to_string(last_result_.counts.bd) +
-                                               " PR " + std::to_string(last_result_.counts.pr));
+                                               " G " + std::to_string(last_result_.counts.gd) +
+                                               " BAD " + std::to_string(last_result_.counts.bd) +
+                                               " POOR " + std::to_string(last_result_.counts.pr));
                 render.generic.notes.push_back("Timing: mean " +
                                                std::to_string(static_cast<int>(last_result_.mean_delta_ms)) +
                                                "ms  stddev " +
@@ -5225,6 +5558,12 @@ void MenuApp::launch_gameplay(const std::string& chart_path) {
 
     session.run();
     session.shutdown();
+
+    const double session_hispeed = session.final_hispeed();
+    if (std::abs(session_hispeed - config_.speed.hi_speed) > 0.0001) {
+        config_.speed.hi_speed = session_hispeed;
+        persist_runtime_config();
+    }
 
     restart_input_thread();
     restart_audio_thread();

@@ -112,6 +112,7 @@ public:
     [[nodiscard]] HudSnapshot hud_snapshot();
     [[nodiscard]] bool was_user_aborted() const { return user_aborted_.load(std::memory_order_acquire); }
     [[nodiscard]] const GameSessionResult& result() const { return result_; }
+    [[nodiscard]] double final_hispeed() const { return config_.speed.hi_speed; }
 
 private:
     struct FutureEvent {
@@ -201,12 +202,15 @@ private:
     void process_input_queue(int64_t buffer_start_samples, int64_t buffer_end_samples, int64_t lookahead_samples);
     [[nodiscard]] bool handle_control_input(const input::InputEvent& event);
     void update_lane_feedback(int lane, input::InputState state);
+    void trigger_lane_hit_effect(int lane);
     void dispatch_lane_input(int lane, input::InputState state, int64_t sample);
     void catch_up_lane_input(int lane, input::InputState state, int64_t sample);
     void schedule_note_guides(int64_t buffer_start_samples, int64_t buffer_end_samples);
     void schedule_note_keysound(const gameplay::NoteEvent& note, int64_t sample);
     void schedule_tone(int lane, int64_t sample, bool guide);
     void adjust_hispeed(double delta);
+    void update_hispeed_repeat_state(uint32_t keycode, input::InputState state, int64_t event_time_ns);
+    void service_hispeed_repeat(int64_t now_ns);
     [[nodiscard]] bool prepare_chart_audio();
     void start_chart_audio_workers(std::size_t worker_count);
     void stop_chart_audio_workers();
@@ -252,6 +256,8 @@ private:
     AudioTimingState last_audio_timing_{};
     bool countdown_active_ = false;
     int countdown_value_ = 0;
+    bool hispeed_decrease_held_ = false;
+    bool hispeed_increase_held_ = false;
     uint32_t escape_keycode_ = 0;
     uint32_t f3_keycode_ = 0;
     uint32_t f4_keycode_ = 0;
@@ -263,7 +269,11 @@ private:
     std::size_t next_guide_note_index_ = 0;
     std::size_t hud_scan_start_ = 0;
     int64_t countdown_started_ns_ = 0;
+    int64_t hispeed_decrease_next_repeat_ns_ = 0;
+    int64_t hispeed_increase_next_repeat_ns_ = 0;
+    int64_t result_transition_sample_ = 0;
     bool gameplay_started_ = false;
+    bool result_transition_pending_ = false;
 
     FutureQueue future_events_{};
     std::vector<ToneVoice> tone_voices_;
@@ -290,7 +300,6 @@ private:
     bool chart_audio_steady_state_logged_ = false;
     std::atomic<bool> synthetic_tones_enabled_{true};
     std::vector<float> lane_activity_;
-    std::vector<uint8_t> lane_pressed_;
     HudCallback hud_callback_;
     LoadingProgressCallback loading_progress_callback_;
     LoadingCancelCallback loading_cancel_callback_;

@@ -94,6 +94,7 @@ const std::unordered_map<std::string, std::vector<std::string>>& default_skin_la
 }
 
 void sanitize_skin_config(SkinConfig& skin) {
+    skin.source = normalize_skin_source_token(skin.source);
     skin.note_shape = normalize_skin_note_shape_token(skin.note_shape);
     skin.judgement_line_position = std::clamp(
         skin.judgement_line_position, kJudgementLinePositionMin, kJudgementLinePositionMax);
@@ -321,11 +322,11 @@ void apply_config_object(const JsonObject& root, RuntimeConfig& config) {
         config.judge.gr_ms = get_number(*judge, "gr", config.judge.gr_ms);
         config.judge.gd_ms = get_number(*judge, "gd", config.judge.gd_ms);
         config.judge.bd_ms = get_number(*judge, "bd", config.judge.bd_ms);
-        config.judge.indirect_miss_ms = get_number(*judge, "indirect_miss", config.judge.indirect_miss_ms);
+        static_cast<void>(get_number(*judge, "indirect_miss", config.judge.indirect_miss_ms));
         config.judge.hold_grace_ms = get_number(*judge, "hold_grace", config.judge.hold_grace_ms);
         config.judge.hold_break_ms = get_number(*judge, "hold_break", config.judge.hold_break_ms);
         config.judge.mask_ms = get_number(*judge, "mask", config.judge.mask_ms);
-        config.judge.indirect_miss_ms = std::max(config.judge.indirect_miss_ms, config.judge.bd_ms);
+        config.judge.indirect_miss_ms = config.judge.bd_ms;
         config.judge.hold_break_ms = std::max(config.judge.hold_break_ms, config.judge.hold_grace_ms);
     }
 
@@ -408,6 +409,10 @@ void apply_config_object(const JsonObject& root, RuntimeConfig& config) {
     }
 
     if (auto* skin = get_object(root, "skin")) {
+        config.skin.source =
+            normalize_skin_source_token(get_string(*skin, "source", config.skin.source));
+        config.skin.osu_skin_name =
+            get_string(*skin, "osu_skin_name", config.skin.osu_skin_name);
         config.skin.note_shape =
             normalize_skin_note_shape_token(get_string(*skin, "note_shape", config.skin.note_shape));
         config.skin.note_border_enabled =
@@ -535,7 +540,6 @@ JsonValue build_json_root(const RuntimeConfig& config) {
     judge.emplace("gr", JsonValue{config.judge.gr_ms});
     judge.emplace("gd", JsonValue{config.judge.gd_ms});
     judge.emplace("bd", JsonValue{config.judge.bd_ms});
-    judge.emplace("indirect_miss", JsonValue{std::max(config.judge.indirect_miss_ms, config.judge.bd_ms)});
     judge.emplace("hold_grace", JsonValue{config.judge.hold_grace_ms});
     judge.emplace("hold_break", JsonValue{std::max(config.judge.hold_break_ms, config.judge.hold_grace_ms)});
     judge.emplace("mask", JsonValue{config.judge.mask_ms});
@@ -611,6 +615,8 @@ JsonValue build_json_root(const RuntimeConfig& config) {
     root.emplace("ui", JsonValue{std::move(ui)});
 
     JsonObject skin;
+    skin.emplace("source", JsonValue{normalize_skin_source_token(config.skin.source)});
+    skin.emplace("osu_skin_name", JsonValue{config.skin.osu_skin_name});
     skin.emplace("note_shape", JsonValue{normalize_skin_note_shape_token(config.skin.note_shape)});
     skin.emplace("note_border_enabled", JsonValue{config.skin.note_border_enabled});
     skin.emplace("judgement_line_position", JsonValue{config.skin.judgement_line_position});
@@ -697,6 +703,14 @@ std::vector<std::string> supported_skin_color_tokens() {
         tokens.emplace_back(entry.token);
     }
     return tokens;
+}
+
+std::string normalize_skin_source_token(std::string_view token) {
+    const std::string normalized = to_lower_ascii(std::string(token));
+    if (normalized == "osu" || normalized == "osu-mania" || normalized == "osu_mania") {
+        return "osu";
+    }
+    return "native";
 }
 
 std::string normalize_skin_color_token(std::string_view token) {
@@ -829,7 +843,7 @@ RuntimeConfig ConfigLoader::defaults() const {
 
     config.graphics.display_mode = "borderless";
     config.graphics.resolution = "native";
-    config.graphics.vsync = true;
+    config.graphics.vsync = false;
     config.graphics.refresh_hz = 1050;
     config.graphics.performance_overlay = false;
 
@@ -841,7 +855,7 @@ RuntimeConfig ConfigLoader::defaults() const {
     config.mode.enable_osu_charts = false;
     config.mode.song_index_profile = "safe";
 
-    config.ui.result_tail_ms = 500.0;
+    config.ui.result_tail_ms = 3000.0;
     config.ui.require_enter_to_exit = true;
 
     config.skin = {};

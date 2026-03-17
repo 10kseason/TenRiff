@@ -33,6 +33,7 @@ inline double compute_gameplay_note_y_normalized(int64_t sample,
                                                  int64_t lookahead_samples,
                                                  int64_t past_samples,
                                                  double judgement_line_position) {
+    constexpr double kFutureEntryOvershoot = 0.12;
     const double clamped_judgement_line = std::clamp(judgement_line_position, 0.0, 1.0);
     const double delta = static_cast<double>(sample - display_sample);
     if (delta >= 0.0) {
@@ -40,7 +41,9 @@ inline double compute_gameplay_note_y_normalized(int64_t sample,
             return clamped_judgement_line;
         }
         const double t = std::clamp(delta / static_cast<double>(lookahead_samples), 0.0, 1.0);
-        return std::clamp(clamped_judgement_line * (1.0 - t), 0.0, 1.0);
+        return std::clamp(clamped_judgement_line - t * (clamped_judgement_line + kFutureEntryOvershoot),
+                          -kFutureEntryOvershoot,
+                          1.0);
     }
 
     if (past_samples <= 0) {

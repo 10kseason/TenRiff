@@ -14,7 +14,7 @@ namespace tenriff::render {
 inline constexpr std::size_t kPerformanceGraphSamples = 180;
 
 struct RenderConfig {
-    bool vsync = true;
+    bool vsync = false;
     int fps_limit = 60;
 };
 

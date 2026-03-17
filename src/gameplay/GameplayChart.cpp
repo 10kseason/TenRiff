@@ -42,7 +42,35 @@ int64_t ms_to_samples(double time_ms, int sample_rate, double rate) {
     return static_cast<int64_t>(std::llround(scaled_ms * static_cast<double>(sample_rate) / 1000.0));
 }
 
+int64_t add_sample_offset(int64_t sample, int64_t sample_offset) {
+    if (sample_offset <= 0) {
+        return sample;
+    }
+    constexpr int64_t kMaxSample = (std::numeric_limits<int64_t>::max)();
+    if (sample > kMaxSample - sample_offset) {
+        return kMaxSample;
+    }
+    return sample + sample_offset;
+}
+
 }  // namespace
+
+void offset_gameplay_chart_samples(GameplayChart& chart, int64_t sample_offset) {
+    if (sample_offset <= 0) {
+        return;
+    }
+
+    chart.duration_samples = add_sample_offset(chart.duration_samples, sample_offset);
+    for (auto& note : chart.notes) {
+        note.start_sample = add_sample_offset(note.start_sample, sample_offset);
+        if (note.end_sample.has_value()) {
+            note.end_sample = add_sample_offset(note.end_sample.value(), sample_offset);
+        }
+    }
+    for (auto& cue : chart.audio_cues) {
+        cue.start_sample = add_sample_offset(cue.start_sample, sample_offset);
+    }
+}
 
 GameplayChart from_bms_timeline(const chart::BmsTimeline& timeline, double rate) {
     GameplayChart chart;

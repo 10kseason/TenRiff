@@ -58,6 +58,7 @@ struct SongIndexLoadResult {
 };
 
 using SongIndexProgressCallback = std::function<void(const SongIndexProgress&)>;
+using SongIndexCancelCallback = std::function<bool()>;
 
 [[nodiscard]] std::string song_index_cache_path_for_source(std::string_view profile_root,
                                                            std::string_view source_root);
@@ -67,12 +68,14 @@ bool save_song_index(const std::string& path,
                      const SongIndex& index,
                      const SongIndexOptions& options = {},
                      std::string* error = nullptr,
-                     SongIndexProgressCallback progress = {});
+                     SongIndexProgressCallback progress = {},
+                     SongIndexCancelCallback cancel = {});
 
 SongIndex scan_songs(const std::string& root_path,
                      const SongIndex* cache,
                      std::vector<std::string>& warnings,
                      SongIndexProgressCallback progress = {},
-                     const SongIndexOptions& options = {});
+                     const SongIndexOptions& options = {},
+                     SongIndexCancelCallback cancel = {});
 
 }  // namespace tenriff::app

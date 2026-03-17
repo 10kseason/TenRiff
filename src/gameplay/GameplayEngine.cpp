@@ -189,7 +189,7 @@ void GameplayEngine::apply_poor(int64_t sample) {
 void GameplayEngine::update_miss(LaneState& lane, int64_t current_sample) {
     while (lane.next_index < lane.notes.size()) {
         const auto& note = lane.notes[lane.next_index];
-        if (current_sample <= note.start_sample + windows_.indirect_miss) {
+        if (current_sample <= note.start_sample + windows_.bd) {
             break;
         }
         apply_poor(note.start_sample);
@@ -303,7 +303,6 @@ JudgeWindowSamples GameplayEngine::build_windows(const config::JudgeConfig& judg
     windows.gr = to_samples(judge.gr_ms);
     windows.gd = to_samples(judge.gd_ms);
     windows.bd = to_samples(judge.bd_ms);
-    windows.indirect_miss = to_samples(std::max(judge.indirect_miss_ms, judge.bd_ms));
     windows.hold_grace = to_samples(judge.hold_grace_ms);
     windows.hold_break = to_samples(judge.hold_break_ms);
     windows.mask = to_samples(judge.mask_ms);
