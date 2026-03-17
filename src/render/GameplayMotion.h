@@ -59,6 +59,17 @@ inline bool should_render_gameplay_note(int64_t start_sample, bool head_visible,
     return !head_visible || start_sample >= display_sample;
 }
 
+inline bool gameplay_note_anchors_to_judgement_line(bool hold, bool head_visible) {
+    return hold && !head_visible;
+}
+
+inline int64_t gameplay_note_render_sample(int64_t start_sample,
+                                           bool hold,
+                                           bool head_visible,
+                                           int64_t display_sample) {
+    return gameplay_note_anchors_to_judgement_line(hold, head_visible) ? display_sample : start_sample;
+}
+
 inline int64_t gameplay_extrapolation_limit_samples(int sample_rate, uint32_t audio_buffer_frames) {
     if (sample_rate <= 0) {
         return 0;

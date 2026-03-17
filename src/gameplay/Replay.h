@@ -32,6 +32,10 @@ struct ReplayFile {
     int sample_rate = 0;
     double rate = 1.0;
     double input_offset_ms = 0.0;
+    std::vector<std::string> mods;
+    double rate_multiplier = 1.0;
+    double score_multiplier = 1.0;
+    int64_t final_score = 0;
 
     ReplayTrace trace;
     ResultStats stats;
@@ -49,6 +53,10 @@ struct ResultFile {
     int sample_rate = 0;
     double rate = 1.0;
     bool game_over = false;
+    std::vector<std::string> mods;
+    double rate_multiplier = 1.0;
+    double score_multiplier = 1.0;
+    int64_t final_score = 0;
 
     ResultStats stats;
 };

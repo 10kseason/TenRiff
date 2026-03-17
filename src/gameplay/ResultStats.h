@@ -31,6 +31,8 @@ struct ResultStats {
     int combo = 0;
     int max_combo = 0;
     int total_notes = 0;
+    int64_t raw_score = 0;
+    int64_t raw_score_accumulator = 0;
 
     double mean_delta_ms = 0.0;
     double m2_delta_ms = 0.0;
@@ -39,7 +41,7 @@ struct ResultStats {
     std::vector<GaugeSample> gauge_history;
     std::vector<ShiftEvent> shifts;
 
-    void record_judgement(game::Judgement judgement, double delta_ms, bool breaks_combo);
+    void record_judgement(game::Judgement judgement, double delta_ms, bool breaks_combo, double weight = 1.0);
     void record_note_total(int count);
     void record_gauge_sample(int64_t sample, double value);
     void record_shift(int64_t sample, game::GaugeType from, game::GaugeType to);

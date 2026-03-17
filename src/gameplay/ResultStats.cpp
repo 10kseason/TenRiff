@@ -5,7 +5,23 @@
 
 namespace tenriff::gameplay {
 
-void ResultStats::record_judgement(game::Judgement judgement, double delta_ms, bool breaks_combo) {
+namespace {
+
+int judgement_score(game::Judgement judgement) {
+    switch (judgement) {
+        case game::Judgement::PG: return 1000;
+        case game::Judgement::GR: return 700;
+        case game::Judgement::GD: return 300;
+        case game::Judgement::BD:
+        case game::Judgement::PR:
+        default:
+            return -200;
+    }
+}
+
+}  // namespace
+
+void ResultStats::record_judgement(game::Judgement judgement, double delta_ms, bool breaks_combo, double weight) {
     switch (judgement) {
         case game::Judgement::PG: ++counts.pg; break;
         case game::Judgement::GR: ++counts.gr; break;
@@ -13,6 +29,12 @@ void ResultStats::record_judgement(game::Judgement judgement, double delta_ms, b
         case game::Judgement::BD: ++counts.bd; break;
         case game::Judgement::PR: ++counts.bd; break;
     }
+
+    const double safe_weight = (std::isfinite(weight) && weight > 0.0) ? weight : 1.0;
+    const int64_t delta_score = static_cast<int64_t>(std::llround(static_cast<double>(judgement_score(judgement)) *
+                                                                  safe_weight));
+    raw_score_accumulator += delta_score;
+    raw_score = std::max<int64_t>(0, raw_score_accumulator);
 
     if (breaks_combo) {
         combo = 0;
@@ -34,6 +56,8 @@ void ResultStats::record_judgement(game::Judgement judgement, double delta_ms, b
 
 void ResultStats::record_note_total(int count) {
     total_notes = count;
+    raw_score = 0;
+    raw_score_accumulator = 0;
     gauge_history.clear();
     shifts.clear();
     const std::size_t reserve_count = static_cast<std::size_t>(std::max(0, count)) * 2u;

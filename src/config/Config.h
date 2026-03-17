@@ -73,6 +73,7 @@ struct SkinConfig {
     std::string osu_skin_name;
     std::string note_shape = "rect";
     bool note_border_enabled = true;
+    bool preserve_note_image_aspect_ratio = false;
     double judgement_line_position = kJudgementLinePositionDefault;
     double combo_position = kComboPositionDefault;
     double note_width_scale = 1.0;
@@ -101,6 +102,7 @@ struct ModeConfig {
     std::string gauge = "normal";
     std::string random = "off";
     uint32_t random_seed = 0;
+    std::vector<std::string> mods;
     bool enable_osu_charts = false;
     std::string song_index_profile = "safe";
 };

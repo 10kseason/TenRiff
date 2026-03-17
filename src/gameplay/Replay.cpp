@@ -32,6 +32,15 @@ config::JsonValue build_counts_json(const JudgementCounts& counts) {
     return config::JsonValue{std::move(obj)};
 }
 
+config::JsonValue build_string_array_json(const std::vector<std::string>& values) {
+    config::JsonArray out;
+    out.reserve(values.size());
+    for (const auto& value : values) {
+        out.emplace_back(value);
+    }
+    return config::JsonValue{std::move(out)};
+}
+
 config::JsonValue build_gauge_history_json(const std::vector<GaugeSample>& history) {
     config::JsonArray values;
     values.reserve(history.size());
@@ -63,6 +72,7 @@ config::JsonValue build_stats_json(const ResultStats& stats) {
     obj.emplace("combo", config::JsonValue{static_cast<double>(stats.combo)});
     obj.emplace("max_combo", config::JsonValue{static_cast<double>(stats.max_combo)});
     obj.emplace("total_notes", config::JsonValue{static_cast<double>(stats.total_notes)});
+    obj.emplace("raw_score", config::JsonValue{static_cast<double>(stats.raw_score)});
     obj.emplace("mean_delta_ms", config::JsonValue{stats.mean_delta_ms});
     obj.emplace("stddev_delta_ms", config::JsonValue{stats.stddev_delta_ms()});
     obj.emplace("gauge_history", build_gauge_history_json(stats.gauge_history));
@@ -135,6 +145,10 @@ ExportResult save_replay_json(const std::string& path, const ReplayFile& replay,
     obj.emplace("sample_rate", config::JsonValue{static_cast<double>(replay.sample_rate)});
     obj.emplace("rate", config::JsonValue{replay.rate});
     obj.emplace("input_offset_ms", config::JsonValue{replay.input_offset_ms});
+    obj.emplace("mods", build_string_array_json(replay.mods));
+    obj.emplace("rate_multiplier", config::JsonValue{replay.rate_multiplier});
+    obj.emplace("score_multiplier", config::JsonValue{replay.score_multiplier});
+    obj.emplace("final_score", config::JsonValue{static_cast<double>(replay.final_score)});
     obj.emplace("trace", build_trace_json(replay.trace));
     obj.emplace("stats", build_stats_json(replay.stats));
     return save_json_file(path, config::JsonValue{std::move(obj)}, indent);
@@ -152,6 +166,10 @@ ExportResult save_result_json(const std::string& path, const ResultFile& result_
     obj.emplace("sample_rate", config::JsonValue{static_cast<double>(result_file.sample_rate)});
     obj.emplace("rate", config::JsonValue{result_file.rate});
     obj.emplace("game_over", config::JsonValue{result_file.game_over});
+    obj.emplace("mods", build_string_array_json(result_file.mods));
+    obj.emplace("rate_multiplier", config::JsonValue{result_file.rate_multiplier});
+    obj.emplace("score_multiplier", config::JsonValue{result_file.score_multiplier});
+    obj.emplace("final_score", config::JsonValue{static_cast<double>(result_file.final_score)});
     obj.emplace("stats", build_stats_json(result_file.stats));
     return save_json_file(path, config::JsonValue{std::move(obj)}, indent);
 }

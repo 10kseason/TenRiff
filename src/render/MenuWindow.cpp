@@ -484,6 +484,142 @@ const D2D1_RECT_F* bitmap_source_rect_or_null(const D2D1_RECT_F& source_rect) {
     return &source_rect;
 }
 
+D2D1_SIZE_F bitmap_source_size(ID2D1Bitmap* bitmap, const D2D1_RECT_F* source_rect) {
+    if (!bitmap) {
+        return D2D1::SizeF(0.0f, 0.0f);
+    }
+    if (source_rect && source_rect->right > source_rect->left && source_rect->bottom > source_rect->top) {
+        return D2D1::SizeF(source_rect->right - source_rect->left,
+                           source_rect->bottom - source_rect->top);
+    }
+    return bitmap->GetSize();
+}
+
+D2D1_RECT_F fit_rect_preserve_aspect(const D2D1_RECT_F& bounds, const D2D1_SIZE_F& source_size) {
+    const float bounds_width = std::max(0.0f, bounds.right - bounds.left);
+    const float bounds_height = std::max(0.0f, bounds.bottom - bounds.top);
+    if (bounds_width <= 0.0f || bounds_height <= 0.0f ||
+        source_size.width <= 0.0f || source_size.height <= 0.0f) {
+        return bounds;
+    }
+
+    const float scale = std::min(bounds_width / source_size.width, bounds_height / source_size.height);
+    const float draw_width = std::max(1.0f, source_size.width * scale);
+    const float draw_height = std::max(1.0f, source_size.height * scale);
+    const float left = bounds.left + (bounds_width - draw_width) * 0.5f;
+    const float top = bounds.top + (bounds_height - draw_height) * 0.5f;
+    return D2D1::RectF(left, top, left + draw_width, top + draw_height);
+}
+
+D2D1_RECT_F inscribed_circle_bitmap_rect(const D2D1_RECT_F& bounds) {
+    const float bounds_width = std::max(0.0f, bounds.right - bounds.left);
+    const float bounds_height = std::max(0.0f, bounds.bottom - bounds.top);
+    const float diameter = std::max(2.0f, std::min(bounds_width, bounds_height) - 2.0f);
+    const float radius = diameter * 0.5f;
+    const float center_x = (bounds.left + bounds.right) * 0.5f;
+    const float center_y = (bounds.top + bounds.bottom) * 0.5f;
+    return D2D1::RectF(center_x - radius, center_y - radius, center_x + radius, center_y + radius);
+}
+
+D2D1_RECT_F gameplay_note_bitmap_dest_rect(const D2D1_RECT_F& note_rect,
+                                           ID2D1Bitmap* bitmap,
+                                           const D2D1_RECT_F* source_rect,
+                                           std::string_view note_shape,
+                                           bool preserve_aspect_ratio) {
+    const std::string normalized_shape = normalize_gameplay_note_shape(note_shape);
+    const D2D1_RECT_F base_rect =
+        normalized_shape == "circle" ? inscribed_circle_bitmap_rect(note_rect) : note_rect;
+    if (!preserve_aspect_ratio || !bitmap) {
+        return base_rect;
+    }
+    return fit_rect_preserve_aspect(base_rect, bitmap_source_size(bitmap, source_rect));
+}
+
+bool create_composited_gameplay_note_bitmap(ID2D1DeviceContext* d2d_context,
+                                            ID2D1Factory1* d2d_factory,
+                                            ID2D1Bitmap* source_bitmap,
+                                            const D2D1_RECT_F* source_rect,
+                                            const D2D1_SIZE_F& target_size,
+                                            bool clip_circle,
+                                            bool preserve_aspect_ratio,
+                                            bool draw_border,
+                                            const D2D1_COLOR_F& border_color,
+                                            Microsoft::WRL::ComPtr<ID2D1Bitmap>& out_bitmap,
+                                            D2D1_RECT_F& out_source_rect) {
+    if (!d2d_context || !d2d_factory || !source_bitmap ||
+        target_size.width <= 0.0f || target_size.height <= 0.0f) {
+        return false;
+    }
+
+    Microsoft::WRL::ComPtr<ID2D1BitmapRenderTarget> render_target;
+    const HRESULT create_hr = d2d_context->CreateCompatibleRenderTarget(target_size, &render_target);
+    if (FAILED(create_hr) || !render_target) {
+        return false;
+    }
+
+    Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> border_brush;
+    if (draw_border &&
+        FAILED(render_target->CreateSolidColorBrush(border_color, &border_brush))) {
+        return false;
+    }
+
+    const D2D1_RECT_F full_rect = D2D1::RectF(0.0f, 0.0f, target_size.width, target_size.height);
+    const D2D1_RECT_F content_rect = D2D1::RectF(1.0f, 1.0f, target_size.width - 1.0f, target_size.height - 1.0f);
+    const D2D1_RECT_F draw_rect = preserve_aspect_ratio
+        ? fit_rect_preserve_aspect(content_rect, bitmap_source_size(source_bitmap, source_rect))
+        : content_rect;
+
+    render_target->BeginDraw();
+    render_target->Clear(D2D1::ColorF(0.0f, 0.0f, 0.0f, 0.0f));
+
+    if (clip_circle) {
+        const D2D1_RECT_F circle_rect = inscribed_circle_bitmap_rect(full_rect);
+        const D2D1_ELLIPSE ellipse = D2D1::Ellipse(
+            D2D1::Point2F((circle_rect.left + circle_rect.right) * 0.5f,
+                          (circle_rect.top + circle_rect.bottom) * 0.5f),
+            (circle_rect.right - circle_rect.left) * 0.5f,
+            (circle_rect.bottom - circle_rect.top) * 0.5f);
+        Microsoft::WRL::ComPtr<ID2D1EllipseGeometry> clip_geometry;
+        Microsoft::WRL::ComPtr<ID2D1Layer> clip_layer;
+        const bool has_clip_layer =
+            SUCCEEDED(d2d_factory->CreateEllipseGeometry(ellipse, &clip_geometry)) &&
+            clip_geometry &&
+            SUCCEEDED(render_target->CreateLayer(&clip_layer)) &&
+            clip_layer;
+        if (has_clip_layer) {
+            render_target->PushLayer(
+                D2D1::LayerParameters(full_rect, clip_geometry.Get(), D2D1_ANTIALIAS_MODE_PER_PRIMITIVE),
+                clip_layer.Get());
+        }
+        render_target->DrawBitmap(source_bitmap, draw_rect, 1.0f,
+                                  D2D1_BITMAP_INTERPOLATION_MODE_LINEAR, source_rect);
+        if (has_clip_layer) {
+            render_target->PopLayer();
+        }
+        if (draw_border && border_brush) {
+            render_target->DrawEllipse(ellipse, border_brush.Get(), 1.3f);
+        }
+    } else {
+        render_target->DrawBitmap(source_bitmap, draw_rect, 1.0f,
+                                  D2D1_BITMAP_INTERPOLATION_MODE_LINEAR, source_rect);
+    }
+
+    const HRESULT end_hr = render_target->EndDraw();
+    if (FAILED(end_hr)) {
+        return false;
+    }
+
+    Microsoft::WRL::ComPtr<ID2D1Bitmap> bitmap;
+    const HRESULT bitmap_hr = render_target->GetBitmap(&bitmap);
+    if (FAILED(bitmap_hr) || !bitmap) {
+        return false;
+    }
+
+    out_source_rect = full_bitmap_source_rect(bitmap->GetSize());
+    out_bitmap = std::move(bitmap);
+    return true;
+}
+
 bool compute_bitmap_alpha_source_rect(IWICBitmapSource* bitmap_source, D2D1_RECT_F& out_source_rect) {
     if (!bitmap_source) {
         return false;
@@ -1397,44 +1533,41 @@ bool MenuWindow::ensure_gameplay_note_sprites(const GameplayHudData& data) {
     const int lane_count = std::clamp(data.lane_count, 1, static_cast<int>(kGameplayHudMaxLanes));
     const bool note_border_enabled = data.note_border_enabled;
     const std::string note_shape = normalize_gameplay_note_shape(data.note_shape);
+    const bool preserve_note_image_aspect_ratio = data.preserve_note_image_aspect_ratio;
     const std::string skin_source = normalize_gameplay_skin_source(data.skin_source);
     const bool use_osu_skin =
         skin_source == "osu" && !data.osu_skin_root.empty() && !data.osu_skin_name.empty();
     bool cache_valid = gameplay_note_sprite_cache_.lane_count == lane_count &&
+                       gameplay_note_sprite_cache_.note_border_enabled == note_border_enabled &&
+                       gameplay_note_sprite_cache_.note_shape == note_shape &&
+                       gameplay_note_sprite_cache_.preserve_note_image_aspect_ratio ==
+                           preserve_note_image_aspect_ratio &&
                        gameplay_note_sprite_cache_.skin_source == skin_source;
     if (use_osu_skin) {
         cache_valid = cache_valid &&
                       gameplay_note_sprite_cache_.osu_skin_root == data.osu_skin_root &&
                       gameplay_note_sprite_cache_.osu_skin_name == data.osu_skin_name;
-    } else {
-        cache_valid = cache_valid &&
-                      gameplay_note_sprite_cache_.note_border_enabled == note_border_enabled &&
-                      gameplay_note_sprite_cache_.note_shape == note_shape;
-        for (int lane = 0; lane < lane_count && cache_valid; ++lane) {
-            uint32_t color = 0xF6F8FF;
-            if (static_cast<std::size_t>(lane) < data.lane_color_count) {
-                color = data.lane_colors[static_cast<std::size_t>(lane)];
-            } else if (!gameplay_lane_uses_white_note(lane + 1)) {
-                color = 0x4F80FF;
-            }
-            if (!d2d_->lane_note_head_bitmaps[static_cast<std::size_t>(lane)] ||
-                !d2d_->lane_note_tail_bitmaps[static_cast<std::size_t>(lane)] ||
-                gameplay_note_sprite_cache_.lane_colors[static_cast<std::size_t>(lane)] != color) {
-                cache_valid = false;
-            }
+    }
+    for (int lane = 0; lane < lane_count && cache_valid; ++lane) {
+        uint32_t color = 0xF6F8FF;
+        if (static_cast<std::size_t>(lane) < data.lane_color_count) {
+            color = data.lane_colors[static_cast<std::size_t>(lane)];
+        } else if (!gameplay_lane_uses_white_note(lane + 1)) {
+            color = 0x4F80FF;
+        }
+        if (!d2d_->lane_note_head_bitmaps[static_cast<std::size_t>(lane)] ||
+            !d2d_->lane_note_hold_head_bitmaps[static_cast<std::size_t>(lane)] ||
+            !d2d_->lane_note_tail_bitmaps[static_cast<std::size_t>(lane)] ||
+            gameplay_note_sprite_cache_.lane_colors[static_cast<std::size_t>(lane)] != color) {
+            cache_valid = false;
         }
     }
     if (cache_valid) {
         return true;
     }
 
+    invalidate_gameplay_note_sprite_cache();
     auto* ctx = d2d_->d2d_context.Get();
-    const std::string procedural_note_shape =
-        (use_osu_skin && note_shape == "circle") ? std::string("rect") : note_shape;
-    if (!use_osu_skin && procedural_note_shape == "circle") {
-        invalidate_gameplay_note_sprite_cache();
-        return false;
-    }
     auto create_note_bitmap = [&](float width,
                                   float height,
                                   const D2D1_COLOR_F& fill_color,
@@ -1460,7 +1593,7 @@ bool MenuWindow::ensure_gameplay_note_sprites(const GameplayHudData& data) {
 
         const D2D1_RECT_F rect = D2D1::RectF(1.0f, 1.0f, width - 1.0f, height - 1.0f);
         draw_note_primitive(render_target.Get(), rect, fill_brush.Get(), border_brush.Get(), 1.3f,
-                            procedural_note_shape, note_border_enabled);
+                            note_shape, note_border_enabled);
 
         const HRESULT end_hr = render_target->EndDraw();
         if (FAILED(end_hr)) {
@@ -1486,6 +1619,7 @@ bool MenuWindow::ensure_gameplay_note_sprites(const GameplayHudData& data) {
     gameplay_note_sprite_cache_.lane_count = lane_count;
     gameplay_note_sprite_cache_.note_border_enabled = note_border_enabled;
     gameplay_note_sprite_cache_.note_shape = note_shape;
+    gameplay_note_sprite_cache_.preserve_note_image_aspect_ratio = preserve_note_image_aspect_ratio;
     gameplay_note_sprite_cache_.skin_source = skin_source;
     gameplay_note_sprite_cache_.osu_skin_root = data.osu_skin_root;
     gameplay_note_sprite_cache_.osu_skin_name = data.osu_skin_name;
@@ -1560,9 +1694,62 @@ bool MenuWindow::ensure_gameplay_note_sprites(const GameplayHudData& data) {
             color = 0x4F80FF;
         }
         gameplay_note_sprite_cache_.lane_colors[static_cast<std::size_t>(lane)] = color;
+        const float head_bitmap_width = 96.0f;
+        const float head_bitmap_height = note_shape == "circle" ? 96.0f : 24.0f;
+        const float tail_bitmap_width = 92.0f;
+        const float tail_bitmap_height = note_shape == "circle" ? 92.0f : 20.0f;
+
+        auto style_imported_circle_bitmap =
+            [&](Microsoft::WRL::ComPtr<ID2D1Bitmap>& bitmap,
+                D2D1_RECT_F& source_rect,
+                float bitmap_width,
+                float bitmap_height) -> bool {
+                if (!use_osu_skin || note_shape != "circle" || !bitmap) {
+                    return true;
+                }
+
+                Microsoft::WRL::ComPtr<ID2D1Bitmap> styled_bitmap;
+                D2D1_RECT_F styled_source_rect = D2D1::RectF(0.0f, 0.0f, 0.0f, 0.0f);
+                if (!create_composited_gameplay_note_bitmap(
+                        ctx,
+                        d2d_->d2d_factory.Get(),
+                        bitmap.Get(),
+                        bitmap_source_rect_or_null(source_rect),
+                        D2D1::SizeF(bitmap_width, bitmap_height),
+                        true,
+                        preserve_note_image_aspect_ratio,
+                        note_border_enabled,
+                        gameplay_note_border_color(color),
+                        styled_bitmap,
+                        styled_source_rect)) {
+                    return false;
+                }
+                bitmap = std::move(styled_bitmap);
+                source_rect = styled_source_rect;
+                return true;
+            };
+
+        if (!style_imported_circle_bitmap(
+                d2d_->lane_note_head_bitmaps[static_cast<std::size_t>(lane)],
+                d2d_->lane_note_head_source_rects[static_cast<std::size_t>(lane)],
+                head_bitmap_width,
+                head_bitmap_height) ||
+            !style_imported_circle_bitmap(
+                d2d_->lane_note_hold_head_bitmaps[static_cast<std::size_t>(lane)],
+                d2d_->lane_note_hold_head_source_rects[static_cast<std::size_t>(lane)],
+                head_bitmap_width,
+                head_bitmap_height) ||
+            !style_imported_circle_bitmap(
+                d2d_->lane_note_tail_bitmaps[static_cast<std::size_t>(lane)],
+                d2d_->lane_note_tail_source_rects[static_cast<std::size_t>(lane)],
+                tail_bitmap_width,
+                tail_bitmap_height)) {
+            invalidate_gameplay_note_sprite_cache();
+            return false;
+        }
 
         if (!d2d_->lane_note_head_bitmaps[static_cast<std::size_t>(lane)] &&
-            !create_note_bitmap(96.0f, 24.0f,
+            !create_note_bitmap(head_bitmap_width, head_bitmap_height,
                                 gameplay_note_fill_color(color),
                                 gameplay_note_border_color(color),
                                 d2d_->lane_note_head_bitmaps[static_cast<std::size_t>(lane)],
@@ -1571,7 +1758,7 @@ bool MenuWindow::ensure_gameplay_note_sprites(const GameplayHudData& data) {
             return false;
         }
         if (!d2d_->lane_note_hold_head_bitmaps[static_cast<std::size_t>(lane)] &&
-            !create_note_bitmap(96.0f, 24.0f,
+            !create_note_bitmap(head_bitmap_width, head_bitmap_height,
                                 gameplay_note_fill_color(color),
                                 gameplay_note_border_color(color),
                                 d2d_->lane_note_hold_head_bitmaps[static_cast<std::size_t>(lane)],
@@ -1580,7 +1767,7 @@ bool MenuWindow::ensure_gameplay_note_sprites(const GameplayHudData& data) {
             return false;
         }
         if (!d2d_->lane_note_tail_bitmaps[static_cast<std::size_t>(lane)] &&
-            !create_note_bitmap(92.0f, 20.0f,
+            !create_note_bitmap(tail_bitmap_width, tail_bitmap_height,
                                 gameplay_note_fill_color(color),
                                 gameplay_note_border_color(color),
                                 d2d_->lane_note_tail_bitmaps[static_cast<std::size_t>(lane)],
@@ -5251,7 +5438,9 @@ void MenuWindow::draw(const MenuRenderData& data) {
             const float lane_center = field_left + (static_cast<float>(lane) - 0.5f) * lane_width;
             const float x0 = lane_center - note_width * 0.5f;
             const float x1 = lane_center + note_width * 0.5f;
-            const float y = gameplay_field_y(field_top, field_height, sample_to_y(note.start_sample));
+            const int64_t render_sample =
+                gameplay_note_render_sample(note.start_sample, note.hold, note.head_visible, display_sample);
+            const float y = gameplay_field_y(field_top, field_height, sample_to_y(render_sample));
             const float tail_y = gameplay_field_y(field_top, field_height, sample_to_y(note.tail_sample));
             const float head_half_h = gameplay_note_head_half_height(note_height_scale);
             const float tail_half_h = gameplay_note_tail_half_height(note_height_scale);
@@ -5310,7 +5499,14 @@ void MenuWindow::draw(const MenuRenderData& data) {
                                   d2d_->lane_note_hold_head_source_rects[static_cast<std::size_t>(lane - 1)])
                             : bitmap_source_rect_or_null(
                                   d2d_->lane_note_head_source_rects[static_cast<std::size_t>(lane - 1)]);
-                    ctx->DrawBitmap(head_bitmap, note_rect, 1.0f, D2D1_BITMAP_INTERPOLATION_MODE_LINEAR, head_source_rect);
+                    const D2D1_RECT_F bitmap_rect =
+                        gameplay_note_bitmap_dest_rect(note_rect,
+                                                       head_bitmap,
+                                                       head_source_rect,
+                                                       note_shape,
+                                                       data.gameplay.preserve_note_image_aspect_ratio);
+                    ctx->DrawBitmap(head_bitmap, bitmap_rect, 1.0f,
+                                    D2D1_BITMAP_INTERPOLATION_MODE_LINEAR, head_source_rect);
                 } else {
                     if (note_fill) {
                         draw_note_primitive(ctx, note_rect, note_fill, note_border, 1.3f,

@@ -37,7 +37,10 @@ struct OsuManiaChart {
     double base_bpm = 0.0;
     double overall_difficulty = 8.0;
     std::string title;
+    std::string title_unicode;
     std::string artist;
+    std::string artist_unicode;
+    std::string version;
     std::string audio_filename;
     std::string background_filename;
     std::vector<OsuManiaTimingPoint> timing_points;

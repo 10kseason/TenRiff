@@ -308,7 +308,8 @@ int key_count_from_mode_token(std::string_view token) {
 
 bool should_store_index_header(std::string_view key) {
     if (key == "BPM" || key == "PLAYER" || key == "GENRE" || key == "TITLE" || key == "ARTIST" ||
-        key == "PLAYLEVEL" || key == "RANK" || key == "TOTAL" || key == "VOLWAV" || key == "LNOBJ") {
+        key == "SUBTITLE" || key == "DIFFICULTY" || key == "PLAYLEVEL" || key == "RANK" ||
+        key == "TOTAL" || key == "VOLWAV" || key == "LNOBJ") {
         return true;
     }
     if (key_count_from_mode_token(key) > 0) {
@@ -717,8 +718,8 @@ BmsParseResult BmsParser::parse(std::string_view content, const BmsParserOptions
         to_upper_ascii(key);
 
         if (key == "BPM" || key == "PLAYER" || key == "GENRE" || key == "TITLE" ||
-            key == "ARTIST" || key == "PLAYLEVEL" || key == "RANK" || key == "TOTAL" ||
-            key == "VOLWAV") {
+            key == "ARTIST" || key == "SUBTITLE" || key == "DIFFICULTY" || key == "PLAYLEVEL" ||
+            key == "RANK" || key == "TOTAL" || key == "VOLWAV") {
             result.chart.headers[key] = value;
             if (key == "BPM") {
                 bool ok = false;

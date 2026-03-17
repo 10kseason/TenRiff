@@ -8,6 +8,7 @@
 #include <sstream>
 #include <unordered_map>
 
+#include "app/ModeManager.h"
 #include "config/SimpleJson.h"
 
 namespace tenriff::config {
@@ -404,6 +405,11 @@ void apply_config_object(const JsonObject& root, RuntimeConfig& config) {
         config.mode.gauge = get_string(*mode, "gauge", config.mode.gauge);
         config.mode.random = get_string(*mode, "random", config.mode.random);
         config.mode.random_seed = static_cast<uint32_t>(get_number(*mode, "random_seed", config.mode.random_seed));
+        if (const auto* mods = get_value(*mode, "mods")) {
+            if (mods->as_array()) {
+                config.mode.mods = ::tenriff::app::normalize_mode_mod_tokens(get_string_array(*mode, "mods"));
+            }
+        }
         config.mode.enable_osu_charts = get_bool(*mode, "enable_osu_charts", config.mode.enable_osu_charts);
         config.mode.song_index_profile =
             normalize_song_index_profile(get_string(*mode, "song_index_profile", config.mode.song_index_profile));
@@ -430,6 +436,10 @@ void apply_config_object(const JsonObject& root, RuntimeConfig& config) {
             normalize_skin_note_shape_token(get_string(*skin, "note_shape", config.skin.note_shape));
         config.skin.note_border_enabled =
             get_bool(*skin, "note_border_enabled", config.skin.note_border_enabled);
+        config.skin.preserve_note_image_aspect_ratio =
+            get_bool(*skin,
+                     "preserve_note_image_aspect_ratio",
+                     config.skin.preserve_note_image_aspect_ratio);
         config.skin.judgement_line_position = std::clamp(
             get_number(*skin, "judgement_line_position", config.skin.judgement_line_position),
             kJudgementLinePositionMin, kJudgementLinePositionMax);
@@ -622,6 +632,13 @@ JsonValue build_json_root(const RuntimeConfig& config) {
     mode.emplace("gauge", JsonValue{config.mode.gauge});
     mode.emplace("random", JsonValue{config.mode.random});
     mode.emplace("random_seed", JsonValue{static_cast<double>(config.mode.random_seed)});
+    const auto normalized_mods = ::tenriff::app::normalize_mode_mod_tokens(config.mode.mods);
+    JsonArray mods;
+    mods.reserve(normalized_mods.size());
+    for (const auto& token : normalized_mods) {
+        mods.emplace_back(token);
+    }
+    mode.emplace("mods", JsonValue{std::move(mods)});
     mode.emplace("enable_osu_charts", JsonValue{config.mode.enable_osu_charts});
     mode.emplace("song_index_profile", JsonValue{normalize_song_index_profile(config.mode.song_index_profile)});
     root.emplace("mode", JsonValue{std::move(mode)});
@@ -643,6 +660,8 @@ JsonValue build_json_root(const RuntimeConfig& config) {
     skin.emplace("osu_skin_name", JsonValue{config.skin.osu_skin_name});
     skin.emplace("note_shape", JsonValue{normalize_skin_note_shape_token(config.skin.note_shape)});
     skin.emplace("note_border_enabled", JsonValue{config.skin.note_border_enabled});
+    skin.emplace("preserve_note_image_aspect_ratio",
+                 JsonValue{config.skin.preserve_note_image_aspect_ratio});
     skin.emplace("judgement_line_position", JsonValue{config.skin.judgement_line_position});
     skin.emplace("combo_position", JsonValue{config.skin.combo_position});
     skin.emplace("note_width_scale", JsonValue{config.skin.note_width_scale});
@@ -893,6 +912,7 @@ RuntimeConfig ConfigLoader::defaults() const {
     config.mode.gauge = "normal";
     config.mode.random = "off";
     config.mode.random_seed = 0;
+    config.mode.mods.clear();
     config.mode.enable_osu_charts = false;
     config.mode.song_index_profile = "safe";
 

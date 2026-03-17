@@ -230,8 +230,14 @@ OsuManiaParseResult OsuManiaLoader::parse(std::string_view content) const {
             std::string value = trim(trimmed.substr(sep + 1));
             if (key == "TITLE") {
                 result.chart.title = value;
+            } else if (key == "TITLEUNICODE") {
+                result.chart.title_unicode = value;
             } else if (key == "ARTIST") {
                 result.chart.artist = value;
+            } else if (key == "ARTISTUNICODE") {
+                result.chart.artist_unicode = value;
+            } else if (key == "VERSION") {
+                result.chart.version = value;
             }
             continue;
         }

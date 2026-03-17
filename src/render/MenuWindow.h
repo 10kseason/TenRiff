@@ -228,6 +228,7 @@ struct GameplayHudData {
     double hold_body_width_scale = 0.60;
     bool note_border_enabled = true;
     std::string note_shape = "rect";
+    bool preserve_note_image_aspect_ratio = false;
     std::string skin_source = "native";
     std::string osu_skin_root;
     std::string osu_skin_name;
@@ -486,6 +487,7 @@ private:
         int lane_count = 0;
         bool note_border_enabled = true;
         std::string note_shape = "rect";
+        bool preserve_note_image_aspect_ratio = false;
         std::string skin_source = "native";
         std::string osu_skin_root;
         std::string osu_skin_name;
