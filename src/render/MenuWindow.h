@@ -186,6 +186,7 @@ struct ResultScreenData {
     int export_warning_count = 0;
 
     std::string replay_file;
+    bool replay_available = false;
     std::string result_file;
     std::vector<std::string> notes;
     std::vector<ResultGaugePoint> gauge_points;

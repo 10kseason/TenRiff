@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -23,6 +24,13 @@ struct ReplayTrace {
     std::vector<ReplayEvent> events;
 };
 
+struct ReplayModeSettings {
+    std::string key_mode;
+    std::string random;
+    std::optional<int> random_seed;
+    std::string gauge;
+};
+
 struct ReplayFile {
     int version = 1;
     std::string chart_path;
@@ -37,6 +45,7 @@ struct ReplayFile {
     double score_multiplier = 1.0;
     int64_t final_score = 0;
 
+    ReplayModeSettings mode;
     ReplayTrace trace;
     ResultStats stats;
 };
@@ -68,7 +77,16 @@ struct ExportResult {
     [[nodiscard]] bool success() const { return error.empty(); }
 };
 
+struct ReplayLoadResult {
+    std::optional<ReplayFile> replay;
+    std::vector<std::string> warnings;
+    std::string error;
+
+    [[nodiscard]] bool success() const { return error.empty() && replay.has_value(); }
+};
+
 [[nodiscard]] ExportResult save_replay_json(const std::string& path, const ReplayFile& replay, int indent = 2);
 [[nodiscard]] ExportResult save_result_json(const std::string& path, const ResultFile& result, int indent = 2);
+[[nodiscard]] ReplayLoadResult load_replay_json(const std::string& path);
 
 }  // namespace tenriff::gameplay

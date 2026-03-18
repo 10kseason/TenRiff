@@ -908,7 +908,7 @@ RuntimeConfig ConfigLoader::defaults() const {
     config.graphics.performance_overlay = false;
 
     config.mode.format = "bms";
-    config.mode.key_mode = "10k";
+    config.mode.key_mode = "none";
     config.mode.gauge = "normal";
     config.mode.random = "off";
     config.mode.random_seed = 0;

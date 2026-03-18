@@ -22,7 +22,7 @@ std::string to_string(KeyMode mode) {
         case KeyMode::Keys9: return "9K";
         case KeyMode::Keys10: return "10K";
         case KeyMode::Keys16: return "16K";
-        case KeyMode::Auto: default: return "AUTO";
+        case KeyMode::Auto: default: return "NONE";
     }
 }
 
@@ -76,7 +76,7 @@ std::optional<ChartFormatMode> parse_chart_format(std::string_view token) {
 
 std::optional<KeyMode> parse_key_mode(std::string_view token) {
     std::string normalized = normalize(token);
-    if (normalized == "AUTO") {
+    if (normalized == "AUTO" || normalized == "NONE" || normalized == "NATIVE") {
         return KeyMode::Auto;
     }
     if (normalized == "4K" || normalized == "4KEY" || normalized == "KEYS4") {

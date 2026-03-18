@@ -4888,7 +4888,9 @@ void MenuWindow::draw(const MenuRenderData& data) {
         draw_panel_row(summary_rect, summary_rect.top + 760.0f, "Gauge Shifts", std::to_string(data.result.shift_count));
 
         if (d2d_->body_format && d2d_->muted_brush) {
-            const std::wstring detail_w = to_wide("ENTER or ESC to return");
+            const std::wstring detail_w =
+                to_wide(data.result.replay_available ? std::string("R / Replay or Enter / Esc to return")
+                                                     : std::string("ENTER or ESC to return"));
             const D2D1_RECT_F detail_rect_hint =
                 D2D1::RectF(summary_rect.left + 28.0f, summary_rect.bottom - 60.0f, summary_rect.right - 28.0f,
                             summary_rect.bottom - 24.0f);
@@ -5097,8 +5099,18 @@ void MenuWindow::draw(const MenuRenderData& data) {
             draw_detail_line(detail_rect.top + 270.0f, data.result.result_file, true);
         }
 
+        const bool show_replay_button = !data.result.replay_file.empty();
+        const bool replay_available = data.result.replay_available;
+        const D2D1_RECT_F back_rect =
+            D2D1::RectF(detail_rect.left + 24.0f, detail_rect.bottom - 78.0f, detail_rect.right - 24.0f,
+                        detail_rect.bottom - 24.0f);
+        const D2D1_RECT_F replay_rect =
+            D2D1::RectF(detail_rect.left + 24.0f, back_rect.top - 66.0f, detail_rect.right - 24.0f,
+                        back_rect.top - 12.0f);
+
         float note_y = detail_rect.top + 326.0f;
-        if (d2d_->body_format && d2d_->text_brush) {
+        const float notes_bottom = (show_replay_button ? replay_rect.top : back_rect.top) - 18.0f;
+        if (d2d_->body_format && d2d_->text_brush && note_y + 24.0f < notes_bottom) {
             const std::wstring notes_w = L"Notes";
             const D2D1_RECT_F notes_rect =
                 D2D1::RectF(detail_rect.left + 24.0f, note_y, detail_rect.right - 24.0f, note_y + 28.0f);
@@ -5106,14 +5118,58 @@ void MenuWindow::draw(const MenuRenderData& data) {
                           d2d_->body_format.Get(), notes_rect, d2d_->text_brush.Get());
         }
         note_y += 34.0f;
-        for (std::size_t i = 0; i < data.result.notes.size() && i < 6; ++i) {
-            draw_detail_line(note_y, data.result.notes[i], true);
-            note_y += 30.0f;
+        if (note_y < notes_bottom && d2d_->body_format) {
+            const D2D1_RECT_F notes_clip_rect =
+                D2D1::RectF(detail_rect.left + 18.0f, note_y - 4.0f, detail_rect.right - 18.0f, notes_bottom);
+            const int max_lines = std::max(
+                0,
+                static_cast<int>(std::floor((notes_clip_rect.bottom - note_y) / 30.0f)));
+            if (max_lines > 0) {
+                ctx->PushAxisAlignedClip(notes_clip_rect, D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
+                std::size_t visible_lines = std::min<std::size_t>(data.result.notes.size(), static_cast<std::size_t>(max_lines));
+                const bool truncated = data.result.notes.size() > visible_lines;
+                if (truncated && visible_lines > 0) {
+                    --visible_lines;
+                }
+                for (std::size_t i = 0; i < visible_lines; ++i) {
+                    draw_detail_line(note_y, data.result.notes[i], true);
+                    note_y += 30.0f;
+                }
+                if (truncated) {
+                    const std::string remaining = "+" + std::to_string(data.result.notes.size() - visible_lines) + " more";
+                    draw_detail_line(note_y, remaining, true);
+                }
+                ctx->PopAxisAlignedClip();
+            }
         }
 
-        const D2D1_RECT_F back_rect =
-            D2D1::RectF(detail_rect.left + 24.0f, detail_rect.bottom - 78.0f, detail_rect.right - 24.0f,
-                        detail_rect.bottom - 24.0f);
+        if (show_replay_button) {
+            if (replay_available) {
+                register_hit(replay_rect, MenuHitTargetKind::SettingsRow, 1);
+            }
+            if (d2d_->button_selected_brush) {
+                d2d_->button_selected_brush->SetOpacity(replay_available ? 0.88f : 0.32f);
+                ctx->FillRoundedRectangle(D2D1::RoundedRect(replay_rect, 14.0f, 14.0f), d2d_->button_selected_brush.Get());
+                d2d_->button_selected_brush->SetOpacity(1.0f);
+            }
+            if (d2d_->accent_brush) {
+                d2d_->accent_brush->SetOpacity(replay_available ? 1.0f : 0.35f);
+                ctx->DrawRoundedRectangle(D2D1::RoundedRect(replay_rect, 14.0f, 14.0f), d2d_->accent_brush.Get(), 1.5f);
+                d2d_->accent_brush->SetOpacity(1.0f);
+            }
+            if (d2d_->title_format && d2d_->text_brush) {
+                const std::wstring replay_w = replay_available ? L"WATCH REPLAY" : L"REPLAY UNAVAILABLE";
+                ID2D1Brush* replay_brush =
+                    replay_available ? static_cast<ID2D1Brush*>(d2d_->text_brush.Get())
+                                     : static_cast<ID2D1Brush*>(d2d_->muted_brush ? d2d_->muted_brush.Get()
+                                                                                   : d2d_->text_brush.Get());
+                d2d_->title_format->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_CENTER);
+                ctx->DrawText(replay_w.c_str(), static_cast<UINT32>(replay_w.size()),
+                              d2d_->title_format.Get(), replay_rect, replay_brush);
+                d2d_->title_format->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_LEADING);
+            }
+        }
+
         register_hit(back_rect, MenuHitTargetKind::SettingsRow, 0);
         if (d2d_->button_selected_brush) {
             ctx->FillRoundedRectangle(D2D1::RoundedRect(back_rect, 14.0f, 14.0f), d2d_->button_selected_brush.Get());
