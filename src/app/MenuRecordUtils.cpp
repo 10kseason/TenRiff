@@ -6,6 +6,7 @@
 #include <sstream>
 
 #include "config/SimpleJson.h"
+#include "gameplay/Replay.h"
 #include "util/Utf8Compat.h"
 
 namespace tenriff::app::menu_records {
@@ -388,71 +389,30 @@ std::optional<ParsedResultRecord> parse_result_file(const std::filesystem::path&
 }
 
 std::optional<ParsedReplayRecord> parse_replay_file(const std::filesystem::path& path, std::string* error) {
-    std::ifstream file(path, std::ios::binary);
-    if (!file) {
+    auto loaded = gameplay::load_replay_json(path.u8string());
+    if (!loaded.success()) {
         if (error) {
-            *error = "Failed to open replay JSON.";
+            *error = loaded.error.empty() ? "Failed to parse replay JSON." : loaded.error;
         }
         return std::nullopt;
     }
 
-    std::ostringstream buffer;
-    buffer << file.rdbuf();
-    auto parsed = config::parse_json(buffer.str());
-    if (!parsed.success() || !parsed.root.has_value()) {
-        if (error) {
-            *error = parsed.error.empty() ? "Failed to parse replay JSON." : parsed.error;
-        }
-        return std::nullopt;
-    }
-
-    const auto* root = parsed.root->as_object();
-    if (!root) {
-        if (error) {
-            *error = "Replay JSON root must be an object.";
-        }
-        return std::nullopt;
-    }
-    const auto* trace = find_json_object(*root, "trace");
-    if (!trace) {
-        if (error) {
-            *error = "Replay JSON missing trace object.";
-        }
-        return std::nullopt;
-    }
-    const auto* stats_obj = find_json_object(*root, "stats");
-
+    const auto& replay = loaded.replay.value();
     ParsedReplayRecord out;
-    out.sample_rate = read_json_int(*root, "sample_rate", read_json_int(*trace, "sample_rate", 0));
-    out.rate = read_json_number(*root, "rate", read_json_number(*trace, "rate", 1.0));
-    out.input_offset_ms = read_json_number(*root, "input_offset_ms", 0.0);
-    out.mods = read_json_string_array(*root, "mods");
-    out.rate_multiplier = read_json_number(*root, "rate_multiplier", 1.0);
-    out.score_multiplier = read_json_number(*root, "score_multiplier", 1.0);
-    out.lane_count = read_json_int(*trace, "lane_count", 0);
-    out.duration_samples = static_cast<int64_t>(std::llround(read_json_number(*trace, "duration_samples", 0.0)));
-    if (stats_obj) {
-        gameplay::ResultStats stats;
-        if (const auto* counts_obj = find_json_object(*stats_obj, "counts")) {
-            stats.counts.pg = read_json_int(*counts_obj, "pg", 0);
-            stats.counts.gr = read_json_int(*counts_obj, "gr", 0);
-            stats.counts.gd = read_json_int(*counts_obj, "gd", 0);
-            stats.counts.bd = read_json_int(*counts_obj, "bd", 0);
-            stats.counts.bd += read_json_int(*counts_obj, "pr", 0);
-            stats.counts.pr = 0;
-        }
-        stats.raw_score = static_cast<int64_t>(std::llround(
-            read_json_number(*stats_obj, "raw_score", static_cast<double>(calculate_score(stats)))));
-        out.raw_score = stats.raw_score;
-    }
-    out.final_score = static_cast<int64_t>(std::llround(read_json_number(
-        *root,
-        "final_score",
-        static_cast<double>(clamp_final_score(out.raw_score, out.score_multiplier)))));
-    if (const auto* events = find_json_value(*trace, "events")) {
-        if (const auto* values = events->as_array()) {
-            out.event_count = static_cast<int>(values->size());
-        }
+    out.sample_rate = replay.sample_rate > 0 ? replay.sample_rate : replay.trace.sample_rate;
+    out.rate = replay.rate;
+    out.input_offset_ms = replay.input_offset_ms;
+    out.mods = replay.mods;
+    out.rate_multiplier = replay.rate_multiplier;
+    out.score_multiplier = replay.score_multiplier;
+    out.lane_count = replay.trace.lane_count;
+    out.duration_samples = replay.trace.duration_samples;
+    out.raw_score = calculate_score(replay.stats);
+    out.final_score = replay.final_score > 0 ? replay.final_score
+                                             : clamp_final_score(out.raw_score, out.score_multiplier);
+    out.event_count = static_cast<int>(replay.trace.events.size());
+    if (!loaded.warnings.empty() && error) {
+        *error = loaded.warnings.front();
     }
     return out;
 }

@@ -35,6 +35,7 @@
 #include "app/OsuSkin.h"
 #include "app/RuntimeConfigMigration.h"
 #include "config/KeycodeMap.h"
+#include "gameplay/Replay.h"
 #include "render/GameplayMotion.h"
 #include "timing/HighResClock.h"
 #include "util/Utf8Compat.h"
@@ -562,6 +563,9 @@ std::string format_label(const std::string& value) {
 }
 
 std::string key_mode_label(const std::string& value) {
+    if (value == "none" || value == "auto") {
+        return "None";
+    }
     if (value == "4k") {
         return "4K";
     }
@@ -586,7 +590,7 @@ std::string key_mode_label(const std::string& value) {
     if (value == "16k") {
         return "16K";
     }
-    return "Auto";
+    return "None";
 }
 
 std::string song_index_profile_label(const std::string& value) {
@@ -634,21 +638,24 @@ std::string song_detail_label(const SongEntry& entry) {
 
 std::string normalize_runtime_key_mode(std::string value) {
     value = to_lower_ascii(std::move(value));
+    if (value == "none" || value == "auto") {
+        return "none";
+    }
     if (value == "4k" || value == "5k" || value == "6k" || value == "7k" || value == "8k" ||
         value == "9k" || value == "10k" || value == "16k") {
         return value;
     }
-    return "auto";
+    return "none";
 }
 
 std::string cycle_runtime_key_mode(std::string_view current, int direction, bool allow_auto) {
-    static constexpr const char* kAutoModes[] = {"auto", "4k", "5k", "6k", "7k", "8k", "9k", "10k", "16k"};
+    static constexpr const char* kAutoModes[] = {"none", "4k", "5k", "6k", "7k", "8k", "9k", "10k", "16k"};
     static constexpr const char* kConcreteModes[] = {"4k", "5k", "6k", "7k", "8k", "9k", "10k", "16k"};
     const auto* options = allow_auto ? kAutoModes : kConcreteModes;
     const int option_count = allow_auto ? static_cast<int>(sizeof(kAutoModes) / sizeof(kAutoModes[0]))
                                         : static_cast<int>(sizeof(kConcreteModes) / sizeof(kConcreteModes[0]));
     std::string normalized = normalize_runtime_key_mode(std::string(current));
-    if (!allow_auto && normalized == "auto") {
+    if (!allow_auto && normalized == "none") {
         normalized = "10k";
     }
 
@@ -2082,6 +2089,16 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
         return;
     }
 
+    if (screen_ == Screen::Result) {
+        if (event.index == 1) {
+            (void)launch_last_result_replay();
+        } else {
+            screen_ = Screen::SongSelect;
+            publish_snapshot();
+        }
+        return;
+    }
+
     const uint32_t action_key = (event.part == render::MenuHitPart::Increment)
                                     ? key_right_
                                     : (event.part == render::MenuHitPart::Decrement ? key_left_ : key_enter_);
@@ -2450,6 +2467,11 @@ void MenuApp::handle_song_select_input(uint32_t keycode) {
             publish_snapshot();
         }
         return;
+    }
+    if (keycode == key_r_ && song_select_view_ == SongSelectView::Records) {
+        if (launch_selected_record_replay()) {
+            return;
+        }
     }
     if (keycode == key_enter_) {
         if (song_select_focus_ == SongSelectFocus::LeftNav) {
@@ -3100,7 +3122,6 @@ void MenuApp::handle_mode_settings_input(uint32_t keycode) {
                 }
             } else {
                 config_.mode.format = "bms";
-                config_.mode.key_mode = "10k";
             }
             mode_dirty_ = true;
             mode_library_dirty_ = true;
@@ -3117,11 +3138,7 @@ void MenuApp::handle_mode_settings_input(uint32_t keycode) {
             mode_dirty_ = true;
             rebuild_visible_song_list();
         } else if (settings_cursor_ == 3) {
-            if (!config_.mode.enable_osu_charts) {
-                config_.mode.key_mode = "10k";
-            } else {
-                config_.mode.key_mode = cycle_runtime_key_mode(config_.mode.key_mode, direction, true);
-            }
+            config_.mode.key_mode = cycle_runtime_key_mode(config_.mode.key_mode, direction, true);
             mode_dirty_ = true;
         } else if (settings_cursor_ == 4) {
             if (config_.mode.gauge == "normal") {
@@ -3309,6 +3326,11 @@ void MenuApp::handle_keymap_test_input(uint32_t keycode) {
 }
 
 void MenuApp::handle_result_input(uint32_t keycode) {
+    if (keycode == key_r_) {
+        if (launch_last_result_replay()) {
+            return;
+        }
+    }
     if (keycode == key_enter_ || keycode == key_escape_ || keycode == key_backspace_) {
         screen_ = Screen::SongSelect;
         publish_snapshot();
@@ -4109,13 +4131,24 @@ void MenuApp::populate_result_render_data(render::MenuRenderData& render, const 
     render.result.shift_count = static_cast<int>(last_result_.shifts.size());
     render.result.export_warning_count = static_cast<int>(last_export_warnings_.size());
     render.result.replay_file = filename_only(last_replay_path_);
+    render.result.replay_available = false;
     render.result.result_file = filename_only(last_result_path_);
+
+    if (!last_replay_path_.empty()) {
+        std::error_code ec;
+        render.result.replay_available = std::filesystem::exists(path_from_utf8(last_replay_path_), ec) && !ec;
+    }
 
     if (!render.result.replay_file.empty()) {
         render.result.notes.push_back("Replay: " + render.result.replay_file);
     }
     if (!render.result.result_file.empty()) {
         render.result.notes.push_back("Result: " + render.result.result_file);
+    }
+    if (render.result.replay_available) {
+        render.result.notes.push_back("R or click Replay to watch the saved input trace.");
+    } else if (!render.result.replay_file.empty()) {
+        render.result.notes.push_back("Replay file is missing or unavailable.");
     }
     render.result.notes.push_back("Score x" + format_decimal(last_result_score_multiplier_));
     if (last_result_rate_multiplier_ != 1.0) {
@@ -4124,6 +4157,9 @@ void MenuApp::populate_result_render_data(render::MenuRenderData& render, const 
     render.result.notes.push_back("Mods: " + mode_mod_summary(last_result_mods_));
     render.result.notes.push_back("Timing center " + format_signed_ms(last_result_.mean_delta_ms) +
                                   "  spread " + format_decimal(render.result.stddev_delta_ms) + "ms");
+    if (last_session_replay_playback_) {
+        render.result.notes.push_back("Replay playback session: no new replay/result export was written.");
+    }
     if (!last_export_warnings_.empty()) {
         render.result.notes.push_back("Export warnings: " + std::to_string(last_export_warnings_.size()));
         const std::size_t preview_count = std::min<std::size_t>(2, last_export_warnings_.size());
@@ -4337,7 +4373,7 @@ void MenuApp::populate_generic_screen_render_data(render::MenuRenderData& render
                         config_.mode.enable_osu_charts ? format_label(config_.mode.format) : std::string("BMS"),
                         settings_cursor_ == 2, render::MenuHitTargetKind::SettingsRow, 2, false, true);
         append_menu_row(render.generic, "Key Mode",
-                        config_.mode.enable_osu_charts ? key_mode_label(config_.mode.key_mode) : std::string("10K"),
+                        key_mode_label(config_.mode.key_mode),
                         settings_cursor_ == 3, render::MenuHitTargetKind::SettingsRow, 3, false, true);
         append_menu_row(render.generic, "Gauge", gauge_label(config_.mode.gauge), settings_cursor_ == 4,
                         render::MenuHitTargetKind::SettingsRow, 4, false, true);
@@ -4355,7 +4391,8 @@ void MenuApp::populate_generic_screen_render_data(render::MenuRenderData& render
         render.generic.notes.push_back("OSU Charts adds 4K-10K .osu beatmaps to song indexing and runtime loading.");
         render.generic.notes.push_back("Indexing Safe keeps RAM low for large scans; Fast uses more RAM for quicker rescans on 32GB+ PCs.");
         render.generic.notes.push_back("Chart Filter switches the visible library between BMS, OSU, or All.");
-        render.generic.notes.push_back("Key Mode selects Auto plus 4K-10K/16K runtime layouts; osu charts still top out at 10K.");
+        render.generic.notes.push_back("Key Mode selects None/native plus 4K-10K/16K runtime layouts; osu charts still top out at 10K.");
+        render.generic.notes.push_back("None keeps the chart's original key count and pattern layout instead of forcing a conversion.");
         render.generic.notes.push_back("Mods opens the registry-backed Mod Manager and shows the current score multiplier.");
         render.generic.notes.push_back("Back saves the toggle/filter and refreshes the song library cache when needed.");
     } else if (screen_ == Screen::ModeMods) {
@@ -4543,7 +4580,8 @@ void MenuApp::render_tick() {
             render_cache_ready_ = true;
             snapshot_changed = true;
         }
-        render_cache_.performance.visible = show_performance_overlay;
+        render_cache_.performance.visible =
+            show_performance_overlay && render_cache_.kind != render::MenuScreenKind::ResultScreen;
     }
 
     if (render_cache_.kind == render::MenuScreenKind::GameplayHud) {
@@ -5124,6 +5162,7 @@ bool MenuApp::open_selected_record_result() {
     last_replay_path_ = record->replay_path;
     last_result_path_ = record->result_path;
     last_export_warnings_.clear();
+    last_session_replay_playback_ = false;
     if (const SongEntry* entry = (selected_song_ >= 0) ? visible_song_entry(static_cast<std::size_t>(selected_song_))
                                                        : nullptr) {
         last_chart_title_ = entry->title.empty() ? entry->path : entry->title;
@@ -5136,6 +5175,47 @@ bool MenuApp::open_selected_record_result() {
     }
     screen_ = Screen::Result;
     return true;
+}
+
+bool MenuApp::launch_replay_from_path(const std::string& replay_path, const std::string& fallback_chart_path) {
+    if (replay_path.empty()) {
+        return false;
+    }
+
+    auto replay_load = gameplay::load_replay_json(replay_path);
+    if (!replay_load.success()) {
+        std::cerr << "[warn] Failed to load replay for playback " << replay_path
+                  << ": " << replay_load.error << std::endl;
+        return false;
+    }
+    for (const auto& warning : replay_load.warnings) {
+        std::cerr << "[warn] " << warning << std::endl;
+    }
+
+    std::string chart_path = replay_load.replay->chart_path;
+    if (chart_path.empty()) {
+        chart_path = fallback_chart_path;
+    }
+    if (chart_path.empty()) {
+        std::cerr << "[warn] Replay file does not contain a chart path: " << replay_path << std::endl;
+        return false;
+    }
+
+    launch_gameplay(chart_path, replay_path);
+    return true;
+}
+
+bool MenuApp::launch_last_result_replay() {
+    return launch_replay_from_path(last_replay_path_);
+}
+
+bool MenuApp::launch_selected_record_replay() {
+    rebuild_current_song_record_indices();
+    const LocalPlayRecord* record = current_selected_record();
+    if (!record) {
+        return false;
+    }
+    return launch_replay_from_path(record->replay_path, record->chart_path);
 }
 
 std::string MenuApp::selected_song_absolute_path() const {
@@ -5211,7 +5291,9 @@ void MenuApp::launch_selected_song() {
     launch_gameplay(chart_path);
 }
 
-void MenuApp::launch_gameplay(const std::string& chart_path) {
+void MenuApp::launch_gameplay(const std::string& chart_path, const std::string& replay_path) {
+    const bool replay_playback = !replay_path.empty();
+    const std::string preserved_result_path = last_result_path_;
     if (selected_song_ >= 0 && selected_song_ < static_cast<int>(visible_song_count())) {
         if (const SongEntry* entry = visible_song_entry(static_cast<std::size_t>(selected_song_))) {
             last_chart_title_ = entry->title.empty() ? entry->path : entry->title;
@@ -5347,6 +5429,7 @@ void MenuApp::launch_gameplay(const std::string& chart_path) {
 
     CommandLineOptions play_options = options_;
     play_options.chart_path = chart_path;
+    play_options.replay_path = replay_path;
     if (!session.initialize(play_options)) {
         const bool loading_canceled = session.was_user_aborted();
         session.shutdown();
@@ -5386,8 +5469,9 @@ void MenuApp::launch_gameplay(const std::string& chart_path) {
         last_result_score_multiplier_ = result.score_multiplier;
         last_result_final_score_ = result.final_score;
         last_replay_path_ = result.replay_path;
-        last_result_path_ = result.result_path;
+        last_result_path_ = (!result.result_path.empty() || !replay_playback) ? result.result_path : preserved_result_path;
         last_export_warnings_ = result.export_warnings;
+        last_session_replay_playback_ = replay_playback;
         reload_chart_best_results();
         screen_ = Screen::Result;
     } else {
@@ -5399,6 +5483,7 @@ void MenuApp::launch_gameplay(const std::string& chart_path) {
         last_replay_path_.clear();
         last_result_path_.clear();
         last_export_warnings_.clear();
+        last_session_replay_playback_ = false;
         screen_ = Screen::SongSelect;
     }
     apply_runtime_graphics_config();
@@ -5571,6 +5656,7 @@ void MenuApp::populate_help_overlay(render::HelpOverlayData& target) const {
             target.title = "Result Screen";
             target.lines = {
                 "This panel shows the saved score, timing spread, gauge trace, and export file names for the run.",
+                "R or the Replay button starts playback from the saved replay file when one is available.",
                 "Enter, Esc, and Backspace all return to Song Select.",
             };
             target.footer = "Back and confirm are intentionally mirrored here for faster recovery after each song.";

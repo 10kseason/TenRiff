@@ -231,6 +231,8 @@ private:
     static void clamp_output(float* output, uint32_t frames, float master_gain);
     void report_loading_progress(int percent, std::string_view stage);
     [[nodiscard]] bool loading_cancel_requested();
+    [[nodiscard]] int64_t playback_sample_for_replay_event(int64_t replay_sample) const;
+    void process_replay_input_queue(int64_t buffer_start_samples, int64_t buffer_end_samples, int64_t lookahead_samples);
 
     [[nodiscard]] std::optional<int> lane_from_keycode(uint32_t keycode) const;
     [[nodiscard]] double lane_frequency_hz(int lane) const;
@@ -241,11 +243,15 @@ private:
     CommandLineOptions options_;
     std::string profile_dir_;
     std::string chart_path_;
+    std::string replay_source_path_;
     ChartFormat chart_format_ = ChartFormat::Unknown;
     gameplay::GameplayChart chart_;
     std::vector<std::string> active_mods_{};
     double rate_multiplier_ = 1.0;
     double score_multiplier_ = 1.0;
+    gameplay::ReplayFile replay_source_{};
+    bool replay_playback_enabled_ = false;
+    std::size_t replay_event_index_ = 0;
 
     std::unique_ptr<gameplay::GameplayEngine> engine_;
     std::mutex engine_mutex_;

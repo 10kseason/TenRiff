@@ -196,8 +196,12 @@ private:
     void reset_song_select_repeat();
     [[nodiscard]] bool is_song_select_repeat_key(uint32_t keycode) const;
 
-    void launch_gameplay(const std::string& chart_path);
+    void launch_gameplay(const std::string& chart_path, const std::string& replay_path = {});
     void launch_selected_song();
+    [[nodiscard]] bool launch_replay_from_path(const std::string& replay_path,
+                                               const std::string& fallback_chart_path = {});
+    [[nodiscard]] bool launch_last_result_replay();
+    [[nodiscard]] bool launch_selected_record_replay();
     void start_keymap_capture();
     void apply_keymap_capture(uint32_t keycode);
     void apply_keymap_reset();
@@ -319,6 +323,7 @@ private:
     double last_result_rate_multiplier_ = 1.0;
     double last_result_score_multiplier_ = 1.0;
     int64_t last_result_final_score_ = 0;
+    bool last_session_replay_playback_ = false;
     double last_chart_bpm_ = 0.0;
     GameplayHudState gameplay_hud_{};
 

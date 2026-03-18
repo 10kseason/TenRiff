@@ -9,6 +9,7 @@ struct CommandLineOptions {
     std::string songs_path = "songs";
     std::string profile = "default";
     std::string chart_path;
+    std::string replay_path;
     bool has_rate = false;
     bool has_hispeed = false;
     bool has_gauge = false;

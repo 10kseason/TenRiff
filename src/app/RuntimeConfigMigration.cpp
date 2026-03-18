@@ -30,7 +30,7 @@ bool is_valid_chart_filter(std::string_view value) {
 
 bool is_valid_osu_key_mode(std::string_view value) {
     const std::string token = to_lower_copy(value);
-    return token.empty() || token == "auto" || token == "4k" || token == "5k" || token == "6k" ||
+    return token.empty() || token == "auto" || token == "none" || token == "4k" || token == "5k" || token == "6k" ||
            token == "7k" || token == "8k" || token == "9k" || token == "10k" || token == "16k";
 }
 
@@ -128,7 +128,7 @@ bool migrate_bms_first_runtime_config(config::RuntimeConfig& config) {
             changed = true;
         }
         if (!is_valid_osu_key_mode(config.mode.key_mode)) {
-            config.mode.key_mode = "auto";
+            config.mode.key_mode = "none";
             changed = true;
         }
     } else {
@@ -136,8 +136,8 @@ bool migrate_bms_first_runtime_config(config::RuntimeConfig& config) {
             config.mode.format = "bms";
             changed = true;
         }
-        if (to_lower_copy(config.mode.key_mode) != "10k") {
-            config.mode.key_mode = "10k";
+        if (!is_valid_osu_key_mode(config.mode.key_mode)) {
+            config.mode.key_mode = "none";
             changed = true;
         }
     }

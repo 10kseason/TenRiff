@@ -1,5 +1,6 @@
 #pragma once
 
+#include <chrono>
 #include <mutex>
 #include <string>
 
@@ -25,6 +26,8 @@ private:
     std::string current_path_;
     double gain_ = 1.0;
     bool open_ = false;
+    bool open_failed_ = false;
+    std::chrono::steady_clock::time_point retry_allowed_at_{};
 };
 
 }  // namespace tenriff::app

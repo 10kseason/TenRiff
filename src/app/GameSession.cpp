@@ -1072,6 +1072,22 @@ std::optional<int> parse_lane_index(std::string_view lane) {
     return value;
 }
 
+std::string replay_key_mode_token(int lane_count) {
+    switch (lane_count) {
+        case 4:
+        case 5:
+        case 6:
+        case 7:
+        case 8:
+        case 9:
+        case 10:
+        case 16:
+            return std::to_string(lane_count) + "k";
+        default:
+            return {};
+    }
+}
+
 std::optional<game::GaugeType> parse_gauge_type(std::string_view value) {
     std::string token(value);
     std::transform(token.begin(), token.end(), token.begin(), [](unsigned char ch) {
@@ -1183,6 +1199,10 @@ bool GameSession::initialize(const CommandLineOptions& options) {
     active_mods_.clear();
     rate_multiplier_ = 1.0;
     score_multiplier_ = 1.0;
+    replay_source_ = {};
+    replay_source_path_.clear();
+    replay_playback_enabled_ = false;
+    replay_event_index_ = 0;
 
     future_events_ = {};
     tone_voices_.clear();
@@ -1271,7 +1291,52 @@ bool GameSession::initialize(const CommandLineOptions& options) {
     f5_keycode_ = config::KeycodeMap::to_keycode("F5").value_or(0);
     f6_keycode_ = config::KeycodeMap::to_keycode("F6").value_or(0);
 
+    if (!options.replay_path.empty()) {
+        auto replay_load = gameplay::load_replay_json(options.replay_path);
+        if (!replay_load.success()) {
+            std::cerr << "[warn] Failed to load replay " << options.replay_path
+                      << ": " << replay_load.error << std::endl;
+            return false;
+        }
+        replay_source_ = std::move(replay_load.replay.value());
+        replay_source_path_ = options.replay_path;
+        replay_playback_enabled_ = true;
+        replay_event_index_ = 0;
+        for (const auto& warning : replay_load.warnings) {
+            std::cerr << "[warn] " << warning << std::endl;
+        }
+        if (!options.has_rate && replay_source_.rate > 0.0) {
+            config_.speed.rate = replay_source_.rate;
+        }
+        if (!replay_source_.mods.empty()) {
+            config_.mode.mods = replay_source_.mods;
+        }
+        if (!replay_source_.mode.key_mode.empty()) {
+            config_.mode.key_mode = replay_source_.mode.key_mode;
+        } else {
+            const std::string inferred_key_mode = replay_key_mode_token(replay_source_.trace.lane_count);
+            if (!inferred_key_mode.empty()) {
+                config_.mode.key_mode = inferred_key_mode;
+            }
+        }
+        if (!replay_source_.mode.random.empty()) {
+            config_.mode.random = replay_source_.mode.random;
+        } else if (config_.mode.random != "off") {
+            std::cerr << "[warn] Replay file does not contain random-mode metadata; current random setting will be used."
+                      << std::endl;
+        }
+        if (replay_source_.mode.random_seed.has_value()) {
+            config_.mode.random_seed = replay_source_.mode.random_seed.value();
+        }
+        if (!replay_source_.mode.gauge.empty()) {
+            config_.mode.gauge = replay_source_.mode.gauge;
+        }
+    }
+
     std::string chart_path = options.chart_path;
+    if (chart_path.empty() && replay_playback_enabled_) {
+        chart_path = replay_source_.chart_path;
+    }
     if (chart_path.empty()) {
         chart_path = find_first_chart(options.songs_path);
     }
@@ -1439,6 +1504,13 @@ bool GameSession::initialize(const CommandLineOptions& options) {
     score_multiplier_ = mode_result.final_multiplier;
 
     chart_ = mode_result.chart;
+    if (replay_playback_enabled_ &&
+        replay_source_.trace.lane_count > 0 &&
+        chart_.lane_count != replay_source_.trace.lane_count) {
+        std::cerr << "[warn] Replay lane-count mismatch after mode application. expected="
+                  << replay_source_.trace.lane_count << " actual=" << chart_.lane_count << std::endl;
+        return false;
+    }
     offset_gameplay_chart_samples(chart_, ms_to_samples(static_cast<double>(kGameplayStartLeadInMs), sample_rate_));
     for (std::size_t i = 0; i < chart_.notes.size(); ++i) {
         chart_.notes[i].note_id = i;
@@ -2342,8 +2414,8 @@ void GameSession::clamp_output(float* output, uint32_t frames, float master_gain
 
 void GameSession::shutdown() {
     stop_requested_.store(true, std::memory_order_release);
-    audio_thread_.stop();
-    input_thread_.stop();
+    audio_thread_.shutdown();
+    input_thread_.shutdown();
     stop_chart_audio_workers();
     if (engine_ && gameplay_started_) {
         {
@@ -2361,72 +2433,79 @@ void GameSession::shutdown() {
                                               result_.score_multiplier)));
         result_.has_value = true;
 
-        const std::string created_utc = utc_timestamp_compact();
         const std::string format_token = chart_format_token(chart_format_);
-
-        std::filesystem::path profile_dir(profile_dir_);
-        std::filesystem::path replay_path = profile_dir / "replays" / ("replay_" + created_utc + ".json");
-        std::filesystem::path result_path = profile_dir / "results" / ("result_" + created_utc + ".json");
-
-        gameplay::ReplayFile replay;
-        replay.chart_path = chart_path_;
-        replay.chart_format = format_token;
-        replay.created_utc = created_utc;
-        replay.trace = engine_->replay();
-        replay.sample_rate = sample_rate_;
-        replay.rate = replay.trace.rate;
-        replay.input_offset_ms = config_.input_offset_ms;
-        replay.mods = result_.mods;
-        replay.rate_multiplier = result_.rate_multiplier;
-        replay.score_multiplier = result_.score_multiplier;
-        replay.final_score = result_.final_score;
-        replay.stats = result_.stats;
-
-        auto replay_export = gameplay::save_replay_json(replay_path.u8string(), replay);
-        if (!replay_export.success()) {
-            if (!replay_export.error.empty()) {
-                result_.export_warnings.push_back("Replay export failed: " + replay_export.error);
-            }
-            result_.export_warnings.insert(result_.export_warnings.end(),
-                                           replay_export.warnings.begin(),
-                                           replay_export.warnings.end());
+        if (replay_playback_enabled_) {
+            result_.replay_path = replay_source_path_;
         } else {
-            result_.replay_path = replay_path.u8string();
-            result_.export_warnings.insert(result_.export_warnings.end(),
-                                           replay_export.warnings.begin(),
-                                           replay_export.warnings.end());
-        }
+            const std::string created_utc = utc_timestamp_compact();
+            std::filesystem::path profile_dir(profile_dir_);
+            std::filesystem::path replay_path = profile_dir / "replays" / ("replay_" + created_utc + ".json");
+            std::filesystem::path result_path = profile_dir / "results" / ("result_" + created_utc + ".json");
 
-        gameplay::ResultFile exported_result;
-        const game::GaugeType final_gauge = engine_->gauge_state().type;
-        exported_result.chart_path = chart_path_;
-        exported_result.chart_format = format_token;
-        exported_result.created_utc = created_utc;
-        exported_result.replay_path = result_.replay_path;
-        exported_result.clear_status = clear_status_label(result_.game_over, final_gauge);
-        exported_result.final_gauge = gauge_type_token(final_gauge);
-        exported_result.sample_rate = sample_rate_;
-        exported_result.rate = replay.rate;
-        exported_result.game_over = result_.game_over;
-        exported_result.mods = result_.mods;
-        exported_result.rate_multiplier = result_.rate_multiplier;
-        exported_result.score_multiplier = result_.score_multiplier;
-        exported_result.final_score = result_.final_score;
-        exported_result.stats = result_.stats;
+            gameplay::ReplayFile replay;
+            replay.chart_path = chart_path_;
+            replay.chart_format = format_token;
+            replay.created_utc = created_utc;
+            replay.sample_rate = sample_rate_;
+            replay.rate = config_.speed.rate;
+            replay.input_offset_ms = config_.input_offset_ms;
+            replay.mods = result_.mods;
+            replay.rate_multiplier = result_.rate_multiplier;
+            replay.score_multiplier = result_.score_multiplier;
+            replay.final_score = result_.final_score;
+            replay.mode.key_mode = config_.mode.key_mode;
+            replay.mode.random = config_.mode.random;
+            replay.mode.random_seed = config_.mode.random_seed;
+            replay.mode.gauge = config_.mode.gauge;
+            replay.trace = engine_->replay();
+            replay.stats = result_.stats;
 
-        auto result_export = gameplay::save_result_json(result_path.u8string(), exported_result);
-        if (!result_export.success()) {
-            if (!result_export.error.empty()) {
-                result_.export_warnings.push_back("Result export failed: " + result_export.error);
+            auto replay_export = gameplay::save_replay_json(replay_path.u8string(), replay);
+            if (!replay_export.success()) {
+                if (!replay_export.error.empty()) {
+                    result_.export_warnings.push_back("Replay export failed: " + replay_export.error);
+                }
+                result_.export_warnings.insert(result_.export_warnings.end(),
+                                               replay_export.warnings.begin(),
+                                               replay_export.warnings.end());
+            } else {
+                result_.replay_path = replay_path.u8string();
+                result_.export_warnings.insert(result_.export_warnings.end(),
+                                               replay_export.warnings.begin(),
+                                               replay_export.warnings.end());
             }
-            result_.export_warnings.insert(result_.export_warnings.end(),
-                                           result_export.warnings.begin(),
-                                           result_export.warnings.end());
-        } else {
-            result_.result_path = result_path.u8string();
-            result_.export_warnings.insert(result_.export_warnings.end(),
-                                           result_export.warnings.begin(),
-                                           result_export.warnings.end());
+
+            gameplay::ResultFile exported_result;
+            const game::GaugeType final_gauge = engine_->gauge_state().type;
+            exported_result.chart_path = chart_path_;
+            exported_result.chart_format = format_token;
+            exported_result.created_utc = created_utc;
+            exported_result.replay_path = result_.replay_path;
+            exported_result.clear_status = clear_status_label(result_.game_over, final_gauge);
+            exported_result.final_gauge = gauge_type_token(final_gauge);
+            exported_result.sample_rate = sample_rate_;
+            exported_result.rate = replay.rate;
+            exported_result.game_over = result_.game_over;
+            exported_result.mods = result_.mods;
+            exported_result.rate_multiplier = result_.rate_multiplier;
+            exported_result.score_multiplier = result_.score_multiplier;
+            exported_result.final_score = result_.final_score;
+            exported_result.stats = result_.stats;
+
+            auto result_export = gameplay::save_result_json(result_path.u8string(), exported_result);
+            if (!result_export.success()) {
+                if (!result_export.error.empty()) {
+                    result_.export_warnings.push_back("Result export failed: " + result_export.error);
+                }
+                result_.export_warnings.insert(result_.export_warnings.end(),
+                                               result_export.warnings.begin(),
+                                               result_export.warnings.end());
+            } else {
+                result_.result_path = result_path.u8string();
+                result_.export_warnings.insert(result_.export_warnings.end(),
+                                               result_export.warnings.begin(),
+                                               result_export.warnings.end());
+            }
         }
     }
     engine_.reset();
@@ -2638,6 +2717,11 @@ void GameSession::process_future_events(int64_t buffer_end_samples, int64_t look
 
 void GameSession::process_input_queue(int64_t buffer_start_samples, int64_t buffer_end_samples,
                                       int64_t lookahead_samples) {
+    if (replay_playback_enabled_) {
+        process_replay_input_queue(buffer_start_samples, buffer_end_samples, lookahead_samples);
+        return;
+    }
+
     // If input falls well behind the current audio cursor, replaying every stale edge can spike the mix callback.
     const double stale_window_ms = std::max(kInputBacklogCatchupFloorMs, config_.judge.bd_ms);
     const int64_t stale_before_sample = buffer_start_samples - ms_to_samples(stale_window_ms, sample_rate_);
@@ -2693,6 +2777,45 @@ void GameSession::process_input_queue(int64_t buffer_start_samples, int64_t buff
 
     for (const auto& buffered : pending_input_events_) {
         dispatch_lane_input(buffered.lane, buffered.state, buffered.sample);
+    }
+}
+
+int64_t GameSession::playback_sample_for_replay_event(int64_t replay_sample) const {
+    const int replay_sample_rate = replay_source_.trace.sample_rate > 0
+                                       ? replay_source_.trace.sample_rate
+                                       : replay_source_.sample_rate;
+    if (replay_sample_rate <= 0 || replay_sample_rate == sample_rate_) {
+        return replay_sample;
+    }
+    return static_cast<int64_t>(std::llround(static_cast<long double>(replay_sample) *
+                                             static_cast<long double>(sample_rate_) /
+                                             static_cast<long double>(replay_sample_rate)));
+}
+
+void GameSession::process_replay_input_queue(int64_t buffer_start_samples,
+                                             int64_t buffer_end_samples,
+                                             int64_t lookahead_samples) {
+    static_cast<void>(buffer_start_samples);
+
+    while (true) {
+        auto maybe_event = input_thread_.queue().pop();
+        if (!maybe_event.has_value()) {
+            break;
+        }
+        if (handle_control_input(*maybe_event) &&
+            finished_.load(std::memory_order_acquire)) {
+            return;
+        }
+    }
+
+    while (replay_event_index_ < replay_source_.trace.events.size()) {
+        const auto& replay_event = replay_source_.trace.events[replay_event_index_];
+        const int64_t playback_sample = playback_sample_for_replay_event(replay_event.sample);
+        if (playback_sample > buffer_end_samples + lookahead_samples) {
+            break;
+        }
+        dispatch_lane_input(replay_event.lane, replay_event.state, playback_sample);
+        ++replay_event_index_;
     }
 }
 

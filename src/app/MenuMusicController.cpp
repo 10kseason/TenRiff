@@ -13,6 +13,7 @@
 #endif
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <filesystem>
 #include <iostream>
@@ -80,11 +81,14 @@ MenuMusicController::~MenuMusicController() {
 void MenuMusicController::play_looping_file(const std::string& path, double gain) {
 #ifdef _WIN32
     const double clamped_gain = std::clamp(gain, 0.0, 1.0);
+    const auto now = std::chrono::steady_clock::now();
 
     std::lock_guard<std::mutex> lock(mutex_);
     if (path.empty()) {
         close_locked();
         requested_path_.clear();
+        open_failed_ = false;
+        retry_allowed_at_ = {};
         return;
     }
 
@@ -93,15 +97,26 @@ void MenuMusicController::play_looping_file(const std::string& path, double gain
         apply_gain_locked();
         return;
     }
+    if (requested_path_ == path && open_failed_) {
+        if (now < retry_allowed_at_) {
+            gain_ = clamped_gain;
+            return;
+        }
+        gain_ = clamped_gain;
+    }
 
     close_locked();
     requested_path_ = path;
     gain_ = clamped_gain;
+    open_failed_ = false;
+    retry_allowed_at_ = {};
 
     std::string error;
     const std::wstring wide_path = wide_from_utf8(path);
     if (wide_path.empty()) {
         std::cerr << "[warn] Failed to resolve menu music path: " << path << std::endl;
+        open_failed_ = true;
+        retry_allowed_at_ = now + std::chrono::seconds(1);
         return;
     }
 
@@ -110,16 +125,21 @@ void MenuMusicController::play_looping_file(const std::string& path, double gain
         open_command = L"open \"" + wide_path + L"\" alias " + std::wstring(kMenuMusicAlias);
         if (!run_mci_command(open_command, &error)) {
             std::cerr << "[warn] Failed to open menu music: " << path << " (" << error << ")" << std::endl;
+            open_failed_ = true;
+            retry_allowed_at_ = now + std::chrono::seconds(1);
             return;
         }
     }
 
     open_ = true;
+    open_failed_ = false;
     current_path_ = path;
     apply_gain_locked();
     if (!run_mci_command(L"play " + std::wstring(kMenuMusicAlias) + L" from 0 repeat", &error)) {
         std::cerr << "[warn] Failed to start menu music: " << path << " (" << error << ")" << std::endl;
         close_locked();
+        open_failed_ = true;
+        retry_allowed_at_ = now + std::chrono::seconds(1);
     }
 #else
     static_cast<void>(path);
@@ -131,6 +151,8 @@ void MenuMusicController::stop() {
     std::lock_guard<std::mutex> lock(mutex_);
     close_locked();
     requested_path_.clear();
+    open_failed_ = false;
+    retry_allowed_at_ = {};
 }
 
 void MenuMusicController::close_locked() {

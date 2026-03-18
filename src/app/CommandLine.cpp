@@ -50,6 +50,10 @@ CommandLineParseResult CommandLine::parse(int argc, char** argv) {
             result.options.chart_path = argv[++i];
             continue;
         }
+        if (arg == "--replay" && i + 1 < argc) {
+            result.options.replay_path = argv[++i];
+            continue;
+        }
         if (arg == "--rate" && i + 1 < argc) {
             double value = 0.0;
             if (parse_double(argv[i + 1], value)) {
