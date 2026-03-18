@@ -1,7 +1,7 @@
-## TenRiff
+# TenRiff
 
 
-# 현재 바이러스로 오탐되는 경우가 있습니다..
+## 현재 바이러스로 오탐되는 경우가 있습니다.. 실제로 바이러스가 있는 것은 아닙니다.
 Language: Korean | [English](README.en.md) | [简体中文](README.zh-CN.md)
 
 TenRiff는 Windows GUI 기반 BMS-first 리듬게임 런타임/런처 프로젝트입니다. 목표는 실사용 가능한 BMS 플레이 환경을 중심으로, 저지먼트/오디오/입력/렌더링 파이프라인을 직접 제어하는 독립 실행형 리듬게임 클라이언트를 만드는 것입니다. 현재 프로젝트 버전은 `0.9.4`이며, MIT 라이선스를 사용합니다. 번들된 서드파티 고지는 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)에 정리합니다.
