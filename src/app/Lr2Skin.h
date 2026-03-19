@@ -8,6 +8,12 @@
 
 namespace tenriff::app {
 
+enum class Lr2ResolutionFamily {
+    Sd,
+    Hd,
+    Fhd,
+};
+
 struct Lr2PlaySkinDefinition {
     bool found = false;
     int keys = 0;
@@ -20,6 +26,7 @@ struct Lr2PlaySkinDefinition {
     std::vector<float> lane_divider_widths;
     float imported_note_width_ratio = 1.0f;
     float imported_note_height_ratio = 1.0f;
+    Lr2ResolutionFamily resolution_family = Lr2ResolutionFamily::Sd;
 };
 
 [[nodiscard]] std::string find_default_lr2_skin_test_root();
@@ -27,6 +34,7 @@ struct Lr2PlaySkinDefinition {
 [[nodiscard]] std::vector<std::string> list_lr2_skin_names(std::string_view root_utf8);
 [[nodiscard]] Lr2PlaySkinDefinition resolve_lr2_play_skin(std::string_view root_utf8,
                                                           std::string_view skin_name,
-                                                          int keys);
+                                                          int keys,
+                                                          std::string_view resolution_override = {});
 
 }  // namespace tenriff::app

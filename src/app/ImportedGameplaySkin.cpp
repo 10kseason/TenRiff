@@ -52,7 +52,8 @@ void apply_key_fallbacks(ImportedGameplaySkinDefinition& definition) {
 ImportedGameplaySkinDefinition resolve_imported_gameplay_skin(std::string_view source_token,
                                                               std::string_view root_utf8,
                                                               std::string_view skin_name,
-                                                              int keys) {
+                                                              int keys,
+                                                              std::string_view lr2_resolution_override) {
     ImportedGameplaySkinDefinition definition;
     const std::string source = to_lower_ascii(std::string(source_token));
     if (source == "osu") {
@@ -78,7 +79,7 @@ ImportedGameplaySkinDefinition resolve_imported_gameplay_skin(std::string_view s
     }
 
     if (source == "lr2") {
-        const auto lr2 = resolve_lr2_play_skin(root_utf8, skin_name, keys);
+        const auto lr2 = resolve_lr2_play_skin(root_utf8, skin_name, keys, lr2_resolution_override);
         if (!lr2.found) {
             return definition;
         }

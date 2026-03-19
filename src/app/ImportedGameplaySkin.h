@@ -33,6 +33,7 @@ struct ImportedGameplaySkinDefinition {
 [[nodiscard]] ImportedGameplaySkinDefinition resolve_imported_gameplay_skin(std::string_view source_token,
                                                                             std::string_view root_utf8,
                                                                             std::string_view skin_name,
-                                                                            int keys);
+                                                                            int keys,
+                                                                            std::string_view lr2_resolution_override = {});
 
 }  // namespace tenriff::app

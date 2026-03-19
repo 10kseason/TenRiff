@@ -193,6 +193,9 @@ private:
     void populate_mode_settings_render_data(render::MenuRenderData& render);
     void populate_mode_mods_render_data(render::MenuRenderData& render);
     void populate_skin_settings_render_data(render::MenuRenderData& render);
+    void populate_keymap_render_data(render::MenuRenderData& render);
+    void populate_keymap_confirm_render_data(render::MenuRenderData& render);
+    void populate_keymap_test_render_data(render::MenuRenderData& render);
     void populate_generic_screen_render_data(render::MenuRenderData& render);
     void render_tick();
     void render_snapshot(const MenuSnapshot& snapshot);
@@ -212,6 +215,7 @@ private:
     void apply_keymap_capture(uint32_t keycode);
     void apply_keymap_reset();
     void apply_keymap_save();
+    void clear_keymap_pending_state();
     void apply_song_sort(SongSortMode mode);
     bool remember_song_source(const std::string& source_path);
     void persist_runtime_config();

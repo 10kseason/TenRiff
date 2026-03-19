@@ -1,6 +1,7 @@
 #include "app/MenuApp.h"
 
 #include <algorithm>
+#include <array>
 #include <filesystem>
 #include <iostream>
 
@@ -67,6 +68,39 @@ std::string normalize_filesystem_display_name(std::string value) {
         value.pop_back();
     }
     return value.empty() ? "Imported Skin" : value;
+}
+
+std::string lr2_resolution_mode_label(std::string_view value) {
+    const std::string normalized = config::normalize_skin_lr2_resolution_mode_token(value);
+    if (normalized == "sd") {
+        return "SD";
+    }
+    if (normalized == "hd") {
+        return "HD";
+    }
+    if (normalized == "fhd") {
+        return "FHD";
+    }
+    return "Auto";
+}
+
+std::string cycle_lr2_resolution_mode(std::string_view value, int direction) {
+    static constexpr std::array<std::string_view, 4> kModes = {"auto", "sd", "hd", "fhd"};
+    const std::string normalized = config::normalize_skin_lr2_resolution_mode_token(value);
+    int index = 0;
+    for (int i = 0; i < static_cast<int>(kModes.size()); ++i) {
+        if (kModes[static_cast<std::size_t>(i)] == normalized) {
+            index = i;
+            break;
+        }
+    }
+    index += direction;
+    if (index < 0) {
+        index = static_cast<int>(kModes.size()) - 1;
+    } else if (index >= static_cast<int>(kModes.size())) {
+        index = 0;
+    }
+    return std::string(kModes[static_cast<std::size_t>(index)]);
 }
 
 fs::path osu_skin_import_root_path(std::string_view profile_dir) {
@@ -442,7 +476,31 @@ std::string MenuApp::active_external_skin_name() const {
 }
 
 void MenuApp::handle_skins_settings_input(uint32_t keycode) {
-    const int item_count = 20;
+    const std::string active_skin_source = config::normalize_skin_source_token(config_.skin.source);
+    const bool lr2_source = active_skin_source == "lr2";
+    const int lr2_shift = lr2_source ? 1 : 0;
+    const int item_count = 20 + lr2_shift;
+    const int imported_skin_row = 1;
+    const int lr2_resolution_row = lr2_source ? 2 : -1;
+    const int import_skin_row = 2 + lr2_shift;
+    const int key_mode_row = 3 + lr2_shift;
+    const int target_lane_row = 4 + lr2_shift;
+    const int lane_color_row = 5 + lr2_shift;
+    const int note_shape_row = 6 + lr2_shift;
+    const int note_border_row = 7 + lr2_shift;
+    const int image_aspect_row = 8 + lr2_shift;
+    const int lane_dividers_row = 9 + lr2_shift;
+    const int judgement_line_row = 10 + lr2_shift;
+    const int gear_boundary_row = 11 + lr2_shift;
+    const int ln_tail_taper_row = 12 + lr2_shift;
+    const int judge_line_row = 13 + lr2_shift;
+    const int note_width_row = 14 + lr2_shift;
+    const int divider_width_row = 15 + lr2_shift;
+    const int ln_body_width_row = 16 + lr2_shift;
+    const int note_height_row = 17 + lr2_shift;
+    const int combo_y_row = 18 + lr2_shift;
+    const int back_row = 19 + lr2_shift;
+
     if (keycode == key_up_) {
         settings_cursor_ = clamp_int(settings_cursor_ - 1, 0, item_count - 1);
         publish_snapshot();
@@ -456,22 +514,30 @@ void MenuApp::handle_skins_settings_input(uint32_t keycode) {
 
     if (settings_cursor_ == 0 && (keycode == key_left_ || keycode == key_right_)) {
         const int direction = (keycode == key_left_) ? -1 : 1;
+        const bool was_lr2 = active_skin_source == "lr2";
         config_.skin.source = cycle_skin_source(config_.skin.source, direction);
+        const bool is_lr2 = config::normalize_skin_source_token(config_.skin.source) == "lr2";
+        const int new_item_count = 20 + (is_lr2 ? 1 : 0);
+        if (!was_lr2 && is_lr2 && settings_cursor_ >= imported_skin_row) {
+            ++settings_cursor_;
+        } else if (was_lr2 && !is_lr2 && settings_cursor_ >= import_skin_row) {
+            --settings_cursor_;
+        }
+        settings_cursor_ = clamp_int(settings_cursor_, 0, new_item_count - 1);
         refresh_available_osu_skins();
         refresh_available_lr2_skins();
         skin_dirty_ = true;
         publish_snapshot();
         return;
     }
-    if (settings_cursor_ == 1 && (keycode == key_left_ || keycode == key_right_)) {
-        const std::string active_source = config::normalize_skin_source_token(config_.skin.source);
+    if (settings_cursor_ == imported_skin_row && (keycode == key_left_ || keycode == key_right_)) {
         auto* names = &available_osu_skin_names_;
         auto* selected_name = &config_.skin.osu_skin_name;
-        if (active_source == "lr2") {
+        if (active_skin_source == "lr2") {
             names = &available_lr2_skin_names_;
             selected_name = &config_.skin.lr2_skin_name;
         }
-        if (active_source != "native" && !names->empty()) {
+        if (active_skin_source != "native" && !names->empty()) {
             int current_index = 0;
             for (int i = 0; i < static_cast<int>(names->size()); ++i) {
                 if ((*names)[static_cast<std::size_t>(i)] == *selected_name) {
@@ -493,7 +559,14 @@ void MenuApp::handle_skins_settings_input(uint32_t keycode) {
         publish_snapshot();
         return;
     }
-    if (settings_cursor_ == 2 && keycode == key_enter_) {
+    if (settings_cursor_ == lr2_resolution_row && (keycode == key_left_ || keycode == key_right_)) {
+        const int direction = (keycode == key_left_) ? -1 : 1;
+        config_.skin.lr2_resolution_mode = cycle_lr2_resolution_mode(config_.skin.lr2_resolution_mode, direction);
+        skin_dirty_ = true;
+        publish_snapshot();
+        return;
+    }
+    if (settings_cursor_ == import_skin_row && keycode == key_enter_) {
 #ifdef _WIN32
         if (auto picked_folder = pick_folder_dialog_utf8(); picked_folder.has_value()) {
             if (!import_skin_path_auto(*picked_folder)) {
@@ -505,7 +578,7 @@ void MenuApp::handle_skins_settings_input(uint32_t keycode) {
 #endif
         return;
     }
-    if (settings_cursor_ == 3 && (keycode == key_left_ || keycode == key_right_)) {
+    if (settings_cursor_ == key_mode_row && (keycode == key_left_ || keycode == key_right_)) {
         const int direction = (keycode == key_left_) ? -1 : 1;
         skin_edit_mode_ = cycle_skin_edit_mode(skin_edit_mode_, direction);
         skin_edit_lane_ = clamp_int(skin_edit_lane_, 0, lane_count_for_skin_mode(skin_edit_mode_) - 1);
@@ -514,7 +587,7 @@ void MenuApp::handle_skins_settings_input(uint32_t keycode) {
         publish_snapshot();
         return;
     }
-    if (settings_cursor_ == 4 && (keycode == key_left_ || keycode == key_right_)) {
+    if (settings_cursor_ == target_lane_row && (keycode == key_left_ || keycode == key_right_)) {
         const int direction = (keycode == key_left_) ? -1 : 1;
         const int lane_count = lane_count_for_skin_mode(skin_edit_mode_);
         int next_lane = skin_edit_lane_ + direction;
@@ -527,7 +600,7 @@ void MenuApp::handle_skins_settings_input(uint32_t keycode) {
         publish_snapshot();
         return;
     }
-    if (settings_cursor_ == 5 && (keycode == key_left_ || keycode == key_right_)) {
+    if (settings_cursor_ == lane_color_row && (keycode == key_left_ || keycode == key_right_)) {
         const int direction = (keycode == key_left_) ? -1 : 1;
         auto& lane_colors = editable_skin_lane_colors(config_.skin, skin_edit_mode_);
         const auto palette = config::supported_skin_color_tokens();
@@ -551,50 +624,50 @@ void MenuApp::handle_skins_settings_input(uint32_t keycode) {
         publish_snapshot();
         return;
     }
-    if (settings_cursor_ == 6 && (keycode == key_left_ || keycode == key_right_)) {
+    if (settings_cursor_ == note_shape_row && (keycode == key_left_ || keycode == key_right_)) {
         config_.skin.note_shape =
             (config::normalize_skin_note_shape_token(config_.skin.note_shape) == "circle") ? "rect" : "circle";
         skin_dirty_ = true;
         publish_snapshot();
         return;
     }
-    if (settings_cursor_ == 7 && (keycode == key_left_ || keycode == key_right_)) {
+    if (settings_cursor_ == note_border_row && (keycode == key_left_ || keycode == key_right_)) {
         config_.skin.note_border_enabled = !config_.skin.note_border_enabled;
         skin_dirty_ = true;
         publish_snapshot();
         return;
     }
-    if (settings_cursor_ == 8 && (keycode == key_left_ || keycode == key_right_)) {
+    if (settings_cursor_ == image_aspect_row && (keycode == key_left_ || keycode == key_right_)) {
         config_.skin.preserve_note_image_aspect_ratio = !config_.skin.preserve_note_image_aspect_ratio;
         skin_dirty_ = true;
         publish_snapshot();
         return;
     }
-    if (settings_cursor_ == 9 && (keycode == key_left_ || keycode == key_right_)) {
+    if (settings_cursor_ == lane_dividers_row && (keycode == key_left_ || keycode == key_right_)) {
         config_.skin.show_lane_dividers = !config_.skin.show_lane_dividers;
         skin_dirty_ = true;
         publish_snapshot();
         return;
     }
-    if (settings_cursor_ == 10 && (keycode == key_left_ || keycode == key_right_)) {
+    if (settings_cursor_ == judgement_line_row && (keycode == key_left_ || keycode == key_right_)) {
         config_.skin.show_judgement_line = !config_.skin.show_judgement_line;
         skin_dirty_ = true;
         publish_snapshot();
         return;
     }
-    if (settings_cursor_ == 11 && (keycode == key_left_ || keycode == key_right_)) {
+    if (settings_cursor_ == gear_boundary_row && (keycode == key_left_ || keycode == key_right_)) {
         config_.skin.show_gear_boundary_line = !config_.skin.show_gear_boundary_line;
         skin_dirty_ = true;
         publish_snapshot();
         return;
     }
-    if (settings_cursor_ == 12 && (keycode == key_left_ || keycode == key_right_)) {
+    if (settings_cursor_ == ln_tail_taper_row && (keycode == key_left_ || keycode == key_right_)) {
         config_.skin.hold_tail_taper_enabled = !config_.skin.hold_tail_taper_enabled;
         skin_dirty_ = true;
         publish_snapshot();
         return;
     }
-    if (settings_cursor_ == 13 && (keycode == key_left_ || keycode == key_right_)) {
+    if (settings_cursor_ == judge_line_row && (keycode == key_left_ || keycode == key_right_)) {
         const int direction = (keycode == key_left_) ? -1 : 1;
         config_.skin.judgement_line_position = clamp_step_value(
             config_.skin.judgement_line_position + static_cast<double>(direction) * kJudgementLinePositionStep,
@@ -603,7 +676,7 @@ void MenuApp::handle_skins_settings_input(uint32_t keycode) {
         publish_snapshot();
         return;
     }
-    if (settings_cursor_ == 14 && (keycode == key_left_ || keycode == key_right_)) {
+    if (settings_cursor_ == note_width_row && (keycode == key_left_ || keycode == key_right_)) {
         const int direction = (keycode == key_left_) ? -1 : 1;
         auto& note_width_scale = editable_skin_note_width_scale(config_.skin, skin_edit_mode_);
         note_width_scale = clamp_step_value(
@@ -613,7 +686,7 @@ void MenuApp::handle_skins_settings_input(uint32_t keycode) {
         publish_snapshot();
         return;
     }
-    if (settings_cursor_ == 15 && (keycode == key_left_ || keycode == key_right_)) {
+    if (settings_cursor_ == divider_width_row && (keycode == key_left_ || keycode == key_right_)) {
         const int direction = (keycode == key_left_) ? -1 : 1;
         auto& lane_divider_width_scale =
             editable_skin_lane_divider_width_scale(config_.skin, skin_edit_mode_);
@@ -624,7 +697,7 @@ void MenuApp::handle_skins_settings_input(uint32_t keycode) {
         publish_snapshot();
         return;
     }
-    if (settings_cursor_ == 16 && (keycode == key_left_ || keycode == key_right_)) {
+    if (settings_cursor_ == ln_body_width_row && (keycode == key_left_ || keycode == key_right_)) {
         const int direction = (keycode == key_left_) ? -1 : 1;
         config_.skin.hold_body_width_scale = clamp_step_value(
             config_.skin.hold_body_width_scale + static_cast<double>(direction) * kNoteSizeScaleStep,
@@ -633,7 +706,7 @@ void MenuApp::handle_skins_settings_input(uint32_t keycode) {
         publish_snapshot();
         return;
     }
-    if (settings_cursor_ == 17 && (keycode == key_left_ || keycode == key_right_)) {
+    if (settings_cursor_ == note_height_row && (keycode == key_left_ || keycode == key_right_)) {
         const int direction = (keycode == key_left_) ? -1 : 1;
         auto& note_height_scale = editable_skin_note_height_scale(config_.skin, skin_edit_mode_);
         note_height_scale = clamp_step_value(
@@ -643,7 +716,7 @@ void MenuApp::handle_skins_settings_input(uint32_t keycode) {
         publish_snapshot();
         return;
     }
-    if (settings_cursor_ == 18 && (keycode == key_left_ || keycode == key_right_)) {
+    if (settings_cursor_ == combo_y_row && (keycode == key_left_ || keycode == key_right_)) {
         const int direction = (keycode == key_left_) ? -1 : 1;
         config_.skin.combo_position = clamp_step_value(
             config_.skin.combo_position + static_cast<double>(direction) * kComboPositionStep,
@@ -653,7 +726,7 @@ void MenuApp::handle_skins_settings_input(uint32_t keycode) {
         return;
     }
 
-    if ((keycode == key_enter_ && settings_cursor_ == item_count - 1) ||
+    if ((keycode == key_enter_ && settings_cursor_ == back_row) ||
         keycode == key_escape_ ||
         keycode == key_backspace_) {
         screen_ = submenu_return_screen_;
@@ -676,6 +749,8 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
     const double preview_lane_divider_width_scale =
         config::resolved_skin_lane_divider_width_scale(config_.skin, skin_edit_mode_);
     const std::string active_skin_source = config::normalize_skin_source_token(config_.skin.source);
+    const bool lr2_source = active_skin_source == "lr2";
+    const int lr2_shift = lr2_source ? 1 : 0;
     const std::string imported_skin_row_label =
         (active_skin_source == "osu") ? "OSU Skin"
                                       : ((active_skin_source == "lr2") ? "LR2 Skin" : "Imported Skin");
@@ -696,44 +771,49 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
                     render::MenuHitTargetKind::SettingsRow, 0, false, true);
     append_menu_row(render.generic, imported_skin_row_label, imported_skin_value, settings_cursor_ == 1,
                     render::MenuHitTargetKind::SettingsRow, 1, false, true);
-    append_menu_row(render.generic, "Import Skin", "Open Folder", settings_cursor_ == 2,
-                    render::MenuHitTargetKind::SettingsRow, 2, true, false);
-    append_menu_row(render.generic, "Key Mode", key_mode_label(skin_edit_mode_), settings_cursor_ == 3,
-                    render::MenuHitTargetKind::SettingsRow, 3, false, true);
+    if (lr2_source) {
+        append_menu_row(render.generic, "LR2 Resolution",
+                        lr2_resolution_mode_label(config_.skin.lr2_resolution_mode),
+                        settings_cursor_ == 2, render::MenuHitTargetKind::SettingsRow, 2, false, true);
+    }
+    append_menu_row(render.generic, "Import Skin", "Open Folder", settings_cursor_ == 2 + lr2_shift,
+                    render::MenuHitTargetKind::SettingsRow, 2 + lr2_shift, true, false);
+    append_menu_row(render.generic, "Key Mode", key_mode_label(skin_edit_mode_), settings_cursor_ == 3 + lr2_shift,
+                    render::MenuHitTargetKind::SettingsRow, 3 + lr2_shift, false, true);
     append_menu_row(render.generic, "Target Lane",
                     lane_display_label(skin_edit_lane_) + " / " + std::to_string(lane_count),
-                    settings_cursor_ == 4, render::MenuHitTargetKind::SettingsRow, 4, false, true);
+                    settings_cursor_ == 4 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 4 + lr2_shift, false, true);
     append_menu_row(render.generic, "Lane Color",
                     config::skin_color_label(preview_lane_colors[static_cast<std::size_t>(skin_edit_lane_)]),
-                    settings_cursor_ == 5, render::MenuHitTargetKind::SettingsRow, 5, false, true);
+                    settings_cursor_ == 5 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 5 + lr2_shift, false, true);
     append_menu_row(render.generic, "Note Shape", config::skin_note_shape_label(config_.skin.note_shape),
-                    settings_cursor_ == 6, render::MenuHitTargetKind::SettingsRow, 6, false, true);
-    append_menu_row(render.generic, "Note Border", on_off(config_.skin.note_border_enabled), settings_cursor_ == 7,
-                    render::MenuHitTargetKind::SettingsRow, 7, false, true);
+                    settings_cursor_ == 6 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 6 + lr2_shift, false, true);
+    append_menu_row(render.generic, "Note Border", on_off(config_.skin.note_border_enabled),
+                    settings_cursor_ == 7 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 7 + lr2_shift, false, true);
     append_menu_row(render.generic, "Image Aspect", on_off(config_.skin.preserve_note_image_aspect_ratio),
-                    settings_cursor_ == 8, render::MenuHitTargetKind::SettingsRow, 8, false, true);
-    append_menu_row(render.generic, "Lane Dividers", on_off(config_.skin.show_lane_dividers), settings_cursor_ == 9,
-                    render::MenuHitTargetKind::SettingsRow, 9, false, true);
+                    settings_cursor_ == 8 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 8 + lr2_shift, false, true);
+    append_menu_row(render.generic, "Lane Dividers", on_off(config_.skin.show_lane_dividers),
+                    settings_cursor_ == 9 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 9 + lr2_shift, false, true);
     append_menu_row(render.generic, "Judgement Line", on_off(config_.skin.show_judgement_line),
-                    settings_cursor_ == 10, render::MenuHitTargetKind::SettingsRow, 10, false, true);
+                    settings_cursor_ == 10 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 10 + lr2_shift, false, true);
     append_menu_row(render.generic, "Gear Boundary", on_off(config_.skin.show_gear_boundary_line),
-                    settings_cursor_ == 11, render::MenuHitTargetKind::SettingsRow, 11, false, true);
+                    settings_cursor_ == 11 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 11 + lr2_shift, false, true);
     append_menu_row(render.generic, "LN Tail Taper", on_off(config_.skin.hold_tail_taper_enabled),
-                    settings_cursor_ == 12, render::MenuHitTargetKind::SettingsRow, 12, false, true);
+                    settings_cursor_ == 12 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 12 + lr2_shift, false, true);
     append_menu_row(render.generic, "Judge Line", format_percent(config_.skin.judgement_line_position),
-                    settings_cursor_ == 13, render::MenuHitTargetKind::SettingsRow, 13, false, true);
-    append_menu_row(render.generic, "Note Width", format_percent(preview_note_width_scale), settings_cursor_ == 14,
-                    render::MenuHitTargetKind::SettingsRow, 14, false, true);
+                    settings_cursor_ == 13 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 13 + lr2_shift, false, true);
+    append_menu_row(render.generic, "Note Width", format_percent(preview_note_width_scale),
+                    settings_cursor_ == 14 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 14 + lr2_shift, false, true);
     append_menu_row(render.generic, "Divider Width", format_percent(preview_lane_divider_width_scale),
-                    settings_cursor_ == 15, render::MenuHitTargetKind::SettingsRow, 15, false, true);
+                    settings_cursor_ == 15 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 15 + lr2_shift, false, true);
     append_menu_row(render.generic, "LN Body Width", format_percent(config_.skin.hold_body_width_scale),
-                    settings_cursor_ == 16, render::MenuHitTargetKind::SettingsRow, 16, false, true);
-    append_menu_row(render.generic, "Note Height", format_percent(preview_note_height_scale), settings_cursor_ == 17,
-                    render::MenuHitTargetKind::SettingsRow, 17, false, true);
-    append_menu_row(render.generic, "Combo Y", format_percent(config_.skin.combo_position), settings_cursor_ == 18,
-                    render::MenuHitTargetKind::SettingsRow, 18, false, true);
-    append_menu_row(render.generic, "Back", "", settings_cursor_ == 19, render::MenuHitTargetKind::SettingsRow, 19,
-                    true, false);
+                    settings_cursor_ == 16 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 16 + lr2_shift, false, true);
+    append_menu_row(render.generic, "Note Height", format_percent(preview_note_height_scale),
+                    settings_cursor_ == 17 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 17 + lr2_shift, false, true);
+    append_menu_row(render.generic, "Combo Y", format_percent(config_.skin.combo_position),
+                    settings_cursor_ == 18 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 18 + lr2_shift, false, true);
+    append_menu_row(render.generic, "Back", "", settings_cursor_ == 19 + lr2_shift,
+                    render::MenuHitTargetKind::SettingsRow, 19 + lr2_shift, true, false);
 
     render.generic.skin_preview.visible = true;
     render.generic.skin_preview.mode_label = key_mode_label(skin_edit_mode_);
@@ -758,6 +838,8 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
     render.generic.skin_preview.skin_source = active_skin_source;
     render.generic.skin_preview.external_skin_root = active_external_skin_root();
     render.generic.skin_preview.external_skin_name = active_external_skin_name();
+    render.generic.skin_preview.lr2_resolution_override =
+        config::normalize_skin_lr2_resolution_mode_token(config_.skin.lr2_resolution_mode);
     render.generic.skin_preview.lane_colors.fill(0);
     for (int lane = 0; lane < lane_count && lane < static_cast<int>(kGameplayHudMaxLanes); ++lane) {
         render.generic.skin_preview.lane_colors[static_cast<std::size_t>(lane)] =
@@ -767,6 +849,7 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
     render.generic.notes.push_back("Skin Source switches between the native vector skin, imported osu!mania PNG skins, and imported LR2 playskins.");
     render.generic.notes.push_back("Imported OSU skins scan profile skins first, then build/Release/test-skins-osu as a fallback test root.");
     render.generic.notes.push_back("Imported LR2 skins scan profile skins first, then build/Release/test-skins-lr2 as a fallback test root.");
+    render.generic.notes.push_back("LR2 Resolution overrides the imported LR2 family before the auto-detected layout is applied.");
     render.generic.notes.push_back("Import Skin opens a folder picker. You can also drag and drop a skin folder onto this screen.");
     render.generic.notes.push_back("LR2 porting imports note, LN, lane-gap, and destination-size data from default active branches in the playskin.");
     render.generic.notes.push_back("Image Aspect keeps imported head and tail art from stretching to the gameplay note box.");

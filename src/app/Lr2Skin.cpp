@@ -5,6 +5,7 @@
 #include <cmath>
 #include <filesystem>
 #include <fstream>
+#include <iostream>
 #include <optional>
 #include <set>
 #include <string>
@@ -57,12 +58,46 @@ struct Lr2ParseState {
     std::unordered_map<std::string, CustomFileSelection> custom_files;
     std::set<int> active_options;
     std::set<std::string> visited_files;
+    std::optional<Lr2ResolutionFamily> explicit_resolution_family;
+    bool top_level_header_open = false;
 };
 
 struct ConditionalFrame {
     bool parent_active = true;
     bool branch_taken = false;
     bool current_active = true;
+};
+
+struct Lr2OrderedDestination {
+    int lane = 0;
+    Lr2DestinationNote dst;
+};
+
+struct Lr2RawPlayLayout {
+    std::vector<int> lane_order;
+    std::vector<Lr2OrderedDestination> ordered_destinations;
+    float average_width = kDefaultLr2NoteWidth;
+    float average_height = kDefaultLr2NoteHeight;
+    float max_x = 0.0f;
+    int size_sample_count = 0;
+    bool has_destinations = false;
+};
+
+struct Lr2NormalizedPlayMetrics {
+    int keys = 0;
+    Lr2ResolutionFamily resolution_family = Lr2ResolutionFamily::Sd;
+    float imported_note_width_ratio = 1.0f;
+    float imported_note_height_ratio = 1.0f;
+    std::vector<float> lane_divider_widths;
+};
+
+struct Lr2CandidateInfo {
+    fs::path skin_file;
+    int requested_keys = 0;
+    int parsed_keys = 0;
+    int file_hint_bonus = 0;
+    int score = 0;
+    Lr2ResolutionFamily resolution_family = Lr2ResolutionFamily::Sd;
 };
 
 fs::path relativize_theme_path(const fs::path& skin_dir, const fs::path& candidate);
@@ -208,6 +243,58 @@ std::optional<float> parse_float_token(const std::vector<std::string>& tokens, s
     } catch (...) {
     }
     return std::nullopt;
+}
+
+std::optional<Lr2ResolutionFamily> parse_lr2_resolution_value(int value) {
+    switch (value) {
+        case 1:
+            return Lr2ResolutionFamily::Hd;
+        case 2:
+            return Lr2ResolutionFamily::Fhd;
+        default:
+            return std::nullopt;
+    }
+}
+
+std::optional<Lr2ResolutionFamily> parse_lr2_resolution_override_token(std::string_view token) {
+    const std::string normalized = to_lower_ascii(trim_copy(token));
+    if (normalized.empty() || normalized == "auto") {
+        return std::nullopt;
+    }
+    if (normalized == "sd" || normalized == "640x480" || normalized == "lr2") {
+        return Lr2ResolutionFamily::Sd;
+    }
+    if (normalized == "hd" || normalized == "1280x720" || normalized == "720p") {
+        return Lr2ResolutionFamily::Hd;
+    }
+    if (normalized == "fhd" || normalized == "1920x1080" || normalized == "1080p") {
+        return Lr2ResolutionFamily::Fhd;
+    }
+    return std::nullopt;
+}
+
+std::string lr2_resolution_family_label(Lr2ResolutionFamily family) {
+    switch (family) {
+        case Lr2ResolutionFamily::Hd:
+            return "hd";
+        case Lr2ResolutionFamily::Fhd:
+            return "fhd";
+        case Lr2ResolutionFamily::Sd:
+        default:
+            return "sd";
+    }
+}
+
+std::pair<float, float> lr2_resolution_family_scale(Lr2ResolutionFamily family) {
+    switch (family) {
+        case Lr2ResolutionFamily::Hd:
+            return {2.0f, 1.5f};
+        case Lr2ResolutionFamily::Fhd:
+            return {3.0f, 2.25f};
+        case Lr2ResolutionFamily::Sd:
+        default:
+            return {1.0f, 1.0f};
+    }
 }
 
 bool evaluate_lr2_if(const std::set<int>& active_options, const std::vector<std::string>& tokens) {
@@ -455,7 +542,7 @@ ImportedSkinImageAsset make_asset_from_slice(const std::unordered_map<int, std::
     return asset;
 }
 
-bool parse_lr2_file(const fs::path& file_path, Lr2ParseState& state) {
+bool parse_lr2_file(const fs::path& file_path, Lr2ParseState& state, bool is_top_level = false) {
     std::error_code canonical_ec;
     const fs::path canonical_path = fs::weakly_canonical(file_path, canonical_ec);
     const std::string visited_key = normalize_path_utf8(canonical_path.empty() ? file_path : canonical_path);
@@ -479,6 +566,10 @@ bool parse_lr2_file(const fs::path& file_path, Lr2ParseState& state) {
         return conditionals.empty() ? true : conditionals.back().current_active;
     };
 
+    if (is_top_level) {
+        state.top_level_header_open = true;
+    }
+
     std::string line;
     while (std::getline(file, line)) {
         if (!line.empty() && line.back() == '\r') {
@@ -501,6 +592,19 @@ bool parse_lr2_file(const fs::path& file_path, Lr2ParseState& state) {
             continue;
         }
         const std::string command = to_lower_ascii(tokens.front());
+
+        if (is_top_level && state.top_level_header_open) {
+            if (command == "#resolution" && !state.explicit_resolution_family.has_value()) {
+                if (const auto resolution_value = parse_int_token(tokens, 1u); resolution_value.has_value()) {
+                    state.explicit_resolution_family = parse_lr2_resolution_value(*resolution_value);
+                }
+                continue;
+            }
+            if (command == "#endofheader") {
+                state.top_level_header_open = false;
+                continue;
+            }
+        }
 
         if (command == "#if") {
             const bool parent_active = current_active();
@@ -572,7 +676,7 @@ bool parse_lr2_file(const fs::path& file_path, Lr2ParseState& state) {
             if (const auto include_path =
                     resolve_existing_lr2_path(state.skin_dir, current_dir, tokens[1u]);
                 include_path.has_value()) {
-                parse_lr2_file(*include_path, state);
+                parse_lr2_file(*include_path, state, false);
             }
             continue;
         }
@@ -733,6 +837,79 @@ std::vector<int> collect_lr2_lane_order(const Lr2ParseState& state) {
     return order;
 }
 
+Lr2RawPlayLayout collect_lr2_raw_play_layout(const Lr2ParseState& state) {
+    Lr2RawPlayLayout layout;
+    layout.lane_order = collect_lr2_lane_order(state);
+    layout.ordered_destinations.reserve(state.dst_notes.size());
+
+    float width_sum = 0.0f;
+    float height_sum = 0.0f;
+    for (const auto& [lane, dst] : state.dst_notes) {
+        if (!dst.valid) {
+            continue;
+        }
+        layout.has_destinations = true;
+        layout.max_x = (std::max)(layout.max_x, dst.x);
+        layout.ordered_destinations.push_back({lane, dst});
+        if (dst.width > 0.0f && dst.height > 0.0f) {
+            width_sum += dst.width;
+            height_sum += dst.height;
+            ++layout.size_sample_count;
+        }
+    }
+
+    std::sort(layout.ordered_destinations.begin(),
+              layout.ordered_destinations.end(),
+              [](const Lr2OrderedDestination& lhs, const Lr2OrderedDestination& rhs) {
+                  if (lhs.dst.x != rhs.dst.x) {
+                      return lhs.dst.x < rhs.dst.x;
+                  }
+                  if (lhs.dst.y != rhs.dst.y) {
+                      return lhs.dst.y < rhs.dst.y;
+                  }
+                  return lhs.lane < rhs.lane;
+              });
+
+    if (layout.size_sample_count > 0) {
+        layout.average_width = width_sum / static_cast<float>(layout.size_sample_count);
+        layout.average_height = height_sum / static_cast<float>(layout.size_sample_count);
+    }
+    return layout;
+}
+
+Lr2ResolutionFamily detect_lr2_auto_resolution_family(const Lr2RawPlayLayout& layout) {
+    if (!layout.has_destinations) {
+        return Lr2ResolutionFamily::Sd;
+    }
+    if (layout.max_x <= 960.0f) {
+        return Lr2ResolutionFamily::Sd;
+    }
+    if (layout.max_x <= 1600.0f) {
+        return Lr2ResolutionFamily::Hd;
+    }
+    return Lr2ResolutionFamily::Fhd;
+}
+
+Lr2ResolutionFamily resolve_lr2_resolution_family(const Lr2ParseState& state,
+                                                  const Lr2RawPlayLayout& layout,
+                                                  std::string_view override_token,
+                                                  const fs::path& skin_file) {
+    const Lr2ResolutionFamily auto_family = detect_lr2_auto_resolution_family(layout);
+    if (const auto override_family = parse_lr2_resolution_override_token(override_token); override_family.has_value()) {
+        return *override_family;
+    }
+    if (state.explicit_resolution_family.has_value()) {
+        if (*state.explicit_resolution_family != auto_family) {
+            std::cerr << "[warn] LR2 playskin resolution mismatch for " << skin_file.u8string()
+                      << ": explicit=" << lr2_resolution_family_label(*state.explicit_resolution_family)
+                      << " auto=" << lr2_resolution_family_label(auto_family)
+                      << ". Using explicit resolution." << std::endl;
+        }
+        return *state.explicit_resolution_family;
+    }
+    return auto_family;
+}
+
 void resize_lane_assets(std::vector<ImportedSkinImageAsset>& assets, int lane_count) {
     if (lane_count <= 0) {
         assets.clear();
@@ -761,21 +938,55 @@ void finalize_key_fallbacks(Lr2PlaySkinDefinition& definition) {
     }
 }
 
-Lr2PlaySkinDefinition build_lr2_definition(const Lr2ParseState& state) {
+Lr2NormalizedPlayMetrics normalize_lr2_play_metrics(const Lr2RawPlayLayout& layout,
+                                                    Lr2ResolutionFamily family) {
+    Lr2NormalizedPlayMetrics metrics;
+    metrics.keys = static_cast<int>(layout.lane_order.size());
+    metrics.resolution_family = family;
+    if (metrics.keys <= 0) {
+        return metrics;
+    }
+
+    const auto [x_scale, y_scale] = lr2_resolution_family_scale(family);
+    if (layout.size_sample_count > 0) {
+        metrics.imported_note_width_ratio =
+            std::clamp((layout.average_width / x_scale) / kDefaultLr2NoteWidth, 0.25f, 4.0f);
+        metrics.imported_note_height_ratio =
+            std::clamp((layout.average_height / y_scale) / kDefaultLr2NoteHeight, 0.25f, 4.0f);
+    }
+
+    if (layout.ordered_destinations.size() >= 2u) {
+        metrics.lane_divider_widths.reserve(layout.ordered_destinations.size() - 1u);
+        for (std::size_t i = 1; i < layout.ordered_destinations.size(); ++i) {
+            const auto& lhs = layout.ordered_destinations[i - 1u].dst;
+            const auto& rhs = layout.ordered_destinations[i].dst;
+            const float divider = std::max(0.0f, (rhs.x - (lhs.x + lhs.width)) / x_scale);
+            metrics.lane_divider_widths.push_back(divider);
+        }
+    }
+    return metrics;
+}
+
+Lr2PlaySkinDefinition build_lr2_definition(const Lr2ParseState& state,
+                                           const Lr2RawPlayLayout& layout,
+                                           const Lr2NormalizedPlayMetrics& metrics) {
     Lr2PlaySkinDefinition definition;
-    const std::vector<int> lane_order = collect_lr2_lane_order(state);
-    definition.keys = static_cast<int>(lane_order.size());
+    definition.keys = metrics.keys;
     if (definition.keys <= 0) {
         return definition;
     }
 
     definition.found = true;
+    definition.resolution_family = metrics.resolution_family;
+    definition.imported_note_width_ratio = metrics.imported_note_width_ratio;
+    definition.imported_note_height_ratio = metrics.imported_note_height_ratio;
+    definition.lane_divider_widths = metrics.lane_divider_widths;
     definition.note_images.resize(static_cast<std::size_t>(definition.keys));
     definition.hold_head_images.resize(static_cast<std::size_t>(definition.keys));
     definition.hold_body_images.resize(static_cast<std::size_t>(definition.keys));
     definition.hold_tail_images.resize(static_cast<std::size_t>(definition.keys));
     for (int lane = 0; lane < definition.keys; ++lane) {
-        const int raw_lane = lane_order[static_cast<std::size_t>(lane)];
+        const int raw_lane = layout.lane_order[static_cast<std::size_t>(lane)];
         definition.note_images[static_cast<std::size_t>(lane)] =
             make_asset_from_slice(state.image_paths, state.note_slices, raw_lane);
         definition.hold_head_images[static_cast<std::size_t>(lane)] =
@@ -784,52 +995,6 @@ Lr2PlaySkinDefinition build_lr2_definition(const Lr2ParseState& state) {
             make_asset_from_slice(state.image_paths, state.hold_body_slices, raw_lane);
         definition.hold_tail_images[static_cast<std::size_t>(lane)] =
             make_asset_from_slice(state.image_paths, state.hold_tail_slices, raw_lane);
-    }
-
-    float width_sum = 0.0f;
-    float height_sum = 0.0f;
-    int width_count = 0;
-    std::vector<std::pair<int, Lr2DestinationNote>> ordered_dst;
-    ordered_dst.reserve(state.dst_notes.size());
-    for (const auto& [index, dst] : state.dst_notes) {
-        if (!dst.valid) {
-            continue;
-        }
-        ordered_dst.emplace_back(index, dst);
-        if (dst.width > 0.0f) {
-            width_sum += dst.width;
-            ++width_count;
-        }
-        if (dst.height > 0.0f) {
-            height_sum += dst.height;
-        }
-    }
-    std::sort(ordered_dst.begin(), ordered_dst.end(), [](const auto& lhs, const auto& rhs) {
-        if (lhs.second.x != rhs.second.x) {
-            return lhs.second.x < rhs.second.x;
-        }
-        if (lhs.second.y != rhs.second.y) {
-            return lhs.second.y < rhs.second.y;
-        }
-        return lhs.first < rhs.first;
-    });
-
-    if (width_count > 0) {
-        const float average_width = width_sum / static_cast<float>(width_count);
-        definition.imported_note_width_ratio =
-            std::clamp(average_width / kDefaultLr2NoteWidth, 0.25f, 4.0f);
-        definition.imported_note_height_ratio =
-            std::clamp((height_sum / static_cast<float>(width_count)) / kDefaultLr2NoteHeight, 0.25f, 4.0f);
-    }
-
-    if (ordered_dst.size() >= 2u) {
-        definition.lane_divider_widths.reserve(ordered_dst.size() - 1u);
-        for (std::size_t i = 1; i < ordered_dst.size(); ++i) {
-            const auto& lhs = ordered_dst[i - 1u].second;
-            const auto& rhs = ordered_dst[i].second;
-            const float divider = std::max(0.0f, rhs.x - (lhs.x + lhs.width));
-            definition.lane_divider_widths.push_back(divider);
-        }
     }
 
     finalize_key_fallbacks(definition);
@@ -909,7 +1074,8 @@ Lr2PlaySkinDefinition trim_or_expand_definition(Lr2PlaySkinDefinition definition
 
 Lr2PlaySkinDefinition resolve_lr2_play_skin(std::string_view root_utf8,
                                             std::string_view skin_name,
-                                            int keys) {
+                                            int keys,
+                                            std::string_view resolution_override) {
     Lr2PlaySkinDefinition best;
     if (root_utf8.empty() || skin_name.empty()) {
         return best;
@@ -926,10 +1092,17 @@ Lr2PlaySkinDefinition resolve_lr2_play_skin(std::string_view root_utf8,
     for (const auto& skin_file : collect_lr2_skin_files(skin_dir)) {
         Lr2ParseState state;
         state.skin_dir = skin_dir;
-        if (!parse_lr2_file(skin_file, state)) {
+        if (!parse_lr2_file(skin_file, state, true)) {
             continue;
         }
-        Lr2PlaySkinDefinition candidate = build_lr2_definition(state);
+        const Lr2RawPlayLayout raw_layout = collect_lr2_raw_play_layout(state);
+        if (raw_layout.lane_order.empty()) {
+            continue;
+        }
+        const Lr2ResolutionFamily resolution_family =
+            resolve_lr2_resolution_family(state, raw_layout, resolution_override, skin_file);
+        const Lr2NormalizedPlayMetrics metrics = normalize_lr2_play_metrics(raw_layout, resolution_family);
+        Lr2PlaySkinDefinition candidate = build_lr2_definition(state, raw_layout, metrics);
         if (!candidate.found || candidate.keys <= 0) {
             continue;
         }
@@ -938,7 +1111,14 @@ Lr2PlaySkinDefinition resolve_lr2_play_skin(std::string_view root_utf8,
         const int asset_bonus = static_cast<int>(candidate.note_images.size()) * 10 +
                                 static_cast<int>(candidate.hold_body_images.size());
         const int file_hint_bonus = score_lr2_skin_file_hint(skin_file, keys);
-        const int score = exact_bonus - delta * 25 + asset_bonus + file_hint_bonus;
+        Lr2CandidateInfo info;
+        info.skin_file = skin_file;
+        info.requested_keys = keys;
+        info.parsed_keys = candidate.keys;
+        info.file_hint_bonus = file_hint_bonus;
+        info.resolution_family = candidate.resolution_family;
+        info.score = exact_bonus - delta * 25 + asset_bonus + file_hint_bonus;
+        const int score = info.score;
         if (score > best_score) {
             best_score = score;
             best = std::move(candidate);
