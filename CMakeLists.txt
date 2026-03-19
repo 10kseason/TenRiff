@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(TenRiff VERSION 0.9.7 LANGUAGES CXX)
+project(TenRiff VERSION 0.9.16 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -135,6 +135,12 @@ if(WIN32)
         src/app/GameSession.cpp
         src/app/MenuApp.cpp
         src/app/MenuAppDeviceSettings.cpp
+        src/app/MenuAppKeymap.cpp
+        src/app/MenuAppRecords.cpp
+        src/app/MenuAppSongSelect.cpp
+        src/app/MenuAppSongSelectRender.cpp
+        src/app/MenuAppSongSelectState.cpp
+        src/app/MenuAppSongSelectUtils.cpp
         src/app/MenuAppSettings.cpp
         src/app/MenuAppSkin.cpp
         src/render/MenuWindow.cpp

@@ -63,6 +63,39 @@ void write_file(const std::filesystem::path& path, const std::string& content = 
     out << content;
 }
 
+void write_simple_lr2_skin(const std::filesystem::path& root,
+                           const std::string& skin_name,
+                           const std::string& asset_name,
+                           std::string_view resolution_header,
+                           float first_x,
+                           float second_x,
+                           float note_width,
+                           float note_height) {
+    const auto skin = root / skin_name;
+    std::filesystem::create_directories(skin / "csv");
+    std::filesystem::create_directories(skin / "img" / "notes");
+
+    std::string top_level =
+        "#INFORMATION,0," + skin_name + ",Tester\n";
+    if (!resolution_header.empty()) {
+        top_level += std::string(resolution_header) + "\n";
+    }
+    top_level += "#ENDOFHEADER\n"
+                 "#INCLUDE,LR2Files\\Theme\\" + skin_name + "\\csv\\layout.csv\n";
+    write_file(skin / "play.lr2skin", top_level);
+
+    const std::string layout =
+        "#IMAGE,LR2Files\\Theme\\" + skin_name + "\\img\\notes\\" + asset_name + "\n" +
+        "#SRC_NOTE,0,0,0,0,30,22,1,1,0,0\n"
+        "#SRC_NOTE,1,0,30,0,30,22,1,1,0,0\n"
+        "#DST_NOTE,0,0," + std::to_string(first_x) + ",400," + std::to_string(note_width) + "," +
+        std::to_string(note_height) + ",0,255,255,255,255,0,0,0,0,0,0,0,0,0\n" +
+        "#DST_NOTE,1,0," + std::to_string(second_x) + ",400," + std::to_string(note_width) + "," +
+        std::to_string(note_height) + ",0,255,255,255,255,0,0,0,0,0,0,0,0,0\n";
+    write_file(skin / "csv" / "layout.csv", layout);
+    write_file(skin / "img" / "notes" / asset_name);
+}
+
 }  // namespace
 
 TEST_CASE("lr2 skin scanner lists skins under the default test root") {
@@ -195,6 +228,89 @@ TEST_CASE("lr2 skin resolver handles multi-option branches, customfile directori
     CHECK(resolved.lane_divider_widths[1] == doctest::Approx(2.0f));
 }
 
+TEST_CASE("lr2 skin resolver honors explicit resolution headers") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+
+    const auto root = temp.path / "skins";
+    write_simple_lr2_skin(root, "HdExplicit", "note.png", "#RESOLUTION,1", 320.0f, 420.0f, 60.0f, 33.0f);
+    write_simple_lr2_skin(root, "FhdExplicit", "note.png", "#RESOLUTION,2", 320.0f, 420.0f, 90.0f, 49.5f);
+
+    const auto hd = tenriff::app::resolve_lr2_play_skin(root.u8string(), "HdExplicit", 2, "auto");
+    REQUIRE(hd.found);
+    CHECK(hd.resolution_family == tenriff::app::Lr2ResolutionFamily::Hd);
+    CHECK(hd.imported_note_width_ratio == doctest::Approx(1.0f));
+    CHECK(hd.imported_note_height_ratio == doctest::Approx(1.0f));
+
+    const auto fhd = tenriff::app::resolve_lr2_play_skin(root.u8string(), "FhdExplicit", 2, "auto");
+    REQUIRE(fhd.found);
+    CHECK(fhd.resolution_family == tenriff::app::Lr2ResolutionFamily::Fhd);
+    CHECK(fhd.imported_note_width_ratio == doctest::Approx(1.0f));
+    CHECK(fhd.imported_note_height_ratio == doctest::Approx(1.0f));
+}
+
+TEST_CASE("lr2 skin resolver auto-detects sd hd and fhd from dst note positions") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+
+    const auto root = temp.path / "skins";
+    write_simple_lr2_skin(root, "SdAuto", "note.png", "", 640.0f, 700.0f, 30.0f, 22.0f);
+    write_simple_lr2_skin(root, "HdAuto", "note.png", "", 1280.0f, 1340.0f, 60.0f, 33.0f);
+    write_simple_lr2_skin(root, "FhdAuto", "note.png", "", 1920.0f, 2010.0f, 90.0f, 49.5f);
+
+    const auto sd = tenriff::app::resolve_lr2_play_skin(root.u8string(), "SdAuto", 2, "auto");
+    REQUIRE(sd.found);
+    CHECK(sd.resolution_family == tenriff::app::Lr2ResolutionFamily::Sd);
+    CHECK(sd.imported_note_width_ratio == doctest::Approx(1.0f));
+    CHECK(sd.imported_note_height_ratio == doctest::Approx(1.0f));
+
+    const auto hd = tenriff::app::resolve_lr2_play_skin(root.u8string(), "HdAuto", 2, "auto");
+    REQUIRE(hd.found);
+    CHECK(hd.resolution_family == tenriff::app::Lr2ResolutionFamily::Hd);
+    CHECK(hd.imported_note_width_ratio == doctest::Approx(1.0f));
+    CHECK(hd.imported_note_height_ratio == doctest::Approx(1.0f));
+
+    const auto fhd = tenriff::app::resolve_lr2_play_skin(root.u8string(), "FhdAuto", 2, "auto");
+    REQUIRE(fhd.found);
+    CHECK(fhd.resolution_family == tenriff::app::Lr2ResolutionFamily::Fhd);
+    CHECK(fhd.imported_note_width_ratio == doctest::Approx(1.0f));
+    CHECK(fhd.imported_note_height_ratio == doctest::Approx(1.0f));
+}
+
+TEST_CASE("lr2 skin resolver override takes precedence over auto detection") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+
+    const auto root = temp.path / "skins";
+    write_simple_lr2_skin(root, "OverrideHd", "note.png", "", 1280.0f, 1340.0f, 60.0f, 33.0f);
+    write_simple_lr2_skin(root, "OverrideSd", "note.png", "", 640.0f, 700.0f, 30.0f, 22.0f);
+
+    const auto forced_sd = tenriff::app::resolve_lr2_play_skin(root.u8string(), "OverrideHd", 2, "sd");
+    REQUIRE(forced_sd.found);
+    CHECK(forced_sd.resolution_family == tenriff::app::Lr2ResolutionFamily::Sd);
+
+    const auto forced_fhd = tenriff::app::resolve_lr2_play_skin(root.u8string(), "OverrideSd", 2, "fhd");
+    REQUIRE(forced_fhd.found);
+    CHECK(forced_fhd.resolution_family == tenriff::app::Lr2ResolutionFamily::Fhd);
+}
+
+TEST_CASE("lr2 skin resolver ignores hd asset names when auto-detecting layout family") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+
+    const auto root = temp.path / "skins";
+    write_simple_lr2_skin(root, "NameTrap", "Snow_HD.png", "", 640.0f, 700.0f, 30.0f, 22.0f);
+
+    const auto resolved = tenriff::app::resolve_lr2_play_skin(root.u8string(), "NameTrap", 2, "auto");
+    REQUIRE(resolved.found);
+    CHECK(resolved.resolution_family == tenriff::app::Lr2ResolutionFamily::Sd);
+    CHECK(resolved.note_images[0].path.find("Snow_HD.png") != std::string::npos);
+}
+
 TEST_CASE("lr2 sample FT skin resolves note directory customfile patterns") {
     const auto sample_root = find_repo_lr2_sample_root();
     if (sample_root.empty()) {
@@ -204,6 +320,7 @@ TEST_CASE("lr2 sample FT skin resolves note directory customfile patterns") {
     const auto resolved = tenriff::app::resolve_lr2_play_skin(sample_root.u8string(), "FT", 8);
     REQUIRE(resolved.found);
     CHECK(resolved.keys == 8);
+    CHECK(resolved.resolution_family == tenriff::app::Lr2ResolutionFamily::Hd);
     REQUIRE(resolved.note_images.size() == 8u);
     CHECK_FALSE(resolved.note_images[0].path.empty());
     CHECK(resolved.note_images[0].has_source_rect);
@@ -218,6 +335,7 @@ TEST_CASE("lr2 sample standard skin resolves multi-option 7key branch") {
     const auto resolved = tenriff::app::resolve_lr2_play_skin(sample_root.u8string(), "LR2", 8);
     REQUIRE(resolved.found);
     CHECK(resolved.keys == 8);
+    CHECK(resolved.resolution_family == tenriff::app::Lr2ResolutionFamily::Sd);
     REQUIRE(resolved.note_images.size() == 8u);
     CHECK(resolved.note_images[0].path.find("LR2 default") != std::string::npos);
     CHECK(resolved.note_images[0].has_source_rect);

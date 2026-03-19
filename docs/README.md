@@ -1,5 +1,7 @@
 # TenRiff Docs Map
 
+Language: Korean | [English](README.en.md) | [简体中文](README.zh-CN.md)
+
 루트 [`README.md`](../README.md)를 먼저 읽었다면, 이 문서는 그 다음 단계의 상세 문서 인덱스입니다. 설계 문서와 현재 상태 문서를 같이 담고 있으므로, 빠르게 맥락을 잡아야 할 때는 아래 순서로 읽는 것이 가장 효율적입니다.
 
 ## Recommended Reading Order
@@ -17,6 +19,8 @@
    - 플레이 루프와 데이터 흐름
 7. `docs/roadmap.md`
    - 중장기 작업 방향
+8. `docs/developer-extension-guide.md`
+   - 새 mode/mod, UI row, runtime migration, replay/result, 테스트를 어디에 추가해야 하는지 설명하는 개발자 문서
 
 ## Which Docs Are Source Of Truth
 - `docs/current-state.md`
@@ -33,6 +37,13 @@
   - 플레이 루프 초기 설계 및 데이터 흐름 설명
 - `docs/latency.md`, `docs/modes.md`, `docs/gap-analysis.md`, `docs/roadmap.md`
   - 기능별 설계/분석/중장기 방향 문서
+- `docs/developer-extension-guide.md`
+  - 현재 코드 기준 유지보수/확장 작업 절차 문서
+
+## Translation Coverage
+- 루트 `README.md`는 `README.en.md`, `README.zh-CN.md` 번역본을 가집니다.
+- `docs/` 안의 주요 문서는 원본 옆에 `.en.md`, `.zh-CN.md` suffix 파일로 번역본을 둡니다.
+- 번역 문서와 원문이 충돌하면, 현재 동작 기준은 여전히 원문 `docs/current-state.md`, `docs/config.md`, 실제 코드 순으로 판단합니다.
 
 ## Practical Rule
 - 현재 동작을 확인할 때는 `docs/current-state.md`를 우선 봅니다.

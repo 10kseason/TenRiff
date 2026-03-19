@@ -2,6 +2,66 @@
 
 TenRiff의 사용자/배포 관점에서 의미 있는 변경만 간단히 기록합니다.
 
+## [0.9.15] - 2026-03-20
+
+### Changed
+- `tests/unit/test_10k_calc_consistency.cpp`와 `tests/smoke/bms_10k_compare_smoke.cpp`를 조정해 로컬 `10k-calc` Python reference가 없을 때 optional check를 skip 하도록 변경
+- 오픈소스 소스패키지가 `10k-calc` 체크아웃 없이도 앱 빌드와 핵심 테스트 실행을 진행할 수 있게 정리
+- 프로젝트 메타데이터와 핵심 현재 상태/로드맵 문서를 `0.9.15` 기준으로 갱신
+## [0.9.16] - 2026-03-20
+
+### Changed
+- `src/render/MenuWindow.cpp`에서 분리 과정 중 누락됐던 창 초기화, imported-skin cache, gameplay static cache, mouse hit-test 구현을 복구해 `build-dist` 릴리스 링크 실패를 수정
+- `build-dist` 기준 `tenriff`와 `bms_parser_tests` 빌드, `bms_parser_tests.exe` 실행까지 다시 통과
+
+## [0.9.14] - 2026-03-20
+
+### Changed
+- `MenuApp`의 Song Select render 조립과 filter/sort state rebuild 경계를 `src/app/MenuAppSongSelectRender.cpp`, `src/app/MenuAppSongSelectState.cpp`, `src/app/MenuAppSongSelectUtils.cpp`로 분리
+- `MenuAppTail.inl`에서 Song Select 전용 대형 구현 블록을 제거해 tail 조각이 gameplay/result 쪽에 더 집중되도록 정리
+- 프로젝트 메타데이터와 핵심 현재 상태/로드맵 문서를 `0.9.14` 기준으로 갱신
+
+## [0.9.13] - 2026-03-20
+
+### Changed
+- 유지보수용으로 `MenuApp` 분리 파일과 Song Select 경계에 짧은 설명 주석을 추가해 캐시/정렬/legacy 동기화 규칙을 더 쉽게 추적할 수 있게 함
+- 프로젝트 메타데이터와 핵심 현재 상태/로드맵 문서를 `0.9.13` 기준으로 갱신
+
+## [0.9.12] - 2026-03-20
+
+### Changed
+- `MenuApp`의 Song Select 하위 유지보수 경계를 더 잘라 `src/app/MenuAppRecords.cpp`와 `src/app/MenuAppSongSelect.cpp`로 분리
+- record/replay/best-result/background-preview 경로와 일부 song-list helper를 `MenuAppTail.inl`에서 분리해 tail 조각의 책임을 축소
+- 프로젝트 메타데이터와 핵심 현재 상태/로드맵 문서를 `0.9.12` 기준으로 갱신
+
+## [0.9.11] - 2026-03-20
+
+### Changed
+- `MenuApp`의 keymap 화면 입력/렌더/캡처/저장 로직을 `src/app/MenuAppKeymap.cpp`로 분리해 메인 파일과 tail 조각의 결합도를 낮춤
+- 프로젝트 메타데이터와 현재 상태/로드맵 문서를 `0.9.11` 기준으로 갱신
+
+## [0.9.10] - 2026-03-20
+
+### Added
+- 루트 README와 `docs/` 문서들의 영문/중문 번역본을 추가해 다국어 문서 진입점을 정리
+- `mode`/mod 확장과 유지보수 절차를 설명하는 개발자용 문서를 추가
+
+### Changed
+- 문서 인덱스와 현재 상태 문서를 `0.9.10` 기준으로 갱신
+
+## [0.9.9] - 2026-03-20
+
+### Changed
+- `MenuWindow.cpp`, `MenuApp.cpp`, `GameSession.cpp` 대형 구현 파일을 더 작은 구현 조각으로 분리하는 유지보수 리팩터를 진행
+- 동작 변경 없이 대형 렌더/메뉴/게임플레이 구현을 분리해 후속 `1.0.0` 안정화 작업의 충돌 범위를 줄임
+
+## [0.9.8] - 2026-03-20
+
+### Changed
+- `skin.lr2_resolution_mode` config schema를 추가하고 `auto | sd | hd | fhd` 저장/정규화/저장 테스트를 맞춤
+- `docs/config.md`와 `docs/current-state.md`를 새 LR2 해상도 override 설정에 맞게 갱신
+- 프로젝트 메타데이터를 `0.9.8` 기준으로 승격
+
 ## [0.9.7] - 2026-03-19
 
 ### Added

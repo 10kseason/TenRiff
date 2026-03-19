@@ -1,100 +1,100 @@
 # TenRiff
 
-Language: [한국어](README.md) | English | [简体中文](README.zh-CN.md)
+Language: [한국어](README.md) | [English](README.en.md) | [简体中文](README.zh-CN.md)
 
-TenRiff is a Windows GUI BMS-first rhythm-game runtime and launcher project. The goal is to build a standalone rhythm-game client centered on practical BMS play, with direct control over judgement, audio, input, and rendering pipelines. The current project version is `0.9.7`, and the project is distributed under the MIT license. Bundled third-party notices are listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+TenRiff is a Windows GUI-based BMS-first rhythm game runtime/launcher project. The goal is to build a standalone rhythm-game client centered on a practical BMS play environment, with direct control over the judgement, audio, input, and rendering pipeline. The current project version is `0.9.16`, and the project uses the MIT License. Bundled third-party notices are collected in [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
 
-This README is an onboarding document for first-time readers. For detailed current behavior, the current `0.9.7` project state, the `0.8.0` baseline, configuration structure, and design docs, continue with [docs/README.md](docs/README.md).
+This README is an introduction that explains "what to look at first when you open the project." For the more detailed current behavior, the current `0.9.16` project state, the `0.8.0` baseline, the config structure, and the design documents, continue reading from [`docs/README.en.md`](docs/README.en.md).
 
-## Project Overview
+## Project At a Glance
 
 - Primary target platform: Windows
-- Primary chart surface: BMS-first
+- Default chart surface: BMS-first
 - Optional supported charts: `.osu` osu!mania 4K-10K
 - Graphics path: D3D11 + Direct2D/DirectWrite
 - Audio path: WASAPI
-- Input path: RawInput or high-polling-rate keyboard polling
+- Input path: RawInput or high-rate polling
 - License: [MIT](LICENSE)
 - Third-party notices: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
-- Release history: [CHANGELOG.md](CHANGELOG.md)
+- Release changelog: [CHANGELOG.md](CHANGELOG.md)
 
 ## Credits / Attribution
 
-TenRiff's current keymode converter includes an adapted port of the N2NC keymode-conversion ideas and code from `krrcream-Toolkit`.
+TenRiff's current key-mode converter implementation includes an adaptation/port based on the N2NC idea and code from `krrcream-Toolkit`.
 
 - Original project: <https://github.com/krrcream/krrcream-Toolkit>
-- Imported scope: keymode conversion logic based on `Tools/N2NC/N2NC.cs`, adapted to TenRiff's C++ `GameplayChart` runtime model
-- Current TenRiff implementation: `src/gameplay/KeyModeConverter.*`
-- License / attribution notice: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
+- Applied scope: porting the key-mode conversion logic from `Tools/N2NC/N2NC.cs` into TenRiff's C++ `GameplayChart` structure
+- Current TenRiff implementation location: `src/gameplay/KeyModeConverter.*`
+- License / source notice: [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)
 
-The project keeps explicit credit to `krrcream` and the original toolkit wherever this adapted logic is used, while also documenting TenRiff-side integration and modification work separately.
+Whenever possible, the original author `krrcream` and the upstream toolkit are kept credited, and TenRiff-side changes/integration details are described separately.
 
-## What Works Right Now
+## What You Can Do Now
 
-The current codebase is already at the stage where the menu opens, songs can be selected, charts can be loaded and played, and results plus local records can be saved.
+The codebase is currently at the level where you can "open the menu, choose a song, load a chart, play it, and review the result and local records."
 
-- BMS parsing / normalization / timeline processing
-  - headers, dictionaries, and measure commands
-  - fractional `#MEASURE`
-  - compact lane mapping for `#4K / #6K / #8K` headers
-  - `#LNOBJ` and LN channels (`51`-`55`, `61`-`65`)
-  - legacy BMS text compatibility through CP932 (Shift-JIS) fallback
-- BMS audio
-  - native WAV decode
-  - native OGG Vorbis decode (`stb_vorbis`) first, with Windows Media Foundation fallback when needed
+- BMS parser / normalizer / timeline handling
+  - Headers, dictionaries, and measure commands
+  - `#MEASURE` fraction handling
+  - Compact lane mapping by declared key count when `#4K / #6K / #8K` headers are present
+  - `#LNOBJ`, LN channels (`51`-`55`, `61`-`65`)
+  - CP932 (Shift-JIS) legacy BMS text support
+- BMS audio handling
+  - Native WAV decoding
+  - Native OGG Vorbis decoding via `stb_vorbis`, with a Windows Media Foundation fallback if needed
   - MP3 via Windows Media Foundation fallback
-  - optional `ffmpeg.exe` fallback
-  - keysound modes: `follow / autoplay / ignore`
+  - `ffmpeg.exe` fallback when needed
+  - `follow / autoplay / ignore` keysound mode
 - Song Select
-  - cache-first loading
-  - forced reindex with `F5`
-  - search, key-count filtering, and difficulty filtering
+  - Cache-first loading
+  - `F5` forced reindexing
+  - Search, key-count filtering, difficulty filtering
   - `LV ASC/DESC`, `TITLE A-Z/Z-A` sorting
-  - external folder / BMS drag-and-drop
-  - saved recent sources
+  - External folder / BMS drag-and-drop
+  - Recent source persistence / reopening
   - `BMS / OSU / All` filtering
 - Gameplay / HUD
-  - real-time HUD
-  - staged chart loading progress
+  - Real-time HUD
+  - Staged chart-loading progress
   - `Esc` cancel during gameplay loading
-  - display offset
-  - performance overlay
-  - note head/tail bitmap cache and static playfield command-list cache
+  - Display offset
+  - Performance overlay
+  - Note head/tail bitmap cache + static playfield command-list cache
 - Options / skins
   - Hi-Speed, Rate, gauge, audio, input, and graphics settings
-  - `Skins` screen for judgement-line position and note width/height
-  - `5K~10K` lane-color editing with live preview
+  - Judgement-line position, note size, and lane color editing in the `Skins` screen
+  - `5K`-`10K` lane color editing with a live preview
 - Results / local records
-  - dedicated result screen
-  - replay/result JSON export
-  - accumulated local chart history
-  - best-record selection that prioritizes clear state
+  - Result screen
+  - Replay / result JSON export
+  - Per-song local record accumulation
+  - Best-record selection with clear-status priority
 
-## Current Limitations
+## What Is Still Limited
 
-The project is usable, but it is not a fully finished product yet.
+The project is usable, but it is not yet a fully finished product.
 
-- Windows GUI is the main supported path.
-- Linux GUI/audio/input backends are not finished yet.
-- Some GUI flows are validated mostly through builds/tests and still need more manual runtime verification.
-- Older design docs may not fully match the current implementation, so [docs/current-state.md](docs/current-state.md) should be treated as the first reference for actual current behavior.
+- Windows GUI is the main path.
+- Linux GUI/audio/input backends are still incomplete.
+- Some GUI paths are validated primarily through build/tests, and manual in-game verification still remains.
+- Older design documents and the current implementation may differ in places, so the current-state document should always be consulted first.
 
 ## Quick Start
 
-### 1. Repository Layout
+### 1. Prepare the repository layout
 
-These directories are the main ones to look at:
+These directories are the usual entry points:
 
-- `src/`: runtime and game code
+- `src/`: runtime/game code
 - `tests/`: unit and smoke tests
 - `docs/`: current-state and design documents
-- `config/`: default global configuration
-- `profiles/`: runtime profile config, keymaps, and local results
+- `config/`: global default config
+- `profiles/`: runtime profiles, keymaps, local results
 - `songs/`: chart root
 
-### 2. Release Build
+### 2. Release build
 
-Typical Windows build commands:
+The following is a typical Windows build example:
 
 ```powershell
 cmake -S . -B build-dist -G "Visual Studio 17 2022" -A x64
@@ -102,19 +102,19 @@ cmake --build build-dist --config Release --target tenriff
 cmake --build build-dist --config Release --target bms_parser_tests
 ```
 
-If Windows Defender or another antivirus temporarily locks `TenRiff.exe`, use the retry wrapper instead.
+If Windows Defender or another antivirus briefly locks `TenRiff.exe`, use the wrapper below:
 
 ```powershell
 .\tools\build_with_retry.ps1 -BuildDir build-dist -Config Release -Targets tenriff,bms_parser_tests
 ```
 
-### 3. Run Tests
+### 3. Run the tests
 
 ```powershell
 .\build-dist\Release\bms_parser_tests.exe
 ```
 
-### 4. Launch
+### 4. Run the app
 
 Direct launch:
 
@@ -122,63 +122,63 @@ Direct launch:
 .\build-dist\Release\TenRiff.exe --songs .\songs --profile default
 ```
 
-Using the launcher script:
+Launcher script:
 
 ```powershell
 .\launch_win.bat
 ```
 
-## Configuration and Runtime Data
+## Config and Runtime Data
 
-TenRiff separates global config from per-profile config.
+TenRiff separates global config from profile config.
 
 - Global config: `config/config.json`
 - Profile config: `profiles/<name>/config.json`
 - Keymap: `profiles/<name>/keymap.json`
-- Song-index cache: `profiles/<name>/.tenriff/song-index/<source-hash>.json`
+- Song index cache: `profiles/<name>/.tenriff/song-index/<source-hash>.json`
 - Replay export: `profiles/<name>/replays/*.json`
 - Result export: `profiles/<name>/results/*.json`
 - Runtime log: `logs/run.log`
-- Crash logs: `logs/crash-*.log`
+- Crash log: `logs/crash-*.log`
 
-For the real config structure, [docs/config.md](docs/config.md) is the fastest place to start.
+For a detailed look at the config structure, the fastest starting point is [`docs/config.en.md`](docs/config.en.md).
 
-## Recommended Reading Order
+## Reading Order
 
-This README is only the entry point. For details, read the docs in this order:
+This README only covers the introduction. For the details, the most efficient reading order is:
 
-1. [docs/README.md](docs/README.md)
-   - docs map
-2. [docs/current-state.md](docs/current-state.md)
-   - what actually works right now
-3. [docs/baseline-0.8.0.md](docs/baseline-0.8.0.md)
-   - the `0.8.0` baseline document future work is expected to preserve
-4. [docs/gameplay-guide.md](docs/gameplay-guide.md)
-   - how to start, basic controls, HUD, judgement, and results
-5. [docs/config.md](docs/config.md)
-   - config, profile, and keymap structure
-6. [docs/menu.md](docs/menu.md)
-   - menu, state-machine, and song-selection flow
-7. [docs/core-loop.md](docs/core-loop.md)
-   - play-loop and data-flow details
-8. [docs/roadmap.md](docs/roadmap.md)
-   - medium- and long-term direction
+1. [`docs/README.en.md`](docs/README.en.md)
+   - Full documentation map
+2. [`docs/current-state.en.md`](docs/current-state.en.md)
+   - What actually works right now
+3. [`docs/baseline-0.8.0.en.md`](docs/baseline-0.8.0.en.md)
+   - The `0.8.0` baseline document that follow-up work should use as a reference
+4. [`docs/gameplay-guide.en.md`](docs/gameplay-guide.en.md)
+   - How to start playing, basic controls, HUD/judgement/result screen explanation from a practical player perspective
+5. [`docs/config.en.md`](docs/config.en.md)
+   - Config/profile/keymap structure
+6. [`docs/menu.en.md`](docs/menu.en.md)
+   - Menu / state machine / song-select flow
+7. [`docs/core-loop.en.md`](docs/core-loop.en.md)
+   - Play loop and data flow
+8. [`docs/roadmap.en.md`](docs/roadmap.en.md)
+   - Long-term direction for future work
 
-## How To Interpret The Docs
+## Document Interpretation Rules
 
-Design docs and current code may disagree. When that happens, use this order of precedence:
+Design documents and the current code may appear to disagree. In that case, the priority order is:
 
-1. current code
-2. [docs/current-state.md](docs/current-state.md)
-3. [docs/config.md](docs/config.md)
-4. older design docs
+1. Current code
+2. [`docs/current-state.en.md`](docs/current-state.en.md)
+3. [`docs/config.en.md`](docs/config.en.md)
+4. Older design documents
 
-In short, for current behavior, prioritize the current-state docs over older design plans.
+In other words, when judging "current behavior," the current-state document should take precedence over older design notes.
 
-## Read Next
+## What To Read Next
 
-- For actual gameplay usage: [docs/gameplay-guide.md](docs/gameplay-guide.md)
-- For configuration details: [docs/config.md](docs/config.md)
-- For menu flow: [docs/menu.md](docs/menu.md)
-- For play-loop details: [docs/core-loop.md](docs/core-loop.md)
-- For a fast status snapshot: [docs/current-state.md](docs/current-state.md)
+- If you want to know how to actually play, read [`docs/gameplay-guide.en.md`](docs/gameplay-guide.en.md)
+- If you want to understand the settings, read [`docs/config.en.md`](docs/config.en.md)
+- If you want to understand the menu flow, read [`docs/menu.en.md`](docs/menu.en.md)
+- If you want to understand the play loop, read [`docs/core-loop.en.md`](docs/core-loop.en.md)
+- If you want a quick overview of the overall state, read [`docs/current-state.en.md`](docs/current-state.en.md)

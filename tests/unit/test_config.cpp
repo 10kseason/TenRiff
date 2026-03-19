@@ -102,6 +102,7 @@ TEST_CASE("config defaults prefer 44100 Hz audio") {
     CHECK(config.skin.source == "native");
     CHECK(config.skin.osu_skin_name.empty());
     CHECK(config.skin.lr2_skin_name.empty());
+    CHECK(config.skin.lr2_resolution_mode == "auto");
     CHECK(config.skin.note_border_enabled);
     CHECK_FALSE(config.skin.preserve_note_image_aspect_ratio);
     CHECK(config.skin.show_lane_dividers);
@@ -350,6 +351,60 @@ TEST_CASE("config save and load preserve lr2 skin selection") {
     CHECK(result.config.skin.source == "lr2");
     CHECK(result.config.skin.lr2_skin_name == "BlueWhite");
     CHECK(result.config.skin.osu_skin_name.empty());
+}
+
+TEST_CASE("config save and load preserve lr2 resolution mode") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+
+    CurrentPathGuard cwd;
+    std::error_code ec;
+    std::filesystem::current_path(temp.path, ec);
+    REQUIRE_FALSE(static_cast<bool>(ec));
+
+    ConfigLoader loader;
+    auto config = loader.defaults();
+    config.skin.source = "lr2";
+    config.skin.lr2_resolution_mode = "FHD";
+
+    std::string error;
+    REQUIRE(loader.save_profile("profiles/test", config, &error));
+    CHECK(error.empty());
+
+    const auto result = loader.load_profile("profiles/test");
+    REQUIRE(result.success());
+    CHECK(result.config.skin.source == "lr2");
+    CHECK(result.config.skin.lr2_resolution_mode == "fhd");
+}
+
+TEST_CASE("config load normalizes invalid lr2 resolution mode") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+
+    std::filesystem::create_directories(temp.path / "config");
+    std::filesystem::create_directories(temp.path / "profiles" / "test");
+    write_file(temp.path / "config" / "config.json",
+               "{\n"
+               "  \"skin\": {\n"
+               "    \"source\": \"lr2\",\n"
+               "    \"lr2_resolution_mode\": \"mystery\"\n"
+               "  }\n"
+               "}\n");
+    write_file(temp.path / "profiles" / "test" / "config.json", "{ }\n");
+
+    CurrentPathGuard cwd;
+    std::error_code ec;
+    std::filesystem::current_path(temp.path, ec);
+    REQUIRE_FALSE(static_cast<bool>(ec));
+
+    ConfigLoader loader;
+    const auto result = loader.load_profile("profiles/test");
+
+    REQUIRE(result.success());
+    CHECK(result.config.skin.source == "lr2");
+    CHECK(result.config.skin.lr2_resolution_mode == "auto");
 }
 
 TEST_CASE("config save and load preserve lane divider width scaling") {

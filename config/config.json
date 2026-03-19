@@ -69,6 +69,7 @@
     "source": "native",
     "osu_skin_name": "",
     "lr2_skin_name": "",
+    "lr2_resolution_mode": "auto",
     "note_shape": "rect",
     "note_border_enabled": true,
     "show_lane_dividers": true,

@@ -126,9 +126,15 @@
 
 ### `skin`
 - `source` (string)
-  - `native | osu`
+  - `native | osu | lr2`
 - `osu_skin_name` (string)
   - imported osu!mania skin name
+- `lr2_skin_name` (string)
+  - imported LR2 playskin name
+- `lr2_resolution_mode` (string)
+  - `auto | sd | hd | fhd`
+  - LR2 playskin의 해상도 override 토큰
+  - `auto`는 asset 파일명 대신 LR2 playskin `#DST_NOTE` 레이아웃 좌표를 기준으로 SD/HD/FHD family를 판정
 - `note_shape` (string)
   - `rect | circle`
 - `note_border_enabled` (bool)
