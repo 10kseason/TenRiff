@@ -237,6 +237,7 @@ struct GameplayHudData {
     std::string skin_source = "native";
     std::string external_skin_root;
     std::string external_skin_name;
+    std::string lr2_resolution_override = "auto";
     double visual_offset_ms = 0.0;
 
     double bpm = 0.0;
@@ -308,6 +309,7 @@ struct SkinPreviewData {
     std::string skin_source = "native";
     std::string external_skin_root;
     std::string external_skin_name;
+    std::string lr2_resolution_override = "auto";
     std::array<uint32_t, kGameplayHudMaxLanes> lane_colors{};
 };
 
@@ -507,6 +509,7 @@ private:
         std::string skin_source = "native";
         std::string external_skin_root;
         std::string external_skin_name;
+        std::string lr2_resolution_override = "auto";
         bool use_full_lane_receptor_layout = false;
         std::size_t lane_divider_width_count = 0;
         std::array<float, kGameplayHudMaxLanes> lane_divider_widths{};

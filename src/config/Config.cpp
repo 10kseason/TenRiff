@@ -96,6 +96,7 @@ const std::unordered_map<std::string, std::vector<std::string>>& default_skin_la
 
 void sanitize_skin_config(SkinConfig& skin) {
     skin.source = normalize_skin_source_token(skin.source);
+    skin.lr2_resolution_mode = normalize_skin_lr2_resolution_mode_token(skin.lr2_resolution_mode);
     skin.note_shape = normalize_skin_note_shape_token(skin.note_shape);
     skin.judgement_line_position = std::clamp(
         skin.judgement_line_position, kJudgementLinePositionMin, kJudgementLinePositionMax);
@@ -434,6 +435,8 @@ void apply_config_object(const JsonObject& root, RuntimeConfig& config) {
             get_string(*skin, "osu_skin_name", config.skin.osu_skin_name);
         config.skin.lr2_skin_name =
             get_string(*skin, "lr2_skin_name", config.skin.lr2_skin_name);
+        config.skin.lr2_resolution_mode = normalize_skin_lr2_resolution_mode_token(
+            get_string(*skin, "lr2_resolution_mode", config.skin.lr2_resolution_mode));
         config.skin.note_shape =
             normalize_skin_note_shape_token(get_string(*skin, "note_shape", config.skin.note_shape));
         config.skin.note_border_enabled =
@@ -669,6 +672,8 @@ JsonValue build_json_root(const RuntimeConfig& config) {
     skin.emplace("source", JsonValue{normalize_skin_source_token(config.skin.source)});
     skin.emplace("osu_skin_name", JsonValue{config.skin.osu_skin_name});
     skin.emplace("lr2_skin_name", JsonValue{config.skin.lr2_skin_name});
+    skin.emplace("lr2_resolution_mode",
+                 JsonValue{normalize_skin_lr2_resolution_mode_token(config.skin.lr2_resolution_mode)});
     skin.emplace("note_shape", JsonValue{normalize_skin_note_shape_token(config.skin.note_shape)});
     skin.emplace("note_border_enabled", JsonValue{config.skin.note_border_enabled});
     skin.emplace("preserve_note_image_aspect_ratio",
@@ -776,6 +781,14 @@ std::string normalize_skin_source_token(std::string_view token) {
         return "lr2";
     }
     return "native";
+}
+
+std::string normalize_skin_lr2_resolution_mode_token(std::string_view token) {
+    const std::string normalized = to_lower_ascii(std::string(token));
+    if (normalized == "sd" || normalized == "hd" || normalized == "fhd") {
+        return normalized;
+    }
+    return "auto";
 }
 
 std::string normalize_skin_color_token(std::string_view token) {

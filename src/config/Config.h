@@ -72,6 +72,7 @@ struct SkinConfig {
     std::string source = "native";
     std::string osu_skin_name;
     std::string lr2_skin_name;
+    std::string lr2_resolution_mode = "auto";
     std::string note_shape = "rect";
     bool note_border_enabled = true;
     bool preserve_note_image_aspect_ratio = false;
@@ -152,6 +153,7 @@ public:
 [[nodiscard]] std::vector<std::string> supported_skin_mode_tokens();
 [[nodiscard]] std::vector<std::string> supported_skin_color_tokens();
 [[nodiscard]] std::string normalize_skin_source_token(std::string_view token);
+[[nodiscard]] std::string normalize_skin_lr2_resolution_mode_token(std::string_view token);
 [[nodiscard]] std::string normalize_skin_color_token(std::string_view token);
 [[nodiscard]] std::string normalize_skin_note_shape_token(std::string_view token);
 [[nodiscard]] std::string skin_note_shape_label(std::string_view token);
