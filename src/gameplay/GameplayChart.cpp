@@ -5,6 +5,35 @@
 
 namespace tenriff::gameplay {
 
+bool NoteEvent::add_audio_asset(std::size_t asset_id) {
+    if (asset_id == kInvalidAudioAssetId) {
+        return false;
+    }
+    for (std::size_t i = 0; i < audio_asset_count; ++i) {
+        if (audio_asset_ids[i] == asset_id) {
+            if (audio_asset_id == kInvalidAudioAssetId) {
+                audio_asset_id = audio_asset_ids[0];
+            }
+            return false;
+        }
+    }
+    if (audio_asset_count >= audio_asset_ids.size()) {
+        if (audio_asset_id == kInvalidAudioAssetId) {
+            audio_asset_id = audio_asset_ids[0];
+        }
+        return false;
+    }
+    audio_asset_ids[audio_asset_count++] = asset_id;
+    audio_asset_id = audio_asset_ids[0];
+    return true;
+}
+
+void NoteEvent::clear_audio_assets() {
+    audio_asset_id = kInvalidAudioAssetId;
+    audio_asset_count = 0;
+    audio_asset_ids.fill(kInvalidAudioAssetId);
+}
+
 std::size_t GameplayChart::intern_audio_asset(std::string path) {
     if (path.empty()) {
         return kInvalidAudioAssetId;
@@ -23,6 +52,26 @@ const std::string* GameplayChart::audio_asset_path(std::size_t asset_id) const {
         return nullptr;
     }
     return &audio_assets[asset_id].path;
+}
+
+std::size_t note_audio_asset_count(const NoteEvent& note) {
+    if (note.audio_asset_count > 0) {
+        return std::min(note.audio_asset_count, note.audio_asset_ids.size());
+    }
+    return (note.audio_asset_id == kInvalidAudioAssetId) ? 0u : 1u;
+}
+
+std::size_t note_audio_asset_at(const NoteEvent& note, std::size_t index) {
+    if (note.audio_asset_count > 0) {
+        if (index >= note.audio_asset_count || index >= note.audio_asset_ids.size()) {
+            return kInvalidAudioAssetId;
+        }
+        return note.audio_asset_ids[index];
+    }
+    if (index == 0) {
+        return note.audio_asset_id;
+    }
+    return kInvalidAudioAssetId;
 }
 
 namespace {
@@ -108,10 +157,12 @@ GameplayChart from_osu_mania(const chart::OsuManiaChart& chart_data, int sample_
     chart.lane_count = chart_data.key_count;
 
     int64_t max_sample = 0;
-    for (const auto& note_data : chart_data.notes) {
+    for (std::size_t i = 0; i < chart_data.notes.size(); ++i) {
+        const auto& note_data = chart_data.notes[i];
         NoteEvent note;
         note.lane = note_data.column + 1;
         note.start_sample = ms_to_samples(static_cast<double>(note_data.start_time_ms), sample_rate, rate);
+        note.note_id = i;
         if (note_data.end_time_ms.has_value()) {
             note.end_sample = ms_to_samples(static_cast<double>(note_data.end_time_ms.value()), sample_rate, rate);
             note.release_required = true;

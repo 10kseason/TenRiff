@@ -432,6 +432,8 @@ void apply_config_object(const JsonObject& root, RuntimeConfig& config) {
             normalize_skin_source_token(get_string(*skin, "source", config.skin.source));
         config.skin.osu_skin_name =
             get_string(*skin, "osu_skin_name", config.skin.osu_skin_name);
+        config.skin.lr2_skin_name =
+            get_string(*skin, "lr2_skin_name", config.skin.lr2_skin_name);
         config.skin.note_shape =
             normalize_skin_note_shape_token(get_string(*skin, "note_shape", config.skin.note_shape));
         config.skin.note_border_enabled =
@@ -440,6 +442,14 @@ void apply_config_object(const JsonObject& root, RuntimeConfig& config) {
             get_bool(*skin,
                      "preserve_note_image_aspect_ratio",
                      config.skin.preserve_note_image_aspect_ratio);
+        config.skin.show_lane_dividers =
+            get_bool(*skin, "show_lane_dividers", config.skin.show_lane_dividers);
+        config.skin.show_judgement_line =
+            get_bool(*skin, "show_judgement_line", config.skin.show_judgement_line);
+        config.skin.show_gear_boundary_line =
+            get_bool(*skin, "show_gear_boundary_line", config.skin.show_gear_boundary_line);
+        config.skin.hold_tail_taper_enabled =
+            get_bool(*skin, "hold_tail_taper_enabled", config.skin.hold_tail_taper_enabled);
         config.skin.judgement_line_position = std::clamp(
             get_number(*skin, "judgement_line_position", config.skin.judgement_line_position),
             kJudgementLinePositionMin, kJudgementLinePositionMax);
@@ -658,10 +668,15 @@ JsonValue build_json_root(const RuntimeConfig& config) {
     JsonObject skin;
     skin.emplace("source", JsonValue{normalize_skin_source_token(config.skin.source)});
     skin.emplace("osu_skin_name", JsonValue{config.skin.osu_skin_name});
+    skin.emplace("lr2_skin_name", JsonValue{config.skin.lr2_skin_name});
     skin.emplace("note_shape", JsonValue{normalize_skin_note_shape_token(config.skin.note_shape)});
     skin.emplace("note_border_enabled", JsonValue{config.skin.note_border_enabled});
     skin.emplace("preserve_note_image_aspect_ratio",
                  JsonValue{config.skin.preserve_note_image_aspect_ratio});
+    skin.emplace("show_lane_dividers", JsonValue{config.skin.show_lane_dividers});
+    skin.emplace("show_judgement_line", JsonValue{config.skin.show_judgement_line});
+    skin.emplace("show_gear_boundary_line", JsonValue{config.skin.show_gear_boundary_line});
+    skin.emplace("hold_tail_taper_enabled", JsonValue{config.skin.hold_tail_taper_enabled});
     skin.emplace("judgement_line_position", JsonValue{config.skin.judgement_line_position});
     skin.emplace("combo_position", JsonValue{config.skin.combo_position});
     skin.emplace("note_width_scale", JsonValue{config.skin.note_width_scale});
@@ -756,6 +771,9 @@ std::string normalize_skin_source_token(std::string_view token) {
     const std::string normalized = to_lower_ascii(std::string(token));
     if (normalized == "osu" || normalized == "osu-mania" || normalized == "osu_mania") {
         return "osu";
+    }
+    if (normalized == "lr2" || normalized == "lunaticrave2" || normalized == "lr2skin") {
+        return "lr2";
     }
     return "native";
 }

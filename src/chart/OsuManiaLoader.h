@@ -23,6 +23,9 @@ struct OsuManiaTimingPoint {
     double time_ms = 0.0;
     double beat_length = 0.0;
     bool inherited = false;
+    int sample_set = 0;
+    int sample_index = 0;
+    int volume = 100;
 };
 
 struct OsuManiaNote {
@@ -30,12 +33,18 @@ struct OsuManiaNote {
     int64_t start_time_ms = 0;
     std::optional<int64_t> end_time_ms;
     int hit_sound = 0;
+    int normal_set = 0;
+    int addition_set = 0;
+    int sample_index = 0;
+    int sample_volume = 0;
+    std::string custom_filename;
 };
 
 struct OsuManiaChart {
     int key_count = 0;
     double base_bpm = 0.0;
     double overall_difficulty = 8.0;
+    int general_sample_set = 1;
     std::string title;
     std::string title_unicode;
     std::string artist;

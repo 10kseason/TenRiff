@@ -227,12 +227,16 @@ struct GameplayHudData {
     double note_height_scale = 1.8;
     double lane_divider_width_scale = 1.0;
     double hold_body_width_scale = 0.60;
+    bool show_lane_dividers = true;
+    bool show_judgement_line = true;
+    bool show_gear_boundary_line = false;
+    bool hold_tail_taper_enabled = false;
     bool note_border_enabled = true;
     std::string note_shape = "rect";
     bool preserve_note_image_aspect_ratio = false;
     std::string skin_source = "native";
-    std::string osu_skin_root;
-    std::string osu_skin_name;
+    std::string external_skin_root;
+    std::string external_skin_name;
     double visual_offset_ms = 0.0;
 
     double bpm = 0.0;
@@ -294,8 +298,16 @@ struct SkinPreviewData {
     double note_height_scale = 1.8;
     double lane_divider_width_scale = 1.0;
     double hold_body_width_scale = 0.60;
+    bool show_lane_dividers = true;
+    bool show_judgement_line = true;
+    bool show_gear_boundary_line = false;
+    bool hold_tail_taper_enabled = false;
     bool note_border_enabled = true;
     std::string note_shape = "rect";
+    bool preserve_note_image_aspect_ratio = false;
+    std::string skin_source = "native";
+    std::string external_skin_root;
+    std::string external_skin_name;
     std::array<uint32_t, kGameplayHudMaxLanes> lane_colors{};
 };
 
@@ -480,6 +492,9 @@ private:
         double note_width_scale = 1.0;
         double note_height_scale = 1.8;
         double lane_divider_width_scale = 1.0;
+        bool show_lane_dividers = true;
+        bool show_judgement_line = true;
+        bool show_gear_boundary_line = false;
         std::size_t lane_divider_width_count = 0;
         std::array<float, kGameplayHudMaxLanes> lane_divider_widths{};
     };
@@ -490,11 +505,13 @@ private:
         std::string note_shape = "rect";
         bool preserve_note_image_aspect_ratio = false;
         std::string skin_source = "native";
-        std::string osu_skin_root;
-        std::string osu_skin_name;
-        bool using_osu_skin_assets = false;
+        std::string external_skin_root;
+        std::string external_skin_name;
+        bool use_full_lane_receptor_layout = false;
         std::size_t lane_divider_width_count = 0;
         std::array<float, kGameplayHudMaxLanes> lane_divider_widths{};
+        float imported_note_width_ratio = 1.0f;
+        float imported_note_height_ratio = 1.0f;
         std::array<uint32_t, kGameplayHudMaxLanes> lane_colors{};
     };
 

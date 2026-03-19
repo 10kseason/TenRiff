@@ -71,9 +71,14 @@ struct UiConfig {
 struct SkinConfig {
     std::string source = "native";
     std::string osu_skin_name;
+    std::string lr2_skin_name;
     std::string note_shape = "rect";
     bool note_border_enabled = true;
     bool preserve_note_image_aspect_ratio = false;
+    bool show_lane_dividers = true;
+    bool show_judgement_line = true;
+    bool show_gear_boundary_line = false;
+    bool hold_tail_taper_enabled = false;
     double judgement_line_position = kJudgementLinePositionDefault;
     double combo_position = kComboPositionDefault;
     double note_width_scale = 1.0;

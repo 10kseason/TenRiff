@@ -87,6 +87,21 @@ std::vector<std::string> split_csv_fields(std::string_view line) {
     return fields;
 }
 
+std::vector<std::string> split_delimited_fields(std::string_view line, char delimiter) {
+    std::vector<std::string> fields;
+    std::size_t start = 0;
+    while (start <= line.size()) {
+        const std::size_t next = line.find(delimiter, start);
+        const std::size_t end = (next == std::string_view::npos) ? line.size() : next;
+        fields.push_back(trim(line.substr(start, end - start)));
+        if (next == std::string_view::npos) {
+            break;
+        }
+        start = next + 1;
+    }
+    return fields;
+}
+
 std::string normalize_event_asset_field(std::string_view view) {
     std::string value = trim(view);
     if (value.size() >= 2 && value.front() == '"' && value.back() == '"') {
@@ -113,6 +128,48 @@ int column_from_x(int x, int key_count) {
         column = key_count - 1;
     }
     return column;
+}
+
+int parse_sample_set_token(std::string_view view) {
+    std::string value = trim(view);
+    if (value.empty()) {
+        return 0;
+    }
+
+    int numeric = 0;
+    if (parse_int(value, numeric)) {
+        return std::clamp(numeric, 0, 3);
+    }
+
+    to_upper_ascii(value);
+    if (value == "NORMAL") {
+        return 1;
+    }
+    if (value == "SOFT") {
+        return 2;
+    }
+    if (value == "DRUM") {
+        return 3;
+    }
+    return 0;
+}
+
+void apply_hit_sample_fields(const std::vector<std::string>& fields, OsuManiaNote& note) {
+    if (!fields.empty()) {
+        note.normal_set = parse_sample_set_token(fields[0]);
+    }
+    if (fields.size() >= 2u) {
+        note.addition_set = parse_sample_set_token(fields[1]);
+    }
+    if (fields.size() >= 3u) {
+        parse_int(fields[2], note.sample_index);
+    }
+    if (fields.size() >= 4u) {
+        parse_int(fields[3], note.sample_volume);
+    }
+    if (fields.size() >= 5u) {
+        note.custom_filename = normalize_event_asset_field(fields[4]);
+    }
 }
 
 }  // namespace
@@ -188,6 +245,8 @@ OsuManiaParseResult OsuManiaLoader::parse(std::string_view content) const {
                 }
             } else if (key == "AUDIOFILENAME") {
                 result.chart.audio_filename = value;
+            } else if (key == "SAMPLESET") {
+                result.chart.general_sample_set = parse_sample_set_token(value);
             }
             continue;
         }
@@ -271,6 +330,9 @@ OsuManiaParseResult OsuManiaLoader::parse(std::string_view content) const {
             double time_ms = 0.0;
             double beat_length = 0.0;
             int uninherited = 1;
+            int sample_set = 0;
+            int sample_index = 0;
+            int volume = 100;
 
             if (!parse_double(tokens[0], time_ms)) {
                 add_message(result.messages, OsuParseSeverity::Error, line_number,
@@ -282,6 +344,15 @@ OsuManiaParseResult OsuManiaLoader::parse(std::string_view content) const {
                             "Failed to parse timing point beat length.");
                 continue;
             }
+            if (tokens.size() >= 4) {
+                sample_set = parse_sample_set_token(tokens[3]);
+            }
+            if (tokens.size() >= 5) {
+                parse_int(tokens[4], sample_index);
+            }
+            if (tokens.size() >= 6) {
+                parse_int(tokens[5], volume);
+            }
             if (tokens.size() >= 7) {
                 parse_int(tokens[6], uninherited);
             }
@@ -290,6 +361,9 @@ OsuManiaParseResult OsuManiaLoader::parse(std::string_view content) const {
             point.time_ms = time_ms;
             point.beat_length = beat_length;
             point.inherited = uninherited == 0;
+            point.sample_set = sample_set;
+            point.sample_index = sample_index;
+            point.volume = std::clamp(volume, 1, 100);
 
             if (!point.inherited) {
                 maybe_set_bpm(point.beat_length);
@@ -342,10 +416,10 @@ OsuManiaParseResult OsuManiaLoader::parse(std::string_view content) const {
                     add_message(result.messages, OsuParseSeverity::Error, line_number,
                                 "Hold note is missing end time field.");
                 } else {
-                    auto colon = tokens[5].find(':');
+                    const std::vector<std::string> hold_fields = split_delimited_fields(tokens[5], ':');
                     std::string_view hold_segment(tokens[5]);
-                    if (colon != std::string::npos) {
-                        hold_segment = hold_segment.substr(0, colon);
+                    if (!hold_fields.empty()) {
+                        hold_segment = hold_fields.front();
                     }
                     int end_time = 0;
                     if (!parse_int(hold_segment, end_time)) {
@@ -358,7 +432,17 @@ OsuManiaParseResult OsuManiaLoader::parse(std::string_view content) const {
                     } else {
                         note.end_time_ms = end_time;
                     }
+                    if (hold_fields.size() > 1u) {
+                        std::vector<std::string> hit_sample_fields;
+                        hit_sample_fields.reserve(hold_fields.size() - 1u);
+                        for (std::size_t i = 1; i < hold_fields.size(); ++i) {
+                            hit_sample_fields.push_back(hold_fields[i]);
+                        }
+                        apply_hit_sample_fields(hit_sample_fields, note);
+                    }
                 }
+            } else if (tokens.size() >= 6u) {
+                apply_hit_sample_fields(split_delimited_fields(tokens[5], ':'), note);
             }
 
             result.chart.notes.push_back(note);

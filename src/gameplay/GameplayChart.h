@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <cstdint>
 #include <limits>
 #include <optional>
@@ -12,6 +13,7 @@
 namespace tenriff::gameplay {
 
 constexpr std::size_t kInvalidAudioAssetId = std::numeric_limits<std::size_t>::max();
+constexpr std::size_t kMaxNoteAudioAssets = 4;
 
 struct AudioAsset {
     std::string path;
@@ -24,6 +26,17 @@ struct NoteEvent {
     bool release_required = false;      // Tail uses release timing judgement when true.
     std::size_t audio_asset_id = kInvalidAudioAssetId;
     std::size_t note_id = 0;
+    float audio_gain = 1.0f;
+    std::size_t audio_asset_count = 0;
+    std::array<std::size_t, kMaxNoteAudioAssets> audio_asset_ids{
+        kInvalidAudioAssetId,
+        kInvalidAudioAssetId,
+        kInvalidAudioAssetId,
+        kInvalidAudioAssetId,
+    };
+
+    bool add_audio_asset(std::size_t asset_id);
+    void clear_audio_assets();
 };
 
 struct AudioCueEvent {
@@ -41,6 +54,9 @@ struct GameplayChart {
     [[nodiscard]] std::size_t intern_audio_asset(std::string path);
     [[nodiscard]] const std::string* audio_asset_path(std::size_t asset_id) const;
 };
+
+[[nodiscard]] std::size_t note_audio_asset_count(const NoteEvent& note);
+[[nodiscard]] std::size_t note_audio_asset_at(const NoteEvent& note, std::size_t index);
 
 void offset_gameplay_chart_samples(GameplayChart& chart, int64_t sample_offset);
 
