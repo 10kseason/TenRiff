@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(TenRiff VERSION 0.9.4 LANGUAGES CXX)
+project(TenRiff VERSION 0.9.7 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -71,11 +71,15 @@ add_library(tenriff_core
     src/app/CommandLine.cpp
     src/app/CrashLogger.cpp
     src/app/GraphicsTiming.cpp
+    src/app/ImportedGameplaySkin.cpp
+    src/app/Lr2Skin.cpp
     src/app/MenuRecordUtils.cpp
     src/app/MenuSongUtils.cpp
     src/app/ModeManager.cpp
     src/app/ModeResolver.cpp
+    src/app/OsuHitsoundResolver.cpp
     src/app/OsuSkin.cpp
+    src/app/PersistedRuntimeConfig.cpp
     src/app/RuntimeConfigMigration.cpp
     src/app/SongIndex.cpp
     src/app/SongIndexerThread.cpp
@@ -130,6 +134,9 @@ if(WIN32)
         src/app/MenuMusicController.cpp
         src/app/GameSession.cpp
         src/app/MenuApp.cpp
+        src/app/MenuAppDeviceSettings.cpp
+        src/app/MenuAppSettings.cpp
+        src/app/MenuAppSkin.cpp
         src/render/MenuWindow.cpp
     )
 
@@ -242,6 +249,7 @@ if(TENRIFF_ENABLE_TESTS)
         tests/unit/test_song_index.cpp
         tests/unit/test_song_select_state.cpp
         tests/unit/test_config.cpp
+        tests/unit/test_lr2_skin.cpp
         tests/unit/test_osu_skin.cpp
         tests/unit/test_game_session_hud.cpp
         tests/unit/test_graphics_timing.cpp

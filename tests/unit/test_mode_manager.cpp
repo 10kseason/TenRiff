@@ -339,7 +339,7 @@ TEST_CASE("mode manager resolves key mode with full short notes and removes redu
     }
 }
 
-TEST_CASE("mode manager ignores mismatched osu key mode while still applying compatible mods") {
+TEST_CASE("mode manager converts osu key mode upward while still applying compatible mods") {
     tenriff::gameplay::GameplayChart chart = make_hold_mix_chart(7);
 
     tenriff::config::ModeConfig mode;
@@ -355,24 +355,54 @@ TEST_CASE("mode manager ignores mismatched osu key mode while still applying com
         175.0,
         44100);
 
-    CHECK(contains_warning(result.warnings, "does not match the selected osu!mania chart"));
-    CHECK(result.chart.lane_count == 7);
-    CHECK(result.settings.key_mode == tenriff::gameplay::KeyMode::Keys7);
+    CHECK_FALSE(contains_warning(result.warnings, "does not match the selected osu!mania chart"));
+    CHECK(result.chart.lane_count == 10);
+    CHECK(result.settings.key_mode == tenriff::gameplay::KeyMode::Keys10);
     CHECK(contains_token(result.active_mods, "no_ln_release"));
     CHECK(contains_token(result.active_mods, "judge_easy"));
     CHECK(result.judge_window_scale == doctest::Approx(1.25));
     CHECK(result.judge.pg_ms == doctest::Approx(12.5));
+    CHECK_FALSE(has_lane_overlap(result.chart));
 
     bool saw_hold = false;
     for (const auto& note : result.chart.notes) {
         CHECK(note.lane >= 1);
-        CHECK(note.lane <= 7);
+        CHECK(note.lane <= 10);
         if (note.end_sample.has_value()) {
             saw_hold = true;
             CHECK_FALSE(note.release_required);
         }
     }
     CHECK(saw_hold);
+}
+
+TEST_CASE("mode manager converts osu key mode downward with randomization while preserving invariants") {
+    tenriff::gameplay::GameplayChart chart = make_hold_mix_chart(7);
+
+    tenriff::config::ModeConfig mode;
+    mode.key_mode = "4k";
+    mode.random = "super_random";
+    mode.random_seed = 77;
+    mode.mods = {"judge_hard"};
+
+    const auto result = tenriff::app::manage_modes(
+        chart,
+        tenriff::app::ChartFormat::OsuMania,
+        mode,
+        make_judge_config(),
+        1.0,
+        175.0,
+        44100);
+
+    CHECK(result.chart.lane_count == 4);
+    CHECK(result.settings.key_mode == tenriff::gameplay::KeyMode::Keys4);
+    CHECK(result.judge_window_scale == doctest::Approx(0.85));
+    CHECK_FALSE(has_lane_overlap(result.chart));
+
+    for (const auto& note : result.chart.notes) {
+        CHECK(note.lane >= 1);
+        CHECK(note.lane <= 4);
+    }
 }
 
 TEST_CASE("mode manager handles empty charts with key mode and mods without crashing") {

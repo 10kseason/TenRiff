@@ -2,6 +2,20 @@
 
 TenRiff의 사용자/배포 관점에서 의미 있는 변경만 간단히 기록합니다.
 
+## [0.9.7] - 2026-03-19
+
+### Added
+- LR2 플레이 스킨 포팅 경로를 추가해 기본 활성 분기 기준으로 노트/LN 이미지와 레인 배치를 가져올 수 있게 함
+- osu!mania 쪽 per-note hitsound 해석, imported skin 크기 비율 반영, 흰선 토글, LN tail taper 같은 1.0 안정화 작업을 반영
+
+### Changed
+- `mode.key_mode` 변환이 osu!mania에도 적용되도록 정리하고, judge/easy-hard persistence, gauge 기본값, 스킨 설정 동작을 보정
+- `MenuApp` 대형 파일 분리 리팩터를 진행해 skin/settings 화면 로직을 별도 translation unit으로 이동
+
+### Packaged
+- Windows 배포 스테이징과 공개 소스 스테이징을 `0.9.7` 기준으로 새로 생성
+- 공개 소스 zip과 Windows 배포 zip을 `0.9.7` 기준으로 다시 생성
+
 ## [0.9.4] - 2026-03-18
 
 ### Added

@@ -40,9 +40,9 @@
     "hard_to_normal_threshold": 66.0,
     "normal_to_easy_threshold": 33.0,
     "delta": {
-      "hard": {"PG": 0.03666667, "GR": 0.02444444, "GD": 0.00611111, "BD": -5.5},
-      "normal": {"PG": 0.05238095, "GR": 0.03492063, "GD": 0.00873016, "BD": -2.75},
-      "easy": {"PG": 0.1, "GR": 0.06666667, "GD": 0.01666667, "BD": -2.0625}
+      "hard": {"PG": 0.03666667, "GR": 0.02444444, "GD": 0.0, "BD": -7.04},
+      "normal": {"PG": 0.05238095, "GR": 0.03492063, "GD": 0.0, "BD": -3.52},
+      "easy": {"PG": 0.1, "GR": 0.06666667, "GD": 0.0, "BD": -2.64}
     }
   },
   "graphics": {
@@ -66,8 +66,15 @@
     "require_enter_to_exit": true
   },
   "skin": {
+    "source": "native",
+    "osu_skin_name": "",
+    "lr2_skin_name": "",
     "note_shape": "rect",
     "note_border_enabled": true,
+    "show_lane_dividers": true,
+    "show_judgement_line": true,
+    "show_gear_boundary_line": false,
+    "hold_tail_taper_enabled": false,
     "judgement_line_position": 0.82,
     "combo_position": 0.24,
     "note_width_scale": 1.0,

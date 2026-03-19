@@ -146,3 +146,46 @@ CircleSize:4
     CHECK(result.success());
     CHECK(result.chart.background_filename == "bgs/cover image.jpg");
 }
+
+TEST_CASE("osu!mania loader parses sample metadata and hitSample extras") {
+    const char* content = R"(osu file format v14
+[General]
+Mode:3
+SampleSet:Soft
+[Difficulty]
+CircleSize:4
+[TimingPoints]
+0,500,4,3,2,65,1,0
+500,-100,4,2,4,80,0,0
+[HitObjects]
+64,192,0,1,8,1:3:5:40:custom-hit.wav
+448,192,500,128,10,900:2:3:6:70:
+)";
+
+    OsuManiaLoader loader;
+    OsuManiaParseResult result = loader.parse(content);
+
+    CHECK(result.success());
+    CHECK(result.chart.general_sample_set == 2);
+    REQUIRE(result.chart.timing_points.size() == 2u);
+    CHECK(result.chart.timing_points[0].sample_set == 3);
+    CHECK(result.chart.timing_points[0].sample_index == 2);
+    CHECK(result.chart.timing_points[0].volume == 65);
+    CHECK(result.chart.timing_points[1].sample_set == 2);
+    CHECK(result.chart.timing_points[1].sample_index == 4);
+    CHECK(result.chart.timing_points[1].volume == 80);
+
+    REQUIRE(result.chart.notes.size() == 2u);
+    CHECK(result.chart.notes[0].normal_set == 1);
+    CHECK(result.chart.notes[0].addition_set == 3);
+    CHECK(result.chart.notes[0].sample_index == 5);
+    CHECK(result.chart.notes[0].sample_volume == 40);
+    CHECK(result.chart.notes[0].custom_filename == "custom-hit.wav");
+
+    CHECK(result.chart.notes[1].end_time_ms.has_value());
+    CHECK(result.chart.notes[1].normal_set == 2);
+    CHECK(result.chart.notes[1].addition_set == 3);
+    CHECK(result.chart.notes[1].sample_index == 6);
+    CHECK(result.chart.notes[1].sample_volume == 70);
+    CHECK(result.chart.notes[1].custom_filename.empty());
+}

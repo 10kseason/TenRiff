@@ -5,6 +5,7 @@
 #include <string>
 
 #include "app/ChartLoader.h"
+#include "gameplay/GameplayChart.h"
 
 using tenriff::app::ChartLoader;
 using tenriff::app::ChartLoadResult;
@@ -409,6 +410,86 @@ TEST_CASE("chart loader keeps non-10K osu!mania lane counts when enabled") {
     CHECK(result.chart.lane_count == 4);
     CHECK(result.chart.notes[0].lane == 1);
     CHECK(result.chart.notes[1].lane == 4);
+}
+
+TEST_CASE("chart loader attaches osu custom hitsound files to note audio") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+
+    const auto chart_path = temp.path / "custom_hitsound.osu";
+    const auto custom_path = temp.path / "custom-hit.ogg";
+    {
+        std::ofstream chart_file(chart_path, std::ios::binary);
+        REQUIRE(chart_file.good());
+        chart_file << "osu file format v14\n"
+                      "[General]\n"
+                      "Mode:3\n"
+                      "[Difficulty]\n"
+                      "CircleSize:4\n"
+                      "[TimingPoints]\n"
+                      "0,500,4,0,0,100,1,0\n"
+                      "[HitObjects]\n"
+                      "0,0,0,1,0,0:0:0:70:custom-hit.ogg\n";
+    }
+    {
+        std::ofstream hitsound_file(custom_path, std::ios::binary);
+        REQUIRE(hitsound_file.good());
+        hitsound_file << "OggS";
+    }
+
+    ChartLoader loader;
+    ChartLoadResult result = loader.load(chart_path.u8string(), 48000, 1.0, "ignore", true);
+
+    CHECK(result.success());
+    REQUIRE(result.chart.notes.size() == 1u);
+    CHECK(tenriff::gameplay::note_audio_asset_count(result.chart.notes.front()) == 1u);
+    CHECK(chart_audio_path(result.chart, result.chart.notes.front().audio_asset_id) == custom_path.u8string());
+    CHECK(result.chart.notes.front().audio_gain == doctest::Approx(0.70f));
+}
+
+TEST_CASE("chart loader attaches multiple osu hitsounds to one note") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+
+    const auto chart_path = temp.path / "multi_hitsound.osu";
+    const auto normal_path = temp.path / "normal-hitnormal.wav";
+    const auto whistle_path = temp.path / "drum-hitwhistle.wav";
+    const auto finish_path = temp.path / "drum-hitfinish.wav";
+    const auto clap_path = temp.path / "drum-hitclap.wav";
+    {
+        std::ofstream chart_file(chart_path, std::ios::binary);
+        REQUIRE(chart_file.good());
+        chart_file << "osu file format v14\n"
+                      "[General]\n"
+                      "Mode:3\n"
+                      "SampleSet:Normal\n"
+                      "[Difficulty]\n"
+                      "CircleSize:4\n"
+                      "[TimingPoints]\n"
+                      "0,500,4,0,0,60,1,0\n"
+                      "[HitObjects]\n"
+                      "0,0,0,1,15,1:3:0:60:\n";
+    }
+    for (const auto& path : {normal_path, whistle_path, finish_path, clap_path}) {
+        std::ofstream file(path, std::ios::binary);
+        REQUIRE(file.good());
+        file << "RIFF";
+    }
+
+    ChartLoader loader;
+    ChartLoadResult result = loader.load(chart_path.u8string(), 48000, 1.0, "ignore", true);
+
+    CHECK(result.success());
+    REQUIRE(result.chart.notes.size() == 1u);
+    const auto& note = result.chart.notes.front();
+    CHECK(tenriff::gameplay::note_audio_asset_count(note) == 4u);
+    CHECK(chart_audio_path(result.chart, tenriff::gameplay::note_audio_asset_at(note, 0)) == normal_path.u8string());
+    CHECK(chart_audio_path(result.chart, tenriff::gameplay::note_audio_asset_at(note, 1)) == whistle_path.u8string());
+    CHECK(chart_audio_path(result.chart, tenriff::gameplay::note_audio_asset_at(note, 2)) == finish_path.u8string());
+    CHECK(chart_audio_path(result.chart, tenriff::gameplay::note_audio_asset_at(note, 3)) == clap_path.u8string());
+    CHECK(note.audio_gain == doctest::Approx(0.60f));
 }
 
 TEST_CASE("chart loader accepts common BMS separator lines and header values containing colon") {

@@ -165,3 +165,27 @@ TEST_CASE("osu skin resolver imports mania column line widths as internal lane d
     CHECK(resolved.lane_divider_widths[1] == doctest::Approx(2.5f));
     CHECK(resolved.lane_divider_widths[2] == doctest::Approx(3.5f));
 }
+
+TEST_CASE("osu skin resolver parses column width and note height scale metrics") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+
+    const auto root = temp.path / "skins";
+    const auto skin = root / "MetricSkin";
+    std::filesystem::create_directories(skin);
+    write_file(skin / "skin.ini",
+               "[Mania]\n"
+               "Keys: 4\n"
+               "ColumnWidth: 24,30,36,30\n"
+               "WidthForNoteHeightScale: 45\n");
+
+    const auto resolved = tenriff::app::resolve_osu_mania_skin(root.u8string(), "MetricSkin", 4);
+    REQUIRE(resolved.found);
+    REQUIRE(resolved.column_widths.size() == 4u);
+    CHECK(resolved.column_widths[0] == doctest::Approx(24.0f));
+    CHECK(resolved.column_widths[2] == doctest::Approx(36.0f));
+    CHECK(resolved.width_for_note_height_scale == doctest::Approx(45.0f));
+    CHECK(resolved.imported_note_width_ratio == doctest::Approx(1.0f));
+    CHECK(resolved.imported_note_height_ratio == doctest::Approx(1.5f));
+}
