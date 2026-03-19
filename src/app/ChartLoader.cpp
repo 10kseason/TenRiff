@@ -11,6 +11,7 @@
 #include <unordered_set>
 
 #include "app/BmsGameplayBuilder.h"
+#include "app/OsuHitsoundResolver.h"
 #include "chart/BmsChartNorm.h"
 #include "chart/BmsParser.h"
 #include "chart/BmsTimeline.h"
@@ -492,6 +493,19 @@ ChartLoadResult ChartLoader::load(const std::string& path,
             result.chart.audio_cues.push_back(std::move(cue));
         } else if (!audio_ref.empty()) {
             result.messages.push_back("Main audio file not found: " + audio_ref);
+        }
+
+        const auto hitsounds = resolve_osu_mania_hitsounds(file_path, parse_result.chart);
+        result.messages.insert(result.messages.end(), hitsounds.messages.begin(), hitsounds.messages.end());
+        for (auto& note : result.chart.notes) {
+            if (note.note_id >= hitsounds.note_hitsounds.size()) {
+                continue;
+            }
+            const auto& resolved_note = hitsounds.note_hitsounds[note.note_id];
+            note.audio_gain = resolved_note.gain;
+            for (std::size_t i = 0; i < resolved_note.asset_count; ++i) {
+                note.add_audio_asset(result.chart.intern_audio_asset(resolved_note.asset_paths[i]));
+            }
         }
 
         result.format = ChartFormat::OsuMania;

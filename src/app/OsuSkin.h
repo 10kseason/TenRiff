@@ -16,6 +16,10 @@ struct OsuManiaSkinDefinition {
     std::vector<std::string> key_images;
     std::vector<std::string> key_pressed_images;
     std::vector<float> lane_divider_widths;
+    std::vector<float> column_widths;
+    float width_for_note_height_scale = 0.0f;
+    float imported_note_width_ratio = 1.0f;
+    float imported_note_height_ratio = 1.0f;
 };
 
 [[nodiscard]] std::string find_default_osu_skin_test_root();

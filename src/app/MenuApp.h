@@ -187,6 +187,12 @@ private:
                                           const LocalPlayRecord* selected_record);
     void populate_song_browser_render_data(render::MenuRenderData& render);
     void populate_result_render_data(render::MenuRenderData& render, const std::string& current_track);
+    void populate_audio_settings_render_data(render::MenuRenderData& render);
+    void populate_graphics_settings_render_data(render::MenuRenderData& render);
+    void populate_input_settings_render_data(render::MenuRenderData& render);
+    void populate_mode_settings_render_data(render::MenuRenderData& render);
+    void populate_mode_mods_render_data(render::MenuRenderData& render);
+    void populate_skin_settings_render_data(render::MenuRenderData& render);
     void populate_generic_screen_render_data(render::MenuRenderData& render);
     void render_tick();
     void render_snapshot(const MenuSnapshot& snapshot);
@@ -223,7 +229,12 @@ private:
     void update_gameplay_loading_state(int percent, std::string_view stage);
     void refresh_keymap_lane_list();
     void refresh_available_osu_skins();
+    void refresh_available_lr2_skins();
     [[nodiscard]] bool import_osu_skin_path(std::string_view source_path);
+    [[nodiscard]] bool import_lr2_skin_path(std::string_view source_path);
+    [[nodiscard]] bool import_skin_path_auto(std::string_view source_path);
+    [[nodiscard]] std::string active_external_skin_root() const;
+    [[nodiscard]] std::string active_external_skin_name() const;
     [[nodiscard]] const struct LocalPlayRecord* current_selected_record() const;
     [[nodiscard]] bool open_selected_record_result();
     [[nodiscard]] const ReplaySummary* replay_summary_for_path(const std::string& path);
@@ -359,6 +370,9 @@ private:
     std::string available_osu_skin_root_;
     std::vector<std::string> available_osu_skin_names_{};
     std::unordered_map<std::string, std::string> available_osu_skin_roots_by_name_{};
+    std::string available_lr2_skin_root_;
+    std::vector<std::string> available_lr2_skin_names_{};
+    std::unordered_map<std::string, std::string> available_lr2_skin_roots_by_name_{};
 
     bool has_result_ = false;
     bool last_game_over_ = false;

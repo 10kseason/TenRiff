@@ -274,6 +274,75 @@ std::vector<float> resolve_lane_divider_widths(const ManiaSection& section, int 
     return widths;
 }
 
+std::vector<float> resolve_column_widths(const ManiaSection& section, int keys) {
+    if (keys <= 0) {
+        return {};
+    }
+    const auto it = section.values.find("columnwidth");
+    if (it == section.values.end()) {
+        return {};
+    }
+    const std::vector<float> parsed = parse_number_csv(it->second);
+    if (parsed.empty()) {
+        return {};
+    }
+    std::vector<float> widths(static_cast<std::size_t>(keys), 0.0f);
+    if (parsed.size() == 1u) {
+        std::fill(widths.begin(), widths.end(), parsed.front());
+        return widths;
+    }
+    const std::size_t count = (std::min)(widths.size(), parsed.size());
+    for (std::size_t i = 0; i < count; ++i) {
+        widths[i] = parsed[i];
+    }
+    for (std::size_t i = count; i < widths.size(); ++i) {
+        widths[i] = parsed.back();
+    }
+    return widths;
+}
+
+float resolve_width_for_note_height_scale(const ManiaSection& section) {
+    const auto it = section.values.find("widthfornoteheightscale");
+    if (it == section.values.end()) {
+        return 0.0f;
+    }
+    try {
+        const float value = std::stof(it->second);
+        return std::isfinite(value) ? std::max(0.0f, value) : 0.0f;
+    } catch (...) {
+        return 0.0f;
+    }
+}
+
+float average_positive_value(const std::vector<float>& values) {
+    double sum = 0.0;
+    std::size_t count = 0;
+    for (float value : values) {
+        if (!std::isfinite(value) || value <= 0.0f) {
+            continue;
+        }
+        sum += value;
+        ++count;
+    }
+    if (count == 0u) {
+        return 0.0f;
+    }
+    return static_cast<float>(sum / static_cast<double>(count));
+}
+
+float minimum_positive_value(const std::vector<float>& values) {
+    float minimum = 0.0f;
+    for (float value : values) {
+        if (!std::isfinite(value) || value <= 0.0f) {
+            continue;
+        }
+        if (minimum <= 0.0f || value < minimum) {
+            minimum = value;
+        }
+    }
+    return minimum;
+}
+
 std::vector<std::string> fallback_lane_families(int keys) {
     switch (keys) {
         case 4: return {"1", "2", "2", "1"};
@@ -392,9 +461,15 @@ OsuManiaSkinDefinition resolve_osu_mania_skin(std::string_view root_utf8,
     definition.key_images.resize(lane_count);
     definition.key_pressed_images.resize(lane_count);
     definition.lane_divider_widths.clear();
+    definition.column_widths.clear();
+    definition.width_for_note_height_scale = 0.0f;
+    definition.imported_note_width_ratio = 1.0f;
+    definition.imported_note_height_ratio = 1.0f;
 
     if (section != nullptr) {
         definition.lane_divider_widths = resolve_lane_divider_widths(*section, definition.keys);
+        definition.column_widths = resolve_column_widths(*section, definition.keys);
+        definition.width_for_note_height_scale = resolve_width_for_note_height_scale(*section);
         for (std::size_t lane = 0; lane < lane_count; ++lane) {
             const std::string lane_suffix = std::to_string(lane);
             const std::string note_image_key = "noteimage" + lane_suffix;
@@ -423,6 +498,18 @@ OsuManiaSkinDefinition resolve_osu_mania_skin(std::string_view root_utf8,
                 resolve_existing_asset(skin_dir, find_value(key_image_key));
             definition.key_pressed_images[lane] =
                 resolve_existing_asset(skin_dir, find_value(key_pressed_key));
+        }
+
+        const float imported_base_width = average_positive_value(definition.column_widths);
+        if (imported_base_width > 0.0f) {
+            definition.imported_note_width_ratio = imported_base_width / 30.0f;
+            const float height_scale_width =
+                (definition.width_for_note_height_scale > 0.0f)
+                    ? definition.width_for_note_height_scale
+                    : minimum_positive_value(definition.column_widths);
+            if (height_scale_width > 0.0f) {
+                definition.imported_note_height_ratio = height_scale_width / imported_base_width;
+            }
         }
     }
 

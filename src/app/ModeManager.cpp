@@ -366,15 +366,6 @@ ModeManagerResult manage_modes(const gameplay::GameplayChart& chart,
         result.warnings.push_back("mode.format=OSU does not match the selected chart. Using detected chart format instead.");
         result.settings.format = detected_format;
     }
-    if (chart_format == ChartFormat::OsuMania) {
-        const int chart_lane_count = std::max(1, chart.lane_count);
-        const int configured_lane_count = target_lane_count(result.settings.key_mode);
-        if (configured_lane_count > 0 && configured_lane_count != chart_lane_count) {
-            result.warnings.push_back("mode.key_mode does not match the selected osu!mania chart. Using the chart lane count instead.");
-            result.settings.key_mode = key_mode_for_lane_count(chart_lane_count);
-        }
-    }
-
     const auto applied = gameplay::apply_mode_settings(result.chart, result.settings, {base_bpm, sample_rate});
     result.chart = applied.chart;
     result.warnings.insert(result.warnings.end(), applied.warnings.begin(), applied.warnings.end());

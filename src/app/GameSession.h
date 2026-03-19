@@ -187,6 +187,7 @@ private:
         int64_t start_sample = 0;
         std::size_t asset_id = 0;
         ChartAudioEvent::Kind kind = ChartAudioEvent::Kind::Bgm;
+        float gain = 1.0f;
     };
 
     struct BufferedLaneInput {

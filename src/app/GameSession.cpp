@@ -40,6 +40,7 @@
 #include "app/ModeManager.h"
 #include "app/GameplayHudWindow.h"
 #include "app/RuntimeConfigMigration.h"
+#include "app/PersistedRuntimeConfig.h"
 #include "config/Keymap.h"
 #include "timing/HighResClock.h"
 
@@ -104,6 +105,27 @@ std::uint64_t estimate_audio_bytes_from_file_size(const std::string& path) {
         return 0;
     }
     return (std::max)(size * 8ull, 256ull * 1024ull);
+}
+
+template <typename Fn>
+void for_each_note_audio_asset_id(const gameplay::NoteEvent& note, Fn&& fn) {
+    const std::size_t count = gameplay::note_audio_asset_count(note);
+    for (std::size_t index = 0; index < count; ++index) {
+        const std::size_t asset_id = gameplay::note_audio_asset_at(note, index);
+        if (asset_id == gameplay::kInvalidAudioAssetId) {
+            continue;
+        }
+        fn(asset_id);
+    }
+}
+
+template <typename Fn>
+void for_each_note_audio_path(const gameplay::GameplayChart& chart, const gameplay::NoteEvent& note, Fn&& fn) {
+    for_each_note_audio_asset_id(note, [&](std::size_t asset_id) {
+        if (const std::string* path = chart.audio_asset_path(asset_id)) {
+            fn(asset_id, *path);
+        }
+    });
 }
 
 float soft_limit_sample(float sample) {
@@ -840,9 +862,9 @@ std::optional<std::string> select_primary_audio_path(ChartFormat format, const g
         }
     }
     for (const auto& note : chart.notes) {
-        if (const std::string* path = chart.audio_asset_path(note.audio_asset_id)) {
-            consider_path(*path);
-        }
+        for_each_note_audio_path(chart, note, [&](std::size_t, const std::string& path) {
+            consider_path(path);
+        });
     }
 
     if (best_path.has_value()) {
@@ -854,8 +876,14 @@ std::optional<std::string> select_primary_audio_path(ChartFormat format, const g
         }
     }
     for (const auto& note : chart.notes) {
-        if (const std::string* path = chart.audio_asset_path(note.audio_asset_id)) {
-            return *path;
+        std::optional<std::string> first_path;
+        for_each_note_audio_path(chart, note, [&](std::size_t, const std::string& path) {
+            if (!first_path.has_value()) {
+                first_path = path;
+            }
+        });
+        if (first_path.has_value()) {
+            return first_path;
         }
     }
     return std::nullopt;
@@ -1252,9 +1280,11 @@ bool GameSession::initialize(const CommandLineOptions& options) {
     }
     config_ = config_result.config;
     const bool migrated_config = migrate_bms_first_runtime_config(config_);
+    const bool stripped_session_only_mods = strip_session_only_mode_mods(config_);
 
-    if (config_result.used_defaults || migrated_config) {
-        config_loader.save_profile(profile_dir_, config_);
+    if (config_result.used_defaults || migrated_config || stripped_session_only_mods) {
+        const config::RuntimeConfig persisted = build_persisted_runtime_config(config_);
+        config_loader.save_profile(profile_dir_, persisted);
     }
     report_loading_progress(12, "Loading keymap");
     if (loading_cancel_requested()) {
@@ -1951,16 +1981,18 @@ bool GameSession::prepare_chart_audio() {
         chart_audio_events_.push_back(ChartAudioEvent{sample, cue.asset_id, ChartAudioEvent::Kind::Bgm});
     }
     for (const auto& note : chart_.notes) {
-        if (note.audio_asset_id >= chart_audio_assets_.size()) {
-            continue;
-        }
-        auto& asset = chart_audio_assets_[note.audio_asset_id];
         const int64_t sample = std::max<int64_t>(0, note.start_sample);
-        asset.has_keysound = true;
-        asset.use_samples.push_back(sample);
-        asset.first_use_sample = (std::min)(asset.first_use_sample, sample);
-        asset.last_use_sample = (std::max)(asset.last_use_sample, sample);
-        ++asset.use_count;
+        for_each_note_audio_asset_id(note, [&](std::size_t asset_id) {
+            if (asset_id >= chart_audio_assets_.size()) {
+                return;
+            }
+            auto& asset = chart_audio_assets_[asset_id];
+            asset.has_keysound = true;
+            asset.use_samples.push_back(sample);
+            asset.first_use_sample = (std::min)(asset.first_use_sample, sample);
+            asset.last_use_sample = (std::max)(asset.last_use_sample, sample);
+            ++asset.use_count;
+        });
     }
 
     for (auto& asset : chart_audio_assets_) {
@@ -2320,11 +2352,15 @@ void GameSession::trim_chart_audio_cache(int64_t current_sample) {
 }
 
 void GameSession::schedule_note_keysound(const gameplay::NoteEvent& note, int64_t sample) {
-    if (note.audio_asset_id >= chart_audio_assets_.size()) {
-        return;
-    }
-    chart_audio_voices_.push_back(
-        ChartAudioVoice{std::max<int64_t>(0, sample), note.audio_asset_id, ChartAudioEvent::Kind::Keysound});
+    const int64_t start_sample = std::max<int64_t>(0, sample);
+    const float gain = std::clamp(note.audio_gain, 0.0f, 1.0f);
+    for_each_note_audio_asset_id(note, [&](std::size_t asset_id) {
+        if (asset_id >= chart_audio_assets_.size()) {
+            return;
+        }
+        chart_audio_voices_.push_back(
+            ChartAudioVoice{start_sample, asset_id, ChartAudioEvent::Kind::Keysound, gain});
+    });
 }
 
 void GameSession::schedule_chart_audio(int64_t buffer_end_samples) {
@@ -2333,7 +2369,7 @@ void GameSession::schedule_chart_audio(int64_t buffer_end_samples) {
         if (evt.start_sample >= buffer_end_samples) {
             break;
         }
-        chart_audio_voices_.push_back(ChartAudioVoice{evt.start_sample, evt.asset_id, evt.kind});
+        chart_audio_voices_.push_back(ChartAudioVoice{evt.start_sample, evt.asset_id, evt.kind, 1.0f});
         ++next_chart_audio_event_;
     }
 }
@@ -2385,7 +2421,9 @@ void GameSession::mix_chart_audio(float* output, uint32_t frames, int64_t buffer
             continue;
         }
 
-        const float gain = (voice.kind == ChartAudioEvent::Kind::Keysound) ? keysound_gain : bgm_gain;
+        const float gain =
+            ((voice.kind == ChartAudioEvent::Kind::Keysound) ? keysound_gain : bgm_gain) *
+            std::clamp(voice.gain, 0.0f, 1.0f);
         (void)mix_chart_audio_clip_linear(*samples,
                                           voice.start_sample,
                                           config_.speed.rate,
