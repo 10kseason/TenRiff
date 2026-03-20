@@ -125,9 +125,17 @@ constexpr GaugeDeltaTable kPreviousCurrentHardGaugeV5{0.01000000, 1.0 / 20.0, 1.
 constexpr GaugeDeltaTable kPreviousCurrentNormalGaugeV5{0.01000000, 1.0 / 20.0, 1.0 / 65.0, -6.00000, -6.00000};
 constexpr GaugeDeltaTable kPreviousCurrentEasyGaugeV5{0.13500000, 1.0 / 20.0, 1.0 / 65.0, -4.00000, -4.00000};
 
-constexpr GaugeDeltaTable kCurrentHardGauge{0.01000000, 1.0 / 20.0, 1.0 / 65.0, -4.00000, -4.00000};
-constexpr GaugeDeltaTable kCurrentNormalGauge{0.01000000, 1.0 / 20.0, 1.0 / 65.0, -2.00000, -2.00000};
-constexpr GaugeDeltaTable kCurrentEasyGauge{0.03200000, 0.03200000 / 20.0, 0.03200000 / 50.0, -2.00000, -2.00000};
+constexpr GaugeDeltaTable kPreviousCurrentHardGaugeV6{0.01000000, 1.0 / 20.0, 1.0 / 65.0, -4.00000, -4.00000};
+constexpr GaugeDeltaTable kPreviousCurrentNormalGaugeV6{0.01000000, 1.0 / 20.0, 1.0 / 65.0, -2.00000, -2.00000};
+constexpr GaugeDeltaTable kPreviousCurrentEasyGaugeV6{0.03200000, 0.03200000 / 20.0, 0.03200000 / 50.0, -2.00000, -2.00000};
+
+constexpr GaugeDeltaTable kPreviousCurrentHardGaugeV7{0.16000000, 0.09000000, 0.01000000, -10.00000, -10.00000};
+constexpr GaugeDeltaTable kPreviousCurrentNormalGaugeV7{0.19000000, 0.15000000, 0.01000000, -6.00000, -6.00000};
+constexpr GaugeDeltaTable kPreviousCurrentEasyGaugeV7{0.25000000, 0.20000000, 0.01000000, -4.00000, -4.00000};
+
+constexpr GaugeDeltaTable kCurrentHardGauge{0.16000000, 0.09000000, 0.01000000, -10.00000, -10.00000};
+constexpr GaugeDeltaTable kCurrentNormalGauge{0.19000000, 0.15000000, 0.01000000, -6.25000, -6.25000};
+constexpr GaugeDeltaTable kCurrentEasyGauge{0.25000000, 0.20000000, 0.01000000, -4.10000, -4.10000};
 
 bool migrate_gauge_delta(double& value, double legacy_value, double current_value) {
     if (std::abs(value - current_value) <= kGaugeDeltaTolerance) {
@@ -282,6 +290,14 @@ bool migrate_bms_first_runtime_config(config::RuntimeConfig& config) {
     changed = migrate_gauge_table(config.gauge.normal, kPreviousCurrentNormalGaugeV5, kCurrentNormalGauge) ||
               changed;
     changed = migrate_gauge_table(config.gauge.easy, kPreviousCurrentEasyGaugeV5, kCurrentEasyGauge) || changed;
+    changed = migrate_gauge_table(config.gauge.hard, kPreviousCurrentHardGaugeV6, kCurrentHardGauge) || changed;
+    changed = migrate_gauge_table(config.gauge.normal, kPreviousCurrentNormalGaugeV6, kCurrentNormalGauge) ||
+              changed;
+    changed = migrate_gauge_table(config.gauge.easy, kPreviousCurrentEasyGaugeV6, kCurrentEasyGauge) || changed;
+    changed = migrate_gauge_table(config.gauge.hard, kPreviousCurrentHardGaugeV7, kCurrentHardGauge) || changed;
+    changed = migrate_gauge_table(config.gauge.normal, kPreviousCurrentNormalGaugeV7, kCurrentNormalGauge) ||
+              changed;
+    changed = migrate_gauge_table(config.gauge.easy, kPreviousCurrentEasyGaugeV7, kCurrentEasyGauge) || changed;
     if (std::abs(config.judge.indirect_miss_ms - config.judge.bd_ms) > kJudgeWindowToleranceMs) {
         config.judge.indirect_miss_ms = config.judge.bd_ms;
         changed = true;
