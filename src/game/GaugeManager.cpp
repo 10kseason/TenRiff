@@ -8,6 +8,12 @@ namespace tenriff::game {
 namespace {
 constexpr double kMaxGauge = 100.0;
 constexpr double kMinGauge = 0.0;
+constexpr double kEasyLowGaugeBadSofteningThreshold = 25.0;
+constexpr double kEasyLowGaugeBadSofteningScale = 0.90;
+
+bool is_bad_judgement(Judgement judgement) {
+    return judgement == Judgement::BD || judgement == Judgement::PR;
+}
 }
 
 GaugeManager::GaugeManager(GaugeConfig config) : config_(config) {}
@@ -17,13 +23,9 @@ GaugeState GaugeManager::initialState(GaugeType type) const noexcept {
     state.type = type;
     switch (type) {
     case GaugeType::Hard:
-        state.value = 100.0;
-        break;
     case GaugeType::Normal:
-        state.value = 50.0;
-        break;
     case GaugeType::Easy:
-        state.value = 30.0;
+        state.value = 100.0;
         break;
     }
     state.game_over = false;
@@ -56,6 +58,11 @@ GaugeResult GaugeManager::applyJudgementWeighted(GaugeState& state, Judgement ju
     }
 
     double delta = deltaFor(state.type, judgement) * weight;
+    if (state.type == GaugeType::Easy && state.value <= kEasyLowGaugeBadSofteningThreshold &&
+        is_bad_judgement(judgement) && delta < 0.0) {
+        // Ease the death spiral slightly when the easy gauge is already nearly empty.
+        delta *= kEasyLowGaugeBadSofteningScale;
+    }
     state.value = std::clamp(state.value + delta, kMinGauge, kMaxGauge);
 
     if (!config_.auto_shift) {

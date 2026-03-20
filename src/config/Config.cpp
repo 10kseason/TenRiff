@@ -8,6 +8,7 @@
 #include <sstream>
 #include <unordered_map>
 
+#include "app/RuntimeConfigMigration.h"
 #include "app/ModeManager.h"
 #include "config/SimpleJson.h"
 
@@ -976,6 +977,7 @@ ConfigLoadResult ConfigLoader::load_profile(std::string_view profile_dir) const 
         result.used_defaults = true;
     }
 
+    result.migrated = ::tenriff::app::migrate_bms_first_runtime_config(result.config);
     apply_audio_preset(result.config);
     result.config.input.polling_hz = sanitize_polling_hz(result.config.input.polling_hz, result.warnings);
     result.config.input.debounce_ms = sanitize_input_debounce_ms(result.config.input.debounce_ms, result.warnings);

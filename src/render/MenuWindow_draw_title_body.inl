@@ -31,13 +31,51 @@
         const ScreenContentBands bands =
             make_screen_content_bands(160.0f, 170.0f, false, 24.0f, 24.0f);
 
-        const D2D1_RECT_F logo_rect = D2D1::RectF(590.0f, 178.0f, 1330.0f, 296.0f);
-        const D2D1_RECT_F logo_shadow_rect = offset_rect(logo_rect, 0.0f, 6.0f);
-        const D2D1_ROUNDED_RECT logo_rule_left =
-            D2D1::RoundedRect(D2D1::RectF(560.0f, 306.0f, 912.0f, 310.0f), 2.0f, 2.0f);
-        const D2D1_ROUNDED_RECT logo_rule_right =
-            D2D1::RoundedRect(D2D1::RectF(1008.0f, 306.0f, 1360.0f, 310.0f), 2.0f, 2.0f);
         const std::wstring logo_w = L"TenRiff";
+        float logo_left = 590.0f;
+        constexpr float kLogoTop = 184.0f;
+        float logo_width = 740.0f;
+        float logo_height = 104.0f;
+        Microsoft::WRL::ComPtr<IDWriteTextLayout> logo_layout;
+        if (d2d_->dwrite_factory && d2d_->logo_format) {
+            if (SUCCEEDED(d2d_->dwrite_factory->CreateTextLayout(logo_w.c_str(),
+                                                                 static_cast<UINT32>(logo_w.size()),
+                                                                 d2d_->logo_format.Get(),
+                                                                 1024.0f,
+                                                                 160.0f,
+                                                                 &logo_layout)) &&
+                logo_layout) {
+                DWRITE_TEXT_METRICS logo_metrics{};
+                if (SUCCEEDED(logo_layout->GetMetrics(&logo_metrics))) {
+                    logo_width = std::ceil(std::max(logo_metrics.width, logo_metrics.widthIncludingTrailingWhitespace));
+                    logo_height = std::ceil(logo_metrics.height);
+                    logo_left = std::floor((kBaseWidth - logo_width) * 0.5f);
+                } else {
+                    logo_layout.Reset();
+                }
+            }
+        }
+        const D2D1_RECT_F logo_rect =
+            D2D1::RectF(logo_left, kLogoTop, logo_left + logo_width, kLogoTop + std::max(96.0f, logo_height));
+        const D2D1_RECT_F logo_shadow_rect = offset_rect(logo_rect, 0.0f, 6.0f);
+        const float logo_rule_y = logo_rect.bottom + 18.0f;
+        const float logo_rule_gap = 42.0f;
+        const float logo_rule_width = 280.0f;
+        const D2D1_ROUNDED_RECT logo_rule_left =
+            D2D1::RoundedRect(D2D1::RectF(std::max(220.0f, logo_rect.left - logo_rule_gap - logo_rule_width),
+                                          logo_rule_y,
+                                          std::max(220.0f, logo_rect.left - logo_rule_gap),
+                                          logo_rule_y + 4.0f),
+                              2.0f,
+                              2.0f);
+        const D2D1_ROUNDED_RECT logo_rule_right =
+            D2D1::RoundedRect(D2D1::RectF(std::min(kBaseWidth - 220.0f, logo_rect.right + logo_rule_gap),
+                                          logo_rule_y,
+                                          std::min(kBaseWidth - 220.0f,
+                                                   logo_rect.right + logo_rule_gap + logo_rule_width),
+                                          logo_rule_y + 4.0f),
+                              2.0f,
+                              2.0f);
         if (d2d_->accent_brush) {
             const float saved_opacity = d2d_->accent_brush->GetOpacity();
             d2d_->accent_brush->SetOpacity(0.18f + logo_pulse * 0.10f);
@@ -45,11 +83,18 @@
             ctx->FillRoundedRectangle(logo_rule_right, d2d_->accent_brush.Get());
             d2d_->accent_brush->SetOpacity(0.14f + logo_pulse * 0.06f);
             if (d2d_->logo_format) {
-                draw_text_clipped_aligned(logo_w,
-                                          d2d_->logo_format.Get(),
-                                          logo_shadow_rect,
-                                          d2d_->accent_brush.Get(),
-                                          DWRITE_TEXT_ALIGNMENT_CENTER);
+                if (logo_layout) {
+                    ctx->DrawTextLayout(D2D1::Point2F(logo_shadow_rect.left, logo_shadow_rect.top),
+                                        logo_layout.Get(),
+                                        d2d_->accent_brush.Get(),
+                                        D2D1_DRAW_TEXT_OPTIONS_CLIP);
+                } else {
+                    draw_text_clipped_aligned(logo_w,
+                                              d2d_->logo_format.Get(),
+                                              logo_shadow_rect,
+                                              d2d_->accent_brush.Get(),
+                                              DWRITE_TEXT_ALIGNMENT_CENTER);
+                }
             }
             d2d_->accent_brush->SetOpacity(saved_opacity);
         }
@@ -60,11 +105,18 @@
                 set_brush_points(d2d_->logo_brush.Get(), logo_rect);
             }
             if (brush) {
-                draw_text_clipped_aligned(logo_w,
-                                          d2d_->logo_format.Get(),
-                                          logo_rect,
-                                          brush,
-                                          DWRITE_TEXT_ALIGNMENT_CENTER);
+                if (logo_layout) {
+                    ctx->DrawTextLayout(D2D1::Point2F(logo_rect.left, logo_rect.top),
+                                        logo_layout.Get(),
+                                        brush,
+                                        D2D1_DRAW_TEXT_OPTIONS_CLIP);
+                } else {
+                    draw_text_clipped_aligned(logo_w,
+                                              d2d_->logo_format.Get(),
+                                              logo_rect,
+                                              brush,
+                                              DWRITE_TEXT_ALIGNMENT_CENTER);
+                }
             }
         }
 

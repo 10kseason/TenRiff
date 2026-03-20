@@ -133,6 +133,7 @@ struct ConfigLoadResult {
     std::vector<std::string> warnings;
     std::string error;
     bool used_defaults = false;
+    bool migrated = false;
 
     [[nodiscard]] bool success() const { return error.empty(); }
 };

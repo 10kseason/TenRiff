@@ -28,14 +28,14 @@ struct GaugeConfig {
     bool auto_shift = true;
     double hard_to_normal_threshold = 66.0;
     double normal_to_easy_threshold = 33.0;
-    GaugeDeltaTable hard{0.03666667, 0.02444444, 0.00000000, -7.04000, -7.04000};
-    GaugeDeltaTable normal{0.05238095, 0.03492063, 0.00000000, -3.52000, -3.52000};
-    GaugeDeltaTable easy{0.10000000, 0.06666667, 0.00000000, -2.64000, -2.64000};
+    GaugeDeltaTable hard{0.01000000, 1.0 / 20.0, 1.0 / 65.0, -4.00000, -4.00000};
+    GaugeDeltaTable normal{0.01000000, 1.0 / 20.0, 1.0 / 65.0, -2.00000, -2.00000};
+    GaugeDeltaTable easy{0.03200000, 0.03200000 / 20.0, 0.03200000 / 50.0, -2.00000, -2.00000};
 };
 
 struct GaugeState {
     GaugeType type = GaugeType::Normal;
-    double value = 50.0;  // 0..100
+    double value = 100.0;  // 0..100
     bool game_over = false;
 };
 

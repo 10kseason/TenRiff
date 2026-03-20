@@ -237,20 +237,57 @@
                                           DWRITE_TEXT_ALIGNMENT_CENTER);
             }
 
+            const D2D1_RECT_F countdown_rect =
+                D2D1::RectF(panel_rect.left + 24.0f,
+                            panel_rect.top + 86.0f,
+                            panel_rect.right - 24.0f,
+                            panel_rect.bottom - 116.0f);
             ID2D1Brush* countdown_brush = d2d_->logo_brush
                                               ? static_cast<ID2D1Brush*>(d2d_->logo_brush.Get())
                                               : static_cast<ID2D1Brush*>(d2d_->accent_brush.Get());
             if (d2d_->logo_brush) {
-                set_brush_points(d2d_->logo_brush.Get(), panel_rect);
+                set_brush_points(d2d_->logo_brush.Get(), countdown_rect);
             }
             if (d2d_->rank_format && countdown_brush) {
                 const std::wstring countdown_w =
                     to_wide(std::to_string(std::max(1, data.gameplay.countdown_value)));
-                ctx->DrawText(countdown_w.c_str(), static_cast<UINT32>(countdown_w.size()),
-                              d2d_->rank_format.Get(),
-                              D2D1::RectF(panel_rect.left + 24.0f, panel_rect.top + 86.0f,
-                                          panel_rect.right - 24.0f, panel_rect.top + 270.0f),
-                              countdown_brush);
+                Microsoft::WRL::ComPtr<IDWriteTextLayout> countdown_layout;
+                bool countdown_layout_ready = false;
+                if (d2d_->dwrite_factory &&
+                    SUCCEEDED(d2d_->dwrite_factory->CreateTextLayout(
+                        countdown_w.c_str(),
+                        static_cast<UINT32>(countdown_w.size()),
+                        d2d_->rank_format.Get(),
+                        std::max(1.0f, countdown_rect.right - countdown_rect.left),
+                        std::max(1.0f, countdown_rect.bottom - countdown_rect.top),
+                        &countdown_layout)) &&
+                    countdown_layout) {
+                    DWRITE_TEXT_METRICS countdown_metrics{};
+                    if (SUCCEEDED(countdown_layout->GetMetrics(&countdown_metrics))) {
+                        const float countdown_width =
+                            std::ceil(std::max(countdown_metrics.width,
+                                               countdown_metrics.widthIncludingTrailingWhitespace));
+                        const float countdown_height = std::ceil(countdown_metrics.height);
+                        const D2D1_POINT_2F countdown_origin =
+                            D2D1::Point2F(
+                                std::floor(countdown_rect.left +
+                                           ((countdown_rect.right - countdown_rect.left) - countdown_width) * 0.5f),
+                                std::floor(countdown_rect.top +
+                                           ((countdown_rect.bottom - countdown_rect.top) - countdown_height) * 0.5f));
+                        ctx->DrawTextLayout(countdown_origin,
+                                            countdown_layout.Get(),
+                                            countdown_brush,
+                                            D2D1_DRAW_TEXT_OPTIONS_CLIP);
+                        countdown_layout_ready = true;
+                    }
+                }
+                if (!countdown_layout_ready) {
+                    draw_text_clipped_aligned(countdown_w,
+                                              d2d_->rank_format.Get(),
+                                              countdown_rect,
+                                              countdown_brush,
+                                              DWRITE_TEXT_ALIGNMENT_CENTER);
+                }
             }
 
             if (d2d_->title_format && d2d_->text_brush) {
