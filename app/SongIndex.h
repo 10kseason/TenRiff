@@ -1,0 +1,82 @@
+#pragma once
+
+#include <cstdint>
+#include <filesystem>
+#include <functional>
+#include <string>
+#include <string_view>
+#include <vector>
+
+namespace tenriff::app {
+
+enum class SongIndexProfile {
+    Safe,
+    Fast,
+};
+
+struct SongEntry {
+    std::string path;
+    std::string title;
+    std::string artist;
+    std::string chart_name;
+    std::string format;
+    std::string layout_label;
+    int key_count = 0;
+    int level = 0;
+    double rating = 0.0;
+    double bpm = 0.0;
+    int64_t mtime = 0;
+};
+
+struct SongIndex {
+    std::vector<SongEntry> entries;
+};
+
+struct SongIndexOptions {
+    bool include_osu = false;
+    SongIndexProfile profile = SongIndexProfile::Safe;
+};
+
+enum class SongIndexProgressStage {
+    ScanningFiles,
+    BuildingMetadata,
+    SavingCache,
+};
+
+struct SongIndexProgress {
+    SongIndexProgressStage stage = SongIndexProgressStage::ScanningFiles;
+    int processed = 0;
+    int total = -1;
+};
+
+struct SongIndexLoadResult {
+    SongIndex index;
+    std::vector<std::string> warnings;
+    std::string error;
+    bool loaded_from_file = false;
+
+    [[nodiscard]] bool success() const { return error.empty(); }
+};
+
+using SongIndexProgressCallback = std::function<void(const SongIndexProgress&)>;
+using SongIndexCancelCallback = std::function<bool()>;
+
+[[nodiscard]] std::string song_index_cache_path_for_source(std::string_view profile_root,
+                                                           std::string_view source_root);
+[[nodiscard]] std::string legacy_song_index_cache_path_for_source(std::string_view source_root);
+SongIndexLoadResult load_song_index(const std::string& path, const SongIndexOptions& options = {});
+bool save_song_index(const std::string& path,
+                     const SongIndex& index,
+                     const SongIndexOptions& options = {},
+                     std::string* error = nullptr,
+                     SongIndexProgressCallback progress = {},
+                     SongIndexCancelCallback cancel = {});
+
+SongIndex scan_songs(const std::string& root_path,
+                     const SongIndex* cache,
+                     std::vector<std::string>& warnings,
+                     SongIndexProgressCallback progress = {},
+                     const SongIndexOptions& options = {},
+                     SongIndexCancelCallback cancel = {});
+
+}  // namespace tenriff::app
