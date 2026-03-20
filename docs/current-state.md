@@ -3,7 +3,7 @@
 이 문서는 다음 에이전트나 새 작업자가 가장 먼저 읽어야 하는 현재 상태 문서입니다. 목표는 "지금 이 프로젝트가 무엇이고, 어디를 보면 되고, 무엇이 아직 미검증인지"를 빠르게 파악하게 하는 것입니다.
 
 ## Baseline
-- 현재 프로젝트 버전은 `0.9.16`
+- 현재 프로젝트 버전은 `0.9.17`
 - 후속 작업의 기준선 문서는 `docs/baseline-0.8.0.md`
 - Windows GUI 빌드가 메인 타깃
 - Linux는 `Baepoks-Linuxs/TenRiff-0.5.0-linux-preview` 수준의 preview만 존재
@@ -161,6 +161,7 @@
 - `ctest --test-dir build -C Release --output-on-failure -R bms_parser_tests`
 
 ## Still Manual-Validation Heavy
+- renderer layout 변경 뒤에는 `docs/ui-audit-checklist.md` 기준으로 `1080p`, `720p windowed`, `Performance HUD on/off` 전수 확인 필요
 - Song Select fast-scroll crash repro on real CJK-heavy library
 - fast profile의 장시간 full-index RAM/commit 재검증
 - gameplay low-FPS/0.1%/0.01% low 확인

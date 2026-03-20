@@ -7,19 +7,21 @@ Language: Korean | [English](README.en.md) | [简体中文](README.zh-CN.md)
 ## Recommended Reading Order
 1. `docs/current-state.md`
    - 현재 제품 상태, 핵심 서브시스템, 검증된 명령, 남은 수동 검증 항목
-2. `docs/baseline-0.8.0.md`
+2. `docs/ui-audit-checklist.md`
+   - renderer layout 변경 뒤 반드시 다시 돌려야 하는 UI 수동 검증 매트릭스
+3. `docs/baseline-0.8.0.md`
    - 현재 작업을 어디서부터 쌓아야 하는지 정하는 `0.8.0` 기준선 문서
-3. `docs/gameplay-guide.md`
+4. `docs/gameplay-guide.md`
    - 실제 플레이 기준의 시작 방법, 곡 선택, 조작, HUD, 판정, 결과 화면 안내
-4. `docs/config.md`
+5. `docs/config.md`
    - 실제 설정/프로필/키맵 구조
-5. `docs/menu.md`
+6. `docs/menu.md`
    - 메뉴/상태머신/곡 선택 흐름
-6. `docs/core-loop.md`
+7. `docs/core-loop.md`
    - 플레이 루프와 데이터 흐름
-7. `docs/roadmap.md`
+8. `docs/roadmap.md`
    - 중장기 작업 방향
-8. `docs/developer-extension-guide.md`
+9. `docs/developer-extension-guide.md`
    - 새 mode/mod, UI row, runtime migration, replay/result, 테스트를 어디에 추가해야 하는지 설명하는 개발자 문서
 
 ## Which Docs Are Source Of Truth

@@ -2,17 +2,27 @@
 
 TenRiff의 사용자/배포 관점에서 의미 있는 변경만 간단히 기록합니다.
 
+## [0.9.17] - 2026-03-20
+
+### Changed
+- 타이틀 메뉴의 메인 브랜딩을 중앙 정렬 `TenRiff` 락업으로 조정하고, 기존 버튼/가이드 패널 레이아웃은 유지
+- 프로젝트 메타데이터와 핵심 현재 상태/로드맵 문서를 `0.9.17` 기준으로 갱신
+
+### Packaged
+- `build-dist` 기준 Windows 배포 스테이징과 공개 오픈소스 소스 스테이징을 `0.9.17` 라인으로 갱신
+
+## [0.9.16] - 2026-03-20
+
+### Changed
+- `src/render/MenuWindow.cpp`에서 분리 과정 중 누락됐던 창 초기화, imported-skin cache, gameplay static cache, mouse hit-test 구현을 복구해 `build-dist` 릴리스 링크 실패를 수정
+- `build-dist` 기준 `tenriff`와 `bms_parser_tests` 빌드, `bms_parser_tests.exe` 실행까지 다시 통과
+
 ## [0.9.15] - 2026-03-20
 
 ### Changed
 - `tests/unit/test_10k_calc_consistency.cpp`와 `tests/smoke/bms_10k_compare_smoke.cpp`를 조정해 로컬 `10k-calc` Python reference가 없을 때 optional check를 skip 하도록 변경
 - 오픈소스 소스패키지가 `10k-calc` 체크아웃 없이도 앱 빌드와 핵심 테스트 실행을 진행할 수 있게 정리
 - 프로젝트 메타데이터와 핵심 현재 상태/로드맵 문서를 `0.9.15` 기준으로 갱신
-## [0.9.16] - 2026-03-20
-
-### Changed
-- `src/render/MenuWindow.cpp`에서 분리 과정 중 누락됐던 창 초기화, imported-skin cache, gameplay static cache, mouse hit-test 구현을 복구해 `build-dist` 릴리스 링크 실패를 수정
-- `build-dist` 기준 `tenriff`와 `bms_parser_tests` 빌드, `bms_parser_tests.exe` 실행까지 다시 통과
 
 ## [0.9.14] - 2026-03-20
 

@@ -2,9 +2,9 @@
 
 Language: [한국어](README.md) | [English](README.en.md) | [简体中文](README.zh-CN.md)
 
-TenRiff 是一个以 BMS-first 为核心的 Windows GUI 节奏游戏运行时/启动器项目。它的目标是构建一个可独立运行的节奏游戏客户端，并直接控制判定、音频、输入和渲染管线，以提供可实际游玩的 BMS 环境。当前项目版本为 `0.9.16`，项目整体使用 MIT 许可证。随项目分发的第三方组件说明见 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)。
+TenRiff 是一个以 BMS-first 为核心的 Windows GUI 节奏游戏运行时/启动器项目。它的目标是构建一个可独立运行的节奏游戏客户端，并直接控制判定、音频、输入和渲染管线，以提供可实际游玩的 BMS 环境。当前项目版本为 `0.9.17`，项目整体使用 MIT 许可证。随项目分发的第三方组件说明见 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)。
 
-这份 README 是面向首次阅读者的入门文档。关于当前实际行为、当前 `0.9.16` 项目状态、`0.8.0` 基准、配置结构以及设计文档，请继续阅读 [`docs/README.zh-CN.md`](docs/README.zh-CN.md)。
+这份 README 是面向首次阅读者的入门文档。关于当前实际行为、当前 `0.9.17` 项目状态、`0.8.0` 基准、配置结构以及设计文档，请继续阅读 [`docs/README.zh-CN.md`](docs/README.zh-CN.md)。
 
 ## 项目一览
 
