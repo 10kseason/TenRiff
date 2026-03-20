@@ -97,6 +97,19 @@ void MenuWindow::draw(const MenuRenderData& data) {
                       format, rect, brush, D2D1_DRAW_TEXT_OPTIONS_CLIP, DWRITE_MEASURING_MODE_NATURAL);
     };
 
+    auto draw_text_clipped_aligned = [&](const std::wstring& text,
+                                         IDWriteTextFormat* format,
+                                         const D2D1_RECT_F& rect,
+                                         ID2D1Brush* brush,
+                                         DWRITE_TEXT_ALIGNMENT alignment) {
+        if (text.empty() || !format || !brush) {
+            return;
+        }
+        format->SetTextAlignment(alignment);
+        draw_text_clipped(text, format, rect, brush);
+        format->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_LEADING);
+    };
+
     auto inset_rect = [](const D2D1_RECT_F& rect, float dx, float dy) {
         return D2D1::RectF(rect.left + dx, rect.top + dy, rect.right - dx, rect.bottom - dy);
     };
@@ -275,18 +288,92 @@ void MenuWindow::draw(const MenuRenderData& data) {
             D2D1::RectF(rect.left + 8.0f, rect.top + 6.0f, rect.right - 8.0f, rect.bottom - 6.0f);
 
         ctx->PushAxisAlignedClip(clip_rect, D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
-
-        d2d_->hud_format->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_LEADING);
-        draw_text_clipped(profile_w, d2d_->hud_format.Get(), left_rect, d2d_->text_brush.Get());
-
-        d2d_->hud_format->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_CENTER);
-        draw_text_clipped(score_w, d2d_->hud_format.Get(), center_rect, d2d_->text_brush.Get());
-
-        d2d_->hud_format->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_TRAILING);
-        draw_text_clipped(track_w, d2d_->hud_format.Get(), right_rect, d2d_->text_brush.Get());
-
-        d2d_->hud_format->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_LEADING);
+        draw_text_clipped_aligned(profile_w,
+                                  d2d_->hud_format.Get(),
+                                  left_rect,
+                                  d2d_->text_brush.Get(),
+                                  DWRITE_TEXT_ALIGNMENT_LEADING);
+        draw_text_clipped_aligned(score_w,
+                                  d2d_->hud_format.Get(),
+                                  center_rect,
+                                  d2d_->text_brush.Get(),
+                                  DWRITE_TEXT_ALIGNMENT_CENTER);
+        draw_text_clipped_aligned(track_w,
+                                  d2d_->hud_format.Get(),
+                                  right_rect,
+                                  d2d_->text_brush.Get(),
+                                  DWRITE_TEXT_ALIGNMENT_TRAILING);
         ctx->PopAxisAlignedClip();
+    };
+
+    auto footer_bar_rect = [&](bool song_select_style) {
+        const float margin = song_select_style ? 26.0f : 80.0f;
+        const float bar_height = song_select_style ? 78.0f : 84.0f;
+        const float bar_bottom = kBaseHeight - (song_select_style ? 20.0f : 24.0f);
+        return D2D1::RectF(margin, bar_bottom - bar_height, kBaseWidth - margin, bar_bottom);
+    };
+
+    struct ScreenContentBands {
+        float header_top = 0.0f;
+        float header_bottom = 0.0f;
+        float body_top = 0.0f;
+        float body_bottom = 0.0f;
+        float footer_top = 0.0f;
+    };
+
+    auto make_screen_content_bands = [&](float header_top,
+                                         float header_height,
+                                         bool song_select_style,
+                                         float body_gap,
+                                         float footer_gap) {
+        const D2D1_RECT_F footer_rect = footer_bar_rect(song_select_style);
+        ScreenContentBands bands;
+        bands.header_top = header_top;
+        bands.header_bottom = header_top + header_height;
+        bands.body_top = bands.header_bottom + body_gap;
+        bands.footer_top = footer_rect.top;
+        bands.body_bottom = std::max(bands.body_top, bands.footer_top - footer_gap);
+        return bands;
+    };
+
+    auto use_compact_performance_overlay = [&]() {
+        return data.kind == MenuScreenKind::SongSelect || data.kind == MenuScreenKind::TitleMenu;
+    };
+
+    auto performance_overlay_panel_rect = [&]() {
+        const bool compact_overlay = use_compact_performance_overlay();
+        const bool gameplay_metrics_visible =
+            data.performance.gameplay_metrics_visible && !compact_overlay;
+        return compact_overlay
+                   ? D2D1::RectF(kBaseWidth - 438.0f, 22.0f, kBaseWidth - 24.0f, 208.0f)
+                   : D2D1::RectF(kBaseWidth - 470.0f,
+                                 44.0f,
+                                 kBaseWidth - 44.0f,
+                                 gameplay_metrics_visible ? 592.0f : 432.0f);
+    };
+
+    auto performance_overlay_safe_left = [&](float gap) {
+        if (!data.performance.visible) {
+            return kBaseWidth - 24.0f;
+        }
+        return performance_overlay_panel_rect().left - gap;
+    };
+
+    auto fit_rect_below_performance_overlay = [&](const D2D1_RECT_F& rect,
+                                                  float bottom_limit,
+                                                  float top_gap) {
+        if (!data.performance.visible) {
+            return rect;
+        }
+        const D2D1_RECT_F overlay_rect = performance_overlay_panel_rect();
+        if (rect.right <= overlay_rect.left || rect.left >= overlay_rect.right || rect.top >= overlay_rect.bottom) {
+            return rect;
+        }
+        const float height = rect.bottom - rect.top;
+        const float new_top = std::max(rect.top, overlay_rect.bottom + top_gap);
+        const float max_bottom = std::max(new_top, bottom_limit);
+        const float new_bottom = std::min(new_top + height, max_bottom);
+        return D2D1::RectF(rect.left, new_top, rect.right, new_bottom);
     };
 
     auto draw_performance_overlay = [&]() {
@@ -294,15 +381,10 @@ void MenuWindow::draw(const MenuRenderData& data) {
             return;
         }
 
-        const bool compact_overlay = data.kind == MenuScreenKind::SongSelect;
+        const bool compact_overlay = use_compact_performance_overlay();
         const bool gameplay_metrics_visible =
             data.performance.gameplay_metrics_visible && !compact_overlay;
-        const D2D1_RECT_F panel_rect = compact_overlay
-                                           ? D2D1::RectF(kBaseWidth - 438.0f, 22.0f, kBaseWidth - 24.0f, 208.0f)
-                                           : D2D1::RectF(kBaseWidth - 470.0f,
-                                                         44.0f,
-                                                         kBaseWidth - 44.0f,
-                                                         gameplay_metrics_visible ? 592.0f : 432.0f);
+        const D2D1_RECT_F panel_rect = performance_overlay_panel_rect();
         const D2D1_ROUNDED_RECT panel_rr = D2D1::RoundedRect(panel_rect, 20.0f, 20.0f);
         if (d2d_->panel_brush) {
             d2d_->panel_brush->SetOpacity(0.88f);

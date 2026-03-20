@@ -28,9 +28,31 @@
 
         draw_song_select_horizon(344.0f, 186.0f, kBaseWidth - 186.0f, 820.0f, 0.10f, 0.28f + logo_pulse * 0.20f);
         draw_song_select_stardust(D2D1::RectF(114.0f, 96.0f, 1810.0f, 364.0f), 36, 0x491u, 0.09f);
+        const ScreenContentBands bands =
+            make_screen_content_bands(160.0f, 170.0f, false, 24.0f, 24.0f);
 
-        const D2D1_RECT_F logo_rect = D2D1::RectF(0.0f, 160.0f, kBaseWidth, 320.0f);
-        const std::wstring logo_w = L"TENRIFF";
+        const D2D1_RECT_F logo_rect = D2D1::RectF(590.0f, 178.0f, 1330.0f, 296.0f);
+        const D2D1_RECT_F logo_shadow_rect = offset_rect(logo_rect, 0.0f, 6.0f);
+        const D2D1_ROUNDED_RECT logo_rule_left =
+            D2D1::RoundedRect(D2D1::RectF(560.0f, 306.0f, 912.0f, 310.0f), 2.0f, 2.0f);
+        const D2D1_ROUNDED_RECT logo_rule_right =
+            D2D1::RoundedRect(D2D1::RectF(1008.0f, 306.0f, 1360.0f, 310.0f), 2.0f, 2.0f);
+        const std::wstring logo_w = L"TenRiff";
+        if (d2d_->accent_brush) {
+            const float saved_opacity = d2d_->accent_brush->GetOpacity();
+            d2d_->accent_brush->SetOpacity(0.18f + logo_pulse * 0.10f);
+            ctx->FillRoundedRectangle(logo_rule_left, d2d_->accent_brush.Get());
+            ctx->FillRoundedRectangle(logo_rule_right, d2d_->accent_brush.Get());
+            d2d_->accent_brush->SetOpacity(0.14f + logo_pulse * 0.06f);
+            if (d2d_->logo_format) {
+                draw_text_clipped_aligned(logo_w,
+                                          d2d_->logo_format.Get(),
+                                          logo_shadow_rect,
+                                          d2d_->accent_brush.Get(),
+                                          DWRITE_TEXT_ALIGNMENT_CENTER);
+            }
+            d2d_->accent_brush->SetOpacity(saved_opacity);
+        }
         if (d2d_->logo_format && d2d_->text_brush) {
             ID2D1Brush* brush = d2d_->logo_brush ? static_cast<ID2D1Brush*>(d2d_->logo_brush.Get())
                                                  : static_cast<ID2D1Brush*>(d2d_->accent_brush.Get());
@@ -38,16 +60,44 @@
                 set_brush_points(d2d_->logo_brush.Get(), logo_rect);
             }
             if (brush) {
-                ctx->DrawText(logo_w.c_str(), static_cast<UINT32>(logo_w.size()),
-                              d2d_->logo_format.Get(), logo_rect, brush);
+                draw_text_clipped_aligned(logo_w,
+                                          d2d_->logo_format.Get(),
+                                          logo_rect,
+                                          brush,
+                                          DWRITE_TEXT_ALIGNMENT_CENTER);
             }
         }
 
         const float button_w = 980.0f;
-        const float button_h = 120.0f;
-        const float button_gap = 26.0f;
+        float button_h = 120.0f;
+        float button_gap = 26.0f;
         const float button_left = (kBaseWidth - button_w) * 0.5f;
-        const float button_top = 380.0f;
+        const float button_stack_top = std::max(360.0f, bands.body_top - 6.0f);
+        const float button_stack_bottom = bands.body_bottom - 8.0f;
+        const float natural_stack_height =
+            button_h * static_cast<float>(data.title.buttons.size()) +
+            button_gap * static_cast<float>(data.title.buttons.empty() ? 0 : data.title.buttons.size() - 1);
+        const float button_available_height = std::max(0.0f, button_stack_bottom - button_stack_top);
+        if (!data.title.buttons.empty() && natural_stack_height > button_available_height) {
+            if (data.title.buttons.size() > 1) {
+                button_gap = std::clamp(
+                    std::floor((button_available_height - button_h * static_cast<float>(data.title.buttons.size())) /
+                               static_cast<float>(data.title.buttons.size() - 1)),
+                    12.0f,
+                    26.0f);
+            } else {
+                button_gap = 0.0f;
+            }
+            const float fitted_button_h =
+                (button_available_height -
+                 button_gap * static_cast<float>(data.title.buttons.empty() ? 0 : data.title.buttons.size() - 1)) /
+                static_cast<float>(std::max<std::size_t>(1, data.title.buttons.size()));
+            button_h = std::clamp(std::floor(fitted_button_h), 104.0f, 120.0f);
+        }
+        const float button_stack_height =
+            button_h * static_cast<float>(data.title.buttons.size()) +
+            button_gap * static_cast<float>(data.title.buttons.empty() ? 0 : data.title.buttons.size() - 1);
+        const float button_top = std::max(button_stack_top, button_stack_bottom - button_stack_height);
 
         for (std::size_t i = 0; i < data.title.buttons.size(); ++i) {
             const auto& button = data.title.buttons[i];
@@ -96,20 +146,23 @@
             if (d2d_->menu_icon_format && d2d_->text_brush) {
                 const std::wstring icon_w = to_wide(button.icon);
                 if (!icon_w.empty()) {
-                    ctx->DrawText(icon_w.c_str(), static_cast<UINT32>(icon_w.size()),
-                                  d2d_->menu_icon_format.Get(), icon_rect, d2d_->text_brush.Get());
+                    draw_text_clipped(icon_w, d2d_->menu_icon_format.Get(), icon_rect, d2d_->text_brush.Get());
                 }
             }
 
             if (d2d_->menu_button_format && d2d_->text_brush) {
                 const std::wstring label_w = to_wide(button.label);
-                ctx->DrawText(label_w.c_str(), static_cast<UINT32>(label_w.size()),
-                              d2d_->menu_button_format.Get(), label_rect, d2d_->text_brush.Get());
+                draw_text_clipped(label_w, d2d_->menu_button_format.Get(), label_rect, d2d_->text_brush.Get());
             }
         }
 
         if (!data.title.guides.empty()) {
-            const D2D1_RECT_F guide_rect = D2D1::RectF(1492.0f, 396.0f, 1834.0f, 820.0f);
+            const D2D1_RECT_F overlay_rect = performance_overlay_panel_rect();
+            const float guide_top =
+                data.performance.visible ? std::max(button_stack_top + 26.0f, overlay_rect.bottom + 26.0f)
+                                         : (button_stack_top + 26.0f);
+            const float guide_bottom = std::max(guide_top + 220.0f, bands.body_bottom - 24.0f);
+            const D2D1_RECT_F guide_rect = D2D1::RectF(1492.0f, guide_top, 1834.0f, guide_bottom);
             draw_glass_panel(guide_rect, 18.0f, 0.76f, 0.24f + logo_pulse * 0.10f, false, 8.0f);
 
             const D2D1_RECT_F guide_header_rect =
@@ -125,25 +178,37 @@
                                      0.08f,
                                      0.18f + logo_pulse * 0.10f);
 
-            float guide_y = guide_rect.top + 98.0f;
+            const float guide_lines_top = guide_rect.top + 98.0f;
+            const float guide_lines_bottom = guide_rect.bottom - 20.0f;
+            const float guide_available_height = std::max(0.0f, guide_lines_bottom - guide_lines_top);
+            const float guide_row_pitch =
+                std::clamp(std::floor(guide_available_height / static_cast<float>(data.title.guides.size())),
+                           44.0f,
+                           62.0f);
+            const float guide_line_height = std::max(28.0f, guide_row_pitch - 12.0f);
+            float guide_y = guide_lines_top;
+            const D2D1_RECT_F guide_clip_rect =
+                D2D1::RectF(guide_rect.left + 18.0f, guide_lines_top - 6.0f, guide_rect.right - 18.0f, guide_rect.bottom - 18.0f);
+            ctx->PushAxisAlignedClip(guide_clip_rect, D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
             for (std::size_t i = 0; i < data.title.guides.size(); ++i) {
                 const D2D1_RECT_F line_rect =
-                    D2D1::RectF(guide_rect.left + 26.0f, guide_y, guide_rect.right - 26.0f, guide_y + 56.0f);
+                    D2D1::RectF(guide_rect.left + 26.0f, guide_y, guide_rect.right - 26.0f, guide_y + guide_line_height);
                 if (d2d_->body_format && d2d_->text_brush) {
                     const std::wstring line_w = to_wide(data.title.guides[i]);
                     draw_text_clipped(line_w, d2d_->body_format.Get(), line_rect, d2d_->text_brush.Get());
                 }
-                guide_y += 68.0f;
+                guide_y += guide_row_pitch;
                 if (i + 1 < data.title.guides.size() && d2d_->button_border_brush) {
                     const float saved_opacity = d2d_->button_border_brush->GetOpacity();
                     d2d_->button_border_brush->SetOpacity(0.16f);
-                    ctx->DrawLine(D2D1::Point2F(guide_rect.left + 24.0f, guide_y - 10.0f),
-                                  D2D1::Point2F(guide_rect.right - 24.0f, guide_y - 10.0f),
+                    ctx->DrawLine(D2D1::Point2F(guide_rect.left + 24.0f, guide_y - 8.0f),
+                                  D2D1::Point2F(guide_rect.right - 24.0f, guide_y - 8.0f),
                                   d2d_->button_border_brush.Get(),
                                   1.0f);
                     d2d_->button_border_brush->SetOpacity(saved_opacity);
                 }
             }
+            ctx->PopAxisAlignedClip();
         }
 
         draw_footer(data.title.profile, data.title.high_score, data.title.track);

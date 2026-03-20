@@ -549,6 +549,47 @@ float gameplay_field_y(float field_top, float field_height, double normalized_y)
     return field_top + field_height * static_cast<float>(normalized_y);
 }
 
+float gameplay_combo_anchor_y(const GameplayFieldLayout& field_layout,
+                              double combo_position,
+                              float top_safe_margin,
+                              float bottom_safe_margin) {
+    const float raw_y =
+        gameplay_field_y(field_layout.top, field_layout.height, clamp_gameplay_combo_position(combo_position));
+    const float min_y = field_layout.top + std::max(0.0f, top_safe_margin);
+    const float max_y = field_layout.bottom - std::max(0.0f, bottom_safe_margin);
+    if (max_y <= min_y) {
+        return (field_layout.top + field_layout.bottom) * 0.5f;
+    }
+    return std::clamp(raw_y, min_y, max_y);
+}
+
+D2D1_RECT_F gameplay_centered_overlay_rect(const GameplayFieldLayout& field_layout,
+                                           float center_y,
+                                           float half_height,
+                                           float horizontal_inset = 0.0f) {
+    const float inset = std::max(0.0f, horizontal_inset);
+    const float left = std::min(field_layout.right, field_layout.left + inset);
+    const float right = std::max(left, field_layout.right - inset);
+    return D2D1::RectF(left, center_y - half_height, right, center_y + half_height);
+}
+
+D2D1_RECT_F gameplay_combo_overlay_rect(const GameplayFieldLayout& field_layout,
+                                        double combo_position,
+                                        float half_height,
+                                        float top_safe_margin,
+                                        float bottom_safe_margin,
+                                        float vertical_offset = 0.0f,
+                                        float horizontal_inset = 0.0f) {
+    const float anchor_y =
+        gameplay_combo_anchor_y(field_layout, combo_position, top_safe_margin, bottom_safe_margin) + vertical_offset;
+    const float min_center_y = field_layout.top + std::max(0.0f, half_height);
+    const float max_center_y = field_layout.bottom - std::max(0.0f, half_height);
+    const float center_y =
+        (max_center_y <= min_center_y) ? (field_layout.top + field_layout.bottom) * 0.5f
+                                       : std::clamp(anchor_y, min_center_y, max_center_y);
+    return gameplay_centered_overlay_rect(field_layout, center_y, half_height, horizontal_inset);
+}
+
 D2D1_RECT_F centered_bitmap_source_rect(const D2D1_SIZE_F& bitmap_size,
                                         const D2D1_RECT_F& target_rect) {
     D2D1_RECT_F source_rect = D2D1::RectF(0.0f, 0.0f, bitmap_size.width, bitmap_size.height);

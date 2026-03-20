@@ -1,6 +1,10 @@
         const float header_left = 84.0f;
         const float header_top = 42.0f;
         const float header_right = kBaseWidth - 84.0f;
+        const float header_safe_right =
+            data.performance.visible
+                ? std::min(header_right, performance_overlay_safe_left(28.0f))
+                : header_right;
         const double judgement_line_position = clamp_gameplay_judgement_line(data.gameplay.judgement_line_position);
         const double combo_position = clamp_gameplay_combo_position(data.gameplay.combo_position);
         const bool use_imported_metrics = normalize_gameplay_skin_source(data.gameplay.skin_source) != "native";
@@ -44,50 +48,62 @@
             if (d2d_->title_format && d2d_->text_brush) {
                 const D2D1_RECT_F title_rect =
                     D2D1::RectF(header_left, header_top, header_right * 0.60f, header_top + 52.0f);
-                ctx->DrawText(gameplay_hud_cache_.title_text.c_str(),
-                              static_cast<UINT32>(gameplay_hud_cache_.title_text.size()),
-                              d2d_->title_format.Get(), title_rect, d2d_->text_brush.Get());
+                draw_text_clipped(gameplay_hud_cache_.title_text,
+                                  d2d_->title_format.Get(),
+                                  title_rect,
+                                  d2d_->text_brush.Get());
             }
             if (d2d_->body_format && d2d_->muted_brush) {
                 const D2D1_RECT_F artist_rect =
                     D2D1::RectF(header_left, header_top + 46.0f, header_right * 0.60f, header_top + 84.0f);
-                ctx->DrawText(gameplay_hud_cache_.artist_text.c_str(),
-                              static_cast<UINT32>(gameplay_hud_cache_.artist_text.size()),
-                              d2d_->body_format.Get(), artist_rect, d2d_->muted_brush.Get());
+                draw_text_clipped(gameplay_hud_cache_.artist_text,
+                                  d2d_->body_format.Get(),
+                                  artist_rect,
+                                  d2d_->muted_brush.Get());
             }
             if (d2d_->hud_format && d2d_->muted_brush) {
                 const D2D1_RECT_F speed_rect =
                     D2D1::RectF(header_left, header_top + 82.0f, header_right * 0.68f, header_top + 118.0f);
-                ctx->DrawText(gameplay_hud_cache_.speed_text.c_str(),
-                              static_cast<UINT32>(gameplay_hud_cache_.speed_text.size()),
-                              d2d_->hud_format.Get(), speed_rect, d2d_->muted_brush.Get());
+                draw_text_clipped(gameplay_hud_cache_.speed_text,
+                                  d2d_->hud_format.Get(),
+                                  speed_rect,
+                                  d2d_->muted_brush.Get());
             }
             if (d2d_->title_format && d2d_->text_brush) {
                 const D2D1_RECT_F score_rect =
-                    D2D1::RectF(kBaseWidth - 700.0f, header_top, kBaseWidth - 90.0f, header_top + 52.0f);
-                d2d_->title_format->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_TRAILING);
-                ctx->DrawText(gameplay_hud_cache_.score_text.c_str(),
-                              static_cast<UINT32>(gameplay_hud_cache_.score_text.size()),
-                              d2d_->title_format.Get(), score_rect, d2d_->text_brush.Get());
-                d2d_->title_format->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_LEADING);
+                    D2D1::RectF(std::max(header_left + 700.0f, header_safe_right - 610.0f),
+                                header_top,
+                                header_safe_right,
+                                header_top + 52.0f);
+                draw_text_clipped_aligned(gameplay_hud_cache_.score_text,
+                                          d2d_->title_format.Get(),
+                                          score_rect,
+                                          d2d_->text_brush.Get(),
+                                          DWRITE_TEXT_ALIGNMENT_TRAILING);
             }
             if (d2d_->body_format && d2d_->text_brush) {
                 const D2D1_RECT_F combo_rect =
-                    D2D1::RectF(kBaseWidth - 780.0f, header_top + 52.0f, kBaseWidth - 90.0f, header_top + 84.0f);
-                d2d_->body_format->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_TRAILING);
-                ctx->DrawText(gameplay_hud_cache_.combo_text.c_str(),
-                              static_cast<UINT32>(gameplay_hud_cache_.combo_text.size()),
-                              d2d_->body_format.Get(), combo_rect, d2d_->text_brush.Get());
-                d2d_->body_format->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_LEADING);
+                    D2D1::RectF(std::max(header_left + 620.0f, header_safe_right - 690.0f),
+                                header_top + 52.0f,
+                                header_safe_right,
+                                header_top + 84.0f);
+                draw_text_clipped_aligned(gameplay_hud_cache_.combo_text,
+                                          d2d_->body_format.Get(),
+                                          combo_rect,
+                                          d2d_->text_brush.Get(),
+                                          DWRITE_TEXT_ALIGNMENT_TRAILING);
             }
             if (d2d_->hud_format && d2d_->muted_brush) {
                 const D2D1_RECT_F judge_stats_rect =
-                    D2D1::RectF(kBaseWidth - 780.0f, header_top + 82.0f, kBaseWidth - 90.0f, header_top + 116.0f);
-                d2d_->hud_format->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_TRAILING);
-                ctx->DrawText(gameplay_hud_cache_.judge_stats_text.c_str(),
-                              static_cast<UINT32>(gameplay_hud_cache_.judge_stats_text.size()),
-                              d2d_->hud_format.Get(), judge_stats_rect, d2d_->muted_brush.Get());
-                d2d_->hud_format->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_LEADING);
+                    D2D1::RectF(std::max(header_left + 620.0f, header_safe_right - 690.0f),
+                                header_top + 82.0f,
+                                header_safe_right,
+                                header_top + 116.0f);
+                draw_text_clipped_aligned(gameplay_hud_cache_.judge_stats_text,
+                                          d2d_->hud_format.Get(),
+                                          judge_stats_rect,
+                                          d2d_->muted_brush.Get(),
+                                          DWRITE_TEXT_ALIGNMENT_TRAILING);
             }
         };
 
@@ -126,7 +142,10 @@
 
         if (data.gameplay.loading && !data.gameplay.active) {
             draw_gameplay_header();
-            const D2D1_RECT_F panel_rect = D2D1::RectF(620.0f, 360.0f, 1300.0f, 620.0f);
+            const D2D1_RECT_F panel_rect =
+                fit_rect_below_performance_overlay(D2D1::RectF(620.0f, 360.0f, 1300.0f, 620.0f),
+                                                   kBaseHeight - 140.0f,
+                                                   22.0f);
             const D2D1_ROUNDED_RECT panel_rr = D2D1::RoundedRect(panel_rect, 24.0f, 24.0f);
             if (d2d_->panel_brush) {
                 d2d_->panel_brush->SetOpacity(0.92f);
@@ -144,27 +163,26 @@
             const std::wstring percent_w =
                 to_wide(std::to_string(std::clamp(data.gameplay.loading_percent, 0, 100)) + "%");
             if (d2d_->title_format && d2d_->text_brush) {
-                d2d_->title_format->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_CENTER);
-                ctx->DrawText(loading_w.c_str(), static_cast<UINT32>(loading_w.size()),
-                              d2d_->title_format.Get(),
-                              D2D1::RectF(panel_rect.left + 32.0f, panel_rect.top + 24.0f,
-                                          panel_rect.right - 32.0f, panel_rect.top + 72.0f),
-                              d2d_->text_brush.Get());
-                ctx->DrawText(percent_w.c_str(), static_cast<UINT32>(percent_w.size()),
-                              d2d_->title_format.Get(),
-                              D2D1::RectF(panel_rect.left + 32.0f, panel_rect.top + 74.0f,
-                                          panel_rect.right - 32.0f, panel_rect.top + 124.0f),
-                              d2d_->text_brush.Get());
-                d2d_->title_format->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_LEADING);
+                draw_text_clipped_aligned(loading_w,
+                                          d2d_->title_format.Get(),
+                                          D2D1::RectF(panel_rect.left + 32.0f, panel_rect.top + 24.0f,
+                                                      panel_rect.right - 32.0f, panel_rect.top + 72.0f),
+                                          d2d_->text_brush.Get(),
+                                          DWRITE_TEXT_ALIGNMENT_CENTER);
+                draw_text_clipped_aligned(percent_w,
+                                          d2d_->title_format.Get(),
+                                          D2D1::RectF(panel_rect.left + 32.0f, panel_rect.top + 74.0f,
+                                                      panel_rect.right - 32.0f, panel_rect.top + 124.0f),
+                                          d2d_->text_brush.Get(),
+                                          DWRITE_TEXT_ALIGNMENT_CENTER);
             }
             if (d2d_->body_format && d2d_->muted_brush) {
-                d2d_->body_format->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_CENTER);
-                ctx->DrawText(stage_w.c_str(), static_cast<UINT32>(stage_w.size()),
-                              d2d_->body_format.Get(),
-                              D2D1::RectF(panel_rect.left + 32.0f, panel_rect.top + 134.0f,
-                                          panel_rect.right - 32.0f, panel_rect.top + 174.0f),
-                              d2d_->muted_brush.Get());
-                d2d_->body_format->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_LEADING);
+                draw_text_clipped_aligned(stage_w,
+                                          d2d_->body_format.Get(),
+                                          D2D1::RectF(panel_rect.left + 32.0f, panel_rect.top + 134.0f,
+                                                      panel_rect.right - 32.0f, panel_rect.top + 174.0f),
+                                          d2d_->muted_brush.Get(),
+                                          DWRITE_TEXT_ALIGNMENT_CENTER);
             }
 
             const D2D1_RECT_F progress_track =
@@ -195,7 +213,10 @@
             }
             draw_gameplay_header();
 
-            const D2D1_RECT_F panel_rect = D2D1::RectF(700.0f, 300.0f, 1220.0f, 760.0f);
+            const D2D1_RECT_F panel_rect =
+                fit_rect_below_performance_overlay(D2D1::RectF(700.0f, 300.0f, 1220.0f, 760.0f),
+                                                   kBaseHeight - 120.0f,
+                                                   22.0f);
             const D2D1_ROUNDED_RECT panel_rr = D2D1::RoundedRect(panel_rect, 28.0f, 28.0f);
             if (d2d_->panel_brush) {
                 d2d_->panel_brush->SetOpacity(0.90f);
@@ -207,14 +228,13 @@
             }
 
             if (d2d_->body_format && d2d_->muted_brush) {
-                d2d_->body_format->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_CENTER);
                 const std::wstring ready_w = L"GET READY";
-                ctx->DrawText(ready_w.c_str(), static_cast<UINT32>(ready_w.size()),
-                              d2d_->body_format.Get(),
-                              D2D1::RectF(panel_rect.left + 24.0f, panel_rect.top + 30.0f,
-                                          panel_rect.right - 24.0f, panel_rect.top + 76.0f),
-                              d2d_->muted_brush.Get());
-                d2d_->body_format->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_LEADING);
+                draw_text_clipped_aligned(ready_w,
+                                          d2d_->body_format.Get(),
+                                          D2D1::RectF(panel_rect.left + 24.0f, panel_rect.top + 30.0f,
+                                                      panel_rect.right - 24.0f, panel_rect.top + 76.0f),
+                                          d2d_->muted_brush.Get(),
+                                          DWRITE_TEXT_ALIGNMENT_CENTER);
             }
 
             ID2D1Brush* countdown_brush = d2d_->logo_brush
@@ -234,14 +254,13 @@
             }
 
             if (d2d_->title_format && d2d_->text_brush) {
-                d2d_->title_format->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_CENTER);
                 const std::wstring start_w = L"START";
-                ctx->DrawText(start_w.c_str(), static_cast<UINT32>(start_w.size()),
-                              d2d_->title_format.Get(),
-                              D2D1::RectF(panel_rect.left + 24.0f, panel_rect.bottom - 132.0f,
-                                          panel_rect.right - 24.0f, panel_rect.bottom - 64.0f),
-                              d2d_->text_brush.Get());
-                d2d_->title_format->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_LEADING);
+                draw_text_clipped_aligned(start_w,
+                                          d2d_->title_format.Get(),
+                                          D2D1::RectF(panel_rect.left + 24.0f, panel_rect.bottom - 132.0f,
+                                                      panel_rect.right - 24.0f, panel_rect.bottom - 64.0f),
+                                          d2d_->text_brush.Get(),
+                                          DWRITE_TEXT_ALIGNMENT_CENTER);
             }
 
             return;
@@ -400,52 +419,63 @@
         ctx->PopAxisAlignedClip();
         ctx->SetAntialiasMode(saved_antialias);
 
-        const float combo_y = gameplay_field_y(field_top, field_height, combo_position);
         const bool show_feedback_overlay =
             data.gameplay.has_feedback && !gameplay_hud_cache_.feedback_text.empty();
+        const float combo_anchor_top_safe = show_feedback_overlay ? 74.0f : 44.0f;
+        const float combo_anchor_bottom_safe = show_feedback_overlay ? 82.0f : 44.0f;
+        const float combo_anchor_y =
+            gameplay_combo_anchor_y(field_layout, combo_position, combo_anchor_top_safe, combo_anchor_bottom_safe);
         if (show_feedback_overlay && d2d_->header_format && d2d_->text_brush) {
-            const float feedback_center_x = (field_left + field_right) * 0.5f;
             const D2D1_RECT_F feedback_rect =
-                D2D1::RectF(field_left - 24.0f, combo_y - 74.0f, field_right + 24.0f, combo_y + 6.0f);
+                gameplay_centered_overlay_rect(field_layout, combo_anchor_y - 34.0f, 40.0f, -24.0f);
             const bool show_timing_indicator =
                 data.gameplay.feedback != "PG" &&
                 std::abs(data.gameplay.feedback_delta_ms) >= 0.05;
             const bool timing_fast = show_timing_indicator && data.gameplay.feedback_delta_ms < 0.0;
             const bool timing_slow = show_timing_indicator && data.gameplay.feedback_delta_ms > 0.0;
+            const D2D1_COLOR_F saved_text_color = d2d_->text_brush->GetColor();
 
             d2d_->text_brush->SetColor(D2D1::ColorF(0x061118, 0.78f));
-            d2d_->header_format->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_CENTER);
             const D2D1_RECT_F feedback_shadow_rect =
                 D2D1::RectF(feedback_rect.left + 3.0f, feedback_rect.top + 3.0f,
                             feedback_rect.right + 3.0f, feedback_rect.bottom + 3.0f);
-            ctx->DrawText(gameplay_hud_cache_.feedback_text.c_str(),
-                          static_cast<UINT32>(gameplay_hud_cache_.feedback_text.size()),
-                          d2d_->header_format.Get(), feedback_shadow_rect, d2d_->text_brush.Get());
+            draw_text_clipped_aligned(gameplay_hud_cache_.feedback_text,
+                                      d2d_->header_format.Get(),
+                                      feedback_shadow_rect,
+                                      d2d_->text_brush.Get(),
+                                      DWRITE_TEXT_ALIGNMENT_CENTER);
 
             d2d_->text_brush->SetColor(gameplay_feedback_color(data.gameplay.feedback));
-            ctx->DrawText(gameplay_hud_cache_.feedback_text.c_str(),
-                          static_cast<UINT32>(gameplay_hud_cache_.feedback_text.size()),
-                          d2d_->header_format.Get(), feedback_rect, d2d_->text_brush.Get());
+            draw_text_clipped_aligned(gameplay_hud_cache_.feedback_text,
+                                      d2d_->header_format.Get(),
+                                      feedback_rect,
+                                      d2d_->text_brush.Get(),
+                                      DWRITE_TEXT_ALIGNMENT_CENTER);
 
             if (show_timing_indicator && d2d_->body_format) {
                 constexpr wchar_t kFastIndicatorText[] = L"\uBE60\uB984";
                 constexpr wchar_t kSlowIndicatorText[] = L"\uB290\uB9BC";
+                const float feedback_center_x = (field_left + field_right) * 0.5f;
                 const D2D1_RECT_F fast_rect =
-                    D2D1::RectF(field_left + 60.0f, combo_y + 8.0f, feedback_center_x - 220.0f, combo_y + 38.0f);
+                    D2D1::RectF(field_left + 60.0f, combo_anchor_y + 8.0f, feedback_center_x - 220.0f, combo_anchor_y + 38.0f);
                 const D2D1_RECT_F slow_rect =
-                    D2D1::RectF(feedback_center_x + 220.0f, combo_y + 8.0f, field_right - 60.0f, combo_y + 38.0f);
+                    D2D1::RectF(feedback_center_x + 220.0f, combo_anchor_y + 8.0f, field_right - 60.0f, combo_anchor_y + 38.0f);
 
-                d2d_->body_format->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_TRAILING);
                 d2d_->text_brush->SetColor(D2D1::ColorF(0x5DA9FF, timing_fast ? 0.82f : 0.28f));
-                ctx->DrawText(kFastIndicatorText, 2, d2d_->body_format.Get(), fast_rect, d2d_->text_brush.Get());
+                draw_text_clipped_aligned(std::wstring(kFastIndicatorText),
+                                          d2d_->body_format.Get(),
+                                          fast_rect,
+                                          d2d_->text_brush.Get(),
+                                          DWRITE_TEXT_ALIGNMENT_TRAILING);
 
-                d2d_->body_format->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_LEADING);
                 d2d_->text_brush->SetColor(D2D1::ColorF(0xFF5A6B, timing_slow ? 0.82f : 0.28f));
-                ctx->DrawText(kSlowIndicatorText, 2, d2d_->body_format.Get(), slow_rect, d2d_->text_brush.Get());
-                d2d_->body_format->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_LEADING);
+                draw_text_clipped_aligned(std::wstring(kSlowIndicatorText),
+                                          d2d_->body_format.Get(),
+                                          slow_rect,
+                                          d2d_->text_brush.Get(),
+                                          DWRITE_TEXT_ALIGNMENT_LEADING);
             }
-            d2d_->header_format->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_CENTER);
-            d2d_->text_brush->SetColor(D2D1::ColorF(0xE8ECF1));
+            d2d_->text_brush->SetColor(saved_text_color);
         }
 
         if (data.gameplay.combo > 0 && d2d_->accent_brush &&
@@ -454,18 +484,34 @@
             const std::wstring combo_overlay_w = to_wide(std::to_string(data.gameplay.combo));
             if (show_feedback_overlay) {
                 const D2D1_RECT_F combo_overlay_rect =
-                    D2D1::RectF(field_left, combo_y + 38.0f, field_right, combo_y + 82.0f);
-                d2d_->title_format->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_CENTER);
+                    gameplay_combo_overlay_rect(field_layout,
+                                                combo_position,
+                                                22.0f,
+                                                combo_anchor_top_safe,
+                                                combo_anchor_bottom_safe,
+                                                60.0f,
+                                                8.0f);
                 d2d_->accent_brush->SetOpacity(0.92f);
-                ctx->DrawText(combo_overlay_w.c_str(), static_cast<UINT32>(combo_overlay_w.size()),
-                              d2d_->title_format.Get(), combo_overlay_rect, d2d_->accent_brush.Get());
+                draw_text_clipped_aligned(combo_overlay_w,
+                                          d2d_->title_format.Get(),
+                                          combo_overlay_rect,
+                                          d2d_->accent_brush.Get(),
+                                          DWRITE_TEXT_ALIGNMENT_CENTER);
                 d2d_->accent_brush->SetOpacity(1.0f);
-                d2d_->title_format->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_LEADING);
             } else {
                 const D2D1_RECT_F combo_overlay_rect =
-                    D2D1::RectF(field_left, combo_y - 44.0f, field_right, combo_y + 44.0f);
-                ctx->DrawText(combo_overlay_w.c_str(), static_cast<UINT32>(combo_overlay_w.size()),
-                              d2d_->header_format.Get(), combo_overlay_rect, d2d_->accent_brush.Get());
+                    gameplay_combo_overlay_rect(field_layout,
+                                                combo_position,
+                                                44.0f,
+                                                combo_anchor_top_safe,
+                                                combo_anchor_bottom_safe,
+                                                0.0f,
+                                                8.0f);
+                draw_text_clipped_aligned(combo_overlay_w,
+                                          d2d_->header_format.Get(),
+                                          combo_overlay_rect,
+                                          d2d_->accent_brush.Get(),
+                                          DWRITE_TEXT_ALIGNMENT_CENTER);
             }
         }
 

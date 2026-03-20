@@ -1,7 +1,9 @@
+        const ScreenContentBands bands =
+            make_screen_content_bands(48.0f, 72.0f, false, 20.0f, 18.0f);
         const float left = 80.0f;
-        const float top = 140.0f;
+        const float top = bands.body_top;
         const float right = kBaseWidth - 80.0f;
-        const float bottom = kBaseHeight - 120.0f;
+        const float bottom = bands.body_bottom;
 
         if (d2d_->card_brush) {
             D2D1_ROUNDED_RECT card =
@@ -18,8 +20,7 @@
         const std::wstring header_wide = to_wide(header);
         D2D1_RECT_F header_rect = D2D1::RectF(left, 48.0f, right, 120.0f);
         if (d2d_->title_format && d2d_->accent_brush) {
-            ctx->DrawText(header_wide.c_str(), static_cast<UINT32>(header_wide.size()),
-                          d2d_->title_format.Get(), header_rect, d2d_->accent_brush.Get());
+            draw_text_clipped(header_wide, d2d_->title_format.Get(), header_rect, d2d_->accent_brush.Get());
         }
 
         const bool has_skin_preview = data.generic.skin_preview.visible;
@@ -42,20 +43,20 @@
                 to_wide(preview.mode_label + " / Lane " + std::to_string(std::max(1, preview.selected_lane)));
             const std::wstring color_w = to_wide("Color: " + preview.selected_color_label);
             if (d2d_->title_format && d2d_->text_brush) {
-                ctx->DrawText(title_w.c_str(), static_cast<UINT32>(title_w.size()),
-                              d2d_->title_format.Get(),
-                              D2D1::RectF(rect.left + 24.0f, rect.top + 18.0f, rect.right - 24.0f, rect.top + 60.0f),
-                              d2d_->text_brush.Get());
+                draw_text_clipped(title_w,
+                                  d2d_->title_format.Get(),
+                                  D2D1::RectF(rect.left + 24.0f, rect.top + 18.0f, rect.right - 24.0f, rect.top + 60.0f),
+                                  d2d_->text_brush.Get());
             }
             if (d2d_->body_format && d2d_->muted_brush) {
-                ctx->DrawText(mode_w.c_str(), static_cast<UINT32>(mode_w.size()),
-                              d2d_->body_format.Get(),
-                              D2D1::RectF(rect.left + 24.0f, rect.top + 56.0f, rect.right - 24.0f, rect.top + 88.0f),
-                              d2d_->muted_brush.Get());
-                ctx->DrawText(color_w.c_str(), static_cast<UINT32>(color_w.size()),
-                              d2d_->body_format.Get(),
-                              D2D1::RectF(rect.left + 24.0f, rect.top + 86.0f, rect.right - 24.0f, rect.top + 118.0f),
-                              d2d_->muted_brush.Get());
+                draw_text_clipped(mode_w,
+                                  d2d_->body_format.Get(),
+                                  D2D1::RectF(rect.left + 24.0f, rect.top + 56.0f, rect.right - 24.0f, rect.top + 88.0f),
+                                  d2d_->muted_brush.Get());
+                draw_text_clipped(color_w,
+                                  d2d_->body_format.Get(),
+                                  D2D1::RectF(rect.left + 24.0f, rect.top + 86.0f, rect.right - 24.0f, rect.top + 118.0f),
+                                  d2d_->muted_brush.Get());
             }
 
             const float preview_bounds_left = rect.left + 28.0f;
@@ -221,11 +222,19 @@
 
             if (d2d_->header_format && d2d_->accent_brush) {
                 const std::wstring combo_w = L"123";
-                const float combo_y = gameplay_field_y(field_layout.top, field_height, combo_position);
                 const D2D1_RECT_F combo_rect =
-                    D2D1::RectF(field_left, combo_y - 40.0f, field_right, combo_y + 40.0f);
-                ctx->DrawText(combo_w.c_str(), static_cast<UINT32>(combo_w.size()),
-                              d2d_->header_format.Get(), combo_rect, d2d_->accent_brush.Get());
+                    gameplay_combo_overlay_rect(field_layout,
+                                                combo_position,
+                                                40.0f,
+                                                40.0f,
+                                                40.0f,
+                                                0.0f,
+                                                8.0f);
+                draw_text_clipped_aligned(combo_w,
+                                          d2d_->header_format.Get(),
+                                          combo_rect,
+                                          d2d_->accent_brush.Get(),
+                                          DWRITE_TEXT_ALIGNMENT_CENTER);
             }
 
             const float swatch_top = rect.bottom - 96.0f;
@@ -246,10 +255,11 @@
                 }
                 if (d2d_->body_format && d2d_->text_brush) {
                     const std::wstring lane_w = to_wide(std::to_string(lane + 1));
-                    d2d_->body_format->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_CENTER);
-                    ctx->DrawText(lane_w.c_str(), static_cast<UINT32>(lane_w.size()),
-                                  d2d_->body_format.Get(), swatch_rect, d2d_->text_brush.Get());
-                    d2d_->body_format->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_LEADING);
+                    draw_text_clipped_aligned(lane_w,
+                                              d2d_->body_format.Get(),
+                                              swatch_rect,
+                                              d2d_->text_brush.Get(),
+                                              DWRITE_TEXT_ALIGNMENT_CENTER);
                 }
             }
         };
@@ -257,6 +267,10 @@
         if (!data.generic.rows.empty() || !data.generic.notes.empty()) {
             const float row_left = left + 24.0f;
             const float base_row_right = has_skin_preview ? (right - preview_width - preview_gap) : (right - 24.0f);
+            const float row_safe_right =
+                (!has_skin_preview && data.performance.visible)
+                    ? std::min(base_row_right, performance_overlay_safe_left(24.0f))
+                    : base_row_right;
             const bool roomy_option_layout = data.generic.rows.size() <= 12;
             const float row_height = roomy_option_layout ? 54.0f : 48.0f;
             const float row_gap = roomy_option_layout ? 10.0f : 8.0f;
@@ -273,8 +287,13 @@
                 roomy_option_layout && d2d_->option_format ? d2d_->option_format.Get() : d2d_->body_format.Get();
 
             if (has_skin_preview) {
-                draw_skin_preview_panel(data.generic.skin_preview,
-                                        D2D1::RectF(base_row_right + preview_gap, top + 24.0f, right - 24.0f, bottom - 24.0f));
+                const D2D1_RECT_F preview_rect = fit_rect_below_performance_overlay(
+                    D2D1::RectF(base_row_right + preview_gap, top + 24.0f, right - 24.0f, bottom - 24.0f),
+                    bottom - 24.0f,
+                    22.0f);
+                if (preview_rect.bottom - preview_rect.top > 180.0f) {
+                    draw_skin_preview_panel(data.generic.skin_preview, preview_rect);
+                }
             }
 
             int displayed_note_count = static_cast<int>(data.generic.notes.size());
@@ -320,7 +339,7 @@
                 !data.generic.rows.empty() && visible_row_count < static_cast<int>(data.generic.rows.size());
             const float scrollbar_gap = show_scrollbar ? 12.0f : 0.0f;
             const float scrollbar_width = show_scrollbar ? 10.0f : 0.0f;
-            const float row_right = base_row_right - scrollbar_gap - scrollbar_width;
+            const float row_right = row_safe_right - scrollbar_gap - scrollbar_width;
             float row_y = list_top;
 
             const int row_window_end = std::min<int>(static_cast<int>(data.generic.rows.size()),
@@ -353,8 +372,7 @@
                 const D2D1_RECT_F label_rect =
                     D2D1::RectF(row_left + 18.0f, row_y + 8.0f, std::max(row_left + 160.0f, label_right), row_y + row_height - 8.0f);
                 if (row_format && d2d_->text_brush) {
-                    ctx->DrawText(label_w.c_str(), static_cast<UINT32>(label_w.size()),
-                                  row_format, label_rect, d2d_->text_brush.Get());
+                    draw_text_clipped(label_w, row_format, label_rect, d2d_->text_brush.Get());
                 }
 
                 if (!row.value.empty() && row_format && d2d_->text_brush) {
@@ -368,10 +386,11 @@
                                         row_y + 8.0f,
                                         value_right,
                                         row_y + row_height - 8.0f);
-                        row_format->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_TRAILING);
-                        ctx->DrawText(value_w.c_str(), static_cast<UINT32>(value_w.size()),
-                                      row_format, value_rect, d2d_->text_brush.Get());
-                        row_format->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_LEADING);
+                        draw_text_clipped_aligned(value_w,
+                                                  row_format,
+                                                  value_rect,
+                                                  d2d_->text_brush.Get(),
+                                                  DWRITE_TEXT_ALIGNMENT_TRAILING);
 
                         const auto draw_action = [&](const D2D1_RECT_F& rect, wchar_t symbol, MenuHitPart part, bool enabled) {
                             const D2D1_ROUNDED_RECT action_rr = D2D1::RoundedRect(rect, 10.0f, 10.0f);
@@ -388,9 +407,11 @@
                             }
                             if (d2d_->title_format && d2d_->text_brush) {
                                 const wchar_t buffer[2] = {symbol, L'\0'};
-                                d2d_->title_format->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_CENTER);
-                                ctx->DrawText(buffer, 1, d2d_->title_format.Get(), rect, d2d_->text_brush.Get());
-                                d2d_->title_format->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_LEADING);
+                                draw_text_clipped_aligned(buffer,
+                                                          d2d_->title_format.Get(),
+                                                          rect,
+                                                          d2d_->text_brush.Get(),
+                                                          DWRITE_TEXT_ALIGNMENT_CENTER);
                             }
                         };
 
@@ -406,10 +427,11 @@
                                         row_y + 8.0f,
                                         row_right - 18.0f,
                                         row_y + row_height - 8.0f);
-                        row_format->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_TRAILING);
-                        ctx->DrawText(value_w.c_str(), static_cast<UINT32>(value_w.size()),
-                                      row_format, value_rect, d2d_->text_brush.Get());
-                        row_format->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_LEADING);
+                        draw_text_clipped_aligned(value_w,
+                                                  row_format,
+                                                  value_rect,
+                                                  d2d_->text_brush.Get(),
+                                                  DWRITE_TEXT_ALIGNMENT_TRAILING);
                     }
                 }
 
@@ -470,8 +492,7 @@
                     const D2D1_RECT_F note_rect =
                         D2D1::RectF(row_left + 6.0f, note_y, row_right - 6.0f, note_y + 30.0f);
                     if (row_format && d2d_->muted_brush) {
-                        ctx->DrawText(note_w.c_str(), static_cast<UINT32>(note_w.size()),
-                                      row_format, note_rect, d2d_->muted_brush.Get());
+                        draw_text_clipped(note_w, row_format, note_rect, d2d_->muted_brush.Get());
                     }
                     note_y += note_line_height;
                 }
@@ -480,6 +501,8 @@
         }
 
         const float line_left = left + 24.0f;
+        const float line_right =
+            data.performance.visible ? std::min(right - 24.0f, performance_overlay_safe_left(24.0f)) : (right - 24.0f);
         float line_y = top + 24.0f;
         const float line_height = 26.0f;
         for (const auto& line : data.lines) {
@@ -490,11 +513,11 @@
             const bool is_option = line_has_prefix(line);
             const std::wstring text = to_wide(strip_prefix(line));
             D2D1_RECT_F line_rect =
-                D2D1::RectF(line_left, line_y, right - 24.0f, line_y + line_height);
+                D2D1::RectF(line_left, line_y, line_right, line_y + line_height);
 
             if (is_option) {
                 D2D1_RECT_F button_rect = D2D1::RectF(line_left - 12.0f, line_y - 4.0f,
-                                                      right - 24.0f, line_y + line_height + 4.0f);
+                                                      line_right, line_y + line_height + 4.0f);
                 D2D1_ROUNDED_RECT button = D2D1::RoundedRect(button_rect, 10.0f, 10.0f);
                 ID2D1SolidColorBrush* fill =
                     selected ? d2d_->button_selected_brush.Get() : d2d_->button_brush.Get();
@@ -510,8 +533,7 @@
 
             ID2D1SolidColorBrush* brush = d2d_->text_brush.Get();
             if (brush && d2d_->body_format) {
-                ctx->DrawText(text.c_str(), static_cast<UINT32>(text.size()),
-                              d2d_->body_format.Get(), line_rect, brush);
+                draw_text_clipped(text, d2d_->body_format.Get(), line_rect, brush);
             }
             line_y += line_height + 8.0f;
         }

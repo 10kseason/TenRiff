@@ -78,7 +78,9 @@
             set_brush_points(d2d_->logo_brush.Get(), header_rect);
         }
         if (d2d_->header_format && header_brush) {
+            d2d_->header_format->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_CENTER);
             draw_text_clipped(header_w, d2d_->header_format.Get(), header_rect, header_brush);
+            d2d_->header_format->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_LEADING);
         }
 
         if (data.song_select.indexing && d2d_->hud_format && d2d_->muted_brush) {
@@ -125,11 +127,38 @@
             }
         }
 
+        const ScreenContentBands bands =
+            make_screen_content_bands(70.0f, 100.0f, true, 50.0f, 70.0f);
+        const float content_top = bands.body_top;
+        const float content_bottom = bands.body_bottom;
         const float nav_left = 120.0f;
         const float nav_width = 290.0f;
         const float nav_top = 236.0f;
-        const float nav_height = 74.0f;
-        const float nav_gap = 14.0f;
+        float nav_height = 74.0f;
+        float nav_gap = 14.0f;
+        const std::size_t nav_count = data.song_select.left_nav.size();
+        if (nav_count > 0) {
+            const float nav_available_height = std::max(0.0f, content_bottom - nav_top);
+            if (nav_count > 1) {
+                const float natural_gap =
+                    (nav_available_height - nav_height * static_cast<float>(nav_count)) /
+                    static_cast<float>(nav_count - 1);
+                nav_gap = std::clamp(std::floor(natural_gap), 8.0f, 14.0f);
+            } else {
+                nav_gap = 0.0f;
+            }
+
+            const float nav_used_height =
+                nav_height * static_cast<float>(nav_count) +
+                nav_gap * static_cast<float>(nav_count > 0 ? nav_count - 1 : 0);
+            if (nav_used_height > nav_available_height) {
+                const float adjusted_height =
+                    (nav_available_height -
+                     nav_gap * static_cast<float>(nav_count > 0 ? nav_count - 1 : 0)) /
+                    static_cast<float>(nav_count);
+                nav_height = std::max(64.0f, std::floor(adjusted_height));
+            }
+        }
         for (std::size_t i = 0; i < data.song_select.left_nav.size(); ++i) {
             const auto& item = data.song_select.left_nav[i];
             const float y0 = nav_top + static_cast<float>(i) * (nav_height + nav_gap);
@@ -186,7 +215,7 @@
             }
         }
 
-        const D2D1_RECT_F list_rect = D2D1::RectF(450.0f, 220.0f, 1270.0f, 912.0f);
+        const D2D1_RECT_F list_rect = D2D1::RectF(450.0f, content_top, 1270.0f, content_bottom);
         draw_glass_panel(list_rect, 18.0f, 0.84f, 0.54f + ambient_pulse * 0.14f, true, 8.0f);
         if (d2d_->title_format && d2d_->text_brush) {
             const std::wstring list_header_w = data.song_select.showing_sources
@@ -504,7 +533,7 @@
             d2d_->title_format->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_LEADING);
         }
 
-        const D2D1_RECT_F right_rect = D2D1::RectF(1320.0f, 220.0f, 1800.0f, 912.0f);
+        const D2D1_RECT_F right_rect = D2D1::RectF(1320.0f, content_top, 1800.0f, content_bottom);
         draw_glass_panel(right_rect, 18.0f, 0.84f, 0.58f + preview_pulse * 0.16f, true, 8.0f);
 
         const float stats_left = right_rect.left + 24.0f;
@@ -729,23 +758,22 @@
             }
 
             stats_y = draw_stat_section(preview_rect.bottom + 140.0f, "OVERVIEW", stats_left, stats_right);
-            row_h = 26.0f;
+            row_h = 24.0f;
             draw_stat_text_row("RANK", data.song_select.rank.empty() ? std::string("--") : data.song_select.rank);
             draw_stat_text_row("SORT", data.song_select.sort_summary);
             draw_stat_text_row("FILTER", data.song_select.browser_summary);
-            draw_stat_text_row("SOURCE", data.song_select.current_source_name);
-            draw_stat_text_row("INDEX", data.song_select.index_profile_label);
             stats_y += 6.0f;
             draw_section_divider(stats_y, stats_left, stats_right, 0.28f);
             stats_y += 12.0f;
             stats_y = draw_stat_section(stats_y, "BEST RECORD", stats_left, stats_right);
-            row_h = compute_row_height(stats_y, 6, right_rect.bottom - 24.0f);
+            row_h = 24.0f;
             draw_stat_row("BEST", data.song_select.best_score);
             draw_stat_row("MAX COMBO", data.song_select.max_combo);
             draw_stat_row("PERFECT", data.song_select.perfect);
             draw_stat_row("GREAT", data.song_select.great);
             draw_stat_row("GOOD", data.song_select.good);
             draw_stat_row("BAD", data.song_select.bad);
+            draw_stat_row("MISS", data.song_select.miss);
         }
 
         ctx->PopAxisAlignedClip();
