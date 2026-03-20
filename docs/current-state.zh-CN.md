@@ -3,8 +3,8 @@
 这份文档是下一位 agent 或新任务接手时应该最先阅读的当前状态文档。目标是快速说明“这个项目现在是什么、应该先看哪里、还有哪些内容尚未验证”。
 
 ## 基线
-- 当前项目版本为 `0.9.92`
-- 后续工作的基准文档是 [`docs/baseline-0.8.0.zh-CN.md`](baseline-0.8.0.zh-CN.md)
+- 当前项目版本为 `0.994`
+- 后续工作的基准文档是 [`docs/baseline-0.9.92.zh-CN.md`](baseline-0.9.92.zh-CN.md)
 - Windows GUI 构建是主目标
 - Linux 仅存在 [`Baepoks-Linuxs/TenRiff-0.5.0-linux-preview`](../Baepoks-Linuxs/TenRiff-0.5.0-linux-preview) 级别的 preview
 - 默认表面是 BMS-first

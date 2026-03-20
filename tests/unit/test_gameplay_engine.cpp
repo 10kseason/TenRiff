@@ -213,7 +213,7 @@ TEST_CASE("gameplay engine gauge uses absolute hold judgements without half-weig
 
     CHECK(engine.stats().counts.pg == 1);
     CHECK(engine.stats().counts.bd == 1);
-    CHECK(engine.gauge_state().value == doctest::Approx(98.00000000));
+    CHECK(engine.gauge_state().value == doctest::Approx(43.75000000));
 }
 
 TEST_CASE("gameplay engine marks early hold release as bad") {

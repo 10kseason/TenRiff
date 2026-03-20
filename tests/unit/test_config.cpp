@@ -51,18 +51,18 @@ void write_file(const std::filesystem::path& path, const std::string& content) {
     out << content;
 }
 
-constexpr double kCurrentHardGd = 1.0 / 65.0;
-constexpr double kCurrentNormalGd = 1.0 / 65.0;
-constexpr double kCurrentEasyGd = 0.032 / 50.0;
-constexpr double kCurrentHardPg = 0.01;
-constexpr double kCurrentNormalPg = 0.01;
-constexpr double kCurrentEasyPg = 0.032;
-constexpr double kCurrentHardGr = 1.0 / 20.0;
-constexpr double kCurrentNormalGr = 1.0 / 20.0;
-constexpr double kCurrentEasyGr = 0.032 / 20.0;
-constexpr double kCurrentHardBd = -4.0;
-constexpr double kCurrentNormalBd = -2.0;
-constexpr double kCurrentEasyBd = -2.0;
+constexpr double kCurrentHardGd = 0.01;
+constexpr double kCurrentNormalGd = 0.01;
+constexpr double kCurrentEasyGd = 0.01;
+constexpr double kCurrentHardPg = 0.16;
+constexpr double kCurrentNormalPg = 0.19;
+constexpr double kCurrentEasyPg = 0.25;
+constexpr double kCurrentHardGr = 0.09;
+constexpr double kCurrentNormalGr = 0.15;
+constexpr double kCurrentEasyGr = 0.20;
+constexpr double kCurrentHardBd = -10.0;
+constexpr double kCurrentNormalBd = -6.25;
+constexpr double kCurrentEasyBd = -4.1;
 
 }  // namespace
 
@@ -1013,9 +1013,9 @@ TEST_CASE("runtime migration upgrades the previous current bad penalties to the 
 TEST_CASE("runtime migration upgrades the most recent shipped gauge defaults to the latest recovery table") {
     ConfigLoader loader;
     auto config = loader.defaults();
-    config.gauge.hard = {0.01000000, 0.05000000, 0.015384615384615385, -8.00000, -8.00000};
-    config.gauge.normal = {0.01000000, 0.05000000, 0.015384615384615385, -6.00000, -6.00000};
-    config.gauge.easy = {0.13500000, 0.05000000, 0.015384615384615385, -4.00000, -4.00000};
+    config.gauge.hard = {0.01000000, 0.05000000, 1.0 / 65.0, -4.00000, -4.00000};
+    config.gauge.normal = {0.01000000, 0.05000000, 1.0 / 65.0, -2.00000, -2.00000};
+    config.gauge.easy = {0.03200000, 0.03200000 / 20.0, 0.03200000 / 50.0, -2.00000, -2.00000};
 
     const bool changed = tenriff::app::migrate_bms_first_runtime_config(config);
 
@@ -1032,6 +1032,24 @@ TEST_CASE("runtime migration upgrades the most recent shipped gauge defaults to 
     CHECK(config.gauge.hard.bd == doctest::Approx(kCurrentHardBd));
     CHECK(config.gauge.normal.bd == doctest::Approx(kCurrentNormalBd));
     CHECK(config.gauge.easy.bd == doctest::Approx(kCurrentEasyBd));
+}
+
+TEST_CASE("runtime migration upgrades the immediate previous gauge defaults to the latest penalties") {
+    ConfigLoader loader;
+    auto config = loader.defaults();
+    config.gauge.hard = {0.16000000, 0.09000000, 0.01000000, -10.00000, -10.00000};
+    config.gauge.normal = {0.19000000, 0.15000000, 0.01000000, -6.00000, -6.00000};
+    config.gauge.easy = {0.25000000, 0.20000000, 0.01000000, -4.00000, -4.00000};
+
+    const bool changed = tenriff::app::migrate_bms_first_runtime_config(config);
+
+    CHECK(changed);
+    CHECK(config.gauge.hard.bd == doctest::Approx(kCurrentHardBd));
+    CHECK(config.gauge.hard.pr == doctest::Approx(kCurrentHardBd));
+    CHECK(config.gauge.normal.bd == doctest::Approx(kCurrentNormalBd));
+    CHECK(config.gauge.normal.pr == doctest::Approx(kCurrentNormalBd));
+    CHECK(config.gauge.easy.bd == doctest::Approx(kCurrentEasyBd));
+    CHECK(config.gauge.easy.pr == doctest::Approx(kCurrentEasyBd));
 }
 
 TEST_CASE("runtime migration upgrades the immediate prior normal and easy penalties to the latest table") {

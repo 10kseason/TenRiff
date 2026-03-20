@@ -2,9 +2,9 @@
 
 Language: [한국어](README.md) | [English](README.en.md) | [简体中文](README.zh-CN.md)
 
-TenRiff is a Windows GUI-based BMS-first rhythm game runtime/launcher project. The goal is to build a standalone rhythm-game client centered on a practical BMS play environment, with direct control over the judgement, audio, input, and rendering pipeline. The current project version is `0.9.92`, and the project uses the MIT License. Bundled third-party notices are collected in [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
+TenRiff is a Windows GUI-based BMS-first rhythm game runtime/launcher project. The goal is to build a standalone rhythm-game client centered on a practical BMS play environment, with direct control over the judgement, audio, input, and rendering pipeline. The current project version is `0.994`, and the project uses the MIT License. Bundled third-party notices are collected in [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
 
-This README is an introduction that explains "what to look at first when you open the project." For the more detailed current behavior, the current `0.9.92` project state, the `0.8.0` baseline, the config structure, and the design documents, continue reading from [`docs/README.en.md`](docs/README.en.md).
+This README is an introduction that explains "what to look at first when you open the project." For the more detailed current behavior, the current `0.994` project state, the `0.9.92` baseline, the config structure, and the design documents, continue reading from [`docs/README.en.md`](docs/README.en.md).
 
 ## Project At a Glance
 
@@ -151,8 +151,8 @@ This README only covers the introduction. For the details, the most efficient re
    - Full documentation map
 2. [`docs/current-state.en.md`](docs/current-state.en.md)
    - What actually works right now
-3. [`docs/baseline-0.8.0.en.md`](docs/baseline-0.8.0.en.md)
-   - The `0.8.0` baseline document that follow-up work should use as a reference
+3. [`docs/baseline-0.9.92.en.md`](docs/baseline-0.9.92.en.md)
+   - The `0.9.92` baseline document that follow-up work should use as a reference
 4. [`docs/gameplay-guide.en.md`](docs/gameplay-guide.en.md)
    - How to start playing, basic controls, HUD/judgement/result screen explanation from a practical player perspective
 5. [`docs/config.en.md`](docs/config.en.md)
