@@ -97,7 +97,7 @@ bool GameSession::initialize(const CommandLineOptions& options) {
         return false;
     }
     config_ = config_result.config;
-    const bool migrated_config = migrate_bms_first_runtime_config(config_);
+    const bool migrated_config = config_result.migrated;
     const bool stripped_session_only_mods = strip_session_only_mode_mods(config_);
 
     if (config_result.used_defaults || migrated_config || stripped_session_only_mods) {

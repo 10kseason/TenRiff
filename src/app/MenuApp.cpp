@@ -439,7 +439,7 @@ bool MenuApp::initialize(const CommandLineOptions& options) {
         return false;
     }
     config_ = config_result.config;
-    const bool migrated_config = migrate_bms_first_runtime_config(config_);
+    const bool migrated_config = config_result.migrated;
     const bool stripped_session_only_mods = strip_session_only_mode_mods(config_);
     first_run_profile_ = config_result.used_defaults;
 

@@ -19,14 +19,16 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
     target.audio_buffer_frames = gameplay_hud_.audio_buffer_frames;
     target.lookahead_samples = gameplay_hud_.lookahead_samples;
     target.past_samples = gameplay_hud_.past_samples;
-    target.judgement_line_position = std::clamp(
+    const double clamped_judgement_line_position = std::clamp(
         config_.skin.judgement_line_position,
         config::kJudgementLinePositionMin,
         config::kJudgementLinePositionMax);
-    target.combo_position = std::clamp(
+    const double clamped_combo_position = std::clamp(
         config_.skin.combo_position,
         config::kComboPositionMin,
         config::kComboPositionMax);
+    target.judgement_line_position = clamped_judgement_line_position;
+    target.combo_position = clamped_combo_position;
     const std::string skin_mode = std::to_string(target.lane_count) + "k";
     target.note_width_scale = std::clamp(
         config::resolved_skin_note_width_scale(config_.skin, skin_mode),
@@ -276,7 +278,8 @@ void MenuApp::populate_title_render_data(render::MenuRenderData& render,
         "UP / DOWN or mouse to move",
         "ENTER or double-click to open",
         "F5 refreshes the current song source",
-        "A/G/I/M/K jumps straight to Audio, Graphics, Input, Mode, Keymap",
+        "A/G/I/M/K jumps to Audio / Graphics",
+        "Input / Mode / Keymap",
         "F1 opens the control help overlay",
         "ESC exits from the title menu",
     };

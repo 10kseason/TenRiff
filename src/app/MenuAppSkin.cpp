@@ -820,9 +820,15 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
     render.generic.skin_preview.selected_color_label =
         config::skin_color_label(preview_lane_colors[static_cast<std::size_t>(skin_edit_lane_)]);
     render.generic.skin_preview.lane_count = lane_count;
-    render.generic.skin_preview.selected_lane = skin_edit_lane_ + 1;
-    render.generic.skin_preview.judgement_line_position = config_.skin.judgement_line_position;
-    render.generic.skin_preview.combo_position = config_.skin.combo_position;
+    render.generic.skin_preview.selected_lane = clamp_int(skin_edit_lane_ + 1, 1, lane_count);
+    render.generic.skin_preview.judgement_line_position = std::clamp(
+        config_.skin.judgement_line_position,
+        config::kJudgementLinePositionMin,
+        config::kJudgementLinePositionMax);
+    render.generic.skin_preview.combo_position = std::clamp(
+        config_.skin.combo_position,
+        config::kComboPositionMin,
+        config::kComboPositionMax);
     render.generic.skin_preview.note_width_scale = preview_note_width_scale;
     render.generic.skin_preview.note_height_scale = preview_note_height_scale;
     render.generic.skin_preview.lane_divider_width_scale = preview_lane_divider_width_scale;
