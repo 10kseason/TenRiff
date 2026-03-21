@@ -13,6 +13,8 @@
   "gauge": "normal",
   "random": "off",
   "random_seed": 0,
+  "enable_osu_charts": false,
+  "ghost_battle_enabled": true,
   "song_index_profile": "safe"
 }
 ```
@@ -23,6 +25,10 @@
 - `gauge`：`normal | hard | easy`
 - `random`：`off | fr | sr`
 - `random_seed`：随机固定用 seed（`0` 也视为固定值）
+- `enable_osu_charts`：`false | true`
+- `ghost_battle_enabled`：`false | true`
+  - `true`：自动加载当前选中谱面的最佳兼容 replay 进行 ghost 对比
+  - `false`：保持普通单场地游玩
 - `song_index_profile`：`safe | fast`
   - `safe`：优先降低 large-library RAM high-water 的默认值
   - `fast`：面向 32GB+ 环境，追求更快重索引的选项

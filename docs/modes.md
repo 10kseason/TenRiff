@@ -13,6 +13,8 @@
   "gauge": "normal",
   "random": "off",
   "random_seed": 0,
+  "enable_osu_charts": false,
+  "ghost_battle_enabled": true,
   "song_index_profile": "safe"
 }
 ```
@@ -23,6 +25,10 @@
 - `gauge`: `normal | hard | easy`
 - `random`: `off | fr | sr`
 - `random_seed`: 랜덤 고정 시드 (0도 고정 값으로 취급)
+- `enable_osu_charts`: `false | true`
+- `ghost_battle_enabled`: `false | true`
+  - `true`: 선택한 차트의 최고 호환 replay를 자동으로 ghost 비교에 사용
+  - `false`: ghost 비교 없이 일반 단일 필드 플레이
 - `song_index_profile`: `safe | fast`
   - `safe`: large-library RAM high-water를 우선 낮추는 기본값
   - `fast`: 32GB+ 환경에서 더 빠른 재인덱싱을 노리는 선택값

@@ -3,7 +3,7 @@
 이 문서는 다음 에이전트나 새 작업자가 가장 먼저 읽어야 하는 현재 상태 문서입니다. 목표는 "지금 이 프로젝트가 무엇이고, 어디를 보면 되고, 무엇이 아직 미검증인지"를 빠르게 파악하게 하는 것입니다.
 
 ## Baseline
-- 현재 프로젝트 버전은 `0.997`
+- 현재 프로젝트 버전은 `0.999`
 - 후속 작업의 기준선 문서는 `docs/baseline-0.9.92.md`
 - Windows GUI 빌드가 메인 타깃
 - Linux는 `Baepoks-Linuxs/TenRiff-0.5.0-linux-preview` 수준의 preview만 존재
@@ -70,7 +70,8 @@
   - `rect` / `circle` note shape
   - note border on/off
   - combo Y 조절
-  - judge line / note width / divider width / note height / LN body width 조절
+  - judge line / lane width / lane spacing / note width / divider width / 16K center gap / note height / LN body width 조절
+  - key mode별 개별 lane 폭과 lane 사이 간격을 각각 저장하고 미리보기/실플레이/ghost field에 같은 레이아웃 계산을 적용
   - osu!mania `ColumnLineWidth`를 읽어 lane divider 폭에 반영
   - `skin.lr2_resolution_mode`는 `auto / sd / hd / fhd`로 LR2 playskin 해상도 override 토큰을 저장
   - LR2 auto-detect는 asset 이름이 아니라 playskin `#DST_NOTE` 좌표 범위를 기준으로 SD/HD/FHD를 판정
@@ -79,8 +80,9 @@
 - Judge:
   - 기본 `GOOD` 범위는 `75ms`
   - 기본 `BAD` 범위는 `340ms`
-  - 간접 미스(auto-miss)는 별도 `POOR` 없이 `BAD`로 접힘
-  - 간접 미스 범위도 내부적으로 `BAD`와 같은 `340ms`
+  - note-consuming 실패(auto-miss, 너무 빨리 눌러 노트를 소모한 경우, hold break/tail miss)는 `BAD`
+  - 너무 이른 non-consuming 입력은 LR2 스타일 `POOR`로 처리되고, 결과/리플레이/UI에 다시 표시됨
+  - `POOR`는 콤보를 끊지 않고 점수/정확도 집계에는 들어가지 않으며, gauge는 전용 `PR` 감소값을 사용
   - tail release timing은 osu hold와 BMS `#LNMODE 2` charge note에만 적용
 - Graphics:
   - resolution preset (`720p`, `1080p`, `qhd`, `native`)
@@ -125,12 +127,12 @@
 
 ## Runtime / Packaging Rules
 - 새 사용자 프로필은 자동 생성
-- 마지막으로 스테이징된 배포 패키지는 `Baepoks/TenRiff-0.997`
+- 마지막으로 스테이징된 배포 패키지는 `Baepoks/TenRiff-0.999`
 - 배포 패키지에는 `Songs`를 넣지 않음
 - 배포 패키지는 메뉴 BGM용 `Mainmusic/` 런타임 자산을 함께 포함
 - 배포 업데이트 요청 시 built artifacts만 `Baepoks/`에 넣는 규칙
 - source-only/public handoff 요청 시 먼저 include/exclude 리스트를 작성하는 것이 사용자 선호
-- 마지막으로 스테이징된 공개 소스 패키지는 `opensource-Tenriff-source/TenRiff-0.997-source`처럼 버전별로 별도 스테이징
+- 마지막으로 스테이징된 공개 소스 패키지는 `opensource-Tenriff-source/TenRiff-0.999-source`처럼 버전별로 별도 스테이징
 - 공개 소스 패키지를 갱신할 때는 문서만 맞추는 것으로 끝내지 않고, 스테이징된 소스 패키지 폴더 자체에서 standalone configure/build/test가 되는지까지 확인하는 규칙
 
 ## Config / Profile Reality
@@ -160,9 +162,9 @@
 - `cmake --build build --config Release --target bms_parser_tests`
 - `cmake --build build --config Release --target bms_realworld_smoke`
 - `ctest --test-dir build -C Release --output-on-failure -R bms_parser_tests`
-- `cmake -S opensource-Tenriff-source/TenRiff-0.997-source -B opensource-Tenriff-source/TenRiff-0.997-source/build-check -G "Visual Studio 17 2022" -A x64`
-- `cmake --build opensource-Tenriff-source/TenRiff-0.997-source/build-check --config Release --target bms_parser_tests`
-- `opensource-Tenriff-source/TenRiff-0.997-source/build-check/Release/bms_parser_tests.exe`
+- `cmake -S opensource-Tenriff-source/TenRiff-0.999-source -B opensource-Tenriff-source/TenRiff-0.999-source/build-check -G "Visual Studio 17 2022" -A x64`
+- `cmake --build opensource-Tenriff-source/TenRiff-0.999-source/build-check --config Release --target bms_parser_tests`
+- `opensource-Tenriff-source/TenRiff-0.999-source/build-check/Release/bms_parser_tests.exe`
 
 ## Still Manual-Validation Heavy
 - renderer layout 변경 뒤에는 `docs/ui-audit-checklist.md` 기준으로 `1080p`, `720p windowed`, `Performance HUD on/off` 전수 확인 필요

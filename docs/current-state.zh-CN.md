@@ -3,7 +3,7 @@
 这份文档是下一位 agent 或新任务接手时应该最先阅读的当前状态文档。目标是快速说明“这个项目现在是什么、应该先看哪里、还有哪些内容尚未验证”。
 
 ## 基线
-- 当前项目版本为 `0.997`
+- 当前项目版本为 `0.999`
 - 后续工作的基准文档是 [`docs/baseline-0.9.92.zh-CN.md`](baseline-0.9.92.zh-CN.md)
 - Windows GUI 构建是主目标
 - Linux 仅存在 [`Baepoks-Linuxs/TenRiff-0.5.0-linux-preview`](../Baepoks-Linuxs/TenRiff-0.5.0-linux-preview) 级别的 preview
@@ -70,7 +70,8 @@
   - `rect` / `circle` note shape
   - note border 开关
   - combo Y 调整
-  - judge line / note width / divider width / note height 调整
+  - judge line / lane width / lane spacing / note width / divider width / 16K center gap / note height 调整
+  - 会按 key mode 保存单独的 lane 宽度数组和 lane 间距数组，并在 preview、实际 gameplay、ghost field 中共用同一套布局计算
   - 读取 osu!mania `ColumnLineWidth` 并反映到 lane divider 宽度
   - `skin.lr2_resolution_mode` 以 `auto / sd / hd / fhd` 保存 LR2 playskin 的分辨率 override token
   - LR2 auto-detect 以 playskin `#DST_NOTE` 的坐标范围而不是 asset 名称来判断 SD/HD/FHD family
@@ -79,8 +80,9 @@
 - Judge：
   - 默认 `GOOD` 范围为 `75ms`
   - 默认 `BAD` 范围为 `340ms`
-  - indirect miss 不再单独显示 `POOR`，而是折叠到 `BAD`
-  - indirect miss 范围在内部也固定为 `340ms`
+  - 会真正消耗 note 的失败（auto-miss、过早吃掉 note、hold break / tail miss）仍然记为 `BAD`
+  - 非消耗型的超早输入会按 LR2 风格记为 `POOR`，并重新出现在结果 / replay / UI 中
+  - `POOR` 不会断 combo，不计入 score / accuracy 总数，并使用独立的 `PR` gauge 损失值
   - tail release timing 仅适用于 osu hold 与 BMS `#LNMODE 2` charge note
 - Graphics：
   - 分辨率预设（`720p`、`1080p`、`qhd`、`native`）
@@ -125,12 +127,12 @@
 
 ## 运行时 / 打包规则
 - 新用户 profile 会自动创建
-- 最近一次 staged 的发布包是 `Baepoks/TenRiff-0.997`
+- 最近一次 staged 的发布包是 `Baepoks/TenRiff-0.999`
 - 发布包不包含 `Songs`
 - 发布包会同时包含用于菜单 BGM 的 `Mainmusic/` 运行时资源
 - 发布更新时，只把已构建的产物放进 `Baepoks/`
 - 如果请求 source-only/public handoff，用户偏好是先写 include/exclude 列表
-- 最近一次 staged 的公开源代码包会像 `opensource-Tenriff-source/TenRiff-0.997-source` 这样按版本单独 staging
+- 最近一次 staged 的公开源代码包会像 `opensource-Tenriff-source/TenRiff-0.999-source` 这样按版本单独 staging
 - 刷新公开源代码包时，不能只同步文档和文件本身，还要确认 staged 出来的源码包目录可以独立完成 configure/build，并能直接运行核心测试二进制
 
 ## 配置 / Profile 现实情况
@@ -160,9 +162,9 @@
 - `cmake --build build --config Release --target bms_parser_tests`
 - `cmake --build build --config Release --target bms_realworld_smoke`
 - `ctest --test-dir build -C Release --output-on-failure -R bms_parser_tests`
-- `cmake -S opensource-Tenriff-source/TenRiff-0.997-source -B opensource-Tenriff-source/TenRiff-0.997-source/build-check -G "Visual Studio 17 2022" -A x64`
-- `cmake --build opensource-Tenriff-source/TenRiff-0.997-source/build-check --config Release --target bms_parser_tests`
-- `opensource-Tenriff-source/TenRiff-0.997-source/build-check/Release/bms_parser_tests.exe`
+- `cmake -S opensource-Tenriff-source/TenRiff-0.999-source -B opensource-Tenriff-source/TenRiff-0.999-source/build-check -G "Visual Studio 17 2022" -A x64`
+- `cmake --build opensource-Tenriff-source/TenRiff-0.999-source/build-check --config Release --target bms_parser_tests`
+- `opensource-Tenriff-source/TenRiff-0.999-source/build-check/Release/bms_parser_tests.exe`
 
 ## 仍然需要手动验证的地方
 - 在真实的 CJK-heavy 曲库上重现 Song Select 快速滚动崩溃

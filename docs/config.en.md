@@ -107,6 +107,9 @@ If a profile does not exist, it is created automatically on first launch.
   - `off | fr | sr`
 - `random_seed` (int)
 - `enable_osu_charts` (bool)
+- `ghost_battle_enabled` (bool)
+  - when `true`, TenRiff auto-loads the selected chart's best compatible replay for ghost comparison
+  - when `false`, normal gameplay stays single-field
 - `song_index_profile` (string)
   - `safe | fast`
   - `safe` is the default that prioritizes lower RAM high-water usage on large libraries
@@ -146,16 +149,29 @@ If a profile does not exist, it is created automatically on first launch.
   - vertical position ratio of the combo display inside the gameplay field
   - clamped to the `0.10..0.78` range
   - default value is `0.24`
+- `lane_width_scales` (object)
+  - per-key-mode arrays for individual lane-width scales
+  - each mode value is a number array with one entry per lane
+  - each value is clamped to the `0.50..1.75` range
 - `note_width_scale` (double)
   - width scale for note heads / tails
   - clamped to the `0.50..1.40` range
+- `lane_spacing_scales` (object)
+  - per-key-mode arrays for blank spacing between lanes
+  - each mode value is a number array with `(lane_count - 1)` entries
+  - each value is clamped to the `0.00..2.00` range
 - `note_height_scale` (double)
   - height scale for note heads / tails
   - clamped to the `0.50..4.00` range
 - `lane_divider_width_scale` (double)
-  - default scale for lane separator lines
+  - shared scale for the white lane separator lines
   - clamped to the `0.00..2.00` range
-  - native skin multiplies the default `1px` divider by this value, and osu skin multiplies it by parsed `ColumnLineWidth` when available
+  - applied uniformly across all key modes
+  - native skin multiplies the default `1px` divider by this value, and osu/lr2 skins also multiply any imported divider widths by it
+- `lane_center_gap_scale` (double)
+  - center-gap scale between the left and right halves of the 16K field
+  - clamped to the `0.00..2.00` range
+  - currently applied only to the `16k` layout
 - `hold_body_width_scale` (double)
   - width scale for long-note bodies
   - clamped to the `0.50..1.20` range
@@ -165,7 +181,10 @@ If a profile does not exist, it is created automatically on first launch.
 - `note_height_scales` (object)
   - per-key-mode `note_height_scale` overrides
 - `lane_divider_width_scales` (object)
-  - per-key-mode `lane_divider_width_scale` overrides
+  - legacy compatibility field
+  - the current runtime uses only the shared `lane_divider_width_scale`
+- `lane_center_gap_scales` (object)
+  - per-key-mode `lane_center_gap_scale` overrides
 - `lane_colors` (object)
   - per-key-mode lane color palettes
   - current default / persisted modes are `4k..10k` and `16k`

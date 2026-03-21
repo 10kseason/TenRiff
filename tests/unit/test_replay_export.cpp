@@ -61,6 +61,7 @@ TEST_CASE("replay export writes JSON with trace events") {
     replay.trace.events.push_back(ReplayEvent{1, InputState::Released, 200});
 
     replay.stats.counts.pg = 1;
+    replay.stats.counts.pr = 2;
     replay.stats.max_combo = 1;
     replay.stats.total_notes = 1;
     replay.stats.raw_score = 1645;
@@ -118,6 +119,7 @@ TEST_CASE("replay export writes JSON with trace events") {
     auto loaded_replay = load_replay_json(path.string());
     REQUIRE(loaded_replay.success());
     REQUIRE(loaded_replay.replay.has_value());
+    CHECK(loaded_replay.replay->stats.counts.pr == 2);
     CHECK(loaded_replay.replay->mode.key_mode == "6k");
     CHECK(loaded_replay.replay->mode.random == "super_random");
     REQUIRE(loaded_replay.replay->mode.random_seed.has_value());
@@ -148,6 +150,7 @@ TEST_CASE("result export writes JSON with replay reference") {
     result.score_multiplier = 0.50;
     result.final_score = 900;
     result.stats.counts.pg = 5;
+    result.stats.counts.pr = 3;
     result.stats.max_combo = 5;
     result.stats.total_notes = 5;
     result.stats.raw_score = 1800;
@@ -183,6 +186,7 @@ TEST_CASE("result export writes JSON with replay reference") {
     CHECK(parsed_result->mods.size() == 1u);
     CHECK(parsed_result->mods[0] == "full_short_notes");
     CHECK(parsed_result->stats.raw_score == 1800);
+    CHECK(parsed_result->stats.counts.pr == 3);
     CHECK(parsed_result->rate_multiplier == doctest::Approx(1.05));
     CHECK(parsed_result->score_multiplier == doctest::Approx(0.50));
     CHECK(parsed_result->final_score == 900);

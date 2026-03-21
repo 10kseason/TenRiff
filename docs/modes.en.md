@@ -13,6 +13,8 @@ This document summarizes the currently implemented mode system and random rules 
   "gauge": "normal",
   "random": "off",
   "random_seed": 0,
+  "enable_osu_charts": false,
+  "ghost_battle_enabled": true,
   "song_index_profile": "safe"
 }
 ```
@@ -23,6 +25,10 @@ This document summarizes the currently implemented mode system and random rules 
 - `gauge`: `normal | hard | easy`
 - `random`: `off | fr | sr`
 - `random_seed`: random fixed seed (`0` is also treated as a fixed value)
+- `enable_osu_charts`: `false | true`
+- `ghost_battle_enabled`: `false | true`
+  - `true`: auto-load the selected chart's best compatible replay for ghost comparison
+  - `false`: keep normal gameplay in the single-field layout
 - `song_index_profile`: `safe | fast`
   - `safe`: the default that prioritizes lowering large-library RAM high-water usage
   - `fast`: the optional choice that aims for faster reindexing in 32GB+ environments

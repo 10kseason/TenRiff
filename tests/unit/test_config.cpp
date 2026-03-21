@@ -63,6 +63,9 @@ constexpr double kCurrentEasyGr = 0.20;
 constexpr double kCurrentHardBd = -10.0;
 constexpr double kCurrentNormalBd = -6.25;
 constexpr double kCurrentEasyBd = -4.1;
+constexpr double kCurrentHardPr = -2.0;
+constexpr double kCurrentNormalPr = -2.0;
+constexpr double kCurrentEasyPr = -1.6;
 
 }  // namespace
 
@@ -86,17 +89,17 @@ TEST_CASE("config defaults prefer 44100 Hz audio") {
     CHECK(config.gauge.hard.gr == doctest::Approx(kCurrentHardGr));
     CHECK(config.gauge.hard.gd == doctest::Approx(kCurrentHardGd));
     CHECK(config.gauge.hard.bd == doctest::Approx(kCurrentHardBd));
-    CHECK(config.gauge.hard.pr == doctest::Approx(kCurrentHardBd));
+    CHECK(config.gauge.hard.pr == doctest::Approx(kCurrentHardPr));
     CHECK(config.gauge.normal.pg == doctest::Approx(kCurrentNormalPg));
     CHECK(config.gauge.normal.gr == doctest::Approx(kCurrentNormalGr));
     CHECK(config.gauge.normal.gd == doctest::Approx(kCurrentNormalGd));
     CHECK(config.gauge.normal.bd == doctest::Approx(kCurrentNormalBd));
-    CHECK(config.gauge.normal.pr == doctest::Approx(kCurrentNormalBd));
+    CHECK(config.gauge.normal.pr == doctest::Approx(kCurrentNormalPr));
     CHECK(config.gauge.easy.pg == doctest::Approx(kCurrentEasyPg));
     CHECK(config.gauge.easy.gr == doctest::Approx(kCurrentEasyGr));
     CHECK(config.gauge.easy.gd == doctest::Approx(kCurrentEasyGd));
     CHECK(config.gauge.easy.bd == doctest::Approx(kCurrentEasyBd));
-    CHECK(config.gauge.easy.pr == doctest::Approx(kCurrentEasyBd));
+    CHECK(config.gauge.easy.pr == doctest::Approx(kCurrentEasyPr));
     CHECK(config.judge.gd_ms == doctest::Approx(75.0));
     CHECK(config.judge.bd_ms == doctest::Approx(340.0));
     CHECK(config.judge.indirect_miss_ms == doctest::Approx(340.0));
@@ -117,6 +120,14 @@ TEST_CASE("config defaults prefer 44100 Hz audio") {
     CHECK(config.skin.note_height_scale == doctest::Approx(1.80));
     CHECK(config.skin.lane_divider_width_scale == doctest::Approx(1.0));
     CHECK(config.skin.hold_body_width_scale == doctest::Approx(0.60));
+    const auto default_lane_widths_10k = tenriff::config::resolved_skin_lane_width_scales(config.skin, "10k");
+    REQUIRE(default_lane_widths_10k.size() == 10u);
+    CHECK(default_lane_widths_10k[0] == doctest::Approx(tenriff::config::kLaneWidthScaleDefault));
+    CHECK(default_lane_widths_10k[9] == doctest::Approx(tenriff::config::kLaneWidthScaleDefault));
+    const auto default_lane_spacing_10k = tenriff::config::resolved_skin_lane_spacing_scales(config.skin, "10k");
+    REQUIRE(default_lane_spacing_10k.size() == 9u);
+    CHECK(default_lane_spacing_10k[0] == doctest::Approx(tenriff::config::kLaneSpacingScaleDefault));
+    CHECK(default_lane_spacing_10k[8] == doctest::Approx(tenriff::config::kLaneSpacingScaleDefault));
     CHECK(config.ui.language == "en");
     CHECK(config.ui.result_tail_ms == doctest::Approx(3000.0));
     CHECK(config.ui.favorite_chart_keys.empty());
@@ -567,7 +578,7 @@ TEST_CASE("config load normalizes invalid lr2 resolution mode") {
     CHECK(result.config.skin.lr2_resolution_mode == "auto");
 }
 
-TEST_CASE("config save and load preserve lane divider width scaling") {
+TEST_CASE("config save and load use shared lane divider width scaling") {
     TempDirGuard temp;
     temp.path = make_temp_dir();
     REQUIRE_FALSE(temp.path.empty());
@@ -589,7 +600,7 @@ TEST_CASE("config save and load preserve lane divider width scaling") {
     const auto result = loader.load_profile("profiles/test");
     REQUIRE(result.success());
     CHECK(result.config.skin.lane_divider_width_scale == doctest::Approx(0.75));
-    CHECK(tenriff::config::resolved_skin_lane_divider_width_scale(result.config.skin, "10k") == doctest::Approx(1.35));
+    CHECK(tenriff::config::resolved_skin_lane_divider_width_scale(result.config.skin, "10k") == doctest::Approx(0.75));
     CHECK(tenriff::config::resolved_skin_lane_divider_width_scale(result.config.skin, "7k") == doctest::Approx(0.75));
 }
 
@@ -695,13 +706,17 @@ TEST_CASE("config save and load preserve skin gameplay settings") {
     config.skin.hold_tail_taper_enabled = true;
     config.skin.judgement_line_position = 0.76;
     config.skin.combo_position = 0.52;
+    config.skin.lane_width_scales["4k"] = {0.75, 1.10, 1.10, 0.75};
     config.skin.note_width_scale = 1.15;
+    config.skin.lane_spacing_scales["4k"] = {0.10, 0.25, 0.10};
     config.skin.hold_body_width_scale = 1.10;
     config.skin.note_height_scale = 1.35;
+    config.skin.lane_center_gap_scale = 0.25;
     config.skin.note_width_scales["4k"] = 0.85;
     config.skin.note_width_scales["16k"] = 0.65;
     config.skin.note_height_scales["4k"] = 1.20;
     config.skin.note_height_scales["16k"] = 1.70;
+    config.skin.lane_center_gap_scales["16k"] = 1.10;
     config.skin.lane_colors["4k"] = {"rose", "gold", "gold", "rose"};
     config.skin.lane_colors["5k"] = {"rose", "mint", "gold", "azure", "ice"};
     config.skin.lane_colors["16k"] = {"rose", "mint", "gold", "azure", "ice", "teal", "violet", "orange",
@@ -722,15 +737,26 @@ TEST_CASE("config save and load preserve skin gameplay settings") {
     CHECK(result.config.skin.hold_tail_taper_enabled);
     CHECK(result.config.skin.judgement_line_position == doctest::Approx(0.76));
     CHECK(result.config.skin.combo_position == doctest::Approx(0.52));
+    const auto saved_lane_widths_4k = tenriff::config::resolved_skin_lane_width_scales(result.config.skin, "4k");
+    REQUIRE(saved_lane_widths_4k.size() == 4u);
+    CHECK(saved_lane_widths_4k[0] == doctest::Approx(0.75));
+    CHECK(saved_lane_widths_4k[1] == doctest::Approx(1.10));
     CHECK(result.config.skin.note_width_scale == doctest::Approx(1.15));
+    const auto saved_lane_spacing_4k = tenriff::config::resolved_skin_lane_spacing_scales(result.config.skin, "4k");
+    REQUIRE(saved_lane_spacing_4k.size() == 3u);
+    CHECK(saved_lane_spacing_4k[0] == doctest::Approx(0.10));
+    CHECK(saved_lane_spacing_4k[1] == doctest::Approx(0.25));
     CHECK(result.config.skin.hold_body_width_scale == doctest::Approx(1.10));
     CHECK(result.config.skin.note_height_scale == doctest::Approx(1.35));
+    CHECK(result.config.skin.lane_center_gap_scale == doctest::Approx(0.25));
     CHECK(tenriff::config::resolved_skin_note_width_scale(result.config.skin, "4k") == doctest::Approx(0.85));
     CHECK(tenriff::config::resolved_skin_note_width_scale(result.config.skin, "16k") == doctest::Approx(0.65));
     CHECK(tenriff::config::resolved_skin_note_width_scale(result.config.skin, "10k") == doctest::Approx(1.15));
     CHECK(tenriff::config::resolved_skin_note_height_scale(result.config.skin, "4k") == doctest::Approx(1.20));
     CHECK(tenriff::config::resolved_skin_note_height_scale(result.config.skin, "16k") == doctest::Approx(1.70));
     CHECK(tenriff::config::resolved_skin_note_height_scale(result.config.skin, "10k") == doctest::Approx(1.35));
+    CHECK(tenriff::config::resolved_skin_lane_center_gap_scale(result.config.skin, "16k") == doctest::Approx(1.10));
+    CHECK(tenriff::config::resolved_skin_lane_center_gap_scale(result.config.skin, "10k") == doctest::Approx(0.25));
     const auto saved_4k = tenriff::config::resolved_skin_lane_colors(result.config.skin, "4k");
     REQUIRE(saved_4k.size() == 4u);
     CHECK(saved_4k[0] == "rose");
@@ -762,15 +788,27 @@ TEST_CASE("config clamps skin gameplay settings into supported range") {
                "    \"note_border_enabled\": false,\n"
                "    \"judgement_line_position\": 1.5,\n"
                "    \"combo_position\": 9.0,\n"
+               "    \"lane_width_scales\": {\n"
+               "      \"4k\": [0.1, 5.0, 1.2],\n"
+               "      \"16k\": [9.0]\n"
+               "    },\n"
                "    \"note_width_scale\": 9.0,\n"
+               "    \"lane_spacing_scales\": {\n"
+               "      \"4k\": [0.1, 9.0, -1.0],\n"
+               "      \"16k\": [9.0]\n"
+               "    },\n"
                "    \"hold_body_width_scale\": 9.0,\n"
                "    \"note_height_scale\": 0.1,\n"
+               "    \"lane_center_gap_scale\": 9.0,\n"
                "    \"note_width_scales\": {\n"
                "      \"4k\": 0.1,\n"
                "      \"16k\": 9.0\n"
                "    },\n"
                "    \"note_height_scales\": {\n"
                "      \"5k\": 0.1,\n"
+               "      \"16k\": 9.0\n"
+               "    },\n"
+               "    \"lane_center_gap_scales\": {\n"
                "      \"16k\": 9.0\n"
                "    },\n"
                "    \"lane_colors\": {\n"
@@ -795,9 +833,20 @@ TEST_CASE("config clamps skin gameplay settings into supported range") {
     CHECK(result.config.skin.judgement_line_position ==
           doctest::Approx(tenriff::config::kJudgementLinePositionMax));
     CHECK(result.config.skin.combo_position == doctest::Approx(tenriff::config::kComboPositionMax));
+    const auto clamped_lane_widths_4k = tenriff::config::resolved_skin_lane_width_scales(result.config.skin, "4k");
+    REQUIRE(clamped_lane_widths_4k.size() == 4u);
+    CHECK(clamped_lane_widths_4k[0] == doctest::Approx(tenriff::config::kLaneWidthScaleMin));
+    CHECK(clamped_lane_widths_4k[1] == doctest::Approx(tenriff::config::kLaneWidthScaleMax));
+    CHECK(clamped_lane_widths_4k[3] == doctest::Approx(tenriff::config::kLaneWidthScaleDefault));
     CHECK(result.config.skin.note_width_scale == doctest::Approx(tenriff::config::kNoteWidthScaleMax));
+    const auto clamped_lane_spacing_4k = tenriff::config::resolved_skin_lane_spacing_scales(result.config.skin, "4k");
+    REQUIRE(clamped_lane_spacing_4k.size() == 3u);
+    CHECK(clamped_lane_spacing_4k[0] == doctest::Approx(0.10));
+    CHECK(clamped_lane_spacing_4k[1] == doctest::Approx(tenriff::config::kLaneSpacingScaleMax));
+    CHECK(clamped_lane_spacing_4k[2] == doctest::Approx(tenriff::config::kLaneSpacingScaleMin));
     CHECK(result.config.skin.hold_body_width_scale == doctest::Approx(tenriff::config::kHoldBodyWidthScaleMax));
     CHECK(result.config.skin.note_height_scale == doctest::Approx(tenriff::config::kNoteHeightScaleMin));
+    CHECK(result.config.skin.lane_center_gap_scale == doctest::Approx(tenriff::config::kLaneCenterGapScaleMax));
     CHECK(tenriff::config::resolved_skin_note_width_scale(result.config.skin, "4k") ==
           doctest::Approx(tenriff::config::kNoteWidthScaleMin));
     CHECK(tenriff::config::resolved_skin_note_width_scale(result.config.skin, "16k") ==
@@ -806,6 +855,8 @@ TEST_CASE("config clamps skin gameplay settings into supported range") {
           doctest::Approx(tenriff::config::kNoteHeightScaleMin));
     CHECK(tenriff::config::resolved_skin_note_height_scale(result.config.skin, "16k") ==
           doctest::Approx(tenriff::config::kNoteHeightScaleMax));
+    CHECK(tenriff::config::resolved_skin_lane_center_gap_scale(result.config.skin, "16k") ==
+          doctest::Approx(tenriff::config::kLaneCenterGapScaleMax));
     const auto clamped_5k = tenriff::config::resolved_skin_lane_colors(result.config.skin, "5k");
     REQUIRE(clamped_5k.size() == 5u);
     CHECK(clamped_5k[0] == "ice");
@@ -917,17 +968,17 @@ TEST_CASE("runtime migration upgrades legacy default gauge deltas to the harsher
     CHECK(config.gauge.hard.gr == doctest::Approx(kCurrentHardGr));
     CHECK(config.gauge.hard.gd == doctest::Approx(kCurrentHardGd));
     CHECK(config.gauge.hard.bd == doctest::Approx(kCurrentHardBd));
-    CHECK(config.gauge.hard.pr == doctest::Approx(kCurrentHardBd));
+    CHECK(config.gauge.hard.pr == doctest::Approx(kCurrentHardPr));
     CHECK(config.gauge.normal.pg == doctest::Approx(kCurrentNormalPg));
     CHECK(config.gauge.normal.gr == doctest::Approx(kCurrentNormalGr));
     CHECK(config.gauge.normal.gd == doctest::Approx(kCurrentNormalGd));
     CHECK(config.gauge.normal.bd == doctest::Approx(kCurrentNormalBd));
-    CHECK(config.gauge.normal.pr == doctest::Approx(kCurrentNormalBd));
+    CHECK(config.gauge.normal.pr == doctest::Approx(kCurrentNormalPr));
     CHECK(config.gauge.easy.pg == doctest::Approx(kCurrentEasyPg));
     CHECK(config.gauge.easy.gr == doctest::Approx(kCurrentEasyGr));
     CHECK(config.gauge.easy.gd == doctest::Approx(kCurrentEasyGd));
     CHECK(config.gauge.easy.bd == doctest::Approx(kCurrentEasyBd));
-    CHECK(config.gauge.easy.pr == doctest::Approx(kCurrentEasyBd));
+    CHECK(config.gauge.easy.pr == doctest::Approx(kCurrentEasyPr));
 }
 
 TEST_CASE("runtime migration upgrades the previous gauge defaults to the latest recovery and bd/pr losses") {
@@ -944,17 +995,17 @@ TEST_CASE("runtime migration upgrades the previous gauge defaults to the latest 
     CHECK(config.gauge.hard.gr == doctest::Approx(kCurrentHardGr));
     CHECK(config.gauge.hard.gd == doctest::Approx(kCurrentHardGd));
     CHECK(config.gauge.hard.bd == doctest::Approx(kCurrentHardBd));
-    CHECK(config.gauge.hard.pr == doctest::Approx(kCurrentHardBd));
+    CHECK(config.gauge.hard.pr == doctest::Approx(kCurrentHardPr));
     CHECK(config.gauge.normal.pg == doctest::Approx(kCurrentNormalPg));
     CHECK(config.gauge.normal.gr == doctest::Approx(kCurrentNormalGr));
     CHECK(config.gauge.normal.gd == doctest::Approx(kCurrentNormalGd));
     CHECK(config.gauge.normal.bd == doctest::Approx(kCurrentNormalBd));
-    CHECK(config.gauge.normal.pr == doctest::Approx(kCurrentNormalBd));
+    CHECK(config.gauge.normal.pr == doctest::Approx(kCurrentNormalPr));
     CHECK(config.gauge.easy.pg == doctest::Approx(kCurrentEasyPg));
     CHECK(config.gauge.easy.gr == doctest::Approx(kCurrentEasyGr));
     CHECK(config.gauge.easy.gd == doctest::Approx(kCurrentEasyGd));
     CHECK(config.gauge.easy.bd == doctest::Approx(kCurrentEasyBd));
-    CHECK(config.gauge.easy.pr == doctest::Approx(kCurrentEasyBd));
+    CHECK(config.gauge.easy.pr == doctest::Approx(kCurrentEasyPr));
 }
 
 TEST_CASE("runtime migration upgrades the immediate prior gauge defaults to the latest recovery and bd/pr losses") {
@@ -968,11 +1019,11 @@ TEST_CASE("runtime migration upgrades the immediate prior gauge defaults to the 
 
     CHECK(changed);
     CHECK(config.gauge.hard.bd == doctest::Approx(kCurrentHardBd));
-    CHECK(config.gauge.hard.pr == doctest::Approx(kCurrentHardBd));
+    CHECK(config.gauge.hard.pr == doctest::Approx(kCurrentHardPr));
     CHECK(config.gauge.normal.bd == doctest::Approx(kCurrentNormalBd));
-    CHECK(config.gauge.normal.pr == doctest::Approx(kCurrentNormalBd));
+    CHECK(config.gauge.normal.pr == doctest::Approx(kCurrentNormalPr));
     CHECK(config.gauge.easy.bd == doctest::Approx(kCurrentEasyBd));
-    CHECK(config.gauge.easy.pr == doctest::Approx(kCurrentEasyBd));
+    CHECK(config.gauge.easy.pr == doctest::Approx(kCurrentEasyPr));
 }
 
 TEST_CASE("runtime migration upgrades the last shipped gauge defaults to the latest recovery and bd/pr losses") {
@@ -989,11 +1040,11 @@ TEST_CASE("runtime migration upgrades the last shipped gauge defaults to the lat
     CHECK(config.gauge.normal.pg == doctest::Approx(kCurrentNormalPg));
     CHECK(config.gauge.easy.pg == doctest::Approx(kCurrentEasyPg));
     CHECK(config.gauge.hard.bd == doctest::Approx(kCurrentHardBd));
-    CHECK(config.gauge.hard.pr == doctest::Approx(kCurrentHardBd));
+    CHECK(config.gauge.hard.pr == doctest::Approx(kCurrentHardPr));
     CHECK(config.gauge.normal.bd == doctest::Approx(kCurrentNormalBd));
-    CHECK(config.gauge.normal.pr == doctest::Approx(kCurrentNormalBd));
+    CHECK(config.gauge.normal.pr == doctest::Approx(kCurrentNormalPr));
     CHECK(config.gauge.easy.bd == doctest::Approx(kCurrentEasyBd));
-    CHECK(config.gauge.easy.pr == doctest::Approx(kCurrentEasyBd));
+    CHECK(config.gauge.easy.pr == doctest::Approx(kCurrentEasyPr));
 }
 
 TEST_CASE("runtime migration upgrades the interim bd/pr-only gauge defaults to the latest recovery table") {
@@ -1028,11 +1079,11 @@ TEST_CASE("runtime migration upgrades the immediate prior shared normal and easy
 
     CHECK(changed);
     CHECK(config.gauge.hard.bd == doctest::Approx(kCurrentHardBd));
-    CHECK(config.gauge.hard.pr == doctest::Approx(kCurrentHardBd));
+    CHECK(config.gauge.hard.pr == doctest::Approx(kCurrentHardPr));
     CHECK(config.gauge.normal.bd == doctest::Approx(kCurrentNormalBd));
-    CHECK(config.gauge.normal.pr == doctest::Approx(kCurrentNormalBd));
+    CHECK(config.gauge.normal.pr == doctest::Approx(kCurrentNormalPr));
     CHECK(config.gauge.easy.bd == doctest::Approx(kCurrentEasyBd));
-    CHECK(config.gauge.easy.pr == doctest::Approx(kCurrentEasyBd));
+    CHECK(config.gauge.easy.pr == doctest::Approx(kCurrentEasyPr));
 }
 
 TEST_CASE("runtime migration upgrades the previous release bad penalties to the latest table") {
@@ -1046,11 +1097,11 @@ TEST_CASE("runtime migration upgrades the previous release bad penalties to the 
 
     CHECK(changed);
     CHECK(config.gauge.hard.bd == doctest::Approx(kCurrentHardBd));
-    CHECK(config.gauge.hard.pr == doctest::Approx(kCurrentHardBd));
+    CHECK(config.gauge.hard.pr == doctest::Approx(kCurrentHardPr));
     CHECK(config.gauge.normal.bd == doctest::Approx(kCurrentNormalBd));
-    CHECK(config.gauge.normal.pr == doctest::Approx(kCurrentNormalBd));
+    CHECK(config.gauge.normal.pr == doctest::Approx(kCurrentNormalPr));
     CHECK(config.gauge.easy.bd == doctest::Approx(kCurrentEasyBd));
-    CHECK(config.gauge.easy.pr == doctest::Approx(kCurrentEasyBd));
+    CHECK(config.gauge.easy.pr == doctest::Approx(kCurrentEasyPr));
 }
 
 TEST_CASE("runtime migration upgrades the former current bad penalties to the latest table") {
@@ -1067,11 +1118,11 @@ TEST_CASE("runtime migration upgrades the former current bad penalties to the la
     CHECK(config.gauge.normal.pg == doctest::Approx(kCurrentNormalPg));
     CHECK(config.gauge.easy.pg == doctest::Approx(kCurrentEasyPg));
     CHECK(config.gauge.hard.bd == doctest::Approx(kCurrentHardBd));
-    CHECK(config.gauge.hard.pr == doctest::Approx(kCurrentHardBd));
+    CHECK(config.gauge.hard.pr == doctest::Approx(kCurrentHardPr));
     CHECK(config.gauge.normal.bd == doctest::Approx(kCurrentNormalBd));
-    CHECK(config.gauge.normal.pr == doctest::Approx(kCurrentNormalBd));
+    CHECK(config.gauge.normal.pr == doctest::Approx(kCurrentNormalPr));
     CHECK(config.gauge.easy.bd == doctest::Approx(kCurrentEasyBd));
-    CHECK(config.gauge.easy.pr == doctest::Approx(kCurrentEasyBd));
+    CHECK(config.gauge.easy.pr == doctest::Approx(kCurrentEasyPr));
 }
 
 TEST_CASE("runtime migration upgrades the previous current bad penalties to the latest table") {
@@ -1085,11 +1136,11 @@ TEST_CASE("runtime migration upgrades the previous current bad penalties to the 
 
     CHECK(changed);
     CHECK(config.gauge.hard.bd == doctest::Approx(kCurrentHardBd));
-    CHECK(config.gauge.hard.pr == doctest::Approx(kCurrentHardBd));
+    CHECK(config.gauge.hard.pr == doctest::Approx(kCurrentHardPr));
     CHECK(config.gauge.normal.bd == doctest::Approx(kCurrentNormalBd));
-    CHECK(config.gauge.normal.pr == doctest::Approx(kCurrentNormalBd));
+    CHECK(config.gauge.normal.pr == doctest::Approx(kCurrentNormalPr));
     CHECK(config.gauge.easy.bd == doctest::Approx(kCurrentEasyBd));
-    CHECK(config.gauge.easy.pr == doctest::Approx(kCurrentEasyBd));
+    CHECK(config.gauge.easy.pr == doctest::Approx(kCurrentEasyPr));
 }
 
 TEST_CASE("runtime migration upgrades the most recent shipped gauge defaults to the latest recovery table") {
@@ -1127,11 +1178,11 @@ TEST_CASE("runtime migration upgrades the immediate previous gauge defaults to t
 
     CHECK(changed);
     CHECK(config.gauge.hard.bd == doctest::Approx(kCurrentHardBd));
-    CHECK(config.gauge.hard.pr == doctest::Approx(kCurrentHardBd));
+    CHECK(config.gauge.hard.pr == doctest::Approx(kCurrentHardPr));
     CHECK(config.gauge.normal.bd == doctest::Approx(kCurrentNormalBd));
-    CHECK(config.gauge.normal.pr == doctest::Approx(kCurrentNormalBd));
+    CHECK(config.gauge.normal.pr == doctest::Approx(kCurrentNormalPr));
     CHECK(config.gauge.easy.bd == doctest::Approx(kCurrentEasyBd));
-    CHECK(config.gauge.easy.pr == doctest::Approx(kCurrentEasyBd));
+    CHECK(config.gauge.easy.pr == doctest::Approx(kCurrentEasyPr));
 }
 
 TEST_CASE("runtime migration upgrades the immediate prior normal and easy penalties to the latest table") {
@@ -1145,11 +1196,11 @@ TEST_CASE("runtime migration upgrades the immediate prior normal and easy penalt
 
     CHECK(changed);
     CHECK(config.gauge.hard.bd == doctest::Approx(kCurrentHardBd));
-    CHECK(config.gauge.hard.pr == doctest::Approx(kCurrentHardBd));
+    CHECK(config.gauge.hard.pr == doctest::Approx(kCurrentHardPr));
     CHECK(config.gauge.normal.bd == doctest::Approx(kCurrentNormalBd));
-    CHECK(config.gauge.normal.pr == doctest::Approx(kCurrentNormalBd));
+    CHECK(config.gauge.normal.pr == doctest::Approx(kCurrentNormalPr));
     CHECK(config.gauge.easy.bd == doctest::Approx(kCurrentEasyBd));
-    CHECK(config.gauge.easy.pr == doctest::Approx(kCurrentEasyBd));
+    CHECK(config.gauge.easy.pr == doctest::Approx(kCurrentEasyPr));
 }
 
 TEST_CASE("runtime migration upgrades the immediate prior great recovery table") {

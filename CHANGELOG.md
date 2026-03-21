@@ -2,6 +2,35 @@
 
 TenRiff의 사용자/배포 관점에서 의미 있는 변경만 간단히 기록합니다.
 
+## [0.999] - 2026-03-22
+
+### Changed
+- 프로젝트 메타데이터와 핵심 현재 상태/로드맵 문서를 `0.999` 기준으로 갱신
+
+### Packaged
+- `build-dist` 기준 Windows 배포 스테이징과 공개 오픈소스 소스 스테이징을 `0.999` 라인으로 갱신
+
+## [0.9989] - 2026-03-21
+
+### Changed
+- `Options > Skins`에 `Target Gap`, `Lane Width`, `Lane Spacing`를 추가해 key mode별 개별 lane 폭과 lane 사이 간격을 직접 조절할 수 있도록 확장
+- skin preview, gameplay, ghost field가 모두 같은 per-lane/per-gap 레이아웃 계산을 사용하도록 정리
+- 판정 흐름을 LR2 기준으로 다시 분리해 note-consuming 실패는 `BAD`, 너무 이른 non-consuming 입력은 `POOR`로 처리하고, `POOR`를 결과/리플레이/UI에 다시 노출
+- 프로젝트 메타데이터와 핵심 현재 상태/로드맵 문서를 `0.9989` 기준으로 갱신
+
+### Packaged
+- `build-dist` 기준 Windows 배포 스테이징과 공개 오픈소스 소스 스테이징을 `0.9989` 라인으로 갱신
+
+## [0.998] - 2026-03-21
+
+### Changed
+- `Options > Skins`에 `16K Center Gap` 옵션을 추가해 16키 필드/미리보기에서 좌우 8레인 사이를 14K2S 스타일로 벌릴 수 있도록 정리
+- Keymap 화면의 캡처/안내 문구를 분리된 하단 footer 영역으로 옮겨, `Enter`로 키 바인딩 대기를 시작해도 lane 리스트가 재배치되지 않도록 수정
+- 프로젝트 메타데이터와 핵심 현재 상태/로드맵 문서를 `0.998` 기준으로 갱신
+
+### Packaged
+- `build-dist` 기준 Windows 배포 스테이징과 공개 오픈소스 소스 스테이징을 `0.998` 라인으로 갱신
+
 ## [0.997] - 2026-03-21
 
 ### Changed

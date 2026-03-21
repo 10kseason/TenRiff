@@ -33,7 +33,7 @@ TEST_CASE("gameplay engine scores a basic hit") {
     CHECK(engine.stats().max_combo == 1);
 }
 
-TEST_CASE("gameplay engine treats ghost input as bad") {
+TEST_CASE("gameplay engine treats LR2-style early non-consuming input as poor") {
     GameplayChart chart;
     chart.lane_count = 1;
     chart.duration_samples = 2000;
@@ -50,7 +50,8 @@ TEST_CASE("gameplay engine treats ghost input as bad") {
     GameplayEngine engine(chart, config);
     (void)engine.handle_input(1, InputState::Pressed, 100);
 
-    CHECK(engine.stats().counts.bd == 1);
+    CHECK(engine.stats().counts.bd == 0);
+    CHECK(engine.stats().counts.pr == 1);
     CHECK(engine.stats().combo == 0);
 }
 
@@ -73,9 +74,52 @@ TEST_CASE("gameplay engine raw score keeps earlier penalties after later hits") 
     (void)engine.handle_input(1, InputState::Pressed, 1000);
     engine.advance(1500);
 
-    CHECK(engine.stats().counts.bd == 1);
+    CHECK(engine.stats().counts.bd == 0);
+    CHECK(engine.stats().counts.pr == 1);
     CHECK(engine.stats().counts.pg == 1);
-    CHECK(engine.stats().raw_score == 800);
+    CHECK(engine.stats().raw_score == 1000);
+}
+
+TEST_CASE("gameplay engine ignores inputs that are too early for LR2 poor") {
+    GameplayChart chart;
+    chart.lane_count = 1;
+    chart.duration_samples = 4000;
+    chart.notes.push_back(NoteEvent{1, 2500, std::nullopt});
+
+    GameplayConfig config;
+    config.sample_rate = 1000;
+    config.rate = 1.0;
+    config.judge.pg_ms = 10.0;
+    config.judge.gr_ms = 20.0;
+    config.judge.gd_ms = 30.0;
+    config.judge.bd_ms = 40.0;
+
+    GameplayEngine engine(chart, config);
+    (void)engine.handle_input(1, InputState::Pressed, 1000);
+
+    CHECK(engine.stats().counts.bd == 0);
+    CHECK(engine.stats().counts.pr == 0);
+}
+
+TEST_CASE("gameplay engine does not add LR2 poor after consuming a miss as bad") {
+    GameplayChart chart;
+    chart.lane_count = 1;
+    chart.duration_samples = 3000;
+    chart.notes.push_back(NoteEvent{1, 1000, std::nullopt});
+
+    GameplayConfig config;
+    config.sample_rate = 1000;
+    config.rate = 1.0;
+    config.judge.pg_ms = 10.0;
+    config.judge.gr_ms = 20.0;
+    config.judge.gd_ms = 30.0;
+    config.judge.bd_ms = 40.0;
+
+    GameplayEngine engine(chart, config);
+    (void)engine.handle_input(1, InputState::Pressed, 1500);
+
+    CHECK(engine.stats().counts.bd == 1);
+    CHECK(engine.stats().counts.pr == 0);
 }
 
 TEST_CASE("gameplay engine scores hold tail based on release timing") {

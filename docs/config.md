@@ -107,6 +107,9 @@
   - `off | fr | sr`
 - `random_seed` (int)
 - `enable_osu_charts` (bool)
+- `ghost_battle_enabled` (bool)
+  - `true`면 선택한 차트의 최고 호환 replay를 자동 ghost 비교 대상으로 불러옴
+  - `false`면 일반 플레이를 단일 필드로 유지
 - `song_index_profile` (string)
   - `safe | fast`
   - `safe`는 대형 라이브러리에서 RAM high-water를 우선 줄이는 기본값
@@ -146,16 +149,29 @@
   - gameplay 필드 내부 콤보 표시의 세로 위치 비율
   - `0.10..0.78` 범위로 clamp
   - 기본값은 `0.24`
+- `lane_width_scales` (object)
+  - key mode별 개별 lane 폭 배율 배열
+  - 각 mode 값은 lane 수만큼의 number array
+  - 각 값은 `0.50..1.75` 범위로 clamp
 - `note_width_scale` (double)
   - 노트 머리/꼬리 가로 배율
   - `0.50..1.40` 범위로 clamp
+- `lane_spacing_scales` (object)
+  - key mode별 lane 사이 빈 간격 배율 배열
+  - 각 mode 값은 `(lane_count - 1)` 길이의 number array
+  - 각 값은 `0.00..2.00` 범위로 clamp
 - `note_height_scale` (double)
   - 노트 머리/꼬리 세로 배율
   - `0.50..4.00` 범위로 clamp
 - `lane_divider_width_scale` (double)
-  - lane 사이 separator 선의 기본 배율
+  - lane 사이 흰 separator 선의 공용 배율
   - `0.00..2.00` 범위로 clamp
-  - native skin은 기본 `1px` divider에 곱하고, osu skin은 `ColumnLineWidth`를 읽었을 때 그 값에 곱함
+  - 모든 key mode에 동일하게 적용됨
+  - native skin은 기본 `1px` divider에 곱하고, osu/lr2 skin은 가져온 divider 폭이 있을 때 그 값에도 곱함
+- `lane_center_gap_scale` (double)
+  - 16K 필드의 좌우 블록 사이 중앙 간격 배율
+  - `0.00..2.00` 범위로 clamp
+  - 현재는 `16k` 레이아웃에서만 적용됨
 - `hold_body_width_scale` (double)
   - 롱노트 몸통 가로 배율
   - `0.50..1.20` 범위로 clamp
@@ -165,7 +181,10 @@
 - `note_height_scales` (object)
   - key mode별 `note_height_scale` override
 - `lane_divider_width_scales` (object)
-  - key mode별 `lane_divider_width_scale` override
+  - 레거시 호환용 필드
+  - 현재 런타임은 공용 `lane_divider_width_scale`만 사용함
+- `lane_center_gap_scales` (object)
+  - key mode별 `lane_center_gap_scale` override
 - `lane_colors` (object)
   - key mode별 lane 색상 팔레트
   - 현재 기본/저장 대상 mode는 `4k..10k`, `16k`

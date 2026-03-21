@@ -105,9 +105,20 @@ TEST_CASE("default gauge penalties keep hard harshest while normal and easy stay
     CHECK(almost_equal(config.easy.bd, -4.1));
     CHECK(std::abs(config.hard.bd) > std::abs(config.normal.bd));
     CHECK(std::abs(config.normal.bd) > std::abs(config.easy.bd));
-    CHECK(almost_equal(config.hard.pr, config.hard.bd));
-    CHECK(almost_equal(config.normal.pr, config.normal.bd));
-    CHECK(almost_equal(config.easy.pr, config.easy.bd));
+    CHECK(almost_equal(config.hard.pr, -2.0));
+    CHECK(almost_equal(config.normal.pr, -2.0));
+    CHECK(almost_equal(config.easy.pr, -1.6));
+}
+
+TEST_CASE("hard gauge LR2 poor penalty softens at or below thirty percent") {
+    GaugeManager manager;
+    auto state = manager.initialState(GaugeType::Hard);
+    state.value = 30.0;
+
+    const auto result = manager.applyJudgement(state, Judgement::PR, 0.0);
+
+    CHECK_FALSE(result.game_over);
+    CHECK(almost_equal(state.value, 28.8, 1e-9));
 }
 
 TEST_CASE("good judgement refills by the configured amount") {

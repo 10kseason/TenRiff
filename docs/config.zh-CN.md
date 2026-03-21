@@ -107,6 +107,9 @@
   - `off | fr | sr`
 - `random_seed` (int)
 - `enable_osu_charts` (bool)
+- `ghost_battle_enabled` (bool)
+  - `true` 时会自动加载当前选中谱面的最佳兼容 replay 作为 ghost 对比
+  - `false` 时普通游玩保持单场地显示
 - `song_index_profile` (string)
   - `safe | fast`
   - `safe` 是优先降低大型曲库 RAM high-water 的默认值
@@ -146,16 +149,29 @@
   - gameplay field 内 combo 显示的垂直位置比例
   - 会被 clamp 在 `0.10..0.78`
   - 默认值为 `0.24`
+- `lane_width_scales` (object)
+  - 按 key mode 保存的单独 lane 宽度缩放数组
+  - 每个 mode 的值都是按 lane 数量排列的 number array
+  - 每个值都会被 clamp 到 `0.50..1.75`
 - `note_width_scale` (double)
   - note head/tail 的横向缩放
   - 会被 clamp 在 `0.50..1.40`
+- `lane_spacing_scales` (object)
+  - 按 key mode 保存的 lane 之间空白间距缩放数组
+  - 每个 mode 的值都是长度为 `(lane_count - 1)` 的 number array
+  - 每个值都会被 clamp 到 `0.00..2.00`
 - `note_height_scale` (double)
   - note head/tail 的纵向缩放
   - 会被 clamp 在 `0.50..4.00`
 - `lane_divider_width_scale` (double)
-  - lane 分隔线的基础宽度缩放
+  - 白色 lane 分隔线的共享宽度缩放
   - 会被 clamp 在 `0.00..2.00`
-  - native skin 会乘到默认 `1px` divider 上；osu skin 在读取到 `ColumnLineWidth` 时，会乘到该值上
+  - 会统一应用到所有 key mode
+  - native skin 会乘到默认 `1px` divider 上；osu/lr2 skin 如果带有导入 divider 宽度，也会一起乘上这个值
+- `lane_center_gap_scale` (double)
+  - 16K 场地左右两半之间的中央间隔缩放
+  - 会被 clamp 在 `0.00..2.00`
+  - 当前只对 `16k` 布局生效
 - `hold_body_width_scale` (double)
   - long note body 的横向缩放
   - 会被 clamp 在 `0.50..1.20`
@@ -165,7 +181,10 @@
 - `note_height_scales` (object)
   - 按 key mode 保存的 `note_height_scale` override
 - `lane_divider_width_scales` (object)
-  - 按 key mode 保存的 `lane_divider_width_scale` override
+  - 旧版兼容字段
+  - 当前运行时只使用共享的 `lane_divider_width_scale`
+- `lane_center_gap_scales` (object)
+  - 按 key mode 保存的 `lane_center_gap_scale` override
 - `lane_colors` (object)
   - 按 key mode 保存的 lane 颜色调色板
   - 当前默认/保存对象为 `4k..10k`、`16k`

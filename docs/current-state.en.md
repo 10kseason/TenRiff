@@ -3,7 +3,7 @@
 This is the document that the next agent or any new contributor should read first. Its goal is to quickly answer: "what is this project now, where should I look, and what is still unverified?"
 
 ## Baseline
-- Current project version: `0.997`
+- Current project version: `0.999`
 - Baseline companion document for follow-up work: `docs/baseline-0.9.92.en.md`
 - Windows GUI build is the main target
 - Linux exists only as a preview-level package at `Baepoks-Linuxs/TenRiff-0.5.0-linux-preview`
@@ -70,7 +70,8 @@ This is the document that the next agent or any new contributor should read firs
   - `rect` / `circle` note shape
   - note border on/off
   - combo Y adjustment
-  - judge line / note width / divider width / note height / LN body width adjustment
+  - judge line / lane width / lane spacing / note width / divider width / 16K center gap / note height / LN body width adjustment
+  - per-key-mode lane-width arrays and inter-lane spacing arrays are persisted and applied through the same layout math in preview, live gameplay, and the ghost field
   - osu!mania `ColumnLineWidth` is read and applied to lane divider width
   - `skin.lr2_resolution_mode` stores LR2 playskin resolution override tokens as `auto / sd / hd / fhd`
   - LR2 auto-detect uses the playskin `#DST_NOTE` coordinate range instead of asset names
@@ -79,8 +80,9 @@ This is the document that the next agent or any new contributor should read firs
 - Judge:
   - default `GOOD` window is `75ms`
   - default `BAD` window is `340ms`
-  - indirect misses are folded into `BAD` without a separate `POOR`
-  - indirect-miss range is internally the same `340ms` as `BAD`
+  - note-consuming failures (auto-miss, too-early consume, hold break / tail miss) stay `BAD`
+  - very early non-consuming presses are handled as LR2-style `POOR` and are visible again in result / replay / UI paths
+  - `POOR` preserves combo, stays out of score / accuracy totals, and uses dedicated `PR` gauge damage values
   - tail release timing applies only to osu hold and BMS `#LNMODE 2` charge notes
 - Graphics:
   - resolution presets (`720p`, `1080p`, `qhd`, `native`)
@@ -125,12 +127,12 @@ This is the document that the next agent or any new contributor should read firs
 
 ## Runtime / Packaging Rules
 - New user profiles are created automatically
-- The last staged distribution package is `Baepoks/TenRiff-0.997`
+- The last staged distribution package is `Baepoks/TenRiff-0.999`
 - Distribution packages do not include `Songs`
 - Distribution packages include the runtime `Mainmusic/` assets used for menu BGM
 - When updating distribution builds, only built artifacts should be copied into `Baepoks/`
 - If a source-only / public handoff is requested, the user's preference is to write an include/exclude list first
-- The last staged public source package is versioned separately, e.g. `opensource-Tenriff-source/TenRiff-0.997-source`
+- The last staged public source package is versioned separately, e.g. `opensource-Tenriff-source/TenRiff-0.999-source`
 - When refreshing a public source package, do not stop at syncing docs/files only; also verify that the staged source-package folder itself can configure, build, and run the core test binary standalone
 
 ## Config / Profile Reality
@@ -160,9 +162,9 @@ This is the document that the next agent or any new contributor should read firs
 - `cmake --build build --config Release --target bms_parser_tests`
 - `cmake --build build --config Release --target bms_realworld_smoke`
 - `ctest --test-dir build -C Release --output-on-failure -R bms_parser_tests`
-- `cmake -S opensource-Tenriff-source/TenRiff-0.997-source -B opensource-Tenriff-source/TenRiff-0.997-source/build-check -G "Visual Studio 17 2022" -A x64`
-- `cmake --build opensource-Tenriff-source/TenRiff-0.997-source/build-check --config Release --target bms_parser_tests`
-- `opensource-Tenriff-source/TenRiff-0.997-source/build-check/Release/bms_parser_tests.exe`
+- `cmake -S opensource-Tenriff-source/TenRiff-0.999-source -B opensource-Tenriff-source/TenRiff-0.999-source/build-check -G "Visual Studio 17 2022" -A x64`
+- `cmake --build opensource-Tenriff-source/TenRiff-0.999-source/build-check --config Release --target bms_parser_tests`
+- `opensource-Tenriff-source/TenRiff-0.999-source/build-check/Release/bms_parser_tests.exe`
 
 ## Still Manual-Validation Heavy
 - Song Select fast-scroll crash reproduction on a real CJK-heavy library

@@ -37,9 +37,9 @@
   },
   "gauge": {
     "delta": {
-      "hard": {"PG": 0.16, "GR": 0.09, "GD": 0.01, "BD": -10.0},
-      "normal": {"PG": 0.19, "GR": 0.15, "GD": 0.01, "BD": -6.25},
-      "easy": {"PG": 0.25, "GR": 0.2, "GD": 0.01, "BD": -4.1}
+      "hard": {"PG": 0.16, "GR": 0.09, "GD": 0.01, "BD": -10.0, "PR": -2.0},
+      "normal": {"PG": 0.19, "GR": 0.15, "GD": 0.01, "BD": -6.25, "PR": -2.0},
+      "easy": {"PG": 0.25, "GR": 0.2, "GD": 0.01, "BD": -4.1, "PR": -1.6}
     }
   },
   "graphics": {
@@ -56,6 +56,7 @@
     "random": "off",
     "random_seed": 0,
     "enable_osu_charts": false,
+    "ghost_battle_enabled": true,
     "song_index_profile": "safe"
   },
   "ui": {
