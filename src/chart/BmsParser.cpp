@@ -309,7 +309,7 @@ int key_count_from_mode_token(std::string_view token) {
 bool should_store_index_header(std::string_view key) {
     if (key == "BPM" || key == "PLAYER" || key == "GENRE" || key == "TITLE" || key == "ARTIST" ||
         key == "SUBTITLE" || key == "DIFFICULTY" || key == "PLAYLEVEL" || key == "RANK" ||
-        key == "TOTAL" || key == "VOLWAV" || key == "LNOBJ") {
+        key == "TOTAL" || key == "VOLWAV" || key == "LNOBJ" || key == "STAGEFILE" || key == "BACKBMP") {
         return true;
     }
     if (key_count_from_mode_token(key) > 0) {
@@ -320,7 +320,8 @@ bool should_store_index_header(std::string_view key) {
 }
 
 bool should_retain_command_for_index(std::string_view channel) {
-    if (channel == "02" || channel == "03" || channel == "08" || channel == "09") {
+    if (channel == "02" || channel == "03" || channel == "04" ||
+        channel == "06" || channel == "07" || channel == "08" || channel == "09") {
         return true;
     }
     return channel.size() == 2 && (channel[0] == '1' || channel[0] == '2' || channel[0] == '5' || channel[0] == '6');

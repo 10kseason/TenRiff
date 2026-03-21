@@ -81,22 +81,50 @@ bool InputThread::start() {
         return true;  // Already running.
     }
 
+    if (thread_.joinable()) {
+        thread_.join();
+    }
+
     should_stop_.store(false, std::memory_order_release);
     is_running_.store(true, std::memory_order_release);
+    {
+        std::lock_guard<std::mutex> lock(start_mutex_);
+        start_result_ready_ = false;
+        start_result_success_ = false;
+    }
 
-    thread_ = std::thread(&InputThread::thread_main, this);
+    try {
+        thread_ = std::thread(&InputThread::thread_main, this);
+    } catch (...) {
+        is_running_.store(false, std::memory_order_release);
+        return false;
+    }
+
+    std::unique_lock<std::mutex> lock(start_mutex_);
+    start_cv_.wait(lock, [this]() { return start_result_ready_; });
+    const bool success = start_result_success_;
+    lock.unlock();
+    if (!success) {
+        if (thread_.joinable()) {
+            thread_.join();
+        }
+        is_running_.store(false, std::memory_order_release);
+        return false;
+    }
+
     return true;
 }
 
 void InputThread::stop() {
-    if (!is_running_.load(std::memory_order_acquire)) {
+    const bool running = is_running_.load(std::memory_order_acquire);
+    if (!running && !thread_.joinable()) {
         return;
     }
 
     should_stop_.store(true, std::memory_order_release);
 
     // Post quit message to the window.
-    if (hwnd_) {
+    if (running && hwnd_) {
         PostMessageW(static_cast<HWND>(hwnd_), WM_TENRIFF_QUIT, 0, 0);
     }
 
@@ -162,9 +190,20 @@ void InputThread::on_input_event(const InputEvent& event) {
     events_processed_.fetch_add(1, std::memory_order_relaxed);
 }
 
+void InputThread::signal_start_result(bool success) {
+    std::lock_guard<std::mutex> lock(start_mutex_);
+    if (start_result_ready_) {
+        return;
+    }
+    start_result_success_ = success;
+    start_result_ready_ = true;
+    start_cv_.notify_one();
+}
+
 void InputThread::thread_main() {
     g_input_thread = this;
     if (config_.backend == InputBackend::Polling) {
+        signal_start_result(true);
         thread_main_polling();
         g_input_thread = nullptr;
         return;
@@ -181,8 +220,12 @@ void InputThread::thread_main_rawinput() {
     wc.hInstance = GetModuleHandleW(nullptr);
     wc.lpszClassName = kWindowClassName;
 
+    SetLastError(ERROR_SUCCESS);
     ATOM class_atom = RegisterClassExW(&wc);
-    if (!class_atom) {
+    const DWORD class_error = class_atom == 0 ? GetLastError() : ERROR_SUCCESS;
+    const bool registered_class = class_atom != 0;
+    if (!registered_class && class_error != ERROR_CLASS_ALREADY_EXISTS) {
+        signal_start_result(false);
         is_running_.store(false, std::memory_order_release);
         return;
     }
@@ -201,7 +244,10 @@ void InputThread::thread_main_rawinput() {
     );
 
     if (!hwnd) {
-        UnregisterClassW(kWindowClassName, GetModuleHandleW(nullptr));
+        signal_start_result(false);
+        if (registered_class) {
+            UnregisterClassW(kWindowClassName, GetModuleHandleW(nullptr));
+        }
         is_running_.store(false, std::memory_order_release);
         return;
     }
@@ -214,12 +260,17 @@ void InputThread::thread_main_rawinput() {
     });
 
     if (!raw_input_handler_->initialize(hwnd, config_.raw_input)) {
+        signal_start_result(false);
         DestroyWindow(hwnd);
-        UnregisterClassW(kWindowClassName, GetModuleHandleW(nullptr));
+        if (registered_class) {
+            UnregisterClassW(kWindowClassName, GetModuleHandleW(nullptr));
+        }
         hwnd_ = nullptr;
         is_running_.store(false, std::memory_order_release);
         return;
     }
+
+    signal_start_result(true);
 
     // Set thread priority (above normal for input responsiveness).
     SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_ABOVE_NORMAL);
@@ -246,7 +297,9 @@ void InputThread::thread_main_rawinput() {
     raw_input_handler_->shutdown();
     DestroyWindow(hwnd);
     hwnd_ = nullptr;
-    UnregisterClassW(kWindowClassName, GetModuleHandleW(nullptr));
+    if (registered_class) {
+        UnregisterClassW(kWindowClassName, GetModuleHandleW(nullptr));
+    }
 }
 
 void InputThread::thread_main_polling() {

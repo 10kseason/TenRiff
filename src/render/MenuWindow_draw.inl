@@ -40,6 +40,12 @@ void MenuWindow::draw(const MenuRenderData& data) {
         if (!ensure_gameplay_static_cache(data.gameplay)) {
             invalidate_gameplay_static_cache();
         }
+    } else if (data.kind == MenuScreenKind::SongSelect) {
+        update_song_select_preview_loading_state(data.song_select, render_now_ns);
+        pump_song_select_preview_loads(data.song_select, render_now_ns);
+    } else {
+        song_select_preview_signature_.clear();
+        song_select_preview_load_hold_until_ns_ = 0;
     }
     ctx->BeginDraw();
 

@@ -246,6 +246,7 @@ private:
     void sort_song_list_preserving_selection();
     void rebuild_visible_song_list(const std::string* selected_path = nullptr);
     void rebuild_current_song_record_indices();
+    void refresh_song_collection_membership_cache();
     void sync_song_select_state();
     void populate_gameplay_render_data(render::GameplayHudData& target,
                                        uint64_t* out_motion_revision = nullptr,
@@ -397,6 +398,9 @@ private:
     std::vector<SongEntry> indexed_songs_{};
     std::vector<std::size_t> visible_song_indices_{};
     std::unordered_map<std::string, BestResultRecord> chart_best_results_{};
+    std::unordered_set<std::string> favorite_song_keys_{};
+    std::unordered_map<std::string, std::unordered_set<std::string>> song_collection_membership_{};
+    int indexed_favorite_count_ = 0;
 
     Screen screen_ = Screen::Title;
     Screen submenu_return_screen_ = Screen::Title;
@@ -443,6 +447,7 @@ private:
     bool mode_dirty_ = false;
     bool mode_library_dirty_ = false;
     int64_t last_indexer_snapshot_ns_ = 0;
+    int64_t last_song_select_slow_snapshot_log_ns_ = 0;
 
     std::atomic<bool> exit_requested_{false};
     int exit_code_ = 0;
@@ -473,7 +478,6 @@ private:
     std::unordered_map<std::string, std::vector<std::size_t>> chart_play_record_indices_{};
     std::vector<std::size_t> current_song_record_indices_{};
     std::unordered_map<std::string, ReplaySummary> replay_summary_cache_{};
-    std::unordered_map<std::string, std::string> song_background_preview_cache_{};
 
     std::string song_search_query_{};
     int song_key_filter_ = 0;

@@ -2050,21 +2050,14 @@ bool MenuWindow::ensure_song_select_preview_bitmap(const SongSelectData& data) {
     }
 
     const std::string preview_path = data.selected_song_background_path;
-    if (song_select_preview_cache_.attempted && song_select_preview_cache_.path == preview_path) {
-        return preview_path.empty() || static_cast<bool>(d2d_->song_select_preview_bitmap);
+    if (song_select_preview_cache_.path == preview_path) {
+        return true;
     }
 
     invalidate_song_select_preview_cache();
     song_select_preview_cache_.path = preview_path;
-    song_select_preview_cache_.attempted = true;
-    if (preview_path.empty()) {
-        return true;
-    }
-
-    return load_bitmap_from_utf8_path(d2d_->wic_factory.Get(),
-                                      d2d_->d2d_context.Get(),
-                                      preview_path,
-                                      d2d_->song_select_preview_bitmap);
+    song_select_preview_cache_.attempted = preview_path.empty();
+    return true;
 }
 
 void MenuWindow::clear_song_card_preview_cache() {
@@ -2073,6 +2066,179 @@ void MenuWindow::clear_song_card_preview_cache() {
     }
     d2d_->song_card_preview_bitmaps.clear();
     d2d_->song_card_preview_lru.clear();
+}
+
+void MenuWindow::update_song_select_preview_loading_state(const SongSelectData& data, int64_t now_ns) {
+    if (data.showing_sources || data.showing_records) {
+        song_select_preview_signature_.clear();
+        song_select_preview_load_hold_until_ns_ = 0;
+        return;
+    }
+
+    std::string signature;
+    signature.reserve(64 + data.songs.size() * 12);
+    signature += std::to_string(data.list_selected_index);
+    signature.push_back('|');
+    signature += std::to_string(data.list_window_start);
+    signature.push_back('|');
+    signature += data.selected_song_background_path;
+    signature.push_back('|');
+    for (const auto& song : data.songs) {
+        signature += std::to_string(song.song_index);
+        signature.push_back(',');
+    }
+
+    if (signature != song_select_preview_signature_) {
+        song_select_preview_signature_ = std::move(signature);
+        song_select_preview_load_hold_until_ns_ = now_ns + 150'000'000LL;
+    }
+}
+
+bool MenuWindow::song_select_preview_loading_deferred(int64_t now_ns) const {
+    return now_ns < song_select_preview_load_hold_until_ns_;
+}
+
+void MenuWindow::touch_song_card_preview_lru(std::string_view path) {
+    if (!d2d_ || path.empty()) {
+        return;
+    }
+
+    const std::string key(path);
+    auto& lru = d2d_->song_card_preview_lru;
+    lru.erase(std::remove(lru.begin(), lru.end(), key), lru.end());
+    lru.push_back(key);
+}
+
+void MenuWindow::trim_song_card_preview_cache() {
+    if (!d2d_) {
+        return;
+    }
+
+    constexpr std::size_t kSongCardPreviewBitmapCacheLimit = 24;
+    while (d2d_->song_card_preview_lru.size() > kSongCardPreviewBitmapCacheLimit) {
+        const std::string evict_key = d2d_->song_card_preview_lru.front();
+        d2d_->song_card_preview_lru.pop_front();
+        d2d_->song_card_preview_bitmaps.erase(evict_key);
+    }
+}
+
+ID2D1Bitmap* MenuWindow::find_song_card_preview_bitmap(std::string_view path) {
+    if (!d2d_ || path.empty()) {
+        return nullptr;
+    }
+
+    const std::string key(path);
+    auto it = d2d_->song_card_preview_bitmaps.find(key);
+    if (it == d2d_->song_card_preview_bitmaps.end()) {
+        return nullptr;
+    }
+
+    touch_song_card_preview_lru(key);
+    return it->second.bitmap.Get();
+}
+
+bool MenuWindow::load_song_card_preview_bitmap(std::string_view path) {
+    if (!d2d_ || !d2d_->d2d_context || !d2d_->wic_factory || path.empty()) {
+        return false;
+    }
+
+    const std::string key(path);
+    auto existing = d2d_->song_card_preview_bitmaps.find(key);
+    if (existing != d2d_->song_card_preview_bitmaps.end()) {
+        touch_song_card_preview_lru(key);
+        return static_cast<bool>(existing->second.bitmap);
+    }
+
+    D2DResources::SongCardPreviewBitmapEntry entry;
+    entry.attempted = true;
+    static_cast<void>(load_bitmap_from_utf8_path(
+        d2d_->wic_factory.Get(), d2d_->d2d_context.Get(), key, entry.bitmap));
+    auto [inserted_it, inserted] =
+        d2d_->song_card_preview_bitmaps.emplace(key, std::move(entry));
+    (void)inserted;
+    touch_song_card_preview_lru(key);
+    trim_song_card_preview_cache();
+    return static_cast<bool>(inserted_it->second.bitmap);
+}
+
+bool MenuWindow::load_selected_song_preview_bitmap(const SongSelectData& data, int64_t now_ns) {
+    static_cast<void>(now_ns);
+
+    if (!ensure_song_select_preview_bitmap(data) || !d2d_ || !d2d_->wic_factory || !d2d_->d2d_context) {
+        return false;
+    }
+
+    if (song_select_preview_cache_.attempted) {
+        return song_select_preview_cache_.path.empty() || static_cast<bool>(d2d_->song_select_preview_bitmap);
+    }
+    if (song_select_preview_cache_.path.empty()) {
+        song_select_preview_cache_.attempted = true;
+        return true;
+    }
+
+    const int64_t load_start_ns = timing::HighResClock::now_ns();
+    const bool loaded = load_bitmap_from_utf8_path(d2d_->wic_factory.Get(),
+                                                   d2d_->d2d_context.Get(),
+                                                   song_select_preview_cache_.path,
+                                                   d2d_->song_select_preview_bitmap);
+    song_select_preview_cache_.attempted = true;
+
+    const double load_ms = static_cast<double>(timing::HighResClock::now_ns() - load_start_ns) / 1'000'000.0;
+    if (load_ms >= 8.0 &&
+        song_select_preview_warned_slow_paths_.emplace(song_select_preview_cache_.path).second) {
+        std::cerr << "[MenuWindow] Slow Song Select preview decode " << load_ms
+                  << " ms path=" << song_select_preview_cache_.path << std::endl;
+    }
+    if (!loaded &&
+        song_select_preview_warned_decode_failures_.emplace(song_select_preview_cache_.path).second) {
+        std::cerr << "[MenuWindow] Failed to decode Song Select preview path="
+                  << song_select_preview_cache_.path << std::endl;
+    }
+
+    return loaded;
+}
+
+void MenuWindow::pump_song_select_preview_loads(const SongSelectData& data, int64_t now_ns) {
+    if (!d2d_ || !d2d_->d2d_context || !d2d_->wic_factory ||
+        data.showing_sources || data.showing_records ||
+        song_select_preview_loading_deferred(now_ns)) {
+        return;
+    }
+
+    if (!song_select_preview_cache_.attempted) {
+        static_cast<void>(load_selected_song_preview_bitmap(data, now_ns));
+        return;
+    }
+
+    auto load_visible_song_if_missing = [&](bool selected_only) -> bool {
+        for (const auto& song : data.songs) {
+            if (song.background_path.empty()) {
+                continue;
+            }
+            if (selected_only && song.song_index != data.list_selected_index) {
+                continue;
+            }
+            if (!selected_only && song.song_index == data.list_selected_index) {
+                continue;
+            }
+
+            const std::string key(song.background_path);
+            auto it = d2d_->song_card_preview_bitmaps.find(key);
+            if (it != d2d_->song_card_preview_bitmaps.end()) {
+                touch_song_card_preview_lru(key);
+                continue;
+            }
+
+            static_cast<void>(load_song_card_preview_bitmap(key));
+            return true;
+        }
+        return false;
+    };
+
+    if (load_visible_song_if_missing(true)) {
+        return;
+    }
+    static_cast<void>(load_visible_song_if_missing(false));
 }
 
 void MenuWindow::invalidate_gameplay_static_cache() {

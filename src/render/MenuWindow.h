@@ -14,7 +14,10 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <unordered_set>
 #include <vector>
+
+struct ID2D1Bitmap;
 
 namespace tenriff::render {
 
@@ -437,6 +440,14 @@ private:
     void invalidate_song_select_preview_cache();
     [[nodiscard]] bool ensure_song_select_preview_bitmap(const SongSelectData& data);
     void clear_song_card_preview_cache();
+    void update_song_select_preview_loading_state(const SongSelectData& data, int64_t now_ns);
+    void pump_song_select_preview_loads(const SongSelectData& data, int64_t now_ns);
+    [[nodiscard]] bool song_select_preview_loading_deferred(int64_t now_ns) const;
+    [[nodiscard]] ID2D1Bitmap* find_song_card_preview_bitmap(std::string_view path);
+    [[nodiscard]] bool load_song_card_preview_bitmap(std::string_view path);
+    [[nodiscard]] bool load_selected_song_preview_bitmap(const SongSelectData& data, int64_t now_ns);
+    void touch_song_card_preview_lru(std::string_view path);
+    void trim_song_card_preview_cache();
     void invalidate_gameplay_static_cache();
     [[nodiscard]] bool ensure_gameplay_static_cache(const GameplayHudData& data);
     [[nodiscard]] bool recreate_targets();
@@ -582,6 +593,10 @@ private:
     GameplayStaticCache gameplay_static_cache_{};
     GameplayNoteSpriteCache gameplay_note_sprite_cache_{};
     SongSelectPreviewCache song_select_preview_cache_{};
+    std::string song_select_preview_signature_{};
+    int64_t song_select_preview_load_hold_until_ns_ = 0;
+    std::unordered_set<std::string> song_select_preview_warned_decode_failures_{};
+    std::unordered_set<std::string> song_select_preview_warned_slow_paths_{};
     SongScrollbarState song_scrollbar_state_{};
     bool song_scroll_drag_active_ = false;
     float song_scroll_drag_offset_y_ = 0.0f;

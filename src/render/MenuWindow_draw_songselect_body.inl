@@ -260,39 +260,6 @@
         const float card_top = list_rect.top + 70.0f;
         const float card_h = 110.0f;
         const float card_gap = 18.0f;
-        constexpr std::size_t kSongCardPreviewBitmapCacheLimit = 24;
-        auto ensure_song_card_preview_bitmap = [&](std::string_view path) -> ID2D1Bitmap* {
-            if (!d2d_ || !d2d_->d2d_context || !d2d_->wic_factory || path.empty()) {
-                return nullptr;
-            }
-
-            const std::string key(path);
-            auto touch_lru = [&](const std::string& touched_key) {
-                auto& lru = d2d_->song_card_preview_lru;
-                lru.erase(std::remove(lru.begin(), lru.end(), touched_key), lru.end());
-                lru.push_back(touched_key);
-            };
-
-            auto it = d2d_->song_card_preview_bitmaps.find(key);
-            if (it != d2d_->song_card_preview_bitmaps.end()) {
-                touch_lru(key);
-                return it->second.bitmap.Get();
-            }
-
-            D2DResources::SongCardPreviewBitmapEntry entry;
-            entry.attempted = true;
-            load_bitmap_from_utf8_path(d2d_->wic_factory.Get(), d2d_->d2d_context.Get(), key, entry.bitmap);
-            auto [inserted_it, inserted] =
-                d2d_->song_card_preview_bitmaps.emplace(key, std::move(entry));
-            (void)inserted;
-            touch_lru(key);
-            while (d2d_->song_card_preview_lru.size() > kSongCardPreviewBitmapCacheLimit) {
-                const std::string evict_key = d2d_->song_card_preview_lru.front();
-                d2d_->song_card_preview_lru.pop_front();
-                d2d_->song_card_preview_bitmaps.erase(evict_key);
-            }
-            return inserted_it->second.bitmap.Get();
-        };
 
         for (std::size_t i = 0; i < data.song_select.songs.size(); ++i) {
             const auto& song = data.song_select.songs[i];
@@ -323,7 +290,7 @@
             const D2D1_RECT_F jacket =
                 D2D1::RectF(card.left + 18.0f, card.top + 12.0f, card.left + 158.0f, card.bottom - 12.0f);
             const D2D1_ROUNDED_RECT jacket_rr = D2D1::RoundedRect(jacket, 10.0f, 10.0f);
-            if (ID2D1Bitmap* jacket_bitmap = ensure_song_card_preview_bitmap(song.background_path)) {
+            if (ID2D1Bitmap* jacket_bitmap = find_song_card_preview_bitmap(song.background_path)) {
                 const D2D1_RECT_F source_rect =
                     centered_bitmap_source_rect(jacket_bitmap->GetSize(), jacket);
                 ctx->PushAxisAlignedClip(jacket, D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);

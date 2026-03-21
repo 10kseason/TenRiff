@@ -1,9 +1,11 @@
 #pragma once
 
 #include <atomic>
+#include <condition_variable>
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <mutex>
 #include <thread>
 #include <vector>
 
@@ -87,6 +89,7 @@ private:
     void thread_main_rawinput();
     void thread_main_polling();
     void on_input_event(const InputEvent& event);
+    void signal_start_result(bool success);
     [[nodiscard]] bool is_input_allowed() const;
     void sync_input_gate(bool allowed);
 
@@ -103,6 +106,10 @@ private:
     // Message window handle (stored as void* to avoid Windows.h).
     void* hwnd_ = nullptr;
     bool last_input_allowed_ = false;
+    std::mutex start_mutex_;
+    std::condition_variable start_cv_;
+    bool start_result_ready_ = false;
+    bool start_result_success_ = false;
 
     std::atomic<uint64_t> events_processed_{0};
     std::atomic<uint64_t> events_dropped_{0};

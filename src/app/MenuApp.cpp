@@ -605,6 +605,7 @@ bool MenuApp::initialize(const CommandLineOptions& options) {
     config_.graphics.refresh_hz =
         clamp_int(config_.graphics.refresh_hz, kGraphicsRefreshHzMin, kGraphicsRefreshHzMax);
     config_.graphics.resolution = normalize_resolution_preset(config_.graphics.resolution);
+    refresh_song_collection_membership_cache();
     refresh_available_osu_skins();
     refresh_available_lr2_skins();
 
@@ -780,7 +781,9 @@ void MenuApp::start_menu_threads() {
     if (!input_thread_.initialize(input_config)) {
         std::cerr << "[error] Failed to initialize input thread." << std::endl;
     } else {
-        (void)input_thread_.start();
+        if (!input_thread_.start()) {
+            std::cerr << "[error] Failed to start input thread." << std::endl;
+        }
     }
 
     const render::RenderConfig render_config = current_render_config();
@@ -818,7 +821,9 @@ void MenuApp::restart_input_thread() {
         std::cerr << "[error] Failed to reinitialize input thread." << std::endl;
         return;
     }
-    (void)input_thread_.start();
+    if (!input_thread_.start()) {
+        std::cerr << "[error] Failed to restart input thread." << std::endl;
+    }
 }
 
 void MenuApp::restart_audio_thread() {
