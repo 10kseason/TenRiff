@@ -6,23 +6,14 @@
 namespace tenriff::game {
 
 namespace {
-constexpr double kHardMaxGauge = 100.0;
-constexpr double kNormalMaxGauge = 50.0;
-constexpr double kEasyMaxGauge = 40.0;
+constexpr double kGaugeMax = 100.0;
 constexpr double kMinGauge = 0.0;
 constexpr double kEasyLowGaugeBadSofteningThreshold = 25.0;
 constexpr double kEasyLowGaugeBadSofteningScale = 0.90;
 
 double max_gauge_for(GaugeType type) {
-    switch (type) {
-    case GaugeType::Hard:
-        return kHardMaxGauge;
-    case GaugeType::Normal:
-        return kNormalMaxGauge;
-    case GaugeType::Easy:
-    default:
-        return kEasyMaxGauge;
-    }
+    static_cast<void>(type);
+    return kGaugeMax;
 }
 
 bool is_bad_judgement(Judgement judgement) {
@@ -73,23 +64,7 @@ GaugeResult GaugeManager::applyJudgementWeighted(GaugeState& state, Judgement ju
     }
     state.value = std::clamp(state.value + delta, kMinGauge, max_gauge_for(state.type));
 
-    if (!config_.auto_shift) {
-        if (state.value <= 0.0) {
-            state.game_over = true;
-            result.game_over = true;
-        }
-        return result;
-    }
-
-    if (state.type == GaugeType::Hard && state.value <= config_.hard_to_normal_threshold) {
-        state.type = GaugeType::Normal;
-        state.value = max_gauge_for(state.type);
-        result.downshifted = true;
-    } else if (state.type == GaugeType::Normal && state.value <= config_.normal_to_easy_threshold) {
-        state.type = GaugeType::Easy;
-        state.value = max_gauge_for(state.type);
-        result.downshifted = true;
-    } else if (state.type == GaugeType::Easy && state.value <= 0.0) {
+    if (state.value <= 0.0) {
         state.game_over = true;
         result.game_over = true;
     }

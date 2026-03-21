@@ -221,6 +221,14 @@ std::string normalize_song_index_profile(std::string value) {
     return "safe";
 }
 
+std::string normalize_ui_language(std::string value) {
+    value = to_lower_ascii(std::move(value));
+    if (value == "ko" || value == "kr" || value == "korean" || value == "ko-kr") {
+        return "ko";
+    }
+    return "en";
+}
+
 int sanitize_refresh_hz(int value, std::vector<std::string>& warnings) {
     if (value >= kRefreshHzMin && value <= kRefreshHzMax) {
         return value;
@@ -250,6 +258,53 @@ std::vector<std::string> get_string_array(const JsonObject& object, std::string_
         }
     }
     return values;
+}
+
+std::unordered_map<std::string, std::vector<std::string>> get_string_array_object(const JsonObject& object,
+                                                                                   std::string_view key) {
+    std::unordered_map<std::string, std::vector<std::string>> values;
+    const auto* value = get_value(object, key);
+    if (!value) {
+        return values;
+    }
+    const auto* root = value->as_object();
+    if (!root) {
+        return values;
+    }
+
+    for (const auto& [name, entry] : *root) {
+        if (name.empty()) {
+            continue;
+        }
+        const auto* array = entry.as_array();
+        if (!array) {
+            continue;
+        }
+        std::vector<std::string> items;
+        items.reserve(array->size());
+        for (const auto& item : *array) {
+            if (!item.is_string()) {
+                continue;
+            }
+            const std::string text = item.as_string();
+            if (!text.empty()) {
+                items.push_back(text);
+            }
+        }
+        values.emplace(name, std::move(items));
+    }
+    return values;
+}
+
+std::string normalize_song_collection_filter(std::string value) {
+    const std::string lowered = to_lower_ascii(value);
+    if (lowered == "favorites" || lowered == "favorite") {
+        return "favorites";
+    }
+    if (lowered == "all" || lowered.empty()) {
+        return "all";
+    }
+    return value;
 }
 
 bool is_allowed_polling_hz(int value) {
@@ -353,14 +408,6 @@ void apply_config_object(const JsonObject& root, RuntimeConfig& config) {
     }
 
     if (auto* gauge = get_object(root, "gauge")) {
-        config.gauge.auto_shift = get_bool(*gauge, "auto_shift", config.gauge.auto_shift);
-        config.gauge.hard_to_normal_threshold = std::clamp(
-            get_number(*gauge, "hard_to_normal_threshold", config.gauge.hard_to_normal_threshold),
-            0.0, 100.0);
-        config.gauge.normal_to_easy_threshold = std::clamp(
-            get_number(*gauge, "normal_to_easy_threshold", config.gauge.normal_to_easy_threshold),
-            0.0, 100.0);
-
         if (auto* delta = get_object(*gauge, "delta")) {
             if (auto* hard = get_object(*delta, "hard")) {
                 config.gauge.hard.pg = get_number(*hard, "PG", config.gauge.hard.pg);
@@ -418,6 +465,7 @@ void apply_config_object(const JsonObject& root, RuntimeConfig& config) {
     }
 
     if (auto* ui = get_object(root, "ui")) {
+        config.ui.language = normalize_ui_language(get_string(*ui, "language", config.ui.language));
         config.ui.result_tail_ms = get_number(*ui, "result_tail_ms", config.ui.result_tail_ms);
         config.ui.require_enter_to_exit = get_bool(*ui, "require_enter_to_exit", config.ui.require_enter_to_exit);
         config.ui.active_song_source =
@@ -427,6 +475,18 @@ void apply_config_object(const JsonObject& root, RuntimeConfig& config) {
                 config.ui.recent_song_sources = get_string_array(*ui, "recent_song_sources");
             }
         }
+        if (const auto* favorites = get_value(*ui, "favorite_chart_keys")) {
+            if (favorites->as_array()) {
+                config.ui.favorite_chart_keys = get_string_array(*ui, "favorite_chart_keys");
+            }
+        }
+        if (const auto* collections = get_value(*ui, "collections")) {
+            if (collections->as_object()) {
+                config.ui.collections = get_string_array_object(*ui, "collections");
+            }
+        }
+        config.ui.song_collection_filter = normalize_song_collection_filter(
+            get_string(*ui, "song_collection_filter", config.ui.song_collection_filter));
     }
 
     if (auto* skin = get_object(root, "skin")) {
@@ -603,10 +663,6 @@ JsonValue build_json_root(const RuntimeConfig& config) {
     root.emplace("speed", JsonValue{std::move(speed)});
 
     JsonObject gauge;
-    gauge.emplace("auto_shift", JsonValue{config.gauge.auto_shift});
-    gauge.emplace("hard_to_normal_threshold", JsonValue{config.gauge.hard_to_normal_threshold});
-    gauge.emplace("normal_to_easy_threshold", JsonValue{config.gauge.normal_to_easy_threshold});
-
     JsonObject delta;
     JsonObject hard;
     hard.emplace("PG", JsonValue{config.gauge.hard.pg});
@@ -658,6 +714,7 @@ JsonValue build_json_root(const RuntimeConfig& config) {
     root.emplace("mode", JsonValue{std::move(mode)});
 
     JsonObject ui;
+    ui.emplace("language", JsonValue{normalize_ui_language(config.ui.language)});
     ui.emplace("result_tail_ms", JsonValue{config.ui.result_tail_ms});
     ui.emplace("require_enter_to_exit", JsonValue{config.ui.require_enter_to_exit});
     ui.emplace("active_song_source", JsonValue{config.ui.active_song_source});
@@ -667,6 +724,26 @@ JsonValue build_json_root(const RuntimeConfig& config) {
         recent_song_sources.emplace_back(source);
     }
     ui.emplace("recent_song_sources", JsonValue{std::move(recent_song_sources)});
+    JsonArray favorite_chart_keys;
+    favorite_chart_keys.reserve(config.ui.favorite_chart_keys.size());
+    for (const auto& key : config.ui.favorite_chart_keys) {
+        favorite_chart_keys.emplace_back(key);
+    }
+    ui.emplace("favorite_chart_keys", JsonValue{std::move(favorite_chart_keys)});
+    JsonObject collections;
+    for (const auto& [name, chart_keys] : config.ui.collections) {
+        if (name.empty()) {
+            continue;
+        }
+        JsonArray keys;
+        keys.reserve(chart_keys.size());
+        for (const auto& chart_key : chart_keys) {
+            keys.emplace_back(chart_key);
+        }
+        collections.emplace(name, JsonValue{std::move(keys)});
+    }
+    ui.emplace("collections", JsonValue{std::move(collections)});
+    ui.emplace("song_collection_filter", JsonValue{normalize_song_collection_filter(config.ui.song_collection_filter)});
     root.emplace("ui", JsonValue{std::move(ui)});
 
     JsonObject skin;
@@ -758,6 +835,10 @@ std::string normalize_skin_mode_token(std::string_view key_mode) {
 
 std::string normalize_song_index_profile_token(std::string_view token) {
     return normalize_song_index_profile(std::string(token));
+}
+
+std::string normalize_ui_language_token(std::string_view token) {
+    return normalize_ui_language(std::string(token));
 }
 
 std::vector<std::string> supported_skin_mode_tokens() {
@@ -948,8 +1029,12 @@ RuntimeConfig ConfigLoader::defaults() const {
     config.mode.enable_osu_charts = false;
     config.mode.song_index_profile = "safe";
 
+    config.ui.language = "en";
     config.ui.result_tail_ms = 3000.0;
     config.ui.require_enter_to_exit = true;
+    config.ui.favorite_chart_keys.clear();
+    config.ui.collections.clear();
+    config.ui.song_collection_filter = "all";
 
     config.skin = {};
     sanitize_skin_config(config.skin);
@@ -983,6 +1068,7 @@ ConfigLoadResult ConfigLoader::load_profile(std::string_view profile_dir) const 
     result.config.input.debounce_ms = sanitize_input_debounce_ms(result.config.input.debounce_ms, result.warnings);
     result.config.graphics.refresh_hz = sanitize_refresh_hz(result.config.graphics.refresh_hz, result.warnings);
     result.config.graphics.resolution = normalize_resolution_preset(result.config.graphics.resolution);
+    result.config.ui.language = normalize_ui_language(result.config.ui.language);
     return result;
 }
 

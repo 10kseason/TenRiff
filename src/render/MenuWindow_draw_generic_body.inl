@@ -38,10 +38,10 @@
                 ctx->DrawRoundedRectangle(panel_rr, d2d_->button_border_brush.Get(), 1.2f);
             }
 
-            const std::wstring title_w = L"LIVE PREVIEW";
+            const std::wstring title_w = wloc("LIVE PREVIEW", "실시간 미리보기");
             const std::wstring mode_w =
-                to_wide(preview.mode_label + " / Lane " + std::to_string(std::max(1, preview.selected_lane)));
-            const std::wstring color_w = to_wide("Color: " + preview.selected_color_label);
+                to_wide(preview.mode_label + " / " + loc("Lane ", "레인 ") + std::to_string(std::max(1, preview.selected_lane)));
+            const std::wstring color_w = to_wide(loc("Color: ", "색상: ") + preview.selected_color_label);
             if (d2d_->title_format && d2d_->text_brush) {
                 draw_text_clipped(title_w,
                                   d2d_->title_format.Get(),

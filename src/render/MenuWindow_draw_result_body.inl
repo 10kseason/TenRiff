@@ -10,7 +10,29 @@
             }
         };
 
-        const std::wstring header_w = L"RESULT";
+        const auto localized_result_status = [&]() {
+            if (data.result.status == "GAME OVER") {
+                return loc("GAME OVER", "게임 오버");
+            }
+            if (data.result.status == "CLEAR") {
+                return loc("CLEAR", "클리어");
+            }
+            return data.result.status;
+        };
+        const auto localized_result_gauge = [&]() {
+            if (!ui_korean) {
+                return data.result.gauge_label;
+            }
+            if (data.result.gauge_label == "HARD") {
+                return std::string("하드");
+            }
+            if (data.result.gauge_label == "EASY") {
+                return std::string("이지");
+            }
+            return std::string("노말");
+        };
+
+        const std::wstring header_w = wloc("RESULT", "결과");
         const D2D1_RECT_F header_rect = D2D1::RectF(100.0f, 60.0f, 700.0f, 150.0f);
         ID2D1Brush* header_brush = d2d_->logo_brush ? static_cast<ID2D1Brush*>(d2d_->logo_brush.Get())
                                                     : static_cast<ID2D1Brush*>(d2d_->accent_brush.Get());
@@ -31,8 +53,8 @@
         draw_panel(breakdown_rect);
         draw_panel(detail_rect);
 
-        const std::wstring title_w = to_wide(data.result.title.empty() ? std::string("Unknown Chart") : data.result.title);
-        const std::wstring artist_w = to_wide(data.result.artist.empty() ? std::string("Unknown Artist") : data.result.artist);
+        const std::wstring title_w = to_wide(data.result.title.empty() ? loc("Unknown Chart", "알 수 없는 차트") : data.result.title);
+        const std::wstring artist_w = to_wide(data.result.artist.empty() ? loc("Unknown Artist", "알 수 없는 아티스트") : data.result.artist);
         if (d2d_->song_title_format && d2d_->text_brush) {
             const D2D1_RECT_F title_rect =
                 D2D1::RectF(summary_rect.left + 28.0f, summary_rect.top + 28.0f, summary_rect.right - 28.0f,
@@ -67,7 +89,7 @@
         }
 
         if (d2d_->hud_format && d2d_->muted_brush) {
-            const std::wstring status_w = to_wide(data.result.status + "  /  SCORE");
+            const std::wstring status_w = to_wide(localized_result_status() + "  /  " + loc("SCORE", "점수"));
             const D2D1_RECT_F status_rect =
                 D2D1::RectF(summary_rect.left + 28.0f, summary_rect.top + 352.0f, summary_rect.right - 28.0f,
                             summary_rect.top + 388.0f);
@@ -118,8 +140,8 @@
             }
         };
 
-        draw_meter(summary_rect.top + 445.0f, "Accuracy", data.result.accuracy, 100.0, D2D1::ColorF(0x6EE7F2));
-        draw_meter(summary_rect.top + 530.0f, "Gauge " + data.result.gauge_label, data.result.gauge_value, 100.0,
+        draw_meter(summary_rect.top + 445.0f, loc("Accuracy", "정확도"), data.result.accuracy, 100.0, D2D1::ColorF(0x6EE7F2));
+        draw_meter(summary_rect.top + 530.0f, loc("Gauge ", "게이지 ") + localized_result_gauge(), data.result.gauge_value, 100.0,
                    data.result.status == "GAME OVER" ? D2D1::ColorF(0xFF6B6B) : D2D1::ColorF(0xFABB4B));
 
         auto draw_panel_row = [&](const D2D1_RECT_F& panel_rect, float y, std::string_view label, std::string_view value) {
@@ -140,19 +162,22 @@
 
         const float summary_stats_top = summary_rect.top + 544.0f;
         const float summary_stats_step = 36.0f;
-        draw_panel_row(summary_rect, summary_stats_top + summary_stats_step * 0.0f, "Max Combo",
+        draw_panel_row(summary_rect, summary_stats_top + summary_stats_step * 0.0f, loc("Max Combo", "최대 콤보"),
                        std::to_string(data.result.max_combo));
-        draw_panel_row(summary_rect, summary_stats_top + summary_stats_step * 1.0f, "Judged",
+        draw_panel_row(summary_rect, summary_stats_top + summary_stats_step * 1.0f, loc("Judged", "판정 수"),
                        std::to_string(data.result.judged_notes));
-        draw_panel_row(summary_rect, summary_stats_top + summary_stats_step * 2.0f, "Total Notes",
+        draw_panel_row(summary_rect, summary_stats_top + summary_stats_step * 2.0f, loc("Total Notes", "전체 노트"),
                        std::to_string(data.result.total_notes));
-        draw_panel_row(summary_rect, summary_stats_top + summary_stats_step * 3.0f, "Gauge Shifts",
+        draw_panel_row(summary_rect, summary_stats_top + summary_stats_step * 3.0f, loc("Gauge Shifts", "게이지 전환"),
                        std::to_string(data.result.shift_count));
 
         if (d2d_->body_format && d2d_->muted_brush) {
             const std::wstring detail_w =
-                to_wide(data.result.replay_available ? std::string("R / Replay or Enter / Esc to return")
-                                                     : std::string("ENTER or ESC to return"));
+                to_wide(data.result.replay_available
+                            ? loc("LEFT / Restart   F1 / Replay   ENTER / ESC / Return",
+                                  "LEFT / 재시작   F1 / 리플레이   ENTER / ESC / 돌아가기")
+                            : loc("LEFT / Restart   ENTER / ESC / Return",
+                                  "LEFT / 재시작   ENTER / ESC / 돌아가기"));
             const D2D1_RECT_F detail_rect_hint =
                 D2D1::RectF(summary_rect.left + 28.0f, summary_rect.bottom - 48.0f, summary_rect.right - 28.0f,
                             summary_rect.bottom - 18.0f);
@@ -164,7 +189,7 @@
         }
 
         if (d2d_->title_format && d2d_->text_brush) {
-            const std::wstring gauge_title_w = L"Gauge Trace";
+            const std::wstring gauge_title_w = wloc("Gauge Trace", "게이지 추적");
             const D2D1_RECT_F gauge_title_rect =
                 D2D1::RectF(gauge_rect.left + 28.0f, gauge_rect.top + 20.0f, gauge_rect.right - 28.0f, gauge_rect.top + 60.0f);
             draw_text_clipped(gauge_title_w, d2d_->title_format.Get(), gauge_title_rect, d2d_->text_brush.Get());
@@ -240,7 +265,7 @@
             ctx->FillEllipse(tail_dot, d2d_->accent_brush.Get());
             d2d_->accent_brush->SetColor(saved);
         } else if (d2d_->body_format && d2d_->muted_brush) {
-            const std::wstring empty_w = L"No gauge history captured.";
+            const std::wstring empty_w = wloc("No gauge history captured.", "기록된 게이지 히스토리가 없습니다.");
             const D2D1_RECT_F empty_rect = D2D1::RectF(plot_rect.left, plot_rect.top + 80.0f, plot_rect.right, plot_rect.top + 120.0f);
             draw_text_clipped_aligned(empty_w,
                                       d2d_->body_format.Get(),
@@ -251,7 +276,7 @@
 
         if (d2d_->body_format && d2d_->text_brush) {
             const std::wstring gauge_summary_w = to_wide(
-                data.result.gauge_label + "  " + format_decimal(data.result.gauge_value) + "%");
+                localized_result_gauge() + "  " + format_decimal(data.result.gauge_value) + "%");
             const D2D1_RECT_F gauge_summary_rect =
                 D2D1::RectF(gauge_rect.right - 280.0f, gauge_rect.top + 22.0f, gauge_rect.right - 24.0f, gauge_rect.top + 58.0f);
             draw_text_clipped_aligned(gauge_summary_w,
@@ -262,7 +287,7 @@
         }
 
         if (d2d_->title_format && d2d_->text_brush) {
-            const std::wstring mix_title_w = L"Judgement Mix";
+            const std::wstring mix_title_w = wloc("Judgement Mix", "판정 분포");
             const D2D1_RECT_F mix_title_rect =
                 D2D1::RectF(breakdown_rect.left + 24.0f, breakdown_rect.top + 18.0f, breakdown_rect.right - 24.0f,
                             breakdown_rect.top + 56.0f);
@@ -320,14 +345,14 @@
             bar_y += 52.0f;
         }
 
-        draw_panel_row(breakdown_rect, breakdown_rect.top + 360.0f, "Timing Mean", format_signed_ms(data.result.mean_delta_ms));
-        draw_panel_row(breakdown_rect, breakdown_rect.top + 398.0f, "Timing StdDev",
+        draw_panel_row(breakdown_rect, breakdown_rect.top + 360.0f, loc("Timing Mean", "평균 타이밍"), format_signed_ms(data.result.mean_delta_ms));
+        draw_panel_row(breakdown_rect, breakdown_rect.top + 398.0f, loc("Timing StdDev", "타이밍 표준편차"),
                        format_decimal(data.result.stddev_delta_ms) + "ms");
-        draw_panel_row(breakdown_rect, breakdown_rect.top + 436.0f, "Warnings",
+        draw_panel_row(breakdown_rect, breakdown_rect.top + 436.0f, loc("Warnings", "경고"),
                        std::to_string(data.result.export_warning_count));
 
         if (d2d_->title_format && d2d_->text_brush) {
-            const std::wstring session_w = L"Session Detail";
+            const std::wstring session_w = wloc("Session Detail", "세션 정보");
             const D2D1_RECT_F session_rect =
                 D2D1::RectF(detail_rect.left + 24.0f, detail_rect.top + 18.0f, detail_rect.right - 24.0f,
                             detail_rect.top + 56.0f);
@@ -350,18 +375,18 @@
         };
 
         float detail_y = detail_rect.top + 58.0f;
-        draw_detail_line(detail_y, "Profile: " + data.result.profile, true);
+        draw_detail_line(detail_y, loc("Profile: ", "프로필: ") + data.result.profile, true);
         detail_y += 32.0f;
-        draw_detail_line(detail_y, "Track: " + data.result.track, true);
+        draw_detail_line(detail_y, loc("Track: ", "트랙: ") + data.result.track, true);
         detail_y += 40.0f;
         if (!data.result.replay_file.empty()) {
-            draw_detail_line(detail_y, "Replay");
+            draw_detail_line(detail_y, loc("Replay", "리플레이"));
             detail_y += 26.0f;
             draw_detail_line(detail_y, data.result.replay_file, true);
             detail_y += 34.0f;
         }
         if (!data.result.result_file.empty()) {
-            draw_detail_line(detail_y, "Result File");
+            draw_detail_line(detail_y, loc("Result File", "결과 파일"));
             detail_y += 26.0f;
             draw_detail_line(detail_y, data.result.result_file, true);
             detail_y += 34.0f;
@@ -379,7 +404,7 @@
         float note_y = detail_y + 18.0f;
         const float notes_bottom = (show_replay_button ? replay_rect.top : back_rect.top) - 18.0f;
         if (d2d_->body_format && d2d_->text_brush && note_y + 24.0f < notes_bottom) {
-            const std::wstring notes_w = L"Notes";
+            const std::wstring notes_w = wloc("Notes", "메모");
             const D2D1_RECT_F notes_rect =
                 D2D1::RectF(detail_rect.left + 24.0f, note_y, detail_rect.right - 24.0f, note_y + 28.0f);
             draw_text_clipped(notes_w, d2d_->body_format.Get(), notes_rect, d2d_->text_brush.Get());
@@ -403,7 +428,8 @@
                     note_y += 30.0f;
                 }
                 if (truncated) {
-                    const std::string remaining = "+" + std::to_string(data.result.notes.size() - visible_lines) + " more";
+                    const std::string remaining = "+" + std::to_string(data.result.notes.size() - visible_lines) + " " +
+                                                  loc("more", "더");
                     draw_detail_line(note_y, remaining, true);
                 }
                 ctx->PopAxisAlignedClip();
@@ -425,7 +451,8 @@
                 d2d_->accent_brush->SetOpacity(1.0f);
             }
             if (d2d_->title_format && d2d_->text_brush) {
-                const std::wstring replay_w = replay_available ? L"WATCH REPLAY" : L"REPLAY UNAVAILABLE";
+                const std::wstring replay_w = replay_available ? wloc("WATCH REPLAY", "리플레이 보기")
+                                                               : wloc("REPLAY UNAVAILABLE", "리플레이 사용 불가");
                 ID2D1Brush* replay_brush =
                     replay_available ? static_cast<ID2D1Brush*>(d2d_->text_brush.Get())
                                      : static_cast<ID2D1Brush*>(d2d_->muted_brush ? d2d_->muted_brush.Get()
@@ -446,7 +473,7 @@
             ctx->DrawRoundedRectangle(D2D1::RoundedRect(back_rect, 14.0f, 14.0f), d2d_->accent_brush.Get(), 1.5f);
         }
         if (d2d_->title_format && d2d_->text_brush) {
-            const std::wstring back_w = L"BACK TO SONG SELECT";
+            const std::wstring back_w = wloc("BACK TO SONG SELECT", "곡 선택으로 돌아가기");
             draw_text_clipped_aligned(back_w,
                                       d2d_->title_format.Get(),
                                       back_rect,

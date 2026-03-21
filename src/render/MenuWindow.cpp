@@ -15,11 +15,15 @@
 #include <algorithm>
 #include <cctype>
 #include <cmath>
+#include <chrono>
 #include <cstdint>
+#include <ctime>
 #include <cwchar>
+#include <filesystem>
 #include <functional>
 #include <iomanip>
 #include <iostream>
+#include <limits>
 #include <mutex>
 #include <sstream>
 #include <string>
@@ -57,6 +61,12 @@ constexpr float kGameplayFieldRight = 1450.0f;
 constexpr float kGameplayFieldTop = 0.0f;
 constexpr float kGameplayFieldBottom = kBaseHeight;
 constexpr float kGameplayGaugeLeft = 1510.0f;
+constexpr float kGameplaySplitPlayerFieldLeft = 250.0f;
+constexpr float kGameplaySplitPlayerFieldRight = 810.0f;
+constexpr float kGameplaySplitGhostFieldLeft = 1110.0f;
+constexpr float kGameplaySplitGhostFieldRight = 1670.0f;
+constexpr float kGameplaySplitPlayerGaugeLeft = 188.0f;
+constexpr float kGameplaySplitGhostGaugeLeft = 1708.0f;
 constexpr float kGameplayGaugeTop = 210.0f;
 constexpr float kGameplayGaugeBottom = 910.0f;
 constexpr float kGameplayHoldTailTaperRatio = 0.55f;
@@ -507,6 +517,14 @@ struct GameplayFieldLayout {
     float note_width = 16.0f;
 };
 
+struct GameplaySurfaceLayout {
+    GameplayFieldLayout player_field{};
+    GameplayFieldLayout ghost_field{};
+    float player_gauge_left = 0.0f;
+    float ghost_gauge_left = 0.0f;
+    bool ghost_visible = false;
+};
+
 GameplayFieldLayout build_gameplay_field_layout(float bounds_left,
                                                 float bounds_right,
                                                 float top,
@@ -532,6 +550,38 @@ GameplayFieldLayout build_gameplay_field_layout(float bounds_left,
     layout.height = std::max(1.0f, bottom - top);
     layout.lane_width = field_width / static_cast<float>(clamped_lane_count);
     layout.note_width = std::min(desired_note_width, std::max(16.0f, layout.lane_width - 4.0f));
+    return layout;
+}
+
+GameplaySurfaceLayout build_gameplay_surface_layout(int lane_count,
+                                                    double note_width_scale,
+                                                    bool ghost_visible) {
+    GameplaySurfaceLayout layout;
+    layout.ghost_visible = ghost_visible;
+    if (ghost_visible) {
+        layout.player_field = build_gameplay_field_layout(kGameplaySplitPlayerFieldLeft,
+                                                          kGameplaySplitPlayerFieldRight,
+                                                          kGameplayFieldTop,
+                                                          kGameplayFieldBottom,
+                                                          lane_count,
+                                                          note_width_scale);
+        layout.ghost_field = build_gameplay_field_layout(kGameplaySplitGhostFieldLeft,
+                                                         kGameplaySplitGhostFieldRight,
+                                                         kGameplayFieldTop,
+                                                         kGameplayFieldBottom,
+                                                         lane_count,
+                                                         note_width_scale);
+        layout.player_gauge_left = kGameplaySplitPlayerGaugeLeft;
+        layout.ghost_gauge_left = kGameplaySplitGhostGaugeLeft;
+    } else {
+        layout.player_field = build_gameplay_field_layout(kGameplayFieldLeft,
+                                                          kGameplayFieldRight,
+                                                          kGameplayFieldTop,
+                                                          kGameplayFieldBottom,
+                                                          lane_count,
+                                                          note_width_scale);
+        layout.player_gauge_left = kGameplayGaugeLeft;
+    }
     return layout;
 }
 
@@ -1538,6 +1588,7 @@ MenuWindow::~MenuWindow() {
 void MenuWindow::shutdown() {
     initialized_.store(false, std::memory_order_release);
     init_success_.store(false, std::memory_order_release);
+    screenshot_requested_.store(false, std::memory_order_release);
     update_cursor_visibility(false);
     clear_song_scrollbar_state();
     hit_regions_.clear();
@@ -1592,6 +1643,7 @@ bool MenuWindow::initialize(const MenuWindowConfig& config) {
     config_dirty_ = false;
     should_close_.store(false, std::memory_order_release);
     fatal_error_.store(false, std::memory_order_release);
+    screenshot_requested_.store(false, std::memory_order_release);
 
     const HRESULT com_hr = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
     if (SUCCEEDED(com_hr)) {
@@ -2044,6 +2096,7 @@ bool MenuWindow::ensure_gameplay_static_cache(const GameplayHudData& data) {
     desired.show_lane_dividers = data.show_lane_dividers;
     desired.show_judgement_line = data.show_judgement_line;
     desired.show_gear_boundary_line = data.show_gear_boundary_line;
+    desired.ghost_visible = data.ghost_visible;
     desired.lane_divider_width_count = resolve_gameplay_lane_divider_widths(
         desired.lane_count,
         data.lane_divider_width_scale,
@@ -2061,6 +2114,7 @@ bool MenuWindow::ensure_gameplay_static_cache(const GameplayHudData& data) {
         gameplay_static_cache_.show_lane_dividers == desired.show_lane_dividers &&
         gameplay_static_cache_.show_judgement_line == desired.show_judgement_line &&
         gameplay_static_cache_.show_gear_boundary_line == desired.show_gear_boundary_line &&
+        gameplay_static_cache_.ghost_visible == desired.ghost_visible &&
         gameplay_static_cache_.lane_divider_width_count == desired.lane_divider_width_count &&
         gameplay_static_cache_.lane_divider_widths == desired.lane_divider_widths;
     if (cache_matches) {
@@ -2088,84 +2142,90 @@ bool MenuWindow::ensure_gameplay_static_cache(const GameplayHudData& data) {
         data.note_height_scale,
         gameplay_note_sprite_cache_.imported_note_height_ratio,
         use_imported_metrics);
-    const GameplayFieldLayout field_layout = build_gameplay_field_layout(
-        kGameplayFieldLeft,
-        kGameplayFieldRight,
-        kGameplayFieldTop,
-        kGameplayFieldBottom,
-        desired.lane_count,
-        note_width_scale);
-    const D2D1_RECT_F field_rect =
-        D2D1::RectF(field_layout.left, field_layout.top, field_layout.right, field_layout.bottom);
+    const GameplaySurfaceLayout surface_layout =
+        build_gameplay_surface_layout(desired.lane_count, note_width_scale, desired.ghost_visible);
+    auto draw_field_panel = [&](const GameplayFieldLayout& field_layout) {
+        const D2D1_RECT_F field_rect =
+            D2D1::RectF(field_layout.left, field_layout.top, field_layout.right, field_layout.bottom);
 
-    if (d2d_->panel_brush) {
-        d2d_->panel_brush->SetOpacity(0.84f);
-        d2d_->d2d_context->FillRoundedRectangle(D2D1::RoundedRect(field_rect, 16.0f, 16.0f), d2d_->panel_brush.Get());
-        d2d_->panel_brush->SetOpacity(1.0f);
-    }
-    if (d2d_->card_brush) {
-        const float lane_width = field_layout.lane_width;
-        for (int lane = 0; lane < desired.lane_count; ++lane) {
-            const float left = field_layout.left + lane_width * static_cast<float>(lane);
-            const float right = left + lane_width;
-            d2d_->card_brush->SetOpacity((lane % 2 == 0) ? 0.28f : 0.18f);
-            d2d_->d2d_context->FillRectangle(
-                D2D1::RectF(left + 1.0f, field_layout.top + 1.0f, right - 1.0f, field_layout.bottom - 1.0f),
-                d2d_->card_brush.Get());
+        if (d2d_->panel_brush) {
+            d2d_->panel_brush->SetOpacity(0.84f);
+            d2d_->d2d_context->FillRoundedRectangle(
+                D2D1::RoundedRect(field_rect, 16.0f, 16.0f), d2d_->panel_brush.Get());
+            d2d_->panel_brush->SetOpacity(1.0f);
         }
-        d2d_->card_brush->SetOpacity(1.0f);
-    }
-    if (d2d_->button_border_brush) {
-        d2d_->d2d_context->DrawRoundedRectangle(D2D1::RoundedRect(field_rect, 16.0f, 16.0f),
-                                                d2d_->button_border_brush.Get(),
-                                                1.4f);
-    }
-
-    if (desired.show_lane_dividers && d2d_->button_border_brush) {
-        const float lane_width = field_layout.lane_width;
-        for (std::size_t divider = 0; divider < desired.lane_divider_width_count; ++divider) {
-            const float x = field_layout.left + lane_width * static_cast<float>(divider + 1);
-            const float stroke = std::max(0.0f, desired.lane_divider_widths[divider]);
-            if (stroke <= 0.0f) {
-                continue;
+        if (d2d_->card_brush) {
+            const float lane_width = field_layout.lane_width;
+            for (int lane = 0; lane < desired.lane_count; ++lane) {
+                const float left = field_layout.left + lane_width * static_cast<float>(lane);
+                const float right = left + lane_width;
+                d2d_->card_brush->SetOpacity((lane % 2 == 0) ? 0.28f : 0.18f);
+                d2d_->d2d_context->FillRectangle(
+                    D2D1::RectF(left + 1.0f, field_layout.top + 1.0f, right - 1.0f, field_layout.bottom - 1.0f),
+                    d2d_->card_brush.Get());
             }
-            d2d_->d2d_context->DrawLine(D2D1::Point2F(x, field_layout.top + 3.0f),
-                                        D2D1::Point2F(x, field_layout.bottom - 3.0f),
-                                        d2d_->button_border_brush.Get(),
-                                        stroke);
+            d2d_->card_brush->SetOpacity(1.0f);
         }
-    }
+        if (d2d_->button_border_brush) {
+            d2d_->d2d_context->DrawRoundedRectangle(D2D1::RoundedRect(field_rect, 16.0f, 16.0f),
+                                                    d2d_->button_border_brush.Get(),
+                                                    1.4f);
+        }
 
-    const float hit_line_y =
-        gameplay_field_y(field_layout.top, field_layout.height, desired.judgement_line_position);
-    if (desired.show_judgement_line && d2d_->judgement_line_brush) {
-        const D2D1_RECT_F line_rect =
-            gameplay_judgement_line_rect(field_layout, hit_line_y, note_height_scale);
-        d2d_->d2d_context->FillRoundedRectangle(D2D1::RoundedRect(line_rect, 5.0f, 5.0f),
-                                                d2d_->judgement_line_brush.Get());
-    }
-    if (desired.show_gear_boundary_line && d2d_->accent_brush) {
-        const float gear_top = gameplay_osu_gear_top(field_layout, hit_line_y, note_height_scale);
-        d2d_->accent_brush->SetOpacity(0.38f);
-        d2d_->d2d_context->DrawLine(D2D1::Point2F(field_layout.left + 4.0f, gear_top),
-                                    D2D1::Point2F(field_layout.right - 4.0f, gear_top),
-                                    d2d_->accent_brush.Get(),
-                                    1.4f);
-        d2d_->accent_brush->SetOpacity(1.0f);
-    }
+        if (desired.show_lane_dividers && d2d_->button_border_brush) {
+            const float lane_width = field_layout.lane_width;
+            for (std::size_t divider = 0; divider < desired.lane_divider_width_count; ++divider) {
+                const float x = field_layout.left + lane_width * static_cast<float>(divider + 1);
+                const float stroke = std::max(0.0f, desired.lane_divider_widths[divider]);
+                if (stroke <= 0.0f) {
+                    continue;
+                }
+                d2d_->d2d_context->DrawLine(D2D1::Point2F(x, field_layout.top + 3.0f),
+                                            D2D1::Point2F(x, field_layout.bottom - 3.0f),
+                                            d2d_->button_border_brush.Get(),
+                                            stroke);
+            }
+        }
 
-    const D2D1_RECT_F gauge_frame = D2D1::RectF(
-        kGameplayGaugeLeft, kGameplayGaugeTop, kGameplayGaugeLeft + kGameplayGaugeWidth, kGameplayGaugeBottom);
-    if (d2d_->footer_brush) {
-        d2d_->footer_brush->SetOpacity(0.62f);
-        d2d_->d2d_context->FillRoundedRectangle(D2D1::RoundedRect(gauge_frame, 10.0f, 10.0f),
-                                                d2d_->footer_brush.Get());
-        d2d_->footer_brush->SetOpacity(1.0f);
-    }
-    if (d2d_->button_border_brush) {
-        d2d_->d2d_context->DrawRoundedRectangle(D2D1::RoundedRect(gauge_frame, 10.0f, 10.0f),
-                                                d2d_->button_border_brush.Get(),
-                                                1.4f);
+        const float hit_line_y =
+            gameplay_field_y(field_layout.top, field_layout.height, desired.judgement_line_position);
+        if (desired.show_judgement_line && d2d_->judgement_line_brush) {
+            const D2D1_RECT_F line_rect =
+                gameplay_judgement_line_rect(field_layout, hit_line_y, note_height_scale);
+            d2d_->d2d_context->FillRoundedRectangle(D2D1::RoundedRect(line_rect, 5.0f, 5.0f),
+                                                    d2d_->judgement_line_brush.Get());
+        }
+        if (desired.show_gear_boundary_line && d2d_->accent_brush) {
+            const float gear_top = gameplay_osu_gear_top(field_layout, hit_line_y, note_height_scale);
+            d2d_->accent_brush->SetOpacity(0.38f);
+            d2d_->d2d_context->DrawLine(D2D1::Point2F(field_layout.left + 4.0f, gear_top),
+                                        D2D1::Point2F(field_layout.right - 4.0f, gear_top),
+                                        d2d_->accent_brush.Get(),
+                                        1.4f);
+            d2d_->accent_brush->SetOpacity(1.0f);
+        }
+    };
+    auto draw_gauge_frame = [&](float gauge_left) {
+        const D2D1_RECT_F gauge_frame = D2D1::RectF(
+            gauge_left, kGameplayGaugeTop, gauge_left + kGameplayGaugeWidth, kGameplayGaugeBottom);
+        if (d2d_->footer_brush) {
+            d2d_->footer_brush->SetOpacity(0.62f);
+            d2d_->d2d_context->FillRoundedRectangle(D2D1::RoundedRect(gauge_frame, 10.0f, 10.0f),
+                                                    d2d_->footer_brush.Get());
+            d2d_->footer_brush->SetOpacity(1.0f);
+        }
+        if (d2d_->button_border_brush) {
+            d2d_->d2d_context->DrawRoundedRectangle(D2D1::RoundedRect(gauge_frame, 10.0f, 10.0f),
+                                                    d2d_->button_border_brush.Get(),
+                                                    1.4f);
+        }
+    };
+
+    draw_field_panel(surface_layout.player_field);
+    draw_gauge_frame(surface_layout.player_gauge_left);
+    if (surface_layout.ghost_visible) {
+        draw_field_panel(surface_layout.ghost_field);
+        draw_gauge_frame(surface_layout.ghost_gauge_left);
     }
 
     const HRESULT end_draw_hr = d2d_->d2d_context->EndDraw();
@@ -2484,6 +2544,187 @@ void MenuWindow::render(const MenuRenderData& data) {
 
 void MenuWindow::request_close() {
     should_close_.store(true, std::memory_order_release);
+}
+
+void MenuWindow::request_screenshot() {
+    screenshot_requested_.store(true, std::memory_order_release);
+}
+
+bool MenuWindow::save_screenshot_to_png() {
+    if (!d2d_ || !d2d_->swap_chain || !d2d_->device || !d2d_->context || !d2d_->wic_factory) {
+        std::cerr << "[warn] Screenshot skipped: renderer resources are unavailable." << std::endl;
+        return false;
+    }
+
+    Microsoft::WRL::ComPtr<ID3D11Texture2D> back_buffer;
+    HRESULT hr = d2d_->swap_chain->GetBuffer(0, IID_PPV_ARGS(&back_buffer));
+    if (FAILED(hr) || !back_buffer) {
+        std::cerr << "[warn] Screenshot failed: could not read swap-chain buffer hr=0x"
+                  << std::hex << static_cast<unsigned long>(hr) << std::dec << std::endl;
+        return false;
+    }
+
+    D3D11_TEXTURE2D_DESC source_desc{};
+    back_buffer->GetDesc(&source_desc);
+    if (source_desc.Width == 0 || source_desc.Height == 0) {
+        std::cerr << "[warn] Screenshot skipped: swap-chain buffer has zero size." << std::endl;
+        return false;
+    }
+
+    D3D11_TEXTURE2D_DESC staging_desc = source_desc;
+    staging_desc.BindFlags = 0;
+    staging_desc.MiscFlags = 0;
+    staging_desc.Usage = D3D11_USAGE_STAGING;
+    staging_desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
+
+    Microsoft::WRL::ComPtr<ID3D11Texture2D> staging_texture;
+    hr = d2d_->device->CreateTexture2D(&staging_desc, nullptr, &staging_texture);
+    if (FAILED(hr) || !staging_texture) {
+        std::cerr << "[warn] Screenshot failed: could not create staging texture hr=0x"
+                  << std::hex << static_cast<unsigned long>(hr) << std::dec << std::endl;
+        return false;
+    }
+
+    d2d_->context->CopyResource(staging_texture.Get(), back_buffer.Get());
+
+    D3D11_MAPPED_SUBRESOURCE mapped{};
+    hr = d2d_->context->Map(staging_texture.Get(), 0, D3D11_MAP_READ, 0, &mapped);
+    if (FAILED(hr) || !mapped.pData || mapped.RowPitch == 0) {
+        std::cerr << "[warn] Screenshot failed: could not map staging texture hr=0x"
+                  << std::hex << static_cast<unsigned long>(hr) << std::dec << std::endl;
+        return false;
+    }
+
+    bool saved = false;
+    do {
+        const std::uint64_t buffer_size_u64 =
+            static_cast<std::uint64_t>(mapped.RowPitch) * static_cast<std::uint64_t>(source_desc.Height);
+        if (buffer_size_u64 == 0 ||
+            buffer_size_u64 > static_cast<std::uint64_t>((std::numeric_limits<UINT>::max)())) {
+            std::cerr << "[warn] Screenshot failed: mapped buffer size is invalid." << std::endl;
+            break;
+        }
+
+        std::error_code ec;
+        std::filesystem::path screenshot_dir = std::filesystem::current_path(ec);
+        if (ec || screenshot_dir.empty()) {
+            screenshot_dir = std::filesystem::temp_directory_path(ec);
+            if (ec || screenshot_dir.empty()) {
+                std::cerr << "[warn] Screenshot failed: could not resolve output directory." << std::endl;
+                break;
+            }
+        }
+        screenshot_dir /= "screenshots";
+        std::filesystem::create_directories(screenshot_dir, ec);
+        if (ec) {
+            std::cerr << "[warn] Screenshot failed: could not create screenshots directory." << std::endl;
+            break;
+        }
+
+        const auto now = std::chrono::system_clock::now();
+        const auto now_ms = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch());
+        const int millisecond = static_cast<int>(now_ms.count() % 1000);
+        const std::time_t now_time = std::chrono::system_clock::to_time_t(now);
+        std::tm local_tm{};
+        localtime_s(&local_tm, &now_time);
+
+        std::wstringstream filename_stream;
+        filename_stream << L"tenriff_" << std::put_time(&local_tm, L"%Y%m%d_%H%M%S")
+                        << L'_' << std::setw(3) << std::setfill(L'0') << millisecond << L".png";
+        const std::filesystem::path screenshot_path = screenshot_dir / filename_stream.str();
+
+        Microsoft::WRL::ComPtr<IWICStream> stream;
+        hr = d2d_->wic_factory->CreateStream(&stream);
+        if (FAILED(hr) || !stream) {
+            std::cerr << "[warn] Screenshot failed: could not create WIC stream hr=0x"
+                      << std::hex << static_cast<unsigned long>(hr) << std::dec << std::endl;
+            break;
+        }
+
+        hr = stream->InitializeFromFilename(screenshot_path.c_str(), GENERIC_WRITE);
+        if (FAILED(hr)) {
+            std::cerr << "[warn] Screenshot failed: could not open output file hr=0x"
+                      << std::hex << static_cast<unsigned long>(hr) << std::dec << std::endl;
+            break;
+        }
+
+        Microsoft::WRL::ComPtr<IWICBitmapEncoder> encoder;
+        hr = d2d_->wic_factory->CreateEncoder(GUID_ContainerFormatPng, nullptr, &encoder);
+        if (FAILED(hr) || !encoder) {
+            std::cerr << "[warn] Screenshot failed: could not create PNG encoder hr=0x"
+                      << std::hex << static_cast<unsigned long>(hr) << std::dec << std::endl;
+            break;
+        }
+
+        hr = encoder->Initialize(stream.Get(), WICBitmapEncoderNoCache);
+        if (FAILED(hr)) {
+            std::cerr << "[warn] Screenshot failed: encoder init failed hr=0x"
+                      << std::hex << static_cast<unsigned long>(hr) << std::dec << std::endl;
+            break;
+        }
+
+        Microsoft::WRL::ComPtr<IWICBitmapFrameEncode> frame;
+        Microsoft::WRL::ComPtr<IPropertyBag2> property_bag;
+        hr = encoder->CreateNewFrame(&frame, &property_bag);
+        if (FAILED(hr) || !frame) {
+            std::cerr << "[warn] Screenshot failed: frame creation failed hr=0x"
+                      << std::hex << static_cast<unsigned long>(hr) << std::dec << std::endl;
+            break;
+        }
+
+        hr = frame->Initialize(property_bag.Get());
+        if (FAILED(hr)) {
+            std::cerr << "[warn] Screenshot failed: frame init failed hr=0x"
+                      << std::hex << static_cast<unsigned long>(hr) << std::dec << std::endl;
+            break;
+        }
+
+        hr = frame->SetSize(source_desc.Width, source_desc.Height);
+        if (FAILED(hr)) {
+            std::cerr << "[warn] Screenshot failed: frame size setup failed hr=0x"
+                      << std::hex << static_cast<unsigned long>(hr) << std::dec << std::endl;
+            break;
+        }
+
+        WICPixelFormatGUID pixel_format = GUID_WICPixelFormat32bppBGRA;
+        hr = frame->SetPixelFormat(&pixel_format);
+        if (FAILED(hr)) {
+            std::cerr << "[warn] Screenshot failed: pixel format setup failed hr=0x"
+                      << std::hex << static_cast<unsigned long>(hr) << std::dec << std::endl;
+            break;
+        }
+
+        hr = frame->WritePixels(source_desc.Height,
+                                mapped.RowPitch,
+                                static_cast<UINT>(buffer_size_u64),
+                                static_cast<BYTE*>(mapped.pData));
+        if (FAILED(hr)) {
+            std::cerr << "[warn] Screenshot failed: pixel write failed hr=0x"
+                      << std::hex << static_cast<unsigned long>(hr) << std::dec << std::endl;
+            break;
+        }
+
+        hr = frame->Commit();
+        if (FAILED(hr)) {
+            std::cerr << "[warn] Screenshot failed: frame commit failed hr=0x"
+                      << std::hex << static_cast<unsigned long>(hr) << std::dec << std::endl;
+            break;
+        }
+
+        hr = encoder->Commit();
+        if (FAILED(hr)) {
+            std::cerr << "[warn] Screenshot failed: encoder commit failed hr=0x"
+                      << std::hex << static_cast<unsigned long>(hr) << std::dec << std::endl;
+            break;
+        }
+
+        std::cerr << "[info] Screenshot saved: "
+                  << wide_to_utf8(screenshot_path.native()) << std::endl;
+        saved = true;
+    } while (false);
+
+    d2d_->context->Unmap(staging_texture.Get(), 0);
+    return saved;
 }
 
 void MenuWindow::queue_resize(unsigned int width, unsigned int height) {

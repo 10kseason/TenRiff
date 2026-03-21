@@ -220,7 +220,7 @@
             const D2D1_RECT_F guide_header_rect =
                 D2D1::RectF(guide_rect.left + 26.0f, guide_rect.top + 18.0f, guide_rect.right - 26.0f, guide_rect.top + 64.0f);
             if (d2d_->body_format && d2d_->accent_brush) {
-                const std::wstring guide_header_w = L"GUIDE";
+                const std::wstring guide_header_w = wloc("GUIDE", "가이드");
                 draw_text_clipped(guide_header_w, d2d_->body_format.Get(), guide_header_rect, d2d_->accent_brush.Get());
             }
             draw_song_select_horizon(guide_rect.top + 72.0f,

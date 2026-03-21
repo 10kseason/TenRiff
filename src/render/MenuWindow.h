@@ -83,10 +83,12 @@ struct SongCardData {
     std::string artist;
     std::string detail;
     std::string background_path;
+    std::string lamp;
     int level = 0;
     double rating = 0.0;
     int song_index = -1;
     bool selected = false;
+    bool favorite = false;
 };
 
 struct SongSelectData {
@@ -109,6 +111,10 @@ struct SongSelectData {
     std::string selected_song_artist;
     std::string selected_song_detail;
     std::string selected_song_background_path;
+    std::string selected_song_lamp;
+    bool selected_song_favorite = false;
+    std::string selected_song_collection_filter;
+    bool selected_song_ghost_available = false;
     std::string browser_summary;
     std::string sort_summary;
     std::string primary_hint;
@@ -273,6 +279,27 @@ struct GameplayHudData {
     std::array<uint32_t, kGameplayHudMaxLanes> lane_colors{};
     std::size_t note_count = 0;
     std::array<GameplayNoteData, kGameplayHudMaxNotes> notes{};
+
+    bool ghost_visible = false;
+    int64_t ghost_score = 0;
+    int ghost_combo = 0;
+    int ghost_max_combo = 0;
+    double ghost_accuracy = 0.0;
+    int ghost_pg = 0;
+    int ghost_gr = 0;
+    int ghost_gd = 0;
+    int ghost_bd = 0;
+    double ghost_gauge = 0.0;
+    std::string ghost_gauge_label;
+    bool ghost_has_feedback = false;
+    std::string ghost_feedback;
+    double ghost_feedback_delta_ms = 0.0;
+    bool ghost_finished = false;
+    bool ghost_game_over = false;
+    std::size_t ghost_lane_activity_count = 0;
+    std::array<float, kGameplayHudMaxLanes> ghost_lane_activity{};
+    std::size_t ghost_note_count = 0;
+    std::array<GameplayNoteData, kGameplayHudMaxNotes> ghost_notes{};
 };
 
 struct MenuRowData {
@@ -350,6 +377,7 @@ struct PerformanceOverlayData {
 
 struct MenuRenderData {
     MenuScreenKind kind = MenuScreenKind::GenericList;
+    bool ui_korean = false;
 
     std::string screen_title;
     std::vector<std::string> lines;
@@ -375,6 +403,7 @@ public:
     void render(const MenuRenderData& data);
     void shutdown();
     void request_close();
+    void request_screenshot();
     void queue_resize(unsigned int width, unsigned int height);
     void on_mouse_button_down(int window_x, int window_y);
     void on_mouse_click(int window_x, int window_y, bool double_click);
@@ -411,6 +440,7 @@ private:
     void invalidate_gameplay_static_cache();
     [[nodiscard]] bool ensure_gameplay_static_cache(const GameplayHudData& data);
     [[nodiscard]] bool recreate_targets();
+    [[nodiscard]] bool save_screenshot_to_png();
     [[nodiscard]] bool is_input_foreground() const;
     void update_cursor_visibility(bool hidden);
     void resize_swap_chain(unsigned int width, unsigned int height);
@@ -429,6 +459,7 @@ private:
     std::atomic<bool> init_done_{false};
     std::atomic<bool> init_success_{false};
     std::atomic<bool> fatal_error_{false};
+    std::atomic<bool> screenshot_requested_{false};
     bool fullscreen_ = false;
     bool fullscreen_restore_pending_ = false;
     bool com_initialized_ = false;
@@ -486,6 +517,12 @@ private:
         std::wstring gauge_label_text{};
         std::wstring gauge_value_text{};
         std::wstring feedback_text{};
+        std::wstring ghost_score_text{};
+        std::wstring ghost_combo_text{};
+        std::wstring ghost_judge_stats_text{};
+        std::wstring ghost_gauge_label_text{};
+        std::wstring ghost_gauge_value_text{};
+        std::wstring ghost_feedback_text{};
     };
 
     struct GameplayStaticCache {
@@ -497,6 +534,7 @@ private:
         bool show_lane_dividers = true;
         bool show_judgement_line = true;
         bool show_gear_boundary_line = false;
+        bool ghost_visible = false;
         std::size_t lane_divider_width_count = 0;
         std::array<float, kGameplayHudMaxLanes> lane_divider_widths{};
     };

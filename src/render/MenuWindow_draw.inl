@@ -110,6 +110,14 @@ void MenuWindow::draw(const MenuRenderData& data) {
         format->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_LEADING);
     };
 
+    const bool ui_korean = data.ui_korean;
+    auto loc = [&](std::string_view english, std::string_view korean) {
+        return std::string(ui_korean ? korean : english);
+    };
+    auto wloc = [&](std::string_view english, std::string_view korean) {
+        return to_wide(std::string(ui_korean ? korean : english));
+    };
+
     auto inset_rect = [](const D2D1_RECT_F& rect, float dx, float dy) {
         return D2D1::RectF(rect.left + dx, rect.top + dy, rect.right - dx, rect.bottom - dy);
     };
@@ -266,10 +274,10 @@ void MenuWindow::draw(const MenuRenderData& data) {
             }
         }
 
-        const std::string profile_text = std::string("PROFILE: ") +
+        const std::string profile_text = loc("PROFILE: ", "프로필: ") +
                                          (profile.empty() ? std::string("PLAYER01") : std::string(profile));
-        const std::string track_text = std::string("TRACK: ") + (track.empty() ? std::string("-") : std::string(track));
-        const std::string score_text = std::string("HIGH SCORE  ") + format_int_with_commas(high_score);
+        const std::string track_text = loc("TRACK: ", "트랙: ") + (track.empty() ? std::string("-") : std::string(track));
+        const std::string score_text = loc("HIGH SCORE  ", "최고 점수  ") + format_int_with_commas(high_score);
 
         const std::wstring profile_w = to_wide(profile_text);
         const std::wstring track_w = to_wide(track_text);
@@ -759,6 +767,10 @@ void MenuWindow::draw(const MenuRenderData& data) {
             shutdown();
             return;
         }
+    }
+    if (SUCCEEDED(hr) &&
+        screenshot_requested_.exchange(false, std::memory_order_acq_rel)) {
+        (void)save_screenshot_to_png();
     }
 
     UINT present_flags = 0;
