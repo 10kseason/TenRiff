@@ -345,7 +345,13 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
                 current_best.has_value ? current_best.clear_status : ui_text("NO PLAY", "기록 없음");
             render.song_select.selected_song_favorite = selected_song_is_favorite();
             render.song_select.selected_song_collection_filter = song_collection_filter_label();
-            render.song_select.selected_song_ghost_available = !best_replay_path_for_selected_song().empty();
+            if (!config_.mode.ghost_battle_enabled) {
+                render.song_select.selected_song_ghost_status = ui_text("OFF", "끔");
+            } else if (!best_replay_path_for_selected_song().empty()) {
+                render.song_select.selected_song_ghost_status = ui_text("READY", "준비됨");
+            } else {
+                render.song_select.selected_song_ghost_status = ui_text("NONE", "없음");
+            }
         }
     }
 
@@ -358,7 +364,7 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
             render.song_select.great = selected_record->great;
             render.song_select.good = selected_record->good;
             render.song_select.bad = selected_record->bad;
-            render.song_select.miss = selected_record->miss;
+            render.song_select.poor = selected_record->poor;
             render.song_select.accuracy = selected_record->accuracy;
             render.song_select.selected_record_created_utc =
                 menu_records::compact_timestamp_label(selected_record->created_utc);
@@ -388,7 +394,7 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
         render.song_select.great = current_best.has_value ? current_best.great : 0;
         render.song_select.good = current_best.has_value ? current_best.good : 0;
         render.song_select.bad = current_best.has_value ? current_best.bad : 0;
-        render.song_select.miss = current_best.has_value ? current_best.miss : 0;
+        render.song_select.poor = current_best.has_value ? current_best.poor : 0;
     }
 }
 

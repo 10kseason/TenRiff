@@ -30,10 +30,22 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
     target.judgement_line_position = clamped_judgement_line_position;
     target.combo_position = clamped_combo_position;
     const std::string skin_mode = std::to_string(target.lane_count) + "k";
+    const auto resolved_lane_widths = config::resolved_skin_lane_width_scales(config_.skin, skin_mode);
+    target.lane_width_scale_count = std::min(resolved_lane_widths.size(), target.lane_width_scales.size());
+    target.lane_width_scales.fill(config::kLaneWidthScaleDefault);
+    for (std::size_t i = 0; i < target.lane_width_scale_count; ++i) {
+        target.lane_width_scales[i] = resolved_lane_widths[i];
+    }
     target.note_width_scale = std::clamp(
         config::resolved_skin_note_width_scale(config_.skin, skin_mode),
         config::kNoteWidthScaleMin,
         config::kNoteWidthScaleMax);
+    const auto resolved_lane_spacings = config::resolved_skin_lane_spacing_scales(config_.skin, skin_mode);
+    target.lane_spacing_scale_count = std::min(resolved_lane_spacings.size(), target.lane_spacing_scales.size());
+    target.lane_spacing_scales.fill(config::kLaneSpacingScaleDefault);
+    for (std::size_t i = 0; i < target.lane_spacing_scale_count; ++i) {
+        target.lane_spacing_scales[i] = resolved_lane_spacings[i];
+    }
     target.note_height_scale = std::clamp(
         config::resolved_skin_note_height_scale(config_.skin, skin_mode),
         config::kNoteHeightScaleMin,
@@ -42,6 +54,10 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
         config::resolved_skin_lane_divider_width_scale(config_.skin, skin_mode),
         config::kLaneDividerWidthScaleMin,
         config::kLaneDividerWidthScaleMax);
+    target.lane_center_gap_scale = std::clamp(
+        config::resolved_skin_lane_center_gap_scale(config_.skin, skin_mode),
+        config::kLaneCenterGapScaleMin,
+        config::kLaneCenterGapScaleMax);
     target.hold_body_width_scale = std::clamp(
         config_.skin.hold_body_width_scale,
         config::kHoldBodyWidthScaleMin,
@@ -67,6 +83,7 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
     target.gr = gameplay_hud_.counts.gr;
     target.gd = gameplay_hud_.counts.gd;
     target.bd = gameplay_hud_.counts.bd;
+    target.pr = gameplay_hud_.counts.pr;
     target.total_notes = gameplay_hud_.counts.pg + gameplay_hud_.counts.gr +
                          gameplay_hud_.counts.gd + gameplay_hud_.counts.bd;
     target.gauge = gameplay_hud_.gauge;
@@ -122,6 +139,7 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
     target.ghost_gr = gameplay_hud_.ghost_counts.gr;
     target.ghost_gd = gameplay_hud_.ghost_counts.gd;
     target.ghost_bd = gameplay_hud_.ghost_counts.bd;
+    target.ghost_pr = gameplay_hud_.ghost_counts.pr;
     target.ghost_gauge = gameplay_hud_.ghost_gauge;
     target.ghost_gauge_label = gauge_type_label(gameplay_hud_.ghost_gauge_type);
     target.ghost_has_feedback = gameplay_hud_.ghost_has_feedback;
@@ -370,7 +388,7 @@ void MenuApp::populate_result_render_data(render::MenuRenderData& render, const 
     render.result.great = last_result_.counts.gr;
     render.result.good = last_result_.counts.gd;
     render.result.bad = last_result_.counts.bd;
-    render.result.miss = 0;
+    render.result.poor = last_result_.counts.pr;
     render.result.mean_delta_ms = last_result_.mean_delta_ms;
     render.result.stddev_delta_ms = last_result_.stddev_delta_ms();
     render.result.shift_count = static_cast<int>(last_result_.shifts.size());
@@ -963,7 +981,7 @@ void MenuApp::launch_gameplay(const std::string& chart_path, const std::string& 
     CommandLineOptions play_options = options_;
     play_options.chart_path = chart_path;
     play_options.replay_path = replay_path;
-    if (replay_path.empty()) {
+    if (replay_path.empty() && config_.mode.ghost_battle_enabled) {
         play_options.ghost_replay_path = best_replay_path_for_selected_song();
     }
     if (!session.initialize(play_options)) {
@@ -1217,12 +1235,14 @@ void MenuApp::populate_help_overlay(render::HelpOverlayData& target) const {
             target.lines = {
                 ui_text("Up / Down or the mouse wheel selects a row. Long lists show a scrollbar on the right.",
                         "위 / 아래 키 또는 마우스 휠로 행을 선택합니다. 긴 목록은 오른쪽 스크롤바가 표시됩니다."),
-                ui_text("Gauge, Random, Mods, Rate, and Hi-Speed change the play feel for the next song.",
-                        "게이지, 랜덤, 모드, Rate, Hi-Speed는 다음 곡의 플레이 감각을 바꿉니다."),
+                ui_text("Ghost Battle, Gauge, Random, Mods, Rate, and Hi-Speed change the next-song compare/play feel.",
+                        "고스트 배틀, 게이지, 랜덤, 모드, Rate, Hi-Speed는 다음 곡의 비교/플레이 감각을 바꿉니다."),
                 ui_text("Indexing Safe minimizes RAM for huge libraries. Fast spends more RAM to speed up rescans.",
                         "인덱싱 안전은 큰 라이브러리에서 RAM 사용을 줄이고, 빠름은 더 많은 RAM으로 재스캔을 빠르게 합니다."),
                 ui_text("Chart Filter decides whether Song Select shows BMS, OSU, or both when OSU indexing is enabled.",
                         "Chart Filter는 OSU 인덱싱이 켜졌을 때 Song Select에 BMS, OSU, 둘 다 표시할지 정합니다."),
+                ui_text("Ghost Battle uses the selected chart's best compatible replay when one exists; turn it off to keep single-field play.",
+                        "고스트 배틀은 선택한 차트의 호환되는 최고 리플레이가 있으면 사용하며, 끄면 단일 플레이 필드로 유지됩니다."),
                 ui_text("Enter on Mods opens the registry-backed Mod Manager for score-multiplier presets.",
                         "Mods에서 Enter를 누르면 점수 배율 프리셋용 Mod Manager를 엽니다."),
             };

@@ -319,7 +319,7 @@ private:
         int great = 0;
         int good = 0;
         int bad = 0;
-        int miss = 0;
+        int poor = 0;
         std::string created_utc;
     };
 
@@ -346,7 +346,7 @@ private:
         int great = 0;
         int good = 0;
         int bad = 0;
-        int miss = 0;
+        int poor = 0;
         double mean_delta_ms = 0.0;
         double stddev_delta_ms = 0.0;
     };
@@ -417,6 +417,7 @@ private:
     int song_select_nav_cursor_ = 0;
     int keymap_cursor_ = 0;
     int skin_edit_lane_ = 0;
+    int skin_edit_gap_ = 0;
     bool keymap_dirty_ = false;
     bool keymap_capture_active_ = false;
     int64_t keymap_capture_deadline_ns_ = 0;

@@ -155,9 +155,9 @@ MenuApp::BestResultRecord MenuApp::best_result_for_song_entry(const SongEntry& e
                 continue;
             }
 
-            const int best_judged = best.perfect + best.great + best.good + best.bad + best.miss;
+            const int best_judged = best.perfect + best.great + best.good + best.bad;
             const int found_judged = found->second.perfect + found->second.great + found->second.good +
-                                     found->second.bad + found->second.miss;
+                                     found->second.bad;
             if (menu_records::is_better_record(found->second.best_score,
                                                menu_records::clear_status_priority(found->second.clear_status,
                                                                                    found->second.game_over,

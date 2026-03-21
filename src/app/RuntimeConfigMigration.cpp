@@ -133,9 +133,9 @@ constexpr GaugeDeltaTable kPreviousCurrentHardGaugeV7{0.16000000, 0.09000000, 0.
 constexpr GaugeDeltaTable kPreviousCurrentNormalGaugeV7{0.19000000, 0.15000000, 0.01000000, -6.00000, -6.00000};
 constexpr GaugeDeltaTable kPreviousCurrentEasyGaugeV7{0.25000000, 0.20000000, 0.01000000, -4.00000, -4.00000};
 
-constexpr GaugeDeltaTable kCurrentHardGauge{0.16000000, 0.09000000, 0.01000000, -10.00000, -10.00000};
-constexpr GaugeDeltaTable kCurrentNormalGauge{0.19000000, 0.15000000, 0.01000000, -6.25000, -6.25000};
-constexpr GaugeDeltaTable kCurrentEasyGauge{0.25000000, 0.20000000, 0.01000000, -4.10000, -4.10000};
+constexpr GaugeDeltaTable kCurrentHardGauge{0.16000000, 0.09000000, 0.01000000, -10.00000, -2.00000};
+constexpr GaugeDeltaTable kCurrentNormalGauge{0.19000000, 0.15000000, 0.01000000, -6.25000, -2.00000};
+constexpr GaugeDeltaTable kCurrentEasyGauge{0.25000000, 0.20000000, 0.01000000, -4.10000, -1.60000};
 
 bool migrate_gauge_delta(double& value, double legacy_value, double current_value) {
     if (std::abs(value - current_value) <= kGaugeDeltaTolerance) {

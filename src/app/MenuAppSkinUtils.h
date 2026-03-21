@@ -181,11 +181,25 @@ inline std::vector<std::string>& editable_skin_lane_colors(config::SkinConfig& s
     return colors;
 }
 
+inline std::vector<double>& editable_skin_lane_width_scales(config::SkinConfig& skin, std::string_view key_mode) {
+    const std::string normalized = config::normalize_skin_mode_token(key_mode);
+    auto& scales = skin.lane_width_scales[normalized];
+    scales = config::resolved_skin_lane_width_scales(skin, normalized);
+    return scales;
+}
+
 inline double& editable_skin_note_width_scale(config::SkinConfig& skin, std::string_view key_mode) {
     const std::string normalized = config::normalize_skin_mode_token(key_mode);
     auto& scale = skin.note_width_scales[normalized];
     scale = config::resolved_skin_note_width_scale(skin, normalized);
     return scale;
+}
+
+inline std::vector<double>& editable_skin_lane_spacing_scales(config::SkinConfig& skin, std::string_view key_mode) {
+    const std::string normalized = config::normalize_skin_mode_token(key_mode);
+    auto& scales = skin.lane_spacing_scales[normalized];
+    scales = config::resolved_skin_lane_spacing_scales(skin, normalized);
+    return scales;
 }
 
 inline double& editable_skin_note_height_scale(config::SkinConfig& skin, std::string_view key_mode) {
@@ -196,9 +210,18 @@ inline double& editable_skin_note_height_scale(config::SkinConfig& skin, std::st
 }
 
 inline double& editable_skin_lane_divider_width_scale(config::SkinConfig& skin, std::string_view key_mode) {
+    static_cast<void>(key_mode);
+    skin.lane_divider_width_scale = std::clamp(
+        skin.lane_divider_width_scale,
+        config::kLaneDividerWidthScaleMin,
+        config::kLaneDividerWidthScaleMax);
+    return skin.lane_divider_width_scale;
+}
+
+inline double& editable_skin_lane_center_gap_scale(config::SkinConfig& skin, std::string_view key_mode) {
     const std::string normalized = config::normalize_skin_mode_token(key_mode);
-    auto& scale = skin.lane_divider_width_scales[normalized];
-    scale = config::resolved_skin_lane_divider_width_scale(skin, normalized);
+    auto& scale = skin.lane_center_gap_scales[normalized];
+    scale = config::resolved_skin_lane_center_gap_scale(skin, normalized);
     return scale;
 }
 

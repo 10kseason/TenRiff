@@ -75,7 +75,7 @@ void MenuApp::reload_chart_best_results() {
         candidate.great = parsed->stats.counts.gr;
         candidate.good = parsed->stats.counts.gd;
         candidate.bad = parsed->stats.counts.bd;
-        candidate.miss = 0;
+        candidate.poor = parsed->stats.counts.pr;
         candidate.created_utc = parsed->created_utc;
         const int candidate_judged = menu_records::judged_total(parsed->stats.counts);
         const int candidate_clear_priority =
@@ -104,7 +104,7 @@ void MenuApp::reload_chart_best_results() {
         record.great = parsed->stats.counts.gr;
         record.good = parsed->stats.counts.gd;
         record.bad = parsed->stats.counts.bd;
-        record.miss = 0;
+        record.poor = parsed->stats.counts.pr;
         record.mean_delta_ms = parsed->stats.mean_delta_ms;
         record.stddev_delta_ms = parsed->stats.stddev_delta_ms();
         const std::size_t record_index = local_play_records_.size();
@@ -120,8 +120,8 @@ void MenuApp::reload_chart_best_results() {
                 continue;
             }
 
-            const int existing_judged = existing->second.perfect + existing->second.great + existing->second.good +
-                                        existing->second.bad + existing->second.miss;
+            const int existing_judged =
+                existing->second.perfect + existing->second.great + existing->second.good + existing->second.bad;
             const int existing_clear_priority =
                 menu_records::clear_status_priority(existing->second.clear_status,
                                                     existing->second.game_over,

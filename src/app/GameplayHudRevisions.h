@@ -146,6 +146,7 @@ inline GameplayHudRevisionFlags diff_gameplay_hud_revisions(const GameplayHudRev
         previous.counts.gr != next.counts.gr ||
         previous.counts.gd != next.counts.gd ||
         previous.counts.bd != next.counts.bd ||
+        previous.counts.pr != next.counts.pr ||
         previous.score != next.score ||
         previous.gauge != next.gauge ||
         previous.gauge_type != next.gauge_type ||
@@ -161,6 +162,7 @@ inline GameplayHudRevisionFlags diff_gameplay_hud_revisions(const GameplayHudRev
         previous.ghost_counts.gr != next.ghost_counts.gr ||
         previous.ghost_counts.gd != next.ghost_counts.gd ||
         previous.ghost_counts.bd != next.ghost_counts.bd ||
+        previous.ghost_counts.pr != next.ghost_counts.pr ||
         previous.ghost_gauge != next.ghost_gauge ||
         previous.ghost_gauge_type != next.ghost_gauge_type ||
         previous.ghost_has_feedback != next.ghost_has_feedback ||

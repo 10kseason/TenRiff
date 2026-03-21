@@ -325,8 +325,7 @@ std::optional<ParsedResultRecord> parse_result_file(const std::filesystem::path&
         out.stats.counts.gr = read_json_int(*counts_obj, "gr", 0);
         out.stats.counts.gd = read_json_int(*counts_obj, "gd", 0);
         out.stats.counts.bd = read_json_int(*counts_obj, "bd", 0);
-        out.stats.counts.bd += read_json_int(*counts_obj, "pr", 0);
-        out.stats.counts.pr = 0;
+        out.stats.counts.pr = read_json_int(*counts_obj, "pr", 0);
     }
     out.stats.max_combo = read_json_int(*stats_obj, "max_combo", 0);
     out.stats.total_notes = read_json_int(*stats_obj, "total_notes", 0);

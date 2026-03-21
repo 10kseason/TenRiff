@@ -14,6 +14,7 @@ namespace {
 
 constexpr int64_t kKeymapCaptureTimeoutNs = 5'000'000'000LL;
 constexpr int64_t kKeymapStatusTimeoutNs = 2'000'000'000LL;
+constexpr int kKeymapFooterReservedLines = 6;
 
 }
 
@@ -37,9 +38,10 @@ void MenuApp::open_keymap_screen(Screen return_screen) {
 void MenuApp::populate_keymap_render_data(render::MenuRenderData& render) {
     config::KeymapManager keymap_manager;
     const auto current_bindings = keymap_manager.bindings_for_mode(working_keymap_, keymap_edit_mode_);
+    render.generic.footer_reserved_lines = kKeymapFooterReservedLines;
     if (!keymap_status_message_.empty() &&
         timing::HighResClock::now_ns() < keymap_status_deadline_ns_) {
-        render.generic.notes.push_back(keymap_status_message_);
+        render.generic.footer_notes.push_back(keymap_status_message_);
     }
     append_menu_row(render.generic,
                     ui_text("Key Mode", "키 모드"),
@@ -70,11 +72,11 @@ void MenuApp::populate_keymap_render_data(render::MenuRenderData& render) {
         const int64_t now_ns = timing::HighResClock::now_ns();
         const int64_t remaining_ns = std::max<int64_t>(0, keymap_capture_deadline_ns_ - now_ns);
         const int remaining_ms = static_cast<int>(remaining_ns / 1'000'000);
-        render.generic.notes.push_back(ui_text("Capture timeout: ", "입력 대기 시간: ") + std::to_string(remaining_ms) + "ms");
-        render.generic.notes.push_back(ui_text("Press any keyboard key. Delete cancels capture.",
-                                               "아무 키나 누르세요. Delete 키로 입력 대기를 취소합니다."));
-        render.generic.notes.push_back(ui_text("Duplicate lane bindings are allowed.",
-                                               "같은 키를 여러 레인에 중복으로 배치할 수 있습니다."));
+        render.generic.footer_notes.push_back(ui_text("Capture timeout: ", "입력 대기 시간: ") + std::to_string(remaining_ms) + "ms");
+        render.generic.footer_notes.push_back(ui_text("Press any keyboard key. Delete cancels capture.",
+                                                      "아무 키나 누르세요. Delete 키로 입력 대기를 취소합니다."));
+        render.generic.footer_notes.push_back(ui_text("Duplicate lane bindings are allowed.",
+                                                      "같은 키를 여러 레인에 중복으로 배치할 수 있습니다."));
     }
     append_menu_row(render.generic,
                     ui_text("Save", "저장"),
@@ -108,16 +110,17 @@ void MenuApp::populate_keymap_render_data(render::MenuRenderData& render) {
                     3,
                     !keymap_capture_active_,
                     false);
-    render.generic.notes.push_back(ui_text("Left/Right on Key Mode selects which 4K-10K or 16K layout you are editing.",
-                                           "키 모드에서 좌우 키를 누르면 편집할 4K~10K 또는 16K 레이아웃을 고릅니다."));
-    render.generic.notes.push_back(ui_text("Enter binds the selected lane. A=Save  R=Reset  F2=NKRO Test  Esc=Back",
-                                           "Enter로 선택 레인에 키를 할당합니다. A=저장  R=초기화  F2=NKRO 테스트  Esc=뒤로"));
+    render.generic.footer_notes.push_back(ui_text("Left/Right on Key Mode selects which 4K-10K or 16K layout you are editing.",
+                                                  "키 모드에서 좌우 키를 누르면 편집할 4K~10K 또는 16K 레이아웃을 고릅니다."));
+    render.generic.footer_notes.push_back(ui_text("Enter binds the selected lane. A=Save  R=Reset  F2=NKRO Test  Esc=Back",
+                                                  "Enter로 선택 레인에 키를 할당합니다. A=저장  R=초기화  F2=NKRO 테스트  Esc=뒤로"));
 }
 
 void MenuApp::populate_keymap_confirm_render_data(render::MenuRenderData& render) {
-    render.generic.notes.push_back(ui_text("Duplicate binding detected.", "중복 키 할당이 감지되었습니다."));
-    render.generic.notes.push_back(ui_text("Key: ", "키: ") + keymap_pending_key_);
-    render.generic.notes.push_back(ui_text("Already used by: ", "이미 사용 중인 레인: ") + keymap_duplicate_lane_);
+    render.generic.footer_reserved_lines = 3;
+    render.generic.footer_notes.push_back(ui_text("Duplicate binding detected.", "중복 키 할당이 감지되었습니다."));
+    render.generic.footer_notes.push_back(ui_text("Key: ", "키: ") + keymap_pending_key_);
+    render.generic.footer_notes.push_back(ui_text("Already used by: ", "이미 사용 중인 레인: ") + keymap_duplicate_lane_);
     append_menu_row(render.generic,
                     ui_text("Replace Existing Binding", "기존 할당 교체"),
                     "",
@@ -137,7 +140,8 @@ void MenuApp::populate_keymap_confirm_render_data(render::MenuRenderData& render
 }
 
 void MenuApp::populate_keymap_test_render_data(render::MenuRenderData& render) {
-    render.generic.notes.push_back(ui_text("NKRO Test (press multiple keys)", "NKRO 테스트 (여러 키를 동시에 눌러보세요)"));
+    render.generic.footer_reserved_lines = 1;
+    render.generic.footer_notes.push_back(ui_text("NKRO Test (press multiple keys)", "NKRO 테스트 (여러 키를 동시에 눌러보세요)"));
     config::KeymapManager keymap_manager;
     const auto current_bindings = keymap_manager.bindings_for_mode(working_keymap_, keymap_edit_mode_);
     for (std::size_t i = 0; i < keymap_lanes_.size(); ++i) {

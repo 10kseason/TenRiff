@@ -252,7 +252,7 @@ std::string judgement_label(game::Judgement judgement) {
         case game::Judgement::GD: return "G";
         case game::Judgement::BD: return "BAD";
         case game::Judgement::PR:
-        default: return "BAD";
+        default: return "POOR";
     }
 }
 
@@ -1601,6 +1601,7 @@ void MenuApp::handle_options_hub_input(uint32_t keycode) {
                 skin_dirty_ = false;
                 skin_edit_mode_ = normalize_skin_edit_mode(config_.mode.key_mode);
                 skin_edit_lane_ = 0;
+                skin_edit_gap_ = 0;
                 refresh_available_osu_skins();
                 refresh_available_lr2_skins();
                 break;
