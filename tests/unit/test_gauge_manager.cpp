@@ -39,19 +39,17 @@ TEST_CASE("all gauge types now start at their cap") {
 
     const auto normal = manager.initialState(GaugeType::Normal);
     CHECK(normal.type == GaugeType::Normal);
-    CHECK(almost_equal(normal.value, 50.0));
+    CHECK(almost_equal(normal.value, 100.0));
     CHECK_FALSE(normal.game_over);
 
     const auto easy = manager.initialState(GaugeType::Easy);
     CHECK(easy.type == GaugeType::Easy);
-    CHECK(almost_equal(easy.value, 40.0));
+    CHECK(almost_equal(easy.value, 100.0));
     CHECK_FALSE(easy.game_over);
 }
 
 TEST_CASE("default PG recovery matches requested per-hit values") {
-    tenriff::game::GaugeConfig config;
-    config.auto_shift = false;
-    GaugeManager manager(config);
+    GaugeManager manager;
 
     GaugeState hard{GaugeType::Hard, 0.0, false};
     manager.applyJudgement(hard, Judgement::PG, 0.0);
@@ -67,9 +65,7 @@ TEST_CASE("default PG recovery matches requested per-hit values") {
 }
 
 TEST_CASE("default GR recovery uses the requested per-gauge values") {
-    tenriff::game::GaugeConfig config;
-    config.auto_shift = false;
-    GaugeManager manager(config);
+    GaugeManager manager;
 
     GaugeState hard{GaugeType::Hard, 0.0, false};
     manager.applyJudgement(hard, Judgement::GR, 0.0);
@@ -85,9 +81,7 @@ TEST_CASE("default GR recovery uses the requested per-gauge values") {
 }
 
 TEST_CASE("default GD recovery uses the requested per-gauge values") {
-    tenriff::game::GaugeConfig config;
-    config.auto_shift = false;
-    GaugeManager manager(config);
+    GaugeManager manager;
 
     GaugeState hard{GaugeType::Hard, 0.0, false};
     manager.applyJudgement(hard, Judgement::GD, 0.0);
@@ -127,43 +121,61 @@ TEST_CASE("good judgement refills by the configured amount") {
     CHECK(almost_equal(state.value, 42.01, 1e-9));
 }
 
-TEST_CASE("gauge downshifts at thresholds and resets the next gauge to full") {
+TEST_CASE("selected gauge type stays fixed while surviving") {
     GaugeManager manager;
     auto state = manager.initialState(GaugeType::Hard);
     state.value = 66.1;
 
     auto result = manager.applyJudgement(state, Judgement::BD, 1000.0);
-    CHECK(result.downshifted);
-    CHECK(state.type == GaugeType::Normal);
-    CHECK(almost_equal(state.value, 50.0));
+    CHECK_FALSE(result.downshifted);
+    CHECK_FALSE(result.game_over);
+    CHECK(state.type == GaugeType::Hard);
+    CHECK(almost_equal(state.value, 56.1));
 
     result = manager.applyJudgement(state, Judgement::PG, 2000.0);
     CHECK_FALSE(result.downshifted);
-    CHECK(state.type == GaugeType::Normal);
-    CHECK(almost_equal(state.value, 50.0));
+    CHECK_FALSE(result.game_over);
+    CHECK(state.type == GaugeType::Hard);
+    CHECK(almost_equal(state.value, 56.26));
 }
 
-TEST_CASE("gauge normal downshifts to easy at the lower threshold") {
-    GaugeManager manager;
-    auto state = manager.initialState(GaugeType::Normal);
-    state.value = 33.1;
-
-    auto result = manager.applyJudgement(state, Judgement::BD, 0.0);
-    CHECK(result.downshifted);
-    CHECK(state.type == GaugeType::Easy);
-    CHECK(almost_equal(state.value, 40.0));
-}
-
-TEST_CASE("gauge downshifts by at most one step per judgement") {
+TEST_CASE("hard gauge triggers game over on empty") {
     GaugeManager manager;
     auto state = manager.initialState(GaugeType::Hard);
-    state.value = 34.0;
+    state.value = 0.1;
 
     auto result = manager.applyJudgement(state, Judgement::BD, 0.0);
-    CHECK(result.downshifted);
-    CHECK_FALSE(result.game_over);
+    CHECK_FALSE(result.downshifted);
+    CHECK(result.game_over);
+    CHECK(state.game_over);
+    CHECK(state.type == GaugeType::Hard);
+    CHECK(almost_equal(state.value, 0.0));
+}
+
+TEST_CASE("normal gauge triggers game over on empty") {
+    GaugeManager manager;
+    auto state = manager.initialState(GaugeType::Normal);
+    state.value = 0.1;
+
+    auto result = manager.applyJudgement(state, Judgement::BD, 0.0);
+    CHECK_FALSE(result.downshifted);
+    CHECK(result.game_over);
+    CHECK(state.game_over);
     CHECK(state.type == GaugeType::Normal);
-    CHECK(almost_equal(state.value, 50.0));
+    CHECK(almost_equal(state.value, 0.0));
+}
+
+TEST_CASE("easy gauge can still recover up to full") {
+    GaugeManager manager;
+    auto state = manager.initialState(GaugeType::Easy);
+    state.value = 99.9;
+
+    const auto result = manager.applyJudgement(state, Judgement::PG, 0.0);
+
+    CHECK_FALSE(result.downshifted);
+    CHECK_FALSE(result.game_over);
+    CHECK(state.type == GaugeType::Easy);
+    CHECK(almost_equal(state.value, 100.0));
 }
 
 TEST_CASE("easy gauge bad penalty softens slightly at or below twenty five percent") {
@@ -184,20 +196,24 @@ TEST_CASE("easy gauge triggers game over on empty") {
     state.value = 0.05;
 
     auto result = manager.applyJudgement(state, Judgement::BD, 5000.0);
+    CHECK_FALSE(result.downshifted);
     CHECK(result.game_over);
     CHECK(state.game_over);
 }
 
-TEST_CASE("auto shift can be disabled to fail immediately") {
-    tenriff::game::GaugeConfig config;
-    config.auto_shift = false;
-    GaugeManager manager(config);
+TEST_CASE("fatal hits keep the selected gauge label") {
+    GaugeManager manager;
+    auto hard = manager.initialState(GaugeType::Hard);
+    hard.value = 0.1;
 
-    auto state = manager.initialState(GaugeType::Hard);
-    state.value = 0.1;
+    auto normal = manager.initialState(GaugeType::Normal);
+    normal.value = 0.1;
 
-    auto result = manager.applyJudgement(state, Judgement::BD, 0.0);
-    CHECK(result.game_over);
-    CHECK(state.game_over);
-    CHECK(state.type == GaugeType::Hard);
+    const auto hard_result = manager.applyJudgement(hard, Judgement::BD, 0.0);
+    const auto normal_result = manager.applyJudgement(normal, Judgement::BD, 0.0);
+
+    CHECK(hard_result.game_over);
+    CHECK(normal_result.game_over);
+    CHECK(hard.type == GaugeType::Hard);
+    CHECK(normal.type == GaugeType::Normal);
 }

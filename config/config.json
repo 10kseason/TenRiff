@@ -36,9 +36,6 @@
     "target_scroll_bps": 380
   },
   "gauge": {
-    "auto_shift": true,
-    "hard_to_normal_threshold": 66.0,
-    "normal_to_easy_threshold": 33.0,
     "delta": {
       "hard": {"PG": 0.16, "GR": 0.09, "GD": 0.01, "BD": -10.0},
       "normal": {"PG": 0.19, "GR": 0.15, "GD": 0.01, "BD": -6.25},
@@ -62,6 +59,7 @@
     "song_index_profile": "safe"
   },
   "ui": {
+    "language": "en",
     "result_tail_ms": 3000,
     "require_enter_to_exit": true
   },

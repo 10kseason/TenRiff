@@ -13,13 +13,15 @@ Language: [한국어](README.md) | [English](README.en.md) | [简体中文](READ
    - 面向真实游玩的启动方式、选歌、操作、HUD、判定、结果说明
 4. [`docs/config.zh-CN.md`](config.zh-CN.md)
    - 实际配置、profile 与 keymap 结构
-5. [`docs/menu.zh-CN.md`](menu.zh-CN.md)
+5. [`docs/localization.zh-CN.md`](localization.zh-CN.md)
+   - 当前英语/韩语 UI 结构，以及以后新增更多语言时需要修改的文件边界
+6. [`docs/menu.zh-CN.md`](menu.zh-CN.md)
    - 菜单/状态机/选歌流程
-6. [`docs/core-loop.zh-CN.md`](core-loop.zh-CN.md)
+7. [`docs/core-loop.zh-CN.md`](core-loop.zh-CN.md)
    - 播放循环与数据流
-7. [`docs/roadmap.zh-CN.md`](roadmap.zh-CN.md)
+8. [`docs/roadmap.zh-CN.md`](roadmap.zh-CN.md)
    - 中长期工作方向
-8. [`docs/developer-extension-guide.zh-CN.md`](developer-extension-guide.zh-CN.md)
+9. [`docs/developer-extension-guide.zh-CN.md`](developer-extension-guide.zh-CN.md)
    - 新增 mode/mod 的开发者指南，说明应该改哪些 C++ 文件
 
 ## 哪些文档算作权威来源
@@ -35,6 +37,8 @@ Language: [한국어](README.md) | [English](README.en.md) | [简体中文](READ
   - 菜单/状态机/低延迟方向性的设计文档
 - [`docs/core-loop.zh-CN.md`](core-loop.zh-CN.md)
   - 播放循环的初期设计与数据流说明
+- [`docs/localization.zh-CN.md`](localization.zh-CN.md)
+  - 当前 UI 本地化结构与未来新增语言时的参考文档
 - [`docs/latency.zh-CN.md`](latency.zh-CN.md)、[`docs/modes.zh-CN.md`](modes.zh-CN.md)、[`docs/gap-analysis.zh-CN.md`](gap-analysis.zh-CN.md)、[`docs/roadmap.zh-CN.md`](roadmap.zh-CN.md)
   - 按功能拆分的设计、分析与中长期方向文档
 - [`docs/developer-extension-guide.zh-CN.md`](developer-extension-guide.zh-CN.md)

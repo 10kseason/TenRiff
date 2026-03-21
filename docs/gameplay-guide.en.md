@@ -112,6 +112,7 @@ If this is not the layout you want, you can change it in `Options > Keymap`.
 - `F4`: increase Hi-Speed
 - `F5`: decrease Hi-Speed significantly
 - `F6`: increase Hi-Speed significantly
+- `F9`: save a screenshot of the current screen
 
 Hi-Speed changes only the visual scroll speed; it does not change the judgement timing itself.
 
@@ -148,12 +149,13 @@ The three default gauge types are:
 - `normal`
 - `easy`
 
-With the default settings, `auto_shift` is enabled, so if the gauge drops too far it can shift down one step.
+The selected gauge always starts at `100%` at the beginning of the song.
 
-- `Hard -> Normal`
-- `Normal -> Easy`
+- `hard`: immediate Game Over at `0%`
+- `normal`: immediate Game Over at `0%`
+- `easy`: immediate Game Over at `0%`
 
-Once the gauge has shifted down, it does not move back up during play.
+There is no automatic gauge shifting during play.
 
 ## 10. Result Screen
 
@@ -166,11 +168,13 @@ After play ends, the Result screen shows:
 - Max Combo
 - PG / GR / GD / BD / PR totals
 - Average timing deviation and variance
-- Final gauge and gauge-shift history
+- Final gauge and gauge history
 - Saved replay / result file name
 
 The return keys are:
 
+- `Left`: restart the same chart immediately
+- `F1`: play the saved replay when one is available
 - `Enter`: return to Song Select
 - `Esc`: return to Song Select
 

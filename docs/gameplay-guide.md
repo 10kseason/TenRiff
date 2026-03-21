@@ -112,6 +112,7 @@ TenRiff의 기본 플레이 흐름은 아래 순서입니다.
 - `F4`: Hi-Speed 증가
 - `F5`: Hi-Speed 크게 감소
 - `F6`: Hi-Speed 크게 증가
+- `F9`: 현재 화면 스크린샷 저장
 
 Hi-Speed는 시각 스크롤 속도만 바꾸고, 판정 타이밍 자체를 바꾸지는 않습니다.
 
@@ -148,12 +149,13 @@ Hi-Speed는 시각 스크롤 속도만 바꾸고, 판정 타이밍 자체를 바
 - `normal`
 - `easy`
 
-기본 설정에서는 `auto_shift`가 켜져 있어서, 게이지가 크게 떨어지면 아래 단계로 한 번 내려갈 수 있습니다.
+선택한 게이지는 곡 시작 시 항상 `100%`에서 시작합니다.
 
-- `Hard -> Normal`
-- `Normal -> Easy`
+- `hard`: `0%`가 되는 즉시 Game Over
+- `normal`: `0%`가 되는 즉시 Game Over
+- `easy`: `0%`가 되는 즉시 Game Over
 
-한 번 내려간 게이지는 플레이 중 다시 위 단계로 올라가지 않습니다.
+플레이 중 자동 단계 시프트는 없습니다.
 
 ## 10. Result 화면
 
@@ -166,11 +168,13 @@ Hi-Speed는 시각 스크롤 속도만 바꾸고, 판정 타이밍 자체를 바
 - Max Combo
 - PG / GR / GD / BD / PR 집계
 - 평균 타이밍 편차와 분산
-- 최종 Gauge와 gauge shift 기록
+- 최종 Gauge와 게이지 기록
 - 저장된 replay/result 파일명
 
 복귀 키는 아래와 같습니다.
 
+- `Left`: 같은 차트를 바로 다시 시작
+- `F1`: 저장된 replay가 있으면 replay 재생
 - `Enter`: Song Select 복귀
 - `Esc`: Song Select 복귀
 

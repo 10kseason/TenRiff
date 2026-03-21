@@ -2,9 +2,9 @@
 
 Language: [한국어](README.md) | [English](README.en.md) | [简体中文](README.zh-CN.md)
 
-TenRiff is a Windows GUI-based BMS-first rhythm game runtime/launcher project. The goal is to build a standalone rhythm-game client centered on a practical BMS play environment, with direct control over the judgement, audio, input, and rendering pipeline. The current project version is `0.994`, and the project uses the MIT License. Bundled third-party notices are collected in [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
+TenRiff is a Windows GUI-based BMS-first rhythm game runtime/launcher project. The goal is to build a standalone rhythm-game client centered on a practical BMS play environment, with direct control over the judgement, audio, input, and rendering pipeline. The current project version is `0.997`, and the project uses the MIT License. Bundled third-party notices are collected in [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
 
-This README is an introduction that explains "what to look at first when you open the project." For the more detailed current behavior, the current `0.994` project state, the `0.9.92` baseline, the config structure, and the design documents, continue reading from [`docs/README.en.md`](docs/README.en.md).
+This README is an introduction that explains "what to look at first when you open the project." For the more detailed current behavior, the current `0.997` project state, the `0.9.92` baseline, the config structure, and the design documents, continue reading from [`docs/README.en.md`](docs/README.en.md).
 
 ## Project At a Glance
 

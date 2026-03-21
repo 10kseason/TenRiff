@@ -72,12 +72,8 @@
 - `target_scroll_bps` (double)
 
 ### `gauge`
-- `auto_shift` (bool)
-- `hard_to_normal_threshold` (double)
-  - Hard 게이지가 이 값 이하로 내려가면 즉시 Normal로 한 단계 시프트
-- `normal_to_easy_threshold` (double)
-  - Normal 게이지가 이 값 이하로 내려가면 즉시 Easy로 한 단계 시프트
-- 한 judgement에서 최대 한 단계만 내려가고, 다시 위 단계로 복귀하지 않음
+- 자동 gauge shift는 없습니다. 선택한 gauge 타입은 곡이 끝나거나 실패할 때까지 유지됩니다.
+- Hard / Normal / Easy는 모두 `100%`에서 시작하고 `0%`가 되면 즉시 실패합니다.
 - `delta`
   - `hard`, `normal`, `easy`
   - 각 안에 `PG`, `GR`, `GD`, `BD`, `PR`
@@ -117,6 +113,10 @@
   - `fast`는 32GB+ 환경에서 더 높은 worker/batch budget으로 재스캔 속도를 높이는 선택값
 
 ### `ui`
+- `language` (string)
+  - `en | ko`
+  - 잘못된 값은 로드 시 `en`으로 정규화
+  - Graphics Settings의 Language row와 연결됨
 - `result_tail_ms` (double)
 - `require_enter_to_exit` (bool)
 - `active_song_source` (string)

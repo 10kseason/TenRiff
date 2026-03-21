@@ -13,13 +13,15 @@ If you have already read the root [`README.en.md`](../README.en.md), this docume
    - How to start playing, choose songs, handle controls, and understand the HUD, judgements, and result screen from a practical player perspective
 4. `docs/config.en.md`
    - Actual config / profile / keymap structure
-5. `docs/menu.en.md`
+5. `docs/localization.en.md`
+   - Current English/Korean UI structure and the file boundaries to touch when adding more languages
+6. `docs/menu.en.md`
    - Menu / state machine / song-select flow
-6. `docs/core-loop.en.md`
+7. `docs/core-loop.en.md`
    - Play loop and data flow
-7. `docs/roadmap.en.md`
+8. `docs/roadmap.en.md`
    - Long-term direction for future work
-8. `docs/developer-extension-guide.en.md`
+9. `docs/developer-extension-guide.en.md`
    - Developer guide explaining where to extend modes/mods, runtime migration, replay/result handling, and maintenance workflows
 
 ## Which Docs Are Source Of Truth
@@ -35,6 +37,8 @@ If you have already read the root [`README.en.md`](../README.en.md), this docume
   - Menu / state machine / low-latency direction design document
 - `docs/core-loop.en.md`
   - Early design and data-flow explanation for the play loop
+- `docs/localization.en.md`
+  - Reference for the current UI localization structure and future language expansion
 - `docs/latency.en.md`, `docs/modes.en.md`, `docs/gap-analysis.en.md`, `docs/roadmap.en.md`
   - Feature-specific design, analysis, and long-term direction documents
 - `docs/developer-extension-guide.en.md`

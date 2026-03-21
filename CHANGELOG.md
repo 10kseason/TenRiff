@@ -2,6 +2,31 @@
 
 TenRiff의 사용자/배포 관점에서 의미 있는 변경만 간단히 기록합니다.
 
+## [0.997] - 2026-03-21
+
+### Changed
+- 저장된 최고 replay가 있으면 일반 플레이에서 자동 ghost 비교를 켜고, 실플레이 왼쪽 / ghost 오른쪽 split HUD로 score, combo, gauge, judgement feedback을 함께 볼 수 있도록 추가
+- Song Select에 Favorites / named Collections / local clear lamp 표시를 추가하고, 관련 필터와 상태 저장을 `config.ui`에 연결
+- Options에 `Calibration Wizard` 화면을 추가해 입력 오프셋과 표시 오프셋을 즉시 저장/리셋할 수 있도록 정리
+- 프로젝트 메타데이터와 핵심 현재 상태/로드맵 문서를 `0.997` 기준으로 갱신
+
+### Packaged
+- `build-dist` 기준 Windows 배포 스테이징과 공개 오픈소스 소스 스테이징을 `0.997` 라인으로 갱신
+
+## [0.995] - 2026-03-21
+
+### Changed
+- 오토 게이지 시프트를 제거하고, 선택한 `Hard / Normal / Easy` 게이지가 곡 시작부터 종료 또는 실패까지 그대로 유지되도록 정리
+- 세 게이지 모두 `100%`에서 시작하고 `0%` 도달 시 즉시 게임오버가 나도록 통일
+- 리절트 화면에서 `Left`로 즉시 재시작, `F1`로 replay 재생, `F9`로 전역 스크린샷 저장을 지원하도록 입력 동작을 재배치
+- 키 설정 화면에서 Save를 한 번만 눌러도 즉시 저장되고 저장 완료 메시지가 뜨도록 UX를 정리
+- Graphics Settings에 `Language` row를 추가하고 메뉴 UI의 `English / 한국어` 전환을 즉시 반영하도록 추가
+- 향후 다국어 확장을 쉽게 따라갈 수 있도록 `docs/localization*.md` 현지화 참고 문서를 추가
+- 프로젝트 메타데이터와 핵심 현재 상태/로드맵 문서를 `0.995` 기준으로 갱신
+
+### Packaged
+- `build-dist` 기준 Windows 배포 스테이징과 공개 오픈소스 소스 스테이징을 `0.995` 라인으로 갱신
+
 ## [0.994] - 2026-03-20
 
 ### Changed

@@ -72,12 +72,8 @@
 - `target_scroll_bps` (double)
 
 ### `gauge`
-- `auto_shift` (bool)
-- `hard_to_normal_threshold` (double)
-  - 当 Hard gauge 低于该值时，会立即向下切换为 Normal
-- `normal_to_easy_threshold` (double)
-  - 当 Normal gauge 低于该值时，会立即向下切换为 Easy
-- 每次判定最多只会下降一级，且不会在游玩过程中自动回升
+- 不再有自动 gauge shift。所选 gauge 类型会一直保持到歌曲结束或失败。
+- Hard / Normal / Easy 都从 `100%` 开始，并在到达 `0%` 时立即失败。
 - `delta`
   - `hard`, `normal`, `easy`
   - 每个条目下包含 `PG`, `GR`, `GD`, `BD`, `PR`
@@ -117,6 +113,10 @@
   - `fast` 是面向 32GB+ 环境、用更高 worker/batch budget 提升重扫速度的可选值
 
 ### `ui`
+- `language` (string)
+  - `en | ko`
+  - 非法值会在加载时规范化为 `en`
+  - 对应 Graphics Settings 中的 Language 行
 - `result_tail_ms` (double)
 - `require_enter_to_exit` (bool)
 - `active_song_source` (string)

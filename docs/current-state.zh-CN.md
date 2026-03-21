@@ -3,7 +3,7 @@
 这份文档是下一位 agent 或新任务接手时应该最先阅读的当前状态文档。目标是快速说明“这个项目现在是什么、应该先看哪里、还有哪些内容尚未验证”。
 
 ## 基线
-- 当前项目版本为 `0.994`
+- 当前项目版本为 `0.997`
 - 后续工作的基准文档是 [`docs/baseline-0.9.92.zh-CN.md`](baseline-0.9.92.zh-CN.md)
 - Windows GUI 构建是主目标
 - Linux 仅存在 [`Baepoks-Linuxs/TenRiff-0.5.0-linux-preview`](../Baepoks-Linuxs/TenRiff-0.5.0-linux-preview) 级别的 preview
@@ -125,12 +125,12 @@
 
 ## 运行时 / 打包规则
 - 新用户 profile 会自动创建
-- 最近一次 staged 的发布包是 `Baepoks/TenRiff-0.9.7`
+- 最近一次 staged 的发布包是 `Baepoks/TenRiff-0.997`
 - 发布包不包含 `Songs`
 - 发布包会同时包含用于菜单 BGM 的 `Mainmusic/` 运行时资源
 - 发布更新时，只把已构建的产物放进 `Baepoks/`
 - 如果请求 source-only/public handoff，用户偏好是先写 include/exclude 列表
-- 最近一次 staged 的公开源代码包会像 `opensource-Tenriff-source/TenRiff-0.9.7-source` 这样按版本单独 staging
+- 最近一次 staged 的公开源代码包会像 `opensource-Tenriff-source/TenRiff-0.997-source` 这样按版本单独 staging
 
 ## 配置 / Profile 现实情况
 - 实际默认值来自 `config/config.json`

@@ -72,12 +72,8 @@ If a profile does not exist, it is created automatically on first launch.
 - `target_scroll_bps` (double)
 
 ### `gauge`
-- `auto_shift` (bool)
-- `hard_to_normal_threshold` (double)
-  - if Hard gauge falls below this value, it shifts down one step to Normal immediately
-- `normal_to_easy_threshold` (double)
-  - if Normal gauge falls below this value, it shifts down one step to Easy immediately
-- only one step can be dropped per judgement, and the gauge does not move back up during play
+- There is no automatic gauge shift. The selected gauge type stays fixed until the song ends or fails.
+- Hard, Normal, and Easy all start at `100%` and fail immediately at `0%`.
 - `delta`
   - `hard`, `normal`, `easy`
   - each contains `PG`, `GR`, `GD`, `BD`, `PR`
@@ -117,6 +113,10 @@ If a profile does not exist, it is created automatically on first launch.
   - `fast` is the optional choice that aims for faster rescans with a higher worker/batch budget in 32GB+ environments
 
 ### `ui`
+- `language` (string)
+  - `en | ko`
+  - invalid values are normalized to `en` on load
+  - wired to the Language row in Graphics Settings
 - `result_tail_ms` (double)
 - `require_enter_to_exit` (bool)
 - `active_song_source` (string)

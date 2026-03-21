@@ -82,8 +82,6 @@ TEST_CASE("config defaults prefer 44100 Hz audio") {
     CHECK(config.graphics.display_mode == "borderless");
     CHECK_FALSE(config.graphics.vsync);
     CHECK(config.graphics.refresh_hz == 1050);
-    CHECK(config.gauge.hard_to_normal_threshold == doctest::Approx(66.0));
-    CHECK(config.gauge.normal_to_easy_threshold == doctest::Approx(33.0));
     CHECK(config.gauge.hard.pg == doctest::Approx(kCurrentHardPg));
     CHECK(config.gauge.hard.gr == doctest::Approx(kCurrentHardGr));
     CHECK(config.gauge.hard.gd == doctest::Approx(kCurrentHardGd));
@@ -119,8 +117,42 @@ TEST_CASE("config defaults prefer 44100 Hz audio") {
     CHECK(config.skin.note_height_scale == doctest::Approx(1.80));
     CHECK(config.skin.lane_divider_width_scale == doctest::Approx(1.0));
     CHECK(config.skin.hold_body_width_scale == doctest::Approx(0.60));
+    CHECK(config.ui.language == "en");
     CHECK(config.ui.result_tail_ms == doctest::Approx(3000.0));
+    CHECK(config.ui.favorite_chart_keys.empty());
+    CHECK(config.ui.collections.empty());
+    CHECK(config.ui.song_collection_filter == "all");
     CHECK(tenriff::config::resolved_skin_lane_colors(config.skin, "16k").size() == 16u);
+}
+
+TEST_CASE("config save and load preserve favorites and collections") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+
+    CurrentPathGuard cwd;
+    std::error_code ec;
+    std::filesystem::current_path(temp.path, ec);
+    REQUIRE_FALSE(static_cast<bool>(ec));
+
+    ConfigLoader loader;
+    auto config = loader.defaults();
+    config.ui.favorite_chart_keys = {"songA", "songB"};
+    config.ui.collections = {
+        {"Favorites+", {"songA"}},
+        {"Practice", {"songB", "songC"}},
+    };
+    config.ui.song_collection_filter = "Practice";
+
+    std::string error;
+    REQUIRE(loader.save_profile("profiles/test", config, &error));
+    CHECK(error.empty());
+
+    const auto result = loader.load_profile("profiles/test");
+    REQUIRE(result.success());
+    CHECK(result.config.ui.favorite_chart_keys == config.ui.favorite_chart_keys);
+    CHECK(result.config.ui.collections == config.ui.collections);
+    CHECK(result.config.ui.song_collection_filter == "Practice");
 }
 
 TEST_CASE("config load folds deprecated indirect miss into the bad window") {
@@ -377,6 +409,56 @@ TEST_CASE("config save and load preserve graphics display settings") {
     CHECK(result.config.graphics.vsync);
     CHECK(result.config.graphics.refresh_hz == 240);
     CHECK(result.config.graphics.performance_overlay);
+}
+
+TEST_CASE("config save and load preserve ui language setting") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+
+    CurrentPathGuard cwd;
+    std::error_code ec;
+    std::filesystem::current_path(temp.path, ec);
+    REQUIRE_FALSE(static_cast<bool>(ec));
+
+    ConfigLoader loader;
+    auto config = loader.defaults();
+    config.ui.language = "ko";
+
+    std::string error;
+    REQUIRE(loader.save_profile("profiles/test", config, &error));
+    CHECK(error.empty());
+
+    const auto result = loader.load_profile("profiles/test");
+    REQUIRE(result.success());
+    CHECK(result.config.ui.language == "ko");
+}
+
+TEST_CASE("config load normalizes invalid ui language to english") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+
+    std::filesystem::create_directories(temp.path / "config");
+    std::filesystem::create_directories(temp.path / "profiles" / "test");
+    write_file(temp.path / "config" / "config.json",
+               "{\n"
+               "  \"ui\": {\n"
+               "    \"language\": \"mystery\"\n"
+               "  }\n"
+               "}\n");
+    write_file(temp.path / "profiles" / "test" / "config.json", "{ }\n");
+
+    CurrentPathGuard cwd;
+    std::error_code ec;
+    std::filesystem::current_path(temp.path, ec);
+    REQUIRE_FALSE(static_cast<bool>(ec));
+
+    ConfigLoader loader;
+    const auto result = loader.load_profile("profiles/test");
+
+    REQUIRE(result.success());
+    CHECK(result.config.ui.language == "en");
 }
 
 TEST_CASE("config save and load preserve osu skin selection") {

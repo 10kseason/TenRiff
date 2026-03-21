@@ -15,13 +15,15 @@ Language: Korean | [English](README.en.md) | [简体中文](README.zh-CN.md)
    - 실제 플레이 기준의 시작 방법, 곡 선택, 조작, HUD, 판정, 결과 화면 안내
 5. `docs/config.md`
    - 실제 설정/프로필/키맵 구조
-6. `docs/menu.md`
+6. `docs/localization.md`
+   - 현재 영어/한국어 UI 구조와 이후 다국어 확장 시 건드릴 파일/경계 정리
+7. `docs/menu.md`
    - 메뉴/상태머신/곡 선택 흐름
-7. `docs/core-loop.md`
+8. `docs/core-loop.md`
    - 플레이 루프와 데이터 흐름
-8. `docs/roadmap.md`
+9. `docs/roadmap.md`
    - 중장기 작업 방향
-9. `docs/developer-extension-guide.md`
+10. `docs/developer-extension-guide.md`
    - 새 mode/mod, UI row, runtime migration, replay/result, 테스트를 어디에 추가해야 하는지 설명하는 개발자 문서
 
 ## Which Docs Are Source Of Truth
@@ -37,6 +39,8 @@ Language: Korean | [English](README.en.md) | [简体中文](README.zh-CN.md)
   - 메뉴/상태머신/저지연 방향성 설계 문서
 - `docs/core-loop.md`
   - 플레이 루프 초기 설계 및 데이터 흐름 설명
+- `docs/localization.md`
+  - 현재 UI 현지화 구조와 향후 다국어 확장용 참고 문서
 - `docs/latency.md`, `docs/modes.md`, `docs/gap-analysis.md`, `docs/roadmap.md`
   - 기능별 설계/분석/중장기 방향 문서
 - `docs/developer-extension-guide.md`

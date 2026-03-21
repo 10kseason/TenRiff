@@ -112,6 +112,7 @@ TenRiff 的基础游玩流程如下：
 - `F4`：提高 Hi-Speed
 - `F5`：大幅降低 Hi-Speed
 - `F6`：大幅提高 Hi-Speed
+- `F9`：保存当前画面的截图
 
 Hi-Speed 只改变视觉滚动速度，不改变判定时机本身。
 
@@ -148,12 +149,13 @@ Hi-Speed 只改变视觉滚动速度，不改变判定时机本身。
 - `normal`
 - `easy`
 
-默认设置中，`auto_shift` 是开启的，因此当 gauge 掉得很低时，可能会自动向下切换一级。
+所选 gauge 会在歌曲开始时固定从 `100%` 起步。
 
-- `Hard -> Normal`
-- `Normal -> Easy`
+- `hard`：到 `0%` 立即 Game Over
+- `normal`：到 `0%` 立即 Game Over
+- `easy`：到 `0%` 立即 Game Over
 
-一旦在游玩过程中降级，就不会再自动升回去。
+游玩过程中不会再发生自动 gauge 降级。
 
 ## 10. Result 画面
 
@@ -166,11 +168,13 @@ Hi-Speed 只改变视觉滚动速度，不改变判定时机本身。
 - Max Combo
 - PG / GR / GD / BD / PR 统计
 - 平均时间偏差与方差
-- 最终 Gauge 与 gauge shift 记录
+- 最终 Gauge 与 gauge 记录
 - 保存的 replay/result 文件名
 
 返回按键如下：
 
+- `Left`：立刻重新开始同一首谱面
+- `F1`：有保存 replay 时播放该 replay
 - `Enter`：返回 Song Select
 - `Esc`：返回 Song Select
 
