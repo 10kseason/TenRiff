@@ -12,22 +12,21 @@ int judgement_score(game::Judgement judgement) {
         case game::Judgement::PG: return 1000;
         case game::Judgement::GR: return 700;
         case game::Judgement::GD: return 300;
-        case game::Judgement::BD:
+        case game::Judgement::BD: return -200;
         case game::Judgement::PR:
-        default:
-            return -200;
+        default: return 0;
     }
 }
 
 }  // namespace
 
-void ResultStats::record_judgement(game::Judgement judgement, double delta_ms, bool breaks_combo, double weight) {
+void ResultStats::record_judgement(game::Judgement judgement, double delta_ms, ComboImpact combo_impact, double weight) {
     switch (judgement) {
         case game::Judgement::PG: ++counts.pg; break;
         case game::Judgement::GR: ++counts.gr; break;
         case game::Judgement::GD: ++counts.gd; break;
         case game::Judgement::BD: ++counts.bd; break;
-        case game::Judgement::PR: ++counts.bd; break;
+        case game::Judgement::PR: ++counts.pr; break;
     }
 
     const double safe_weight = (std::isfinite(weight) && weight > 0.0) ? weight : 1.0;
@@ -36,13 +35,18 @@ void ResultStats::record_judgement(game::Judgement judgement, double delta_ms, b
     raw_score_accumulator += delta_score;
     raw_score = std::max<int64_t>(0, raw_score_accumulator);
 
-    if (breaks_combo) {
+    switch (combo_impact) {
+    case ComboImpact::Break:
         combo = 0;
-    } else {
+        break;
+    case ComboImpact::Increment:
         ++combo;
         if (combo > max_combo) {
             max_combo = combo;
         }
+        break;
+    case ComboImpact::Preserve:
+        break;
     }
 
     if (std::isfinite(delta_ms)) {

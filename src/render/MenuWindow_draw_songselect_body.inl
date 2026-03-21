@@ -651,7 +651,7 @@
             draw_stat_row(loc("GREAT", "그레이트"), data.song_select.great);
             draw_stat_row(loc("GOOD", "굿"), data.song_select.good);
             draw_stat_row("BAD", data.song_select.bad);
-            draw_stat_row(loc("MISS", "미스"), data.song_select.miss);
+            draw_stat_row("POOR", data.song_select.poor);
 
             stats_y += 8.0f;
             stats_y = draw_stat_section(stats_y, loc("REPLAY", "리플레이"), stats_left, stats_right);
@@ -748,7 +748,10 @@
             draw_stat_text_row(loc("RANK", "랭크"), data.song_select.rank.empty() ? std::string("--") : data.song_select.rank);
             draw_stat_text_row(loc("LAMP", "클리어"), data.song_select.selected_song_lamp.empty() ? std::string("--") : data.song_select.selected_song_lamp);
             draw_stat_text_row(loc("FAVORITE", "페이보릿"), data.song_select.selected_song_favorite ? loc("YES", "예") : loc("NO", "아니오"));
-            draw_stat_text_row(loc("GHOST", "고스트"), data.song_select.selected_song_ghost_available ? loc("READY", "준비됨") : loc("NONE", "없음"));
+            draw_stat_text_row(loc("GHOST", "고스트"),
+                               data.song_select.selected_song_ghost_status.empty()
+                                   ? loc("NONE", "없음")
+                                   : data.song_select.selected_song_ghost_status);
             draw_stat_text_row(loc("COLLECTION", "컬렉션"), data.song_select.selected_song_collection_filter.empty() ? loc("ALL", "전체") : data.song_select.selected_song_collection_filter);
             draw_stat_text_row(loc("SORT", "정렬"), data.song_select.sort_summary);
             draw_stat_text_row(loc("FILTER", "필터"), data.song_select.browser_summary);
@@ -763,7 +766,7 @@
             draw_stat_row(loc("GREAT", "그레이트"), data.song_select.great);
             draw_stat_row(loc("GOOD", "굿"), data.song_select.good);
             draw_stat_row("BAD", data.song_select.bad);
-            draw_stat_row(loc("MISS", "미스"), data.song_select.miss);
+            draw_stat_row("POOR", data.song_select.poor);
         }
 
         ctx->PopAxisAlignedClip();

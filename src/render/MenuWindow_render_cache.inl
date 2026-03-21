@@ -151,6 +151,7 @@ void MenuWindow::update_brushes() {
     ctx->CreateSolidColorBrush(D2D1::ColorF(0x242638), &d2d_->button_brush);
     ctx->CreateSolidColorBrush(D2D1::ColorF(0x6EE7F2, 0.22f), &d2d_->button_selected_brush);
     ctx->CreateSolidColorBrush(D2D1::ColorF(0x31344A), &d2d_->button_border_brush);
+    ctx->CreateSolidColorBrush(D2D1::ColorF(0xF6F8FF, 0.85f), &d2d_->lane_divider_brush);
     ctx->CreateSolidColorBrush(D2D1::ColorF(0xF6F8FF, 0.97f), &d2d_->note_fill_brush);
     ctx->CreateSolidColorBrush(D2D1::ColorF(0xCAD8E7, 0.98f), &d2d_->note_border_brush);
     ctx->CreateSolidColorBrush(D2D1::ColorF(0xF6F8FF, 0.36f), &d2d_->note_hold_brush);

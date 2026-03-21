@@ -126,6 +126,7 @@ config::JsonValue build_counts_json(const JudgementCounts& counts) {
     obj.emplace("gr", config::JsonValue{static_cast<double>(counts.gr)});
     obj.emplace("gd", config::JsonValue{static_cast<double>(counts.gd)});
     obj.emplace("bd", config::JsonValue{static_cast<double>(counts.bd)});
+    obj.emplace("pr", config::JsonValue{static_cast<double>(counts.pr)});
     return config::JsonValue{std::move(obj)};
 }
 
@@ -377,8 +378,7 @@ ReplayLoadResult load_replay_json(const std::string& path) {
             replay.stats.counts.gr = read_json_int(*counts, "gr", 0);
             replay.stats.counts.gd = read_json_int(*counts, "gd", 0);
             replay.stats.counts.bd = read_json_int(*counts, "bd", 0);
-            replay.stats.counts.bd += read_json_int(*counts, "pr", 0);
-            replay.stats.counts.pr = 0;
+            replay.stats.counts.pr = read_json_int(*counts, "pr", 0);
         }
         replay.stats.combo = read_json_int(*stats, "combo", 0);
         replay.stats.max_combo = read_json_int(*stats, "max_combo", replay.stats.combo);

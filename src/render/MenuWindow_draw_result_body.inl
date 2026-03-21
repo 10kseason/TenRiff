@@ -304,10 +304,11 @@
             {"GR", data.result.great, D2D1::ColorF(0x6EE7F2)},
             {"G", data.result.good, D2D1::ColorF(0xFAE36E)},
             {"BAD", data.result.bad, D2D1::ColorF(0xFF9F43)},
+            {"POOR", data.result.poor, D2D1::ColorF(0xFF6B6B)},
         };
 
         const int max_bar_count = std::max({1, data.result.perfect, data.result.great, data.result.good,
-                                            data.result.bad});
+                                            data.result.bad, data.result.poor});
         float bar_y = breakdown_rect.top + 82.0f;
         for (const auto& bar : bars) {
             const D2D1_RECT_F label_rect =

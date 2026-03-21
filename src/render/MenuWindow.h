@@ -117,7 +117,7 @@ struct SongSelectData {
     std::string selected_song_lamp;
     bool selected_song_favorite = false;
     std::string selected_song_collection_filter;
-    bool selected_song_ghost_available = false;
+    std::string selected_song_ghost_status;
     std::string browser_summary;
     std::string sort_summary;
     std::string primary_hint;
@@ -146,7 +146,7 @@ struct SongSelectData {
     int great = 0;
     int good = 0;
     int bad = 0;
-    int miss = 0;
+    int poor = 0;
     double accuracy = 0.0;
     std::string selected_record_created_utc;
     std::string selected_record_status;
@@ -187,7 +187,7 @@ struct ResultScreenData {
     int great = 0;
     int good = 0;
     int bad = 0;
-    int miss = 0;
+    int poor = 0;
 
     double mean_delta_ms = 0.0;
     double stddev_delta_ms = 0.0;
@@ -232,9 +232,14 @@ struct GameplayHudData {
     int64_t past_samples = 0;
     double judgement_line_position = 0.82;
     double combo_position = 0.24;
+    std::size_t lane_width_scale_count = 0;
+    std::array<double, kGameplayHudMaxLanes> lane_width_scales{};
     double note_width_scale = 1.0;
+    std::size_t lane_spacing_scale_count = 0;
+    std::array<double, kGameplayHudMaxLanes> lane_spacing_scales{};
     double note_height_scale = 1.8;
     double lane_divider_width_scale = 1.0;
+    double lane_center_gap_scale = 0.0;
     double hold_body_width_scale = 0.60;
     bool show_lane_dividers = true;
     bool show_judgement_line = true;
@@ -292,6 +297,7 @@ struct GameplayHudData {
     int ghost_gr = 0;
     int ghost_gd = 0;
     int ghost_bd = 0;
+    int ghost_pr = 0;
     double ghost_gauge = 0.0;
     std::string ghost_gauge_label;
     bool ghost_has_feedback = false;
@@ -323,11 +329,17 @@ struct SkinPreviewData {
     std::string selected_color_label;
     int lane_count = 0;
     int selected_lane = -1;
+    int selected_gap = -1;
     double judgement_line_position = 0.82;
     double combo_position = 0.24;
+    std::size_t lane_width_scale_count = 0;
+    std::array<double, kGameplayHudMaxLanes> lane_width_scales{};
     double note_width_scale = 1.0;
+    std::size_t lane_spacing_scale_count = 0;
+    std::array<double, kGameplayHudMaxLanes> lane_spacing_scales{};
     double note_height_scale = 1.8;
     double lane_divider_width_scale = 1.0;
+    double lane_center_gap_scale = 0.0;
     double hold_body_width_scale = 0.60;
     bool show_lane_dividers = true;
     bool show_judgement_line = true;
@@ -347,6 +359,8 @@ struct GenericMenuData {
     std::string heading;
     std::vector<MenuRowData> rows;
     std::vector<std::string> notes;
+    std::vector<std::string> footer_notes;
+    int footer_reserved_lines = 0;
     SkinPreviewData skin_preview;
 };
 
@@ -541,7 +555,12 @@ private:
         double judgement_line_position = 0.82;
         double note_width_scale = 1.0;
         double note_height_scale = 1.8;
+        std::size_t lane_width_scale_count = 0;
+        std::array<double, kGameplayHudMaxLanes> lane_width_scales{};
+        std::size_t lane_spacing_scale_count = 0;
+        std::array<double, kGameplayHudMaxLanes> lane_spacing_scales{};
         double lane_divider_width_scale = 1.0;
+        double lane_center_gap_scale = 0.0;
         bool show_lane_dividers = true;
         bool show_judgement_line = true;
         bool show_gear_boundary_line = false;

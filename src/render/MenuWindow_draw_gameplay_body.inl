@@ -147,7 +147,8 @@
                 to_wide("PG " + std::to_string(data.gameplay.pg) +
                         "  GR " + std::to_string(data.gameplay.gr) +
                         "  G " + std::to_string(data.gameplay.gd) +
-                        "  BAD " + std::to_string(data.gameplay.bd));
+                        "  BAD " + std::to_string(data.gameplay.bd) +
+                        "  PR " + std::to_string(data.gameplay.pr));
             gameplay_hud_cache_.gauge_label_text = to_wide(gauge_label);
             gameplay_hud_cache_.gauge_value_text =
                 to_wide(std::to_string(static_cast<int>(std::llround(data.gameplay.gauge))) + "%");
@@ -161,7 +162,8 @@
                 to_wide("PG " + std::to_string(data.gameplay.ghost_pg) +
                         "  GR " + std::to_string(data.gameplay.ghost_gr) +
                         "  G " + std::to_string(data.gameplay.ghost_gd) +
-                        "  BAD " + std::to_string(data.gameplay.ghost_bd));
+                        "  BAD " + std::to_string(data.gameplay.ghost_bd) +
+                        "  PR " + std::to_string(data.gameplay.ghost_pr));
             gameplay_hud_cache_.ghost_gauge_label_text = to_wide(ghost_gauge_label);
             gameplay_hud_cache_.ghost_gauge_value_text =
                 to_wide(std::to_string(static_cast<int>(std::llround(data.gameplay.ghost_gauge))) + "%");
@@ -345,15 +347,21 @@
 
         const int lane_count = std::clamp(data.gameplay.lane_count, 1, static_cast<int>(kGameplayHudMaxLanes));
         const GameplaySurfaceLayout surface_layout =
-            build_gameplay_surface_layout(lane_count, note_width_scale, data.gameplay.ghost_visible);
+            build_gameplay_surface_layout(
+                lane_count,
+                note_width_scale,
+                data.gameplay.lane_width_scale_count,
+                data.gameplay.lane_width_scales,
+                data.gameplay.lane_spacing_scale_count,
+                data.gameplay.lane_spacing_scales,
+                data.gameplay.ghost_visible,
+                data.gameplay.lane_center_gap_scale);
         const GameplayFieldLayout field_layout = surface_layout.player_field;
         const float field_left = field_layout.left;
         const float field_right = field_layout.right;
         const float field_top = field_layout.top;
         const float field_bottom = field_layout.bottom;
         const float field_height = field_layout.height;
-        const float lane_width = field_layout.lane_width;
-        const float note_width = field_layout.note_width;
         const D2D1_RECT_F field_clip_rect =
             D2D1::RectF(field_left + 2.0f, field_top + 2.0f, field_right - 2.0f, field_bottom - 2.0f);
         const float hit_line_y = gameplay_field_y(field_top, field_height, judgement_line_position);
@@ -376,7 +384,9 @@
                 continue;
             }
             const D2D1_SIZE_F bitmap_size = key_bitmap->GetSize();
-            const float lane_center = field_left + (static_cast<float>(lane) + 0.5f) * lane_width;
+            const float lane_center = gameplay_lane_center(field_layout, lane);
+            const float lane_width = gameplay_lane_width(field_layout, lane);
+            const float note_width = gameplay_note_width(field_layout, lane);
             const D2D1_RECT_F receptor_rect =
                 gameplay_key_bitmap_rect(field_layout,
                                          hit_line_y,
@@ -401,7 +411,8 @@
                 continue;
             }
             const int lane = std::clamp(note.lane, 1, lane_count);
-            const float lane_center = field_left + (static_cast<float>(lane) - 0.5f) * lane_width;
+            const float lane_center = gameplay_lane_center(field_layout, lane - 1);
+            const float note_width = gameplay_note_width(field_layout, lane - 1);
             const float x0 = lane_center - note_width * 0.5f;
             const float x1 = lane_center + note_width * 0.5f;
             const int64_t render_sample =
@@ -660,7 +671,8 @@
                 if (activity <= 0.01f) {
                     continue;
                 }
-                const float lane_center = field_left + (static_cast<float>(lane) + 0.5f) * lane_width;
+                const float lane_center = gameplay_lane_center(field_layout, static_cast<int>(lane));
+                const float note_width = gameplay_note_width(field_layout, static_cast<int>(lane));
                 const float x0 = lane_center - note_width * 0.5f;
                 const float x1 = lane_center + note_width * 0.5f;
                 const float glow_half_h = 8.0f + 14.0f * activity;
@@ -736,8 +748,6 @@
             const float ghost_field_top = ghost_field_layout.top;
             const float ghost_field_bottom = ghost_field_layout.bottom;
             const float ghost_field_height = ghost_field_layout.height;
-            const float ghost_lane_width = ghost_field_layout.lane_width;
-            const float ghost_note_width = ghost_field_layout.note_width;
             const D2D1_RECT_F ghost_field_clip_rect =
                 D2D1::RectF(ghost_field_left + 2.0f, ghost_field_top + 2.0f,
                             ghost_field_right - 2.0f, ghost_field_bottom - 2.0f);
@@ -759,7 +769,9 @@
                     continue;
                 }
                 const D2D1_SIZE_F bitmap_size = key_bitmap->GetSize();
-                const float lane_center = ghost_field_left + (static_cast<float>(lane) + 0.5f) * ghost_lane_width;
+                const float lane_center = gameplay_lane_center(ghost_field_layout, lane);
+                const float ghost_lane_width = gameplay_lane_width(ghost_field_layout, lane);
+                const float ghost_note_width = gameplay_note_width(ghost_field_layout, lane);
                 const D2D1_RECT_F receptor_rect =
                     gameplay_key_bitmap_rect(ghost_field_layout,
                                              ghost_hit_line_y,
@@ -784,7 +796,8 @@
                     continue;
                 }
                 const int lane = std::clamp(note.lane, 1, lane_count);
-                const float lane_center = ghost_field_left + (static_cast<float>(lane) - 0.5f) * ghost_lane_width;
+                const float lane_center = gameplay_lane_center(ghost_field_layout, lane - 1);
+                const float ghost_note_width = gameplay_note_width(ghost_field_layout, lane - 1);
                 const float x0 = lane_center - ghost_note_width * 0.5f;
                 const float x1 = lane_center + ghost_note_width * 0.5f;
                 const int64_t render_sample =
@@ -979,12 +992,13 @@
                     std::min(data.gameplay.ghost_lane_activity_count, static_cast<std::size_t>(lane_count));
                 for (std::size_t lane = 0; lane < count; ++lane) {
                     const float activity = std::clamp(data.gameplay.ghost_lane_activity[lane], 0.0f, 1.0f);
-                    if (activity <= 0.01f) {
-                        continue;
-                    }
-                    const float lane_center = ghost_field_left + (static_cast<float>(lane) + 0.5f) * ghost_lane_width;
-                    const float x0 = lane_center - ghost_note_width * 0.5f;
-                    const float x1 = lane_center + ghost_note_width * 0.5f;
+                if (activity <= 0.01f) {
+                    continue;
+                }
+                const float lane_center = gameplay_lane_center(ghost_field_layout, static_cast<int>(lane));
+                const float ghost_note_width = gameplay_note_width(ghost_field_layout, static_cast<int>(lane));
+                const float x0 = lane_center - ghost_note_width * 0.5f;
+                const float x1 = lane_center + ghost_note_width * 0.5f;
                     const float glow_half_h = 8.0f + 14.0f * activity;
                     const D2D1_RECT_F glow_rect =
                         D2D1::RectF(x0,

@@ -68,10 +68,14 @@ std::optional<NoteEvent> GameplayEngine::handle_input(int lane, input::InputStat
         if (lane_state.mask_until > input_sample) {
             return std::nullopt;
         }
+        const std::size_t previous_next_index = lane_state.next_index;
         auto hit_note = try_hit_note(lane_state, input_sample);
         if (!hit_note.has_value()) {
-            apply_bad_miss(input_sample);
-            lane_state.mask_until = input_sample + windows_.mask;
+            if (previous_next_index == lane_state.next_index &&
+                should_apply_early_empty_poor(lane_state, input_sample)) {
+                apply_empty_poor(input_sample);
+                lane_state.mask_until = input_sample + windows_.mask;
+            }
             return std::nullopt;
         }
         return hit_note;
@@ -121,7 +125,7 @@ void GameplayEngine::collect_active_holds(std::vector<ActiveHoldView>& out) cons
 }
 
 void GameplayEngine::apply_judgement(game::Judgement judgement, double delta_ms, int64_t sample,
-                                     double weight, bool breaks_combo) {
+                                     double weight, ComboImpact combo_impact) {
     live_feedback_.has_value = true;
     live_feedback_.judgement = judgement;
     live_feedback_.delta_ms = std::isfinite(delta_ms) ? delta_ms : 0.0;
@@ -131,7 +135,7 @@ void GameplayEngine::apply_judgement(game::Judgement judgement, double delta_ms,
     auto previous_type = gauge_state_.type;
     auto result = gauge_manager_.applyJudgement(gauge_state_, judgement, time_ms);
 
-    stats_.record_judgement(judgement, delta_ms, breaks_combo, weight);
+    stats_.record_judgement(judgement, delta_ms, combo_impact, weight);
     stats_.record_gauge_sample(sample, gauge_state_.value);
 
     if (result.downshifted) {
@@ -161,10 +165,11 @@ std::optional<NoteEvent> GameplayEngine::try_hit_note(LaneState& lane, int64_t i
 
         auto judgement = classify_judgement(delta_samples);
         double delta_ms = static_cast<double>(delta_samples) * 1000.0 / static_cast<double>(sample_rate_);
-        bool breaks_combo = (judgement == game::Judgement::BD);
+        const ComboImpact combo_impact =
+            (judgement == game::Judgement::BD) ? ComboImpact::Break : ComboImpact::Increment;
 
         double weight = note.end_sample.has_value() ? 0.5 : 1.0;
-        apply_judgement(judgement, delta_ms, input_sample, weight, breaks_combo);
+        apply_judgement(judgement, delta_ms, input_sample, weight, combo_impact);
 
         if (note.end_sample.has_value()) {
             HoldState hold;
@@ -182,7 +187,19 @@ std::optional<NoteEvent> GameplayEngine::try_hit_note(LaneState& lane, int64_t i
 }
 
 void GameplayEngine::apply_bad_miss(int64_t sample) {
-    apply_judgement(game::Judgement::BD, std::numeric_limits<double>::quiet_NaN(), sample, 1.0, true);
+    apply_judgement(game::Judgement::BD,
+                    std::numeric_limits<double>::quiet_NaN(),
+                    sample,
+                    1.0,
+                    ComboImpact::Break);
+}
+
+void GameplayEngine::apply_empty_poor(int64_t sample) {
+    apply_judgement(game::Judgement::PR,
+                    std::numeric_limits<double>::quiet_NaN(),
+                    sample,
+                    1.0,
+                    ComboImpact::Preserve);
 }
 
 void GameplayEngine::update_miss(LaneState& lane, int64_t current_sample) {
@@ -210,8 +227,9 @@ void GameplayEngine::update_hold(LaneState& lane, int64_t current_sample) {
             const int64_t delta_samples = quantize_hold_tail_delta(hold.release_sample - hold.end_sample);
             const auto judgement = classify_hold_tail_judgement(delta_samples);
             double delta_ms = static_cast<double>(delta_samples) * 1000.0 / static_cast<double>(sample_rate_);
-            bool breaks_combo = (judgement == game::Judgement::BD);
-            apply_judgement(judgement, delta_ms, hold.release_sample, 0.5, breaks_combo);
+            const ComboImpact combo_impact =
+                (judgement == game::Judgement::BD) ? ComboImpact::Break : ComboImpact::Increment;
+            apply_judgement(judgement, delta_ms, hold.release_sample, 0.5, combo_impact);
             lane.hold.reset();
             return;
         }
@@ -220,8 +238,9 @@ void GameplayEngine::update_hold(LaneState& lane, int64_t current_sample) {
             const int64_t delta_samples = quantize_hold_tail_delta(hold.release_sample - hold.end_sample);
             const auto judgement = classify_hold_tail_judgement(delta_samples);
             double delta_ms = static_cast<double>(delta_samples) * 1000.0 / static_cast<double>(sample_rate_);
-            bool breaks_combo = (judgement == game::Judgement::BD);
-            apply_judgement(judgement, delta_ms, hold.release_sample, 0.5, breaks_combo);
+            const ComboImpact combo_impact =
+                (judgement == game::Judgement::BD) ? ComboImpact::Break : ComboImpact::Increment;
+            apply_judgement(judgement, delta_ms, hold.release_sample, 0.5, combo_impact);
             lane.hold.reset();
             return;
         }
@@ -233,7 +252,7 @@ void GameplayEngine::update_hold(LaneState& lane, int64_t current_sample) {
                             std::numeric_limits<double>::quiet_NaN(),
                             hold.end_sample + hold_timeout,
                             0.5,
-                            true);
+                            ComboImpact::Break);
             lane.hold.reset();
         }
         return;
@@ -245,8 +264,9 @@ void GameplayEngine::update_hold(LaneState& lane, int64_t current_sample) {
                 hold.release_active ? quantize_hold_tail_delta(hold.release_sample - hold.end_sample) : 0;
             const auto judgement = classify_hold_tail_judgement(delta_samples);
             const double delta_ms = static_cast<double>(delta_samples) * 1000.0 / static_cast<double>(sample_rate_);
-            const bool breaks_combo = (judgement == game::Judgement::BD);
-            apply_judgement(judgement, delta_ms, hold.end_sample, 0.5, breaks_combo);
+            const ComboImpact combo_impact =
+                (judgement == game::Judgement::BD) ? ComboImpact::Break : ComboImpact::Increment;
+            apply_judgement(judgement, delta_ms, hold.end_sample, 0.5, combo_impact);
         }
         lane.hold.reset();
     }
@@ -302,10 +322,20 @@ JudgeWindowSamples GameplayEngine::build_windows(const config::JudgeConfig& judg
     windows.gr = to_samples(judge.gr_ms);
     windows.gd = to_samples(judge.gd_ms);
     windows.bd = to_samples(judge.bd_ms);
+    windows.pr_early = to_samples(1000.0);
     windows.hold_grace = to_samples(judge.hold_grace_ms);
     windows.hold_break = to_samples(judge.hold_break_ms);
     windows.mask = to_samples(judge.mask_ms);
     return windows;
+}
+
+bool GameplayEngine::should_apply_early_empty_poor(const LaneState& lane, int64_t input_sample) const {
+    if (lane.next_index >= lane.notes.size()) {
+        return false;
+    }
+    const auto& note = lane.notes[lane.next_index];
+    const int64_t early_distance = note.start_sample - input_sample;
+    return early_distance > windows_.bd && early_distance <= windows_.pr_early;
 }
 
 game::Judgement GameplayEngine::classify_judgement(int64_t delta_samples) const {

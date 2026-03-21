@@ -25,9 +25,9 @@ struct GaugeDeltaTable {
 };
 
 struct GaugeConfig {
-    GaugeDeltaTable hard{0.16000000, 0.09000000, 0.01000000, -10.00000, -10.00000};
-    GaugeDeltaTable normal{0.19000000, 0.15000000, 0.01000000, -6.25000, -6.25000};
-    GaugeDeltaTable easy{0.25000000, 0.20000000, 0.01000000, -4.10000, -4.10000};
+    GaugeDeltaTable hard{0.16000000, 0.09000000, 0.01000000, -10.00000, -2.00000};
+    GaugeDeltaTable normal{0.19000000, 0.15000000, 0.01000000, -6.25000, -2.00000};
+    GaugeDeltaTable easy{0.25000000, 0.20000000, 0.01000000, -4.10000, -1.60000};
 };
 
 struct GaugeState {

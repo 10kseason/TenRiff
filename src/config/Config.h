@@ -14,13 +14,22 @@ namespace tenriff::config {
 inline constexpr double kJudgementLinePositionMin = 0.55;
 inline constexpr double kJudgementLinePositionMax = 0.86;
 inline constexpr double kJudgementLinePositionDefault = 0.82;
+inline constexpr double kLaneWidthScaleMin = 0.50;
+inline constexpr double kLaneWidthScaleMax = 1.75;
+inline constexpr double kLaneWidthScaleDefault = 1.00;
 inline constexpr double kNoteWidthScaleMin = 0.50;
 inline constexpr double kNoteWidthScaleMax = 1.40;
+inline constexpr double kLaneSpacingScaleMin = 0.00;
+inline constexpr double kLaneSpacingScaleMax = 2.00;
+inline constexpr double kLaneSpacingScaleDefault = 0.00;
 inline constexpr double kNoteHeightScaleMin = 0.50;
 inline constexpr double kNoteHeightScaleMax = 4.00;
 inline constexpr double kLaneDividerWidthScaleMin = 0.00;
 inline constexpr double kLaneDividerWidthScaleMax = 2.00;
 inline constexpr double kLaneDividerWidthScaleDefault = 1.00;
+inline constexpr double kLaneCenterGapScaleMin = 0.00;
+inline constexpr double kLaneCenterGapScaleMax = 2.00;
+inline constexpr double kLaneCenterGapScaleDefault = 0.00;
 inline constexpr double kHoldBodyWidthScaleMin = 0.50;
 inline constexpr double kHoldBodyWidthScaleMax = 1.20;
 inline constexpr double kHoldBodyWidthScaleDefault = 0.60;
@@ -86,13 +95,17 @@ struct SkinConfig {
     bool hold_tail_taper_enabled = false;
     double judgement_line_position = kJudgementLinePositionDefault;
     double combo_position = kComboPositionDefault;
+    std::unordered_map<std::string, std::vector<double>> lane_width_scales;
     double note_width_scale = 1.0;
+    std::unordered_map<std::string, double> note_width_scales;
+    std::unordered_map<std::string, std::vector<double>> lane_spacing_scales;
     double note_height_scale = 1.8;
     double lane_divider_width_scale = kLaneDividerWidthScaleDefault;
+    double lane_center_gap_scale = kLaneCenterGapScaleDefault;
     double hold_body_width_scale = kHoldBodyWidthScaleDefault;
-    std::unordered_map<std::string, double> note_width_scales;
     std::unordered_map<std::string, double> note_height_scales;
     std::unordered_map<std::string, double> lane_divider_width_scales;
+    std::unordered_map<std::string, double> lane_center_gap_scales;
     std::unordered_map<std::string, std::vector<std::string>> lane_colors;
 };
 
@@ -114,6 +127,7 @@ struct ModeConfig {
     uint32_t random_seed = 0;
     std::vector<std::string> mods;
     bool enable_osu_charts = false;
+    bool ghost_battle_enabled = true;
     std::string song_index_profile = "safe";
 };
 
@@ -165,9 +179,12 @@ public:
 [[nodiscard]] std::string skin_note_shape_label(std::string_view token);
 [[nodiscard]] std::string skin_color_label(std::string_view token);
 [[nodiscard]] uint32_t skin_color_rgb(std::string_view token);
+[[nodiscard]] std::vector<double> resolved_skin_lane_width_scales(const SkinConfig& skin, std::string_view key_mode);
 [[nodiscard]] double resolved_skin_note_width_scale(const SkinConfig& skin, std::string_view key_mode);
+[[nodiscard]] std::vector<double> resolved_skin_lane_spacing_scales(const SkinConfig& skin, std::string_view key_mode);
 [[nodiscard]] double resolved_skin_note_height_scale(const SkinConfig& skin, std::string_view key_mode);
 [[nodiscard]] double resolved_skin_lane_divider_width_scale(const SkinConfig& skin, std::string_view key_mode);
+[[nodiscard]] double resolved_skin_lane_center_gap_scale(const SkinConfig& skin, std::string_view key_mode);
 [[nodiscard]] std::vector<std::string> default_skin_lane_colors(std::string_view key_mode);
 [[nodiscard]] std::vector<std::string> resolved_skin_lane_colors(const SkinConfig& skin, std::string_view key_mode);
 

@@ -17,6 +17,7 @@ struct JudgeWindowSamples {
     int64_t gr = 0;
     int64_t gd = 0;
     int64_t bd = 0;
+    int64_t pr_early = 0;
     int64_t hold_grace = 0;
     int64_t hold_break = 0;
     int64_t mask = 0;
@@ -80,13 +81,19 @@ public:
     [[nodiscard]] int64_t duration_samples() const { return duration_samples_; }
 
 private:
-    void apply_judgement(game::Judgement judgement, double delta_ms, int64_t sample, double weight, bool breaks_combo);
+    void apply_judgement(game::Judgement judgement,
+                         double delta_ms,
+                         int64_t sample,
+                         double weight,
+                         ComboImpact combo_impact);
     [[nodiscard]] std::optional<NoteEvent> try_hit_note(LaneState& lane, int64_t input_sample);
     void apply_bad_miss(int64_t sample);
+    void apply_empty_poor(int64_t sample);
     void update_miss(LaneState& lane, int64_t current_sample);
     void update_hold(LaneState& lane, int64_t current_sample);
     void finalize_if_done(int64_t current_sample);
     void update_lane_input_state(LaneState& lane, input::InputState state, int64_t input_sample);
+    [[nodiscard]] bool should_apply_early_empty_poor(const LaneState& lane, int64_t input_sample) const;
 
     [[nodiscard]] double samples_to_ms(int64_t samples) const;
     [[nodiscard]] JudgeWindowSamples build_windows(const config::JudgeConfig& judge, double rate) const;

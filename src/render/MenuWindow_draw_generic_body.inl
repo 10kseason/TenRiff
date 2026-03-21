@@ -92,22 +92,26 @@
                 preview.note_height_scale,
                 imported_note_height_ratio,
                 use_imported_metrics);
+            const float lane_center_gap_scale = clamp_gameplay_lane_center_gap_scale(preview.lane_center_gap_scale);
             const GameplayFieldLayout field_layout = build_gameplay_field_layout(
                 preview_bounds_left,
                 preview_bounds_right,
                 field_top,
                 field_bottom,
                 lane_count,
-                note_width_scale);
+                note_width_scale,
+                preview.lane_width_scale_count,
+                preview.lane_width_scales,
+                preview.lane_spacing_scale_count,
+                preview.lane_spacing_scales,
+                lane_center_gap_scale);
             const float field_height = field_layout.height;
             const float field_left = field_layout.left;
             const float field_right = field_layout.right;
-            const float lane_width = field_layout.lane_width;
             const float hit_line_y =
                 gameplay_field_y(field_layout.top,
                                  field_height,
                                  clamp_gameplay_judgement_line(preview.judgement_line_position));
-            const float note_width = field_layout.note_width;
             const float head_half_h = gameplay_note_head_half_height(note_height_scale);
             const float tail_half_h = gameplay_note_tail_half_height(note_height_scale);
             std::array<float, kGameplayHudMaxLanes> preview_lane_divider_widths{};
@@ -135,8 +139,8 @@
             }
 
             for (int lane = 0; lane < lane_count; ++lane) {
-                const float x0 = field_left + static_cast<float>(lane) * lane_width;
-                const float x1 = x0 + lane_width;
+                const float x0 = gameplay_lane_left(field_layout, lane);
+                const float x1 = gameplay_lane_right(field_layout, lane);
                 const uint32_t rgb = preview.lane_colors[static_cast<std::size_t>(lane)];
                 if (d2d_->note_fill_brush) {
                     d2d_->note_fill_brush->SetColor(gameplay_lane_preview_fill(rgb, lane + 1 == preview.selected_lane));
@@ -147,14 +151,32 @@
                                        d2d_->note_fill_brush.Get());
                 }
                 if (preview.show_lane_dividers &&
-                    d2d_->button_border_brush &&
+                    d2d_->lane_divider_brush &&
                     static_cast<std::size_t>(lane) < preview_lane_divider_width_count) {
+                    if (gameplay_is_center_gap_divider(field_layout, static_cast<std::size_t>(lane))) {
+                        continue;
+                    }
                     const float divider_width = preview_lane_divider_widths[static_cast<std::size_t>(lane)];
                     if (divider_width <= 0.01f) {
                         continue;
                     }
-                    ctx->DrawLine(D2D1::Point2F(x1, field_layout.top), D2D1::Point2F(x1, field_layout.bottom),
-                                  d2d_->button_border_brush.Get(), divider_width);
+                    const float divider_x = gameplay_lane_divider_x(field_layout, static_cast<std::size_t>(lane));
+                    ctx->DrawLine(D2D1::Point2F(divider_x, field_layout.top), D2D1::Point2F(divider_x, field_layout.bottom),
+                                  d2d_->lane_divider_brush.Get(), divider_width);
+                }
+            }
+            if (preview.selected_gap > 0 && d2d_->accent_brush) {
+                const int gap_index = std::min(preview.selected_gap - 1, lane_count - 2);
+                const float gap_left = gameplay_lane_right(field_layout, gap_index);
+                const float gap_width = gameplay_lane_gap_after(field_layout, gap_index);
+                if (gap_width > 1.0f) {
+                    d2d_->accent_brush->SetOpacity(0.24f);
+                    ctx->FillRectangle(D2D1::RectF(gap_left,
+                                                   field_layout.top + 12.0f,
+                                                   gap_left + gap_width,
+                                                   field_layout.bottom - 12.0f),
+                                       d2d_->accent_brush.Get());
+                    d2d_->accent_brush->SetOpacity(1.0f);
                 }
             }
 
@@ -173,7 +195,8 @@
 
             for (int lane = 0; lane < lane_count; ++lane) {
                 const uint32_t rgb = preview.lane_colors[static_cast<std::size_t>(lane)];
-                const float lane_center = field_left + (static_cast<float>(lane) + 0.5f) * lane_width;
+                const float lane_center = gameplay_lane_center(field_layout, lane);
+                const float note_width = gameplay_note_width(field_layout, lane);
                 const float x0 = lane_center - note_width * 0.5f;
                 const float x1 = lane_center + note_width * 0.5f;
                 const float default_y =
@@ -240,8 +263,8 @@
             const float swatch_top = rect.bottom - 96.0f;
             const float swatch_height = 54.0f;
             for (int lane = 0; lane < lane_count; ++lane) {
-                const float x0 = field_left + static_cast<float>(lane) * lane_width;
-                const float x1 = x0 + lane_width;
+                const float x0 = gameplay_lane_left(field_layout, lane);
+                const float x1 = gameplay_lane_right(field_layout, lane);
                 const D2D1_RECT_F swatch_rect = D2D1::RectF(x0 + 4.0f, swatch_top, x1 - 4.0f, swatch_top + swatch_height);
                 const D2D1_ROUNDED_RECT swatch_rr = D2D1::RoundedRect(swatch_rect, 10.0f, 10.0f);
                 if (d2d_->note_fill_brush) {
@@ -264,7 +287,8 @@
             }
         };
 
-        if (!data.generic.rows.empty() || !data.generic.notes.empty()) {
+        if (!data.generic.rows.empty() || !data.generic.notes.empty() ||
+            !data.generic.footer_notes.empty() || data.generic.footer_reserved_lines > 0) {
             const float row_left = left + 24.0f;
             const float base_row_right = has_skin_preview ? (right - preview_width - preview_gap) : (right - 24.0f);
             const float row_safe_right =
@@ -281,6 +305,9 @@
             const float action_gap = 10.0f;
             const float note_line_height = roomy_option_layout ? 34.0f : 28.0f;
             const float note_section_gap = data.generic.notes.empty() ? 0.0f : (roomy_option_layout ? 18.0f : 14.0f);
+            const bool has_footer_notes =
+                !data.generic.footer_notes.empty() || data.generic.footer_reserved_lines > 0;
+            const float footer_section_gap = has_footer_notes ? (roomy_option_layout ? 18.0f : 14.0f) : 0.0f;
             const float list_top = top + 24.0f;
             const float list_bottom_limit = bottom - 20.0f;
             IDWriteTextFormat* row_format =
@@ -302,17 +329,24 @@
                 notes_height = note_section_gap + note_line_height * static_cast<float>(displayed_note_count);
             }
 
-            float row_region_bottom = list_bottom_limit - notes_height;
+            const int footer_reserved_line_count =
+                std::max(static_cast<int>(data.generic.footer_notes.size()), std::max(0, data.generic.footer_reserved_lines));
+            const float footer_notes_height =
+                has_footer_notes
+                    ? (footer_section_gap + note_line_height * static_cast<float>(footer_reserved_line_count))
+                    : 0.0f;
+            const float note_region_bottom = list_bottom_limit - footer_notes_height;
+            float row_region_bottom = note_region_bottom - notes_height;
             const float minimum_row_region_height = data.generic.rows.empty() ? 0.0f : row_height;
             if (minimum_row_region_height > 0.0f && row_region_bottom - list_top < minimum_row_region_height && displayed_note_count > 0) {
                 displayed_note_count = std::min(displayed_note_count, 3);
                 notes_height = note_section_gap + note_line_height * static_cast<float>(displayed_note_count);
-                row_region_bottom = list_bottom_limit - notes_height;
+                row_region_bottom = note_region_bottom - notes_height;
             }
             if (minimum_row_region_height > 0.0f && row_region_bottom - list_top < minimum_row_region_height) {
                 displayed_note_count = 0;
                 notes_height = 0.0f;
-                row_region_bottom = list_bottom_limit;
+                row_region_bottom = note_region_bottom;
             }
 
             int selected_row_index = 0;
@@ -479,7 +513,7 @@
             }
 
             if (displayed_note_count > 0) {
-                const float notes_top = list_bottom_limit - notes_height;
+                const float notes_top = note_region_bottom - notes_height;
                 float note_y = notes_top + note_section_gap;
                 if (d2d_->button_border_brush) {
                     d2d_->button_border_brush->SetOpacity(0.35f);
@@ -495,6 +529,25 @@
                         draw_text_clipped(note_w, row_format, note_rect, d2d_->muted_brush.Get());
                     }
                     note_y += note_line_height;
+                }
+            }
+            if (has_footer_notes) {
+                const float footer_top = list_bottom_limit - footer_notes_height;
+                float footer_y = footer_top + footer_section_gap;
+                if (d2d_->button_border_brush) {
+                    d2d_->button_border_brush->SetOpacity(0.35f);
+                    ctx->DrawLine(D2D1::Point2F(row_left, footer_top), D2D1::Point2F(row_right, footer_top),
+                                  d2d_->button_border_brush.Get(), 1.0f);
+                    d2d_->button_border_brush->SetOpacity(1.0f);
+                }
+                for (const auto& note : data.generic.footer_notes) {
+                    const std::wstring note_w = to_wide(note);
+                    const D2D1_RECT_F note_rect =
+                        D2D1::RectF(row_left + 6.0f, footer_y, row_right - 6.0f, footer_y + 30.0f);
+                    if (row_format && d2d_->muted_brush) {
+                        draw_text_clipped(note_w, row_format, note_rect, d2d_->muted_brush.Get());
+                    }
+                    footer_y += note_line_height;
                 }
             }
             return;

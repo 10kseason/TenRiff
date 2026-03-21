@@ -95,6 +95,35 @@ const std::unordered_map<std::string, std::vector<std::string>>& default_skin_la
     return kDefaults;
 }
 
+std::size_t lane_gap_count_for_skin_mode_token(std::string_view key_mode) {
+    const int lane_count = lane_count_for_skin_mode_token(key_mode);
+    return (lane_count > 1) ? static_cast<std::size_t>(lane_count - 1) : 0u;
+}
+
+std::vector<double> default_skin_scale_vector(std::size_t count, double default_value) {
+    return std::vector<double>(count, default_value);
+}
+
+std::vector<double> sanitize_skin_scale_vector(std::string_view key_mode,
+                                               const std::vector<double>& values,
+                                               double default_value,
+                                               double min_value,
+                                               double max_value,
+                                               bool spacing_vector) {
+    const std::size_t expected_count =
+        spacing_vector ? lane_gap_count_for_skin_mode_token(key_mode)
+                       : static_cast<std::size_t>(lane_count_for_skin_mode_token(key_mode));
+    std::vector<double> sanitized = default_skin_scale_vector(expected_count, default_value);
+    for (std::size_t i = 0; i < expected_count && i < values.size(); ++i) {
+        const double value = values[i];
+        if (!std::isfinite(value)) {
+            continue;
+        }
+        sanitized[i] = std::clamp(value, min_value, max_value);
+    }
+    return sanitized;
+}
+
 void sanitize_skin_config(SkinConfig& skin) {
     skin.source = normalize_skin_source_token(skin.source);
     skin.lr2_resolution_mode = normalize_skin_lr2_resolution_mode_token(skin.lr2_resolution_mode);
@@ -103,20 +132,38 @@ void sanitize_skin_config(SkinConfig& skin) {
         skin.judgement_line_position, kJudgementLinePositionMin, kJudgementLinePositionMax);
     skin.combo_position = std::clamp(
         skin.combo_position, kComboPositionMin, kComboPositionMax);
+    std::unordered_map<std::string, std::vector<double>> sanitized_lane_width_scales;
     skin.note_width_scale = std::clamp(
         skin.note_width_scale, kNoteWidthScaleMin, kNoteWidthScaleMax);
+    std::unordered_map<std::string, double> sanitized_note_width_scales;
+    std::unordered_map<std::string, std::vector<double>> sanitized_lane_spacing_scales;
     skin.note_height_scale = std::clamp(
         skin.note_height_scale, kNoteHeightScaleMin, kNoteHeightScaleMax);
     skin.lane_divider_width_scale = std::clamp(
         skin.lane_divider_width_scale, kLaneDividerWidthScaleMin, kLaneDividerWidthScaleMax);
+    skin.lane_center_gap_scale = std::clamp(
+        skin.lane_center_gap_scale, kLaneCenterGapScaleMin, kLaneCenterGapScaleMax);
     skin.hold_body_width_scale = std::clamp(
         skin.hold_body_width_scale, kHoldBodyWidthScaleMin, kHoldBodyWidthScaleMax);
 
     const auto& supported_modes = supported_skin_mode_tokens();
-    std::unordered_map<std::string, double> sanitized_note_width_scales;
     std::unordered_map<std::string, double> sanitized_note_height_scales;
     std::unordered_map<std::string, double> sanitized_lane_divider_width_scales;
+    std::unordered_map<std::string, double> sanitized_lane_center_gap_scales;
     std::unordered_map<std::string, std::vector<std::string>> sanitized_lane_colors;
+    for (const auto& [mode, values] : skin.lane_width_scales) {
+        const std::string normalized = normalize_skin_mode_token(mode);
+        if (std::find(supported_modes.begin(), supported_modes.end(), normalized) == supported_modes.end()) {
+            continue;
+        }
+        sanitized_lane_width_scales[normalized] = sanitize_skin_scale_vector(
+            normalized,
+            values,
+            kLaneWidthScaleDefault,
+            kLaneWidthScaleMin,
+            kLaneWidthScaleMax,
+            false);
+    }
     for (const auto& [mode, value] : skin.note_width_scales) {
         const std::string normalized = normalize_skin_mode_token(mode);
         if (!std::isfinite(value) ||
@@ -125,6 +172,19 @@ void sanitize_skin_config(SkinConfig& skin) {
         }
         sanitized_note_width_scales[normalized] =
             std::clamp(value, kNoteWidthScaleMin, kNoteWidthScaleMax);
+    }
+    for (const auto& [mode, values] : skin.lane_spacing_scales) {
+        const std::string normalized = normalize_skin_mode_token(mode);
+        if (std::find(supported_modes.begin(), supported_modes.end(), normalized) == supported_modes.end()) {
+            continue;
+        }
+        sanitized_lane_spacing_scales[normalized] = sanitize_skin_scale_vector(
+            normalized,
+            values,
+            kLaneSpacingScaleDefault,
+            kLaneSpacingScaleMin,
+            kLaneSpacingScaleMax,
+            true);
     }
     for (const auto& [mode, value] : skin.note_height_scales) {
         const std::string normalized = normalize_skin_mode_token(mode);
@@ -144,12 +204,24 @@ void sanitize_skin_config(SkinConfig& skin) {
         sanitized_lane_divider_width_scales[normalized] =
             std::clamp(value, kLaneDividerWidthScaleMin, kLaneDividerWidthScaleMax);
     }
+    for (const auto& [mode, value] : skin.lane_center_gap_scales) {
+        const std::string normalized = normalize_skin_mode_token(mode);
+        if (!std::isfinite(value) ||
+            std::find(supported_modes.begin(), supported_modes.end(), normalized) == supported_modes.end()) {
+            continue;
+        }
+        sanitized_lane_center_gap_scales[normalized] =
+            std::clamp(value, kLaneCenterGapScaleMin, kLaneCenterGapScaleMax);
+    }
     for (const auto& mode : supported_modes) {
         sanitized_lane_colors.emplace(mode, resolved_skin_lane_colors(skin, mode));
     }
+    skin.lane_width_scales = std::move(sanitized_lane_width_scales);
     skin.note_width_scales = std::move(sanitized_note_width_scales);
+    skin.lane_spacing_scales = std::move(sanitized_lane_spacing_scales);
     skin.note_height_scales = std::move(sanitized_note_height_scales);
     skin.lane_divider_width_scales = std::move(sanitized_lane_divider_width_scales);
+    skin.lane_center_gap_scales = std::move(sanitized_lane_center_gap_scales);
     skin.lane_colors = std::move(sanitized_lane_colors);
 }
 
@@ -414,21 +486,21 @@ void apply_config_object(const JsonObject& root, RuntimeConfig& config) {
                 config.gauge.hard.gr = get_number(*hard, "GR", config.gauge.hard.gr);
                 config.gauge.hard.gd = get_number(*hard, "GD", config.gauge.hard.gd);
                 config.gauge.hard.bd = get_number(*hard, "BD", config.gauge.hard.bd);
-                config.gauge.hard.pr = config.gauge.hard.bd;
+                config.gauge.hard.pr = get_number(*hard, "PR", config.gauge.hard.pr);
             }
             if (auto* normal = get_object(*delta, "normal")) {
                 config.gauge.normal.pg = get_number(*normal, "PG", config.gauge.normal.pg);
                 config.gauge.normal.gr = get_number(*normal, "GR", config.gauge.normal.gr);
                 config.gauge.normal.gd = get_number(*normal, "GD", config.gauge.normal.gd);
                 config.gauge.normal.bd = get_number(*normal, "BD", config.gauge.normal.bd);
-                config.gauge.normal.pr = config.gauge.normal.bd;
+                config.gauge.normal.pr = get_number(*normal, "PR", config.gauge.normal.pr);
             }
             if (auto* easy = get_object(*delta, "easy")) {
                 config.gauge.easy.pg = get_number(*easy, "PG", config.gauge.easy.pg);
                 config.gauge.easy.gr = get_number(*easy, "GR", config.gauge.easy.gr);
                 config.gauge.easy.gd = get_number(*easy, "GD", config.gauge.easy.gd);
                 config.gauge.easy.bd = get_number(*easy, "BD", config.gauge.easy.bd);
-                config.gauge.easy.pr = config.gauge.easy.bd;
+                config.gauge.easy.pr = get_number(*easy, "PR", config.gauge.easy.pr);
             }
         }
     }
@@ -460,6 +532,8 @@ void apply_config_object(const JsonObject& root, RuntimeConfig& config) {
             }
         }
         config.mode.enable_osu_charts = get_bool(*mode, "enable_osu_charts", config.mode.enable_osu_charts);
+        config.mode.ghost_battle_enabled =
+            get_bool(*mode, "ghost_battle_enabled", config.mode.ghost_battle_enabled);
         config.mode.song_index_profile =
             normalize_song_index_profile(get_string(*mode, "song_index_profile", config.mode.song_index_profile));
     }
@@ -523,12 +597,61 @@ void apply_config_object(const JsonObject& root, RuntimeConfig& config) {
         config.skin.note_width_scale = std::clamp(
             get_number(*skin, "note_width_scale", config.skin.note_width_scale),
             kNoteWidthScaleMin, kNoteWidthScaleMax);
+        if (const auto* lane_width_scales = get_object(*skin, "lane_width_scales")) {
+            for (const auto& [mode, value] : *lane_width_scales) {
+                const auto* array = value.as_array();
+                if (!array) {
+                    continue;
+                }
+                std::vector<double> raw_values;
+                raw_values.reserve(array->size());
+                for (const auto& item : *array) {
+                    if (!item.is_number()) {
+                        continue;
+                    }
+                    raw_values.push_back(item.as_number(kLaneWidthScaleDefault));
+                }
+                config.skin.lane_width_scales[normalize_skin_mode_token(mode)] = sanitize_skin_scale_vector(
+                    mode,
+                    raw_values,
+                    kLaneWidthScaleDefault,
+                    kLaneWidthScaleMin,
+                    kLaneWidthScaleMax,
+                    false);
+            }
+        }
         config.skin.note_height_scale = std::clamp(
             get_number(*skin, "note_height_scale", config.skin.note_height_scale),
             kNoteHeightScaleMin, kNoteHeightScaleMax);
+        if (const auto* lane_spacing_scales = get_object(*skin, "lane_spacing_scales")) {
+            for (const auto& [mode, value] : *lane_spacing_scales) {
+                const auto* array = value.as_array();
+                if (!array) {
+                    continue;
+                }
+                std::vector<double> raw_values;
+                raw_values.reserve(array->size());
+                for (const auto& item : *array) {
+                    if (!item.is_number()) {
+                        continue;
+                    }
+                    raw_values.push_back(item.as_number(kLaneSpacingScaleDefault));
+                }
+                config.skin.lane_spacing_scales[normalize_skin_mode_token(mode)] = sanitize_skin_scale_vector(
+                    mode,
+                    raw_values,
+                    kLaneSpacingScaleDefault,
+                    kLaneSpacingScaleMin,
+                    kLaneSpacingScaleMax,
+                    true);
+            }
+        }
         config.skin.lane_divider_width_scale = std::clamp(
             get_number(*skin, "lane_divider_width_scale", config.skin.lane_divider_width_scale),
             kLaneDividerWidthScaleMin, kLaneDividerWidthScaleMax);
+        config.skin.lane_center_gap_scale = std::clamp(
+            get_number(*skin, "lane_center_gap_scale", config.skin.lane_center_gap_scale),
+            kLaneCenterGapScaleMin, kLaneCenterGapScaleMax);
         config.skin.hold_body_width_scale = std::clamp(
             get_number(*skin, "hold_body_width_scale", config.skin.hold_body_width_scale),
             kHoldBodyWidthScaleMin, kHoldBodyWidthScaleMax);
@@ -559,6 +682,17 @@ void apply_config_object(const JsonObject& root, RuntimeConfig& config) {
                     value.as_number(config.skin.lane_divider_width_scale),
                     kLaneDividerWidthScaleMin,
                     kLaneDividerWidthScaleMax);
+            }
+        }
+        if (const auto* lane_center_gap_scales = get_object(*skin, "lane_center_gap_scales")) {
+            for (const auto& [mode, value] : *lane_center_gap_scales) {
+                if (!value.is_number()) {
+                    continue;
+                }
+                config.skin.lane_center_gap_scales[normalize_skin_mode_token(mode)] = std::clamp(
+                    value.as_number(config.skin.lane_center_gap_scale),
+                    kLaneCenterGapScaleMin,
+                    kLaneCenterGapScaleMax);
             }
         }
         if (const auto* lane_colors = get_object(*skin, "lane_colors")) {
@@ -669,6 +803,7 @@ JsonValue build_json_root(const RuntimeConfig& config) {
     hard.emplace("GR", JsonValue{config.gauge.hard.gr});
     hard.emplace("GD", JsonValue{config.gauge.hard.gd});
     hard.emplace("BD", JsonValue{config.gauge.hard.bd});
+    hard.emplace("PR", JsonValue{config.gauge.hard.pr});
     delta.emplace("hard", JsonValue{std::move(hard)});
 
     JsonObject normal;
@@ -676,6 +811,7 @@ JsonValue build_json_root(const RuntimeConfig& config) {
     normal.emplace("GR", JsonValue{config.gauge.normal.gr});
     normal.emplace("GD", JsonValue{config.gauge.normal.gd});
     normal.emplace("BD", JsonValue{config.gauge.normal.bd});
+    normal.emplace("PR", JsonValue{config.gauge.normal.pr});
     delta.emplace("normal", JsonValue{std::move(normal)});
 
     JsonObject easy;
@@ -683,6 +819,7 @@ JsonValue build_json_root(const RuntimeConfig& config) {
     easy.emplace("GR", JsonValue{config.gauge.easy.gr});
     easy.emplace("GD", JsonValue{config.gauge.easy.gd});
     easy.emplace("BD", JsonValue{config.gauge.easy.bd});
+    easy.emplace("PR", JsonValue{config.gauge.easy.pr});
     delta.emplace("easy", JsonValue{std::move(easy)});
 
     gauge.emplace("delta", JsonValue{std::move(delta)});
@@ -710,6 +847,7 @@ JsonValue build_json_root(const RuntimeConfig& config) {
     }
     mode.emplace("mods", JsonValue{std::move(mods)});
     mode.emplace("enable_osu_charts", JsonValue{config.mode.enable_osu_charts});
+    mode.emplace("ghost_battle_enabled", JsonValue{config.mode.ghost_battle_enabled});
     mode.emplace("song_index_profile", JsonValue{normalize_song_index_profile(config.mode.song_index_profile)});
     root.emplace("mode", JsonValue{std::move(mode)});
 
@@ -763,20 +901,42 @@ JsonValue build_json_root(const RuntimeConfig& config) {
     skin.emplace("judgement_line_position", JsonValue{config.skin.judgement_line_position});
     skin.emplace("combo_position", JsonValue{config.skin.combo_position});
     skin.emplace("note_width_scale", JsonValue{config.skin.note_width_scale});
+    JsonObject lane_width_scales;
+    JsonObject note_width_scales;
+    JsonObject lane_spacing_scales;
     skin.emplace("note_height_scale", JsonValue{config.skin.note_height_scale});
     skin.emplace("lane_divider_width_scale", JsonValue{config.skin.lane_divider_width_scale});
+    skin.emplace("lane_center_gap_scale", JsonValue{config.skin.lane_center_gap_scale});
     skin.emplace("hold_body_width_scale", JsonValue{config.skin.hold_body_width_scale});
-    JsonObject note_width_scales;
     JsonObject note_height_scales;
     JsonObject lane_divider_width_scales;
+    JsonObject lane_center_gap_scales;
     for (const auto& mode : supported_skin_mode_tokens()) {
+        JsonArray lane_widths;
+        const auto resolved_lane_widths = resolved_skin_lane_width_scales(config.skin, mode);
+        lane_widths.reserve(resolved_lane_widths.size());
+        for (const double value : resolved_lane_widths) {
+            lane_widths.emplace_back(JsonValue{value});
+        }
+        lane_width_scales.emplace(mode, JsonValue{std::move(lane_widths)});
         note_width_scales.emplace(mode, JsonValue{resolved_skin_note_width_scale(config.skin, mode)});
+        JsonArray lane_spacings;
+        const auto resolved_lane_spacings = resolved_skin_lane_spacing_scales(config.skin, mode);
+        lane_spacings.reserve(resolved_lane_spacings.size());
+        for (const double value : resolved_lane_spacings) {
+            lane_spacings.emplace_back(JsonValue{value});
+        }
+        lane_spacing_scales.emplace(mode, JsonValue{std::move(lane_spacings)});
         note_height_scales.emplace(mode, JsonValue{resolved_skin_note_height_scale(config.skin, mode)});
         lane_divider_width_scales.emplace(mode, JsonValue{resolved_skin_lane_divider_width_scale(config.skin, mode)});
+        lane_center_gap_scales.emplace(mode, JsonValue{resolved_skin_lane_center_gap_scale(config.skin, mode)});
     }
+    skin.emplace("lane_width_scales", JsonValue{std::move(lane_width_scales)});
     skin.emplace("note_width_scales", JsonValue{std::move(note_width_scales)});
+    skin.emplace("lane_spacing_scales", JsonValue{std::move(lane_spacing_scales)});
     skin.emplace("note_height_scales", JsonValue{std::move(note_height_scales)});
     skin.emplace("lane_divider_width_scales", JsonValue{std::move(lane_divider_width_scales)});
+    skin.emplace("lane_center_gap_scales", JsonValue{std::move(lane_center_gap_scales)});
     JsonObject lane_colors;
     for (const auto& mode : supported_skin_mode_tokens()) {
         JsonArray colors;
@@ -919,6 +1079,24 @@ uint32_t skin_color_rgb(std::string_view token) {
     return 0xF6F8FF;
 }
 
+std::vector<double> resolved_skin_lane_width_scales(const SkinConfig& skin, std::string_view key_mode) {
+    const std::string normalized = normalize_skin_mode_token(key_mode);
+    std::vector<double> resolved = default_skin_scale_vector(
+        static_cast<std::size_t>(lane_count_for_skin_mode_token(normalized)),
+        kLaneWidthScaleDefault);
+    const auto it = skin.lane_width_scales.find(normalized);
+    if (it == skin.lane_width_scales.end()) {
+        return resolved;
+    }
+    return sanitize_skin_scale_vector(
+        normalized,
+        it->second,
+        kLaneWidthScaleDefault,
+        kLaneWidthScaleMin,
+        kLaneWidthScaleMax,
+        false);
+}
+
 double resolved_skin_note_width_scale(const SkinConfig& skin, std::string_view key_mode) {
     const std::string normalized = normalize_skin_mode_token(key_mode);
     double resolved = std::clamp(skin.note_width_scale, kNoteWidthScaleMin, kNoteWidthScaleMax);
@@ -927,6 +1105,23 @@ double resolved_skin_note_width_scale(const SkinConfig& skin, std::string_view k
         return resolved;
     }
     return std::clamp(it->second, kNoteWidthScaleMin, kNoteWidthScaleMax);
+}
+
+std::vector<double> resolved_skin_lane_spacing_scales(const SkinConfig& skin, std::string_view key_mode) {
+    const std::string normalized = normalize_skin_mode_token(key_mode);
+    std::vector<double> resolved =
+        default_skin_scale_vector(lane_gap_count_for_skin_mode_token(normalized), kLaneSpacingScaleDefault);
+    const auto it = skin.lane_spacing_scales.find(normalized);
+    if (it == skin.lane_spacing_scales.end()) {
+        return resolved;
+    }
+    return sanitize_skin_scale_vector(
+        normalized,
+        it->second,
+        kLaneSpacingScaleDefault,
+        kLaneSpacingScaleMin,
+        kLaneSpacingScaleMax,
+        true);
 }
 
 double resolved_skin_note_height_scale(const SkinConfig& skin, std::string_view key_mode) {
@@ -940,16 +1135,24 @@ double resolved_skin_note_height_scale(const SkinConfig& skin, std::string_view 
 }
 
 double resolved_skin_lane_divider_width_scale(const SkinConfig& skin, std::string_view key_mode) {
-    const std::string normalized = normalize_skin_mode_token(key_mode);
-    double resolved = std::clamp(
+    static_cast<void>(key_mode);
+    return std::clamp(
         skin.lane_divider_width_scale,
         kLaneDividerWidthScaleMin,
         kLaneDividerWidthScaleMax);
-    const auto it = skin.lane_divider_width_scales.find(normalized);
-    if (it == skin.lane_divider_width_scales.end() || !std::isfinite(it->second)) {
+}
+
+double resolved_skin_lane_center_gap_scale(const SkinConfig& skin, std::string_view key_mode) {
+    const std::string normalized = normalize_skin_mode_token(key_mode);
+    double resolved = std::clamp(
+        skin.lane_center_gap_scale,
+        kLaneCenterGapScaleMin,
+        kLaneCenterGapScaleMax);
+    const auto it = skin.lane_center_gap_scales.find(normalized);
+    if (it == skin.lane_center_gap_scales.end() || !std::isfinite(it->second)) {
         return resolved;
     }
-    return std::clamp(it->second, kLaneDividerWidthScaleMin, kLaneDividerWidthScaleMax);
+    return std::clamp(it->second, kLaneCenterGapScaleMin, kLaneCenterGapScaleMax);
 }
 
 std::vector<std::string> default_skin_lane_colors(std::string_view key_mode) {
@@ -1027,6 +1230,7 @@ RuntimeConfig ConfigLoader::defaults() const {
     config.mode.random_seed = 0;
     config.mode.mods.clear();
     config.mode.enable_osu_charts = false;
+    config.mode.ghost_battle_enabled = true;
     config.mode.song_index_profile = "safe";
 
     config.ui.language = "en";

@@ -15,6 +15,12 @@ struct JudgementCounts {
     int pr = 0;
 };
 
+enum class ComboImpact {
+    Increment,
+    Break,
+    Preserve,
+};
+
 struct GaugeSample {
     int64_t sample = 0;
     double value = 0.0;
@@ -41,7 +47,7 @@ struct ResultStats {
     std::vector<GaugeSample> gauge_history;
     std::vector<ShiftEvent> shifts;
 
-    void record_judgement(game::Judgement judgement, double delta_ms, bool breaks_combo, double weight = 1.0);
+    void record_judgement(game::Judgement judgement, double delta_ms, ComboImpact combo_impact, double weight = 1.0);
     void record_note_total(int count);
     void record_gauge_sample(int64_t sample, double value);
     void record_shift(int64_t sample, game::GaugeType from, game::GaugeType to);
