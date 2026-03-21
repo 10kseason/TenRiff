@@ -283,4 +283,55 @@ std::string filename_only(const std::string& path) {
     return path_from_utf8(path).filename().u8string();
 }
 
+SongMembershipSet build_song_membership_set(const std::vector<std::string>& values) {
+    SongMembershipSet membership;
+    membership.reserve(values.size());
+    for (const auto& value : values) {
+        if (!value.empty()) {
+            membership.emplace(value);
+        }
+    }
+    return membership;
+}
+
+SongCollectionMembershipLookup build_song_collection_membership_lookup(
+    const std::unordered_map<std::string, std::vector<std::string>>& collections) {
+    SongCollectionMembershipLookup lookup;
+    lookup.reserve(collections.size());
+    for (const auto& [name, items] : collections) {
+        lookup.emplace(name, build_song_membership_set(items));
+    }
+    return lookup;
+}
+
+bool song_membership_contains(const SongMembershipSet& values, std::string_view target) {
+    if (target.empty()) {
+        return false;
+    }
+    return values.find(std::string(target)) != values.end();
+}
+
+bool song_collection_membership_contains(const SongCollectionMembershipLookup& lookup,
+                                         std::string_view collection_name,
+                                         std::string_view target) {
+    if (collection_name.empty() || target.empty()) {
+        return false;
+    }
+    const auto it = lookup.find(std::string(collection_name));
+    if (it == lookup.end()) {
+        return false;
+    }
+    return song_membership_contains(it->second, target);
+}
+
+int count_song_membership_matches(const std::vector<std::string>& song_keys, const SongMembershipSet& membership) {
+    int count = 0;
+    for (const auto& key : song_keys) {
+        if (song_membership_contains(membership, key)) {
+            ++count;
+        }
+    }
+    return count;
+}
+
 }  // namespace tenriff::app::menu_song_select

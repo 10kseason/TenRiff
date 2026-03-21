@@ -519,6 +519,7 @@ void MenuApp::populate_generic_screen_render_data(render::MenuRenderData& render
 }
 
 void MenuApp::publish_snapshot() {
+    const int64_t publish_start_ns = timing::HighResClock::now_ns();
     if (screen_ == Screen::SongSelect) {
         sync_song_select_state();
     }
@@ -566,6 +567,21 @@ void MenuApp::publish_snapshot() {
         std::lock_guard<std::mutex> lock(snapshot_mutex_);
         snapshot_ = std::move(snapshot);
         ++snapshot_version_;
+    }
+
+    if (screen_ == Screen::SongSelect && song_select_view_ == SongSelectView::Songs) {
+        const int64_t publish_elapsed_ns = timing::HighResClock::now_ns() - publish_start_ns;
+        constexpr int64_t kSlowSongSelectSnapshotNs = 8'000'000LL;
+        constexpr int64_t kSlowSnapshotLogCooldownNs = 2'000'000'000LL;
+        if (publish_elapsed_ns >= kSlowSongSelectSnapshotNs &&
+            (publish_start_ns - last_song_select_slow_snapshot_log_ns_) >= kSlowSnapshotLogCooldownNs) {
+            last_song_select_slow_snapshot_log_ns_ = publish_start_ns;
+            std::cerr << "[MenuApp] Slow Song Select snapshot " 
+                      << (static_cast<double>(publish_elapsed_ns) / 1'000'000.0)
+                      << " ms selected=" << selected_song_
+                      << " visible=" << visible_song_count()
+                      << " path=" << selected_song_path() << std::endl;
+        }
     }
 }
 

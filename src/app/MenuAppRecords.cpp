@@ -398,29 +398,7 @@ std::string MenuApp::song_absolute_path(const SongEntry& entry) const {
 }
 
 std::string MenuApp::song_background_preview_path_for_entry(const SongEntry& entry) {
-    using namespace menu_song_select;
-
-    const std::string chart_path = song_absolute_path(entry);
-    if (chart_path.empty()) {
-        return {};
-    }
-
-    // Preview resolution can touch disk repeatedly while moving the cursor, so keep a
-    // normalized path-key cache at the MenuApp layer.
-    const std::string cache_key = menu_songs::normalize_path_key(path_from_utf8(chart_path));
-    if (!cache_key.empty()) {
-        auto cached = song_background_preview_cache_.find(cache_key);
-        if (cached != song_background_preview_cache_.end()) {
-            return cached->second;
-        }
-    }
-
-    const std::string resolved_path = menu_songs::resolve_song_background_preview_path(chart_path);
-
-    if (!cache_key.empty()) {
-        song_background_preview_cache_[cache_key] = resolved_path;
-    }
-    return resolved_path;
+    return entry.background_preview_path;
 }
 
 std::string MenuApp::selected_song_background_preview_path() {

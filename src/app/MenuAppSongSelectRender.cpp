@@ -111,16 +111,6 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
         std::to_string(render.song_select.source_count) + " " +
         ui_text(render.song_select.source_count == 1 ? "ROOT" : "ROOTS", "소스");
     const std::string browser_detail = render.song_select.browser_summary;
-    int favorite_count = 0;
-    for (const auto& entry : indexed_songs_) {
-        const std::string key =
-            menu_songs::normalize_path_key(path_from_utf8(song_absolute_path(entry)));
-        if (!key.empty() &&
-            std::find(config_.ui.favorite_chart_keys.begin(), config_.ui.favorite_chart_keys.end(), key) !=
-                config_.ui.favorite_chart_keys.end()) {
-            ++favorite_count;
-        }
-    }
     const std::string records_detail =
         (render.song_select.record_count > 0)
             ? (std::to_string(render.song_select.record_count) + " " + ui_text("PLAYS", "플레이"))
@@ -189,7 +179,7 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
         render::MenuButtonData{ui_text("FAVORITES", "페이보릿"), "V", song_select_nav_cursor_ == 4,
                                to_lower_ascii(config_.ui.song_collection_filter) == "favorites"
                                    ? ui_text("ACTIVE", "활성")
-                                   : (std::to_string(favorite_count) + " " + ui_text("CHARTS", "차트"))},
+                                   : (std::to_string(indexed_favorite_count_) + " " + ui_text("CHARTS", "차트"))},
         render::MenuButtonData{ui_text("BROWSE", "탐색"), "F", song_select_nav_cursor_ == 5, browser_detail},
         render::MenuButtonData{ui_text("MOD", "모드"), "M", song_select_nav_cursor_ == 6,
                                format_multiplier(config_.speed.rate) + " / HS " +
@@ -318,8 +308,7 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
                     menu_songs::normalize_path_key(path_from_utf8(song_absolute_path(*entry)));
                 card.favorite =
                     !song_key.empty() &&
-                    std::find(config_.ui.favorite_chart_keys.begin(), config_.ui.favorite_chart_keys.end(), song_key) !=
-                        config_.ui.favorite_chart_keys.end();
+                    song_membership_contains(favorite_song_keys_, song_key);
                 render.song_select.songs.push_back(std::move(card));
             }
         }

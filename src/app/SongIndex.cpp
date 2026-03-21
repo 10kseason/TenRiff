@@ -1,5 +1,6 @@
 #include "app/SongIndex.h"
 #include "app/SongIndexBudget.h"
+#include "app/MenuSongUtils.h"
 
 #include <algorithm>
 #include <atomic>
@@ -34,7 +35,7 @@ namespace tenriff::app {
 
 namespace {
 
-constexpr int kSongIndexVersion = 8;
+constexpr int kSongIndexVersion = 9;
 constexpr std::uintmax_t kMaxMetadataChartFileBytes = 8u * 1024u * 1024u;
 
 bool cancel_requested(const SongIndexCancelCallback& cancel) {
@@ -526,7 +527,7 @@ SongEntry build_bms_entry(std::string relative_path,
 
     chart::BmsParser parser;
     chart::BmsParserOptions parser_options;
-    parser_options.retain_wav_bmp = false;
+    parser_options.retain_wav_bmp = true;
     parser_options.retain_unknown_headers = false;
     parser_options.retain_nonessential_commands = false;
     auto parsed = parser.parseFile(full_path.u8string(), parser_options);
@@ -562,6 +563,8 @@ SongEntry build_bms_entry(std::string relative_path,
     }
 
     entry.bpm = parsed.chart.base_bpm;
+    entry.background_preview_path =
+        menu_songs::resolve_bms_background_preview_path(full_path, parsed.chart);
     const int metadata_level = entry.level;
     auto difficulty = calculate_bms_difficulty(parsed.chart);
     if (difficulty.has_value() && difficulty->note_count > 0) {
@@ -624,6 +627,8 @@ SongEntry build_osu_entry(std::string relative_path,
     entry.artist = preferred_osu_metadata_text(parsed.chart.artist, parsed.chart.artist_unicode);
     entry.chart_name = sanitized_metadata_text(parsed.chart.version);
     entry.bpm = parsed.chart.base_bpm;
+    entry.background_preview_path =
+        menu_songs::resolve_osu_background_preview_path(full_path, parsed.chart.background_filename);
 
     const auto difficulty = chart::calculate_osu_mania_difficulty(parsed.chart);
     if (difficulty.note_count > 0) {
@@ -1346,6 +1351,12 @@ private:
                     return false;
                 }
                 entry.layout_label = util::sanitize_ui_text(value.value());
+            } else if (*key == "background_preview_path") {
+                auto value = parse_string();
+                if (!value.has_value()) {
+                    return false;
+                }
+                entry.background_preview_path = util::ensure_utf8_text(value.value());
             } else if (*key == "key_count") {
                 auto value = parse_number();
                 if (!value.has_value()) {
@@ -1532,6 +1543,8 @@ bool save_song_index(const std::string& path,
         write_json_string(file, entry.format);
         file << ",\"layout_label\":";
         write_json_string(file, entry.layout_label);
+        file << ",\"background_preview_path\":";
+        write_json_string(file, entry.background_preview_path);
         file << ",\"key_count\":" << entry.key_count;
         file << ",\"level\":" << entry.level;
         file << ",\"rating\":" << entry.rating;

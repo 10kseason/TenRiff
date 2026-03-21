@@ -21,6 +21,7 @@ struct SongEntry {
     std::string chart_name;
     std::string format;
     std::string layout_label;
+    std::string background_preview_path;
     int key_count = 0;
     int level = 0;
     double rating = 0.0;

@@ -2,12 +2,18 @@
 
 #include <cstdint>
 #include <filesystem>
+#include <unordered_map>
+#include <unordered_set>
 #include <string>
 #include <string_view>
+#include <vector>
 
 #include "app/SongIndex.h"
 
 namespace tenriff::app::menu_song_select {
+
+using SongMembershipSet = std::unordered_set<std::string>;
+using SongCollectionMembershipLookup = std::unordered_map<std::string, SongMembershipSet>;
 
 std::filesystem::path path_from_utf8(std::string_view value);
 std::string safe_ui_text(std::string_view value, std::string_view fallback = {});
@@ -29,5 +35,13 @@ bool song_entry_less_by_title_desc(const SongEntry& lhs, const SongEntry& rhs);
 std::string key_filter_label(int key_filter);
 std::string browser_summary_label(std::string_view query, int key_filter, int level_min, int level_max);
 std::string filename_only(const std::string& path);
+SongMembershipSet build_song_membership_set(const std::vector<std::string>& values);
+SongCollectionMembershipLookup build_song_collection_membership_lookup(
+    const std::unordered_map<std::string, std::vector<std::string>>& collections);
+bool song_membership_contains(const SongMembershipSet& values, std::string_view target);
+bool song_collection_membership_contains(const SongCollectionMembershipLookup& lookup,
+                                         std::string_view collection_name,
+                                         std::string_view target);
+int count_song_membership_matches(const std::vector<std::string>& song_keys, const SongMembershipSet& membership);
 
 }  // namespace tenriff::app::menu_song_select

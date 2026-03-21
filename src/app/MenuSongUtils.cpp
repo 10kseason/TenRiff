@@ -486,6 +486,31 @@ std::vector<std::string> build_chart_path_keys(const std::string& chart_path, co
     return keys;
 }
 
+std::string resolve_osu_background_preview_path(const std::filesystem::path& chart_path,
+                                                std::string_view background_filename) {
+    if (chart_path.empty() || background_filename.empty()) {
+        return {};
+    }
+    if (auto preview = resolve_preview_asset_path(chart_path, std::string(background_filename));
+        preview.has_value()) {
+        return preview->u8string();
+    }
+    return {};
+}
+
+std::string resolve_bms_background_preview_path(const std::filesystem::path& chart_path,
+                                                const chart::BmsChart& chart) {
+    if (chart_path.empty()) {
+        return {};
+    }
+    for (const auto& preview_reference : collect_bms_preview_references(chart)) {
+        if (auto preview = resolve_preview_asset_path(chart_path, preview_reference); preview.has_value()) {
+            return preview->u8string();
+        }
+    }
+    return {};
+}
+
 std::string resolve_song_background_preview_path(const std::string& chart_path) {
     if (chart_path.empty()) {
         return {};
@@ -505,15 +530,7 @@ std::string resolve_song_background_preview_path(const std::string& chart_path) 
         buffer << file.rdbuf();
         chart::OsuManiaLoader loader;
         const auto parsed = loader.parse(buffer.str());
-        if (parsed.chart.background_filename.empty()) {
-            return {};
-        }
-
-        if (auto preview = resolve_preview_asset_path(chart_fs_path, parsed.chart.background_filename);
-            preview.has_value()) {
-            return preview->u8string();
-        }
-        return {};
+        return resolve_osu_background_preview_path(chart_fs_path, parsed.chart.background_filename);
     }
 
     if (!is_bms_chart_extension(chart_ext)) {
@@ -524,12 +541,7 @@ std::string resolve_song_background_preview_path(const std::string& chart_path) 
     chart::BmsParserOptions options;
     options.tolerant = true;
     const auto parsed = parser.parseFile(chart_path, options);
-    for (const auto& preview_reference : collect_bms_preview_references(parsed.chart)) {
-        if (auto preview = resolve_preview_asset_path(chart_fs_path, preview_reference); preview.has_value()) {
-            return preview->u8string();
-        }
-    }
-    return {};
+    return resolve_bms_background_preview_path(chart_fs_path, parsed.chart);
 }
 
 }  // namespace tenriff::app::menu_songs

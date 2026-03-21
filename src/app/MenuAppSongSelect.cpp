@@ -27,11 +27,30 @@ std::vector<std::string> ordered_collection_names(const config::RuntimeConfig& c
     return names;
 }
 
-bool vector_contains(const std::vector<std::string>& values, std::string_view target) {
-    return std::find(values.begin(), values.end(), target) != values.end();
-}
-
 }  // namespace
+
+void MenuApp::refresh_song_collection_membership_cache() {
+    using namespace menu_song_select;
+
+    favorite_song_keys_ = build_song_membership_set(config_.ui.favorite_chart_keys);
+    song_collection_membership_ = build_song_collection_membership_lookup(config_.ui.collections);
+
+    indexed_favorite_count_ = 0;
+    if (indexed_songs_.empty() || favorite_song_keys_.empty()) {
+        return;
+    }
+
+    for (const auto& entry : indexed_songs_) {
+        const std::string absolute = song_absolute_path(entry);
+        if (absolute.empty()) {
+            continue;
+        }
+        const std::string key = menu_songs::normalize_path_key(path_from_utf8(absolute));
+        if (song_membership_contains(favorite_song_keys_, key)) {
+            ++indexed_favorite_count_;
+        }
+    }
+}
 
 std::string MenuApp::selected_song_path() const {
     if (selected_song_ < 0) {
@@ -78,23 +97,23 @@ std::string MenuApp::selected_song_storage_key() const {
 }
 
 bool MenuApp::selected_song_is_favorite() const {
+    using namespace menu_song_select;
+
     const std::string key = selected_song_storage_key();
     if (key.empty()) {
         return false;
     }
-    return vector_contains(config_.ui.favorite_chart_keys, key);
+    return song_membership_contains(favorite_song_keys_, key);
 }
 
 bool MenuApp::selected_song_is_in_collection(std::string_view name) const {
+    using namespace menu_song_select;
+
     const std::string key = selected_song_storage_key();
     if (key.empty() || name.empty()) {
         return false;
     }
-    const auto it = config_.ui.collections.find(std::string(name));
-    if (it == config_.ui.collections.end()) {
-        return false;
-    }
-    return vector_contains(it->second, key);
+    return song_collection_membership_contains(song_collection_membership_, name, key);
 }
 
 bool MenuApp::song_entry_matches_collection_filter(const SongEntry& entry) const {
@@ -111,14 +130,14 @@ bool MenuApp::song_entry_matches_collection_filter(const SongEntry& entry) const
     }
 
     if (filter == "favorites") {
-        return vector_contains(config_.ui.favorite_chart_keys, key);
+        return song_membership_contains(favorite_song_keys_, key);
     }
 
-    const auto it = config_.ui.collections.find(config_.ui.song_collection_filter);
-    if (it == config_.ui.collections.end()) {
+    const auto it = song_collection_membership_.find(config_.ui.song_collection_filter);
+    if (it == song_collection_membership_.end()) {
         return true;
     }
-    return vector_contains(it->second, key);
+    return song_membership_contains(it->second, key);
 }
 
 MenuApp::BestResultRecord MenuApp::best_result_for_song_entry(const SongEntry& entry) const {
@@ -213,6 +232,7 @@ void MenuApp::create_next_song_collection() {
         if (config_.ui.collections.find(name) == config_.ui.collections.end()) {
             config_.ui.collections.emplace(name, std::vector<std::string>{});
             config_.ui.song_collection_filter = name;
+            refresh_song_collection_membership_cache();
             return;
         }
         ++next_index;
@@ -232,6 +252,7 @@ bool MenuApp::toggle_selected_song_favorite() {
     } else {
         favorites.erase(it);
     }
+    refresh_song_collection_membership_cache();
     return true;
 }
 
@@ -251,6 +272,7 @@ bool MenuApp::toggle_selected_song_in_collection(std::string_view name) {
     } else {
         items.erase(it);
     }
+    refresh_song_collection_membership_cache();
     return true;
 }
 
@@ -258,7 +280,6 @@ void MenuApp::update_song_list(SongIndex index) {
     using namespace menu_song_select;
 
     std::string selected_path = selected_song_path();
-    song_background_preview_cache_.clear();
     indexed_songs_ = std::move(index.entries);
     // Sanitize once when the source list changes so later view rebuilds can stay cheap.
     for (auto& entry : indexed_songs_) {
@@ -266,6 +287,7 @@ void MenuApp::update_song_list(SongIndex index) {
         entry.artist = safe_ui_text(entry.artist);
         entry.format = safe_ui_text(entry.format);
     }
+    refresh_song_collection_membership_cache();
     rebuild_visible_song_list(selected_path.empty() ? nullptr : &selected_path);
     sync_song_select_state();
 }
