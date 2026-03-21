@@ -108,13 +108,30 @@ If Windows Defender or another antivirus briefly locks `TenRiff.exe`, use the wr
 .\tools\build_with_retry.ps1 -BuildDir build-dist -Config Release -Targets tenriff,bms_parser_tests
 ```
 
-### 3. Run the tests
+### 3. Public source packages can be built directly too
+
+The versioned public source bundles (packages such as `TenRiff-0.997-source.zip`) include `external/`, `src/`, `tests/`, `config/`, `docs/`, and `Mainmusic/`, so they can be configured and built directly after extraction.
+
+- The source bundle does not include `tools/build_with_retry.ps1`, so use plain `cmake --build`.
+- `10k-calc/` is intentionally excluded from the public source bundle, so optional Python-reference checks may print `[skip]` and still be considered normal.
+- `profiles/`, `songs/`, and `logs/` are also excluded from the bundle, but `launch_win.bat` creates the needed folders on first launch.
+
+Inside the extracted source-package folder, a typical flow looks like this:
+
+```powershell
+cmake -S . -B build -G "Visual Studio 17 2022" -A x64
+cmake --build build --config Release --target tenriff
+cmake --build build --config Release --target bms_parser_tests
+.\build\Release\bms_parser_tests.exe
+```
+
+### 4. Run the tests
 
 ```powershell
 .\build-dist\Release\bms_parser_tests.exe
 ```
 
-### 4. Run the app
+### 5. Run the app
 
 Direct launch:
 

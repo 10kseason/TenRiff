@@ -239,6 +239,60 @@ TEST_CASE("song scan keeps chart names for BMS subtitles and osu versions") {
     CHECK(by_path.at("named_chart.osu").chart_name == "MX");
 }
 
+TEST_CASE("song scan stores indexed background preview paths for BMS and osu charts") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+
+    std::filesystem::create_directories(temp.path / "bgs");
+    write_file(temp.path / "cover.png", "");
+    write_file(temp.path / "bgs" / "cover image.jpg", "");
+    write_file(temp.path / "preview_stagefile.bms",
+               "#TITLE Preview BMS\n"
+               "#ARTIST Composer\n"
+               "#PLAYLEVEL 10\n"
+               "#BPM 150\n"
+               "#STAGEFILE cover.png\n"
+               "#00111:01\n");
+    write_file(temp.path / "preview_events.osu",
+               "osu file format v14\n"
+               "[General]\n"
+               "AudioFilename:test.mp3\n"
+               "Mode:3\n"
+               "[Metadata]\n"
+               "Title:Preview Osu\n"
+               "Artist:Composer\n"
+               "[Difficulty]\n"
+               "CircleSize:4\n"
+               "[Events]\n"
+               "0,0,\"bgs/cover image.jpg\",0,0\n"
+               "[TimingPoints]\n"
+               "0,500,4,0,0,100,1,0\n"
+               "[HitObjects]\n"
+               "64,192,0,1,0,0:0:0:0:\n");
+
+    SongIndexOptions options;
+    options.include_osu = true;
+    std::vector<std::string> warnings;
+    SongIndex index = scan_songs(temp.path.u8string(), nullptr, warnings, {}, options);
+
+    REQUIRE(index.entries.size() == 2u);
+    CHECK(warnings.empty());
+
+    std::unordered_map<std::string, tenriff::app::SongEntry> by_path;
+    for (const auto& entry : index.entries) {
+        by_path.emplace(entry.path, entry);
+    }
+
+    REQUIRE(by_path.count("preview_stagefile.bms") == 1u);
+    CHECK_FALSE(by_path.at("preview_stagefile.bms").background_preview_path.empty());
+    CHECK(std::filesystem::path(by_path.at("preview_stagefile.bms").background_preview_path).filename() == "cover.png");
+
+    REQUIRE(by_path.count("preview_events.osu") == 1u);
+    CHECK_FALSE(by_path.at("preview_events.osu").background_preview_path.empty());
+    CHECK(std::filesystem::path(by_path.at("preview_events.osu").background_preview_path).filename() == "cover image.jpg");
+}
+
 TEST_CASE("song scan computes 10k-calc difficulty for BMS entries") {
     TempDirGuard temp;
     temp.path = make_temp_dir();
@@ -471,7 +525,7 @@ TEST_CASE("cached song index load drops non-BMS menu entries") {
     const auto index_path = temp.path / "song_index.json";
     write_file(index_path,
                "{\n"
-               "  \"version\": 8,\n"
+               "  \"version\": 9,\n"
                "  \"include_osu\": true,\n"
                "  \"entries\": [\n"
                "    {\"path\":\"ten.osu\",\"title\":\"Ten\",\"artist\":\"A\",\"chart_name\":\"MX\",\"format\":\"osu\",\"key_count\":10,\"level\":12,\"rating\":8.25,\"bpm\":180,\"mtime\":1},\n"
@@ -507,7 +561,7 @@ TEST_CASE("cached song index exposes osu entries when enabled") {
     const auto index_path = temp.path / "song_index.json";
     write_file(index_path,
                "{\n"
-               "  \"version\": 8,\n"
+               "  \"version\": 9,\n"
                "  \"include_osu\": true,\n"
                "  \"entries\": [\n"
                 "    {\"path\":\"ten.osu\",\"title\":\"Ten\",\"artist\":\"A\",\"chart_name\":\"MX\",\"format\":\"osu\",\"key_count\":10,\"level\":12,\"rating\":8.25,\"bpm\":180,\"mtime\":1},\n"
@@ -524,14 +578,14 @@ TEST_CASE("cached song index exposes osu entries when enabled") {
     REQUIRE(result.index.entries.size() == 2u);
 }
 
-TEST_CASE("streaming song index loader parses compact single-line schema 8 caches") {
+TEST_CASE("streaming song index loader parses compact single-line schema 9 caches") {
     TempDirGuard temp;
     temp.path = make_temp_dir();
     REQUIRE_FALSE(temp.path.empty());
 
     const auto index_path = temp.path / "song_index.json";
     write_file(index_path,
-               "{\"version\":8,\"include_osu\":false,\"entries\":["
+               "{\"version\":9,\"include_osu\":false,\"entries\":["
                "{\"path\":\"legacy.bms\",\"title\":\"Legacy\",\"artist\":\"Composer\",\"chart_name\":\"Hyper\",\"format\":\"bms\",\"layout_label\":\"7+1 SP\",\"key_count\":8,\"level\":12,\"rating\":7.5,\"bpm\":150,\"mtime\":1},"
                "{\"path\":\"ignored.osu\",\"title\":\"Ignored\",\"artist\":\"Mapper\",\"format\":\"osu\",\"key_count\":10,\"level\":13,\"rating\":8.5,\"bpm\":180,\"mtime\":2}"
                "]}");
@@ -564,6 +618,7 @@ TEST_CASE("song index save and load support UTF-8 cache paths") {
     entry.chart_name = "Another";
     entry.format = "bms";
     entry.layout_label = "7+1 SP";
+    entry.background_preview_path = (cache_dir / "preview.png").u8string();
     entry.key_count = 8;
     entry.level = 12;
     entry.rating = 7.5;
@@ -584,6 +639,7 @@ TEST_CASE("song index save and load support UTF-8 cache paths") {
     CHECK(result.index.entries.front().title == "Legacy");
     CHECK(result.index.entries.front().chart_name == "Another");
     CHECK(result.index.entries.front().layout_label == "7+1 SP");
+    CHECK(result.index.entries.front().background_preview_path == entry.background_preview_path);
 }
 
 TEST_CASE("song index cache stays profile-local and does not create cache folders in the song source") {
@@ -613,6 +669,7 @@ TEST_CASE("song index cache stays profile-local and does not create cache folder
     entry.chart_name = "Hyper";
     entry.format = "bms";
     entry.layout_label = "10K BMS";
+    entry.background_preview_path = (songs_root / "preview.png").u8string();
     entry.key_count = 10;
     entry.level = 12;
     entry.rating = 4.5;
@@ -663,7 +720,7 @@ TEST_CASE("cached song index sanitizes control heavy metadata on load") {
     const auto index_path = temp.path / "song_index.json";
     write_file(index_path,
                "{\n"
-               "  \"version\": 8,\n"
+               "  \"version\": 9,\n"
                "  \"entries\": [\n"
                 "    {\"path\":\"legacy.bms\",\"title\":\"Bad\\nTitle\",\"artist\":\"Artist\\tName\",\"chart_name\":\"Hyper\\r\",\"format\":\"bms\\r\",\"key_count\":10,\"level\":11,\"rating\":6.75,\"bpm\":180,\"mtime\":1}\n"
                "  ]\n"
@@ -801,7 +858,7 @@ TEST_CASE("song index save cancellation removes the partial cache file") {
     REQUIRE_FALSE(temp.path.empty());
 
     SongIndex index;
-    index.entries.push_back({"one.bms", "One", "Artist", "Hyper", "bms", "", 10, 10, 1.0, 150.0, 1});
+    index.entries.push_back({"one.bms", "One", "Artist", "Hyper", "bms", "", "", 10, 10, 1.0, 150.0, 1});
 
     const auto index_path = temp.path / "song_index.json";
     std::string error;

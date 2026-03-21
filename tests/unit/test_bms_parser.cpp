@@ -216,11 +216,12 @@ TEST_CASE("index parser mode skips heavy asset maps and nonessential commands") 
     CHECK(result.chart.headers.count("SUBARTIST") == 0u);
     CHECK(result.chart.wav.empty());
     CHECK(result.chart.bmp.empty());
-    REQUIRE(result.chart.commands.size() == 4u);
-    CHECK_EQ(result.chart.commands[0].channel, "11");
-    CHECK_EQ(result.chart.commands[1].channel, "03");
-    CHECK_EQ(result.chart.commands[2].channel, "08");
-    CHECK_EQ(result.chart.commands[3].channel, "09");
+    REQUIRE(result.chart.commands.size() == 5u);
+    CHECK_EQ(result.chart.commands[0].channel, "04");
+    CHECK_EQ(result.chart.commands[1].channel, "11");
+    CHECK_EQ(result.chart.commands[2].channel, "03");
+    CHECK_EQ(result.chart.commands[3].channel, "08");
+    CHECK_EQ(result.chart.commands[4].channel, "09");
 }
 
 TEST_CASE("compact lane mapping follows explicit BMS key headers") {

@@ -108,13 +108,30 @@ Windows Defender나 다른 안티바이러스가 `TenRiff.exe`를 잠깐 잠그�
 .\tools\build_with_retry.ps1 -BuildDir build-dist -Config Release -Targets tenriff,bms_parser_tests
 ```
 
-### 3. 테스트 실행
+### 3. 공개 소스 패키지로도 빌드 가능
+
+버전별 공개 소스 번들(`TenRiff-0.997-source.zip` 같은 패키지)은 `external/`, `src/`, `tests/`, `config/`, `docs/`, `Mainmusic/`를 포함하므로, 압축을 푼 폴더만으로도 바로 configure/build 할 수 있습니다.
+
+- 소스 번들에는 `tools/build_with_retry.ps1`가 없으므로 plain `cmake --build`를 사용해야 합니다.
+- `10k-calc/`는 공개 소스 번들에서 제외되므로 Python reference 기반 optional 검사는 `[skip]`으로 넘어가도 정상입니다.
+- `profiles/`, `songs/`, `logs/`도 번들에는 없지만 `launch_win.bat`가 첫 실행 때 필요한 폴더를 자동 생성합니다.
+
+공개 소스 번들을 푼 폴더 안에서의 예시는 다음과 같습니다.
+
+```powershell
+cmake -S . -B build -G "Visual Studio 17 2022" -A x64
+cmake --build build --config Release --target tenriff
+cmake --build build --config Release --target bms_parser_tests
+.\build\Release\bms_parser_tests.exe
+```
+
+### 4. 테스트 실행
 
 ```powershell
 .\build-dist\Release\bms_parser_tests.exe
 ```
 
-### 4. 실행
+### 5. 실행
 
 직접 실행:
 

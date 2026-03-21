@@ -108,13 +108,30 @@ cmake --build build-dist --config Release --target bms_parser_tests
 .\tools\build_with_retry.ps1 -BuildDir build-dist -Config Release -Targets tenriff,bms_parser_tests
 ```
 
-### 3. 运行测试
+### 3. 公开源代码包也可以直接构建
+
+按版本发布的公开源代码包（例如 `TenRiff-0.997-source.zip`）已经包含 `external/`、`src/`、`tests/`、`config/`、`docs/` 和 `Mainmusic/`，因此解压后就可以直接进行 configure/build。
+
+- 源代码包中不包含 `tools/build_with_retry.ps1`，所以这里应使用原生 `cmake --build`。
+- `10k-calc/` 会从公开源代码包中排除，因此依赖 Python reference 的 optional 检查即使输出 `[skip]` 也属于正常情况。
+- `profiles/`、`songs/`、`logs/` 也不会放进源代码包，但 `launch_win.bat` 会在首次启动时自动创建所需目录。
+
+在解压后的源代码包目录中，典型流程如下：
+
+```powershell
+cmake -S . -B build -G "Visual Studio 17 2022" -A x64
+cmake --build build --config Release --target tenriff
+cmake --build build --config Release --target bms_parser_tests
+.\build\Release\bms_parser_tests.exe
+```
+
+### 4. 运行测试
 
 ```powershell
 .\build-dist\Release\bms_parser_tests.exe
 ```
 
-### 4. 启动
+### 5. 启动
 
 直接启动：
 

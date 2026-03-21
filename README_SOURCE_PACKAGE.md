@@ -5,3 +5,15 @@ TenRiff source package notes
 - Internal agent workflow files such as `AGENTS.md` are not part of the public source bundle.
 - The included `SOURCE_PACKAGE_SCOPE.txt` file defines the exact include/exclude rules used for the staged bundle.
 - The repository license is MIT. Keep the top-level `LICENSE` file with any redistributed source bundle.
+- The source bundle includes the code/docs/dependencies needed for a standalone Windows configure/build, but it does not ship `tools/build_with_retry.ps1` or the local `10k-calc/` reference checkout.
+- Typical Windows build flow inside the extracted source-package root:
+
+```powershell
+cmake -S . -B build -G "Visual Studio 17 2022" -A x64
+cmake --build build --config Release --target tenriff
+cmake --build build --config Release --target bms_parser_tests
+.\build\Release\bms_parser_tests.exe
+```
+
+- Optional Python-reference checks can print `[skip]` when `10k-calc/` is absent; that is expected for the public source package.
+- `launch_win.bat` can create missing `profiles/`, `songs/`, and `logs/` folders on first launch.

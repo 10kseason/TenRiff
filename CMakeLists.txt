@@ -239,6 +239,7 @@ if(TENRIFF_ENABLE_TESTS)
         tests/unit/test_osu_mania_loader.cpp
         tests/unit/test_clock_sync.cpp
         tests/unit/test_key_state_tracker.cpp
+        tests/unit/test_input_thread.cpp
         tests/unit/test_keycode_map.cpp
         tests/unit/test_keymap.cpp
         tests/unit/test_simple_json.cpp
