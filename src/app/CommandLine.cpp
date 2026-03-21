@@ -15,22 +15,6 @@ bool parse_double(const char* text, double& out) {
     return end && *end == '\0';
 }
 
-bool parse_bool_token(const char* text, bool& out) {
-    if (!text) {
-        return false;
-    }
-    std::string token(text);
-    if (token == "on" || token == "true" || token == "1") {
-        out = true;
-        return true;
-    }
-    if (token == "off" || token == "false" || token == "0") {
-        out = false;
-        return true;
-    }
-    return false;
-}
-
 }  // namespace
 
 CommandLineParseResult CommandLine::parse(int argc, char** argv) {
@@ -75,15 +59,6 @@ CommandLineParseResult CommandLine::parse(int argc, char** argv) {
         if (arg == "--gauge" && i + 1 < argc) {
             result.options.gauge = argv[++i];
             result.options.has_gauge = true;
-            continue;
-        }
-        if (arg == "--autoshift") {
-            bool value = true;
-            if (i + 1 < argc && parse_bool_token(argv[i + 1], value)) {
-                ++i;
-            }
-            result.options.autoshift = value;
-            result.options.has_autoshift = true;
             continue;
         }
         if (arg == "--debug") {

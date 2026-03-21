@@ -74,6 +74,20 @@ constexpr int64_t kHispeedRepeatIntervalMs = 45;
 constexpr std::size_t kMaxToneVoices = 256;
 constexpr double kTwoPi = 6.28318530717958647692;
 
+std::string normalize_runtime_key_mode_local(std::string value) {
+    std::transform(value.begin(), value.end(), value.begin(), [](unsigned char ch) {
+        return static_cast<char>(std::tolower(ch));
+    });
+    if (value == "none" || value == "auto") {
+        return "none";
+    }
+    if (value == "4k" || value == "5k" || value == "6k" || value == "7k" || value == "8k" ||
+        value == "9k" || value == "10k" || value == "16k") {
+        return value;
+    }
+    return "none";
+}
+
 int64_t ms_to_samples(double ms, int sample_rate) {
     if (sample_rate <= 0) {
         return 0;

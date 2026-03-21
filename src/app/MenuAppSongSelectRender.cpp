@@ -16,13 +16,13 @@ namespace {
 
 constexpr int kSongSelectVisibleCardCount = 5;
 
-std::string song_sort_detail_label(MenuApp::SongSortMode mode) {
+std::string song_sort_detail_label(MenuApp::SongSortMode mode, bool korean) {
     switch (mode) {
-        case MenuApp::SongSortMode::DifficultyDesc: return "LV DESC";
-        case MenuApp::SongSortMode::TitleAsc: return "A-Z";
-        case MenuApp::SongSortMode::TitleDesc: return "Z-A";
+        case MenuApp::SongSortMode::DifficultyDesc: return korean ? "LV 내림" : "LV DESC";
+        case MenuApp::SongSortMode::TitleAsc: return korean ? "가-힣" : "A-Z";
+        case MenuApp::SongSortMode::TitleDesc: return korean ? "힣-가" : "Z-A";
         case MenuApp::SongSortMode::DifficultyAsc:
-        default: return "LV ASC";
+        default: return korean ? "LV 오름" : "LV ASC";
     }
 }
 
@@ -44,45 +44,105 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
     render.song_select.record_count = static_cast<int>(current_song_record_indices_.size());
     render.song_select.showing_sources = (song_select_view_ == SongSelectView::Sources);
     render.song_select.showing_records = (song_select_view_ == SongSelectView::Records);
+    const bool korean = ui_uses_korean();
+    const auto key_filter_summary = [&]() {
+        return song_key_filter_ <= 0 ? ui_text("All Keys", "전체 키") : key_mode_label(std::to_string(song_key_filter_) + "k");
+    };
+    const auto browser_summary = [&]() {
+        std::vector<std::string> parts;
+        if (!song_search_query_.empty()) {
+            parts.push_back(ui_text("Q ", "검색 ") + safe_ui_text(song_search_query_));
+        }
+        if (song_level_min_filter_ > 0 || song_level_max_filter_ > 0) {
+            if (song_level_min_filter_ <= 0 && song_level_max_filter_ > 0) {
+                parts.push_back(ui_text("LV <= ", "LV <= ") + std::to_string(song_level_max_filter_));
+            } else if (song_level_min_filter_ > 0 && song_level_max_filter_ <= 0) {
+                parts.push_back("LV " + std::to_string(song_level_min_filter_) + "+");
+            } else {
+                parts.push_back("LV " + std::to_string(song_level_min_filter_) + "-" +
+                                std::to_string(song_level_max_filter_));
+            }
+        }
+        if (to_lower_ascii(config_.ui.song_collection_filter) != "all") {
+            parts.push_back(ui_text("COL ", "컬렉션 ") + song_collection_filter_label());
+        }
+        if (parts.empty()) {
+            return ui_text("NO FILTER", "필터 없음");
+        }
+        std::string joined;
+        for (std::size_t i = 0; i < parts.size(); ++i) {
+            if (i > 0) {
+                joined += " / ";
+            }
+            joined += parts[i];
+        }
+        return joined;
+    };
     render.song_select.high_score =
         render.song_select.showing_sources ? 0 :
         (render.song_select.showing_records && selected_record ? selected_record->score :
          (current_best.has_value ? current_best.best_score : 0));
     render.song_select.current_source_name =
-        safe_ui_text(menu_songs::song_source_display_name(songs_path_), "Songs");
+        safe_ui_text(menu_songs::song_source_display_name(songs_path_), ui_text("Songs", "곡"));
     render.song_select.current_source_path = safe_ui_text_or_placeholder(songs_path_, "<invalid path>");
-    render.song_select.index_profile_label = song_index_profile_label(config_.mode.song_index_profile);
-    render.song_select.browser_summary = browser_summary_label(song_search_query_,
-                                                               song_key_filter_,
-                                                               song_level_min_filter_,
-                                                               song_level_max_filter_);
-    render.song_select.sort_summary = song_sort_detail_label(song_sort_mode_);
+    render.song_select.index_profile_label = ui_song_index_profile_label(config_.mode.song_index_profile);
+    render.song_select.browser_summary = browser_summary();
+    render.song_select.sort_summary = song_sort_detail_label(song_sort_mode_, korean);
     render.song_select.primary_hint =
         render.song_select.showing_sources
-            ? "UP/DOWN or wheel  MOVE     ENTER / dbl-click  OPEN SOURCE     PGUP/PGDN  PAGE"
+            ? ui_text("UP/DOWN or wheel  MOVE     ENTER / dbl-click  OPEN SOURCE     PGUP/PGDN  PAGE",
+                      "위/아래 또는 휠  이동     ENTER / 더블클릭  소스 열기     PGUP/PGDN  페이지")
             : (render.song_select.showing_records
-                   ? "UP/DOWN or wheel  MOVE     ENTER / dbl-click  OPEN RESULT     PGUP/PGDN  PAGE"
-                   : "UP/DOWN or wheel  MOVE     ENTER / dbl-click  PLAY     PGUP/PGDN  PAGE");
+                   ? ui_text("UP/DOWN or wheel  MOVE     ENTER / dbl-click  OPEN RESULT     PGUP/PGDN  PAGE",
+                             "위/아래 또는 휠  이동     ENTER / 더블클릭  결과 열기     PGUP/PGDN  페이지")
+                   : ui_text("UP/DOWN or wheel  MOVE     ENTER / dbl-click  PLAY     PGUP/PGDN  PAGE",
+                             "위/아래 또는 휠  이동     ENTER / 더블클릭  플레이     PGUP/PGDN  페이지"));
     render.song_select.secondary_hint =
         render.song_select.showing_sources
-            ? "LEFT/RIGHT  NAV FOCUS     BACKSPACE  SONGS     F2  BROWSE     F5  REINDEX     F1  HELP"
+            ? ui_text("LEFT/RIGHT  NAV FOCUS     BACKSPACE  SONGS     F2  BROWSE     F5  REINDEX     F1  HELP",
+                      "좌/우  탐색 전환     BACKSPACE  곡 목록     F2  찾아보기     F5  재인덱스     F1  도움말")
             : (render.song_select.showing_records
-                   ? "LEFT/RIGHT  NAV FOCUS     BACKSPACE  SONGS     ESC  TITLE     F1  HELP"
-                   : "LEFT/RIGHT  NAV FOCUS     BACKSPACE  SOURCES     A/G/I/M/K  SETTINGS     F5  REINDEX     F1  HELP");
+                   ? ui_text("LEFT/RIGHT  NAV FOCUS     BACKSPACE  SONGS     ESC  TITLE     F1  HELP",
+                             "좌/우  탐색 전환     BACKSPACE  곡 목록     ESC  타이틀     F1  도움말")
+                   : ui_text("LEFT/RIGHT  NAV FOCUS     BACKSPACE  SOURCES     A/G/I/M/K  SETTINGS     F5  REINDEX     F1  HELP",
+                             "좌/우  탐색 전환     BACKSPACE  소스     A/G/I/M/K  설정     F5  재인덱스     F1  도움말"));
 
     const std::string source_detail =
-        std::to_string(render.song_select.source_count) + " ROOT" +
-        (render.song_select.source_count == 1 ? "" : "S");
+        std::to_string(render.song_select.source_count) + " " +
+        ui_text(render.song_select.source_count == 1 ? "ROOT" : "ROOTS", "소스");
     const std::string browser_detail = render.song_select.browser_summary;
+    int favorite_count = 0;
+    for (const auto& entry : indexed_songs_) {
+        const std::string key =
+            menu_songs::normalize_path_key(path_from_utf8(song_absolute_path(entry)));
+        if (!key.empty() &&
+            std::find(config_.ui.favorite_chart_keys.begin(), config_.ui.favorite_chart_keys.end(), key) !=
+                config_.ui.favorite_chart_keys.end()) {
+            ++favorite_count;
+        }
+    }
     const std::string records_detail =
         (render.song_select.record_count > 0)
-            ? (std::to_string(render.song_select.record_count) + " PLAYS")
-            : std::string("NO PLAYS");
+            ? (std::to_string(render.song_select.record_count) + " " + ui_text("PLAYS", "플레이"))
+            : ui_text("NO PLAYS", "플레이 없음");
 
     render.song_select.indexing = song_indexer_.is_running();
     if (render.song_select.indexing) {
         const auto progress = song_indexer_.progress();
-        render.song_select.indexing_stage = song_index_stage_label(progress.stage);
+        switch (progress.stage) {
+            case SongIndexProgressStage::ScanningFiles:
+                render.song_select.indexing_stage = ui_text("SCANNING FILES", "파일 스캔");
+                break;
+            case SongIndexProgressStage::BuildingMetadata:
+                render.song_select.indexing_stage = ui_text("BUILDING METADATA", "메타데이터 생성");
+                break;
+            case SongIndexProgressStage::SavingCache:
+                render.song_select.indexing_stage = ui_text("WRITING CACHE", "캐시 저장");
+                break;
+            default:
+                render.song_select.indexing_stage = ui_text("INDEXING", "인덱싱");
+                break;
+        }
         render.song_select.indexing_processed = std::max(0, progress.processed);
         render.song_select.indexing_total = progress.total;
         if (progress.total > 0) {
@@ -113,26 +173,30 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
     }
 
     render.song_select.left_nav = {
-        render::MenuButtonData{"LEVEL", "L", song_select_nav_cursor_ == 0,
+        render::MenuButtonData{ui_text("LEVEL", "레벨"), "L", song_select_nav_cursor_ == 0,
                                (song_sort_mode_ == SongSortMode::DifficultyAsc ||
                                 song_sort_mode_ == SongSortMode::DifficultyDesc)
-                                   ? song_sort_detail_label(song_sort_mode_)
-                                   : "LV ASC"},
-        render::MenuButtonData{"TITLE", "T", song_select_nav_cursor_ == 1,
+                                   ? song_sort_detail_label(song_sort_mode_, korean)
+                                   : song_sort_detail_label(SongSortMode::DifficultyAsc, korean)},
+        render::MenuButtonData{ui_text("TITLE", "제목"), "T", song_select_nav_cursor_ == 1,
                                (song_sort_mode_ == SongSortMode::TitleAsc ||
                                 song_sort_mode_ == SongSortMode::TitleDesc)
-                                   ? song_sort_detail_label(song_sort_mode_)
-                                   : "A-Z"},
-        render::MenuButtonData{"SOURCES", "D", song_select_nav_cursor_ == 2,
-                               render.song_select.showing_sources ? "ACTIVE" : source_detail},
-        render::MenuButtonData{"KEY", "K", song_select_nav_cursor_ == 3, key_filter_label(song_key_filter_)},
-        render::MenuButtonData{"BROWSE", "F", song_select_nav_cursor_ == 4, browser_detail},
-        render::MenuButtonData{"MOD", "M", song_select_nav_cursor_ == 5,
+                                   ? song_sort_detail_label(song_sort_mode_, korean)
+                                   : song_sort_detail_label(SongSortMode::TitleAsc, korean)},
+        render::MenuButtonData{ui_text("SOURCES", "소스"), "D", song_select_nav_cursor_ == 2,
+                               render.song_select.showing_sources ? ui_text("ACTIVE", "활성") : source_detail},
+        render::MenuButtonData{ui_text("KEY", "키"), "K", song_select_nav_cursor_ == 3, key_filter_summary()},
+        render::MenuButtonData{ui_text("FAVORITES", "페이보릿"), "V", song_select_nav_cursor_ == 4,
+                               to_lower_ascii(config_.ui.song_collection_filter) == "favorites"
+                                   ? ui_text("ACTIVE", "활성")
+                                   : (std::to_string(favorite_count) + " " + ui_text("CHARTS", "차트"))},
+        render::MenuButtonData{ui_text("BROWSE", "탐색"), "F", song_select_nav_cursor_ == 5, browser_detail},
+        render::MenuButtonData{ui_text("MOD", "모드"), "M", song_select_nav_cursor_ == 6,
                                format_multiplier(config_.speed.rate) + " / HS " +
                                    format_decimal(config_.speed.hi_speed)},
-        render::MenuButtonData{"OPTIONS", "O", song_select_nav_cursor_ == 6, "AUDIO / GFX"},
-        render::MenuButtonData{"RECORDS", "R", song_select_nav_cursor_ == 7,
-                               render.song_select.showing_records ? "ACTIVE" : records_detail},
+        render::MenuButtonData{ui_text("OPTIONS", "옵션"), "O", song_select_nav_cursor_ == 7, ui_text("AUDIO / GFX", "AUDIO / GFX")},
+        render::MenuButtonData{ui_text("RECORDS", "기록"), "R", song_select_nav_cursor_ == 8,
+                               render.song_select.showing_records ? ui_text("ACTIVE", "활성") : records_detail},
     };
 
     if (render.song_select.showing_sources) {
@@ -161,15 +225,15 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
                 card.selected = (i == selected_source_);
                 card.detail = safe_ui_text((menu_songs::normalize_path_key(path_from_utf8(source_path)) ==
                                             menu_songs::normalize_path_key(path_from_utf8(songs_path_)))
-                                               ? "CURRENT SOURCE"
-                                               : "RECENT SOURCE");
+                                               ? ui_text("CURRENT SOURCE", "현재 소스")
+                                               : ui_text("RECENT SOURCE", "최근 소스"));
                 render.song_select.songs.push_back(std::move(card));
             }
 
             const std::string& selected_source =
                 config_.ui.recent_song_sources[static_cast<std::size_t>(selected_source_)];
             render.song_select.selected_source_name =
-                safe_ui_text(menu_songs::song_source_display_name(selected_source), "Songs");
+                safe_ui_text(menu_songs::song_source_display_name(selected_source), ui_text("Songs", "곡"));
             render.song_select.selected_source_path =
                 safe_ui_text_or_placeholder(selected_source, "<invalid path>");
             const auto count_it =
@@ -181,9 +245,10 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
                 menu_songs::normalize_path_key(path_from_utf8(songs_path_));
         }
         if (total_sources == 0) {
-            render.song_select.empty_title = "NO SONG SOURCES";
+            render.song_select.empty_title = ui_text("NO SONG SOURCES", "불러온 곡 소스 없음");
             render.song_select.empty_message =
-                "Press F2 to choose a folder, or drag and drop one onto the window.";
+                ui_text("Press F2 to choose a folder, or drag and drop one onto the window.",
+                        "F2로 폴더를 고르거나, 창에 폴더를 드래그 앤 드롭하세요.");
         }
     } else if (render.song_select.showing_records) {
         const int total = static_cast<int>(current_song_record_indices_.size());
@@ -204,20 +269,21 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
                     local_play_records_[current_song_record_indices_[static_cast<std::size_t>(i)]];
                 render::SongCardData card;
                 card.title = menu_records::compact_timestamp_label(record.created_utc);
-                card.artist = record.clear_status + "  " + record.rank + "  SCORE " +
+                card.artist = record.clear_status + "  " + record.rank + "  " + ui_text("SCORE ", "점수 ") +
                               format_int_with_commas(record.score);
                 card.detail = record.replay_path.empty()
-                                  ? "RESULT ONLY"
-                                  : "REPLAY " + filename_only(record.replay_path);
+                                  ? ui_text("RESULT ONLY", "결과만 있음")
+                                  : ui_text("REPLAY ", "리플레이 ") + filename_only(record.replay_path);
                 card.song_index = i;
                 card.selected = (i == selected_record_);
                 render.song_select.songs.push_back(std::move(card));
             }
         }
         if (total == 0) {
-            render.song_select.empty_title = "NO LOCAL RECORDS";
+            render.song_select.empty_title = ui_text("NO LOCAL RECORDS", "로컬 기록 없음");
             render.song_select.empty_message =
-                "Play a chart first. Saved results and replays will appear here.";
+                ui_text("Play a chart first. Saved results and replays will appear here.",
+                        "먼저 차트를 플레이하세요. 저장된 결과와 리플레이가 여기에 표시됩니다.");
         }
     } else {
         const int total = static_cast<int>(visible_song_count());
@@ -242,27 +308,38 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
                 card.artist = song_artist_for_ui(*entry);
                 card.detail = safe_ui_text_or_placeholder(song_detail_label(*entry), "<invalid detail>");
                 card.background_path = song_background_preview_path_for_entry(*entry);
+                const BestResultRecord best = best_result_for_song_entry(*entry);
+                card.lamp = best.has_value ? best.clear_status : std::string{};
                 card.level = entry->level;
                 card.rating = entry->rating;
                 card.song_index = i;
                 card.selected = (i == selected_song_);
+                const std::string song_key =
+                    menu_songs::normalize_path_key(path_from_utf8(song_absolute_path(*entry)));
+                card.favorite =
+                    !song_key.empty() &&
+                    std::find(config_.ui.favorite_chart_keys.begin(), config_.ui.favorite_chart_keys.end(), song_key) !=
+                        config_.ui.favorite_chart_keys.end();
                 render.song_select.songs.push_back(std::move(card));
             }
         }
         if (total == 0) {
             if (!song_search_query_.empty() || song_key_filter_ > 0 || song_level_min_filter_ > 0 ||
                 song_level_max_filter_ > 0) {
-                render.song_select.empty_title = "NO CHARTS MATCH";
+                render.song_select.empty_title = ui_text("NO CHARTS MATCH", "일치하는 차트 없음");
                 render.song_select.empty_message =
-                    "Clear filters in Browse or switch the active source to see more charts.";
+                    ui_text("Clear filters in Browse or switch the active source to see more charts.",
+                            "탐색에서 필터를 지우거나 활성 소스를 바꿔 더 많은 차트를 보세요.");
             } else if (render.song_select.indexing) {
-                render.song_select.empty_title = "BUILDING LIBRARY";
+                render.song_select.empty_title = ui_text("BUILDING LIBRARY", "라이브러리 생성 중");
                 render.song_select.empty_message =
-                    "The current source is still indexing. You can keep browsing while scan progress updates above.";
+                    ui_text("The current source is still indexing. You can keep browsing while scan progress updates above.",
+                            "현재 소스를 아직 인덱싱 중입니다. 위 진행 상황이 갱신되는 동안 계속 둘러볼 수 있습니다.");
             } else {
-                render.song_select.empty_title = "NO CHARTS INDEXED";
+                render.song_select.empty_title = ui_text("NO CHARTS INDEXED", "인덱싱된 차트 없음");
                 render.song_select.empty_message =
-                    "Press F5 to scan the current source, or use F2 / drag-and-drop to point TenRiff at a songs folder.";
+                    ui_text("Press F5 to scan the current source, or use F2 / drag-and-drop to point TenRiff at a songs folder.",
+                            "F5로 현재 소스를 스캔하거나, F2 / 드래그 앤 드롭으로 곡 폴더를 지정하세요.");
             }
         }
     }
@@ -275,6 +352,11 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
             render.song_select.selected_song_artist = song_artist_for_ui(*entry);
             render.song_select.selected_song_detail = safe_ui_text_or_placeholder(song_detail_label(*entry), "-");
             render.song_select.selected_song_background_path = selected_song_background_preview_path();
+            render.song_select.selected_song_lamp =
+                current_best.has_value ? current_best.clear_status : ui_text("NO PLAY", "기록 없음");
+            render.song_select.selected_song_favorite = selected_song_is_favorite();
+            render.song_select.selected_song_collection_filter = song_collection_filter_label();
+            render.song_select.selected_song_ghost_available = !best_replay_path_for_selected_song().empty();
         }
     }
 
@@ -297,16 +379,16 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
                 render.song_select.selected_record_replay_lane_count = replay->lane_count;
                 render.song_select.selected_record_replay_event_count = replay->event_count;
                 if (!replay->exists) {
-                    render.song_select.selected_record_replay_detail = "Replay missing";
+                    render.song_select.selected_record_replay_detail = ui_text("Replay missing", "리플레이 파일 없음");
                 } else if (!replay->error.empty()) {
-                    render.song_select.selected_record_replay_detail = "Replay parse warning";
+                    render.song_select.selected_record_replay_detail = ui_text("Replay parse warning", "리플레이 파싱 경고");
                 } else {
                     render.song_select.selected_record_replay_detail =
                         format_multiplier(replay->rate) + " / " +
                         format_signed_offset_ms(replay->input_offset_ms);
                 }
             } else {
-                render.song_select.selected_record_replay_detail = "No replay";
+                render.song_select.selected_record_replay_detail = ui_text("No replay", "리플레이 없음");
             }
         }
     } else if (!render.song_select.showing_sources) {
@@ -327,59 +409,99 @@ void MenuApp::populate_song_browser_render_data(render::MenuRenderData& render) 
     render.kind = render::MenuScreenKind::GenericList;
 
     append_menu_row(render.generic,
-                    "Search",
-                    song_search_query_.empty() ? std::string("<type to search>") : song_search_query_,
+                    ui_text("Search", "검색"),
+                    song_search_query_.empty() ? ui_text("<type to search>", "<검색어 입력>") : song_search_query_,
                     settings_cursor_ == 0,
                     render::MenuHitTargetKind::SettingsRow,
                     0,
                     true,
                     false);
     append_menu_row(render.generic,
-                    "Key Filter",
-                    key_filter_label(song_key_filter_),
+                    ui_text("Key Filter", "키 필터"),
+                    (song_key_filter_ <= 0 ? ui_text("All Keys", "전체 키") : key_mode_label(std::to_string(song_key_filter_) + "k")),
                     settings_cursor_ == 1,
                     render::MenuHitTargetKind::SettingsRow,
                     1,
                     false,
                     true);
     append_menu_row(render.generic,
-                    "Difficulty Min",
-                    song_level_min_filter_ > 0 ? std::to_string(song_level_min_filter_) : "Any",
+                    ui_text("Difficulty Min", "난이도 최소"),
+                    song_level_min_filter_ > 0 ? std::to_string(song_level_min_filter_) : ui_text("Any", "제한 없음"),
                     settings_cursor_ == 2,
                     render::MenuHitTargetKind::SettingsRow,
                     2,
                     false,
                     true);
     append_menu_row(render.generic,
-                    "Difficulty Max",
-                    song_level_max_filter_ > 0 ? std::to_string(song_level_max_filter_) : "Any",
+                    ui_text("Difficulty Max", "난이도 최대"),
+                    song_level_max_filter_ > 0 ? std::to_string(song_level_max_filter_) : ui_text("Any", "제한 없음"),
                     settings_cursor_ == 3,
                     render::MenuHitTargetKind::SettingsRow,
                     3,
                     false,
                     true);
     append_menu_row(render.generic,
-                    "Clear Filters",
-                    "",
+                    ui_text("Collection Filter", "컬렉션 필터"),
+                    song_collection_filter_label(),
                     settings_cursor_ == 4,
                     render::MenuHitTargetKind::SettingsRow,
                     4,
-                    true,
-                    false);
+                    false,
+                    true);
+    const std::string named_collection = current_named_song_collection();
+    const bool toggles_collection = !named_collection.empty();
     append_menu_row(render.generic,
-                    "Back",
-                    "",
+                    toggles_collection ? ui_text("Toggle Collection Item", "컬렉션 곡 토글")
+                                       : ui_text("Toggle Favorite", "페이보릿 토글"),
+                    toggles_collection
+                        ? ui_text(selected_song_is_in_collection(named_collection) ? "In Collection" : "Not In Collection",
+                                  selected_song_is_in_collection(named_collection) ? "컬렉션에 포함됨" : "컬렉션에 없음")
+                        : ui_text(selected_song_is_favorite() ? "Favorite" : "Not Favorite",
+                                  selected_song_is_favorite() ? "페이보릿" : "페이보릿 아님"),
                     settings_cursor_ == 5,
                     render::MenuHitTargetKind::SettingsRow,
                     5,
                     true,
                     false);
+    append_menu_row(render.generic,
+                    ui_text("New Collection", "새 컬렉션"),
+                    current_named_song_collection().empty() ? ui_text("Create", "생성") : current_named_song_collection(),
+                    settings_cursor_ == 6,
+                    render::MenuHitTargetKind::SettingsRow,
+                    6,
+                    true,
+                    false);
+    append_menu_row(render.generic,
+                    ui_text("Clear Filters", "필터 지우기"),
+                    "",
+                    settings_cursor_ == 7,
+                    render::MenuHitTargetKind::SettingsRow,
+                    7,
+                    true,
+                    false);
+    append_menu_row(render.generic,
+                    ui_text("Back", "뒤로"),
+                    "",
+                    settings_cursor_ == 8,
+                    render::MenuHitTargetKind::SettingsRow,
+                    8,
+                    true,
+                    false);
 
-    render.generic.notes.push_back("Search matches title, artist, and chart path.");
-    render.generic.notes.push_back("Use letters/numbers/space on the Search row. Backspace deletes, Delete clears.");
-    render.generic.notes.push_back("Key Filter supports All plus 4K through 10K and 16K. Song Select also has a quick KEY toggle.");
-    render.generic.notes.push_back("Difficulty filters apply to indexed LV values only.");
-    render.generic.notes.push_back("Sort order stays available from Song Select: LEVEL toggles ASC/DESC, TITLE toggles A-Z/Z-A.");
+    render.generic.notes.push_back(ui_text("Search matches title, artist, and chart path.",
+                                           "검색은 제목, 아티스트, 차트 경로를 대상으로 합니다."));
+    render.generic.notes.push_back(ui_text("Use letters/numbers/space on the Search row. Backspace deletes, Delete clears.",
+                                           "검색 행에서 문자/숫자/스페이스를 입력하세요. Backspace는 한 글자 삭제, Delete는 전체 삭제입니다."));
+    render.generic.notes.push_back(ui_text("Key Filter supports All plus 4K through 10K and 16K. Song Select also has a quick KEY toggle.",
+                                           "키 필터는 전체, 4K~10K, 16K를 지원합니다. Song Select 왼쪽 KEY 토글로도 빠르게 바꿀 수 있습니다."));
+    render.generic.notes.push_back(ui_text("Difficulty filters apply to indexed LV values only.",
+                                           "난이도 필터는 인덱싱된 LV 값에만 적용됩니다."));
+    render.generic.notes.push_back(ui_text("Collection Filter cycles All, Favorites, and any named collections you created.",
+                                           "컬렉션 필터는 전체, 페이보릿, 생성한 컬렉션들을 순환합니다."));
+    render.generic.notes.push_back(ui_text("Toggle Favorite works from All/Favorites. When a named collection is selected it toggles membership in that collection.",
+                                           "전체/페이보릿에서는 페이보릿을 토글하고, 이름 있는 컬렉션이 선택된 상태에서는 그 컬렉션 포함 여부를 토글합니다."));
+    render.generic.notes.push_back(ui_text("Sort order stays available from Song Select: LEVEL toggles ASC/DESC, TITLE toggles A-Z/Z-A.",
+                                           "정렬은 Song Select에서도 바꿀 수 있습니다: LEVEL은 오름/내림, TITLE은 가나다/역가나다를 전환합니다."));
 }
 
 }  // namespace tenriff::app

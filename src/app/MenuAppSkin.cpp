@@ -752,71 +752,76 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
     const bool lr2_source = active_skin_source == "lr2";
     const int lr2_shift = lr2_source ? 1 : 0;
     const std::string imported_skin_row_label =
-        (active_skin_source == "osu") ? "OSU Skin"
-                                      : ((active_skin_source == "lr2") ? "LR2 Skin" : "Imported Skin");
-    std::string imported_skin_value = "N/A";
+        (active_skin_source == "osu") ? ui_text("OSU Skin", "OSU 스킨")
+                                      : ((active_skin_source == "lr2") ? ui_text("LR2 Skin", "LR2 스킨")
+                                                                       : ui_text("Imported Skin", "가져온 스킨"));
+    std::string imported_skin_value = ui_text("N/A", "없음");
     if (active_skin_source == "osu") {
         imported_skin_value = available_osu_skin_names_.empty()
-                                  ? std::string("Not Found")
+                                  ? ui_text("Not Found", "없음")
                                   : (config_.skin.osu_skin_name.empty() ? available_osu_skin_names_.front()
                                                                         : config_.skin.osu_skin_name);
     } else if (active_skin_source == "lr2") {
         imported_skin_value = available_lr2_skin_names_.empty()
-                                  ? std::string("Not Found")
+                                  ? ui_text("Not Found", "없음")
                                   : (config_.skin.lr2_skin_name.empty() ? available_lr2_skin_names_.front()
                                                                         : config_.skin.lr2_skin_name);
     }
 
-    append_menu_row(render.generic, "Skin Source", skin_source_label(active_skin_source), settings_cursor_ == 0,
+    append_menu_row(render.generic, ui_text("Skin Source", "스킨 소스"), ui_skin_source_label(active_skin_source), settings_cursor_ == 0,
                     render::MenuHitTargetKind::SettingsRow, 0, false, true);
     append_menu_row(render.generic, imported_skin_row_label, imported_skin_value, settings_cursor_ == 1,
                     render::MenuHitTargetKind::SettingsRow, 1, false, true);
     if (lr2_source) {
-        append_menu_row(render.generic, "LR2 Resolution",
-                        lr2_resolution_mode_label(config_.skin.lr2_resolution_mode),
+        append_menu_row(render.generic, ui_text("LR2 Resolution", "LR2 해상도"),
+                        ui_uses_korean()
+                            ? ((config::normalize_skin_lr2_resolution_mode_token(config_.skin.lr2_resolution_mode) == "auto")
+                                   ? std::string("자동")
+                                   : lr2_resolution_mode_label(config_.skin.lr2_resolution_mode))
+                            : lr2_resolution_mode_label(config_.skin.lr2_resolution_mode),
                         settings_cursor_ == 2, render::MenuHitTargetKind::SettingsRow, 2, false, true);
     }
-    append_menu_row(render.generic, "Import Skin", "Open Folder", settings_cursor_ == 2 + lr2_shift,
+    append_menu_row(render.generic, ui_text("Import Skin", "스킨 가져오기"), ui_text("Open Folder", "폴더 열기"), settings_cursor_ == 2 + lr2_shift,
                     render::MenuHitTargetKind::SettingsRow, 2 + lr2_shift, true, false);
-    append_menu_row(render.generic, "Key Mode", key_mode_label(skin_edit_mode_), settings_cursor_ == 3 + lr2_shift,
+    append_menu_row(render.generic, ui_text("Key Mode", "키 모드"), ui_key_mode_label(skin_edit_mode_), settings_cursor_ == 3 + lr2_shift,
                     render::MenuHitTargetKind::SettingsRow, 3 + lr2_shift, false, true);
-    append_menu_row(render.generic, "Target Lane",
-                    lane_display_label(skin_edit_lane_) + " / " + std::to_string(lane_count),
+    append_menu_row(render.generic, ui_text("Target Lane", "대상 레인"),
+                    ui_text("Lane ", "레인 ") + std::to_string(skin_edit_lane_ + 1) + " / " + std::to_string(lane_count),
                     settings_cursor_ == 4 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 4 + lr2_shift, false, true);
-    append_menu_row(render.generic, "Lane Color",
+    append_menu_row(render.generic, ui_text("Lane Color", "레인 색상"),
                     config::skin_color_label(preview_lane_colors[static_cast<std::size_t>(skin_edit_lane_)]),
                     settings_cursor_ == 5 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 5 + lr2_shift, false, true);
-    append_menu_row(render.generic, "Note Shape", config::skin_note_shape_label(config_.skin.note_shape),
+    append_menu_row(render.generic, ui_text("Note Shape", "노트 모양"), ui_skin_note_shape_label(config_.skin.note_shape),
                     settings_cursor_ == 6 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 6 + lr2_shift, false, true);
-    append_menu_row(render.generic, "Note Border", on_off(config_.skin.note_border_enabled),
+    append_menu_row(render.generic, ui_text("Note Border", "노트 테두리"), ui_on_off(config_.skin.note_border_enabled),
                     settings_cursor_ == 7 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 7 + lr2_shift, false, true);
-    append_menu_row(render.generic, "Image Aspect", on_off(config_.skin.preserve_note_image_aspect_ratio),
+    append_menu_row(render.generic, ui_text("Image Aspect", "이미지 비율"), ui_on_off(config_.skin.preserve_note_image_aspect_ratio),
                     settings_cursor_ == 8 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 8 + lr2_shift, false, true);
-    append_menu_row(render.generic, "Lane Dividers", on_off(config_.skin.show_lane_dividers),
+    append_menu_row(render.generic, ui_text("Lane Dividers", "레인 구분선"), ui_on_off(config_.skin.show_lane_dividers),
                     settings_cursor_ == 9 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 9 + lr2_shift, false, true);
-    append_menu_row(render.generic, "Judgement Line", on_off(config_.skin.show_judgement_line),
+    append_menu_row(render.generic, ui_text("Judgement Line", "판정선 표시"), ui_on_off(config_.skin.show_judgement_line),
                     settings_cursor_ == 10 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 10 + lr2_shift, false, true);
-    append_menu_row(render.generic, "Gear Boundary", on_off(config_.skin.show_gear_boundary_line),
+    append_menu_row(render.generic, ui_text("Gear Boundary", "기어 경계선"), ui_on_off(config_.skin.show_gear_boundary_line),
                     settings_cursor_ == 11 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 11 + lr2_shift, false, true);
-    append_menu_row(render.generic, "LN Tail Taper", on_off(config_.skin.hold_tail_taper_enabled),
+    append_menu_row(render.generic, ui_text("LN Tail Taper", "LN 꼬리 테이퍼"), ui_on_off(config_.skin.hold_tail_taper_enabled),
                     settings_cursor_ == 12 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 12 + lr2_shift, false, true);
-    append_menu_row(render.generic, "Judge Line", format_percent(config_.skin.judgement_line_position),
+    append_menu_row(render.generic, ui_text("Judge Line", "판정선 위치"), format_percent(config_.skin.judgement_line_position),
                     settings_cursor_ == 13 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 13 + lr2_shift, false, true);
-    append_menu_row(render.generic, "Note Width", format_percent(preview_note_width_scale),
+    append_menu_row(render.generic, ui_text("Note Width", "노트 너비"), format_percent(preview_note_width_scale),
                     settings_cursor_ == 14 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 14 + lr2_shift, false, true);
-    append_menu_row(render.generic, "Divider Width", format_percent(preview_lane_divider_width_scale),
+    append_menu_row(render.generic, ui_text("Divider Width", "구분선 너비"), format_percent(preview_lane_divider_width_scale),
                     settings_cursor_ == 15 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 15 + lr2_shift, false, true);
-    append_menu_row(render.generic, "LN Body Width", format_percent(config_.skin.hold_body_width_scale),
+    append_menu_row(render.generic, ui_text("LN Body Width", "LN 몸통 너비"), format_percent(config_.skin.hold_body_width_scale),
                     settings_cursor_ == 16 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 16 + lr2_shift, false, true);
-    append_menu_row(render.generic, "Note Height", format_percent(preview_note_height_scale),
+    append_menu_row(render.generic, ui_text("Note Height", "노트 높이"), format_percent(preview_note_height_scale),
                     settings_cursor_ == 17 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 17 + lr2_shift, false, true);
-    append_menu_row(render.generic, "Combo Y", format_percent(config_.skin.combo_position),
+    append_menu_row(render.generic, ui_text("Combo Y", "콤보 Y"), format_percent(config_.skin.combo_position),
                     settings_cursor_ == 18 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 18 + lr2_shift, false, true);
-    append_menu_row(render.generic, "Back", "", settings_cursor_ == 19 + lr2_shift,
+    append_menu_row(render.generic, ui_text("Back", "뒤로"), "", settings_cursor_ == 19 + lr2_shift,
                     render::MenuHitTargetKind::SettingsRow, 19 + lr2_shift, true, false);
 
     render.generic.skin_preview.visible = true;
-    render.generic.skin_preview.mode_label = key_mode_label(skin_edit_mode_);
+    render.generic.skin_preview.mode_label = ui_key_mode_label(skin_edit_mode_);
     render.generic.skin_preview.selected_color_label =
         config::skin_color_label(preview_lane_colors[static_cast<std::size_t>(skin_edit_lane_)]);
     render.generic.skin_preview.lane_count = lane_count;
@@ -852,17 +857,28 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
             config::skin_color_rgb(preview_lane_colors[static_cast<std::size_t>(lane)]);
     }
 
-    render.generic.notes.push_back("Skin Source switches between the native vector skin, imported osu!mania PNG skins, and imported LR2 playskins.");
-    render.generic.notes.push_back("Imported OSU skins scan profile skins first, then build/Release/test-skins-osu as a fallback test root.");
-    render.generic.notes.push_back("Imported LR2 skins scan profile skins first, then build/Release/test-skins-lr2 as a fallback test root.");
-    render.generic.notes.push_back("LR2 Resolution overrides the imported LR2 family before the auto-detected layout is applied.");
-    render.generic.notes.push_back("Import Skin opens a folder picker. You can also drag and drop a skin folder onto this screen.");
-    render.generic.notes.push_back("LR2 porting imports note, LN, lane-gap, and destination-size data from default active branches in the playskin.");
-    render.generic.notes.push_back("Image Aspect keeps imported head and tail art from stretching to the gameplay note box.");
-    render.generic.notes.push_back("Lane Dividers, Judgement Line, and Gear Boundary can be toggled independently.");
-    render.generic.notes.push_back("LN Tail Taper only changes visuals: the hold body narrows toward the tail without changing timing or hitboxes.");
-    render.generic.notes.push_back("Divider Width scales native lane separators and multiplies imported divider widths when the external skin provides them.");
-    render.generic.notes.push_back("Key Mode and Target Lane still edit the native fallback palette and sizing per layout.");
+    render.generic.notes.push_back(ui_text("Skin Source switches between the native vector skin, imported osu!mania PNG skins, and imported LR2 playskins.",
+                                           "스킨 소스는 기본 벡터 스킨, 가져온 osu!mania PNG 스킨, 가져온 LR2 플레이스킨 사이를 전환합니다."));
+    render.generic.notes.push_back(ui_text("Imported OSU skins scan profile skins first, then build/Release/test-skins-osu as a fallback test root.",
+                                           "가져온 OSU 스킨은 먼저 프로필 스킨 폴더를 찾고, 없으면 build/Release/test-skins-osu를 테스트 루트로 사용합니다."));
+    render.generic.notes.push_back(ui_text("Imported LR2 skins scan profile skins first, then build/Release/test-skins-lr2 as a fallback test root.",
+                                           "가져온 LR2 스킨은 먼저 프로필 스킨 폴더를 찾고, 없으면 build/Release/test-skins-lr2를 테스트 루트로 사용합니다."));
+    render.generic.notes.push_back(ui_text("LR2 Resolution overrides the imported LR2 family before the auto-detected layout is applied.",
+                                           "LR2 해상도는 자동 감지 레이아웃을 적용하기 전에 가져온 LR2 계열 해상도를 덮어씁니다."));
+    render.generic.notes.push_back(ui_text("Import Skin opens a folder picker. You can also drag and drop a skin folder onto this screen.",
+                                           "스킨 가져오기는 폴더 선택 창을 엽니다. 이 화면에 스킨 폴더를 드래그 앤 드롭해도 됩니다."));
+    render.generic.notes.push_back(ui_text("LR2 porting imports note, LN, lane-gap, and destination-size data from default active branches in the playskin.",
+                                           "LR2 포팅은 플레이스킨의 기본 활성 브랜치에서 노트, LN, 레인 간격, 대상 크기 데이터를 가져옵니다."));
+    render.generic.notes.push_back(ui_text("Image Aspect keeps imported head and tail art from stretching to the gameplay note box.",
+                                           "이미지 비율은 가져온 헤드/테일 이미지를 게임 노트 박스에 맞출 때 늘어나지 않도록 유지합니다."));
+    render.generic.notes.push_back(ui_text("Lane Dividers, Judgement Line, and Gear Boundary can be toggled independently.",
+                                           "레인 구분선, 판정선, 기어 경계선은 각각 독립적으로 켜고 끌 수 있습니다."));
+    render.generic.notes.push_back(ui_text("LN Tail Taper only changes visuals: the hold body narrows toward the tail without changing timing or hitboxes.",
+                                           "LN 꼬리 테이퍼는 시각 효과만 바꿉니다. 판정이나 히트박스는 그대로 두고 홀드 몸통만 꼬리 쪽으로 좁아집니다."));
+    render.generic.notes.push_back(ui_text("Divider Width scales native lane separators and multiplies imported divider widths when the external skin provides them.",
+                                           "구분선 너비는 기본 레인 구분선을 조절하고, 외부 스킨이 제공하는 구분선 폭에도 배율로 적용됩니다."));
+    render.generic.notes.push_back(ui_text("Key Mode and Target Lane still edit the native fallback palette and sizing per layout.",
+                                           "키 모드와 대상 레인은 각 레이아웃별 기본 대체 팔레트와 크기 설정을 계속 편집합니다."));
 }
 
 }  // namespace tenriff::app

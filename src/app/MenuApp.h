@@ -57,6 +57,7 @@ private:
         SettingsGraphics,
         SettingsSkins,
         SettingsInput,
+        SettingsCalibration,
         ModeSelect,
         ModeMods,
         Keymap,
@@ -139,6 +140,23 @@ private:
         std::array<float, kGameplayHudMaxLanes> lane_activity{};
         std::size_t note_count = 0;
         std::array<Note, kGameplayHudMaxNotes> notes{};
+
+        bool ghost_visible = false;
+        int64_t ghost_score = 0;
+        int ghost_combo = 0;
+        int ghost_max_combo = 0;
+        gameplay::JudgementCounts ghost_counts;
+        double ghost_gauge = 0.0;
+        game::GaugeType ghost_gauge_type = game::GaugeType::Normal;
+        bool ghost_has_feedback = false;
+        game::Judgement ghost_feedback = game::Judgement::BD;
+        double ghost_feedback_delta_ms = 0.0;
+        bool ghost_finished = false;
+        bool ghost_game_over = false;
+        std::size_t ghost_lane_activity_count = 0;
+        std::array<float, kGameplayHudMaxLanes> ghost_lane_activity{};
+        std::size_t ghost_note_count = 0;
+        std::array<Note, kGameplayHudMaxNotes> ghost_notes{};
     };
 
     void start_menu_threads();
@@ -168,6 +186,7 @@ private:
     void handle_graphics_settings_input(uint32_t keycode);
     void handle_skins_settings_input(uint32_t keycode);
     void handle_input_settings_input(uint32_t keycode);
+    void handle_calibration_settings_input(uint32_t keycode);
     void handle_mode_settings_input(uint32_t keycode);
     void handle_mode_mods_input(uint32_t keycode);
     void handle_keymap_input(uint32_t keycode);
@@ -190,6 +209,7 @@ private:
     void populate_audio_settings_render_data(render::MenuRenderData& render);
     void populate_graphics_settings_render_data(render::MenuRenderData& render);
     void populate_input_settings_render_data(render::MenuRenderData& render);
+    void populate_calibration_settings_render_data(render::MenuRenderData& render);
     void populate_mode_settings_render_data(render::MenuRenderData& render);
     void populate_mode_mods_render_data(render::MenuRenderData& render);
     void populate_skin_settings_render_data(render::MenuRenderData& render);
@@ -242,15 +262,45 @@ private:
     [[nodiscard]] const struct LocalPlayRecord* current_selected_record() const;
     [[nodiscard]] bool open_selected_record_result();
     [[nodiscard]] const ReplaySummary* replay_summary_for_path(const std::string& path);
+    [[nodiscard]] std::string best_replay_path_for_selected_song() const;
     [[nodiscard]] bool move_song_select_selection(int delta);
     [[nodiscard]] bool handle_settings_shortcut(uint32_t keycode, Screen return_screen);
     [[nodiscard]] std::string song_absolute_path(const SongEntry& entry) const;
     [[nodiscard]] std::string song_background_preview_path_for_entry(const SongEntry& entry);
     [[nodiscard]] std::string selected_song_absolute_path() const;
+    [[nodiscard]] std::string selected_song_storage_key() const;
+    [[nodiscard]] bool selected_song_is_favorite() const;
+    [[nodiscard]] bool selected_song_is_in_collection(std::string_view name) const;
+    [[nodiscard]] bool song_entry_matches_collection_filter(const SongEntry& entry) const;
+    [[nodiscard]] BestResultRecord best_result_for_song_entry(const SongEntry& entry) const;
+    [[nodiscard]] std::string current_named_song_collection() const;
+    [[nodiscard]] std::string song_collection_filter_label() const;
+    void cycle_song_collection_filter(int direction);
+    void create_next_song_collection();
+    [[nodiscard]] bool toggle_selected_song_favorite();
+    [[nodiscard]] bool toggle_selected_song_in_collection(std::string_view name);
     [[nodiscard]] std::string selected_song_background_preview_path();
     void sync_menu_music();
     void open_keymap_screen(Screen return_screen);
+    void clear_keymap_status_message();
+    void show_keymap_status_message(std::string message);
     void populate_help_overlay(render::HelpOverlayData& target) const;
+
+    [[nodiscard]] bool ui_uses_korean() const;
+    [[nodiscard]] std::string ui_text(std::string_view english, std::string_view korean) const;
+    [[nodiscard]] std::string ui_on_off(bool enabled) const;
+    [[nodiscard]] std::string ui_language_label(std::string_view token) const;
+    [[nodiscard]] std::string ui_display_mode_label(std::string_view token) const;
+    [[nodiscard]] std::string ui_resolution_label(std::string_view token) const;
+    [[nodiscard]] std::string ui_preset_label(std::string_view token) const;
+    [[nodiscard]] std::string ui_keysound_policy_label(std::string_view token) const;
+    [[nodiscard]] std::string ui_song_index_profile_label(std::string_view token) const;
+    [[nodiscard]] std::string ui_chart_filter_label(std::string_view token) const;
+    [[nodiscard]] std::string ui_key_mode_label(std::string_view token) const;
+    [[nodiscard]] std::string ui_gauge_label(std::string_view token) const;
+    [[nodiscard]] std::string ui_random_label(std::string_view token) const;
+    [[nodiscard]] std::string ui_skin_source_label(std::string_view token) const;
+    [[nodiscard]] std::string ui_skin_note_shape_label(std::string_view token) const;
 
     [[nodiscard]] std::string screen_title() const;
     [[nodiscard]] const SongEntry* visible_song_entry(std::size_t visible_index) const;
@@ -329,6 +379,7 @@ private:
     std::string profile_dir_;
     std::string songs_path_;
     std::string cache_path_;
+    std::string last_chart_path_;
     std::string last_chart_title_;
     std::string last_chart_artist_;
     std::string last_replay_path_;
@@ -355,6 +406,7 @@ private:
     int selected_record_ = 0;
     int settings_cursor_ = 0;
     int options_cursor_ = 0;
+    int calibration_step_ms_ = 5;
     SongSelectFocus song_select_focus_ = SongSelectFocus::SongList;
     SongSortMode song_sort_mode_ = SongSortMode::DifficultyAsc;
     SongSelectView song_select_view_ = SongSelectView::Songs;
@@ -369,6 +421,8 @@ private:
     std::string keymap_pending_lane_;
     std::string keymap_pending_key_;
     std::string keymap_duplicate_lane_;
+    std::string keymap_status_message_;
+    int64_t keymap_status_deadline_ns_ = 0;
     bool first_run_profile_ = false;
     bool help_overlay_visible_ = false;
     std::string available_osu_skin_root_;
@@ -447,6 +501,7 @@ private:
     uint32_t key_f1_ = 0;
     uint32_t key_f2_ = 0;
     uint32_t key_f5_ = 0;
+    uint32_t key_f9_ = 0;
 };
 
 }  // namespace tenriff::app

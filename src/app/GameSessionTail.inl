@@ -49,6 +49,9 @@ bool GameSession::initialize(const CommandLineOptions& options) {
     replay_source_path_.clear();
     replay_playback_enabled_ = false;
     replay_event_index_ = 0;
+    ghost_replay_source_ = {};
+    ghost_replay_enabled_ = false;
+    ghost_replay_event_index_ = 0;
 
     future_events_ = {};
     tone_voices_.clear();
@@ -60,7 +63,9 @@ bool GameSession::initialize(const CommandLineOptions& options) {
     chart_audio_active_until_samples_.reset();
     pending_input_events_.clear();
     hidden_hit_note_ids_.clear();
+    ghost_hidden_hit_note_ids_.clear();
     active_holds_buffer_.clear();
+    ghost_active_holds_buffer_.clear();
     next_chart_audio_event_ = 0;
     startup_preload_budget_bytes_ = 0;
     runtime_chart_audio_budget_bytes_ = 0;
@@ -73,8 +78,10 @@ bool GameSession::initialize(const CommandLineOptions& options) {
     synthetic_tones_enabled_.store(true, std::memory_order_release);
     next_guide_note_index_ = 0;
     hud_scan_start_ = 0;
+    ghost_hud_scan_start_ = 0;
     chart_ = {};
     lane_activity_.clear();
+    ghost_lane_activity_.clear();
     pending_input_events_.reserve(64);
     last_loading_percent_ = -1;
     last_loading_stage_.clear();
@@ -130,14 +137,12 @@ bool GameSession::initialize(const CommandLineOptions& options) {
     if (options.has_hispeed) {
         config_.speed.hi_speed = options.hispeed;
     }
-    if (options.has_autoshift) {
-        config_.gauge.auto_shift = options.autoshift;
-    }
     escape_keycode_ = config::KeycodeMap::to_keycode("Esc").value_or(0);
     f3_keycode_ = config::KeycodeMap::to_keycode("F3").value_or(0);
     f4_keycode_ = config::KeycodeMap::to_keycode("F4").value_or(0);
     f5_keycode_ = config::KeycodeMap::to_keycode("F5").value_or(0);
     f6_keycode_ = config::KeycodeMap::to_keycode("F6").value_or(0);
+    f9_keycode_ = config::KeycodeMap::to_keycode("F9").value_or(0);
 
     if (!options.replay_path.empty()) {
         auto replay_load = gameplay::load_replay_json(options.replay_path);
@@ -178,6 +183,20 @@ bool GameSession::initialize(const CommandLineOptions& options) {
         }
         if (!replay_source_.mode.gauge.empty()) {
             config_.mode.gauge = replay_source_.mode.gauge;
+        }
+    }
+    if (!replay_playback_enabled_ && !options.ghost_replay_path.empty()) {
+        auto ghost_load = gameplay::load_replay_json(options.ghost_replay_path);
+        if (!ghost_load.success()) {
+            std::cerr << "[warn] Failed to load ghost replay " << options.ghost_replay_path
+                      << ": " << ghost_load.error << std::endl;
+        } else {
+            ghost_replay_source_ = std::move(ghost_load.replay.value());
+            ghost_replay_enabled_ = true;
+            ghost_replay_event_index_ = 0;
+            for (const auto& warning : ghost_load.warnings) {
+                std::cerr << "[warn] " << warning << std::endl;
+            }
         }
     }
 
@@ -359,12 +378,45 @@ bool GameSession::initialize(const CommandLineOptions& options) {
                   << replay_source_.trace.lane_count << " actual=" << chart_.lane_count << std::endl;
         return false;
     }
+    if (ghost_replay_enabled_) {
+        bool ghost_compatible = true;
+        if (ghost_replay_source_.trace.lane_count > 0 &&
+            chart_.lane_count != ghost_replay_source_.trace.lane_count) {
+            ghost_compatible = false;
+        }
+        if (ghost_compatible && ghost_replay_source_.rate > 0.0 &&
+            std::abs(ghost_replay_source_.rate - config_.speed.rate) > 0.001) {
+            ghost_compatible = false;
+        }
+        if (ghost_compatible && !ghost_replay_source_.mode.key_mode.empty() &&
+            normalize_runtime_key_mode_local(ghost_replay_source_.mode.key_mode) !=
+                normalize_runtime_key_mode_local(config_.mode.key_mode)) {
+            ghost_compatible = false;
+        }
+        if (ghost_compatible && !ghost_replay_source_.mode.random.empty() &&
+            ghost_replay_source_.mode.random != config_.mode.random) {
+            ghost_compatible = false;
+        }
+        if (ghost_compatible && ghost_replay_source_.mode.random_seed.has_value() &&
+            ghost_replay_source_.mode.random_seed.value() != static_cast<int>(config_.mode.random_seed)) {
+            ghost_compatible = false;
+        }
+        if (!ghost_compatible) {
+            std::cerr << "[warn] Ghost replay metadata does not match the current gameplay settings. "
+                      << "Ghost comparison will be disabled for this run." << std::endl;
+            ghost_replay_enabled_ = false;
+            ghost_replay_source_ = {};
+            ghost_replay_event_index_ = 0;
+        }
+    }
     offset_gameplay_chart_samples(chart_, ms_to_samples(static_cast<double>(kGameplayStartLeadInMs), sample_rate_));
     for (std::size_t i = 0; i < chart_.notes.size(); ++i) {
         chart_.notes[i].note_id = i;
     }
     hidden_hit_note_ids_.assign(chart_.notes.size(), 0);
+    ghost_hidden_hit_note_ids_.assign(chart_.notes.size(), 0);
     active_holds_buffer_.clear();
+    ghost_active_holds_buffer_.clear();
     key_to_lane_.clear();
     config::KeymapManager keymap_manager_runtime;
     const std::string active_key_mode =
@@ -389,11 +441,26 @@ bool GameSession::initialize(const CommandLineOptions& options) {
     }
     next_guide_note_index_ = 0;
     hud_scan_start_ = 0;
+    ghost_hud_scan_start_ = 0;
     tone_voices_.reserve(std::max<std::size_t>(64, chart_.notes.size() / 8));
     chart_audio_voices_.reserve(std::max<std::size_t>(128, chart_.notes.size() / 16));
     lane_activity_.assign(static_cast<std::size_t>(std::max(1, chart_.lane_count)), 0.0f);
+    ghost_lane_activity_.assign(static_cast<std::size_t>(std::max(1, chart_.lane_count)), 0.0f);
 
     engine_ = std::make_unique<gameplay::GameplayEngine>(chart_, gameplay_config);
+    if (ghost_replay_enabled_) {
+        gameplay::GameplayConfig ghost_config = gameplay_config;
+        if (!ghost_replay_source_.mode.gauge.empty()) {
+            if (ghost_replay_source_.mode.gauge == "hard") {
+                ghost_config.initial_gauge = game::GaugeType::Hard;
+            } else if (ghost_replay_source_.mode.gauge == "easy") {
+                ghost_config.initial_gauge = game::GaugeType::Easy;
+            } else {
+                ghost_config.initial_gauge = game::GaugeType::Normal;
+            }
+        }
+        ghost_engine_ = std::make_unique<gameplay::GameplayEngine>(chart_, ghost_config);
+    }
     report_loading_progress(96, "Starting gameplay");
     if (loading_cancel_requested()) {
         return false;
@@ -503,6 +570,10 @@ void GameSession::set_loading_cancel_callback(LoadingCancelCallback callback) {
     loading_cancel_callback_ = std::move(callback);
 }
 
+void GameSession::set_screenshot_callback(ScreenshotCallback callback) {
+    screenshot_callback_ = std::move(callback);
+}
+
 void GameSession::report_loading_progress(int percent, std::string_view stage) {
     const int clamped_percent = std::clamp(percent, 0, 100);
     if (last_loading_percent_ == clamped_percent && last_loading_stage_ == stage) {
@@ -597,6 +668,38 @@ GameSession::HudSnapshot GameSession::hud_snapshot() {
         snapshot.lane_activity.fill(0.0f);
         snapshot.lane_activity_count = std::min<std::size_t>(lane_activity_.size(), kGameplayHudMaxLanes);
         std::copy_n(lane_activity_.begin(), snapshot.lane_activity_count, snapshot.lane_activity.begin());
+
+        if (ghost_engine_) {
+            snapshot.ghost_visible = true;
+            snapshot.ghost_finished = ghost_engine_->is_finished();
+            snapshot.ghost_game_over = ghost_engine_->is_game_over();
+
+            const auto& ghost_stats = ghost_engine_->stats();
+            snapshot.ghost_combo = ghost_stats.combo;
+            snapshot.ghost_max_combo = ghost_stats.max_combo;
+            snapshot.ghost_counts = ghost_stats.counts;
+            snapshot.ghost_score = ghost_stats.raw_score;
+
+            const auto& ghost_gauge_state = ghost_engine_->gauge_state();
+            snapshot.ghost_gauge = ghost_gauge_state.value;
+            snapshot.ghost_gauge_type = ghost_gauge_state.type;
+
+            const auto& ghost_feedback = ghost_engine_->live_feedback();
+            const int64_t ghost_feedback_age_samples =
+                ghost_feedback.has_value ? std::max<int64_t>(0, snapshot.current_sample - ghost_feedback.sample) : 0;
+            snapshot.ghost_has_feedback =
+                ghost_feedback.has_value && ghost_feedback_age_samples <= feedback_display_samples;
+            snapshot.ghost_feedback_judgement = ghost_feedback.judgement;
+            snapshot.ghost_feedback_delta_ms =
+                snapshot.ghost_has_feedback ? ghost_feedback.delta_ms : 0.0;
+            ghost_engine_->collect_active_holds(ghost_active_holds_buffer_);
+            snapshot.ghost_lane_activity.fill(0.0f);
+            snapshot.ghost_lane_activity_count =
+                std::min<std::size_t>(ghost_lane_activity_.size(), kGameplayHudMaxLanes);
+            std::copy_n(ghost_lane_activity_.begin(),
+                        snapshot.ghost_lane_activity_count,
+                        snapshot.ghost_lane_activity.begin());
+        }
     }
 
     const double safe_rate =
@@ -689,6 +792,74 @@ GameSession::HudSnapshot GameSession::hud_snapshot() {
                   }
                   return lhs.lane < rhs.lane;
               });
+
+    if (snapshot.ghost_visible) {
+        if (ghost_hud_scan_start_ >= chart_.notes.size()) {
+            ghost_hud_scan_start_ = chart_.notes.size();
+        }
+        while (ghost_hud_scan_start_ < chart_.notes.size() &&
+               note_is_expired_for_hud(chart_.notes[ghost_hud_scan_start_], snapshot.current_sample,
+                                       expanded_window.past_samples)) {
+            ++ghost_hud_scan_start_;
+        }
+
+        snapshot.ghost_note_count = 0;
+        for (std::size_t i = ghost_hud_scan_start_; i < chart_.notes.size(); ++i) {
+            const auto& note = chart_.notes[i];
+            if (note.note_id < ghost_hidden_hit_note_ids_.size() && ghost_hidden_hit_note_ids_[note.note_id] != 0) {
+                continue;
+            }
+            if (note.start_sample > snapshot.current_sample + expanded_window.lookahead_samples) {
+                break;
+            }
+            if (note.lane <= 0 || note.lane > snapshot.lane_count) {
+                continue;
+            }
+
+            HudNote hud_note;
+            hud_note.lane = note.lane;
+            hud_note.start_sample = note.start_sample;
+            hud_note.tail_sample = note_visible_end_sample(note);
+            hud_note.hold = note.end_sample.has_value();
+            hud_note.head_visible = true;
+            snapshot.ghost_notes[snapshot.ghost_note_count++] = hud_note;
+            if (snapshot.ghost_note_count >= kGameplayHudMaxNotes) {
+                break;
+            }
+        }
+
+        for (const auto& hold : ghost_active_holds_buffer_) {
+            if (snapshot.ghost_note_count >= kGameplayHudMaxNotes) {
+                break;
+            }
+            if (hold.lane <= 0 || hold.lane > snapshot.lane_count) {
+                continue;
+            }
+            if (hold.end_sample < snapshot.current_sample - expanded_window.past_samples) {
+                continue;
+            }
+
+            HudNote hud_note;
+            hud_note.lane = hold.lane;
+            hud_note.start_sample = snapshot.current_sample;
+            hud_note.tail_sample = std::max(hold.end_sample, snapshot.current_sample);
+            hud_note.hold = true;
+            hud_note.head_visible = false;
+            snapshot.ghost_notes[snapshot.ghost_note_count++] = hud_note;
+        }
+
+        std::sort(snapshot.ghost_notes.begin(),
+                  snapshot.ghost_notes.begin() + static_cast<std::ptrdiff_t>(snapshot.ghost_note_count),
+                  [](const HudNote& lhs, const HudNote& rhs) {
+                      if (lhs.start_sample != rhs.start_sample) {
+                          return lhs.start_sample < rhs.start_sample;
+                      }
+                      if (lhs.tail_sample != rhs.tail_sample) {
+                          return lhs.tail_sample < rhs.tail_sample;
+                      }
+                      return lhs.lane < rhs.lane;
+                  });
+    }
 
     return snapshot;
 }
@@ -1365,6 +1536,7 @@ void GameSession::shutdown() {
         }
     }
     engine_.reset();
+    ghost_engine_.reset();
     countdown_active_ = false;
     countdown_value_ = 0;
     countdown_started_ns_ = 0;
@@ -1398,8 +1570,13 @@ void GameSession::shutdown() {
     lane_activity_.clear();
     hidden_hit_note_ids_.clear();
     active_holds_buffer_.clear();
+    ghost_lane_activity_.clear();
+    ghost_hidden_hit_note_ids_.clear();
+    ghost_active_holds_buffer_.clear();
     hud_scan_start_ = 0;
+    ghost_hud_scan_start_ = 0;
     hud_callback_ = nullptr;
+    screenshot_callback_ = nullptr;
 }
 
 void GameSession::audio_callback(float* output, uint32_t frames, int64_t buffer_start_samples) {
@@ -1423,13 +1600,20 @@ void GameSession::audio_callback(float* output, uint32_t frames, int64_t buffer_
         schedule_note_guides(buffer_start_samples, buffer_end_samples);
         process_future_events(buffer_end_samples, lookahead_samples);
         process_input_queue(buffer_start_samples, buffer_end_samples, lookahead_samples);
+        process_ghost_replay_queue(buffer_end_samples, lookahead_samples);
         service_hispeed_repeat(now_ns);
         engine_->advance(buffer_end_samples);
+        if (ghost_engine_) {
+            ghost_engine_->advance(buffer_end_samples);
+        }
 
         if (!lane_activity_.empty() && sample_rate_ > 0) {
             const float decay = static_cast<float>(static_cast<double>(frames) * 5.0 /
                                                    static_cast<double>(sample_rate_));
             for (float& activity : lane_activity_) {
+                activity = std::max(0.0f, activity - decay);
+            }
+            for (float& activity : ghost_lane_activity_) {
                 activity = std::max(0.0f, activity - decay);
             }
         }
@@ -1499,6 +1683,12 @@ bool GameSession::handle_control_input(const input::InputEvent& event) {
         }
         if (f6_keycode_ != 0 && event.keycode == f6_keycode_) {
             adjust_hispeed(kHispeedStepCoarse);
+            return true;
+        }
+        if (f9_keycode_ != 0 && event.keycode == f9_keycode_) {
+            if (screenshot_callback_) {
+                screenshot_callback_();
+            }
             return true;
         }
     }
@@ -1636,10 +1826,11 @@ void GameSession::process_input_queue(int64_t buffer_start_samples, int64_t buff
     }
 }
 
-int64_t GameSession::playback_sample_for_replay_event(int64_t replay_sample) const {
-    const int replay_sample_rate = replay_source_.trace.sample_rate > 0
-                                       ? replay_source_.trace.sample_rate
-                                       : replay_source_.sample_rate;
+int64_t GameSession::playback_sample_for_replay_event(const gameplay::ReplayFile& replay,
+                                                      int64_t replay_sample) const {
+    const int replay_sample_rate = replay.trace.sample_rate > 0
+                                       ? replay.trace.sample_rate
+                                       : replay.sample_rate;
     if (replay_sample_rate <= 0 || replay_sample_rate == sample_rate_) {
         return replay_sample;
     }
@@ -1666,12 +1857,48 @@ void GameSession::process_replay_input_queue(int64_t buffer_start_samples,
 
     while (replay_event_index_ < replay_source_.trace.events.size()) {
         const auto& replay_event = replay_source_.trace.events[replay_event_index_];
-        const int64_t playback_sample = playback_sample_for_replay_event(replay_event.sample);
+        const int64_t playback_sample = playback_sample_for_replay_event(replay_source_, replay_event.sample);
         if (playback_sample > buffer_end_samples + lookahead_samples) {
             break;
         }
         dispatch_lane_input(replay_event.lane, replay_event.state, playback_sample);
         ++replay_event_index_;
+    }
+}
+
+void GameSession::dispatch_ghost_lane_input(int lane, input::InputState state, int64_t sample) {
+    if (!ghost_engine_) {
+        return;
+    }
+
+    if (state == input::InputState::Pressed) {
+        const int lane_index = lane - 1;
+        if (lane_index >= 0 && lane_index < static_cast<int>(ghost_lane_activity_.size())) {
+            ghost_lane_activity_[static_cast<std::size_t>(lane_index)] = 1.0f;
+        }
+    }
+
+    auto hit_note = ghost_engine_->handle_input(lane, state, sample);
+    if (state == input::InputState::Pressed && hit_note.has_value() &&
+        hit_note->note_id < ghost_hidden_hit_note_ids_.size()) {
+        ghost_hidden_hit_note_ids_[hit_note->note_id] = 1;
+    }
+}
+
+void GameSession::process_ghost_replay_queue(int64_t buffer_end_samples, int64_t lookahead_samples) {
+    if (!ghost_engine_ || !ghost_replay_enabled_) {
+        return;
+    }
+
+    while (ghost_replay_event_index_ < ghost_replay_source_.trace.events.size()) {
+        const auto& replay_event = ghost_replay_source_.trace.events[ghost_replay_event_index_];
+        const int64_t playback_sample =
+            playback_sample_for_replay_event(ghost_replay_source_, replay_event.sample);
+        if (playback_sample > buffer_end_samples + lookahead_samples) {
+            break;
+        }
+        dispatch_ghost_lane_input(replay_event.lane, replay_event.state, playback_sample);
+        ++ghost_replay_event_index_;
     }
 }
 

@@ -57,7 +57,8 @@ void MenuApp::rebuild_visible_song_list(const std::string* selected_path) {
         if (song_entry_matches_chart_filter(entry, chart_filter) &&
             song_entry_matches_search(entry, song_search_query_) &&
             song_entry_matches_key_filter(entry, song_key_filter_) &&
-            song_entry_matches_level_filter(entry, song_level_min_filter_, song_level_max_filter_)) {
+            song_entry_matches_level_filter(entry, song_level_min_filter_, song_level_max_filter_) &&
+            song_entry_matches_collection_filter(entry)) {
             visible_song_indices_.push_back(index);
         }
     }

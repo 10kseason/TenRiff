@@ -10,14 +10,13 @@ struct CommandLineOptions {
     std::string profile = "default";
     std::string chart_path;
     std::string replay_path;
+    std::string ghost_replay_path;
     bool has_rate = false;
     bool has_hispeed = false;
     bool has_gauge = false;
-    bool has_autoshift = false;
     double rate = 1.0;
     double hispeed = 3.0;
     std::string gauge;
-    bool autoshift = true;
     bool debug = false;
     bool no_vsync = false;
 };

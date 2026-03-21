@@ -258,50 +258,9 @@ const MenuApp::ReplaySummary* MenuApp::replay_summary_for_path(const std::string
 }
 
 MenuApp::BestResultRecord MenuApp::current_song_best_result() const {
-    using namespace menu_song_select;
-
-    BestResultRecord best;
     const SongEntry* entry = (selected_song_ >= 0) ? visible_song_entry(static_cast<std::size_t>(selected_song_))
                                                    : nullptr;
-    if (!entry) {
-        return best;
-    }
-
-    try {
-        for (const auto& key : menu_songs::build_chart_path_keys(entry->path, songs_path_)) {
-            auto found = chart_best_results_.find(key);
-            if (found == chart_best_results_.end()) {
-                continue;
-            }
-            if (!best.has_value) {
-                best = found->second;
-                continue;
-            }
-
-            const int best_judged = best.perfect + best.great + best.good + best.bad + best.miss;
-            const int found_judged = found->second.perfect + found->second.great + found->second.good +
-                                     found->second.bad + found->second.miss;
-            if (menu_records::is_better_record(found->second.best_score,
-                                               menu_records::clear_status_priority(found->second.clear_status,
-                                                                                   found->second.game_over,
-                                                                                   found->second.final_gauge),
-                                               found->second.max_combo,
-                                               found_judged,
-                                               found->second.created_utc,
-                                               best.best_score,
-                                               menu_records::clear_status_priority(best.clear_status,
-                                                                                   best.game_over,
-                                                                                   best.final_gauge),
-                                               best.max_combo,
-                                               best_judged,
-                                               best.created_utc)) {
-                best = found->second;
-            }
-        }
-    } catch (...) {
-    }
-
-    return best;
+    return entry ? best_result_for_song_entry(*entry) : BestResultRecord{};
 }
 
 bool MenuApp::open_selected_record_result() {
@@ -378,6 +337,19 @@ bool MenuApp::launch_replay_from_path(const std::string& replay_path, const std:
 
 bool MenuApp::launch_last_result_replay() {
     return launch_replay_from_path(last_replay_path_);
+}
+
+std::string MenuApp::best_replay_path_for_selected_song() const {
+    for (std::size_t record_index : current_song_record_indices_) {
+        if (record_index >= local_play_records_.size()) {
+            continue;
+        }
+        const auto& record = local_play_records_[record_index];
+        if (!record.replay_path.empty()) {
+            return record.replay_path;
+        }
+    }
+    return {};
 }
 
 bool MenuApp::launch_selected_record_replay() {

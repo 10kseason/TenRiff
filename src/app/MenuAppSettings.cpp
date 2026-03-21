@@ -207,54 +207,64 @@ void MenuApp::handle_mode_mods_input(uint32_t keycode) {
 }
 
 void MenuApp::populate_audio_settings_render_data(render::MenuRenderData& render) {
-    append_menu_row(render.generic, "Preset", preset_label(config_.audio_ui.preset), settings_cursor_ == 0,
+    append_menu_row(render.generic, ui_text("Preset", "프리셋"), ui_preset_label(config_.audio_ui.preset), settings_cursor_ == 0,
                     render::MenuHitTargetKind::SettingsRow, 0, false, true);
-    append_menu_row(render.generic, "Keysound Mode", keysound_policy_label(config_.audio_ui.bms_keysound_policy), settings_cursor_ == 1,
+    append_menu_row(render.generic, ui_text("Keysound Mode", "키음 모드"), ui_keysound_policy_label(config_.audio_ui.bms_keysound_policy), settings_cursor_ == 1,
                     render::MenuHitTargetKind::SettingsRow, 1, false, true);
-    append_menu_row(render.generic, "Master Volume", format_percent(config_.audio_ui.master_volume), settings_cursor_ == 2,
+    append_menu_row(render.generic, ui_text("Master Volume", "마스터 볼륨"), format_percent(config_.audio_ui.master_volume), settings_cursor_ == 2,
                     render::MenuHitTargetKind::SettingsRow, 2, false, true);
-    append_menu_row(render.generic, "BGM Volume", format_percent(config_.audio_ui.bgm_volume), settings_cursor_ == 3,
+    append_menu_row(render.generic, ui_text("BGM Volume", "BGM 볼륨"), format_percent(config_.audio_ui.bgm_volume), settings_cursor_ == 3,
                     render::MenuHitTargetKind::SettingsRow, 3, false, true);
-    append_menu_row(render.generic, "Keysound Volume", format_percent(config_.audio_ui.keysound_volume), settings_cursor_ == 4,
+    append_menu_row(render.generic, ui_text("Keysound Volume", "키음 볼륨"), format_percent(config_.audio_ui.keysound_volume), settings_cursor_ == 4,
                     render::MenuHitTargetKind::SettingsRow, 4, false, true);
-    append_menu_row(render.generic, "Back", "", settings_cursor_ == 5, render::MenuHitTargetKind::SettingsRow, 5, true, false);
-    render.generic.notes.push_back("Follow: note hits trigger keysounds. Autoplay: note keysounds are mixed into background audio.");
-    render.generic.notes.push_back("Off: skip note keysounds. Autoplay mode routes note keysounds through BGM volume.");
-    render.generic.notes.push_back("Left/Right or click +/- to change. Back saves and returns.");
+    append_menu_row(render.generic, ui_text("Back", "뒤로"), "", settings_cursor_ == 5, render::MenuHitTargetKind::SettingsRow, 5, true, false);
+    render.generic.notes.push_back(ui_text("Follow: note hits trigger keysounds. Autoplay: note keysounds are mixed into background audio.",
+                                           "연동: 노트를 칠 때 키음이 납니다. 자동재생: 노트 키음이 배경음에 섞여 재생됩니다."));
+    render.generic.notes.push_back(ui_text("Off: skip note keysounds. Autoplay mode routes note keysounds through BGM volume.",
+                                           "끔: 노트 키음을 재생하지 않습니다. 자동재생에서는 노트 키음이 BGM 볼륨을 따릅니다."));
+    render.generic.notes.push_back(ui_text("Left/Right or click +/- to change. Back saves and returns.",
+                                           "좌우 키나 +/- 클릭으로 변경합니다. 뒤로 가면 저장 후 돌아갑니다."));
 }
 
 void MenuApp::populate_mode_settings_render_data(render::MenuRenderData& render) {
-    append_menu_row(render.generic, "OSU Charts", on_off(config_.mode.enable_osu_charts), settings_cursor_ == 0,
+    append_menu_row(render.generic, ui_text("OSU Charts", "OSU 차트"), ui_on_off(config_.mode.enable_osu_charts), settings_cursor_ == 0,
                     render::MenuHitTargetKind::SettingsRow, 0, false, true);
-    append_menu_row(render.generic, "Indexing",
-                    song_index_profile_label(config_.mode.song_index_profile),
+    append_menu_row(render.generic, ui_text("Indexing", "인덱싱"),
+                    ui_song_index_profile_label(config_.mode.song_index_profile),
                     settings_cursor_ == 1, render::MenuHitTargetKind::SettingsRow, 1, false, true);
-    append_menu_row(render.generic, "Chart Filter",
-                    config_.mode.enable_osu_charts ? format_label(config_.mode.format) : std::string("BMS"),
+    append_menu_row(render.generic, ui_text("Chart Filter", "차트 필터"),
+                    config_.mode.enable_osu_charts ? ui_chart_filter_label(config_.mode.format) : std::string("BMS"),
                     settings_cursor_ == 2, render::MenuHitTargetKind::SettingsRow, 2, false, true);
-    append_menu_row(render.generic, "Key Mode",
-                    key_mode_label(config_.mode.key_mode),
+    append_menu_row(render.generic, ui_text("Key Mode", "키 모드"),
+                    ui_key_mode_label(config_.mode.key_mode),
                     settings_cursor_ == 3, render::MenuHitTargetKind::SettingsRow, 3, false, true);
-    append_menu_row(render.generic, "Gauge", gauge_label(config_.mode.gauge), settings_cursor_ == 4,
+    append_menu_row(render.generic, ui_text("Gauge", "게이지"), ui_gauge_label(config_.mode.gauge), settings_cursor_ == 4,
                     render::MenuHitTargetKind::SettingsRow, 4, false, true);
-    append_menu_row(render.generic, "Random", random_label(config_.mode.random), settings_cursor_ == 5,
+    append_menu_row(render.generic, ui_text("Random", "랜덤"), ui_random_label(config_.mode.random), settings_cursor_ == 5,
                     render::MenuHitTargetKind::SettingsRow, 5, false, true);
-    append_menu_row(render.generic, "Random Seed", std::to_string(config_.mode.random_seed), settings_cursor_ == 6,
+    append_menu_row(render.generic, ui_text("Random Seed", "랜덤 시드"), std::to_string(config_.mode.random_seed), settings_cursor_ == 6,
                     render::MenuHitTargetKind::SettingsRow, 6, false, true);
-    append_menu_row(render.generic, "Mods", mode_score_summary(config_.mode.mods, config_.speed.rate),
+    append_menu_row(render.generic, ui_text("Mods", "모드"), mode_score_summary(config_.mode.mods, config_.speed.rate),
                     settings_cursor_ == 7, render::MenuHitTargetKind::SettingsRow, 7, true, false);
     append_menu_row(render.generic, "Rate", format_multiplier(config_.speed.rate), settings_cursor_ == 8,
                     render::MenuHitTargetKind::SettingsRow, 8, false, true);
-    append_menu_row(render.generic, "Hi-Speed", format_decimal(config_.speed.hi_speed), settings_cursor_ == 9,
+    append_menu_row(render.generic, ui_text("Hi-Speed", "하이스피드"), format_decimal(config_.speed.hi_speed), settings_cursor_ == 9,
                     render::MenuHitTargetKind::SettingsRow, 9, false, true);
-    append_menu_row(render.generic, "Back", "", settings_cursor_ == 10, render::MenuHitTargetKind::SettingsRow, 10, true, false);
-    render.generic.notes.push_back("OSU Charts adds 4K-10K .osu beatmaps to song indexing and runtime loading.");
-    render.generic.notes.push_back("Indexing Safe keeps RAM low for large scans; Fast uses more RAM for quicker rescans on 32GB+ PCs.");
-    render.generic.notes.push_back("Chart Filter switches the visible library between BMS, OSU, or All.");
-    render.generic.notes.push_back("Key Mode selects None/native plus 4K-10K/16K runtime layouts; osu charts still top out at 10K.");
-    render.generic.notes.push_back("None keeps the chart's original key count and pattern layout instead of forcing a conversion.");
-    render.generic.notes.push_back("Mods opens the registry-backed Mod Manager and shows the current score multiplier.");
-    render.generic.notes.push_back("Back saves the toggle/filter and refreshes the song library cache when needed.");
+    append_menu_row(render.generic, ui_text("Back", "뒤로"), "", settings_cursor_ == 10, render::MenuHitTargetKind::SettingsRow, 10, true, false);
+    render.generic.notes.push_back(ui_text("OSU Charts adds 4K-10K .osu beatmaps to song indexing and runtime loading.",
+                                           "OSU 차트를 켜면 4K~10K .osu 비트맵도 곡 인덱싱과 실행 대상에 포함됩니다."));
+    render.generic.notes.push_back(ui_text("Indexing Safe keeps RAM low for large scans; Fast uses more RAM for quicker rescans on 32GB+ PCs.",
+                                           "인덱싱 안전은 대형 스캔에서 RAM 사용을 낮추고, 빠름은 32GB+ 환경에서 더 많은 RAM으로 재스캔을 가속합니다."));
+    render.generic.notes.push_back(ui_text("Chart Filter switches the visible library between BMS, OSU, or All.",
+                                           "차트 필터는 보이는 라이브러리를 BMS, OSU, 전체 중에서 전환합니다."));
+    render.generic.notes.push_back(ui_text("Key Mode selects None/native plus 4K-10K/16K runtime layouts; osu charts still top out at 10K.",
+                                           "키 모드는 원본 또는 4K~10K/16K 런타임 레이아웃을 고릅니다. osu 차트는 여전히 최대 10K까지입니다."));
+    render.generic.notes.push_back(ui_text("None keeps the chart's original key count and pattern layout instead of forcing a conversion.",
+                                           "원본은 강제 변환 없이 차트의 원래 키 수와 패턴 배치를 유지합니다."));
+    render.generic.notes.push_back(ui_text("Mods opens the registry-backed Mod Manager and shows the current score multiplier.",
+                                           "모드는 현재 점수 배율을 보여주고, 등록 기반 Mod Manager를 엽니다."));
+    render.generic.notes.push_back(ui_text("Back saves the toggle/filter and refreshes the song library cache when needed.",
+                                           "뒤로 가면 토글/필터를 저장하고 필요 시 곡 라이브러리 캐시를 새로 고칩니다."));
 }
 
 void MenuApp::populate_mode_mods_render_data(render::MenuRenderData& render) {
@@ -270,15 +280,16 @@ void MenuApp::populate_mode_mods_render_data(render::MenuRenderData& render) {
                         true);
     }
     append_menu_row(render.generic,
-                    "Back",
+                    ui_text("Back", "뒤로"),
                     "",
                     settings_cursor_ == static_cast<int>(categories.size()),
                     render::MenuHitTargetKind::SettingsRow,
                     static_cast<int>(categories.size()),
                     true,
                     false);
-    render.generic.notes.push_back("Final score uses the lowest multiplier between active mods and the current Rate.");
-    render.generic.notes.push_back("Current: " + mode_score_summary(config_.mode.mods, config_.speed.rate));
+    render.generic.notes.push_back(ui_text("Final score uses the lowest multiplier between active mods and the current Rate.",
+                                           "최종 점수는 활성 모드와 현재 Rate 중 더 낮은 배율을 사용합니다."));
+    render.generic.notes.push_back(ui_text("Current: ", "현재: ") + mode_score_summary(config_.mode.mods, config_.speed.rate));
     std::vector<std::string> mod_warnings;
     (void)normalize_mode_mod_tokens(config_.mode.mods, &mod_warnings);
     for (const auto& warning : mod_warnings) {

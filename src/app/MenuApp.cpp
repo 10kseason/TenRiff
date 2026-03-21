@@ -348,6 +348,135 @@ std::string format_signed_ms(double value) {
 
 MenuApp::MenuApp() = default;
 
+bool MenuApp::ui_uses_korean() const {
+    return config::normalize_ui_language_token(config_.ui.language) == "ko";
+}
+
+std::string MenuApp::ui_text(std::string_view english, std::string_view korean) const {
+    return std::string(ui_uses_korean() ? korean : english);
+}
+
+std::string MenuApp::ui_on_off(bool enabled) const {
+    return ui_text(enabled ? "On" : "Off", enabled ? "켜짐" : "꺼짐");
+}
+
+std::string MenuApp::ui_language_label(std::string_view token) const {
+    const std::string normalized = config::normalize_ui_language_token(token);
+    if (normalized == "ko") {
+        return ui_text("Korean", "한국어");
+    }
+    return ui_text("English", "영어");
+}
+
+std::string MenuApp::ui_display_mode_label(std::string_view token) const {
+    const std::string normalized = normalize_display_mode(std::string(token));
+    if (normalized == "windowed") {
+        return ui_text("Windowed", "창 모드");
+    }
+    if (normalized == "fullscreen") {
+        return ui_text("Fullscreen", "전체 화면");
+    }
+    return ui_text("Borderless", "테두리 없음");
+}
+
+std::string MenuApp::ui_resolution_label(std::string_view token) const {
+    const std::string normalized = normalize_resolution_preset(std::string(token));
+    if (normalized == "720p") {
+        return "1280x720";
+    }
+    if (normalized == "1080p") {
+        return "1920x1080";
+    }
+    if (normalized == "qhd") {
+        return "2560x1440";
+    }
+    return ui_text("Monitor Native", "모니터 기본");
+}
+
+std::string MenuApp::ui_preset_label(std::string_view token) const {
+    if (to_lower_ascii(std::string(token)) == "high") {
+        return ui_text("High", "고성능");
+    }
+    return ui_text("Basic", "기본");
+}
+
+std::string MenuApp::ui_keysound_policy_label(std::string_view token) const {
+    const std::string normalized = to_lower_ascii(std::string(token));
+    if (normalized == "autoplay") {
+        return ui_text("Autoplay", "자동재생");
+    }
+    if (normalized == "ignore" || normalized == "off") {
+        return ui_text("Off", "끔");
+    }
+    return ui_text("Follow", "연동");
+}
+
+std::string MenuApp::ui_song_index_profile_label(std::string_view token) const {
+    if (config::normalize_song_index_profile_token(token) == "fast") {
+        return ui_text("Fast", "빠름");
+    }
+    return ui_text("Safe", "안전");
+}
+
+std::string MenuApp::ui_chart_filter_label(std::string_view token) const {
+    const std::string normalized = normalize_chart_filter(std::string(token));
+    if (normalized == "bms") {
+        return "BMS";
+    }
+    if (normalized == "osu") {
+        return "OSU";
+    }
+    return ui_text("All", "전체");
+}
+
+std::string MenuApp::ui_key_mode_label(std::string_view token) const {
+    const std::string normalized = normalize_runtime_key_mode(std::string(token));
+    if (normalized == "none") {
+        return ui_text("None", "원본");
+    }
+    return key_mode_label(normalized);
+}
+
+std::string MenuApp::ui_gauge_label(std::string_view token) const {
+    const std::string normalized = to_lower_ascii(std::string(token));
+    if (normalized == "hard") {
+        return ui_text("Hard", "하드");
+    }
+    if (normalized == "easy") {
+        return ui_text("Easy", "이지");
+    }
+    return ui_text("Normal", "노말");
+}
+
+std::string MenuApp::ui_random_label(std::string_view token) const {
+    const std::string normalized = to_lower_ascii(std::string(token));
+    if (normalized == "fr") {
+        return "FR";
+    }
+    if (normalized == "sr") {
+        return "SR";
+    }
+    return ui_text("Off", "끔");
+}
+
+std::string MenuApp::ui_skin_source_label(std::string_view token) const {
+    const std::string normalized = config::normalize_skin_source_token(token);
+    if (normalized == "osu") {
+        return "osu!mania";
+    }
+    if (normalized == "lr2") {
+        return "LR2";
+    }
+    return ui_text("Native", "기본");
+}
+
+std::string MenuApp::ui_skin_note_shape_label(std::string_view token) const {
+    if (config::normalize_skin_note_shape_token(token) == "circle") {
+        return ui_text("Circle", "원형");
+    }
+    return ui_text("Rect", "사각형");
+}
+
 GameplayHudRevisionInput MenuApp::gameplay_hud_revision_input(const GameplayHudState& state) {
     GameplayHudRevisionInput input;
     input.active = state.active;
@@ -388,6 +517,32 @@ GameplayHudRevisionInput MenuApp::gameplay_hud_revision_input(const GameplayHudS
             state.notes[i].tail_sample,
             state.notes[i].hold,
             state.notes[i].head_visible,
+        };
+    }
+    input.ghost_visible = state.ghost_visible;
+    input.ghost_score = state.ghost_score;
+    input.ghost_combo = state.ghost_combo;
+    input.ghost_max_combo = state.ghost_max_combo;
+    input.ghost_counts = state.ghost_counts;
+    input.ghost_gauge = state.ghost_gauge;
+    input.ghost_gauge_type = state.ghost_gauge_type;
+    input.ghost_has_feedback = state.ghost_has_feedback;
+    input.ghost_feedback = state.ghost_feedback;
+    input.ghost_feedback_delta_ms = state.ghost_feedback_delta_ms;
+    input.ghost_finished = state.ghost_finished;
+    input.ghost_game_over = state.ghost_game_over;
+    input.ghost_lane_activity_count = state.ghost_lane_activity_count;
+    std::copy_n(state.ghost_lane_activity.begin(),
+                state.ghost_lane_activity_count,
+                input.ghost_lane_activity.begin());
+    input.ghost_note_count = state.ghost_note_count;
+    for (std::size_t i = 0; i < state.ghost_note_count; ++i) {
+        input.ghost_notes[i] = GameplayHudRevisionNote{
+            state.ghost_notes[i].lane,
+            state.ghost_notes[i].start_sample,
+            state.ghost_notes[i].tail_sample,
+            state.ghost_notes[i].hold,
+            state.ghost_notes[i].head_visible,
         };
     }
     return input;
@@ -484,6 +639,7 @@ bool MenuApp::initialize(const CommandLineOptions& options) {
     key_f1_ = config::KeycodeMap::to_keycode("F1").value_or(0);
     key_f2_ = config::KeycodeMap::to_keycode("F2").value_or(0);
     key_f5_ = config::KeycodeMap::to_keycode("F5").value_or(0);
+    key_f9_ = config::KeycodeMap::to_keycode("F9").value_or(0);
 
     {
         config::KeymapManager keymap_manager;
@@ -848,6 +1004,12 @@ void MenuApp::switch_song_source(const std::string& new_songs_path, bool force_r
 void MenuApp::handle_input_event(const input::InputEvent& event) {
     update_pressed_keys(event);
 
+    if (event.state == input::InputState::Pressed &&
+        key_f9_ != 0 && event.keycode == key_f9_) {
+        menu_window_.request_screenshot();
+        return;
+    }
+
     if (screen_ == Screen::Keymap && keymap_capture_active_) {
         if (event.state == input::InputState::Pressed) {
             apply_keymap_capture(event.keycode);
@@ -859,12 +1021,14 @@ void MenuApp::handle_input_event(const input::InputEvent& event) {
         return;
     }
 
-    if (screen_ != Screen::Gameplay && key_f1_ != 0 && event.keycode == key_f1_) {
+    const bool help_overlay_supported =
+        screen_ != Screen::Gameplay && screen_ != Screen::Result;
+    if (help_overlay_supported && key_f1_ != 0 && event.keycode == key_f1_) {
         help_overlay_visible_ = !help_overlay_visible_;
         publish_snapshot();
         return;
     }
-    if (help_overlay_visible_) {
+    if (help_overlay_supported && help_overlay_visible_) {
         if (event.keycode == key_escape_ || event.keycode == key_backspace_) {
             help_overlay_visible_ = false;
             publish_snapshot();
@@ -904,6 +1068,9 @@ void MenuApp::handle_input_event(const input::InputEvent& event) {
             break;
         case Screen::SettingsInput:
             handle_input_settings_input(event.keycode);
+            break;
+        case Screen::SettingsCalibration:
+            handle_calibration_settings_input(event.keycode);
             break;
         case Screen::ModeSelect:
             handle_mode_settings_input(event.keycode);
@@ -972,6 +1139,9 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
                         break;
                     case Screen::SettingsInput:
                         handle_input_settings_input(direction_key);
+                        break;
+                    case Screen::SettingsCalibration:
+                        handle_calibration_settings_input(direction_key);
                         break;
                     case Screen::ModeSelect:
                         handle_mode_settings_input(direction_key);
@@ -1062,11 +1232,11 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
                 return;
             }
             if (event.part == render::MenuHitPart::Decrement) {
-                options_cursor_ = clamp_int(event.index - 1, 0, 6);
+                options_cursor_ = clamp_int(event.index - 1, 0, 7);
                 publish_snapshot();
                 return;
             }
-            options_cursor_ = clamp_int(event.index, 0, 6);
+            options_cursor_ = clamp_int(event.index, 0, 7);
             handle_options_hub_input(key_enter_);
             return;
         case render::MenuHitTargetKind::SongNavButton:
@@ -1077,7 +1247,7 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
             song_select_nav_cursor_ = clamp_int(
                 (event.part == render::MenuHitPart::Decrement) ? (event.index - 1) : event.index,
                 0,
-                7);
+                8);
             publish_snapshot();
             if (event.part == render::MenuHitPart::Activate) {
                 handle_song_select_input(key_enter_);
@@ -1182,7 +1352,7 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
             handle_audio_settings_input(action_key);
             return;
         case Screen::SettingsGraphics:
-            settings_cursor_ = clamp_int(event.index, 0, 6);
+            settings_cursor_ = clamp_int(event.index, 0, 7);
             handle_graphics_settings_input(action_key);
             return;
         case Screen::SongBrowser:
@@ -1195,8 +1365,12 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
             handle_skins_settings_input(action_key);
             return;
         case Screen::SettingsInput:
-            settings_cursor_ = clamp_int(event.index, 0, 1);
+            settings_cursor_ = clamp_int(event.index, 0, 2);
             handle_input_settings_input(action_key);
+            return;
+        case Screen::SettingsCalibration:
+            settings_cursor_ = clamp_int(event.index, 0, 4);
+            handle_calibration_settings_input(action_key);
             return;
         case Screen::ModeSelect:
             settings_cursor_ = clamp_int(event.index, 0, 10);
@@ -1313,7 +1487,7 @@ void MenuApp::handle_quick_setup_input(uint32_t keycode) {
 
 #ifdef _WIN32
     if ((keycode == key_enter_ && settings_cursor_ == 0) || keycode == key_f2_) {
-        std::string new_path = browse_for_folder("Select Songs Folder");
+        std::string new_path = browse_for_folder(ui_text("Select Songs Folder", "곡 폴더 선택"));
         if (!new_path.empty()) {
             switch_song_source(new_path, false);
             publish_snapshot();
@@ -1390,7 +1564,7 @@ void MenuApp::handle_quick_setup_input(uint32_t keycode) {
 }
 
 void MenuApp::handle_options_hub_input(uint32_t keycode) {
-    constexpr int item_count = 7;
+    constexpr int item_count = 8;
     const Screen return_screen = submenu_return_screen_;
     if (keycode == key_up_) {
         options_cursor_ = clamp_int(options_cursor_ - 1, 0, item_count - 1);
@@ -1432,10 +1606,15 @@ void MenuApp::handle_options_hub_input(uint32_t keycode) {
                 break;
             case 4:
                 submenu_return_screen_ = return_screen;
-                screen_ = Screen::ModeSelect;
+                screen_ = Screen::SettingsCalibration;
                 settings_cursor_ = 0;
                 break;
             case 5:
+                submenu_return_screen_ = return_screen;
+                screen_ = Screen::ModeSelect;
+                settings_cursor_ = 0;
+                break;
+            case 6:
                 open_keymap_screen(return_screen);
                 break;
             default:
@@ -1470,7 +1649,7 @@ void MenuApp::handle_song_select_input(uint32_t keycode) {
     }
 #ifdef _WIN32
     if (keycode == key_f2_) {
-        std::string new_path = browse_for_folder("Select Songs Folder");
+        std::string new_path = browse_for_folder(ui_text("Select Songs Folder", "곡 폴더 선택"));
         if (!new_path.empty()) {
             switch_song_source(new_path, false);
             song_select_view_ = SongSelectView::Songs;
@@ -1502,7 +1681,7 @@ void MenuApp::handle_song_select_input(uint32_t keycode) {
     }
     if (keycode == key_up_) {
         if (song_select_focus_ == SongSelectFocus::LeftNav) {
-            song_select_nav_cursor_ = clamp_int(song_select_nav_cursor_ - 1, 0, 7);
+            song_select_nav_cursor_ = clamp_int(song_select_nav_cursor_ - 1, 0, 8);
             publish_snapshot();
             return;
         }
@@ -1513,7 +1692,7 @@ void MenuApp::handle_song_select_input(uint32_t keycode) {
     }
     if (keycode == key_down_) {
         if (song_select_focus_ == SongSelectFocus::LeftNav) {
-            song_select_nav_cursor_ = clamp_int(song_select_nav_cursor_ + 1, 0, 7);
+            song_select_nav_cursor_ = clamp_int(song_select_nav_cursor_ + 1, 0, 8);
             publish_snapshot();
             return;
         }
@@ -1555,24 +1734,37 @@ void MenuApp::handle_song_select_input(uint32_t keycode) {
                     publish_snapshot();
                     return;
                 case 4:
+                    if (to_lower_ascii(config_.ui.song_collection_filter) == "favorites") {
+                        config_.ui.song_collection_filter = "all";
+                    } else {
+                        config_.ui.song_collection_filter = "favorites";
+                    }
+                    persist_runtime_config();
+                    song_select_view_ = SongSelectView::Songs;
+                    rebuild_visible_song_list();
+                    rebuild_current_song_record_indices();
+                    song_select_focus_ = SongSelectFocus::SongList;
+                    publish_snapshot();
+                    return;
+                case 5:
                     submenu_return_screen_ = Screen::SongSelect;
                     screen_ = Screen::SongBrowser;
                     settings_cursor_ = 0;
                     publish_snapshot();
                     return;
-                case 5:
+                case 6:
                     submenu_return_screen_ = Screen::SongSelect;
                     screen_ = Screen::ModeSelect;
                     settings_cursor_ = 0;
                     publish_snapshot();
                     return;
-                case 6:
+                case 7:
                     submenu_return_screen_ = Screen::SongSelect;
                     screen_ = Screen::OptionsHub;
                     options_cursor_ = 0;
                     publish_snapshot();
                     return;
-                case 7:
+                case 8:
                     song_select_view_ = SongSelectView::Records;
                     selected_record_ = 0;
                     song_select_focus_ = SongSelectFocus::SongList;
@@ -1625,7 +1817,7 @@ void MenuApp::handle_song_select_input(uint32_t keycode) {
 }
 
 void MenuApp::handle_song_browser_input(uint32_t keycode) {
-    const int item_count = 6;
+    const int item_count = 9;
     if (keycode == key_up_) {
         settings_cursor_ = clamp_int(settings_cursor_ - 1, 0, item_count - 1);
         publish_snapshot();
@@ -1667,6 +1859,13 @@ void MenuApp::handle_song_browser_input(uint32_t keycode) {
         apply_filter_refresh();
         return;
     }
+    if (settings_cursor_ == 4 && (keycode == key_left_ || keycode == key_right_)) {
+        const int direction = (keycode == key_left_) ? -1 : 1;
+        cycle_song_collection_filter(direction);
+        persist_runtime_config();
+        apply_filter_refresh();
+        return;
+    }
 
     if (settings_cursor_ == 0) {
         if (keycode == key_backspace_) {
@@ -1691,15 +1890,42 @@ void MenuApp::handle_song_browser_input(uint32_t keycode) {
     }
 
     if (keycode == key_enter_) {
-        if (settings_cursor_ == 4) {
+        if (settings_cursor_ == 5) {
+            const std::string named_collection = current_named_song_collection();
+            bool changed = false;
+            if (!named_collection.empty()) {
+                changed = toggle_selected_song_in_collection(named_collection);
+            } else {
+                changed = toggle_selected_song_favorite();
+            }
+            if (changed) {
+                persist_runtime_config();
+                if (to_lower_ascii(config_.ui.song_collection_filter) == "favorites" ||
+                    !named_collection.empty()) {
+                    apply_filter_refresh();
+                } else {
+                    publish_snapshot();
+                }
+            }
+            return;
+        }
+        if (settings_cursor_ == 6) {
+            create_next_song_collection();
+            persist_runtime_config();
+            apply_filter_refresh();
+            return;
+        }
+        if (settings_cursor_ == 7) {
             song_search_query_.clear();
             song_key_filter_ = 0;
             song_level_min_filter_ = 0;
             song_level_max_filter_ = 0;
+            config_.ui.song_collection_filter = "all";
+            persist_runtime_config();
             apply_filter_refresh();
             return;
         }
-        if (settings_cursor_ == 5) {
+        if (settings_cursor_ == 8) {
             screen_ = submenu_return_screen_;
             settings_cursor_ = 0;
             publish_snapshot();
@@ -1757,7 +1983,15 @@ bool MenuApp::move_song_select_selection(int delta) {
 }
 
 void MenuApp::handle_result_input(uint32_t keycode) {
-    if (keycode == key_r_) {
+    if (keycode == key_left_) {
+        if (!last_chart_path_.empty()) {
+            launch_gameplay(last_chart_path_);
+        } else {
+            launch_selected_song();
+        }
+        return;
+    }
+    if (keycode == key_f1_) {
         if (launch_last_result_replay()) {
             return;
         }

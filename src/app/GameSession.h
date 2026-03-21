@@ -76,6 +76,23 @@ public:
         std::array<float, kGameplayHudMaxLanes> lane_activity{};
         std::size_t note_count = 0;
         std::array<HudNote, kGameplayHudMaxNotes> notes{};
+
+        bool ghost_visible = false;
+        int64_t ghost_score = 0;
+        int ghost_combo = 0;
+        int ghost_max_combo = 0;
+        gameplay::JudgementCounts ghost_counts;
+        double ghost_gauge = 0.0;
+        game::GaugeType ghost_gauge_type = game::GaugeType::Normal;
+        bool ghost_has_feedback = false;
+        game::Judgement ghost_feedback_judgement = game::Judgement::BD;
+        double ghost_feedback_delta_ms = 0.0;
+        bool ghost_finished = false;
+        bool ghost_game_over = false;
+        std::size_t ghost_lane_activity_count = 0;
+        std::array<float, kGameplayHudMaxLanes> ghost_lane_activity{};
+        std::size_t ghost_note_count = 0;
+        std::array<HudNote, kGameplayHudMaxNotes> ghost_notes{};
     };
 
     using HudCallback = std::function<void(const HudSnapshot&)>;
@@ -87,6 +104,7 @@ public:
 
     using LoadingProgressCallback = std::function<void(const LoadingProgress&)>;
     using LoadingCancelCallback = std::function<bool()>;
+    using ScreenshotCallback = std::function<void()>;
 
     struct GameSessionResult {
         bool has_value = false;
@@ -114,6 +132,7 @@ public:
     void set_hud_callback(HudCallback callback);
     void set_loading_progress_callback(LoadingProgressCallback callback);
     void set_loading_cancel_callback(LoadingCancelCallback callback);
+    void set_screenshot_callback(ScreenshotCallback callback);
     [[nodiscard]] HudSnapshot hud_snapshot();
     [[nodiscard]] bool was_user_aborted() const { return user_aborted_.load(std::memory_order_acquire); }
     [[nodiscard]] const GameSessionResult& result() const { return result_; }
@@ -232,8 +251,11 @@ private:
     static void clamp_output(float* output, uint32_t frames, float master_gain);
     void report_loading_progress(int percent, std::string_view stage);
     [[nodiscard]] bool loading_cancel_requested();
-    [[nodiscard]] int64_t playback_sample_for_replay_event(int64_t replay_sample) const;
+    [[nodiscard]] int64_t playback_sample_for_replay_event(const gameplay::ReplayFile& replay,
+                                                           int64_t replay_sample) const;
     void process_replay_input_queue(int64_t buffer_start_samples, int64_t buffer_end_samples, int64_t lookahead_samples);
+    void process_ghost_replay_queue(int64_t buffer_end_samples, int64_t lookahead_samples);
+    void dispatch_ghost_lane_input(int lane, input::InputState state, int64_t sample);
 
     [[nodiscard]] std::optional<int> lane_from_keycode(uint32_t keycode) const;
     [[nodiscard]] double lane_frequency_hz(int lane) const;
@@ -253,8 +275,12 @@ private:
     gameplay::ReplayFile replay_source_{};
     bool replay_playback_enabled_ = false;
     std::size_t replay_event_index_ = 0;
+    gameplay::ReplayFile ghost_replay_source_{};
+    bool ghost_replay_enabled_ = false;
+    std::size_t ghost_replay_event_index_ = 0;
 
     std::unique_ptr<gameplay::GameplayEngine> engine_;
+    std::unique_ptr<gameplay::GameplayEngine> ghost_engine_;
     std::mutex engine_mutex_;
 
     input::InputThread input_thread_;
@@ -278,6 +304,7 @@ private:
     uint32_t f4_keycode_ = 0;
     uint32_t f5_keycode_ = 0;
     uint32_t f6_keycode_ = 0;
+    uint32_t f9_keycode_ = 0;
 
     int64_t input_offset_samples_ = 0;
     int sample_rate_ = 48000;
@@ -302,7 +329,9 @@ private:
     std::unique_ptr<std::atomic<int64_t>[]> chart_audio_active_until_samples_;
     std::vector<BufferedLaneInput> pending_input_events_;
     std::vector<uint8_t> hidden_hit_note_ids_;
+    std::vector<uint8_t> ghost_hidden_hit_note_ids_;
     std::vector<gameplay::ActiveHoldView> active_holds_buffer_;
+    std::vector<gameplay::ActiveHoldView> ghost_active_holds_buffer_;
     std::size_t next_chart_audio_event_ = 0;
     std::uint64_t startup_preload_budget_bytes_ = 0;
     std::uint64_t runtime_chart_audio_budget_bytes_ = 0;
@@ -315,13 +344,16 @@ private:
     bool chart_audio_steady_state_logged_ = false;
     std::atomic<bool> synthetic_tones_enabled_{true};
     std::vector<float> lane_activity_;
+    std::vector<float> ghost_lane_activity_;
     HudCallback hud_callback_;
     LoadingProgressCallback loading_progress_callback_;
     LoadingCancelCallback loading_cancel_callback_;
+    ScreenshotCallback screenshot_callback_;
     int last_loading_percent_ = -1;
     std::string last_loading_stage_;
 
     GameSessionResult result_{};
+    std::size_t ghost_hud_scan_start_ = 0;
 };
 
 }  // namespace tenriff::app
