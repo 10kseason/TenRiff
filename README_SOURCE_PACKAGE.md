@@ -17,3 +17,4 @@ cmake --build build --config Release --target bms_parser_tests
 
 - Optional Python-reference checks can print `[skip]` when `10k-calc/` is absent; that is expected for the public source package.
 - `launch_win.bat` can create missing `profiles/`, `songs/`, and `logs/` folders on first launch.
+- When refreshing this public source bundle for a release, verify at least the standalone configure/build/test path above from the staged source-package root.

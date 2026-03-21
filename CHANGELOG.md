@@ -9,6 +9,7 @@ TenRiff의 사용자/배포 관점에서 의미 있는 변경만 간단히 기�
 - Song Select에 Favorites / named Collections / local clear lamp 표시를 추가하고, 관련 필터와 상태 저장을 `config.ui`에 연결
 - Options에 `Calibration Wizard` 화면을 추가해 입력 오프셋과 표시 오프셋을 즉시 저장/리셋할 수 있도록 정리
 - 루트 README 3종과 `README_SOURCE_PACKAGE.md`에 공개 오픈소스 소스 패키지 전용 CMake 빌드 절차와 제외 항목(`tools/`, `10k-calc/`, runtime data dirs) 안내를 추가
+- `docs/current-state*`, `docs/developer-extension-guide*`, `README_SOURCE_PACKAGE.md`에 공개 소스 패키지 갱신 시 staged source bundle 자체에서 standalone configure/build/test를 확인해야 한다는 유지보수 규칙을 추가
 - 프로젝트 메타데이터와 핵심 현재 상태/로드맵 문서를 `0.997` 기준으로 갱신
 
 ### Packaged
