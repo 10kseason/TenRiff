@@ -131,6 +131,7 @@ This is the document that the next agent or any new contributor should read firs
 - When updating distribution builds, only built artifacts should be copied into `Baepoks/`
 - If a source-only / public handoff is requested, the user's preference is to write an include/exclude list first
 - The last staged public source package is versioned separately, e.g. `opensource-Tenriff-source/TenRiff-0.997-source`
+- When refreshing a public source package, do not stop at syncing docs/files only; also verify that the staged source-package folder itself can configure, build, and run the core test binary standalone
 
 ## Config / Profile Reality
 - The real default values live in `config/config.json`
@@ -159,6 +160,9 @@ This is the document that the next agent or any new contributor should read firs
 - `cmake --build build --config Release --target bms_parser_tests`
 - `cmake --build build --config Release --target bms_realworld_smoke`
 - `ctest --test-dir build -C Release --output-on-failure -R bms_parser_tests`
+- `cmake -S opensource-Tenriff-source/TenRiff-0.997-source -B opensource-Tenriff-source/TenRiff-0.997-source/build-check -G "Visual Studio 17 2022" -A x64`
+- `cmake --build opensource-Tenriff-source/TenRiff-0.997-source/build-check --config Release --target bms_parser_tests`
+- `opensource-Tenriff-source/TenRiff-0.997-source/build-check/Release/bms_parser_tests.exe`
 
 ## Still Manual-Validation Heavy
 - Song Select fast-scroll crash reproduction on a real CJK-heavy library

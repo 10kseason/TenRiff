@@ -161,6 +161,8 @@ Language: Korean | [English](developer-extension-guide.en.md) | [简体中文](d
 
 문서 동기화는 보통 `docs/current-state.md`, `docs/config.md`, `docs/README.md`, 그리고 필요하면 새 기능 문서 순서로 생각합니다. 이번 턴처럼 문서만 추가할 때는 새 개발자 가이드 파일들을 먼저 만들고, 이후 코드 변경이 생기면 현재 상태 문서를 따로 갱신하는 방식이 안전합니다.
 
+공개 소스 패키지까지 함께 손대는 작업이라면 여기서 한 단계 더 가야 합니다. `opensource-Tenriff-source/TenRiff-<version>-source`를 다시 스테이징한 뒤에는, 그 폴더 안에 repo 전용 보조 파일(`tools/`, `10k-calc/`, 기존 `profiles/`)이 없다는 전제에서 raw `cmake` configure/build와 최소 `bms_parser_tests` 실행까지 확인해야 합니다.
+
 ## Common Mistakes
 
 - 토큰을 `ModeSettings`에만 추가하고 `ModeResolver`와 `MenuApp` UI를 잊는 경우
@@ -182,4 +184,4 @@ Language: Korean | [English](developer-extension-guide.en.md) | [简体中文](d
 - `Replay` / `Result` JSON이 새 모드 정보를 포함한다.
 - `tests/unit`과 `tests/smoke`가 모두 통과한다.
 - 필요하면 `docs/current-state.md`와 `docs/config.md`를 별도 문서 패스로 갱신한다.
-
+- 공개 소스 패키지를 갱신했다면 `opensource-Tenriff-source/TenRiff-<version>-source` 자체에서 standalone `cmake` configure/build와 `bms_parser_tests` 실행까지 확인한다.

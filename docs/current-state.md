@@ -131,6 +131,7 @@
 - 배포 업데이트 요청 시 built artifacts만 `Baepoks/`에 넣는 규칙
 - source-only/public handoff 요청 시 먼저 include/exclude 리스트를 작성하는 것이 사용자 선호
 - 마지막으로 스테이징된 공개 소스 패키지는 `opensource-Tenriff-source/TenRiff-0.997-source`처럼 버전별로 별도 스테이징
+- 공개 소스 패키지를 갱신할 때는 문서만 맞추는 것으로 끝내지 않고, 스테이징된 소스 패키지 폴더 자체에서 standalone configure/build/test가 되는지까지 확인하는 규칙
 
 ## Config / Profile Reality
 - 실제 기본값은 `config/config.json`
@@ -159,6 +160,9 @@
 - `cmake --build build --config Release --target bms_parser_tests`
 - `cmake --build build --config Release --target bms_realworld_smoke`
 - `ctest --test-dir build -C Release --output-on-failure -R bms_parser_tests`
+- `cmake -S opensource-Tenriff-source/TenRiff-0.997-source -B opensource-Tenriff-source/TenRiff-0.997-source/build-check -G "Visual Studio 17 2022" -A x64`
+- `cmake --build opensource-Tenriff-source/TenRiff-0.997-source/build-check --config Release --target bms_parser_tests`
+- `opensource-Tenriff-source/TenRiff-0.997-source/build-check/Release/bms_parser_tests.exe`
 
 ## Still Manual-Validation Heavy
 - renderer layout 변경 뒤에는 `docs/ui-audit-checklist.md` 기준으로 `1080p`, `720p windowed`, `Performance HUD on/off` 전수 확인 필요

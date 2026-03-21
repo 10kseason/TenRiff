@@ -161,6 +161,8 @@ Random 行为必须在固定 seed 下保持确定性。只要新增 random 模�
 
 文档同步通常按这个顺序想：[`docs/current-state.zh-CN.md`](current-state.zh-CN.md)、[`docs/config.zh-CN.md`](config.zh-CN.md)、[`docs/README.zh-CN.md`](README.zh-CN.md)，然后再是功能专项文档。本轮只新增开发者指南，所以如果之后需要更新代码行为描述，再单独做一次 current-state 文档更新会更稳。
 
+如果这次工作还会刷新公开源代码包，就还要再多做一步。重新 staging `opensource-Tenriff-source/TenRiff-<version>-source` 之后，要在那个目录本身里按“没有 `tools/`、`10k-calc/`、现成 `profiles/` 这类 repo 专用辅助内容”的前提，实际验证原生 `cmake` configure/build，并至少运行一次 `bms_parser_tests`。
+
 ## 常见坑
 
 - 只在 `ModeSettings` 里加 token，却忘了 `ModeResolver` 和菜单 UI。
@@ -182,3 +184,4 @@ Random 行为必须在固定 seed 下保持确定性。只要新增 random 模�
 - Replay/result JSON 包含新的模式信息。
 - `tests/unit` 与 `tests/smoke` 仍然全部通过。
 - 如果行为会被用户直接看到，再在单独的文档更新里同步 [`docs/current-state.zh-CN.md`](current-state.zh-CN.md) 和 [`docs/config.zh-CN.md`](config.zh-CN.md)。
+- 如果刷新了公开源代码包，还要在 `opensource-Tenriff-source/TenRiff-<version>-source` 目录里验证 standalone `cmake` configure/build 和 `bms_parser_tests` 的实际运行。

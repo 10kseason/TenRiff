@@ -131,6 +131,7 @@
 - 发布更新时，只把已构建的产物放进 `Baepoks/`
 - 如果请求 source-only/public handoff，用户偏好是先写 include/exclude 列表
 - 最近一次 staged 的公开源代码包会像 `opensource-Tenriff-source/TenRiff-0.997-source` 这样按版本单独 staging
+- 刷新公开源代码包时，不能只同步文档和文件本身，还要确认 staged 出来的源码包目录可以独立完成 configure/build，并能直接运行核心测试二进制
 
 ## 配置 / Profile 现实情况
 - 实际默认值来自 `config/config.json`
@@ -159,6 +160,9 @@
 - `cmake --build build --config Release --target bms_parser_tests`
 - `cmake --build build --config Release --target bms_realworld_smoke`
 - `ctest --test-dir build -C Release --output-on-failure -R bms_parser_tests`
+- `cmake -S opensource-Tenriff-source/TenRiff-0.997-source -B opensource-Tenriff-source/TenRiff-0.997-source/build-check -G "Visual Studio 17 2022" -A x64`
+- `cmake --build opensource-Tenriff-source/TenRiff-0.997-source/build-check --config Release --target bms_parser_tests`
+- `opensource-Tenriff-source/TenRiff-0.997-source/build-check/Release/bms_parser_tests.exe`
 
 ## 仍然需要手动验证的地方
 - 在真实的 CJK-heavy 曲库上重现 Song Select 快速滚动崩溃

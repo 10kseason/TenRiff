@@ -161,6 +161,8 @@ New mode work is easy to break if you skip tests.
 
 For docs, think in this order: `docs/current-state.md`, `docs/config.md`, `docs/README.md`, then any feature-specific docs. This turn only adds the developer guide, so keep code-facing behavior changes and current-state docs in a later pass if they are needed.
 
+If the work also refreshes the public source package, go one step further. After restaging `opensource-Tenriff-source/TenRiff-<version>-source`, verify raw `cmake` configure/build plus at least a `bms_parser_tests` run inside that staged folder, assuming repo-only helpers such as `tools/`, `10k-calc/`, and existing `profiles/` are absent there.
+
 ## Common Mistakes
 
 - Adding a token in `ModeSettings` but forgetting `ModeResolver` and the menu UI.
@@ -182,4 +184,4 @@ For docs, think in this order: `docs/current-state.md`, `docs/config.md`, `docs/
 - Replay/result JSON includes the new mode information.
 - `tests/unit` and `tests/smoke` still pass.
 - If behavior is user-visible, update `docs/current-state.md` and `docs/config.md` in a separate docs pass.
-
+- If the public source package was refreshed, verify standalone `cmake` configure/build and a `bms_parser_tests` run from `opensource-Tenriff-source/TenRiff-<version>-source` itself.
