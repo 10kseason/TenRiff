@@ -484,6 +484,34 @@ TEST_CASE("gameplay engine auto-misses once the bad window is exceeded") {
     CHECK(engine.stats().counts.bd == 1);
 }
 
+TEST_CASE("gameplay engine does not shift later notes after a bad on the same lane") {
+    GameplayChart chart;
+    chart.lane_count = 1;
+    chart.duration_samples = 4000;
+    chart.notes.push_back(NoteEvent{1, 1000, std::nullopt});
+    chart.notes.push_back(NoteEvent{1, 2000, std::nullopt});
+
+    GameplayConfig config;
+    config.sample_rate = 1000;
+    config.rate = 1.0;
+    config.judge.pg_ms = 10.0;
+    config.judge.gr_ms = 20.0;
+    config.judge.gd_ms = 30.0;
+    config.judge.bd_ms = 40.0;
+
+    GameplayEngine engine(chart, config);
+    (void)engine.handle_input(1, InputState::Pressed, 1500);
+    (void)engine.handle_input(1, InputState::Released, 1600);
+
+    auto next_hit = engine.handle_input(1, InputState::Pressed, 2000);
+
+    REQUIRE(next_hit.has_value());
+    CHECK(next_hit->start_sample == 2000);
+    CHECK(engine.stats().counts.bd == 1);
+    CHECK(engine.stats().counts.pg == 1);
+    CHECK(engine.stats().combo == 1);
+}
+
 TEST_CASE("judge easy mod expands charge hold tail windows during gameplay") {
     GameplayChart chart;
     chart.lane_count = 1;

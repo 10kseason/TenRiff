@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(TenRiff VERSION 0.999 LANGUAGES CXX)
+project(TenRiff VERSION 1.0.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -246,6 +246,7 @@ if(TENRIFF_ENABLE_TESTS)
         tests/unit/test_mode_applier.cpp
         tests/unit/test_mode_manager.cpp
         tests/unit/test_gameplay_engine.cpp
+        tests/unit/test_session_result_status.cpp
         tests/unit/test_replay_export.cpp
         tests/unit/test_chart_loader.cpp
         tests/unit/test_chart_audio_streaming.cpp
