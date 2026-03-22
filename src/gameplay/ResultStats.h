@@ -43,6 +43,8 @@ struct ResultStats {
     double mean_delta_ms = 0.0;
     double m2_delta_ms = 0.0;
     int delta_samples = 0;
+    int positive_delta_count = 0;
+    int negative_delta_count = 0;
 
     std::vector<GaugeSample> gauge_history;
     std::vector<ShiftEvent> shifts;

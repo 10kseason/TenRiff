@@ -51,6 +51,11 @@ void ResultStats::record_judgement(game::Judgement judgement, double delta_ms, C
 
     if (std::isfinite(delta_ms)) {
         ++delta_samples;
+        if (delta_ms > 0.05) {
+            ++positive_delta_count;
+        } else if (delta_ms < -0.05) {
+            ++negative_delta_count;
+        }
         double delta = delta_ms - mean_delta_ms;
         mean_delta_ms += delta / static_cast<double>(delta_samples);
         double delta2 = delta_ms - mean_delta_ms;

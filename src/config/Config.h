@@ -116,6 +116,7 @@ struct InputConfig {
     bool grab = false;
     std::size_t queue_size = 2048;
     int polling_hz = 1000;
+    int judgement_hz = 4000;
     double debounce_ms = 8.0;
 };
 

@@ -35,6 +35,9 @@
             },
             timing::HighResClock::now_ns());
         const int64_t display_sample = motion_diagnostics.display_sample;
+        constexpr double kGameplayTimingIndicatorRangeMs = 80.0;
+        constexpr float kGameplayTimingIndicatorHalfWidth = 124.0f;
+        constexpr float kGameplayTimingIndicatorHeight = 8.0f;
 
         auto sample_to_y = [&](int64_t sample) -> float {
             return static_cast<float>(compute_gameplay_note_y_normalized(sample,
@@ -42,6 +45,131 @@
                                                                          data.gameplay.lookahead_samples,
                                                                          data.gameplay.past_samples,
                                                                          judgement_line_position));
+        };
+
+        auto draw_timing_indicator = [&](float indicator_left,
+                                         float indicator_right,
+                                         float combo_anchor_y,
+                                         const std::array<double, kGameplayTimingHistoryMaxEntries>& timing_history,
+                                         std::size_t timing_history_count,
+                                         bool has_live_feedback,
+                                         double live_feedback_delta_ms) {
+            if (!d2d_->body_format || !d2d_->text_brush) {
+                return;
+            }
+            if (timing_history_count == 0 && !has_live_feedback) {
+                return;
+            }
+
+            constexpr wchar_t kFastIndicatorText[] = L"\uBE60\uB984";
+            constexpr wchar_t kSlowIndicatorText[] = L"\uB290\uB9BC";
+            const float feedback_center_x = (indicator_left + indicator_right) * 0.5f;
+            const D2D1_RECT_F indicator_rect =
+                D2D1::RectF(feedback_center_x - kGameplayTimingIndicatorHalfWidth,
+                            combo_anchor_y + 16.0f,
+                            feedback_center_x + kGameplayTimingIndicatorHalfWidth,
+                            combo_anchor_y + 16.0f + kGameplayTimingIndicatorHeight);
+            const D2D1_RECT_F fast_rect =
+                D2D1::RectF(indicator_left + 60.0f,
+                            combo_anchor_y + 8.0f,
+                            indicator_rect.left - 18.0f,
+                            combo_anchor_y + 38.0f);
+            const D2D1_RECT_F slow_rect =
+                D2D1::RectF(indicator_rect.right + 18.0f,
+                            combo_anchor_y + 8.0f,
+                            indicator_right - 60.0f,
+                            combo_anchor_y + 38.0f);
+            const double reference_delta_ms =
+                timing_history_count > 0 ? timing_history[timing_history_count - 1] : live_feedback_delta_ms;
+            const bool timing_fast = reference_delta_ms < -0.05;
+            const bool timing_slow = reference_delta_ms > 0.05;
+
+            if (d2d_->card_brush) {
+                d2d_->card_brush->SetOpacity(0.75f);
+                ctx->FillRoundedRectangle(D2D1::RoundedRect(indicator_rect, 4.0f, 4.0f), d2d_->card_brush.Get());
+                d2d_->card_brush->SetOpacity(1.0f);
+            }
+            if (d2d_->accent_brush) {
+                const auto saved_color = d2d_->accent_brush->GetColor();
+                const float saved_opacity = d2d_->accent_brush->GetOpacity();
+                d2d_->accent_brush->SetOpacity(0.26f);
+                d2d_->accent_brush->SetColor(D2D1::ColorF(0x5DA9FF));
+                ctx->FillRectangle(D2D1::RectF(indicator_rect.left, indicator_rect.top,
+                                               feedback_center_x, indicator_rect.bottom),
+                                   d2d_->accent_brush.Get());
+                d2d_->accent_brush->SetColor(D2D1::ColorF(0xFF5A6B));
+                ctx->FillRectangle(D2D1::RectF(feedback_center_x, indicator_rect.top,
+                                               indicator_rect.right, indicator_rect.bottom),
+                                   d2d_->accent_brush.Get());
+                d2d_->accent_brush->SetColor(saved_color);
+                d2d_->accent_brush->SetOpacity(saved_opacity);
+            }
+            if (d2d_->button_border_brush) {
+                ctx->DrawRoundedRectangle(D2D1::RoundedRect(indicator_rect, 4.0f, 4.0f),
+                                          d2d_->button_border_brush.Get(),
+                                          1.0f);
+            }
+
+            const D2D1_COLOR_F saved_text_color = d2d_->text_brush->GetColor();
+            const float indicator_center_y = (indicator_rect.top + indicator_rect.bottom) * 0.5f;
+            d2d_->text_brush->SetColor(D2D1::ColorF(0xF7FAFD, 0.92f));
+            ctx->FillRectangle(D2D1::RectF(feedback_center_x - 1.0f, indicator_rect.top - 3.0f,
+                                           feedback_center_x + 1.0f, indicator_rect.bottom + 3.0f),
+                               d2d_->text_brush.Get());
+
+            for (std::size_t i = 0; i < timing_history_count; ++i) {
+                const double delta_ms = timing_history[i];
+                const float history_weight =
+                    static_cast<float>(i + 1) / static_cast<float>(std::max<std::size_t>(1, timing_history_count));
+                const float marker_center_x =
+                    feedback_center_x +
+                    static_cast<float>(std::clamp(delta_ms / kGameplayTimingIndicatorRangeMs, -1.0, 1.0)) *
+                        kGameplayTimingIndicatorHalfWidth;
+                const float marker_half_width = 0.8f + 0.8f * history_weight;
+                const float marker_half_height = 1.4f + 2.4f * history_weight;
+                D2D1_COLOR_F marker_color = D2D1::ColorF(0xF7FAFD, 0.12f + 0.50f * history_weight * history_weight);
+                if (delta_ms < -0.05) {
+                    marker_color = D2D1::ColorF(0x5DA9FF, 0.12f + 0.50f * history_weight * history_weight);
+                } else if (delta_ms > 0.05) {
+                    marker_color = D2D1::ColorF(0xFF5A6B, 0.12f + 0.50f * history_weight * history_weight);
+                }
+                d2d_->text_brush->SetColor(marker_color);
+                ctx->FillRoundedRectangle(
+                    D2D1::RoundedRect(D2D1::RectF(marker_center_x - marker_half_width,
+                                                 indicator_center_y - marker_half_height,
+                                                 marker_center_x + marker_half_width,
+                                                 indicator_center_y + marker_half_height),
+                                      marker_half_width,
+                                      marker_half_width),
+                    d2d_->text_brush.Get());
+            }
+
+            if (has_live_feedback) {
+                const float live_marker_center_x =
+                    feedback_center_x +
+                    static_cast<float>(std::clamp(live_feedback_delta_ms / kGameplayTimingIndicatorRangeMs,
+                                                  -1.0,
+                                                  1.0)) *
+                        kGameplayTimingIndicatorHalfWidth;
+                d2d_->text_brush->SetColor(D2D1::ColorF(0xF7FAFD, 0.98f));
+                ctx->FillEllipse(D2D1::Ellipse(D2D1::Point2F(live_marker_center_x, indicator_center_y), 5.0f, 5.0f),
+                                 d2d_->text_brush.Get());
+            }
+
+            d2d_->text_brush->SetColor(D2D1::ColorF(0x5DA9FF, timing_fast ? 0.82f : 0.28f));
+            draw_text_clipped_aligned(std::wstring(kFastIndicatorText),
+                                      d2d_->body_format.Get(),
+                                      fast_rect,
+                                      d2d_->text_brush.Get(),
+                                      DWRITE_TEXT_ALIGNMENT_TRAILING);
+
+            d2d_->text_brush->SetColor(D2D1::ColorF(0xFF5A6B, timing_slow ? 0.82f : 0.28f));
+            draw_text_clipped_aligned(std::wstring(kSlowIndicatorText),
+                                      d2d_->body_format.Get(),
+                                      slow_rect,
+                                      d2d_->text_brush.Get(),
+                                      DWRITE_TEXT_ALIGNMENT_LEADING);
+            d2d_->text_brush->SetColor(saved_text_color);
         };
 
         auto draw_gameplay_header = [&]() {
@@ -505,61 +633,44 @@
 
         const bool show_feedback_overlay =
             data.gameplay.has_feedback && !gameplay_hud_cache_.feedback_text.empty();
-        const float combo_anchor_top_safe = show_feedback_overlay ? 74.0f : 44.0f;
-        const float combo_anchor_bottom_safe = show_feedback_overlay ? 82.0f : 44.0f;
+        const bool has_timing_history = data.gameplay.timing_history_count > 0;
+        const bool reserve_timing_overlay_space = show_feedback_overlay || has_timing_history;
+        const float combo_anchor_top_safe = reserve_timing_overlay_space ? 74.0f : 44.0f;
+        const float combo_anchor_bottom_safe = reserve_timing_overlay_space ? 82.0f : 44.0f;
         const float combo_anchor_y =
             gameplay_combo_anchor_y(field_layout, combo_position, combo_anchor_top_safe, combo_anchor_bottom_safe);
-        if (show_feedback_overlay && d2d_->header_format && d2d_->text_brush) {
-            const D2D1_RECT_F feedback_rect =
-                gameplay_centered_overlay_rect(field_layout, combo_anchor_y - 34.0f, 40.0f, -24.0f);
-            const bool show_timing_indicator =
-                data.gameplay.feedback != "PG" &&
-                std::abs(data.gameplay.feedback_delta_ms) >= 0.05;
-            const bool timing_fast = show_timing_indicator && data.gameplay.feedback_delta_ms < 0.0;
-            const bool timing_slow = show_timing_indicator && data.gameplay.feedback_delta_ms > 0.0;
-            const D2D1_COLOR_F saved_text_color = d2d_->text_brush->GetColor();
+        if ((show_feedback_overlay || has_timing_history) && d2d_->text_brush) {
+            if (show_feedback_overlay && d2d_->header_format) {
+                const D2D1_RECT_F feedback_rect =
+                    gameplay_centered_overlay_rect(field_layout, combo_anchor_y - 34.0f, 40.0f, -24.0f);
+                const D2D1_COLOR_F saved_text_color = d2d_->text_brush->GetColor();
 
-            d2d_->text_brush->SetColor(D2D1::ColorF(0x061118, 0.78f));
-            const D2D1_RECT_F feedback_shadow_rect =
-                D2D1::RectF(feedback_rect.left + 3.0f, feedback_rect.top + 3.0f,
-                            feedback_rect.right + 3.0f, feedback_rect.bottom + 3.0f);
-            draw_text_clipped_aligned(gameplay_hud_cache_.feedback_text,
-                                      d2d_->header_format.Get(),
-                                      feedback_shadow_rect,
-                                      d2d_->text_brush.Get(),
-                                      DWRITE_TEXT_ALIGNMENT_CENTER);
-
-            d2d_->text_brush->SetColor(gameplay_feedback_color(data.gameplay.feedback));
-            draw_text_clipped_aligned(gameplay_hud_cache_.feedback_text,
-                                      d2d_->header_format.Get(),
-                                      feedback_rect,
-                                      d2d_->text_brush.Get(),
-                                      DWRITE_TEXT_ALIGNMENT_CENTER);
-
-            if (show_timing_indicator && d2d_->body_format) {
-                constexpr wchar_t kFastIndicatorText[] = L"\uBE60\uB984";
-                constexpr wchar_t kSlowIndicatorText[] = L"\uB290\uB9BC";
-                const float feedback_center_x = (field_left + field_right) * 0.5f;
-                const D2D1_RECT_F fast_rect =
-                    D2D1::RectF(field_left + 60.0f, combo_anchor_y + 8.0f, feedback_center_x - 220.0f, combo_anchor_y + 38.0f);
-                const D2D1_RECT_F slow_rect =
-                    D2D1::RectF(feedback_center_x + 220.0f, combo_anchor_y + 8.0f, field_right - 60.0f, combo_anchor_y + 38.0f);
-
-                d2d_->text_brush->SetColor(D2D1::ColorF(0x5DA9FF, timing_fast ? 0.82f : 0.28f));
-                draw_text_clipped_aligned(std::wstring(kFastIndicatorText),
-                                          d2d_->body_format.Get(),
-                                          fast_rect,
+                d2d_->text_brush->SetColor(D2D1::ColorF(0x061118, 0.78f));
+                const D2D1_RECT_F feedback_shadow_rect =
+                    D2D1::RectF(feedback_rect.left + 3.0f, feedback_rect.top + 3.0f,
+                                feedback_rect.right + 3.0f, feedback_rect.bottom + 3.0f);
+                draw_text_clipped_aligned(gameplay_hud_cache_.feedback_text,
+                                          d2d_->header_format.Get(),
+                                          feedback_shadow_rect,
                                           d2d_->text_brush.Get(),
-                                          DWRITE_TEXT_ALIGNMENT_TRAILING);
+                                          DWRITE_TEXT_ALIGNMENT_CENTER);
 
-                d2d_->text_brush->SetColor(D2D1::ColorF(0xFF5A6B, timing_slow ? 0.82f : 0.28f));
-                draw_text_clipped_aligned(std::wstring(kSlowIndicatorText),
-                                          d2d_->body_format.Get(),
-                                          slow_rect,
+                d2d_->text_brush->SetColor(gameplay_feedback_color(data.gameplay.feedback));
+                draw_text_clipped_aligned(gameplay_hud_cache_.feedback_text,
+                                          d2d_->header_format.Get(),
+                                          feedback_rect,
                                           d2d_->text_brush.Get(),
-                                          DWRITE_TEXT_ALIGNMENT_LEADING);
+                                          DWRITE_TEXT_ALIGNMENT_CENTER);
+                d2d_->text_brush->SetColor(saved_text_color);
             }
-            d2d_->text_brush->SetColor(saved_text_color);
+
+            draw_timing_indicator(field_left,
+                                  field_right,
+                                  combo_anchor_y,
+                                  data.gameplay.timing_history_delta_ms,
+                                  data.gameplay.timing_history_count,
+                                  data.gameplay.has_feedback,
+                                  data.gameplay.feedback_delta_ms);
         }
 
         if (data.gameplay.combo > 0 && d2d_->accent_brush &&
@@ -889,66 +1000,48 @@
 
             const bool show_ghost_feedback_overlay =
                 data.gameplay.ghost_has_feedback && !gameplay_hud_cache_.ghost_feedback_text.empty();
-            const float ghost_combo_anchor_top_safe = show_ghost_feedback_overlay ? 74.0f : 44.0f;
-            const float ghost_combo_anchor_bottom_safe = show_ghost_feedback_overlay ? 82.0f : 44.0f;
+            const bool ghost_has_timing_history = data.gameplay.ghost_timing_history_count > 0;
+            const bool reserve_ghost_timing_overlay_space =
+                show_ghost_feedback_overlay || ghost_has_timing_history;
+            const float ghost_combo_anchor_top_safe = reserve_ghost_timing_overlay_space ? 74.0f : 44.0f;
+            const float ghost_combo_anchor_bottom_safe = reserve_ghost_timing_overlay_space ? 82.0f : 44.0f;
             const float ghost_combo_anchor_y =
                 gameplay_combo_anchor_y(ghost_field_layout,
                                         combo_position,
                                         ghost_combo_anchor_top_safe,
                                         ghost_combo_anchor_bottom_safe);
-            if (show_ghost_feedback_overlay && d2d_->header_format && d2d_->text_brush) {
-                const D2D1_RECT_F feedback_rect =
-                    gameplay_centered_overlay_rect(ghost_field_layout, ghost_combo_anchor_y - 34.0f, 40.0f, -24.0f);
-                const bool show_timing_indicator =
-                    data.gameplay.ghost_feedback != "PG" &&
-                    std::abs(data.gameplay.ghost_feedback_delta_ms) >= 0.05;
-                const bool timing_fast = show_timing_indicator && data.gameplay.ghost_feedback_delta_ms < 0.0;
-                const bool timing_slow = show_timing_indicator && data.gameplay.ghost_feedback_delta_ms > 0.0;
-                const D2D1_COLOR_F saved_text_color = d2d_->text_brush->GetColor();
+            if ((show_ghost_feedback_overlay || ghost_has_timing_history) && d2d_->text_brush) {
+                if (show_ghost_feedback_overlay && d2d_->header_format) {
+                    const D2D1_RECT_F feedback_rect = gameplay_centered_overlay_rect(
+                        ghost_field_layout, ghost_combo_anchor_y - 34.0f, 40.0f, -24.0f);
+                    const D2D1_COLOR_F saved_text_color = d2d_->text_brush->GetColor();
 
-                d2d_->text_brush->SetColor(D2D1::ColorF(0x061118, 0.78f));
-                const D2D1_RECT_F feedback_shadow_rect =
-                    D2D1::RectF(feedback_rect.left + 3.0f, feedback_rect.top + 3.0f,
-                                feedback_rect.right + 3.0f, feedback_rect.bottom + 3.0f);
-                draw_text_clipped_aligned(gameplay_hud_cache_.ghost_feedback_text,
-                                          d2d_->header_format.Get(),
-                                          feedback_shadow_rect,
-                                          d2d_->text_brush.Get(),
-                                          DWRITE_TEXT_ALIGNMENT_CENTER);
-
-                d2d_->text_brush->SetColor(gameplay_feedback_color(data.gameplay.ghost_feedback));
-                draw_text_clipped_aligned(gameplay_hud_cache_.ghost_feedback_text,
-                                          d2d_->header_format.Get(),
-                                          feedback_rect,
-                                          d2d_->text_brush.Get(),
-                                          DWRITE_TEXT_ALIGNMENT_CENTER);
-
-                if (show_timing_indicator && d2d_->body_format) {
-                    constexpr wchar_t kFastIndicatorText[] = L"\uBE60\uB984";
-                    constexpr wchar_t kSlowIndicatorText[] = L"\uB290\uB9BC";
-                    const float feedback_center_x = (ghost_field_left + ghost_field_right) * 0.5f;
-                    const D2D1_RECT_F fast_rect =
-                        D2D1::RectF(ghost_field_left + 60.0f, ghost_combo_anchor_y + 8.0f,
-                                    feedback_center_x - 160.0f, ghost_combo_anchor_y + 38.0f);
-                    const D2D1_RECT_F slow_rect =
-                        D2D1::RectF(feedback_center_x + 160.0f, ghost_combo_anchor_y + 8.0f,
-                                    ghost_field_right - 60.0f, ghost_combo_anchor_y + 38.0f);
-
-                    d2d_->text_brush->SetColor(D2D1::ColorF(0x5DA9FF, timing_fast ? 0.82f : 0.28f));
-                    draw_text_clipped_aligned(std::wstring(kFastIndicatorText),
-                                              d2d_->body_format.Get(),
-                                              fast_rect,
+                    d2d_->text_brush->SetColor(D2D1::ColorF(0x061118, 0.78f));
+                    const D2D1_RECT_F feedback_shadow_rect =
+                        D2D1::RectF(feedback_rect.left + 3.0f, feedback_rect.top + 3.0f,
+                                    feedback_rect.right + 3.0f, feedback_rect.bottom + 3.0f);
+                    draw_text_clipped_aligned(gameplay_hud_cache_.ghost_feedback_text,
+                                              d2d_->header_format.Get(),
+                                              feedback_shadow_rect,
                                               d2d_->text_brush.Get(),
-                                              DWRITE_TEXT_ALIGNMENT_TRAILING);
+                                              DWRITE_TEXT_ALIGNMENT_CENTER);
 
-                    d2d_->text_brush->SetColor(D2D1::ColorF(0xFF5A6B, timing_slow ? 0.82f : 0.28f));
-                    draw_text_clipped_aligned(std::wstring(kSlowIndicatorText),
-                                              d2d_->body_format.Get(),
-                                              slow_rect,
+                    d2d_->text_brush->SetColor(gameplay_feedback_color(data.gameplay.ghost_feedback));
+                    draw_text_clipped_aligned(gameplay_hud_cache_.ghost_feedback_text,
+                                              d2d_->header_format.Get(),
+                                              feedback_rect,
                                               d2d_->text_brush.Get(),
-                                              DWRITE_TEXT_ALIGNMENT_LEADING);
+                                              DWRITE_TEXT_ALIGNMENT_CENTER);
+                    d2d_->text_brush->SetColor(saved_text_color);
                 }
-                d2d_->text_brush->SetColor(saved_text_color);
+
+                draw_timing_indicator(ghost_field_left,
+                                      ghost_field_right,
+                                      ghost_combo_anchor_y,
+                                      data.gameplay.ghost_timing_history_delta_ms,
+                                      data.gameplay.ghost_timing_history_count,
+                                      data.gameplay.ghost_has_feedback,
+                                      data.gameplay.ghost_feedback_delta_ms);
             }
             if (data.gameplay.ghost_combo > 0 && d2d_->accent_brush &&
                 (show_ghost_feedback_overlay ? (d2d_->title_format.Get() != nullptr)

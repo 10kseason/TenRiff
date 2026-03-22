@@ -193,12 +193,13 @@ void AudioThread::process_buffer() {
     // `total_samples_played()` is our running count of frames already released to the
     // backend. The next writable region begins at that write cursor; adding padding
     // again pushes the callback timeline one device-latency too far into the future.
-    int64_t current_samples = backend_->total_samples_played();
-    int64_t buffer_start_samples = current_samples;
+    const int64_t write_cursor_samples = backend_->total_samples_played();
+    const int64_t buffer_start_samples = write_cursor_samples;
+    const int64_t playback_sample = playback_sample_from_write_cursor(write_cursor_samples, padding);
 
     // Invoke the callback.
     if (callback_) {
-        callback_(buffer, frames_obtained, buffer_start_samples);
+        callback_(buffer, frames_obtained, buffer_start_samples, playback_sample);
     } else {
         // Silent fill if no callback.
         std::memset(buffer, 0, frames_obtained * 2 * sizeof(float));

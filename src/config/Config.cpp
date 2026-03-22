@@ -391,6 +391,14 @@ int sanitize_polling_hz(int value, std::vector<std::string>& warnings) {
     return 1000;
 }
 
+int sanitize_judgement_hz(int value, std::vector<std::string>& warnings) {
+    if (is_allowed_polling_hz(value)) {
+        return value;
+    }
+    warnings.push_back("input.judgement_hz must be 1000/2000/4000/8000; using 4000.");
+    return 4000;
+}
+
 double sanitize_input_debounce_ms(double value, std::vector<std::string>& warnings) {
     if (std::isfinite(value) && value >= kInputDebounceWindowMin && value <= kInputDebounceWindowMax) {
         return value;
@@ -457,6 +465,7 @@ void apply_config_object(const JsonObject& root, RuntimeConfig& config) {
         config.input.grab = get_bool(*input, "grab", config.input.grab);
         config.input.queue_size = static_cast<std::size_t>(get_number(*input, "queue_size", config.input.queue_size));
         config.input.polling_hz = static_cast<int>(get_number(*input, "polling_hz", config.input.polling_hz));
+        config.input.judgement_hz = static_cast<int>(get_number(*input, "judgement_hz", config.input.judgement_hz));
         config.input.debounce_ms = get_number(*input, "debounce_ms", config.input.debounce_ms);
     }
 
@@ -777,6 +786,7 @@ JsonValue build_json_root(const RuntimeConfig& config) {
     input.emplace("grab", JsonValue{config.input.grab});
     input.emplace("queue_size", JsonValue{static_cast<double>(config.input.queue_size)});
     input.emplace("polling_hz", JsonValue{static_cast<double>(config.input.polling_hz)});
+    input.emplace("judgement_hz", JsonValue{static_cast<double>(config.input.judgement_hz)});
     input.emplace("debounce_ms", JsonValue{config.input.debounce_ms});
     root.emplace("input", JsonValue{std::move(input)});
 
@@ -1208,6 +1218,7 @@ RuntimeConfig ConfigLoader::defaults() const {
     config.input.grab = false;
     config.input.queue_size = 2048;
     config.input.polling_hz = 1000;
+    config.input.judgement_hz = 4000;
     config.input.debounce_ms = 8.0;
 
     config.judge = {};
@@ -1269,6 +1280,7 @@ ConfigLoadResult ConfigLoader::load_profile(std::string_view profile_dir) const 
     result.migrated = ::tenriff::app::migrate_bms_first_runtime_config(result.config);
     apply_audio_preset(result.config);
     result.config.input.polling_hz = sanitize_polling_hz(result.config.input.polling_hz, result.warnings);
+    result.config.input.judgement_hz = sanitize_judgement_hz(result.config.input.judgement_hz, result.warnings);
     result.config.input.debounce_ms = sanitize_input_debounce_ms(result.config.input.debounce_ms, result.warnings);
     result.config.graphics.refresh_hz = sanitize_refresh_hz(result.config.graphics.refresh_hz, result.warnings);
     result.config.graphics.resolution = normalize_resolution_preset(result.config.graphics.resolution);

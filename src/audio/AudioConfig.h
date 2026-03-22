@@ -46,10 +46,21 @@ enum class AudioResult {
     Unknown,
 };
 
+[[nodiscard]] inline int64_t playback_sample_from_write_cursor(int64_t write_cursor_samples,
+                                                               uint32_t queued_padding_frames) {
+    return write_cursor_samples > static_cast<int64_t>(queued_padding_frames)
+               ? (write_cursor_samples - static_cast<int64_t>(queued_padding_frames))
+               : 0;
+}
+
 /// Callback signature for audio processing.
 /// @param output     Interleaved stereo float buffer to fill.
 /// @param frames     Number of frames to render.
-/// @param buffer_start_samples  Absolute sample position of buffer start (playback domain).
-using AudioCallback = void(*)(float* output, uint32_t frames, int64_t buffer_start_samples);
+/// @param buffer_start_samples  Absolute sample position of the writable buffer start.
+/// @param playback_sample       Absolute sample position currently leaving the device.
+using AudioCallback = void(*)(float* output,
+                              uint32_t frames,
+                              int64_t buffer_start_samples,
+                              int64_t playback_sample);
 
 }  // namespace tenriff::audio

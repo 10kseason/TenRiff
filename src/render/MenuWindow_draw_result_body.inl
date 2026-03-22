@@ -406,6 +406,51 @@
             detail_y += 34.0f;
         }
 
+        if (data.result.timing_guidance_visible) {
+            const D2D1_RECT_F guidance_rect =
+                D2D1::RectF(detail_rect.left + 20.0f, detail_y, detail_rect.right - 20.0f, detail_y + 108.0f);
+            const D2D1_ROUNDED_RECT guidance_rr = D2D1::RoundedRect(guidance_rect, 14.0f, 14.0f);
+            if (d2d_->panel_brush) {
+                d2d_->panel_brush->SetOpacity(0.92f);
+                ctx->FillRoundedRectangle(guidance_rr, d2d_->panel_brush.Get());
+                d2d_->panel_brush->SetOpacity(1.0f);
+            }
+            if (d2d_->accent_brush) {
+                const auto saved = d2d_->accent_brush->GetColor();
+                d2d_->accent_brush->SetColor(
+                    data.result.timing_guidance_direction > 0 ? D2D1::ColorF(0xFF8A5B) : D2D1::ColorF(0x5DA9FF));
+                ctx->DrawRoundedRectangle(guidance_rr, d2d_->accent_brush.Get(), 1.8f);
+                d2d_->accent_brush->SetColor(saved);
+            }
+
+            if (d2d_->body_format && d2d_->text_brush) {
+                const D2D1_RECT_F title_rect =
+                    D2D1::RectF(guidance_rect.left + 16.0f, guidance_rect.top + 12.0f,
+                                guidance_rect.right - 16.0f, guidance_rect.top + 36.0f);
+                draw_text_clipped(to_wide(data.result.timing_guidance_title),
+                                  d2d_->body_format.Get(),
+                                  title_rect,
+                                  d2d_->text_brush.Get());
+            }
+            if (d2d_->body_format && d2d_->muted_brush) {
+                const D2D1_RECT_F message_rect =
+                    D2D1::RectF(guidance_rect.left + 16.0f, guidance_rect.top + 40.0f,
+                                guidance_rect.right - 16.0f, guidance_rect.top + 66.0f);
+                const D2D1_RECT_F detail_rect_message =
+                    D2D1::RectF(guidance_rect.left + 16.0f, guidance_rect.top + 68.0f,
+                                guidance_rect.right - 16.0f, guidance_rect.top + 94.0f);
+                draw_text_clipped(to_wide(data.result.timing_guidance_message),
+                                  d2d_->body_format.Get(),
+                                  message_rect,
+                                  d2d_->muted_brush.Get());
+                draw_text_clipped(to_wide(data.result.timing_guidance_detail),
+                                  d2d_->body_format.Get(),
+                                  detail_rect_message,
+                                  d2d_->muted_brush.Get());
+            }
+            detail_y = guidance_rect.bottom + 18.0f;
+        }
+
         const bool show_replay_button = !data.result.replay_file.empty();
         const bool replay_available = data.result.replay_available;
         const D2D1_RECT_F back_rect =

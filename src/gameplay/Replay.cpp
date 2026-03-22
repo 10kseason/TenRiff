@@ -173,6 +173,8 @@ config::JsonValue build_stats_json(const ResultStats& stats) {
     obj.emplace("raw_score", config::JsonValue{static_cast<double>(stats.raw_score)});
     obj.emplace("mean_delta_ms", config::JsonValue{stats.mean_delta_ms});
     obj.emplace("stddev_delta_ms", config::JsonValue{stats.stddev_delta_ms()});
+    obj.emplace("positive_delta_count", config::JsonValue{static_cast<double>(stats.positive_delta_count)});
+    obj.emplace("negative_delta_count", config::JsonValue{static_cast<double>(stats.negative_delta_count)});
     obj.emplace("gauge_history", build_gauge_history_json(stats.gauge_history));
     obj.emplace("shifts", build_shift_json(stats.shifts));
     return config::JsonValue{std::move(obj)};
@@ -385,6 +387,8 @@ ReplayLoadResult load_replay_json(const std::string& path) {
         replay.stats.total_notes = read_json_int(*stats, "total_notes", 0);
         replay.stats.raw_score = read_json_i64(*stats, "raw_score", derived_raw_score(replay.stats));
         replay.stats.mean_delta_ms = read_json_number(*stats, "mean_delta_ms", 0.0);
+        replay.stats.positive_delta_count = read_json_int(*stats, "positive_delta_count", 0);
+        replay.stats.negative_delta_count = read_json_int(*stats, "negative_delta_count", 0);
         const double stddev_delta_ms = read_json_number(*stats, "stddev_delta_ms", 0.0);
         const int judged = replay.stats.counts.pg + replay.stats.counts.gr +
                            replay.stats.counts.gd + replay.stats.counts.bd;

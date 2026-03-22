@@ -17,8 +17,12 @@ public:
     /// Callback signature for audio processing.
     /// @param output     Interleaved stereo float buffer to fill (may be nullptr for silent tick).
     /// @param frames     Number of frames to render.
-    /// @param buffer_start_samples  Absolute sample position of buffer start.
-    using Callback = std::function<void(float* output, uint32_t frames, int64_t buffer_start_samples)>;
+    /// @param buffer_start_samples  Absolute sample position of the writable buffer start.
+    /// @param playback_sample       Absolute sample position currently leaving the device.
+    using Callback = std::function<void(float* output,
+                                        uint32_t frames,
+                                        int64_t buffer_start_samples,
+                                        int64_t playback_sample)>;
 
     AudioThread();
     ~AudioThread();

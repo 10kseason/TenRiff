@@ -124,12 +124,33 @@ void GameplayEngine::collect_active_holds(std::vector<ActiveHoldView>& out) cons
     }
 }
 
+void GameplayEngine::collect_recent_timing_deltas(std::array<double, kGameplayTimingHistoryMaxEntries>& out,
+                                                  std::size_t* out_count) const {
+    const std::size_t count = std::min(recent_timing_delta_count_, recent_timing_deltas_.size());
+    if (out_count) {
+        *out_count = count;
+    }
+    out.fill(0.0);
+    if (count == 0) {
+        return;
+    }
+
+    const std::size_t start =
+        (recent_timing_delta_head_ + recent_timing_deltas_.size() - count) % recent_timing_deltas_.size();
+    for (std::size_t i = 0; i < count; ++i) {
+        out[i] = recent_timing_deltas_[(start + i) % recent_timing_deltas_.size()];
+    }
+}
+
 void GameplayEngine::apply_judgement(game::Judgement judgement, double delta_ms, int64_t sample,
                                      double weight, ComboImpact combo_impact) {
     live_feedback_.has_value = true;
     live_feedback_.judgement = judgement;
     live_feedback_.delta_ms = std::isfinite(delta_ms) ? delta_ms : 0.0;
     live_feedback_.sample = sample;
+    if (std::isfinite(delta_ms)) {
+        push_recent_timing_delta(delta_ms);
+    }
 
     double time_ms = samples_to_ms(sample);
     auto previous_type = gauge_state_.type;
@@ -144,6 +165,18 @@ void GameplayEngine::apply_judgement(game::Judgement judgement, double delta_ms,
 
     if (result.game_over) {
         game_over_ = true;
+    }
+}
+
+void GameplayEngine::push_recent_timing_delta(double delta_ms) {
+    if (!std::isfinite(delta_ms) || recent_timing_deltas_.empty()) {
+        return;
+    }
+
+    recent_timing_deltas_[recent_timing_delta_head_] = delta_ms;
+    recent_timing_delta_head_ = (recent_timing_delta_head_ + 1) % recent_timing_deltas_.size();
+    if (recent_timing_delta_count_ < recent_timing_deltas_.size()) {
+        ++recent_timing_delta_count_;
     }
 }
 

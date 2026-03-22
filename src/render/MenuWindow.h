@@ -193,6 +193,11 @@ struct ResultScreenData {
     double stddev_delta_ms = 0.0;
     int shift_count = 0;
     int export_warning_count = 0;
+    bool timing_guidance_visible = false;
+    int timing_guidance_direction = 0;
+    std::string timing_guidance_title;
+    std::string timing_guidance_message;
+    std::string timing_guidance_detail;
 
     std::string replay_file;
     bool replay_available = false;
@@ -277,6 +282,8 @@ struct GameplayHudData {
     bool has_feedback = false;
     std::string feedback;
     double feedback_delta_ms = 0.0;
+    std::size_t timing_history_count = 0;
+    std::array<double, kGameplayTimingHistoryMaxEntries> timing_history_delta_ms{};
 
     bool finished = false;
     bool game_over = false;
@@ -303,6 +310,8 @@ struct GameplayHudData {
     bool ghost_has_feedback = false;
     std::string ghost_feedback;
     double ghost_feedback_delta_ms = 0.0;
+    std::size_t ghost_timing_history_count = 0;
+    std::array<double, kGameplayTimingHistoryMaxEntries> ghost_timing_history_delta_ms{};
     bool ghost_finished = false;
     bool ghost_game_over = false;
     std::size_t ghost_lane_activity_count = 0;

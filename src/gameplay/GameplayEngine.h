@@ -1,9 +1,11 @@
 #pragma once
 
+#include <array>
 #include <cstdint>
 #include <optional>
 #include <vector>
 
+#include "GameplayHudLimits.h"
 #include "config/Config.h"
 #include "game/GaugeManager.h"
 #include "gameplay/GameplayChart.h"
@@ -76,6 +78,8 @@ public:
     [[nodiscard]] const ReplayTrace& replay() const { return replay_; }
     [[nodiscard]] const LiveJudgementFeedback& live_feedback() const { return live_feedback_; }
     void collect_active_holds(std::vector<ActiveHoldView>& out) const;
+    void collect_recent_timing_deltas(std::array<double, kGameplayTimingHistoryMaxEntries>& out,
+                                      std::size_t* out_count) const;
 
     [[nodiscard]] int lane_count() const { return lane_count_; }
     [[nodiscard]] int64_t duration_samples() const { return duration_samples_; }
@@ -94,6 +98,7 @@ private:
     void finalize_if_done(int64_t current_sample);
     void update_lane_input_state(LaneState& lane, input::InputState state, int64_t input_sample);
     [[nodiscard]] bool should_apply_early_empty_poor(const LaneState& lane, int64_t input_sample) const;
+    void push_recent_timing_delta(double delta_ms);
 
     [[nodiscard]] double samples_to_ms(int64_t samples) const;
     [[nodiscard]] JudgeWindowSamples build_windows(const config::JudgeConfig& judge, double rate) const;
@@ -115,6 +120,9 @@ private:
     ResultStats stats_;
     ReplayTrace replay_;
     LiveJudgementFeedback live_feedback_;
+    std::array<double, kGameplayTimingHistoryMaxEntries> recent_timing_deltas_{};
+    std::size_t recent_timing_delta_count_ = 0;
+    std::size_t recent_timing_delta_head_ = 0;
 
     bool finished_ = false;
     bool game_over_ = false;
