@@ -332,6 +332,8 @@ std::optional<ParsedResultRecord> parse_result_file(const std::filesystem::path&
     out.stats.raw_score = static_cast<int64_t>(std::llround(
         read_json_number(*stats_obj, "raw_score", static_cast<double>(calculate_score(out.stats)))));
     out.stats.mean_delta_ms = read_json_number(*stats_obj, "mean_delta_ms", 0.0);
+    out.stats.positive_delta_count = read_json_int(*stats_obj, "positive_delta_count", 0);
+    out.stats.negative_delta_count = read_json_int(*stats_obj, "negative_delta_count", 0);
     const double stddev_delta_ms = read_json_number(*stats_obj, "stddev_delta_ms", 0.0);
     out.mods = read_json_string_array(*root, "mods");
     out.rate_multiplier = read_json_number(*root, "rate_multiplier", 1.0);

@@ -91,6 +91,11 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
     target.has_feedback = gameplay_hud_.has_feedback;
     target.feedback = judgement_label(gameplay_hud_.feedback);
     target.feedback_delta_ms = gameplay_hud_.feedback_delta_ms;
+    target.timing_history_count = gameplay_hud_.timing_history_count;
+    target.timing_history_delta_ms.fill(0.0);
+    std::copy_n(gameplay_hud_.timing_history_delta_ms.begin(),
+                gameplay_hud_.timing_history_count,
+                target.timing_history_delta_ms.begin());
     target.finished = gameplay_hud_.finished;
     target.game_over = gameplay_hud_.game_over;
 
@@ -145,6 +150,11 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
     target.ghost_has_feedback = gameplay_hud_.ghost_has_feedback;
     target.ghost_feedback = judgement_label(gameplay_hud_.ghost_feedback);
     target.ghost_feedback_delta_ms = gameplay_hud_.ghost_feedback_delta_ms;
+    target.ghost_timing_history_count = gameplay_hud_.ghost_timing_history_count;
+    target.ghost_timing_history_delta_ms.fill(0.0);
+    std::copy_n(gameplay_hud_.ghost_timing_history_delta_ms.begin(),
+                gameplay_hud_.ghost_timing_history_count,
+                target.ghost_timing_history_delta_ms.begin());
     target.ghost_finished = gameplay_hud_.ghost_finished;
     target.ghost_game_over = gameplay_hud_.ghost_game_over;
     target.ghost_lane_activity_count = gameplay_hud_.ghost_lane_activity_count;
@@ -352,6 +362,12 @@ void MenuApp::populate_title_render_data(render::MenuRenderData& render,
 }
 
 void MenuApp::populate_result_render_data(render::MenuRenderData& render, const std::string& current_track) {
+    constexpr int kResultTimingGuidanceMinSignedSamples = 16;
+    constexpr int kResultTimingGuidanceDominantNumerator = 6;
+    constexpr int kResultTimingGuidanceDominantDenominator = 10;
+    constexpr double kResultTimingGuidanceMinMeanMs = 2.0;
+    constexpr double kResultTimingGuidanceFallbackMeanMs = 6.0;
+
     render.kind = render::MenuScreenKind::ResultScreen;
     render.result.profile = options_.profile;
     render.result.track = last_chart_title_.empty() ? current_track : last_chart_title_;
@@ -401,6 +417,55 @@ void MenuApp::populate_result_render_data(render::MenuRenderData& render, const 
     if (!last_replay_path_.empty()) {
         std::error_code ec;
         render.result.replay_available = std::filesystem::exists(path_from_utf8(last_replay_path_), ec) && !ec;
+    }
+
+    const int positive_delta_count = last_result_.positive_delta_count;
+    const int negative_delta_count = last_result_.negative_delta_count;
+    const int signed_delta_count = positive_delta_count + negative_delta_count;
+    int timing_guidance_direction = 0;
+    if (signed_delta_count >= kResultTimingGuidanceMinSignedSamples &&
+        std::abs(last_result_.mean_delta_ms) >= kResultTimingGuidanceMinMeanMs) {
+        const int dominant_count = (std::max)(positive_delta_count, negative_delta_count);
+        if (dominant_count * kResultTimingGuidanceDominantDenominator >=
+            signed_delta_count * kResultTimingGuidanceDominantNumerator) {
+            if (positive_delta_count > negative_delta_count && last_result_.mean_delta_ms >= 0.0) {
+                timing_guidance_direction = 1;
+            } else if (negative_delta_count > positive_delta_count && last_result_.mean_delta_ms <= 0.0) {
+                timing_guidance_direction = -1;
+            }
+        }
+    }
+    if (timing_guidance_direction == 0 &&
+        judged >= kResultTimingGuidanceMinSignedSamples &&
+        std::abs(last_result_.mean_delta_ms) >= kResultTimingGuidanceFallbackMeanMs) {
+        timing_guidance_direction = (last_result_.mean_delta_ms > 0.0) ? 1 : -1;
+    }
+    render.result.timing_guidance_visible = timing_guidance_direction != 0;
+    render.result.timing_guidance_direction = timing_guidance_direction;
+    if (render.result.timing_guidance_visible) {
+        const std::string bias_summary =
+            (signed_delta_count > 0)
+                ? ("+" + std::to_string(positive_delta_count) + " / -" + std::to_string(negative_delta_count))
+                : format_signed_offset_ms(last_result_.mean_delta_ms);
+        if (timing_guidance_direction > 0) {
+            render.result.timing_guidance_title =
+                ui_text("Timing Advice ", "타이밍 알림 ") + "(" + bias_summary + ")";
+            render.result.timing_guidance_message =
+                ui_text("Step 1: Skins > Judge Line -> move '-' first.",
+                        "1단계: Skins > 판정선 위치를 먼저 '-' 쪽으로 조절하세요.");
+            render.result.timing_guidance_detail =
+                ui_text("Step 2: If '+' still stays dominant, Graphics > Display Offset -> move '+'.",
+                        "2단계: 그래도 '+' 쪽이 남으면 Graphics > 표시 오프셋을 '+' 쪽으로 조절하세요.");
+        } else {
+            render.result.timing_guidance_title =
+                ui_text("Timing Advice ", "타이밍 알림 ") + "(" + bias_summary + ")";
+            render.result.timing_guidance_message =
+                ui_text("Step 1: Skins > Judge Line -> move '+' first.",
+                        "1단계: Skins > 판정선 위치를 먼저 '+' 쪽으로 조절하세요.");
+            render.result.timing_guidance_detail =
+                ui_text("Step 2: If '-' still stays dominant, Graphics > Display Offset -> move '-'.",
+                        "2단계: 그래도 '-' 쪽이 남으면 Graphics > 표시 오프셋을 '-' 쪽으로 조절하세요.");
+        }
     }
 
     if (!render.result.replay_file.empty()) {
@@ -864,6 +929,11 @@ void MenuApp::launch_gameplay(const std::string& chart_path, const std::string& 
         next.has_feedback = hud.has_feedback;
         next.feedback = hud.feedback_judgement;
         next.feedback_delta_ms = hud.feedback_delta_ms;
+        next.timing_history_count = hud.timing_history_count;
+        next.timing_history_delta_ms.fill(0.0);
+        std::copy_n(hud.timing_history_delta_ms.begin(),
+                    hud.timing_history_count,
+                    next.timing_history_delta_ms.begin());
         next.lane_activity_count = hud.lane_activity_count;
         next.lane_activity.fill(0.0f);
         std::copy_n(hud.lane_activity.begin(), hud.lane_activity_count, next.lane_activity.begin());
@@ -887,6 +957,11 @@ void MenuApp::launch_gameplay(const std::string& chart_path, const std::string& 
         next.ghost_has_feedback = hud.ghost_has_feedback;
         next.ghost_feedback = hud.ghost_feedback_judgement;
         next.ghost_feedback_delta_ms = hud.ghost_feedback_delta_ms;
+        next.ghost_timing_history_count = hud.ghost_timing_history_count;
+        next.ghost_timing_history_delta_ms.fill(0.0);
+        std::copy_n(hud.ghost_timing_history_delta_ms.begin(),
+                    hud.ghost_timing_history_count,
+                    next.ghost_timing_history_delta_ms.begin());
         next.ghost_finished = hud.ghost_finished;
         next.ghost_game_over = hud.ghost_game_over;
         next.ghost_lane_activity_count = hud.ghost_lane_activity_count;
@@ -935,6 +1010,11 @@ void MenuApp::launch_gameplay(const std::string& chart_path, const std::string& 
         gameplay_hud_.has_feedback = hud.has_feedback;
         gameplay_hud_.feedback = hud.feedback_judgement;
         gameplay_hud_.feedback_delta_ms = hud.feedback_delta_ms;
+        gameplay_hud_.timing_history_count = hud.timing_history_count;
+        gameplay_hud_.timing_history_delta_ms.fill(0.0);
+        std::copy_n(hud.timing_history_delta_ms.begin(),
+                    hud.timing_history_count,
+                    gameplay_hud_.timing_history_delta_ms.begin());
         gameplay_hud_.lane_activity_count = hud.lane_activity_count;
         gameplay_hud_.lane_activity.fill(0.0f);
         std::copy_n(hud.lane_activity.begin(), hud.lane_activity_count, gameplay_hud_.lane_activity.begin());
@@ -959,6 +1039,11 @@ void MenuApp::launch_gameplay(const std::string& chart_path, const std::string& 
         gameplay_hud_.ghost_has_feedback = hud.ghost_has_feedback;
         gameplay_hud_.ghost_feedback = hud.ghost_feedback_judgement;
         gameplay_hud_.ghost_feedback_delta_ms = hud.ghost_feedback_delta_ms;
+        gameplay_hud_.ghost_timing_history_count = hud.ghost_timing_history_count;
+        gameplay_hud_.ghost_timing_history_delta_ms.fill(0.0);
+        std::copy_n(hud.ghost_timing_history_delta_ms.begin(),
+                    hud.ghost_timing_history_count,
+                    gameplay_hud_.ghost_timing_history_delta_ms.begin());
         gameplay_hud_.ghost_finished = hud.ghost_finished;
         gameplay_hud_.ghost_game_over = hud.ghost_game_over;
         gameplay_hud_.ghost_lane_activity_count = hud.ghost_lane_activity_count;
@@ -1208,8 +1293,10 @@ void MenuApp::populate_help_overlay(render::HelpOverlayData& target) const {
             target.lines = {
                 ui_text("Up / Down or the mouse wheel selects a row.",
                         "위 / 아래 키 또는 마우스 휠로 행을 선택합니다."),
-                ui_text("Polling Hz changes how often keyboard state is sampled.",
-                        "Polling Hz는 키보드 상태를 얼마나 자주 읽을지 바꿉니다."),
+                ui_text("Polling Hz changes how often the polling backend samples keyboard state.",
+                        "Polling Hz는 폴링 백엔드가 키보드 상태를 얼마나 자주 읽을지 바꿉니다."),
+                ui_text("Judgement Hz changes how often the audio-thread judgement loop sub-steps internally.",
+                        "Judgement Hz는 오디오 스레드 내부 판정 루프 세분화 빈도를 바꿉니다."),
                 ui_text("Debounce filters switch chatter before gameplay receives duplicate presses.",
                         "디바운스는 게임플레이가 중복 입력을 받기 전에 스위치 떨림을 걸러냅니다."),
                 ui_text("Esc or Backspace saves and returns.",

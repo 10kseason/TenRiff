@@ -53,6 +53,8 @@ struct GameplayHudRevisionInput {
     bool has_feedback = false;
     game::Judgement feedback = game::Judgement::BD;
     double feedback_delta_ms = 0.0;
+    std::size_t timing_history_count = 0;
+    std::array<double, kGameplayTimingHistoryMaxEntries> timing_history_delta_ms{};
 
     std::size_t lane_activity_count = 0;
     std::array<float, kGameplayHudMaxLanes> lane_activity{};
@@ -69,6 +71,8 @@ struct GameplayHudRevisionInput {
     bool ghost_has_feedback = false;
     game::Judgement ghost_feedback = game::Judgement::BD;
     double ghost_feedback_delta_ms = 0.0;
+    std::size_t ghost_timing_history_count = 0;
+    std::array<double, kGameplayTimingHistoryMaxEntries> ghost_timing_history_delta_ms{};
     bool ghost_finished = false;
     bool ghost_game_over = false;
     std::size_t ghost_lane_activity_count = 0;
@@ -108,6 +112,17 @@ inline bool gameplay_hud_lane_activity_equal(const GameplayHudRevisionInput& lhs
                       rhs.lane_activity.begin());
 }
 
+inline bool gameplay_hud_timing_history_equal(const GameplayHudRevisionInput& lhs,
+                                              const GameplayHudRevisionInput& rhs) {
+    if (lhs.timing_history_count != rhs.timing_history_count) {
+        return false;
+    }
+    return std::equal(lhs.timing_history_delta_ms.begin(),
+                      lhs.timing_history_delta_ms.begin() +
+                          static_cast<std::ptrdiff_t>(lhs.timing_history_count),
+                      rhs.timing_history_delta_ms.begin());
+}
+
 inline bool gameplay_hud_ghost_notes_equal(const GameplayHudRevisionInput& lhs,
                                            const GameplayHudRevisionInput& rhs) {
     if (lhs.ghost_note_count != rhs.ghost_note_count) {
@@ -134,6 +149,17 @@ inline bool gameplay_hud_ghost_lane_activity_equal(const GameplayHudRevisionInpu
                       lhs.ghost_lane_activity.begin() +
                           static_cast<std::ptrdiff_t>(lhs.ghost_lane_activity_count),
                       rhs.ghost_lane_activity.begin());
+}
+
+inline bool gameplay_hud_ghost_timing_history_equal(const GameplayHudRevisionInput& lhs,
+                                                    const GameplayHudRevisionInput& rhs) {
+    if (lhs.ghost_timing_history_count != rhs.ghost_timing_history_count) {
+        return false;
+    }
+    return std::equal(lhs.ghost_timing_history_delta_ms.begin(),
+                      lhs.ghost_timing_history_delta_ms.begin() +
+                          static_cast<std::ptrdiff_t>(lhs.ghost_timing_history_count),
+                      rhs.ghost_timing_history_delta_ms.begin());
 }
 
 inline GameplayHudRevisionFlags diff_gameplay_hud_revisions(const GameplayHudRevisionInput& previous,
@@ -187,11 +213,13 @@ inline GameplayHudRevisionFlags diff_gameplay_hud_revisions(const GameplayHudRev
         previous.lookahead_samples != next.lookahead_samples ||
         previous.past_samples != next.past_samples ||
         previous.feedback_delta_ms != next.feedback_delta_ms ||
+        !gameplay_hud_timing_history_equal(previous, next) ||
         !gameplay_hud_lane_activity_equal(previous, next) ||
         !gameplay_hud_notes_equal(previous, next) ||
         previous.ghost_finished != next.ghost_finished ||
         previous.ghost_game_over != next.ghost_game_over ||
         previous.ghost_feedback_delta_ms != next.ghost_feedback_delta_ms ||
+        !gameplay_hud_ghost_timing_history_equal(previous, next) ||
         !gameplay_hud_ghost_lane_activity_equal(previous, next) ||
         !gameplay_hud_ghost_notes_equal(previous, next);
 

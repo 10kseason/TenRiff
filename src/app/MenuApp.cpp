@@ -507,6 +507,10 @@ GameplayHudRevisionInput MenuApp::gameplay_hud_revision_input(const GameplayHudS
     input.has_feedback = state.has_feedback;
     input.feedback = state.feedback;
     input.feedback_delta_ms = state.feedback_delta_ms;
+    input.timing_history_count = state.timing_history_count;
+    std::copy_n(state.timing_history_delta_ms.begin(),
+                state.timing_history_count,
+                input.timing_history_delta_ms.begin());
     input.lane_activity_count = state.lane_activity_count;
     std::copy_n(state.lane_activity.begin(), state.lane_activity_count, input.lane_activity.begin());
     input.note_count = state.note_count;
@@ -529,6 +533,10 @@ GameplayHudRevisionInput MenuApp::gameplay_hud_revision_input(const GameplayHudS
     input.ghost_has_feedback = state.ghost_has_feedback;
     input.ghost_feedback = state.ghost_feedback;
     input.ghost_feedback_delta_ms = state.ghost_feedback_delta_ms;
+    input.ghost_timing_history_count = state.ghost_timing_history_count;
+    std::copy_n(state.ghost_timing_history_delta_ms.begin(),
+                state.ghost_timing_history_count,
+                input.ghost_timing_history_delta_ms.begin());
     input.ghost_finished = state.ghost_finished;
     input.ghost_game_over = state.ghost_game_over;
     input.ghost_lane_activity_count = state.ghost_lane_activity_count;

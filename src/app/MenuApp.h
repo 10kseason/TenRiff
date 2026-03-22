@@ -133,6 +133,8 @@ private:
         bool has_feedback = false;
         game::Judgement feedback = game::Judgement::BD;
         double feedback_delta_ms = 0.0;
+        std::size_t timing_history_count = 0;
+        std::array<double, kGameplayTimingHistoryMaxEntries> timing_history_delta_ms{};
         uint64_t motion_revision = 0;
         uint64_t text_revision = 0;
 
@@ -151,6 +153,8 @@ private:
         bool ghost_has_feedback = false;
         game::Judgement ghost_feedback = game::Judgement::BD;
         double ghost_feedback_delta_ms = 0.0;
+        std::size_t ghost_timing_history_count = 0;
+        std::array<double, kGameplayTimingHistoryMaxEntries> ghost_timing_history_delta_ms{};
         bool ghost_finished = false;
         bool ghost_game_over = false;
         std::size_t ghost_lane_activity_count = 0;

@@ -23,6 +23,7 @@
 #include "config/Keymap.h"
 #include "config/KeycodeMap.h"
 #include "GameplayHudLimits.h"
+#include "app/JudgementLoopTiming.h"
 #include "gameplay/GameplayEngine.h"
 #include "input/InputThread.h"
 #include "timing/ClockSync.h"
@@ -71,6 +72,8 @@ public:
         bool has_feedback = false;
         game::Judgement feedback_judgement = game::Judgement::BD;
         double feedback_delta_ms = 0.0;
+        std::size_t timing_history_count = 0;
+        std::array<double, kGameplayTimingHistoryMaxEntries> timing_history_delta_ms{};
 
         std::size_t lane_activity_count = 0;
         std::array<float, kGameplayHudMaxLanes> lane_activity{};
@@ -87,6 +90,8 @@ public:
         bool ghost_has_feedback = false;
         game::Judgement ghost_feedback_judgement = game::Judgement::BD;
         double ghost_feedback_delta_ms = 0.0;
+        std::size_t ghost_timing_history_count = 0;
+        std::array<double, kGameplayTimingHistoryMaxEntries> ghost_timing_history_delta_ms{};
         bool ghost_finished = false;
         bool ghost_game_over = false;
         std::size_t ghost_lane_activity_count = 0;
@@ -153,6 +158,8 @@ private:
 
         bool push(const FutureEvent& evt);
         std::optional<FutureEvent> pop();
+        [[nodiscard]] std::optional<FutureEvent> peek() const;
+        void consume();
         [[nodiscard]] bool empty() const { return head == tail; }
     };
 
@@ -222,7 +229,13 @@ private:
         uint32_t buffer_frames = 0;
     };
 
-    void audio_callback(float* output, uint32_t frames, int64_t buffer_start_samples);
+    void audio_callback(float* output,
+                        uint32_t frames,
+                        int64_t buffer_start_samples,
+                        int64_t playback_sample);
+    void refresh_judgement_loop_timing();
+    [[nodiscard]] int64_t next_judgement_loop_step_samples();
+    void run_judgement_loop(int64_t buffer_start_samples, int64_t buffer_end_samples, int64_t lookahead_samples);
     void process_countdown_input_queue();
     void process_future_events(int64_t buffer_end_samples, int64_t lookahead_samples);
     void process_input_queue(int64_t buffer_start_samples, int64_t buffer_end_samples, int64_t lookahead_samples);
@@ -308,7 +321,10 @@ private:
     uint32_t f9_keycode_ = 0;
 
     int64_t input_offset_samples_ = 0;
+    int64_t current_playback_sample_ = 0;
     int sample_rate_ = 48000;
+    JudgementLoopTimingPlan judgement_loop_plan_{};
+    int64_t judgement_loop_step_carry_ = 0;
     std::size_t next_guide_note_index_ = 0;
     std::size_t hud_scan_start_ = 0;
     int64_t countdown_started_ns_ = 0;

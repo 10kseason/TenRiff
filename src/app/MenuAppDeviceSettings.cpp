@@ -122,7 +122,7 @@ void MenuApp::handle_graphics_settings_input(uint32_t keycode) {
 }
 
 void MenuApp::handle_input_settings_input(uint32_t keycode) {
-    const int item_count = 3;
+    const int item_count = 4;
     if (keycode == key_up_) {
         settings_cursor_ = clamp_int(settings_cursor_ - 1, 0, item_count - 1);
         publish_snapshot();
@@ -145,6 +145,17 @@ void MenuApp::handle_input_settings_input(uint32_t keycode) {
     }
 
     if (settings_cursor_ == 1 && (keycode == key_left_ || keycode == key_right_)) {
+        const int direction = (keycode == key_left_) ? -1 : 1;
+        const int option_count = static_cast<int>(sizeof(kPollingOptions) / sizeof(kPollingOptions[0]));
+        const int next_index =
+            next_option_index(kPollingOptions, option_count, config_.input.judgement_hz, direction);
+        config_.input.judgement_hz = kPollingOptions[next_index];
+        input_dirty_ = true;
+        publish_snapshot();
+        return;
+    }
+
+    if (settings_cursor_ == 2 && (keycode == key_left_ || keycode == key_right_)) {
         const int direction = (keycode == key_left_) ? -1 : 1;
         const int option_count = static_cast<int>(sizeof(kDebounceMsOptions) / sizeof(kDebounceMsOptions[0]));
         const int current = static_cast<int>(std::llround(config_.input.debounce_ms));
@@ -263,9 +274,15 @@ void MenuApp::populate_graphics_settings_render_data(render::MenuRenderData& ren
 void MenuApp::populate_input_settings_render_data(render::MenuRenderData& render) {
     append_menu_row(render.generic, ui_text("Polling Hz", "폴링 Hz"), std::to_string(config_.input.polling_hz), settings_cursor_ == 0,
                     render::MenuHitTargetKind::SettingsRow, 0, false, true);
-    append_menu_row(render.generic, ui_text("Debounce", "디바운스"), format_decimal(config_.input.debounce_ms) + " ms", settings_cursor_ == 1,
+    append_menu_row(render.generic, ui_text("Judgement Hz", "판정 Hz"), std::to_string(config_.input.judgement_hz), settings_cursor_ == 1,
                     render::MenuHitTargetKind::SettingsRow, 1, false, true);
-    append_menu_row(render.generic, ui_text("Back", "뒤로"), "", settings_cursor_ == 2, render::MenuHitTargetKind::SettingsRow, 2, true, false);
+    append_menu_row(render.generic, ui_text("Debounce", "디바운스"), format_decimal(config_.input.debounce_ms) + " ms", settings_cursor_ == 2,
+                    render::MenuHitTargetKind::SettingsRow, 2, false, true);
+    append_menu_row(render.generic, ui_text("Back", "뒤로"), "", settings_cursor_ == 3, render::MenuHitTargetKind::SettingsRow, 3, true, false);
+    render.generic.notes.push_back(ui_text("Polling Hz changes how often the polling backend samples keyboard state.",
+                                           "폴링 Hz는 폴링 백엔드가 키보드 상태를 얼마나 자주 읽을지 바꿉니다."));
+    render.generic.notes.push_back(ui_text("Judgement Hz changes how often the audio-thread judgement loop sub-steps internally.",
+                                           "판정 Hz는 오디오 스레드 내부 판정 루프를 얼마나 촘촘히 세분화할지 바꿉니다."));
     render.generic.notes.push_back(ui_text("Debounce filters duplicate switch chatter on a single key before gameplay sees it.",
                                            "디바운스는 게임플레이로 전달되기 전 한 키의 중복 스위치 떨림 입력을 걸러냅니다."));
     render.generic.notes.push_back(ui_text("Left/Right or click +/- to change. Back saves and returns.",
