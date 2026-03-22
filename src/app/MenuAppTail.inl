@@ -375,7 +375,8 @@ void MenuApp::populate_result_render_data(render::MenuRenderData& render, const 
     }
 
     render.result.rank = menu_records::calculate_rank(last_result_, last_game_over_);
-    render.result.status = last_game_over_ ? "GAME OVER" : "CLEAR";
+    render.result.status = !last_clear_status_.empty() ? last_clear_status_
+                                                       : (last_game_over_ ? "GAME OVER" : "CLEAR");
     render.result.gauge_label = gauge_type_label(final_gauge_type);
     render.result.score = last_result_final_score_;
     render.result.accuracy = accuracy;
@@ -1017,6 +1018,7 @@ void MenuApp::launch_gameplay(const std::string& chart_path, const std::string& 
     if (result.has_value) {
         last_result_ = result.stats;
         last_game_over_ = result.game_over;
+        last_clear_status_ = result.clear_status;
         has_result_ = true;
         last_result_mods_ = result.mods;
         last_result_rate_multiplier_ = result.rate_multiplier;
@@ -1030,6 +1032,7 @@ void MenuApp::launch_gameplay(const std::string& chart_path, const std::string& 
         screen_ = Screen::Result;
     } else {
         has_result_ = false;
+        last_clear_status_.clear();
         last_result_mods_.clear();
         last_result_rate_multiplier_ = 1.0;
         last_result_score_multiplier_ = 1.0;

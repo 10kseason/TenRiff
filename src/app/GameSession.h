@@ -110,6 +110,7 @@ public:
         bool has_value = false;
         bool game_over = false;
         bool finished = false;
+        std::string clear_status = "FAILED";
         gameplay::ResultStats stats;
         std::vector<std::string> mods;
         double rate_multiplier = 1.0;

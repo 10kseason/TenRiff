@@ -41,6 +41,7 @@
 #include "app/GameplayHudWindow.h"
 #include "app/RuntimeConfigMigration.h"
 #include "app/PersistedRuntimeConfig.h"
+#include "app/SessionResultStatus.h"
 #include "config/Keymap.h"
 #include "timing/HighResClock.h"
 
@@ -1162,18 +1163,6 @@ std::string gauge_type_token(game::GaugeType type) {
         case game::GaugeType::Easy: return "easy";
         case game::GaugeType::Normal:
         default: return "normal";
-    }
-}
-
-std::string clear_status_label(bool game_over, game::GaugeType final_gauge) {
-    if (game_over) {
-        return "FAILED";
-    }
-    switch (final_gauge) {
-        case game::GaugeType::Hard: return "HARD CLEAR";
-        case game::GaugeType::Easy: return "EASY CLEAR";
-        case game::GaugeType::Normal:
-        default: return "CLEAR";
     }
 }
 

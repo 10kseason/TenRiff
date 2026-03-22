@@ -385,6 +385,7 @@ private:
     std::string last_chart_artist_;
     std::string last_replay_path_;
     std::string last_result_path_;
+    std::string last_clear_status_;
     std::vector<std::string> last_export_warnings_;
     std::vector<std::string> last_result_mods_{};
     double last_result_rate_multiplier_ = 1.0;

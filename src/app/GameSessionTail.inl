@@ -32,6 +32,7 @@ bool GameSession::initialize(const CommandLineOptions& options) {
     last_audio_sample_.store(0, std::memory_order_release);
     audio_timing_sequence_.store(0, std::memory_order_release);
     last_audio_timing_ = {};
+    clock_sync_.reset();
     countdown_active_ = false;
     countdown_value_ = 0;
     countdown_started_ns_ = 0;
@@ -1445,12 +1446,26 @@ void GameSession::shutdown() {
     input_thread_.shutdown();
     stop_chart_audio_workers();
     if (engine_ && gameplay_started_) {
+        bool engine_game_over = false;
+        bool engine_finished = false;
+        game::GaugeType final_gauge = game::GaugeType::Normal;
         {
             std::lock_guard<std::mutex> lock(engine_mutex_);
             result_.stats = engine_->stats();
-            result_.game_over = engine_->is_game_over();
-            result_.finished = engine_->is_finished();
+            engine_game_over = engine_->is_game_over();
+            engine_finished = engine_->is_finished();
+            final_gauge = engine_->gauge_state().type;
         }
+        result_.finished = engine_finished;
+        result_.clear_status = gameplay_session_clear_status(
+            engine_finished,
+            engine_game_over,
+            user_aborted_.load(std::memory_order_acquire),
+            final_gauge);
+        result_.game_over = !gameplay_session_cleared(
+            engine_finished,
+            engine_game_over,
+            user_aborted_.load(std::memory_order_acquire));
         result_.mods = active_mods_;
         result_.rate_multiplier = rate_multiplier_;
         result_.score_multiplier = score_multiplier_;
@@ -1503,12 +1518,11 @@ void GameSession::shutdown() {
             }
 
             gameplay::ResultFile exported_result;
-            const game::GaugeType final_gauge = engine_->gauge_state().type;
             exported_result.chart_path = chart_path_;
             exported_result.chart_format = format_token;
             exported_result.created_utc = created_utc;
             exported_result.replay_path = result_.replay_path;
-            exported_result.clear_status = clear_status_label(result_.game_over, final_gauge);
+            exported_result.clear_status = result_.clear_status;
             exported_result.final_gauge = gauge_type_token(final_gauge);
             exported_result.sample_rate = sample_rate_;
             exported_result.rate = replay.rate;
@@ -1537,6 +1551,7 @@ void GameSession::shutdown() {
     }
     engine_.reset();
     ghost_engine_.reset();
+    clock_sync_.reset();
     countdown_active_ = false;
     countdown_value_ = 0;
     countdown_started_ns_ = 0;
