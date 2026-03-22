@@ -14,8 +14,20 @@
             if (data.result.status == "GAME OVER") {
                 return loc("GAME OVER", "게임 오버");
             }
+            if (data.result.status == "FAILED") {
+                return loc("FAILED", "실패");
+            }
+            if (data.result.status == "ABORTED") {
+                return loc("ABORTED", "중도 종료");
+            }
             if (data.result.status == "CLEAR") {
                 return loc("CLEAR", "클리어");
+            }
+            if (data.result.status == "HARD CLEAR") {
+                return loc("HARD CLEAR", "하드 클리어");
+            }
+            if (data.result.status == "EASY CLEAR") {
+                return loc("EASY CLEAR", "이지 클리어");
             }
             return data.result.status;
         };
@@ -141,8 +153,9 @@
         };
 
         draw_meter(summary_rect.top + 445.0f, loc("Accuracy", "정확도"), data.result.accuracy, 100.0, D2D1::ColorF(0x6EE7F2));
+        const bool result_cleared = data.result.status.find("CLEAR") != std::string::npos;
         draw_meter(summary_rect.top + 530.0f, loc("Gauge ", "게이지 ") + localized_result_gauge(), data.result.gauge_value, 100.0,
-                   data.result.status == "GAME OVER" ? D2D1::ColorF(0xFF6B6B) : D2D1::ColorF(0xFABB4B));
+                   result_cleared ? D2D1::ColorF(0xFABB4B) : D2D1::ColorF(0xFF6B6B));
 
         auto draw_panel_row = [&](const D2D1_RECT_F& panel_rect, float y, std::string_view label, std::string_view value) {
             if (!d2d_->stats_label_format || !d2d_->stats_value_format || !d2d_->text_brush) {
