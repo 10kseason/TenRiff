@@ -4,6 +4,8 @@ Language: [한국어](README.md) | [English](README.en.md) | [简体中文](READ
 
 If you have already read the root [`README.en.md`](../README.en.md), this document is the next-step index into the detailed documentation. It includes both design documents and the current-state document, so when you need to gather context quickly, the following order is the most efficient.
 
+This codebase should also be read as a `vibe coding` work that grew through rapid iteration and experimentation.
+
 ## Recommended Reading Order
 1. `docs/current-state.en.md`
    - Current product state, core subsystems, validated commands, and remaining manual verification items
@@ -48,6 +50,9 @@ If you have already read the root [`README.en.md`](../README.en.md), this docume
 - The root `README.md` also has [`README.en.md`](../README.en.md) and [`README.zh-CN.md`](../README.zh-CN.md).
 - Major `docs/` documents are translated side-by-side as `.en.md` and `.zh-CN.md` files.
 - If a translation and the Korean original disagree, use the current code first, then `docs/current-state.md`, then `docs/config.md`.
+
+## Acknowledgements
+- Thanks to OpenAI Codex, ChatGPT, Claude Code, Gemini, and the guest testers who helped validate the project.
 
 ## Practical Rule
 - When checking current behavior, start with `docs/current-state.en.md`.

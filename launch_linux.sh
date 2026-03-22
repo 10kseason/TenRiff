@@ -52,7 +52,8 @@ if [[ ! -f "$CONFIG_DIR/config.json" ]]; then
     "use_qpc": true,
     "grab": false,
     "queue_size": 2048,
-    "polling_hz": 1000
+    "polling_hz": 1000,
+    "judgement_hz": 4000
   },
   "judge": {
     "pg": 15.5,

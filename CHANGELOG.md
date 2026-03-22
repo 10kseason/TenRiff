@@ -2,6 +2,20 @@
 
 TenRiff의 사용자/배포 관점에서 의미 있는 변경만 간단히 기록합니다.
 
+## [1.0.01] - 2026-03-23
+
+### Changed
+- 오디오 콜백 내부 판정 루프를 입력 `polling_hz`(`1000/2000/4000/8000Hz`) 기준의 서브스텝으로 세분화하고, 미래로 매핑된 입력은 현재 버퍼 끝으로 당기지 않고 후속 틱까지 유지하도록 정리
+- 입력 폴링과 내부 판정 서브스텝 빈도를 분리해 `input.polling_hz` 기본값은 `1000Hz`, `input.judgement_hz` 기본값은 `4000Hz`로 운용하도록 조정
+- 입력 시각을 write cursor가 아니라 실제 playback head 기준으로 오디오 clock sync에 맞추도록 수정해, recent future-queue 변경 이후 생긴 체감 입력 지연/먹통 회귀를 완화
+- 인게임 timing indicator를 최근 `100노트` 롤링 히스토리로 확장해, 최신 기록은 선명하게 남고 오래된 기록은 점차 흐려지며 밀려나도록 조정
+- 판정 hot path를 직접 비교할 수 있는 synthetic `gameplay_judgement_benchmark` 타깃을 추가
+- 루트 README와 문서 맵에 `vibe coding` 작품 성격과 감사 크레딧을 명시
+- 프로젝트 메타데이터와 현재 상태/로드맵 문서를 `1.0.01` 배포 라인 기준으로 갱신
+
+### Packaged
+- `build-dist` 기준 Windows 배포 스테이징과 공개 오픈소스 소스 스테이징을 `1.0.01` 라인으로 갱신
+
 ## [1.0.0] - 2026-03-22
 
 ### Changed

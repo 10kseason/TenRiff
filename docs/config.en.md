@@ -44,6 +44,12 @@ If a profile does not exist, it is created automatically on first launch.
 - `queue_size` (int)
 - `polling_hz` (int)
   - `1000 | 2000 | 4000 | 8000`
+  - how often the polling backend samples keyboard state
+  - default is `1000` (`1ms`)
+- `judgement_hz` (int)
+  - `1000 | 2000 | 4000 | 8000`
+  - sub-step cadence used by the audio-thread judgement loop
+  - default is `4000` (`0.25ms`)
 - `debounce_ms` (double)
   - input debounce time used to filter extremely short up/down chatter on the same key before runtime processing
   - clamped to the `0..25` range

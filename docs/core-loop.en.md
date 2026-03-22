@@ -28,6 +28,8 @@ This document summarizes the structure and data flow of the currently implemente
 - `app/GameSession.*`
   - CLI options -> config application -> chart loading -> input / audio thread startup
   - Input queue consumption + judgement updates in the audio callback
+  - The polling backend samples keyboard state at `input.polling_hz` (`1000..8000 Hz`)
+  - Judgement / miss / hold updates are sub-stepped inside the callback at a separate `input.judgement_hz` cadence (`1000..8000 Hz`) instead of advancing only once per audio buffer
 
 ## Initial Judgement Policy To Note
 - **Hold tail judgement** applies only to osu!mania holds and BMS `#LNMODE 2` charge notes; early release is treated as BAD

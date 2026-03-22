@@ -77,6 +77,8 @@ TEST_CASE("config defaults prefer 44100 Hz audio") {
     CHECK(config.audio_ui.preset == "high");
     CHECK(config.audio_ui.bgm_volume == doctest::Approx(0.75));
     CHECK(config.audio_ui.keysound_volume == doctest::Approx(1.0));
+    CHECK(config.input.polling_hz == 1000);
+    CHECK(config.input.judgement_hz == 4000);
     CHECK(config.input.debounce_ms == doctest::Approx(8.0));
     CHECK(config.mode.format == "bms");
     CHECK_FALSE(config.mode.enable_osu_charts);
@@ -275,6 +277,8 @@ TEST_CASE("config save and load preserve input debounce setting") {
 
     ConfigLoader loader;
     auto config = loader.defaults();
+    config.input.polling_hz = 2000;
+    config.input.judgement_hz = 8000;
     config.input.debounce_ms = 12.0;
 
     std::string error;
@@ -283,6 +287,8 @@ TEST_CASE("config save and load preserve input debounce setting") {
 
     const auto result = loader.load_profile("profiles/test");
     REQUIRE(result.success());
+    CHECK(result.config.input.polling_hz == 2000);
+    CHECK(result.config.input.judgement_hz == 8000);
     CHECK(result.config.input.debounce_ms == doctest::Approx(12.0));
 }
 
@@ -1279,6 +1285,35 @@ TEST_CASE("runtime migration upgrades legacy hold and debounce defaults") {
     CHECK(config.judge.hold_grace_ms == doctest::Approx(80.0));
     CHECK(config.judge.hold_break_ms == doctest::Approx(200.0));
     CHECK(config.input.debounce_ms == doctest::Approx(8.0));
+}
+
+TEST_CASE("config load keeps polling cadence and defaults judgement cadence when the new field is missing") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+
+    std::filesystem::create_directories(temp.path / "config");
+    std::filesystem::create_directories(temp.path / "profiles" / "test");
+    write_file(temp.path / "config" / "config.json",
+               "{\n"
+               "  \"input\": {\n"
+               "    \"polling_hz\": 1000,\n"
+               "    \"debounce_ms\": 8.0\n"
+               "  }\n"
+               "}\n");
+    write_file(temp.path / "profiles" / "test" / "config.json", "{ }\n");
+
+    CurrentPathGuard cwd;
+    std::error_code ec;
+    std::filesystem::current_path(temp.path, ec);
+    REQUIRE_FALSE(static_cast<bool>(ec));
+
+    ConfigLoader loader;
+    const auto result = loader.load_profile("profiles/test");
+
+    REQUIRE(result.success());
+    CHECK(result.config.input.polling_hz == 1000);
+    CHECK(result.config.input.judgement_hz == 4000);
 }
 
 TEST_CASE("runtime migration upgrades the old default note height scale to 180 percent") {

@@ -1,5 +1,6 @@
 #include "doctest/doctest.h"
 
+#include "audio/AudioConfig.h"
 #include "input/InputEvent.h"
 #include "input/SPSCQueue.h"
 #include "timing/ClockSync.h"
@@ -125,3 +126,8 @@ TEST_CASE("ClockSync reset clears accumulated state") {
     CHECK_FALSE(sync.input_to_audio_samples(500'000'000).has_value());
 }
 
+TEST_CASE("audio playback sample tracks the device head instead of the write cursor") {
+    CHECK(tenriff::audio::playback_sample_from_write_cursor(4096, 512) == 3584);
+    CHECK(tenriff::audio::playback_sample_from_write_cursor(256, 256) == 0);
+    CHECK(tenriff::audio::playback_sample_from_write_cursor(128, 512) == 0);
+}

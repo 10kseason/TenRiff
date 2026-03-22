@@ -2,6 +2,7 @@
 
 #include <optional>
 
+#include "app/JudgementLoopTiming.h"
 #include "app/GameplayHudRevisions.h"
 #include "app/GameplayHudWindow.h"
 #include "gameplay/GameplayChart.h"
@@ -104,4 +105,52 @@ TEST_CASE("gameplay hud revisions bump text caches for score and feedback change
 
     const auto diff = tenriff::app::diff_gameplay_hud_revisions(previous, next);
     CHECK(diff.text_changed);
+}
+
+TEST_CASE("gameplay hud revisions treat timing history updates as motion changes") {
+    tenriff::app::GameplayHudRevisionInput previous;
+    previous.timing_history_count = 2;
+    previous.timing_history_delta_ms[0] = -6.0;
+    previous.timing_history_delta_ms[1] = 3.0;
+
+    auto next = previous;
+    next.timing_history_delta_ms[1] = 4.0;
+
+    const auto diff = tenriff::app::diff_gameplay_hud_revisions(previous, next);
+    CHECK(diff.motion_changed);
+}
+
+TEST_CASE("judgement loop timing plan clamps to supported polling range") {
+    const auto plan = tenriff::app::build_judgement_loop_timing_plan(48000, 12000);
+
+    CHECK(plan.target_hz == 8000);
+    CHECK(plan.base_step_samples == 6);
+    CHECK(plan.remainder_samples == 0);
+}
+
+TEST_CASE("judgement loop timing preserves the requested average hz at 44.1k") {
+    const auto plan = tenriff::app::build_judgement_loop_timing_plan(44100, 8000);
+
+    REQUIRE(plan.target_hz == 8000);
+    CHECK(plan.base_step_samples == 5);
+    CHECK(plan.remainder_samples == 4100);
+
+    int64_t carry = 0;
+    int64_t accumulated_samples = 0;
+    int five_sample_steps = 0;
+    int six_sample_steps = 0;
+    for (int i = 0; i < plan.target_hz; ++i) {
+        const int64_t step = tenriff::app::next_judgement_loop_step_samples(plan, carry);
+        accumulated_samples += step;
+        if (step == 5) {
+            ++five_sample_steps;
+        } else if (step == 6) {
+            ++six_sample_steps;
+        }
+    }
+
+    CHECK(accumulated_samples == 44100);
+    CHECK(five_sample_steps == 3900);
+    CHECK(six_sample_steps == 4100);
+    CHECK(carry == 0);
 }

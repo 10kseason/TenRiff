@@ -236,6 +236,39 @@ TEST_CASE("gameplay engine auto-clears standard hold tails without release timin
     CHECK(engine.stats().raw_score == 1000);
 }
 
+TEST_CASE("gameplay engine keeps the latest one hundred timing deltas in order") {
+    GameplayChart chart;
+    chart.lane_count = 1;
+    chart.duration_samples = 130000;
+    for (int i = 0; i < 120; ++i) {
+        chart.notes.push_back(NoteEvent{1, 1000 + static_cast<int64_t>(i) * 1000, std::nullopt});
+    }
+
+    GameplayConfig config;
+    config.sample_rate = 1000;
+    config.rate = 1.0;
+    config.judge.pg_ms = 10.0;
+    config.judge.gr_ms = 30.0;
+    config.judge.gd_ms = 60.0;
+    config.judge.bd_ms = 100.0;
+
+    GameplayEngine engine(chart, config);
+    for (int i = 0; i < 120; ++i) {
+        const int64_t start_sample = 1000 + static_cast<int64_t>(i) * 1000;
+        const int64_t delta_samples = static_cast<int64_t>(i - 60);
+        (void)engine.handle_input(1, InputState::Pressed, start_sample + delta_samples);
+    }
+    engine.advance(130000);
+
+    std::array<double, tenriff::kGameplayTimingHistoryMaxEntries> timing_history{};
+    std::size_t timing_history_count = 0;
+    engine.collect_recent_timing_deltas(timing_history, &timing_history_count);
+
+    CHECK(timing_history_count == tenriff::kGameplayTimingHistoryMaxEntries);
+    CHECK(timing_history.front() == doctest::Approx(-40.0));
+    CHECK(timing_history.back() == doctest::Approx(59.0));
+}
+
 TEST_CASE("gameplay engine gauge uses absolute hold judgements without half-weight scaling") {
     GameplayChart chart;
     chart.lane_count = 1;

@@ -4,6 +4,8 @@ Language: [한국어](README.md) | [English](README.en.md) | [简体中文](READ
 
 如果你已经先读过根目录的 [`README.zh-CN.md`](../README.zh-CN.md)，那么这份文档就是下一步的详细文档索引。这里同时包含设计文档与当前状态文档，所以想快速建立上下文时，最有效的阅读顺序如下。
 
+这套代码库也应被明确理解为一个 `vibe coding` 作品，它是在快速迭代与实验中逐步发展出来的。
+
 ## 推荐阅读顺序
 1. [`docs/current-state.zh-CN.md`](current-state.zh-CN.md)
    - 当前产品状态、核心子系统、已验证命令和仍待手动验证的项目
@@ -43,6 +45,9 @@ Language: [한국어](README.md) | [English](README.en.md) | [简体中文](READ
   - 按功能拆分的设计、分析与中长期方向文档
 - [`docs/developer-extension-guide.zh-CN.md`](developer-extension-guide.zh-CN.md)
   - 面向开发者的 mode/mod 扩展指南
+
+## 致谢
+- 感谢 OpenAI Codex、ChatGPT、Claude Code、Gemini，以及帮助一起验证项目的各位 guest testers。
 
 ## 实用规则
 - 在确认当前行为时，优先看 [`docs/current-state.zh-CN.md`](current-state.zh-CN.md)。

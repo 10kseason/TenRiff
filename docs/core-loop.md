@@ -28,6 +28,8 @@
 - `app/GameSession.*`
   - CLI 옵션 → 설정 적용 → 차트 로드 → 입력/오디오 스레드 시작
   - 오디오 콜백에서 입력 큐 소비 + 판정 갱신
+  - 입력 폴링 백엔드는 `input.polling_hz`(`1000~8000Hz`)로 키 상태를 샘플링
+  - 판정/미스/홀드 갱신은 별도 `input.judgement_hz`(`1000~8000Hz`) 기준 내부 미니 틱으로 세분화되어 버퍼 전체를 한 번에 처리하지 않음
 
 ## 판정 관련 초기 정책(확인 필요)
 - **Hold Tail 판정**은 osu!mania hold와 BMS `#LNMODE 2` charge note에만 적용되며, 조기 릴리즈는 BAD 처리

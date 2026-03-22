@@ -4,6 +4,8 @@ Language: Korean | [English](README.en.md) | [简体中文](README.zh-CN.md)
 
 루트 [`README.md`](../README.md)를 먼저 읽었다면, 이 문서는 그 다음 단계의 상세 문서 인덱스입니다. 설계 문서와 현재 상태 문서를 같이 담고 있으므로, 빠르게 맥락을 잡아야 할 때는 아래 순서로 읽는 것이 가장 효율적입니다.
 
+이 프로젝트 코드는 빠른 반복과 실험을 전제로 발전한 `vibe coding` 작품이라는 점을 전제로 읽는 편이 맞습니다.
+
 ## Recommended Reading Order
 1. `docs/current-state.md`
    - 현재 제품 상태, 핵심 서브시스템, 검증된 명령, 남은 수동 검증 항목
@@ -50,6 +52,9 @@ Language: Korean | [English](README.en.md) | [简体中文](README.zh-CN.md)
 - 루트 `README.md`는 `README.en.md`, `README.zh-CN.md` 번역본을 가집니다.
 - `docs/` 안의 주요 문서는 원본 옆에 `.en.md`, `.zh-CN.md` suffix 파일로 번역본을 둡니다.
 - 번역 문서와 원문이 충돌하면, 현재 동작 기준은 여전히 원문 `docs/current-state.md`, `docs/config.md`, 실제 코드 순으로 판단합니다.
+
+## Acknowledgements
+- OpenAI Codex, ChatGPT, Claude Code, Gemini, 그리고 프로젝트 검증을 도와주신 게스트 테스터분들께 감사드립니다.
 
 ## Practical Rule
 - 현재 동작을 확인할 때는 `docs/current-state.md`를 우선 봅니다.

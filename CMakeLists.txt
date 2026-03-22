@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(TenRiff VERSION 1.0.0 LANGUAGES CXX)
+project(TenRiff VERSION 1.0.01 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -219,6 +219,15 @@ if(TENRIFF_ENABLE_TESTS)
             ${CMAKE_CURRENT_SOURCE_DIR}/src
     )
     target_link_libraries(song_index_benchmark PRIVATE tenriff_core)
+
+    add_executable(gameplay_judgement_benchmark
+        tests/smoke/gameplay_judgement_benchmark.cpp
+    )
+    target_include_directories(gameplay_judgement_benchmark
+        PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/src
+    )
+    target_link_libraries(gameplay_judgement_benchmark PRIVATE tenriff_core)
 
     add_executable(n2nc_compare_smoke
         tests/smoke/n2nc_compare_smoke.cpp

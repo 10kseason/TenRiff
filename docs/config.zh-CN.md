@@ -44,6 +44,12 @@
 - `queue_size` (int)
 - `polling_hz` (int)
   - `1000 | 2000 | 4000 | 8000`
+  - polling backend 读取键盘状态的频率
+  - 默认值为 `1000`（`1ms`）
+- `judgement_hz` (int)
+  - `1000 | 2000 | 4000 | 8000`
+  - 音频线程内部判定循环的 sub-step 频率
+  - 默认值为 `4000`（`0.25ms`）
 - `debounce_ms` (double)
   - 在运行时前过滤同一按键上极短暂的 up/down 抖动的输入去抖时间
   - 会被 clamp 在 `0..25` 范围内
