@@ -15,7 +15,7 @@ public:
     bool setRate(double rate);
     bool setHiSpeed(double hi_speed);
 
-    // Judge windows shrink as playback rate increases.
+    // Judge windows stay in real playback milliseconds; chart/audio scheduling already encodes the rate change.
     [[nodiscard]] double scaleJudgeWindow(double base_window_ms) const noexcept;
 
     // Effective scroll speed used for UI hints (BPM * HS / rate).
@@ -30,4 +30,3 @@ private:
 };
 
 }  // namespace tenriff::game
-

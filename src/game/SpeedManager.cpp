@@ -26,10 +26,8 @@ bool SpeedManager::setHiSpeed(double hi_speed) {
 }
 
 double SpeedManager::scaleJudgeWindow(double base_window_ms) const noexcept {
-    if (rate_ <= kEpsilon) {
-        return base_window_ms;
-    }
-    return base_window_ms / rate_;
+    static_cast<void>(rate_);
+    return base_window_ms;
 }
 
 std::optional<double> SpeedManager::scrollBps(double bpm) const noexcept {
@@ -58,4 +56,3 @@ std::optional<double> SpeedManager::recommendHiSpeed(double bpm, double target_s
 }
 
 }  // namespace tenriff::game
-

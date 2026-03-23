@@ -172,6 +172,98 @@
             d2d_->text_brush->SetColor(saved_text_color);
         };
 
+        auto format_progress_clock = [&](int64_t sample_count) -> std::string {
+            if (data.gameplay.sample_rate <= 0) {
+                return "--:--";
+            }
+            const int64_t safe_samples = std::max<int64_t>(0, sample_count);
+            const int64_t total_seconds =
+                std::max<int64_t>(0, static_cast<int64_t>((safe_samples + data.gameplay.sample_rate / 2) /
+                                                          data.gameplay.sample_rate));
+            const int64_t hours = total_seconds / 3600;
+            const int64_t minutes = (total_seconds / 60) % 60;
+            const int64_t seconds = total_seconds % 60;
+            if (hours > 0) {
+                return std::to_string(hours) + ":" +
+                       (minutes < 10 ? "0" : "") + std::to_string(minutes) + ":" +
+                       (seconds < 10 ? "0" : "") + std::to_string(seconds);
+            }
+            const int64_t total_minutes = total_seconds / 60;
+            return std::to_string(total_minutes) + ":" +
+                   (seconds < 10 ? "0" : "") + std::to_string(seconds);
+        };
+
+        auto draw_gameplay_progress_bar = [&]() {
+            if (!d2d_->hud_format || !d2d_->text_brush || data.gameplay.duration_samples <= 0) {
+                return;
+            }
+
+            const int64_t progress_sample =
+                std::clamp<int64_t>(data.gameplay.current_sample, 0, data.gameplay.duration_samples);
+            const int64_t remaining_sample = std::max<int64_t>(0, data.gameplay.duration_samples - progress_sample);
+            const float fill_ratio =
+                std::clamp(static_cast<float>(static_cast<double>(progress_sample) /
+                                             static_cast<double>(std::max<int64_t>(1, data.gameplay.duration_samples))),
+                           0.0f,
+                           1.0f);
+            const D2D1_RECT_F track_rect =
+                D2D1::RectF(header_left,
+                            16.0f,
+                            header_safe_right,
+                            36.0f);
+            if (d2d_->card_brush) {
+                d2d_->card_brush->SetOpacity(0.72f);
+                ctx->FillRoundedRectangle(D2D1::RoundedRect(track_rect, 10.0f, 10.0f), d2d_->card_brush.Get());
+                d2d_->card_brush->SetOpacity(1.0f);
+            }
+            if (d2d_->accent_brush && fill_ratio > 0.0f) {
+                const float inner_left = track_rect.left + 3.0f;
+                const float inner_right = track_rect.right - 3.0f;
+                const float inner_top = track_rect.top + 3.0f;
+                const float inner_bottom = track_rect.bottom - 3.0f;
+                const float fill_right = inner_left + (inner_right - inner_left) * fill_ratio;
+                const D2D1_RECT_F fill_rect =
+                    D2D1::RectF(inner_left, inner_top, std::max(inner_left, fill_right), inner_bottom);
+                ctx->FillRoundedRectangle(D2D1::RoundedRect(fill_rect, 8.0f, 8.0f), d2d_->accent_brush.Get());
+            }
+            if (d2d_->button_border_brush) {
+                ctx->DrawRoundedRectangle(D2D1::RoundedRect(track_rect, 10.0f, 10.0f),
+                                          d2d_->button_border_brush.Get(),
+                                          1.0f);
+            }
+
+            const std::wstring elapsed_total_w =
+                to_wide(format_progress_clock(progress_sample) + " / " +
+                        format_progress_clock(data.gameplay.duration_samples));
+            const std::wstring remaining_w =
+                to_wide(loc("LEFT ", "남은 ") + format_progress_clock(remaining_sample));
+            const std::wstring percent_w =
+                to_wide(std::to_string(static_cast<int>(std::llround(fill_ratio * 100.0f))) + "%");
+
+            const D2D1_COLOR_F saved_text_color = d2d_->text_brush->GetColor();
+            d2d_->text_brush->SetColor(D2D1::ColorF(0xF7FAFD, 0.92f));
+            draw_text_clipped(elapsed_total_w,
+                              d2d_->hud_format.Get(),
+                              D2D1::RectF(track_rect.left + 12.0f, track_rect.top - 1.0f,
+                                          track_rect.left + 250.0f, track_rect.bottom + 1.0f),
+                              d2d_->text_brush.Get());
+            draw_text_clipped_aligned(percent_w,
+                                      d2d_->hud_format.Get(),
+                                      D2D1::RectF(track_rect.left + 180.0f, track_rect.top - 1.0f,
+                                                  track_rect.right - 180.0f, track_rect.bottom + 1.0f),
+                                      d2d_->text_brush.Get(),
+                                      DWRITE_TEXT_ALIGNMENT_CENTER);
+            if (d2d_->muted_brush) {
+                draw_text_clipped_aligned(remaining_w,
+                                          d2d_->hud_format.Get(),
+                                          D2D1::RectF(track_rect.right - 260.0f, track_rect.top - 1.0f,
+                                                      track_rect.right - 12.0f, track_rect.bottom + 1.0f),
+                                          d2d_->muted_brush.Get(),
+                                          DWRITE_TEXT_ALIGNMENT_TRAILING);
+            }
+            d2d_->text_brush->SetColor(saved_text_color);
+        };
+
         auto draw_gameplay_header = [&]() {
             if (d2d_->title_format && d2d_->text_brush) {
                 const D2D1_RECT_F title_rect =
@@ -711,6 +803,7 @@
         }
 
         draw_gameplay_header();
+        draw_gameplay_progress_bar();
         if (surface_layout.ghost_visible && d2d_->body_format && d2d_->title_format) {
             auto draw_field_summary = [&](const GameplayFieldLayout& summary_layout,
                                           const std::wstring& label_text,

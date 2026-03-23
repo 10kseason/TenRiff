@@ -20,6 +20,7 @@
 #include <ctime>
 #include <cwchar>
 #include <filesystem>
+#include <fstream>
 #include <functional>
 #include <iomanip>
 #include <iostream>
@@ -57,6 +58,8 @@ constexpr float kBaseWidth = 1920.0f;
 constexpr float kBaseHeight = 1080.0f;
 constexpr wchar_t kWindowClassName[] = L"TenRiffMenuWindow";
 constexpr float kGameplayFieldLeft = 470.0f;
+constexpr std::uint32_t kDxgiErrorInvalidCall = 0x887A0001u;
+constexpr std::uint32_t kDxgiStatusModeChanged = 0x087A0007u;
 constexpr float kGameplayFieldRight = 1450.0f;
 constexpr float kGameplayFieldTop = 0.0f;
 constexpr float kGameplayFieldBottom = kBaseHeight;
@@ -1395,6 +1398,55 @@ bool show_fatal_error(const std::string& message) {
     return false;
 }
 
+std::string renderer_log_timestamp_local() {
+    const auto now = std::chrono::system_clock::now();
+    const std::time_t now_time = std::chrono::system_clock::to_time_t(now);
+    std::tm local_tm{};
+    localtime_s(&local_tm, &now_time);
+
+    const auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()) % 1000;
+
+    std::ostringstream stream;
+    stream << std::put_time(&local_tm, "%Y-%m-%d %H:%M:%S")
+           << '.'
+           << std::setfill('0')
+           << std::setw(3)
+           << ms.count();
+    return stream.str();
+}
+
+std::filesystem::path renderer_runtime_log_path() {
+    wchar_t buffer[MAX_PATH] = {};
+    const DWORD length = GetModuleFileNameW(nullptr, buffer, static_cast<DWORD>(std::size(buffer)));
+    if (length == 0 || length >= static_cast<DWORD>(std::size(buffer))) {
+        return {};
+    }
+
+    std::error_code ec;
+    std::filesystem::path log_dir = std::filesystem::path(buffer).parent_path() / "logs";
+    std::filesystem::create_directories(log_dir, ec);
+    if (ec) {
+        return {};
+    }
+    return log_dir / "run.log";
+}
+
+bool append_renderer_fatal_log(std::string_view message) {
+    const std::filesystem::path log_path = renderer_runtime_log_path();
+    if (log_path.empty()) {
+        return false;
+    }
+
+    std::ofstream out(log_path, std::ios::app);
+    if (!out) {
+        return false;
+    }
+
+    out << "[fatal][" << renderer_log_timestamp_local() << "] " << message << '\n';
+    out.flush();
+    return out.good();
+}
+
 bool line_is_selected(const std::string& line) {
     return line.size() >= 2 && line[0] == '>' && line[1] == ' ';
 }
@@ -2071,14 +2123,11 @@ bool MenuWindow::initialize(const MenuWindowConfig& config) {
     DragAcceptFiles(hwnd, TRUE);
 
     if (config_.display_mode == "fullscreen") {
-        const HRESULT fullscreen_hr = d2d_->swap_chain->SetFullscreenState(TRUE, nullptr);
-        if (SUCCEEDED(fullscreen_hr)) {
-            fullscreen_ = true;
-            fullscreen_restore_pending_ = false;
-            apply_fullscreen_target(d2d_->swap_chain.Get(), config_, width_, height_);
-        } else {
-            std::cerr << "[MenuWindow::initialize] Initial SetFullscreenState(TRUE) failed hr=0x"
-                      << std::hex << static_cast<unsigned long>(fullscreen_hr) << std::dec << std::endl;
+        if (!enter_fullscreen_mode(width_, height_, "MenuWindow::initialize")) {
+            if (fullscreen_restore_pending_) {
+                std::cerr << "[MenuWindow::initialize] Initial fullscreen transition will retry on the next frame."
+                          << std::endl;
+            }
         }
     }
 
@@ -2095,7 +2144,11 @@ void MenuWindow::set_config(const MenuWindowConfig& config) {
 bool MenuWindow::fail_fatal(std::string_view message) {
     fatal_error_.store(true, std::memory_order_release);
     should_close_.store(true, std::memory_order_release);
-    show_fatal_error(std::string(message));
+    std::string fatal_message(message);
+    if (append_renderer_fatal_log(message)) {
+        fatal_message += "\n\nDiagnostic log written to logs/run.log next to TenRiff.exe.";
+    }
+    show_fatal_error(fatal_message);
     return false;
 }
 
@@ -2910,19 +2963,14 @@ void MenuWindow::render(const MenuRenderData& data) {
             if (FAILED(fs_hr)) {
                 std::cerr << "[MenuWindow::render] SetFullscreenState(FALSE) during background transition failed hr=0x"
                           << std::hex << static_cast<unsigned long>(fs_hr) << std::dec << std::endl;
+                return;
             }
             fullscreen_ = false;
             fullscreen_restore_pending_ = true;
         } else if (!window_minimized && window_in_foreground &&
                    fullscreen_restore_pending_ && !fullscreen_) {
-            const HRESULT fs_hr = d2d_->swap_chain->SetFullscreenState(TRUE, nullptr);
-            if (SUCCEEDED(fs_hr)) {
-                fullscreen_ = true;
-                fullscreen_restore_pending_ = false;
-                apply_fullscreen_target(d2d_->swap_chain.Get(), config_, width_, height_);
-            } else {
-                std::cerr << "[MenuWindow::render] SetFullscreenState(TRUE) during foreground restore failed hr=0x"
-                          << std::hex << static_cast<unsigned long>(fs_hr) << std::dec << std::endl;
+            if (!enter_fullscreen_mode(width_, height_, "MenuWindow::render")) {
+                return;
             }
         }
     } else {

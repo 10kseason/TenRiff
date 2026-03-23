@@ -12,7 +12,9 @@ void MenuWindow::draw(const MenuRenderData& data) {
 
     if (resize_pending_) {
         resize_pending_ = false;
-        resize_swap_chain(pending_width_, pending_height_);
+        if (!resize_swap_chain(pending_width_, pending_height_)) {
+            return;
+        }
     }
 
     if (!d2d_->d2d_target) {
@@ -798,6 +800,35 @@ void MenuWindow::draw(const MenuRenderData& data) {
         const HWND hwnd = static_cast<HWND>(hwnd_);
         const bool window_minimized = hwnd && IsIconic(hwnd);
         const bool window_in_foreground = is_input_foreground();
+        bool client_size_mismatch = false;
+        if (hwnd) {
+            RECT client_rect{};
+            if (GetClientRect(hwnd, &client_rect)) {
+                const unsigned int client_width =
+                    static_cast<unsigned int>(std::max(0L, client_rect.right - client_rect.left));
+                const unsigned int client_height =
+                    static_cast<unsigned int>(std::max(0L, client_rect.bottom - client_rect.top));
+                const bool fullscreen_invalid_call =
+                    static_cast<std::uint32_t>(present_hr) == kDxgiErrorInvalidCall &&
+                    config_.display_mode == "fullscreen";
+                client_size_mismatch =
+                    client_width > 0 && client_height > 0 &&
+                    (client_width != width_ || client_height != height_);
+                if (static_cast<std::uint32_t>(present_hr) == kDxgiErrorInvalidCall &&
+                    (client_size_mismatch || fullscreen_restore_pending_ || fullscreen_invalid_call)) {
+                    pending_width_ = fullscreen_invalid_call && width_ > 0 ? width_ : client_width;
+                    pending_height_ = fullscreen_invalid_call && height_ > 0 ? height_ : client_height;
+                    resize_pending_ = true;
+                    std::cerr << "[MenuWindow::draw] Present returned retryable invalid call hr=0x"
+                              << std::hex << static_cast<unsigned long>(present_hr) << std::dec
+                              << " client=" << client_width << "x" << client_height
+                              << " current=" << width_ << "x" << height_
+                              << " pending=" << pending_width_ << "x" << pending_height_
+                              << " mode=" << config_.display_mode << std::endl;
+                    return;
+                }
+            }
+        }
         if (app::should_treat_present_failure_as_transient(
                 static_cast<std::uint32_t>(present_hr),
                 config_.display_mode == "fullscreen",

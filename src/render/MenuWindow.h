@@ -82,6 +82,7 @@ struct TitleMenuData {
 };
 
 struct SongCardData {
+    std::string group_label;
     std::string title;
     std::string artist;
     std::string detail;
@@ -118,6 +119,7 @@ struct SongSelectData {
     bool selected_song_favorite = false;
     std::string selected_song_collection_filter;
     std::string selected_song_ghost_status;
+    std::string group_summary;
     std::string browser_summary;
     std::string sort_summary;
     std::string primary_hint;
@@ -477,7 +479,8 @@ private:
     [[nodiscard]] bool save_screenshot_to_png();
     [[nodiscard]] bool is_input_foreground() const;
     void update_cursor_visibility(bool hidden);
-    void resize_swap_chain(unsigned int width, unsigned int height);
+    [[nodiscard]] bool resize_swap_chain(unsigned int width, unsigned int height);
+    [[nodiscard]] bool enter_fullscreen_mode(unsigned int width, unsigned int height, const char* log_context);
     void push_click_event(MenuClickEvent event);
     void clear_song_scrollbar_state();
     [[nodiscard]] bool translate_window_point(int window_x, int window_y, float* out_x, float* out_y) const;

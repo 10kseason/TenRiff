@@ -65,13 +65,20 @@ void MenuWindow::apply_pending_config() {
 
         const bool need_fullscreen_reset = fullscreen_ && (resolution_changed || display_mode_changed);
         if (need_fullscreen_reset || (fullscreen_ && config_.display_mode != "fullscreen")) {
-            d2d_->swap_chain->SetFullscreenState(FALSE, nullptr);
+            const HRESULT leave_fullscreen_hr = d2d_->swap_chain->SetFullscreenState(FALSE, nullptr);
+            if (FAILED(leave_fullscreen_hr)) {
+                std::cerr << "[MenuWindow::apply_pending_config] SetFullscreenState(FALSE) before resize/mode switch failed hr=0x"
+                          << std::hex << static_cast<unsigned long>(leave_fullscreen_hr) << std::dec << std::endl;
+                if (config_.display_mode == "fullscreen") {
+                    fullscreen_restore_pending_ = true;
+                } else {
+                    config_ = previous;
+                }
+                return;
+            }
             fullscreen_ = false;
             fullscreen_restore_pending_ = false;
         }
-
-        width_ = next_width;
-        height_ = next_height;
         if (hwnd) {
             if (display_mode_changed) {
                 SetWindowLongPtrW(hwnd, GWL_STYLE, static_cast<LONG_PTR>(next_style));
@@ -93,28 +100,47 @@ void MenuWindow::apply_pending_config() {
                          SWP_NOZORDER | SWP_NOACTIVATE | SWP_SHOWWINDOW | SWP_FRAMECHANGED);
         }
 
-        if (resolution_changed || display_mode_changed) {
-            resize_swap_chain(next_width, next_height);
+        const bool want_fullscreen = (config_.display_mode == "fullscreen");
+        if ((resolution_changed || display_mode_changed) && !want_fullscreen) {
+            if (!resize_swap_chain(next_width, next_height)) {
+                if (config_.display_mode == "fullscreen") {
+                    fullscreen_restore_pending_ = true;
+                }
+                return;
+            }
         } else {
+            width_ = next_width;
+            height_ = next_height;
             update_layout();
         }
 
-        const bool want_fullscreen = (config_.display_mode == "fullscreen");
-        if (want_fullscreen != fullscreen_) {
-            const HRESULT fs_hr = d2d_->swap_chain->SetFullscreenState(want_fullscreen ? TRUE : FALSE, nullptr);
-            if (FAILED(fs_hr)) {
-                std::cerr << "[MenuWindow::apply_pending_config] SetFullscreenState("
-                          << (want_fullscreen ? "TRUE" : "FALSE") << ") failed hr=0x"
-                          << std::hex << static_cast<unsigned long>(fs_hr) << std::dec << std::endl;
-                config_.display_mode = previous.display_mode;
-                fullscreen_restore_pending_ = want_fullscreen;
+        const bool fullscreen_state_changed = (want_fullscreen != fullscreen_);
+        if (fullscreen_state_changed) {
+            if (want_fullscreen) {
+                if (!enter_fullscreen_mode(next_width, next_height, "MenuWindow::apply_pending_config")) {
+                    return;
+                }
             } else {
-                fullscreen_ = want_fullscreen;
-                fullscreen_restore_pending_ = false;
+                const HRESULT fs_hr = d2d_->swap_chain->SetFullscreenState(FALSE, nullptr);
+                if (FAILED(fs_hr)) {
+                    std::cerr << "[MenuWindow::apply_pending_config] SetFullscreenState(FALSE) failed hr=0x"
+                              << std::hex << static_cast<unsigned long>(fs_hr) << std::dec << std::endl;
+                    config_.display_mode = previous.display_mode;
+                } else {
+                    fullscreen_ = false;
+                    fullscreen_restore_pending_ = false;
+                }
             }
         }
         if (fullscreen_) {
-            apply_fullscreen_target(d2d_->swap_chain.Get(), config_, width_, height_);
+            if (!fullscreen_state_changed) {
+                apply_fullscreen_target(d2d_->swap_chain.Get(), config_, width_, height_);
+                if (want_fullscreen && (resolution_changed || display_mode_changed)) {
+                    if (!resize_swap_chain(next_width, next_height)) {
+                        return;
+                    }
+                }
+            }
         }
     }
 }
@@ -462,22 +488,79 @@ bool MenuWindow::recreate_targets() {
     return false;
 }
 
-void MenuWindow::resize_swap_chain(unsigned int width, unsigned int height) {
+bool MenuWindow::resize_swap_chain(unsigned int width, unsigned int height) {
     if (!d2d_ || !d2d_->swap_chain || width == 0 || height == 0) {
-        return;
+        return false;
     }
 
-    width_ = width;
-    height_ = height;
     invalidate_menu_scene_target();
     d2d_->d2d_context->SetTarget(nullptr);
     d2d_->d2d_target.Reset();
-    d2d_->swap_chain->ResizeBuffers(0, width_, height_, DXGI_FORMAT_UNKNOWN, swap_chain_flags_);
-    if (!recreate_targets()) {
-        fail_fatal("Failed to recreate render target after resize.");
+    const HRESULT resize_hr =
+        d2d_->swap_chain->ResizeBuffers(0, width, height, DXGI_FORMAT_UNKNOWN, swap_chain_flags_);
+    if (FAILED(resize_hr)) {
+        std::cerr << "[MenuWindow::resize_swap_chain] ResizeBuffers failed hr=0x"
+                  << std::hex << static_cast<unsigned long>(resize_hr) << std::dec
+                  << " requested=" << width << "x" << height
+                  << " mode=" << config_.display_mode
+                  << " fullscreen_=" << fullscreen_ << std::endl;
+        if (!recreate_targets()) {
+            fail_fatal("Failed to recover the menu render target after a resize transition.");
+            shutdown();
+            return false;
+        }
+        const std::uint32_t resize_code = static_cast<std::uint32_t>(resize_hr);
+        if (resize_code == kDxgiErrorInvalidCall || resize_code == kDxgiStatusModeChanged) {
+            pending_width_ = width;
+            pending_height_ = height;
+            resize_pending_ = true;
+            return false;
+        }
+        fail_fatal("Failed to resize the menu swap chain. Attach logs/run.log.");
         shutdown();
-        return;
+        return false;
+    }
+    width_ = width;
+    height_ = height;
+    if (!recreate_targets()) {
+        std::cerr << "[MenuWindow::resize_swap_chain] recreate_targets failed after ResizeBuffers success."
+                  << " requested=" << width << "x" << height << std::endl;
+        pending_width_ = width;
+        pending_height_ = height;
+        resize_pending_ = true;
+        return false;
     }
     update_layout();
     update_brushes();
+    return true;
+}
+
+bool MenuWindow::enter_fullscreen_mode(unsigned int width,
+                                       unsigned int height,
+                                       const char* log_context) {
+    if (!d2d_ || !d2d_->swap_chain) {
+        return false;
+    }
+
+    const HRESULT fs_hr = d2d_->swap_chain->SetFullscreenState(TRUE, nullptr);
+    if (FAILED(fs_hr)) {
+        std::cerr << "[" << log_context << "] SetFullscreenState(TRUE) failed hr=0x"
+                  << std::hex << static_cast<unsigned long>(fs_hr) << std::dec << std::endl;
+        fullscreen_restore_pending_ = true;
+        return false;
+    }
+
+    fullscreen_ = true;
+    fullscreen_restore_pending_ = false;
+    apply_fullscreen_target(d2d_->swap_chain.Get(), config_, width, height);
+
+    // DXGI flip-model fullscreen transitions require a post-transition ResizeBuffers.
+    if (!resize_swap_chain(width, height)) {
+        std::cerr << "[" << log_context
+                  << "] ResizeBuffers after SetFullscreenState(TRUE) did not complete immediately."
+                  << " requested=" << width << "x" << height << std::endl;
+        return false;
+    }
+
+    return true;
 }

@@ -341,12 +341,12 @@ void GameplayEngine::update_lane_input_state(LaneState& lane, input::InputState 
 }
 
 JudgeWindowSamples GameplayEngine::build_windows(const config::JudgeConfig& judge, double rate) const {
-    double scale = 1.0;
-    if (std::isfinite(rate) && rate > 0.0) {
-        scale = 1.0 / rate;
-    }
+    static_cast<void>(rate);
     auto to_samples = [&](double ms) -> int64_t {
-        double scaled = ms * scale * static_cast<double>(sample_rate_) / 1000.0;
+        // Chart note samples are already rate-adjusted during chart conversion, and input timestamps map to the
+        // live playback head. Keep judge windows in real playback milliseconds so rate changes do not tighten or
+        // loosen timing a second time here.
+        double scaled = ms * static_cast<double>(sample_rate_) / 1000.0;
         return static_cast<int64_t>(std::llround(scaled));
     };
 
