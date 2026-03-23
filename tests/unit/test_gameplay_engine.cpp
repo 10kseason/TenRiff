@@ -33,6 +33,34 @@ TEST_CASE("gameplay engine scores a basic hit") {
     CHECK(engine.stats().max_combo == 1);
 }
 
+TEST_CASE("gameplay engine keeps real-time judge windows unchanged at faster rate") {
+    GameplayChart chart;
+    chart.lane_count = 1;
+    chart.duration_samples = 2000;
+
+    GameplayConfig config;
+    config.sample_rate = 1000;
+    config.rate = 1.5;
+    config.judge.pg_ms = 10.0;
+    config.judge.gr_ms = 20.0;
+    config.judge.gd_ms = 30.0;
+    config.judge.bd_ms = 40.0;
+
+    const int64_t playback_note_sample = static_cast<int64_t>(std::llround(1000.0 / config.rate));
+    chart.notes.push_back(NoteEvent{1, playback_note_sample, std::nullopt});
+
+    GameplayEngine engine(chart, config);
+    (void)engine.handle_input(1, InputState::Pressed, playback_note_sample + 30);
+    engine.advance(playback_note_sample + 100);
+
+    CHECK(engine.stats().counts.pg == 0);
+    CHECK(engine.stats().counts.gr == 0);
+    CHECK(engine.stats().counts.gd == 1);
+    CHECK(engine.stats().counts.bd == 0);
+    CHECK(engine.live_feedback().has_value);
+    CHECK(engine.live_feedback().delta_ms == doctest::Approx(30.0));
+}
+
 TEST_CASE("gameplay engine treats LR2-style early non-consuming input as poor") {
     GameplayChart chart;
     chart.lane_count = 1;

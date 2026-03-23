@@ -38,6 +38,7 @@ TEST_CASE("fullscreen present disables tearing even when vsync is off") {
 TEST_CASE("alt-tab fullscreen present failures are treated as transient") {
     CHECK(should_treat_present_failure_as_transient(0x887A0001u, true, false, false));
     CHECK(should_treat_present_failure_as_transient(0x087A0001u, false, false, false));
+    CHECK(should_treat_present_failure_as_transient(0x087A0007u, false, true, false));
     CHECK(should_treat_present_failure_as_transient(0x887A0001u, false, true, true));
     CHECK_FALSE(should_treat_present_failure_as_transient(0x887A0001u, false, true, false));
 }

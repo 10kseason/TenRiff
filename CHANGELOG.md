@@ -2,6 +2,21 @@
 
 TenRiff의 사용자/배포 관점에서 의미 있는 변경만 간단히 기록합니다.
 
+## [1.0.02] - 2026-03-23
+
+### Changed
+- rate 변경 시 차트/오디오가 이미 playback timeline으로 압축된 상태를 기준으로, 판정 윈도우를 더 이상 `1 / rate`로 이중 축소하지 않도록 수정
+- 인게임 HUD 상단에 곡 진행 프로그레스 바와 `경과 / 전체 / 남은 시간` 표기를 추가
+- Song Select에 `ARTIST` 정렬을 추가하고, 검색 입력을 별도 Browse 화면이 아니라 Song Select 왼쪽 `SEARCH` 항목에서 바로 받도록 조정
+- Song Select에 osu! 스타일의 `GROUP` 토글을 추가해 `Artist / Level / Folder / None` 기준으로 현재 정렬 안에서 묶어 볼 수 있게 조정
+- Song Select 왼쪽 레일 항목이 많아졌을 때 버튼 높이/간격/텍스트를 자동으로 압축해 footer 영역을 침범하지 않도록 UI 레이아웃을 조정
+- 해상도와 `windowed / borderless / fullscreen` 전환을 반복할 때 swap-chain 전환 실패가 곧바로 `Present` fatal로 이어지지 않도록 렌더러 재시도/복구 경로를 보강
+- fullscreen 상태에서 `720p` 같은 낮은 해상도로 전환할 때 flip-model swap-chain이 `SetFullscreenState(TRUE)` 이후 다시 `ResizeBuffers` 되도록 순서를 고쳐, `Failed to present the menu frame` fatal을 줄이도록 보강
+- 프로젝트 메타데이터와 현재 상태/로드맵 문서를 `1.0.02` 배포 라인 기준으로 갱신
+
+### Packaged
+- `build-dist` 기준 Windows 배포 스테이징과 공개 오픈소스 소스 스테이징을 `1.0.02` 라인으로 갱신
+
 ## [1.0.01] - 2026-03-23
 
 ### Changed
@@ -9,6 +24,7 @@ TenRiff의 사용자/배포 관점에서 의미 있는 변경만 간단히 기�
 - 입력 폴링과 내부 판정 서브스텝 빈도를 분리해 `input.polling_hz` 기본값은 `1000Hz`, `input.judgement_hz` 기본값은 `4000Hz`로 운용하도록 조정
 - 입력 시각을 write cursor가 아니라 실제 playback head 기준으로 오디오 clock sync에 맞추도록 수정해, recent future-queue 변경 이후 생긴 체감 입력 지연/먹통 회귀를 완화
 - 인게임 timing indicator를 최근 `100노트` 롤링 히스토리로 확장해, 최신 기록은 선명하게 남고 오래된 기록은 점차 흐려지며 밀려나도록 조정
+- 렌더러 fatal 에러가 launcher 없이 `TenRiff.exe`만 직접 실행돼도 `logs/run.log`를 직접 남기도록 보강하고, Windows 배포판에 `launch_win.bat`와 빈 `logs/` 폴더를 다시 포함
 - 판정 hot path를 직접 비교할 수 있는 synthetic `gameplay_judgement_benchmark` 타깃을 추가
 - 루트 README와 문서 맵에 `vibe coding` 작품 성격과 감사 크레딧을 명시
 - 프로젝트 메타데이터와 현재 상태/로드맵 문서를 `1.0.01` 배포 라인 기준으로 갱신

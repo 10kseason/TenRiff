@@ -12,12 +12,12 @@ bool almost_equal(double lhs, double rhs, double eps = 1e-6) {
 }
 }  // namespace
 
-TEST_CASE("speed manager scales judge windows by rate") {
+TEST_CASE("speed manager keeps judge windows in playback milliseconds") {
     SpeedManager manager;
     CHECK(manager.setRate(1.2));
     CHECK(manager.setHiSpeed(3.0));
 
-    CHECK(almost_equal(manager.scaleJudgeWindow(15.5), 12.9166667));
+    CHECK(almost_equal(manager.scaleJudgeWindow(15.5), 15.5));
     auto scroll = manager.scrollBps(150.0);
     CHECK(scroll.has_value());
     CHECK(almost_equal(scroll.value(), 375.0));
@@ -39,4 +39,3 @@ TEST_CASE("speed manager recommends hi-speed from target scroll") {
     CHECK_FALSE(manager.recommendHiSpeed(0.0, 300.0).has_value());
     CHECK_FALSE(manager.recommendHiSpeed(180.0, -1.0).has_value());
 }
-
