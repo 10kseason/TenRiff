@@ -261,6 +261,11 @@ void MenuApp::sync_menu_music() {
         return;
     }
 
+    if (!config_.audio_ui.background_sound_enabled) {
+        menu_music_.stop();
+        return;
+    }
+
     const double gain = std::clamp(config_.audio_ui.master_volume * config_.audio_ui.bgm_volume, 0.0, 1.0);
     menu_music_.play_looping_file(music_path, gain);
 }

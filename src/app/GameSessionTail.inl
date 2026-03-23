@@ -30,6 +30,102 @@ void GameSession::FutureQueue::consume() {
     }
 }
 
+void GameSession::rebuild_polled_gameplay_keys() {
+    polled_gameplay_keys_.clear();
+    polled_gameplay_keys_.reserve(key_to_lane_.size() + 6);
+
+    auto append_unique_key = [this](uint32_t keycode) {
+        if (keycode == 0) {
+            return;
+        }
+        for (const auto& tracked : polled_gameplay_keys_) {
+            if (tracked.keycode == keycode) {
+                return;
+            }
+        }
+        polled_gameplay_keys_.push_back(PolledGameplayKey{keycode});
+    };
+
+    for (const auto& [keycode, lane] : key_to_lane_) {
+        static_cast<void>(lane);
+        append_unique_key(keycode);
+    }
+    append_unique_key(escape_keycode_);
+    append_unique_key(f3_keycode_);
+    append_unique_key(f4_keycode_);
+    append_unique_key(f5_keycode_);
+    append_unique_key(f6_keycode_);
+    append_unique_key(f9_keycode_);
+}
+
+void GameSession::sync_polled_key_state(uint32_t keycode,
+                                        input::InputState state,
+                                        std::optional<int64_t> queue_event_ns) {
+    for (auto& tracked : polled_gameplay_keys_) {
+        if (tracked.keycode != keycode) {
+            continue;
+        }
+        tracked.pressed = (state == input::InputState::Pressed);
+        if (queue_event_ns.has_value()) {
+            tracked.last_queue_event_ns = *queue_event_ns;
+        }
+        return;
+    }
+}
+
+std::optional<input::InputEvent> GameSession::filter_gameplay_input_event(const input::InputEvent& event) {
+    sync_polled_key_state(event.keycode, event.state, event.input_time_ns);
+    return gameplay_input_state_tracker_.process(event);
+}
+
+void GameSession::poll_gameplay_keys(int64_t sample, bool capture_lane_inputs) {
+    constexpr int64_t kGameplayInputPollQueueGraceNs = 20'000'000LL;
+
+    if (polled_gameplay_keys_.empty()) {
+        return;
+    }
+
+    const int64_t now_ns = timing::HighResClock::now_ns();
+    for (auto& tracked : polled_gameplay_keys_) {
+        if (tracked.last_queue_event_ns != (std::numeric_limits<int64_t>::min)() &&
+            now_ns - tracked.last_queue_event_ns <= kGameplayInputPollQueueGraceNs) {
+            continue;
+        }
+
+        const auto poll_vk = config::KeycodeMap::polling_vk_for_keycode(tracked.keycode);
+        if (!poll_vk.has_value()) {
+            continue;
+        }
+        const bool pressed = (GetAsyncKeyState(static_cast<int>(*poll_vk)) & 0x8000) != 0;
+        if (pressed == tracked.pressed) {
+            continue;
+        }
+
+        tracked.pressed = pressed;
+
+        input::InputEvent event{};
+        event.keycode = tracked.keycode;
+        event.state = pressed ? input::InputState::Pressed : input::InputState::Released;
+        event.input_time_ns = now_ns;
+
+        auto filtered = gameplay_input_state_tracker_.process(event);
+        if (!filtered.has_value()) {
+            continue;
+        }
+
+        if (handle_control_input(*filtered)) {
+            continue;
+        }
+        if (!capture_lane_inputs) {
+            continue;
+        }
+
+        if (auto lane = lane_from_keycode(filtered->keycode)) {
+            pending_input_events_.push_back(BufferedLaneInput{lane.value(), filtered->state, sample});
+        }
+    }
+}
+
 GameSession::GameSession() = default;
 
 GameSession::~GameSession() {
@@ -45,6 +141,7 @@ bool GameSession::initialize(const CommandLineOptions& options) {
     last_audio_sample_.store(0, std::memory_order_release);
     audio_timing_sequence_.store(0, std::memory_order_release);
     last_audio_timing_ = {};
+    startup_input_timing_anchor_ = {};
     clock_sync_.reset();
     countdown_active_ = false;
     countdown_value_ = 0;
@@ -70,6 +167,8 @@ bool GameSession::initialize(const CommandLineOptions& options) {
     judgement_loop_step_carry_ = 0;
 
     future_events_ = {};
+    gameplay_input_state_tracker_.reset();
+    polled_gameplay_keys_.clear();
     tone_voices_.clear();
     stop_chart_audio_workers();
     chart_audio_assets_.clear();
@@ -451,6 +550,8 @@ bool GameSession::initialize(const CommandLineOptions& options) {
         }
         key_to_lane_[keycode.value()] = lane_index.value();
     }
+    gameplay_input_state_tracker_.reset();
+    rebuild_polled_gameplay_keys();
     report_loading_progress(88, "Preparing chart audio");
     if (loading_cancel_requested()) {
         return false;
@@ -542,6 +643,7 @@ void GameSession::run() {
     }
 
     if (!stop_requested_.load(std::memory_order_acquire) && !finished_.load(std::memory_order_acquire)) {
+        rebaseline_gameplay_start_input_state(current_playback_sample_);
         if (audio_thread_.start() != audio::AudioResult::Success) {
             std::cerr << "[error] Failed to start gameplay audio." << std::endl;
             stop_requested_.store(true, std::memory_order_release);
@@ -1390,7 +1492,9 @@ void GameSession::mix_chart_audio(float* output, uint32_t frames, int64_t buffer
         return;
     }
 
-    const float bgm_gain = static_cast<float>(std::clamp(config_.audio_ui.bgm_volume, 0.0, 2.0));
+    const float bgm_gain = config_.audio_ui.background_sound_enabled
+                               ? static_cast<float>(std::clamp(config_.audio_ui.bgm_volume, 0.0, 2.0))
+                               : 0.0f;
     const float keysound_gain = static_cast<float>(std::clamp(config_.audio_ui.keysound_volume, 0.0, 2.0));
     const int64_t buffer_end_samples = buffer_start_samples + static_cast<int64_t>(frames);
     std::size_t write_index = 0;
@@ -1574,6 +1678,7 @@ void GameSession::shutdown() {
     ghost_engine_.reset();
     clock_sync_.reset();
     current_playback_sample_ = 0;
+    startup_input_timing_anchor_ = {};
     countdown_active_ = false;
     countdown_value_ = 0;
     countdown_started_ns_ = 0;
@@ -1610,6 +1715,8 @@ void GameSession::shutdown() {
     ghost_lane_activity_.clear();
     ghost_hidden_hit_note_ids_.clear();
     ghost_active_holds_buffer_.clear();
+    gameplay_input_state_tracker_.reset();
+    polled_gameplay_keys_.clear();
     hud_scan_start_ = 0;
     ghost_hud_scan_start_ = 0;
     hud_callback_ = nullptr;
@@ -1636,6 +1743,9 @@ void GameSession::audio_callback(float* output,
         const int64_t lookahead_samples = ms_to_samples(static_cast<double>(kLookaheadMs), sample_rate_);
 
         const int64_t now_ns = timing::HighResClock::now_ns();
+        startup_input_timing_anchor_.playback_sample = playback_sample;
+        startup_input_timing_anchor_.callback_time_ns = now_ns;
+        startup_input_timing_anchor_.valid = true;
         current_playback_sample_ = playback_sample;
         clock_sync_.add_sample(now_ns, playback_sample);
         schedule_note_guides(buffer_start_samples, buffer_end_samples);
@@ -1723,9 +1833,70 @@ void GameSession::process_countdown_input_queue() {
         if (!maybe_event.has_value()) {
             break;
         }
-        if (handle_control_input(*maybe_event) &&
+        auto filtered = filter_gameplay_input_event(*maybe_event);
+        if (!filtered.has_value()) {
+            continue;
+        }
+        if (handle_control_input(*filtered) &&
             finished_.load(std::memory_order_acquire)) {
             return;
+        }
+    }
+
+    poll_gameplay_keys(current_playback_sample_, false);
+    if (finished_.load(std::memory_order_acquire)) {
+        return;
+    }
+
+    std::fill(lane_activity_.begin(), lane_activity_.end(), 0.0f);
+}
+
+void GameSession::rebaseline_gameplay_start_input_state(int64_t sample) {
+    while (input_thread_.queue().pop().has_value()) {
+    }
+    while (future_events_.pop().has_value()) {
+    }
+    pending_input_events_.clear();
+
+    gameplay_input_state_tracker_.reset();
+    hispeed_decrease_held_ = false;
+    hispeed_increase_held_ = false;
+    hispeed_decrease_next_repeat_ns_ = 0;
+    hispeed_increase_next_repeat_ns_ = 0;
+
+    const int64_t baseline_time_ns = timing::HighResClock::now_ns();
+    for (auto& tracked : polled_gameplay_keys_) {
+        tracked.last_queue_event_ns = (std::numeric_limits<int64_t>::min)();
+
+        bool pressed = false;
+        if (const auto poll_vk = config::KeycodeMap::polling_vk_for_keycode(tracked.keycode); poll_vk.has_value()) {
+            pressed = (GetAsyncKeyState(static_cast<int>(*poll_vk)) & 0x8000) != 0;
+        }
+        tracked.pressed = pressed;
+        if (!pressed) {
+            continue;
+        }
+
+        input::InputEvent baseline_event{};
+        baseline_event.keycode = tracked.keycode;
+        baseline_event.state = input::InputState::Pressed;
+        baseline_event.input_time_ns = baseline_time_ns;
+
+        auto filtered = gameplay_input_state_tracker_.process(baseline_event);
+        if (!filtered.has_value()) {
+            continue;
+        }
+
+        if (tracked.keycode == f3_keycode_) {
+            hispeed_decrease_held_ = true;
+            hispeed_decrease_next_repeat_ns_ = baseline_time_ns + ms_to_ns(kHispeedRepeatInitialDelayMs);
+        } else if (tracked.keycode == f4_keycode_) {
+            hispeed_increase_held_ = true;
+            hispeed_increase_next_repeat_ns_ = baseline_time_ns + ms_to_ns(kHispeedRepeatInitialDelayMs);
+        }
+
+        if (auto lane = lane_from_keycode(filtered->keycode)) {
+            catch_up_lane_input(lane.value(), filtered->state, sample);
         }
     }
 
@@ -1765,10 +1936,13 @@ bool GameSession::handle_control_input(const input::InputEvent& event) {
 }
 
 void GameSession::update_lane_feedback(int lane, input::InputState state) {
-    static_cast<void>(state);
     const int lane_index = lane - 1;
     if (lane_index < 0 || lane_index >= static_cast<int>(lane_activity_.size())) {
         return;
+    }
+
+    if (state == input::InputState::Pressed) {
+        lane_activity_[static_cast<std::size_t>(lane_index)] = 1.0f;
     }
 }
 
@@ -1844,7 +2018,12 @@ void GameSession::process_input_queue(int64_t buffer_start_samples, int64_t buff
             break;
         }
 
-        auto event = maybe_event.value();
+        auto filtered = filter_gameplay_input_event(*maybe_event);
+        if (!filtered.has_value()) {
+            continue;
+        }
+
+        auto event = filtered.value();
         if (handle_control_input(event)) {
             if (finished_.load(std::memory_order_acquire)) {
                 return;
@@ -1853,7 +2032,13 @@ void GameSession::process_input_queue(int64_t buffer_start_samples, int64_t buff
         }
 
         auto mapped = clock_sync_.input_to_audio_samples(event.input_time_ns);
-        int64_t sample = mapped.value_or(current_playback_sample_) + input_offset_samples_;
+        int64_t sample = resolve_startup_gameplay_input_sample(
+                             mapped,
+                             event.input_time_ns,
+                             startup_input_timing_anchor_,
+                             sample_rate_,
+                             current_playback_sample_) +
+                         input_offset_samples_;
         auto lane = lane_from_keycode(event.keycode);
         if (!lane.has_value()) {
             continue;
@@ -1887,6 +2072,11 @@ void GameSession::process_input_queue(int64_t buffer_start_samples, int64_t buff
         catch_up_lane_input(buffered.lane, buffered.state, buffered.sample);
     }
 
+    poll_gameplay_keys(buffer_end_samples, true);
+    if (finished_.load(std::memory_order_acquire)) {
+        return;
+    }
+
     for (const auto& buffered : pending_input_events_) {
         dispatch_lane_input(buffered.lane, buffered.state, buffered.sample);
     }
@@ -1915,10 +2105,19 @@ void GameSession::process_replay_input_queue(int64_t buffer_start_samples,
         if (!maybe_event.has_value()) {
             break;
         }
-        if (handle_control_input(*maybe_event) &&
+        auto filtered = filter_gameplay_input_event(*maybe_event);
+        if (!filtered.has_value()) {
+            continue;
+        }
+        if (handle_control_input(*filtered) &&
             finished_.load(std::memory_order_acquire)) {
             return;
         }
+    }
+
+    poll_gameplay_keys(buffer_end_samples, false);
+    if (finished_.load(std::memory_order_acquire)) {
+        return;
     }
 
     while (replay_event_index_ < replay_source_.trace.events.size()) {

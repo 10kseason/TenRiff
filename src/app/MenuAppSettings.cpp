@@ -6,7 +6,7 @@
 namespace tenriff::app {
 
 void MenuApp::handle_audio_settings_input(uint32_t keycode) {
-    const int item_count = 6;
+    const int item_count = 7;
     if (keycode == key_up_) {
         settings_cursor_ = clamp_int(settings_cursor_ - 1, 0, item_count - 1);
         publish_snapshot();
@@ -35,7 +35,15 @@ void MenuApp::handle_audio_settings_input(uint32_t keycode) {
         return;
     }
 
-    if (settings_cursor_ == 2 && (keycode == key_left_ || keycode == key_right_)) {
+    if (settings_cursor_ == 2 &&
+        (keycode == key_left_ || keycode == key_right_ || keycode == key_enter_)) {
+        config_.audio_ui.background_sound_enabled = !config_.audio_ui.background_sound_enabled;
+        audio_dirty_ = true;
+        publish_snapshot();
+        return;
+    }
+
+    if (settings_cursor_ == 3 && (keycode == key_left_ || keycode == key_right_)) {
         const double direction = (keycode == key_left_) ? -1.0 : 1.0;
         config_.audio_ui.master_volume = clamp_step_value(config_.audio_ui.master_volume + direction * kVolumeStep,
                                                           kVolumeMin, kVolumeMax, kVolumeStep);
@@ -44,7 +52,7 @@ void MenuApp::handle_audio_settings_input(uint32_t keycode) {
         return;
     }
 
-    if (settings_cursor_ == 3 && (keycode == key_left_ || keycode == key_right_)) {
+    if (settings_cursor_ == 4 && (keycode == key_left_ || keycode == key_right_)) {
         const double direction = (keycode == key_left_) ? -1.0 : 1.0;
         config_.audio_ui.bgm_volume = clamp_step_value(config_.audio_ui.bgm_volume + direction * kChartMixVolumeStep,
                                                        kChartMixVolumeMin, kChartMixVolumeMax, kChartMixVolumeStep);
@@ -53,7 +61,7 @@ void MenuApp::handle_audio_settings_input(uint32_t keycode) {
         return;
     }
 
-    if (settings_cursor_ == 4 && (keycode == key_left_ || keycode == key_right_)) {
+    if (settings_cursor_ == 5 && (keycode == key_left_ || keycode == key_right_)) {
         const double direction = (keycode == key_left_) ? -1.0 : 1.0;
         config_.audio_ui.keysound_volume =
             clamp_step_value(config_.audio_ui.keysound_volume + direction * kChartMixVolumeStep,
@@ -214,15 +222,19 @@ void MenuApp::populate_audio_settings_render_data(render::MenuRenderData& render
                     render::MenuHitTargetKind::SettingsRow, 0, false, true);
     append_menu_row(render.generic, ui_text("Keysound Mode", "키음 모드"), ui_keysound_policy_label(config_.audio_ui.bms_keysound_policy), settings_cursor_ == 1,
                     render::MenuHitTargetKind::SettingsRow, 1, false, true);
-    append_menu_row(render.generic, ui_text("Master Volume", "마스터 볼륨"), format_percent(config_.audio_ui.master_volume), settings_cursor_ == 2,
+    append_menu_row(render.generic, ui_text("Background Sound", "배경음"), ui_on_off(config_.audio_ui.background_sound_enabled), settings_cursor_ == 2,
                     render::MenuHitTargetKind::SettingsRow, 2, false, true);
-    append_menu_row(render.generic, ui_text("BGM Volume", "BGM 볼륨"), format_percent(config_.audio_ui.bgm_volume), settings_cursor_ == 3,
+    append_menu_row(render.generic, ui_text("Master Volume", "마스터 볼륨"), format_percent(config_.audio_ui.master_volume), settings_cursor_ == 3,
                     render::MenuHitTargetKind::SettingsRow, 3, false, true);
-    append_menu_row(render.generic, ui_text("Keysound Volume", "키음 볼륨"), format_percent(config_.audio_ui.keysound_volume), settings_cursor_ == 4,
+    append_menu_row(render.generic, ui_text("BGM Volume", "BGM 볼륨"), format_percent(config_.audio_ui.bgm_volume), settings_cursor_ == 4,
                     render::MenuHitTargetKind::SettingsRow, 4, false, true);
-    append_menu_row(render.generic, ui_text("Back", "뒤로"), "", settings_cursor_ == 5, render::MenuHitTargetKind::SettingsRow, 5, true, false);
+    append_menu_row(render.generic, ui_text("Keysound Volume", "키음 볼륨"), format_percent(config_.audio_ui.keysound_volume), settings_cursor_ == 5,
+                    render::MenuHitTargetKind::SettingsRow, 5, false, true);
+    append_menu_row(render.generic, ui_text("Back", "뒤로"), "", settings_cursor_ == 6, render::MenuHitTargetKind::SettingsRow, 6, true, false);
     render.generic.notes.push_back(ui_text("Follow: note hits trigger keysounds. Autoplay: note keysounds are mixed into background audio.",
                                            "연동: 노트를 칠 때 키음이 납니다. 자동재생: 노트 키음이 배경음에 섞여 재생됩니다."));
+    render.generic.notes.push_back(ui_text("Background Sound controls menu BGM and chart background audio. Keysounds stay separate.",
+                                           "배경음은 메뉴 BGM과 차트 배경음을 켜고 끕니다. 키음은 별도로 유지됩니다."));
     render.generic.notes.push_back(ui_text("Off: skip note keysounds. Autoplay mode routes note keysounds through BGM volume.",
                                            "끔: 노트 키음을 재생하지 않습니다. 자동재생에서는 노트 키음이 BGM 볼륨을 따릅니다."));
     render.generic.notes.push_back(ui_text("Left/Right or click +/- to change. Back saves and returns.",

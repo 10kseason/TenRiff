@@ -18,6 +18,7 @@
 
 #include "app/ChartLoader.h"
 #include "app/CommandLine.h"
+#include "app/GameSessionInputTiming.h"
 #include "audio/AudioThread.h"
 #include "config/Config.h"
 #include "config/Keymap.h"
@@ -223,6 +224,12 @@ private:
         int64_t sample = 0;
     };
 
+    struct PolledGameplayKey {
+        uint32_t keycode = 0;
+        bool pressed = false;
+        int64_t last_queue_event_ns = (std::numeric_limits<int64_t>::min)();
+    };
+
     struct AudioTimingState {
         int64_t sample = 0;
         int64_t time_ns = 0;
@@ -237,9 +244,14 @@ private:
     [[nodiscard]] int64_t next_judgement_loop_step_samples();
     void run_judgement_loop(int64_t buffer_start_samples, int64_t buffer_end_samples, int64_t lookahead_samples);
     void process_countdown_input_queue();
+    void rebaseline_gameplay_start_input_state(int64_t sample);
     void process_future_events(int64_t buffer_end_samples, int64_t lookahead_samples);
     void process_input_queue(int64_t buffer_start_samples, int64_t buffer_end_samples, int64_t lookahead_samples);
     [[nodiscard]] bool handle_control_input(const input::InputEvent& event);
+    void rebuild_polled_gameplay_keys();
+    void sync_polled_key_state(uint32_t keycode, input::InputState state, std::optional<int64_t> queue_event_ns);
+    [[nodiscard]] std::optional<input::InputEvent> filter_gameplay_input_event(const input::InputEvent& event);
+    void poll_gameplay_keys(int64_t sample, bool capture_lane_inputs);
     void update_lane_feedback(int lane, input::InputState state);
     void trigger_lane_hit_effect(int lane);
     void dispatch_lane_input(int lane, input::InputState state, int64_t sample);
@@ -300,6 +312,7 @@ private:
     input::InputThread input_thread_;
     audio::AudioThread audio_thread_;
     timing::ClockSync clock_sync_;
+    input::KeyStateTracker gameplay_input_state_tracker_{input::KeyStateConfig{0}};
 
     std::unordered_map<uint32_t, int> key_to_lane_;
 
@@ -309,6 +322,7 @@ private:
     std::atomic<int64_t> last_audio_sample_{0};
     std::atomic<uint64_t> audio_timing_sequence_{0};
     AudioTimingState last_audio_timing_{};
+    StartupInputTimingAnchor startup_input_timing_anchor_{};
     bool countdown_active_ = false;
     int countdown_value_ = 0;
     bool hispeed_decrease_held_ = false;
@@ -335,6 +349,7 @@ private:
     bool result_transition_pending_ = false;
 
     FutureQueue future_events_{};
+    std::vector<PolledGameplayKey> polled_gameplay_keys_;
     std::vector<ToneVoice> tone_voices_;
     std::vector<ChartAudioAsset> chart_audio_assets_;
     std::vector<ChartAudioEvent> chart_audio_events_;

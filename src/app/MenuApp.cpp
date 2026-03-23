@@ -1388,7 +1388,7 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
             handle_quick_setup_input(action_key);
             return;
         case Screen::SettingsAudio:
-            settings_cursor_ = clamp_int(event.index, 0, 5);
+            settings_cursor_ = clamp_int(event.index, 0, 6);
             handle_audio_settings_input(action_key);
             return;
         case Screen::SettingsGraphics:
