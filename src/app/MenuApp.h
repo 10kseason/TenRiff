@@ -77,6 +77,15 @@ public:
         DifficultyDesc,
         TitleAsc,
         TitleDesc,
+        ArtistAsc,
+        ArtistDesc,
+    };
+
+    enum class SongGroupMode {
+        None,
+        Artist,
+        Level,
+        Folder,
     };
 
 private:
@@ -418,6 +427,7 @@ private:
     int calibration_step_ms_ = 5;
     SongSelectFocus song_select_focus_ = SongSelectFocus::SongList;
     SongSortMode song_sort_mode_ = SongSortMode::DifficultyAsc;
+    SongGroupMode song_group_mode_ = SongGroupMode::None;
     SongSelectView song_select_view_ = SongSelectView::Songs;
     int song_select_nav_cursor_ = 0;
     int keymap_cursor_ = 0;
@@ -486,6 +496,7 @@ private:
     std::unordered_map<std::string, ReplaySummary> replay_summary_cache_{};
 
     std::string song_search_query_{};
+    bool song_select_search_active_ = false;
     int song_key_filter_ = 0;
     int song_level_min_filter_ = 0;
     int song_level_max_filter_ = 0;

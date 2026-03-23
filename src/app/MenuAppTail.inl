@@ -1150,7 +1150,7 @@ std::string MenuApp::screen_title() const {
                 return ui_text("Local Records", "로컬 기록");
             }
             return ui_text("Song Select", "곡 선택");
-        case Screen::SongBrowser: return ui_text("Song Browser", "곡 탐색");
+        case Screen::SongBrowser: return ui_text("Song Filters", "곡 필터");
         case Screen::Gameplay: return ui_text("Gameplay", "게임플레이");
         case Screen::SettingsAudio: return ui_text("Audio Settings", "오디오 설정");
         case Screen::SettingsGraphics: return ui_text("Graphics Settings", "그래픽 설정");
@@ -1214,6 +1214,10 @@ void MenuApp::populate_help_overlay(render::HelpOverlayData& target) const {
                         "좌 / 우 키로 왼쪽 내비게이션과 곡 목록 사이의 포커스를 전환합니다."),
                 ui_text("Enter selects the focused item. Double-click on a song launches it immediately.",
                         "Enter는 선택된 항목을 열고, 곡을 더블클릭하면 즉시 시작합니다."),
+                ui_text("LEVEL, TITLE, and ARTIST on the left rail toggle the current sort mode, and GROUP clusters the list like osu!-style grouping.",
+                        "왼쪽 레일의 LEVEL, TITLE, ARTIST는 정렬 방식을 전환하고, GROUP는 osu!처럼 목록을 묶어 보여줍니다."),
+                ui_text("SEARCH now lives on Song Select. Select SEARCH and press Enter, or type directly there, to filter title, artist, and path.",
+                        "검색은 이제 Song Select에 있습니다. SEARCH를 선택하고 Enter를 누르거나, 그 위치에서 바로 입력해 제목, 아티스트, 경로를 필터링하세요."),
                 ui_text("Backspace jumps to Sources or back to Songs. Esc returns to the title screen.",
                         "Backspace는 Sources 또는 Songs로 이동하고, Esc는 타이틀 화면으로 돌아갑니다."),
                 ui_text("F2 chooses a new songs folder. F5 refreshes the active source.",
@@ -1223,20 +1227,20 @@ void MenuApp::populate_help_overlay(render::HelpOverlayData& target) const {
                 ui_text("A / G / I / M / K opens Audio, Graphics, Input, Mode, and Keymap from Song Select.",
                         "A / G / I / M / K로 Song Select에서 Audio, Graphics, Input, Mode, Keymap을 바로 엽니다."),
             };
-            target.footer = ui_text("Current source, filter, sort, and indexing profile stay visible on the Song Select screen.",
-                                    "현재 소스, 필터, 정렬, 인덱싱 프로필은 Song Select 화면에 계속 표시됩니다.");
+            target.footer = ui_text("Current source, group, filter, sort, and indexing profile stay visible on the Song Select screen.",
+                                    "현재 소스, 그룹, 필터, 정렬, 인덱싱 프로필은 Song Select 화면에 계속 표시됩니다.");
             return;
         case Screen::SongBrowser:
-            target.title = ui_text("Browse Help", "탐색 도움말");
+            target.title = ui_text("Filter Help", "필터 도움말");
             target.lines = {
-                ui_text("Search matches title, artist, and chart path.",
-                        "검색은 제목, 아티스트, 차트 경로를 대상으로 합니다."),
+                ui_text("This screen now handles filters only. Search moved to the Song Select SEARCH item.",
+                        "이 화면은 이제 필터 전용입니다. 검색은 Song Select의 SEARCH 항목으로 이동했습니다."),
                 ui_text("Up / Down or the mouse wheel moves the selection. Long lists now show a scrollbar on the right.",
                         "위 / 아래 키 또는 마우스 휠로 선택을 이동합니다. 긴 목록은 오른쪽 스크롤바가 표시됩니다."),
-                ui_text("Type while Search is selected. Backspace deletes one character. Delete clears the whole query.",
-                        "Search가 선택된 상태에서 입력하면 검색됩니다. Backspace는 한 글자 삭제, Delete는 전체 삭제입니다."),
-                ui_text("Left / Right adjusts key and difficulty filters. Enter activates Clear Filters or Back.",
-                        "좌 / 우 키로 키 수와 난이도 필터를 조정하고, Enter는 필터 지우기 또는 뒤로를 실행합니다."),
+                ui_text("Left / Right adjusts key, difficulty, and collection filters in place. Grouping and sort still live on the Song Select rail.",
+                        "좌 / 우 키로 키 수, 난이도, 컬렉션 필터를 바로 조정합니다. 그룹과 정렬은 Song Select 레일에서 계속 조정합니다."),
+                ui_text("Enter toggles collection membership, creates the next collection, clears filters, or goes back.",
+                        "Enter로 컬렉션 토글, 다음 컬렉션 생성, 필터 초기화, 뒤로 가기를 실행합니다."),
             };
             target.footer = ui_text("Esc or Backspace returns to Song Select. Press F1 again to close help.",
                                     "Esc 또는 Backspace로 Song Select로 돌아갑니다. 도움말을 닫으려면 F1을 다시 누르세요.");

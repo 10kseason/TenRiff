@@ -21,8 +21,40 @@ std::string song_sort_detail_label(MenuApp::SongSortMode mode, bool korean) {
         case MenuApp::SongSortMode::DifficultyDesc: return korean ? "LV 내림" : "LV DESC";
         case MenuApp::SongSortMode::TitleAsc: return korean ? "가-힣" : "A-Z";
         case MenuApp::SongSortMode::TitleDesc: return korean ? "힣-가" : "Z-A";
+        case MenuApp::SongSortMode::ArtistAsc: return korean ? "아티스트 가-힣" : "ART A-Z";
+        case MenuApp::SongSortMode::ArtistDesc: return korean ? "아티스트 힣-가" : "ART Z-A";
         case MenuApp::SongSortMode::DifficultyAsc:
         default: return korean ? "LV 오름" : "LV ASC";
+    }
+}
+
+std::string song_group_detail_label(MenuApp::SongGroupMode mode, bool korean) {
+    switch (mode) {
+        case MenuApp::SongGroupMode::Artist: return korean ? "아티스트" : "ARTIST";
+        case MenuApp::SongGroupMode::Level: return korean ? "레벨" : "LEVEL";
+        case MenuApp::SongGroupMode::Folder: return korean ? "폴더" : "FOLDER";
+        case MenuApp::SongGroupMode::None:
+        default: return korean ? "없음" : "NONE";
+    }
+}
+
+std::string song_group_section_label(MenuApp::SongGroupMode mode, const SongEntry& entry, bool korean) {
+    using namespace menu_song_select;
+
+    switch (mode) {
+        case MenuApp::SongGroupMode::Artist: {
+            const std::string artist = safe_ui_text(entry.artist);
+            return !artist.empty() ? artist : (korean ? "아티스트 미상" : "UNKNOWN ARTIST");
+        }
+        case MenuApp::SongGroupMode::Level:
+            return entry.level > 0 ? ("LV " + std::to_string(entry.level)) : std::string("LV ?");
+        case MenuApp::SongGroupMode::Folder: {
+            const std::string folder = song_group_folder_label(entry);
+            return !folder.empty() ? folder : (korean ? "루트" : "ROOT");
+        }
+        case MenuApp::SongGroupMode::None:
+        default:
+            return {};
     }
 }
 
@@ -86,6 +118,7 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
         safe_ui_text(menu_songs::song_source_display_name(songs_path_), ui_text("Songs", "곡"));
     render.song_select.current_source_path = safe_ui_text_or_placeholder(songs_path_, "<invalid path>");
     render.song_select.index_profile_label = ui_song_index_profile_label(config_.mode.song_index_profile);
+    render.song_select.group_summary = song_group_detail_label(song_group_mode_, korean);
     render.song_select.browser_summary = browser_summary();
     render.song_select.sort_summary = song_sort_detail_label(song_sort_mode_, korean);
     render.song_select.primary_hint =
@@ -104,12 +137,13 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
             : (render.song_select.showing_records
                    ? ui_text("LEFT/RIGHT  NAV FOCUS     BACKSPACE  SONGS     ESC  TITLE     F1  HELP",
                              "좌/우  탐색 전환     BACKSPACE  곡 목록     ESC  타이틀     F1  도움말")
-                   : ui_text("LEFT/RIGHT  NAV FOCUS     BACKSPACE  SOURCES     A/G/I/M/K  SETTINGS     F5  REINDEX     F1  HELP",
-                             "좌/우  탐색 전환     BACKSPACE  소스     A/G/I/M/K  설정     F5  재인덱스     F1  도움말"));
+                   : ui_text("LEFT/RIGHT  NAV FOCUS     ENTER SEARCH  TYPE QUERY     A/G/I/M/K  SETTINGS     F5  REINDEX     F1  HELP",
+                             "좌/우  탐색 전환     ENTER SEARCH  검색 입력     A/G/I/M/K  설정     F5  재인덱스     F1  도움말"));
 
     const std::string source_detail =
         std::to_string(render.song_select.source_count) + " " +
         ui_text(render.song_select.source_count == 1 ? "ROOT" : "ROOTS", "소스");
+    const std::string group_detail = render.song_select.group_summary;
     const std::string browser_detail = render.song_select.browser_summary;
     const std::string records_detail =
         (render.song_select.record_count > 0)
@@ -173,19 +207,34 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
                                 song_sort_mode_ == SongSortMode::TitleDesc)
                                    ? song_sort_detail_label(song_sort_mode_, korean)
                                    : song_sort_detail_label(SongSortMode::TitleAsc, korean)},
-        render::MenuButtonData{ui_text("SOURCES", "소스"), "D", song_select_nav_cursor_ == 2,
+        render::MenuButtonData{ui_text("ARTIST", "아티스트"), "A", song_select_nav_cursor_ == 2,
+                               (song_sort_mode_ == SongSortMode::ArtistAsc ||
+                                song_sort_mode_ == SongSortMode::ArtistDesc)
+                                   ? song_sort_detail_label(song_sort_mode_, korean)
+                                   : song_sort_detail_label(SongSortMode::ArtistAsc, korean)},
+        render::MenuButtonData{ui_text("SOURCES", "소스"), "D", song_select_nav_cursor_ == 3,
                                render.song_select.showing_sources ? ui_text("ACTIVE", "활성") : source_detail},
-        render::MenuButtonData{ui_text("KEY", "키"), "K", song_select_nav_cursor_ == 3, key_filter_summary()},
-        render::MenuButtonData{ui_text("FAVORITES", "페이보릿"), "V", song_select_nav_cursor_ == 4,
+        render::MenuButtonData{ui_text("KEY", "키"), "K", song_select_nav_cursor_ == 4, key_filter_summary()},
+        render::MenuButtonData{ui_text("FAVORITES", "페이보릿"), "V", song_select_nav_cursor_ == 5,
                                to_lower_ascii(config_.ui.song_collection_filter) == "favorites"
                                    ? ui_text("ACTIVE", "활성")
                                    : (std::to_string(indexed_favorite_count_) + " " + ui_text("CHARTS", "차트"))},
-        render::MenuButtonData{ui_text("BROWSE", "탐색"), "F", song_select_nav_cursor_ == 5, browser_detail},
-        render::MenuButtonData{ui_text("MOD", "모드"), "M", song_select_nav_cursor_ == 6,
+        render::MenuButtonData{ui_text("SEARCH", "검색"), "S", song_select_nav_cursor_ == 6,
+                               song_search_query_.empty()
+                                   ? (song_select_search_active_
+                                          ? ui_text("<typing>", "<입력 중>")
+                                          : ui_text("<type to search>", "<검색어 입력>"))
+                                   : (song_select_search_active_
+                                          ? ui_text("Q ", "검색 ") + safe_ui_text(song_search_query_) + "  " +
+                                                ui_text("(typing)", "(입력 중)")
+                                          : ui_text("Q ", "검색 ") + safe_ui_text(song_search_query_))},
+        render::MenuButtonData{ui_text("FILTER", "필터"), "F", song_select_nav_cursor_ == 7, browser_detail},
+        render::MenuButtonData{ui_text("GROUP", "그룹"), "G", song_select_nav_cursor_ == 8, group_detail},
+        render::MenuButtonData{ui_text("MOD", "모드"), "M", song_select_nav_cursor_ == 9,
                                format_multiplier(config_.speed.rate) + " / HS " +
                                    format_decimal(config_.speed.hi_speed)},
-        render::MenuButtonData{ui_text("OPTIONS", "옵션"), "O", song_select_nav_cursor_ == 7, ui_text("AUDIO / GFX", "AUDIO / GFX")},
-        render::MenuButtonData{ui_text("RECORDS", "기록"), "R", song_select_nav_cursor_ == 8,
+        render::MenuButtonData{ui_text("OPTIONS", "옵션"), "O", song_select_nav_cursor_ == 10, ui_text("AUDIO / GFX", "AUDIO / GFX")},
+        render::MenuButtonData{ui_text("RECORDS", "기록"), "R", song_select_nav_cursor_ == 11,
                                render.song_select.showing_records ? ui_text("ACTIVE", "활성") : records_detail},
     };
 
@@ -287,6 +336,7 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
             render.song_select.list_visible_count = end - start;
             render.song_select.list_window_start = start;
             render.song_select.list_selected_index = selected_song_;
+            std::string last_group_label;
 
             for (int i = start; i < end; ++i) {
                 const SongEntry* entry = visible_song_entry(static_cast<std::size_t>(i));
@@ -294,6 +344,13 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
                     continue;
                 }
                 render::SongCardData card;
+                if (song_group_mode_ != SongGroupMode::None) {
+                    const std::string group_label = song_group_section_label(song_group_mode_, *entry, korean);
+                    if (render.song_select.songs.empty() || group_label != last_group_label) {
+                        card.group_label = group_label;
+                    }
+                    last_group_label = group_label;
+                }
                 card.title = song_title_for_ui(*entry);
                 card.artist = song_artist_for_ui(*entry);
                 card.detail = safe_ui_text_or_placeholder(song_detail_label(*entry), "<invalid detail>");
@@ -317,8 +374,8 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
                 song_level_max_filter_ > 0) {
                 render.song_select.empty_title = ui_text("NO CHARTS MATCH", "일치하는 차트 없음");
                 render.song_select.empty_message =
-                    ui_text("Clear filters in Browse or switch the active source to see more charts.",
-                            "탐색에서 필터를 지우거나 활성 소스를 바꿔 더 많은 차트를 보세요.");
+                    ui_text("Clear the current search/filter or switch the active source to see more charts.",
+                            "현재 검색/필터를 지우거나 활성 소스를 바꿔 더 많은 차트를 보세요.");
             } else if (render.song_select.indexing) {
                 render.song_select.empty_title = ui_text("BUILDING LIBRARY", "라이브러리 생성 중");
                 render.song_select.empty_message =
@@ -404,43 +461,35 @@ void MenuApp::populate_song_browser_render_data(render::MenuRenderData& render) 
     render.kind = render::MenuScreenKind::GenericList;
 
     append_menu_row(render.generic,
-                    ui_text("Search", "검색"),
-                    song_search_query_.empty() ? ui_text("<type to search>", "<검색어 입력>") : song_search_query_,
+                    ui_text("Key Filter", "키 필터"),
+                    (song_key_filter_ <= 0 ? ui_text("All Keys", "전체 키") : key_mode_label(std::to_string(song_key_filter_) + "k")),
                     settings_cursor_ == 0,
                     render::MenuHitTargetKind::SettingsRow,
                     0,
-                    true,
-                    false);
+                    false,
+                    true);
     append_menu_row(render.generic,
-                    ui_text("Key Filter", "키 필터"),
-                    (song_key_filter_ <= 0 ? ui_text("All Keys", "전체 키") : key_mode_label(std::to_string(song_key_filter_) + "k")),
+                    ui_text("Difficulty Min", "난이도 최소"),
+                    song_level_min_filter_ > 0 ? std::to_string(song_level_min_filter_) : ui_text("Any", "제한 없음"),
                     settings_cursor_ == 1,
                     render::MenuHitTargetKind::SettingsRow,
                     1,
                     false,
                     true);
     append_menu_row(render.generic,
-                    ui_text("Difficulty Min", "난이도 최소"),
-                    song_level_min_filter_ > 0 ? std::to_string(song_level_min_filter_) : ui_text("Any", "제한 없음"),
+                    ui_text("Difficulty Max", "난이도 최대"),
+                    song_level_max_filter_ > 0 ? std::to_string(song_level_max_filter_) : ui_text("Any", "제한 없음"),
                     settings_cursor_ == 2,
                     render::MenuHitTargetKind::SettingsRow,
                     2,
                     false,
                     true);
     append_menu_row(render.generic,
-                    ui_text("Difficulty Max", "난이도 최대"),
-                    song_level_max_filter_ > 0 ? std::to_string(song_level_max_filter_) : ui_text("Any", "제한 없음"),
+                    ui_text("Collection Filter", "컬렉션 필터"),
+                    song_collection_filter_label(),
                     settings_cursor_ == 3,
                     render::MenuHitTargetKind::SettingsRow,
                     3,
-                    false,
-                    true);
-    append_menu_row(render.generic,
-                    ui_text("Collection Filter", "컬렉션 필터"),
-                    song_collection_filter_label(),
-                    settings_cursor_ == 4,
-                    render::MenuHitTargetKind::SettingsRow,
-                    4,
                     false,
                     true);
     const std::string named_collection = current_named_song_collection();
@@ -453,40 +502,38 @@ void MenuApp::populate_song_browser_render_data(render::MenuRenderData& render) 
                                   selected_song_is_in_collection(named_collection) ? "컬렉션에 포함됨" : "컬렉션에 없음")
                         : ui_text(selected_song_is_favorite() ? "Favorite" : "Not Favorite",
                                   selected_song_is_favorite() ? "페이보릿" : "페이보릿 아님"),
+                    settings_cursor_ == 4,
+                    render::MenuHitTargetKind::SettingsRow,
+                    4,
+                    true,
+                    false);
+    append_menu_row(render.generic,
+                    ui_text("New Collection", "새 컬렉션"),
+                    current_named_song_collection().empty() ? ui_text("Create", "생성") : current_named_song_collection(),
                     settings_cursor_ == 5,
                     render::MenuHitTargetKind::SettingsRow,
                     5,
                     true,
                     false);
     append_menu_row(render.generic,
-                    ui_text("New Collection", "새 컬렉션"),
-                    current_named_song_collection().empty() ? ui_text("Create", "생성") : current_named_song_collection(),
+                    ui_text("Clear Filters", "필터 지우기"),
+                    "",
                     settings_cursor_ == 6,
                     render::MenuHitTargetKind::SettingsRow,
                     6,
                     true,
                     false);
     append_menu_row(render.generic,
-                    ui_text("Clear Filters", "필터 지우기"),
+                    ui_text("Back", "뒤로"),
                     "",
                     settings_cursor_ == 7,
                     render::MenuHitTargetKind::SettingsRow,
                     7,
                     true,
                     false);
-    append_menu_row(render.generic,
-                    ui_text("Back", "뒤로"),
-                    "",
-                    settings_cursor_ == 8,
-                    render::MenuHitTargetKind::SettingsRow,
-                    8,
-                    true,
-                    false);
 
-    render.generic.notes.push_back(ui_text("Search matches title, artist, and chart path.",
-                                           "검색은 제목, 아티스트, 차트 경로를 대상으로 합니다."));
-    render.generic.notes.push_back(ui_text("Use letters/numbers/space on the Search row. Backspace deletes, Delete clears.",
-                                           "검색 행에서 문자/숫자/스페이스를 입력하세요. Backspace는 한 글자 삭제, Delete는 전체 삭제입니다."));
+    render.generic.notes.push_back(ui_text("Search moved to Song Select. Use the SEARCH item there for title, artist, and path matches.",
+                                           "검색은 Song Select로 옮겨졌습니다. 제목, 아티스트, 경로 검색은 그쪽 SEARCH 항목을 사용하세요."));
     render.generic.notes.push_back(ui_text("Key Filter supports All plus 4K through 10K and 16K. Song Select also has a quick KEY toggle.",
                                            "키 필터는 전체, 4K~10K, 16K를 지원합니다. Song Select 왼쪽 KEY 토글로도 빠르게 바꿀 수 있습니다."));
     render.generic.notes.push_back(ui_text("Difficulty filters apply to indexed LV values only.",
@@ -495,8 +542,8 @@ void MenuApp::populate_song_browser_render_data(render::MenuRenderData& render) 
                                            "컬렉션 필터는 전체, 페이보릿, 생성한 컬렉션들을 순환합니다."));
     render.generic.notes.push_back(ui_text("Toggle Favorite works from All/Favorites. When a named collection is selected it toggles membership in that collection.",
                                            "전체/페이보릿에서는 페이보릿을 토글하고, 이름 있는 컬렉션이 선택된 상태에서는 그 컬렉션 포함 여부를 토글합니다."));
-    render.generic.notes.push_back(ui_text("Sort order stays available from Song Select: LEVEL toggles ASC/DESC, TITLE toggles A-Z/Z-A.",
-                                           "정렬은 Song Select에서도 바꿀 수 있습니다: LEVEL은 오름/내림, TITLE은 가나다/역가나다를 전환합니다."));
+    render.generic.notes.push_back(ui_text("Sort and grouping stay available from Song Select: LEVEL, TITLE, ARTIST, and GROUP can all be adjusted there.",
+                                           "정렬과 그룹은 Song Select에서도 바로 바꿀 수 있습니다: LEVEL, TITLE, ARTIST, GROUP를 그쪽에서 조정하세요."));
 }
 
 }  // namespace tenriff::app

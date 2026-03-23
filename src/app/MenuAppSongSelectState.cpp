@@ -11,6 +11,22 @@
 
 namespace tenriff::app {
 
+namespace {
+
+std::string song_group_sort_key(const SongEntry& entry, MenuApp::SongGroupMode mode) {
+    using namespace menu_song_select;
+
+    switch (mode) {
+        case MenuApp::SongGroupMode::Artist: return song_group_artist_key(entry);
+        case MenuApp::SongGroupMode::Level: return song_group_level_key(entry);
+        case MenuApp::SongGroupMode::Folder: return song_group_folder_key(entry);
+        case MenuApp::SongGroupMode::None:
+        default: return {};
+    }
+}
+
+}  // namespace
+
 void MenuApp::apply_song_sort(SongSortMode mode) {
     song_sort_mode_ = mode;
     sort_song_list_preserving_selection();
@@ -63,27 +79,34 @@ void MenuApp::rebuild_visible_song_list(const std::string* selected_path) {
         }
     }
 
-    if (song_sort_mode_ == SongSortMode::DifficultyAsc) {
-        std::stable_sort(visible_song_indices_.begin(), visible_song_indices_.end(), [this](std::size_t lhs,
-                                                                                            std::size_t rhs) {
-            return song_entry_less_by_difficulty_asc(indexed_songs_[lhs], indexed_songs_[rhs]);
-        });
-    } else if (song_sort_mode_ == SongSortMode::DifficultyDesc) {
-        std::stable_sort(visible_song_indices_.begin(), visible_song_indices_.end(), [this](std::size_t lhs,
-                                                                                            std::size_t rhs) {
-            return song_entry_less_by_difficulty_desc(indexed_songs_[lhs], indexed_songs_[rhs]);
-        });
-    } else if (song_sort_mode_ == SongSortMode::TitleAsc) {
-        std::stable_sort(visible_song_indices_.begin(), visible_song_indices_.end(), [this](std::size_t lhs,
-                                                                                             std::size_t rhs) {
-            return song_entry_less_by_title_asc(indexed_songs_[lhs], indexed_songs_[rhs]);
-        });
-    } else {
-        std::stable_sort(visible_song_indices_.begin(), visible_song_indices_.end(), [this](std::size_t lhs,
-                                                                                             std::size_t rhs) {
-            return song_entry_less_by_title_desc(indexed_songs_[lhs], indexed_songs_[rhs]);
-        });
-    }
+    const auto song_sort_compare = [this](const SongEntry& lhs, const SongEntry& rhs) {
+        switch (song_sort_mode_) {
+            case SongSortMode::DifficultyAsc: return song_entry_less_by_difficulty_asc(lhs, rhs);
+            case SongSortMode::DifficultyDesc: return song_entry_less_by_difficulty_desc(lhs, rhs);
+            case SongSortMode::TitleAsc: return song_entry_less_by_title_asc(lhs, rhs);
+            case SongSortMode::ArtistAsc: return song_entry_less_by_artist_asc(lhs, rhs);
+            case SongSortMode::ArtistDesc: return song_entry_less_by_artist_desc(lhs, rhs);
+            case SongSortMode::TitleDesc:
+            default: return song_entry_less_by_title_desc(lhs, rhs);
+        }
+    };
+
+    std::stable_sort(visible_song_indices_.begin(), visible_song_indices_.end(), [this, &song_sort_compare](std::size_t lhs,
+                                                                                                              std::size_t rhs) {
+        const SongEntry& lhs_entry = indexed_songs_[lhs];
+        const SongEntry& rhs_entry = indexed_songs_[rhs];
+        if (song_group_mode_ != SongGroupMode::None) {
+            const std::string lhs_group = song_group_sort_key(lhs_entry, song_group_mode_);
+            const std::string rhs_group = song_group_sort_key(rhs_entry, song_group_mode_);
+            if (lhs_group != rhs_group) {
+                const bool reverse_group_order =
+                    (song_group_mode_ == SongGroupMode::Artist && song_sort_mode_ == SongSortMode::ArtistDesc) ||
+                    (song_group_mode_ == SongGroupMode::Level && song_sort_mode_ == SongSortMode::DifficultyDesc);
+                return reverse_group_order ? (lhs_group > rhs_group) : (lhs_group < rhs_group);
+            }
+        }
+        return song_sort_compare(lhs_entry, rhs_entry);
+    });
 
     if (visible_song_indices_.empty()) {
         selected_song_ = 0;

@@ -8,6 +8,7 @@ namespace tenriff::app {
 namespace {
 
 constexpr std::uint32_t kDxgiStatusOccluded = 0x087A0001u;
+constexpr std::uint32_t kDxgiStatusModeChanged = 0x087A0007u;
 constexpr std::uint32_t kDxgiErrorInvalidCall = 0x887A0001u;
 
 }  // namespace
@@ -58,6 +59,9 @@ bool should_treat_present_failure_as_transient(std::uint32_t present_hr,
         return true;
     }
     if (present_hr == kDxgiStatusOccluded) {
+        return true;
+    }
+    if (present_hr == kDxgiStatusModeChanged) {
         return true;
     }
     return present_hr == kDxgiErrorInvalidCall &&

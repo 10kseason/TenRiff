@@ -21,6 +21,11 @@ std::string song_sort_title_key(const SongEntry& entry) {
     return to_lower_ascii(display);
 }
 
+std::string song_sort_artist_key(const SongEntry& entry) {
+    const std::string display = entry.artist.empty() ? song_title_for_ui(entry) : entry.artist;
+    return to_lower_ascii(display);
+}
+
 std::string level_filter_label(int level_min, int level_max) {
     if (level_min <= 0 && level_max <= 0) {
         return "All Levels";
@@ -74,6 +79,52 @@ std::string song_title_for_ui(const SongEntry& entry) {
 
 std::string song_artist_for_ui(const SongEntry& entry) {
     return safe_ui_text_or_placeholder(entry.artist, "<invalid artist>");
+}
+
+std::string song_group_artist_key(const SongEntry& entry) {
+    const std::string artist = safe_ui_text(entry.artist);
+    if (!artist.empty()) {
+        return to_lower_ascii(artist);
+    }
+    return "~unknown-artist";
+}
+
+std::string song_group_level_key(const SongEntry& entry) {
+    if (entry.level > 0) {
+        const int clamped_level = std::clamp(entry.level, 0, 9999);
+        const int thousands = clamped_level / 1000;
+        const int hundreds = (clamped_level / 100) % 10;
+        const int tens = (clamped_level / 10) % 10;
+        const int ones = clamped_level % 10;
+        std::string key = "lv:";
+        key.push_back(static_cast<char>('0' + thousands));
+        key.push_back(static_cast<char>('0' + hundreds));
+        key.push_back(static_cast<char>('0' + tens));
+        key.push_back(static_cast<char>('0' + ones));
+        return key;
+    }
+    return "lv:9999";
+}
+
+std::string song_group_folder_label(const SongEntry& entry) {
+    const std::filesystem::path parent = path_from_utf8(entry.path).parent_path();
+    if (parent.empty()) {
+        return {};
+    }
+    const std::string label = util::sanitize_ui_text(parent.filename().u8string());
+    if (!label.empty()) {
+        return label;
+    }
+    const std::string fallback = util::sanitize_ui_text(parent.u8string());
+    return fallback;
+}
+
+std::string song_group_folder_key(const SongEntry& entry) {
+    const std::string label = song_group_folder_label(entry);
+    if (!label.empty()) {
+        return to_lower_ascii(label);
+    }
+    return "root";
 }
 
 std::string song_detail_label(const SongEntry& entry) {
@@ -246,6 +297,42 @@ bool song_entry_less_by_title_desc(const SongEntry& lhs, const SongEntry& rhs) {
     }
     if (lhs.rating != rhs.rating) {
         return lhs.rating > rhs.rating;
+    }
+    return to_lower_ascii(lhs.path) < to_lower_ascii(rhs.path);
+}
+
+bool song_entry_less_by_artist_asc(const SongEntry& lhs, const SongEntry& rhs) {
+    const std::string lhs_artist = song_sort_artist_key(lhs);
+    const std::string rhs_artist = song_sort_artist_key(rhs);
+    if (lhs_artist != rhs_artist) {
+        return lhs_artist < rhs_artist;
+    }
+    const std::string lhs_title = song_sort_title_key(lhs);
+    const std::string rhs_title = song_sort_title_key(rhs);
+    if (lhs_title != rhs_title) {
+        return lhs_title < rhs_title;
+    }
+    const int lhs_level = lhs.level > 0 ? lhs.level : 9999;
+    const int rhs_level = rhs.level > 0 ? rhs.level : 9999;
+    if (lhs_level != rhs_level) {
+        return lhs_level < rhs_level;
+    }
+    return to_lower_ascii(lhs.path) < to_lower_ascii(rhs.path);
+}
+
+bool song_entry_less_by_artist_desc(const SongEntry& lhs, const SongEntry& rhs) {
+    const std::string lhs_artist = song_sort_artist_key(lhs);
+    const std::string rhs_artist = song_sort_artist_key(rhs);
+    if (lhs_artist != rhs_artist) {
+        return lhs_artist > rhs_artist;
+    }
+    const std::string lhs_title = song_sort_title_key(lhs);
+    const std::string rhs_title = song_sort_title_key(rhs);
+    if (lhs_title != rhs_title) {
+        return lhs_title < rhs_title;
+    }
+    if (lhs.level != rhs.level) {
+        return lhs.level > rhs.level;
     }
     return to_lower_ascii(lhs.path) < to_lower_ascii(rhs.path);
 }
