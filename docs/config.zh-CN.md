@@ -29,6 +29,8 @@
   - `basic | high`
 - `bms_keysound_policy` (string)
   - `follow | autoplay | ignore`
+- `background_sound_enabled` (bool)
+  - 控制菜单 BGM 和谱面背景音的开关
 - `volume` (double)
   - master volume
 - `bgm_volume` (double)

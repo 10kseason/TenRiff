@@ -2,7 +2,18 @@
 
 TenRiff의 사용자/배포 관점에서 의미 있는 변경만 간단히 기록합니다.
 
-## [1.0.02] - 2026-03-23
+## [1.0.21] - 2026-03-24
+
+### Changed
+- `Audio > Background Sound` 토글을 추가해 메뉴 BGM과 차트 배경음을 on/off 할 수 있도록 하고, hit keysound는 별도로 유지되도록 분리
+- 게임 시작 직전에 눌린 키가 이후 입력 상태를 오염시키지 않도록, countdown 종료 직전 현재 눌림 상태를 non-scoring baseline으로 재동기화
+- `ClockSync`가 아직 fit되지 않은 게임 시작 직후에는 입력을 `current_playback_sample_`에 뭉개지 않고, 오디오 콜백 시점의 startup anchor 기준으로 샘플 위치를 선형 환산하도록 바꿔 첫 몇 노트 입력이 늦게 몰리는 문제를 완화
+- 프로젝트 메타데이터와 현재 상태/로드맵 문서를 `1.0.21` 배포 라인 기준으로 갱신
+
+### Packaged
+- `build-dist` 기준 Windows 배포 스테이징과 공개 오픈소스 소스 스테이징을 `1.0.21` 라인으로 갱신
+
+## [1.0.1] - 2026-03-24
 
 ### Changed
 - rate 변경 시 차트/오디오가 이미 playback timeline으로 압축된 상태를 기준으로, 판정 윈도우를 더 이상 `1 / rate`로 이중 축소하지 않도록 수정
@@ -12,10 +23,12 @@ TenRiff의 사용자/배포 관점에서 의미 있는 변경만 간단히 기�
 - Song Select 왼쪽 레일 항목이 많아졌을 때 버튼 높이/간격/텍스트를 자동으로 압축해 footer 영역을 침범하지 않도록 UI 레이아웃을 조정
 - 해상도와 `windowed / borderless / fullscreen` 전환을 반복할 때 swap-chain 전환 실패가 곧바로 `Present` fatal로 이어지지 않도록 렌더러 재시도/복구 경로를 보강
 - fullscreen 상태에서 `720p` 같은 낮은 해상도로 전환할 때 flip-model swap-chain이 `SetFullscreenState(TRUE)` 이후 다시 `ResizeBuffers` 되도록 순서를 고쳐, `Failed to present the menu frame` fatal을 줄이도록 보강
-- 프로젝트 메타데이터와 현재 상태/로드맵 문서를 `1.0.02` 배포 라인 기준으로 갱신
+- 인게임 입력이 RawInput/큐 입력 정체 상황에서도 끊기지 않도록, 게임 세션 안에서 매핑된 lane/control 키를 큐 입력과 `GetAsyncKeyState` fallback polling으로 병합
+- Windows 비미국권/중국권 키보드 레이아웃에서 `;`, `[`, `\` 같은 OEM 키가 깨지지 않도록 keymap/rawinput/polling 경로를 스캔코드 기반 정규화로 통일
+- 프로젝트 메타데이터와 현재 상태/로드맵 문서를 `1.0.1` 배포 라인 기준으로 갱신
 
 ### Packaged
-- `build-dist` 기준 Windows 배포 스테이징과 공개 오픈소스 소스 스테이징을 `1.0.02` 라인으로 갱신
+- `build-dist` 기준 Windows 배포 스테이징과 공개 오픈소스 소스 스테이징을 `1.0.1` 라인으로 갱신
 
 ## [1.0.01] - 2026-03-23
 

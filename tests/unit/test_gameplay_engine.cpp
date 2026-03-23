@@ -475,6 +475,32 @@ TEST_CASE("gameplay engine catch-up sync preserves stale hold release timing") {
     CHECK(engine.stats().counts.bd == 1);
 }
 
+TEST_CASE("gameplay engine prestart baseline press does not block the first real hit") {
+    GameplayChart chart;
+    chart.lane_count = 1;
+    chart.duration_samples = 3000;
+    chart.notes.push_back(NoteEvent{1, 1000, std::nullopt});
+
+    GameplayConfig config;
+    config.sample_rate = 1000;
+    config.rate = 1.0;
+    config.judge.pg_ms = 10.0;
+    config.judge.gr_ms = 20.0;
+    config.judge.gd_ms = 30.0;
+    config.judge.bd_ms = 40.0;
+
+    GameplayEngine engine(chart, config);
+    engine.sync_input_state(1, InputState::Pressed, 0);
+    engine.sync_input_state(1, InputState::Released, 900);
+
+    auto hit_note = engine.handle_input(1, InputState::Pressed, 1000);
+
+    REQUIRE(hit_note.has_value());
+    CHECK(hit_note->start_sample == 1000);
+    CHECK(engine.stats().counts.pg == 1);
+    CHECK(engine.stats().counts.bd == 0);
+}
+
 TEST_CASE("gameplay engine exposes active holds after a successful hold head hit") {
     GameplayChart chart;
     chart.lane_count = 1;

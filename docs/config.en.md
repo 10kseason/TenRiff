@@ -29,6 +29,8 @@ If a profile does not exist, it is created automatically on first launch.
   - `basic | high`
 - `bms_keysound_policy` (string)
   - `follow | autoplay | ignore`
+- `background_sound_enabled` (bool)
+  - turns menu BGM and chart background audio on or off
 - `volume` (double)
   - master volume
 - `bgm_volume` (double)

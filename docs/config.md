@@ -29,6 +29,8 @@
   - `basic | high`
 - `bms_keysound_policy` (string)
   - `follow | autoplay | ignore`
+- `background_sound_enabled` (bool)
+  - 메뉴 BGM과 차트 배경음을 켜고 끔
 - `volume` (double)
   - master volume
 - `bgm_volume` (double)

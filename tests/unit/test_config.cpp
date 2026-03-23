@@ -75,6 +75,7 @@ TEST_CASE("config defaults prefer 44100 Hz audio") {
 
     CHECK(config.audio.sample_rate == 44100);
     CHECK(config.audio_ui.preset == "high");
+    CHECK(config.audio_ui.background_sound_enabled);
     CHECK(config.audio_ui.bgm_volume == doctest::Approx(0.75));
     CHECK(config.audio_ui.keysound_volume == doctest::Approx(1.0));
     CHECK(config.input.polling_hz == 1000);
@@ -335,6 +336,7 @@ TEST_CASE("config save and load preserve volume and speed settings") {
 
     ConfigLoader loader;
     auto config = loader.defaults();
+    config.audio_ui.background_sound_enabled = false;
     config.audio_ui.master_volume = 0.65;
     config.audio_ui.bgm_volume = 0.55;
     config.audio_ui.keysound_volume = 1.35;
@@ -350,6 +352,7 @@ TEST_CASE("config save and load preserve volume and speed settings") {
 
     const auto result = loader.load_profile("profiles/test");
     REQUIRE(result.success());
+    CHECK_FALSE(result.config.audio_ui.background_sound_enabled);
     CHECK(result.config.audio_ui.master_volume == doctest::Approx(0.65));
     CHECK(result.config.audio_ui.bgm_volume == doctest::Approx(0.55));
     CHECK(result.config.audio_ui.keysound_volume == doctest::Approx(1.35));

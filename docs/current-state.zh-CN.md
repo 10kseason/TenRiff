@@ -3,7 +3,7 @@
 这份文档是下一位 agent 或新任务接手时应该最先阅读的当前状态文档。目标是快速说明“这个项目现在是什么、应该先看哪里、还有哪些内容尚未验证”。
 
 ## 基线
-- 当前项目版本为 `1.0.02`
+- 当前项目版本为 `1.0.21`
 - 后续工作的基准文档是 [`docs/baseline-1.0.0.zh-CN.md`](baseline-1.0.0.zh-CN.md)
 - Windows GUI 构建是主目标
 - Linux 仅存在 [`Baepoks-Linuxs/TenRiff-0.5.0-linux-preview`](../Baepoks-Linuxs/TenRiff-0.5.0-linux-preview) 级别的 preview
@@ -83,6 +83,7 @@
   - 会真正消耗 note 的失败（auto-miss、过早吃掉 note、hold break / tail miss）仍然记为 `BAD`
   - 非消耗型的超早输入会按 LR2 风格记为 `POOR`，并重新出现在结果 / replay / UI 中
   - `POOR` 不会断 combo，不计入 score / accuracy 总数，并使用独立的 `PR` gauge 损失值
+  - gameplay 刚开始而 `ClockSync` 还没拟合出来时，会基于 startup anchor（`playback_sample + callback time`）线性估算输入 sample，避免最前面的几颗 note 都被压到同一个当前 playback sample 上
   - tail release timing 仅适用于 osu hold 与 BMS `#LNMODE 2` charge note
 - Graphics：
   - 分辨率预设（`720p`、`1080p`、`qhd`、`native`）
@@ -127,12 +128,12 @@
 
 ## 运行时 / 打包规则
 - 新用户 profile 会自动创建
-- 最近一次 staged 的发布包是 `Baepoks/TenRiff-1.0.02`
+- 最近一次 staged 的发布包是 `Baepoks/TenRiff-1.0.21`
 - 发布包不包含 `Songs`
 - 发布包会同时包含用于菜单 BGM 的 `Mainmusic/` 运行时资源
 - 发布更新时，只把已构建的产物放进 `Baepoks/`
 - 如果请求 source-only/public handoff，用户偏好是先写 include/exclude 列表
-- 最近一次 staged 的公开源代码包会像 `opensource-Tenriff-source/TenRiff-1.0.02-source` 这样按版本单独 staging
+- 最近一次 staged 的公开源代码包会像 `opensource-Tenriff-source/TenRiff-1.0.21-source` 这样按版本单独 staging
 - 刷新公开源代码包时，不能只同步文档和文件本身，还要确认 staged 出来的源码包目录可以独立完成 configure/build，并能直接运行核心测试二进制
 
 ## 配置 / Profile 现实情况
@@ -162,9 +163,9 @@
 - `cmake --build build --config Release --target bms_parser_tests`
 - `cmake --build build --config Release --target bms_realworld_smoke`
 - `ctest --test-dir build -C Release --output-on-failure -R bms_parser_tests`
-- `cmake -S opensource-Tenriff-source/TenRiff-1.0.02-source -B opensource-Tenriff-source/TenRiff-1.0.02-source/build-check -G "Visual Studio 17 2022" -A x64`
-- `cmake --build opensource-Tenriff-source/TenRiff-1.0.02-source/build-check --config Release --target bms_parser_tests`
-- `opensource-Tenriff-source/TenRiff-1.0.02-source/build-check/Release/bms_parser_tests.exe`
+- `cmake -S opensource-Tenriff-source/TenRiff-1.0.21-source -B opensource-Tenriff-source/TenRiff-1.0.21-source/build-check -G "Visual Studio 17 2022" -A x64`
+- `cmake --build opensource-Tenriff-source/TenRiff-1.0.21-source/build-check --config Release --target bms_parser_tests`
+- `opensource-Tenriff-source/TenRiff-1.0.21-source/build-check/Release/bms_parser_tests.exe`
 
 ## 仍然需要手动验证的地方
 - 在真实的 CJK-heavy 曲库上重现 Song Select 快速滚动崩溃

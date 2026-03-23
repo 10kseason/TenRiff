@@ -2,9 +2,11 @@
 
 #include <optional>
 
+#include "app/GameSessionInputTiming.h"
 #include "app/JudgementLoopTiming.h"
 #include "app/GameplayHudRevisions.h"
 #include "app/GameplayHudWindow.h"
+#include "gameplay/GameplayEngine.h"
 #include "gameplay/GameplayChart.h"
 
 namespace {
@@ -153,4 +155,119 @@ TEST_CASE("judgement loop timing preserves the requested average hz at 44.1k") {
     CHECK(five_sample_steps == 3900);
     CHECK(six_sample_steps == 4100);
     CHECK(carry == 0);
+}
+
+TEST_CASE("startup input anchor maps callback time to playback sample") {
+    tenriff::app::StartupInputTimingAnchor anchor;
+    anchor.playback_sample = 48'000;
+    anchor.callback_time_ns = 1'000'000'000LL;
+    anchor.valid = true;
+
+    auto mapped =
+        tenriff::app::estimate_input_sample_from_startup_anchor(1'000'000'000LL, anchor, 48'000);
+
+    REQUIRE(mapped.has_value());
+    CHECK(*mapped == 48'000);
+}
+
+TEST_CASE("startup input anchor linearly maps nearby timestamps and clamps before zero") {
+    tenriff::app::StartupInputTimingAnchor anchor;
+    anchor.playback_sample = 48'000;
+    anchor.callback_time_ns = 1'000'000'000LL;
+    anchor.valid = true;
+
+    auto earlier =
+        tenriff::app::estimate_input_sample_from_startup_anchor(750'000'000LL, anchor, 48'000);
+    auto later =
+        tenriff::app::estimate_input_sample_from_startup_anchor(1'125'000'000LL, anchor, 48'000);
+
+    REQUIRE(earlier.has_value());
+    REQUIRE(later.has_value());
+    CHECK(*earlier == 36'000);
+    CHECK(*later == 54'000);
+
+    tenriff::app::StartupInputTimingAnchor near_zero_anchor;
+    near_zero_anchor.playback_sample = 500;
+    near_zero_anchor.callback_time_ns = 1'000'000'000LL;
+    near_zero_anchor.valid = true;
+
+    auto clamped =
+        tenriff::app::estimate_input_sample_from_startup_anchor(0, near_zero_anchor, 48'000);
+    REQUIRE(clamped.has_value());
+    CHECK(*clamped == 0);
+}
+
+TEST_CASE("startup gameplay input sample prefers clock sync estimate over startup anchor") {
+    tenriff::app::StartupInputTimingAnchor anchor;
+    anchor.playback_sample = 1'000;
+    anchor.callback_time_ns = 1'000'000'000LL;
+    anchor.valid = true;
+
+    const int64_t sample = tenriff::app::resolve_startup_gameplay_input_sample(
+        1'320, 1'050'000'000LL, anchor, 1'000, 0);
+
+    CHECK(sample == 1'320);
+}
+
+TEST_CASE("startup mapping without clock fit still hits the first note") {
+    tenriff::gameplay::GameplayChart chart;
+    chart.lane_count = 1;
+    chart.duration_samples = 3'000;
+    chart.notes.push_back(tenriff::gameplay::NoteEvent{1, 1'000, std::nullopt});
+
+    tenriff::gameplay::GameplayConfig config;
+    config.sample_rate = 1'000;
+    config.rate = 1.0;
+    config.judge.pg_ms = 10.0;
+    config.judge.gr_ms = 20.0;
+    config.judge.gd_ms = 30.0;
+    config.judge.bd_ms = 40.0;
+
+    tenriff::app::StartupInputTimingAnchor anchor;
+    anchor.playback_sample = 1'000;
+    anchor.callback_time_ns = 1'000'000'000LL;
+    anchor.valid = true;
+
+    const int64_t mapped_sample = tenriff::app::resolve_startup_gameplay_input_sample(
+        std::nullopt, 1'000'000'000LL, anchor, config.sample_rate, 0);
+
+    tenriff::gameplay::GameplayEngine engine(chart, config);
+    auto hit_note = engine.handle_input(1, tenriff::input::InputState::Pressed, mapped_sample);
+
+    REQUIRE(hit_note.has_value());
+    CHECK(hit_note->start_sample == 1'000);
+    CHECK(engine.stats().counts.pg == 1);
+    CHECK(engine.stats().counts.bd == 0);
+}
+
+TEST_CASE("startup mapping stays stable across repeated session-style starts") {
+    tenriff::gameplay::GameplayChart chart;
+    chart.lane_count = 1;
+    chart.duration_samples = 3'000;
+    chart.notes.push_back(tenriff::gameplay::NoteEvent{1, 1'020, std::nullopt});
+
+    tenriff::gameplay::GameplayConfig config;
+    config.sample_rate = 1'000;
+    config.rate = 1.0;
+    config.judge.pg_ms = 10.0;
+    config.judge.gr_ms = 20.0;
+    config.judge.gd_ms = 30.0;
+    config.judge.bd_ms = 40.0;
+
+    for (int session = 0; session < 2; ++session) {
+        tenriff::app::StartupInputTimingAnchor anchor;
+        anchor.playback_sample = 1'000;
+        anchor.callback_time_ns = 1'000'000'000LL;
+        anchor.valid = true;
+
+        const int64_t mapped_sample = tenriff::app::resolve_startup_gameplay_input_sample(
+            std::nullopt, 1'020'000'000LL, anchor, config.sample_rate, 0);
+
+        tenriff::gameplay::GameplayEngine engine(chart, config);
+        auto hit_note = engine.handle_input(1, tenriff::input::InputState::Pressed, mapped_sample);
+
+        REQUIRE(hit_note.has_value());
+        CHECK(hit_note->start_sample == 1'020);
+        CHECK(engine.stats().counts.pg == 1);
+    }
 }
