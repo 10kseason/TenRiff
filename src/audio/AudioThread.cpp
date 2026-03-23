@@ -205,8 +205,14 @@ void AudioThread::process_buffer() {
         std::memset(buffer, 0, frames_obtained * 2 * sizeof(float));
     }
 
+    // Do not advance the engine cursor if WASAPI rejected the rendered buffer.
+    auto release_result = backend_->release_buffer(frames_obtained);
+    if (release_result != AudioResult::Success) {
+        should_stop_.store(true, std::memory_order_release);
+        return;
+    }
+
     // Release buffer and update sample count.
-    backend_->release_buffer(frames_obtained);
     backend_->add_samples_played(frames_obtained);
 }
 

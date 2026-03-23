@@ -65,6 +65,7 @@ struct GraphicsConfig {
 struct AudioUiConfig {
     std::string preset = "high";
     std::string bms_keysound_policy = "follow";
+    bool background_sound_enabled = true;
     double master_volume = 1.0;
     double bgm_volume = 0.75;
     double keysound_volume = 1.0;

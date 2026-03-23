@@ -1,5 +1,7 @@
 #include "input/RawInputHandler.h"
 
+#include "config/KeycodeMap.h"
+
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
 #endif
@@ -131,9 +133,9 @@ void RawInputHandler::process_keyboard_input(const void* raw_input) {
     // Build the event.
     InputEvent event{};
     
-    // Use virtual key code as the keycode (or scan code for more precision).
-    // Using VKey for now as it's more portable.
-    event.keycode = kb.VKey;
+    // Use locale-stable physical scan aliases for layout-sensitive OEM keys so
+    // keymaps survive non-US layouts and IME-heavy Windows setups.
+    event.keycode = config::KeycodeMap::normalize_windows_raw_keycode(kb.VKey, kb.MakeCode, kb.Flags);
     
     // Determine state: RI_KEY_BREAK means key released.
     event.state = (kb.Flags & RI_KEY_BREAK) ? InputState::Released : InputState::Pressed;

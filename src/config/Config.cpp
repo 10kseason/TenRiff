@@ -447,6 +447,8 @@ void apply_config_object(const JsonObject& root, RuntimeConfig& config) {
             normalize_bms_keysound_policy(get_string(*audio,
                                                      "bms_keysound_policy",
                                                      config.audio_ui.bms_keysound_policy));
+        config.audio_ui.background_sound_enabled =
+            get_bool(*audio, "background_sound_enabled", config.audio_ui.background_sound_enabled);
         config.audio_ui.master_volume =
             std::clamp(get_number(*audio, "volume", config.audio_ui.master_volume),
                        kMasterVolumeMin, kMasterVolumeMax);
@@ -774,6 +776,7 @@ JsonValue build_json_root(const RuntimeConfig& config) {
     audio.emplace("affinity", JsonValue{static_cast<double>(config.audio.affinity_core)});
     audio.emplace("preset", JsonValue{config.audio_ui.preset});
     audio.emplace("bms_keysound_policy", JsonValue{config.audio_ui.bms_keysound_policy});
+    audio.emplace("background_sound_enabled", JsonValue{config.audio_ui.background_sound_enabled});
     audio.emplace("volume", JsonValue{config.audio_ui.master_volume});
     audio.emplace("bgm_volume", JsonValue{config.audio_ui.bgm_volume});
     audio.emplace("keysound_volume", JsonValue{config.audio_ui.keysound_volume});
@@ -1208,6 +1211,7 @@ RuntimeConfig ConfigLoader::defaults() const {
 
     config.audio_ui.preset = "high";
     config.audio_ui.bms_keysound_policy = "follow";
+    config.audio_ui.background_sound_enabled = true;
     config.audio_ui.master_volume = 1.0;
     config.audio_ui.bgm_volume = 0.75;
     config.audio_ui.keysound_volume = 1.0;

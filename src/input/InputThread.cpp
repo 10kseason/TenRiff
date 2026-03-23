@@ -7,6 +7,7 @@
 #endif
 #include <windows.h>
 
+#include "config/KeycodeMap.h"
 #include "timing/HighResClock.h"
 
 namespace tenriff::input {
@@ -348,8 +349,8 @@ void InputThread::thread_main_polling() {
 
         const int64_t stamp_ns = now_ns;
         for (std::size_t i = 0; i < keys.size(); ++i) {
-            const uint32_t keycode = keys[i];
-            const SHORT state = GetAsyncKeyState(static_cast<int>(keycode));
+            const uint32_t poll_vk = keys[i];
+            const SHORT state = GetAsyncKeyState(static_cast<int>(poll_vk));
             const uint8_t pressed = (state & 0x8000) ? 1 : 0;
             if (pressed == last_state[i]) {
                 continue;
@@ -357,7 +358,7 @@ void InputThread::thread_main_polling() {
             last_state[i] = pressed;
 
             InputEvent event;
-            event.keycode = keycode;
+            event.keycode = config::KeycodeMap::normalize_windows_polling_keycode(poll_vk);
             event.state = pressed ? InputState::Pressed : InputState::Released;
             event.input_time_ns = stamp_ns;
             event.device_id = 0;

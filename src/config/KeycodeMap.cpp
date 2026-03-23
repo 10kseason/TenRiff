@@ -1,6 +1,8 @@
 #include "config/KeycodeMap.h"
 
 #include <algorithm>
+#include <array>
+#include <cstdio>
 
 #ifdef _WIN32
 #ifndef WIN32_LEAN_AND_MEAN
@@ -28,6 +30,102 @@ std::string normalize(std::string_view name) {
 }
 
 #ifdef _WIN32
+constexpr uint32_t kScanKeycodePrefix = 0x10000u;
+
+struct ScanAlias {
+    std::string_view normalized_name;
+    uint16_t scan_code;
+};
+
+constexpr std::array<ScanAlias, 11> kLayoutSensitiveScanAliases{{
+    {"SEMICOLON", 0x0027u},
+    {"PLUS", 0x000Du},
+    {"EQUALS", 0x000Du},
+    {"COMMA", 0x0033u},
+    {"MINUS", 0x000Cu},
+    {"PERIOD", 0x0034u},
+    {"DOT", 0x0034u},
+    {"SLASH", 0x0035u},
+    {"GRAVE", 0x0029u},
+    {"BACKTICK", 0x0029u},
+    {"LBRACKET", 0x001Au},
+}};
+
+constexpr std::array<ScanAlias, 3> kAdditionalLayoutSensitiveScanAliases{{
+    {"BACKSLASH", 0x002Bu},
+    {"RBRACKET", 0x001Bu},
+    {"APOSTROPHE", 0x0028u},
+}};
+
+constexpr uint16_t encode_scan_code(uint16_t make_code, uint16_t flags) {
+    uint16_t scan_code = static_cast<uint16_t>(make_code & 0x00FFu);
+    if ((flags & RI_KEY_E1) != 0u) {
+        scan_code |= 0xE100u;
+    } else if ((flags & RI_KEY_E0) != 0u) {
+        scan_code |= 0xE000u;
+    }
+    return scan_code;
+}
+
+constexpr uint32_t scancode_keycode(uint16_t scan_code) {
+    return kScanKeycodePrefix | static_cast<uint32_t>(scan_code);
+}
+
+constexpr bool is_scancode_keycode(uint32_t keycode) {
+    return (keycode & kScanKeycodePrefix) != 0u;
+}
+
+constexpr uint16_t decode_scancode_keycode(uint32_t keycode) {
+    return static_cast<uint16_t>(keycode & 0xFFFFu);
+}
+
+std::optional<uint16_t> scan_code_from_name(std::string_view normalized_name) {
+    for (const auto& alias : kLayoutSensitiveScanAliases) {
+        if (alias.normalized_name == normalized_name) {
+            return alias.scan_code;
+        }
+    }
+    for (const auto& alias : kAdditionalLayoutSensitiveScanAliases) {
+        if (alias.normalized_name == normalized_name) {
+            return alias.scan_code;
+        }
+    }
+    if (normalized_name == "LEFTBRACKET") {
+        return static_cast<uint16_t>(0x001Au);
+    }
+    if (normalized_name == "RIGHTBRACKET") {
+        return static_cast<uint16_t>(0x001Bu);
+    }
+    if (normalized_name == "QUOTE") {
+        return static_cast<uint16_t>(0x0028u);
+    }
+    return std::nullopt;
+}
+
+std::string name_from_scan_code(uint16_t scan_code) {
+    switch (scan_code) {
+        case 0x000Du: return "Plus";
+        case 0x001Au: return "LBracket";
+        case 0x001Bu: return "RBracket";
+        case 0x0027u: return "Semicolon";
+        case 0x0028u: return "Apostrophe";
+        case 0x0029u: return "Grave";
+        case 0x002Bu: return "Backslash";
+        case 0x0033u: return "Comma";
+        case 0x0034u: return "Period";
+        case 0x0035u: return "Slash";
+        default: break;
+    }
+
+    char buffer[16] = {};
+    if ((scan_code & 0xFF00u) == 0xE000u || (scan_code & 0xFF00u) == 0xE100u) {
+        std::snprintf(buffer, sizeof(buffer), "SC_%04X", static_cast<unsigned int>(scan_code));
+    } else {
+        std::snprintf(buffer, sizeof(buffer), "SC_%02X", static_cast<unsigned int>(scan_code & 0x00FFu));
+    }
+    return buffer;
+}
+
 std::optional<uint32_t> parse_vk_token(std::string_view token) {
     if (token.size() != 5 || token[0] != 'V' || token[1] != 'K' || token[2] != '_') {
         return std::nullopt;
@@ -58,6 +156,57 @@ std::string fallback_vk_name(uint32_t keycode) {
     name[4] = kHex[keycode & 0xF];
     return name;
 }
+
+std::optional<uint32_t> parse_scancode_token(std::string_view token) {
+    if (token.size() < 5 || token[0] != 'S' || token[1] != 'C' || token[2] != '_') {
+        return std::nullopt;
+    }
+
+    uint16_t scan_code = 0;
+    for (std::size_t i = 3; i < token.size(); ++i) {
+        const char ch = token[i];
+        scan_code <<= 4;
+        if (ch >= '0' && ch <= '9') {
+            scan_code = static_cast<uint16_t>(scan_code | static_cast<uint16_t>(ch - '0'));
+            continue;
+        }
+        if (ch >= 'A' && ch <= 'F') {
+            scan_code = static_cast<uint16_t>(scan_code | static_cast<uint16_t>(10 + (ch - 'A')));
+            continue;
+        }
+        return std::nullopt;
+    }
+    return scancode_keycode(scan_code);
+}
+
+uint16_t scan_code_from_vk(uint32_t vkey) {
+    const HKL layout = GetKeyboardLayout(0);
+    const UINT scan = MapVirtualKeyExW(vkey, MAPVK_VK_TO_VSC_EX, layout);
+    if (scan == 0u) {
+        return 0u;
+    }
+    if ((scan & 0xFF00u) == 0xE000u || (scan & 0xFF00u) == 0xE100u) {
+        return static_cast<uint16_t>(scan);
+    }
+    return static_cast<uint16_t>(scan & 0x00FFu);
+}
+
+uint32_t normalize_layout_sensitive_key(uint32_t fallback_vkey, uint16_t scan_code) {
+    if (scan_code_from_name("SEMICOLON").value() == scan_code ||
+        scan_code_from_name("PLUS").value() == scan_code ||
+        scan_code_from_name("COMMA").value() == scan_code ||
+        scan_code_from_name("MINUS").value() == scan_code ||
+        scan_code_from_name("PERIOD").value() == scan_code ||
+        scan_code_from_name("SLASH").value() == scan_code ||
+        scan_code_from_name("GRAVE").value() == scan_code ||
+        scan_code_from_name("LBRACKET").value() == scan_code ||
+        scan_code_from_name("BACKSLASH").value() == scan_code ||
+        scan_code_from_name("RBRACKET").value() == scan_code ||
+        scan_code_from_name("APOSTROPHE").value() == scan_code) {
+        return scancode_keycode(scan_code);
+    }
+    return fallback_vkey;
+}
 #endif
 
 }  // namespace
@@ -81,6 +230,12 @@ std::optional<uint32_t> KeycodeMap::to_keycode(std::string_view name) {
 
     if (auto generic_vk = parse_vk_token(normalized)) {
         return generic_vk;
+    }
+    if (auto generic_scan = parse_scancode_token(normalized)) {
+        return generic_scan;
+    }
+    if (auto scan_code = scan_code_from_name(normalized)) {
+        return scancode_keycode(*scan_code);
     }
 
     if (normalized == "SPACE") return static_cast<uint32_t>(VK_SPACE);
@@ -148,18 +303,6 @@ std::optional<uint32_t> KeycodeMap::to_keycode(std::string_view name) {
     if (normalized == "DECIMAL" || normalized == "NUMPADDECIMAL") return static_cast<uint32_t>(VK_DECIMAL);
     if (normalized == "DIVIDE" || normalized == "NUMPADDIVIDE") return static_cast<uint32_t>(VK_DIVIDE);
 
-    if (normalized == "SEMICOLON") return static_cast<uint32_t>(VK_OEM_1);
-    if (normalized == "PLUS" || normalized == "EQUALS") return static_cast<uint32_t>(VK_OEM_PLUS);
-    if (normalized == "COMMA") return static_cast<uint32_t>(VK_OEM_COMMA);
-    if (normalized == "MINUS") return static_cast<uint32_t>(VK_OEM_MINUS);
-    if (normalized == "PERIOD" || normalized == "DOT") return static_cast<uint32_t>(VK_OEM_PERIOD);
-    if (normalized == "SLASH") return static_cast<uint32_t>(VK_OEM_2);
-    if (normalized == "GRAVE" || normalized == "BACKTICK") return static_cast<uint32_t>(VK_OEM_3);
-    if (normalized == "LBRACKET" || normalized == "LEFTBRACKET") return static_cast<uint32_t>(VK_OEM_4);
-    if (normalized == "BACKSLASH") return static_cast<uint32_t>(VK_OEM_5);
-    if (normalized == "RBRACKET" || normalized == "RIGHTBRACKET") return static_cast<uint32_t>(VK_OEM_6);
-    if (normalized == "APOSTROPHE" || normalized == "QUOTE") return static_cast<uint32_t>(VK_OEM_7);
-
     return std::nullopt;
 #else
     if (normalized.size() == 1) {
@@ -173,6 +316,10 @@ std::optional<uint32_t> KeycodeMap::to_keycode(std::string_view name) {
 
 std::string KeycodeMap::to_name(uint32_t keycode) {
 #ifdef _WIN32
+    if (is_scancode_keycode(keycode)) {
+        return name_from_scan_code(decode_scancode_keycode(keycode));
+    }
+
     if (keycode >= 'A' && keycode <= 'Z') {
         char ch = static_cast<char>(keycode);
         return std::string(1, ch);
@@ -260,5 +407,33 @@ std::string KeycodeMap::to_name(uint32_t keycode) {
 
     return "Unknown";
 }
+
+#ifdef _WIN32
+uint32_t KeycodeMap::normalize_windows_raw_keycode(uint32_t vkey, uint16_t make_code, uint16_t flags) {
+    const uint16_t scan_code = encode_scan_code(make_code, flags);
+    return normalize_layout_sensitive_key(vkey, scan_code);
+}
+
+uint32_t KeycodeMap::normalize_windows_polling_keycode(uint32_t vkey) {
+    return normalize_layout_sensitive_key(vkey, scan_code_from_vk(vkey));
+}
+
+std::optional<uint32_t> KeycodeMap::polling_vk_for_keycode(uint32_t keycode) {
+    if (!is_scancode_keycode(keycode)) {
+        if (keycode <= 0xFFu) {
+            return keycode;
+        }
+        return std::nullopt;
+    }
+
+    const uint16_t scan_code = decode_scancode_keycode(keycode);
+    const HKL layout = GetKeyboardLayout(0);
+    const UINT vkey = MapVirtualKeyExW(scan_code, MAPVK_VSC_TO_VK_EX, layout);
+    if (vkey != 0u) {
+        return static_cast<uint32_t>(vkey);
+    }
+    return std::nullopt;
+}
+#endif
 
 }  // namespace tenriff::config
