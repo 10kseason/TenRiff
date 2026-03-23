@@ -8,6 +8,7 @@
     "affinity": -1,
     "preset": "high",
     "bms_keysound_policy": "follow",
+    "background_sound_enabled": true,
     "volume": 1.0,
     "bgm_volume": 0.75,
     "keysound_volume": 1.0
