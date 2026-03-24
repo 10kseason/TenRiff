@@ -1,5 +1,7 @@
 #include "doctest/doctest.h"
 
+#include <cmath>
+
 #include "app/ModeManager.h"
 #include "gameplay/GameplayEngine.h"
 

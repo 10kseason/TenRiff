@@ -2,9 +2,9 @@
 
 Language: [한국어](README.md) | [English](README.en.md) | [简体中文](README.zh-CN.md)
 
-TenRiff is a Windows GUI-based BMS-first rhythm game runtime/launcher project. The goal is to build a standalone rhythm-game client centered on a practical BMS play environment, with direct control over the judgement, audio, input, and rendering pipeline. The current project version is `1.0.21`, and the project uses the MIT License. Bundled third-party notices are collected in [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
+TenRiff is a Windows GUI-based BMS-first rhythm game runtime/launcher project. The goal is to build a standalone rhythm-game client centered on a practical BMS play environment, with direct control over the judgement, audio, input, and rendering pipeline. The current project version is `1.0.3`, and the project uses the MIT License. Bundled third-party notices are collected in [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
 
-This README is an introduction that explains "what to look at first when you open the project." For the more detailed current behavior, the current `1.0.21` project state, the `1.0.0` baseline, the config structure, and the design documents, continue reading from [`docs/README.en.md`](docs/README.en.md).
+This README is an introduction that explains "what to look at first when you open the project." For the more detailed current behavior, the current `1.0.3` project state, the `1.0.0` baseline, the config structure, and the design documents, continue reading from [`docs/README.en.md`](docs/README.en.md).
 
 TenRiff should also be read as a `vibe coding` work: it was shaped through fast iteration and experimentation rather than only through a traditional long-form design-first process.
 
@@ -116,7 +116,7 @@ If Windows Defender or another antivirus briefly locks `TenRiff.exe`, use the wr
 
 ### 3. Public source packages can be built directly too
 
-The versioned public source bundles (packages such as `TenRiff-1.0.21-source.zip`) include `external/`, `src/`, `tests/`, `config/`, `docs/`, and `Mainmusic/`, so they can be configured and built directly after extraction.
+The versioned public source bundles (packages such as `TenRiff-1.0.3-source.zip`) include `external/`, `src/`, `tests/`, `config/`, `docs/`, and `Mainmusic/`, so they can be configured and built directly after extraction.
 
 - The source bundle does not include `tools/build_with_retry.ps1`, so use plain `cmake --build`.
 - `10k-calc/` is intentionally excluded from the public source bundle, so optional Python-reference checks may print `[skip]` and still be considered normal.

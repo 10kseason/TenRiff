@@ -30,6 +30,20 @@ TEST_CASE("keycode map keeps common punctuation names stable") {
     CHECK(tenriff::config::KeycodeMap::to_name(backslash.value()) == "Backslash");
 }
 
+TEST_CASE("keycode map canonicalizes legacy OEM tokens and punctuation aliases") {
+#if defined(_WIN32)
+    const auto semicolon = tenriff::config::KeycodeMap::to_keycode("VK_OEM_1");
+    REQUIRE(semicolon.has_value());
+    CHECK(tenriff::config::KeycodeMap::to_name(semicolon.value()) == "Semicolon");
+
+    const auto lbracket = tenriff::config::KeycodeMap::to_keycode("[");
+    REQUIRE(lbracket.has_value());
+    CHECK(tenriff::config::KeycodeMap::to_name(lbracket.value()) == "LBracket");
+#else
+    SUCCEED();
+#endif
+}
+
 #if defined(_WIN32)
 TEST_CASE("keycode map uses physical scan aliases for layout-sensitive OEM keys") {
     const auto lbracket = tenriff::config::KeycodeMap::to_keycode("LBracket");
@@ -55,5 +69,13 @@ TEST_CASE("keycode map normalizes raw and polling OEM keys to the same physical 
 
     const auto poll_vk = tenriff::config::KeycodeMap::polling_vk_for_keycode(lbracket.value());
     CHECK(poll_vk.has_value());
+}
+
+TEST_CASE("keycode map recovers raw process keys from scan code under IME-like input") {
+    const auto a_key = tenriff::config::KeycodeMap::to_keycode("A");
+    REQUIRE(a_key.has_value());
+
+    const uint32_t raw = tenriff::config::KeycodeMap::normalize_windows_raw_keycode(VK_PROCESSKEY, 0x1Eu, 0);
+    CHECK(raw == a_key.value());
 }
 #endif

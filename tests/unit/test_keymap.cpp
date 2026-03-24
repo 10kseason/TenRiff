@@ -133,3 +133,69 @@ TEST_CASE("legacy keymap bindings migrate into 10K mode without losing other def
     CHECK(manager.bindings_for_mode(result.keymap, "4k").at("lane1") == "D");
     CHECK(manager.bindings_for_mode(result.keymap, "4k").at("lane4") == "Semicolon");
 }
+
+TEST_CASE("keymap load canonicalizes legacy OEM tokens into current names") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+
+    write_file(temp.path / "profiles" / "test" / "keymap.json",
+               "{\n"
+               "  \"layout\": \"multi\",\n"
+               "  \"modes\": {\n"
+               "    \"4k\": {\n"
+               "      \"lane1\": \"D\",\n"
+               "      \"lane2\": \"F\",\n"
+               "      \"lane3\": \"L\",\n"
+               "      \"lane4\": \"VK_OEM_1\"\n"
+               "    },\n"
+               "    \"10k\": {\n"
+               "      \"lane10\": \"[\"\n"
+               "    }\n"
+               "  }\n"
+               "}\n");
+
+    CurrentPathGuard cwd;
+    std::error_code ec;
+    std::filesystem::current_path(temp.path, ec);
+    REQUIRE_FALSE(static_cast<bool>(ec));
+
+    tenriff::config::KeymapManager manager;
+    const auto result = manager.load_profile("profiles/test");
+    REQUIRE(result.success());
+    CHECK(result.normalized_binding_count >= 2);
+    CHECK(manager.bindings_for_mode(result.keymap, "4k").at("lane4") == "Semicolon");
+    CHECK(manager.bindings_for_mode(result.keymap, "10k").at("lane10") == "LBracket");
+}
+
+TEST_CASE("keymap load repairs invalid bindings with per-lane defaults") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+
+    write_file(temp.path / "profiles" / "test" / "keymap.json",
+               "{\n"
+               "  \"layout\": \"multi\",\n"
+               "  \"modes\": {\n"
+               "    \"4k\": {\n"
+               "      \"lane1\": \"BogusKey\",\n"
+               "      \"lane2\": \"F\",\n"
+               "      \"lane3\": \"L\",\n"
+               "      \"lane4\": \"Semicolon\"\n"
+               "    }\n"
+               "  }\n"
+               "}\n");
+
+    CurrentPathGuard cwd;
+    std::error_code ec;
+    std::filesystem::current_path(temp.path, ec);
+    REQUIRE_FALSE(static_cast<bool>(ec));
+
+    tenriff::config::KeymapManager manager;
+    const auto result = manager.load_profile("profiles/test");
+    REQUIRE(result.success());
+    CHECK(result.repaired_binding_count == 1);
+    REQUIRE_FALSE(result.warnings.empty());
+    CHECK(manager.bindings_for_mode(result.keymap, "4k").at("lane1") == "D");
+    CHECK(manager.bindings_for_mode(result.keymap, "4k").at("lane2") == "F");
+}
