@@ -30,6 +30,99 @@ void GameSession::FutureQueue::consume() {
     }
 }
 
+void GameSession::rebuild_input_thread_config(input::InputThreadConfig& input_config) const {
+    input_config.backend = config_.input.rawinput ? input::InputBackend::RawInput
+                                                  : input::InputBackend::Polling;
+    input_config.raw_input.register_keyboard = config_.input.rawinput;
+    input_config.raw_input.input_sink = true;
+    input_config.raw_input.no_legacy = false;
+    input_config.polling_hz = config_.input.polling_hz;
+    input_config.key_state.debounce_window_ns =
+        std::max<int64_t>(0, static_cast<int64_t>(std::llround(config_.input.debounce_ms * 1'000'000.0)));
+}
+
+void GameSession::persist_runtime_input_backend() const {
+    config::ConfigLoader loader;
+    std::string error;
+    const config::RuntimeConfig persisted = build_persisted_runtime_config(config_);
+    if (!loader.save_profile(profile_dir_, persisted, &error)) {
+        std::cerr << "[error] " << error << std::endl;
+    }
+}
+
+void GameSession::reset_input_backend_probe() {
+    input_backend_probe_.reset();
+    input_probe_polled_states_.clear();
+}
+
+bool GameSession::fallback_gameplay_input_to_polling(std::string_view reason, bool countdown_phase) {
+    if (!config_.input.rawinput) {
+        return false;
+    }
+
+    std::cerr << "[warn] " << reason << std::endl;
+
+    std::unique_lock<std::mutex> lock(engine_mutex_, std::defer_lock);
+    if (!countdown_phase) {
+        lock.lock();
+    }
+
+    config_.input.rawinput = false;
+    config_.input.backend = "polling";
+    reset_input_backend_probe();
+    input_thread_.shutdown();
+
+    input::InputThreadConfig input_config;
+    rebuild_input_thread_config(input_config);
+    if (!input_thread_.initialize(input_config) || !input_thread_.start()) {
+        std::cerr << "[error] Failed to restart gameplay input thread with Polling fallback." << std::endl;
+        return false;
+    }
+
+    rebaseline_gameplay_start_input_state(last_audio_sample_.load(std::memory_order_acquire));
+    persist_runtime_input_backend();
+    input_backend_auto_fallback_ = true;
+    input_backend_fallback_reason_ = std::string(reason);
+    return true;
+}
+
+void GameSession::service_input_backend_health() {
+    const auto snapshot = input_thread_.health_snapshot();
+    if (snapshot.backend != input::InputBackend::RawInput) {
+        reset_input_backend_probe();
+        return;
+    }
+
+    const int64_t now_ns = timing::HighResClock::now_ns();
+    bool polled_change = false;
+    for (const auto& tracked : polled_gameplay_keys_) {
+        const auto poll_vk = config::KeycodeMap::polling_vk_for_keycode(tracked.keycode);
+        if (!poll_vk.has_value()) {
+            continue;
+        }
+
+        const bool pressed = (GetAsyncKeyState(static_cast<int>(*poll_vk)) & 0x8000) != 0;
+        auto [it, inserted] = input_probe_polled_states_.emplace(tracked.keycode, pressed);
+        if (inserted) {
+            continue;
+        }
+        if (it->second == pressed) {
+            continue;
+        }
+        it->second = pressed;
+        polled_change = true;
+    }
+
+    if (polled_change) {
+        input_backend_probe_.note_polled_change(now_ns, snapshot);
+    }
+    if (input_backend_probe_.should_trigger_fallback(now_ns, snapshot)) {
+        static constexpr char kFallbackReason[] =
+            "RawInput inactive for bound gameplay keys, switching to Polling";
+        static_cast<void>(fallback_gameplay_input_to_polling(kFallbackReason, countdown_active_));
+    }
+}
+
 void GameSession::rebuild_polled_gameplay_keys() {
     polled_gameplay_keys_.clear();
     polled_gameplay_keys_.reserve(key_to_lane_.size() + 6);
@@ -167,6 +260,9 @@ bool GameSession::initialize(const CommandLineOptions& options) {
     judgement_loop_step_carry_ = 0;
 
     future_events_ = {};
+    reset_input_backend_probe();
+    input_backend_auto_fallback_ = false;
+    input_backend_fallback_reason_.clear();
     gameplay_input_state_tracker_.reset();
     polled_gameplay_keys_.clear();
     tone_voices_.clear();
@@ -237,8 +333,11 @@ bool GameSession::initialize(const CommandLineOptions& options) {
         return false;
     }
     keymap_ = keymap_result.keymap;
+    for (const auto& warning : keymap_result.warnings) {
+        std::cerr << "[warn] " << warning << std::endl;
+    }
 
-    if (keymap_result.used_defaults) {
+    if (keymap_result.used_defaults || keymap_result.rewritten()) {
         keymap_manager.save_profile(profile_dir_, keymap_);
     }
     report_loading_progress(22, "Resolving chart");
@@ -332,14 +431,7 @@ bool GameSession::initialize(const CommandLineOptions& options) {
     }
 
     input::InputThreadConfig input_config;
-    input_config.backend = config_.input.rawinput ? input::InputBackend::RawInput
-                                                  : input::InputBackend::Polling;
-    input_config.raw_input.register_keyboard = config_.input.rawinput;
-    input_config.raw_input.input_sink = true;
-    input_config.raw_input.no_legacy = false;
-    input_config.polling_hz = config_.input.polling_hz;
-    input_config.key_state.debounce_window_ns =
-        std::max<int64_t>(0, static_cast<int64_t>(std::llround(config_.input.debounce_ms * 1'000'000.0)));
+    rebuild_input_thread_config(input_config);
 
     if (!input_thread_.initialize(input_config)) {
         return false;
@@ -550,6 +642,19 @@ bool GameSession::initialize(const CommandLineOptions& options) {
         }
         key_to_lane_[keycode.value()] = lane_index.value();
     }
+    std::cerr << "[info] Gameplay input backend="
+              << (config_.input.rawinput ? "RawInput" : "Polling")
+              << " key_mode=" << active_key_mode
+              << " bound_lanes=" << key_to_lane_.size() << "/" << std::max(1, chart_.lane_count)
+              << " keymap_normalized=" << keymap_result.normalized_binding_count
+              << " keymap_repaired=" << keymap_result.repaired_binding_count
+              << std::endl;
+    if (key_to_lane_.empty() || key_to_lane_.size() < static_cast<std::size_t>(std::max(1, chart_.lane_count))) {
+        std::cerr << "[warn] Gameplay lane binding coverage incomplete: mapped=" << key_to_lane_.size()
+                  << " expected=" << std::max(1, chart_.lane_count)
+                  << ". Invalid bindings or duplicate lane keys may prevent judgement/input interaction."
+                  << std::endl;
+    }
     gameplay_input_state_tracker_.reset();
     rebuild_polled_gameplay_keys();
     report_loading_progress(88, "Preparing chart audio");
@@ -611,6 +716,10 @@ void GameSession::run() {
             if (finished_.load(std::memory_order_acquire) || stop_requested_.load(std::memory_order_acquire)) {
                 break;
             }
+            service_input_backend_health();
+            if (finished_.load(std::memory_order_acquire) || stop_requested_.load(std::memory_order_acquire)) {
+                break;
+            }
             service_hispeed_repeat(timing::HighResClock::now_ns());
 
             const int64_t now_ns = timing::HighResClock::now_ns();
@@ -643,7 +752,6 @@ void GameSession::run() {
     }
 
     if (!stop_requested_.load(std::memory_order_acquire) && !finished_.load(std::memory_order_acquire)) {
-        rebaseline_gameplay_start_input_state(current_playback_sample_);
         if (audio_thread_.start() != audio::AudioResult::Success) {
             std::cerr << "[error] Failed to start gameplay audio." << std::endl;
             stop_requested_.store(true, std::memory_order_release);
@@ -658,6 +766,7 @@ void GameSession::run() {
             break;
         }
 
+        service_input_backend_health();
         service_chart_audio_streaming(last_audio_sample_.load(std::memory_order_acquire));
 
         const auto now = std::chrono::steady_clock::now();
@@ -1727,6 +1836,7 @@ void GameSession::audio_callback(float* output,
                                  uint32_t frames,
                                  int64_t buffer_start_samples,
                                  int64_t playback_sample) {
+    static_cast<void>(playback_sample);
     if (output && frames > 0) {
         std::fill(output, output + frames * 2, 0.0f);
     }
@@ -1743,14 +1853,16 @@ void GameSession::audio_callback(float* output,
         const int64_t lookahead_samples = ms_to_samples(static_cast<double>(kLookaheadMs), sample_rate_);
 
         const int64_t now_ns = timing::HighResClock::now_ns();
-        startup_input_timing_anchor_.playback_sample = playback_sample;
-        startup_input_timing_anchor_.callback_time_ns = now_ns;
-        startup_input_timing_anchor_.valid = true;
-        current_playback_sample_ = playback_sample;
-        clock_sync_.add_sample(now_ns, playback_sample);
+        clock_sync_.add_sample(now_ns, buffer_start_samples);
         schedule_note_guides(buffer_start_samples, buffer_end_samples);
+        process_future_events(buffer_end_samples, lookahead_samples);
+        process_input_queue(buffer_start_samples, buffer_end_samples, lookahead_samples);
         service_hispeed_repeat(now_ns);
-        run_judgement_loop(buffer_start_samples, buffer_end_samples, lookahead_samples);
+        process_ghost_replay_queue(buffer_end_samples, lookahead_samples);
+        engine_->advance(buffer_end_samples);
+        if (ghost_engine_) {
+            ghost_engine_->advance(buffer_end_samples);
+        }
 
         if (!lane_activity_.empty() && sample_rate_ > 0) {
             const float decay = static_cast<float>(static_cast<double>(frames) * 5.0 /
@@ -1833,19 +1945,10 @@ void GameSession::process_countdown_input_queue() {
         if (!maybe_event.has_value()) {
             break;
         }
-        auto filtered = filter_gameplay_input_event(*maybe_event);
-        if (!filtered.has_value()) {
-            continue;
-        }
-        if (handle_control_input(*filtered) &&
+        if (handle_control_input(*maybe_event) &&
             finished_.load(std::memory_order_acquire)) {
             return;
         }
-    }
-
-    poll_gameplay_keys(current_playback_sample_, false);
-    if (finished_.load(std::memory_order_acquire)) {
-        return;
     }
 
     std::fill(lane_activity_.begin(), lane_activity_.end(), 0.0f);
@@ -1978,19 +2081,18 @@ void GameSession::catch_up_lane_input(int lane, input::InputState state, int64_t
 
 void GameSession::process_future_events(int64_t buffer_end_samples, int64_t lookahead_samples) {
     while (true) {
-        auto next = future_events_.peek();
+        auto next = future_events_.pop();
         if (!next.has_value()) {
             return;
         }
-        if (next->sample > buffer_end_samples + lookahead_samples) {
-            return;
-        }
-        future_events_.consume();
         if (handle_control_input(next->event)) {
             if (finished_.load(std::memory_order_acquire)) {
                 return;
             }
             continue;
+        }
+        if (next->sample > buffer_end_samples + lookahead_samples) {
+            next->sample = buffer_end_samples;
         }
         if (auto lane = lane_from_keycode(next->event.keycode)) {
             dispatch_lane_input(lane.value(), next->event.state, next->sample);
@@ -2006,7 +2108,7 @@ void GameSession::process_input_queue(int64_t buffer_start_samples, int64_t buff
     }
 
     // If input falls well behind the current audio cursor, replaying every stale edge can spike the mix callback.
-    const double stale_window_ms = std::max(kInputBacklogCatchupFloorMs, config_.judge.bd_ms);
+    const double stale_window_ms = std::max(kInputBacklogCatchupFloorMs, config_.judge.indirect_miss_ms);
     const int64_t stale_before_sample = buffer_start_samples - ms_to_samples(stale_window_ms, sample_rate_);
     std::array<BufferedLaneInput, kGameplayHudMaxLanes> stale_lane_inputs{};
     std::array<uint8_t, kGameplayHudMaxLanes> stale_lane_present{};
@@ -2018,12 +2120,7 @@ void GameSession::process_input_queue(int64_t buffer_start_samples, int64_t buff
             break;
         }
 
-        auto filtered = filter_gameplay_input_event(*maybe_event);
-        if (!filtered.has_value()) {
-            continue;
-        }
-
-        auto event = filtered.value();
+        auto event = maybe_event.value();
         if (handle_control_input(event)) {
             if (finished_.load(std::memory_order_acquire)) {
                 return;
@@ -2032,23 +2129,13 @@ void GameSession::process_input_queue(int64_t buffer_start_samples, int64_t buff
         }
 
         auto mapped = clock_sync_.input_to_audio_samples(event.input_time_ns);
-        int64_t sample = resolve_startup_gameplay_input_sample(
-                             mapped,
-                             event.input_time_ns,
-                             startup_input_timing_anchor_,
-                             sample_rate_,
-                             current_playback_sample_) +
-                         input_offset_samples_;
+        int64_t sample = mapped.value_or(buffer_start_samples) + input_offset_samples_;
         auto lane = lane_from_keycode(event.keycode);
         if (!lane.has_value()) {
             continue;
         }
         if (sample > buffer_end_samples + lookahead_samples) {
-            if (!future_events_.push(FutureEvent{event, sample})) {
-                sample = buffer_end_samples;
-            } else {
-                continue;
-            }
+            sample = buffer_end_samples;
         }
 
         const int lane_index = lane.value() - 1;
@@ -2070,11 +2157,6 @@ void GameSession::process_input_queue(int64_t buffer_start_samples, int64_t buff
         }
         const auto& buffered = stale_lane_inputs[lane_index];
         catch_up_lane_input(buffered.lane, buffered.state, buffered.sample);
-    }
-
-    poll_gameplay_keys(buffer_end_samples, true);
-    if (finished_.load(std::memory_order_acquire)) {
-        return;
     }
 
     for (const auto& buffered : pending_input_events_) {

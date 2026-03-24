@@ -608,6 +608,8 @@ MenuApp::~MenuApp() {
 
 bool MenuApp::initialize(const CommandLineOptions& options) {
     exit_code_ = 0;
+    input_backend_auto_fallback_ = false;
+    input_backend_fallback_reason_.clear();
     options_ = options;
     songs_path_ = menu_songs::normalize_song_source_path(options.songs_path);
     if (songs_path_.empty()) {
@@ -645,8 +647,11 @@ bool MenuApp::initialize(const CommandLineOptions& options) {
         return false;
     }
     keymap_ = keymap_result.keymap;
+    for (const auto& warning : keymap_result.warnings) {
+        std::cerr << "[warn] " << warning << std::endl;
+    }
 
-    if (keymap_result.used_defaults) {
+    if (keymap_result.used_defaults || keymap_result.rewritten()) {
         keymap_manager.save_profile(profile_dir_, keymap_);
     }
     first_run_profile_ = first_run_profile_ || keymap_result.used_defaults;
@@ -773,6 +778,7 @@ void MenuApp::run() {
         }
 
         update_keymap_capture_timeout();
+        service_input_backend_health();
         update_song_select_repeat();
 
         if (screen_ == Screen::SongSelect && song_indexer_.is_running()) {
@@ -798,6 +804,11 @@ void MenuApp::shutdown() {
 }
 
 void MenuApp::start_menu_threads() {
+    reset_input_backend_probe();
+    if (config_.input.rawinput) {
+        input_backend_auto_fallback_ = false;
+        input_backend_fallback_reason_.clear();
+    }
     input::InputThreadConfig input_config;
     input_config.backend = config_.input.rawinput ? input::InputBackend::RawInput
                                                   : input::InputBackend::Polling;
@@ -837,6 +848,11 @@ void MenuApp::stop_menu_threads() {
 }
 
 void MenuApp::restart_input_thread() {
+    reset_input_backend_probe();
+    if (config_.input.rawinput) {
+        input_backend_auto_fallback_ = false;
+        input_backend_fallback_reason_.clear();
+    }
     input_thread_.shutdown();
     input::InputThreadConfig input_config;
     input_config.backend = config_.input.rawinput ? input::InputBackend::RawInput
@@ -853,6 +869,135 @@ void MenuApp::restart_input_thread() {
     }
     if (!input_thread_.start()) {
         std::cerr << "[error] Failed to restart input thread." << std::endl;
+    }
+}
+
+void MenuApp::reset_input_backend_probe() {
+    input_backend_probe_.reset();
+    input_probe_polled_states_.clear();
+}
+
+std::vector<uint32_t> MenuApp::current_menu_probe_keycodes() const {
+    std::vector<uint32_t> keycodes;
+    auto append_keycode = [&keycodes](uint32_t keycode) {
+        if (keycode == 0) {
+            return;
+        }
+        if (std::find(keycodes.begin(), keycodes.end(), keycode) != keycodes.end()) {
+            return;
+        }
+        keycodes.push_back(keycode);
+    };
+
+    append_keycode(key_up_);
+    append_keycode(key_down_);
+    append_keycode(key_left_);
+    append_keycode(key_right_);
+    append_keycode(key_page_up_);
+    append_keycode(key_page_down_);
+    append_keycode(key_enter_);
+    append_keycode(key_escape_);
+    append_keycode(key_backspace_);
+    append_keycode(key_delete_);
+    append_keycode(key_f1_);
+    append_keycode(key_f2_);
+    append_keycode(key_f5_);
+    append_keycode(key_f9_);
+
+    config::KeymapManager keymap_manager;
+    const auto bindings = keymap_manager.bindings_for_mode(working_keymap_, keymap_edit_mode_);
+    for (const auto& [lane, key] : bindings) {
+        static_cast<void>(lane);
+        if (auto keycode = config::KeycodeMap::to_keycode(key)) {
+            append_keycode(*keycode);
+        }
+    }
+
+    return keycodes;
+}
+
+void MenuApp::rebuild_pressed_keys_from_polling_snapshot() {
+    pressed_keys_.clear();
+    for (uint32_t keycode : current_menu_probe_keycodes()) {
+        const auto poll_vk = config::KeycodeMap::polling_vk_for_keycode(keycode);
+        if (!poll_vk.has_value()) {
+            continue;
+        }
+        if ((GetAsyncKeyState(static_cast<int>(*poll_vk)) & 0x8000) != 0) {
+            pressed_keys_.insert(keycode);
+        }
+    }
+    if (pressed_keys_.find(song_select_repeat_key_) == pressed_keys_.end()) {
+        reset_song_select_repeat();
+    }
+}
+
+bool MenuApp::fallback_menu_input_to_polling(std::string_view reason) {
+    if (!config_.input.rawinput) {
+        return false;
+    }
+
+    std::cerr << "[warn] " << reason << std::endl;
+    config_.input.rawinput = false;
+    config_.input.backend = "polling";
+    restart_input_thread();
+    rebuild_pressed_keys_from_polling_snapshot();
+    persist_runtime_config();
+
+    input_backend_auto_fallback_ = true;
+    input_backend_fallback_reason_ = std::string(reason);
+    publish_snapshot();
+    return true;
+}
+
+std::string MenuApp::current_input_backend_status_label() const {
+    const auto snapshot = input_thread_.health_snapshot();
+    std::string label = "Input backend: ";
+    label += (snapshot.backend == input::InputBackend::RawInput) ? "RawInput" : "Polling";
+    if (input_backend_auto_fallback_) {
+        label += " (auto-fallback)";
+    }
+    return label;
+}
+
+void MenuApp::service_input_backend_health() {
+    if (screen_ != Screen::KeymapTest) {
+        reset_input_backend_probe();
+        return;
+    }
+
+    const auto snapshot = input_thread_.health_snapshot();
+    if (snapshot.backend != input::InputBackend::RawInput) {
+        reset_input_backend_probe();
+        return;
+    }
+
+    const int64_t now_ns = timing::HighResClock::now_ns();
+    bool polled_change = false;
+    for (uint32_t keycode : current_menu_probe_keycodes()) {
+        const auto poll_vk = config::KeycodeMap::polling_vk_for_keycode(keycode);
+        if (!poll_vk.has_value()) {
+            continue;
+        }
+        const bool pressed = (GetAsyncKeyState(static_cast<int>(*poll_vk)) & 0x8000) != 0;
+        auto [it, inserted] = input_probe_polled_states_.emplace(keycode, pressed);
+        if (inserted) {
+            continue;
+        }
+        if (it->second == pressed) {
+            continue;
+        }
+        it->second = pressed;
+        polled_change = true;
+    }
+
+    if (polled_change) {
+        input_backend_probe_.note_polled_change(now_ns, snapshot);
+    }
+    if (input_backend_probe_.should_trigger_fallback(now_ns, snapshot)) {
+        static constexpr char kFallbackReason[] =
+            "RawInput inactive for bound keys in NKRO Test, switching to Polling";
+        static_cast<void>(fallback_menu_input_to_polling(kFallbackReason));
     }
 }
 

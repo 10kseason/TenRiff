@@ -140,8 +140,9 @@ void MenuApp::populate_keymap_confirm_render_data(render::MenuRenderData& render
 }
 
 void MenuApp::populate_keymap_test_render_data(render::MenuRenderData& render) {
-    render.generic.footer_reserved_lines = 1;
+    render.generic.footer_reserved_lines = 2;
     render.generic.footer_notes.push_back(ui_text("NKRO Test (press multiple keys)", "NKRO 테스트 (여러 키를 동시에 눌러보세요)"));
+    render.generic.footer_notes.push_back(current_input_backend_status_label());
     config::KeymapManager keymap_manager;
     const auto current_bindings = keymap_manager.bindings_for_mode(working_keymap_, keymap_edit_mode_);
     for (std::size_t i = 0; i < keymap_lanes_.size(); ++i) {
