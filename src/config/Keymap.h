@@ -16,9 +16,15 @@ struct Keymap {
 struct KeymapLoadResult {
     Keymap keymap;
     std::string error;
+    std::vector<std::string> warnings;
     bool used_defaults = false;
+    int normalized_binding_count = 0;
+    int repaired_binding_count = 0;
 
     [[nodiscard]] bool success() const { return error.empty(); }
+    [[nodiscard]] bool rewritten() const {
+        return normalized_binding_count > 0 || repaired_binding_count > 0;
+    }
 };
 
 class KeymapManager {

@@ -7,6 +7,7 @@
 #include <sstream>
 #include <unordered_set>
 
+#include "config/KeycodeMap.h"
 #include "config/SimpleJson.h"
 
 namespace tenriff::config {
@@ -58,6 +59,53 @@ std::unordered_map<std::string, std::string> bindings_from_vector(const std::vec
         bindings.emplace("lane" + std::to_string(i + 1), keys[i]);
     }
     return bindings;
+}
+
+std::string format_binding_value_for_log(std::string_view value) {
+    if (value.empty()) {
+        return "<empty>";
+    }
+    return std::string(value);
+}
+
+void canonicalize_mode_bindings(const KeymapManager& manager,
+                                Keymap& keymap,
+                                std::string_view key_mode,
+                                KeymapLoadResult& result) {
+    const std::string normalized_mode = manager.normalize_mode_token(key_mode);
+    auto defaults = manager.bindings_for_mode(manager.default_keymap(), normalized_mode);
+    auto lane_ids = manager.lane_ids_for_mode(normalized_mode);
+    auto& bindings = keymap.mode_bindings[normalized_mode];
+
+    for (const auto& lane : lane_ids) {
+        const std::string original = [&]() -> std::string {
+            auto it = bindings.find(lane);
+            if (it == bindings.end()) {
+                return {};
+            }
+            return it->second;
+        }();
+
+        const auto keycode = KeycodeMap::to_keycode(original);
+        if (!keycode.has_value()) {
+            const std::string fallback = defaults[lane];
+            if (original != fallback) {
+                ++result.repaired_binding_count;
+                result.warnings.push_back("Keymap binding repaired: mode=" + normalized_mode +
+                                          " lane=" + lane +
+                                          " original=" + format_binding_value_for_log(original) +
+                                          " fallback=" + fallback);
+            }
+            bindings[lane] = fallback;
+            continue;
+        }
+
+        const std::string canonical = KeycodeMap::to_name(*keycode);
+        if (canonical != original) {
+            ++result.normalized_binding_count;
+        }
+        bindings[lane] = canonical;
+    }
 }
 
 }  // namespace
@@ -197,6 +245,10 @@ KeymapLoadResult KeymapManager::load_profile(std::string_view profile_dir) const
             result.keymap.bindings[lane] = value.as_string();
             result.keymap.mode_bindings["10k"][lane] = value.as_string();
         }
+    }
+
+    for (const auto& mode : supported_mode_tokens()) {
+        canonicalize_mode_bindings(*this, result.keymap, mode, result);
     }
 
     if (result.keymap.mode_bindings.find("10k") != result.keymap.mode_bindings.end()) {

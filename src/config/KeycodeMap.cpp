@@ -149,6 +149,29 @@ std::optional<uint32_t> parse_vk_token(std::string_view token) {
     return static_cast<uint32_t>((hi << 4) | lo);
 }
 
+std::optional<uint32_t> parse_named_vk_token(std::string_view token) {
+    if (token == "VK_OEM_1" || token == "OEM_1" || token == "OEM1") return static_cast<uint32_t>(VK_OEM_1);
+    if (token == "VK_OEM_PLUS" || token == "OEM_PLUS" || token == "OEMPLUS") {
+        return static_cast<uint32_t>(VK_OEM_PLUS);
+    }
+    if (token == "VK_OEM_COMMA" || token == "OEM_COMMA" || token == "OEMCOMMA") {
+        return static_cast<uint32_t>(VK_OEM_COMMA);
+    }
+    if (token == "VK_OEM_MINUS" || token == "OEM_MINUS" || token == "OEMMINUS") {
+        return static_cast<uint32_t>(VK_OEM_MINUS);
+    }
+    if (token == "VK_OEM_PERIOD" || token == "OEM_PERIOD" || token == "OEMPERIOD") {
+        return static_cast<uint32_t>(VK_OEM_PERIOD);
+    }
+    if (token == "VK_OEM_2" || token == "OEM_2" || token == "OEM2") return static_cast<uint32_t>(VK_OEM_2);
+    if (token == "VK_OEM_3" || token == "OEM_3" || token == "OEM3") return static_cast<uint32_t>(VK_OEM_3);
+    if (token == "VK_OEM_4" || token == "OEM_4" || token == "OEM4") return static_cast<uint32_t>(VK_OEM_4);
+    if (token == "VK_OEM_5" || token == "OEM_5" || token == "OEM5") return static_cast<uint32_t>(VK_OEM_5);
+    if (token == "VK_OEM_6" || token == "OEM_6" || token == "OEM6") return static_cast<uint32_t>(VK_OEM_6);
+    if (token == "VK_OEM_7" || token == "OEM_7" || token == "OEM7") return static_cast<uint32_t>(VK_OEM_7);
+    return std::nullopt;
+}
+
 std::string fallback_vk_name(uint32_t keycode) {
     static constexpr char kHex[] = "0123456789ABCDEF";
     std::string name = "VK_00";
@@ -191,6 +214,25 @@ uint16_t scan_code_from_vk(uint32_t vkey) {
     return static_cast<uint16_t>(scan & 0x00FFu);
 }
 
+bool raw_vkey_needs_scan_recovery(uint32_t vkey) {
+    return vkey == 0u || vkey == 0xFFu || vkey == static_cast<uint32_t>(VK_PROCESSKEY) ||
+           vkey == static_cast<uint32_t>(VK_PACKET);
+}
+
+uint32_t recover_raw_vkey_from_scan_code(uint32_t vkey, uint16_t scan_code) {
+    if (!raw_vkey_needs_scan_recovery(vkey) || scan_code == 0u) {
+        return vkey;
+    }
+
+    const HKL layout = GetKeyboardLayout(0);
+    const UINT mapped = MapVirtualKeyExW(scan_code, MAPVK_VSC_TO_VK_EX, layout);
+    if (mapped != 0u) {
+        return static_cast<uint32_t>(mapped);
+    }
+
+    return vkey;
+}
+
 uint32_t normalize_layout_sensitive_key(uint32_t fallback_vkey, uint16_t scan_code) {
     if (scan_code_from_name("SEMICOLON").value() == scan_code ||
         scan_code_from_name("PLUS").value() == scan_code ||
@@ -226,10 +268,27 @@ std::optional<uint32_t> KeycodeMap::to_keycode(std::string_view name) {
         if (ch >= '0' && ch <= '9') {
             return static_cast<uint32_t>(ch);
         }
+        switch (ch) {
+            case ';': return scancode_keycode(0x0027u);
+            case '=': return scancode_keycode(0x000Du);
+            case ',': return scancode_keycode(0x0033u);
+            case '-': return scancode_keycode(0x000Cu);
+            case '.': return scancode_keycode(0x0034u);
+            case '/': return scancode_keycode(0x0035u);
+            case '`': return scancode_keycode(0x0029u);
+            case '[': return scancode_keycode(0x001Au);
+            case '\\': return scancode_keycode(0x002Bu);
+            case ']': return scancode_keycode(0x001Bu);
+            case '\'': return scancode_keycode(0x0028u);
+            default: break;
+        }
     }
 
     if (auto generic_vk = parse_vk_token(normalized)) {
         return generic_vk;
+    }
+    if (auto named_vk = parse_named_vk_token(normalized)) {
+        return normalize_windows_polling_keycode(*named_vk);
     }
     if (auto generic_scan = parse_scancode_token(normalized)) {
         return generic_scan;
@@ -411,7 +470,8 @@ std::string KeycodeMap::to_name(uint32_t keycode) {
 #ifdef _WIN32
 uint32_t KeycodeMap::normalize_windows_raw_keycode(uint32_t vkey, uint16_t make_code, uint16_t flags) {
     const uint16_t scan_code = encode_scan_code(make_code, flags);
-    return normalize_layout_sensitive_key(vkey, scan_code);
+    const uint32_t resolved_vkey = recover_raw_vkey_from_scan_code(vkey, scan_code);
+    return normalize_layout_sensitive_key(resolved_vkey, scan_code);
 }
 
 uint32_t KeycodeMap::normalize_windows_polling_keycode(uint32_t vkey) {

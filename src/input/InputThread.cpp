@@ -67,6 +67,13 @@ InputThread::~InputThread() {
 bool InputThread::initialize(const InputThreadConfig& config) {
     config_ = config;
     last_input_allowed_ = false;
+    active_backend_.store(static_cast<uint8_t>(config_.backend), std::memory_order_release);
+    last_allowed_event_time_ns_.store(0, std::memory_order_release);
+    last_queue_push_time_ns_.store(0, std::memory_order_release);
+    allowed_event_count_.store(0, std::memory_order_release);
+    events_processed_.store(0, std::memory_order_release);
+    events_dropped_.store(0, std::memory_order_release);
+    event_queue_.reset();
     
     // Create components (will be used by the thread).
     key_state_tracker_ = std::make_unique<KeyStateTracker>(config.key_state);
@@ -134,6 +141,11 @@ void InputThread::stop() {
     }
 
     is_running_.store(false, std::memory_order_release);
+    event_queue_.reset();
+    if (key_state_tracker_) {
+        key_state_tracker_->reset();
+    }
+    last_input_allowed_ = false;
 }
 
 void InputThread::shutdown() {
@@ -151,6 +163,17 @@ void InputThread::reset_key_states() {
         // Note: This is technically a race condition, but reset() is simple enough.
         key_state_tracker_->reset();
     }
+}
+
+InputThreadHealthSnapshot InputThread::health_snapshot() const {
+    InputThreadHealthSnapshot snapshot;
+    snapshot.backend = current_backend();
+    snapshot.last_allowed_event_time_ns = last_allowed_event_time_ns_.load(std::memory_order_acquire);
+    snapshot.last_queue_push_time_ns = last_queue_push_time_ns_.load(std::memory_order_acquire);
+    snapshot.allowed_event_count = allowed_event_count_.load(std::memory_order_acquire);
+    snapshot.queue_push_count = events_processed_.load(std::memory_order_acquire);
+    snapshot.dropped_count = events_dropped_.load(std::memory_order_acquire);
+    return snapshot;
 }
 
 bool InputThread::is_input_allowed() const {
@@ -175,6 +198,9 @@ void InputThread::on_input_event(const InputEvent& event) {
         return;
     }
 
+    allowed_event_count_.fetch_add(1, std::memory_order_relaxed);
+    last_allowed_event_time_ns_.store(event.input_time_ns, std::memory_order_release);
+
     // Process through key state tracker for debouncing.
     auto filtered = key_state_tracker_->process(event);
     
@@ -188,6 +214,7 @@ void InputThread::on_input_event(const InputEvent& event) {
         return;
     }
 
+    last_queue_push_time_ns_.store(filtered->input_time_ns, std::memory_order_release);
     events_processed_.fetch_add(1, std::memory_order_relaxed);
 }
 

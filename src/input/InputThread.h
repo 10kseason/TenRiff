@@ -21,6 +21,15 @@ enum class InputBackend : uint8_t {
     Polling = 1,
 };
 
+struct InputThreadHealthSnapshot {
+    InputBackend backend = InputBackend::Polling;
+    int64_t last_allowed_event_time_ns = 0;
+    int64_t last_queue_push_time_ns = 0;
+    uint64_t allowed_event_count = 0;
+    uint64_t queue_push_count = 0;
+    uint64_t dropped_count = 0;
+};
+
 /// Configuration for the input thread.
 struct InputThreadConfig {
     InputBackend backend = InputBackend::Polling;  ///< Input backend selection.
@@ -81,6 +90,12 @@ public:
         return events_dropped_.load(std::memory_order_acquire); 
     }
 
+    [[nodiscard]] InputBackend current_backend() const {
+        return static_cast<InputBackend>(active_backend_.load(std::memory_order_acquire));
+    }
+
+    [[nodiscard]] InputThreadHealthSnapshot health_snapshot() const;
+
     /// Reset all key states (call on focus loss).
     void reset_key_states();
 
@@ -102,6 +117,7 @@ private:
     std::thread thread_;
     std::atomic<bool> is_running_{false};
     std::atomic<bool> should_stop_{false};
+    std::atomic<uint8_t> active_backend_{static_cast<uint8_t>(InputBackend::Polling)};
 
     // Message window handle (stored as void* to avoid Windows.h).
     void* hwnd_ = nullptr;
@@ -111,6 +127,9 @@ private:
     bool start_result_ready_ = false;
     bool start_result_success_ = false;
 
+    std::atomic<int64_t> last_allowed_event_time_ns_{0};
+    std::atomic<int64_t> last_queue_push_time_ns_{0};
+    std::atomic<uint64_t> allowed_event_count_{0};
     std::atomic<uint64_t> events_processed_{0};
     std::atomic<uint64_t> events_dropped_{0};
 };

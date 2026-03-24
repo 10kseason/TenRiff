@@ -40,6 +40,11 @@ public:
 
     [[nodiscard]] std::size_t capacity() const { return Capacity - 1; }
 
+    void reset() {
+        tail_.store(0, std::memory_order_release);
+        head_.store(0, std::memory_order_release);
+    }
+
 private:
     [[nodiscard]] std::size_t increment(std::size_t index) const { return (index + 1) % Capacity; }
 
@@ -49,4 +54,3 @@ private:
 };
 
 }  // namespace tenriff::input
-
