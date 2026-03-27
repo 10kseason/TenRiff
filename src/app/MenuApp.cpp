@@ -55,8 +55,8 @@ using menu_song_select::song_title_for_ui;
 
 constexpr int kSnapshotSongCount = 10;
 constexpr int kSongSelectVisibleCardCount = 5;
-constexpr int kSongSelectNavLastIndex = 11;
-constexpr int kSongBrowserRowCount = 8;
+constexpr int kSongSelectNavLastIndex = 5;
+constexpr int kSongBrowserRowCount = 10;
 constexpr int64_t kSongSelectRepeatInitialDelayNs = 250'000'000LL;
 constexpr int64_t kSongSelectRepeatIntervalNs = 45'000'000LL;
 constexpr std::size_t kRecentSongSourceLimit = 12;
@@ -315,6 +315,26 @@ MenuApp::SongGroupMode cycle_song_group_mode(MenuApp::SongGroupMode mode) {
         case MenuApp::SongGroupMode::Folder:
         default: return MenuApp::SongGroupMode::None;
     }
+}
+
+MenuApp::SongSortMode cycle_song_sort_mode(MenuApp::SongSortMode mode, int direction) {
+    static constexpr std::array<MenuApp::SongSortMode, 6> kModes = {
+        MenuApp::SongSortMode::DifficultyAsc,
+        MenuApp::SongSortMode::DifficultyDesc,
+        MenuApp::SongSortMode::TitleAsc,
+        MenuApp::SongSortMode::TitleDesc,
+        MenuApp::SongSortMode::ArtistAsc,
+        MenuApp::SongSortMode::ArtistDesc,
+    };
+
+    auto it = std::find(kModes.begin(), kModes.end(), mode);
+    std::size_t index = (it == kModes.end()) ? 0u : static_cast<std::size_t>(std::distance(kModes.begin(), it));
+    if (direction >= 0) {
+        index = (index + 1) % kModes.size();
+    } else {
+        index = (index + kModes.size() - 1) % kModes.size();
+    }
+    return kModes[index];
 }
 
 std::optional<char> search_character_from_keycode(uint32_t keycode) {
@@ -961,7 +981,14 @@ std::string MenuApp::current_input_backend_status_label() const {
 }
 
 void MenuApp::service_input_backend_health() {
-    if (screen_ != Screen::KeymapTest) {
+    const bool probe_supported =
+        screen_ == Screen::QuickSetup ||
+        screen_ == Screen::Title ||
+        screen_ == Screen::SongSelect ||
+        screen_ == Screen::OptionsHub ||
+        screen_ == Screen::Keymap ||
+        screen_ == Screen::KeymapTest;
+    if (!probe_supported) {
         reset_input_backend_probe();
         return;
     }
@@ -974,9 +1001,16 @@ void MenuApp::service_input_backend_health() {
 
     const int64_t now_ns = timing::HighResClock::now_ns();
     bool polled_change = false;
+    static std::unordered_set<uint32_t> warned_unpollable_keys;
     for (uint32_t keycode : current_menu_probe_keycodes()) {
         const auto poll_vk = config::KeycodeMap::polling_vk_for_keycode(keycode);
         if (!poll_vk.has_value()) {
+            if (warned_unpollable_keys.insert(keycode).second) {
+                std::cerr << "[warn] Menu polling fallback cannot verify key "
+                          << config::KeycodeMap::to_name(keycode)
+                          << " (" << keycode << "); RawInput menu health checks will ignore it."
+                          << std::endl;
+            }
             continue;
         }
         const bool pressed = (GetAsyncKeyState(static_cast<int>(*poll_vk)) & 0x8000) != 0;
@@ -995,9 +1029,18 @@ void MenuApp::service_input_backend_health() {
         input_backend_probe_.note_polled_change(now_ns, snapshot);
     }
     if (input_backend_probe_.should_trigger_fallback(now_ns, snapshot)) {
-        static constexpr char kFallbackReason[] =
-            "RawInput inactive for bound keys in NKRO Test, switching to Polling";
-        static_cast<void>(fallback_menu_input_to_polling(kFallbackReason));
+        const char* screen_label = "menu";
+        switch (screen_) {
+            case Screen::QuickSetup: screen_label = "Quick Setup"; break;
+            case Screen::Title: screen_label = "Title"; break;
+            case Screen::SongSelect: screen_label = "Song Select"; break;
+            case Screen::OptionsHub: screen_label = "Options"; break;
+            case Screen::Keymap: screen_label = "Keymap"; break;
+            case Screen::KeymapTest: screen_label = "NKRO Test"; break;
+            default: break;
+        }
+        static_cast<void>(fallback_menu_input_to_polling(
+            std::string("RawInput inactive for menu keys on ") + screen_label + ", switching to Polling"));
     }
 }
 
@@ -1558,7 +1601,7 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
             handle_calibration_settings_input(action_key);
             return;
         case Screen::ModeSelect:
-            settings_cursor_ = clamp_int(event.index, 0, 10);
+            settings_cursor_ = clamp_int(event.index, 0, 13);
             handle_mode_settings_input(action_key);
             return;
         case Screen::ModeMods:
@@ -1587,28 +1630,9 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
 }
 
 bool MenuApp::handle_settings_shortcut(uint32_t keycode, Screen return_screen) {
-    auto open_settings = [&](Screen target) {
-        submenu_return_screen_ = return_screen;
-        screen_ = target;
-        settings_cursor_ = 0;
-    };
-
-    if (keycode == key_a_) {
-        open_settings(Screen::SettingsAudio);
-    } else if (keycode == key_g_) {
-        open_settings(Screen::SettingsGraphics);
-    } else if (keycode == key_i_) {
-        open_settings(Screen::SettingsInput);
-    } else if (keycode == key_m_) {
-        open_settings(Screen::ModeSelect);
-    } else if (keycode == key_k_) {
-        open_keymap_screen(return_screen);
-    } else {
-        return false;
-    }
-
-    publish_snapshot();
-    return true;
+    static_cast<void>(keycode);
+    static_cast<void>(return_screen);
+    return false;
 }
 
 void MenuApp::handle_title_input(uint32_t keycode) {
@@ -1617,9 +1641,16 @@ void MenuApp::handle_title_input(uint32_t keycode) {
         publish_snapshot();
         return;
     }
-    if (handle_settings_shortcut(keycode, Screen::Title)) {
+#ifdef _WIN32
+    if (keycode == key_f2_) {
+        std::string new_path = browse_for_folder(ui_text("Select Songs Folder", "곡 폴더 선택"));
+        if (!new_path.empty()) {
+            switch_song_source(new_path, false);
+            publish_snapshot();
+        }
         return;
     }
+#endif
     if (keycode == key_up_) {
         title_cursor_ = clamp_int(title_cursor_ - 1, 0, 3);
         publish_snapshot();
@@ -1632,6 +1663,16 @@ void MenuApp::handle_title_input(uint32_t keycode) {
     }
     if (keycode == key_enter_) {
         if (title_cursor_ == 0) {
+#ifdef _WIN32
+            if (visible_song_count() == 0) {
+                std::string new_path = browse_for_folder(ui_text("Select Songs Folder", "곡 폴더 선택"));
+                if (!new_path.empty()) {
+                    switch_song_source(new_path, false);
+                    publish_snapshot();
+                }
+                return;
+            }
+#endif
             screen_ = Screen::SongSelect;
             song_select_focus_ = SongSelectFocus::SongList;
             publish_snapshot();
@@ -1835,7 +1876,7 @@ void MenuApp::handle_song_select_input(uint32_t keycode) {
         publish_snapshot();
     };
     const bool search_nav_selected =
-        song_select_focus_ == SongSelectFocus::LeftNav && song_select_nav_cursor_ == 6;
+        song_select_focus_ == SongSelectFocus::LeftNav && song_select_nav_cursor_ == 2;
     if (song_select_search_active_) {
         if (keycode == key_enter_ || keycode == key_escape_) {
             song_select_search_active_ = false;
@@ -1910,12 +1951,6 @@ void MenuApp::handle_song_select_input(uint32_t keycode) {
         return;
     }
 #endif
-    if (keycode == key_a_ || keycode == key_g_ || keycode == key_i_ || keycode == key_m_ || keycode == key_k_) {
-        song_select_search_active_ = false;
-    }
-    if (handle_settings_shortcut(keycode, Screen::SongSelect)) {
-        return;
-    }
     if (keycode == key_left_) {
         song_select_search_active_ = false;
         song_select_focus_ = SongSelectFocus::LeftNav;
@@ -1940,7 +1975,7 @@ void MenuApp::handle_song_select_input(uint32_t keycode) {
     if (keycode == key_up_) {
         if (song_select_focus_ == SongSelectFocus::LeftNav) {
             song_select_nav_cursor_ = clamp_int(song_select_nav_cursor_ - 1, 0, kSongSelectNavLastIndex);
-            if (song_select_nav_cursor_ != 6) {
+            if (song_select_nav_cursor_ != 2) {
                 song_select_search_active_ = false;
             }
             publish_snapshot();
@@ -1955,7 +1990,7 @@ void MenuApp::handle_song_select_input(uint32_t keycode) {
     if (keycode == key_down_) {
         if (song_select_focus_ == SongSelectFocus::LeftNav) {
             song_select_nav_cursor_ = clamp_int(song_select_nav_cursor_ + 1, 0, kSongSelectNavLastIndex);
-            if (song_select_nav_cursor_ != 6) {
+            if (song_select_nav_cursor_ != 2) {
                 song_select_search_active_ = false;
             }
             publish_snapshot();
@@ -1977,93 +2012,53 @@ void MenuApp::handle_song_select_input(uint32_t keycode) {
             switch (song_select_nav_cursor_) {
                 case 0:
                     song_select_search_active_ = false;
-                    apply_song_sort(toggle_difficulty_sort(song_sort_mode_));
                     song_select_view_ = SongSelectView::Songs;
+                    song_select_focus_ = SongSelectFocus::SongList;
                     publish_snapshot();
                     return;
                 case 1:
                     song_select_search_active_ = false;
-                    apply_song_sort(toggle_title_sort(song_sort_mode_));
-                    song_select_view_ = SongSelectView::Songs;
+#ifdef _WIN32
+                    if (config_.ui.recent_song_sources.empty()) {
+                        std::string new_path = browse_for_folder(ui_text("Select Songs Folder", "곡 폴더 선택"));
+                        if (!new_path.empty()) {
+                            switch_song_source(new_path, false);
+                            song_select_view_ = SongSelectView::Songs;
+                        }
+                    } else
+#endif
+                    {
+                        song_select_view_ = SongSelectView::Sources;
+                        selected_source_ = 0;
+                    }
+                    song_select_focus_ = SongSelectFocus::SongList;
                     publish_snapshot();
                     return;
                 case 2:
-                    song_select_search_active_ = false;
-                    apply_song_sort(toggle_artist_sort(song_sort_mode_));
-                    song_select_view_ = SongSelectView::Songs;
-                    publish_snapshot();
-                    return;
-                case 3:
-                    song_select_search_active_ = false;
-                    song_select_view_ = SongSelectView::Sources;
-                    selected_source_ = 0;
-                    song_select_focus_ = SongSelectFocus::SongList;
-                    publish_snapshot();
-                    return;
-                case 4:
-                    song_select_search_active_ = false;
-                    song_key_filter_ = cycle_key_filter_value(song_key_filter_, 1);
-                    song_select_view_ = SongSelectView::Songs;
-                    rebuild_visible_song_list();
-                    rebuild_current_song_record_indices();
-                    song_select_focus_ = SongSelectFocus::SongList;
-                    publish_snapshot();
-                    return;
-                case 5:
-                    song_select_search_active_ = false;
-                    if (to_lower_ascii(config_.ui.song_collection_filter) == "favorites") {
-                        config_.ui.song_collection_filter = "all";
-                    } else {
-                        config_.ui.song_collection_filter = "favorites";
-                    }
-                    persist_runtime_config();
-                    song_select_view_ = SongSelectView::Songs;
-                    rebuild_visible_song_list();
-                    rebuild_current_song_record_indices();
-                    song_select_focus_ = SongSelectFocus::SongList;
-                    publish_snapshot();
-                    return;
-                case 6:
                     song_select_search_active_ = true;
                     song_select_view_ = SongSelectView::Songs;
                     publish_snapshot();
                     return;
-                case 7:
+                case 3:
                     song_select_search_active_ = false;
                     submenu_return_screen_ = Screen::SongSelect;
                     screen_ = Screen::SongBrowser;
                     settings_cursor_ = 0;
                     publish_snapshot();
                     return;
-                case 8:
-                    song_select_search_active_ = false;
-                    song_group_mode_ = cycle_song_group_mode(song_group_mode_);
-                    song_select_view_ = SongSelectView::Songs;
-                    rebuild_visible_song_list();
-                    rebuild_current_song_record_indices();
-                    song_select_focus_ = SongSelectFocus::SongList;
-                    publish_snapshot();
-                    return;
-                case 9:
-                    song_select_search_active_ = false;
-                    submenu_return_screen_ = Screen::SongSelect;
-                    screen_ = Screen::ModeSelect;
-                    settings_cursor_ = 0;
-                    publish_snapshot();
-                    return;
-                case 10:
-                    song_select_search_active_ = false;
-                    submenu_return_screen_ = Screen::SongSelect;
-                    screen_ = Screen::OptionsHub;
-                    options_cursor_ = 0;
-                    publish_snapshot();
-                    return;
-                case 11:
+                case 4:
                     song_select_search_active_ = false;
                     song_select_view_ = SongSelectView::Records;
                     selected_record_ = 0;
                     song_select_focus_ = SongSelectFocus::SongList;
                     rebuild_current_song_record_indices();
+                    publish_snapshot();
+                    return;
+                case 5:
+                    song_select_search_active_ = false;
+                    submenu_return_screen_ = Screen::SongSelect;
+                    screen_ = Screen::OptionsHub;
+                    options_cursor_ = 0;
                     publish_snapshot();
                     return;
                 default:
@@ -2092,15 +2087,8 @@ void MenuApp::handle_song_select_input(uint32_t keycode) {
     }
     if (keycode == key_backspace_) {
         song_select_search_active_ = false;
-        if (song_select_view_ == SongSelectView::Records) {
+        if (song_select_view_ != SongSelectView::Songs) {
             song_select_view_ = SongSelectView::Songs;
-            song_select_focus_ = SongSelectFocus::SongList;
-            publish_snapshot();
-            return;
-        }
-        if (song_select_view_ != SongSelectView::Sources && !config_.ui.recent_song_sources.empty()) {
-            song_select_view_ = SongSelectView::Sources;
-            selected_source_ = 0;
             song_select_focus_ = SongSelectFocus::SongList;
             publish_snapshot();
             return;
@@ -2136,12 +2124,22 @@ void MenuApp::handle_song_browser_input(uint32_t keycode) {
     };
 
     if (settings_cursor_ == 0 && (keycode == key_left_ || keycode == key_right_)) {
+        apply_song_sort(cycle_song_sort_mode(song_sort_mode_, (keycode == key_left_) ? -1 : 1));
+        apply_filter_refresh();
+        return;
+    }
+    if (settings_cursor_ == 1 && (keycode == key_left_ || keycode == key_right_)) {
+        song_group_mode_ = cycle_song_group_mode(song_group_mode_);
+        apply_filter_refresh();
+        return;
+    }
+    if (settings_cursor_ == 2 && (keycode == key_left_ || keycode == key_right_)) {
         const int direction = (keycode == key_left_) ? -1 : 1;
         song_key_filter_ = cycle_key_filter_value(song_key_filter_, direction);
         apply_filter_refresh();
         return;
     }
-    if (settings_cursor_ == 1 && (keycode == key_left_ || keycode == key_right_)) {
+    if (settings_cursor_ == 3 && (keycode == key_left_ || keycode == key_right_)) {
         const int direction = (keycode == key_left_) ? -1 : 1;
         song_level_min_filter_ = clamp_int(song_level_min_filter_ + direction, 0, 50);
         if (song_level_max_filter_ > 0 && song_level_min_filter_ > song_level_max_filter_) {
@@ -2150,7 +2148,7 @@ void MenuApp::handle_song_browser_input(uint32_t keycode) {
         apply_filter_refresh();
         return;
     }
-    if (settings_cursor_ == 2 && (keycode == key_left_ || keycode == key_right_)) {
+    if (settings_cursor_ == 4 && (keycode == key_left_ || keycode == key_right_)) {
         const int direction = (keycode == key_left_) ? -1 : 1;
         song_level_max_filter_ = clamp_int(song_level_max_filter_ + direction, 0, 50);
         if (song_level_max_filter_ > 0 && song_level_min_filter_ > song_level_max_filter_) {
@@ -2159,7 +2157,7 @@ void MenuApp::handle_song_browser_input(uint32_t keycode) {
         apply_filter_refresh();
         return;
     }
-    if (settings_cursor_ == 3 && (keycode == key_left_ || keycode == key_right_)) {
+    if (settings_cursor_ == 5 && (keycode == key_left_ || keycode == key_right_)) {
         const int direction = (keycode == key_left_) ? -1 : 1;
         cycle_song_collection_filter(direction);
         persist_runtime_config();
@@ -2168,7 +2166,7 @@ void MenuApp::handle_song_browser_input(uint32_t keycode) {
     }
 
     if (keycode == key_enter_) {
-        if (settings_cursor_ == 4) {
+        if (settings_cursor_ == 6) {
             const std::string named_collection = current_named_song_collection();
             bool changed = false;
             if (!named_collection.empty()) {
@@ -2187,13 +2185,13 @@ void MenuApp::handle_song_browser_input(uint32_t keycode) {
             }
             return;
         }
-        if (settings_cursor_ == 5) {
+        if (settings_cursor_ == 7) {
             create_next_song_collection();
             persist_runtime_config();
             apply_filter_refresh();
             return;
         }
-        if (settings_cursor_ == 6) {
+        if (settings_cursor_ == 8) {
             song_key_filter_ = 0;
             song_level_min_filter_ = 0;
             song_level_max_filter_ = 0;
@@ -2202,7 +2200,7 @@ void MenuApp::handle_song_browser_input(uint32_t keycode) {
             apply_filter_refresh();
             return;
         }
-        if (settings_cursor_ == 7) {
+        if (settings_cursor_ == 9) {
             screen_ = submenu_return_screen_;
             settings_cursor_ = 0;
             publish_snapshot();

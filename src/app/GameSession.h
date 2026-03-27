@@ -145,6 +145,7 @@ public:
     [[nodiscard]] bool was_user_aborted() const { return user_aborted_.load(std::memory_order_acquire); }
     [[nodiscard]] const GameSessionResult& result() const { return result_; }
     [[nodiscard]] double final_hispeed() const { return config_.speed.hi_speed; }
+    [[nodiscard]] bool final_rawinput_enabled() const { return config_.input.rawinput; }
 
 private:
     struct FutureEvent {
@@ -285,7 +286,9 @@ private:
     [[nodiscard]] bool loading_cancel_requested();
     [[nodiscard]] int64_t playback_sample_for_replay_event(const gameplay::ReplayFile& replay,
                                                            int64_t replay_sample) const;
+    void build_autoplay_events();
     void process_replay_input_queue(int64_t buffer_start_samples, int64_t buffer_end_samples, int64_t lookahead_samples);
+    void process_autoplay_queue(int64_t buffer_end_samples, int64_t lookahead_samples);
     void process_ghost_replay_queue(int64_t buffer_end_samples, int64_t lookahead_samples);
     void dispatch_ghost_lane_input(int lane, input::InputState state, int64_t sample);
 
@@ -307,6 +310,10 @@ private:
     gameplay::ReplayFile replay_source_{};
     bool replay_playback_enabled_ = false;
     std::size_t replay_event_index_ = 0;
+    std::vector<gameplay::ReplayEvent> autoplay_events_{};
+    bool autoplay_enabled_ = false;
+    std::size_t autoplay_event_index_ = 0;
+    bool practice_no_fail_enabled_ = false;
     gameplay::ReplayFile ghost_replay_source_{};
     bool ghost_replay_enabled_ = false;
     std::size_t ghost_replay_event_index_ = 0;

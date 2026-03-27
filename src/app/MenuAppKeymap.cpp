@@ -16,16 +16,42 @@ constexpr int64_t kKeymapCaptureTimeoutNs = 5'000'000'000LL;
 constexpr int64_t kKeymapStatusTimeoutNs = 2'000'000'000LL;
 constexpr int kKeymapFooterReservedLines = 6;
 
+bool is_concrete_keymap_mode(std::string_view token) {
+    return token == "4k" || token == "5k" || token == "6k" || token == "7k" ||
+           token == "8k" || token == "9k" || token == "10k" || token == "16k";
+}
+
+}
+
+std::string resolve_keymap_edit_mode_for_menu(std::optional<int> selected_chart_key_count,
+                                              std::string_view runtime_key_mode) {
+    config::KeymapManager manager;
+    if (selected_chart_key_count.has_value()) {
+        const int key_count = selected_chart_key_count.value();
+        if ((key_count >= 4 && key_count <= 10) || key_count == 16) {
+            return manager.normalize_mode_token(std::to_string(key_count) + "k");
+        }
+    }
+
+    const std::string normalized_runtime = to_lower_ascii(std::string(runtime_key_mode));
+    if (is_concrete_keymap_mode(normalized_runtime)) {
+        return manager.normalize_mode_token(normalized_runtime);
+    }
+    return "10k";
 }
 
 void MenuApp::open_keymap_screen(Screen return_screen) {
     submenu_return_screen_ = return_screen;
-    // Edit against a working copy so Save/Back semantics stay explicit.
     working_keymap_ = keymap_;
-    {
-        config::KeymapManager keymap_manager;
-        keymap_edit_mode_ = keymap_manager.normalize_mode_token(config_.mode.key_mode);
+    std::optional<int> selected_chart_key_count;
+    if (return_screen == Screen::SongSelect) {
+        if (const SongEntry* entry = (selected_song_ >= 0)
+                                         ? visible_song_entry(static_cast<std::size_t>(selected_song_))
+                                         : nullptr) {
+            selected_chart_key_count = entry->key_count;
+        }
     }
+    keymap_edit_mode_ = resolve_keymap_edit_mode_for_menu(selected_chart_key_count, config_.mode.key_mode);
     refresh_keymap_lane_list();
     keymap_cursor_ = 0;
     keymap_dirty_ = false;
@@ -42,6 +68,26 @@ void MenuApp::populate_keymap_render_data(render::MenuRenderData& render) {
     if (!keymap_status_message_.empty() &&
         timing::HighResClock::now_ns() < keymap_status_deadline_ns_) {
         render.generic.footer_notes.push_back(keymap_status_message_);
+    }
+    render.generic.footer_notes.push_back(current_input_backend_status_label());
+    if (submenu_return_screen_ == Screen::SongSelect) {
+        if (const SongEntry* entry = (selected_song_ >= 0)
+                                         ? visible_song_entry(static_cast<std::size_t>(selected_song_))
+                                         : nullptr) {
+            const std::string selected_mode =
+                resolve_keymap_edit_mode_for_menu(entry->key_count, config_.mode.key_mode);
+            if (selected_mode != keymap_edit_mode_) {
+                render.generic.footer_notes.push_back(
+                    ui_text("Selected chart uses ", "선택한 차트 키 모드: ") +
+                    ui_key_mode_label(selected_mode) +
+                    ui_text(" / editing ", " / 현재 편집: ") +
+                    ui_key_mode_label(keymap_edit_mode_));
+            } else {
+                render.generic.footer_notes.push_back(
+                    ui_text("Selected chart key mode: ", "선택한 차트 키 모드: ") +
+                    ui_key_mode_label(selected_mode));
+            }
+        }
     }
     append_menu_row(render.generic,
                     ui_text("Key Mode", "키 모드"),
@@ -79,19 +125,11 @@ void MenuApp::populate_keymap_render_data(render::MenuRenderData& render) {
                                                       "같은 키를 여러 레인에 중복으로 배치할 수 있습니다."));
     }
     append_menu_row(render.generic,
-                    ui_text("Save", "저장"),
-                    "",
-                    false,
-                    render::MenuHitTargetKind::KeymapButton,
-                    0,
-                    !keymap_capture_active_,
-                    false);
-    append_menu_row(render.generic,
                     ui_text("Reset", "초기화"),
                     "",
                     false,
                     render::MenuHitTargetKind::KeymapButton,
-                    1,
+                    0,
                     !keymap_capture_active_,
                     false);
     append_menu_row(render.generic,
@@ -99,7 +137,7 @@ void MenuApp::populate_keymap_render_data(render::MenuRenderData& render) {
                     "",
                     false,
                     render::MenuHitTargetKind::KeymapButton,
-                    2,
+                    1,
                     !keymap_capture_active_,
                     false);
     append_menu_row(render.generic,
@@ -107,36 +145,17 @@ void MenuApp::populate_keymap_render_data(render::MenuRenderData& render) {
                     "",
                     false,
                     render::MenuHitTargetKind::KeymapButton,
-                    3,
+                    2,
                     !keymap_capture_active_,
                     false);
     render.generic.footer_notes.push_back(ui_text("Left/Right on Key Mode selects which 4K-10K or 16K layout you are editing.",
                                                   "키 모드에서 좌우 키를 누르면 편집할 4K~10K 또는 16K 레이아웃을 고릅니다."));
-    render.generic.footer_notes.push_back(ui_text("Enter binds the selected lane. A=Save  R=Reset  F2=NKRO Test  Esc=Back",
-                                                  "Enter로 선택 레인에 키를 할당합니다. A=저장  R=초기화  F2=NKRO 테스트  Esc=뒤로"));
+    render.generic.footer_notes.push_back(ui_text("Enter binds the selected lane and saves immediately. Reset also saves immediately.",
+                                                  "Enter로 선택 레인에 키를 할당하면 즉시 저장됩니다. 초기화도 바로 저장됩니다."));
 }
 
 void MenuApp::populate_keymap_confirm_render_data(render::MenuRenderData& render) {
-    render.generic.footer_reserved_lines = 3;
-    render.generic.footer_notes.push_back(ui_text("Duplicate binding detected.", "중복 키 할당이 감지되었습니다."));
-    render.generic.footer_notes.push_back(ui_text("Key: ", "키: ") + keymap_pending_key_);
-    render.generic.footer_notes.push_back(ui_text("Already used by: ", "이미 사용 중인 레인: ") + keymap_duplicate_lane_);
-    append_menu_row(render.generic,
-                    ui_text("Replace Existing Binding", "기존 할당 교체"),
-                    "",
-                    true,
-                    render::MenuHitTargetKind::SettingsRow,
-                    0,
-                    true,
-                    false);
-    append_menu_row(render.generic,
-                    ui_text("Cancel", "취소"),
-                    "",
-                    false,
-                    render::MenuHitTargetKind::SettingsRow,
-                    1,
-                    true,
-                    false);
+    populate_keymap_render_data(render);
 }
 
 void MenuApp::populate_keymap_test_render_data(render::MenuRenderData& render) {
@@ -207,43 +226,13 @@ void MenuApp::handle_keymap_input(uint32_t keycode) {
         publish_snapshot();
         return;
     }
-    if (keycode == key_a_) {
-        apply_keymap_save();
-        publish_snapshot();
-        return;
-    }
-    if (keycode == key_r_) {
-        apply_keymap_reset();
-        publish_snapshot();
-        return;
-    }
-    if (keycode == key_f2_) {
-        screen_ = Screen::KeymapTest;
-        publish_snapshot();
-        return;
-    }
     if (keycode == key_escape_ || keycode == key_backspace_) {
         exit_keymap_screen();
     }
 }
 
 void MenuApp::handle_keymap_confirm_input(uint32_t keycode) {
-    if (keycode == key_enter_) {
-        if (!keymap_duplicate_lane_.empty()) {
-            working_keymap_.bindings[keymap_duplicate_lane_] = "";
-        }
-        if (!keymap_pending_lane_.empty()) {
-            working_keymap_.bindings[keymap_pending_lane_] = keymap_pending_key_;
-            keymap_dirty_ = true;
-            clear_keymap_status_message();
-        }
-        clear_keymap_pending_state();
-        screen_ = Screen::Keymap;
-        publish_snapshot();
-        return;
-    }
-    if (keycode == key_escape_ || keycode == key_backspace_) {
-        clear_keymap_pending_state();
+    if (keycode == key_enter_ || keycode == key_escape_ || keycode == key_backspace_) {
         screen_ = Screen::Keymap;
         publish_snapshot();
     }
@@ -304,23 +293,45 @@ void MenuApp::apply_keymap_capture(uint32_t keycode) {
     }
 
     const std::string& lane = keymap_lanes_[static_cast<std::size_t>(lane_index)];
-    working_keymap_.mode_bindings[keymap_edit_mode_][lane] = key_name;
+    config::KeymapManager manager;
+    config::Keymap pending = working_keymap_;
+    pending.mode_bindings[keymap_edit_mode_][lane] = key_name;
     if (keymap_edit_mode_ == "10k") {
-        // Keep the legacy top-level 10K map in sync for older profile readers.
-        working_keymap_.bindings = working_keymap_.mode_bindings[keymap_edit_mode_];
+        pending.bindings = pending.mode_bindings[keymap_edit_mode_];
     }
-    keymap_dirty_ = true;
+
+    std::string error;
+    if (!manager.save_profile(profile_dir_, pending, &error)) {
+        std::cerr << "[error] " << error << std::endl;
+        show_keymap_status_message(ui_text("Failed to save keymap.", "키 설정 저장에 실패했습니다."));
+        keymap_capture_active_ = false;
+        publish_snapshot();
+        return;
+    }
+
+    working_keymap_ = pending;
+    keymap_ = pending;
+    keymap_dirty_ = false;
     keymap_capture_active_ = false;
-    clear_keymap_status_message();
+    show_keymap_status_message(ui_text("Saved ", "저장됨: ") + lane + " = " + key_name);
     clear_keymap_pending_state();
     publish_snapshot();
 }
 
 void MenuApp::apply_keymap_reset() {
     config::KeymapManager manager;
-    manager.reset_mode_bindings(working_keymap_, keymap_edit_mode_);
-    keymap_dirty_ = true;
-    clear_keymap_status_message();
+    config::Keymap pending = working_keymap_;
+    manager.reset_mode_bindings(pending, keymap_edit_mode_);
+    std::string error;
+    if (!manager.save_profile(profile_dir_, pending, &error)) {
+        std::cerr << "[error] " << error << std::endl;
+        show_keymap_status_message(ui_text("Failed to save keymap.", "키 설정 저장에 실패했습니다."));
+        return;
+    }
+    working_keymap_ = pending;
+    keymap_ = pending;
+    keymap_dirty_ = false;
+    show_keymap_status_message(ui_text("Key mode reset and saved.", "키 모드 초기화 후 저장되었습니다."));
 }
 
 void MenuApp::apply_keymap_save() {
@@ -353,7 +364,6 @@ void MenuApp::clear_keymap_pending_state() {
 }
 
 void MenuApp::exit_keymap_screen() {
-    working_keymap_ = keymap_;
     keymap_dirty_ = false;
     keymap_capture_active_ = false;
     clear_keymap_status_message();

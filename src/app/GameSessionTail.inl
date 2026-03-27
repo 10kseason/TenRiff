@@ -44,7 +44,11 @@ void GameSession::rebuild_input_thread_config(input::InputThreadConfig& input_co
 void GameSession::persist_runtime_input_backend() const {
     config::ConfigLoader loader;
     std::string error;
-    const config::RuntimeConfig persisted = build_persisted_runtime_config(config_);
+    config::RuntimeConfig persisted = build_persisted_runtime_config(config_);
+    auto loaded = loader.load_profile(profile_dir_);
+    if (loaded.success()) {
+        persisted = build_persisted_input_backend_config(loaded.config, config_);
+    }
     if (!loader.save_profile(profile_dir_, persisted, &error)) {
         std::cerr << "[error] " << error << std::endl;
     }
@@ -253,6 +257,10 @@ bool GameSession::initialize(const CommandLineOptions& options) {
     replay_source_path_.clear();
     replay_playback_enabled_ = false;
     replay_event_index_ = 0;
+    autoplay_events_.clear();
+    autoplay_enabled_ = false;
+    autoplay_event_index_ = 0;
+    practice_no_fail_enabled_ = false;
     ghost_replay_source_ = {};
     ghost_replay_enabled_ = false;
     ghost_replay_event_index_ = 0;
@@ -315,6 +323,8 @@ bool GameSession::initialize(const CommandLineOptions& options) {
         return false;
     }
     config_ = config_result.config;
+    autoplay_enabled_ = config_.mode.autoplay_enabled;
+    practice_no_fail_enabled_ = config_.mode.practice_no_fail_enabled;
     const bool migrated_config = config_result.migrated;
     const bool stripped_session_only_mods = strip_session_only_mode_mods(config_);
 
@@ -398,6 +408,8 @@ bool GameSession::initialize(const CommandLineOptions& options) {
         if (!replay_source_.mode.gauge.empty()) {
             config_.mode.gauge = replay_source_.mode.gauge;
         }
+        autoplay_enabled_ = false;
+        practice_no_fail_enabled_ = replay_source_.mode.practice_no_fail_enabled;
     }
     if (!replay_playback_enabled_ && !options.ghost_replay_path.empty()) {
         auto ghost_load = gameplay::load_replay_json(options.ghost_replay_path);
@@ -557,6 +569,7 @@ bool GameSession::initialize(const CommandLineOptions& options) {
     gameplay_config.judge = mode_result.judge;
     gameplay_config.gauge = config_.gauge;
     gameplay_config.input_offset_ms = config_.input_offset_ms;
+    gameplay_config.practice_no_fail_enabled = practice_no_fail_enabled_;
     switch (mode_result.settings.gauge) {
         case gameplay::GaugeMode::Hard:
             gameplay_config.initial_gauge = game::GaugeType::Hard;
@@ -627,6 +640,7 @@ bool GameSession::initialize(const CommandLineOptions& options) {
     ghost_hidden_hit_note_ids_.assign(chart_.notes.size(), 0);
     active_holds_buffer_.clear();
     ghost_active_holds_buffer_.clear();
+    build_autoplay_events();
     key_to_lane_.clear();
     config::KeymapManager keymap_manager_runtime;
     const std::string active_key_mode =
@@ -752,6 +766,8 @@ void GameSession::run() {
     }
 
     if (!stop_requested_.load(std::memory_order_acquire) && !finished_.load(std::memory_order_acquire)) {
+        startup_input_timing_anchor_ = {};
+        rebaseline_gameplay_start_input_state(0);
         if (audio_thread_.start() != audio::AudioResult::Success) {
             std::cerr << "[error] Failed to start gameplay audio." << std::endl;
             stop_requested_.store(true, std::memory_order_release);
@@ -1695,7 +1711,9 @@ void GameSession::shutdown() {
             engine_finished,
             engine_game_over,
             user_aborted_.load(std::memory_order_acquire),
-            final_gauge);
+            final_gauge,
+            autoplay_enabled_,
+            practice_no_fail_enabled_);
         result_.game_over = !gameplay_session_cleared(
             engine_finished,
             engine_game_over,
@@ -1733,6 +1751,8 @@ void GameSession::shutdown() {
             replay.mode.random = config_.mode.random;
             replay.mode.random_seed = config_.mode.random_seed;
             replay.mode.gauge = config_.mode.gauge;
+            replay.mode.autoplay_enabled = autoplay_enabled_;
+            replay.mode.practice_no_fail_enabled = practice_no_fail_enabled_;
             replay.trace = engine_->replay();
             replay.stats = result_.stats;
 
@@ -1765,6 +1785,8 @@ void GameSession::shutdown() {
             exported_result.rate_multiplier = result_.rate_multiplier;
             exported_result.score_multiplier = result_.score_multiplier;
             exported_result.final_score = result_.final_score;
+            exported_result.autoplay_enabled = autoplay_enabled_;
+            exported_result.practice_no_fail_enabled = practice_no_fail_enabled_;
             exported_result.stats = result_.stats;
 
             auto result_export = gameplay::save_result_json(result_path.u8string(), exported_result);
@@ -1818,6 +1840,10 @@ void GameSession::shutdown() {
     active_mods_.clear();
     rate_multiplier_ = 1.0;
     score_multiplier_ = 1.0;
+    autoplay_events_.clear();
+    autoplay_enabled_ = false;
+    autoplay_event_index_ = 0;
+    practice_no_fail_enabled_ = false;
     lane_activity_.clear();
     hidden_hit_note_ids_.clear();
     active_holds_buffer_.clear();
@@ -1853,11 +1879,17 @@ void GameSession::audio_callback(float* output,
         const int64_t lookahead_samples = ms_to_samples(static_cast<double>(kLookaheadMs), sample_rate_);
 
         const int64_t now_ns = timing::HighResClock::now_ns();
+        if (!startup_input_timing_anchor_.valid) {
+            startup_input_timing_anchor_.playback_sample = buffer_start_samples;
+            startup_input_timing_anchor_.callback_time_ns = now_ns;
+            startup_input_timing_anchor_.valid = true;
+        }
         clock_sync_.add_sample(now_ns, buffer_start_samples);
         schedule_note_guides(buffer_start_samples, buffer_end_samples);
         process_future_events(buffer_end_samples, lookahead_samples);
         process_input_queue(buffer_start_samples, buffer_end_samples, lookahead_samples);
         service_hispeed_repeat(now_ns);
+        process_autoplay_queue(buffer_end_samples, lookahead_samples);
         process_ghost_replay_queue(buffer_end_samples, lookahead_samples);
         engine_->advance(buffer_end_samples);
         if (ghost_engine_) {
@@ -1930,6 +1962,7 @@ void GameSession::run_judgement_loop(int64_t buffer_start_samples,
         const int64_t tick_end_samples = std::min(buffer_end_samples, tick_cursor + step_samples);
         process_future_events(tick_end_samples, lookahead_samples);
         process_input_queue(tick_cursor, tick_end_samples, lookahead_samples);
+        process_autoplay_queue(tick_end_samples, lookahead_samples);
         process_ghost_replay_queue(tick_end_samples, lookahead_samples);
         engine_->advance(tick_end_samples);
         if (ghost_engine_) {
@@ -1998,6 +2031,9 @@ void GameSession::rebaseline_gameplay_start_input_state(int64_t sample) {
             hispeed_increase_next_repeat_ns_ = baseline_time_ns + ms_to_ns(kHispeedRepeatInitialDelayMs);
         }
 
+        if (autoplay_enabled_ || replay_playback_enabled_) {
+            continue;
+        }
         if (auto lane = lane_from_keycode(filtered->keycode)) {
             catch_up_lane_input(lane.value(), filtered->state, sample);
         }
@@ -2094,6 +2130,9 @@ void GameSession::process_future_events(int64_t buffer_end_samples, int64_t look
         if (next->sample > buffer_end_samples + lookahead_samples) {
             next->sample = buffer_end_samples;
         }
+        if (autoplay_enabled_) {
+            continue;
+        }
         if (auto lane = lane_from_keycode(next->event.keycode)) {
             dispatch_lane_input(lane.value(), next->event.state, next->sample);
         }
@@ -2120,7 +2159,11 @@ void GameSession::process_input_queue(int64_t buffer_start_samples, int64_t buff
             break;
         }
 
-        auto event = maybe_event.value();
+        auto filtered = filter_gameplay_input_event(*maybe_event);
+        if (!filtered.has_value()) {
+            continue;
+        }
+        const auto event = *filtered;
         if (handle_control_input(event)) {
             if (finished_.load(std::memory_order_acquire)) {
                 return;
@@ -2128,10 +2171,18 @@ void GameSession::process_input_queue(int64_t buffer_start_samples, int64_t buff
             continue;
         }
 
-        auto mapped = clock_sync_.input_to_audio_samples(event.input_time_ns);
-        int64_t sample = mapped.value_or(buffer_start_samples) + input_offset_samples_;
+        const int64_t mapped_sample = resolve_startup_gameplay_input_sample(
+            clock_sync_.input_to_audio_samples(event.input_time_ns),
+            event.input_time_ns,
+            startup_input_timing_anchor_,
+            sample_rate_,
+            buffer_start_samples);
+        int64_t sample = mapped_sample + input_offset_samples_;
         auto lane = lane_from_keycode(event.keycode);
         if (!lane.has_value()) {
+            continue;
+        }
+        if (autoplay_enabled_) {
             continue;
         }
         if (sample > buffer_end_samples + lookahead_samples) {
@@ -2151,6 +2202,14 @@ void GameSession::process_input_queue(int64_t buffer_start_samples, int64_t buff
         pending_input_events_.push_back(BufferedLaneInput{lane.value(), event.state, sample});
     }
 
+    // Keep live gameplay on the same merged queue + polling path as replay/control input so
+    // dead RawInput sessions can still surface lane edges immediately instead of waiting for
+    // a later replay session to trip the backend fallback.
+    poll_gameplay_keys(buffer_end_samples, !autoplay_enabled_);
+    if (finished_.load(std::memory_order_acquire)) {
+        return;
+    }
+
     for (std::size_t lane_index = 0; lane_index < stale_lane_present.size(); ++lane_index) {
         if (stale_lane_present[lane_index] == 0) {
             continue;
@@ -2161,6 +2220,60 @@ void GameSession::process_input_queue(int64_t buffer_start_samples, int64_t buff
 
     for (const auto& buffered : pending_input_events_) {
         dispatch_lane_input(buffered.lane, buffered.state, buffered.sample);
+    }
+}
+
+void GameSession::build_autoplay_events() {
+    autoplay_events_.clear();
+    autoplay_event_index_ = 0;
+    if (!autoplay_enabled_ || chart_.notes.empty()) {
+        return;
+    }
+
+    autoplay_events_.reserve(chart_.notes.size() * 2);
+    for (const auto& note : chart_.notes) {
+        if (note.lane <= 0) {
+            continue;
+        }
+
+        autoplay_events_.push_back(gameplay::ReplayEvent{
+            note.lane,
+            input::InputState::Pressed,
+            note.start_sample,
+        });
+        autoplay_events_.push_back(gameplay::ReplayEvent{
+            note.lane,
+            input::InputState::Released,
+            note.end_sample.value_or(note.start_sample + 1),
+        });
+    }
+
+    std::stable_sort(autoplay_events_.begin(),
+                     autoplay_events_.end(),
+                     [](const gameplay::ReplayEvent& lhs, const gameplay::ReplayEvent& rhs) {
+                         if (lhs.sample != rhs.sample) {
+                             return lhs.sample < rhs.sample;
+                         }
+                         if (lhs.state != rhs.state) {
+                             return lhs.state == input::InputState::Pressed &&
+                                    rhs.state == input::InputState::Released;
+                         }
+                         return lhs.lane < rhs.lane;
+                     });
+}
+
+void GameSession::process_autoplay_queue(int64_t buffer_end_samples, int64_t lookahead_samples) {
+    if (!autoplay_enabled_ || !engine_) {
+        return;
+    }
+
+    while (autoplay_event_index_ < autoplay_events_.size()) {
+        const auto& autoplay_event = autoplay_events_[autoplay_event_index_];
+        if (autoplay_event.sample > buffer_end_samples + lookahead_samples) {
+            break;
+        }
+        dispatch_lane_input(autoplay_event.lane, autoplay_event.state, autoplay_event.sample);
+        ++autoplay_event_index_;
     }
 }
 

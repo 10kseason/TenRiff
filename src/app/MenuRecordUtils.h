@@ -23,6 +23,8 @@ struct ParsedResultRecord {
     int64_t final_score = 0;
     gameplay::ResultStats stats;
     bool game_over = false;
+    bool autoplay_enabled = false;
+    bool practice_no_fail_enabled = false;
 };
 
 struct ParsedReplayRecord {
@@ -37,9 +39,16 @@ struct ParsedReplayRecord {
     double rate_multiplier = 1.0;
     double score_multiplier = 1.0;
     int64_t final_score = 0;
+    bool autoplay_enabled = false;
+    bool practice_no_fail_enabled = false;
 };
 
 int judged_total(const gameplay::JudgementCounts& counts);
+bool clear_status_is_assist(std::string_view clear_status);
+bool assist_flags_active(bool autoplay_enabled, bool practice_no_fail_enabled);
+bool default_ghost_replay_allowed(bool autoplay_enabled,
+                                  bool practice_no_fail_enabled,
+                                  std::string_view clear_status);
 int clear_status_priority(std::string_view clear_status, bool game_over, std::string_view final_gauge);
 std::string normalized_clear_status(std::string_view clear_status, bool game_over, std::string_view final_gauge);
 std::string compact_timestamp_label(std::string_view created_utc);

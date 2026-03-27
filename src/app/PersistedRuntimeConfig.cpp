@@ -34,6 +34,15 @@ bool strip_session_only_mode_mods(config::RuntimeConfig& config) {
 config::RuntimeConfig build_persisted_runtime_config(const config::RuntimeConfig& config) {
     config::RuntimeConfig persisted = config;
     static_cast<void>(strip_session_only_mode_mods(persisted));
+    persisted.input.backend = persisted.input.rawinput ? "rawinput" : "polling";
+    return persisted;
+}
+
+config::RuntimeConfig build_persisted_input_backend_config(const config::RuntimeConfig& persisted_base,
+                                                           const config::RuntimeConfig& runtime_source) {
+    config::RuntimeConfig persisted = build_persisted_runtime_config(persisted_base);
+    persisted.input.rawinput = runtime_source.input.rawinput;
+    persisted.input.backend = persisted.input.rawinput ? "rawinput" : "polling";
     return persisted;
 }
 

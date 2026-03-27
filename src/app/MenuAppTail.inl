@@ -338,8 +338,8 @@ void MenuApp::populate_quick_setup_render_data(render::MenuRenderData& render) {
                                            "권장 시작값: 노말 게이지, Rate 1.00x, 표시 오프셋 0ms, BMS 키음 연동."));
     render.generic.notes.push_back(ui_text("Songs Folder opens a picker on Enter or F2. You can also drag and drop a folder later.",
                                            "곡 폴더는 Enter 또는 F2로 선택 창을 엽니다. 나중에 폴더를 드래그 앤 드롭해도 됩니다."));
-    render.generic.notes.push_back(ui_text("These values stay editable later from Song Select: A=Audio  G=Graphics  I=Input  M=Mode  K=Keymap.",
-                                           "이 값들은 나중에 Song Select에서도 수정할 수 있습니다: A=Audio  G=Graphics  I=Input  M=Mode  K=Keymap."));
+    render.generic.notes.push_back(ui_text("You can keep adjusting these later from Song Select > Options and Mode Settings.",
+                                           "이 값들은 나중에 Song Select > 옵션과 모드 설정에서도 계속 조정할 수 있습니다."));
 }
 
 void MenuApp::populate_title_render_data(render::MenuRenderData& render,
@@ -349,8 +349,12 @@ void MenuApp::populate_title_render_data(render::MenuRenderData& render,
     render.title.profile = options_.profile;
     render.title.track = current_track;
     render.title.high_score = current_best.has_value ? current_best.best_score : 0;
+    const bool no_songs_indexed = visible_song_count() == 0;
     render.title.buttons = {
-        render::MenuButtonData{ui_text("PLAY", "플레이"), u8"▶", title_cursor_ == 0},
+        render::MenuButtonData{no_songs_indexed ? ui_text("ADD SONGS FOLDER", "곡 폴더 추가")
+                                                : ui_text("PLAY", "플레이"),
+                               no_songs_indexed ? u8"＋" : u8"▶",
+                               title_cursor_ == 0},
         render::MenuButtonData{ui_text("EDIT", "에디트"), u8"✎", title_cursor_ == 1},
         render::MenuButtonData{ui_text("OPTIONS", "옵션"), u8"⚙", title_cursor_ == 2},
         render::MenuButtonData{ui_text("EXIT", "종료"), u8"⏻", title_cursor_ == 3},
@@ -358,9 +362,11 @@ void MenuApp::populate_title_render_data(render::MenuRenderData& render,
     render.title.guides = {
         ui_text("UP / DOWN or mouse to move", "위 / 아래 또는 마우스로 이동"),
         ui_text("ENTER or double-click to open", "ENTER 또는 더블클릭으로 열기"),
+        no_songs_indexed
+            ? ui_text("PLAY becomes Add Songs Folder until a library is indexed",
+                      "라이브러리가 생기기 전까지 PLAY가 곡 폴더 추가로 바뀝니다")
+            : ui_text("F2 adds or switches the current songs folder", "F2로 곡 폴더를 추가하거나 바꿉니다"),
         ui_text("F5 refreshes the current song source", "F5로 현재 곡 소스를 새로고침"),
-        ui_text("A/G/I/M/K jumps to Audio / Graphics", "A/G/I/M/K로 Audio / Graphics"),
-        ui_text("Input / Mode / Keymap", "Input / Mode / Keymap 바로 이동"),
         ui_text("F1 opens the control help overlay", "F1로 조작 도움말 열기"),
         ui_text("ESC exits from the title menu", "ESC로 타이틀 메뉴 종료"),
     };
@@ -579,8 +585,8 @@ void MenuApp::populate_generic_screen_render_data(render::MenuRenderData& render
         append_menu_row(render.generic, ui_text("Back", "뒤로"), "", options_cursor_ == 7, render::MenuHitTargetKind::OptionsItem, 7, true, false);
         render.generic.notes.push_back(ui_text("Up/Down to move, Enter to select, Esc to return.",
                                                "위/아래로 이동하고 Enter로 선택, Esc로 돌아갑니다."));
-        render.generic.notes.push_back(ui_text("A/G/I/M/K also jumps directly into Audio, Graphics, Input, Mode, and Keymap.",
-                                               "A/G/I/M/K로 Audio, Graphics, Input, Mode, Keymap으로 바로 이동할 수도 있습니다."));
+        render.generic.notes.push_back(ui_text("Use the listed rows directly here. F1 opens help, F2 opens the songs-folder picker, and F5 refreshes the library.",
+                                               "여기서는 보이는 항목을 직접 여세요. F1은 도움말, F2는 곡 폴더 선택, F5는 라이브러리 새로고침입니다."));
     } else if (screen_ == Screen::EditStub) {
         render.generic.notes.push_back(ui_text("Editor is not implemented yet.", "에디터는 아직 구현되지 않았습니다."));
         append_menu_row(render.generic, ui_text("Back", "뒤로"), "", true, render::MenuHitTargetKind::SettingsRow, 0, true, false);
@@ -1101,6 +1107,11 @@ void MenuApp::launch_gameplay(const std::string& chart_path, const std::string& 
         config_.speed.hi_speed = session_hispeed;
         persist_runtime_config();
     }
+    const bool session_rawinput = session.final_rawinput_enabled();
+    if (config_.input.rawinput != session_rawinput) {
+        config_.input.rawinput = session_rawinput;
+        config_.input.backend = session_rawinput ? "rawinput" : "polling";
+    }
 
     restart_input_thread();
     restart_audio_thread();
@@ -1202,10 +1213,10 @@ void MenuApp::populate_help_overlay(render::HelpOverlayData& target) const {
                         "위 / 아래 키 또는 마우스로 PLAY, EDIT, OPTIONS, EXIT를 선택합니다."),
                 ui_text("Enter or double-click opens the selected button.",
                         "Enter 또는 더블클릭으로 선택한 버튼을 엽니다."),
-                ui_text("F5 refreshes the current song source before you enter Song Select.",
-                        "F5로 Song Select에 들어가기 전 현재 곡 소스를 새로고침합니다."),
-                ui_text("A / G / I / M / K jumps straight to Audio, Graphics, Input, Mode, and Keymap.",
-                        "A / G / I / M / K로 Audio, Graphics, Input, Mode, Keymap으로 바로 이동합니다."),
+                ui_text("If no songs are indexed yet, PLAY becomes Add Songs Folder so recovery stays visible on the first screen.",
+                        "아직 인덱싱된 곡이 없으면 PLAY가 곡 폴더 추가로 바뀌어 첫 화면에서 바로 복구할 수 있습니다."),
+                ui_text("F2 opens the songs-folder picker and F5 refreshes the current source.",
+                        "F2는 곡 폴더 선택 창을 열고 F5는 현재 소스를 새로고칩니다."),
             };
             target.footer = ui_text("Esc exits TenRiff. Press F1 again to close help.",
                                     "Esc로 TenRiff를 종료합니다. 도움말을 닫으려면 F1을 다시 누르세요.");
@@ -1219,18 +1230,16 @@ void MenuApp::populate_help_overlay(render::HelpOverlayData& target) const {
                         "좌 / 우 키로 왼쪽 내비게이션과 곡 목록 사이의 포커스를 전환합니다."),
                 ui_text("Enter selects the focused item. Double-click on a song launches it immediately.",
                         "Enter는 선택된 항목을 열고, 곡을 더블클릭하면 즉시 시작합니다."),
-                ui_text("LEVEL, TITLE, and ARTIST on the left rail toggle the current sort mode, and GROUP clusters the list like osu!-style grouping.",
-                        "왼쪽 레일의 LEVEL, TITLE, ARTIST는 정렬 방식을 전환하고, GROUP는 osu!처럼 목록을 묶어 보여줍니다."),
-                ui_text("SEARCH now lives on Song Select. Select SEARCH and press Enter, or type directly there, to filter title, artist, and path.",
-                        "검색은 이제 Song Select에 있습니다. SEARCH를 선택하고 Enter를 누르거나, 그 위치에서 바로 입력해 제목, 아티스트, 경로를 필터링하세요."),
-                ui_text("Backspace jumps to Sources or back to Songs. Esc returns to the title screen.",
-                        "Backspace는 Sources 또는 Songs로 이동하고, Esc는 타이틀 화면으로 돌아갑니다."),
+                ui_text("The left rail is now just Songs, Sources, Search, Filter, Records, and Options.",
+                        "왼쪽 레일은 이제 Songs, Sources, Search, Filter, Records, Options만 남습니다."),
+                ui_text("SEARCH filters title, artist, and path. FILTER now owns sort, group, key, difficulty, and collections.",
+                        "SEARCH는 제목, 아티스트, 경로를 검색하고 FILTER는 정렬, 그룹, 키, 난이도, 컬렉션을 담당합니다."),
+                ui_text("Backspace returns from Sources or Records to Songs. Esc returns to the title screen.",
+                        "Backspace는 Sources나 Records에서 Songs로 돌아가고 Esc는 타이틀 화면으로 돌아갑니다."),
                 ui_text("F2 chooses a new songs folder. F5 refreshes the active source.",
                         "F2로 새 곡 폴더를 고르고, F5로 활성 소스를 새로고침합니다."),
                 ui_text("Safe indexing lowers RAM use for very large libraries. Fast rescans quicker on high-memory PCs.",
                         "안전 인덱싱은 매우 큰 라이브러리에서 RAM 사용량을 줄이고, 빠름은 메모리가 많은 PC에서 재스캔 속도를 높입니다."),
-                ui_text("A / G / I / M / K opens Audio, Graphics, Input, Mode, and Keymap from Song Select.",
-                        "A / G / I / M / K로 Song Select에서 Audio, Graphics, Input, Mode, Keymap을 바로 엽니다."),
             };
             target.footer = ui_text("Current source, group, filter, sort, and indexing profile stay visible on the Song Select screen.",
                                     "현재 소스, 그룹, 필터, 정렬, 인덱싱 프로필은 Song Select 화면에 계속 표시됩니다.");
@@ -1242,8 +1251,8 @@ void MenuApp::populate_help_overlay(render::HelpOverlayData& target) const {
                         "이 화면은 이제 필터 전용입니다. 검색은 Song Select의 SEARCH 항목으로 이동했습니다."),
                 ui_text("Up / Down or the mouse wheel moves the selection. Long lists now show a scrollbar on the right.",
                         "위 / 아래 키 또는 마우스 휠로 선택을 이동합니다. 긴 목록은 오른쪽 스크롤바가 표시됩니다."),
-                ui_text("Left / Right adjusts key, difficulty, and collection filters in place. Grouping and sort still live on the Song Select rail.",
-                        "좌 / 우 키로 키 수, 난이도, 컬렉션 필터를 바로 조정합니다. 그룹과 정렬은 Song Select 레일에서 계속 조정합니다."),
+                ui_text("Left / Right adjusts sort, group, key, difficulty, and collection filters in place.",
+                        "좌 / 우 키로 정렬, 그룹, 키 수, 난이도, 컬렉션 필터를 이 화면에서 바로 조정합니다."),
                 ui_text("Enter toggles collection membership, creates the next collection, clears filters, or goes back.",
                         "Enter로 컬렉션 토글, 다음 컬렉션 생성, 필터 초기화, 뒤로 가기를 실행합니다."),
             };
@@ -1334,14 +1343,16 @@ void MenuApp::populate_help_overlay(render::HelpOverlayData& target) const {
             target.lines = {
                 ui_text("Up / Down or the mouse wheel selects a row. Long lists show a scrollbar on the right.",
                         "위 / 아래 키 또는 마우스 휠로 행을 선택합니다. 긴 목록은 오른쪽 스크롤바가 표시됩니다."),
-                ui_text("Ghost Battle, Gauge, Random, Mods, Rate, and Hi-Speed change the next-song compare/play feel.",
-                        "고스트 배틀, 게이지, 랜덤, 모드, Rate, Hi-Speed는 다음 곡의 비교/플레이 감각을 바꿉니다."),
+                ui_text("Ghost Battle, Autoplay, Practice, Gauge, Random, Mods, Rate, and Hi-Speed change the next-song compare/play feel.",
+                        "고스트 배틀, 오토플레이, 연습 모드, 게이지, 랜덤, 모드, Rate, Hi-Speed는 다음 곡의 비교/플레이 감각을 바꿉니다."),
                 ui_text("Indexing Safe minimizes RAM for huge libraries. Fast spends more RAM to speed up rescans.",
                         "인덱싱 안전은 큰 라이브러리에서 RAM 사용을 줄이고, 빠름은 더 많은 RAM으로 재스캔을 빠르게 합니다."),
                 ui_text("Chart Filter decides whether Song Select shows BMS, OSU, or both when OSU indexing is enabled.",
                         "Chart Filter는 OSU 인덱싱이 켜졌을 때 Song Select에 BMS, OSU, 둘 다 표시할지 정합니다."),
                 ui_text("Ghost Battle uses the selected chart's best compatible replay when one exists; turn it off to keep single-field play.",
                         "고스트 배틀은 선택한 차트의 호환되는 최고 리플레이가 있으면 사용하며, 끄면 단일 플레이 필드로 유지됩니다."),
+                ui_text("Autoplay and Practice are assist modes for QA. Their results are marked ASSIST and are not used as default ghost bests.",
+                        "오토플레이와 연습 모드는 QA용 보조 기능입니다. 결과는 ASSIST로 표시되고 기본 고스트 최고 기록으로 쓰이지 않습니다."),
                 ui_text("Enter on Mods opens the registry-backed Mod Manager for score-multiplier presets.",
                         "Mods에서 Enter를 누르면 점수 배율 프리셋용 Mod Manager를 엽니다."),
             };
@@ -1368,11 +1379,13 @@ void MenuApp::populate_help_overlay(render::HelpOverlayData& target) const {
                         "위 / 아래 키로 레인을 선택하고, Enter로 해당 레인의 키 입력 대기를 시작합니다."),
                 ui_text("Left / Right on Key Mode switches which 4K-10K or 16K layout you are editing.",
                         "Key Mode에서 좌 / 우 키를 누르면 편집할 4K~10K 또는 16K 레이아웃을 바꿉니다."),
-                ui_text("A saves, R resets, F2 opens NKRO Test, and Esc returns.",
-                        "A는 저장, R은 초기화, F2는 NKRO Test, Esc는 뒤로 이동입니다."),
+                ui_text("Captured keys save immediately. Reset also saves immediately, and NKRO Test stays visible as a normal button.",
+                        "입력한 키는 즉시 저장됩니다. 초기화도 바로 저장되고 NKRO Test는 일반 버튼으로 계속 보입니다."),
+                ui_text("When you opened Keymap from Song Select, the editor defaults to the selected chart's key mode.",
+                        "Song Select에서 Keymap을 열면 선택한 차트의 키 모드가 기본 편집 대상으로 잡힙니다."),
             };
-            target.footer = ui_text("Duplicate lane bindings are allowed.",
-                                    "같은 키를 여러 레인에 중복으로 배치할 수 있습니다.");
+            target.footer = ui_text("Duplicate lane bindings are allowed. Esc or Backspace returns.",
+                                    "같은 키를 여러 레인에 중복으로 배치할 수 있습니다. Esc 또는 Backspace로 돌아갑니다.");
             return;
         case Screen::KeymapTest:
             target.title = "NKRO Test";
@@ -1405,8 +1418,8 @@ void MenuApp::populate_help_overlay(render::HelpOverlayData& target) const {
             target.lines = {
                 ui_text("Enter opens Audio, Graphics, Skins, Input, Calibration Wizard, Mode, or Keymap.",
                         "Enter로 Audio, Graphics, Skins, Input, 캘리브레이션 위저드, Mode, Keymap을 엽니다."),
-                ui_text("A / G / I / M / K jumps directly to the most common settings screens.",
-                        "A / G / I / M / K로 자주 쓰는 설정 화면으로 바로 이동합니다."),
+                ui_text("Keep shortcuts surfaced here: use the listed rows, F1 for help, F2 for songs folder, and F5 for reindex.",
+                        "여기서는 보이는 조작만 유지합니다. 표시된 행, F1 도움말, F2 곡 폴더, F5 재인덱스를 사용하세요."),
             };
             target.footer = ui_text("Esc or Backspace returns to the previous screen.",
                                     "Esc 또는 Backspace로 이전 화면으로 돌아갑니다.");

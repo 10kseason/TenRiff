@@ -128,12 +128,28 @@ int judged_total(const gameplay::JudgementCounts& counts) {
     return counts.pg + counts.gr + counts.gd + counts.bd;
 }
 
+bool clear_status_is_assist(std::string_view clear_status) {
+    const std::string status = to_lower_ascii(std::string(clear_status));
+    return status.find("assist") != std::string::npos;
+}
+
+bool assist_flags_active(bool autoplay_enabled, bool practice_no_fail_enabled) {
+    return autoplay_enabled || practice_no_fail_enabled;
+}
+
+bool default_ghost_replay_allowed(bool autoplay_enabled,
+                                  bool practice_no_fail_enabled,
+                                  std::string_view clear_status) {
+    return !assist_flags_active(autoplay_enabled, practice_no_fail_enabled) &&
+           !clear_status_is_assist(clear_status);
+}
+
 int clear_status_priority(std::string_view clear_status, bool game_over, std::string_view final_gauge) {
+    const std::string status = to_lower_ascii(std::string(clear_status));
     if (game_over) {
         return 0;
     }
-    const std::string status = to_lower_ascii(std::string(clear_status));
-    if (status.find("assist") != std::string::npos) {
+    if (clear_status_is_assist(clear_status)) {
         return 1;
     }
     if (status.find("easy") != std::string::npos) {
@@ -338,6 +354,9 @@ std::optional<ParsedResultRecord> parse_result_file(const std::filesystem::path&
     out.mods = read_json_string_array(*root, "mods");
     out.rate_multiplier = read_json_number(*root, "rate_multiplier", 1.0);
     out.score_multiplier = read_json_number(*root, "score_multiplier", 1.0);
+    out.autoplay_enabled = read_json_bool(*root, "autoplay_enabled", clear_status_is_assist(out.clear_status));
+    out.practice_no_fail_enabled =
+        read_json_bool(*root, "practice_no_fail_enabled", clear_status_is_assist(out.clear_status));
 
     if (const auto* gauge_history = find_json_value(*stats_obj, "gauge_history")) {
         if (const auto* values = gauge_history->as_array()) {
@@ -412,6 +431,8 @@ std::optional<ParsedReplayRecord> parse_replay_file(const std::filesystem::path&
     out.final_score = replay.final_score > 0 ? replay.final_score
                                              : clamp_final_score(out.raw_score, out.score_multiplier);
     out.event_count = static_cast<int>(replay.trace.events.size());
+    out.autoplay_enabled = replay.mode.autoplay_enabled;
+    out.practice_no_fail_enabled = replay.mode.practice_no_fail_enabled;
     if (!loaded.warnings.empty() && error) {
         *error = loaded.warnings.front();
     }

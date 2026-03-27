@@ -94,6 +94,8 @@ void MenuApp::reload_chart_best_results() {
         record.mods = parsed->mods;
         record.rate_multiplier = parsed->rate_multiplier;
         record.score_multiplier = parsed->score_multiplier;
+        record.autoplay_enabled = parsed->autoplay_enabled;
+        record.practice_no_fail_enabled = parsed->practice_no_fail_enabled;
         record.raw_score = parsed->stats.raw_score;
         record.score = candidate.best_score;
         record.accuracy = menu_records::calculate_accuracy(parsed->stats);
@@ -346,7 +348,10 @@ std::string MenuApp::best_replay_path_for_selected_song() const {
             continue;
         }
         const auto& record = local_play_records_[record_index];
-        if (!record.replay_path.empty()) {
+        if (!record.replay_path.empty() &&
+            menu_records::default_ghost_replay_allowed(record.autoplay_enabled,
+                                                       record.practice_no_fail_enabled,
+                                                       record.clear_status)) {
             return record.replay_path;
         }
     }

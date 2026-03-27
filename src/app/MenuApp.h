@@ -28,6 +28,9 @@
 
 namespace tenriff::app {
 
+[[nodiscard]] std::string resolve_keymap_edit_mode_for_menu(std::optional<int> selected_chart_key_count,
+                                                            std::string_view runtime_key_mode);
+
 class MenuApp {
 public:
     MenuApp();
@@ -356,6 +359,8 @@ private:
         std::vector<std::string> mods;
         double rate_multiplier = 1.0;
         double score_multiplier = 1.0;
+        bool autoplay_enabled = false;
+        bool practice_no_fail_enabled = false;
         int64_t raw_score = 0;
         int64_t score = 0;
         double accuracy = 0.0;
