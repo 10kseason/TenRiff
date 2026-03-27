@@ -14,7 +14,7 @@
     "keysound_volume": 1.0
   },
   "input": {
-    "backend": "polling",
+    "backend": "rawinput",
     "rawinput": true,
     "use_qpc": true,
     "grab": false,
