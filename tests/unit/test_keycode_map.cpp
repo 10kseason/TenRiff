@@ -65,10 +65,40 @@ TEST_CASE("keycode map normalizes raw and polling OEM keys to the same physical 
     const uint32_t polled = tenriff::config::KeycodeMap::normalize_windows_polling_keycode(VK_OEM_4);
 
     CHECK(raw == lbracket.value());
-    CHECK(polled == lbracket.value() || polled == VK_OEM_4 || polled == VK_OEM_6);
+    CHECK(polled == lbracket.value());
 
     const auto poll_vk = tenriff::config::KeycodeMap::polling_vk_for_keycode(lbracket.value());
     CHECK(poll_vk.has_value());
+    CHECK(poll_vk.value() == static_cast<uint32_t>(VK_OEM_4));
+}
+
+TEST_CASE("keycode map keeps layout-sensitive polling round trips stable") {
+    struct Case {
+        const char* name;
+        uint32_t vkey;
+    };
+    const Case cases[] = {
+        {"Semicolon", VK_OEM_1},
+        {"Plus", VK_OEM_PLUS},
+        {"Comma", VK_OEM_COMMA},
+        {"Minus", VK_OEM_MINUS},
+        {"Period", VK_OEM_PERIOD},
+        {"Slash", VK_OEM_2},
+        {"Grave", VK_OEM_3},
+        {"LBracket", VK_OEM_4},
+        {"Backslash", VK_OEM_5},
+        {"RBracket", VK_OEM_6},
+        {"Apostrophe", VK_OEM_7},
+    };
+
+    for (const auto& item : cases) {
+        const auto keycode = tenriff::config::KeycodeMap::to_keycode(item.name);
+        REQUIRE(keycode.has_value());
+        CHECK(tenriff::config::KeycodeMap::normalize_windows_polling_keycode(item.vkey) == keycode.value());
+        const auto poll_vk = tenriff::config::KeycodeMap::polling_vk_for_keycode(keycode.value());
+        REQUIRE(poll_vk.has_value());
+        CHECK(poll_vk.value() == item.vkey);
+    }
 }
 
 TEST_CASE("keycode map recovers raw process keys from scan code under IME-like input") {

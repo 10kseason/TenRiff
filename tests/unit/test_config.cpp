@@ -400,6 +400,59 @@ TEST_CASE("persisted runtime config strips session-only judge mods") {
     CHECK(persisted.mode.mods[1] == "no_ln_release");
 }
 
+TEST_CASE("persisted input backend config does not leak replay session mode changes") {
+    ConfigLoader loader;
+    auto persisted_base = loader.defaults();
+    persisted_base.mode.key_mode = "7k";
+    persisted_base.mode.random = "off";
+    persisted_base.mode.gauge = "hard";
+    persisted_base.input.backend = "polling";
+    persisted_base.input.rawinput = true;
+
+    auto runtime_source = persisted_base;
+    runtime_source.mode.key_mode = "10k";
+    runtime_source.mode.random = "super_random";
+    runtime_source.mode.gauge = "easy";
+    runtime_source.mode.mods = {"judge_easy", "full_long_notes"};
+    runtime_source.input.backend = "polling";
+    runtime_source.input.rawinput = false;
+
+    const auto persisted =
+        tenriff::app::build_persisted_input_backend_config(persisted_base, runtime_source);
+
+    CHECK(persisted.input.backend == "polling");
+    CHECK_FALSE(persisted.input.rawinput);
+    CHECK(persisted.mode.key_mode == "7k");
+    CHECK(persisted.mode.random == "off");
+    CHECK(persisted.mode.gauge == "hard");
+    REQUIRE(persisted.mode.mods.empty());
+}
+
+TEST_CASE("config save and load keep input backend string aligned with rawinput state") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+
+    CurrentPathGuard cwd;
+    std::error_code ec;
+    std::filesystem::current_path(temp.path, ec);
+    REQUIRE_FALSE(static_cast<bool>(ec));
+
+    ConfigLoader loader;
+    auto config = loader.defaults();
+    config.input.backend = "polling";
+    config.input.rawinput = true;
+
+    std::string error;
+    REQUIRE(loader.save_profile("profiles/test", config, &error));
+    CHECK(error.empty());
+
+    const auto result = loader.load_profile("profiles/test");
+    REQUIRE(result.success());
+    CHECK(result.config.input.rawinput);
+    CHECK(result.config.input.backend == "rawinput");
+}
+
 TEST_CASE("config save and load preserve graphics display settings") {
     TempDirGuard temp;
     temp.path = make_temp_dir();
