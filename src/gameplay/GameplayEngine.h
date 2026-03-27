@@ -48,6 +48,7 @@ struct GameplayConfig {
     game::GaugeConfig gauge;
     game::GaugeType initial_gauge = game::GaugeType::Normal;
     double input_offset_ms = 0.0;
+    bool practice_no_fail_enabled = false;
 };
 
 struct LiveJudgementFeedback {
@@ -126,6 +127,7 @@ private:
 
     bool finished_ = false;
     bool game_over_ = false;
+    bool practice_no_fail_enabled_ = false;
 };
 
 }  // namespace tenriff::gameplay

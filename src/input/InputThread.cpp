@@ -1,6 +1,8 @@
 #include "input/InputThread.h"
 
 #include <chrono>
+#include <iostream>
+#include <unordered_set>
 
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
@@ -45,18 +47,24 @@ LRESULT CALLBACK input_window_proc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lp
     return DefWindowProcW(hwnd, msg, wparam, lparam);
 }
 
-bool is_current_process_foreground() {
-    const HWND foreground = GetForegroundWindow();
-    if (!foreground) {
-        return false;
-    }
+}  // namespace
 
-    DWORD process_id = 0;
-    GetWindowThreadProcessId(foreground, &process_id);
-    return process_id == GetCurrentProcessId();
+#ifdef _WIN32
+std::atomic<bool>& shared_app_activation_state() {
+    static std::atomic<bool> state{false};
+    return state;
 }
 
-}  // namespace
+void set_shared_app_activation_state(bool active) {
+    auto& state = shared_app_activation_state();
+    const bool previous = state.exchange(active, std::memory_order_acq_rel);
+    if (previous == active) {
+        return;
+    }
+
+    std::cerr << "[info] Input gate " << (active ? "opened" : "closed") << std::endl;
+}
+#endif
 
 InputThread::InputThread() = default;
 
@@ -66,6 +74,8 @@ InputThread::~InputThread() {
 
 bool InputThread::initialize(const InputThreadConfig& config) {
     config_ = config;
+    app_active_state_ = config_.app_active_state ? config_.app_active_state
+                                                 : &shared_app_activation_state();
     last_input_allowed_ = false;
     active_backend_.store(static_cast<uint8_t>(config_.backend), std::memory_order_release);
     last_allowed_event_time_ns_.store(0, std::memory_order_release);
@@ -177,7 +187,10 @@ InputThreadHealthSnapshot InputThread::health_snapshot() const {
 }
 
 bool InputThread::is_input_allowed() const {
-    return is_current_process_foreground();
+    if (app_active_state_) {
+        return app_active_state_->load(std::memory_order_acquire);
+    }
+    return shared_app_activation_state().load(std::memory_order_acquire);
 }
 
 void InputThread::sync_input_gate(bool allowed) {
@@ -238,6 +251,72 @@ void InputThread::thread_main() {
     }
     thread_main_rawinput();
     g_input_thread = nullptr;
+}
+
+std::vector<uint32_t> InputThread::build_polling_key_list() const {
+    std::vector<uint32_t> keys;
+    if (!config_.polling_keys.empty()) {
+        keys.reserve(config_.polling_keys.size());
+        std::unordered_set<uint32_t> seen_keys;
+        std::unordered_set<uint32_t> warned_unpollable_keys;
+        for (uint32_t keycode : config_.polling_keys) {
+#ifdef _WIN32
+            const auto poll_vk = config::KeycodeMap::polling_vk_for_keycode(keycode);
+            if (!poll_vk.has_value()) {
+                if (warned_unpollable_keys.insert(keycode).second) {
+                    std::cerr << "[warn] Input polling cannot track key "
+                              << config::KeycodeMap::to_name(keycode) << " (" << keycode << ")" << std::endl;
+                }
+                continue;
+            }
+            if (seen_keys.insert(*poll_vk).second) {
+                keys.push_back(*poll_vk);
+            }
+#else
+            if (seen_keys.insert(keycode).second) {
+                keys.push_back(keycode);
+            }
+#endif
+        }
+    }
+
+    if (keys.empty()) {
+        keys.reserve(256);
+        for (uint32_t keycode = 0; keycode <= 0xFF; ++keycode) {
+            keys.push_back(keycode);
+        }
+    }
+    return keys;
+}
+
+void InputThread::refresh_polling_key_state(const std::vector<uint32_t>& keys,
+                                            std::vector<uint8_t>& last_state) {
+    last_state.resize(keys.size(), 0);
+    for (std::size_t i = 0; i < keys.size(); ++i) {
+        const SHORT state = GetAsyncKeyState(static_cast<int>(keys[i]));
+        last_state[i] = (state & 0x8000) ? 1 : 0;
+    }
+}
+
+void InputThread::poll_input_keys(const std::vector<uint32_t>& keys,
+                                  std::vector<uint8_t>& last_state,
+                                  int64_t stamp_ns) {
+    for (std::size_t i = 0; i < keys.size(); ++i) {
+        const uint32_t poll_vk = keys[i];
+        const SHORT state = GetAsyncKeyState(static_cast<int>(poll_vk));
+        const uint8_t pressed = (state & 0x8000) ? 1 : 0;
+        if (pressed == last_state[i]) {
+            continue;
+        }
+        last_state[i] = pressed;
+
+        InputEvent event;
+        event.keycode = config::KeycodeMap::normalize_windows_polling_keycode(poll_vk);
+        event.state = pressed ? InputState::Pressed : InputState::Released;
+        event.input_time_ns = stamp_ns;
+        event.device_id = 0;
+        on_input_event(event);
+    }
 }
 
 void InputThread::thread_main_rawinput() {
@@ -303,22 +382,57 @@ void InputThread::thread_main_rawinput() {
     // Set thread priority (above normal for input responsiveness).
     SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_ABOVE_NORMAL);
 
-    // Message pump.
-    MSG msg;
+    const int polling_hz = config_.polling_hz <= 0 ? 1000 : config_.polling_hz;
+    const int64_t interval_ns = 1'000'000'000LL / static_cast<int64_t>(polling_hz);
+    const std::vector<uint32_t> keys = build_polling_key_list();
+    std::vector<uint8_t> last_state;
+    last_state.reserve(keys.size());
+    refresh_polling_key_state(keys, last_state);
+
+    int64_t next_poll_ns = timing::HighResClock::now_ns();
     while (!should_stop_.load(std::memory_order_acquire)) {
-        BOOL result = GetMessageW(&msg, nullptr, 0, 0);
-        
-        if (result == 0 || result == -1) {
-            break;  // WM_QUIT or error.
+        MSG msg;
+        bool had_message = false;
+        while (PeekMessageW(&msg, nullptr, 0, 0, PM_REMOVE)) {
+            had_message = true;
+            if (msg.message == WM_QUIT) {
+                should_stop_.store(true, std::memory_order_release);
+                break;
+            }
+
+            if (msg.message == WM_INPUT) {
+                raw_input_handler_->process_message(msg.lParam);
+            }
+
+            TranslateMessage(&msg);
+            DispatchMessageW(&msg);
+        }
+        if (should_stop_.load(std::memory_order_acquire)) {
+            break;
         }
 
-        // Handle WM_INPUT directly.
-        if (msg.message == WM_INPUT) {
-            raw_input_handler_->process_message(msg.lParam);
+        const int64_t now_ns = timing::HighResClock::now_ns();
+        const bool allowed = is_input_allowed();
+        if (allowed != last_input_allowed_) {
+            sync_input_gate(allowed);
+            refresh_polling_key_state(keys, last_state);
         }
 
-        TranslateMessage(&msg);
-        DispatchMessageW(&msg);
+        if (!allowed) {
+            next_poll_ns = now_ns + interval_ns;
+        } else if (now_ns >= next_poll_ns) {
+            poll_input_keys(keys, last_state, now_ns);
+            next_poll_ns = now_ns + interval_ns;
+        }
+
+        if (!had_message) {
+            const int64_t remaining_ns = next_poll_ns - now_ns;
+            if (remaining_ns > 200'000) {
+                std::this_thread::sleep_for(std::chrono::nanoseconds(remaining_ns - 100'000));
+            } else {
+                std::this_thread::yield();
+            }
+        }
     }
 
     // Cleanup.
@@ -333,15 +447,10 @@ void InputThread::thread_main_rawinput() {
 void InputThread::thread_main_polling() {
     const int polling_hz = config_.polling_hz <= 0 ? 1000 : config_.polling_hz;
     const int64_t interval_ns = 1'000'000'000LL / static_cast<int64_t>(polling_hz);
-    std::vector<uint32_t> keys = config_.polling_keys;
-    if (keys.empty()) {
-        keys.reserve(256);
-        for (uint32_t keycode = 0; keycode <= 0xFF; ++keycode) {
-            keys.push_back(keycode);
-        }
-    }
-
-    std::vector<uint8_t> last_state(keys.size(), 0);
+    const std::vector<uint32_t> keys = build_polling_key_list();
+    std::vector<uint8_t> last_state;
+    last_state.reserve(keys.size());
+    refresh_polling_key_state(keys, last_state);
     SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_ABOVE_NORMAL);
 
     int64_t next_tick_ns = timing::HighResClock::now_ns();
@@ -360,10 +469,7 @@ void InputThread::thread_main_polling() {
         const bool allowed = is_input_allowed();
         if (allowed != last_input_allowed_) {
             sync_input_gate(allowed);
-            for (std::size_t i = 0; i < keys.size(); ++i) {
-                const SHORT state = GetAsyncKeyState(static_cast<int>(keys[i]));
-                last_state[i] = (state & 0x8000) ? 1 : 0;
-            }
+            refresh_polling_key_state(keys, last_state);
         }
 
         if (!allowed) {
@@ -374,23 +480,7 @@ void InputThread::thread_main_polling() {
             continue;
         }
 
-        const int64_t stamp_ns = now_ns;
-        for (std::size_t i = 0; i < keys.size(); ++i) {
-            const uint32_t poll_vk = keys[i];
-            const SHORT state = GetAsyncKeyState(static_cast<int>(poll_vk));
-            const uint8_t pressed = (state & 0x8000) ? 1 : 0;
-            if (pressed == last_state[i]) {
-                continue;
-            }
-            last_state[i] = pressed;
-
-            InputEvent event;
-            event.keycode = config::KeycodeMap::normalize_windows_polling_keycode(poll_vk);
-            event.state = pressed ? InputState::Pressed : InputState::Released;
-            event.input_time_ns = stamp_ns;
-            event.device_id = 0;
-            on_input_event(event);
-        }
+        poll_input_keys(keys, last_state, now_ns);
 
         next_tick_ns += interval_ns;
         if (next_tick_ns <= now_ns) {

@@ -37,7 +37,14 @@ struct InputThreadConfig {
     KeyStateConfig key_state;      ///< Key state tracker configuration.
     int polling_hz = 1000;         ///< Polling frequency for polling backend.
     std::vector<uint32_t> polling_keys;  ///< Optional list of keys to poll (empty = all 0..255).
+    std::atomic<bool>* app_active_state = nullptr;  ///< Shared app activation flag.
 };
+
+#ifdef _WIN32
+/// Shared app activation state used by the menu window and input thread.
+[[nodiscard]] std::atomic<bool>& shared_app_activation_state();
+void set_shared_app_activation_state(bool active);
+#endif
 
 /// Input thread wrapper for asynchronous RawInput processing.
 /// Creates a hidden message window and runs a message pump on a dedicated thread.
@@ -103,6 +110,12 @@ private:
     void thread_main();
     void thread_main_rawinput();
     void thread_main_polling();
+    void poll_input_keys(const std::vector<uint32_t>& keys,
+                         std::vector<uint8_t>& last_state,
+                         int64_t stamp_ns);
+    [[nodiscard]] std::vector<uint32_t> build_polling_key_list() const;
+    void refresh_polling_key_state(const std::vector<uint32_t>& keys,
+                                   std::vector<uint8_t>& last_state);
     void on_input_event(const InputEvent& event);
     void signal_start_result(bool success);
     [[nodiscard]] bool is_input_allowed() const;
@@ -118,6 +131,7 @@ private:
     std::atomic<bool> is_running_{false};
     std::atomic<bool> should_stop_{false};
     std::atomic<uint8_t> active_backend_{static_cast<uint8_t>(InputBackend::Polling)};
+    std::atomic<bool>* app_active_state_ = nullptr;
 
     // Message window handle (stored as void* to avoid Windows.h).
     void* hwnd_ = nullptr;

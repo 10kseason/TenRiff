@@ -29,6 +29,8 @@ struct ReplayModeSettings {
     std::string random;
     std::optional<int> random_seed;
     std::string gauge;
+    bool autoplay_enabled = false;
+    bool practice_no_fail_enabled = false;
 };
 
 struct ReplayFile {
@@ -66,6 +68,8 @@ struct ResultFile {
     double rate_multiplier = 1.0;
     double score_multiplier = 1.0;
     int64_t final_score = 0;
+    bool autoplay_enabled = false;
+    bool practice_no_fail_enabled = false;
 
     ResultStats stats;
 };

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <iostream>
 
 #include "input/InputThread.h"
 
@@ -49,6 +50,7 @@ public:
         if (now_ns - pending_since_ns_ < grace_ns_) {
             return false;
         }
+        std::cerr << "[warn] RawInput inactive for bound keys, switching to Polling" << std::endl;
         reset();
         return true;
     }

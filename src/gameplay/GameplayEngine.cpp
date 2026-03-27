@@ -23,7 +23,8 @@ GameplayEngine::GameplayEngine(const GameplayChart& chart, const GameplayConfig&
       rate_(clamp_rate(config.rate)),
       duration_samples_(chart.duration_samples),
       windows_(build_windows(config.judge, config.rate)),
-      gauge_manager_(config.gauge) {
+      gauge_manager_(config.gauge),
+      practice_no_fail_enabled_(config.practice_no_fail_enabled) {
     if (lane_count_ <= 0) {
         lane_count_ = 10;
     }
@@ -163,7 +164,7 @@ void GameplayEngine::apply_judgement(game::Judgement judgement, double delta_ms,
         stats_.record_shift(sample, previous_type, gauge_state_.type);
     }
 
-    if (result.game_over) {
+    if (result.game_over && !practice_no_fail_enabled_) {
         game_over_ = true;
     }
 }

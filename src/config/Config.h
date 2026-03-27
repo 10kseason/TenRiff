@@ -130,6 +130,8 @@ struct ModeConfig {
     std::vector<std::string> mods;
     bool enable_osu_charts = false;
     bool ghost_battle_enabled = true;
+    bool autoplay_enabled = false;
+    bool practice_no_fail_enabled = false;
     std::string song_index_profile = "safe";
 };
 

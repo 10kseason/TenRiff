@@ -74,6 +74,11 @@ double read_json_number(const config::JsonObject& root, std::string_view key, do
     return value ? value->as_number(fallback) : fallback;
 }
 
+bool read_json_bool(const config::JsonObject& root, std::string_view key, bool fallback) {
+    const auto* value = find_json_value(root, key);
+    return value ? value->as_bool(fallback) : fallback;
+}
+
 std::string read_json_string(const config::JsonObject& root, std::string_view key, std::string fallback = {}) {
     const auto* value = find_json_value(root, key);
     return value ? value->as_string(std::move(fallback)) : fallback;
@@ -217,6 +222,8 @@ config::JsonValue build_mode_json(const ReplayModeSettings& mode) {
     if (!mode.gauge.empty()) {
         obj.emplace("gauge", config::JsonValue{mode.gauge});
     }
+    obj.emplace("autoplay_enabled", config::JsonValue{mode.autoplay_enabled});
+    obj.emplace("practice_no_fail_enabled", config::JsonValue{mode.practice_no_fail_enabled});
     return config::JsonValue{std::move(obj)};
 }
 
@@ -288,6 +295,8 @@ ExportResult save_result_json(const std::string& path, const ResultFile& result_
     obj.emplace("rate_multiplier", config::JsonValue{result_file.rate_multiplier});
     obj.emplace("score_multiplier", config::JsonValue{result_file.score_multiplier});
     obj.emplace("final_score", config::JsonValue{static_cast<double>(result_file.final_score)});
+    obj.emplace("autoplay_enabled", config::JsonValue{result_file.autoplay_enabled});
+    obj.emplace("practice_no_fail_enabled", config::JsonValue{result_file.practice_no_fail_enabled});
     obj.emplace("stats", build_stats_json(result_file.stats));
     return save_json_file(path, config::JsonValue{std::move(obj)}, indent);
 }
@@ -345,6 +354,9 @@ ReplayLoadResult load_replay_json(const std::string& path) {
             replay.mode.random_seed = read_json_int(*mode, "random_seed", 0);
         }
         replay.mode.gauge = read_json_string(*mode, "gauge");
+        replay.mode.autoplay_enabled = read_json_bool(*mode, "autoplay_enabled", false);
+        replay.mode.practice_no_fail_enabled =
+            read_json_bool(*mode, "practice_no_fail_enabled", false);
     }
 
     replay.trace.sample_rate = read_json_int(*trace, "sample_rate", replay.sample_rate);

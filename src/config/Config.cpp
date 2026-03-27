@@ -545,6 +545,10 @@ void apply_config_object(const JsonObject& root, RuntimeConfig& config) {
         config.mode.enable_osu_charts = get_bool(*mode, "enable_osu_charts", config.mode.enable_osu_charts);
         config.mode.ghost_battle_enabled =
             get_bool(*mode, "ghost_battle_enabled", config.mode.ghost_battle_enabled);
+        config.mode.autoplay_enabled =
+            get_bool(*mode, "autoplay_enabled", config.mode.autoplay_enabled);
+        config.mode.practice_no_fail_enabled =
+            get_bool(*mode, "practice_no_fail_enabled", config.mode.practice_no_fail_enabled);
         config.mode.song_index_profile =
             normalize_song_index_profile(get_string(*mode, "song_index_profile", config.mode.song_index_profile));
     }
@@ -861,6 +865,8 @@ JsonValue build_json_root(const RuntimeConfig& config) {
     mode.emplace("mods", JsonValue{std::move(mods)});
     mode.emplace("enable_osu_charts", JsonValue{config.mode.enable_osu_charts});
     mode.emplace("ghost_battle_enabled", JsonValue{config.mode.ghost_battle_enabled});
+    mode.emplace("autoplay_enabled", JsonValue{config.mode.autoplay_enabled});
+    mode.emplace("practice_no_fail_enabled", JsonValue{config.mode.practice_no_fail_enabled});
     mode.emplace("song_index_profile", JsonValue{normalize_song_index_profile(config.mode.song_index_profile)});
     root.emplace("mode", JsonValue{std::move(mode)});
 
@@ -1246,6 +1252,8 @@ RuntimeConfig ConfigLoader::defaults() const {
     config.mode.mods.clear();
     config.mode.enable_osu_charts = false;
     config.mode.ghost_battle_enabled = true;
+    config.mode.autoplay_enabled = false;
+    config.mode.practice_no_fail_enabled = false;
     config.mode.song_index_profile = "safe";
 
     config.ui.language = "en";
