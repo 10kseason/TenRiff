@@ -293,6 +293,21 @@ std::string normalize_song_index_profile(std::string value) {
     return "safe";
 }
 
+std::string normalize_input_backend(std::string value, std::string_view fallback) {
+    value = to_lower_ascii(std::move(value));
+    if (value == "rawinput" || value == "raw") {
+        return "rawinput";
+    }
+    if (value == "polling" || value == "poll") {
+        return "polling";
+    }
+    return std::string(fallback);
+}
+
+void sync_input_backend_fields(InputConfig& input) {
+    input.backend = input.rawinput ? "rawinput" : "polling";
+}
+
 std::string normalize_ui_language(std::string value) {
     value = to_lower_ascii(std::move(value));
     if (value == "ko" || value == "kr" || value == "korean" || value == "ko-kr") {
@@ -461,8 +476,15 @@ void apply_config_object(const JsonObject& root, RuntimeConfig& config) {
     }
 
     if (auto* input = get_object(root, "input")) {
-        config.input.backend = get_string(*input, "backend", config.input.backend);
-        config.input.rawinput = get_bool(*input, "rawinput", config.input.rawinput);
+        const std::string fallback_backend = config.input.rawinput ? "rawinput" : "polling";
+        const std::string parsed_backend =
+            normalize_input_backend(get_string(*input, "backend", config.input.backend), fallback_backend);
+        config.input.backend = parsed_backend;
+        if (get_value(*input, "rawinput")) {
+            config.input.rawinput = get_bool(*input, "rawinput", config.input.rawinput);
+        } else {
+            config.input.rawinput = (parsed_backend == "rawinput");
+        }
         config.input.use_qpc = get_bool(*input, "use_qpc", config.input.use_qpc);
         config.input.grab = get_bool(*input, "grab", config.input.grab);
         config.input.queue_size = static_cast<std::size_t>(get_number(*input, "queue_size", config.input.queue_size));
@@ -470,6 +492,7 @@ void apply_config_object(const JsonObject& root, RuntimeConfig& config) {
         config.input.judgement_hz = static_cast<int>(get_number(*input, "judgement_hz", config.input.judgement_hz));
         config.input.debounce_ms = get_number(*input, "debounce_ms", config.input.debounce_ms);
     }
+    sync_input_backend_fields(config.input);
 
     if (auto* judge = get_object(root, "judge")) {
         config.judge.pg_ms = get_number(*judge, "pg", config.judge.pg_ms);
@@ -787,7 +810,7 @@ JsonValue build_json_root(const RuntimeConfig& config) {
     root.emplace("audio", JsonValue{std::move(audio)});
 
     JsonObject input;
-    input.emplace("backend", JsonValue{config.input.backend});
+    input.emplace("backend", JsonValue{config.input.rawinput ? "rawinput" : "polling"});
     input.emplace("rawinput", JsonValue{config.input.rawinput});
     input.emplace("use_qpc", JsonValue{config.input.use_qpc});
     input.emplace("grab", JsonValue{config.input.grab});
@@ -1222,8 +1245,8 @@ RuntimeConfig ConfigLoader::defaults() const {
     config.audio_ui.bgm_volume = 0.75;
     config.audio_ui.keysound_volume = 1.0;
 
-    config.input.backend = "polling";
     config.input.rawinput = true;
+    sync_input_backend_fields(config.input);
     config.input.use_qpc = true;
     config.input.grab = false;
     config.input.queue_size = 2048;

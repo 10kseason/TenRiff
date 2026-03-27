@@ -102,6 +102,42 @@ std::optional<uint16_t> scan_code_from_name(std::string_view normalized_name) {
     return std::nullopt;
 }
 
+std::optional<uint16_t> known_scan_code_from_layout_sensitive_vk(uint32_t vkey) {
+    switch (vkey) {
+        case VK_OEM_1: return static_cast<uint16_t>(0x0027u);
+        case VK_OEM_PLUS: return static_cast<uint16_t>(0x000Du);
+        case VK_OEM_COMMA: return static_cast<uint16_t>(0x0033u);
+        case VK_OEM_MINUS: return static_cast<uint16_t>(0x000Cu);
+        case VK_OEM_PERIOD: return static_cast<uint16_t>(0x0034u);
+        case VK_OEM_2: return static_cast<uint16_t>(0x0035u);
+        case VK_OEM_3: return static_cast<uint16_t>(0x0029u);
+        case VK_OEM_4: return static_cast<uint16_t>(0x001Au);
+        case VK_OEM_5: return static_cast<uint16_t>(0x002Bu);
+        case VK_OEM_6: return static_cast<uint16_t>(0x001Bu);
+        case VK_OEM_7: return static_cast<uint16_t>(0x0028u);
+        default: break;
+    }
+    return std::nullopt;
+}
+
+std::optional<uint32_t> layout_sensitive_vk_from_scan_code(uint16_t scan_code) {
+    switch (scan_code) {
+        case 0x0027u: return static_cast<uint32_t>(VK_OEM_1);
+        case 0x000Du: return static_cast<uint32_t>(VK_OEM_PLUS);
+        case 0x0033u: return static_cast<uint32_t>(VK_OEM_COMMA);
+        case 0x000Cu: return static_cast<uint32_t>(VK_OEM_MINUS);
+        case 0x0034u: return static_cast<uint32_t>(VK_OEM_PERIOD);
+        case 0x0035u: return static_cast<uint32_t>(VK_OEM_2);
+        case 0x0029u: return static_cast<uint32_t>(VK_OEM_3);
+        case 0x001Au: return static_cast<uint32_t>(VK_OEM_4);
+        case 0x002Bu: return static_cast<uint32_t>(VK_OEM_5);
+        case 0x001Bu: return static_cast<uint32_t>(VK_OEM_6);
+        case 0x0028u: return static_cast<uint32_t>(VK_OEM_7);
+        default: break;
+    }
+    return std::nullopt;
+}
+
 std::string name_from_scan_code(uint16_t scan_code) {
     switch (scan_code) {
         case 0x000Du: return "Plus";
@@ -203,6 +239,9 @@ std::optional<uint32_t> parse_scancode_token(std::string_view token) {
 }
 
 uint16_t scan_code_from_vk(uint32_t vkey) {
+    if (const auto known = known_scan_code_from_layout_sensitive_vk(vkey)) {
+        return *known;
+    }
     const HKL layout = GetKeyboardLayout(0);
     const UINT scan = MapVirtualKeyExW(vkey, MAPVK_VK_TO_VSC_EX, layout);
     if (scan == 0u) {
@@ -487,6 +526,9 @@ std::optional<uint32_t> KeycodeMap::polling_vk_for_keycode(uint32_t keycode) {
     }
 
     const uint16_t scan_code = decode_scancode_keycode(keycode);
+    if (const auto known = layout_sensitive_vk_from_scan_code(scan_code)) {
+        return *known;
+    }
     const HKL layout = GetKeyboardLayout(0);
     const UINT vkey = MapVirtualKeyExW(scan_code, MAPVK_VSC_TO_VK_EX, layout);
     if (vkey != 0u) {
