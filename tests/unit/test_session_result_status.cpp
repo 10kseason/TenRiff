@@ -25,3 +25,17 @@ TEST_CASE("unfinished or aborted gameplay never counts as clear") {
     CHECK(tenriff::app::gameplay_session_clear_status(
               true, false, true, tenriff::game::GaugeType::Normal) == "ABORTED");
 }
+
+TEST_CASE("assist clears are labeled explicitly") {
+    CHECK(tenriff::app::gameplay_session_clear_status(
+              true, false, false, tenriff::game::GaugeType::Normal, true, false) ==
+          "ASSIST AUTOPLAY CLEAR");
+    CHECK(tenriff::app::gameplay_session_clear_status(
+              true, false, false, tenriff::game::GaugeType::Hard, false, true) ==
+          "ASSIST PRACTICE HARD CLEAR");
+    CHECK(tenriff::app::gameplay_session_clear_status(
+              true, false, false, tenriff::game::GaugeType::Easy, true, true) ==
+          "ASSIST AUTOPLAY PRACTICE EASY CLEAR");
+    CHECK(tenriff::app::gameplay_session_clear_status(
+              false, false, false, tenriff::game::GaugeType::Normal, true, false) == "FAILED");
+}

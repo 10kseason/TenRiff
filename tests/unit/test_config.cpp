@@ -903,6 +903,31 @@ TEST_CASE("config save and load preserve recent song sources") {
     CHECK(result.config.ui.recent_song_sources[1] == "D:/Songs/PackA");
 }
 
+TEST_CASE("config save and load preserve assist mode flags") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+
+    CurrentPathGuard cwd;
+    std::error_code ec;
+    std::filesystem::current_path(temp.path, ec);
+    REQUIRE_FALSE(static_cast<bool>(ec));
+
+    ConfigLoader loader;
+    auto config = loader.defaults();
+    config.mode.autoplay_enabled = true;
+    config.mode.practice_no_fail_enabled = true;
+
+    std::string error;
+    REQUIRE(loader.save_profile("profiles/test", config, &error));
+    CHECK(error.empty());
+
+    const auto result = loader.load_profile("profiles/test");
+    REQUIRE(result.success());
+    CHECK(result.config.mode.autoplay_enabled);
+    CHECK(result.config.mode.practice_no_fail_enabled);
+}
+
 TEST_CASE("bms-first runtime migration keeps valid keysound modes while forcing only the bms filter") {
     ConfigLoader loader;
     auto config = loader.defaults();

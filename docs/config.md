@@ -118,6 +118,14 @@
 - `ghost_battle_enabled` (bool)
   - `true`면 선택한 차트의 최고 호환 replay를 자동 ghost 비교 대상으로 불러옴
   - `false`면 일반 플레이를 단일 필드로 유지
+- `autoplay_enabled` (bool)
+  - QA용 assist 모드
+  - `true`면 판정 가능한 노트 입력을 자동으로 처리하고 결과에는 `ASSIST` clear status가 붙음
+  - 기본 ghost/replay 비교 대상에서는 제외되는 쪽으로 사용됨
+- `practice_no_fail_enabled` (bool)
+  - QA용 assist 모드
+  - `true`면 gauge 기반 조기 실패를 막고 차트 끝까지 판정/결과 저장을 유지함
+  - 결과에는 `ASSIST` clear status가 붙음
 - `song_index_profile` (string)
   - `safe | fast`
   - `safe`는 대형 라이브러리에서 RAM high-water를 우선 줄이는 기본값
@@ -218,6 +226,8 @@
 ### Notes
 - old single-layout keymaps는 런타임에서 10K map으로 마이그레이션됩니다.
 - runtime은 최종 차트 lane count 기준으로 해당 mode binding을 선택합니다.
+- key rebinding은 성공 즉시 `keymap.json`에 저장되고 별도의 최종 저장 단계를 요구하지 않습니다.
+- Song Select에서 키맵 편집을 열면 현재 선택된 차트의 lane count를 우선 사용하고, 그 다음 `mode.key_mode`, 마지막으로 `10k`를 기본 편집 대상으로 삼습니다.
 
 ## Runtime Migration Notes
 - stale profile은 일부 값이 자동 교정됩니다.

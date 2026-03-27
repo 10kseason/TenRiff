@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(TenRiff VERSION 1.0.3 LANGUAGES CXX)
+project(TenRiff VERSION 1.0.5 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -67,6 +67,7 @@ add_library(tenriff_core
     src/gameplay/ResultStats.cpp
     src/gameplay/Replay.cpp
     src/app/BmsGameplayBuilder.cpp
+    src/app/BmsKeyConverter.cpp
     src/app/ChartLoader.cpp
     src/app/CommandLine.cpp
     src/app/CrashLogger.cpp
@@ -182,6 +183,39 @@ else()
     target_link_libraries(tenriff PRIVATE tenriff_chart tenriff_game tenriff_runtime tenriff_core)
 endif()
 
+add_executable(bms_key_converter
+    src/bms_key_converter_main.cpp
+)
+
+target_include_directories(bms_key_converter
+    PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
+)
+
+if(WIN32)
+    target_link_libraries(bms_key_converter PRIVATE tenriff_chart tenriff_game tenriff_runtime tenriff_core tenriff_audio tenriff_app)
+else()
+    target_link_libraries(bms_key_converter PRIVATE tenriff_chart tenriff_game tenriff_runtime tenriff_core)
+endif()
+
+if(WIN32)
+    add_executable(bms_key_converter_gui WIN32
+        src/bms_key_converter_gui_main.cpp
+    )
+
+    target_include_directories(bms_key_converter_gui
+        PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/src
+    )
+
+    target_link_libraries(bms_key_converter_gui
+        PRIVATE
+            tenriff_core
+            comdlg32
+            shell32
+    )
+endif()
+
 if(TENRIFF_ENABLE_TESTS)
     enable_testing()
     add_executable(bms_realworld_smoke
@@ -272,6 +306,7 @@ if(TENRIFF_ENABLE_TESTS)
         tests/unit/test_game_session_hud.cpp
         tests/unit/test_graphics_timing.cpp
         tests/unit/test_render_performance.cpp
+        tests/unit/test_bms_key_converter.cpp
         tests/unit/test_utf8_compat.cpp
     )
     target_include_directories(bms_parser_tests

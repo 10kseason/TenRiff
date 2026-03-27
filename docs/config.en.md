@@ -118,6 +118,14 @@ If a profile does not exist, it is created automatically on first launch.
 - `ghost_battle_enabled` (bool)
   - when `true`, TenRiff auto-loads the selected chart's best compatible replay for ghost comparison
   - when `false`, normal gameplay stays single-field
+- `autoplay_enabled` (bool)
+  - QA assist mode
+  - when `true`, playable note input is handled automatically and the result is tagged with `ASSIST`
+  - intended to stay out of the default ghost / replay comparison flow
+- `practice_no_fail_enabled` (bool)
+  - QA assist mode
+  - when `true`, gauge-based early failure is disabled while judgement and result export still run to chart end
+  - the result is tagged with `ASSIST`
 - `song_index_profile` (string)
   - `safe | fast`
   - `safe` is the default that prioritizes lower RAM high-water usage on large libraries
@@ -218,6 +226,8 @@ If a profile does not exist, it is created automatically on first launch.
 ### Notes
 - Old single-layout keymaps are migrated into the 10K map at runtime.
 - Runtime selects the relevant mode binding based on the final chart lane count.
+- Key rebinding is saved immediately to `keymap.json` after a successful capture; there is no separate final save step.
+- When opening keymap editing from Song Select, the editor should default to the selected chart's lane count first, then fall back to `mode.key_mode`, then `10k`.
 
 ## Runtime Migration Notes
 - Stale profiles are automatically corrected for some values.

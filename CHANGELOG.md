@@ -2,6 +2,18 @@
 
 TenRiff의 사용자/배포 관점에서 의미 있는 변경만 간단히 기록합니다.
 
+## [1.0.5] - 2026-03-27
+
+### Changed
+- 메뉴 입력 게이트를 프로세스 foreground PID 기준 대신 앱 활성화 상태 기준으로 정리하고, `Quick Setup`/`Title`/`Song Select`/`Options`/`Keymap`에서도 `RawInput` 이상 시 자동 polling fallback이 동작하도록 보강
+- Keymap 편집 모드를 선택한 차트 lane count 기준으로 맞추고, 리바인드 성공 즉시 저장되도록 바꾸면서 숨겨진 메뉴/키맵 단축키를 정리
+- `Autoplay`와 `Practice (No Fail)` 보조 모드를 추가하고, assist 결과 표기/리플레이 메타데이터/기록 우선순위에서 일반 플레이와 구분되도록 정리
+- 게임 시작 직전 입력 상태를 다시 baseline으로 동기화하고 startup timing anchor를 실제 입력 샘플 환산에 연결해, 카운트다운 이후 첫 입력이 늦거나 씹히는 문제를 완화
+- 프로젝트 메타데이터와 현재 상태/로드맵 문서를 `1.0.5` 배포 라인 기준으로 갱신
+
+### Packaged
+- `build-dist` 기준 Windows 배포 스테이징과 공개 오픈소스 소스 스테이징을 `1.0.5` 라인으로 갱신
+
 ## [1.0.3] - 2026-03-24
 
 ### Changed

@@ -52,6 +52,8 @@ TEST_CASE("replay export writes JSON with trace events") {
     replay.mode.random = "super_random";
     replay.mode.random_seed = 4123;
     replay.mode.gauge = "easy";
+    replay.mode.autoplay_enabled = true;
+    replay.mode.practice_no_fail_enabled = true;
 
     replay.trace.sample_rate = 48000;
     replay.trace.rate = 1.0;
@@ -107,6 +109,8 @@ TEST_CASE("replay export writes JSON with trace events") {
     CHECK(mode->find("random")->second.as_string() == "super_random");
     CHECK(mode->find("random_seed")->second.as_number() == doctest::Approx(4123.0));
     CHECK(mode->find("gauge")->second.as_string() == "easy");
+    CHECK(mode->find("autoplay_enabled")->second.as_bool(false));
+    CHECK(mode->find("practice_no_fail_enabled")->second.as_bool(false));
 
     auto parsed_replay = tenriff::app::menu_records::parse_replay_file(path, nullptr);
     REQUIRE(parsed_replay.has_value());
@@ -115,6 +119,8 @@ TEST_CASE("replay export writes JSON with trace events") {
     CHECK(parsed_replay->score_multiplier == doctest::Approx(0.75));
     CHECK(parsed_replay->raw_score == 1645);
     CHECK(parsed_replay->final_score == 1234);
+    CHECK(parsed_replay->autoplay_enabled);
+    CHECK(parsed_replay->practice_no_fail_enabled);
 
     auto loaded_replay = load_replay_json(path.string());
     REQUIRE(loaded_replay.success());
@@ -125,6 +131,8 @@ TEST_CASE("replay export writes JSON with trace events") {
     REQUIRE(loaded_replay.replay->mode.random_seed.has_value());
     CHECK(loaded_replay.replay->mode.random_seed.value() == 4123);
     CHECK(loaded_replay.replay->mode.gauge == "easy");
+    CHECK(loaded_replay.replay->mode.autoplay_enabled);
+    CHECK(loaded_replay.replay->mode.practice_no_fail_enabled);
     CHECK(loaded_replay.replay->trace.events.size() == 2u);
     CHECK(loaded_replay.replay->trace.events[0].lane == 1);
     CHECK(loaded_replay.replay->trace.events[0].state == InputState::Pressed);
@@ -149,6 +157,8 @@ TEST_CASE("result export writes JSON with replay reference") {
     result.rate_multiplier = 1.05;
     result.score_multiplier = 0.50;
     result.final_score = 900;
+    result.autoplay_enabled = false;
+    result.practice_no_fail_enabled = true;
     result.stats.counts.pg = 5;
     result.stats.counts.pr = 3;
     result.stats.max_combo = 5;
@@ -180,6 +190,8 @@ TEST_CASE("result export writes JSON with replay reference") {
     auto game_over_it = root->find("game_over");
     REQUIRE(game_over_it != root->end());
     CHECK(game_over_it->second.as_bool(true) == result.game_over);
+    CHECK(root->find("autoplay_enabled")->second.as_bool(true) == result.autoplay_enabled);
+    CHECK(root->find("practice_no_fail_enabled")->second.as_bool(false) == result.practice_no_fail_enabled);
 
     auto parsed_result = tenriff::app::menu_records::parse_result_file(path, nullptr);
     REQUIRE(parsed_result.has_value());
@@ -190,6 +202,8 @@ TEST_CASE("result export writes JSON with replay reference") {
     CHECK(parsed_result->rate_multiplier == doctest::Approx(1.05));
     CHECK(parsed_result->score_multiplier == doctest::Approx(0.50));
     CHECK(parsed_result->final_score == 900);
+    CHECK_FALSE(parsed_result->autoplay_enabled);
+    CHECK(parsed_result->practice_no_fail_enabled);
 
     std::error_code ec;
     std::filesystem::remove(path, ec);
@@ -294,4 +308,12 @@ TEST_CASE("legacy replay loading succeeds without embedded mode metadata") {
 
     std::error_code ec;
     std::filesystem::remove(path, ec);
+}
+
+TEST_CASE("assist replays are excluded from default ghost selection") {
+    CHECK(tenriff::app::menu_records::default_ghost_replay_allowed(false, false, "HARD CLEAR"));
+    CHECK_FALSE(tenriff::app::menu_records::default_ghost_replay_allowed(true, false, "CLEAR"));
+    CHECK_FALSE(tenriff::app::menu_records::default_ghost_replay_allowed(false, true, "CLEAR"));
+    CHECK_FALSE(tenriff::app::menu_records::default_ghost_replay_allowed(false, false,
+                                                                         "ASSIST AUTOPLAY CLEAR"));
 }

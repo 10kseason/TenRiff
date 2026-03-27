@@ -118,6 +118,14 @@
 - `ghost_battle_enabled` (bool)
   - `true` 时会自动加载当前选中谱面的最佳兼容 replay 作为 ghost 对比
   - `false` 时普通游玩保持单场地显示
+- `autoplay_enabled` (bool)
+  - QA 用 assist 模式
+  - `true` 时会自动处理可判定的按键输入，结果会带上 `ASSIST` clear status
+  - 默认 ghost / replay 对比流程会将其视为非竞争性运行
+- `practice_no_fail_enabled` (bool)
+  - QA 用 assist 模式
+  - `true` 时会禁止基于 gauge 的提前失败，但仍保留判定与结果导出直到谱面结束
+  - 结果会带上 `ASSIST` clear status
 - `song_index_profile` (string)
   - `safe | fast`
   - `safe` 是优先降低大型曲库 RAM high-water 的默认值
@@ -218,6 +226,8 @@
 ### 说明
 - 旧的单布局 keymap 会在运行时迁移到 10K map。
 - 运行时会根据最终谱面的 lane count 选择对应 mode 的 binding。
+- 成功完成按键捕获后会立即写入 `keymap.json`，不再需要单独的最终保存步骤。
+- 从 Song Select 打开 keymap 编辑时，会优先使用当前选中谱面的 lane count，其次回退到 `mode.key_mode`，最后才是 `10k`。
 
 ## 运行时迁移说明
 - stale profile 的部分值会被自动修正。

@@ -34,3 +34,20 @@ TEST_CASE("raw input thread can stop and restart without silently failing") {
     SUCCEED();
 #endif
 }
+
+TEST_CASE("shared app activation state can be toggled for menu input gating") {
+#if defined(_WIN32)
+    auto& state = tenriff::input::shared_app_activation_state();
+    const bool original = state.load(std::memory_order_acquire);
+
+    tenriff::input::set_shared_app_activation_state(false);
+    CHECK_FALSE(state.load(std::memory_order_acquire));
+
+    tenriff::input::set_shared_app_activation_state(true);
+    CHECK(state.load(std::memory_order_acquire));
+
+    tenriff::input::set_shared_app_activation_state(original);
+#else
+    SUCCEED();
+#endif
+}

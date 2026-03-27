@@ -10,10 +10,11 @@
 - **Windows 菜单 UI 基于 D3D11 + Direct2D/DirectWrite**，会渲染标题/选歌（青色布局）以及其他设置页面（列表 UI）
 - 输入键摘要：
   - Title：`↑/↓` 移动，`Enter` 选择（PLAY/EDIT/OPTIONS/EXIT），`Esc` 退出
-  - Song Select：`↑/↓` 移动歌曲，`←/→` 切换左侧菜单焦点，`Enter` 选择/开始，`A/G/I/M/K` 进入设置，`Esc` 返回
+  - Song Select：`↑/↓` 移动歌曲，`←/→` 切换左侧菜单焦点，`Enter` 选择/开始，`Esc` 返回
   - Settings/Mode：`↑/↓` 移动项目，`←/→` 改变数值，`Enter/Esc` 返回
-  - Keymap：`↑/↓` 选择，`Enter` 捕获绑定，`A` 保存，`R` 重置，`F2` NKRO 测试，`Esc` 返回
+  - Keymap：`↑/↓` 选择，`Enter` 捕获绑定，`Esc` 返回
   - Result：只能用 `Enter` 返回 Song Select
+  - 共享功能键：`F1` 帮助，`F2` songs-folder browse，`F5` refresh/reindex，`F9` screenshot
 
 ## 不可妥协的规则
 - **保持菜单中的音频设备处于打开状态。** 在进入菜单时初始化音频 backend，并运行静音回调（零缓冲），这样在 gameplay 开始之前 `playhead_samples` / `buffer_start_samples` 仍然有效。开始歌曲时不要重新打开设备，以避免 warm-up 抖动。
@@ -37,6 +38,7 @@
 - **SongIndexerThread** 扫描文件夹，提取 path/title/artist/BPM/key count/mode/preview audio。进度会发回 UI，交互必须保持响应。
 - **缓存索引**（`song_index.json` 或 SQLite）通过 mtime/hash 检查避免全量重扫。首次运行可能较慢；后续应该接近瞬时。
 - **预览音频** 通过音频引擎调度：UI 只负责 enqueue preview request，AudioThread 负责混音，确保时序一致。
+- Empty-state 页面应提供持续可见的 `Add Songs Folder` 动作；drag-and-drop 仍保留，但作为次要入口。
 
 ## 设置：以延迟优先为中心
 把这些放在第一页，让用户第一时间看到与延迟相关的开关：
@@ -51,6 +53,8 @@
 ## Key remap 与 NKRO 测试
 - 通过 InputThread 的 **下一条输入事件** 捕获绑定按键；不要通过轮询 render loop 来阻塞等待。
 - 为每个按键保持 UP/DOWN 状态机，这样 DOWN 状态下重复 DOWN 和 UP 状态下重复 UP 会被丢弃；把配置好的 debounce 窗口（默认 `8 ms`）内的 down→up→down 抖动压缩掉。
+- 成功捕获后应立即保存，不再有单独的隐藏保存组合键。
+- NKRO 测试仍保留为可见工具页面，但不再是隐藏快捷键。
 - NKRO 测试应显示当前按下集合，并用相同的输入事件实时高亮 ghosting / missing keys。
 
 ## 进入 gameplay 时不要产生延迟尖峰

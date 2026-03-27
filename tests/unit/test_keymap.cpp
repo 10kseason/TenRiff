@@ -1,11 +1,18 @@
 #include <filesystem>
 #include <fstream>
+#include <optional>
 #include <random>
 #include <string>
+#include <string_view>
 
 #include "doctest/doctest.h"
 
 #include "config/Keymap.h"
+
+namespace tenriff::app {
+std::string resolve_keymap_edit_mode_for_menu(std::optional<int> selected_chart_key_count,
+                                              std::string_view runtime_key_mode);
+}
 
 namespace {
 
@@ -104,6 +111,41 @@ TEST_CASE("keymap save and load preserve per-mode bindings") {
     CHECK(manager.bindings_for_mode(result.keymap, "7k").at("lane4") == "Enter");
     CHECK(manager.bindings_for_mode(result.keymap, "16k").at("lane16") == "Apostrophe");
     CHECK(manager.bindings_for_mode(result.keymap, "10k").at("lane5") == "V");
+}
+
+TEST_CASE("keymap save and load preserve arrow-key bindings") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+
+    CurrentPathGuard cwd;
+    std::error_code ec;
+    std::filesystem::current_path(temp.path, ec);
+    REQUIRE_FALSE(static_cast<bool>(ec));
+
+    tenriff::config::KeymapManager manager;
+    auto keymap = manager.default_keymap();
+    keymap.mode_bindings["7k"]["lane1"] = "Up";
+    keymap.mode_bindings["7k"]["lane2"] = "Left";
+    keymap.mode_bindings["7k"]["lane3"] = "Right";
+
+    std::string error;
+    REQUIRE(manager.save_profile("profiles/test", keymap, &error));
+    CHECK(error.empty());
+
+    const auto result = manager.load_profile("profiles/test");
+    REQUIRE(result.success());
+    CHECK(manager.bindings_for_mode(result.keymap, "7k").at("lane1") == "Up");
+    CHECK(manager.bindings_for_mode(result.keymap, "7k").at("lane2") == "Left");
+    CHECK(manager.bindings_for_mode(result.keymap, "7k").at("lane3") == "Right");
+}
+
+TEST_CASE("keymap edit mode resolution prefers selected chart key count") {
+    CHECK(tenriff::app::resolve_keymap_edit_mode_for_menu(7, "4k") == "7k");
+    CHECK(tenriff::app::resolve_keymap_edit_mode_for_menu(8, "10k") == "8k");
+    CHECK(tenriff::app::resolve_keymap_edit_mode_for_menu(std::nullopt, "16k") == "16k");
+    CHECK(tenriff::app::resolve_keymap_edit_mode_for_menu(std::nullopt, "auto") == "10k");
+    CHECK(tenriff::app::resolve_keymap_edit_mode_for_menu(std::nullopt, "") == "10k");
 }
 
 TEST_CASE("legacy keymap bindings migrate into 10K mode without losing other defaults") {

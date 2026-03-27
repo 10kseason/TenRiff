@@ -573,6 +573,35 @@ TEST_CASE("gameplay engine auto-misses once the bad window is exceeded") {
     CHECK(engine.stats().counts.bd == 1);
 }
 
+TEST_CASE("practice no-fail prevents hard gauge game over") {
+    GameplayChart chart;
+    chart.lane_count = 1;
+    chart.duration_samples = 8000;
+    for (int i = 0; i < 12; ++i) {
+        chart.notes.push_back(NoteEvent{1, 1000 + static_cast<int64_t>(i) * 100, std::nullopt});
+    }
+
+    GameplayConfig config;
+    config.sample_rate = 1000;
+    config.rate = 1.0;
+    config.initial_gauge = tenriff::game::GaugeType::Hard;
+    config.judge.pg_ms = 10.0;
+    config.judge.gr_ms = 20.0;
+    config.judge.gd_ms = 30.0;
+    config.judge.bd_ms = 40.0;
+
+    GameplayEngine normal_engine(chart, config);
+    normal_engine.advance(4000);
+    CHECK(normal_engine.is_game_over());
+
+    config.practice_no_fail_enabled = true;
+    GameplayEngine practice_engine(chart, config);
+    practice_engine.advance(4000);
+    CHECK_FALSE(practice_engine.is_game_over());
+    CHECK(practice_engine.is_finished());
+    CHECK(practice_engine.stats().counts.bd >= 10);
+}
+
 TEST_CASE("gameplay engine does not shift later notes after a bad on the same lane") {
     GameplayChart chart;
     chart.lane_count = 1;

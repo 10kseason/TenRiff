@@ -10,10 +10,11 @@ The main menu must follow the same low-latency philosophy as gameplay: audio run
 - The **Windows menu UI is built on D3D11 + Direct2D / DirectWrite** and renders Title / Song Select (cyan layout) and other settings screens (list UI).
 - Input summary:
   - Title: `↑ / ↓` move, `Enter` select (PLAY / EDIT / OPTIONS / EXIT), `Esc` quit
-  - Song Select: `↑ / ↓` song movement, `← / →` switch focus on the left menu, `Enter` select / play, `A / G / I / M / K` enter settings, `Esc` back
+  - Song Select: `↑ / ↓` song movement, `← / →` switch focus on the left menu, `Enter` select / play, `Esc` back
   - Settings / Mode: `↑ / ↓` move items, `← / →` change values, `Enter / Esc` return
-  - Keymap: `↑ / ↓` select, `Enter` capture binding, `A` save, `R` reset, `F2` NKRO test, `Esc` return
+  - Keymap: `↑ / ↓` select, `Enter` capture binding, `Esc` return
   - Result: return to Song Select with `Enter` only
+  - Shared utility keys: `F1` help, `F2` songs-folder browse, `F5` refresh / reindex, `F9` screenshot
 
 ## Non-Negotiable Rules
 - **Keep the audio device open from the menu.** Initialize the audio backend when entering the menu and run silent callbacks (zero buffers) so `playhead_samples` / `buffer_start_samples` remain valid before gameplay begins. Avoid reopening the device when starting a song to prevent warm-up jitter.
@@ -37,6 +38,7 @@ States render UI and consume already-timestamped input events; heavyweight work 
 - **SongIndexerThread** scans folders for path / title / artist / BPM / key count / mode / preview audio. Progress updates are posted to the UI; interaction stays responsive.
 - **Cache index** (`song_index.json` or SQLite) with mtime / hash checks to avoid full rescans. First run can be slow; subsequent runs should be instant.
 - **Preview audio** is scheduled through the audio engine: the UI enqueues preview requests, and AudioThread mixes them so timing stays aligned.
+- Empty-state screens should expose a persistent `Add Songs Folder` action; drag-and-drop stays supported but secondary.
 
 ## Settings: Latency-First Surface
 Put these on the first page so users see latency-critical toggles immediately:
@@ -51,6 +53,8 @@ Put these on the first page so users see latency-critical toggles immediately:
 ## Key Remap and NKRO Test
 - Capture the **next input event** from InputThread to bind keys; never block by polling the render loop.
 - Keep a per-key state machine (UP / DOWN) so duplicate DOWNs while DOWN and UPs while UP are dropped; collapse down -> up -> down chatter within the configured debounce window (default `8 ms`).
+- Successful key captures should save immediately; there is no separate hidden save chord.
+- The NKRO test remains a visible tool screen, but not a hidden keyboard shortcut.
 - The NKRO test shows the current pressed set and highlights ghosting / missing keys in real time using the same input events.
 
 ## Transition Into Gameplay Without Lag Spikes
