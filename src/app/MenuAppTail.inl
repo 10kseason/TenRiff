@@ -1127,15 +1127,10 @@ void MenuApp::launch_gameplay(const std::string& chart_path, const std::string& 
         config_.input.rawinput = session_rawinput;
         config_.input.backend = session_rawinput ? "rawinput" : "polling";
     }
-    const auto& session_input_backend_state = session.input_backend_state();
-    if (session_input_backend_state.auto_fallback) {
-        input_backend_state_ = session_input_backend_state;
-    } else if (session_rawinput || !input_backend_state_.auto_fallback) {
-        input_backend_state_ = {};
-        input_backend_state_.configured_backend = session_rawinput ? input::InputBackend::RawInput
-                                                                   : input::InputBackend::Polling;
-        input_backend_state_.effective_backend = input_backend_state_.configured_backend;
-    }
+    input_backend_state_ = {};
+    input_backend_state_.configured_backend = session_rawinput ? input::InputBackend::RawInput
+                                                               : input::InputBackend::Polling;
+    input_backend_state_.effective_backend = input_backend_state_.configured_backend;
 
     restart_input_thread();
     restart_audio_thread();
@@ -1337,8 +1332,6 @@ void MenuApp::populate_help_overlay(render::HelpOverlayData& target) const {
                         "위 / 아래 키 또는 마우스 휠로 행을 선택합니다."),
                 ui_text("Polling Hz changes how often the polling backend samples keyboard state.",
                         "Polling Hz는 폴링 백엔드가 키보드 상태를 얼마나 자주 읽을지 바꿉니다."),
-                ui_text("Judgement Hz changes how often the audio-thread judgement loop sub-steps internally.",
-                        "Judgement Hz는 오디오 스레드 내부 판정 루프 세분화 빈도를 바꿉니다."),
                 ui_text("Debounce filters switch chatter before gameplay receives duplicate presses.",
                         "디바운스는 게임플레이가 중복 입력을 받기 전에 스위치 떨림을 걸러냅니다."),
                 ui_text("Esc or Backspace saves and returns.",

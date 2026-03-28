@@ -7,6 +7,8 @@
 
 namespace tenriff::app {
 
+inline constexpr double kGameplayInputBacklogCatchupFloorMs = 96.0;
+
 struct StartupInputTimingAnchor {
     int64_t playback_sample = 0;
     int64_t callback_time_ns = 0;
@@ -47,6 +49,10 @@ struct StartupInputTimingAnchor {
     }
 
     return fallback_sample;
+}
+
+[[nodiscard]] inline double gameplay_input_backlog_stale_window_ms(double bad_window_ms) {
+    return std::max(kGameplayInputBacklogCatchupFloorMs, bad_window_ms);
 }
 
 }  // namespace tenriff::app

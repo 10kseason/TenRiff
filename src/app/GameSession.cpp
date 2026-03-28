@@ -59,7 +59,6 @@ constexpr double kHudFeedbackDisplayMs = 240.0;
 constexpr double kHudRenderSlackMs = 24.0;
 constexpr double kGuideToneMs = 28.0;
 constexpr double kHitToneMs = 44.0;
-constexpr double kInputBacklogCatchupFloorMs = 96.0;
 constexpr double kGuideToneGain = 0.055;
 constexpr double kHitToneGain = 0.120;
 constexpr float kOutputSoftLimitThreshold = 0.92f;

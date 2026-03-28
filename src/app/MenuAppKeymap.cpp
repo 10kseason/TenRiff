@@ -59,6 +59,7 @@ void MenuApp::open_keymap_screen(Screen return_screen) {
     clear_keymap_status_message();
     clear_keymap_pending_state();
     screen_ = Screen::Keymap;
+    refresh_menu_input_polling_scope();
 }
 
 void MenuApp::populate_keymap_render_data(render::MenuRenderData& render) {
@@ -129,7 +130,7 @@ void MenuApp::populate_keymap_render_data(render::MenuRenderData& render) {
                     "",
                     false,
                     render::MenuHitTargetKind::KeymapButton,
-                    0,
+                    kKeymapButtonReset,
                     !keymap_capture_active_,
                     false);
     append_menu_row(render.generic,
@@ -137,7 +138,7 @@ void MenuApp::populate_keymap_render_data(render::MenuRenderData& render) {
                     "",
                     false,
                     render::MenuHitTargetKind::KeymapButton,
-                    1,
+                    kKeymapButtonNkroTest,
                     !keymap_capture_active_,
                     false);
     append_menu_row(render.generic,
@@ -145,7 +146,7 @@ void MenuApp::populate_keymap_render_data(render::MenuRenderData& render) {
                     "",
                     false,
                     render::MenuHitTargetKind::KeymapButton,
-                    2,
+                    kKeymapButtonBack,
                     !keymap_capture_active_,
                     false);
     render.generic.footer_notes.push_back(ui_text("Left/Right on Key Mode selects which 4K-10K or 16K layout you are editing.",
@@ -218,6 +219,7 @@ void MenuApp::handle_keymap_input(uint32_t keycode) {
         }
         keymap_edit_mode_ = modes[static_cast<std::size_t>(current_index)];
         refresh_keymap_lane_list();
+        refresh_menu_input_polling_scope();
         publish_snapshot();
         return;
     }
@@ -260,6 +262,7 @@ void MenuApp::update_keymap_capture_timeout() {
     const int64_t now_ns = timing::HighResClock::now_ns();
     if (now_ns >= keymap_capture_deadline_ns_) {
         keymap_capture_active_ = false;
+        refresh_menu_input_polling_scope();
         publish_snapshot();
     }
 }
@@ -271,6 +274,7 @@ void MenuApp::start_keymap_capture() {
     }
     keymap_capture_active_ = true;
     keymap_capture_deadline_ns_ = timing::HighResClock::now_ns() + kKeymapCaptureTimeoutNs;
+    refresh_menu_input_polling_scope();
 }
 
 void MenuApp::apply_keymap_capture(uint32_t keycode) {
@@ -283,11 +287,13 @@ void MenuApp::apply_keymap_capture(uint32_t keycode) {
     const std::string key_name = config::KeycodeMap::to_name(keycode);
     if ((key_delete_ != 0 && keycode == key_delete_) || key_name == "Delete") {
         keymap_capture_active_ = false;
+        refresh_menu_input_polling_scope();
         publish_snapshot();
         return;
     }
     if (key_name == "Unknown") {
         keymap_capture_active_ = false;
+        refresh_menu_input_polling_scope();
         publish_snapshot();
         return;
     }
@@ -305,6 +311,7 @@ void MenuApp::apply_keymap_capture(uint32_t keycode) {
         std::cerr << "[error] " << error << std::endl;
         show_keymap_status_message(ui_text("Failed to save keymap.", "키 설정 저장에 실패했습니다."));
         keymap_capture_active_ = false;
+        refresh_menu_input_polling_scope();
         publish_snapshot();
         return;
     }
@@ -315,6 +322,7 @@ void MenuApp::apply_keymap_capture(uint32_t keycode) {
     keymap_capture_active_ = false;
     show_keymap_status_message(ui_text("Saved ", "저장됨: ") + lane + " = " + key_name);
     clear_keymap_pending_state();
+    refresh_menu_input_polling_scope();
     publish_snapshot();
 }
 
@@ -332,6 +340,7 @@ void MenuApp::apply_keymap_reset() {
     keymap_ = pending;
     keymap_dirty_ = false;
     show_keymap_status_message(ui_text("Key mode reset and saved.", "키 모드 초기화 후 저장되었습니다."));
+    refresh_menu_input_polling_scope();
 }
 
 void MenuApp::apply_keymap_save() {
@@ -369,6 +378,7 @@ void MenuApp::exit_keymap_screen() {
     clear_keymap_status_message();
     clear_keymap_pending_state();
     screen_ = submenu_return_screen_;
+    refresh_menu_input_polling_scope();
     publish_snapshot();
 }
 

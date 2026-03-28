@@ -411,6 +411,55 @@ std::string format_signed_ms(double value) {
 
 }  // namespace
 
+std::vector<uint32_t> build_menu_probe_keycodes(const std::vector<uint32_t>& fixed_menu_keys,
+                                                const config::Keymap& working_keymap,
+                                                std::string_view keymap_edit_mode,
+                                                bool include_keymap_bindings,
+                                                bool capture_all_keys) {
+    std::vector<uint32_t> keycodes;
+    auto append_keycode = [&keycodes](uint32_t keycode) {
+        if (keycode == 0) {
+            return;
+        }
+        if (std::find(keycodes.begin(), keycodes.end(), keycode) != keycodes.end()) {
+            return;
+        }
+        keycodes.push_back(keycode);
+    };
+
+    for (uint32_t keycode : fixed_menu_keys) {
+        append_keycode(keycode);
+    }
+
+    if (!include_keymap_bindings) {
+        return keycodes;
+    }
+
+    if (capture_all_keys) {
+#ifdef _WIN32
+        for (uint32_t vkey = 0; vkey <= 0xFFu; ++vkey) {
+            append_keycode(config::KeycodeMap::normalize_windows_polling_keycode(vkey));
+        }
+#else
+        for (uint32_t keycode = 0; keycode <= 0xFFu; ++keycode) {
+            append_keycode(keycode);
+        }
+#endif
+        return keycodes;
+    }
+
+    config::KeymapManager keymap_manager;
+    const auto bindings = keymap_manager.bindings_for_mode(working_keymap, keymap_edit_mode);
+    for (const auto& [lane, key] : bindings) {
+        static_cast<void>(lane);
+        if (const auto keycode = config::KeycodeMap::to_keycode(key)) {
+            append_keycode(*keycode);
+        }
+    }
+
+    return keycodes;
+}
+
 MenuApp::MenuApp() = default;
 
 bool MenuApp::ui_uses_korean() const {
@@ -823,7 +872,6 @@ void MenuApp::run() {
         }
 
         update_keymap_capture_timeout();
-        service_input_backend_health();
         update_song_select_repeat();
 
         if (screen_ == Screen::SongSelect && song_indexer_.is_running()) {
@@ -849,17 +897,10 @@ void MenuApp::shutdown() {
 }
 
 void MenuApp::start_menu_threads() {
-    reset_input_backend_probe();
-    if (config_.input.rawinput) {
-        input_backend_state_ = {};
-        input_backend_state_.configured_backend = input::InputBackend::RawInput;
-        input_backend_state_.effective_backend = input::InputBackend::RawInput;
-    } else if (!input_backend_state_.auto_fallback) {
-        input_backend_state_.configured_backend = input::InputBackend::Polling;
-        input_backend_state_.effective_backend = input::InputBackend::Polling;
-    } else {
-        input_backend_state_.effective_backend = input::InputBackend::Polling;
-    }
+    input_backend_state_ = {};
+    input_backend_state_.configured_backend = config_.input.rawinput ? input::InputBackend::RawInput
+                                                                     : input::InputBackend::Polling;
+    input_backend_state_.effective_backend = input_backend_state_.configured_backend;
     input::InputThreadConfig input_config;
     input_config.backend = config_.input.rawinput ? input::InputBackend::RawInput
                                                   : input::InputBackend::Polling;
@@ -869,7 +910,6 @@ void MenuApp::start_menu_threads() {
     input_config.polling_hz = config_.input.polling_hz;
     input_config.key_state.debounce_window_ns =
         std::max<int64_t>(0, static_cast<int64_t>(std::llround(config_.input.debounce_ms * 1'000'000.0)));
-    input_config.polling_keys = current_menu_probe_keycodes();
 
     if (!input_thread_.initialize(input_config)) {
         std::cerr << "[error] Failed to initialize input thread." << std::endl;
@@ -900,17 +940,10 @@ void MenuApp::stop_menu_threads() {
 }
 
 void MenuApp::restart_input_thread() {
-    reset_input_backend_probe();
-    if (config_.input.rawinput) {
-        input_backend_state_ = {};
-        input_backend_state_.configured_backend = input::InputBackend::RawInput;
-        input_backend_state_.effective_backend = input::InputBackend::RawInput;
-    } else if (!input_backend_state_.auto_fallback) {
-        input_backend_state_.configured_backend = input::InputBackend::Polling;
-        input_backend_state_.effective_backend = input::InputBackend::Polling;
-    } else {
-        input_backend_state_.effective_backend = input::InputBackend::Polling;
-    }
+    input_backend_state_ = {};
+    input_backend_state_.configured_backend = config_.input.rawinput ? input::InputBackend::RawInput
+                                                                     : input::InputBackend::Polling;
+    input_backend_state_.effective_backend = input_backend_state_.configured_backend;
     input_thread_.shutdown();
     input::InputThreadConfig input_config;
     input_config.backend = config_.input.rawinput ? input::InputBackend::RawInput
@@ -921,7 +954,6 @@ void MenuApp::restart_input_thread() {
     input_config.polling_hz = config_.input.polling_hz;
     input_config.key_state.debounce_window_ns =
         std::max<int64_t>(0, static_cast<int64_t>(std::llround(config_.input.debounce_ms * 1'000'000.0)));
-    input_config.polling_keys = current_menu_probe_keycodes();
     if (!input_thread_.initialize(input_config)) {
         std::cerr << "[error] Failed to reinitialize input thread." << std::endl;
         return;
@@ -937,42 +969,49 @@ void MenuApp::reset_input_backend_probe() {
 }
 
 std::vector<uint32_t> MenuApp::current_menu_probe_keycodes() const {
-    std::vector<uint32_t> keycodes;
-    auto append_keycode = [&keycodes](uint32_t keycode) {
-        if (keycode == 0) {
-            return;
+    std::vector<uint32_t> fixed_menu_keys;
+    fixed_menu_keys.reserve(14);
+    auto append_fixed_key = [&fixed_menu_keys](uint32_t keycode) {
+        if (keycode != 0) {
+            fixed_menu_keys.push_back(keycode);
         }
-        if (std::find(keycodes.begin(), keycodes.end(), keycode) != keycodes.end()) {
-            return;
-        }
-        keycodes.push_back(keycode);
     };
 
-    append_keycode(key_up_);
-    append_keycode(key_down_);
-    append_keycode(key_left_);
-    append_keycode(key_right_);
-    append_keycode(key_page_up_);
-    append_keycode(key_page_down_);
-    append_keycode(key_enter_);
-    append_keycode(key_escape_);
-    append_keycode(key_backspace_);
-    append_keycode(key_delete_);
-    append_keycode(key_f1_);
-    append_keycode(key_f2_);
-    append_keycode(key_f5_);
-    append_keycode(key_f9_);
+    append_fixed_key(key_up_);
+    append_fixed_key(key_down_);
+    append_fixed_key(key_left_);
+    append_fixed_key(key_right_);
+    append_fixed_key(key_page_up_);
+    append_fixed_key(key_page_down_);
+    append_fixed_key(key_enter_);
+    append_fixed_key(key_escape_);
+    append_fixed_key(key_backspace_);
+    append_fixed_key(key_delete_);
+    append_fixed_key(key_f1_);
+    append_fixed_key(key_f2_);
+    append_fixed_key(key_f5_);
+    append_fixed_key(key_f9_);
 
-    config::KeymapManager keymap_manager;
-    const auto bindings = keymap_manager.bindings_for_mode(working_keymap_, keymap_edit_mode_);
-    for (const auto& [lane, key] : bindings) {
-        static_cast<void>(lane);
-        if (auto keycode = config::KeycodeMap::to_keycode(key)) {
-            append_keycode(*keycode);
-        }
+    const bool include_keymap_bindings =
+        screen_ == Screen::Keymap || screen_ == Screen::KeymapTest;
+    const bool capture_all_keys =
+        screen_ == Screen::Keymap && keymap_capture_active_;
+    return build_menu_probe_keycodes(fixed_menu_keys,
+                                     working_keymap_,
+                                     keymap_edit_mode_,
+                                     include_keymap_bindings,
+                                     capture_all_keys);
+}
+
+void MenuApp::refresh_menu_input_polling_scope() {
+    if (!input_thread_.is_running()) {
+        return;
+    }
+    if (input_thread_.current_backend() != input::InputBackend::Polling) {
+        return;
     }
 
-    return keycodes;
+    rebuild_pressed_keys_from_polling_snapshot();
 }
 
 void MenuApp::rebuild_pressed_keys_from_polling_snapshot() {
@@ -1023,87 +1062,20 @@ bool MenuApp::fallback_menu_input_to_polling(std::string_view reason) {
 }
 
 std::string MenuApp::current_input_backend_status_label() const {
-    const auto snapshot = input_thread_.health_snapshot();
-    InputBackendRuntimeState state = input_backend_state_;
-    state.effective_backend = snapshot.backend;
-    if (!state.auto_fallback) {
-        state.configured_backend = snapshot.backend;
-    }
+    InputBackendRuntimeState state{};
+    state.configured_backend = config_.input.rawinput ? input::InputBackend::RawInput
+                                                      : input::InputBackend::Polling;
+    state.effective_backend = input_thread_.is_running() ? input_thread_.current_backend()
+                                                         : state.configured_backend;
     return format_input_backend_status_label(state, ui_uses_korean());
 }
 
 std::string MenuApp::current_input_backend_status_detail() const {
-    const auto snapshot = input_thread_.health_snapshot();
-    InputBackendRuntimeState state = input_backend_state_;
-    state.effective_backend = snapshot.backend;
-    if (!state.auto_fallback) {
-        state.configured_backend = snapshot.backend;
-    }
-    return format_input_backend_status_detail(state, ui_uses_korean());
+    return {};
 }
 
 void MenuApp::service_input_backend_health() {
-    const bool probe_supported =
-        screen_ == Screen::QuickSetup ||
-        screen_ == Screen::Title ||
-        screen_ == Screen::SongSelect ||
-        screen_ == Screen::OptionsHub ||
-        screen_ == Screen::Keymap ||
-        screen_ == Screen::KeymapTest;
-    if (!probe_supported) {
-        reset_input_backend_probe();
-        return;
-    }
-
-    const auto snapshot = input_thread_.health_snapshot();
-    if (snapshot.backend != input::InputBackend::RawInput) {
-        reset_input_backend_probe();
-        return;
-    }
-
-    const int64_t now_ns = timing::HighResClock::now_ns();
-    bool polled_change = false;
-    static std::unordered_set<uint32_t> warned_unpollable_keys;
-    for (uint32_t keycode : current_menu_probe_keycodes()) {
-        const auto poll_vk = config::KeycodeMap::polling_vk_for_keycode(keycode);
-        if (!poll_vk.has_value()) {
-            if (warned_unpollable_keys.insert(keycode).second) {
-                std::cerr << "[warn] Menu polling fallback cannot verify key "
-                          << config::KeycodeMap::to_name(keycode)
-                          << " (" << keycode << "); RawInput menu health checks will ignore it."
-                          << std::endl;
-            }
-            continue;
-        }
-        const bool pressed = (GetAsyncKeyState(static_cast<int>(*poll_vk)) & 0x8000) != 0;
-        auto [it, inserted] = input_probe_polled_states_.emplace(keycode, pressed);
-        if (inserted) {
-            continue;
-        }
-        if (it->second == pressed) {
-            continue;
-        }
-        it->second = pressed;
-        polled_change = true;
-    }
-
-    if (polled_change) {
-        input_backend_probe_.note_polled_change(now_ns, snapshot);
-    }
-    if (input_backend_probe_.should_trigger_fallback(now_ns, snapshot)) {
-        const char* screen_label = "menu";
-        switch (screen_) {
-            case Screen::QuickSetup: screen_label = "Quick Setup"; break;
-            case Screen::Title: screen_label = "Title"; break;
-            case Screen::SongSelect: screen_label = "Song Select"; break;
-            case Screen::OptionsHub: screen_label = "Options"; break;
-            case Screen::Keymap: screen_label = "Keymap"; break;
-            case Screen::KeymapTest: screen_label = "NKRO Test"; break;
-            default: break;
-        }
-        static_cast<void>(fallback_menu_input_to_polling(
-            std::string("RawInput inactive for menu keys on ") + screen_label + ", switching to Polling"));
-    }
+    reset_input_backend_probe();
 }
 
 void MenuApp::restart_audio_thread() {
@@ -1591,19 +1563,15 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
                 return;
             }
             switch (event.index) {
-                case 0:
-                    apply_keymap_save();
-                    publish_snapshot();
-                    break;
-                case 1:
+                case kKeymapButtonReset:
                     apply_keymap_reset();
                     publish_snapshot();
                     break;
-                case 2:
+                case kKeymapButtonNkroTest:
                     screen_ = Screen::KeymapTest;
                     publish_snapshot();
                     break;
-                case 3:
+                case kKeymapButtonBack:
                     exit_keymap_screen();
                     break;
                 default:

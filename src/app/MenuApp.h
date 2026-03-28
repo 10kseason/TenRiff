@@ -46,6 +46,10 @@ public:
     [[nodiscard]] int exit_code() const { return exit_code_; }
 
 private:
+    static constexpr int kKeymapButtonReset = 0;
+    static constexpr int kKeymapButtonNkroTest = 1;
+    static constexpr int kKeymapButtonBack = 2;
+
     struct BestResultRecord;
     struct LocalPlayRecord;
     struct ReplaySummary;
@@ -245,6 +249,7 @@ private:
     void reset_song_select_repeat();
     [[nodiscard]] bool is_song_select_repeat_key(uint32_t keycode) const;
     [[nodiscard]] std::vector<uint32_t> current_menu_probe_keycodes() const;
+    void refresh_menu_input_polling_scope();
     void rebuild_pressed_keys_from_polling_snapshot();
     [[nodiscard]] bool fallback_menu_input_to_polling(std::string_view reason);
     [[nodiscard]] std::string current_input_backend_status_label() const;

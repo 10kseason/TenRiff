@@ -526,7 +526,6 @@ bool GameSession::initialize(const CommandLineOptions& options) {
             sample_rate_ = static_cast<int>(requested_rate);
         }
         input_offset_samples_ = ms_to_samples(config_.input_offset_ms, sample_rate_);
-        refresh_judgement_loop_timing();
         return true;
     };
 
@@ -796,10 +795,6 @@ void GameSession::run() {
             if (finished_.load(std::memory_order_acquire) || stop_requested_.load(std::memory_order_acquire)) {
                 break;
             }
-            service_input_backend_health();
-            if (finished_.load(std::memory_order_acquire) || stop_requested_.load(std::memory_order_acquire)) {
-                break;
-            }
             service_hispeed_repeat(timing::HighResClock::now_ns());
 
             const int64_t now_ns = timing::HighResClock::now_ns();
@@ -832,8 +827,6 @@ void GameSession::run() {
     }
 
     if (!stop_requested_.load(std::memory_order_acquire) && !finished_.load(std::memory_order_acquire)) {
-        startup_input_timing_anchor_ = {};
-        rebaseline_gameplay_start_input_state(0);
         if (audio_thread_.start() != audio::AudioResult::Success) {
             std::cerr << "[error] Failed to start gameplay audio." << std::endl;
             stop_requested_.store(true, std::memory_order_release);
@@ -848,7 +841,6 @@ void GameSession::run() {
             break;
         }
 
-        service_input_backend_health();
         service_chart_audio_streaming(last_audio_sample_.load(std::memory_order_acquire));
 
         const auto now = std::chrono::steady_clock::now();
@@ -1945,11 +1937,6 @@ void GameSession::audio_callback(float* output,
         const int64_t lookahead_samples = ms_to_samples(static_cast<double>(kLookaheadMs), sample_rate_);
 
         const int64_t now_ns = timing::HighResClock::now_ns();
-        if (!startup_input_timing_anchor_.valid) {
-            startup_input_timing_anchor_.playback_sample = buffer_start_samples;
-            startup_input_timing_anchor_.callback_time_ns = now_ns;
-            startup_input_timing_anchor_.valid = true;
-        }
         clock_sync_.add_sample(now_ns, buffer_start_samples);
         schedule_note_guides(buffer_start_samples, buffer_end_samples);
         process_future_events(buffer_end_samples, lookahead_samples);
@@ -2213,7 +2200,7 @@ void GameSession::process_input_queue(int64_t buffer_start_samples, int64_t buff
     }
 
     // If input falls well behind the current audio cursor, replaying every stale edge can spike the mix callback.
-    const double stale_window_ms = std::max(kInputBacklogCatchupFloorMs, config_.judge.indirect_miss_ms);
+    const double stale_window_ms = gameplay_input_backlog_stale_window_ms(config_.judge.bd_ms);
     const int64_t stale_before_sample = buffer_start_samples - ms_to_samples(stale_window_ms, sample_rate_);
     std::array<BufferedLaneInput, kGameplayHudMaxLanes> stale_lane_inputs{};
     std::array<uint8_t, kGameplayHudMaxLanes> stale_lane_present{};
@@ -2225,11 +2212,7 @@ void GameSession::process_input_queue(int64_t buffer_start_samples, int64_t buff
             break;
         }
 
-        auto filtered = filter_gameplay_input_event(*maybe_event);
-        if (!filtered.has_value()) {
-            continue;
-        }
-        const auto event = *filtered;
+        const auto event = *maybe_event;
         if (handle_control_input(event)) {
             if (finished_.load(std::memory_order_acquire)) {
                 return;
@@ -2237,13 +2220,8 @@ void GameSession::process_input_queue(int64_t buffer_start_samples, int64_t buff
             continue;
         }
 
-        const int64_t mapped_sample = resolve_startup_gameplay_input_sample(
-            clock_sync_.input_to_audio_samples(event.input_time_ns),
-            event.input_time_ns,
-            startup_input_timing_anchor_,
-            sample_rate_,
-            buffer_start_samples);
-        int64_t sample = mapped_sample + input_offset_samples_;
+        auto mapped = clock_sync_.input_to_audio_samples(event.input_time_ns);
+        int64_t sample = mapped.value_or(buffer_start_samples) + input_offset_samples_;
         auto lane = lane_from_keycode(event.keycode);
         if (!lane.has_value()) {
             continue;
@@ -2266,14 +2244,6 @@ void GameSession::process_input_queue(int64_t buffer_start_samples, int64_t buff
             continue;
         }
         pending_input_events_.push_back(BufferedLaneInput{lane.value(), event.state, sample});
-    }
-
-    // Keep live gameplay on the same merged queue + polling path as replay/control input so
-    // dead RawInput sessions can still surface lane edges immediately instead of waiting for
-    // a later replay session to trip the backend fallback.
-    poll_gameplay_keys(buffer_end_samples, !autoplay_enabled_);
-    if (finished_.load(std::memory_order_acquire)) {
-        return;
     }
 
     for (std::size_t lane_index = 0; lane_index < stale_lane_present.size(); ++lane_index) {
@@ -2366,19 +2336,10 @@ void GameSession::process_replay_input_queue(int64_t buffer_start_samples,
         if (!maybe_event.has_value()) {
             break;
         }
-        auto filtered = filter_gameplay_input_event(*maybe_event);
-        if (!filtered.has_value()) {
-            continue;
-        }
-        if (handle_control_input(*filtered) &&
+        if (handle_control_input(*maybe_event) &&
             finished_.load(std::memory_order_acquire)) {
             return;
         }
-    }
-
-    poll_gameplay_keys(buffer_end_samples, false);
-    if (finished_.load(std::memory_order_acquire)) {
-        return;
     }
 
     while (replay_event_index_ < replay_source_.trace.events.size()) {
