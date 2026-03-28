@@ -271,3 +271,9 @@ TEST_CASE("startup mapping stays stable across repeated session-style starts") {
         CHECK(engine.stats().counts.pg == 1);
     }
 }
+
+TEST_CASE("gameplay input backlog stale window follows 0.999 bad-window logic") {
+    CHECK(tenriff::app::gameplay_input_backlog_stale_window_ms(80.0) == doctest::Approx(96.0));
+    CHECK(tenriff::app::gameplay_input_backlog_stale_window_ms(96.0) == doctest::Approx(96.0));
+    CHECK(tenriff::app::gameplay_input_backlog_stale_window_ms(140.0) == doctest::Approx(140.0));
+}

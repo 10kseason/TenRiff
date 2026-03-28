@@ -2,6 +2,17 @@
 
 TenRiff의 사용자/배포 관점에서 의미 있는 변경만 간단히 기록합니다.
 
+## [1.0.8] - 2026-03-28
+
+### Changed
+- Windows 입력 경로를 `0.999` 기준으로 되돌려 RawInput 기본 동작, foreground 기반 입력 게이트, `ClockSync` 직접 샘플 매핑, `BAD` 창 기준 backlog 압축 흐름을 다시 기본선으로 복구
+- `1.0.7`에서 추가됐던 menu/gameplay 자동 Polling fallback 및 Polling 강제 영구 저장을 제거하고, profile/config seed도 다시 `rawinput=true` 기본선으로 복귀
+- 입력 설정 화면에서 실제로 더 이상 쓰지 않던 `Judgement Hz` 조절 행을 제거해 현재 런타임 동작과 UI를 맞춤
+- 두 키보드 source 집계 입력 처리와 한글 경로 osu asset 해석 보강은 유지한 채, 입력 핵심 경로만 `0.999` 논리로 정리
+
+### Packaged
+- `build-dist` 기준 Windows 배포 스테이징과 공개 오픈소스 소스 스테이징을 `1.0.8` 라인으로 갱신
+
 ## [1.0.7] - 2026-03-28
 
 ### Changed

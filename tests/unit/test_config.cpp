@@ -78,6 +78,8 @@ TEST_CASE("config defaults prefer 44100 Hz audio") {
     CHECK(config.audio_ui.background_sound_enabled);
     CHECK(config.audio_ui.bgm_volume == doctest::Approx(0.75));
     CHECK(config.audio_ui.keysound_volume == doctest::Approx(1.0));
+    CHECK(config.input.rawinput);
+    CHECK(config.input.backend == "rawinput");
     CHECK(config.input.polling_hz == 1000);
     CHECK(config.input.judgement_hz == 4000);
     CHECK(config.input.debounce_ms == doctest::Approx(8.0));
@@ -428,7 +430,7 @@ TEST_CASE("persisted input backend config does not leak replay session mode chan
     REQUIRE(persisted.mode.mods.empty());
 }
 
-TEST_CASE("config save and load force polling backend for this release line") {
+TEST_CASE("config save and load preserve rawinput backend when enabled") {
     TempDirGuard temp;
     temp.path = make_temp_dir();
     REQUIRE_FALSE(temp.path.empty());
@@ -440,7 +442,7 @@ TEST_CASE("config save and load force polling backend for this release line") {
 
     ConfigLoader loader;
     auto config = loader.defaults();
-    config.input.backend = "polling";
+    config.input.backend = "rawinput";
     config.input.rawinput = true;
 
     std::string error;
@@ -449,8 +451,8 @@ TEST_CASE("config save and load force polling backend for this release line") {
 
     const auto result = loader.load_profile("profiles/test");
     REQUIRE(result.success());
-    CHECK_FALSE(result.config.input.rawinput);
-    CHECK(result.config.input.backend == "polling");
+    CHECK(result.config.input.rawinput);
+    CHECK(result.config.input.backend == "rawinput");
 }
 
 TEST_CASE("config save and load preserve graphics display settings") {

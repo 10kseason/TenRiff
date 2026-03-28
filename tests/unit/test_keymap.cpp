@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <filesystem>
 #include <fstream>
 #include <optional>
@@ -7,11 +8,17 @@
 
 #include "doctest/doctest.h"
 
+#include "config/KeycodeMap.h"
 #include "config/Keymap.h"
 
 namespace tenriff::app {
 std::string resolve_keymap_edit_mode_for_menu(std::optional<int> selected_chart_key_count,
                                               std::string_view runtime_key_mode);
+std::vector<uint32_t> build_menu_probe_keycodes(const std::vector<uint32_t>& fixed_menu_keys,
+                                                const config::Keymap& working_keymap,
+                                                std::string_view keymap_edit_mode,
+                                                bool include_keymap_bindings,
+                                                bool capture_all_keys);
 }
 
 namespace {
@@ -146,6 +153,58 @@ TEST_CASE("keymap edit mode resolution prefers selected chart key count") {
     CHECK(tenriff::app::resolve_keymap_edit_mode_for_menu(std::nullopt, "16k") == "16k");
     CHECK(tenriff::app::resolve_keymap_edit_mode_for_menu(std::nullopt, "auto") == "10k");
     CHECK(tenriff::app::resolve_keymap_edit_mode_for_menu(std::nullopt, "") == "10k");
+}
+
+TEST_CASE("menu probe keycodes only include menu navigation outside keymap screens") {
+    tenriff::config::KeymapManager manager;
+    const auto keymap = manager.default_keymap();
+    const std::vector<uint32_t> fixed_menu_keys{
+        tenriff::config::KeycodeMap::to_keycode("Up").value(),
+        tenriff::config::KeycodeMap::to_keycode("Enter").value(),
+    };
+
+    const auto keycodes = tenriff::app::build_menu_probe_keycodes(
+        fixed_menu_keys, keymap, "4k", false, false);
+
+    CHECK(keycodes == fixed_menu_keys);
+    CHECK(std::find(keycodes.begin(), keycodes.end(),
+                    tenriff::config::KeycodeMap::to_keycode("D").value()) == keycodes.end());
+}
+
+TEST_CASE("menu probe keycodes include active keymap bindings on keymap screens") {
+    tenriff::config::KeymapManager manager;
+    const auto keymap = manager.default_keymap();
+    const std::vector<uint32_t> fixed_menu_keys{
+        tenriff::config::KeycodeMap::to_keycode("Up").value(),
+    };
+
+    const auto keycodes = tenriff::app::build_menu_probe_keycodes(
+        fixed_menu_keys, keymap, "4k", true, false);
+
+    CHECK(std::find(keycodes.begin(), keycodes.end(), fixed_menu_keys.front()) != keycodes.end());
+    CHECK(std::find(keycodes.begin(), keycodes.end(),
+                    tenriff::config::KeycodeMap::to_keycode("D").value()) != keycodes.end());
+    CHECK(std::find(keycodes.begin(), keycodes.end(),
+                    tenriff::config::KeycodeMap::to_keycode("Semicolon").value()) != keycodes.end());
+}
+
+TEST_CASE("menu probe keycodes expand to full polling range during key capture") {
+    tenriff::config::KeymapManager manager;
+    const auto keymap = manager.default_keymap();
+    const std::vector<uint32_t> fixed_menu_keys{
+        tenriff::config::KeycodeMap::to_keycode("Up").value(),
+    };
+
+    const auto keycodes = tenriff::app::build_menu_probe_keycodes(
+        fixed_menu_keys, keymap, "4k", true, true);
+
+    CHECK(keycodes.size() > 100u);
+    CHECK(std::find(keycodes.begin(), keycodes.end(),
+                    tenriff::config::KeycodeMap::to_keycode("F12").value()) != keycodes.end());
+    CHECK(std::find(keycodes.begin(), keycodes.end(),
+                    tenriff::config::KeycodeMap::to_keycode("Delete").value()) != keycodes.end());
+    CHECK(std::find(keycodes.begin(), keycodes.end(),
+                    tenriff::config::KeycodeMap::to_keycode("Semicolon").value()) != keycodes.end());
 }
 
 TEST_CASE("legacy keymap bindings migrate into 10K mode without losing other defaults") {
