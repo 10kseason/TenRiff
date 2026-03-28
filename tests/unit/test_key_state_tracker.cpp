@@ -129,32 +129,103 @@ TEST_CASE("KeyStateTracker reset clears all state") {
     CHECK(!tracker.is_key_pressed(0x44));
 }
 
-TEST_CASE("KeyStateTracker filters duplicate edges from merged input sources") {
+TEST_CASE("KeyStateTracker keeps a shared key pressed until every source releases") {
+    KeyStateConfig config;
+    config.debounce_window_ns = 0;
+    KeyStateTracker tracker(config);
+
+    InputEvent keyboard_a_press{};
+    keyboard_a_press.keycode = 0x41;
+    keyboard_a_press.state = InputState::Pressed;
+    keyboard_a_press.input_time_ns = 1'000'000;
+    keyboard_a_press.device_id = 0x101;
+    REQUIRE(tracker.process(keyboard_a_press).has_value());
+
+    InputEvent keyboard_b_press = keyboard_a_press;
+    keyboard_b_press.input_time_ns = 1'100'000;
+    keyboard_b_press.device_id = 0x201;  // Same low byte, different full-width source token.
+    CHECK_FALSE(tracker.process(keyboard_b_press).has_value());
+    CHECK(tracker.is_key_pressed(0x41));
+    CHECK(tracker.pressed_count() == 1);
+
+    InputEvent keyboard_a_release = keyboard_a_press;
+    keyboard_a_release.state = InputState::Released;
+    keyboard_a_release.input_time_ns = 2'000'000;
+    CHECK_FALSE(tracker.process(keyboard_a_release).has_value());
+    CHECK(tracker.is_key_pressed(0x41));
+    CHECK(tracker.pressed_count() == 1);
+
+    InputEvent keyboard_b_release = keyboard_b_press;
+    keyboard_b_release.state = InputState::Released;
+    keyboard_b_release.input_time_ns = 2'100'000;
+    auto result = tracker.process(keyboard_b_release);
+    REQUIRE(result.has_value());
+    CHECK(result->state == InputState::Released);
+    CHECK_FALSE(tracker.is_key_pressed(0x41));
+    CHECK(tracker.pressed_count() == 0);
+}
+
+TEST_CASE("KeyStateTracker filters duplicate edges from raw and polling sources") {
     KeyStateConfig config;
     config.debounce_window_ns = 0;
     KeyStateTracker tracker(config);
 
     InputEvent raw_press{};
-    raw_press.keycode = 0x41;  // 'A'
+    raw_press.keycode = 0x41;
     raw_press.state = InputState::Pressed;
     raw_press.input_time_ns = 1'000'000;
-    raw_press.device_id = 1;
+    raw_press.device_id = 0x1001;
     REQUIRE(tracker.process(raw_press).has_value());
 
     InputEvent polled_press = raw_press;
     polled_press.input_time_ns = 1'100'000;
-    polled_press.device_id = 0;
+    polled_press.device_id = kPollingAggregateDeviceId;
     CHECK_FALSE(tracker.process(polled_press).has_value());
 
-    InputEvent raw_release{};
-    raw_release.keycode = 0x41;
+    InputEvent raw_release = raw_press;
     raw_release.state = InputState::Released;
     raw_release.input_time_ns = 2'000'000;
-    raw_release.device_id = 1;
-    REQUIRE(tracker.process(raw_release).has_value());
+    CHECK_FALSE(tracker.process(raw_release).has_value());
+    CHECK(tracker.is_key_pressed(0x41));
 
-    InputEvent polled_release = raw_release;
+    InputEvent polled_release = polled_press;
+    polled_release.state = InputState::Released;
     polled_release.input_time_ns = 2'100'000;
-    polled_release.device_id = 0;
-    CHECK_FALSE(tracker.process(polled_release).has_value());
+    auto result = tracker.process(polled_release);
+    REQUIRE(result.has_value());
+    CHECK(result->state == InputState::Released);
+    CHECK_FALSE(tracker.is_key_pressed(0x41));
+}
+
+TEST_CASE("KeyStateTracker keeps different keys independent across multiple sources") {
+    KeyStateConfig config;
+    config.debounce_window_ns = 0;
+    KeyStateTracker tracker(config);
+
+    InputEvent left_press{};
+    left_press.keycode = 0x41;
+    left_press.state = InputState::Pressed;
+    left_press.input_time_ns = 1'000'000;
+    left_press.device_id = 0x10;
+    REQUIRE(tracker.process(left_press).has_value());
+
+    InputEvent right_press{};
+    right_press.keycode = 0x42;
+    right_press.state = InputState::Pressed;
+    right_press.input_time_ns = 1'100'000;
+    right_press.device_id = 0x20;
+    REQUIRE(tracker.process(right_press).has_value());
+
+    CHECK(tracker.is_key_pressed(0x41));
+    CHECK(tracker.is_key_pressed(0x42));
+    CHECK(tracker.pressed_count() == 2);
+
+    InputEvent left_release = left_press;
+    left_release.state = InputState::Released;
+    left_release.input_time_ns = 2'000'000;
+    REQUIRE(tracker.process(left_release).has_value());
+
+    CHECK_FALSE(tracker.is_key_pressed(0x41));
+    CHECK(tracker.is_key_pressed(0x42));
+    CHECK(tracker.pressed_count() == 1);
 }

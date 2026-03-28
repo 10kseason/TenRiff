@@ -76,6 +76,24 @@ TEST_CASE("render pacing advances to the next aligned deadline after overruns") 
     CHECK(tenriff::render::advance_frame_deadline_ns(1'000, 100, 1'300) == 1'400);
 }
 
+TEST_CASE("render wait policy shrinks the busy tail for high off-vsync fps") {
+    const auto baseline = tenriff::render::render_wait_policy(false, 300);
+    CHECK(baseline.coarse_sleep_min_ns == tenriff::render::kRenderDefaultCoarseSleepMinNs);
+    CHECK(baseline.spin_guard_ns == tenriff::render::kRenderDefaultSpinGuardNs);
+    CHECK(baseline.yield_threshold_ns == tenriff::render::kRenderDefaultYieldThresholdNs);
+
+    const auto high_fps = tenriff::render::render_wait_policy(false, 1050);
+    CHECK(high_fps.coarse_sleep_min_ns < baseline.coarse_sleep_min_ns);
+    CHECK(high_fps.spin_guard_ns < baseline.spin_guard_ns);
+    CHECK(high_fps.yield_threshold_ns < baseline.yield_threshold_ns);
+    CHECK(high_fps.yield_threshold_ns <= high_fps.spin_guard_ns);
+
+    const auto vsync_policy = tenriff::render::render_wait_policy(true, 1050);
+    CHECK(vsync_policy.coarse_sleep_min_ns == baseline.coarse_sleep_min_ns);
+    CHECK(vsync_policy.spin_guard_ns == baseline.spin_guard_ns);
+    CHECK(vsync_policy.yield_threshold_ns == baseline.yield_threshold_ns);
+}
+
 TEST_CASE("gameplay motion extrapolates from audio sample time and clamps stale HUD drift") {
     tenriff::render::GameplayMotionState state;
     state.current_sample = 1000;

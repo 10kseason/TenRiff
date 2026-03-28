@@ -48,7 +48,7 @@ if [[ ! -f "$CONFIG_DIR/config.json" ]]; then
   },
   "input": {
     "backend": "polling",
-    "rawinput": true,
+    "rawinput": false,
     "use_qpc": true,
     "grab": false,
     "queue_size": 2048,

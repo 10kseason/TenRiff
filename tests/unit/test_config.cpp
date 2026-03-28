@@ -87,7 +87,7 @@ TEST_CASE("config defaults prefer 44100 Hz audio") {
     CHECK(config.graphics.resolution == "native");
     CHECK(config.graphics.display_mode == "borderless");
     CHECK_FALSE(config.graphics.vsync);
-    CHECK(config.graphics.refresh_hz == 1050);
+    CHECK(config.graphics.refresh_hz == 300);
     CHECK(config.gauge.hard.pg == doctest::Approx(kCurrentHardPg));
     CHECK(config.gauge.hard.gr == doctest::Approx(kCurrentHardGr));
     CHECK(config.gauge.hard.gd == doctest::Approx(kCurrentHardGd));
@@ -428,7 +428,7 @@ TEST_CASE("persisted input backend config does not leak replay session mode chan
     REQUIRE(persisted.mode.mods.empty());
 }
 
-TEST_CASE("config save and load keep input backend string aligned with rawinput state") {
+TEST_CASE("config save and load force polling backend for this release line") {
     TempDirGuard temp;
     temp.path = make_temp_dir();
     REQUIRE_FALSE(temp.path.empty());
@@ -449,8 +449,8 @@ TEST_CASE("config save and load keep input backend string aligned with rawinput 
 
     const auto result = loader.load_profile("profiles/test");
     REQUIRE(result.success());
-    CHECK(result.config.input.rawinput);
-    CHECK(result.config.input.backend == "rawinput");
+    CHECK_FALSE(result.config.input.rawinput);
+    CHECK(result.config.input.backend == "polling");
 }
 
 TEST_CASE("config save and load preserve graphics display settings") {
@@ -1436,4 +1436,19 @@ TEST_CASE("runtime migration flips the old default vsync preset to off") {
 
     CHECK(changed);
     CHECK_FALSE(config.graphics.vsync);
+}
+
+TEST_CASE("runtime migration lowers the old default off-vsync gameplay cap") {
+    ConfigLoader loader;
+    auto config = loader.defaults();
+    config.graphics.display_mode = "borderless";
+    config.graphics.resolution = "native";
+    config.graphics.vsync = false;
+    config.graphics.refresh_hz = 1050;
+    config.graphics.performance_overlay = false;
+
+    const bool changed = tenriff::app::migrate_bms_first_runtime_config(config);
+
+    CHECK(changed);
+    CHECK(config.graphics.refresh_hz == 300);
 }

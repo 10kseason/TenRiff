@@ -14,8 +14,8 @@
     "keysound_volume": 1.0
   },
   "input": {
-    "backend": "rawinput",
-    "rawinput": true,
+    "backend": "polling",
+    "rawinput": false,
     "use_qpc": true,
     "grab": false,
     "queue_size": 2048,
@@ -48,7 +48,7 @@
     "display_mode": "borderless",
     "resolution": "native",
     "vsync": false,
-    "refresh_hz": 1050,
+    "refresh_hz": 300,
     "performance_overlay": false
   },
   "mode": {

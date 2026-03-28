@@ -14,6 +14,9 @@ TEST_CASE("graphics timing keeps the configured cap when vsync is disabled") {
     CHECK(effective_render_fps_limit(false, 1000, 144, false) == 300);
     CHECK(effective_present_refresh_hz(false, 240, 144, true) == 240);
     CHECK(effective_render_fps_limit(false, 240, 144, true) == 240);
+    CHECK(effective_render_fps_limit(false, 1050, 144, true) == 300);
+    CHECK(effective_render_fps_limit(false, 1050, 240, true) == 480);
+    CHECK(effective_render_fps_limit(false, 720, 360, true) == 720);
 }
 
 TEST_CASE("graphics timing uses the detected monitor refresh when vsync is enabled") {

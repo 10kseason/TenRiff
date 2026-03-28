@@ -448,6 +448,42 @@ TEST_CASE("chart loader attaches osu custom hitsound files to note audio") {
     CHECK(result.chart.notes.front().audio_gain == doctest::Approx(0.70f));
 }
 
+TEST_CASE("chart loader resolves osu custom hitsound fallback under Korean filenames") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+
+    const auto chart_path = temp.path / "korean_hitsound.osu";
+    const auto hitsound_path = temp.path / std::filesystem::u8path(u8"한글샘플.ogg");
+    {
+        std::ofstream chart_file(chart_path, std::ios::binary);
+        REQUIRE(chart_file.good());
+        chart_file << "osu file format v14\n"
+                      "[General]\n"
+                      "Mode:3\n"
+                      "[Difficulty]\n"
+                      "CircleSize:4\n"
+                      "[TimingPoints]\n"
+                      "0,500,4,0,0,85,1,0\n"
+                      "[HitObjects]\n"
+                      "0,0,0,1,0,0:0:0:85:\xED\x95\x9C\xEA\xB8\x80\xEC\x83\x98\xED\x94\x8C\n";
+    }
+    {
+        std::ofstream hitsound_file(hitsound_path, std::ios::binary);
+        REQUIRE(hitsound_file.good());
+        hitsound_file << "OggS";
+    }
+
+    ChartLoader loader;
+    ChartLoadResult result = loader.load(chart_path.u8string(), 48000, 1.0, "ignore", true);
+
+    CHECK(result.success());
+    REQUIRE(result.chart.notes.size() == 1u);
+    CHECK(tenriff::gameplay::note_audio_asset_count(result.chart.notes.front()) == 1u);
+    CHECK(chart_audio_path(result.chart, result.chart.notes.front().audio_asset_id) == hitsound_path.u8string());
+    CHECK(result.chart.notes.front().audio_gain == doctest::Approx(0.85f));
+}
+
 TEST_CASE("chart loader attaches multiple osu hitsounds to one note") {
     TempDirGuard temp;
     temp.path = make_temp_dir();

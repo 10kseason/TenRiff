@@ -2,6 +2,28 @@
 
 TenRiff의 사용자/배포 관점에서 의미 있는 변경만 간단히 기록합니다.
 
+## [1.0.7] - 2026-03-28
+
+### Changed
+- Windows `1.0.7` 테스트 릴리스 라인에서는 RawInput 불안정 원인 분리를 위해 입력 백엔드를 설정/기존 프로필 값과 무관하게 Polling으로 고정하고, 저장 시에도 `polling` + `rawinput=false`만 남도록 정규화
+- 기본 전역 config, 기본 profile config, Linux launcher seed config, config schema 문서를 Polling 고정 동작에 맞게 정리
+- 최근 한글 경로 보강에 이어 osu!mania skin/hitsound asset 경로와 입력 backend persistence 경계를 함께 정리해 테스트 릴리스의 재현성 우선 정책을 강화
+
+### Packaged
+- `build-dist` 기준 Windows 배포 스테이징과 공개 오픈소스 소스 스테이징을 `1.0.7` 라인으로 갱신
+
+## [1.0.6] - 2026-03-28
+
+### Changed
+- 같은 키를 두 키보드가 동시에 눌러도 마지막 소스가 해제될 때까지 논리적 `Pressed` 상태를 유지하도록 입력 상태 추적을 `keycode + source` 집계 방식으로 재구성
+- RawInput source token을 저비트 `device_id`가 아닌 전체 폭 토큰으로 확장하고, polling aggregate source를 별도로 예약해 다중 키보드/RawInput+polling 혼합 상황의 상태 충돌을 줄임
+- 메뉴/게임플레이/리플레이에서 자동 polling fallback이 발생했을 때 `configured/effective backend`, fallback origin, reason, timestamp를 상태/UI/로그에 남기고 profile backend 저장은 그대로 유지하도록 정리
+- 메뉴 polling 대상 키를 현재 화면의 실제 메뉴 키로, 게임플레이 polling 대상 키를 실제 lane/control 바인딩으로 제한해 불필요한 입력 변화가 상태 추적에 섞이지 않도록 정리
+- 프로젝트 메타데이터와 현재 상태/로드맵 문서를 `1.0.6` 배포 라인 기준으로 갱신
+
+### Packaged
+- `build-dist` 기준 Windows 배포 스테이징과 공개 오픈소스 소스 스테이징을 `1.0.6` 라인으로 갱신
+
 ## [1.0.5] - 2026-03-27
 
 ### Changed
@@ -9,6 +31,8 @@ TenRiff의 사용자/배포 관점에서 의미 있는 변경만 간단히 기�
 - Keymap 편집 모드를 선택한 차트 lane count 기준으로 맞추고, 리바인드 성공 즉시 저장되도록 바꾸면서 숨겨진 메뉴/키맵 단축키를 정리
 - `Autoplay`와 `Practice (No Fail)` 보조 모드를 추가하고, assist 결과 표기/리플레이 메타데이터/기록 우선순위에서 일반 플레이와 구분되도록 정리
 - 게임 시작 직전 입력 상태를 다시 baseline으로 동기화하고 startup timing anchor를 실제 입력 샘플 환산에 연결해, 카운트다운 이후 첫 입력이 늦거나 씹히는 문제를 완화
+- 레이아웃 민감 OEM 키(`Semicolon`/`Bracket` 계열 등)의 polling 정규화를 고정 매핑으로 안정화하고, 기본 `vsync=false` 그래픽 프리셋의 gameplay cap을 `1050`에서 `300`으로 내려 첫 실행부터 과한 렌더 스케줄링이 입력을 흔들지 않도록 조정
+- `vsync=false` gameplay render pacing에 `min(configured target, max(300, monitor_hz * 2))` safety clamp와 high-FPS adaptive wait tail을 추가해, stale/custom `1050Hz` 프로필에서도 render thread가 과하게 yield/spin 하며 입력 타이밍을 흔드는 경로를 줄임
 - 프로젝트 메타데이터와 현재 상태/로드맵 문서를 `1.0.5` 배포 라인 기준으로 갱신
 
 ### Packaged

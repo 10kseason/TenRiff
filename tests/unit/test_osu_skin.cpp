@@ -119,6 +119,30 @@ TEST_CASE("osu skin resolver honors mania note and key mappings from skin ini") 
     CHECK(resolved.key_pressed_images[0].find("keyD.png") != std::string::npos);
 }
 
+TEST_CASE("osu skin resolver finds extensionless Korean asset tokens") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+
+    const auto root = temp.path / "skins";
+    const auto skin = root / "KoreanSkin";
+    const auto folder = skin / std::filesystem::u8path(u8"화살표");
+    std::filesystem::create_directories(folder);
+    write_file(skin / "skin.ini",
+               "[Mania]\n"
+               "Keys: 4\n"
+               "NoteImage0: 화살표/노트\n"
+               "KeyImage0: 화살표/키\n");
+    write_file(folder / std::filesystem::u8path(u8"노트.png"));
+    write_file(folder / std::filesystem::u8path(u8"키.png"));
+
+    const auto resolved = tenriff::app::resolve_osu_mania_skin(root.u8string(), "KoreanSkin", 4);
+    REQUIRE(resolved.found);
+    REQUIRE(resolved.note_images.size() == 4u);
+    CHECK(resolved.note_images[0] == (folder / std::filesystem::u8path(u8"노트.png")).u8string());
+    CHECK(resolved.key_images[0] == (folder / std::filesystem::u8path(u8"키.png")).u8string());
+}
+
 TEST_CASE("osu skin resolver falls back to standard mania family assets") {
     TempDirGuard temp;
     temp.path = make_temp_dir();
