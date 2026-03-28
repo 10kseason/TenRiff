@@ -39,7 +39,9 @@ If a profile does not exist, it is created automatically on first launch.
 ### `input`
 - `backend` (string)
   - `polling | rawinput`
+  - On the current `1.0.7` Windows release line, RawInput is under investigation for instability, so the runtime normalizes this to `polling` regardless of the stored value
 - `rawinput` (bool)
+  - On the current `1.0.7` Windows release line this is kept only as a compatibility field and is always saved back as `false`
 - `use_qpc` (bool)
 - `grab` (bool)
   - currently a Linux-preview-oriented setting
@@ -95,9 +97,9 @@ If a profile does not exist, it is created automatically on first launch.
 - `vsync` (bool)
 - `refresh_hz` (int)
   - clamped to the `60..1050` range
-  - default value is `1050`
+  - default value is `300`
   - serves as a direct FPS cap only when `vsync=false`
-  - when `vsync=false`, menu rendering uses an effective cap of `300`, while gameplay uses the configured target up to `1050`
+  - when `vsync=false`, menu rendering uses an effective cap of `300`, while gameplay render pacing is safety-clamped to `min(configured target, max(300, monitor_hz * 2))`
   - when `vsync=true`, the present refresh follows the active monitor Hz and render pacing targets `monitor_hz * 2` (`1050` clamp)
 - `performance_overlay` (bool)
 

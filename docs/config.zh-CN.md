@@ -39,7 +39,9 @@
 ### `input`
 - `backend` (string)
   - `polling | rawinput`
+  - 在当前 `1.0.7` Windows 发布线上，由于仍在排查 RawInput 不稳定问题，运行时会无条件把它规范化为 `polling`
 - `rawinput` (bool)
+  - 在当前 `1.0.7` Windows 发布线上，这个字段只为兼容旧配置保留，保存时始终会回写为 `false`
 - `use_qpc` (bool)
 - `grab` (bool)
   - 当前主要对应 Linux preview 语义
@@ -95,9 +97,9 @@
 - `vsync` (bool)
 - `refresh_hz` (int)
   - 会被 clamp 到 `60..1050`
-  - 默认值为 `1050`
+  - 默认值为 `300`
   - 只有在 `vsync=false` 时才充当直接 FPS 上限
-  - `vsync=false` 时，menu 的有效上限为 `300`，gameplay 最多使用配置值到 `1050`
+  - `vsync=false` 时，menu 的有效上限为 `300`，gameplay 的 render pacing 会安全限制到 `min(configured target, max(300, monitor_hz * 2))`
   - `vsync=true` 时，present refresh 以当前活动显示器 Hz 为准，render pacing 的目标是 `monitor_hz * 2`（上限 `1050`）
 - `performance_overlay` (bool)
 

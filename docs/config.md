@@ -39,7 +39,9 @@
 ### `input`
 - `backend` (string)
   - `polling | rawinput`
+  - 현재 `1.0.7` Windows 릴리스 라인에서는 RawInput 불안정 조사 때문에 저장값과 무관하게 항상 `polling`으로 정규화됨
 - `rawinput` (bool)
+  - 현재 `1.0.7` Windows 릴리스 라인에서는 호환성 필드만 유지되며 저장 시 항상 `false`로 내려감
 - `use_qpc` (bool)
 - `grab` (bool)
   - 현재 Linux preview 성격
@@ -95,9 +97,9 @@
 - `vsync` (bool)
 - `refresh_hz` (int)
   - `60..1050` 범위로 clamp
-  - 기본값은 `1050`
+  - 기본값은 `300`
   - `vsync=false`일 때만 직접적인 FPS cap 역할을 함
-  - `vsync=false`면 menu는 effective cap `300`, gameplay는 configured target을 최대 `1050`까지 사용
+  - `vsync=false`면 menu는 effective cap `300`, gameplay render pacing은 `min(configured target, max(300, monitor_hz * 2))`로 safety clamp됨
   - `vsync=true`면 present refresh는 active monitor Hz를 따르고, render pacing은 `monitor_hz * 2`를 목표로 함 (`1050` clamp)
 - `performance_overlay` (bool)
 

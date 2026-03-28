@@ -3,12 +3,13 @@
 This is the document that the next agent or any new contributor should read first. Its goal is to quickly answer: "what is this project now, where should I look, and what is still unverified?"
 
 ## Baseline
-- Current project version: `1.0.5`
+- Current project version: `1.0.7`
 - Baseline companion document for follow-up work: `docs/baseline-1.0.0.en.md`
 - Windows GUI build is the main target
 - Linux exists only as a preview-level package at `Baepoks-Linuxs/TenRiff-0.5.0-linux-preview`
 - Default surface is BMS-first
 - `.osu` can be re-enabled as an option and supports 4K-10K
+- The `1.0.7` Windows test release line hard-locks the input backend to Polling while RawInput instability is being isolated
 
 ## Core Architecture
 - `MenuApp`
@@ -128,12 +129,12 @@ This is the document that the next agent or any new contributor should read firs
 
 ## Runtime / Packaging Rules
 - New user profiles are created automatically
-- The last staged distribution package is `Baepoks/TenRiff-1.0.5`
+- The last staged distribution package is `Baepoks/TenRiff-1.0.7`
 - Distribution packages do not include `Songs`
 - Distribution packages include the runtime `Mainmusic/` assets used for menu BGM
 - When updating distribution builds, only built artifacts should be copied into `Baepoks/`
 - If a source-only / public handoff is requested, the user's preference is to write an include/exclude list first
-- The last staged public source package is versioned separately, e.g. `opensource-Tenriff-source/TenRiff-1.0.5-source`
+- The last staged public source package is versioned separately, e.g. `opensource-Tenriff-source/TenRiff-1.0.7-source`
 - When refreshing a public source package, do not stop at syncing docs/files only; also verify that the staged source-package folder itself can configure, build, and run the core test binary standalone
 
 ## Config / Profile Reality
@@ -163,9 +164,9 @@ This is the document that the next agent or any new contributor should read firs
 - `cmake --build build --config Release --target bms_parser_tests`
 - `cmake --build build --config Release --target bms_realworld_smoke`
 - `ctest --test-dir build -C Release --output-on-failure -R bms_parser_tests`
-- `cmake -S opensource-Tenriff-source/TenRiff-1.0.5-source -B opensource-Tenriff-source/TenRiff-1.0.5-source/build-check -G "Visual Studio 17 2022" -A x64`
-- `cmake --build opensource-Tenriff-source/TenRiff-1.0.5-source/build-check --config Release --target bms_parser_tests`
-- `opensource-Tenriff-source/TenRiff-1.0.5-source/build-check/Release/bms_parser_tests.exe`
+- `cmake -S opensource-Tenriff-source/TenRiff-1.0.7-source -B opensource-Tenriff-source/TenRiff-1.0.7-source/build-check -G "Visual Studio 17 2022" -A x64`
+- `cmake --build opensource-Tenriff-source/TenRiff-1.0.7-source/build-check --config Release --target bms_parser_tests`
+- `opensource-Tenriff-source/TenRiff-1.0.7-source/build-check/Release/bms_parser_tests.exe`
 
 ## Still Manual-Validation Heavy
 - Song Select fast-scroll crash reproduction on a real CJK-heavy library
