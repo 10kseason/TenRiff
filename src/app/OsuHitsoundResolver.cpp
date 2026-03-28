@@ -119,10 +119,15 @@ std::vector<std::filesystem::path> build_reference_candidates(const std::string&
 #endif
     candidates.push_back(ref_path);
     if (!ref_path.has_extension()) {
-        candidates.push_back(ref_path.string() + ".wav");
-        candidates.push_back(ref_path.string() + ".ogg");
-        candidates.push_back(ref_path.string() + ".wave");
-        candidates.push_back(ref_path.string() + ".mp3");
+        auto push_with_suffix = [&](std::string_view suffix) {
+            fs::path candidate = ref_path;
+            candidate += suffix;
+            candidates.push_back(std::move(candidate));
+        };
+        push_with_suffix(".wav");
+        push_with_suffix(".ogg");
+        push_with_suffix(".wave");
+        push_with_suffix(".mp3");
     } else {
         const std::string ext = to_lower_ascii(ref_path.extension().u8string());
         if (ext == ".wav") {

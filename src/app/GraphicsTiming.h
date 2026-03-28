@@ -7,6 +7,8 @@ namespace tenriff::app {
 inline constexpr int kGraphicsRefreshHzMin = 60;
 inline constexpr int kGraphicsRefreshHzMax = 1050;
 inline constexpr int kGraphicsMenuRefreshHzCap = 300;
+inline constexpr int kGraphicsOffVsyncGameplayRefreshHzFloor = 300;
+inline constexpr int kGraphicsOffVsyncGameplayMonitorMultiplier = 2;
 
 [[nodiscard]] int clamp_graphics_refresh_hz(int value);
 [[nodiscard]] int effective_configured_refresh_hz(int configured_refresh_hz, bool gameplay_active);

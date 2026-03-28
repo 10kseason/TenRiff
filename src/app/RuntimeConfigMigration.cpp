@@ -51,6 +51,7 @@ constexpr double kCurrentInputDebounceMs = 8.0;
 constexpr double kLegacyResultTailMs = 500.0;
 constexpr double kCurrentResultTailMs = 3000.0;
 constexpr int kLegacyGraphicsRefreshHz = 1050;
+constexpr int kCurrentDefaultGraphicsRefreshHz = 300;
 constexpr double kLegacyNoteHeightScale = 1.0;
 constexpr double kCurrentNoteHeightScale = 1.8;
 constexpr double kJudgeWindowToleranceMs = 0.001;
@@ -166,6 +167,14 @@ bool matches_legacy_default_graphics(const config::RuntimeConfig& config) {
            !config.graphics.performance_overlay;
 }
 
+bool matches_legacy_default_off_vsync_graphics(const config::RuntimeConfig& config) {
+    return to_lower_copy(config.graphics.display_mode) == "borderless" &&
+           to_lower_copy(config.graphics.resolution) == "native" &&
+           !config.graphics.vsync &&
+           config.graphics.refresh_hz == kLegacyGraphicsRefreshHz &&
+           !config.graphics.performance_overlay;
+}
+
 }  // namespace
 
 bool migrate_bms_first_runtime_config(config::RuntimeConfig& config) {
@@ -235,6 +244,10 @@ bool migrate_bms_first_runtime_config(config::RuntimeConfig& config) {
     }
     if (matches_legacy_default_graphics(config)) {
         config.graphics.vsync = false;
+        changed = true;
+    }
+    if (matches_legacy_default_off_vsync_graphics(config)) {
+        config.graphics.refresh_hz = kCurrentDefaultGraphicsRefreshHz;
         changed = true;
     }
     changed = migrate_gauge_table(config.gauge.hard, kLegacyHardGauge, kCurrentHardGauge) || changed;

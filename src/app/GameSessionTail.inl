@@ -39,6 +39,33 @@ void GameSession::rebuild_input_thread_config(input::InputThreadConfig& input_co
     input_config.polling_hz = config_.input.polling_hz;
     input_config.key_state.debounce_window_ns =
         std::max<int64_t>(0, static_cast<int64_t>(std::llround(config_.input.debounce_ms * 1'000'000.0)));
+
+    auto append_unique_key = [&input_config](uint32_t keycode) {
+        if (keycode == 0) {
+            return;
+        }
+        if (std::find(input_config.polling_keys.begin(), input_config.polling_keys.end(), keycode) !=
+            input_config.polling_keys.end()) {
+            return;
+        }
+        input_config.polling_keys.push_back(keycode);
+    };
+
+    for (const auto& tracked : polled_gameplay_keys_) {
+        append_unique_key(tracked.keycode);
+    }
+    if (input_config.polling_keys.empty()) {
+        for (const auto& [keycode, lane] : key_to_lane_) {
+            static_cast<void>(lane);
+            append_unique_key(keycode);
+        }
+        append_unique_key(escape_keycode_);
+        append_unique_key(f3_keycode_);
+        append_unique_key(f4_keycode_);
+        append_unique_key(f5_keycode_);
+        append_unique_key(f6_keycode_);
+        append_unique_key(f9_keycode_);
+    }
 }
 
 void GameSession::persist_runtime_input_backend() const {
@@ -64,7 +91,41 @@ bool GameSession::fallback_gameplay_input_to_polling(std::string_view reason, bo
         return false;
     }
 
-    std::cerr << "[warn] " << reason << std::endl;
+    const auto snapshot = input_thread_.health_snapshot();
+    const InputFallbackOrigin fallback_origin =
+        replay_playback_enabled_ ? InputFallbackOrigin::Replay : InputFallbackOrigin::Gameplay;
+    const std::string fallback_timestamp = utc_timestamp_compact();
+    uint32_t recent_buffer_frames = 0;
+    for (;;) {
+        const uint64_t begin = audio_timing_sequence_.load(std::memory_order_acquire);
+        if ((begin & 1u) != 0u) {
+            continue;
+        }
+
+        const AudioTimingState timing = last_audio_timing_;
+        const uint64_t end = audio_timing_sequence_.load(std::memory_order_acquire);
+        if (begin != end) {
+            continue;
+        }
+
+        recent_buffer_frames = timing.buffer_frames;
+        break;
+    }
+    std::string buffer_ms_text = "n/a";
+    if (sample_rate_ > 0 && recent_buffer_frames > 0) {
+        const double buffer_ms =
+            static_cast<double>(recent_buffer_frames) * 1000.0 / static_cast<double>(sample_rate_);
+        buffer_ms_text = std::to_string(buffer_ms);
+    }
+
+    std::cerr << "[warn] " << reason
+              << " timestamp=" << fallback_timestamp
+              << " origin=" << input_fallback_origin_label(fallback_origin)
+              << " effective_backend=" << input_backend_name(snapshot.backend)
+              << " queue_drops=" << snapshot.dropped_count
+              << " queue_pushes=" << snapshot.queue_push_count
+              << " buffer_ms=" << buffer_ms_text
+              << std::endl;
 
     std::unique_lock<std::mutex> lock(engine_mutex_, std::defer_lock);
     if (!countdown_phase) {
@@ -85,8 +146,11 @@ bool GameSession::fallback_gameplay_input_to_polling(std::string_view reason, bo
 
     rebaseline_gameplay_start_input_state(last_audio_sample_.load(std::memory_order_acquire));
     persist_runtime_input_backend();
-    input_backend_auto_fallback_ = true;
-    input_backend_fallback_reason_ = std::string(reason);
+    input_backend_state_.effective_backend = input::InputBackend::Polling;
+    input_backend_state_.auto_fallback = true;
+    input_backend_state_.fallback_origin = fallback_origin;
+    input_backend_state_.fallback_reason = std::string(reason);
+    input_backend_state_.fallback_timestamp_utc = fallback_timestamp;
     return true;
 }
 
@@ -204,6 +268,7 @@ void GameSession::poll_gameplay_keys(int64_t sample, bool capture_lane_inputs) {
         event.keycode = tracked.keycode;
         event.state = pressed ? input::InputState::Pressed : input::InputState::Released;
         event.input_time_ns = now_ns;
+        event.device_id = input::kPollingAggregateDeviceId;
 
         auto filtered = gameplay_input_state_tracker_.process(event);
         if (!filtered.has_value()) {
@@ -269,8 +334,7 @@ bool GameSession::initialize(const CommandLineOptions& options) {
 
     future_events_ = {};
     reset_input_backend_probe();
-    input_backend_auto_fallback_ = false;
-    input_backend_fallback_reason_.clear();
+    input_backend_state_ = {};
     gameplay_input_state_tracker_.reset();
     polled_gameplay_keys_.clear();
     tone_voices_.clear();
@@ -323,6 +387,9 @@ bool GameSession::initialize(const CommandLineOptions& options) {
         return false;
     }
     config_ = config_result.config;
+    input_backend_state_.configured_backend = config_.input.rawinput ? input::InputBackend::RawInput
+                                                                     : input::InputBackend::Polling;
+    input_backend_state_.effective_backend = input_backend_state_.configured_backend;
     autoplay_enabled_ = config_.mode.autoplay_enabled;
     practice_no_fail_enabled_ = config_.mode.practice_no_fail_enabled;
     const bool migrated_config = config_result.migrated;
@@ -437,17 +504,6 @@ bool GameSession::initialize(const CommandLineOptions& options) {
         return false;
     }
     chart_path_ = chart_path;
-    report_loading_progress(30, "Initializing input");
-    if (loading_cancel_requested()) {
-        return false;
-    }
-
-    input::InputThreadConfig input_config;
-    rebuild_input_thread_config(input_config);
-
-    if (!input_thread_.initialize(input_config)) {
-        return false;
-    }
     report_loading_progress(42, "Opening audio device");
     if (loading_cancel_requested()) {
         return false;
@@ -676,6 +732,16 @@ bool GameSession::initialize(const CommandLineOptions& options) {
         return false;
     }
     if (!prepare_chart_audio()) {
+        return false;
+    }
+    report_loading_progress(92, "Initializing input");
+    if (loading_cancel_requested()) {
+        return false;
+    }
+
+    input::InputThreadConfig input_config;
+    rebuild_input_thread_config(input_config);
+    if (!input_thread_.initialize(input_config)) {
         return false;
     }
     next_guide_note_index_ = 0;

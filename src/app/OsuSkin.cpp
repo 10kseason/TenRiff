@@ -190,10 +190,15 @@ std::string resolve_existing_asset(const fs::path& skin_dir, const std::string& 
     std::vector<fs::path> candidates;
     candidates.push_back(relative);
     if (!relative.has_extension()) {
-        candidates.push_back(relative.string() + ".png");
-        candidates.push_back(relative.string() + "@2x.png");
-        candidates.push_back(relative.string() + ".jpg");
-        candidates.push_back(relative.string() + ".jpeg");
+        auto push_with_suffix = [&](std::string_view suffix) {
+            fs::path candidate = relative;
+            candidate += suffix;
+            candidates.push_back(std::move(candidate));
+        };
+        push_with_suffix(".png");
+        push_with_suffix("@2x.png");
+        push_with_suffix(".jpg");
+        push_with_suffix(".jpeg");
     }
     for (const auto& candidate : candidates) {
         std::error_code ec;

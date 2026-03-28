@@ -4,6 +4,15 @@
 
 namespace tenriff::app {
 
+namespace {
+
+void force_polling_input_backend(config::RuntimeConfig& config) {
+    config.input.rawinput = false;
+    config.input.backend = "polling";
+}
+
+}  // namespace
+
 bool is_session_only_mode_mod(std::string_view token) {
     const auto* descriptor = find_mode_mod_descriptor(token);
     if (!descriptor) {
@@ -34,15 +43,15 @@ bool strip_session_only_mode_mods(config::RuntimeConfig& config) {
 config::RuntimeConfig build_persisted_runtime_config(const config::RuntimeConfig& config) {
     config::RuntimeConfig persisted = config;
     static_cast<void>(strip_session_only_mode_mods(persisted));
-    persisted.input.backend = persisted.input.rawinput ? "rawinput" : "polling";
+    force_polling_input_backend(persisted);
     return persisted;
 }
 
 config::RuntimeConfig build_persisted_input_backend_config(const config::RuntimeConfig& persisted_base,
                                                            const config::RuntimeConfig& runtime_source) {
+    static_cast<void>(runtime_source);
     config::RuntimeConfig persisted = build_persisted_runtime_config(persisted_base);
-    persisted.input.rawinput = runtime_source.input.rawinput;
-    persisted.input.backend = persisted.input.rawinput ? "rawinput" : "polling";
+    force_polling_input_backend(persisted);
     return persisted;
 }
 

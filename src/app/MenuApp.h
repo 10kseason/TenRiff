@@ -12,6 +12,7 @@
 
 #include "app/CommandLine.h"
 #include "app/GameplayHudRevisions.h"
+#include "app/InputBackendStatus.h"
 #include "app/MenuMusicController.h"
 #include "app/SongSelectState.h"
 #include "GameplayHudLimits.h"
@@ -247,6 +248,7 @@ private:
     void rebuild_pressed_keys_from_polling_snapshot();
     [[nodiscard]] bool fallback_menu_input_to_polling(std::string_view reason);
     [[nodiscard]] std::string current_input_backend_status_label() const;
+    [[nodiscard]] std::string current_input_backend_status_detail() const;
 
     void launch_gameplay(const std::string& chart_path, const std::string& replay_path = {});
     void launch_selected_song();
@@ -537,8 +539,7 @@ private:
     uint32_t key_f9_ = 0;
     input::RawInputHealthProbe input_backend_probe_{};
     std::unordered_map<uint32_t, bool> input_probe_polled_states_{};
-    bool input_backend_auto_fallback_ = false;
-    std::string input_backend_fallback_reason_{};
+    InputBackendRuntimeState input_backend_state_{};
 };
 
 }  // namespace tenriff::app

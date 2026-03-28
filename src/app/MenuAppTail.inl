@@ -370,6 +370,10 @@ void MenuApp::populate_title_render_data(render::MenuRenderData& render,
         ui_text("F1 opens the control help overlay", "F1로 조작 도움말 열기"),
         ui_text("ESC exits from the title menu", "ESC로 타이틀 메뉴 종료"),
     };
+    render.title.guides.push_back(current_input_backend_status_label());
+    if (const std::string detail = current_input_backend_status_detail(); !detail.empty()) {
+        render.title.guides.push_back(detail);
+    }
 }
 
 void MenuApp::populate_result_render_data(render::MenuRenderData& render, const std::string& current_track) {
@@ -484,6 +488,10 @@ void MenuApp::populate_result_render_data(render::MenuRenderData& render, const 
     }
     if (!render.result.result_file.empty()) {
         render.result.notes.push_back(ui_text("Result: ", "결과 파일: ") + render.result.result_file);
+    }
+    render.result.notes.push_back(current_input_backend_status_label());
+    if (const std::string detail = current_input_backend_status_detail(); !detail.empty()) {
+        render.result.notes.push_back(detail);
     }
     render.result.notes.push_back(ui_text("Left restarts the same chart immediately.", "Left로 같은 차트를 즉시 재시작합니다."));
     if (render.result.replay_available) {
@@ -610,6 +618,13 @@ void MenuApp::populate_generic_screen_render_data(render::MenuRenderData& render
         populate_keymap_confirm_render_data(render);
     } else if (screen_ == Screen::KeymapTest) {
         populate_keymap_test_render_data(render);
+    }
+
+    if (screen_ != Screen::Keymap && screen_ != Screen::KeymapTest) {
+        render.generic.footer_notes.push_back(current_input_backend_status_label());
+        if (const std::string detail = current_input_backend_status_detail(); !detail.empty()) {
+            render.generic.footer_notes.push_back(detail);
+        }
     }
 }
 
@@ -1111,6 +1126,15 @@ void MenuApp::launch_gameplay(const std::string& chart_path, const std::string& 
     if (config_.input.rawinput != session_rawinput) {
         config_.input.rawinput = session_rawinput;
         config_.input.backend = session_rawinput ? "rawinput" : "polling";
+    }
+    const auto& session_input_backend_state = session.input_backend_state();
+    if (session_input_backend_state.auto_fallback) {
+        input_backend_state_ = session_input_backend_state;
+    } else if (session_rawinput || !input_backend_state_.auto_fallback) {
+        input_backend_state_ = {};
+        input_backend_state_.configured_backend = session_rawinput ? input::InputBackend::RawInput
+                                                                   : input::InputBackend::Polling;
+        input_backend_state_.effective_backend = input_backend_state_.configured_backend;
     }
 
     restart_input_thread();

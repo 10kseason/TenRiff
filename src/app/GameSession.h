@@ -18,6 +18,7 @@
 
 #include "app/ChartLoader.h"
 #include "app/CommandLine.h"
+#include "app/InputBackendStatus.h"
 #include "app/GameSessionInputTiming.h"
 #include "audio/AudioThread.h"
 #include "config/Config.h"
@@ -146,6 +147,7 @@ public:
     [[nodiscard]] const GameSessionResult& result() const { return result_; }
     [[nodiscard]] double final_hispeed() const { return config_.speed.hi_speed; }
     [[nodiscard]] bool final_rawinput_enabled() const { return config_.input.rawinput; }
+    [[nodiscard]] const InputBackendRuntimeState& input_backend_state() const { return input_backend_state_; }
 
 private:
     struct FutureEvent {
@@ -364,8 +366,7 @@ private:
     FutureQueue future_events_{};
     input::RawInputHealthProbe input_backend_probe_{};
     std::unordered_map<uint32_t, bool> input_probe_polled_states_{};
-    bool input_backend_auto_fallback_ = false;
-    std::string input_backend_fallback_reason_{};
+    InputBackendRuntimeState input_backend_state_{};
     std::vector<PolledGameplayKey> polled_gameplay_keys_;
     std::vector<ToneVoice> tone_voices_;
     std::vector<ChartAudioAsset> chart_audio_assets_;

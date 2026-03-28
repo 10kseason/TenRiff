@@ -126,6 +126,13 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
     render.song_select.index_profile_label = ui_song_index_profile_label(config_.mode.song_index_profile);
     render.song_select.group_summary = song_group_detail_label(song_group_mode_, korean);
     render.song_select.browser_summary = browser_summary();
+    const std::string input_backend_label = current_input_backend_status_label();
+    if (!input_backend_label.empty()) {
+        if (!render.song_select.browser_summary.empty()) {
+            render.song_select.browser_summary += " / ";
+        }
+        render.song_select.browser_summary += input_backend_label;
+    }
     render.song_select.sort_summary = song_sort_detail_label(song_sort_mode_, korean);
     render.song_select.primary_hint =
         render.song_select.showing_sources

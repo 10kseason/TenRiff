@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <cstdio>
+#include <ctime>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -147,6 +149,27 @@ std::string resolve_menu_music_file_path(std::string_view filename) {
         return candidate.lexically_normal().u8string();
     }
     return {};
+}
+
+std::string utc_timestamp_compact_menu() {
+    std::time_t now = std::time(nullptr);
+    std::tm tm{};
+#if defined(_WIN32)
+    gmtime_s(&tm, &now);
+#else
+    gmtime_r(&now, &tm);
+#endif
+    char buffer[32] = {};
+    std::snprintf(buffer,
+                  sizeof(buffer),
+                  "%04d%02d%02d_%02d%02d%02dZ",
+                  tm.tm_year + 1900,
+                  tm.tm_mon + 1,
+                  tm.tm_mday,
+                  tm.tm_hour,
+                  tm.tm_min,
+                  tm.tm_sec);
+    return buffer;
 }
 
 SongIndexLoadResult load_song_index_from_available_cache(const std::string& primary_cache_path,
@@ -628,8 +651,7 @@ MenuApp::~MenuApp() {
 
 bool MenuApp::initialize(const CommandLineOptions& options) {
     exit_code_ = 0;
-    input_backend_auto_fallback_ = false;
-    input_backend_fallback_reason_.clear();
+    input_backend_state_ = {};
     options_ = options;
     songs_path_ = menu_songs::normalize_song_source_path(options.songs_path);
     if (songs_path_.empty()) {
@@ -646,6 +668,9 @@ bool MenuApp::initialize(const CommandLineOptions& options) {
         return false;
     }
     config_ = config_result.config;
+    input_backend_state_.configured_backend = config_.input.rawinput ? input::InputBackend::RawInput
+                                                                     : input::InputBackend::Polling;
+    input_backend_state_.effective_backend = input_backend_state_.configured_backend;
     const bool migrated_config = config_result.migrated;
     const bool stripped_session_only_mods = strip_session_only_mode_mods(config_);
     first_run_profile_ = config_result.used_defaults;
@@ -826,8 +851,14 @@ void MenuApp::shutdown() {
 void MenuApp::start_menu_threads() {
     reset_input_backend_probe();
     if (config_.input.rawinput) {
-        input_backend_auto_fallback_ = false;
-        input_backend_fallback_reason_.clear();
+        input_backend_state_ = {};
+        input_backend_state_.configured_backend = input::InputBackend::RawInput;
+        input_backend_state_.effective_backend = input::InputBackend::RawInput;
+    } else if (!input_backend_state_.auto_fallback) {
+        input_backend_state_.configured_backend = input::InputBackend::Polling;
+        input_backend_state_.effective_backend = input::InputBackend::Polling;
+    } else {
+        input_backend_state_.effective_backend = input::InputBackend::Polling;
     }
     input::InputThreadConfig input_config;
     input_config.backend = config_.input.rawinput ? input::InputBackend::RawInput
@@ -838,6 +869,7 @@ void MenuApp::start_menu_threads() {
     input_config.polling_hz = config_.input.polling_hz;
     input_config.key_state.debounce_window_ns =
         std::max<int64_t>(0, static_cast<int64_t>(std::llround(config_.input.debounce_ms * 1'000'000.0)));
+    input_config.polling_keys = current_menu_probe_keycodes();
 
     if (!input_thread_.initialize(input_config)) {
         std::cerr << "[error] Failed to initialize input thread." << std::endl;
@@ -870,8 +902,14 @@ void MenuApp::stop_menu_threads() {
 void MenuApp::restart_input_thread() {
     reset_input_backend_probe();
     if (config_.input.rawinput) {
-        input_backend_auto_fallback_ = false;
-        input_backend_fallback_reason_.clear();
+        input_backend_state_ = {};
+        input_backend_state_.configured_backend = input::InputBackend::RawInput;
+        input_backend_state_.effective_backend = input::InputBackend::RawInput;
+    } else if (!input_backend_state_.auto_fallback) {
+        input_backend_state_.configured_backend = input::InputBackend::Polling;
+        input_backend_state_.effective_backend = input::InputBackend::Polling;
+    } else {
+        input_backend_state_.effective_backend = input::InputBackend::Polling;
     }
     input_thread_.shutdown();
     input::InputThreadConfig input_config;
@@ -883,6 +921,7 @@ void MenuApp::restart_input_thread() {
     input_config.polling_hz = config_.input.polling_hz;
     input_config.key_state.debounce_window_ns =
         std::max<int64_t>(0, static_cast<int64_t>(std::llround(config_.input.debounce_ms * 1'000'000.0)));
+    input_config.polling_keys = current_menu_probe_keycodes();
     if (!input_thread_.initialize(input_config)) {
         std::cerr << "[error] Failed to reinitialize input thread." << std::endl;
         return;
@@ -957,27 +996,50 @@ bool MenuApp::fallback_menu_input_to_polling(std::string_view reason) {
         return false;
     }
 
-    std::cerr << "[warn] " << reason << std::endl;
+    const auto snapshot = input_thread_.health_snapshot();
+    const std::string fallback_timestamp = utc_timestamp_compact_menu();
+    std::cerr << "[warn] " << reason
+              << " timestamp=" << fallback_timestamp
+              << " origin=" << input_fallback_origin_label(InputFallbackOrigin::Menu)
+              << " effective_backend=" << input_backend_name(snapshot.backend)
+              << " queue_drops=" << snapshot.dropped_count
+              << " queue_pushes=" << snapshot.queue_push_count
+              << " buffer_ms=n/a"
+              << std::endl;
     config_.input.rawinput = false;
     config_.input.backend = "polling";
     restart_input_thread();
     rebuild_pressed_keys_from_polling_snapshot();
     persist_runtime_config();
 
-    input_backend_auto_fallback_ = true;
-    input_backend_fallback_reason_ = std::string(reason);
+    input_backend_state_.configured_backend = input::InputBackend::RawInput;
+    input_backend_state_.effective_backend = input::InputBackend::Polling;
+    input_backend_state_.auto_fallback = true;
+    input_backend_state_.fallback_origin = InputFallbackOrigin::Menu;
+    input_backend_state_.fallback_reason = std::string(reason);
+    input_backend_state_.fallback_timestamp_utc = fallback_timestamp;
     publish_snapshot();
     return true;
 }
 
 std::string MenuApp::current_input_backend_status_label() const {
     const auto snapshot = input_thread_.health_snapshot();
-    std::string label = "Input backend: ";
-    label += (snapshot.backend == input::InputBackend::RawInput) ? "RawInput" : "Polling";
-    if (input_backend_auto_fallback_) {
-        label += " (auto-fallback)";
+    InputBackendRuntimeState state = input_backend_state_;
+    state.effective_backend = snapshot.backend;
+    if (!state.auto_fallback) {
+        state.configured_backend = snapshot.backend;
     }
-    return label;
+    return format_input_backend_status_label(state, ui_uses_korean());
+}
+
+std::string MenuApp::current_input_backend_status_detail() const {
+    const auto snapshot = input_thread_.health_snapshot();
+    InputBackendRuntimeState state = input_backend_state_;
+    state.effective_backend = snapshot.backend;
+    if (!state.auto_fallback) {
+        state.configured_backend = snapshot.backend;
+    }
+    return format_input_backend_status_detail(state, ui_uses_korean());
 }
 
 void MenuApp::service_input_backend_health() {
@@ -1077,7 +1139,7 @@ int MenuApp::effective_refresh_hz() const {
 
 int MenuApp::effective_present_refresh_hz() const {
     const int detected_monitor_refresh_hz =
-        detect_active_monitor_refresh_hz(config_.graphics.refresh_hz);
+        detect_active_monitor_refresh_hz(kGraphicsRefreshHzMin);
     return ::tenriff::app::effective_present_refresh_hz(config_.graphics.vsync,
                                                         config_.graphics.refresh_hz,
                                                         detected_monitor_refresh_hz,
@@ -1086,7 +1148,7 @@ int MenuApp::effective_present_refresh_hz() const {
 
 int MenuApp::effective_render_fps_limit() const {
     const int detected_monitor_refresh_hz =
-        detect_active_monitor_refresh_hz(config_.graphics.refresh_hz);
+        detect_active_monitor_refresh_hz(kGraphicsRefreshHzMin);
     return ::tenriff::app::effective_render_fps_limit(config_.graphics.vsync,
                                                       config_.graphics.refresh_hz,
                                                       detected_monitor_refresh_hz,
