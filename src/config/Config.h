@@ -111,8 +111,8 @@ struct SkinConfig {
 };
 
 struct InputConfig {
-    std::string backend = "polling";
-    bool rawinput = false;
+    std::string backend = "rawinput";
+    bool rawinput = true;
     bool use_qpc = true;
     bool grab = false;
     std::size_t queue_size = 2048;

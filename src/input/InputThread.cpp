@@ -47,6 +47,17 @@ LRESULT CALLBACK input_window_proc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lp
     return DefWindowProcW(hwnd, msg, wparam, lparam);
 }
 
+bool is_current_process_foreground() {
+    const HWND foreground = GetForegroundWindow();
+    if (!foreground) {
+        return false;
+    }
+
+    DWORD process_id = 0;
+    GetWindowThreadProcessId(foreground, &process_id);
+    return process_id == GetCurrentProcessId();
+}
+
 }  // namespace
 
 #ifdef _WIN32
@@ -74,8 +85,7 @@ InputThread::~InputThread() {
 
 bool InputThread::initialize(const InputThreadConfig& config) {
     config_ = config;
-    app_active_state_ = config_.app_active_state ? config_.app_active_state
-                                                 : &shared_app_activation_state();
+    app_active_state_ = config_.app_active_state;
     last_input_allowed_ = false;
     active_backend_.store(static_cast<uint8_t>(config_.backend), std::memory_order_release);
     last_allowed_event_time_ns_.store(0, std::memory_order_release);
@@ -190,7 +200,7 @@ bool InputThread::is_input_allowed() const {
     if (app_active_state_) {
         return app_active_state_->load(std::memory_order_acquire);
     }
-    return shared_app_activation_state().load(std::memory_order_acquire);
+    return is_current_process_foreground();
 }
 
 void InputThread::sync_input_gate(bool allowed) {

@@ -27,7 +27,7 @@ constexpr double kVisualOffsetMax = 500.0;
 constexpr int kRefreshHzMin = 60;
 constexpr int kRefreshHzMax = 1050;
 constexpr int kDefaultGraphicsRefreshHz = 300;
-constexpr bool kForcePollingInputBackend = true;
+constexpr bool kForcePollingInputBackend = false;
 
 struct SkinPaletteEntry {
     const char* token;
@@ -1254,7 +1254,7 @@ RuntimeConfig ConfigLoader::defaults() const {
     config.audio_ui.bgm_volume = 0.75;
     config.audio_ui.keysound_volume = 1.0;
 
-    config.input.rawinput = false;
+    config.input.rawinput = true;
     sync_input_backend_fields(config.input);
     config.input.use_qpc = true;
     config.input.grab = false;
