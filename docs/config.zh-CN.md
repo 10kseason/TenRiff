@@ -39,9 +39,11 @@
 ### `input`
 - `backend` (string)
   - `polling | rawinput`
-  - 在当前 `1.0.7` Windows 发布线上，由于仍在排查 RawInput 不稳定问题，运行时会无条件把它规范化为 `polling`
+  - 当前 `1.0.8` 发布线的默认值是 `rawinput`
+  - 运行时会再次尊重保存值，不再强制把它规范化为 `polling`
 - `rawinput` (bool)
-  - 在当前 `1.0.7` Windows 发布线上，这个字段只为兼容旧配置保留，保存时始终会回写为 `false`
+  - 与 `backend` 一起保存的便捷布尔字段
+  - 在当前 `1.0.8` 发布线上会按当前值正常保存和恢复
 - `use_qpc` (bool)
 - `grab` (bool)
   - 当前主要对应 Linux preview 语义
@@ -52,7 +54,8 @@
   - 默认值为 `1000`（`1ms`）
 - `judgement_hz` (int)
   - `1000 | 2000 | 4000 | 8000`
-  - 音频线程内部判定循环的 sub-step 频率
+  - 保留在输入配置中的兼容字段
+  - 当前 `1.0.8` 运行时已不再用它驱动独立的音频线程判定 sub-step 循环
   - 默认值为 `4000`（`0.25ms`）
 - `debounce_ms` (double)
   - 在运行时前过滤同一按键上极短暂的 up/down 抖动的输入去抖时间

@@ -3,13 +3,13 @@
 This is the document that the next agent or any new contributor should read first. Its goal is to quickly answer: "what is this project now, where should I look, and what is still unverified?"
 
 ## Baseline
-- Current project version: `1.0.7`
+- Current project version: `1.0.8`
 - Baseline companion document for follow-up work: `docs/baseline-1.0.0.en.md`
 - Windows GUI build is the main target
 - Linux exists only as a preview-level package at `Baepoks-Linuxs/TenRiff-0.5.0-linux-preview`
 - Default surface is BMS-first
 - `.osu` can be re-enabled as an option and supports 4K-10K
-- The `1.0.7` Windows test release line hard-locks the input backend to Polling while RawInput instability is being isolated
+- The `1.0.8` release line restores the `0.999` input path as the baseline: RawInput is the default again, input gating follows foreground ownership, and gameplay input maps directly from `ClockSync`
 
 ## Core Architecture
 - `MenuApp`
@@ -84,11 +84,12 @@ This is the document that the next agent or any new contributor should read firs
   - note-consuming failures (auto-miss, too-early consume, hold break / tail miss) stay `BAD`
   - very early non-consuming presses are handled as LR2-style `POOR` and are visible again in result / replay / UI paths
   - `POOR` preserves combo, stays out of score / accuracy totals, and uses dedicated `PR` gauge damage values
-  - right after gameplay starts, before `ClockSync` has an estimate, input samples are linearly estimated from a startup anchor (`playback_sample + callback time`) so the first few notes do not collapse onto one current-playback sample
+  - live gameplay input uses the `ClockSync` estimate directly, and stale backlog compression now follows the `BAD` window again to match the `0.999` boundary
   - tail release timing applies only to osu hold and BMS `#LNMODE 2` charge notes
+  - when two keyboards press the same key, the logical `Pressed` state remains active until the last input source releases it
 - Graphics:
   - resolution presets (`720p`, `1080p`, `qhd`, `native`)
-  - `refresh_hz` (`60..1050`, default `1050`)
+  - `refresh_hz` (`60..1050`, default `300`)
   - VSync off: menu effective cap `300`, gameplay can use the configured target up to `1050`
   - VSync on: present refresh follows the active monitor Hz and render pacing targets `monitor_hz * 2` (`1050` clamp)
   - `visual_offset_ms`
@@ -129,12 +130,12 @@ This is the document that the next agent or any new contributor should read firs
 
 ## Runtime / Packaging Rules
 - New user profiles are created automatically
-- The last staged distribution package is `Baepoks/TenRiff-1.0.7`
+- The last staged distribution package is `Baepoks/TenRiff-1.0.8`
 - Distribution packages do not include `Songs`
 - Distribution packages include the runtime `Mainmusic/` assets used for menu BGM
 - When updating distribution builds, only built artifacts should be copied into `Baepoks/`
 - If a source-only / public handoff is requested, the user's preference is to write an include/exclude list first
-- The last staged public source package is versioned separately, e.g. `opensource-Tenriff-source/TenRiff-1.0.7-source`
+- The last staged public source package is versioned separately, e.g. `opensource-Tenriff-source/TenRiff-1.0.8-source`
 - When refreshing a public source package, do not stop at syncing docs/files only; also verify that the staged source-package folder itself can configure, build, and run the core test binary standalone
 
 ## Config / Profile Reality
@@ -164,9 +165,9 @@ This is the document that the next agent or any new contributor should read firs
 - `cmake --build build --config Release --target bms_parser_tests`
 - `cmake --build build --config Release --target bms_realworld_smoke`
 - `ctest --test-dir build -C Release --output-on-failure -R bms_parser_tests`
-- `cmake -S opensource-Tenriff-source/TenRiff-1.0.7-source -B opensource-Tenriff-source/TenRiff-1.0.7-source/build-check -G "Visual Studio 17 2022" -A x64`
-- `cmake --build opensource-Tenriff-source/TenRiff-1.0.7-source/build-check --config Release --target bms_parser_tests`
-- `opensource-Tenriff-source/TenRiff-1.0.7-source/build-check/Release/bms_parser_tests.exe`
+- `cmake -S opensource-Tenriff-source/TenRiff-1.0.8-source -B opensource-Tenriff-source/TenRiff-1.0.8-source/build-check -G "Visual Studio 17 2022" -A x64`
+- `cmake --build opensource-Tenriff-source/TenRiff-1.0.8-source/build-check --config Release --target bms_parser_tests`
+- `opensource-Tenriff-source/TenRiff-1.0.8-source/build-check/Release/bms_parser_tests.exe`
 
 ## Still Manual-Validation Heavy
 - Song Select fast-scroll crash reproduction on a real CJK-heavy library

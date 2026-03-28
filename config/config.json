@@ -14,13 +14,12 @@
     "keysound_volume": 1.0
   },
   "input": {
-    "backend": "polling",
-    "rawinput": false,
+    "backend": "rawinput",
+    "rawinput": true,
     "use_qpc": true,
     "grab": false,
     "queue_size": 2048,
     "polling_hz": 1000,
-    "judgement_hz": 4000,
     "debounce_ms": 8.0
   },
   "judge": {

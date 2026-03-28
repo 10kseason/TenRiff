@@ -3,13 +3,13 @@
 이 문서는 다음 에이전트나 새 작업자가 가장 먼저 읽어야 하는 현재 상태 문서입니다. 목표는 "지금 이 프로젝트가 무엇이고, 어디를 보면 되고, 무엇이 아직 미검증인지"를 빠르게 파악하게 하는 것입니다.
 
 ## Baseline
-- 현재 프로젝트 버전은 `1.0.7`
+- 현재 프로젝트 버전은 `1.0.8`
 - 후속 작업의 기준선 문서는 `docs/baseline-1.0.0.md`
 - Windows GUI 빌드가 메인 타깃
 - Linux는 `Baepoks-Linuxs/TenRiff-0.5.0-linux-preview` 수준의 preview만 존재
 - 기본 표면은 BMS-first
 - `.osu`는 옵션으로 다시 활성화 가능하며 4K~10K를 지원
-- `1.0.7` Windows 테스트 릴리스 라인에서는 RawInput 원인 분리를 위해 입력 백엔드를 Polling으로 고정
+- `1.0.8` 릴리스 라인은 `0.999` 입력 경로를 기준으로 RawInput 기본값, foreground 기준 입력 게이트, `ClockSync` 직접 샘플 매핑을 다시 기본선으로 사용
 
 ## Core Architecture
 - `MenuApp`
@@ -84,11 +84,12 @@
   - note-consuming 실패(auto-miss, 너무 빨리 눌러 노트를 소모한 경우, hold break/tail miss)는 `BAD`
   - 너무 이른 non-consuming 입력은 LR2 스타일 `POOR`로 처리되고, 결과/리플레이/UI에 다시 표시됨
   - `POOR`는 콤보를 끊지 않고 점수/정확도 집계에는 들어가지 않으며, gauge는 전용 `PR` 감소값을 사용
-  - 게임 시작 직후 `ClockSync`가 아직 추정치를 만들기 전에는 startup anchor(`playback_sample + callback time`) 기준으로 입력 샘플을 선형 환산해, 첫 몇 노트 입력이 현재 playback sample 한 점으로 뭉개지지 않도록 함
+  - gameplay live input는 `ClockSync` 추정치를 직접 사용하고, backlog stale 압축은 `BAD` 창 기준으로 동작해 `0.999` 라인과 같은 입력 처리 경계를 유지
   - tail release timing은 osu hold와 BMS `#LNMODE 2` charge note에만 적용
+  - 같은 키를 두 키보드가 동시에 눌러도 마지막 입력 소스가 해제될 때까지 논리적 `Pressed` 상태를 유지
 - Graphics:
   - resolution preset (`720p`, `1080p`, `qhd`, `native`)
-  - `refresh_hz` (`60..1050`, 기본 `1050`)
+  - `refresh_hz` (`60..1050`, 기본 `300`)
   - VSync off: menu effective cap `300`, gameplay configured target 최대 `1050`
   - VSync on: present refresh는 active monitor Hz를 따라가고 render pacing은 `monitor_hz * 2`를 목표로 함 (`1050` clamp)
   - `visual_offset_ms`
@@ -129,12 +130,12 @@
 
 ## Runtime / Packaging Rules
 - 새 사용자 프로필은 자동 생성
-- 마지막으로 스테이징된 배포 패키지는 `Baepoks/TenRiff-1.0.7`
+- 마지막으로 스테이징된 배포 패키지는 `Baepoks/TenRiff-1.0.8`
 - 배포 패키지에는 `Songs`를 넣지 않음
 - 배포 패키지는 메뉴 BGM용 `Mainmusic/` 런타임 자산을 함께 포함
 - 배포 업데이트 요청 시 built artifacts만 `Baepoks/`에 넣는 규칙
 - source-only/public handoff 요청 시 먼저 include/exclude 리스트를 작성하는 것이 사용자 선호
-- 마지막으로 스테이징된 공개 소스 패키지는 `opensource-Tenriff-source/TenRiff-1.0.7-source`처럼 버전별로 별도 스테이징
+- 마지막으로 스테이징된 공개 소스 패키지는 `opensource-Tenriff-source/TenRiff-1.0.8-source`처럼 버전별로 별도 스테이징
 - 공개 소스 패키지를 갱신할 때는 문서만 맞추는 것으로 끝내지 않고, 스테이징된 소스 패키지 폴더 자체에서 standalone configure/build/test가 되는지까지 확인하는 규칙
 
 ## Config / Profile Reality
@@ -164,9 +165,9 @@
 - `cmake --build build --config Release --target bms_parser_tests`
 - `cmake --build build --config Release --target bms_realworld_smoke`
 - `ctest --test-dir build -C Release --output-on-failure -R bms_parser_tests`
-- `cmake -S opensource-Tenriff-source/TenRiff-1.0.7-source -B opensource-Tenriff-source/TenRiff-1.0.7-source/build-check -G "Visual Studio 17 2022" -A x64`
-- `cmake --build opensource-Tenriff-source/TenRiff-1.0.7-source/build-check --config Release --target bms_parser_tests`
-- `opensource-Tenriff-source/TenRiff-1.0.7-source/build-check/Release/bms_parser_tests.exe`
+- `cmake -S opensource-Tenriff-source/TenRiff-1.0.8-source -B opensource-Tenriff-source/TenRiff-1.0.8-source/build-check -G "Visual Studio 17 2022" -A x64`
+- `cmake --build opensource-Tenriff-source/TenRiff-1.0.8-source/build-check --config Release --target bms_parser_tests`
+- `opensource-Tenriff-source/TenRiff-1.0.8-source/build-check/Release/bms_parser_tests.exe`
 
 ## Still Manual-Validation Heavy
 - renderer layout 변경 뒤에는 `docs/ui-audit-checklist.md` 기준으로 `1080p`, `720p windowed`, `Performance HUD on/off` 전수 확인 필요
