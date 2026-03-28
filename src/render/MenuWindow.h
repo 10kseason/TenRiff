@@ -25,7 +25,7 @@ struct MenuWindowConfig {
     std::string title = "TenRiff";
     std::string display_mode = "borderless";
     bool vsync = false;
-    int refresh_hz = 1050;
+    int refresh_hz = 300;
     int width = 1280;
     int height = 720;
 };

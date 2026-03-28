@@ -35,15 +35,20 @@ public:
     [[nodiscard]] std::size_t pressed_count() const;
 
 private:
-    struct KeyState {
+    struct SourceState {
         InputState state = InputState::Released;
         int64_t last_event_time_ns = 0;
-        bool has_event = false;  ///< Whether any event has been processed for this key.
+        bool has_event = false;
+    };
+
+    struct KeyState {
+        std::unordered_map<InputSourceToken, SourceState> sources;
+        std::size_t pressed_source_count = 0;
     };
 
     KeyStateConfig config_;
     std::unordered_map<uint32_t, KeyState> key_states_;
-    std::size_t pressed_count_ = 0;
+    std::size_t pressed_key_count_ = 0;
 };
 
 }  // namespace tenriff::input

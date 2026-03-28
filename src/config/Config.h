@@ -58,7 +58,7 @@ struct GraphicsConfig {
     std::string display_mode = "borderless";
     std::string resolution = "native";
     bool vsync = false;
-    int refresh_hz = 1050;
+    int refresh_hz = 300;
     bool performance_overlay = false;
 };
 
@@ -112,7 +112,7 @@ struct SkinConfig {
 
 struct InputConfig {
     std::string backend = "polling";
-    bool rawinput = true;
+    bool rawinput = false;
     bool use_qpc = true;
     bool grab = false;
     std::size_t queue_size = 2048;

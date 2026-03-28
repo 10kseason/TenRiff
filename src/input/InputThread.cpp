@@ -314,7 +314,7 @@ void InputThread::poll_input_keys(const std::vector<uint32_t>& keys,
         event.keycode = config::KeycodeMap::normalize_windows_polling_keycode(poll_vk);
         event.state = pressed ? InputState::Pressed : InputState::Released;
         event.input_time_ns = stamp_ns;
-        event.device_id = 0;
+        event.device_id = kPollingAggregateDeviceId;
         on_input_event(event);
     }
 }

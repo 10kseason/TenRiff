@@ -24,9 +24,6 @@ namespace tenriff::render {
 
 namespace {
 
-constexpr int64_t kCoarseSleepMinNs = 500'000LL;
-constexpr int64_t kSpinGuardNs = 150'000LL;
-constexpr int64_t kYieldThresholdNs = 80'000LL;
 constexpr int64_t kMaxOversleepEstimateNs = 2'000'000LL;
 constexpr std::size_t kMaxPerformanceHistory = 24000;
 constexpr int64_t kPerformanceWindowNs = 10'000'000'000LL;
@@ -99,7 +96,10 @@ void update_oversleep_estimate(int64_t target_wake_ns,
 }
 
 template <typename Waiter>
-void precise_wait_until_ns(int64_t deadline_ns, int64_t* oversleep_estimate_ns, const Waiter& waiter) {
+void precise_wait_until_ns(int64_t deadline_ns,
+                           int64_t* oversleep_estimate_ns,
+                           const RenderWaitPolicy& wait_policy,
+                           const Waiter& waiter) {
     for (;;) {
         const int64_t now_ns = timing::HighResClock::now_ns();
         if (now_ns >= deadline_ns) {
@@ -108,8 +108,8 @@ void precise_wait_until_ns(int64_t deadline_ns, int64_t* oversleep_estimate_ns, 
 
         const int64_t remaining_ns = deadline_ns - now_ns;
         const int64_t oversleep_ns = oversleep_estimate_ns ? *oversleep_estimate_ns : 0;
-        if (remaining_ns > kCoarseSleepMinNs + kSpinGuardNs + oversleep_ns) {
-            const int64_t sleep_ns = remaining_ns - kSpinGuardNs - oversleep_ns;
+        if (remaining_ns > wait_policy.coarse_sleep_min_ns + wait_policy.spin_guard_ns + oversleep_ns) {
+            const int64_t sleep_ns = remaining_ns - wait_policy.spin_guard_ns - oversleep_ns;
             const int64_t target_wake_ns = now_ns + sleep_ns;
             if (waiter(sleep_ns)) {
                 update_oversleep_estimate(target_wake_ns, timing::HighResClock::now_ns(), oversleep_estimate_ns);
@@ -120,7 +120,7 @@ void precise_wait_until_ns(int64_t deadline_ns, int64_t* oversleep_estimate_ns, 
             continue;
         }
 
-        if (remaining_ns > kYieldThresholdNs) {
+        if (remaining_ns > wait_policy.yield_threshold_ns) {
             std::this_thread::yield();
             continue;
         }
@@ -388,6 +388,7 @@ void RenderThread::thread_main() {
         if (target_fps <= 0) {
             target_fps = 60;
         }
+        const RenderWaitPolicy wait_policy = render_wait_policy(config.vsync, target_fps);
         const int64_t frame_interval_ns = 1'000'000'000LL / target_fps;
 
         const int64_t now_ns = timing::HighResClock::now_ns();
@@ -395,6 +396,7 @@ void RenderThread::thread_main() {
             precise_wait_until_ns(
                 next_tick_ns,
                 &oversleep_estimate_ns,
+                wait_policy,
 #ifdef _WIN32
                 [&waitable_timer](int64_t duration_ns) { return waitable_timer.wait_for_ns(duration_ns); }
 #else

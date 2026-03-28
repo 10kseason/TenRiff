@@ -7,6 +7,8 @@
 #endif
 #include <windows.h>
 
+#include <limits>
+
 namespace tenriff::input {
 
 RawInputHandler::RawInputHandler() {
@@ -151,8 +153,10 @@ void RawInputHandler::process_keyboard_input(const void* raw_input) {
         static_cast<double>(counter.QuadPart) * 1'000'000'000.0 / static_cast<double>(qpc_frequency_)
     );
 
-    // Device ID from RawInput header.
-    event.device_id = static_cast<uint8_t>(reinterpret_cast<uintptr_t>(raw->header.hDevice) & 0xFF);
+    const auto source_token = reinterpret_cast<std::uintptr_t>(raw->header.hDevice);
+    event.device_id = (source_token == kPollingAggregateDeviceId)
+                          ? (std::numeric_limits<InputSourceToken>::max)()
+                          : source_token;
 
     ++events_processed_;
 

@@ -26,6 +26,8 @@ constexpr double kVisualOffsetMin = -500.0;
 constexpr double kVisualOffsetMax = 500.0;
 constexpr int kRefreshHzMin = 60;
 constexpr int kRefreshHzMax = 1050;
+constexpr int kDefaultGraphicsRefreshHz = 300;
+constexpr bool kForcePollingInputBackend = true;
 
 struct SkinPaletteEntry {
     const char* token;
@@ -305,6 +307,11 @@ std::string normalize_input_backend(std::string value, std::string_view fallback
 }
 
 void sync_input_backend_fields(InputConfig& input) {
+    if (kForcePollingInputBackend) {
+        input.rawinput = false;
+        input.backend = "polling";
+        return;
+    }
     input.backend = input.rawinput ? "rawinput" : "polling";
 }
 
@@ -809,15 +816,17 @@ JsonValue build_json_root(const RuntimeConfig& config) {
     audio.emplace("keysound_volume", JsonValue{config.audio_ui.keysound_volume});
     root.emplace("audio", JsonValue{std::move(audio)});
 
+    InputConfig persisted_input = config.input;
+    sync_input_backend_fields(persisted_input);
     JsonObject input;
-    input.emplace("backend", JsonValue{config.input.rawinput ? "rawinput" : "polling"});
-    input.emplace("rawinput", JsonValue{config.input.rawinput});
-    input.emplace("use_qpc", JsonValue{config.input.use_qpc});
-    input.emplace("grab", JsonValue{config.input.grab});
-    input.emplace("queue_size", JsonValue{static_cast<double>(config.input.queue_size)});
-    input.emplace("polling_hz", JsonValue{static_cast<double>(config.input.polling_hz)});
-    input.emplace("judgement_hz", JsonValue{static_cast<double>(config.input.judgement_hz)});
-    input.emplace("debounce_ms", JsonValue{config.input.debounce_ms});
+    input.emplace("backend", JsonValue{persisted_input.backend});
+    input.emplace("rawinput", JsonValue{persisted_input.rawinput});
+    input.emplace("use_qpc", JsonValue{persisted_input.use_qpc});
+    input.emplace("grab", JsonValue{persisted_input.grab});
+    input.emplace("queue_size", JsonValue{static_cast<double>(persisted_input.queue_size)});
+    input.emplace("polling_hz", JsonValue{static_cast<double>(persisted_input.polling_hz)});
+    input.emplace("judgement_hz", JsonValue{static_cast<double>(persisted_input.judgement_hz)});
+    input.emplace("debounce_ms", JsonValue{persisted_input.debounce_ms});
     root.emplace("input", JsonValue{std::move(input)});
 
     JsonObject judge;
@@ -1245,7 +1254,7 @@ RuntimeConfig ConfigLoader::defaults() const {
     config.audio_ui.bgm_volume = 0.75;
     config.audio_ui.keysound_volume = 1.0;
 
-    config.input.rawinput = true;
+    config.input.rawinput = false;
     sync_input_backend_fields(config.input);
     config.input.use_qpc = true;
     config.input.grab = false;
@@ -1264,7 +1273,7 @@ RuntimeConfig ConfigLoader::defaults() const {
     config.graphics.display_mode = "borderless";
     config.graphics.resolution = "native";
     config.graphics.vsync = false;
-    config.graphics.refresh_hz = 1050;
+    config.graphics.refresh_hz = kDefaultGraphicsRefreshHz;
     config.graphics.performance_overlay = false;
 
     config.mode.format = "bms";
@@ -1314,6 +1323,7 @@ ConfigLoadResult ConfigLoader::load_profile(std::string_view profile_dir) const 
 
     result.migrated = ::tenriff::app::migrate_bms_first_runtime_config(result.config);
     apply_audio_preset(result.config);
+    sync_input_backend_fields(result.config.input);
     result.config.input.polling_hz = sanitize_polling_hz(result.config.input.polling_hz, result.warnings);
     result.config.input.judgement_hz = sanitize_judgement_hz(result.config.input.judgement_hz, result.warnings);
     result.config.input.debounce_ms = sanitize_input_debounce_ms(result.config.input.debounce_ms, result.warnings);
