@@ -39,11 +39,11 @@ If a profile does not exist, it is created automatically on first launch.
 ### `input`
 - `backend` (string)
   - `polling | rawinput`
-  - default is `rawinput` on the current `1.0.8` release line
+  - default is `rawinput` on the current `1.0.9` release line
   - the runtime respects the stored value again and no longer force-normalizes it to `polling`
 - `rawinput` (bool)
   - convenience boolean persisted alongside `backend`
-  - on the current `1.0.8` release line it is saved and restored as-is
+  - on the current `1.0.9` release line it is saved and restored as-is
 - `use_qpc` (bool)
 - `grab` (bool)
   - currently a Linux-preview-oriented setting
@@ -55,7 +55,7 @@ If a profile does not exist, it is created automatically on first launch.
 - `judgement_hz` (int)
   - `1000 | 2000 | 4000 | 8000`
   - compatibility field kept in the input config
-  - the current `1.0.8` runtime no longer drives a separate audio-thread judgement sub-step loop from this value
+  - the current `1.0.9` runtime no longer drives a separate audio-thread judgement sub-step loop from this value
   - default is `4000` (`0.25ms`)
 - `debounce_ms` (double)
   - input debounce time used to filter extremely short up/down chatter on the same key before runtime processing

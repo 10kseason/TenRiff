@@ -3,13 +3,13 @@
 这份文档是下一位 agent 或新任务接手时应该最先阅读的当前状态文档。目标是快速说明“这个项目现在是什么、应该先看哪里、还有哪些内容尚未验证”。
 
 ## 基线
-- 当前项目版本为 `1.0.8`
+- 当前项目版本为 `1.0.9`
 - 后续工作的基准文档是 [`docs/baseline-1.0.0.zh-CN.md`](baseline-1.0.0.zh-CN.md)
 - Windows GUI 构建是主目标
 - Linux 仅存在 [`Baepoks-Linuxs/TenRiff-0.5.0-linux-preview`](../Baepoks-Linuxs/TenRiff-0.5.0-linux-preview) 级别的 preview
 - 默认表面是 BMS-first
 - `.osu` 可以通过选项重新启用，并支持 4K~10K
-- `1.0.8` 发布线把 `0.999` 时期的输入路径重新作为基线：RawInput 再次成为默认值，输入门控重新按前台窗口归属判断，gameplay 输入直接使用 `ClockSync` 映射
+- `1.0.9` 发布线继续沿用 `0.999` 时期恢复后的输入基线，但修正了 gameplay live input 在大缓冲设备上错误跟随 future write cursor 的问题，现改为跟随真实 playback head
 
 ## 核心架构
 - `MenuApp`
@@ -130,12 +130,12 @@
 
 ## 运行时 / 打包规则
 - 新用户 profile 会自动创建
-- 最近一次 staged 的发布包是 `Baepoks/TenRiff-1.0.8`
+- 最近一次 staged 的发布包是 `Baepoks/TenRiff-1.0.9`
 - 发布包不包含 `Songs`
 - 发布包会同时包含用于菜单 BGM 的 `Mainmusic/` 运行时资源
 - 发布更新时，只把已构建的产物放进 `Baepoks/`
 - 如果请求 source-only/public handoff，用户偏好是先写 include/exclude 列表
-- 最近一次 staged 的公开源代码包会像 `opensource-Tenriff-source/TenRiff-1.0.8-source` 这样按版本单独 staging
+- 最近一次 staged 的公开源代码包会像 `opensource-Tenriff-source/TenRiff-1.0.9-source` 这样按版本单独 staging
 - 刷新公开源代码包时，不能只同步文档和文件本身，还要确认 staged 出来的源码包目录可以独立完成 configure/build，并能直接运行核心测试二进制
 
 ## 配置 / Profile 现实情况
@@ -165,9 +165,9 @@
 - `cmake --build build --config Release --target bms_parser_tests`
 - `cmake --build build --config Release --target bms_realworld_smoke`
 - `ctest --test-dir build -C Release --output-on-failure -R bms_parser_tests`
-- `cmake -S opensource-Tenriff-source/TenRiff-1.0.8-source -B opensource-Tenriff-source/TenRiff-1.0.8-source/build-check -G "Visual Studio 17 2022" -A x64`
-- `cmake --build opensource-Tenriff-source/TenRiff-1.0.8-source/build-check --config Release --target bms_parser_tests`
-- `opensource-Tenriff-source/TenRiff-1.0.8-source/build-check/Release/bms_parser_tests.exe`
+- `cmake -S opensource-Tenriff-source/TenRiff-1.0.9-source -B opensource-Tenriff-source/TenRiff-1.0.9-source/build-check -G "Visual Studio 17 2022" -A x64`
+- `cmake --build opensource-Tenriff-source/TenRiff-1.0.9-source/build-check --config Release --target bms_parser_tests`
+- `opensource-Tenriff-source/TenRiff-1.0.9-source/build-check/Release/bms_parser_tests.exe`
 
 ## 仍然需要手动验证的地方
 - 在真实的 CJK-heavy 曲库上重现 Song Select 快速滚动崩溃
