@@ -240,6 +240,18 @@ TEST_CASE("startup mapping without clock fit still hits the first note") {
     CHECK(engine.stats().counts.bd == 0);
 }
 
+TEST_CASE("startup mapping without clock fit uses playback head instead of future write cursor fallback") {
+    tenriff::app::StartupInputTimingAnchor anchor;
+    anchor.playback_sample = 1'000;
+    anchor.callback_time_ns = 1'000'000'000LL;
+    anchor.valid = true;
+
+    const int64_t mapped_sample = tenriff::app::resolve_startup_gameplay_input_sample(
+        std::nullopt, 1'000'000'000LL, anchor, 1'000, 1'256);
+
+    CHECK(mapped_sample == 1'000);
+}
+
 TEST_CASE("startup mapping stays stable across repeated session-style starts") {
     tenriff::gameplay::GameplayChart chart;
     chart.lane_count = 1;

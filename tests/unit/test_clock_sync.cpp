@@ -131,3 +131,21 @@ TEST_CASE("audio playback sample tracks the device head instead of the write cur
     CHECK(tenriff::audio::playback_sample_from_write_cursor(256, 256) == 0);
     CHECK(tenriff::audio::playback_sample_from_write_cursor(128, 512) == 0);
 }
+
+TEST_CASE("ClockSync mapping follows playback head when non-zero padding exists") {
+    constexpr int64_t input_time_ns = 1'000'000'000LL;
+    constexpr int64_t write_cursor_samples = 4096;
+    constexpr uint32_t queued_padding_frames = 512;
+    const int64_t playback_sample =
+        tenriff::audio::playback_sample_from_write_cursor(write_cursor_samples, queued_padding_frames);
+    REQUIRE(playback_sample == 3584);
+
+    tenriff::timing::ClockSync sync;
+    sync.add_sample(input_time_ns, playback_sample);
+    sync.add_sample(input_time_ns + 1'000'000'000LL, playback_sample + 48'000);
+
+    auto mapped = sync.input_to_audio_samples(input_time_ns);
+    REQUIRE(mapped.has_value());
+    CHECK(*mapped == playback_sample);
+    CHECK(*mapped != write_cursor_samples);
+}

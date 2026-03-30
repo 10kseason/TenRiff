@@ -2,6 +2,16 @@
 
 TenRiff의 사용자/배포 관점에서 의미 있는 변경만 간단히 기록합니다.
 
+## [1.0.9] - 2026-03-29
+
+### Changed
+- gameplay live input timing이 더 이상 미래 write cursor 기준으로 밀리지 않도록, `GameSession`이 `ClockSync`와 startup fallback을 실제 device playback head(`playback_sample`) 기준으로 매핑하도록 수정
+- 장치 padding이 큰 노트북/공유 WASAPI 환경에서 지속적으로 늦게 판정되던 경로를 줄이기 위해 gameplay 시작 시 오디오 timing 진단 로그(`exclusive/shared`, `sample_rate`, `buffer_frames`, `write_ahead`)를 1회 남기도록 보강
+- 입력 backend fallback 이후 gameplay 입력 baseline 재동기화도 마지막 committed sample이 아니라 현재 playback head를 우선 사용하도록 정리
+
+### Packaged
+- `build-dist` 기준 Windows 배포 스테이징과 공개 오픈소스 소스 스테이징을 `1.0.9` 라인으로 갱신
+
 ## [1.0.8] - 2026-03-28
 
 ### Changed
@@ -9,6 +19,7 @@ TenRiff의 사용자/배포 관점에서 의미 있는 변경만 간단히 기�
 - `1.0.7`에서 추가됐던 menu/gameplay 자동 Polling fallback 및 Polling 강제 영구 저장을 제거하고, profile/config seed도 다시 `rawinput=true` 기본선으로 복귀
 - 입력 설정 화면에서 실제로 더 이상 쓰지 않던 `Judgement Hz` 조절 행을 제거해 현재 런타임 동작과 UI를 맞춤
 - 두 키보드 source 집계 입력 처리와 한글 경로 osu asset 해석 보강은 유지한 채, 입력 핵심 경로만 `0.999` 논리로 정리
+- 게임 도중 abort 후 다음 판에서 menu pressed-state와 gameplay 시작 baseline이 엉키며 입력이 흔들리던 세션 경계 회귀를 고쳐, 메뉴 스레드 재시작과 gameplay 시작 직전에 입력 상태를 다시 비우고 재동기화
 
 ### Packaged
 - `build-dist` 기준 Windows 배포 스테이징과 공개 오픈소스 소스 스테이징을 `1.0.8` 라인으로 갱신
