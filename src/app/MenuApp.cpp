@@ -897,6 +897,8 @@ void MenuApp::shutdown() {
 }
 
 void MenuApp::start_menu_threads() {
+    pressed_keys_.clear();
+    reset_song_select_repeat();
     input_backend_state_ = {};
     input_backend_state_.configured_backend = config_.input.rawinput ? input::InputBackend::RawInput
                                                                      : input::InputBackend::Polling;
@@ -916,6 +918,8 @@ void MenuApp::start_menu_threads() {
     } else {
         if (!input_thread_.start()) {
             std::cerr << "[error] Failed to start input thread." << std::endl;
+        } else if (input_config.backend == input::InputBackend::Polling) {
+            rebuild_pressed_keys_from_polling_snapshot();
         }
     }
 
@@ -933,6 +937,8 @@ void MenuApp::start_menu_threads() {
 }
 
 void MenuApp::stop_menu_threads() {
+    pressed_keys_.clear();
+    reset_song_select_repeat();
     render_thread_.stop();
     menu_music_.stop();
     audio_thread_.shutdown();
@@ -940,6 +946,8 @@ void MenuApp::stop_menu_threads() {
 }
 
 void MenuApp::restart_input_thread() {
+    pressed_keys_.clear();
+    reset_song_select_repeat();
     input_backend_state_ = {};
     input_backend_state_.configured_backend = config_.input.rawinput ? input::InputBackend::RawInput
                                                                      : input::InputBackend::Polling;
@@ -960,6 +968,8 @@ void MenuApp::restart_input_thread() {
     }
     if (!input_thread_.start()) {
         std::cerr << "[error] Failed to restart input thread." << std::endl;
+    } else if (input_config.backend == input::InputBackend::Polling) {
+        rebuild_pressed_keys_from_polling_snapshot();
     }
 }
 

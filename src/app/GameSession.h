@@ -236,6 +236,8 @@ private:
 
     struct AudioTimingState {
         int64_t sample = 0;
+        int64_t buffer_start_sample = 0;
+        int64_t playback_sample = 0;
         int64_t time_ns = 0;
         uint32_t buffer_frames = 0;
     };
@@ -393,6 +395,7 @@ private:
     bool chart_audio_startup_logged_ = false;
     bool chart_audio_steady_state_logged_ = false;
     std::atomic<bool> synthetic_tones_enabled_{true};
+    bool audio_timing_diagnostics_logged_ = false;
     std::vector<float> lane_activity_;
     std::vector<float> ghost_lane_activity_;
     HudCallback hud_callback_;

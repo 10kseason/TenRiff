@@ -144,7 +144,8 @@ bool GameSession::fallback_gameplay_input_to_polling(std::string_view reason, bo
         return false;
     }
 
-    rebaseline_gameplay_start_input_state(last_audio_sample_.load(std::memory_order_acquire));
+    const int64_t baseline_sample = countdown_phase ? 0 : current_playback_sample_;
+    rebaseline_gameplay_start_input_state(baseline_sample);
     persist_runtime_input_backend();
     input_backend_state_.effective_backend = input::InputBackend::Polling;
     input_backend_state_.auto_fallback = true;
@@ -827,6 +828,10 @@ void GameSession::run() {
     }
 
     if (!stop_requested_.load(std::memory_order_acquire) && !finished_.load(std::memory_order_acquire)) {
+        rebaseline_gameplay_start_input_state(0);
+        current_playback_sample_ = 0;
+        startup_input_timing_anchor_ = {};
+        audio_timing_diagnostics_logged_ = false;
         if (audio_thread_.start() != audio::AudioResult::Success) {
             std::cerr << "[error] Failed to start gameplay audio." << std::endl;
             stop_requested_.store(true, std::memory_order_release);
@@ -1868,6 +1873,7 @@ void GameSession::shutdown() {
     clock_sync_.reset();
     current_playback_sample_ = 0;
     startup_input_timing_anchor_ = {};
+    audio_timing_diagnostics_logged_ = false;
     countdown_active_ = false;
     countdown_value_ = 0;
     countdown_started_ns_ = 0;
@@ -1920,7 +1926,6 @@ void GameSession::audio_callback(float* output,
                                  uint32_t frames,
                                  int64_t buffer_start_samples,
                                  int64_t playback_sample) {
-    static_cast<void>(playback_sample);
     if (output && frames > 0) {
         std::fill(output, output + frames * 2, 0.0f);
     }
@@ -1937,7 +1942,26 @@ void GameSession::audio_callback(float* output,
         const int64_t lookahead_samples = ms_to_samples(static_cast<double>(kLookaheadMs), sample_rate_);
 
         const int64_t now_ns = timing::HighResClock::now_ns();
-        clock_sync_.add_sample(now_ns, buffer_start_samples);
+        // Input timestamps must learn against the device head, not the future write cursor.
+        current_playback_sample_ = playback_sample;
+        startup_input_timing_anchor_ = StartupInputTimingAnchor{playback_sample, now_ns, true};
+        clock_sync_.add_sample(now_ns, playback_sample);
+        if (!audio_timing_diagnostics_logged_) {
+            const int64_t write_ahead_frames = (std::max)(int64_t{0}, buffer_start_samples - playback_sample);
+            const double write_ahead_ms =
+                (sample_rate_ > 0)
+                    ? (static_cast<double>(write_ahead_frames) * 1000.0 / static_cast<double>(sample_rate_))
+                    : 0.0;
+            std::cerr << "[info] Gameplay audio timing mode="
+                      << (audio_thread_.is_exclusive() ? "exclusive" : "shared")
+                      << " sample_rate=" << sample_rate_
+                      << " buffer_frames=" << audio_thread_.buffer_frames()
+                      << " callback_frames=" << frames
+                      << " write_ahead_frames=" << write_ahead_frames
+                      << " write_ahead_ms=" << write_ahead_ms
+                      << std::endl;
+            audio_timing_diagnostics_logged_ = true;
+        }
         schedule_note_guides(buffer_start_samples, buffer_end_samples);
         process_future_events(buffer_end_samples, lookahead_samples);
         process_input_queue(buffer_start_samples, buffer_end_samples, lookahead_samples);
@@ -1991,6 +2015,8 @@ void GameSession::audio_callback(float* output,
     const int64_t committed_time_ns = timing::HighResClock::now_ns();
     audio_timing_sequence_.fetch_add(1, std::memory_order_acq_rel);
     last_audio_timing_.sample = committed_sample;
+    last_audio_timing_.buffer_start_sample = buffer_start_samples;
+    last_audio_timing_.playback_sample = playback_sample;
     last_audio_timing_.time_ns = committed_time_ns;
     last_audio_timing_.buffer_frames = frames;
     audio_timing_sequence_.fetch_add(1, std::memory_order_release);
@@ -2221,7 +2247,12 @@ void GameSession::process_input_queue(int64_t buffer_start_samples, int64_t buff
         }
 
         auto mapped = clock_sync_.input_to_audio_samples(event.input_time_ns);
-        int64_t sample = mapped.value_or(buffer_start_samples) + input_offset_samples_;
+        int64_t sample = resolve_startup_gameplay_input_sample(mapped,
+                                                               event.input_time_ns,
+                                                               startup_input_timing_anchor_,
+                                                               sample_rate_,
+                                                               current_playback_sample_) +
+                         input_offset_samples_;
         auto lane = lane_from_keycode(event.keycode);
         if (!lane.has_value()) {
             continue;
