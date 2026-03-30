@@ -116,10 +116,11 @@ cmake --build build-dist --config Release --target bms_parser_tests
 
 ### 3. 公开源代码包也可以直接构建
 
-按版本发布的公开源代码包（例如 `TenRiff-1.0.9-source.zip`）已经包含 `external/`、`src/`、`tests/`、`config/`、`docs/` 和 `Mainmusic/`，因此解压后就可以直接进行 configure/build。
+按版本发布的公开源代码包（例如 `TenRiff-1.0.9-source.zip`）已经包含 `external/`（但不含 `external/llama.cpp/`）、`src/`、`tests/`、`config/`、`docs/` 和 `Mainmusic/`，因此解压后就可以直接进行 configure/build。
 
 - 源代码包中不包含 `tools/build_with_retry.ps1`，所以这里应使用原生 `cmake --build`。
 - `10k-calc/` 会从公开源代码包中排除，因此依赖 Python reference 的 optional 检查即使输出 `[skip]` 也属于正常情况。
+- `external/llama.cpp/` 也会从公开源代码包中排除，因此本地 LLM/tooling checkout 需要自行另外准备。
 - `profiles/`、`songs/`、`logs/` 也不会放进源代码包，但 `launch_win.bat` 会在首次启动时自动创建所需目录。
 
 在解压后的源代码包目录中，典型流程如下：

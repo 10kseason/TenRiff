@@ -11,6 +11,7 @@ TenRiff의 사용자/배포 관점에서 의미 있는 변경만 간단히 기�
 
 ### Packaged
 - `build-dist` 기준 Windows 배포 스테이징과 공개 오픈소스 소스 스테이징을 `1.0.9` 라인으로 갱신
+- 공개 소스 패키징 스크립트가 이제 `external/llama.cpp/`를 기본 제외하여 로컬 LLM/tooling checkout이 `TenRiff-1.0.9-source*`에 섞여 나가지 않도록 고정
 
 ## [1.0.8] - 2026-03-28
 

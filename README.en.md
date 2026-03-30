@@ -116,10 +116,11 @@ If Windows Defender or another antivirus briefly locks `TenRiff.exe`, use the wr
 
 ### 3. Public source packages can be built directly too
 
-The versioned public source bundles (packages such as `TenRiff-1.0.9-source.zip`) include `external/`, `src/`, `tests/`, `config/`, `docs/`, and `Mainmusic/`, so they can be configured and built directly after extraction.
+The versioned public source bundles (packages such as `TenRiff-1.0.9-source.zip`) include `external/` except `external/llama.cpp/`, `src/`, `tests/`, `config/`, `docs/`, and `Mainmusic/`, so they can be configured and built directly after extraction.
 
 - The source bundle does not include `tools/build_with_retry.ps1`, so use plain `cmake --build`.
 - `10k-calc/` is intentionally excluded from the public source bundle, so optional Python-reference checks may print `[skip]` and still be considered normal.
+- `external/llama.cpp/` is also intentionally excluded, so any local LLM/tooling checkout must be restored separately.
 - `profiles/`, `songs/`, and `logs/` are also excluded from the bundle, but `launch_win.bat` creates the needed folders on first launch.
 
 Inside the extracted source-package folder, a typical flow looks like this:

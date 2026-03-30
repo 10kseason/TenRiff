@@ -5,7 +5,7 @@ TenRiff source package notes
 - Internal agent workflow files such as `AGENTS.md` are not part of the public source bundle.
 - The included `SOURCE_PACKAGE_SCOPE.txt` file defines the exact include/exclude rules used for the staged bundle.
 - The repository license is MIT. Keep the top-level `LICENSE` file with any redistributed source bundle.
-- The source bundle includes the code/docs/dependencies needed for a standalone Windows configure/build, but it does not ship `tools/build_with_retry.ps1` or the local `10k-calc/` reference checkout.
+- The source bundle includes the code/docs/dependencies needed for a standalone Windows configure/build, but it does not ship `tools/build_with_retry.ps1`, the local `10k-calc/` reference checkout, or `external/llama.cpp/`.
 - Typical Windows build flow inside the extracted source-package root:
 
 ```powershell

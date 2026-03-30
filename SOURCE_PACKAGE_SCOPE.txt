@@ -1,4 +1,4 @@
-TenRiff 1.0.8 open-source source package scope
+TenRiff 1.0.9 open-source source package scope
 
 Included in versioned source bundles:
 - CHANGELOG.md
@@ -15,7 +15,7 @@ Included in versioned source bundles:
 - Mainmusic/
 - config/
 - docs/
-- external/
+- external/ (except `external/llama.cpp/`)
 - src/
 - tests/
 
@@ -26,6 +26,7 @@ Excluded from versioned source bundles:
 - Baepoks/
 - Baepoks-Linuxs/
 - opensource-Tenriff-source/TenRiff-*-source/
+- external/llama.cpp/
 - .codex-memory/
 - .claude/
 - .codex_tmp_skills/
@@ -44,4 +45,5 @@ Notes:
 - The source bundle is intended to contain code, docs, config, and tests needed to inspect or rebuild the project.
 - Internal agent instructions and private working context are intentionally excluded from the public source package.
 - Local caches, packaged binaries, user profiles, and private working files are intentionally excluded.
+- Local LLM/tooling checkouts such as `external/llama.cpp/` are intentionally excluded from the public source package.
 - The repository license is MIT and should be shipped with both source and binary distributions.
