@@ -2,6 +2,36 @@
 
 TenRiff의 사용자/배포 관점에서 의미 있는 변경만 간단히 기록합니다.
 
+## [1.1.2] - 2026-03-31
+
+### Changed
+- gameplay live 입력 백엔드를 안정성 우선으로 다시 `Polling`에 고정하고, gameplay 세션의 always-allow 입력 게이트는 유지해 foreground 판정 때문에 인게임 입력 전체가 막히지 않도록 정리
+- 메뉴 입력은 기존 foreground process/root-window 경계를 그대로 유지하고, 저장된 `input.backend` / `input.rawinput` 값은 더 이상 gameplay fallback 결과로 영구 rewrite하지 않도록 유지
+- `1.1.1` 문서에서 하이브리드 gameplay 입력으로 설명하던 부분을 현재 코드 기준의 polling 고정 동작으로 정정
+- `docs/baseline-1.1.2*`를 새 기준선 문서로 승격하고, `1.1.2` 라인을 현재 공개 기준의 `final stable` 버전으로 명명
+
+### Packaging
+- 프로젝트 메타데이터, 문서, `build-dist` 기준 Windows 배포 스테이징, 공개 오픈소스 소스 스테이징을 `1.1.2` 라인으로 갱신
+
+## [1.1.1] - 2026-03-31
+
+### Changed
+- gameplay 입력 경로를 하이브리드 입력 캡처로 재정리해 `RawInput` 사용 시에도 polling shadow가 계속 같이 동작하고, 두 source는 `KeyStateTracker`에서 dedupe된 뒤 하나의 gameplay queue로 합류하도록 수정
+- `InputThread`에 runtime gate policy를 추가해 메뉴는 기존처럼 foreground process 기준 입력 게이트를 유지하고, gameplay 세션은 foreground 여부와 무관하게 입력을 계속 수집하도록 분리
+- gameplay/menu의 restart형 `RawInput -> Polling` 자동 재시작 및 profile 입력 설정 영구 rewrite 경로를 제거하고, runtime backend 상태는 실제 소비된 입력 source 기준으로만 갱신하도록 정리
+
+### Packaging
+- 프로젝트 메타데이터, 문서, `build-dist` 기준 Windows 배포 스테이징, 공개 오픈소스 소스 스테이징을 `1.1.1` 라인으로 갱신
+
+## [1.1.0] - 2026-03-31
+
+### Changed
+- 포커싱/입력 게이트 경로를 `0.999` 방식으로 되돌려, `InputThread`는 다시 현재 foreground process 기준으로 입력 허용을 판정하고 `MenuWindow` UI hit-test/fullscreen foreground 판단도 root-window foreground 비교를 사용하도록 정리
+- `1.0.9`에서 도입했던 gameplay playback-head 기준 live-input timing 보정은 유지하고, shared activation state(`WM_ACTIVATEAPP`/`WM_SETFOCUS`) 기반 메뉴-입력 동기화 경로만 제거
+
+### Packaged
+- 프로젝트 메타데이터, 문서, `build-dist` 기준 Windows 배포 스테이징, 공개 오픈소스 소스 스테이징을 `1.1.0` 라인으로 갱신
+
 ## [1.0.9] - 2026-03-29
 
 ### Changed

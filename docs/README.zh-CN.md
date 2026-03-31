@@ -1,6 +1,6 @@
 # TenRiff 文档地图
 
-Language: [한국어](README.md) | [English](README.en.md) | [简体中文](README.zh-CN.md)
+Language: [한국어](README.md) | [English](README.en.md) | [简体中文](README.zh-CN.md) | [日本語](README.ja.md)
 
 如果你已经先读过根目录的 [`README.zh-CN.md`](../README.zh-CN.md)，那么这份文档就是下一步的详细文档索引。这里同时包含设计文档与当前状态文档，所以想快速建立上下文时，最有效的阅读顺序如下。
 
@@ -9,8 +9,8 @@ Language: [한국어](README.md) | [English](README.en.md) | [简体中文](READ
 ## 推荐阅读顺序
 1. [`docs/current-state.zh-CN.md`](current-state.zh-CN.md)
    - 当前产品状态、核心子系统、已验证命令和仍待手动验证的项目
-2. [`docs/baseline-1.0.0.zh-CN.md`](baseline-1.0.0.zh-CN.md)
-   - 规定当前工作应从哪里继续叠加的 `1.0.0` 基准文档
+2. [`docs/baseline-1.1.2.zh-CN.md`](baseline-1.1.2.zh-CN.md)
+   - 规定当前工作应从哪里继续叠加的 `1.1.2 final stable` 基准文档
 3. [`docs/gameplay-guide.zh-CN.md`](gameplay-guide.zh-CN.md)
    - 面向真实游玩的启动方式、选歌、操作、HUD、判定、结果说明
 4. [`docs/config.zh-CN.md`](config.zh-CN.md)
@@ -29,8 +29,8 @@ Language: [한국어](README.md) | [English](README.en.md) | [简体中文](READ
 ## 哪些文档算作权威来源
 - [`docs/current-state.zh-CN.md`](current-state.zh-CN.md)
   - 当前实现状态的总结文档
-- [`docs/baseline-1.0.0.zh-CN.md`](baseline-1.0.0.zh-CN.md)
-  - 后续工作必须保持的 `1.0.0` 基准文档
+- [`docs/baseline-1.1.2.zh-CN.md`](baseline-1.1.2.zh-CN.md)
+  - 后续工作必须保持的 `1.1.2 final stable` 基准文档
 - [`docs/config.zh-CN.md`](config.zh-CN.md)
   - 以实际的 `config/config.json`、`profiles/<name>/config.json`、`keymap.json` 为准
 
@@ -49,7 +49,12 @@ Language: [한국어](README.md) | [English](README.en.md) | [简体中文](READ
 ## 致谢
 - 感谢 OpenAI Codex、ChatGPT、Claude Code、Gemini，以及帮助一起验证项目的各位 guest testers。
 
+## 翻译覆盖
+- 根目录 `README.md` 还提供 [`README.en.md`](../README.en.md)、[`README.zh-CN.md`](../README.zh-CN.md) 与 [`README.ja.md`](../README.ja.md)。
+- `docs/` 下的主要文档以 `.en.md`、`.zh-CN.md`、`.ja.md` 后缀并排提供翻译版本。
+- 如果翻译内容与韩文原文冲突，应优先以当前代码、`docs/current-state.md`、`docs/config.md` 为准。
+
 ## 实用规则
 - 在确认当前行为时，优先看 [`docs/current-state.zh-CN.md`](current-state.zh-CN.md)。
-- 在确认应当在哪个基准上继续叠加工作时，要同时看 [`docs/baseline-1.0.0.zh-CN.md`](baseline-1.0.0.zh-CN.md)。
+- 在确认应当在哪个基准上继续叠加工作时，要同时看 [`docs/baseline-1.1.2.zh-CN.md`](baseline-1.1.2.zh-CN.md)。
 - 由于较旧的设计文档和当前代码可能不同，若出现冲突，请优先按当前代码、[`docs/current-state.zh-CN.md`](current-state.zh-CN.md)、[`docs/config.zh-CN.md`](config.zh-CN.md) 的顺序解释。

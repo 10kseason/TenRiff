@@ -1,10 +1,10 @@
 # TenRiff
 
-Language: Korean | [English](README.en.md) | [简体中文](README.zh-CN.md)
+Language: Korean | [English](README.en.md) | [简体中文](README.zh-CN.md) | [日本語](README.ja.md)
 
-TenRiff는 Windows GUI 기반 BMS-first 리듬게임 런타임/런처 프로젝트입니다. 목표는 실사용 가능한 BMS 플레이 환경을 중심으로, 저지먼트/오디오/입력/렌더링 파이프라인을 직접 제어하는 독립 실행형 리듬게임 클라이언트를 만드는 것입니다. 현재 프로젝트 버전은 `1.0.9`이며, MIT 라이선스를 사용합니다. 번들된 서드파티 고지는 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)에 정리합니다.
+TenRiff는 Windows GUI 기반 BMS-first 리듬게임 런타임/런처 프로젝트입니다. 목표는 실사용 가능한 BMS 플레이 환경을 중심으로, 저지먼트/오디오/입력/렌더링 파이프라인을 직접 제어하는 독립 실행형 리듬게임 클라이언트를 만드는 것입니다. 현재 프로젝트 버전은 `1.1.2`이며, 현재 공개 기준선의 `final stable` 버전으로 명명했습니다. MIT 라이선스를 사용하며, 번들된 서드파티 고지는 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)에 정리합니다.
 
-이 README는 "프로젝트를 처음 열었을 때 무엇을 보면 되는지"를 설명하는 입문 문서입니다. 더 자세한 현재 동작, 현재 `1.0.9` 프로젝트 상태, `1.0.0` 기준선, 설정 구조, 설계 문서는 [`docs/README.md`](docs/README.md)부터 이어서 읽는 구조를 기준으로 작성했습니다.
+이 README는 "프로젝트를 처음 열었을 때 무엇을 보면 되는지"를 설명하는 입문 문서입니다. 더 자세한 현재 동작, 현재 `1.1.2 final stable` 프로젝트 상태, `1.1.2` 기준선, 설정 구조, 설계 문서는 [`docs/README.md`](docs/README.md)부터 이어서 읽는 구조를 기준으로 작성했습니다.
 
 TenRiff 코드는 전통적인 장기 설계 문서 중심 개발만으로 쌓인 프로젝트가 아니라, 빠른 반복과 실험을 중시한 `vibe coding` 성격이 강한 작품이라는 점을 명시합니다.
 
@@ -116,7 +116,7 @@ Windows Defender나 다른 안티바이러스가 `TenRiff.exe`를 잠깐 잠그�
 
 ### 3. 공개 소스 패키지로도 빌드 가능
 
-버전별 공개 소스 번들(`TenRiff-1.0.9-source.zip` 같은 패키지)은 `external/`(단, `external/llama.cpp/` 제외), `src/`, `tests/`, `config/`, `docs/`, `Mainmusic/`를 포함하므로, 압축을 푼 폴더만으로도 바로 configure/build 할 수 있습니다.
+버전별 공개 소스 번들(`TenRiff-1.1.2-source.zip` 같은 패키지)은 `external/`(단, `external/llama.cpp/` 제외), `src/`, `tests/`, `config/`, `docs/`, `Mainmusic/`를 포함하므로, 압축을 푼 폴더만으로도 바로 configure/build 할 수 있습니다.
 
 - 소스 번들에는 `tools/build_with_retry.ps1`가 없으므로 plain `cmake --build`를 사용해야 합니다.
 - `10k-calc/`는 공개 소스 번들에서 제외되므로 Python reference 기반 optional 검사는 `[skip]`으로 넘어가도 정상입니다.
@@ -175,8 +175,8 @@ README는 입문 설명만 담당합니다. 세부 내용은 아래 순서로 �
    - 전체 문서 맵
 2. [`docs/current-state.md`](docs/current-state.md)
    - 지금 실제로 무엇이 동작하는지
-3. [`docs/baseline-1.0.0.md`](docs/baseline-1.0.0.md)
-   - 후속 작업이 기준으로 삼아야 하는 `1.0.0` 베이스 문서
+3. [`docs/baseline-1.1.2.md`](docs/baseline-1.1.2.md)
+   - 후속 작업이 기준으로 삼아야 하는 `1.1.2 final stable` 베이스 문서
 4. [`docs/gameplay-guide.md`](docs/gameplay-guide.md)
    - 실제 플레이 기준의 시작 방법, 기본 조작, HUD/판정/결과 화면 설명
 5. [`docs/config.md`](docs/config.md)

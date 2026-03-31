@@ -1,5 +1,5 @@
 # TenRiff 开发扩展指南
-Language: [한국어](developer-extension-guide.md) | [English](developer-extension-guide.en.md) | [简体中文](developer-extension-guide.zh-CN.md)
+Language: [한국어](developer-extension-guide.md) | [English](developer-extension-guide.en.md) | [简体中文](developer-extension-guide.zh-CN.md) | [日本語](developer-extension-guide.ja.md)
 
 本文说明在 TenRiff 中新增 `mode/mod`，或者扩展现有模式链时，应该修改哪些代码位置。它是面向维护和扩展的代码地图，不是面向玩家的说明书。
 

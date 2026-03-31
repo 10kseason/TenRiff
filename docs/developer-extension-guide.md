@@ -1,5 +1,5 @@
 # TenRiff Developer Extension Guide
-Language: Korean | [English](developer-extension-guide.en.md) | [简体中文](developer-extension-guide.zh-CN.md)
+Language: Korean | [English](developer-extension-guide.en.md) | [简体中文](developer-extension-guide.zh-CN.md) | [日本語](developer-extension-guide.ja.md)
 
 이 문서는 새 `mode/mod`를 추가하거나 기존 모드 체인을 확장할 때 어디를 바꿔야 하는지 정리한 개발자용 안내서입니다. 사용자 문서가 아니라 유지보수 문서이므로, 코드 경계와 테스트 경계를 먼저 보고 작업하는 기준으로 읽으면 됩니다.
 

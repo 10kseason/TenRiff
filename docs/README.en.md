@@ -1,6 +1,6 @@
 # TenRiff Docs Map
 
-Language: [한국어](README.md) | [English](README.en.md) | [简体中文](README.zh-CN.md)
+Language: [한국어](README.md) | [English](README.en.md) | [简体中文](README.zh-CN.md) | [日本語](README.ja.md)
 
 If you have already read the root [`README.en.md`](../README.en.md), this document is the next-step index into the detailed documentation. It includes both design documents and the current-state document, so when you need to gather context quickly, the following order is the most efficient.
 
@@ -9,8 +9,8 @@ This codebase should also be read as a `vibe coding` work that grew through rapi
 ## Recommended Reading Order
 1. `docs/current-state.en.md`
    - Current product state, core subsystems, validated commands, and remaining manual verification items
-2. `docs/baseline-1.0.0.en.md`
-   - The `1.0.0` baseline document that defines what the current work should be stacked on top of
+2. `docs/baseline-1.1.2.en.md`
+   - The `1.1.2 final stable` baseline document that defines what the current work should be stacked on top of
 3. `docs/gameplay-guide.en.md`
    - How to start playing, choose songs, handle controls, and understand the HUD, judgements, and result screen from a practical player perspective
 4. `docs/config.en.md`
@@ -29,8 +29,8 @@ This codebase should also be read as a `vibe coding` work that grew through rapi
 ## Which Docs Are Source Of Truth
 - `docs/current-state.en.md`
   - Summary of the current implementation state
-- `docs/baseline-1.0.0.en.md`
-  - The `1.0.0` baseline document that follow-up work should preserve
+- `docs/baseline-1.1.2.en.md`
+  - The `1.1.2 final stable` baseline document that follow-up work should preserve
 - `docs/config.en.md`
   - Based on the actual `config/config.json`, `profiles/<name>/config.json`, and `keymap.json`
 
@@ -47,8 +47,8 @@ This codebase should also be read as a `vibe coding` work that grew through rapi
   - Maintenance guide for mode/mod extension work in the current codebase
 
 ## Translation Coverage
-- The root `README.md` also has [`README.en.md`](../README.en.md) and [`README.zh-CN.md`](../README.zh-CN.md).
-- Major `docs/` documents are translated side-by-side as `.en.md` and `.zh-CN.md` files.
+- The root `README.md` also has [`README.en.md`](../README.en.md), [`README.zh-CN.md`](../README.zh-CN.md), and [`README.ja.md`](../README.ja.md).
+- Major `docs/` documents are translated side-by-side as `.en.md`, `.zh-CN.md`, and `.ja.md` files.
 - If a translation and the Korean original disagree, use the current code first, then `docs/current-state.md`, then `docs/config.md`.
 
 ## Acknowledgements
@@ -56,5 +56,5 @@ This codebase should also be read as a `vibe coding` work that grew through rapi
 
 ## Practical Rule
 - When checking current behavior, start with `docs/current-state.en.md`.
-- When deciding what baseline to build on, read `docs/baseline-1.0.0.en.md` together with it.
+- When deciding what baseline to build on, read `docs/baseline-1.1.2.en.md` together with it.
 - Older design documents and current code can differ, so if there is a conflict, interpret things in the order of current code, then `docs/current-state.en.md`, then `docs/config.en.md`.

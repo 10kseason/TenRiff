@@ -1,6 +1,6 @@
 # TenRiff Localization Guide (current)
 
-Language: [한국어](localization.md) | English | [简体中文](localization.zh-CN.md)
+Language: [한국어](localization.md) | English | [简体中文](localization.zh-CN.md) | [日本語](localization.ja.md)
 
 This document summarizes TenRiff's current UI localization structure and gives a practical reference for adding more languages later without having to rediscover the relevant files and boundaries.
 

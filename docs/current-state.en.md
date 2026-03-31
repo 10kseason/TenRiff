@@ -4,7 +4,8 @@ This is the document that the next agent or any new contributor should read firs
 
 ## Baseline
 - Current project version: `1.1.2`
-- Baseline companion document for follow-up work: `docs/baseline-1.0.0.en.md`
+- The `1.1.2` line is named the public `final stable` version
+- Baseline companion document for follow-up work: `docs/baseline-1.1.2.en.md`
 - Windows GUI build is the main target
 - Linux exists only as a preview-level package at `Baepoks-Linuxs/TenRiff-0.5.0-linux-preview`
 - Default surface is BMS-first

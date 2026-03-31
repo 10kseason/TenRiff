@@ -1,5 +1,5 @@
 # TenRiff Developer Extension Guide
-Language: [한국어](developer-extension-guide.md) | English | [简体中文](developer-extension-guide.zh-CN.md)
+Language: [한국어](developer-extension-guide.md) | English | [简体中文](developer-extension-guide.zh-CN.md) | [日本語](developer-extension-guide.ja.md)
 
 This guide explains where to change the code when adding a new `mode/mod`, or when extending the existing mode pipeline. It is intentionally code-first: use it as a maintenance map for the runtime, UI, migration, replay/result, and test layers.
 

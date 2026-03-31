@@ -4,7 +4,8 @@
 
 ## Baseline
 - 현재 프로젝트 버전은 `1.1.2`
-- 후속 작업의 기준선 문서는 `docs/baseline-1.0.0.md`
+- 현재 `1.1.2` 라인은 공개 기준의 `final stable` 버전으로 명명됨
+- 후속 작업의 기준선 문서는 `docs/baseline-1.1.2.md`
 - Windows GUI 빌드가 메인 타깃
 - Linux는 `Baepoks-Linuxs/TenRiff-0.5.0-linux-preview` 수준의 preview만 존재
 - 기본 표면은 BMS-first

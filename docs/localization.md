@@ -1,6 +1,6 @@
 # TenRiff Localization Guide (current)
 
-Language: Korean | [English](localization.en.md) | [简体中文](localization.zh-CN.md)
+Language: Korean | [English](localization.en.md) | [简体中文](localization.zh-CN.md) | [日本語](localization.ja.md)
 
 이 문서는 TenRiff의 현재 UI 현지화 구조를 정리하고, 나중에 다른 언어를 추가할 때 어디를 어떻게 건드려야 하는지 빠르게 찾을 수 있게 만드는 참고 문서입니다.
 

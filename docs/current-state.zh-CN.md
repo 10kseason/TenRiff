@@ -4,7 +4,8 @@
 
 ## 基线
 - 当前项目版本为 `1.1.2`
-- 后续工作的基准文档是 [`docs/baseline-1.0.0.zh-CN.md`](baseline-1.0.0.zh-CN.md)
+- `1.1.2` 版本线现被命名为公开基准的 `final stable` 版本
+- 后续工作的基准文档是 [`docs/baseline-1.1.2.zh-CN.md`](baseline-1.1.2.zh-CN.md)
 - Windows GUI 构建是主目标
 - Linux 仅存在 [`Baepoks-Linuxs/TenRiff-0.5.0-linux-preview`](../Baepoks-Linuxs/TenRiff-0.5.0-linux-preview) 级别的 preview
 - 默认表面是 BMS-first

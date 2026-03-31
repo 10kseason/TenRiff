@@ -1,6 +1,6 @@
 # TenRiff 本地化指南（当前）
 
-Language: [한국어](localization.md) | [English](localization.en.md) | 简体中文
+Language: [한국어](localization.md) | [English](localization.en.md) | 简体中文 | [日本語](localization.ja.md)
 
 这份文档整理 TenRiff 当前的 UI 本地化结构，并给以后新增更多语言时提供一个可直接查阅的参考，避免再次从零寻找相关文件和边界。
 

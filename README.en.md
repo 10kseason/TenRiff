@@ -1,10 +1,10 @@
 # TenRiff
 
-Language: [한국어](README.md) | [English](README.en.md) | [简体中文](README.zh-CN.md)
+Language: [한국어](README.md) | [English](README.en.md) | [简体中文](README.zh-CN.md) | [日本語](README.ja.md)
 
-TenRiff is a Windows GUI-based BMS-first rhythm game runtime/launcher project. The goal is to build a standalone rhythm-game client centered on a practical BMS play environment, with direct control over the judgement, audio, input, and rendering pipeline. The current project version is `1.0.9`, and the project uses the MIT License. Bundled third-party notices are collected in [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
+TenRiff is a Windows GUI-based BMS-first rhythm game runtime/launcher project. The goal is to build a standalone rhythm-game client centered on a practical BMS play environment, with direct control over the judgement, audio, input, and rendering pipeline. The current project version is `1.1.2`, and this line is now named the public `final stable` version. The project uses the MIT License, and bundled third-party notices are collected in [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
 
-This README is an introduction that explains "what to look at first when you open the project." For the more detailed current behavior, the current `1.0.9` project state, the `1.0.0` baseline, the config structure, and the design documents, continue reading from [`docs/README.en.md`](docs/README.en.md).
+This README is an introduction that explains "what to look at first when you open the project." For the more detailed current behavior, the current `1.1.2 final stable` project state, the `1.1.2` baseline, the config structure, and the design documents, continue reading from [`docs/README.en.md`](docs/README.en.md).
 
 TenRiff should also be read as a `vibe coding` work: it was shaped through fast iteration and experimentation rather than only through a traditional long-form design-first process.
 
@@ -116,7 +116,7 @@ If Windows Defender or another antivirus briefly locks `TenRiff.exe`, use the wr
 
 ### 3. Public source packages can be built directly too
 
-The versioned public source bundles (packages such as `TenRiff-1.0.9-source.zip`) include `external/` except `external/llama.cpp/`, `src/`, `tests/`, `config/`, `docs/`, and `Mainmusic/`, so they can be configured and built directly after extraction.
+The versioned public source bundles (packages such as `TenRiff-1.1.2-source.zip`) include `external/` except `external/llama.cpp/`, `src/`, `tests/`, `config/`, `docs/`, and `Mainmusic/`, so they can be configured and built directly after extraction.
 
 - The source bundle does not include `tools/build_with_retry.ps1`, so use plain `cmake --build`.
 - `10k-calc/` is intentionally excluded from the public source bundle, so optional Python-reference checks may print `[skip]` and still be considered normal.
@@ -175,8 +175,8 @@ This README only covers the introduction. For the details, the most efficient re
    - Full documentation map
 2. [`docs/current-state.en.md`](docs/current-state.en.md)
    - What actually works right now
-3. [`docs/baseline-1.0.0.en.md`](docs/baseline-1.0.0.en.md)
-   - The `1.0.0` baseline document that follow-up work should use as a reference
+3. [`docs/baseline-1.1.2.en.md`](docs/baseline-1.1.2.en.md)
+   - The `1.1.2 final stable` baseline document that follow-up work should use as a reference
 4. [`docs/gameplay-guide.en.md`](docs/gameplay-guide.en.md)
    - How to start playing, basic controls, HUD/judgement/result screen explanation from a practical player perspective
 5. [`docs/config.en.md`](docs/config.en.md)
