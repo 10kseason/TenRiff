@@ -1643,19 +1643,10 @@ LRESULT CALLBACK menu_window_proc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lpa
     auto* window = reinterpret_cast<MenuWindow*>(GetWindowLongPtrW(hwnd, GWLP_USERDATA));
     switch (msg) {
         case WM_CLOSE:
-            tenriff::input::set_shared_app_activation_state(false);
             if (window) {
                 window->request_close();
             }
             DestroyWindow(hwnd);
-            return 0;
-        case WM_ACTIVATEAPP:
-            tenriff::input::set_shared_app_activation_state(wparam != FALSE);
-            return 0;
-        case WM_SETFOCUS:
-            tenriff::input::set_shared_app_activation_state(true);
-            return 0;
-        case WM_KILLFOCUS:
             return 0;
         case WM_SETCURSOR:
             if (window && window->cursor_hidden()) {
@@ -1664,7 +1655,6 @@ LRESULT CALLBACK menu_window_proc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lpa
             }
             break;
         case WM_DESTROY:
-            tenriff::input::set_shared_app_activation_state(false);
             PostQuitMessage(0);
             return 0;
         case WM_SIZE:
@@ -1854,7 +1844,6 @@ void MenuWindow::shutdown() {
     initialized_.store(false, std::memory_order_release);
     init_success_.store(false, std::memory_order_release);
     screenshot_requested_.store(false, std::memory_order_release);
-    tenriff::input::set_shared_app_activation_state(false);
     update_cursor_visibility(false);
     clear_song_scrollbar_state();
     hit_regions_.clear();
@@ -1887,7 +1876,6 @@ void MenuWindow::shutdown() {
 void MenuWindow::destroy_window() {
     HWND hwnd = static_cast<HWND>(hwnd_);
     hwnd_ = nullptr;
-    tenriff::input::set_shared_app_activation_state(false);
     if (!hwnd) {
         return;
     }
@@ -2703,7 +2691,18 @@ bool MenuWindow::is_input_foreground() const {
     if (!hwnd || !IsWindow(hwnd)) {
         return false;
     }
-    return tenriff::input::shared_app_activation_state().load(std::memory_order_acquire);
+
+    const HWND foreground = GetForegroundWindow();
+    if (!foreground) {
+        return false;
+    }
+    if (foreground == hwnd) {
+        return true;
+    }
+
+    const HWND foreground_root = GetAncestor(foreground, GA_ROOT);
+    const HWND window_root = GetAncestor(hwnd, GA_ROOT);
+    return foreground_root != nullptr && foreground_root == window_root;
 }
 
 void MenuWindow::clear_song_scrollbar_state() {

@@ -21,6 +21,15 @@ enum class InputBackend : uint8_t {
     Polling = 1,
 };
 
+enum class InputGatePolicy : uint8_t {
+    ForegroundProcess = 0,
+    AlwaysAllow = 1,
+};
+
+[[nodiscard]] inline bool input_gate_policy_allows(InputGatePolicy policy, bool process_is_foreground) {
+    return policy == InputGatePolicy::AlwaysAllow || process_is_foreground;
+}
+
 struct InputThreadHealthSnapshot {
     InputBackend backend = InputBackend::Polling;
     int64_t last_allowed_event_time_ns = 0;
@@ -33,18 +42,12 @@ struct InputThreadHealthSnapshot {
 /// Configuration for the input thread.
 struct InputThreadConfig {
     InputBackend backend = InputBackend::Polling;  ///< Input backend selection.
+    InputGatePolicy gate_policy = InputGatePolicy::ForegroundProcess;  ///< Runtime input gate policy.
     RawInputConfig raw_input;      ///< RawInput configuration.
     KeyStateConfig key_state;      ///< Key state tracker configuration.
     int polling_hz = 1000;         ///< Polling frequency for polling backend.
     std::vector<uint32_t> polling_keys;  ///< Optional list of keys to poll (empty = all 0..255).
-    std::atomic<bool>* app_active_state = nullptr;  ///< Shared app activation flag.
 };
-
-#ifdef _WIN32
-/// Shared app activation state used by the menu window and input thread.
-[[nodiscard]] std::atomic<bool>& shared_app_activation_state();
-void set_shared_app_activation_state(bool active);
-#endif
 
 /// Input thread wrapper for asynchronous RawInput processing.
 /// Creates a hidden message window and runs a message pump on a dedicated thread.
@@ -131,7 +134,6 @@ private:
     std::atomic<bool> is_running_{false};
     std::atomic<bool> should_stop_{false};
     std::atomic<uint8_t> active_backend_{static_cast<uint8_t>(InputBackend::Polling)};
-    std::atomic<bool>* app_active_state_ = nullptr;
 
     // Message window handle (stored as void* to avoid Windows.h).
     void* hwnd_ = nullptr;
