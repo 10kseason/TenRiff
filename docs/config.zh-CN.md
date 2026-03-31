@@ -39,11 +39,13 @@
 ### `input`
 - `backend` (string)
   - `polling | rawinput`
-  - 当前 `1.0.9` 发布线的默认值是 `rawinput`
-  - 运行时会再次尊重保存值，不再强制把它规范化为 `polling`
+  - 当前 `1.1.2` 发布线的默认值是 `rawinput`
+  - 保存值会被保留，不会在写回时强制规范化为 `polling`
+  - 但当前 `1.1.2` 的 gameplay live 输入采集为了稳定性仍固定为 `Polling`
 - `rawinput` (bool)
   - 与 `backend` 一起保存的便捷布尔字段
-  - 在当前 `1.0.9` 发布线上会按当前值正常保存和恢复
+  - 在当前 `1.1.2` 发布线上会按当前值正常保存和恢复
+  - gameplay runtime 可能不会按这个值进行 live capture，但配置本身会保留
 - `use_qpc` (bool)
 - `grab` (bool)
   - 当前主要对应 Linux preview 语义
@@ -55,7 +57,7 @@
 - `judgement_hz` (int)
   - `1000 | 2000 | 4000 | 8000`
   - 保留在输入配置中的兼容字段
-  - 当前 `1.0.9` 运行时已不再用它驱动独立的音频线程判定 sub-step 循环
+  - 当前 `1.1.2` 运行时已不再用它驱动独立的音频线程判定 sub-step 循环
   - 默认值为 `4000`（`0.25ms`）
 - `debounce_ms` (double)
   - 在运行时前过滤同一按键上极短暂的 up/down 抖动的输入去抖时间

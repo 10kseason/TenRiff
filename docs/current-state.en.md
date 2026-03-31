@@ -3,13 +3,14 @@
 This is the document that the next agent or any new contributor should read first. Its goal is to quickly answer: "what is this project now, where should I look, and what is still unverified?"
 
 ## Baseline
-- Current project version: `1.0.9`
+- Current project version: `1.1.2`
 - Baseline companion document for follow-up work: `docs/baseline-1.0.0.en.md`
 - Windows GUI build is the main target
 - Linux exists only as a preview-level package at `Baepoks-Linuxs/TenRiff-0.5.0-linux-preview`
 - Default surface is BMS-first
 - `.osu` can be re-enabled as an option and supports 4K-10K
-- The `1.0.9` release line keeps the restored `0.999` input path baseline, but fixes gameplay live-input mapping so it follows the real playback head instead of the future write cursor on larger device buffers
+- The `1.1.2` release line keeps the `1.0.9` gameplay playback-head timing fix, but pins live gameplay capture to `Polling` for stability while keeping the gameplay session on an always-allow input gate regardless of foreground state
+- On the same `1.1.2` line, menu input still uses the foreground process/root-window boundary, while restart-style backend fallback and persisted input-backend rewrites remain removed and the saved backend preference is preserved as configuration
 
 ## Core Architecture
 - `MenuApp`
@@ -130,12 +131,12 @@ This is the document that the next agent or any new contributor should read firs
 
 ## Runtime / Packaging Rules
 - New user profiles are created automatically
-- The last staged distribution package is `Baepoks/TenRiff-1.0.9`
+- The last staged distribution package is `Baepoks/TenRiff-1.1.2`
 - Distribution packages do not include `Songs`
 - Distribution packages include the runtime `Mainmusic/` assets used for menu BGM
 - When updating distribution builds, only built artifacts should be copied into `Baepoks/`
 - If a source-only / public handoff is requested, the user's preference is to write an include/exclude list first
-- The last staged public source package is versioned separately, e.g. `opensource-Tenriff-source/TenRiff-1.0.9-source`
+- The last staged public source package is versioned separately, e.g. `opensource-Tenriff-source/TenRiff-1.1.2-source`
 - When refreshing a public source package, do not stop at syncing docs/files only; also verify that the staged source-package folder itself can configure, build, and run the core test binary standalone
 
 ## Config / Profile Reality
@@ -165,9 +166,9 @@ This is the document that the next agent or any new contributor should read firs
 - `cmake --build build --config Release --target bms_parser_tests`
 - `cmake --build build --config Release --target bms_realworld_smoke`
 - `ctest --test-dir build -C Release --output-on-failure -R bms_parser_tests`
-- `cmake -S opensource-Tenriff-source/TenRiff-1.0.9-source -B opensource-Tenriff-source/TenRiff-1.0.9-source/build-check -G "Visual Studio 17 2022" -A x64`
-- `cmake --build opensource-Tenriff-source/TenRiff-1.0.9-source/build-check --config Release --target bms_parser_tests`
-- `opensource-Tenriff-source/TenRiff-1.0.9-source/build-check/Release/bms_parser_tests.exe`
+- `cmake -S opensource-Tenriff-source/TenRiff-1.1.2-source -B opensource-Tenriff-source/TenRiff-1.1.2-source/build-check -G "Visual Studio 17 2022" -A x64`
+- `cmake --build opensource-Tenriff-source/TenRiff-1.1.2-source/build-check --config Release --target bms_parser_tests`
+- `opensource-Tenriff-source/TenRiff-1.1.2-source/build-check/Release/bms_parser_tests.exe`
 
 ## Still Manual-Validation Heavy
 - Song Select fast-scroll crash reproduction on a real CJK-heavy library
