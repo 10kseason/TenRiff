@@ -28,7 +28,6 @@
 #include "app/JudgementLoopTiming.h"
 #include "gameplay/GameplayEngine.h"
 #include "input/InputThread.h"
-#include "input/RawInputHealthProbe.h"
 #include "timing/ClockSync.h"
 
 namespace tenriff::app {
@@ -254,11 +253,8 @@ private:
     void process_future_events(int64_t buffer_end_samples, int64_t lookahead_samples);
     void process_input_queue(int64_t buffer_start_samples, int64_t buffer_end_samples, int64_t lookahead_samples);
     [[nodiscard]] bool handle_control_input(const input::InputEvent& event);
-    void service_input_backend_health();
-    void reset_input_backend_probe();
-    [[nodiscard]] bool fallback_gameplay_input_to_polling(std::string_view reason, bool countdown_phase);
     void rebuild_input_thread_config(input::InputThreadConfig& config) const;
-    void persist_runtime_input_backend() const;
+    void note_runtime_input_event_source(const input::InputEvent& event);
     void rebuild_polled_gameplay_keys();
     void sync_polled_key_state(uint32_t keycode, input::InputState state, std::optional<int64_t> queue_event_ns);
     [[nodiscard]] std::optional<input::InputEvent> filter_gameplay_input_event(const input::InputEvent& event);
@@ -366,8 +362,6 @@ private:
     bool result_transition_pending_ = false;
 
     FutureQueue future_events_{};
-    input::RawInputHealthProbe input_backend_probe_{};
-    std::unordered_map<uint32_t, bool> input_probe_polled_states_{};
     InputBackendRuntimeState input_backend_state_{};
     std::vector<PolledGameplayKey> polled_gameplay_keys_;
     std::vector<ToneVoice> tone_voices_;

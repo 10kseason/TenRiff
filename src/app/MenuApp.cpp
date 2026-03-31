@@ -906,6 +906,7 @@ void MenuApp::start_menu_threads() {
     input::InputThreadConfig input_config;
     input_config.backend = config_.input.rawinput ? input::InputBackend::RawInput
                                                   : input::InputBackend::Polling;
+    input_config.gate_policy = input::InputGatePolicy::ForegroundProcess;
     input_config.raw_input.register_keyboard = config_.input.rawinput;
     input_config.raw_input.input_sink = true;
     input_config.raw_input.no_legacy = false;
@@ -956,6 +957,7 @@ void MenuApp::restart_input_thread() {
     input::InputThreadConfig input_config;
     input_config.backend = config_.input.rawinput ? input::InputBackend::RawInput
                                                   : input::InputBackend::Polling;
+    input_config.gate_policy = input::InputGatePolicy::ForegroundProcess;
     input_config.raw_input.register_keyboard = config_.input.rawinput;
     input_config.raw_input.input_sink = true;
     input_config.raw_input.no_legacy = false;
@@ -971,11 +973,6 @@ void MenuApp::restart_input_thread() {
     } else if (input_config.backend == input::InputBackend::Polling) {
         rebuild_pressed_keys_from_polling_snapshot();
     }
-}
-
-void MenuApp::reset_input_backend_probe() {
-    input_backend_probe_.reset();
-    input_probe_polled_states_.clear();
 }
 
 std::vector<uint32_t> MenuApp::current_menu_probe_keycodes() const {
@@ -1040,52 +1037,28 @@ void MenuApp::rebuild_pressed_keys_from_polling_snapshot() {
     }
 }
 
-bool MenuApp::fallback_menu_input_to_polling(std::string_view reason) {
-    if (!config_.input.rawinput) {
-        return false;
-    }
-
-    const auto snapshot = input_thread_.health_snapshot();
-    const std::string fallback_timestamp = utc_timestamp_compact_menu();
-    std::cerr << "[warn] " << reason
-              << " timestamp=" << fallback_timestamp
-              << " origin=" << input_fallback_origin_label(InputFallbackOrigin::Menu)
-              << " effective_backend=" << input_backend_name(snapshot.backend)
-              << " queue_drops=" << snapshot.dropped_count
-              << " queue_pushes=" << snapshot.queue_push_count
-              << " buffer_ms=n/a"
-              << std::endl;
-    config_.input.rawinput = false;
-    config_.input.backend = "polling";
-    restart_input_thread();
-    rebuild_pressed_keys_from_polling_snapshot();
-    persist_runtime_config();
-
-    input_backend_state_.configured_backend = input::InputBackend::RawInput;
-    input_backend_state_.effective_backend = input::InputBackend::Polling;
-    input_backend_state_.auto_fallback = true;
-    input_backend_state_.fallback_origin = InputFallbackOrigin::Menu;
-    input_backend_state_.fallback_reason = std::string(reason);
-    input_backend_state_.fallback_timestamp_utc = fallback_timestamp;
-    publish_snapshot();
-    return true;
+void MenuApp::note_runtime_input_event_source(const input::InputEvent& event) {
+    const bool polling_event = input_backend_for_event(event) == input::InputBackend::Polling;
+    const bool switching_to_polling = polling_event &&
+                                      input_backend_state_.configured_backend == input::InputBackend::RawInput &&
+                                      input_backend_state_.effective_backend != input::InputBackend::Polling;
+    sync_runtime_input_backend_state(input_backend_state_,
+                                     event,
+                                     InputFallbackOrigin::Menu,
+                                     switching_to_polling
+                                         ? "Polling shadow event observed while RawInput is configured."
+                                         : std::string_view{},
+                                     switching_to_polling
+                                         ? std::string_view{utc_timestamp_compact_menu()}
+                                         : std::string_view{});
 }
 
 std::string MenuApp::current_input_backend_status_label() const {
-    InputBackendRuntimeState state{};
-    state.configured_backend = config_.input.rawinput ? input::InputBackend::RawInput
-                                                      : input::InputBackend::Polling;
-    state.effective_backend = input_thread_.is_running() ? input_thread_.current_backend()
-                                                         : state.configured_backend;
-    return format_input_backend_status_label(state, ui_uses_korean());
+    return format_input_backend_status_label(input_backend_state_, ui_uses_korean());
 }
 
 std::string MenuApp::current_input_backend_status_detail() const {
-    return {};
-}
-
-void MenuApp::service_input_backend_health() {
-    reset_input_backend_probe();
+    return format_input_backend_status_detail(input_backend_state_, ui_uses_korean());
 }
 
 void MenuApp::restart_audio_thread() {
@@ -1269,6 +1242,7 @@ void MenuApp::switch_song_source(const std::string& new_songs_path, bool force_r
 }
 
 void MenuApp::handle_input_event(const input::InputEvent& event) {
+    note_runtime_input_event_source(event);
     update_pressed_keys(event);
 
     if (event.state == input::InputState::Pressed &&

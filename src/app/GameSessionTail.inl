@@ -31,9 +31,11 @@ void GameSession::FutureQueue::consume() {
 }
 
 void GameSession::rebuild_input_thread_config(input::InputThreadConfig& input_config) const {
-    input_config.backend = config_.input.rawinput ? input::InputBackend::RawInput
-                                                  : input::InputBackend::Polling;
-    input_config.raw_input.register_keyboard = config_.input.rawinput;
+    // Stability-first hotfix: keep gameplay capture on the polling backend so
+    // lane/control input still works even when RawInput delivery regresses.
+    input_config.backend = input::InputBackend::Polling;
+    input_config.gate_policy = input::InputGatePolicy::AlwaysAllow;
+    input_config.raw_input.register_keyboard = false;
     input_config.raw_input.input_sink = true;
     input_config.raw_input.no_legacy = false;
     input_config.polling_hz = config_.input.polling_hz;
@@ -68,128 +70,20 @@ void GameSession::rebuild_input_thread_config(input::InputThreadConfig& input_co
     }
 }
 
-void GameSession::persist_runtime_input_backend() const {
-    config::ConfigLoader loader;
-    std::string error;
-    config::RuntimeConfig persisted = build_persisted_runtime_config(config_);
-    auto loaded = loader.load_profile(profile_dir_);
-    if (loaded.success()) {
-        persisted = build_persisted_input_backend_config(loaded.config, config_);
-    }
-    if (!loader.save_profile(profile_dir_, persisted, &error)) {
-        std::cerr << "[error] " << error << std::endl;
-    }
-}
-
-void GameSession::reset_input_backend_probe() {
-    input_backend_probe_.reset();
-    input_probe_polled_states_.clear();
-}
-
-bool GameSession::fallback_gameplay_input_to_polling(std::string_view reason, bool countdown_phase) {
-    if (!config_.input.rawinput) {
-        return false;
-    }
-
-    const auto snapshot = input_thread_.health_snapshot();
-    const InputFallbackOrigin fallback_origin =
-        replay_playback_enabled_ ? InputFallbackOrigin::Replay : InputFallbackOrigin::Gameplay;
-    const std::string fallback_timestamp = utc_timestamp_compact();
-    uint32_t recent_buffer_frames = 0;
-    for (;;) {
-        const uint64_t begin = audio_timing_sequence_.load(std::memory_order_acquire);
-        if ((begin & 1u) != 0u) {
-            continue;
-        }
-
-        const AudioTimingState timing = last_audio_timing_;
-        const uint64_t end = audio_timing_sequence_.load(std::memory_order_acquire);
-        if (begin != end) {
-            continue;
-        }
-
-        recent_buffer_frames = timing.buffer_frames;
-        break;
-    }
-    std::string buffer_ms_text = "n/a";
-    if (sample_rate_ > 0 && recent_buffer_frames > 0) {
-        const double buffer_ms =
-            static_cast<double>(recent_buffer_frames) * 1000.0 / static_cast<double>(sample_rate_);
-        buffer_ms_text = std::to_string(buffer_ms);
-    }
-
-    std::cerr << "[warn] " << reason
-              << " timestamp=" << fallback_timestamp
-              << " origin=" << input_fallback_origin_label(fallback_origin)
-              << " effective_backend=" << input_backend_name(snapshot.backend)
-              << " queue_drops=" << snapshot.dropped_count
-              << " queue_pushes=" << snapshot.queue_push_count
-              << " buffer_ms=" << buffer_ms_text
-              << std::endl;
-
-    std::unique_lock<std::mutex> lock(engine_mutex_, std::defer_lock);
-    if (!countdown_phase) {
-        lock.lock();
-    }
-
-    config_.input.rawinput = false;
-    config_.input.backend = "polling";
-    reset_input_backend_probe();
-    input_thread_.shutdown();
-
-    input::InputThreadConfig input_config;
-    rebuild_input_thread_config(input_config);
-    if (!input_thread_.initialize(input_config) || !input_thread_.start()) {
-        std::cerr << "[error] Failed to restart gameplay input thread with Polling fallback." << std::endl;
-        return false;
-    }
-
-    const int64_t baseline_sample = countdown_phase ? 0 : current_playback_sample_;
-    rebaseline_gameplay_start_input_state(baseline_sample);
-    persist_runtime_input_backend();
-    input_backend_state_.effective_backend = input::InputBackend::Polling;
-    input_backend_state_.auto_fallback = true;
-    input_backend_state_.fallback_origin = fallback_origin;
-    input_backend_state_.fallback_reason = std::string(reason);
-    input_backend_state_.fallback_timestamp_utc = fallback_timestamp;
-    return true;
-}
-
-void GameSession::service_input_backend_health() {
-    const auto snapshot = input_thread_.health_snapshot();
-    if (snapshot.backend != input::InputBackend::RawInput) {
-        reset_input_backend_probe();
-        return;
-    }
-
-    const int64_t now_ns = timing::HighResClock::now_ns();
-    bool polled_change = false;
-    for (const auto& tracked : polled_gameplay_keys_) {
-        const auto poll_vk = config::KeycodeMap::polling_vk_for_keycode(tracked.keycode);
-        if (!poll_vk.has_value()) {
-            continue;
-        }
-
-        const bool pressed = (GetAsyncKeyState(static_cast<int>(*poll_vk)) & 0x8000) != 0;
-        auto [it, inserted] = input_probe_polled_states_.emplace(tracked.keycode, pressed);
-        if (inserted) {
-            continue;
-        }
-        if (it->second == pressed) {
-            continue;
-        }
-        it->second = pressed;
-        polled_change = true;
-    }
-
-    if (polled_change) {
-        input_backend_probe_.note_polled_change(now_ns, snapshot);
-    }
-    if (input_backend_probe_.should_trigger_fallback(now_ns, snapshot)) {
-        static constexpr char kFallbackReason[] =
-            "RawInput inactive for bound gameplay keys, switching to Polling";
-        static_cast<void>(fallback_gameplay_input_to_polling(kFallbackReason, countdown_active_));
-    }
+void GameSession::note_runtime_input_event_source(const input::InputEvent& event) {
+    const bool polling_event = input_backend_for_event(event) == input::InputBackend::Polling;
+    const bool switching_to_polling = polling_event &&
+                                      input_backend_state_.configured_backend == input::InputBackend::RawInput &&
+                                      input_backend_state_.effective_backend != input::InputBackend::Polling;
+    sync_runtime_input_backend_state(input_backend_state_,
+                                     event,
+                                     InputFallbackOrigin::Gameplay,
+                                     switching_to_polling
+                                         ? "Polling shadow event observed while RawInput is configured."
+                                         : std::string_view{},
+                                     switching_to_polling
+                                         ? std::string_view{utc_timestamp_compact()}
+                                         : std::string_view{});
 }
 
 void GameSession::rebuild_polled_gameplay_keys() {
@@ -334,7 +228,6 @@ bool GameSession::initialize(const CommandLineOptions& options) {
     judgement_loop_step_carry_ = 0;
 
     future_events_ = {};
-    reset_input_backend_probe();
     input_backend_state_ = {};
     gameplay_input_state_tracker_.reset();
     polled_gameplay_keys_.clear();
@@ -712,8 +605,7 @@ bool GameSession::initialize(const CommandLineOptions& options) {
         }
         key_to_lane_[keycode.value()] = lane_index.value();
     }
-    std::cerr << "[info] Gameplay input backend="
-              << (config_.input.rawinput ? "RawInput" : "Polling")
+    std::cerr << "[info] Gameplay input backend=Polling"
               << " key_mode=" << active_key_mode
               << " bound_lanes=" << key_to_lane_.size() << "/" << std::max(1, chart_.lane_count)
               << " keymap_normalized=" << keymap_result.normalized_binding_count
@@ -2057,6 +1949,7 @@ void GameSession::process_countdown_input_queue() {
         if (!maybe_event.has_value()) {
             break;
         }
+        note_runtime_input_event_source(*maybe_event);
         if (handle_control_input(*maybe_event) &&
             finished_.load(std::memory_order_acquire)) {
             return;
@@ -2239,6 +2132,7 @@ void GameSession::process_input_queue(int64_t buffer_start_samples, int64_t buff
         }
 
         const auto event = *maybe_event;
+        note_runtime_input_event_source(event);
         if (handle_control_input(event)) {
             if (finished_.load(std::memory_order_acquire)) {
                 return;
@@ -2367,6 +2261,7 @@ void GameSession::process_replay_input_queue(int64_t buffer_start_samples,
         if (!maybe_event.has_value()) {
             break;
         }
+        note_runtime_input_event_source(*maybe_event);
         if (handle_control_input(*maybe_event) &&
             finished_.load(std::memory_order_acquire)) {
             return;

@@ -1122,16 +1122,6 @@ void MenuApp::launch_gameplay(const std::string& chart_path, const std::string& 
         config_.speed.hi_speed = session_hispeed;
         persist_runtime_config();
     }
-    const bool session_rawinput = session.final_rawinput_enabled();
-    if (config_.input.rawinput != session_rawinput) {
-        config_.input.rawinput = session_rawinput;
-        config_.input.backend = session_rawinput ? "rawinput" : "polling";
-    }
-    input_backend_state_ = {};
-    input_backend_state_.configured_backend = session_rawinput ? input::InputBackend::RawInput
-                                                               : input::InputBackend::Polling;
-    input_backend_state_.effective_backend = input_backend_state_.configured_backend;
-
     restart_input_thread();
     restart_audio_thread();
     const auto& result = session.result();

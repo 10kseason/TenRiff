@@ -23,7 +23,6 @@
 #include "config/Keymap.h"
 #include "gameplay/ResultStats.h"
 #include "input/InputThread.h"
-#include "input/RawInputHealthProbe.h"
 #include "render/MenuWindow.h"
 #include "render/RenderThread.h"
 
@@ -243,15 +242,13 @@ private:
     void render_snapshot(const MenuSnapshot& snapshot);
     void update_keymap_capture_timeout();
     void update_pressed_keys(const input::InputEvent& event);
-    void service_input_backend_health();
-    void reset_input_backend_probe();
     void update_song_select_repeat();
     void reset_song_select_repeat();
     [[nodiscard]] bool is_song_select_repeat_key(uint32_t keycode) const;
     [[nodiscard]] std::vector<uint32_t> current_menu_probe_keycodes() const;
     void refresh_menu_input_polling_scope();
     void rebuild_pressed_keys_from_polling_snapshot();
-    [[nodiscard]] bool fallback_menu_input_to_polling(std::string_view reason);
+    void note_runtime_input_event_source(const input::InputEvent& event);
     [[nodiscard]] std::string current_input_backend_status_label() const;
     [[nodiscard]] std::string current_input_backend_status_detail() const;
 
@@ -542,8 +539,6 @@ private:
     uint32_t key_f2_ = 0;
     uint32_t key_f5_ = 0;
     uint32_t key_f9_ = 0;
-    input::RawInputHealthProbe input_backend_probe_{};
-    std::unordered_map<uint32_t, bool> input_probe_polled_states_{};
     InputBackendRuntimeState input_backend_state_{};
 };
 

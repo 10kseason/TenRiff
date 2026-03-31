@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <string>
+#include <string_view>
 
 #include "input/InputThread.h"
 
@@ -27,6 +28,12 @@ struct InputBackendRuntimeState {
     return backend == input::InputBackend::RawInput ? "RawInput" : "Polling";
 }
 
+[[nodiscard]] inline input::InputBackend input_backend_for_event(const input::InputEvent& event) {
+    return event.device_id == input::kPollingAggregateDeviceId
+               ? input::InputBackend::Polling
+               : input::InputBackend::RawInput;
+}
+
 [[nodiscard]] inline std::string input_fallback_origin_label(InputFallbackOrigin origin, bool korean = false) {
     switch (origin) {
         case InputFallbackOrigin::Menu: return korean ? "메뉴" : "menu";
@@ -35,6 +42,31 @@ struct InputBackendRuntimeState {
         case InputFallbackOrigin::None:
         default: return korean ? "없음" : "none";
     }
+}
+
+inline void sync_runtime_input_backend_state(InputBackendRuntimeState& state,
+                                             const input::InputEvent& event,
+                                             InputFallbackOrigin fallback_origin,
+                                             std::string_view fallback_reason = {},
+                                             std::string_view fallback_timestamp_utc = {}) {
+    state.effective_backend = input_backend_for_event(event);
+    if (state.configured_backend == input::InputBackend::RawInput &&
+        state.effective_backend == input::InputBackend::Polling) {
+        state.auto_fallback = true;
+        state.fallback_origin = fallback_origin;
+        if (!fallback_reason.empty()) {
+            state.fallback_reason = std::string(fallback_reason);
+        }
+        if (!fallback_timestamp_utc.empty()) {
+            state.fallback_timestamp_utc = std::string(fallback_timestamp_utc);
+        }
+        return;
+    }
+
+    state.auto_fallback = false;
+    state.fallback_origin = InputFallbackOrigin::None;
+    state.fallback_reason.clear();
+    state.fallback_timestamp_utc.clear();
 }
 
 [[nodiscard]] inline std::string format_input_backend_status_label(const InputBackendRuntimeState& state,
