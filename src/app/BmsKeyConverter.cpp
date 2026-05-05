@@ -31,6 +31,9 @@ namespace {
 constexpr double kPositionEpsilon = 1e-9;
 constexpr int kQuantizeSliceCount = 1920;
 constexpr int kMaxExactSliceCount = 19200;
+constexpr int kAutoSampleRateFallback = 44100;
+constexpr int kMinAudioSampleRate = 8000;
+constexpr int kMaxAudioSampleRate = 192000;
 constexpr double kBeatsPerMeasure = 4.0;
 constexpr double kStopTicksPerBeat = 48.0;
 
@@ -124,6 +127,461 @@ int64_t scale_samples(int64_t samples, double rate) {
     return static_cast<int64_t>(std::llround(static_cast<double>(samples) / rate));
 }
 
+bool is_plausible_audio_sample_rate(int sample_rate) {
+    return sample_rate >= kMinAudioSampleRate && sample_rate <= kMaxAudioSampleRate;
+}
+
+uint16_t read_le_u16(const uint8_t* data) {
+    return static_cast<uint16_t>(data[0]) |
+           static_cast<uint16_t>(static_cast<uint16_t>(data[1]) << 8u);
+}
+
+uint32_t read_le_u32(const uint8_t* data) {
+    return static_cast<uint32_t>(data[0]) |
+           (static_cast<uint32_t>(data[1]) << 8u) |
+           (static_cast<uint32_t>(data[2]) << 16u) |
+           (static_cast<uint32_t>(data[3]) << 24u);
+}
+
+std::filesystem::path path_from_utf8(std::string_view value) {
+#ifdef _WIN32
+    try {
+        return std::filesystem::u8path(std::string(value));
+    } catch (...) {
+        return std::filesystem::path(std::string(value));
+    }
+#else
+    return std::filesystem::path(std::string(value));
+#endif
+}
+
+std::string normalize_path_key(std::string value) {
+    std::replace(value.begin(), value.end(), '\\', '/');
+    return to_lower_ascii(std::move(value));
+}
+
+std::string normalize_asset_reference(std::string value) {
+    value = trim_copy(value);
+    if (value.size() >= 2) {
+        const char first = value.front();
+        const char last = value.back();
+        if ((first == '"' && last == '"') || (first == '\'' && last == '\'')) {
+            value = trim_copy(value.substr(1, value.size() - 2));
+        }
+    }
+    return value;
+}
+
+bool is_audio_extension(std::string_view extension) {
+    return extension == ".wav" || extension == ".wave" || extension == ".ogg" || extension == ".mp3";
+}
+
+std::filesystem::path normalize_resolved_path(const std::filesystem::path& path) {
+    namespace fs = std::filesystem;
+    std::error_code ec;
+    fs::path normalized = path;
+    if (!normalized.is_absolute()) {
+        const fs::path absolute = fs::absolute(normalized, ec);
+        if (!ec && !absolute.empty()) {
+            normalized = absolute;
+        }
+        ec.clear();
+    }
+
+    const fs::path canonical = fs::weakly_canonical(normalized, ec);
+    if (!ec && !canonical.empty()) {
+        return canonical;
+    }
+    return normalized.lexically_normal();
+}
+
+struct AudioAssetLookup {
+    bool built = false;
+    std::unordered_map<std::string, std::filesystem::path> by_relative;
+    std::unordered_map<std::string, std::filesystem::path> by_filename;
+};
+
+void build_audio_asset_lookup(const std::filesystem::path& chart_path, AudioAssetLookup& lookup) {
+    if (lookup.built) {
+        return;
+    }
+    lookup.built = true;
+
+    namespace fs = std::filesystem;
+    const fs::path root = chart_path.parent_path();
+    if (root.empty()) {
+        return;
+    }
+
+    std::error_code ec;
+    fs::recursive_directory_iterator it(root, fs::directory_options::skip_permission_denied, ec);
+    fs::recursive_directory_iterator end;
+    while (it != end) {
+        if (ec) {
+            ec.clear();
+            it.increment(ec);
+            continue;
+        }
+
+        const fs::directory_entry& entry = *it;
+        if (!entry.is_regular_file(ec)) {
+            ec.clear();
+            it.increment(ec);
+            continue;
+        }
+        ec.clear();
+
+        const fs::path full = normalize_resolved_path(entry.path());
+        const std::string extension = to_lower_ascii(full.extension().u8string());
+        if (!is_audio_extension(extension)) {
+            it.increment(ec);
+            continue;
+        }
+
+        fs::path relative = fs::relative(full, root, ec);
+        if (ec || relative.empty()) {
+            ec.clear();
+            relative = full.lexically_relative(root);
+        }
+        if (!relative.empty()) {
+            lookup.by_relative.emplace(normalize_path_key(relative.generic_u8string()), full);
+        }
+        lookup.by_filename.emplace(to_lower_ascii(full.filename().u8string()), full);
+
+        it.increment(ec);
+    }
+}
+
+std::vector<std::filesystem::path> build_audio_reference_candidates(const std::string& reference) {
+    namespace fs = std::filesystem;
+    const fs::path ref_path = path_from_utf8(reference);
+    const std::string extension = to_lower_ascii(ref_path.extension().u8string());
+    const bool prefer_ogg_for_wav_reference = extension == ".wav" || extension == ".wave";
+
+    std::vector<fs::path> candidates;
+    std::unordered_set<std::string> seen;
+    auto push = [&](const fs::path& candidate) {
+        const std::string key = normalize_path_key(candidate.generic_u8string());
+        if (seen.emplace(key).second) {
+            candidates.push_back(candidate);
+        }
+    };
+    auto push_replaced_extension = [&](std::string_view next_extension) {
+        fs::path candidate = ref_path;
+        if (extension.empty()) {
+            candidate += next_extension;
+        } else {
+            candidate.replace_extension(next_extension);
+        }
+        push(candidate);
+    };
+
+    if (!prefer_ogg_for_wav_reference) {
+        push(ref_path);
+    }
+
+    if (extension.empty()) {
+        push_replaced_extension(".ogg");
+        push_replaced_extension(".wav");
+        push_replaced_extension(".wave");
+        push_replaced_extension(".mp3");
+    } else if (extension == ".wav" || extension == ".wave") {
+        push_replaced_extension(".ogg");
+        push(ref_path);
+        push_replaced_extension(extension == ".wav" ? ".wave" : ".wav");
+        push_replaced_extension(".mp3");
+    } else if (is_audio_extension(extension)) {
+        push_replaced_extension(".ogg");
+        push_replaced_extension(".wav");
+        push_replaced_extension(".wave");
+        push_replaced_extension(".mp3");
+    }
+
+    return candidates;
+}
+
+std::optional<std::filesystem::path> lookup_audio_candidate(const std::filesystem::path& chart_path,
+                                                            const std::filesystem::path& candidate,
+                                                            AudioAssetLookup& lookup) {
+    namespace fs = std::filesystem;
+    const fs::path direct = candidate.is_absolute()
+                                ? candidate.lexically_normal()
+                                : (chart_path.parent_path() / candidate).lexically_normal();
+    std::error_code ec;
+    if (!direct.empty() && fs::exists(direct, ec) && !ec) {
+        return normalize_resolved_path(direct);
+    }
+
+    build_audio_asset_lookup(chart_path, lookup);
+
+    auto rel_it = lookup.by_relative.find(normalize_path_key(candidate.generic_u8string()));
+    if (rel_it != lookup.by_relative.end()) {
+        return rel_it->second;
+    }
+
+    auto file_it = lookup.by_filename.find(to_lower_ascii(candidate.filename().u8string()));
+    if (file_it != lookup.by_filename.end()) {
+        return file_it->second;
+    }
+
+    return std::nullopt;
+}
+
+std::optional<std::filesystem::path> resolve_audio_reference_path(const std::filesystem::path& chart_path,
+                                                                  const std::string& reference,
+                                                                  AudioAssetLookup& lookup) {
+    const auto candidates = build_audio_reference_candidates(reference);
+    for (const auto& candidate : candidates) {
+        auto resolved = lookup_audio_candidate(chart_path, candidate, lookup);
+        if (resolved.has_value()) {
+            return resolved;
+        }
+    }
+    return std::nullopt;
+}
+
+std::optional<int> probe_wav_sample_rate(const std::filesystem::path& path) {
+    std::ifstream file(path, std::ios::binary);
+    if (!file) {
+        return std::nullopt;
+    }
+
+    std::array<uint8_t, 12> riff{};
+    file.read(reinterpret_cast<char*>(riff.data()), static_cast<std::streamsize>(riff.size()));
+    if (file.gcount() != static_cast<std::streamsize>(riff.size()) ||
+        std::string_view(reinterpret_cast<const char*>(riff.data()), 4) != "RIFF" ||
+        std::string_view(reinterpret_cast<const char*>(riff.data() + 8), 4) != "WAVE") {
+        return std::nullopt;
+    }
+
+    while (file) {
+        std::array<uint8_t, 8> chunk{};
+        file.read(reinterpret_cast<char*>(chunk.data()), static_cast<std::streamsize>(chunk.size()));
+        if (file.gcount() != static_cast<std::streamsize>(chunk.size())) {
+            break;
+        }
+
+        const uint32_t chunk_size = read_le_u32(chunk.data() + 4);
+        if (std::string_view(reinterpret_cast<const char*>(chunk.data()), 4) == "fmt " && chunk_size >= 16) {
+            std::array<uint8_t, 16> fmt{};
+            file.read(reinterpret_cast<char*>(fmt.data()), static_cast<std::streamsize>(fmt.size()));
+            if (file.gcount() != static_cast<std::streamsize>(fmt.size())) {
+                return std::nullopt;
+            }
+            const uint16_t channels = read_le_u16(fmt.data() + 2);
+            const int sample_rate = static_cast<int>(read_le_u32(fmt.data() + 4));
+            if (channels > 0 && is_plausible_audio_sample_rate(sample_rate)) {
+                return sample_rate;
+            }
+            return std::nullopt;
+        }
+
+        const std::streamoff skip = static_cast<std::streamoff>(chunk_size + (chunk_size & 1u));
+        file.seekg(skip, std::ios::cur);
+    }
+
+    return std::nullopt;
+}
+
+std::optional<int> probe_ogg_vorbis_sample_rate_light(const std::filesystem::path& path) {
+    std::ifstream file(path, std::ios::binary);
+    if (!file) {
+        return std::nullopt;
+    }
+
+    std::vector<uint8_t> bytes(64 * 1024);
+    file.read(reinterpret_cast<char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
+    bytes.resize(static_cast<std::size_t>(std::max<std::streamsize>(0, file.gcount())));
+
+    static constexpr std::array<uint8_t, 7> kVorbisId = {0x01, 'v', 'o', 'r', 'b', 'i', 's'};
+    for (std::size_t i = 0; i + 16 <= bytes.size(); ++i) {
+        if (!std::equal(kVorbisId.begin(), kVorbisId.end(), bytes.begin() + static_cast<std::ptrdiff_t>(i))) {
+            continue;
+        }
+        const int sample_rate = static_cast<int>(read_le_u32(bytes.data() + i + 12));
+        if (is_plausible_audio_sample_rate(sample_rate)) {
+            return sample_rate;
+        }
+    }
+
+    return std::nullopt;
+}
+
+std::optional<int> probe_mp3_sample_rate_light(const std::filesystem::path& path) {
+    std::ifstream file(path, std::ios::binary);
+    if (!file) {
+        return std::nullopt;
+    }
+
+    std::vector<uint8_t> bytes(1024 * 1024);
+    file.read(reinterpret_cast<char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
+    bytes.resize(static_cast<std::size_t>(std::max<std::streamsize>(0, file.gcount())));
+
+    std::size_t begin = 0;
+    if (bytes.size() >= 10 && bytes[0] == 'I' && bytes[1] == 'D' && bytes[2] == '3') {
+        const std::size_t tag_size = (static_cast<std::size_t>(bytes[6] & 0x7f) << 21u) |
+                                     (static_cast<std::size_t>(bytes[7] & 0x7f) << 14u) |
+                                     (static_cast<std::size_t>(bytes[8] & 0x7f) << 7u) |
+                                     static_cast<std::size_t>(bytes[9] & 0x7f);
+        begin = std::min<std::size_t>(bytes.size(), 10u + tag_size);
+    }
+
+    static constexpr int kMpeg1Rates[3] = {44100, 48000, 32000};
+    static constexpr int kMpeg2Rates[3] = {22050, 24000, 16000};
+    static constexpr int kMpeg25Rates[3] = {11025, 12000, 8000};
+
+    for (std::size_t i = begin; i + 4 <= bytes.size(); ++i) {
+        if (bytes[i] != 0xff || (bytes[i + 1] & 0xe0u) != 0xe0u) {
+            continue;
+        }
+
+        const int version = (bytes[i + 1] >> 3u) & 0x03u;
+        const int layer = (bytes[i + 1] >> 1u) & 0x03u;
+        const int sample_rate_index = (bytes[i + 2] >> 2u) & 0x03u;
+        if (version == 1 || layer == 0 || sample_rate_index == 3) {
+            continue;
+        }
+
+        int sample_rate = 0;
+        if (version == 3) {
+            sample_rate = kMpeg1Rates[sample_rate_index];
+        } else if (version == 2) {
+            sample_rate = kMpeg2Rates[sample_rate_index];
+        } else {
+            sample_rate = kMpeg25Rates[sample_rate_index];
+        }
+        if (is_plausible_audio_sample_rate(sample_rate)) {
+            return sample_rate;
+        }
+    }
+
+    return std::nullopt;
+}
+
+std::optional<int> probe_audio_sample_rate_light(const std::filesystem::path& path) {
+    const std::string extension = to_lower_ascii(path.extension().u8string());
+    if (extension == ".wav" || extension == ".wave") {
+        return probe_wav_sample_rate(path);
+    }
+    if (extension == ".ogg") {
+        return probe_ogg_vorbis_sample_rate_light(path);
+    }
+    if (extension == ".mp3") {
+        return probe_mp3_sample_rate_light(path);
+    }
+    return std::nullopt;
+}
+
+std::map<std::string, std::size_t> collect_bms_audio_reference_counts(const chart::BmsChart& chart,
+                                                                      bool note_lanes) {
+    std::map<std::string, std::size_t> counts;
+    for (const auto& command : chart.commands) {
+        const bool matches = note_lanes ? is_note_lane_channel(command.channel) : command.channel == "01";
+        if (!matches || command.data.size() % 2 != 0) {
+            continue;
+        }
+        for (std::size_t i = 0; i + 2 <= command.data.size(); i += 2) {
+            const std::string token = to_upper_ascii(command.data.substr(i, 2));
+            if (token != "00") {
+                ++counts[token];
+            }
+        }
+    }
+    return counts;
+}
+
+std::optional<int> choose_sample_rate_from_references(const std::filesystem::path& chart_path,
+                                                      const chart::BmsChart& chart,
+                                                      const std::map<std::string, std::size_t>& reference_counts) {
+    if (reference_counts.empty()) {
+        return std::nullopt;
+    }
+
+    struct RateScore {
+        std::size_t weight = 0;
+        std::string first_path;
+    };
+
+    AudioAssetLookup lookup;
+    std::map<int, RateScore> scores;
+    for (const auto& [object_id, count] : reference_counts) {
+        auto wav_it = chart.wav.find(object_id);
+        if (wav_it == chart.wav.end()) {
+            continue;
+        }
+
+        const std::string reference = normalize_asset_reference(wav_it->second);
+        if (reference.empty()) {
+            continue;
+        }
+
+        auto resolved = resolve_audio_reference_path(chart_path, reference, lookup);
+        if (!resolved.has_value()) {
+            continue;
+        }
+
+        auto sample_rate = probe_audio_sample_rate_light(resolved.value());
+        if (!sample_rate.has_value()) {
+            continue;
+        }
+
+        auto& score = scores[sample_rate.value()];
+        score.weight += std::max<std::size_t>(1u, count);
+        if (score.first_path.empty()) {
+            score.first_path = resolved->filename().u8string();
+        }
+    }
+
+    if (scores.empty()) {
+        return std::nullopt;
+    }
+
+    auto best = scores.begin();
+    for (auto it = std::next(scores.begin()); it != scores.end(); ++it) {
+        if (it->second.weight > best->second.weight) {
+            best = it;
+            continue;
+        }
+        if (it->second.weight == best->second.weight) {
+            const int lhs_distance = std::abs(it->first - kAutoSampleRateFallback);
+            const int rhs_distance = std::abs(best->first - kAutoSampleRateFallback);
+            if (lhs_distance < rhs_distance || (lhs_distance == rhs_distance && it->first < best->first)) {
+                best = it;
+            }
+        }
+    }
+
+    return best->first;
+}
+
+int resolve_effective_sample_rate(const std::string& input_path,
+                                  const chart::BmsChart& chart,
+                                  int requested_sample_rate,
+                                  std::vector<std::string>& warnings) {
+    if (requested_sample_rate > 0) {
+        return requested_sample_rate;
+    }
+
+    const std::filesystem::path chart_path = path_from_utf8(input_path);
+    auto keysound_rate = choose_sample_rate_from_references(chart_path,
+                                                           chart,
+                                                           collect_bms_audio_reference_counts(chart, true));
+    if (keysound_rate.has_value()) {
+        return keysound_rate.value();
+    }
+
+    auto bgm_rate = choose_sample_rate_from_references(chart_path,
+                                                       chart,
+                                                       collect_bms_audio_reference_counts(chart, false));
+    if (bgm_rate.has_value()) {
+        return bgm_rate.value();
+    }
+
+    warnings.push_back("Auto sample rate fell back to " + std::to_string(kAutoSampleRateFallback) +
+                       " Hz because no referenced BMS audio sample rate could be probed.");
+    return kAutoSampleRateFallback;
+}
+
 std::size_t hold_count(const gameplay::GameplayChart& chart) {
     return static_cast<std::size_t>(std::count_if(chart.notes.begin(), chart.notes.end(), [](const auto& note) {
         return note.end_sample.has_value();
@@ -172,7 +630,7 @@ struct LayoutDefinition {
 const std::vector<BmsKeyConverterPreset>& preset_table() {
     static const std::vector<BmsKeyConverterPreset> presets = {
         {"default", "Default (8K)", 8, 8, 2, 4, true},
-        {"10k", "10K Preset", 10, 8, 2, 4, true},
+        {"10k", "10K Preset", 10, 10, 1, 5, true, 0u},
         {"9k", "9K Preset", 9, 8, 2, 4, true},
         {"8k", "8K Preset", 8, 8, 2, 4, true},
         {"7k", "7K Preset", 7, 7, 2, 4, false},
@@ -205,6 +663,27 @@ bool preset_matches_token(const BmsKeyConverterPreset& preset, std::string_view 
     }
 
     return false;
+}
+
+std::optional<gameplay::KeyModeConversionStyle> parse_conversion_style(std::string_view token) {
+    const std::string normalized = normalize_preset_token(token);
+    if (normalized.empty() ||
+        normalized == "krr" ||
+        normalized == "legacy" ||
+        normalized == "krrlegacy" ||
+        normalized == "n2nc") {
+        return gameplay::KeyModeConversionStyle::KrrLegacy;
+    }
+
+    if (normalized == "10ksplit" ||
+        normalized == "split10k" ||
+        normalized == "tenkeysplit" ||
+        normalized == "leftright10k" ||
+        normalized == "balanced10k") {
+        return gameplay::KeyModeConversionStyle::TenKeySplit;
+    }
+
+    return std::nullopt;
 }
 
 LayoutDefinition resolve_layout_definition(int lane_count) {
@@ -928,14 +1407,25 @@ BmsKeyConverterResult convert_bms_chart_file(const BmsKeyConverterOptions& optio
         result.error = "Output path is required.";
         return result;
     }
-    if (options.sample_rate <= 0) {
-        result.error = "Sample rate must be positive.";
+    if (options.sample_rate < 0) {
+        result.error = "Sample rate must be positive, or 0 for auto.";
         return result;
     }
 
     const LayoutDefinition layout = resolve_layout_definition(options.target_lane_count);
     if (layout.lane_count <= 0) {
         result.error = "Unsupported target lane count. Supported values: 4, 5, 6, 8, 9, 10, 16.";
+        return result;
+    }
+
+    const std::optional<gameplay::KeyModeConversionStyle> conversion_style =
+        parse_conversion_style(options.conversion_style);
+    if (!conversion_style.has_value()) {
+        result.error = "Unsupported conversion algorithm. Supported values: krr, 10k-split.";
+        return result;
+    }
+    if (conversion_style.value() == gameplay::KeyModeConversionStyle::TenKeySplit && layout.lane_count != 10) {
+        result.error = "The 10k-split conversion algorithm requires target 10K.";
         return result;
     }
 
@@ -949,6 +1439,11 @@ BmsKeyConverterResult convert_bms_chart_file(const BmsKeyConverterOptions& optio
         return result;
     }
 
+    const int effective_sample_rate =
+        resolve_effective_sample_rate(options.input_path, parsed.chart, options.sample_rate, result.warnings);
+    result.sample_rate = effective_sample_rate;
+    result.sample_rate_auto = options.sample_rate == 0;
+
     chart::BmsChartNormalizer normalizer;
     chart::BmsNormalizationResult normalization = normalizer.normalize(parsed.chart);
     if (!normalization.success()) {
@@ -960,7 +1455,7 @@ BmsKeyConverterResult convert_bms_chart_file(const BmsKeyConverterOptions& optio
     }
 
     chart::BmsTimelineBuilder timeline_builder;
-    chart::BmsTimelineResult timeline = timeline_builder.build(normalization.chart, options.sample_rate);
+    chart::BmsTimelineResult timeline = timeline_builder.build(normalization.chart, effective_sample_rate);
     if (!timeline.success()) {
         result.error = "Failed to build a playable timeline from the input BMS chart.";
         for (const auto& message : timeline.messages) {
@@ -992,14 +1487,20 @@ BmsKeyConverterResult convert_bms_chart_file(const BmsKeyConverterOptions& optio
                                   layout.lane_count,
                                   options.seed,
                                   normalization.chart.base_bpm,
-                                  options.sample_rate);
+                                  effective_sample_rate);
+    const bool tenkey_split_style = conversion_style.value() == gameplay::KeyModeConversionStyle::TenKeySplit;
     if (options.max_keys > 0) {
         converter_options.max_keys = options.max_keys;
+    } else if (tenkey_split_style) {
+        converter_options.max_keys = std::min(layout.lane_count, 8);
     }
     if (options.min_keys > 0) {
         converter_options.min_keys = options.min_keys;
+    } else if (tenkey_split_style) {
+        converter_options.min_keys = std::min(layout.lane_count, 2);
     }
     converter_options.transform_speed_slot = options.transform_speed_slot;
+    converter_options.style = conversion_style.value();
 
     gameplay::KeyModeConverterResult converted =
         gameplay::convert_key_mode_chart(source_build.chart, converter_options);
@@ -1011,7 +1512,7 @@ BmsKeyConverterResult convert_bms_chart_file(const BmsKeyConverterOptions& optio
     }
 
     const std::string output_text =
-        build_bms_text(parsed.chart, normalization.chart, placements, converted.chart, layout, options.sample_rate, result.warnings);
+        build_bms_text(parsed.chart, normalization.chart, placements, converted.chart, layout, effective_sample_rate, result.warnings);
 
     std::string write_error;
     if (!write_text_file(options.output_path, output_text, write_error)) {

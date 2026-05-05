@@ -34,6 +34,23 @@ bool parse_u32(const char* text, uint32_t& value) {
     return parsed == value;
 }
 
+bool parse_sample_rate(const char* text, int& value) {
+    if (!text) {
+        return false;
+    }
+    std::string token(text);
+    for (char& ch : token) {
+        if (ch >= 'A' && ch <= 'Z') {
+            ch = static_cast<char>(ch + ('a' - 'A'));
+        }
+    }
+    if (token == "auto" || token == "detect" || token == "0") {
+        value = 0;
+        return true;
+    }
+    return parse_int(text, value) && value > 0;
+}
+
 void print_usage() {
     std::vector<std::string> preset_tokens;
     for (const auto& preset : tenriff::app::bms_key_converter_presets()) {
@@ -55,8 +72,11 @@ void print_usage() {
     std::cout << ">]\n"
         << "                         [--max-keys <n>] [--min-keys <n>]\n"
         << "                         [--transform-speed-slot <0-8>] [--seed <u32>]\n"
-        << "                         [--sample-rate <hz>]\n"
+        << "                         [--sample-rate <hz|auto>] [--algorithm <krr|10k-split>]\n"
         << "Preset applies the original krrcream Toolkit target/max/min/speed defaults.\n"
+        << "Preset 10k uses target=10, max=10, min=1, speed slot 5 (2 bars), and fixed seed 0.\n"
+        << "Sample rate defaults to auto and is detected from referenced BMS keysounds before falling back to 44100 Hz.\n"
+        << "Algorithm krr preserves the legacy N2NC flow; 10k-split requires target 10K and keeps source halves on 1-5 / 6-10.\n"
         << "Explicit --target-keys/--max-keys/--min-keys/--transform-speed-slot override preset values.\n";
 }
 
@@ -117,10 +137,14 @@ int main(int argc, char** argv) {
             continue;
         }
         if (arg == "--sample-rate" && i + 1 < argc) {
-            if (!parse_int(argv[++i], options.sample_rate)) {
-                std::cerr << "Invalid --sample-rate value.\n";
+            if (!parse_sample_rate(argv[++i], options.sample_rate)) {
+                std::cerr << "Invalid --sample-rate value. Use a positive integer or auto.\n";
                 return 1;
             }
+            continue;
+        }
+        if (arg == "--algorithm" && i + 1 < argc) {
+            options.conversion_style = argv[++i];
             continue;
         }
         if (arg == "--seed" && i + 1 < argc) {
@@ -163,6 +187,9 @@ int main(int argc, char** argv) {
         if (!speed_slot_specified) {
             options.transform_speed_slot = preset.transform_speed_slot;
         }
+        if (preset.fixed_seed.has_value()) {
+            options.seed = preset.fixed_seed.value();
+        }
     }
 
     const auto result = tenriff::app::convert_bms_chart_file(options);
@@ -175,6 +202,7 @@ int main(int argc, char** argv) {
     }
 
     std::cout << "Converted " << result.source_lane_count << "K -> " << result.target_lane_count
-              << "K, notes=" << result.note_count << ", holds=" << result.hold_count << '\n';
+              << "K, notes=" << result.note_count << ", holds=" << result.hold_count
+              << ", sample_rate=" << result.sample_rate << (result.sample_rate_auto ? " (auto)" : "") << '\n';
     return 0;
 }

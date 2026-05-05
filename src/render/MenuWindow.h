@@ -252,6 +252,9 @@ struct GameplayHudData {
     bool show_judgement_line = true;
     bool show_gear_boundary_line = false;
     bool hold_tail_taper_enabled = false;
+    bool judgement_line_glow_enabled = true;
+    bool key_pulse_enabled = true;
+    std::string key_label_position = "bottom";
     bool note_border_enabled = true;
     std::string note_shape = "rect";
     bool preserve_note_image_aspect_ratio = false;
@@ -259,6 +262,10 @@ struct GameplayHudData {
     std::string external_skin_root;
     std::string external_skin_name;
     std::string lr2_resolution_override = "auto";
+    double lane_background_opacity = 0.18;
+    double visual_opacity = 0.96;
+    double note_outline_opacity = 0.78;
+    double hold_body_opacity = 0.24;
     double visual_offset_ms = 0.0;
 
     double bpm = 0.0;
@@ -294,6 +301,8 @@ struct GameplayHudData {
     std::array<float, kGameplayHudMaxLanes> lane_activity{};
     std::size_t lane_color_count = 0;
     std::array<uint32_t, kGameplayHudMaxLanes> lane_colors{};
+    std::size_t key_label_count = 0;
+    std::array<std::string, kGameplayHudMaxLanes> key_labels{};
     std::size_t note_count = 0;
     std::array<GameplayNoteData, kGameplayHudMaxNotes> notes{};
 
@@ -356,6 +365,9 @@ struct SkinPreviewData {
     bool show_judgement_line = true;
     bool show_gear_boundary_line = false;
     bool hold_tail_taper_enabled = false;
+    bool judgement_line_glow_enabled = true;
+    bool key_pulse_enabled = true;
+    std::string key_label_position = "bottom";
     bool note_border_enabled = true;
     std::string note_shape = "rect";
     bool preserve_note_image_aspect_ratio = false;
@@ -363,6 +375,10 @@ struct SkinPreviewData {
     std::string external_skin_root;
     std::string external_skin_name;
     std::string lr2_resolution_override = "auto";
+    double lane_background_opacity = 0.18;
+    double visual_opacity = 0.96;
+    double note_outline_opacity = 0.78;
+    double hold_body_opacity = 0.24;
     std::array<uint32_t, kGameplayHudMaxLanes> lane_colors{};
 };
 
@@ -576,7 +592,12 @@ private:
         bool show_lane_dividers = true;
         bool show_judgement_line = true;
         bool show_gear_boundary_line = false;
+        bool judgement_line_glow_enabled = true;
+        double lane_background_opacity = 0.18;
+        double visual_opacity = 0.96;
         bool ghost_visible = false;
+        std::size_t lane_color_count = 0;
+        std::array<uint32_t, kGameplayHudMaxLanes> lane_colors{};
         std::size_t lane_divider_width_count = 0;
         std::array<float, kGameplayHudMaxLanes> lane_divider_widths{};
     };

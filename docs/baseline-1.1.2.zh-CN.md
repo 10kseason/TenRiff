@@ -15,7 +15,7 @@
 
 ## 稳定契约
 - 保留 `1.0.9` 中基于真实 playback head 的 gameplay 输入时序修正。
-- gameplay live 输入采集继续为稳定性固定到 `Polling`。
+- gameplay live 输入采集优先使用已保存的 RawInput 设置，并通过 bound-key polling shadow 与 RawInput 启动失败时的 Polling fallback 保持输入识别。
 - gameplay 会话继续保持不受 foreground 限制的 always-allow 输入 gate。
 - menu 输入继续使用 foreground process/root-window 边界。
 - 已保存的 `input.backend` / `input.rawinput` 不再因为 runtime fallback 被重写，应原样保留。
@@ -67,7 +67,7 @@
 
 ## 后续工作必须保留的内容
 - 基于 playback head 的 gameplay 输入时序修正
-- `Polling` live capture 与已保存 backend 偏好分离保留的策略
+- RawInput 优先 live capture、polling shadow/fallback 与已保存 backend 偏好分离保留的策略
 - BMS-first 表面
 - 大曲库 `safe` indexing 稳定性
 - 菜单缓存优先加载

@@ -10,8 +10,8 @@
 - Linux 仅存在 [`Baepoks-Linuxs/TenRiff-0.5.0-linux-preview`](../Baepoks-Linuxs/TenRiff-0.5.0-linux-preview) 级别的 preview
 - 默认表面是 BMS-first
 - `.osu` 可以通过选项重新启用，并支持 4K~10K
-- `1.1.2` 发布线保留了 `1.0.9` 基于真实 playback head 的 gameplay 输入时序修正，但为了稳定性把 live gameplay 输入采集固定到 `Polling`，同时保留 gameplay 会话不受 foreground 限制的 always-allow gate
-- 同一条 `1.1.2` 发布线里，menu 输入仍然保持 foreground process/root-window 边界，而 restart 风格的 backend fallback 与 profile 输入后端持久化改写继续被移除，保存的 backend 偏好只作为配置保留
+- `1.1.2` 发布线保留了 `1.0.9` 基于真实 playback head 的 gameplay 输入时序修正，live gameplay 输入优先使用已保存的 RawInput 设置，并通过 bound-key polling shadow 与 RawInput 启动失败时的 Polling fallback 保持输入识别
+- 同一条 `1.1.2` 发布线里，menu 输入仍然保持 foreground process/root-window 边界，RawInput 启动失败时会用 Polling fallback 重试，但不会持久化改写 profile 输入后端，保存的 backend 偏好只作为配置保留
 
 ## 核心架构
 - `MenuApp`

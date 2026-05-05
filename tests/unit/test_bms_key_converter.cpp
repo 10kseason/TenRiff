@@ -33,6 +33,43 @@ std::filesystem::path make_temp_dir() {
     return {};
 }
 
+void write_minimal_wav(const std::filesystem::path& path, int sample_rate) {
+    std::ofstream out(path, std::ios::binary);
+    REQUIRE(out.good());
+
+    auto write_u16 = [&](uint16_t value) {
+        const char bytes[2] = {
+            static_cast<char>(value & 0xffu),
+            static_cast<char>((value >> 8u) & 0xffu),
+        };
+        out.write(bytes, 2);
+    };
+    auto write_u32 = [&](uint32_t value) {
+        const char bytes[4] = {
+            static_cast<char>(value & 0xffu),
+            static_cast<char>((value >> 8u) & 0xffu),
+            static_cast<char>((value >> 16u) & 0xffu),
+            static_cast<char>((value >> 24u) & 0xffu),
+        };
+        out.write(bytes, 4);
+    };
+
+    out.write("RIFF", 4);
+    write_u32(38);
+    out.write("WAVE", 4);
+    out.write("fmt ", 4);
+    write_u32(16);
+    write_u16(1);
+    write_u16(1);
+    write_u32(static_cast<uint32_t>(sample_rate));
+    write_u32(static_cast<uint32_t>(sample_rate * 2));
+    write_u16(2);
+    write_u16(16);
+    out.write("data", 4);
+    write_u32(2);
+    write_u16(0);
+}
+
 }  // namespace
 
 TEST_CASE("bms key converter writes a reparsable converted chart") {
@@ -137,11 +174,58 @@ TEST_CASE("bms key converter rejects unsupported target lane counts") {
     CHECK(result.error.find("Unsupported target lane count") != std::string::npos);
 }
 
+TEST_CASE("bms key converter auto-detects sample rate from BMS keysounds") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+
+    const auto input_path = temp.path / "source_keysound_rate.bms";
+    const auto output_path = temp.path / "converted_keysound_rate.bms";
+    write_minimal_wav(temp.path / "key.wav", 48000);
+
+    {
+        std::ofstream chart_file(input_path, std::ios::binary);
+        REQUIRE(chart_file.good());
+        chart_file << "#TITLE Auto Rate\n"
+                      "#BPM 120\n"
+                      "#WAV01 key.wav\n"
+                      "#00111:01\n"
+                      "#00212:01\n"
+                      "#00313:01\n"
+                      "#00414:01\n";
+    }
+
+    tenriff::app::BmsKeyConverterOptions options;
+    options.input_path = input_path.u8string();
+    options.output_path = output_path.u8string();
+    options.target_lane_count = 10;
+
+    const auto auto_result = tenriff::app::convert_bms_chart_file(options);
+    CHECK(auto_result.success);
+    CHECK(auto_result.sample_rate_auto);
+    CHECK(auto_result.sample_rate == 48000);
+
+    options.output_path = (temp.path / "converted_keysound_rate_manual.bms").u8string();
+    options.sample_rate = 22050;
+    const auto manual_result = tenriff::app::convert_bms_chart_file(options);
+    CHECK(manual_result.success);
+    CHECK_FALSE(manual_result.sample_rate_auto);
+    CHECK(manual_result.sample_rate == 22050);
+}
+
 TEST_CASE("bms key converter exposes original toolkit presets") {
     const auto& presets = tenriff::app::bms_key_converter_presets();
     CHECK(presets.size() >= 9u);
 
     tenriff::app::BmsKeyConverterPreset preset;
+    REQUIRE(tenriff::app::find_bms_key_converter_preset("10k", preset));
+    CHECK(preset.target_lane_count == 10);
+    CHECK(preset.max_keys == 10);
+    CHECK(preset.min_keys == 1);
+    CHECK(preset.transform_speed_slot == 5);
+    REQUIRE(preset.fixed_seed.has_value());
+    CHECK(preset.fixed_seed.value() == 0u);
+
     REQUIRE(tenriff::app::find_bms_key_converter_preset("a10k", preset));
     CHECK(preset.target_lane_count == 10);
     CHECK(preset.max_keys == 7);

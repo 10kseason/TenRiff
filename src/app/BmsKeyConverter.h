@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -16,6 +17,7 @@ struct BmsKeyConverterPreset {
     int min_keys = 0;
     int transform_speed_slot = 0;
     bool supported_output = true;
+    std::optional<uint32_t> fixed_seed;
 };
 
 struct BmsKeyConverterOptions {
@@ -26,7 +28,8 @@ struct BmsKeyConverterOptions {
     int min_keys = 0;
     int transform_speed_slot = 4;
     uint32_t seed = 0;
-    int sample_rate = 44100;
+    int sample_rate = 0;
+    std::string conversion_style = "krr";
 };
 
 struct BmsKeyConverterResult {
@@ -34,6 +37,8 @@ struct BmsKeyConverterResult {
     std::string error;
     int source_lane_count = 0;
     int target_lane_count = 0;
+    int sample_rate = 0;
+    bool sample_rate_auto = false;
     std::size_t note_count = 0;
     std::size_t hold_count = 0;
     std::vector<std::string> warnings;

@@ -36,6 +36,18 @@ inline constexpr double kHoldBodyWidthScaleDefault = 0.60;
 inline constexpr double kComboPositionMin = 0.10;
 inline constexpr double kComboPositionMax = 0.78;
 inline constexpr double kComboPositionDefault = 0.24;
+inline constexpr double kSkinLaneBackgroundOpacityMin = 0.00;
+inline constexpr double kSkinLaneBackgroundOpacityMax = 0.45;
+inline constexpr double kSkinLaneBackgroundOpacityDefault = 0.18;
+inline constexpr double kSkinVisualOpacityMin = 0.20;
+inline constexpr double kSkinVisualOpacityMax = 1.00;
+inline constexpr double kSkinVisualOpacityDefault = 0.96;
+inline constexpr double kSkinNoteOutlineOpacityMin = 0.00;
+inline constexpr double kSkinNoteOutlineOpacityMax = 1.00;
+inline constexpr double kSkinNoteOutlineOpacityDefault = 0.78;
+inline constexpr double kSkinHoldBodyOpacityMin = 0.05;
+inline constexpr double kSkinHoldBodyOpacityMax = 0.60;
+inline constexpr double kSkinHoldBodyOpacityDefault = 0.24;
 
 struct JudgeConfig {
     double pg_ms = 15.5;
@@ -87,6 +99,7 @@ struct SkinConfig {
     std::string osu_skin_name;
     std::string lr2_skin_name;
     std::string lr2_resolution_mode = "auto";
+    std::string visual_preset = "tenriff";
     std::string note_shape = "rect";
     bool note_border_enabled = true;
     bool preserve_note_image_aspect_ratio = false;
@@ -94,8 +107,15 @@ struct SkinConfig {
     bool show_judgement_line = true;
     bool show_gear_boundary_line = false;
     bool hold_tail_taper_enabled = false;
+    bool judgement_line_glow_enabled = true;
+    bool key_pulse_enabled = true;
+    std::string key_label_position = "bottom";
     double judgement_line_position = kJudgementLinePositionDefault;
     double combo_position = kComboPositionDefault;
+    double lane_background_opacity = kSkinLaneBackgroundOpacityDefault;
+    double visual_opacity = kSkinVisualOpacityDefault;
+    double note_outline_opacity = kSkinNoteOutlineOpacityDefault;
+    double hold_body_opacity = kSkinHoldBodyOpacityDefault;
     std::unordered_map<std::string, std::vector<double>> lane_width_scales;
     double note_width_scale = 1.0;
     std::unordered_map<std::string, double> note_width_scales;
@@ -178,6 +198,12 @@ public:
 [[nodiscard]] std::vector<std::string> supported_skin_color_tokens();
 [[nodiscard]] std::string normalize_skin_source_token(std::string_view token);
 [[nodiscard]] std::string normalize_skin_lr2_resolution_mode_token(std::string_view token);
+[[nodiscard]] std::string normalize_skin_visual_preset_token(std::string_view token);
+[[nodiscard]] std::vector<std::string> supported_skin_visual_preset_tokens();
+[[nodiscard]] std::string skin_visual_preset_label(std::string_view token);
+void apply_skin_visual_preset(SkinConfig& skin, std::string_view token);
+[[nodiscard]] std::string normalize_skin_key_label_position_token(std::string_view token);
+[[nodiscard]] std::string skin_key_label_position_label(std::string_view token);
 [[nodiscard]] std::string normalize_skin_color_token(std::string_view token);
 [[nodiscard]] std::string normalize_skin_note_shape_token(std::string_view token);
 [[nodiscard]] std::string skin_note_shape_label(std::string_view token);

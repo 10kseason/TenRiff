@@ -10,8 +10,8 @@
 - Linux は `Baepoks-Linuxs/TenRiff-0.5.0-linux-preview` レベルの preview のみ
 - 既定サーフェスは BMS-first
 - `.osu` はオプションで再有効化でき、4K-10K をサポート
-- `1.1.2` リリースラインは `1.0.9` の gameplay playback-head 入力タイミング補正を維持しつつ、live gameplay 入力キャプチャを安定性優先で `Polling` に固定し、gameplay セッションは foreground に関係なく入力を受け続ける always-allow gate を維持する
-- 同じ `1.1.2` ラインで、menu 入力は従来の foreground process/root-window 境界を維持し、restart 型 backend fallback や profile 入力設定の永続 rewrite は削除されたまま、保存済み backend 設定は設定値として保持される
+- `1.1.2` リリースラインは `1.0.9` の gameplay playback-head 入力タイミング補正を維持しつつ、live gameplay 入力は保存済み RawInput 設定を優先し、bound-key polling shadow と RawInput 起動失敗時の Polling fallback で入力認識を維持する
+- 同じ `1.1.2` ラインで、menu 入力は従来の foreground process/root-window 境界を維持し、RawInput 起動失敗時は Polling fallback で再試行するが、profile 入力設定の永続 rewrite はせず保存済み backend 設定を保持する
 
 ## Core Architecture
 - `MenuApp`

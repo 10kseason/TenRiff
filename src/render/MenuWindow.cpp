@@ -1566,20 +1566,22 @@ double pulse_wave_01(int64_t now_ns, double period_sec, double phase = 0.0) {
     return 0.5 + 0.5 * std::sin((seconds / period_sec + phase) * kTau);
 }
 
-D2D1_COLOR_F gameplay_note_fill_color(uint32_t rgb) {
-    return color_from_rgb(rgb, 0.97f);
+D2D1_COLOR_F gameplay_note_fill_color(uint32_t rgb, float opacity = 0.96f) {
+    return color_from_rgb(rgb, std::clamp(opacity, 0.0f, 1.0f));
 }
 
-D2D1_COLOR_F gameplay_note_border_color(uint32_t rgb) {
-    return color_from_rgb(blend_rgb(rgb, 0xFFFFFF, 0.55f), 0.98f);
+D2D1_COLOR_F gameplay_note_border_color(uint32_t rgb, float opacity = 0.78f) {
+    return color_from_rgb(blend_rgb(rgb, 0xFFFFFF, 0.55f), std::clamp(opacity, 0.0f, 1.0f));
 }
 
-D2D1_COLOR_F gameplay_note_hold_color(uint32_t rgb) {
-    return color_from_rgb(blend_rgb(rgb, 0xFFFFFF, 0.18f), 0.34f);
+D2D1_COLOR_F gameplay_note_hold_color(uint32_t rgb, float opacity = 0.24f) {
+    return color_from_rgb(blend_rgb(rgb, 0xFFFFFF, 0.18f), std::clamp(opacity, 0.0f, 1.0f));
 }
 
-D2D1_COLOR_F gameplay_lane_preview_fill(uint32_t rgb, bool selected) {
-    return color_from_rgb(blend_rgb(rgb, 0xFFFFFF, selected ? 0.10f : 0.04f), selected ? 0.32f : 0.22f);
+D2D1_COLOR_F gameplay_lane_preview_fill(uint32_t rgb, bool selected, float opacity = 0.18f) {
+    const float base_opacity = std::clamp(opacity, 0.0f, 0.60f);
+    return color_from_rgb(blend_rgb(rgb, 0xFFFFFF, selected ? 0.12f : 0.04f),
+                          std::clamp(base_opacity * (selected ? 1.35f : 1.0f), 0.0f, 0.70f));
 }
 
 void draw_note_primitive(ID2D1RenderTarget* target,
@@ -1595,9 +1597,7 @@ void draw_note_primitive(ID2D1RenderTarget* target,
 
     const std::string normalized_shape = normalize_gameplay_note_shape(note_shape);
     const D2D1_ANTIALIAS_MODE saved_antialias = target->GetAntialiasMode();
-    target->SetAntialiasMode(normalized_shape == "circle"
-                                 ? D2D1_ANTIALIAS_MODE_PER_PRIMITIVE
-                                 : D2D1_ANTIALIAS_MODE_ALIASED);
+    target->SetAntialiasMode(D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
 
     if (normalized_shape == "circle") {
         const float diameter = std::max(2.0f, std::min(rect.right - rect.left, rect.bottom - rect.top) - 2.0f);
@@ -1611,9 +1611,13 @@ void draw_note_primitive(ID2D1RenderTarget* target,
             target->DrawEllipse(ellipse, border, border_width);
         }
     } else {
-        target->FillRectangle(rect, fill);
+        const float width = std::max(1.0f, rect.right - rect.left);
+        const float height = std::max(1.0f, rect.bottom - rect.top);
+        const float radius = std::clamp(std::min(width, height) * 0.22f, 3.0f, 8.0f);
+        const D2D1_ROUNDED_RECT rounded = D2D1::RoundedRect(rect, radius, radius);
+        target->FillRoundedRectangle(rounded, fill);
         if (draw_border && border) {
-            target->DrawRectangle(rect, border, border_width);
+            target->DrawRoundedRectangle(rounded, border, border_width);
         }
     }
 
@@ -2529,7 +2533,15 @@ bool MenuWindow::ensure_gameplay_static_cache(const GameplayHudData& data) {
     desired.show_lane_dividers = data.show_lane_dividers;
     desired.show_judgement_line = data.show_judgement_line;
     desired.show_gear_boundary_line = data.show_gear_boundary_line;
+    desired.judgement_line_glow_enabled = data.judgement_line_glow_enabled;
+    desired.lane_background_opacity = std::clamp(data.lane_background_opacity, 0.0, 0.45);
+    desired.visual_opacity = std::clamp(data.visual_opacity, 0.20, 1.0);
     desired.ghost_visible = data.ghost_visible;
+    desired.lane_color_count = std::min(data.lane_color_count, desired.lane_colors.size());
+    desired.lane_colors.fill(0);
+    for (std::size_t lane = 0; lane < desired.lane_color_count; ++lane) {
+        desired.lane_colors[lane] = data.lane_colors[lane];
+    }
     desired.lane_divider_width_count = resolve_gameplay_lane_divider_widths(
         desired.lane_count,
         data.lane_divider_width_scale,
@@ -2552,7 +2564,12 @@ bool MenuWindow::ensure_gameplay_static_cache(const GameplayHudData& data) {
         gameplay_static_cache_.show_lane_dividers == desired.show_lane_dividers &&
         gameplay_static_cache_.show_judgement_line == desired.show_judgement_line &&
         gameplay_static_cache_.show_gear_boundary_line == desired.show_gear_boundary_line &&
+        gameplay_static_cache_.judgement_line_glow_enabled == desired.judgement_line_glow_enabled &&
+        gameplay_static_cache_.lane_background_opacity == desired.lane_background_opacity &&
+        gameplay_static_cache_.visual_opacity == desired.visual_opacity &&
         gameplay_static_cache_.ghost_visible == desired.ghost_visible &&
+        gameplay_static_cache_.lane_color_count == desired.lane_color_count &&
+        gameplay_static_cache_.lane_colors == desired.lane_colors &&
         gameplay_static_cache_.lane_divider_width_count == desired.lane_divider_width_count &&
         gameplay_static_cache_.lane_divider_widths == desired.lane_divider_widths;
     if (cache_matches) {
@@ -2600,16 +2617,31 @@ bool MenuWindow::ensure_gameplay_static_cache(const GameplayHudData& data) {
                 D2D1::RoundedRect(field_rect, 16.0f, 16.0f), d2d_->panel_brush.Get());
             d2d_->panel_brush->SetOpacity(1.0f);
         }
-        if (d2d_->card_brush) {
+        if (d2d_->note_fill_brush) {
+            const float lane_bg_opacity = static_cast<float>(
+                std::clamp(desired.lane_background_opacity * desired.visual_opacity, 0.0, 0.50));
             for (int lane = 0; lane < desired.lane_count; ++lane) {
                 const float left = gameplay_lane_left(field_layout, lane);
                 const float right = gameplay_lane_right(field_layout, lane);
-                d2d_->card_brush->SetOpacity((lane % 2 == 0) ? 0.28f : 0.18f);
-                d2d_->d2d_context->FillRectangle(
-                    D2D1::RectF(left + 1.0f, field_layout.top + 1.0f, right - 1.0f, field_layout.bottom - 1.0f),
-                    d2d_->card_brush.Get());
+                uint32_t lane_color = 0xF6F8FF;
+                if (static_cast<std::size_t>(lane) < desired.lane_color_count) {
+                    lane_color = desired.lane_colors[static_cast<std::size_t>(lane)];
+                } else if (!gameplay_lane_uses_white_note(lane + 1)) {
+                    lane_color = 0x4F80FF;
+                }
+                d2d_->note_fill_brush->SetColor(
+                    color_from_rgb(blend_rgb(lane_color, 0xFFFFFF, (lane % 2 == 0) ? 0.08f : 0.02f),
+                                   lane_bg_opacity * ((lane % 2 == 0) ? 1.0f : 0.72f)));
+                d2d_->d2d_context->FillRoundedRectangle(
+                    D2D1::RoundedRect(
+                        D2D1::RectF(left + 1.0f,
+                                    field_layout.top + 1.0f,
+                                    right - 1.0f,
+                                    field_layout.bottom - 1.0f),
+                        5.0f,
+                        5.0f),
+                    d2d_->note_fill_brush.Get());
             }
-            d2d_->card_brush->SetOpacity(1.0f);
         }
         if (d2d_->button_border_brush) {
             d2d_->d2d_context->DrawRoundedRectangle(D2D1::RoundedRect(field_rect, 16.0f, 16.0f),
@@ -2639,6 +2671,28 @@ bool MenuWindow::ensure_gameplay_static_cache(const GameplayHudData& data) {
         if (desired.show_judgement_line && d2d_->judgement_line_brush) {
             const D2D1_RECT_F line_rect =
                 gameplay_judgement_line_rect(field_layout, hit_line_y, note_height_scale);
+            if (desired.judgement_line_glow_enabled) {
+                const float saved_opacity = d2d_->judgement_line_brush->GetOpacity();
+                const D2D1_RECT_F outer_glow =
+                    D2D1::RectF(field_layout.left + 5.0f,
+                                line_rect.top - 12.0f,
+                                field_layout.right - 5.0f,
+                                line_rect.bottom + 12.0f);
+                const D2D1_RECT_F inner_glow =
+                    D2D1::RectF(field_layout.left + 8.0f,
+                                line_rect.top - 5.0f,
+                                field_layout.right - 8.0f,
+                                line_rect.bottom + 5.0f);
+                d2d_->judgement_line_brush->SetOpacity(
+                    static_cast<float>(0.18 * desired.visual_opacity));
+                d2d_->d2d_context->FillRoundedRectangle(D2D1::RoundedRect(outer_glow, 10.0f, 10.0f),
+                                                        d2d_->judgement_line_brush.Get());
+                d2d_->judgement_line_brush->SetOpacity(
+                    static_cast<float>(0.32 * desired.visual_opacity));
+                d2d_->d2d_context->FillRoundedRectangle(D2D1::RoundedRect(inner_glow, 7.0f, 7.0f),
+                                                        d2d_->judgement_line_brush.Get());
+                d2d_->judgement_line_brush->SetOpacity(saved_opacity);
+            }
             d2d_->d2d_context->FillRoundedRectangle(D2D1::RoundedRect(line_rect, 5.0f, 5.0f),
                                                     d2d_->judgement_line_brush.Get());
         }

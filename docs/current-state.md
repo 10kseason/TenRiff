@@ -10,8 +10,8 @@
 - Linux는 `Baepoks-Linuxs/TenRiff-0.5.0-linux-preview` 수준의 preview만 존재
 - 기본 표면은 BMS-first
 - `.osu`는 옵션으로 다시 활성화 가능하며 4K~10K를 지원
-- `1.1.2` 릴리스 라인은 `1.0.9`의 gameplay playback-head 입력 타이밍 보정을 유지하면서, gameplay live 입력 캡처를 안정성 우선으로 `Polling`에 고정하고 gameplay 세션은 foreground 여부와 무관하게 계속 입력을 받도록 always-allow gate를 유지
-- 같은 `1.1.2` 라인에서 메뉴 입력은 기존 foreground process/root-window 경계를 유지하고, gameplay/menu의 restart형 backend fallback 및 profile 입력 설정 영구 rewrite는 제거한 대신 저장된 backend 설정은 그대로 보존
+- `1.1.2` 릴리스 라인은 `1.0.9`의 gameplay playback-head 입력 타이밍 보정을 유지하면서, gameplay live 입력 캡처는 저장된 RawInput 설정을 우선 사용하고 bound-key polling shadow와 RawInput 시작 실패 시 Polling fallback으로 입력 인식이 끊기지 않게 함
+- 같은 `1.1.2` 라인에서 메뉴 입력은 기존 foreground process/root-window 경계를 유지하고, RawInput 시작 실패 시 Polling fallback으로 재시도하지만 profile 입력 설정은 영구 rewrite하지 않고 저장된 backend 설정을 그대로 보존
 
 ## Core Architecture
 - `MenuApp`
@@ -26,6 +26,7 @@
   - 오디오 마스터 클럭과 믹싱 담당
 - `InputThread`
   - RawInput/폴링 입력 수집 후 큐로 전달
+  - RawInput 모드에서도 bound-key polling shadow를 함께 운용해 RawInput 이벤트가 누락되는 환경에서 입력 인식이 끊기지 않게 함
 - `RenderThread` + `MenuWindow`
   - D3D11 + Direct2D/DirectWrite 기반 메뉴/인게임 HUD 렌더
   - 최근 유지보수 리팩터에서 대형 구현 파일을 조각 파일로 분리하는 방향으로 정리 중
@@ -68,10 +69,15 @@
   - 키모드별 별도 keymap
   - 4K~10K chart difficulty 계산
   - `mode.key_mode`는 N2NC 스타일 lane remap 기반으로 키수를 변환
+  - `mode.key_mode=10k` 변환은 standalone converter의 krrcream식 10K preset과 맞춰 `target=10`, `max_keys=10`, `min_keys=1`, `transform_speed_slot=5`, `seed=0`을 기본으로 사용
   - `mode.key_mode=none`은 차트의 원래 키 수와 기본 패턴 레이아웃을 그대로 유지
 - Skins / Gameplay feel:
-  - `rect` / `circle` note shape
-  - note border on/off
+  - `Classic`, `Neon`, `Minimal`, `TenRiff` visual presets
+  - `rect` / `circle` note shape, with native `rect` rendered as a rounded note box
+  - note border on/off plus thin outline alpha
+  - lane background alpha, overall visual opacity, and lower LN body alpha controls
+  - judgement-line glow and short per-key press pulse controls
+  - small key labels can be shown at the lane top/bottom or hidden
   - combo Y 조절
   - judge line / lane width / lane spacing / note width / divider width / 16K center gap / note height / LN body width 조절
   - key mode별 개별 lane 폭과 lane 사이 간격을 각각 저장하고 미리보기/실플레이/ghost field에 같은 레이아웃 계산을 적용
@@ -126,7 +132,7 @@
   - peak memory 약 `working set 453MB`, `private 524MB`
   - 같은 라이브러리 1024-chart sample에서 fast profile throughput은 safe 대비 약 `2.05x`
 - cache schema:
-  - `version = 8`
+  - `version = 9`
   - `include_osu` 포함
   - optional `layout_label` 포함
 

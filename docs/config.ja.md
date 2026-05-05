@@ -41,11 +41,11 @@ profile が存在しない場合は初回起動時に自動生成されます。
   - `polling | rawinput`
   - 現在の `1.1.2 final stable` ラインの既定値は `rawinput`
   - 保存時に `polling` へ強制正規化されず、保存値はそのまま維持される
-  - ただし gameplay セッションの live capture 自体は安定性のため `Polling` に固定
+  - gameplay セッションは `rawinput=true` の場合 RawInput を優先し、bound-key polling shadow と RawInput 起動失敗時の Polling fallback で入力認識を維持する
 - `rawinput` (bool)
   - `backend` と並ぶ便宜的な保存フラグ
   - 現在の `1.1.2 final stable` ラインではそのまま保存/復元される
-  - gameplay runtime が live capture で無視することはあるが、config 値自体は保持される
+  - `true` の場合 menu/gameplay は RawInput を優先しつつ、入力認識維持のため polling shadow/fallback を許可する
 - `use_qpc` (bool)
 - `grab` (bool)
   - 現状では Linux preview 向け設定

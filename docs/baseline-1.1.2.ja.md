@@ -15,7 +15,7 @@
 
 ## Stable Contract
 - `1.0.9` で整理した gameplay playback-head 基準の入力タイミング補正は維持対象です。
-- gameplay の live 入力キャプチャは安定性優先で `Polling` に固定します。
+- gameplay の live 入力キャプチャは保存済み RawInput 設定を優先し、bound-key polling shadow と RawInput 起動失敗時の Polling fallback で入力認識を維持します。
 - gameplay セッションは foreground 状態に関係なく入力を受け続ける always-allow gate を維持します。
 - menu 入力は従来どおり foreground process/root-window 境界を維持します。
 - 保存済みの `input.backend` / `input.rawinput` は runtime fallback の結果で書き換えず、そのまま保持します。
@@ -67,7 +67,7 @@
 
 ## What To Preserve In Follow-Up Work
 - playback-head 基準の gameplay 入力タイミング補正
-- gameplay live capture の `Polling` 固定と、保存済み backend 設定保持の分離方針
+- gameplay live capture の RawInput 優先 + polling shadow/fallback と、保存済み backend 設定保持の分離方針
 - BMS-first サーフェス
 - large-library `safe` indexing 安定性
 - menu の cache-first ロード

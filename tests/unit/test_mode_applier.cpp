@@ -1,5 +1,7 @@
 #include <algorithm>
+#include <iterator>
 #include <limits>
+#include <map>
 #include <set>
 #include <string>
 #include <string_view>
@@ -428,6 +430,209 @@ TEST_CASE("key mode converter keeps source chord width when expanding to 8-plus 
         }
     }
     CHECK(used_new_lane);
+}
+
+TEST_CASE("runtime 10K key mode uses krrcream 10K preset defaults") {
+    using namespace tenriff::gameplay;
+
+    const GameplayChart chart = make_representative_chart(4);
+
+    ModeSettings settings;
+    settings.key_mode = KeyMode::Keys10;
+    settings.random_seed = 9999;
+
+    ModeApplyContext context;
+    context.base_bpm = 174.0;
+    context.sample_rate = 48000;
+
+    const auto runtime_result = apply_mode_settings(chart, settings, context);
+
+    KeyModeConverterOptions expected_options;
+    expected_options.target_lane_count = 10;
+    expected_options.max_keys = 10;
+    expected_options.min_keys = 1;
+    expected_options.transform_speed_slot = 5;
+    expected_options.seed = 0;
+    expected_options.base_bpm = context.base_bpm;
+    expected_options.sample_rate = context.sample_rate;
+
+    const auto expected_result = convert_key_mode_chart(chart, expected_options);
+
+    REQUIRE(runtime_result.chart.lane_count == 10);
+    REQUIRE(expected_result.converted);
+    CHECK(chart_signature(runtime_result.chart) == chart_signature(expected_result.chart));
+    CHECK(contains_warning(runtime_result.warnings, "Key mode converter remapped"));
+}
+
+TEST_CASE("10K split converter preserves source hand halves") {
+    using namespace tenriff::gameplay;
+
+    GameplayChart chart;
+    chart.lane_count = 8;
+    chart.duration_samples = 300;
+    for (int lane = 1; lane <= 8; ++lane) {
+        append_note(chart, lane, 180);
+    }
+
+    KeyModeConverterOptions options;
+    options.target_lane_count = 10;
+    options.max_keys = 10;
+    options.min_keys = 2;
+    options.seed = 1234;
+    options.base_bpm = 180.0;
+    options.sample_rate = 44100;
+    options.style = KeyModeConversionStyle::TenKeySplit;
+
+    const auto result = convert_key_mode_chart(chart, options);
+    CHECK(result.converted);
+    CHECK(result.chart.lane_count == 10);
+    CHECK(result.chart.notes.size() > 8u);
+    CHECK_FALSE(has_lane_overlap(result.chart));
+    CHECK(contains_warning(result.warnings, "10K split converter remapped"));
+
+    std::vector<int> target_by_source(9, 0);
+    std::set<int> used_lanes;
+    for (const auto& note : result.chart.notes) {
+        CHECK(note.note_id >= 1u);
+        CHECK(note.note_id <= 8u);
+        target_by_source[note.note_id] = note.lane;
+        used_lanes.insert(note.lane);
+    }
+
+    CHECK(used_lanes.size() == 10u);
+    for (int source_lane = 1; source_lane <= 4; ++source_lane) {
+        CHECK(target_by_source[source_lane] >= 1);
+        CHECK(target_by_source[source_lane] <= 5);
+    }
+    for (int source_lane = 5; source_lane <= 8; ++source_lane) {
+        CHECK(target_by_source[source_lane] >= 6);
+        CHECK(target_by_source[source_lane] <= 10);
+    }
+}
+
+TEST_CASE("10K split converter preserves original same-lane jacks") {
+    using namespace tenriff::gameplay;
+
+    GameplayChart chart;
+    chart.lane_count = 4;
+    chart.duration_samples = 2000;
+    for (int i = 0; i < 16; ++i) {
+        append_note(chart, 1, 100 + i * 100);
+    }
+
+    KeyModeConverterOptions options;
+    options.target_lane_count = 10;
+    options.max_keys = 10;
+    options.min_keys = 2;
+    options.seed = 20260429;
+    options.base_bpm = 180.0;
+    options.sample_rate = 44100;
+    options.style = KeyModeConversionStyle::TenKeySplit;
+
+    const auto result = convert_key_mode_chart(chart, options);
+    CHECK(result.converted);
+    CHECK(result.chart.lane_count == 10);
+    CHECK(result.chart.notes.size() > chart.notes.size());
+    CHECK_FALSE(has_lane_overlap(result.chart));
+
+    std::set<int> used_left_lanes;
+    std::vector<int> hits_by_lane(6, 0);
+    for (const auto& note : result.chart.notes) {
+        CHECK(note.lane >= 1);
+        CHECK(note.lane <= 5);
+        used_left_lanes.insert(note.lane);
+        ++hits_by_lane[static_cast<std::size_t>(note.lane)];
+    }
+    CHECK(used_left_lanes.size() >= 4u);
+    CHECK(*std::max_element(hits_by_lane.begin(), hits_by_lane.end()) >= static_cast<int>(chart.notes.size()));
+}
+
+TEST_CASE("10K split converter avoids new immediate jacks when source lanes change") {
+    using namespace tenriff::gameplay;
+
+    GameplayChart chart;
+    chart.lane_count = 4;
+    chart.duration_samples = 1000;
+    append_note(chart, 1, 100);
+    append_note(chart, 2, 200);
+    append_note(chart, 3, 300);
+    append_note(chart, 4, 400);
+
+    KeyModeConverterOptions options;
+    options.target_lane_count = 10;
+    options.max_keys = 10;
+    options.min_keys = 2;
+    options.seed = 7123;
+    options.base_bpm = 180.0;
+    options.sample_rate = 44100;
+    options.style = KeyModeConversionStyle::TenKeySplit;
+
+    const auto result = convert_key_mode_chart(chart, options);
+    CHECK(result.converted);
+    CHECK(result.chart.lane_count == 10);
+    CHECK_FALSE(has_lane_overlap(result.chart));
+
+    std::map<int64_t, std::set<int>> lanes_by_start;
+    for (const auto& note : result.chart.notes) {
+        lanes_by_start[note.start_sample].insert(note.lane);
+    }
+
+    std::set<int> previous_lanes;
+    bool first = true;
+    for (const auto& [_, lanes] : lanes_by_start) {
+        if (!first) {
+            std::vector<int> intersection;
+            std::set_intersection(previous_lanes.begin(),
+                                  previous_lanes.end(),
+                                  lanes.begin(),
+                                  lanes.end(),
+                                  std::back_inserter(intersection));
+            CHECK(intersection.empty());
+        }
+        previous_lanes = lanes;
+        first = false;
+    }
+}
+
+TEST_CASE("10K split converter fills sparse rows inside each active hand") {
+    using namespace tenriff::gameplay;
+
+    GameplayChart chart;
+    chart.lane_count = 4;
+    chart.duration_samples = 500;
+    append_note(chart, 1, 180);
+    append_note(chart, 4, 180);
+
+    KeyModeConverterOptions options;
+    options.target_lane_count = 10;
+    options.max_keys = 10;
+    options.min_keys = 4;
+    options.seed = 1001;
+    options.base_bpm = 180.0;
+    options.sample_rate = 44100;
+    options.style = KeyModeConversionStyle::TenKeySplit;
+
+    const auto result = convert_key_mode_chart(chart, options);
+    CHECK(result.converted);
+    CHECK(result.chart.lane_count == 10);
+    CHECK_FALSE(has_lane_overlap(result.chart));
+
+    int left_heads = 0;
+    int right_heads = 0;
+    for (const auto& note : result.chart.notes) {
+        if (note.start_sample != 180) {
+            continue;
+        }
+        if (note.lane >= 1 && note.lane <= 5) {
+            ++left_heads;
+        } else if (note.lane >= 6 && note.lane <= 10) {
+            ++right_heads;
+        }
+    }
+
+    CHECK(left_heads >= 2);
+    CHECK(right_heads >= 2);
+    CHECK(left_heads + right_heads >= 4);
 }
 
 TEST_CASE("key mode converter resolves missing source lane count from note data") {

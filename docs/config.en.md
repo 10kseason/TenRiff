@@ -41,11 +41,11 @@ If a profile does not exist, it is created automatically on first launch.
   - `polling | rawinput`
   - default is `rawinput` on the current `1.1.2` release line
   - the stored value is preserved and no longer force-normalized to `polling` on save
-  - the current `1.1.2` gameplay session still pins live capture to `Polling` for stability
+  - gameplay starts RawInput first when `rawinput=true`, while bound-key polling shadow and Polling fallback on RawInput startup failure keep input recognition alive
 - `rawinput` (bool)
   - convenience boolean persisted alongside `backend`
   - on the current `1.1.2` release line it is saved and restored as-is
-  - gameplay runtime may ignore this for live capture, but the config value itself is preserved
+  - when `true`, menu/gameplay prefer RawInput while allowing polling shadow/fallback to preserve input recognition
 - `use_qpc` (bool)
 - `grab` (bool)
   - currently a Linux-preview-oriented setting
