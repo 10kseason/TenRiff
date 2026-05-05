@@ -115,13 +115,21 @@ TEST_CASE("config defaults prefer 44100 Hz audio") {
     CHECK(config.skin.osu_skin_name.empty());
     CHECK(config.skin.lr2_skin_name.empty());
     CHECK(config.skin.lr2_resolution_mode == "auto");
+    CHECK(config.skin.visual_preset == "tenriff");
     CHECK(config.skin.note_border_enabled);
     CHECK_FALSE(config.skin.preserve_note_image_aspect_ratio);
     CHECK(config.skin.show_lane_dividers);
     CHECK(config.skin.show_judgement_line);
     CHECK_FALSE(config.skin.show_gear_boundary_line);
     CHECK_FALSE(config.skin.hold_tail_taper_enabled);
+    CHECK(config.skin.judgement_line_glow_enabled);
+    CHECK(config.skin.key_pulse_enabled);
+    CHECK(config.skin.key_label_position == "bottom");
     CHECK(config.skin.combo_position == doctest::Approx(tenriff::config::kComboPositionDefault));
+    CHECK(config.skin.lane_background_opacity == doctest::Approx(tenriff::config::kSkinLaneBackgroundOpacityDefault));
+    CHECK(config.skin.visual_opacity == doctest::Approx(tenriff::config::kSkinVisualOpacityDefault));
+    CHECK(config.skin.note_outline_opacity == doctest::Approx(tenriff::config::kSkinNoteOutlineOpacityDefault));
+    CHECK(config.skin.hold_body_opacity == doctest::Approx(tenriff::config::kSkinHoldBodyOpacityDefault));
     CHECK(config.skin.note_height_scale == doctest::Approx(1.80));
     CHECK(config.skin.lane_divider_width_scale == doctest::Approx(1.0));
     CHECK(config.skin.hold_body_width_scale == doctest::Approx(0.60));
@@ -611,6 +619,66 @@ TEST_CASE("config save and load preserve lr2 resolution mode") {
     REQUIRE(result.success());
     CHECK(result.config.skin.source == "lr2");
     CHECK(result.config.skin.lr2_resolution_mode == "fhd");
+}
+
+TEST_CASE("config save and load preserve skin visual preset controls") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+
+    CurrentPathGuard cwd;
+    std::error_code ec;
+    std::filesystem::current_path(temp.path, ec);
+    REQUIRE_FALSE(static_cast<bool>(ec));
+
+    ConfigLoader loader;
+    auto config = loader.defaults();
+    config.skin.visual_preset = "neon";
+    config.skin.lane_background_opacity = 0.25;
+    config.skin.visual_opacity = 0.85;
+    config.skin.note_outline_opacity = 0.55;
+    config.skin.hold_body_opacity = 0.20;
+    config.skin.judgement_line_glow_enabled = true;
+    config.skin.key_pulse_enabled = false;
+    config.skin.key_label_position = "top";
+
+    std::string error;
+    REQUIRE(loader.save_profile("profiles/test", config, &error));
+    CHECK(error.empty());
+
+    const auto result = loader.load_profile("profiles/test");
+    REQUIRE(result.success());
+    CHECK(result.config.skin.visual_preset == "neon");
+    CHECK(result.config.skin.lane_background_opacity == doctest::Approx(0.25));
+    CHECK(result.config.skin.visual_opacity == doctest::Approx(0.85));
+    CHECK(result.config.skin.note_outline_opacity == doctest::Approx(0.55));
+    CHECK(result.config.skin.hold_body_opacity == doctest::Approx(0.20));
+    CHECK(result.config.skin.judgement_line_glow_enabled);
+    CHECK_FALSE(result.config.skin.key_pulse_enabled);
+    CHECK(result.config.skin.key_label_position == "top");
+}
+
+TEST_CASE("skin visual presets apply their bundled gameplay appearance") {
+    ConfigLoader loader;
+    auto config = loader.defaults();
+
+    tenriff::config::apply_skin_visual_preset(config.skin, "minimal");
+
+    CHECK(config.skin.visual_preset == "minimal");
+    CHECK_FALSE(config.skin.show_lane_dividers);
+    CHECK_FALSE(config.skin.judgement_line_glow_enabled);
+    CHECK_FALSE(config.skin.key_pulse_enabled);
+    CHECK(config.skin.key_label_position == "top");
+    CHECK(config.skin.visual_opacity == doctest::Approx(0.82));
+    CHECK(config.skin.hold_body_opacity == doctest::Approx(0.15));
+
+    tenriff::config::apply_skin_visual_preset(config.skin, "unknown");
+
+    CHECK(config.skin.visual_preset == "tenriff");
+    CHECK(config.skin.show_lane_dividers);
+    CHECK(config.skin.judgement_line_glow_enabled);
+    CHECK(config.skin.key_pulse_enabled);
+    CHECK(config.skin.key_label_position == "bottom");
 }
 
 TEST_CASE("config load normalizes invalid lr2 resolution mode") {

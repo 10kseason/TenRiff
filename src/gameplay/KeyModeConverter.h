@@ -8,6 +8,11 @@
 
 namespace tenriff::gameplay {
 
+enum class KeyModeConversionStyle {
+    KrrLegacy,
+    TenKeySplit,
+};
+
 struct KeyModeConverterOptions {
     int target_lane_count = 0;
     int max_keys = 0;
@@ -16,6 +21,7 @@ struct KeyModeConverterOptions {
     uint32_t seed = 0;
     double base_bpm = 180.0;
     int sample_rate = 44100;
+    KeyModeConversionStyle style = KeyModeConversionStyle::KrrLegacy;
 };
 
 struct KeyModeConverterResult {

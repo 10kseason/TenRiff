@@ -914,14 +914,35 @@ void MenuApp::start_menu_threads() {
     input_config.key_state.debounce_window_ns =
         std::max<int64_t>(0, static_cast<int64_t>(std::llround(config_.input.debounce_ms * 1'000'000.0)));
 
-    if (!input_thread_.initialize(input_config)) {
-        std::cerr << "[error] Failed to initialize input thread." << std::endl;
-    } else {
-        if (!input_thread_.start()) {
-            std::cerr << "[error] Failed to start input thread." << std::endl;
-        } else if (input_config.backend == input::InputBackend::Polling) {
-            rebuild_pressed_keys_from_polling_snapshot();
+    auto start_input_thread = [this, &input_config]() {
+        if (!input_thread_.initialize(input_config)) {
+            return false;
         }
+        return input_thread_.start();
+    };
+    auto mark_polling_fallback = [this](std::string reason) {
+        input_backend_state_.auto_fallback = true;
+        input_backend_state_.fallback_origin = InputFallbackOrigin::Menu;
+        input_backend_state_.fallback_reason = std::move(reason);
+        input_backend_state_.fallback_timestamp_utc = utc_timestamp_compact_menu();
+        input_backend_state_.effective_backend = input::InputBackend::Polling;
+    };
+
+    bool input_started = start_input_thread();
+    if (!input_started && input_config.backend == input::InputBackend::RawInput) {
+        std::cerr << "[warn] Menu RawInput start failed; falling back to Polling so menu input stays responsive."
+                  << std::endl;
+        input_thread_.shutdown();
+        input_config.backend = input::InputBackend::Polling;
+        input_config.raw_input.register_keyboard = false;
+        mark_polling_fallback("RawInput start failed; Polling fallback kept menu input active.");
+        input_started = start_input_thread();
+    }
+
+    if (!input_started) {
+        std::cerr << "[error] Failed to start input thread." << std::endl;
+    } else if (input_config.backend == input::InputBackend::Polling) {
+        rebuild_pressed_keys_from_polling_snapshot();
     }
 
     const render::RenderConfig render_config = current_render_config();
@@ -964,11 +985,33 @@ void MenuApp::restart_input_thread() {
     input_config.polling_hz = config_.input.polling_hz;
     input_config.key_state.debounce_window_ns =
         std::max<int64_t>(0, static_cast<int64_t>(std::llround(config_.input.debounce_ms * 1'000'000.0)));
-    if (!input_thread_.initialize(input_config)) {
-        std::cerr << "[error] Failed to reinitialize input thread." << std::endl;
-        return;
+
+    auto start_input_thread = [this, &input_config]() {
+        if (!input_thread_.initialize(input_config)) {
+            return false;
+        }
+        return input_thread_.start();
+    };
+    auto mark_polling_fallback = [this](std::string reason) {
+        input_backend_state_.auto_fallback = true;
+        input_backend_state_.fallback_origin = InputFallbackOrigin::Menu;
+        input_backend_state_.fallback_reason = std::move(reason);
+        input_backend_state_.fallback_timestamp_utc = utc_timestamp_compact_menu();
+        input_backend_state_.effective_backend = input::InputBackend::Polling;
+    };
+
+    bool input_started = start_input_thread();
+    if (!input_started && input_config.backend == input::InputBackend::RawInput) {
+        std::cerr << "[warn] Menu RawInput restart failed; falling back to Polling so menu input stays responsive."
+                  << std::endl;
+        input_thread_.shutdown();
+        input_config.backend = input::InputBackend::Polling;
+        input_config.raw_input.register_keyboard = false;
+        mark_polling_fallback("RawInput restart failed; Polling fallback kept menu input active.");
+        input_started = start_input_thread();
     }
-    if (!input_thread_.start()) {
+
+    if (!input_started) {
         std::cerr << "[error] Failed to restart input thread." << std::endl;
     } else if (input_config.backend == input::InputBackend::Polling) {
         rebuild_pressed_keys_from_polling_snapshot();
@@ -1012,9 +1055,6 @@ std::vector<uint32_t> MenuApp::current_menu_probe_keycodes() const {
 
 void MenuApp::refresh_menu_input_polling_scope() {
     if (!input_thread_.is_running()) {
-        return;
-    }
-    if (input_thread_.current_backend() != input::InputBackend::Polling) {
         return;
     }
 
@@ -1603,7 +1643,7 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
             return;
         case Screen::SettingsSkins:
             settings_cursor_ = clamp_int(event.index, 0,
-                                         19 + (config::normalize_skin_source_token(config_.skin.source) == "lr2" ? 1 : 0));
+                                         31 + (config::normalize_skin_source_token(config_.skin.source) == "lr2" ? 1 : 0));
             handle_skins_settings_input(action_key);
             return;
         case Screen::SettingsInput:

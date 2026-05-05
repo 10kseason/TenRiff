@@ -106,6 +106,13 @@ std::vector<double> default_skin_scale_vector(std::size_t count, double default_
     return std::vector<double>(count, default_value);
 }
 
+double clamp_finite(double value, double min_value, double max_value, double fallback) {
+    if (!std::isfinite(value)) {
+        return fallback;
+    }
+    return std::clamp(value, min_value, max_value);
+}
+
 std::vector<double> sanitize_skin_scale_vector(std::string_view key_mode,
                                                const std::vector<double>& values,
                                                double default_value,
@@ -129,11 +136,33 @@ std::vector<double> sanitize_skin_scale_vector(std::string_view key_mode,
 void sanitize_skin_config(SkinConfig& skin) {
     skin.source = normalize_skin_source_token(skin.source);
     skin.lr2_resolution_mode = normalize_skin_lr2_resolution_mode_token(skin.lr2_resolution_mode);
+    skin.visual_preset = normalize_skin_visual_preset_token(skin.visual_preset);
     skin.note_shape = normalize_skin_note_shape_token(skin.note_shape);
+    skin.key_label_position = normalize_skin_key_label_position_token(skin.key_label_position);
     skin.judgement_line_position = std::clamp(
         skin.judgement_line_position, kJudgementLinePositionMin, kJudgementLinePositionMax);
     skin.combo_position = std::clamp(
         skin.combo_position, kComboPositionMin, kComboPositionMax);
+    skin.lane_background_opacity = clamp_finite(
+        skin.lane_background_opacity,
+        kSkinLaneBackgroundOpacityMin,
+        kSkinLaneBackgroundOpacityMax,
+        kSkinLaneBackgroundOpacityDefault);
+    skin.visual_opacity = clamp_finite(
+        skin.visual_opacity,
+        kSkinVisualOpacityMin,
+        kSkinVisualOpacityMax,
+        kSkinVisualOpacityDefault);
+    skin.note_outline_opacity = clamp_finite(
+        skin.note_outline_opacity,
+        kSkinNoteOutlineOpacityMin,
+        kSkinNoteOutlineOpacityMax,
+        kSkinNoteOutlineOpacityDefault);
+    skin.hold_body_opacity = clamp_finite(
+        skin.hold_body_opacity,
+        kSkinHoldBodyOpacityMin,
+        kSkinHoldBodyOpacityMax,
+        kSkinHoldBodyOpacityDefault);
     std::unordered_map<std::string, std::vector<double>> sanitized_lane_width_scales;
     skin.note_width_scale = std::clamp(
         skin.note_width_scale, kNoteWidthScaleMin, kNoteWidthScaleMax);
@@ -617,6 +646,8 @@ void apply_config_object(const JsonObject& root, RuntimeConfig& config) {
             get_string(*skin, "lr2_skin_name", config.skin.lr2_skin_name);
         config.skin.lr2_resolution_mode = normalize_skin_lr2_resolution_mode_token(
             get_string(*skin, "lr2_resolution_mode", config.skin.lr2_resolution_mode));
+        config.skin.visual_preset = normalize_skin_visual_preset_token(
+            get_string(*skin, "visual_preset", config.skin.visual_preset));
         config.skin.note_shape =
             normalize_skin_note_shape_token(get_string(*skin, "note_shape", config.skin.note_shape));
         config.skin.note_border_enabled =
@@ -633,12 +664,38 @@ void apply_config_object(const JsonObject& root, RuntimeConfig& config) {
             get_bool(*skin, "show_gear_boundary_line", config.skin.show_gear_boundary_line);
         config.skin.hold_tail_taper_enabled =
             get_bool(*skin, "hold_tail_taper_enabled", config.skin.hold_tail_taper_enabled);
+        config.skin.judgement_line_glow_enabled =
+            get_bool(*skin, "judgement_line_glow_enabled", config.skin.judgement_line_glow_enabled);
+        config.skin.key_pulse_enabled =
+            get_bool(*skin, "key_pulse_enabled", config.skin.key_pulse_enabled);
+        config.skin.key_label_position = normalize_skin_key_label_position_token(
+            get_string(*skin, "key_label_position", config.skin.key_label_position));
         config.skin.judgement_line_position = std::clamp(
             get_number(*skin, "judgement_line_position", config.skin.judgement_line_position),
             kJudgementLinePositionMin, kJudgementLinePositionMax);
         config.skin.combo_position = std::clamp(
             get_number(*skin, "combo_position", config.skin.combo_position),
             kComboPositionMin, kComboPositionMax);
+        config.skin.lane_background_opacity = clamp_finite(
+            get_number(*skin, "lane_background_opacity", config.skin.lane_background_opacity),
+            kSkinLaneBackgroundOpacityMin,
+            kSkinLaneBackgroundOpacityMax,
+            kSkinLaneBackgroundOpacityDefault);
+        config.skin.visual_opacity = clamp_finite(
+            get_number(*skin, "visual_opacity", config.skin.visual_opacity),
+            kSkinVisualOpacityMin,
+            kSkinVisualOpacityMax,
+            kSkinVisualOpacityDefault);
+        config.skin.note_outline_opacity = clamp_finite(
+            get_number(*skin, "note_outline_opacity", config.skin.note_outline_opacity),
+            kSkinNoteOutlineOpacityMin,
+            kSkinNoteOutlineOpacityMax,
+            kSkinNoteOutlineOpacityDefault);
+        config.skin.hold_body_opacity = clamp_finite(
+            get_number(*skin, "hold_body_opacity", config.skin.hold_body_opacity),
+            kSkinHoldBodyOpacityMin,
+            kSkinHoldBodyOpacityMax,
+            kSkinHoldBodyOpacityDefault);
         config.skin.note_width_scale = std::clamp(
             get_number(*skin, "note_width_scale", config.skin.note_width_scale),
             kNoteWidthScaleMin, kNoteWidthScaleMax);
@@ -941,6 +998,7 @@ JsonValue build_json_root(const RuntimeConfig& config) {
     skin.emplace("lr2_skin_name", JsonValue{config.skin.lr2_skin_name});
     skin.emplace("lr2_resolution_mode",
                  JsonValue{normalize_skin_lr2_resolution_mode_token(config.skin.lr2_resolution_mode)});
+    skin.emplace("visual_preset", JsonValue{normalize_skin_visual_preset_token(config.skin.visual_preset)});
     skin.emplace("note_shape", JsonValue{normalize_skin_note_shape_token(config.skin.note_shape)});
     skin.emplace("note_border_enabled", JsonValue{config.skin.note_border_enabled});
     skin.emplace("preserve_note_image_aspect_ratio",
@@ -949,8 +1007,16 @@ JsonValue build_json_root(const RuntimeConfig& config) {
     skin.emplace("show_judgement_line", JsonValue{config.skin.show_judgement_line});
     skin.emplace("show_gear_boundary_line", JsonValue{config.skin.show_gear_boundary_line});
     skin.emplace("hold_tail_taper_enabled", JsonValue{config.skin.hold_tail_taper_enabled});
+    skin.emplace("judgement_line_glow_enabled", JsonValue{config.skin.judgement_line_glow_enabled});
+    skin.emplace("key_pulse_enabled", JsonValue{config.skin.key_pulse_enabled});
+    skin.emplace("key_label_position",
+                 JsonValue{normalize_skin_key_label_position_token(config.skin.key_label_position)});
     skin.emplace("judgement_line_position", JsonValue{config.skin.judgement_line_position});
     skin.emplace("combo_position", JsonValue{config.skin.combo_position});
+    skin.emplace("lane_background_opacity", JsonValue{config.skin.lane_background_opacity});
+    skin.emplace("visual_opacity", JsonValue{config.skin.visual_opacity});
+    skin.emplace("note_outline_opacity", JsonValue{config.skin.note_outline_opacity});
+    skin.emplace("hold_body_opacity", JsonValue{config.skin.hold_body_opacity});
     skin.emplace("note_width_scale", JsonValue{config.skin.note_width_scale});
     JsonObject lane_width_scales;
     JsonObject note_width_scales;
@@ -1082,6 +1148,102 @@ std::string normalize_skin_lr2_resolution_mode_token(std::string_view token) {
         return normalized;
     }
     return "auto";
+}
+
+std::string normalize_skin_visual_preset_token(std::string_view token) {
+    const std::string normalized = to_lower_ascii(std::string(token));
+    if (normalized == "classic" || normalized == "neon" || normalized == "minimal") {
+        return normalized;
+    }
+    return "tenriff";
+}
+
+std::vector<std::string> supported_skin_visual_preset_tokens() {
+    return {"classic", "neon", "minimal", "tenriff"};
+}
+
+std::string skin_visual_preset_label(std::string_view token) {
+    const std::string normalized = normalize_skin_visual_preset_token(token);
+    if (normalized == "classic") {
+        return "Classic";
+    }
+    if (normalized == "neon") {
+        return "Neon";
+    }
+    if (normalized == "minimal") {
+        return "Minimal";
+    }
+    return "TenRiff";
+}
+
+void apply_skin_visual_preset(SkinConfig& skin, std::string_view token) {
+    const std::string preset = normalize_skin_visual_preset_token(token);
+    skin.visual_preset = preset;
+    skin.note_shape = "rect";
+    skin.note_border_enabled = true;
+    skin.show_judgement_line = true;
+
+    if (preset == "classic") {
+        skin.show_lane_dividers = true;
+        skin.lane_background_opacity = 0.12;
+        skin.visual_opacity = 1.00;
+        skin.note_outline_opacity = 0.82;
+        skin.hold_body_opacity = 0.34;
+        skin.judgement_line_glow_enabled = false;
+        skin.key_pulse_enabled = false;
+        skin.key_label_position = "bottom";
+    } else if (preset == "neon") {
+        skin.show_lane_dividers = true;
+        skin.lane_background_opacity = 0.26;
+        skin.visual_opacity = 1.00;
+        skin.note_outline_opacity = 0.95;
+        skin.hold_body_opacity = 0.28;
+        skin.judgement_line_glow_enabled = true;
+        skin.key_pulse_enabled = true;
+        skin.key_label_position = "bottom";
+    } else if (preset == "minimal") {
+        skin.show_lane_dividers = false;
+        skin.lane_background_opacity = 0.06;
+        skin.visual_opacity = 0.82;
+        skin.note_outline_opacity = 0.40;
+        skin.hold_body_opacity = 0.15;
+        skin.judgement_line_glow_enabled = false;
+        skin.key_pulse_enabled = false;
+        skin.key_label_position = "top";
+    } else {
+        skin.show_lane_dividers = true;
+        skin.lane_background_opacity = kSkinLaneBackgroundOpacityDefault;
+        skin.visual_opacity = kSkinVisualOpacityDefault;
+        skin.note_outline_opacity = kSkinNoteOutlineOpacityDefault;
+        skin.hold_body_opacity = kSkinHoldBodyOpacityDefault;
+        skin.judgement_line_glow_enabled = true;
+        skin.key_pulse_enabled = true;
+        skin.key_label_position = "bottom";
+    }
+
+    sanitize_skin_config(skin);
+}
+
+std::string normalize_skin_key_label_position_token(std::string_view token) {
+    const std::string normalized = to_lower_ascii(std::string(token));
+    if (normalized == "top" || normalized == "upper" || normalized == "up") {
+        return "top";
+    }
+    if (normalized == "off" || normalized == "none" || normalized == "hidden" || normalized == "hide") {
+        return "off";
+    }
+    return "bottom";
+}
+
+std::string skin_key_label_position_label(std::string_view token) {
+    const std::string normalized = normalize_skin_key_label_position_token(token);
+    if (normalized == "top") {
+        return "Top";
+    }
+    if (normalized == "off") {
+        return "Off";
+    }
+    return "Bottom";
 }
 
 std::string normalize_skin_color_token(std::string_view token) {

@@ -10,8 +10,8 @@ This is the document that the next agent or any new contributor should read firs
 - Linux exists only as a preview-level package at `Baepoks-Linuxs/TenRiff-0.5.0-linux-preview`
 - Default surface is BMS-first
 - `.osu` can be re-enabled as an option and supports 4K-10K
-- The `1.1.2` release line keeps the `1.0.9` gameplay playback-head timing fix, but pins live gameplay capture to `Polling` for stability while keeping the gameplay session on an always-allow input gate regardless of foreground state
-- On the same `1.1.2` line, menu input still uses the foreground process/root-window boundary, while restart-style backend fallback and persisted input-backend rewrites remain removed and the saved backend preference is preserved as configuration
+- The `1.1.2` release line keeps the `1.0.9` gameplay playback-head timing fix, while live gameplay input prefers saved RawInput and uses bound-key polling shadow plus Polling fallback on RawInput startup failure to keep input recognition alive
+- On the same `1.1.2` line, menu input still uses the foreground process/root-window boundary and retries Polling if RawInput startup fails, while persisted input-backend rewrites remain removed and the saved backend preference is preserved as configuration
 
 ## Core Architecture
 - `MenuApp`

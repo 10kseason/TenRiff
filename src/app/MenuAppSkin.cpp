@@ -33,6 +33,7 @@ constexpr double kJudgementLinePositionStep = 0.01;
 constexpr double kComboPositionStep = 0.02;
 constexpr double kNoteSizeScaleStep = 0.05;
 constexpr double kLaneDividerScaleStep = 0.05;
+constexpr double kSkinOpacityStep = 0.05;
 
 fs::path path_from_utf8(std::string_view value) {
     try {
@@ -479,7 +480,7 @@ void MenuApp::handle_skins_settings_input(uint32_t keycode) {
     const std::string active_skin_source = config::normalize_skin_source_token(config_.skin.source);
     const bool lr2_source = active_skin_source == "lr2";
     const int lr2_shift = lr2_source ? 1 : 0;
-    const int item_count = 24 + lr2_shift;
+    const int item_count = 32 + lr2_shift;
     const int imported_skin_row = 1;
     const int lr2_resolution_row = lr2_source ? 2 : -1;
     const int import_skin_row = 2 + lr2_shift;
@@ -494,16 +495,24 @@ void MenuApp::handle_skins_settings_input(uint32_t keycode) {
     const int judgement_line_row = 11 + lr2_shift;
     const int gear_boundary_row = 12 + lr2_shift;
     const int ln_tail_taper_row = 13 + lr2_shift;
-    const int judge_line_row = 14 + lr2_shift;
-    const int lane_width_row = 15 + lr2_shift;
-    const int note_width_row = 16 + lr2_shift;
-    const int lane_spacing_row = 17 + lr2_shift;
-    const int divider_width_row = 18 + lr2_shift;
-    const int center_gap_row = 19 + lr2_shift;
-    const int ln_body_width_row = 20 + lr2_shift;
-    const int note_height_row = 21 + lr2_shift;
-    const int combo_y_row = 22 + lr2_shift;
-    const int back_row = 23 + lr2_shift;
+    const int visual_preset_row = 14 + lr2_shift;
+    const int lane_background_opacity_row = 15 + lr2_shift;
+    const int visual_opacity_row = 16 + lr2_shift;
+    const int note_outline_opacity_row = 17 + lr2_shift;
+    const int ln_body_opacity_row = 18 + lr2_shift;
+    const int judgement_line_glow_row = 19 + lr2_shift;
+    const int key_pulse_row = 20 + lr2_shift;
+    const int key_label_position_row = 21 + lr2_shift;
+    const int judge_line_row = 22 + lr2_shift;
+    const int lane_width_row = 23 + lr2_shift;
+    const int note_width_row = 24 + lr2_shift;
+    const int lane_spacing_row = 25 + lr2_shift;
+    const int divider_width_row = 26 + lr2_shift;
+    const int center_gap_row = 27 + lr2_shift;
+    const int ln_body_width_row = 28 + lr2_shift;
+    const int note_height_row = 29 + lr2_shift;
+    const int combo_y_row = 30 + lr2_shift;
+    const int back_row = 31 + lr2_shift;
 
     if (keycode == key_up_) {
         settings_cursor_ = clamp_int(settings_cursor_ - 1, 0, item_count - 1);
@@ -521,7 +530,7 @@ void MenuApp::handle_skins_settings_input(uint32_t keycode) {
         const bool was_lr2 = active_skin_source == "lr2";
         config_.skin.source = cycle_skin_source(config_.skin.source, direction);
         const bool is_lr2 = config::normalize_skin_source_token(config_.skin.source) == "lr2";
-        const int new_item_count = 21 + (is_lr2 ? 1 : 0);
+        const int new_item_count = 32 + (is_lr2 ? 1 : 0);
         if (!was_lr2 && is_lr2 && settings_cursor_ >= imported_skin_row) {
             ++settings_cursor_;
         } else if (was_lr2 && !is_lr2 && settings_cursor_ >= import_skin_row) {
@@ -687,6 +696,76 @@ void MenuApp::handle_skins_settings_input(uint32_t keycode) {
     }
     if (settings_cursor_ == ln_tail_taper_row && (keycode == key_left_ || keycode == key_right_)) {
         config_.skin.hold_tail_taper_enabled = !config_.skin.hold_tail_taper_enabled;
+        skin_dirty_ = true;
+        publish_snapshot();
+        return;
+    }
+    if (settings_cursor_ == visual_preset_row && (keycode == key_left_ || keycode == key_right_)) {
+        const int direction = (keycode == key_left_) ? -1 : 1;
+        config::apply_skin_visual_preset(config_.skin, cycle_skin_visual_preset(config_.skin.visual_preset, direction));
+        skin_dirty_ = true;
+        publish_snapshot();
+        return;
+    }
+    if (settings_cursor_ == lane_background_opacity_row && (keycode == key_left_ || keycode == key_right_)) {
+        const int direction = (keycode == key_left_) ? -1 : 1;
+        config_.skin.lane_background_opacity = clamp_step_value(
+            config_.skin.lane_background_opacity + static_cast<double>(direction) * kSkinOpacityStep,
+            config::kSkinLaneBackgroundOpacityMin,
+            config::kSkinLaneBackgroundOpacityMax,
+            kSkinOpacityStep);
+        skin_dirty_ = true;
+        publish_snapshot();
+        return;
+    }
+    if (settings_cursor_ == visual_opacity_row && (keycode == key_left_ || keycode == key_right_)) {
+        const int direction = (keycode == key_left_) ? -1 : 1;
+        config_.skin.visual_opacity = clamp_step_value(
+            config_.skin.visual_opacity + static_cast<double>(direction) * kSkinOpacityStep,
+            config::kSkinVisualOpacityMin,
+            config::kSkinVisualOpacityMax,
+            kSkinOpacityStep);
+        skin_dirty_ = true;
+        publish_snapshot();
+        return;
+    }
+    if (settings_cursor_ == note_outline_opacity_row && (keycode == key_left_ || keycode == key_right_)) {
+        const int direction = (keycode == key_left_) ? -1 : 1;
+        config_.skin.note_outline_opacity = clamp_step_value(
+            config_.skin.note_outline_opacity + static_cast<double>(direction) * kSkinOpacityStep,
+            config::kSkinNoteOutlineOpacityMin,
+            config::kSkinNoteOutlineOpacityMax,
+            kSkinOpacityStep);
+        skin_dirty_ = true;
+        publish_snapshot();
+        return;
+    }
+    if (settings_cursor_ == ln_body_opacity_row && (keycode == key_left_ || keycode == key_right_)) {
+        const int direction = (keycode == key_left_) ? -1 : 1;
+        config_.skin.hold_body_opacity = clamp_step_value(
+            config_.skin.hold_body_opacity + static_cast<double>(direction) * kSkinOpacityStep,
+            config::kSkinHoldBodyOpacityMin,
+            config::kSkinHoldBodyOpacityMax,
+            kSkinOpacityStep);
+        skin_dirty_ = true;
+        publish_snapshot();
+        return;
+    }
+    if (settings_cursor_ == judgement_line_glow_row && (keycode == key_left_ || keycode == key_right_)) {
+        config_.skin.judgement_line_glow_enabled = !config_.skin.judgement_line_glow_enabled;
+        skin_dirty_ = true;
+        publish_snapshot();
+        return;
+    }
+    if (settings_cursor_ == key_pulse_row && (keycode == key_left_ || keycode == key_right_)) {
+        config_.skin.key_pulse_enabled = !config_.skin.key_pulse_enabled;
+        skin_dirty_ = true;
+        publish_snapshot();
+        return;
+    }
+    if (settings_cursor_ == key_label_position_row && (keycode == key_left_ || keycode == key_right_)) {
+        const int direction = (keycode == key_left_) ? -1 : 1;
+        config_.skin.key_label_position = cycle_skin_key_label_position(config_.skin.key_label_position, direction);
         skin_dirty_ = true;
         publish_snapshot();
         return;
@@ -898,32 +977,54 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
                     settings_cursor_ == 12 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 12 + lr2_shift, false, true);
     append_menu_row(render.generic, ui_text("LN Tail Taper", "LN 꼬리 테이퍼"), ui_on_off(config_.skin.hold_tail_taper_enabled),
                     settings_cursor_ == 13 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 13 + lr2_shift, false, true);
-    append_menu_row(render.generic, ui_text("Judge Line", "판정선 위치"), format_percent(config_.skin.judgement_line_position),
+    append_menu_row(render.generic, ui_text("Visual Preset", "비주얼 프리셋"),
+                    config::skin_visual_preset_label(config_.skin.visual_preset),
                     settings_cursor_ == 14 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 14 + lr2_shift, false, true);
-    append_menu_row(render.generic, ui_text("Lane Width", "레인 너비"), format_percent(preview_lane_width_scale),
+    append_menu_row(render.generic, ui_text("Lane BG Alpha", "레인 배경 투명도"),
+                    format_percent(config_.skin.lane_background_opacity),
                     settings_cursor_ == 15 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 15 + lr2_shift, false, true);
-    append_menu_row(render.generic, ui_text("Note Width", "노트 너비"), format_percent(preview_note_width_scale),
+    append_menu_row(render.generic, ui_text("Visual Opacity", "전체 투명도"),
+                    format_percent(config_.skin.visual_opacity),
                     settings_cursor_ == 16 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 16 + lr2_shift, false, true);
-    append_menu_row(render.generic, ui_text("Lane Spacing", "레인 간격"), format_percent(preview_lane_spacing_scale),
-                    settings_cursor_ == 17 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 17 + lr2_shift, false, gap_count > 0);
-    append_menu_row(render.generic, ui_text("Divider Width", "구분선 너비"), format_percent(preview_lane_divider_width_scale),
+    append_menu_row(render.generic, ui_text("Outline Alpha", "외곽선 투명도"),
+                    format_percent(config_.skin.note_outline_opacity),
+                    settings_cursor_ == 17 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 17 + lr2_shift, false, true);
+    append_menu_row(render.generic, ui_text("LN Body Alpha", "LN 몸통 투명도"),
+                    format_percent(config_.skin.hold_body_opacity),
                     settings_cursor_ == 18 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 18 + lr2_shift, false, true);
+    append_menu_row(render.generic, ui_text("Judge Glow", "판정선 글로우"), ui_on_off(config_.skin.judgement_line_glow_enabled),
+                    settings_cursor_ == 19 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 19 + lr2_shift, false, true);
+    append_menu_row(render.generic, ui_text("Key Pulse", "키 펄스"), ui_on_off(config_.skin.key_pulse_enabled),
+                    settings_cursor_ == 20 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 20 + lr2_shift, false, true);
+    append_menu_row(render.generic, ui_text("Key Labels", "키 이름"),
+                    config::skin_key_label_position_label(config_.skin.key_label_position),
+                    settings_cursor_ == 21 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 21 + lr2_shift, false, true);
+    append_menu_row(render.generic, ui_text("Judge Line", "판정선 위치"), format_percent(config_.skin.judgement_line_position),
+                    settings_cursor_ == 22 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 22 + lr2_shift, false, true);
+    append_menu_row(render.generic, ui_text("Lane Width", "레인 너비"), format_percent(preview_lane_width_scale),
+                    settings_cursor_ == 23 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 23 + lr2_shift, false, true);
+    append_menu_row(render.generic, ui_text("Note Width", "노트 너비"), format_percent(preview_note_width_scale),
+                    settings_cursor_ == 24 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 24 + lr2_shift, false, true);
+    append_menu_row(render.generic, ui_text("Lane Spacing", "레인 간격"), format_percent(preview_lane_spacing_scale),
+                    settings_cursor_ == 25 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 25 + lr2_shift, false, gap_count > 0);
+    append_menu_row(render.generic, ui_text("Divider Width", "구분선 너비"), format_percent(preview_lane_divider_width_scale),
+                    settings_cursor_ == 26 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 26 + lr2_shift, false, true);
     append_menu_row(render.generic,
                     ui_text("16K Center Gap", "16K 중앙 간격"),
                     center_gap_available ? format_percent(preview_lane_center_gap_scale) : ui_text("16K Only", "16K 전용"),
-                    settings_cursor_ == 19 + lr2_shift,
+                    settings_cursor_ == 27 + lr2_shift,
                     render::MenuHitTargetKind::SettingsRow,
-                    19 + lr2_shift,
+                    27 + lr2_shift,
                     false,
                     center_gap_available);
     append_menu_row(render.generic, ui_text("LN Body Width", "LN 몸통 너비"), format_percent(config_.skin.hold_body_width_scale),
-                    settings_cursor_ == 20 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 20 + lr2_shift, false, true);
+                    settings_cursor_ == 28 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 28 + lr2_shift, false, true);
     append_menu_row(render.generic, ui_text("Note Height", "노트 높이"), format_percent(preview_note_height_scale),
-                    settings_cursor_ == 21 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 21 + lr2_shift, false, true);
+                    settings_cursor_ == 29 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 29 + lr2_shift, false, true);
     append_menu_row(render.generic, ui_text("Combo Y", "콤보 Y"), format_percent(config_.skin.combo_position),
-                    settings_cursor_ == 22 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 22 + lr2_shift, false, true);
-    append_menu_row(render.generic, ui_text("Back", "뒤로"), "", settings_cursor_ == 23 + lr2_shift,
-                    render::MenuHitTargetKind::SettingsRow, 23 + lr2_shift, true, false);
+                    settings_cursor_ == 30 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 30 + lr2_shift, false, true);
+    append_menu_row(render.generic, ui_text("Back", "뒤로"), "", settings_cursor_ == 31 + lr2_shift,
+                    render::MenuHitTargetKind::SettingsRow, 31 + lr2_shift, true, false);
 
     render.generic.skin_preview.visible = true;
     render.generic.skin_preview.mode_label = ui_key_mode_label(skin_edit_mode_);
@@ -961,6 +1062,10 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
     render.generic.skin_preview.show_judgement_line = config_.skin.show_judgement_line;
     render.generic.skin_preview.show_gear_boundary_line = config_.skin.show_gear_boundary_line;
     render.generic.skin_preview.hold_tail_taper_enabled = config_.skin.hold_tail_taper_enabled;
+    render.generic.skin_preview.judgement_line_glow_enabled = config_.skin.judgement_line_glow_enabled;
+    render.generic.skin_preview.key_pulse_enabled = config_.skin.key_pulse_enabled;
+    render.generic.skin_preview.key_label_position =
+        config::normalize_skin_key_label_position_token(config_.skin.key_label_position);
     render.generic.skin_preview.note_border_enabled = config_.skin.note_border_enabled;
     render.generic.skin_preview.note_shape = config_.skin.note_shape;
     render.generic.skin_preview.preserve_note_image_aspect_ratio =
@@ -970,6 +1075,22 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
     render.generic.skin_preview.external_skin_name = active_external_skin_name();
     render.generic.skin_preview.lr2_resolution_override =
         config::normalize_skin_lr2_resolution_mode_token(config_.skin.lr2_resolution_mode);
+    render.generic.skin_preview.lane_background_opacity = std::clamp(
+        config_.skin.lane_background_opacity,
+        config::kSkinLaneBackgroundOpacityMin,
+        config::kSkinLaneBackgroundOpacityMax);
+    render.generic.skin_preview.visual_opacity = std::clamp(
+        config_.skin.visual_opacity,
+        config::kSkinVisualOpacityMin,
+        config::kSkinVisualOpacityMax);
+    render.generic.skin_preview.note_outline_opacity = std::clamp(
+        config_.skin.note_outline_opacity,
+        config::kSkinNoteOutlineOpacityMin,
+        config::kSkinNoteOutlineOpacityMax);
+    render.generic.skin_preview.hold_body_opacity = std::clamp(
+        config_.skin.hold_body_opacity,
+        config::kSkinHoldBodyOpacityMin,
+        config::kSkinHoldBodyOpacityMax);
     render.generic.skin_preview.lane_colors.fill(0);
     for (int lane = 0; lane < lane_count && lane < static_cast<int>(kGameplayHudMaxLanes); ++lane) {
         render.generic.skin_preview.lane_colors[static_cast<std::size_t>(lane)] =

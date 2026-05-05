@@ -47,6 +47,7 @@ enum ControlId : int {
     kIdSeedEdit = 1010,
     kIdSampleRateEdit = 1011,
     kIdConvertButton = 1012,
+    kIdAlgorithmCombo = 1013,
 };
 
 struct AppState {
@@ -59,6 +60,8 @@ struct AppState {
     HWND output_browse_button = nullptr;
     HWND preset_label = nullptr;
     HWND preset_combo = nullptr;
+    HWND algorithm_label = nullptr;
+    HWND algorithm_combo = nullptr;
     HWND target_label = nullptr;
     HWND target_combo = nullptr;
     HWND max_keys_label = nullptr;
@@ -192,6 +195,25 @@ bool parse_optional_u32(HWND edit, uint32_t default_value, uint32_t& value) {
     return parse_u32_value(text, value);
 }
 
+bool parse_sample_rate_edit(HWND edit, int& value) {
+    std::wstring text = get_window_text_copy(edit);
+    if (is_blank(text)) {
+        value = 0;
+        return true;
+    }
+    std::transform(text.begin(), text.end(), text.begin(), [](wchar_t ch) {
+        if (ch >= L'A' && ch <= L'Z') {
+            return static_cast<wchar_t>(ch - (L'A' - L'a'));
+        }
+        return ch;
+    });
+    if (text == L"auto" || text == L"detect" || text == L"0") {
+        value = 0;
+        return true;
+    }
+    return parse_int_value(text, value) && value > 0;
+}
+
 std::wstring lowercase_ascii(std::wstring value) {
     std::transform(value.begin(), value.end(), value.begin(), [](wchar_t ch) {
         if (ch >= L'A' && ch <= L'Z') {
@@ -217,6 +239,15 @@ int selected_target_keys(const AppState& state) {
         return 0;
     }
     return static_cast<int>(item_data);
+}
+
+std::string selected_algorithm(const AppState& state) {
+    const int selection = static_cast<int>(SendMessageW(state.algorithm_combo, CB_GETCURSEL, 0, 0));
+    if (selection == CB_ERR) {
+        return "krr";
+    }
+    const LRESULT item_data = SendMessageW(state.algorithm_combo, CB_GETITEMDATA, selection, 0);
+    return item_data == 1 ? "10k-split" : "krr";
 }
 
 bool select_target_keys(AppState& state, int target_keys) {
@@ -253,6 +284,9 @@ void apply_selected_preset(AppState& state) {
     set_window_text_copy(state.max_keys_edit, std::to_wstring(preset.max_keys));
     set_window_text_copy(state.min_keys_edit, std::to_wstring(preset.min_keys));
     set_window_text_copy(state.speed_slot_edit, std::to_wstring(preset.transform_speed_slot));
+    if (preset.fixed_seed.has_value()) {
+        set_window_text_copy(state.seed_edit, std::to_wstring(preset.fixed_seed.value()));
+    }
     state.applying_preset = false;
     maybe_apply_output_suggestion(state);
 }
@@ -363,6 +397,7 @@ bool collect_options(const AppState& state, tenriff::app::BmsKeyConverterOptions
     options.input_path = tenriff::util::utf8_from_wide_lossy(input_path);
     options.output_path = tenriff::util::utf8_from_wide_lossy(output_path);
     options.target_lane_count = selected_target_keys(state);
+    options.conversion_style = selected_algorithm(state);
 
     if (options.input_path.empty()) {
         error = L"Failed to encode the input path as UTF-8.";
@@ -392,12 +427,8 @@ bool collect_options(const AppState& state, tenriff::app::BmsKeyConverterOptions
         error = L"Seed must be a valid unsigned integer.";
         return false;
     }
-    if (!parse_optional_int(state.sample_rate_edit, 44100, options.sample_rate)) {
-        error = L"Sample Rate must be a valid integer.";
-        return false;
-    }
-    if (options.sample_rate <= 0) {
-        error = L"Sample Rate must be positive.";
+    if (!parse_sample_rate_edit(state.sample_rate_edit, options.sample_rate)) {
+        error = L"Sample Rate must be Auto, 0, or a positive integer.";
         return false;
     }
 
@@ -430,6 +461,8 @@ void layout_controls(HWND window, AppState& state) {
     y += row_height + row_gap + 4;
     MoveWindow(state.preset_label, margin, y + 4, 76, row_height, TRUE);
     MoveWindow(state.preset_combo, margin + 78, y, 200, 240, TRUE);
+    MoveWindow(state.algorithm_label, margin + 296, y + 4, 76, row_height, TRUE);
+    MoveWindow(state.algorithm_combo, margin + 374, y, 190, 160, TRUE);
 
     y += row_height + row_gap;
     MoveWindow(state.target_label, margin, y + 4, 76, row_height, TRUE);
@@ -465,6 +498,22 @@ void initialize_target_combo(AppState& state) {
         }
     }
     SendMessageW(state.target_combo, CB_SETCURSEL, 0, 0);
+}
+
+void initialize_algorithm_combo(AppState& state) {
+    const LRESULT legacy_index =
+        SendMessageW(state.algorithm_combo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(L"Krr Legacy"));
+    if (legacy_index != CB_ERR && legacy_index != CB_ERRSPACE) {
+        SendMessageW(state.algorithm_combo, CB_SETITEMDATA, static_cast<WPARAM>(legacy_index), static_cast<LPARAM>(0));
+    }
+
+    const LRESULT split_index =
+        SendMessageW(state.algorithm_combo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(L"10K Split"));
+    if (split_index != CB_ERR && split_index != CB_ERRSPACE) {
+        SendMessageW(state.algorithm_combo, CB_SETITEMDATA, static_cast<WPARAM>(split_index), static_cast<LPARAM>(1));
+    }
+
+    SendMessageW(state.algorithm_combo, CB_SETCURSEL, 0, 0);
 }
 
 void initialize_preset_combo(AppState& state) {
@@ -538,6 +587,12 @@ void create_controls(HWND window, AppState& state) {
                                 L"",
                                 WS_CHILD | WS_VISIBLE | WS_TABSTOP | CBS_DROPDOWNLIST | WS_VSCROLL,
                                 kIdPresetCombo);
+    state.algorithm_label = create(0, L"STATIC", L"Algorithm", WS_CHILD | WS_VISIBLE, 0);
+    state.algorithm_combo = create(0,
+                                   L"COMBOBOX",
+                                   L"",
+                                   WS_CHILD | WS_VISIBLE | WS_TABSTOP | CBS_DROPDOWNLIST | WS_VSCROLL,
+                                   kIdAlgorithmCombo);
     state.target_label = create(0, L"STATIC", L"Target", WS_CHILD | WS_VISIBLE, 0);
     state.target_combo = create(0,
                                 L"COMBOBOX",
@@ -563,11 +618,11 @@ void create_controls(HWND window, AppState& state) {
     state.sample_rate_label = create(0, L"STATIC", L"Sample Rate", WS_CHILD | WS_VISIBLE, 0);
     state.sample_rate_edit = create(WS_EX_CLIENTEDGE,
                                     L"EDIT",
-                                    L"44100",
+                                    L"Auto",
                                     WS_CHILD | WS_VISIBLE | WS_TABSTOP | ES_AUTOHSCROLL,
                                     kIdSampleRateEdit);
     state.hint_label =
-        create(0, L"STATIC", L"Preset fills toolkit defaults; manual edits stay allowed.", WS_CHILD | WS_VISIBLE, 0);
+        create(0, L"STATIC", L"Krr is legacy; 10K Split expands each source hand into 5 lanes.", WS_CHILD | WS_VISIBLE, 0);
     state.convert_button = create(0,
                                   L"BUTTON",
                                   L"Convert",
@@ -583,6 +638,7 @@ void create_controls(HWND window, AppState& state) {
                             0);
 
     initialize_preset_combo(state);
+    initialize_algorithm_combo(state);
     initialize_target_combo(state);
     SendMessageW(state.log_edit, EM_LIMITTEXT, static_cast<WPARAM>(0x7ffffffe), 0);
     DragAcceptFiles(window, TRUE);
@@ -590,7 +646,7 @@ void create_controls(HWND window, AppState& state) {
 
     append_log(state, L"Select a BMS-family chart or drag one into this window.");
     append_log(state, L"Supported targets: 4K, 5K, 6K, 8K, 9K, 10K, 16K.");
-    append_log(state, L"Preset profiles mirror the original krrcream Toolkit N2NC presets.");
+    append_log(state, L"Krr Legacy preserves the original N2NC path; 10K Split expands source halves across lanes 1-5 / 6-10.");
 }
 
 void log_conversion_result(AppState& state,
@@ -608,7 +664,9 @@ void log_conversion_result(AppState& state,
 
     std::wstringstream summary;
     summary << L"[ok] Converted " << result.source_lane_count << L"K -> " << result.target_lane_count
-            << L"K, notes=" << result.note_count << L", holds=" << result.hold_count << L", elapsed=" << elapsed_ms
+            << L"K, notes=" << result.note_count << L", holds=" << result.hold_count
+            << L", sample_rate=" << result.sample_rate << (result.sample_rate_auto ? L" auto" : L"")
+            << L", elapsed=" << elapsed_ms
             << L" ms";
     append_log(state, summary.str());
     append_log(state, L"Output: " + tenriff::util::wide_from_utf8_lossy(options.output_path));
@@ -728,6 +786,7 @@ LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM w_param, LPARAM l
         case kIdMaxKeysEdit:
         case kIdMinKeysEdit:
         case kIdSpeedSlotEdit:
+        case kIdSeedEdit:
             if (HIWORD(w_param) == EN_CHANGE && !state->applying_preset) {
                 SendMessageW(state->preset_combo, CB_SETCURSEL, 0, 0);
             }

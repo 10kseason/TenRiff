@@ -174,6 +174,44 @@ inline std::string cycle_skin_source(std::string_view value, int direction) {
     return kSources[index];
 }
 
+inline std::string cycle_skin_visual_preset(std::string_view value, int direction) {
+    const auto presets = config::supported_skin_visual_preset_tokens();
+    int index = 0;
+    const std::string normalized = config::normalize_skin_visual_preset_token(value);
+    for (int i = 0; i < static_cast<int>(presets.size()); ++i) {
+        if (presets[static_cast<std::size_t>(i)] == normalized) {
+            index = i;
+            break;
+        }
+    }
+    index += direction;
+    if (index < 0) {
+        index = static_cast<int>(presets.size()) - 1;
+    } else if (index >= static_cast<int>(presets.size())) {
+        index = 0;
+    }
+    return presets[static_cast<std::size_t>(index)];
+}
+
+inline std::string cycle_skin_key_label_position(std::string_view value, int direction) {
+    static constexpr const char* kPositions[] = {"bottom", "top", "off"};
+    int index = 0;
+    const std::string normalized = config::normalize_skin_key_label_position_token(value);
+    for (int i = 0; i < 3; ++i) {
+        if (normalized == kPositions[i]) {
+            index = i;
+            break;
+        }
+    }
+    index += direction;
+    if (index < 0) {
+        index = 2;
+    } else if (index >= 3) {
+        index = 0;
+    }
+    return kPositions[index];
+}
+
 inline std::vector<std::string>& editable_skin_lane_colors(config::SkinConfig& skin, std::string_view key_mode) {
     const std::string normalized = config::normalize_skin_mode_token(key_mode);
     auto& colors = skin.lane_colors[normalized];

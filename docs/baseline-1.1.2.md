@@ -15,7 +15,7 @@
 
 ## Stable Contract
 - `1.0.9`에서 정리한 gameplay playback-head 기준 입력 타이밍 보정은 유지 대상이다.
-- gameplay live 입력 캡처는 안정성 우선으로 `Polling`에 고정한다.
+- gameplay live 입력 캡처는 저장된 RawInput 설정을 우선 사용하되 bound-key polling shadow와 RawInput 시작 실패 시 Polling fallback으로 입력 인식이 끊기지 않게 한다.
 - gameplay 세션은 foreground 여부와 무관하게 계속 입력을 받는 always-allow gate를 유지한다.
 - 메뉴 입력은 기존 foreground process/root-window 경계를 유지한다.
 - 저장된 `input.backend` / `input.rawinput` 값은 runtime fallback 결과로 다시 써 버리지 않고 그대로 보존한다.
@@ -67,7 +67,7 @@
 
 ## What To Preserve In Follow-Up Work
 - playback-head 기준 gameplay 입력 타이밍 보정
-- gameplay live capture `Polling` 고정과 저장 backend 보존의 분리 정책
+- gameplay live capture RawInput 우선 + polling shadow/fallback 정책과 저장 backend 보존의 분리 정책
 - BMS-first 표면
 - large-library safe indexing 안정성
 - 메뉴 캐시 우선 로드

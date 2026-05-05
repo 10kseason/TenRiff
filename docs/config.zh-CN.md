@@ -41,11 +41,11 @@
   - `polling | rawinput`
   - 当前 `1.1.2` 发布线的默认值是 `rawinput`
   - 保存值会被保留，不会在写回时强制规范化为 `polling`
-  - 但当前 `1.1.2` 的 gameplay live 输入采集为了稳定性仍固定为 `Polling`
+  - gameplay 在 `rawinput=true` 时优先启动 RawInput，并通过 bound-key polling shadow 与 RawInput 启动失败时的 Polling fallback 保持输入识别
 - `rawinput` (bool)
   - 与 `backend` 一起保存的便捷布尔字段
   - 在当前 `1.1.2` 发布线上会按当前值正常保存和恢复
-  - gameplay runtime 可能不会按这个值进行 live capture，但配置本身会保留
+  - 为 `true` 时，menu/gameplay 优先使用 RawInput，同时允许 polling shadow/fallback 保持输入识别
 - `use_qpc` (bool)
 - `grab` (bool)
   - 当前主要对应 Linux preview 语义

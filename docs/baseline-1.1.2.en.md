@@ -15,7 +15,7 @@ This document defines the `1.1.2 final stable` baseline that future TenRiff work
 
 ## Stable Contract
 - Keep the gameplay input-timing correction that was anchored to the real playback head in `1.0.9`.
-- Keep live gameplay input capture pinned to `Polling` for stability.
+- Prefer saved RawInput for live gameplay input capture, while keeping bound-key polling shadow and Polling fallback on RawInput startup failure so input recognition stays alive.
 - Keep the gameplay session on an always-allow input gate regardless of foreground state.
 - Keep menu input on the foreground process/root-window boundary.
 - Preserve saved `input.backend` / `input.rawinput` values instead of rewriting them from runtime fallback behavior.
@@ -67,7 +67,7 @@ This document defines the `1.1.2 final stable` baseline that future TenRiff work
 
 ## What To Preserve In Follow-Up Work
 - The playback-head-based gameplay input timing fix
-- The split policy between pinned `Polling` live capture and preserved saved backend preferences
+- The split policy between RawInput-first live capture, polling shadow/fallback, and preserved saved backend preferences
 - The BMS-first surface
 - Large-library `safe` indexing stability
 - Cache-first menu loading

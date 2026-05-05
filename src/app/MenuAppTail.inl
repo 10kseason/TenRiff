@@ -66,6 +66,9 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
     target.show_judgement_line = config_.skin.show_judgement_line;
     target.show_gear_boundary_line = config_.skin.show_gear_boundary_line;
     target.hold_tail_taper_enabled = config_.skin.hold_tail_taper_enabled;
+    target.judgement_line_glow_enabled = config_.skin.judgement_line_glow_enabled;
+    target.key_pulse_enabled = config_.skin.key_pulse_enabled;
+    target.key_label_position = config::normalize_skin_key_label_position_token(config_.skin.key_label_position);
     target.note_border_enabled = config_.skin.note_border_enabled;
     target.note_shape = config::normalize_skin_note_shape_token(config_.skin.note_shape);
     target.preserve_note_image_aspect_ratio = config_.skin.preserve_note_image_aspect_ratio;
@@ -74,6 +77,22 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
     target.external_skin_name = active_external_skin_name();
     target.lr2_resolution_override =
         config::normalize_skin_lr2_resolution_mode_token(config_.skin.lr2_resolution_mode);
+    target.lane_background_opacity = std::clamp(
+        config_.skin.lane_background_opacity,
+        config::kSkinLaneBackgroundOpacityMin,
+        config::kSkinLaneBackgroundOpacityMax);
+    target.visual_opacity = std::clamp(
+        config_.skin.visual_opacity,
+        config::kSkinVisualOpacityMin,
+        config::kSkinVisualOpacityMax);
+    target.note_outline_opacity = std::clamp(
+        config_.skin.note_outline_opacity,
+        config::kSkinNoteOutlineOpacityMin,
+        config::kSkinNoteOutlineOpacityMax);
+    target.hold_body_opacity = std::clamp(
+        config_.skin.hold_body_opacity,
+        config::kSkinHoldBodyOpacityMin,
+        config::kSkinHoldBodyOpacityMax);
     target.visual_offset_ms = std::clamp(config_.visual_offset_ms, kVisualOffsetMin, kVisualOffsetMax);
     target.rate = gameplay_hud_.rate;
     target.hispeed = gameplay_hud_.hispeed;
@@ -109,6 +128,64 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
     target.lane_color_count = std::min<std::size_t>(lane_colors.size(), static_cast<std::size_t>(target.lane_count));
     for (std::size_t i = 0; i < target.lane_color_count; ++i) {
         target.lane_colors[i] = config::skin_color_rgb(lane_colors[i]);
+    }
+
+    auto compact_key_label = [](std::string value) -> std::string {
+        if (value == "Semicolon") {
+            return ";";
+        }
+        if (value == "LBracket") {
+            return "[";
+        }
+        if (value == "RBracket") {
+            return "]";
+        }
+        if (value == "Apostrophe") {
+            return "'";
+        }
+        if (value == "Comma") {
+            return ",";
+        }
+        if (value == "Period") {
+            return ".";
+        }
+        if (value == "Slash") {
+            return "/";
+        }
+        if (value == "Backslash") {
+            return "\\";
+        }
+        if (value == "Grave") {
+            return "`";
+        }
+        if (value == "Space") {
+            return "SP";
+        }
+        if (value == "Backspace") {
+            return "Bksp";
+        }
+        if (value == "PageUp") {
+            return "PgUp";
+        }
+        if (value == "PageDown") {
+            return "PgDn";
+        }
+        return value;
+    };
+
+    target.key_label_count = 0;
+    target.key_labels.fill(std::string{});
+    if (target.key_label_position != "off") {
+        config::KeymapManager keymap_manager;
+        const auto bindings = keymap_manager.bindings_for_mode(keymap_, skin_mode);
+        target.key_label_count = static_cast<std::size_t>(target.lane_count);
+        for (std::size_t i = 0; i < target.key_label_count && i < target.key_labels.size(); ++i) {
+            const std::string lane_id = "lane" + std::to_string(i + 1);
+            const auto binding = bindings.find(lane_id);
+            if (binding != bindings.end()) {
+                target.key_labels[i] = compact_key_label(binding->second);
+            }
+        }
     }
 
     target.note_count = gameplay_hud_.note_count;

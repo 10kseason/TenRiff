@@ -31,11 +31,10 @@ void GameSession::FutureQueue::consume() {
 }
 
 void GameSession::rebuild_input_thread_config(input::InputThreadConfig& input_config) const {
-    // Stability-first hotfix: keep gameplay capture on the polling backend so
-    // lane/control input still works even when RawInput delivery regresses.
-    input_config.backend = input::InputBackend::Polling;
+    input_config.backend = config_.input.rawinput ? input::InputBackend::RawInput
+                                                  : input::InputBackend::Polling;
     input_config.gate_policy = input::InputGatePolicy::AlwaysAllow;
-    input_config.raw_input.register_keyboard = false;
+    input_config.raw_input.register_keyboard = config_.input.rawinput;
     input_config.raw_input.input_sink = true;
     input_config.raw_input.no_legacy = false;
     input_config.polling_hz = config_.input.polling_hz;
@@ -605,7 +604,9 @@ bool GameSession::initialize(const CommandLineOptions& options) {
         }
         key_to_lane_[keycode.value()] = lane_index.value();
     }
-    std::cerr << "[info] Gameplay input backend=Polling"
+    const char* gameplay_input_backend_label =
+        config_.input.rawinput ? "RawInput+PollingShadow" : "Polling";
+    std::cerr << "[info] Gameplay input backend=" << gameplay_input_backend_label
               << " key_mode=" << active_key_mode
               << " bound_lanes=" << key_to_lane_.size() << "/" << std::max(1, chart_.lane_count)
               << " keymap_normalized=" << keymap_result.normalized_binding_count
@@ -634,7 +635,22 @@ bool GameSession::initialize(const CommandLineOptions& options) {
     input::InputThreadConfig input_config;
     rebuild_input_thread_config(input_config);
     if (!input_thread_.initialize(input_config)) {
-        return false;
+        if (input_config.backend != input::InputBackend::RawInput) {
+            return false;
+        }
+        std::cerr << "[warn] Gameplay RawInput initialize failed; falling back to Polling so input stays playable."
+                  << std::endl;
+        input_thread_.shutdown();
+        input_config.backend = input::InputBackend::Polling;
+        input_config.raw_input.register_keyboard = false;
+        input_backend_state_.auto_fallback = true;
+        input_backend_state_.fallback_origin = InputFallbackOrigin::Gameplay;
+        input_backend_state_.fallback_reason = "RawInput initialize failed; Polling fallback kept gameplay input active.";
+        input_backend_state_.fallback_timestamp_utc = utc_timestamp_compact();
+        input_backend_state_.effective_backend = input::InputBackend::Polling;
+        if (!input_thread_.initialize(input_config)) {
+            return false;
+        }
     }
     next_guide_note_index_ = 0;
     hud_scan_start_ = 0;
@@ -664,7 +680,25 @@ bool GameSession::initialize(const CommandLineOptions& options) {
     }
 
     if (!input_thread_.start()) {
-        return false;
+        if (input_config.backend != input::InputBackend::RawInput) {
+            return false;
+        }
+        std::cerr << "[warn] Gameplay RawInput start failed; falling back to Polling so input stays playable."
+                  << std::endl;
+        input_thread_.shutdown();
+        input_config.backend = input::InputBackend::Polling;
+        input_config.raw_input.register_keyboard = false;
+        input_backend_state_.auto_fallback = true;
+        input_backend_state_.fallback_origin = InputFallbackOrigin::Gameplay;
+        input_backend_state_.fallback_reason = "RawInput start failed; Polling fallback kept gameplay input active.";
+        input_backend_state_.fallback_timestamp_utc = utc_timestamp_compact();
+        input_backend_state_.effective_backend = input::InputBackend::Polling;
+        if (!input_thread_.initialize(input_config)) {
+            return false;
+        }
+        if (!input_thread_.start()) {
+            return false;
+        }
     }
 
     countdown_active_ = true;

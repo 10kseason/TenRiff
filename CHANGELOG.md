@@ -5,9 +5,9 @@ TenRiff의 사용자/배포 관점에서 의미 있는 변경만 간단히 기�
 ## [1.1.2] - 2026-03-31
 
 ### Changed
-- gameplay live 입력 백엔드를 안정성 우선으로 다시 `Polling`에 고정하고, gameplay 세션의 always-allow 입력 게이트는 유지해 foreground 판정 때문에 인게임 입력 전체가 막히지 않도록 정리
-- 메뉴 입력은 기존 foreground process/root-window 경계를 그대로 유지하고, 저장된 `input.backend` / `input.rawinput` 값은 더 이상 gameplay fallback 결과로 영구 rewrite하지 않도록 유지
-- `1.1.1` 문서에서 하이브리드 gameplay 입력으로 설명하던 부분을 현재 코드 기준의 polling 고정 동작으로 정정
+- gameplay live 입력 백엔드는 저장된 RawInput 설정을 우선 사용하되 bound-key polling shadow를 함께 유지하고, RawInput 초기화/시작 실패 시 Polling으로 재시도해 입력 인식이 끊기지 않도록 정리
+- 메뉴 입력은 기존 foreground process/root-window 경계를 유지하면서 RawInput 시작 실패 시 Polling fallback으로 재시도하고, 저장된 `input.backend` / `input.rawinput` 값은 runtime fallback 결과로 영구 rewrite하지 않도록 유지
+- `1.1.1` 문서에서 하이브리드 gameplay 입력으로 설명하던 부분을 RawInput 우선 + polling shadow/fallback 동작 기준으로 다시 맞춤
 - `docs/baseline-1.1.2*`를 새 기준선 문서로 승격하고, `1.1.2` 라인을 현재 공개 기준의 `final stable` 버전으로 명명
 
 ### Packaging

@@ -126,6 +126,16 @@
             const double combo_position = clamp_gameplay_combo_position(preview.combo_position);
             const std::string note_shape = normalize_gameplay_note_shape(preview.note_shape);
             const bool note_border_enabled = preview.note_border_enabled;
+            const float preview_visual_opacity =
+                static_cast<float>(std::clamp(preview.visual_opacity, 0.20, 1.0));
+            const float preview_outline_opacity =
+                static_cast<float>(std::clamp(preview.note_outline_opacity, 0.0, 1.0) * preview_visual_opacity);
+            const float preview_hold_body_opacity =
+                static_cast<float>(std::clamp(preview.hold_body_opacity, 0.05, 0.60) * preview_visual_opacity);
+            const float preview_lane_bg_opacity =
+                static_cast<float>(std::clamp(preview.lane_background_opacity, 0.0, 0.45) * preview_visual_opacity);
+            const std::string preview_key_label_position =
+                config::normalize_skin_key_label_position_token(preview.key_label_position);
 
             const D2D1_ROUNDED_RECT field_rr =
                 D2D1::RoundedRect(D2D1::RectF(field_left, field_layout.top, field_right, field_layout.bottom),
@@ -143,12 +153,16 @@
                 const float x1 = gameplay_lane_right(field_layout, lane);
                 const uint32_t rgb = preview.lane_colors[static_cast<std::size_t>(lane)];
                 if (d2d_->note_fill_brush) {
-                    d2d_->note_fill_brush->SetColor(gameplay_lane_preview_fill(rgb, lane + 1 == preview.selected_lane));
-                    ctx->FillRectangle(D2D1::RectF(x0 + 2.0f,
-                                                   field_layout.top + 2.0f,
-                                                   x1 - 2.0f,
-                                                   field_layout.bottom - 2.0f),
-                                       d2d_->note_fill_brush.Get());
+                    d2d_->note_fill_brush->SetColor(
+                        gameplay_lane_preview_fill(rgb, lane + 1 == preview.selected_lane, preview_lane_bg_opacity));
+                    ctx->FillRoundedRectangle(
+                        D2D1::RoundedRect(D2D1::RectF(x0 + 2.0f,
+                                                      field_layout.top + 2.0f,
+                                                      x1 - 2.0f,
+                                                      field_layout.bottom - 2.0f),
+                                          5.0f,
+                                          5.0f),
+                        d2d_->note_fill_brush.Get());
                 }
                 if (preview.show_lane_dividers &&
                     d2d_->lane_divider_brush &&
@@ -183,7 +197,21 @@
             if (preview.show_judgement_line && d2d_->judgement_line_brush) {
                 const D2D1_RECT_F hit_line_rect =
                     gameplay_judgement_line_rect(field_layout, hit_line_y, note_height_scale);
-                ctx->FillRectangle(hit_line_rect, d2d_->judgement_line_brush.Get());
+                if (preview.judgement_line_glow_enabled) {
+                    const float saved_opacity = d2d_->judgement_line_brush->GetOpacity();
+                    d2d_->judgement_line_brush->SetOpacity(0.20f * preview_visual_opacity);
+                    ctx->FillRoundedRectangle(
+                        D2D1::RoundedRect(D2D1::RectF(field_left + 5.0f,
+                                                      hit_line_rect.top - 11.0f,
+                                                      field_right - 5.0f,
+                                                      hit_line_rect.bottom + 11.0f),
+                                          10.0f,
+                                          10.0f),
+                        d2d_->judgement_line_brush.Get());
+                    d2d_->judgement_line_brush->SetOpacity(saved_opacity);
+                }
+                ctx->FillRoundedRectangle(D2D1::RoundedRect(hit_line_rect, 5.0f, 5.0f),
+                                          d2d_->judgement_line_brush.Get());
                 ctx->DrawLine(D2D1::Point2F(field_left, hit_line_y), D2D1::Point2F(field_right, hit_line_y),
                               d2d_->judgement_line_brush.Get(), 1.4f);
             }
@@ -204,13 +232,13 @@
                 const bool draw_selected_hold_preview = (lane + 1 == preview.selected_lane) && d2d_->note_hold_brush;
                 const float y = draw_selected_hold_preview ? hit_line_y : default_y;
                 if (d2d_->note_fill_brush) {
-                    d2d_->note_fill_brush->SetColor(gameplay_note_fill_color(rgb));
+                    d2d_->note_fill_brush->SetColor(gameplay_note_fill_color(rgb, preview_visual_opacity));
                 }
                 if (d2d_->note_border_brush) {
-                    d2d_->note_border_brush->SetColor(gameplay_note_border_color(rgb));
+                    d2d_->note_border_brush->SetColor(gameplay_note_border_color(rgb, preview_outline_opacity));
                 }
                 if (d2d_->note_hold_brush) {
-                    d2d_->note_hold_brush->SetColor(gameplay_note_hold_color(rgb));
+                    d2d_->note_hold_brush->SetColor(gameplay_note_hold_color(rgb, preview_hold_body_opacity));
                 }
 
                 if (draw_selected_hold_preview) {
@@ -239,8 +267,28 @@
                 const D2D1_RECT_F note_rect = D2D1::RectF(x0, y - head_half_h, x1, y + head_half_h);
                 if (d2d_->note_fill_brush) {
                     draw_note_primitive(ctx, note_rect, d2d_->note_fill_brush.Get(), d2d_->note_border_brush.Get(),
-                                        1.2f, note_shape, note_border_enabled);
+                                        0.85f, note_shape, note_border_enabled);
                 }
+            }
+
+            if (preview_key_label_position != "off" && d2d_->hud_format && d2d_->text_brush) {
+                const bool top_labels = preview_key_label_position == "top";
+                const float label_top = top_labels ? field_layout.top + 8.0f : field_layout.bottom - 30.0f;
+                const D2D1_COLOR_F saved_text_color = d2d_->text_brush->GetColor();
+                d2d_->text_brush->SetColor(D2D1::ColorF(0xF7FAFD, 0.38f * preview_visual_opacity));
+                for (int lane = 0; lane < lane_count; ++lane) {
+                    const std::wstring lane_w = to_wide(std::to_string(lane + 1));
+                    draw_text_clipped_aligned(
+                        lane_w,
+                        d2d_->hud_format.Get(),
+                        D2D1::RectF(gameplay_lane_left(field_layout, lane) + 2.0f,
+                                    label_top,
+                                    gameplay_lane_right(field_layout, lane) - 2.0f,
+                                    label_top + 22.0f),
+                        d2d_->text_brush.Get(),
+                        DWRITE_TEXT_ALIGNMENT_CENTER);
+                }
+                d2d_->text_brush->SetColor(saved_text_color);
             }
 
             if (d2d_->header_format && d2d_->accent_brush) {
@@ -268,7 +316,9 @@
                 const D2D1_RECT_F swatch_rect = D2D1::RectF(x0 + 4.0f, swatch_top, x1 - 4.0f, swatch_top + swatch_height);
                 const D2D1_ROUNDED_RECT swatch_rr = D2D1::RoundedRect(swatch_rect, 10.0f, 10.0f);
                 if (d2d_->note_fill_brush) {
-                    d2d_->note_fill_brush->SetColor(gameplay_note_fill_color(preview.lane_colors[static_cast<std::size_t>(lane)]));
+                    d2d_->note_fill_brush->SetColor(
+                        gameplay_note_fill_color(preview.lane_colors[static_cast<std::size_t>(lane)],
+                                                 preview_visual_opacity));
                     ctx->FillRoundedRectangle(swatch_rr, d2d_->note_fill_brush.Get());
                 }
                 ID2D1SolidColorBrush* border =

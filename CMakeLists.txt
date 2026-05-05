@@ -100,6 +100,24 @@ target_link_libraries(tenriff_core
         tenriff_runtime
 )
 
+add_library(tenriff_bms_key_converter_core
+    src/app/BmsKeyConverter.cpp
+    src/app/BmsGameplayBuilder.cpp
+    src/chart/BmsParser.cpp
+    src/chart/BmsChartNorm.cpp
+    src/chart/BmsTimeline.cpp
+    src/chart/NoteLaneMapping.cpp
+    src/gameplay/GameplayChart.cpp
+    src/gameplay/KeyModeConverter.cpp
+)
+
+target_include_directories(tenriff_bms_key_converter_core
+    PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
+)
+
+target_compile_features(tenriff_bms_key_converter_core PUBLIC cxx_std_17)
+
 # Audio and input subsystem (Windows-specific for now).
 if(WIN32)
     target_link_libraries(tenriff_core
@@ -193,9 +211,9 @@ target_include_directories(bms_key_converter
 )
 
 if(WIN32)
-    target_link_libraries(bms_key_converter PRIVATE tenriff_chart tenriff_game tenriff_runtime tenriff_core tenriff_audio tenriff_app)
+    target_link_libraries(bms_key_converter PRIVATE tenriff_bms_key_converter_core)
 else()
-    target_link_libraries(bms_key_converter PRIVATE tenriff_chart tenriff_game tenriff_runtime tenriff_core)
+    target_link_libraries(bms_key_converter PRIVATE tenriff_bms_key_converter_core)
 endif()
 
 if(WIN32)
@@ -210,7 +228,7 @@ if(WIN32)
 
     target_link_libraries(bms_key_converter_gui
         PRIVATE
-            tenriff_core
+            tenriff_bms_key_converter_core
             comdlg32
             shell32
     )

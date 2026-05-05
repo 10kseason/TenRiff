@@ -41,11 +41,11 @@
   - `polling | rawinput`
   - 현재 `1.1.2` 릴리스 라인 기본값은 `rawinput`
   - 저장값은 그대로 유지되며 자동으로 `polling`으로 강제 저장되지는 않음
-  - 단, 현재 `1.1.2` gameplay 세션의 live 입력 캡처는 안정성 우선으로 `Polling`에 고정
+  - gameplay 세션은 `rawinput=true`일 때 RawInput을 먼저 띄우고, bound-key polling shadow와 시작 실패 시 Polling fallback으로 입력 인식 끊김을 막음
 - `rawinput` (bool)
   - `backend`와 함께 저장되는 편의 필드
   - 현재 `1.1.2` 릴리스 라인에서는 저장 시에도 현재 값이 유지됨
-  - gameplay runtime은 이 저장값과 무관하게 polling live capture를 사용하지만, 설정 파일 자체는 그대로 보존
+  - `true`이면 menu/gameplay 모두 RawInput을 우선 사용하되 입력 인식 유지를 위한 polling shadow/fallback을 허용
 - `use_qpc` (bool)
 - `grab` (bool)
   - 현재 Linux preview 성격
@@ -116,6 +116,7 @@
 - `key_mode` (string)
   - `none | auto | 4k | 5k | 6k | 7k | 8k | 9k | 10k | 16k`
   - `none`은 차트 원래 키 수를 그대로 사용
+  - `10k` 변환은 standalone BMS key converter의 krrcream식 10K preset과 맞춰 `max_keys=10`, `min_keys=1`, `transform_speed_slot=5`, `seed=0`으로 적용
 - `gauge` (string)
   - `normal | hard | easy`
 - `random` (string)
@@ -161,9 +162,32 @@
   - `auto | sd | hd | fhd`
   - LR2 playskin의 해상도 override 토큰
   - `auto`는 asset 파일명 대신 LR2 playskin `#DST_NOTE` 레이아웃 좌표를 기준으로 SD/HD/FHD family를 판정
+- `visual_preset` (string)
+  - `classic | neon | minimal | tenriff`
+  - Skins 메뉴에서 변경하면 아래 visual opacity/glow/key-label 옵션 묶음을 preset 값으로 즉시 재설정
 - `note_shape` (string)
   - `rect | circle`
+  - `rect`는 native renderer에서 둥근 박스형 note head/tail로 그려짐
 - `note_border_enabled` (bool)
+- `lane_background_opacity` (double)
+  - lane별 반투명 배경 alpha
+  - `0.00..0.45` 범위로 clamp
+- `visual_opacity` (double)
+  - note/receptor/key-label 계열 전체 opacity 배율
+  - `0.20..1.00` 범위로 clamp
+- `note_outline_opacity` (double)
+  - native note thin outline alpha
+  - `0.00..1.00` 범위로 clamp
+- `hold_body_opacity` (double)
+  - 롱노트 body alpha
+  - `0.05..0.60` 범위로 clamp
+- `judgement_line_glow_enabled` (bool)
+  - 판정선 주변 glow 표시
+- `key_pulse_enabled` (bool)
+  - 입력 순간 판정선 근처에 짧은 lane pulse 표시
+- `key_label_position` (string)
+  - `bottom | top | off`
+  - gameplay lane 안쪽에 현재 keymap의 키 이름을 작게 표시
 - `judgement_line_position` (double)
   - gameplay 판정선의 세로 위치 비율
   - `0.55..0.86` 범위로 clamp

@@ -65,6 +65,14 @@ KeyModeConverterOptions default_converter_options(int source_lane_count,
     options.base_bpm = context.base_bpm;
     options.sample_rate = context.sample_rate;
 
+    if (target_lane_count == 10) {
+        options.max_keys = 10;
+        options.min_keys = 1;
+        options.transform_speed_slot = 5;
+        options.seed = 0;
+        return options;
+    }
+
     if (target_lane_count >= 8 && target_lane_count > source_lane_count && source_lane_count <= 7) {
         options.max_keys = std::max(1, source_lane_count);
         options.min_keys = std::max(1, source_lane_count);
