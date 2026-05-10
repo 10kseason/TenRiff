@@ -720,6 +720,7 @@ bool MenuApp::initialize(const CommandLineOptions& options) {
     input_backend_state_.configured_backend = config_.input.rawinput ? input::InputBackend::RawInput
                                                                      : input::InputBackend::Polling;
     input_backend_state_.effective_backend = input_backend_state_.configured_backend;
+    last_gameplay_input_backend_state_ = input_backend_state_;
     const bool migrated_config = config_result.migrated;
     const bool stripped_session_only_mods = strip_session_only_mode_mods(config_);
     first_run_profile_ = config_result.used_defaults;
@@ -941,8 +942,19 @@ void MenuApp::start_menu_threads() {
 
     if (!input_started) {
         std::cerr << "[error] Failed to start input thread." << std::endl;
-    } else if (input_config.backend == input::InputBackend::Polling) {
-        rebuild_pressed_keys_from_polling_snapshot();
+    } else {
+        input_backend_state_.effective_backend = input_thread_.current_backend();
+        std::cerr << "[info] Menu input active configured="
+                  << input_backend_name(input_backend_state_.configured_backend)
+                  << " effective=" << input_backend_name(input_backend_state_.effective_backend)
+                  << " gate=foreground-process polling_scope=all-keys";
+        if (input_backend_state_.auto_fallback && !input_backend_state_.fallback_reason.empty()) {
+            std::cerr << " fallback_reason=\"" << input_backend_state_.fallback_reason << "\"";
+        }
+        std::cerr << std::endl;
+        if (input_config.backend == input::InputBackend::Polling) {
+            rebuild_pressed_keys_from_polling_snapshot();
+        }
     }
 
     const render::RenderConfig render_config = current_render_config();
@@ -1013,8 +1025,19 @@ void MenuApp::restart_input_thread() {
 
     if (!input_started) {
         std::cerr << "[error] Failed to restart input thread." << std::endl;
-    } else if (input_config.backend == input::InputBackend::Polling) {
-        rebuild_pressed_keys_from_polling_snapshot();
+    } else {
+        input_backend_state_.effective_backend = input_thread_.current_backend();
+        std::cerr << "[info] Menu input restarted configured="
+                  << input_backend_name(input_backend_state_.configured_backend)
+                  << " effective=" << input_backend_name(input_backend_state_.effective_backend)
+                  << " gate=foreground-process polling_scope=all-keys";
+        if (input_backend_state_.auto_fallback && !input_backend_state_.fallback_reason.empty()) {
+            std::cerr << " fallback_reason=\"" << input_backend_state_.fallback_reason << "\"";
+        }
+        std::cerr << std::endl;
+        if (input_config.backend == input::InputBackend::Polling) {
+            rebuild_pressed_keys_from_polling_snapshot();
+        }
     }
 }
 
