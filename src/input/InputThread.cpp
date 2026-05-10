@@ -375,12 +375,16 @@ void InputThread::thread_main_rawinput() {
     // Set thread priority (above normal for input responsiveness).
     SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_ABOVE_NORMAL);
 
+    const bool polling_shadow_enabled = config_.rawinput_polling_shadow;
     const int polling_hz = config_.polling_hz <= 0 ? 1000 : config_.polling_hz;
     const int64_t interval_ns = 1'000'000'000LL / static_cast<int64_t>(polling_hz);
-    const std::vector<uint32_t> keys = build_polling_key_list();
+    const std::vector<uint32_t> keys = polling_shadow_enabled ? build_polling_key_list()
+                                                              : std::vector<uint32_t>{};
     std::vector<uint8_t> last_state;
     last_state.reserve(keys.size());
-    refresh_polling_key_state(keys, last_state);
+    if (polling_shadow_enabled) {
+        refresh_polling_key_state(keys, last_state);
+    }
 
     int64_t next_poll_ns = timing::HighResClock::now_ns();
     while (!should_stop_.load(std::memory_order_acquire)) {
@@ -408,10 +412,14 @@ void InputThread::thread_main_rawinput() {
         const bool allowed = is_input_allowed();
         if (allowed != last_input_allowed_) {
             sync_input_gate(allowed);
-            refresh_polling_key_state(keys, last_state);
+            if (polling_shadow_enabled) {
+                refresh_polling_key_state(keys, last_state);
+            }
         }
 
-        if (!allowed) {
+        if (!polling_shadow_enabled) {
+            next_poll_ns = now_ns + interval_ns;
+        } else if (!allowed) {
             next_poll_ns = now_ns + interval_ns;
         } else if (now_ns >= next_poll_ns) {
             poll_input_keys(keys, last_state, now_ns);
@@ -419,11 +427,15 @@ void InputThread::thread_main_rawinput() {
         }
 
         if (!had_message) {
-            const int64_t remaining_ns = next_poll_ns - now_ns;
-            if (remaining_ns > 200'000) {
-                std::this_thread::sleep_for(std::chrono::nanoseconds(remaining_ns - 100'000));
+            if (polling_shadow_enabled) {
+                const int64_t remaining_ns = next_poll_ns - now_ns;
+                if (remaining_ns > 200'000) {
+                    std::this_thread::sleep_for(std::chrono::nanoseconds(remaining_ns - 100'000));
+                } else {
+                    std::this_thread::yield();
+                }
             } else {
-                std::this_thread::yield();
+                std::this_thread::sleep_for(std::chrono::milliseconds(1));
             }
         }
     }

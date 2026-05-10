@@ -911,6 +911,7 @@ void MenuApp::start_menu_threads() {
     input_config.raw_input.register_keyboard = config_.input.rawinput;
     input_config.raw_input.input_sink = true;
     input_config.raw_input.no_legacy = false;
+    input_config.rawinput_polling_shadow = false;
     input_config.polling_hz = config_.input.polling_hz;
     input_config.key_state.debounce_window_ns =
         std::max<int64_t>(0, static_cast<int64_t>(std::llround(config_.input.debounce_ms * 1'000'000.0)));
@@ -947,7 +948,10 @@ void MenuApp::start_menu_threads() {
         std::cerr << "[info] Menu input active configured="
                   << input_backend_name(input_backend_state_.configured_backend)
                   << " effective=" << input_backend_name(input_backend_state_.effective_backend)
-                  << " gate=foreground-process polling_scope=all-keys";
+                  << " gate=foreground-process "
+                  << (input_config.backend == input::InputBackend::RawInput
+                          ? "polling_shadow=off"
+                          : "polling_scope=all-keys");
         if (input_backend_state_.auto_fallback && !input_backend_state_.fallback_reason.empty()) {
             std::cerr << " fallback_reason=\"" << input_backend_state_.fallback_reason << "\"";
         }
@@ -994,6 +998,7 @@ void MenuApp::restart_input_thread() {
     input_config.raw_input.register_keyboard = config_.input.rawinput;
     input_config.raw_input.input_sink = true;
     input_config.raw_input.no_legacy = false;
+    input_config.rawinput_polling_shadow = false;
     input_config.polling_hz = config_.input.polling_hz;
     input_config.key_state.debounce_window_ns =
         std::max<int64_t>(0, static_cast<int64_t>(std::llround(config_.input.debounce_ms * 1'000'000.0)));
@@ -1030,7 +1035,10 @@ void MenuApp::restart_input_thread() {
         std::cerr << "[info] Menu input restarted configured="
                   << input_backend_name(input_backend_state_.configured_backend)
                   << " effective=" << input_backend_name(input_backend_state_.effective_backend)
-                  << " gate=foreground-process polling_scope=all-keys";
+                  << " gate=foreground-process "
+                  << (input_config.backend == input::InputBackend::RawInput
+                          ? "polling_shadow=off"
+                          : "polling_scope=all-keys");
         if (input_backend_state_.auto_fallback && !input_backend_state_.fallback_reason.empty()) {
             std::cerr << " fallback_reason=\"" << input_backend_state_.fallback_reason << "\"";
         }
@@ -1101,19 +1109,7 @@ void MenuApp::rebuild_pressed_keys_from_polling_snapshot() {
 }
 
 void MenuApp::note_runtime_input_event_source(const input::InputEvent& event) {
-    const bool polling_event = input_backend_for_event(event) == input::InputBackend::Polling;
-    const bool switching_to_polling = polling_event &&
-                                      input_backend_state_.configured_backend == input::InputBackend::RawInput &&
-                                      input_backend_state_.effective_backend != input::InputBackend::Polling;
-    sync_runtime_input_backend_state(input_backend_state_,
-                                     event,
-                                     InputFallbackOrigin::Menu,
-                                     switching_to_polling
-                                         ? "Polling shadow event observed while RawInput is configured."
-                                         : std::string_view{},
-                                     switching_to_polling
-                                         ? std::string_view{utc_timestamp_compact_menu()}
-                                         : std::string_view{});
+    sync_runtime_input_backend_state(input_backend_state_, event, InputFallbackOrigin::Menu);
 }
 
 std::string MenuApp::current_input_backend_status_label() const {

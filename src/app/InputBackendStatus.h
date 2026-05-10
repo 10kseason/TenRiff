@@ -2,7 +2,6 @@
 
 #include <cstdint>
 #include <string>
-#include <string_view>
 
 #include "input/InputThread.h"
 
@@ -46,23 +45,19 @@ struct InputBackendRuntimeState {
 
 inline void sync_runtime_input_backend_state(InputBackendRuntimeState& state,
                                              const input::InputEvent& event,
-                                             InputFallbackOrigin fallback_origin,
-                                             std::string_view fallback_reason = {},
-                                             std::string_view fallback_timestamp_utc = {}) {
-    state.effective_backend = input_backend_for_event(event);
+                                             InputFallbackOrigin fallback_origin) {
+    static_cast<void>(fallback_origin);
+
+    const input::InputBackend event_backend = input_backend_for_event(event);
     if (state.configured_backend == input::InputBackend::RawInput &&
-        state.effective_backend == input::InputBackend::Polling) {
-        state.auto_fallback = true;
-        state.fallback_origin = fallback_origin;
-        if (!fallback_reason.empty()) {
-            state.fallback_reason = std::string(fallback_reason);
-        }
-        if (!fallback_timestamp_utc.empty()) {
-            state.fallback_timestamp_utc = std::string(fallback_timestamp_utc);
-        }
+        event_backend == input::InputBackend::Polling) {
+        // RawInput can deliberately run polling as a shadow path. A shadow
+        // event is not an effective-backend switch and must not make menu
+        // diagnostics report Polling unless startup actually fell back.
         return;
     }
 
+    state.effective_backend = event_backend;
     state.auto_fallback = false;
     state.fallback_origin = InputFallbackOrigin::None;
     state.fallback_reason.clear();

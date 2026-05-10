@@ -70,19 +70,7 @@ void GameSession::rebuild_input_thread_config(input::InputThreadConfig& input_co
 }
 
 void GameSession::note_runtime_input_event_source(const input::InputEvent& event) {
-    const bool polling_event = input_backend_for_event(event) == input::InputBackend::Polling;
-    const bool switching_to_polling = polling_event &&
-                                      input_backend_state_.configured_backend == input::InputBackend::RawInput &&
-                                      input_backend_state_.effective_backend != input::InputBackend::Polling;
-    sync_runtime_input_backend_state(input_backend_state_,
-                                     event,
-                                     InputFallbackOrigin::Gameplay,
-                                     switching_to_polling
-                                         ? "Polling shadow event observed while RawInput is configured."
-                                         : std::string_view{},
-                                     switching_to_polling
-                                         ? std::string_view{utc_timestamp_compact()}
-                                         : std::string_view{});
+    sync_runtime_input_backend_state(input_backend_state_, event, InputFallbackOrigin::Gameplay);
 }
 
 void GameSession::rebuild_polled_gameplay_keys() {

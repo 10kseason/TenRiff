@@ -36,7 +36,7 @@ TEST_CASE("input backend status detail keeps fallback origin and timestamp") {
           "RawInput inactive for bound gameplay keys, switching to Polling");
 }
 
-TEST_CASE("input backend status detects polling shadow events as auto-fallback when rawinput is configured") {
+TEST_CASE("input backend status keeps rawinput effective when polling shadow events are observed") {
     InputBackendRuntimeState state;
     state.configured_backend = InputBackend::RawInput;
     state.effective_backend = InputBackend::RawInput;
@@ -45,16 +45,12 @@ TEST_CASE("input backend status detects polling shadow events as auto-fallback w
     polled_event.device_id = kPollingAggregateDeviceId;
     CHECK(input_backend_for_event(polled_event) == InputBackend::Polling);
 
-    sync_runtime_input_backend_state(state,
-                                     polled_event,
-                                     InputFallbackOrigin::Gameplay,
-                                     "Polling shadow event observed while RawInput is configured.",
-                                     "20260331_010203Z");
-    CHECK(state.effective_backend == InputBackend::Polling);
-    CHECK(state.auto_fallback);
-    CHECK(state.fallback_origin == InputFallbackOrigin::Gameplay);
-    CHECK(state.fallback_reason == "Polling shadow event observed while RawInput is configured.");
-    CHECK(state.fallback_timestamp_utc == "20260331_010203Z");
+    sync_runtime_input_backend_state(state, polled_event, InputFallbackOrigin::Gameplay);
+    CHECK(state.effective_backend == InputBackend::RawInput);
+    CHECK_FALSE(state.auto_fallback);
+    CHECK(state.fallback_origin == InputFallbackOrigin::None);
+    CHECK(state.fallback_reason.empty());
+    CHECK(state.fallback_timestamp_utc.empty());
 }
 
 TEST_CASE("input backend status preserves startup fallback diagnostics across later polling events") {
@@ -83,7 +79,7 @@ TEST_CASE("input backend status clears auto-fallback when rawinput events resume
     state.effective_backend = InputBackend::Polling;
     state.auto_fallback = true;
     state.fallback_origin = InputFallbackOrigin::Gameplay;
-    state.fallback_reason = "Polling shadow event observed while RawInput is configured.";
+    state.fallback_reason = "RawInput start failed; Polling fallback kept gameplay input active.";
     state.fallback_timestamp_utc = "20260331_010203Z";
 
     InputEvent raw_event{};
