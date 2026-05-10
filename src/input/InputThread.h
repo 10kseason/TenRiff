@@ -47,6 +47,7 @@ struct InputThreadConfig {
     KeyStateConfig key_state;      ///< Key state tracker configuration.
     int polling_hz = 1000;         ///< Polling frequency for polling backend.
     std::vector<uint32_t> polling_keys;  ///< Optional list of keys to poll (empty = all 0..255).
+    bool rawinput_polling_shadow = true;  ///< Poll selected keys while RawInput remains primary.
 };
 
 /// Input thread wrapper for asynchronous RawInput processing.
