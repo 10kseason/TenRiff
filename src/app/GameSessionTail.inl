@@ -604,9 +604,9 @@ bool GameSession::initialize(const CommandLineOptions& options) {
         }
         key_to_lane_[keycode.value()] = lane_index.value();
     }
-    const char* gameplay_input_backend_label =
-        config_.input.rawinput ? "RawInput+PollingShadow" : "Polling";
-    std::cerr << "[info] Gameplay input backend=" << gameplay_input_backend_label
+    std::cerr << "[info] Gameplay input configured="
+              << input_backend_name(input_backend_state_.configured_backend)
+              << " polling_shadow=" << (config_.input.rawinput ? "bound-keys" : "primary")
               << " key_mode=" << active_key_mode
               << " bound_lanes=" << key_to_lane_.size() << "/" << std::max(1, chart_.lane_count)
               << " keymap_normalized=" << keymap_result.normalized_binding_count
@@ -634,6 +634,11 @@ bool GameSession::initialize(const CommandLineOptions& options) {
 
     input::InputThreadConfig input_config;
     rebuild_input_thread_config(input_config);
+    std::cerr << "[info] Gameplay input startup requested="
+              << input_backend_name(input_config.backend)
+              << " gate=always polling_keys=" << input_config.polling_keys.size()
+              << " polling_shadow=" << (config_.input.rawinput ? "bound-keys" : "primary")
+              << std::endl;
     if (!input_thread_.initialize(input_config)) {
         if (input_config.backend != input::InputBackend::RawInput) {
             return false;
@@ -700,6 +705,16 @@ bool GameSession::initialize(const CommandLineOptions& options) {
             return false;
         }
     }
+    input_backend_state_.effective_backend = input_thread_.current_backend();
+    std::cerr << "[info] Gameplay input active configured="
+              << input_backend_name(input_backend_state_.configured_backend)
+              << " effective=" << input_backend_name(input_backend_state_.effective_backend)
+              << " gate=always polling_keys=" << input_config.polling_keys.size()
+              << " polling_shadow=" << (config_.input.rawinput ? "bound-keys" : "primary");
+    if (input_backend_state_.auto_fallback && !input_backend_state_.fallback_reason.empty()) {
+        std::cerr << " fallback_reason=\"" << input_backend_state_.fallback_reason << "\"";
+    }
+    std::cerr << std::endl;
 
     countdown_active_ = true;
     countdown_value_ = static_cast<int>(kGameplayStartCountdownSeconds);

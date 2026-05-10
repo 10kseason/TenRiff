@@ -566,9 +566,13 @@ void MenuApp::populate_result_render_data(render::MenuRenderData& render, const 
     if (!render.result.result_file.empty()) {
         render.result.notes.push_back(ui_text("Result: ", "결과 파일: ") + render.result.result_file);
     }
-    render.result.notes.push_back(current_input_backend_status_label());
-    if (const std::string detail = current_input_backend_status_detail(); !detail.empty()) {
-        render.result.notes.push_back(detail);
+    render.result.notes.push_back(ui_text("Gameplay ", "게임플레이 ") +
+                                  format_input_backend_status_label(last_gameplay_input_backend_state_,
+                                                                    ui_uses_korean()));
+    if (const std::string detail =
+            format_input_backend_status_detail(last_gameplay_input_backend_state_, ui_uses_korean());
+        !detail.empty()) {
+        render.result.notes.push_back(ui_text("Gameplay ", "게임플레이 ") + detail);
     }
     render.result.notes.push_back(ui_text("Left restarts the same chart immediately.", "Left로 같은 차트를 즉시 재시작합니다."));
     if (render.result.replay_available) {
@@ -970,6 +974,12 @@ void MenuApp::launch_gameplay(const std::string& chart_path, const std::string& 
     }
 
     screen_ = Screen::Gameplay;
+    last_gameplay_input_backend_state_ = {};
+    last_gameplay_input_backend_state_.configured_backend = config_.input.rawinput
+                                                                ? input::InputBackend::RawInput
+                                                                : input::InputBackend::Polling;
+    last_gameplay_input_backend_state_.effective_backend =
+        last_gameplay_input_backend_state_.configured_backend;
     apply_runtime_graphics_config();
     {
         std::lock_guard<std::mutex> lock(gameplay_hud_mutex_);
@@ -1174,6 +1184,7 @@ void MenuApp::launch_gameplay(const std::string& chart_path, const std::string& 
         play_options.ghost_replay_path = best_replay_path_for_selected_song();
     }
     if (!session.initialize(play_options)) {
+        last_gameplay_input_backend_state_ = session.input_backend_state();
         const bool loading_canceled = session.was_user_aborted();
         session.shutdown();
         if (!loading_canceled) {
@@ -1192,6 +1203,7 @@ void MenuApp::launch_gameplay(const std::string& chart_path, const std::string& 
     }
 
     session.run();
+    last_gameplay_input_backend_state_ = session.input_backend_state();
     session.shutdown();
 
     const double session_hispeed = session.final_hispeed();

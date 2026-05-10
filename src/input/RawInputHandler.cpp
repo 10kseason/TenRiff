@@ -7,6 +7,7 @@
 #endif
 #include <windows.h>
 
+#include <iostream>
 #include <limits>
 
 namespace tenriff::input {
@@ -27,6 +28,7 @@ RawInputHandler::~RawInputHandler() {
 
 bool RawInputHandler::initialize(HWND hwnd, const RawInputConfig& config) {
     if (!hwnd) {
+        std::cerr << "[warn] RawInput registration skipped: missing target window." << std::endl;
         return false;
     }
 
@@ -67,14 +69,25 @@ bool RawInputHandler::initialize(HWND hwnd, const RawInputConfig& config) {
     }
 
     if (devices.empty()) {
+        std::cerr << "[warn] RawInput registration skipped: no devices requested." << std::endl;
         return false;
     }
 
+    SetLastError(ERROR_SUCCESS);
     BOOL result = RegisterRawInputDevices(
         devices.data(),
         static_cast<UINT>(devices.size()),
         sizeof(RAWINPUTDEVICE)
     );
+
+    if (result != TRUE) {
+        std::cerr << "[warn] RegisterRawInputDevices failed error=" << GetLastError()
+                  << " keyboard=" << (config.register_keyboard ? "true" : "false")
+                  << " gamepad=" << (config.register_gamepad ? "true" : "false")
+                  << " input_sink=" << (config.input_sink ? "true" : "false")
+                  << " no_legacy=" << (config.no_legacy ? "true" : "false")
+                  << std::endl;
+    }
 
     return result == TRUE;
 }

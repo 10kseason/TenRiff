@@ -540,6 +540,7 @@ private:
     uint32_t key_f5_ = 0;
     uint32_t key_f9_ = 0;
     InputBackendRuntimeState input_backend_state_{};
+    InputBackendRuntimeState last_gameplay_input_backend_state_{};
 };
 
 }  // namespace tenriff::app

@@ -321,6 +321,8 @@ void InputThread::thread_main_rawinput() {
     const DWORD class_error = class_atom == 0 ? GetLastError() : ERROR_SUCCESS;
     const bool registered_class = class_atom != 0;
     if (!registered_class && class_error != ERROR_CLASS_ALREADY_EXISTS) {
+        std::cerr << "[warn] RawInput hidden window class registration failed error="
+                  << class_error << std::endl;
         signal_start_result(false);
         is_running_.store(false, std::memory_order_release);
         return;
@@ -340,6 +342,8 @@ void InputThread::thread_main_rawinput() {
     );
 
     if (!hwnd) {
+        std::cerr << "[warn] RawInput hidden message window creation failed error="
+                  << GetLastError() << std::endl;
         signal_start_result(false);
         if (registered_class) {
             UnregisterClassW(kWindowClassName, GetModuleHandleW(nullptr));
