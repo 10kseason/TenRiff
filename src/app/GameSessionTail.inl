@@ -34,6 +34,7 @@ void GameSession::rebuild_input_thread_config(input::InputThreadConfig& input_co
     input_config.backend = config_.input.rawinput ? input::InputBackend::RawInput
                                                   : input::InputBackend::Polling;
     input_config.gate_policy = input::InputGatePolicy::AlwaysAllow;
+    input_config.rawinput_polling_shadow = false;
     input_config.raw_input.register_keyboard = config_.input.rawinput;
     input_config.raw_input.input_sink = true;
     input_config.raw_input.no_legacy = false;
@@ -507,6 +508,9 @@ bool GameSession::initialize(const CommandLineOptions& options) {
     gameplay_config.input_offset_ms = config_.input_offset_ms;
     gameplay_config.practice_no_fail_enabled = practice_no_fail_enabled_;
     switch (mode_result.settings.gauge) {
+        case gameplay::GaugeMode::ExHard:
+            gameplay_config.initial_gauge = game::GaugeType::ExHard;
+            break;
         case gameplay::GaugeMode::Hard:
             gameplay_config.initial_gauge = game::GaugeType::Hard;
             break;
@@ -657,12 +661,8 @@ bool GameSession::initialize(const CommandLineOptions& options) {
     if (ghost_replay_enabled_) {
         gameplay::GameplayConfig ghost_config = gameplay_config;
         if (!ghost_replay_source_.mode.gauge.empty()) {
-            if (ghost_replay_source_.mode.gauge == "hard") {
-                ghost_config.initial_gauge = game::GaugeType::Hard;
-            } else if (ghost_replay_source_.mode.gauge == "easy") {
-                ghost_config.initial_gauge = game::GaugeType::Easy;
-            } else {
-                ghost_config.initial_gauge = game::GaugeType::Normal;
+            if (auto gauge = parse_gauge_type(ghost_replay_source_.mode.gauge)) {
+                ghost_config.initial_gauge = gauge.value();
             }
         }
         ghost_engine_ = std::make_unique<gameplay::GameplayEngine>(chart_, ghost_config);

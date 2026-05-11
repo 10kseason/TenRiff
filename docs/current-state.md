@@ -3,15 +3,15 @@
 이 문서는 다음 에이전트나 새 작업자가 가장 먼저 읽어야 하는 현재 상태 문서입니다. 목표는 "지금 이 프로젝트가 무엇이고, 어디를 보면 되고, 무엇이 아직 미검증인지"를 빠르게 파악하게 하는 것입니다.
 
 ## Baseline
-- 현재 프로젝트 버전은 `1.1.2`
-- 현재 `1.1.2` 라인은 공개 기준의 `final stable` 버전으로 명명됨
+- 현재 프로젝트 버전은 `1.1.3`
+- 현재 `1.1.3` 라인은 `1.1.2 final stable` 기준선 위에 쌓은 후속 버전
 - 후속 작업의 기준선 문서는 `docs/baseline-1.1.2.md`
 - Windows GUI 빌드가 메인 타깃
 - Linux는 `Baepoks-Linuxs/TenRiff-0.5.0-linux-preview` 수준의 preview만 존재
 - 기본 표면은 BMS-first
 - `.osu`는 옵션으로 다시 활성화 가능하며 4K~10K를 지원
-- `1.1.2` 릴리스 라인은 `1.0.9`의 gameplay playback-head 입력 타이밍 보정을 유지하면서, gameplay live 입력 캡처는 저장된 RawInput 설정을 우선 사용하고 bound-key polling shadow와 RawInput 시작 실패 시 Polling fallback으로 입력 인식이 끊기지 않게 함
-- 같은 `1.1.2` 라인에서 메뉴 입력은 기존 foreground process/root-window 경계를 유지하고, RawInput 시작 실패 시 Polling fallback으로 재시도하지만 profile 입력 설정은 영구 rewrite하지 않고 저장된 backend 설정을 그대로 보존
+- `1.1.3` 릴리스 라인은 `1.0.9`의 gameplay playback-head 입력 타이밍 보정을 유지하면서, gameplay live 입력 캡처는 저장된 RawInput 설정을 우선 사용하고 세션 로컬 bound-key polling fallback으로 RawInput edge 누락을 보정함
+- 같은 `1.1.3` 라인에서 메뉴 입력은 기존 foreground process/root-window 경계를 유지하고, RawInput 시작 실패 시 Polling fallback으로 재시도하지만 profile 입력 설정은 영구 rewrite하지 않고 저장된 backend 설정을 그대로 보존
 
 ## Core Architecture
 - `MenuApp`
@@ -26,7 +26,7 @@
   - 오디오 마스터 클럭과 믹싱 담당
 - `InputThread`
   - RawInput/폴링 입력 수집 후 큐로 전달
-  - RawInput 모드에서도 bound-key polling shadow를 함께 운용해 RawInput 이벤트가 누락되는 환경에서 입력 인식이 끊기지 않게 함
+  - gameplay RawInput thread 내부 polling shadow는 끄고, `GameSession` 쪽 bound-key polling fallback이 누락된 edge를 보정함
 - `RenderThread` + `MenuWindow`
   - D3D11 + Direct2D/DirectWrite 기반 메뉴/인게임 HUD 렌더
   - 최근 유지보수 리팩터에서 대형 구현 파일을 조각 파일로 분리하는 방향으로 정리 중
@@ -87,6 +87,7 @@
   - 미래 노트 상단 진입 easing
   - 마지막 판정 노트 처리 직후 플레이 종료
 - Judge:
+  - 게이지 모드는 `EX-Hard / Hard / Normal / Easy`를 지원하며 모두 `100%`에서 시작하고 `0%`에서 즉시 실패함
   - 기본 `GOOD` 범위는 `75ms`
   - 기본 `BAD` 범위는 `340ms`
   - note-consuming 실패(auto-miss, 너무 빨리 눌러 노트를 소모한 경우, hold break/tail miss)는 `BAD`

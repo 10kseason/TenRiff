@@ -39,13 +39,13 @@ profile が存在しない場合は初回起動時に自動生成されます。
 ### `input`
 - `backend` (string)
   - `polling | rawinput`
-  - 現在の `1.1.2 final stable` ラインの既定値は `rawinput`
+  - 現在の `1.1.3` ラインの既定値は `rawinput`
   - 保存時に `polling` へ強制正規化されず、保存値はそのまま維持される
-  - gameplay セッションは `rawinput=true` の場合 RawInput を優先し、bound-key polling shadow と RawInput 起動失敗時の Polling fallback で入力認識を維持する
+  - gameplay セッションは `rawinput=true` の場合 RawInput を優先し、session-local bound-key polling fallback で RawInput edge の取りこぼしを補正する
 - `rawinput` (bool)
   - `backend` と並ぶ便宜的な保存フラグ
-  - 現在の `1.1.2 final stable` ラインではそのまま保存/復元される
-  - `true` の場合 menu/gameplay は RawInput を優先しつつ、入力認識維持のため polling shadow/fallback を許可する
+  - 現在の `1.1.3` ラインではそのまま保存/復元される
+  - `true` の場合 menu/gameplay は RawInput を優先しつつ、入力認識維持のため polling fallback を許可する
 - `use_qpc` (bool)
 - `grab` (bool)
   - 現状では Linux preview 向け設定
@@ -57,10 +57,10 @@ profile が存在しない場合は初回起動時に自動生成されます。
 - `judgement_hz` (int)
   - `1000 | 2000 | 4000 | 8000`
   - input config に残っている互換フィールド
-  - 現在の `1.1.2` runtime では別個の audio-thread judgement sub-step loop をこれで駆動しない
+  - 現在の `1.1.3` runtime では別個の audio-thread judgement sub-step loop をこれで駆動しない
   - 既定は `4000` (`0.25ms`)
 - `debounce_ms` (double)
-  - 同じキーの極短い up/down ノイズを落とす debounce 時間
+  - 入力状態追跡の設定値。現在の runtime は実際の Press/Release 遷移を debounce で捨てず、同一状態の duplicate event だけを押下状態追跡から除外する
   - `0..25` に clamp
   - 既定値は `8ms`
 
@@ -88,9 +88,9 @@ profile が存在しない場合は初回起動時に自動生成されます。
 
 ### `gauge`
 - automatic gauge shift はありません。選択した gauge type は曲終了または失敗まで固定です。
-- Hard、Normal、Easy はすべて `100%` で開始し、`0%` で即失敗します。
+- EX-Hard、Hard、Normal、Easy はすべて `100%` で開始し、`0%` で即失敗します。
 - `delta`
-  - `hard`, `normal`, `easy`
+  - `ex_hard`, `hard`, `normal`, `easy`
   - それぞれ `PG`, `GR`, `GD`, `BD`, `PR` を持つ
 
 ### `graphics`
@@ -117,7 +117,7 @@ profile が存在しない場合は初回起動時に自動生成されます。
   - `none | auto | 4k | 5k | 6k | 7k | 8k | 9k | 10k | 16k`
   - `none` は譜面本来の key count をそのまま使う
 - `gauge` (string)
-  - `normal | hard | easy`
+  - `normal | hard | ex_hard | easy`
 - `random` (string)
   - `off | fr | sr`
 - `random_seed` (int)

@@ -2,6 +2,16 @@
 
 TenRiff의 사용자/배포 관점에서 의미 있는 변경만 간단히 기록합니다.
 
+## [1.1.3] - 2026-05-11
+
+### Added
+- `EX-Hard` 게이지를 추가해 Hard보다 낮은 회복과 더 큰 `BAD`/`POOR` 손실을 가진 도전용 clear status(`EX-HARD CLEAR`)를 지원
+
+### Fixed
+- LN/hold 판정의 `0.5` weight가 게이지 증감에도 적용되도록 수정하고, Easy 25% 이하 `BAD` 완화가 weighted hold `BAD`에도 같이 적용되도록 정리
+- 너무 늦은 입력으로 직전 노트를 `BAD` 처리한 경우 같은 입력이 다음 노트를 즉시 판정하지 않도록 mask 기준을 입력 시각으로 변경
+- gameplay RawInput 경로에서 thread 내부 polling shadow를 끄고, polling release가 stale RawInput source를 정리하도록 해 키가 눌린 상태로 stuck 되는 입력 누락 가능성을 줄임
+
 ## [1.1.2] - 2026-03-31
 
 ### Changed

@@ -4,7 +4,7 @@ This roadmap captures the recommended high-level order for building out the game
 
 ## Current baseline
 - Windows GUI/runtime is the primary supported path.
-- Project version line is `1.1.2`, named the current public `final stable` version.
+- Project version line is `1.1.3`, built on the `1.1.2 final stable` baseline.
 - BMS-first menu/runtime is active by default, with optional 4K-10K `.osu` support behind config/menu toggles.
 - For current shipped behavior, read `docs/current-state.md` first; this roadmap is about direction and remaining work.
 

@@ -3,15 +3,15 @@
 この文書は、次のエージェントや新しい作業者が最初に読むべき current-state 文書です。目的は、「このプロジェクトは今どういう状態で、どこを見ればよく、何がまだ未検証か」を素早く把握できるようにすることです。
 
 ## Baseline
-- 現在のプロジェクト版は `1.1.2`
-- `1.1.2` ラインは公開基準の `final stable` バージョンとして命名されている
+- 現在のプロジェクト版は `1.1.3`
+- `1.1.3` ラインは `1.1.2 final stable` ベースラインの上に積み重ねた後続バージョン
 - 後続作業の基準文書は `docs/baseline-1.1.2.ja.md`
 - Windows GUI ビルドが主対象
 - Linux は `Baepoks-Linuxs/TenRiff-0.5.0-linux-preview` レベルの preview のみ
 - 既定サーフェスは BMS-first
 - `.osu` はオプションで再有効化でき、4K-10K をサポート
-- `1.1.2` リリースラインは `1.0.9` の gameplay playback-head 入力タイミング補正を維持しつつ、live gameplay 入力は保存済み RawInput 設定を優先し、bound-key polling shadow と RawInput 起動失敗時の Polling fallback で入力認識を維持する
-- 同じ `1.1.2` ラインで、menu 入力は従来の foreground process/root-window 境界を維持し、RawInput 起動失敗時は Polling fallback で再試行するが、profile 入力設定の永続 rewrite はせず保存済み backend 設定を保持する
+- `1.1.3` リリースラインは `1.0.9` の gameplay playback-head 入力タイミング補正を維持しつつ、live gameplay 入力は保存済み RawInput 設定を優先し、session-local bound-key polling fallback で RawInput edge の取りこぼしを補正する
+- 同じ `1.1.3` ラインで、menu 入力は従来の foreground process/root-window 境界を維持し、RawInput 起動失敗時は Polling fallback で再試行するが、profile 入力設定の永続 rewrite はせず保存済み backend 設定を保持する
 
 ## Core Architecture
 - `MenuApp`
@@ -26,6 +26,7 @@
   - オーディオのマスタークロックとミキシングを担当
 - `InputThread`
   - RawInput / polling 入力を収集し、キューへ渡す
+  - gameplay では RawInput thread 内部の polling shadow を切り、`GameSession` 側の bound-key polling fallback が missed edge を補正する
 - `RenderThread` + `MenuWindow`
   - D3D11 + Direct2D/DirectWrite ベースの menu / gameplay HUD レンダリング
   - 最近の保守リファクタでは大きな実装ファイルを細分化している
@@ -86,6 +87,7 @@
   - note-consuming failure（auto-miss、早すぎる消費、hold break / tail miss）は `BAD`
   - かなり早い non-consuming press は LR2 スタイル `POOR` として扱われ、result / replay / UI に再表示される
   - `POOR` は combo を切らず、score / accuracy には入らず、専用 `PR` gauge damage を使う
+  - gauge mode は `EX-Hard / Hard / Normal / Easy` をサポートし、すべて `100%` で開始して `0%` で即失敗する
   - live gameplay input は `ClockSync` 推定値を直接使い、stale backlog compression は再び `BAD` window 基準で動く
   - tail release timing は osu hold と BMS `#LNMODE 2` charge note のみに適用
   - 2 台のキーボードが同じキーを押しても、最後の入力ソースが離すまで論理 `Pressed` は維持される

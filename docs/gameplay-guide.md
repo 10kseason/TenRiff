@@ -143,14 +143,16 @@ Hi-Speed는 시각 스크롤 속도만 바꾸고, 판정 타이밍 자체를 바
 - `PR`: Poor / Miss
 
 ### 게이지
-선택 가능한 기본 게이지는 아래 세 가지입니다.
+선택 가능한 기본 게이지는 아래 네 가지입니다.
 
+- `ex_hard`
 - `hard`
 - `normal`
 - `easy`
 
 선택한 게이지는 곡 시작 시 항상 `100%`에서 시작합니다.
 
+- `ex_hard`: Hard보다 회복이 낮고 `BAD`/`POOR` 손실이 더 큰 도전용 게이지. `0%`가 되는 즉시 Game Over
 - `hard`: `0%`가 되는 즉시 Game Over
 - `normal`: `0%`가 되는 즉시 Game Over
 - `easy`: `0%`가 되는 즉시 Game Over

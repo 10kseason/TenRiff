@@ -11,9 +11,9 @@ TenRiff prioritizes minimal input-to-judgement-to-sound latency (<20 ms end-to-e
 - **Raw event hygiene**:
   - Windows: register `WM_INPUT` with `RIDEV_EXINPUTSINK | RIDEV_NOLEGACY`, fetch data via `GetRawInputData`, and cache `QueryPerformanceFrequency` using 64-bit math.
   - Linux: allow toggling `EVIOCGRAB` to exclusively claim devices, with a UI warning about potential compatibility trade-offs.
-- **Noise/debounce filter**: Drop repeated up/down pairs that arrive within the configured debounce window on the same key to reject hardware chatter.
+- **Noise/debounce filter**: Drop duplicate same-state edges while preserving real Press/Release transitions, so fast taps and releases cannot leave a key stuck down.
 - **Multi-device ingest**: Process keyboards and gamepads on their own threads (RawInput/DirectInput/XInput or evdev with `poll`/`epoll`) and merge events into the shared SPSC queue with unified timestamps.
-- **Stateful debounce**: Track a per-key state machine (UP/DOWN) so duplicate DOWNs while DOWN (and UPs while UP) are discarded, and collapse fast down→up→down chatter that arrives within the current debounce window (default `8 ms`).
+- **Stateful input tracking**: Track a per-key state machine (UP/DOWN) so duplicate DOWNs while DOWN and UPs while UP are discarded without swallowing valid down→up→down rhythm input.
 
 ## Audio and threading
 - **Alternate audio backends**: Offer `--audio-backend=wasapi|asio` on Windows and `--audio-backend=alsa|jack` on Linux to reach lower buffers on pro interfaces.

@@ -10,9 +10,9 @@ TenRiff 以最小输入到判定到声音的延迟（端到端 <20 ms）为优�
 - **原始事件卫生处理**：
   - Windows：注册 `WM_INPUT` 时使用 `RIDEV_EXINPUTSINK | RIDEV_NOLEGACY`，通过 `GetRawInputData` 取数据，并用 64 位数学缓存 `QueryPerformanceFrequency`
   - Linux：允许切换 `EVIOCGRAB` 以独占设备，同时在 UI 中提示兼容性取舍
-- **噪声/去抖过滤**：对同一按键在配置的 debounce 窗口内到达的重复 up/down 对进行丢弃，过滤硬件抖动
+- **噪声/去抖过滤**：丢弃同状态重复边沿，但保留真实 Press/Release 转换，避免快速点击或 release 让按键卡在按下状态
 - **多设备输入**：让键盘和手柄各自走独立线程（RawInput/DirectInput/XInput 或带 `poll`/`epoll` 的 evdev），再把事件合并进共享 SPSC queue，并统一时间戳
-- **状态型去抖**：为每个键维护 UP/DOWN 状态机，把 DOWN 状态下的重复 DOWN 和 UP 状态下的重复 UP 丢掉，同时把落在当前 debounce 窗口内的 down→up→down 抖动压缩掉（默认 `8 ms`）
+- **状态型输入跟踪**：为每个键维护 UP/DOWN 状态机，把 DOWN 状态下的重复 DOWN 和 UP 状态下的重复 UP 丢掉，但不吞掉有效的 down→up→down 节奏输入
 
 ## 音频与线程
 - **替代音频 backend**：在 Windows 上提供 `--audio-backend=wasapi|asio`，在 Linux 上提供 `--audio-backend=alsa|jack`，以便专业接口能跑到更低 buffer。

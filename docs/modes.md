@@ -22,7 +22,7 @@
 ## 모드 의미
 - `format`: `auto | bms | osu`
 - `key_mode`: `none | auto | 4k | 5k | 6k | 7k | 8k | 9k | 10k | 16k`
-- `gauge`: `normal | hard | easy`
+- `gauge`: `normal | hard | ex_hard | easy`
 - `random`: `off | fr | sr`
 - `random_seed`: 랜덤 고정 시드 (0도 고정 값으로 취급)
 - `enable_osu_charts`: `false | true`
@@ -44,6 +44,11 @@
 - `none`은 차트 레인 수와 기본 패턴 레이아웃을 그대로 사용
 - `auto`는 legacy alias로 남아 있으며 현재는 `none`과 같은 동작
 - `4k..16k`는 N2NC 기반 lane remap으로 키 수를 맞춤
+
+## 게이지 규칙
+- 모든 게이지는 `100%`에서 시작하고 `0%`에 도달하면 즉시 실패합니다.
+- `ex_hard`는 Hard보다 회복이 낮고 `BAD`/`POOR` 손실이 더 큰 도전용 게이지입니다.
+- clear status는 `EX-HARD CLEAR`, `HARD CLEAR`, `CLEAR`, `EASY CLEAR` 순으로 구분됩니다.
 
 ## 구현 위치
 - 모드 파싱: `src/gameplay/ModeSettings.*`, `src/app/ModeResolver.*`

@@ -28,6 +28,7 @@ std::string to_string(KeyMode mode) {
 
 std::string to_string(GaugeMode mode) {
     switch (mode) {
+        case GaugeMode::ExHard: return "EX-HARD";
         case GaugeMode::Hard: return "HARD";
         case GaugeMode::Easy: return "EASY";
         case GaugeMode::Normal: default: return "NORMAL";
@@ -108,6 +109,9 @@ std::optional<KeyMode> parse_key_mode(std::string_view token) {
 
 std::optional<GaugeMode> parse_gauge_mode(std::string_view token) {
     std::string normalized = normalize(token);
+    if (normalized == "EXHARD" || normalized == "EX-HARD" || normalized == "EX_HARD") {
+        return GaugeMode::ExHard;
+    }
     if (normalized == "HARD") {
         return GaugeMode::Hard;
     }

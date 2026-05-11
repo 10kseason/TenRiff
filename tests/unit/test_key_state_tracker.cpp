@@ -41,7 +41,7 @@ TEST_CASE("KeyStateTracker filters duplicate key events") {
     CHECK(!result.has_value());
 }
 
-TEST_CASE("KeyStateTracker filters chatter within debounce window") {
+TEST_CASE("KeyStateTracker does not swallow release edges within debounce window") {
     KeyStateConfig config;
     config.debounce_window_ns = 5'000'000;  // 5ms
     KeyStateTracker tracker(config);
@@ -54,27 +54,23 @@ TEST_CASE("KeyStateTracker filters chatter within debounce window") {
     auto result = tracker.process(press1);
     REQUIRE(result.has_value());
 
-    // Release at t=2ms (within debounce window) - should be filtered as chatter.
+    // Release at t=2ms (within debounce window) must still pass so the key cannot get stuck down.
     InputEvent release{};
     release.keycode = 0x44;
     release.state = InputState::Released;
     release.input_time_ns = 2'000'000;
     result = tracker.process(release);
-    CHECK(!result.has_value());
+    REQUIRE(result.has_value());
+    CHECK(result->state == InputState::Released);
+    CHECK_FALSE(tracker.is_key_pressed(0x44));
 
-    // Release at t=10ms (outside debounce window) - should pass.
-    release.input_time_ns = 10'000'000;
-    // Need to reset first since state wasn't updated due to filter.
-    tracker.reset();
-    
-    // Re-press and then release after window.
-    result = tracker.process(press1);
+    // A quick re-press should also pass; fast jacks are gameplay input, not chatter.
+    InputEvent press2 = press1;
+    press2.input_time_ns = 4'000'000;
+    result = tracker.process(press2);
     REQUIRE(result.has_value());
-    
-    release.input_time_ns = 10'000'000;  // 10ms after
-    result = tracker.process(release);
-    REQUIRE(result.has_value());
-    CHECK(result.value().state == InputState::Released);
+    CHECK(result->state == InputState::Pressed);
+    CHECK(tracker.is_key_pressed(0x44));
 }
 
 TEST_CASE("KeyStateTracker tracks pressed key count") {
@@ -185,16 +181,45 @@ TEST_CASE("KeyStateTracker filters duplicate edges from raw and polling sources"
     InputEvent raw_release = raw_press;
     raw_release.state = InputState::Released;
     raw_release.input_time_ns = 2'000'000;
-    CHECK_FALSE(tracker.process(raw_release).has_value());
-    CHECK(tracker.is_key_pressed(0x41));
+    auto result = tracker.process(raw_release);
+    REQUIRE(result.has_value());
+    CHECK(result->state == InputState::Released);
+    CHECK_FALSE(tracker.is_key_pressed(0x41));
 
     InputEvent polled_release = polled_press;
     polled_release.state = InputState::Released;
     polled_release.input_time_ns = 2'100'000;
+    result = tracker.process(polled_release);
+    CHECK_FALSE(result.has_value());
+    CHECK_FALSE(tracker.is_key_pressed(0x41));
+}
+
+TEST_CASE("KeyStateTracker lets polling release clear stale raw input sources") {
+    KeyStateConfig config;
+    config.debounce_window_ns = 0;
+    KeyStateTracker tracker(config);
+
+    InputEvent raw_press{};
+    raw_press.keycode = 0x41;
+    raw_press.state = InputState::Pressed;
+    raw_press.input_time_ns = 1'000'000;
+    raw_press.device_id = 0x1001;
+    REQUIRE(tracker.process(raw_press).has_value());
+
+    InputEvent polled_press = raw_press;
+    polled_press.input_time_ns = 1'100'000;
+    polled_press.device_id = kPollingAggregateDeviceId;
+    CHECK_FALSE(tracker.process(polled_press).has_value());
+    CHECK(tracker.is_key_pressed(0x41));
+
+    InputEvent polled_release = polled_press;
+    polled_release.state = InputState::Released;
+    polled_release.input_time_ns = 2'000'000;
     auto result = tracker.process(polled_release);
     REQUIRE(result.has_value());
     CHECK(result->state == InputState::Released);
     CHECK_FALSE(tracker.is_key_pressed(0x41));
+    CHECK(tracker.pressed_count() == 0);
 }
 
 TEST_CASE("KeyStateTracker keeps different keys independent across multiple sources") {

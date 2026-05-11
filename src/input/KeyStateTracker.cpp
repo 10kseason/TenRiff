@@ -7,6 +7,35 @@ KeyStateTracker::KeyStateTracker(const KeyStateConfig& config)
 
 std::optional<InputEvent> KeyStateTracker::process(const InputEvent& event) {
     auto& key_state = key_states_[event.keycode];
+    const bool was_pressed = key_state.pressed_source_count > 0;
+
+    // Polling aggregate is a physical-state mirror, not another keyboard source.
+    if (event.device_id == kPollingAggregateDeviceId && event.state == InputState::Released) {
+        auto& source_state = key_state.sources[event.device_id];
+        source_state.state = InputState::Released;
+        source_state.last_event_time_ns = event.input_time_ns;
+        source_state.has_event = true;
+
+        if (!was_pressed) {
+            return std::nullopt;
+        }
+
+        for (auto& [source, state] : key_state.sources) {
+            static_cast<void>(source);
+            state.state = InputState::Released;
+            state.last_event_time_ns = event.input_time_ns;
+            state.has_event = true;
+        }
+        key_state.pressed_source_count = 0;
+        if (pressed_key_count_ > 0) {
+            --pressed_key_count_;
+        }
+
+        InputEvent logical_event = event;
+        logical_event.state = InputState::Released;
+        return logical_event;
+    }
+
     auto& source_state = key_state.sources[event.device_id];
     const auto now_ns = event.input_time_ns;
 
@@ -14,14 +43,14 @@ std::optional<InputEvent> KeyStateTracker::process(const InputEvent& event) {
         return std::nullopt;
     }
 
-    if (source_state.has_event) {
-        const auto time_delta = now_ns - source_state.last_event_time_ns;
-        if (time_delta > 0 && time_delta < config_.debounce_window_ns) {
-            return std::nullopt;
-        }
+    // A polling press that agrees with RawInput should not keep the key down after RawInput releases.
+    if (event.device_id == kPollingAggregateDeviceId && event.state == InputState::Pressed && was_pressed) {
+        source_state.state = InputState::Pressed;
+        source_state.last_event_time_ns = now_ns;
+        source_state.has_event = true;
+        return std::nullopt;
     }
 
-    const bool was_pressed = key_state.pressed_source_count > 0;
     const auto previous_source_state = source_state.state;
     source_state.state = event.state;
     source_state.last_event_time_ns = now_ns;

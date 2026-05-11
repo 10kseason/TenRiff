@@ -299,13 +299,48 @@ inline std::string cycle_runtime_key_mode(std::string_view current, int directio
 }
 
 inline std::string gauge_label(const std::string& value) {
-    if (value == "hard") {
+    const std::string normalized = to_lower_ascii(value);
+    if (normalized == "ex_hard" || normalized == "ex-hard" || normalized == "exhard") {
+        return "EX-Hard";
+    }
+    if (normalized == "hard") {
         return "Hard";
     }
-    if (value == "easy") {
+    if (normalized == "easy") {
         return "Easy";
     }
     return "Normal";
+}
+
+inline std::string normalize_gauge_mode(std::string value) {
+    value = to_lower_ascii(std::move(value));
+    if (value == "ex_hard" || value == "ex-hard" || value == "exhard") {
+        return "ex_hard";
+    }
+    if (value == "hard" || value == "easy") {
+        return value;
+    }
+    return "normal";
+}
+
+inline std::string cycle_gauge_mode(std::string current, int direction) {
+    static constexpr const char* kGauges[] = {"normal", "hard", "ex_hard", "easy"};
+    const int option_count = static_cast<int>(sizeof(kGauges) / sizeof(kGauges[0]));
+    current = normalize_gauge_mode(std::move(current));
+    int index = 0;
+    for (int i = 0; i < option_count; ++i) {
+        if (current == kGauges[i]) {
+            index = i;
+            break;
+        }
+    }
+    index += direction;
+    if (index < 0) {
+        index = option_count - 1;
+    } else if (index >= option_count) {
+        index = 0;
+    }
+    return kGauges[index];
 }
 
 inline std::string random_label(const std::string& value) {

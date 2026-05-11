@@ -22,7 +22,7 @@
 ## Mode Meanings
 - `format`: `auto | bms | osu`
 - `key_mode`: `none | auto | 4k | 5k | 6k | 7k | 8k | 9k | 10k | 16k`
-- `gauge`: `normal | hard | easy`
+- `gauge`: `normal | hard | ex_hard | easy`
 - `random`: `off | fr | sr`
 - `random_seed`: 固定 random seed（`0` も固定値として扱う）
 - `enable_osu_charts`: `false | true`
@@ -44,6 +44,11 @@
 - `none` は譜面の lane count と base pattern layout をそのまま維持する
 - `auto` は legacy alias で、現状は `none` と同じ挙動
 - `4k..16k` は N2NC ベースの lane remap で key count を合わせる
+
+## Gauge Rules
+- すべての gauge は `100%` で開始し、`0%` に到達すると即失敗する。
+- `ex_hard` は Hard より回復が低く、`BAD` / `POOR` の損失が大きい challenge gauge。
+- clear status は `EX-HARD CLEAR`, `HARD CLEAR`, `CLEAR`, `EASY CLEAR` として区別される。
 
 ## Implementation Location
 - Mode parsing: `src/gameplay/ModeSettings.*`, `src/app/ModeResolver.*`

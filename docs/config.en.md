@@ -39,13 +39,13 @@ If a profile does not exist, it is created automatically on first launch.
 ### `input`
 - `backend` (string)
   - `polling | rawinput`
-  - default is `rawinput` on the current `1.1.2` release line
+  - default is `rawinput` on the current `1.1.3` release line
   - the stored value is preserved and no longer force-normalized to `polling` on save
-  - gameplay starts RawInput first when `rawinput=true`, while bound-key polling shadow and Polling fallback on RawInput startup failure keep input recognition alive
+  - gameplay starts RawInput first when `rawinput=true`, while a session-local bound-key polling fallback corrects missed RawInput edges
 - `rawinput` (bool)
   - convenience boolean persisted alongside `backend`
-  - on the current `1.1.2` release line it is saved and restored as-is
-  - when `true`, menu/gameplay prefer RawInput while allowing polling shadow/fallback to preserve input recognition
+  - on the current `1.1.3` release line it is saved and restored as-is
+  - when `true`, menu/gameplay prefer RawInput while allowing polling fallback to preserve input recognition
 - `use_qpc` (bool)
 - `grab` (bool)
   - currently a Linux-preview-oriented setting
@@ -57,10 +57,10 @@ If a profile does not exist, it is created automatically on first launch.
 - `judgement_hz` (int)
   - `1000 | 2000 | 4000 | 8000`
   - compatibility field kept in the input config
-  - the current `1.1.2` runtime no longer drives a separate audio-thread judgement sub-step loop from this value
+  - the current `1.1.3` runtime no longer drives a separate audio-thread judgement sub-step loop from this value
   - default is `4000` (`0.25ms`)
 - `debounce_ms` (double)
-  - input debounce time used to filter extremely short up/down chatter on the same key before runtime processing
+  - input state-tracking setting. The current runtime does not drop real Press/Release transitions through debounce; it only removes duplicate same-state events from pressed-state tracking
   - clamped to the `0..25` range
   - default value is `8ms`
 
@@ -88,9 +88,9 @@ If a profile does not exist, it is created automatically on first launch.
 
 ### `gauge`
 - There is no automatic gauge shift. The selected gauge type stays fixed until the song ends or fails.
-- Hard, Normal, and Easy all start at `100%` and fail immediately at `0%`.
+- EX-Hard, Hard, Normal, and Easy all start at `100%` and fail immediately at `0%`.
 - `delta`
-  - `hard`, `normal`, `easy`
+  - `ex_hard`, `hard`, `normal`, `easy`
   - each contains `PG`, `GR`, `GD`, `BD`, `PR`
 
 ### `graphics`
@@ -117,7 +117,7 @@ If a profile does not exist, it is created automatically on first launch.
   - `none | auto | 4k | 5k | 6k | 7k | 8k | 9k | 10k | 16k`
   - `none` means using the chart's original key count as-is
 - `gauge` (string)
-  - `normal | hard | easy`
+  - `normal | hard | ex_hard | easy`
 - `random` (string)
   - `off | fr | sr`
 - `random_seed` (int)

@@ -32,6 +32,11 @@ TEST_CASE("gauge applies judgement deltas and clamps") {
 TEST_CASE("all gauge types now start at their cap") {
     GaugeManager manager;
 
+    const auto ex_hard = manager.initialState(GaugeType::ExHard);
+    CHECK(ex_hard.type == GaugeType::ExHard);
+    CHECK(almost_equal(ex_hard.value, 100.0));
+    CHECK_FALSE(ex_hard.game_over);
+
     const auto hard = manager.initialState(GaugeType::Hard);
     CHECK(hard.type == GaugeType::Hard);
     CHECK(almost_equal(hard.value, 100.0));
@@ -51,6 +56,10 @@ TEST_CASE("all gauge types now start at their cap") {
 TEST_CASE("default PG recovery matches requested per-hit values") {
     GaugeManager manager;
 
+    GaugeState ex_hard{GaugeType::ExHard, 0.0, false};
+    manager.applyJudgement(ex_hard, Judgement::PG, 0.0);
+    CHECK(almost_equal(ex_hard.value, 0.08, 1e-9));
+
     GaugeState hard{GaugeType::Hard, 0.0, false};
     manager.applyJudgement(hard, Judgement::PG, 0.0);
     CHECK(almost_equal(hard.value, 0.16, 1e-9));
@@ -67,6 +76,10 @@ TEST_CASE("default PG recovery matches requested per-hit values") {
 TEST_CASE("default GR recovery uses the requested per-gauge values") {
     GaugeManager manager;
 
+    GaugeState ex_hard{GaugeType::ExHard, 0.0, false};
+    manager.applyJudgement(ex_hard, Judgement::GR, 0.0);
+    CHECK(almost_equal(ex_hard.value, 0.04, 1e-9));
+
     GaugeState hard{GaugeType::Hard, 0.0, false};
     manager.applyJudgement(hard, Judgement::GR, 0.0);
     CHECK(almost_equal(hard.value, 0.09, 1e-9));
@@ -82,6 +95,10 @@ TEST_CASE("default GR recovery uses the requested per-gauge values") {
 
 TEST_CASE("default GD recovery uses the requested per-gauge values") {
     GaugeManager manager;
+
+    GaugeState ex_hard{GaugeType::ExHard, 0.0, false};
+    manager.applyJudgement(ex_hard, Judgement::GD, 0.0);
+    CHECK(almost_equal(ex_hard.value, 0.0, 1e-9));
 
     GaugeState hard{GaugeType::Hard, 0.0, false};
     manager.applyJudgement(hard, Judgement::GD, 0.0);
@@ -100,14 +117,30 @@ TEST_CASE("default gauge penalties keep hard harshest while normal and easy stay
     GaugeManager manager;
     const auto& config = manager.config();
 
+    CHECK(almost_equal(config.ex_hard.bd, -18.0));
     CHECK(almost_equal(config.hard.bd, -10.0));
     CHECK(almost_equal(config.normal.bd, -6.25));
     CHECK(almost_equal(config.easy.bd, -4.1));
+    CHECK(std::abs(config.ex_hard.bd) > std::abs(config.hard.bd));
     CHECK(std::abs(config.hard.bd) > std::abs(config.normal.bd));
     CHECK(std::abs(config.normal.bd) > std::abs(config.easy.bd));
+    CHECK(almost_equal(config.ex_hard.pr, -4.0));
     CHECK(almost_equal(config.hard.pr, -2.0));
     CHECK(almost_equal(config.normal.pr, -2.0));
     CHECK(almost_equal(config.easy.pr, -1.6));
+}
+
+TEST_CASE("ex-hard gauge has no low-gauge poor softening and can fail quickly") {
+    GaugeManager manager;
+    auto state = manager.initialState(GaugeType::ExHard);
+    state.value = 3.5;
+
+    const auto result = manager.applyJudgement(state, Judgement::PR, 0.0);
+
+    CHECK(result.game_over);
+    CHECK(state.game_over);
+    CHECK(state.type == GaugeType::ExHard);
+    CHECK(almost_equal(state.value, 0.0));
 }
 
 TEST_CASE("hard gauge LR2 poor penalty softens at or below thirty percent") {

@@ -299,7 +299,7 @@ TEST_CASE("gameplay engine keeps the latest one hundred timing deltas in order")
     CHECK(timing_history.back() == doctest::Approx(59.0));
 }
 
-TEST_CASE("gameplay engine gauge uses absolute hold judgements without half-weight scaling") {
+TEST_CASE("gameplay engine applies hold judgement weight to gauge deltas") {
     GameplayChart chart;
     chart.lane_count = 1;
     chart.duration_samples = 3000;
@@ -320,7 +320,40 @@ TEST_CASE("gameplay engine gauge uses absolute hold judgements without half-weig
 
     CHECK(engine.stats().counts.pg == 1);
     CHECK(engine.stats().counts.bd == 1);
-    CHECK(engine.gauge_state().value == doctest::Approx(93.75000000));
+    CHECK(engine.gauge_state().value == doctest::Approx(96.87500000));
+}
+
+TEST_CASE("gameplay engine applies easy low-gauge softening to weighted hold bads") {
+    GameplayChart chart;
+    chart.lane_count = 1;
+    chart.duration_samples = 5000;
+    for (int i = 0; i < 19; ++i) {
+        chart.notes.push_back(NoteEvent{1, 1000 + static_cast<int64_t>(i) * 100, std::nullopt});
+    }
+    chart.notes.push_back(NoteEvent{1, 3000, 4000});
+
+    GameplayConfig config;
+    config.sample_rate = 1000;
+    config.rate = 1.0;
+    config.initial_gauge = tenriff::game::GaugeType::Easy;
+    config.judge.pg_ms = 10.0;
+    config.judge.gr_ms = 20.0;
+    config.judge.gd_ms = 30.0;
+    config.judge.bd_ms = 40.0;
+    config.judge.hold_grace_ms = 20.0;
+    config.judge.hold_break_ms = 100.0;
+
+    GameplayEngine engine(chart, config);
+    engine.advance(2841);
+    CHECK(engine.gauge_state().value == doctest::Approx(22.1));
+
+    (void)engine.handle_input(1, InputState::Pressed, 3000);
+    (void)engine.handle_input(1, InputState::Released, 3200);
+    engine.advance(4100);
+
+    CHECK(engine.stats().counts.bd == 20);
+    CHECK(engine.stats().counts.pg == 1);
+    CHECK(engine.gauge_state().value == doctest::Approx(20.38));
 }
 
 TEST_CASE("gameplay engine marks early hold release as bad") {
@@ -628,6 +661,40 @@ TEST_CASE("gameplay engine does not shift later notes after a bad on the same la
     CHECK(engine.stats().counts.bd == 1);
     CHECK(engine.stats().counts.pg == 1);
     CHECK(engine.stats().combo == 1);
+}
+
+TEST_CASE("late miss recovery press cannot consume the next note") {
+    GameplayChart chart;
+    chart.lane_count = 1;
+    chart.duration_samples = 3000;
+    chart.notes.push_back(NoteEvent{1, 1000, std::nullopt});
+    chart.notes.push_back(NoteEvent{1, 1060, std::nullopt});
+
+    GameplayConfig config;
+    config.sample_rate = 1000;
+    config.rate = 1.0;
+    config.judge.pg_ms = 10.0;
+    config.judge.gr_ms = 20.0;
+    config.judge.gd_ms = 30.0;
+    config.judge.bd_ms = 40.0;
+    config.judge.mask_ms = 30.0;
+
+    GameplayEngine engine(chart, config);
+    auto recovered = engine.handle_input(1, InputState::Pressed, 1045);
+
+    CHECK_FALSE(recovered.has_value());
+    CHECK(engine.stats().counts.bd == 1);
+    CHECK(engine.stats().counts.pg == 0);
+
+    auto masked = engine.handle_input(1, InputState::Pressed, 1060);
+    CHECK_FALSE(masked.has_value());
+    CHECK(engine.stats().counts.bd == 1);
+
+    auto next_hit = engine.handle_input(1, InputState::Pressed, 1076);
+    REQUIRE(next_hit.has_value());
+    CHECK(next_hit->start_sample == 1060);
+    CHECK(engine.stats().counts.bd == 1);
+    CHECK(engine.stats().counts.gr == 1);
 }
 
 TEST_CASE("judge easy mod expands charge hold tail windows during gameplay") {

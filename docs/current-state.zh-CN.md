@@ -3,15 +3,15 @@
 这份文档是下一位 agent 或新任务接手时应该最先阅读的当前状态文档。目标是快速说明“这个项目现在是什么、应该先看哪里、还有哪些内容尚未验证”。
 
 ## 基线
-- 当前项目版本为 `1.1.2`
-- `1.1.2` 版本线现被命名为公开基准的 `final stable` 版本
+- 当前项目版本为 `1.1.3`
+- `1.1.3` 版本线是在 `1.1.2 final stable` 基准上继续叠加的后续版本
 - 后续工作的基准文档是 [`docs/baseline-1.1.2.zh-CN.md`](baseline-1.1.2.zh-CN.md)
 - Windows GUI 构建是主目标
 - Linux 仅存在 [`Baepoks-Linuxs/TenRiff-0.5.0-linux-preview`](../Baepoks-Linuxs/TenRiff-0.5.0-linux-preview) 级别的 preview
 - 默认表面是 BMS-first
 - `.osu` 可以通过选项重新启用，并支持 4K~10K
-- `1.1.2` 发布线保留了 `1.0.9` 基于真实 playback head 的 gameplay 输入时序修正，live gameplay 输入优先使用已保存的 RawInput 设置，并通过 bound-key polling shadow 与 RawInput 启动失败时的 Polling fallback 保持输入识别
-- 同一条 `1.1.2` 发布线里，menu 输入仍然保持 foreground process/root-window 边界，RawInput 启动失败时会用 Polling fallback 重试，但不会持久化改写 profile 输入后端，保存的 backend 偏好只作为配置保留
+- `1.1.3` 发布线保留了 `1.0.9` 基于真实 playback head 的 gameplay 输入时序修正，live gameplay 输入优先使用已保存的 RawInput 设置，并通过 session-local bound-key polling fallback 修正 RawInput 边沿漏报
+- 同一条 `1.1.3` 发布线里，menu 输入仍然保持 foreground process/root-window 边界，RawInput 启动失败时会用 Polling fallback 重试，但不会持久化改写 profile 输入后端，保存的 backend 偏好只作为配置保留
 
 ## 核心架构
 - `MenuApp`
@@ -26,6 +26,7 @@
   - 负责音频主时钟与混音
 - `InputThread`
   - 负责收集 RawInput/polling 输入并投递到队列
+  - gameplay 会关闭 RawInput thread 内部 polling shadow，由 `GameSession` 侧的 bound-key polling fallback 修正漏掉的 edge
 - `RenderThread` + `MenuWindow`
   - 基于 D3D11 + Direct2D/DirectWrite 的菜单/游戏中 HUD 渲染
   - 最近的维护型重构正在朝着把大型实现文件拆成碎片文件的方向整理
@@ -86,6 +87,7 @@
   - 会真正消耗 note 的失败（auto-miss、过早吃掉 note、hold break / tail miss）仍然记为 `BAD`
   - 非消耗型的超早输入会按 LR2 风格记为 `POOR`，并重新出现在结果 / replay / UI 中
   - `POOR` 不会断 combo，不计入 score / accuracy 总数，并使用独立的 `PR` gauge 损失值
+  - gauge 模式支持 `EX-Hard / Hard / Normal / Easy`，全部从 `100%` 开始，并在 `0%` 时立即失败
   - live gameplay 输入会直接使用 `ClockSync` 的估计结果，stale backlog 压缩也重新按 `BAD` 窗口执行，以匹配 `0.999` 的输入边界
   - tail release timing 仅适用于 osu hold 与 BMS `#LNMODE 2` charge note
   - 当两把键盘同时按住同一个键时，逻辑 `Pressed` 状态会一直保持到最后一个输入源释放为止

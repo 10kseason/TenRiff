@@ -39,13 +39,13 @@
 ### `input`
 - `backend` (string)
   - `polling | rawinput`
-  - 현재 `1.1.2` 릴리스 라인 기본값은 `rawinput`
+  - 현재 `1.1.3` 릴리스 라인 기본값은 `rawinput`
   - 저장값은 그대로 유지되며 자동으로 `polling`으로 강제 저장되지는 않음
-  - gameplay 세션은 `rawinput=true`일 때 RawInput을 먼저 띄우고, bound-key polling shadow와 시작 실패 시 Polling fallback으로 입력 인식 끊김을 막음
+  - gameplay 세션은 `rawinput=true`일 때 RawInput을 먼저 띄우고, 세션 로컬 bound-key polling fallback으로 RawInput 누락을 보정함
 - `rawinput` (bool)
   - `backend`와 함께 저장되는 편의 필드
-  - 현재 `1.1.2` 릴리스 라인에서는 저장 시에도 현재 값이 유지됨
-  - `true`이면 menu/gameplay 모두 RawInput을 우선 사용하되 입력 인식 유지를 위한 polling shadow/fallback을 허용
+  - 현재 `1.1.3` 릴리스 라인에서는 저장 시에도 현재 값이 유지됨
+  - `true`이면 menu/gameplay 모두 RawInput을 우선 사용하되 입력 인식 유지를 위한 polling fallback을 허용
 - `use_qpc` (bool)
 - `grab` (bool)
   - 현재 Linux preview 성격
@@ -57,10 +57,10 @@
 - `judgement_hz` (int)
   - `1000 | 2000 | 4000 | 8000`
   - 호환성용으로 남아 있는 입력 설정 필드
-  - 현재 `1.1.2` 런타임에서는 별도 오디오 판정 서브루프를 이 값으로 구동하지 않음
+  - 현재 `1.1.3` 런타임에서는 별도 오디오 판정 서브루프를 이 값으로 구동하지 않음
   - 기본값은 `4000` (`0.25ms`)
 - `debounce_ms` (double)
-  - 같은 키에서 매우 짧게 튀는 up/down 채터링을 런타임 전에 걸러내는 입력 디바운스 시간
+  - 같은 키의 입력 상태 추적 설정값. 현재 런타임은 실제 Press/Release 전환을 디바운스로 버리지 않고, 같은 상태의 중복 이벤트만 눌림 상태 추적에서 제거
   - `0..25` 범위로 clamp
   - 기본값은 `8ms`
 
@@ -88,9 +88,9 @@
 
 ### `gauge`
 - 자동 gauge shift는 없습니다. 선택한 gauge 타입은 곡이 끝나거나 실패할 때까지 유지됩니다.
-- Hard / Normal / Easy는 모두 `100%`에서 시작하고 `0%`가 되면 즉시 실패합니다.
+- EX-Hard / Hard / Normal / Easy는 모두 `100%`에서 시작하고 `0%`가 되면 즉시 실패합니다.
 - `delta`
-  - `hard`, `normal`, `easy`
+  - `ex_hard`, `hard`, `normal`, `easy`
   - 각 안에 `PG`, `GR`, `GD`, `BD`, `PR`
 
 ### `graphics`
@@ -118,7 +118,7 @@
   - `none`은 차트 원래 키 수를 그대로 사용
   - `10k` 변환은 standalone BMS key converter의 krrcream식 10K preset과 맞춰 `max_keys=10`, `min_keys=1`, `transform_speed_slot=5`, `seed=0`으로 적용
 - `gauge` (string)
-  - `normal | hard | easy`
+  - `normal | hard | ex_hard | easy`
 - `random` (string)
   - `off | fr | sr`
 - `random_seed` (int)

@@ -1135,6 +1135,12 @@ std::optional<game::GaugeType> parse_gauge_type(std::string_view value) {
     std::transform(token.begin(), token.end(), token.begin(), [](unsigned char ch) {
         return static_cast<char>(std::tolower(ch));
     });
+    token.erase(std::remove_if(token.begin(), token.end(), [](unsigned char ch) {
+        return ch == '-' || ch == '_' || ch == ' ' || ch == '\t';
+    }), token.end());
+    if (token == "exhard") {
+        return game::GaugeType::ExHard;
+    }
     if (token == "hard") {
         return game::GaugeType::Hard;
     }
@@ -1158,6 +1164,7 @@ std::string chart_format_token(ChartFormat format) {
 
 std::string gauge_type_token(game::GaugeType type) {
     switch (type) {
+        case game::GaugeType::ExHard: return "ex_hard";
         case game::GaugeType::Hard: return "hard";
         case game::GaugeType::Easy: return "easy";
         case game::GaugeType::Normal:

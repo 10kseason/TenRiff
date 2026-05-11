@@ -18,6 +18,7 @@ std::string input_state_label(input::InputState state) {
 
 std::string gauge_label(game::GaugeType type) {
     switch (type) {
+        case game::GaugeType::ExHard: return "ex_hard";
         case game::GaugeType::Hard: return "hard";
         case game::GaugeType::Easy: return "easy";
         case game::GaugeType::Normal:
@@ -26,6 +27,9 @@ std::string gauge_label(game::GaugeType type) {
 }
 
 game::GaugeType gauge_type_from_string(std::string_view token) {
+    if (token == "ex_hard" || token == "ex-hard" || token == "exhard") {
+        return game::GaugeType::ExHard;
+    }
     if (token == "hard") {
         return game::GaugeType::Hard;
     }

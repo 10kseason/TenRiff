@@ -7,6 +7,8 @@ TEST_CASE("completed gameplay without fail counts as clear") {
     CHECK(tenriff::app::gameplay_session_clear_status(
               true, false, false, tenriff::game::GaugeType::Normal) == "CLEAR");
     CHECK(tenriff::app::gameplay_session_clear_status(
+              true, false, false, tenriff::game::GaugeType::ExHard) == "EX-HARD CLEAR");
+    CHECK(tenriff::app::gameplay_session_clear_status(
               true, false, false, tenriff::game::GaugeType::Hard) == "HARD CLEAR");
     CHECK(tenriff::app::gameplay_session_clear_status(
               true, false, false, tenriff::game::GaugeType::Easy) == "EASY CLEAR");
@@ -33,6 +35,9 @@ TEST_CASE("assist clears are labeled explicitly") {
     CHECK(tenriff::app::gameplay_session_clear_status(
               true, false, false, tenriff::game::GaugeType::Hard, false, true) ==
           "ASSIST PRACTICE HARD CLEAR");
+    CHECK(tenriff::app::gameplay_session_clear_status(
+              true, false, false, tenriff::game::GaugeType::ExHard, true, false) ==
+          "ASSIST AUTOPLAY EX-HARD CLEAR");
     CHECK(tenriff::app::gameplay_session_clear_status(
               true, false, false, tenriff::game::GaugeType::Easy, true, true) ==
           "ASSIST AUTOPLAY PRACTICE EASY CLEAR");
