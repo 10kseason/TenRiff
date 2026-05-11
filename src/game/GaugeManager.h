@@ -11,6 +11,7 @@ enum class Judgement {
 };
 
 enum class GaugeType {
+    ExHard,
     Hard,
     Normal,
     Easy,
@@ -25,6 +26,7 @@ struct GaugeDeltaTable {
 };
 
 struct GaugeConfig {
+    GaugeDeltaTable ex_hard{0.08000000, 0.04000000, 0.00000000, -18.00000, -4.00000};
     GaugeDeltaTable hard{0.16000000, 0.09000000, 0.01000000, -10.00000, -2.00000};
     GaugeDeltaTable normal{0.19000000, 0.15000000, 0.01000000, -6.25000, -2.00000};
     GaugeDeltaTable easy{0.25000000, 0.20000000, 0.01000000, -4.10000, -1.60000};

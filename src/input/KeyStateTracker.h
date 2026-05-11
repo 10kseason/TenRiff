@@ -13,7 +13,7 @@ struct KeyStateConfig {
     int64_t debounce_window_ns = 5'000'000;  ///< 5ms default debounce window.
 };
 
-/// Tracks per-key state and filters duplicate/chatter events.
+/// Tracks per-key state and filters duplicate same-state events without dropping real release edges.
 /// Thread-safety: NOT thread-safe. Use from InputThread only.
 class KeyStateTracker {
 public:

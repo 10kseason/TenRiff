@@ -551,6 +551,13 @@ void apply_config_object(const JsonObject& root, RuntimeConfig& config) {
 
     if (auto* gauge = get_object(root, "gauge")) {
         if (auto* delta = get_object(*gauge, "delta")) {
+            if (auto* ex_hard = get_object(*delta, "ex_hard")) {
+                config.gauge.ex_hard.pg = get_number(*ex_hard, "PG", config.gauge.ex_hard.pg);
+                config.gauge.ex_hard.gr = get_number(*ex_hard, "GR", config.gauge.ex_hard.gr);
+                config.gauge.ex_hard.gd = get_number(*ex_hard, "GD", config.gauge.ex_hard.gd);
+                config.gauge.ex_hard.bd = get_number(*ex_hard, "BD", config.gauge.ex_hard.bd);
+                config.gauge.ex_hard.pr = get_number(*ex_hard, "PR", config.gauge.ex_hard.pr);
+            }
             if (auto* hard = get_object(*delta, "hard")) {
                 config.gauge.hard.pg = get_number(*hard, "PG", config.gauge.hard.pg);
                 config.gauge.hard.gr = get_number(*hard, "GR", config.gauge.hard.gr);
@@ -904,6 +911,14 @@ JsonValue build_json_root(const RuntimeConfig& config) {
 
     JsonObject gauge;
     JsonObject delta;
+    JsonObject ex_hard;
+    ex_hard.emplace("PG", JsonValue{config.gauge.ex_hard.pg});
+    ex_hard.emplace("GR", JsonValue{config.gauge.ex_hard.gr});
+    ex_hard.emplace("GD", JsonValue{config.gauge.ex_hard.gd});
+    ex_hard.emplace("BD", JsonValue{config.gauge.ex_hard.bd});
+    ex_hard.emplace("PR", JsonValue{config.gauge.ex_hard.pr});
+    delta.emplace("ex_hard", JsonValue{std::move(ex_hard)});
+
     JsonObject hard;
     hard.emplace("PG", JsonValue{config.gauge.hard.pg});
     hard.emplace("GR", JsonValue{config.gauge.hard.gr});

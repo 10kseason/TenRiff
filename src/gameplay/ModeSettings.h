@@ -26,6 +26,7 @@ enum class KeyMode {
 };
 
 enum class GaugeMode {
+    ExHard,
     Hard,
     Normal,
     Easy,

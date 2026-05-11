@@ -2,9 +2,9 @@
 
 Language: Korean | [English](README.en.md) | [简体中文](README.zh-CN.md) | [日本語](README.ja.md)
 
-TenRiff는 Windows GUI 기반 BMS-first 리듬게임 런타임/런처 프로젝트입니다. 목표는 실사용 가능한 BMS 플레이 환경을 중심으로, 저지먼트/오디오/입력/렌더링 파이프라인을 직접 제어하는 독립 실행형 리듬게임 클라이언트를 만드는 것입니다. 현재 프로젝트 버전은 `1.1.2`이며, 현재 공개 기준선의 `final stable` 버전으로 명명했습니다. MIT 라이선스를 사용하며, 번들된 서드파티 고지는 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)에 정리합니다.
+TenRiff는 Windows GUI 기반 BMS-first 리듬게임 런타임/런처 프로젝트입니다. 목표는 실사용 가능한 BMS 플레이 환경을 중심으로, 저지먼트/오디오/입력/렌더링 파이프라인을 직접 제어하는 독립 실행형 리듬게임 클라이언트를 만드는 것입니다. 현재 프로젝트 버전은 `1.1.3`이며, `1.1.2 final stable` 기준선 위에 쌓은 후속 라인입니다. MIT 라이선스를 사용하며, 번들된 서드파티 고지는 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)에 정리합니다.
 
-이 README는 "프로젝트를 처음 열었을 때 무엇을 보면 되는지"를 설명하는 입문 문서입니다. 더 자세한 현재 동작, 현재 `1.1.2 final stable` 프로젝트 상태, `1.1.2` 기준선, 설정 구조, 설계 문서는 [`docs/README.md`](docs/README.md)부터 이어서 읽는 구조를 기준으로 작성했습니다.
+이 README는 "프로젝트를 처음 열었을 때 무엇을 보면 되는지"를 설명하는 입문 문서입니다. 더 자세한 현재 동작, 현재 `1.1.3` 프로젝트 상태, `1.1.2 final stable` 기준선, 설정 구조, 설계 문서는 [`docs/README.md`](docs/README.md)부터 이어서 읽는 구조를 기준으로 작성했습니다.
 
 TenRiff 코드는 전통적인 장기 설계 문서 중심 개발만으로 쌓인 프로젝트가 아니라, 빠른 반복과 실험을 중시한 `vibe coding` 성격이 강한 작품이라는 점을 명시합니다.
 
@@ -67,7 +67,7 @@ OpenAI Codex, ChatGPT, Claude Code, Gemini, 그리고 프로젝트를 함께 검
   - performance overlay
   - note head/tail bitmap cache + static playfield command-list cache
 - 옵션 / 스킨
-  - Hi-Speed, Rate, gauge, audio, input, graphics 설정
+  - Hi-Speed, Rate, EX-Hard/Hard/Normal/Easy gauge, audio, input, graphics 설정
   - `Skins` 화면에서 판정선 위치, 노트 가로/세로 크기
   - `5K~10K` lane color 편집 + 실시간 프리뷰
 - 결과 / 로컬 기록
@@ -116,7 +116,7 @@ Windows Defender나 다른 안티바이러스가 `TenRiff.exe`를 잠깐 잠그�
 
 ### 3. 공개 소스 패키지로도 빌드 가능
 
-버전별 공개 소스 번들(`TenRiff-1.1.2-source.zip` 같은 패키지)은 `external/`(단, `external/llama.cpp/` 제외), `src/`, `tests/`, `config/`, `docs/`, `Mainmusic/`를 포함하므로, 압축을 푼 폴더만으로도 바로 configure/build 할 수 있습니다.
+버전별 공개 소스 번들(`TenRiff-1.1.3-source.zip` 같은 패키지)은 `external/`(단, `external/llama.cpp/` 제외), `src/`, `tests/`, `config/`, `docs/`, `Mainmusic/`를 포함하므로, 압축을 푼 폴더만으로도 바로 configure/build 할 수 있습니다.
 
 - 소스 번들에는 `tools/build_with_retry.ps1`가 없으므로 plain `cmake --build`를 사용해야 합니다.
 - `10k-calc/`는 공개 소스 번들에서 제외되므로 Python reference 기반 optional 검사는 `[skip]`으로 넘어가도 정상입니다.
@@ -138,7 +138,33 @@ cmake --build build --config Release --target bms_parser_tests
 .\build-dist\Release\bms_parser_tests.exe
 ```
 
-### 5. 실행
+### 5. BMS 키 컨버터
+
+TenRiff에는 게임 런타임과 별도로 빌드할 수 있는 BMS 키 컨버터가 있습니다. 이 도구는 TenRiff의 BMS 파서/타임라인 처리와 `krrcream-Toolkit` N2NC 기반 키모드 변환 코어를 사용해 BMS 차트를 다른 키 수의 BMS 파일로 다시 씁니다. 게임을 실행하지 않고 특정 차트를 `4K / 5K / 6K / 8K / 9K / 10K / 16K` 출력으로 변환하고 싶을 때 쓰는 보조 도구입니다.
+
+독립 빌드:
+
+```powershell
+cmake -S tools/bms-key-converter -B build-bms-key-converter -G "Visual Studio 17 2022" -A x64
+cmake --build build-bms-key-converter --config Release --target bms_key_converter
+cmake --build build-bms-key-converter --config Release --target bms_key_converter_gui
+```
+
+CLI 예시:
+
+```powershell
+.\build-bms-key-converter\Release\bms_key_converter.exe --input "chart.bms" --output "chart_10k.bms" --preset 10k
+.\build-bms-key-converter\Release\bms_key_converter.exe --input "chart.bms" --output "chart_10k_split.bms" --preset 10k --algorithm 10k-split
+```
+
+- 기본 `krr` 알고리즘은 N2NC 계열 변환 흐름을 따릅니다.
+- `10k-split` 알고리즘은 10K 전용으로, 원본 차트의 좌/우 손 영역을 각각 `1-5` / `6-10` lane으로 나누어 확장합니다.
+- sample rate는 기본값 `auto`이며, 참조된 keysound/BGM 오디오에서 먼저 추정하고 실패할 때만 `44100 Hz`로 떨어집니다.
+- Windows에서는 `bms_key_converter_gui.exe`로 간단한 Win32 GUI도 사용할 수 있습니다.
+
+자세한 옵션과 변환 주의사항은 [`tools/bms-key-converter/README.md`](tools/bms-key-converter/README.md)를 참고하세요.
+
+### 6. 실행
 
 직접 실행:
 

@@ -22,7 +22,7 @@ This document summarizes the currently implemented mode system and random rules 
 ## Mode Meanings
 - `format`: `auto | bms | osu`
 - `key_mode`: `none | auto | 4k | 5k | 6k | 7k | 8k | 9k | 10k | 16k`
-- `gauge`: `normal | hard | easy`
+- `gauge`: `normal | hard | ex_hard | easy`
 - `random`: `off | fr | sr`
 - `random_seed`: random fixed seed (`0` is also treated as a fixed value)
 - `enable_osu_charts`: `false | true`
@@ -44,6 +44,11 @@ This document summarizes the currently implemented mode system and random rules 
 - `none` keeps the chart's lane count and base pattern layout as-is
 - `auto` is kept as a legacy alias and currently behaves the same as `none`
 - `4k..16k` match the key count through N2NC-based lane remapping
+
+## Gauge Rules
+- All gauges start at `100%` and fail immediately at `0%`.
+- `ex_hard` is a challenge gauge with lower recovery and heavier `BAD` / `POOR` loss than Hard.
+- Clear status is separated as `EX-HARD CLEAR`, `HARD CLEAR`, `CLEAR`, and `EASY CLEAR`.
 
 ## Implementation Location
 - Mode parsing: `src/gameplay/ModeSettings.*`, `src/app/ModeResolver.*`

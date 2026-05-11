@@ -263,6 +263,7 @@ std::string browse_for_folder(const std::string& title) {
 
 std::string gauge_type_label(game::GaugeType type) {
     switch (type) {
+        case game::GaugeType::ExHard: return "EX-HARD";
         case game::GaugeType::Hard: return "HARD";
         case game::GaugeType::Easy: return "EASY";
         case game::GaugeType::Normal:
@@ -380,10 +381,14 @@ std::optional<char> search_character_from_keycode(uint32_t keycode) {
 }
 
 game::GaugeType gauge_type_from_mode_string(std::string_view value) {
-    if (value == "hard") {
+    const std::string normalized = normalize_gauge_mode(std::string(value));
+    if (normalized == "ex_hard") {
+        return game::GaugeType::ExHard;
+    }
+    if (normalized == "hard") {
         return game::GaugeType::Hard;
     }
-    if (value == "easy") {
+    if (normalized == "easy") {
         return game::GaugeType::Easy;
     }
     return game::GaugeType::Normal;
@@ -391,6 +396,7 @@ game::GaugeType gauge_type_from_mode_string(std::string_view value) {
 
 std::string short_gauge_type_label(game::GaugeType type) {
     switch (type) {
+        case game::GaugeType::ExHard: return "EX";
         case game::GaugeType::Hard: return "H";
         case game::GaugeType::Easy: return "E";
         case game::GaugeType::Normal:
@@ -552,7 +558,10 @@ std::string MenuApp::ui_key_mode_label(std::string_view token) const {
 }
 
 std::string MenuApp::ui_gauge_label(std::string_view token) const {
-    const std::string normalized = to_lower_ascii(std::string(token));
+    const std::string normalized = normalize_gauge_mode(std::string(token));
+    if (normalized == "ex_hard") {
+        return ui_text("EX-Hard", "EX-하드");
+    }
     if (normalized == "hard") {
         return ui_text("Hard", "하드");
     }
@@ -1798,13 +1807,7 @@ void MenuApp::handle_quick_setup_input(uint32_t keycode) {
     if (keycode == key_left_ || keycode == key_right_) {
         const int direction = (keycode == key_left_) ? -1 : 1;
         if (settings_cursor_ == 1) {
-            if (config_.mode.gauge == "normal") {
-                config_.mode.gauge = (direction > 0) ? "hard" : "easy";
-            } else if (config_.mode.gauge == "hard") {
-                config_.mode.gauge = (direction > 0) ? "easy" : "normal";
-            } else {
-                config_.mode.gauge = (direction > 0) ? "normal" : "hard";
-            }
+            config_.mode.gauge = cycle_gauge_mode(config_.mode.gauge, direction);
             persist_runtime_config();
             publish_snapshot();
             return;

@@ -35,6 +35,8 @@ GaugeState GaugeManager::initialState(GaugeType type) const noexcept {
 
 GaugeDeltaTable GaugeManager::tableFor(GaugeType type) const noexcept {
     switch (type) {
+    case GaugeType::ExHard:
+        return config_.ex_hard;
     case GaugeType::Hard:
         return config_.hard;
     case GaugeType::Normal:

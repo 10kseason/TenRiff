@@ -155,7 +155,7 @@ void GameplayEngine::apply_judgement(game::Judgement judgement, double delta_ms,
 
     double time_ms = samples_to_ms(sample);
     auto previous_type = gauge_state_.type;
-    auto result = gauge_manager_.applyJudgement(gauge_state_, judgement, time_ms);
+    auto result = gauge_manager_.applyJudgementWeighted(gauge_state_, judgement, time_ms, weight);
 
     stats_.record_judgement(judgement, delta_ms, combo_impact, weight);
     stats_.record_gauge_sample(sample, gauge_state_.value);
@@ -188,9 +188,9 @@ std::optional<NoteEvent> GameplayEngine::try_hit_note(LaneState& lane, int64_t i
 
         if (delta_samples > windows_.bd) {
             apply_bad_miss(note.start_sample);
-            lane.mask_until = note.start_sample + windows_.mask;
+            lane.mask_until = input_sample + windows_.mask;
             ++lane.next_index;
-            continue;
+            return std::nullopt;
         }
 
         if (std::abs(delta_samples) > windows_.bd) {

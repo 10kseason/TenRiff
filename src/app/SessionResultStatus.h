@@ -45,6 +45,7 @@ inline std::string gameplay_session_clear_status(bool finished,
     const std::string assist_prefix =
         gameplay_session_assist_prefix(autoplay_enabled, practice_no_fail_enabled);
     switch (final_gauge) {
+        case game::GaugeType::ExHard: return assist_prefix + "EX-HARD CLEAR";
         case game::GaugeType::Hard: return assist_prefix + "HARD CLEAR";
         case game::GaugeType::Easy: return assist_prefix + "EASY CLEAR";
         case game::GaugeType::Normal:

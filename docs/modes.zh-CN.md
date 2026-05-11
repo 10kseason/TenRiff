@@ -22,7 +22,7 @@
 ## 模式含义
 - `format`：`auto | bms | osu`
 - `key_mode`：`none | auto | 4k | 5k | 6k | 7k | 8k | 9k | 10k | 16k`
-- `gauge`：`normal | hard | easy`
+- `gauge`：`normal | hard | ex_hard | easy`
 - `random`：`off | fr | sr`
 - `random_seed`：随机固定用 seed（`0` 也视为固定值）
 - `enable_osu_charts`：`false | true`
@@ -44,6 +44,11 @@
 - `none` 表示直接使用谱面的原始 lane 数和基础 pattern 布局
 - `auto` 作为 legacy alias 保留，当前行为与 `none` 相同
 - `4k..16k` 会通过基于 N2NC 的 lane remap 来匹配目标键数
+
+## Gauge 规则
+- 所有 gauge 都从 `100%` 开始，并在到达 `0%` 时立即失败。
+- `ex_hard` 是挑战用 gauge，回复低于 Hard，`BAD` / `POOR` 损失更大。
+- clear status 会区分为 `EX-HARD CLEAR`、`HARD CLEAR`、`CLEAR`、`EASY CLEAR`。
 
 ## 实现位置
 - 模式解析：`src/gameplay/ModeSettings.*`、`src/app/ModeResolver.*`

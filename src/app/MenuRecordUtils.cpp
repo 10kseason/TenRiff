@@ -40,10 +40,14 @@ std::string safe_ui_text_or_placeholder(std::string_view value, std::string_view
 }
 
 game::GaugeType gauge_type_from_mode_string(std::string_view value) {
-    if (value == "hard") {
+    const std::string gauge = to_lower_ascii(std::string(value));
+    if (gauge == "ex_hard" || gauge == "ex-hard" || gauge == "exhard") {
+        return game::GaugeType::ExHard;
+    }
+    if (gauge == "hard") {
         return game::GaugeType::Hard;
     }
-    if (value == "easy") {
+    if (gauge == "easy") {
         return game::GaugeType::Easy;
     }
     return game::GaugeType::Normal;
@@ -152,6 +156,10 @@ int clear_status_priority(std::string_view clear_status, bool game_over, std::st
     if (clear_status_is_assist(clear_status)) {
         return 1;
     }
+    if (status.find("ex-hard") != std::string::npos || status.find("ex hard") != std::string::npos ||
+        status.find("exhard") != std::string::npos) {
+        return 5;
+    }
     if (status.find("easy") != std::string::npos) {
         return 2;
     }
@@ -159,6 +167,9 @@ int clear_status_priority(std::string_view clear_status, bool game_over, std::st
         return 4;
     }
     const std::string gauge = to_lower_ascii(std::string(final_gauge));
+    if (gauge == "ex_hard" || gauge == "ex-hard" || gauge == "exhard") {
+        return 5;
+    }
     if (gauge == "hard") {
         return 4;
     }
@@ -177,6 +188,9 @@ std::string normalized_clear_status(std::string_view clear_status, bool game_ove
         return "FAILED";
     }
     const std::string gauge = to_lower_ascii(std::string(final_gauge));
+    if (gauge == "ex_hard" || gauge == "ex-hard" || gauge == "exhard") {
+        return "EX-HARD CLEAR";
+    }
     if (gauge == "hard") {
         return "HARD CLEAR";
     }

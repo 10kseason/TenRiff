@@ -52,7 +52,7 @@
 
 ## Key remap 与 NKRO 测试
 - 通过 InputThread 的 **下一条输入事件** 捕获绑定按键；不要通过轮询 render loop 来阻塞等待。
-- 为每个按键保持 UP/DOWN 状态机，这样 DOWN 状态下重复 DOWN 和 UP 状态下重复 UP 会被丢弃；把配置好的 debounce 窗口（默认 `8 ms`）内的 down→up→down 抖动压缩掉。
+- 为每个按键保持 UP/DOWN 状态机，这样 DOWN 状态下重复 DOWN 和 UP 状态下重复 UP 会被丢弃；保留真实 down→up→down 转换，避免快速点击或 release 被吞掉。
 - 成功捕获后应立即保存，不再有单独的隐藏保存组合键。
 - NKRO 测试仍保留为可见工具页面，但不再是隐藏快捷键。
 - NKRO 测试应显示当前按下集合，并用相同的输入事件实时高亮 ghosting / missing keys。

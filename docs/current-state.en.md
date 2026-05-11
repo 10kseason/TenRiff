@@ -3,15 +3,15 @@
 This is the document that the next agent or any new contributor should read first. Its goal is to quickly answer: "what is this project now, where should I look, and what is still unverified?"
 
 ## Baseline
-- Current project version: `1.1.2`
-- The `1.1.2` line is named the public `final stable` version
+- Current project version: `1.1.3`
+- The `1.1.3` line builds on top of the `1.1.2 final stable` baseline
 - Baseline companion document for follow-up work: `docs/baseline-1.1.2.en.md`
 - Windows GUI build is the main target
 - Linux exists only as a preview-level package at `Baepoks-Linuxs/TenRiff-0.5.0-linux-preview`
 - Default surface is BMS-first
 - `.osu` can be re-enabled as an option and supports 4K-10K
-- The `1.1.2` release line keeps the `1.0.9` gameplay playback-head timing fix, while live gameplay input prefers saved RawInput and uses bound-key polling shadow plus Polling fallback on RawInput startup failure to keep input recognition alive
-- On the same `1.1.2` line, menu input still uses the foreground process/root-window boundary and retries Polling if RawInput startup fails, while persisted input-backend rewrites remain removed and the saved backend preference is preserved as configuration
+- The `1.1.3` release line keeps the `1.0.9` gameplay playback-head timing fix, while live gameplay input prefers saved RawInput and uses a session-local bound-key polling fallback to correct missed RawInput edges
+- On the same `1.1.3` line, menu input still uses the foreground process/root-window boundary and retries Polling if RawInput startup fails, while persisted input-backend rewrites remain removed and the saved backend preference is preserved as configuration
 
 ## Core Architecture
 - `MenuApp`
@@ -26,6 +26,7 @@ This is the document that the next agent or any new contributor should read firs
   - Handles the audio master clock and mixing
 - `InputThread`
   - Collects RawInput / polling input and passes it into the queue
+  - Gameplay disables the RawInput thread's internal polling shadow; `GameSession` owns the bound-key polling fallback for missed edges
 - `RenderThread` + `MenuWindow`
   - Menu and in-game HUD rendering built on D3D11 + Direct2D / DirectWrite
   - The recent maintenance refactor is organizing large implementation files into smaller fragments
@@ -86,6 +87,7 @@ This is the document that the next agent or any new contributor should read firs
   - note-consuming failures (auto-miss, too-early consume, hold break / tail miss) stay `BAD`
   - very early non-consuming presses are handled as LR2-style `POOR` and are visible again in result / replay / UI paths
   - `POOR` preserves combo, stays out of score / accuracy totals, and uses dedicated `PR` gauge damage values
+  - gauge modes support `EX-Hard / Hard / Normal / Easy`; all start at `100%` and fail immediately at `0%`
   - live gameplay input uses the `ClockSync` estimate directly, and stale backlog compression now follows the `BAD` window again to match the `0.999` boundary
   - tail release timing applies only to osu hold and BMS `#LNMODE 2` charge notes
   - when two keyboards press the same key, the logical `Pressed` state remains active until the last input source releases it

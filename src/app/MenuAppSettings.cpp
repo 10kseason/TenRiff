@@ -134,13 +134,7 @@ void MenuApp::handle_mode_settings_input(uint32_t keycode) {
             config_.mode.key_mode = cycle_runtime_key_mode(config_.mode.key_mode, direction, true);
             mode_dirty_ = true;
         } else if (settings_cursor_ == 7) {
-            if (config_.mode.gauge == "normal") {
-                config_.mode.gauge = (direction > 0) ? "hard" : "easy";
-            } else if (config_.mode.gauge == "hard") {
-                config_.mode.gauge = (direction > 0) ? "easy" : "normal";
-            } else {
-                config_.mode.gauge = (direction > 0) ? "normal" : "hard";
-            }
+            config_.mode.gauge = cycle_gauge_mode(config_.mode.gauge, direction);
             mode_dirty_ = true;
         } else if (settings_cursor_ == 8) {
             if (config_.mode.random == "off") {

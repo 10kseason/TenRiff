@@ -39,13 +39,13 @@
 ### `input`
 - `backend` (string)
   - `polling | rawinput`
-  - 当前 `1.1.2` 发布线的默认值是 `rawinput`
+  - 当前 `1.1.3` 发布线的默认值是 `rawinput`
   - 保存值会被保留，不会在写回时强制规范化为 `polling`
-  - gameplay 在 `rawinput=true` 时优先启动 RawInput，并通过 bound-key polling shadow 与 RawInput 启动失败时的 Polling fallback 保持输入识别
+  - gameplay 在 `rawinput=true` 时优先启动 RawInput，并通过 session-local bound-key polling fallback 修正 RawInput 边沿漏报
 - `rawinput` (bool)
   - 与 `backend` 一起保存的便捷布尔字段
-  - 在当前 `1.1.2` 发布线上会按当前值正常保存和恢复
-  - 为 `true` 时，menu/gameplay 优先使用 RawInput，同时允许 polling shadow/fallback 保持输入识别
+  - 在当前 `1.1.3` 发布线上会按当前值正常保存和恢复
+  - 为 `true` 时，menu/gameplay 优先使用 RawInput，同时允许 polling fallback 保持输入识别
 - `use_qpc` (bool)
 - `grab` (bool)
   - 当前主要对应 Linux preview 语义
@@ -57,10 +57,10 @@
 - `judgement_hz` (int)
   - `1000 | 2000 | 4000 | 8000`
   - 保留在输入配置中的兼容字段
-  - 当前 `1.1.2` 运行时已不再用它驱动独立的音频线程判定 sub-step 循环
+  - 当前 `1.1.3` 运行时已不再用它驱动独立的音频线程判定 sub-step 循环
   - 默认值为 `4000`（`0.25ms`）
 - `debounce_ms` (double)
-  - 在运行时前过滤同一按键上极短暂的 up/down 抖动的输入去抖时间
+  - 输入状态跟踪设置。当前 runtime 不会用 debounce 丢弃真实的 Press/Release 转换，只会从按下状态跟踪中去掉同状态重复事件
   - 会被 clamp 在 `0..25` 范围内
   - 默认值为 `8ms`
 
@@ -88,9 +88,9 @@
 
 ### `gauge`
 - 不再有自动 gauge shift。所选 gauge 类型会一直保持到歌曲结束或失败。
-- Hard / Normal / Easy 都从 `100%` 开始，并在到达 `0%` 时立即失败。
+- EX-Hard / Hard / Normal / Easy 都从 `100%` 开始，并在到达 `0%` 时立即失败。
 - `delta`
-  - `hard`, `normal`, `easy`
+  - `ex_hard`, `hard`, `normal`, `easy`
   - 每个条目下包含 `PG`, `GR`, `GD`, `BD`, `PR`
 
 ### `graphics`
@@ -117,7 +117,7 @@
   - `none | auto | 4k | 5k | 6k | 7k | 8k | 9k | 10k | 16k`
   - `none` 表示直接沿用谱面的原始键数
 - `gauge` (string)
-  - `normal | hard | easy`
+  - `normal | hard | ex_hard | easy`
 - `random` (string)
   - `off | fr | sr`
 - `random_seed` (int)

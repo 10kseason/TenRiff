@@ -50,7 +50,7 @@ main menu も gameplay と同じ低遅延思想に従う必要があります。
 
 ## Key Remap and NKRO Test
 - key binding 取得は **次の input event** を InputThread から受けて行い、render loop の polling でブロックしない。
-- per-key state machine（UP / DOWN）を維持し、DOWN 中の duplicate DOWN、UP 中の duplicate UP を落とす。既定 `8 ms` の debounce window 内の down -> up -> down chatter も圧縮する。
+- per-key state machine（UP / DOWN）を維持し、DOWN 中の duplicate DOWN、UP 中の duplicate UP を落とす。実際の down -> up -> down 遷移は保持し、fast tap や release を捨てない。
 - key capture 成功時は即保存し、隠れた最終 save chord は設けない。
 - NKRO test は見える画面として残すが、隠しショートカットにはしない。
 - NKRO test は現在押されている集合を表示し、同じ input event を使って ghosting / missing key をリアルタイムに示す。

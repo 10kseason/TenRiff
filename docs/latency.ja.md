@@ -7,7 +7,7 @@ TenRiff は input-to-judgement-to-sound の end-to-end 遅延を最小化する�
 - per-profile `input_offset_ms` を追加し、device / driver 遅延を微調整できるようにする。
 - in-game loopback calibrator で key press の beep と mic loopback から推奨 offset を提案する。
 - HUD に現在の PG / GR / GD / BD window を表示し、rate 変化時の体感差を見やすくする。
-- raw event hygiene、multi-device ingest、stateful debounce を維持し、hardware chatter と duplicate edge を圧縮する。
+- raw event hygiene、multi-device ingest、stateful input tracking を維持し、duplicate edge を圧縮しつつ実際の Press/Release 遷移は保持する。
 
 ## Audio and Threading
 - `--audio-backend=wasapi|asio`、`--audio-backend=alsa|jack` のような backend 切替を用意する。
