@@ -4,14 +4,15 @@
 
 ## Baseline
 - 現在のプロジェクト版は `1.1.3`
-- multiplayer preview r4 は既存の `1.1.3 stable` を置き換えない独立 prerelease ライン
+- multiplayer preview r5 は既存の `1.1.3 stable` を置き換えない独立 prerelease ライン
 - 後続作業の基準文書は `docs/baseline-1.1.2.ja.md`
 - Windows GUI ビルドが主対象
 - Linux は `Baepoks-Linuxs/TenRiff-0.5.0-linux-preview` レベルの preview のみ
 - 既定サーフェスは BMS-first
 - `.osu` はオプションで再有効化でき、4K-10K をサポート
-- `1.1.3 multiplayer preview r4` の gameplay 入力は RawInput を優先しつつ、同じ `InputThread` で bound-key polling shadow を常時動作させる。起動失敗または message pump の予期しない終了時も queue / pressed state を reset せず、その producer を Polling に切り替える
-- menu 入力は従来の foreground process/root-window 境界を維持し、RawInput の起動失敗または runtime の thread/event 配信停止を検知すると現在の menu session だけ Polling に fallback し、保存済み profile backend 設定は保持する
+- `1.1.3 multiplayer preview r5` の gameplay 入力は RawInput を優先しつつ、同じ `InputThread` で bound-key polling shadow を常時動作させる。起動失敗または message pump の予期しない終了時も queue / pressed state を reset せず、その producer を Polling に切り替える
+- menu 入力は従来の foreground process/root-window 境界を維持する。RawInput の起動失敗、process-global 登録先の消失、hidden message window の終了を検知すると、ユーザー入力を待たず Polling に切り替える。
+- 確認済み fallback は profile を書き換えず、そのアプリ実行中の menu と後続 gameplay に維持する。アプリ再起動または `Options -> Input Settings -> Backend` の明示変更で再試行する。
 
 ## Core Architecture
 - `MenuApp`
@@ -139,7 +140,7 @@
 
 ## Runtime / Packaging Rules
 - 新しい user profile は自動生成される
-- 公開 P2P prerelease は `TenRiff 1.1.3 Multiplayer Preview r4` で、stable 1.1.3 の配布 asset とは分離する
+- 公開 P2P prerelease は `TenRiff 1.1.3 Multiplayer Preview r5` で、stable 1.1.3 の配布 asset とは分離する
 - distribution package には `Songs` を含めない
 - distribution package には menu BGM 用の `Mainmusic/` runtime asset を含める
 - distribution 更新には built artifact と必要な runtime asset だけを含める

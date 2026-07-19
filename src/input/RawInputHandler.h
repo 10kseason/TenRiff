@@ -48,6 +48,10 @@ public:
     /// @return true if the message was handled.
     bool process_message(intptr_t lparam);
 
+    /// Verify that this handler still owns live process-global RawInput
+    /// registrations targeting its message window.
+    [[nodiscard]] bool registration_target_is_healthy() const;
+
     /// Unregister and clean up.
     void shutdown();
 

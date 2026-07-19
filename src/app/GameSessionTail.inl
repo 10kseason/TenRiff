@@ -203,9 +203,7 @@ bool GameSession::initialize(const CommandLineOptions& options) {
         return false;
     }
     config_ = config_result.config;
-    input_backend_state_.configured_backend = config_.input.rawinput ? input::InputBackend::RawInput
-                                                                     : input::InputBackend::Polling;
-    input_backend_state_.effective_backend = input_backend_state_.configured_backend;
+    const bool profile_rawinput = config_.input.rawinput;
     const bool migrated_config = config_result.migrated;
     const bool stripped_session_only_mods = strip_session_only_mode_mods(config_);
 
@@ -215,6 +213,30 @@ bool GameSession::initialize(const CommandLineOptions& options) {
     }
     if (peer_battle_mode_) {
         apply_peer_battle_rules(config_);
+    }
+    if (force_polling_input_ && profile_rawinput) {
+        // This is a process-lifetime recovery override. Keep the saved profile
+        // on RawInput so an explicit retry or app restart can select it again.
+        config_.input.rawinput = false;
+        config_.input.backend = "polling";
+    }
+    input_backend_state_.configured_backend = profile_rawinput ? input::InputBackend::RawInput
+                                                               : input::InputBackend::Polling;
+    input_backend_state_.effective_backend = config_.input.rawinput ? input::InputBackend::RawInput
+                                                                    : input::InputBackend::Polling;
+    if (force_polling_input_ && profile_rawinput) {
+        input_backend_state_.auto_fallback = true;
+        input_backend_state_.fallback_origin =
+            forced_polling_input_state_.fallback_origin == InputFallbackOrigin::None
+                ? InputFallbackOrigin::Menu
+                : forced_polling_input_state_.fallback_origin;
+        input_backend_state_.fallback_reason = forced_polling_input_state_.fallback_reason.empty()
+                                                   ? "A prior RawInput failure latched Polling for the rest of this app run."
+                                                   : forced_polling_input_state_.fallback_reason;
+        input_backend_state_.fallback_timestamp_utc =
+            forced_polling_input_state_.fallback_timestamp_utc.empty()
+                ? utc_timestamp_compact()
+                : forced_polling_input_state_.fallback_timestamp_utc;
     }
     autoplay_enabled_ = config_.mode.autoplay_enabled;
     practice_no_fail_enabled_ = config_.mode.practice_no_fail_enabled;
@@ -536,7 +558,7 @@ bool GameSession::initialize(const CommandLineOptions& options) {
     }
     std::cerr << "[info] Gameplay input configured="
               << input_backend_name(input_backend_state_.configured_backend)
-              << " polling_shadow=" << (config_.input.rawinput ? "off" : "primary")
+              << " polling_shadow=" << (config_.input.rawinput ? "bound-keys" : "primary")
               << " key_mode=" << active_key_mode
               << " bound_lanes=" << key_to_lane_.size() << "/" << std::max(1, chart_.lane_count)
               << " keymap_normalized=" << keymap_result.normalized_binding_count
@@ -1639,6 +1661,17 @@ void GameSession::clamp_output(float* output, uint32_t frames, float master_gain
 void GameSession::shutdown() {
     stop_requested_.store(true, std::memory_order_release);
     audio_thread_.shutdown();
+    if (input_thread_.is_running() &&
+        input_backend_state_.configured_backend == input::InputBackend::RawInput &&
+        input_thread_.current_backend() == input::InputBackend::Polling &&
+        !input_backend_state_.auto_fallback) {
+        input_backend_state_.auto_fallback = true;
+        input_backend_state_.fallback_origin = InputFallbackOrigin::Gameplay;
+        input_backend_state_.fallback_reason =
+            "RawInput became unhealthy during gameplay; Polling kept note input active.";
+        input_backend_state_.fallback_timestamp_utc = utc_timestamp_compact();
+        input_backend_state_.effective_backend = input::InputBackend::Polling;
+    }
     input_thread_.shutdown();
     stop_chart_audio_workers();
     if (engine_ && gameplay_started_) {

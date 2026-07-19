@@ -37,23 +37,25 @@ If a profile does not exist, it is created automatically on first launch.
 - `keysound_volume` (double)
 
 ### `input`
+
 - `backend` (string)
   - `polling | rawinput`
-  - default is `rawinput` on the current `1.1.3` release line
-  - the stored value is preserved and no longer force-normalized to `polling` on save
-  - in the `1.1.3` preview, gameplay keeps RawInput and a bound-key polling shadow together inside the same `InputThread` when `rawinput=true`
-  - initialization/startup failure or an unexpected RawInput message-pump exit switches the same producer thread to Polling without resetting its queue or pressed state
+  - defaults to `rawinput` on the current `1.1.3` release line
+  - selectable per profile under `Options -> Input Settings -> Backend` or `Options -> Profile Setup -> Input Backend`
+  - runtime fallback never rewrites the saved value to `polling`
+  - a confirmed RawInput startup failure, registration-target loss, or message-window exit latches Polling across menu and subsequent gameplay sessions for the current app run
+  - restarting the app or explicitly changing Backend in Input Settings retries the selected backend
 - `rawinput` (bool)
   - convenience boolean persisted alongside `backend`
-  - on the current `1.1.3` release line it is saved and restored as-is
-  - when `true`, menu/gameplay prefer RawInput, and gameplay continuously shadows note/control keys with polling to survive runtime delivery loss
+  - when `true`, menu/gameplay prefer RawInput
+  - gameplay continuously shadows bound note/control keys with polling in the same `InputThread`
 - `use_qpc` (bool)
 - `grab` (bool)
   - currently a Linux-preview-oriented setting
 - `queue_size` (int)
 - `polling_hz` (int)
   - `1000 | 2000 | 4000 | 8000`
-  - how often the polling backend samples keyboard state
+  - sampling cadence for the Polling backend and the gameplay polling shadow
   - default is `1000` (`1ms`)
 - `judgement_hz` (int)
   - `1000 | 2000 | 4000 | 8000`
@@ -61,10 +63,9 @@ If a profile does not exist, it is created automatically on first launch.
   - the current `1.1.3` runtime no longer drives a separate audio-thread judgement sub-step loop from this value
   - default is `4000` (`0.25ms`)
 - `debounce_ms` (double)
-  - input state-tracking setting. The current runtime does not drop real Press/Release transitions through debounce; it only removes duplicate same-state events from pressed-state tracking
+  - real Press/Release transitions are preserved; only duplicate same-state events are removed from pressed-state tracking
   - clamped to the `0..25` range
   - default value is `8ms`
-
 ### `judge`
 - `pg`, `gr`, `gd`, `bd` (double, ms)
 - default `gd` is `75ms`

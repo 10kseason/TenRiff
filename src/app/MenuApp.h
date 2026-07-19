@@ -189,7 +189,7 @@ private:
 
     void start_menu_threads();
     void stop_menu_threads();
-    void restart_input_thread();
+    void restart_input_thread(bool retry_configured_backend = false);
     void restart_audio_thread();
     void restart_render_thread();
     void apply_runtime_graphics_config();
@@ -259,6 +259,7 @@ private:
     void refresh_menu_input_polling_scope();
     void rebuild_pressed_keys_from_polling_snapshot();
     [[nodiscard]] bool fallback_menu_input_to_polling(std::string_view reason);
+    void remember_input_backend_fallback(const InputBackendRuntimeState& state);
     void note_runtime_input_event_source(const input::InputEvent& event);
     [[nodiscard]] std::string current_input_backend_status_label() const;
     [[nodiscard]] std::string current_input_backend_status_detail() const;
@@ -516,6 +517,7 @@ private:
     gameplay::ResultStats last_result_{};
 
     bool input_dirty_ = false;
+    bool input_backend_dirty_ = false;
     bool audio_dirty_ = false;
     bool graphics_dirty_ = false;
     bool skin_dirty_ = false;
@@ -584,6 +586,7 @@ private:
     uint32_t key_f9_ = 0;
     input::RawInputHealthProbe input_backend_probe_{};
     std::unordered_map<uint32_t, bool> input_probe_polled_states_{};
+    InputBackendFallbackPolicy input_backend_fallback_policy_{};
     InputBackendRuntimeState input_backend_state_{};
     InputBackendRuntimeState last_gameplay_input_backend_state_{};
 };

@@ -10,6 +10,7 @@
 #include <iostream>
 #include <limits>
 #include <mutex>
+#include <optional>
 
 namespace tenriff::input {
 
@@ -24,6 +25,28 @@ struct RawInputRegistrationOwners {
 RawInputRegistrationOwners& registration_owners() {
     static RawInputRegistrationOwners owners;
     return owners;
+}
+
+std::optional<HWND> registered_target_for_usage(USHORT usage_page, USHORT usage) {
+    UINT count = 0;
+    if (GetRegisteredRawInputDevices(nullptr, &count, sizeof(RAWINPUTDEVICE)) == static_cast<UINT>(-1) ||
+        count == 0) {
+        return std::nullopt;
+    }
+
+    std::vector<RAWINPUTDEVICE> devices(count);
+    UINT capacity = count;
+    const UINT registered = GetRegisteredRawInputDevices(devices.data(), &capacity, sizeof(RAWINPUTDEVICE));
+    if (registered == static_cast<UINT>(-1)) {
+        return std::nullopt;
+    }
+
+    for (UINT i = 0; i < registered; ++i) {
+        if (devices[i].usUsagePage == usage_page && devices[i].usUsage == usage) {
+            return devices[i].hwndTarget;
+        }
+    }
+    return std::nullopt;
 }
 
 }  // namespace
@@ -94,6 +117,38 @@ bool RawInputHandler::initialize(HWND hwnd, const RawInputConfig& config) {
     auto& owners = registration_owners();
     std::lock_guard<std::mutex> lock(owners.mutex);
 
+    auto has_live_other_owner = [this, hwnd](RawInputHandler*& tracked_owner,
+                                              USHORT usage_page,
+                                              USHORT usage) {
+        const auto registered_target = registered_target_for_usage(usage_page, usage);
+        const HWND tracked_target = tracked_owner ? tracked_owner->hwnd_ : nullptr;
+        const bool tracked_owner_is_live =
+            tracked_owner != nullptr && tracked_owner != this && tracked_target != nullptr &&
+            IsWindow(tracked_target) != FALSE && registered_target.has_value() &&
+            *registered_target == tracked_target;
+        const bool untracked_live_target =
+            registered_target.has_value() && *registered_target != nullptr && *registered_target != hwnd &&
+            IsWindow(*registered_target) != FALSE;
+
+        if (tracked_owner_is_live || untracked_live_target) {
+            return true;
+        }
+
+        if (tracked_owner != nullptr && tracked_owner != this) {
+            // The bookkeeping outlived a registration/window. The stale
+            // handler will no longer be allowed to remove a newer owner.
+            tracked_owner = nullptr;
+        }
+        return false;
+    };
+
+    if ((config.register_keyboard && has_live_other_owner(owners.keyboard, 0x01, 0x06)) ||
+        (config.register_gamepad && has_live_other_owner(owners.gamepad, 0x01, 0x05))) {
+        std::cerr << "[warn] RawInput registration rejected: another live process-global owner already exists."
+                  << std::endl;
+        return false;
+    }
+
     SetLastError(ERROR_SUCCESS);
     const BOOL result = RegisterRawInputDevices(
         devices.data(),
@@ -118,6 +173,29 @@ bool RawInputHandler::initialize(HWND hwnd, const RawInputConfig& config) {
     }
     if (registered_gamepad_) {
         owners.gamepad = this;
+    }
+    return true;
+}
+
+bool RawInputHandler::registration_target_is_healthy() const {
+    if (!hwnd_ || (!registered_keyboard_ && !registered_gamepad_) || IsWindow(hwnd_) == FALSE) {
+        return false;
+    }
+
+    auto& owners = registration_owners();
+    std::lock_guard<std::mutex> lock(owners.mutex);
+
+    if (registered_keyboard_) {
+        const auto target = registered_target_for_usage(0x01, 0x06);
+        if (owners.keyboard != this || !target.has_value() || *target != hwnd_) {
+            return false;
+        }
+    }
+    if (registered_gamepad_) {
+        const auto target = registered_target_for_usage(0x01, 0x05);
+        if (owners.gamepad != this || !target.has_value() || *target != hwnd_) {
+            return false;
+        }
     }
     return true;
 }
@@ -219,21 +297,27 @@ void RawInputHandler::shutdown() {
 
     std::vector<RAWINPUTDEVICE> devices;
     if (registered_keyboard_ && owners.keyboard == this) {
-        RAWINPUTDEVICE keyboard{};
-        keyboard.usUsagePage = 0x01;
-        keyboard.usUsage = 0x06;
-        keyboard.dwFlags = RIDEV_REMOVE;
-        keyboard.hwndTarget = nullptr;
-        devices.push_back(keyboard);
+        const auto target = registered_target_for_usage(0x01, 0x06);
+        if (target.has_value() && *target == hwnd_) {
+            RAWINPUTDEVICE keyboard{};
+            keyboard.usUsagePage = 0x01;
+            keyboard.usUsage = 0x06;
+            keyboard.dwFlags = RIDEV_REMOVE;
+            keyboard.hwndTarget = nullptr;
+            devices.push_back(keyboard);
+        }
         owners.keyboard = nullptr;
     }
     if (registered_gamepad_ && owners.gamepad == this) {
-        RAWINPUTDEVICE gamepad{};
-        gamepad.usUsagePage = 0x01;
-        gamepad.usUsage = 0x05;
-        gamepad.dwFlags = RIDEV_REMOVE;
-        gamepad.hwndTarget = nullptr;
-        devices.push_back(gamepad);
+        const auto target = registered_target_for_usage(0x01, 0x05);
+        if (target.has_value() && *target == hwnd_) {
+            RAWINPUTDEVICE gamepad{};
+            gamepad.usUsagePage = 0x01;
+            gamepad.usUsage = 0x05;
+            gamepad.dwFlags = RIDEV_REMOVE;
+            gamepad.hwndTarget = nullptr;
+            devices.push_back(gamepad);
+        }
         owners.gamepad = nullptr;
     }
 

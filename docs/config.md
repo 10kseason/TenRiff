@@ -37,34 +37,35 @@
 - `keysound_volume` (double)
 
 ### `input`
+
 - `backend` (string)
   - `polling | rawinput`
-  - 현재 `1.1.3` 릴리스 라인 기본값은 `rawinput`
-  - 저장값은 그대로 유지되며 자동으로 `polling`으로 강제 저장되지는 않음
-  - `1.1.3` preview gameplay는 `rawinput=true`일 때 같은 `InputThread` 안에서 RawInput과 bound-key polling shadow를 함께 유지함
-  - 초기화/시작 실패 또는 RawInput message pump의 예기치 않은 종료 시 queue와 pressed state를 reset하지 않고 같은 producer thread에서 Polling으로 전환함
+  - 현재 `1.1.3` 릴리스 라인의 기본값은 `rawinput`
+  - `Options -> Input Settings -> Backend` 또는 `Options -> Profile Setup -> Input Backend`에서 프로필별로 RawInput/Polling을 직접 선택 가능
+  - 저장값은 런타임 fallback 때문에 자동으로 `polling`으로 덮어쓰지 않음
+  - RawInput 시작 실패, 등록 대상 손실, 메시지 창 종료가 확인되면 현재 앱 실행 동안 메뉴와 다음 gameplay 세션 모두 Polling을 유지
+  - 앱 재시작 또는 Input Settings의 명시적인 Backend 변경 시 선택한 백엔드를 다시 시도
 - `rawinput` (bool)
   - `backend`와 함께 저장되는 편의 필드
-  - 현재 `1.1.3` 릴리스 라인에서는 저장 시에도 현재 값이 유지됨
-  - `true`이면 menu/gameplay 모두 RawInput을 우선 사용하고, gameplay는 노트/control 키 polling shadow를 항상 함께 사용해 runtime 입력 중단을 보완
+  - `true`이면 menu/gameplay가 RawInput을 우선 사용
+  - gameplay는 같은 `InputThread`에서 노트/control 키를 bound-key polling shadow로 항상 보조 감시
 - `use_qpc` (bool)
 - `grab` (bool)
   - 현재 Linux preview 성격
 - `queue_size` (int)
 - `polling_hz` (int)
   - `1000 | 2000 | 4000 | 8000`
-  - 폴링 백엔드가 키보드 상태를 읽는 빈도
+  - Polling backend와 gameplay polling shadow가 키 상태를 읽는 빈도
   - 기본값은 `1000` (`1ms`)
 - `judgement_hz` (int)
   - `1000 | 2000 | 4000 | 8000`
   - 호환성용으로 남아 있는 입력 설정 필드
-  - 현재 `1.1.3` 런타임에서는 별도 오디오 판정 서브루프를 이 값으로 구동하지 않음
+  - 현재 `1.1.3` runtime은 별도 오디오 판정 서브루프를 이 값으로 구동하지 않음
   - 기본값은 `4000` (`0.25ms`)
 - `debounce_ms` (double)
-  - 같은 키의 입력 상태 추적 설정값. 현재 런타임은 실제 Press/Release 전환을 디바운스로 버리지 않고, 같은 상태의 중복 이벤트만 눌림 상태 추적에서 제거
+  - 실제 Press/Release 전환은 버리지 않고 같은 상태의 중복 이벤트만 상태 추적에서 제거
   - `0..25` 범위로 clamp
   - 기본값은 `8ms`
-
 ### `judge`
 - `pg`, `gr`, `gd`, `bd` (double, ms)
 - 기본 `gd`는 `75ms`

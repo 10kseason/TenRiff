@@ -122,7 +122,7 @@ void MenuApp::handle_graphics_settings_input(uint32_t keycode) {
 }
 
 void MenuApp::handle_input_settings_input(uint32_t keycode) {
-    const int item_count = 3;
+    const int item_count = 4;
     if (keycode == key_up_) {
         settings_cursor_ = clamp_int(settings_cursor_ - 1, 0, item_count - 1);
         publish_snapshot();
@@ -135,6 +135,20 @@ void MenuApp::handle_input_settings_input(uint32_t keycode) {
     }
 
     if (settings_cursor_ == 0 && (keycode == key_left_ || keycode == key_right_)) {
+        const bool requested_rawinput = keycode == key_right_;
+        const bool backend_changed = config_.input.rawinput != requested_rawinput;
+        const bool retry_rawinput = requested_rawinput && input_backend_fallback_policy_.polling_latched();
+        if (backend_changed || retry_rawinput) {
+            config_.input.rawinput = requested_rawinput;
+            config_.input.backend = requested_rawinput ? "rawinput" : "polling";
+            input_dirty_ = true;
+            input_backend_dirty_ = true;
+        }
+        publish_snapshot();
+        return;
+    }
+
+    if (settings_cursor_ == 1 && (keycode == key_left_ || keycode == key_right_)) {
         const int direction = (keycode == key_left_) ? -1 : 1;
         const int option_count = static_cast<int>(sizeof(kPollingOptions) / sizeof(kPollingOptions[0]));
         const int next_index = next_option_index(kPollingOptions, option_count, config_.input.polling_hz, direction);
@@ -144,7 +158,7 @@ void MenuApp::handle_input_settings_input(uint32_t keycode) {
         return;
     }
 
-    if (settings_cursor_ == 1 && (keycode == key_left_ || keycode == key_right_)) {
+    if (settings_cursor_ == 2 && (keycode == key_left_ || keycode == key_right_)) {
         const int direction = (keycode == key_left_) ? -1 : 1;
         const int option_count = static_cast<int>(sizeof(kDebounceMsOptions) / sizeof(kDebounceMsOptions[0]));
         const int current = static_cast<int>(std::llround(config_.input.debounce_ms));
@@ -155,13 +169,17 @@ void MenuApp::handle_input_settings_input(uint32_t keycode) {
         return;
     }
 
-    if (keycode == key_enter_ || keycode == key_escape_ || keycode == key_backspace_) {
+    const bool back_requested =
+        keycode == key_escape_ || keycode == key_backspace_ ||
+        (keycode == key_enter_ && settings_cursor_ == item_count - 1);
+    if (back_requested) {
         screen_ = submenu_return_screen_;
         settings_cursor_ = 0;
         if (input_dirty_) {
             persist_runtime_config();
-            restart_input_thread();
+            restart_input_thread(input_backend_dirty_);
             input_dirty_ = false;
+            input_backend_dirty_ = false;
         }
         publish_snapshot();
     }
@@ -261,19 +279,30 @@ void MenuApp::populate_graphics_settings_render_data(render::MenuRenderData& ren
 }
 
 void MenuApp::populate_input_settings_render_data(render::MenuRenderData& render) {
-    append_menu_row(render.generic, ui_text("Polling Hz", "폴링 Hz"), std::to_string(config_.input.polling_hz), settings_cursor_ == 0,
+    std::string backend_value = config_.input.rawinput ? "RawInput" : "Polling";
+    if (config_.input.rawinput && input_backend_fallback_policy_.polling_latched()) {
+        backend_value += " (active: Polling)";
+    }
+    append_menu_row(render.generic, ui_text("Backend", "입력 백엔드"), backend_value, settings_cursor_ == 0,
                     render::MenuHitTargetKind::SettingsRow, 0, false, true);
-    append_menu_row(render.generic, ui_text("Debounce", "디바운스"), format_decimal(config_.input.debounce_ms) + " ms", settings_cursor_ == 1,
+    append_menu_row(render.generic, ui_text("Polling Hz", "폴링 Hz"), std::to_string(config_.input.polling_hz), settings_cursor_ == 1,
                     render::MenuHitTargetKind::SettingsRow, 1, false, true);
-    append_menu_row(render.generic, ui_text("Back", "뒤로"), "", settings_cursor_ == 2, render::MenuHitTargetKind::SettingsRow, 2, true, false);
-    render.generic.notes.push_back(ui_text("Polling Hz changes how often the polling backend samples keyboard state.",
-                                           "폴링 Hz는 폴링 백엔드가 키보드 상태를 얼마나 자주 읽을지 바꿉니다."));
-    render.generic.notes.push_back(ui_text("During gameplay, RawInput uses this cadence as an always-on bound-key backup so silent backend failures do not stop note input.",
-                                           "플레이 중에는 RawInput이 조용히 멈춰도 노트 입력이 끊기지 않도록 이 주기로 매핑된 키만 항상 백업 폴링합니다."));
+    append_menu_row(render.generic, ui_text("Debounce", "디바운스"), format_decimal(config_.input.debounce_ms) + " ms", settings_cursor_ == 2,
+                    render::MenuHitTargetKind::SettingsRow, 2, false, true);
+    append_menu_row(render.generic, ui_text("Back", "뒤로"), "", settings_cursor_ == 3,
+                    render::MenuHitTargetKind::SettingsRow, 3, true, false);
+    render.generic.notes.push_back(ui_text("Backend selects RawInput or Polling for the saved profile.",
+                                           "입력 백엔드는 프로필에 저장할 RawInput 또는 Polling을 선택합니다."));
+    render.generic.notes.push_back(ui_text("After a confirmed RawInput failure, this app run stays on Polling so menu and note input keep working.",
+                                           "RawInput 고장이 확인되면 이번 실행 동안 Polling을 유지해 메뉴와 노트 입력이 계속 작동합니다."));
+    render.generic.notes.push_back(ui_text("Left selects Polling. Right selects or retries RawInput and clears the runtime fallback.",
+                                           "왼쪽은 Polling을 선택하고, 오른쪽은 런타임 대체를 해제해 RawInput을 선택하거나 다시 시도합니다."));
+    render.generic.notes.push_back(ui_text("During gameplay, RawInput also uses Polling Hz as an always-on bound-key backup.",
+                                           "플레이 중 RawInput은 폴링 Hz 주기로 노트 키를 항상 보조 감시합니다."));
     render.generic.notes.push_back(ui_text("Debounce filters duplicate switch chatter on a single key before gameplay sees it.",
-                                           "디바운스는 게임플레이로 전달되기 전 한 키의 중복 스위치 떨림 입력을 걸러냅니다."));
+                                           "디바운스는 플레이에 전달되기 전 한 키의 중복 스위치 채터링을 걸러냅니다."));
     render.generic.notes.push_back(ui_text("Left/Right or click +/- to change. Back saves and returns.",
-                                           "좌우 키나 +/- 클릭으로 변경합니다. 뒤로 가면 저장 후 돌아갑니다."));
+                                           "좌우 키 또는 +/- 클릭으로 변경합니다. 뒤로 가면 저장됩니다."));
 }
 
 void MenuApp::populate_calibration_settings_render_data(render::MenuRenderData& render) {

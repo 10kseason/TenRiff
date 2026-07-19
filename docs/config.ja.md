@@ -37,34 +37,35 @@ profile が存在しない場合は初回起動時に自動生成されます。
 - `keysound_volume` (double)
 
 ### `input`
+
 - `backend` (string)
   - `polling | rawinput`
-  - 現在の `1.1.3` ラインの既定値は `rawinput`
-  - 保存時に `polling` へ強制正規化されず、保存値はそのまま維持される
-  - `1.1.3` preview の gameplay は `rawinput=true` の場合、同じ `InputThread` 内で RawInput と bound-key polling shadow を併用する
-  - 初期化/起動失敗または RawInput message pump の予期しない終了時は、queue / pressed state を reset せず同じ producer thread を Polling に切り替える
+  - 現行 `1.1.3` リリースラインの既定値は `rawinput`
+  - `Options -> Input Settings -> Backend` または `Options -> Profile Setup -> Input Backend` で profile ごとに選択可能
+  - runtime fallback は保存済みの値を `polling` に書き換えない
+  - RawInput の起動失敗、登録先の消失、message window の終了を確認すると、そのアプリ実行中は menu と後続 gameplay の両方で Polling を維持する
+  - アプリ再起動または Input Settings で Backend を明示変更すると、選択した backend を再試行する
 - `rawinput` (bool)
-  - `backend` と並ぶ便宜的な保存フラグ
-  - 現在の `1.1.3` ラインではそのまま保存/復元される
-  - `true` の場合 menu/gameplay は RawInput を優先し、gameplay は note/control key の polling shadow を常時使って runtime の入力停止を補う
+  - `backend` と一緒に保存される補助フィールド
+  - `true` の場合、menu/gameplay は RawInput を優先
+  - gameplay は同じ `InputThread` 内で note/control key を bound-key polling shadow により常時監視する
 - `use_qpc` (bool)
 - `grab` (bool)
-  - 現状では Linux preview 向け設定
+  - 現在は Linux preview 向けの設定
 - `queue_size` (int)
 - `polling_hz` (int)
   - `1000 | 2000 | 4000 | 8000`
-  - polling backend が keyboard state を読む頻度
-  - 既定は `1000` (`1ms`)
+  - Polling backend と gameplay polling shadow の sampling 頻度
+  - 既定値は `1000` (`1ms`)
 - `judgement_hz` (int)
   - `1000 | 2000 | 4000 | 8000`
-  - input config に残っている互換フィールド
-  - 現在の `1.1.3` runtime では別個の audio-thread judgement sub-step loop をこれで駆動しない
-  - 既定は `4000` (`0.25ms`)
+  - input config に残している互換フィールド
+  - 現行 runtime はこの値で別の audio-thread judgement sub-step loop を駆動しない
+  - 既定値は `4000` (`0.25ms`)
 - `debounce_ms` (double)
-  - 入力状態追跡の設定値。現在の runtime は実際の Press/Release 遷移を debounce で捨てず、同一状態の duplicate event だけを押下状態追跡から除外する
+  - 実際の Press/Release 遷移は維持し、同一状態の重複 event のみ pressed-state tracking から除去する
   - `0..25` に clamp
   - 既定値は `8ms`
-
 ### `judge`
 - `pg`, `gr`, `gd`, `bd` (double, ms)
 - 既定 `gd` は `75ms`

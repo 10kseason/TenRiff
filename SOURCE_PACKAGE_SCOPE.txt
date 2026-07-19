@@ -1,4 +1,4 @@
-TenRiff 1.1.3 multiplayer preview r4 open-source source package scope
+TenRiff 1.1.3 multiplayer preview r5 open-source source package scope
 
 Included in versioned source bundles:
 - CHANGELOG.md

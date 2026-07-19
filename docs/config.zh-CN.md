@@ -37,34 +37,35 @@
 - `keysound_volume` (double)
 
 ### `input`
+
 - `backend` (string)
   - `polling | rawinput`
-  - 当前 `1.1.3` 发布线的默认值是 `rawinput`
-  - 保存值会被保留，不会在写回时强制规范化为 `polling`
-  - `1.1.3` preview 的 gameplay 在 `rawinput=true` 时，会在同一个 `InputThread` 内同时保持 RawInput 与 bound-key polling shadow
-  - 初始化/启动失败或 RawInput message pump 意外退出时，会在不重置 queue/pressed state 的情况下把同一 producer thread 切换到 Polling
+  - 当前 `1.1.3` 发布线默认值为 `rawinput`
+  - 可在 `Options -> Input Settings -> Backend` 或 `Options -> Profile Setup -> Input Backend` 中按 profile 选择
+  - runtime fallback 不会把已保存值改写为 `polling`
+  - 确认 RawInput 启动失败、注册目标丢失或 message window 退出后，本次应用运行期间 menu 与后续 gameplay 都会保持 Polling
+  - 重启应用或在 Input Settings 中明确更改 Backend 后，会重试所选 backend
 - `rawinput` (bool)
-  - 与 `backend` 一起保存的便捷布尔字段
-  - 在当前 `1.1.3` 发布线上会按当前值正常保存和恢复
-  - 为 `true` 时，menu/gameplay 优先使用 RawInput；gameplay 会持续用 polling shadow 监测 note/control key，以补偿运行时输入中断
+  - 与 `backend` 一起保存的辅助布尔字段
+  - 为 `true` 时，menu/gameplay 优先使用 RawInput
+  - gameplay 会在同一 `InputThread` 中持续用 bound-key polling shadow 监测 note/control key
 - `use_qpc` (bool)
 - `grab` (bool)
-  - 当前主要对应 Linux preview 语义
+  - 当前主要用于 Linux preview
 - `queue_size` (int)
 - `polling_hz` (int)
   - `1000 | 2000 | 4000 | 8000`
-  - polling backend 读取键盘状态的频率
-  - 默认值为 `1000`（`1ms`）
+  - Polling backend 与 gameplay polling shadow 的采样频率
+  - 默认值为 `1000` (`1ms`)
 - `judgement_hz` (int)
   - `1000 | 2000 | 4000 | 8000`
-  - 保留在输入配置中的兼容字段
-  - 当前 `1.1.3` 运行时已不再用它驱动独立的音频线程判定 sub-step 循环
-  - 默认值为 `4000`（`0.25ms`）
+  - input config 中保留的兼容字段
+  - 当前 runtime 不再用此值驱动独立的 audio-thread judgement sub-step loop
+  - 默认值为 `4000` (`0.25ms`)
 - `debounce_ms` (double)
-  - 输入状态跟踪设置。当前 runtime 不会用 debounce 丢弃真实的 Press/Release 转换，只会从按下状态跟踪中去掉同状态重复事件
-  - 会被 clamp 在 `0..25` 范围内
+  - 保留真实 Press/Release 转换，仅从 pressed-state tracking 中移除同状态重复 event
+  - clamp 到 `0..25`
   - 默认值为 `8ms`
-
 ### `judge`
 - `pg`, `gr`, `gd`, `bd` (double, ms)
 - 默认 `gd` 为 `75ms`

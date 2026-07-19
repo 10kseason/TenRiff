@@ -21,6 +21,7 @@ constexpr wchar_t kWindowClassName[] = L"TenRiff_InputWindow";
 
 // Custom message for shutdown.
 constexpr UINT WM_TENRIFF_QUIT = WM_USER + 1;
+constexpr int64_t kRawInputRegistrationHealthIntervalNs = 100'000'000LL;
 
 // Global pointer for window procedure (thread-local would be cleaner but adds complexity).
 thread_local InputThread* g_input_thread = nullptr;
@@ -40,7 +41,12 @@ LRESULT CALLBACK input_window_proc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lp
             PostQuitMessage(0);
             return 0;
 
+        case WM_CLOSE:
+            DestroyWindow(hwnd);
+            return 0;
+
         case WM_DESTROY:
+            PostQuitMessage(0);
             return 0;
     }
 
@@ -399,6 +405,7 @@ bool InputThread::thread_main_rawinput() {
 
     bool runtime_failure = false;
     int64_t next_poll_ns = timing::HighResClock::now_ns();
+    int64_t next_registration_health_check_ns = next_poll_ns + kRawInputRegistrationHealthIntervalNs;
     while (!should_stop_.load(std::memory_order_acquire)) {
         MSG msg;
         bool had_message = false;
@@ -421,6 +428,16 @@ bool InputThread::thread_main_rawinput() {
         }
 
         const int64_t now_ns = timing::HighResClock::now_ns();
+        if (now_ns >= next_registration_health_check_ns) {
+            if (!raw_input_handler_->registration_target_is_healthy()) {
+                std::cerr << "[warn] RawInput registration target became invalid; switching to Polling."
+                          << std::endl;
+                runtime_failure = true;
+                break;
+            }
+            next_registration_health_check_ns = now_ns + kRawInputRegistrationHealthIntervalNs;
+        }
+
         const bool allowed = is_input_allowed();
         if (allowed != last_input_allowed_) {
             sync_input_gate(allowed);
@@ -454,7 +471,9 @@ bool InputThread::thread_main_rawinput() {
 
     // Cleanup.
     raw_input_handler_->shutdown();
-    DestroyWindow(hwnd);
+    if (IsWindow(hwnd) != FALSE) {
+        DestroyWindow(hwnd);
+    }
     hwnd_ = nullptr;
     if (registered_class) {
         UnregisterClassW(kWindowClassName, GetModuleHandleW(nullptr));
