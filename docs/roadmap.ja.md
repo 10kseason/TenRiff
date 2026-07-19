@@ -4,7 +4,7 @@
 
 ## Current Baseline
 - Windows GUI / runtime が主なサポート経路です。
-- プロジェクト版ラインは `1.1.3` で、`1.1.2 final stable` ベースラインの上に積み重ねた後続ラインです。
+- プロジェクト版ラインは `1.1.3` で、multiplayer preview r4 は stable 1.1.3 asset と分離して公開します。
 - 既定では BMS-first の menu / runtime が有効で、4K-10K `.osu` は config / menu toggle の背後にある任意機能です。
 - 現在出荷されている挙動は [`docs/current-state.ja.md`](current-state.ja.md) を先に見てください。この roadmap は方向と残作業を示す文書です。
 

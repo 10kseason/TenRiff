@@ -46,6 +46,7 @@ struct GameplayConfig {
     double rate = 1.0;
     config::JudgeConfig judge;
     game::GaugeConfig gauge;
+    game::GaugeRuntimePolicy gauge_policy;
     game::GaugeType initial_gauge = game::GaugeType::Normal;
     double input_offset_ms = 0.0;
     bool practice_no_fail_enabled = false;

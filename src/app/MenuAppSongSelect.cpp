@@ -281,6 +281,7 @@ void MenuApp::update_song_list(SongIndex index) {
 
     std::string selected_path = selected_song_path();
     indexed_songs_ = std::move(index.entries);
+    ++song_index_revision_;
     // Sanitize once when the source list changes so later view rebuilds can stay cheap.
     for (auto& entry : indexed_songs_) {
         entry.title = safe_ui_text(entry.title);

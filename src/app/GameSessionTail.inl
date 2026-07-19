@@ -34,7 +34,10 @@ void GameSession::rebuild_input_thread_config(input::InputThreadConfig& input_co
     input_config.backend = config_.input.rawinput ? input::InputBackend::RawInput
                                                   : input::InputBackend::Polling;
     input_config.gate_policy = input::InputGatePolicy::AlwaysAllow;
-    input_config.rawinput_polling_shadow = false;
+    // Gameplay always keeps a bound-key polling shadow inside InputThread.
+    // RawInput remains the low-latency primary path, while the same single
+    // KeyStateTracker deduplicates polling edges if WM_INPUT silently stops.
+    input_config.rawinput_polling_shadow = config_.input.rawinput;
     input_config.raw_input.register_keyboard = config_.input.rawinput;
     input_config.raw_input.input_sink = true;
     input_config.raw_input.no_legacy = false;
@@ -102,75 +105,6 @@ void GameSession::rebuild_polled_gameplay_keys() {
     append_unique_key(f9_keycode_);
 }
 
-void GameSession::sync_polled_key_state(uint32_t keycode,
-                                        input::InputState state,
-                                        std::optional<int64_t> queue_event_ns) {
-    for (auto& tracked : polled_gameplay_keys_) {
-        if (tracked.keycode != keycode) {
-            continue;
-        }
-        tracked.pressed = (state == input::InputState::Pressed);
-        if (queue_event_ns.has_value()) {
-            tracked.last_queue_event_ns = *queue_event_ns;
-        }
-        return;
-    }
-}
-
-std::optional<input::InputEvent> GameSession::filter_gameplay_input_event(const input::InputEvent& event) {
-    sync_polled_key_state(event.keycode, event.state, event.input_time_ns);
-    return gameplay_input_state_tracker_.process(event);
-}
-
-void GameSession::poll_gameplay_keys(int64_t sample, bool capture_lane_inputs) {
-    constexpr int64_t kGameplayInputPollQueueGraceNs = 20'000'000LL;
-
-    if (polled_gameplay_keys_.empty()) {
-        return;
-    }
-
-    const int64_t now_ns = timing::HighResClock::now_ns();
-    for (auto& tracked : polled_gameplay_keys_) {
-        if (tracked.last_queue_event_ns != (std::numeric_limits<int64_t>::min)() &&
-            now_ns - tracked.last_queue_event_ns <= kGameplayInputPollQueueGraceNs) {
-            continue;
-        }
-
-        const auto poll_vk = config::KeycodeMap::polling_vk_for_keycode(tracked.keycode);
-        if (!poll_vk.has_value()) {
-            continue;
-        }
-        const bool pressed = (GetAsyncKeyState(static_cast<int>(*poll_vk)) & 0x8000) != 0;
-        if (pressed == tracked.pressed) {
-            continue;
-        }
-
-        tracked.pressed = pressed;
-
-        input::InputEvent event{};
-        event.keycode = tracked.keycode;
-        event.state = pressed ? input::InputState::Pressed : input::InputState::Released;
-        event.input_time_ns = now_ns;
-        event.device_id = input::kPollingAggregateDeviceId;
-
-        auto filtered = gameplay_input_state_tracker_.process(event);
-        if (!filtered.has_value()) {
-            continue;
-        }
-
-        if (handle_control_input(*filtered)) {
-            continue;
-        }
-        if (!capture_lane_inputs) {
-            continue;
-        }
-
-        if (auto lane = lane_from_keycode(filtered->keycode)) {
-            pending_input_events_.push_back(BufferedLaneInput{lane.value(), filtered->state, sample});
-        }
-    }
-}
-
 GameSession::GameSession() = default;
 
 GameSession::~GameSession() {
@@ -182,6 +116,7 @@ bool GameSession::initialize(const CommandLineOptions& options) {
     result_ = {};
     stop_requested_.store(false, std::memory_order_release);
     finished_.store(false, std::memory_order_release);
+    spectating_peer_.store(false, std::memory_order_release);
     user_aborted_.store(false, std::memory_order_release);
     last_audio_sample_.store(0, std::memory_order_release);
     audio_timing_sequence_.store(0, std::memory_order_release);
@@ -217,7 +152,6 @@ bool GameSession::initialize(const CommandLineOptions& options) {
 
     future_events_ = {};
     input_backend_state_ = {};
-    gameplay_input_state_tracker_.reset();
     polled_gameplay_keys_.clear();
     tone_voices_.clear();
     stop_chart_audio_workers();
@@ -272,8 +206,6 @@ bool GameSession::initialize(const CommandLineOptions& options) {
     input_backend_state_.configured_backend = config_.input.rawinput ? input::InputBackend::RawInput
                                                                      : input::InputBackend::Polling;
     input_backend_state_.effective_backend = input_backend_state_.configured_backend;
-    autoplay_enabled_ = config_.mode.autoplay_enabled;
-    practice_no_fail_enabled_ = config_.mode.practice_no_fail_enabled;
     const bool migrated_config = config_result.migrated;
     const bool stripped_session_only_mods = strip_session_only_mode_mods(config_);
 
@@ -281,6 +213,11 @@ bool GameSession::initialize(const CommandLineOptions& options) {
         const config::RuntimeConfig persisted = build_persisted_runtime_config(config_);
         config_loader.save_profile(profile_dir_, persisted);
     }
+    if (peer_battle_mode_) {
+        apply_peer_battle_rules(config_);
+    }
+    autoplay_enabled_ = config_.mode.autoplay_enabled;
+    practice_no_fail_enabled_ = config_.mode.practice_no_fail_enabled;
     report_loading_progress(12, "Loading keymap");
     if (loading_cancel_requested()) {
         return false;
@@ -505,6 +442,7 @@ bool GameSession::initialize(const CommandLineOptions& options) {
     gameplay_config.rate = config_.speed.rate;
     gameplay_config.judge = mode_result.judge;
     gameplay_config.gauge = config_.gauge;
+    gameplay_config.gauge_policy.normal_to_easy_shift = peer_battle_mode_;
     gameplay_config.input_offset_ms = config_.input_offset_ms;
     gameplay_config.practice_no_fail_enabled = practice_no_fail_enabled_;
     switch (mode_result.settings.gauge) {
@@ -598,7 +536,7 @@ bool GameSession::initialize(const CommandLineOptions& options) {
     }
     std::cerr << "[info] Gameplay input configured="
               << input_backend_name(input_backend_state_.configured_backend)
-              << " polling_shadow=" << (config_.input.rawinput ? "bound-keys" : "primary")
+              << " polling_shadow=" << (config_.input.rawinput ? "off" : "primary")
               << " key_mode=" << active_key_mode
               << " bound_lanes=" << key_to_lane_.size() << "/" << std::max(1, chart_.lane_count)
               << " keymap_normalized=" << keymap_result.normalized_binding_count
@@ -610,7 +548,6 @@ bool GameSession::initialize(const CommandLineOptions& options) {
                   << ". Invalid bindings or duplicate lane keys may prevent judgement/input interaction."
                   << std::endl;
     }
-    gameplay_input_state_tracker_.reset();
     rebuild_polled_gameplay_keys();
     report_loading_progress(88, "Preparing chart audio");
     if (loading_cancel_requested()) {
@@ -629,7 +566,10 @@ bool GameSession::initialize(const CommandLineOptions& options) {
     std::cerr << "[info] Gameplay input startup requested="
               << input_backend_name(input_config.backend)
               << " gate=always polling_keys=" << input_config.polling_keys.size()
-              << " polling_shadow=" << (config_.input.rawinput ? "bound-keys" : "primary")
+              << " polling_shadow="
+              << (input_config.backend == input::InputBackend::Polling
+                      ? "primary"
+                      : (input_config.rawinput_polling_shadow ? "bound-keys" : "off"))
               << std::endl;
     if (!input_thread_.initialize(input_config)) {
         if (input_config.backend != input::InputBackend::RawInput) {
@@ -698,7 +638,10 @@ bool GameSession::initialize(const CommandLineOptions& options) {
               << input_backend_name(input_backend_state_.configured_backend)
               << " effective=" << input_backend_name(input_backend_state_.effective_backend)
               << " gate=always polling_keys=" << input_config.polling_keys.size()
-              << " polling_shadow=" << (config_.input.rawinput ? "bound-keys" : "primary");
+              << " polling_shadow="
+              << (input_config.backend == input::InputBackend::Polling
+                      ? "primary"
+                      : (input_config.rawinput_polling_shadow ? "bound-keys" : "off"));
     if (input_backend_state_.auto_fallback && !input_backend_state_.fallback_reason.empty()) {
         std::cerr << " fallback_reason=\"" << input_backend_state_.fallback_reason << "\"";
     }
@@ -775,6 +718,12 @@ void GameSession::run() {
             break;
         }
 
+        if (spectating_peer_.load(std::memory_order_acquire) &&
+            peer_spectator_done_callback_ && peer_spectator_done_callback_()) {
+            finished_.store(true, std::memory_order_release);
+            break;
+        }
+
         service_chart_audio_streaming(last_audio_sample_.load(std::memory_order_acquire));
 
         const auto now = std::chrono::steady_clock::now();
@@ -812,6 +761,10 @@ void GameSession::set_screenshot_callback(ScreenshotCallback callback) {
     screenshot_callback_ = std::move(callback);
 }
 
+void GameSession::set_peer_spectator_done_callback(PeerSpectatorDoneCallback callback) {
+    peer_spectator_done_callback_ = std::move(callback);
+}
+
 void GameSession::report_loading_progress(int percent, std::string_view stage) {
     const int clamped_percent = std::clamp(percent, 0, 100);
     if (last_loading_percent_ == clamped_percent && last_loading_stage_ == stage) {
@@ -845,6 +798,7 @@ bool GameSession::loading_cancel_requested() {
 GameSession::HudSnapshot GameSession::hud_snapshot() {
     HudSnapshot snapshot;
     snapshot.finished = finished_.load(std::memory_order_acquire);
+    snapshot.spectating_peer = spectating_peer_.load(std::memory_order_acquire);
     snapshot.user_aborted = user_aborted_.load(std::memory_order_acquire);
     snapshot.sample_rate = sample_rate_;
     snapshot.hud_publish_time_ns = timing::HighResClock::now_ns();
@@ -1843,7 +1797,6 @@ void GameSession::shutdown() {
     ghost_lane_activity_.clear();
     ghost_hidden_hit_note_ids_.clear();
     ghost_active_holds_buffer_.clear();
-    gameplay_input_state_tracker_.reset();
     polled_gameplay_keys_.clear();
     hud_scan_start_ = 0;
     ghost_hud_scan_start_ = 0;
@@ -1913,8 +1866,19 @@ void GameSession::audio_callback(float* output,
             }
         }
 
-        if (stop_requested_.load(std::memory_order_acquire) || engine_->is_game_over()) {
+        if (stop_requested_.load(std::memory_order_acquire)) {
             finished_.store(true, std::memory_order_release);
+        } else if (engine_->is_game_over()) {
+            if (peer_battle_mode_) {
+                // Keep the synchronized chart/audio timeline alive while the
+                // defeated player watches the remaining peer. FinalScore stays
+                // single-shot and is sent only after this spectator phase ends.
+                spectating_peer_.store(true, std::memory_order_release);
+                result_transition_pending_ = false;
+                result_transition_sample_ = 0;
+            } else {
+                finished_.store(true, std::memory_order_release);
+            }
         } else if (engine_->is_finished()) {
             if (!result_transition_pending_) {
                 const int64_t tail_samples =
@@ -1987,6 +1951,8 @@ void GameSession::process_countdown_input_queue() {
             break;
         }
         note_runtime_input_event_source(*maybe_event);
+        // InputThread already publishes one logical edge per key. Re-filtering
+        // by device here can leave a countdown-baselined lane stuck down.
         if (handle_control_input(*maybe_event) &&
             finished_.load(std::memory_order_acquire)) {
             return;
@@ -2003,7 +1969,6 @@ void GameSession::rebaseline_gameplay_start_input_state(int64_t sample) {
     }
     pending_input_events_.clear();
 
-    gameplay_input_state_tracker_.reset();
     hispeed_decrease_held_ = false;
     hispeed_increase_held_ = false;
     hispeed_decrease_next_repeat_ns_ = 0;
@@ -2011,13 +1976,10 @@ void GameSession::rebaseline_gameplay_start_input_state(int64_t sample) {
 
     const int64_t baseline_time_ns = timing::HighResClock::now_ns();
     for (auto& tracked : polled_gameplay_keys_) {
-        tracked.last_queue_event_ns = (std::numeric_limits<int64_t>::min)();
-
         bool pressed = false;
         if (const auto poll_vk = config::KeycodeMap::polling_vk_for_keycode(tracked.keycode); poll_vk.has_value()) {
             pressed = (GetAsyncKeyState(static_cast<int>(*poll_vk)) & 0x8000) != 0;
         }
-        tracked.pressed = pressed;
         if (!pressed) {
             continue;
         }
@@ -2026,11 +1988,6 @@ void GameSession::rebaseline_gameplay_start_input_state(int64_t sample) {
         baseline_event.keycode = tracked.keycode;
         baseline_event.state = input::InputState::Pressed;
         baseline_event.input_time_ns = baseline_time_ns;
-
-        auto filtered = gameplay_input_state_tracker_.process(baseline_event);
-        if (!filtered.has_value()) {
-            continue;
-        }
 
         if (tracked.keycode == f3_keycode_) {
             hispeed_decrease_held_ = true;
@@ -2043,8 +2000,8 @@ void GameSession::rebaseline_gameplay_start_input_state(int64_t sample) {
         if (autoplay_enabled_ || replay_playback_enabled_) {
             continue;
         }
-        if (auto lane = lane_from_keycode(filtered->keycode)) {
-            catch_up_lane_input(lane.value(), filtered->state, sample);
+        if (auto lane = lane_from_keycode(baseline_event.keycode)) {
+            catch_up_lane_input(lane.value(), baseline_event.state, sample);
         }
     }
 

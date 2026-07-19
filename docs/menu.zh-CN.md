@@ -6,6 +6,7 @@
 - `MenuApp` 通过 **InputThread(轮询)** → **SPSC 队列** → **菜单状态机** → **RenderThread(D3D11 窗口渲染)** 这一流程运行
 - `SongIndexerThread` 在后台生成曲目索引，并缓存到 `profiles/<name>/.tenriff/song-index/<source-hash>.json`
 - 在菜单里调整 audio/graphics/input/mode 设置时，会保存到 profile 配置文件
+- `Options -> Profile Setup` 会重新打开当前 profile 的首次设置页面，并立即保存 language/audio/input/graphics/keymap
 - 开始游玩时，当前实现会停止菜单线程并单独运行 `GameSession`
 - **Windows 菜单 UI 基于 D3D11 + Direct2D/DirectWrite**，会渲染标题/选歌（青色布局）以及其他设置页面（列表 UI）
 - 输入键摘要：

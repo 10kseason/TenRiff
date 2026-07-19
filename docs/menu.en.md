@@ -6,6 +6,7 @@ The main menu must follow the same low-latency philosophy as gameplay: audio run
 - `MenuApp` runs as **InputThread (polling)** -> **SPSC queue** -> **menu state machine** -> **RenderThread (D3D11 window render)**.
 - `SongIndexerThread` builds the song index in the background and caches it at `profiles/<name>/.tenriff/song-index/<source-hash>.json`.
 - When audio / graphics / input / mode settings are changed in the menu, they are saved to the profile config file.
+- `Options -> Profile Setup` reopens first-run setup for the active profile and immediately saves language, audio, input, graphics, and keymap changes.
 - When play starts, the current implementation stops the menu thread and runs `GameSession` separately.
 - The **Windows menu UI is built on D3D11 + Direct2D / DirectWrite** and renders Title / Song Select (cyan layout) and other settings screens (list UI).
 - Input summary:

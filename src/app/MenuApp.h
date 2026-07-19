@@ -1,5 +1,8 @@
 #pragma once
 
+#include "app/MultiplayerMenuState.h"
+#include "network/PeerSession.h"
+
 #include <array>
 #include <atomic>
 #include <cstdint>
@@ -14,6 +17,7 @@
 #include "app/GameplayHudRevisions.h"
 #include "app/InputBackendStatus.h"
 #include "app/MenuMusicController.h"
+#include "app/MultiplayerChartSearch.h"
 #include "app/SongSelectState.h"
 #include "GameplayHudLimits.h"
 #include "app/SongIndex.h"
@@ -23,6 +27,7 @@
 #include "config/Keymap.h"
 #include "gameplay/ResultStats.h"
 #include "input/InputThread.h"
+#include "input/RawInputHealthProbe.h"
 #include "render/MenuWindow.h"
 #include "render/RenderThread.h"
 
@@ -57,7 +62,7 @@ private:
         QuickSetup,
         Title,
         OptionsHub,
-        EditStub,
+        Multiplayer,
         SongSelect,
         SongBrowser,
         Gameplay,
@@ -119,6 +124,7 @@ private:
         bool active = false;
         bool finished = false;
         bool game_over = false;
+        bool spectating_peer = false;
         bool user_aborted = false;
         bool loading = false;
         bool countdown_active = false;
@@ -150,6 +156,7 @@ private:
         bool has_feedback = false;
         game::Judgement feedback = game::Judgement::BD;
         double feedback_delta_ms = 0.0;
+        uint64_t peer_revision = 0;
         std::size_t timing_history_count = 0;
         std::array<double, kGameplayTimingHistoryMaxEntries> timing_history_delta_ms{};
         uint64_t motion_revision = 0;
@@ -200,7 +207,7 @@ private:
     void handle_quick_setup_input(uint32_t keycode);
     void handle_title_input(uint32_t keycode);
     void handle_options_hub_input(uint32_t keycode);
-    void handle_edit_stub_input(uint32_t keycode);
+    void handle_multiplayer_input(uint32_t keycode);
     void handle_song_select_input(uint32_t keycode);
     void handle_song_browser_input(uint32_t keycode);
     void handle_audio_settings_input(uint32_t keycode);
@@ -218,6 +225,7 @@ private:
     void publish_snapshot();
     [[nodiscard]] std::string current_track_label() const;
     void populate_quick_setup_render_data(render::MenuRenderData& render);
+    void populate_multiplayer_render_data(render::MenuRenderData& render);
     void populate_title_render_data(render::MenuRenderData& render,
                                     const std::string& current_track,
                                     const BestResultRecord& current_best);
@@ -242,18 +250,32 @@ private:
     void render_snapshot(const MenuSnapshot& snapshot);
     void update_keymap_capture_timeout();
     void update_pressed_keys(const input::InputEvent& event);
+    void service_input_backend_health();
+    void reset_input_backend_probe();
     void update_song_select_repeat();
     void reset_song_select_repeat();
     [[nodiscard]] bool is_song_select_repeat_key(uint32_t keycode) const;
     [[nodiscard]] std::vector<uint32_t> current_menu_probe_keycodes() const;
     void refresh_menu_input_polling_scope();
     void rebuild_pressed_keys_from_polling_snapshot();
+    [[nodiscard]] bool fallback_menu_input_to_polling(std::string_view reason);
     void note_runtime_input_event_source(const input::InputEvent& event);
     [[nodiscard]] std::string current_input_backend_status_label() const;
     [[nodiscard]] std::string current_input_backend_status_detail() const;
 
-    void launch_gameplay(const std::string& chart_path, const std::string& replay_path = {});
+    void launch_gameplay(const std::string& chart_path,
+                         const std::string& replay_path = {},
+                         GameplayLaunchKind launch_kind = GameplayLaunchKind::SinglePlayer);
     void launch_selected_song();
+    void select_multiplayer_chart();
+    void service_multiplayer();
+    void reset_multiplayer_for_single_player();
+    void leave_multiplayer();
+    void open_multiplayer_options();
+    void reset_multiplayer_chart_match_search();
+    void service_multiplayer_chart_match(const network::PeerSessionSnapshot& peer);
+    [[nodiscard]] bool coordinate_multiplayer_start();
+    [[nodiscard]] bool wait_for_multiplayer_result();
     [[nodiscard]] bool launch_replay_from_path(const std::string& replay_path,
                                                const std::string& fallback_chart_path = {});
     [[nodiscard]] bool launch_last_result_replay();
@@ -424,8 +446,29 @@ private:
     double last_chart_bpm_ = 0.0;
     GameplayHudState gameplay_hud_{};
 
+    network::PeerSession peer_session_{};
+    MultiplayerMenuState multiplayer_menu_{};
+    std::string multiplayer_chart_path_{};
+    std::string multiplayer_chart_title_{};
+    network::ChartFingerprint multiplayer_chart_fingerprint_{};
+    std::string multiplayer_status_message_{};
+    uint64_t multiplayer_last_revision_ = 0;
+    network::ChartFingerprint multiplayer_chart_match_target_{};
+    uint64_t multiplayer_chart_match_index_revision_ = 0;
+    std::vector<std::string> multiplayer_chart_match_source_inputs_{};
+    std::vector<std::string> multiplayer_chart_match_sources_{};
+    std::size_t multiplayer_chart_match_source_cursor_ = 0;
+    std::vector<MultiplayerChartSearchCandidate> multiplayer_chart_match_candidates_{};
+    std::size_t multiplayer_chart_match_cursor_ = 0;
+    bool multiplayer_chart_match_active_ = false;
+    bool multiplayer_selecting_chart_ = false;
+    std::atomic<bool> multiplayer_match_active_{false};
+    bool last_game_was_multiplayer_ = false;
+    bool multiplayer_waiting_for_result_exit_ = false;
+
     SongIndexerThread song_indexer_{};
     std::vector<SongEntry> indexed_songs_{};
+    uint64_t song_index_revision_ = 0;
     std::vector<std::size_t> visible_song_indices_{};
     std::unordered_map<std::string, BestResultRecord> chart_best_results_{};
     std::unordered_set<std::string> favorite_song_keys_{};
@@ -539,6 +582,8 @@ private:
     uint32_t key_f2_ = 0;
     uint32_t key_f5_ = 0;
     uint32_t key_f9_ = 0;
+    input::RawInputHealthProbe input_backend_probe_{};
+    std::unordered_map<uint32_t, bool> input_probe_polled_states_{};
     InputBackendRuntimeState input_backend_state_{};
     InputBackendRuntimeState last_gameplay_input_backend_state_{};
 };

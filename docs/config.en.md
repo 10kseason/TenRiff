@@ -41,11 +41,12 @@ If a profile does not exist, it is created automatically on first launch.
   - `polling | rawinput`
   - default is `rawinput` on the current `1.1.3` release line
   - the stored value is preserved and no longer force-normalized to `polling` on save
-  - gameplay starts RawInput first when `rawinput=true`, while a session-local bound-key polling fallback corrects missed RawInput edges
+  - in the `1.1.3` preview, gameplay keeps RawInput and a bound-key polling shadow together inside the same `InputThread` when `rawinput=true`
+  - initialization/startup failure or an unexpected RawInput message-pump exit switches the same producer thread to Polling without resetting its queue or pressed state
 - `rawinput` (bool)
   - convenience boolean persisted alongside `backend`
   - on the current `1.1.3` release line it is saved and restored as-is
-  - when `true`, menu/gameplay prefer RawInput while allowing polling fallback to preserve input recognition
+  - when `true`, menu/gameplay prefer RawInput, and gameplay continuously shadows note/control keys with polling to survive runtime delivery loss
 - `use_qpc` (bool)
 - `grab` (bool)
   - currently a Linux-preview-oriented setting

@@ -706,6 +706,35 @@ TEST_CASE("chart loader auto-detects headerless player-one 7+1 SP charts") {
     }
 }
 
+TEST_CASE("chart loader maps 7+1 SP scratch to the first gameplay lane") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+
+    const auto chart_path = temp.path / "seven_sp_scratch_first.bms";
+    {
+        std::ofstream chart_file(chart_path, std::ios::binary);
+        REQUIRE(chart_file.good());
+        chart_file << "#TITLE Seven SP Scratch First\n"
+                      "#7K\n"
+                      "#BPM 120\n"
+                      "#00116:01\n"
+                      "#00211:01\n"
+                      "#00319:01\n";
+    }
+
+    ChartLoader loader;
+    ChartLoadResult result = loader.load(chart_path.u8string(), 48000, 1.0, "ignore");
+
+    CHECK(result.success());
+    CHECK(result.format == ChartFormat::Bms);
+    CHECK(result.chart.lane_count == 8);
+    REQUIRE(result.chart.notes.size() == 3u);
+    CHECK(result.chart.notes[0].lane == 1);
+    CHECK(result.chart.notes[1].lane == 2);
+    CHECK(result.chart.notes[2].lane == 8);
+}
+
 TEST_CASE("chart loader maps pms extension charts to 9 lanes") {
     TempDirGuard temp;
     temp.path = make_temp_dir();

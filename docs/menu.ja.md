@@ -6,6 +6,7 @@ main menu も gameplay と同じ低遅延思想に従う必要があります。
 - `MenuApp` は **InputThread (polling)** -> **SPSC queue** -> **menu state machine** -> **RenderThread (D3D11 window render)** で動く。
 - `SongIndexerThread` はバックグラウンドで song index を構築し、`profiles/<name>/.tenriff/song-index/<source-hash>.json` にキャッシュする。
 - menu で audio / graphics / input / mode settings を変えると profile config file に保存される。
+- `Options -> Profile Setup` は現在の profile の初回 setup を開き直し、language / audio / input / graphics / keymap を即時保存する。
 - play 開始時、現行実装は menu thread を止めて `GameSession` を別実行する。
 - **Windows menu UI は D3D11 + Direct2D / DirectWrite** ベースで、Title / Song Select と各種 settings screen を描画する。
 - Input summary:

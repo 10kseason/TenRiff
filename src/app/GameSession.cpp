@@ -41,6 +41,7 @@
 #include "app/GameplayHudWindow.h"
 #include "app/RuntimeConfigMigration.h"
 #include "app/PersistedRuntimeConfig.h"
+#include "app/PeerBattleRules.h"
 #include "app/SessionResultStatus.h"
 #include "config/Keymap.h"
 #include "timing/HighResClock.h"

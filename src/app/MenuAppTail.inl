@@ -117,6 +117,63 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
                 target.timing_history_delta_ms.begin());
     target.finished = gameplay_hud_.finished;
     target.game_over = gameplay_hud_.game_over;
+    target.spectating_peer = gameplay_hud_.spectating_peer;
+
+    const network::PeerSessionSnapshot peer = peer_session_.snapshot();
+    target.peer_visible = multiplayer_match_active_ && peer.role != network::PeerRole::None;
+    target.peer_score_available = target.peer_visible && peer.has_remote_score;
+    target.peer_name = peer.peer_name;
+    target.peer_disconnected = target.peer_visible && peer.state != network::PeerSessionState::Connected;
+    target.peer_status = target.peer_disconnected ? ui_text("DISCONNECTED", "연결 끊김")
+                                                   : ui_text("PLAYING", "플레이 중");
+    target.peer_current_sample = 0;
+    target.peer_score = 0;
+    target.peer_combo = 0;
+    target.peer_max_combo = 0;
+    target.peer_pg = 0;
+    target.peer_gr = 0;
+    target.peer_gd = 0;
+    target.peer_bd = 0;
+    target.peer_pr = 0;
+    target.peer_gauge = 0.0;
+    target.peer_finished = false;
+    target.peer_game_over = false;
+    target.peer_aborted = false;
+    if (target.peer_visible && peer.has_remote_score) {
+        target.peer_current_sample = peer.latest_remote_score.current_sample;
+        target.peer_score = peer.latest_remote_score.score;
+        target.peer_combo = peer.latest_remote_score.combo;
+        target.peer_max_combo = peer.latest_remote_score.max_combo;
+        target.peer_pg = peer.latest_remote_score.perfect;
+        target.peer_gr = peer.latest_remote_score.great;
+        target.peer_gd = peer.latest_remote_score.good;
+        target.peer_bd = peer.latest_remote_score.bad;
+        target.peer_pr = peer.latest_remote_score.poor;
+        target.peer_gauge = static_cast<double>(peer.latest_remote_score.gauge_milli) / 1000.0;
+        target.peer_finished = peer.latest_remote_score.finished;
+        target.peer_game_over = peer.latest_remote_score.game_over;
+        target.peer_aborted = peer.latest_remote_score.aborted;
+        if (target.peer_finished) {
+            target.peer_status = peer.latest_remote_score.aborted
+                                     ? ui_text("ABORTED", "중단")
+                                     : (peer.latest_remote_score.game_over
+                                            ? ui_text("FAILED", "실패")
+                                            : ui_text("FINISHED", "완료"));
+        }
+    }
+    if (!target.peer_disconnected && target.peer_game_over) {
+        target.peer_status = ui_text("GAME OVER", "\uAC8C\uC784 \uC624\uBC84");
+    } else if (!target.peer_disconnected && target.peer_aborted) {
+        target.peer_status = ui_text("ABORTED", "\uC911\uB2E8");
+    } else if (!target.peer_disconnected && target.peer_finished) {
+        target.peer_status = ui_text("FINISHED", "\uC644\uB8CC");
+    }
+    const PeerBattleScoreLead versus_lead =
+        target.peer_score_available
+            ? peer_battle_score_lead(gameplay_hud_.score, target.peer_score)
+            : PeerBattleScoreLead{};
+    target.versus_score_difference = versus_lead.difference;
+    target.versus_score_position = versus_lead.position;
 
     target.lane_activity_count = gameplay_hud_.lane_activity_count;
     target.lane_activity.fill(0.0f);
@@ -213,6 +270,36 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
         target.accuracy = 0.0;
     }
 
+    if (target.spectating_peer && target.peer_score_available) {
+        // Render-only perspective switch. Local result data stays untouched,
+        // while the visible score/gauge panel follows the surviving peer.
+        target.score = target.peer_score;
+        target.combo = target.peer_combo;
+        target.max_combo = target.peer_max_combo;
+        target.pg = target.peer_pg;
+        target.gr = target.peer_gr;
+        target.gd = target.peer_gd;
+        target.bd = target.peer_bd;
+        target.pr = target.peer_pr;
+        target.total_notes = target.peer_pg + target.peer_gr + target.peer_gd + target.peer_bd;
+        target.gauge = target.peer_gauge;
+        target.gauge_label = ui_text("OPPONENT", "\uC0C1\uB300");
+        target.has_feedback = false;
+        target.timing_history_count = 0;
+        target.lane_activity_count = 0;
+        const int peer_judged_total =
+            target.peer_pg + target.peer_gr + target.peer_gd + target.peer_bd;
+        if (peer_judged_total > 0) {
+            const double peer_weighted =
+                target.peer_pg * 1.0 + target.peer_gr * 0.80 +
+                target.peer_gd * 0.50 + target.peer_bd * 0.20;
+            target.accuracy =
+                std::clamp(peer_weighted / static_cast<double>(peer_judged_total) * 100.0, 0.0, 100.0);
+        } else {
+            target.accuracy = 0.0;
+        }
+    }
+
     target.ghost_visible = gameplay_hud_.ghost_visible;
     target.ghost_score = gameplay_hud_.ghost_score;
     target.ghost_combo = gameplay_hud_.ghost_combo;
@@ -276,11 +363,13 @@ void MenuApp::update_gameplay_loading_state(int percent, std::string_view stage)
         const GameplayHudRevisionInput previous = gameplay_hud_revision_input(gameplay_hud_);
         GameplayHudRevisionInput next = previous;
         next.loading = true;
+        next.active = false;
         next.loading_percent = clamp_int(percent, 0, 100);
         next.loading_stage = std::string(stage);
         const GameplayHudRevisionFlags diff = diff_gameplay_hud_revisions(previous, next);
 
         gameplay_hud_.loading = next.loading;
+        gameplay_hud_.active = false;
         gameplay_hud_.loading_percent = next.loading_percent;
         gameplay_hud_.loading_stage = next.loading_stage;
         advance_gameplay_hud_revisions(gameplay_hud_, diff.motion_changed, false);
@@ -348,8 +437,11 @@ void MenuApp::sync_menu_music() {
 }
 
 void MenuApp::populate_quick_setup_render_data(render::MenuRenderData& render) {
+    const auto setup_entry = profile_setup::entry(first_run_profile_);
+    const bool first_run = setup_entry == profile_setup::Entry::FirstRun;
     render.kind = render::MenuScreenKind::GenericList;
-    render.generic.heading = ui_text("Quick Setup", "빠른 설정");
+    render.generic.heading = first_run ? ui_text("Quick Setup", "빠른 설정")
+                                       : ui_text("Profile Setup", "프로필 설정");
 
     append_menu_row(render.generic,
                     ui_text("Songs Folder", "곡 폴더"),
@@ -393,24 +485,30 @@ void MenuApp::populate_quick_setup_render_data(render::MenuRenderData& render) {
                     false,
                     true);
     append_menu_row(render.generic,
-                    ui_text("Continue to Song Select", "Song Select로 계속"),
+                    first_run ? ui_text("Continue to Song Select", "곡 선택으로 계속")
+                              : ui_text("Done", "완료"),
                     "",
                     settings_cursor_ == 5,
                     render::MenuHitTargetKind::SettingsRow,
                     5,
                     true,
                     false);
-    append_menu_row(render.generic,
-                    ui_text("Skip to Title", "타이틀로 건너뛰기"),
-                    "",
-                    settings_cursor_ == 6,
-                    render::MenuHitTargetKind::SettingsRow,
-                    6,
-                    true,
-                    false);
-
-    render.generic.notes.push_back(ui_text("First launch detected. TenRiff already created a default profile and default keymap.",
-                                           "첫 실행이 감지되었습니다. TenRiff가 기본 프로필과 기본 키맵을 이미 만들었습니다."));
+    if (first_run) {
+        append_menu_row(render.generic,
+                        ui_text("Skip to Title", "타이틀로 건너뛰기"),
+                        "",
+                        settings_cursor_ == profile_setup::kFirstRunSkipRow,
+                        render::MenuHitTargetKind::SettingsRow,
+                        profile_setup::kFirstRunSkipRow,
+                        true,
+                        false);
+        render.generic.notes.push_back(ui_text("First launch detected. TenRiff already created a default profile and default keymap.",
+                                               "첫 실행을 감지했습니다. TenRiff가 기본 프로필과 기본 키 설정을 만들었습니다."));
+    } else {
+        render.generic.notes.push_back(ui_text("Active profile: ", "현재 프로필: ") + safe_ui_text(options_.profile));
+        render.generic.notes.push_back(ui_text("Changes on this screen are saved immediately to the active profile.",
+                                               "이 화면의 변경 사항은 현재 프로필에 즉시 저장됩니다."));
+    }
     render.generic.notes.push_back(ui_text("Recommended start: Gauge Normal, Rate 1.00x, Display Offset 0ms, BMS Keysound Follow.",
                                            "권장 시작값: 노말 게이지, Rate 1.00x, 표시 오프셋 0ms, BMS 키음 연동."));
     render.generic.notes.push_back(ui_text("Songs Folder opens a picker on Enter or F2. You can also drag and drop a folder later.",
@@ -432,7 +530,7 @@ void MenuApp::populate_title_render_data(render::MenuRenderData& render,
                                                 : ui_text("PLAY", "플레이"),
                                no_songs_indexed ? u8"＋" : u8"▶",
                                title_cursor_ == 0},
-        render::MenuButtonData{ui_text("EDIT", "에디트"), u8"✎", title_cursor_ == 1},
+        render::MenuButtonData{ui_text("MULTIPLAYER", "멀티플레이"), "P2P", title_cursor_ == 1},
         render::MenuButtonData{ui_text("OPTIONS", "옵션"), u8"⚙", title_cursor_ == 2},
         render::MenuButtonData{ui_text("EXIT", "종료"), u8"⏻", title_cursor_ == 3},
     };
@@ -461,6 +559,7 @@ void MenuApp::populate_result_render_data(render::MenuRenderData& render, const 
     constexpr double kResultTimingGuidanceFallbackMeanMs = 6.0;
 
     render.kind = render::MenuScreenKind::ResultScreen;
+    render.result.peer_battle = last_game_was_multiplayer_;
     render.result.profile = options_.profile;
     render.result.track = last_chart_title_.empty() ? current_track : last_chart_title_;
     render.result.title = last_chart_title_.empty() ? ui_text("Unknown Chart", "알 수 없는 차트") : last_chart_title_;
@@ -509,6 +608,9 @@ void MenuApp::populate_result_render_data(render::MenuRenderData& render, const 
     if (!last_replay_path_.empty()) {
         std::error_code ec;
         render.result.replay_available = std::filesystem::exists(path_from_utf8(last_replay_path_), ec) && !ec;
+    }
+    if (render.result.peer_battle) {
+        render.result.replay_available = false;
     }
 
     const int positive_delta_count = last_result_.positive_delta_count;
@@ -574,12 +676,78 @@ void MenuApp::populate_result_render_data(render::MenuRenderData& render, const 
         !detail.empty()) {
         render.result.notes.push_back(ui_text("Gameplay ", "게임플레이 ") + detail);
     }
-    render.result.notes.push_back(ui_text("Left restarts the same chart immediately.", "Left로 같은 차트를 즉시 재시작합니다."));
-    if (render.result.replay_available) {
-        render.result.notes.push_back(ui_text("F1 or click Replay watches the saved input trace.",
-                                              "F1 또는 Replay 클릭으로 저장된 입력 리플레이를 재생합니다."));
-    } else if (!render.result.replay_file.empty()) {
-        render.result.notes.push_back(ui_text("Replay file is missing or unavailable.", "리플레이 파일이 없거나 사용할 수 없습니다."));
+    if (render.result.peer_battle) {
+        const network::PeerSessionSnapshot peer = peer_session_.snapshot();
+        const std::string peer_label =
+            peer.peer_name.empty() ? ui_text("Opponent", "상대") : peer.peer_name;
+        render.result.peer_name = peer_label;
+        if (peer.has_remote_score && peer.latest_remote_score.finished) {
+            const network::PeerScore& peer_score = peer.latest_remote_score;
+            const MultiplayerScoreComparison comparison =
+                compare_multiplayer_scores(last_result_final_score_, peer_score.score);
+            render.result.peer_result_available = true;
+            render.result.peer_score = peer_score.score;
+            render.result.peer_score_difference = comparison.difference;
+            render.result.peer_gauge_value =
+                std::clamp(static_cast<double>(peer_score.gauge_milli) / 1000.0, 0.0, 100.0);
+            render.result.peer_max_combo = peer_score.max_combo;
+            render.result.peer_perfect = peer_score.perfect;
+            render.result.peer_great = peer_score.great;
+            render.result.peer_good = peer_score.good;
+            render.result.peer_bad = peer_score.bad;
+            render.result.peer_poor = peer_score.poor;
+            render.result.peer_status = peer_score.aborted
+                                            ? "ABORTED"
+                                            : (peer_score.game_over ? "GAME OVER" : "FINISHED");
+            render.result.peer_outcome =
+                comparison.outcome == MultiplayerScoreOutcome::Win
+                    ? "WIN"
+                    : (comparison.outcome == MultiplayerScoreOutcome::Loss ? "LOSE" : "DRAW");
+        } else {
+            render.result.peer_result_available = false;
+            render.result.peer_status =
+                peer.state == network::PeerSessionState::Connected ? "WAITING" : "DISCONNECTED";
+            render.result.peer_outcome = "NO CONTEST";
+        }
+        std::vector<std::string> peer_notes;
+        if (peer.has_remote_score) {
+            const network::PeerScore& score = peer.latest_remote_score;
+            std::string summary = peer_label + " / " +
+                                  ui_text("Score ", "점수 ") + std::to_string(score.score) +
+                                  " / " + ui_text("Max Combo ", "최대 콤보 ") +
+                                  std::to_string(score.max_combo);
+            summary += score.finished ? ui_text(" / FINISHED", " / 종료")
+                                      : ui_text(" / PLAYING", " / 플레이 중");
+            peer_notes.push_back(std::move(summary));
+            if (score.finished) {
+                const std::string outcome =
+                    last_result_final_score_ > score.score
+                        ? ui_text("Peer result: WIN", "P2P 결과: 승리")
+                        : (last_result_final_score_ < score.score
+                               ? ui_text("Peer result: LOSE", "P2P 결과: 패배")
+                               : ui_text("Peer result: DRAW", "P2P 결과: 무승부"));
+                peer_notes.push_back(outcome);
+            }
+        } else if (peer.state == network::PeerSessionState::Connected) {
+            peer_notes.push_back(ui_text("Opponent is still playing. Live result is pending.",
+                                         "상대가 아직 플레이 중입니다. 최종 결과를 기다리는 중입니다."));
+        } else {
+            peer_notes.push_back(ui_text("Opponent disconnected before the final result arrived.",
+                                         "최종 결과를 받기 전에 상대 연결이 끊겼습니다."));
+        }
+        peer_notes.push_back(ui_text("Enter or Esc returns to the multiplayer lobby.",
+                                     "Enter 또는 Esc로 멀티플레이 로비로 돌아갑니다."));
+        render.result.notes.insert(render.result.notes.begin(),
+                                   std::make_move_iterator(peer_notes.begin()),
+                                   std::make_move_iterator(peer_notes.end()));
+    } else {
+        render.result.notes.push_back(ui_text("Left restarts the same chart immediately.", "Left로 같은 차트를 즉시 재시작합니다."));
+        if (render.result.replay_available) {
+            render.result.notes.push_back(ui_text("F1 or click Replay watches the saved input trace.",
+                                                  "F1 또는 Replay 클릭으로 저장된 입력 리플레이를 재생합니다."));
+        } else if (!render.result.replay_file.empty()) {
+            render.result.notes.push_back(ui_text("Replay file is missing or unavailable.", "리플레이 파일이 없거나 사용할 수 없습니다."));
+        }
     }
     render.result.notes.push_back(ui_text("Score x", "점수 x") + format_decimal(last_result_score_multiplier_));
     if (last_result_rate_multiplier_ != 1.0) {
@@ -671,14 +839,14 @@ void MenuApp::populate_generic_screen_render_data(render::MenuRenderData& render
         append_menu_row(render.generic, ui_text("Calibration Wizard", "캘리브레이션 위저드"), "", options_cursor_ == 4, render::MenuHitTargetKind::OptionsItem, 4, true, false);
         append_menu_row(render.generic, ui_text("Mode", "모드"), "", options_cursor_ == 5, render::MenuHitTargetKind::OptionsItem, 5, true, false);
         append_menu_row(render.generic, ui_text("Keymap", "키 설정"), "", options_cursor_ == 6, render::MenuHitTargetKind::OptionsItem, 6, true, false);
-        append_menu_row(render.generic, ui_text("Back", "뒤로"), "", options_cursor_ == 7, render::MenuHitTargetKind::OptionsItem, 7, true, false);
+        append_menu_row(render.generic, ui_text("Profile Setup", "프로필 설정"), safe_ui_text(options_.profile), options_cursor_ == profile_setup::kOptionsProfileSetupRow, render::MenuHitTargetKind::OptionsItem, profile_setup::kOptionsProfileSetupRow, true, false);
+        append_menu_row(render.generic, ui_text("Back", "뒤로"), "", options_cursor_ == profile_setup::kOptionsBackRow, render::MenuHitTargetKind::OptionsItem, profile_setup::kOptionsBackRow, true, false);
         render.generic.notes.push_back(ui_text("Up/Down to move, Enter to select, Esc to return.",
                                                "위/아래로 이동하고 Enter로 선택, Esc로 돌아갑니다."));
         render.generic.notes.push_back(ui_text("Use the listed rows directly here. F1 opens help, F2 opens the songs-folder picker, and F5 refreshes the library.",
                                                "여기서는 보이는 항목을 직접 여세요. F1은 도움말, F2는 곡 폴더 선택, F5는 라이브러리 새로고침입니다."));
-    } else if (screen_ == Screen::EditStub) {
-        render.generic.notes.push_back(ui_text("Editor is not implemented yet.", "에디터는 아직 구현되지 않았습니다."));
-        append_menu_row(render.generic, ui_text("Back", "뒤로"), "", true, render::MenuHitTargetKind::SettingsRow, 0, true, false);
+    } else if (screen_ == Screen::Multiplayer) {
+        populate_multiplayer_render_data(render);
     } else if (screen_ == Screen::SettingsAudio) {
         populate_audio_settings_render_data(render);
     } else if (screen_ == Screen::SettingsGraphics) {
@@ -767,7 +935,7 @@ void MenuApp::publish_snapshot() {
         if (publish_elapsed_ns >= kSlowSongSelectSnapshotNs &&
             (publish_start_ns - last_song_select_slow_snapshot_log_ns_) >= kSlowSnapshotLogCooldownNs) {
             last_song_select_slow_snapshot_log_ns_ = publish_start_ns;
-            std::cerr << "[MenuApp] Slow Song Select snapshot " 
+            std::cerr << "[MenuApp] Slow Song Select snapshot "
                       << (static_cast<double>(publish_elapsed_ns) / 1'000'000.0)
                       << " ms selected=" << selected_song_
                       << " visible=" << visible_song_count()
@@ -855,7 +1023,8 @@ void MenuApp::render_tick() {
                         render_cache_.gameplay.audio_buffer_frames,
                         render_cache_.gameplay.visual_offset_ms,
                         render_cache_.gameplay.finished,
-                        render_cache_.gameplay.game_over,
+                        render_cache_.gameplay.game_over &&
+                            !render_cache_.gameplay.spectating_peer,
                     },
                     timing::HighResClock::now_ns());
                 render_cache_.performance.gameplay_audio_age_ms = diagnostics.audio_age_ms;
@@ -957,11 +1126,25 @@ bool MenuApp::is_song_select_repeat_key(uint32_t keycode) const {
            keycode == key_page_up_ || keycode == key_page_down_;
 }
 
-void MenuApp::launch_gameplay(const std::string& chart_path, const std::string& replay_path) {
+void MenuApp::launch_gameplay(const std::string& chart_path,
+                              const std::string& replay_path,
+                              GameplayLaunchKind launch_kind) {
     const bool replay_playback = !replay_path.empty();
+    // The caller owns the launch intent. Inferring it from lobby flags makes a
+    // stale multiplayer screen/result state capable of hijacking a local run.
+    const bool peer_battle = gameplay_launch_uses_peer_battle(launch_kind, replay_playback);
+    if (!peer_battle) {
+        reset_multiplayer_for_single_player();
+    }
     const std::string preserved_result_path = last_result_path_;
     last_chart_path_ = chart_path;
-    if (selected_song_ >= 0 && selected_song_ < static_cast<int>(visible_song_count())) {
+    if (peer_battle) {
+        last_chart_title_ = multiplayer_chart_title_.empty()
+                                ? filename_only(chart_path)
+                                : multiplayer_chart_title_;
+        last_chart_artist_.clear();
+        last_chart_bpm_ = 0.0;
+    } else if (selected_song_ >= 0 && selected_song_ < static_cast<int>(visible_song_count())) {
         if (const SongEntry* entry = visible_song_entry(static_cast<std::size_t>(selected_song_))) {
             last_chart_title_ = entry->title.empty() ? entry->path : entry->title;
             last_chart_artist_ = entry->artist;
@@ -994,6 +1177,22 @@ void MenuApp::launch_gameplay(const std::string& chart_path, const std::string& 
     audio_thread_.shutdown();
 
     GameSession session;
+    session.set_peer_battle_mode(peer_battle);
+    session.set_peer_spectator_done_callback([this, peer_battle]() {
+        if (!peer_battle) {
+            return true;
+        }
+        const network::PeerSessionSnapshot peer = peer_session_.snapshot();
+        const PeerBattleSpectatorState state{
+            true,
+            peer.state == network::PeerSessionState::Connected,
+            peer.round_active,
+            peer.has_remote_score && peer.latest_remote_score.finished,
+            peer.has_remote_score && peer.latest_remote_score.game_over,
+        };
+        return peer_battle_spectator_decision(state) ==
+               PeerBattleSpectatorDecision::FinishSession;
+    });
     session.set_loading_progress_callback([this](const GameSession::LoadingProgress& progress) {
         update_gameplay_loading_state(progress.percent, progress.stage);
     });
@@ -1002,15 +1201,46 @@ void MenuApp::launch_gameplay(const std::string& chart_path, const std::string& 
     });
 #ifdef _WIN32
     auto escape_was_down = std::make_shared<std::atomic<bool>>((GetAsyncKeyState(VK_ESCAPE) & 0x8000) != 0);
-    session.set_loading_cancel_callback([escape_was_down]() {
+    session.set_loading_cancel_callback([this, escape_was_down, peer_battle]() {
+        if (peer_battle) {
+            const network::PeerSessionSnapshot peer = peer_session_.snapshot();
+            if (peer.state != network::PeerSessionState::Connected || !peer.round_active) {
+                return true;
+            }
+        }
         const bool escape_down = (GetAsyncKeyState(VK_ESCAPE) & 0x8000) != 0;
         const bool fresh_press = escape_down && !escape_was_down->exchange(escape_down, std::memory_order_acq_rel);
-        return fresh_press;
+        if (!fresh_press) return false;
+        const HWND foreground = GetForegroundWindow();
+        DWORD foreground_process_id = 0;
+        if (foreground) GetWindowThreadProcessId(foreground, &foreground_process_id);
+        return foreground_process_id == GetCurrentProcessId();
     });
 #else
     session.set_loading_cancel_callback([]() { return false; });
 #endif
-    session.set_hud_callback([this](const GameSession::HudSnapshot& hud) {
+    session.set_hud_callback([this, peer_battle](const GameSession::HudSnapshot& hud) {
+        uint64_t peer_revision = 0;
+        if (peer_battle) {
+            network::PeerScore score;
+            score.score = hud.score;
+            score.current_sample = hud.current_sample;
+            score.combo = hud.combo;
+            score.max_combo = hud.max_combo;
+            score.perfect = hud.counts.pg;
+            score.great = hud.counts.gr;
+            score.good = hud.counts.gd;
+            score.bad = hud.counts.bd;
+            score.poor = hud.counts.pr;
+            score.gauge_milli = static_cast<int>(std::llround(std::clamp(hud.gauge, 0.0, 100.0) * 1000.0));
+            // Live HUD frames must never become FinalScore. The authoritative
+            // final packet is emitted once after GameSession shutdown/export.
+            score.finished = false;
+            score.game_over = hud.game_over;
+            score.aborted = false;
+            (void)peer_session_.publish_score(score, false);
+            peer_revision = peer_session_.snapshot().revision;
+        }
         std::lock_guard<std::mutex> lock(gameplay_hud_mutex_);
         const GameplayHudRevisionInput previous = gameplay_hud_revision_input(gameplay_hud_);
         GameplayHudRevisionInput next = previous;
@@ -1020,6 +1250,7 @@ void MenuApp::launch_gameplay(const std::string& chart_path, const std::string& 
         next.active = hud.active;
         next.finished = hud.finished;
         next.game_over = hud.game_over;
+        next.spectating_peer = hud.spectating_peer;
         next.user_aborted = hud.user_aborted;
         next.countdown_active = hud.countdown_active;
         next.countdown_value = hud.countdown_value;
@@ -1042,6 +1273,7 @@ void MenuApp::launch_gameplay(const std::string& chart_path, const std::string& 
         next.has_feedback = hud.has_feedback;
         next.feedback = hud.feedback_judgement;
         next.feedback_delta_ms = hud.feedback_delta_ms;
+        next.peer_revision = peer_revision;
         next.timing_history_count = hud.timing_history_count;
         next.timing_history_delta_ms.fill(0.0);
         std::copy_n(hud.timing_history_delta_ms.begin(),
@@ -1100,6 +1332,7 @@ void MenuApp::launch_gameplay(const std::string& chart_path, const std::string& 
         gameplay_hud_.active = hud.active;
         gameplay_hud_.finished = hud.finished;
         gameplay_hud_.game_over = hud.game_over;
+        gameplay_hud_.spectating_peer = hud.spectating_peer;
         gameplay_hud_.user_aborted = hud.user_aborted;
         gameplay_hud_.countdown_active = hud.countdown_active;
         gameplay_hud_.countdown_value = hud.countdown_value;
@@ -1123,6 +1356,7 @@ void MenuApp::launch_gameplay(const std::string& chart_path, const std::string& 
         gameplay_hud_.has_feedback = hud.has_feedback;
         gameplay_hud_.feedback = hud.feedback_judgement;
         gameplay_hud_.feedback_delta_ms = hud.feedback_delta_ms;
+        gameplay_hud_.peer_revision = peer_revision;
         gameplay_hud_.timing_history_count = hud.timing_history_count;
         gameplay_hud_.timing_history_delta_ms.fill(0.0);
         std::copy_n(hud.timing_history_delta_ms.begin(),
@@ -1180,7 +1414,7 @@ void MenuApp::launch_gameplay(const std::string& chart_path, const std::string& 
     CommandLineOptions play_options = options_;
     play_options.chart_path = chart_path;
     play_options.replay_path = replay_path;
-    if (replay_path.empty() && config_.mode.ghost_battle_enabled) {
+    if (!peer_battle && replay_path.empty() && config_.mode.ghost_battle_enabled) {
         play_options.ghost_replay_path = best_replay_path_for_selected_song();
     }
     if (!session.initialize(play_options)) {
@@ -1196,7 +1430,60 @@ void MenuApp::launch_gameplay(const std::string& chart_path, const std::string& 
             std::lock_guard<std::mutex> lock(gameplay_hud_mutex_);
             reset_gameplay_hud_state(gameplay_hud_);
         }
-        screen_ = Screen::SongSelect;
+        if (peer_battle) {
+            const network::PeerSessionSnapshot peer_after_loading = peer_session_.snapshot();
+            const bool launch_canceled_cleanly =
+                loading_canceled &&
+                peer_after_loading.state == network::PeerSessionState::Connected &&
+                !peer_after_loading.round_active;
+            if (!launch_canceled_cleanly) {
+                peer_session_.disconnect(loading_canceled ? "Peer canceled chart loading"
+                                                          : "Peer failed to load the chart");
+            }
+            multiplayer_match_active_.store(false, std::memory_order_release);
+            last_game_was_multiplayer_ = false;
+            multiplayer_waiting_for_result_exit_ = false;
+            multiplayer_status_message_ =
+                launch_canceled_cleanly
+                    ? ui_text("Match start canceled because Ready changed. Connection kept.",
+                              "준비 상태가 바뀌어 시작을 취소했습니다. 연결은 유지됩니다.")
+                    : loading_canceled
+                    ? ui_text("Multiplayer loading was canceled; reconnect to try again.",
+                              "멀티플레이 로딩을 취소했습니다. 다시 시도하려면 재연결하세요.")
+                    : ui_text("This PC could not load the battle chart; reconnect after fixing it.",
+                              "이 PC에서 대전 차트를 로드하지 못했습니다. 문제를 고친 뒤 재연결하세요.");
+            screen_ = Screen::Multiplayer;
+        } else {
+            screen_ = Screen::SongSelect;
+        }
+        apply_runtime_graphics_config();
+        publish_snapshot();
+        return;
+    }
+
+    if (peer_battle && !coordinate_multiplayer_start()) {
+        session.shutdown();
+        const network::PeerSessionSnapshot peer_after_sync = peer_session_.snapshot();
+        const bool launch_canceled_cleanly =
+            peer_after_sync.state == network::PeerSessionState::Connected &&
+            !peer_after_sync.round_active;
+        if (!launch_canceled_cleanly) {
+            peer_session_.disconnect("Multiplayer start synchronization failed");
+        } else {
+            multiplayer_status_message_ =
+                ui_text("Match start canceled because Ready changed. Connection kept.",
+                        "준비 상태가 바뀌어 시작을 취소했습니다. 연결은 유지됩니다.");
+        }
+        multiplayer_match_active_.store(false, std::memory_order_release);
+        last_game_was_multiplayer_ = false;
+        multiplayer_waiting_for_result_exit_ = false;
+        restart_input_thread();
+        restart_audio_thread();
+        {
+            std::lock_guard<std::mutex> lock(gameplay_hud_mutex_);
+            reset_gameplay_hud_state(gameplay_hud_);
+        }
+        screen_ = Screen::Multiplayer;
         apply_runtime_graphics_config();
         publish_snapshot();
         return;
@@ -1204,6 +1491,7 @@ void MenuApp::launch_gameplay(const std::string& chart_path, const std::string& 
 
     session.run();
     last_gameplay_input_backend_state_ = session.input_backend_state();
+    const bool session_aborted = session.was_user_aborted();
     session.shutdown();
 
     const double session_hispeed = session.final_hispeed();
@@ -1211,9 +1499,42 @@ void MenuApp::launch_gameplay(const std::string& chart_path, const std::string& 
         config_.speed.hi_speed = session_hispeed;
         persist_runtime_config();
     }
+    const auto& result = session.result();
+    if (peer_battle) {
+        network::PeerScore final_score;
+        final_score.finished = true;
+        final_score.aborted = session_aborted || !result.has_value;
+        if (result.has_value) {
+            final_score.score = result.final_score;
+            final_score.combo = result.stats.combo;
+            final_score.max_combo = result.stats.max_combo;
+            final_score.perfect = result.stats.counts.pg;
+            final_score.great = result.stats.counts.gr;
+            final_score.good = result.stats.counts.gd;
+            final_score.bad = result.stats.counts.bd;
+            final_score.poor = result.stats.counts.pr;
+            final_score.game_over = result.game_over;
+            if (!result.stats.gauge_history.empty()) {
+                final_score.current_sample = result.stats.gauge_history.back().sample;
+                final_score.gauge_milli = static_cast<int>(std::llround(
+                    std::clamp(result.stats.gauge_history.back().value, 0.0, 100.0) * 1000.0));
+            }
+        }
+        if (peer_session_.publish_score(final_score, true)) {
+            (void)wait_for_multiplayer_result();
+        } else {
+            multiplayer_status_message_ =
+                ui_text("Could not send the local final result.",
+                        "내 최종 결과를 상대에게 전송하지 못했습니다.");
+            peer_session_.disconnect("Local final result could not be sent");
+        }
+        multiplayer_match_active_.store(false, std::memory_order_release);
+    }
+    // Restart menu input only after the peer-result barrier. Otherwise keys
+    // pressed while waiting accumulate in the blocked menu loop and can close
+    // the comparison result as soon as it appears.
     restart_input_thread();
     restart_audio_thread();
-    const auto& result = session.result();
     if (result.has_value) {
         last_result_ = result.stats;
         last_game_over_ = result.game_over;
@@ -1240,7 +1561,12 @@ void MenuApp::launch_gameplay(const std::string& chart_path, const std::string& 
         last_result_path_.clear();
         last_export_warnings_.clear();
         last_session_replay_playback_ = false;
-        screen_ = Screen::SongSelect;
+        screen_ = peer_battle ? Screen::Multiplayer : Screen::SongSelect;
+        if (peer_battle) {
+            multiplayer_status_message_ =
+                ui_text("Local play ended. Waiting for the peer before rematch.",
+                        "로컬 플레이가 끝났습니다. 재대전 전에 상대를 기다리는 중입니다.");
+        }
     }
     apply_runtime_graphics_config();
     {
@@ -1252,10 +1578,12 @@ void MenuApp::launch_gameplay(const std::string& chart_path, const std::string& 
 
 std::string MenuApp::screen_title() const {
     switch (screen_) {
-        case Screen::QuickSetup: return ui_text("Quick Setup", "빠른 설정");
+        case Screen::QuickSetup:
+            return first_run_profile_ ? ui_text("Quick Setup", "빠른 설정")
+                                      : ui_text("Profile Setup", "프로필 설정");
         case Screen::Title: return ui_text("Title", "타이틀");
         case Screen::OptionsHub: return ui_text("Options", "옵션");
-        case Screen::EditStub: return ui_text("Edit", "에디트");
+        case Screen::Multiplayer: return ui_text("Peer Multiplayer", "P2P 멀티플레이");
         case Screen::SongSelect:
             if (song_select_view_ == SongSelectView::Sources) {
                 return ui_text("Song Sources", "곡 소스");
@@ -1290,25 +1618,39 @@ void MenuApp::populate_help_overlay(render::HelpOverlayData& target) const {
 
     switch (screen_) {
         case Screen::QuickSetup:
-            target.title = ui_text("Quick Setup", "빠른 설정");
-            target.lines = {
-                ui_text("TenRiff already created a default profile and default keymap for this first launch.",
-                        "TenRiff가 첫 실행용 기본 프로필과 기본 키맵을 이미 만들었습니다."),
-                ui_text("Songs Folder opens a picker on Enter or F2. You can also drag and drop a folder later.",
-                        "곡 폴더는 Enter 또는 F2로 선택 창을 엽니다. 나중에 폴더를 드래그 앤 드롭해도 됩니다."),
-                ui_text("Recommended starting values are Gauge Normal, Rate 1.00x, Display Offset 0ms, and BMS Keysound Follow.",
-                        "권장 시작값은 노말 게이지, Rate 1.00x, 표시 오프셋 0ms, BMS 키음 연동입니다."),
-                ui_text("Left / Right changes the highlighted setting. Continue saves the current values and opens Song Select.",
-                        "좌우 키로 선택된 설정을 바꾸고, Continue로 현재 값을 저장한 뒤 Song Select로 이동합니다."),
-            };
-            target.footer = ui_text("Esc or Backspace skips to the title screen. Press F1 again to close help.",
-                                    "Esc 또는 Backspace로 타이틀 화면으로 건너뜁니다. 도움말을 닫으려면 F1을 다시 누르세요.");
+            if (first_run_profile_) {
+                target.title = ui_text("Quick Setup", "빠른 설정");
+                target.lines = {
+                    ui_text("TenRiff already created a default profile and default keymap for this first launch.",
+                            "TenRiff가 첫 실행용 기본 프로필과 기본 키 설정을 만들었습니다."),
+                    ui_text("Songs Folder opens a picker on Enter or F2. You can also drag and drop a folder later.",
+                            "곡 폴더는 Enter 또는 F2로 선택 창을 엽니다. 나중에 폴더를 드래그 앤 드롭해도 됩니다."),
+                    ui_text("Recommended starting values are Gauge Normal, Rate 1.00x, Display Offset 0ms, and BMS Keysound Follow.",
+                            "권장 시작값은 노말 게이지, Rate 1.00x, 표시 오프셋 0ms, BMS 키음 연동입니다."),
+                    ui_text("Left / Right changes the highlighted setting. Continue opens Song Select.",
+                            "좌우 키로 선택된 설정을 바꾸고, 계속을 누르면 곡 선택으로 이동합니다."),
+                };
+                target.footer = ui_text("Esc or Backspace skips to the title screen. Press F1 again to close help.",
+                                        "Esc 또는 Backspace로 타이틀 화면으로 건너뜁니다. 도움말을 닫으려면 F1을 다시 누르세요.");
+            } else {
+                target.title = ui_text("Profile Setup", "프로필 설정");
+                target.lines = {
+                    ui_text("This screen edits the active profile shown at the top of the list.",
+                            "이 화면은 목록 위에 표시된 현재 프로필을 편집합니다."),
+                    ui_text("Songs Folder, Gauge, Rate, Display Offset, and BMS Keysound are saved immediately.",
+                            "곡 폴더, 게이지, Rate, 표시 오프셋, BMS 키음 설정은 즉시 저장됩니다."),
+                    ui_text("Use Keymap and the other Options screens for the remaining profile settings.",
+                            "나머지 프로필 설정은 키 설정과 다른 옵션 화면에서 조정할 수 있습니다."),
+                };
+                target.footer = ui_text("Done, Esc, or Backspace returns to Options. Press F1 again to close help.",
+                                        "완료, Esc 또는 Backspace로 옵션에 돌아갑니다. 도움말을 닫으려면 F1을 다시 누르세요.");
+            }
             return;
         case Screen::Title:
             target.title = ui_text("Title Controls", "타이틀 조작");
             target.lines = {
-                ui_text("Up / Down or the mouse selects PLAY, EDIT, OPTIONS, or EXIT.",
-                        "위 / 아래 키 또는 마우스로 PLAY, EDIT, OPTIONS, EXIT를 선택합니다."),
+                ui_text("Up / Down or the mouse selects PLAY, MULTIPLAYER, OPTIONS, or EXIT.",
+                        "위 / 아래 키 또는 마우스로 PLAY, MULTIPLAYER, OPTIONS, EXIT를 선택합니다."),
                 ui_text("Enter or double-click opens the selected button.",
                         "Enter 또는 더블클릭으로 선택한 버튼을 엽니다."),
                 ui_text("If no songs are indexed yet, PLAY becomes Add Songs Folder so recovery stays visible on the first screen.",
@@ -1318,6 +1660,21 @@ void MenuApp::populate_help_overlay(render::HelpOverlayData& target) const {
             };
             target.footer = ui_text("Esc exits TenRiff. Press F1 again to close help.",
                                     "Esc로 TenRiff를 종료합니다. 도움말을 닫으려면 F1을 다시 누르세요.");
+            return;
+        case Screen::Multiplayer:
+            target.title = ui_text("Peer Multiplayer", "P2P 멀티플레이");
+            target.lines = {
+                ui_text("Host opens one direct TCP session; Join connects to the host IP and port.",
+                        "호스트는 TCP 세션을 열고, 참가자는 호스트 IP와 포트로 직접 연결합니다."),
+                ui_text("Both PCs must select an identical chart file before Ready becomes available.",
+                        "준비하려면 두 PC에서 완전히 동일한 차트 파일을 선택해야 합니다."),
+                ui_text("The host starts after both players are ready. Esc disconnects and returns to Title.",
+                        "양쪽 준비 후 호스트가 시작합니다. Esc는 연결을 끊고 타이틀로 돌아갑니다."),
+                ui_text("Internet play needs router TCP forwarding and a firewall rule on the host.",
+                        "인터넷 대전은 호스트 공유기의 TCP 포트 포워딩과 방화벽 허용이 필요합니다."),
+            };
+            target.footer = ui_text("This is direct-IP play for trusted peers; charts are not transferred.",
+                                    "신뢰하는 상대와 쓰는 직접 IP 연결이며 차트 파일은 전송하지 않습니다.");
             return;
         case Screen::SongSelect:
             target.title = ui_text("Song Select Controls", "곡 선택 조작");

@@ -46,6 +46,7 @@ public:
         bool active = false;
         bool finished = false;
         bool game_over = false;
+        bool spectating_peer = false;
         bool user_aborted = false;
         bool countdown_active = false;
         int countdown_value = 0;
@@ -112,6 +113,7 @@ public:
     using LoadingProgressCallback = std::function<void(const LoadingProgress&)>;
     using LoadingCancelCallback = std::function<bool()>;
     using ScreenshotCallback = std::function<void()>;
+    using PeerSpectatorDoneCallback = std::function<bool()>;
 
     struct GameSessionResult {
         bool has_value = false;
@@ -141,6 +143,8 @@ public:
     void set_loading_progress_callback(LoadingProgressCallback callback);
     void set_loading_cancel_callback(LoadingCancelCallback callback);
     void set_screenshot_callback(ScreenshotCallback callback);
+    void set_peer_spectator_done_callback(PeerSpectatorDoneCallback callback);
+    void set_peer_battle_mode(bool enabled) { peer_battle_mode_ = enabled; }
     [[nodiscard]] HudSnapshot hud_snapshot();
     [[nodiscard]] bool was_user_aborted() const { return user_aborted_.load(std::memory_order_acquire); }
     [[nodiscard]] const GameSessionResult& result() const { return result_; }
@@ -229,8 +233,6 @@ private:
 
     struct PolledGameplayKey {
         uint32_t keycode = 0;
-        bool pressed = false;
-        int64_t last_queue_event_ns = (std::numeric_limits<int64_t>::min)();
     };
 
     struct AudioTimingState {
@@ -256,9 +258,6 @@ private:
     void rebuild_input_thread_config(input::InputThreadConfig& config) const;
     void note_runtime_input_event_source(const input::InputEvent& event);
     void rebuild_polled_gameplay_keys();
-    void sync_polled_key_state(uint32_t keycode, input::InputState state, std::optional<int64_t> queue_event_ns);
-    [[nodiscard]] std::optional<input::InputEvent> filter_gameplay_input_event(const input::InputEvent& event);
-    void poll_gameplay_keys(int64_t sample, bool capture_lane_inputs);
     void update_lane_feedback(int lane, input::InputState state);
     void trigger_lane_hit_effect(int lane);
     void dispatch_lane_input(int lane, input::InputState state, int64_t sample);
@@ -325,12 +324,12 @@ private:
     input::InputThread input_thread_;
     audio::AudioThread audio_thread_;
     timing::ClockSync clock_sync_;
-    input::KeyStateTracker gameplay_input_state_tracker_{input::KeyStateConfig{0}};
 
     std::unordered_map<uint32_t, int> key_to_lane_;
 
     std::atomic<bool> stop_requested_{false};
     std::atomic<bool> finished_{false};
+    std::atomic<bool> spectating_peer_{false};
     std::atomic<bool> user_aborted_{false};
     std::atomic<int64_t> last_audio_sample_{0};
     std::atomic<uint64_t> audio_timing_sequence_{0};
@@ -360,6 +359,7 @@ private:
     int64_t result_transition_sample_ = 0;
     bool gameplay_started_ = false;
     bool result_transition_pending_ = false;
+    bool peer_battle_mode_ = false;
 
     FutureQueue future_events_{};
     InputBackendRuntimeState input_backend_state_{};
@@ -396,6 +396,7 @@ private:
     LoadingProgressCallback loading_progress_callback_;
     LoadingCancelCallback loading_cancel_callback_;
     ScreenshotCallback screenshot_callback_;
+    PeerSpectatorDoneCallback peer_spectator_done_callback_;
     int last_loading_percent_ = -1;
     std::string last_loading_stage_;
 

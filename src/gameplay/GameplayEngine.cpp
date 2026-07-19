@@ -23,7 +23,7 @@ GameplayEngine::GameplayEngine(const GameplayChart& chart, const GameplayConfig&
       rate_(clamp_rate(config.rate)),
       duration_samples_(chart.duration_samples),
       windows_(build_windows(config.judge, config.rate)),
-      gauge_manager_(config.gauge),
+      gauge_manager_(config.gauge, config.gauge_policy),
       practice_no_fail_enabled_(config.practice_no_fail_enabled) {
     if (lane_count_ <= 0) {
         lane_count_ = 10;

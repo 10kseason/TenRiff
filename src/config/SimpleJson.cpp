@@ -140,7 +140,7 @@ private:
         if (consume('}')) {
             return JsonValue{std::move(object)};
         }
-        while (pos_ < input_.size()) {
+        while (true) {
             skip_ws();
             auto key = parse_string();
             if (!key.has_value()) {
@@ -159,14 +159,17 @@ private:
             object.emplace(std::move(key.value()), std::move(value.value()));
             skip_ws();
             if (consume('}')) {
-                break;
+                return JsonValue{std::move(object)};
+            }
+            if (pos_ >= input_.size()) {
+                set_error("Unterminated JSON object.");
+                return std::nullopt;
             }
             if (!consume(',')) {
                 set_error("Expected ',' between JSON object members.");
                 return std::nullopt;
             }
         }
-        return JsonValue{std::move(object)};
     }
 
     std::optional<JsonValue> parse_array() {
@@ -179,7 +182,7 @@ private:
         if (consume(']')) {
             return JsonValue{std::move(array)};
         }
-        while (pos_ < input_.size()) {
+        while (true) {
             auto value = parse_value();
             if (!value.has_value()) {
                 return std::nullopt;
@@ -187,14 +190,17 @@ private:
             array.push_back(std::move(value.value()));
             skip_ws();
             if (consume(']')) {
-                break;
+                return JsonValue{std::move(array)};
+            }
+            if (pos_ >= input_.size()) {
+                set_error("Unterminated JSON array.");
+                return std::nullopt;
             }
             if (!consume(',')) {
                 set_error("Expected ',' between JSON array elements.");
                 return std::nullopt;
             }
         }
-        return JsonValue{std::move(array)};
     }
 
     std::optional<std::string> parse_string() {
@@ -256,6 +262,10 @@ private:
                 }
                 continue;
             }
+            if (static_cast<unsigned char>(ch) < 0x20) {
+                set_error("Unescaped control character in JSON string.");
+                return std::nullopt;
+            }
             out.push_back(ch);
         }
         set_error("Unterminated JSON string.");
@@ -264,16 +274,37 @@ private:
 
     std::optional<double> parse_number() {
         std::size_t start = pos_;
-        if (pos_ < input_.size() && (input_[pos_] == '-' || input_[pos_] == '+')) {
+        if (pos_ < input_.size() && input_[pos_] == '-') {
             ++pos_;
         }
-        while (pos_ < input_.size() && std::isdigit(static_cast<unsigned char>(input_[pos_]))) {
-            ++pos_;
+
+        if (pos_ >= input_.size()) {
+            return std::nullopt;
         }
+        if (input_[pos_] == '0') {
+            ++pos_;
+            if (pos_ < input_.size() && std::isdigit(static_cast<unsigned char>(input_[pos_]))) {
+                set_error("Invalid leading zero in JSON number.");
+                return std::nullopt;
+            }
+        } else if (input_[pos_] >= '1' && input_[pos_] <= '9') {
+            do {
+                ++pos_;
+            } while (pos_ < input_.size() && std::isdigit(static_cast<unsigned char>(input_[pos_])));
+        } else {
+            pos_ = start;
+            return std::nullopt;
+        }
+
         if (pos_ < input_.size() && input_[pos_] == '.') {
             ++pos_;
+            const std::size_t fraction_start = pos_;
             while (pos_ < input_.size() && std::isdigit(static_cast<unsigned char>(input_[pos_]))) {
                 ++pos_;
+            }
+            if (fraction_start == pos_) {
+                set_error("Expected digits after decimal point in JSON number.");
+                return std::nullopt;
             }
         }
         if (pos_ < input_.size() && (input_[pos_] == 'e' || input_[pos_] == 'E')) {
@@ -281,12 +312,14 @@ private:
             if (pos_ < input_.size() && (input_[pos_] == '-' || input_[pos_] == '+')) {
                 ++pos_;
             }
+            const std::size_t exponent_start = pos_;
             while (pos_ < input_.size() && std::isdigit(static_cast<unsigned char>(input_[pos_]))) {
                 ++pos_;
             }
-        }
-        if (start == pos_) {
-            return std::nullopt;
+            if (exponent_start == pos_) {
+                set_error("Expected digits in JSON number exponent.");
+                return std::nullopt;
+            }
         }
         std::string_view token = input_.substr(start, pos_ - start);
         double value = 0.0;

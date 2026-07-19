@@ -2,7 +2,7 @@
 
 Language: [한국어](README.md) | [English](README.en.md) | [简体中文](README.zh-CN.md) | 日本語
 
-TenRiff は、Windows GUI ベースの BMS-first リズムゲーム実行環境兼ランチャープロジェクトです。実用的な BMS プレイ環境を中心に、判定、オーディオ、入力、レンダリングのパイプラインを直接制御するスタンドアロンのリズムゲームクライアントを作ることを目的としています。現在のプロジェクト版は `1.1.3` で、`1.1.2 final stable` ベースラインの上に積み重ねた後続ラインです。ライセンスは MIT で、同梱されるサードパーティ通知は [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) にまとめています。
+TenRiff は、Windows GUI ベースの BMS-first リズムゲーム実行環境兼ランチャープロジェクトです。実用的な BMS プレイ環境を中心に、判定、オーディオ、入力、レンダリングのパイプラインを直接制御するスタンドアロンのリズムゲームクライアントを作ることを目的としています。現在のプロジェクト版は `1.1.3` で、multiplayer preview r4 は既存の `1.1.3 stable` とは別の prerelease として公開します。ライセンスは MIT で、同梱されるサードパーティ通知は [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) にまとめています。
 
 この README は「プロジェクトを開いたときに最初にどこを見ればよいか」を説明する導入文書です。より詳しい現在の挙動、現在の `1.1.3` プロジェクト状態、`1.1.2 final stable` ベースライン、設定構造、設計文書は [`docs/README.ja.md`](docs/README.ja.md) から続けて読む前提で構成しています。
 

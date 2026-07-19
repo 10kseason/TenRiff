@@ -109,6 +109,22 @@ TEST_CASE("gameplay hud revisions bump text caches for score and feedback change
     CHECK(diff.text_changed);
 }
 
+TEST_CASE("gameplay hud revisions refresh peer text and spectator presentation") {
+    tenriff::app::GameplayHudRevisionInput previous;
+    previous.peer_revision = 10;
+
+    auto next = previous;
+    next.peer_revision = 11;
+    auto diff = tenriff::app::diff_gameplay_hud_revisions(previous, next);
+    CHECK(diff.text_changed);
+    CHECK_FALSE(diff.motion_changed);
+
+    next.spectating_peer = true;
+    diff = tenriff::app::diff_gameplay_hud_revisions(previous, next);
+    CHECK(diff.text_changed);
+    CHECK(diff.motion_changed);
+}
+
 TEST_CASE("gameplay hud revisions treat timing history updates as motion changes") {
     tenriff::app::GameplayHudRevisionInput previous;
     previous.timing_history_count = 2;

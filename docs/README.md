@@ -15,17 +15,19 @@ Language: Korean | [English](README.en.md) | [简体中文](README.zh-CN.md) | [
    - 현재 작업을 어디서부터 쌓아야 하는지 정하는 `1.1.2 final stable` 기준선 문서
 4. `docs/gameplay-guide.md`
    - 실제 플레이 기준의 시작 방법, 곡 선택, 조작, HUD, 판정, 결과 화면 안내
-5. `docs/config.md`
+5. `docs/multiplayer.md`
+   - 1:1 직접 IP 멀티플레이의 호스트/참가 절차, 포트 설정, 고정 규칙, 보안 및 네트워크 제한
+6. `docs/config.md`
    - 실제 설정/프로필/키맵 구조
-6. `docs/localization.md`
+7. `docs/localization.md`
    - 현재 영어/한국어 UI 구조와 이후 다국어 확장 시 건드릴 파일/경계 정리
-7. `docs/menu.md`
+8. `docs/menu.md`
    - 메뉴/상태머신/곡 선택 흐름
-8. `docs/core-loop.md`
+9. `docs/core-loop.md`
    - 플레이 루프와 데이터 흐름
-9. `docs/roadmap.md`
+10. `docs/roadmap.md`
    - 중장기 작업 방향
-10. `docs/developer-extension-guide.md`
+11. `docs/developer-extension-guide.md`
    - 새 mode/mod, UI row, runtime migration, replay/result, 테스트를 어디에 추가해야 하는지 설명하는 개발자 문서
 
 ## Which Docs Are Source Of Truth

@@ -23,6 +23,7 @@ struct GameplayHudRevisionInput {
     bool active = false;
     bool finished = false;
     bool game_over = false;
+    bool spectating_peer = false;
     bool user_aborted = false;
     bool loading = false;
     bool countdown_active = false;
@@ -53,6 +54,7 @@ struct GameplayHudRevisionInput {
     bool has_feedback = false;
     game::Judgement feedback = game::Judgement::BD;
     double feedback_delta_ms = 0.0;
+    std::uint64_t peer_revision = 0;
     std::size_t timing_history_count = 0;
     std::array<double, kGameplayTimingHistoryMaxEntries> timing_history_delta_ms{};
 
@@ -180,6 +182,8 @@ inline GameplayHudRevisionFlags diff_gameplay_hud_revisions(const GameplayHudRev
         previous.hispeed != next.hispeed ||
         previous.has_feedback != next.has_feedback ||
         previous.feedback != next.feedback ||
+        previous.spectating_peer != next.spectating_peer ||
+        previous.peer_revision != next.peer_revision ||
         previous.ghost_visible != next.ghost_visible ||
         previous.ghost_score != next.ghost_score ||
         previous.ghost_combo != next.ghost_combo ||
@@ -198,6 +202,7 @@ inline GameplayHudRevisionFlags diff_gameplay_hud_revisions(const GameplayHudRev
         previous.active != next.active ||
         previous.finished != next.finished ||
         previous.game_over != next.game_over ||
+        previous.spectating_peer != next.spectating_peer ||
         previous.user_aborted != next.user_aborted ||
         previous.loading != next.loading ||
         previous.countdown_active != next.countdown_active ||

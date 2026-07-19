@@ -417,6 +417,10 @@ std::string MenuApp::selected_song_background_preview_path() {
 }
 
 void MenuApp::launch_selected_song() {
+    if (multiplayer_selecting_chart_) {
+        select_multiplayer_chart();
+        return;
+    }
     const std::string chart_path = selected_song_absolute_path();
     if (chart_path.empty()) {
         return;

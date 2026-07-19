@@ -5,6 +5,52 @@
 
 #include "input/InputThread.h"
 
+#if defined(_WIN32)
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#include <windows.h>
+
+#include <optional>
+#include <vector>
+
+namespace {
+
+std::optional<HWND> registered_raw_keyboard_target() {
+    UINT count = 0;
+    if (GetRegisteredRawInputDevices(nullptr, &count, sizeof(RAWINPUTDEVICE)) == static_cast<UINT>(-1) ||
+        count == 0) {
+        return std::nullopt;
+    }
+
+    std::vector<RAWINPUTDEVICE> devices(count);
+    UINT capacity = count;
+    const UINT registered = GetRegisteredRawInputDevices(devices.data(), &capacity, sizeof(RAWINPUTDEVICE));
+    if (registered == static_cast<UINT>(-1)) {
+        return std::nullopt;
+    }
+    for (UINT i = 0; i < registered; ++i) {
+        if (devices[i].usUsagePage == 0x01 && devices[i].usUsage == 0x06) {
+            return devices[i].hwndTarget;
+        }
+    }
+    return std::nullopt;
+}
+
+tenriff::input::InputThreadConfig raw_input_test_config() {
+    tenriff::input::InputThreadConfig config;
+    config.backend = tenriff::input::InputBackend::RawInput;
+    config.raw_input.register_keyboard = true;
+    config.raw_input.input_sink = true;
+    config.raw_input.no_legacy = false;
+    config.rawinput_polling_shadow = false;
+    config.gate_policy = tenriff::input::InputGatePolicy::AlwaysAllow;
+    return config;
+}
+
+}  // namespace
+#endif
+
 TEST_CASE("input gate policy keeps menu foreground-only and gameplay always-allow") {
     CHECK(tenriff::input::input_gate_policy_allows(tenriff::input::InputGatePolicy::ForegroundProcess, true));
     CHECK_FALSE(tenriff::input::input_gate_policy_allows(tenriff::input::InputGatePolicy::ForegroundProcess, false));
@@ -17,12 +63,7 @@ TEST_CASE("raw input thread can stop and restart without silently failing") {
     using namespace std::chrono_literals;
 
     tenriff::input::InputThread input_thread;
-    tenriff::input::InputThreadConfig config;
-    config.backend = tenriff::input::InputBackend::RawInput;
-    config.raw_input.register_keyboard = true;
-    config.raw_input.input_sink = true;
-    config.raw_input.no_legacy = false;
-    config.gate_policy = tenriff::input::InputGatePolicy::AlwaysAllow;
+    const auto config = raw_input_test_config();
 
     REQUIRE(input_thread.initialize(config));
     REQUIRE(input_thread.start());
@@ -38,6 +79,75 @@ TEST_CASE("raw input thread can stop and restart without silently failing") {
 
     input_thread.shutdown();
     CHECK_FALSE(input_thread.is_running());
+#else
+    SUCCEED();
+#endif
+}
+
+TEST_CASE("new RawInput owner survives shutdown of the previous input thread") {
+#if defined(_WIN32)
+    using namespace std::chrono_literals;
+
+    tenriff::input::InputThread previous_owner;
+    tenriff::input::InputThread current_owner;
+    const auto config = raw_input_test_config();
+
+    REQUIRE(previous_owner.initialize(config));
+    REQUIRE(previous_owner.start());
+    const auto previous_target = registered_raw_keyboard_target();
+    REQUIRE(previous_target.has_value());
+    REQUIRE(*previous_target != nullptr);
+
+    REQUIRE(current_owner.initialize(config));
+    REQUIRE(current_owner.start());
+    const auto current_target = registered_raw_keyboard_target();
+    REQUIRE(current_target.has_value());
+    REQUIRE(*current_target != nullptr);
+    CHECK(*current_target != *previous_target);
+
+    previous_owner.shutdown();
+    std::this_thread::sleep_for(20ms);
+
+    CHECK(current_owner.is_running());
+    const auto target_after_previous_shutdown = registered_raw_keyboard_target();
+    REQUIRE(target_after_previous_shutdown.has_value());
+    CHECK(*target_after_previous_shutdown == *current_target);
+    CHECK(IsWindow(*target_after_previous_shutdown) != FALSE);
+
+    DWORD target_process_id = 0;
+    GetWindowThreadProcessId(*target_after_previous_shutdown, &target_process_id);
+    CHECK(target_process_id == GetCurrentProcessId());
+
+    current_owner.shutdown();
+#else
+    SUCCEED();
+#endif
+}
+
+TEST_CASE("RawInput thread falls back in place when its message pump exits") {
+#if defined(_WIN32)
+    using namespace std::chrono_literals;
+
+    tenriff::input::InputThread input_thread;
+    const auto config = raw_input_test_config();
+    REQUIRE(input_thread.initialize(config));
+    REQUIRE(input_thread.start());
+
+    const auto target = registered_raw_keyboard_target();
+    REQUIRE(target.has_value());
+    REQUIRE(*target != nullptr);
+    const DWORD thread_id = GetWindowThreadProcessId(*target, nullptr);
+    REQUIRE(thread_id != 0);
+    REQUIRE(PostThreadMessageW(thread_id, WM_QUIT, 0, 0) != FALSE);
+
+    for (int attempt = 0;
+         attempt < 100 && input_thread.current_backend() != tenriff::input::InputBackend::Polling;
+         ++attempt) {
+        std::this_thread::sleep_for(2ms);
+    }
+    CHECK(input_thread.is_running());
+    CHECK(input_thread.current_backend() == tenriff::input::InputBackend::Polling);
+    input_thread.shutdown();
 #else
     SUCCEED();
 #endif

@@ -41,11 +41,12 @@
   - `polling | rawinput`
   - 현재 `1.1.3` 릴리스 라인 기본값은 `rawinput`
   - 저장값은 그대로 유지되며 자동으로 `polling`으로 강제 저장되지는 않음
-  - gameplay 세션은 `rawinput=true`일 때 RawInput을 먼저 띄우고, 세션 로컬 bound-key polling fallback으로 RawInput 누락을 보정함
+  - `1.1.3` preview gameplay는 `rawinput=true`일 때 같은 `InputThread` 안에서 RawInput과 bound-key polling shadow를 함께 유지함
+  - 초기화/시작 실패 또는 RawInput message pump의 예기치 않은 종료 시 queue와 pressed state를 reset하지 않고 같은 producer thread에서 Polling으로 전환함
 - `rawinput` (bool)
   - `backend`와 함께 저장되는 편의 필드
   - 현재 `1.1.3` 릴리스 라인에서는 저장 시에도 현재 값이 유지됨
-  - `true`이면 menu/gameplay 모두 RawInput을 우선 사용하되 입력 인식 유지를 위한 polling fallback을 허용
+  - `true`이면 menu/gameplay 모두 RawInput을 우선 사용하고, gameplay는 노트/control 키 polling shadow를 항상 함께 사용해 runtime 입력 중단을 보완
 - `use_qpc` (bool)
 - `grab` (bool)
   - 현재 Linux preview 성격

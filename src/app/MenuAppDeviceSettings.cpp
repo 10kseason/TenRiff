@@ -268,6 +268,8 @@ void MenuApp::populate_input_settings_render_data(render::MenuRenderData& render
     append_menu_row(render.generic, ui_text("Back", "뒤로"), "", settings_cursor_ == 2, render::MenuHitTargetKind::SettingsRow, 2, true, false);
     render.generic.notes.push_back(ui_text("Polling Hz changes how often the polling backend samples keyboard state.",
                                            "폴링 Hz는 폴링 백엔드가 키보드 상태를 얼마나 자주 읽을지 바꿉니다."));
+    render.generic.notes.push_back(ui_text("During gameplay, RawInput uses this cadence as an always-on bound-key backup so silent backend failures do not stop note input.",
+                                           "플레이 중에는 RawInput이 조용히 멈춰도 노트 입력이 끊기지 않도록 이 주기로 매핑된 키만 항상 백업 폴링합니다."));
     render.generic.notes.push_back(ui_text("Debounce filters duplicate switch chatter on a single key before gameplay sees it.",
                                            "디바운스는 게임플레이로 전달되기 전 한 키의 중복 스위치 떨림 입력을 걸러냅니다."));
     render.generic.notes.push_back(ui_text("Left/Right or click +/- to change. Back saves and returns.",

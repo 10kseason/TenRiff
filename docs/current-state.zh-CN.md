@@ -4,14 +4,14 @@
 
 ## 基线
 - 当前项目版本为 `1.1.3`
-- `1.1.3` 版本线是在 `1.1.2 final stable` 基准上继续叠加的后续版本
+- multiplayer preview r4 是独立 prerelease，不会覆盖现有的 `1.1.3 stable` 版本
 - 后续工作的基准文档是 [`docs/baseline-1.1.2.zh-CN.md`](baseline-1.1.2.zh-CN.md)
 - Windows GUI 构建是主目标
 - Linux 仅存在 [`Baepoks-Linuxs/TenRiff-0.5.0-linux-preview`](../Baepoks-Linuxs/TenRiff-0.5.0-linux-preview) 级别的 preview
 - 默认表面是 BMS-first
 - `.osu` 可以通过选项重新启用，并支持 4K~10K
-- `1.1.3` 发布线保留了 `1.0.9` 基于真实 playback head 的 gameplay 输入时序修正，live gameplay 输入优先使用已保存的 RawInput 设置，并通过 session-local bound-key polling fallback 修正 RawInput 边沿漏报
-- 同一条 `1.1.3` 发布线里，menu 输入仍然保持 foreground process/root-window 边界，RawInput 启动失败时会用 Polling fallback 重试，但不会持久化改写 profile 输入后端，保存的 backend 偏好只作为配置保留
+- `1.1.3 multiplayer preview r4` 的 gameplay 输入优先使用 RawInput，同时在同一 `InputThread` 中持续运行 bound-key polling shadow；启动失败或 message pump 意外退出时，会在不重置 queue/pressed state 的情况下把该 producer 切换到 Polling
+- menu 输入保持 foreground process/root-window 边界；RawInput 启动失败或运行时 thread/event 投递停止时，仅将当前 menu session fallback 到 Polling，并保留 profile 中保存的 backend 设置
 
 ## 核心架构
 - `MenuApp`
@@ -26,7 +26,7 @@
   - 负责音频主时钟与混音
 - `InputThread`
   - 负责收集 RawInput/polling 输入并投递到队列
-  - gameplay 会关闭 RawInput thread 内部 polling shadow，由 `GameSession` 侧的 bound-key polling fallback 修正漏掉的 edge
+  - gameplay 在单一 `InputThread` state tracker 中对 RawInput 与 bound-key polling shadow 去重，`GameSession` 不再按 source 二次过滤 logical edge
 - `RenderThread` + `MenuWindow`
   - 基于 D3D11 + Direct2D/DirectWrite 的菜单/游戏中 HUD 渲染
   - 最近的维护型重构正在朝着把大型实现文件拆成碎片文件的方向整理
@@ -106,6 +106,11 @@
   - Song Select indexing progress
   - gameplay chart loading progress
   - gameplay loading 时 `Esc` 取消
+- Profile UX：
+  - 可从 `Options -> Profile Setup` 重新打开当前 profile 的首次设置页面，并立即保存 language/audio/input/graphics/keymap
+- Direct-IP multiplayer preview：
+  - joiner 只在 active source 和 `recent_song_sources` 的现有 profile-local cache 中按 host chart 的 hash + size 查找
+  - 不进行全盘扫描或自动重扫，并拒绝 cache 中指向 source root 外部的路径
 
 ## 曲目索引模型
 - 在切换 song source 时，会优先读取 profile-local 的 `profiles/<name>/.tenriff/song-index/<source-hash>.json` 缓存
@@ -124,7 +129,7 @@
   - 用于索引的 BMS parse 采用低内存路径，跳过 asset map/不必要的 header/非必需 command
   - cache save 使用 streaming write，而不是生成巨大的 JSON tree
 - 实测：
-  - `D:\Stellaverse (2025-12-14)` 的 safe full-index 基准为 `46,636` 个 candidate / `46,602` 个 indexed entries
+  - 46k-chart Windows benchmark library 的 safe full-index 基准为 `46,636` 个 candidate / `46,602` 个 indexed entries
   - 峰值内存大约为 `working set 453MB`、`private 524MB`
   - 同一库 1024-chart sample 下，fast profile 吞吐量约为 safe 的 `2.05x`
 - cache schema：
@@ -134,12 +139,12 @@
 
 ## 运行时 / 打包规则
 - 新用户 profile 会自动创建
-- 最近一次 staged 的发布包是 `Baepoks/TenRiff-1.1.2`
+- 公开 P2P prerelease 为 `TenRiff 1.1.3 Multiplayer Preview r4`，与 stable 1.1.3 发布 asset 分离
 - 发布包不包含 `Songs`
 - 发布包会同时包含用于菜单 BGM 的 `Mainmusic/` 运行时资源
-- 发布更新时，只把已构建的产物放进 `Baepoks/`
-- 如果请求 source-only/public handoff，用户偏好是先写 include/exclude 列表
-- 最近一次 staged 的公开源代码包会像 `opensource-Tenriff-source/TenRiff-1.1.2-source` 这样按版本单独 staging
+- 发布更新只包含已构建产物和必要的运行时资源
+- source-only/public handoff 前先确认 include/exclude 列表
+- preview source branch 和 tag 与 stable release 分开管理
 - 刷新公开源代码包时，不能只同步文档和文件本身，还要确认 staged 出来的源码包目录可以独立完成 configure/build，并能直接运行核心测试二进制
 
 ## 配置 / Profile 现实情况
@@ -169,9 +174,9 @@
 - `cmake --build build --config Release --target bms_parser_tests`
 - `cmake --build build --config Release --target bms_realworld_smoke`
 - `ctest --test-dir build -C Release --output-on-failure -R bms_parser_tests`
-- `cmake -S opensource-Tenriff-source/TenRiff-1.1.2-source -B opensource-Tenriff-source/TenRiff-1.1.2-source/build-check -G "Visual Studio 17 2022" -A x64`
-- `cmake --build opensource-Tenriff-source/TenRiff-1.1.2-source/build-check --config Release --target bms_parser_tests`
-- `opensource-Tenriff-source/TenRiff-1.1.2-source/build-check/Release/bms_parser_tests.exe`
+- `cmake -S . -B build-check -G "Visual Studio 17 2022" -A x64`
+- `cmake --build build-check --config Release --target bms_parser_tests`
+- `.\build-check\Release\bms_parser_tests.exe`
 
 ## 仍然需要手动验证的地方
 - 在真实的 CJK-heavy 曲库上重现 Song Select 快速滚动崩溃

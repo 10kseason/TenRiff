@@ -169,7 +169,12 @@ struct ResultShiftMarker {
 };
 
 struct ResultScreenData {
+    bool peer_battle = false;
+    bool peer_result_available = false;
     std::string profile;
+    std::string peer_name;
+    std::string peer_status = "WAITING";
+    std::string peer_outcome;
     std::string track;
     std::string title;
     std::string artist;
@@ -190,6 +195,16 @@ struct ResultScreenData {
     int good = 0;
     int bad = 0;
     int poor = 0;
+
+    int64_t peer_score = 0;
+    int64_t peer_score_difference = 0;
+    double peer_gauge_value = 0.0;
+    int peer_max_combo = 0;
+    int peer_perfect = 0;
+    int peer_great = 0;
+    int peer_good = 0;
+    int peer_bad = 0;
+    int peer_poor = 0;
 
     double mean_delta_ms = 0.0;
     double stddev_delta_ms = 0.0;
@@ -296,6 +311,28 @@ struct GameplayHudData {
 
     bool finished = false;
     bool game_over = false;
+    bool spectating_peer = false;
+
+    bool peer_visible = false;
+    bool peer_score_available = false;
+    std::string peer_name;
+    std::string peer_status;
+    int64_t peer_current_sample = 0;
+    int64_t peer_score = 0;
+    int peer_combo = 0;
+    int peer_max_combo = 0;
+    int peer_pg = 0;
+    int peer_gr = 0;
+    int peer_gd = 0;
+    int peer_bd = 0;
+    int peer_pr = 0;
+    double peer_gauge = 0.0;
+    bool peer_finished = false;
+    bool peer_game_over = false;
+    bool peer_aborted = false;
+    bool peer_disconnected = false;
+    int64_t versus_score_difference = 0;
+    double versus_score_position = 0.5;
 
     std::size_t lane_activity_count = 0;
     std::array<float, kGameplayHudMaxLanes> lane_activity{};
@@ -570,6 +607,14 @@ private:
         std::wstring gauge_label_text{};
         std::wstring gauge_value_text{};
         std::wstring feedback_text{};
+        std::wstring peer_name_text{};
+        std::wstring peer_status_text{};
+        std::wstring peer_score_text{};
+        std::wstring peer_combo_text{};
+        std::wstring peer_judge_stats_text{};
+        std::wstring peer_gauge_text{};
+        std::wstring versus_score_difference_text{};
+        std::wstring spectating_text{};
         std::wstring ghost_score_text{};
         std::wstring ghost_combo_text{};
         std::wstring ghost_judge_stats_text{};

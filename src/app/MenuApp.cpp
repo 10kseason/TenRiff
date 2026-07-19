@@ -38,6 +38,8 @@
 #include "app/MenuRecordUtils.h"
 #include "app/MenuSongUtils.h"
 #include "app/PersistedRuntimeConfig.h"
+#include "app/PeerBattleRuntimeRules.h"
+#include "app/ProfileSetupFlow.h"
 #include "app/RuntimeConfigMigration.h"
 #include "config/KeycodeMap.h"
 #include "gameplay/Replay.h"
@@ -62,6 +64,20 @@ constexpr int kSongBrowserRowCount = 10;
 constexpr int64_t kSongSelectRepeatInitialDelayNs = 250'000'000LL;
 constexpr int64_t kSongSelectRepeatIntervalNs = 45'000'000LL;
 constexpr std::size_t kRecentSongSourceLimit = 12;
+
+bool is_current_process_foreground_menu() {
+#ifdef _WIN32
+    const HWND foreground = GetForegroundWindow();
+    if (!foreground) {
+        return false;
+    }
+    DWORD process_id = 0;
+    GetWindowThreadProcessId(foreground, &process_id);
+    return process_id == GetCurrentProcessId();
+#else
+    return true;
+#endif
+}
 
 int detect_active_monitor_refresh_hz(int fallback_hz) {
 #ifdef _WIN32
@@ -605,6 +621,7 @@ GameplayHudRevisionInput MenuApp::gameplay_hud_revision_input(const GameplayHudS
     input.active = state.active;
     input.finished = state.finished;
     input.game_over = state.game_over;
+    input.spectating_peer = state.spectating_peer;
     input.user_aborted = state.user_aborted;
     input.loading = state.loading;
     input.countdown_active = state.countdown_active;
@@ -630,6 +647,7 @@ GameplayHudRevisionInput MenuApp::gameplay_hud_revision_input(const GameplayHudS
     input.has_feedback = state.has_feedback;
     input.feedback = state.feedback;
     input.feedback_delta_ms = state.feedback_delta_ms;
+    input.peer_revision = state.peer_revision;
     input.timing_history_count = state.timing_history_count;
     std::copy_n(state.timing_history_delta_ms.begin(),
                 state.timing_history_count,
@@ -870,6 +888,8 @@ void MenuApp::run() {
             }
             handle_menu_click(click.value());
         }
+        service_input_backend_health();
+        service_multiplayer();
 
         SongIndex updated;
         std::vector<std::string> warnings;
@@ -902,6 +922,7 @@ void MenuApp::run() {
 
 void MenuApp::shutdown() {
     exit_requested_.store(true, std::memory_order_release);
+    peer_session_.disconnect();
     stop_menu_threads();
     song_indexer_.stop();
 }
@@ -909,6 +930,7 @@ void MenuApp::shutdown() {
 void MenuApp::start_menu_threads() {
     pressed_keys_.clear();
     reset_song_select_repeat();
+    reset_input_backend_probe();
     input_backend_state_ = {};
     input_backend_state_.configured_backend = config_.input.rawinput ? input::InputBackend::RawInput
                                                                      : input::InputBackend::Polling;
@@ -995,6 +1017,7 @@ void MenuApp::stop_menu_threads() {
 void MenuApp::restart_input_thread() {
     pressed_keys_.clear();
     reset_song_select_repeat();
+    reset_input_backend_probe();
     input_backend_state_ = {};
     input_backend_state_.configured_backend = config_.input.rawinput ? input::InputBackend::RawInput
                                                                      : input::InputBackend::Polling;
@@ -1114,6 +1137,102 @@ void MenuApp::rebuild_pressed_keys_from_polling_snapshot() {
     }
     if (pressed_keys_.find(song_select_repeat_key_) == pressed_keys_.end()) {
         reset_song_select_repeat();
+    }
+}
+
+void MenuApp::reset_input_backend_probe() {
+    input_backend_probe_.reset();
+    input_probe_polled_states_.clear();
+}
+
+bool MenuApp::fallback_menu_input_to_polling(std::string_view reason) {
+    if (!config_.input.rawinput) {
+        return false;
+    }
+
+    const auto snapshot = input_thread_.health_snapshot();
+    const std::string fallback_timestamp = utc_timestamp_compact_menu();
+    std::cerr << "[warn] " << reason
+              << " timestamp=" << fallback_timestamp
+              << " origin=" << input_fallback_origin_label(InputFallbackOrigin::Menu)
+              << " effective_backend=" << input_backend_name(snapshot.backend)
+              << " queue_drops=" << snapshot.dropped_count
+              << " queue_pushes=" << snapshot.queue_push_count
+              << std::endl;
+
+    reset_input_backend_probe();
+    input_thread_.shutdown();
+
+    input::InputThreadConfig fallback_config;
+    fallback_config.backend = input::InputBackend::Polling;
+    fallback_config.gate_policy = input::InputGatePolicy::ForegroundProcess;
+    fallback_config.raw_input.register_keyboard = false;
+    fallback_config.rawinput_polling_shadow = false;
+    fallback_config.polling_hz = config_.input.polling_hz;
+    fallback_config.key_state.debounce_window_ns =
+        std::max<int64_t>(0, static_cast<int64_t>(std::llround(config_.input.debounce_ms * 1'000'000.0)));
+
+    if (!input_thread_.initialize(fallback_config) || !input_thread_.start()) {
+        std::cerr << "[error] Failed to recover menu input with Polling; retrying configured backend."
+                  << std::endl;
+        restart_input_thread();
+        return false;
+    }
+
+    rebuild_pressed_keys_from_polling_snapshot();
+    input_backend_state_.configured_backend = input::InputBackend::RawInput;
+    input_backend_state_.effective_backend = input::InputBackend::Polling;
+    input_backend_state_.auto_fallback = true;
+    input_backend_state_.fallback_origin = InputFallbackOrigin::Menu;
+    input_backend_state_.fallback_reason = std::string(reason);
+    input_backend_state_.fallback_timestamp_utc = fallback_timestamp;
+    publish_snapshot();
+    return true;
+}
+
+void MenuApp::service_input_backend_health() {
+    if (!config_.input.rawinput || input_backend_state_.auto_fallback || screen_ == Screen::Gameplay) {
+        reset_input_backend_probe();
+        return;
+    }
+    if (!is_current_process_foreground_menu()) {
+        reset_input_backend_probe();
+        return;
+    }
+    if (!input_thread_.is_running()) {
+        static_cast<void>(fallback_menu_input_to_polling(
+            "RawInput menu thread stopped unexpectedly; switching to Polling"));
+        return;
+    }
+
+    const auto snapshot = input_thread_.health_snapshot();
+    if (snapshot.backend != input::InputBackend::RawInput) {
+        reset_input_backend_probe();
+        return;
+    }
+
+    const int64_t now_ns = timing::HighResClock::now_ns();
+    bool polled_change = false;
+    for (uint32_t keycode : current_menu_probe_keycodes()) {
+        const auto poll_vk = config::KeycodeMap::polling_vk_for_keycode(keycode);
+        if (!poll_vk.has_value()) {
+            continue;
+        }
+        const bool pressed = (GetAsyncKeyState(static_cast<int>(*poll_vk)) & 0x8000) != 0;
+        auto [it, inserted] = input_probe_polled_states_.emplace(keycode, pressed);
+        if (inserted || it->second == pressed) {
+            continue;
+        }
+        it->second = pressed;
+        polled_change = true;
+    }
+
+    if (polled_change) {
+        input_backend_probe_.note_polled_change(now_ns, snapshot);
+    }
+    if (input_backend_probe_.should_trigger_fallback(now_ns, snapshot)) {
+        static_cast<void>(fallback_menu_input_to_polling(
+            "RawInput inactive after a menu key changed; switching to Polling"));
     }
 }
 
@@ -1355,8 +1474,8 @@ void MenuApp::handle_input_event(const input::InputEvent& event) {
         case Screen::OptionsHub:
             handle_options_hub_input(event.keycode);
             break;
-        case Screen::EditStub:
-            handle_edit_stub_input(event.keycode);
+        case Screen::Multiplayer:
+            handle_multiplayer_input(event.keycode);
             break;
         case Screen::SongSelect:
             handle_song_select_input(event.keycode);
@@ -1434,6 +1553,9 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
                     case Screen::OptionsHub:
                         handle_options_hub_input(direction_key);
                         break;
+                    case Screen::Multiplayer:
+                        handle_multiplayer_input(direction_key);
+                        break;
                     case Screen::SongBrowser:
                         handle_song_browser_input(direction_key);
                         break;
@@ -1493,6 +1615,9 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
         return;
     }
     if (event.kind == render::MenuHitTargetKind::FileDrop) {
+        if (screen_ == Screen::Multiplayer) {
+            return;
+        }
         if (screen_ == Screen::SettingsSkins) {
             if (!import_skin_path_auto(event.path)) {
                 std::cerr << "[warn] Ignored dropped path (expected an osu!mania or LR2 skin folder, or a folder containing skins): "
@@ -1542,11 +1667,11 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
                 return;
             }
             if (event.part == render::MenuHitPart::Decrement) {
-                options_cursor_ = clamp_int(event.index - 1, 0, 7);
+                options_cursor_ = clamp_int(event.index - 1, 0, profile_setup::kOptionsHubRowCount - 1);
                 publish_snapshot();
                 return;
             }
-            options_cursor_ = clamp_int(event.index, 0, 7);
+            options_cursor_ = clamp_int(event.index, 0, profile_setup::kOptionsHubRowCount - 1);
             handle_options_hub_input(key_enter_);
             return;
         case render::MenuHitTargetKind::SongNavButton:
@@ -1639,11 +1764,13 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
     }
 
     if (screen_ == Screen::Result) {
-        if (event.index == 1) {
+        if (event.index == 1 && !last_game_was_multiplayer_) {
             (void)launch_last_result_replay();
         } else {
-            screen_ = Screen::SongSelect;
-            publish_snapshot();
+            // Keep mouse and keyboard result exits on the same path. The old
+            // direct SongSelect jump left multiplayer round flags behind, so
+            // the following single-player result was mistaken for a P2P one.
+            handle_result_input(key_enter_);
         }
         return;
     }
@@ -1654,7 +1781,10 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
 
     switch (screen_) {
         case Screen::QuickSetup:
-            settings_cursor_ = clamp_int(event.index, 0, 6);
+            settings_cursor_ = clamp_int(
+                event.index,
+                0,
+                profile_setup::row_count(profile_setup::entry(first_run_profile_)) - 1);
             handle_quick_setup_input(action_key);
             return;
         case Screen::SettingsAudio:
@@ -1690,8 +1820,9 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
             settings_cursor_ = clamp_int(event.index, 0, static_cast<int>(mode_mod_categories().size()));
             handle_mode_mods_input(action_key);
             return;
-        case Screen::EditStub:
-            handle_edit_stub_input(key_enter_);
+        case Screen::Multiplayer:
+            multiplayer_menu_.cursor = clamp_multiplayer_menu_cursor(event.index);
+            handle_multiplayer_input(action_key);
             return;
         case Screen::Result:
             handle_result_input(key_enter_);
@@ -1755,13 +1886,15 @@ void MenuApp::handle_title_input(uint32_t keycode) {
                 return;
             }
 #endif
+            reset_multiplayer_for_single_player();
             screen_ = Screen::SongSelect;
             song_select_focus_ = SongSelectFocus::SongList;
             publish_snapshot();
             return;
         }
         if (title_cursor_ == 1) {
-            screen_ = Screen::EditStub;
+            screen_ = Screen::Multiplayer;
+            multiplayer_menu_.cursor = 0;
             publish_snapshot();
             return;
         }
@@ -1781,7 +1914,8 @@ void MenuApp::handle_title_input(uint32_t keycode) {
 }
 
 void MenuApp::handle_quick_setup_input(uint32_t keycode) {
-    constexpr int item_count = 7;
+    const auto setup_entry = profile_setup::entry(first_run_profile_);
+    const int item_count = profile_setup::row_count(setup_entry);
     if (keycode == key_up_) {
         settings_cursor_ = clamp_int(settings_cursor_ - 1, 0, item_count - 1);
         publish_snapshot();
@@ -1840,17 +1974,18 @@ void MenuApp::handle_quick_setup_input(uint32_t keycode) {
     }
 
     if (keycode == key_enter_) {
-        if (settings_cursor_ == 5) {
+        const auto destination = profile_setup::enter_destination(setup_entry, settings_cursor_);
+        if (destination != profile_setup::Destination::Stay) {
             first_run_profile_ = false;
-            screen_ = Screen::SongSelect;
-            song_select_focus_ = SongSelectFocus::SongList;
-            persist_runtime_config();
-            publish_snapshot();
-            return;
-        }
-        if (settings_cursor_ == 6) {
-            first_run_profile_ = false;
-            screen_ = Screen::Title;
+            if (destination == profile_setup::Destination::SongSelect) {
+                screen_ = Screen::SongSelect;
+                song_select_focus_ = SongSelectFocus::SongList;
+            } else if (destination == profile_setup::Destination::Title) {
+                screen_ = Screen::Title;
+            } else {
+                screen_ = Screen::OptionsHub;
+                options_cursor_ = profile_setup::kOptionsProfileSetupRow;
+            }
             persist_runtime_config();
             publish_snapshot();
             return;
@@ -1858,15 +1993,21 @@ void MenuApp::handle_quick_setup_input(uint32_t keycode) {
     }
 
     if (keycode == key_escape_ || keycode == key_backspace_) {
+        const auto destination = profile_setup::cancel_destination(setup_entry);
         first_run_profile_ = false;
-        screen_ = Screen::Title;
+        if (destination == profile_setup::Destination::OptionsHub) {
+            screen_ = Screen::OptionsHub;
+            options_cursor_ = profile_setup::kOptionsProfileSetupRow;
+        } else {
+            screen_ = Screen::Title;
+        }
         persist_runtime_config();
         publish_snapshot();
     }
 }
 
 void MenuApp::handle_options_hub_input(uint32_t keycode) {
-    constexpr int item_count = 8;
+    constexpr int item_count = profile_setup::kOptionsHubRowCount;
     const Screen return_screen = submenu_return_screen_;
     if (keycode == key_up_) {
         options_cursor_ = clamp_int(options_cursor_ - 1, 0, item_count - 1);
@@ -1920,6 +2061,10 @@ void MenuApp::handle_options_hub_input(uint32_t keycode) {
             case 6:
                 open_keymap_screen(return_screen);
                 break;
+            case profile_setup::kOptionsProfileSetupRow:
+                screen_ = Screen::QuickSetup;
+                settings_cursor_ = 0;
+                break;
             default:
                 screen_ = return_screen;
                 break;
@@ -1930,13 +2075,6 @@ void MenuApp::handle_options_hub_input(uint32_t keycode) {
 
     if (keycode == key_escape_ || keycode == key_backspace_) {
         screen_ = return_screen;
-        publish_snapshot();
-    }
-}
-
-void MenuApp::handle_edit_stub_input(uint32_t keycode) {
-    if (keycode == key_enter_ || keycode == key_escape_ || keycode == key_backspace_) {
-        screen_ = Screen::Title;
         publish_snapshot();
     }
 }
@@ -2169,12 +2307,24 @@ void MenuApp::handle_song_select_input(uint32_t keycode) {
             publish_snapshot();
             return;
         }
+        if (multiplayer_selecting_chart_) {
+            multiplayer_selecting_chart_ = false;
+            screen_ = Screen::Multiplayer;
+            publish_snapshot();
+            return;
+        }
         screen_ = Screen::Title;
         publish_snapshot();
         return;
     }
     if (keycode == key_escape_) {
         song_select_search_active_ = false;
+        if (multiplayer_selecting_chart_) {
+            multiplayer_selecting_chart_ = false;
+            screen_ = Screen::Multiplayer;
+            publish_snapshot();
+            return;
+        }
         screen_ = Screen::Title;
         publish_snapshot();
     }
@@ -2334,6 +2484,38 @@ bool MenuApp::move_song_select_selection(int delta) {
 }
 
 void MenuApp::handle_result_input(uint32_t keycode) {
+    if (last_game_was_multiplayer_) {
+        if (keycode == key_enter_ || keycode == key_escape_ || keycode == key_backspace_) {
+            const network::PeerSessionSnapshot peer = peer_session_.snapshot();
+            const bool peer_finished =
+                peer.has_remote_score && peer.latest_remote_score.finished;
+            const bool disconnected = peer.state != network::PeerSessionState::Connected;
+            if (peer_finished || disconnected) {
+                peer_session_.reset_round();
+                const bool waiting_for_peer_exit =
+                    !disconnected && peer_session_.snapshot().round_active;
+                last_game_was_multiplayer_ = false;
+                multiplayer_waiting_for_result_exit_ = waiting_for_peer_exit;
+                multiplayer_status_message_ =
+                    disconnected
+                        ? ui_text("Peer disconnected. Reconnect for another match.",
+                                  "상대 연결이 끊겼습니다. 다시 대전하려면 재연결하세요.")
+                        : waiting_for_peer_exit
+                              ? ui_text("Waiting for the peer to leave the result screen.",
+                                        "상대가 리절트 화면에서 나가기를 기다리는 중입니다.")
+                        : ui_text("Round complete. Ready again for a rematch.",
+                                  "대전이 끝났습니다. 다시 준비하면 재대전할 수 있습니다.");
+            } else {
+                multiplayer_status_message_ =
+                    ui_text("Waiting for the peer to finish before rematch.",
+                            "재대전 전에 상대 플레이가 끝나기를 기다리는 중입니다.");
+            }
+            multiplayer_match_active_.store(false, std::memory_order_release);
+            screen_ = Screen::Multiplayer;
+            publish_snapshot();
+        }
+        return;
+    }
     if (keycode == key_left_) {
         if (!last_chart_path_.empty()) {
             launch_gameplay(last_chart_path_);
