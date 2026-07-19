@@ -37,7 +37,7 @@ TEST_CASE("SPSCQueue preserves order and drops when full") {
     CHECK(*third == 3);
 }
 
-TEST_CASE("ClockSync estimates slope and intercept for input to audio mapping") {
+TEST_CASE("ClockSync estimates slope and anchored input-to-audio mapping") {
     tenriff::timing::ClockSyncConfig config{};
     config.max_samples = 4;
     tenriff::timing::ClockSync sync(config);
@@ -148,4 +148,77 @@ TEST_CASE("ClockSync mapping follows playback head when non-zero padding exists"
     REQUIRE(mapped.has_value());
     CHECK(*mapped == playback_sample);
     CHECK(*mapped != write_cursor_samples);
+}
+
+TEST_CASE("ClockSync stays stable with multi-day QPC timestamps") {
+    constexpr int64_t qpc_base_ns = 4LL * 24LL * 60LL * 60LL * 1'000'000'000LL;
+    constexpr int64_t callback_step_ns = 2'902'494LL;
+    constexpr int64_t callback_step_samples = 128;
+    constexpr int sample_count = 512;
+
+    tenriff::timing::ClockSync sync;
+    for (int i = 0; i < sample_count; ++i) {
+        sync.add_sample(qpc_base_ns + static_cast<int64_t>(i) * callback_step_ns,
+                        static_cast<int64_t>(i) * callback_step_samples);
+    }
+
+    auto mapped = sync.input_to_audio_samples(
+        qpc_base_ns + static_cast<int64_t>(sample_count - 1) * callback_step_ns);
+    REQUIRE(mapped.has_value());
+
+    const int64_t expected = static_cast<int64_t>(sample_count - 1) * callback_step_samples;
+    CHECK(*mapped >= expected - 8);
+    CHECK(*mapped <= expected + 8);
+}
+
+TEST_CASE("ClockSync recovers after a sustained audio clock discontinuity") {
+    constexpr int64_t qpc_base_ns = 1'000'000'000LL;
+    constexpr int64_t callback_step_ns = 10'000'000LL;
+    constexpr int64_t callback_step_samples = 480;
+    constexpr int64_t audio_rebase_samples = 24'000;
+
+    tenriff::timing::ClockSync sync;
+    for (int i = 0; i < 16; ++i) {
+        sync.add_sample(qpc_base_ns + static_cast<int64_t>(i) * callback_step_ns,
+                        static_cast<int64_t>(i) * callback_step_samples);
+    }
+
+    for (int i = 16; i < 48; ++i) {
+        sync.add_sample(qpc_base_ns + static_cast<int64_t>(i) * callback_step_ns,
+                        static_cast<int64_t>(i) * callback_step_samples + audio_rebase_samples);
+    }
+
+    auto mapped = sync.input_to_audio_samples(qpc_base_ns + 47LL * callback_step_ns);
+    REQUIRE(mapped.has_value());
+
+    const int64_t expected = 47LL * callback_step_samples + audio_rebase_samples;
+    CHECK(*mapped >= expected - 8);
+    CHECK(*mapped <= expected + 8);
+}
+
+TEST_CASE("ClockSync keeps its fit across separated one-shot outliers") {
+    tenriff::timing::ClockSyncConfig config;
+    config.rebase_after_consecutive_outliers = 2;
+    tenriff::timing::ClockSync sync(config);
+
+    constexpr int64_t qpc_base_ns = 4LL * 24LL * 60LL * 60LL * 1'000'000'000LL;
+    constexpr int64_t callback_step_ns = 10'000'000LL;
+    constexpr int64_t callback_step_samples = 480;
+
+    for (int i = 0; i < 8; ++i) {
+        sync.add_sample(qpc_base_ns + static_cast<int64_t>(i) * callback_step_ns,
+                        static_cast<int64_t>(i) * callback_step_samples);
+    }
+
+    for (int i = 8; i < 24; i += 2) {
+        sync.add_sample(qpc_base_ns + static_cast<int64_t>(i) * callback_step_ns,
+                        1'000'000 + static_cast<int64_t>(i) * callback_step_samples);
+        sync.add_sample(qpc_base_ns + static_cast<int64_t>(i + 1) * callback_step_ns,
+                        static_cast<int64_t>(i + 1) * callback_step_samples);
+    }
+
+    auto mapped = sync.input_to_audio_samples(qpc_base_ns + 23LL * callback_step_ns);
+    REQUIRE(mapped.has_value());
+    CHECK(*mapped >= 23LL * callback_step_samples - 8);
+    CHECK(*mapped <= 23LL * callback_step_samples + 8);
 }

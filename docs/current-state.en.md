@@ -3,14 +3,14 @@
 This is the document that the next agent or any new contributor should read first. Its goal is to quickly answer: "what is this project now, where should I look, and what is still unverified?"
 
 ## Baseline
-- Current project version: `1.1.3`
-- Multiplayer preview r5 is a separate prerelease line and does not replace the existing `1.1.3 stable` release
+- Current project version: `1.1.4 stable`
+- Direct-IP multiplayer and the preview r5 input-backend lifecycle fixes are integrated into `1.1.4 stable`
 - Baseline companion document for follow-up work: `docs/baseline-1.1.2.en.md`
 - Windows GUI build is the main target
 - Linux exists only as a preview-level package at `Baepoks-Linuxs/TenRiff-0.5.0-linux-preview`
 - Default surface is BMS-first
 - `.osu` can be re-enabled as an option and supports 4K-10K
-- The `1.1.3 multiplayer preview r5` keeps RawInput primary while continuously running a bound-key polling shadow in the same `InputThread`; startup failure or an unexpected message-pump exit switches that producer to Polling without resetting its queue or pressed state
+- The `1.1.4 stable` runtime keeps RawInput primary while continuously running a bound-key polling shadow in the same `InputThread`; startup failure or an unexpected message-pump exit switches that producer to Polling without resetting its queue or pressed state
 - Menu input keeps the foreground process/root-window boundary. A RawInput startup failure, process-global registration-target loss, or hidden message-window exit switches it to Polling without waiting for a user key.
 - A confirmed fallback stays active across menu and subsequent gameplay sessions for the current app run without rewriting the profile; app restart or an explicit `Options -> Input Settings -> Backend` change retries it.
 
@@ -85,11 +85,13 @@ This is the document that the next agent or any new contributor should read firs
 - Judge:
   - default `GOOD` window is `75ms`
   - default `BAD` window is `340ms`
+  - if the pending same-lane note is already a `BAD` while the immediate next note is clearly `GOOD` or better, the pending note is recorded as a miss and the current press scores the next note instead of locking the stream into repeated `BAD`s
   - note-consuming failures (auto-miss, too-early consume, hold break / tail miss) stay `BAD`
   - very early non-consuming presses are handled as LR2-style `POOR` and are visible again in result / replay / UI paths
   - `POOR` preserves combo, stays out of score / accuracy totals, and uses dedicated `PR` gauge damage values
   - gauge modes support `EX-Hard / Hard / Normal / Easy`; all start at `100%` and fail immediately at `0%`
-  - live gameplay input uses the `ClockSync` estimate directly, and stale backlog compression now follows the `BAD` window again to match the `0.999` boundary
+  - live gameplay `ClockSync` uses centered anchor regression instead of large absolute Windows QPC values and automatically rebases after sustained clock discontinuities
+  - stale backlog is classified from QPC event age and the `BAD` window; a fresh input whose sample mapping drifts far from the current playback anchor falls back to that anchor instead of becoming permanently non-scoring catch-up
   - tail release timing applies only to osu hold and BMS `#LNMODE 2` charge notes
   - when two keyboards press the same key, the logical `Pressed` state remains active until the last input source releases it
 - Graphics:
@@ -109,7 +111,7 @@ This is the document that the next agent or any new contributor should read firs
   - `Esc` cancel during gameplay loading
 - Profile UX:
   - `Options -> Profile Setup` reopens the first-run setup surface for the active profile and saves language, audio, input, graphics, and keymap changes immediately
-- Direct-IP multiplayer preview:
+- Direct-IP multiplayer:
   - A joiner matches the host chart by exact hash and size across the active source and existing profile-local caches for `recent_song_sources`
   - It never scans the whole disk or starts a rescan, and cached paths outside their source root are rejected
   - The multiplayer-only gauge is a one-way shift: `Normal` at or below `33%` changes once to `Easy 100%`, never shifts back, and reaching `Easy 0%` gives that player GAME OVER
@@ -144,7 +146,7 @@ This is the document that the next agent or any new contributor should read firs
 
 ## Runtime / Packaging Rules
 - New user profiles are created automatically
-- The public P2P prerelease is `TenRiff 1.1.3 Multiplayer Preview r5`, separate from the stable 1.1.3 distribution asset
+- The current official P2P distribution line is `TenRiff 1.1.4 stable`
 - Distribution packages do not include `Songs`
 - Distribution packages include the runtime `Mainmusic/` assets used for menu BGM
 - Distribution updates include only built artifacts and required runtime assets

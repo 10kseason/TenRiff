@@ -921,11 +921,11 @@ void MenuApp::publish_snapshot() {
         render.gameplay.artist = last_chart_artist_;
         render.gameplay.bpm = last_chart_bpm_;
         populate_gameplay_render_data(render.gameplay);
-        if (last_chart_bpm_ > 0.0 && render.gameplay.rate > 0.0) {
-            render.gameplay.scroll_speed = (last_chart_bpm_ * render.gameplay.hispeed) / render.gameplay.rate;
-        } else {
-            render.gameplay.scroll_speed = 0.0;
-        }
+        render.gameplay.scroll_speed =
+            game::SpeedManager::scrollBps(last_chart_bpm_,
+                                          render.gameplay.rate,
+                                          render.gameplay.hispeed)
+                .value_or(0.0);
     } else if (screen_ == Screen::Result) {
         populate_result_render_data(render, current_track);
     } else {
@@ -1009,12 +1009,11 @@ void MenuApp::render_tick() {
             populate_gameplay_render_data(render_cache_.gameplay,
                                           &gameplay_motion_revision,
                                           &gameplay_text_revision);
-            if (render_cache_.gameplay.bpm > 0.0 && render_cache_.gameplay.rate > 0.0) {
-                render_cache_.gameplay.scroll_speed =
-                    (render_cache_.gameplay.bpm * render_cache_.gameplay.hispeed) / render_cache_.gameplay.rate;
-            } else {
-                render_cache_.gameplay.scroll_speed = 0.0;
-            }
+            render_cache_.gameplay.scroll_speed =
+                game::SpeedManager::scrollBps(render_cache_.gameplay.bpm,
+                                              render_cache_.gameplay.rate,
+                                              render_cache_.gameplay.hispeed)
+                    .value_or(0.0);
             rendered_gameplay_motion_version_ = gameplay_motion_revision;
             rendered_gameplay_text_version_ = gameplay_text_revision;
         }

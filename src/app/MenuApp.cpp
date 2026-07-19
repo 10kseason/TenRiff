@@ -42,6 +42,7 @@
 #include "app/ProfileSetupFlow.h"
 #include "app/RuntimeConfigMigration.h"
 #include "config/KeycodeMap.h"
+#include "game/SpeedManager.h"
 #include "gameplay/Replay.h"
 #include "render/GameplayMotion.h"
 #include "timing/HighResClock.h"

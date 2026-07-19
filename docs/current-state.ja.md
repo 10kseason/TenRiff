@@ -3,14 +3,14 @@
 この文書は、次のエージェントや新しい作業者が最初に読むべき current-state 文書です。目的は、「このプロジェクトは今どういう状態で、どこを見ればよく、何がまだ未検証か」を素早く把握できるようにすることです。
 
 ## Baseline
-- 現在のプロジェクト版は `1.1.3`
-- multiplayer preview r5 は既存の `1.1.3 stable` を置き換えない独立 prerelease ライン
+- 現在のプロジェクト版は `1.1.4 stable`
+- direct-IP multiplayer と preview r5 の input-backend lifecycle 修正は `1.1.4 stable` に統合
 - 後続作業の基準文書は `docs/baseline-1.1.2.ja.md`
 - Windows GUI ビルドが主対象
 - Linux は `Baepoks-Linuxs/TenRiff-0.5.0-linux-preview` レベルの preview のみ
 - 既定サーフェスは BMS-first
 - `.osu` はオプションで再有効化でき、4K-10K をサポート
-- `1.1.3 multiplayer preview r5` の gameplay 入力は RawInput を優先しつつ、同じ `InputThread` で bound-key polling shadow を常時動作させる。起動失敗または message pump の予期しない終了時も queue / pressed state を reset せず、その producer を Polling に切り替える
+- `1.1.4 stable` の gameplay 入力は RawInput を優先しつつ、同じ `InputThread` で bound-key polling shadow を常時動作させる。起動失敗または message pump の予期しない終了時も queue / pressed state を reset せず、その producer を Polling に切り替える
 - menu 入力は従来の foreground process/root-window 境界を維持する。RawInput の起動失敗、process-global 登録先の消失、hidden message window の終了を検知すると、ユーザー入力を待たず Polling に切り替える。
 - 確認済み fallback は profile を書き換えず、そのアプリ実行中の menu と後続 gameplay に維持する。アプリ再起動または `Options -> Input Settings -> Backend` の明示変更で再試行する。
 
@@ -85,11 +85,13 @@
 - Judge:
   - 既定 `GOOD` window は `75ms`
   - 既定 `BAD` window は `340ms`
+  - 同一 lane の pending note がすでに `BAD` で、直後の note が明確に `GOOD` 以上なら、pending note を miss として記録し、現在の press を次の note に割り当てて連続 `BAD` lock を防ぐ
   - note-consuming failure（auto-miss、早すぎる消費、hold break / tail miss）は `BAD`
   - かなり早い non-consuming press は LR2 スタイル `POOR` として扱われ、result / replay / UI に再表示される
   - `POOR` は combo を切らず、score / accuracy には入らず、専用 `PR` gauge damage を使う
   - gauge mode は `EX-Hard / Hard / Normal / Easy` をサポートし、すべて `100%` で開始して `0%` で即失敗する
-  - live gameplay input は `ClockSync` 推定値を直接使い、stale backlog compression は再び `BAD` window 基準で動く
+  - live gameplay の `ClockSync` は大きな Windows QPC 絶対値ではなく centered anchor regression を使い、継続する clock discontinuity 後に自動 rebase する
+  - stale backlog は QPC event age と `BAD` window で判定し、fresh input の sample mapping が現在の playback anchor から大きくずれた場合は anchor に fallback する
   - tail release timing は osu hold と BMS `#LNMODE 2` charge note のみに適用
   - 2 台のキーボードが同じキーを押しても、最後の入力ソースが離すまで論理 `Pressed` は維持される
 - Graphics:
@@ -109,7 +111,7 @@
   - gameplay loading 中の `Esc` cancel
 - Profile UX:
   - `Options -> Profile Setup` から現在の profile の初回 setup 画面を開き直し、language / audio / input / graphics / keymap を即時保存できる
-- Direct-IP multiplayer preview:
+- Direct-IP multiplayer:
   - joiner は active source と `recent_song_sources` の既存 profile-local cache だけを対象に、host chart の hash + size を照合する
   - 全 disk scan や自動 rescan は行わず、source root 外を指す cache path は拒否する
 
@@ -140,7 +142,7 @@
 
 ## Runtime / Packaging Rules
 - 新しい user profile は自動生成される
-- 公開 P2P prerelease は `TenRiff 1.1.3 Multiplayer Preview r5` で、stable 1.1.3 の配布 asset とは分離する
+- 現在の正式 P2P 配布ラインは `TenRiff 1.1.4 stable`
 - distribution package には `Songs` を含めない
 - distribution package には menu BGM 用の `Mainmusic/` runtime asset を含める
 - distribution 更新には built artifact と必要な runtime asset だけを含める

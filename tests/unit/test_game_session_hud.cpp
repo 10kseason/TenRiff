@@ -213,6 +213,18 @@ TEST_CASE("startup input anchor linearly maps nearby timestamps and clamps befor
     CHECK(*clamped == 0);
 }
 
+TEST_CASE("startup input anchor keeps callback deltas at multi-day QPC values") {
+    tenriff::app::StartupInputTimingAnchor anchor;
+    anchor.playback_sample = 1'000;
+    anchor.callback_time_ns = 4LL * 24LL * 60LL * 60LL * 1'000'000'000LL;
+    anchor.valid = true;
+
+    const auto mapped = tenriff::app::estimate_input_sample_from_startup_anchor(
+        anchor.callback_time_ns + 10'000'000LL, anchor, 44'100);
+    REQUIRE(mapped.has_value());
+    CHECK(*mapped == 1'441);
+}
+
 TEST_CASE("startup gameplay input sample prefers clock sync estimate over startup anchor") {
     tenriff::app::StartupInputTimingAnchor anchor;
     anchor.playback_sample = 1'000;
@@ -304,4 +316,35 @@ TEST_CASE("gameplay input backlog stale window follows 0.999 bad-window logic") 
     CHECK(tenriff::app::gameplay_input_backlog_stale_window_ms(80.0) == doctest::Approx(96.0));
     CHECK(tenriff::app::gameplay_input_backlog_stale_window_ms(96.0) == doctest::Approx(96.0));
     CHECK(tenriff::app::gameplay_input_backlog_stale_window_ms(140.0) == doctest::Approx(140.0));
+}
+
+TEST_CASE("gameplay input backlog uses QPC event age instead of the audio write cursor") {
+    constexpr int64_t callback_time_ns = 10'000'000'000LL;
+
+    CHECK_FALSE(tenriff::app::gameplay_input_event_is_stale(
+        callback_time_ns - 20'000'000LL, callback_time_ns, 80.0));
+    CHECK(tenriff::app::gameplay_input_event_is_stale(
+        callback_time_ns - 150'000'000LL, callback_time_ns, 80.0));
+    CHECK_FALSE(tenriff::app::gameplay_input_event_is_stale(
+        callback_time_ns + 1'000'000LL, callback_time_ns, 80.0));
+}
+
+TEST_CASE("fresh gameplay input recovers from a drifted ClockSync estimate") {
+    tenriff::app::StartupInputTimingAnchor anchor;
+    anchor.playback_sample = 1'000;
+    anchor.callback_time_ns = 10'000'000'000LL;
+    anchor.valid = true;
+
+    const int64_t input_time_ns = anchor.callback_time_ns + 10'000'000LL;
+    const auto anchor_sample =
+        tenriff::app::estimate_input_sample_from_startup_anchor(input_time_ns, anchor, 1'000);
+    REQUIRE(anchor_sample.has_value());
+    REQUIRE(*anchor_sample == 1'010);
+
+    CHECK(tenriff::app::reconcile_fresh_gameplay_input_sample(
+              500, anchor_sample, false, 340.0, 1'000) == 1'010);
+    CHECK(tenriff::app::reconcile_fresh_gameplay_input_sample(
+              900, anchor_sample, false, 340.0, 1'000) == 900);
+    CHECK(tenriff::app::reconcile_fresh_gameplay_input_sample(
+              500, anchor_sample, true, 340.0, 1'000) == 500);
 }

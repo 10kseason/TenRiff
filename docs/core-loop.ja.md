@@ -20,6 +20,7 @@
   - `rate` 適用時は `t' = t / rate` で schedule をスケーリング
 - `gameplay/GameplayEngine.*`
   - judgement windows (`PG / GR / GD / BD`) と 30ms mask を適用
+  - 同一 lane の古い note がすでに BD で、直後の note が明確に GD 以上なら、古い note を miss として記録し、現在の press を次の note に割り当てて BAD chain を防ぐ
   - POOR event に lane mask を適用
   - **Hold rule**: 早離しは BAD
   - **Hold tail rule**: osu!mania hold と BMS `#LNMODE 2` charge note のみ通常 judgement window を使って release timing を評価（head/tail 50:50）

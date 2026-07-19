@@ -20,6 +20,7 @@
   - `rate` 적용 시 스케줄을 `t' = t / rate`로 스케일
 - `gameplay/GameplayEngine.*`
   - 판정 윈도우( PG/GR/GD/BD )와 마스크(30ms) 적용
+  - 넓은 BD 창 안의 이전 노트가 다음 정확 입력을 가로채지 않도록, 바로 다음 노트가 GD 이상으로 명확한 경우 이전 노트를 miss 처리하고 현재 입력을 다음 노트에 배정
   - POOR 발생 시 레인 마스크 적용
   - **Hold 규칙**: 조기 릴리즈는 BAD
   - **Hold Tail 규칙**: osu!mania hold와 BMS `#LNMODE 2` charge note만 릴리즈 타이밍을 일반 판정 윈도우로 평가(헤드/테일 50:50)

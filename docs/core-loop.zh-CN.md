@@ -20,6 +20,7 @@
   - 在应用 `rate` 时，把时间表按 `t' = t / rate` 进行缩放
 - `gameplay/GameplayEngine.*`
   - 应用判定窗口（PG/GR/GD/BD）与 mask（30ms）
+  - 当同一 lane 的旧 note 已经是 BD，而紧接的下一 note 明确为 GD 或更高时，把旧 note 记为 miss，并将当前按键分配给下一 note，避免连续 BAD
   - POOR 发生时应用 lane mask
   - **Hold 规则**：过早 release 判定为 BAD
   - **Hold Tail 规则**：只有 osu!mania hold 与 BMS `#LNMODE 2` charge note 才把 release timing 当作普通判定窗口处理（head/tail 50:50）

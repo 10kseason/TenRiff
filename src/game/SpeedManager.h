@@ -18,10 +18,17 @@ public:
     // Judge windows stay in real playback milliseconds; chart/audio scheduling already encodes the rate change.
     [[nodiscard]] double scaleJudgeWindow(double base_window_ms) const noexcept;
 
-    // Effective scroll speed used for UI hints (BPM * HS / rate).
+    // Visual scrolling is owned by Hi-Speed. Rate already changes chart/audio scheduling.
+    [[nodiscard]] static std::optional<double> visualScrollScale(double rate, double hi_speed) noexcept;
+    [[nodiscard]] static std::optional<double> scrollBps(double bpm,
+                                                         double rate,
+                                                         double hi_speed) noexcept;
+
+    // Effective scroll speed used for UI hints (BPM * HS).
     [[nodiscard]] std::optional<double> scrollBps(double bpm) const noexcept;
 
     // Recommend a Hi-Speed multiplier to reach the desired scroll speed at the given BPM.
+    // The recommendation stays stable when playback Rate changes.
     [[nodiscard]] std::optional<double> recommendHiSpeed(double bpm, double target_scroll_bps) const noexcept;
 
 private:

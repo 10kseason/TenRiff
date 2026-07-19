@@ -115,6 +115,7 @@ If this is not the layout you want, you can change it in `Options > Keymap`.
 - `F9`: save a screenshot of the current screen
 
 Hi-Speed changes only the visual scroll speed; it does not change the judgement timing itself.
+Rate changes playback tempo and chart scheduling, but it does not change visual scroll speed at the same Hi-Speed.
 
 ## 8. How to Read the HUD
 
