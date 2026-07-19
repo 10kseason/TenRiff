@@ -41,11 +41,12 @@ profile が存在しない場合は初回起動時に自動生成されます。
   - `polling | rawinput`
   - 現在の `1.1.3` ラインの既定値は `rawinput`
   - 保存時に `polling` へ強制正規化されず、保存値はそのまま維持される
-  - gameplay セッションは `rawinput=true` の場合 RawInput を優先し、session-local bound-key polling fallback で RawInput edge の取りこぼしを補正する
+  - `1.1.3` preview の gameplay は `rawinput=true` の場合、同じ `InputThread` 内で RawInput と bound-key polling shadow を併用する
+  - 初期化/起動失敗または RawInput message pump の予期しない終了時は、queue / pressed state を reset せず同じ producer thread を Polling に切り替える
 - `rawinput` (bool)
   - `backend` と並ぶ便宜的な保存フラグ
   - 現在の `1.1.3` ラインではそのまま保存/復元される
-  - `true` の場合 menu/gameplay は RawInput を優先しつつ、入力認識維持のため polling fallback を許可する
+  - `true` の場合 menu/gameplay は RawInput を優先し、gameplay は note/control key の polling shadow を常時使って runtime の入力停止を補う
 - `use_qpc` (bool)
 - `grab` (bool)
   - 現状では Linux preview 向け設定

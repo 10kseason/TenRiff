@@ -66,6 +66,8 @@ add_library(tenriff_core
     src/gameplay/ModeSettings.cpp
     src/gameplay/ResultStats.cpp
     src/gameplay/Replay.cpp
+    src/network/PeerProtocol.cpp
+    src/network/PeerSession.cpp
     src/app/BmsGameplayBuilder.cpp
     src/app/BmsKeyConverter.cpp
     src/app/ChartLoader.cpp
@@ -76,6 +78,7 @@ add_library(tenriff_core
     src/app/Lr2Skin.cpp
     src/app/MenuRecordUtils.cpp
     src/app/MenuSongUtils.cpp
+    src/app/MultiplayerChartSearch.cpp
     src/app/ModeManager.cpp
     src/app/ModeResolver.cpp
     src/app/OsuHitsoundResolver.cpp
@@ -99,6 +102,10 @@ target_link_libraries(tenriff_core
         tenriff_game
         tenriff_runtime
 )
+
+if(WIN32)
+    target_link_libraries(tenriff_core PUBLIC ws2_32)
+endif()
 
 add_library(tenriff_bms_key_converter_core
     src/app/BmsKeyConverter.cpp
@@ -153,6 +160,7 @@ if(WIN32)
         src/app/MenuMusicController.cpp
         src/app/GameSession.cpp
         src/app/MenuApp.cpp
+        src/app/MenuAppMultiplayer.cpp
         src/app/MenuAppDeviceSettings.cpp
         src/app/MenuAppKeymap.cpp
         src/app/MenuAppRecords.cpp
@@ -320,11 +328,15 @@ if(TENRIFF_ENABLE_TESTS)
         tests/unit/test_song_select_state.cpp
         tests/unit/test_config.cpp
         tests/unit/test_input_backend_status.cpp
+        tests/unit/test_profile_setup_flow.cpp
         tests/unit/test_lr2_skin.cpp
         tests/unit/test_osu_skin.cpp
         tests/unit/test_game_session_hud.cpp
         tests/unit/test_graphics_timing.cpp
         tests/unit/test_render_performance.cpp
+        tests/unit/test_peer_protocol.cpp
+        tests/unit/test_peer_session.cpp
+        tests/unit/test_multiplayer_menu_state.cpp
         tests/unit/test_bms_key_converter.cpp
         tests/unit/test_utf8_compat.cpp
     )

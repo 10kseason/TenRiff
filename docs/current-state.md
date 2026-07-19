@@ -4,14 +4,14 @@
 
 ## Baseline
 - 현재 프로젝트 버전은 `1.1.3`
-- 현재 `1.1.3` 라인은 `1.1.2 final stable` 기준선 위에 쌓은 후속 버전
+- 현재 멀티플레이 preview r4는 기존 `1.1.3 stable`과 분리된 prerelease 라인
 - 후속 작업의 기준선 문서는 `docs/baseline-1.1.2.md`
 - Windows GUI 빌드가 메인 타깃
 - Linux는 `Baepoks-Linuxs/TenRiff-0.5.0-linux-preview` 수준의 preview만 존재
 - 기본 표면은 BMS-first
 - `.osu`는 옵션으로 다시 활성화 가능하며 4K~10K를 지원
-- `1.1.3` 릴리스 라인은 `1.0.9`의 gameplay playback-head 입력 타이밍 보정을 유지하면서, gameplay live 입력 캡처는 저장된 RawInput 설정을 우선 사용하고 세션 로컬 bound-key polling fallback으로 RawInput edge 누락을 보정함
-- 같은 `1.1.3` 라인에서 메뉴 입력은 기존 foreground process/root-window 경계를 유지하고, RawInput 시작 실패 시 Polling fallback으로 재시도하지만 profile 입력 설정은 영구 rewrite하지 않고 저장된 backend 설정을 그대로 보존
+- `1.1.3 multiplayer preview r4`의 gameplay live 입력은 저장된 RawInput을 우선하면서 같은 `InputThread`의 bound-key polling shadow를 항상 유지하고, 시작 실패뿐 아니라 message pump의 예기치 않은 종료도 queue/state reset 없이 현재 producer thread에서 Polling으로 전환함
+- 메뉴 입력은 기존 foreground process/root-window 경계를 유지하고, RawInput 시작 실패뿐 아니라 런타임 스레드/이벤트 전달 정지도 감지해 현재 메뉴 세션만 Polling으로 fallback하며 profile의 backend 설정은 그대로 보존
 
 ## Core Architecture
 - `MenuApp`
@@ -26,7 +26,7 @@
   - 오디오 마스터 클럭과 믹싱 담당
 - `InputThread`
   - RawInput/폴링 입력 수집 후 큐로 전달
-  - gameplay RawInput thread 내부 polling shadow는 끄고, `GameSession` 쪽 bound-key polling fallback이 누락된 edge를 보정함
+  - gameplay는 RawInput과 bound-key polling shadow를 단일 상태 추적기에서 dedupe한 logical edge로 큐에 전달하며, `GameSession`은 이를 source 단위로 다시 필터링하지 않음
 - `RenderThread` + `MenuWindow`
   - D3D11 + Direct2D/DirectWrite 기반 메뉴/인게임 HUD 렌더
   - 최근 유지보수 리팩터에서 대형 구현 파일을 조각 파일로 분리하는 방향으로 정리 중
@@ -111,6 +111,24 @@
   - Song Select indexing progress 표시
   - gameplay chart loading progress 표시
   - gameplay loading 중 `Esc` cancel
+- Profile UX:
+  - `Options -> Profile Setup`에서 현재 프로필의 언어, 오디오, 입력 백엔드, 그래픽, 키맵을 첫 실행용 Quick Setup 화면으로 다시 조정하고 즉시 저장
+- 직접 IP 멀티플레이:
+  - Windows에서 1 호스트 + 1 참가자 TCP 연결, 기본 `27300/TCP`
+  - 호스트만 선곡하며 참가자는 현재 source와 profile의 `recent_song_sources`에 기록된 폴더의 기존 캐시를 순서대로 열어 hash+size가 일치하는 차트를 자동 선택
+  - 최근 source 검색은 profile-local cache만 읽고 전체 디스크 탐색이나 자동 재인덱싱은 하지 않으며, 캐시의 source 밖 경로는 거부
+  - Options 진입 시 Ready 해제, 양쪽 chart load 완료 후 시작 barrier
+  - 멀티 전용 게이지는 `Normal`이 `33%` 이하가 되면 `Easy 100%`로 한 번만 시프트하고, Easy에서는 되돌아가지 않으며 `0%`에서 해당 플레이어가 Game Over
+  - 플레이 중 상대 점수/콤보/게이지/상태 HUD와 로컬 관점 score-gap bar를 표시하며, `-10,000 / 0 / +10,000`을 `LOSS 끝 / 중앙 / WIN 끝`으로 clamp
+  - score-gap 끝단은 표시 전용이며 경기 종료나 결과 확정 조건이 아님
+  - 한쪽이 먼저 Game Over되면 다른 플레이어는 계속 진행하고, 사망한 쪽은 상대의 aggregate 점수/콤보/게이지/상태를 보며 기다린 뒤 양쪽 종료 후 비교 결과로 이동
+  - peer protocol은 정확한 lane input이나 note별 판정/hold state를 전송하지 않으므로 상대 플레이필드는 추측 렌더하지 않음
+  - protocol v2의 모든 경기 프레임에 round nonce를 붙이고 RoundCancel/ACK 순서를 보장해 지연 패킷과 Ready/Launch 교차를 연결 해제 없이 정리
+  - 전용 RoundReset으로 양쪽이 모두 Result를 나가기 전에는 다음 선곡/Ready/Options를 막고 상대 결과를 보존
+  - heartbeat RTT의 절반을 시작 카운트다운에 보정해 직접 IP 연결의 양쪽 시작 시점 오차를 줄임
+  - Rate 1.0, 원본 키 수, `Normal <= 33% -> Easy 100%` 단방향 게이지, 기본 판정, Random/Mods/Assist off를 세션에만 적용
+  - 차트 전송, NAT traversal, 릴레이/매치메이킹, 암호화/인증, 안티치트, 자동 재접속은 미지원
+  - 상세 사용/보안 경계는 `docs/multiplayer.md`
 
 ## Song Indexing Model
 - Song source 전환 시 profile-local `profiles/<name>/.tenriff/song-index/<source-hash>.json` 캐시를 먼저 읽음
@@ -129,7 +147,7 @@
   - 인덱싱용 BMS parse는 asset map/불필요 header/비필수 command를 생략하는 저메모리 경로 사용
   - cache save는 giant JSON tree 대신 streaming write
 - 실측:
-  - `D:\Stellaverse (2025-12-14)` safe full-index 기준 `46,636` candidate / `46,602` indexed entries
+  - 46k-chart Windows benchmark library safe full-index 기준 `46,636` candidate / `46,602` indexed entries
   - peak memory 약 `working set 453MB`, `private 524MB`
   - 같은 라이브러리 1024-chart sample에서 fast profile throughput은 safe 대비 약 `2.05x`
 - cache schema:
@@ -139,12 +157,12 @@
 
 ## Runtime / Packaging Rules
 - 새 사용자 프로필은 자동 생성
-- 마지막으로 스테이징된 배포 패키지는 `Baepoks/TenRiff-1.1.2`
+- 이번 공개 P2P prerelease는 `TenRiff 1.1.3 Multiplayer Preview r4`이며 기존 stable 1.1.3 배포 자산과 분리
 - 배포 패키지에는 `Songs`를 넣지 않음
 - 배포 패키지는 메뉴 BGM용 `Mainmusic/` 런타임 자산을 함께 포함
-- 배포 업데이트 요청 시 built artifacts만 `Baepoks/`에 넣는 규칙
-- source-only/public handoff 요청 시 먼저 include/exclude 리스트를 작성하는 것이 사용자 선호
-- 마지막으로 스테이징된 공개 소스 패키지는 `opensource-Tenriff-source/TenRiff-1.1.2-source`처럼 버전별로 별도 스테이징
+- 배포 업데이트에는 built artifacts와 필요한 런타임 자산만 포함
+- source-only/public handoff 전에는 include/exclude 목록을 먼저 확정
+- preview source branch와 tag는 stable 릴리스와 분리해 버전별로 관리
 - 공개 소스 패키지를 갱신할 때는 문서만 맞추는 것으로 끝내지 않고, 스테이징된 소스 패키지 폴더 자체에서 standalone configure/build/test가 되는지까지 확인하는 규칙
 
 ## Config / Profile Reality
@@ -159,7 +177,10 @@
 
 ## High-Value Files
 - `src/app/MenuApp.cpp`
+- `src/app/MenuAppMultiplayer.cpp`
 - `src/app/GameSession.cpp`
+- `src/network/PeerProtocol.*`
+- `src/network/PeerSession.*`
 - `src/app/SongIndex.cpp`
 - `src/app/SongIndexerThread.cpp`
 - `src/render/MenuWindow.cpp`
@@ -174,9 +195,9 @@
 - `cmake --build build --config Release --target bms_parser_tests`
 - `cmake --build build --config Release --target bms_realworld_smoke`
 - `ctest --test-dir build -C Release --output-on-failure -R bms_parser_tests`
-- `cmake -S opensource-Tenriff-source/TenRiff-1.1.2-source -B opensource-Tenriff-source/TenRiff-1.1.2-source/build-check -G "Visual Studio 17 2022" -A x64`
-- `cmake --build opensource-Tenriff-source/TenRiff-1.1.2-source/build-check --config Release --target bms_parser_tests`
-- `opensource-Tenriff-source/TenRiff-1.1.2-source/build-check/Release/bms_parser_tests.exe`
+- `cmake -S . -B build-check -G "Visual Studio 17 2022" -A x64`
+- `cmake --build build-check --config Release --target bms_parser_tests`
+- `.\build-check\Release\bms_parser_tests.exe`
 
 ## Still Manual-Validation Heavy
 - renderer layout 변경 뒤에는 `docs/ui-audit-checklist.md` 기준으로 `1080p`, `720p windowed`, `Performance HUD on/off` 전수 확인 필요
@@ -186,6 +207,7 @@
 - OBS/Discord/Game Bar와 graphics live-apply 공존 확인
 - drag-and-drop / external Korean-path sources GUI 확인
 - 4K~10K `.osu` 실기 keymap 분리 확인
+- 서로 다른 두 Windows PC/LAN 및 공인 IP 포트 포워딩 환경의 P2P 실기 확인
 - Linux는 아직 실제 실행판이 아님
 
 ## Best Next Read

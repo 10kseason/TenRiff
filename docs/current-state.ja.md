@@ -4,14 +4,14 @@
 
 ## Baseline
 - 現在のプロジェクト版は `1.1.3`
-- `1.1.3` ラインは `1.1.2 final stable` ベースラインの上に積み重ねた後続バージョン
+- multiplayer preview r4 は既存の `1.1.3 stable` を置き換えない独立 prerelease ライン
 - 後続作業の基準文書は `docs/baseline-1.1.2.ja.md`
 - Windows GUI ビルドが主対象
 - Linux は `Baepoks-Linuxs/TenRiff-0.5.0-linux-preview` レベルの preview のみ
 - 既定サーフェスは BMS-first
 - `.osu` はオプションで再有効化でき、4K-10K をサポート
-- `1.1.3` リリースラインは `1.0.9` の gameplay playback-head 入力タイミング補正を維持しつつ、live gameplay 入力は保存済み RawInput 設定を優先し、session-local bound-key polling fallback で RawInput edge の取りこぼしを補正する
-- 同じ `1.1.3` ラインで、menu 入力は従来の foreground process/root-window 境界を維持し、RawInput 起動失敗時は Polling fallback で再試行するが、profile 入力設定の永続 rewrite はせず保存済み backend 設定を保持する
+- `1.1.3 multiplayer preview r4` の gameplay 入力は RawInput を優先しつつ、同じ `InputThread` で bound-key polling shadow を常時動作させる。起動失敗または message pump の予期しない終了時も queue / pressed state を reset せず、その producer を Polling に切り替える
+- menu 入力は従来の foreground process/root-window 境界を維持し、RawInput の起動失敗または runtime の thread/event 配信停止を検知すると現在の menu session だけ Polling に fallback し、保存済み profile backend 設定は保持する
 
 ## Core Architecture
 - `MenuApp`
@@ -26,7 +26,7 @@
   - オーディオのマスタークロックとミキシングを担当
 - `InputThread`
   - RawInput / polling 入力を収集し、キューへ渡す
-  - gameplay では RawInput thread 内部の polling shadow を切り、`GameSession` 側の bound-key polling fallback が missed edge を補正する
+  - gameplay は RawInput と bound-key polling shadow を単一の `InputThread` state tracker で dedupeし、`GameSession` では logical edge を source 単位で再フィルタリングしない
 - `RenderThread` + `MenuWindow`
   - D3D11 + Direct2D/DirectWrite ベースの menu / gameplay HUD レンダリング
   - 最近の保守リファクタでは大きな実装ファイルを細分化している
@@ -106,6 +106,11 @@
   - Song Select indexing progress 表示
   - gameplay chart-loading progress 表示
   - gameplay loading 中の `Esc` cancel
+- Profile UX:
+  - `Options -> Profile Setup` から現在の profile の初回 setup 画面を開き直し、language / audio / input / graphics / keymap を即時保存できる
+- Direct-IP multiplayer preview:
+  - joiner は active source と `recent_song_sources` の既存 profile-local cache だけを対象に、host chart の hash + size を照合する
+  - 全 disk scan や自動 rescan は行わず、source root 外を指す cache path は拒否する
 
 ## Song Indexing Model
 - song source が変わると、まず `profiles/<name>/.tenriff/song-index/<source-hash>.json` の profile-local cache を読む
@@ -124,7 +129,7 @@
   - indexing 用 BMS parse は asset map / 不要 header / 非必須 command を省く低メモリ経路を使用
   - cache save は giant JSON tree ではなく streaming write
 - 実測:
-  - `D:\Stellaverse (2025-12-14)` の safe full-index で `46,636` candidates / `46,602` indexed entries
+  - 46k-chart Windows benchmark library の safe full-index で `46,636` candidates / `46,602` indexed entries
   - peak memory はおよそ `working set 453MB`, `private 524MB`
   - 同ライブラリの 1024-chart sample では fast profile throughput が safe 比で約 `2.05x`
 - Cache schema:
@@ -134,12 +139,12 @@
 
 ## Runtime / Packaging Rules
 - 新しい user profile は自動生成される
-- 最後に staged された distribution package は `Baepoks/TenRiff-1.1.2`
+- 公開 P2P prerelease は `TenRiff 1.1.3 Multiplayer Preview r4` で、stable 1.1.3 の配布 asset とは分離する
 - distribution package には `Songs` を含めない
 - distribution package には menu BGM 用の `Mainmusic/` runtime asset を含める
-- distribution build 更新時は built artifact だけを `Baepoks/` に入れる
-- source-only / public handoff が要求された場合、まず include/exclude リストを書くのがユーザーの好み
-- 最後に staged された public source package は `opensource-Tenriff-source/TenRiff-1.1.2-source` のようにバージョン別に分離される
+- distribution 更新には built artifact と必要な runtime asset だけを含める
+- source-only / public handoff 前に include/exclude リストを確定する
+- preview source branch と tag は stable release と分離して管理する
 - public source package 更新時は docs/files を揃えるだけで終えず、その staged folder 自体で standalone configure/build/test が通ることも確認する
 
 ## Config / Profile Reality
@@ -169,9 +174,9 @@
 - `cmake --build build --config Release --target bms_parser_tests`
 - `cmake --build build --config Release --target bms_realworld_smoke`
 - `ctest --test-dir build -C Release --output-on-failure -R bms_parser_tests`
-- `cmake -S opensource-Tenriff-source/TenRiff-1.1.2-source -B opensource-Tenriff-source/TenRiff-1.1.2-source/build-check -G "Visual Studio 17 2022" -A x64`
-- `cmake --build opensource-Tenriff-source/TenRiff-1.1.2-source/build-check --config Release --target bms_parser_tests`
-- `opensource-Tenriff-source/TenRiff-1.1.2-source/build-check/Release/bms_parser_tests.exe`
+- `cmake -S . -B build-check -G "Visual Studio 17 2022" -A x64`
+- `cmake --build build-check --config Release --target bms_parser_tests`
+- `.\build-check\Release\bms_parser_tests.exe`
 
 ## Still Manual-Validation Heavy
 - 実際の CJK-heavy library での Song Select fast-scroll crash 再現

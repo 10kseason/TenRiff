@@ -36,8 +36,25 @@ std::optional<InputEvent> KeyStateTracker::process(const InputEvent& event) {
         return logical_event;
     }
 
-    auto& source_state = key_state.sources[event.device_id];
     const auto now_ns = event.input_time_ns;
+
+    // Polling is an aggregate physical mirror. If it observed the press first,
+    // move that single logical ownership to the concrete RawInput source when
+    // the delayed raw edge arrives. Counting both sources makes the raw release
+    // leave the key logically pressed and swallows the next fast jack.
+    if (event.device_id != kPollingAggregateDeviceId && event.state == InputState::Pressed) {
+        auto polling = key_state.sources.find(kPollingAggregateDeviceId);
+        if (polling != key_state.sources.end() && polling->second.state == InputState::Pressed) {
+            polling->second.state = InputState::Released;
+            polling->second.last_event_time_ns = now_ns;
+            polling->second.has_event = true;
+            if (key_state.pressed_source_count > 0) {
+                --key_state.pressed_source_count;
+            }
+        }
+    }
+
+    auto& source_state = key_state.sources[event.device_id];
 
     if (source_state.state == event.state) {
         return std::nullopt;
@@ -45,7 +62,9 @@ std::optional<InputEvent> KeyStateTracker::process(const InputEvent& event) {
 
     // A polling press that agrees with RawInput should not keep the key down after RawInput releases.
     if (event.device_id == kPollingAggregateDeviceId && event.state == InputState::Pressed && was_pressed) {
-        source_state.state = InputState::Pressed;
+        // Keep the aggregate source non-owning. Its later release can still
+        // clear stale raw sources through the dedicated release path above.
+        source_state.state = InputState::Released;
         source_state.last_event_time_ns = now_ns;
         source_state.has_event = true;
         return std::nullopt;

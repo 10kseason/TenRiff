@@ -498,7 +498,7 @@ DeclaredLayout detect_declared_layout(const BmsChart& chart, std::string_view so
             return DeclaredLayout{6, "5+1 SP", {"11", "12", "13", "14", "15", "16"}};
         }
         if (explicit_key_count == 7 && uses_sp7_channels) {
-            return DeclaredLayout{8, "7+1 SP", {"11", "12", "13", "14", "15", "16", "18", "19"}};
+            return DeclaredLayout{8, "7+1 SP", {"16", "11", "12", "13", "14", "15", "18", "19"}};
         }
     }
 
@@ -519,7 +519,7 @@ DeclaredLayout detect_declared_layout(const BmsChart& chart, std::string_view so
 
     if ((is_player_one_header(chart) || !has_two_player_channels) && !has_two_player_channels) {
         if (uses_sp7_channels) {
-            return DeclaredLayout{8, "7+1 SP", {"11", "12", "13", "14", "15", "16", "18", "19"}};
+            return DeclaredLayout{8, "7+1 SP", {"16", "11", "12", "13", "14", "15", "18", "19"}};
         }
         if (uses_sp5_channels) {
             return DeclaredLayout{6, "5+1 SP", {"11", "12", "13", "14", "15", "16"}};
@@ -528,7 +528,7 @@ DeclaredLayout detect_declared_layout(const BmsChart& chart, std::string_view so
 
     if (!has_two_player_channels && fits_standard_sp_seven &&
         contains_any_channel(lane_channels, {"18", "19"})) {
-        return DeclaredLayout{8, "7+1 SP", std::vector<std::string>(kSpSevenTemplate.begin(), kSpSevenTemplate.end())};
+        return DeclaredLayout{8, "7+1 SP", {"16", "11", "12", "13", "14", "15", "18", "19"}};
     }
     if (!has_two_player_channels && fits_standard_sp_five && contains_channel(lane_channels, "16")) {
         return DeclaredLayout{6, "5+1 SP", std::vector<std::string>(kSpFiveTemplate.begin(), kSpFiveTemplate.end())};

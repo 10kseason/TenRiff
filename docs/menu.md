@@ -6,6 +6,7 @@ The main menu must honor the same low-latency philosophy as gameplay: audio runs
 - `MenuApp`는 **InputThread(폴링)** → **SPSC 큐** → **메뉴 상태 머신** → **RenderThread(D3D11 윈도우 렌더)** 흐름으로 동작한다.
 - `SongIndexerThread`가 백그라운드에서 곡 인덱스를 생성하고 `profiles/<name>/.tenriff/song-index/<source-hash>.json`에 캐시한다.
 - 메뉴에서 오디오/그래픽/인풋/모드 설정을 변경하면 프로필 설정 파일에 저장된다.
+- `Options -> Profile Setup`은 현재 프로필의 첫 실행 설정 화면을 다시 열어 언어/오디오/입력/그래픽/키맵을 즉시 저장한다.
 - 플레이 시작 시에는 현재 구현상 메뉴 스레드를 중지하고 `GameSession`을 별도로 실행한다.
 - **Windows 메뉴 UI는 D3D11 + Direct2D/DirectWrite 기반**으로 타이틀/곡선택(시안 레이아웃)과 기타 설정 화면(리스트 UI)을 렌더링한다.
 - 입력 키 요약:
@@ -44,7 +45,7 @@ States render UI and consume already-timestamped input events; heavyweight work 
 - **Cache index** (`song_index.json` or SQLite) with mtime/hash checks to avoid full rescans. First run can be slow; subsequent runs should be instant.
 - **Preview audio** is scheduled through the audio engine: UI enqueues preview requests, AudioThread mixes them so timing stays aligned.
 - Empty-state screens should expose a persistent `Add Songs Folder` action; drag-and-drop stays supported but secondary.
-- RawInput이 메뉴에서 비정상적으로 멎으면 `Quick Setup`, `Title`, `Song Select`, `Options`, `Keymap`, `NKRO Test`에서 자동으로 폴링으로 폴백한다.
+- RawInput 스레드나 이벤트 전달이 메뉴에서 비정상적으로 멎으면 멀티플레이/리절트를 포함한 메뉴 화면 전체에서 현재 세션만 자동으로 폴링으로 폴백하고, 저장된 backend 설정은 바꾸지 않는다.
 
 ## Settings: latency-first surface
 Put these on the first page so users see latency-critical toggles immediately:

@@ -23,7 +23,8 @@ bool is_easy_softened_bad_judgement(Judgement judgement) {
 }
 }
 
-GaugeManager::GaugeManager(GaugeConfig config) : config_(config) {}
+GaugeManager::GaugeManager(GaugeConfig config, GaugeRuntimePolicy policy)
+    : config_(config), policy_(policy) {}
 
 GaugeState GaugeManager::initialState(GaugeType type) const noexcept {
     GaugeState state;
@@ -71,6 +72,20 @@ GaugeResult GaugeManager::applyJudgementWeighted(GaugeState& state, Judgement ju
         delta *= kLr2HardPoorLowGaugeScale;
     }
     state.value = std::clamp(state.value + delta, kMinGauge, max_gauge_for(state.type));
+
+    const double normal_to_easy_threshold =
+        std::clamp(policy_.normal_to_easy_threshold, kMinGauge, kGaugeMax);
+    if (policy_.normal_to_easy_shift && state.type == GaugeType::Normal &&
+        state.value <= normal_to_easy_threshold) {
+        state.type = GaugeType::Easy;
+        // The legacy auto-shift behavior restarted the destination gauge at its
+        // cap. The current Easy cap is 100%, while subsequent Easy depletion
+        // still follows the normal zero-gauge game-over path below.
+        state.value = max_gauge_for(state.type);
+        state.game_over = false;
+        result.downshifted = true;
+        return result;
+    }
 
     if (state.value <= 0.0) {
         state.game_over = true;

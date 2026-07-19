@@ -222,6 +222,84 @@ TEST_CASE("KeyStateTracker lets polling release clear stale raw input sources") 
     CHECK(tracker.pressed_count() == 0);
 }
 
+TEST_CASE("KeyStateTracker transfers a polling-first press to the late RawInput source") {
+    KeyStateConfig config;
+    config.debounce_window_ns = 0;
+    KeyStateTracker tracker(config);
+
+    InputEvent polled_press{};
+    polled_press.keycode = 0x41;
+    polled_press.state = InputState::Pressed;
+    polled_press.input_time_ns = 1'000'000;
+    polled_press.device_id = kPollingAggregateDeviceId;
+    auto result = tracker.process(polled_press);
+    REQUIRE(result.has_value());
+    CHECK(result->state == InputState::Pressed);
+
+    InputEvent raw_press = polled_press;
+    raw_press.input_time_ns = 1'100'000;
+    raw_press.device_id = 0x1001;
+    CHECK_FALSE(tracker.process(raw_press).has_value());
+    CHECK(tracker.is_key_pressed(0x41));
+    CHECK(tracker.pressed_count() == 1);
+
+    InputEvent raw_release = raw_press;
+    raw_release.state = InputState::Released;
+    raw_release.input_time_ns = 1'500'000;
+    result = tracker.process(raw_release);
+    REQUIRE(result.has_value());
+    CHECK(result->state == InputState::Released);
+    CHECK_FALSE(tracker.is_key_pressed(0x41));
+    CHECK(tracker.pressed_count() == 0);
+
+    InputEvent polled_release = polled_press;
+    polled_release.state = InputState::Released;
+    polled_release.input_time_ns = 1'600'000;
+    CHECK_FALSE(tracker.process(polled_release).has_value());
+}
+
+TEST_CASE("KeyStateTracker preserves every rapid jack edge with mixed RawInput and polling order") {
+    KeyStateConfig config;
+    config.debounce_window_ns = 0;
+    KeyStateTracker tracker(config);
+    std::size_t logical_edges = 0;
+
+    for (int cycle = 0; cycle < 100; ++cycle) {
+        const int64_t base_ns = static_cast<int64_t>(cycle) * 1'000'000;
+        InputEvent raw_press{};
+        raw_press.keycode = 0x41;
+        raw_press.state = InputState::Pressed;
+        raw_press.input_time_ns = base_ns + 100'000;
+        raw_press.device_id = 0x1001;
+
+        InputEvent polled_press = raw_press;
+        polled_press.device_id = kPollingAggregateDeviceId;
+        polled_press.input_time_ns = base_ns + (cycle % 2 == 0 ? 50'000 : 150'000);
+
+        if (cycle % 2 == 0) {
+            logical_edges += tracker.process(polled_press).has_value() ? 1u : 0u;
+            logical_edges += tracker.process(raw_press).has_value() ? 1u : 0u;
+        } else {
+            logical_edges += tracker.process(raw_press).has_value() ? 1u : 0u;
+            logical_edges += tracker.process(polled_press).has_value() ? 1u : 0u;
+        }
+
+        InputEvent raw_release = raw_press;
+        raw_release.state = InputState::Released;
+        raw_release.input_time_ns = base_ns + 400'000;
+        logical_edges += tracker.process(raw_release).has_value() ? 1u : 0u;
+
+        InputEvent polled_release = polled_press;
+        polled_release.state = InputState::Released;
+        polled_release.input_time_ns = base_ns + 450'000;
+        logical_edges += tracker.process(polled_release).has_value() ? 1u : 0u;
+    }
+
+    CHECK(logical_edges == 200);
+    CHECK_FALSE(tracker.is_key_pressed(0x41));
+    CHECK(tracker.pressed_count() == 0);
+}
+
 TEST_CASE("KeyStateTracker keeps different keys independent across multiple sources") {
     KeyStateConfig config;
     config.debounce_window_ns = 0;

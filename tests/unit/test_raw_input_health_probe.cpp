@@ -36,3 +36,18 @@ TEST_CASE("raw input health probe cancels fallback when raw events resume") {
     CHECK_FALSE(probe.should_trigger_fallback(1150, resumed));
     CHECK_FALSE(probe.pending());
 }
+
+TEST_CASE("raw input health probe ignores a polled change already explained by a recent raw event") {
+    tenriff::input::RawInputHealthProbe probe(100);
+    tenriff::input::InputThreadHealthSnapshot snapshot;
+    snapshot.backend = tenriff::input::InputBackend::RawInput;
+    snapshot.allowed_event_count = 5;
+    snapshot.queue_push_count = 5;
+    snapshot.last_allowed_event_time_ns = 950;
+    snapshot.last_queue_push_time_ns = 950;
+
+    probe.note_polled_change(1000, snapshot);
+
+    CHECK_FALSE(probe.pending());
+    CHECK_FALSE(probe.should_trigger_fallback(1200, snapshot));
+}

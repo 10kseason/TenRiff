@@ -303,8 +303,8 @@ TEST_CASE("parser detects explicit 7+1 SP layout and stores label") {
     CHECK(result.success());
     CHECK_EQ(result.chart.declared_key_count, 8);
     CHECK_EQ(result.chart.layout_label, "7+1 SP");
-    for (const std::pair<const char*, int> lane_case : {std::pair{"11", 1}, {"12", 2}, {"13", 3}, {"14", 4},
-                                                         {"15", 5}, {"16", 6}, {"18", 7}, {"19", 8}}) {
+    for (const std::pair<const char*, int> lane_case : {std::pair{"16", 1}, {"11", 2}, {"12", 3}, {"13", 4},
+                                                         {"14", 5}, {"15", 6}, {"18", 7}, {"19", 8}}) {
         auto mapped_lane = result.chart.lane_mapping.laneForChannel(lane_case.first);
         REQUIRE(mapped_lane.has_value());
         CHECK_EQ(mapped_lane.value(), lane_case.second);
@@ -349,8 +349,8 @@ TEST_CASE("parser auto-detects headerless player-one 7+1 SP layout") {
     CHECK(result.success());
     CHECK_EQ(result.chart.declared_key_count, 8);
     CHECK_EQ(result.chart.layout_label, "7+1 SP");
-    for (const std::pair<const char*, int> lane_case : {std::pair{"11", 1}, {"12", 2}, {"13", 3}, {"14", 4},
-                                                         {"15", 5}, {"16", 6}, {"18", 7}, {"19", 8}}) {
+    for (const std::pair<const char*, int> lane_case : {std::pair{"16", 1}, {"11", 2}, {"12", 3}, {"13", 4},
+                                                         {"14", 5}, {"15", 6}, {"18", 7}, {"19", 8}}) {
         auto mapped_lane = result.chart.lane_mapping.laneForChannel(lane_case.first);
         REQUIRE(mapped_lane.has_value());
         CHECK_EQ(mapped_lane.value(), lane_case.second);
@@ -401,8 +401,8 @@ TEST_CASE("parser infers sparse standard SP charts without falling back to 10K")
     REQUIRE(lane11.has_value());
     REQUIRE(lane14.has_value());
     REQUIRE(lane19.has_value());
-    CHECK_EQ(lane11.value(), 1);
-    CHECK_EQ(lane14.value(), 4);
+    CHECK_EQ(lane11.value(), 2);
+    CHECK_EQ(lane14.value(), 5);
     CHECK_EQ(lane19.value(), 8);
 }
 

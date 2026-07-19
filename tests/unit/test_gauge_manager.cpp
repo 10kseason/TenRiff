@@ -5,6 +5,7 @@
 #include "game/GaugeManager.h"
 
 using tenriff::game::GaugeManager;
+using tenriff::game::GaugeRuntimePolicy;
 using tenriff::game::GaugeState;
 using tenriff::game::GaugeType;
 using tenriff::game::Judgement;
@@ -183,6 +184,51 @@ TEST_CASE("selected gauge type stays fixed while surviving") {
     CHECK(almost_equal(state.value, 56.26));
 }
 
+TEST_CASE("normal gauge remains fixed when the runtime shift policy is disabled") {
+    GaugeManager manager;
+    auto state = manager.initialState(GaugeType::Normal);
+    state.value = 34.0;
+
+    const auto result = manager.applyJudgement(state, Judgement::PR, 0.0);
+
+    CHECK_FALSE(result.downshifted);
+    CHECK_FALSE(result.game_over);
+    CHECK(state.type == GaugeType::Normal);
+    CHECK(almost_equal(state.value, 32.0));
+}
+
+TEST_CASE("runtime normal-to-easy policy shifts at thirty three percent and refills Easy") {
+    GaugeRuntimePolicy policy;
+    policy.normal_to_easy_shift = true;
+    tenriff::game::GaugeConfig config;
+    config.normal.gd = 0.0;
+    GaugeManager manager(config, policy);
+
+    auto above_threshold = manager.initialState(GaugeType::Normal);
+    above_threshold.value = 33.01;
+    const auto above = manager.applyJudgement(above_threshold, Judgement::GD, 0.0);
+    CHECK_FALSE(above.downshifted);
+    CHECK(above_threshold.type == GaugeType::Normal);
+    CHECK(almost_equal(above_threshold.value, 33.01));
+
+    auto state = manager.initialState(GaugeType::Normal);
+    state.value = 33.0;
+
+    const auto shift = manager.applyJudgement(state, Judgement::GD, 0.0);
+
+    CHECK(shift.downshifted);
+    CHECK_FALSE(shift.game_over);
+    CHECK(state.type == GaugeType::Easy);
+    CHECK(almost_equal(state.value, 100.0));
+    CHECK_FALSE(state.game_over);
+
+    const auto easy_hit = manager.applyJudgement(state, Judgement::PR, 1.0);
+    CHECK_FALSE(easy_hit.downshifted);
+    CHECK_FALSE(easy_hit.game_over);
+    CHECK(state.type == GaugeType::Easy);
+    CHECK(almost_equal(state.value, 98.4));
+}
+
 TEST_CASE("hard gauge triggers game over on empty") {
     GaugeManager manager;
     auto state = manager.initialState(GaugeType::Hard);
@@ -243,6 +289,22 @@ TEST_CASE("easy gauge triggers game over on empty") {
     CHECK_FALSE(result.downshifted);
     CHECK(result.game_over);
     CHECK(state.game_over);
+}
+
+TEST_CASE("runtime normal-to-easy policy still fails when Easy reaches zero") {
+    GaugeRuntimePolicy policy;
+    policy.normal_to_easy_shift = true;
+    GaugeManager manager({}, policy);
+    auto state = manager.initialState(GaugeType::Easy);
+    state.value = 0.05;
+
+    const auto result = manager.applyJudgement(state, Judgement::BD, 0.0);
+
+    CHECK_FALSE(result.downshifted);
+    CHECK(result.game_over);
+    CHECK(state.game_over);
+    CHECK(state.type == GaugeType::Easy);
+    CHECK(almost_equal(state.value, 0.0));
 }
 
 TEST_CASE("fatal hits keep the selected gauge label") {

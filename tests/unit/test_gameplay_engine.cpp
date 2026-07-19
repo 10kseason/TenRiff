@@ -635,6 +635,42 @@ TEST_CASE("practice no-fail prevents hard gauge game over") {
     CHECK(practice_engine.stats().counts.bd >= 10);
 }
 
+TEST_CASE("gameplay engine records one multiplayer gauge shift before Easy game over") {
+    GameplayChart chart;
+    chart.lane_count = 1;
+    chart.duration_samples = 4000;
+    chart.notes.push_back(NoteEvent{1, 1000, std::nullopt});
+    chart.notes.push_back(NoteEvent{1, 2000, std::nullopt});
+
+    GameplayConfig config;
+    config.sample_rate = 1000;
+    config.rate = 1.0;
+    config.judge.pg_ms = 10.0;
+    config.judge.gr_ms = 20.0;
+    config.judge.gd_ms = 30.0;
+    config.judge.bd_ms = 40.0;
+    config.gauge.normal.bd = -70.0;
+    config.gauge.easy.bd = -100.0;
+    config.gauge_policy.normal_to_easy_shift = true;
+
+    GameplayEngine engine(chart, config);
+    engine.advance(1041);
+
+    REQUIRE(engine.stats().shifts.size() == 1u);
+    CHECK(engine.stats().shifts[0].from == tenriff::game::GaugeType::Normal);
+    CHECK(engine.stats().shifts[0].to == tenriff::game::GaugeType::Easy);
+    CHECK(engine.gauge_state().type == tenriff::game::GaugeType::Easy);
+    CHECK(engine.gauge_state().value == doctest::Approx(100.0));
+    CHECK_FALSE(engine.is_game_over());
+
+    engine.advance(2041);
+
+    CHECK(engine.stats().shifts.size() == 1u);
+    CHECK(engine.gauge_state().type == tenriff::game::GaugeType::Easy);
+    CHECK(engine.gauge_state().value == doctest::Approx(0.0));
+    CHECK(engine.is_game_over());
+}
+
 TEST_CASE("gameplay engine does not shift later notes after a bad on the same lane") {
     GameplayChart chart;
     chart.lane_count = 1;

@@ -4,14 +4,14 @@ This is the document that the next agent or any new contributor should read firs
 
 ## Baseline
 - Current project version: `1.1.3`
-- The `1.1.3` line builds on top of the `1.1.2 final stable` baseline
+- Multiplayer preview r4 is a separate prerelease line and does not replace the existing `1.1.3 stable` release
 - Baseline companion document for follow-up work: `docs/baseline-1.1.2.en.md`
 - Windows GUI build is the main target
 - Linux exists only as a preview-level package at `Baepoks-Linuxs/TenRiff-0.5.0-linux-preview`
 - Default surface is BMS-first
 - `.osu` can be re-enabled as an option and supports 4K-10K
-- The `1.1.3` release line keeps the `1.0.9` gameplay playback-head timing fix, while live gameplay input prefers saved RawInput and uses a session-local bound-key polling fallback to correct missed RawInput edges
-- On the same `1.1.3` line, menu input still uses the foreground process/root-window boundary and retries Polling if RawInput startup fails, while persisted input-backend rewrites remain removed and the saved backend preference is preserved as configuration
+- The `1.1.3 multiplayer preview r4` keeps RawInput primary while continuously running a bound-key polling shadow in the same `InputThread`; startup failure or an unexpected message-pump exit switches that producer to Polling without resetting its queue or pressed state
+- Menu input keeps the foreground process/root-window boundary and falls back to Polling for the current menu session when RawInput startup fails or runtime thread/event delivery stops, while preserving the saved profile backend preference
 
 ## Core Architecture
 - `MenuApp`
@@ -26,7 +26,7 @@ This is the document that the next agent or any new contributor should read firs
   - Handles the audio master clock and mixing
 - `InputThread`
   - Collects RawInput / polling input and passes it into the queue
-  - Gameplay disables the RawInput thread's internal polling shadow; `GameSession` owns the bound-key polling fallback for missed edges
+  - Gameplay deduplicates RawInput and the bound-key polling shadow in one `InputThread` state tracker; `GameSession` does not filter the logical edges again by source
 - `RenderThread` + `MenuWindow`
   - Menu and in-game HUD rendering built on D3D11 + Direct2D / DirectWrite
   - The recent maintenance refactor is organizing large implementation files into smaller fragments
@@ -106,6 +106,15 @@ This is the document that the next agent or any new contributor should read firs
   - Song Select indexing progress display
   - gameplay chart-loading progress display
   - `Esc` cancel during gameplay loading
+- Profile UX:
+  - `Options -> Profile Setup` reopens the first-run setup surface for the active profile and saves language, audio, input, graphics, and keymap changes immediately
+- Direct-IP multiplayer preview:
+  - A joiner matches the host chart by exact hash and size across the active source and existing profile-local caches for `recent_song_sources`
+  - It never scans the whole disk or starts a rescan, and cached paths outside their source root are rejected
+  - The multiplayer-only gauge is a one-way shift: `Normal` at or below `33%` changes once to `Easy 100%`, never shifts back, and reaching `Easy 0%` gives that player GAME OVER
+  - The live score-gap bar is local-player-relative: `-10,000 / 0 / +10,000` map to the `LOSS` endpoint, center, and `WIN` endpoint; reaching an endpoint is display-only and never ends the match
+  - If one player reaches GAME OVER first, the other player continues; the defeated player waits on an aggregate spectator surface showing peer score, combo, gauge, and status until both results are ready
+  - The peer protocol does not transport exact lane input, per-note judgement, or hold state, so it does not render a guessed remote note field
 
 ## Song Indexing Model
 - When the song source changes, the profile-local cache at `profiles/<name>/.tenriff/song-index/<source-hash>.json` is read first
@@ -124,7 +133,7 @@ This is the document that the next agent or any new contributor should read firs
   - BMS parsing for indexing uses a lower-memory path that skips asset maps, unnecessary headers, and non-essential commands
   - cache save uses streaming writes instead of a giant JSON tree
 - Measurement:
-  - on `D:\Stellaverse (2025-12-14)` safe full-index, `46,636` candidates / `46,602` indexed entries
+  - on a 46k-chart Windows benchmark library safe full-index, `46,636` candidates / `46,602` indexed entries
   - peak memory roughly `working set 453MB`, `private 524MB`
   - on a 1024-chart sample from the same library, fast-profile throughput is about `2.05x` vs safe
 - Cache schema:
@@ -134,12 +143,12 @@ This is the document that the next agent or any new contributor should read firs
 
 ## Runtime / Packaging Rules
 - New user profiles are created automatically
-- The last staged distribution package is `Baepoks/TenRiff-1.1.2`
+- The public P2P prerelease is `TenRiff 1.1.3 Multiplayer Preview r4`, separate from the stable 1.1.3 distribution asset
 - Distribution packages do not include `Songs`
 - Distribution packages include the runtime `Mainmusic/` assets used for menu BGM
-- When updating distribution builds, only built artifacts should be copied into `Baepoks/`
-- If a source-only / public handoff is requested, the user's preference is to write an include/exclude list first
-- The last staged public source package is versioned separately, e.g. `opensource-Tenriff-source/TenRiff-1.1.2-source`
+- Distribution updates include only built artifacts and required runtime assets
+- Confirm the include/exclude list before a source-only or public handoff
+- Keep preview source branches and tags versioned separately from stable releases
 - When refreshing a public source package, do not stop at syncing docs/files only; also verify that the staged source-package folder itself can configure, build, and run the core test binary standalone
 
 ## Config / Profile Reality
@@ -169,9 +178,9 @@ This is the document that the next agent or any new contributor should read firs
 - `cmake --build build --config Release --target bms_parser_tests`
 - `cmake --build build --config Release --target bms_realworld_smoke`
 - `ctest --test-dir build -C Release --output-on-failure -R bms_parser_tests`
-- `cmake -S opensource-Tenriff-source/TenRiff-1.1.2-source -B opensource-Tenriff-source/TenRiff-1.1.2-source/build-check -G "Visual Studio 17 2022" -A x64`
-- `cmake --build opensource-Tenriff-source/TenRiff-1.1.2-source/build-check --config Release --target bms_parser_tests`
-- `opensource-Tenriff-source/TenRiff-1.1.2-source/build-check/Release/bms_parser_tests.exe`
+- `cmake -S . -B build-check -G "Visual Studio 17 2022" -A x64`
+- `cmake --build build-check --config Release --target bms_parser_tests`
+- `.\build-check\Release\bms_parser_tests.exe`
 
 ## Still Manual-Validation Heavy
 - Song Select fast-scroll crash reproduction on a real CJK-heavy library

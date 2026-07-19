@@ -2,7 +2,7 @@
 
 Language: Korean | [English](README.en.md) | [简体中文](README.zh-CN.md) | [日本語](README.ja.md)
 
-TenRiff는 Windows GUI 기반 BMS-first 리듬게임 런타임/런처 프로젝트입니다. 목표는 실사용 가능한 BMS 플레이 환경을 중심으로, 저지먼트/오디오/입력/렌더링 파이프라인을 직접 제어하는 독립 실행형 리듬게임 클라이언트를 만드는 것입니다. 현재 프로젝트 버전은 `1.1.3`이며, `1.1.2 final stable` 기준선 위에 쌓은 후속 라인입니다. MIT 라이선스를 사용하며, 번들된 서드파티 고지는 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)에 정리합니다.
+TenRiff는 Windows GUI 기반 BMS-first 리듬게임 런타임/런처 프로젝트입니다. 목표는 실사용 가능한 BMS 플레이 환경을 중심으로, 저지먼트/오디오/입력/렌더링 파이프라인을 직접 제어하는 독립 실행형 리듬게임 클라이언트를 만드는 것입니다. 현재 프로젝트 버전은 `1.1.3`이며, 기존 `1.1.3 stable` 위에 멀티플레이 preview r4 변경을 별도 prerelease로 제공합니다. MIT 라이선스를 사용하며, 번들된 서드파티 고지는 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)에 정리합니다.
 
 이 README는 "프로젝트를 처음 열었을 때 무엇을 보면 되는지"를 설명하는 입문 문서입니다. 더 자세한 현재 동작, 현재 `1.1.3` 프로젝트 상태, `1.1.2 final stable` 기준선, 설정 구조, 설계 문서는 [`docs/README.md`](docs/README.md)부터 이어서 읽는 구조를 기준으로 작성했습니다.
 
@@ -16,6 +16,7 @@ TenRiff 코드는 전통적인 장기 설계 문서 중심 개발만으로 쌓�
 - 그래픽 경로: D3D11 + Direct2D/DirectWrite
 - 오디오 경로: WASAPI
 - 입력 경로: RawInput 또는 고주사율 polling
+- 직접 IP 멀티플레이: 1 호스트 + 1 참가자 TCP 대전(기본 `27300/TCP`, [사용 안내](docs/multiplayer.md))
 - 라이선스: [MIT](LICENSE)
 - 서드파티 고지: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
 - 릴리스 변경 이력: [CHANGELOG.md](CHANGELOG.md)
@@ -181,6 +182,8 @@ CLI 예시:
 ## 설정과 런타임 데이터
 
 TenRiff는 전역 설정과 프로필 설정을 분리합니다.
+
+실행 중에는 `OPTIONS -> Profile Setup`에서 현재 프로필의 주요 설정과 키맵을 다시 빠르게 맞출 수 있습니다.
 
 - 전역 설정: `config/config.json`
 - 프로필 설정: `profiles/<name>/config.json`

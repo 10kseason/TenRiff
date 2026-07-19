@@ -39,7 +39,7 @@
                 data.gameplay.audio_buffer_frames,
                 data.gameplay.visual_offset_ms,
                 data.gameplay.finished,
-                data.gameplay.game_over,
+                data.gameplay.game_over && !data.gameplay.spectating_peer,
             },
             timing::HighResClock::now_ns());
         const int64_t display_sample = motion_diagnostics.display_sample;
@@ -380,6 +380,49 @@
             gameplay_hud_cache_.gauge_label_text = to_wide(gauge_label);
             gameplay_hud_cache_.gauge_value_text =
                 to_wide(std::to_string(static_cast<int>(std::llround(data.gameplay.gauge))) + "%");
+            gameplay_hud_cache_.peer_name_text =
+                to_wide(data.gameplay.peer_name.empty() ? loc("OPPONENT", "\uC0C1\uB300") : data.gameplay.peer_name);
+            std::string peer_status = data.gameplay.peer_status;
+            if (data.gameplay.peer_disconnected) {
+                peer_status = loc("DISCONNECTED", "\uC5F0\uACB0 \uB04A\uAE40");
+            } else if (data.gameplay.peer_game_over) {
+                peer_status = loc("GAME OVER", "\uAC8C\uC784 \uC624\uBC84");
+            } else if (data.gameplay.peer_aborted) {
+                peer_status = loc("ABORTED", "\uC911\uB2E8");
+            } else if (data.gameplay.peer_finished) {
+                peer_status = loc("FINISHED", "\uC644\uB8CC");
+            } else if (peer_status.empty()) {
+                peer_status = loc("PLAYING", "\uD50C\uB808\uC774 \uC911");
+            }
+            gameplay_hud_cache_.peer_status_text = to_wide(peer_status);
+            gameplay_hud_cache_.peer_score_text =
+                to_wide(loc("SCORE  ", "\uC810\uC218  ") + format_int_with_commas(data.gameplay.peer_score));
+            gameplay_hud_cache_.peer_combo_text =
+                to_wide(loc("COMBO ", "\uCF64\uBCF4 ") + std::to_string(data.gameplay.peer_combo) +
+                        "   " + loc("MAX ", "\uCD5C\uB300 ") + std::to_string(data.gameplay.peer_max_combo));
+            gameplay_hud_cache_.peer_judge_stats_text =
+                to_wide("PG " + std::to_string(data.gameplay.peer_pg) +
+                        "  GR " + std::to_string(data.gameplay.peer_gr) +
+                        "  G " + std::to_string(data.gameplay.peer_gd) +
+                        "  BAD " + std::to_string(data.gameplay.peer_bd) +
+                        "  PR " + std::to_string(data.gameplay.peer_pr));
+            gameplay_hud_cache_.peer_gauge_text =
+                to_wide(loc("GAUGE ", "\uAC8C\uC774\uC9C0 ") +
+                        std::to_string(static_cast<int>(std::llround(data.gameplay.peer_gauge))) + "%");
+            if (!data.gameplay.peer_score_available) {
+                gameplay_hud_cache_.versus_score_difference_text = L"SYNC";
+            } else {
+                const std::string difference_prefix =
+                    data.gameplay.versus_score_difference > 0 ? "+" : "";
+                gameplay_hud_cache_.versus_score_difference_text =
+                    to_wide(difference_prefix +
+                            format_int_with_commas(data.gameplay.versus_score_difference));
+            }
+            gameplay_hud_cache_.spectating_text =
+                to_wide(loc("SPECTATING ", "\uAD00\uC804 \uC911  ") +
+                        (data.gameplay.peer_name.empty()
+                             ? loc("OPPONENT", "\uC0C1\uB300")
+                             : data.gameplay.peer_name));
             gameplay_hud_cache_.ghost_score_text =
                 to_wide(loc("SCORE  ", "점수  ") + format_int_with_commas(data.gameplay.ghost_score));
             gameplay_hud_cache_.ghost_combo_text =
@@ -412,6 +455,8 @@
 
         if (data.gameplay.loading && !data.gameplay.active) {
             draw_gameplay_header();
+            const bool waiting_for_peer_result =
+                data.gameplay.finished && data.gameplay.peer_visible;
             const D2D1_RECT_F panel_rect =
                 fit_rect_below_performance_overlay(D2D1::RectF(620.0f, 360.0f, 1300.0f, 620.0f),
                                                    kBaseHeight - 140.0f,
@@ -426,12 +471,17 @@
                 ctx->DrawRoundedRectangle(panel_rr, d2d_->button_border_brush.Get(), 1.6f);
             }
 
-            const std::wstring loading_w = wloc("LOADING CHART", "차트 로딩 중");
+            const std::wstring loading_w =
+                waiting_for_peer_result
+                    ? wloc("WAITING FOR OPPONENT", "상대 결과 대기 중")
+                    : wloc("LOADING CHART", "차트 로딩 중");
             const std::wstring stage_w =
                 to_wide(data.gameplay.loading_stage.empty() ? loc("Preparing gameplay", "게임 준비 중")
                                                             : data.gameplay.loading_stage);
             const std::wstring percent_w =
-                to_wide(std::to_string(std::clamp(data.gameplay.loading_percent, 0, 100)) + "%");
+                waiting_for_peer_result
+                    ? wloc("RESULT SYNC", "결과 동기화")
+                    : to_wide(std::to_string(std::clamp(data.gameplay.loading_percent, 0, 100)) + "%");
             if (d2d_->title_format && d2d_->text_brush) {
                 draw_text_clipped_aligned(loading_w,
                                           d2d_->title_format.Get(),
@@ -845,6 +895,259 @@
 
         draw_gameplay_header();
         draw_gameplay_progress_bar();
+        if (data.gameplay.peer_visible) {
+            const D2D1_RECT_F lead_track =
+                D2D1::RectF(field_left + 80.0f, 186.0f, field_right - 80.0f, 202.0f);
+            const float lead_center_x = (lead_track.left + lead_track.right) * 0.5f;
+            const float lead_position = static_cast<float>(
+                std::clamp(data.gameplay.versus_score_position, 0.0, 1.0));
+            const float marker_x =
+                lead_track.left + (lead_track.right - lead_track.left) * lead_position;
+
+            if (d2d_->card_brush) {
+                d2d_->card_brush->SetOpacity(0.88f);
+                ctx->FillRoundedRectangle(D2D1::RoundedRect(lead_track, 8.0f, 8.0f),
+                                          d2d_->card_brush.Get());
+                d2d_->card_brush->SetOpacity(1.0f);
+            }
+            if (d2d_->accent_brush) {
+                const D2D1_COLOR_F saved_color = d2d_->accent_brush->GetColor();
+                const float saved_opacity = d2d_->accent_brush->GetOpacity();
+                d2d_->accent_brush->SetOpacity(0.32f);
+                d2d_->accent_brush->SetColor(D2D1::ColorF(0xFF5A6B));
+                ctx->FillRoundedRectangle(
+                    D2D1::RoundedRect(D2D1::RectF(lead_track.left,
+                                                 lead_track.top,
+                                                 lead_center_x,
+                                                 lead_track.bottom),
+                                      8.0f,
+                                      8.0f),
+                    d2d_->accent_brush.Get());
+                d2d_->accent_brush->SetColor(D2D1::ColorF(0x89D185));
+                ctx->FillRoundedRectangle(
+                    D2D1::RoundedRect(D2D1::RectF(lead_center_x,
+                                                 lead_track.top,
+                                                 lead_track.right,
+                                                 lead_track.bottom),
+                                      8.0f,
+                                      8.0f),
+                    d2d_->accent_brush.Get());
+
+                const D2D1_COLOR_F marker_color =
+                    lead_position < 0.5f
+                        ? D2D1::ColorF(0xFF5A6B, 0.98f)
+                        : (lead_position > 0.5f
+                               ? D2D1::ColorF(0x89D185, 0.98f)
+                               : D2D1::ColorF(0x6EE7F2, 0.98f));
+                d2d_->accent_brush->SetColor(marker_color);
+                d2d_->accent_brush->SetOpacity(1.0f);
+                ctx->DrawLine(D2D1::Point2F(marker_x, lead_track.top - 17.0f),
+                              D2D1::Point2F(marker_x, lead_track.top + 2.0f),
+                              d2d_->accent_brush.Get(),
+                              3.0f);
+                ctx->DrawLine(D2D1::Point2F(marker_x, lead_track.top + 2.0f),
+                              D2D1::Point2F(marker_x - 7.0f, lead_track.top - 6.0f),
+                              d2d_->accent_brush.Get(),
+                              3.0f);
+                ctx->DrawLine(D2D1::Point2F(marker_x, lead_track.top + 2.0f),
+                              D2D1::Point2F(marker_x + 7.0f, lead_track.top - 6.0f),
+                              d2d_->accent_brush.Get(),
+                              3.0f);
+                d2d_->accent_brush->SetColor(saved_color);
+                d2d_->accent_brush->SetOpacity(saved_opacity);
+            }
+            if (d2d_->button_border_brush) {
+                ctx->DrawRoundedRectangle(D2D1::RoundedRect(lead_track, 8.0f, 8.0f),
+                                          d2d_->button_border_brush.Get(),
+                                          1.0f);
+                ctx->DrawLine(D2D1::Point2F(lead_center_x, lead_track.top - 3.0f),
+                              D2D1::Point2F(lead_center_x, lead_track.bottom + 3.0f),
+                              d2d_->button_border_brush.Get(),
+                              1.4f);
+            }
+            if (d2d_->body_format && d2d_->text_brush) {
+                const D2D1_COLOR_F saved_text_color = d2d_->text_brush->GetColor();
+                d2d_->text_brush->SetColor(D2D1::ColorF(0xFF5A6B, 0.96f));
+                draw_text_clipped(L"LOSS",
+                                  d2d_->body_format.Get(),
+                                  D2D1::RectF(lead_track.left,
+                                              lead_track.top - 31.0f,
+                                              lead_track.left + 120.0f,
+                                              lead_track.top - 3.0f),
+                                  d2d_->text_brush.Get());
+                d2d_->text_brush->SetColor(D2D1::ColorF(0x89D185, 0.96f));
+                draw_text_clipped_aligned(L"WIN",
+                                          d2d_->body_format.Get(),
+                                          D2D1::RectF(lead_track.right - 120.0f,
+                                                      lead_track.top - 31.0f,
+                                                      lead_track.right,
+                                                      lead_track.top - 3.0f),
+                                          d2d_->text_brush.Get(),
+                                          DWRITE_TEXT_ALIGNMENT_TRAILING);
+                d2d_->text_brush->SetColor(D2D1::ColorF(0xF7FAFD, 0.94f));
+                draw_text_clipped_aligned(gameplay_hud_cache_.versus_score_difference_text,
+                                          d2d_->body_format.Get(),
+                                          D2D1::RectF(lead_center_x - 120.0f,
+                                                      lead_track.top - 31.0f,
+                                                      lead_center_x + 120.0f,
+                                                      lead_track.top - 3.0f),
+                                          d2d_->text_brush.Get(),
+                                          DWRITE_TEXT_ALIGNMENT_CENTER);
+                d2d_->text_brush->SetColor(saved_text_color);
+            }
+
+            if (data.gameplay.spectating_peer && d2d_->panel_brush &&
+                d2d_->header_format && d2d_->text_brush) {
+                const D2D1_RECT_F spectator_rect =
+                    D2D1::RectF(field_left + 80.0f, 216.0f, field_right - 80.0f, 266.0f);
+                d2d_->panel_brush->SetOpacity(0.82f);
+                ctx->FillRoundedRectangle(D2D1::RoundedRect(spectator_rect, 16.0f, 16.0f),
+                                          d2d_->panel_brush.Get());
+                d2d_->panel_brush->SetOpacity(1.0f);
+                draw_text_clipped_aligned(gameplay_hud_cache_.spectating_text,
+                                          d2d_->header_format.Get(),
+                                          spectator_rect,
+                                          d2d_->text_brush.Get(),
+                                          DWRITE_TEXT_ALIGNMENT_CENTER);
+            }
+        }
+        if (data.gameplay.peer_visible) {
+            // The protocol exposes aggregate opponent state, not lane events.
+            const D2D1_RECT_F peer_panel_rect = surface_layout.ghost_visible
+                ? D2D1::RectF(820.0f, 260.0f, 1100.0f, 494.0f)
+                : D2D1::RectF(84.0f, 210.0f, 420.0f, 444.0f);
+            const D2D1_ROUNDED_RECT peer_panel =
+                D2D1::RoundedRect(peer_panel_rect, 18.0f, 18.0f);
+            if (d2d_->panel_brush) {
+                d2d_->panel_brush->SetOpacity(0.82f);
+                ctx->FillRoundedRectangle(peer_panel, d2d_->panel_brush.Get());
+                d2d_->panel_brush->SetOpacity(1.0f);
+            }
+            if (d2d_->button_border_brush) {
+                ctx->DrawRoundedRectangle(peer_panel, d2d_->button_border_brush.Get(), 1.2f);
+            }
+
+            D2D1_COLOR_F peer_state_color = D2D1::ColorF(0x6EE7F2, 0.92f);
+            if (data.gameplay.peer_disconnected || data.gameplay.peer_game_over) {
+                peer_state_color = D2D1::ColorF(0xFF5A6B, 0.94f);
+            } else if (data.gameplay.peer_aborted) {
+                peer_state_color = D2D1::ColorF(0xFFB703, 0.94f);
+            } else if (data.gameplay.peer_finished) {
+                peer_state_color = D2D1::ColorF(0x89D185, 0.94f);
+            }
+            if (d2d_->accent_brush) {
+                const D2D1_COLOR_F saved_color = d2d_->accent_brush->GetColor();
+                const float saved_opacity = d2d_->accent_brush->GetOpacity();
+                d2d_->accent_brush->SetColor(peer_state_color);
+                d2d_->accent_brush->SetOpacity(1.0f);
+                ctx->FillRoundedRectangle(
+                    D2D1::RoundedRect(D2D1::RectF(peer_panel_rect.left + 16.0f,
+                                                 peer_panel_rect.top + 14.0f,
+                                                 peer_panel_rect.left + 22.0f,
+                                                 peer_panel_rect.top + 34.0f),
+                                      3.0f,
+                                      3.0f),
+                    d2d_->accent_brush.Get());
+                d2d_->accent_brush->SetColor(saved_color);
+                d2d_->accent_brush->SetOpacity(saved_opacity);
+            }
+
+            if (d2d_->hud_format && d2d_->muted_brush) {
+                draw_text_clipped(wloc("OPPONENT", "\uC0C1\uB300"),
+                                  d2d_->hud_format.Get(),
+                                  D2D1::RectF(peer_panel_rect.left + 30.0f,
+                                              peer_panel_rect.top + 10.0f,
+                                              peer_panel_rect.right - 14.0f,
+                                              peer_panel_rect.top + 38.0f),
+                                  d2d_->muted_brush.Get());
+            }
+            if (d2d_->body_format && d2d_->text_brush) {
+                draw_text_clipped(gameplay_hud_cache_.peer_name_text,
+                                  d2d_->body_format.Get(),
+                                  D2D1::RectF(peer_panel_rect.left + 16.0f,
+                                              peer_panel_rect.top + 38.0f,
+                                              peer_panel_rect.right - 116.0f,
+                                              peer_panel_rect.top + 70.0f),
+                                  d2d_->text_brush.Get());
+                const D2D1_COLOR_F saved_text_color = d2d_->text_brush->GetColor();
+                d2d_->text_brush->SetColor(peer_state_color);
+                draw_text_clipped_aligned(gameplay_hud_cache_.peer_status_text,
+                                          d2d_->body_format.Get(),
+                                          D2D1::RectF(peer_panel_rect.right - 112.0f,
+                                                      peer_panel_rect.top + 38.0f,
+                                                      peer_panel_rect.right - 16.0f,
+                                                      peer_panel_rect.top + 70.0f),
+                                          d2d_->text_brush.Get(),
+                                          DWRITE_TEXT_ALIGNMENT_TRAILING);
+                d2d_->text_brush->SetColor(saved_text_color);
+            }
+            if (d2d_->header_format && d2d_->text_brush) {
+                draw_text_clipped(gameplay_hud_cache_.peer_score_text,
+                                  d2d_->header_format.Get(),
+                                  D2D1::RectF(peer_panel_rect.left + 16.0f,
+                                              peer_panel_rect.top + 74.0f,
+                                              peer_panel_rect.right - 16.0f,
+                                              peer_panel_rect.top + 116.0f),
+                                  d2d_->text_brush.Get());
+            }
+            if (d2d_->body_format && d2d_->text_brush) {
+                draw_text_clipped(gameplay_hud_cache_.peer_combo_text,
+                                  d2d_->body_format.Get(),
+                                  D2D1::RectF(peer_panel_rect.left + 16.0f,
+                                              peer_panel_rect.top + 116.0f,
+                                              peer_panel_rect.right - 16.0f,
+                                              peer_panel_rect.top + 148.0f),
+                                  d2d_->text_brush.Get());
+            }
+            if (d2d_->hud_format && d2d_->muted_brush) {
+                draw_text_clipped(gameplay_hud_cache_.peer_judge_stats_text,
+                                  d2d_->hud_format.Get(),
+                                  D2D1::RectF(peer_panel_rect.left + 16.0f,
+                                              peer_panel_rect.top + 148.0f,
+                                              peer_panel_rect.right - 16.0f,
+                                              peer_panel_rect.top + 178.0f),
+                                  d2d_->muted_brush.Get());
+                draw_text_clipped(gameplay_hud_cache_.peer_gauge_text,
+                                  d2d_->hud_format.Get(),
+                                  D2D1::RectF(peer_panel_rect.left + 16.0f,
+                                              peer_panel_rect.top + 180.0f,
+                                              peer_panel_rect.right - 16.0f,
+                                              peer_panel_rect.top + 208.0f),
+                                  d2d_->muted_brush.Get());
+            }
+
+            const float peer_gauge_ratio =
+                static_cast<float>(std::clamp(data.gameplay.peer_gauge / 100.0, 0.0, 1.0));
+            const D2D1_RECT_F peer_gauge_track =
+                D2D1::RectF(peer_panel_rect.left + 16.0f,
+                            peer_panel_rect.bottom - 18.0f,
+                            peer_panel_rect.right - 16.0f,
+                            peer_panel_rect.bottom - 10.0f);
+            if (d2d_->card_brush) {
+                d2d_->card_brush->SetOpacity(0.86f);
+                ctx->FillRoundedRectangle(D2D1::RoundedRect(peer_gauge_track, 4.0f, 4.0f),
+                                          d2d_->card_brush.Get());
+                d2d_->card_brush->SetOpacity(1.0f);
+            }
+            if (d2d_->accent_brush && peer_gauge_ratio > 0.0f) {
+                const D2D1_COLOR_F saved_color = d2d_->accent_brush->GetColor();
+                const float saved_opacity = d2d_->accent_brush->GetOpacity();
+                d2d_->accent_brush->SetColor(peer_state_color);
+                d2d_->accent_brush->SetOpacity(0.90f);
+                const float fill_right = peer_gauge_track.left +
+                    (peer_gauge_track.right - peer_gauge_track.left) * peer_gauge_ratio;
+                ctx->FillRoundedRectangle(
+                    D2D1::RoundedRect(D2D1::RectF(peer_gauge_track.left,
+                                                 peer_gauge_track.top,
+                                                 fill_right,
+                                                 peer_gauge_track.bottom),
+                                      4.0f,
+                                      4.0f),
+                    d2d_->accent_brush.Get());
+                d2d_->accent_brush->SetColor(saved_color);
+                d2d_->accent_brush->SetOpacity(saved_opacity);
+            }
+        }
         if (surface_layout.ghost_visible && d2d_->body_format && d2d_->title_format) {
             auto draw_field_summary = [&](const GameplayFieldLayout& summary_layout,
                                           const std::wstring& label_text,
@@ -974,7 +1277,7 @@
             d2d_->body_format->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_LEADING);
         }
 
-        if (data.gameplay.game_over && d2d_->panel_brush) {
+        if (data.gameplay.game_over && !data.gameplay.spectating_peer && d2d_->panel_brush) {
             const D2D1_RECT_F overlay = D2D1::RectF(field_left - 10.0f, field_top - 10.0f,
                                                     field_right + 10.0f, field_bottom + 10.0f);
             d2d_->panel_brush->SetOpacity(0.78f);

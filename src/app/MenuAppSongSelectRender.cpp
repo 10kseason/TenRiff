@@ -135,23 +135,29 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
     }
     render.song_select.sort_summary = song_sort_detail_label(song_sort_mode_, korean);
     render.song_select.primary_hint =
-        render.song_select.showing_sources
+        multiplayer_selecting_chart_
+            ? ui_text("UP/DOWN or wheel  MOVE     ENTER / dbl-click  SELECT FOR LOBBY",
+                      "위/아래 또는 휠  이동     ENTER / 더블클릭  로비 곡 선택")
+            : (render.song_select.showing_sources
             ? ui_text("UP/DOWN or wheel  MOVE     ENTER / dbl-click  OPEN SOURCE     PGUP/PGDN  PAGE",
                       "위/아래 또는 휠  이동     ENTER / 더블클릭  소스 열기     PGUP/PGDN  페이지")
             : (render.song_select.showing_records
                    ? ui_text("UP/DOWN or wheel  MOVE     ENTER / dbl-click  OPEN RESULT     PGUP/PGDN  PAGE",
                              "위/아래 또는 휠  이동     ENTER / 더블클릭  결과 열기     PGUP/PGDN  페이지")
                    : ui_text("UP/DOWN or wheel  MOVE     ENTER / dbl-click  PLAY     PGUP/PGDN  PAGE",
-                             "위/아래 또는 휠  이동     ENTER / 더블클릭  플레이     PGUP/PGDN  페이지"));
+                             "위/아래 또는 휠  이동     ENTER / 더블클릭  플레이     PGUP/PGDN  페이지")));
     render.song_select.secondary_hint =
-        render.song_select.showing_sources
+        multiplayer_selecting_chart_
+            ? ui_text("ESC / BACKSPACE  BACK TO MULTIPLAYER LOBBY",
+                      "ESC / BACKSPACE  멀티플레이 로비로 돌아가기")
+            : (render.song_select.showing_sources
             ? ui_text("LEFT/RIGHT  NAV FOCUS     BACKSPACE  BACK     F2  ADD FOLDER     F5  REINDEX     F1  HELP",
                       "좌/우  탐색 전환     BACKSPACE  뒤로     F2  폴더 추가     F5  재인덱스     F1  도움말")
             : (render.song_select.showing_records
                    ? ui_text("LEFT/RIGHT  NAV FOCUS     BACKSPACE  BACK     ESC  TITLE     F1  HELP",
                              "좌/우  탐색 전환     BACKSPACE  뒤로     ESC  타이틀     F1  도움말")
                    : ui_text("LEFT/RIGHT  NAV FOCUS     ENTER SEARCH  TYPE QUERY     F2  ADD FOLDER     F5  REINDEX     F1  HELP",
-                             "좌/우  탐색 전환     ENTER SEARCH  검색 입력     F2  폴더 추가     F5  재인덱스     F1  도움말"));
+                             "좌/우  탐색 전환     ENTER SEARCH  검색 입력     F2  폴더 추가     F5  재인덱스     F1  도움말")));
 
     const std::string source_detail =
         std::to_string(render.song_select.source_count) + " " +

@@ -32,6 +32,13 @@ struct GaugeConfig {
     GaugeDeltaTable easy{0.25000000, 0.20000000, 0.01000000, -4.10000, -1.60000};
 };
 
+// Session-only gauge behavior. Keep this separate from GaugeConfig so battle
+// rules can opt in without changing persisted single-player gauge tuning.
+struct GaugeRuntimePolicy {
+    bool normal_to_easy_shift = false;
+    double normal_to_easy_threshold = 33.0;
+};
+
 struct GaugeState {
     GaugeType type = GaugeType::Normal;
     double value = 100.0;  // 0..100
@@ -45,9 +52,10 @@ struct GaugeResult {
 
 class GaugeManager {
 public:
-    explicit GaugeManager(GaugeConfig config = {});
+    explicit GaugeManager(GaugeConfig config = {}, GaugeRuntimePolicy policy = {});
 
     [[nodiscard]] const GaugeConfig& config() const noexcept { return config_; }
+    [[nodiscard]] const GaugeRuntimePolicy& policy() const noexcept { return policy_; }
 
     [[nodiscard]] GaugeState initialState(GaugeType type) const noexcept;
 
@@ -59,6 +67,7 @@ private:
     [[nodiscard]] double deltaFor(GaugeType type, Judgement judgement) const noexcept;
 
     GaugeConfig config_;
+    GaugeRuntimePolicy policy_;
 };
 
 }  // namespace tenriff::game

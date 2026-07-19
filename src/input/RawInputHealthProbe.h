@@ -23,6 +23,18 @@ public:
             reset();
             return;
         }
+        const int64_t last_raw_event_ns =
+            snapshot.last_allowed_event_time_ns > snapshot.last_queue_push_time_ns
+                ? snapshot.last_allowed_event_time_ns
+                : snapshot.last_queue_push_time_ns;
+        // The menu loop can observe the physical key change just after it has
+        // already drained the matching RawInput event. Do not arm a false
+        // fallback when delivery was recent enough to explain the change.
+        if (last_raw_event_ns > 0 && now_ns >= last_raw_event_ns &&
+            now_ns - last_raw_event_ns <= grace_ns_) {
+            reset();
+            return;
+        }
         if (pending_) {
             return;
         }

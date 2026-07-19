@@ -58,6 +58,8 @@ private:
     void process_keyboard_input(const void* raw_input);
 
     HWND hwnd_ = nullptr;
+    bool registered_keyboard_ = false;
+    bool registered_gamepad_ = false;
     EventCallback callback_;
     std::vector<uint8_t> input_buffer_;  // Reusable buffer for GetRawInputData.
     

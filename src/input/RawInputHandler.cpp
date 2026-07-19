@@ -9,8 +9,24 @@
 
 #include <iostream>
 #include <limits>
+#include <mutex>
 
 namespace tenriff::input {
+
+namespace {
+
+struct RawInputRegistrationOwners {
+    std::mutex mutex;
+    RawInputHandler* keyboard = nullptr;
+    RawInputHandler* gamepad = nullptr;
+};
+
+RawInputRegistrationOwners& registration_owners() {
+    static RawInputRegistrationOwners owners;
+    return owners;
+}
+
+}  // namespace
 
 RawInputHandler::RawInputHandler() {
     // Cache QPC frequency.
@@ -32,7 +48,9 @@ bool RawInputHandler::initialize(HWND hwnd, const RawInputConfig& config) {
         return false;
     }
 
-    hwnd_ = hwnd;
+    // RawInput registration is process-global per usage. Release only this
+    // instance's previous ownership before attempting a new registration.
+    shutdown();
 
     // Build registration array.
     std::vector<RAWINPUTDEVICE> devices;
@@ -73,12 +91,14 @@ bool RawInputHandler::initialize(HWND hwnd, const RawInputConfig& config) {
         return false;
     }
 
+    auto& owners = registration_owners();
+    std::lock_guard<std::mutex> lock(owners.mutex);
+
     SetLastError(ERROR_SUCCESS);
-    BOOL result = RegisterRawInputDevices(
+    const BOOL result = RegisterRawInputDevices(
         devices.data(),
         static_cast<UINT>(devices.size()),
-        sizeof(RAWINPUTDEVICE)
-    );
+        sizeof(RAWINPUTDEVICE));
 
     if (result != TRUE) {
         std::cerr << "[warn] RegisterRawInputDevices failed error=" << GetLastError()
@@ -87,9 +107,19 @@ bool RawInputHandler::initialize(HWND hwnd, const RawInputConfig& config) {
                   << " input_sink=" << (config.input_sink ? "true" : "false")
                   << " no_legacy=" << (config.no_legacy ? "true" : "false")
                   << std::endl;
+        return false;
     }
 
-    return result == TRUE;
+    hwnd_ = hwnd;
+    registered_keyboard_ = config.register_keyboard;
+    registered_gamepad_ = config.register_gamepad;
+    if (registered_keyboard_) {
+        owners.keyboard = this;
+    }
+    if (registered_gamepad_) {
+        owners.gamepad = this;
+    }
+    return true;
 }
 
 bool RawInputHandler::process_message(intptr_t lparam) {
@@ -180,20 +210,41 @@ void RawInputHandler::process_keyboard_input(const void* raw_input) {
 }
 
 void RawInputHandler::shutdown() {
-    if (!hwnd_) {
+    if (!hwnd_ && !registered_keyboard_ && !registered_gamepad_) {
         return;
     }
 
-    // Unregister devices by sending RIDEV_REMOVE.
-    RAWINPUTDEVICE keyboard{};
-    keyboard.usUsagePage = 0x01;
-    keyboard.usUsage = 0x06;
-    keyboard.dwFlags = RIDEV_REMOVE;
-    keyboard.hwndTarget = nullptr;
+    auto& owners = registration_owners();
+    std::lock_guard<std::mutex> lock(owners.mutex);
 
-    RegisterRawInputDevices(&keyboard, 1, sizeof(RAWINPUTDEVICE));
+    std::vector<RAWINPUTDEVICE> devices;
+    if (registered_keyboard_ && owners.keyboard == this) {
+        RAWINPUTDEVICE keyboard{};
+        keyboard.usUsagePage = 0x01;
+        keyboard.usUsage = 0x06;
+        keyboard.dwFlags = RIDEV_REMOVE;
+        keyboard.hwndTarget = nullptr;
+        devices.push_back(keyboard);
+        owners.keyboard = nullptr;
+    }
+    if (registered_gamepad_ && owners.gamepad == this) {
+        RAWINPUTDEVICE gamepad{};
+        gamepad.usUsagePage = 0x01;
+        gamepad.usUsage = 0x05;
+        gamepad.dwFlags = RIDEV_REMOVE;
+        gamepad.hwndTarget = nullptr;
+        devices.push_back(gamepad);
+        owners.gamepad = nullptr;
+    }
+
+    if (!devices.empty() &&
+        RegisterRawInputDevices(devices.data(), static_cast<UINT>(devices.size()), sizeof(RAWINPUTDEVICE)) != TRUE) {
+        std::cerr << "[warn] RawInput unregister failed error=" << GetLastError() << std::endl;
+    }
 
     hwnd_ = nullptr;
+    registered_keyboard_ = false;
+    registered_gamepad_ = false;
 }
 
 }  // namespace tenriff::input

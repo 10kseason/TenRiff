@@ -2,6 +2,33 @@
 
 TenRiff의 사용자/배포 관점에서 의미 있는 변경만 간단히 기록합니다.
 
+## [1.1.3 Multiplayer Preview r4] - 2026-07-19
+
+### Added
+- 동일 차트 파일을 가진 두 PC가 IP와 TCP 포트로 직접 연결하는 1:1 멀티플레이를 추가하고, 로비/Ready/호스트 시작, 양쪽 로딩 barrier, 실시간 상대 HUD, 최종 결과 및 재대전 흐름을 지원
+- 멀티 선곡 권한을 호스트로 제한하고, 참가자는 호스트의 차트 HASH+파일 크기로 현재 곡 폴더와 프로필에 기록된 최근 로드 폴더의 기존 인덱스에서 동일 차트를 자동 선택
+- Options에 `Profile Setup` 재진입 항목을 추가해 현재 프로필의 언어·오디오·입력 백엔드·그래픽·키맵을 첫 실행과 같은 한 화면에서 다시 설정
+- 양쪽 플레이 종료 후 내 결과와 상대 결과, 승패 및 signed 점수차를 함께 보여주는 대전 결과 화면을 추가
+
+### Changed
+- 멀티플레이 게이지를 세션 전용 단방향 시프트로 변경해 `Normal`이 `33%` 이하가 되면 `Easy 100%`로 한 번 전환되고, 이후 되돌아가지 않으며 `Easy 0%`에서 해당 플레이어가 Game Over되도록 조정
+- 플레이 중 로컬 기준 점수차를 `LOSS(-10,000) <- 0 -> WIN(+10,000)` 끝단으로 표시하되, 끝단 도달은 표시 포화일 뿐 경기를 종료하지 않도록 분리
+- 한쪽이 먼저 Game Over되면 다른 플레이어는 계속 진행하고, 사망한 쪽은 상대의 aggregate 점수·콤보·게이지·상태를 보며 결과를 기다리도록 변경; protocol이 전송하지 않는 정확한 lane input/note state는 관전 화면에 표시하지 않음
+
+### Fixed
+- 메뉴↔게임 입력 전환에서 이전 RawInput 인스턴스의 늦은 해제가 새 등록까지 제거하지 않도록 소유권을 분리하고, 메뉴 health fallback을 복구해 입력 스레드만 살아 있는 무응답 상태를 방지
+- gameplay RawInput 경로에 같은 `InputThread`/`KeyStateTracker`를 쓰는 bound-key polling shadow를 항상 유지하고, polling press가 먼저 도착한 뒤 늦은 Raw press가 오는 순서도 소유권 이전으로 중복 없이 처리해 빠른 잭 입력의 release/재입력 누락을 방지
+- RawInput message pump가 실행 중 예기치 않게 끝나면 queue와 pressed-state를 초기화하지 않고 같은 producer thread에서 Polling으로 전환해 플레이 중 노트 키 입력이 통째로 멎는 경로를 복구
+- 멀티 로비에서 Options 진입 시 Ready를 먼저 해제하고, 멀티 Result의 마우스 Back이 round 상태 정리를 우회해 이후 싱글 Result를 P2P로 오인하던 문제를 수정
+- 경기 종료 HUD와 shutdown 경로가 FinalScore를 중복 전송해 상대 round reset과 충돌할 수 있던 race를 제거
+- protocol v2의 round nonce + 전용 `RoundReset`으로 한쪽이 Result를 먼저 닫았을 때 다음 Ready/선곡이 상대 FinalScore를 지우거나 연결을 끊던 경쟁 조건을 막고, 양쪽 Result 종료 뒤에만 재대전을 해제
+- 모든 경기 패킷을 round nonce로 묶고 ordered `RoundCancel`/ACK barrier를 추가해, Launch와 빠른 Ready 해제가 교차하거나 지연 Loaded/Chart가 도착해도 연결을 유지한 채 로비 상태를 양쪽 Ready=false로 동기화
+- heartbeat RTT의 절반만큼 참가자 Begin 지연을 보정해 직접 IP 환경의 시작 시점 오차를 줄임
+- 싱글 진입/실행 시 남은 멀티 세션·선곡 상태를 정리하고 gameplay 호출 목적을 명시적으로 구분해, 멀티 화면을 거친 뒤 싱글 플레이가 대전 경로로 오인되어 메뉴로 복귀하던 문제를 수정
+
+### Packaging
+- 개인정보성 MP3 태그를 제거한 `TenRiff-1.1.3-multiplayer-preview-r4.zip`을 별도 GitHub prerelease 자산으로 게시하고, 기존 stable 1.1.3 자산은 유지
+
 ## [1.1.3] - 2026-05-11
 
 ### Added
@@ -462,7 +489,7 @@ TenRiff의 사용자/배포 관점에서 의미 있는 변경만 간단히 기�
 - 배포판과 공개 소스 번들 릴리스 라인을 `0.8.0`으로 승격
 
 ### Verified
-- `D:\Stellaverse (2025-12-14)` full-index 실측에서 `46,636` candidate 기준 safe profile peak 메모리가 약 `working set 453MB / private 524MB` 수준으로 완주 확인
+- 46k-chart Windows benchmark library full-index 실측에서 `46,636` candidate 기준 safe profile peak 메모리가 약 `working set 453MB / private 524MB` 수준으로 완주 확인
 - 같은 라이브러리 1024-chart sample 기준 fast profile이 safe profile 대비 약 `2.05x` 빠른 metadata throughput 확인
 
 ## [0.7.9] - 2026-03-16

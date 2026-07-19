@@ -234,12 +234,23 @@ void InputThread::thread_main() {
     g_input_thread = this;
     if (config_.backend == InputBackend::Polling) {
         signal_start_result(true);
-        thread_main_polling();
+        thread_main_polling(false);
         g_input_thread = nullptr;
+        is_running_.store(false, std::memory_order_release);
         return;
     }
-    thread_main_rawinput();
+    const bool rawinput_failed_at_runtime = thread_main_rawinput();
+    if (rawinput_failed_at_runtime && !should_stop_.load(std::memory_order_acquire)) {
+        // Stay on the same producer thread and preserve the queue/tracker. A
+        // GameSession-side restart would race the audio callback and lose held
+        // key state; in-place Polling keeps the next edge playable.
+        std::cerr << "[warn] RawInput message pump exited unexpectedly; continuing with Polling on the same input thread."
+                  << std::endl;
+        active_backend_.store(static_cast<uint8_t>(InputBackend::Polling), std::memory_order_release);
+        thread_main_polling(true);
+    }
     g_input_thread = nullptr;
+    is_running_.store(false, std::memory_order_release);
 }
 
 std::vector<uint32_t> InputThread::build_polling_key_list() const {
@@ -308,7 +319,7 @@ void InputThread::poll_input_keys(const std::vector<uint32_t>& keys,
     }
 }
 
-void InputThread::thread_main_rawinput() {
+bool InputThread::thread_main_rawinput() {
     // Register window class.
     WNDCLASSEXW wc = {};
     wc.cbSize = sizeof(wc);
@@ -325,7 +336,7 @@ void InputThread::thread_main_rawinput() {
                   << class_error << std::endl;
         signal_start_result(false);
         is_running_.store(false, std::memory_order_release);
-        return;
+        return false;
     }
 
     // Create hidden message window.
@@ -349,7 +360,7 @@ void InputThread::thread_main_rawinput() {
             UnregisterClassW(kWindowClassName, GetModuleHandleW(nullptr));
         }
         is_running_.store(false, std::memory_order_release);
-        return;
+        return false;
     }
 
     hwnd_ = hwnd;
@@ -367,7 +378,7 @@ void InputThread::thread_main_rawinput() {
         }
         hwnd_ = nullptr;
         is_running_.store(false, std::memory_order_release);
-        return;
+        return false;
     }
 
     signal_start_result(true);
@@ -386,6 +397,7 @@ void InputThread::thread_main_rawinput() {
         refresh_polling_key_state(keys, last_state);
     }
 
+    bool runtime_failure = false;
     int64_t next_poll_ns = timing::HighResClock::now_ns();
     while (!should_stop_.load(std::memory_order_acquire)) {
         MSG msg;
@@ -393,7 +405,7 @@ void InputThread::thread_main_rawinput() {
         while (PeekMessageW(&msg, nullptr, 0, 0, PM_REMOVE)) {
             had_message = true;
             if (msg.message == WM_QUIT) {
-                should_stop_.store(true, std::memory_order_release);
+                runtime_failure = !should_stop_.load(std::memory_order_acquire);
                 break;
             }
 
@@ -404,7 +416,7 @@ void InputThread::thread_main_rawinput() {
             TranslateMessage(&msg);
             DispatchMessageW(&msg);
         }
-        if (should_stop_.load(std::memory_order_acquire)) {
+        if (runtime_failure || should_stop_.load(std::memory_order_acquire)) {
             break;
         }
 
@@ -447,15 +459,30 @@ void InputThread::thread_main_rawinput() {
     if (registered_class) {
         UnregisterClassW(kWindowClassName, GetModuleHandleW(nullptr));
     }
+    return runtime_failure;
 }
 
-void InputThread::thread_main_polling() {
+void InputThread::thread_main_polling(bool reconcile_existing_state) {
     const int polling_hz = config_.polling_hz <= 0 ? 1000 : config_.polling_hz;
     const int64_t interval_ns = 1'000'000'000LL / static_cast<int64_t>(polling_hz);
     const std::vector<uint32_t> keys = build_polling_key_list();
     std::vector<uint8_t> last_state;
     last_state.reserve(keys.size());
-    refresh_polling_key_state(keys, last_state);
+    if (reconcile_existing_state) {
+        // RawInput may have died after losing the final release edge. Force one
+        // polling transition per tracked key so the preserved KeyStateTracker
+        // is reconciled with the keyboard's current physical state instead of
+        // baselining a stale logical press forever.
+        last_state.resize(keys.size(), 0);
+        for (std::size_t i = 0; i < keys.size(); ++i) {
+            const SHORT state = GetAsyncKeyState(static_cast<int>(keys[i]));
+            const bool pressed = (state & 0x8000) != 0;
+            last_state[i] = pressed ? 0 : 1;
+        }
+        poll_input_keys(keys, last_state, timing::HighResClock::now_ns());
+    } else {
+        refresh_polling_key_state(keys, last_state);
+    }
     SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_ABOVE_NORMAL);
 
     int64_t next_tick_ns = timing::HighResClock::now_ns();

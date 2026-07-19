@@ -112,8 +112,8 @@ public:
 
 private:
     void thread_main();
-    void thread_main_rawinput();
-    void thread_main_polling();
+    [[nodiscard]] bool thread_main_rawinput();
+    void thread_main_polling(bool reconcile_existing_state = false);
     void poll_input_keys(const std::vector<uint32_t>& keys,
                          std::vector<uint8_t>& last_state,
                          int64_t stamp_ns);
