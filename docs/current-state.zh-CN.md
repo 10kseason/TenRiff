@@ -4,14 +4,15 @@
 
 ## 基线
 - 当前项目版本为 `1.1.3`
-- multiplayer preview r4 是独立 prerelease，不会覆盖现有的 `1.1.3 stable` 版本
+- multiplayer preview r5 是独立 prerelease，不会覆盖现有的 `1.1.3 stable` 版本
 - 后续工作的基准文档是 [`docs/baseline-1.1.2.zh-CN.md`](baseline-1.1.2.zh-CN.md)
 - Windows GUI 构建是主目标
 - Linux 仅存在 [`Baepoks-Linuxs/TenRiff-0.5.0-linux-preview`](../Baepoks-Linuxs/TenRiff-0.5.0-linux-preview) 级别的 preview
 - 默认表面是 BMS-first
 - `.osu` 可以通过选项重新启用，并支持 4K~10K
-- `1.1.3 multiplayer preview r4` 的 gameplay 输入优先使用 RawInput，同时在同一 `InputThread` 中持续运行 bound-key polling shadow；启动失败或 message pump 意外退出时，会在不重置 queue/pressed state 的情况下把该 producer 切换到 Polling
-- menu 输入保持 foreground process/root-window 边界；RawInput 启动失败或运行时 thread/event 投递停止时，仅将当前 menu session fallback 到 Polling，并保留 profile 中保存的 backend 设置
+- `1.1.3 multiplayer preview r5` 的 gameplay 输入优先使用 RawInput，同时在同一 `InputThread` 中持续运行 bound-key polling shadow；启动失败或 message pump 意外退出时，会在不重置 queue/pressed state 的情况下把该 producer 切换到 Polling
+- menu 输入保持 foreground process/root-window 边界。检测到 RawInput 启动失败、process-global 注册目标丢失或 hidden message window 退出时，无需等待用户按键即可切换到 Polling。
+- 已确认的 fallback 不会改写 profile，并在本次应用运行期间持续用于 menu 与后续 gameplay；重启应用或明确更改 `Options -> Input Settings -> Backend` 后才会重试。
 
 ## 核心架构
 - `MenuApp`
@@ -139,7 +140,7 @@
 
 ## 运行时 / 打包规则
 - 新用户 profile 会自动创建
-- 公开 P2P prerelease 为 `TenRiff 1.1.3 Multiplayer Preview r4`，与 stable 1.1.3 发布 asset 分离
+- 公开 P2P prerelease 为 `TenRiff 1.1.3 Multiplayer Preview r5`，与 stable 1.1.3 发布 asset 分离
 - 发布包不包含 `Songs`
 - 发布包会同时包含用于菜单 BGM 的 `Mainmusic/` 运行时资源
 - 发布更新只包含已构建产物和必要的运行时资源

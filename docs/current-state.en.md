@@ -4,14 +4,15 @@ This is the document that the next agent or any new contributor should read firs
 
 ## Baseline
 - Current project version: `1.1.3`
-- Multiplayer preview r4 is a separate prerelease line and does not replace the existing `1.1.3 stable` release
+- Multiplayer preview r5 is a separate prerelease line and does not replace the existing `1.1.3 stable` release
 - Baseline companion document for follow-up work: `docs/baseline-1.1.2.en.md`
 - Windows GUI build is the main target
 - Linux exists only as a preview-level package at `Baepoks-Linuxs/TenRiff-0.5.0-linux-preview`
 - Default surface is BMS-first
 - `.osu` can be re-enabled as an option and supports 4K-10K
-- The `1.1.3 multiplayer preview r4` keeps RawInput primary while continuously running a bound-key polling shadow in the same `InputThread`; startup failure or an unexpected message-pump exit switches that producer to Polling without resetting its queue or pressed state
-- Menu input keeps the foreground process/root-window boundary and falls back to Polling for the current menu session when RawInput startup fails or runtime thread/event delivery stops, while preserving the saved profile backend preference
+- The `1.1.3 multiplayer preview r5` keeps RawInput primary while continuously running a bound-key polling shadow in the same `InputThread`; startup failure or an unexpected message-pump exit switches that producer to Polling without resetting its queue or pressed state
+- Menu input keeps the foreground process/root-window boundary. A RawInput startup failure, process-global registration-target loss, or hidden message-window exit switches it to Polling without waiting for a user key.
+- A confirmed fallback stays active across menu and subsequent gameplay sessions for the current app run without rewriting the profile; app restart or an explicit `Options -> Input Settings -> Backend` change retries it.
 
 ## Core Architecture
 - `MenuApp`
@@ -143,7 +144,7 @@ This is the document that the next agent or any new contributor should read firs
 
 ## Runtime / Packaging Rules
 - New user profiles are created automatically
-- The public P2P prerelease is `TenRiff 1.1.3 Multiplayer Preview r4`, separate from the stable 1.1.3 distribution asset
+- The public P2P prerelease is `TenRiff 1.1.3 Multiplayer Preview r5`, separate from the stable 1.1.3 distribution asset
 - Distribution packages do not include `Songs`
 - Distribution packages include the runtime `Mainmusic/` assets used for menu BGM
 - Distribution updates include only built artifacts and required runtime assets

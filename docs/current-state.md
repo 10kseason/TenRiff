@@ -4,14 +4,15 @@
 
 ## Baseline
 - 현재 프로젝트 버전은 `1.1.3`
-- 현재 멀티플레이 preview r4는 기존 `1.1.3 stable`과 분리된 prerelease 라인
+- 현재 멀티플레이 preview r5는 기존 `1.1.3 stable`과 분리된 prerelease 라인
 - 후속 작업의 기준선 문서는 `docs/baseline-1.1.2.md`
 - Windows GUI 빌드가 메인 타깃
 - Linux는 `Baepoks-Linuxs/TenRiff-0.5.0-linux-preview` 수준의 preview만 존재
 - 기본 표면은 BMS-first
 - `.osu`는 옵션으로 다시 활성화 가능하며 4K~10K를 지원
-- `1.1.3 multiplayer preview r4`의 gameplay live 입력은 저장된 RawInput을 우선하면서 같은 `InputThread`의 bound-key polling shadow를 항상 유지하고, 시작 실패뿐 아니라 message pump의 예기치 않은 종료도 queue/state reset 없이 현재 producer thread에서 Polling으로 전환함
-- 메뉴 입력은 기존 foreground process/root-window 경계를 유지하고, RawInput 시작 실패뿐 아니라 런타임 스레드/이벤트 전달 정지도 감지해 현재 메뉴 세션만 Polling으로 fallback하며 profile의 backend 설정은 그대로 보존
+- `1.1.3 multiplayer preview r5`의 gameplay live 입력은 저장된 RawInput을 우선하면서 같은 `InputThread`의 bound-key polling shadow를 항상 유지하고, 시작 실패뿐 아니라 message pump의 예기치 않은 종료도 queue/state reset 없이 현재 producer thread에서 Polling으로 전환함
+- 메뉴 입력은 기존 foreground process/root-window 경계를 유지한다. RawInput 시작 실패, process-global 등록 대상 손실, 숨은 message window 종료를 감지하면 사용자 키 입력을 기다리지 않고 Polling으로 전환한다.
+- 확인된 fallback은 profile 값을 덮어쓰지 않은 채 현재 앱 실행의 메뉴와 다음 gameplay까지 유지한다. 앱 재시작 또는 `Options -> Input Settings -> Backend`의 명시적 변경만 재시도한다.
 
 ## Core Architecture
 - `MenuApp`
@@ -157,7 +158,7 @@
 
 ## Runtime / Packaging Rules
 - 새 사용자 프로필은 자동 생성
-- 이번 공개 P2P prerelease는 `TenRiff 1.1.3 Multiplayer Preview r4`이며 기존 stable 1.1.3 배포 자산과 분리
+- 이번 공개 P2P prerelease는 `TenRiff 1.1.3 Multiplayer Preview r5`이며 기존 stable 1.1.3 배포 자산과 분리
 - 배포 패키지에는 `Songs`를 넣지 않음
 - 배포 패키지는 메뉴 BGM용 `Mainmusic/` 런타임 자산을 함께 포함
 - 배포 업데이트에는 built artifacts와 필요한 런타임 자산만 포함

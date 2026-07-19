@@ -145,6 +145,11 @@ public:
     void set_screenshot_callback(ScreenshotCallback callback);
     void set_peer_spectator_done_callback(PeerSpectatorDoneCallback callback);
     void set_peer_battle_mode(bool enabled) { peer_battle_mode_ = enabled; }
+    void set_input_backend_fallback_override(const InputBackendRuntimeState& state) {
+        force_polling_input_ = state.auto_fallback &&
+                               state.effective_backend == input::InputBackend::Polling;
+        forced_polling_input_state_ = state;
+    }
     [[nodiscard]] HudSnapshot hud_snapshot();
     [[nodiscard]] bool was_user_aborted() const { return user_aborted_.load(std::memory_order_acquire); }
     [[nodiscard]] const GameSessionResult& result() const { return result_; }
@@ -360,8 +365,10 @@ private:
     bool gameplay_started_ = false;
     bool result_transition_pending_ = false;
     bool peer_battle_mode_ = false;
+    bool force_polling_input_ = false;
 
     FutureQueue future_events_{};
+    InputBackendRuntimeState forced_polling_input_state_{};
     InputBackendRuntimeState input_backend_state_{};
     std::vector<PolledGameplayKey> polled_gameplay_keys_;
     std::vector<ToneVoice> tone_voices_;

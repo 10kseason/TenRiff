@@ -484,13 +484,25 @@ void MenuApp::populate_quick_setup_render_data(render::MenuRenderData& render) {
                     4,
                     false,
                     true);
+    std::string profile_backend_value = config_.input.rawinput ? "RawInput" : "Polling";
+    if (config_.input.rawinput && input_backend_fallback_policy_.polling_latched()) {
+        profile_backend_value += " (active: Polling)";
+    }
+    append_menu_row(render.generic,
+                    ui_text("Input Backend", "입력 백엔드"),
+                    profile_backend_value,
+                    settings_cursor_ == profile_setup::kBackendRow,
+                    render::MenuHitTargetKind::SettingsRow,
+                    profile_setup::kBackendRow,
+                    false,
+                    true);
     append_menu_row(render.generic,
                     first_run ? ui_text("Continue to Song Select", "곡 선택으로 계속")
                               : ui_text("Done", "완료"),
                     "",
-                    settings_cursor_ == 5,
+                    settings_cursor_ == profile_setup::kDoneRow,
                     render::MenuHitTargetKind::SettingsRow,
-                    5,
+                    profile_setup::kDoneRow,
                     true,
                     false);
     if (first_run) {
@@ -1157,12 +1169,8 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
     }
 
     screen_ = Screen::Gameplay;
-    last_gameplay_input_backend_state_ = {};
-    last_gameplay_input_backend_state_.configured_backend = config_.input.rawinput
-                                                                ? input::InputBackend::RawInput
-                                                                : input::InputBackend::Polling;
-    last_gameplay_input_backend_state_.effective_backend =
-        last_gameplay_input_backend_state_.configured_backend;
+    last_gameplay_input_backend_state_ =
+        input_backend_fallback_policy_.runtime_state(config_.input.rawinput);
     apply_runtime_graphics_config();
     {
         std::lock_guard<std::mutex> lock(gameplay_hud_mutex_);
@@ -1178,6 +1186,8 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
 
     GameSession session;
     session.set_peer_battle_mode(peer_battle);
+    session.set_input_backend_fallback_override(
+        input_backend_fallback_policy_.runtime_state(config_.input.rawinput));
     session.set_peer_spectator_done_callback([this, peer_battle]() {
         if (!peer_battle) {
             return true;
@@ -1418,9 +1428,10 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
         play_options.ghost_replay_path = best_replay_path_for_selected_song();
     }
     if (!session.initialize(play_options)) {
-        last_gameplay_input_backend_state_ = session.input_backend_state();
         const bool loading_canceled = session.was_user_aborted();
         session.shutdown();
+        last_gameplay_input_backend_state_ = session.input_backend_state();
+        remember_input_backend_fallback(last_gameplay_input_backend_state_);
         if (!loading_canceled) {
             std::cerr << "[error] Failed to initialize gameplay session." << std::endl;
         }
@@ -1463,6 +1474,8 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
 
     if (peer_battle && !coordinate_multiplayer_start()) {
         session.shutdown();
+        last_gameplay_input_backend_state_ = session.input_backend_state();
+        remember_input_backend_fallback(last_gameplay_input_backend_state_);
         const network::PeerSessionSnapshot peer_after_sync = peer_session_.snapshot();
         const bool launch_canceled_cleanly =
             peer_after_sync.state == network::PeerSessionState::Connected &&
@@ -1490,9 +1503,10 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
     }
 
     session.run();
-    last_gameplay_input_backend_state_ = session.input_backend_state();
     const bool session_aborted = session.was_user_aborted();
     session.shutdown();
+    last_gameplay_input_backend_state_ = session.input_backend_state();
+    remember_input_backend_fallback(last_gameplay_input_backend_state_);
 
     const double session_hispeed = session.final_hispeed();
     if (std::abs(session_hispeed - config_.speed.hi_speed) > 0.0001) {
@@ -1764,17 +1778,19 @@ void MenuApp::populate_help_overlay(render::HelpOverlayData& target) const {
         case Screen::SettingsInput:
             target.title = ui_text("Input Settings", "입력 설정");
             target.lines = {
-                ui_text("Up / Down or the mouse wheel selects a row.",
-                        "위 / 아래 키 또는 마우스 휠로 행을 선택합니다."),
-                ui_text("Polling Hz changes how often the polling backend samples keyboard state.",
-                        "Polling Hz는 폴링 백엔드가 키보드 상태를 얼마나 자주 읽을지 바꿉니다."),
+                ui_text("Backend selects RawInput or Polling for this profile.",
+                        "입력 백엔드는 이 프로필에서 사용할 RawInput 또는 Polling을 선택합니다."),
+                ui_text("A confirmed failure stays on Polling; Left selects Polling and Right retries RawInput.",
+                        "고장이 확인되면 Polling을 유지하며, 왼쪽은 Polling 선택, 오른쪽은 RawInput 재시도입니다."),
+                ui_text("Polling Hz controls the Polling backend and gameplay note-key backup cadence.",
+                        "Polling Hz는 폴링 백엔드와 플레이 중 노트 키 보조 감시 주기를 정합니다."),
                 ui_text("Debounce filters switch chatter before gameplay receives duplicate presses.",
-                        "디바운스는 게임플레이가 중복 입력을 받기 전에 스위치 떨림을 걸러냅니다."),
+                        "디바운스는 플레이가 중복 입력을 받기 전에 스위치 채터링을 걸러냅니다."),
                 ui_text("Esc or Backspace saves and returns.",
                         "Esc 또는 Backspace로 저장하고 돌아갑니다."),
             };
             target.footer = ui_text("Input changes apply after the input thread restarts when you leave the screen.",
-                                    "입력 변경 사항은 이 화면을 나가며 입력 스레드가 다시 시작된 뒤 적용됩니다.");
+                                    "화면을 나갈 때 입력 스레드를 다시 시작한 뒤 변경 사항이 적용됩니다.");
             return;
         case Screen::SettingsCalibration:
             target.title = ui_text("Calibration Wizard", "캘리브레이션 위저드");

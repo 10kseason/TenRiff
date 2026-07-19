@@ -2,6 +2,18 @@
 
 TenRiff의 사용자/배포 관점에서 의미 있는 변경만 간단히 기록합니다.
 
+## [1.1.3 Multiplayer Preview r5] - 2026-07-19
+
+### Fixed
+- RawInput 등록을 process-global 단일 소유권으로 관리해 메뉴와 gameplay 입력 인스턴스가 전환 중 서로의 등록을 해제하지 않도록 수정
+- RawInput 대상 창 교체·종료와 숨은 message window 종료를 100ms 주기로 감지하고, 키 입력을 기다리지 않은 채 같은 입력 스레드에서 Polling으로 즉시 전환
+- 한 번 확인된 Polling fallback을 profile 설정 파일은 덮어쓰지 않고 현재 앱 실행과 다음 gameplay까지 유지해, 사망·메뉴 복귀 뒤 키를 움직여야 입력이 살아나던 상태를 제거
+- `Input Settings`와 `Profile Setup`에서 Polling/RawInput을 직접 선택하고 RawInput 재시도를 명시적으로 수행할 수 있도록 backend 설정 흐름을 정리
+- 소유권 충돌, 대상 창 손실, message pump 종료, fallback 고정 및 profile 설정 동작을 회귀 테스트로 추가
+
+### Packaging
+- 입력 backend 수명주기 수정이 포함된 `TenRiff-1.1.3-multiplayer-preview-r5.zip`을 새 GitHub prerelease 자산으로 게시하고, 기존 stable 1.1.3 및 preview r4 자산은 유지
+
 ## [1.1.3 Multiplayer Preview r4] - 2026-07-19
 
 ### Added

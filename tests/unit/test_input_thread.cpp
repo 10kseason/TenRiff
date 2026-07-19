@@ -48,6 +48,19 @@ tenriff::input::InputThreadConfig raw_input_test_config() {
     return config;
 }
 
+bool wait_for_backend(tenriff::input::InputThread& input_thread,
+                      tenriff::input::InputBackend backend,
+                      std::chrono::milliseconds timeout = std::chrono::milliseconds(750)) {
+    const auto deadline = std::chrono::steady_clock::now() + timeout;
+    while (std::chrono::steady_clock::now() < deadline) {
+        if (input_thread.current_backend() == backend) {
+            return true;
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(2));
+    }
+    return input_thread.current_backend() == backend;
+}
+
 }  // namespace
 #endif
 
@@ -84,7 +97,7 @@ TEST_CASE("raw input thread can stop and restart without silently failing") {
 #endif
 }
 
-TEST_CASE("new RawInput owner survives shutdown of the previous input thread") {
+TEST_CASE("second live RawInput owner is rejected until the first owner stops") {
 #if defined(_WIN32)
     using namespace std::chrono_literals;
 
@@ -99,23 +112,26 @@ TEST_CASE("new RawInput owner survives shutdown of the previous input thread") {
     REQUIRE(*previous_target != nullptr);
 
     REQUIRE(current_owner.initialize(config));
+    CHECK_FALSE(current_owner.start());
+    CHECK_FALSE(current_owner.is_running());
+    CHECK(previous_owner.is_running());
+
+    const auto target_after_rejection = registered_raw_keyboard_target();
+    REQUIRE(target_after_rejection.has_value());
+    CHECK(*target_after_rejection == *previous_target);
+    CHECK(IsWindow(*target_after_rejection) != FALSE);
+
+    previous_owner.shutdown();
+
     REQUIRE(current_owner.start());
+    CHECK(current_owner.is_running());
     const auto current_target = registered_raw_keyboard_target();
     REQUIRE(current_target.has_value());
     REQUIRE(*current_target != nullptr);
-    CHECK(*current_target != *previous_target);
-
-    previous_owner.shutdown();
-    std::this_thread::sleep_for(20ms);
-
-    CHECK(current_owner.is_running());
-    const auto target_after_previous_shutdown = registered_raw_keyboard_target();
-    REQUIRE(target_after_previous_shutdown.has_value());
-    CHECK(*target_after_previous_shutdown == *current_target);
-    CHECK(IsWindow(*target_after_previous_shutdown) != FALSE);
+    CHECK(IsWindow(*current_target) != FALSE);
 
     DWORD target_process_id = 0;
-    GetWindowThreadProcessId(*target_after_previous_shutdown, &target_process_id);
+    GetWindowThreadProcessId(*current_target, &target_process_id);
     CHECK(target_process_id == GetCurrentProcessId());
 
     current_owner.shutdown();
@@ -140,13 +156,84 @@ TEST_CASE("RawInput thread falls back in place when its message pump exits") {
     REQUIRE(thread_id != 0);
     REQUIRE(PostThreadMessageW(thread_id, WM_QUIT, 0, 0) != FALSE);
 
-    for (int attempt = 0;
-         attempt < 100 && input_thread.current_backend() != tenriff::input::InputBackend::Polling;
-         ++attempt) {
-        std::this_thread::sleep_for(2ms);
-    }
+    CHECK(wait_for_backend(input_thread, tenriff::input::InputBackend::Polling));
     CHECK(input_thread.is_running());
-    CHECK(input_thread.current_backend() == tenriff::input::InputBackend::Polling);
+    input_thread.shutdown();
+#else
+    SUCCEED();
+#endif
+}
+
+TEST_CASE("RawInput window close switches to Polling without key activity") {
+#if defined(_WIN32)
+    tenriff::input::InputThread input_thread;
+    const auto config = raw_input_test_config();
+    REQUIRE(input_thread.initialize(config));
+    REQUIRE(input_thread.start());
+
+    const auto target = registered_raw_keyboard_target();
+    REQUIRE(target.has_value());
+    REQUIRE(*target != nullptr);
+    REQUIRE(PostMessageW(*target, WM_CLOSE, 0, 0) != FALSE);
+
+    CHECK(wait_for_backend(input_thread, tenriff::input::InputBackend::Polling));
+    CHECK(input_thread.is_running());
+    CHECK(IsWindow(*target) == FALSE);
+    input_thread.shutdown();
+#else
+    SUCCEED();
+#endif
+}
+
+TEST_CASE("RawInput target replacement switches to Polling without key activity") {
+#if defined(_WIN32)
+    tenriff::input::InputThread input_thread;
+    const auto config = raw_input_test_config();
+    REQUIRE(input_thread.initialize(config));
+    REQUIRE(input_thread.start());
+
+    HWND replacement = CreateWindowExW(0,
+                                       L"STATIC",
+                                       L"TenRiff RawInput replacement test",
+                                       WS_POPUP,
+                                       0, 0, 0, 0,
+                                       nullptr,
+                                       nullptr,
+                                       GetModuleHandleW(nullptr),
+                                       nullptr);
+    REQUIRE(replacement != nullptr);
+
+    RAWINPUTDEVICE keyboard{};
+    keyboard.usUsagePage = 0x01;
+    keyboard.usUsage = 0x06;
+    keyboard.dwFlags = RIDEV_INPUTSINK | RIDEV_DEVNOTIFY;
+    keyboard.hwndTarget = replacement;
+    const BOOL override_registered = RegisterRawInputDevices(&keyboard, 1, sizeof(RAWINPUTDEVICE));
+    if (override_registered == FALSE) {
+        DestroyWindow(replacement);
+    }
+    REQUIRE(override_registered != FALSE);
+
+    struct RegistrationCleanup {
+        HWND hwnd = nullptr;
+        ~RegistrationCleanup() {
+            RAWINPUTDEVICE remove{};
+            remove.usUsagePage = 0x01;
+            remove.usUsage = 0x06;
+            remove.dwFlags = RIDEV_REMOVE;
+            remove.hwndTarget = nullptr;
+            RegisterRawInputDevices(&remove, 1, sizeof(RAWINPUTDEVICE));
+            if (hwnd && IsWindow(hwnd) != FALSE) {
+                DestroyWindow(hwnd);
+            }
+        }
+    } cleanup{replacement};
+
+    const auto replaced_target = registered_raw_keyboard_target();
+    REQUIRE(replaced_target.has_value());
+    CHECK(*replaced_target == replacement);
+    CHECK(wait_for_backend(input_thread, tenriff::input::InputBackend::Polling));
+    CHECK(input_thread.is_running());
     input_thread.shutdown();
 #else
     SUCCEED();
