@@ -2,6 +2,28 @@
 
 TenRiff의 사용자/배포 관점에서 의미 있는 변경만 간단히 기록합니다.
 
+## [Unreleased]
+
+## [1.1.4] - 2026-07-20
+
+### Changed
+- `1.1.3 Multiplayer Preview r5`까지의 직접 IP 멀티플레이와 RawInput/Polling 수명주기 수정을 정식 stable 라인에 통합
+- Rate는 곡 재생 속도와 차트 스케줄만 바꾸고, 같은 Hi-Speed의 시각 스크롤 속도는 유지하도록 정리
+
+### Fixed
+- 같은 레인에서 노트 하나를 놓친 뒤 넓은 `BAD` 창의 이전 노트가 다음 정확 입력을 계속 가로채던 판정 고정을 수정하고, 이전 노트는 `BAD` 미스로 정리하되 바로 다음 노트가 `GOOD` 이상으로 명확할 때 그 입력을 다음 노트에 배정
+- Windows를 며칠 이상 재부팅하지 않은 상태에서도 `ClockSync`가 큰 QPC 절대값 때문에 회귀 정밀도를 잃지 않도록 centered anchor 회귀로 변경하고, 지속적인 오디오 시계 불연속 뒤 자동 재기준화
+- gameplay backlog stale 여부를 QPC 이벤트 나이로 판별하고 fresh 입력은 최신 playback anchor와 대조해, 키 불빛은 반응하지만 이후 입력이 비채점 catch-up으로 고정되던 경로를 복구
+- 낮은 Rate에서 HUD가 `Hi-Speed / Rate`를 적용해 노트 스크롤이 오히려 빨라지던 문제를 수정
+
+### Packaging
+- 정식 Windows 배포 자산을 `TenRiff-1.1.4.zip`으로 갱신하고, 멀티플레이 안내와 BMS key converter를 stable 패키지에 포함
+
+### Verification
+- 기본 판정창과 210ms 동일 레인 스트림으로 `BAD` 연쇄를 재현해 수정 전 실패를 확인하고 수정 후 정상 복구를 검증
+- multi-day QPC, 지속 clock discontinuity, fresh/stale input anchor, Rate/Hi-Speed 독립 회귀 테스트를 추가
+- Release `bms_parser_tests`/CTest 통과, Release 실행 파일 링크 성공, 문제 곡 사용자 실플레이 재검증 통과
+
 ## [1.1.3 Multiplayer Preview r5] - 2026-07-19
 
 ### Fixed

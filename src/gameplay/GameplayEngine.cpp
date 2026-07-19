@@ -188,9 +188,12 @@ std::optional<NoteEvent> GameplayEngine::try_hit_note(LaneState& lane, int64_t i
 
         if (delta_samples > windows_.bd) {
             apply_bad_miss(note.start_sample);
-            lane.mask_until = input_sample + windows_.mask;
+            lane.mask_until = std::max(lane.mask_until, note.start_sample + windows_.mask);
             ++lane.next_index;
-            return std::nullopt;
+            if (game_over_) {
+                return std::nullopt;
+            }
+            continue;
         }
 
         if (std::abs(delta_samples) > windows_.bd) {
@@ -198,6 +201,23 @@ std::optional<NoteEvent> GameplayEngine::try_hit_note(LaneState& lane, int64_t i
         }
 
         auto judgement = classify_judgement(delta_samples);
+        if (judgement == game::Judgement::BD && lane.next_index + 1 < lane.notes.size()) {
+            const auto& next_note = lane.notes[lane.next_index + 1];
+            const int64_t next_delta_samples = input_sample - next_note.start_sample;
+
+            // A wide BAD window must not let one missed note steal every later exact press in a dense stream.
+            // Recover only when the immediate next note is unambiguously inside the non-BAD window.
+            if (std::abs(next_delta_samples) <= windows_.gd) {
+                apply_bad_miss(note.start_sample);
+                lane.mask_until = std::max(lane.mask_until, note.start_sample + windows_.mask);
+                ++lane.next_index;
+                if (game_over_) {
+                    return std::nullopt;
+                }
+                continue;
+            }
+        }
+
         double delta_ms = static_cast<double>(delta_samples) * 1000.0 / static_cast<double>(sample_rate_);
         const ComboImpact combo_impact =
             (judgement == game::Judgement::BD) ? ComboImpact::Break : ComboImpact::Increment;

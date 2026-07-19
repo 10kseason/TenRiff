@@ -20,6 +20,7 @@ This document summarizes the structure and data flow of the currently implemente
   - When `rate` is applied, scales the schedule with `t' = t / rate`
 - `gameplay/GameplayEngine.*`
   - Applies judgement windows (`PG / GR / GD / BD`) and the 30ms mask
+  - If an old same-lane note is already BD while the immediate next note is clearly GD or better, records the old note as a miss and assigns the current press to the next note instead of chaining BADs
   - Applies lane masks on POOR events
   - **Hold rule**: early release is BAD
   - **Hold tail rule**: only osu!mania holds and BMS `#LNMODE 2` charge notes evaluate release timing against the normal judgement window (head/tail 50:50)

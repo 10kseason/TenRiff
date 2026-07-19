@@ -699,7 +699,47 @@ TEST_CASE("gameplay engine does not shift later notes after a bad on the same la
     CHECK(engine.stats().combo == 1);
 }
 
-TEST_CASE("late miss recovery press cannot consume the next note") {
+TEST_CASE("gameplay engine recovers from a missed dense note without chaining bad judgements") {
+    GameplayChart chart;
+    chart.lane_count = 1;
+    chart.duration_samples = 3000;
+    chart.notes.push_back(NoteEvent{1, 1000, std::nullopt});
+    chart.notes.push_back(NoteEvent{1, 1210, std::nullopt});
+    chart.notes.push_back(NoteEvent{1, 1420, std::nullopt});
+    chart.notes.push_back(NoteEvent{1, 1630, std::nullopt});
+
+    GameplayConfig config;
+    config.sample_rate = 1000;
+    config.rate = 1.0;
+    config.judge.pg_ms = 15.5;
+    config.judge.gr_ms = 31.0;
+    config.judge.gd_ms = 75.0;
+    config.judge.bd_ms = 340.0;
+    config.judge.mask_ms = 30.0;
+
+    GameplayEngine engine(chart, config);
+    auto first_hit = engine.handle_input(1, InputState::Pressed, 1000);
+    (void)engine.handle_input(1, InputState::Released, 1020);
+
+    REQUIRE(first_hit.has_value());
+    CHECK(first_hit->start_sample == 1000);
+
+    // The 1210 note is intentionally missed. Both later presses are exact for their
+    // intended notes and must not be consumed as late BADs on the preceding note.
+    auto recovered_hit = engine.handle_input(1, InputState::Pressed, 1420);
+    (void)engine.handle_input(1, InputState::Released, 1440);
+    auto following_hit = engine.handle_input(1, InputState::Pressed, 1630);
+
+    REQUIRE(recovered_hit.has_value());
+    CHECK(recovered_hit->start_sample == 1420);
+    REQUIRE(following_hit.has_value());
+    CHECK(following_hit->start_sample == 1630);
+    CHECK(engine.stats().counts.bd == 1);
+    CHECK(engine.stats().counts.pg == 3);
+    CHECK(engine.stats().combo == 2);
+}
+
+TEST_CASE("late miss recovery press scores the clearly closer next note") {
     GameplayChart chart;
     chart.lane_count = 1;
     chart.duration_samples = 3000;
@@ -718,19 +758,12 @@ TEST_CASE("late miss recovery press cannot consume the next note") {
     GameplayEngine engine(chart, config);
     auto recovered = engine.handle_input(1, InputState::Pressed, 1045);
 
-    CHECK_FALSE(recovered.has_value());
+    REQUIRE(recovered.has_value());
+    CHECK(recovered->start_sample == 1060);
     CHECK(engine.stats().counts.bd == 1);
     CHECK(engine.stats().counts.pg == 0);
-
-    auto masked = engine.handle_input(1, InputState::Pressed, 1060);
-    CHECK_FALSE(masked.has_value());
-    CHECK(engine.stats().counts.bd == 1);
-
-    auto next_hit = engine.handle_input(1, InputState::Pressed, 1076);
-    REQUIRE(next_hit.has_value());
-    CHECK(next_hit->start_sample == 1060);
-    CHECK(engine.stats().counts.bd == 1);
     CHECK(engine.stats().counts.gr == 1);
+    CHECK(engine.stats().combo == 1);
 }
 
 TEST_CASE("judge easy mod expands charge hold tail windows during gameplay") {

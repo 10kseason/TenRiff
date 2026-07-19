@@ -44,6 +44,7 @@
 #include "app/PeerBattleRules.h"
 #include "app/SessionResultStatus.h"
 #include "config/Keymap.h"
+#include "game/SpeedManager.h"
 #include "timing/HighResClock.h"
 
 namespace tenriff::app {

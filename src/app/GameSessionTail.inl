@@ -919,11 +919,8 @@ GameSession::HudSnapshot GameSession::hud_snapshot() {
         }
     }
 
-    const double safe_rate =
-        (std::isfinite(snapshot.rate) && snapshot.rate > 0.01) ? snapshot.rate : 1.0;
-    const double safe_hispeed =
-        (std::isfinite(snapshot.hispeed) && snapshot.hispeed > 0.01) ? snapshot.hispeed : 3.0;
-    const double scroll_scale = safe_hispeed / safe_rate;
+    const double scroll_scale =
+        game::SpeedManager::visualScrollScale(snapshot.rate, snapshot.hispeed).value_or(3.0);
     const double normalized_scale = std::max(0.1, scroll_scale / 3.0);
     const double dynamic_lookahead_ms = std::clamp(
         static_cast<double>(kHudLookaheadMs) / normalized_scale,
@@ -2145,9 +2142,10 @@ void GameSession::process_input_queue(int64_t buffer_start_samples, int64_t buff
         return;
     }
 
-    // If input falls well behind the current audio cursor, replaying every stale edge can spike the mix callback.
+    // Backlog age is measured in the same QPC clock as the input event. The
+    // mapped sample can temporarily drift while the audio clock rebases, and
+    // must not turn a fresh physical press into a non-scoring catch-up event.
     const double stale_window_ms = gameplay_input_backlog_stale_window_ms(config_.judge.bd_ms);
-    const int64_t stale_before_sample = buffer_start_samples - ms_to_samples(stale_window_ms, sample_rate_);
     std::array<BufferedLaneInput, kGameplayHudMaxLanes> stale_lane_inputs{};
     std::array<uint8_t, kGameplayHudMaxLanes> stale_lane_present{};
     pending_input_events_.clear();
@@ -2167,13 +2165,28 @@ void GameSession::process_input_queue(int64_t buffer_start_samples, int64_t buff
             continue;
         }
 
+        const bool event_is_stale = gameplay_input_event_is_stale(
+            event.input_time_ns,
+            startup_input_timing_anchor_.callback_time_ns,
+            stale_window_ms);
         auto mapped = clock_sync_.input_to_audio_samples(event.input_time_ns);
-        int64_t sample = resolve_startup_gameplay_input_sample(mapped,
-                                                               event.input_time_ns,
-                                                               startup_input_timing_anchor_,
-                                                               sample_rate_,
-                                                               current_playback_sample_) +
-                         input_offset_samples_;
+        int64_t resolved_sample = resolve_startup_gameplay_input_sample(
+            mapped,
+            event.input_time_ns,
+            startup_input_timing_anchor_,
+            sample_rate_,
+            current_playback_sample_);
+        const auto anchor_sample = estimate_input_sample_from_startup_anchor(
+            event.input_time_ns,
+            startup_input_timing_anchor_,
+            sample_rate_);
+        resolved_sample = reconcile_fresh_gameplay_input_sample(
+            resolved_sample,
+            anchor_sample,
+            event_is_stale,
+            stale_window_ms,
+            sample_rate_);
+        int64_t sample = resolved_sample + input_offset_samples_;
         auto lane = lane_from_keycode(event.keycode);
         if (!lane.has_value()) {
             continue;
@@ -2189,7 +2202,7 @@ void GameSession::process_input_queue(int64_t buffer_start_samples, int64_t buff
         if (lane_index < 0 || lane_index >= static_cast<int>(kGameplayHudMaxLanes)) {
             continue;
         }
-        if (sample < stale_before_sample) {
+        if (event_is_stale) {
             stale_lane_present[static_cast<std::size_t>(lane_index)] = 1;
             stale_lane_inputs[static_cast<std::size_t>(lane_index)] = BufferedLaneInput{
                 lane.value(), event.state, sample};

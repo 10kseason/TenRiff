@@ -4,7 +4,7 @@
 
 ## 当前基线
 - Windows GUI/runtime 是主要受支持路径。
-- 项目版本线是 `1.1.3`；multiplayer preview r5 与 stable 1.1.3 asset 分开发布。
+- 项目版本线是 `1.1.4 stable`；direct-IP multiplayer 与 r5 的输入生命周期修复已包含在此版本线中。
 - 默认启用 BMS-first 的菜单/runtime，同时可以通过 config/menu 开关启用 4K-10K `.osu` 支持。
 - 关于当前已发布的行为，请先看 [`docs/current-state.zh-CN.md`](current-state.zh-CN.md)；这份路线图主要讲方向和剩余工作。
 

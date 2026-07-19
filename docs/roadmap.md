@@ -4,7 +4,7 @@ This roadmap captures the recommended high-level order for building out the game
 
 ## Current baseline
 - Windows GUI/runtime is the primary supported path.
-- Project version line is `1.1.3`; multiplayer preview r5 is published separately from the stable 1.1.3 asset.
+- Project version line is `1.1.4 stable`; direct-IP multiplayer and the r5 input-lifecycle fixes are included in this line.
 - BMS-first menu/runtime is active by default, with optional 4K-10K `.osu` support behind config/menu toggles.
 - For current shipped behavior, read `docs/current-state.md` first; this roadmap is about direction and remaining work.
 
