@@ -3,15 +3,15 @@
 这份文档是下一位 agent 或新任务接手时应该最先阅读的当前状态文档。目标是快速说明“这个项目现在是什么、应该先看哪里、还有哪些内容尚未验证”。
 
 ## 基线
-- 当前项目版本为 `1.1.6 stable`
-- direct-IP multiplayer 与 preview r5 的输入 backend 生命周期修复已整合进 `1.1.6 stable`
-- `1.1.6` 包含 Ghost Battle 默认 `OFF`、安全 OSK/OSZ 安装、更完整的 osu!mania skin 应用、0～100% 判定线、LN 显示与难度评估改进，以及 Mirror 模式
+- 当前项目版本为 `1.1.7 stable`
+- direct-IP multiplayer 与 preview r5 的输入 backend 生命周期修复已整合进 `1.1.7 stable`
+- `1.1.7` 在 1.1.6 功能基础上改进了原生/fallback 音符与 LN 材质、判定/连击与状态槽条 HUD 层级，以及 Song Select 的选择和预览视觉
 - 后续工作的基准文档是 [`docs/baseline-1.1.2.zh-CN.md`](baseline-1.1.2.zh-CN.md)
 - Windows GUI 构建是主目标
 - Linux 仅存在 [`Baepoks-Linuxs/TenRiff-0.5.0-linux-preview`](../Baepoks-Linuxs/TenRiff-0.5.0-linux-preview) 级别的 preview
 - 默认表面是 BMS-first
 - `.osu` 可以通过选项重新启用，并支持 4K~10K
-- `1.1.6 stable` 的 gameplay 输入优先使用 RawInput，同时在同一 `InputThread` 中持续运行 bound-key polling shadow；启动失败或 message pump 意外退出时，会在不重置 queue/pressed state 的情况下把该 producer 切换到 Polling
+- `1.1.7 stable` 的 gameplay 输入优先使用 RawInput，同时在同一 `InputThread` 中持续运行 bound-key polling shadow；启动失败或 message pump 意外退出时，会在不重置 queue/pressed state 的情况下把该 producer 切换到 Polling
 - menu 输入保持 foreground process/root-window 边界。检测到 RawInput 启动失败、process-global 注册目标丢失或 hidden message window 退出时，无需等待用户按键即可切换到 Polling。
 - 已确认的 fallback 不会改写 profile，并在本次应用运行期间持续用于 menu 与后续 gameplay；重启应用或明确更改 `Options -> Input Settings -> Backend` 后才会重试。
 
@@ -151,7 +151,7 @@
 
 ## 运行时 / 打包规则
 - 新用户 profile 会自动创建
-- 当前正式 P2P 发布线为 `TenRiff 1.1.6 stable`
+- 当前正式 P2P 发布线为 `TenRiff 1.1.7 stable`
 - 发布包不包含 `Songs`
 - 发布包会同时包含用于菜单 BGM 的 `Mainmusic/` 运行时资源
 - 发布更新只包含已构建产物和必要的运行时资源

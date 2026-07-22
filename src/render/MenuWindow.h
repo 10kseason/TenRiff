@@ -603,6 +603,8 @@ private:
         std::wstring speed_text{};
         std::wstring score_text{};
         std::wstring combo_text{};
+        std::wstring combo_value_text{};
+        std::wstring combo_label_text{};
         std::wstring judge_stats_text{};
         std::wstring gauge_label_text{};
         std::wstring gauge_value_text{};
@@ -617,6 +619,7 @@ private:
         std::wstring spectating_text{};
         std::wstring ghost_score_text{};
         std::wstring ghost_combo_text{};
+        std::wstring ghost_combo_value_text{};
         std::wstring ghost_judge_stats_text{};
         std::wstring ghost_gauge_label_text{};
         std::wstring ghost_gauge_value_text{};

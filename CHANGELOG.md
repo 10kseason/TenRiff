@@ -4,6 +4,28 @@ TenRiff의 사용자/배포 관점에서 의미 있는 변경만 간단히 기�
 
 ## [Unreleased]
 
+## [1.1.7] - 2026-07-22
+
+### Changed
+
+- 네이티브 노트와 이미지가 없거나 일부만 있는 스킨 fallback을 캐시된 단일 패스 재질 그라데이션으로 개선하고, 롱노트 body의 대비와 tail cap을 명확히 하면서 기존 import 스킨 비트맵은 그대로 보존
+- 0%/100% 위치에서도 판정선 core가 잘리지 않게 하고, 키 입력 pulse·판정/콤보·상태별 게이지를 cyan/white 중심 계층과 캐시된 segmented grid로 재정리
+- player/ghost 콤보와 게이지를 공통 렌더 경로로 통합하고 콤보 문자열을 HUD revision 단위로 캐시해 두 화면의 크기 차이와 불필요한 프레임별 문자열 생성을 제거
+- Song Select 선택곡 아트를 목록 배경에 은은하게 연결하고 선택 카드의 cyan rail/top sheen, 미리보기 HUD band, 긴 필터 값용 compact 표기를 추가해 선택 상태와 정보 대비를 강화
+
+### Packaging
+
+- 정식 Windows 배포 자산을 `baepo/TenRiff-1.1.7`과 `TenRiff-1.1.7.zip`으로 구성하고, 빈 `logs/`/`songs/`, 멀티플레이 안내, BMS key converter를 포함
+- 공개 소스 번들을 활성 Git checkout의 명시 allowlist에서 `opensource-Tenriff-source/TenRiff-1.1.7-source.zip`으로 구성
+
+### Verification
+
+- 0%/100% 판정선 끝점의 노트 좌표 연속성, active LN의 판정선 고정, stale-head에서 headless hold로 전환될 때 빈 프레임이 생기지 않는 조건을 렌더 회귀 테스트로 보강
+- 활성 checkout과 독립 공개 소스 stage에서 각각 단위 테스트 `449 pass / 1 optional skip / 0 fail`, CTest `1/1` 통과
+- Release `TenRiff.exe`, CLI/GUI BMS key converter 링크 성공
+- 바이너리 ZIP `18 entries`와 소스 ZIP `324 entries`를 실제 압축 해제해 stage 및 checkout 파일 해시와 대조하고, 빈 `logs/`/`songs/`, 금지 산출물·개인 로컬 경로·secret 형태 문자열 부재를 확인
+- 앱 내장 캡처로 1280x720 Song Select 및 gameplay의 레이아웃·판정선·게이지를 확인
+
 ## [1.1.6] - 2026-07-22
 
 ### Added

@@ -3,15 +3,15 @@
 이 문서는 다음 에이전트나 새 작업자가 가장 먼저 읽어야 하는 현재 상태 문서입니다. 목표는 "지금 이 프로젝트가 무엇이고, 어디를 보면 되고, 무엇이 아직 미검증인지"를 빠르게 파악하게 하는 것입니다.
 
 ## Baseline
-- 현재 프로젝트 버전은 `1.1.6 stable`
-- 직접 IP 멀티플레이와 preview r5의 입력 backend 수명주기 수정은 `1.1.6 stable`에 통합
-- `1.1.6`는 고스트 배틀 기본 `OFF`, 안전한 OSK/OSZ 설치, 확장된 osu!mania 스킨 적용, 0~100% 판정선, LN 표시·난이도 완화, Mirror 모드를 포함
+- 현재 프로젝트 버전은 `1.1.7 stable`
+- 직접 IP 멀티플레이와 preview r5의 입력 backend 수명주기 수정은 `1.1.7 stable`에 통합
+- `1.1.7`은 1.1.6 기능에 네이티브/fallback 노트·LN 재질, 판정선·콤보·상태별 게이지 HUD 계층, Song Select 선택/미리보기 시각 개선을 추가
 - 후속 작업의 기준선 문서는 `docs/baseline-1.1.2.md`
 - Windows GUI 빌드가 메인 타깃
 - Linux는 `Baepoks-Linuxs/TenRiff-0.5.0-linux-preview` 수준의 preview만 존재
 - 기본 표면은 BMS-first
 - `.osu`는 옵션으로 다시 활성화 가능하며 4K~10K를 지원
-- `1.1.6 stable`의 gameplay live 입력은 저장된 RawInput을 우선하면서 같은 `InputThread`의 bound-key polling shadow를 항상 유지하고, 시작 실패뿐 아니라 message pump의 예기치 않은 종료도 queue/state reset 없이 현재 producer thread에서 Polling으로 전환함
+- `1.1.7 stable`의 gameplay live 입력은 저장된 RawInput을 우선하면서 같은 `InputThread`의 bound-key polling shadow를 항상 유지하고, 시작 실패뿐 아니라 message pump의 예기치 않은 종료도 queue/state reset 없이 현재 producer thread에서 Polling으로 전환함
 - 메뉴 입력은 기존 foreground process/root-window 경계를 유지한다. RawInput 시작 실패, process-global 등록 대상 손실, 숨은 message window 종료를 감지하면 사용자 키 입력을 기다리지 않고 Polling으로 전환한다.
 - 확인된 fallback은 profile 값을 덮어쓰지 않은 채 현재 앱 실행의 메뉴와 다음 gameplay까지 유지한다. 앱 재시작 또는 `Options -> Input Settings -> Backend`의 명시적 변경만 재시도한다.
 
@@ -169,7 +169,7 @@
 
 ## Runtime / Packaging Rules
 - 새 사용자 프로필은 자동 생성
-- 현재 정식 P2P 배포 라인은 `TenRiff 1.1.6 stable`
+- 현재 정식 P2P 배포 라인은 `TenRiff 1.1.7 stable`
 - 배포 패키지에는 `Songs`를 넣지 않음
 - 배포 패키지는 메뉴 BGM용 `Mainmusic/` 런타임 자산을 함께 포함
 - 배포 업데이트에는 built artifacts와 필요한 런타임 자산만 포함

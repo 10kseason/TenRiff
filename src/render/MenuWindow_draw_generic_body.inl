@@ -132,6 +132,10 @@
                 static_cast<float>(std::clamp(preview.note_outline_opacity, 0.0, 1.0) * preview_visual_opacity);
             const float preview_hold_body_opacity =
                 static_cast<float>(std::clamp(preview.hold_body_opacity, 0.05, 0.60) * preview_visual_opacity);
+            const float preview_native_hold_body_opacity =
+                use_imported_metrics
+                    ? preview_hold_body_opacity
+                    : gameplay_native_hold_body_opacity(preview_hold_body_opacity, preview_visual_opacity);
             const float preview_lane_bg_opacity =
                 static_cast<float>(std::clamp(preview.lane_background_opacity, 0.0, 0.45) * preview_visual_opacity);
             const std::string preview_key_label_position =
@@ -238,7 +242,8 @@
                     d2d_->note_border_brush->SetColor(gameplay_note_border_color(rgb, preview_outline_opacity));
                 }
                 if (d2d_->note_hold_brush) {
-                    d2d_->note_hold_brush->SetColor(gameplay_note_hold_color(rgb, preview_hold_body_opacity));
+                    d2d_->note_hold_brush->SetColor(
+                        gameplay_note_hold_color(rgb, preview_native_hold_body_opacity));
                 }
 
                 if (draw_selected_hold_preview) {

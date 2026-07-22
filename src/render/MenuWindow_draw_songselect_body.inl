@@ -71,7 +71,7 @@
         draw_song_select_stardust(D2D1::RectF(960.0f, 874.0f, 1770.0f, 1038.0f), 24, 0x251u, 0.06f);
 
         const D2D1_RECT_F header_rect = D2D1::RectF(0.0f, 70.0f, kBaseWidth, 170.0f);
-        const std::wstring header_w = L"TENG SELECT";
+        const std::wstring header_w = L"TENRIFF SELECT";
         ID2D1Brush* header_brush = d2d_->logo_brush ? static_cast<ID2D1Brush*>(d2d_->logo_brush.Get())
                                                     : static_cast<ID2D1Brush*>(d2d_->accent_brush.Get());
         if (d2d_->logo_brush) {
@@ -131,6 +131,9 @@
             make_screen_content_bands(70.0f, 100.0f, true, 50.0f, 70.0f);
         const float content_top = bands.body_top;
         const float content_bottom = bands.body_bottom;
+        const bool has_selected_preview_art =
+            !data.song_select.showing_sources && !data.song_select.showing_records &&
+            ensure_song_select_preview_bitmap(data.song_select) && d2d_->song_select_preview_bitmap;
         const float nav_left = 120.0f;
         const float nav_width = 290.0f;
         float nav_top = content_top + 12.0f;
@@ -250,6 +253,22 @@
 
         const D2D1_RECT_F list_rect = D2D1::RectF(450.0f, content_top, 1270.0f, content_bottom);
         draw_glass_panel(list_rect, 18.0f, 0.84f, 0.54f + ambient_pulse * 0.14f, true, 8.0f);
+        if (has_selected_preview_art) {
+            // Reuse the already-cached selected preview as a quiet list backdrop. One low-alpha
+            // bitmap draw keeps the cards readable without adding another decode or cache path.
+            const D2D1_RECT_F backdrop_rect =
+                D2D1::RectF(list_rect.left + 8.0f, list_rect.top + 8.0f,
+                            list_rect.right - 8.0f, list_rect.bottom - 8.0f);
+            const D2D1_RECT_F backdrop_source =
+                centered_bitmap_source_rect(d2d_->song_select_preview_bitmap->GetSize(), backdrop_rect);
+            ctx->PushAxisAlignedClip(backdrop_rect, D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
+            ctx->DrawBitmap(d2d_->song_select_preview_bitmap.Get(),
+                            backdrop_rect,
+                            0.075f,
+                            D2D1_BITMAP_INTERPOLATION_MODE_LINEAR,
+                            &backdrop_source);
+            ctx->PopAxisAlignedClip();
+        }
         if (d2d_->title_format && d2d_->text_brush) {
             const std::wstring list_header_w = data.song_select.showing_sources
                                                    ? wloc("Sources", "소스")
@@ -314,9 +333,18 @@
                              4.0f);
             if (song.selected && d2d_->accent_brush) {
                 const float saved_opacity = d2d_->accent_brush->GetOpacity();
-                d2d_->accent_brush->SetOpacity(0.82f);
-                ctx->FillRectangle(D2D1::RectF(card.left + 18.0f, card.bottom - 6.0f, card.right - 18.0f, card.bottom - 4.0f),
-                                   d2d_->accent_brush.Get());
+                d2d_->accent_brush->SetOpacity(0.88f);
+                ctx->FillRoundedRectangle(
+                    D2D1::RoundedRect(D2D1::RectF(card.left + 8.0f, card.top + 14.0f,
+                                                  card.left + 13.0f, card.bottom - 14.0f),
+                                      2.5f, 2.5f),
+                    d2d_->accent_brush.Get());
+                d2d_->accent_brush->SetOpacity(0.14f + card_pulse * 0.08f);
+                ctx->FillRoundedRectangle(
+                    D2D1::RoundedRect(D2D1::RectF(card.left + 22.0f, card.top + 7.0f,
+                                                  card.right - 22.0f, card.top + 9.0f),
+                                      1.0f, 1.0f),
+                    d2d_->accent_brush.Get());
                 d2d_->accent_brush->SetOpacity(saved_opacity);
             }
 
@@ -610,13 +638,20 @@
             }
             const std::wstring label_w = to_wide(std::string(label));
             const std::wstring value_w = to_wide(std::string(value));
-            const D2D1_RECT_F label_rect = D2D1::RectF(stats_left, stats_y, stats_right - 180.0f, stats_y + row_h);
-            const D2D1_RECT_F value_rect = D2D1::RectF(stats_right - 180.0f, stats_y, stats_right, stats_y + row_h);
+            const bool compact_value = value_w.size() > 18u && d2d_->hud_format;
+            const float value_width = compact_value ? 280.0f : 180.0f;
+            const D2D1_RECT_F label_rect =
+                D2D1::RectF(stats_left, stats_y, stats_right - value_width, stats_y + row_h);
+            const D2D1_RECT_F value_rect =
+                D2D1::RectF(stats_right - value_width, stats_y, stats_right, stats_y + row_h);
             draw_text_clipped(label_w,
                               d2d_->stats_label_format.Get(),
                               label_rect,
                               d2d_->muted_brush ? d2d_->muted_brush.Get() : d2d_->text_brush.Get());
-            draw_text_clipped(value_w, d2d_->stats_value_format.Get(), value_rect, d2d_->text_brush.Get());
+            draw_text_clipped(value_w,
+                              compact_value ? d2d_->hud_format.Get() : d2d_->stats_value_format.Get(),
+                              value_rect,
+                              d2d_->text_brush.Get());
             stats_y += row_h;
         };
 
@@ -730,7 +765,7 @@
             const D2D1_RECT_F preview_rect =
                 D2D1::RectF(showcase_rect.left + 8.0f, showcase_rect.top + 8.0f, showcase_rect.right - 8.0f, showcase_rect.bottom - 8.0f);
             const D2D1_ROUNDED_RECT preview_rr = D2D1::RoundedRect(preview_rect, 14.0f, 14.0f);
-            if (ensure_song_select_preview_bitmap(data.song_select) && d2d_->song_select_preview_bitmap) {
+            if (has_selected_preview_art) {
                 const D2D1_RECT_F source_rect =
                     centered_bitmap_source_rect(d2d_->song_select_preview_bitmap->GetSize(), preview_rect);
                 ctx->DrawBitmap(d2d_->song_select_preview_bitmap.Get(),
@@ -760,6 +795,33 @@
                     d2d_->title_format->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_LEADING);
                 }
             }
+            const D2D1_RECT_F preview_hud_band =
+                D2D1::RectF(preview_rect.left + 8.0f,
+                            preview_rect.top + 8.0f,
+                            preview_rect.right - 8.0f,
+                            preview_rect.top + 46.0f);
+            if (d2d_->card_brush) {
+                const float saved_opacity = d2d_->card_brush->GetOpacity();
+                d2d_->card_brush->SetOpacity(0.78f);
+                ctx->FillRoundedRectangle(D2D1::RoundedRect(preview_hud_band, 9.0f, 9.0f),
+                                          d2d_->card_brush.Get());
+                d2d_->card_brush->SetOpacity(saved_opacity);
+            }
+            if (d2d_->accent_brush) {
+                const D2D1_COLOR_F saved_color = d2d_->accent_brush->GetColor();
+                const float saved_opacity = d2d_->accent_brush->GetOpacity();
+                d2d_->accent_brush->SetColor(D2D1::ColorF(0x6EE7F2));
+                d2d_->accent_brush->SetOpacity(0.82f);
+                const D2D1_RECT_F preview_hud_rule =
+                    D2D1::RectF(preview_hud_band.left + 10.0f,
+                                preview_hud_band.bottom - 4.0f,
+                                preview_hud_band.right - 10.0f,
+                                preview_hud_band.bottom - 2.0f);
+                ctx->FillRoundedRectangle(D2D1::RoundedRect(preview_hud_rule, 1.0f, 1.0f),
+                                          d2d_->accent_brush.Get());
+                d2d_->accent_brush->SetColor(saved_color);
+                d2d_->accent_brush->SetOpacity(saved_opacity);
+            }
             if (d2d_->button_border_brush) {
                 const float saved_opacity = d2d_->button_border_brush->GetOpacity();
                 d2d_->button_border_brush->SetOpacity(0.72f);
@@ -767,11 +829,20 @@
                 d2d_->button_border_brush->SetOpacity(saved_opacity);
             }
 
-            if (d2d_->body_format && d2d_->muted_brush) {
+            if (d2d_->body_format && d2d_->text_brush) {
                 const std::wstring preview_label_w = wloc("CHART PREVIEW", "차트 미리보기");
                 const D2D1_RECT_F preview_label_rect =
-                    D2D1::RectF(preview_rect.left + 16.0f, preview_rect.top + 10.0f, preview_rect.right - 16.0f, preview_rect.top + 36.0f);
-                draw_text_clipped(preview_label_w, d2d_->body_format.Get(), preview_label_rect, d2d_->muted_brush.Get());
+                    D2D1::RectF(preview_hud_band.left + 14.0f,
+                                preview_hud_band.top + 2.0f,
+                                preview_hud_band.right - 14.0f,
+                                preview_hud_band.bottom - 6.0f);
+                const D2D1_COLOR_F saved_color = d2d_->text_brush->GetColor();
+                const float saved_opacity = d2d_->text_brush->GetOpacity();
+                d2d_->text_brush->SetColor(D2D1::ColorF(0xF7FAFD));
+                d2d_->text_brush->SetOpacity(0.94f);
+                draw_text_clipped(preview_label_w, d2d_->body_format.Get(), preview_label_rect, d2d_->text_brush.Get());
+                d2d_->text_brush->SetColor(saved_color);
+                d2d_->text_brush->SetOpacity(saved_opacity);
             }
 
             if (d2d_->song_title_format && d2d_->text_brush) {

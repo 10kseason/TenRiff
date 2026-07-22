@@ -812,16 +812,18 @@ float gameplay_combo_overlay_center_x(const GameplayFieldLayout& field_layout) {
 }
 
 D2D1_RECT_F gameplay_combo_overlay_rect(const GameplayFieldLayout& field_layout,
-                                        double combo_position,
-                                        float half_height,
-                                        float top_safe_margin,
-                                        float bottom_safe_margin,
-                                        float vertical_offset = 0.0f,
-                                        float horizontal_inset = 0.0f) {
+                                         double combo_position,
+                                         float half_height,
+                                         float top_safe_margin,
+                                         float bottom_safe_margin,
+                                         float vertical_offset = 0.0f,
+                                         float horizontal_inset = 0.0f,
+                                         float bottom_extension = 0.0f) {
     const float anchor_y =
         gameplay_combo_anchor_y(field_layout, combo_position, top_safe_margin, bottom_safe_margin) + vertical_offset;
     const float min_center_y = field_layout.top + std::max(0.0f, half_height);
-    const float max_center_y = field_layout.bottom - std::max(0.0f, half_height);
+    const float max_center_y = field_layout.bottom - std::max(0.0f, half_height) -
+                               std::max(0.0f, bottom_extension);
     const float center_y =
         (max_center_y <= min_center_y) ? (field_layout.top + field_layout.bottom) * 0.5f
                                        : std::clamp(anchor_y, min_center_y, max_center_y);
@@ -1578,6 +1580,15 @@ D2D1_COLOR_F gameplay_note_hold_color(uint32_t rgb, float opacity = 0.24f) {
     return color_from_rgb(blend_rgb(rgb, 0xFFFFFF, 0.18f), std::clamp(opacity, 0.0f, 1.0f));
 }
 
+float gameplay_native_hold_body_opacity(float base_opacity, float visual_opacity) {
+    // The legacy body alpha is intentionally subtle for bitmap skins, but applying it directly to
+    // the procedural material makes the narrow LN body disappear against jacket-heavy playfields.
+    // Boost only the native/fallback pass; imported body bitmaps keep their authored alpha.
+    constexpr float kNativeHoldBodyContrastGain = 2.10f;
+    return std::min(std::clamp(visual_opacity, 0.0f, 1.0f),
+                    std::clamp(base_opacity, 0.0f, 1.0f) * kNativeHoldBodyContrastGain);
+}
+
 D2D1_COLOR_F gameplay_lane_preview_fill(uint32_t rgb, bool selected, float opacity = 0.18f) {
     const float base_opacity = std::clamp(opacity, 0.0f, 0.60f);
     return color_from_rgb(blend_rgb(rgb, 0xFFFFFF, selected ? 0.12f : 0.04f),
@@ -1622,6 +1633,21 @@ void draw_note_primitive(ID2D1RenderTarget* target,
     }
 
     target->SetAntialiasMode(saved_antialias);
+}
+
+ID2D1Brush* configure_gameplay_material_brush(ID2D1LinearGradientBrush* material,
+                                              ID2D1Brush* fallback,
+                                              const D2D1_RECT_F& rect,
+                                              float opacity,
+                                              bool horizontal) {
+    if (!material) {
+        return fallback;
+    }
+    material->SetStartPoint(D2D1::Point2F(rect.left, rect.top));
+    material->SetEndPoint(horizontal ? D2D1::Point2F(rect.right, rect.top)
+                                     : D2D1::Point2F(rect.left, rect.bottom));
+    material->SetOpacity(std::clamp(opacity, 0.0f, 1.0f));
+    return material;
 }
 
 void set_brush_points(ID2D1LinearGradientBrush* brush, const D2D1_RECT_F& rect) {
@@ -1785,6 +1811,7 @@ struct MenuWindow::D2DResources {
     Microsoft::WRL::ComPtr<IDWriteTextFormat> menu_button_format;
     Microsoft::WRL::ComPtr<IDWriteTextFormat> menu_icon_format;
     Microsoft::WRL::ComPtr<IDWriteTextFormat> header_format;
+    Microsoft::WRL::ComPtr<IDWriteTextFormat> gameplay_combo_format;
     Microsoft::WRL::ComPtr<IDWriteTextFormat> song_title_format;
     Microsoft::WRL::ComPtr<IDWriteTextFormat> song_artist_format;
     Microsoft::WRL::ComPtr<IDWriteTextFormat> hud_format;
@@ -1813,6 +1840,10 @@ struct MenuWindow::D2DResources {
     std::array<D2D1_RECT_F, kGameplayHudMaxLanes> lane_note_hold_body_source_rects{};
     std::array<Microsoft::WRL::ComPtr<ID2D1Bitmap>, kGameplayHudMaxLanes> lane_note_tail_bitmaps{};
     std::array<D2D1_RECT_F, kGameplayHudMaxLanes> lane_note_tail_source_rects{};
+    std::array<Microsoft::WRL::ComPtr<ID2D1LinearGradientBrush>, kGameplayHudMaxLanes>
+        lane_native_note_brushes{};
+    std::array<Microsoft::WRL::ComPtr<ID2D1LinearGradientBrush>, kGameplayHudMaxLanes>
+        lane_native_hold_brushes{};
     std::array<Microsoft::WRL::ComPtr<ID2D1Bitmap>, kGameplayHudMaxLanes> lane_key_idle_bitmaps{};
     std::array<D2D1_RECT_F, kGameplayHudMaxLanes> lane_key_idle_source_rects{};
     std::array<Microsoft::WRL::ComPtr<ID2D1Bitmap>, kGameplayHudMaxLanes> lane_key_pressed_bitmaps{};
@@ -1836,6 +1867,7 @@ struct MenuWindow::D2DResources {
     Microsoft::WRL::ComPtr<ID2D1LinearGradientBrush> bg_brush;
     Microsoft::WRL::ComPtr<ID2D1PathGeometry> performance_graph_geometry;
     Microsoft::WRL::ComPtr<ID2D1CommandList> gameplay_static_command_list;
+    std::array<Microsoft::WRL::ComPtr<ID2D1PathGeometry>, 2> gameplay_gauge_grid_geometries{};
 };
 
 MenuWindow::MenuWindow() : d2d_(std::make_unique<D2DResources>()) {}
@@ -2105,6 +2137,8 @@ bool MenuWindow::initialize(const MenuWindowConfig& config) {
         !create_text_format(L"Segoe UI Semibold", DWRITE_FONT_WEIGHT_SEMI_BOLD, 34.0f, &d2d_->menu_button_format) ||
         !create_text_format(L"Segoe UI Symbol", DWRITE_FONT_WEIGHT_NORMAL, 26.0f, &d2d_->menu_icon_format) ||
         !create_text_format(L"Segoe UI Semibold", DWRITE_FONT_WEIGHT_SEMI_BOLD, 52.0f, &d2d_->header_format) ||
+        !create_text_format(L"Bahnschrift SemiBold", DWRITE_FONT_WEIGHT_SEMI_BOLD, 42.0f,
+                            &d2d_->gameplay_combo_format) ||
         !create_text_format(L"Segoe UI Semibold", DWRITE_FONT_WEIGHT_SEMI_BOLD, 24.0f, &d2d_->song_title_format) ||
         !create_text_format(L"Segoe UI", DWRITE_FONT_WEIGHT_NORMAL, 18.0f, &d2d_->song_artist_format) ||
         !create_text_format(L"Segoe UI", DWRITE_FONT_WEIGHT_NORMAL, 16.0f, &d2d_->hud_format) ||
@@ -2187,6 +2221,12 @@ void MenuWindow::invalidate_gameplay_note_sprite_cache() {
     for (auto& rect : d2d_->lane_note_tail_source_rects) {
         rect = D2D1::RectF(0.0f, 0.0f, 0.0f, 0.0f);
     }
+    for (auto& brush : d2d_->lane_native_note_brushes) {
+        brush.Reset();
+    }
+    for (auto& brush : d2d_->lane_native_hold_brushes) {
+        brush.Reset();
+    }
     for (auto& bitmap : d2d_->lane_key_idle_bitmaps) {
         bitmap.Reset();
     }
@@ -2233,6 +2273,53 @@ bool MenuWindow::ensure_gameplay_note_sprites(const GameplayHudData& data) {
     gameplay_note_sprite_cache_.external_skin_name = data.external_skin_name;
     gameplay_note_sprite_cache_.lr2_resolution_override = data.lr2_resolution_override;
     gameplay_note_sprite_cache_.lane_colors = data.lane_colors;
+
+    // Native and partial-import fallbacks share cached lane gradients. This keeps the material
+    // upgrade inside the existing single fill pass instead of adding a highlight primitive per note.
+    for (int lane = 0; lane < lane_count; ++lane) {
+        const std::size_t index = static_cast<std::size_t>(lane);
+        uint32_t lane_color = 0xF6F8FF;
+        if (index < data.lane_color_count) {
+            lane_color = data.lane_colors[index];
+        } else if (!gameplay_lane_uses_white_note(lane + 1)) {
+            lane_color = 0x4F80FF;
+        }
+
+        const D2D1_GRADIENT_STOP note_stops[] = {
+            {0.00f, color_from_rgb(blend_rgb(lane_color, 0xFFFFFF, 0.78f))},
+            {0.24f, color_from_rgb(blend_rgb(lane_color, 0xFFFFFF, 0.34f))},
+            {0.62f, color_from_rgb(lane_color)},
+            {1.00f, color_from_rgb(blend_rgb(lane_color, 0x07131E, 0.22f))},
+        };
+        Microsoft::WRL::ComPtr<ID2D1GradientStopCollection> note_stop_collection;
+        if (SUCCEEDED(d2d_->d2d_context->CreateGradientStopCollection(
+                note_stops, 4, note_stop_collection.ReleaseAndGetAddressOf()))) {
+            const D2D1_LINEAR_GRADIENT_BRUSH_PROPERTIES properties =
+                D2D1::LinearGradientBrushProperties(D2D1::Point2F(0.0f, 0.0f),
+                                                    D2D1::Point2F(0.0f, 1.0f));
+            static_cast<void>(d2d_->d2d_context->CreateLinearGradientBrush(
+                properties,
+                note_stop_collection.Get(),
+                d2d_->lane_native_note_brushes[index].ReleaseAndGetAddressOf()));
+        }
+
+        const D2D1_GRADIENT_STOP hold_stops[] = {
+            {0.00f, color_from_rgb(blend_rgb(lane_color, 0xFFFFFF, 0.14f))},
+            {0.50f, color_from_rgb(blend_rgb(lane_color, 0xFFFFFF, 0.72f))},
+            {1.00f, color_from_rgb(blend_rgb(lane_color, 0xFFFFFF, 0.14f))},
+        };
+        Microsoft::WRL::ComPtr<ID2D1GradientStopCollection> hold_stop_collection;
+        if (SUCCEEDED(d2d_->d2d_context->CreateGradientStopCollection(
+                hold_stops, 3, hold_stop_collection.ReleaseAndGetAddressOf()))) {
+            const D2D1_LINEAR_GRADIENT_BRUSH_PROPERTIES properties =
+                D2D1::LinearGradientBrushProperties(D2D1::Point2F(0.0f, 0.0f),
+                                                    D2D1::Point2F(1.0f, 0.0f));
+            static_cast<void>(d2d_->d2d_context->CreateLinearGradientBrush(
+                properties,
+                hold_stop_collection.Get(),
+                d2d_->lane_native_hold_brushes[index].ReleaseAndGetAddressOf()));
+        }
+    }
 
     if (source == "native") {
         return true;
@@ -2543,6 +2630,9 @@ void MenuWindow::invalidate_gameplay_static_cache() {
     gameplay_static_cache_ = GameplayStaticCache{};
     if (d2d_) {
         d2d_->gameplay_static_command_list.Reset();
+        for (auto& geometry : d2d_->gameplay_gauge_grid_geometries) {
+            geometry.Reset();
+        }
     }
 }
 
@@ -2648,6 +2738,9 @@ bool MenuWindow::ensure_gameplay_static_cache(const GameplayHudData& data) {
     }
 
     d2d_->gameplay_static_command_list.Reset();
+    for (auto& geometry : d2d_->gameplay_gauge_grid_geometries) {
+        geometry.Reset();
+    }
     if (FAILED(d2d_->d2d_context->CreateCommandList(d2d_->gameplay_static_command_list.ReleaseAndGetAddressOf())) ||
         !d2d_->gameplay_static_command_list) {
         return false;
@@ -2671,6 +2764,31 @@ bool MenuWindow::ensure_gameplay_static_cache(const GameplayHudData& data) {
             desired.lane_spacing_scales,
             desired.ghost_visible,
             desired.lane_center_gap_scale);
+    auto build_gauge_grid = [&](std::size_t index, float gauge_left) {
+        Microsoft::WRL::ComPtr<ID2D1PathGeometry> geometry;
+        if (FAILED(d2d_->d2d_factory->CreatePathGeometry(geometry.ReleaseAndGetAddressOf())) || !geometry) {
+            return;
+        }
+        Microsoft::WRL::ComPtr<ID2D1GeometrySink> sink;
+        if (FAILED(geometry->Open(sink.ReleaseAndGetAddressOf())) || !sink) {
+            return;
+        }
+        for (int segment = 1; segment < 10; ++segment) {
+            const float ratio = static_cast<float>(segment) / 10.0f;
+            const float y = kGameplayGaugeBottom -
+                            (kGameplayGaugeBottom - kGameplayGaugeTop) * ratio;
+            sink->BeginFigure(D2D1::Point2F(gauge_left + 4.0f, y), D2D1_FIGURE_BEGIN_HOLLOW);
+            sink->AddLine(D2D1::Point2F(gauge_left + kGameplayGaugeWidth - 4.0f, y));
+            sink->EndFigure(D2D1_FIGURE_END_OPEN);
+        }
+        if (SUCCEEDED(sink->Close())) {
+            d2d_->gameplay_gauge_grid_geometries[index] = std::move(geometry);
+        }
+    };
+    build_gauge_grid(0, surface_layout.player_gauge_left);
+    if (surface_layout.ghost_visible) {
+        build_gauge_grid(1, surface_layout.ghost_gauge_left);
+    }
     auto draw_field_panel = [&](const GameplayFieldLayout& field_layout) {
         const D2D1_RECT_F field_rect =
             D2D1::RectF(field_layout.left, field_layout.top, field_layout.right, field_layout.bottom);
@@ -2758,7 +2876,29 @@ bool MenuWindow::ensure_gameplay_static_cache(const GameplayHudData& data) {
                 d2d_->judgement_line_brush->SetOpacity(saved_opacity);
             }
             d2d_->d2d_context->FillRoundedRectangle(D2D1::RoundedRect(line_rect, 5.0f, 5.0f),
-                                                    d2d_->judgement_line_brush.Get());
+                                                     d2d_->judgement_line_brush.Get());
+            if (d2d_->accent_brush) {
+                // Keep the endpoint core fully visible while the logical line remains exactly at 0%/100%.
+                const float core_y = std::clamp(hit_line_y,
+                                                field_layout.top + 1.5f,
+                                                field_layout.bottom - 1.5f);
+                const D2D1_COLOR_F saved_color = d2d_->accent_brush->GetColor();
+                const float saved_opacity = d2d_->accent_brush->GetOpacity();
+                d2d_->accent_brush->SetColor(D2D1::ColorF(0x6EE7F2));
+                d2d_->accent_brush->SetOpacity(static_cast<float>(0.92 * desired.visual_opacity));
+                d2d_->d2d_context->DrawLine(D2D1::Point2F(field_layout.left + 7.0f, core_y),
+                                            D2D1::Point2F(field_layout.right - 7.0f, core_y),
+                                            d2d_->accent_brush.Get(),
+                                            3.0f);
+                d2d_->accent_brush->SetColor(D2D1::ColorF(0xF7FAFD));
+                d2d_->accent_brush->SetOpacity(static_cast<float>(0.96 * desired.visual_opacity));
+                d2d_->d2d_context->DrawLine(D2D1::Point2F(field_layout.left + 9.0f, core_y),
+                                            D2D1::Point2F(field_layout.right - 9.0f, core_y),
+                                            d2d_->accent_brush.Get(),
+                                            1.0f);
+                d2d_->accent_brush->SetColor(saved_color);
+                d2d_->accent_brush->SetOpacity(saved_opacity);
+            }
         }
         if (desired.show_gear_boundary_line && d2d_->accent_brush) {
             const float gear_top = gameplay_osu_gear_top(field_layout, hit_line_y, note_height_scale);
@@ -2781,8 +2921,8 @@ bool MenuWindow::ensure_gameplay_static_cache(const GameplayHudData& data) {
         }
         if (d2d_->button_border_brush) {
             d2d_->d2d_context->DrawRoundedRectangle(D2D1::RoundedRect(gauge_frame, 10.0f, 10.0f),
-                                                    d2d_->button_border_brush.Get(),
-                                                    1.4f);
+                                                     d2d_->button_border_brush.Get(),
+                                                     1.4f);
         }
     };
 

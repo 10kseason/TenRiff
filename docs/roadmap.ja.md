@@ -4,7 +4,7 @@
 
 ## Current Baseline
 - Windows GUI / runtime が主なサポート経路です。
-- プロジェクト版ラインは `1.1.6 stable` で、安全な OSK/OSZ import、osu!mania skin 対応拡張、Ghost Battle 既定 `OFF`、判定ライン全域、LN 改善、Mirror mode を含みます。
+- プロジェクト版ラインは `1.1.7 stable` で、1.1.6 の機能に native/fallback note・LN の素材更新、gameplay HUD 階層の統合、Song Select の visual upgrade を追加します。
 - 既定では BMS-first の menu / runtime が有効で、4K-10K `.osu` は config / menu toggle の背後にある任意機能です。
 - 現在出荷されている挙動は [`docs/current-state.ja.md`](current-state.ja.md) を先に見てください。この roadmap は方向と残作業を示す文書です。
 

@@ -2,9 +2,9 @@
 
 Language: Korean | [English](README.en.md) | [简体中文](README.zh-CN.md) | [日本語](README.ja.md)
 
-TenRiff는 Windows GUI 기반 BMS-first 리듬게임 런타임/런처 프로젝트입니다. 목표는 실사용 가능한 BMS 플레이 환경을 중심으로, 저지먼트/오디오/입력/렌더링 파이프라인을 직접 제어하는 독립 실행형 리듬게임 클라이언트를 만드는 것입니다. 현재 정식 프로젝트 버전은 `1.1.6`이며, 직접 IP 멀티플레이, 안전한 OSK/OSZ 가져오기와 확장된 osu!mania 스킨 적용에 더해 0~100% 판정선, 끊김 없는 LN 표시, 완화된 LN 난이도 평가, 결정적 Mirror 모드를 포함합니다. MIT 라이선스를 사용하며, 번들된 서드파티 고지는 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)에 정리합니다.
+TenRiff는 Windows GUI 기반 BMS-first 리듬게임 런타임/런처 프로젝트입니다. 목표는 실사용 가능한 BMS 플레이 환경을 중심으로, 저지먼트/오디오/입력/렌더링 파이프라인을 직접 제어하는 독립 실행형 리듬게임 클라이언트를 만드는 것입니다. 현재 정식 프로젝트 버전은 `1.1.7`이며, 1.1.6의 직접 IP 멀티플레이·안전한 OSK/OSZ 가져오기·0~100% 판정선·LN 난이도 완화·Mirror 모드에 더해 네이티브/fallback 노트·LN 재질, 판정/콤보·게이지 HUD 계층, Song Select 선택/미리보기 시각을 개선했습니다. MIT 라이선스를 사용하며, 번들된 서드파티 고지는 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)에 정리합니다.
 
-이 README는 "프로젝트를 처음 열었을 때 무엇을 보면 되는지"를 설명하는 입문 문서입니다. 더 자세한 현재 동작, 현재 `1.1.6` 프로젝트 상태, `1.1.2 final stable` 기준선, 설정 구조, 설계 문서는 [`docs/README.md`](docs/README.md)부터 이어서 읽는 구조를 기준으로 작성했습니다.
+이 README는 "프로젝트를 처음 열었을 때 무엇을 보면 되는지"를 설명하는 입문 문서입니다. 더 자세한 현재 동작, 현재 `1.1.7` 프로젝트 상태, `1.1.2 final stable` 기준선, 설정 구조, 설계 문서는 [`docs/README.md`](docs/README.md)부터 이어서 읽는 구조를 기준으로 작성했습니다.
 
 TenRiff 코드는 전통적인 장기 설계 문서 중심 개발만으로 쌓인 프로젝트가 아니라, 빠른 반복과 실험을 중시한 `vibe coding` 성격이 강한 작품이라는 점을 명시합니다.
 
@@ -119,7 +119,7 @@ Windows Defender나 다른 안티바이러스가 `TenRiff.exe`를 잠깐 잠그�
 
 ### 3. 공개 소스 패키지로도 빌드 가능
 
-버전별 공개 소스 번들(`TenRiff-1.1.6-source.zip` 같은 패키지)은 `external/`(단, `external/llama.cpp/` 제외), `src/`, `tests/`, `config/`, `docs/`, `Mainmusic/`를 포함하므로, 압축을 푼 폴더만으로도 바로 configure/build 할 수 있습니다.
+버전별 공개 소스 번들(`TenRiff-1.1.7-source.zip` 같은 패키지)은 `external/`(단, `external/llama.cpp/` 제외), `src/`, `tests/`, `config/`, `docs/`, `Mainmusic/`를 포함하므로, 압축을 푼 폴더만으로도 바로 configure/build 할 수 있습니다.
 
 - 공개 소스 번들은 별도 로컬 빌드 래퍼에 의존하지 않으며, 위의 plain `cmake --build` 흐름을 사용합니다.
 - `10k-calc/`는 공개 소스 번들에서 제외되므로 Python reference 기반 optional 검사는 `[skip]`으로 넘어가도 정상입니다.
