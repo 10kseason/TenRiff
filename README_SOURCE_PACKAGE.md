@@ -1,10 +1,10 @@
-TenRiff source package notes (`1.1.6 stable`)
+TenRiff source package notes (`1.1.7 stable`)
 
 - This folder is a curated source-only staging area for public/open-source distribution.
 - It intentionally excludes local build trees, packaged binaries, caches, user profiles, logs, and private working notes.
 - Internal agent workflow files such as `AGENTS.md` are not part of the public source bundle.
 - The included `SOURCE_PACKAGE_SCOPE.txt` file defines the exact include/exclude rules used for the staged bundle.
-- The current source line is the `1.1.6 stable` release, including safe OSK/OSZ import, expanded osu!mania skin fidelity, the full judge-line range, LN improvements, and Mirror mode.
+- The current source line is the `1.1.7 stable` release, adding clearer native/fallback note and LN materials, unified gameplay HUD hierarchy, and stronger Song Select selection/preview visuals on top of the 1.1.6 feature set.
 - The repository license is MIT. Keep the top-level `LICENSE` file with any redistributed source bundle.
 - The source bundle includes the code/docs/dependencies needed for a standalone Windows configure/build, but it does not ship the local `10k-calc/` reference checkout or `external/llama.cpp/`.
 - The staged docs/readmes now track Korean, English, Simplified Chinese, and Japanese entrypoints.

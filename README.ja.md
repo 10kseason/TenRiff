@@ -2,9 +2,9 @@
 
 Language: [한국어](README.md) | [English](README.en.md) | [简体中文](README.zh-CN.md) | 日本語
 
-TenRiff は、Windows GUI ベースの BMS-first リズムゲーム実行環境兼ランチャープロジェクトです。現在の stable プロジェクト版は `1.1.6` で、direct-IP multiplayer、安全な OSK/OSZ import、osu!mania skin 適用の拡張に加え、0～100% の判定ライン、途切れない LN 描画、緩和した LN 難易度評価、決定的 Mirror mode を含みます。ライセンスは MIT で、同梱されるサードパーティ通知は [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) にまとめています。
+TenRiff は、Windows GUI ベースの BMS-first リズムゲーム実行環境兼ランチャープロジェクトです。現在の stable プロジェクト版は `1.1.7` で、1.1.6 の multiplayer・安全な import・判定ライン・LN 評価・Mirror mode に加え、native/fallback note・LN の素材感、判定/コンボ・ゲージ HUD の階層、Song Select の選択/preview 表現を改善しました。ライセンスは MIT で、同梱されるサードパーティ通知は [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) にまとめています。
 
-この README は「プロジェクトを開いたときに最初にどこを見ればよいか」を説明する導入文書です。より詳しい現在の挙動、現在の `1.1.6` プロジェクト状態、`1.1.2 final stable` ベースライン、設定構造、設計文書は [`docs/README.ja.md`](docs/README.ja.md) から続けて読む前提で構成しています。
+この README は「プロジェクトを開いたときに最初にどこを見ればよいか」を説明する導入文書です。より詳しい現在の挙動、現在の `1.1.7` プロジェクト状態、`1.1.2 final stable` ベースライン、設定構造、設計文書は [`docs/README.ja.md`](docs/README.ja.md) から続けて読む前提で構成しています。
 
 TenRiff のコードベースは、伝統的な長文設計書主導だけで積み上がったものではなく、高速な反復と実験を重視した `vibe coding` 的な性格を持つ作品でもあります。
 
@@ -119,7 +119,7 @@ Windows Defender などが一時的に `TenRiff.exe` をロックした場合は
 
 ### 3. 公開ソースパッケージも直接ビルド可能
 
-バージョン付き公開ソースバンドル（`TenRiff-1.1.6-source.zip` のようなパッケージ）には、`external/`（ただし `external/llama.cpp/` を除く）、`src/`、`tests/`、`config/`、`docs/`、`Mainmusic/` が含まれているため、展開したフォルダだけで configure/build できます。
+バージョン付き公開ソースバンドル（`TenRiff-1.1.7-source.zip` のようなパッケージ）には、`external/`（ただし `external/llama.cpp/` を除く）、`src/`、`tests/`、`config/`、`docs/`、`Mainmusic/` が含まれているため、展開したフォルダだけで configure/build できます。
 
 - 公開ソースバンドルはローカルのビルドラッパーに依存しません。上記の通常の `cmake --build` 手順を使います。
 - `10k-calc/` は公開ソースバンドルから除外されるため、Python reference ベースの optional チェックが `[skip]` でも正常です。

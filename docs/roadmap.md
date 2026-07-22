@@ -4,7 +4,7 @@ This roadmap captures the recommended high-level order for building out the game
 
 ## Current baseline
 - Windows GUI/runtime is the primary supported path.
-- Project version line is `1.1.6 stable`; this line also includes safe OSK/OSZ import, expanded osu!mania skin support, Ghost Battle default-off behavior, the full judge-line range, LN improvements, and Mirror mode.
+- Project version line is `1.1.7 stable`; this line adds the native/fallback note and LN material refresh, unified gameplay HUD hierarchy, and Song Select visual upgrade on top of the 1.1.6 feature set.
 - BMS-first menu/runtime is active by default, with optional 4K-10K `.osu` support behind config/menu toggles.
 - For current shipped behavior, read `docs/current-state.md` first; this roadmap is about direction and remaining work.
 

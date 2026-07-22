@@ -3,15 +3,15 @@
 This is the document that the next agent or any new contributor should read first. Its goal is to quickly answer: "what is this project now, where should I look, and what is still unverified?"
 
 ## Baseline
-- Current project version: `1.1.6 stable`
-- Direct-IP multiplayer and the preview r5 input-backend lifecycle fixes are integrated into `1.1.6 stable`
-- `1.1.6` includes Ghost Battle default-off behavior, safe OSK/OSZ installation, expanded osu!mania skin fidelity, a 0-100% judge line, smoother LN visuals and analysis, and Mirror mode
+- Current project version: `1.1.7 stable`
+- Direct-IP multiplayer and the preview r5 input-backend lifecycle fixes are integrated into `1.1.7 stable`
+- `1.1.7` adds clearer native/fallback note and LN materials, a unified judgement/combo and state-aware gauge HUD hierarchy, and stronger Song Select selection/preview visuals on top of the 1.1.6 feature set
 - Baseline companion document for follow-up work: `docs/baseline-1.1.2.en.md`
 - Windows GUI build is the main target
 - Linux exists only as a preview-level package at `Baepoks-Linuxs/TenRiff-0.5.0-linux-preview`
 - Default surface is BMS-first
 - `.osu` can be re-enabled as an option and supports 4K-10K
-- The `1.1.6 stable` runtime keeps RawInput primary while continuously running a bound-key polling shadow in the same `InputThread`; startup failure or an unexpected message-pump exit switches that producer to Polling without resetting its queue or pressed state
+- The `1.1.7 stable` runtime keeps RawInput primary while continuously running a bound-key polling shadow in the same `InputThread`; startup failure or an unexpected message-pump exit switches that producer to Polling without resetting its queue or pressed state
 - Menu input keeps the foreground process/root-window boundary. A RawInput startup failure, process-global registration-target loss, or hidden message-window exit switches it to Polling without waiting for a user key.
 - A confirmed fallback stays active across menu and subsequent gameplay sessions for the current app run without rewriting the profile; app restart or an explicit `Options -> Input Settings -> Backend` change retries it.
 
@@ -155,7 +155,7 @@ This is the document that the next agent or any new contributor should read firs
 
 ## Runtime / Packaging Rules
 - New user profiles are created automatically
-- The current official P2P distribution line is `TenRiff 1.1.6 stable`
+- The current official P2P distribution line is `TenRiff 1.1.7 stable`
 - Distribution packages do not include `Songs`
 - Distribution packages include the runtime `Mainmusic/` assets used for menu BGM
 - Distribution updates include only built artifacts and required runtime assets

@@ -4,7 +4,7 @@
 
 ## 当前基线
 - Windows GUI/runtime 是主要受支持路径。
-- 项目版本线是 `1.1.6 stable`；此版本线也包含安全 OSK/OSZ 导入、更完整的 osu!mania skin 支持、Ghost Battle 默认 `OFF`、完整判定线范围、LN 改进和 Mirror 模式。
+- 项目版本线是 `1.1.7 stable`；此版本线在 1.1.6 功能基础上加入原生/fallback 音符与 LN 材质更新、统一的 gameplay HUD 层级和 Song Select 视觉升级。
 - 默认启用 BMS-first 的菜单/runtime，同时可以通过 config/menu 开关启用 4K-10K `.osu` 支持。
 - 关于当前已发布的行为，请先看 [`docs/current-state.zh-CN.md`](current-state.zh-CN.md)；这份路线图主要讲方向和剩余工作。
 

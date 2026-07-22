@@ -29,6 +29,8 @@
             static_cast<float>(std::clamp(data.gameplay.note_outline_opacity, 0.0, 1.0) * visual_opacity);
         const float hold_body_opacity =
             static_cast<float>(std::clamp(data.gameplay.hold_body_opacity, 0.05, 0.60) * visual_opacity);
+        const float native_hold_body_opacity =
+            gameplay_native_hold_body_opacity(hold_body_opacity, visual_opacity);
         const std::string key_label_position =
             config::normalize_skin_key_label_position_token(data.gameplay.key_label_position);
 
@@ -377,6 +379,8 @@
                 to_wide(loc("COMBO ", "콤보 ") + std::to_string(data.gameplay.combo) +
                         "   " + loc("MAX ", "최대 ") + std::to_string(data.gameplay.max_combo) +
                         "   " + loc("ACC ", "정확도 ") + format_decimal(data.gameplay.accuracy, 2) + "%");
+            gameplay_hud_cache_.combo_value_text = to_wide(std::to_string(data.gameplay.combo));
+            gameplay_hud_cache_.combo_label_text = wloc("COMBO", "콤보");
             gameplay_hud_cache_.judge_stats_text =
                 to_wide("PG " + std::to_string(data.gameplay.pg) +
                         "  GR " + std::to_string(data.gameplay.gr) +
@@ -435,6 +439,8 @@
                 to_wide(loc("COMBO ", "콤보 ") + std::to_string(data.gameplay.ghost_combo) +
                         "   " + loc("MAX ", "최대 ") + std::to_string(data.gameplay.ghost_max_combo) +
                         "   " + loc("ACC ", "정확도 ") + format_decimal(data.gameplay.ghost_accuracy, 2) + "%");
+            gameplay_hud_cache_.ghost_combo_value_text =
+                to_wide(std::to_string(data.gameplay.ghost_combo));
             gameplay_hud_cache_.ghost_judge_stats_text =
                 to_wide("PG " + std::to_string(data.gameplay.ghost_pg) +
                         "  GR " + std::to_string(data.gameplay.ghost_gr) +
@@ -688,6 +694,164 @@
         const D2D1_RECT_F field_clip_rect =
             D2D1::RectF(field_left + 2.0f, field_top + 2.0f, field_right - 2.0f, field_bottom - 2.0f);
         const float hit_line_y = gameplay_field_y(field_top, field_height, judgement_line_position);
+
+        auto draw_vertical_gauge = [&](float gauge_left,
+                                       double gauge_value,
+                                       std::string_view gauge_token,
+                                       const std::wstring& gauge_label_text,
+                                       const std::wstring& gauge_value_text,
+                                       std::size_t gauge_grid_index) {
+            const float gauge_ratio =
+                static_cast<float>(std::clamp(gauge_value / 100.0, 0.0, 1.0));
+            const float fill_top =
+                kGameplayGaugeBottom - (kGameplayGaugeBottom - kGameplayGaugeTop) * gauge_ratio;
+            uint32_t gauge_rgb = 0xFFB703;
+            if (gauge_token == "HARD" || gauge_token == "EX-HARD") {
+                gauge_rgb = 0xFF4D6D;
+            } else if (gauge_token == "EASY") {
+                gauge_rgb = 0x89D185;
+            }
+
+            if (d2d_->accent_brush && gauge_ratio > 0.0f) {
+                const D2D1_COLOR_F saved_color = d2d_->accent_brush->GetColor();
+                const float saved_opacity = d2d_->accent_brush->GetOpacity();
+                const float inner_bottom = kGameplayGaugeBottom - 4.0f;
+                const float inner_top = std::clamp(fill_top + 4.0f,
+                                                   kGameplayGaugeTop + 4.0f,
+                                                   inner_bottom);
+
+                d2d_->accent_brush->SetColor(
+                    color_from_rgb(gauge_rgb, 0.16f * visual_opacity));
+                const D2D1_RECT_F halo =
+                    D2D1::RectF(gauge_left + 1.0f,
+                                std::max(kGameplayGaugeTop + 1.0f, fill_top - 3.0f),
+                                gauge_left + kGameplayGaugeWidth - 1.0f,
+                                kGameplayGaugeBottom - 1.0f);
+                ctx->FillRoundedRectangle(D2D1::RoundedRect(halo, 10.0f, 10.0f),
+                                          d2d_->accent_brush.Get());
+
+                if (inner_top < inner_bottom) {
+                    const D2D1_RECT_F fill =
+                        D2D1::RectF(gauge_left + 4.0f,
+                                    inner_top,
+                                    gauge_left + kGameplayGaugeWidth - 4.0f,
+                                    inner_bottom);
+                    d2d_->accent_brush->SetColor(
+                        color_from_rgb(gauge_rgb, 0.80f * visual_opacity));
+                    ctx->FillRoundedRectangle(D2D1::RoundedRect(fill, 8.0f, 8.0f),
+                                              d2d_->accent_brush.Get());
+
+                    const D2D1_RECT_F sheen =
+                        D2D1::RectF(fill.left + 5.0f,
+                                    fill.top + 3.0f,
+                                    std::min(fill.right - 4.0f, fill.left + 10.0f),
+                                    fill.bottom - 3.0f);
+                    if (sheen.bottom > sheen.top && sheen.right > sheen.left) {
+                        d2d_->accent_brush->SetColor(
+                            color_from_rgb(blend_rgb(gauge_rgb, 0xFFFFFF, 0.72f),
+                                           0.46f * visual_opacity));
+                        ctx->FillRoundedRectangle(D2D1::RoundedRect(sheen, 3.0f, 3.0f),
+                                                  d2d_->accent_brush.Get());
+                    }
+                }
+
+                d2d_->accent_brush->SetColor(saved_color);
+                d2d_->accent_brush->SetOpacity(saved_opacity);
+            }
+
+            if (d2d_->button_border_brush &&
+                gauge_grid_index < d2d_->gameplay_gauge_grid_geometries.size() &&
+                d2d_->gameplay_gauge_grid_geometries[gauge_grid_index]) {
+                const float saved_opacity = d2d_->button_border_brush->GetOpacity();
+                d2d_->button_border_brush->SetOpacity(0.42f * visual_opacity);
+                ctx->DrawGeometry(d2d_->gameplay_gauge_grid_geometries[gauge_grid_index].Get(),
+                                  d2d_->button_border_brush.Get(),
+                                  1.0f);
+                d2d_->button_border_brush->SetOpacity(saved_opacity);
+            }
+
+            const D2D1_RECT_F label_rect =
+                D2D1::RectF(gauge_left - 90.0f,
+                            kGameplayGaugeTop - 42.0f,
+                            gauge_left + 140.0f,
+                            kGameplayGaugeTop - 8.0f);
+            const D2D1_RECT_F value_rect =
+                D2D1::RectF(gauge_left - 90.0f,
+                            kGameplayGaugeBottom + 8.0f,
+                            gauge_left + 140.0f,
+                            kGameplayGaugeBottom + 50.0f);
+            if (d2d_->body_format && d2d_->accent_brush) {
+                const D2D1_COLOR_F saved_color = d2d_->accent_brush->GetColor();
+                const float saved_opacity = d2d_->accent_brush->GetOpacity();
+                d2d_->accent_brush->SetColor(color_from_rgb(gauge_rgb, 0.92f));
+                draw_text_clipped_aligned(gauge_label_text,
+                                          d2d_->body_format.Get(),
+                                          label_rect,
+                                          d2d_->accent_brush.Get(),
+                                          DWRITE_TEXT_ALIGNMENT_CENTER);
+                d2d_->accent_brush->SetColor(saved_color);
+                d2d_->accent_brush->SetOpacity(saved_opacity);
+            }
+            if (d2d_->title_format && d2d_->text_brush) {
+                draw_text_clipped_aligned(gauge_value_text,
+                                          d2d_->title_format.Get(),
+                                          value_rect,
+                                          d2d_->text_brush.Get(),
+                                          DWRITE_TEXT_ALIGNMENT_CENTER);
+            }
+        };
+
+        auto draw_combo_overlay = [&](const GameplayFieldLayout& combo_field_layout,
+                                      const std::wstring& combo_value_text,
+                                      const std::wstring& combo_label_text,
+                                      float top_safe_margin,
+                                      float bottom_safe_margin,
+                                      float vertical_offset) {
+            if (combo_value_text.empty() || !d2d_->accent_brush || !d2d_->gameplay_combo_format) {
+                return;
+            }
+            constexpr float kComboHalfHeight = 30.0f;
+            constexpr float kComboLabelExtension = 18.0f;
+            const D2D1_RECT_F combo_rect =
+                gameplay_combo_overlay_rect(combo_field_layout,
+                                            combo_position,
+                                            kComboHalfHeight,
+                                            top_safe_margin,
+                                            bottom_safe_margin,
+                                            vertical_offset,
+                                            8.0f,
+                                            kComboLabelExtension);
+            if (d2d_->footer_brush) {
+                const D2D1_RECT_F shadow_rect =
+                    D2D1::RectF(combo_rect.left + 2.0f,
+                                combo_rect.top + 3.0f,
+                                combo_rect.right + 2.0f,
+                                combo_rect.bottom + 3.0f);
+                draw_text_clipped_aligned(combo_value_text,
+                                          d2d_->gameplay_combo_format.Get(),
+                                          shadow_rect,
+                                          d2d_->footer_brush.Get(),
+                                          DWRITE_TEXT_ALIGNMENT_CENTER);
+            }
+            const float saved_opacity = d2d_->accent_brush->GetOpacity();
+            d2d_->accent_brush->SetOpacity(0.94f);
+            draw_text_clipped_aligned(combo_value_text,
+                                      d2d_->gameplay_combo_format.Get(),
+                                      combo_rect,
+                                      d2d_->accent_brush.Get(),
+                                      DWRITE_TEXT_ALIGNMENT_CENTER);
+            d2d_->accent_brush->SetOpacity(saved_opacity);
+            if (d2d_->hud_format && d2d_->muted_brush) {
+                draw_text_clipped_aligned(combo_label_text,
+                                          d2d_->hud_format.Get(),
+                                          D2D1::RectF(combo_rect.left,
+                                                      combo_rect.bottom - 2.0f,
+                                                      combo_rect.right,
+                                                      combo_rect.bottom + kComboLabelExtension),
+                                          d2d_->muted_brush.Get(),
+                                          DWRITE_TEXT_ALIGNMENT_CENTER);
+            }
+        };
         if (d2d_->gameplay_static_command_list) {
             ctx->DrawImage(d2d_->gameplay_static_command_list.Get());
         }
@@ -776,6 +940,7 @@
             const bool render_head =
                 should_render_gameplay_note_head(note.start_sample, note.head_visible, display_sample);
             const int lane = std::clamp(note.lane, 1, lane_count);
+            const std::size_t lane_index = static_cast<std::size_t>(lane - 1);
             const float lane_center = gameplay_lane_center(field_layout, lane - 1);
             const float note_width = gameplay_note_width(field_layout, lane - 1);
             const float x0 = lane_center - note_width * 0.5f;
@@ -787,8 +952,8 @@
             const float head_half_h = gameplay_note_head_half_height(note_height_scale);
             const float tail_half_h = gameplay_note_tail_half_height(note_height_scale);
             uint32_t lane_color = 0xF6F8FF;
-            if (static_cast<std::size_t>(lane - 1) < data.gameplay.lane_color_count) {
-                lane_color = data.gameplay.lane_colors[static_cast<std::size_t>(lane - 1)];
+            if (lane_index < data.gameplay.lane_color_count) {
+                lane_color = data.gameplay.lane_colors[lane_index];
             } else if (!gameplay_lane_uses_white_note(lane)) {
                 lane_color = 0x4F80FF;
             }
@@ -802,15 +967,17 @@
                 note_border->SetColor(gameplay_note_border_color(lane_color, note_outline_opacity));
             }
             if (note_hold_fill) {
-                note_hold_fill->SetColor(gameplay_note_hold_color(lane_color, hold_body_opacity));
+                note_hold_fill->SetColor(gameplay_note_hold_color(lane_color, native_hold_body_opacity));
             }
-            ID2D1Bitmap* note_head_bitmap = d2d_->lane_note_head_bitmaps[static_cast<std::size_t>(lane - 1)].Get();
+            ID2D1LinearGradientBrush* note_material = d2d_->lane_native_note_brushes[lane_index].Get();
+            ID2D1LinearGradientBrush* hold_material = d2d_->lane_native_hold_brushes[lane_index].Get();
+            ID2D1Bitmap* note_head_bitmap = d2d_->lane_note_head_bitmaps[lane_index].Get();
             ID2D1Bitmap* note_hold_head_bitmap =
-                d2d_->lane_note_hold_head_bitmaps[static_cast<std::size_t>(lane - 1)].Get();
+                d2d_->lane_note_hold_head_bitmaps[lane_index].Get();
             ID2D1Bitmap* note_hold_body_bitmap =
-                d2d_->lane_note_hold_body_bitmaps[static_cast<std::size_t>(lane - 1)].Get();
+                d2d_->lane_note_hold_body_bitmaps[lane_index].Get();
             ID2D1Bitmap* note_hold_tail_bitmap =
-                d2d_->lane_note_tail_bitmaps[static_cast<std::size_t>(lane - 1)].Get();
+                d2d_->lane_note_tail_bitmaps[lane_index].Get();
 
             if (note.hold && note_hold_fill) {
                 const float head_body_inset = gameplay_hold_body_cap_inset(note_shape, head_half_h);
@@ -822,12 +989,13 @@
                 if (body_bottom > body_top) {
                     if (note_hold_body_bitmap && !data.gameplay.hold_tail_taper_enabled) {
                         const D2D1_RECT_F* hold_body_source_rect =
-                            bitmap_source_rect_or_null(
-                                d2d_->lane_note_hold_body_source_rects[static_cast<std::size_t>(lane - 1)]);
+                            bitmap_source_rect_or_null(d2d_->lane_note_hold_body_source_rects[lane_index]);
                         ctx->DrawBitmap(note_hold_body_bitmap, hold_body, hold_body_opacity,
                                         D2D1_BITMAP_INTERPOLATION_MODE_LINEAR,
                                         hold_body_source_rect);
                     } else {
+                        ID2D1Brush* hold_body_brush = configure_gameplay_material_brush(
+                            hold_material, note_hold_fill, hold_body, native_hold_body_opacity, true);
                         draw_gameplay_hold_body(ctx,
                                                 d2d_->d2d_factory.Get(),
                                                 hold_body,
@@ -836,28 +1004,39 @@
                                                 tail_y,
                                                 hold_half_width,
                                                 data.gameplay.hold_tail_taper_enabled,
-                                                note_hold_fill);
+                                                hold_body_brush);
                     }
                 }
             }
 
-            if (note.hold && note_hold_tail_bitmap) {
+            if (note.hold) {
                 const D2D1_RECT_F tail_rect =
                     D2D1::RectF(x0, tail_y - tail_half_h, x1, tail_y + tail_half_h);
-                const D2D1_RECT_F* tail_source_rect =
-                    bitmap_source_rect_or_null(
-                        d2d_->lane_note_tail_source_rects[static_cast<std::size_t>(lane - 1)]);
-                const D2D1_RECT_F tail_bitmap_rect =
-                    gameplay_note_bitmap_dest_rect(tail_rect,
-                                                   note_hold_tail_bitmap,
-                                                   tail_source_rect,
-                                                   note_shape,
-                                                   data.gameplay.preserve_note_image_aspect_ratio);
-                ctx->DrawBitmap(note_hold_tail_bitmap,
-                                tail_bitmap_rect,
-                                visual_opacity,
-                                D2D1_BITMAP_INTERPOLATION_MODE_LINEAR,
-                                tail_source_rect);
+                if (note_hold_tail_bitmap) {
+                    const D2D1_RECT_F* tail_source_rect =
+                        bitmap_source_rect_or_null(d2d_->lane_note_tail_source_rects[lane_index]);
+                    const D2D1_RECT_F tail_bitmap_rect =
+                        gameplay_note_bitmap_dest_rect(tail_rect,
+                                                       note_hold_tail_bitmap,
+                                                       tail_source_rect,
+                                                       note_shape,
+                                                       data.gameplay.preserve_note_image_aspect_ratio);
+                    ctx->DrawBitmap(note_hold_tail_bitmap,
+                                    tail_bitmap_rect,
+                                    visual_opacity,
+                                    D2D1_BITMAP_INTERPOLATION_MODE_LINEAR,
+                                    tail_source_rect);
+                } else if (note_fill) {
+                    ID2D1Brush* tail_fill = configure_gameplay_material_brush(
+                        note_material, note_fill, tail_rect, visual_opacity, false);
+                    draw_note_primitive(ctx,
+                                        tail_rect,
+                                        tail_fill,
+                                        nullptr,
+                                        0.0f,
+                                        note_shape,
+                                        false);
+                }
             }
 
             const D2D1_RECT_F note_rect = D2D1::RectF(x0, y - head_half_h, x1, y + head_half_h);
@@ -867,9 +1046,9 @@
                     const D2D1_RECT_F* head_source_rect =
                         note.hold
                             ? bitmap_source_rect_or_null(
-                                  d2d_->lane_note_hold_head_source_rects[static_cast<std::size_t>(lane - 1)])
+                                  d2d_->lane_note_hold_head_source_rects[lane_index])
                             : bitmap_source_rect_or_null(
-                                  d2d_->lane_note_head_source_rects[static_cast<std::size_t>(lane - 1)]);
+                                  d2d_->lane_note_head_source_rects[lane_index]);
                     const D2D1_RECT_F bitmap_rect =
                         gameplay_note_bitmap_dest_rect(note_rect,
                                                        head_bitmap,
@@ -880,7 +1059,9 @@
                                     D2D1_BITMAP_INTERPOLATION_MODE_LINEAR, head_source_rect);
                 } else {
                     if (note_fill) {
-                        draw_note_primitive(ctx, note_rect, note_fill, note_border, 0.85f,
+                        ID2D1Brush* head_fill = configure_gameplay_material_brush(
+                            note_material, note_fill, note_rect, visual_opacity, false);
+                        draw_note_primitive(ctx, note_rect, head_fill, note_border, 0.85f,
                                             note_shape, note_border_enabled);
                     }
                 }
@@ -931,41 +1112,13 @@
                                   data.gameplay.feedback_delta_ms);
         }
 
-        if (data.gameplay.combo > 0 && d2d_->accent_brush &&
-            (show_feedback_overlay ? (d2d_->title_format.Get() != nullptr)
-                                   : (d2d_->header_format.Get() != nullptr))) {
-            const std::wstring combo_overlay_w = to_wide(std::to_string(data.gameplay.combo));
-            if (show_feedback_overlay) {
-                const D2D1_RECT_F combo_overlay_rect =
-                    gameplay_combo_overlay_rect(field_layout,
-                                                combo_position,
-                                                22.0f,
-                                                combo_anchor_top_safe,
-                                                combo_anchor_bottom_safe,
-                                                60.0f,
-                                                8.0f);
-                d2d_->accent_brush->SetOpacity(0.92f);
-                draw_text_clipped_aligned(combo_overlay_w,
-                                          d2d_->title_format.Get(),
-                                          combo_overlay_rect,
-                                          d2d_->accent_brush.Get(),
-                                          DWRITE_TEXT_ALIGNMENT_CENTER);
-                d2d_->accent_brush->SetOpacity(1.0f);
-            } else {
-                const D2D1_RECT_F combo_overlay_rect =
-                    gameplay_combo_overlay_rect(field_layout,
-                                                combo_position,
-                                                44.0f,
-                                                combo_anchor_top_safe,
-                                                combo_anchor_bottom_safe,
-                                                0.0f,
-                                                8.0f);
-                draw_text_clipped_aligned(combo_overlay_w,
-                                          d2d_->header_format.Get(),
-                                          combo_overlay_rect,
-                                          d2d_->accent_brush.Get(),
-                                          DWRITE_TEXT_ALIGNMENT_CENTER);
-            }
+        if (data.gameplay.combo > 0) {
+            draw_combo_overlay(field_layout,
+                               gameplay_hud_cache_.combo_value_text,
+                               gameplay_hud_cache_.combo_label_text,
+                               combo_anchor_top_safe,
+                               combo_anchor_bottom_safe,
+                               show_feedback_overlay ? 60.0f : 0.0f);
         }
 
         draw_gameplay_header();
@@ -1299,6 +1452,12 @@
                 const float note_width = gameplay_note_width(field_layout, static_cast<int>(lane));
                 const float pulse_half_w = note_width * (0.50f + 0.09f * pulse);
                 const float pulse_half_h = 5.0f + 8.0f * pulse;
+                const float beam_half_h = 20.0f + 38.0f * pulse;
+                const D2D1_RECT_F beam_rect =
+                    D2D1::RectF(lane_center - pulse_half_w * 0.78f,
+                                std::max(field_top + 2.0f, hit_line_y - beam_half_h),
+                                lane_center + pulse_half_w * 0.78f,
+                                std::min(field_bottom - 2.0f, hit_line_y + beam_half_h));
                 const D2D1_RECT_F glow_rect =
                     D2D1::RectF(lane_center - pulse_half_w,
                                 std::max(field_top + 2.0f, hit_line_y - pulse_half_h),
@@ -1309,48 +1468,24 @@
                     pulse_color = data.gameplay.lane_colors[lane];
                 }
                 d2d_->note_fill_brush->SetColor(
+                    color_from_rgb(blend_rgb(pulse_color, 0x6EE7F2, 0.38f),
+                                   (0.025f + 0.085f * pulse) * visual_opacity));
+                ctx->FillRoundedRectangle(D2D1::RoundedRect(beam_rect, 9.0f, 9.0f),
+                                          d2d_->note_fill_brush.Get());
+                d2d_->note_fill_brush->SetColor(
                     color_from_rgb(blend_rgb(pulse_color, 0xFFFFFF, 0.22f),
-                                   (0.07f + 0.18f * pulse) * visual_opacity));
+                                   (0.10f + 0.24f * pulse) * visual_opacity));
                 ctx->FillRoundedRectangle(D2D1::RoundedRect(glow_rect, 6.0f, 6.0f),
                                           d2d_->note_fill_brush.Get());
             }
         }
 
-        const float gauge_left = surface_layout.player_gauge_left;
-        const float gauge_top = kGameplayGaugeTop;
-        const float gauge_bottom = kGameplayGaugeBottom;
-        const float gauge_width = kGameplayGaugeWidth;
-
-        const float gauge_ratio = static_cast<float>(std::clamp(data.gameplay.gauge / 100.0, 0.0, 1.0));
-        const float fill_top = gauge_bottom - (gauge_bottom - gauge_top) * gauge_ratio;
-        if (d2d_->accent_brush) {
-            D2D1_COLOR_F gauge_color = D2D1::ColorF(0xFFB703, 0.90f);
-            if (data.gameplay.gauge_label == "HARD") {
-                gauge_color = D2D1::ColorF(0xFF4D6D, 0.92f);
-            } else if (data.gameplay.gauge_label == "EASY") {
-                gauge_color = D2D1::ColorF(0x89D185, 0.92f);
-            }
-            d2d_->accent_brush->SetColor(gauge_color);
-            const D2D1_RECT_F fill =
-                D2D1::RectF(gauge_left + 4.0f, fill_top + 4.0f, gauge_left + gauge_width - 4.0f, gauge_bottom - 4.0f);
-            ctx->FillRoundedRectangle(D2D1::RoundedRect(fill, 8.0f, 8.0f), d2d_->accent_brush.Get());
-            d2d_->accent_brush->SetColor(D2D1::ColorF(0x6EE7F2));
-        }
-
-        if (d2d_->body_format && d2d_->text_brush) {
-            const D2D1_RECT_F label_rect =
-                D2D1::RectF(gauge_left - 90.0f, gauge_top - 38.0f, gauge_left + 140.0f, gauge_top - 8.0f);
-            const D2D1_RECT_F value_rect =
-                D2D1::RectF(gauge_left - 90.0f, gauge_bottom + 10.0f, gauge_left + 140.0f, gauge_bottom + 42.0f);
-            d2d_->body_format->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_CENTER);
-            ctx->DrawText(gameplay_hud_cache_.gauge_label_text.c_str(),
-                          static_cast<UINT32>(gameplay_hud_cache_.gauge_label_text.size()),
-                          d2d_->body_format.Get(), label_rect, d2d_->text_brush.Get());
-            ctx->DrawText(gameplay_hud_cache_.gauge_value_text.c_str(),
-                          static_cast<UINT32>(gameplay_hud_cache_.gauge_value_text.size()),
-                          d2d_->body_format.Get(), value_rect, d2d_->text_brush.Get());
-            d2d_->body_format->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_LEADING);
-        }
+        draw_vertical_gauge(surface_layout.player_gauge_left,
+                            data.gameplay.gauge,
+                            data.gameplay.gauge_label,
+                            gameplay_hud_cache_.gauge_label_text,
+                            gameplay_hud_cache_.gauge_value_text,
+                            0);
 
         if (data.gameplay.game_over && !data.gameplay.spectating_peer && d2d_->panel_brush) {
             const D2D1_RECT_F overlay = D2D1::RectF(field_left - 10.0f, field_top - 10.0f,
@@ -1435,6 +1570,7 @@
                 const bool render_head =
                     should_render_gameplay_note_head(note.start_sample, note.head_visible, display_sample);
                 const int lane = std::clamp(note.lane, 1, lane_count);
+                const std::size_t lane_index = static_cast<std::size_t>(lane - 1);
                 const float lane_center = gameplay_lane_center(ghost_field_layout, lane - 1);
                 const float ghost_note_width = gameplay_note_width(ghost_field_layout, lane - 1);
                 const float x0 = lane_center - ghost_note_width * 0.5f;
@@ -1447,8 +1583,8 @@
                 const float head_half_h = gameplay_note_head_half_height(note_height_scale);
                 const float tail_half_h = gameplay_note_tail_half_height(note_height_scale);
                 uint32_t lane_color = 0xF6F8FF;
-                if (static_cast<std::size_t>(lane - 1) < data.gameplay.lane_color_count) {
-                    lane_color = data.gameplay.lane_colors[static_cast<std::size_t>(lane - 1)];
+                if (lane_index < data.gameplay.lane_color_count) {
+                    lane_color = data.gameplay.lane_colors[lane_index];
                 } else if (!gameplay_lane_uses_white_note(lane)) {
                     lane_color = 0x4F80FF;
                 }
@@ -1462,15 +1598,17 @@
                     note_border->SetColor(gameplay_note_border_color(lane_color, note_outline_opacity));
                 }
                 if (note_hold_fill) {
-                    note_hold_fill->SetColor(gameplay_note_hold_color(lane_color, hold_body_opacity));
+                    note_hold_fill->SetColor(gameplay_note_hold_color(lane_color, native_hold_body_opacity));
                 }
-                ID2D1Bitmap* note_head_bitmap = d2d_->lane_note_head_bitmaps[static_cast<std::size_t>(lane - 1)].Get();
+                ID2D1LinearGradientBrush* note_material = d2d_->lane_native_note_brushes[lane_index].Get();
+                ID2D1LinearGradientBrush* hold_material = d2d_->lane_native_hold_brushes[lane_index].Get();
+                ID2D1Bitmap* note_head_bitmap = d2d_->lane_note_head_bitmaps[lane_index].Get();
                 ID2D1Bitmap* note_hold_head_bitmap =
-                    d2d_->lane_note_hold_head_bitmaps[static_cast<std::size_t>(lane - 1)].Get();
+                    d2d_->lane_note_hold_head_bitmaps[lane_index].Get();
                 ID2D1Bitmap* note_hold_body_bitmap =
-                    d2d_->lane_note_hold_body_bitmaps[static_cast<std::size_t>(lane - 1)].Get();
+                    d2d_->lane_note_hold_body_bitmaps[lane_index].Get();
                 ID2D1Bitmap* note_hold_tail_bitmap =
-                    d2d_->lane_note_tail_bitmaps[static_cast<std::size_t>(lane - 1)].Get();
+                    d2d_->lane_note_tail_bitmaps[lane_index].Get();
 
                 if (note.hold && note_hold_fill) {
                     const float head_body_inset =
@@ -1483,12 +1621,13 @@
                     if (body_bottom > body_top) {
                         if (note_hold_body_bitmap && !data.gameplay.hold_tail_taper_enabled) {
                             const D2D1_RECT_F* hold_body_source_rect =
-                                bitmap_source_rect_or_null(
-                                    d2d_->lane_note_hold_body_source_rects[static_cast<std::size_t>(lane - 1)]);
+                                bitmap_source_rect_or_null(d2d_->lane_note_hold_body_source_rects[lane_index]);
                             ctx->DrawBitmap(note_hold_body_bitmap, hold_body, hold_body_opacity,
                                             D2D1_BITMAP_INTERPOLATION_MODE_LINEAR,
                                             hold_body_source_rect);
                         } else {
+                            ID2D1Brush* hold_body_brush = configure_gameplay_material_brush(
+                                hold_material, note_hold_fill, hold_body, native_hold_body_opacity, true);
                             draw_gameplay_hold_body(ctx,
                                                     d2d_->d2d_factory.Get(),
                                                     hold_body,
@@ -1497,28 +1636,39 @@
                                                     tail_y,
                                                     hold_half_width,
                                                     data.gameplay.hold_tail_taper_enabled,
-                                                    note_hold_fill);
+                                                    hold_body_brush);
                         }
                     }
                 }
 
-                if (note.hold && note_hold_tail_bitmap) {
+                if (note.hold) {
                     const D2D1_RECT_F tail_rect =
                         D2D1::RectF(x0, tail_y - tail_half_h, x1, tail_y + tail_half_h);
-                    const D2D1_RECT_F* tail_source_rect =
-                        bitmap_source_rect_or_null(
-                            d2d_->lane_note_tail_source_rects[static_cast<std::size_t>(lane - 1)]);
-                    const D2D1_RECT_F tail_bitmap_rect =
-                        gameplay_note_bitmap_dest_rect(tail_rect,
-                                                       note_hold_tail_bitmap,
-                                                       tail_source_rect,
-                                                       note_shape,
-                                                       data.gameplay.preserve_note_image_aspect_ratio);
-                    ctx->DrawBitmap(note_hold_tail_bitmap,
-                                    tail_bitmap_rect,
-                                    visual_opacity,
-                                    D2D1_BITMAP_INTERPOLATION_MODE_LINEAR,
-                                    tail_source_rect);
+                    if (note_hold_tail_bitmap) {
+                        const D2D1_RECT_F* tail_source_rect =
+                            bitmap_source_rect_or_null(d2d_->lane_note_tail_source_rects[lane_index]);
+                        const D2D1_RECT_F tail_bitmap_rect =
+                            gameplay_note_bitmap_dest_rect(tail_rect,
+                                                           note_hold_tail_bitmap,
+                                                           tail_source_rect,
+                                                           note_shape,
+                                                           data.gameplay.preserve_note_image_aspect_ratio);
+                        ctx->DrawBitmap(note_hold_tail_bitmap,
+                                        tail_bitmap_rect,
+                                        visual_opacity,
+                                        D2D1_BITMAP_INTERPOLATION_MODE_LINEAR,
+                                        tail_source_rect);
+                    } else if (note_fill) {
+                        ID2D1Brush* tail_fill = configure_gameplay_material_brush(
+                            note_material, note_fill, tail_rect, visual_opacity, false);
+                        draw_note_primitive(ctx,
+                                            tail_rect,
+                                            tail_fill,
+                                            nullptr,
+                                            0.0f,
+                                            note_shape,
+                                            false);
+                    }
                 }
 
                 const D2D1_RECT_F note_rect = D2D1::RectF(x0, y - head_half_h, x1, y + head_half_h);
@@ -1528,9 +1678,9 @@
                         const D2D1_RECT_F* head_source_rect =
                             note.hold
                                 ? bitmap_source_rect_or_null(
-                                      d2d_->lane_note_hold_head_source_rects[static_cast<std::size_t>(lane - 1)])
+                                      d2d_->lane_note_hold_head_source_rects[lane_index])
                                 : bitmap_source_rect_or_null(
-                                      d2d_->lane_note_head_source_rects[static_cast<std::size_t>(lane - 1)]);
+                                      d2d_->lane_note_head_source_rects[lane_index]);
                         const D2D1_RECT_F bitmap_rect =
                             gameplay_note_bitmap_dest_rect(note_rect,
                                                            head_bitmap,
@@ -1540,7 +1690,9 @@
                         ctx->DrawBitmap(head_bitmap, bitmap_rect, visual_opacity,
                                         D2D1_BITMAP_INTERPOLATION_MODE_LINEAR, head_source_rect);
                     } else if (note_fill) {
-                        draw_note_primitive(ctx, note_rect, note_fill, note_border, 0.85f,
+                        ID2D1Brush* head_fill = configure_gameplay_material_brush(
+                            note_material, note_fill, note_rect, visual_opacity, false);
+                        draw_note_primitive(ctx, note_rect, head_fill, note_border, 0.85f,
                                             note_shape, note_border_enabled);
                     }
                 }
@@ -1593,41 +1745,13 @@
                                       data.gameplay.ghost_has_feedback,
                                       data.gameplay.ghost_feedback_delta_ms);
             }
-            if (data.gameplay.ghost_combo > 0 && d2d_->accent_brush &&
-                (show_ghost_feedback_overlay ? (d2d_->title_format.Get() != nullptr)
-                                             : (d2d_->header_format.Get() != nullptr))) {
-                const std::wstring combo_overlay_w = to_wide(std::to_string(data.gameplay.ghost_combo));
-                if (show_ghost_feedback_overlay) {
-                    const D2D1_RECT_F combo_overlay_rect =
-                        gameplay_combo_overlay_rect(ghost_field_layout,
-                                                    combo_position,
-                                                    22.0f,
-                                                    ghost_combo_anchor_top_safe,
-                                                    ghost_combo_anchor_bottom_safe,
-                                                    60.0f,
-                                                    8.0f);
-                    d2d_->accent_brush->SetOpacity(0.92f);
-                    draw_text_clipped_aligned(combo_overlay_w,
-                                              d2d_->title_format.Get(),
-                                              combo_overlay_rect,
-                                              d2d_->accent_brush.Get(),
-                                              DWRITE_TEXT_ALIGNMENT_CENTER);
-                    d2d_->accent_brush->SetOpacity(1.0f);
-                } else {
-                    const D2D1_RECT_F combo_overlay_rect =
-                        gameplay_combo_overlay_rect(ghost_field_layout,
-                                                    combo_position,
-                                                    44.0f,
-                                                    ghost_combo_anchor_top_safe,
-                                                    ghost_combo_anchor_bottom_safe,
-                                                    0.0f,
-                                                    8.0f);
-                    draw_text_clipped_aligned(combo_overlay_w,
-                                              d2d_->header_format.Get(),
-                                              combo_overlay_rect,
-                                              d2d_->accent_brush.Get(),
-                                              DWRITE_TEXT_ALIGNMENT_CENTER);
-                }
+            if (data.gameplay.ghost_combo > 0) {
+                draw_combo_overlay(ghost_field_layout,
+                                   gameplay_hud_cache_.ghost_combo_value_text,
+                                   gameplay_hud_cache_.combo_label_text,
+                                   ghost_combo_anchor_top_safe,
+                                   ghost_combo_anchor_bottom_safe,
+                                   show_ghost_feedback_overlay ? 60.0f : 0.0f);
             }
 
             if (data.gameplay.key_pulse_enabled && d2d_->note_fill_brush && data.gameplay.ghost_lane_activity_count > 0) {
@@ -1643,6 +1767,12 @@
                     const float ghost_note_width = gameplay_note_width(ghost_field_layout, static_cast<int>(lane));
                     const float pulse_half_w = ghost_note_width * (0.50f + 0.09f * pulse);
                     const float pulse_half_h = 5.0f + 8.0f * pulse;
+                    const float beam_half_h = 20.0f + 38.0f * pulse;
+                    const D2D1_RECT_F beam_rect =
+                        D2D1::RectF(lane_center - pulse_half_w * 0.78f,
+                                    std::max(ghost_field_top + 2.0f, ghost_hit_line_y - beam_half_h),
+                                    lane_center + pulse_half_w * 0.78f,
+                                    std::min(ghost_field_bottom - 2.0f, ghost_hit_line_y + beam_half_h));
                     const D2D1_RECT_F glow_rect =
                         D2D1::RectF(lane_center - pulse_half_w,
                                     std::max(ghost_field_top + 2.0f, ghost_hit_line_y - pulse_half_h),
@@ -1653,54 +1783,24 @@
                         pulse_color = data.gameplay.lane_colors[lane];
                     }
                     d2d_->note_fill_brush->SetColor(
+                        color_from_rgb(blend_rgb(pulse_color, 0x6EE7F2, 0.38f),
+                                       (0.025f + 0.085f * pulse) * visual_opacity));
+                    ctx->FillRoundedRectangle(D2D1::RoundedRect(beam_rect, 9.0f, 9.0f),
+                                              d2d_->note_fill_brush.Get());
+                    d2d_->note_fill_brush->SetColor(
                         color_from_rgb(blend_rgb(pulse_color, 0xFFFFFF, 0.22f),
-                                       (0.07f + 0.18f * pulse) * visual_opacity));
+                                       (0.10f + 0.24f * pulse) * visual_opacity));
                     ctx->FillRoundedRectangle(D2D1::RoundedRect(glow_rect, 6.0f, 6.0f),
                                               d2d_->note_fill_brush.Get());
                 }
             }
 
-            const float ghost_gauge_left = surface_layout.ghost_gauge_left;
-            const float ghost_gauge_top = kGameplayGaugeTop;
-            const float ghost_gauge_bottom = kGameplayGaugeBottom;
-            const float ghost_gauge_width = kGameplayGaugeWidth;
-            const float ghost_gauge_ratio =
-                static_cast<float>(std::clamp(data.gameplay.ghost_gauge / 100.0, 0.0, 1.0));
-            const float ghost_fill_top =
-                ghost_gauge_bottom - (ghost_gauge_bottom - ghost_gauge_top) * ghost_gauge_ratio;
-            if (d2d_->accent_brush) {
-                D2D1_COLOR_F gauge_color = D2D1::ColorF(0xFFB703, 0.90f);
-                if (data.gameplay.ghost_gauge_label == "HARD") {
-                    gauge_color = D2D1::ColorF(0xFF4D6D, 0.92f);
-                } else if (data.gameplay.ghost_gauge_label == "EASY") {
-                    gauge_color = D2D1::ColorF(0x89D185, 0.92f);
-                }
-                d2d_->accent_brush->SetColor(gauge_color);
-                const D2D1_RECT_F fill =
-                    D2D1::RectF(ghost_gauge_left + 4.0f,
-                                ghost_fill_top + 4.0f,
-                                ghost_gauge_left + ghost_gauge_width - 4.0f,
-                                ghost_gauge_bottom - 4.0f);
-                ctx->FillRoundedRectangle(D2D1::RoundedRect(fill, 8.0f, 8.0f), d2d_->accent_brush.Get());
-                d2d_->accent_brush->SetColor(D2D1::ColorF(0x6EE7F2));
-            }
-
-            if (d2d_->body_format && d2d_->text_brush) {
-                const D2D1_RECT_F label_rect =
-                    D2D1::RectF(ghost_gauge_left - 90.0f, ghost_gauge_top - 38.0f,
-                                ghost_gauge_left + 140.0f, ghost_gauge_top - 8.0f);
-                const D2D1_RECT_F value_rect =
-                    D2D1::RectF(ghost_gauge_left - 90.0f, ghost_gauge_bottom + 10.0f,
-                                ghost_gauge_left + 140.0f, ghost_gauge_bottom + 42.0f);
-                d2d_->body_format->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_CENTER);
-                ctx->DrawText(gameplay_hud_cache_.ghost_gauge_label_text.c_str(),
-                              static_cast<UINT32>(gameplay_hud_cache_.ghost_gauge_label_text.size()),
-                              d2d_->body_format.Get(), label_rect, d2d_->text_brush.Get());
-                ctx->DrawText(gameplay_hud_cache_.ghost_gauge_value_text.c_str(),
-                              static_cast<UINT32>(gameplay_hud_cache_.ghost_gauge_value_text.size()),
-                              d2d_->body_format.Get(), value_rect, d2d_->text_brush.Get());
-                d2d_->body_format->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_LEADING);
-            }
+            draw_vertical_gauge(surface_layout.ghost_gauge_left,
+                                data.gameplay.ghost_gauge,
+                                data.gameplay.ghost_gauge_label,
+                                gameplay_hud_cache_.ghost_gauge_label_text,
+                                gameplay_hud_cache_.ghost_gauge_value_text,
+                                1);
 
             if (data.gameplay.ghost_game_over && d2d_->panel_brush) {
                 const D2D1_RECT_F overlay =
