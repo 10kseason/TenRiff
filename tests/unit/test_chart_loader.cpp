@@ -5,6 +5,7 @@
 #include <string>
 
 #include "app/ChartLoader.h"
+#include "app/OsuAssetPath.h"
 #include "gameplay/GameplayChart.h"
 
 using tenriff::app::ChartLoader;
@@ -301,6 +302,169 @@ TEST_CASE("chart loader loads osu!mania charts when the option is enabled") {
     CHECK(result.chart.notes[1].release_required);
     REQUIRE(result.chart.audio_cues.size() == 1u);
     CHECK(chart_audio_path(result.chart, result.chart.audio_cues.front().asset_id) == audio_path.u8string());
+}
+
+TEST_CASE("osu asset references reject absolute drive UNC rooted and traversal forms") {
+    using tenriff::app::osu_assets::is_safe_relative_reference;
+
+    CHECK(is_safe_relative_reference("audio/song.ogg"));
+    CHECK(is_safe_relative_reference(std::string(u8"오디오/노래.ogg")));
+    CHECK_FALSE(is_safe_relative_reference("../outside.ogg"));
+    CHECK_FALSE(is_safe_relative_reference("audio/../../outside.ogg"));
+    CHECK_FALSE(is_safe_relative_reference("/absolute/outside.ogg"));
+    CHECK_FALSE(is_safe_relative_reference(R"(\rooted\outside.ogg)"));
+    CHECK_FALSE(is_safe_relative_reference(R"(C:\outside.ogg)"));
+    CHECK_FALSE(is_safe_relative_reference(R"(C:outside.ogg)"));
+    CHECK_FALSE(is_safe_relative_reference(R"(\\server\share\outside.ogg)"));
+}
+
+TEST_CASE("chart loader contains osu main audio and custom hitsounds to the chart directory") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+
+    const auto chart_dir = temp.path / "beatmap";
+    std::filesystem::create_directories(chart_dir);
+    const auto outside_audio = temp.path / "outside.ogg";
+    const auto outside_hitsound = temp.path / "outside-hit.ogg";
+    {
+        std::ofstream file(outside_audio, std::ios::binary);
+        REQUIRE(file.good());
+        file << "OggS";
+    }
+    {
+        std::ofstream file(outside_hitsound, std::ios::binary);
+        REQUIRE(file.good());
+        file << "OggS";
+    }
+
+    auto write_chart = [&](const std::filesystem::path& path,
+                           const std::string& audio_reference,
+                           const std::string& custom_hitsound) {
+        std::ofstream chart_file(path, std::ios::binary);
+        REQUIRE(chart_file.good());
+        chart_file << "osu file format v14\n"
+                      "[General]\n"
+                      "AudioFilename:" << audio_reference << "\n"
+                      "Mode:3\n"
+                      "[Difficulty]\n"
+                      "CircleSize:4\n"
+                      "[TimingPoints]\n"
+                      "0,500,4,0,0,100,1,0\n"
+                      "[HitObjects]\n"
+                      "0,0,0,1,0,0:0:0:100:" << custom_hitsound << "\n";
+    };
+
+    const auto traversal_chart = chart_dir / "traversal.osu";
+    write_chart(traversal_chart, "../outside.ogg", "../outside-hit.ogg");
+
+    ChartLoader loader;
+    ChartLoadResult traversal = loader.load(traversal_chart.u8string(), 48000, 1.0, "ignore", true);
+    CHECK(traversal.success());
+    CHECK(traversal.chart.audio_cues.empty());
+    REQUIRE(traversal.chart.notes.size() == 1u);
+    CHECK(tenriff::gameplay::note_audio_asset_count(traversal.chart.notes.front()) == 0u);
+
+    const auto absolute_chart = chart_dir / "absolute.osu";
+    write_chart(absolute_chart, outside_audio.u8string(), outside_hitsound.u8string());
+    ChartLoadResult absolute = loader.load(absolute_chart.u8string(), 48000, 1.0, "ignore", true);
+    CHECK(absolute.success());
+    CHECK(absolute.chart.audio_cues.empty());
+    REQUIRE(absolute.chart.notes.size() == 1u);
+    CHECK(tenriff::gameplay::note_audio_asset_count(absolute.chart.notes.front()) == 0u);
+}
+
+TEST_CASE("chart loader rejects osu audio reached through a link outside the chart directory") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+
+    const auto chart_dir = temp.path / "beatmap";
+    std::filesystem::create_directories(chart_dir);
+    const auto outside_audio = temp.path / "outside.ogg";
+    {
+        std::ofstream file(outside_audio, std::ios::binary);
+        REQUIRE(file.good());
+        file << "OggS";
+    }
+
+    std::error_code link_ec;
+    std::filesystem::create_symlink(outside_audio, chart_dir / "linked.ogg", link_ec);
+    if (link_ec) {
+        return;
+    }
+
+    const auto chart_path = chart_dir / "linked.osu";
+    {
+        std::ofstream chart_file(chart_path, std::ios::binary);
+        REQUIRE(chart_file.good());
+        chart_file << "osu file format v14\n"
+                      "[General]\n"
+                      "AudioFilename:linked.ogg\n"
+                      "Mode:3\n"
+                      "[Difficulty]\n"
+                      "CircleSize:4\n"
+                      "[TimingPoints]\n"
+                      "0,500,4,0,0,100,1,0\n"
+                      "[HitObjects]\n"
+                      "0,0,0,1,0,0:0:0:0:\n";
+    }
+
+    ChartLoader loader;
+    const ChartLoadResult result = loader.load(chart_path.u8string(), 48000, 1.0, "ignore", true);
+    CHECK(result.success());
+    CHECK(result.chart.audio_cues.empty());
+}
+
+TEST_CASE("chart loader preserves nested CJK osu audio and hitsound references") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+
+    const auto chart_dir = temp.path / std::filesystem::u8path(u8"비트맵");
+    const auto audio_dir = chart_dir / std::filesystem::u8path(u8"오디오");
+    const auto hitsound_dir = chart_dir / std::filesystem::u8path(u8"효과");
+    std::filesystem::create_directories(audio_dir);
+    std::filesystem::create_directories(hitsound_dir);
+    const auto audio_path = audio_dir / std::filesystem::u8path(u8"노래.ogg");
+    const auto hitsound_path = hitsound_dir / std::filesystem::u8path(u8"클랩.ogg");
+    {
+        std::ofstream file(audio_path, std::ios::binary);
+        REQUIRE(file.good());
+        file << "OggS";
+    }
+    {
+        std::ofstream file(hitsound_path, std::ios::binary);
+        REQUIRE(file.good());
+        file << "OggS";
+    }
+
+    const auto chart_path = chart_dir / std::filesystem::u8path(u8"차트.osu");
+    {
+        std::ofstream chart_file(chart_path, std::ios::binary);
+        REQUIRE(chart_file.good());
+        chart_file << "osu file format v14\n"
+                      "[General]\n"
+                      "AudioFilename:" << std::string(u8"오디오/노래.ogg") << "\n"
+                      "Mode:3\n"
+                      "[Difficulty]\n"
+                      "CircleSize:4\n"
+                      "[TimingPoints]\n"
+                      "0,500,4,0,0,100,1,0\n"
+                      "[HitObjects]\n"
+                      "0,0,0,1,0,0:0:0:100:" << std::string(u8"효과/클랩.ogg") << "\n";
+    }
+
+    ChartLoader loader;
+    const ChartLoadResult result = loader.load(chart_path.u8string(), 48000, 1.0, "ignore", true);
+    CHECK(result.success());
+    REQUIRE(result.chart.audio_cues.size() == 1u);
+    CHECK(chart_audio_path(result.chart, result.chart.audio_cues.front().asset_id) ==
+          std::filesystem::weakly_canonical(audio_path).u8string());
+    REQUIRE(result.chart.notes.size() == 1u);
+    REQUIRE(tenriff::gameplay::note_audio_asset_count(result.chart.notes.front()) == 1u);
+    CHECK(chart_audio_path(result.chart, result.chart.notes.front().audio_asset_id) ==
+          std::filesystem::weakly_canonical(hitsound_path).u8string());
 }
 
 TEST_CASE("chart loader falls back to osu sibling ogg when AudioFilename is missing") {

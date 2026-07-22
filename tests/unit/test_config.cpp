@@ -90,9 +90,12 @@ TEST_CASE("config defaults prefer 44100 Hz audio") {
     CHECK(config.input.debounce_ms == doctest::Approx(8.0));
     CHECK(config.mode.format == "bms");
     CHECK_FALSE(config.mode.enable_osu_charts);
+    CHECK_FALSE(config.mode.ghost_battle_enabled);
     CHECK(config.mode.song_index_profile == "safe");
     CHECK(config.graphics.resolution == "native");
     CHECK(config.graphics.display_mode == "borderless");
+    CHECK(tenriff::config::kJudgementLinePositionMin == doctest::Approx(0.0));
+    CHECK(tenriff::config::kJudgementLinePositionMax == doctest::Approx(1.0));
     CHECK_FALSE(config.graphics.vsync);
     CHECK(config.graphics.refresh_hz == 300);
     CHECK(config.gauge.ex_hard.pg == doctest::Approx(kCurrentExHardPg));
@@ -368,6 +371,7 @@ TEST_CASE("config save and load preserve volume and speed settings") {
     config.speed.rate = 1.25;
     config.speed.hi_speed = 4.75;
     config.mode.enable_osu_charts = true;
+    config.mode.ghost_battle_enabled = true;
     config.mode.format = "osu";
     config.mode.song_index_profile = "fast";
 
@@ -384,6 +388,7 @@ TEST_CASE("config save and load preserve volume and speed settings") {
     CHECK(result.config.speed.rate == doctest::Approx(1.25));
     CHECK(result.config.speed.hi_speed == doctest::Approx(4.75));
     CHECK(result.config.mode.enable_osu_charts);
+    CHECK(result.config.mode.ghost_battle_enabled);
     CHECK(result.config.mode.format == "osu");
     CHECK(result.config.mode.song_index_profile == "fast");
 }
@@ -851,7 +856,7 @@ TEST_CASE("config save and load preserve skin gameplay settings") {
     config.skin.show_judgement_line = false;
     config.skin.show_gear_boundary_line = true;
     config.skin.hold_tail_taper_enabled = true;
-    config.skin.judgement_line_position = 0.76;
+    config.skin.judgement_line_position = 0.0;
     config.skin.combo_position = 0.52;
     config.skin.lane_width_scales["4k"] = {0.75, 1.10, 1.10, 0.75};
     config.skin.note_width_scale = 1.15;
@@ -882,7 +887,7 @@ TEST_CASE("config save and load preserve skin gameplay settings") {
     CHECK_FALSE(result.config.skin.show_judgement_line);
     CHECK(result.config.skin.show_gear_boundary_line);
     CHECK(result.config.skin.hold_tail_taper_enabled);
-    CHECK(result.config.skin.judgement_line_position == doctest::Approx(0.76));
+    CHECK(result.config.skin.judgement_line_position == doctest::Approx(0.0));
     CHECK(result.config.skin.combo_position == doctest::Approx(0.52));
     const auto saved_lane_widths_4k = tenriff::config::resolved_skin_lane_width_scales(result.config.skin, "4k");
     REQUIRE(saved_lane_widths_4k.size() == 4u);
@@ -1012,6 +1017,30 @@ TEST_CASE("config clamps skin gameplay settings into supported range") {
     REQUIRE(saved_10k.size() == 10u);
     CHECK(saved_10k[0] == "rose");
     CHECK(saved_10k[9] == "rose");
+}
+
+TEST_CASE("config clamps judgement line positions below zero") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+
+    CurrentPathGuard cwd;
+    std::error_code ec;
+    std::filesystem::current_path(temp.path, ec);
+    REQUIRE_FALSE(static_cast<bool>(ec));
+
+    ConfigLoader loader;
+    auto config = loader.defaults();
+    config.skin.judgement_line_position = -0.25;
+
+    std::string error;
+    REQUIRE(loader.save_profile("profiles/test", config, &error));
+    CHECK(error.empty());
+
+    const auto result = loader.load_profile("profiles/test");
+    REQUIRE(result.success());
+    CHECK(result.config.skin.judgement_line_position ==
+          doctest::Approx(tenriff::config::kJudgementLinePositionMin));
 }
 
 TEST_CASE("config save and load preserve recent song sources") {

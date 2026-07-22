@@ -35,7 +35,7 @@ namespace tenriff::app {
 
 namespace {
 
-constexpr int kSongIndexVersion = 9;
+constexpr int kSongIndexVersion = 10;
 constexpr std::uintmax_t kMaxMetadataChartFileBytes = 8u * 1024u * 1024u;
 
 bool cancel_requested(const SongIndexCancelCallback& cancel) {

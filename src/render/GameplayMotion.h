@@ -53,10 +53,35 @@ inline double compute_gameplay_note_y_normalized(int64_t sample,
     return std::clamp(clamped_judgement_line + t * (1.0 - clamped_judgement_line), 0.0, 1.0);
 }
 
-inline bool should_render_gameplay_note(int64_t start_sample, bool head_visible, int64_t display_sample) {
-    // Regular notes should disappear as soon as their head passes the judgement line.
-    // Active-hold synthetic tails keep head_visible=false so their body can stay anchored until release/end.
-    return !head_visible || start_sample >= display_sample;
+inline bool should_render_gameplay_note(int64_t start_sample,
+                                        int64_t tail_sample,
+                                        bool hold,
+                                        bool head_visible,
+                                        int64_t snapshot_sample,
+                                        int64_t display_sample,
+                                        int64_t handoff_grace_samples) {
+    if (!hold) {
+        return head_visible && start_sample >= display_sample;
+    }
+    if (!head_visible) {
+        return tail_sample >= display_sample;
+    }
+    if (start_sample >= display_sample) {
+        return true;
+    }
+
+    // Bridge only the stale pre-hit snapshot into the next active-hold HUD
+    // update. Keeping the original body until its tail would make a missed LN
+    // look held even though no headless active-hold snapshot was produced.
+    return snapshot_sample <= start_sample &&
+           tail_sample >= display_sample &&
+           display_sample - start_sample <= std::max<int64_t>(0, handoff_grace_samples);
+}
+
+inline bool should_render_gameplay_note_head(int64_t start_sample,
+                                             bool head_visible,
+                                             int64_t display_sample) {
+    return head_visible && start_sample >= display_sample;
 }
 
 inline bool gameplay_note_anchors_to_judgement_line(bool hold, bool head_visible) {
@@ -78,6 +103,22 @@ inline int64_t gameplay_extrapolation_limit_samples(int sample_rate, uint32_t au
         24.0 * static_cast<double>(sample_rate) / 1000.0));
     const int64_t buffer_limit = static_cast<int64_t>(audio_buffer_frames) * 2;
     return std::max<int64_t>(min_limit, buffer_limit);
+}
+
+inline int64_t gameplay_hold_handoff_grace_samples(int sample_rate,
+                                                   int64_t extrapolation_limit_samples) {
+    if (sample_rate <= 0) {
+        return std::max<int64_t>(0, extrapolation_limit_samples);
+    }
+    constexpr double kHudRefreshMarginMs = 8.0;
+    constexpr double kMaxHandoffGraceMs = 64.0;
+    const int64_t hud_refresh_margin = static_cast<int64_t>(std::llround(
+        kHudRefreshMarginMs * static_cast<double>(sample_rate) / 1000.0));
+    const int64_t max_grace = static_cast<int64_t>(std::llround(
+        kMaxHandoffGraceMs * static_cast<double>(sample_rate) / 1000.0));
+    const int64_t extrapolation_grace = std::clamp<int64_t>(
+        extrapolation_limit_samples, 0, max_grace);
+    return std::min(max_grace, extrapolation_grace + hud_refresh_margin);
 }
 
 inline GameplayMotionDiagnostics compute_gameplay_motion_diagnostics(const GameplayMotionState& state,

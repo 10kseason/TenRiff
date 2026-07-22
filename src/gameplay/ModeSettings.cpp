@@ -37,6 +37,7 @@ std::string to_string(GaugeMode mode) {
 
 std::string to_string(RandomMode mode) {
     switch (mode) {
+        case RandomMode::Mirror: return "MIRROR";
         case RandomMode::FullRandom: return "FR";
         case RandomMode::SuperRandom: return "SR";
         case RandomMode::Off: default: return "OFF";
@@ -128,6 +129,9 @@ std::optional<RandomMode> parse_random_mode(std::string_view token) {
     std::string normalized = normalize(token);
     if (normalized == "OFF" || normalized == "NONE") {
         return RandomMode::Off;
+    }
+    if (normalized == "MIRROR") {
+        return RandomMode::Mirror;
     }
     if (normalized == "FR" || normalized == "FULLRANDOM" || normalized == "FULL_RANDOM") {
         return RandomMode::FullRandom;

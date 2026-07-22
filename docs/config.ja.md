@@ -40,7 +40,7 @@ profile が存在しない場合は初回起動時に自動生成されます。
 
 - `backend` (string)
   - `polling | rawinput`
-  - 現行 `1.1.4` リリースラインの既定値は `rawinput`
+  - 現行 `1.1.6` リリースラインの既定値は `rawinput`
   - `Options -> Input Settings -> Backend` または `Options -> Profile Setup -> Input Backend` で profile ごとに選択可能
   - runtime fallback は保存済みの値を `polling` に書き換えない
   - RawInput の起動失敗、登録先の消失、message window の終了を確認すると、そのアプリ実行中は menu と後続 gameplay の両方で Polling を維持する
@@ -98,7 +98,9 @@ profile が存在しない場合は初回起動時に自動生成されます。
 ### `graphics`
 - `display_mode` (string)
   - `borderless | windowed | fullscreen`
+  - 既定値は `borderless`。Discord、OBS、Game Bar などの外部 overlay にもこの mode を推奨
   - `windowed` はタイトルバー付き固定サイズウィンドウ
+  - `fullscreen` は DXGI exclusive fullscreen のため、現在の Discord Game Overlay は表示されない
 - `resolution` (string)
   - `native | 720p | 1080p | qhd`
 - `vsync` (bool)
@@ -109,6 +111,7 @@ profile が存在しない場合は初回起動時に自動生成されます。
   - `vsync=false` では menu は実効 `300` cap、gameplay は `min(configured target, max(300, monitor_hz * 2))` で safety clamp
   - `vsync=true` では present refresh は active monitor Hz に従い、render pacing は `monitor_hz * 2` を狙う（`1050` clamp）
 - `performance_overlay` (bool)
+  - 既定値は `false`。右上を使うため、同じ角に置いた Discord Voice widget と重なる場合がある
 
 ### `mode`
 - `format` (string)
@@ -121,10 +124,12 @@ profile が存在しない場合は初回起動時に自動生成されます。
 - `gauge` (string)
   - `normal | hard | ex_hard | easy`
 - `random` (string)
-  - `off | fr | sr`
+  - `off | mirror | fr | sr`
 - `random_seed` (int)
+  - FR/SR と強制 key-mode 変換の固定 seed。Mirror 変換自体は使用しない
 - `enable_osu_charts` (bool)
 - `ghost_battle_enabled` (bool)
+  - 既定値は `false`
   - `true` のとき、選択譜面の互換性ある best replay を自動ロードして ghost 比較を行う
   - `false` のとき、通常 gameplay は single-field のまま
 - `autoplay_enabled` (bool)
@@ -168,7 +173,7 @@ profile が存在しない場合は初回起動時に自動生成されます。
 - `note_border_enabled` (bool)
 - `judgement_line_position` (double)
   - gameplay judgement line の縦位置比率
-  - `0.55..0.86` に clamp
+  - `0.00..1.00`（0%～100%）に clamp
   - 既定値は `0.82`
 - `combo_position` (double)
   - gameplay field 内の combo 表示縦位置比率

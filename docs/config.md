@@ -40,7 +40,7 @@
 
 - `backend` (string)
   - `polling | rawinput`
-  - 현재 `1.1.4` 릴리스 라인의 기본값은 `rawinput`
+  - 현재 `1.1.6` 릴리스 라인의 기본값은 `rawinput`
   - `Options -> Input Settings -> Backend` 또는 `Options -> Profile Setup -> Input Backend`에서 프로필별로 RawInput/Polling을 직접 선택 가능
   - 저장값은 런타임 fallback 때문에 자동으로 `polling`으로 덮어쓰지 않음
   - RawInput 시작 실패, 등록 대상 손실, 메시지 창 종료가 확인되면 현재 앱 실행 동안 메뉴와 다음 gameplay 세션 모두 Polling을 유지
@@ -60,7 +60,7 @@
 - `judgement_hz` (int)
   - `1000 | 2000 | 4000 | 8000`
   - 호환성용으로 남아 있는 입력 설정 필드
-  - 현재 `1.1.4` runtime은 별도 오디오 판정 서브루프를 이 값으로 구동하지 않음
+  - 현재 `1.1.6` runtime은 별도 오디오 판정 서브루프를 이 값으로 구동하지 않음
   - 기본값은 `4000` (`0.25ms`)
 - `debounce_ms` (double)
   - 실제 Press/Release 전환은 버리지 않고 같은 상태의 중복 이벤트만 상태 추적에서 제거
@@ -98,7 +98,9 @@
 ### `graphics`
 - `display_mode` (string)
   - `borderless | windowed | fullscreen`
+  - 기본값은 `borderless`; Discord/OBS/Game Bar 같은 외부 오버레이에도 이 모드를 권장
   - `windowed`는 제목줄이 있는 고정 크기 창이며 이동 가능
+  - `fullscreen`은 DXGI 독점 전체 화면이라 현재 Discord Game Overlay가 표시되지 않음
 - `resolution` (string)
   - `native | 720p | 1080p | qhd`
 - `vsync` (bool)
@@ -109,6 +111,7 @@
   - `vsync=false`면 menu는 effective cap `300`, gameplay render pacing은 `min(configured target, max(300, monitor_hz * 2))`로 safety clamp됨
   - `vsync=true`면 present refresh는 active monitor Hz를 따르고, render pacing은 `monitor_hz * 2`를 목표로 함 (`1050` clamp)
 - `performance_overlay` (bool)
+  - 기본값은 `false`; 우상단을 사용하므로 Discord Voice 위젯을 같은 모서리에 두면 겹칠 수 있음
 
 ### `mode`
 - `format` (string)
@@ -122,10 +125,12 @@
 - `gauge` (string)
   - `normal | hard | ex_hard | easy`
 - `random` (string)
-  - `off | fr | sr`
+  - `off | mirror | fr | sr`
 - `random_seed` (int)
+  - FR/SR와 강제 key-mode 변환의 고정 seed이며, Mirror 레인 반전 자체는 사용하지 않음
 - `enable_osu_charts` (bool)
 - `ghost_battle_enabled` (bool)
+  - 기본값은 `false`
   - `true`면 선택한 차트의 최고 호환 replay를 자동 ghost 비교 대상으로 불러옴
   - `false`면 일반 플레이를 단일 필드로 유지
 - `autoplay_enabled` (bool)
@@ -192,7 +197,7 @@
   - gameplay lane 안쪽에 현재 keymap의 키 이름을 작게 표시
 - `judgement_line_position` (double)
   - gameplay 판정선의 세로 위치 비율
-  - `0.55..0.86` 범위로 clamp
+  - `0.00..1.00` 범위(0%~100%)로 clamp
   - 기본값은 `0.82`
 - `combo_position` (double)
   - gameplay 필드 내부 콤보 표시의 세로 위치 비율

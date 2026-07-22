@@ -344,6 +344,9 @@ inline std::string cycle_gauge_mode(std::string current, int direction) {
 }
 
 inline std::string random_label(const std::string& value) {
+    if (value == "mirror") {
+        return "Mirror";
+    }
     if (value == "fr") {
         return "FR";
     }

@@ -4,6 +4,68 @@ TenRiff의 사용자/배포 관점에서 의미 있는 변경만 간단히 기�
 
 ## [Unreleased]
 
+## [1.1.6] - 2026-07-22
+
+### Added
+
+- Mode Settings의 Random에 결정적 `Mirror`를 추가하고, 일반 키모드는 전체 반전하며 10K/16K는 두 플레이어 영역을 유지한 채 각 절반 안에서 반전
+
+### Changed
+
+- BMS/osu!mania 네이티브 난이도 계산에서 롱노트 Head/Tail miss-ms를 0.5배로 완화해 `300ms -> 150ms`처럼 평가하고, 기존 LV/CR 캐시를 재사용하지 않도록 song-index schema를 10으로 갱신 (실플레이 판정창은 변경 없음)
+
+### Fixed
+
+- 스킨 판정선 위치를 기존 55~86% 제한 대신 0~100% 전체 범위에서 1% 단위로 조절할 수 있도록 설정과 렌더러 제한을 통일
+- 롱노트 머리 판정 직후 HUD 스냅샷이 이전 active-hold 상태와 새 hidden 상태를 섞지 않도록 동기화하고, 다음 HUD 갱신까지 롱노트 몸통이 끊기지 않게 렌더 전환을 보강
+
+### Packaging
+
+- 정식 Windows 배포 자산을 `baepo/TenRiff-1.1.6`과 `TenRiff-1.1.6.zip`으로 새로 구성하고, 빈 `logs/`/`songs/`, 멀티플레이 안내, BMS key converter를 포함
+- 공개 소스 번들을 활성 Git checkout의 명시 allowlist에서 `opensource-Tenriff-source/TenRiff-1.1.6-source.zip`으로 새로 구성
+
+### Verification
+
+- 활성 checkout과 독립 공개 소스 스테이지에서 각각 단위 테스트 `449 pass / 1 optional skip / 0 fail`, CTest `1/1` 통과
+- Release `TenRiff.exe`, CLI/GUI BMS key converter 링크 성공
+- 바이너리 ZIP 18 entries와 소스 ZIP 324 entries를 실제 압축 해제해 stage 해시와 대조하고, 빈 `logs/`/`songs/`, 금지 경로·개인 로컬 경로·secret 형태 문자열 부재를 확인
+
+## [1.1.5] - 2026-07-20
+
+> Local staging only; no GitHub tag/release was published. These changes are included in `1.1.6`.
+
+### Added
+
+- `.osk` 파일 선택/드롭으로 활성 프로필의 `skins`에 스킨을 설치하고, `.osz`는 `Shift+F2` 또는 드롭으로 활성 songs source에 설치한 뒤 osu chart를 활성화하고 재인덱싱하는 import 경로를 추가
+- osu!mania 스킨의 지원 note/LN 이미지와 `ColumnWidth`, `ColumnSpacing`, `ColumnLineWidth`, `HitPosition` 같은 레이아웃 값을 gameplay에 반영하고, 현재 렌더링하지 않는 다른 osu! mode 자산도 archive 안의 원본 파일은 보존
+
+### Changed
+
+- 신규 설치와 `ghost_battle_enabled` 키가 없는 설정에서는 고스트 배틀을 기본 `OFF`로 시작하되, 사용자가 이미 저장한 명시적 `true` 선택은 그대로 유지
+- Graphics 화면에서 실제 DXGI 전체 화면을 `독점 전체 화면`으로 명확히 표시하고, Discord 음성 오버레이에는 `Borderless/Windowed`와 좌하단 Voice 위젯 배치를 안내
+
+### Security / Compatibility
+
+- OSK/OSZ archive 전체를 먼저 검증하고 전용 staging에 압축 해제한 뒤 원자적으로 설치하며, 기존 폴더를 덮어쓰지 않고 충돌 시 새 이름을 사용
+- 경로 탈출·절대/UNC 경로, 심볼릭 링크, Windows 예약 경로, 대소문자/파일·폴더 충돌, 손상 CRC, 과도한 압축 해제 크기와 비정상 ZIP 메타데이터를 거부
+- 일반 ZIP64와 UTF-8/레거시 CP932 파일명을 지원하고, `.osu`의 배경·오디오·히트사운드 참조를 차트 폴더 내부로 제한
+- archive의 유효 파일은 보존하지만 화면 적용 범위는 TenRiff가 지원하는 osu!mania gameplay 요소이며, 모든 osu! mode/UI의 pixel-perfect 재현을 의미하지는 않음
+- Discord 항목은 기존 Game Overlay와의 실행 모드·배치 호환 안내이며, Discord SDK 기반 음성 기능이나 참가자 목록 직접 렌더링은 추가하지 않음
+
+### Packaging
+
+- 정식 Windows 배포 자산을 `baepo/TenRiff-1.1.5`와 `TenRiff-1.1.5.zip`으로 갱신하고, 빈 `logs/`/`songs/`, 멀티플레이 안내, BMS key converter를 포함
+- 공개 소스 번들을 `opensource-Tenriff-source/TenRiff-1.1.5-source`와 같은 이름의 ZIP으로 갱신하고, build tree·사용자 데이터·내부 작업 파일을 제외한 명시 allowlist만 포함
+- 바이너리 패키지의 `THIRD_PARTY_NOTICES.md`에 miniz 3.1.2 MIT 전문을 직접 포함해 정적 링크 배포에서도 라이선스 참조가 끊기지 않도록 정리
+
+### Verification
+
+- CMake project/cache 버전 `1.1.5`, Release `TenRiff.exe`, CLI/GUI BMS key converter 링크 성공
+- 작업 checkout과 독립 공개 소스 스테이지에서 각각 단위 테스트 `444 pass / 1 optional skip / 0 fail`, CTest `1/1` 통과
+- 일반 deflate/ZIP64/CP932와 무덮어쓰기, 경로 탈출, 링크·충돌, 크기 제한, CRC, staging 정리 회귀 테스트 통과
+- osu 스킨 매핑·고해상도/CJK 자산·fallback·레이아웃 수치와 osu 자산 경로 제한 회귀 테스트 통과
+- 수동 확인 잔여: 다양한 실사용 OSK/OSZ의 GUI 호환성, 실제 Discord 음성 참가자/발화자 overlay, 권한이 필요한 Windows symlink 경로, 모든 외부 스킨의 시각적 동일성
+
 ## [1.1.4] - 2026-07-20
 
 ### Changed

@@ -69,11 +69,18 @@ TenRiff 的基础游玩流程如下：
 - `Mode > Gauge`：`normal`
 - `Mode > Rate`：`1.0x`
 - `Mode > Hi-Speed`：先保持默认
+- `Graphics > Display`：使用 Discord voice overlay 时推荐 `Borderless`
 - `Graphics > Performance HUD`：只在需要时打开
 - `Graphics > Display Offset`：从默认 `0ms` 开始
 - `Audio > Keysound Mode`：BMS 推荐 `follow`
 
 如果 note 看起来太慢或太快，先调整 `Hi-Speed`；如果判定感觉没问题，但画面看起来偏慢或偏快，则调整 `Display Offset`。
+
+### Discord voice overlay
+
+请在 Discord 的 `User Settings > Game Overlay` 中启用 overlay 和 Voice widget，并将 TenRiff 设为 `Graphics > Display > Borderless` 或 `Windowed`。当前 Discord Game Overlay 不会显示在 DXGI 独占全屏中。为了避免遮挡 gameplay 信息，建议把 Voice widget 固定在左下角，并关闭 TenRiff 的 `Performance HUD`。如果 Discord 没有自动识别 TenRiff，请在 `Registered Games` 中添加正在运行的 `TenRiff.exe`。
+
+Discord 客户端的设置方法请参考[官方 Game Overlay 指南](https://support.discord.com/hc/en-us/articles/217659737-Game-Overlay-101)。
 
 ## 5. 默认按键布局
 

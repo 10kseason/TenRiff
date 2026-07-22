@@ -552,7 +552,7 @@ void MenuApp::populate_title_render_data(render::MenuRenderData& render,
         no_songs_indexed
             ? ui_text("PLAY becomes Add Songs Folder until a library is indexed",
                       "라이브러리가 생기기 전까지 PLAY가 곡 폴더 추가로 바뀝니다")
-            : ui_text("F2 adds or switches the current songs folder", "F2로 곡 폴더를 추가하거나 바꿉니다"),
+            : ui_text("F2 selects a songs folder; Shift+F2 imports OSZ", "F2로 곡 폴더 선택, Shift+F2로 OSZ 가져오기"),
         ui_text("F5 refreshes the current song source", "F5로 현재 곡 소스를 새로고침"),
         ui_text("F1 opens the control help overlay", "F1로 조작 도움말 열기"),
         ui_text("ESC exits from the title menu", "ESC로 타이틀 메뉴 종료"),
@@ -1668,8 +1668,8 @@ void MenuApp::populate_help_overlay(render::HelpOverlayData& target) const {
                         "Enter 또는 더블클릭으로 선택한 버튼을 엽니다."),
                 ui_text("If no songs are indexed yet, PLAY becomes Add Songs Folder so recovery stays visible on the first screen.",
                         "아직 인덱싱된 곡이 없으면 PLAY가 곡 폴더 추가로 바뀌어 첫 화면에서 바로 복구할 수 있습니다."),
-                ui_text("F2 opens the songs-folder picker and F5 refreshes the current source.",
-                        "F2는 곡 폴더 선택 창을 열고 F5는 현재 소스를 새로고칩니다."),
+                ui_text("F2 opens the songs-folder picker, Shift+F2 imports OSZ, and F5 refreshes the source.",
+                        "F2는 곡 폴더 선택, Shift+F2는 OSZ 가져오기, F5는 소스 새로고침입니다."),
             };
             target.footer = ui_text("Esc exits TenRiff. Press F1 again to close help.",
                                     "Esc로 TenRiff를 종료합니다. 도움말을 닫으려면 F1을 다시 누르세요.");
@@ -1704,8 +1704,8 @@ void MenuApp::populate_help_overlay(render::HelpOverlayData& target) const {
                         "SEARCH는 제목, 아티스트, 경로를 검색하고 FILTER는 정렬, 그룹, 키, 난이도, 컬렉션을 담당합니다."),
                 ui_text("Backspace returns from Sources or Records to Songs. Esc returns to the title screen.",
                         "Backspace는 Sources나 Records에서 Songs로 돌아가고 Esc는 타이틀 화면으로 돌아갑니다."),
-                ui_text("F2 chooses a new songs folder. F5 refreshes the active source.",
-                        "F2로 새 곡 폴더를 고르고, F5로 활성 소스를 새로고침합니다."),
+                ui_text("F2 chooses a songs folder. Shift+F2 imports OSZ. F5 refreshes the active source.",
+                        "F2로 곡 폴더 선택, Shift+F2로 OSZ 가져오기, F5로 활성 소스를 새로고침합니다."),
                 ui_text("Safe indexing lowers RAM use for very large libraries. Fast rescans quicker on high-memory PCs.",
                         "안전 인덱싱은 매우 큰 라이브러리에서 RAM 사용량을 줄이고, 빠름은 메모리가 많은 PC에서 재스캔 속도를 높입니다."),
             };
@@ -1751,6 +1751,8 @@ void MenuApp::populate_help_overlay(render::HelpOverlayData& target) const {
                         "표시 모드, 해상도, 주사율, VSync는 조정 중에도 즉시 적용됩니다."),
                 ui_text("Language switches the menu UI immediately. Display Offset shifts visuals only.",
                         "언어는 메뉴 UI에 즉시 반영되고, 표시 오프셋은 시각 요소만 이동합니다."),
+                ui_text("For Discord voice overlay, use Borderless or Windowed and pin the Voice widget at bottom-left.",
+                        "Discord 음성 오버레이는 테두리 없음 또는 창 모드를 쓰고 Voice 위젯을 좌하단에 고정하세요."),
                 ui_text("Esc or Backspace saves and returns.",
                         "Esc 또는 Backspace로 저장하고 돌아갑니다."),
             };

@@ -65,11 +65,18 @@ Windows では通常、次のどちらかで起動します。
 - `Mode > Gauge`: `normal`
 - `Mode > Rate`: `1.0x`
 - `Mode > Hi-Speed`: まずは既定値
+- `Graphics > Display`: Discord voice overlay を使う場合は `Borderless` を推奨
 - `Graphics > Performance HUD`: 必要なときだけ on
 - `Graphics > Display Offset`: 最初は `0ms`
 - `Audio > Keysound Mode`: BMS では `follow` 推奨
 
 ノートが遅すぎる/速すぎるなら、まず `Hi-Speed` だけを調整してください。判定は合っているのに見た目だけ遅い/早い場合は `Display Offset` を調整します。
+
+### Discord voice overlay
+
+Discord の `User Settings > Game Overlay` で overlay と Voice widget を有効にし、TenRiff は `Graphics > Display > Borderless` または `Windowed` で実行してください。現在の Discord Game Overlay は DXGI exclusive fullscreen では表示されません。gameplay 情報との重なりを減らすには Voice widget を左下に固定し、TenRiff の `Performance HUD` は off にすることを推奨します。Discord が TenRiff を自動検出しない場合は、`Registered Games` で実行中の `TenRiff.exe` を追加してください。
+
+client 側の設定は Discord の [公式 Game Overlay guide](https://support.discord.com/hc/en-us/articles/217659737-Game-Overlay-101) を参照してください。
 
 ## 5. 既定キー配置
 

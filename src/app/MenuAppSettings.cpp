@@ -138,9 +138,11 @@ void MenuApp::handle_mode_settings_input(uint32_t keycode) {
             mode_dirty_ = true;
         } else if (settings_cursor_ == 8) {
             if (config_.mode.random == "off") {
-                config_.mode.random = (direction > 0) ? "fr" : "sr";
+                config_.mode.random = (direction > 0) ? "mirror" : "sr";
+            } else if (config_.mode.random == "mirror") {
+                config_.mode.random = (direction > 0) ? "fr" : "off";
             } else if (config_.mode.random == "fr") {
-                config_.mode.random = (direction > 0) ? "sr" : "off";
+                config_.mode.random = (direction > 0) ? "sr" : "mirror";
             } else {
                 config_.mode.random = (direction > 0) ? "off" : "fr";
             }
@@ -289,6 +291,9 @@ void MenuApp::populate_mode_settings_render_data(render::MenuRenderData& render)
                                            "키 모드는 원본 또는 4K~10K/16K 런타임 레이아웃을 고릅니다. osu 차트는 여전히 최대 10K까지입니다."));
     render.generic.notes.push_back(ui_text("None keeps the chart's original key count and pattern layout instead of forcing a conversion.",
                                            "원본은 강제 변환 없이 차트의 원래 키 수와 패턴 배치를 유지합니다."));
+    render.generic.notes.push_back(ui_text(
+        "Mirror itself is seedless. Key Mode conversion runs first and may still use Random Seed.",
+        "미러 자체는 시드를 쓰지 않지만, 먼저 실행되는 키 모드 변환은 랜덤 시드를 사용할 수 있습니다."));
     render.generic.notes.push_back(ui_text("Mods opens the registry-backed Mod Manager and shows the current score multiplier.",
                                            "모드는 현재 점수 배율을 보여주고, 등록 기반 Mod Manager를 엽니다."));
     render.generic.notes.push_back(ui_text("Back saves the toggle/filter and refreshes the song library cache when needed.",

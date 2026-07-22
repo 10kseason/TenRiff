@@ -7,6 +7,7 @@
 #include <string>
 #include <vector>
 
+#include "app/MenuSongUtils.h"
 #include "app/SongIndex.h"
 #include "app/SongIndexBudget.h"
 
@@ -293,6 +294,63 @@ TEST_CASE("song scan stores indexed background preview paths for BMS and osu cha
     CHECK(std::filesystem::path(by_path.at("preview_events.osu").background_preview_path).filename() == "cover image.jpg");
 }
 
+TEST_CASE("osu Events backgrounds stay inside the chart directory while nested CJK paths work") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+
+    const auto chart_dir = temp.path / std::filesystem::u8path(u8"비트맵");
+    const auto nested_dir = chart_dir / std::filesystem::u8path(u8"배경");
+    std::filesystem::create_directories(nested_dir);
+    const auto chart_path = chart_dir / "preview.osu";
+    const auto nested_image = nested_dir / std::filesystem::u8path(u8"표지.png");
+    const auto outside_image = temp.path / "outside.png";
+    write_file(chart_path, "osu file format v14\n");
+    write_file(nested_image, "PNG");
+    write_file(outside_image, "PNG");
+
+    CHECK(tenriff::app::menu_songs::resolve_osu_background_preview_path(
+              chart_path, std::string(u8"배경/표지.png")) ==
+          std::filesystem::weakly_canonical(nested_image).u8string());
+    CHECK(tenriff::app::menu_songs::resolve_osu_background_preview_path(
+              chart_path, "../outside.png").empty());
+    CHECK(tenriff::app::menu_songs::resolve_osu_background_preview_path(
+              chart_path, outside_image.u8string()).empty());
+    CHECK(tenriff::app::menu_songs::resolve_osu_background_preview_path(
+              chart_path, R"(\\server\share\outside.png)").empty());
+
+    std::error_code link_ec;
+    std::filesystem::create_symlink(outside_image, chart_dir / "linked.png", link_ec);
+    if (!link_ec) {
+        CHECK(tenriff::app::menu_songs::resolve_osu_background_preview_path(
+                  chart_path, "linked.png").empty());
+    }
+}
+
+TEST_CASE("BMS background traversal compatibility remains unchanged") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+
+    const auto chart_dir = temp.path / "bms";
+    std::filesystem::create_directories(chart_dir);
+    const auto outside_image = temp.path / "outside.png";
+    write_file(outside_image, "PNG");
+    write_file(chart_dir / "preview.bms",
+               "#TITLE Preview BMS\n"
+               "#ARTIST Composer\n"
+               "#PLAYLEVEL 10\n"
+               "#BPM 150\n"
+               "#STAGEFILE ../outside.png\n"
+               "#00111:01\n");
+
+    std::vector<std::string> warnings;
+    const SongIndex index = scan_songs(temp.path.u8string(), nullptr, warnings);
+    REQUIRE(index.entries.size() == 1u);
+    CHECK(index.entries.front().background_preview_path ==
+          std::filesystem::weakly_canonical(outside_image).u8string());
+}
+
 TEST_CASE("song scan computes 10k-calc difficulty for BMS entries") {
     TempDirGuard temp;
     temp.path = make_temp_dir();
@@ -525,7 +583,7 @@ TEST_CASE("cached song index load drops non-BMS menu entries") {
     const auto index_path = temp.path / "song_index.json";
     write_file(index_path,
                "{\n"
-               "  \"version\": 9,\n"
+               "  \"version\": 10,\n"
                "  \"include_osu\": true,\n"
                "  \"entries\": [\n"
                "    {\"path\":\"ten.osu\",\"title\":\"Ten\",\"artist\":\"A\",\"chart_name\":\"MX\",\"format\":\"osu\",\"key_count\":10,\"level\":12,\"rating\":8.25,\"bpm\":180,\"mtime\":1},\n"
@@ -561,7 +619,7 @@ TEST_CASE("cached song index exposes osu entries when enabled") {
     const auto index_path = temp.path / "song_index.json";
     write_file(index_path,
                "{\n"
-               "  \"version\": 9,\n"
+               "  \"version\": 10,\n"
                "  \"include_osu\": true,\n"
                "  \"entries\": [\n"
                 "    {\"path\":\"ten.osu\",\"title\":\"Ten\",\"artist\":\"A\",\"chart_name\":\"MX\",\"format\":\"osu\",\"key_count\":10,\"level\":12,\"rating\":8.25,\"bpm\":180,\"mtime\":1},\n"
@@ -578,14 +636,14 @@ TEST_CASE("cached song index exposes osu entries when enabled") {
     REQUIRE(result.index.entries.size() == 2u);
 }
 
-TEST_CASE("streaming song index loader parses compact single-line schema 9 caches") {
+TEST_CASE("streaming song index loader parses compact single-line schema 10 caches") {
     TempDirGuard temp;
     temp.path = make_temp_dir();
     REQUIRE_FALSE(temp.path.empty());
 
     const auto index_path = temp.path / "song_index.json";
     write_file(index_path,
-               "{\"version\":9,\"include_osu\":false,\"entries\":["
+               "{\"version\":10,\"include_osu\":false,\"entries\":["
                "{\"path\":\"legacy.bms\",\"title\":\"Legacy\",\"artist\":\"Composer\",\"chart_name\":\"Hyper\",\"format\":\"bms\",\"layout_label\":\"7+1 SP\",\"key_count\":8,\"level\":12,\"rating\":7.5,\"bpm\":150,\"mtime\":1},"
                "{\"path\":\"ignored.osu\",\"title\":\"Ignored\",\"artist\":\"Mapper\",\"format\":\"osu\",\"key_count\":10,\"level\":13,\"rating\":8.5,\"bpm\":180,\"mtime\":2}"
                "]}");
@@ -720,7 +778,7 @@ TEST_CASE("cached song index sanitizes control heavy metadata on load") {
     const auto index_path = temp.path / "song_index.json";
     write_file(index_path,
                "{\n"
-               "  \"version\": 9,\n"
+               "  \"version\": 10,\n"
                "  \"entries\": [\n"
                 "    {\"path\":\"legacy.bms\",\"title\":\"Bad\\nTitle\",\"artist\":\"Artist\\tName\",\"chart_name\":\"Hyper\\r\",\"format\":\"bms\\r\",\"key_count\":10,\"level\":11,\"rating\":6.75,\"bpm\":180,\"mtime\":1}\n"
                "  ]\n"
@@ -883,7 +941,7 @@ TEST_CASE("stale song index version triggers silent rescan instead of using cach
     const auto index_path = temp.path / "song_index.json";
     write_file(index_path,
                "{\n"
-               "  \"version\": 6,\n"
+               "  \"version\": 9,\n"
                "  \"entries\": [\n"
                 "    {\"path\":\"legacy.bms\",\"title\":\"Legacy\",\"artist\":\"C\",\"format\":\"bms\",\"key_count\":10,\"level\":11,\"rating\":6.75,\"bpm\":180,\"mtime\":1}\n"
                "  ]\n"

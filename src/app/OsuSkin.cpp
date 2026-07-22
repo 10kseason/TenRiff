@@ -24,6 +24,8 @@ struct ManiaSection {
     std::unordered_map<std::string, std::string> values;
 };
 
+constexpr float kMaxManiaMetric = 4096.0f;
+
 std::string to_lower_ascii(std::string value) {
     for (char& ch : value) {
         ch = static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
@@ -74,6 +76,43 @@ std::string normalize_path_utf8(const fs::path& path) {
         normalized = normalized.lexically_normal();
     }
     return normalized.u8string();
+}
+
+bool path_stays_within(const fs::path& root, const fs::path& candidate) {
+    std::error_code ec;
+    const fs::path canonical_root = fs::weakly_canonical(root, ec);
+    if (ec || canonical_root.empty()) {
+        return false;
+    }
+    ec.clear();
+    const fs::path canonical_candidate = fs::weakly_canonical(candidate, ec);
+    if (ec || canonical_candidate.empty()) {
+        return false;
+    }
+
+    const fs::path relative = canonical_candidate.lexically_relative(canonical_root);
+    if (relative.empty() || relative.is_absolute() || relative.has_root_name() ||
+        relative.has_root_directory()) {
+        return false;
+    }
+    for (const auto& component : relative) {
+        if (component == "..") {
+            return false;
+        }
+    }
+    return true;
+}
+
+bool is_safe_relative_path(const fs::path& path) {
+    if (path.empty() || path.is_absolute() || path.has_root_name() || path.has_root_directory()) {
+        return false;
+    }
+    for (const auto& component : path) {
+        if (component == "..") {
+            return false;
+        }
+    }
+    return true;
 }
 
 bool has_osu_skin_assets(const fs::path& dir) {
@@ -187,22 +226,38 @@ std::string resolve_existing_asset(const fs::path& skin_dir, const std::string& 
         return {};
     }
     const fs::path relative = util::path_from_utf8_lossy(token);
+    if (!is_safe_relative_path(relative)) {
+        return {};
+    }
     std::vector<fs::path> candidates;
-    candidates.push_back(relative);
-    if (!relative.has_extension()) {
+    if (to_lower_ascii(relative.extension().u8string()) == ".png") {
+        const std::string stem = relative.stem().u8string();
+        if (stem.size() < 3u || to_lower_ascii(stem.substr(stem.size() - 3u)) != "@2x") {
+            fs::path high_dpi = relative.parent_path() / relative.stem();
+            high_dpi += "@2x.png";
+            candidates.push_back(std::move(high_dpi));
+        }
+        candidates.push_back(relative);
+    } else if (!relative.has_extension()) {
+        candidates.push_back(relative);
         auto push_with_suffix = [&](std::string_view suffix) {
             fs::path candidate = relative;
             candidate += suffix;
             candidates.push_back(std::move(candidate));
         };
-        push_with_suffix(".png");
         push_with_suffix("@2x.png");
+        push_with_suffix(".png");
         push_with_suffix(".jpg");
         push_with_suffix(".jpeg");
+    } else {
+        candidates.push_back(relative);
     }
     for (const auto& candidate : candidates) {
         std::error_code ec;
         const fs::path full = skin_dir / candidate;
+        if (!path_stays_within(skin_dir, full)) {
+            continue;
+        }
         if (fs::exists(full, ec) && fs::is_regular_file(full, ec)) {
             return normalize_path_utf8(full);
         }
@@ -229,7 +284,7 @@ std::vector<float> parse_number_csv(std::string_view value) {
             try {
                 const float parsed = std::stof(token);
                 if (std::isfinite(parsed)) {
-                    numbers.push_back(std::max(0.0f, parsed));
+                    numbers.push_back(std::clamp(parsed, 0.0f, kMaxManiaMetric));
                 }
             } catch (...) {
             }
@@ -256,11 +311,7 @@ std::vector<float> resolve_lane_divider_widths(const ManiaSection& section, int 
     }
 
     const std::size_t internal_count = static_cast<std::size_t>(keys - 1);
-    std::vector<float> widths(internal_count, 0.0f);
-    if (parsed.size() == 1u) {
-        std::fill(widths.begin(), widths.end(), parsed.front());
-        return widths;
-    }
+    std::vector<float> widths(internal_count, 2.0f);
     if (parsed.size() == static_cast<std::size_t>(keys + 1)) {
         for (std::size_t divider = 0; divider < internal_count; ++divider) {
             widths[divider] = parsed[divider + 1];
@@ -291,19 +342,46 @@ std::vector<float> resolve_column_widths(const ManiaSection& section, int keys) 
     if (parsed.empty()) {
         return {};
     }
-    std::vector<float> widths(static_cast<std::size_t>(keys), 0.0f);
-    if (parsed.size() == 1u) {
-        std::fill(widths.begin(), widths.end(), parsed.front());
-        return widths;
-    }
+    std::vector<float> widths(static_cast<std::size_t>(keys), 30.0f);
     const std::size_t count = (std::min)(widths.size(), parsed.size());
     for (std::size_t i = 0; i < count; ++i) {
         widths[i] = parsed[i];
     }
-    for (std::size_t i = count; i < widths.size(); ++i) {
-        widths[i] = parsed.back();
-    }
     return widths;
+}
+
+std::vector<float> resolve_column_spacings(const ManiaSection& section, int keys) {
+    if (keys <= 1) {
+        return {};
+    }
+    const auto it = section.values.find("columnspacing");
+    if (it == section.values.end()) {
+        return {};
+    }
+    const std::vector<float> parsed = parse_number_csv(it->second);
+    if (parsed.empty()) {
+        return {};
+    }
+
+    std::vector<float> spacings(static_cast<std::size_t>(keys - 1), 0.0f);
+    const std::size_t count = (std::min)(spacings.size(), parsed.size());
+    std::copy_n(parsed.begin(), count, spacings.begin());
+    return spacings;
+}
+
+std::optional<float> resolve_hit_position(const ManiaSection& section) {
+    const auto it = section.values.find("hitposition");
+    if (it == section.values.end()) {
+        return std::nullopt;
+    }
+    try {
+        const float value = std::stof(it->second);
+        if (std::isfinite(value)) {
+            return std::clamp(value, 0.0f, kMaxManiaMetric);
+        }
+    } catch (...) {
+    }
+    return std::nullopt;
 }
 
 float resolve_width_for_note_height_scale(const ManiaSection& section) {
@@ -313,7 +391,7 @@ float resolve_width_for_note_height_scale(const ManiaSection& section) {
     }
     try {
         const float value = std::stof(it->second);
-        return std::isfinite(value) ? std::max(0.0f, value) : 0.0f;
+        return std::isfinite(value) ? std::clamp(value, 0.0f, kMaxManiaMetric) : 0.0f;
     } catch (...) {
         return 0.0f;
     }
@@ -351,14 +429,16 @@ float minimum_positive_value(const std::vector<float>& values) {
 std::vector<std::string> fallback_lane_families(int keys) {
     switch (keys) {
         case 4: return {"1", "2", "2", "1"};
-        case 5: return {"1", "2", "3", "2", "1"};
-        case 6: return {"1", "2", "3", "3", "2", "1"};
-        case 7: return {"1", "2", "1", "3", "1", "2", "1"};
-        case 8: return {"1", "2", "1", "S", "S", "1", "2", "1"};
-        case 9: return {"1", "2", "1", "S", "3", "S", "1", "2", "1"};
-        case 10: return {"1", "2", "3", "2", "1", "1", "2", "3", "2", "1"};
-        case 16: return {"1", "2", "1", "S", "S", "1", "2", "1",
-                         "1", "2", "1", "S", "S", "1", "2", "1"};
+        case 5: return {"1", "2", "S", "2", "1"};
+        case 6: return {"1", "2", "1", "1", "2", "1"};
+        case 7: return {"1", "2", "1", "S", "1", "2", "1"};
+        case 8: return {"1", "2", "1", "2", "2", "1", "2", "1"};
+        case 9: return {"1", "2", "1", "2", "S", "2", "1", "2", "1"};
+        // osu! defines fallback families through 9K. TenRiff composes its extended
+        // layouts from two standard halves instead of inventing another family.
+        case 10: return {"1", "2", "S", "2", "1", "1", "2", "S", "2", "1"};
+        case 16: return {"1", "2", "1", "2", "2", "1", "2", "1",
+                         "1", "2", "1", "2", "2", "1", "2", "1"};
         default: break;
     }
     std::vector<std::string> families;
@@ -448,15 +528,31 @@ OsuManiaSkinDefinition resolve_osu_mania_skin(std::string_view root_utf8,
     }
 
     const fs::path root = util::path_from_utf8_lossy(root_utf8);
-    const fs::path skin_dir = root / util::path_from_utf8_lossy(std::string(skin_name));
+    const fs::path relative_skin = util::path_from_utf8_lossy(std::string(skin_name));
+    if (!is_safe_relative_path(relative_skin)) {
+        return definition;
+    }
+    const fs::path skin_dir = root / relative_skin;
     std::error_code ec;
-    if (!fs::is_directory(skin_dir, ec)) {
+    if (!fs::is_directory(skin_dir, ec) || !path_stays_within(root, skin_dir)) {
         return definition;
     }
 
-    definition.found = true;
-    const auto sections = parse_skin_ini(skin_dir / "skin.ini");
+    const fs::path skin_ini = skin_dir / "skin.ini";
+    ec.clear();
+    const bool has_skin_ini = fs::is_regular_file(skin_ini, ec) &&
+                              path_stays_within(skin_dir, skin_ini);
+    const auto sections = has_skin_ini
+                              ? parse_skin_ini(skin_ini)
+                              : std::unordered_map<int, ManiaSection>{};
     const ManiaSection* section = find_exact_section(sections, definition.keys);
+    // A declared skin.ini is authoritative: applying a different key-count section can
+    // silently map the wrong receptors and notes. Legacy asset-only skins still use the
+    // conventional mania-note/mania-key family fallback below.
+    if (has_skin_ini && section == nullptr) {
+        return definition;
+    }
+    definition.found = (section != nullptr);
 
     const std::size_t lane_count = static_cast<std::size_t>(definition.keys);
     definition.note_images.resize(lane_count);
@@ -467,6 +563,9 @@ OsuManiaSkinDefinition resolve_osu_mania_skin(std::string_view root_utf8,
     definition.key_pressed_images.resize(lane_count);
     definition.lane_divider_widths.clear();
     definition.column_widths.clear();
+    definition.column_spacings.clear();
+    definition.hit_position = 0.0f;
+    definition.has_hit_position = false;
     definition.width_for_note_height_scale = 0.0f;
     definition.imported_note_width_ratio = 1.0f;
     definition.imported_note_height_ratio = 1.0f;
@@ -474,6 +573,11 @@ OsuManiaSkinDefinition resolve_osu_mania_skin(std::string_view root_utf8,
     if (section != nullptr) {
         definition.lane_divider_widths = resolve_lane_divider_widths(*section, definition.keys);
         definition.column_widths = resolve_column_widths(*section, definition.keys);
+        definition.column_spacings = resolve_column_spacings(*section, definition.keys);
+        if (const auto hit_position = resolve_hit_position(*section); hit_position.has_value()) {
+            definition.hit_position = *hit_position;
+            definition.has_hit_position = true;
+        }
         definition.width_for_note_height_scale = resolve_width_for_note_height_scale(*section);
         for (std::size_t lane = 0; lane < lane_count; ++lane) {
             const std::string lane_suffix = std::to_string(lane);
@@ -539,6 +643,20 @@ OsuManiaSkinDefinition resolve_osu_mania_skin(std::string_view root_utf8,
         if (definition.key_pressed_images[lane].empty()) {
             definition.key_pressed_images[lane] = resolve_family_asset(skin_dir, "mania-key", family, "D");
         }
+    }
+
+    if (!has_skin_ini) {
+        const auto has_asset = [](const std::vector<std::string>& assets) {
+            return std::any_of(assets.begin(), assets.end(), [](const std::string& path) {
+                return !path.empty();
+            });
+        };
+        definition.found = has_asset(definition.note_images) ||
+                           has_asset(definition.hold_head_images) ||
+                           has_asset(definition.hold_body_images) ||
+                           has_asset(definition.hold_tail_images) ||
+                           has_asset(definition.key_images) ||
+                           has_asset(definition.key_pressed_images);
     }
 
     return definition;

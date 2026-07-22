@@ -58,7 +58,7 @@
     "random": "off",
     "random_seed": 0,
     "enable_osu_charts": false,
-    "ghost_battle_enabled": true,
+    "ghost_battle_enabled": false,
     "song_index_profile": "safe"
   },
   "ui": {

@@ -266,6 +266,15 @@ void MenuApp::populate_graphics_settings_render_data(render::MenuRenderData& ren
     append_menu_row(render.generic, ui_text("Display Offset", "표시 오프셋"), format_signed_offset_ms(config_.visual_offset_ms), settings_cursor_ == 6,
                     render::MenuHitTargetKind::SettingsRow, 6, false, true);
     append_menu_row(render.generic, ui_text("Back", "뒤로"), "", settings_cursor_ == 7, render::MenuHitTargetKind::SettingsRow, 7, true, false);
+    if (normalize_display_mode(config_.graphics.display_mode) == "fullscreen") {
+        render.generic.notes.push_back(ui_text(
+            "Discord's current voice overlay does not work in Exclusive Fullscreen. Switch Display to Borderless or Windowed.",
+            "현재 Discord 음성 오버레이는 독점 전체 화면에서 동작하지 않습니다. 표시 모드를 테두리 없음 또는 창 모드로 바꾸세요."));
+    } else {
+        render.generic.notes.push_back(ui_text(
+            "Discord voice overlay: pin Voice at bottom-left and keep Performance HUD off to avoid covering gameplay information.",
+            "Discord 음성 오버레이는 Voice를 좌하단에 고정하고 성능 HUD를 끄면 게임 정보와 가장 덜 겹칩니다."));
+    }
     render.generic.notes.push_back(ui_text("Performance HUD shows frame graph, AVG ms/FPS, 0.1%/0.01% lows, and max FPS.",
                                            "성능 HUD는 프레임 그래프, 평균 ms/FPS, 0.1%/0.01% low, 최대 FPS를 표시합니다."));
     render.generic.notes.push_back(ui_text("Resolution cycles 720p, 1080p, QHD, or the current monitor native size. Refresh Hz ranges from 60 to 1050.",

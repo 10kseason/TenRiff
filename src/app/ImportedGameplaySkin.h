@@ -25,6 +25,10 @@ struct ImportedGameplaySkinDefinition {
     std::vector<ImportedSkinImageAsset> key_images;
     std::vector<ImportedSkinImageAsset> key_pressed_images;
     std::vector<float> lane_divider_widths;
+    std::vector<float> column_widths;
+    std::vector<float> column_spacings;
+    float hit_position = 0.0f;
+    bool has_hit_position = false;
     float imported_note_width_ratio = 1.0f;
     float imported_note_height_ratio = 1.0f;
     bool use_full_lane_receptor_layout = false;

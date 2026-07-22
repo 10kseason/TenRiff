@@ -49,7 +49,7 @@ TEST_CASE("replay export writes JSON with trace events") {
     replay.score_multiplier = 0.75;
     replay.final_score = 1234;
     replay.mode.key_mode = "6k";
-    replay.mode.random = "super_random";
+    replay.mode.random = "mirror";
     replay.mode.random_seed = 4123;
     replay.mode.gauge = "easy";
     replay.mode.autoplay_enabled = true;
@@ -106,7 +106,7 @@ TEST_CASE("replay export writes JSON with trace events") {
     const auto* mode = mode_it->second.as_object();
     REQUIRE(mode != nullptr);
     CHECK(mode->find("key_mode")->second.as_string() == "6k");
-    CHECK(mode->find("random")->second.as_string() == "super_random");
+    CHECK(mode->find("random")->second.as_string() == "mirror");
     CHECK(mode->find("random_seed")->second.as_number() == doctest::Approx(4123.0));
     CHECK(mode->find("gauge")->second.as_string() == "easy");
     CHECK(mode->find("autoplay_enabled")->second.as_bool(false));
@@ -127,7 +127,7 @@ TEST_CASE("replay export writes JSON with trace events") {
     REQUIRE(loaded_replay.replay.has_value());
     CHECK(loaded_replay.replay->stats.counts.pr == 2);
     CHECK(loaded_replay.replay->mode.key_mode == "6k");
-    CHECK(loaded_replay.replay->mode.random == "super_random");
+    CHECK(loaded_replay.replay->mode.random == "mirror");
     REQUIRE(loaded_replay.replay->mode.random_seed.has_value());
     CHECK(loaded_replay.replay->mode.random_seed.value() == 4123);
     CHECK(loaded_replay.replay->mode.gauge == "easy");

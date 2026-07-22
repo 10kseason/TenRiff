@@ -208,6 +208,121 @@ TEST_CASE("Super Random avoids overlapping lanes") {
     CHECK(is_time_sorted(result.chart));
 }
 
+TEST_CASE("Mirror reverses lanes deterministically while preserving note metadata") {
+    using namespace tenriff::gameplay;
+
+    GameplayChart chart;
+    chart.lane_count = 5;
+    append_note(chart, 1, 100, 260, true);
+    append_note(chart, 2, 400);
+    append_note(chart, 3, 700, 940, false);
+    append_note(chart, 5, 1200);
+    chart.notes[0].audio_asset_id = 7;
+    chart.notes[0].audio_gain = 0.65f;
+
+    ModeSettings settings;
+    settings.random = RandomMode::Mirror;
+    settings.random_seed = 1;
+
+    const auto first = apply_mode_settings(chart, settings);
+    settings.random_seed = 9999;
+    const auto second = apply_mode_settings(chart, settings);
+
+    CHECK(first.chart.lane_count == chart.lane_count);
+    CHECK(chart_signature(first.chart) == chart_signature(second.chart));
+    CHECK(is_time_sorted(first.chart));
+    REQUIRE(first.chart.notes.size() == chart.notes.size());
+
+    for (const auto& original : chart.notes) {
+        const auto mirrored = std::find_if(first.chart.notes.begin(), first.chart.notes.end(), [&](const auto& note) {
+            return note.note_id == original.note_id;
+        });
+        REQUIRE(mirrored != first.chart.notes.end());
+        CHECK(mirrored->lane == chart.lane_count + 1 - original.lane);
+        CHECK(mirrored->start_sample == original.start_sample);
+        CHECK(mirrored->end_sample == original.end_sample);
+        CHECK(mirrored->release_required == original.release_required);
+        CHECK(mirrored->audio_asset_id == original.audio_asset_id);
+        CHECK(mirrored->audio_gain == doctest::Approx(original.audio_gain));
+    }
+
+    const auto restored = apply_mode_settings(first.chart, settings);
+    CHECK(chart_signature(restored.chart) == chart_signature(chart));
+}
+
+TEST_CASE("random mode parser accepts Mirror tokens") {
+    using tenriff::gameplay::RandomMode;
+    using tenriff::gameplay::parse_random_mode;
+    using tenriff::gameplay::to_string;
+
+    REQUIRE(parse_random_mode("mirror").has_value());
+    CHECK(parse_random_mode("mirror").value() == RandomMode::Mirror);
+    CHECK(to_string(RandomMode::Mirror) == "MIRROR");
+}
+
+TEST_CASE("Mirror preserves player halves for 10K and 16K layouts") {
+    using namespace tenriff::gameplay;
+
+    for (const int lane_count : {10, 16}) {
+        GameplayChart chart;
+        chart.lane_count = lane_count;
+        for (int lane = 1; lane <= lane_count; ++lane) {
+            append_note(chart, lane, 100);
+        }
+
+        ModeSettings settings;
+        settings.random = RandomMode::Mirror;
+        const auto result = apply_mode_settings(chart, settings);
+        const int half = lane_count / 2;
+
+        CHECK(is_time_sorted(result.chart));
+        REQUIRE(result.chart.notes.size() == chart.notes.size());
+        for (const auto& original : chart.notes) {
+            const auto mirrored = std::find_if(result.chart.notes.begin(), result.chart.notes.end(), [&](const auto& note) {
+                return note.note_id == original.note_id;
+            });
+            REQUIRE(mirrored != result.chart.notes.end());
+            const int group_start = original.lane <= half ? 1 : half + 1;
+            const int expected_lane = group_start + half - 1 - (original.lane - group_start);
+            CHECK(mirrored->lane == expected_lane);
+            CHECK((mirrored->lane <= half) == (original.lane <= half));
+        }
+    }
+}
+
+TEST_CASE("key mode conversion runs before Mirror") {
+    using namespace tenriff::gameplay;
+
+    const GameplayChart chart = make_hold_chart(8);
+    ModeApplyContext context;
+    context.base_bpm = 176.0;
+    context.sample_rate = 44100;
+
+    ModeSettings converted_settings;
+    converted_settings.key_mode = KeyMode::Keys4;
+    converted_settings.random_seed = 31337;
+    const auto converted = apply_mode_settings(chart, converted_settings, context);
+
+    ModeSettings mirror_settings = converted_settings;
+    mirror_settings.random = RandomMode::Mirror;
+    const auto mirrored = apply_mode_settings(chart, mirror_settings, context);
+
+    REQUIRE(converted.chart.lane_count == 4);
+    REQUIRE(mirrored.chart.lane_count == converted.chart.lane_count);
+    REQUIRE(mirrored.chart.notes.size() == converted.chart.notes.size());
+    for (const auto& converted_note : converted.chart.notes) {
+        const auto mirrored_note = std::find_if(
+            mirrored.chart.notes.begin(), mirrored.chart.notes.end(), [&](const auto& note) {
+                return note.note_id == converted_note.note_id;
+            });
+        REQUIRE(mirrored_note != mirrored.chart.notes.end());
+        CHECK(mirrored_note->lane == converted.chart.lane_count + 1 - converted_note.lane);
+        CHECK(mirrored_note->start_sample == converted_note.start_sample);
+        CHECK(mirrored_note->end_sample == converted_note.end_sample);
+        CHECK(mirrored_note->release_required == converted_note.release_required);
+    }
+}
+
 TEST_CASE("key mode parser accepts none plus 4K through 16K") {
     using tenriff::gameplay::KeyMode;
     using tenriff::gameplay::parse_key_mode;

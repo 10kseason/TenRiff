@@ -69,11 +69,18 @@ These settings are a good starting point:
 - `Mode > Gauge`: `normal`
 - `Mode > Rate`: `1.0x`
 - `Mode > Hi-Speed`: start with the default value
+- `Graphics > Display`: use `Borderless` when using Discord voice overlay
 - `Graphics > Performance HUD`: turn it on only when needed
 - `Graphics > Display Offset`: start at the default `0ms`
 - `Audio > Keysound Mode`: `follow` is recommended for BMS
 
 If the notes look too slow or too fast, adjust only `Hi-Speed` first. If the judgement feels correct but the visuals look late or early, adjust `Display Offset`.
+
+### Discord voice overlay
+
+Enable the overlay and Voice widget under Discord's `User Settings > Game Overlay`, then run TenRiff in `Graphics > Display > Borderless` or `Windowed`. The current Discord Game Overlay is not displayed in DXGI exclusive fullscreen. To avoid covering gameplay information, pin the Voice widget at bottom-left and leave TenRiff's `Performance HUD` off. If Discord does not detect TenRiff automatically, add the running `TenRiff.exe` under `Registered Games`.
+
+See Discord's [official Game Overlay guide](https://support.discord.com/hc/en-us/articles/217659737-Game-Overlay-101) for the client-side settings.
 
 ## 5. Default Key Layout
 

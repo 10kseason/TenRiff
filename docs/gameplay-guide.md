@@ -69,11 +69,18 @@ TenRiff의 기본 플레이 흐름은 아래 순서입니다.
 - `Mode > Gauge`: `normal`
 - `Mode > Rate`: `1.0x`
 - `Mode > Hi-Speed`: 기본값 그대로 시작
+- `Graphics > Display`: Discord 음성 오버레이를 쓸 때는 `Borderless` 권장
 - `Graphics > Performance HUD`: 필요할 때만 켜기
 - `Graphics > Display Offset`: 기본값 `0ms`에서 시작
 - `Audio > Keysound Mode`: BMS는 `follow` 권장
 
 노트가 너무 느리거나 빠르게 보이면 우선 `Hi-Speed`만 조정하고, 판정은 맞는데 화면만 늦거나 빠르게 보이면 `Display Offset`을 조정하는 식으로 접근하면 됩니다.
+
+### Discord 음성 오버레이
+
+Discord의 `User Settings > Game Overlay`에서 오버레이와 Voice 위젯을 켠 뒤, TenRiff는 `Graphics > Display > Borderless` 또는 `Windowed`로 실행하세요. 현재 Discord Game Overlay는 DXGI 독점 전체 화면에서는 표시되지 않습니다. 플레이 정보와의 겹침을 줄이려면 Voice 위젯을 좌하단에 고정하고 TenRiff의 `Performance HUD`는 꺼 두는 구성을 권장합니다. Discord가 TenRiff를 자동 인식하지 못하면 `Registered Games`에서 실행 중인 `TenRiff.exe`를 추가해야 합니다.
+
+Discord 설정 방법은 [공식 Game Overlay 안내](https://support.discord.com/hc/en-us/articles/217659737-Game-Overlay-101)를 참고하세요.
 
 ## 5. 기본 키 배치
 

@@ -9,13 +9,16 @@ main menu も gameplay と同じ低遅延思想に従う必要があります。
 - `Options -> Profile Setup` は現在の profile の初回 setup を開き直し、language / audio / input / graphics / keymap を即時保存する。
 - play 開始時、現行実装は menu thread を止めて `GameSession` を別実行する。
 - **Windows menu UI は D3D11 + Direct2D / DirectWrite** ベースで、Title / Song Select と各種 settings screen を描画する。
+- Skins 画面のファイル選択または `.osk` drag-and-drop は、現在の profile の `skins` にインストールする。
+- `Shift+F2` または `.osz` drag-and-drop は現在の songs source にインストールし、osu chart を有効化してその source を再インデックスする。
+- OSK/OSZ は archive 全体を事前検証し、staging に展開して atomic に確定し、既存フォルダを上書きしない。
 - Input summary:
-  - Title: `↑ / ↓` move, `Enter` select (`PLAY / EDIT / OPTIONS / EXIT`), `Esc` quit
-  - Song Select: `↑ / ↓` song movement, `← / →` left menu focus 切り替え, `Enter` select / play, `Esc` back
+  - Title: `↑ / ↓` move, `Enter` select (`PLAY / EDIT / OPTIONS / EXIT`), `F2` songs-folder browse, `Shift+F2` OSZ import, `Esc` quit
+  - Song Select: `↑ / ↓` song movement, `← / →` left menu focus 切り替え, `Enter` select / play, `Shift+F2` OSZ import, `Esc` back
   - Settings / Mode: `↑ / ↓` item 移動, `← / →` 値変更, `Enter / Esc` で戻る
   - Keymap: `↑ / ↓` select, `Enter` capture binding, `Esc` return
   - Result: `Enter` で Song Select に戻る
-  - Shared utility keys: `F1` help, `F2` songs-folder browse, `F5` refresh / reindex, `F9` screenshot
+  - Shared utility keys: `F1` help, `F2` songs-folder browse, `Shift+F2` OSZ import, `F5` refresh / reindex, `F9` screenshot
 
 ## Non-Negotiable Rules
 - **menu から audio device を閉じない。** menu 進入時に audio backend を初期化し、silent callback（zero buffer）を走らせて、gameplay 前から `playhead_samples` / `buffer_start_samples` を有効に保つ。曲開始時の device reopen は warm-up jitter の原因になるので避ける。
@@ -38,7 +41,7 @@ main menu も gameplay と同じ低遅延思想に従う必要があります。
 - **SongIndexerThread** は path / title / artist / BPM / key count / mode / preview audio をスキャンする。進捗更新は UI に投稿し、操作性は維持する。
 - **Cache index**（`song_index.json` または SQLite）を mtime / hash と合わせて使い、毎回 full rescan しない。初回は遅くてよいが、次回以降は即時性を目指す。
 - **Preview audio** は audio engine 経由でスケジュールする。UI は preview request を enqueue し、AudioThread が mix して timing を合わせる。
-- empty-state 画面には常設の `Add Songs Folder` action を置き、drag-and-drop は補助扱いにする。
+- empty-state 画面には常設の `Add Songs Folder` action を置き、外部 folder、BMS file、`.osz` archive も drag-and-drop に対応する。
 
 ## Settings: Latency-First Surface
 - Audio backend (`wasapi / asio`, `alsa / jack`)

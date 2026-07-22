@@ -57,7 +57,7 @@ TEST_CASE("10k difficulty matches python jack reference") {
     CHECK(metrics.average_nps == doctest::Approx(14.512471655));
 }
 
-TEST_CASE("10k difficulty matches python mixed hold reference") {
+TEST_CASE("10k difficulty applies TenRiff long-note miss-ms relaxation") {
     auto chart = make_chart(10);
     for (int i = 0; i < 32; ++i) {
         add_tap(chart, i % 10, i * 160);
@@ -67,7 +67,7 @@ TEST_CASE("10k difficulty matches python mixed hold reference") {
     }
 
     const OsuDifficultyMetrics metrics = calculate_osu_mania_difficulty(chart);
-    CHECK(metrics.circus_rating == doctest::Approx(3.022832854));
+    CHECK(metrics.circus_rating == doctest::Approx(2.970716216));
     CHECK(metrics.revive_level == 6);
     CHECK(metrics.peak_nps == doctest::Approx(9.0));
     CHECK(metrics.average_nps == doctest::Approx(8.064516129));

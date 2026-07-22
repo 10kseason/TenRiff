@@ -3,14 +3,15 @@
 이 문서는 다음 에이전트나 새 작업자가 가장 먼저 읽어야 하는 현재 상태 문서입니다. 목표는 "지금 이 프로젝트가 무엇이고, 어디를 보면 되고, 무엇이 아직 미검증인지"를 빠르게 파악하게 하는 것입니다.
 
 ## Baseline
-- 현재 프로젝트 버전은 `1.1.4 stable`
-- 직접 IP 멀티플레이와 preview r5의 입력 backend 수명주기 수정은 `1.1.4 stable`에 통합
+- 현재 프로젝트 버전은 `1.1.6 stable`
+- 직접 IP 멀티플레이와 preview r5의 입력 backend 수명주기 수정은 `1.1.6 stable`에 통합
+- `1.1.6`는 고스트 배틀 기본 `OFF`, 안전한 OSK/OSZ 설치, 확장된 osu!mania 스킨 적용, 0~100% 판정선, LN 표시·난이도 완화, Mirror 모드를 포함
 - 후속 작업의 기준선 문서는 `docs/baseline-1.1.2.md`
 - Windows GUI 빌드가 메인 타깃
 - Linux는 `Baepoks-Linuxs/TenRiff-0.5.0-linux-preview` 수준의 preview만 존재
 - 기본 표면은 BMS-first
 - `.osu`는 옵션으로 다시 활성화 가능하며 4K~10K를 지원
-- `1.1.4 stable`의 gameplay live 입력은 저장된 RawInput을 우선하면서 같은 `InputThread`의 bound-key polling shadow를 항상 유지하고, 시작 실패뿐 아니라 message pump의 예기치 않은 종료도 queue/state reset 없이 현재 producer thread에서 Polling으로 전환함
+- `1.1.6 stable`의 gameplay live 입력은 저장된 RawInput을 우선하면서 같은 `InputThread`의 bound-key polling shadow를 항상 유지하고, 시작 실패뿐 아니라 message pump의 예기치 않은 종료도 queue/state reset 없이 현재 producer thread에서 Polling으로 전환함
 - 메뉴 입력은 기존 foreground process/root-window 경계를 유지한다. RawInput 시작 실패, process-global 등록 대상 손실, 숨은 message window 종료를 감지하면 사용자 키 입력을 기다리지 않고 Polling으로 전환한다.
 - 확인된 fallback은 profile 값을 덮어쓰지 않은 채 현재 앱 실행의 메뉴와 다음 gameplay까지 유지한다. 앱 재시작 또는 `Options -> Input Settings -> Backend`의 명시적 변경만 재시도한다.
 
@@ -62,6 +63,8 @@
   - 마우스 휠 이동
   - 좌측 `KEY` 빠른 필터 토글
   - 외부 폴더/BMS drag-and-drop
+  - `.osz`는 `Shift+F2` 파일 선택 또는 drag-and-drop으로 활성 songs source에 설치하고, osu chart를 활성화한 뒤 해당 source를 재인덱싱
+  - OSZ 설치는 archive 전체 사전 검증과 staging 추출 뒤 원자적으로 완료하며 기존 폴더를 덮어쓰지 않고, `.osu`의 배경/오디오/히트사운드 참조를 차트 폴더 내부로 제한
   - recent source 저장/재열기
   - BMS / OSU / All 필터
   - difficulty/title 정렬
@@ -72,6 +75,10 @@
   - `mode.key_mode`는 N2NC 스타일 lane remap 기반으로 키수를 변환
   - `mode.key_mode=10k` 변환은 standalone converter의 krrcream식 10K preset과 맞춰 `target=10`, `max_keys=10`, `min_keys=1`, `transform_speed_slot=5`, `seed=0`을 기본으로 사용
   - `mode.key_mode=none`은 차트의 원래 키 수와 기본 패턴 레이아웃을 그대로 유지
+- Native difficulty:
+  - BMS/osu!mania LV/CR 계산에서 롱노트 Head/Tail의 miss-ms만 0.5배로 평가해 `300ms`를 `150ms`처럼 완화하며, 실제 gameplay 판정창은 그대로 유지
+- Lane transform:
+  - Random은 `Off / Mirror / FR / SR`를 지원하며, Mirror는 key-mode 변환 뒤 최종 레인을 반전하고 10K/16K는 각 플레이어 절반을 독립적으로 반전
 - Skins / Gameplay feel:
   - `Classic`, `Neon`, `Minimal`, `TenRiff` visual presets
   - `rect` / `circle` note shape, with native `rect` rendered as a rounded note box
@@ -82,7 +89,9 @@
   - combo Y 조절
   - judge line / lane width / lane spacing / note width / divider width / 16K center gap / note height / LN body width 조절
   - key mode별 개별 lane 폭과 lane 사이 간격을 각각 저장하고 미리보기/실플레이/ghost field에 같은 레이아웃 계산을 적용
-  - osu!mania `ColumnLineWidth`를 읽어 lane divider 폭에 반영
+  - `.osk`는 Skins 화면의 파일 선택 또는 drag-and-drop으로 활성 프로필의 `skins`에 설치하며, OSZ와 같은 transactional/no-overwrite archive 정책을 사용
+  - osu!mania의 지원 note/LN 이미지와 `ColumnWidth`, `ColumnSpacing`, `ColumnLineWidth`, `HitPosition`을 gameplay 레이아웃에 반영
+  - archive의 모든 유효 파일은 보존하지만, TenRiff가 렌더링하지 않는 다른 osu! mode/UI 자산까지 pixel-perfect로 재현하지는 않음
   - `skin.lr2_resolution_mode`는 `auto / sd / hd / fhd`로 LR2 playskin 해상도 override 토큰을 저장
   - LR2 auto-detect는 asset 이름이 아니라 playskin `#DST_NOTE` 좌표 범위를 기준으로 SD/HD/FHD를 판정
   - 미래 노트 상단 진입 easing
@@ -154,13 +163,13 @@
   - peak memory 약 `working set 453MB`, `private 524MB`
   - 같은 라이브러리 1024-chart sample에서 fast profile throughput은 safe 대비 약 `2.05x`
 - cache schema:
-  - `version = 9`
+  - `version = 10`
   - `include_osu` 포함
   - optional `layout_label` 포함
 
 ## Runtime / Packaging Rules
 - 새 사용자 프로필은 자동 생성
-- 현재 정식 P2P 배포 라인은 `TenRiff 1.1.4 stable`
+- 현재 정식 P2P 배포 라인은 `TenRiff 1.1.6 stable`
 - 배포 패키지에는 `Songs`를 넣지 않음
 - 배포 패키지는 메뉴 BGM용 `Mainmusic/` 런타임 자산을 함께 포함
 - 배포 업데이트에는 built artifacts와 필요한 런타임 자산만 포함

@@ -5,9 +5,12 @@
             data.performance.visible
                 ? std::min(header_right, performance_overlay_safe_left(28.0f))
                 : header_right;
-        const double judgement_line_position = clamp_gameplay_judgement_line(data.gameplay.judgement_line_position);
-        const double combo_position = clamp_gameplay_combo_position(data.gameplay.combo_position);
         const bool use_imported_metrics = normalize_gameplay_skin_source(data.gameplay.skin_source) != "native";
+        const double judgement_line_position =
+            use_imported_metrics && gameplay_note_sprite_cache_.has_imported_judgement_line_position
+                ? gameplay_note_sprite_cache_.imported_judgement_line_position
+                : clamp_gameplay_judgement_line(data.gameplay.judgement_line_position);
+        const double combo_position = clamp_gameplay_combo_position(data.gameplay.combo_position);
         const float note_width_scale = effective_gameplay_note_width_scale(
             data.gameplay.note_width_scale,
             gameplay_note_sprite_cache_.imported_note_width_ratio,
@@ -43,6 +46,9 @@
             },
             timing::HighResClock::now_ns());
         const int64_t display_sample = motion_diagnostics.display_sample;
+        const int64_t hold_handoff_grace_samples = gameplay_hold_handoff_grace_samples(
+            data.gameplay.sample_rate,
+            motion_diagnostics.extrapolation_limit_samples);
         constexpr double kGameplayTimingIndicatorRangeMs = 80.0;
         constexpr float kGameplayTimingIndicatorHalfWidth = 124.0f;
         constexpr float kGameplayTimingIndicatorHeight = 8.0f;
@@ -624,14 +630,53 @@
         }
 
         const int lane_count = std::clamp(data.gameplay.lane_count, 1, static_cast<int>(kGameplayHudMaxLanes));
+        std::array<double, kGameplayHudMaxLanes> effective_lane_width_scales{};
+        effective_lane_width_scales.fill(kGameplayLaneWidthScaleDefault);
+        std::size_t effective_lane_width_scale_count =
+            std::min(data.gameplay.lane_width_scale_count, effective_lane_width_scales.size());
+        for (std::size_t lane = 0; lane < effective_lane_width_scale_count; ++lane) {
+            effective_lane_width_scales[lane] = data.gameplay.lane_width_scales[lane];
+        }
+        if (use_imported_metrics &&
+            gameplay_note_sprite_cache_.imported_lane_width_scale_count ==
+                static_cast<std::size_t>(lane_count)) {
+            effective_lane_width_scale_count = static_cast<std::size_t>(lane_count);
+            for (std::size_t lane = 0; lane < effective_lane_width_scale_count; ++lane) {
+                effective_lane_width_scales[lane] = std::clamp(
+                    effective_lane_width_scales[lane] *
+                        gameplay_note_sprite_cache_.imported_lane_width_scales[lane],
+                    kGameplayLaneWidthScaleMin,
+                    kGameplayLaneWidthScaleMax);
+            }
+        }
+        std::array<double, kGameplayHudMaxLanes> effective_lane_spacing_scales{};
+        effective_lane_spacing_scales.fill(kGameplayLaneSpacingScaleDefault);
+        std::size_t effective_lane_spacing_scale_count =
+            std::min(data.gameplay.lane_spacing_scale_count, effective_lane_spacing_scales.size());
+        for (std::size_t gap = 0; gap < effective_lane_spacing_scale_count; ++gap) {
+            effective_lane_spacing_scales[gap] = data.gameplay.lane_spacing_scales[gap];
+        }
+        if (use_imported_metrics &&
+            gameplay_note_sprite_cache_.imported_lane_spacing_scale_count ==
+                static_cast<std::size_t>(std::max(0, lane_count - 1))) {
+            effective_lane_spacing_scale_count =
+                gameplay_note_sprite_cache_.imported_lane_spacing_scale_count;
+            for (std::size_t gap = 0; gap < effective_lane_spacing_scale_count; ++gap) {
+                effective_lane_spacing_scales[gap] = std::clamp(
+                    effective_lane_spacing_scales[gap] +
+                        gameplay_note_sprite_cache_.imported_lane_spacing_scales[gap],
+                    kGameplayLaneSpacingScaleMin,
+                    kGameplayLaneSpacingScaleMax);
+            }
+        }
         const GameplaySurfaceLayout surface_layout =
             build_gameplay_surface_layout(
                 lane_count,
                 note_width_scale,
-                data.gameplay.lane_width_scale_count,
-                data.gameplay.lane_width_scales,
-                data.gameplay.lane_spacing_scale_count,
-                data.gameplay.lane_spacing_scales,
+                effective_lane_width_scale_count,
+                effective_lane_width_scales,
+                effective_lane_spacing_scale_count,
+                effective_lane_spacing_scales,
                 data.gameplay.ghost_visible,
                 data.gameplay.lane_center_gap_scale);
         const GameplayFieldLayout field_layout = surface_layout.player_field;
@@ -718,9 +763,18 @@
         }
         for (std::size_t note_index = 0; note_index < data.gameplay.note_count; ++note_index) {
             const auto& note = data.gameplay.notes[note_index];
-            if (!should_render_gameplay_note(note.start_sample, note.head_visible, display_sample)) {
+            if (!should_render_gameplay_note(
+                    note.start_sample,
+                    note.tail_sample,
+                    note.hold,
+                    note.head_visible,
+                    data.gameplay.current_sample,
+                    display_sample,
+                    hold_handoff_grace_samples)) {
                 continue;
             }
+            const bool render_head =
+                should_render_gameplay_note_head(note.start_sample, note.head_visible, display_sample);
             const int lane = std::clamp(note.lane, 1, lane_count);
             const float lane_center = gameplay_lane_center(field_layout, lane - 1);
             const float note_width = gameplay_note_width(field_layout, lane - 1);
@@ -755,11 +809,13 @@
                 d2d_->lane_note_hold_head_bitmaps[static_cast<std::size_t>(lane - 1)].Get();
             ID2D1Bitmap* note_hold_body_bitmap =
                 d2d_->lane_note_hold_body_bitmaps[static_cast<std::size_t>(lane - 1)].Get();
+            ID2D1Bitmap* note_hold_tail_bitmap =
+                d2d_->lane_note_tail_bitmaps[static_cast<std::size_t>(lane - 1)].Get();
 
             if (note.hold && note_hold_fill) {
                 const float head_body_inset = gameplay_hold_body_cap_inset(note_shape, head_half_h);
                 const float body_top = std::min(y, tail_y);
-                const float body_bottom = std::max(y, tail_y) - (note.head_visible ? head_body_inset : 0.0f);
+                const float body_bottom = std::max(y, tail_y) - (render_head ? head_body_inset : 0.0f);
                 const float hold_half_width = std::max(4.0f, note_width * 0.5f * hold_body_width_scale);
                 const D2D1_RECT_F hold_body =
                     D2D1::RectF(lane_center - hold_half_width, body_top, lane_center + hold_half_width, body_bottom);
@@ -785,8 +841,27 @@
                 }
             }
 
+            if (note.hold && note_hold_tail_bitmap) {
+                const D2D1_RECT_F tail_rect =
+                    D2D1::RectF(x0, tail_y - tail_half_h, x1, tail_y + tail_half_h);
+                const D2D1_RECT_F* tail_source_rect =
+                    bitmap_source_rect_or_null(
+                        d2d_->lane_note_tail_source_rects[static_cast<std::size_t>(lane - 1)]);
+                const D2D1_RECT_F tail_bitmap_rect =
+                    gameplay_note_bitmap_dest_rect(tail_rect,
+                                                   note_hold_tail_bitmap,
+                                                   tail_source_rect,
+                                                   note_shape,
+                                                   data.gameplay.preserve_note_image_aspect_ratio);
+                ctx->DrawBitmap(note_hold_tail_bitmap,
+                                tail_bitmap_rect,
+                                visual_opacity,
+                                D2D1_BITMAP_INTERPOLATION_MODE_LINEAR,
+                                tail_source_rect);
+            }
+
             const D2D1_RECT_F note_rect = D2D1::RectF(x0, y - head_half_h, x1, y + head_half_h);
-            if (note.head_visible) {
+            if (render_head) {
                 ID2D1Bitmap* head_bitmap = note.hold && note_hold_head_bitmap ? note_hold_head_bitmap : note_head_bitmap;
                 if (head_bitmap) {
                     const D2D1_RECT_F* head_source_rect =
@@ -1347,9 +1422,18 @@
             }
             for (std::size_t note_index = 0; note_index < data.gameplay.ghost_note_count; ++note_index) {
                 const auto& note = data.gameplay.ghost_notes[note_index];
-                if (!should_render_gameplay_note(note.start_sample, note.head_visible, display_sample)) {
+                if (!should_render_gameplay_note(
+                        note.start_sample,
+                        note.tail_sample,
+                        note.hold,
+                        note.head_visible,
+                        data.gameplay.current_sample,
+                        display_sample,
+                        hold_handoff_grace_samples)) {
                     continue;
                 }
+                const bool render_head =
+                    should_render_gameplay_note_head(note.start_sample, note.head_visible, display_sample);
                 const int lane = std::clamp(note.lane, 1, lane_count);
                 const float lane_center = gameplay_lane_center(ghost_field_layout, lane - 1);
                 const float ghost_note_width = gameplay_note_width(ghost_field_layout, lane - 1);
@@ -1361,6 +1445,7 @@
                 const float tail_y =
                     gameplay_field_y(ghost_field_top, ghost_field_height, sample_to_y(note.tail_sample));
                 const float head_half_h = gameplay_note_head_half_height(note_height_scale);
+                const float tail_half_h = gameplay_note_tail_half_height(note_height_scale);
                 uint32_t lane_color = 0xF6F8FF;
                 if (static_cast<std::size_t>(lane - 1) < data.gameplay.lane_color_count) {
                     lane_color = data.gameplay.lane_colors[static_cast<std::size_t>(lane - 1)];
@@ -1384,12 +1469,14 @@
                     d2d_->lane_note_hold_head_bitmaps[static_cast<std::size_t>(lane - 1)].Get();
                 ID2D1Bitmap* note_hold_body_bitmap =
                     d2d_->lane_note_hold_body_bitmaps[static_cast<std::size_t>(lane - 1)].Get();
+                ID2D1Bitmap* note_hold_tail_bitmap =
+                    d2d_->lane_note_tail_bitmaps[static_cast<std::size_t>(lane - 1)].Get();
 
                 if (note.hold && note_hold_fill) {
                     const float head_body_inset =
                         gameplay_hold_body_cap_inset(note_shape, gameplay_note_head_half_height(note_height_scale));
                     const float body_top = std::min(y, tail_y);
-                    const float body_bottom = std::max(y, tail_y) - (note.head_visible ? head_body_inset : 0.0f);
+                    const float body_bottom = std::max(y, tail_y) - (render_head ? head_body_inset : 0.0f);
                     const float hold_half_width = std::max(4.0f, ghost_note_width * 0.5f * hold_body_width_scale);
                     const D2D1_RECT_F hold_body =
                         D2D1::RectF(lane_center - hold_half_width, body_top, lane_center + hold_half_width, body_bottom);
@@ -1415,8 +1502,27 @@
                     }
                 }
 
+                if (note.hold && note_hold_tail_bitmap) {
+                    const D2D1_RECT_F tail_rect =
+                        D2D1::RectF(x0, tail_y - tail_half_h, x1, tail_y + tail_half_h);
+                    const D2D1_RECT_F* tail_source_rect =
+                        bitmap_source_rect_or_null(
+                            d2d_->lane_note_tail_source_rects[static_cast<std::size_t>(lane - 1)]);
+                    const D2D1_RECT_F tail_bitmap_rect =
+                        gameplay_note_bitmap_dest_rect(tail_rect,
+                                                       note_hold_tail_bitmap,
+                                                       tail_source_rect,
+                                                       note_shape,
+                                                       data.gameplay.preserve_note_image_aspect_ratio);
+                    ctx->DrawBitmap(note_hold_tail_bitmap,
+                                    tail_bitmap_rect,
+                                    visual_opacity,
+                                    D2D1_BITMAP_INTERPOLATION_MODE_LINEAR,
+                                    tail_source_rect);
+                }
+
                 const D2D1_RECT_F note_rect = D2D1::RectF(x0, y - head_half_h, x1, y + head_half_h);
-                if (note.head_visible) {
+                if (render_head) {
                     ID2D1Bitmap* head_bitmap = note.hold && note_hold_head_bitmap ? note_hold_head_bitmap : note_head_bitmap;
                     if (head_bitmap) {
                         const D2D1_RECT_F* head_source_rect =

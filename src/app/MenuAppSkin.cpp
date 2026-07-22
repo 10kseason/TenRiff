@@ -4,6 +4,7 @@
 #include <array>
 #include <filesystem>
 #include <iostream>
+#include <iterator>
 
 #ifdef _WIN32
 #ifndef NOMINMAX
@@ -20,6 +21,7 @@
 #include "app/Lr2Skin.h"
 #include "app/MenuAppSkinUtils.h"
 #include "app/MenuSongUtils.h"
+#include "app/OsuArchiveImport.h"
 #include "app/OsuSkin.h"
 #include "util/Utf8Compat.h"
 
@@ -41,6 +43,16 @@ fs::path path_from_utf8(std::string_view value) {
     } catch (...) {
         return {};
     }
+}
+
+std::string to_lower_ascii(std::string value) {
+    std::transform(value.begin(), value.end(), value.begin(), [](unsigned char ch) {
+        if (ch >= static_cast<unsigned char>('A') && ch <= static_cast<unsigned char>('Z')) {
+            return static_cast<char>(ch - static_cast<unsigned char>('A') + static_cast<unsigned char>('a'));
+        }
+        return static_cast<char>(ch);
+    });
+    return value;
 }
 
 std::string normalize_filesystem_display_name(std::string value) {
@@ -165,6 +177,65 @@ std::optional<std::string> pick_folder_dialog_utf8() {
     }
     return result;
 }
+
+std::optional<std::string> pick_osk_dialog_utf8() {
+    const HRESULT init_hr = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
+    const bool should_uninitialize = SUCCEEDED(init_hr);
+    Microsoft::WRL::ComPtr<IFileOpenDialog> dialog;
+    const HRESULT create_hr = CoCreateInstance(CLSID_FileOpenDialog,
+                                               nullptr,
+                                               CLSCTX_INPROC_SERVER,
+                                               IID_PPV_ARGS(&dialog));
+    if (FAILED(create_hr) || !dialog) {
+        if (should_uninitialize) {
+            CoUninitialize();
+        }
+        return std::nullopt;
+    }
+
+    DWORD options = 0;
+    if (FAILED(dialog->GetOptions(&options))) {
+        if (should_uninitialize) {
+            CoUninitialize();
+        }
+        return std::nullopt;
+    }
+    dialog->SetOptions(options | FOS_FORCEFILESYSTEM | FOS_FILEMUSTEXIST | FOS_PATHMUSTEXIST);
+    const COMDLG_FILTERSPEC filters[] = {
+        {L"osu! skin package (*.osk)", L"*.osk"},
+        {L"All files (*.*)", L"*.*"},
+    };
+    dialog->SetFileTypes(static_cast<UINT>(std::size(filters)), filters);
+    dialog->SetFileTypeIndex(1);
+    dialog->SetDefaultExtension(L"osk");
+    dialog->SetTitle(L"Import osu! skin package");
+
+    if (FAILED(dialog->Show(nullptr))) {
+        if (should_uninitialize) {
+            CoUninitialize();
+        }
+        return std::nullopt;
+    }
+
+    Microsoft::WRL::ComPtr<IShellItem> item;
+    if (FAILED(dialog->GetResult(&item)) || !item) {
+        if (should_uninitialize) {
+            CoUninitialize();
+        }
+        return std::nullopt;
+    }
+
+    PWSTR raw_path = nullptr;
+    std::optional<std::string> result;
+    if (SUCCEEDED(item->GetDisplayName(SIGDN_FILESYSPATH, &raw_path)) && raw_path) {
+        result = std::filesystem::path(raw_path).u8string();
+        CoTaskMemFree(raw_path);
+    }
+    if (should_uninitialize) {
+        CoUninitialize();
+    }
+    return result;
+}
 #endif
 
 }  // namespace
@@ -263,11 +334,36 @@ bool MenuApp::import_osu_skin_path(std::string_view source_path) {
 
     const fs::path source = path_from_utf8(normalized_source);
     std::error_code ec;
+    const fs::path import_root = osu_skin_import_root_path(profile_dir_);
+
+    if (fs::is_regular_file(source, ec) &&
+        to_lower_ascii(source.extension().u8string()) == ".osk") {
+        OsuArchiveImportLimits limits;
+        limits.max_archive_bytes = 512ull * 1024ull * 1024ull;
+        limits.max_file_bytes = 256ull * 1024ull * 1024ull;
+        limits.max_total_uncompressed_bytes = 1ull * 1024ull * 1024ull * 1024ull;
+        limits.max_entries = 4096;
+        limits.max_path_components = 32;
+        const OsuArchiveImportResult result = import_osu_archive(
+            normalized_source, import_root.u8string(), OsuArchiveKind::Osk, limits);
+        if (!result.success) {
+            std::cerr << "[warn] Failed to import OSK package: " << result.error << std::endl;
+            return false;
+        }
+        config_.skin.osu_skin_name = result.display_name;
+        config_.skin.source = "osu";
+        refresh_available_osu_skins();
+        skin_dirty_ = true;
+        std::cerr << "[info] Imported OSK skin '" << result.display_name << "' ("
+                  << result.extracted_file_count << " files, " << result.extracted_bytes
+                  << " bytes)." << std::endl;
+        return true;
+    }
+    ec.clear();
     if (!fs::is_directory(source, ec)) {
         return false;
     }
 
-    const fs::path import_root = osu_skin_import_root_path(profile_dir_);
     fs::create_directories(import_root, ec);
     if (ec) {
         std::cerr << "[warn] Failed to create osu skin import root: " << import_root.u8string() << std::endl;
@@ -581,10 +677,12 @@ void MenuApp::handle_skins_settings_input(uint32_t keycode) {
     }
     if (settings_cursor_ == import_skin_row && keycode == key_enter_) {
 #ifdef _WIN32
-        if (auto picked_folder = pick_folder_dialog_utf8(); picked_folder.has_value()) {
-            if (!import_skin_path_auto(*picked_folder)) {
-                std::cerr << "[warn] Selected folder is not an osu!mania or LR2 skin folder: "
-                          << *picked_folder << std::endl;
+        const bool pick_osk = active_skin_source != "lr2";
+        const auto picked_path = pick_osk ? pick_osk_dialog_utf8() : pick_folder_dialog_utf8();
+        if (picked_path.has_value()) {
+            if (!import_skin_path_auto(*picked_path)) {
+                std::cerr << "[warn] Selected path is not a supported osu!mania or LR2 skin package: "
+                          << *picked_path << std::endl;
             }
             publish_snapshot();
         }
@@ -942,7 +1040,10 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
                             : lr2_resolution_mode_label(config_.skin.lr2_resolution_mode),
                         settings_cursor_ == 2, render::MenuHitTargetKind::SettingsRow, 2, false, true);
     }
-    append_menu_row(render.generic, ui_text("Import Skin", "스킨 가져오기"), ui_text("Open Folder", "폴더 열기"), settings_cursor_ == 2 + lr2_shift,
+    append_menu_row(render.generic, ui_text("Import Skin", "스킨 가져오기"),
+                    active_skin_source == "lr2" ? ui_text("Open Folder", "폴더 열기")
+                                                 : ui_text("Open OSK / drop folder", "OSK 열기 / 폴더 놓기"),
+                    settings_cursor_ == 2 + lr2_shift,
                     render::MenuHitTargetKind::SettingsRow, 2 + lr2_shift, true, false);
     append_menu_row(render.generic, ui_text("Key Mode", "키 모드"), ui_key_mode_label(skin_edit_mode_), settings_cursor_ == 3 + lr2_shift,
                     render::MenuHitTargetKind::SettingsRow, 3 + lr2_shift, false, true);
@@ -1105,8 +1206,15 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
                                            "가져온 LR2 스킨은 먼저 프로필 스킨 폴더를 찾고, 없으면 build/Release/test-skins-lr2를 테스트 루트로 사용합니다."));
     render.generic.notes.push_back(ui_text("LR2 Resolution overrides the imported LR2 family before the auto-detected layout is applied.",
                                            "LR2 해상도는 자동 감지 레이아웃을 적용하기 전에 가져온 LR2 계열 해상도를 덮어씁니다."));
-    render.generic.notes.push_back(ui_text("Import Skin opens a folder picker. You can also drag and drop a skin folder onto this screen.",
-                                           "스킨 가져오기는 폴더 선택 창을 엽니다. 이 화면에 스킨 폴더를 드래그 앤 드롭해도 됩니다."));
+    if (active_skin_source == "lr2") {
+        render.generic.notes.push_back(ui_text(
+            "Import Skin opens a folder picker. You can also drag and drop an LR2 skin folder onto this screen.",
+            "스킨 가져오기는 폴더 선택 창을 엽니다. 이 화면에 LR2 스킨 폴더를 드래그 앤 드롭해도 됩니다."));
+    } else {
+        render.generic.notes.push_back(ui_text(
+            "Import Skin opens an OSK file picker. You can also drag and drop an OSK package or osu! skin folder onto this screen.",
+            "스킨 가져오기는 OSK 파일 선택 창을 엽니다. 이 화면에 OSK 패키지나 osu! 스킨 폴더를 드래그 앤 드롭해도 됩니다."));
+    }
     render.generic.notes.push_back(ui_text("LR2 porting imports note, LN, lane-gap, and destination-size data from default active branches in the playskin.",
                                            "LR2 포팅은 플레이스킨의 기본 활성 브랜치에서 노트, LN, 레인 간격, 대상 크기 데이터를 가져옵니다."));
     render.generic.notes.push_back(ui_text("Image Aspect keeps imported head and tail art from stretching to the gameplay note box.",

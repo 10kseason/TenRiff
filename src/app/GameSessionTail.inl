@@ -917,7 +917,6 @@ GameSession::HudSnapshot GameSession::hud_snapshot() {
                         snapshot.ghost_lane_activity_count,
                         snapshot.ghost_lane_activity.begin());
         }
-    }
 
     const double scroll_scale =
         game::SpeedManager::visualScrollScale(snapshot.rate, snapshot.hispeed).value_or(3.0);
@@ -950,7 +949,29 @@ GameSession::HudSnapshot GameSession::hud_snapshot() {
         ++hud_scan_start_;
     }
 
+    // Hidden-note flags and active holds must come from the same engine epoch.
+    // Active holds are appended first so dense lookahead never crowds them out.
     snapshot.note_count = 0;
+    for (const auto& hold : active_holds_buffer_) {
+        if (snapshot.note_count >= kGameplayHudMaxNotes) {
+            break;
+        }
+        if (hold.lane <= 0 || hold.lane > snapshot.lane_count) {
+            continue;
+        }
+        if (hold.end_sample < snapshot.current_sample - expanded_window.past_samples) {
+            continue;
+        }
+
+        HudNote hud_note;
+        hud_note.lane = hold.lane;
+        hud_note.start_sample = snapshot.current_sample;
+        hud_note.tail_sample = std::max(hold.end_sample, snapshot.current_sample);
+        hud_note.hold = true;
+        hud_note.head_visible = false;
+        snapshot.notes[snapshot.note_count++] = hud_note;
+    }
+
     for (std::size_t i = hud_scan_start_; i < chart_.notes.size(); ++i) {
         const auto& note = chart_.notes[i];
         if (note.note_id < hidden_hit_note_ids_.size() && hidden_hit_note_ids_[note.note_id] != 0) {
@@ -975,38 +996,6 @@ GameSession::HudSnapshot GameSession::hud_snapshot() {
         }
     }
 
-    for (const auto& hold : active_holds_buffer_) {
-        if (snapshot.note_count >= kGameplayHudMaxNotes) {
-            break;
-        }
-        if (hold.lane <= 0 || hold.lane > snapshot.lane_count) {
-            continue;
-        }
-        if (hold.end_sample < snapshot.current_sample - expanded_window.past_samples) {
-            continue;
-        }
-
-        HudNote hud_note;
-        hud_note.lane = hold.lane;
-        hud_note.start_sample = snapshot.current_sample;
-        hud_note.tail_sample = std::max(hold.end_sample, snapshot.current_sample);
-        hud_note.hold = true;
-        hud_note.head_visible = false;
-        snapshot.notes[snapshot.note_count++] = hud_note;
-    }
-
-    std::sort(snapshot.notes.begin(),
-              snapshot.notes.begin() + static_cast<std::ptrdiff_t>(snapshot.note_count),
-              [](const HudNote& lhs, const HudNote& rhs) {
-                  if (lhs.start_sample != rhs.start_sample) {
-                      return lhs.start_sample < rhs.start_sample;
-                  }
-                  if (lhs.tail_sample != rhs.tail_sample) {
-                      return lhs.tail_sample < rhs.tail_sample;
-                  }
-                  return lhs.lane < rhs.lane;
-              });
-
     if (snapshot.ghost_visible) {
         if (ghost_hud_scan_start_ >= chart_.notes.size()) {
             ghost_hud_scan_start_ = chart_.notes.size();
@@ -1018,6 +1007,26 @@ GameSession::HudSnapshot GameSession::hud_snapshot() {
         }
 
         snapshot.ghost_note_count = 0;
+        for (const auto& hold : ghost_active_holds_buffer_) {
+            if (snapshot.ghost_note_count >= kGameplayHudMaxNotes) {
+                break;
+            }
+            if (hold.lane <= 0 || hold.lane > snapshot.lane_count) {
+                continue;
+            }
+            if (hold.end_sample < snapshot.current_sample - expanded_window.past_samples) {
+                continue;
+            }
+
+            HudNote hud_note;
+            hud_note.lane = hold.lane;
+            hud_note.start_sample = snapshot.current_sample;
+            hud_note.tail_sample = std::max(hold.end_sample, snapshot.current_sample);
+            hud_note.hold = true;
+            hud_note.head_visible = false;
+            snapshot.ghost_notes[snapshot.ghost_note_count++] = hud_note;
+        }
+
         for (std::size_t i = ghost_hud_scan_start_; i < chart_.notes.size(); ++i) {
             const auto& note = chart_.notes[i];
             if (note.note_id < ghost_hidden_hit_note_ids_.size() && ghost_hidden_hit_note_ids_[note.note_id] != 0) {
@@ -1041,27 +1050,22 @@ GameSession::HudSnapshot GameSession::hud_snapshot() {
                 break;
             }
         }
+    }
+    }
 
-        for (const auto& hold : ghost_active_holds_buffer_) {
-            if (snapshot.ghost_note_count >= kGameplayHudMaxNotes) {
-                break;
-            }
-            if (hold.lane <= 0 || hold.lane > snapshot.lane_count) {
-                continue;
-            }
-            if (hold.end_sample < snapshot.current_sample - expanded_window.past_samples) {
-                continue;
-            }
+    std::sort(snapshot.notes.begin(),
+              snapshot.notes.begin() + static_cast<std::ptrdiff_t>(snapshot.note_count),
+              [](const HudNote& lhs, const HudNote& rhs) {
+                  if (lhs.start_sample != rhs.start_sample) {
+                      return lhs.start_sample < rhs.start_sample;
+                  }
+                  if (lhs.tail_sample != rhs.tail_sample) {
+                      return lhs.tail_sample < rhs.tail_sample;
+                  }
+                  return lhs.lane < rhs.lane;
+              });
 
-            HudNote hud_note;
-            hud_note.lane = hold.lane;
-            hud_note.start_sample = snapshot.current_sample;
-            hud_note.tail_sample = std::max(hold.end_sample, snapshot.current_sample);
-            hud_note.hold = true;
-            hud_note.head_visible = false;
-            snapshot.ghost_notes[snapshot.ghost_note_count++] = hud_note;
-        }
-
+    if (snapshot.ghost_visible) {
         std::sort(snapshot.ghost_notes.begin(),
                   snapshot.ghost_notes.begin() + static_cast<std::ptrdiff_t>(snapshot.ghost_note_count),
                   [](const HudNote& lhs, const HudNote& rhs) {

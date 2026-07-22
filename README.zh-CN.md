@@ -2,9 +2,9 @@
 
 Language: [한국어](README.md) | [English](README.en.md) | [简体中文](README.zh-CN.md) | [日本語](README.ja.md)
 
-TenRiff 是一个以 BMS-first 为核心的 Windows GUI 节奏游戏运行时/启动器项目。当前 stable 项目版本为 `1.1.4`，包含 direct-IP multiplayer，以及最新的输入生命周期与判定 timing 修复。项目整体使用 MIT 许可证，随项目分发的第三方组件说明见 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)。
+TenRiff 是一个以 BMS-first 为核心的 Windows GUI 节奏游戏运行时/启动器项目。当前 stable 项目版本为 `1.1.6`，包含 direct-IP multiplayer、安全 OSK/OSZ 导入、更完整的 osu!mania skin 应用，以及 0～100% 判定线、连续 LN 显示、放宽的 LN 难度评估和确定性的 Mirror 模式。项目整体使用 MIT 许可证，随项目分发的第三方组件说明见 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)。
 
-这份 README 是面向首次阅读者的入门文档。关于当前实际行为、当前 `1.1.4` 项目状态、`1.1.2 final stable` 基准、配置结构以及设计文档，请继续阅读 [`docs/README.zh-CN.md`](docs/README.zh-CN.md)。
+这份 README 是面向首次阅读者的入门文档。关于当前实际行为、当前 `1.1.6` 项目状态、`1.1.2 final stable` 基准、配置结构以及设计文档，请继续阅读 [`docs/README.zh-CN.md`](docs/README.zh-CN.md)。
 
 TenRiff 也明确属于一种 `vibe coding` 作品：它更多是在快速迭代和实验中成形，而不是只按照传统的长篇设计先行流程推进。
 
@@ -16,6 +16,7 @@ TenRiff 也明确属于一种 `vibe coding` 作品：它更多是在快速迭代
 - 图形路径：D3D11 + Direct2D/DirectWrite
 - 音频路径：WASAPI
 - 输入路径：RawInput 或高轮询率键盘 polling
+- direct-IP multiplayer：1 名 host + 1 名 joiner 的 TCP 对战（默认 `27300/TCP`，见[使用说明](docs/multiplayer.zh-CN.md)）
 - 许可证：[MIT](LICENSE)
 - 第三方说明：[`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)
 - 发布历史：[`CHANGELOG.md`](CHANGELOG.md)
@@ -57,6 +58,7 @@ TenRiff 当前的键位模式转换器包含基于 `krrcream-Toolkit` 中 N2NC �
   - 搜索、键数过滤、难度过滤
   - `LV ASC/DESC`、`TITLE A-Z/Z-A` 排序
   - 外部文件夹/BMS 拖放
+  - 通过 `Shift+F2` 选择文件或直接拖放，将 `.osz` 安装到 active songs source，启用 osu chart 后重新索引
   - recent source 保存与重新打开
   - `BMS / OSU / All` 过滤
 - Gameplay / HUD
@@ -66,10 +68,14 @@ TenRiff 当前的键位模式转换器包含基于 `krrcream-Toolkit` 中 N2NC �
   - display offset
   - performance overlay
   - note head/tail 位图缓存与静态 playfield command-list 缓存
+  - Ghost Battle 在新设置或缺少配置项时默认 `OFF`，已有明确 opt-in 的 profile 保持不变
 - 选项/皮肤
   - Hi-Speed、Rate、gauge、audio、input、graphics 设置
   - `Skins` 画面中可调判定线位置、note 宽度/高度
   - `5K~10K` lane color 编辑与实时预览
+  - 通过 `.osk` 文件选择或拖放，将 skin 安装到 active profile
+  - 应用受支持的 osu!mania note/LN 图片以及 `ColumnWidth`、`ColumnSpacing`、`ColumnLineWidth`、`HitPosition`
+  - OSK/OSZ 会先 preflight 并通过 staging 安装，不覆盖现有 folder；chart asset 引用被限制在安装后的 beatmap folder 内
 - 结果/本地记录
   - 专用结果画面
   - replay/result JSON 导出
@@ -82,6 +88,7 @@ TenRiff 当前的键位模式转换器包含基于 `krrcream-Toolkit` 中 N2NC �
 
 - Windows GUI 是当前主要支持路径。
 - Linux GUI/audio/input 后端尚未完成。
+- osu skin import 只应用 TenRiff 支持的 osu!mania gameplay 元素，并不保证对所有 osu! mode/UI asset 做 pixel-perfect 还原。
 - 一部分 GUI 流程目前主要通过构建/测试验证，仍然需要更多实际运行下的手动验证。
 - 较旧的设计文档可能与当前实现不完全一致，因此要确认当前行为时，应优先查看 [`docs/current-state.zh-CN.md`](docs/current-state.zh-CN.md)。
 
@@ -108,17 +115,13 @@ cmake --build build-dist --config Release --target tenriff
 cmake --build build-dist --config Release --target bms_parser_tests
 ```
 
-如果 Windows Defender 或其他杀毒软件会暂时锁住 `TenRiff.exe`，可以改用下面的重试包装脚本。
-
-```powershell
-.\tools\build_with_retry.ps1 -BuildDir build-dist -Config Release -Targets tenriff,bms_parser_tests
-```
+如果 Windows Defender 或其他杀毒软件暂时锁住 `TenRiff.exe`，请在锁定解除后重新运行同一条 `cmake --build` 命令。
 
 ### 3. 公开源代码包也可以直接构建
 
-按版本发布的公开源代码包（例如 `TenRiff-1.1.4-source.zip`）已经包含 `external/`（但不含 `external/llama.cpp/`）、`src/`、`tests/`、`config/`、`docs/` 和 `Mainmusic/`，因此解压后就可以直接进行 configure/build。
+按版本发布的公开源代码包（例如 `TenRiff-1.1.6-source.zip`）已经包含 `external/`（但不含 `external/llama.cpp/`）、`src/`、`tests/`、`config/`、`docs/` 和 `Mainmusic/`，因此解压后就可以直接进行 configure/build。
 
-- 源代码包中不包含 `tools/build_with_retry.ps1`，所以这里应使用原生 `cmake --build`。
+- 公开源代码包不依赖本地构建包装脚本；请使用上面展示的原生 `cmake --build` 流程。
 - `10k-calc/` 会从公开源代码包中排除，因此依赖 Python reference 的 optional 检查即使输出 `[skip]` 也属于正常情况。
 - `external/llama.cpp/` 也会从公开源代码包中排除，因此本地 LLM/tooling checkout 需要自行另外准备。
 - `profiles/`、`songs/`、`logs/` 也不会放进源代码包，但 `launch_win.bat` 会在首次启动时自动创建所需目录。

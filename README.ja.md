@@ -2,9 +2,9 @@
 
 Language: [한국어](README.md) | [English](README.en.md) | [简体中文](README.zh-CN.md) | 日本語
 
-TenRiff は、Windows GUI ベースの BMS-first リズムゲーム実行環境兼ランチャープロジェクトです。現在の stable プロジェクト版は `1.1.4` で、direct-IP multiplayer と最新の input lifecycle・判定 timing 修正を含みます。ライセンスは MIT で、同梱されるサードパーティ通知は [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) にまとめています。
+TenRiff は、Windows GUI ベースの BMS-first リズムゲーム実行環境兼ランチャープロジェクトです。現在の stable プロジェクト版は `1.1.6` で、direct-IP multiplayer、安全な OSK/OSZ import、osu!mania skin 適用の拡張に加え、0～100% の判定ライン、途切れない LN 描画、緩和した LN 難易度評価、決定的 Mirror mode を含みます。ライセンスは MIT で、同梱されるサードパーティ通知は [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) にまとめています。
 
-この README は「プロジェクトを開いたときに最初にどこを見ればよいか」を説明する導入文書です。より詳しい現在の挙動、現在の `1.1.4` プロジェクト状態、`1.1.2 final stable` ベースライン、設定構造、設計文書は [`docs/README.ja.md`](docs/README.ja.md) から続けて読む前提で構成しています。
+この README は「プロジェクトを開いたときに最初にどこを見ればよいか」を説明する導入文書です。より詳しい現在の挙動、現在の `1.1.6` プロジェクト状態、`1.1.2 final stable` ベースライン、設定構造、設計文書は [`docs/README.ja.md`](docs/README.ja.md) から続けて読む前提で構成しています。
 
 TenRiff のコードベースは、伝統的な長文設計書主導だけで積み上がったものではなく、高速な反復と実験を重視した `vibe coding` 的な性格を持つ作品でもあります。
 
@@ -16,6 +16,7 @@ TenRiff のコードベースは、伝統的な長文設計書主導だけで積
 - グラフィックス経路: D3D11 + Direct2D/DirectWrite
 - オーディオ経路: WASAPI
 - 入力経路: RawInput または高ポーリング polling
+- direct-IP multiplayer: host 1 人 + joiner 1 人の TCP 対戦（既定 `27300/TCP`、[利用案内](docs/multiplayer.ja.md)）
 - ライセンス: [MIT](LICENSE)
 - サードパーティ通知: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
 - リリース変更履歴: [CHANGELOG.md](CHANGELOG.md)
@@ -57,6 +58,7 @@ OpenAI Codex、ChatGPT、Claude Code、Gemini、そして検証に協力して�
   - 検索、キー数フィルタ、難易度フィルタ
   - `LV ASC/DESC`, `TITLE A-Z/Z-A` ソート
   - 外部フォルダ/BMS のドラッグアンドドロップ
+  - `Shift+F2` のファイル選択または drag-and-drop で `.osz` を active songs source にインストールし、osu chart を有効化して再インデックス
   - recent source 保存/再オープン
   - `BMS / OSU / All` フィルタ
 - Gameplay / HUD
@@ -66,10 +68,14 @@ OpenAI Codex、ChatGPT、Claude Code、Gemini、そして検証に協力して�
   - display offset
   - performance overlay
   - note head/tail ビットマップキャッシュ + static playfield command-list キャッシュ
+  - Ghost Battle は新規または key のない設定で既定 `OFF`、既存の明示的 opt-in は維持
 - オプション / スキン
   - Hi-Speed、Rate、gauge、audio、input、graphics 設定
   - `Skins` 画面での判定線位置、ノートサイズ、レーンカラー編集
   - `5K`-`10K` レーンカラー編集とライブプレビュー
+  - `.osk` のファイル選択/drag-and-drop で active profile に skin をインストール
+  - 対応する osu!mania note/LN image と `ColumnWidth`, `ColumnSpacing`, `ColumnLineWidth`, `HitPosition` を適用
+  - OSK/OSZ は既存 folder を上書きせず preflight + staging し、chart asset 参照をインストール先 beatmap folder 内に制限
 - 結果 / ローカル記録
   - Result 画面
   - replay / result JSON export
@@ -82,6 +88,7 @@ OpenAI Codex、ChatGPT、Claude Code、Gemini、そして検証に協力して�
 
 - Windows GUI がメイン経路です。
 - Linux GUI/audio/input バックエンドはまだ未完成です。
+- osu skin import は TenRiff が対応する osu!mania gameplay 要素を適用するもので、全 osu! mode/UI asset の pixel-perfect 再現を保証しません。
 - 一部 GUI 経路は主に build/test ベースで検証されており、実機での手動検証がまだ残っています。
 - 古い設計文書と現在の実装が食い違う場合があるため、現行挙動を判断するときは [`docs/current-state.ja.md`](docs/current-state.ja.md) を優先してください。
 
@@ -108,17 +115,13 @@ cmake --build build-dist --config Release --target tenriff
 cmake --build build-dist --config Release --target bms_parser_tests
 ```
 
-Windows Defender などが一時的に `TenRiff.exe` をロックする環境では、次のラッパーを使えます。
-
-```powershell
-.\tools\build_with_retry.ps1 -BuildDir build-dist -Config Release -Targets tenriff,bms_parser_tests
-```
+Windows Defender などが一時的に `TenRiff.exe` をロックした場合は、ロック解除後に同じ `cmake --build` コマンドを再実行します。
 
 ### 3. 公開ソースパッケージも直接ビルド可能
 
-バージョン付き公開ソースバンドル（`TenRiff-1.1.4-source.zip` のようなパッケージ）には、`external/`（ただし `external/llama.cpp/` を除く）、`src/`、`tests/`、`config/`、`docs/`、`Mainmusic/` が含まれているため、展開したフォルダだけで configure/build できます。
+バージョン付き公開ソースバンドル（`TenRiff-1.1.6-source.zip` のようなパッケージ）には、`external/`（ただし `external/llama.cpp/` を除く）、`src/`、`tests/`、`config/`、`docs/`、`Mainmusic/` が含まれているため、展開したフォルダだけで configure/build できます。
 
-- ソースバンドルには `tools/build_with_retry.ps1` は含まれないため、通常の `cmake --build` を使います。
+- 公開ソースバンドルはローカルのビルドラッパーに依存しません。上記の通常の `cmake --build` 手順を使います。
 - `10k-calc/` は公開ソースバンドルから除外されるため、Python reference ベースの optional チェックが `[skip]` でも正常です。
 - `external/llama.cpp/` も公開ソースバンドルから除外されるため、ローカル LLM/tooling checkout は別途復元が必要です。
 - `profiles/`、`songs/`、`logs/` もバンドルには含まれませんが、`launch_win.bat` が初回起動時に必要なフォルダを自動作成します。

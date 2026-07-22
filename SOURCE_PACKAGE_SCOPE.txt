@@ -1,4 +1,4 @@
-TenRiff 1.1.4 stable open-source source package scope
+TenRiff 1.1.6 stable open-source source package scope
 
 Included in versioned source bundles:
 - CHANGELOG.md
@@ -10,6 +10,7 @@ Included in versioned source bundles:
 - README.zh-CN.md
 - README.ja.md
 - README_SOURCE_PACKAGE.md
+- SOURCE_PACKAGE_SCOPE.txt
 - THIRD_PARTY_NOTICES.md
 - launch_win.bat
 - launch_linux.sh
@@ -27,6 +28,9 @@ Excluded from versioned source bundles:
 - build_*/
 - Baepoks/
 - Baepoks-Linuxs/
+- baepo/
+- .codex-upload-*/
+- art/
 - opensource-Tenriff-source/TenRiff-*-source/
 - external/llama.cpp/
 - .codex-memory/

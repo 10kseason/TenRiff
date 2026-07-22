@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(TenRiff VERSION 1.1.4 LANGUAGES CXX)
+project(TenRiff VERSION 1.1.6 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -11,6 +11,19 @@ if(MSVC)
 endif()
 
 option(TENRIFF_ENABLE_TESTS "Build TenRiff unit tests" ON)
+
+# Pinned vendored miniz is used only for local .osk/.osz ZIP package import.
+add_library(tenriff_miniz STATIC
+    external/miniz/miniz.c
+    external/miniz/miniz_tdef.c
+    external/miniz/miniz_tinfl.c
+    external/miniz/miniz_zip.c
+)
+
+target_include_directories(tenriff_miniz
+    PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/external/miniz
+)
 
 add_library(tenriff_chart
     src/chart/BmsParser.cpp
@@ -81,6 +94,7 @@ add_library(tenriff_core
     src/app/MultiplayerChartSearch.cpp
     src/app/ModeManager.cpp
     src/app/ModeResolver.cpp
+    src/app/OsuArchiveImport.cpp
     src/app/OsuHitsoundResolver.cpp
     src/app/OsuSkin.cpp
     src/app/PersistedRuntimeConfig.cpp
@@ -101,6 +115,8 @@ target_link_libraries(tenriff_core
         tenriff_chart
         tenriff_game
         tenriff_runtime
+    PRIVATE
+        tenriff_miniz
 )
 
 if(WIN32)
@@ -330,6 +346,7 @@ if(TENRIFF_ENABLE_TESTS)
         tests/unit/test_input_backend_status.cpp
         tests/unit/test_profile_setup_flow.cpp
         tests/unit/test_lr2_skin.cpp
+        tests/unit/test_osu_archive_import.cpp
         tests/unit/test_osu_skin.cpp
         tests/unit/test_game_session_hud.cpp
         tests/unit/test_graphics_timing.cpp
@@ -343,6 +360,7 @@ if(TENRIFF_ENABLE_TESTS)
     target_include_directories(bms_parser_tests
         PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/external
+            ${CMAKE_CURRENT_SOURCE_DIR}/external/miniz
             ${CMAKE_CURRENT_SOURCE_DIR}/src
     )
     if(WIN32)

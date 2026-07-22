@@ -2,9 +2,9 @@
 
 Language: Korean | [English](README.en.md) | [简体中文](README.zh-CN.md) | [日本語](README.ja.md)
 
-TenRiff는 Windows GUI 기반 BMS-first 리듬게임 런타임/런처 프로젝트입니다. 목표는 실사용 가능한 BMS 플레이 환경을 중심으로, 저지먼트/오디오/입력/렌더링 파이프라인을 직접 제어하는 독립 실행형 리듬게임 클라이언트를 만드는 것입니다. 현재 정식 프로젝트 버전은 `1.1.4`이며, 직접 IP 멀티플레이와 최신 입력 수명주기·판정 타이밍 수정이 stable 라인에 포함됩니다. MIT 라이선스를 사용하며, 번들된 서드파티 고지는 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)에 정리합니다.
+TenRiff는 Windows GUI 기반 BMS-first 리듬게임 런타임/런처 프로젝트입니다. 목표는 실사용 가능한 BMS 플레이 환경을 중심으로, 저지먼트/오디오/입력/렌더링 파이프라인을 직접 제어하는 독립 실행형 리듬게임 클라이언트를 만드는 것입니다. 현재 정식 프로젝트 버전은 `1.1.6`이며, 직접 IP 멀티플레이, 안전한 OSK/OSZ 가져오기와 확장된 osu!mania 스킨 적용에 더해 0~100% 판정선, 끊김 없는 LN 표시, 완화된 LN 난이도 평가, 결정적 Mirror 모드를 포함합니다. MIT 라이선스를 사용하며, 번들된 서드파티 고지는 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)에 정리합니다.
 
-이 README는 "프로젝트를 처음 열었을 때 무엇을 보면 되는지"를 설명하는 입문 문서입니다. 더 자세한 현재 동작, 현재 `1.1.4` 프로젝트 상태, `1.1.2 final stable` 기준선, 설정 구조, 설계 문서는 [`docs/README.md`](docs/README.md)부터 이어서 읽는 구조를 기준으로 작성했습니다.
+이 README는 "프로젝트를 처음 열었을 때 무엇을 보면 되는지"를 설명하는 입문 문서입니다. 더 자세한 현재 동작, 현재 `1.1.6` 프로젝트 상태, `1.1.2 final stable` 기준선, 설정 구조, 설계 문서는 [`docs/README.md`](docs/README.md)부터 이어서 읽는 구조를 기준으로 작성했습니다.
 
 TenRiff 코드는 전통적인 장기 설계 문서 중심 개발만으로 쌓인 프로젝트가 아니라, 빠른 반복과 실험을 중시한 `vibe coding` 성격이 강한 작품이라는 점을 명시합니다.
 
@@ -58,6 +58,7 @@ OpenAI Codex, ChatGPT, Claude Code, Gemini, 그리고 프로젝트를 함께 검
   - 검색, 키수 필터, 난이도 필터
   - `LV ASC/DESC`, `TITLE A-Z/Z-A` 정렬
   - 외부 폴더/BMS drag-and-drop
+  - `Shift+F2` 파일 선택 또는 drag-and-drop으로 `.osz`를 활성 songs source에 설치하고 osu chart 활성화 후 재인덱싱
   - recent source 저장/재열기
   - `BMS / OSU / All` 필터
 - Gameplay / HUD
@@ -67,10 +68,14 @@ OpenAI Codex, ChatGPT, Claude Code, Gemini, 그리고 프로젝트를 함께 검
   - display offset
   - performance overlay
   - note head/tail bitmap cache + static playfield command-list cache
+  - 고스트 배틀은 새 설정에서 기본 `OFF`이며 사용자가 켠 기존 프로필은 유지
 - 옵션 / 스킨
   - Hi-Speed, Rate, EX-Hard/Hard/Normal/Easy gauge, audio, input, graphics 설정
   - `Skins` 화면에서 판정선 위치, 노트 가로/세로 크기
   - `5K~10K` lane color 편집 + 실시간 프리뷰
+  - `.osk` 파일 선택/drag-and-drop으로 활성 프로필에 설치
+  - osu!mania note/LN 이미지와 `ColumnWidth`, `ColumnSpacing`, `ColumnLineWidth`, `HitPosition` 반영
+  - OSK/OSZ는 staging 검증 후 설치하고 기존 폴더는 덮어쓰지 않으며, `.osu` 자산 참조의 패키지 밖 경로 탈출을 차단하고 현재 표시하지 않는 다른 osu! mode 자산도 원본 파일은 보존
 - 결과 / 로컬 기록
   - 결과 화면
   - replay/result JSON export
@@ -83,6 +88,7 @@ OpenAI Codex, ChatGPT, Claude Code, Gemini, 그리고 프로젝트를 함께 검
 
 - Windows GUI가 메인 경로입니다.
 - Linux GUI/audio/input 백엔드는 아직 완성되지 않았습니다.
+- osu skin import는 TenRiff가 지원하는 osu!mania gameplay 요소를 적용하는 기능이며, 모든 osu! mode의 화면을 원본과 픽셀 단위로 재현하는 기능은 아닙니다.
 - 일부 GUI 경로는 빌드/테스트 위주로 검증되어 있고, 실기 수동 검증은 계속 남아 있습니다.
 - 오래된 설계 문서와 현재 구현이 일부 다를 수 있으므로, 현재 동작 기준 문서는 반드시 [`docs/current-state.md`](docs/current-state.md)를 우선 봐야 합니다.
 
@@ -109,17 +115,13 @@ cmake --build build-dist --config Release --target tenriff
 cmake --build build-dist --config Release --target bms_parser_tests
 ```
 
-Windows Defender나 다른 안티바이러스가 `TenRiff.exe`를 잠깐 잠그는 환경이면 아래 래퍼를 쓰면 됩니다.
-
-```powershell
-.\tools\build_with_retry.ps1 -BuildDir build-dist -Config Release -Targets tenriff,bms_parser_tests
-```
+Windows Defender나 다른 안티바이러스가 `TenRiff.exe`를 잠깐 잠그면 잠금이 풀린 뒤 같은 `cmake --build` 명령을 다시 실행합니다.
 
 ### 3. 공개 소스 패키지로도 빌드 가능
 
-버전별 공개 소스 번들(`TenRiff-1.1.4-source.zip` 같은 패키지)은 `external/`(단, `external/llama.cpp/` 제외), `src/`, `tests/`, `config/`, `docs/`, `Mainmusic/`를 포함하므로, 압축을 푼 폴더만으로도 바로 configure/build 할 수 있습니다.
+버전별 공개 소스 번들(`TenRiff-1.1.6-source.zip` 같은 패키지)은 `external/`(단, `external/llama.cpp/` 제외), `src/`, `tests/`, `config/`, `docs/`, `Mainmusic/`를 포함하므로, 압축을 푼 폴더만으로도 바로 configure/build 할 수 있습니다.
 
-- 소스 번들에는 `tools/build_with_retry.ps1`가 없으므로 plain `cmake --build`를 사용해야 합니다.
+- 공개 소스 번들은 별도 로컬 빌드 래퍼에 의존하지 않으며, 위의 plain `cmake --build` 흐름을 사용합니다.
 - `10k-calc/`는 공개 소스 번들에서 제외되므로 Python reference 기반 optional 검사는 `[skip]`으로 넘어가도 정상입니다.
 - `external/llama.cpp/`도 공개 소스 번들에서 제외되므로, 로컬 LLM/tooling 체크아웃은 별도로 재구성해야 합니다.
 - `profiles/`, `songs/`, `logs/`도 번들에는 없지만 `launch_win.bat`가 첫 실행 때 필요한 폴더를 자동 생성합니다.

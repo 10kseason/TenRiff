@@ -659,6 +659,12 @@ private:
         bool use_full_lane_receptor_layout = false;
         std::size_t lane_divider_width_count = 0;
         std::array<float, kGameplayHudMaxLanes> lane_divider_widths{};
+        std::size_t imported_lane_width_scale_count = 0;
+        std::array<double, kGameplayHudMaxLanes> imported_lane_width_scales{};
+        std::size_t imported_lane_spacing_scale_count = 0;
+        std::array<double, kGameplayHudMaxLanes> imported_lane_spacing_scales{};
+        bool has_imported_judgement_line_position = false;
+        double imported_judgement_line_position = 0.82;
         float imported_note_width_ratio = 1.0f;
         float imported_note_height_ratio = 1.0f;
         std::array<uint32_t, kGameplayHudMaxLanes> lane_colors{};
