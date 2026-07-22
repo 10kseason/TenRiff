@@ -8,6 +8,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <iterator>
 #include <memory>
 #include <optional>
 #include <sstream>
@@ -37,6 +38,7 @@
 #include "app/ModeManager.h"
 #include "app/MenuRecordUtils.h"
 #include "app/MenuSongUtils.h"
+#include "app/OsuArchiveImport.h"
 #include "app/PersistedRuntimeConfig.h"
 #include "app/PeerBattleRuntimeRules.h"
 #include "app/ProfileSetupFlow.h"
@@ -46,6 +48,7 @@
 #include "gameplay/Replay.h"
 #include "render/GameplayMotion.h"
 #include "timing/HighResClock.h"
+#include "util/Utf8Compat.h"
 
 namespace tenriff::app {
 
@@ -275,6 +278,62 @@ std::string browse_for_folder(const std::string& title) {
 
     CoUninitialize();
     return result;
+}
+
+std::string browse_for_osz(const std::string& title) {
+    std::string result;
+    const HRESULT init_hr = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
+    const bool should_uninitialize = SUCCEEDED(init_hr);
+
+    Microsoft::WRL::ComPtr<IFileOpenDialog> dialog;
+    if (FAILED(CoCreateInstance(CLSID_FileOpenDialog,
+                                nullptr,
+                                CLSCTX_INPROC_SERVER,
+                                IID_PPV_ARGS(&dialog))) ||
+        !dialog) {
+        if (should_uninitialize) {
+            CoUninitialize();
+        }
+        return result;
+    }
+    DWORD options = 0;
+    if (FAILED(dialog->GetOptions(&options))) {
+        if (should_uninitialize) {
+            CoUninitialize();
+        }
+        return result;
+    }
+    dialog->SetOptions(options | FOS_FORCEFILESYSTEM | FOS_FILEMUSTEXIST | FOS_PATHMUSTEXIST);
+    const COMDLG_FILTERSPEC filters[] = {
+        {L"osu! beatmap package (*.osz)", L"*.osz"},
+        {L"All files (*.*)", L"*.*"},
+    };
+    dialog->SetFileTypes(static_cast<UINT>(std::size(filters)), filters);
+    dialog->SetFileTypeIndex(1);
+    dialog->SetDefaultExtension(L"osz");
+
+    const std::wstring wide_title = util::wide_from_multibyte(title, CP_UTF8);
+    if (!wide_title.empty()) {
+        dialog->SetTitle(wide_title.c_str());
+    }
+    if (SUCCEEDED(dialog->Show(nullptr))) {
+        Microsoft::WRL::ComPtr<IShellItem> item;
+        if (SUCCEEDED(dialog->GetResult(&item)) && item) {
+            PWSTR raw_path = nullptr;
+            if (SUCCEEDED(item->GetDisplayName(SIGDN_FILESYSPATH, &raw_path)) && raw_path) {
+                result = std::filesystem::path(raw_path).u8string();
+                CoTaskMemFree(raw_path);
+            }
+        }
+    }
+    if (should_uninitialize) {
+        CoUninitialize();
+    }
+    return result;
+}
+
+bool shift_key_is_down() {
+    return (GetAsyncKeyState(VK_SHIFT) & 0x8000) != 0;
 }
 #endif
 
@@ -511,7 +570,7 @@ std::string MenuApp::ui_display_mode_label(std::string_view token) const {
         return ui_text("Windowed", "창 모드");
     }
     if (normalized == "fullscreen") {
-        return ui_text("Fullscreen", "전체 화면");
+        return ui_text("Exclusive Fullscreen", "독점 전체 화면");
     }
     return ui_text("Borderless", "테두리 없음");
 }
@@ -590,6 +649,9 @@ std::string MenuApp::ui_gauge_label(std::string_view token) const {
 
 std::string MenuApp::ui_random_label(std::string_view token) const {
     const std::string normalized = to_lower_ascii(std::string(token));
+    if (normalized == "mirror") {
+        return ui_text("Mirror", "미러");
+    }
     if (normalized == "fr") {
         return "FR";
     }
@@ -1387,6 +1449,36 @@ void MenuApp::persist_runtime_config() {
     }
 }
 
+bool MenuApp::import_osz_path(std::string_view source_path) {
+    if (source_path.empty() || songs_path_.empty()) {
+        return false;
+    }
+
+    OsuArchiveImportLimits limits;
+    limits.max_archive_bytes = 4ull * 1024ull * 1024ull * 1024ull;
+    limits.max_file_bytes = 2ull * 1024ull * 1024ull * 1024ull;
+    limits.max_total_uncompressed_bytes = 8ull * 1024ull * 1024ull * 1024ull;
+    limits.max_entries = 16384;
+    limits.max_path_components = 64;
+    const OsuArchiveImportResult result = import_osu_archive(
+        source_path, songs_path_, OsuArchiveKind::Osz, limits);
+    if (!result.success) {
+        std::cerr << "[warn] Failed to import OSZ package: " << result.error << std::endl;
+        return false;
+    }
+
+    config_.mode.enable_osu_charts = true;
+    if (to_lower_ascii(config_.mode.format) == "bms") {
+        config_.mode.format = "auto";
+    }
+    persist_runtime_config();
+    std::cerr << "[info] Imported OSZ beatmap set '" << result.display_name << "' ("
+              << result.extracted_file_count << " files, " << result.extracted_bytes
+              << " bytes)." << std::endl;
+    switch_song_source(songs_path_, true);
+    return true;
+}
+
 void MenuApp::refresh_song_source(bool force_reindex) {
     switch_song_source(songs_path_, force_reindex);
 }
@@ -1640,9 +1732,37 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
         if (screen_ == Screen::Multiplayer) {
             return;
         }
+        std::string dropped_extension;
+        try {
+            dropped_extension = to_lower_ascii(path_from_utf8(event.path).extension().u8string());
+        } catch (...) {
+            dropped_extension.clear();
+        }
+        if (dropped_extension == ".osk") {
+            if (!import_osu_skin_path(event.path)) {
+                std::cerr << "[warn] Ignored invalid or unsupported OSK package: " << event.path << std::endl;
+                return;
+            }
+            config_.skin.source = "osu";
+            persist_runtime_config();
+            publish_snapshot();
+            return;
+        }
+        if (dropped_extension == ".osz") {
+            if (!import_osz_path(event.path)) {
+                std::cerr << "[warn] Ignored invalid or unsupported OSZ package: " << event.path << std::endl;
+                return;
+            }
+            screen_ = Screen::SongSelect;
+            song_select_search_active_ = false;
+            song_select_focus_ = SongSelectFocus::SongList;
+            song_select_view_ = SongSelectView::Songs;
+            publish_snapshot();
+            return;
+        }
         if (screen_ == Screen::SettingsSkins) {
             if (!import_skin_path_auto(event.path)) {
-                std::cerr << "[warn] Ignored dropped path (expected an osu!mania or LR2 skin folder, or a folder containing skins): "
+                std::cerr << "[warn] Ignored dropped path (expected an OSK package, an osu!mania/LR2 skin folder, or a folder containing skins): "
                           << event.path << std::endl;
                 return;
             }
@@ -1878,6 +1998,18 @@ void MenuApp::handle_title_input(uint32_t keycode) {
     }
 #ifdef _WIN32
     if (keycode == key_f2_) {
+        if (shift_key_is_down()) {
+            const std::string package_path =
+                browse_for_osz(ui_text("Import OSZ Beatmap Package", "OSZ 비트맵 패키지 가져오기"));
+            if (!package_path.empty() && import_osz_path(package_path)) {
+                reset_multiplayer_for_single_player();
+                screen_ = Screen::SongSelect;
+                song_select_focus_ = SongSelectFocus::SongList;
+                song_select_view_ = SongSelectView::Songs;
+                publish_snapshot();
+            }
+            return;
+        }
         std::string new_path = browse_for_folder(ui_text("Select Songs Folder", "곡 폴더 선택"));
         if (!new_path.empty()) {
             switch_song_source(new_path, false);
@@ -2191,6 +2323,15 @@ void MenuApp::handle_song_select_input(uint32_t keycode) {
 #ifdef _WIN32
     if (keycode == key_f2_) {
         song_select_search_active_ = false;
+        if (shift_key_is_down()) {
+            const std::string package_path =
+                browse_for_osz(ui_text("Import OSZ Beatmap Package", "OSZ 비트맵 패키지 가져오기"));
+            if (!package_path.empty() && import_osz_path(package_path)) {
+                song_select_view_ = SongSelectView::Songs;
+                publish_snapshot();
+            }
+            return;
+        }
         std::string new_path = browse_for_folder(ui_text("Select Songs Folder", "곡 폴더 선택"));
         if (!new_path.empty()) {
             switch_song_source(new_path, false);

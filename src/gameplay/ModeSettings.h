@@ -34,6 +34,7 @@ enum class GaugeMode {
 
 enum class RandomMode {
     Off,
+    Mirror,
     FullRandom,
     SuperRandom,
 };

@@ -9,13 +9,16 @@ The main menu must follow the same low-latency philosophy as gameplay: audio run
 - `Options -> Profile Setup` reopens first-run setup for the active profile and immediately saves language, audio, input, graphics, and keymap changes.
 - When play starts, the current implementation stops the menu thread and runs `GameSession` separately.
 - The **Windows menu UI is built on D3D11 + Direct2D / DirectWrite** and renders Title / Song Select (cyan layout) and other settings screens (list UI).
+- The Skins file picker or `.osk` drag-and-drop installs into the active profile's `skins` directory.
+- `Shift+F2` or `.osz` drag-and-drop installs into the active songs source, enables osu charts, and reindexes that source.
+- OSK/OSZ imports preflight the complete archive, extract through staging, commit atomically, and never overwrite an existing folder.
 - Input summary:
-  - Title: `↑ / ↓` move, `Enter` select (PLAY / EDIT / OPTIONS / EXIT), `Esc` quit
-  - Song Select: `↑ / ↓` song movement, `← / →` switch focus on the left menu, `Enter` select / play, `Esc` back
+  - Title: `↑ / ↓` move, `Enter` select (PLAY / EDIT / OPTIONS / EXIT), `F2` songs-folder browse, `Shift+F2` OSZ import, `Esc` quit
+  - Song Select: `↑ / ↓` song movement, `← / →` switch focus on the left menu, `Enter` select / play, `Shift+F2` OSZ import, `Esc` back
   - Settings / Mode: `↑ / ↓` move items, `← / →` change values, `Enter / Esc` return
   - Keymap: `↑ / ↓` select, `Enter` capture binding, `Esc` return
   - Result: return to Song Select with `Enter` only
-  - Shared utility keys: `F1` help, `F2` songs-folder browse, `F5` refresh / reindex, `F9` screenshot
+  - Shared utility keys: `F1` help, `F2` songs-folder browse, `Shift+F2` OSZ import, `F5` refresh / reindex, `F9` screenshot
 
 ## Non-Negotiable Rules
 - **Keep the audio device open from the menu.** Initialize the audio backend when entering the menu and run silent callbacks (zero buffers) so `playhead_samples` / `buffer_start_samples` remain valid before gameplay begins. Avoid reopening the device when starting a song to prevent warm-up jitter.
@@ -39,7 +42,7 @@ States render UI and consume already-timestamped input events; heavyweight work 
 - **SongIndexerThread** scans folders for path / title / artist / BPM / key count / mode / preview audio. Progress updates are posted to the UI; interaction stays responsive.
 - **Cache index** (`song_index.json` or SQLite) with mtime / hash checks to avoid full rescans. First run can be slow; subsequent runs should be instant.
 - **Preview audio** is scheduled through the audio engine: the UI enqueues preview requests, and AudioThread mixes them so timing stays aligned.
-- Empty-state screens should expose a persistent `Add Songs Folder` action; drag-and-drop stays supported but secondary.
+- Empty-state screens should expose a persistent `Add Songs Folder` action; external folders, BMS files, and `.osz` archives also support drag-and-drop.
 
 ## Settings: Latency-First Surface
 Put these on the first page so users see latency-critical toggles immediately:

@@ -75,9 +75,9 @@ constexpr float kGameplayGaugeTop = 210.0f;
 constexpr float kGameplayGaugeBottom = 910.0f;
 constexpr float kGameplayHoldTailTaperRatio = 0.55f;
 constexpr float kGameplayGaugeWidth = 46.0f;
-constexpr double kGameplayJudgementLineMin = 0.55;
-constexpr double kGameplayJudgementLineMax = 0.86;
-constexpr double kGameplayJudgementLineDefault = 0.82;
+constexpr double kGameplayJudgementLineMin = config::kJudgementLinePositionMin;
+constexpr double kGameplayJudgementLineMax = config::kJudgementLinePositionMax;
+constexpr double kGameplayJudgementLineDefault = config::kJudgementLinePositionDefault;
 constexpr double kGameplayNoteWidthScaleMin = 0.50;
 constexpr double kGameplayNoteWidthScaleMax = 1.40;
 constexpr double kGameplayLaneWidthScaleMin = 0.50;
@@ -2257,6 +2257,44 @@ bool MenuWindow::ensure_gameplay_note_sprites(const GameplayHudData& data) {
         gameplay_note_sprite_cache_.lane_divider_widths[i] = imported.lane_divider_widths[i];
     }
 
+    if (imported.column_widths.size() == static_cast<std::size_t>(lane_count)) {
+        double total_width = 0.0;
+        std::size_t valid_width_count = 0;
+        for (float width : imported.column_widths) {
+            if (std::isfinite(width) && width > 0.0f) {
+                total_width += width;
+                ++valid_width_count;
+            }
+        }
+        const double average_width =
+            valid_width_count > 0 ? total_width / static_cast<double>(valid_width_count) : 0.0;
+        if (average_width > 0.0) {
+            gameplay_note_sprite_cache_.imported_lane_width_scale_count =
+                imported.column_widths.size();
+            for (std::size_t lane = 0; lane < imported.column_widths.size(); ++lane) {
+                gameplay_note_sprite_cache_.imported_lane_width_scales[lane] =
+                    std::clamp(static_cast<double>(imported.column_widths[lane]) / average_width,
+                               kGameplayLaneWidthScaleMin,
+                               kGameplayLaneWidthScaleMax);
+            }
+            if (imported.column_spacings.size() == static_cast<std::size_t>(lane_count - 1)) {
+                gameplay_note_sprite_cache_.imported_lane_spacing_scale_count =
+                    imported.column_spacings.size();
+                for (std::size_t gap = 0; gap < imported.column_spacings.size(); ++gap) {
+                    gameplay_note_sprite_cache_.imported_lane_spacing_scales[gap] =
+                        std::clamp(static_cast<double>(imported.column_spacings[gap]) / average_width,
+                                   kGameplayLaneSpacingScaleMin,
+                                   kGameplayLaneSpacingScaleMax);
+                }
+            }
+        }
+    }
+    if (imported.has_hit_position && std::isfinite(imported.hit_position)) {
+        gameplay_note_sprite_cache_.has_imported_judgement_line_position = true;
+        gameplay_note_sprite_cache_.imported_judgement_line_position =
+            clamp_gameplay_judgement_line(static_cast<double>(imported.hit_position) / 480.0);
+    }
+
     auto pick_asset = [](const std::vector<app::ImportedSkinImageAsset>& assets,
                          int lane_index) -> const app::ImportedSkinImageAsset* {
         if (assets.empty() || lane_index < 0) {
@@ -2515,18 +2553,51 @@ bool MenuWindow::ensure_gameplay_static_cache(const GameplayHudData& data) {
 
     GameplayStaticCache desired{};
     desired.lane_count = std::clamp(data.lane_count, 1, static_cast<int>(kGameplayHudMaxLanes));
-    desired.judgement_line_position = clamp_gameplay_judgement_line(data.judgement_line_position);
-    desired.note_width_scale = data.note_width_scale;
-    desired.note_height_scale = data.note_height_scale;
+    const bool use_imported_metrics = normalize_gameplay_skin_source(data.skin_source) != "native";
+    desired.judgement_line_position =
+        gameplay_note_sprite_cache_.has_imported_judgement_line_position
+            ? gameplay_note_sprite_cache_.imported_judgement_line_position
+            : clamp_gameplay_judgement_line(data.judgement_line_position);
+    desired.note_width_scale = effective_gameplay_note_width_scale(
+        data.note_width_scale,
+        gameplay_note_sprite_cache_.imported_note_width_ratio,
+        use_imported_metrics);
+    desired.note_height_scale = effective_gameplay_note_height_scale(
+        data.note_height_scale,
+        gameplay_note_sprite_cache_.imported_note_height_ratio,
+        use_imported_metrics);
     desired.lane_width_scale_count = std::min(data.lane_width_scale_count, desired.lane_width_scales.size());
     desired.lane_width_scales.fill(kGameplayLaneWidthScaleDefault);
     for (std::size_t i = 0; i < desired.lane_width_scale_count; ++i) {
         desired.lane_width_scales[i] = data.lane_width_scales[i];
     }
+    if (gameplay_note_sprite_cache_.imported_lane_width_scale_count ==
+        static_cast<std::size_t>(desired.lane_count)) {
+        desired.lane_width_scale_count = static_cast<std::size_t>(desired.lane_count);
+        for (std::size_t lane = 0; lane < desired.lane_width_scale_count; ++lane) {
+            desired.lane_width_scales[lane] = std::clamp(
+                desired.lane_width_scales[lane] *
+                    gameplay_note_sprite_cache_.imported_lane_width_scales[lane],
+                kGameplayLaneWidthScaleMin,
+                kGameplayLaneWidthScaleMax);
+        }
+    }
     desired.lane_spacing_scale_count = std::min(data.lane_spacing_scale_count, desired.lane_spacing_scales.size());
     desired.lane_spacing_scales.fill(kGameplayLaneSpacingScaleDefault);
     for (std::size_t i = 0; i < desired.lane_spacing_scale_count; ++i) {
         desired.lane_spacing_scales[i] = data.lane_spacing_scales[i];
+    }
+    if (gameplay_note_sprite_cache_.imported_lane_spacing_scale_count ==
+        static_cast<std::size_t>(std::max(0, desired.lane_count - 1))) {
+        desired.lane_spacing_scale_count =
+            gameplay_note_sprite_cache_.imported_lane_spacing_scale_count;
+        for (std::size_t gap = 0; gap < desired.lane_spacing_scale_count; ++gap) {
+            desired.lane_spacing_scales[gap] = std::clamp(
+                desired.lane_spacing_scales[gap] +
+                    gameplay_note_sprite_cache_.imported_lane_spacing_scales[gap],
+                kGameplayLaneSpacingScaleMin,
+                kGameplayLaneSpacingScaleMax);
+        }
     }
     desired.lane_divider_width_scale = data.lane_divider_width_scale;
     desired.lane_center_gap_scale = data.lane_center_gap_scale;
@@ -2588,15 +2659,8 @@ bool MenuWindow::ensure_gameplay_static_cache(const GameplayHudData& data) {
     d2d_->d2d_context->BeginDraw();
     d2d_->d2d_context->SetTransform(D2D1::Matrix3x2F::Identity());
 
-    const bool use_imported_metrics = normalize_gameplay_skin_source(data.skin_source) != "native";
-    const float note_width_scale = effective_gameplay_note_width_scale(
-        data.note_width_scale,
-        gameplay_note_sprite_cache_.imported_note_width_ratio,
-        use_imported_metrics);
-    const float note_height_scale = effective_gameplay_note_height_scale(
-        data.note_height_scale,
-        gameplay_note_sprite_cache_.imported_note_height_ratio,
-        use_imported_metrics);
+    const float note_width_scale = static_cast<float>(desired.note_width_scale);
+    const float note_height_scale = static_cast<float>(desired.note_height_scale);
     const GameplaySurfaceLayout surface_layout =
         build_gameplay_surface_layout(
             desired.lane_count,

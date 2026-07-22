@@ -4,7 +4,7 @@ This roadmap captures the recommended high-level order for building out the game
 
 ## Current Baseline
 - Windows GUI / runtime is the primary supported path.
-- Project version line is `1.1.4 stable`; direct-IP multiplayer and the r5 input-lifecycle fixes are included in this line.
+- Project version line is `1.1.6 stable`; this line also includes safe OSK/OSZ import, expanded osu!mania skin support, Ghost Battle default-off behavior, the full judge-line range, LN improvements, and Mirror mode.
 - BMS-first menu / runtime is active by default, with optional 4K-10K `.osu` support behind config / menu toggles.
 - For current shipped behavior, read `docs/current-state.en.md` first; this roadmap is about direction and remaining work.
 
@@ -38,8 +38,8 @@ This roadmap captures the recommended high-level order for building out the game
 - ✅ Key remapping UI per the "리맵 UI 플로우" spec (including NKRO test).
 - Once this lands, the project becomes a solid personal practice tool.
 
-## 3) Add Two Random Modes First
-- ✅ Start with **Full Random (FR)** and **Super Random (SR)**; defer **AR** until later.
+## 3) Add Lane-Transform and Random Modes
+- ✅ **Mirror**, **Full Random (FR)**, and **Super Random (SR)** are implemented; defer **AR** until its behavior is specified.
 
 ## 4) Attach a Launcher
 - Handle folder checks, first-run config creation, and error-code cataloging.

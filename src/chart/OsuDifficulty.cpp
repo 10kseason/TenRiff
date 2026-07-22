@@ -46,6 +46,7 @@ constexpr std::array<double, 4> kJackBaseIntervalsMs = {{75.0, 100.0, 125.0, 150
 constexpr std::array<double, 4> kJackLnIntervalsMs = {{37.5, 50.0, 62.5, 75.0}};
 constexpr std::array<double, 4> kJackCoefficients = {{1.0, 0.5, 0.4, 0.1}};
 constexpr std::array<double, 4> kVibroJackNerfWeights = {{0.5, 1.0, 0.0, 0.0}};
+constexpr double kLongNoteMissMsScale = 0.5;
 
 enum class DifficultyEventType {
     Rice,
@@ -58,6 +59,11 @@ enum class JudgmentNoteType {
     Head,
     Tail,
 };
+
+double scale_difficulty_timing_offset(double ms_offset, JudgmentNoteType note_type) {
+    // This eases LN difficulty only; gameplay judgement windows remain unchanged.
+    return note_type == JudgmentNoteType::Rice ? ms_offset : ms_offset * kLongNoteMissMsScale;
+}
 
 enum class MatrixKey {
     K4,
@@ -610,6 +616,7 @@ std::pair<std::optional<double>, std::optional<double>> get_judgment_by_timing(d
         return {100.0, 100.0};
     }
 
+    const double effective_ms_offset = scale_difficulty_timing_offset(ms_offset, note_type);
     for (const auto& judgment : judgments) {
         const auto plus_range = judgment_range(judgment, note_type, true);
         const auto minus_range = judgment_range(judgment, note_type, false);
@@ -625,7 +632,7 @@ std::pair<std::optional<double>, std::optional<double>> get_judgment_by_timing(d
             total_range += std::abs(*minus_range);
         }
 
-        if (ms_offset <= total_range) {
+        if (effective_ms_offset <= total_range) {
             return judgment_result_value(judgment);
         }
     }
@@ -662,8 +669,9 @@ std::pair<std::optional<double>, std::optional<double>> get_judgment_for_fds_rds
         return {100.0, 100.0};
     }
 
-    const double abs_offset = std::abs(timing_offset_ms);
-    const bool is_late = timing_offset_ms >= 0.0;
+    const double effective_timing_offset_ms = scale_difficulty_timing_offset(timing_offset_ms, note_type);
+    const double abs_offset = std::abs(effective_timing_offset_ms);
+    const bool is_late = effective_timing_offset_ms >= 0.0;
     for (const auto& judgment : judgments) {
         const auto range = judgment_range(judgment, note_type, is_late);
         if (!range.has_value()) {

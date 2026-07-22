@@ -4,7 +4,7 @@
 
 ## 当前基线
 - Windows GUI/runtime 是主要受支持路径。
-- 项目版本线是 `1.1.4 stable`；direct-IP multiplayer 与 r5 的输入生命周期修复已包含在此版本线中。
+- 项目版本线是 `1.1.6 stable`；此版本线也包含安全 OSK/OSZ 导入、更完整的 osu!mania skin 支持、Ghost Battle 默认 `OFF`、完整判定线范围、LN 改进和 Mirror 模式。
 - 默认启用 BMS-first 的菜单/runtime，同时可以通过 config/menu 开关启用 4K-10K `.osu` 支持。
 - 关于当前已发布的行为，请先看 [`docs/current-state.zh-CN.md`](current-state.zh-CN.md)；这份路线图主要讲方向和剩余工作。
 
@@ -38,8 +38,8 @@
 - ✅ 按“重映射 UI 流程”规格实现 key remapping UI（包括 NKRO 测试）。
 - 这一项完成后，项目会变成一个很不错的个人练习工具。
 
-## 3) 先加入两个随机模式
-- ✅ 先实现 **Full Random（FR）** 和 **Super Random（SR）**；把 **AR** 留到后面。
+## 3) Lane transform / Random mode
+- ✅ 已实现 **Mirror**、**Full Random（FR）** 与 **Super Random（SR）**；**AR** 延后到行为定义明确之后。
 
 ## 4) 接入 launcher
 - 处理文件夹检查、首次运行配置创建、错误码分类。

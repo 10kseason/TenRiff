@@ -11,6 +11,7 @@
 #include <unordered_set>
 
 #include "app/BmsGameplayBuilder.h"
+#include "app/OsuAssetPath.h"
 #include "app/OsuHitsoundResolver.h"
 #include "chart/BmsChartNorm.h"
 #include "chart/BmsParser.h"
@@ -56,18 +57,6 @@ std::string normalize_asset_reference(std::string value) {
     return value;
 }
 
-std::filesystem::path resolve_asset_path(const std::filesystem::path& chart_path, const std::string& reference) {
-#ifdef _WIN32
-    std::filesystem::path ref_path = std::filesystem::u8path(reference);
-#else
-    std::filesystem::path ref_path(reference);
-#endif
-    if (ref_path.is_absolute()) {
-        return ref_path.lexically_normal();
-    }
-    return (chart_path.parent_path() / ref_path).lexically_normal();
-}
-
 std::filesystem::path normalize_resolved_path(const std::filesystem::path& path) {
     namespace fs = std::filesystem;
     std::error_code ec;
@@ -104,7 +93,9 @@ struct AssetLookupIndex {
     std::vector<std::filesystem::path> audio_files;
 };
 
-void build_asset_lookup(const std::filesystem::path& chart_path, AssetLookupIndex& lookup) {
+void build_asset_lookup(const std::filesystem::path& chart_path,
+                        AssetLookupIndex& lookup,
+                        bool restrict_to_chart_root) {
     if (lookup.built) {
         return;
     }
@@ -114,7 +105,14 @@ void build_asset_lookup(const std::filesystem::path& chart_path, AssetLookupInde
     lookup.audio_files.clear();
 
     namespace fs = std::filesystem;
-    const fs::path root = chart_path.parent_path();
+    fs::path root = chart_path.parent_path();
+    if (restrict_to_chart_root) {
+        const auto canonical_root = osu_assets::canonical_chart_root(chart_path);
+        if (!canonical_root.has_value()) {
+            return;
+        }
+        root = *canonical_root;
+    }
     if (root.empty()) {
         return;
     }
@@ -142,7 +140,17 @@ void build_asset_lookup(const std::filesystem::path& chart_path, AssetLookupInde
         }
         ec.clear();
 
-        const fs::path full = normalize_resolved_path(entry.path());
+        fs::path full;
+        if (restrict_to_chart_root) {
+            const auto contained = osu_assets::canonical_existing_file_in_chart_root(chart_path, entry.path());
+            if (!contained.has_value()) {
+                it.increment(ec);
+                continue;
+            }
+            full = *contained;
+        } else {
+            full = normalize_resolved_path(entry.path());
+        }
         fs::path relative = fs::relative(full, root, ec);
         if (ec || relative.empty()) {
             ec.clear();
@@ -165,17 +173,29 @@ void build_asset_lookup(const std::filesystem::path& chart_path, AssetLookupInde
 
 std::optional<std::filesystem::path> lookup_asset_path_candidate(const std::filesystem::path& chart_path,
                                                                  const std::filesystem::path& ref_path,
-                                                                 AssetLookupIndex& lookup) {
+                                                                 AssetLookupIndex& lookup,
+                                                                 bool restrict_to_chart_root) {
     namespace fs = std::filesystem;
+    if (restrict_to_chart_root &&
+        !osu_assets::is_safe_relative_reference(ref_path.generic_u8string())) {
+        return std::nullopt;
+    }
     const fs::path direct = ref_path.is_absolute()
                                 ? ref_path.lexically_normal()
                                 : (chart_path.parent_path() / ref_path).lexically_normal();
-    std::error_code ec;
-    if (!direct.empty() && fs::exists(direct, ec) && !ec) {
-        return normalize_resolved_path(direct);
+    if (restrict_to_chart_root) {
+        if (auto contained = osu_assets::canonical_existing_file_in_chart_root(chart_path, direct);
+            contained.has_value()) {
+            return contained;
+        }
+    } else {
+        std::error_code ec;
+        if (!direct.empty() && fs::exists(direct, ec) && !ec) {
+            return normalize_resolved_path(direct);
+        }
     }
 
-    build_asset_lookup(chart_path, lookup);
+    build_asset_lookup(chart_path, lookup, restrict_to_chart_root);
 
     const std::string rel_key = normalize_path_key(ref_path.generic_u8string());
     auto rel_it = lookup.by_relative.find(rel_key);
@@ -251,10 +271,14 @@ std::vector<std::filesystem::path> build_asset_reference_candidates(const std::s
 
 std::optional<std::filesystem::path> resolve_asset_path_with_fallback(const std::filesystem::path& chart_path,
                                                                       const std::string& reference,
-                                                                      AssetLookupIndex& lookup) {
+                                                                      AssetLookupIndex& lookup,
+                                                                      bool restrict_to_chart_root) {
+    if (restrict_to_chart_root && !osu_assets::is_safe_relative_reference(reference)) {
+        return std::nullopt;
+    }
     const auto candidates = build_asset_reference_candidates(reference);
     for (const auto& candidate : candidates) {
-        auto resolved = lookup_asset_path_candidate(chart_path, candidate, lookup);
+        auto resolved = lookup_asset_path_candidate(chart_path, candidate, lookup, restrict_to_chart_root);
         if (resolved.has_value()) {
             return resolved;
         }
@@ -300,7 +324,8 @@ std::optional<std::filesystem::path> resolve_osu_main_audio_path(const std::file
                                                                  AssetLookupIndex& lookup) {
     const std::string audio_ref = normalize_asset_reference(std::string(audio_filename));
     if (!audio_ref.empty()) {
-        if (auto resolved = resolve_asset_path_with_fallback(chart_path, audio_ref, lookup); resolved.has_value()) {
+        if (auto resolved = resolve_asset_path_with_fallback(chart_path, audio_ref, lookup, true);
+            resolved.has_value()) {
             return resolved;
         }
     }
@@ -309,14 +334,15 @@ std::optional<std::filesystem::path> resolve_osu_main_audio_path(const std::file
     const std::string stem = chart_path.stem().u8string();
     if (!stem.empty()) {
         for (std::string_view ext : {".ogg", ".wav", ".wave", ".mp3"}) {
-            if (auto resolved = lookup_asset_path_candidate(chart_path, fs::path(stem + std::string(ext)), lookup);
+            if (auto resolved =
+                    lookup_asset_path_candidate(chart_path, fs::path(stem + std::string(ext)), lookup, true);
                 resolved.has_value()) {
                 return resolved;
             }
         }
     }
 
-    build_asset_lookup(chart_path, lookup);
+    build_asset_lookup(chart_path, lookup, true);
     if (lookup.audio_files.empty()) {
         return std::nullopt;
     }
@@ -433,7 +459,7 @@ std::optional<std::string> resolve_bms_audio_path(const std::filesystem::path& c
     }
 
     std::optional<std::string> resolved_path;
-    auto resolved = resolve_asset_path_with_fallback(chart_path, wav_ref, asset_lookup);
+    auto resolved = resolve_asset_path_with_fallback(chart_path, wav_ref, asset_lookup, false);
     if (resolved.has_value()) {
         resolved_path = resolved->u8string();
     } else if (warned_missing_file_ref.emplace(wav_ref_key).second) {

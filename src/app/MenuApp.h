@@ -308,6 +308,7 @@ private:
     [[nodiscard]] bool import_osu_skin_path(std::string_view source_path);
     [[nodiscard]] bool import_lr2_skin_path(std::string_view source_path);
     [[nodiscard]] bool import_skin_path_auto(std::string_view source_path);
+    [[nodiscard]] bool import_osz_path(std::string_view source_path);
     [[nodiscard]] std::string active_external_skin_root() const;
     [[nodiscard]] std::string active_external_skin_name() const;
     [[nodiscard]] const struct LocalPlayRecord* current_selected_record() const;

@@ -151,13 +151,13 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
             ? ui_text("ESC / BACKSPACE  BACK TO MULTIPLAYER LOBBY",
                       "ESC / BACKSPACE  멀티플레이 로비로 돌아가기")
             : (render.song_select.showing_sources
-            ? ui_text("LEFT/RIGHT  NAV FOCUS     BACKSPACE  BACK     F2  ADD FOLDER     F5  REINDEX     F1  HELP",
-                      "좌/우  탐색 전환     BACKSPACE  뒤로     F2  폴더 추가     F5  재인덱스     F1  도움말")
+            ? ui_text("LEFT/RIGHT NAV     BACKSPACE BACK     F2 FOLDER     SHIFT+F2 OSZ     F5 REINDEX     F1 HELP",
+                      "좌/우 탐색     BACKSPACE 뒤로     F2 폴더     SHIFT+F2 OSZ     F5 재인덱스     F1 도움말")
             : (render.song_select.showing_records
                    ? ui_text("LEFT/RIGHT  NAV FOCUS     BACKSPACE  BACK     ESC  TITLE     F1  HELP",
                              "좌/우  탐색 전환     BACKSPACE  뒤로     ESC  타이틀     F1  도움말")
-                   : ui_text("LEFT/RIGHT  NAV FOCUS     ENTER SEARCH  TYPE QUERY     F2  ADD FOLDER     F5  REINDEX     F1  HELP",
-                             "좌/우  탐색 전환     ENTER SEARCH  검색 입력     F2  폴더 추가     F5  재인덱스     F1  도움말")));
+                   : ui_text("LEFT/RIGHT NAV     ENTER SEARCH     F2 FOLDER     SHIFT+F2 OSZ     F5 REINDEX     F1 HELP",
+                             "좌/우 탐색     ENTER 검색     F2 폴더     SHIFT+F2 OSZ     F5 재인덱스     F1 도움말")));
 
     const std::string source_detail =
         std::to_string(render.song_select.source_count) + " " +
@@ -289,7 +289,7 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
         if (total_sources == 0) {
             render.song_select.empty_title = ui_text("NO SONG SOURCES", "불러온 곡 소스 없음");
             render.song_select.empty_message =
-                ui_text("Use SOURCES > Add Songs Folder, press F2, or drag and drop a folder onto the window.",
+                ui_text("Use SOURCES > Add Songs Folder, press F2, or drop a folder/OSZ package onto the window.",
                         "SOURCES > 폴더 추가를 사용하거나 F2를 누르거나, 폴더를 창에 드래그 앤 드롭하세요.");
         }
     } else if (render.song_select.showing_records) {
@@ -387,7 +387,7 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
             } else {
                 render.song_select.empty_title = ui_text("NO CHARTS INDEXED", "인덱싱된 차트 없음");
                 render.song_select.empty_message =
-                    ui_text("Use SOURCES > Add Songs Folder, press F2, or drag-and-drop a songs folder. Then use F5 to reindex.",
+                    ui_text("Use SOURCES > Add Songs Folder, press F2, or drop a songs folder/OSZ package. Then use F5 to reindex.",
                             "SOURCES > 폴더 추가를 사용하거나 F2를 누르거나 곡 폴더를 드래그 앤 드롭한 뒤 F5로 재인덱스하세요.");
             }
         }

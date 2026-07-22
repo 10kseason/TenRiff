@@ -34,15 +34,56 @@ void copy_osu_assets(const std::vector<std::string>& source,
     }
 }
 
-void apply_key_fallbacks(ImportedGameplaySkinDefinition& definition) {
-    if (definition.key_images.empty() && !definition.note_images.empty()) {
-        definition.key_images = definition.note_images;
-    }
-    if (definition.key_pressed_images.empty()) {
-        if (!definition.hold_head_images.empty()) {
-            definition.key_pressed_images = definition.hold_head_images;
-        } else if (!definition.note_images.empty()) {
-            definition.key_pressed_images = definition.note_images;
+void apply_asset_fallbacks(ImportedGameplaySkinDefinition& definition) {
+    const std::size_t lane_count = (std::max)({
+        static_cast<std::size_t>(std::max(definition.keys, 0)),
+        definition.note_images.size(),
+        definition.hold_head_images.size(),
+        definition.hold_tail_images.size(),
+        definition.key_images.size(),
+        definition.key_pressed_images.size(),
+    });
+    const auto resize_preserving_broadcast = [lane_count](
+                                                  std::vector<ImportedSkinImageAsset>& assets) {
+        if (assets.size() == 1u && lane_count > 1u) {
+            const ImportedSkinImageAsset broadcast = assets.front();
+            assets.resize(lane_count, broadcast);
+            return;
+        }
+        assets.resize(lane_count);
+    };
+    resize_preserving_broadcast(definition.hold_tail_images);
+    resize_preserving_broadcast(definition.key_images);
+    resize_preserving_broadcast(definition.key_pressed_images);
+
+    const auto asset_at = [](const std::vector<ImportedSkinImageAsset>& assets,
+                             std::size_t lane) -> const ImportedSkinImageAsset* {
+        if (assets.empty()) {
+            return nullptr;
+        }
+        const std::size_t index = (assets.size() == 1u) ? 0u : lane;
+        if (index >= assets.size() || assets[index].path.empty()) {
+            return nullptr;
+        }
+        return &assets[index];
+    };
+
+    for (std::size_t lane = 0; lane < lane_count; ++lane) {
+        const ImportedSkinImageAsset* note = asset_at(definition.note_images, lane);
+        const ImportedSkinImageAsset* hold_head = asset_at(definition.hold_head_images, lane);
+
+        if (definition.hold_tail_images[lane].path.empty() && hold_head != nullptr) {
+            definition.hold_tail_images[lane] = *hold_head;
+        }
+        if (definition.key_images[lane].path.empty() && note != nullptr) {
+            definition.key_images[lane] = *note;
+        }
+        if (definition.key_pressed_images[lane].path.empty()) {
+            if (hold_head != nullptr) {
+                definition.key_pressed_images[lane] = *hold_head;
+            } else if (note != nullptr) {
+                definition.key_pressed_images[lane] = *note;
+            }
         }
     }
 }
@@ -65,6 +106,10 @@ ImportedGameplaySkinDefinition resolve_imported_gameplay_skin(std::string_view s
         definition.found = true;
         definition.keys = osu.keys;
         definition.lane_divider_widths = osu.lane_divider_widths;
+        definition.column_widths = osu.column_widths;
+        definition.column_spacings = osu.column_spacings;
+        definition.hit_position = osu.hit_position;
+        definition.has_hit_position = osu.has_hit_position;
         definition.imported_note_width_ratio = osu.imported_note_width_ratio;
         definition.imported_note_height_ratio = osu.imported_note_height_ratio;
         definition.use_full_lane_receptor_layout = true;
@@ -74,7 +119,7 @@ ImportedGameplaySkinDefinition resolve_imported_gameplay_skin(std::string_view s
         copy_osu_assets(osu.hold_tail_images, definition.hold_tail_images);
         copy_osu_assets(osu.key_images, definition.key_images);
         copy_osu_assets(osu.key_pressed_images, definition.key_pressed_images);
-        apply_key_fallbacks(definition);
+        apply_asset_fallbacks(definition);
         return definition;
     }
 
@@ -95,7 +140,7 @@ ImportedGameplaySkinDefinition resolve_imported_gameplay_skin(std::string_view s
         definition.imported_note_width_ratio = lr2.imported_note_width_ratio;
         definition.imported_note_height_ratio = lr2.imported_note_height_ratio;
         definition.use_full_lane_receptor_layout = false;
-        apply_key_fallbacks(definition);
+        apply_asset_fallbacks(definition);
         return definition;
     }
 

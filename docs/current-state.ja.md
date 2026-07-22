@@ -3,14 +3,15 @@
 この文書は、次のエージェントや新しい作業者が最初に読むべき current-state 文書です。目的は、「このプロジェクトは今どういう状態で、どこを見ればよく、何がまだ未検証か」を素早く把握できるようにすることです。
 
 ## Baseline
-- 現在のプロジェクト版は `1.1.4 stable`
-- direct-IP multiplayer と preview r5 の input-backend lifecycle 修正は `1.1.4 stable` に統合
+- 現在のプロジェクト版は `1.1.6 stable`
+- direct-IP multiplayer と preview r5 の input-backend lifecycle 修正は `1.1.6 stable` に統合
+- `1.1.6` は Ghost Battle 既定 `OFF`、安全な OSK/OSZ install、osu!mania skin 適用の拡張、0～100% の判定ライン、LN 表示・難易度評価の改善、Mirror mode を含む
 - 後続作業の基準文書は `docs/baseline-1.1.2.ja.md`
 - Windows GUI ビルドが主対象
 - Linux は `Baepoks-Linuxs/TenRiff-0.5.0-linux-preview` レベルの preview のみ
 - 既定サーフェスは BMS-first
 - `.osu` はオプションで再有効化でき、4K-10K をサポート
-- `1.1.4 stable` の gameplay 入力は RawInput を優先しつつ、同じ `InputThread` で bound-key polling shadow を常時動作させる。起動失敗または message pump の予期しない終了時も queue / pressed state を reset せず、その producer を Polling に切り替える
+- `1.1.6 stable` の gameplay 入力は RawInput を優先しつつ、同じ `InputThread` で bound-key polling shadow を常時動作させる。起動失敗または message pump の予期しない終了時も queue / pressed state を reset せず、その producer を Polling に切り替える
 - menu 入力は従来の foreground process/root-window 境界を維持する。RawInput の起動失敗、process-global 登録先の消失、hidden message window の終了を検知すると、ユーザー入力を待たず Polling に切り替える。
 - 確認済み fallback は profile を書き換えず、そのアプリ実行中の menu と後続 gameplay に維持する。アプリ再起動または `Options -> Input Settings -> Backend` の明示変更で再試行する。
 
@@ -62,6 +63,8 @@
   - mouse-wheel navigation
   - 左側 `KEY` quick filter toggle
   - external folder / BMS drag-and-drop
+  - `.osz` は `Shift+F2` のファイル選択または drag-and-drop で現在の songs source にインストールされ、osu chart を有効化してその source を再インデックスする
+  - OSZ は archive 全体を事前検証し、staging に展開してから atomic に確定して既存フォルダを上書きせず、`.osu` の background/audio/hitsound 参照を chart directory 内に制限する
   - recent source の保存と再オープン
   - BMS / OSU / All filtering
   - difficulty / title sorting
@@ -71,13 +74,19 @@
   - 4K-10K chart difficulty calculation
   - `mode.key_mode` は N2NC スタイルの lane remap でキー数を変換
   - `mode.key_mode=none` は元のキー数と基本パターンレイアウトを維持
+- Native difficulty:
+  - BMS/osu!mania の LV/CR 計算では long-note Head/Tail の miss-ms だけを 0.5倍で評価し、`300ms`を`150ms`として緩和する。実際の gameplay 判定 window は変更しない
+- Lane transform:
+  - Random は `Off / Mirror / FR / SR` に対応。Mirror は key-mode 変換後の最終 lane を反転し、10K/16K は各 player half 内で独立して反転
 - Skins / gameplay feel:
   - `rect` / `circle` note shape
   - note border on/off
   - combo Y adjustment
   - judge line / lane width / lane spacing / note width / divider width / 16K center gap / note height / LN body width adjustment
   - キーモードごとの lane-width 配列と inter-lane spacing 配列が保存され、preview / live gameplay / ghost field の同じレイアウト計算に適用される
-  - osu!mania `ColumnLineWidth` を読み込んで lane divider 幅へ反映
+  - `.osk` は Skins 画面のファイル選択または drag-and-drop で現在の profile の `skins` にインストールされ、OSZ と同じ transactional/no-overwrite 方針を使う
+  - 対応する osu!mania の note/LN 画像と `ColumnWidth`、`ColumnSpacing`、`ColumnLineWidth`、`HitPosition` を gameplay layout に反映
+  - archive 内の有効なファイルはすべて保持するが、未対応の osu! mode や UI asset を pixel-perfect に再現するものではない
   - `skin.lr2_resolution_mode` は `auto / sd / hd / fhd` を保持
   - LR2 auto-detect は asset 名ではなく playskin `#DST_NOTE` の座標範囲を使う
   - フィールド上端からの future-note entry easing
@@ -136,13 +145,13 @@
   - peak memory はおよそ `working set 453MB`, `private 524MB`
   - 同ライブラリの 1024-chart sample では fast profile throughput が safe 比で約 `2.05x`
 - Cache schema:
-  - `version = 8`
+  - `version = 10`
   - `include_osu` を含む
   - optional `layout_label`
 
 ## Runtime / Packaging Rules
 - 新しい user profile は自動生成される
-- 現在の正式 P2P 配布ラインは `TenRiff 1.1.4 stable`
+- 現在の正式 P2P 配布ラインは `TenRiff 1.1.6 stable`
 - distribution package には `Songs` を含めない
 - distribution package には menu BGM 用の `Mainmusic/` runtime asset を含める
 - distribution 更新には built artifact と必要な runtime asset だけを含める

@@ -5,6 +5,8 @@
 #include <cmath>
 #include <unordered_set>
 
+#include "app/OsuAssetPath.h"
+
 namespace tenriff::app {
 
 namespace {
@@ -86,25 +88,6 @@ const chart::OsuManiaTimingPoint* find_effective_timing_point(const chart::OsuMa
     return active;
 }
 
-std::filesystem::path normalize_resolved_path(const std::filesystem::path& path) {
-    namespace fs = std::filesystem;
-    std::error_code ec;
-    fs::path normalized = path;
-    if (!normalized.is_absolute()) {
-        const fs::path absolute = fs::absolute(normalized, ec);
-        if (!ec && !absolute.empty()) {
-            normalized = absolute;
-        } else {
-            ec.clear();
-        }
-    }
-    const fs::path canonical = fs::weakly_canonical(normalized, ec);
-    if (!ec && !canonical.empty()) {
-        return canonical;
-    }
-    return normalized.lexically_normal();
-}
-
 std::vector<std::filesystem::path> build_reference_candidates(const std::string& reference) {
     namespace fs = std::filesystem;
     std::vector<fs::path> candidates;
@@ -148,12 +131,16 @@ std::vector<std::filesystem::path> build_reference_candidates(const std::string&
 std::optional<std::filesystem::path> resolve_local_audio_path(const std::filesystem::path& chart_path,
                                                               const std::string& reference) {
     namespace fs = std::filesystem;
+    const std::string normalized = normalize_asset_reference(reference);
+    if (!osu_assets::is_safe_relative_reference(normalized)) {
+        return std::nullopt;
+    }
     const fs::path base_dir = chart_path.parent_path();
-    for (const auto& candidate : build_reference_candidates(reference)) {
-        const fs::path full = candidate.is_absolute() ? candidate : (base_dir / candidate);
-        std::error_code ec;
-        if (fs::exists(full, ec) && fs::is_regular_file(full, ec)) {
-            return normalize_resolved_path(full);
+    for (const auto& candidate : build_reference_candidates(normalized)) {
+        const fs::path full = base_dir / candidate;
+        if (auto contained = osu_assets::canonical_existing_file_in_chart_root(chart_path, full);
+            contained.has_value()) {
+            return contained;
         }
     }
     return std::nullopt;

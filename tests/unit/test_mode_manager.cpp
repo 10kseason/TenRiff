@@ -445,6 +445,7 @@ TEST_CASE("mode manager key mode combo matrix preserves chart invariants") {
         {make_dense_tap_chart(8), "4k", "super_random", {"full_long_notes"}, 4, 1.0},
         {make_hold_mix_chart(8), "4k", "full_random", {"full_short_notes"}, 4, 1.0},
         {make_hold_mix_chart(8), "6k", "super_random", {"no_ln_release", "judge_hard"}, 6, 0.85},
+        {make_hold_mix_chart(7), "4k", "mirror", {"judge_hard"}, 4, 0.85},
         {make_dense_tap_chart(4), "16k", "off", {"judge_easy"}, 16, 1.25}
     };
 

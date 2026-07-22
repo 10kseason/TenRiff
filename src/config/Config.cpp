@@ -1460,7 +1460,7 @@ RuntimeConfig ConfigLoader::defaults() const {
     config.mode.random_seed = 0;
     config.mode.mods.clear();
     config.mode.enable_osu_charts = false;
-    config.mode.ghost_battle_enabled = true;
+    config.mode.ghost_battle_enabled = false;
     config.mode.autoplay_enabled = false;
     config.mode.practice_no_fail_enabled = false;
     config.mode.song_index_profile = "safe";

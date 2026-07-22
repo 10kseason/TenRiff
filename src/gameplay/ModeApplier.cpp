@@ -120,6 +120,26 @@ void apply_legacy_key_mode_fallback(GameplayChart& chart,
     warnings.push_back("Key mode fallback kept the original lane count.");
 }
 
+void apply_mirror(GameplayChart& chart) {
+    const int lane_count = chart.lane_count;
+    if (lane_count <= 0) {
+        return;
+    }
+
+    // TenRiff's 10K/16K layouts are two-player fields, so mirror each side
+    // independently instead of moving notes across the player boundary.
+    const int mirror_group_size = (lane_count == 10 || lane_count == 16) ? lane_count / 2 : lane_count;
+    for (auto& note : chart.notes) {
+        if (note.lane <= 0 || note.lane > lane_count) {
+            continue;
+        }
+        const int group_start = ((note.lane - 1) / mirror_group_size) * mirror_group_size + 1;
+        note.lane = group_start + mirror_group_size - 1 - (note.lane - group_start);
+    }
+
+    sort_notes_for_gameplay(chart);
+}
+
 void apply_full_random(GameplayChart& chart, uint32_t seed) {
     const int lane_count = chart.lane_count;
     if (lane_count <= 0) {
@@ -235,7 +255,9 @@ ModeApplyResult apply_mode_settings(const GameplayChart& chart,
         }
     }
 
-    if (settings.random == RandomMode::FullRandom) {
+    if (settings.random == RandomMode::Mirror) {
+        apply_mirror(result.chart);
+    } else if (settings.random == RandomMode::FullRandom) {
         apply_full_random(result.chart, settings.random_seed);
     } else if (settings.random == RandomMode::SuperRandom) {
         apply_super_random(result.chart, settings.random_seed, result.warnings);

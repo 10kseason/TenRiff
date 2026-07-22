@@ -77,6 +77,15 @@ void add_hold(OsuManiaChart& chart, int column, int start_ms, int end_ms) {
     chart.notes.push_back(OsuManiaNote{column, start_ms, end_ms, 0});
 }
 
+bool has_long_notes(const OsuManiaChart& chart) {
+    for (const auto& note : chart.notes) {
+        if (note.end_time_ms.has_value() && *note.end_time_ms > note.start_time_ms) {
+            return true;
+        }
+    }
+    return false;
+}
+
 std::filesystem::path make_temp_dir() {
     const auto base = std::filesystem::temp_directory_path() / "tenriff_10k_calc_compare";
     std::filesystem::create_directories(base);
@@ -487,7 +496,7 @@ std::optional<std::vector<PythonMetrics>> run_python_reference(const std::filesy
 
 }  // namespace
 
-TEST_CASE("10k-calc python reference matches C++ port on representative fixtures") {
+TEST_CASE("10k-calc python reference matches taps and bounds TenRiff-relaxed long notes") {
     const auto repo_root = find_repo_root();
     if (repo_root.empty()) {
         std::cout << "[skip] 10k-calc python reference not available; skipping optional consistency check\n";
@@ -517,11 +526,25 @@ TEST_CASE("10k-calc python reference matches C++ port on representative fixtures
         const auto cpp_metrics = calculate_osu_mania_difficulty(cases[i].chart, cases[i].options);
         const auto& py_metrics = (*python_metrics)[i];
 
-        check_close(cases[i].name, "circus_rating", cpp_metrics.circus_rating, py_metrics.circus_rating);
-        if (cpp_metrics.revive_level != py_metrics.revive_level) {
-            throw doctest::TestFailure(cases[i].name + " revive_level mismatch (" +
-                                       std::to_string(cpp_metrics.revive_level) + " vs " +
-                                       std::to_string(py_metrics.revive_level) + ")");
+        if (has_long_notes(cases[i].chart)) {
+            // TenRiff intentionally evaluates LN miss-ms at half scale after the upstream calculator port.
+            if (!(cpp_metrics.circus_rating < py_metrics.circus_rating)) {
+                throw doctest::TestFailure(cases[i].name + " relaxed circus_rating was not below the Python value (" +
+                                           std::to_string(cpp_metrics.circus_rating) + " vs " +
+                                           std::to_string(py_metrics.circus_rating) + ")");
+            }
+            if (cpp_metrics.revive_level > py_metrics.revive_level) {
+                throw doctest::TestFailure(cases[i].name + " relaxed revive_level exceeded the Python value (" +
+                                           std::to_string(cpp_metrics.revive_level) + " vs " +
+                                           std::to_string(py_metrics.revive_level) + ")");
+            }
+        } else {
+            check_close(cases[i].name, "circus_rating", cpp_metrics.circus_rating, py_metrics.circus_rating);
+            if (cpp_metrics.revive_level != py_metrics.revive_level) {
+                throw doctest::TestFailure(cases[i].name + " revive_level mismatch (" +
+                                           std::to_string(cpp_metrics.revive_level) + " vs " +
+                                           std::to_string(py_metrics.revive_level) + ")");
+            }
         }
         check_close(cases[i].name, "peak_nps", cpp_metrics.peak_nps, py_metrics.peak_nps);
         check_close(cases[i].name, "average_nps", cpp_metrics.average_nps, py_metrics.average_nps);

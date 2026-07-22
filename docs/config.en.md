@@ -40,7 +40,7 @@ If a profile does not exist, it is created automatically on first launch.
 
 - `backend` (string)
   - `polling | rawinput`
-  - defaults to `rawinput` on the current `1.1.4` release line
+  - defaults to `rawinput` on the current `1.1.6` release line
   - selectable per profile under `Options -> Input Settings -> Backend` or `Options -> Profile Setup -> Input Backend`
   - runtime fallback never rewrites the saved value to `polling`
   - a confirmed RawInput startup failure, registration-target loss, or message-window exit latches Polling across menu and subsequent gameplay sessions for the current app run
@@ -60,7 +60,7 @@ If a profile does not exist, it is created automatically on first launch.
 - `judgement_hz` (int)
   - `1000 | 2000 | 4000 | 8000`
   - compatibility field kept in the input config
-  - the current `1.1.4` runtime no longer drives a separate audio-thread judgement sub-step loop from this value
+  - the current `1.1.6` runtime no longer drives a separate audio-thread judgement sub-step loop from this value
   - default is `4000` (`0.25ms`)
 - `debounce_ms` (double)
   - real Press/Release transitions are preserved; only duplicate same-state events are removed from pressed-state tracking
@@ -98,7 +98,9 @@ If a profile does not exist, it is created automatically on first launch.
 ### `graphics`
 - `display_mode` (string)
   - `borderless | windowed | fullscreen`
+  - the default is `borderless`; it is also the recommended mode for external overlays such as Discord, OBS, and Game Bar
   - `windowed` is a fixed-size window with a title bar and can be moved
+  - `fullscreen` is DXGI exclusive fullscreen, where the current Discord Game Overlay is not displayed
 - `resolution` (string)
   - `native | 720p | 1080p | qhd`
 - `vsync` (bool)
@@ -109,6 +111,7 @@ If a profile does not exist, it is created automatically on first launch.
   - when `vsync=false`, menu rendering uses an effective cap of `300`, while gameplay render pacing is safety-clamped to `min(configured target, max(300, monitor_hz * 2))`
   - when `vsync=true`, the present refresh follows the active monitor Hz and render pacing targets `monitor_hz * 2` (`1050` clamp)
 - `performance_overlay` (bool)
+  - defaults to `false`; it occupies the top-right corner and can overlap a Discord Voice widget placed there
 
 ### `mode`
 - `format` (string)
@@ -121,10 +124,12 @@ If a profile does not exist, it is created automatically on first launch.
 - `gauge` (string)
   - `normal | hard | ex_hard | easy`
 - `random` (string)
-  - `off | fr | sr`
+  - `off | mirror | fr | sr`
 - `random_seed` (int)
+  - fixed seed for FR/SR and forced key-mode conversion; the Mirror transform itself does not use it
 - `enable_osu_charts` (bool)
 - `ghost_battle_enabled` (bool)
+  - defaults to `false`
   - when `true`, TenRiff auto-loads the selected chart's best compatible replay for ghost comparison
   - when `false`, normal gameplay stays single-field
 - `autoplay_enabled` (bool)
@@ -168,7 +173,7 @@ If a profile does not exist, it is created automatically on first launch.
 - `note_border_enabled` (bool)
 - `judgement_line_position` (double)
   - vertical position ratio of the gameplay judgement line
-  - clamped to the `0.55..0.86` range
+  - clamped to the `0.00..1.00` range (0% to 100%)
   - default value is `0.82`
 - `combo_position` (double)
   - vertical position ratio of the combo display inside the gameplay field

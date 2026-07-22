@@ -40,7 +40,7 @@
 
 - `backend` (string)
   - `polling | rawinput`
-  - 当前 `1.1.4` 发布线默认值为 `rawinput`
+  - 当前 `1.1.6` 发布线默认值为 `rawinput`
   - 可在 `Options -> Input Settings -> Backend` 或 `Options -> Profile Setup -> Input Backend` 中按 profile 选择
   - runtime fallback 不会把已保存值改写为 `polling`
   - 确认 RawInput 启动失败、注册目标丢失或 message window 退出后，本次应用运行期间 menu 与后续 gameplay 都会保持 Polling
@@ -98,7 +98,9 @@
 ### `graphics`
 - `display_mode` (string)
   - `borderless | windowed | fullscreen`
+  - 默认值为 `borderless`；Discord、OBS、Game Bar 等外部 overlay 也推荐使用此模式
   - `windowed` 是带标题栏的固定大小窗口，可拖动
+  - `fullscreen` 是 DXGI 独占全屏，当前 Discord Game Overlay 不会显示
 - `resolution` (string)
   - `native | 720p | 1080p | qhd`
 - `vsync` (bool)
@@ -109,6 +111,7 @@
   - `vsync=false` 时，menu 的有效上限为 `300`，gameplay 的 render pacing 会安全限制到 `min(configured target, max(300, monitor_hz * 2))`
   - `vsync=true` 时，present refresh 以当前活动显示器 Hz 为准，render pacing 的目标是 `monitor_hz * 2`（上限 `1050`）
 - `performance_overlay` (bool)
+  - 默认值为 `false`；它位于右上角，可能会与放在同一角落的 Discord Voice widget 重叠
 
 ### `mode`
 - `format` (string)
@@ -121,10 +124,12 @@
 - `gauge` (string)
   - `normal | hard | ex_hard | easy`
 - `random` (string)
-  - `off | fr | sr`
+  - `off | mirror | fr | sr`
 - `random_seed` (int)
+  - FR/SR 与强制 key-mode 变换使用的固定 seed；Mirror 变换本身不使用
 - `enable_osu_charts` (bool)
 - `ghost_battle_enabled` (bool)
+  - 默认值为 `false`
   - `true` 时会自动加载当前选中谱面的最佳兼容 replay 作为 ghost 对比
   - `false` 时普通游玩保持单场地显示
 - `autoplay_enabled` (bool)
@@ -168,7 +173,7 @@
 - `note_border_enabled` (bool)
 - `judgement_line_position` (double)
   - gameplay 判定线的垂直位置比例
-  - 会被 clamp 在 `0.55..0.86`
+  - 会被 clamp 在 `0.00..1.00`（0%～100%）
   - 默认值为 `0.82`
 - `combo_position` (double)
   - gameplay field 内 combo 显示的垂直位置比例

@@ -11,8 +11,8 @@
 
 namespace tenriff::config {
 
-inline constexpr double kJudgementLinePositionMin = 0.55;
-inline constexpr double kJudgementLinePositionMax = 0.86;
+inline constexpr double kJudgementLinePositionMin = 0.00;
+inline constexpr double kJudgementLinePositionMax = 1.00;
 inline constexpr double kJudgementLinePositionDefault = 0.82;
 inline constexpr double kLaneWidthScaleMin = 0.50;
 inline constexpr double kLaneWidthScaleMax = 1.75;
@@ -149,7 +149,7 @@ struct ModeConfig {
     uint32_t random_seed = 0;
     std::vector<std::string> mods;
     bool enable_osu_charts = false;
-    bool ghost_battle_enabled = true;
+    bool ghost_battle_enabled = false;
     bool autoplay_enabled = false;
     bool practice_no_fail_enabled = false;
     std::string song_index_profile = "safe";

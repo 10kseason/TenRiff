@@ -2,9 +2,9 @@
 
 Language: [한국어](README.md) | [English](README.en.md) | [简体中文](README.zh-CN.md) | [日本語](README.ja.md)
 
-TenRiff is a Windows GUI-based BMS-first rhythm game runtime/launcher project. The current stable project version is `1.1.4`, including direct-IP multiplayer plus the latest input-lifecycle and judgement-timing fixes. The project uses the MIT License, and bundled third-party notices are collected in [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
+TenRiff is a Windows GUI-based BMS-first rhythm game runtime/launcher project. The current stable project version is `1.1.6`, combining direct-IP multiplayer, safe OSK/OSZ import, and expanded osu!mania skin fidelity with a 0-100% judge-line range, seamless hold rendering, relaxed LN difficulty analysis, and deterministic Mirror mode. The project uses the MIT License, and bundled third-party notices are collected in [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
 
-This README is an introduction that explains "what to look at first when you open the project." For the more detailed current behavior, the current `1.1.4` project state, the `1.1.2 final stable` baseline, the config structure, and the design documents, continue reading from [`docs/README.en.md`](docs/README.en.md).
+This README is an introduction that explains "what to look at first when you open the project." For the more detailed current behavior, the current `1.1.6` project state, the `1.1.2 final stable` baseline, the config structure, and the design documents, continue reading from [`docs/README.en.md`](docs/README.en.md).
 
 TenRiff should also be read as a `vibe coding` work: it was shaped through fast iteration and experimentation rather than only through a traditional long-form design-first process.
 
@@ -16,6 +16,7 @@ TenRiff should also be read as a `vibe coding` work: it was shaped through fast 
 - Graphics path: D3D11 + Direct2D/DirectWrite
 - Audio path: WASAPI
 - Input path: RawInput or high-rate polling
+- Direct-IP multiplayer: one host plus one joiner over TCP (default `27300/TCP`; see [usage](docs/multiplayer.en.md))
 - License: [MIT](LICENSE)
 - Third-party notices: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
 - Release changelog: [CHANGELOG.md](CHANGELOG.md)
@@ -57,6 +58,7 @@ The codebase is currently at the level where you can "open the menu, choose a so
   - Search, key-count filtering, difficulty filtering
   - `LV ASC/DESC`, `TITLE A-Z/Z-A` sorting
   - External folder / BMS drag-and-drop
+  - `Shift+F2` file selection or drag-and-drop installs `.osz` into the active songs source, enables osu charts, and reindexes
   - Recent source persistence / reopening
   - `BMS / OSU / All` filtering
 - Gameplay / HUD
@@ -66,10 +68,14 @@ The codebase is currently at the level where you can "open the menu, choose a so
   - Display offset
   - Performance overlay
   - Note head/tail bitmap cache + static playfield command-list cache
+  - Ghost Battle defaults to `OFF` for new/missing-key settings while preserving an existing explicit opt-in
 - Options / skins
   - Hi-Speed, Rate, gauge, audio, input, and graphics settings
   - Judgement-line position, note size, and lane color editing in the `Skins` screen
   - `5K`-`10K` lane color editing with a live preview
+  - `.osk` file selection or drag-and-drop installs a skin into the active profile
+  - Applies supported osu!mania note/LN images plus `ColumnWidth`, `ColumnSpacing`, `ColumnLineWidth`, and `HitPosition`
+  - OSK/OSZ packages are preflighted and staged without overwriting existing folders; chart asset references are contained inside the installed beatmap folder
 - Results / local records
   - Result screen
   - Replay / result JSON export
@@ -82,6 +88,7 @@ The project is usable, but it is not yet a fully finished product.
 
 - Windows GUI is the main path.
 - Linux GUI/audio/input backends are still incomplete.
+- osu skin import applies the osu!mania gameplay elements TenRiff supports; it does not claim pixel-perfect rendering of every osu! mode and UI asset.
 - Some GUI paths are validated primarily through build/tests, and manual in-game verification still remains.
 - Older design documents and the current implementation may differ in places, so the current-state document should always be consulted first.
 
@@ -108,17 +115,13 @@ cmake --build build-dist --config Release --target tenriff
 cmake --build build-dist --config Release --target bms_parser_tests
 ```
 
-If Windows Defender or another antivirus briefly locks `TenRiff.exe`, use the wrapper below:
-
-```powershell
-.\tools\build_with_retry.ps1 -BuildDir build-dist -Config Release -Targets tenriff,bms_parser_tests
-```
+If Windows Defender or another antivirus briefly locks `TenRiff.exe`, rerun the same `cmake --build` command after the lock is released.
 
 ### 3. Public source packages can be built directly too
 
-The versioned public source bundles (packages such as `TenRiff-1.1.4-source.zip`) include `external/` except `external/llama.cpp/`, `src/`, `tests/`, `config/`, `docs/`, and `Mainmusic/`, so they can be configured and built directly after extraction.
+The versioned public source bundles (packages such as `TenRiff-1.1.6-source.zip`) include `external/` except `external/llama.cpp/`, `src/`, `tests/`, `config/`, `docs/`, and `Mainmusic/`, so they can be configured and built directly after extraction.
 
-- The source bundle does not include `tools/build_with_retry.ps1`, so use plain `cmake --build`.
+- The public source bundle does not depend on local build wrappers; use the plain `cmake --build` flow shown above.
 - `10k-calc/` is intentionally excluded from the public source bundle, so optional Python-reference checks may print `[skip]` and still be considered normal.
 - `external/llama.cpp/` is also intentionally excluded, so any local LLM/tooling checkout must be restored separately.
 - `profiles/`, `songs/`, and `logs/` are also excluded from the bundle, but `launch_win.bat` creates the needed folders on first launch.

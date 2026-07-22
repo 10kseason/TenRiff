@@ -142,12 +142,38 @@ TEST_CASE("gameplay note y mapping eases notes in from slightly above the field"
           doctest::Approx(-0.12));
     CHECK(tenriff::render::compute_gameplay_note_y_normalized(820, 1000, 2200, 180, judge_line) ==
           doctest::Approx(1.0));
+    CHECK(tenriff::render::compute_gameplay_note_y_normalized(1000, 1000, 2200, 180, 0.0) ==
+          doctest::Approx(0.0));
+    CHECK(tenriff::render::compute_gameplay_note_y_normalized(1000, 1000, 2200, 180, 1.0) ==
+          doctest::Approx(1.0));
 }
 
-TEST_CASE("gameplay rendering cuts regular notes once the head passes the judgement line") {
-    CHECK(tenriff::render::should_render_gameplay_note(1000, true, 1000));
-    CHECK_FALSE(tenriff::render::should_render_gameplay_note(999, true, 1000));
-    CHECK(tenriff::render::should_render_gameplay_note(999, false, 1000));
+TEST_CASE("gameplay rendering keeps a hold body continuous across the active-hold handoff") {
+    constexpr int64_t handoff_grace_samples = 32;
+    CHECK(tenriff::render::gameplay_hold_handoff_grace_samples(1000, 24) == handoff_grace_samples);
+    CHECK(tenriff::render::gameplay_hold_handoff_grace_samples(1000, 1000) == 64);
+
+    CHECK(tenriff::render::should_render_gameplay_note(1000, 1000, false, true, 1000, 1000,
+                                                       handoff_grace_samples));
+    CHECK_FALSE(tenriff::render::should_render_gameplay_note(999, 999, false, true, 999, 1000,
+                                                             handoff_grace_samples));
+
+    CHECK(tenriff::render::should_render_gameplay_note(1000, 1600, true, true, 999, 1032,
+                                                       handoff_grace_samples));
+    CHECK_FALSE(tenriff::render::should_render_gameplay_note(1000, 1600, true, true, 999, 1033,
+                                                             handoff_grace_samples));
+    CHECK_FALSE(tenriff::render::should_render_gameplay_note(1000, 1600, true, true, 1001, 1001,
+                                                             handoff_grace_samples));
+    CHECK_FALSE(tenriff::render::should_render_gameplay_note(999, 999, true, true, 999, 1000,
+                                                             handoff_grace_samples));
+    CHECK(tenriff::render::should_render_gameplay_note(999, 1600, true, false, 1600, 1600,
+                                                       handoff_grace_samples));
+    CHECK_FALSE(tenriff::render::should_render_gameplay_note(999, 1600, true, false, 1601, 1601,
+                                                             handoff_grace_samples));
+
+    CHECK(tenriff::render::should_render_gameplay_note_head(1000, true, 1000));
+    CHECK_FALSE(tenriff::render::should_render_gameplay_note_head(999, true, 1000));
+    CHECK_FALSE(tenriff::render::should_render_gameplay_note_head(1000, false, 1000));
 }
 
 TEST_CASE("active hold synthetic notes stay anchored to the judgement line") {
