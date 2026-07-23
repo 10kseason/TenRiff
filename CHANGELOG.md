@@ -4,6 +4,22 @@ TenRiff의 사용자/배포 관점에서 의미 있는 변경만 간단히 기�
 
 ## [Unreleased]
 
+## [1.1.9] - 2026-07-23
+
+### Fixed
+
+- `Sudden Death (1 MISS)`가 모든 네이티브 `BAD`가 아니라 실제 osu!mania OD8 객체 `MISS`에서만 발동하도록 수정해, OD8 기준으로 유효한 롱노트 헤드가 입력 즉시 Miss로 강제 변환되던 문제를 해결
+
+### Packaging
+
+- 공개된 `1.1.8` 태그와 자산은 그대로 보존하고, Windows 배포물 `baepo/TenRiff-1.1.9.zip`과 공개 소스 번들 `opensource-Tenriff-source/TenRiff-1.1.9-source.zip`을 새 패치 릴리스 자산으로 구성
+
+### Verification
+
+- 활성 checkout과 최종 공개 소스 ZIP 추출본에서 각각 단위 테스트 `467 pass / 1 optional skip / 0 fail`, CTest `1/1` 통과
+- Release `TenRiff.exe`, CLI/GUI BMS key converter를 활성 checkout과 독립 소스 추출본에서 모두 링크
+- 바이너리 ZIP `18 entries`, 소스 ZIP `327 entries`, converter ZIP `3 entries`를 확인하고, 실제 압축 해제본과 stage의 파일별 SHA-256 및 빈 `logs/`/`songs/`, 금지 경로·개인 로컬 경로·secret 형태 문자열 부재를 검증
+
 ## [1.1.8] - 2026-07-23
 
 ### Added

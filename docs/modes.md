@@ -37,8 +37,8 @@
   - `false`: ghost 비교 없이 일반 단일 필드 플레이
 - `autoplay_enabled`: 판정 가능한 노트를 자동 처리하고 결과를 `ASSIST`로 표시
 - `practice_no_fail_enabled`: 게이지 기반 조기 실패를 막고 차트 끝까지 진행
-- `one_miss_fail_enabled`: 첫 `BAD`에서 즉시 실패하는 `Sudden Death (1 MISS)`
-  - 빈 키 입력의 `POOR`는 즉사 조건이 아님
+- `one_miss_fail_enabled`: 첫 osu!mania OD8 객체 `MISS`에서 즉시 실패하는 `Sudden Death (1 MISS)`
+  - 네이티브 `BAD`만으로는 즉사하지 않으며 빈 키 입력의 `POOR`도 즉사 조건이 아님
   - Mode Settings에서 Practice No-Fail과 상호 배타적
 - `song_index_profile`: `safe | fast`
   - `safe`: large-library RAM high-water를 우선 낮추는 기본값
@@ -70,7 +70,7 @@
 - 모든 게이지는 `100%`에서 시작하고 `0%`에 도달하면 즉시 실패합니다.
 - `ex_hard`는 Hard보다 회복이 낮고 `BAD`/`POOR` 손실이 더 큰 도전용 게이지입니다.
 - clear status는 `EX-HARD CLEAR`, `HARD CLEAR`, `CLEAR`, `EASY CLEAR` 순으로 구분됩니다.
-- `Sudden Death (1 MISS)`는 게이지 종류가 아니라 첫 `BAD`에서 현재 게이지를 0으로 만들고 즉시 종료하는 별도 실패 규칙입니다.
+- `Sudden Death (1 MISS)`는 게이지 종류가 아니라 첫 osu!mania OD8 객체 `MISS`에서 현재 게이지를 0으로 만들고 즉시 종료하는 별도 실패 규칙입니다.
 
 ## 구현 위치
 - 모드 파싱: `src/gameplay/ModeSettings.*`, `src/app/ModeResolver.*`

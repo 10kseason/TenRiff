@@ -67,7 +67,7 @@ TenRiff 的基础游玩流程如下：
 刚开始时，可以从下面这样的配置入手：
 
 - `Mode > Gauge`：`normal`
-- `Mode > Sudden Death`：仅在需要首次 BAD 即结束的挑战时打开
+- `Mode > Sudden Death`：仅在需要首次 osu!mania OD8 `MISS` 即结束的挑战时打开
 - `Mode > Rate`：`1.0x`
 - `Mode > Hi-Speed`：先保持默认
 - `Graphics > Display`：使用 Discord voice overlay 时推荐 `Borderless`
@@ -171,7 +171,7 @@ Rate 只改变歌曲播放速度和谱面时间轴；在相同 Hi-Speed 下，�
 - `easy`：到 `0%` 立即 Game Over
 
 游玩过程中不会再发生自动 gauge 降级。
-`Sudden Death (1 MISS)` 不是 gauge 类型，而是在首次 `BAD` 时把 gauge 置零并立即结束的规则。空按产生的 `POOR` 不计入，并且不能与 Practice No-Fail 同时启用。
+`Sudden Death (1 MISS)` 不是 gauge 类型，而是在首次 osu!mania OD8 对象 `MISS` 时把 gauge 置零并立即结束的规则。仅原生 `BAD` timing 不会触发，空按产生的 `POOR` 也不计入，并且不能与 Practice No-Fail 同时启用。
 
 ## 10. Result 画面
 

@@ -1,10 +1,10 @@
-TenRiff source package notes (`1.1.8 stable`)
+TenRiff source package notes (`1.1.9 stable`)
 
 - This folder is a curated source-only staging area for public/open-source distribution.
 - It intentionally excludes local build trees, packaged binaries, caches, user profiles, logs, and private working notes.
 - Internal agent workflow files such as `AGENTS.md` are not part of the public source bundle.
 - The included `SOURCE_PACKAGE_SCOPE.txt` file defines the exact include/exclude rules used for the staged bundle.
-- The current source line is the `1.1.8 stable` release, adding an osu!mania OD8 auxiliary score, first-BAD `Sudden Death (1 MISS)`, and deterministic `LN Mix 10%-90%` on top of the 1.1.7 visual refresh.
+- The current source line is the `1.1.9 stable` patch, which makes `Sudden Death (1 MISS)` follow actual OD8 object `MISS` results instead of every native `BAD`, while retaining the OD8 score and LN Mix features introduced in 1.1.8.
 - The repository license is MIT. Keep the top-level `LICENSE` file with any redistributed source bundle.
 - The source bundle includes the code/docs/dependencies needed for a standalone Windows configure/build, but it does not ship the local `10k-calc/` reference checkout or `external/llama.cpp/`.
 - The staged docs/readmes now track Korean, English, Simplified Chinese, and Japanese entrypoints.

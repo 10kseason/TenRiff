@@ -3,15 +3,16 @@
 この文書は、次のエージェントや新しい作業者が最初に読むべき current-state 文書です。目的は、「このプロジェクトは今どういう状態で、どこを見ればよく、何がまだ未検証か」を素早く把握できるようにすることです。
 
 ## Baseline
-- 現在のプロジェクト版は `1.1.8 stable`
+- 現在のプロジェクト版は `1.1.9 stable`
 - direct-IP multiplayer と preview r5 の input-backend lifecycle 修正は `1.1.8 stable` に統合
-- `1.1.8` は 1.1.7 の visual refresh に osu!mania OD8 補助スコア、最初の BAD で終了する `Sudden Death (1 MISS)`、決定的な `LN Mix 10%～90%` を追加
+- `1.1.8` は 1.1.7 の visual refresh に osu!mania OD8 補助スコア、最初の native `BAD` で終了する `Sudden Death (1 MISS)`、決定的な `LN Mix 10%～90%` を追加
+- `1.1.9` は Sudden Death がすべての native `BAD` ではなく実際の OD8 object `MISS` のみで発動するように修正し、有効な hold head の即失敗を防止
 - 後続作業の基準文書は `docs/baseline-1.1.2.ja.md`
 - Windows GUI ビルドが主対象
 - Linux は `Baepoks-Linuxs/TenRiff-0.5.0-linux-preview` レベルの preview のみ
 - 既定サーフェスは BMS-first
 - `.osu` はオプションで再有効化でき、4K-10K をサポート
-- `1.1.8 stable` の gameplay 入力は RawInput を優先しつつ、同じ `InputThread` で bound-key polling shadow を常時動作させる。起動失敗または message pump の予期しない終了時も queue / pressed state を reset せず、その producer を Polling に切り替える
+- `1.1.9 stable` の gameplay 入力は RawInput を優先しつつ、同じ `InputThread` で bound-key polling shadow を常時動作させる。起動失敗または message pump の予期しない終了時も queue / pressed state を reset せず、その producer を Polling に切り替える
 - menu 入力は従来の foreground process/root-window 境界を維持する。RawInput の起動失敗、process-global 登録先の消失、hidden message window の終了を検知すると、ユーザー入力を待たず Polling に切り替える。
 - 確認済み fallback は profile を書き換えず、そのアプリ実行中の menu と後続 gameplay に維持する。アプリ再起動または `Options -> Input Settings -> Backend` の明示変更で再試行する。
 
@@ -100,7 +101,7 @@
   - かなり早い non-consuming press は LR2 スタイル `POOR` として扱われ、result / replay / UI に再表示される
   - `POOR` は combo を切らず、score / accuracy には入らず、専用 `PR` gauge damage を使う
   - gauge mode は `EX-Hard / Hard / Normal / Easy` をサポートし、すべて `100%` で開始して `0%` で即失敗する
-  - `Sudden Death (1 MISS)` は最初の `BAD` で即失敗する。空打ちの `POOR` は無視し、Practice No-Fail とは排他的に動作する
+  - `Sudden Death (1 MISS)` は最初の osu!mania OD8 object `MISS` で即失敗する。native `BAD` timing だけでは発動せず、空打ちの `POOR` も無視し、Practice No-Fail とは排他的に動作する
   - Gameplay / Result に実入力 timing を osu!mania stable OD8 window と ScoreV1（最大 1,000,000）で換算した補助 `OSU OD8` score を表示し、TenRiff native score / ranking は変更しない
   - live gameplay の `ClockSync` は大きな Windows QPC 絶対値ではなく centered anchor regression を使い、継続する clock discontinuity 後に自動 rebase する
   - stale backlog は QPC event age と `BAD` window で判定し、fresh input の sample mapping が現在の playback anchor から大きくずれた場合は anchor に fallback する
@@ -154,7 +155,7 @@
 
 ## Runtime / Packaging Rules
 - 新しい user profile は自動生成される
-- 現在の正式 P2P 配布ラインは `TenRiff 1.1.8 stable`
+- 現在の正式 P2P 配布ラインは `TenRiff 1.1.9 stable`
 - distribution package には `Songs` を含めない
 - distribution package には menu BGM 用の `Mainmusic/` runtime asset を含める
 - distribution 更新には built artifact と必要な runtime asset だけを含める

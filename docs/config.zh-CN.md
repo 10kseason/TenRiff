@@ -40,7 +40,7 @@
 
 - `backend` (string)
   - `polling | rawinput`
-  - 当前 `1.1.8` 发布线默认值为 `rawinput`
+  - 当前 `1.1.9` 发布线默认值为 `rawinput`
   - 可在 `Options -> Input Settings -> Backend` 或 `Options -> Profile Setup -> Input Backend` 中按 profile 选择
   - runtime fallback 不会把已保存值改写为 `polling`
   - 确认 RawInput 启动失败、注册目标丢失或 message window 退出后，本次应用运行期间 menu 与后续 gameplay 都会保持 Polling
@@ -145,8 +145,8 @@
   - `true` 时会禁止基于 gauge 的提前失败，但仍保留判定与结果导出直到谱面结束
   - 结果会带上 `ASSIST` clear status
 - `one_miss_fail_enabled` (bool)
-  - `true` 时第一次出现 `BAD` 判定就会把 gauge 归零并立即失败
-  - 空键输入产生的 `POOR` 不会触发该模式
+  - `true` 时首次出现 osu!mania OD8 对象 `MISS` 就会把 gauge 归零并立即失败
+  - 仅原生 `BAD` timing 不会触发，空键输入产生的 `POOR` 也不会触发该模式
   - 在 Mode Settings 中启用后会自动关闭 `practice_no_fail_enabled`
 - `song_index_profile` (string)
   - `safe | fast`

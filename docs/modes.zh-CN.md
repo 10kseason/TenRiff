@@ -37,8 +37,8 @@
   - `false`：保持普通单场地游玩
 - `autoplay_enabled`：自动处理可判定 note，并把结果标为 `ASSIST`
 - `practice_no_fail_enabled`：阻止 gauge 导致的提前失败，继续游玩到谱面结束
-- `one_miss_fail_enabled`：首次 `BAD` 即失败的 `Sudden Death (1 MISS)`
-  - 空按产生的 `POOR` 不会触发
+- `one_miss_fail_enabled`：首次 osu!mania OD8 对象 `MISS` 即失败的 `Sudden Death (1 MISS)`
+  - 仅原生 `BAD` timing 不会触发，空按产生的 `POOR` 也不会触发
   - 在 Mode Settings 中与 Practice No-Fail 互斥
 - `song_index_profile`：`safe | fast`
   - `safe`：优先降低 large-library RAM high-water 的默认值
@@ -70,7 +70,7 @@
 - 所有 gauge 都从 `100%` 开始，并在到达 `0%` 时立即失败。
 - `ex_hard` 是挑战用 gauge，回复低于 Hard，`BAD` / `POOR` 损失更大。
 - clear status 会区分为 `EX-HARD CLEAR`、`HARD CLEAR`、`CLEAR`、`EASY CLEAR`。
-- `Sudden Death (1 MISS)` 不是 gauge 类型，而是首次 `BAD` 时把当前 gauge 置零并立即结束的独立失败规则。
+- `Sudden Death (1 MISS)` 不是 gauge 类型，而是首次 osu!mania OD8 对象 `MISS` 时把当前 gauge 置零并立即结束的独立失败规则。
 
 ## 实现位置
 - 模式解析：`src/gameplay/ModeSettings.*`、`src/app/ModeResolver.*`

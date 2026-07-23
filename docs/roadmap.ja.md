@@ -4,7 +4,7 @@
 
 ## Current Baseline
 - Windows GUI / runtime が主なサポート経路です。
-- プロジェクト版ラインは `1.1.8 stable` で、1.1.7 の visual refresh に osu!mania OD8 補助スコア、最初の BAD で終了する `Sudden Death (1 MISS)`、決定的な `LN Mix 10%～90%` を追加します。
+- プロジェクト版ラインは `1.1.9 stable` で、この patch は Sudden Death がすべての native `BAD` ではなく実際の OD8 object `MISS` に従うように修正し、1.1.8 の OD8 score と LN Mix を維持します。
 - 既定では BMS-first の menu / runtime が有効で、4K-10K `.osu` は config / menu toggle の背後にある任意機能です。
 - 現在出荷されている挙動は [`docs/current-state.ja.md`](current-state.ja.md) を先に見てください。この roadmap は方向と残作業を示す文書です。
 
