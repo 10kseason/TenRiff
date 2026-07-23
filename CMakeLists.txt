@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(TenRiff VERSION 1.1.7 LANGUAGES C CXX)
+project(TenRiff VERSION 1.1.8 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -77,6 +77,7 @@ add_library(tenriff_core
     src/gameplay/KeyModeConverter.cpp
     src/gameplay/ModeApplier.cpp
     src/gameplay/ModeSettings.cpp
+    src/gameplay/OsuManiaScore.cpp
     src/gameplay/ResultStats.cpp
     src/gameplay/Replay.cpp
     src/network/PeerProtocol.cpp
@@ -332,6 +333,7 @@ if(TENRIFF_ENABLE_TESTS)
         tests/unit/test_mode_applier.cpp
         tests/unit/test_mode_manager.cpp
         tests/unit/test_gameplay_engine.cpp
+        tests/unit/test_osu_mania_score.cpp
         tests/unit/test_session_result_status.cpp
         tests/unit/test_replay_export.cpp
         tests/unit/test_chart_loader.cpp

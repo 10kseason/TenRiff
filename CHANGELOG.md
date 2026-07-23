@@ -4,6 +4,30 @@ TenRiff의 사용자/배포 관점에서 의미 있는 변경만 간단히 기�
 
 ## [Unreleased]
 
+## [1.1.8] - 2026-07-23
+
+### Added
+
+- 인게임 HUD와 결과 화면에 실제 입력 타이밍을 osu!mania stable OD8 판정창 및 ScoreV1 기준으로 환산한 `OSU OD8` 보조 점수를 추가하고, 리플레이/결과 JSON에도 변환 점수와 판정 수를 저장
+- Mode Settings에 첫 `BAD`에서 게이지를 0으로 만들고 즉시 종료하는 `Sudden Death (1 MISS)`를 추가하며, 빈 키 `POOR`는 제외하고 Practice No-Fail과는 상호 배타적으로 처리
+- Mod Manager의 Note Structure에 `LN Mix 10%~90%`를 추가해 기존 롱노트는 유지하고, 50ms 이상 길이와 다음 동일 레인 노트 전 50ms 여유를 확보할 수 있는 단노트 중 설정 비율을 `Random Seed` 기반으로 골라 일반 롱노트로 결정적으로 변환
+
+### Fixed
+
+- LN Mix로 생성한 롱노트 꼬리가 다음 동일 레인 노트의 1 sample 전까지 이어져 겹쳐 보이고 release/repress 여유가 없던 문제를 수정해 최소 50ms 간격을 보장하고, 기존 동일 레인 span과 충돌하는 head는 변환 후보에서 제외
+- Full LN, Full Tap, LN Mix처럼 노트 구조 mod가 다른 replay를 기본 ghost로 선택하거나 현재 차트에 그대로 재생하지 않도록 정규화된 mod 구성이 같은 경우만 호환 처리
+
+### Packaging
+
+- 정식 Windows 배포 자산을 `baepo/TenRiff-1.1.8`과 `TenRiff-1.1.8.zip`으로 구성하고, 빈 `logs/`/`songs/`, 멀티플레이 안내, BMS key converter를 포함
+- 공개 소스 번들을 활성 worktree의 명시 allowlist에서 `opensource-Tenriff-source/TenRiff-1.1.8-source.zip`으로 구성해 새 OD8 구현/테스트 파일까지 포함
+
+### Verification
+
+- 활성 checkout과 독립 공개 소스 stage에서 각각 단위 테스트 `463 pass / 1 optional skip / 0 fail`, CTest `1/1` 통과
+- Release `TenRiff.exe`, CLI/GUI BMS key converter를 활성 checkout과 독립 공개 소스 stage에서 모두 링크
+- 바이너리 ZIP `18 entries`와 소스 ZIP `327 entries`를 실제 압축 해제해 stage 파일별 SHA-256과 대조하고, 빈 `logs/`/`songs/`, 금지 산출물·개인 로컬 경로·secret 형태 문자열 부재를 확인
+
 ## [1.1.7] - 2026-07-22
 
 ### Changed

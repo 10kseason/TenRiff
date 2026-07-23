@@ -152,6 +152,7 @@ struct ModeConfig {
     bool ghost_battle_enabled = false;
     bool autoplay_enabled = false;
     bool practice_no_fail_enabled = false;
+    bool one_miss_fail_enabled = false;
     std::string song_index_profile = "safe";
 };
 

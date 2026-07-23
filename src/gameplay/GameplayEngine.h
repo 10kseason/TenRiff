@@ -31,6 +31,8 @@ struct HoldState {
     bool broken = false;
     bool release_active = false;
     int64_t release_sample = 0;
+    double osu_head_delta_ms = 0.0;
+    bool osu_released_during_body = false;
 };
 
 struct LaneState {
@@ -50,6 +52,7 @@ struct GameplayConfig {
     game::GaugeType initial_gauge = game::GaugeType::Normal;
     double input_offset_ms = 0.0;
     bool practice_no_fail_enabled = false;
+    bool one_miss_fail_enabled = false;
 };
 
 struct LiveJudgementFeedback {
@@ -93,8 +96,9 @@ private:
                          double weight,
                          ComboImpact combo_impact);
     [[nodiscard]] std::optional<NoteEvent> try_hit_note(LaneState& lane, int64_t input_sample);
-    void apply_bad_miss(int64_t sample);
+    void apply_bad_miss(const NoteEvent& note, int64_t sample);
     void apply_empty_poor(int64_t sample);
+    void record_osu_hold(const HoldState& hold, int64_t release_sample, bool forced_miss = false);
     void update_miss(LaneState& lane, int64_t current_sample);
     void update_hold(LaneState& lane, int64_t current_sample);
     void finalize_if_done(int64_t current_sample);
@@ -129,6 +133,7 @@ private:
     bool finished_ = false;
     bool game_over_ = false;
     bool practice_no_fail_enabled_ = false;
+    bool one_miss_fail_enabled_ = false;
 };
 
 }  // namespace tenriff::gameplay

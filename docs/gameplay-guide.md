@@ -52,7 +52,7 @@ TenRiff의 기본 플레이 흐름은 아래 순서입니다.
 
 ### Song Select에서 자주 쓰는 화면
 - `Mode`
-  - Gauge, Random, Rate, Hi-Speed, OSU Charts, Chart Filter 조정
+  - Ghost Battle, Autoplay, Practice, Sudden Death, Key Mode, Gauge, Random, Mods, Rate, Hi-Speed, OSU Charts, Chart Filter 조정
 - `Audio`
   - Master/BGM/Keysound 볼륨과 BMS keysound 정책 조정
 - `Graphics`
@@ -67,6 +67,7 @@ TenRiff의 기본 플레이 흐름은 아래 순서입니다.
 처음에는 아래 정도로 시작하면 무난합니다.
 
 - `Mode > Gauge`: `normal`
+- `Mode > Sudden Death`: 첫 BAD 즉사 도전을 원할 때만 켜기
 - `Mode > Rate`: `1.0x`
 - `Mode > Hi-Speed`: 기본값 그대로 시작
 - `Graphics > Display`: Discord 음성 오버레이를 쓸 때는 `Borderless` 권장
@@ -133,6 +134,8 @@ Rate는 곡 재생 속도와 차트 스케줄만 바꾸며, 같은 Hi-Speed에�
 - 현재 `Rate`
 - 현재 `Hi-Speed`
 - Gauge 값과 현재 Gauge 종류
+- TenRiff native Score
+- 실제 입력 timing을 osu!mania stable OD8/ScoreV1로 환산한 보조 `OSU OD8` 점수
 - Combo
 - 최근 판정(`PG / GR / GD / BD / PR`)
 - 타이밍 편차(ms)
@@ -150,6 +153,8 @@ Rate는 곡 재생 속도와 차트 스케줄만 바꾸며, 같은 Hi-Speed에�
 - `BD`: Bad
 - `PR`: Poor / Miss
 
+`OSU OD8`은 최대 1,000,000점인 보조 비교 점수이며, TenRiff의 native Score·랭크·클리어 판정을 바꾸지 않습니다.
+
 ### 게이지
 선택 가능한 기본 게이지는 아래 네 가지입니다.
 
@@ -166,6 +171,7 @@ Rate는 곡 재생 속도와 차트 스케줄만 바꾸며, 같은 Hi-Speed에�
 - `easy`: `0%`가 되는 즉시 Game Over
 
 플레이 중 자동 단계 시프트는 없습니다.
+`Sudden Death (1 MISS)`는 게이지 종류가 아니라 첫 `BAD`에서 게이지를 0으로 만들고 즉시 종료하는 규칙입니다. 빈 키 `POOR`는 즉사로 세지 않으며 Practice No-Fail과 동시에 켤 수 없습니다.
 
 ## 10. Result 화면
 
@@ -173,7 +179,8 @@ Rate는 곡 재생 속도와 차트 스케줄만 바꾸며, 같은 Hi-Speed에�
 
 - Clear / Game Over 상태
 - Rank
-- Score
+- TenRiff native Score
+- `OSU OD8` 보조 점수와 환산 판정 집계
 - Accuracy
 - Max Combo
 - PG / GR / GD / BD / PR 집계

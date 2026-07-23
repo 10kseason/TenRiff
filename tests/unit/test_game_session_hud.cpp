@@ -102,6 +102,8 @@ TEST_CASE("gameplay hud revisions bump text caches for score and feedback change
     next.combo = 8;
     next.max_combo = 20;
     next.counts.pg = 6;
+    next.osu_od8_score_available = true;
+    next.osu_od8_score = 500'000;
     next.gauge = 49.5;
     next.feedback = tenriff::game::Judgement::PG;
 

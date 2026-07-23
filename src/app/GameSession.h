@@ -65,6 +65,8 @@ public:
         int max_combo = 0;
         gameplay::JudgementCounts counts;
         int64_t score = 0;
+        bool osu_od8_score_available = false;
+        int64_t osu_od8_score = 0;
 
         double gauge = 0.0;
         game::GaugeType gauge_type = game::GaugeType::Normal;
@@ -85,6 +87,8 @@ public:
 
         bool ghost_visible = false;
         int64_t ghost_score = 0;
+        bool ghost_osu_od8_score_available = false;
+        int64_t ghost_osu_od8_score = 0;
         int ghost_combo = 0;
         int ghost_max_combo = 0;
         gameplay::JudgementCounts ghost_counts;
@@ -318,6 +322,7 @@ private:
     bool autoplay_enabled_ = false;
     std::size_t autoplay_event_index_ = 0;
     bool practice_no_fail_enabled_ = false;
+    bool one_miss_fail_enabled_ = false;
     gameplay::ReplayFile ghost_replay_source_{};
     bool ghost_replay_enabled_ = false;
     std::size_t ghost_replay_event_index_ = 0;

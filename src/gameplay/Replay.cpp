@@ -139,6 +139,27 @@ config::JsonValue build_counts_json(const JudgementCounts& counts) {
     return config::JsonValue{std::move(obj)};
 }
 
+config::JsonValue build_osu_od8_json(const OsuManiaScoreV1& score) {
+    config::JsonObject counts;
+    counts.emplace("perfect", config::JsonValue{static_cast<double>(score.counts.perfect)});
+    counts.emplace("great", config::JsonValue{static_cast<double>(score.counts.great)});
+    counts.emplace("good", config::JsonValue{static_cast<double>(score.counts.good)});
+    counts.emplace("ok", config::JsonValue{static_cast<double>(score.counts.ok)});
+    counts.emplace("meh", config::JsonValue{static_cast<double>(score.counts.meh)});
+    counts.emplace("miss", config::JsonValue{static_cast<double>(score.counts.miss)});
+
+    config::JsonObject obj;
+    obj.emplace("available", config::JsonValue{score.available});
+    obj.emplace("od", config::JsonValue{kOsuManiaReferenceOd});
+    obj.emplace("system", config::JsonValue{"score_v1"});
+    obj.emplace("total_objects", config::JsonValue{static_cast<double>(score.total_objects)});
+    obj.emplace("judged_objects", config::JsonValue{static_cast<double>(score.judged_objects)});
+    obj.emplace("score", config::JsonValue{static_cast<double>(score.score)});
+    obj.emplace("bonus", config::JsonValue{score.bonus});
+    obj.emplace("counts", config::JsonValue{std::move(counts)});
+    return config::JsonValue{std::move(obj)};
+}
+
 config::JsonValue build_string_array_json(const std::vector<std::string>& values) {
     config::JsonArray out;
     out.reserve(values.size());
@@ -180,6 +201,7 @@ config::JsonValue build_stats_json(const ResultStats& stats) {
     obj.emplace("max_combo", config::JsonValue{static_cast<double>(stats.max_combo)});
     obj.emplace("total_notes", config::JsonValue{static_cast<double>(stats.total_notes)});
     obj.emplace("raw_score", config::JsonValue{static_cast<double>(stats.raw_score)});
+    obj.emplace("osu_od8", build_osu_od8_json(stats.osu_od8));
     obj.emplace("mean_delta_ms", config::JsonValue{stats.mean_delta_ms});
     obj.emplace("stddev_delta_ms", config::JsonValue{stats.stddev_delta_ms()});
     obj.emplace("positive_delta_count", config::JsonValue{static_cast<double>(stats.positive_delta_count)});
@@ -228,6 +250,7 @@ config::JsonValue build_mode_json(const ReplayModeSettings& mode) {
     }
     obj.emplace("autoplay_enabled", config::JsonValue{mode.autoplay_enabled});
     obj.emplace("practice_no_fail_enabled", config::JsonValue{mode.practice_no_fail_enabled});
+    obj.emplace("one_miss_fail_enabled", config::JsonValue{mode.one_miss_fail_enabled});
     return config::JsonValue{std::move(obj)};
 }
 
@@ -301,6 +324,7 @@ ExportResult save_result_json(const std::string& path, const ResultFile& result_
     obj.emplace("final_score", config::JsonValue{static_cast<double>(result_file.final_score)});
     obj.emplace("autoplay_enabled", config::JsonValue{result_file.autoplay_enabled});
     obj.emplace("practice_no_fail_enabled", config::JsonValue{result_file.practice_no_fail_enabled});
+    obj.emplace("one_miss_fail_enabled", config::JsonValue{result_file.one_miss_fail_enabled});
     obj.emplace("stats", build_stats_json(result_file.stats));
     return save_json_file(path, config::JsonValue{std::move(obj)}, indent);
 }
@@ -361,6 +385,8 @@ ReplayLoadResult load_replay_json(const std::string& path) {
         replay.mode.autoplay_enabled = read_json_bool(*mode, "autoplay_enabled", false);
         replay.mode.practice_no_fail_enabled =
             read_json_bool(*mode, "practice_no_fail_enabled", false);
+        replay.mode.one_miss_fail_enabled =
+            read_json_bool(*mode, "one_miss_fail_enabled", false);
     }
 
     replay.trace.sample_rate = read_json_int(*trace, "sample_rate", replay.sample_rate);
@@ -402,6 +428,22 @@ ReplayLoadResult load_replay_json(const std::string& path) {
         replay.stats.max_combo = read_json_int(*stats, "max_combo", replay.stats.combo);
         replay.stats.total_notes = read_json_int(*stats, "total_notes", 0);
         replay.stats.raw_score = read_json_i64(*stats, "raw_score", derived_raw_score(replay.stats));
+        if (const auto* osu_od8 = find_json_object(*stats, "osu_od8")) {
+            replay.stats.osu_od8.available = read_json_bool(*osu_od8, "available", true);
+            replay.stats.osu_od8.total_objects = read_json_int(*osu_od8, "total_objects", replay.stats.total_notes);
+            replay.stats.osu_od8.judged_objects = read_json_int(*osu_od8, "judged_objects", 0);
+            replay.stats.osu_od8.score = read_json_i64(*osu_od8, "score", 0);
+            replay.stats.osu_od8.score_accumulator = static_cast<double>(replay.stats.osu_od8.score);
+            replay.stats.osu_od8.bonus = read_json_number(*osu_od8, "bonus", 100.0);
+            if (const auto* counts = find_json_object(*osu_od8, "counts")) {
+                replay.stats.osu_od8.counts.perfect = read_json_int(*counts, "perfect", 0);
+                replay.stats.osu_od8.counts.great = read_json_int(*counts, "great", 0);
+                replay.stats.osu_od8.counts.good = read_json_int(*counts, "good", 0);
+                replay.stats.osu_od8.counts.ok = read_json_int(*counts, "ok", 0);
+                replay.stats.osu_od8.counts.meh = read_json_int(*counts, "meh", 0);
+                replay.stats.osu_od8.counts.miss = read_json_int(*counts, "miss", 0);
+            }
+        }
         replay.stats.mean_delta_ms = read_json_number(*stats, "mean_delta_ms", 0.0);
         replay.stats.positive_delta_count = read_json_int(*stats, "positive_delta_count", 0);
         replay.stats.negative_delta_count = read_json_int(*stats, "negative_delta_count", 0);

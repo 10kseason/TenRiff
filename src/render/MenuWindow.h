@@ -184,6 +184,8 @@ struct ResultScreenData {
     std::string gauge_label = "NORMAL";
 
     int64_t score = 0;
+    bool osu_od8_score_available = false;
+    int64_t osu_od8_score = 0;
     double accuracy = 0.0;
     double gauge_value = 0.0;
     int max_combo = 0;
@@ -289,6 +291,8 @@ struct GameplayHudData {
     double scroll_speed = 0.0;
 
     int64_t score = 0;
+    bool osu_od8_score_available = false;
+    int64_t osu_od8_score = 0;
     int combo = 0;
     int max_combo = 0;
     int total_notes = 0;
@@ -345,6 +349,8 @@ struct GameplayHudData {
 
     bool ghost_visible = false;
     int64_t ghost_score = 0;
+    bool ghost_osu_od8_score_available = false;
+    int64_t ghost_osu_od8_score = 0;
     int ghost_combo = 0;
     int ghost_max_combo = 0;
     double ghost_accuracy = 0.0;

@@ -3,15 +3,15 @@
 这份文档是下一位 agent 或新任务接手时应该最先阅读的当前状态文档。目标是快速说明“这个项目现在是什么、应该先看哪里、还有哪些内容尚未验证”。
 
 ## 基线
-- 当前项目版本为 `1.1.7 stable`
-- direct-IP multiplayer 与 preview r5 的输入 backend 生命周期修复已整合进 `1.1.7 stable`
-- `1.1.7` 在 1.1.6 功能基础上改进了原生/fallback 音符与 LN 材质、判定/连击与状态槽条 HUD 层级，以及 Song Select 的选择和预览视觉
+- 当前项目版本为 `1.1.8 stable`
+- direct-IP multiplayer 与 preview r5 的输入 backend 生命周期修复已整合进 `1.1.8 stable`
+- `1.1.8` 在 1.1.7 视觉更新基础上加入 osu!mania OD8 辅助分数、首次 BAD 即结束的 `Sudden Death (1 MISS)`，以及确定性的 `LN Mix 10%～90%`
 - 后续工作的基准文档是 [`docs/baseline-1.1.2.zh-CN.md`](baseline-1.1.2.zh-CN.md)
 - Windows GUI 构建是主目标
 - Linux 仅存在 [`Baepoks-Linuxs/TenRiff-0.5.0-linux-preview`](../Baepoks-Linuxs/TenRiff-0.5.0-linux-preview) 级别的 preview
 - 默认表面是 BMS-first
 - `.osu` 可以通过选项重新启用，并支持 4K~10K
-- `1.1.7 stable` 的 gameplay 输入优先使用 RawInput，同时在同一 `InputThread` 中持续运行 bound-key polling shadow；启动失败或 message pump 意外退出时，会在不重置 queue/pressed state 的情况下把该 producer 切换到 Polling
+- `1.1.8 stable` 的 gameplay 输入优先使用 RawInput，同时在同一 `InputThread` 中持续运行 bound-key polling shadow；启动失败或 message pump 意外退出时，会在不重置 queue/pressed state 的情况下把该 producer 切换到 Polling
 - menu 输入保持 foreground process/root-window 边界。检测到 RawInput 启动失败、process-global 注册目标丢失或 hidden message window 退出时，无需等待用户按键即可切换到 Polling。
 - 已确认的 fallback 不会改写 profile，并在本次应用运行期间持续用于 menu 与后续 gameplay；重启应用或明确更改 `Options -> Input Settings -> Backend` 后才会重试。
 
@@ -78,6 +78,7 @@
   - BMS/osu!mania 的 LV/CR 计算仅将 long-note Head/Tail 的 miss-ms 按 0.5倍评估，使 `300ms`按`150ms`处理；实际 gameplay 判定范围保持不变
 - Lane transform：
   - Random 支持 `Off / Mirror / FR / SR`；Mirror 在 key-mode 变换后反转最终 lane，10K/16K 则在每个 player half 内独立反转
+  - Mod Manager 的 `LN Mix 10%～90%` 会保留已有 hold，排除与同 lane 已有 span 重叠的 head，并通过 `Random Seed` 从既能形成至少 50ms hold、又能在下一音符前保留 50ms 间隔的 tap 中确定性选择指定比例
 - Skins / Gameplay feel：
   - `rect` / `circle` note shape
   - note border 开关
@@ -99,6 +100,8 @@
   - 非消耗型的超早输入会按 LR2 风格记为 `POOR`，并重新出现在结果 / replay / UI 中
   - `POOR` 不会断 combo，不计入 score / accuracy 总数，并使用独立的 `PR` gauge 损失值
   - gauge 模式支持 `EX-Hard / Hard / Normal / Easy`，全部从 `100%` 开始，并在 `0%` 时立即失败
+  - `Sudden Death (1 MISS)` 会在首次 `BAD` 时立即失败；空按产生的 `POOR` 不触发，并且该选项与 Practice No-Fail 互斥
+  - Gameplay 与 Result 会显示按 osu!mania stable OD8 判定窗和 ScoreV1（最高 1,000,000）换算真实输入 timing 的辅助 `OSU OD8` 分数；TenRiff 原生分数与排名保持不变
   - live gameplay 的 `ClockSync` 使用 centered anchor regression，避免大型 Windows QPC 绝对值造成精度损失，并在持续 clock discontinuity 后自动 rebase
   - stale backlog 按 QPC event age 与 `BAD` window 判定；若 fresh input 的 sample mapping 与当前 playback anchor 偏差过大，则 fallback 到 anchor
   - tail release timing 仅适用于 osu hold 与 BMS `#LNMODE 2` charge note
@@ -151,7 +154,7 @@
 
 ## 运行时 / 打包规则
 - 新用户 profile 会自动创建
-- 当前正式 P2P 发布线为 `TenRiff 1.1.7 stable`
+- 当前正式 P2P 发布线为 `TenRiff 1.1.8 stable`
 - 发布包不包含 `Songs`
 - 发布包会同时包含用于菜单 BGM 的 `Mainmusic/` 运行时资源
 - 发布更新只包含已构建产物和必要的运行时资源

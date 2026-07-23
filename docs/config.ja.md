@@ -40,7 +40,7 @@ profile が存在しない場合は初回起動時に自動生成されます。
 
 - `backend` (string)
   - `polling | rawinput`
-  - 現行 `1.1.7` リリースラインの既定値は `rawinput`
+  - 現行 `1.1.8` リリースラインの既定値は `rawinput`
   - `Options -> Input Settings -> Backend` または `Options -> Profile Setup -> Input Backend` で profile ごとに選択可能
   - runtime fallback は保存済みの値を `polling` に書き換えない
   - RawInput の起動失敗、登録先の消失、message window の終了を確認すると、そのアプリ実行中は menu と後続 gameplay の両方で Polling を維持する
@@ -126,7 +126,11 @@ profile が存在しない場合は初回起動時に自動生成されます。
 - `random` (string)
   - `off | mirror | fr | sr`
 - `random_seed` (int)
-  - FR/SR と強制 key-mode 変換の固定 seed。Mirror 変換自体は使用しない
+  - FR/SR、強制 key-mode 変換、LN Mix 対象選択の固定 seed。Mirror 変換自体は使用しない
+- `mods` (string array)
+  - Note Structure では `full_long_notes`、`ln_mix_10`～`ln_mix_90`、`full_short_notes` のいずれか一つを選択できる
+  - LN Mix は 50ms 以上の hold と同じ lane の次ノート前 50ms の余裕を両方確保できる tap のみを候補にし、指定割合を丸めた個数だけ standard hold に変換する
+  - 既存 hold は維持され、同じ lane の既存 span と重なる head は除外され、同じ `random_seed` では同じ tap が選択される
 - `enable_osu_charts` (bool)
 - `ghost_battle_enabled` (bool)
   - 既定値は `false`
@@ -140,6 +144,10 @@ profile が存在しない場合は初回起動時に自動生成されます。
   - QA assist mode
   - `true` のとき gauge による早期失敗を無効化し、判定と result export は最後まで継続
   - result には `ASSIST` が付く
+- `one_miss_fail_enabled` (bool)
+  - `true` のとき最初の `BAD` 判定で gauge が 0 になり、即座に失敗する
+  - 空打ちの `POOR` は即死条件に含めない
+  - Mode Settings で有効にすると `practice_no_fail_enabled` は自動的に無効になる
 - `song_index_profile` (string)
   - `safe | fast`
   - `safe` は大規模ライブラリで RAM high-water を抑える既定値

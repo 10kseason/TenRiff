@@ -40,7 +40,7 @@
 
 - `backend` (string)
   - `polling | rawinput`
-  - 当前 `1.1.7` 发布线默认值为 `rawinput`
+  - 当前 `1.1.8` 发布线默认值为 `rawinput`
   - 可在 `Options -> Input Settings -> Backend` 或 `Options -> Profile Setup -> Input Backend` 中按 profile 选择
   - runtime fallback 不会把已保存值改写为 `polling`
   - 确认 RawInput 启动失败、注册目标丢失或 message window 退出后，本次应用运行期间 menu 与后续 gameplay 都会保持 Polling
@@ -126,7 +126,11 @@
 - `random` (string)
   - `off | mirror | fr | sr`
 - `random_seed` (int)
-  - FR/SR 与强制 key-mode 变换使用的固定 seed；Mirror 变换本身不使用
+  - FR/SR、强制 key-mode 变换和 LN Mix 目标选择使用的固定 seed；Mirror 变换本身不使用
+- `mods` (string array)
+  - Note Structure 可在 `full_long_notes`、`ln_mix_10` 到 `ln_mix_90`、`full_short_notes` 中选择一个
+  - LN Mix 仅把既能形成至少 50ms hold、又能在同 lane 下一音符前保留 50ms 间隔的 tap 作为候选，并按指定比例四舍五入后转换为普通 hold
+  - 已有 hold 会保留，与同 lane 已有 span 重叠的 head 会被排除，相同 `random_seed` 会选择相同 tap
 - `enable_osu_charts` (bool)
 - `ghost_battle_enabled` (bool)
   - 默认值为 `false`
@@ -140,6 +144,10 @@
   - QA 用 assist 模式
   - `true` 时会禁止基于 gauge 的提前失败，但仍保留判定与结果导出直到谱面结束
   - 结果会带上 `ASSIST` clear status
+- `one_miss_fail_enabled` (bool)
+  - `true` 时第一次出现 `BAD` 判定就会把 gauge 归零并立即失败
+  - 空键输入产生的 `POOR` 不会触发该模式
+  - 在 Mode Settings 中启用后会自动关闭 `practice_no_fail_enabled`
 - `song_index_profile` (string)
   - `safe | fast`
   - `safe` 是优先降低大型曲库 RAM high-water 的默认值

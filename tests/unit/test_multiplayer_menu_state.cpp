@@ -158,6 +158,7 @@ TEST_CASE("peer battle rules fix scoring while preserving local presentation") {
     config.mode.ghost_battle_enabled = true;
     config.mode.autoplay_enabled = true;
     config.mode.practice_no_fail_enabled = true;
+    config.mode.one_miss_fail_enabled = true;
     config.skin.note_height_scale = 2.4;
     config.input_offset_ms = 17.0;
     config.visual_offset_ms = -12.0;
@@ -176,6 +177,7 @@ TEST_CASE("peer battle rules fix scoring while preserving local presentation") {
     CHECK_FALSE(config.mode.ghost_battle_enabled);
     CHECK_FALSE(config.mode.autoplay_enabled);
     CHECK_FALSE(config.mode.practice_no_fail_enabled);
+    CHECK_FALSE(config.mode.one_miss_fail_enabled);
 
     CHECK(config.speed.hi_speed == doctest::Approx(6.25));
     CHECK(config.skin.note_height_scale == doctest::Approx(2.4));

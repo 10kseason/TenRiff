@@ -67,6 +67,7 @@ void ResultStats::record_note_total(int count) {
     total_notes = count;
     raw_score = 0;
     raw_score_accumulator = 0;
+    initialize_osu_mania_od8_score(osu_od8, count);
     gauge_history.clear();
     shifts.clear();
     const std::size_t reserve_count = static_cast<std::size_t>(std::max(0, count)) * 2u;

@@ -40,7 +40,7 @@ If a profile does not exist, it is created automatically on first launch.
 
 - `backend` (string)
   - `polling | rawinput`
-  - defaults to `rawinput` on the current `1.1.7` release line
+  - defaults to `rawinput` on the current `1.1.8` release line
   - selectable per profile under `Options -> Input Settings -> Backend` or `Options -> Profile Setup -> Input Backend`
   - runtime fallback never rewrites the saved value to `polling`
   - a confirmed RawInput startup failure, registration-target loss, or message-window exit latches Polling across menu and subsequent gameplay sessions for the current app run
@@ -60,7 +60,7 @@ If a profile does not exist, it is created automatically on first launch.
 - `judgement_hz` (int)
   - `1000 | 2000 | 4000 | 8000`
   - compatibility field kept in the input config
-  - the current `1.1.7` runtime no longer drives a separate audio-thread judgement sub-step loop from this value
+  - the current `1.1.8` runtime no longer drives a separate audio-thread judgement sub-step loop from this value
   - default is `4000` (`0.25ms`)
 - `debounce_ms` (double)
   - real Press/Release transitions are preserved; only duplicate same-state events are removed from pressed-state tracking
@@ -126,7 +126,11 @@ If a profile does not exist, it is created automatically on first launch.
 - `random` (string)
   - `off | mirror | fr | sr`
 - `random_seed` (int)
-  - fixed seed for FR/SR and forced key-mode conversion; the Mirror transform itself does not use it
+  - fixed seed for FR/SR, forced key-mode conversion, and LN Mix selection; the Mirror transform itself does not use it
+- `mods` (string array)
+  - Note Structure accepts one of `full_long_notes`, `ln_mix_10` through `ln_mix_90`, or `full_short_notes`
+  - LN Mix considers only taps that can form a hold of at least 50ms while leaving 50ms before the next same-lane note, rounds the requested eligible-tap percentage, and converts that many into standard holds
+  - existing holds are preserved, heads overlapping an existing same-lane span are excluded, and the same `random_seed` selects the same taps
 - `enable_osu_charts` (bool)
 - `ghost_battle_enabled` (bool)
   - defaults to `false`
@@ -140,6 +144,10 @@ If a profile does not exist, it is created automatically on first launch.
   - QA assist mode
   - when `true`, gauge-based early failure is disabled while judgement and result export still run to chart end
   - the result is tagged with `ASSIST`
+- `one_miss_fail_enabled` (bool)
+  - when `true`, the first `BAD` judgement forces the gauge to zero and ends the run immediately
+  - empty-key `POOR` judgements do not trigger it
+  - enabling it in Mode Settings automatically disables `practice_no_fail_enabled`
 - `song_index_profile` (string)
   - `safe | fast`
   - `safe` is the default that prioritizes lower RAM high-water usage on large libraries

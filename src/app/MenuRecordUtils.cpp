@@ -156,6 +156,9 @@ int clear_status_priority(std::string_view clear_status, bool game_over, std::st
     if (clear_status_is_assist(clear_status)) {
         return 1;
     }
+    if (status.find("sudden death") != std::string::npos) {
+        return 6;
+    }
     if (status.find("ex-hard") != std::string::npos || status.find("ex hard") != std::string::npos ||
         status.find("exhard") != std::string::npos) {
         return 5;
@@ -361,6 +364,22 @@ std::optional<ParsedResultRecord> parse_result_file(const std::filesystem::path&
     out.stats.total_notes = read_json_int(*stats_obj, "total_notes", 0);
     out.stats.raw_score = static_cast<int64_t>(std::llround(
         read_json_number(*stats_obj, "raw_score", static_cast<double>(calculate_score(out.stats)))));
+    if (const auto* osu_od8 = find_json_object(*stats_obj, "osu_od8")) {
+        out.stats.osu_od8.available = read_json_bool(*osu_od8, "available", true);
+        out.stats.osu_od8.total_objects = read_json_int(*osu_od8, "total_objects", out.stats.total_notes);
+        out.stats.osu_od8.judged_objects = read_json_int(*osu_od8, "judged_objects", 0);
+        out.stats.osu_od8.score = static_cast<int64_t>(std::llround(read_json_number(*osu_od8, "score", 0.0)));
+        out.stats.osu_od8.score_accumulator = static_cast<double>(out.stats.osu_od8.score);
+        out.stats.osu_od8.bonus = read_json_number(*osu_od8, "bonus", 100.0);
+        if (const auto* counts = find_json_object(*osu_od8, "counts")) {
+            out.stats.osu_od8.counts.perfect = read_json_int(*counts, "perfect", 0);
+            out.stats.osu_od8.counts.great = read_json_int(*counts, "great", 0);
+            out.stats.osu_od8.counts.good = read_json_int(*counts, "good", 0);
+            out.stats.osu_od8.counts.ok = read_json_int(*counts, "ok", 0);
+            out.stats.osu_od8.counts.meh = read_json_int(*counts, "meh", 0);
+            out.stats.osu_od8.counts.miss = read_json_int(*counts, "miss", 0);
+        }
+    }
     out.stats.mean_delta_ms = read_json_number(*stats_obj, "mean_delta_ms", 0.0);
     out.stats.positive_delta_count = read_json_int(*stats_obj, "positive_delta_count", 0);
     out.stats.negative_delta_count = read_json_int(*stats_obj, "negative_delta_count", 0);
@@ -371,6 +390,7 @@ std::optional<ParsedResultRecord> parse_result_file(const std::filesystem::path&
     out.autoplay_enabled = read_json_bool(*root, "autoplay_enabled", clear_status_is_assist(out.clear_status));
     out.practice_no_fail_enabled =
         read_json_bool(*root, "practice_no_fail_enabled", clear_status_is_assist(out.clear_status));
+    out.one_miss_fail_enabled = read_json_bool(*root, "one_miss_fail_enabled", false);
 
     if (const auto* gauge_history = find_json_value(*stats_obj, "gauge_history")) {
         if (const auto* values = gauge_history->as_array()) {
@@ -447,6 +467,7 @@ std::optional<ParsedReplayRecord> parse_replay_file(const std::filesystem::path&
     out.event_count = static_cast<int>(replay.trace.events.size());
     out.autoplay_enabled = replay.mode.autoplay_enabled;
     out.practice_no_fail_enabled = replay.mode.practice_no_fail_enabled;
+    out.one_miss_fail_enabled = replay.mode.one_miss_fail_enabled;
     if (!loaded.warnings.empty() && error) {
         *error = loaded.warnings.front();
     }

@@ -144,6 +144,7 @@ bool GameSession::initialize(const CommandLineOptions& options) {
     autoplay_enabled_ = false;
     autoplay_event_index_ = 0;
     practice_no_fail_enabled_ = false;
+    one_miss_fail_enabled_ = false;
     ghost_replay_source_ = {};
     ghost_replay_enabled_ = false;
     ghost_replay_event_index_ = 0;
@@ -240,6 +241,7 @@ bool GameSession::initialize(const CommandLineOptions& options) {
     }
     autoplay_enabled_ = config_.mode.autoplay_enabled;
     practice_no_fail_enabled_ = config_.mode.practice_no_fail_enabled;
+    one_miss_fail_enabled_ = config_.mode.one_miss_fail_enabled;
     report_loading_progress(12, "Loading keymap");
     if (loading_cancel_requested()) {
         return false;
@@ -318,6 +320,7 @@ bool GameSession::initialize(const CommandLineOptions& options) {
         }
         autoplay_enabled_ = false;
         practice_no_fail_enabled_ = replay_source_.mode.practice_no_fail_enabled;
+        one_miss_fail_enabled_ = replay_source_.mode.one_miss_fail_enabled;
     }
     if (!replay_playback_enabled_ && !options.ghost_replay_path.empty()) {
         auto ghost_load = gameplay::load_replay_json(options.ghost_replay_path);
@@ -467,6 +470,7 @@ bool GameSession::initialize(const CommandLineOptions& options) {
     gameplay_config.gauge_policy.normal_to_easy_shift = peer_battle_mode_;
     gameplay_config.input_offset_ms = config_.input_offset_ms;
     gameplay_config.practice_no_fail_enabled = practice_no_fail_enabled_;
+    gameplay_config.one_miss_fail_enabled = one_miss_fail_enabled_;
     switch (mode_result.settings.gauge) {
         case gameplay::GaugeMode::ExHard:
             gameplay_config.initial_gauge = game::GaugeType::ExHard;
@@ -522,6 +526,10 @@ bool GameSession::initialize(const CommandLineOptions& options) {
         }
         if (ghost_compatible && ghost_replay_source_.mode.random_seed.has_value() &&
             ghost_replay_source_.mode.random_seed.value() != static_cast<int>(config_.mode.random_seed)) {
+            ghost_compatible = false;
+        }
+        if (ghost_compatible &&
+            !equivalent_mode_mod_tokens(ghost_replay_source_.mods, active_mods_)) {
             ghost_compatible = false;
         }
         if (!ghost_compatible) {
@@ -866,6 +874,8 @@ GameSession::HudSnapshot GameSession::hud_snapshot() {
         snapshot.score = std::max<int64_t>(
             0,
             static_cast<int64_t>(std::llround(static_cast<double>(stats.raw_score) * score_multiplier_)));
+        snapshot.osu_od8_score_available = stats.osu_od8.available;
+        snapshot.osu_od8_score = stats.osu_od8.score;
 
         const auto& gauge_state = engine_->gauge_state();
         snapshot.gauge = gauge_state.value;
@@ -894,6 +904,8 @@ GameSession::HudSnapshot GameSession::hud_snapshot() {
             snapshot.ghost_max_combo = ghost_stats.max_combo;
             snapshot.ghost_counts = ghost_stats.counts;
             snapshot.ghost_score = ghost_stats.raw_score;
+            snapshot.ghost_osu_od8_score_available = ghost_stats.osu_od8.available;
+            snapshot.ghost_osu_od8_score = ghost_stats.osu_od8.score;
 
             const auto& ghost_gauge_state = ghost_engine_->gauge_state();
             snapshot.ghost_gauge = ghost_gauge_state.value;
@@ -1693,7 +1705,8 @@ void GameSession::shutdown() {
             user_aborted_.load(std::memory_order_acquire),
             final_gauge,
             autoplay_enabled_,
-            practice_no_fail_enabled_);
+            practice_no_fail_enabled_,
+            one_miss_fail_enabled_);
         result_.game_over = !gameplay_session_cleared(
             engine_finished,
             engine_game_over,
@@ -1733,6 +1746,7 @@ void GameSession::shutdown() {
             replay.mode.gauge = config_.mode.gauge;
             replay.mode.autoplay_enabled = autoplay_enabled_;
             replay.mode.practice_no_fail_enabled = practice_no_fail_enabled_;
+            replay.mode.one_miss_fail_enabled = one_miss_fail_enabled_;
             replay.trace = engine_->replay();
             replay.stats = result_.stats;
 
@@ -1767,6 +1781,7 @@ void GameSession::shutdown() {
             exported_result.final_score = result_.final_score;
             exported_result.autoplay_enabled = autoplay_enabled_;
             exported_result.practice_no_fail_enabled = practice_no_fail_enabled_;
+            exported_result.one_miss_fail_enabled = one_miss_fail_enabled_;
             exported_result.stats = result_.stats;
 
             auto result_export = gameplay::save_result_json(result_path.u8string(), exported_result);
@@ -1825,6 +1840,7 @@ void GameSession::shutdown() {
     autoplay_enabled_ = false;
     autoplay_event_index_ = 0;
     practice_no_fail_enabled_ = false;
+    one_miss_fail_enabled_ = false;
     lane_activity_.clear();
     hidden_hit_note_ids_.clear();
     active_holds_buffer_.clear();

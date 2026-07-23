@@ -405,7 +405,8 @@ TEST_CASE("config save and load normalize mode mods") {
 
     ConfigLoader loader;
     auto config = loader.defaults();
-    config.mode.mods = {"judge_hard", "Judge Easy", "no_ln_release", "full_short_notes", "judge_easy", "mystery"};
+    config.mode.mods = {"judge_hard", "Judge Easy", "full_short_notes",
+                        "ln_mix_30", "judge_easy", "mystery"};
 
     std::string error;
     REQUIRE(loader.save_profile("profiles/test", config, &error));
@@ -415,7 +416,7 @@ TEST_CASE("config save and load normalize mode mods") {
     REQUIRE(result.success());
     REQUIRE(result.config.mode.mods.size() == 2u);
     CHECK(result.config.mode.mods[0] == "judge_easy");
-    CHECK(result.config.mode.mods[1] == "full_short_notes");
+    CHECK(result.config.mode.mods[1] == "ln_mix_30");
 }
 
 TEST_CASE("persisted runtime config strips session-only judge mods") {
@@ -1070,7 +1071,7 @@ TEST_CASE("config save and load preserve recent song sources") {
     CHECK(result.config.ui.recent_song_sources[1] == "D:/Songs/PackA");
 }
 
-TEST_CASE("config save and load preserve assist mode flags") {
+TEST_CASE("config save and load preserve gameplay mode flags") {
     TempDirGuard temp;
     temp.path = make_temp_dir();
     REQUIRE_FALSE(temp.path.empty());
@@ -1084,6 +1085,7 @@ TEST_CASE("config save and load preserve assist mode flags") {
     auto config = loader.defaults();
     config.mode.autoplay_enabled = true;
     config.mode.practice_no_fail_enabled = true;
+    config.mode.one_miss_fail_enabled = true;
 
     std::string error;
     REQUIRE(loader.save_profile("profiles/test", config, &error));
@@ -1093,6 +1095,7 @@ TEST_CASE("config save and load preserve assist mode flags") {
     REQUIRE(result.success());
     CHECK(result.config.mode.autoplay_enabled);
     CHECK(result.config.mode.practice_no_fail_enabled);
+    CHECK(result.config.mode.one_miss_fail_enabled);
 }
 
 TEST_CASE("bms-first runtime migration keeps valid keysound modes while forcing only the bms filter") {

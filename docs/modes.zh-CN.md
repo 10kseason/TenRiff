@@ -1,6 +1,6 @@
-# 模式系统（Format / Key / Gauge / Random）
+# 模式系统（Format / Key / Gauge / Random / Mods）
 
-这份文档概述当前已经实现的模式系统与 lane transform/随机规则（Mirror/FR/SR）。
+这份文档概述当前已经实现的模式系统、lane transform/随机规则（Mirror/FR/SR）以及 note structure mod。
 
 ## 设置位置
 - 全局：`config/config.json` 的 `mode` section
@@ -13,8 +13,12 @@
   "gauge": "normal",
   "random": "off",
   "random_seed": 0,
+  "mods": [],
   "enable_osu_charts": false,
   "ghost_battle_enabled": false,
+  "autoplay_enabled": false,
+  "practice_no_fail_enabled": false,
+  "one_miss_fail_enabled": false,
   "song_index_profile": "safe"
 }
 ```
@@ -24,12 +28,18 @@
 - `key_mode`：`none | auto | 4k | 5k | 6k | 7k | 8k | 9k | 10k | 16k`
 - `gauge`：`normal | hard | ex_hard | easy`
 - `random`：`off | mirror | fr | sr`
-- `random_seed`：FR/SR 与强制 key-mode 变换使用的固定 seed（`0` 也视为固定值）
+- `random_seed`：FR/SR、强制 key-mode 变换和 LN Mix 目标选择使用的固定 seed（`0` 也视为固定值）
+- `mods`：由 Mod Manager 规范化并保存的 mod token 数组
 - `enable_osu_charts`：`false | true`
 - `ghost_battle_enabled`：`false | true`
   - 默认值为 `false`
   - `true`：自动加载当前选中谱面的最佳兼容 replay 进行 ghost 对比
   - `false`：保持普通单场地游玩
+- `autoplay_enabled`：自动处理可判定 note，并把结果标为 `ASSIST`
+- `practice_no_fail_enabled`：阻止 gauge 导致的提前失败，继续游玩到谱面结束
+- `one_miss_fail_enabled`：首次 `BAD` 即失败的 `Sudden Death (1 MISS)`
+  - 空按产生的 `POOR` 不会触发
+  - 在 Mode Settings 中与 Practice No-Fail 互斥
 - `song_index_profile`：`safe | fast`
   - `safe`：优先降低 large-library RAM high-water 的默认值
   - `fast`：面向 32GB+ 环境，追求更快重索引的选项
@@ -44,6 +54,12 @@
   - **Long note 会保持 head/tail 在同一 lane**
   - 如果没有可用候选 lane，就保持原始 lane 并记录警告
 
+## Note Structure Mod
+- **Full LN**：把可转换 tap 变成在同 lane 下一 note 前结束的普通 hold
+- **LN Mix 10%～90%**：保留已有 hold，排除与同 lane 已有 span 重叠的 head，并用 `random_seed` 从既能形成至少 50ms hold、又能在下一 note 前保留 50ms 间隔的 tap 中确定性选择指定比例
+- **Full Tap**：移除所有 hold tail，把 hold 转换为 tap
+- 三项属于同一个 `Note Structure` category，因此只会启用一个；同一谱面和 seed 会复现相同的 LN Mix 结果
+
 ## Key mode 处理
 - `none` 表示直接使用谱面的原始 lane 数和基础 pattern 布局
 - `auto` 作为 legacy alias 保留，当前行为与 `none` 相同
@@ -54,7 +70,9 @@
 - 所有 gauge 都从 `100%` 开始，并在到达 `0%` 时立即失败。
 - `ex_hard` 是挑战用 gauge，回复低于 Hard，`BAD` / `POOR` 损失更大。
 - clear status 会区分为 `EX-HARD CLEAR`、`HARD CLEAR`、`CLEAR`、`EASY CLEAR`。
+- `Sudden Death (1 MISS)` 不是 gauge 类型，而是首次 `BAD` 时把当前 gauge 置零并立即结束的独立失败规则。
 
 ## 实现位置
 - 模式解析：`src/gameplay/ModeSettings.*`、`src/app/ModeResolver.*`
 - 模式应用：`src/gameplay/ModeApplier.*`
+- Mod registry / note structure 变换：`src/app/ModeManager.*`

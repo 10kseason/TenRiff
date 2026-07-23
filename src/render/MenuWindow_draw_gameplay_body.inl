@@ -373,8 +373,13 @@
                         " / HS " + format_decimal(data.gameplay.hispeed, 2) +
                         " / BPM " + std::to_string(static_cast<int>(std::llround(data.gameplay.bpm))) +
                         " / " + loc("Scroll ", "스크롤 ") + std::to_string(static_cast<int>(std::llround(data.gameplay.scroll_speed))));
-            gameplay_hud_cache_.score_text =
-                to_wide(loc("SCORE  ", "점수  ") + format_int_with_commas(data.gameplay.score));
+            std::string score_summary =
+                loc("SCORE  ", "점수  ") + format_int_with_commas(data.gameplay.score);
+            if (data.gameplay.osu_od8_score_available) {
+                score_summary += "  /  OSU OD8  " +
+                                 format_int_with_commas(data.gameplay.osu_od8_score);
+            }
+            gameplay_hud_cache_.score_text = to_wide(score_summary);
             gameplay_hud_cache_.combo_text =
                 to_wide(loc("COMBO ", "콤보 ") + std::to_string(data.gameplay.combo) +
                         "   " + loc("MAX ", "최대 ") + std::to_string(data.gameplay.max_combo) +
@@ -433,8 +438,13 @@
                         (data.gameplay.peer_name.empty()
                              ? loc("OPPONENT", "\uC0C1\uB300")
                              : data.gameplay.peer_name));
-            gameplay_hud_cache_.ghost_score_text =
-                to_wide(loc("SCORE  ", "점수  ") + format_int_with_commas(data.gameplay.ghost_score));
+            std::string ghost_score_summary =
+                loc("SCORE  ", "점수  ") + format_int_with_commas(data.gameplay.ghost_score);
+            if (data.gameplay.ghost_osu_od8_score_available) {
+                ghost_score_summary += "  /  OSU OD8  " +
+                                       format_int_with_commas(data.gameplay.ghost_osu_od8_score);
+            }
+            gameplay_hud_cache_.ghost_score_text = to_wide(ghost_score_summary);
             gameplay_hud_cache_.ghost_combo_text =
                 to_wide(loc("COMBO ", "콤보 ") + std::to_string(data.gameplay.ghost_combo) +
                         "   " + loc("MAX ", "최대 ") + std::to_string(data.gameplay.ghost_max_combo) +

@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cstdint>
 #include <cmath>
 #include <limits>
 #include <unordered_map>
@@ -32,6 +33,15 @@ const std::vector<ModeModDescriptor>& registry_storage() {
         {"judge_easy", "Judge Easy", "Judge Easy", "judge_window", "Judge Window", 0.85},
         {"judge_hard", "Judge Hard", "Judge Hard", "judge_window", "Judge Window", 1.10},
         {"full_long_notes", "Full Long Notes", "Full LN", "note_structure", "Note Structure", 1.00},
+        {"ln_mix_10", "LN Mix 10%", "LN 10%", "note_structure", "Note Structure", 1.00, 10},
+        {"ln_mix_20", "LN Mix 20%", "LN 20%", "note_structure", "Note Structure", 1.00, 20},
+        {"ln_mix_30", "LN Mix 30%", "LN 30%", "note_structure", "Note Structure", 1.00, 30},
+        {"ln_mix_40", "LN Mix 40%", "LN 40%", "note_structure", "Note Structure", 1.00, 40},
+        {"ln_mix_50", "LN Mix 50%", "LN 50%", "note_structure", "Note Structure", 1.00, 50},
+        {"ln_mix_60", "LN Mix 60%", "LN 60%", "note_structure", "Note Structure", 1.00, 60},
+        {"ln_mix_70", "LN Mix 70%", "LN 70%", "note_structure", "Note Structure", 1.00, 70},
+        {"ln_mix_80", "LN Mix 80%", "LN 80%", "note_structure", "Note Structure", 1.00, 80},
+        {"ln_mix_90", "LN Mix 90%", "LN 90%", "note_structure", "Note Structure", 1.00, 90},
         {"full_short_notes", "Full Short Notes", "Full Tap", "note_structure", "Note Structure", 0.50},
         {"no_ln_release", "No LN Release", "No LN Release", "hold_rule", "Hold Rule", 0.90},
     };
@@ -185,6 +195,129 @@ void apply_full_long_notes(gameplay::GameplayChart& chart) {
     }
 }
 
+uint64_t mix_long_note_hash(uint64_t value) {
+    // SplitMix64 keeps the chosen taps stable across standard-library and
+    // compiler versions, unlike std::hash or a distribution implementation.
+    value += 0x9E3779B97F4A7C15ull;
+    value = (value ^ (value >> 30u)) * 0xBF58476D1CE4E5B9ull;
+    value = (value ^ (value >> 27u)) * 0x94D049BB133111EBull;
+    return value ^ (value >> 31u);
+}
+
+int selected_long_note_mix_percent(const std::vector<std::string>& active_mods) {
+    for (const auto& token : active_mods) {
+        const auto* descriptor = find_mode_mod_descriptor(token);
+        if (descriptor && descriptor->long_note_mix_percent > 0) {
+            return descriptor->long_note_mix_percent;
+        }
+    }
+    return 0;
+}
+
+void apply_mixed_long_notes(gameplay::GameplayChart& chart,
+                            int percent,
+                            uint32_t random_seed,
+                            int sample_rate) {
+    percent = std::clamp(percent, 0, 100);
+    if (percent <= 0 || chart.notes.empty()) {
+        return;
+    }
+
+    int lane_count = chart.lane_count;
+    if (lane_count <= 0) {
+        for (const auto& note : chart.notes) {
+            lane_count = std::max(lane_count, note.lane);
+        }
+    }
+    if (lane_count <= 0) {
+        return;
+    }
+
+    struct Candidate {
+        std::size_t note_index = 0;
+        int64_t end_sample = 0;
+        uint64_t selection_key = 0;
+    };
+
+    std::vector<std::vector<std::size_t>> lanes(static_cast<std::size_t>(lane_count) + 1u);
+    for (std::size_t index = 0; index < chart.notes.size(); ++index) {
+        const auto& note = chart.notes[index];
+        if (note.lane > 0 && note.lane <= lane_count) {
+            lanes[static_cast<std::size_t>(note.lane)].push_back(index);
+        }
+    }
+
+    constexpr int kFallbackSampleRate = 44100;
+    const int effective_sample_rate = sample_rate > 0 ? sample_rate : kFallbackSampleRate;
+    const int64_t minimum_length_samples =
+        std::max<int64_t>(1, static_cast<int64_t>(std::llround(effective_sample_rate * 0.05)));
+    const int64_t same_lane_clearance_samples = minimum_length_samples;
+    std::vector<Candidate> candidates;
+    candidates.reserve(chart.notes.size());
+
+    for (int lane = 1; lane <= lane_count; ++lane) {
+        auto& indices = lanes[static_cast<std::size_t>(lane)];
+        std::stable_sort(indices.begin(), indices.end(), [&](std::size_t lhs, std::size_t rhs) {
+            if (chart.notes[lhs].start_sample != chart.notes[rhs].start_sample) {
+                return chart.notes[lhs].start_sample < chart.notes[rhs].start_sample;
+            }
+            return lhs < rhs;
+        });
+
+        bool has_prior_lane_span = false;
+        int64_t prior_lane_end = 0;
+        for (std::size_t position = 0; position < indices.size(); ++position) {
+            const std::size_t note_index = indices[position];
+            const auto& note = chart.notes[note_index];
+            const int64_t original_end =
+                std::max(note.start_sample, note.end_sample.value_or(note.start_sample));
+            const bool overlaps_prior_lane_span =
+                has_prior_lane_span && note.start_sample <= prior_lane_end;
+            prior_lane_end = has_prior_lane_span ? std::max(prior_lane_end, original_end) : original_end;
+            has_prior_lane_span = true;
+
+            if (note.end_sample.has_value() || overlaps_prior_lane_span) {
+                continue;
+            }
+
+            int64_t end_sample = chart.duration_samples;
+            if (position + 1 < indices.size()) {
+                // A one-sample tail-to-head gap still renders and plays like an
+                // overlap. Keep a short release/repress lane between generated
+                // holds and the next note while preserving taps on other lanes.
+                end_sample =
+                    chart.notes[indices[position + 1]].start_sample - same_lane_clearance_samples;
+            }
+            if (end_sample - note.start_sample < minimum_length_samples) {
+                continue;
+            }
+
+            uint64_t material = static_cast<uint64_t>(random_seed);
+            material ^= static_cast<uint64_t>(note.start_sample) + 0x9E3779B97F4A7C15ull;
+            material ^= static_cast<uint64_t>(note.lane) * 0xBF58476D1CE4E5B9ull;
+            material ^= static_cast<uint64_t>(note_index) * 0x94D049BB133111EBull;
+            candidates.push_back(Candidate{note_index, end_sample, mix_long_note_hash(material)});
+        }
+    }
+
+    const std::size_t selected_count = std::min<std::size_t>(
+        candidates.size(),
+        static_cast<std::size_t>(std::llround(static_cast<double>(candidates.size()) *
+                                              static_cast<double>(percent) / 100.0)));
+    std::sort(candidates.begin(), candidates.end(), [](const Candidate& lhs, const Candidate& rhs) {
+        if (lhs.selection_key != rhs.selection_key) {
+            return lhs.selection_key < rhs.selection_key;
+        }
+        return lhs.note_index < rhs.note_index;
+    });
+
+    for (std::size_t i = 0; i < selected_count; ++i) {
+        auto& note = chart.notes[candidates[i].note_index];
+        note.end_sample = candidates[i].end_sample;
+        note.release_required = false;
+    }
+}
+
 void scale_judge_windows(config::JudgeConfig& judge, double scale) {
     if (!std::isfinite(scale) || scale <= 0.0 || std::abs(scale - 1.0) < 1e-9) {
         return;
@@ -273,6 +406,11 @@ std::vector<std::string> normalize_mode_mod_tokens(const std::vector<std::string
     }
 
     return active;
+}
+
+bool equivalent_mode_mod_tokens(const std::vector<std::string>& lhs,
+                                const std::vector<std::string>& rhs) {
+    return normalize_mode_mod_tokens(lhs) == normalize_mode_mod_tokens(rhs);
 }
 
 std::string mode_mod_summary(const std::vector<std::string>& tokens) {
@@ -377,6 +515,9 @@ ModeManagerResult manage_modes(const gameplay::GameplayChart& chart,
     } else {
         if (has_mod_token(result.active_mods, "full_long_notes")) {
             apply_full_long_notes(result.chart);
+        } else if (const int mix_percent = selected_long_note_mix_percent(result.active_mods);
+                   mix_percent > 0) {
+            apply_mixed_long_notes(result.chart, mix_percent, config.random_seed, sample_rate);
         }
         if (has_mod_token(result.active_mods, "no_ln_release")) {
             apply_no_ln_release(result.chart);

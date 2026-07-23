@@ -44,7 +44,7 @@ TEST_CASE("replay export writes JSON with trace events") {
     replay.sample_rate = 48000;
     replay.rate = 1.0;
     replay.input_offset_ms = -2.5;
-    replay.mods = {"judge_easy", "no_ln_release"};
+    replay.mods = {"judge_easy", "ln_mix_30", "no_ln_release"};
     replay.rate_multiplier = 0.75;
     replay.score_multiplier = 0.75;
     replay.final_score = 1234;
@@ -54,6 +54,7 @@ TEST_CASE("replay export writes JSON with trace events") {
     replay.mode.gauge = "easy";
     replay.mode.autoplay_enabled = true;
     replay.mode.practice_no_fail_enabled = true;
+    replay.mode.one_miss_fail_enabled = true;
 
     replay.trace.sample_rate = 48000;
     replay.trace.rate = 1.0;
@@ -68,6 +69,11 @@ TEST_CASE("replay export writes JSON with trace events") {
     replay.stats.total_notes = 1;
     replay.stats.raw_score = 1645;
     replay.stats.mean_delta_ms = 1.25;
+    replay.stats.osu_od8.available = true;
+    replay.stats.osu_od8.total_objects = 1;
+    replay.stats.osu_od8.judged_objects = 1;
+    replay.stats.osu_od8.counts.perfect = 1;
+    replay.stats.osu_od8.score = 1'000'000;
 
     const std::filesystem::path path = "replay_export_test.json";
     auto exported = save_replay_json(path.string(), replay);
@@ -94,9 +100,10 @@ TEST_CASE("replay export writes JSON with trace events") {
     REQUIRE(mods_it != root->end());
     const auto* mods = mods_it->second.as_array();
     REQUIRE(mods != nullptr);
-    REQUIRE(mods->size() == 2u);
+    REQUIRE(mods->size() == 3u);
     CHECK((*mods)[0].as_string() == "judge_easy");
-    CHECK((*mods)[1].as_string() == "no_ln_release");
+    CHECK((*mods)[1].as_string() == "ln_mix_30");
+    CHECK((*mods)[2].as_string() == "no_ln_release");
 
     CHECK(root->find("rate_multiplier")->second.as_number() == doctest::Approx(0.75));
     CHECK(root->find("score_multiplier")->second.as_number() == doctest::Approx(0.75));
@@ -111,21 +118,26 @@ TEST_CASE("replay export writes JSON with trace events") {
     CHECK(mode->find("gauge")->second.as_string() == "easy");
     CHECK(mode->find("autoplay_enabled")->second.as_bool(false));
     CHECK(mode->find("practice_no_fail_enabled")->second.as_bool(false));
+    CHECK(mode->find("one_miss_fail_enabled")->second.as_bool(false));
 
     auto parsed_replay = tenriff::app::menu_records::parse_replay_file(path, nullptr);
     REQUIRE(parsed_replay.has_value());
-    CHECK(parsed_replay->mods.size() == 2u);
+    CHECK(parsed_replay->mods.size() == 3u);
+    CHECK(parsed_replay->mods[1] == "ln_mix_30");
     CHECK(parsed_replay->rate_multiplier == doctest::Approx(0.75));
     CHECK(parsed_replay->score_multiplier == doctest::Approx(0.75));
     CHECK(parsed_replay->raw_score == 1645);
     CHECK(parsed_replay->final_score == 1234);
     CHECK(parsed_replay->autoplay_enabled);
     CHECK(parsed_replay->practice_no_fail_enabled);
+    CHECK(parsed_replay->one_miss_fail_enabled);
 
     auto loaded_replay = load_replay_json(path.string());
     REQUIRE(loaded_replay.success());
     REQUIRE(loaded_replay.replay.has_value());
     CHECK(loaded_replay.replay->stats.counts.pr == 2);
+    REQUIRE(loaded_replay.replay->mods.size() == 3u);
+    CHECK(loaded_replay.replay->mods[1] == "ln_mix_30");
     CHECK(loaded_replay.replay->mode.key_mode == "6k");
     CHECK(loaded_replay.replay->mode.random == "mirror");
     REQUIRE(loaded_replay.replay->mode.random_seed.has_value());
@@ -133,6 +145,10 @@ TEST_CASE("replay export writes JSON with trace events") {
     CHECK(loaded_replay.replay->mode.gauge == "easy");
     CHECK(loaded_replay.replay->mode.autoplay_enabled);
     CHECK(loaded_replay.replay->mode.practice_no_fail_enabled);
+    CHECK(loaded_replay.replay->mode.one_miss_fail_enabled);
+    CHECK(loaded_replay.replay->stats.osu_od8.available);
+    CHECK(loaded_replay.replay->stats.osu_od8.score == 1'000'000);
+    CHECK(loaded_replay.replay->stats.osu_od8.counts.perfect == 1);
     CHECK(loaded_replay.replay->trace.events.size() == 2u);
     CHECK(loaded_replay.replay->trace.events[0].lane == 1);
     CHECK(loaded_replay.replay->trace.events[0].state == InputState::Pressed);
@@ -153,17 +169,22 @@ TEST_CASE("result export writes JSON with replay reference") {
     result.sample_rate = 48000;
     result.rate = 1.0;
     result.game_over = false;
-    result.mods = {"full_short_notes"};
+    result.mods = {"ln_mix_30"};
     result.rate_multiplier = 1.05;
     result.score_multiplier = 0.50;
     result.final_score = 900;
     result.autoplay_enabled = false;
     result.practice_no_fail_enabled = true;
+    result.one_miss_fail_enabled = true;
     result.stats.counts.pg = 5;
     result.stats.counts.pr = 3;
     result.stats.max_combo = 5;
     result.stats.total_notes = 5;
     result.stats.raw_score = 1800;
+    result.stats.osu_od8.available = true;
+    result.stats.osu_od8.total_objects = 5;
+    result.stats.osu_od8.judged_objects = 5;
+    result.stats.osu_od8.score = 876'543;
 
     const std::filesystem::path path = "result_export_test.json";
     auto exported = save_result_json(path.string(), result);
@@ -192,11 +213,12 @@ TEST_CASE("result export writes JSON with replay reference") {
     CHECK(game_over_it->second.as_bool(true) == result.game_over);
     CHECK(root->find("autoplay_enabled")->second.as_bool(true) == result.autoplay_enabled);
     CHECK(root->find("practice_no_fail_enabled")->second.as_bool(false) == result.practice_no_fail_enabled);
+    CHECK(root->find("one_miss_fail_enabled")->second.as_bool(false) == result.one_miss_fail_enabled);
 
     auto parsed_result = tenriff::app::menu_records::parse_result_file(path, nullptr);
     REQUIRE(parsed_result.has_value());
     CHECK(parsed_result->mods.size() == 1u);
-    CHECK(parsed_result->mods[0] == "full_short_notes");
+    CHECK(parsed_result->mods[0] == "ln_mix_30");
     CHECK(parsed_result->stats.raw_score == 1800);
     CHECK(parsed_result->stats.counts.pr == 3);
     CHECK(parsed_result->rate_multiplier == doctest::Approx(1.05));
@@ -204,6 +226,9 @@ TEST_CASE("result export writes JSON with replay reference") {
     CHECK(parsed_result->final_score == 900);
     CHECK_FALSE(parsed_result->autoplay_enabled);
     CHECK(parsed_result->practice_no_fail_enabled);
+    CHECK(parsed_result->one_miss_fail_enabled);
+    CHECK(parsed_result->stats.osu_od8.available);
+    CHECK(parsed_result->stats.osu_od8.score == 876'543);
 
     std::error_code ec;
     std::filesystem::remove(path, ec);

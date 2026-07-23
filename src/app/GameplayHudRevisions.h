@@ -44,6 +44,8 @@ struct GameplayHudRevisionInput {
     int max_combo = 0;
     gameplay::JudgementCounts counts;
     int64_t score = 0;
+    bool osu_od8_score_available = false;
+    int64_t osu_od8_score = 0;
 
     double gauge = 0.0;
     game::GaugeType gauge_type = game::GaugeType::Normal;
@@ -65,6 +67,8 @@ struct GameplayHudRevisionInput {
 
     bool ghost_visible = false;
     int64_t ghost_score = 0;
+    bool ghost_osu_od8_score_available = false;
+    int64_t ghost_osu_od8_score = 0;
     int ghost_combo = 0;
     int ghost_max_combo = 0;
     gameplay::JudgementCounts ghost_counts;
@@ -176,6 +180,8 @@ inline GameplayHudRevisionFlags diff_gameplay_hud_revisions(const GameplayHudRev
         previous.counts.bd != next.counts.bd ||
         previous.counts.pr != next.counts.pr ||
         previous.score != next.score ||
+        previous.osu_od8_score_available != next.osu_od8_score_available ||
+        previous.osu_od8_score != next.osu_od8_score ||
         previous.gauge != next.gauge ||
         previous.gauge_type != next.gauge_type ||
         previous.rate != next.rate ||
@@ -186,6 +192,8 @@ inline GameplayHudRevisionFlags diff_gameplay_hud_revisions(const GameplayHudRev
         previous.peer_revision != next.peer_revision ||
         previous.ghost_visible != next.ghost_visible ||
         previous.ghost_score != next.ghost_score ||
+        previous.ghost_osu_od8_score_available != next.ghost_osu_od8_score_available ||
+        previous.ghost_osu_od8_score != next.ghost_osu_od8_score ||
         previous.ghost_combo != next.ghost_combo ||
         previous.ghost_max_combo != next.ghost_max_combo ||
         previous.ghost_counts.pg != next.ghost_counts.pg ||

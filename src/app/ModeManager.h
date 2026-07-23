@@ -18,6 +18,7 @@ struct ModeModDescriptor {
     std::string_view category_token;
     std::string_view category_label;
     double score_multiplier = 1.0;
+    int long_note_mix_percent = 0;
 };
 
 struct ModeModCategoryDescriptor {
@@ -43,6 +44,8 @@ struct ModeManagerResult {
 [[nodiscard]] const ModeModDescriptor* find_mode_mod_descriptor(std::string_view token);
 [[nodiscard]] std::vector<std::string> normalize_mode_mod_tokens(const std::vector<std::string>& tokens,
                                                                  std::vector<std::string>* warnings = nullptr);
+[[nodiscard]] bool equivalent_mode_mod_tokens(const std::vector<std::string>& lhs,
+                                               const std::vector<std::string>& rhs);
 [[nodiscard]] std::string mode_mod_summary(const std::vector<std::string>& tokens);
 [[nodiscard]] std::string mode_mod_category_value(std::string_view category_token,
                                                   const std::vector<std::string>& tokens);

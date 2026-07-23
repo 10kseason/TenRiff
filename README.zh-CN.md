@@ -2,9 +2,9 @@
 
 Language: [한국어](README.md) | [English](README.en.md) | [简体中文](README.zh-CN.md) | [日本語](README.ja.md)
 
-TenRiff 是一个以 BMS-first 为核心的 Windows GUI 节奏游戏运行时/启动器项目。当前 stable 项目版本为 `1.1.7`，在 1.1.6 的多人游戏、安全导入、判定线、LN 难度评估和 Mirror 功能基础上，改进了原生/fallback 音符与 LN 材质、判定/连击与槽条 HUD 层级，以及 Song Select 的选择和预览视觉。项目整体使用 MIT 许可证，随项目分发的第三方组件说明见 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)。
+TenRiff 是一个以 BMS-first 为核心的 Windows GUI 节奏游戏运行时/启动器项目。当前 stable 项目版本为 `1.1.8`，在 1.1.7 视觉更新基础上加入 osu!mania OD8 辅助分数、首次 BAD 即结束的 `Sudden Death (1 MISS)`，以及确定性的 `LN Mix 10%～90%`。项目整体使用 MIT 许可证，随项目分发的第三方组件说明见 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)。
 
-这份 README 是面向首次阅读者的入门文档。关于当前实际行为、当前 `1.1.7` 项目状态、`1.1.2 final stable` 基准、配置结构以及设计文档，请继续阅读 [`docs/README.zh-CN.md`](docs/README.zh-CN.md)。
+这份 README 是面向首次阅读者的入门文档。关于当前实际行为、当前 `1.1.8` 项目状态、`1.1.2 final stable` 基准、配置结构以及设计文档，请继续阅读 [`docs/README.zh-CN.md`](docs/README.zh-CN.md)。
 
 TenRiff 也明确属于一种 `vibe coding` 作品：它更多是在快速迭代和实验中成形，而不是只按照传统的长篇设计先行流程推进。
 
@@ -119,7 +119,7 @@ cmake --build build-dist --config Release --target bms_parser_tests
 
 ### 3. 公开源代码包也可以直接构建
 
-按版本发布的公开源代码包（例如 `TenRiff-1.1.7-source.zip`）已经包含 `external/`（但不含 `external/llama.cpp/`）、`src/`、`tests/`、`config/`、`docs/` 和 `Mainmusic/`，因此解压后就可以直接进行 configure/build。
+按版本发布的公开源代码包（例如 `TenRiff-1.1.8-source.zip`）已经包含 `external/`（但不含 `external/llama.cpp/`）、`src/`、`tests/`、`config/`、`docs/` 和 `Mainmusic/`，因此解压后就可以直接进行 configure/build。
 
 - 公开源代码包不依赖本地构建包装脚本；请使用上面展示的原生 `cmake --build` 流程。
 - `10k-calc/` 会从公开源代码包中排除，因此依赖 Python reference 的 optional 检查即使输出 `[skip]` 也属于正常情况。
