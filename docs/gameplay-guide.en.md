@@ -52,7 +52,7 @@ The standard TenRiff play flow is:
 
 ### Screens commonly used from Song Select
 - `Mode`
-  - Adjust Gauge, Random, Rate, Hi-Speed, OSU Charts, and Chart Filter
+  - Adjust Ghost Battle, Autoplay, Practice, Sudden Death, Key Mode, Gauge, Random, Mods, Rate, Hi-Speed, OSU Charts, and Chart Filter
 - `Audio`
   - Adjust Master / BGM / Keysound volume and the BMS keysound policy
 - `Graphics`
@@ -67,6 +67,7 @@ The standard TenRiff play flow is:
 These settings are a good starting point:
 
 - `Mode > Gauge`: `normal`
+- `Mode > Sudden Death`: enable only when you want a first-BAD challenge
 - `Mode > Rate`: `1.0x`
 - `Mode > Hi-Speed`: start with the default value
 - `Graphics > Display`: use `Borderless` when using Discord voice overlay
@@ -133,6 +134,8 @@ The in-game HUD usually shows:
 - Current `Rate`
 - Current `Hi-Speed`
 - Gauge value and current gauge type
+- Native TenRiff Score
+- Auxiliary `OSU OD8` score converted from real input timing with osu!mania stable OD8 / ScoreV1
 - Combo
 - Recent judgement (`PG / GR / GD / BD / PR`)
 - Timing deviation in milliseconds
@@ -150,20 +153,25 @@ The current default judgement labels use the following abbreviations:
 - `BD`: Bad
 - `PR`: Poor / Miss
 
-### Gauge
-The three default gauge types are:
+The `OSU OD8` value is an auxiliary comparison score capped at 1,000,000; it does not change TenRiff's native score, rank, or clear result.
 
+### Gauge
+The four default gauge types are:
+
+- `ex_hard`
 - `hard`
 - `normal`
 - `easy`
 
 The selected gauge always starts at `100%` at the beginning of the song.
 
+- `ex_hard`: lower recovery and heavier `BAD` / `POOR` damage than Hard; immediate Game Over at `0%`
 - `hard`: immediate Game Over at `0%`
 - `normal`: immediate Game Over at `0%`
 - `easy`: immediate Game Over at `0%`
 
 There is no automatic gauge shifting during play.
+`Sudden Death (1 MISS)` is not a gauge type: it forces the gauge to zero and ends the run on the first `BAD`. Empty-key `POOR` does not count, and it cannot be enabled together with Practice No-Fail.
 
 ## 10. Result Screen
 
@@ -171,7 +179,8 @@ After play ends, the Result screen shows:
 
 - Clear / Game Over status
 - Rank
-- Score
+- Native TenRiff Score
+- Auxiliary `OSU OD8` score and converted judgement totals
 - Accuracy
 - Max Combo
 - PG / GR / GD / BD / PR totals

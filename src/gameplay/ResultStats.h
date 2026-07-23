@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "game/GaugeManager.h"
+#include "gameplay/OsuManiaScore.h"
 
 namespace tenriff::gameplay {
 
@@ -39,6 +40,7 @@ struct ResultStats {
     int total_notes = 0;
     int64_t raw_score = 0;
     int64_t raw_score_accumulator = 0;
+    OsuManiaScoreV1 osu_od8;
 
     double mean_delta_ms = 0.0;
     double m2_delta_ms = 0.0;

@@ -257,6 +257,8 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
         target.notes[i] = out_note;
     }
     target.score = gameplay_hud_.score;
+    target.osu_od8_score_available = gameplay_hud_.osu_od8_score_available;
+    target.osu_od8_score = gameplay_hud_.osu_od8_score;
 
     const int judged_total = gameplay_hud_.counts.pg + gameplay_hud_.counts.gr + gameplay_hud_.counts.gd +
                              gameplay_hud_.counts.bd;
@@ -274,6 +276,8 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
         // Render-only perspective switch. Local result data stays untouched,
         // while the visible score/gauge panel follows the surviving peer.
         target.score = target.peer_score;
+        target.osu_od8_score_available = false;
+        target.osu_od8_score = 0;
         target.combo = target.peer_combo;
         target.max_combo = target.peer_max_combo;
         target.pg = target.peer_pg;
@@ -302,6 +306,8 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
 
     target.ghost_visible = gameplay_hud_.ghost_visible;
     target.ghost_score = gameplay_hud_.ghost_score;
+    target.ghost_osu_od8_score_available = gameplay_hud_.ghost_osu_od8_score_available;
+    target.ghost_osu_od8_score = gameplay_hud_.ghost_osu_od8_score;
     target.ghost_combo = gameplay_hud_.ghost_combo;
     target.ghost_max_combo = gameplay_hud_.ghost_max_combo;
     target.ghost_pg = gameplay_hud_.ghost_counts.pg;
@@ -598,6 +604,8 @@ void MenuApp::populate_result_render_data(render::MenuRenderData& render, const 
                                                        : (last_game_over_ ? "GAME OVER" : "CLEAR");
     render.result.gauge_label = gauge_type_label(final_gauge_type);
     render.result.score = last_result_final_score_;
+    render.result.osu_od8_score_available = last_result_.osu_od8.available;
+    render.result.osu_od8_score = last_result_.osu_od8.score;
     render.result.accuracy = accuracy;
     render.result.gauge_value =
         last_result_.gauge_history.empty() ? 0.0 : last_result_.gauge_history.back().value;
@@ -1275,6 +1283,8 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
         next.max_combo = hud.max_combo;
         next.counts = hud.counts;
         next.score = hud.score;
+        next.osu_od8_score_available = hud.osu_od8_score_available;
+        next.osu_od8_score = hud.osu_od8_score;
         next.gauge = hud.gauge;
         next.gauge_type = hud.gauge_type;
         next.rate = hud.rate;
@@ -1303,6 +1313,8 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
         }
         next.ghost_visible = hud.ghost_visible;
         next.ghost_score = hud.ghost_score;
+        next.ghost_osu_od8_score_available = hud.ghost_osu_od8_score_available;
+        next.ghost_osu_od8_score = hud.ghost_osu_od8_score;
         next.ghost_combo = hud.ghost_combo;
         next.ghost_max_combo = hud.ghost_max_combo;
         next.ghost_counts = hud.ghost_counts;
@@ -1358,6 +1370,8 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
         gameplay_hud_.max_combo = hud.max_combo;
         gameplay_hud_.counts = hud.counts;
         gameplay_hud_.score = hud.score;
+        gameplay_hud_.osu_od8_score_available = hud.osu_od8_score_available;
+        gameplay_hud_.osu_od8_score = hud.osu_od8_score;
         gameplay_hud_.gauge = hud.gauge;
         gameplay_hud_.gauge_type = hud.gauge_type;
         gameplay_hud_.rate = hud.rate;
@@ -1387,6 +1401,8 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
         }
         gameplay_hud_.ghost_visible = hud.ghost_visible;
         gameplay_hud_.ghost_score = hud.ghost_score;
+        gameplay_hud_.ghost_osu_od8_score_available = hud.ghost_osu_od8_score_available;
+        gameplay_hud_.ghost_osu_od8_score = hud.ghost_osu_od8_score;
         gameplay_hud_.ghost_combo = hud.ghost_combo;
         gameplay_hud_.ghost_max_combo = hud.ghost_max_combo;
         gameplay_hud_.ghost_counts = hud.ghost_counts;
@@ -1813,8 +1829,8 @@ void MenuApp::populate_help_overlay(render::HelpOverlayData& target) const {
             target.lines = {
                 ui_text("Up / Down or the mouse wheel selects a row. Long lists show a scrollbar on the right.",
                         "위 / 아래 키 또는 마우스 휠로 행을 선택합니다. 긴 목록은 오른쪽 스크롤바가 표시됩니다."),
-                ui_text("Ghost Battle, Autoplay, Practice, Gauge, Random, Mods, Rate, and Hi-Speed change the next-song compare/play feel.",
-                        "고스트 배틀, 오토플레이, 연습 모드, 게이지, 랜덤, 모드, Rate, Hi-Speed는 다음 곡의 비교/플레이 감각을 바꿉니다."),
+                ui_text("Ghost Battle, Autoplay, Practice, Sudden Death, Gauge, Random, Mods, Rate, and Hi-Speed change the next-song compare/play feel.",
+                        "고스트 배틀, 오토플레이, 연습 모드, 서든 데스, 게이지, 랜덤, 모드, Rate, Hi-Speed는 다음 곡의 비교/플레이 감각을 바꿉니다."),
                 ui_text("Indexing Safe minimizes RAM for huge libraries. Fast spends more RAM to speed up rescans.",
                         "인덱싱 안전은 큰 라이브러리에서 RAM 사용을 줄이고, 빠름은 더 많은 RAM으로 재스캔을 빠르게 합니다."),
                 ui_text("Chart Filter decides whether Song Select shows BMS, OSU, or both when OSU indexing is enabled.",

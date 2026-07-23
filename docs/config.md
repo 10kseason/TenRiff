@@ -40,7 +40,7 @@
 
 - `backend` (string)
   - `polling | rawinput`
-  - 현재 `1.1.7` 릴리스 라인의 기본값은 `rawinput`
+  - 현재 `1.1.8` 릴리스 라인의 기본값은 `rawinput`
   - `Options -> Input Settings -> Backend` 또는 `Options -> Profile Setup -> Input Backend`에서 프로필별로 RawInput/Polling을 직접 선택 가능
   - 저장값은 런타임 fallback 때문에 자동으로 `polling`으로 덮어쓰지 않음
   - RawInput 시작 실패, 등록 대상 손실, 메시지 창 종료가 확인되면 현재 앱 실행 동안 메뉴와 다음 gameplay 세션 모두 Polling을 유지
@@ -60,7 +60,7 @@
 - `judgement_hz` (int)
   - `1000 | 2000 | 4000 | 8000`
   - 호환성용으로 남아 있는 입력 설정 필드
-  - 현재 `1.1.7` runtime은 별도 오디오 판정 서브루프를 이 값으로 구동하지 않음
+  - 현재 `1.1.8` runtime은 별도 오디오 판정 서브루프를 이 값으로 구동하지 않음
   - 기본값은 `4000` (`0.25ms`)
 - `debounce_ms` (double)
   - 실제 Press/Release 전환은 버리지 않고 같은 상태의 중복 이벤트만 상태 추적에서 제거
@@ -127,7 +127,11 @@
 - `random` (string)
   - `off | mirror | fr | sr`
 - `random_seed` (int)
-  - FR/SR와 강제 key-mode 변환의 고정 seed이며, Mirror 레인 반전 자체는 사용하지 않음
+  - FR/SR, 강제 key-mode 변환, LN Mix 대상 선택의 고정 seed이며 Mirror 레인 반전 자체는 사용하지 않음
+- `mods` (string array)
+  - Note Structure에서 `full_long_notes`, `ln_mix_10`~`ln_mix_90`, `full_short_notes` 중 하나를 선택 가능
+  - LN Mix는 50ms 이상 길이와 다음 동일 레인 노트 전 50ms 여유를 모두 확보할 수 있는 단노트만 후보로 삼고, 요청 비율만큼 정확히 반올림해 일반 롱노트로 변환
+  - 기존 롱노트는 보존하고 같은 레인의 기존 span과 겹치는 head는 제외하며, 같은 `random_seed`에서는 같은 단노트가 변환됨
 - `enable_osu_charts` (bool)
 - `ghost_battle_enabled` (bool)
   - 기본값은 `false`
@@ -141,6 +145,10 @@
   - QA용 assist 모드
   - `true`면 gauge 기반 조기 실패를 막고 차트 끝까지 판정/결과 저장을 유지함
   - 결과에는 `ASSIST` clear status가 붙음
+- `one_miss_fail_enabled` (bool)
+  - `true`면 첫 `BAD` 판정에서 게이지가 0이 되고 즉시 실패함
+  - 빈 키 입력의 `POOR`는 즉사 조건에 포함하지 않음
+  - Mode Settings에서 활성화하면 `practice_no_fail_enabled`가 자동으로 꺼짐
 - `song_index_profile` (string)
   - `safe | fast`
   - `safe`는 대형 라이브러리에서 RAM high-water를 우선 줄이는 기본값

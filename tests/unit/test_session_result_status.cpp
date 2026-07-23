@@ -44,3 +44,12 @@ TEST_CASE("assist clears are labeled explicitly") {
     CHECK(tenriff::app::gameplay_session_clear_status(
               false, false, false, tenriff::game::GaugeType::Normal, true, false) == "FAILED");
 }
+
+TEST_CASE("sudden death clears are labeled above the underlying gauge") {
+    CHECK(tenriff::app::gameplay_session_clear_status(
+              true, false, false, tenriff::game::GaugeType::Normal, false, false, true) ==
+          "SUDDEN DEATH CLEAR");
+    CHECK(tenriff::app::gameplay_session_clear_status(
+              true, false, false, tenriff::game::GaugeType::Hard, true, false, true) ==
+          "ASSIST AUTOPLAY SUDDEN DEATH CLEAR");
+}

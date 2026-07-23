@@ -349,6 +349,7 @@ std::string MenuApp::best_replay_path_for_selected_song() const {
         }
         const auto& record = local_play_records_[record_index];
         if (!record.replay_path.empty() &&
+            equivalent_mode_mod_tokens(record.mods, config_.mode.mods) &&
             menu_records::default_ghost_replay_allowed(record.autoplay_enabled,
                                                        record.practice_no_fail_enabled,
                                                        record.clear_status)) {

@@ -50,7 +50,7 @@ Windows では通常、次のどちらかで起動します。
 
 ### Song Select からよく使う画面
 - `Mode`
-  - Gauge、Random、Rate、Hi-Speed、OSU Charts、Chart Filter を調整
+  - Ghost Battle、Autoplay、Practice、Sudden Death、Key Mode、Gauge、Random、Mods、Rate、Hi-Speed、OSU Charts、Chart Filter を調整
 - `Audio`
   - Master / BGM / Keysound volume と BMS keysound policy を調整
 - `Graphics`
@@ -63,6 +63,7 @@ Windows では通常、次のどちらかで起動します。
 ## 4. 初期設定のおすすめ
 
 - `Mode > Gauge`: `normal`
+- `Mode > Sudden Death`: 最初の BAD で終了する challenge が必要なときだけ有効化
 - `Mode > Rate`: `1.0x`
 - `Mode > Hi-Speed`: まずは既定値
 - `Graphics > Display`: Discord voice overlay を使う場合は `Borderless` を推奨
@@ -125,6 +126,8 @@ Rate は曲の再生速度と譜面スケジュールだけを変え、同じ Hi
 - 現在の `Rate`
 - 現在の `Hi-Speed`
 - Gauge 値と現在の gauge type
+- TenRiff native Score
+- 実入力 timing を osu!mania stable OD8 / ScoreV1 で換算した補助 `OSU OD8` score
 - Combo
 - 直近 judgement (`PG / GR / GD / BD / PR`)
 - タイミングずれ（ms）
@@ -140,24 +143,30 @@ Rate は曲の再生速度と譜面スケジュールだけを変え、同じ Hi
 - `BD`: Bad
 - `PR`: Poor / Miss
 
+`OSU OD8` は最大 1,000,000 の補助比較 score であり、TenRiff の native score、rank、clear result は変更しません。
+
 ### Gauge
+- `ex_hard`
 - `hard`
 - `normal`
 - `easy`
 
 選択した gauge は曲開始時に常に `100%` で始まります。
 
+- `ex_hard`: Hard より回復が低く `BAD` / `POOR` damage が大きい。 `0%` で即 Game Over
 - `hard`: `0%` で即 Game Over
 - `normal`: `0%` で即 Game Over
 - `easy`: `0%` で即 Game Over
 
 automatic gauge shifting はありません。
+`Sudden Death (1 MISS)` は gauge type ではなく、最初の `BAD` で gauge を 0 にして即終了する rule です。空打ちの `POOR` は対象外で、Practice No-Fail と同時には有効化できません。
 
 ## 10. Result 画面
 
 - Clear / Game Over 状態
 - Rank
-- Score
+- TenRiff native Score
+- `OSU OD8` 補助 score と換算 judgement 集計
 - Accuracy
 - Max Combo
 - PG / GR / GD / BD / PR の合計

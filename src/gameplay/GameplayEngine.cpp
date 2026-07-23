@@ -24,7 +24,8 @@ GameplayEngine::GameplayEngine(const GameplayChart& chart, const GameplayConfig&
       duration_samples_(chart.duration_samples),
       windows_(build_windows(config.judge, config.rate)),
       gauge_manager_(config.gauge, config.gauge_policy),
-      practice_no_fail_enabled_(config.practice_no_fail_enabled) {
+      practice_no_fail_enabled_(config.practice_no_fail_enabled),
+      one_miss_fail_enabled_(config.one_miss_fail_enabled) {
     if (lane_count_ <= 0) {
         lane_count_ = 10;
     }
@@ -104,7 +105,13 @@ void GameplayEngine::advance(int64_t current_sample) {
 
     for (auto& lane : lanes_) {
         update_miss(lane, current_sample);
+        if (game_over_) {
+            break;
+        }
         update_hold(lane, current_sample);
+        if (game_over_) {
+            break;
+        }
     }
 
     finalize_if_done(current_sample);
@@ -157,6 +164,14 @@ void GameplayEngine::apply_judgement(game::Judgement judgement, double delta_ms,
     auto previous_type = gauge_state_.type;
     auto result = gauge_manager_.applyJudgementWeighted(gauge_state_, judgement, time_ms, weight);
 
+    // Sudden Death is a scoring-rule failure, not a gauge preset. Force the
+    // visible gauge to zero and let it take precedence over Practice No-Fail.
+    if (one_miss_fail_enabled_ && judgement == game::Judgement::BD) {
+        gauge_state_.value = 0.0;
+        gauge_state_.game_over = true;
+        result.game_over = true;
+    }
+
     stats_.record_judgement(judgement, delta_ms, combo_impact, weight);
     stats_.record_gauge_sample(sample, gauge_state_.value);
 
@@ -164,7 +179,7 @@ void GameplayEngine::apply_judgement(game::Judgement judgement, double delta_ms,
         stats_.record_shift(sample, previous_type, gauge_state_.type);
     }
 
-    if (result.game_over && !practice_no_fail_enabled_) {
+    if (result.game_over && (one_miss_fail_enabled_ || !practice_no_fail_enabled_)) {
         game_over_ = true;
     }
 }
@@ -187,7 +202,7 @@ std::optional<NoteEvent> GameplayEngine::try_hit_note(LaneState& lane, int64_t i
         int64_t delta_samples = input_sample - note.start_sample;
 
         if (delta_samples > windows_.bd) {
-            apply_bad_miss(note.start_sample);
+            apply_bad_miss(note, note.start_sample);
             lane.mask_until = std::max(lane.mask_until, note.start_sample + windows_.mask);
             ++lane.next_index;
             if (game_over_) {
@@ -208,7 +223,7 @@ std::optional<NoteEvent> GameplayEngine::try_hit_note(LaneState& lane, int64_t i
             // A wide BAD window must not let one missed note steal every later exact press in a dense stream.
             // Recover only when the immediate next note is unambiguously inside the non-BAD window.
             if (std::abs(next_delta_samples) <= windows_.gd) {
-                apply_bad_miss(note.start_sample);
+                apply_bad_miss(note, note.start_sample);
                 lane.mask_until = std::max(lane.mask_until, note.start_sample + windows_.mask);
                 ++lane.next_index;
                 if (game_over_) {
@@ -223,13 +238,21 @@ std::optional<NoteEvent> GameplayEngine::try_hit_note(LaneState& lane, int64_t i
             (judgement == game::Judgement::BD) ? ComboImpact::Break : ComboImpact::Increment;
 
         double weight = note.end_sample.has_value() ? 0.5 : 1.0;
+        if (!note.end_sample.has_value()) {
+            record_osu_mania_od8_judgement(stats_.osu_od8, classify_osu_mania_od8_tap(delta_ms));
+        }
         apply_judgement(judgement, delta_ms, input_sample, weight, combo_impact);
 
         if (note.end_sample.has_value()) {
-            HoldState hold;
-            hold.end_sample = note.end_sample.value();
-            hold.release_required = note.release_required;
-            lane.hold = hold;
+            if (game_over_) {
+                record_osu_mania_od8_judgement(stats_.osu_od8, OsuManiaJudgement::Miss);
+            } else {
+                HoldState hold;
+                hold.end_sample = note.end_sample.value();
+                hold.release_required = note.release_required;
+                hold.osu_head_delta_ms = delta_ms;
+                lane.hold = hold;
+            }
         }
 
         NoteEvent hit_note = note;
@@ -240,7 +263,9 @@ std::optional<NoteEvent> GameplayEngine::try_hit_note(LaneState& lane, int64_t i
     return std::nullopt;
 }
 
-void GameplayEngine::apply_bad_miss(int64_t sample) {
+void GameplayEngine::apply_bad_miss(const NoteEvent& note, int64_t sample) {
+    static_cast<void>(note);
+    record_osu_mania_od8_judgement(stats_.osu_od8, OsuManiaJudgement::Miss);
     apply_judgement(game::Judgement::BD,
                     std::numeric_limits<double>::quiet_NaN(),
                     sample,
@@ -256,15 +281,28 @@ void GameplayEngine::apply_empty_poor(int64_t sample) {
                     ComboImpact::Preserve);
 }
 
+void GameplayEngine::record_osu_hold(const HoldState& hold, int64_t release_sample, bool forced_miss) {
+    const double tail_delta_ms = samples_to_ms(release_sample - hold.end_sample);
+    record_osu_mania_od8_judgement(
+        stats_.osu_od8,
+        classify_osu_mania_od8_hold(hold.osu_head_delta_ms,
+                                    tail_delta_ms,
+                                    hold.osu_released_during_body,
+                                    forced_miss));
+}
+
 void GameplayEngine::update_miss(LaneState& lane, int64_t current_sample) {
     while (lane.next_index < lane.notes.size()) {
         const auto& note = lane.notes[lane.next_index];
         if (current_sample <= note.start_sample + windows_.bd) {
             break;
         }
-        apply_bad_miss(note.start_sample);
+        apply_bad_miss(note, note.start_sample);
         lane.mask_until = note.start_sample + windows_.mask;
         ++lane.next_index;
+        if (game_over_) {
+            break;
+        }
     }
 }
 
@@ -283,6 +321,7 @@ void GameplayEngine::update_hold(LaneState& lane, int64_t current_sample) {
             double delta_ms = static_cast<double>(delta_samples) * 1000.0 / static_cast<double>(sample_rate_);
             const ComboImpact combo_impact =
                 (judgement == game::Judgement::BD) ? ComboImpact::Break : ComboImpact::Increment;
+            record_osu_hold(hold, hold.release_sample);
             apply_judgement(judgement, delta_ms, hold.release_sample, 0.5, combo_impact);
             lane.hold.reset();
             return;
@@ -294,6 +333,7 @@ void GameplayEngine::update_hold(LaneState& lane, int64_t current_sample) {
             double delta_ms = static_cast<double>(delta_samples) * 1000.0 / static_cast<double>(sample_rate_);
             const ComboImpact combo_impact =
                 (judgement == game::Judgement::BD) ? ComboImpact::Break : ComboImpact::Increment;
+            record_osu_hold(hold, hold.release_sample);
             apply_judgement(judgement, delta_ms, hold.release_sample, 0.5, combo_impact);
             lane.hold.reset();
             return;
@@ -302,6 +342,7 @@ void GameplayEngine::update_hold(LaneState& lane, int64_t current_sample) {
 
     if (hold.release_required) {
         if (current_sample > hold.end_sample + hold_timeout) {
+            record_osu_hold(hold, hold.end_sample + hold_timeout, true);
             apply_judgement(game::Judgement::BD,
                             std::numeric_limits<double>::quiet_NaN(),
                             hold.end_sample + hold_timeout,
@@ -320,6 +361,8 @@ void GameplayEngine::update_hold(LaneState& lane, int64_t current_sample) {
             const double delta_ms = static_cast<double>(delta_samples) * 1000.0 / static_cast<double>(sample_rate_);
             const ComboImpact combo_impact =
                 (judgement == game::Judgement::BD) ? ComboImpact::Break : ComboImpact::Increment;
+            const int64_t osu_release_sample = hold.release_active ? hold.release_sample : hold.end_sample;
+            record_osu_hold(hold, osu_release_sample);
             apply_judgement(judgement, delta_ms, hold.end_sample, 0.5, combo_impact);
         }
         lane.hold.reset();
@@ -356,6 +399,11 @@ void GameplayEngine::update_lane_input_state(LaneState& lane, input::InputState 
 
     lane.key_down = false;
     if (lane.hold.has_value()) {
+        const int64_t osu_early_meh_window =
+            static_cast<int64_t>(std::llround(127.0 * static_cast<double>(sample_rate_) / 1000.0));
+        if (input_sample < lane.hold->end_sample - osu_early_meh_window) {
+            lane.hold->osu_released_during_body = true;
+        }
         lane.hold->release_active = true;
         lane.hold->release_sample = input_sample;
     }

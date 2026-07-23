@@ -146,6 +146,8 @@ private:
         int max_combo = 0;
         gameplay::JudgementCounts counts;
         int64_t score = 0;
+        bool osu_od8_score_available = false;
+        int64_t osu_od8_score = 0;
 
         double gauge = 0.0;
         game::GaugeType gauge_type = game::GaugeType::Normal;
@@ -169,6 +171,8 @@ private:
 
         bool ghost_visible = false;
         int64_t ghost_score = 0;
+        bool ghost_osu_od8_score_available = false;
+        int64_t ghost_osu_od8_score = 0;
         int ghost_combo = 0;
         int ghost_max_combo = 0;
         gameplay::JudgementCounts ghost_counts;

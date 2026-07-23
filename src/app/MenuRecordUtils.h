@@ -25,6 +25,7 @@ struct ParsedResultRecord {
     bool game_over = false;
     bool autoplay_enabled = false;
     bool practice_no_fail_enabled = false;
+    bool one_miss_fail_enabled = false;
 };
 
 struct ParsedReplayRecord {
@@ -41,6 +42,7 @@ struct ParsedReplayRecord {
     int64_t final_score = 0;
     bool autoplay_enabled = false;
     bool practice_no_fail_enabled = false;
+    bool one_miss_fail_enabled = false;
 };
 
 int judged_total(const gameplay::JudgementCounts& counts);

@@ -52,7 +52,7 @@ TenRiff 的基础游玩流程如下：
 
 ### Song Select 中常用的设置页面
 - `Mode`
-  - 调整 Gauge、Random、Rate、Hi-Speed、OSU Charts、Chart Filter
+  - 调整 Ghost Battle、Autoplay、Practice、Sudden Death、Key Mode、Gauge、Random、Mods、Rate、Hi-Speed、OSU Charts、Chart Filter
 - `Audio`
   - 调整 Master/BGM/Keysound 音量以及 BMS keysound policy
 - `Graphics`
@@ -67,6 +67,7 @@ TenRiff 的基础游玩流程如下：
 刚开始时，可以从下面这样的配置入手：
 
 - `Mode > Gauge`：`normal`
+- `Mode > Sudden Death`：仅在需要首次 BAD 即结束的挑战时打开
 - `Mode > Rate`：`1.0x`
 - `Mode > Hi-Speed`：先保持默认
 - `Graphics > Display`：使用 Discord voice overlay 时推荐 `Borderless`
@@ -133,6 +134,8 @@ Rate 只改变歌曲播放速度和谱面时间轴；在相同 Hi-Speed 下，�
 - 当前 `Rate`
 - 当前 `Hi-Speed`
 - Gauge 数值与当前 Gauge 类型
+- TenRiff 原生 Score
+- 按 osu!mania stable OD8 / ScoreV1 换算真实输入 timing 的辅助 `OSU OD8` 分数
 - Combo
 - 最近判定（`PG / GR / GD / BD / PR`）
 - 时间偏差（ms）
@@ -150,20 +153,25 @@ Rate 只改变歌曲播放速度和谱面时间轴；在相同 Hi-Speed 下，�
 - `BD`：Bad
 - `PR`：Poor / Miss
 
-### Gauge
-可选的基础 gauge 有以下三种：
+`OSU OD8` 是最高 1,000,000 的辅助比较分数，不会改变 TenRiff 的原生分数、排名或 clear 结果。
 
+### Gauge
+可选的基础 gauge 有以下四种：
+
+- `ex_hard`
 - `hard`
 - `normal`
 - `easy`
 
 所选 gauge 会在歌曲开始时固定从 `100%` 起步。
 
+- `ex_hard`：回复低于 Hard，`BAD` / `POOR` 损失更大；到 `0%` 立即 Game Over
 - `hard`：到 `0%` 立即 Game Over
 - `normal`：到 `0%` 立即 Game Over
 - `easy`：到 `0%` 立即 Game Over
 
 游玩过程中不会再发生自动 gauge 降级。
+`Sudden Death (1 MISS)` 不是 gauge 类型，而是在首次 `BAD` 时把 gauge 置零并立即结束的规则。空按产生的 `POOR` 不计入，并且不能与 Practice No-Fail 同时启用。
 
 ## 10. Result 画面
 
@@ -171,7 +179,8 @@ Rate 只改变歌曲播放速度和谱面时间轴；在相同 Hi-Speed 下，�
 
 - Clear / Game Over 状态
 - Rank
-- Score
+- TenRiff 原生 Score
+- `OSU OD8` 辅助分数与换算判定统计
 - Accuracy
 - Max Combo
 - PG / GR / GD / BD / PR 统计

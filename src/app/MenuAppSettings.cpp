@@ -84,7 +84,7 @@ void MenuApp::handle_audio_settings_input(uint32_t keycode) {
 }
 
 void MenuApp::handle_mode_settings_input(uint32_t keycode) {
-    const int item_count = 14;
+    const int item_count = 15;
     if (keycode == key_up_) {
         settings_cursor_ = clamp_int(settings_cursor_ - 1, 0, item_count - 1);
         publish_snapshot();
@@ -129,14 +129,23 @@ void MenuApp::handle_mode_settings_input(uint32_t keycode) {
             mode_dirty_ = true;
         } else if (settings_cursor_ == 5) {
             config_.mode.practice_no_fail_enabled = !config_.mode.practice_no_fail_enabled;
+            if (config_.mode.practice_no_fail_enabled) {
+                config_.mode.one_miss_fail_enabled = false;
+            }
             mode_dirty_ = true;
         } else if (settings_cursor_ == 6) {
-            config_.mode.key_mode = cycle_runtime_key_mode(config_.mode.key_mode, direction, true);
+            config_.mode.one_miss_fail_enabled = !config_.mode.one_miss_fail_enabled;
+            if (config_.mode.one_miss_fail_enabled) {
+                config_.mode.practice_no_fail_enabled = false;
+            }
             mode_dirty_ = true;
         } else if (settings_cursor_ == 7) {
-            config_.mode.gauge = cycle_gauge_mode(config_.mode.gauge, direction);
+            config_.mode.key_mode = cycle_runtime_key_mode(config_.mode.key_mode, direction, true);
             mode_dirty_ = true;
         } else if (settings_cursor_ == 8) {
+            config_.mode.gauge = cycle_gauge_mode(config_.mode.gauge, direction);
+            mode_dirty_ = true;
+        } else if (settings_cursor_ == 9) {
             if (config_.mode.random == "off") {
                 config_.mode.random = (direction > 0) ? "mirror" : "sr";
             } else if (config_.mode.random == "mirror") {
@@ -147,19 +156,19 @@ void MenuApp::handle_mode_settings_input(uint32_t keycode) {
                 config_.mode.random = (direction > 0) ? "off" : "fr";
             }
             mode_dirty_ = true;
-        } else if (settings_cursor_ == 9) {
+        } else if (settings_cursor_ == 10) {
             int next_value = static_cast<int>(config_.mode.random_seed) + direction;
             next_value = clamp_int(next_value, kSeedMin, kSeedMax);
             config_.mode.random_seed = static_cast<uint32_t>(next_value);
             mode_dirty_ = true;
-        } else if (settings_cursor_ == 10) {
+        } else if (settings_cursor_ == 11) {
             publish_snapshot();
             return;
-        } else if (settings_cursor_ == 11) {
+        } else if (settings_cursor_ == 12) {
             config_.speed.rate = clamp_step_value(config_.speed.rate + static_cast<double>(direction) * kRateStep,
                                                   kRateMin, kRateMax, kRateStep);
             mode_dirty_ = true;
-        } else if (settings_cursor_ == 12) {
+        } else if (settings_cursor_ == 13) {
             config_.speed.hi_speed = clamp_step_value(
                 config_.speed.hi_speed + static_cast<double>(direction) * kHiSpeedStep,
                 kHiSpeedMin, kHiSpeedMax, kHiSpeedStep);
@@ -170,7 +179,7 @@ void MenuApp::handle_mode_settings_input(uint32_t keycode) {
     }
 
     if (keycode == key_enter_ || keycode == key_escape_ || keycode == key_backspace_) {
-        if (keycode == key_enter_ && settings_cursor_ == 10) {
+        if (keycode == key_enter_ && settings_cursor_ == 11) {
             screen_ = Screen::ModeMods;
             settings_cursor_ = 0;
             publish_snapshot();
@@ -214,7 +223,7 @@ void MenuApp::handle_mode_mods_input(uint32_t keycode) {
 
     if (keycode == key_enter_ || keycode == key_escape_ || keycode == key_backspace_) {
         screen_ = Screen::ModeSelect;
-        settings_cursor_ = 8;
+        settings_cursor_ = 11;
         publish_snapshot();
     }
 }
@@ -259,22 +268,25 @@ void MenuApp::populate_mode_settings_render_data(render::MenuRenderData& render)
     append_menu_row(render.generic, ui_text("Practice (No Fail)", "연습 모드 (실패 없음)"),
                     ui_on_off(config_.mode.practice_no_fail_enabled),
                     settings_cursor_ == 5, render::MenuHitTargetKind::SettingsRow, 5, false, true);
+    append_menu_row(render.generic, ui_text("Sudden Death (1 MISS)", "서든 데스 (1미스 즉사)"),
+                    ui_on_off(config_.mode.one_miss_fail_enabled),
+                    settings_cursor_ == 6, render::MenuHitTargetKind::SettingsRow, 6, false, true);
     append_menu_row(render.generic, ui_text("Key Mode", "키 모드"),
                     ui_key_mode_label(config_.mode.key_mode),
-                    settings_cursor_ == 6, render::MenuHitTargetKind::SettingsRow, 6, false, true);
-    append_menu_row(render.generic, ui_text("Gauge", "게이지"), ui_gauge_label(config_.mode.gauge), settings_cursor_ == 7,
-                    render::MenuHitTargetKind::SettingsRow, 7, false, true);
-    append_menu_row(render.generic, ui_text("Random", "랜덤"), ui_random_label(config_.mode.random), settings_cursor_ == 8,
+                    settings_cursor_ == 7, render::MenuHitTargetKind::SettingsRow, 7, false, true);
+    append_menu_row(render.generic, ui_text("Gauge", "게이지"), ui_gauge_label(config_.mode.gauge), settings_cursor_ == 8,
                     render::MenuHitTargetKind::SettingsRow, 8, false, true);
-    append_menu_row(render.generic, ui_text("Random Seed", "랜덤 시드"), std::to_string(config_.mode.random_seed), settings_cursor_ == 9,
+    append_menu_row(render.generic, ui_text("Random", "랜덤"), ui_random_label(config_.mode.random), settings_cursor_ == 9,
                     render::MenuHitTargetKind::SettingsRow, 9, false, true);
+    append_menu_row(render.generic, ui_text("Random Seed", "랜덤 시드"), std::to_string(config_.mode.random_seed), settings_cursor_ == 10,
+                    render::MenuHitTargetKind::SettingsRow, 10, false, true);
     append_menu_row(render.generic, ui_text("Mods", "모드"), mode_score_summary(config_.mode.mods, config_.speed.rate),
-                    settings_cursor_ == 10, render::MenuHitTargetKind::SettingsRow, 10, true, false);
-    append_menu_row(render.generic, "Rate", format_multiplier(config_.speed.rate), settings_cursor_ == 11,
-                    render::MenuHitTargetKind::SettingsRow, 11, false, true);
-    append_menu_row(render.generic, ui_text("Hi-Speed", "하이스피드"), format_decimal(config_.speed.hi_speed), settings_cursor_ == 12,
+                    settings_cursor_ == 11, render::MenuHitTargetKind::SettingsRow, 11, true, false);
+    append_menu_row(render.generic, "Rate", format_multiplier(config_.speed.rate), settings_cursor_ == 12,
                     render::MenuHitTargetKind::SettingsRow, 12, false, true);
-    append_menu_row(render.generic, ui_text("Back", "뒤로"), "", settings_cursor_ == 13, render::MenuHitTargetKind::SettingsRow, 13, true, false);
+    append_menu_row(render.generic, ui_text("Hi-Speed", "하이스피드"), format_decimal(config_.speed.hi_speed), settings_cursor_ == 13,
+                    render::MenuHitTargetKind::SettingsRow, 13, false, true);
+    append_menu_row(render.generic, ui_text("Back", "뒤로"), "", settings_cursor_ == 14, render::MenuHitTargetKind::SettingsRow, 14, true, false);
     render.generic.notes.push_back(ui_text("OSU Charts adds 4K-10K .osu beatmaps to song indexing and runtime loading.",
                                            "OSU 차트를 켜면 4K~10K .osu 비트맵도 곡 인덱싱과 실행 대상에 포함됩니다."));
     render.generic.notes.push_back(ui_text("Indexing Safe keeps RAM low for large scans; Fast uses more RAM for quicker rescans on 32GB+ PCs.",
@@ -287,6 +299,8 @@ void MenuApp::populate_mode_settings_render_data(render::MenuRenderData& render)
                                            "오토플레이는 일반 플레이 경로로 완벽 판정을 주입하고 결과를 ASSIST로 표시합니다."));
     render.generic.notes.push_back(ui_text("Practice (No Fail) prevents early game over but still keeps judgement, gauge, replay, and result export active until the end.",
                                            "연습 모드(실패 없음)는 중간 게임오버를 막지만 판정, 게이지, 리플레이, 결과 저장은 끝까지 유지합니다."));
+    render.generic.notes.push_back(ui_text("Sudden Death ends the run on the first BAD. Empty-key POOR judgements do not trigger it, and enabling it disables Practice No-Fail.",
+                                           "서든 데스는 첫 BAD에서 즉시 종료합니다. 빈 키 POOR는 즉사로 세지 않으며, 켜면 연습 모드가 꺼집니다."));
     render.generic.notes.push_back(ui_text("Key Mode selects None/native plus 4K-10K/16K runtime layouts; osu charts still top out at 10K.",
                                            "키 모드는 원본 또는 4K~10K/16K 런타임 레이아웃을 고릅니다. osu 차트는 여전히 최대 10K까지입니다."));
     render.generic.notes.push_back(ui_text("None keeps the chart's original key count and pattern layout instead of forcing a conversion.",
@@ -322,6 +336,9 @@ void MenuApp::populate_mode_mods_render_data(render::MenuRenderData& render) {
                     false);
     render.generic.notes.push_back(ui_text("Final score uses the lowest multiplier between active mods and the current Rate.",
                                            "최종 점수는 활성 모드와 현재 Rate 중 더 낮은 배율을 사용합니다."));
+    render.generic.notes.push_back(ui_text(
+        "LN Mix converts 10%-90% of eligible taps into standard holds. It uses Random Seed even when Random is Off.",
+        "LN Mix는 변환 가능한 단노트의 10%~90%를 일반 롱노트로 바꿉니다. Random이 꺼져 있어도 Random Seed를 사용합니다."));
     render.generic.notes.push_back(ui_text("Current: ", "현재: ") + mode_score_summary(config_.mode.mods, config_.speed.rate));
     std::vector<std::string> mod_warnings;
     (void)normalize_mode_mod_tokens(config_.mode.mods, &mod_warnings);

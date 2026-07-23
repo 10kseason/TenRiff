@@ -31,6 +31,7 @@ struct ReplayModeSettings {
     std::string gauge;
     bool autoplay_enabled = false;
     bool practice_no_fail_enabled = false;
+    bool one_miss_fail_enabled = false;
 };
 
 struct ReplayFile {
@@ -70,6 +71,7 @@ struct ResultFile {
     int64_t final_score = 0;
     bool autoplay_enabled = false;
     bool practice_no_fail_enabled = false;
+    bool one_miss_fail_enabled = false;
 
     ResultStats stats;
 };

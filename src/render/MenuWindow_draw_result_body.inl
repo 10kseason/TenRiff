@@ -26,6 +26,9 @@
             if (data.result.status == "HARD CLEAR") {
                 return loc("HARD CLEAR", "하드 클리어");
             }
+            if (data.result.status == "SUDDEN DEATH CLEAR") {
+                return loc("SUDDEN DEATH CLEAR", "서든 데스 클리어");
+            }
             if (data.result.status == "EASY CLEAR") {
                 return loc("EASY CLEAR", "이지 클리어");
             }
@@ -379,8 +382,10 @@
                        std::to_string(data.result.judged_notes));
         draw_panel_row(summary_rect, summary_stats_top + summary_stats_step * 2.0f, loc("Total Notes", "전체 노트"),
                        std::to_string(data.result.total_notes));
-        draw_panel_row(summary_rect, summary_stats_top + summary_stats_step * 3.0f, loc("Gauge Shifts", "게이지 전환"),
-                       std::to_string(data.result.shift_count));
+        draw_panel_row(summary_rect, summary_stats_top + summary_stats_step * 3.0f, "OSU OD8",
+                       data.result.osu_od8_score_available
+                           ? format_int_with_commas(data.result.osu_od8_score)
+                           : "--");
 
         if (d2d_->body_format && d2d_->muted_brush) {
             const std::wstring detail_w =

@@ -635,6 +635,88 @@ TEST_CASE("practice no-fail prevents hard gauge game over") {
     CHECK(practice_engine.stats().counts.bd >= 10);
 }
 
+TEST_CASE("sudden death stops on the first bad even when practice no-fail is set") {
+    GameplayChart chart;
+    chart.lane_count = 2;
+    chart.duration_samples = 4000;
+    chart.notes.push_back(NoteEvent{1, 1000, std::nullopt});
+    chart.notes.push_back(NoteEvent{2, 1000, std::nullopt});
+
+    GameplayConfig config;
+    config.sample_rate = 1000;
+    config.judge.pg_ms = 10.0;
+    config.judge.gr_ms = 20.0;
+    config.judge.gd_ms = 30.0;
+    config.judge.bd_ms = 40.0;
+    config.practice_no_fail_enabled = true;
+    config.one_miss_fail_enabled = true;
+
+    GameplayEngine engine(chart, config);
+    engine.advance(1041);
+
+    CHECK(engine.is_game_over());
+    CHECK_FALSE(engine.is_finished());
+    CHECK(engine.stats().counts.bd == 1);
+    CHECK(engine.stats().osu_od8.counts.miss == 1);
+    CHECK(engine.gauge_state().value == doctest::Approx(0.0));
+}
+
+TEST_CASE("sudden death ignores empty poor presses but kills on a timed bad") {
+    GameplayChart chart;
+    chart.lane_count = 1;
+    chart.duration_samples = 3000;
+    chart.notes.push_back(NoteEvent{1, 1000, std::nullopt});
+
+    GameplayConfig config;
+    config.sample_rate = 1000;
+    config.judge.pg_ms = 10.0;
+    config.judge.gr_ms = 20.0;
+    config.judge.gd_ms = 30.0;
+    config.judge.bd_ms = 140.0;
+    config.one_miss_fail_enabled = true;
+
+    GameplayEngine engine(chart, config);
+    (void)engine.handle_input(1, InputState::Pressed, 100);
+    CHECK(engine.stats().counts.pr == 1);
+    CHECK_FALSE(engine.is_game_over());
+
+    (void)engine.handle_input(1, InputState::Released, 200);
+    (void)engine.handle_input(1, InputState::Pressed, 1100);
+    CHECK(engine.stats().counts.bd == 1);
+    CHECK(engine.stats().osu_od8.counts.ok == 1);
+    CHECK(engine.is_game_over());
+}
+
+TEST_CASE("gameplay engine exposes OD8 ScoreV1 and scores a hold as one osu object") {
+    GameplayChart chart;
+    chart.lane_count = 1;
+    chart.duration_samples = 3000;
+    NoteEvent hold;
+    hold.lane = 1;
+    hold.start_sample = 1000;
+    hold.end_sample = 2000;
+    chart.notes.push_back(hold);
+
+    GameplayConfig config;
+    config.sample_rate = 1000;
+    config.judge.pg_ms = 15.5;
+    config.judge.gr_ms = 31.0;
+    config.judge.gd_ms = 75.0;
+    config.judge.bd_ms = 340.0;
+    config.judge.hold_grace_ms = 80.0;
+    config.judge.hold_break_ms = 200.0;
+
+    GameplayEngine engine(chart, config);
+    (void)engine.handle_input(1, InputState::Pressed, 1010);
+    engine.advance(2000);
+
+    CHECK(engine.stats().counts.pg == 2);
+    CHECK(engine.stats().osu_od8.total_objects == 1);
+    CHECK(engine.stats().osu_od8.judged_objects == 1);
+    CHECK(engine.stats().osu_od8.counts.perfect == 1);
+    CHECK(engine.stats().osu_od8.score == 1'000'000);
+}
+
 TEST_CASE("gameplay engine records one multiplayer gauge shift before Easy game over") {
     GameplayChart chart;
     chart.lane_count = 1;
