@@ -635,7 +635,7 @@ TEST_CASE("practice no-fail prevents hard gauge game over") {
     CHECK(practice_engine.stats().counts.bd >= 10);
 }
 
-TEST_CASE("sudden death stops on the first bad even when practice no-fail is set") {
+TEST_CASE("sudden death stops on the first missed object even when practice no-fail is set") {
     GameplayChart chart;
     chart.lane_count = 2;
     chart.duration_samples = 4000;
@@ -661,7 +661,7 @@ TEST_CASE("sudden death stops on the first bad even when practice no-fail is set
     CHECK(engine.gauge_state().value == doctest::Approx(0.0));
 }
 
-TEST_CASE("sudden death ignores empty poor presses but kills on a timed bad") {
+TEST_CASE("sudden death uses OD8 miss boundaries instead of native bad timing") {
     GameplayChart chart;
     chart.lane_count = 1;
     chart.duration_samples = 3000;
@@ -673,6 +673,8 @@ TEST_CASE("sudden death ignores empty poor presses but kills on a timed bad") {
     config.judge.gr_ms = 20.0;
     config.judge.gd_ms = 30.0;
     config.judge.bd_ms = 140.0;
+    config.gauge.normal.bd = -100.0;
+    config.practice_no_fail_enabled = true;
     config.one_miss_fail_enabled = true;
 
     GameplayEngine engine(chart, config);
@@ -684,6 +686,96 @@ TEST_CASE("sudden death ignores empty poor presses but kills on a timed bad") {
     (void)engine.handle_input(1, InputState::Pressed, 1100);
     CHECK(engine.stats().counts.bd == 1);
     CHECK(engine.stats().osu_od8.counts.ok == 1);
+    CHECK_FALSE(engine.is_game_over());
+
+    GameplayEngine missed_engine(chart, config);
+    (void)missed_engine.handle_input(1, InputState::Pressed, 1104);
+    CHECK(missed_engine.stats().counts.bd == 1);
+    CHECK(missed_engine.stats().osu_od8.counts.miss == 1);
+    CHECK(missed_engine.is_game_over());
+}
+
+TEST_CASE("sudden death keeps an OD8-valid hold head alive until its tail") {
+    GameplayChart chart;
+    chart.lane_count = 1;
+    chart.duration_samples = 3000;
+    chart.notes.push_back(NoteEvent{1, 1000, 2000});
+
+    GameplayConfig config;
+    config.sample_rate = 1000;
+    config.judge.pg_ms = 15.5;
+    config.judge.gr_ms = 31.0;
+    config.judge.gd_ms = 75.0;
+    config.judge.bd_ms = 340.0;
+    config.judge.hold_grace_ms = 80.0;
+    config.judge.hold_break_ms = 200.0;
+    config.one_miss_fail_enabled = true;
+
+    GameplayEngine engine(chart, config);
+    (void)engine.handle_input(1, InputState::Pressed, 1100);
+
+    std::vector<tenriff::gameplay::ActiveHoldView> active_holds;
+    engine.collect_active_holds(active_holds);
+    CHECK(engine.stats().counts.bd == 1);
+    CHECK(engine.stats().osu_od8.judged_objects == 0);
+    CHECK(active_holds.size() == 1u);
+    CHECK_FALSE(engine.is_game_over());
+
+    engine.advance(2000);
+    CHECK(engine.stats().osu_od8.counts.ok == 1);
+    CHECK(engine.stats().osu_od8.counts.miss == 0);
+    CHECK_FALSE(engine.is_game_over());
+}
+
+TEST_CASE("sudden death rejects an OD8-missed hold head immediately") {
+    GameplayChart chart;
+    chart.lane_count = 1;
+    chart.duration_samples = 3000;
+    chart.notes.push_back(NoteEvent{1, 1000, 2000});
+
+    GameplayConfig config;
+    config.sample_rate = 1000;
+    config.judge.pg_ms = 15.5;
+    config.judge.gr_ms = 31.0;
+    config.judge.gd_ms = 75.0;
+    config.judge.bd_ms = 340.0;
+    config.one_miss_fail_enabled = true;
+
+    GameplayEngine engine(chart, config);
+    (void)engine.handle_input(1, InputState::Pressed, 1104);
+
+    std::vector<tenriff::gameplay::ActiveHoldView> active_holds;
+    engine.collect_active_holds(active_holds);
+    CHECK(engine.stats().counts.bd == 1);
+    CHECK(engine.stats().osu_od8.counts.miss == 1);
+    CHECK(active_holds.empty());
+    CHECK(engine.is_game_over());
+}
+
+TEST_CASE("sudden death catches an OD8 hold-tail miss even when native timing is great") {
+    GameplayChart chart;
+    chart.lane_count = 1;
+    chart.duration_samples = 3000;
+    chart.notes.push_back(NoteEvent{1, 1000, 2000});
+
+    GameplayConfig config;
+    config.sample_rate = 1000;
+    config.judge.pg_ms = 15.5;
+    config.judge.gr_ms = 31.0;
+    config.judge.gd_ms = 75.0;
+    config.judge.bd_ms = 340.0;
+    config.judge.hold_grace_ms = 80.0;
+    config.judge.hold_break_ms = 200.0;
+    config.one_miss_fail_enabled = true;
+
+    GameplayEngine engine(chart, config);
+    (void)engine.handle_input(1, InputState::Pressed, 1000);
+    (void)engine.handle_input(1, InputState::Released, 1850);
+    engine.advance(2000);
+
+    CHECK(engine.stats().counts.pg == 1);
+    CHECK(engine.stats().counts.gr == 1);
+    CHECK(engine.stats().osu_od8.counts.miss == 1);
     CHECK(engine.is_game_over());
 }
 
@@ -959,4 +1051,45 @@ TEST_CASE("full long notes preserve raw score potential during gameplay") {
 
     CHECK(engine.stats().counts.pg == 2);
     CHECK(engine.stats().raw_score == 1000);
+}
+
+TEST_CASE("LN mix hold heads respect OD8 sudden-death boundaries during gameplay") {
+    GameplayChart chart;
+    chart.lane_count = 1;
+    chart.duration_samples = 2000;
+    chart.notes.push_back(NoteEvent{1, 1000, std::nullopt});
+
+    tenriff::config::ModeConfig mode;
+    mode.mods = {"ln_mix_90"};
+
+    const auto mode_result = tenriff::app::manage_modes(
+        chart,
+        tenriff::app::ChartFormat::Bms,
+        mode,
+        tenriff::config::JudgeConfig{},
+        1.0,
+        180.0,
+        1000);
+
+    REQUIRE(mode_result.chart.notes.size() == 1u);
+    REQUIRE(mode_result.chart.notes[0].end_sample.has_value());
+    CHECK_FALSE(mode_result.chart.notes[0].release_required);
+
+    GameplayConfig config;
+    config.sample_rate = 1000;
+    config.judge.pg_ms = 15.5;
+    config.judge.gr_ms = 31.0;
+    config.judge.gd_ms = 75.0;
+    config.judge.bd_ms = 340.0;
+    config.one_miss_fail_enabled = true;
+
+    GameplayEngine engine(mode_result.chart, config);
+    (void)engine.handle_input(1, InputState::Pressed, 1100);
+
+    std::vector<tenriff::gameplay::ActiveHoldView> active_holds;
+    engine.collect_active_holds(active_holds);
+    CHECK(engine.stats().counts.bd == 1);
+    CHECK(engine.stats().osu_od8.judged_objects == 0);
+    CHECK(active_holds.size() == 1u);
+    CHECK_FALSE(engine.is_game_over());
 }

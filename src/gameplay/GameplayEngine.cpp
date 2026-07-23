@@ -151,7 +151,7 @@ void GameplayEngine::collect_recent_timing_deltas(std::array<double, kGameplayTi
 }
 
 void GameplayEngine::apply_judgement(game::Judgement judgement, double delta_ms, int64_t sample,
-                                     double weight, ComboImpact combo_impact) {
+                                     double weight, ComboImpact combo_impact, bool osu_miss) {
     live_feedback_.has_value = true;
     live_feedback_.judgement = judgement;
     live_feedback_.delta_ms = std::isfinite(delta_ms) ? delta_ms : 0.0;
@@ -164,9 +164,11 @@ void GameplayEngine::apply_judgement(game::Judgement judgement, double delta_ms,
     auto previous_type = gauge_state_.type;
     auto result = gauge_manager_.applyJudgementWeighted(gauge_state_, judgement, time_ms, weight);
 
-    // Sudden Death is a scoring-rule failure, not a gauge preset. Force the
-    // visible gauge to zero and let it take precedence over Practice No-Fail.
-    if (one_miss_fail_enabled_ && judgement == game::Judgement::BD) {
+    // Native BAD includes hittable timing errors, so it is not equivalent to
+    // an osu!mania miss. Sudden Death follows the OD8 object judgement that is
+    // shown in the result instead of killing valid late/early hold heads.
+    const bool sudden_death_triggered = one_miss_fail_enabled_ && osu_miss;
+    if (sudden_death_triggered) {
         gauge_state_.value = 0.0;
         gauge_state_.game_over = true;
         result.game_over = true;
@@ -179,7 +181,7 @@ void GameplayEngine::apply_judgement(game::Judgement judgement, double delta_ms,
         stats_.record_shift(sample, previous_type, gauge_state_.type);
     }
 
-    if (result.game_over && (one_miss_fail_enabled_ || !practice_no_fail_enabled_)) {
+    if (sudden_death_triggered || (result.game_over && !practice_no_fail_enabled_)) {
         game_over_ = true;
     }
 }
@@ -237,11 +239,13 @@ std::optional<NoteEvent> GameplayEngine::try_hit_note(LaneState& lane, int64_t i
         const ComboImpact combo_impact =
             (judgement == game::Judgement::BD) ? ComboImpact::Break : ComboImpact::Increment;
 
+        const auto osu_head_judgement = classify_osu_mania_od8_tap(delta_ms);
+        const bool osu_head_miss = osu_head_judgement == OsuManiaJudgement::Miss;
         double weight = note.end_sample.has_value() ? 0.5 : 1.0;
         if (!note.end_sample.has_value()) {
-            record_osu_mania_od8_judgement(stats_.osu_od8, classify_osu_mania_od8_tap(delta_ms));
+            record_osu_mania_od8_judgement(stats_.osu_od8, osu_head_judgement);
         }
-        apply_judgement(judgement, delta_ms, input_sample, weight, combo_impact);
+        apply_judgement(judgement, delta_ms, input_sample, weight, combo_impact, osu_head_miss);
 
         if (note.end_sample.has_value()) {
             if (game_over_) {
@@ -270,7 +274,8 @@ void GameplayEngine::apply_bad_miss(const NoteEvent& note, int64_t sample) {
                     std::numeric_limits<double>::quiet_NaN(),
                     sample,
                     1.0,
-                    ComboImpact::Break);
+                    ComboImpact::Break,
+                    true);
 }
 
 void GameplayEngine::apply_empty_poor(int64_t sample) {
@@ -278,17 +283,20 @@ void GameplayEngine::apply_empty_poor(int64_t sample) {
                     std::numeric_limits<double>::quiet_NaN(),
                     sample,
                     1.0,
-                    ComboImpact::Preserve);
+                    ComboImpact::Preserve,
+                    false);
 }
 
-void GameplayEngine::record_osu_hold(const HoldState& hold, int64_t release_sample, bool forced_miss) {
+OsuManiaJudgement GameplayEngine::record_osu_hold(const HoldState& hold,
+                                                   int64_t release_sample,
+                                                   bool forced_miss) {
     const double tail_delta_ms = samples_to_ms(release_sample - hold.end_sample);
-    record_osu_mania_od8_judgement(
-        stats_.osu_od8,
-        classify_osu_mania_od8_hold(hold.osu_head_delta_ms,
-                                    tail_delta_ms,
-                                    hold.osu_released_during_body,
-                                    forced_miss));
+    const auto judgement = classify_osu_mania_od8_hold(hold.osu_head_delta_ms,
+                                                        tail_delta_ms,
+                                                        hold.osu_released_during_body,
+                                                        forced_miss);
+    record_osu_mania_od8_judgement(stats_.osu_od8, judgement);
+    return judgement;
 }
 
 void GameplayEngine::update_miss(LaneState& lane, int64_t current_sample) {
@@ -321,8 +329,13 @@ void GameplayEngine::update_hold(LaneState& lane, int64_t current_sample) {
             double delta_ms = static_cast<double>(delta_samples) * 1000.0 / static_cast<double>(sample_rate_);
             const ComboImpact combo_impact =
                 (judgement == game::Judgement::BD) ? ComboImpact::Break : ComboImpact::Increment;
-            record_osu_hold(hold, hold.release_sample);
-            apply_judgement(judgement, delta_ms, hold.release_sample, 0.5, combo_impact);
+            const auto osu_judgement = record_osu_hold(hold, hold.release_sample);
+            apply_judgement(judgement,
+                            delta_ms,
+                            hold.release_sample,
+                            0.5,
+                            combo_impact,
+                            osu_judgement == OsuManiaJudgement::Miss);
             lane.hold.reset();
             return;
         }
@@ -333,8 +346,13 @@ void GameplayEngine::update_hold(LaneState& lane, int64_t current_sample) {
             double delta_ms = static_cast<double>(delta_samples) * 1000.0 / static_cast<double>(sample_rate_);
             const ComboImpact combo_impact =
                 (judgement == game::Judgement::BD) ? ComboImpact::Break : ComboImpact::Increment;
-            record_osu_hold(hold, hold.release_sample);
-            apply_judgement(judgement, delta_ms, hold.release_sample, 0.5, combo_impact);
+            const auto osu_judgement = record_osu_hold(hold, hold.release_sample);
+            apply_judgement(judgement,
+                            delta_ms,
+                            hold.release_sample,
+                            0.5,
+                            combo_impact,
+                            osu_judgement == OsuManiaJudgement::Miss);
             lane.hold.reset();
             return;
         }
@@ -342,12 +360,13 @@ void GameplayEngine::update_hold(LaneState& lane, int64_t current_sample) {
 
     if (hold.release_required) {
         if (current_sample > hold.end_sample + hold_timeout) {
-            record_osu_hold(hold, hold.end_sample + hold_timeout, true);
+            const auto osu_judgement = record_osu_hold(hold, hold.end_sample + hold_timeout, true);
             apply_judgement(game::Judgement::BD,
                             std::numeric_limits<double>::quiet_NaN(),
                             hold.end_sample + hold_timeout,
                             0.5,
-                            ComboImpact::Break);
+                            ComboImpact::Break,
+                            osu_judgement == OsuManiaJudgement::Miss);
             lane.hold.reset();
         }
         return;
@@ -362,8 +381,13 @@ void GameplayEngine::update_hold(LaneState& lane, int64_t current_sample) {
             const ComboImpact combo_impact =
                 (judgement == game::Judgement::BD) ? ComboImpact::Break : ComboImpact::Increment;
             const int64_t osu_release_sample = hold.release_active ? hold.release_sample : hold.end_sample;
-            record_osu_hold(hold, osu_release_sample);
-            apply_judgement(judgement, delta_ms, hold.end_sample, 0.5, combo_impact);
+            const auto osu_judgement = record_osu_hold(hold, osu_release_sample);
+            apply_judgement(judgement,
+                            delta_ms,
+                            hold.end_sample,
+                            0.5,
+                            combo_impact,
+                            osu_judgement == OsuManiaJudgement::Miss);
         }
         lane.hold.reset();
     }

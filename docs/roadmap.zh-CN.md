@@ -4,7 +4,7 @@
 
 ## 当前基线
 - Windows GUI/runtime 是主要受支持路径。
-- 项目版本线是 `1.1.8 stable`；此版本线在 1.1.7 视觉更新基础上加入 osu!mania OD8 辅助分数、首次 BAD 即结束的 `Sudden Death (1 MISS)`，以及确定性的 `LN Mix 10%～90%`。
+- 项目版本线是 `1.1.9 stable`；此补丁使 Sudden Death 按实际 OD8 对象 `MISS` 触发，而不是按每个原生 `BAD` 触发，并保留 1.1.8 引入的 OD8 分数与 LN Mix。
 - 默认启用 BMS-first 的菜单/runtime，同时可以通过 config/menu 开关启用 4K-10K `.osu` 支持。
 - 关于当前已发布的行为，请先看 [`docs/current-state.zh-CN.md`](current-state.zh-CN.md)；这份路线图主要讲方向和剩余工作。
 

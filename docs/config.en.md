@@ -40,7 +40,7 @@ If a profile does not exist, it is created automatically on first launch.
 
 - `backend` (string)
   - `polling | rawinput`
-  - defaults to `rawinput` on the current `1.1.8` release line
+  - defaults to `rawinput` on the current `1.1.9` release line
   - selectable per profile under `Options -> Input Settings -> Backend` or `Options -> Profile Setup -> Input Backend`
   - runtime fallback never rewrites the saved value to `polling`
   - a confirmed RawInput startup failure, registration-target loss, or message-window exit latches Polling across menu and subsequent gameplay sessions for the current app run
@@ -60,7 +60,7 @@ If a profile does not exist, it is created automatically on first launch.
 - `judgement_hz` (int)
   - `1000 | 2000 | 4000 | 8000`
   - compatibility field kept in the input config
-  - the current `1.1.8` runtime no longer drives a separate audio-thread judgement sub-step loop from this value
+  - the current `1.1.9` runtime no longer drives a separate audio-thread judgement sub-step loop from this value
   - default is `4000` (`0.25ms`)
 - `debounce_ms` (double)
   - real Press/Release transitions are preserved; only duplicate same-state events are removed from pressed-state tracking
@@ -145,8 +145,8 @@ If a profile does not exist, it is created automatically on first launch.
   - when `true`, gauge-based early failure is disabled while judgement and result export still run to chart end
   - the result is tagged with `ASSIST`
 - `one_miss_fail_enabled` (bool)
-  - when `true`, the first `BAD` judgement forces the gauge to zero and ends the run immediately
-  - empty-key `POOR` judgements do not trigger it
+  - when `true`, the first osu!mania OD8 object `MISS` forces the gauge to zero and ends the run immediately
+  - native `BAD` timing alone and empty-key `POOR` judgements do not trigger it
   - enabling it in Mode Settings automatically disables `practice_no_fail_enabled`
 - `song_index_profile` (string)
   - `safe | fast`

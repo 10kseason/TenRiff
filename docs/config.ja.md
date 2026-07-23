@@ -40,7 +40,7 @@ profile が存在しない場合は初回起動時に自動生成されます。
 
 - `backend` (string)
   - `polling | rawinput`
-  - 現行 `1.1.8` リリースラインの既定値は `rawinput`
+  - 現行 `1.1.9` リリースラインの既定値は `rawinput`
   - `Options -> Input Settings -> Backend` または `Options -> Profile Setup -> Input Backend` で profile ごとに選択可能
   - runtime fallback は保存済みの値を `polling` に書き換えない
   - RawInput の起動失敗、登録先の消失、message window の終了を確認すると、そのアプリ実行中は menu と後続 gameplay の両方で Polling を維持する
@@ -145,8 +145,8 @@ profile が存在しない場合は初回起動時に自動生成されます。
   - `true` のとき gauge による早期失敗を無効化し、判定と result export は最後まで継続
   - result には `ASSIST` が付く
 - `one_miss_fail_enabled` (bool)
-  - `true` のとき最初の `BAD` 判定で gauge が 0 になり、即座に失敗する
-  - 空打ちの `POOR` は即死条件に含めない
+  - `true` のとき最初の osu!mania OD8 object `MISS` で gauge が 0 になり、即座に失敗する
+  - native `BAD` timing だけでは発動せず、空打ちの `POOR` も即死条件に含めない
   - Mode Settings で有効にすると `practice_no_fail_enabled` は自動的に無効になる
 - `song_index_profile` (string)
   - `safe | fast`

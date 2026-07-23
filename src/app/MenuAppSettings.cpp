@@ -299,8 +299,8 @@ void MenuApp::populate_mode_settings_render_data(render::MenuRenderData& render)
                                            "오토플레이는 일반 플레이 경로로 완벽 판정을 주입하고 결과를 ASSIST로 표시합니다."));
     render.generic.notes.push_back(ui_text("Practice (No Fail) prevents early game over but still keeps judgement, gauge, replay, and result export active until the end.",
                                            "연습 모드(실패 없음)는 중간 게임오버를 막지만 판정, 게이지, 리플레이, 결과 저장은 끝까지 유지합니다."));
-    render.generic.notes.push_back(ui_text("Sudden Death ends the run on the first BAD. Empty-key POOR judgements do not trigger it, and enabling it disables Practice No-Fail.",
-                                           "서든 데스는 첫 BAD에서 즉시 종료합니다. 빈 키 POOR는 즉사로 세지 않으며, 켜면 연습 모드가 꺼집니다."));
+    render.generic.notes.push_back(ui_text("Sudden Death ends the run on the first osu!mania OD8 MISS. Native BAD timing alone and empty-key POOR judgements do not trigger it, and enabling it disables Practice No-Fail.",
+                                           "서든 데스는 첫 osu!mania OD8 MISS에서 즉시 종료합니다. 네이티브 BAD만으로는 즉사하지 않고 빈 키 POOR도 세지 않으며, 켜면 연습 모드가 꺼집니다."));
     render.generic.notes.push_back(ui_text("Key Mode selects None/native plus 4K-10K/16K runtime layouts; osu charts still top out at 10K.",
                                            "키 모드는 원본 또는 4K~10K/16K 런타임 레이아웃을 고릅니다. osu 차트는 여전히 최대 10K까지입니다."));
     render.generic.notes.push_back(ui_text("None keeps the chart's original key count and pattern layout instead of forcing a conversion.",

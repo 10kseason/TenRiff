@@ -4,7 +4,7 @@ This roadmap captures the recommended high-level order for building out the game
 
 ## Current Baseline
 - Windows GUI / runtime is the primary supported path.
-- Project version line is `1.1.8 stable`; this line adds an osu!mania OD8 auxiliary score, first-BAD `Sudden Death (1 MISS)`, and deterministic `LN Mix 10%-90%` on top of the 1.1.7 visual refresh.
+- Project version line is `1.1.9 stable`; this patch makes Sudden Death follow actual OD8 object `MISS` results instead of every native `BAD`, while retaining the OD8 score and LN Mix features introduced in 1.1.8.
 - BMS-first menu / runtime is active by default, with optional 4K-10K `.osu` support behind config / menu toggles.
 - For current shipped behavior, read `docs/current-state.en.md` first; this roadmap is about direction and remaining work.
 

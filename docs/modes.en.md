@@ -37,8 +37,8 @@ This document summarizes the implemented mode system, lane-transform/random rule
   - `false`: keep normal gameplay in the single-field layout
 - `autoplay_enabled`: automatically handles hittable notes and marks the result as `ASSIST`
 - `practice_no_fail_enabled`: prevents gauge-based early failure and keeps playing to the chart end
-- `one_miss_fail_enabled`: `Sudden Death (1 MISS)`, which fails immediately on the first `BAD`
-  - empty-key `POOR` does not trigger it
+- `one_miss_fail_enabled`: `Sudden Death (1 MISS)`, which fails immediately on the first osu!mania OD8 object `MISS`
+  - native `BAD` timing alone and empty-key `POOR` do not trigger it
   - mutually exclusive with Practice No-Fail in Mode Settings
 - `song_index_profile`: `safe | fast`
   - `safe`: the default that prioritizes lowering large-library RAM high-water usage
@@ -70,7 +70,7 @@ This document summarizes the implemented mode system, lane-transform/random rule
 - All gauges start at `100%` and fail immediately at `0%`.
 - `ex_hard` is a challenge gauge with lower recovery and heavier `BAD` / `POOR` loss than Hard.
 - Clear status is separated as `EX-HARD CLEAR`, `HARD CLEAR`, `CLEAR`, and `EASY CLEAR`.
-- `Sudden Death (1 MISS)` is not a gauge type; it is a separate failure rule that forces the current gauge to zero and ends the run on the first `BAD`.
+- `Sudden Death (1 MISS)` is not a gauge type; it is a separate failure rule that forces the current gauge to zero and ends the run on the first osu!mania OD8 object `MISS`.
 
 ## Implementation Location
 - Mode parsing: `src/gameplay/ModeSettings.*`, `src/app/ModeResolver.*`

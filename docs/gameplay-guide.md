@@ -67,7 +67,7 @@ TenRiff의 기본 플레이 흐름은 아래 순서입니다.
 처음에는 아래 정도로 시작하면 무난합니다.
 
 - `Mode > Gauge`: `normal`
-- `Mode > Sudden Death`: 첫 BAD 즉사 도전을 원할 때만 켜기
+- `Mode > Sudden Death`: 첫 osu!mania OD8 `MISS` 즉사 도전을 원할 때만 켜기
 - `Mode > Rate`: `1.0x`
 - `Mode > Hi-Speed`: 기본값 그대로 시작
 - `Graphics > Display`: Discord 음성 오버레이를 쓸 때는 `Borderless` 권장
@@ -171,7 +171,7 @@ Rate는 곡 재생 속도와 차트 스케줄만 바꾸며, 같은 Hi-Speed에�
 - `easy`: `0%`가 되는 즉시 Game Over
 
 플레이 중 자동 단계 시프트는 없습니다.
-`Sudden Death (1 MISS)`는 게이지 종류가 아니라 첫 `BAD`에서 게이지를 0으로 만들고 즉시 종료하는 규칙입니다. 빈 키 `POOR`는 즉사로 세지 않으며 Practice No-Fail과 동시에 켤 수 없습니다.
+`Sudden Death (1 MISS)`는 게이지 종류가 아니라 첫 osu!mania OD8 객체 `MISS`에서 게이지를 0으로 만들고 즉시 종료하는 규칙입니다. 네이티브 `BAD`만으로는 즉사하지 않고 빈 키 `POOR`도 세지 않으며 Practice No-Fail과 동시에 켤 수 없습니다.
 
 ## 10. Result 화면
 

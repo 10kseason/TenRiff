@@ -63,7 +63,7 @@ Windows では通常、次のどちらかで起動します。
 ## 4. 初期設定のおすすめ
 
 - `Mode > Gauge`: `normal`
-- `Mode > Sudden Death`: 最初の BAD で終了する challenge が必要なときだけ有効化
+- `Mode > Sudden Death`: 最初の osu!mania OD8 `MISS` で終了する challenge が必要なときだけ有効化
 - `Mode > Rate`: `1.0x`
 - `Mode > Hi-Speed`: まずは既定値
 - `Graphics > Display`: Discord voice overlay を使う場合は `Borderless` を推奨
@@ -159,7 +159,7 @@ Rate は曲の再生速度と譜面スケジュールだけを変え、同じ Hi
 - `easy`: `0%` で即 Game Over
 
 automatic gauge shifting はありません。
-`Sudden Death (1 MISS)` は gauge type ではなく、最初の `BAD` で gauge を 0 にして即終了する rule です。空打ちの `POOR` は対象外で、Practice No-Fail と同時には有効化できません。
+`Sudden Death (1 MISS)` は gauge type ではなく、最初の osu!mania OD8 object `MISS` で gauge を 0 にして即終了する rule です。native `BAD` timing だけでは発動せず、空打ちの `POOR` も対象外で、Practice No-Fail と同時には有効化できません。
 
 ## 10. Result 画面
 

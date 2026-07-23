@@ -3,15 +3,16 @@
 이 문서는 다음 에이전트나 새 작업자가 가장 먼저 읽어야 하는 현재 상태 문서입니다. 목표는 "지금 이 프로젝트가 무엇이고, 어디를 보면 되고, 무엇이 아직 미검증인지"를 빠르게 파악하게 하는 것입니다.
 
 ## Baseline
-- 현재 프로젝트 버전은 `1.1.8 stable`
+- 현재 프로젝트 버전은 `1.1.9 stable`
 - 직접 IP 멀티플레이와 preview r5의 입력 backend 수명주기 수정은 `1.1.8 stable`에 통합
-- `1.1.8`은 1.1.7의 시각 개선에 osu!mania OD8 보조 점수, 첫 BAD 즉사 `Sudden Death (1 MISS)`, 결정적 `LN Mix 10%~90%`를 추가
+- `1.1.8`은 1.1.7의 시각 개선에 osu!mania OD8 보조 점수, 첫 네이티브 `BAD` 즉사 `Sudden Death (1 MISS)`, 결정적 `LN Mix 10%~90%`를 추가
+- `1.1.9`는 Sudden Death가 모든 네이티브 `BAD`가 아니라 실제 OD8 객체 `MISS`에서만 발동하도록 수정해 유효한 롱노트 헤드의 입력 즉시 실패를 방지
 - 후속 작업의 기준선 문서는 `docs/baseline-1.1.2.md`
 - Windows GUI 빌드가 메인 타깃
 - Linux는 `Baepoks-Linuxs/TenRiff-0.5.0-linux-preview` 수준의 preview만 존재
 - 기본 표면은 BMS-first
 - `.osu`는 옵션으로 다시 활성화 가능하며 4K~10K를 지원
-- `1.1.8 stable`의 gameplay live 입력은 저장된 RawInput을 우선하면서 같은 `InputThread`의 bound-key polling shadow를 항상 유지하고, 시작 실패뿐 아니라 message pump의 예기치 않은 종료도 queue/state reset 없이 현재 producer thread에서 Polling으로 전환함
+- `1.1.9 stable`의 gameplay live 입력은 저장된 RawInput을 우선하면서 같은 `InputThread`의 bound-key polling shadow를 항상 유지하고, 시작 실패뿐 아니라 message pump의 예기치 않은 종료도 queue/state reset 없이 현재 producer thread에서 Polling으로 전환함
 - 메뉴 입력은 기존 foreground process/root-window 경계를 유지한다. RawInput 시작 실패, process-global 등록 대상 손실, 숨은 message window 종료를 감지하면 사용자 키 입력을 기다리지 않고 Polling으로 전환한다.
 - 확인된 fallback은 profile 값을 덮어쓰지 않은 채 현재 앱 실행의 메뉴와 다음 gameplay까지 유지한다. 앱 재시작 또는 `Options -> Input Settings -> Backend`의 명시적 변경만 재시도한다.
 
@@ -99,7 +100,7 @@
   - 마지막 판정 노트 처리 직후 플레이 종료
 - Judge:
   - 게이지 모드는 `EX-Hard / Hard / Normal / Easy`를 지원하며 모두 `100%`에서 시작하고 `0%`에서 즉시 실패함
-  - `Sudden Death (1 MISS)`는 첫 `BAD`에서 즉시 실패하며 빈 키 `POOR`는 무시하고 Practice No-Fail과 상호 배타적으로 동작
+  - `Sudden Death (1 MISS)`는 첫 osu!mania OD8 객체 `MISS`에서 즉시 실패하며, 네이티브 `BAD`만으로는 발동하지 않고 빈 키 `POOR`도 무시하며 Practice No-Fail과 상호 배타적으로 동작
   - 인게임/결과 화면에 실제 입력 타이밍을 osu!mania stable OD8 판정창과 ScoreV1(최대 1,000,000)으로 환산한 보조 `OSU OD8` 점수를 표시하며, 네이티브 TenRiff 점수와 랭킹은 변경하지 않음
   - 기본 `GOOD` 범위는 `75ms`
   - 기본 `BAD` 범위는 `340ms`
@@ -172,7 +173,7 @@
 
 ## Runtime / Packaging Rules
 - 새 사용자 프로필은 자동 생성
-- 현재 정식 P2P 배포 라인은 `TenRiff 1.1.8 stable`
+- 현재 정식 P2P 배포 라인은 `TenRiff 1.1.9 stable`
 - 배포 패키지에는 `Songs`를 넣지 않음
 - 배포 패키지는 메뉴 BGM용 `Mainmusic/` 런타임 자산을 함께 포함
 - 배포 업데이트에는 built artifacts와 필요한 런타임 자산만 포함

@@ -67,7 +67,7 @@ The standard TenRiff play flow is:
 These settings are a good starting point:
 
 - `Mode > Gauge`: `normal`
-- `Mode > Sudden Death`: enable only when you want a first-BAD challenge
+- `Mode > Sudden Death`: enable only when you want a first-OD8-MISS challenge
 - `Mode > Rate`: `1.0x`
 - `Mode > Hi-Speed`: start with the default value
 - `Graphics > Display`: use `Borderless` when using Discord voice overlay
@@ -171,7 +171,7 @@ The selected gauge always starts at `100%` at the beginning of the song.
 - `easy`: immediate Game Over at `0%`
 
 There is no automatic gauge shifting during play.
-`Sudden Death (1 MISS)` is not a gauge type: it forces the gauge to zero and ends the run on the first `BAD`. Empty-key `POOR` does not count, and it cannot be enabled together with Practice No-Fail.
+`Sudden Death (1 MISS)` is not a gauge type: it forces the gauge to zero and ends the run on the first osu!mania OD8 object `MISS`. Native `BAD` timing alone and empty-key `POOR` do not count, and it cannot be enabled together with Practice No-Fail.
 
 ## 10. Result Screen
 
