@@ -40,7 +40,7 @@
 
 - `backend` (string)
   - `polling | rawinput`
-  - 현재 `1.1.9` 릴리스 라인의 기본값은 `rawinput`
+  - 현재 `1.2.0` 릴리스 라인의 기본값은 `rawinput`
   - `Options -> Input Settings -> Backend` 또는 `Options -> Profile Setup -> Input Backend`에서 프로필별로 RawInput/Polling을 직접 선택 가능
   - 저장값은 런타임 fallback 때문에 자동으로 `polling`으로 덮어쓰지 않음
   - RawInput 시작 실패, 등록 대상 손실, 메시지 창 종료가 확인되면 현재 앱 실행 동안 메뉴와 다음 gameplay 세션 모두 Polling을 유지
@@ -60,7 +60,7 @@
 - `judgement_hz` (int)
   - `1000 | 2000 | 4000 | 8000`
   - 호환성용으로 남아 있는 입력 설정 필드
-  - 현재 `1.1.9` runtime은 별도 오디오 판정 서브루프를 이 값으로 구동하지 않음
+  - 현재 `1.2.0` runtime은 별도 오디오 판정 서브루프를 이 값으로 구동하지 않음
   - 기본값은 `4000` (`0.25ms`)
 - `debounce_ms` (double)
   - 실제 Press/Release 전환은 버리지 않고 같은 상태의 중복 이벤트만 상태 추적에서 제거
@@ -112,6 +112,12 @@
   - `vsync=true`면 present refresh는 active monitor Hz를 따르고, render pacing은 `monitor_hz * 2`를 목표로 함 (`1050` clamp)
 - `performance_overlay` (bool)
   - 기본값은 `false`; 우상단을 사용하므로 Discord Voice 위젯을 같은 모서리에 두면 겹칠 수 있음
+- `background_upscale_mode` (string)
+  - `lunasr | off`
+  - 기본값은 `lunasr`; 1920x1080보다 작은 BMS 이미지 BGA와 osu!mania 배경을 비동기로 FHD 보간
+  - 처리 중이거나 WinML 모델/이미지 디코드/추론이 실패하면 기존 native bitmap을 계속 사용
+  - Graphics Settings의 `BGA Upscale` row와 연결됨
+  - 상세 계약과 제한은 `tools/lunasr/README.md`
 
 ### `mode`
 - `format` (string)

@@ -3,6 +3,7 @@
 #include "render/GameplayMotion.h"
 #include "render/RenderPacing.h"
 #include "render/RenderThread.h"
+#include "render/LunaSrBackgroundUpscaler.h"
 
 namespace {
 
@@ -213,3 +214,11 @@ TEST_CASE("active hold synthetic notes stay anchored to the judgement line") {
 }
 
 }  // namespace
+TEST_CASE("LunaSR background policy only targets low-resolution images in LunaSR mode") {
+    using tenriff::render::LunaSrBackgroundUpscaler;
+
+    CHECK(LunaSrBackgroundUpscaler::should_upscale(640, 480, "lunasr"));
+    CHECK(LunaSrBackgroundUpscaler::should_upscale(1280, 720, "lunasr"));
+    CHECK_FALSE(LunaSrBackgroundUpscaler::should_upscale(1920, 1080, "lunasr"));
+    CHECK_FALSE(LunaSrBackgroundUpscaler::should_upscale(1280, 720, "off"));
+}

@@ -41,7 +41,7 @@ int next_option_index(const int* options, int count, int current, int direction)
 }  // namespace
 
 void MenuApp::handle_graphics_settings_input(uint32_t keycode) {
-    const int item_count = 8;
+    const int item_count = 9;
     if (keycode == key_up_) {
         settings_cursor_ = clamp_int(settings_cursor_ - 1, 0, item_count - 1);
         publish_snapshot();
@@ -93,13 +93,22 @@ void MenuApp::handle_graphics_settings_input(uint32_t keycode) {
         return;
     }
     if (settings_cursor_ == 5 && (keycode == key_left_ || keycode == key_right_)) {
+        config_.graphics.background_upscale_mode =
+            config::normalize_background_upscale_mode(config_.graphics.background_upscale_mode) == "lunasr"
+                ? "off"
+                : "lunasr";
+        graphics_dirty_ = true;
+        publish_snapshot();
+        return;
+    }
+    if (settings_cursor_ == 6 && (keycode == key_left_ || keycode == key_right_)) {
         config_.ui.language =
             (config::normalize_ui_language_token(config_.ui.language) == "ko") ? "en" : "ko";
         graphics_dirty_ = true;
         publish_snapshot();
         return;
     }
-    if (settings_cursor_ == 6 && (keycode == key_left_ || keycode == key_right_)) {
+    if (settings_cursor_ == 7 && (keycode == key_left_ || keycode == key_right_)) {
         const int direction = (keycode == key_left_) ? -1 : 1;
         config_.visual_offset_ms = clamp_step_value(
             config_.visual_offset_ms + static_cast<double>(direction) * kVisualOffsetStep,
@@ -261,11 +270,17 @@ void MenuApp::populate_graphics_settings_render_data(render::MenuRenderData& ren
                     render::MenuHitTargetKind::SettingsRow, 3, false, true);
     append_menu_row(render.generic, ui_text("Performance HUD", "성능 HUD"), ui_on_off(config_.graphics.performance_overlay), settings_cursor_ == 4,
                     render::MenuHitTargetKind::SettingsRow, 4, false, true);
-    append_menu_row(render.generic, ui_text("Language", "언어"), ui_language_label(config_.ui.language), settings_cursor_ == 5,
+    append_menu_row(render.generic, ui_text("BGA Upscale", "BGA 업스케일"),
+                    config::normalize_background_upscale_mode(config_.graphics.background_upscale_mode) == "lunasr"
+                        ? "LunaSR FHD"
+                        : ui_text("Native", "원본"),
+                    settings_cursor_ == 5,
                     render::MenuHitTargetKind::SettingsRow, 5, false, true);
-    append_menu_row(render.generic, ui_text("Display Offset", "표시 오프셋"), format_signed_offset_ms(config_.visual_offset_ms), settings_cursor_ == 6,
+    append_menu_row(render.generic, ui_text("Language", "언어"), ui_language_label(config_.ui.language), settings_cursor_ == 6,
                     render::MenuHitTargetKind::SettingsRow, 6, false, true);
-    append_menu_row(render.generic, ui_text("Back", "뒤로"), "", settings_cursor_ == 7, render::MenuHitTargetKind::SettingsRow, 7, true, false);
+    append_menu_row(render.generic, ui_text("Display Offset", "표시 오프셋"), format_signed_offset_ms(config_.visual_offset_ms), settings_cursor_ == 7,
+                    render::MenuHitTargetKind::SettingsRow, 7, false, true);
+    append_menu_row(render.generic, ui_text("Back", "뒤로"), "", settings_cursor_ == 8, render::MenuHitTargetKind::SettingsRow, 8, true, false);
     if (normalize_display_mode(config_.graphics.display_mode) == "fullscreen") {
         render.generic.notes.push_back(ui_text(
             "Discord's current voice overlay does not work in Exclusive Fullscreen. Switch Display to Borderless or Windowed.",
@@ -281,6 +296,9 @@ void MenuApp::populate_graphics_settings_render_data(render::MenuRenderData& ren
                                            "해상도는 720p, 1080p, QHD, 모니터 기본 크기를 순환합니다. 주사율은 60~1050Hz 범위입니다."));
     render.generic.notes.push_back(ui_text("Menu rendering is capped at 300 Hz. Gameplay uses the configured value up to 1050 Hz.",
                                            "메뉴 렌더링은 300Hz까지 제한되고, 게임플레이는 설정값을 최대 1050Hz까지 사용합니다."));
+    render.generic.notes.push_back(ui_text(
+        "LunaSR FHD upscales BMS BGA and chart photos below 1920x1080 on a background worker; native scaling stays active until each frame is ready.",
+        "LunaSR FHD는 1920x1080 미만 BMS BGA와 차트 사진을 백그라운드 작업으로 보간하며, 프레임 준비 전에는 원본 확대를 유지합니다."));
     render.generic.notes.push_back(ui_text("Language changes the menu UI immediately. Display Offset shifts only visuals from -500ms to +500ms.",
                                            "언어는 메뉴 UI에 즉시 반영됩니다. 표시 오프셋은 시각 요소만 -500ms~+500ms 범위에서 이동합니다."));
     render.generic.notes.push_back(ui_text("Display, Resolution, Refresh Hz, and VSync apply immediately. Back saves and returns.",

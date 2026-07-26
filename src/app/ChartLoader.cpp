@@ -11,6 +11,7 @@
 #include <unordered_set>
 
 #include "app/BmsGameplayBuilder.h"
+#include "app/MenuSongUtils.h"
 #include "app/OsuAssetPath.h"
 #include "app/OsuHitsoundResolver.h"
 #include "chart/BmsChartNorm.h"
@@ -470,6 +471,50 @@ std::optional<std::string> resolve_bms_audio_path(const std::filesystem::path& c
     return resolved_path;
 }
 
+std::optional<std::string> resolve_bms_visual_path(
+    const std::filesystem::path& chart_path,
+    const chart::BmsChart& parsed_chart,
+    std::string_view object_id,
+    AssetLookupIndex& asset_lookup,
+    std::unordered_map<std::string, std::optional<std::string>>& resolved_bmp_cache,
+    std::unordered_set<std::string>& warned_missing_bmp_id,
+    std::unordered_set<std::string>& warned_missing_file_ref,
+    std::vector<std::string>& messages) {
+    const std::string object_key(object_id);
+    const auto bmp_it = parsed_chart.bmp.find(object_key);
+    if (bmp_it == parsed_chart.bmp.end()) {
+        if (warned_missing_bmp_id.emplace(object_key).second) {
+            messages.push_back("BGA references undefined #BMP" + object_key + ".");
+        }
+        return std::nullopt;
+    }
+
+    const std::string bmp_ref = normalize_asset_reference(bmp_it->second);
+    if (bmp_ref.empty()) {
+        return std::nullopt;
+    }
+    const std::string bmp_ref_key = normalize_path_key(bmp_ref);
+    const auto cached = resolved_bmp_cache.find(bmp_ref_key);
+    if (cached != resolved_bmp_cache.end()) {
+        return cached->second;
+    }
+
+#ifdef _WIN32
+    const std::filesystem::path ref_path = std::filesystem::u8path(bmp_ref);
+#else
+    const std::filesystem::path ref_path(bmp_ref);
+#endif
+    std::optional<std::string> resolved_path;
+    if (auto resolved = lookup_asset_path_candidate(chart_path, ref_path, asset_lookup, false);
+        resolved.has_value()) {
+        resolved_path = resolved->u8string();
+    } else if (warned_missing_file_ref.emplace(bmp_ref_key).second) {
+        messages.push_back("BGA file not found: " + bmp_ref);
+    }
+    resolved_bmp_cache.emplace(bmp_ref_key, resolved_path);
+    return resolved_path;
+}
+
 }  // namespace
 
 ChartLoadResult ChartLoader::load(const std::string& path,
@@ -519,6 +564,27 @@ ChartLoadResult ChartLoader::load(const std::string& path,
             result.chart.audio_cues.push_back(std::move(cue));
         } else if (!audio_ref.empty()) {
             result.messages.push_back("Main audio file not found: " + audio_ref);
+        }
+
+        const std::string background_ref =
+            normalize_asset_reference(parse_result.chart.background_filename);
+        if (!background_ref.empty()) {
+#ifdef _WIN32
+            const std::filesystem::path background_path = std::filesystem::u8path(background_ref);
+#else
+            const std::filesystem::path background_path(background_ref);
+#endif
+            if (auto resolved_background =
+                    lookup_asset_path_candidate(file_path, background_path, asset_lookup, true);
+                resolved_background.has_value()) {
+                gameplay::VisualCueEvent cue;
+                cue.start_sample = 0;
+                cue.asset_id = result.chart.intern_visual_asset(resolved_background->u8string());
+                cue.layer = gameplay::VisualLayer::Base;
+                result.chart.visual_cues.push_back(std::move(cue));
+            } else {
+                result.messages.push_back("Background image file not found: " + background_ref);
+            }
         }
 
         const auto hitsounds = resolve_osu_mania_hitsounds(file_path, parse_result.chart);
@@ -575,6 +641,9 @@ ChartLoadResult ChartLoader::load(const std::string& path,
     std::unordered_map<std::string, std::optional<std::string>> resolved_wav_cache;
     std::unordered_set<std::string> warned_missing_wav_id;
     std::unordered_set<std::string> warned_missing_file_ref;
+    std::unordered_map<std::string, std::optional<std::string>> resolved_bmp_cache;
+    std::unordered_set<std::string> warned_missing_bmp_id;
+    std::unordered_set<std::string> warned_missing_bmp_file_ref;
 
     for (const auto& scheduled : timeline_result.timeline.events) {
         const bool is_bgm = (scheduled.event.type == chart::BmsNormalizedEventType::Bgm);
@@ -598,6 +667,46 @@ ChartLoadResult ChartLoader::load(const std::string& path,
         cue.start_sample = std::max<int64_t>(0, scale_samples(scheduled.time_samples, rate));
         cue.asset_id = result.chart.intern_audio_asset(resolved_path.value());
         result.chart.audio_cues.push_back(std::move(cue));
+    }
+
+    bool has_base_visual_cue = false;
+    for (const auto& scheduled : timeline_result.timeline.events) {
+        if (scheduled.event.type != chart::BmsNormalizedEventType::Bga ||
+            (scheduled.event.channel != "04" && scheduled.event.channel != "07")) {
+            continue;
+        }
+        auto resolved_path = resolve_bms_visual_path(file_path,
+                                                     parse_result.chart,
+                                                     scheduled.event.object_id,
+                                                     asset_lookup,
+                                                     resolved_bmp_cache,
+                                                     warned_missing_bmp_id,
+                                                     warned_missing_bmp_file_ref,
+                                                     result.messages);
+        if (!resolved_path.has_value()) {
+            continue;
+        }
+
+        gameplay::VisualCueEvent cue;
+        cue.start_sample = std::max<int64_t>(0, scale_samples(scheduled.time_samples, rate));
+        cue.asset_id = result.chart.intern_visual_asset(resolved_path.value());
+        cue.layer = scheduled.event.channel == "07"
+                        ? gameplay::VisualLayer::Overlay
+                        : gameplay::VisualLayer::Base;
+        has_base_visual_cue = has_base_visual_cue || cue.layer == gameplay::VisualLayer::Base;
+        result.chart.visual_cues.push_back(std::move(cue));
+    }
+
+    if (!has_base_visual_cue) {
+        const std::string fallback_background =
+            menu_songs::resolve_bms_background_preview_path(file_path, parse_result.chart);
+        if (!fallback_background.empty()) {
+            gameplay::VisualCueEvent cue;
+            cue.start_sample = 0;
+            cue.asset_id = result.chart.intern_visual_asset(fallback_background);
+            cue.layer = gameplay::VisualLayer::Base;
+            result.chart.visual_cues.push_back(std::move(cue));
+        }
     }
 
     if (keysound_policy != BmsKeysoundPolicy::Ignore) {
@@ -640,6 +749,14 @@ ChartLoadResult ChartLoader::load(const std::string& path,
                          const std::string_view lhs_view = lhs_path ? std::string_view(*lhs_path) : std::string_view{};
                          const std::string_view rhs_view = rhs_path ? std::string_view(*rhs_path) : std::string_view{};
                          return lhs_view < rhs_view;
+                     });
+    std::stable_sort(result.chart.visual_cues.begin(), result.chart.visual_cues.end(),
+                     [](const gameplay::VisualCueEvent& lhs,
+                        const gameplay::VisualCueEvent& rhs) {
+                         if (lhs.start_sample != rhs.start_sample) {
+                             return lhs.start_sample < rhs.start_sample;
+                         }
+                         return static_cast<int>(lhs.layer) < static_cast<int>(rhs.layer);
                      });
     result.format = ChartFormat::Bms;
     return result;

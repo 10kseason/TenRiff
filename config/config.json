@@ -49,7 +49,8 @@
     "resolution": "native",
     "vsync": false,
     "refresh_hz": 300,
-    "performance_overlay": false
+    "performance_overlay": false,
+    "background_upscale_mode": "lunasr"
   },
   "mode": {
     "format": "bms",

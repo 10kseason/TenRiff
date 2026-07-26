@@ -54,6 +54,26 @@ const std::string* GameplayChart::audio_asset_path(std::size_t asset_id) const {
     return &audio_assets[asset_id].path;
 }
 
+std::size_t GameplayChart::intern_visual_asset(std::string path) {
+    if (path.empty()) {
+        return kInvalidVisualAssetId;
+    }
+    for (std::size_t index = 0; index < visual_assets.size(); ++index) {
+        if (visual_assets[index].path == path) {
+            return index;
+        }
+    }
+    visual_assets.push_back(VisualAsset{std::move(path)});
+    return visual_assets.size() - 1;
+}
+
+const std::string* GameplayChart::visual_asset_path(std::size_t asset_id) const {
+    if (asset_id >= visual_assets.size()) {
+        return nullptr;
+    }
+    return &visual_assets[asset_id].path;
+}
+
 std::size_t note_audio_asset_count(const NoteEvent& note) {
     if (note.audio_asset_count > 0) {
         return std::min(note.audio_asset_count, note.audio_asset_ids.size());
@@ -117,6 +137,9 @@ void offset_gameplay_chart_samples(GameplayChart& chart, int64_t sample_offset) 
         }
     }
     for (auto& cue : chart.audio_cues) {
+        cue.start_sample = add_sample_offset(cue.start_sample, sample_offset);
+    }
+    for (auto& cue : chart.visual_cues) {
         cue.start_sample = add_sample_offset(cue.start_sample, sample_offset);
     }
 }

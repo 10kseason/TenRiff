@@ -40,7 +40,7 @@ If a profile does not exist, it is created automatically on first launch.
 
 - `backend` (string)
   - `polling | rawinput`
-  - defaults to `rawinput` on the current `1.1.9` release line
+  - defaults to `rawinput` on the current `1.2.0` release line
   - selectable per profile under `Options -> Input Settings -> Backend` or `Options -> Profile Setup -> Input Backend`
   - runtime fallback never rewrites the saved value to `polling`
   - a confirmed RawInput startup failure, registration-target loss, or message-window exit latches Polling across menu and subsequent gameplay sessions for the current app run
@@ -60,7 +60,7 @@ If a profile does not exist, it is created automatically on first launch.
 - `judgement_hz` (int)
   - `1000 | 2000 | 4000 | 8000`
   - compatibility field kept in the input config
-  - the current `1.1.9` runtime no longer drives a separate audio-thread judgement sub-step loop from this value
+  - the current `1.2.0` runtime no longer drives a separate audio-thread judgement sub-step loop from this value
   - default is `4000` (`0.25ms`)
 - `debounce_ms` (double)
   - real Press/Release transitions are preserved; only duplicate same-state events are removed from pressed-state tracking
@@ -112,6 +112,11 @@ If a profile does not exist, it is created automatically on first launch.
   - when `vsync=true`, the present refresh follows the active monitor Hz and render pacing targets `monitor_hz * 2` (`1050` clamp)
 - `performance_overlay` (bool)
   - defaults to `false`; it occupies the top-right corner and can overlap a Discord Voice widget placed there
+- `background_upscale_mode` (string)
+  - `lunasr | off`
+  - defaults to `lunasr`; asynchronously upscales sub-1920x1080 BMS image BGA and osu!mania backgrounds to FHD
+  - keeps the native bitmap active while processing or when model loading, image decoding, or inference fails
+  - connected to the `BGA Upscale` row in Graphics Settings
 
 ### `mode`
 - `format` (string)

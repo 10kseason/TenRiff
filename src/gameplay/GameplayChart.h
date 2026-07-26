@@ -13,6 +13,7 @@
 namespace tenriff::gameplay {
 
 constexpr std::size_t kInvalidAudioAssetId = std::numeric_limits<std::size_t>::max();
+constexpr std::size_t kInvalidVisualAssetId = std::numeric_limits<std::size_t>::max();
 constexpr std::size_t kMaxNoteAudioAssets = 4;
 
 struct AudioAsset {
@@ -44,15 +45,34 @@ struct AudioCueEvent {
     std::size_t asset_id = kInvalidAudioAssetId;
 };
 
+enum class VisualLayer {
+    Base,
+    Overlay,
+};
+
+struct VisualAsset {
+    std::string path;
+};
+
+struct VisualCueEvent {
+    int64_t start_sample = 0;
+    std::size_t asset_id = kInvalidVisualAssetId;
+    VisualLayer layer = VisualLayer::Base;
+};
+
 struct GameplayChart {
     int lane_count = 0;
     int64_t duration_samples = 0;
     std::vector<AudioAsset> audio_assets;
     std::vector<NoteEvent> notes;
     std::vector<AudioCueEvent> audio_cues;
+    std::vector<VisualAsset> visual_assets;
+    std::vector<VisualCueEvent> visual_cues;
 
     [[nodiscard]] std::size_t intern_audio_asset(std::string path);
     [[nodiscard]] const std::string* audio_asset_path(std::size_t asset_id) const;
+    [[nodiscard]] std::size_t intern_visual_asset(std::string path);
+    [[nodiscard]] const std::string* visual_asset_path(std::size_t asset_id) const;
 };
 
 [[nodiscard]] std::size_t note_audio_asset_count(const NoteEvent& note);

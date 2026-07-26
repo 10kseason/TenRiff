@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(TenRiff VERSION 1.1.9 LANGUAGES C CXX)
+project(TenRiff VERSION 1.2.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -11,6 +11,7 @@ if(MSVC)
 endif()
 
 option(TENRIFF_ENABLE_TESTS "Build TenRiff unit tests" ON)
+option(TENRIFF_ENABLE_LUNASR "Enable the optional WinML LunaSR background upscaler" ON)
 
 # Pinned vendored miniz is used only for local .osk/.osz ZIP package import.
 add_library(tenriff_miniz STATIC
@@ -187,6 +188,7 @@ if(WIN32)
         src/app/MenuAppSongSelectUtils.cpp
         src/app/MenuAppSettings.cpp
         src/app/MenuAppSkin.cpp
+        src/render/LunaSrBackgroundUpscaler.cpp
         src/render/MenuWindow.cpp
     )
 
@@ -212,6 +214,22 @@ if(WIN32)
             mfuuid
             winmm
     )
+
+    if(TENRIFF_ENABLE_LUNASR AND MSVC)
+        target_compile_definitions(tenriff_app PRIVATE TENRIFF_ENABLE_LUNASR=1)
+        target_link_libraries(tenriff_app PRIVATE windowsapp)
+
+        add_executable(lunasr_winml_smoke
+            tools/lunasr/winml_smoke.cpp
+            src/render/LunaSrBackgroundUpscaler.cpp
+        )
+        target_include_directories(lunasr_winml_smoke PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/src
+        )
+        target_compile_definitions(lunasr_winml_smoke PRIVATE TENRIFF_ENABLE_LUNASR=1)
+        target_compile_features(lunasr_winml_smoke PRIVATE cxx_std_17)
+        target_link_libraries(lunasr_winml_smoke PRIVATE windowsapp ole32 windowscodecs)
+    endif()
 endif()
 
 add_executable(tenriff
@@ -224,6 +242,22 @@ if(WIN32)
     target_link_libraries(tenriff PRIVATE tenriff_chart tenriff_game tenriff_runtime tenriff_core tenriff_audio tenriff_app)
 else()
     target_link_libraries(tenriff PRIVATE tenriff_chart tenriff_game tenriff_runtime tenriff_core)
+endif()
+
+if(WIN32 AND MSVC AND TENRIFF_ENABLE_LUNASR)
+    set(TENRIFF_LUNASR_MODEL
+        "${CMAKE_CURRENT_SOURCE_DIR}/tools/lunasr/lunasr_general_mc65_ww35_dense8_b6_v1_540p_residual_winml_public.onnx")
+    add_custom_command(TARGET tenriff POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E make_directory
+                "$<TARGET_FILE_DIR:tenriff>/tools/lunasr"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "${TENRIFF_LUNASR_MODEL}"
+                "$<TARGET_FILE_DIR:tenriff>/tools/lunasr/"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/lunasr/LICENSE.LunaSR"
+                "$<TARGET_FILE_DIR:tenriff>/tools/lunasr/"
+        COMMENT "Copying the optional LunaSR WinML model"
+    )
 endif()
 
 add_executable(bms_key_converter

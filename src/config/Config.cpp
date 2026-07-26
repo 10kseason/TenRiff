@@ -595,6 +595,10 @@ void apply_config_object(const JsonObject& root, RuntimeConfig& config) {
         config.graphics.refresh_hz = static_cast<int>(fallback_refresh);
         config.graphics.performance_overlay =
             get_bool(*graphics, "performance_overlay", config.graphics.performance_overlay);
+        config.graphics.background_upscale_mode = normalize_background_upscale_mode(
+            get_string(*graphics,
+                       "background_upscale_mode",
+                       config.graphics.background_upscale_mode));
     }
 
     if (auto* mode = get_object(root, "mode")) {
@@ -954,6 +958,9 @@ JsonValue build_json_root(const RuntimeConfig& config) {
     graphics.emplace("vsync", JsonValue{config.graphics.vsync});
     graphics.emplace("refresh_hz", JsonValue{static_cast<double>(config.graphics.refresh_hz)});
     graphics.emplace("performance_overlay", JsonValue{config.graphics.performance_overlay});
+    graphics.emplace("background_upscale_mode",
+                     JsonValue{normalize_background_upscale_mode(
+                         config.graphics.background_upscale_mode)});
     root.emplace("graphics", JsonValue{std::move(graphics)});
 
     JsonObject mode;
@@ -1094,6 +1101,11 @@ JsonValue build_json_root(const RuntimeConfig& config) {
 }
 
 }  // namespace
+
+std::string normalize_background_upscale_mode(std::string_view token) {
+    const std::string normalized = to_lower_ascii(std::string(token));
+    return normalized == "off" || normalized == "native" ? "off" : "lunasr";
+}
 
 std::string normalize_skin_mode_token(std::string_view key_mode) {
     std::string normalized = to_lower_ascii(std::string(key_mode));
@@ -1455,6 +1467,7 @@ RuntimeConfig ConfigLoader::defaults() const {
     config.graphics.vsync = false;
     config.graphics.refresh_hz = kDefaultGraphicsRefreshHz;
     config.graphics.performance_overlay = false;
+    config.graphics.background_upscale_mode = "lunasr";
 
     config.mode.format = "bms";
     config.mode.key_mode = "none";
@@ -1510,6 +1523,8 @@ ConfigLoadResult ConfigLoader::load_profile(std::string_view profile_dir) const 
     result.config.input.debounce_ms = sanitize_input_debounce_ms(result.config.input.debounce_ms, result.warnings);
     result.config.graphics.refresh_hz = sanitize_refresh_hz(result.config.graphics.refresh_hz, result.warnings);
     result.config.graphics.resolution = normalize_resolution_preset(result.config.graphics.resolution);
+    result.config.graphics.background_upscale_mode =
+        normalize_background_upscale_mode(result.config.graphics.background_upscale_mode);
     result.config.ui.language = normalize_ui_language(result.config.ui.language);
     return result;
 }
