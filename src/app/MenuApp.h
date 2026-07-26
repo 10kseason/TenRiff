@@ -141,6 +141,8 @@ private:
         uint32_t audio_buffer_frames = 0;
         int64_t lookahead_samples = 0;
         int64_t past_samples = 0;
+        std::string background_base_path;
+        std::string background_overlay_path;
 
         int combo = 0;
         int max_combo = 0;

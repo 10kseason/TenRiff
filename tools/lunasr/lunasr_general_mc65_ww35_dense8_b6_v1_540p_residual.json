@@ -1,0 +1,36 @@
+{
+  "scale": 2,
+  "input_layout": "NCHW",
+  "input_shape": [
+    1,
+    1,
+    540,
+    960
+  ],
+  "output_shapes": [
+    [
+      1,
+      1,
+      1080,
+      1920
+    ]
+  ],
+  "output_shape": [
+    1,
+    1,
+    1080,
+    1920
+  ],
+  "input_range": [
+    0.0,
+    1.0
+  ],
+  "channels": 8,
+  "blocks": 6,
+  "block_kind": "dense",
+  "residual_gate": false,
+  "gate_on_gpu": false,
+  "gpu_gate_formula": null,
+  "includes_bilinear_skip": false,
+  "opset": 18
+}

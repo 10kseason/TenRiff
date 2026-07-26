@@ -498,6 +498,10 @@ bool GameSession::initialize(const CommandLineOptions& options) {
     score_multiplier_ = mode_result.final_multiplier;
 
     chart_ = mode_result.chart;
+    next_visual_cue_index_ = 0;
+    last_visual_cue_sample_ = -1;
+    current_background_base_path_.clear();
+    current_background_overlay_path_.clear();
     if (replay_playback_enabled_ &&
         replay_source_.trace.lane_count > 0 &&
         chart_.lane_count != replay_source_.trace.lane_count) {
@@ -866,6 +870,26 @@ GameSession::HudSnapshot GameSession::hud_snapshot() {
         snapshot.hispeed = config_.speed.hi_speed;
         snapshot.lane_count = std::max(1, engine_->lane_count());
         snapshot.duration_samples = engine_->duration_samples();
+
+        if (snapshot.current_sample < last_visual_cue_sample_) {
+            next_visual_cue_index_ = 0;
+            current_background_base_path_.clear();
+            current_background_overlay_path_.clear();
+        }
+        while (next_visual_cue_index_ < chart_.visual_cues.size() &&
+               chart_.visual_cues[next_visual_cue_index_].start_sample <= snapshot.current_sample) {
+            const auto& cue = chart_.visual_cues[next_visual_cue_index_++];
+            if (const std::string* path = chart_.visual_asset_path(cue.asset_id)) {
+                if (cue.layer == gameplay::VisualLayer::Overlay) {
+                    current_background_overlay_path_ = *path;
+                } else {
+                    current_background_base_path_ = *path;
+                }
+            }
+        }
+        last_visual_cue_sample_ = snapshot.current_sample;
+        snapshot.background_base_path = current_background_base_path_;
+        snapshot.background_overlay_path = current_background_overlay_path_;
 
         const auto& stats = engine_->stats();
         snapshot.combo = stats.combo;
@@ -1833,6 +1857,10 @@ void GameSession::shutdown() {
     chart_audio_steady_state_logged_ = false;
     synthetic_tones_enabled_.store(true, std::memory_order_release);
     chart_ = {};
+    next_visual_cue_index_ = 0;
+    last_visual_cue_sample_ = -1;
+    current_background_base_path_.clear();
+    current_background_overlay_path_.clear();
     active_mods_.clear();
     rate_multiplier_ = 1.0;
     score_multiplier_ = 1.0;

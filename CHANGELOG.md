@@ -4,6 +4,27 @@ TenRiff의 사용자/배포 관점에서 의미 있는 변경만 간단히 기�
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-07-26
+
+### Added
+
+- BMS 채널 `04`/ `07` 이미지 cue와 osu!mania Events 배경을 gameplay sample timeline에 연결하고, FHD 미만 이미지를 LunaSR/Windows ML worker로 비동기 1920x1080 보간하는 선택형 `BGA Upscale` 설정을 추가
+- 원본 ONNX를 보존하면서 Windows ML이 읽을 수 있는 IR v9 호환 사본, GPU smoke target, 모델/license의 Release 후처리 복사를 추가
+
+### Changed
+
+- LunaSR 결과가 준비되기 전이나 모델·디코드·추론 실패 시 기존 native background를 계속 표시하며, PNG 알파를 FHD 출력에도 유지하도록 구성
+
+### Packaging
+
+- Windows 배포물 `baepo/TenRiff-1.2.0.zip`, 공개 소스 번들 `opensource-Tenriff-source/TenRiff-1.2.0-source.zip`, SHA-256 manifest를 새 정식 릴리스 자산으로 구성
+
+### Verification
+
+- 활성 checkout과 공개 소스 ZIP 추출본에서 각각 단위 테스트 `471 pass / 1 optional skip / 0 fail`, CTest `1/1` 통과
+- 양쪽에서 Release `TenRiff.exe`, CLI/GUI BMS key converter, LunaSR WinML smoke target 링크 성공
+- 바이너리 ZIP `21 entries`, 소스 ZIP `337 entries`, converter ZIP `3 entries`와 빈 `logs/`·`songs/`, stage/추출본 파일별 SHA-256 일치를 검증
+
 ## [1.1.9] - 2026-07-23
 
 ### Fixed

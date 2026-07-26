@@ -22,6 +22,11 @@ Bundled components
    Copyright: RAD Game Tools, Valve Software, Rich Geldreich, Tenacious Software LLC, and contributors
    License: MIT; the complete text is reproduced below, and source bundles also carry the upstream file at `external/miniz/LICENSE`
 
+4. `tools/lunasr/`
+   Component: LunaSR General 65:35 image-upscaling model and integration assets
+   Copyright: 2026 LunaSR contributors
+   License: MIT; binary and source bundles retain the complete text at `tools/lunasr/LICENSE.LunaSR`
+
 TenRiff's key-mode converter contains an adapted C++ port of the N2NC keymode-conversion logic from
 krrcream's Toolkit. The implementation was integrated and modified for TenRiff's `GameplayChart`
 runtime model and menu/gameplay mode-application flow.

@@ -72,6 +72,7 @@ struct GraphicsConfig {
     bool vsync = false;
     int refresh_hz = 300;
     bool performance_overlay = false;
+    std::string background_upscale_mode = "lunasr";
 };
 
 struct AudioUiConfig {
@@ -195,6 +196,7 @@ public:
 [[nodiscard]] std::string normalize_skin_mode_token(std::string_view key_mode);
 [[nodiscard]] std::string normalize_ui_language_token(std::string_view token);
 [[nodiscard]] std::string normalize_song_index_profile_token(std::string_view token);
+[[nodiscard]] std::string normalize_background_upscale_mode(std::string_view token);
 [[nodiscard]] std::vector<std::string> supported_skin_mode_tokens();
 [[nodiscard]] std::vector<std::string> supported_skin_color_tokens();
 [[nodiscard]] std::string normalize_skin_source_token(std::string_view token);

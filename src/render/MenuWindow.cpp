@@ -1849,6 +1849,8 @@ struct MenuWindow::D2DResources {
     std::array<Microsoft::WRL::ComPtr<ID2D1Bitmap>, kGameplayHudMaxLanes> lane_key_pressed_bitmaps{};
     std::array<D2D1_RECT_F, kGameplayHudMaxLanes> lane_key_pressed_source_rects{};
     Microsoft::WRL::ComPtr<ID2D1Bitmap> song_select_preview_bitmap;
+    Microsoft::WRL::ComPtr<ID2D1Bitmap> gameplay_background_base_bitmap;
+    Microsoft::WRL::ComPtr<ID2D1Bitmap> gameplay_background_overlay_bitmap;
     std::unordered_map<std::string, SongCardPreviewBitmapEntry> song_card_preview_bitmaps{};
     std::deque<std::string> song_card_preview_lru{};
     Microsoft::WRL::ComPtr<ID2D1GradientStopCollection> glow_stops;
@@ -1870,7 +1872,9 @@ struct MenuWindow::D2DResources {
     std::array<Microsoft::WRL::ComPtr<ID2D1PathGeometry>, 2> gameplay_gauge_grid_geometries{};
 };
 
-MenuWindow::MenuWindow() : d2d_(std::make_unique<D2DResources>()) {}
+MenuWindow::MenuWindow()
+    : d2d_(std::make_unique<D2DResources>()),
+      gameplay_background_upscaler_(std::make_unique<LunaSrBackgroundUpscaler>()) {}
 
 MenuWindow::~MenuWindow() {
     shutdown();
@@ -1896,6 +1900,7 @@ void MenuWindow::shutdown() {
     fullscreen_ = false;
     fullscreen_restore_pending_ = false;
     invalidate_gameplay_note_sprite_cache();
+    invalidate_gameplay_background_cache();
     invalidate_song_select_preview_cache();
     clear_song_card_preview_cache();
     invalidate_gameplay_static_cache();
@@ -2419,6 +2424,109 @@ bool MenuWindow::ensure_gameplay_note_sprites(const GameplayHudData& data) {
         load_asset(imported.key_pressed_images, lane, &d2d_->lane_key_pressed_bitmaps[index], &d2d_->lane_key_pressed_source_rects[index]);
     }
 
+    return true;
+}
+
+void MenuWindow::invalidate_gameplay_background_cache() {
+    gameplay_background_cache_ = GameplayBackgroundCache{};
+    if (gameplay_background_upscaler_) {
+        gameplay_background_upscaler_->clear();
+    }
+    if (d2d_) {
+        d2d_->gameplay_background_base_bitmap.Reset();
+        d2d_->gameplay_background_overlay_bitmap.Reset();
+    }
+}
+
+bool MenuWindow::ensure_gameplay_background_bitmap(const GameplayHudData& data) {
+    if (!d2d_ || !d2d_->wic_factory || !d2d_->d2d_context ||
+        !gameplay_background_upscaler_) {
+        return false;
+    }
+
+    const std::string upscale_mode =
+        data.background_upscale_mode == "lunasr" ? "lunasr" : "off";
+    const bool paths_changed =
+        gameplay_background_cache_.base_path != data.background_base_path ||
+        gameplay_background_cache_.overlay_path != data.background_overlay_path;
+    const bool mode_changed = gameplay_background_cache_.upscale_mode != upscale_mode;
+    if (paths_changed || mode_changed) {
+        gameplay_background_upscaler_->clear();
+        gameplay_background_cache_ = GameplayBackgroundCache{};
+        gameplay_background_cache_.base_path = data.background_base_path;
+        gameplay_background_cache_.overlay_path = data.background_overlay_path;
+        gameplay_background_cache_.upscale_mode = upscale_mode;
+
+        d2d_->gameplay_background_base_bitmap.Reset();
+        d2d_->gameplay_background_overlay_bitmap.Reset();
+        if (!data.background_base_path.empty()) {
+            static_cast<void>(load_bitmap_from_utf8_path(
+                d2d_->wic_factory.Get(),
+                d2d_->d2d_context.Get(),
+                data.background_base_path,
+                d2d_->gameplay_background_base_bitmap));
+        }
+        if (!data.background_overlay_path.empty()) {
+            static_cast<void>(load_bitmap_from_utf8_path(
+                d2d_->wic_factory.Get(),
+                d2d_->d2d_context.Get(),
+                data.background_overlay_path,
+                d2d_->gameplay_background_overlay_bitmap));
+        }
+    }
+
+    if (upscale_mode == "lunasr") {
+        if (const auto frame = gameplay_background_upscaler_->take_ready();
+            frame && frame->width > 0 && frame->height > 0 && !frame->bgra.empty()) {
+            const D2D1_BITMAP_PROPERTIES properties = D2D1::BitmapProperties(
+                D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM,
+                                  D2D1_ALPHA_MODE_PREMULTIPLIED));
+            Microsoft::WRL::ComPtr<ID2D1Bitmap> bitmap;
+            const HRESULT bitmap_hr = d2d_->d2d_context->CreateBitmap(
+                D2D1::SizeU(frame->width, frame->height),
+                frame->bgra.data(),
+                frame->width * 4,
+                &properties,
+                bitmap.ReleaseAndGetAddressOf());
+            if (SUCCEEDED(bitmap_hr) && bitmap) {
+                if (frame->source_path == gameplay_background_cache_.base_path) {
+                    d2d_->gameplay_background_base_bitmap = bitmap;
+                    gameplay_background_cache_.base_is_lunasr = true;
+                }
+                if (frame->source_path == gameplay_background_cache_.overlay_path) {
+                    d2d_->gameplay_background_overlay_bitmap = bitmap;
+                    gameplay_background_cache_.overlay_is_lunasr = true;
+                }
+            }
+        }
+    }
+
+    auto needs_upscale = [&](ID2D1Bitmap* bitmap, bool is_lunasr) {
+        if (!bitmap || is_lunasr || upscale_mode != "lunasr") {
+            return false;
+        }
+        const D2D1_SIZE_U size = bitmap->GetPixelSize();
+        return LunaSrBackgroundUpscaler::should_upscale(
+            size.width, size.height, upscale_mode);
+    };
+
+    std::string desired_request;
+    if (needs_upscale(d2d_->gameplay_background_base_bitmap.Get(),
+                      gameplay_background_cache_.base_is_lunasr)) {
+        desired_request = gameplay_background_cache_.base_path;
+    } else if (needs_upscale(d2d_->gameplay_background_overlay_bitmap.Get(),
+                             gameplay_background_cache_.overlay_is_lunasr)) {
+        desired_request = gameplay_background_cache_.overlay_path;
+    }
+
+    if (desired_request != gameplay_background_cache_.requested_path) {
+        gameplay_background_cache_.requested_path = desired_request;
+        if (desired_request.empty()) {
+            gameplay_background_upscaler_->clear();
+        } else {
+            gameplay_background_upscaler_->request(desired_request);
+        }
+    }
     return true;
 }
 

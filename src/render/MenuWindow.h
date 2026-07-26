@@ -3,6 +3,7 @@
 #ifdef _WIN32
 
 #include "GameplayHudLimits.h"
+#include "render/LunaSrBackgroundUpscaler.h"
 #include "render/RenderThread.h"
 
 #include <array>
@@ -254,6 +255,9 @@ struct GameplayHudData {
     uint32_t audio_buffer_frames = 0;
     int64_t lookahead_samples = 0;
     int64_t past_samples = 0;
+    std::string background_base_path;
+    std::string background_overlay_path;
+    std::string background_upscale_mode = "lunasr";
     double judgement_line_position = 0.82;
     double combo_position = 0.24;
     std::size_t lane_width_scale_count = 0;
@@ -521,6 +525,8 @@ private:
     [[nodiscard]] bool render_menu_scene(MenuScreenKind kind, int64_t now_ns);
     void invalidate_gameplay_note_sprite_cache();
     [[nodiscard]] bool ensure_gameplay_note_sprites(const GameplayHudData& data);
+    void invalidate_gameplay_background_cache();
+    [[nodiscard]] bool ensure_gameplay_background_bitmap(const GameplayHudData& data);
     void invalidate_song_select_preview_cache();
     [[nodiscard]] bool ensure_song_select_preview_bitmap(const SongSelectData& data);
     void clear_song_card_preview_cache();
@@ -679,6 +685,15 @@ private:
         std::array<uint32_t, kGameplayHudMaxLanes> lane_colors{};
     };
 
+    struct GameplayBackgroundCache {
+        std::string base_path;
+        std::string overlay_path;
+        std::string upscale_mode = "off";
+        std::string requested_path;
+        bool base_is_lunasr = false;
+        bool overlay_is_lunasr = false;
+    };
+
     struct SongSelectPreviewCache {
         std::string path{};
         bool attempted = false;
@@ -704,6 +719,8 @@ private:
     GameplayHudCache gameplay_hud_cache_{};
     GameplayStaticCache gameplay_static_cache_{};
     GameplayNoteSpriteCache gameplay_note_sprite_cache_{};
+    GameplayBackgroundCache gameplay_background_cache_{};
+    std::unique_ptr<LunaSrBackgroundUpscaler> gameplay_background_upscaler_{};
     SongSelectPreviewCache song_select_preview_cache_{};
     std::string song_select_preview_signature_{};
     int64_t song_select_preview_load_hold_until_ns_ = 0;

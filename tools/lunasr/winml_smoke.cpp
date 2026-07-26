@@ -1,0 +1,190 @@
+#include <algorithm>
+#include <array>
+#include <chrono>
+#include <cstdint>
+#include <filesystem>
+#include <fstream>
+#include <iostream>
+#include <thread>
+#include <vector>
+
+#include "render/LunaSrBackgroundUpscaler.h"
+
+#include <winrt/Windows.AI.MachineLearning.h>
+#include <winrt/Windows.Foundation.Collections.h>
+#include <winrt/base.h>
+
+namespace {
+
+bool write_smoke_bmp(const std::filesystem::path& path) {
+    constexpr std::uint32_t width = 4;
+    constexpr std::uint32_t height = 4;
+    constexpr std::size_t header_size = 54;
+    std::vector<std::uint8_t> bytes(header_size + width * height * 4, 0);
+    const auto put_u16 = [&](std::size_t offset, std::uint16_t value) {
+        bytes[offset] = static_cast<std::uint8_t>(value);
+        bytes[offset + 1] = static_cast<std::uint8_t>(value >> 8);
+    };
+    const auto put_u32 = [&](std::size_t offset, std::uint32_t value) {
+        for (std::size_t byte = 0; byte < 4; ++byte) {
+            bytes[offset + byte] = static_cast<std::uint8_t>(value >> (byte * 8));
+        }
+    };
+
+    bytes[0] = 'B';
+    bytes[1] = 'M';
+    put_u32(2, static_cast<std::uint32_t>(bytes.size()));
+    put_u32(10, static_cast<std::uint32_t>(header_size));
+    put_u32(14, 40);
+    put_u32(18, width);
+    put_u32(22, height);
+    put_u16(26, 1);
+    put_u16(28, 32);
+    put_u32(34, width * height * 4);
+    for (std::size_t pixel = 0; pixel < width * height; ++pixel) {
+        const std::size_t offset = header_size + pixel * 4;
+        bytes[offset] = static_cast<std::uint8_t>(32 + pixel * 7);
+        bytes[offset + 1] = static_cast<std::uint8_t>(64 + pixel * 5);
+        bytes[offset + 2] = static_cast<std::uint8_t>(96 + pixel * 3);
+        bytes[offset + 3] = 255;
+    }
+
+    std::ofstream output(path, std::ios::binary | std::ios::trunc);
+    output.write(reinterpret_cast<const char*>(bytes.data()),
+                 static_cast<std::streamsize>(bytes.size()));
+    return output.good();
+}
+
+}  // namespace
+
+int wmain(int argc, wchar_t** argv) {
+    try {
+        winrt::init_apartment(winrt::apartment_type::multi_threaded);
+
+        const std::filesystem::path model_path =
+            argc > 1
+                ? std::filesystem::path(argv[1])
+                : std::filesystem::path(
+                      L"tools\\lunasr\\lunasr_general_mc65_ww35_dense8_b6_v1_540p_residual_winml_public.onnx");
+        if (!std::filesystem::is_regular_file(model_path)) {
+            std::wcerr << L"model not found: " << model_path.c_str() << L'\n';
+            return 2;
+        }
+
+        namespace ml = winrt::Windows::AI::MachineLearning;
+        const auto load_started = std::chrono::steady_clock::now();
+        const ml::LearningModel model = ml::LearningModel::LoadFromFilePath(model_path.c_str());
+        const ml::LearningModelDevice device(ml::LearningModelDeviceKind::DirectXHighPerformance);
+        const ml::LearningModelSession session(model, device);
+        const auto session_ready = std::chrono::steady_clock::now();
+        ml::LearningModelBinding binding(session);
+
+        const std::vector<std::int64_t> input_shape{1, 1, 540, 960};
+        const std::vector<std::int64_t> output_shape{1, 1, 1080, 1920};
+        std::vector<float> input(540u * 960u, 0.5f);
+        const ml::TensorFloat input_tensor = ml::TensorFloat::CreateFromArray(input_shape, input);
+        const ml::TensorFloat output_tensor = ml::TensorFloat::Create(output_shape);
+        binding.Bind(L"luma_lr", input_tensor);
+        binding.Bind(L"luma_residual", output_tensor);
+        const auto evaluate_started = std::chrono::steady_clock::now();
+        session.Evaluate(binding, L"lunasr-smoke");
+        const auto evaluate_finished = std::chrono::steady_clock::now();
+
+        const auto values = output_tensor.GetAsVectorView();
+        if (values.Size() != 1080u * 1920u) {
+            std::cerr << "unexpected output size: " << values.Size() << '\n';
+            return 3;
+        }
+
+        float max_abs = 0.0f;
+        for (const float value : values) {
+            max_abs = std::max(max_abs, std::abs(value));
+        }
+        std::cout << "LunaSR WinML smoke passed: values=" << values.Size()
+                  << " max_abs=" << max_abs
+                  << " session_ms="
+                  << std::chrono::duration<double, std::milli>(
+                         session_ready - load_started).count()
+                  << " evaluate_ms="
+                  << std::chrono::duration<double, std::milli>(
+                         evaluate_finished - evaluate_started).count()
+                  << '\n';
+
+        const auto unique_suffix = std::to_wstring(static_cast<long long>(
+            std::chrono::steady_clock::now().time_since_epoch().count()));
+        const std::filesystem::path image_path =
+            std::filesystem::temp_directory_path() /
+            (std::wstring(L"tenriff_lunasr_smoke_") + unique_suffix + L".bmp");
+        const std::filesystem::path warm_image_path =
+            std::filesystem::temp_directory_path() /
+            (std::wstring(L"tenriff_lunasr_smoke_") + unique_suffix + L"_warm.bmp");
+        if (!write_smoke_bmp(image_path) || !write_smoke_bmp(warm_image_path)) {
+            std::wcerr << L"could not create WIC smoke image: " << image_path.c_str() << L'\n';
+            return 4;
+        }
+
+        std::shared_ptr<const tenriff::render::LunaSrBackgroundFrame> frame;
+        std::shared_ptr<const tenriff::render::LunaSrBackgroundFrame> warm_frame;
+        const auto pipeline_started = std::chrono::steady_clock::now();
+        auto pipeline_finished = pipeline_started;
+        auto warm_started = pipeline_started;
+        auto warm_finished = pipeline_started;
+        {
+            tenriff::render::LunaSrBackgroundUpscaler upscaler;
+            upscaler.request(image_path.u8string());
+            const auto deadline = pipeline_started + std::chrono::seconds(10);
+            while (std::chrono::steady_clock::now() < deadline) {
+                frame = upscaler.take_ready();
+                if (frame) {
+                    break;
+                }
+                std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            }
+            pipeline_finished = std::chrono::steady_clock::now();
+            if (frame) {
+                warm_started = pipeline_finished;
+                upscaler.request(warm_image_path.u8string());
+                const auto warm_deadline = warm_started + std::chrono::seconds(10);
+                while (std::chrono::steady_clock::now() < warm_deadline) {
+                    warm_frame = upscaler.take_ready();
+                    if (warm_frame) {
+                        break;
+                    }
+                    std::this_thread::sleep_for(std::chrono::milliseconds(5));
+                }
+                warm_finished = std::chrono::steady_clock::now();
+            }
+        }
+        std::error_code remove_error;
+        std::filesystem::remove(image_path, remove_error);
+        remove_error.clear();
+        std::filesystem::remove(warm_image_path, remove_error);
+        if (!frame || !warm_frame ||
+            frame->width != tenriff::render::kLunaSrTargetWidth ||
+            frame->height != tenriff::render::kLunaSrTargetHeight ||
+            frame->bgra.size() != static_cast<std::size_t>(frame->width) * frame->height * 4 ||
+            warm_frame->bgra.size() != frame->bgra.size()) {
+            std::cerr << "LunaSR WIC-to-BGRA pipeline did not produce an FHD frame\n";
+            return 5;
+        }
+        std::cout << "LunaSR background pipeline passed: "
+                  << frame->width << 'x' << frame->height
+                  << " bgra_bytes=" << frame->bgra.size()
+                  << " pipeline_ms="
+                  << std::chrono::duration<double, std::milli>(
+                         pipeline_finished - pipeline_started).count()
+                  << " warm_frame_ms="
+                  << std::chrono::duration<double, std::milli>(
+                         warm_finished - warm_started).count()
+                  << '\n';
+        return 0;
+    } catch (const winrt::hresult_error& error) {
+        std::wcerr << L"WinML error 0x" << std::hex
+                   << static_cast<std::uint32_t>(error.code()) << L": "
+                   << error.message().c_str() << L'\n';
+        return 1;
+    } catch (const std::exception& error) {
+        std::cerr << "error: " << error.what() << '\n';
+        return 1;
+    }
+}

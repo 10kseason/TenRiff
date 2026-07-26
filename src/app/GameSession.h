@@ -60,6 +60,8 @@ public:
         uint32_t audio_buffer_frames = 0;
         int64_t lookahead_samples = 0;
         int64_t past_samples = 0;
+        std::string background_base_path;
+        std::string background_overlay_path;
 
         int combo = 0;
         int max_combo = 0;
@@ -414,6 +416,10 @@ private:
 
     GameSessionResult result_{};
     std::size_t ghost_hud_scan_start_ = 0;
+    std::size_t next_visual_cue_index_ = 0;
+    int64_t last_visual_cue_sample_ = -1;
+    std::string current_background_base_path_;
+    std::string current_background_overlay_path_;
 };
 
 }  // namespace tenriff::app

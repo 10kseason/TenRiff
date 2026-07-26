@@ -1,0 +1,20 @@
+{
+  "onnx_checker": "passed",
+  "onnxruntime": "passed",
+  "input_shape": [
+    1,
+    1,
+    540,
+    960
+  ],
+  "output_shape": [
+    1,
+    1,
+    1080,
+    1920
+  ],
+  "max_abs_error": 3.8743019104003906e-07,
+  "mean_abs_error": 4.2786215459500454e-08,
+  "pytorch_abs_max": 0.4820115566253662,
+  "allclose_atol_1e-5_rtol_1e-4": true
+}

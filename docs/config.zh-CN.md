@@ -40,7 +40,7 @@
 
 - `backend` (string)
   - `polling | rawinput`
-  - 当前 `1.1.9` 发布线默认值为 `rawinput`
+  - 当前 `1.2.0` 发布线默认值为 `rawinput`
   - 可在 `Options -> Input Settings -> Backend` 或 `Options -> Profile Setup -> Input Backend` 中按 profile 选择
   - runtime fallback 不会把已保存值改写为 `polling`
   - 确认 RawInput 启动失败、注册目标丢失或 message window 退出后，本次应用运行期间 menu 与后续 gameplay 都会保持 Polling
@@ -112,6 +112,11 @@
   - `vsync=true` 时，present refresh 以当前活动显示器 Hz 为准，render pacing 的目标是 `monitor_hz * 2`（上限 `1050`）
 - `performance_overlay` (bool)
   - 默认值为 `false`；它位于右上角，可能会与放在同一角落的 Discord Voice widget 重叠
+- `background_upscale_mode` (string)
+  - `lunasr | off`
+  - 默认值为 `lunasr`；把低于 1920x1080 的 BMS 图片 BGA 和 osu!mania 背景异步放大到 FHD
+  - 处理期间或 model load、image decode、inference 失败时继续使用 native bitmap
+  - 对应 Graphics Settings 中的 `BGA Upscale` 行
 
 ### `mode`
 - `format` (string)

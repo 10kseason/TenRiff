@@ -40,7 +40,7 @@ profile が存在しない場合は初回起動時に自動生成されます。
 
 - `backend` (string)
   - `polling | rawinput`
-  - 現行 `1.1.9` リリースラインの既定値は `rawinput`
+  - 現行 `1.2.0` リリースラインの既定値は `rawinput`
   - `Options -> Input Settings -> Backend` または `Options -> Profile Setup -> Input Backend` で profile ごとに選択可能
   - runtime fallback は保存済みの値を `polling` に書き換えない
   - RawInput の起動失敗、登録先の消失、message window の終了を確認すると、そのアプリ実行中は menu と後続 gameplay の両方で Polling を維持する
@@ -112,6 +112,11 @@ profile が存在しない場合は初回起動時に自動生成されます。
   - `vsync=true` では present refresh は active monitor Hz に従い、render pacing は `monitor_hz * 2` を狙う（`1050` clamp）
 - `performance_overlay` (bool)
   - 既定値は `false`。右上を使うため、同じ角に置いた Discord Voice widget と重なる場合がある
+- `background_upscale_mode` (string)
+  - `lunasr | off`
+  - 既定値は `lunasr`。1920x1080 未満の BMS image BGA と osu!mania 背景を FHD に非同期補間
+  - 処理中または model load / image decode / inference 失敗時は native bitmap を維持
+  - Graphics Settings の `BGA Upscale` row に接続
 
 ### `mode`
 - `format` (string)

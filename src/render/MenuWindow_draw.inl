@@ -39,6 +39,9 @@ void MenuWindow::draw(const MenuRenderData& data) {
         if (!ensure_gameplay_note_sprites(data.gameplay)) {
             invalidate_gameplay_note_sprite_cache();
         }
+        if (!ensure_gameplay_background_bitmap(data.gameplay)) {
+            invalidate_gameplay_background_cache();
+        }
         if (!ensure_gameplay_static_cache(data.gameplay)) {
             invalidate_gameplay_static_cache();
         }
@@ -70,6 +73,37 @@ void MenuWindow::draw(const MenuRenderData& data) {
     const D2D1_MATRIX_3X2_F transform =
         D2D1::Matrix3x2F(scale_, 0.0f, 0.0f, scale_, offset_x_, offset_y_);
     ctx->SetTransform(transform);
+
+    if (data.kind == MenuScreenKind::GameplayHud) {
+        const D2D1_RECT_F background_rect =
+            D2D1::RectF(0.0f, 0.0f, kBaseWidth, kBaseHeight);
+        if (d2d_->gameplay_background_base_bitmap) {
+            const D2D1_RECT_F source_rect = centered_bitmap_source_rect(
+                d2d_->gameplay_background_base_bitmap->GetSize(), background_rect);
+            ctx->DrawBitmap(d2d_->gameplay_background_base_bitmap.Get(),
+                            background_rect,
+                            0.72f,
+                            D2D1_BITMAP_INTERPOLATION_MODE_LINEAR,
+                            &source_rect);
+        }
+        if (d2d_->gameplay_background_overlay_bitmap) {
+            const D2D1_RECT_F source_rect = centered_bitmap_source_rect(
+                d2d_->gameplay_background_overlay_bitmap->GetSize(), background_rect);
+            ctx->DrawBitmap(d2d_->gameplay_background_overlay_bitmap.Get(),
+                            background_rect,
+                            0.82f,
+                            D2D1_BITMAP_INTERPOLATION_MODE_LINEAR,
+                            &source_rect);
+        }
+        if ((d2d_->gameplay_background_base_bitmap ||
+             d2d_->gameplay_background_overlay_bitmap) &&
+            d2d_->panel_brush) {
+            const float saved_opacity = d2d_->panel_brush->GetOpacity();
+            d2d_->panel_brush->SetOpacity(0.30f);
+            ctx->FillRectangle(background_rect, d2d_->panel_brush.Get());
+            d2d_->panel_brush->SetOpacity(saved_opacity);
+        }
+    }
 
     if (d2d_->glow_brush) {
         const float saved_opacity = d2d_->glow_brush->GetOpacity();

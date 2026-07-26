@@ -50,23 +50,27 @@ TEST_CASE("negative display offset keeps past notes alive longer in the HUD") {
     CHECK(window.lookahead_samples == 2224);
 }
 
-TEST_CASE("gameplay chart sample offsets move notes audio and duration together") {
+TEST_CASE("gameplay chart sample offsets move notes audio visuals and duration together") {
     tenriff::gameplay::GameplayChart chart;
     chart.duration_samples = 4000;
     chart.notes.push_back(tenriff::gameplay::NoteEvent{1, 1000, std::nullopt});
     chart.notes.push_back(tenriff::gameplay::NoteEvent{2, 2000, 2800});
     chart.audio_cues.push_back(tenriff::gameplay::AudioCueEvent{500, 0});
+    chart.visual_cues.push_back(
+        tenriff::gameplay::VisualCueEvent{750, 0, tenriff::gameplay::VisualLayer::Base});
 
     tenriff::gameplay::offset_gameplay_chart_samples(chart, 3000);
 
     REQUIRE(chart.notes.size() == 2);
     REQUIRE(chart.audio_cues.size() == 1);
+    REQUIRE(chart.visual_cues.size() == 1);
     CHECK(chart.duration_samples == 7000);
     CHECK(chart.notes[0].start_sample == 4000);
     CHECK(chart.notes[1].start_sample == 5000);
     REQUIRE(chart.notes[1].end_sample.has_value());
     CHECK(chart.notes[1].end_sample.value() == 5800);
     CHECK(chart.audio_cues[0].start_sample == 3500);
+    CHECK(chart.visual_cues[0].start_sample == 3750);
 }
 
 TEST_CASE("gameplay hud revisions ignore sample-only updates for text caches") {

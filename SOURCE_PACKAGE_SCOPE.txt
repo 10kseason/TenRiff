@@ -1,4 +1,4 @@
-TenRiff 1.1.9 stable open-source source package scope
+TenRiff 1.2.0 stable open-source source package scope
 
 Included in versioned source bundles:
 - CHANGELOG.md
@@ -21,6 +21,7 @@ Included in versioned source bundles:
 - src/
 - tests/
 - tools/bms-key-converter/
+- tools/lunasr/
 
 Excluded from versioned source bundles:
 - build/
@@ -47,6 +48,7 @@ Excluded from versioned source bundles:
 - Memory for ai and Human Worker.txt
 - P_DA.bme
 - 10k-calc/
+- tools/lunasr/HUGGINGFACE.md (private storage handoff only)
 
 Notes:
 - The source bundle is intended to contain code, docs, config, and tests needed to inspect or rebuild the project.
@@ -54,3 +56,4 @@ Notes:
 - Local caches, packaged binaries, user profiles, and private working files are intentionally excluded.
 - Local LLM/tooling checkouts such as `external/llama.cpp/` are intentionally excluded from the public source package.
 - The repository license is MIT and should be shipped with both source and binary distributions.
+- The bundled LunaSR model is MIT-licensed and retains `tools/lunasr/LICENSE.LunaSR`.

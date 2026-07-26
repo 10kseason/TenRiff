@@ -52,6 +52,11 @@ std::string chart_audio_path(const tenriff::gameplay::GameplayChart& chart, std:
     return path ? *path : std::string{};
 }
 
+std::string chart_visual_path(const tenriff::gameplay::GameplayChart& chart, std::size_t asset_id) {
+    const std::string* path = chart.visual_asset_path(asset_id);
+    return path ? *path : std::string{};
+}
+
 }  // namespace
 
 TEST_CASE("chart loader falls back to ogg when referenced wav is missing") {
@@ -302,6 +307,130 @@ TEST_CASE("chart loader loads osu!mania charts when the option is enabled") {
     CHECK(result.chart.notes[1].release_required);
     REQUIRE(result.chart.audio_cues.size() == 1u);
     CHECK(chart_audio_path(result.chart, result.chart.audio_cues.front().asset_id) == audio_path.u8string());
+}
+
+TEST_CASE("chart loader schedules osu background images at gameplay start") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+
+    const auto chart_path = temp.path / "background.osu";
+    const auto background_path = temp.path / "cover image.jpg";
+    {
+        std::ofstream chart_file(chart_path, std::ios::binary);
+        REQUIRE(chart_file.good());
+        chart_file << "osu file format v14\n"
+                      "[General]\n"
+                      "Mode:3\n"
+                      "[Difficulty]\n"
+                      "CircleSize:4\n"
+                      "[Events]\n"
+                      "0,0,\"cover image.jpg\",0,0\n"
+                      "[TimingPoints]\n"
+                      "0,500,4,0,0,100,1,0\n"
+                      "[HitObjects]\n"
+                      "0,0,0,1,0,0:0:0:0:\n";
+    }
+    {
+        std::ofstream image_file(background_path, std::ios::binary);
+        REQUIRE(image_file.good());
+        image_file << "image";
+    }
+
+    ChartLoader loader;
+    const ChartLoadResult result =
+        loader.load(chart_path.u8string(), 48000, 1.0, "ignore", true);
+
+    CHECK(result.success());
+    REQUIRE(result.chart.visual_cues.size() == 1u);
+    CHECK(result.chart.visual_cues.front().start_sample == 0);
+    CHECK(result.chart.visual_cues.front().layer == tenriff::gameplay::VisualLayer::Base);
+    CHECK(chart_visual_path(result.chart, result.chart.visual_cues.front().asset_id) ==
+          std::filesystem::weakly_canonical(background_path).u8string());
+}
+
+TEST_CASE("chart loader schedules BMS base and overlay BGA images") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+
+    const auto chart_path = temp.path / "bga.bms";
+    const auto base_path = temp.path / "base.png";
+    const auto overlay_path = temp.path / "overlay.png";
+    const auto poor_path = temp.path / "poor.png";
+    {
+        std::ofstream chart_file(chart_path, std::ios::binary);
+        REQUIRE(chart_file.good());
+        chart_file << "#TITLE BGA\n"
+                      "#BPM 120\n"
+                      "#BMP01 base.png\n"
+                      "#BMP02 overlay.png\n"
+                      "#BMP03 poor.png\n"
+                      "#00104:01\n"
+                      "#00107:0002\n"
+                      "#00106:03\n";
+    }
+    {
+        std::ofstream base_file(base_path, std::ios::binary);
+        REQUIRE(base_file.good());
+        base_file << "base";
+    }
+    {
+        std::ofstream overlay_file(overlay_path, std::ios::binary);
+        REQUIRE(overlay_file.good());
+        overlay_file << "overlay";
+    }
+    {
+        std::ofstream poor_file(poor_path, std::ios::binary);
+        REQUIRE(poor_file.good());
+        poor_file << "poor";
+    }
+
+    ChartLoader loader;
+    const ChartLoadResult result =
+        loader.load(chart_path.u8string(), 48000, 1.0, "ignore");
+
+    CHECK(result.success());
+    REQUIRE(result.chart.visual_cues.size() == 2u);
+    CHECK(result.chart.visual_cues[0].layer == tenriff::gameplay::VisualLayer::Base);
+    CHECK(result.chart.visual_cues[1].layer == tenriff::gameplay::VisualLayer::Overlay);
+    CHECK(result.chart.visual_cues[0].start_sample < result.chart.visual_cues[1].start_sample);
+    CHECK(chart_visual_path(result.chart, result.chart.visual_cues[0].asset_id) ==
+          std::filesystem::weakly_canonical(base_path).u8string());
+    CHECK(chart_visual_path(result.chart, result.chart.visual_cues[1].asset_id) ==
+          std::filesystem::weakly_canonical(overlay_path).u8string());
+}
+
+TEST_CASE("chart loader uses BMS stage image when timed BGA is absent") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+
+    const auto chart_path = temp.path / "stage.bms";
+    const auto stage_path = temp.path / "stage.jpg";
+    {
+        std::ofstream chart_file(chart_path, std::ios::binary);
+        REQUIRE(chart_file.good());
+        chart_file << "#TITLE Static Background\n"
+                      "#BPM 120\n"
+                      "#STAGEFILE stage.jpg\n"
+                      "#00111:01\n";
+    }
+    {
+        std::ofstream image_file(stage_path, std::ios::binary);
+        REQUIRE(image_file.good());
+        image_file << "stage";
+    }
+
+    ChartLoader loader;
+    const ChartLoadResult result =
+        loader.load(chart_path.u8string(), 48000, 1.0, "ignore");
+
+    CHECK(result.success());
+    REQUIRE(result.chart.visual_cues.size() == 1u);
+    CHECK(result.chart.visual_cues.front().start_sample == 0);
+    CHECK(chart_visual_path(result.chart, result.chart.visual_cues.front().asset_id) ==
+          std::filesystem::weakly_canonical(stage_path).u8string());
 }
 
 TEST_CASE("osu asset references reject absolute drive UNC rooted and traversal forms") {

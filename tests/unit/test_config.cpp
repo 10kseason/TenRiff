@@ -98,6 +98,7 @@ TEST_CASE("config defaults prefer 44100 Hz audio") {
     CHECK(tenriff::config::kJudgementLinePositionMax == doctest::Approx(1.0));
     CHECK_FALSE(config.graphics.vsync);
     CHECK(config.graphics.refresh_hz == 300);
+    CHECK(config.graphics.background_upscale_mode == "lunasr");
     CHECK(config.gauge.ex_hard.pg == doctest::Approx(kCurrentExHardPg));
     CHECK(config.gauge.ex_hard.gr == doctest::Approx(kCurrentExHardGr));
     CHECK(config.gauge.ex_hard.gd == doctest::Approx(kCurrentExHardGd));
@@ -501,6 +502,7 @@ TEST_CASE("config save and load preserve graphics display settings") {
     config.graphics.vsync = true;
     config.graphics.refresh_hz = 240;
     config.graphics.performance_overlay = true;
+    config.graphics.background_upscale_mode = "off";
 
     std::string error;
     REQUIRE(loader.save_profile("profiles/test", config, &error));
@@ -513,6 +515,7 @@ TEST_CASE("config save and load preserve graphics display settings") {
     CHECK(result.config.graphics.vsync);
     CHECK(result.config.graphics.refresh_hz == 240);
     CHECK(result.config.graphics.performance_overlay);
+    CHECK(result.config.graphics.background_upscale_mode == "off");
 }
 
 TEST_CASE("config save and load preserve ui language setting") {
