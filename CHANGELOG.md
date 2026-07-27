@@ -4,6 +4,8 @@ TenRiff의 사용자/배포 관점에서 의미 있는 변경만 간단히 기�
 
 ## [Unreleased]
 
+## [1.2.1] - 2026-07-27
+
 ### Added
 
 - 싱글플레이 중 `Esc`로 논리 재생 시간을 멈추는 pause menu를 열고 `계속하기 / 재시작 / 나가기`를 선택할 수 있도록 추가
@@ -13,6 +15,15 @@ TenRiff의 사용자/배포 관점에서 의미 있는 변경만 간단히 기�
 
 - LunaSR runtime 모델을 `basic_v2_final.pt`에서 내보낸 공개 WinML ONNX로 교체하고, gameplay BGA base/overlay뿐 아니라 Song Select에서 선택된 FHD 미만 BGI에도 비동기 보간을 적용
 - pause 중 WASAPI stream은 silence로 유지하되 chart/audio/judgement의 논리 sample clock은 정지하도록 변경
+
+### Packaging
+
+- Windows 배포물 `baepo/TenRiff-1.2.1.zip`, 공개 소스 번들 `opensource-Tenriff-source/TenRiff-1.2.1-source.zip`, SHA-256 manifest를 새 패치 릴리스 자산으로 구성
+
+### Verification
+
+- 활성 checkout 단위 테스트 `475 pass / 1 optional skip / 0 fail`, CTest `1/1` 통과
+- Release `TenRiff.exe`, LunaSR WinML GPU smoke와 1920x1080 BGRA pipeline 통과
 
 ## [1.2.0] - 2026-07-26
 

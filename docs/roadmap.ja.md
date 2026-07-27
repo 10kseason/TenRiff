@@ -4,7 +4,7 @@
 
 ## Current Baseline
 - Windows GUI / runtime が主なサポート経路です。
-- プロジェクト版ラインは `1.2.0 stable` で、sample-aligned BMS/osu 背景表示と Windows ML による任意の非同期 LunaSR FHD 補間を追加します。
+- プロジェクト版ラインは `1.2.1 stable` で、LunaSR Basic v2、選択 BGI 補間、single-player pause menu、polygon note、LN tail cap toggle を追加します。
 - 既定では BMS-first の menu / runtime が有効で、4K-10K `.osu` は config / menu toggle の背後にある任意機能です。
 - 現在出荷されている挙動は [`docs/current-state.ja.md`](current-state.ja.md) を先に見てください。この roadmap は方向と残作業を示す文書です。
 
