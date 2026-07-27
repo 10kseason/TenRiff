@@ -1,0 +1,26 @@
+{
+  "source_checkpoint": "basic_v2_final.pt",
+  "source_checkpoint_sha256": "b3265820b5e85fa914165e1432aef3cfc847938f1388e2585c992ee6ef4d922b",
+  "source_epoch": 84,
+  "validation_psnr": 44.04436367648002,
+  "baseline_psnr": 42.454356084956224,
+  "psnr_delta": 1.5900075915237935,
+  "onnx_checker": "passed",
+  "onnxruntime": "passed",
+  "input_shape": [
+    1,
+    1,
+    540,
+    960
+  ],
+  "output_shape": [
+    1,
+    1,
+    1080,
+    1920
+  ],
+  "max_abs_error": 3.2782554626464844e-07,
+  "mean_abs_error": 3.704051820818677e-08,
+  "allclose_atol_1e-5_rtol_1e-4": true,
+  "onnx_sha256": "4aa31fae7e31ba4c1156118d31e7fc0a7e8f27683f54753d58e5d64ae227e00e"
+}

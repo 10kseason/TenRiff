@@ -466,10 +466,66 @@ std::string normalize_gameplay_note_shape(std::string_view value) {
     std::transform(normalized.begin(), normalized.end(), normalized.begin(), [](unsigned char ch) {
         return static_cast<char>(std::tolower(ch));
     });
-    if (normalized == "circle") {
-        return "circle";
+    if (normalized == "circle" || normalized == "triangle" || normalized == "pentagon" ||
+        normalized == "hexagon") {
+        return normalized;
     }
     return "rect";
+}
+
+std::optional<std::size_t> gameplay_note_polygon_index(std::string_view note_shape) {
+    const std::string normalized = normalize_gameplay_note_shape(note_shape);
+    if (normalized == "triangle") return 0;
+    if (normalized == "pentagon") return 1;
+    if (normalized == "hexagon") return 2;
+    return std::nullopt;
+}
+
+bool create_unit_note_polygon_geometry(ID2D1Factory1* factory,
+                                       int sides,
+                                       ID2D1PathGeometry** out_geometry) {
+    if (!factory || !out_geometry || sides < 3) {
+        return false;
+    }
+    *out_geometry = nullptr;
+
+    Microsoft::WRL::ComPtr<ID2D1PathGeometry> geometry;
+    if (FAILED(factory->CreatePathGeometry(geometry.ReleaseAndGetAddressOf())) || !geometry) {
+        return false;
+    }
+    Microsoft::WRL::ComPtr<ID2D1GeometrySink> sink;
+    if (FAILED(geometry->Open(sink.ReleaseAndGetAddressOf())) || !sink) {
+        return false;
+    }
+
+    constexpr double kPi = 3.14159265358979323846;
+    std::vector<D2D1_POINT_2F> points;
+    points.reserve(static_cast<std::size_t>(sides));
+    for (int i = 0; i < sides; ++i) {
+        const double angle = -kPi * 0.5 + 2.0 * kPi * static_cast<double>(i) / static_cast<double>(sides);
+        points.push_back(D2D1::Point2F(static_cast<float>(std::cos(angle) * 0.5),
+                                      static_cast<float>(std::sin(angle) * 0.5)));
+    }
+    sink->BeginFigure(points.front(), D2D1_FIGURE_BEGIN_FILLED);
+    sink->AddLines(points.data() + 1, static_cast<UINT32>(points.size() - 1));
+    sink->EndFigure(D2D1_FIGURE_END_CLOSED);
+    if (FAILED(sink->Close())) {
+        return false;
+    }
+
+    *out_geometry = geometry.Detach();
+    return true;
+}
+
+template <std::size_t Size>
+ID2D1Geometry* gameplay_note_polygon_geometry(
+    const std::array<Microsoft::WRL::ComPtr<ID2D1PathGeometry>, Size>& geometries,
+    std::string_view note_shape) {
+    const auto index = gameplay_note_polygon_index(note_shape);
+    if (!index.has_value() || index.value() >= geometries.size()) {
+        return nullptr;
+    }
+    return geometries[index.value()].Get();
 }
 
 float gameplay_hold_body_cap_inset(std::string_view note_shape, float half_height) {
@@ -1601,7 +1657,8 @@ void draw_note_primitive(ID2D1RenderTarget* target,
                          ID2D1Brush* border,
                          float border_width,
                          std::string_view note_shape,
-                         bool draw_border) {
+                         bool draw_border,
+                         ID2D1Geometry* polygon_geometry = nullptr) {
     if (!target || !fill) {
         return;
     }
@@ -1621,6 +1678,24 @@ void draw_note_primitive(ID2D1RenderTarget* target,
         if (draw_border && border) {
             target->DrawEllipse(ellipse, border, border_width);
         }
+    } else if (polygon_geometry && gameplay_note_polygon_index(normalized_shape).has_value()) {
+        const float width = std::max(2.0f, rect.right - rect.left);
+        const float height = std::max(2.0f, rect.bottom - rect.top);
+        const float center_x = (rect.left + rect.right) * 0.5f;
+        const float center_y = (rect.top + rect.bottom) * 0.5f;
+        D2D1_MATRIX_3X2_F saved_transform{};
+        target->GetTransform(&saved_transform);
+        const D2D1_MATRIX_3X2_F shape_transform =
+            D2D1::Matrix3x2F::Scale(width, height) *
+            D2D1::Matrix3x2F::Translation(center_x, center_y) *
+            saved_transform;
+        target->SetTransform(shape_transform);
+        target->FillGeometry(polygon_geometry, fill);
+        if (draw_border && border) {
+            const float unit_border_width = border_width / std::max(width, height);
+            target->DrawGeometry(polygon_geometry, border, unit_border_width);
+        }
+        target->SetTransform(saved_transform);
     } else {
         const float width = std::max(1.0f, rect.right - rect.left);
         const float height = std::max(1.0f, rect.bottom - rect.top);
@@ -1870,11 +1945,13 @@ struct MenuWindow::D2DResources {
     Microsoft::WRL::ComPtr<ID2D1PathGeometry> performance_graph_geometry;
     Microsoft::WRL::ComPtr<ID2D1CommandList> gameplay_static_command_list;
     std::array<Microsoft::WRL::ComPtr<ID2D1PathGeometry>, 2> gameplay_gauge_grid_geometries{};
+    std::array<Microsoft::WRL::ComPtr<ID2D1PathGeometry>, 3> gameplay_note_shape_geometries{};
 };
 
 MenuWindow::MenuWindow()
     : d2d_(std::make_unique<D2DResources>()),
-      gameplay_background_upscaler_(std::make_unique<LunaSrBackgroundUpscaler>()) {}
+      gameplay_background_upscaler_(std::make_unique<LunaSrBackgroundUpscaler>()),
+      song_select_background_upscaler_(std::make_unique<LunaSrBackgroundUpscaler>()) {}
 
 MenuWindow::~MenuWindow() {
     shutdown();
@@ -2087,6 +2164,13 @@ bool MenuWindow::initialize(const MenuWindowConfig& config) {
         !d2d_->d2d_factory) {
         destroy_window();
         return fail_fatal("Failed to create the Direct2D factory.");
+    }
+    constexpr std::array<int, 3> kNotePolygonSides{3, 5, 6};
+    for (std::size_t index = 0; index < kNotePolygonSides.size(); ++index) {
+        static_cast<void>(create_unit_note_polygon_geometry(
+            d2d_->d2d_factory.Get(),
+            kNotePolygonSides[index],
+            d2d_->gameplay_note_shape_geometries[index].ReleaseAndGetAddressOf()));
     }
     if (FAILED(d2d_->d2d_factory->CreateDevice(dxgi_device.Get(), d2d_->d2d_device.ReleaseAndGetAddressOf())) ||
         !d2d_->d2d_device ||
@@ -2532,24 +2616,67 @@ bool MenuWindow::ensure_gameplay_background_bitmap(const GameplayHudData& data) 
 
 void MenuWindow::invalidate_song_select_preview_cache() {
     song_select_preview_cache_ = SongSelectPreviewCache{};
+    if (song_select_background_upscaler_) {
+        song_select_background_upscaler_->clear();
+    }
     if (d2d_) {
         d2d_->song_select_preview_bitmap.Reset();
     }
 }
 
 bool MenuWindow::ensure_song_select_preview_bitmap(const SongSelectData& data) {
-    if (!d2d_ || !d2d_->wic_factory || !d2d_->d2d_context) {
+    if (!d2d_ || !d2d_->wic_factory || !d2d_->d2d_context ||
+        !song_select_background_upscaler_) {
         return false;
     }
 
     const std::string preview_path = data.selected_song_background_path;
-    if (song_select_preview_cache_.path == preview_path) {
-        return true;
+    const std::string upscale_mode =
+        data.background_upscale_mode == "lunasr" ? "lunasr" : "off";
+    if (song_select_preview_cache_.path != preview_path ||
+        song_select_preview_cache_.upscale_mode != upscale_mode) {
+        invalidate_song_select_preview_cache();
+        song_select_preview_cache_.path = preview_path;
+        song_select_preview_cache_.upscale_mode = upscale_mode;
+        song_select_preview_cache_.attempted = preview_path.empty();
     }
 
-    invalidate_song_select_preview_cache();
-    song_select_preview_cache_.path = preview_path;
-    song_select_preview_cache_.attempted = preview_path.empty();
+    if (upscale_mode == "lunasr") {
+        if (const auto frame = song_select_background_upscaler_->take_ready();
+            frame && frame->source_path == preview_path && frame->width > 0 &&
+            frame->height > 0 && !frame->bgra.empty()) {
+            const D2D1_BITMAP_PROPERTIES properties = D2D1::BitmapProperties(
+                D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM,
+                                  D2D1_ALPHA_MODE_PREMULTIPLIED));
+            Microsoft::WRL::ComPtr<ID2D1Bitmap> bitmap;
+            if (SUCCEEDED(d2d_->d2d_context->CreateBitmap(
+                    D2D1::SizeU(frame->width, frame->height),
+                    frame->bgra.data(),
+                    frame->width * 4,
+                    &properties,
+                    bitmap.ReleaseAndGetAddressOf())) && bitmap) {
+                d2d_->song_select_preview_bitmap = bitmap;
+                song_select_preview_cache_.is_lunasr = true;
+            }
+        }
+    }
+
+    std::string desired_request;
+    if (d2d_->song_select_preview_bitmap &&
+        !song_select_preview_cache_.is_lunasr && upscale_mode == "lunasr") {
+        const D2D1_SIZE_U size = d2d_->song_select_preview_bitmap->GetPixelSize();
+        if (LunaSrBackgroundUpscaler::should_upscale(size.width, size.height, upscale_mode)) {
+            desired_request = preview_path;
+        }
+    }
+    if (desired_request != song_select_preview_cache_.requested_path) {
+        song_select_preview_cache_.requested_path = desired_request;
+        if (desired_request.empty()) {
+            song_select_background_upscaler_->clear();
+        } else {
+            song_select_background_upscaler_->request(desired_request);
+        }
+    }
     return true;
 }
 

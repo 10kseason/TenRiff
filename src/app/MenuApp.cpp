@@ -673,12 +673,13 @@ std::string MenuApp::ui_skin_source_label(std::string_view token) const {
 }
 
 std::string MenuApp::ui_skin_note_shape_label(std::string_view token) const {
-    if (config::normalize_skin_note_shape_token(token) == "circle") {
-        return ui_text("Circle", "원형");
-    }
-    return ui_text("Rect", "사각형");
+    const std::string normalized = config::normalize_skin_note_shape_token(token);
+    if (normalized == "circle") return ui_text("Circle", "\uC6D0\uD615");
+    if (normalized == "triangle") return ui_text("Triangle", "\uC0BC\uAC01\uD615");
+    if (normalized == "pentagon") return ui_text("Pentagon", "\uC624\uAC01\uD615");
+    if (normalized == "hexagon") return ui_text("Hexagon", "\uC721\uAC01\uD615");
+    return ui_text("Rect", "\uC0AC\uAC01\uD615");
 }
-
 GameplayHudRevisionInput MenuApp::gameplay_hud_revision_input(const GameplayHudState& state) {
     GameplayHudRevisionInput input;
     input.active = state.active;
@@ -686,6 +687,8 @@ GameplayHudRevisionInput MenuApp::gameplay_hud_revision_input(const GameplayHudS
     input.game_over = state.game_over;
     input.spectating_peer = state.spectating_peer;
     input.user_aborted = state.user_aborted;
+    input.paused = state.paused;
+    input.pause_menu_cursor = state.pause_menu_cursor;
     input.loading = state.loading;
     input.countdown_active = state.countdown_active;
     input.countdown_value = state.countdown_value;

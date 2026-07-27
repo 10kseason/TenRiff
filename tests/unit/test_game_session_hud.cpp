@@ -5,6 +5,7 @@
 #include "app/GameSessionInputTiming.h"
 #include "app/JudgementLoopTiming.h"
 #include "app/GameplayHudRevisions.h"
+#include "app/GameplayPauseMenu.h"
 #include "app/GameplayHudWindow.h"
 #include "gameplay/GameplayEngine.h"
 #include "gameplay/GameplayChart.h"
@@ -73,6 +74,35 @@ TEST_CASE("gameplay chart sample offsets move notes audio visuals and duration t
     CHECK(chart.visual_cues[0].start_sample == 3750);
 }
 
+TEST_CASE("gameplay pause menu wraps and maps all actions") {
+    using tenriff::app::GameplayPauseAction;
+
+    CHECK(tenriff::app::wrap_gameplay_pause_cursor(0, -1) == 2);
+    CHECK(tenriff::app::wrap_gameplay_pause_cursor(2, 1) == 0);
+    CHECK(tenriff::app::gameplay_pause_action_for_cursor(0) == GameplayPauseAction::Continue);
+    CHECK(tenriff::app::gameplay_pause_action_for_cursor(1) == GameplayPauseAction::Restart);
+    CHECK(tenriff::app::gameplay_pause_action_for_cursor(2) == GameplayPauseAction::Exit);
+}
+
+TEST_CASE("gameplay pause freezes the logical sample clock across resume") {
+    CHECK(tenriff::app::gameplay_logical_sample(12'000, 2'000) == 10'000);
+    CHECK(tenriff::app::gameplay_logical_sample(500, 700) == 0);
+
+    const auto offset = tenriff::app::gameplay_pause_resume_offset(2'000, 12'000, 18'500);
+    CHECK(offset == 8'500);
+    CHECK(tenriff::app::gameplay_logical_sample(18'500, offset) == 10'000);
+}
+
+TEST_CASE("gameplay pause changes refresh motion and menu text") {
+    tenriff::app::GameplayHudRevisionInput previous;
+    auto next = previous;
+    next.paused = true;
+    next.pause_menu_cursor = 1;
+
+    const auto diff = tenriff::app::diff_gameplay_hud_revisions(previous, next);
+    CHECK(diff.motion_changed);
+    CHECK(diff.text_changed);
+}
 TEST_CASE("gameplay hud revisions ignore sample-only updates for text caches") {
     tenriff::app::GameplayHudRevisionInput previous;
     previous.current_sample = 1200;

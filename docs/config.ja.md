@@ -182,7 +182,9 @@ profile が存在しない場合は初回起動時に自動生成されます。
   - LR2 playskin resolution override token
   - `auto` は asset file 名ではなく `#DST_NOTE` レイアウト座標を見て SD/HD/FHD を解決
 - `note_shape` (string)
-  - `rect | circle`
+  - `rect | triangle | pentagon | hexagon | circle`
+- `show_hold_tail` (bool)
+  - long-note の判定と body の連続性を変えず、tail cap だけを表示または非表示にする
 - `note_border_enabled` (bool)
 - `judgement_line_position` (double)
   - gameplay judgement line の縦位置比率

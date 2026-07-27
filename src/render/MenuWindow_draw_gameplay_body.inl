@@ -23,6 +23,8 @@
             clamp_gameplay_hold_body_width_scale(data.gameplay.hold_body_width_scale);
         const bool note_border_enabled = data.gameplay.note_border_enabled;
         const std::string note_shape = normalize_gameplay_note_shape(data.gameplay.note_shape);
+        ID2D1Geometry* note_polygon_geometry = gameplay_note_polygon_geometry(
+            d2d_->gameplay_note_shape_geometries, note_shape);
         const float visual_opacity =
             static_cast<float>(std::clamp(data.gameplay.visual_opacity, 0.20, 1.0));
         const float note_outline_opacity =
@@ -43,7 +45,7 @@
                 0,
                 data.gameplay.audio_buffer_frames,
                 data.gameplay.visual_offset_ms,
-                data.gameplay.finished,
+                data.gameplay.finished || data.gameplay.paused,
                 data.gameplay.game_over && !data.gameplay.spectating_peer,
             },
             timing::HighResClock::now_ns());
@@ -1019,7 +1021,7 @@
                 }
             }
 
-            if (note.hold) {
+            if (note.hold && data.gameplay.show_hold_tail) {
                 const D2D1_RECT_F tail_rect =
                     D2D1::RectF(x0, tail_y - tail_half_h, x1, tail_y + tail_half_h);
                 if (note_hold_tail_bitmap) {
@@ -1045,7 +1047,8 @@
                                         nullptr,
                                         0.0f,
                                         note_shape,
-                                        false);
+                                        false,
+                                        note_polygon_geometry);
                 }
             }
 
@@ -1072,7 +1075,7 @@
                         ID2D1Brush* head_fill = configure_gameplay_material_brush(
                             note_material, note_fill, note_rect, visual_opacity, false);
                         draw_note_primitive(ctx, note_rect, head_fill, note_border, 0.85f,
-                                            note_shape, note_border_enabled);
+                                            note_shape, note_border_enabled, note_polygon_geometry);
                     }
                 }
             }
@@ -1651,7 +1654,7 @@
                     }
                 }
 
-                if (note.hold) {
+                if (note.hold && data.gameplay.show_hold_tail) {
                     const D2D1_RECT_F tail_rect =
                         D2D1::RectF(x0, tail_y - tail_half_h, x1, tail_y + tail_half_h);
                     if (note_hold_tail_bitmap) {
@@ -1677,7 +1680,8 @@
                                             nullptr,
                                             0.0f,
                                             note_shape,
-                                            false);
+                                            false,
+                                            note_polygon_geometry);
                     }
                 }
 
@@ -1703,7 +1707,7 @@
                         ID2D1Brush* head_fill = configure_gameplay_material_brush(
                             note_material, note_fill, note_rect, visual_opacity, false);
                         draw_note_primitive(ctx, note_rect, head_fill, note_border, 0.85f,
-                                            note_shape, note_border_enabled);
+                                            note_shape, note_border_enabled, note_polygon_geometry);
                     }
                 }
             }
@@ -1830,4 +1834,83 @@
                     d2d_->header_format->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_LEADING);
                 }
             }
+        }
+        if (data.gameplay.paused && d2d_->panel_brush && d2d_->card_brush &&
+            d2d_->text_brush && d2d_->header_format && d2d_->body_format) {
+            const D2D1_RECT_F screen_overlay = D2D1::RectF(0.0f, 0.0f, kBaseWidth, kBaseHeight);
+            const D2D1_RECT_F pause_panel = D2D1::RectF(650.0f, 210.0f, 1270.0f, 870.0f);
+            const float saved_panel_opacity = d2d_->panel_brush->GetOpacity();
+            const float saved_card_opacity = d2d_->card_brush->GetOpacity();
+            const D2D1_COLOR_F saved_text_color = d2d_->text_brush->GetColor();
+            const float saved_text_opacity = d2d_->text_brush->GetOpacity();
+
+            d2d_->panel_brush->SetOpacity(0.76f);
+            ctx->FillRectangle(screen_overlay, d2d_->panel_brush.Get());
+            d2d_->card_brush->SetOpacity(0.98f);
+            ctx->FillRoundedRectangle(D2D1::RoundedRect(pause_panel, 28.0f, 28.0f), d2d_->card_brush.Get());
+            if (d2d_->button_border_brush) {
+                ctx->DrawRoundedRectangle(D2D1::RoundedRect(pause_panel, 28.0f, 28.0f),
+                                          d2d_->button_border_brush.Get(),
+                                          2.0f);
+            }
+
+            d2d_->text_brush->SetColor(D2D1::ColorF(0xF7FAFD, 1.0f));
+            draw_text_clipped_aligned(L"PAUSED  /  \uC77C\uC2DC\uC815\uC9C0",
+                                      d2d_->header_format.Get(),
+                                      D2D1::RectF(pause_panel.left + 40.0f,
+                                                  pause_panel.top + 42.0f,
+                                                  pause_panel.right - 40.0f,
+                                                  pause_panel.top + 118.0f),
+                                      d2d_->text_brush.Get(),
+                                      DWRITE_TEXT_ALIGNMENT_CENTER);
+
+            constexpr std::array<const wchar_t*, 3> kPauseLabels{
+                L"\uACC4\uC18D\uD558\uAE30  /  CONTINUE",
+                L"\uC7AC\uC2DC\uC791  /  RESTART",
+                L"\uB098\uAC00\uAE30  /  EXIT",
+            };
+            const int selected_pause_row = std::clamp(data.gameplay.pause_menu_cursor, 0, 2);
+            for (int row = 0; row < static_cast<int>(kPauseLabels.size()); ++row) {
+                const float top = pause_panel.top + 160.0f + static_cast<float>(row) * 118.0f;
+                const D2D1_RECT_F row_rect =
+                    D2D1::RectF(pause_panel.left + 72.0f,
+                                top,
+                                pause_panel.right - 72.0f,
+                                top + 86.0f);
+                const bool selected = row == selected_pause_row;
+                if (selected && d2d_->accent_brush) {
+                    const float saved_accent_opacity = d2d_->accent_brush->GetOpacity();
+                    d2d_->accent_brush->SetOpacity(0.28f);
+                    ctx->FillRoundedRectangle(D2D1::RoundedRect(row_rect, 14.0f, 14.0f),
+                                              d2d_->accent_brush.Get());
+                    d2d_->accent_brush->SetOpacity(saved_accent_opacity);
+                }
+                if (d2d_->button_border_brush) {
+                    ctx->DrawRoundedRectangle(D2D1::RoundedRect(row_rect, 14.0f, 14.0f),
+                                              d2d_->button_border_brush.Get(),
+                                              selected ? 2.0f : 1.0f);
+                }
+                d2d_->text_brush->SetColor(
+                    selected ? D2D1::ColorF(0xFFFFFF, 1.0f) : D2D1::ColorF(0xAAB7C4, 0.92f));
+                draw_text_clipped_aligned(kPauseLabels[static_cast<std::size_t>(row)],
+                                          d2d_->body_format.Get(),
+                                          row_rect,
+                                          d2d_->text_brush.Get(),
+                                          DWRITE_TEXT_ALIGNMENT_CENTER);
+            }
+
+            d2d_->text_brush->SetColor(D2D1::ColorF(0x94A3B8, 0.92f));
+            draw_text_clipped_aligned(L"\u2191\u2193 \uC120\uD0DD   ENTER \uD655\uC778   ESC \uACC4\uC18D",
+                                      d2d_->body_format.Get(),
+                                      D2D1::RectF(pause_panel.left + 30.0f,
+                                                  pause_panel.bottom - 82.0f,
+                                                  pause_panel.right - 30.0f,
+                                                  pause_panel.bottom - 30.0f),
+                                      d2d_->text_brush.Get(),
+                                      DWRITE_TEXT_ALIGNMENT_CENTER);
+
+            d2d_->panel_brush->SetOpacity(saved_panel_opacity);
+            d2d_->card_brush->SetOpacity(saved_card_opacity);
+            d2d_->text_brush->SetColor(saved_text_color);
+            d2d_->text_brush->SetOpacity(saved_text_opacity);
         }

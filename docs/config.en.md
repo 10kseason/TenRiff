@@ -182,7 +182,9 @@ If a profile does not exist, it is created automatically on first launch.
   - LR2 playskin resolution override token
   - `auto` resolves the SD/HD/FHD family based on the LR2 playskin `#DST_NOTE` layout coordinates instead of asset file names
 - `note_shape` (string)
-  - `rect | circle`
+  - `rect | triangle | pentagon | hexagon | circle`
+- `show_hold_tail` (bool)
+  - shows or hides the long-note tail cap without changing hold judgement/body continuity
 - `note_border_enabled` (bool)
 - `judgement_line_position` (double)
   - vertical position ratio of the gameplay judgement line

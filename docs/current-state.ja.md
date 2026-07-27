@@ -7,6 +7,7 @@
 - direct-IP multiplayer と preview r5 の input-backend lifecycle 修正は `1.1.8 stable` に統合
 - `1.1.8` は 1.1.7 の visual refresh に osu!mania OD8 補助スコア、最初の native `BAD` で終了する `Sudden Death (1 MISS)`、決定的な `LN Mix 10%～90%` を追加
 - `1.2.0` は BMS channel `04/07` と osu!mania 背景を gameplay sample timeline に接続し、FHD 未満の画像背景を Windows ML 上の LunaSR で非同期補間
+- 現在の patch は LunaSR `basic_v2` へ切り替え、gameplay BGA と Song Select の選択 BGI を補間し、single-player の Esc pause menu、polygon note shape、LN tail cap toggle を追加します。
 - 後続作業の基準文書は `docs/baseline-1.1.2.ja.md`
 - Windows GUI ビルドが主対象
 - Linux は `Baepoks-Linuxs/TenRiff-0.5.0-linux-preview` レベルの preview のみ

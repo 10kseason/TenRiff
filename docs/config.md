@@ -187,8 +187,10 @@
   - `classic | neon | minimal | tenriff`
   - Skins 메뉴에서 변경하면 아래 visual opacity/glow/key-label 옵션 묶음을 preset 값으로 즉시 재설정
 - `note_shape` (string)
-  - `rect | circle`
+  - `rect | triangle | pentagon | hexagon | circle`
   - `rect`는 native renderer에서 둥근 박스형 note head/tail로 그려짐
+- `show_hold_tail` (bool)
+  - 롱노트 판정과 body 연결은 유지하면서 tail cap만 표시하거나 숨김
 - `note_border_enabled` (bool)
 - `lane_background_opacity` (double)
   - lane별 반투명 배경 alpha

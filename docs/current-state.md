@@ -7,6 +7,7 @@
 - 직접 IP 멀티플레이와 preview r5의 입력 backend 수명주기 수정은 `1.1.8 stable`에 통합
 - `1.1.8`은 1.1.7의 시각 개선에 osu!mania OD8 보조 점수, 첫 네이티브 `BAD` 즉사 `Sudden Death (1 MISS)`, 결정적 `LN Mix 10%~90%`를 추가
 - `1.2.0`은 BMS 채널 `04/07` 및 osu!mania 배경을 gameplay sample timeline에 연결하고, FHD 미만 이미지 배경을 Windows ML 기반 LunaSR로 비동기 보간
+- 현재 패치는 LunaSR 런타임을 `basic_v2`로 교체하고 gameplay BGA layer와 Song Select의 선택 BGI를 보간하며, 싱글플레이 Esc 일시정지 메뉴·다각형 노트 모양·LN tail cap 토글을 추가.
 - 후속 작업의 기준선 문서는 `docs/baseline-1.1.2.md`
 - Windows GUI 빌드가 메인 타깃
 - Linux는 `Baepoks-Linuxs/TenRiff-0.5.0-linux-preview` 수준의 preview만 존재

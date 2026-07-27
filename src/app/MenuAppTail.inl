@@ -7,6 +7,8 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
     target.text_revision = gameplay_hud_.text_revision;
     target.active = gameplay_hud_.active;
     target.loading = gameplay_hud_.loading;
+    target.paused = gameplay_hud_.paused;
+    target.pause_menu_cursor = gameplay_hud_.pause_menu_cursor;
     target.countdown_active = gameplay_hud_.countdown_active;
     target.countdown_value = gameplay_hud_.countdown_value;
     target.loading_percent = gameplay_hud_.loading_percent;
@@ -68,6 +70,7 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
     target.show_lane_dividers = config_.skin.show_lane_dividers;
     target.show_judgement_line = config_.skin.show_judgement_line;
     target.show_gear_boundary_line = config_.skin.show_gear_boundary_line;
+    target.show_hold_tail = config_.skin.show_hold_tail;
     target.hold_tail_taper_enabled = config_.skin.hold_tail_taper_enabled;
     target.judgement_line_glow_enabled = config_.skin.judgement_line_glow_enabled;
     target.key_pulse_enabled = config_.skin.key_pulse_enabled;
@@ -1272,6 +1275,8 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
         next.game_over = hud.game_over;
         next.spectating_peer = hud.spectating_peer;
         next.user_aborted = hud.user_aborted;
+        next.paused = hud.paused;
+        next.pause_menu_cursor = hud.pause_menu_cursor;
         next.countdown_active = hud.countdown_active;
         next.countdown_value = hud.countdown_value;
         next.lane_count = hud.lane_count;
@@ -1358,6 +1363,8 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
         gameplay_hud_.game_over = hud.game_over;
         gameplay_hud_.spectating_peer = hud.spectating_peer;
         gameplay_hud_.user_aborted = hud.user_aborted;
+        gameplay_hud_.paused = hud.paused;
+        gameplay_hud_.pause_menu_cursor = hud.pause_menu_cursor;
         gameplay_hud_.countdown_active = hud.countdown_active;
         gameplay_hud_.countdown_value = hud.countdown_value;
         gameplay_hud_.lane_count = hud.lane_count;
@@ -1524,6 +1531,8 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
 
     session.run();
     const bool session_aborted = session.was_user_aborted();
+    const bool session_restart_requested = session.was_restart_requested();
+    const bool session_exit_requested = session.was_exit_requested();
     session.shutdown();
     last_gameplay_input_backend_state_ = session.input_backend_state();
     remember_input_backend_fallback(last_gameplay_input_backend_state_);
@@ -1532,6 +1541,40 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
     if (std::abs(session_hispeed - config_.speed.hi_speed) > 0.0001) {
         config_.speed.hi_speed = session_hispeed;
         persist_runtime_config();
+    }
+    if (session_restart_requested) {
+        {
+            std::lock_guard<std::mutex> lock(gameplay_hud_mutex_);
+            reset_gameplay_hud_state(gameplay_hud_);
+            gameplay_hud_.loading = true;
+            gameplay_hud_.loading_percent = 0;
+            gameplay_hud_.loading_stage = "Restarting gameplay";
+        }
+        publish_snapshot();
+        launch_gameplay(chart_path, replay_path, launch_kind);
+        return;
+    }
+    if (session_exit_requested) {
+        restart_input_thread();
+        restart_audio_thread();
+        has_result_ = false;
+        last_clear_status_.clear();
+        last_result_mods_.clear();
+        last_result_rate_multiplier_ = 1.0;
+        last_result_score_multiplier_ = 1.0;
+        last_result_final_score_ = 0;
+        last_replay_path_.clear();
+        last_result_path_.clear();
+        last_export_warnings_.clear();
+        last_session_replay_playback_ = false;
+        screen_ = Screen::SongSelect;
+        apply_runtime_graphics_config();
+        {
+            std::lock_guard<std::mutex> lock(gameplay_hud_mutex_);
+            reset_gameplay_hud_state(gameplay_hud_);
+        }
+        publish_snapshot();
+        return;
     }
     const auto& result = session.result();
     if (peer_battle) {

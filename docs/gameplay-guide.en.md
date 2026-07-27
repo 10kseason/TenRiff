@@ -115,8 +115,8 @@ If this is not the layout you want, you can change it in `Options > Keymap`.
 ## 7. In-Game Controls
 
 - Chart key input: based on the current keymap
-- `Esc`: stop play
-- `F3`: decrease Hi-Speed
+- `Esc`: open the pause menu (Continue / Restart / Exit) in single-player; abort play in multiplayer
+- F3: decrease Hi-Speed
 - `F4`: increase Hi-Speed
 - `F5`: decrease Hi-Speed significantly
 - `F6`: increase Hi-Speed significantly

@@ -7,6 +7,7 @@
 - direct-IP multiplayer 与 preview r5 的输入 backend 生命周期修复已整合进 `1.1.8 stable`
 - `1.1.8` 在 1.1.7 视觉更新基础上加入 osu!mania OD8 辅助分数、首次原生 `BAD` 即结束的 `Sudden Death (1 MISS)`，以及确定性的 `LN Mix 10%～90%`
 - `1.2.0` 把 BMS 通道 `04/07` 和 osu!mania 背景接入 gameplay sample timeline，并通过 Windows ML 上的 LunaSR 异步放大低于 FHD 的图片背景
+- 当前补丁切换到 LunaSR `basic_v2`，对 gameplay BGA 和 Song Select 选中 BGI 进行放大，并加入单人 Esc 暂停菜单、多边形音符与 LN 尾帽开关。
 - 后续工作的基准文档是 [`docs/baseline-1.1.2.zh-CN.md`](baseline-1.1.2.zh-CN.md)
 - Windows GUI 构建是主目标
 - Linux 仅存在 [`Baepoks-Linuxs/TenRiff-0.5.0-linux-preview`](../Baepoks-Linuxs/TenRiff-0.5.0-linux-preview) 级别的 preview

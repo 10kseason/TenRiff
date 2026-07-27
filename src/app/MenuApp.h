@@ -126,6 +126,8 @@ private:
         bool game_over = false;
         bool spectating_peer = false;
         bool user_aborted = false;
+        bool paused = false;
+        int pause_menu_cursor = 0;
         bool loading = false;
         bool countdown_active = false;
         int countdown_value = 0;

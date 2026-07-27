@@ -7,6 +7,7 @@ This is the document that the next agent or any new contributor should read firs
 - Direct-IP multiplayer and the preview r5 input-backend lifecycle fixes are integrated into `1.1.8 stable`
 - `1.1.8` adds an osu!mania OD8 auxiliary score, first-native-`BAD` `Sudden Death (1 MISS)`, and deterministic `LN Mix 10%-90%` on top of the 1.1.7 visual refresh
 - `1.2.0` connects BMS channel `04/07` and osu!mania backgrounds to the gameplay sample timeline and asynchronously upscales sub-FHD image backgrounds through LunaSR on Windows ML
+- Current patch switches the runtime to LunaSR `basic_v2`, applies it to gameplay BGA layers and the selected Song Select BGI, adds the single-player Esc pause menu, and adds polygon note shapes plus an optional LN tail cap.
 - Baseline companion document for follow-up work: `docs/baseline-1.1.2.en.md`
 - Windows GUI build is the main target
 - Linux exists only as a preview-level package at `Baepoks-Linuxs/TenRiff-0.5.0-linux-preview`

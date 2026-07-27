@@ -182,7 +182,9 @@
   - LR2 playskin 的分辨率 override token
   - `auto` 会基于 LR2 playskin `#DST_NOTE` 的布局坐标，而不是 asset 文件名，来判断 SD/HD/FHD family
 - `note_shape` (string)
-  - `rect | circle`
+  - `rect | triangle | pentagon | hexagon | circle`
+- `show_hold_tail` (bool)
+  - 不改变长按音符判定和 body 连续性，仅显示或隐藏 tail cap
 - `note_border_enabled` (bool)
 - `judgement_line_position` (double)
   - gameplay 判定线的垂直位置比例

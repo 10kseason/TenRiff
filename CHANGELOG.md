@@ -4,6 +4,16 @@ TenRiff의 사용자/배포 관점에서 의미 있는 변경만 간단히 기�
 
 ## [Unreleased]
 
+### Added
+
+- 싱글플레이 중 `Esc`로 논리 재생 시간을 멈추는 pause menu를 열고 `계속하기 / 재시작 / 나가기`를 선택할 수 있도록 추가
+- native note skin에 `triangle / pentagon / hexagon` shape와 롱노트 tail cap 표시 토글을 추가
+
+### Changed
+
+- LunaSR runtime 모델을 `basic_v2_final.pt`에서 내보낸 공개 WinML ONNX로 교체하고, gameplay BGA base/overlay뿐 아니라 Song Select에서 선택된 FHD 미만 BGI에도 비동기 보간을 적용
+- pause 중 WASAPI stream은 silence로 유지하되 chart/audio/judgement의 논리 sample clock은 정지하도록 변경
+
 ## [1.2.0] - 2026-07-26
 
 ### Added

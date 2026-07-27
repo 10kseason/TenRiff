@@ -79,6 +79,7 @@
     "show_lane_dividers": true,
     "show_judgement_line": true,
     "show_gear_boundary_line": false,
+    "show_hold_tail": true,
     "hold_tail_taper_enabled": false,
     "judgement_line_glow_enabled": true,
     "key_pulse_enabled": true,
