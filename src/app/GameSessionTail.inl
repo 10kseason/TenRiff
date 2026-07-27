@@ -65,6 +65,9 @@ void GameSession::rebuild_input_thread_config(input::InputThreadConfig& input_co
             append_unique_key(keycode);
         }
         append_unique_key(escape_keycode_);
+        append_unique_key(up_keycode_);
+        append_unique_key(down_keycode_);
+        append_unique_key(enter_keycode_);
         append_unique_key(f3_keycode_);
         append_unique_key(f4_keycode_);
         append_unique_key(f5_keycode_);
@@ -79,7 +82,7 @@ void GameSession::note_runtime_input_event_source(const input::InputEvent& event
 
 void GameSession::rebuild_polled_gameplay_keys() {
     polled_gameplay_keys_.clear();
-    polled_gameplay_keys_.reserve(key_to_lane_.size() + 6);
+    polled_gameplay_keys_.reserve(key_to_lane_.size() + 9);
 
     auto append_unique_key = [this](uint32_t keycode) {
         if (keycode == 0) {
@@ -98,6 +101,9 @@ void GameSession::rebuild_polled_gameplay_keys() {
         append_unique_key(keycode);
     }
     append_unique_key(escape_keycode_);
+    append_unique_key(up_keycode_);
+    append_unique_key(down_keycode_);
+    append_unique_key(enter_keycode_);
     append_unique_key(f3_keycode_);
     append_unique_key(f4_keycode_);
     append_unique_key(f5_keycode_);
@@ -118,6 +124,15 @@ bool GameSession::initialize(const CommandLineOptions& options) {
     finished_.store(false, std::memory_order_release);
     spectating_peer_.store(false, std::memory_order_release);
     user_aborted_.store(false, std::memory_order_release);
+    paused_.store(false, std::memory_order_release);
+    pause_resume_requested_.store(false, std::memory_order_release);
+    restart_requested_.store(false, std::memory_order_release);
+    exit_requested_.store(false, std::memory_order_release);
+    pause_menu_cursor_.store(0, std::memory_order_release);
+    pause_sample_offset_ = 0;
+    pause_physical_start_sample_ = 0;
+    paused_chart_sample_ = 0;
+    pause_anchor_valid_ = false;
     last_audio_sample_.store(0, std::memory_order_release);
     audio_timing_sequence_.store(0, std::memory_order_release);
     last_audio_timing_ = {};
@@ -272,6 +287,9 @@ bool GameSession::initialize(const CommandLineOptions& options) {
         config_.speed.hi_speed = options.hispeed;
     }
     escape_keycode_ = config::KeycodeMap::to_keycode("Esc").value_or(0);
+    up_keycode_ = config::KeycodeMap::to_keycode("Up").value_or(0);
+    down_keycode_ = config::KeycodeMap::to_keycode("Down").value_or(0);
+    enter_keycode_ = config::KeycodeMap::to_keycode("Enter").value_or(0);
     f3_keycode_ = config::KeycodeMap::to_keycode("F3").value_or(0);
     f4_keycode_ = config::KeycodeMap::to_keycode("F4").value_or(0);
     f5_keycode_ = config::KeycodeMap::to_keycode("F5").value_or(0);
@@ -834,6 +852,8 @@ GameSession::HudSnapshot GameSession::hud_snapshot() {
     snapshot.finished = finished_.load(std::memory_order_acquire);
     snapshot.spectating_peer = spectating_peer_.load(std::memory_order_acquire);
     snapshot.user_aborted = user_aborted_.load(std::memory_order_acquire);
+    snapshot.paused = paused_.load(std::memory_order_acquire);
+    snapshot.pause_menu_cursor = pause_menu_cursor_.load(std::memory_order_acquire);
     snapshot.sample_rate = sample_rate_;
     snapshot.hud_publish_time_ns = timing::HighResClock::now_ns();
     snapshot.countdown_active = countdown_active_;
@@ -1711,7 +1731,9 @@ void GameSession::shutdown() {
     }
     input_thread_.shutdown();
     stop_chart_audio_workers();
-    if (engine_ && gameplay_started_) {
+    if (engine_ && gameplay_started_ &&
+        !restart_requested_.load(std::memory_order_acquire) &&
+        !exit_requested_.load(std::memory_order_acquire)) {
         bool engine_game_over = false;
         bool engine_finished = false;
         game::GaugeType final_gauge = game::GaugeType::Normal;
@@ -1828,6 +1850,12 @@ void GameSession::shutdown() {
     ghost_engine_.reset();
     clock_sync_.reset();
     current_playback_sample_ = 0;
+    pause_sample_offset_ = 0;
+    pause_physical_start_sample_ = 0;
+    paused_chart_sample_ = 0;
+    pause_anchor_valid_ = false;
+    paused_.store(false, std::memory_order_release);
+    pause_resume_requested_.store(false, std::memory_order_release);
     startup_input_timing_anchor_ = {};
     audio_timing_diagnostics_logged_ = false;
     countdown_active_ = false;
@@ -1884,13 +1912,22 @@ void GameSession::shutdown() {
 
 void GameSession::audio_callback(float* output,
                                  uint32_t frames,
-                                 int64_t buffer_start_samples,
-                                 int64_t playback_sample) {
+                                 int64_t physical_buffer_start_samples,
+                                 int64_t physical_playback_sample) {
     if (output && frames > 0) {
         std::fill(output, output + frames * 2, 0.0f);
     }
 
     bool engine_active = false;
+    bool paused_callback = false;
+    int64_t logical_buffer_start_samples =
+        gameplay_logical_sample(physical_buffer_start_samples, pause_sample_offset_);
+    int64_t logical_playback_sample =
+        gameplay_logical_sample(physical_playback_sample, pause_sample_offset_);
+    int64_t committed_sample = logical_buffer_start_samples + static_cast<int64_t>(frames);
+    int64_t committed_buffer_start_sample = logical_buffer_start_samples;
+    int64_t committed_playback_sample = logical_playback_sample;
+
     {
         std::lock_guard<std::mutex> lock(engine_mutex_);
         if (!engine_) {
@@ -1898,102 +1935,149 @@ void GameSession::audio_callback(float* output,
         }
         engine_active = true;
 
-        const int64_t buffer_end_samples = buffer_start_samples + static_cast<int64_t>(frames);
-        const int64_t lookahead_samples = ms_to_samples(static_cast<double>(kLookaheadMs), sample_rate_);
-
         const int64_t now_ns = timing::HighResClock::now_ns();
-        // Input timestamps must learn against the device head, not the future write cursor.
-        current_playback_sample_ = playback_sample;
-        startup_input_timing_anchor_ = StartupInputTimingAnchor{playback_sample, now_ns, true};
-        clock_sync_.add_sample(now_ns, playback_sample);
-        if (!audio_timing_diagnostics_logged_) {
-            const int64_t write_ahead_frames = (std::max)(int64_t{0}, buffer_start_samples - playback_sample);
-            const double write_ahead_ms =
-                (sample_rate_ > 0)
-                    ? (static_cast<double>(write_ahead_frames) * 1000.0 / static_cast<double>(sample_rate_))
-                    : 0.0;
-            std::cerr << "[info] Gameplay audio timing mode="
-                      << (audio_thread_.is_exclusive() ? "exclusive" : "shared")
-                      << " sample_rate=" << sample_rate_
-                      << " buffer_frames=" << audio_thread_.buffer_frames()
-                      << " callback_frames=" << frames
-                      << " write_ahead_frames=" << write_ahead_frames
-                      << " write_ahead_ms=" << write_ahead_ms
-                      << std::endl;
-            audio_timing_diagnostics_logged_ = true;
-        }
-        schedule_note_guides(buffer_start_samples, buffer_end_samples);
-        process_future_events(buffer_end_samples, lookahead_samples);
-        process_input_queue(buffer_start_samples, buffer_end_samples, lookahead_samples);
-        service_hispeed_repeat(now_ns);
-        process_autoplay_queue(buffer_end_samples, lookahead_samples);
-        process_ghost_replay_queue(buffer_end_samples, lookahead_samples);
-        engine_->advance(buffer_end_samples);
-        if (ghost_engine_) {
-            ghost_engine_->advance(buffer_end_samples);
-        }
+        if (paused_.load(std::memory_order_acquire)) {
+            if (!pause_anchor_valid_) {
+                pause_physical_start_sample_ = physical_buffer_start_samples;
+                paused_chart_sample_ = logical_buffer_start_samples;
+                pause_anchor_valid_ = true;
+            }
 
-        if (!lane_activity_.empty() && sample_rate_ > 0) {
-            const float decay = static_cast<float>(static_cast<double>(frames) * 5.0 /
-                                                   static_cast<double>(sample_rate_));
-            for (float& activity : lane_activity_) {
-                activity = std::max(0.0f, activity - decay);
+            current_playback_sample_ = paused_chart_sample_;
+            process_paused_input_queue();
+            if (stop_requested_.load(std::memory_order_acquire)) {
+                finished_.store(true, std::memory_order_release);
+            } else if (pause_resume_requested_.exchange(false, std::memory_order_acq_rel)) {
+                // Include this silent callback in the offset so the next audible
+                // buffer resumes at the exact chart sample where pause began.
+                const int64_t physical_resume_sample =
+                    physical_buffer_start_samples + static_cast<int64_t>(frames);
+                pause_sample_offset_ = gameplay_pause_resume_offset(
+                    pause_sample_offset_, pause_physical_start_sample_, physical_resume_sample);
+                pause_anchor_valid_ = false;
+                paused_.store(false, std::memory_order_release);
+                clock_sync_.reset();
+                startup_input_timing_anchor_ = {};
+                rebaseline_gameplay_start_input_state(paused_chart_sample_);
             }
-            for (float& activity : ghost_lane_activity_) {
-                activity = std::max(0.0f, activity - decay);
-            }
-        }
 
-        if (stop_requested_.load(std::memory_order_acquire)) {
-            finished_.store(true, std::memory_order_release);
-        } else if (engine_->is_game_over()) {
-            if (peer_battle_mode_) {
-                // Keep the synchronized chart/audio timeline alive while the
-                // defeated player watches the remaining peer. FinalScore stays
-                // single-shot and is sent only after this spectator phase ends.
-                spectating_peer_.store(true, std::memory_order_release);
-                result_transition_pending_ = false;
-                result_transition_sample_ = 0;
-            } else {
-                finished_.store(true, std::memory_order_release);
-            }
-        } else if (engine_->is_finished()) {
-            if (!result_transition_pending_) {
-                const int64_t tail_samples =
-                    ms_to_samples(std::max(0.0, config_.ui.result_tail_ms), sample_rate_);
-                result_transition_sample_ = buffer_end_samples + tail_samples;
-                result_transition_pending_ = true;
-            }
-            if (buffer_end_samples >= result_transition_sample_) {
-                finished_.store(true, std::memory_order_release);
-            }
+            committed_sample = paused_chart_sample_;
+            committed_buffer_start_sample = paused_chart_sample_;
+            committed_playback_sample = paused_chart_sample_;
+            paused_callback = true;
         } else {
-            result_transition_pending_ = false;
-            result_transition_sample_ = 0;
+            const int64_t buffer_end_samples =
+                logical_buffer_start_samples + static_cast<int64_t>(frames);
+            const int64_t lookahead_samples =
+                ms_to_samples(static_cast<double>(kLookaheadMs), sample_rate_);
+
+            // Input timestamps must learn against the device head, not the future write cursor.
+            current_playback_sample_ = logical_playback_sample;
+            startup_input_timing_anchor_ = StartupInputTimingAnchor{logical_playback_sample, now_ns, true};
+            clock_sync_.add_sample(now_ns, logical_playback_sample);
+            if (!audio_timing_diagnostics_logged_) {
+                const int64_t write_ahead_frames =
+                    (std::max)(int64_t{0}, logical_buffer_start_samples - logical_playback_sample);
+                const double write_ahead_ms =
+                    (sample_rate_ > 0)
+                        ? (static_cast<double>(write_ahead_frames) * 1000.0 /
+                           static_cast<double>(sample_rate_))
+                        : 0.0;
+                std::cerr << "[info] Gameplay audio timing mode="
+                          << (audio_thread_.is_exclusive() ? "exclusive" : "shared")
+                          << " sample_rate=" << sample_rate_
+                          << " buffer_frames=" << audio_thread_.buffer_frames()
+                          << " callback_frames=" << frames
+                          << " write_ahead_frames=" << write_ahead_frames
+                          << " write_ahead_ms=" << write_ahead_ms
+                          << std::endl;
+                audio_timing_diagnostics_logged_ = true;
+            }
+
+            schedule_note_guides(logical_buffer_start_samples, buffer_end_samples);
+            process_future_events(buffer_end_samples, lookahead_samples);
+            process_input_queue(logical_buffer_start_samples, buffer_end_samples, lookahead_samples);
+
+            if (paused_.load(std::memory_order_acquire)) {
+                pause_physical_start_sample_ = physical_buffer_start_samples;
+                paused_chart_sample_ = logical_buffer_start_samples;
+                pause_anchor_valid_ = true;
+                committed_sample = paused_chart_sample_;
+                committed_buffer_start_sample = paused_chart_sample_;
+                committed_playback_sample = paused_chart_sample_;
+                paused_callback = true;
+            } else {
+                service_hispeed_repeat(now_ns);
+                process_autoplay_queue(buffer_end_samples, lookahead_samples);
+                process_ghost_replay_queue(buffer_end_samples, lookahead_samples);
+                engine_->advance(buffer_end_samples);
+                if (ghost_engine_) {
+                    ghost_engine_->advance(buffer_end_samples);
+                }
+
+                if (!lane_activity_.empty() && sample_rate_ > 0) {
+                    const float decay = static_cast<float>(static_cast<double>(frames) * 5.0 /
+                                                           static_cast<double>(sample_rate_));
+                    for (float& activity : lane_activity_) {
+                        activity = std::max(0.0f, activity - decay);
+                    }
+                    for (float& activity : ghost_lane_activity_) {
+                        activity = std::max(0.0f, activity - decay);
+                    }
+                }
+
+                if (stop_requested_.load(std::memory_order_acquire)) {
+                    finished_.store(true, std::memory_order_release);
+                } else if (engine_->is_game_over()) {
+                    if (peer_battle_mode_) {
+                        // Keep the synchronized chart/audio timeline alive while the
+                        // defeated player watches the remaining peer. FinalScore stays
+                        // single-shot and is sent only after this spectator phase ends.
+                        spectating_peer_.store(true, std::memory_order_release);
+                        result_transition_pending_ = false;
+                        result_transition_sample_ = 0;
+                    } else {
+                        finished_.store(true, std::memory_order_release);
+                    }
+                } else if (engine_->is_finished()) {
+                    if (!result_transition_pending_) {
+                        const int64_t tail_samples =
+                            ms_to_samples(std::max(0.0, config_.ui.result_tail_ms), sample_rate_);
+                        result_transition_sample_ = buffer_end_samples + tail_samples;
+                        result_transition_pending_ = true;
+                    }
+                    if (buffer_end_samples >= result_transition_sample_) {
+                        finished_.store(true, std::memory_order_release);
+                    }
+                } else {
+                    result_transition_pending_ = false;
+                    result_transition_sample_ = 0;
+                }
+            }
         }
     }
 
-    if (engine_active) {
-        const int64_t buffer_end_samples = buffer_start_samples + static_cast<int64_t>(frames);
+    if (engine_active && !paused_callback) {
+        const int64_t buffer_end_samples =
+            logical_buffer_start_samples + static_cast<int64_t>(frames);
         schedule_chart_audio(buffer_end_samples);
-        mix_chart_audio(output, frames, buffer_start_samples);
-        mix_tones(output, frames, buffer_start_samples);
-        const float master_gain = static_cast<float>(std::clamp(config_.audio_ui.master_volume, 0.0, 1.0));
+        mix_chart_audio(output, frames, logical_buffer_start_samples);
+        mix_tones(output, frames, logical_buffer_start_samples);
+        const float master_gain =
+            static_cast<float>(std::clamp(config_.audio_ui.master_volume, 0.0, 1.0));
         clamp_output(output, frames, master_gain);
     }
 
-    const int64_t committed_sample = buffer_start_samples + static_cast<int64_t>(frames);
     const int64_t committed_time_ns = timing::HighResClock::now_ns();
     audio_timing_sequence_.fetch_add(1, std::memory_order_acq_rel);
     last_audio_timing_.sample = committed_sample;
-    last_audio_timing_.buffer_start_sample = buffer_start_samples;
-    last_audio_timing_.playback_sample = playback_sample;
+    last_audio_timing_.buffer_start_sample = committed_buffer_start_sample;
+    last_audio_timing_.playback_sample = committed_playback_sample;
     last_audio_timing_.time_ns = committed_time_ns;
     last_audio_timing_.buffer_frames = frames;
     audio_timing_sequence_.fetch_add(1, std::memory_order_release);
     last_audio_sample_.store(committed_sample, std::memory_order_release);
 }
-
 void GameSession::refresh_judgement_loop_timing() {
     judgement_loop_plan_ = build_judgement_loop_timing_plan(sample_rate_, config_.input.judgement_hz);
     judgement_loop_step_carry_ = 0;
@@ -2038,6 +2122,24 @@ void GameSession::process_countdown_input_queue() {
     }
 
     std::fill(lane_activity_.begin(), lane_activity_.end(), 0.0f);
+}
+
+void GameSession::process_paused_input_queue() {
+    while (true) {
+        auto maybe_event = input_thread_.queue().pop();
+        if (!maybe_event.has_value()) {
+            break;
+        }
+        note_runtime_input_event_source(*maybe_event);
+        (void)handle_control_input(*maybe_event);
+    }
+    while (future_events_.pop().has_value()) {
+    }
+    pending_input_events_.clear();
+    hispeed_decrease_held_ = false;
+    hispeed_increase_held_ = false;
+    std::fill(lane_activity_.begin(), lane_activity_.end(), 0.0f);
+    std::fill(ghost_lane_activity_.begin(), ghost_lane_activity_.end(), 0.0f);
 }
 
 void GameSession::rebaseline_gameplay_start_input_state(int64_t sample) {
@@ -2087,6 +2189,51 @@ void GameSession::rebaseline_gameplay_start_input_state(int64_t sample) {
 }
 
 bool GameSession::handle_control_input(const input::InputEvent& event) {
+    if (paused_.load(std::memory_order_acquire)) {
+        if (event.state != input::InputState::Pressed) {
+            return true;
+        }
+        if (f9_keycode_ != 0 && event.keycode == f9_keycode_) {
+            if (screenshot_callback_) {
+                screenshot_callback_();
+            }
+            return true;
+        }
+        if (escape_keycode_ != 0 && event.keycode == escape_keycode_) {
+            pause_resume_requested_.store(true, std::memory_order_release);
+            return true;
+        }
+        if (up_keycode_ != 0 && event.keycode == up_keycode_) {
+            const int cursor = pause_menu_cursor_.load(std::memory_order_acquire);
+            pause_menu_cursor_.store(wrap_gameplay_pause_cursor(cursor, -1), std::memory_order_release);
+            return true;
+        }
+        if (down_keycode_ != 0 && event.keycode == down_keycode_) {
+            const int cursor = pause_menu_cursor_.load(std::memory_order_acquire);
+            pause_menu_cursor_.store(wrap_gameplay_pause_cursor(cursor, 1), std::memory_order_release);
+            return true;
+        }
+        if (enter_keycode_ != 0 && event.keycode == enter_keycode_) {
+            switch (gameplay_pause_action_for_cursor(pause_menu_cursor_.load(std::memory_order_acquire))) {
+                case GameplayPauseAction::Continue:
+                    pause_resume_requested_.store(true, std::memory_order_release);
+                    break;
+                case GameplayPauseAction::Restart:
+                    restart_requested_.store(true, std::memory_order_release);
+                    user_aborted_.store(true, std::memory_order_release);
+                    stop_requested_.store(true, std::memory_order_release);
+                    finished_.store(true, std::memory_order_release);
+                    break;
+                case GameplayPauseAction::Exit:
+                    exit_requested_.store(true, std::memory_order_release);
+                    user_aborted_.store(true, std::memory_order_release);
+                    stop_requested_.store(true, std::memory_order_release);
+                    finished_.store(true, std::memory_order_release);
+                    break;
+            }
+        }
+        return true;
+    }
     if ((f3_keycode_ != 0 && event.keycode == f3_keycode_) ||
         (f4_keycode_ != 0 && event.keycode == f4_keycode_)) {
         update_hispeed_repeat_state(event.keycode, event.state, event.input_time_ns);
@@ -2110,9 +2257,17 @@ bool GameSession::handle_control_input(const input::InputEvent& event) {
     }
     if (escape_keycode_ != 0 && event.state == input::InputState::Pressed &&
         event.keycode == escape_keycode_) {
-        user_aborted_.store(true, std::memory_order_release);
-        stop_requested_.store(true, std::memory_order_release);
-        finished_.store(true, std::memory_order_release);
+        if (peer_battle_mode_ || !gameplay_started_) {
+            user_aborted_.store(true, std::memory_order_release);
+            stop_requested_.store(true, std::memory_order_release);
+            finished_.store(true, std::memory_order_release);
+        } else {
+            pause_menu_cursor_.store(0, std::memory_order_release);
+            pause_resume_requested_.store(false, std::memory_order_release);
+            paused_.store(true, std::memory_order_release);
+            hispeed_decrease_held_ = false;
+            hispeed_increase_held_ = false;
+        }
         return true;
     }
     return false;

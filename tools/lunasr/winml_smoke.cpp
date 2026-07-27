@@ -65,7 +65,7 @@ int wmain(int argc, wchar_t** argv) {
             argc > 1
                 ? std::filesystem::path(argv[1])
                 : std::filesystem::path(
-                      L"tools\\lunasr\\lunasr_general_mc65_ww35_dense8_b6_v1_540p_residual_winml_public.onnx");
+                      L"tools\\lunasr\\lunasr_basic_v2_dense8_b6_540p_residual_winml_public.onnx");
         if (!std::filesystem::is_regular_file(model_path)) {
             std::wcerr << L"model not found: " << model_path.c_str() << L'\n';
             return 2;

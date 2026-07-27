@@ -135,6 +135,7 @@ TEST_CASE("config defaults prefer 44100 Hz audio") {
     CHECK(config.skin.show_lane_dividers);
     CHECK(config.skin.show_judgement_line);
     CHECK_FALSE(config.skin.show_gear_boundary_line);
+    CHECK(config.skin.show_hold_tail);
     CHECK_FALSE(config.skin.hold_tail_taper_enabled);
     CHECK(config.skin.judgement_line_glow_enabled);
     CHECK(config.skin.key_pulse_enabled);
@@ -859,6 +860,7 @@ TEST_CASE("config save and load preserve skin gameplay settings") {
     config.skin.show_lane_dividers = false;
     config.skin.show_judgement_line = false;
     config.skin.show_gear_boundary_line = true;
+    config.skin.show_hold_tail = false;
     config.skin.hold_tail_taper_enabled = true;
     config.skin.judgement_line_position = 0.0;
     config.skin.combo_position = 0.52;
@@ -890,6 +892,7 @@ TEST_CASE("config save and load preserve skin gameplay settings") {
     CHECK_FALSE(result.config.skin.show_lane_dividers);
     CHECK_FALSE(result.config.skin.show_judgement_line);
     CHECK(result.config.skin.show_gear_boundary_line);
+    CHECK_FALSE(result.config.skin.show_hold_tail);
     CHECK(result.config.skin.hold_tail_taper_enabled);
     CHECK(result.config.skin.judgement_line_position == doctest::Approx(0.0));
     CHECK(result.config.skin.combo_position == doctest::Approx(0.52));
@@ -930,6 +933,13 @@ TEST_CASE("config save and load preserve skin gameplay settings") {
     CHECK(saved_16k[15] == "rose");
 }
 
+TEST_CASE("skin note shape normalization supports polygon choices") {
+    CHECK(tenriff::config::normalize_skin_note_shape_token("triangle") == "triangle");
+    CHECK(tenriff::config::normalize_skin_note_shape_token("pentagon") == "pentagon");
+    CHECK(tenriff::config::normalize_skin_note_shape_token("hexagon") == "hexagon");
+    CHECK(tenriff::config::normalize_skin_note_shape_token("rectangle") == "rect");
+    CHECK(tenriff::config::normalize_skin_note_shape_token("star") == "rect");
+}
 TEST_CASE("config clamps skin gameplay settings into supported range") {
     TempDirGuard temp;
     temp.path = make_temp_dir();
@@ -940,7 +950,7 @@ TEST_CASE("config clamps skin gameplay settings into supported range") {
     write_file(temp.path / "config" / "config.json",
                "{\n"
                "  \"skin\": {\n"
-               "    \"note_shape\": \"hexagon\",\n"
+               "    \"note_shape\": \"star\",\n"
                "    \"note_border_enabled\": false,\n"
                "    \"judgement_line_position\": 1.5,\n"
                "    \"combo_position\": 9.0,\n"

@@ -125,6 +125,8 @@
                 clamp_gameplay_hold_body_width_scale(preview.hold_body_width_scale);
             const double combo_position = clamp_gameplay_combo_position(preview.combo_position);
             const std::string note_shape = normalize_gameplay_note_shape(preview.note_shape);
+            ID2D1Geometry* note_polygon_geometry = gameplay_note_polygon_geometry(
+                d2d_->gameplay_note_shape_geometries, note_shape);
             const bool note_border_enabled = preview.note_border_enabled;
             const float preview_visual_opacity =
                 static_cast<float>(std::clamp(preview.visual_opacity, 0.20, 1.0));
@@ -269,10 +271,23 @@
                     }
                 }
 
+                if (draw_selected_hold_preview && preview.show_hold_tail && d2d_->note_fill_brush) {
+                    const float tail_y = std::max(field_layout.top + 20.0f, hit_line_y - field_height * 0.18f);
+                    const D2D1_RECT_F tail_rect =
+                        D2D1::RectF(x0, tail_y - tail_half_h, x1, tail_y + tail_half_h);
+                    draw_note_primitive(ctx,
+                                        tail_rect,
+                                        d2d_->note_fill_brush.Get(),
+                                        d2d_->note_border_brush.Get(),
+                                        0.85f,
+                                        note_shape,
+                                        note_border_enabled,
+                                        note_polygon_geometry);
+                }
                 const D2D1_RECT_F note_rect = D2D1::RectF(x0, y - head_half_h, x1, y + head_half_h);
                 if (d2d_->note_fill_brush) {
                     draw_note_primitive(ctx, note_rect, d2d_->note_fill_brush.Get(), d2d_->note_border_brush.Get(),
-                                        0.85f, note_shape, note_border_enabled);
+                                        0.85f, note_shape, note_border_enabled, note_polygon_geometry);
                 }
             }
 

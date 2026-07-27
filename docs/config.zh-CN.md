@@ -40,7 +40,7 @@
 
 - `backend` (string)
   - `polling | rawinput`
-  - 当前 `1.2.0` 发布线默认值为 `rawinput`
+  - 当前 `1.2.1` 发布线默认值为 `rawinput`
   - 可在 `Options -> Input Settings -> Backend` 或 `Options -> Profile Setup -> Input Backend` 中按 profile 选择
   - runtime fallback 不会把已保存值改写为 `polling`
   - 确认 RawInput 启动失败、注册目标丢失或 message window 退出后，本次应用运行期间 menu 与后续 gameplay 都会保持 Polling
@@ -182,7 +182,9 @@
   - LR2 playskin 的分辨率 override token
   - `auto` 会基于 LR2 playskin `#DST_NOTE` 的布局坐标，而不是 asset 文件名，来判断 SD/HD/FHD family
 - `note_shape` (string)
-  - `rect | circle`
+  - `rect | triangle | pentagon | hexagon | circle`
+- `show_hold_tail` (bool)
+  - 不改变长按音符判定和 body 连续性，仅显示或隐藏 tail cap
 - `note_border_enabled` (bool)
 - `judgement_line_position` (double)
   - gameplay 判定线的垂直位置比例

@@ -3,16 +3,17 @@
 This is the document that the next agent or any new contributor should read first. Its goal is to quickly answer: "what is this project now, where should I look, and what is still unverified?"
 
 ## Baseline
-- Current project version: `1.2.0 stable`
+- Current project version: `1.2.1 stable`
 - Direct-IP multiplayer and the preview r5 input-backend lifecycle fixes are integrated into `1.1.8 stable`
 - `1.1.8` adds an osu!mania OD8 auxiliary score, first-native-`BAD` `Sudden Death (1 MISS)`, and deterministic `LN Mix 10%-90%` on top of the 1.1.7 visual refresh
 - `1.2.0` connects BMS channel `04/07` and osu!mania backgrounds to the gameplay sample timeline and asynchronously upscales sub-FHD image backgrounds through LunaSR on Windows ML
+- `1.2.1` switches the runtime to LunaSR `basic_v2`, applies it to gameplay BGA layers and the selected Song Select BGI, adds the single-player Esc pause menu, and adds polygon note shapes plus an optional LN tail cap.
 - Baseline companion document for follow-up work: `docs/baseline-1.1.2.en.md`
 - Windows GUI build is the main target
 - Linux exists only as a preview-level package at `Baepoks-Linuxs/TenRiff-0.5.0-linux-preview`
 - Default surface is BMS-first
 - `.osu` can be re-enabled as an option and supports 4K-10K
-- The `1.2.0 stable` runtime keeps RawInput primary while continuously running a bound-key polling shadow in the same `InputThread`; startup failure or an unexpected message-pump exit switches that producer to Polling without resetting its queue or pressed state
+- The `1.2.1 stable` runtime keeps RawInput primary while continuously running a bound-key polling shadow in the same `InputThread`; startup failure or an unexpected message-pump exit switches that producer to Polling without resetting its queue or pressed state
 - Menu input keeps the foreground process/root-window boundary. A RawInput startup failure, process-global registration-target loss, or hidden message-window exit switches it to Polling without waiting for a user key.
 - A confirmed fallback stays active across menu and subsequent gameplay sessions for the current app run without rewriting the profile; app restart or an explicit `Options -> Input Settings -> Backend` change retries it.
 
@@ -160,7 +161,7 @@ This is the document that the next agent or any new contributor should read firs
 
 ## Runtime / Packaging Rules
 - New user profiles are created automatically
-- The current official P2P distribution line is `TenRiff 1.2.0 stable`
+- The current official P2P distribution line is `TenRiff 1.2.1 stable`
 - Distribution packages do not include `Songs`
 - Distribution packages include the runtime `Mainmusic/` assets used for menu BGM
 - Distribution updates include only built artifacts and required runtime assets

@@ -40,7 +40,7 @@ If a profile does not exist, it is created automatically on first launch.
 
 - `backend` (string)
   - `polling | rawinput`
-  - defaults to `rawinput` on the current `1.2.0` release line
+  - defaults to `rawinput` on the current `1.2.1` release line
   - selectable per profile under `Options -> Input Settings -> Backend` or `Options -> Profile Setup -> Input Backend`
   - runtime fallback never rewrites the saved value to `polling`
   - a confirmed RawInput startup failure, registration-target loss, or message-window exit latches Polling across menu and subsequent gameplay sessions for the current app run
@@ -60,7 +60,7 @@ If a profile does not exist, it is created automatically on first launch.
 - `judgement_hz` (int)
   - `1000 | 2000 | 4000 | 8000`
   - compatibility field kept in the input config
-  - the current `1.2.0` runtime no longer drives a separate audio-thread judgement sub-step loop from this value
+  - the current `1.2.1` runtime no longer drives a separate audio-thread judgement sub-step loop from this value
   - default is `4000` (`0.25ms`)
 - `debounce_ms` (double)
   - real Press/Release transitions are preserved; only duplicate same-state events are removed from pressed-state tracking
@@ -182,7 +182,9 @@ If a profile does not exist, it is created automatically on first launch.
   - LR2 playskin resolution override token
   - `auto` resolves the SD/HD/FHD family based on the LR2 playskin `#DST_NOTE` layout coordinates instead of asset file names
 - `note_shape` (string)
-  - `rect | circle`
+  - `rect | triangle | pentagon | hexagon | circle`
+- `show_hold_tail` (bool)
+  - shows or hides the long-note tail cap without changing hold judgement/body continuity
 - `note_border_enabled` (bool)
 - `judgement_line_position` (double)
   - vertical position ratio of the gameplay judgement line

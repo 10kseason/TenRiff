@@ -1,0 +1,18 @@
+{
+  "model": "basic_v2",
+  "scale": 2,
+  "input_layout": "NCHW",
+  "input_name": "luma_lr",
+  "input_shape": [1, 1, 540, 960],
+  "output_name": "luma_residual",
+  "output_shape": [1, 1, 1080, 1920],
+  "input_range": [0.0, 1.0],
+  "channels": 8,
+  "blocks": 6,
+  "block_kind": "dense",
+  "residual_gate": false,
+  "includes_bilinear_skip": false,
+  "opset": 18,
+  "ir_version": 9,
+  "composition": "clamp(bilinear_x2(rgb_lr) + luma_residual, 0, 1)"
+}

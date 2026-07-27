@@ -25,6 +25,8 @@ struct GameplayHudRevisionInput {
     bool game_over = false;
     bool spectating_peer = false;
     bool user_aborted = false;
+    bool paused = false;
+    int pause_menu_cursor = 0;
     bool loading = false;
     bool countdown_active = false;
     int countdown_value = 0;
@@ -188,6 +190,8 @@ inline GameplayHudRevisionFlags diff_gameplay_hud_revisions(const GameplayHudRev
         previous.hispeed != next.hispeed ||
         previous.has_feedback != next.has_feedback ||
         previous.feedback != next.feedback ||
+        previous.paused != next.paused ||
+        previous.pause_menu_cursor != next.pause_menu_cursor ||
         previous.spectating_peer != next.spectating_peer ||
         previous.peer_revision != next.peer_revision ||
         previous.ghost_visible != next.ghost_visible ||
@@ -212,6 +216,7 @@ inline GameplayHudRevisionFlags diff_gameplay_hud_revisions(const GameplayHudRev
         previous.game_over != next.game_over ||
         previous.spectating_peer != next.spectating_peer ||
         previous.user_aborted != next.user_aborted ||
+        previous.paused != next.paused ||
         previous.loading != next.loading ||
         previous.countdown_active != next.countdown_active ||
         previous.countdown_value != next.countdown_value ||

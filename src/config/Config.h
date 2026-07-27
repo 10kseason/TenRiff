@@ -107,6 +107,7 @@ struct SkinConfig {
     bool show_lane_dividers = true;
     bool show_judgement_line = true;
     bool show_gear_boundary_line = false;
+    bool show_hold_tail = true;
     bool hold_tail_taper_enabled = false;
     bool judgement_line_glow_enabled = true;
     bool key_pulse_enabled = true;

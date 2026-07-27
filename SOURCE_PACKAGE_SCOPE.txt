@@ -1,4 +1,4 @@
-TenRiff 1.2.0 stable open-source source package scope
+TenRiff 1.2.1 stable open-source source package scope
 
 Included in versioned source bundles:
 - CHANGELOG.md
@@ -49,6 +49,9 @@ Excluded from versioned source bundles:
 - P_DA.bme
 - 10k-calc/
 - tools/lunasr/HUGGINGFACE.md (private storage handoff only)
+- tools/lunasr/*.pt (private training checkpoints)
+- tools/lunasr/*_residual.onnx (private exporter intermediate)
+- tools/lunasr/*_winml.onnx (private compatibility intermediate; only `*_winml_public.onnx` is public)
 
 Notes:
 - The source bundle is intended to contain code, docs, config, and tests needed to inspect or rebuild the project.

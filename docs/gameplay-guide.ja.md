@@ -109,8 +109,8 @@ client 側の設定は Discord の [公式 Game Overlay guide](https://support.d
 ## 7. プレイ中の操作
 
 - 譜面キー入力: 現在の keymap に従う
-- `Esc`: プレイ停止
-- `F3`: Hi-Speed を下げる
+- `Esc`: single-player では pause menu（Continue / Restart / Exit）、multiplayer ではプレイを中止
+- F3: Hi-Speed を下げる
 - `F4`: Hi-Speed を上げる
 - `F5`: Hi-Speed を大きく下げる
 - `F6`: Hi-Speed を大きく上げる

@@ -115,8 +115,8 @@ Discord 설정 방법은 [공식 Game Overlay 안내](https://support.discord.co
 ## 7. 플레이 중 조작
 
 - 차트 키 입력: 현재 키맵 기준
-- `Esc`: 플레이 중단
-- `F3`: Hi-Speed 감소
+- `Esc`: 싱글플레이에서는 일시정지 메뉴(계속하기 / 재시작 / 나가기), 멀티플레이에서는 플레이 중단
+- F3: Hi-Speed 감소
 - `F4`: Hi-Speed 증가
 - `F5`: Hi-Speed 크게 감소
 - `F6`: Hi-Speed 크게 증가

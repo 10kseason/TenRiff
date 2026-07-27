@@ -20,6 +20,7 @@
 #include "app/CommandLine.h"
 #include "app/InputBackendStatus.h"
 #include "app/GameSessionInputTiming.h"
+#include "app/GameplayPauseMenu.h"
 #include "audio/AudioThread.h"
 #include "config/Config.h"
 #include "config/Keymap.h"
@@ -48,6 +49,8 @@ public:
         bool game_over = false;
         bool spectating_peer = false;
         bool user_aborted = false;
+        bool paused = false;
+        int pause_menu_cursor = 0;
         bool countdown_active = false;
         int countdown_value = 0;
 
@@ -158,6 +161,12 @@ public:
     }
     [[nodiscard]] HudSnapshot hud_snapshot();
     [[nodiscard]] bool was_user_aborted() const { return user_aborted_.load(std::memory_order_acquire); }
+    [[nodiscard]] bool was_restart_requested() const {
+        return restart_requested_.load(std::memory_order_acquire);
+    }
+    [[nodiscard]] bool was_exit_requested() const {
+        return exit_requested_.load(std::memory_order_acquire);
+    }
     [[nodiscard]] const GameSessionResult& result() const { return result_; }
     [[nodiscard]] double final_hispeed() const { return config_.speed.hi_speed; }
     [[nodiscard]] bool final_rawinput_enabled() const { return config_.input.rawinput; }
@@ -262,6 +271,7 @@ private:
     [[nodiscard]] int64_t next_judgement_loop_step_samples();
     void run_judgement_loop(int64_t buffer_start_samples, int64_t buffer_end_samples, int64_t lookahead_samples);
     void process_countdown_input_queue();
+    void process_paused_input_queue();
     void rebaseline_gameplay_start_input_state(int64_t sample);
     void process_future_events(int64_t buffer_end_samples, int64_t lookahead_samples);
     void process_input_queue(int64_t buffer_start_samples, int64_t buffer_end_samples, int64_t lookahead_samples);
@@ -343,6 +353,11 @@ private:
     std::atomic<bool> finished_{false};
     std::atomic<bool> spectating_peer_{false};
     std::atomic<bool> user_aborted_{false};
+    std::atomic<bool> paused_{false};
+    std::atomic<bool> pause_resume_requested_{false};
+    std::atomic<bool> restart_requested_{false};
+    std::atomic<bool> exit_requested_{false};
+    std::atomic<int> pause_menu_cursor_{0};
     std::atomic<int64_t> last_audio_sample_{0};
     std::atomic<uint64_t> audio_timing_sequence_{0};
     AudioTimingState last_audio_timing_{};
@@ -352,6 +367,9 @@ private:
     bool hispeed_decrease_held_ = false;
     bool hispeed_increase_held_ = false;
     uint32_t escape_keycode_ = 0;
+    uint32_t up_keycode_ = 0;
+    uint32_t down_keycode_ = 0;
+    uint32_t enter_keycode_ = 0;
     uint32_t f3_keycode_ = 0;
     uint32_t f4_keycode_ = 0;
     uint32_t f5_keycode_ = 0;
@@ -360,6 +378,10 @@ private:
 
     int64_t input_offset_samples_ = 0;
     int64_t current_playback_sample_ = 0;
+    int64_t pause_sample_offset_ = 0;
+    int64_t pause_physical_start_sample_ = 0;
+    int64_t paused_chart_sample_ = 0;
+    bool pause_anchor_valid_ = false;
     int sample_rate_ = 48000;
     JudgementLoopTimingPlan judgement_loop_plan_{};
     int64_t judgement_loop_step_carry_ = 0;

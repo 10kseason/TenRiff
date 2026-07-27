@@ -116,6 +116,7 @@ struct SongSelectData {
     std::string selected_song_artist;
     std::string selected_song_detail;
     std::string selected_song_background_path;
+    std::string background_upscale_mode = "lunasr";
     std::string selected_song_lamp;
     bool selected_song_favorite = false;
     std::string selected_song_collection_filter;
@@ -242,6 +243,8 @@ struct GameplayHudData {
     uint64_t text_revision = 0;
     bool active = false;
     bool loading = false;
+    bool paused = false;
+    int pause_menu_cursor = 0;
     bool countdown_active = false;
     int countdown_value = 0;
     int loading_percent = 0;
@@ -272,6 +275,7 @@ struct GameplayHudData {
     bool show_lane_dividers = true;
     bool show_judgement_line = true;
     bool show_gear_boundary_line = false;
+    bool show_hold_tail = true;
     bool hold_tail_taper_enabled = false;
     bool judgement_line_glow_enabled = true;
     bool key_pulse_enabled = true;
@@ -411,6 +415,7 @@ struct SkinPreviewData {
     bool show_lane_dividers = true;
     bool show_judgement_line = true;
     bool show_gear_boundary_line = false;
+    bool show_hold_tail = true;
     bool hold_tail_taper_enabled = false;
     bool judgement_line_glow_enabled = true;
     bool key_pulse_enabled = true;
@@ -696,7 +701,10 @@ private:
 
     struct SongSelectPreviewCache {
         std::string path{};
+        std::string upscale_mode = "off";
+        std::string requested_path{};
         bool attempted = false;
+        bool is_lunasr = false;
     };
 
     struct SongScrollbarState {
@@ -721,6 +729,7 @@ private:
     GameplayNoteSpriteCache gameplay_note_sprite_cache_{};
     GameplayBackgroundCache gameplay_background_cache_{};
     std::unique_ptr<LunaSrBackgroundUpscaler> gameplay_background_upscaler_{};
+    std::unique_ptr<LunaSrBackgroundUpscaler> song_select_background_upscaler_{};
     SongSelectPreviewCache song_select_preview_cache_{};
     std::string song_select_preview_signature_{};
     int64_t song_select_preview_load_hold_until_ns_ = 0;

@@ -115,7 +115,7 @@ Discord 客户端的设置方法请参考[官方 Game Overlay 指南](https://su
 ## 7. 游玩中的操作
 
 - 谱面按键输入：以当前 keymap 为准
-- `Esc`：中止游玩
+- `Esc`：单人模式打开暂停菜单（继续 / 重新开始 / 退出）；多人模式中止游玩
 - `F3`：降低 Hi-Speed
 - `F4`：提高 Hi-Speed
 - `F5`：大幅降低 Hi-Speed

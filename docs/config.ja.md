@@ -40,7 +40,7 @@ profile が存在しない場合は初回起動時に自動生成されます。
 
 - `backend` (string)
   - `polling | rawinput`
-  - 現行 `1.2.0` リリースラインの既定値は `rawinput`
+  - 現行 `1.2.1` リリースラインの既定値は `rawinput`
   - `Options -> Input Settings -> Backend` または `Options -> Profile Setup -> Input Backend` で profile ごとに選択可能
   - runtime fallback は保存済みの値を `polling` に書き換えない
   - RawInput の起動失敗、登録先の消失、message window の終了を確認すると、そのアプリ実行中は menu と後続 gameplay の両方で Polling を維持する
@@ -182,7 +182,9 @@ profile が存在しない場合は初回起動時に自動生成されます。
   - LR2 playskin resolution override token
   - `auto` は asset file 名ではなく `#DST_NOTE` レイアウト座標を見て SD/HD/FHD を解決
 - `note_shape` (string)
-  - `rect | circle`
+  - `rect | triangle | pentagon | hexagon | circle`
+- `show_hold_tail` (bool)
+  - long-note の判定と body の連続性を変えず、tail cap だけを表示または非表示にする
 - `note_border_enabled` (bool)
 - `judgement_line_position` (double)
   - gameplay judgement line の縦位置比率

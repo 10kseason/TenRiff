@@ -40,7 +40,7 @@ constexpr std::uint32_t kModelInputWidth = 960;
 constexpr std::uint32_t kModelInputHeight = 540;
 constexpr std::size_t kCachedFrameLimit = 3;
 constexpr wchar_t kModelFilename[] =
-    L"lunasr_general_mc65_ww35_dense8_b6_v1_540p_residual_winml_public.onnx";
+    L"lunasr_basic_v2_dense8_b6_540p_residual_winml_public.onnx";
 
 std::string lower_ascii(std::string_view value) {
     std::string result(value);

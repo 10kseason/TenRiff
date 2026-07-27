@@ -4,7 +4,7 @@ This roadmap captures the recommended high-level order for building out the game
 
 ## Current baseline
 - Windows GUI/runtime is the primary supported path.
-- Project version line is `1.2.0 stable`; this release adds sample-aligned BMS/osu background presentation and optional asynchronous LunaSR FHD upscaling through Windows ML.
+- Project version line is `1.2.1 stable`; this release updates LunaSR to Basic v2 and adds selected BGI upscaling, a single-player pause menu, polygon notes, and an LN tail-cap toggle.
 - BMS-first menu/runtime is active by default, with optional 4K-10K `.osu` support behind config/menu toggles.
 - For current shipped behavior, read `docs/current-state.md` first; this roadmap is about direction and remaining work.
 

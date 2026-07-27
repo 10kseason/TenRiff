@@ -675,6 +675,8 @@ void apply_config_object(const JsonObject& root, RuntimeConfig& config) {
             get_bool(*skin, "show_judgement_line", config.skin.show_judgement_line);
         config.skin.show_gear_boundary_line =
             get_bool(*skin, "show_gear_boundary_line", config.skin.show_gear_boundary_line);
+        config.skin.show_hold_tail =
+            get_bool(*skin, "show_hold_tail", config.skin.show_hold_tail);
         config.skin.hold_tail_taper_enabled =
             get_bool(*skin, "hold_tail_taper_enabled", config.skin.hold_tail_taper_enabled);
         config.skin.judgement_line_glow_enabled =
@@ -1031,6 +1033,7 @@ JsonValue build_json_root(const RuntimeConfig& config) {
     skin.emplace("show_lane_dividers", JsonValue{config.skin.show_lane_dividers});
     skin.emplace("show_judgement_line", JsonValue{config.skin.show_judgement_line});
     skin.emplace("show_gear_boundary_line", JsonValue{config.skin.show_gear_boundary_line});
+    skin.emplace("show_hold_tail", JsonValue{config.skin.show_hold_tail});
     skin.emplace("hold_tail_taper_enabled", JsonValue{config.skin.hold_tail_taper_enabled});
     skin.emplace("judgement_line_glow_enabled", JsonValue{config.skin.judgement_line_glow_enabled});
     skin.emplace("key_pulse_enabled", JsonValue{config.skin.key_pulse_enabled});
@@ -1288,20 +1291,24 @@ std::string normalize_skin_color_token(std::string_view token) {
 
 std::string normalize_skin_note_shape_token(std::string_view token) {
     const std::string normalized = to_lower_ascii(std::string(token));
-    if (normalized == "circle") {
-        return "circle";
+    if (normalized == "circle" || normalized == "triangle" || normalized == "pentagon" ||
+        normalized == "hexagon") {
+        return normalized;
+    }
+    if (normalized == "rectangle") {
+        return "rect";
     }
     return "rect";
 }
 
 std::string skin_note_shape_label(std::string_view token) {
     const std::string normalized = normalize_skin_note_shape_token(token);
-    if (normalized == "circle") {
-        return "Circle";
-    }
+    if (normalized == "circle") return "Circle";
+    if (normalized == "triangle") return "Triangle";
+    if (normalized == "pentagon") return "Pentagon";
+    if (normalized == "hexagon") return "Hexagon";
     return "Rect";
 }
-
 std::string skin_color_label(std::string_view token) {
     const std::string normalized = normalize_skin_color_token(token);
     for (const auto& entry : skin_palette_entries()) {

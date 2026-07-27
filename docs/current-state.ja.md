@@ -3,16 +3,17 @@
 この文書は、次のエージェントや新しい作業者が最初に読むべき current-state 文書です。目的は、「このプロジェクトは今どういう状態で、どこを見ればよく、何がまだ未検証か」を素早く把握できるようにすることです。
 
 ## Baseline
-- 現在のプロジェクト版は `1.2.0 stable`
+- 現在のプロジェクト版は `1.2.1 stable`
 - direct-IP multiplayer と preview r5 の input-backend lifecycle 修正は `1.1.8 stable` に統合
 - `1.1.8` は 1.1.7 の visual refresh に osu!mania OD8 補助スコア、最初の native `BAD` で終了する `Sudden Death (1 MISS)`、決定的な `LN Mix 10%～90%` を追加
 - `1.2.0` は BMS channel `04/07` と osu!mania 背景を gameplay sample timeline に接続し、FHD 未満の画像背景を Windows ML 上の LunaSR で非同期補間
+- `1.2.1` は LunaSR `basic_v2` へ切り替え、gameplay BGA と Song Select の選択 BGI を補間し、single-player の Esc pause menu、polygon note shape、LN tail cap toggle を追加します。
 - 後続作業の基準文書は `docs/baseline-1.1.2.ja.md`
 - Windows GUI ビルドが主対象
 - Linux は `Baepoks-Linuxs/TenRiff-0.5.0-linux-preview` レベルの preview のみ
 - 既定サーフェスは BMS-first
 - `.osu` はオプションで再有効化でき、4K-10K をサポート
-- `1.2.0 stable` の gameplay 入力は RawInput を優先しつつ、同じ `InputThread` で bound-key polling shadow を常時動作させる。起動失敗または message pump の予期しない終了時も queue / pressed state を reset せず、その producer を Polling に切り替える
+- `1.2.1 stable` の gameplay 入力は RawInput を優先しつつ、同じ `InputThread` で bound-key polling shadow を常時動作させる。起動失敗または message pump の予期しない終了時も queue / pressed state を reset せず、その producer を Polling に切り替える
 - menu 入力は従来の foreground process/root-window 境界を維持する。RawInput の起動失敗、process-global 登録先の消失、hidden message window の終了を検知すると、ユーザー入力を待たず Polling に切り替える。
 - 確認済み fallback は profile を書き換えず、そのアプリ実行中の menu と後続 gameplay に維持する。アプリ再起動または `Options -> Input Settings -> Backend` の明示変更で再試行する。
 
@@ -156,7 +157,7 @@
 
 ## Runtime / Packaging Rules
 - 新しい user profile は自動生成される
-- 現在の正式 P2P 配布ラインは `TenRiff 1.2.0 stable`
+- 現在の正式 P2P 配布ラインは `TenRiff 1.2.1 stable`
 - distribution package には `Songs` を含めない
 - distribution package には menu BGM 用の `Mainmusic/` runtime asset を含める
 - distribution 更新には built artifact と必要な runtime asset だけを含める
