@@ -50,7 +50,7 @@
     "vsync": false,
     "refresh_hz": 300,
     "performance_overlay": false,
-    "background_upscale_mode": "lunasr"
+    "background_upscale_mode": "off"
   },
   "mode": {
     "format": "bms",

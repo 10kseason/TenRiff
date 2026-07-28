@@ -272,7 +272,7 @@ void MenuApp::populate_graphics_settings_render_data(render::MenuRenderData& ren
                     render::MenuHitTargetKind::SettingsRow, 4, false, true);
     append_menu_row(render.generic, ui_text("BGA Upscale", "BGA 업스케일"),
                     config::normalize_background_upscale_mode(config_.graphics.background_upscale_mode) == "lunasr"
-                        ? "LunaSR FHD"
+                        ? "External LunaSR"
                         : ui_text("Native", "원본"),
                     settings_cursor_ == 5,
                     render::MenuHitTargetKind::SettingsRow, 5, false, true);

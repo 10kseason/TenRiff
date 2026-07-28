@@ -72,7 +72,7 @@ struct GraphicsConfig {
     bool vsync = false;
     int refresh_hz = 300;
     bool performance_overlay = false;
-    std::string background_upscale_mode = "lunasr";
+    std::string background_upscale_mode = "off";
 };
 
 struct AudioUiConfig {

@@ -98,7 +98,10 @@ TEST_CASE("config defaults prefer 44100 Hz audio") {
     CHECK(tenriff::config::kJudgementLinePositionMax == doctest::Approx(1.0));
     CHECK_FALSE(config.graphics.vsync);
     CHECK(config.graphics.refresh_hz == 300);
-    CHECK(config.graphics.background_upscale_mode == "lunasr");
+    CHECK(config.graphics.background_upscale_mode == "off");
+    CHECK(tenriff::config::normalize_background_upscale_mode("lunasr") == "lunasr");
+    CHECK(tenriff::config::normalize_background_upscale_mode("native") == "off");
+    CHECK(tenriff::config::normalize_background_upscale_mode("unexpected") == "off");
     CHECK(config.gauge.ex_hard.pg == doctest::Approx(kCurrentExHardPg));
     CHECK(config.gauge.ex_hard.gr == doctest::Approx(kCurrentExHardGr));
     CHECK(config.gauge.ex_hard.gd == doctest::Approx(kCurrentExHardGd));
