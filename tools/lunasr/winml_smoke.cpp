@@ -65,7 +65,7 @@ int wmain(int argc, wchar_t** argv) {
             argc > 1
                 ? std::filesystem::path(argv[1])
                 : std::filesystem::path(
-                      L"tools\\lunasr\\lunasr_quality_rgb_staged32_intel_npu_x2_v1_e48_540p_rgb_residual_fp16_winml_public.onnx");
+                      L"tools\\lunasr\\lunasr_quality_rgb_staged32_intel_npu_x2_v1_e48_540p_rgb_residual_int8_qdq_winml_public.onnx");
         if (!std::filesystem::is_regular_file(model_path)) {
             std::wcerr << L"model not found: " << model_path.c_str() << L'\n';
             return 2;
@@ -82,9 +82,9 @@ int wmain(int argc, wchar_t** argv) {
         const std::vector<std::int64_t> input_shape{1, 3, 540, 960};
         const std::vector<std::int64_t> output_shape{1, 3, 1080, 1920};
         std::vector<float> input(3u * 540u * 960u, 0.5f);
-        const ml::TensorFloat16Bit input_tensor =
-            ml::TensorFloat16Bit::CreateFromArray(input_shape, input);
-        const ml::TensorFloat16Bit output_tensor = ml::TensorFloat16Bit::Create(output_shape);
+        const ml::TensorFloat input_tensor =
+            ml::TensorFloat::CreateFromArray(input_shape, input);
+        const ml::TensorFloat output_tensor = ml::TensorFloat::Create(output_shape);
         binding.Bind(L"rgb_lr", input_tensor);
         binding.Bind(L"rgb_residual_x2", output_tensor);
         const auto evaluate_started = std::chrono::steady_clock::now();

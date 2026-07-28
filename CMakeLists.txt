@@ -258,7 +258,7 @@ endif()
 
 if(WIN32 AND MSVC AND TENRIFF_ENABLE_LUNASR)
     set(TENRIFF_LUNASR_MODEL
-        "${CMAKE_CURRENT_SOURCE_DIR}/tools/lunasr/lunasr_quality_rgb_staged32_intel_npu_x2_v1_e48_540p_rgb_residual_fp16_winml_public.onnx")
+        "${CMAKE_CURRENT_SOURCE_DIR}/tools/lunasr/lunasr_quality_rgb_staged32_intel_npu_x2_v1_e48_540p_rgb_residual_int8_qdq_winml_public.onnx")
     add_custom_command(TARGET tenriff POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E make_directory
                 "$<TARGET_FILE_DIR:tenriff>/tools/lunasr"
@@ -266,6 +266,7 @@ if(WIN32 AND MSVC AND TENRIFF_ENABLE_LUNASR)
                 "$<TARGET_FILE_DIR:tenriff>/tools/lunasr/lunasr_general_mc65_ww35_dense8_b6_v1_540p_residual_winml.onnx"
                 "$<TARGET_FILE_DIR:tenriff>/tools/lunasr/lunasr_general_mc65_ww35_dense8_b6_v1_540p_residual_winml_public.onnx"
                 "$<TARGET_FILE_DIR:tenriff>/tools/lunasr/lunasr_basic_v2_dense8_b6_540p_residual_winml_public.onnx"
+                "$<TARGET_FILE_DIR:tenriff>/tools/lunasr/lunasr_quality_rgb_staged32_intel_npu_x2_v1_e48_540p_rgb_residual_fp16_winml_public.onnx"
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
                 "${TENRIFF_LUNASR_MODEL}"
                 "$<TARGET_FILE_DIR:tenriff>/tools/lunasr/"

@@ -41,7 +41,7 @@ constexpr std::uint32_t kModelInputWidth = 960;
 constexpr std::uint32_t kModelInputHeight = 540;
 constexpr std::size_t kCachedFrameLimit = 3;
 constexpr wchar_t kModelFilename[] =
-    L"lunasr_quality_rgb_staged32_intel_npu_x2_v1_e48_540p_rgb_residual_fp16_winml_public.onnx";
+    L"lunasr_quality_rgb_staged32_intel_npu_x2_v1_e48_540p_rgb_residual_int8_qdq_winml_public.onnx";
 constexpr int kBenchmarkWarmupFrames = 3;
 constexpr int kBenchmarkTimedFrames = 12;
 
@@ -370,9 +370,9 @@ bool pass_process_benchmark_gate(
         std::vector<float> input(static_cast<std::size_t>(kModelInputWidth) *
                                  kModelInputHeight * 3,
                                  0.5f);
-        const ml::TensorFloat16Bit input_tensor =
-            ml::TensorFloat16Bit::CreateFromArray(input_shape, input);
-        const ml::TensorFloat16Bit output_tensor = ml::TensorFloat16Bit::Create(output_shape);
+        const ml::TensorFloat input_tensor =
+            ml::TensorFloat::CreateFromArray(input_shape, input);
+        const ml::TensorFloat output_tensor = ml::TensorFloat::Create(output_shape);
         ml::LearningModelBinding binding(session);
         binding.Bind(L"rgb_lr", input_tensor);
         binding.Bind(L"rgb_residual_x2", output_tensor);
@@ -539,10 +539,10 @@ struct LunaSrBackgroundUpscaler::Impl {
                     continue;
                 }
 
-                const ml::TensorFloat16Bit input_tensor =
-                    ml::TensorFloat16Bit::CreateFromArray(input_shape, rgb);
-                const ml::TensorFloat16Bit output_tensor =
-                    ml::TensorFloat16Bit::Create(output_shape);
+                const ml::TensorFloat input_tensor =
+                    ml::TensorFloat::CreateFromArray(input_shape, rgb);
+                const ml::TensorFloat output_tensor =
+                    ml::TensorFloat::Create(output_shape);
                 ml::LearningModelBinding binding(session);
                 binding.Bind(L"rgb_lr", input_tensor);
                 binding.Bind(L"rgb_residual_x2", output_tensor);

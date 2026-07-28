@@ -1,0 +1,69 @@
+{
+  "name": "LunaSR Quality RGB Staged32 x2 INT8 QDQ",
+  "source_checkpoint_sha256": "4027c43462e5422be23d2eed72056cf294e41390103fa79c62ddd36a5b5181ba",
+  "source_fp32_model_sha256": "12b93fd0f7d60cb5bbda80215f9b4eac78e241c83a3307821d3474830bac52f0",
+  "runtime_model": "lunasr_quality_rgb_staged32_intel_npu_x2_v1_e48_540p_rgb_residual_int8_qdq_winml_public.onnx",
+  "runtime_sha256": "4a74dbb8ff59257e71325911e90eb460feb3b15429fd992e035bbacc4619f557",
+  "runtime_bytes": 503736,
+  "ir_version": 9,
+  "opset": 18,
+  "parameters": 290222,
+  "input": {
+    "name": "rgb_lr",
+    "dtype": "float32",
+    "shape": [1, 3, 540, 960]
+  },
+  "output": {
+    "name": "rgb_residual_x2",
+    "dtype": "float32",
+    "shape": [1, 3, 1080, 1920]
+  },
+  "composition": "clamp(bilinear_x2(rgb_lr) + rgb_residual_x2, 0, 1)",
+  "quantization": {
+    "format": "static S8S8 QDQ",
+    "activation_dtype": "int8",
+    "weight_dtype": "int8",
+    "model_boundary_dtype": "float32",
+    "per_channel_weights": true,
+    "calibration_method": "MinMax symmetric",
+    "calibration_domains": 2,
+    "calibration_samples": 16,
+    "quantized_conv_nodes": 35,
+    "conv_nodes": 35,
+    "operator_counts": {
+      "DequantizeLinear": 135,
+      "QuantizeLinear": 67,
+      "Conv": 35,
+      "Relu": 19,
+      "Add": 22,
+      "DepthToSpace": 5
+    }
+  },
+  "quality_validation": {
+    "comparison": "INT8 QDQ versus the source FP32 ONNX on four held-out real game frames",
+    "max_abs_diff": 0.049231831915676594,
+    "mean_abs_diff": 0.002243374089030124,
+    "mean_rmse": 0.00334295598177384,
+    "minimum_composed_rgb_psnr_db": 47.37285839970422,
+    "mean_composed_rgb_psnr_db": 49.89332673667086,
+    "status": "measured"
+  },
+  "winml_verification": {
+    "model_load": "passed",
+    "directx_session_compile": "passed",
+    "evaluate": "passed",
+    "output_values": 6220800,
+    "performance_result": "deferred because the GPU was concurrently occupied by training"
+  },
+  "runtime_gate": {
+    "minimum_inference_fps": 35.0,
+    "warmup_frames": 3,
+    "timed_frames": 12,
+    "failure_behavior": "disable LunaSR for the process and keep native BGA/BGI scaling"
+  },
+  "hardware_guidance": {
+    "estimated_recommendation": "NVIDIA GeForce RTX 3070-class or faster",
+    "guaranteed": false,
+    "note": "Activation is decided by the per-process 35 FPS benchmark after current system load is applied."
+  }
+}
