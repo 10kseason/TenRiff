@@ -1,10 +1,23 @@
 #include "app/MenuApp.h"
 
 #include <cmath>
+#include <filesystem>
+#include <iterator>
+#include <optional>
+
+#ifdef _WIN32
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#include <shobjidl.h>
+#include <wrl/client.h>
+#endif
 
 #include "app/GraphicsTiming.h"
 #include "app/MenuAppSettingsUtils.h"
 #include "app/MenuAppSkinUtils.h"
+#include "util/Utf8Compat.h"
 
 namespace tenriff::app {
 
@@ -14,6 +27,70 @@ const int kPollingOptions[] = {1000, 2000, 4000, 8000};
 const int kDebounceMsOptions[] = {0, 2, 4, 6, 8, 10, 12};
 const int kCalibrationStepOptions[] = {1, 5, 10, 25};
 
+std::string onnx_model_label(std::string_view model_path, std::string_view empty_label) {
+    if (model_path.empty()) {
+        return std::string(empty_label);
+    }
+    try {
+        const std::string filename = util::path_from_utf8_lossy(model_path).filename().u8string();
+        return util::sanitize_ui_text(filename.empty() ? std::string(model_path) : filename);
+    } catch (...) {
+        return util::sanitize_ui_text(model_path);
+    }
+}
+
+#ifdef _WIN32
+std::optional<std::string> pick_onnx_model_dialog_utf8() {
+    const HRESULT init_hr =
+        CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
+    const bool should_uninitialize = SUCCEEDED(init_hr);
+
+    Microsoft::WRL::ComPtr<IFileOpenDialog> dialog;
+    if (FAILED(CoCreateInstance(CLSID_FileOpenDialog,
+                                nullptr,
+                                CLSCTX_INPROC_SERVER,
+                                IID_PPV_ARGS(&dialog))) ||
+        !dialog) {
+        if (should_uninitialize) {
+            CoUninitialize();
+        }
+        return std::nullopt;
+    }
+
+    DWORD options = 0;
+    if (FAILED(dialog->GetOptions(&options))) {
+        if (should_uninitialize) {
+            CoUninitialize();
+        }
+        return std::nullopt;
+    }
+    dialog->SetOptions(options | FOS_FORCEFILESYSTEM | FOS_FILEMUSTEXIST | FOS_PATHMUSTEXIST);
+    const COMDLG_FILTERSPEC filters[] = {
+        {L"ONNX model (*.onnx)", L"*.onnx"},
+        {L"All files (*.*)", L"*.*"},
+    };
+    dialog->SetFileTypes(static_cast<UINT>(std::size(filters)), filters);
+    dialog->SetFileTypeIndex(1);
+    dialog->SetDefaultExtension(L"onnx");
+    dialog->SetTitle(L"Select external ONNX upscaler");
+
+    std::optional<std::string> result;
+    if (SUCCEEDED(dialog->Show(nullptr))) {
+        Microsoft::WRL::ComPtr<IShellItem> item;
+        if (SUCCEEDED(dialog->GetResult(&item)) && item) {
+            PWSTR raw_path = nullptr;
+            if (SUCCEEDED(item->GetDisplayName(SIGDN_FILESYSPATH, &raw_path)) && raw_path) {
+                result = std::filesystem::path(raw_path).u8string();
+                CoTaskMemFree(raw_path);
+            }
+        }
+    }
+    if (should_uninitialize) {
+        CoUninitialize();
+    }
+    return result;
+}
+#endif
 int next_option_index(const int* options, int count, int current, int direction) {
     int index = 0;
     int best_distance = count > 0 ? std::abs(options[0] - current) : 0;
@@ -41,7 +118,7 @@ int next_option_index(const int* options, int count, int current, int direction)
 }  // namespace
 
 void MenuApp::handle_graphics_settings_input(uint32_t keycode) {
-    const int item_count = 9;
+    const int item_count = 10;
     if (keycode == key_up_) {
         settings_cursor_ = clamp_int(settings_cursor_ - 1, 0, item_count - 1);
         publish_snapshot();
@@ -92,23 +169,36 @@ void MenuApp::handle_graphics_settings_input(uint32_t keycode) {
         publish_snapshot();
         return;
     }
-    if (settings_cursor_ == 5 && (keycode == key_left_ || keycode == key_right_)) {
+    if (settings_cursor_ == 5 &&
+        (keycode == key_left_ || keycode == key_right_ || keycode == key_enter_)) {
         config_.graphics.background_upscale_mode =
-            config::normalize_background_upscale_mode(config_.graphics.background_upscale_mode) == "lunasr"
+            config::normalize_background_upscale_mode(config_.graphics.background_upscale_mode) == "onnx"
                 ? "off"
-                : "lunasr";
+                : "onnx";
         graphics_dirty_ = true;
         publish_snapshot();
         return;
     }
-    if (settings_cursor_ == 6 && (keycode == key_left_ || keycode == key_right_)) {
+    if (settings_cursor_ == 6 &&
+        (keycode == key_left_ || keycode == key_right_ || keycode == key_enter_)) {
+#ifdef _WIN32
+        if (const auto selected = pick_onnx_model_dialog_utf8(); selected.has_value()) {
+            config_.graphics.background_upscale_model_path = selected.value();
+            config_.graphics.background_upscale_mode = "onnx";
+            graphics_dirty_ = true;
+        }
+#endif
+        publish_snapshot();
+        return;
+    }
+    if (settings_cursor_ == 7 && (keycode == key_left_ || keycode == key_right_)) {
         config_.ui.language =
             (config::normalize_ui_language_token(config_.ui.language) == "ko") ? "en" : "ko";
         graphics_dirty_ = true;
         publish_snapshot();
         return;
     }
-    if (settings_cursor_ == 7 && (keycode == key_left_ || keycode == key_right_)) {
+    if (settings_cursor_ == 8 && (keycode == key_left_ || keycode == key_right_)) {
         const int direction = (keycode == key_left_) ? -1 : 1;
         config_.visual_offset_ms = clamp_step_value(
             config_.visual_offset_ms + static_cast<double>(direction) * kVisualOffsetStep,
@@ -118,7 +208,9 @@ void MenuApp::handle_graphics_settings_input(uint32_t keycode) {
         return;
     }
 
-    if (keycode == key_enter_ || keycode == key_escape_ || keycode == key_backspace_) {
+    const bool back_requested = keycode == key_escape_ || keycode == key_backspace_ ||
+                                (keycode == key_enter_ && settings_cursor_ == item_count - 1);
+    if (back_requested) {
         screen_ = submenu_return_screen_;
         settings_cursor_ = 0;
         if (graphics_dirty_) {
@@ -270,17 +362,22 @@ void MenuApp::populate_graphics_settings_render_data(render::MenuRenderData& ren
                     render::MenuHitTargetKind::SettingsRow, 3, false, true);
     append_menu_row(render.generic, ui_text("Performance HUD", "성능 HUD"), ui_on_off(config_.graphics.performance_overlay), settings_cursor_ == 4,
                     render::MenuHitTargetKind::SettingsRow, 4, false, true);
-    append_menu_row(render.generic, ui_text("BGA Upscale", "BGA 업스케일"),
-                    config::normalize_background_upscale_mode(config_.graphics.background_upscale_mode) == "lunasr"
-                        ? "External LunaSR"
+    append_menu_row(render.generic, ui_text("BGA Upscaler", "BGA 업스케일러"),
+                    config::normalize_background_upscale_mode(config_.graphics.background_upscale_mode) == "onnx"
+                        ? "External ONNX"
                         : ui_text("Native", "원본"),
                     settings_cursor_ == 5,
                     render::MenuHitTargetKind::SettingsRow, 5, false, true);
-    append_menu_row(render.generic, ui_text("Language", "언어"), ui_language_label(config_.ui.language), settings_cursor_ == 6,
-                    render::MenuHitTargetKind::SettingsRow, 6, false, true);
-    append_menu_row(render.generic, ui_text("Display Offset", "표시 오프셋"), format_signed_offset_ms(config_.visual_offset_ms), settings_cursor_ == 7,
+    append_menu_row(render.generic, ui_text("ONNX Model", "ONNX 모델"),
+                    onnx_model_label(config_.graphics.background_upscale_model_path,
+                                     ui_text("Select...", "선택...")),
+                    settings_cursor_ == 6,
+                    render::MenuHitTargetKind::SettingsRow, 6, false, false);
+    append_menu_row(render.generic, ui_text("Language", "언어"), ui_language_label(config_.ui.language), settings_cursor_ == 7,
                     render::MenuHitTargetKind::SettingsRow, 7, false, true);
-    append_menu_row(render.generic, ui_text("Back", "뒤로"), "", settings_cursor_ == 8, render::MenuHitTargetKind::SettingsRow, 8, true, false);
+    append_menu_row(render.generic, ui_text("Display Offset", "표시 오프셋"), format_signed_offset_ms(config_.visual_offset_ms), settings_cursor_ == 8,
+                    render::MenuHitTargetKind::SettingsRow, 8, false, true);
+    append_menu_row(render.generic, ui_text("Back", "뒤로"), "", settings_cursor_ == 9, render::MenuHitTargetKind::SettingsRow, 9, true, false);
     if (normalize_display_mode(config_.graphics.display_mode) == "fullscreen") {
         render.generic.notes.push_back(ui_text(
             "Discord's current voice overlay does not work in Exclusive Fullscreen. Switch Display to Borderless or Windowed.",
@@ -297,8 +394,11 @@ void MenuApp::populate_graphics_settings_render_data(render::MenuRenderData& ren
     render.generic.notes.push_back(ui_text("Menu rendering is capped at 300 Hz. Gameplay uses the configured value up to 1050 Hz.",
                                            "메뉴 렌더링은 300Hz까지 제한되고, 게임플레이는 설정값을 최대 1050Hz까지 사용합니다."));
     render.generic.notes.push_back(ui_text(
-        "LunaSR runs only after the RGB x2 benchmark reaches 35 FPS. MPG video uses FFmpeg when the system codec fails; native scaling remains active after any failure.",
-        "LunaSR는 RGB x2 벤치마크가 35 FPS 이상일 때만 동작합니다. MPG 시스템 코덱 실패 시 FFmpeg를 사용하며, 모든 실패 후에는 원본 확대를 유지합니다."));
+        "Choose a compatible RGB residual x2 ONNX model. It runs only after the 35 FPS benchmark passes; any load, contract, or inference failure keeps native scaling.",
+        "호환되는 RGB residual x2 ONNX 모델을 지정하세요. 35 FPS 벤치마크 통과 후에만 실행되며 로드·계약·추론 실패 시 원본 확대를 유지합니다."));
+    render.generic.notes.push_back(ui_text(
+        "Press Enter on ONNX Model or drop an .onnx file on this screen. Public packages do not include a model.",
+        "ONNX 모델에서 Enter를 누르거나 이 화면에 .onnx 파일을 놓으세요. 공개 패키지에는 모델이 포함되지 않습니다."));
     render.generic.notes.push_back(ui_text("Language changes the menu UI immediately. Display Offset shifts only visuals from -500ms to +500ms.",
                                            "언어는 메뉴 UI에 즉시 반영됩니다. 표시 오프셋은 시각 요소만 -500ms~+500ms 범위에서 이동합니다."));
     render.generic.notes.push_back(ui_text("Display, Resolution, Refresh Hz, and VSync apply immediately. Back saves and returns.",

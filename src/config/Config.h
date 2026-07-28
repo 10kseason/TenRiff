@@ -73,6 +73,7 @@ struct GraphicsConfig {
     int refresh_hz = 300;
     bool performance_overlay = false;
     std::string background_upscale_mode = "off";
+    std::string background_upscale_model_path;
 };
 
 struct AudioUiConfig {

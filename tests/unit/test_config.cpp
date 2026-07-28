@@ -99,7 +99,9 @@ TEST_CASE("config defaults prefer 44100 Hz audio") {
     CHECK_FALSE(config.graphics.vsync);
     CHECK(config.graphics.refresh_hz == 300);
     CHECK(config.graphics.background_upscale_mode == "off");
-    CHECK(tenriff::config::normalize_background_upscale_mode("lunasr") == "lunasr");
+    CHECK(config.graphics.background_upscale_model_path.empty());
+    CHECK(tenriff::config::normalize_background_upscale_mode("onnx") == "onnx");
+    CHECK(tenriff::config::normalize_background_upscale_mode("lunasr") == "onnx");
     CHECK(tenriff::config::normalize_background_upscale_mode("native") == "off");
     CHECK(tenriff::config::normalize_background_upscale_mode("unexpected") == "off");
     CHECK(config.gauge.ex_hard.pg == doctest::Approx(kCurrentExHardPg));
@@ -506,7 +508,8 @@ TEST_CASE("config save and load preserve graphics display settings") {
     config.graphics.vsync = true;
     config.graphics.refresh_hz = 240;
     config.graphics.performance_overlay = true;
-    config.graphics.background_upscale_mode = "off";
+    config.graphics.background_upscale_mode = "onnx";
+    config.graphics.background_upscale_model_path = "models/custom-upscaler.onnx";
 
     std::string error;
     REQUIRE(loader.save_profile("profiles/test", config, &error));
@@ -519,7 +522,8 @@ TEST_CASE("config save and load preserve graphics display settings") {
     CHECK(result.config.graphics.vsync);
     CHECK(result.config.graphics.refresh_hz == 240);
     CHECK(result.config.graphics.performance_overlay);
-    CHECK(result.config.graphics.background_upscale_mode == "off");
+    CHECK(result.config.graphics.background_upscale_mode == "onnx");
+    CHECK(result.config.graphics.background_upscale_model_path == "models/custom-upscaler.onnx");
 }
 
 TEST_CASE("config save and load preserve ui language setting") {

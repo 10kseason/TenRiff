@@ -402,6 +402,8 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
             render.song_select.selected_song_detail = safe_ui_text_or_placeholder(song_detail_label(*entry), "-");
             render.song_select.selected_song_background_path = selected_song_background_preview_path();
             render.song_select.background_upscale_mode = config_.graphics.background_upscale_mode;
+            render.song_select.background_upscale_model_path =
+                config_.graphics.background_upscale_model_path;
             render.song_select.selected_song_lamp =
                 current_best.has_value ? current_best.clear_status : ui_text("NO PLAY", "기록 없음");
             render.song_select.selected_song_favorite = selected_song_is_favorite();

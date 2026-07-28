@@ -599,6 +599,10 @@ void apply_config_object(const JsonObject& root, RuntimeConfig& config) {
             get_string(*graphics,
                        "background_upscale_mode",
                        config.graphics.background_upscale_mode));
+        config.graphics.background_upscale_model_path =
+            get_string(*graphics,
+                       "background_upscale_model_path",
+                       config.graphics.background_upscale_model_path);
     }
 
     if (auto* mode = get_object(root, "mode")) {
@@ -963,6 +967,8 @@ JsonValue build_json_root(const RuntimeConfig& config) {
     graphics.emplace("background_upscale_mode",
                      JsonValue{normalize_background_upscale_mode(
                          config.graphics.background_upscale_mode)});
+    graphics.emplace("background_upscale_model_path",
+                     JsonValue{config.graphics.background_upscale_model_path});
     root.emplace("graphics", JsonValue{std::move(graphics)});
 
     JsonObject mode;
@@ -1107,7 +1113,7 @@ JsonValue build_json_root(const RuntimeConfig& config) {
 
 std::string normalize_background_upscale_mode(std::string_view token) {
     const std::string normalized = to_lower_ascii(std::string(token));
-    return normalized == "lunasr" ? "lunasr" : "off";
+    return (normalized == "onnx" || normalized == "lunasr") ? "onnx" : "off";
 }
 
 std::string normalize_skin_mode_token(std::string_view key_mode) {
@@ -1475,6 +1481,7 @@ RuntimeConfig ConfigLoader::defaults() const {
     config.graphics.refresh_hz = kDefaultGraphicsRefreshHz;
     config.graphics.performance_overlay = false;
     config.graphics.background_upscale_mode = "off";
+    config.graphics.background_upscale_model_path.clear();
 
     config.mode.format = "bms";
     config.mode.key_mode = "none";

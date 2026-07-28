@@ -4,6 +4,27 @@ TenRiff의 사용자/배포 관점에서 의미 있는 변경만 간단히 기�
 
 ## [Unreleased]
 
+## [1.2.5] - 2026-07-29
+
+### Changed
+
+- LunaSR 모델명을 노출하던 배경 업스케일 연동을 모델 중립적인 `External ONNX Upscaler`로 교체하고, 기존 `lunasr` 설정값은 `onnx`로 자동 마이그레이션
+- Graphics Settings에 `.onnx` 파일 선택 행을 추가하고, 파일 드롭도 지원하며 선택 경로를 `background_upscale_model_path`에 프로필별 저장
+- 선택된 모델 경로마다 WinML session과 35 FPS 성능 게이트를 공유하고, `off` 상태에서는 모델을 로드하거나 벤치마크하지 않도록 유지
+- 현재 호환 계약을 `rgb_lr` float32 NCHW 1x3x540x960 입력과 `rgb_residual_x2` float32 NCHW 1x3x1080x1920 residual 출력으로 명시
+
+### Packaging
+
+- Windows `TenRiff-1.2.5.zip`, 공개 소스 `TenRiff-1.2.5-source.zip`, SHA-256 manifest를 모델 비포함 패치 릴리즈 자산으로 구성
+
+### Verification
+
+- Release `TenRiff.exe`, CLI/GUI BMS key converter, External ONNX WinML smoke target 빌드 성공
+- 모델 경로가 없는 smoke가 예상 코드 `2`로 종료되어 외부 모델 필수 경계를 확인
+- 활성 checkout과 독립 source stage에서 각각 `478 pass / 1 optional skip / 0 fail`, CTest `1/1` 통과
+- 독립 source stage에서도 Release 실행 파일·CLI/GUI converter·External ONNX smoke target을 새 경로에서 전체 빌드
+- Windows/source stage와 ZIP의 ONNX·checkpoint·모델 전용 metadata, legacy `tools/lunasr` 경로, 개인 경로·credential 패턴이 모두 0개임을 확인
+
 ## [1.2.4] - 2026-07-29
 
 ### Changed

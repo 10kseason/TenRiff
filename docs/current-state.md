@@ -3,7 +3,7 @@
 이 문서는 다음 에이전트나 새 작업자가 가장 먼저 읽어야 하는 현재 상태 문서입니다. 목표는 "지금 이 프로젝트가 무엇이고, 어디를 보면 되고, 무엇이 아직 미검증인지"를 빠르게 파악하게 하는 것입니다.
 
 ## Baseline
-- 현재 프로젝트 버전은 `1.2.4 stable`
+- 현재 프로젝트 버전은 `1.2.5 stable`
 - 직접 IP 멀티플레이와 preview r5의 입력 backend 수명주기 수정은 `1.1.8 stable`에 통합
 - `1.1.8`은 1.1.7의 시각 개선에 osu!mania OD8 보조 점수, 첫 네이티브 `BAD` 즉사 `Sudden Death (1 MISS)`, 결정적 `LN Mix 10%~90%`를 추가
 - `1.2.0`은 BMS 채널 `04/07` 및 osu!mania 배경을 gameplay sample timeline에 연결하고, FHD 미만 이미지 배경을 Windows ML 기반 LunaSR로 비동기 보간
@@ -11,6 +11,7 @@
 - `1.2.2`는 procedural 원·다각형 스킨을 막대와 같은 100% 폭으로 보정하고, FFmpeg 폴백이 있는 MPG/MPEG 동영상 BGA를 추가하며, LunaSR를 필수 200 FPS 벤치마크 게이트 뒤의 staged32 RGB FP16 모델로 교체.
 - `1.2.3`은 LunaSR 고정 RGB x2 성능 게이트를 200 FPS에서 35 FPS로 낮춤.
 - `1.2.4`는 권리 경계가 불명확한 LunaSR ONNX와 모델 전용 메타데이터를 공개 배포에서 제거하고, 기본값이 `off`인 사용자 제공 모델 opt-in 연동만 유지.
+- `1.2.5`는 모델명을 노출하던 연동을 generic External ONNX Upscaler로 교체하고, Graphics Settings 파일 선택/.onnx 드롭, 프로필별 모델 경로, 모델별 WinML session·35 FPS gate를 추가.
 - 후속 작업의 기준선 문서는 `docs/baseline-1.1.2.md`
 - Windows GUI 빌드가 메인 타깃
 - Linux는 `Baepoks-Linuxs/TenRiff-0.5.0-linux-preview` 수준의 preview만 존재
@@ -123,8 +124,8 @@
   - VSync on: present refresh는 active monitor Hz를 따라가고 render pacing은 `monitor_hz * 2`를 목표로 함 (`1050` clamp)
   - `visual_offset_ms`
   - `performance_overlay`
-  - `background_upscale_mode=lunasr|off`: 기본값은 `off`; 공개 모델은 포함하지 않으며 권리 정리된 사용자 모델 `lunasr_user_rgb_x2_winml.onnx`가 있고 35 FPS 벤치마크를 통과할 때만 FHD x2 처리
-  - 사용자 모델의 권리·품질·성능은 사용자가 확인해야 하며, TenRiff 공개 릴리즈는 특정 모델을 보증하지 않음
+  - `background_upscale_mode=onnx|off`와 `background_upscale_model_path`: 기본값은 `off`; Graphics Settings에서 호환 ONNX를 선택하거나 드롭하며 공개 모델은 포함하지 않음
+  - 현재 지원 계약은 960x540 RGB residual x2이며 모델 권리·품질·성능은 사용자가 확인; 로드·계약·벤치마크·추론 실패 시 native scaling 유지
 - Gameplay performance:
   - static playfield command-list cache
   - note head/tail bitmap cache
@@ -179,7 +180,7 @@
 
 ## Runtime / Packaging Rules
 - 새 사용자 프로필은 자동 생성
-- 현재 정식 P2P 배포 라인은 `TenRiff 1.2.4 stable`
+- 현재 정식 P2P 배포 라인은 `TenRiff 1.2.5 stable`
 - 배포 패키지에는 `Songs`를 넣지 않음
 - 배포 패키지는 메뉴 BGM용 `Mainmusic/` 런타임 자산을 함께 포함
 - 배포 업데이트에는 built artifacts와 필요한 런타임 자산만 포함

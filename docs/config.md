@@ -40,7 +40,7 @@
 
 - `backend` (string)
   - `polling | rawinput`
-  - 현재 `1.2.4` 릴리스 라인의 기본값은 `rawinput`
+  - 현재 `1.2.5` 릴리스 라인의 기본값은 `rawinput`
   - `Options -> Input Settings -> Backend` 또는 `Options -> Profile Setup -> Input Backend`에서 프로필별로 RawInput/Polling을 직접 선택 가능
   - 저장값은 런타임 fallback 때문에 자동으로 `polling`으로 덮어쓰지 않음
   - RawInput 시작 실패, 등록 대상 손실, 메시지 창 종료가 확인되면 현재 앱 실행 동안 메뉴와 다음 gameplay 세션 모두 Polling을 유지
@@ -60,7 +60,7 @@
 - `judgement_hz` (int)
   - `1000 | 2000 | 4000 | 8000`
   - 호환성용으로 남아 있는 입력 설정 필드
-  - 현재 `1.2.4` runtime은 별도 오디오 판정 서브루프를 이 값으로 구동하지 않음
+  - 현재 `1.2.5` runtime은 별도 오디오 판정 서브루프를 이 값으로 구동하지 않음
   - 기본값은 `4000` (`0.25ms`)
 - `debounce_ms` (double)
   - 실제 Press/Release 전환은 버리지 않고 같은 상태의 중복 이벤트만 상태 추적에서 제거
@@ -113,13 +113,14 @@
 - `performance_overlay` (bool)
   - 기본값은 `false`; 우상단을 사용하므로 Discord Voice 위젯을 같은 모서리에 두면 겹칠 수 있음
 - `background_upscale_mode` (string)
-  - `lunasr | off`
-  - 기본값은 `off`; 공개 패키지에는 ONNX를 넣지 않으며 사용자가 권리 정리된 `lunasr_user_rgb_x2_winml.onnx`를 직접 제공한 경우에만 opt-in 가능
-  - 고정 RGB x2 벤치마크가 `35 FPS` 이상일 때만 LunaSR를 사용하며, 미달·모델 실패 시 해당 프로세스에서 차단하고 native scaling 유지
-  - 사용자 모델의 권리·품질·성능은 사용자가 확인해야 하며, TenRiff는 특정 모델을 보증하지 않음
-  - MPG/MPEG 등 동영상은 Media Foundation을 우선 사용하고 시스템 코덱 실패 시 `ffmpeg.exe`로 폴백
-  - Graphics Settings의 `BGA Upscale` row와 연결됨
-  - 상세 계약과 제한은 `tools/lunasr/README.md`
+  - `onnx | off`; 기존 `lunasr` 값은 호환을 위해 `onnx`로 마이그레이션
+  - 기본값은 `off`; 모드가 꺼져 있으면 모델을 로드하거나 벤치마크하지 않음
+- `background_upscale_model_path` (string)
+  - Graphics Settings의 `ONNX Model`에서 파일을 선택하거나 해당 화면에 `.onnx`를 드롭하면 저장됨
+  - 절대 경로 또는 실행 파일/현재 작업 폴더 기준 상대 경로를 허용하며 공개 패키지에는 모델을 포함하지 않음
+  - 현재 계약은 float32 NCHW `rgb_lr [1,3,540,960]` -> `rgb_residual_x2 [1,3,1080,1920]` residual x2
+  - 35 FPS 벤치마크, 모델 로드, 입출력 계약 또는 추론 실패 시 native scaling 유지
+  - 사용자 모델의 권리·품질·성능은 사용자가 확인해야 하며 상세 계약은 `tools/onnx_upscaler/README.md`
 
 ### `mode`
 - `format` (string)

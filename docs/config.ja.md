@@ -40,7 +40,7 @@ profile が存在しない場合は初回起動時に自動生成されます。
 
 - `backend` (string)
   - `polling | rawinput`
-  - 現行 `1.2.4` リリースラインの既定値は `rawinput`
+  - 現行 `1.2.5` リリースラインの既定値は `rawinput`
   - `Options -> Input Settings -> Backend` または `Options -> Profile Setup -> Input Backend` で profile ごとに選択可能
   - runtime fallback は保存済みの値を `polling` に書き換えない
   - RawInput の起動失敗、登録先の消失、message window の終了を確認すると、そのアプリ実行中は menu と後続 gameplay の両方で Polling を維持する
@@ -113,12 +113,14 @@ profile が存在しない場合は初回起動時に自動生成されます。
 - `performance_overlay` (bool)
   - 既定値は `false`。右上を使うため、同じ角に置いた Discord Voice widget と重なる場合がある
 - `background_upscale_mode` (string)
-  - `lunasr | off`
-  - 既定値は `off`。公開 package に ONNX は含まれず、権利処理済み `lunasr_user_rgb_x2_winml.onnx` を user が配置した場合だけ opt-in 可能
-  - 固定 RGB x2 ベンチマークが `35 FPS` 以上の場合だけ LunaSR を使用し、未達または失敗時はプロセス内で無効化して native scaling を維持
-  - user model の権利・品質・性能は user が確認し、TenRiff は特定 model を保証しない
-  - MPG/MPEG などの動画は Media Foundation を優先し、システム codec が失敗した場合は `ffmpeg.exe` に fallback
-  - Graphics Settings の `BGA Upscale` row に接続
+  - `onnx | off`。旧 `lunasr` 値は互換性のため `onnx` に移行
+  - 既定値は `off`。無効時は model load と benchmark を実行しない
+- `background_upscale_model_path` (string)
+  - Graphics Settings の `ONNX Model` で選択するか、その画面に `.onnx` file を drop
+  - 絶対 path または executable/current directory 基準の相対 path。公開 package は model を含まない
+  - 現在の契約: float32 NCHW `rgb_lr [1,3,540,960]` -> `rgb_residual_x2 [1,3,1080,1920]` residual x2
+  - benchmark・load・contract・inference 失敗時は native scaling を維持
+  - model の権利・品質・性能は user が確認。詳細は `tools/onnx_upscaler/README.md`
 
 ### `mode`
 - `format` (string)

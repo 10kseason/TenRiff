@@ -1,13 +1,13 @@
-TenRiff source package notes (`1.2.4 stable`)
+TenRiff source package notes (`1.2.5 stable`)
 
 - This folder is a curated source-only staging area for public/open-source distribution.
 - It intentionally excludes local build trees, packaged binaries, caches, user profiles, logs, and private working notes.
 - Internal agent workflow files such as `AGENTS.md` are not part of the public source bundle.
 - The included `SOURCE_PACKAGE_SCOPE.txt` file defines the exact include/exclude rules used for the staged bundle.
-- The current source line is `1.2.4 stable`; it keeps MPG/MPEG video BGA decoding with an FFmpeg fallback, removes the rights-unclear LunaSR model from public packages, and leaves LunaSR as an opt-in user-supplied-model integration that defaults to `off`.
+- The current source line is `1.2.5 stable`; it keeps MPG/MPEG video BGA decoding with an FFmpeg fallback and exposes an opt-in External ONNX Upscaler that defaults to `off`.
 - The repository license is MIT. Keep the top-level `LICENSE` file with any redistributed source bundle.
 - The source bundle includes the code/docs/dependencies needed for a standalone Windows configure/build, but it does not ship the local `10k-calc/` reference checkout or `external/llama.cpp/`.
-- The optional LunaSR integration and conversion/smoke tools remain under `tools/lunasr/`, but no ONNX model, checkpoint, training data, or model-specific verification metadata is distributed.
+- The generic integration and compatibility smoke/quantization tools live under `tools/onnx_upscaler/`, but no ONNX model, checkpoint, training data, or model-specific verification metadata is distributed. Users must supply a rights-cleared model matching the documented 960x540 RGB residual x2 contract.
 - The staged docs/readmes now track Korean, English, Simplified Chinese, and Japanese entrypoints.
 - Typical Windows build flow inside the extracted source-package root:
 

@@ -4,7 +4,7 @@
 #include "render/GameplayMotion.h"
 #include "render/RenderPacing.h"
 #include "render/RenderThread.h"
-#include "render/LunaSrBackgroundUpscaler.h"
+#include "render/OnnxBackgroundUpscaler.h"
 
 namespace {
 
@@ -215,13 +215,13 @@ TEST_CASE("active hold synthetic notes stay anchored to the judgement line") {
 }
 
 }  // namespace
-TEST_CASE("LunaSR background policy only targets low-resolution images in LunaSR mode") {
-    using tenriff::render::LunaSrBackgroundUpscaler;
+TEST_CASE("external ONNX background policy only targets low-resolution images in ONNX mode") {
+    using tenriff::render::OnnxBackgroundUpscaler;
 
-    CHECK(LunaSrBackgroundUpscaler::should_upscale(640, 480, "lunasr"));
-    CHECK(LunaSrBackgroundUpscaler::should_upscale(1280, 720, "lunasr"));
-    CHECK_FALSE(LunaSrBackgroundUpscaler::should_upscale(1920, 1080, "lunasr"));
-    CHECK_FALSE(LunaSrBackgroundUpscaler::should_upscale(1280, 720, "off"));
+    CHECK(OnnxBackgroundUpscaler::should_upscale(640, 480, "onnx"));
+    CHECK(OnnxBackgroundUpscaler::should_upscale(1280, 720, "onnx"));
+    CHECK_FALSE(OnnxBackgroundUpscaler::should_upscale(1920, 1080, "onnx"));
+    CHECK_FALSE(OnnxBackgroundUpscaler::should_upscale(1280, 720, "off"));
 }
 TEST_CASE("procedural circle and polygon skins use the full 100 percent bar width") {
     using tenriff::render::gameplay_note_shape_extents;
@@ -245,10 +245,10 @@ TEST_CASE("Media Foundation BGA video extension policy accepts MPG and common co
     CHECK_FALSE(BgaVideoDecoder::is_supported_video_path("still.png"));
 }
 
-TEST_CASE("LunaSR x2 performance gate requires a measured 35 FPS") {
-    using tenriff::render::LunaSrBackgroundUpscaler;
+TEST_CASE("external ONNX x2 performance gate requires a measured 35 FPS") {
+    using tenriff::render::OnnxBackgroundUpscaler;
 
-    CHECK_FALSE(LunaSrBackgroundUpscaler::meets_performance_gate(34.999));
-    CHECK(LunaSrBackgroundUpscaler::meets_performance_gate(35.0));
-    CHECK(LunaSrBackgroundUpscaler::meets_performance_gate(60.0));
+    CHECK_FALSE(OnnxBackgroundUpscaler::meets_performance_gate(34.999));
+    CHECK(OnnxBackgroundUpscaler::meets_performance_gate(35.0));
+    CHECK(OnnxBackgroundUpscaler::meets_performance_gate(60.0));
 }

@@ -1976,9 +1976,9 @@ MenuWindow::MenuWindow()
     : d2d_(std::make_unique<D2DResources>()),
       gameplay_base_video_decoder_(std::make_unique<BgaVideoDecoder>()),
       gameplay_overlay_video_decoder_(std::make_unique<BgaVideoDecoder>()),
-      gameplay_background_upscaler_(std::make_unique<LunaSrBackgroundUpscaler>()),
-      gameplay_overlay_background_upscaler_(std::make_unique<LunaSrBackgroundUpscaler>()),
-      song_select_background_upscaler_(std::make_unique<LunaSrBackgroundUpscaler>()) {}
+      gameplay_background_upscaler_(std::make_unique<OnnxBackgroundUpscaler>()),
+      gameplay_overlay_background_upscaler_(std::make_unique<OnnxBackgroundUpscaler>()),
+      song_select_background_upscaler_(std::make_unique<OnnxBackgroundUpscaler>()) {}
 
 MenuWindow::~MenuWindow() {
     shutdown();
@@ -2558,7 +2558,30 @@ void MenuWindow::invalidate_gameplay_background_cache() {
     }
 }
 
+void MenuWindow::set_background_upscale_model_path(std::string model_path) {
+    if (active_background_upscale_model_path_ == model_path) {
+        return;
+    }
+
+    active_background_upscale_model_path_ = std::move(model_path);
+    gameplay_background_upscaler_ =
+        std::make_unique<OnnxBackgroundUpscaler>(active_background_upscale_model_path_);
+    gameplay_overlay_background_upscaler_ =
+        std::make_unique<OnnxBackgroundUpscaler>(active_background_upscale_model_path_);
+    song_select_background_upscaler_ =
+        std::make_unique<OnnxBackgroundUpscaler>(active_background_upscale_model_path_);
+    gameplay_background_cache_ = GameplayBackgroundCache{};
+    song_select_preview_cache_ = SongSelectPreviewCache{};
+    if (d2d_) {
+        d2d_->gameplay_background_base_bitmap.Reset();
+        d2d_->gameplay_background_overlay_bitmap.Reset();
+        d2d_->song_select_preview_bitmap.Reset();
+    }
+}
+
 bool MenuWindow::ensure_gameplay_background_bitmap(const GameplayHudData& data) {
+    set_background_upscale_model_path(
+        data.background_upscale_mode == "onnx" ? data.background_upscale_model_path : "");
     if (!d2d_ || !d2d_->wic_factory || !d2d_->d2d_context ||
         !gameplay_base_video_decoder_ || !gameplay_overlay_video_decoder_ ||
         !gameplay_background_upscaler_ || !gameplay_overlay_background_upscaler_) {
@@ -2566,7 +2589,7 @@ bool MenuWindow::ensure_gameplay_background_bitmap(const GameplayHudData& data) 
     }
 
     const std::string upscale_mode =
-        data.background_upscale_mode == "lunasr" ? "lunasr" : "off";
+        data.background_upscale_mode == "onnx" ? "onnx" : "off";
     const bool paths_changed =
         gameplay_background_cache_.base_path != data.background_base_path ||
         gameplay_background_cache_.overlay_path != data.background_overlay_path ||
@@ -2633,11 +2656,11 @@ bool MenuWindow::ensure_gameplay_background_bitmap(const GameplayHudData& data) 
     const auto process_video_layer = [&](const std::string& path,
                                          int64_t start_sample,
                                          BgaVideoDecoder* decoder,
-                                         LunaSrBackgroundUpscaler* upscaler,
+                                         OnnxBackgroundUpscaler* upscaler,
                                          Microsoft::WRL::ComPtr<ID2D1Bitmap>& bitmap,
                                          std::string& requested_key,
                                          std::string& upscaled_key,
-                                         bool& is_lunasr) {
+                                         bool& is_upscaled) {
         if (!decoder || !upscaler || !BgaVideoDecoder::is_supported_video_path(path)) {
             return;
         }
@@ -2649,12 +2672,12 @@ bool MenuWindow::ensure_gameplay_background_bitmap(const GameplayHudData& data) 
         if (const auto frame = decoder->take_ready();
             frame && frame->source_path == path && !frame->bgra.empty()) {
             if (upload_bgra(frame->width, frame->height, frame->bgra, bitmap)) {
-                is_lunasr = false;
+                is_upscaled = false;
                 upscaled_key.clear();
                 const std::string frame_key =
                     path + "|mf|" + std::to_string(frame->timestamp_100ns);
-                if (upscale_mode == "lunasr" &&
-                    LunaSrBackgroundUpscaler::should_upscale(
+                if (upscale_mode == "onnx" &&
+                    OnnxBackgroundUpscaler::should_upscale(
                         frame->width, frame->height, upscale_mode)) {
                     requested_key = frame_key;
                     upscaler->request_bgra(frame_key,
@@ -2670,7 +2693,7 @@ bool MenuWindow::ensure_gameplay_background_bitmap(const GameplayHudData& data) 
         if (const auto frame = upscaler->take_ready();
             frame && frame->source_path == requested_key && !frame->bgra.empty() &&
             upload_bgra(frame->width, frame->height, frame->bgra, bitmap)) {
-            is_lunasr = true;
+            is_upscaled = true;
             upscaled_key = frame->source_path;
         }
     };
@@ -2682,7 +2705,7 @@ bool MenuWindow::ensure_gameplay_background_bitmap(const GameplayHudData& data) 
                         d2d_->gameplay_background_base_bitmap,
                         gameplay_background_cache_.base_requested_key,
                         gameplay_background_cache_.base_upscaled_key,
-                        gameplay_background_cache_.base_is_lunasr);
+                        gameplay_background_cache_.base_is_upscaled);
     process_video_layer(gameplay_background_cache_.overlay_path,
                         gameplay_background_cache_.overlay_start_sample,
                         gameplay_overlay_video_decoder_.get(),
@@ -2690,21 +2713,21 @@ bool MenuWindow::ensure_gameplay_background_bitmap(const GameplayHudData& data) 
                         d2d_->gameplay_background_overlay_bitmap,
                         gameplay_background_cache_.overlay_requested_key,
                         gameplay_background_cache_.overlay_upscaled_key,
-                        gameplay_background_cache_.overlay_is_lunasr);
+                        gameplay_background_cache_.overlay_is_upscaled);
 
     const auto process_static_layer = [&](const std::string& path,
-                                          LunaSrBackgroundUpscaler* upscaler,
+                                          OnnxBackgroundUpscaler* upscaler,
                                           ID2D1Bitmap* bitmap,
                                           Microsoft::WRL::ComPtr<ID2D1Bitmap>& destination,
                                           std::string& requested_key,
                                           std::string& upscaled_key,
-                                          bool& is_lunasr) {
+                                          bool& is_upscaled) {
         if (!upscaler || path.empty() || BgaVideoDecoder::is_supported_video_path(path)) {
             return;
         }
-        if (bitmap && !is_lunasr && upscale_mode == "lunasr") {
+        if (bitmap && !is_upscaled && upscale_mode == "onnx") {
             const D2D1_SIZE_U size = bitmap->GetPixelSize();
-            if (LunaSrBackgroundUpscaler::should_upscale(size.width, size.height, upscale_mode) &&
+            if (OnnxBackgroundUpscaler::should_upscale(size.width, size.height, upscale_mode) &&
                 requested_key != path) {
                 requested_key = path;
                 upscaler->request(path);
@@ -2713,7 +2736,7 @@ bool MenuWindow::ensure_gameplay_background_bitmap(const GameplayHudData& data) 
         if (const auto frame = upscaler->take_ready();
             frame && frame->source_path == requested_key && !frame->bgra.empty() &&
             upload_bgra(frame->width, frame->height, frame->bgra, destination)) {
-            is_lunasr = true;
+            is_upscaled = true;
             upscaled_key = frame->source_path;
         }
     };
@@ -2724,14 +2747,14 @@ bool MenuWindow::ensure_gameplay_background_bitmap(const GameplayHudData& data) 
                          d2d_->gameplay_background_base_bitmap,
                          gameplay_background_cache_.base_requested_key,
                          gameplay_background_cache_.base_upscaled_key,
-                         gameplay_background_cache_.base_is_lunasr);
+                         gameplay_background_cache_.base_is_upscaled);
     process_static_layer(gameplay_background_cache_.overlay_path,
                          gameplay_overlay_background_upscaler_.get(),
                          d2d_->gameplay_background_overlay_bitmap.Get(),
                          d2d_->gameplay_background_overlay_bitmap,
                          gameplay_background_cache_.overlay_requested_key,
                          gameplay_background_cache_.overlay_upscaled_key,
-                         gameplay_background_cache_.overlay_is_lunasr);
+                         gameplay_background_cache_.overlay_is_upscaled);
     return true;
 }
 void MenuWindow::invalidate_song_select_preview_cache() {
@@ -2745,6 +2768,8 @@ void MenuWindow::invalidate_song_select_preview_cache() {
 }
 
 bool MenuWindow::ensure_song_select_preview_bitmap(const SongSelectData& data) {
+    set_background_upscale_model_path(
+        data.background_upscale_mode == "onnx" ? data.background_upscale_model_path : "");
     if (!d2d_ || !d2d_->wic_factory || !d2d_->d2d_context ||
         !song_select_background_upscaler_) {
         return false;
@@ -2752,7 +2777,7 @@ bool MenuWindow::ensure_song_select_preview_bitmap(const SongSelectData& data) {
 
     const std::string preview_path = data.selected_song_background_path;
     const std::string upscale_mode =
-        data.background_upscale_mode == "lunasr" ? "lunasr" : "off";
+        data.background_upscale_mode == "onnx" ? "onnx" : "off";
     if (song_select_preview_cache_.path != preview_path ||
         song_select_preview_cache_.upscale_mode != upscale_mode) {
         invalidate_song_select_preview_cache();
@@ -2761,7 +2786,7 @@ bool MenuWindow::ensure_song_select_preview_bitmap(const SongSelectData& data) {
         song_select_preview_cache_.attempted = preview_path.empty();
     }
 
-    if (upscale_mode == "lunasr") {
+    if (upscale_mode == "onnx") {
         if (const auto frame = song_select_background_upscaler_->take_ready();
             frame && frame->source_path == preview_path && frame->width > 0 &&
             frame->height > 0 && !frame->bgra.empty()) {
@@ -2776,16 +2801,16 @@ bool MenuWindow::ensure_song_select_preview_bitmap(const SongSelectData& data) {
                     &properties,
                     bitmap.ReleaseAndGetAddressOf())) && bitmap) {
                 d2d_->song_select_preview_bitmap = bitmap;
-                song_select_preview_cache_.is_lunasr = true;
+                song_select_preview_cache_.is_upscaled = true;
             }
         }
     }
 
     std::string desired_request;
     if (d2d_->song_select_preview_bitmap &&
-        !song_select_preview_cache_.is_lunasr && upscale_mode == "lunasr") {
+        !song_select_preview_cache_.is_upscaled && upscale_mode == "onnx") {
         const D2D1_SIZE_U size = d2d_->song_select_preview_bitmap->GetPixelSize();
-        if (LunaSrBackgroundUpscaler::should_upscale(size.width, size.height, upscale_mode)) {
+        if (OnnxBackgroundUpscaler::should_upscale(size.width, size.height, upscale_mode)) {
             desired_request = preview_path;
         }
     }

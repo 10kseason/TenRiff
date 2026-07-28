@@ -3,7 +3,7 @@
 这份文档是下一位 agent 或新任务接手时应该最先阅读的当前状态文档。目标是快速说明“这个项目现在是什么、应该先看哪里、还有哪些内容尚未验证”。
 
 ## 基线
-- 当前项目版本为 `1.2.4 stable`
+- 当前项目版本为 `1.2.5 stable`
 - direct-IP multiplayer 与 preview r5 的输入 backend 生命周期修复已整合进 `1.1.8 stable`
 - `1.1.8` 在 1.1.7 视觉更新基础上加入 osu!mania OD8 辅助分数、首次原生 `BAD` 即结束的 `Sudden Death (1 MISS)`，以及确定性的 `LN Mix 10%～90%`
 - `1.2.0` 把 BMS 通道 `04/07` 和 osu!mania 背景接入 gameplay sample timeline，并通过 Windows ML 上的 LunaSR 异步放大低于 FHD 的图片背景
@@ -11,6 +11,7 @@
 - `1.2.2` 将 procedural 圆形/多边形 skin 修正为与条形相同的 100% 宽度，加入带 FFmpeg 回退的 MPG/MPEG 视频 BGA，并将 LunaSR 切换到必须通过 200 FPS 基准门槛的 staged32 RGB FP16 模型。
 - `1.2.3` 将 LunaSR 固定 RGB x2 性能门槛从 200 FPS 降至 35 FPS。
 - `1.2.4` 从公开发布中移除权利边界不明确的 LunaSR ONNX 与模型专用 metadata，仅保留默认值为 `off` 的用户自备模型 opt-in 集成。
+- `1.2.5` 将带模型品牌的集成改为通用 External ONNX Upscaler，加入 Graphics Settings 文件选择/.onnx 拖放、profile 模型路径，以及按模型建立的 WinML session 与 35 FPS gate。
 - 后续工作的基准文档是 [`docs/baseline-1.1.2.zh-CN.md`](baseline-1.1.2.zh-CN.md)
 - Windows GUI 构建是主目标
 - Linux 仅存在 [`Baepoks-Linuxs/TenRiff-0.5.0-linux-preview`](../Baepoks-Linuxs/TenRiff-0.5.0-linux-preview) 级别的 preview
@@ -118,8 +119,8 @@
   - VSync on：present refresh 跟随活动显示器 Hz，render pacing 目标为 `monitor_hz * 2`（上限 `1050`）
   - `visual_offset_ms`
   - `performance_overlay`
-  - `background_upscale_mode=lunasr|off`：默认值为 `off`；不附带公开模型，仅在存在权利已厘清的用户模型 `lunasr_user_rgb_x2_winml.onnx` 且通过 35 FPS 基准时执行 FHD x2
-  - 用户需自行确认所提供模型的权利、质量与性能；TenRiff 公开发布不保证任何特定模型
+  - `background_upscale_mode=onnx|off` 与 `background_upscale_model_path`：默认值为 `off`；可在 Graphics Settings 选择或拖入兼容 ONNX；公开包不包含模型
+  - 当前契约为 960x540 RGB residual x2；用户负责模型权利、质量和性能，加载、契约、基准或推理失败时保持 native scaling
 - Gameplay performance：
   - static playfield command-list cache
   - note head/tail bitmap cache
@@ -161,7 +162,7 @@
 
 ## 运行时 / 打包规则
 - 新用户 profile 会自动创建
-- 当前正式 P2P 发布线为 `TenRiff 1.2.4 stable`
+- 当前正式 P2P 发布线为 `TenRiff 1.2.5 stable`
 - 发布包不包含 `Songs`
 - 发布包会同时包含用于菜单 BGM 的 `Mainmusic/` 运行时资源
 - 发布更新只包含已构建产物和必要的运行时资源

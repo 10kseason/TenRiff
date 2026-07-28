@@ -25,16 +25,15 @@
 /WORK_STATUS.txt
 /Memory for ai and Human Worker.txt
 /P_DA.bme
-/tools/lunasr/HUGGINGFACE.md
-/tools/lunasr/model/
-/tools/lunasr/*.pt
-/tools/lunasr/*.pth
-/tools/lunasr/*.ckpt
-/tools/lunasr/*.safetensors
-/tools/lunasr/*.onnx
-/tools/lunasr/*_public.json
-/tools/lunasr/*_verification.json
-
+/models/
+/tools/onnx_upscaler/model/
+*.onnx
+*.pt
+*.pth
+*.ckpt
+*.safetensors
+*_public.json
+*_verification.json
 CMakeUserPresets.json
 *.user
 *.suo

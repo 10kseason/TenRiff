@@ -26,6 +26,7 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
     target.background_base_start_sample = gameplay_hud_.background_base_start_sample;
     target.background_overlay_start_sample = gameplay_hud_.background_overlay_start_sample;
     target.background_upscale_mode = config_.graphics.background_upscale_mode;
+    target.background_upscale_model_path = config_.graphics.background_upscale_model_path;
     const double clamped_judgement_line_position = std::clamp(
         config_.skin.judgement_line_position,
         config::kJudgementLinePositionMin,

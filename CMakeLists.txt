@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(TenRiff VERSION 1.2.4 LANGUAGES C CXX)
+project(TenRiff VERSION 1.2.5 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -11,7 +11,7 @@ if(MSVC)
 endif()
 
 option(TENRIFF_ENABLE_TESTS "Build TenRiff unit tests" ON)
-option(TENRIFF_ENABLE_LUNASR "Enable the optional user-supplied WinML LunaSR background upscaler" ON)
+option(TENRIFF_ENABLE_ONNX_UPSCALER "Enable the optional user-selected WinML ONNX background upscaler" ON)
 
 # Pinned vendored miniz is used only for local .osk/.osz ZIP package import.
 add_library(tenriff_miniz STATIC
@@ -190,7 +190,7 @@ if(WIN32)
         src/app/MenuAppSkin.cpp
         src/render/BgaVideoDecoder.cpp
         src/render/BgaVideoFfmpeg.cpp
-        src/render/LunaSrBackgroundUpscaler.cpp
+        src/render/OnnxBackgroundUpscaler.cpp
         src/render/MenuWindow.cpp
     )
 
@@ -217,7 +217,7 @@ if(WIN32)
             winmm
     )
     add_executable(bga_video_smoke
-        tools/lunasr/bga_video_smoke.cpp
+        tools/bga_video_smoke.cpp
         src/render/BgaVideoDecoder.cpp
         src/render/BgaVideoFfmpeg.cpp
     )
@@ -227,20 +227,20 @@ if(WIN32)
     target_compile_features(bga_video_smoke PRIVATE cxx_std_17)
     target_link_libraries(bga_video_smoke PRIVATE ole32 mfplat mfreadwrite mfuuid)
 
-    if(TENRIFF_ENABLE_LUNASR AND MSVC)
-        target_compile_definitions(tenriff_app PRIVATE TENRIFF_ENABLE_LUNASR=1)
+    if(TENRIFF_ENABLE_ONNX_UPSCALER AND MSVC)
+        target_compile_definitions(tenriff_app PRIVATE TENRIFF_ENABLE_ONNX_UPSCALER=1)
         target_link_libraries(tenriff_app PRIVATE windowsapp)
 
-        add_executable(lunasr_winml_smoke
-            tools/lunasr/winml_smoke.cpp
-            src/render/LunaSrBackgroundUpscaler.cpp
+        add_executable(onnx_upscaler_winml_smoke
+            tools/onnx_upscaler/winml_smoke.cpp
+            src/render/OnnxBackgroundUpscaler.cpp
         )
-        target_include_directories(lunasr_winml_smoke PRIVATE
+        target_include_directories(onnx_upscaler_winml_smoke PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/src
         )
-        target_compile_definitions(lunasr_winml_smoke PRIVATE TENRIFF_ENABLE_LUNASR=1)
-        target_compile_features(lunasr_winml_smoke PRIVATE cxx_std_17)
-        target_link_libraries(lunasr_winml_smoke PRIVATE windowsapp ole32 windowscodecs)
+        target_compile_definitions(onnx_upscaler_winml_smoke PRIVATE TENRIFF_ENABLE_ONNX_UPSCALER=1)
+        target_compile_features(onnx_upscaler_winml_smoke PRIVATE cxx_std_17)
+        target_link_libraries(onnx_upscaler_winml_smoke PRIVATE windowsapp ole32 windowscodecs)
     endif()
 endif()
 
