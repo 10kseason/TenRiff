@@ -65,6 +65,8 @@ public:
         int64_t past_samples = 0;
         std::string background_base_path;
         std::string background_overlay_path;
+        int64_t background_base_start_sample = 0;
+        int64_t background_overlay_start_sample = 0;
 
         int combo = 0;
         int max_combo = 0;
@@ -442,6 +444,8 @@ private:
     int64_t last_visual_cue_sample_ = -1;
     std::string current_background_base_path_;
     std::string current_background_overlay_path_;
+    int64_t current_background_base_start_sample_ = 0;
+    int64_t current_background_overlay_start_sample_ = 0;
 };
 
 }  // namespace tenriff::app

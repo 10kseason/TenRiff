@@ -506,6 +506,25 @@ bool create_unit_note_polygon_geometry(ID2D1Factory1* factory,
         points.push_back(D2D1::Point2F(static_cast<float>(std::cos(angle) * 0.5),
                                       static_cast<float>(std::sin(angle) * 0.5)));
     }
+    float min_x = points.front().x;
+    float max_x = points.front().x;
+    float min_y = points.front().y;
+    float max_y = points.front().y;
+    for (const auto& point : points) {
+        min_x = std::min(min_x, point.x);
+        max_x = std::max(max_x, point.x);
+        min_y = std::min(min_y, point.y);
+        max_y = std::max(max_y, point.y);
+    }
+    const float extent_x = std::max(0.001f, max_x - min_x);
+    const float center_x = (min_x + max_x) * 0.5f;
+    const float center_y = (min_y + max_y) * 0.5f;
+    for (auto& point : points) {
+        // Normalize against the horizontal extent only. Every polygon reaches the same
+        // lane width as a 100% bar while preserving its regular-polygon proportions.
+        point.x = (point.x - center_x) / extent_x;
+        point.y = (point.y - center_y) / extent_x;
+    }
     sink->BeginFigure(points.front(), D2D1_FIGURE_BEGIN_FILLED);
     sink->AddLines(points.data() + 1, static_cast<UINT32>(points.size() - 1));
     sink->EndFigure(D2D1_FIGURE_END_CLOSED);
@@ -962,6 +981,7 @@ D2D1_RECT_F fit_rect_preserve_aspect(const D2D1_RECT_F& bounds, const D2D1_SIZE_
     return D2D1::RectF(left, top, left + draw_width, top + draw_height);
 }
 
+
 D2D1_RECT_F inscribed_circle_bitmap_rect(const D2D1_RECT_F& bounds) {
     const float bounds_width = std::max(0.0f, bounds.right - bounds.left);
     const float bounds_height = std::max(0.0f, bounds.bottom - bounds.top);
@@ -971,15 +991,12 @@ D2D1_RECT_F inscribed_circle_bitmap_rect(const D2D1_RECT_F& bounds) {
     const float center_y = (bounds.top + bounds.bottom) * 0.5f;
     return D2D1::RectF(center_x - radius, center_y - radius, center_x + radius, center_y + radius);
 }
-
 D2D1_RECT_F gameplay_note_bitmap_dest_rect(const D2D1_RECT_F& note_rect,
                                            ID2D1Bitmap* bitmap,
                                            const D2D1_RECT_F* source_rect,
                                            std::string_view note_shape,
                                            bool preserve_aspect_ratio) {
-    const std::string normalized_shape = normalize_gameplay_note_shape(note_shape);
-    const D2D1_RECT_F base_rect =
-        normalized_shape == "circle" ? inscribed_circle_bitmap_rect(note_rect) : note_rect;
+    const D2D1_RECT_F base_rect = note_rect;
     if (!preserve_aspect_ratio || !bitmap) {
         return base_rect;
     }
@@ -1664,14 +1681,23 @@ void draw_note_primitive(ID2D1RenderTarget* target,
     }
 
     const std::string normalized_shape = normalize_gameplay_note_shape(note_shape);
+    const auto extents = gameplay_note_shape_extents(rect.right - rect.left,
+                                                     rect.bottom - rect.top,
+                                                     normalized_shape);
+    const float center_x = (rect.left + rect.right) * 0.5f;
+    const float center_y = (rect.top + rect.bottom) * 0.5f;
+    const D2D1_RECT_F shape_rect = D2D1::RectF(center_x - extents.half_width,
+                                               center_y - extents.half_height,
+                                               center_x + extents.half_width,
+                                               center_y + extents.half_height);
     const D2D1_ANTIALIAS_MODE saved_antialias = target->GetAntialiasMode();
     target->SetAntialiasMode(D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
 
     if (normalized_shape == "circle") {
-        const float diameter = std::max(2.0f, std::min(rect.right - rect.left, rect.bottom - rect.top) - 2.0f);
+        const float diameter = std::max(2.0f, shape_rect.right - shape_rect.left - 2.0f);
         const float radius = diameter * 0.5f;
         const D2D1_ELLIPSE ellipse = D2D1::Ellipse(
-            D2D1::Point2F((rect.left + rect.right) * 0.5f, (rect.top + rect.bottom) * 0.5f),
+            D2D1::Point2F(center_x, center_y),
             radius,
             radius);
         target->FillEllipse(ellipse, fill);
@@ -1679,10 +1705,8 @@ void draw_note_primitive(ID2D1RenderTarget* target,
             target->DrawEllipse(ellipse, border, border_width);
         }
     } else if (polygon_geometry && gameplay_note_polygon_index(normalized_shape).has_value()) {
-        const float width = std::max(2.0f, rect.right - rect.left);
-        const float height = std::max(2.0f, rect.bottom - rect.top);
-        const float center_x = (rect.left + rect.right) * 0.5f;
-        const float center_y = (rect.top + rect.bottom) * 0.5f;
+        const float width = std::max(2.0f, shape_rect.right - shape_rect.left);
+        const float height = width;
         D2D1_MATRIX_3X2_F saved_transform{};
         target->GetTransform(&saved_transform);
         const D2D1_MATRIX_3X2_F shape_transform =
@@ -1697,10 +1721,10 @@ void draw_note_primitive(ID2D1RenderTarget* target,
         }
         target->SetTransform(saved_transform);
     } else {
-        const float width = std::max(1.0f, rect.right - rect.left);
-        const float height = std::max(1.0f, rect.bottom - rect.top);
+        const float width = std::max(1.0f, shape_rect.right - shape_rect.left);
+        const float height = std::max(1.0f, shape_rect.bottom - shape_rect.top);
         const float radius = std::clamp(std::min(width, height) * 0.22f, 3.0f, 8.0f);
-        const D2D1_ROUNDED_RECT rounded = D2D1::RoundedRect(rect, radius, radius);
+        const D2D1_ROUNDED_RECT rounded = D2D1::RoundedRect(shape_rect, radius, radius);
         target->FillRoundedRectangle(rounded, fill);
         if (draw_border && border) {
             target->DrawRoundedRectangle(rounded, border, border_width);
@@ -1950,7 +1974,10 @@ struct MenuWindow::D2DResources {
 
 MenuWindow::MenuWindow()
     : d2d_(std::make_unique<D2DResources>()),
+      gameplay_base_video_decoder_(std::make_unique<BgaVideoDecoder>()),
+      gameplay_overlay_video_decoder_(std::make_unique<BgaVideoDecoder>()),
       gameplay_background_upscaler_(std::make_unique<LunaSrBackgroundUpscaler>()),
+      gameplay_overlay_background_upscaler_(std::make_unique<LunaSrBackgroundUpscaler>()),
       song_select_background_upscaler_(std::make_unique<LunaSrBackgroundUpscaler>()) {}
 
 MenuWindow::~MenuWindow() {
@@ -2513,8 +2540,17 @@ bool MenuWindow::ensure_gameplay_note_sprites(const GameplayHudData& data) {
 
 void MenuWindow::invalidate_gameplay_background_cache() {
     gameplay_background_cache_ = GameplayBackgroundCache{};
+    if (gameplay_base_video_decoder_) {
+        gameplay_base_video_decoder_->clear();
+    }
+    if (gameplay_overlay_video_decoder_) {
+        gameplay_overlay_video_decoder_->clear();
+    }
     if (gameplay_background_upscaler_) {
         gameplay_background_upscaler_->clear();
+    }
+    if (gameplay_overlay_background_upscaler_) {
+        gameplay_overlay_background_upscaler_->clear();
     }
     if (d2d_) {
         d2d_->gameplay_background_base_bitmap.Reset();
@@ -2524,7 +2560,8 @@ void MenuWindow::invalidate_gameplay_background_cache() {
 
 bool MenuWindow::ensure_gameplay_background_bitmap(const GameplayHudData& data) {
     if (!d2d_ || !d2d_->wic_factory || !d2d_->d2d_context ||
-        !gameplay_background_upscaler_) {
+        !gameplay_base_video_decoder_ || !gameplay_overlay_video_decoder_ ||
+        !gameplay_background_upscaler_ || !gameplay_overlay_background_upscaler_) {
         return false;
     }
 
@@ -2532,25 +2569,34 @@ bool MenuWindow::ensure_gameplay_background_bitmap(const GameplayHudData& data) 
         data.background_upscale_mode == "lunasr" ? "lunasr" : "off";
     const bool paths_changed =
         gameplay_background_cache_.base_path != data.background_base_path ||
-        gameplay_background_cache_.overlay_path != data.background_overlay_path;
+        gameplay_background_cache_.overlay_path != data.background_overlay_path ||
+        gameplay_background_cache_.base_start_sample != data.background_base_start_sample ||
+        gameplay_background_cache_.overlay_start_sample != data.background_overlay_start_sample;
     const bool mode_changed = gameplay_background_cache_.upscale_mode != upscale_mode;
     if (paths_changed || mode_changed) {
+        gameplay_base_video_decoder_->clear();
+        gameplay_overlay_video_decoder_->clear();
         gameplay_background_upscaler_->clear();
+        gameplay_overlay_background_upscaler_->clear();
         gameplay_background_cache_ = GameplayBackgroundCache{};
         gameplay_background_cache_.base_path = data.background_base_path;
         gameplay_background_cache_.overlay_path = data.background_overlay_path;
+        gameplay_background_cache_.base_start_sample = data.background_base_start_sample;
+        gameplay_background_cache_.overlay_start_sample = data.background_overlay_start_sample;
         gameplay_background_cache_.upscale_mode = upscale_mode;
 
         d2d_->gameplay_background_base_bitmap.Reset();
         d2d_->gameplay_background_overlay_bitmap.Reset();
-        if (!data.background_base_path.empty()) {
+        if (!data.background_base_path.empty() &&
+            !BgaVideoDecoder::is_supported_video_path(data.background_base_path)) {
             static_cast<void>(load_bitmap_from_utf8_path(
                 d2d_->wic_factory.Get(),
                 d2d_->d2d_context.Get(),
                 data.background_base_path,
                 d2d_->gameplay_background_base_bitmap));
         }
-        if (!data.background_overlay_path.empty()) {
+        if (!data.background_overlay_path.empty() &&
+            !BgaVideoDecoder::is_supported_video_path(data.background_overlay_path)) {
             static_cast<void>(load_bitmap_from_utf8_path(
                 d2d_->wic_factory.Get(),
                 d2d_->d2d_context.Get(),
@@ -2559,61 +2605,135 @@ bool MenuWindow::ensure_gameplay_background_bitmap(const GameplayHudData& data) 
         }
     }
 
-    if (upscale_mode == "lunasr") {
-        if (const auto frame = gameplay_background_upscaler_->take_ready();
-            frame && frame->width > 0 && frame->height > 0 && !frame->bgra.empty()) {
-            const D2D1_BITMAP_PROPERTIES properties = D2D1::BitmapProperties(
-                D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM,
-                                  D2D1_ALPHA_MODE_PREMULTIPLIED));
-            Microsoft::WRL::ComPtr<ID2D1Bitmap> bitmap;
-            const HRESULT bitmap_hr = d2d_->d2d_context->CreateBitmap(
-                D2D1::SizeU(frame->width, frame->height),
-                frame->bgra.data(),
-                frame->width * 4,
-                &properties,
-                bitmap.ReleaseAndGetAddressOf());
-            if (SUCCEEDED(bitmap_hr) && bitmap) {
-                if (frame->source_path == gameplay_background_cache_.base_path) {
-                    d2d_->gameplay_background_base_bitmap = bitmap;
-                    gameplay_background_cache_.base_is_lunasr = true;
-                }
-                if (frame->source_path == gameplay_background_cache_.overlay_path) {
-                    d2d_->gameplay_background_overlay_bitmap = bitmap;
-                    gameplay_background_cache_.overlay_is_lunasr = true;
+    const auto upload_bgra = [&](std::uint32_t width,
+                                 std::uint32_t height,
+                                 const std::vector<std::uint8_t>& bgra,
+                                 Microsoft::WRL::ComPtr<ID2D1Bitmap>& destination) {
+        if (width == 0 || height == 0 ||
+            bgra.size() != static_cast<std::size_t>(width) * height * 4) {
+            return false;
+        }
+        const D2D1_BITMAP_PROPERTIES properties = D2D1::BitmapProperties(
+            D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM,
+                              D2D1_ALPHA_MODE_PREMULTIPLIED));
+        Microsoft::WRL::ComPtr<ID2D1Bitmap> bitmap;
+        const HRESULT bitmap_hr = d2d_->d2d_context->CreateBitmap(
+            D2D1::SizeU(width, height),
+            bgra.data(),
+            width * 4,
+            &properties,
+            bitmap.ReleaseAndGetAddressOf());
+        if (FAILED(bitmap_hr) || !bitmap) {
+            return false;
+        }
+        destination = std::move(bitmap);
+        return true;
+    };
+
+    const auto process_video_layer = [&](const std::string& path,
+                                         int64_t start_sample,
+                                         BgaVideoDecoder* decoder,
+                                         LunaSrBackgroundUpscaler* upscaler,
+                                         Microsoft::WRL::ComPtr<ID2D1Bitmap>& bitmap,
+                                         std::string& requested_key,
+                                         std::string& upscaled_key,
+                                         bool& is_lunasr) {
+        if (!decoder || !upscaler || !BgaVideoDecoder::is_supported_video_path(path)) {
+            return;
+        }
+        const double sample_rate = static_cast<double>(std::max(1, data.sample_rate));
+        const double playback_rate = std::clamp(data.rate, 0.05, 4.0);
+        const double position_seconds =
+            std::max<int64_t>(0, data.current_sample - start_sample) / sample_rate * playback_rate;
+        decoder->request(path, position_seconds);
+        if (const auto frame = decoder->take_ready();
+            frame && frame->source_path == path && !frame->bgra.empty()) {
+            if (upload_bgra(frame->width, frame->height, frame->bgra, bitmap)) {
+                is_lunasr = false;
+                upscaled_key.clear();
+                const std::string frame_key =
+                    path + "|mf|" + std::to_string(frame->timestamp_100ns);
+                if (upscale_mode == "lunasr" &&
+                    LunaSrBackgroundUpscaler::should_upscale(
+                        frame->width, frame->height, upscale_mode)) {
+                    requested_key = frame_key;
+                    upscaler->request_bgra(frame_key,
+                                           frame->width,
+                                           frame->height,
+                                           frame->bgra);
+                } else {
+                    requested_key.clear();
+                    upscaler->clear();
                 }
             }
         }
-    }
-
-    auto needs_upscale = [&](ID2D1Bitmap* bitmap, bool is_lunasr) {
-        if (!bitmap || is_lunasr || upscale_mode != "lunasr") {
-            return false;
+        if (const auto frame = upscaler->take_ready();
+            frame && frame->source_path == requested_key && !frame->bgra.empty() &&
+            upload_bgra(frame->width, frame->height, frame->bgra, bitmap)) {
+            is_lunasr = true;
+            upscaled_key = frame->source_path;
         }
-        const D2D1_SIZE_U size = bitmap->GetPixelSize();
-        return LunaSrBackgroundUpscaler::should_upscale(
-            size.width, size.height, upscale_mode);
     };
 
-    std::string desired_request;
-    if (needs_upscale(d2d_->gameplay_background_base_bitmap.Get(),
-                      gameplay_background_cache_.base_is_lunasr)) {
-        desired_request = gameplay_background_cache_.base_path;
-    } else if (needs_upscale(d2d_->gameplay_background_overlay_bitmap.Get(),
-                             gameplay_background_cache_.overlay_is_lunasr)) {
-        desired_request = gameplay_background_cache_.overlay_path;
-    }
+    process_video_layer(gameplay_background_cache_.base_path,
+                        gameplay_background_cache_.base_start_sample,
+                        gameplay_base_video_decoder_.get(),
+                        gameplay_background_upscaler_.get(),
+                        d2d_->gameplay_background_base_bitmap,
+                        gameplay_background_cache_.base_requested_key,
+                        gameplay_background_cache_.base_upscaled_key,
+                        gameplay_background_cache_.base_is_lunasr);
+    process_video_layer(gameplay_background_cache_.overlay_path,
+                        gameplay_background_cache_.overlay_start_sample,
+                        gameplay_overlay_video_decoder_.get(),
+                        gameplay_overlay_background_upscaler_.get(),
+                        d2d_->gameplay_background_overlay_bitmap,
+                        gameplay_background_cache_.overlay_requested_key,
+                        gameplay_background_cache_.overlay_upscaled_key,
+                        gameplay_background_cache_.overlay_is_lunasr);
 
-    if (desired_request != gameplay_background_cache_.requested_path) {
-        gameplay_background_cache_.requested_path = desired_request;
-        if (desired_request.empty()) {
-            gameplay_background_upscaler_->clear();
-        } else {
-            gameplay_background_upscaler_->request(desired_request);
+    const auto process_static_layer = [&](const std::string& path,
+                                          LunaSrBackgroundUpscaler* upscaler,
+                                          ID2D1Bitmap* bitmap,
+                                          Microsoft::WRL::ComPtr<ID2D1Bitmap>& destination,
+                                          std::string& requested_key,
+                                          std::string& upscaled_key,
+                                          bool& is_lunasr) {
+        if (!upscaler || path.empty() || BgaVideoDecoder::is_supported_video_path(path)) {
+            return;
         }
-    }
+        if (bitmap && !is_lunasr && upscale_mode == "lunasr") {
+            const D2D1_SIZE_U size = bitmap->GetPixelSize();
+            if (LunaSrBackgroundUpscaler::should_upscale(size.width, size.height, upscale_mode) &&
+                requested_key != path) {
+                requested_key = path;
+                upscaler->request(path);
+            }
+        }
+        if (const auto frame = upscaler->take_ready();
+            frame && frame->source_path == requested_key && !frame->bgra.empty() &&
+            upload_bgra(frame->width, frame->height, frame->bgra, destination)) {
+            is_lunasr = true;
+            upscaled_key = frame->source_path;
+        }
+    };
+
+    process_static_layer(gameplay_background_cache_.base_path,
+                         gameplay_background_upscaler_.get(),
+                         d2d_->gameplay_background_base_bitmap.Get(),
+                         d2d_->gameplay_background_base_bitmap,
+                         gameplay_background_cache_.base_requested_key,
+                         gameplay_background_cache_.base_upscaled_key,
+                         gameplay_background_cache_.base_is_lunasr);
+    process_static_layer(gameplay_background_cache_.overlay_path,
+                         gameplay_overlay_background_upscaler_.get(),
+                         d2d_->gameplay_background_overlay_bitmap.Get(),
+                         d2d_->gameplay_background_overlay_bitmap,
+                         gameplay_background_cache_.overlay_requested_key,
+                         gameplay_background_cache_.overlay_upscaled_key,
+                         gameplay_background_cache_.overlay_is_lunasr);
     return true;
 }
-
 void MenuWindow::invalidate_song_select_preview_cache() {
     song_select_preview_cache_ = SongSelectPreviewCache{};
     if (song_select_background_upscaler_) {

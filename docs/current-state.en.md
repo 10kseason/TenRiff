@@ -3,17 +3,18 @@
 This is the document that the next agent or any new contributor should read first. Its goal is to quickly answer: "what is this project now, where should I look, and what is still unverified?"
 
 ## Baseline
-- Current project version: `1.2.1 stable`
+- Current project version: `1.2.2 stable`
 - Direct-IP multiplayer and the preview r5 input-backend lifecycle fixes are integrated into `1.1.8 stable`
 - `1.1.8` adds an osu!mania OD8 auxiliary score, first-native-`BAD` `Sudden Death (1 MISS)`, and deterministic `LN Mix 10%-90%` on top of the 1.1.7 visual refresh
 - `1.2.0` connects BMS channel `04/07` and osu!mania backgrounds to the gameplay sample timeline and asynchronously upscales sub-FHD image backgrounds through LunaSR on Windows ML
 - `1.2.1` switches the runtime to LunaSR `basic_v2`, applies it to gameplay BGA layers and the selected Song Select BGI, adds the single-player Esc pause menu, and adds polygon note shapes plus an optional LN tail cap.
+- `1.2.2` normalizes procedural circle/polygon skins to the full 100% bar width, adds MPG/MPEG video BGA decoding with an FFmpeg fallback, and switches LunaSR to the staged32 RGB FP16 model behind a mandatory 200 FPS benchmark gate.
 - Baseline companion document for follow-up work: `docs/baseline-1.1.2.en.md`
 - Windows GUI build is the main target
 - Linux exists only as a preview-level package at `Baepoks-Linuxs/TenRiff-0.5.0-linux-preview`
 - Default surface is BMS-first
 - `.osu` can be re-enabled as an option and supports 4K-10K
-- The `1.2.1 stable` runtime keeps RawInput primary while continuously running a bound-key polling shadow in the same `InputThread`; startup failure or an unexpected message-pump exit switches that producer to Polling without resetting its queue or pressed state
+- The `1.2.2 stable` runtime keeps RawInput primary while continuously running a bound-key polling shadow in the same `InputThread`; startup failure or an unexpected message-pump exit switches that producer to Polling without resetting its queue or pressed state
 - Menu input keeps the foreground process/root-window boundary. A RawInput startup failure, process-global registration-target loss, or hidden message-window exit switches it to Polling without waiting for a user key.
 - A confirmed fallback stays active across menu and subsequent gameplay sessions for the current app run without rewriting the profile; app restart or an explicit `Options -> Input Settings -> Backend` change retries it.
 
@@ -82,7 +83,7 @@ This is the document that the next agent or any new contributor should read firs
   - Random supports `Off / Mirror / FR / SR`; Mirror reverses the final lanes after key-mode conversion, with 10K/16K mirrored independently inside each player half
   - Mod Manager `LN Mix 10%-90%` preserves existing holds, excludes heads overlapping an existing same-lane span, and uses `Random Seed` to deterministically convert the requested share of taps that can form a hold of at least 50ms while leaving 50ms before the next same-lane note
 - Skins / gameplay feel:
-  - `rect` / `circle` note shape
+  - `rect / triangle / pentagon / hexagon / circle` note shapes; procedural circles and polygons use the full rect-bar width at 100%
   - note border on/off
   - combo Y adjustment
   - judge line / lane width / lane spacing / note width / divider width / 16K center gap / note height / LN body width adjustment
@@ -115,7 +116,7 @@ This is the document that the next agent or any new contributor should read firs
   - VSync on: present refresh follows the active monitor Hz and render pacing targets `monitor_hz * 2` (`1050` clamp)
   - `visual_offset_ms`
   - `performance_overlay`
-  - `background_upscale_mode=lunasr|off`: asynchronously produces an FHD background on a Windows ML worker and keeps native scaling active until completion or after failure
+  - `background_upscale_mode=lunasr|off`: image/video BGA stays native unless the staged32 RGB FP16 WinML inference benchmark reaches 200 FPS; MPG/MPEG uses Media Foundation with an FFmpeg fallback
 - Gameplay performance:
   - static playfield command-list cache
   - note head / tail bitmap cache
@@ -161,7 +162,7 @@ This is the document that the next agent or any new contributor should read firs
 
 ## Runtime / Packaging Rules
 - New user profiles are created automatically
-- The current official P2P distribution line is `TenRiff 1.2.1 stable`
+- The current official P2P distribution line is `TenRiff 1.2.2 stable`
 - Distribution packages do not include `Songs`
 - Distribution packages include the runtime `Mainmusic/` assets used for menu BGM
 - Distribution updates include only built artifacts and required runtime assets

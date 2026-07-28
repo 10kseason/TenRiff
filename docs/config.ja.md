@@ -40,7 +40,7 @@ profile が存在しない場合は初回起動時に自動生成されます。
 
 - `backend` (string)
   - `polling | rawinput`
-  - 現行 `1.2.1` リリースラインの既定値は `rawinput`
+  - 現行 `1.2.2` リリースラインの既定値は `rawinput`
   - `Options -> Input Settings -> Backend` または `Options -> Profile Setup -> Input Backend` で profile ごとに選択可能
   - runtime fallback は保存済みの値を `polling` に書き換えない
   - RawInput の起動失敗、登録先の消失、message window の終了を確認すると、そのアプリ実行中は menu と後続 gameplay の両方で Polling を維持する
@@ -114,8 +114,9 @@ profile が存在しない場合は初回起動時に自動生成されます。
   - 既定値は `false`。右上を使うため、同じ角に置いた Discord Voice widget と重なる場合がある
 - `background_upscale_mode` (string)
   - `lunasr | off`
-  - 既定値は `lunasr`。1920x1080 未満の BMS image BGA と osu!mania 背景を FHD に非同期補間
-  - 処理中または model load / image decode / inference 失敗時は native bitmap を維持
+  - 既定値は `lunasr`。1920x1080 未満の BMS 画像・動画 BGA と osu!mania 背景を FHD x2 候補として非同期処理
+  - 固定 RGB x2 ベンチマークが `200 FPS` 以上の場合だけ LunaSR を使用し、未達または失敗時はプロセス内で無効化して native scaling を維持
+  - MPG/MPEG などの動画は Media Foundation を優先し、システム codec が失敗した場合は `ffmpeg.exe` に fallback
   - Graphics Settings の `BGA Upscale` row に接続
 
 ### `mode`
@@ -183,6 +184,7 @@ profile が存在しない場合は初回起動時に自動生成されます。
   - `auto` は asset file 名ではなく `#DST_NOTE` レイアウト座標を見て SD/HD/FHD を解決
 - `note_shape` (string)
   - `rect | triangle | pentagon | hexagon | circle`
+  - 100% では procedural 円・多角形が rect bar と同じ lane 全幅を使用
 - `show_hold_tail` (bool)
   - long-note の判定と body の連続性を変えず、tail cap だけを表示または非表示にする
 - `note_border_enabled` (bool)

@@ -520,6 +520,8 @@ bool GameSession::initialize(const CommandLineOptions& options) {
     last_visual_cue_sample_ = -1;
     current_background_base_path_.clear();
     current_background_overlay_path_.clear();
+    current_background_base_start_sample_ = 0;
+    current_background_overlay_start_sample_ = 0;
     if (replay_playback_enabled_ &&
         replay_source_.trace.lane_count > 0 &&
         chart_.lane_count != replay_source_.trace.lane_count) {
@@ -895,6 +897,8 @@ GameSession::HudSnapshot GameSession::hud_snapshot() {
             next_visual_cue_index_ = 0;
             current_background_base_path_.clear();
             current_background_overlay_path_.clear();
+            current_background_base_start_sample_ = 0;
+            current_background_overlay_start_sample_ = 0;
         }
         while (next_visual_cue_index_ < chart_.visual_cues.size() &&
                chart_.visual_cues[next_visual_cue_index_].start_sample <= snapshot.current_sample) {
@@ -902,14 +906,18 @@ GameSession::HudSnapshot GameSession::hud_snapshot() {
             if (const std::string* path = chart_.visual_asset_path(cue.asset_id)) {
                 if (cue.layer == gameplay::VisualLayer::Overlay) {
                     current_background_overlay_path_ = *path;
+                    current_background_overlay_start_sample_ = cue.start_sample;
                 } else {
                     current_background_base_path_ = *path;
+                    current_background_base_start_sample_ = cue.start_sample;
                 }
             }
         }
         last_visual_cue_sample_ = snapshot.current_sample;
         snapshot.background_base_path = current_background_base_path_;
         snapshot.background_overlay_path = current_background_overlay_path_;
+        snapshot.background_base_start_sample = current_background_base_start_sample_;
+        snapshot.background_overlay_start_sample = current_background_overlay_start_sample_;
 
         const auto& stats = engine_->stats();
         snapshot.combo = stats.combo;
@@ -1889,6 +1897,8 @@ void GameSession::shutdown() {
     last_visual_cue_sample_ = -1;
     current_background_base_path_.clear();
     current_background_overlay_path_.clear();
+    current_background_base_start_sample_ = 0;
+    current_background_overlay_start_sample_ = 0;
     active_mods_.clear();
     rate_multiplier_ = 1.0;
     score_multiplier_ = 1.0;

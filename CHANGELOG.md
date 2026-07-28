@@ -4,6 +4,28 @@ TenRiff의 사용자/배포 관점에서 의미 있는 변경만 간단히 기�
 
 ## [Unreleased]
 
+## [1.2.2] - 2026-07-28
+
+### Fixed
+
+- procedural `circle / triangle / pentagon / hexagon` 노트가 100% 설정에서도 짧은 note height에 맞춰 막대보다 작게 보이던 문제를 수정하고 lane 전체 폭을 기준으로 정규화
+- Media Foundation이 열지 못하는 MPG/MPEG BGA를 persistent `ffmpeg.exe` image-pipe 폴백으로 실시간 표시
+
+### Changed
+
+- LunaSR runtime을 staged32 RGB FP16 residual 모델로 교체하고, 원본 IR 10은 보존하면서 graph·weight가 같은 WinML IR 9 파생본을 사용
+- 고정 960x540 RGB x2 추론이 200 FPS 이상인지 최초 1회 벤치마크하고, 미달·오류 시 해당 프로세스에서 LunaSR를 차단한 뒤 native BGA scaling 유지
+
+### Packaging
+
+- Windows 배포물 `baepo/TenRiff-1.2.2.zip`, 공개 소스 번들 `opensource-Tenriff-source/TenRiff-1.2.2-source.zip`, SHA-256 manifest를 새 패치 릴리스 자산으로 구성
+
+### Verification
+
+- Release 전체 빌드, 단위 테스트 `478 pass / 1 optional skip / 0 fail`, CTest `1/1` 통과
+- 실제 320x240 MPEG-1 BGA의 FFmpeg 폴백에서 첫 프레임과 0.23초 이후 프레임 진행 확인
+- 원본 IR 10과 WinML IR 9 모델 모두 ONNX checker 통과, IR 필드 정규화 후 graph byte 동일 확인
+- WinML RGB FP16 출력 스모크 통과; 반복 벤치마크 `24.09~45.70 FPS`로 200 FPS 미달 차단 정책 확인
 ## [1.2.1] - 2026-07-27
 
 ### Added

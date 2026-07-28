@@ -297,8 +297,8 @@ void MenuApp::populate_graphics_settings_render_data(render::MenuRenderData& ren
     render.generic.notes.push_back(ui_text("Menu rendering is capped at 300 Hz. Gameplay uses the configured value up to 1050 Hz.",
                                            "메뉴 렌더링은 300Hz까지 제한되고, 게임플레이는 설정값을 최대 1050Hz까지 사용합니다."));
     render.generic.notes.push_back(ui_text(
-        "LunaSR FHD upscales BMS BGA and chart photos below 1920x1080 on a background worker; native scaling stays active until each frame is ready.",
-        "LunaSR FHD는 1920x1080 미만 BMS BGA와 차트 사진을 백그라운드 작업으로 보간하며, 프레임 준비 전에는 원본 확대를 유지합니다."));
+        "LunaSR runs only after the RGB x2 benchmark reaches 200 FPS. MPG video uses FFmpeg when the system codec fails; native scaling remains active after any failure.",
+        "LunaSR는 RGB x2 벤치마크가 200 FPS 이상일 때만 동작합니다. MPG 시스템 코덱 실패 시 FFmpeg를 사용하며, 모든 실패 후에는 원본 확대를 유지합니다."));
     render.generic.notes.push_back(ui_text("Language changes the menu UI immediately. Display Offset shifts only visuals from -500ms to +500ms.",
                                            "언어는 메뉴 UI에 즉시 반영됩니다. 표시 오프셋은 시각 요소만 -500ms~+500ms 범위에서 이동합니다."));
     render.generic.notes.push_back(ui_text("Display, Resolution, Refresh Hz, and VSync apply immediately. Back saves and returns.",

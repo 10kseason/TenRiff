@@ -3,17 +3,18 @@
 この文書は、次のエージェントや新しい作業者が最初に読むべき current-state 文書です。目的は、「このプロジェクトは今どういう状態で、どこを見ればよく、何がまだ未検証か」を素早く把握できるようにすることです。
 
 ## Baseline
-- 現在のプロジェクト版は `1.2.1 stable`
+- 現在のプロジェクト版は `1.2.2 stable`
 - direct-IP multiplayer と preview r5 の input-backend lifecycle 修正は `1.1.8 stable` に統合
 - `1.1.8` は 1.1.7 の visual refresh に osu!mania OD8 補助スコア、最初の native `BAD` で終了する `Sudden Death (1 MISS)`、決定的な `LN Mix 10%～90%` を追加
 - `1.2.0` は BMS channel `04/07` と osu!mania 背景を gameplay sample timeline に接続し、FHD 未満の画像背景を Windows ML 上の LunaSR で非同期補間
 - `1.2.1` は LunaSR `basic_v2` へ切り替え、gameplay BGA と Song Select の選択 BGI を補間し、single-player の Esc pause menu、polygon note shape、LN tail cap toggle を追加します。
+- `1.2.2` は procedural 円・多角形 skin を bar と同じ 100% 幅に補正し、FFmpeg fallback 付き MPG/MPEG 動画 BGA を追加し、LunaSR を必須 200 FPS benchmark gate 付き staged32 RGB FP16 model に切り替えます。
 - 後続作業の基準文書は `docs/baseline-1.1.2.ja.md`
 - Windows GUI ビルドが主対象
 - Linux は `Baepoks-Linuxs/TenRiff-0.5.0-linux-preview` レベルの preview のみ
 - 既定サーフェスは BMS-first
 - `.osu` はオプションで再有効化でき、4K-10K をサポート
-- `1.2.1 stable` の gameplay 入力は RawInput を優先しつつ、同じ `InputThread` で bound-key polling shadow を常時動作させる。起動失敗または message pump の予期しない終了時も queue / pressed state を reset せず、その producer を Polling に切り替える
+- `1.2.2 stable` の gameplay 入力は RawInput を優先しつつ、同じ `InputThread` で bound-key polling shadow を常時動作させる。起動失敗または message pump の予期しない終了時も queue / pressed state を reset せず、その producer を Polling に切り替える
 - menu 入力は従来の foreground process/root-window 境界を維持する。RawInput の起動失敗、process-global 登録先の消失、hidden message window の終了を検知すると、ユーザー入力を待たず Polling に切り替える。
 - 確認済み fallback は profile を書き換えず、そのアプリ実行中の menu と後続 gameplay に維持する。アプリ再起動または `Options -> Input Settings -> Backend` の明示変更で再試行する。
 
@@ -82,7 +83,7 @@
   - Random は `Off / Mirror / FR / SR` に対応。Mirror は key-mode 変換後の最終 lane を反転し、10K/16K は各 player half 内で独立して反転
   - Mod Manager の `LN Mix 10%～90%` は既存 hold を維持し、同じ lane の既存 span と重なる head を除外したうえで、50ms 以上の hold と次ノート前 50ms の余裕を確保できる tap から設定割合を `Random Seed` で決定的に選ぶ
 - Skins / gameplay feel:
-  - `rect` / `circle` note shape
+  - `rect / triangle / pentagon / hexagon / circle` note shape。procedural 円・多角形は 100% で rect bar と同じ全幅を使用
   - note border on/off
   - combo Y adjustment
   - judge line / lane width / lane spacing / note width / divider width / 16K center gap / note height / LN body width adjustment
@@ -115,7 +116,7 @@
   - VSync on: present refresh は active monitor Hz に追従し、render pacing は `monitor_hz * 2` を目標にする（`1050` clamp）
   - `visual_offset_ms`
   - `performance_overlay`
-  - `background_upscale_mode=lunasr|off`: Windows ML worker で FHD 背景を非同期生成し、完了前または失敗時は native scaling を維持
+  - `background_upscale_mode=lunasr|off`: staged32 RGB FP16 WinML 推論 benchmark が 200 FPS 以上の場合だけ画像・動画 BGA を FHD x2 処理し、MPG/MPEG は Media Foundation 失敗時に FFmpeg fallback を使用
 - Gameplay performance:
   - static playfield command-list cache
   - note head / tail bitmap cache
@@ -157,7 +158,7 @@
 
 ## Runtime / Packaging Rules
 - 新しい user profile は自動生成される
-- 現在の正式 P2P 配布ラインは `TenRiff 1.2.1 stable`
+- 現在の正式 P2P 配布ラインは `TenRiff 1.2.2 stable`
 - distribution package には `Songs` を含めない
 - distribution package には menu BGM 用の `Mainmusic/` runtime asset を含める
 - distribution 更新には built artifact と必要な runtime asset だけを含める

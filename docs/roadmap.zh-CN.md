@@ -4,7 +4,7 @@
 
 ## 当前基线
 - Windows GUI/runtime 是主要受支持路径。
-- 项目版本线是 `1.2.1 stable`；此版本加入 LunaSR Basic v2、选中 BGI 放大、单人暂停菜单、多边形音符和 LN 尾帽开关。
+- 项目版本线是 `1.2.2 stable`；此版本加入带 FFmpeg 回退的 MPG/MPEG 视频 BGA 解码，并把 staged32 RGB FP16 LunaSR 模型置于必须通过的 200 FPS 安全门槛之后。
 - 默认启用 BMS-first 的菜单/runtime，同时可以通过 config/menu 开关启用 4K-10K `.osu` 支持。
 - 关于当前已发布的行为，请先看 [`docs/current-state.zh-CN.md`](current-state.zh-CN.md)；这份路线图主要讲方向和剩余工作。
 
