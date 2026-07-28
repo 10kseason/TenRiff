@@ -3,18 +3,19 @@
 이 문서는 다음 에이전트나 새 작업자가 가장 먼저 읽어야 하는 현재 상태 문서입니다. 목표는 "지금 이 프로젝트가 무엇이고, 어디를 보면 되고, 무엇이 아직 미검증인지"를 빠르게 파악하게 하는 것입니다.
 
 ## Baseline
-- 현재 프로젝트 버전은 `1.2.2 stable`
+- 현재 프로젝트 버전은 `1.2.3 stable`
 - 직접 IP 멀티플레이와 preview r5의 입력 backend 수명주기 수정은 `1.1.8 stable`에 통합
 - `1.1.8`은 1.1.7의 시각 개선에 osu!mania OD8 보조 점수, 첫 네이티브 `BAD` 즉사 `Sudden Death (1 MISS)`, 결정적 `LN Mix 10%~90%`를 추가
 - `1.2.0`은 BMS 채널 `04/07` 및 osu!mania 배경을 gameplay sample timeline에 연결하고, FHD 미만 이미지 배경을 Windows ML 기반 LunaSR로 비동기 보간
 - `1.2.1`은 LunaSR 런타임을 `basic_v2`로 교체하고 gameplay BGA layer와 Song Select의 선택 BGI를 보간하며, 싱글플레이 Esc 일시정지 메뉴·다각형 노트 모양·LN tail cap 토글을 추가.
 - `1.2.2`는 procedural 원·다각형 스킨을 막대와 같은 100% 폭으로 보정하고, FFmpeg 폴백이 있는 MPG/MPEG 동영상 BGA를 추가하며, LunaSR를 필수 200 FPS 벤치마크 게이트 뒤의 staged32 RGB FP16 모델로 교체.
+- `1.2.3`은 LunaSR 고정 RGB x2 성능 게이트를 200 FPS에서 35 FPS로 낮춰, 측정값이 35 FPS 이상이면 업스케일을 활성화.
 - 후속 작업의 기준선 문서는 `docs/baseline-1.1.2.md`
 - Windows GUI 빌드가 메인 타깃
 - Linux는 `Baepoks-Linuxs/TenRiff-0.5.0-linux-preview` 수준의 preview만 존재
 - 기본 표면은 BMS-first
 - `.osu`는 옵션으로 다시 활성화 가능하며 4K~10K를 지원
-- `1.2.2 stable`의 gameplay live 입력은 저장된 RawInput을 우선하면서 같은 `InputThread`의 bound-key polling shadow를 항상 유지하고, 시작 실패뿐 아니라 message pump의 예기치 않은 종료도 queue/state reset 없이 현재 producer thread에서 Polling으로 전환함
+- `1.2.3 stable`의 gameplay live 입력은 저장된 RawInput을 우선하면서 같은 `InputThread`의 bound-key polling shadow를 항상 유지하고, 시작 실패뿐 아니라 message pump의 예기치 않은 종료도 queue/state reset 없이 현재 producer thread에서 Polling으로 전환함
 - 메뉴 입력은 기존 foreground process/root-window 경계를 유지한다. RawInput 시작 실패, process-global 등록 대상 손실, 숨은 message window 종료를 감지하면 사용자 키 입력을 기다리지 않고 Polling으로 전환한다.
 - 확인된 fallback은 profile 값을 덮어쓰지 않은 채 현재 앱 실행의 메뉴와 다음 gameplay까지 유지한다. 앱 재시작 또는 `Options -> Input Settings -> Backend`의 명시적 변경만 재시도한다.
 
@@ -121,7 +122,8 @@
   - VSync on: present refresh는 active monitor Hz를 따라가고 render pacing은 `monitor_hz * 2`를 목표로 함 (`1050` clamp)
   - `visual_offset_ms`
   - `performance_overlay`
-  - `background_upscale_mode=lunasr|off`: staged32 RGB FP16 WinML 추론 벤치마크가 200 FPS 이상일 때만 이미지·동영상 BGA를 FHD x2 처리하며, MPG/MPEG는 Media Foundation 실패 시 FFmpeg 폴백 사용
+  - `background_upscale_mode=lunasr|off`: staged32 RGB FP16 WinML 추론 벤치마크가 35 FPS 이상일 때만 이미지·동영상 BGA를 FHD x2 처리하며, MPG/MPEG는 Media Foundation 실패 시 FFmpeg 폴백 사용
+  - 권장 GPU는 `RTX 3070급 이상`으로 추정하지만 보장 사양은 아니며, GPU 이름이 아니라 각 PC의 최초 35 FPS 벤치마크가 실제 활성화 여부를 결정
 - Gameplay performance:
   - static playfield command-list cache
   - note head/tail bitmap cache
@@ -176,7 +178,7 @@
 
 ## Runtime / Packaging Rules
 - 새 사용자 프로필은 자동 생성
-- 현재 정식 P2P 배포 라인은 `TenRiff 1.2.2 stable`
+- 현재 정식 P2P 배포 라인은 `TenRiff 1.2.3 stable`
 - 배포 패키지에는 `Songs`를 넣지 않음
 - 배포 패키지는 메뉴 BGM용 `Mainmusic/` 런타임 자산을 함께 포함
 - 배포 업데이트에는 built artifacts와 필요한 런타임 자산만 포함

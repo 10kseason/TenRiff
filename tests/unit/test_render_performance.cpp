@@ -245,10 +245,10 @@ TEST_CASE("Media Foundation BGA video extension policy accepts MPG and common co
     CHECK_FALSE(BgaVideoDecoder::is_supported_video_path("still.png"));
 }
 
-TEST_CASE("LunaSR x2 performance gate requires a measured 200 FPS") {
+TEST_CASE("LunaSR x2 performance gate requires a measured 35 FPS") {
     using tenriff::render::LunaSrBackgroundUpscaler;
 
-    CHECK_FALSE(LunaSrBackgroundUpscaler::meets_performance_gate(199.999));
-    CHECK(LunaSrBackgroundUpscaler::meets_performance_gate(200.0));
-    CHECK(LunaSrBackgroundUpscaler::meets_performance_gate(240.0));
+    CHECK_FALSE(LunaSrBackgroundUpscaler::meets_performance_gate(34.999));
+    CHECK(LunaSrBackgroundUpscaler::meets_performance_gate(35.0));
+    CHECK(LunaSrBackgroundUpscaler::meets_performance_gate(60.0));
 }

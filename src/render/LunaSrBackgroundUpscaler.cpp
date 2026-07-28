@@ -391,8 +391,8 @@ bool pass_process_benchmark_gate(
         }
         passed = LunaSrBackgroundUpscaler::meets_performance_gate(fps);
         detail = passed
-                     ? "Fixed 960x540 RGB x2 inference passed the 200 FPS gate."
-                     : "Fixed 960x540 RGB x2 inference is below 200 FPS; LunaSR is disabled.";
+                     ? "Fixed 960x540 RGB x2 inference passed the 35 FPS gate."
+                     : "Fixed 960x540 RGB x2 inference is below 35 FPS; LunaSR is disabled.";
     } catch (const winrt::hresult_error& error) {
         detail = "WinML benchmark failed with HRESULT 0x" +
                  std::to_string(static_cast<std::uint32_t>(error.code())) +

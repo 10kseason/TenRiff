@@ -10,7 +10,7 @@ namespace tenriff::render {
 
 inline constexpr std::uint32_t kLunaSrTargetWidth = 1920;
 inline constexpr std::uint32_t kLunaSrTargetHeight = 1080;
-inline constexpr double kLunaSrMinimumBenchmarkFps = 200.0;
+inline constexpr double kLunaSrMinimumBenchmarkFps = 35.0;
 
 struct LunaSrBackgroundFrame {
     std::string source_path;

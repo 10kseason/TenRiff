@@ -40,7 +40,7 @@
 
 - `backend` (string)
   - `polling | rawinput`
-  - 현재 `1.2.2` 릴리스 라인의 기본값은 `rawinput`
+  - 현재 `1.2.3` 릴리스 라인의 기본값은 `rawinput`
   - `Options -> Input Settings -> Backend` 또는 `Options -> Profile Setup -> Input Backend`에서 프로필별로 RawInput/Polling을 직접 선택 가능
   - 저장값은 런타임 fallback 때문에 자동으로 `polling`으로 덮어쓰지 않음
   - RawInput 시작 실패, 등록 대상 손실, 메시지 창 종료가 확인되면 현재 앱 실행 동안 메뉴와 다음 gameplay 세션 모두 Polling을 유지
@@ -60,7 +60,7 @@
 - `judgement_hz` (int)
   - `1000 | 2000 | 4000 | 8000`
   - 호환성용으로 남아 있는 입력 설정 필드
-  - 현재 `1.2.2` runtime은 별도 오디오 판정 서브루프를 이 값으로 구동하지 않음
+  - 현재 `1.2.3` runtime은 별도 오디오 판정 서브루프를 이 값으로 구동하지 않음
   - 기본값은 `4000` (`0.25ms`)
 - `debounce_ms` (double)
   - 실제 Press/Release 전환은 버리지 않고 같은 상태의 중복 이벤트만 상태 추적에서 제거
@@ -115,7 +115,8 @@
 - `background_upscale_mode` (string)
   - `lunasr | off`
   - 기본값은 `lunasr`; 1920x1080보다 작은 BMS 이미지·동영상 BGA와 osu!mania 배경을 FHD x2 후보로 비동기 처리
-  - 고정 RGB x2 벤치마크가 `200 FPS` 이상일 때만 LunaSR를 사용하며, 미달·모델 실패 시 해당 프로세스에서 차단하고 native scaling 유지
+  - 고정 RGB x2 벤치마크가 `35 FPS` 이상일 때만 LunaSR를 사용하며, 미달·모델 실패 시 해당 프로세스에서 차단하고 native scaling 유지
+  - 권장 GPU는 `RTX 3070급 이상`으로 추정하지만 보장 사양은 아니며, 각 PC의 최초 35 FPS 벤치마크가 실제 활성화 여부를 결정
   - MPG/MPEG 등 동영상은 Media Foundation을 우선 사용하고 시스템 코덱 실패 시 `ffmpeg.exe`로 폴백
   - Graphics Settings의 `BGA Upscale` row와 연결됨
   - 상세 계약과 제한은 `tools/lunasr/README.md`

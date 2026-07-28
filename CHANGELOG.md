@@ -4,6 +4,18 @@ TenRiff의 사용자/배포 관점에서 의미 있는 변경만 간단히 기�
 
 ## [Unreleased]
 
+## [1.2.3] - 2026-07-28
+
+### Changed
+
+- LunaSR 고정 RGB x2 성능 게이트를 `200 FPS`에서 `35 FPS`로 낮춰, 측정값이 35 FPS 이상이면 업스케일을 활성화하고 미만이면 native BGA scaling을 유지
+- 권장 GPU를 `RTX 3070급 이상`으로 추정해 안내하되, 실제 활성화 여부는 GPU 이름이 아니라 각 PC의 최초 35 FPS 벤치마크 결과로 결정
+
+### Verification
+
+- Release 증분 빌드, 단위 테스트 `478 pass / 1 optional skip / 0 fail`, CTest `1/1` 통과
+- WinML 반복 측정에서 `25.23 FPS`는 차단되고 `40.29 FPS`는 35 FPS 게이트를 통과해 1920x1080 BGRA 파이프라인까지 완료
+
 ## [1.2.2] - 2026-07-28
 
 ### Fixed

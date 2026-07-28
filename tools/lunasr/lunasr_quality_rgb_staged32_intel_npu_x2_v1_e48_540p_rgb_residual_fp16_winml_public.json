@@ -22,10 +22,15 @@
   "composition": "clamp(bilinear_x2(rgb_lr) + rgb_residual_x2, 0, 1)",
   "winml_conversion": "IR version only; graph, opset, tensors, and weights are unchanged",
   "runtime_gate": {
-    "minimum_inference_fps": 200.0,
+    "minimum_inference_fps": 35.0,
     "warmup_frames": 3,
     "timed_frames": 12,
     "failure_behavior": "disable LunaSR for the process and keep native BGA/BGI scaling"
+  },
+  "hardware_guidance": {
+    "estimated_recommendation": "NVIDIA GeForce RTX 3070-class or faster",
+    "guaranteed": false,
+    "note": "Activation is decided by the per-process 35 FPS benchmark; driver, power, and background load can change the result."
   },
   "source_export_verification": {
     "max_abs_diff": 0.00110626220703125,
