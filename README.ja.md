@@ -2,9 +2,9 @@
 
 Language: [한국어](README.md) | [English](README.en.md) | [简体中文](README.zh-CN.md) | 日本語
 
-TenRiff は、Windows GUI ベースの BMS-first リズムゲーム実行環境兼ランチャープロジェクトです。現在の stable プロジェクト版は `1.2.3` で、FFmpeg fallback 付き MPG/MPEG 動画 BGA decode を維持し、staged32 RGB INT8 QDQ LunaSR model を使用し、safety gate を 35 FPS に維持します。推奨 GPU は `RTX 3070 クラス以上`という推定であり、保証要件ではありません。実際の有効化は各 PC の初回 benchmark で決まります。gate 未達時は LunaSR の frame copy と inference を停止し、native BGA scaling を維持します。ライセンスは MIT で、同梱されるサードパーティ通知は [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) にまとめています。
+TenRiff は、Windows GUI ベースの BMS-first リズムゲーム実行環境兼ランチャープロジェクトです。現在の stable プロジェクト版は `1.2.4` で、FFmpeg fallback 付き MPG/MPEG 動画 BGA decode を維持しつつ、権利範囲が不明確な LunaSR model は公開 package から除外し、user-supplied model の opt-in integration だけを残します。既定値は `off` で、権利処理済み model を配置して有効化した場合も各 PC の初回 35 FPS benchmark が実行可否を決定します。gate 未達時は LunaSR の frame copy と inference を停止し、native BGA scaling を維持します。ライセンスは MIT で、同梱されるサードパーティ通知は [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) にまとめています。
 
-この README は「プロジェクトを開いたときに最初にどこを見ればよいか」を説明する導入文書です。より詳しい現在の挙動、現在の `1.2.3` プロジェクト状態、`1.1.2 final stable` ベースライン、設定構造、設計文書は [`docs/README.ja.md`](docs/README.ja.md) から続けて読む前提で構成しています。
+この README は「プロジェクトを開いたときに最初にどこを見ればよいか」を説明する導入文書です。より詳しい現在の挙動、現在の `1.2.4` プロジェクト状態、`1.1.2 final stable` ベースライン、設定構造、設計文書は [`docs/README.ja.md`](docs/README.ja.md) から続けて読む前提で構成しています。
 
 TenRiff のコードベースは、伝統的な長文設計書主導だけで積み上がったものではなく、高速な反復と実験を重視した `vibe coding` 的な性格を持つ作品でもあります。
 

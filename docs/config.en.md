@@ -40,7 +40,7 @@ If a profile does not exist, it is created automatically on first launch.
 
 - `backend` (string)
   - `polling | rawinput`
-  - defaults to `rawinput` on the current `1.2.3` release line
+  - defaults to `rawinput` on the current `1.2.4` release line
   - selectable per profile under `Options -> Input Settings -> Backend` or `Options -> Profile Setup -> Input Backend`
   - runtime fallback never rewrites the saved value to `polling`
   - a confirmed RawInput startup failure, registration-target loss, or message-window exit latches Polling across menu and subsequent gameplay sessions for the current app run
@@ -60,7 +60,7 @@ If a profile does not exist, it is created automatically on first launch.
 - `judgement_hz` (int)
   - `1000 | 2000 | 4000 | 8000`
   - compatibility field kept in the input config
-  - the current `1.2.3` runtime no longer drives a separate audio-thread judgement sub-step loop from this value
+  - the current `1.2.4` runtime no longer drives a separate audio-thread judgement sub-step loop from this value
   - default is `4000` (`0.25ms`)
 - `debounce_ms` (double)
   - real Press/Release transitions are preserved; only duplicate same-state events are removed from pressed-state tracking
@@ -114,9 +114,9 @@ If a profile does not exist, it is created automatically on first launch.
   - defaults to `false`; it occupies the top-right corner and can overlap a Discord Voice widget placed there
 - `background_upscale_mode` (string)
   - `lunasr | off`
-  - defaults to `lunasr`; asynchronously considers sub-1920x1080 BMS image/video BGA and osu!mania backgrounds for FHD x2
+  - defaults to `off`; public packages contain no ONNX, and opt-in requires the user to provide a rights-cleared `lunasr_user_rgb_x2_winml.onnx`
   - LunaSR runs only after its fixed RGB x2 benchmark reaches at least `35 FPS`; otherwise it is disabled for the process and native scaling remains active
-  - `RTX 3070-class or faster` is an estimated recommendation, not a guarantee; each PC's first 35 FPS benchmark decides activation
+  - the user is responsible for the supplied model's rights, quality, and performance; TenRiff does not endorse a specific model
   - MPG/MPEG and common video containers use Media Foundation first, then `ffmpeg.exe` when the system codec cannot decode them
   - connected to the `BGA Upscale` row in Graphics Settings
 

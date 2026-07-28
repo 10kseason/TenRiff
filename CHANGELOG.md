@@ -4,6 +4,27 @@ TenRiff의 사용자/배포 관점에서 의미 있는 변경만 간단히 기�
 
 ## [Unreleased]
 
+## [1.2.4] - 2026-07-29
+
+### Changed
+
+- 권리 경계가 불명확한 제3자 게임 촬영 기반 LunaSR ONNX·checkpoint 파생물·모델 전용 검증 메타데이터를 공개 저장소와 Windows/source 릴리즈 패키지에서 제외
+- LunaSR 코드는 권리 정리된 사용자 모델을 `lunasr_user_rgb_x2_winml.onnx`로 직접 넣는 opt-in 연동으로 유지하고, 공개 설정 기본값과 잘못된 설정 fallback을 `off`로 변경
+
+### Fixed
+
+- 삭제된 `tools/lunasr/LICENSE.LunaSR`를 계속 복사·해시·고지하던 stale CMake와 배포 문서 참조를 제거해 모델이 없는 공개 Release 빌드가 실패하지 않도록 정리
+### Packaging
+
+- Windows `TenRiff-1.2.4.zip`, 공개 소스 `TenRiff-1.2.4-source.zip`, SHA-256 manifest를 모델 비포함 패치 릴리즈 자산으로 구성
+
+### Verification
+
+- 활성 checkout과 공개 소스 stage에서 각각 `478 pass / 1 optional skip / 0 fail`, CTest `1/1` 통과
+- Release `TenRiff.exe`, CLI/GUI BMS key converter, 사용자 모델용 LunaSR WinML smoke target 빌드 성공
+- 모델이 없는 LunaSR smoke가 예상 코드 `2`로 native fallback 경계를 확인했고 Release 출력·Windows ZIP·source ZIP의 ONNX/checkpoint/model metadata가 모두 0개임을 확인
+- 바이너리 ZIP `20 entries`, 소스 ZIP `339 entries`, source stage `314 files`의 stage/추출본/working tree SHA-256 parity와 개인 경로·credential 패턴 0건을 확인
+
 ## [1.2.3] - 2026-07-28
 
 ### Changed

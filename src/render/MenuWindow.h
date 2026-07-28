@@ -117,7 +117,7 @@ struct SongSelectData {
     std::string selected_song_artist;
     std::string selected_song_detail;
     std::string selected_song_background_path;
-    std::string background_upscale_mode = "lunasr";
+    std::string background_upscale_mode = "off";
     std::string selected_song_lamp;
     bool selected_song_favorite = false;
     std::string selected_song_collection_filter;
@@ -263,7 +263,7 @@ struct GameplayHudData {
     std::string background_overlay_path;
     int64_t background_base_start_sample = 0;
     int64_t background_overlay_start_sample = 0;
-    std::string background_upscale_mode = "lunasr";
+    std::string background_upscale_mode = "off";
     double judgement_line_position = 0.82;
     double combo_position = 0.24;
     std::size_t lane_width_scale_count = 0;

@@ -2,9 +2,9 @@
 
 Language: [한국어](README.md) | [English](README.en.md) | [简体中文](README.zh-CN.md) | [日本語](README.ja.md)
 
-TenRiff is a Windows GUI-based BMS-first rhythm game runtime/launcher project. The current stable project version is `1.2.3`; it keeps MPG/MPEG video BGA decoding with an FFmpeg fallback and uses the staged32 RGB INT8 QDQ LunaSR model while keeping its safety gate at 35 FPS. An `RTX 3070-class or faster` GPU is the estimated recommendation, not a guaranteed requirement; the first benchmark on each PC decides whether LunaSR is enabled. If the gate is not met, TenRiff stops LunaSR frame copies and inference and keeps native BGA scaling. The project uses the MIT License, and bundled third-party notices are collected in [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
+TenRiff is a Windows GUI-based BMS-first rhythm game runtime/launcher project. The current stable project version is `1.2.4`; it keeps MPG/MPEG video BGA decoding with an FFmpeg fallback, removes the rights-unclear LunaSR model from public packages, and retains only an opt-in user-supplied-model integration. The default is `off`; when a rights-cleared model is supplied and enabled, the first 35 FPS benchmark on each PC decides whether LunaSR runs. If the gate is not met, TenRiff stops LunaSR frame copies and inference and keeps native BGA scaling. The project uses the MIT License, and bundled third-party notices are collected in [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
 
-This README is an introduction that explains "what to look at first when you open the project." For the more detailed current behavior, the current `1.2.3` project state, the `1.1.2 final stable` baseline, the config structure, and the design documents, continue reading from [`docs/README.en.md`](docs/README.en.md).
+This README is an introduction that explains "what to look at first when you open the project." For the more detailed current behavior, the current `1.2.4` project state, the `1.1.2 final stable` baseline, the config structure, and the design documents, continue reading from [`docs/README.en.md`](docs/README.en.md).
 
 TenRiff should also be read as a `vibe coding` work: it was shaped through fast iteration and experimentation rather than only through a traditional long-form design-first process.
 

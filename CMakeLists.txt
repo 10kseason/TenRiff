@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(TenRiff VERSION 1.2.3 LANGUAGES C CXX)
+project(TenRiff VERSION 1.2.4 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -11,7 +11,7 @@ if(MSVC)
 endif()
 
 option(TENRIFF_ENABLE_TESTS "Build TenRiff unit tests" ON)
-option(TENRIFF_ENABLE_LUNASR "Enable the optional WinML LunaSR background upscaler" ON)
+option(TENRIFF_ENABLE_LUNASR "Enable the optional user-supplied WinML LunaSR background upscaler" ON)
 
 # Pinned vendored miniz is used only for local .osk/.osz ZIP package import.
 add_library(tenriff_miniz STATIC
@@ -256,26 +256,6 @@ else()
     target_link_libraries(tenriff PRIVATE tenriff_chart tenriff_game tenriff_runtime tenriff_core)
 endif()
 
-if(WIN32 AND MSVC AND TENRIFF_ENABLE_LUNASR)
-    set(TENRIFF_LUNASR_MODEL
-        "${CMAKE_CURRENT_SOURCE_DIR}/tools/lunasr/lunasr_quality_rgb_staged32_intel_npu_x2_v1_e48_540p_rgb_residual_int8_qdq_winml_public.onnx")
-    add_custom_command(TARGET tenriff POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E make_directory
-                "$<TARGET_FILE_DIR:tenriff>/tools/lunasr"
-        COMMAND ${CMAKE_COMMAND} -E rm -f
-                "$<TARGET_FILE_DIR:tenriff>/tools/lunasr/lunasr_general_mc65_ww35_dense8_b6_v1_540p_residual_winml.onnx"
-                "$<TARGET_FILE_DIR:tenriff>/tools/lunasr/lunasr_general_mc65_ww35_dense8_b6_v1_540p_residual_winml_public.onnx"
-                "$<TARGET_FILE_DIR:tenriff>/tools/lunasr/lunasr_basic_v2_dense8_b6_540p_residual_winml_public.onnx"
-                "$<TARGET_FILE_DIR:tenriff>/tools/lunasr/lunasr_quality_rgb_staged32_intel_npu_x2_v1_e48_540p_rgb_residual_fp16_winml_public.onnx"
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                "${TENRIFF_LUNASR_MODEL}"
-                "$<TARGET_FILE_DIR:tenriff>/tools/lunasr/"
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                "${CMAKE_CURRENT_SOURCE_DIR}/tools/lunasr/LICENSE.LunaSR"
-                "$<TARGET_FILE_DIR:tenriff>/tools/lunasr/"
-        COMMENT "Copying the optional LunaSR WinML model"
-    )
-endif()
 
 add_executable(bms_key_converter
     src/bms_key_converter_main.cpp

@@ -1,4 +1,4 @@
-TenRiff 1.2.3 stable open-source source package scope
+TenRiff 1.2.4 stable open-source source package scope
 
 Included in versioned source bundles:
 - CHANGELOG.md
@@ -49,9 +49,9 @@ Excluded from versioned source bundles:
 - P_DA.bme
 - 10k-calc/
 - tools/lunasr/HUGGINGFACE.md (private storage handoff only)
-- tools/lunasr/*.pt (private training checkpoints)
-- tools/lunasr/*_residual.onnx (private exporter intermediate)
-- tools/lunasr/*_winml.onnx (private compatibility intermediate; only `*_winml_public.onnx` is public)
+- tools/lunasr/*.pt, *.pth, *.ckpt, *.safetensors (private training checkpoints)
+- tools/lunasr/*.onnx (all model artifacts, including user-supplied runtime models)
+- tools/lunasr/*_public.json and *_verification.json (model-specific metadata)
 
 Notes:
 - The source bundle is intended to contain code, docs, config, and tests needed to inspect or rebuild the project.
@@ -59,4 +59,4 @@ Notes:
 - Local caches, packaged binaries, user profiles, and private working files are intentionally excluded.
 - Local LLM/tooling checkouts such as `external/llama.cpp/` are intentionally excluded from the public source package.
 - The repository license is MIT and should be shipped with both source and binary distributions.
-- The bundled LunaSR model is MIT-licensed and retains `tools/lunasr/LICENSE.LunaSR`.
+- LunaSR integration source and tools are included, but ONNX models, checkpoints, training data, and model-specific verification metadata are excluded.

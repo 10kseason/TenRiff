@@ -1107,7 +1107,7 @@ JsonValue build_json_root(const RuntimeConfig& config) {
 
 std::string normalize_background_upscale_mode(std::string_view token) {
     const std::string normalized = to_lower_ascii(std::string(token));
-    return normalized == "off" || normalized == "native" ? "off" : "lunasr";
+    return normalized == "lunasr" ? "lunasr" : "off";
 }
 
 std::string normalize_skin_mode_token(std::string_view key_mode) {
@@ -1474,7 +1474,7 @@ RuntimeConfig ConfigLoader::defaults() const {
     config.graphics.vsync = false;
     config.graphics.refresh_hz = kDefaultGraphicsRefreshHz;
     config.graphics.performance_overlay = false;
-    config.graphics.background_upscale_mode = "lunasr";
+    config.graphics.background_upscale_mode = "off";
 
     config.mode.format = "bms";
     config.mode.key_mode = "none";

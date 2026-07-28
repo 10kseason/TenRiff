@@ -41,7 +41,7 @@ constexpr std::uint32_t kModelInputWidth = 960;
 constexpr std::uint32_t kModelInputHeight = 540;
 constexpr std::size_t kCachedFrameLimit = 3;
 constexpr wchar_t kModelFilename[] =
-    L"lunasr_quality_rgb_staged32_intel_npu_x2_v1_e48_540p_rgb_residual_int8_qdq_winml_public.onnx";
+    L"lunasr_user_rgb_x2_winml.onnx";
 constexpr int kBenchmarkWarmupFrames = 3;
 constexpr int kBenchmarkTimedFrames = 12;
 

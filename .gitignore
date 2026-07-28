@@ -28,8 +28,12 @@
 /tools/lunasr/HUGGINGFACE.md
 /tools/lunasr/model/
 /tools/lunasr/*.pt
-/tools/lunasr/*_residual.onnx
-/tools/lunasr/*_winml.onnx
+/tools/lunasr/*.pth
+/tools/lunasr/*.ckpt
+/tools/lunasr/*.safetensors
+/tools/lunasr/*.onnx
+/tools/lunasr/*_public.json
+/tools/lunasr/*_verification.json
 
 CMakeUserPresets.json
 *.user

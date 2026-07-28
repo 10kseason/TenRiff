@@ -40,7 +40,7 @@
 
 - `backend` (string)
   - `polling | rawinput`
-  - 当前 `1.2.3` 发布线默认值为 `rawinput`
+  - 当前 `1.2.4` 发布线默认值为 `rawinput`
   - 可在 `Options -> Input Settings -> Backend` 或 `Options -> Profile Setup -> Input Backend` 中按 profile 选择
   - runtime fallback 不会把已保存值改写为 `polling`
   - 确认 RawInput 启动失败、注册目标丢失或 message window 退出后，本次应用运行期间 menu 与后续 gameplay 都会保持 Polling
@@ -114,9 +114,9 @@
   - 默认值为 `false`；它位于右上角，可能会与放在同一角落的 Discord Voice widget 重叠
 - `background_upscale_mode` (string)
   - `lunasr | off`
-  - 默认值为 `lunasr`；异步把低于 1920x1080 的 BMS 图片/视频 BGA 和 osu!mania 背景作为 FHD x2 候选
+  - 默认值为 `off`；公开包不含 ONNX，只有用户自行放入权利已厘清的 `lunasr_user_rgb_x2_winml.onnx` 后才能 opt-in
   - 只有固定 RGB x2 基准达到 `35 FPS` 才启用 LunaSR；未达到或失败时在本进程中禁用并保持 native scaling
-  - 推荐 GPU 估计为 `RTX 3070 级或更高`，这不是保证；每台 PC 的首次 35 FPS 基准决定是否启用
+  - 用户需自行确认所提供模型的权利、质量与性能；TenRiff 不保证任何特定模型
   - MPG/MPEG 等视频优先使用 Media Foundation，系统 codec 无法解码时回退到 `ffmpeg.exe`
   - 连接到 Graphics Settings 的 `BGA Upscale` 行
 
