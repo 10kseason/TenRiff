@@ -4,7 +4,7 @@
 
 ## Current Baseline
 - Windows GUI / runtime が主なサポート経路です。
-- プロジェクト版ラインは `1.2.2 stable` で、FFmpeg fallback 付き MPG/MPEG 動画 BGA decode を追加し、staged32 RGB FP16 LunaSR model を必須 200 FPS safety gate の背後に配置します。
+- プロジェクト版ラインは `1.2.3 stable` で、FFmpeg fallback 付き MPG/MPEG 動画 BGA decode を維持し、staged32 RGB FP16 LunaSR gate を 35 FPS に下げます。`RTX 3070 クラス以上`は推定推奨であり、保証要件ではありません。
 - 既定では BMS-first の menu / runtime が有効で、4K-10K `.osu` は config / menu toggle の背後にある任意機能です。
 - 現在出荷されている挙動は [`docs/current-state.ja.md`](current-state.ja.md) を先に見てください。この roadmap は方向と残作業を示す文書です。
 

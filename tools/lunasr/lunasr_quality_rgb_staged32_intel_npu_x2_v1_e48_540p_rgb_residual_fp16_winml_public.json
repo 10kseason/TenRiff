@@ -27,6 +27,11 @@
     "timed_frames": 12,
     "failure_behavior": "disable LunaSR for the process and keep native BGA/BGI scaling"
   },
+  "hardware_guidance": {
+    "estimated_recommendation": "NVIDIA GeForce RTX 3070-class or faster",
+    "guaranteed": false,
+    "note": "Activation is decided by the per-process 35 FPS benchmark; driver, power, and background load can change the result."
+  },
   "source_export_verification": {
     "max_abs_diff": 0.00110626220703125,
     "mean_abs_diff": 0.00007358622563803576,

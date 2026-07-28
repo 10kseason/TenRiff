@@ -40,7 +40,7 @@ profile が存在しない場合は初回起動時に自動生成されます。
 
 - `backend` (string)
   - `polling | rawinput`
-  - 現行 `1.2.2` リリースラインの既定値は `rawinput`
+  - 現行 `1.2.3` リリースラインの既定値は `rawinput`
   - `Options -> Input Settings -> Backend` または `Options -> Profile Setup -> Input Backend` で profile ごとに選択可能
   - runtime fallback は保存済みの値を `polling` に書き換えない
   - RawInput の起動失敗、登録先の消失、message window の終了を確認すると、そのアプリ実行中は menu と後続 gameplay の両方で Polling を維持する
@@ -116,6 +116,7 @@ profile が存在しない場合は初回起動時に自動生成されます。
   - `lunasr | off`
   - 既定値は `lunasr`。1920x1080 未満の BMS 画像・動画 BGA と osu!mania 背景を FHD x2 候補として非同期処理
   - 固定 RGB x2 ベンチマークが `35 FPS` 以上の場合だけ LunaSR を使用し、未達または失敗時はプロセス内で無効化して native scaling を維持
+  - 推奨 GPU は `RTX 3070 クラス以上`という推定であり保証ではなく、各 PC の初回 35 FPS benchmark が有効化を決定
   - MPG/MPEG などの動画は Media Foundation を優先し、システム codec が失敗した場合は `ffmpeg.exe` に fallback
   - Graphics Settings の `BGA Upscale` row に接続
 

@@ -4,7 +4,7 @@ This roadmap captures the recommended high-level order for building out the game
 
 ## Current baseline
 - Windows GUI/runtime is the primary supported path.
-- Project version line is `1.2.2 stable`; this release adds MPG/MPEG video BGA decoding with an FFmpeg fallback and places the staged32 RGB FP16 LunaSR model behind a mandatory 200 FPS safety gate.
+- Project version line is `1.2.3 stable`; this release keeps MPG/MPEG video BGA decoding with an FFmpeg fallback and lowers the staged32 RGB FP16 LunaSR gate to 35 FPS. `RTX 3070-class or faster` is an estimated recommendation, not a guarantee.
 - BMS-first menu/runtime is active by default, with optional 4K-10K `.osu` support behind config/menu toggles.
 - For current shipped behavior, read `docs/current-state.md` first; this roadmap is about direction and remaining work.
 

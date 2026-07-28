@@ -2,9 +2,9 @@
 
 Language: [한국어](README.md) | [English](README.en.md) | [简体中文](README.zh-CN.md) | [日本語](README.ja.md)
 
-TenRiff is a Windows GUI-based BMS-first rhythm game runtime/launcher project. The current stable project version is `1.2.2`; it adds MPG/MPEG video BGA decoding with an FFmpeg fallback and updates LunaSR to the staged32 RGB FP16 model behind a mandatory 200 FPS safety gate. If the gate is not met, TenRiff stops LunaSR frame copies and inference and keeps native BGA scaling. The project uses the MIT License, and bundled third-party notices are collected in [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
+TenRiff is a Windows GUI-based BMS-first rhythm game runtime/launcher project. The current stable project version is `1.2.3`; it keeps MPG/MPEG video BGA decoding with an FFmpeg fallback and adjusts the staged32 RGB FP16 LunaSR safety gate to 35 FPS. An `RTX 3070-class or faster` GPU is the estimated recommendation, not a guaranteed requirement; the first benchmark on each PC decides whether LunaSR is enabled. If the gate is not met, TenRiff stops LunaSR frame copies and inference and keeps native BGA scaling. The project uses the MIT License, and bundled third-party notices are collected in [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
 
-This README is an introduction that explains "what to look at first when you open the project." For the more detailed current behavior, the current `1.2.2` project state, the `1.1.2 final stable` baseline, the config structure, and the design documents, continue reading from [`docs/README.en.md`](docs/README.en.md).
+This README is an introduction that explains "what to look at first when you open the project." For the more detailed current behavior, the current `1.2.3` project state, the `1.1.2 final stable` baseline, the config structure, and the design documents, continue reading from [`docs/README.en.md`](docs/README.en.md).
 
 TenRiff should also be read as a `vibe coding` work: it was shaped through fast iteration and experimentation rather than only through a traditional long-form design-first process.
 
