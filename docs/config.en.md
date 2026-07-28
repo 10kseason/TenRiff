@@ -115,7 +115,7 @@ If a profile does not exist, it is created automatically on first launch.
 - `background_upscale_mode` (string)
   - `lunasr | off`
   - defaults to `lunasr`; asynchronously considers sub-1920x1080 BMS image/video BGA and osu!mania backgrounds for FHD x2
-  - LunaSR runs only after its fixed RGB x2 benchmark reaches at least `200 FPS`; otherwise it is disabled for the process and native scaling remains active
+  - LunaSR runs only after its fixed RGB x2 benchmark reaches at least `35 FPS`; otherwise it is disabled for the process and native scaling remains active
   - MPG/MPEG and common video containers use Media Foundation first, then `ffmpeg.exe` when the system codec cannot decode them
   - connected to the `BGA Upscale` row in Graphics Settings
 

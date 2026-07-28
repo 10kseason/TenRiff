@@ -115,7 +115,7 @@
 - `background_upscale_mode` (string)
   - `lunasr | off`
   - 默认值为 `lunasr`；异步把低于 1920x1080 的 BMS 图片/视频 BGA 和 osu!mania 背景作为 FHD x2 候选
-  - 只有固定 RGB x2 基准达到 `200 FPS` 才启用 LunaSR；未达到或失败时在本进程中禁用并保持 native scaling
+  - 只有固定 RGB x2 基准达到 `35 FPS` 才启用 LunaSR；未达到或失败时在本进程中禁用并保持 native scaling
   - MPG/MPEG 等视频优先使用 Media Foundation，系统 codec 无法解码时回退到 `ffmpeg.exe`
   - 连接到 Graphics Settings 的 `BGA Upscale` 行
 

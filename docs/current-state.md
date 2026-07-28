@@ -9,6 +9,7 @@
 - `1.2.0`은 BMS 채널 `04/07` 및 osu!mania 배경을 gameplay sample timeline에 연결하고, FHD 미만 이미지 배경을 Windows ML 기반 LunaSR로 비동기 보간
 - `1.2.1`은 LunaSR 런타임을 `basic_v2`로 교체하고 gameplay BGA layer와 Song Select의 선택 BGI를 보간하며, 싱글플레이 Esc 일시정지 메뉴·다각형 노트 모양·LN tail cap 토글을 추가.
 - `1.2.2`는 procedural 원·다각형 스킨을 막대와 같은 100% 폭으로 보정하고, FFmpeg 폴백이 있는 MPG/MPEG 동영상 BGA를 추가하며, LunaSR를 필수 200 FPS 벤치마크 게이트 뒤의 staged32 RGB FP16 모델로 교체.
+- `Unreleased`는 LunaSR 고정 RGB x2 성능 게이트를 200 FPS에서 35 FPS로 낮춰, 측정값이 35 FPS 이상이면 업스케일을 활성화.
 - 후속 작업의 기준선 문서는 `docs/baseline-1.1.2.md`
 - Windows GUI 빌드가 메인 타깃
 - Linux는 `Baepoks-Linuxs/TenRiff-0.5.0-linux-preview` 수준의 preview만 존재
@@ -121,7 +122,7 @@
   - VSync on: present refresh는 active monitor Hz를 따라가고 render pacing은 `monitor_hz * 2`를 목표로 함 (`1050` clamp)
   - `visual_offset_ms`
   - `performance_overlay`
-  - `background_upscale_mode=lunasr|off`: staged32 RGB FP16 WinML 추론 벤치마크가 200 FPS 이상일 때만 이미지·동영상 BGA를 FHD x2 처리하며, MPG/MPEG는 Media Foundation 실패 시 FFmpeg 폴백 사용
+  - `background_upscale_mode=lunasr|off`: staged32 RGB FP16 WinML 추론 벤치마크가 35 FPS 이상일 때만 이미지·동영상 BGA를 FHD x2 처리하며, MPG/MPEG는 Media Foundation 실패 시 FFmpeg 폴백 사용
 - Gameplay performance:
   - static playfield command-list cache
   - note head/tail bitmap cache

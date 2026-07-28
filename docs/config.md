@@ -115,7 +115,7 @@
 - `background_upscale_mode` (string)
   - `lunasr | off`
   - 기본값은 `lunasr`; 1920x1080보다 작은 BMS 이미지·동영상 BGA와 osu!mania 배경을 FHD x2 후보로 비동기 처리
-  - 고정 RGB x2 벤치마크가 `200 FPS` 이상일 때만 LunaSR를 사용하며, 미달·모델 실패 시 해당 프로세스에서 차단하고 native scaling 유지
+  - 고정 RGB x2 벤치마크가 `35 FPS` 이상일 때만 LunaSR를 사용하며, 미달·모델 실패 시 해당 프로세스에서 차단하고 native scaling 유지
   - MPG/MPEG 등 동영상은 Media Foundation을 우선 사용하고 시스템 코덱 실패 시 `ffmpeg.exe`로 폴백
   - Graphics Settings의 `BGA Upscale` row와 연결됨
   - 상세 계약과 제한은 `tools/lunasr/README.md`

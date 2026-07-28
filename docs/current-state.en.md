@@ -9,6 +9,7 @@ This is the document that the next agent or any new contributor should read firs
 - `1.2.0` connects BMS channel `04/07` and osu!mania backgrounds to the gameplay sample timeline and asynchronously upscales sub-FHD image backgrounds through LunaSR on Windows ML
 - `1.2.1` switches the runtime to LunaSR `basic_v2`, applies it to gameplay BGA layers and the selected Song Select BGI, adds the single-player Esc pause menu, and adds polygon note shapes plus an optional LN tail cap.
 - `1.2.2` normalizes procedural circle/polygon skins to the full 100% bar width, adds MPG/MPEG video BGA decoding with an FFmpeg fallback, and switches LunaSR to the staged32 RGB FP16 model behind a mandatory 200 FPS benchmark gate.
+- `Unreleased` lowers the fixed RGB x2 LunaSR performance gate from 200 FPS to 35 FPS, enabling upscaling when the measured result is at least 35 FPS.
 - Baseline companion document for follow-up work: `docs/baseline-1.1.2.en.md`
 - Windows GUI build is the main target
 - Linux exists only as a preview-level package at `Baepoks-Linuxs/TenRiff-0.5.0-linux-preview`
@@ -116,7 +117,7 @@ This is the document that the next agent or any new contributor should read firs
   - VSync on: present refresh follows the active monitor Hz and render pacing targets `monitor_hz * 2` (`1050` clamp)
   - `visual_offset_ms`
   - `performance_overlay`
-  - `background_upscale_mode=lunasr|off`: image/video BGA stays native unless the staged32 RGB FP16 WinML inference benchmark reaches 200 FPS; MPG/MPEG uses Media Foundation with an FFmpeg fallback
+  - `background_upscale_mode=lunasr|off`: image/video BGA stays native unless the staged32 RGB FP16 WinML inference benchmark reaches 35 FPS; MPG/MPEG uses Media Foundation with an FFmpeg fallback
 - Gameplay performance:
   - static playfield command-list cache
   - note head / tail bitmap cache

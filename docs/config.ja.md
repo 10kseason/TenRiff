@@ -115,7 +115,7 @@ profile が存在しない場合は初回起動時に自動生成されます。
 - `background_upscale_mode` (string)
   - `lunasr | off`
   - 既定値は `lunasr`。1920x1080 未満の BMS 画像・動画 BGA と osu!mania 背景を FHD x2 候補として非同期処理
-  - 固定 RGB x2 ベンチマークが `200 FPS` 以上の場合だけ LunaSR を使用し、未達または失敗時はプロセス内で無効化して native scaling を維持
+  - 固定 RGB x2 ベンチマークが `35 FPS` 以上の場合だけ LunaSR を使用し、未達または失敗時はプロセス内で無効化して native scaling を維持
   - MPG/MPEG などの動画は Media Foundation を優先し、システム codec が失敗した場合は `ffmpeg.exe` に fallback
   - Graphics Settings の `BGA Upscale` row に接続
 
