@@ -9,7 +9,7 @@
 - `1.2.0` 把 BMS 通道 `04/07` 和 osu!mania 背景接入 gameplay sample timeline，并通过 Windows ML 上的 LunaSR 异步放大低于 FHD 的图片背景
 - `1.2.1` 切换到 LunaSR `basic_v2`，对 gameplay BGA 和 Song Select 选中 BGI 进行放大，并加入单人 Esc 暂停菜单、多边形音符与 LN 尾帽开关。
 - `1.2.2` 将 procedural 圆形/多边形 skin 修正为与条形相同的 100% 宽度，加入带 FFmpeg 回退的 MPG/MPEG 视频 BGA，并将 LunaSR 切换到必须通过 200 FPS 基准门槛的 staged32 RGB FP16 模型。
-- `1.2.3` 将 LunaSR 固定 RGB x2 性能门槛从 200 FPS 降至 35 FPS，测量结果达到 35 FPS 时启用放大。
+- `1.2.3` 将 LunaSR 固定 RGB x2 性能门槛从 200 FPS 降至 35 FPS，并把 staged32 runtime 切换为 35/35 Conv 均已量化的 static S8S8 QDQ INT8 模型。
 - 后续工作的基准文档是 [`docs/baseline-1.1.2.zh-CN.md`](baseline-1.1.2.zh-CN.md)
 - Windows GUI 构建是主目标
 - Linux 仅存在 [`Baepoks-Linuxs/TenRiff-0.5.0-linux-preview`](../Baepoks-Linuxs/TenRiff-0.5.0-linux-preview) 级别的 preview
@@ -117,7 +117,7 @@
   - VSync on：present refresh 跟随活动显示器 Hz，render pacing 目标为 `monitor_hz * 2`（上限 `1050`）
   - `visual_offset_ms`
   - `performance_overlay`
-  - `background_upscale_mode=lunasr|off`：仅当 staged32 RGB FP16 WinML 推理基准达到 35 FPS 时才对图片/视频 BGA 执行 FHD x2；MPG/MPEG 在 Media Foundation 失败时回退到 FFmpeg
+  - `background_upscale_mode=lunasr|off`：仅当 staged32 RGB INT8 QDQ WinML 推理基准达到 35 FPS 时才对图片/视频 BGA 执行 FHD x2；MPG/MPEG 在 Media Foundation 失败时回退到 FFmpeg
   - 推荐 GPU 估计为 `RTX 3070 级或更高`，这不是保证要求；实际是否启用由每台 PC 的首次 35 FPS 基准决定
 - Gameplay performance：
   - static playfield command-list cache

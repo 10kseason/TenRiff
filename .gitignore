@@ -26,6 +26,7 @@
 /Memory for ai and Human Worker.txt
 /P_DA.bme
 /tools/lunasr/HUGGINGFACE.md
+/tools/lunasr/model/
 /tools/lunasr/*.pt
 /tools/lunasr/*_residual.onnx
 /tools/lunasr/*_winml.onnx

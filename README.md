@@ -2,7 +2,7 @@
 
 Language: Korean | [English](README.en.md) | [简体中文](README.zh-CN.md) | [日本語](README.ja.md)
 
-TenRiff는 Windows GUI 기반 BMS-first 리듬게임 런타임/런처 프로젝트입니다. 목표는 실사용 가능한 BMS 플레이 환경을 중심으로, 저지먼트/오디오/입력/렌더링 파이프라인을 직접 제어하는 독립 실행형 리듬게임 클라이언트를 만드는 것입니다. 현재 정식 프로젝트 버전은 `1.2.3`이며, MPG/MPEG 동영상 BGA 디코딩과 FFmpeg 폴백을 유지하면서 LunaSR staged32 RGB FP16 모델의 안전 게이트를 35 FPS로 조정했습니다. 권장 GPU는 `RTX 3070급 이상`으로 추정하지만 보장 사양은 아니며, 실제 활성화 여부는 각 PC의 최초 벤치마크 결과로 결정됩니다. 게이트를 통과하지 못하면 LunaSR 프레임 복사와 추론을 중단하고 native BGA scaling을 유지합니다. MIT 라이선스를 사용하며, 번들된 서드파티 고지는 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)에 정리합니다.
+TenRiff는 Windows GUI 기반 BMS-first 리듬게임 런타임/런처 프로젝트입니다. 목표는 실사용 가능한 BMS 플레이 환경을 중심으로, 저지먼트/오디오/입력/렌더링 파이프라인을 직접 제어하는 독립 실행형 리듬게임 클라이언트를 만드는 것입니다. 현재 정식 프로젝트 버전은 `1.2.3`이며, MPG/MPEG 동영상 BGA 디코딩과 FFmpeg 폴백을 유지하면서 LunaSR staged32 RGB INT8 QDQ 모델을 사용하고 안전 게이트를 35 FPS로 유지합니다. 권장 GPU는 `RTX 3070급 이상`으로 추정하지만 보장 사양은 아니며, 실제 활성화 여부는 각 PC의 최초 벤치마크 결과로 결정됩니다. 게이트를 통과하지 못하면 LunaSR 프레임 복사와 추론을 중단하고 native BGA scaling을 유지합니다. MIT 라이선스를 사용하며, 번들된 서드파티 고지는 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)에 정리합니다.
 
 이 README는 "프로젝트를 처음 열었을 때 무엇을 보면 되는지"를 설명하는 입문 문서입니다. 더 자세한 현재 동작, 현재 `1.2.3` 프로젝트 상태, `1.1.2 final stable` 기준선, 설정 구조, 설계 문서는 [`docs/README.md`](docs/README.md)부터 이어서 읽는 구조를 기준으로 작성했습니다.
 

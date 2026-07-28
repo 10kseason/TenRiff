@@ -4,7 +4,7 @@
 
 ## 当前基线
 - Windows GUI/runtime 是主要受支持路径。
-- 项目版本线是 `1.2.3 stable`；此版本保留带 FFmpeg 回退的 MPG/MPEG 视频 BGA 解码，并把 staged32 RGB FP16 LunaSR 门槛降至 35 FPS。`RTX 3070 级或更高`是估计推荐，不是保证要求。
+- 项目版本线是 `1.2.3 stable`；此版本保留带 FFmpeg 回退的 MPG/MPEG 视频 BGA 解码，并使用带 35 FPS 门槛的 staged32 RGB INT8 QDQ LunaSR 模型。`RTX 3070 级或更高`是估计推荐，不是保证要求。
 - 默认启用 BMS-first 的菜单/runtime，同时可以通过 config/menu 开关启用 4K-10K `.osu` 支持。
 - 关于当前已发布的行为，请先看 [`docs/current-state.zh-CN.md`](current-state.zh-CN.md)；这份路线图主要讲方向和剩余工作。
 

@@ -9,7 +9,7 @@
 - `1.2.0` は BMS channel `04/07` と osu!mania 背景を gameplay sample timeline に接続し、FHD 未満の画像背景を Windows ML 上の LunaSR で非同期補間
 - `1.2.1` は LunaSR `basic_v2` へ切り替え、gameplay BGA と Song Select の選択 BGI を補間し、single-player の Esc pause menu、polygon note shape、LN tail cap toggle を追加します。
 - `1.2.2` は procedural 円・多角形 skin を bar と同じ 100% 幅に補正し、FFmpeg fallback 付き MPG/MPEG 動画 BGA を追加し、LunaSR を必須 200 FPS benchmark gate 付き staged32 RGB FP16 model に切り替えます。
-- `1.2.3` は LunaSR の固定 RGB x2 performance gate を 200 FPS から 35 FPS に下げ、測定値が 35 FPS 以上なら upscaling を有効にします。
+- `1.2.3` は LunaSR の固定 RGB x2 performance gate を 200 FPS から 35 FPS に下げ、staged32 runtime を 35/35 Conv 量子化の static S8S8 QDQ INT8 model に切り替えます。
 - 後続作業の基準文書は `docs/baseline-1.1.2.ja.md`
 - Windows GUI ビルドが主対象
 - Linux は `Baepoks-Linuxs/TenRiff-0.5.0-linux-preview` レベルの preview のみ
@@ -117,7 +117,7 @@
   - VSync on: present refresh は active monitor Hz に追従し、render pacing は `monitor_hz * 2` を目標にする（`1050` clamp）
   - `visual_offset_ms`
   - `performance_overlay`
-  - `background_upscale_mode=lunasr|off`: staged32 RGB FP16 WinML 推論 benchmark が 35 FPS 以上の場合だけ画像・動画 BGA を FHD x2 処理し、MPG/MPEG は Media Foundation 失敗時に FFmpeg fallback を使用
+  - `background_upscale_mode=lunasr|off`: staged32 RGB INT8 QDQ WinML 推論 benchmark が 35 FPS 以上の場合だけ画像・動画 BGA を FHD x2 処理し、MPG/MPEG は Media Foundation 失敗時に FFmpeg fallback を使用
   - 推奨 GPU は `RTX 3070 クラス以上`という推定であり保証要件ではなく、実際の有効化は各 PC の初回 35 FPS benchmark で決定
 - Gameplay performance:
   - static playfield command-list cache
