@@ -1,8 +1,11 @@
 #pragma once
 
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <cstdint>
+#include <string>
+#include <string_view>
 
 namespace tenriff::render {
 
@@ -27,6 +30,28 @@ struct GameplayMotionDiagnostics {
     double extrapolated_ms = 0.0;
     double buffer_ms = 0.0;
 };
+
+struct GameplayNoteShapeExtents {
+    float half_width = 0.0f;
+    float half_height = 0.0f;
+};
+
+inline GameplayNoteShapeExtents gameplay_note_shape_extents(float width,
+                                                            float height,
+                                                            std::string_view shape) {
+    std::string normalized(shape);
+    std::transform(normalized.begin(), normalized.end(), normalized.begin(), [](unsigned char ch) {
+        return static_cast<char>(std::tolower(ch));
+    });
+    const float safe_width = std::max(2.0f, width);
+    const float safe_height = std::max(2.0f, height);
+    const bool lane_width_shape = normalized == "circle" || normalized == "triangle" ||
+                                  normalized == "pentagon" || normalized == "hexagon";
+    return GameplayNoteShapeExtents{
+        safe_width * 0.5f,
+        (lane_width_shape ? safe_width : safe_height) * 0.5f,
+    };
+}
 
 inline double compute_gameplay_note_y_normalized(int64_t sample,
                                                  int64_t display_sample,

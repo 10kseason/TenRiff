@@ -1,10 +1,10 @@
-TenRiff source package notes (`1.2.1 stable`)
+TenRiff source package notes (`1.2.2 stable`)
 
 - This folder is a curated source-only staging area for public/open-source distribution.
 - It intentionally excludes local build trees, packaged binaries, caches, user profiles, logs, and private working notes.
 - Internal agent workflow files such as `AGENTS.md` are not part of the public source bundle.
 - The included `SOURCE_PACKAGE_SCOPE.txt` file defines the exact include/exclude rules used for the staged bundle.
-- The current source line is `1.2.1 stable`, which updates LunaSR to Basic v2 and adds selected Song Select BGI upscaling, a single-player pause menu, polygon note shapes, and an LN tail-cap toggle.
+- The current source line is `1.2.2 stable`, which adds MPG/MPEG video BGA decoding with an FFmpeg fallback and places the staged32 RGB FP16 LunaSR model behind a mandatory 200 FPS safety gate.
 - The repository license is MIT. Keep the top-level `LICENSE` file with any redistributed source bundle.
 - The source bundle includes the code/docs/dependencies needed for a standalone Windows configure/build, but it does not ship the local `10k-calc/` reference checkout or `external/llama.cpp/`.
 - The optional LunaSR source/model package is included under `tools/lunasr/` with its dedicated MIT license and WinML-compatible ONNX artifact.

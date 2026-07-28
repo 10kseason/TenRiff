@@ -1,49 +1,46 @@
-# TenRiff LunaSR Basic v2
+# TenRiff LunaSR Quality RGB x2
 
-이 폴더에는 TenRiff의 선택형 실시간 배경 업스케일링에 사용하는 LunaSR Basic v2 공개 런타임 모델과 계약 문서가 들어 있습니다.
+이 폴더에는 TenRiff의 선택형 실시간 BGA/BGI 업스케일 경로에 사용하는 LunaSR RGB residual 모델과 런타임 계약이 들어 있습니다.
 
 ## 동작 범위
 
-- 입력 이미지가 `1920x1080`보다 작고 `graphics.background_upscale_mode`가 `lunasr`일 때만 처리합니다.
-- 게임플레이 BMS BGA의 Base 채널과 Overlay 채널, osu!mania 배경을 각각 비동기로 FHD 보간합니다.
-- Song Select의 선택 곡 BGI/재킷 미리보기도 같은 경로로 비동기 보간합니다.
-- 추론 준비 중이거나 실패한 경우에는 원본 WIC 비트맵을 그대로 표시합니다.
-- 고해상도 원본은 재처리하지 않습니다.
+- `graphics.background_upscale_mode=lunasr`이고 입력이 `1920x1080`보다 작을 때만 FHD x2 후보로 처리합니다.
+- BMS gameplay base/overlay BGA, osu!mania 배경, Song Select의 선택 BGI를 렌더·오디오 스레드와 분리된 worker에서 처리합니다.
+- 정적 PNG/JPG 계열은 WIC로 읽습니다.
+- MPG/MPEG/MP4/M4V/WMV/AVI BGA는 Media Foundation을 먼저 사용하고, 시스템 코덱이 열지 못하면 `ffmpeg.exe` image-pipe로 폴백합니다.
+- 모델 준비·벤치마크·디코드·추론이 실패하거나 느리면 native bitmap/video frame을 계속 표시합니다.
 
-## 배포 파일
+## 200 FPS 성능 게이트
 
-- `lunasr_basic_v2_dense8_b6_540p_residual_winml_public.onnx`: Windows ML용 공개 런타임 모델
-- `lunasr_basic_v2_dense8_b6_540p_residual.json`: 입출력 계약
-- `lunasr_basic_v2_dense8_b6_540p_residual.verification.json`: 체크포인트/ONNX 검증 결과
-- `export_basic_v2_winml.py`: 동일한 공개 ONNX를 다시 만드는 변환 스크립트
-- `SHA256SUMS.txt`: 공개 파일 무결성
-- `LICENSE.LunaSR`: LunaSR 코드·모델 패키지 라이선스
+LunaSR x2는 처음 필요해질 때 고정 `960x540 RGB -> 1920x1080 RGB residual` 추론을 3회 워밍업한 뒤 12회 측정합니다. 측정값이 `200 FPS` 미만이면 해당 프로세스에서 LunaSR를 비활성화하고 이후 BGA 프레임 복사와 추론도 중단합니다. BGA 자체는 native scaling으로 계속 재생됩니다.
 
-`basic_v2_final.pt`는 변환 소스 체크포인트이며 공개 Git 또는 배포 패키지에 포함하지 않습니다.
+2026-07-28 현재 이 개발 PC의 반복 WinML 스모크는 `24.09~45.70 FPS`로 측정되어 게이트가 의도대로 차단되었습니다. 이 수치는 기기·드라이버에 따라 달라지며, 실제 사용 가능 여부는 각 PC에서 최초 실행 시 다시 결정됩니다.
 
 ## 모델 계약
 
-- 구조: Dense8-B6, 8채널, 6블록, residual gate 없음
-- 입력: `luma_lr`, float32 `[1, 1, 540, 960]`, gamma-encoded BT.709 luma `0..1`
-- 출력: `luma_residual`, float32 `[1, 1, 1080, 1920]`
-- 합성: `clamp(bilinear_x2(rgb_lr) + luma_residual, 0, 1)`
-- ONNX opset 18 / IR version 9
+- 원본: `lunasr_quality_rgb_staged32_intel_npu_x2_v1_e48_540p_rgb_residual_fp16.onnx`
+- WinML 런타임본: `lunasr_quality_rgb_staged32_intel_npu_x2_v1_e48_540p_rgb_residual_fp16_winml_public.onnx`
+- 입력: `rgb_lr`, float16 `[1, 3, 540, 960]`
+- 출력: `rgb_residual_x2`, float16 `[1, 3, 1080, 1920]`
+- 합성: `clamp(bilinear_x2(rgb_lr) + rgb_residual_x2, 0, 1)`
+- ONNX opset 18, 81 nodes, 290,222 parameters
 
-모델 출력은 완성 RGB가 아니라 luma residual입니다. TenRiff는 원본 RGB를 half-pixel bilinear x2로 확대한 뒤 같은 residual을 R/G/B 채널에 합성합니다.
+원본 ONNX는 IR 10이지만 이 프로젝트가 사용하는 Windows ML 런타임은 IR 9까지만 허용합니다. 따라서 런타임본은 원본을 보존한 채 IR version 필드만 9로 낮춘 별도 파일입니다. graph, opset, tensor, weight는 바꾸지 않았습니다.
 
-## 검증 결과
+## 파일
 
-- source checkpoint: `basic_v2_final.pt`, epoch 84
-- validation PSNR: `44.04436367648002 dB`
-- bilinear baseline: `42.454356084956224 dB`
-- improvement: `+1.5900075915237935 dB`
-- ONNX checker: 통과
-- ONNX Runtime CPU: 통과
-- PyTorch 대비 최대 절대 오차: `3.2782554626464844e-07`
-- PyTorch 대비 평균 절대 오차: `3.704051820818677e-08`
+- `*_fp16.onnx`: 전달받은 원본 RGB FP16 모델
+- `*_winml_public.onnx`: TenRiff가 로드하는 WinML IR 9 파생본
+- `*_winml_public.json`: 공개 가능한 모델·게이트 계약과 검증 요약
+- `winml_smoke.cpp`: 모델 로드, 출력, 200 FPS 정책 스모크
+- `bga_video_smoke.cpp`: 실제 비디오 프레임 진행 스모크
+- `SHA256SUMS.txt`: 공개 런타임 파일 무결성
+- `LICENSE.LunaSR`: LunaSR 모델/코드 라이선스
 
-## 현재 제한
+로컬 checkpoint 경로가 들어 있는 `*_verification.json`, `basic_v2_final.pt`, private Hugging Face 메모는 공개 배포 계약에 포함하지 않습니다.
 
-- 고정 입력/출력 모델이므로 QHD/4K 직접 출력은 지원하지 않습니다. FHD 결과를 렌더러가 화면 크기에 맞춥니다.
-- 현재 이미지 BGA/BGI의 정적 프레임을 처리합니다. 동영상 BGA나 애니메이션 GIF의 연속 프레임 추론은 지원하지 않습니다.
-- BMS poor-BGA 채널 06의 miss-trigger 전환과 색상 키 합성은 이 기능 범위 밖입니다.
+## 제한
+
+- 업스케일 결과는 고정 FHD이며 QHD/4K 직접 출력 모델이 아닙니다.
+- FFmpeg 폴백이 필요한 MPG는 `ffmpeg.exe`가 실행 파일 옆 또는 PATH에 있어야 합니다.
+- BMS poor-BGA 채널 06의 miss-trigger 전환 및 색상 키 합성은 별도 기능 범위입니다.

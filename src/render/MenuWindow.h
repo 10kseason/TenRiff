@@ -3,6 +3,7 @@
 #ifdef _WIN32
 
 #include "GameplayHudLimits.h"
+#include "render/BgaVideoDecoder.h"
 #include "render/LunaSrBackgroundUpscaler.h"
 #include "render/RenderThread.h"
 
@@ -260,6 +261,8 @@ struct GameplayHudData {
     int64_t past_samples = 0;
     std::string background_base_path;
     std::string background_overlay_path;
+    int64_t background_base_start_sample = 0;
+    int64_t background_overlay_start_sample = 0;
     std::string background_upscale_mode = "lunasr";
     double judgement_line_position = 0.82;
     double combo_position = 0.24;
@@ -693,8 +696,13 @@ private:
     struct GameplayBackgroundCache {
         std::string base_path;
         std::string overlay_path;
+        int64_t base_start_sample = 0;
+        int64_t overlay_start_sample = 0;
         std::string upscale_mode = "off";
-        std::string requested_path;
+        std::string base_requested_key;
+        std::string overlay_requested_key;
+        std::string base_upscaled_key;
+        std::string overlay_upscaled_key;
         bool base_is_lunasr = false;
         bool overlay_is_lunasr = false;
     };
@@ -728,7 +736,10 @@ private:
     GameplayStaticCache gameplay_static_cache_{};
     GameplayNoteSpriteCache gameplay_note_sprite_cache_{};
     GameplayBackgroundCache gameplay_background_cache_{};
+    std::unique_ptr<BgaVideoDecoder> gameplay_base_video_decoder_{};
+    std::unique_ptr<BgaVideoDecoder> gameplay_overlay_video_decoder_{};
     std::unique_ptr<LunaSrBackgroundUpscaler> gameplay_background_upscaler_{};
+    std::unique_ptr<LunaSrBackgroundUpscaler> gameplay_overlay_background_upscaler_{};
     std::unique_ptr<LunaSrBackgroundUpscaler> song_select_background_upscaler_{};
     SongSelectPreviewCache song_select_preview_cache_{};
     std::string song_select_preview_signature_{};

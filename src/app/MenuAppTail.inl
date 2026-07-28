@@ -23,6 +23,8 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
     target.past_samples = gameplay_hud_.past_samples;
     target.background_base_path = gameplay_hud_.background_base_path;
     target.background_overlay_path = gameplay_hud_.background_overlay_path;
+    target.background_base_start_sample = gameplay_hud_.background_base_start_sample;
+    target.background_overlay_start_sample = gameplay_hud_.background_overlay_start_sample;
     target.background_upscale_mode = config_.graphics.background_upscale_mode;
     const double clamped_judgement_line_position = std::clamp(
         config_.skin.judgement_line_position,
@@ -1378,6 +1380,8 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
         gameplay_hud_.past_samples = hud.past_samples;
         gameplay_hud_.background_base_path = hud.background_base_path;
         gameplay_hud_.background_overlay_path = hud.background_overlay_path;
+        gameplay_hud_.background_base_start_sample = hud.background_base_start_sample;
+        gameplay_hud_.background_overlay_start_sample = hud.background_overlay_start_sample;
         gameplay_hud_.combo = hud.combo;
         gameplay_hud_.max_combo = hud.max_combo;
         gameplay_hud_.counts = hud.counts;

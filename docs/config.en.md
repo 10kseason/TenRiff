@@ -40,7 +40,7 @@ If a profile does not exist, it is created automatically on first launch.
 
 - `backend` (string)
   - `polling | rawinput`
-  - defaults to `rawinput` on the current `1.2.1` release line
+  - defaults to `rawinput` on the current `1.2.2` release line
   - selectable per profile under `Options -> Input Settings -> Backend` or `Options -> Profile Setup -> Input Backend`
   - runtime fallback never rewrites the saved value to `polling`
   - a confirmed RawInput startup failure, registration-target loss, or message-window exit latches Polling across menu and subsequent gameplay sessions for the current app run
@@ -60,7 +60,7 @@ If a profile does not exist, it is created automatically on first launch.
 - `judgement_hz` (int)
   - `1000 | 2000 | 4000 | 8000`
   - compatibility field kept in the input config
-  - the current `1.2.1` runtime no longer drives a separate audio-thread judgement sub-step loop from this value
+  - the current `1.2.2` runtime no longer drives a separate audio-thread judgement sub-step loop from this value
   - default is `4000` (`0.25ms`)
 - `debounce_ms` (double)
   - real Press/Release transitions are preserved; only duplicate same-state events are removed from pressed-state tracking
@@ -114,8 +114,9 @@ If a profile does not exist, it is created automatically on first launch.
   - defaults to `false`; it occupies the top-right corner and can overlap a Discord Voice widget placed there
 - `background_upscale_mode` (string)
   - `lunasr | off`
-  - defaults to `lunasr`; asynchronously upscales sub-1920x1080 BMS image BGA and osu!mania backgrounds to FHD
-  - keeps the native bitmap active while processing or when model loading, image decoding, or inference fails
+  - defaults to `lunasr`; asynchronously considers sub-1920x1080 BMS image/video BGA and osu!mania backgrounds for FHD x2
+  - LunaSR runs only after its fixed RGB x2 benchmark reaches at least `200 FPS`; otherwise it is disabled for the process and native scaling remains active
+  - MPG/MPEG and common video containers use Media Foundation first, then `ffmpeg.exe` when the system codec cannot decode them
   - connected to the `BGA Upscale` row in Graphics Settings
 
 ### `mode`
@@ -183,6 +184,7 @@ If a profile does not exist, it is created automatically on first launch.
   - `auto` resolves the SD/HD/FHD family based on the LR2 playskin `#DST_NOTE` layout coordinates instead of asset file names
 - `note_shape` (string)
   - `rect | triangle | pentagon | hexagon | circle`
+  - at 100%, procedural circle and polygon shapes use the same full lane width as the rect bar
 - `show_hold_tail` (bool)
   - shows or hides the long-note tail cap without changing hold judgement/body continuity
 - `note_border_enabled` (bool)

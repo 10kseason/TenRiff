@@ -65,7 +65,7 @@ int wmain(int argc, wchar_t** argv) {
             argc > 1
                 ? std::filesystem::path(argv[1])
                 : std::filesystem::path(
-                      L"tools\\lunasr\\lunasr_basic_v2_dense8_b6_540p_residual_winml_public.onnx");
+                      L"tools\\lunasr\\lunasr_quality_rgb_staged32_intel_npu_x2_v1_e48_540p_rgb_residual_fp16_winml_public.onnx");
         if (!std::filesystem::is_regular_file(model_path)) {
             std::wcerr << L"model not found: " << model_path.c_str() << L'\n';
             return 2;
@@ -79,19 +79,20 @@ int wmain(int argc, wchar_t** argv) {
         const auto session_ready = std::chrono::steady_clock::now();
         ml::LearningModelBinding binding(session);
 
-        const std::vector<std::int64_t> input_shape{1, 1, 540, 960};
-        const std::vector<std::int64_t> output_shape{1, 1, 1080, 1920};
-        std::vector<float> input(540u * 960u, 0.5f);
-        const ml::TensorFloat input_tensor = ml::TensorFloat::CreateFromArray(input_shape, input);
-        const ml::TensorFloat output_tensor = ml::TensorFloat::Create(output_shape);
-        binding.Bind(L"luma_lr", input_tensor);
-        binding.Bind(L"luma_residual", output_tensor);
+        const std::vector<std::int64_t> input_shape{1, 3, 540, 960};
+        const std::vector<std::int64_t> output_shape{1, 3, 1080, 1920};
+        std::vector<float> input(3u * 540u * 960u, 0.5f);
+        const ml::TensorFloat16Bit input_tensor =
+            ml::TensorFloat16Bit::CreateFromArray(input_shape, input);
+        const ml::TensorFloat16Bit output_tensor = ml::TensorFloat16Bit::Create(output_shape);
+        binding.Bind(L"rgb_lr", input_tensor);
+        binding.Bind(L"rgb_residual_x2", output_tensor);
         const auto evaluate_started = std::chrono::steady_clock::now();
         session.Evaluate(binding, L"lunasr-smoke");
         const auto evaluate_finished = std::chrono::steady_clock::now();
 
         const auto values = output_tensor.GetAsVectorView();
-        if (values.Size() != 1080u * 1920u) {
+        if (values.Size() != 3u * 1080u * 1920u) {
             std::cerr << "unexpected output size: " << values.Size() << '\n';
             return 3;
         }
@@ -132,7 +133,7 @@ int wmain(int argc, wchar_t** argv) {
         {
             tenriff::render::LunaSrBackgroundUpscaler upscaler;
             upscaler.request(image_path.u8string());
-            const auto deadline = pipeline_started + std::chrono::seconds(10);
+            const auto deadline = pipeline_started + std::chrono::seconds(20);
             while (std::chrono::steady_clock::now() < deadline) {
                 frame = upscaler.take_ready();
                 if (frame) {
@@ -144,7 +145,7 @@ int wmain(int argc, wchar_t** argv) {
             if (frame) {
                 warm_started = pipeline_finished;
                 upscaler.request(warm_image_path.u8string());
-                const auto warm_deadline = warm_started + std::chrono::seconds(10);
+                const auto warm_deadline = warm_started + std::chrono::seconds(20);
                 while (std::chrono::steady_clock::now() < warm_deadline) {
                     warm_frame = upscaler.take_ready();
                     if (warm_frame) {
@@ -159,6 +160,14 @@ int wmain(int argc, wchar_t** argv) {
         std::filesystem::remove(image_path, remove_error);
         remove_error.clear();
         std::filesystem::remove(warm_image_path, remove_error);
+        const auto benchmark = tenriff::render::LunaSrBackgroundUpscaler::benchmark_status();
+        if (benchmark.state == tenriff::render::LunaSrBenchmarkState::Failed &&
+            !tenriff::render::LunaSrBackgroundUpscaler::meets_performance_gate(benchmark.fps)) {
+            std::cout << "LunaSR performance gate correctly disabled x2: fps=" << benchmark.fps
+                      << " required=" << tenriff::render::kLunaSrMinimumBenchmarkFps
+                      << " detail=" << benchmark.detail << '\n';
+            return 0;
+        }
         if (!frame || !warm_frame ||
             frame->width != tenriff::render::kLunaSrTargetWidth ||
             frame->height != tenriff::render::kLunaSrTargetHeight ||

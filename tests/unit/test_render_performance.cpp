@@ -1,5 +1,6 @@
 #include "doctest/doctest.h"
 
+#include "render/BgaVideoDecoder.h"
 #include "render/GameplayMotion.h"
 #include "render/RenderPacing.h"
 #include "render/RenderThread.h"
@@ -221,4 +222,33 @@ TEST_CASE("LunaSR background policy only targets low-resolution images in LunaSR
     CHECK(LunaSrBackgroundUpscaler::should_upscale(1280, 720, "lunasr"));
     CHECK_FALSE(LunaSrBackgroundUpscaler::should_upscale(1920, 1080, "lunasr"));
     CHECK_FALSE(LunaSrBackgroundUpscaler::should_upscale(1280, 720, "off"));
+}
+TEST_CASE("procedural circle and polygon skins use the full 100 percent bar width") {
+    using tenriff::render::gameplay_note_shape_extents;
+
+    const auto bar = gameplay_note_shape_extents(72.0f, 24.0f, "rect");
+    CHECK(bar.half_width == doctest::Approx(36.0f));
+    CHECK(bar.half_height == doctest::Approx(12.0f));
+
+    for (const char* shape : {"circle", "triangle", "pentagon", "hexagon"}) {
+        const auto extents = gameplay_note_shape_extents(72.0f, 24.0f, shape);
+        CHECK(extents.half_width == doctest::Approx(36.0f));
+        CHECK(extents.half_height == doctest::Approx(36.0f));
+    }
+}
+TEST_CASE("Media Foundation BGA video extension policy accepts MPG and common containers") {
+    using tenriff::render::BgaVideoDecoder;
+
+    CHECK(BgaVideoDecoder::is_supported_video_path("movie.mpg"));
+    CHECK(BgaVideoDecoder::is_supported_video_path("MOVIE.MPEG"));
+    CHECK(BgaVideoDecoder::is_supported_video_path("clip.mp4"));
+    CHECK_FALSE(BgaVideoDecoder::is_supported_video_path("still.png"));
+}
+
+TEST_CASE("LunaSR x2 performance gate requires a measured 200 FPS") {
+    using tenriff::render::LunaSrBackgroundUpscaler;
+
+    CHECK_FALSE(LunaSrBackgroundUpscaler::meets_performance_gate(199.999));
+    CHECK(LunaSrBackgroundUpscaler::meets_performance_gate(200.0));
+    CHECK(LunaSrBackgroundUpscaler::meets_performance_gate(240.0));
 }

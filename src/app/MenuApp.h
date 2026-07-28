@@ -145,6 +145,8 @@ private:
         int64_t past_samples = 0;
         std::string background_base_path;
         std::string background_overlay_path;
+        int64_t background_base_start_sample = 0;
+        int64_t background_overlay_start_sample = 0;
 
         int combo = 0;
         int max_combo = 0;
