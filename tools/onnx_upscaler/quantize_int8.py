@@ -21,7 +21,7 @@ IMAGE_SUFFIXES = {".bmp", ".jpeg", ".jpg", ".png", ".webp"}
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Quantize the LunaSR staged RGB residual model to static S8S8 QDQ INT8."
+        description="Quantize a compatible RGB residual x2 model to static S8S8 QDQ INT8."
     )
     parser.add_argument("--input", type=Path, required=True, help="FP32 ONNX model")
     parser.add_argument("--output", type=Path, required=True, help="INT8 ONNX output")
@@ -59,7 +59,7 @@ def image_tensor(path: Path) -> np.ndarray:
     return np.transpose(array, (2, 0, 1))[None].copy()
 
 
-class LunaSrCalibrationReader(CalibrationDataReader):
+class OnnxUpscalerCalibrationReader(CalibrationDataReader):
     def __init__(self, images: list[Path]) -> None:
         self.images = images
         self._iterator: Iterator[dict[str, np.ndarray]] | None = None
@@ -91,7 +91,7 @@ def main() -> None:
     quantize_static(
         model_input=str(args.input),
         model_output=str(args.output),
-        calibration_data_reader=LunaSrCalibrationReader(calibration_images),
+        calibration_data_reader=OnnxUpscalerCalibrationReader(calibration_images),
         quant_format=QuantFormat.QDQ,
         activation_type=QuantType.QInt8,
         weight_type=QuantType.QInt8,

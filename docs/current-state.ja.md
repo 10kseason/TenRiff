@@ -3,7 +3,7 @@
 この文書は、次のエージェントや新しい作業者が最初に読むべき current-state 文書です。目的は、「このプロジェクトは今どういう状態で、どこを見ればよく、何がまだ未検証か」を素早く把握できるようにすることです。
 
 ## Baseline
-- 現在のプロジェクト版は `1.2.4 stable`
+- 現在のプロジェクト版は `1.2.5 stable`
 - direct-IP multiplayer と preview r5 の input-backend lifecycle 修正は `1.1.8 stable` に統合
 - `1.1.8` は 1.1.7 の visual refresh に osu!mania OD8 補助スコア、最初の native `BAD` で終了する `Sudden Death (1 MISS)`、決定的な `LN Mix 10%～90%` を追加
 - `1.2.0` は BMS channel `04/07` と osu!mania 背景を gameplay sample timeline に接続し、FHD 未満の画像背景を Windows ML 上の LunaSR で非同期補間
@@ -11,6 +11,7 @@
 - `1.2.2` は procedural 円・多角形 skin を bar と同じ 100% 幅に補正し、FFmpeg fallback 付き MPG/MPEG 動画 BGA を追加し、LunaSR を必須 200 FPS benchmark gate 付き staged32 RGB FP16 model に切り替えます。
 - `1.2.3` は LunaSR の固定 RGB x2 performance gate を 200 FPS から 35 FPS に下げます。
 - `1.2.4` は権利範囲が不明確な LunaSR ONNX と model 固有 metadata を公開配布から除外し、既定値 `off` の user-supplied model opt-in integration だけを残します。
+- `1.2.5` は model 固有名の integration を generic External ONNX Upscaler に置換し、Graphics Settings の file 選択/.onnx drop、profile 別 model path、model 別 WinML session・35 FPS gate を追加。
 - 後続作業の基準文書は `docs/baseline-1.1.2.ja.md`
 - Windows GUI ビルドが主対象
 - Linux は `Baepoks-Linuxs/TenRiff-0.5.0-linux-preview` レベルの preview のみ
@@ -118,8 +119,8 @@
   - VSync on: present refresh は active monitor Hz に追従し、render pacing は `monitor_hz * 2` を目標にする（`1050` clamp）
   - `visual_offset_ms`
   - `performance_overlay`
-  - `background_upscale_mode=lunasr|off`: 既定値は `off`。公開 model は同梱せず、権利処理済み user model `lunasr_user_rgb_x2_winml.onnx` が存在して 35 FPS benchmark を通過した場合だけ FHD x2 を実行
-  - user model の権利・品質・性能は user が確認し、TenRiff 公開 release は特定 model を保証しない
+  - `background_upscale_mode=onnx|off` と `background_upscale_model_path`: 既定値は `off`。Graphics Settings で互換 ONNX を選択/drop。公開 model は同梱しない
+  - 現在の契約は 960x540 RGB residual x2。model の権利・品質・性能は user が確認し、load・contract・benchmark・inference 失敗時は native scaling
 - Gameplay performance:
   - static playfield command-list cache
   - note head / tail bitmap cache
@@ -161,7 +162,7 @@
 
 ## Runtime / Packaging Rules
 - 新しい user profile は自動生成される
-- 現在の正式 P2P 配布ラインは `TenRiff 1.2.4 stable`
+- 現在の正式 P2P 配布ラインは `TenRiff 1.2.5 stable`
 - distribution package には `Songs` を含めない
 - distribution package には menu BGM 用の `Mainmusic/` runtime asset を含める
 - distribution 更新には built artifact と必要な runtime asset だけを含める

@@ -4,7 +4,7 @@
 
 ## 当前基线
 - Windows GUI/runtime 是主要受支持路径。
-- 项目版本线是 `1.2.4 stable`；公开包不再附带 LunaSR 模型，保留的用户自备模型集成默认值为 `off`，并要求权利已厘清的模型通过 35 FPS 门槛。
+- 项目版本线是 `1.2.5 stable`；公开包不附带任何 upscaler 模型，通用 External ONNX Upscaler 默认值为 `off`，并要求兼容且权利已厘清的模型通过 35 FPS 门槛。
 - 默认启用 BMS-first 的菜单/runtime，同时可以通过 config/menu 开关启用 4K-10K `.osu` 支持。
 - 关于当前已发布的行为，请先看 [`docs/current-state.zh-CN.md`](current-state.zh-CN.md)；这份路线图主要讲方向和剩余工作。
 

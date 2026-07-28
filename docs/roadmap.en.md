@@ -4,7 +4,7 @@ This roadmap captures the recommended high-level order for building out the game
 
 ## Current Baseline
 - Windows GUI / runtime is the primary supported path.
-- Project version line is `1.2.4 stable`; public packages no longer bundle a LunaSR model, and the remaining user-supplied-model integration defaults to `off` and requires a rights-cleared model plus a successful 35 FPS gate.
+- Project version line is `1.2.5 stable`; public packages bundle no upscaler model, while the generic External ONNX Upscaler defaults to `off` and requires a compatible rights-cleared model plus a successful 35 FPS gate.
 - BMS-first menu / runtime is active by default, with optional 4K-10K `.osu` support behind config / menu toggles.
 - For current shipped behavior, read `docs/current-state.en.md` first; this roadmap is about direction and remaining work.
 

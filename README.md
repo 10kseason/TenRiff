@@ -2,9 +2,9 @@
 
 Language: Korean | [English](README.en.md) | [简体中文](README.zh-CN.md) | [日本語](README.ja.md)
 
-TenRiff는 Windows GUI 기반 BMS-first 리듬게임 런타임/런처 프로젝트입니다. 목표는 실사용 가능한 BMS 플레이 환경을 중심으로, 저지먼트/오디오/입력/렌더링 파이프라인을 직접 제어하는 독립 실행형 리듬게임 클라이언트를 만드는 것입니다. 현재 정식 프로젝트 버전은 `1.2.4`이며, MPG/MPEG 동영상 BGA 디코딩과 FFmpeg 폴백을 유지하면서, 권리 경계가 불명확한 LunaSR 모델은 공개 패키지에서 제외하고 사용자 제공 모델 연동만 opt-in으로 유지합니다. 기본값은 `off`이며, 사용자가 권리 정리된 모델을 제공해 기능을 켠 경우에도 실제 활성화 여부는 각 PC의 최초 35 FPS 벤치마크 결과로 결정됩니다. 게이트를 통과하지 못하면 LunaSR 프레임 복사와 추론을 중단하고 native BGA scaling을 유지합니다. MIT 라이선스를 사용하며, 번들된 서드파티 고지는 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)에 정리합니다.
+TenRiff는 Windows GUI 기반 BMS-first 리듬게임 런타임/런처 프로젝트입니다. 현재 정식 프로젝트 버전은 `1.2.5`이며, Graphics Settings에서 권리 정리된 외부 ONNX 업스케일러를 직접 선택하거나 .onnx 파일을 드롭해 BGA/BGI 확대에 사용할 수 있습니다. 공개 패키지에는 모델을 넣지 않고 기본값은 `off`입니다. 현재 지원 계약은 고정 960x540 RGB residual x2이며, 35 FPS 벤치마크 또는 로드·계약·추론에 실패하면 native BGA scaling을 유지합니다. MIT 라이선스를 사용하며, 번들된 서드파티 고지는 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)에 정리합니다.
 
-이 README는 "프로젝트를 처음 열었을 때 무엇을 보면 되는지"를 설명하는 입문 문서입니다. 더 자세한 현재 동작, 현재 `1.2.4` 프로젝트 상태, `1.1.2 final stable` 기준선, 설정 구조, 설계 문서는 [`docs/README.md`](docs/README.md)부터 이어서 읽는 구조를 기준으로 작성했습니다.
+이 README는 "프로젝트를 처음 열었을 때 무엇을 보면 되는지"를 설명하는 입문 문서입니다. 더 자세한 현재 동작, 현재 `1.2.5` 프로젝트 상태, `1.1.2 final stable` 기준선, 설정 구조, 설계 문서는 [`docs/README.md`](docs/README.md)부터 이어서 읽는 구조를 기준으로 작성했습니다.
 
 TenRiff 코드는 전통적인 장기 설계 문서 중심 개발만으로 쌓인 프로젝트가 아니라, 빠른 반복과 실험을 중시한 `vibe coding` 성격이 강한 작품이라는 점을 명시합니다.
 

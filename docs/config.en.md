@@ -40,7 +40,7 @@ If a profile does not exist, it is created automatically on first launch.
 
 - `backend` (string)
   - `polling | rawinput`
-  - defaults to `rawinput` on the current `1.2.4` release line
+  - defaults to `rawinput` on the current `1.2.5` release line
   - selectable per profile under `Options -> Input Settings -> Backend` or `Options -> Profile Setup -> Input Backend`
   - runtime fallback never rewrites the saved value to `polling`
   - a confirmed RawInput startup failure, registration-target loss, or message-window exit latches Polling across menu and subsequent gameplay sessions for the current app run
@@ -60,7 +60,7 @@ If a profile does not exist, it is created automatically on first launch.
 - `judgement_hz` (int)
   - `1000 | 2000 | 4000 | 8000`
   - compatibility field kept in the input config
-  - the current `1.2.4` runtime no longer drives a separate audio-thread judgement sub-step loop from this value
+  - the current `1.2.5` runtime no longer drives a separate audio-thread judgement sub-step loop from this value
   - default is `4000` (`0.25ms`)
 - `debounce_ms` (double)
   - real Press/Release transitions are preserved; only duplicate same-state events are removed from pressed-state tracking
@@ -113,12 +113,14 @@ If a profile does not exist, it is created automatically on first launch.
 - `performance_overlay` (bool)
   - defaults to `false`; it occupies the top-right corner and can overlap a Discord Voice widget placed there
 - `background_upscale_mode` (string)
-  - `lunasr | off`
-  - defaults to `off`; public packages contain no ONNX, and opt-in requires the user to provide a rights-cleared `lunasr_user_rgb_x2_winml.onnx`
-  - LunaSR runs only after its fixed RGB x2 benchmark reaches at least `35 FPS`; otherwise it is disabled for the process and native scaling remains active
-  - the user is responsible for the supplied model's rights, quality, and performance; TenRiff does not endorse a specific model
-  - MPG/MPEG and common video containers use Media Foundation first, then `ffmpeg.exe` when the system codec cannot decode them
-  - connected to the `BGA Upscale` row in Graphics Settings
+  - `onnx | off`; legacy `lunasr` values migrate to `onnx`
+  - defaults to `off`; no model load or benchmark runs while disabled
+- `background_upscale_model_path` (string)
+  - selected from Graphics Settings > `ONNX Model`, or set by dropping an `.onnx` file on that screen
+  - accepts an absolute path or a path relative to the executable/current directory; public packages include no model
+  - current contract: float32 NCHW `rgb_lr [1,3,540,960]` -> `rgb_residual_x2 [1,3,1080,1920]` residual x2
+  - benchmark, load, contract, or inference failure keeps native scaling
+  - users are responsible for model rights, quality, and performance; see `tools/onnx_upscaler/README.md`
 
 ### `mode`
 - `format` (string)

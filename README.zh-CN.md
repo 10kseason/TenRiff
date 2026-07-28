@@ -2,9 +2,9 @@
 
 Language: [한국어](README.md) | [English](README.en.md) | [简体中文](README.zh-CN.md) | [日本語](README.ja.md)
 
-TenRiff 是一个以 BMS-first 为核心的 Windows GUI 节奏游戏运行时/启动器项目。当前 stable 项目版本为 `1.2.4`；它保留带 FFmpeg 回退的 MPG/MPEG 视频 BGA 解码，同时从公开包中移除权利边界不明确的 LunaSR 模型，只保留用户自行提供模型的 opt-in 集成。默认值为 `off`；用户放入权利已厘清的模型并启用后，是否运行仍由每台 PC 的首次 35 FPS 基准决定。未达到门槛时会停止 LunaSR 帧复制与推理，并保持 native BGA scaling。项目整体使用 MIT 许可证，随项目分发的第三方组件说明见 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)。
+TenRiff 是一个以 BMS-first 为核心的 Windows GUI 节奏游戏运行时/启动器。当前 stable 版本为 `1.2.5`。用户可在 Graphics Settings 中选择权利已厘清的外部 ONNX upscaler，或把 .onnx 文件拖入该页面，用于 BGA/BGI 放大。公开包不包含模型，默认值为 `off`。当前仅支持固定 960x540 RGB residual x2 契约；基准、加载、契约或推理失败时继续使用 native scaling。项目采用 MIT 许可证。
 
-这份 README 是面向首次阅读者的入门文档。关于当前实际行为、当前 `1.2.4` 项目状态、`1.1.2 final stable` 基准、配置结构以及设计文档，请继续阅读 [`docs/README.zh-CN.md`](docs/README.zh-CN.md)。
+这份 README 是入门文档。关于当前行为、`1.2.5` 项目状态、`1.1.2 final stable` 基准、配置和设计文档，请继续阅读 [`docs/README.zh-CN.md`](docs/README.zh-CN.md)。
 
 TenRiff 也明确属于一种 `vibe coding` 作品：它更多是在快速迭代和实验中成形，而不是只按照传统的长篇设计先行流程推进。
 

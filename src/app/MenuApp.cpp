@@ -1745,6 +1745,14 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
         } catch (...) {
             dropped_extension.clear();
         }
+        if (screen_ == Screen::SettingsGraphics && dropped_extension == ".onnx") {
+            config_.graphics.background_upscale_model_path = event.path;
+            config_.graphics.background_upscale_mode = "onnx";
+            graphics_dirty_ = true;
+            persist_runtime_config();
+            publish_snapshot();
+            return;
+        }
         if (dropped_extension == ".osk") {
             if (!import_osu_skin_path(event.path)) {
                 std::cerr << "[warn] Ignored invalid or unsupported OSK package: " << event.path << std::endl;
@@ -1941,7 +1949,7 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
             handle_audio_settings_input(action_key);
             return;
         case Screen::SettingsGraphics:
-            settings_cursor_ = clamp_int(event.index, 0, 7);
+            settings_cursor_ = clamp_int(event.index, 0, 9);
             handle_graphics_settings_input(action_key);
             return;
         case Screen::SongBrowser:

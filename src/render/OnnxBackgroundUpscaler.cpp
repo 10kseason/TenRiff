@@ -1,4 +1,4 @@
-#include "render/LunaSrBackgroundUpscaler.h"
+#include "render/OnnxBackgroundUpscaler.h"
 
 #include <algorithm>
 #include <array>
@@ -27,7 +27,7 @@
 #include "util/Utf8Compat.h"
 #endif
 
-#if defined(TENRIFF_ENABLE_LUNASR) && defined(_WIN32)
+#if defined(TENRIFF_ENABLE_ONNX_UPSCALER) && defined(_WIN32)
 #include <winrt/Windows.AI.MachineLearning.h>
 #include <winrt/Windows.Foundation.Collections.h>
 #include <winrt/base.h>
@@ -40,8 +40,6 @@ namespace {
 constexpr std::uint32_t kModelInputWidth = 960;
 constexpr std::uint32_t kModelInputHeight = 540;
 constexpr std::size_t kCachedFrameLimit = 3;
-constexpr wchar_t kModelFilename[] =
-    L"lunasr_user_rgb_x2_winml.onnx";
 constexpr int kBenchmarkWarmupFrames = 3;
 constexpr int kBenchmarkTimedFrames = 12;
 
@@ -56,48 +54,61 @@ std::string lower_ascii(std::string_view value) {
 struct ProcessBenchmarkGate {
     std::mutex mutex;
     std::condition_variable changed;
-    LunaSrBenchmarkState state = LunaSrBenchmarkState::Pending;
+    OnnxUpscaleBenchmarkState state = OnnxUpscaleBenchmarkState::Pending;
     double fps = 0.0;
     std::string detail;
 };
 
-ProcessBenchmarkGate& process_benchmark_gate() {
-    static ProcessBenchmarkGate gate;
+std::shared_ptr<ProcessBenchmarkGate> process_benchmark_gate(std::string_view model_key) {
+    static std::mutex gates_mutex;
+    static std::unordered_map<std::string, std::shared_ptr<ProcessBenchmarkGate>> gates;
+    std::lock_guard<std::mutex> lock(gates_mutex);
+    auto& gate = gates[std::string(model_key)];
+    if (!gate) {
+        gate = std::make_shared<ProcessBenchmarkGate>();
+    }
     return gate;
 }
 
-LunaSrBenchmarkStatus benchmark_status_snapshot() {
-    auto& gate = process_benchmark_gate();
+OnnxUpscaleBenchmarkStatus benchmark_status_snapshot(ProcessBenchmarkGate& gate) {
     std::lock_guard<std::mutex> lock(gate.mutex);
-    return LunaSrBenchmarkStatus{gate.state, gate.fps, gate.detail};
+    return OnnxUpscaleBenchmarkStatus{gate.state, gate.fps, gate.detail};
 }
 
 #ifdef _WIN32
-std::optional<std::filesystem::path> find_model_path() {
+std::optional<std::filesystem::path> resolve_model_path(std::string_view configured_path) {
     namespace fs = std::filesystem;
+    if (configured_path.empty()) {
+        return std::nullopt;
+    }
+
+    const fs::path configured = util::path_from_utf8_lossy(configured_path);
+    std::error_code ec;
+    if (configured.is_absolute()) {
+        return fs::is_regular_file(configured, ec) && !ec
+                   ? std::optional<fs::path>{configured}
+                   : std::nullopt;
+    }
+
+    std::vector<fs::path> roots;
     std::array<wchar_t, 32768> module_path{};
     const DWORD length = GetModuleFileNameW(nullptr,
                                             module_path.data(),
                                             static_cast<DWORD>(module_path.size()));
-    std::vector<fs::path> roots;
     if (length > 0 && length < module_path.size()) {
         roots.push_back(fs::path(module_path.data()).parent_path());
     }
-    std::error_code ec;
     const fs::path current = fs::current_path(ec);
     if (!ec && !current.empty()) {
         roots.push_back(current);
     }
 
     for (const auto& root : roots) {
-        for (const auto& relative : {fs::path(L"tools") / L"lunasr" / kModelFilename,
-                                     fs::path(L"lunasr") / kModelFilename}) {
-            const fs::path candidate = root / relative;
-            if (fs::is_regular_file(candidate, ec) && !ec) {
-                return candidate;
-            }
-            ec.clear();
+        const fs::path candidate = root / configured;
+        if (fs::is_regular_file(candidate, ec) && !ec) {
+            return candidate;
         }
+        ec.clear();
     }
     return std::nullopt;
 }
@@ -267,19 +278,19 @@ std::vector<float> bgra_to_nchw_rgb(const std::vector<std::uint8_t>& bgra) {
     return rgb;
 }
 
-std::vector<std::uint8_t> compose_lunasr_bgra(
+std::vector<std::uint8_t> compose_onnx_residual_bgra(
     const std::vector<std::uint8_t>& input,
     const std::vector<float>& residual) {
     const std::size_t expected = static_cast<std::size_t>(kModelInputWidth) *
                                  kModelInputHeight * 4;
-    const std::size_t target_pixels = static_cast<std::size_t>(kLunaSrTargetWidth) *
-                                      kLunaSrTargetHeight;
+    const std::size_t target_pixels = static_cast<std::size_t>(kOnnxUpscaleTargetWidth) *
+                                      kOnnxUpscaleTargetHeight;
     if (input.size() != expected || residual.size() != target_pixels * 3) {
         return {};
     }
 
-    std::vector<std::uint8_t> output(static_cast<std::size_t>(kLunaSrTargetWidth) *
-                                     kLunaSrTargetHeight * 4);
+    std::vector<std::uint8_t> output(static_cast<std::size_t>(kOnnxUpscaleTargetWidth) *
+                                     kOnnxUpscaleTargetHeight * 4);
     const auto compose_row = [&](std::uint32_t y) {
         const float source_y = (static_cast<float>(y) + 0.5f) * 0.5f - 0.5f;
         const int y0_raw = static_cast<int>(std::floor(source_y));
@@ -290,7 +301,7 @@ std::vector<std::uint8_t> compose_lunasr_bgra(
             std::clamp(y1_raw, 0, static_cast<int>(kModelInputHeight) - 1));
         const float wy = source_y - std::floor(source_y);
 
-        for (std::uint32_t x = 0; x < kLunaSrTargetWidth; ++x) {
+        for (std::uint32_t x = 0; x < kOnnxUpscaleTargetWidth; ++x) {
             const float source_x = (static_cast<float>(x) + 0.5f) * 0.5f - 0.5f;
             const int x0_raw = static_cast<int>(std::floor(source_x));
             const int x1_raw = x0_raw + 1;
@@ -304,7 +315,7 @@ std::vector<std::uint8_t> compose_lunasr_bgra(
             const std::size_t p10 = (static_cast<std::size_t>(y0) * kModelInputWidth + x1) * 4;
             const std::size_t p01 = (static_cast<std::size_t>(y1) * kModelInputWidth + x0) * 4;
             const std::size_t p11 = (static_cast<std::size_t>(y1) * kModelInputWidth + x1) * 4;
-            const std::size_t out = (static_cast<std::size_t>(y) * kLunaSrTargetWidth + x) * 4;
+            const std::size_t out = (static_cast<std::size_t>(y) * kOnnxUpscaleTargetWidth + x) * 4;
             const auto interpolate = [&](std::size_t channel) {
                 const float top = input[p00 + channel] * (1.0f - wx) +
                                   input[p10 + channel] * wx;
@@ -315,7 +326,7 @@ std::vector<std::uint8_t> compose_lunasr_bgra(
             const float alpha_byte = std::clamp(interpolate(3), 0.0f, 255.0f);
             const float alpha = alpha_byte / 255.0f;
             const std::size_t output_pixel = static_cast<std::size_t>(y) *
-                                             kLunaSrTargetWidth + x;
+                                             kOnnxUpscaleTargetWidth + x;
             for (std::size_t channel = 0; channel < 3; ++channel) {
                 const std::size_t residual_channel = 2 - channel;  // BGRA -> RGB NCHW
                 const float detail = residual[residual_channel * target_pixels + output_pixel];
@@ -330,9 +341,9 @@ std::vector<std::uint8_t> compose_lunasr_bgra(
         }
     };
 #ifdef _MSC_VER
-    concurrency::parallel_for<std::uint32_t>(0, kLunaSrTargetHeight, compose_row);
+    concurrency::parallel_for<std::uint32_t>(0, kOnnxUpscaleTargetHeight, compose_row);
 #else
-    for (std::uint32_t y = 0; y < kLunaSrTargetHeight; ++y) {
+    for (std::uint32_t y = 0; y < kOnnxUpscaleTargetHeight; ++y) {
         compose_row(y);
     }
 #endif
@@ -340,23 +351,23 @@ std::vector<std::uint8_t> compose_lunasr_bgra(
 }
 
 bool pass_process_benchmark_gate(
-    const winrt::Windows::AI::MachineLearning::LearningModelSession& session) {
-    auto& gate = process_benchmark_gate();
+    const winrt::Windows::AI::MachineLearning::LearningModelSession& session,
+    ProcessBenchmarkGate& gate) {
     {
         std::unique_lock<std::mutex> lock(gate.mutex);
-        if (gate.state == LunaSrBenchmarkState::Passed) {
+        if (gate.state == OnnxUpscaleBenchmarkState::Passed) {
             return true;
         }
-        if (gate.state == LunaSrBenchmarkState::Failed) {
+        if (gate.state == OnnxUpscaleBenchmarkState::Failed) {
             return false;
         }
-        if (gate.state == LunaSrBenchmarkState::Running) {
+        if (gate.state == OnnxUpscaleBenchmarkState::Running) {
             gate.changed.wait(lock, [&gate]() {
-                return gate.state != LunaSrBenchmarkState::Running;
+                return gate.state != OnnxUpscaleBenchmarkState::Running;
             });
-            return gate.state == LunaSrBenchmarkState::Passed;
+            return gate.state == OnnxUpscaleBenchmarkState::Passed;
         }
-        gate.state = LunaSrBenchmarkState::Running;
+        gate.state = OnnxUpscaleBenchmarkState::Running;
         gate.detail = "Benchmarking fixed 960x540 RGB x2 inference.";
     }
 
@@ -366,7 +377,7 @@ bool pass_process_benchmark_gate(
     try {
         namespace ml = winrt::Windows::AI::MachineLearning;
         const std::vector<std::int64_t> input_shape{1, 3, kModelInputHeight, kModelInputWidth};
-        const std::vector<std::int64_t> output_shape{1, 3, kLunaSrTargetHeight, kLunaSrTargetWidth};
+        const std::vector<std::int64_t> output_shape{1, 3, kOnnxUpscaleTargetHeight, kOnnxUpscaleTargetWidth};
         std::vector<float> input(static_cast<std::size_t>(kModelInputWidth) *
                                  kModelInputHeight * 3,
                                  0.5f);
@@ -377,11 +388,11 @@ bool pass_process_benchmark_gate(
         binding.Bind(L"rgb_lr", input_tensor);
         binding.Bind(L"rgb_residual_x2", output_tensor);
         for (int frame = 0; frame < kBenchmarkWarmupFrames; ++frame) {
-            session.Evaluate(binding, L"tenriff-lunasr-benchmark-warmup");
+            session.Evaluate(binding, L"tenriff-onnx-upscaler-benchmark-warmup");
         }
         const auto started = std::chrono::steady_clock::now();
         for (int frame = 0; frame < kBenchmarkTimedFrames; ++frame) {
-            session.Evaluate(binding, L"tenriff-lunasr-benchmark");
+            session.Evaluate(binding, L"tenriff-onnx-upscaler-benchmark");
         }
         const auto finished = std::chrono::steady_clock::now();
         const double elapsed_seconds =
@@ -389,35 +400,37 @@ bool pass_process_benchmark_gate(
         if (elapsed_seconds > 0.0) {
             fps = static_cast<double>(kBenchmarkTimedFrames) / elapsed_seconds;
         }
-        passed = LunaSrBackgroundUpscaler::meets_performance_gate(fps);
+        passed = OnnxBackgroundUpscaler::meets_performance_gate(fps);
         detail = passed
                      ? "Fixed 960x540 RGB x2 inference passed the 35 FPS gate."
-                     : "Fixed 960x540 RGB x2 inference is below 35 FPS; LunaSR is disabled.";
+                     : "Fixed 960x540 RGB x2 inference is below 35 FPS; the external ONNX upscaler is disabled.";
     } catch (const winrt::hresult_error& error) {
         detail = "WinML benchmark failed with HRESULT 0x" +
                  std::to_string(static_cast<std::uint32_t>(error.code())) +
-                 "; LunaSR is disabled.";
+                 "; the external ONNX upscaler is disabled.";
     } catch (const std::exception& error) {
         detail = std::string("WinML benchmark failed: ") + error.what() +
-                 "; LunaSR is disabled.";
+                 "; the external ONNX upscaler is disabled.";
     }
 
     {
         std::lock_guard<std::mutex> lock(gate.mutex);
         gate.fps = fps;
         gate.detail = detail;
-        gate.state = passed ? LunaSrBenchmarkState::Passed : LunaSrBenchmarkState::Failed;
+        gate.state = passed ? OnnxUpscaleBenchmarkState::Passed : OnnxUpscaleBenchmarkState::Failed;
     }
     gate.changed.notify_all();
-    std::cerr << "[LunaSR] benchmark=" << fps << " FPS, required="
-              << kLunaSrMinimumBenchmarkFps << " FPS: " << detail << '\n';
+    std::cerr << "[ONNX Upscaler] benchmark=" << fps << " FPS, required="
+              << kOnnxUpscaleMinimumBenchmarkFps << " FPS: " << detail << '\n';
     return passed;
 }
 #endif
 
 }  // namespace
 
-struct LunaSrBackgroundUpscaler::Impl {
+struct OnnxBackgroundUpscaler::Impl {
+    std::string model_path;
+    std::shared_ptr<ProcessBenchmarkGate> benchmark_gate;
     std::mutex mutex;
     std::condition_variable wake;
     std::thread worker;
@@ -430,11 +443,14 @@ struct LunaSrBackgroundUpscaler::Impl {
     std::vector<std::uint8_t> pending_bgra;
     std::uint64_t request_id = 0;
     std::uint64_t pending_id = 0;
-    std::shared_ptr<const LunaSrBackgroundFrame> ready;
-    std::unordered_map<std::string, std::shared_ptr<const LunaSrBackgroundFrame>> cache;
+    std::shared_ptr<const OnnxUpscaleFrame> ready;
+    std::unordered_map<std::string, std::shared_ptr<const OnnxUpscaleFrame>> cache;
     std::deque<std::string> cache_lru;
 
-    Impl() : worker([this]() { run(); }) {}
+    explicit Impl(std::string configured_model_path)
+        : model_path(std::move(configured_model_path)),
+          benchmark_gate(process_benchmark_gate(model_path)),
+          worker([this]() { run(); }) {}
 
     ~Impl() {
         {
@@ -457,7 +473,7 @@ struct LunaSrBackgroundUpscaler::Impl {
     }
 
     void run() {
-#if defined(TENRIFF_ENABLE_LUNASR) && defined(_WIN32)
+#if defined(TENRIFF_ENABLE_ONNX_UPSCALER) && defined(_WIN32)
         try {
             winrt::init_apartment(winrt::apartment_type::multi_threaded);
             Microsoft::WRL::ComPtr<IWICImagingFactory> wic_factory;
@@ -466,18 +482,18 @@ struct LunaSrBackgroundUpscaler::Impl {
                                         CLSCTX_INPROC_SERVER,
                                         IID_PPV_ARGS(&wic_factory))) ||
                 !wic_factory) {
-                std::cerr << "[LunaSR] WIC initialization failed; using native background scaling.\n";
+                std::cerr << "[ONNX Upscaler] WIC initialization failed; using native background scaling.\n";
                 return;
             }
 
-            const auto model_path = find_model_path();
-            if (!model_path.has_value()) {
-                std::cerr << "[LunaSR] WinML model not found; using native background scaling.\n";
+            const auto resolved_model_path = resolve_model_path(model_path);
+            if (!resolved_model_path.has_value()) {
+                std::cerr << "[ONNX Upscaler] WinML model not found; using native background scaling.\n";
                 return;
             }
 
             namespace ml = winrt::Windows::AI::MachineLearning;
-            const ml::LearningModel model = ml::LearningModel::LoadFromFilePath(model_path->c_str());
+            const ml::LearningModel model = ml::LearningModel::LoadFromFilePath(resolved_model_path->c_str());
             ml::LearningModelSession session{nullptr};
             try {
                 session = ml::LearningModelSession(
@@ -489,12 +505,12 @@ struct LunaSrBackgroundUpscaler::Impl {
                     ml::LearningModelDevice(ml::LearningModelDeviceKind::DirectX));
             }
 
-            if (!pass_process_benchmark_gate(session)) {
+            if (!pass_process_benchmark_gate(session, *benchmark_gate)) {
                 return;
             }
 
             const std::vector<std::int64_t> input_shape{1, 3, kModelInputHeight, kModelInputWidth};
-            const std::vector<std::int64_t> output_shape{1, 3, kLunaSrTargetHeight, kLunaSrTargetWidth};
+            const std::vector<std::int64_t> output_shape{1, 3, kOnnxUpscaleTargetHeight, kOnnxUpscaleTargetWidth};
 
             while (true) {
                 std::string path;
@@ -529,7 +545,7 @@ struct LunaSrBackgroundUpscaler::Impl {
                                                              low_bgra)
                                          : decode_cover_frame(wic_factory.Get(), path, low_bgra);
                 if (!decoded) {
-                    std::cerr << "[LunaSR] Could not decode background; keeping native bitmap: "
+                    std::cerr << "[ONNX Upscaler] Could not decode background; keeping native bitmap: "
                               << path << '\n';
                     continue;
                 }
@@ -546,27 +562,27 @@ struct LunaSrBackgroundUpscaler::Impl {
                 ml::LearningModelBinding binding(session);
                 binding.Bind(L"rgb_lr", input_tensor);
                 binding.Bind(L"rgb_residual_x2", output_tensor);
-                session.Evaluate(binding, L"tenriff-lunasr-background");
+                session.Evaluate(binding, L"tenriff-onnx-upscaler-background");
 
-                std::vector<float> residual(static_cast<std::size_t>(kLunaSrTargetWidth) *
-                                            kLunaSrTargetHeight * 3);
+                std::vector<float> residual(static_cast<std::size_t>(kOnnxUpscaleTargetWidth) *
+                                            kOnnxUpscaleTargetHeight * 3);
                 const auto residual_view = output_tensor.GetAsVectorView();
                 if (residual_view.GetMany(0, residual) != residual.size()) {
-                    std::cerr << "[LunaSR] WinML returned an incomplete frame; keeping native bitmap.\n";
+                    std::cerr << "[ONNX Upscaler] WinML returned an incomplete frame; keeping native bitmap.\n";
                     continue;
                 }
 
                 std::vector<std::uint8_t> output =
-                    compose_lunasr_bgra(low_bgra, residual);
+                    compose_onnx_residual_bgra(low_bgra, residual);
                 if (output.empty()) {
                     continue;
                 }
 
-                auto frame = std::make_shared<LunaSrBackgroundFrame>();
+                auto frame = std::make_shared<OnnxUpscaleFrame>();
                 frame->source_path = path;
                 frame->request_id = id;
-                frame->width = kLunaSrTargetWidth;
-                frame->height = kLunaSrTargetHeight;
+                frame->width = kOnnxUpscaleTargetWidth;
+                frame->height = kOnnxUpscaleTargetHeight;
                 frame->bgra = std::move(output);
 
                 {
@@ -581,12 +597,12 @@ struct LunaSrBackgroundUpscaler::Impl {
                 }
             }
         } catch (const winrt::hresult_error& error) {
-            std::wcerr << L"[LunaSR] WinML disabled after error 0x" << std::hex
+            std::wcerr << L"[ONNX Upscaler] WinML disabled after error 0x" << std::hex
                        << static_cast<std::uint32_t>(error.code()) << std::dec
                        << L": " << error.message().c_str()
                        << L". Native background scaling remains active.\n";
         } catch (const std::exception& error) {
-            std::cerr << "[LunaSR] Upscaler disabled: " << error.what()
+            std::cerr << "[ONNX Upscaler] Upscaler disabled: " << error.what()
                       << ". Native background scaling remains active.\n";
         }
 #else
@@ -596,16 +612,16 @@ struct LunaSrBackgroundUpscaler::Impl {
     }
 };
 
-LunaSrBackgroundUpscaler::LunaSrBackgroundUpscaler()
-    : impl_(std::make_unique<Impl>()) {}
+OnnxBackgroundUpscaler::OnnxBackgroundUpscaler(std::string model_path)
+    : impl_(std::make_unique<Impl>(std::move(model_path))) {}
 
-LunaSrBackgroundUpscaler::~LunaSrBackgroundUpscaler() = default;
+OnnxBackgroundUpscaler::~OnnxBackgroundUpscaler() = default;
 
-void LunaSrBackgroundUpscaler::request(std::string path) {
+void OnnxBackgroundUpscaler::request(std::string path) {
     if (!impl_ || path.empty()) {
         return;
     }
-    if (benchmark_status_snapshot().state == LunaSrBenchmarkState::Failed) {
+    if (benchmark_status_snapshot(*impl_->benchmark_gate).state == OnnxUpscaleBenchmarkState::Failed) {
         return;
     }
     std::lock_guard<std::mutex> lock(impl_->mutex);
@@ -631,7 +647,7 @@ void LunaSrBackgroundUpscaler::request(std::string path) {
     impl_->wake.notify_one();
 }
 
-void LunaSrBackgroundUpscaler::request_bgra(std::string source_key,
+void OnnxBackgroundUpscaler::request_bgra(std::string source_key,
                                              std::uint32_t width,
                                              std::uint32_t height,
                                              const std::vector<std::uint8_t>& bgra) {
@@ -639,7 +655,7 @@ void LunaSrBackgroundUpscaler::request_bgra(std::string source_key,
     if (!impl_ || source_key.empty() || width == 0 || height == 0 || bgra.size() != expected) {
         return;
     }
-    if (benchmark_status_snapshot().state == LunaSrBenchmarkState::Failed) {
+    if (benchmark_status_snapshot(*impl_->benchmark_gate).state == OnnxUpscaleBenchmarkState::Failed) {
         return;
     }
     std::lock_guard<std::mutex> lock(impl_->mutex);
@@ -657,7 +673,7 @@ void LunaSrBackgroundUpscaler::request_bgra(std::string source_key,
     impl_->wake.notify_one();
 }
 
-std::shared_ptr<const LunaSrBackgroundFrame> LunaSrBackgroundUpscaler::take_ready() {
+std::shared_ptr<const OnnxUpscaleFrame> OnnxBackgroundUpscaler::take_ready() {
     if (!impl_) {
         return {};
     }
@@ -665,7 +681,7 @@ std::shared_ptr<const LunaSrBackgroundFrame> LunaSrBackgroundUpscaler::take_read
     return std::exchange(impl_->ready, {});
 }
 
-void LunaSrBackgroundUpscaler::clear() {
+void OnnxBackgroundUpscaler::clear() {
     if (!impl_) {
         return;
     }
@@ -680,19 +696,20 @@ void LunaSrBackgroundUpscaler::clear() {
     ++impl_->request_id;
 }
 
-bool LunaSrBackgroundUpscaler::should_upscale(std::uint32_t width,
+bool OnnxBackgroundUpscaler::should_upscale(std::uint32_t width,
                                               std::uint32_t height,
                                               std::string_view mode) {
-    return lower_ascii(mode) == "lunasr" && width > 0 && height > 0 &&
-           (width < kLunaSrTargetWidth || height < kLunaSrTargetHeight);
+    return lower_ascii(mode) == "onnx" && width > 0 && height > 0 &&
+           (width < kOnnxUpscaleTargetWidth || height < kOnnxUpscaleTargetHeight);
 }
 
-bool LunaSrBackgroundUpscaler::meets_performance_gate(double fps) {
-    return std::isfinite(fps) && fps >= kLunaSrMinimumBenchmarkFps;
+bool OnnxBackgroundUpscaler::meets_performance_gate(double fps) {
+    return std::isfinite(fps) && fps >= kOnnxUpscaleMinimumBenchmarkFps;
 }
 
-LunaSrBenchmarkStatus LunaSrBackgroundUpscaler::benchmark_status() {
-    return benchmark_status_snapshot();
+OnnxUpscaleBenchmarkStatus OnnxBackgroundUpscaler::benchmark_status() const {
+    return impl_ ? benchmark_status_snapshot(*impl_->benchmark_gate)
+                 : OnnxUpscaleBenchmarkStatus{};
 }
 
 }  // namespace tenriff::render

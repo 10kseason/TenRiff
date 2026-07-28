@@ -1,4 +1,4 @@
-TenRiff 1.2.4 stable open-source source package scope
+TenRiff 1.2.5 stable open-source source package scope
 
 Included in versioned source bundles:
 - CHANGELOG.md
@@ -21,7 +21,8 @@ Included in versioned source bundles:
 - src/
 - tests/
 - tools/bms-key-converter/
-- tools/lunasr/
+- tools/onnx_upscaler/
+- tools/bga_video_smoke.cpp
 
 Excluded from versioned source bundles:
 - build/
@@ -48,10 +49,11 @@ Excluded from versioned source bundles:
 - Memory for ai and Human Worker.txt
 - P_DA.bme
 - 10k-calc/
-- tools/lunasr/HUGGINGFACE.md (private storage handoff only)
-- tools/lunasr/*.pt, *.pth, *.ckpt, *.safetensors (private training checkpoints)
-- tools/lunasr/*.onnx (all model artifacts, including user-supplied runtime models)
-- tools/lunasr/*_public.json and *_verification.json (model-specific metadata)
+- models/
+- tools/onnx_upscaler/model/
+- *.pt, *.pth, *.ckpt, *.safetensors (private training checkpoints)
+- *.onnx (all model artifacts, including user-supplied runtime models)
+- *_public.json and *_verification.json (model-specific metadata)
 
 Notes:
 - The source bundle is intended to contain code, docs, config, and tests needed to inspect or rebuild the project.
@@ -59,4 +61,4 @@ Notes:
 - Local caches, packaged binaries, user profiles, and private working files are intentionally excluded.
 - Local LLM/tooling checkouts such as `external/llama.cpp/` are intentionally excluded from the public source package.
 - The repository license is MIT and should be shipped with both source and binary distributions.
-- LunaSR integration source and tools are included, but ONNX models, checkpoints, training data, and model-specific verification metadata are excluded.
+- The generic External ONNX Upscaler source and compatibility tools are included, but ONNX models, checkpoints, training data, and model-specific verification metadata are excluded.

@@ -4,7 +4,7 @@
 
 ## Current Baseline
 - Windows GUI / runtime が主なサポート経路です。
-- プロジェクト版ラインは `1.2.4 stable`。公開 package は LunaSR model を同梱せず、残る user-supplied-model integration は既定値 `off` で、権利処理済み model と 35 FPS gate 通過を必要とします。
+- プロジェクト版ラインは `1.2.5 stable`。公開 package は upscaler model を同梱せず、generic External ONNX Upscaler は既定値 `off` で、互換性と権利を確認済みの model と 35 FPS gate 通過を必要とします。
 - 既定では BMS-first の menu / runtime が有効で、4K-10K `.osu` は config / menu toggle の背後にある任意機能です。
 - 現在出荷されている挙動は [`docs/current-state.ja.md`](current-state.ja.md) を先に見てください。この roadmap は方向と残作業を示す文書です。
 

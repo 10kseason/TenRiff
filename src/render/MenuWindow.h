@@ -4,7 +4,7 @@
 
 #include "GameplayHudLimits.h"
 #include "render/BgaVideoDecoder.h"
-#include "render/LunaSrBackgroundUpscaler.h"
+#include "render/OnnxBackgroundUpscaler.h"
 #include "render/RenderThread.h"
 
 #include <array>
@@ -118,6 +118,7 @@ struct SongSelectData {
     std::string selected_song_detail;
     std::string selected_song_background_path;
     std::string background_upscale_mode = "off";
+    std::string background_upscale_model_path;
     std::string selected_song_lamp;
     bool selected_song_favorite = false;
     std::string selected_song_collection_filter;
@@ -264,6 +265,7 @@ struct GameplayHudData {
     int64_t background_base_start_sample = 0;
     int64_t background_overlay_start_sample = 0;
     std::string background_upscale_mode = "off";
+    std::string background_upscale_model_path;
     double judgement_line_position = 0.82;
     double combo_position = 0.24;
     std::size_t lane_width_scale_count = 0;
@@ -534,6 +536,7 @@ private:
     void invalidate_gameplay_note_sprite_cache();
     [[nodiscard]] bool ensure_gameplay_note_sprites(const GameplayHudData& data);
     void invalidate_gameplay_background_cache();
+    void set_background_upscale_model_path(std::string model_path);
     [[nodiscard]] bool ensure_gameplay_background_bitmap(const GameplayHudData& data);
     void invalidate_song_select_preview_cache();
     [[nodiscard]] bool ensure_song_select_preview_bitmap(const SongSelectData& data);
@@ -703,8 +706,8 @@ private:
         std::string overlay_requested_key;
         std::string base_upscaled_key;
         std::string overlay_upscaled_key;
-        bool base_is_lunasr = false;
-        bool overlay_is_lunasr = false;
+        bool base_is_upscaled = false;
+        bool overlay_is_upscaled = false;
     };
 
     struct SongSelectPreviewCache {
@@ -712,7 +715,7 @@ private:
         std::string upscale_mode = "off";
         std::string requested_path{};
         bool attempted = false;
-        bool is_lunasr = false;
+        bool is_upscaled = false;
     };
 
     struct SongScrollbarState {
@@ -736,11 +739,12 @@ private:
     GameplayStaticCache gameplay_static_cache_{};
     GameplayNoteSpriteCache gameplay_note_sprite_cache_{};
     GameplayBackgroundCache gameplay_background_cache_{};
+    std::string active_background_upscale_model_path_{};
     std::unique_ptr<BgaVideoDecoder> gameplay_base_video_decoder_{};
     std::unique_ptr<BgaVideoDecoder> gameplay_overlay_video_decoder_{};
-    std::unique_ptr<LunaSrBackgroundUpscaler> gameplay_background_upscaler_{};
-    std::unique_ptr<LunaSrBackgroundUpscaler> gameplay_overlay_background_upscaler_{};
-    std::unique_ptr<LunaSrBackgroundUpscaler> song_select_background_upscaler_{};
+    std::unique_ptr<OnnxBackgroundUpscaler> gameplay_background_upscaler_{};
+    std::unique_ptr<OnnxBackgroundUpscaler> gameplay_overlay_background_upscaler_{};
+    std::unique_ptr<OnnxBackgroundUpscaler> song_select_background_upscaler_{};
     SongSelectPreviewCache song_select_preview_cache_{};
     std::string song_select_preview_signature_{};
     int64_t song_select_preview_load_hold_until_ns_ = 0;

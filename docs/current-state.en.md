@@ -3,7 +3,7 @@
 This is the document that the next agent or any new contributor should read first. Its goal is to quickly answer: "what is this project now, where should I look, and what is still unverified?"
 
 ## Baseline
-- Current project version: `1.2.4 stable`
+- Current project version: `1.2.5 stable`
 - Direct-IP multiplayer and the preview r5 input-backend lifecycle fixes are integrated into `1.1.8 stable`
 - `1.1.8` adds an osu!mania OD8 auxiliary score, first-native-`BAD` `Sudden Death (1 MISS)`, and deterministic `LN Mix 10%-90%` on top of the 1.1.7 visual refresh
 - `1.2.0` connects BMS channel `04/07` and osu!mania backgrounds to the gameplay sample timeline and asynchronously upscales sub-FHD image backgrounds through LunaSR on Windows ML
@@ -11,6 +11,7 @@ This is the document that the next agent or any new contributor should read firs
 - `1.2.2` normalizes procedural circle/polygon skins to the full 100% bar width, adds MPG/MPEG video BGA decoding with an FFmpeg fallback, and switches LunaSR to the staged32 RGB FP16 model behind a mandatory 200 FPS benchmark gate.
 - `1.2.3` lowers the fixed RGB x2 LunaSR performance gate from 200 FPS to 35 FPS.
 - `1.2.4` removes rights-unclear LunaSR ONNX and model-specific metadata from public distribution and retains only an opt-in user-supplied-model integration that defaults to `off`.
+- `1.2.5` replaces the model-branded integration with a generic External ONNX Upscaler, adds Graphics Settings selection/.onnx drop, saves a per-profile model path, and creates model-specific WinML sessions and 35 FPS gates.
 - Baseline companion document for follow-up work: `docs/baseline-1.1.2.en.md`
 - Windows GUI build is the main target
 - Linux exists only as a preview-level package at `Baepoks-Linuxs/TenRiff-0.5.0-linux-preview`
@@ -118,8 +119,8 @@ This is the document that the next agent or any new contributor should read firs
   - VSync on: present refresh follows the active monitor Hz and render pacing targets `monitor_hz * 2` (`1050` clamp)
   - `visual_offset_ms`
   - `performance_overlay`
-  - `background_upscale_mode=lunasr|off`: defaults to `off`; no public model is bundled, and FHD x2 runs only when a rights-cleared user model named `lunasr_user_rgb_x2_winml.onnx` is present and passes the 35 FPS benchmark
-  - the user is responsible for the supplied model's rights, quality, and performance; the public TenRiff release does not endorse a specific model
+  - `background_upscale_mode=onnx|off` plus `background_upscale_model_path`: defaults to `off`; select or drop a compatible ONNX in Graphics Settings; public packages include no model
+  - current contract is 960x540 RGB residual x2; users own model rights/quality/performance, and load, contract, benchmark, or inference failure keeps native scaling
 - Gameplay performance:
   - static playfield command-list cache
   - note head / tail bitmap cache
@@ -165,7 +166,7 @@ This is the document that the next agent or any new contributor should read firs
 
 ## Runtime / Packaging Rules
 - New user profiles are created automatically
-- The current official P2P distribution line is `TenRiff 1.2.4 stable`
+- The current official P2P distribution line is `TenRiff 1.2.5 stable`
 - Distribution packages do not include `Songs`
 - Distribution packages include the runtime `Mainmusic/` assets used for menu BGM
 - Distribution updates include only built artifacts and required runtime assets
