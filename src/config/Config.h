@@ -74,7 +74,7 @@ struct GraphicsConfig {
     bool performance_overlay = false;
     std::string background_upscale_mode = "off";
     std::string background_upscale_model_path;
-    bool background_upscale_prefer_npu = true;
+    bool background_upscale_prefer_npu = false;
 };
 
 struct AudioUiConfig {

@@ -3,7 +3,7 @@
 이 문서는 다음 에이전트나 새 작업자가 가장 먼저 읽어야 하는 현재 상태 문서입니다. 목표는 "지금 이 프로젝트가 무엇이고, 어디를 보면 되고, 무엇이 아직 미검증인지"를 빠르게 파악하게 하는 것입니다.
 
 ## Baseline
-- 현재 프로젝트 버전은 `1.2.6 stable`
+- 현재 프로젝트 버전은 `1.2.7 stable`
 - 직접 IP 멀티플레이와 preview r5의 입력 backend 수명주기 수정은 `1.1.8 stable`에 통합
 - `1.1.8`은 1.1.7의 시각 개선에 osu!mania OD8 보조 점수, 첫 네이티브 `BAD` 즉사 `Sudden Death (1 MISS)`, 결정적 `LN Mix 10%~90%`를 추가
 - `1.2.0`은 BMS 채널 `04/07` 및 osu!mania 배경을 gameplay sample timeline에 연결하고, FHD 미만 이미지 배경을 Windows ML 기반 LunaSR로 비동기 보간
@@ -13,6 +13,7 @@
 - `1.2.4`는 권리 경계가 불명확한 LunaSR ONNX와 모델 전용 메타데이터를 공개 배포에서 제거하고, 기본값이 `off`인 사용자 제공 모델 opt-in 연동만 유지.
 - `1.2.5`는 모델명을 노출하던 연동을 generic External ONNX Upscaler로 교체하고, Graphics Settings 파일 선택/.onnx 드롭, 프로필별 모델 경로와 모델별 WinML session을 추가.
 - `1.2.6`은 실행 가능한 차트를 BMS 계열로 한정하고 native/LR2 스킨만 유지하며, ONNX 업스케일러 수동 활성화와 실험적 NPU 우선 옵션, Song Select Rate 조절, 중앙 인덱싱 진행 표시, 로컬 JSON 난이도표, BMS 키음 지연 입력 핫픽스를 추가.
+- `1.2.7`은 External ONNX Upscaler의 FP16 binding, float 경계 INT8 QDQ 감지, 고성능 DirectX GPU 기본값, 동영상 BGA one-in-flight backpressure를 수정.
 - 후속 작업의 기준선 문서는 `docs/baseline-1.1.2.md`
 - Windows GUI 빌드가 메인 타깃
 - Linux는 `Baepoks-Linuxs/TenRiff-0.5.0-linux-preview` 수준의 preview만 존재
@@ -125,8 +126,8 @@
   - `performance_overlay`
   - `background_upscale_model_path`는 Graphics Settings에서 선택하거나 드롭한 호환 ONNX 경로만 저장하며 공개 모델은 포함하지 않음
   - BGA Upscaler는 기본 `off`; 사용자가 명시적으로 켜고 고사양 경고를 확인해야 하며 자동 benchmark gate는 없음
-  - 현재 지원 계약은 960x540 RGB residual x2이며 모델 권리·품질·성능은 사용자가 확인; 로드·계약·decode·추론 실패 시 native scaling 유지
-  - `background_upscale_prefer_npu=true`는 업스케일러가 켜졌을 때만 WinML `DirectXMinPower` session을 먼저 요청하는 실험 옵션. 실제 NPU/GPU 선택은 Windows/driver가 결정하며, 생성 실패 시 기존 고성능 DirectX 경로와 일반 DirectX fallback을 사용
+  - 현재 지원 계약은 960x540 RGB residual x2이며 FP32/FP16 입출력과 float 경계 INT8 QDQ metadata를 자동 감지. 모델 권리·품질·성능은 사용자가 확인; 로드·계약·decode·추론 실패 시 native scaling 유지
+  - 기본값은 고성능 DirectX GPU이고, `background_upscale_prefer_npu=true`는 업스케일러가 켜졌을 때만 WinML `DirectXMinPower` session을 먼저 요청하는 opt-in 실험 옵션. 실제 NPU/GPU 선택은 Windows/driver가 결정하며, 생성·평가 실패 시 고성능 DirectX 경로와 일반 DirectX fallback을 사용
 - Gameplay performance:
   - static playfield command-list cache
   - note head/tail bitmap cache
@@ -181,7 +182,7 @@
 
 ## Runtime / Packaging Rules
 - 새 사용자 프로필은 자동 생성
-- 현재 정식 P2P 배포 라인은 `TenRiff 1.2.6 stable`
+- 현재 정식 P2P 배포 라인은 `TenRiff 1.2.7 stable`
 - 배포 패키지에는 `Songs`를 넣지 않음
 - 배포 패키지는 메뉴 BGM용 `Mainmusic/` 런타임 자산을 함께 포함
 - 배포 업데이트에는 built artifacts와 필요한 런타임 자산만 포함

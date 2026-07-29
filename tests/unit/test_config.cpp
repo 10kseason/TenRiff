@@ -98,7 +98,7 @@ TEST_CASE("config defaults prefer 44100 Hz audio") {
     CHECK(config.graphics.refresh_hz == 300);
     CHECK(config.graphics.background_upscale_mode == "off");
     CHECK(config.graphics.background_upscale_model_path.empty());
-    CHECK(config.graphics.background_upscale_prefer_npu);
+    CHECK_FALSE(config.graphics.background_upscale_prefer_npu);
     CHECK(tenriff::config::normalize_background_upscale_mode("onnx") == "onnx");
     CHECK(tenriff::config::normalize_background_upscale_mode("lunasr") == "onnx");
     CHECK(tenriff::config::normalize_background_upscale_mode("native") == "off");

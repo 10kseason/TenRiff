@@ -1481,7 +1481,7 @@ RuntimeConfig ConfigLoader::defaults() const {
     config.graphics.performance_overlay = false;
     config.graphics.background_upscale_mode = "off";
     config.graphics.background_upscale_model_path.clear();
-    config.graphics.background_upscale_prefer_npu = true;
+    config.graphics.background_upscale_prefer_npu = false;
 
     config.mode.key_mode = "none";
     config.mode.gauge = "normal";

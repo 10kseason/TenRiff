@@ -104,7 +104,7 @@ If this is not the layout you want, you can change it in `Options > Keymap`.
 ## 6. Things to Know Before Starting Play
 
 ### Chart format
-- TenRiff 1.2.6 indexes and plays only BMS-family charts (`.bms/.bme/.bml/.pms`).
+- TenRiff 1.2.7 indexes and plays only BMS-family charts (`.bms/.bme/.bml/.pms`).
 
 ### Loading
 - Right after song start, chart-loading progress may be shown.
