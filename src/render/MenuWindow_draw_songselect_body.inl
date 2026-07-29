@@ -100,11 +100,12 @@
             }
             status += " (" + std::to_string(data.song_select.song_count) + " songs)";
             const std::wstring status_w = to_wide(status);
-            const D2D1_RECT_F status_rect = D2D1::RectF(120.0f, 190.0f, 820.0f, 222.0f);
-            d2d_->hud_format->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_LEADING);
+            const D2D1_RECT_F status_rect = D2D1::RectF(560.0f, 190.0f, 1360.0f, 222.0f);
+            d2d_->hud_format->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_CENTER);
             draw_text_clipped(status_w, d2d_->hud_format.Get(), status_rect, d2d_->muted_brush.Get());
+            d2d_->hud_format->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_LEADING);
 
-            const D2D1_RECT_F progress_track = D2D1::RectF(120.0f, 228.0f, 610.0f, 246.0f);
+            const D2D1_RECT_F progress_track = D2D1::RectF(560.0f, 228.0f, 1360.0f, 246.0f);
             if (d2d_->card_brush) {
                 d2d_->card_brush->SetOpacity(0.72f);
                 ctx->FillRoundedRectangle(D2D1::RoundedRect(progress_track, 8.0f, 8.0f), d2d_->card_brush.Get());
@@ -471,9 +472,12 @@
                               count_label,
                               song.selected);
                 }
-            } else if ((song.level > 0 || song.rating > 0.0) && d2d_->body_format && d2d_->text_brush) {
+            } else if ((!song.level_label.empty() || song.level > 0 || song.rating > 0.0) &&
+                       d2d_->body_format && d2d_->text_brush) {
                 std::ostringstream level_stream;
-                if (song.level > 0) {
+                if (!song.level_label.empty()) {
+                    level_stream << song.level_label;
+                } else if (song.level > 0) {
                     level_stream << "LV " << song.level;
                 }
                 if (song.rating > 0.0) {

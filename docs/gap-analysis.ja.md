@@ -21,7 +21,7 @@
 - BMS parser / normalize / timeline（sample-time）基盤
 - 基本 10-key channel mapping
 - SpeedManager / GaugeManager の baseline spec 対応
-- osu!mania loader（mode / key / timing points / notes）
+- BMS family 専用 chart loader / indexer
 - RawInput + InputThread + SPSCQueue + ClockSync scaffolding
 - Input polling（1000 / 2000 / 4000 / 8000 Hz）+ RenderThread 分離
 - WASAPI backend + AudioThread skeleton
@@ -65,11 +65,11 @@
 - Gap: なし
 - Severity: Resolved
 
-### 7) osu!mania loader が共通 pipeline にまだ完全接続されていない
-- Requirement: BMS と同じ normalize / scheduling path
-- Current state: osu!mania -> GameplayChart 変換経路は接続済み
-- Gap: BMS normalize / timeline pipeline と同じ中間モデルへの統合が不完全
-- Severity: Medium
+### 7) chart input scope
+- Requirement: BMS family 専用の loading / indexing
+- Current state: `.bms/.bme/.bml/.pms` のみを support し、osu loader と import path は削除済み
+- Gap: なし
+- Severity: Resolved
 
 ### 8) judgement rules（window / mask / LN handling）未実装
 - Requirement: PG / GR / GD / BD / PR window、30ms lane mask、LN retention / leave rule

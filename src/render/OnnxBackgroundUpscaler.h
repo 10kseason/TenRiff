@@ -10,7 +10,6 @@ namespace tenriff::render {
 
 inline constexpr std::uint32_t kOnnxUpscaleTargetWidth = 1920;
 inline constexpr std::uint32_t kOnnxUpscaleTargetHeight = 1080;
-inline constexpr double kOnnxUpscaleMinimumBenchmarkFps = 35.0;
 
 struct OnnxUpscaleFrame {
     std::string source_path;
@@ -20,25 +19,12 @@ struct OnnxUpscaleFrame {
     std::vector<std::uint8_t> bgra;
 };
 
-enum class OnnxUpscaleBenchmarkState {
-    Pending,
-    Running,
-    Passed,
-    Failed,
-};
-
-struct OnnxUpscaleBenchmarkStatus {
-    OnnxUpscaleBenchmarkState state = OnnxUpscaleBenchmarkState::Pending;
-    double fps = 0.0;
-    std::string detail;
-};
-
 // External ONNX inference is intentionally isolated from the render and audio threads. A request
 // decodes and evaluates on one worker; callers keep drawing the native bitmap
 // until a completed FHD frame is available.
 class OnnxBackgroundUpscaler {
 public:
-    explicit OnnxBackgroundUpscaler(std::string model_path = {});
+    explicit OnnxBackgroundUpscaler(std::string model_path = {}, bool prefer_npu = true);
     ~OnnxBackgroundUpscaler();
 
     OnnxBackgroundUpscaler(const OnnxBackgroundUpscaler&) = delete;
@@ -55,9 +41,6 @@ public:
     [[nodiscard]] static bool should_upscale(std::uint32_t width,
                                              std::uint32_t height,
                                              std::string_view mode);
-    [[nodiscard]] static bool meets_performance_gate(double fps);
-    [[nodiscard]] OnnxUpscaleBenchmarkStatus benchmark_status() const;
-
 private:
     struct Impl;
     std::unique_ptr<Impl> impl_;

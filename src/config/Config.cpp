@@ -603,10 +603,13 @@ void apply_config_object(const JsonObject& root, RuntimeConfig& config) {
             get_string(*graphics,
                        "background_upscale_model_path",
                        config.graphics.background_upscale_model_path);
+        config.graphics.background_upscale_prefer_npu =
+            get_bool(*graphics,
+                     "background_upscale_prefer_npu",
+                     config.graphics.background_upscale_prefer_npu);
     }
 
     if (auto* mode = get_object(root, "mode")) {
-        config.mode.format = get_string(*mode, "format", config.mode.format);
         config.mode.key_mode = get_string(*mode, "key_mode", config.mode.key_mode);
         config.mode.gauge = get_string(*mode, "gauge", config.mode.gauge);
         config.mode.random = get_string(*mode, "random", config.mode.random);
@@ -616,7 +619,6 @@ void apply_config_object(const JsonObject& root, RuntimeConfig& config) {
                 config.mode.mods = ::tenriff::app::normalize_mode_mod_tokens(get_string_array(*mode, "mods"));
             }
         }
-        config.mode.enable_osu_charts = get_bool(*mode, "enable_osu_charts", config.mode.enable_osu_charts);
         config.mode.ghost_battle_enabled =
             get_bool(*mode, "ghost_battle_enabled", config.mode.ghost_battle_enabled);
         config.mode.autoplay_enabled =
@@ -652,13 +654,13 @@ void apply_config_object(const JsonObject& root, RuntimeConfig& config) {
         }
         config.ui.song_collection_filter = normalize_song_collection_filter(
             get_string(*ui, "song_collection_filter", config.ui.song_collection_filter));
+        config.ui.difficulty_table_path =
+            get_string(*ui, "difficulty_table_path", config.ui.difficulty_table_path);
     }
 
     if (auto* skin = get_object(root, "skin")) {
         config.skin.source =
             normalize_skin_source_token(get_string(*skin, "source", config.skin.source));
-        config.skin.osu_skin_name =
-            get_string(*skin, "osu_skin_name", config.skin.osu_skin_name);
         config.skin.lr2_skin_name =
             get_string(*skin, "lr2_skin_name", config.skin.lr2_skin_name);
         config.skin.lr2_resolution_mode = normalize_skin_lr2_resolution_mode_token(
@@ -969,10 +971,11 @@ JsonValue build_json_root(const RuntimeConfig& config) {
                          config.graphics.background_upscale_mode)});
     graphics.emplace("background_upscale_model_path",
                      JsonValue{config.graphics.background_upscale_model_path});
+    graphics.emplace("background_upscale_prefer_npu",
+                     JsonValue{config.graphics.background_upscale_prefer_npu});
     root.emplace("graphics", JsonValue{std::move(graphics)});
 
     JsonObject mode;
-    mode.emplace("format", JsonValue{config.mode.format});
     mode.emplace("key_mode", JsonValue{config.mode.key_mode});
     mode.emplace("gauge", JsonValue{config.mode.gauge});
     mode.emplace("random", JsonValue{config.mode.random});
@@ -984,7 +987,6 @@ JsonValue build_json_root(const RuntimeConfig& config) {
         mods.emplace_back(token);
     }
     mode.emplace("mods", JsonValue{std::move(mods)});
-    mode.emplace("enable_osu_charts", JsonValue{config.mode.enable_osu_charts});
     mode.emplace("ghost_battle_enabled", JsonValue{config.mode.ghost_battle_enabled});
     mode.emplace("autoplay_enabled", JsonValue{config.mode.autoplay_enabled});
     mode.emplace("practice_no_fail_enabled", JsonValue{config.mode.practice_no_fail_enabled});
@@ -1023,11 +1025,11 @@ JsonValue build_json_root(const RuntimeConfig& config) {
     }
     ui.emplace("collections", JsonValue{std::move(collections)});
     ui.emplace("song_collection_filter", JsonValue{normalize_song_collection_filter(config.ui.song_collection_filter)});
+    ui.emplace("difficulty_table_path", JsonValue{config.ui.difficulty_table_path});
     root.emplace("ui", JsonValue{std::move(ui)});
 
     JsonObject skin;
     skin.emplace("source", JsonValue{normalize_skin_source_token(config.skin.source)});
-    skin.emplace("osu_skin_name", JsonValue{config.skin.osu_skin_name});
     skin.emplace("lr2_skin_name", JsonValue{config.skin.lr2_skin_name});
     skin.emplace("lr2_resolution_mode",
                  JsonValue{normalize_skin_lr2_resolution_mode_token(config.skin.lr2_resolution_mode)});
@@ -1172,9 +1174,6 @@ std::vector<std::string> supported_skin_color_tokens() {
 
 std::string normalize_skin_source_token(std::string_view token) {
     const std::string normalized = to_lower_ascii(std::string(token));
-    if (normalized == "osu" || normalized == "osu-mania" || normalized == "osu_mania") {
-        return "osu";
-    }
     if (normalized == "lr2" || normalized == "lunaticrave2" || normalized == "lr2skin") {
         return "lr2";
     }
@@ -1482,14 +1481,13 @@ RuntimeConfig ConfigLoader::defaults() const {
     config.graphics.performance_overlay = false;
     config.graphics.background_upscale_mode = "off";
     config.graphics.background_upscale_model_path.clear();
+    config.graphics.background_upscale_prefer_npu = true;
 
-    config.mode.format = "bms";
     config.mode.key_mode = "none";
     config.mode.gauge = "normal";
     config.mode.random = "off";
     config.mode.random_seed = 0;
     config.mode.mods.clear();
-    config.mode.enable_osu_charts = false;
     config.mode.ghost_battle_enabled = false;
     config.mode.autoplay_enabled = false;
     config.mode.practice_no_fail_enabled = false;
@@ -1502,6 +1500,7 @@ RuntimeConfig ConfigLoader::defaults() const {
     config.ui.favorite_chart_keys.clear();
     config.ui.collections.clear();
     config.ui.song_collection_filter = "all";
+    config.ui.difficulty_table_path.clear();
 
     config.skin = {};
     sanitize_skin_config(config.skin);

@@ -1,13 +1,13 @@
-TenRiff source package notes (`1.2.5 stable`)
+TenRiff source package notes (`1.2.6 stable`)
 
 - This folder is a curated source-only staging area for public/open-source distribution.
 - It intentionally excludes local build trees, packaged binaries, caches, user profiles, logs, and private working notes.
 - Internal agent workflow files such as `AGENTS.md` are not part of the public source bundle.
 - The included `SOURCE_PACKAGE_SCOPE.txt` file defines the exact include/exclude rules used for the staged bundle.
-- The current source line is `1.2.5 stable`; it keeps MPG/MPEG video BGA decoding with an FFmpeg fallback and exposes an opt-in External ONNX Upscaler that defaults to `off`.
+- The current source line is `1.2.6 stable`; it supports BMS-family charts and native/LR2 skins, keeps MPG/MPEG video BGA decoding with an FFmpeg fallback, and exposes an External ONNX Upscaler that remains off until the user enables it and acknowledges the high-spec warning.
 - The repository license is MIT. Keep the top-level `LICENSE` file with any redistributed source bundle.
 - The source bundle includes the code/docs/dependencies needed for a standalone Windows configure/build, but it does not ship the local `10k-calc/` reference checkout or `external/llama.cpp/`.
-- The generic integration and compatibility smoke/quantization tools live under `tools/onnx_upscaler/`, but no ONNX model, checkpoint, training data, or model-specific verification metadata is distributed. Users must supply a rights-cleared model matching the documented 960x540 RGB residual x2 contract.
+- The generic integration and compatibility smoke/quantization tools live under `tools/onnx_upscaler/`, but no ONNX model, checkpoint, training data, or model-specific verification metadata is distributed. Users must supply a rights-cleared model matching the documented 960x540 RGB residual x2 contract. Model selection only stores a path; there is no automatic benchmark gate. The experimental NPU preference requests a low-power WinML route, but Windows/the driver chooses the actual device and TenRiff falls back to the existing DirectX routes when needed.
 - The staged docs/readmes now track Korean, English, Simplified Chinese, and Japanese entrypoints.
 - Typical Windows build flow inside the extracted source-package root:
 

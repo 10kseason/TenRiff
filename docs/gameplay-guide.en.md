@@ -48,17 +48,20 @@ The standard TenRiff play flow is:
 - `Enter`: start the currently selected song
 - `Left` / `Right`: switch focus on the left-side menu
 - `Esc`: return to the previous screen
-- `F5`: reindex the song library
+- `-` / `+`: adjust the next-play Rate immediately
+- `F5`: reindex the song library; centered stage / percent / ETA and a progress bar appear while it runs
+- `Browse > Difficulty Table`: select or clear a local BMS difficulty-table header JSON
 
 ### Screens commonly used from Song Select
 - `Mode`
-  - Adjust Ghost Battle, Autoplay, Practice, Sudden Death, Key Mode, Gauge, Random, Mods, Rate, Hi-Speed, OSU Charts, and Chart Filter
+  - Adjust Ghost Battle, Autoplay, Practice, Sudden Death, Key Mode, Gauge, Random, Mods, Rate, and Hi-Speed
 - `Audio`
   - Adjust Master / BGM / Keysound volume and the BMS keysound policy
 - `Graphics`
-  - Adjust VSync, Refresh Hz, Performance HUD, and Display Offset
+  - Adjust VSync, Refresh Hz, Performance HUD, Display Offset, and the external ONNX BGA Upscaler
+  - Selecting a model is separate from enabling the upscaler and accepting its high-spec warning. Experimental `Prefer NPU` only uses an NPU when Windows/the driver actually select one
 - `Skins`
-  - Adjust judgement-line position, note size, LN body width, and lane colors
+  - Switch native/LR2 skins, import an LR2 folder, and adjust judgement-line position, note size, LN body width, and lane colors
 - `Keymap`
   - Change key bindings and run the NKRO test
 
@@ -101,8 +104,7 @@ If this is not the layout you want, you can change it in `Options > Keymap`.
 ## 6. Things to Know Before Starting Play
 
 ### Chart format
-- The default filter is BMS-centric.
-- osu!mania can be indexed and played from `4K` to `10K` when you enable it in the options.
+- TenRiff 1.2.6 indexes and plays only BMS-family charts (`.bms/.bme/.bml/.pms`).
 
 ### Loading
 - Right after song start, chart-loading progress may be shown.
@@ -171,7 +173,7 @@ The selected gauge always starts at `100%` at the beginning of the song.
 - `easy`: immediate Game Over at `0%`
 
 There is no automatic gauge shifting during play.
-`Sudden Death (1 MISS)` is not a gauge type: it forces the gauge to zero and ends the run on the first osu!mania OD8 object `MISS`. Native `BAD` timing alone and empty-key `POOR` do not count, and it cannot be enabled together with Practice No-Fail.
+`Sudden Death (1 MISS)` is not a gauge type: it forces the gauge to zero and ends the run on the first OD8-converted object `MISS`. Native `BAD` timing alone and empty-key `POOR` do not count, and it cannot be enabled together with Practice No-Fail.
 
 ## 10. Result Screen
 
@@ -208,6 +210,8 @@ The return keys are:
 ### BMS keysounds are too loud or too quiet
 - Adjust `Audio > Keysound Volume`.
 - This can be tuned separately from BGM.
+- The late-input path that could stay silent under `follow` was fixed in 1.2.6: judgement time stays unchanged while only the audible start is pinned to the current writable buffer.
+- If it is still silent, verify `Keysound Mode=follow`, a non-zero volume, and the chart's `#WAV` asset paths.
 
 ### The input feels unstable or key conflicts are suspected
 - Use `Options > Keymap > NKRO Test` and press multiple keys at once to check.

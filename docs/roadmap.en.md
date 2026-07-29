@@ -4,8 +4,8 @@ This roadmap captures the recommended high-level order for building out the game
 
 ## Current Baseline
 - Windows GUI / runtime is the primary supported path.
-- Project version line is `1.2.5 stable`; public packages bundle no upscaler model, while the generic External ONNX Upscaler defaults to `off` and requires a compatible rights-cleared model plus a successful 35 FPS gate.
-- BMS-first menu / runtime is active by default, with optional 4K-10K `.osu` support behind config / menu toggles.
+- Project version line is `1.2.6 stable`; public packages bundle no upscaler model. Selecting a compatible rights-cleared ONNX only stores its path, and BGA Upscaler remains off until the user enables it and accepts the high-spec warning; there is no automatic benchmark gate.
+- The active menu / runtime is BMS-family only (`.bms/.bme/.bml/.pms`) and supports native/LR2 skins.
 - For current shipped behavior, read `docs/current-state.en.md` first; this roadmap is about direction and remaining work.
 
 ## 0) Fix the Skeleton and Master Clock
@@ -29,10 +29,10 @@ This roadmap captures the recommended high-level order for building out the game
 - Minimal BMS loader (essential channels only) -> note scheduling -> judgement -> result screen.
 - Use the audio engine to schedule preview audio (no UI-thread playback) and preload keysounds during Song Select.
 
-## 1.5) Support Both BMS and osu! Beatmaps
-- Add an osu! beatmap (mania) loader alongside BMS, sharing the normalized event model.
-- Keep the scheduling / judgement path unified so chart-format differences are isolated at load time.
-- Expose format selection in Song Select and ensure replay / result screens show the originating format.
+## 1.5) Harden BMS-Only Chart Support
+- The former multi-format direction is superseded for the current release line; keep loading, indexing, replay, result, and difficulty-table behavior focused on the BMS family.
+- Continue hardening real-pack encoding, keysound, BGA, long-note, and lane-layout compatibility without reintroducing archive or alternate-format import paths.
+- Keep optional integrations user-supplied, disabled until explicitly enabled, and safely recoverable to native behavior.
 
 ## 2) Key Remap Plus 8K / 10K Modes
 - ✅ Key remapping UI per the "리맵 UI 플로우" spec (including NKRO test).

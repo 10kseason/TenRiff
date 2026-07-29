@@ -155,9 +155,7 @@ New mode work is easy to break if you skip tests.
 - `tests/unit/test_replay_export.cpp`
   - Replay/result JSON fields and restoration behavior.
 - `tests/smoke/bms_mode_smoke.cpp`
-  - Real-chart combinations of key mode, random, and mods.
-- `tests/smoke/n2nc_compare_smoke.cpp`
-  - Key-mode remap behavior against known conversion cases.
+  - Real-BMS-chart combinations of key mode, random, mods, and known lane-remap cases.
 
 For docs, think in this order: `docs/current-state.md`, `docs/config.md`, `docs/README.md`, then any feature-specific docs. This turn only adds the developer guide, so keep code-facing behavior changes and current-state docs in a later pass if they are needed.
 

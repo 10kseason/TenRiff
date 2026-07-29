@@ -16,14 +16,14 @@
   - `keymap.json` をロードし、default keymap を構築
   - `KeycodeMap` で key string を keycode に変換
 - `gameplay/GameplayChart.*`
-  - BMS / OSU timeline を **sample-time-based note events** に変換
+  - BMS timeline を **sample-time-based note events** に変換
   - `rate` 適用時は `t' = t / rate` で schedule をスケーリング
 - `gameplay/GameplayEngine.*`
   - judgement windows (`PG / GR / GD / BD`) と 30ms mask を適用
   - 同一 lane の古い note がすでに BD で、直後の note が明確に GD 以上なら、古い note を miss として記録し、現在の press を次の note に割り当てて BAD chain を防ぐ
   - POOR event に lane mask を適用
   - **Hold rule**: 早離しは BAD
-  - **Hold tail rule**: osu!mania hold と BMS `#LNMODE 2` charge note のみ通常 judgement window を使って release timing を評価（head/tail 50:50）
+  - **Hold tail rule**: BMS `#LNMODE 2` charge note のみ通常 judgement window を使って release timing を評価（head/tail 50:50）
   - 通常 BMS long note は最後まで保持されれば終端で auto 処理され、tail-release timing judgement は使わない
   - result statistics（combo、judgement counts、average / standard deviation）を集計
 - `app/GameSession.*`
@@ -33,7 +33,7 @@
   - judgement / miss / hold 更新は audio buffer ごと 1 回ではなく、別の `input.judgement_hz` cadence（`1000..8000 Hz`）で callback 内 sub-step される
 
 ## Initial Judgement Policy To Note
-- **Hold tail judgement** は osu!mania hold と BMS `#LNMODE 2` charge note にのみ適用され、早離しは BAD
+- **Hold tail judgement** は BMS `#LNMODE 2` charge note にのみ適用され、早離しは BAD
 
 ## Planned Future Connections
 - Menu state machine (Title / SongSelect / Gameplay / Result)

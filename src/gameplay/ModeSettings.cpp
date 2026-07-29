@@ -4,14 +4,6 @@
 
 namespace tenriff::gameplay {
 
-std::string to_string(ChartFormatMode mode) {
-    switch (mode) {
-        case ChartFormatMode::Bms: return "BMS";
-        case ChartFormatMode::Osu: return "OSU";
-        case ChartFormatMode::Auto: default: return "AUTO";
-    }
-}
-
 std::string to_string(KeyMode mode) {
     switch (mode) {
         case KeyMode::Keys4: return "4K";
@@ -61,20 +53,6 @@ std::string normalize(std::string_view token) {
 }
 
 }  // namespace
-
-std::optional<ChartFormatMode> parse_chart_format(std::string_view token) {
-    std::string normalized = normalize(token);
-    if (normalized == "AUTO") {
-        return ChartFormatMode::Auto;
-    }
-    if (normalized == "BMS") {
-        return ChartFormatMode::Bms;
-    }
-    if (normalized == "OSU" || normalized == "OSUMANIA") {
-        return ChartFormatMode::Osu;
-    }
-    return std::nullopt;
-}
 
 std::optional<KeyMode> parse_key_mode(std::string_view token) {
     std::string normalized = normalize(token);

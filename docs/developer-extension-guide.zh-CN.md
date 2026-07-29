@@ -155,9 +155,7 @@ Random 行为必须在固定 seed 下保持确定性。只要新增 random 模�
 - `tests/unit/test_replay_export.cpp`
   - 验证 replay/result JSON 字段和恢复行为。
 - `tests/smoke/bms_mode_smoke.cpp`
-  - 检查真实谱面下 key mode、random、mod 组合是否正常。
-- `tests/smoke/n2nc_compare_smoke.cpp`
-  - 和已知转换样例比对 key-mode remap 行为。
+  - 检查真实 BMS 谱面下 key mode、random、mod 和已知 lane-remap 组合是否正常。
 
 文档同步通常按这个顺序想：[`docs/current-state.zh-CN.md`](current-state.zh-CN.md)、[`docs/config.zh-CN.md`](config.zh-CN.md)、[`docs/README.zh-CN.md`](README.zh-CN.md)，然后再是功能专项文档。本轮只新增开发者指南，所以如果之后需要更新代码行为描述，再单独做一次 current-state 文档更新会更稳。
 

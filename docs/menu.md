@@ -9,13 +9,14 @@ The main menu must honor the same low-latency philosophy as gameplay: audio runs
 - `Options -> Profile Setup`은 현재 프로필의 첫 실행 설정 화면을 다시 열어 언어/오디오/입력/그래픽/키맵을 즉시 저장한다.
 - 플레이 시작 시에는 현재 구현상 메뉴 스레드를 중지하고 `GameSession`을 별도로 실행한다.
 - **Windows 메뉴 UI는 D3D11 + Direct2D/DirectWrite 기반**으로 타이틀/곡선택(시안 레이아웃)과 기타 설정 화면(리스트 UI)을 렌더링한다.
-- Skins 화면의 파일 선택 또는 `.osk` drag-and-drop은 활성 프로필의 `skins`에 설치한다.
-- `Shift+F2` 파일 선택 또는 `.osz` drag-and-drop은 활성 songs source에 설치하고 osu chart를 활성화한 뒤 재인덱싱한다.
-- OSK/OSZ는 archive 전체를 사전 검증해 staging에 추출한 뒤 원자적으로 설치하며, 기존 폴더를 덮어쓰지 않는다.
+- Skins는 native/LR2 전용이며, LR2 playskin 폴더 선택 또는 drag-and-drop으로 활성 프로필의 `skins`에 복사한다.
+- Song Select 재인덱싱 중 stage/percent/ETA와 progress bar를 화면 중앙에 표시한다.
+- Browse에서 로컬 BMS 난이도표 header JSON을 선택하면 현재 source를 재인덱싱해 hash 일치 곡에 표 레벨을 적용한다.
+- Graphics의 ONNX 모델 선택은 경로만 저장한다. `BGA Upscaler`를 직접 켜고 고사양 경고를 확인해야 하며, `NPU 우선(실험)`은 Windows/드라이버의 실제 장치 선택을 강제하지 않는다.
 - 입력 키 요약:
-  - Title: `↑/↓` 이동, `Enter` 선택(PLAY/EDIT/OPTIONS/EXIT), `F2` 곡 폴더 선택, `Shift+F2` OSZ 선택, `F5` 새로고침, `Esc` 종료
+  - Title: `↑/↓` 이동, `Enter` 선택(PLAY/EDIT/OPTIONS/EXIT), `F2` 곡 폴더 선택, `F5` 새로고침, `Esc` 종료
     - 곡이 하나도 인덱싱되지 않았으면 첫 버튼은 `PLAY` 대신 `Add Songs Folder`로 보인다.
-  - Song Select: `↑/↓` 곡 이동, `PgUp/PgDn` 페이지 이동, `←/→` 좌측 메뉴 포커스 전환, `Enter` 선택/플레이, `Shift+F2` OSZ 선택, `Esc` 타이틀 복귀
+  - Song Select: `↑/↓` 곡 이동, `PgUp/PgDn` 페이지 이동, `←/→` 좌측 메뉴 포커스 전환, `Enter` 선택/플레이, `-`/`+` Rate 조정, `Esc` 타이틀 복귀
     - 좌측 메뉴는 `Songs / Sources / Search / Filter / Records / Options`만 유지한다.
     - `Backspace`는 `Sources` 또는 `Records`에서 `Songs`로 되돌아갈 때만 쓴다.
   - Settings/Mode: `↑/↓` 항목 이동, `←/→` 값 변경, `Enter/Esc` 복귀
@@ -23,7 +24,7 @@ The main menu must honor the same low-latency philosophy as gameplay: audio runs
     - 캡처 성공 시 즉시 `keymap.json`에 저장된다.
     - Song Select에서 열면 선택한 차트의 lane count를 우선 기준으로 편집 모드를 잡는다.
   - Result: `Enter`로만 곡 선택 복귀
-  - Shared utility keys: `F1` 도움말, `F2` songs-folder browse, `Shift+F2` OSZ import, `F5` refresh/reindex, `F9` screenshot
+  - Shared utility keys: `F1` 도움말, `F2` songs-folder browse, `F5` refresh/reindex, `F9` screenshot
 
 ## Non-negotiable rules
 - **Keep the audio device open from the menu.** Initialize the audio backend on menu entry and run silent callbacks (zero buffers) so `playhead_samples`/`buffer_start_samples` stay valid before gameplay begins. Avoid reopening devices when starting a song to prevent warm-up jitter.
@@ -44,10 +45,12 @@ States render UI and consume already-timestamped input events; heavyweight work 
 `Title → SongSelect → Gameplay → Result` is the minimal playable loop. Each transition should reuse the live audio clock and keep InputThread running.
 
 ## Song select without hitching
-- **SongIndexerThread** scans folders for path/title/artist/BPM/key count/mode/preview audio. Progress updates are posted to the UI; interaction stays responsive.
+- **SongIndexerThread** scans BMS-family files for path/title/artist/BPM/key count/mode/preview audio. Stage/percent/ETA and a progress bar are centered below the Song Select header while interaction stays responsive.
 - **Cache index** (`song_index.json` or SQLite) with mtime/hash checks to avoid full rescans. First run can be slow; subsequent runs should be instant.
 - **Preview audio** is scheduled through the audio engine: UI enqueues preview requests, AudioThread mixes them so timing stays aligned.
-- Empty-state screens should expose a persistent `Add Songs Folder` action; external folders, BMS files, and `.osz` archives also support drag-and-drop.
+- Empty-state screens should expose a persistent `Add Songs Folder` action; external folders and BMS files also support drag-and-drop.
+- Browse can select or clear a local BMS difficulty-table header JSON. The path is saved in `ui.difficulty_table_path`, and changing it triggers a reindex so MD5/SHA-256 matches receive table levels.
+- Song Select `-` / `+` changes and saves `speed.rate` immediately unless search text entry is active.
 - RawInput 스레드나 이벤트 전달이 메뉴에서 비정상적으로 멎으면 멀티플레이/리절트를 포함한 메뉴 화면 전체에서 현재 세션만 자동으로 폴링으로 폴백하고, 저장된 backend 설정은 바꾸지 않는다.
 
 ## Settings: latency-first surface

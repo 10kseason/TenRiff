@@ -88,8 +88,6 @@ TEST_CASE("config defaults prefer 44100 Hz audio") {
     CHECK(config.input.polling_hz == 1000);
     CHECK(config.input.judgement_hz == 4000);
     CHECK(config.input.debounce_ms == doctest::Approx(8.0));
-    CHECK(config.mode.format == "bms");
-    CHECK_FALSE(config.mode.enable_osu_charts);
     CHECK_FALSE(config.mode.ghost_battle_enabled);
     CHECK(config.mode.song_index_profile == "safe");
     CHECK(config.graphics.resolution == "native");
@@ -100,6 +98,7 @@ TEST_CASE("config defaults prefer 44100 Hz audio") {
     CHECK(config.graphics.refresh_hz == 300);
     CHECK(config.graphics.background_upscale_mode == "off");
     CHECK(config.graphics.background_upscale_model_path.empty());
+    CHECK(config.graphics.background_upscale_prefer_npu);
     CHECK(tenriff::config::normalize_background_upscale_mode("onnx") == "onnx");
     CHECK(tenriff::config::normalize_background_upscale_mode("lunasr") == "onnx");
     CHECK(tenriff::config::normalize_background_upscale_mode("native") == "off");
@@ -131,7 +130,6 @@ TEST_CASE("config defaults prefer 44100 Hz audio") {
     CHECK(config.judge.hold_break_ms == doctest::Approx(200.0));
     CHECK(config.skin.note_shape == "rect");
     CHECK(config.skin.source == "native");
-    CHECK(config.skin.osu_skin_name.empty());
     CHECK(config.skin.lr2_skin_name.empty());
     CHECK(config.skin.lr2_resolution_mode == "auto");
     CHECK(config.skin.visual_preset == "tenriff");
@@ -166,6 +164,7 @@ TEST_CASE("config defaults prefer 44100 Hz audio") {
     CHECK(config.ui.favorite_chart_keys.empty());
     CHECK(config.ui.collections.empty());
     CHECK(config.ui.song_collection_filter == "all");
+    CHECK(config.ui.difficulty_table_path.empty());
     CHECK(tenriff::config::resolved_skin_lane_colors(config.skin, "16k").size() == 16u);
 }
 
@@ -187,6 +186,7 @@ TEST_CASE("config save and load preserve favorites and collections") {
         {"Practice", {"songB", "songC"}},
     };
     config.ui.song_collection_filter = "Practice";
+    config.ui.difficulty_table_path = "tables/insane.json";
 
     std::string error;
     REQUIRE(loader.save_profile("profiles/test", config, &error));
@@ -197,6 +197,7 @@ TEST_CASE("config save and load preserve favorites and collections") {
     CHECK(result.config.ui.favorite_chart_keys == config.ui.favorite_chart_keys);
     CHECK(result.config.ui.collections == config.ui.collections);
     CHECK(result.config.ui.song_collection_filter == "Practice");
+    CHECK(result.config.ui.difficulty_table_path == "tables/insane.json");
 }
 
 TEST_CASE("config load folds deprecated indirect miss into the bad window") {
@@ -377,9 +378,7 @@ TEST_CASE("config save and load preserve volume and speed settings") {
     config.audio_ui.keysound_volume = 1.35;
     config.speed.rate = 1.25;
     config.speed.hi_speed = 4.75;
-    config.mode.enable_osu_charts = true;
     config.mode.ghost_battle_enabled = true;
-    config.mode.format = "osu";
     config.mode.song_index_profile = "fast";
 
     std::string error;
@@ -394,9 +393,7 @@ TEST_CASE("config save and load preserve volume and speed settings") {
     CHECK(result.config.audio_ui.keysound_volume == doctest::Approx(1.35));
     CHECK(result.config.speed.rate == doctest::Approx(1.25));
     CHECK(result.config.speed.hi_speed == doctest::Approx(4.75));
-    CHECK(result.config.mode.enable_osu_charts);
     CHECK(result.config.mode.ghost_battle_enabled);
-    CHECK(result.config.mode.format == "osu");
     CHECK(result.config.mode.song_index_profile == "fast");
 }
 
@@ -510,6 +507,7 @@ TEST_CASE("config save and load preserve graphics display settings") {
     config.graphics.performance_overlay = true;
     config.graphics.background_upscale_mode = "onnx";
     config.graphics.background_upscale_model_path = "models/custom-upscaler.onnx";
+    config.graphics.background_upscale_prefer_npu = false;
 
     std::string error;
     REQUIRE(loader.save_profile("profiles/test", config, &error));
@@ -524,6 +522,7 @@ TEST_CASE("config save and load preserve graphics display settings") {
     CHECK(result.config.graphics.performance_overlay);
     CHECK(result.config.graphics.background_upscale_mode == "onnx");
     CHECK(result.config.graphics.background_upscale_model_path == "models/custom-upscaler.onnx");
+    CHECK_FALSE(result.config.graphics.background_upscale_prefer_npu);
 }
 
 TEST_CASE("config save and load preserve ui language setting") {
@@ -576,7 +575,7 @@ TEST_CASE("config load normalizes invalid ui language to english") {
     CHECK(result.config.ui.language == "en");
 }
 
-TEST_CASE("config save and load preserve osu skin selection") {
+TEST_CASE("config save and load normalize unsupported skin sources to native") {
     TempDirGuard temp;
     temp.path = make_temp_dir();
     REQUIRE_FALSE(temp.path.empty());
@@ -588,8 +587,7 @@ TEST_CASE("config save and load preserve osu skin selection") {
 
     ConfigLoader loader;
     auto config = loader.defaults();
-    config.skin.source = "osu";
-    config.skin.osu_skin_name = "Happy";
+    config.skin.source = "unsupported";
 
     std::string error;
     REQUIRE(loader.save_profile("profiles/test", config, &error));
@@ -597,8 +595,7 @@ TEST_CASE("config save and load preserve osu skin selection") {
 
     const auto result = loader.load_profile("profiles/test");
     REQUIRE(result.success());
-    CHECK(result.config.skin.source == "osu");
-    CHECK(result.config.skin.osu_skin_name == "Happy");
+    CHECK(result.config.skin.source == "native");
     CHECK(result.config.skin.lr2_skin_name.empty());
 }
 
@@ -625,7 +622,6 @@ TEST_CASE("config save and load preserve lr2 skin selection") {
     REQUIRE(result.success());
     CHECK(result.config.skin.source == "lr2");
     CHECK(result.config.skin.lr2_skin_name == "BlueWhite");
-    CHECK(result.config.skin.osu_skin_name.empty());
 }
 
 TEST_CASE("config save and load preserve lr2 resolution mode") {
@@ -1118,48 +1114,29 @@ TEST_CASE("config save and load preserve gameplay mode flags") {
     CHECK(result.config.mode.one_miss_fail_enabled);
 }
 
-TEST_CASE("bms-first runtime migration keeps valid keysound modes while forcing only the bms filter") {
+TEST_CASE("bms-first runtime migration preserves valid keysound and key mode settings") {
     ConfigLoader loader;
     auto config = loader.defaults();
     config.audio_ui.preset = "basic";
     config.audio_ui.bms_keysound_policy = "autoplay";
-    config.mode.format = "osu";
     config.mode.key_mode = "none";
 
     const bool changed = tenriff::app::migrate_bms_first_runtime_config(config);
 
-    CHECK(changed);
+    CHECK_FALSE(changed);
     CHECK(config.audio_ui.preset == "basic");
     CHECK(config.audio_ui.bms_keysound_policy == "autoplay");
-    CHECK(config.mode.format == "bms");
     CHECK(config.mode.key_mode == "none");
-}
-
-TEST_CASE("runtime migration preserves valid enabled osu chart filters") {
-    ConfigLoader loader;
-    auto config = loader.defaults();
-    config.mode.enable_osu_charts = true;
-    config.mode.format = "osu";
-    config.mode.key_mode = "7k";
-
-    const bool changed = tenriff::app::migrate_bms_first_runtime_config(config);
-
-    CHECK_FALSE(changed);
-    CHECK(config.mode.enable_osu_charts);
-    CHECK(config.mode.format == "osu");
-    CHECK(config.mode.key_mode == "7k");
 }
 
 TEST_CASE("runtime migration replaces invalid key mode tokens with none") {
     ConfigLoader loader;
     auto config = loader.defaults();
-    config.mode.enable_osu_charts = false;
     config.mode.key_mode = "mystery";
 
     const bool changed = tenriff::app::migrate_bms_first_runtime_config(config);
 
     CHECK(changed);
-    CHECK(config.mode.format == "bms");
     CHECK(config.mode.key_mode == "none");
 }
 

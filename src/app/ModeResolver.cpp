@@ -7,12 +7,6 @@ namespace tenriff::app {
 ModeResolveResult resolve_mode_settings(const config::ModeConfig& config) {
     ModeResolveResult result;
 
-    if (auto parsed = gameplay::parse_chart_format(config.format)) {
-        result.settings.format = parsed.value();
-    } else if (!config.format.empty()) {
-        result.warnings.push_back("mode.format not recognized; using AUTO.");
-    }
-
     if (auto parsed = gameplay::parse_key_mode(config.key_mode)) {
         result.settings.key_mode = parsed.value();
     } else if (!config.key_mode.empty()) {

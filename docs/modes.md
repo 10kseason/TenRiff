@@ -1,4 +1,4 @@
-# Mode System (Format/Key/Gauge/Random/Mods)
+# Mode System (Key/Gauge/Random/Mods)
 
 이 문서는 현재 구현된 모드 시스템, 레인 변형/랜덤 규칙(Mirror/FR/SR), 노트 구조 mod를 요약합니다.
 
@@ -8,13 +8,11 @@
 
 ```json
 "mode": {
-  "format": "auto",
   "key_mode": "none",
   "gauge": "normal",
   "random": "off",
   "random_seed": 0,
   "mods": [],
-  "enable_osu_charts": false,
   "ghost_battle_enabled": false,
   "autoplay_enabled": false,
   "practice_no_fail_enabled": false,
@@ -24,25 +22,26 @@
 ```
 
 ## 모드 의미
-- `format`: `auto | bms | osu`
+- 차트 입력은 BMS 계열(`.bms/.bme/.bml/.pms`) 전용이며 `format`과 `enable_osu_charts` 설정은 제거됨
 - `key_mode`: `none | auto | 4k | 5k | 6k | 7k | 8k | 9k | 10k | 16k`
 - `gauge`: `normal | hard | ex_hard | easy`
 - `random`: `off | mirror | fr | sr`
 - `random_seed`: FR/SR, 강제 key-mode 변환, LN Mix 대상 선택의 고정 시드 (0도 고정 값으로 취급)
 - `mods`: Mod Manager에서 정규화해 저장하는 mod token 배열
-- `enable_osu_charts`: `false | true`
 - `ghost_battle_enabled`: `false | true`
   - 기본값은 `false`
   - `true`: 선택한 차트의 최고 호환 replay를 자동으로 ghost 비교에 사용
   - `false`: ghost 비교 없이 일반 단일 필드 플레이
 - `autoplay_enabled`: 판정 가능한 노트를 자동 처리하고 결과를 `ASSIST`로 표시
 - `practice_no_fail_enabled`: 게이지 기반 조기 실패를 막고 차트 끝까지 진행
-- `one_miss_fail_enabled`: 첫 osu!mania OD8 객체 `MISS`에서 즉시 실패하는 `Sudden Death (1 MISS)`
+- `one_miss_fail_enabled`: 첫 OD8 환산 객체 `MISS`에서 즉시 실패하는 `Sudden Death (1 MISS)`
   - 네이티브 `BAD`만으로는 즉사하지 않으며 빈 키 입력의 `POOR`도 즉사 조건이 아님
   - Mode Settings에서 Practice No-Fail과 상호 배타적
 - `song_index_profile`: `safe | fast`
   - `safe`: large-library RAM high-water를 우선 낮추는 기본값
   - `fast`: 32GB+ 환경에서 더 빠른 재인덱싱을 노리는 선택값
+
+`Rate`는 `mode`가 아니라 `speed.rate`에 저장됩니다. Mode Settings에서 조정할 수 있고, Song Select에서는 검색 입력 중이 아닐 때 `-` / `+`로 다음 플레이 값을 바로 바꿀 수 있습니다.
 
 ## 레인 변형 / 랜덤 규칙
 - **Mirror**: key-mode 변환이 끝난 최종 레인을 고정 반전
@@ -70,7 +69,7 @@
 - 모든 게이지는 `100%`에서 시작하고 `0%`에 도달하면 즉시 실패합니다.
 - `ex_hard`는 Hard보다 회복이 낮고 `BAD`/`POOR` 손실이 더 큰 도전용 게이지입니다.
 - clear status는 `EX-HARD CLEAR`, `HARD CLEAR`, `CLEAR`, `EASY CLEAR` 순으로 구분됩니다.
-- `Sudden Death (1 MISS)`는 게이지 종류가 아니라 첫 osu!mania OD8 객체 `MISS`에서 현재 게이지를 0으로 만들고 즉시 종료하는 별도 실패 규칙입니다.
+- `Sudden Death (1 MISS)`는 게이지 종류가 아니라 첫 OD8 환산 객체 `MISS`에서 현재 게이지를 0으로 만들고 즉시 종료하는 별도 실패 규칙입니다.
 
 ## 구현 위치
 - 모드 파싱: `src/gameplay/ModeSettings.*`, `src/app/ModeResolver.*`

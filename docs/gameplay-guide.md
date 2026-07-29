@@ -48,17 +48,20 @@ TenRiff의 기본 플레이 흐름은 아래 순서입니다.
 - `Enter`: 현재 곡 시작
 - `Left` / `Right`: 좌측 메뉴 포커스 전환
 - `Esc`: 이전 화면으로 복귀
-- `F5`: 곡 라이브러리 재인덱싱
+- `-` / `+`: 다음 플레이의 Rate 즉시 조정
+- `F5`: 곡 라이브러리 재인덱싱; 실행 중에는 stage/퍼센트/ETA와 progress bar가 화면 중앙에 표시됨
+- `Browse > Difficulty Table`: 로컬 BMS 난이도표 header JSON 선택 또는 해제
 
 ### Song Select에서 자주 쓰는 화면
 - `Mode`
-  - Ghost Battle, Autoplay, Practice, Sudden Death, Key Mode, Gauge, Random, Mods, Rate, Hi-Speed, OSU Charts, Chart Filter 조정
+  - Ghost Battle, Autoplay, Practice, Sudden Death, Key Mode, Gauge, Random, Mods, Rate, Hi-Speed 조정
 - `Audio`
   - Master/BGM/Keysound 볼륨과 BMS keysound 정책 조정
 - `Graphics`
-  - VSync, Refresh Hz, Performance HUD, Display Offset 조정
+  - VSync, Refresh Hz, Performance HUD, Display Offset, 외부 ONNX BGA Upscaler 조정
+  - 모델 선택 후 Upscaler를 직접 켜고 고사양 경고를 확인해야 함. `NPU 우선(실험)`은 Windows/드라이버가 실제 NPU를 선택할 수 있을 때만 사용됨
 - `Skins`
-  - 판정선 위치, 노트 크기, LN 몸통 폭, lane color 조정
+  - native/LR2 스킨 전환, LR2 폴더 가져오기, 판정선 위치, 노트 크기, LN 몸통 폭, lane color 조정
 - `Keymap`
   - 키 배치 변경과 NKRO 테스트
 
@@ -67,7 +70,7 @@ TenRiff의 기본 플레이 흐름은 아래 순서입니다.
 처음에는 아래 정도로 시작하면 무난합니다.
 
 - `Mode > Gauge`: `normal`
-- `Mode > Sudden Death`: 첫 osu!mania OD8 `MISS` 즉사 도전을 원할 때만 켜기
+- `Mode > Sudden Death`: 첫 OD8 환산 `MISS` 즉사 도전을 원할 때만 켜기
 - `Mode > Rate`: `1.0x`
 - `Mode > Hi-Speed`: 기본값 그대로 시작
 - `Graphics > Display`: Discord 음성 오버레이를 쓸 때는 `Borderless` 권장
@@ -101,8 +104,7 @@ Discord 설정 방법은 [공식 Game Overlay 안내](https://support.discord.co
 ## 6. 플레이 시작 전 알아둘 점
 
 ### 차트 형식
-- 기본 필터는 BMS 중심입니다.
-- osu!mania는 옵션에서 활성화하면 `4K`부터 `10K`까지 인덱싱/플레이할 수 있습니다.
+- TenRiff 1.2.6은 BMS 계열(`.bms/.bme/.bml/.pms`)만 인덱싱하고 플레이합니다.
 
 ### 로딩
 - 곡 시작 직후에는 차트 로딩 진행 상태가 표시될 수 있습니다.
@@ -171,7 +173,7 @@ Rate는 곡 재생 속도와 차트 스케줄만 바꾸며, 같은 Hi-Speed에�
 - `easy`: `0%`가 되는 즉시 Game Over
 
 플레이 중 자동 단계 시프트는 없습니다.
-`Sudden Death (1 MISS)`는 게이지 종류가 아니라 첫 osu!mania OD8 객체 `MISS`에서 게이지를 0으로 만들고 즉시 종료하는 규칙입니다. 네이티브 `BAD`만으로는 즉사하지 않고 빈 키 `POOR`도 세지 않으며 Practice No-Fail과 동시에 켤 수 없습니다.
+`Sudden Death (1 MISS)`는 게이지 종류가 아니라 첫 OD8 환산 객체 `MISS`에서 게이지를 0으로 만들고 즉시 종료하는 규칙입니다. 네이티브 `BAD`만으로는 즉사하지 않고 빈 키 `POOR`도 세지 않으며 Practice No-Fail과 동시에 켤 수 없습니다.
 
 ## 10. Result 화면
 
@@ -208,6 +210,8 @@ Rate는 곡 재생 속도와 차트 스케줄만 바꾸며, 같은 Hi-Speed에�
 ### BMS에서 건반음이 너무 크거나 작다
 - `Audio > Keysound Volume`을 조정합니다.
 - 배경음과 분리해서 조절할 수 있습니다.
+- `follow`인데도 키음이 안 났던 늦은 입력 경로는 1.2.6에서 판정 시각은 유지하고 가청 시작점만 현재 쓰기 가능한 버퍼에 맞추도록 수정했습니다.
+- 계속 무음이면 `Keysound Mode=follow`, 0이 아닌 볼륨, 차트의 `#WAV` 파일 경로를 확인합니다.
 
 ### 입력이 불안하거나 키 충돌이 의심된다
 - `Options > Keymap > NKRO Test`에서 여러 키를 동시에 눌러 확인합니다.

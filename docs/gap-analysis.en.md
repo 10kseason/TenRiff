@@ -21,7 +21,7 @@
 - BMS parser / normalize / timeline (sample-time) foundation
 - Basic 10-key channel mapping
 - SpeedManager / GaugeManager baseline spec support
-- osu!mania loader (mode / key / timing points / notes)
+- BMS-family-only chart loader and indexer
 - RawInput + InputThread + SPSCQueue + ClockSync scaffolding
 - Input polling (1000 / 2000 / 4000 / 8000 Hz) + RenderThread separation
 - WASAPI backend + AudioThread skeleton
@@ -77,13 +77,13 @@
 - Related files: `src/app/MenuApp.*`, `src/app/GameSession.*`, `src/gameplay/Replay.*`, `src/gameplay/ResultStats.*`
 - Fix direction (summary): add a replay loader later for playback / verification
 
-### 7) osu!mania loader is not yet connected to the common pipeline
-- Requirement: the same normalize / scheduling path as BMS
-- Current state: the osu!mania -> GameplayChart conversion path is connected
-- Gap: integration into the same intermediate model as the BMS normalize / timeline pipeline is incomplete
-- Severity: Medium
-- Related files: `src/chart/OsuManiaLoader.*`, `src/gameplay/GameplayChart.*`
-- Fix direction (summary): define a shared normalized intermediate model and unify BMS / OSU
+### 7) Chart input scope
+- Requirement: BMS-family-only loading and indexing
+- Current state: only `.bms/.bme/.bml/.pms` are supported; osu loading and import paths are removed
+- Gap: none
+- Severity: Resolved
+- Related files: `src/chart/BmsParser.*`, `src/app/ChartLoader.*`, `src/app/SongIndex.*`
+- Fix direction (summary): retain BMS parser, timeline, and real-chart regressions
 
 ### 8) Judgement rules (window / mask / LN handling) not implemented
 - Requirement: PG / GR / GD / BD / PR windows, 30ms lane mask, LN retention / leave rules

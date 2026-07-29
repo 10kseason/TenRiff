@@ -14,7 +14,6 @@ namespace tenriff::app {
 
 namespace {
 
-using gameplay::ChartFormatMode;
 using gameplay::KeyMode;
 
 std::string normalize_ascii_token(std::string_view value) {
@@ -106,16 +105,6 @@ int target_lane_count(KeyMode mode) {
         case KeyMode::Auto:
         default:
             return 0;
-    }
-}
-
-ChartFormatMode chart_format_mode_for_chart(ChartFormat format) {
-    switch (format) {
-        case ChartFormat::Bms: return ChartFormatMode::Bms;
-        case ChartFormat::OsuMania: return ChartFormatMode::Osu;
-        case ChartFormat::Unknown:
-        default:
-            return ChartFormatMode::Auto;
     }
 }
 
@@ -495,15 +484,6 @@ ModeManagerResult manage_modes(const gameplay::GameplayChart& chart,
     result.settings = resolved.settings;
     result.warnings.insert(result.warnings.end(), resolved.warnings.begin(), resolved.warnings.end());
 
-    const ChartFormatMode detected_format = chart_format_mode_for_chart(chart_format);
-    if (result.settings.format == ChartFormatMode::Bms && chart_format != ChartFormat::Bms) {
-        result.warnings.push_back("mode.format=BMS does not match the selected chart. Using detected chart format instead.");
-        result.settings.format = detected_format;
-    }
-    if (result.settings.format == ChartFormatMode::Osu && chart_format != ChartFormat::OsuMania) {
-        result.warnings.push_back("mode.format=OSU does not match the selected chart. Using detected chart format instead.");
-        result.settings.format = detected_format;
-    }
     const auto applied = gameplay::apply_mode_settings(result.chart, result.settings, {base_bpm, sample_rate});
     result.chart = applied.chart;
     result.warnings.insert(result.warnings.end(), applied.warnings.begin(), applied.warnings.end());

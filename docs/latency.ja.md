@@ -3,7 +3,7 @@
 TenRiff は input-to-judgement-to-sound の end-to-end 遅延を最小化することを重視します。このノートは、"Raw Input -> SPSC queue -> Audio thread judgement" という方針を保ったまま、後続作業でどこを締めるべきかをまとめたものです。
 
 ## Input Pipeline and Timestamping
-- BMS / osu! timeline は load 時に sample positions へ正規化し、judgement、keysound、mixer が同じ決定的 clock で動くようにする。
+- BMS timeline は load 時に sample positions へ正規化し、judgement、keysound、mixer が同じ決定的 clock で動くようにする。
 - per-profile `input_offset_ms` を追加し、device / driver 遅延を微調整できるようにする。
 - in-game loopback calibrator で key press の beep と mic loopback から推奨 offset を提案する。
 - HUD に現在の PG / GR / GD / BD window を表示し、rate 変化時の体感差を見やすくする。

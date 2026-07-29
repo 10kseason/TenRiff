@@ -7,6 +7,7 @@
 #include <string>
 #include <vector>
 
+#include "app/ChartFileHash.h"
 #include "app/MenuSongUtils.h"
 #include "app/SongIndex.h"
 #include "app/SongIndexBudget.h"
@@ -127,7 +128,7 @@ TEST_CASE("song scan only exposes BMS-family charts in the menu index") {
     CHECK(by_path.at("another.bme").title == "Another");
 }
 
-TEST_CASE("song scan exposes 4K through 10K osu!mania charts when enabled") {
+TEST_CASE("song scan remains BMS-only when osu files are present") {
     TempDirGuard temp;
     temp.path = make_temp_dir();
     REQUIRE_FALSE(temp.path.empty());
@@ -164,30 +165,21 @@ TEST_CASE("song scan exposes 4K through 10K osu!mania charts when enabled") {
                "256,0,500,1,0,0:0:0:0:\n");
     write_file(temp.path / "legacy.bms", minimal_bms_chart("Legacy", 12));
 
-    SongIndexOptions options;
-    options.include_osu = true;
     std::vector<std::string> warnings;
-    SongIndex index = scan_songs(temp.path.u8string(), nullptr, warnings, {}, options);
+    SongIndex index = scan_songs(temp.path.u8string(), nullptr, warnings);
 
-    REQUIRE(index.entries.size() == 3u);
+    REQUIRE(index.entries.size() == 1u);
     CHECK(warnings.empty());
     std::unordered_map<std::string, tenriff::app::SongEntry> by_path;
     for (const auto& entry : index.entries) {
         by_path.emplace(entry.path, entry);
     }
-    REQUIRE(by_path.count("four.osu") == 1u);
-    CHECK(by_path.at("four.osu").format == "osu");
-    CHECK(by_path.at("four.osu").key_count == 4);
-    CHECK(by_path.at("four.osu").title == "Four");
-    CHECK(by_path.at("four.osu").rating >= 0.0);
-    REQUIRE(by_path.count("ten.osu") == 1u);
-    CHECK(by_path.at("ten.osu").format == "osu");
-    CHECK(by_path.at("ten.osu").key_count == 10);
-    CHECK(by_path.at("ten.osu").title == "Ten");
-    CHECK(by_path.at("ten.osu").rating >= 0.0);
+    REQUIRE(by_path.count("legacy.bms") == 1u);
+    CHECK(by_path.count("four.osu") == 0u);
+    CHECK(by_path.count("ten.osu") == 0u);
 }
 
-TEST_CASE("song scan keeps chart names for BMS subtitles and osu versions") {
+TEST_CASE("song scan keeps chart names for BMS subtitles") {
     TempDirGuard temp;
     temp.path = make_temp_dir();
     REQUIRE_FALSE(temp.path.empty());
@@ -218,12 +210,10 @@ TEST_CASE("song scan keeps chart names for BMS subtitles and osu versions") {
                "0,0,0,1,0,0:0:0:0:\n"
                "511,0,500,1,0,0:0:0:0:\n");
 
-    SongIndexOptions options;
-    options.include_osu = true;
     std::vector<std::string> warnings;
-    SongIndex index = scan_songs(temp.path.u8string(), nullptr, warnings, {}, options);
+    SongIndex index = scan_songs(temp.path.u8string(), nullptr, warnings);
 
-    REQUIRE(index.entries.size() == 2u);
+    REQUIRE(index.entries.size() == 1u);
     CHECK(warnings.empty());
 
     std::unordered_map<std::string, tenriff::app::SongEntry> by_path;
@@ -234,13 +224,10 @@ TEST_CASE("song scan keeps chart names for BMS subtitles and osu versions") {
     REQUIRE(by_path.count("named_chart.bms") == 1u);
     CHECK(by_path.at("named_chart.bms").chart_name == "Another");
 
-    REQUIRE(by_path.count("named_chart.osu") == 1u);
-    CHECK(by_path.at("named_chart.osu").title == std::string(u8"네임드 오수"));
-    CHECK(by_path.at("named_chart.osu").artist == std::string(u8"작곡가"));
-    CHECK(by_path.at("named_chart.osu").chart_name == "MX");
+    CHECK(by_path.count("named_chart.osu") == 0u);
 }
 
-TEST_CASE("song scan stores indexed background preview paths for BMS and osu charts") {
+TEST_CASE("song scan stores indexed background preview paths for BMS charts") {
     TempDirGuard temp;
     temp.path = make_temp_dir();
     REQUIRE_FALSE(temp.path.empty());
@@ -272,12 +259,10 @@ TEST_CASE("song scan stores indexed background preview paths for BMS and osu cha
                "[HitObjects]\n"
                "64,192,0,1,0,0:0:0:0:\n");
 
-    SongIndexOptions options;
-    options.include_osu = true;
     std::vector<std::string> warnings;
-    SongIndex index = scan_songs(temp.path.u8string(), nullptr, warnings, {}, options);
+    SongIndex index = scan_songs(temp.path.u8string(), nullptr, warnings);
 
-    REQUIRE(index.entries.size() == 2u);
+    REQUIRE(index.entries.size() == 1u);
     CHECK(warnings.empty());
 
     std::unordered_map<std::string, tenriff::app::SongEntry> by_path;
@@ -289,42 +274,6 @@ TEST_CASE("song scan stores indexed background preview paths for BMS and osu cha
     CHECK_FALSE(by_path.at("preview_stagefile.bms").background_preview_path.empty());
     CHECK(std::filesystem::path(by_path.at("preview_stagefile.bms").background_preview_path).filename() == "cover.png");
 
-    REQUIRE(by_path.count("preview_events.osu") == 1u);
-    CHECK_FALSE(by_path.at("preview_events.osu").background_preview_path.empty());
-    CHECK(std::filesystem::path(by_path.at("preview_events.osu").background_preview_path).filename() == "cover image.jpg");
-}
-
-TEST_CASE("osu Events backgrounds stay inside the chart directory while nested CJK paths work") {
-    TempDirGuard temp;
-    temp.path = make_temp_dir();
-    REQUIRE_FALSE(temp.path.empty());
-
-    const auto chart_dir = temp.path / std::filesystem::u8path(u8"비트맵");
-    const auto nested_dir = chart_dir / std::filesystem::u8path(u8"배경");
-    std::filesystem::create_directories(nested_dir);
-    const auto chart_path = chart_dir / "preview.osu";
-    const auto nested_image = nested_dir / std::filesystem::u8path(u8"표지.png");
-    const auto outside_image = temp.path / "outside.png";
-    write_file(chart_path, "osu file format v14\n");
-    write_file(nested_image, "PNG");
-    write_file(outside_image, "PNG");
-
-    CHECK(tenriff::app::menu_songs::resolve_osu_background_preview_path(
-              chart_path, std::string(u8"배경/표지.png")) ==
-          std::filesystem::weakly_canonical(nested_image).u8string());
-    CHECK(tenriff::app::menu_songs::resolve_osu_background_preview_path(
-              chart_path, "../outside.png").empty());
-    CHECK(tenriff::app::menu_songs::resolve_osu_background_preview_path(
-              chart_path, outside_image.u8string()).empty());
-    CHECK(tenriff::app::menu_songs::resolve_osu_background_preview_path(
-              chart_path, R"(\\server\share\outside.png)").empty());
-
-    std::error_code link_ec;
-    std::filesystem::create_symlink(outside_image, chart_dir / "linked.png", link_ec);
-    if (!link_ec) {
-        CHECK(tenriff::app::menu_songs::resolve_osu_background_preview_path(
-                  chart_path, "linked.png").empty());
-    }
 }
 
 TEST_CASE("BMS background traversal compatibility remains unchanged") {
@@ -418,8 +367,6 @@ TEST_CASE("song scan computes difficulty for non-10K charts") {
                "#00114:01010101\n"
                "#00115:00010001\n");
 
-    SongIndexOptions options;
-    options.include_osu = true;
     write_file(temp.path / "four_dense.osu",
                "osu file format v14\n"
                "[General]\n"
@@ -444,18 +391,18 @@ TEST_CASE("song scan computes difficulty for non-10K charts") {
                "511,0,630,1,0,0:0:0:0:\n");
 
     std::vector<std::string> warnings;
-    SongIndex index = scan_songs(temp.path.u8string(), nullptr, warnings, {}, options);
+    SongIndex index = scan_songs(temp.path.u8string(), nullptr, warnings);
 
-    REQUIRE(index.entries.size() == 2u);
+    REQUIRE(index.entries.size() == 1u);
     CHECK(warnings.empty());
     std::unordered_map<std::string, tenriff::app::SongEntry> by_path;
     for (const auto& entry : index.entries) {
         by_path.emplace(entry.path, entry);
     }
     REQUIRE(by_path.count("four_dense.bms") == 1u);
-    REQUIRE(by_path.count("four_dense.osu") == 1u);
+    CHECK(by_path.count("four_dense.osu") == 0u);
     CHECK(by_path.at("four_dense.bms").rating > 0.0);
-    CHECK(by_path.at("four_dense.osu").rating > 0.0);
+    CHECK(by_path.count("four_dense.osu") == 0u);
 }
 
 TEST_CASE("song scan exposes BMS SP layouts with compact lane counts and labels") {
@@ -575,6 +522,169 @@ TEST_CASE("song scan supports UTF-8 song roots") {
     CHECK(index.entries.front().path == std::filesystem::u8path(u8"테스트.bms").u8string());
 }
 
+TEST_CASE("song scan hashes BMS and applies a local difficulty table with SHA-256 priority") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+
+    const auto chart_path = temp.path / "table_chart.bms";
+    write_file(chart_path, dense_bms_chart("Table Chart", 12));
+
+    std::string hash_error;
+    const auto hashes = tenriff::app::hash_chart_file(chart_path, &hash_error);
+    REQUIRE(hash_error.empty());
+    REQUIRE(hashes.valid());
+
+    const auto data_path = temp.path / "table-data.json";
+    write_file(data_path,
+               "["
+               "{\"md5\":\"" + hashes.md5 + "\",\"level\":\"1\"},"
+               "{\"sha256\":\"" + hashes.sha256 + "\",\"level\":\"12\"}"
+               "]");
+    const auto header_path = temp.path / "table-header.json";
+    write_file(header_path,
+               "{\"name\":\"Local Grade\",\"symbol\":\"#\","
+               "\"level_order\":[\"1\",\"12\"],\"data_url\":\"table-data.json\"}");
+
+    SongIndexOptions options;
+    options.difficulty_table_path = header_path.u8string();
+    std::vector<std::string> warnings;
+    const SongIndex index = scan_songs(temp.path.u8string(), nullptr, warnings, {}, options);
+
+    REQUIRE(warnings.empty());
+    REQUIRE(index.entries.size() == 1u);
+    const auto& entry = index.entries.front();
+    CHECK(entry.md5 == hashes.md5);
+    CHECK(entry.sha256 == hashes.sha256);
+    CHECK(entry.native_level == entry.level);
+    CHECK(entry.difficulty_table_name == "Local Grade");
+    CHECK(entry.difficulty_table_symbol == "#");
+    CHECK(entry.difficulty_table_level == "12");
+    CHECK(entry.difficulty_table_order == 1);
+}
+
+TEST_CASE("schema 11 cache persists hashes and reapplies the current local difficulty table") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+
+    const auto chart_path = temp.path / "cached_table_chart.bms";
+    write_file(chart_path, dense_bms_chart("Cached Table Chart", 12));
+
+    std::string hash_error;
+    const auto hashes = tenriff::app::hash_chart_file(chart_path, &hash_error);
+    REQUIRE(hash_error.empty());
+    REQUIRE(hashes.valid());
+
+    const auto data_path = temp.path / "table-data.json";
+    const auto header_path = temp.path / "table-header.json";
+    write_file(data_path, "[{\"sha256\":\"" + hashes.sha256 + "\",\"level\":\"A\"}]");
+    write_file(header_path,
+               "{\"name\":\"Initial\",\"symbol\":\"I\","
+               "\"level_order\":[\"A\"],\"data_url\":\"table-data.json\"}");
+
+    SongIndexOptions options;
+    options.difficulty_table_path = header_path.u8string();
+    std::vector<std::string> warnings;
+    const SongIndex scanned = scan_songs(temp.path.u8string(), nullptr, warnings, {}, options);
+    REQUIRE(warnings.empty());
+    REQUIRE(scanned.entries.size() == 1u);
+    CHECK(scanned.entries.front().difficulty_table_name == "Initial");
+    CHECK(scanned.entries.front().difficulty_table_level == "A");
+    CHECK(scanned.entries.front().file_size == hashes.size);
+
+    const auto cache_path = temp.path / "song_index.json";
+    std::string save_error;
+    REQUIRE(save_song_index(cache_path.u8string(), scanned, options, &save_error));
+    CHECK(save_error.empty());
+
+    const SongIndexLoadResult without_table = load_song_index(cache_path.u8string());
+    REQUIRE(without_table.success());
+    REQUIRE(without_table.loaded_from_file);
+    REQUIRE(without_table.index.entries.size() == 1u);
+    CHECK(without_table.index.entries.front().level == without_table.index.entries.front().native_level);
+    CHECK(without_table.index.entries.front().difficulty_table_name.empty());
+    CHECK(without_table.index.entries.front().difficulty_table_level.empty());
+    CHECK(without_table.index.entries.front().difficulty_table_order == -1);
+
+    write_file(data_path,
+               "[{\"sha256\":\""
+               "0000000000000000000000000000000000000000000000000000000000000000\","
+               "\"level\":\"X\"}]");
+    write_file(header_path,
+               "{\"name\":\"Mismatch\",\"symbol\":\"M\","
+               "\"level_order\":[\"X\"],\"data_url\":\"table-data.json\"}");
+    const SongIndexLoadResult mismatch = load_song_index(cache_path.u8string(), options);
+    REQUIRE(mismatch.success());
+    REQUIRE(mismatch.loaded_from_file);
+    REQUIRE(mismatch.index.entries.size() == 1u);
+    CHECK(mismatch.index.entries.front().level == mismatch.index.entries.front().native_level);
+    CHECK(mismatch.index.entries.front().difficulty_table_name.empty());
+    CHECK(mismatch.index.entries.front().difficulty_table_level.empty());
+    CHECK(mismatch.index.entries.front().difficulty_table_order == -1);
+
+    write_file(data_path, "[{\"sha256\":\"" + hashes.sha256 + "\",\"level\":\"B\"}]");
+    write_file(header_path,
+               "{\"name\":\"Updated\",\"symbol\":\"U\","
+               "\"level_order\":[\"A\",\"B\"],\"data_url\":\"table-data.json\"}");
+    SongIndexLoadResult updated = load_song_index(cache_path.u8string(), options);
+    REQUIRE(updated.success());
+    REQUIRE(updated.loaded_from_file);
+    REQUIRE(updated.index.entries.size() == 1u);
+    CHECK(updated.index.entries.front().md5 == hashes.md5);
+    CHECK(updated.index.entries.front().sha256 == hashes.sha256);
+    CHECK(updated.index.entries.front().file_size == hashes.size);
+    CHECK(updated.index.entries.front().level == updated.index.entries.front().native_level);
+    CHECK(updated.index.entries.front().difficulty_table_name == "Updated");
+    CHECK(updated.index.entries.front().difficulty_table_symbol == "U");
+    CHECK(updated.index.entries.front().difficulty_table_level == "B");
+    CHECK(updated.index.entries.front().difficulty_table_order == 1);
+
+    updated.index.entries.front().title = "Cached Sentinel";
+    write_file(data_path, "[{\"sha256\":\"" + hashes.sha256 + "\",\"level\":\"C\"}]");
+    write_file(header_path,
+               "{\"name\":\"Rescanned\",\"symbol\":\"R\","
+               "\"level_order\":[\"A\",\"B\",\"C\"],\"data_url\":\"table-data.json\"}");
+
+    warnings.clear();
+    const SongIndex rescanned =
+        scan_songs(temp.path.u8string(), &updated.index, warnings, {}, options);
+    REQUIRE(warnings.empty());
+    REQUIRE(rescanned.entries.size() == 1u);
+    CHECK(rescanned.entries.front().title == "Cached Sentinel");
+    CHECK(rescanned.entries.front().md5 == hashes.md5);
+    CHECK(rescanned.entries.front().sha256 == hashes.sha256);
+    CHECK(rescanned.entries.front().level == rescanned.entries.front().native_level);
+    CHECK(rescanned.entries.front().difficulty_table_name == "Rescanned");
+    CHECK(rescanned.entries.front().difficulty_table_symbol == "R");
+    CHECK(rescanned.entries.front().difficulty_table_level == "C");
+    CHECK(rescanned.entries.front().difficulty_table_order == 2);
+
+    SongIndex wrong_size_cache = rescanned;
+    wrong_size_cache.entries.front().title = "Wrong Size Sentinel";
+    ++wrong_size_cache.entries.front().file_size;
+    warnings.clear();
+    const SongIndex size_refreshed =
+        scan_songs(temp.path.u8string(), &wrong_size_cache, warnings, {}, options);
+    REQUIRE(warnings.empty());
+    REQUIRE(size_refreshed.entries.size() == 1u);
+    CHECK(size_refreshed.entries.front().title == "Cached Table Chart");
+    CHECK(size_refreshed.entries.front().file_size == hashes.size);
+
+    SongIndex forced_cache = rescanned;
+    forced_cache.entries.front().title = "Forced Refresh Sentinel";
+    SongIndexOptions forced_options = options;
+    forced_options.reuse_cached_metadata = false;
+    warnings.clear();
+    const SongIndex force_refreshed =
+        scan_songs(temp.path.u8string(), &forced_cache, warnings, {}, forced_options);
+    REQUIRE(warnings.empty());
+    REQUIRE(force_refreshed.entries.size() == 1u);
+    CHECK(force_refreshed.entries.front().title == "Cached Table Chart");
+    CHECK(force_refreshed.entries.front().md5 == hashes.md5);
+    CHECK(force_refreshed.entries.front().sha256 == hashes.sha256);
+}
+
 TEST_CASE("cached song index load drops non-BMS menu entries") {
     TempDirGuard temp;
     temp.path = make_temp_dir();
@@ -583,8 +693,7 @@ TEST_CASE("cached song index load drops non-BMS menu entries") {
     const auto index_path = temp.path / "song_index.json";
     write_file(index_path,
                "{\n"
-               "  \"version\": 10,\n"
-               "  \"include_osu\": true,\n"
+               "  \"version\": 11,\n"
                "  \"entries\": [\n"
                "    {\"path\":\"ten.osu\",\"title\":\"Ten\",\"artist\":\"A\",\"chart_name\":\"MX\",\"format\":\"osu\",\"key_count\":10,\"level\":12,\"rating\":8.25,\"bpm\":180,\"mtime\":1},\n"
                "    {\"path\":\"legacy.bms\",\"title\":\"Legacy\",\"artist\":\"C\",\"chart_name\":\"Another\",\"format\":\"bms\",\"layout_label\":\"5+1 SP\",\"key_count\":6,\"level\":11,\"rating\":6.75,\"bpm\":180,\"mtime\":1},\n"
@@ -611,7 +720,7 @@ TEST_CASE("cached song index load drops non-BMS menu entries") {
     CHECK(by_path.at("another.bme").rating == doctest::Approx(8.5));
 }
 
-TEST_CASE("cached song index exposes osu entries when enabled") {
+TEST_CASE("cached song index filters non-BMS entries") {
     TempDirGuard temp;
     temp.path = make_temp_dir();
     REQUIRE_FALSE(temp.path.empty());
@@ -619,31 +728,29 @@ TEST_CASE("cached song index exposes osu entries when enabled") {
     const auto index_path = temp.path / "song_index.json";
     write_file(index_path,
                "{\n"
-               "  \"version\": 10,\n"
-               "  \"include_osu\": true,\n"
+               "  \"version\": 11,\n"
                "  \"entries\": [\n"
                 "    {\"path\":\"ten.osu\",\"title\":\"Ten\",\"artist\":\"A\",\"chart_name\":\"MX\",\"format\":\"osu\",\"key_count\":10,\"level\":12,\"rating\":8.25,\"bpm\":180,\"mtime\":1},\n"
                 "    {\"path\":\"legacy.bms\",\"title\":\"Legacy\",\"artist\":\"C\",\"format\":\"bms\",\"key_count\":10,\"level\":11,\"rating\":6.75,\"bpm\":180,\"mtime\":1}\n"
                "  ]\n"
                "}\n");
 
-    SongIndexOptions options;
-    options.include_osu = true;
-    SongIndexLoadResult result = load_song_index(index_path.u8string(), options);
+    SongIndexLoadResult result = load_song_index(index_path.u8string());
 
     CHECK(result.success());
     CHECK(result.loaded_from_file);
-    REQUIRE(result.index.entries.size() == 2u);
+    REQUIRE(result.index.entries.size() == 1u);
+    CHECK(result.index.entries.front().path == "legacy.bms");
 }
 
-TEST_CASE("streaming song index loader parses compact single-line schema 10 caches") {
+TEST_CASE("streaming song index loader parses compact single-line schema 11 caches") {
     TempDirGuard temp;
     temp.path = make_temp_dir();
     REQUIRE_FALSE(temp.path.empty());
 
     const auto index_path = temp.path / "song_index.json";
     write_file(index_path,
-               "{\"version\":10,\"include_osu\":false,\"entries\":["
+               "{\"version\":11,\"entries\":["
                "{\"path\":\"legacy.bms\",\"title\":\"Legacy\",\"artist\":\"Composer\",\"chart_name\":\"Hyper\",\"format\":\"bms\",\"layout_label\":\"7+1 SP\",\"key_count\":8,\"level\":12,\"rating\":7.5,\"bpm\":150,\"mtime\":1},"
                "{\"path\":\"ignored.osu\",\"title\":\"Ignored\",\"artist\":\"Mapper\",\"format\":\"osu\",\"key_count\":10,\"level\":13,\"rating\":8.5,\"bpm\":180,\"mtime\":2}"
                "]}");
@@ -778,7 +885,7 @@ TEST_CASE("cached song index sanitizes control heavy metadata on load") {
     const auto index_path = temp.path / "song_index.json";
     write_file(index_path,
                "{\n"
-               "  \"version\": 10,\n"
+               "  \"version\": 11,\n"
                "  \"entries\": [\n"
                 "    {\"path\":\"legacy.bms\",\"title\":\"Bad\\nTitle\",\"artist\":\"Artist\\tName\",\"chart_name\":\"Hyper\\r\",\"format\":\"bms\\r\",\"key_count\":10,\"level\":11,\"rating\":6.75,\"bpm\":180,\"mtime\":1}\n"
                "  ]\n"
@@ -916,7 +1023,17 @@ TEST_CASE("song index save cancellation removes the partial cache file") {
     REQUIRE_FALSE(temp.path.empty());
 
     SongIndex index;
-    index.entries.push_back({"one.bms", "One", "Artist", "Hyper", "bms", "", "", 10, 10, 1.0, 150.0, 1});
+    tenriff::app::SongEntry entry;
+    entry.path = "one.bms";
+    entry.title = "One";
+    entry.artist = "Artist";
+    entry.chart_name = "Hyper";
+    entry.format = "bms";
+    entry.key_count = 10;
+    entry.level = 10;
+    entry.native_level = 10;
+    entry.mtime = 1;
+    index.entries.push_back(std::move(entry));
 
     const auto index_path = temp.path / "song_index.json";
     std::string error;

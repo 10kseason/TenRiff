@@ -540,7 +540,7 @@ TEST_CASE("mode manager resolves key mode with full short notes and removes redu
     }
 }
 
-TEST_CASE("mode manager converts osu key mode upward while still applying compatible mods") {
+TEST_CASE("mode manager converts BMS key mode upward while still applying compatible mods") {
     tenriff::gameplay::GameplayChart chart = make_hold_mix_chart(7);
 
     tenriff::config::ModeConfig mode;
@@ -549,14 +549,13 @@ TEST_CASE("mode manager converts osu key mode upward while still applying compat
 
     const auto result = tenriff::app::manage_modes(
         chart,
-        tenriff::app::ChartFormat::OsuMania,
+        tenriff::app::ChartFormat::Bms,
         mode,
         make_judge_config(),
         1.0,
         175.0,
         44100);
 
-    CHECK_FALSE(contains_warning(result.warnings, "does not match the selected osu!mania chart"));
     CHECK(result.chart.lane_count == 10);
     CHECK(result.settings.key_mode == tenriff::gameplay::KeyMode::Keys10);
     CHECK(contains_token(result.active_mods, "no_ln_release"));
@@ -577,7 +576,7 @@ TEST_CASE("mode manager converts osu key mode upward while still applying compat
     CHECK(saw_hold);
 }
 
-TEST_CASE("mode manager converts osu key mode downward with randomization while preserving invariants") {
+TEST_CASE("mode manager converts BMS key mode downward with randomization while preserving invariants") {
     tenriff::gameplay::GameplayChart chart = make_hold_mix_chart(7);
 
     tenriff::config::ModeConfig mode;
@@ -588,7 +587,7 @@ TEST_CASE("mode manager converts osu key mode downward with randomization while 
 
     const auto result = tenriff::app::manage_modes(
         chart,
-        tenriff::app::ChartFormat::OsuMania,
+        tenriff::app::ChartFormat::Bms,
         mode,
         make_judge_config(),
         1.0,

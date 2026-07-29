@@ -2,21 +2,20 @@
 
 Language: [한국어](README.md) | [English](README.en.md) | [简体中文](README.zh-CN.md) | 日本語
 
-TenRiff は Windows GUI ベースの BMS-first リズムゲーム runtime/launcher です。現在の stable 版は `1.2.5`。Graphics Settings で権利処理済みの外部 ONNX upscaler を選択するか、.onnx file を drop して BGA/BGI に使用できます。公開 package は model を含まず、既定値は `off` です。現在の契約は固定 960x540 RGB residual x2 で、benchmark・load・contract・inference の失敗時は native scaling を維持します。license は MIT です。
+TenRiff は Windows GUI ベースの BMS リズムゲーム runtime/launcher です。現在の stable 版は `1.2.6` で、譜面入力は BMS family（`.bms/.bme/.bml/.pms`）に限定されます。Graphics Settings で権利処理済みの外部 ONNX model を選び、`BGA Upscaler` を明示的に ON にして high-spec 警告を確認すると BGA/BGI に使用できます。公開 package は model を含まず既定値は `off`、performance benchmark gate はありません。load・contract・inference の失敗時は native scaling を維持します。実験的な `NPU 優先` は ONNX 使用時に Windows ML へ low-power device を要求しますが、実際の device は Windows/driver が決定し、session 作成失敗時は high-performance DirectX 経路へ fallback します。license は MIT です。
 
-この README は導入文書です。現在の挙動、`1.2.5` project state、`1.1.2 final stable` baseline、設定と設計文書は [`docs/README.ja.md`](docs/README.ja.md) から参照してください。
+この README は導入文書です。現在の挙動、`1.2.6` project state、`1.1.2 final stable` baseline、設定と設計文書は [`docs/README.ja.md`](docs/README.ja.md) から参照してください。
 
 TenRiff のコードベースは、伝統的な長文設計書主導だけで積み上がったものではなく、高速な反復と実験を重視した `vibe coding` 的な性格を持つ作品でもあります。
 
 ## プロジェクト概要
 
 - 主対象プラットフォーム: Windows
-- 既定の譜面サーフェス: BMS-first
-- 任意で対応する譜面: `.osu` osu!mania 4K-10K
+- 対応譜面: BMS family のみ（`.bms/.bme/.bml/.pms`）
 - グラフィックス経路: D3D11 + Direct2D/DirectWrite
 - オーディオ経路: WASAPI
 - 入力経路: RawInput または高ポーリング polling
-- direct-IP multiplayer: host 1 人 + joiner 1 人の TCP 対戦（既定 `27300/TCP`、[利用案内](docs/multiplayer.ja.md)）
+- direct-IP multiplayer: host 1 人 + joiner 1 人の TCP 対戦（既定 `27300/TCP`、[利用案内](docs/multiplayer.md)）
 - ライセンス: [MIT](LICENSE)
 - サードパーティ通知: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
 - リリース変更履歴: [CHANGELOG.md](CHANGELOG.md)
@@ -52,15 +51,16 @@ OpenAI Codex、ChatGPT、Claude Code、Gemini、そして検証に協力して�
   - MP3 は Windows Media Foundation フォールバック
   - 必要時は `ffmpeg.exe` フォールバック
   - keysound モード `follow / autoplay / ignore`
+  - 遅れて到着した real-time input は判定時刻を維持し、可聴 trigger だけを現在書き込み可能な buffer 境界へ固定して短い keysound の全欠落を防止
 - Song Select
   - キャッシュ優先ロード
-  - `F5` 強制再インデックス
+  - `F5` 強制再インデックスと中央表示の stage / percent / ETA progress
   - 検索、キー数フィルタ、難易度フィルタ
   - `LV ASC/DESC`, `TITLE A-Z/Z-A` ソート
   - 外部フォルダ/BMS のドラッグアンドドロップ
-  - `Shift+F2` のファイル選択または drag-and-drop で `.osz` を active songs source にインストールし、osu chart を有効化して再インデックス
   - recent source 保存/再オープン
-  - `BMS / OSU / All` フィルタ
+  - `-` / `+` で次の play の Rate を即時調整
+  - Browse で local BMS difficulty-table JSON を選択し、MD5/SHA-256 一致譜面へ table level を適用
 - Gameplay / HUD
   - リアルタイム HUD
   - 段階的な譜面ロード進行表示
@@ -73,9 +73,8 @@ OpenAI Codex、ChatGPT、Claude Code、Gemini、そして検証に協力して�
   - Hi-Speed、Rate、gauge、audio、input、graphics 設定
   - `Skins` 画面での判定線位置、ノートサイズ、レーンカラー編集
   - `5K`-`10K` レーンカラー編集とライブプレビュー
-  - `.osk` のファイル選択/drag-and-drop で active profile に skin をインストール
-  - 対応する osu!mania note/LN image と `ColumnWidth`, `ColumnSpacing`, `ColumnLineWidth`, `HitPosition` を適用
-  - OSK/OSZ は既存 folder を上書きせず preflight + staging し、chart asset 参照をインストール先 beatmap folder 内に制限
+  - native vector skin と LR2 playskin のみ対応
+  - LR2 skin folder の選択/drag-and-drop で active profile にコピーし、note・LN・lane-gap・destination-size data を反映
 - 結果 / ローカル記録
   - Result 画面
   - replay / result JSON export
@@ -88,7 +87,7 @@ OpenAI Codex、ChatGPT、Claude Code、Gemini、そして検証に協力して�
 
 - Windows GUI がメイン経路です。
 - Linux GUI/audio/input バックエンドはまだ未完成です。
-- osu skin import は TenRiff が対応する osu!mania gameplay 要素を適用するもので、全 osu! mode/UI asset の pixel-perfect 再現を保証しません。
+- LR2 playskin import は対応する gameplay 要素を移植する機能であり、LR2 UI 全体の pixel-perfect 再現を保証しません。
 - 一部 GUI 経路は主に build/test ベースで検証されており、実機での手動検証がまだ残っています。
 - 古い設計文書と現在の実装が食い違う場合があるため、現行挙動を判断するときは [`docs/current-state.ja.md`](docs/current-state.ja.md) を優先してください。
 

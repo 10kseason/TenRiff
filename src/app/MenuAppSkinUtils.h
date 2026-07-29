@@ -146,9 +146,6 @@ inline std::string lane_display_label(int lane_index) {
 
 inline std::string skin_source_label(std::string_view value) {
     const std::string normalized = config::normalize_skin_source_token(value);
-    if (normalized == "osu") {
-        return "osu!mania";
-    }
     if (normalized == "lr2") {
         return "LR2";
     }
@@ -156,22 +153,11 @@ inline std::string skin_source_label(std::string_view value) {
 }
 
 inline std::string cycle_skin_source(std::string_view value, int direction) {
-    static constexpr const char* kSources[] = {"native", "osu", "lr2"};
-    int index = 0;
     const std::string normalized = config::normalize_skin_source_token(value);
-    for (int i = 0; i < 3; ++i) {
-        if (normalized == kSources[i]) {
-            index = i;
-            break;
-        }
+    if (direction == 0) {
+        return normalized;
     }
-    index += direction;
-    if (index < 0) {
-        index = 2;
-    } else if (index >= 3) {
-        index = 0;
-    }
-    return kSources[index];
+    return normalized == "lr2" ? "native" : "lr2";
 }
 
 inline std::string cycle_skin_visual_preset(std::string_view value, int direction) {

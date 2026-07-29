@@ -4,6 +4,36 @@ TenRiff의 사용자/배포 관점에서 의미 있는 변경만 간단히 기�
 
 ## [Unreleased]
 
+## [1.2.6] - 2026-07-29
+
+### Added
+
+- 로컬 표준 BMS 난이도표 헤더 JSON을 선택하면 차트 파일의 SHA-256/MD5를 대조해 표 이름·기호·레벨·순서를 Song Index에 연결하고, Song Select 배지·정렬·그룹·숫자 필터에 우선 반영
+- External ONNX Upscaler에 `NPU 우선(실험)` 설정을 추가해 Windows의 저전력 DirectX ML 장치를 먼저 요청하고, 세션 생성 또는 첫 추론이 거부되면 고성능 DirectX 경로로 재시도
+
+### Fixed
+
+- 실시간 BMS 입력이 오디오 write cursor보다 늦게 도착했을 때 판정·리플레이 시각은 그대로 유지하면서 가청 키음만 현재 쓰기 가능한 버퍼 경계에 붙여 짧은 키음이 통째로 빠지던 문제 수정
+- LR2 playskin의 누락된 `#IMAGE`도 선언 슬롯을 소비하고 include/상위 파일이 같은 슬롯 카운터를 공유하도록 바꿔 이후 `#SRC_*` 이미지 번호가 밀리던 문제 수정
+- 난이도표를 바꾼 직후 기존 Song Index 캐시에 저장된 차트 해시를 재사용해 대규모 라이브러리를 다시 파싱하지 않고 표 레벨을 즉시 갱신하며, F5 강제 재검색은 파일 크기와 밀리초 mtime까지 확인해 같은 초에 바뀐 차트의 해시도 다시 계산
+- 헤더 형식이 아니거나 읽을 수 없는 난이도표 JSON은 설정에 저장하지 않아 적용되지 않은 표가 선택된 것처럼 남던 상태 표시 문제 수정
+
+### Changed
+
+- 차트 입력을 BMS 계열(`.bms/.bme/.bml/.pms`) 전용으로 정리하고 `.osu` 파서, `.osz` 가져오기, 관련 설정·캐시·테스트·miniz 의존성을 제거
+- 스킨 입력을 native/LR2 전용으로 정리하고 `.osk` 가져오기와 osu 스킨 런타임을 제거하되, 기존 사용자 스킨 폴더는 삭제하지 않고 오래된 `skin.source=osu`만 native로 안전 정규화
+- ONNX 업스케일러의 자동 FPS 벤치마크/차단을 제거하고, 모델 경로 선택과 수동 ON/OFF 및 기본 `아니오`인 고사양 경고 확인만 남김
+- Song Select 인덱싱 stage/퍼센트/ETA 진행 표시를 화면 중앙으로 옮기고, 메뉴에서 `-`/`+` 및 Mode Settings로 다음 플레이 Rate를 조정하도록 연결
+
+### Packaging
+
+- 모델을 포함하지 않는 Windows `TenRiff-1.2.6.zip`, 공개 소스 `TenRiff-1.2.6-source.zip`, SHA-256 manifest를 같은 릴리즈 자산으로 구성
+
+### Verification
+
+- Release 단위 테스트 `438 pass / 1 optional skip / 0 fail`, CTest `1/1` 통과 및 `.osu` 확장자 unsupported 회귀, 키음 지연 입력, 난이도표 해시/캐시/UI 정렬, LR2 이미지 슬롯 회귀를 포함해 확인
+- NPU 실제 선택 여부는 Windows/드라이버 정책에 달려 있으므로 Release 빌드와 폴백 경로를 확인하고, NPU 실기 추론은 지원 장치에서 별도 확인 대상으로 유지
+
 ## [1.2.5] - 2026-07-29
 
 ### Changed

@@ -3,20 +3,20 @@
 이 문서는 다음 에이전트나 새 작업자가 가장 먼저 읽어야 하는 현재 상태 문서입니다. 목표는 "지금 이 프로젝트가 무엇이고, 어디를 보면 되고, 무엇이 아직 미검증인지"를 빠르게 파악하게 하는 것입니다.
 
 ## Baseline
-- 현재 프로젝트 버전은 `1.2.5 stable`
+- 현재 프로젝트 버전은 `1.2.6 stable`
 - 직접 IP 멀티플레이와 preview r5의 입력 backend 수명주기 수정은 `1.1.8 stable`에 통합
 - `1.1.8`은 1.1.7의 시각 개선에 osu!mania OD8 보조 점수, 첫 네이티브 `BAD` 즉사 `Sudden Death (1 MISS)`, 결정적 `LN Mix 10%~90%`를 추가
 - `1.2.0`은 BMS 채널 `04/07` 및 osu!mania 배경을 gameplay sample timeline에 연결하고, FHD 미만 이미지 배경을 Windows ML 기반 LunaSR로 비동기 보간
 - `1.2.1`은 LunaSR 런타임을 `basic_v2`로 교체하고 gameplay BGA layer와 Song Select의 선택 BGI를 보간하며, 싱글플레이 Esc 일시정지 메뉴·다각형 노트 모양·LN tail cap 토글을 추가.
 - `1.2.2`는 procedural 원·다각형 스킨을 막대와 같은 100% 폭으로 보정하고, FFmpeg 폴백이 있는 MPG/MPEG 동영상 BGA를 추가하며, LunaSR를 필수 200 FPS 벤치마크 게이트 뒤의 staged32 RGB FP16 모델로 교체.
-- `1.2.3`은 LunaSR 고정 RGB x2 성능 게이트를 200 FPS에서 35 FPS로 낮춤.
+- `1.2.3`은 당시 LunaSR 고정 RGB x2 성능 게이트를 완화함.
 - `1.2.4`는 권리 경계가 불명확한 LunaSR ONNX와 모델 전용 메타데이터를 공개 배포에서 제거하고, 기본값이 `off`인 사용자 제공 모델 opt-in 연동만 유지.
-- `1.2.5`는 모델명을 노출하던 연동을 generic External ONNX Upscaler로 교체하고, Graphics Settings 파일 선택/.onnx 드롭, 프로필별 모델 경로, 모델별 WinML session·35 FPS gate를 추가.
+- `1.2.5`는 모델명을 노출하던 연동을 generic External ONNX Upscaler로 교체하고, Graphics Settings 파일 선택/.onnx 드롭, 프로필별 모델 경로와 모델별 WinML session을 추가.
+- `1.2.6`은 실행 가능한 차트를 BMS 계열로 한정하고 native/LR2 스킨만 유지하며, ONNX 업스케일러 수동 활성화와 실험적 NPU 우선 옵션, Song Select Rate 조절, 중앙 인덱싱 진행 표시, 로컬 JSON 난이도표, BMS 키음 지연 입력 핫픽스를 추가.
 - 후속 작업의 기준선 문서는 `docs/baseline-1.1.2.md`
 - Windows GUI 빌드가 메인 타깃
 - Linux는 `Baepoks-Linuxs/TenRiff-0.5.0-linux-preview` 수준의 preview만 존재
-- 기본 표면은 BMS-first
-- `.osu`는 옵션으로 다시 활성화 가능하며 4K~10K를 지원
+- 지원 차트 표면은 BMS 계열(`.bms/.bme/.bml/.pms`) 전용
 - `1.2.4 stable`의 gameplay live 입력은 저장된 RawInput을 우선하면서 같은 `InputThread`의 bound-key polling shadow를 항상 유지하고, 시작 실패뿐 아니라 message pump의 예기치 않은 종료도 queue/state reset 없이 현재 producer thread에서 Polling으로 전환함
 - 메뉴 입력은 기존 foreground process/root-window 경계를 유지한다. RawInput 시작 실패, process-global 등록 대상 손실, 숨은 message window 종료를 감지하면 사용자 키 입력을 기다리지 않고 Polling으로 전환한다.
 - 확인된 fallback은 profile 값을 덮어쓰지 않은 채 현재 앱 실행의 메뉴와 다음 gameplay까지 유지한다. 앱 재시작 또는 `Options -> Input Settings -> Backend`의 명시적 변경만 재시도한다.
@@ -54,6 +54,7 @@
   - `follow`
   - `autoplay`
   - `ignore`
+  - 늦게 도착한 실시간 입력도 원래 sample timestamp로 판정하되, 실제 키음 시작은 현재 writable buffer 경계에 고정해 소리가 누락되지 않게 함
 - BMS long note:
   - LN channel (`51`-`55`, `61`-`65`)
   - `#LNOBJ`
@@ -69,20 +70,19 @@
   - 마우스 휠 이동
   - 좌측 `KEY` 빠른 필터 토글
   - 외부 폴더/BMS drag-and-drop
-  - `.osz`는 `Shift+F2` 파일 선택 또는 drag-and-drop으로 활성 songs source에 설치하고, osu chart를 활성화한 뒤 해당 source를 재인덱싱
-  - OSZ 설치는 archive 전체 사전 검증과 staging 추출 뒤 원자적으로 완료하며 기존 폴더를 덮어쓰지 않고, `.osu`의 배경/오디오/히트사운드 참조를 차트 폴더 내부로 제한
   - recent source 저장/재열기
-  - BMS / OSU / All 필터
   - difficulty/title 정렬
-- osu!mania:
-  - 4K~10K 로드/실행
+  - 검색 입력 중이 아닐 때 `-`/`+`로 현재 플레이 Rate 조절
+  - 인덱싱 중 stage, percent, 처리량, ETA, 곡 수와 bar를 헤더 아래 중앙에 표시
+  - Browse에서 로컬 난이도표 header JSON을 선택하고 MD5/SHA-256으로 매칭한 난이도·심볼을 표시; 변경 시 재인덱싱
+- BMS key mode:
   - 키모드별 별도 keymap
-  - 4K~10K chart difficulty 계산
+  - 지원 키 수에 대한 chart difficulty 계산
   - `mode.key_mode`는 N2NC 스타일 lane remap 기반으로 키수를 변환
   - `mode.key_mode=10k` 변환은 standalone converter의 krrcream식 10K preset과 맞춰 `target=10`, `max_keys=10`, `min_keys=1`, `transform_speed_slot=5`, `seed=0`을 기본으로 사용
   - `mode.key_mode=none`은 차트의 원래 키 수와 기본 패턴 레이아웃을 그대로 유지
 - Native difficulty:
-  - BMS/osu!mania LV/CR 계산에서 롱노트 Head/Tail의 miss-ms만 0.5배로 평가해 `300ms`를 `150ms`처럼 완화하며, 실제 gameplay 판정창은 그대로 유지
+  - BMS LV/CR 계산에서 롱노트 Head/Tail의 miss-ms만 0.5배로 평가해 `300ms`를 `150ms`처럼 완화하며, 실제 gameplay 판정창은 그대로 유지
 - Lane transform:
   - Random은 `Off / Mirror / FR / SR`를 지원하며, Mirror는 key-mode 변환 뒤 최종 레인을 반전하고 10K/16K는 각 플레이어 절반을 독립적으로 반전
   - Mod Manager의 `LN Mix 10%~90%`는 기존 롱노트를 보존하고 같은 레인의 기존 span과 겹치는 head는 제외하면서, 50ms 이상 길이와 다음 동일 레인 노트 전 50ms 여유를 확보할 수 있는 단노트 중 설정 비율을 `Random Seed` 기반으로 골라 일반 롱노트로 변환
@@ -96,16 +96,15 @@
   - combo Y 조절
   - judge line / lane width / lane spacing / note width / divider width / 16K center gap / note height / LN body width 조절
   - key mode별 개별 lane 폭과 lane 사이 간격을 각각 저장하고 미리보기/실플레이/ghost field에 같은 레이아웃 계산을 적용
-  - `.osk`는 Skins 화면의 파일 선택 또는 drag-and-drop으로 활성 프로필의 `skins`에 설치하며, OSZ와 같은 transactional/no-overwrite archive 정책을 사용
-  - osu!mania의 지원 note/LN 이미지와 `ColumnWidth`, `ColumnSpacing`, `ColumnLineWidth`, `HitPosition`을 gameplay 레이아웃에 반영
-  - archive의 모든 유효 파일은 보존하지만, TenRiff가 렌더링하지 않는 다른 osu! mode/UI 자산까지 pixel-perfect로 재현하지는 않음
+  - 지원 스킨 경로는 `native`와 LR2 playskin뿐이며, Skins 화면에서 LR2 폴더를 선택하거나 드롭하면 활성 프로필로 가져옴
+  - LR2 note/LN 이미지, lane gap, destination size를 gameplay 레이아웃에 반영
   - `skin.lr2_resolution_mode`는 `auto / sd / hd / fhd`로 LR2 playskin 해상도 override 토큰을 저장
   - LR2 auto-detect는 asset 이름이 아니라 playskin `#DST_NOTE` 좌표 범위를 기준으로 SD/HD/FHD를 판정
   - 미래 노트 상단 진입 easing
   - 마지막 판정 노트 처리 직후 플레이 종료
 - Judge:
   - 게이지 모드는 `EX-Hard / Hard / Normal / Easy`를 지원하며 모두 `100%`에서 시작하고 `0%`에서 즉시 실패함
-  - `Sudden Death (1 MISS)`는 첫 osu!mania OD8 객체 `MISS`에서 즉시 실패하며, 네이티브 `BAD`만으로는 발동하지 않고 빈 키 `POOR`도 무시하며 Practice No-Fail과 상호 배타적으로 동작
+  - `Sudden Death (1 MISS)`는 첫 OD8 환산 객체 `MISS`에서 즉시 실패하며, 네이티브 `BAD`만으로는 발동하지 않고 빈 키 `POOR`도 무시하며 Practice No-Fail과 상호 배타적으로 동작
   - 인게임/결과 화면에 실제 입력 타이밍을 osu!mania stable OD8 판정창과 ScoreV1(최대 1,000,000)으로 환산한 보조 `OSU OD8` 점수를 표시하며, 네이티브 TenRiff 점수와 랭킹은 변경하지 않음
   - 기본 `GOOD` 범위는 `75ms`
   - 기본 `BAD` 범위는 `340ms`
@@ -115,7 +114,7 @@
   - `POOR`는 콤보를 끊지 않고 점수/정확도 집계에는 들어가지 않으며, gauge는 전용 `PR` 감소값을 사용
   - gameplay live input의 `ClockSync`는 큰 Windows QPC 절대값 대신 centered anchor 회귀를 사용하고, 연속 시계 이상치 뒤 자동 재기준화함
   - backlog stale 여부는 QPC 이벤트 나이와 `BAD` 창으로 판정하며, 실제로 fresh인 입력의 sample 매핑이 현재 playback anchor와 크게 어긋나면 anchor 값으로 복구해 비채점 catch-up 고정을 방지
-  - tail release timing은 osu hold와 BMS `#LNMODE 2` charge note에만 적용
+  - tail release timing은 BMS `#LNMODE 2` charge note에만 적용
   - 같은 키를 두 키보드가 동시에 눌러도 마지막 입력 소스가 해제될 때까지 논리적 `Pressed` 상태를 유지
 - Graphics:
   - resolution preset (`720p`, `1080p`, `qhd`, `native`)
@@ -124,14 +123,16 @@
   - VSync on: present refresh는 active monitor Hz를 따라가고 render pacing은 `monitor_hz * 2`를 목표로 함 (`1050` clamp)
   - `visual_offset_ms`
   - `performance_overlay`
-  - `background_upscale_mode=onnx|off`와 `background_upscale_model_path`: 기본값은 `off`; Graphics Settings에서 호환 ONNX를 선택하거나 드롭하며 공개 모델은 포함하지 않음
-  - 현재 지원 계약은 960x540 RGB residual x2이며 모델 권리·품질·성능은 사용자가 확인; 로드·계약·벤치마크·추론 실패 시 native scaling 유지
+  - `background_upscale_model_path`는 Graphics Settings에서 선택하거나 드롭한 호환 ONNX 경로만 저장하며 공개 모델은 포함하지 않음
+  - BGA Upscaler는 기본 `off`; 사용자가 명시적으로 켜고 고사양 경고를 확인해야 하며 자동 benchmark gate는 없음
+  - 현재 지원 계약은 960x540 RGB residual x2이며 모델 권리·품질·성능은 사용자가 확인; 로드·계약·decode·추론 실패 시 native scaling 유지
+  - `background_upscale_prefer_npu=true`는 업스케일러가 켜졌을 때만 WinML `DirectXMinPower` session을 먼저 요청하는 실험 옵션. 실제 NPU/GPU 선택은 Windows/driver가 결정하며, 생성 실패 시 기존 고성능 DirectX 경로와 일반 DirectX fallback을 사용
 - Gameplay performance:
   - static playfield command-list cache
   - note head/tail bitmap cache
   - fixed-size HUD note transport
 - Loading UX:
-  - Song Select indexing progress 표시
+  - Song Select 헤더 아래 중앙에 indexing stage/percent/processed/total/ETA/song count와 progress bar 표시
   - gameplay chart loading progress 표시
   - gameplay loading 중 `Esc` cancel
 - Profile UX:
@@ -174,13 +175,13 @@
   - peak memory 약 `working set 453MB`, `private 524MB`
   - 같은 라이브러리 1024-chart sample에서 fast profile throughput은 safe 대비 약 `2.05x`
 - cache schema:
-  - `version = 10`
-  - `include_osu` 포함
+  - `version = 11`
   - optional `layout_label` 포함
+  - `native_level`, `md5`, `sha256`와 난이도표 이름/심볼/레벨/정렬값 포함
 
 ## Runtime / Packaging Rules
 - 새 사용자 프로필은 자동 생성
-- 현재 정식 P2P 배포 라인은 `TenRiff 1.2.5 stable`
+- 현재 정식 P2P 배포 라인은 `TenRiff 1.2.6 stable`
 - 배포 패키지에는 `Songs`를 넣지 않음
 - 배포 패키지는 메뉴 BGM용 `Mainmusic/` 런타임 자산을 함께 포함
 - 배포 업데이트에는 built artifacts와 필요한 런타임 자산만 포함
@@ -194,9 +195,8 @@
 - keymap은 `profiles/<name>/keymap.json`
 - `keymap.json`은 `modes.{4k..10k}` per-mode binding 구조
 - stale profile은 runtime migration으로 일부 자동 보정됨
-  - BMS-first default
   - keysound policy
-  - osu key-mode mismatch 등
+  - 제거된 osu 설정 필드는 더 이상 저장하지 않음
 
 ## High-Value Files
 - `src/app/MenuApp.cpp`
@@ -229,7 +229,8 @@
 - gameplay low-FPS/0.1%/0.01% low 확인
 - OBS/Discord/Game Bar와 graphics live-apply 공존 확인
 - drag-and-drop / external Korean-path sources GUI 확인
-- 4K~10K `.osu` 실기 keymap 분리 확인
+- 실제 NPU 탑재 Windows PC에서 `NPU 우선(실험)` on/off와 WinML device fallback 확인
+- 로컬 난이도표 교체 후 해시 매칭·재인덱싱·표시 순서 GUI 확인
 - 서로 다른 두 Windows PC/LAN 및 공인 IP 포트 포워딩 환경의 P2P 실기 확인
 - Linux는 아직 실제 실행판이 아님
 

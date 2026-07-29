@@ -31,7 +31,6 @@ using tenriff::app::scan_songs;
 struct Options {
     fs::path songs_root;
     fs::path cache_path;
-    bool include_osu = false;
     bool full_index = false;
     std::size_t sample_count = 2048;
     std::optional<std::uint64_t> seed;
@@ -118,9 +117,8 @@ std::string stage_name(SongIndexProgressStage stage) {
     }
 }
 
-bool is_chart_extension(std::string_view lower_ext, bool include_osu) {
-    return lower_ext == ".bms" || lower_ext == ".bme" || lower_ext == ".bml" || lower_ext == ".pms" ||
-           (include_osu && lower_ext == ".osu");
+bool is_chart_extension(std::string_view lower_ext) {
+    return lower_ext == ".bms" || lower_ext == ".bme" || lower_ext == ".bml" || lower_ext == ".pms";
 }
 
 std::string normalize_profile(std::string value) {
@@ -135,7 +133,7 @@ std::string normalize_profile(std::string value) {
 
 void print_usage(const char* argv0) {
     std::cout << "Usage: " << (argv0 ? argv0 : "song_index_benchmark")
-              << " --songs-root <path> [--cache-path <path>] [--include-osu] [--full-index]"
+              << " --songs-root <path> [--cache-path <path>] [--full-index]"
               << " [--sample-count <n>] [--seed <u64>] [--profile safe|fast]\n";
 }
 
@@ -156,10 +154,6 @@ bool parse_options(int argc, char** argv, Options& options) {
                 return false;
             }
             options.cache_path = fs::u8path(argv[++i]);
-            continue;
-        }
-        if (arg == "--include-osu") {
-            options.include_osu = true;
             continue;
         }
         if (arg == "--full-index") {
@@ -247,7 +241,6 @@ void print_stage_report(const std::array<StageTiming, 3>& stages) {
 }
 
 CensusResult run_census(const fs::path& songs_root,
-                        bool include_osu,
                         std::size_t sample_count,
                         std::uint64_t seed) {
     CensusResult result;
@@ -296,7 +289,7 @@ CensusResult run_census(const fs::path& songs_root,
         }
 
         const std::string ext = to_lower_ascii(entry.path().extension().u8string());
-        if (!is_chart_extension(ext, include_osu)) {
+        if (!is_chart_extension(ext)) {
             it.increment(ec);
             continue;
         }
@@ -364,7 +357,6 @@ bool stage_sample_files(const std::vector<SampleCandidate>& samples, TempDirGuar
 
 int run_full_index_benchmark(const Options& options) {
     SongIndexOptions index_options;
-    index_options.include_osu = options.include_osu;
     index_options.profile =
         (normalize_profile(options.profile) == "fast") ? tenriff::app::SongIndexProfile::Fast
                                                        : tenriff::app::SongIndexProfile::Safe;
@@ -373,7 +365,6 @@ int run_full_index_benchmark(const Options& options) {
     std::cout << "mode: full-index\n";
     std::cout << "songs_root: " << options.songs_root.u8string() << '\n';
     std::cout << "cache_path: " << options.cache_path.u8string() << '\n';
-    std::cout << "include_osu: " << (options.include_osu ? "true" : "false") << '\n';
     std::cout << "profile: " << normalize_profile(options.profile) << '\n';
 
     const auto cold_load_begin = Clock::now();
@@ -453,7 +444,6 @@ int run_lightweight_benchmark(const Options& options) {
     const std::uint64_t seed = options.seed.value_or(
         static_cast<std::uint64_t>(std::chrono::high_resolution_clock::now().time_since_epoch().count()));
     SongIndexOptions index_options;
-    index_options.include_osu = options.include_osu;
     index_options.profile =
         (normalize_profile(options.profile) == "fast") ? tenriff::app::SongIndexProfile::Fast
                                                        : tenriff::app::SongIndexProfile::Safe;
@@ -461,12 +451,11 @@ int run_lightweight_benchmark(const Options& options) {
     std::cout << "mode: lightweight-census-sample\n";
     std::cout << "songs_root: " << options.songs_root.u8string() << '\n';
     std::cout << "cache_path: " << options.cache_path.u8string() << '\n';
-    std::cout << "include_osu: " << (options.include_osu ? "true" : "false") << '\n';
     std::cout << "profile: " << normalize_profile(options.profile) << '\n';
     std::cout << "sample_count: " << options.sample_count << '\n';
     std::cout << "seed: " << seed << '\n';
 
-    CensusResult census = run_census(options.songs_root, options.include_osu, options.sample_count, seed);
+    CensusResult census = run_census(options.songs_root, options.sample_count, seed);
     std::cout << "\ncensus:\n";
     std::cout << "  candidate_count: " << census.candidate_count << '\n';
     std::cout << "  scan_only_ms: " << std::fixed << std::setprecision(2) << census.elapsed_ms << '\n';

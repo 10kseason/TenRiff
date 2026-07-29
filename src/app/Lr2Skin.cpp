@@ -50,6 +50,7 @@ struct CustomFileSelection {
 struct Lr2ParseState {
     fs::path skin_dir;
     std::unordered_map<int, std::string> image_paths;
+    int next_image_index = 0;
     std::unordered_map<int, Lr2SourceSlice> note_slices;
     std::unordered_map<int, Lr2SourceSlice> hold_head_slices;
     std::unordered_map<int, Lr2SourceSlice> hold_body_slices;
@@ -557,10 +558,6 @@ bool parse_lr2_file(const fs::path& file_path, Lr2ParseState& state, bool is_top
 
     const fs::path current_dir = file_path.parent_path();
     std::vector<ConditionalFrame> conditionals;
-    int next_image_index = 0;
-    for (const auto& [index, _] : state.image_paths) {
-        next_image_index = (std::max)(next_image_index, index + 1);
-    }
 
     auto current_active = [&]() {
         return conditionals.empty() ? true : conditionals.back().current_active;
@@ -684,6 +681,10 @@ bool parse_lr2_file(const fs::path& file_path, Lr2ParseState& state, bool is_top
             if (tokens.size() < 2u) {
                 continue;
             }
+            // LR2 source commands address images by declaration order. Reserve the slot even
+            // when its file is missing, and share the counter across includes so a caller cannot
+            // reuse an index that an included file already consumed.
+            const int image_index = state.next_image_index++;
             const std::string image_token = normalize_lr2_token(tokens[1u]);
             const std::string customized_token = apply_custom_file_selection(state, image_token);
             std::string resolved_path;
@@ -699,7 +700,7 @@ bool parse_lr2_file(const fs::path& file_path, Lr2ParseState& state, bool is_top
                 }
             }
             if (!resolved_path.empty()) {
-                state.image_paths[next_image_index++] = resolved_path;
+                state.image_paths[image_index] = resolved_path;
             }
             continue;
         }

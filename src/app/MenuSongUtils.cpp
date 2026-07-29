@@ -3,16 +3,12 @@
 #include <algorithm>
 #include <cctype>
 #include <filesystem>
-#include <fstream>
 #include <optional>
-#include <sstream>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
-#include "app/OsuAssetPath.h"
 #include "chart/BmsParser.h"
-#include "chart/OsuManiaLoader.h"
 #include "util/Utf8Compat.h"
 
 namespace tenriff::app::menu_songs {
@@ -116,8 +112,7 @@ struct PreviewAssetLookupIndex {
 };
 
 void build_preview_asset_lookup(const std::filesystem::path& chart_path,
-                                PreviewAssetLookupIndex& lookup,
-                                bool restrict_to_chart_root) {
+                                 PreviewAssetLookupIndex& lookup) {
     if (lookup.built) {
         return;
     }
@@ -126,14 +121,7 @@ void build_preview_asset_lookup(const std::filesystem::path& chart_path,
     lookup.by_filename.clear();
 
     namespace fs = std::filesystem;
-    fs::path root = chart_path.parent_path();
-    if (restrict_to_chart_root) {
-        const auto canonical_root = osu_assets::canonical_chart_root(chart_path);
-        if (!canonical_root.has_value()) {
-            return;
-        }
-        root = *canonical_root;
-    }
+    const fs::path root = chart_path.parent_path();
     if (root.empty()) {
         return;
     }
@@ -162,17 +150,7 @@ void build_preview_asset_lookup(const std::filesystem::path& chart_path,
             continue;
         }
 
-        fs::path full;
-        if (restrict_to_chart_root) {
-            const auto contained = osu_assets::canonical_existing_file_in_chart_root(chart_path, entry.path());
-            if (!contained.has_value()) {
-                it.increment(ec);
-                continue;
-            }
-            full = *contained;
-        } else {
-            full = normalize_resolved_preview_path(entry.path());
-        }
+        const fs::path full = normalize_resolved_preview_path(entry.path());
         fs::path relative = fs::relative(full, root, ec);
         if (ec || relative.empty()) {
             ec.clear();
@@ -187,33 +165,19 @@ void build_preview_asset_lookup(const std::filesystem::path& chart_path,
 }
 
 std::optional<std::filesystem::path> lookup_preview_asset_candidate(const std::filesystem::path& chart_path,
-                                                                    const std::filesystem::path& ref_path,
-                                                                    PreviewAssetLookupIndex& lookup,
-                                                                    bool restrict_to_chart_root) {
+                                                                     const std::filesystem::path& ref_path,
+                                                                     PreviewAssetLookupIndex& lookup) {
     namespace fs = std::filesystem;
-    if (restrict_to_chart_root &&
-        !osu_assets::is_safe_relative_reference(ref_path.generic_u8string())) {
-        return std::nullopt;
-    }
     const fs::path direct = ref_path.is_absolute()
                                 ? ref_path.lexically_normal()
                                 : (chart_path.parent_path() / ref_path).lexically_normal();
-    if (restrict_to_chart_root) {
-        if (is_preview_image_extension(to_lower_ascii(direct.extension().u8string()))) {
-            if (auto contained = osu_assets::canonical_existing_file_in_chart_root(chart_path, direct);
-                contained.has_value()) {
-                return contained;
-            }
-        }
-    } else {
-        std::error_code ec;
-        if (!direct.empty() && fs::exists(direct, ec) && !ec &&
-            is_preview_image_extension(to_lower_ascii(direct.extension().u8string()))) {
-            return normalize_resolved_preview_path(direct);
-        }
+    std::error_code ec;
+    if (!direct.empty() && fs::exists(direct, ec) && !ec &&
+        is_preview_image_extension(to_lower_ascii(direct.extension().u8string()))) {
+        return normalize_resolved_preview_path(direct);
     }
 
-    build_preview_asset_lookup(chart_path, lookup, restrict_to_chart_root);
+    build_preview_asset_lookup(chart_path, lookup);
 
     const std::string relative_key = normalize_asset_lookup_key(ref_path.generic_u8string());
     auto relative_it = lookup.by_relative.find(relative_key);
@@ -276,16 +240,11 @@ std::vector<std::filesystem::path> build_preview_reference_candidates(const std:
 }
 
 std::optional<std::filesystem::path> resolve_preview_asset_path(const std::filesystem::path& chart_path,
-                                                                const std::string& reference,
-                                                                bool restrict_to_chart_root) {
+                                                                 const std::string& reference) {
     const std::string normalized = normalize_asset_reference(reference);
-    if (restrict_to_chart_root && !osu_assets::is_safe_relative_reference(normalized)) {
-        return std::nullopt;
-    }
     PreviewAssetLookupIndex lookup;
     for (const auto& candidate : build_preview_reference_candidates(normalized)) {
-        if (auto resolved =
-                lookup_preview_asset_candidate(chart_path, candidate, lookup, restrict_to_chart_root);
+        if (auto resolved = lookup_preview_asset_candidate(chart_path, candidate, lookup);
             resolved.has_value()) {
             return resolved;
         }
@@ -367,7 +326,7 @@ bool is_bms_chart_extension(std::string_view ext) {
 }
 
 bool is_supported_chart_extension(std::string_view ext) {
-    return is_bms_chart_extension(ext) || ext == ".osu";
+    return is_bms_chart_extension(ext);
 }
 
 std::optional<std::string> normalize_dropped_song_source(const std::string& raw_path) {
@@ -527,25 +486,13 @@ std::vector<std::string> build_chart_path_keys(const std::string& chart_path, co
     return keys;
 }
 
-std::string resolve_osu_background_preview_path(const std::filesystem::path& chart_path,
-                                                std::string_view background_filename) {
-    if (chart_path.empty() || background_filename.empty()) {
-        return {};
-    }
-    if (auto preview = resolve_preview_asset_path(chart_path, std::string(background_filename), true);
-        preview.has_value()) {
-        return preview->u8string();
-    }
-    return {};
-}
-
 std::string resolve_bms_background_preview_path(const std::filesystem::path& chart_path,
                                                 const chart::BmsChart& chart) {
     if (chart_path.empty()) {
         return {};
     }
     for (const auto& preview_reference : collect_bms_preview_references(chart)) {
-        if (auto preview = resolve_preview_asset_path(chart_path, preview_reference, false);
+        if (auto preview = resolve_preview_asset_path(chart_path, preview_reference);
             preview.has_value()) {
             return preview->u8string();
         }
@@ -561,19 +508,6 @@ std::string resolve_song_background_preview_path(const std::string& chart_path) 
     namespace fs = std::filesystem;
     const fs::path chart_fs_path = path_from_utf8(chart_path);
     const std::string chart_ext = to_lower_ascii(chart_fs_path.extension().u8string());
-
-    if (chart_ext == ".osu") {
-        std::ifstream file(chart_fs_path, std::ios::binary);
-        if (!file) {
-            return {};
-        }
-
-        std::ostringstream buffer;
-        buffer << file.rdbuf();
-        chart::OsuManiaLoader loader;
-        const auto parsed = loader.parse(buffer.str());
-        return resolve_osu_background_preview_path(chart_fs_path, parsed.chart.background_filename);
-    }
 
     if (!is_bms_chart_extension(chart_ext)) {
         return {};

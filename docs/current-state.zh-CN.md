@@ -3,20 +3,20 @@
 这份文档是下一位 agent 或新任务接手时应该最先阅读的当前状态文档。目标是快速说明“这个项目现在是什么、应该先看哪里、还有哪些内容尚未验证”。
 
 ## 基线
-- 当前项目版本为 `1.2.5 stable`
+- 当前项目版本为 `1.2.6 stable`
 - direct-IP multiplayer 与 preview r5 的输入 backend 生命周期修复已整合进 `1.1.8 stable`
 - `1.1.8` 在 1.1.7 视觉更新基础上加入 osu!mania OD8 辅助分数、首次原生 `BAD` 即结束的 `Sudden Death (1 MISS)`，以及确定性的 `LN Mix 10%～90%`
 - `1.2.0` 把 BMS 通道 `04/07` 和 osu!mania 背景接入 gameplay sample timeline，并通过 Windows ML 上的 LunaSR 异步放大低于 FHD 的图片背景
 - `1.2.1` 切换到 LunaSR `basic_v2`，对 gameplay BGA 和 Song Select 选中 BGI 进行放大，并加入单人 Esc 暂停菜单、多边形音符与 LN 尾帽开关。
 - `1.2.2` 将 procedural 圆形/多边形 skin 修正为与条形相同的 100% 宽度，加入带 FFmpeg 回退的 MPG/MPEG 视频 BGA，并将 LunaSR 切换到必须通过 200 FPS 基准门槛的 staged32 RGB FP16 模型。
-- `1.2.3` 将 LunaSR 固定 RGB x2 性能门槛从 200 FPS 降至 35 FPS。
+- `1.2.3` 放宽了当时的 LunaSR 固定 RGB x2 性能门槛。
 - `1.2.4` 从公开发布中移除权利边界不明确的 LunaSR ONNX 与模型专用 metadata，仅保留默认值为 `off` 的用户自备模型 opt-in 集成。
-- `1.2.5` 将带模型品牌的集成改为通用 External ONNX Upscaler，加入 Graphics Settings 文件选择/.onnx 拖放、profile 模型路径，以及按模型建立的 WinML session 与 35 FPS gate。
+- `1.2.5` 将带模型品牌的集成改为通用 External ONNX Upscaler，加入 Graphics Settings 文件选择/.onnx 拖放、profile 模型路径，以及按模型建立的 WinML session。
+- `1.2.6` 将可运行谱面限定为 BMS family，仅保留 native/LR2 skin，并加入 ONNX upscaler 手动启用、实验性 NPU 优先、Song Select Rate 调整、中央索引进度、local JSON 难度表及 BMS keysound late-input hotfix。
 - 后续工作的基准文档是 [`docs/baseline-1.1.2.zh-CN.md`](baseline-1.1.2.zh-CN.md)
 - Windows GUI 构建是主目标
-- Linux 仅存在 [`Baepoks-Linuxs/TenRiff-0.5.0-linux-preview`](../Baepoks-Linuxs/TenRiff-0.5.0-linux-preview) 级别的 preview
-- 默认表面是 BMS-first
-- `.osu` 可以通过选项重新启用，并支持 4K~10K
+- Linux 仅存在 `Baepoks-Linuxs/TenRiff-0.5.0-linux-preview` 级别的 preview
+- 支持的 chart surface 仅限 BMS family（`.bms/.bme/.bml/.pms`）
 - `1.2.4 stable` 的 gameplay 输入优先使用 RawInput，同时在同一 `InputThread` 中持续运行 bound-key polling shadow；启动失败或 message pump 意外退出时，会在不重置 queue/pressed state 的情况下把该 producer 切换到 Polling
 - menu 输入保持 foreground process/root-window 边界。检测到 RawInput 启动失败、process-global 注册目标丢失或 hidden message window 退出时，无需等待用户按键即可切换到 Polling。
 - 已确认的 fallback 不会改写 profile，并在本次应用运行期间持续用于 menu 与后续 gameplay；重启应用或明确更改 `Options -> Input Settings -> Backend` 后才会重试。
@@ -54,6 +54,7 @@
   - `follow`
   - `autoplay`
   - `ignore`
+  - 延迟到达的实时输入仍按原 sample timestamp 判定，但可听 keysound 的起点会固定到当前 writable-buffer 边界
 - BMS long note：
   - LN channel（`51`-`55`, `61`-`65`）
   - `#LNOBJ`
@@ -69,19 +70,18 @@
   - 鼠标滚轮移动
   - 左侧 `KEY` 快速过滤切换
   - 外部文件夹/BMS drag-and-drop
-  - 可通过 `Shift+F2` 文件选择或 drag-and-drop 将 `.osz` 安装到当前 songs source；安装后会启用 osu chart 并重新索引该 source
-  - OSZ 安装会先预检整个 archive，再通过 staging 解压并原子提交，不会覆盖已有文件夹，并将 `.osu` 的 background/audio/hitsound 引用限制在 chart 目录内
   - recent source 保存/重新打开
-  - BMS / OSU / All 过滤
   - difficulty/title 排序
-- osu!mania：
-  - 4K~10K 读取/运行
+  - search 未激活时可用 `-`/`+` 调整当前 play Rate
+  - 索引时在 header 下方中央显示 stage、percentage、processed/total、ETA、song count 与 progress bar
+  - Browse 可选择 local difficulty-table header JSON；通过 MD5/SHA-256 匹配 level/symbol，更换后会重新索引
+- BMS key mode：
   - 按 key mode 分开的 keymap
-  - 4K~10K chart difficulty 计算
+  - 对支持 key count 进行 chart difficulty 计算
   - `mode.key_mode` 通过 N2NC 风格的 lane remap 进行键数变换
   - `mode.key_mode=none` 表示保持谱面的原始键数与基础 pattern 布局不变
 - Native difficulty：
-  - BMS/osu!mania 的 LV/CR 计算仅将 long-note Head/Tail 的 miss-ms 按 0.5倍评估，使 `300ms`按`150ms`处理；实际 gameplay 判定范围保持不变
+  - BMS 的 LV/CR 计算仅将 long-note Head/Tail 的 miss-ms 按 0.5倍评估，使 `300ms`按`150ms`处理；实际 gameplay 判定范围保持不变
 - Lane transform：
   - Random 支持 `Off / Mirror / FR / SR`；Mirror 在 key-mode 变换后反转最终 lane，10K/16K 则在每个 player half 内独立反转
   - Mod Manager 的 `LN Mix 10%～90%` 会保留已有 hold，排除与同 lane 已有 span 重叠的 head，并通过 `Random Seed` 从既能形成至少 50ms hold、又能在下一音符前保留 50ms 间隔的 tap 中确定性选择指定比例
@@ -91,9 +91,8 @@
   - combo Y 调整
   - judge line / lane width / lane spacing / note width / divider width / 16K center gap / note height 调整
   - 会按 key mode 保存单独的 lane 宽度数组和 lane 间距数组，并在 preview、实际 gameplay、ghost field 中共用同一套布局计算
-  - 可在 Skins 页面通过文件选择或 drag-and-drop 将 `.osk` 安装到当前 profile 的 `skins`，并使用与 OSZ 相同的 transactional/no-overwrite 策略
-  - 将受支持的 osu!mania note/LN 图片以及 `ColumnWidth`、`ColumnSpacing`、`ColumnLineWidth`、`HitPosition` 应用到 gameplay 布局
-  - archive 中所有有效文件都会保留，但 TenRiff 不会对尚未支持的 osu! mode 或 UI asset 做 pixel-perfect 还原
+  - 支持的 skin route 仅有 `native` 与 LR2 playskin；可在 Skins 中选择或拖入 LR2 folder 并导入当前 profile
+  - 将 LR2 note/LN 图片、lane gap 与 destination size 应用到 gameplay 布局
   - `skin.lr2_resolution_mode` 以 `auto / sd / hd / fhd` 保存 LR2 playskin 的分辨率 override token
   - LR2 auto-detect 以 playskin `#DST_NOTE` 的坐标范围而不是 asset 名称来判断 SD/HD/FHD family
   - future note 的上方进入 easing
@@ -106,11 +105,11 @@
   - 非消耗型的超早输入会按 LR2 风格记为 `POOR`，并重新出现在结果 / replay / UI 中
   - `POOR` 不会断 combo，不计入 score / accuracy 总数，并使用独立的 `PR` gauge 损失值
   - gauge 模式支持 `EX-Hard / Hard / Normal / Easy`，全部从 `100%` 开始，并在 `0%` 时立即失败
-  - `Sudden Death (1 MISS)` 会在首次 osu!mania OD8 对象 `MISS` 时立即失败；仅原生 `BAD` timing 不会触发，空按产生的 `POOR` 也不触发，并且该选项与 Practice No-Fail 互斥
+  - `Sudden Death (1 MISS)` 会在首次 OD8 换算对象 `MISS` 时立即失败；仅原生 `BAD` timing 不会触发，空按产生的 `POOR` 也不触发，并且该选项与 Practice No-Fail 互斥
   - Gameplay 与 Result 会显示按 osu!mania stable OD8 判定窗和 ScoreV1（最高 1,000,000）换算真实输入 timing 的辅助 `OSU OD8` 分数；TenRiff 原生分数与排名保持不变
   - live gameplay 的 `ClockSync` 使用 centered anchor regression，避免大型 Windows QPC 绝对值造成精度损失，并在持续 clock discontinuity 后自动 rebase
   - stale backlog 按 QPC event age 与 `BAD` window 判定；若 fresh input 的 sample mapping 与当前 playback anchor 偏差过大，则 fallback 到 anchor
-  - tail release timing 仅适用于 osu hold 与 BMS `#LNMODE 2` charge note
+  - tail release timing 仅适用于 BMS `#LNMODE 2` charge note
   - 当两把键盘同时按住同一个键时，逻辑 `Pressed` 状态会一直保持到最后一个输入源释放为止
 - Graphics：
   - 分辨率预设（`720p`、`1080p`、`qhd`、`native`）
@@ -119,14 +118,16 @@
   - VSync on：present refresh 跟随活动显示器 Hz，render pacing 目标为 `monitor_hz * 2`（上限 `1050`）
   - `visual_offset_ms`
   - `performance_overlay`
-  - `background_upscale_mode=onnx|off` 与 `background_upscale_model_path`：默认值为 `off`；可在 Graphics Settings 选择或拖入兼容 ONNX；公开包不包含模型
-  - 当前契约为 960x540 RGB residual x2；用户负责模型权利、质量和性能，加载、契约、基准或推理失败时保持 native scaling
+  - `background_upscale_model_path` 只保存从 Graphics Settings 选择或拖入的兼容 ONNX 路径；公开包不包含模型
+  - BGA Upscaler 默认为 `off`；用户必须明确开启并确认 high-spec warning，不存在自动 benchmark gate
+  - 当前契约为 960x540 RGB residual x2；用户负责模型权利、质量和性能，加载、契约、decode 或推理失败时保持 native scaling
+  - 实验性 `background_upscale_prefer_npu=true` 仅在 upscaler 开启时优先请求 WinML `DirectXMinPower` session。实际使用 NPU 或 GPU 由 Windows/driver 决定；session 创建失败时会回退到现有 high-performance DirectX route 与普通 DirectX fallback
 - Gameplay performance：
   - static playfield command-list cache
   - note head/tail bitmap cache
   - fixed-size HUD note transport
 - Loading UX：
-  - Song Select indexing progress
+  - 在 Song Select header 下方中央显示 indexing stage/percentage/processed/total/ETA/song count 与 progress bar
   - gameplay chart loading progress
   - gameplay loading 时 `Esc` 取消
 - Profile UX：
@@ -156,13 +157,13 @@
   - 峰值内存大约为 `working set 453MB`、`private 524MB`
   - 同一库 1024-chart sample 下，fast profile 吞吐量约为 safe 的 `2.05x`
 - cache schema：
-  - `version = 10`
-  - 包含 `include_osu`
+  - `version = 11`
   - 可选包含 `layout_label`
+  - 包含 `native_level`、`md5`、`sha256` 及 difficulty-table name/symbol/level/order metadata
 
 ## 运行时 / 打包规则
 - 新用户 profile 会自动创建
-- 当前正式 P2P 发布线为 `TenRiff 1.2.5 stable`
+- 当前正式 P2P 发布线为 `TenRiff 1.2.6 stable`
 - 发布包不包含 `Songs`
 - 发布包会同时包含用于菜单 BGM 的 `Mainmusic/` 运行时资源
 - 发布更新只包含已构建产物和必要的运行时资源
@@ -176,9 +177,8 @@
 - keymap 位于 `profiles/<name>/keymap.json`
 - `keymap.json` 采用 `modes.{4k..10k}` 的 per-mode binding 结构
 - stale profile 会通过 runtime migration 自动修正部分值
-  - BMS-first default
   - keysound policy
-  - osu key-mode mismatch 等
+  - 已移除的 osu 字段不再保存
 
 ## 高价值文件
 - `src/app/MenuApp.cpp`
@@ -207,7 +207,8 @@
 - gameplay 的 low-FPS / 0.1% / 0.01% low 确认
 - OBS/Discord/Game Bar 与 graphics live-apply 的共存确认
 - drag-and-drop / 外部 Korean-path sources 的 GUI 确认
-- 4K~10K `.osu` 在实机上的 keymap 分离确认
+- 在真实 NPU Windows PC 上确认 `NPU 优先（实验）` on/off 与 WinML device fallback
+- 更换 local 难度表后确认 hash matching、reindex 与显示顺序
 - Linux 目前仍不是真实可运行版本
 
 ## 最适合接着看的文档

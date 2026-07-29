@@ -22,6 +22,15 @@ inline int64_t chart_audio_playback_duration_frames(int64_t source_frames, doubl
     return (std::max)(int64_t{1}, static_cast<int64_t>(std::ceil(scaled_frames)));
 }
 
+// Judgement keeps the original input timestamp, but a sound triggered by that
+// input cannot be written into an audio buffer that has already been submitted.
+// Pin only the audible trigger to the current buffer so short keysounds are not
+// skipped in full when the playback head trails the write cursor.
+inline int64_t pin_realtime_audio_start_sample(int64_t event_sample,
+                                               int64_t buffer_start_sample) {
+    return (std::max)(int64_t{0}, (std::max)(event_sample, buffer_start_sample));
+}
+
 inline int64_t mix_chart_audio_clip_linear(const std::vector<float>& source,
                                            int64_t voice_start_sample,
                                            double playback_rate,

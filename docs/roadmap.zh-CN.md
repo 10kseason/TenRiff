@@ -4,8 +4,8 @@
 
 ## 当前基线
 - Windows GUI/runtime 是主要受支持路径。
-- 项目版本线是 `1.2.5 stable`；公开包不附带任何 upscaler 模型，通用 External ONNX Upscaler 默认值为 `off`，并要求兼容且权利已厘清的模型通过 35 FPS 门槛。
-- 默认启用 BMS-first 的菜单/runtime，同时可以通过 config/menu 开关启用 4K-10K `.osu` 支持。
+- 项目版本线是 `1.2.6 stable`；公开包不附带任何 upscaler 模型。选择兼容且权利已厘清的 ONNX 只会保存路径，BGA Upscaler 会一直保持 off，直到用户手动开启并确认 high-spec warning；不存在自动 benchmark gate。
+- 当前菜单/runtime 仅支持 BMS family（`.bms/.bme/.bml/.pms`）与 native/LR2 skin。
 - 关于当前已发布的行为，请先看 [`docs/current-state.zh-CN.md`](current-state.zh-CN.md)；这份路线图主要讲方向和剩余工作。
 
 ## 0) 先修骨架与主时钟
@@ -29,10 +29,10 @@
 - 做一个最小 BMS loader（只保留必要 channel）→ note scheduling → judgement → result screen。
 - 通过音频引擎调度 preview audio（不要在 UI 线程直接播放），并在 Song Select 期间预加载 keysounds。
 
-## 1.5) 同时支持 BMS 和 osu! 谱面
-- 另外加入 osu! beatmap（mania）loader，与 BMS 共享规范化后的事件模型。
-- 保持 scheduling/judgement 路径统一，让 chart format 的差异只停留在加载阶段。
-- 在 song select 中暴露 format selection，并确保 replay/result 画面显示来源格式。
+## 1.5) 加固 BMS-only 谱面支持
+- 之前的 multi-format 方向在当前 release line 已 superseded；loading、indexing、replay、result 与 difficulty-table 都聚焦 BMS family。
+- 不重新引入 archive 或其他格式 import path，继续强化真实曲包的 encoding、keysound、BGA、long note 与 lane layout 兼容性。
+- optional integration 继续采用 user-supplied、明确启用前保持 disabled、失败时可安全回到 native behavior 的边界。
 
 ## 2) Key remap + 8K/10K modes
 - ✅ 按“重映射 UI 流程”规格实现 key remapping UI（包括 NKRO 测试）。

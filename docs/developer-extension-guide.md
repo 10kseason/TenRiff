@@ -155,9 +155,7 @@ Language: Korean | [English](developer-extension-guide.en.md) | [简体中文](d
 - `tests/unit/test_replay_export.cpp`
   - replay/result JSON 필드와 복원 가능성을 검증합니다.
 - `tests/smoke/bms_mode_smoke.cpp`
-  - 실제 차트에서 mode 조합과 lane 변형이 깨지지 않는지 확인합니다.
-- `tests/smoke/n2nc_compare_smoke.cpp`
-  - 키 모드 변환이 기대한 lane remap과 맞는지 비교합니다.
+  - 실제 BMS 차트에서 mode 조합, lane 변형, 기대한 lane remap이 깨지지 않는지 확인합니다.
 
 문서 동기화는 보통 `docs/current-state.md`, `docs/config.md`, `docs/README.md`, 그리고 필요하면 새 기능 문서 순서로 생각합니다. 이번 턴처럼 문서만 추가할 때는 새 개발자 가이드 파일들을 먼저 만들고, 이후 코드 변경이 생기면 현재 상태 문서를 따로 갱신하는 방식이 안전합니다.
 

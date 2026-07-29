@@ -2,21 +2,20 @@
 
 Language: [한국어](README.md) | [English](README.en.md) | [简体中文](README.zh-CN.md) | [日本語](README.ja.md)
 
-TenRiff is a Windows GUI-based BMS-first rhythm game runtime/launcher. The current stable version is `1.2.5`. Graphics Settings can select or accept a dropped rights-cleared external ONNX upscaler for BGA/BGI images. Public packages contain no model and default to `off`. The current contract is fixed 960x540 RGB residual x2; benchmark, load, contract, or inference failure keeps native scaling. The project uses the MIT License, and bundled third-party notices are collected in [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
+TenRiff is a Windows GUI BMS rhythm-game runtime/launcher. The current stable version is `1.2.6`, and chart input is limited to the BMS family (`.bms/.bme/.bml/.pms`). Graphics Settings lets users select a rights-cleared external ONNX model, then explicitly enable `BGA Upscaler` and accept a high-spec warning. Public packages contain no model and the feature defaults to `off`; there is no performance benchmark gate, and load, contract, or inference failure keeps native scaling. Experimental `Prefer NPU` asks Windows ML for a low-power device while ONNX is active, but Windows and the driver choose the actual device; session failure falls back to the high-performance DirectX path. The project uses the MIT License, and bundled third-party notices are collected in [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
 
-This README is an introduction that explains "what to look at first when you open the project." For current behavior, the `1.2.5` project state, the `1.1.2 final stable` baseline, configuration, and design documents, continue from [`docs/README.en.md`](docs/README.en.md).
+This README is an introduction that explains "what to look at first when you open the project." For current behavior, the `1.2.6` project state, the `1.1.2 final stable` baseline, configuration, and design documents, continue from [`docs/README.en.md`](docs/README.en.md).
 
 TenRiff should also be read as a `vibe coding` work: it was shaped through fast iteration and experimentation rather than only through a traditional long-form design-first process.
 
 ## Project At a Glance
 
 - Primary target platform: Windows
-- Default chart surface: BMS-first
-- Optional supported charts: `.osu` osu!mania 4K-10K
+- Supported charts: BMS-family only (`.bms/.bme/.bml/.pms`)
 - Graphics path: D3D11 + Direct2D/DirectWrite
 - Audio path: WASAPI
 - Input path: RawInput or high-rate polling
-- Direct-IP multiplayer: one host plus one joiner over TCP (default `27300/TCP`; see [usage](docs/multiplayer.en.md))
+- Direct-IP multiplayer: one host plus one joiner over TCP (default `27300/TCP`; see [usage](docs/multiplayer.md))
 - License: [MIT](LICENSE)
 - Third-party notices: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
 - Release changelog: [CHANGELOG.md](CHANGELOG.md)
@@ -52,15 +51,16 @@ The codebase is currently at the level where you can "open the menu, choose a so
   - MP3 via Windows Media Foundation fallback
   - `ffmpeg.exe` fallback when needed
   - `follow / autoplay / ignore` keysound mode
+  - Late real-time inputs keep their judgement timestamp while only the audible trigger is pinned to the current writable buffer boundary, preventing short keysounds from being skipped completely
 - Song Select
   - Cache-first loading
-  - `F5` forced reindexing
+  - `F5` forced reindexing with centered stage / percent / ETA progress
   - Search, key-count filtering, difficulty filtering
   - `LV ASC/DESC`, `TITLE A-Z/Z-A` sorting
   - External folder / BMS drag-and-drop
-  - `Shift+F2` file selection or drag-and-drop installs `.osz` into the active songs source, enables osu charts, and reindexes
   - Recent source persistence / reopening
-  - `BMS / OSU / All` filtering
+  - `-` / `+` adjusts the next-play Rate immediately
+  - Browse can select a local BMS difficulty-table JSON and apply table levels to MD5/SHA-256 matches
 - Gameplay / HUD
   - Real-time HUD
   - Staged chart-loading progress
@@ -73,9 +73,8 @@ The codebase is currently at the level where you can "open the menu, choose a so
   - Hi-Speed, Rate, gauge, audio, input, and graphics settings
   - Judgement-line position, note size, and lane color editing in the `Skins` screen
   - `5K`-`10K` lane color editing with a live preview
-  - `.osk` file selection or drag-and-drop installs a skin into the active profile
-  - Applies supported osu!mania note/LN images plus `ColumnWidth`, `ColumnSpacing`, `ColumnLineWidth`, and `HitPosition`
-  - OSK/OSZ packages are preflighted and staged without overwriting existing folders; chart asset references are contained inside the installed beatmap folder
+  - Native vector and LR2 playskins only
+  - LR2 skin-folder selection or drag-and-drop copies into the active profile and imports note, LN, lane-gap, and destination-size data
 - Results / local records
   - Result screen
   - Replay / result JSON export
@@ -88,7 +87,7 @@ The project is usable, but it is not yet a fully finished product.
 
 - Windows GUI is the main path.
 - Linux GUI/audio/input backends are still incomplete.
-- osu skin import applies the osu!mania gameplay elements TenRiff supports; it does not claim pixel-perfect rendering of every osu! mode and UI asset.
+- LR2 playskin import ports supported gameplay elements; it does not claim pixel-perfect reproduction of the full LR2 UI.
 - Some GUI paths are validated primarily through build/tests, and manual in-game verification still remains.
 - Older design documents and the current implementation may differ in places, so the current-state document should always be consulted first.
 

@@ -47,7 +47,10 @@ std::string song_group_section_label(MenuApp::SongGroupMode mode, const SongEntr
             return !artist.empty() ? artist : (korean ? "아티스트 미상" : "UNKNOWN ARTIST");
         }
         case MenuApp::SongGroupMode::Level:
-            return entry.level > 0 ? ("LV " + std::to_string(entry.level)) : std::string("LV ?");
+            if (const std::string label = song_difficulty_label(entry); !label.empty()) {
+                return label;
+            }
+            return "LV ?";
         case MenuApp::SongGroupMode::Folder: {
             const std::string folder = song_group_folder_label(entry);
             return !folder.empty() ? folder : (korean ? "루트" : "ROOT");
@@ -98,6 +101,10 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
         if (to_lower_ascii(config_.ui.song_collection_filter) != "all") {
             parts.push_back(ui_text("COL ", "컬렉션 ") + song_collection_filter_label());
         }
+        if (!config_.ui.difficulty_table_path.empty()) {
+            parts.push_back(ui_text("TABLE ", "난이도표 ") +
+                            safe_ui_text(filename_only(config_.ui.difficulty_table_path), "JSON"));
+        }
         if (parts.empty()) {
             return ui_text("NO FILTER", "필터 없음");
         }
@@ -124,6 +131,7 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
         safe_ui_text(menu_songs::song_source_display_name(songs_path_), ui_text("Songs", "곡"));
     render.song_select.current_source_path = safe_ui_text_or_placeholder(songs_path_, "<invalid path>");
     render.song_select.index_profile_label = ui_song_index_profile_label(config_.mode.song_index_profile);
+    render.song_select.background_upscale_prefer_npu = config_.graphics.background_upscale_prefer_npu;
     render.song_select.group_summary = song_group_detail_label(song_group_mode_, korean);
     render.song_select.browser_summary = browser_summary();
     const std::string input_backend_label = current_input_backend_status_label();
@@ -151,13 +159,13 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
             ? ui_text("ESC / BACKSPACE  BACK TO MULTIPLAYER LOBBY",
                       "ESC / BACKSPACE  멀티플레이 로비로 돌아가기")
             : (render.song_select.showing_sources
-            ? ui_text("LEFT/RIGHT NAV     BACKSPACE BACK     F2 FOLDER     SHIFT+F2 OSZ     F5 REINDEX     F1 HELP",
-                      "좌/우 탐색     BACKSPACE 뒤로     F2 폴더     SHIFT+F2 OSZ     F5 재인덱스     F1 도움말")
+            ? ui_text("LEFT/RIGHT NAV     BACKSPACE BACK     F2 FOLDER     -/+ RATE     F5 REINDEX     F1 HELP",
+                      "좌/우 탐색     BACKSPACE 뒤로     F2 폴더     -/+ 배속     F5 재인덱스     F1 도움말")
             : (render.song_select.showing_records
                    ? ui_text("LEFT/RIGHT  NAV FOCUS     BACKSPACE  BACK     ESC  TITLE     F1  HELP",
                              "좌/우  탐색 전환     BACKSPACE  뒤로     ESC  타이틀     F1  도움말")
-                   : ui_text("LEFT/RIGHT NAV     ENTER SEARCH     F2 FOLDER     SHIFT+F2 OSZ     F5 REINDEX     F1 HELP",
-                             "좌/우 탐색     ENTER 검색     F2 폴더     SHIFT+F2 OSZ     F5 재인덱스     F1 도움말")));
+                   : ui_text("LEFT/RIGHT NAV     ENTER SEARCH     F2 FOLDER     -/+ RATE     F5 REINDEX     F1 HELP",
+                             "좌/우 탐색     ENTER 검색     F2 폴더     -/+ 배속     F5 재인덱스     F1 도움말")));
 
     const std::string source_detail =
         std::to_string(render.song_select.source_count) + " " +
@@ -289,7 +297,7 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
         if (total_sources == 0) {
             render.song_select.empty_title = ui_text("NO SONG SOURCES", "불러온 곡 소스 없음");
             render.song_select.empty_message =
-                ui_text("Use SOURCES > Add Songs Folder, press F2, or drop a folder/OSZ package onto the window.",
+                ui_text("Use SOURCES > Add Songs Folder, press F2, or drop a folder onto the window.",
                         "SOURCES > 폴더 추가를 사용하거나 F2를 누르거나, 폴더를 창에 드래그 앤 드롭하세요.");
         }
     } else if (render.song_select.showing_records) {
@@ -360,6 +368,7 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
                 card.background_path = song_background_preview_path_for_entry(*entry);
                 const BestResultRecord best = best_result_for_song_entry(*entry);
                 card.lamp = best.has_value ? best.clear_status : std::string{};
+                card.level_label = song_difficulty_label(*entry);
                 card.level = entry->level;
                 card.rating = entry->rating;
                 card.song_index = i;
@@ -387,7 +396,7 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
             } else {
                 render.song_select.empty_title = ui_text("NO CHARTS INDEXED", "인덱싱된 차트 없음");
                 render.song_select.empty_message =
-                    ui_text("Use SOURCES > Add Songs Folder, press F2, or drop a songs folder/OSZ package. Then use F5 to reindex.",
+                    ui_text("Use SOURCES > Add Songs Folder, press F2, or drop a songs folder. Then use F5 to reindex.",
                             "SOURCES > 폴더 추가를 사용하거나 F2를 누르거나 곡 폴더를 드래그 앤 드롭한 뒤 F5로 재인덱스하세요.");
             }
         }
@@ -507,11 +516,21 @@ void MenuApp::populate_song_browser_render_data(render::MenuRenderData& render) 
                     false,
                     true);
     append_menu_row(render.generic,
-                    ui_text("Collection Filter", "컬렉션 필터"),
-                    song_collection_filter_label(),
+                    ui_text("Difficulty Table", "난이도표"),
+                    config_.ui.difficulty_table_path.empty()
+                        ? ui_text("Native LV", "기본 LV")
+                        : safe_ui_text(filename_only(config_.ui.difficulty_table_path), "JSON"),
                     settings_cursor_ == 5,
                     render::MenuHitTargetKind::SettingsRow,
                     5,
+                    false,
+                    true);
+    append_menu_row(render.generic,
+                    ui_text("Collection Filter", "컬렉션 필터"),
+                    song_collection_filter_label(),
+                    settings_cursor_ == 6,
+                    render::MenuHitTargetKind::SettingsRow,
+                    6,
                     false,
                     true);
     const std::string named_collection = current_named_song_collection();
@@ -524,33 +543,33 @@ void MenuApp::populate_song_browser_render_data(render::MenuRenderData& render) 
                                   selected_song_is_in_collection(named_collection) ? "컬렉션에 포함됨" : "컬렉션에 없음")
                         : ui_text(selected_song_is_favorite() ? "Favorite" : "Not Favorite",
                                   selected_song_is_favorite() ? "페이보릿" : "페이보릿 아님"),
-                    settings_cursor_ == 6,
-                    render::MenuHitTargetKind::SettingsRow,
-                    6,
-                    true,
-                    false);
-    append_menu_row(render.generic,
-                    ui_text("New Collection", "새 컬렉션"),
-                    current_named_song_collection().empty() ? ui_text("Create", "생성") : current_named_song_collection(),
                     settings_cursor_ == 7,
                     render::MenuHitTargetKind::SettingsRow,
                     7,
                     true,
                     false);
     append_menu_row(render.generic,
-                    ui_text("Clear Filters", "필터 지우기"),
-                    "",
+                    ui_text("New Collection", "새 컬렉션"),
+                    current_named_song_collection().empty() ? ui_text("Create", "생성") : current_named_song_collection(),
                     settings_cursor_ == 8,
                     render::MenuHitTargetKind::SettingsRow,
                     8,
                     true,
                     false);
     append_menu_row(render.generic,
-                    ui_text("Back", "뒤로"),
+                    ui_text("Clear Filters", "필터 지우기"),
                     "",
                     settings_cursor_ == 9,
                     render::MenuHitTargetKind::SettingsRow,
                     9,
+                    true,
+                    false);
+    append_menu_row(render.generic,
+                    ui_text("Back", "뒤로"),
+                    "",
+                    settings_cursor_ == 10,
+                    render::MenuHitTargetKind::SettingsRow,
+                    10,
                     true,
                     false);
 
@@ -558,8 +577,9 @@ void MenuApp::populate_song_browser_render_data(render::MenuRenderData& render) 
                                            "검색은 Song Select에 있습니다. 제목, 아티스트, 경로 검색은 SEARCH 항목을 사용하세요."));
     render.generic.notes.push_back(ui_text("Sort and Group moved here so the left rail only separates Songs, Sources, Search, Filter, Records, and Options.",
                                            "왼쪽 레일이 곡/소스/검색/필터/기록/옵션만 남도록 정렬과 그룹을 이 화면으로 옮겼습니다."));
-    render.generic.notes.push_back(ui_text("Difficulty filters apply to indexed LV values only.",
-                                           "난이도 필터는 인덱싱된 LV 값에만 적용됩니다."));
+    render.generic.notes.push_back(ui_text(
+        "Difficulty Table selects a local standard BMS table header JSON. Right/Enter chooses a file; Left clears it. Matching levels drive badges, grouping, sorting, and numeric filters.",
+        "난이도표는 로컬 표준 BMS 난이도표 헤더 JSON을 선택합니다. 오른쪽/Enter로 선택하고 왼쪽으로 해제합니다. 일치한 레벨은 배지·그룹·정렬·숫자 필터에 연동됩니다."));
     render.generic.notes.push_back(ui_text("Collection Filter cycles All, Favorites, and any named collections you created.",
                                            "컬렉션 필터는 전체, 페이보릿, 생성한 컬렉션들을 순환합니다."));
     render.generic.notes.push_back(ui_text("Toggle Favorite works from All/Favorites. When a named collection is selected it toggles membership in that collection.",
