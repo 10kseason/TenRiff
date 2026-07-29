@@ -3,7 +3,6 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
-#include <chrono>
 #include <condition_variable>
 #include <cctype>
 #include <deque>
@@ -40,8 +39,6 @@ namespace {
 constexpr std::uint32_t kModelInputWidth = 960;
 constexpr std::uint32_t kModelInputHeight = 540;
 constexpr std::size_t kCachedFrameLimit = 3;
-constexpr int kBenchmarkWarmupFrames = 3;
-constexpr int kBenchmarkTimedFrames = 12;
 
 std::string lower_ascii(std::string_view value) {
     std::string result(value);
@@ -49,30 +46,6 @@ std::string lower_ascii(std::string_view value) {
         return static_cast<char>(std::tolower(ch));
     });
     return result;
-}
-
-struct ProcessBenchmarkGate {
-    std::mutex mutex;
-    std::condition_variable changed;
-    OnnxUpscaleBenchmarkState state = OnnxUpscaleBenchmarkState::Pending;
-    double fps = 0.0;
-    std::string detail;
-};
-
-std::shared_ptr<ProcessBenchmarkGate> process_benchmark_gate(std::string_view model_key) {
-    static std::mutex gates_mutex;
-    static std::unordered_map<std::string, std::shared_ptr<ProcessBenchmarkGate>> gates;
-    std::lock_guard<std::mutex> lock(gates_mutex);
-    auto& gate = gates[std::string(model_key)];
-    if (!gate) {
-        gate = std::make_shared<ProcessBenchmarkGate>();
-    }
-    return gate;
-}
-
-OnnxUpscaleBenchmarkStatus benchmark_status_snapshot(ProcessBenchmarkGate& gate) {
-    std::lock_guard<std::mutex> lock(gate.mutex);
-    return OnnxUpscaleBenchmarkStatus{gate.state, gate.fps, gate.detail};
 }
 
 #ifdef _WIN32
@@ -350,87 +323,13 @@ std::vector<std::uint8_t> compose_onnx_residual_bgra(
     return output;
 }
 
-bool pass_process_benchmark_gate(
-    const winrt::Windows::AI::MachineLearning::LearningModelSession& session,
-    ProcessBenchmarkGate& gate) {
-    {
-        std::unique_lock<std::mutex> lock(gate.mutex);
-        if (gate.state == OnnxUpscaleBenchmarkState::Passed) {
-            return true;
-        }
-        if (gate.state == OnnxUpscaleBenchmarkState::Failed) {
-            return false;
-        }
-        if (gate.state == OnnxUpscaleBenchmarkState::Running) {
-            gate.changed.wait(lock, [&gate]() {
-                return gate.state != OnnxUpscaleBenchmarkState::Running;
-            });
-            return gate.state == OnnxUpscaleBenchmarkState::Passed;
-        }
-        gate.state = OnnxUpscaleBenchmarkState::Running;
-        gate.detail = "Benchmarking fixed 960x540 RGB x2 inference.";
-    }
-
-    double fps = 0.0;
-    std::string detail;
-    bool passed = false;
-    try {
-        namespace ml = winrt::Windows::AI::MachineLearning;
-        const std::vector<std::int64_t> input_shape{1, 3, kModelInputHeight, kModelInputWidth};
-        const std::vector<std::int64_t> output_shape{1, 3, kOnnxUpscaleTargetHeight, kOnnxUpscaleTargetWidth};
-        std::vector<float> input(static_cast<std::size_t>(kModelInputWidth) *
-                                 kModelInputHeight * 3,
-                                 0.5f);
-        const ml::TensorFloat input_tensor =
-            ml::TensorFloat::CreateFromArray(input_shape, input);
-        const ml::TensorFloat output_tensor = ml::TensorFloat::Create(output_shape);
-        ml::LearningModelBinding binding(session);
-        binding.Bind(L"rgb_lr", input_tensor);
-        binding.Bind(L"rgb_residual_x2", output_tensor);
-        for (int frame = 0; frame < kBenchmarkWarmupFrames; ++frame) {
-            session.Evaluate(binding, L"tenriff-onnx-upscaler-benchmark-warmup");
-        }
-        const auto started = std::chrono::steady_clock::now();
-        for (int frame = 0; frame < kBenchmarkTimedFrames; ++frame) {
-            session.Evaluate(binding, L"tenriff-onnx-upscaler-benchmark");
-        }
-        const auto finished = std::chrono::steady_clock::now();
-        const double elapsed_seconds =
-            std::chrono::duration<double>(finished - started).count();
-        if (elapsed_seconds > 0.0) {
-            fps = static_cast<double>(kBenchmarkTimedFrames) / elapsed_seconds;
-        }
-        passed = OnnxBackgroundUpscaler::meets_performance_gate(fps);
-        detail = passed
-                     ? "Fixed 960x540 RGB x2 inference passed the 35 FPS gate."
-                     : "Fixed 960x540 RGB x2 inference is below 35 FPS; the external ONNX upscaler is disabled.";
-    } catch (const winrt::hresult_error& error) {
-        detail = "WinML benchmark failed with HRESULT 0x" +
-                 std::to_string(static_cast<std::uint32_t>(error.code())) +
-                 "; the external ONNX upscaler is disabled.";
-    } catch (const std::exception& error) {
-        detail = std::string("WinML benchmark failed: ") + error.what() +
-                 "; the external ONNX upscaler is disabled.";
-    }
-
-    {
-        std::lock_guard<std::mutex> lock(gate.mutex);
-        gate.fps = fps;
-        gate.detail = detail;
-        gate.state = passed ? OnnxUpscaleBenchmarkState::Passed : OnnxUpscaleBenchmarkState::Failed;
-    }
-    gate.changed.notify_all();
-    std::cerr << "[ONNX Upscaler] benchmark=" << fps << " FPS, required="
-              << kOnnxUpscaleMinimumBenchmarkFps << " FPS: " << detail << '\n';
-    return passed;
-}
 #endif
 
 }  // namespace
 
 struct OnnxBackgroundUpscaler::Impl {
     std::string model_path;
-    std::shared_ptr<ProcessBenchmarkGate> benchmark_gate;
+    bool prefer_npu = true;
     std::mutex mutex;
     std::condition_variable wake;
     std::thread worker;
@@ -447,9 +346,9 @@ struct OnnxBackgroundUpscaler::Impl {
     std::unordered_map<std::string, std::shared_ptr<const OnnxUpscaleFrame>> cache;
     std::deque<std::string> cache_lru;
 
-    explicit Impl(std::string configured_model_path)
+    explicit Impl(std::string configured_model_path, bool configured_prefer_npu)
         : model_path(std::move(configured_model_path)),
-          benchmark_gate(process_benchmark_gate(model_path)),
+          prefer_npu(configured_prefer_npu),
           worker([this]() { run(); }) {}
 
     ~Impl() {
@@ -495,18 +394,36 @@ struct OnnxBackgroundUpscaler::Impl {
             namespace ml = winrt::Windows::AI::MachineLearning;
             const ml::LearningModel model = ml::LearningModel::LoadFromFilePath(resolved_model_path->c_str());
             ml::LearningModelSession session{nullptr};
-            try {
-                session = ml::LearningModelSession(
-                    model,
-                    ml::LearningModelDevice(ml::LearningModelDeviceKind::DirectXHighPerformance));
-            } catch (const winrt::hresult_error&) {
-                session = ml::LearningModelSession(
-                    model,
-                    ml::LearningModelDevice(ml::LearningModelDeviceKind::DirectX));
+            bool using_low_power_preference = false;
+            const auto make_high_performance_session = [&]() {
+                try {
+                    return ml::LearningModelSession(
+                        model,
+                        ml::LearningModelDevice(ml::LearningModelDeviceKind::DirectXHighPerformance));
+                } catch (const winrt::hresult_error&) {
+                    return ml::LearningModelSession(
+                        model,
+                        ml::LearningModelDevice(ml::LearningModelDeviceKind::DirectX));
+                }
+            };
+            if (prefer_npu) {
+                try {
+                    // Legacy WinML cannot name an NPU directly. DirectXMinPower asks Windows for
+                    // its lowest-power compatible ML device, which can be an NPU when the OS and
+                    // driver expose one. We keep a deterministic GPU fallback below.
+                    session = ml::LearningModelSession(
+                        model,
+                        ml::LearningModelDevice(ml::LearningModelDeviceKind::DirectXMinPower));
+                    using_low_power_preference = true;
+                    std::cerr << "[ONNX Upscaler] Requested the Windows low-power AI device "
+                                 "(NPU when available).\n";
+                } catch (const winrt::hresult_error&) {
+                    std::cerr << "[ONNX Upscaler] Low-power/NPU-preferred session unavailable; "
+                                 "falling back to high-performance DirectX.\n";
+                }
             }
-
-            if (!pass_process_benchmark_gate(session, *benchmark_gate)) {
-                return;
+            if (!session) {
+                session = make_high_performance_session();
             }
 
             const std::vector<std::int64_t> input_shape{1, 3, kModelInputHeight, kModelInputWidth};
@@ -555,20 +472,41 @@ struct OnnxBackgroundUpscaler::Impl {
                     continue;
                 }
 
-                const ml::TensorFloat input_tensor =
-                    ml::TensorFloat::CreateFromArray(input_shape, rgb);
-                const ml::TensorFloat output_tensor =
-                    ml::TensorFloat::Create(output_shape);
-                ml::LearningModelBinding binding(session);
-                binding.Bind(L"rgb_lr", input_tensor);
-                binding.Bind(L"rgb_residual_x2", output_tensor);
-                session.Evaluate(binding, L"tenriff-onnx-upscaler-background");
+                const auto evaluate_residual = [&](const ml::LearningModelSession& active_session) {
+                    const ml::TensorFloat input_tensor =
+                        ml::TensorFloat::CreateFromArray(input_shape, rgb);
+                    const ml::TensorFloat output_tensor =
+                        ml::TensorFloat::Create(output_shape);
+                    ml::LearningModelBinding binding(active_session);
+                    binding.Bind(L"rgb_lr", input_tensor);
+                    binding.Bind(L"rgb_residual_x2", output_tensor);
+                    active_session.Evaluate(binding, L"tenriff-onnx-upscaler-background");
 
-                std::vector<float> residual(static_cast<std::size_t>(kOnnxUpscaleTargetWidth) *
-                                            kOnnxUpscaleTargetHeight * 3);
-                const auto residual_view = output_tensor.GetAsVectorView();
-                if (residual_view.GetMany(0, residual) != residual.size()) {
-                    std::cerr << "[ONNX Upscaler] WinML returned an incomplete frame; keeping native bitmap.\n";
+                    std::vector<float> residual(static_cast<std::size_t>(kOnnxUpscaleTargetWidth) *
+                                                kOnnxUpscaleTargetHeight * 3);
+                    const auto residual_view = output_tensor.GetAsVectorView();
+                    if (residual_view.GetMany(0, residual) != residual.size()) {
+                        residual.clear();
+                    }
+                    return residual;
+                };
+
+                std::vector<float> residual;
+                try {
+                    residual = evaluate_residual(session);
+                } catch (const winrt::hresult_error&) {
+                    if (!using_low_power_preference) {
+                        throw;
+                    }
+                    std::cerr << "[ONNX Upscaler] NPU/low-power evaluation rejected this model; "
+                                 "retrying on high-performance DirectX.\n";
+                    session = make_high_performance_session();
+                    using_low_power_preference = false;
+                    residual = evaluate_residual(session);
+                }
+                if (residual.empty()) {
+                    std::cerr << "[ONNX Upscaler] WinML returned an incomplete frame; "
+                                 "keeping native bitmap.\n";
                     continue;
                 }
 
@@ -612,16 +550,13 @@ struct OnnxBackgroundUpscaler::Impl {
     }
 };
 
-OnnxBackgroundUpscaler::OnnxBackgroundUpscaler(std::string model_path)
-    : impl_(std::make_unique<Impl>(std::move(model_path))) {}
+OnnxBackgroundUpscaler::OnnxBackgroundUpscaler(std::string model_path, bool prefer_npu)
+    : impl_(std::make_unique<Impl>(std::move(model_path), prefer_npu)) {}
 
 OnnxBackgroundUpscaler::~OnnxBackgroundUpscaler() = default;
 
 void OnnxBackgroundUpscaler::request(std::string path) {
     if (!impl_ || path.empty()) {
-        return;
-    }
-    if (benchmark_status_snapshot(*impl_->benchmark_gate).state == OnnxUpscaleBenchmarkState::Failed) {
         return;
     }
     std::lock_guard<std::mutex> lock(impl_->mutex);
@@ -653,9 +588,6 @@ void OnnxBackgroundUpscaler::request_bgra(std::string source_key,
                                              const std::vector<std::uint8_t>& bgra) {
     const std::size_t expected = static_cast<std::size_t>(width) * height * 4;
     if (!impl_ || source_key.empty() || width == 0 || height == 0 || bgra.size() != expected) {
-        return;
-    }
-    if (benchmark_status_snapshot(*impl_->benchmark_gate).state == OnnxUpscaleBenchmarkState::Failed) {
         return;
     }
     std::lock_guard<std::mutex> lock(impl_->mutex);
@@ -701,15 +633,6 @@ bool OnnxBackgroundUpscaler::should_upscale(std::uint32_t width,
                                               std::string_view mode) {
     return lower_ascii(mode) == "onnx" && width > 0 && height > 0 &&
            (width < kOnnxUpscaleTargetWidth || height < kOnnxUpscaleTargetHeight);
-}
-
-bool OnnxBackgroundUpscaler::meets_performance_gate(double fps) {
-    return std::isfinite(fps) && fps >= kOnnxUpscaleMinimumBenchmarkFps;
-}
-
-OnnxUpscaleBenchmarkStatus OnnxBackgroundUpscaler::benchmark_status() const {
-    return impl_ ? benchmark_status_snapshot(*impl_->benchmark_gate)
-                 : OnnxUpscaleBenchmarkStatus{};
 }
 
 }  // namespace tenriff::render

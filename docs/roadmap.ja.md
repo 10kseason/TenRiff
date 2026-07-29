@@ -4,8 +4,8 @@
 
 ## Current Baseline
 - Windows GUI / runtime が主なサポート経路です。
-- プロジェクト版ラインは `1.2.5 stable`。公開 package は upscaler model を同梱せず、generic External ONNX Upscaler は既定値 `off` で、互換性と権利を確認済みの model と 35 FPS gate 通過を必要とします。
-- 既定では BMS-first の menu / runtime が有効で、4K-10K `.osu` は config / menu toggle の背後にある任意機能です。
+- プロジェクト版ラインは `1.2.6 stable`。公開 package は upscaler model を同梱しない。互換性と権利を確認済みの ONNX を選択しても path を保存するだけで、BGA Upscaler は user が有効化して high-spec warning を確認するまで off のまま。自動 benchmark gate はない。
+- 現行 menu / runtime は BMS family（`.bms/.bme/.bml/.pms`）専用で、native/LR2 skin をサポート。
 - 現在出荷されている挙動は [`docs/current-state.ja.md`](current-state.ja.md) を先に見てください。この roadmap は方向と残作業を示す文書です。
 
 ## 0) 骨格と master clock を固める
@@ -29,10 +29,10 @@
 - 最小 BMS loader（essential channel のみ）-> note scheduling -> judgement -> result screen を通す。
 - preview audio は audio engine で予約し、Song Select 中に keysound を preload する。
 
-## 1.5) BMS と osu! beatmap の両対応
-- BMS と並行して osu! beatmap（mania）loader を追加し、正規化後イベントモデルを共有する。
-- scheduling / judgement 経路は共通のままにし、chart-format 差分は load 時点に閉じ込める。
-- Song Select に format selection を出し、replay / result 画面にも元 format を表示する。
+## 1.5) BMS-only chart support の強化
+- 以前の multi-format 方針は現行 release line では superseded。loading、indexing、replay、result、difficulty-table は BMS family に集中する。
+- archive や別 format の import path を再導入せず、real-pack の encoding、keysound、BGA、long note、lane layout 互換性を強化する。
+- optional integration は user-supplied、明示的に有効化するまで disabled、失敗時は native behavior へ安全に復帰できる形を維持する。
 
 ## 2) Key remap と 8K / 10K modes
 - ✅ 「リマップ UI フロー」仕様どおりの key remapping UI（NKRO test を含む）。

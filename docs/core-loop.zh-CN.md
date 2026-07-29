@@ -16,14 +16,14 @@
   - 读取 `keymap.json` 并生成默认 keymap
   - 使用 `KeycodeMap` 把按键字符串转换为 keycode
 - `gameplay/GameplayChart.*`
-  - 将 BMS/OSU 时间线转换为 **以 sample time 为基础的 note event**
+  - 将 BMS 时间线转换为 **以 sample time 为基础的 note event**
   - 在应用 `rate` 时，把时间表按 `t' = t / rate` 进行缩放
 - `gameplay/GameplayEngine.*`
   - 应用判定窗口（PG/GR/GD/BD）与 mask（30ms）
   - 当同一 lane 的旧 note 已经是 BD，而紧接的下一 note 明确为 GD 或更高时，把旧 note 记为 miss，并将当前按键分配给下一 note，避免连续 BAD
   - POOR 发生时应用 lane mask
   - **Hold 规则**：过早 release 判定为 BAD
-  - **Hold Tail 规则**：只有 osu!mania hold 与 BMS `#LNMODE 2` charge note 才把 release timing 当作普通判定窗口处理（head/tail 50:50）
+  - **Hold Tail 规则**：只有 BMS `#LNMODE 2` charge note 才把 release timing 当作普通判定窗口处理（head/tail 50:50）
   - 普通 BMS long note 只要保持到结束，就由 tail 自动处理，不使用 tail release timing 判定
   - 收集结果统计（combo、判定计数、平均/标准差）
 - `app/GameSession.*`
@@ -31,7 +31,7 @@
   - 在音频回调中消费输入队列并更新判定
 
 ## 判定相关的初始策略（待确认）
-- **Hold Tail 判定** 仅适用于 osu!mania hold 和 BMS `#LNMODE 2` charge note；过早 release 视为 BAD
+- **Hold Tail 判定** 仅适用于 BMS `#LNMODE 2` charge note；过早 release 视为 BAD
 
 ## 后续将连接的部分
 - 菜单状态机（Title/SongSelect/Gameplay/Result）

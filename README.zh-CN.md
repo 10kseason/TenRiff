@@ -2,21 +2,20 @@
 
 Language: [한국어](README.md) | [English](README.en.md) | [简体中文](README.zh-CN.md) | [日本語](README.ja.md)
 
-TenRiff 是一个以 BMS-first 为核心的 Windows GUI 节奏游戏运行时/启动器。当前 stable 版本为 `1.2.5`。用户可在 Graphics Settings 中选择权利已厘清的外部 ONNX upscaler，或把 .onnx 文件拖入该页面，用于 BGA/BGI 放大。公开包不包含模型，默认值为 `off`。当前仅支持固定 960x540 RGB residual x2 契约；基准、加载、契约或推理失败时继续使用 native scaling。项目采用 MIT 许可证。
+TenRiff 是一个 Windows GUI BMS 节奏游戏运行时/启动器。当前 stable 版本为 `1.2.6`，谱面输入仅支持 BMS family（`.bms/.bme/.bml/.pms`）。用户可在 Graphics Settings 中选择权利已厘清的外部 ONNX model，然后明确打开 `BGA Upscaler` 并确认高配置警告。公开包不包含模型，默认值为 `off`；不再设置性能 benchmark gate，加载、契约或推理失败时继续使用 native scaling。实验性的 `优先 NPU` 只在 ONNX 启用时请求 Windows ML 优先使用低功耗设备，但实际设备由 Windows/driver 决定；session 创建失败时会回退到高性能 DirectX 路径。项目采用 MIT 许可证。
 
-这份 README 是入门文档。关于当前行为、`1.2.5` 项目状态、`1.1.2 final stable` 基准、配置和设计文档，请继续阅读 [`docs/README.zh-CN.md`](docs/README.zh-CN.md)。
+这份 README 是入门文档。关于当前行为、`1.2.6` 项目状态、`1.1.2 final stable` 基准、配置和设计文档，请继续阅读 [`docs/README.zh-CN.md`](docs/README.zh-CN.md)。
 
 TenRiff 也明确属于一种 `vibe coding` 作品：它更多是在快速迭代和实验中成形，而不是只按照传统的长篇设计先行流程推进。
 
 ## 项目一览
 
 - 主要目标平台：Windows
-- 主要谱面表面：BMS-first
-- 可选支持谱面：`.osu` osu!mania 4K-10K
+- 支持谱面：仅 BMS family（`.bms/.bme/.bml/.pms`）
 - 图形路径：D3D11 + Direct2D/DirectWrite
 - 音频路径：WASAPI
 - 输入路径：RawInput 或高轮询率键盘 polling
-- direct-IP multiplayer：1 名 host + 1 名 joiner 的 TCP 对战（默认 `27300/TCP`，见[使用说明](docs/multiplayer.zh-CN.md)）
+- direct-IP multiplayer：1 名 host + 1 名 joiner 的 TCP 对战（默认 `27300/TCP`，见[使用说明](docs/multiplayer.md)）
 - 许可证：[MIT](LICENSE)
 - 第三方说明：[`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)
 - 发布历史：[`CHANGELOG.md`](CHANGELOG.md)
@@ -52,15 +51,16 @@ TenRiff 当前的键位模式转换器包含基于 `krrcream-Toolkit` 中 N2NC �
   - MP3 通过 Windows Media Foundation 回退
   - 必要时可使用 `ffmpeg.exe` 回退
   - keysound 模式：`follow / autoplay / ignore`
+  - 对晚到的实时输入保留原判定时间，只把可听 trigger 固定到当前可写 buffer 边界，避免短 keysound 被整段跳过
 - Song Select
   - 缓存优先加载
-  - 通过 `F5` 强制重新索引
+  - 通过 `F5` 强制重新索引，并在画面中央显示 stage / percent / ETA
   - 搜索、键数过滤、难度过滤
   - `LV ASC/DESC`、`TITLE A-Z/Z-A` 排序
   - 外部文件夹/BMS 拖放
-  - 通过 `Shift+F2` 选择文件或直接拖放，将 `.osz` 安装到 active songs source，启用 osu chart 后重新索引
   - recent source 保存与重新打开
-  - `BMS / OSU / All` 过滤
+  - 用 `-` / `+` 立即调整下一次游玩的 Rate
+  - 在 Browse 中选择本地 BMS 难度表 JSON，并给 MD5/SHA-256 匹配谱面应用表等级
 - Gameplay / HUD
   - 实时 HUD
   - 分阶段的谱面加载进度
@@ -73,9 +73,8 @@ TenRiff 当前的键位模式转换器包含基于 `krrcream-Toolkit` 中 N2NC �
   - Hi-Speed、Rate、gauge、audio、input、graphics 设置
   - `Skins` 画面中可调判定线位置、note 宽度/高度
   - `5K~10K` lane color 编辑与实时预览
-  - 通过 `.osk` 文件选择或拖放，将 skin 安装到 active profile
-  - 应用受支持的 osu!mania note/LN 图片以及 `ColumnWidth`、`ColumnSpacing`、`ColumnLineWidth`、`HitPosition`
-  - OSK/OSZ 会先 preflight 并通过 staging 安装，不覆盖现有 folder；chart asset 引用被限制在安装后的 beatmap folder 内
+  - 仅支持 native vector skin 与 LR2 playskin
+  - 通过选择或拖放 LR2 skin folder 复制到 active profile，并导入 note、LN、lane-gap、destination-size 数据
 - 结果/本地记录
   - 专用结果画面
   - replay/result JSON 导出
@@ -88,7 +87,7 @@ TenRiff 当前的键位模式转换器包含基于 `krrcream-Toolkit` 中 N2NC �
 
 - Windows GUI 是当前主要支持路径。
 - Linux GUI/audio/input 后端尚未完成。
-- osu skin import 只应用 TenRiff 支持的 osu!mania gameplay 元素，并不保证对所有 osu! mode/UI asset 做 pixel-perfect 还原。
+- LR2 playskin import 只移植受支持的 gameplay 元素，并不保证对完整 LR2 UI 做 pixel-perfect 还原。
 - 一部分 GUI 流程目前主要通过构建/测试验证，仍然需要更多实际运行下的手动验证。
 - 较旧的设计文档可能与当前实现不完全一致，因此要确认当前行为时，应优先查看 [`docs/current-state.zh-CN.md`](docs/current-state.zh-CN.md)。
 

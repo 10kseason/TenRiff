@@ -385,7 +385,6 @@ std::vector<ModeCase> build_mode_cases(int source_lane_count, std::uint32_t seed
                          bool expect_release_disabled,
                          bool expect_no_ln_release_removed) {
         ModeConfig config;
-        config.format = "bms";
         config.key_mode = std::move(key_mode);
         config.random = std::move(random);
         config.random_seed = seed;

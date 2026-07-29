@@ -74,6 +74,7 @@ struct GraphicsConfig {
     bool performance_overlay = false;
     std::string background_upscale_mode = "off";
     std::string background_upscale_model_path;
+    bool background_upscale_prefer_npu = true;
 };
 
 struct AudioUiConfig {
@@ -94,11 +95,11 @@ struct UiConfig {
     std::vector<std::string> favorite_chart_keys;
     std::unordered_map<std::string, std::vector<std::string>> collections;
     std::string song_collection_filter = "all";
+    std::string difficulty_table_path;
 };
 
 struct SkinConfig {
     std::string source = "native";
-    std::string osu_skin_name;
     std::string lr2_skin_name;
     std::string lr2_resolution_mode = "auto";
     std::string visual_preset = "tenriff";
@@ -145,13 +146,11 @@ struct InputConfig {
 };
 
 struct ModeConfig {
-    std::string format = "auto";
     std::string key_mode = "auto";
     std::string gauge = "normal";
     std::string random = "off";
     uint32_t random_seed = 0;
     std::vector<std::string> mods;
-    bool enable_osu_charts = false;
     bool ghost_battle_enabled = false;
     bool autoplay_enabled = false;
     bool practice_no_fail_enabled = false;

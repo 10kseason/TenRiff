@@ -244,11 +244,3 @@ TEST_CASE("Media Foundation BGA video extension policy accepts MPG and common co
     CHECK(BgaVideoDecoder::is_supported_video_path("clip.mp4"));
     CHECK_FALSE(BgaVideoDecoder::is_supported_video_path("still.png"));
 }
-
-TEST_CASE("external ONNX x2 performance gate requires a measured 35 FPS") {
-    using tenriff::render::OnnxBackgroundUpscaler;
-
-    CHECK_FALSE(OnnxBackgroundUpscaler::meets_performance_gate(34.999));
-    CHECK(OnnxBackgroundUpscaler::meets_performance_gate(35.0));
-    CHECK(OnnxBackgroundUpscaler::meets_performance_gate(60.0));
-}

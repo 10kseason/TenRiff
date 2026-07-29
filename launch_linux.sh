@@ -87,12 +87,10 @@ if [[ ! -f "$CONFIG_DIR/config.json" ]]; then
     "performance_overlay": false
   },
   "mode": {
-    "format": "bms",
     "key_mode": "10k",
     "gauge": "normal",
     "random": "off",
-    "random_seed": 0,
-    "enable_osu_charts": false
+    "random_seed": 0
   },
   "ui": {
     "result_tail_ms": 500,

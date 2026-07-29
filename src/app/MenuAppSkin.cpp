@@ -21,8 +21,6 @@
 #include "app/Lr2Skin.h"
 #include "app/MenuAppSkinUtils.h"
 #include "app/MenuSongUtils.h"
-#include "app/OsuArchiveImport.h"
-#include "app/OsuSkin.h"
 #include "util/Utf8Compat.h"
 
 namespace tenriff::app {
@@ -43,16 +41,6 @@ fs::path path_from_utf8(std::string_view value) {
     } catch (...) {
         return {};
     }
-}
-
-std::string to_lower_ascii(std::string value) {
-    std::transform(value.begin(), value.end(), value.begin(), [](unsigned char ch) {
-        if (ch >= static_cast<unsigned char>('A') && ch <= static_cast<unsigned char>('Z')) {
-            return static_cast<char>(ch - static_cast<unsigned char>('A') + static_cast<unsigned char>('a'));
-        }
-        return static_cast<char>(ch);
-    });
-    return value;
 }
 
 std::string normalize_filesystem_display_name(std::string value) {
@@ -116,10 +104,6 @@ std::string cycle_lr2_resolution_mode(std::string_view value, int direction) {
     return std::string(kModes[static_cast<std::size_t>(index)]);
 }
 
-fs::path osu_skin_import_root_path(std::string_view profile_dir) {
-    return path_from_utf8(profile_dir) / "skins" / "osu";
-}
-
 fs::path lr2_skin_import_root_path(std::string_view profile_dir) {
     return path_from_utf8(profile_dir) / "skins" / "lr2";
 }
@@ -178,110 +162,9 @@ std::optional<std::string> pick_folder_dialog_utf8() {
     return result;
 }
 
-std::optional<std::string> pick_osk_dialog_utf8() {
-    const HRESULT init_hr = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
-    const bool should_uninitialize = SUCCEEDED(init_hr);
-    Microsoft::WRL::ComPtr<IFileOpenDialog> dialog;
-    const HRESULT create_hr = CoCreateInstance(CLSID_FileOpenDialog,
-                                               nullptr,
-                                               CLSCTX_INPROC_SERVER,
-                                               IID_PPV_ARGS(&dialog));
-    if (FAILED(create_hr) || !dialog) {
-        if (should_uninitialize) {
-            CoUninitialize();
-        }
-        return std::nullopt;
-    }
-
-    DWORD options = 0;
-    if (FAILED(dialog->GetOptions(&options))) {
-        if (should_uninitialize) {
-            CoUninitialize();
-        }
-        return std::nullopt;
-    }
-    dialog->SetOptions(options | FOS_FORCEFILESYSTEM | FOS_FILEMUSTEXIST | FOS_PATHMUSTEXIST);
-    const COMDLG_FILTERSPEC filters[] = {
-        {L"osu! skin package (*.osk)", L"*.osk"},
-        {L"All files (*.*)", L"*.*"},
-    };
-    dialog->SetFileTypes(static_cast<UINT>(std::size(filters)), filters);
-    dialog->SetFileTypeIndex(1);
-    dialog->SetDefaultExtension(L"osk");
-    dialog->SetTitle(L"Import osu! skin package");
-
-    if (FAILED(dialog->Show(nullptr))) {
-        if (should_uninitialize) {
-            CoUninitialize();
-        }
-        return std::nullopt;
-    }
-
-    Microsoft::WRL::ComPtr<IShellItem> item;
-    if (FAILED(dialog->GetResult(&item)) || !item) {
-        if (should_uninitialize) {
-            CoUninitialize();
-        }
-        return std::nullopt;
-    }
-
-    PWSTR raw_path = nullptr;
-    std::optional<std::string> result;
-    if (SUCCEEDED(item->GetDisplayName(SIGDN_FILESYSPATH, &raw_path)) && raw_path) {
-        result = std::filesystem::path(raw_path).u8string();
-        CoTaskMemFree(raw_path);
-    }
-    if (should_uninitialize) {
-        CoUninitialize();
-    }
-    return result;
-}
 #endif
 
 }  // namespace
-
-void MenuApp::refresh_available_osu_skins() {
-    available_osu_skin_root_.clear();
-    available_osu_skin_names_.clear();
-    available_osu_skin_roots_by_name_.clear();
-
-    auto add_skin_root = [&](const std::string& root, bool prefer_existing) {
-        if (root.empty()) {
-            return;
-        }
-        const auto names = list_osu_skin_names(root);
-        for (const auto& name : names) {
-            const auto it = available_osu_skin_roots_by_name_.find(name);
-            if (it == available_osu_skin_roots_by_name_.end()) {
-                available_osu_skin_names_.push_back(name);
-                available_osu_skin_roots_by_name_[name] = root;
-            } else if (!prefer_existing) {
-                it->second = root;
-            }
-        }
-    };
-
-    add_skin_root(osu_skin_import_root_path(profile_dir_).u8string(), false);
-    add_skin_root(find_default_osu_skin_test_root(), true);
-    std::sort(available_osu_skin_names_.begin(), available_osu_skin_names_.end());
-
-    if (available_osu_skin_names_.empty()) {
-        config_.skin.osu_skin_name.clear();
-        return;
-    }
-    if (config_.skin.osu_skin_name.empty() ||
-        std::find(available_osu_skin_names_.begin(),
-                  available_osu_skin_names_.end(),
-                  config_.skin.osu_skin_name) == available_osu_skin_names_.end()) {
-        config_.skin.osu_skin_name = available_osu_skin_names_.front();
-    }
-    const auto root_it = available_osu_skin_roots_by_name_.find(config_.skin.osu_skin_name);
-    if (root_it != available_osu_skin_roots_by_name_.end()) {
-        available_osu_skin_root_ = root_it->second;
-    } else {
-        available_osu_skin_root_.clear();
-    }
-}
 
 void MenuApp::refresh_available_lr2_skins() {
     available_lr2_skin_root_.clear();
@@ -324,112 +207,6 @@ void MenuApp::refresh_available_lr2_skins() {
     } else {
         available_lr2_skin_root_.clear();
     }
-}
-
-bool MenuApp::import_osu_skin_path(std::string_view source_path) {
-    const std::string normalized_source = menu_songs::normalize_song_source_path(std::string(source_path));
-    if (normalized_source.empty()) {
-        return false;
-    }
-
-    const fs::path source = path_from_utf8(normalized_source);
-    std::error_code ec;
-    const fs::path import_root = osu_skin_import_root_path(profile_dir_);
-
-    if (fs::is_regular_file(source, ec) &&
-        to_lower_ascii(source.extension().u8string()) == ".osk") {
-        OsuArchiveImportLimits limits;
-        limits.max_archive_bytes = 512ull * 1024ull * 1024ull;
-        limits.max_file_bytes = 256ull * 1024ull * 1024ull;
-        limits.max_total_uncompressed_bytes = 1ull * 1024ull * 1024ull * 1024ull;
-        limits.max_entries = 4096;
-        limits.max_path_components = 32;
-        const OsuArchiveImportResult result = import_osu_archive(
-            normalized_source, import_root.u8string(), OsuArchiveKind::Osk, limits);
-        if (!result.success) {
-            std::cerr << "[warn] Failed to import OSK package: " << result.error << std::endl;
-            return false;
-        }
-        config_.skin.osu_skin_name = result.display_name;
-        config_.skin.source = "osu";
-        refresh_available_osu_skins();
-        skin_dirty_ = true;
-        std::cerr << "[info] Imported OSK skin '" << result.display_name << "' ("
-                  << result.extracted_file_count << " files, " << result.extracted_bytes
-                  << " bytes)." << std::endl;
-        return true;
-    }
-    ec.clear();
-    if (!fs::is_directory(source, ec)) {
-        return false;
-    }
-
-    fs::create_directories(import_root, ec);
-    if (ec) {
-        std::cerr << "[warn] Failed to create osu skin import root: " << import_root.u8string() << std::endl;
-        return false;
-    }
-
-    int imported_count = 0;
-    auto import_single_skin = [&](const fs::path& skin_dir) -> bool {
-        const std::string source_skin_path = menu_songs::normalize_song_source_path(skin_dir.u8string());
-        if (source_skin_path.empty() || !is_osu_skin_directory(source_skin_path)) {
-            return false;
-        }
-
-        const std::string base_name = normalize_filesystem_display_name(skin_dir.filename().u8string());
-        fs::path destination = import_root / path_from_utf8(base_name);
-        std::error_code path_ec;
-        const fs::path source_canonical = fs::weakly_canonical(skin_dir, path_ec);
-        path_ec.clear();
-        const fs::path import_root_canonical = fs::weakly_canonical(import_root, path_ec);
-        path_ec.clear();
-
-        if (!source_canonical.empty() &&
-            !import_root_canonical.empty() &&
-            source_canonical.parent_path() == import_root_canonical) {
-            config_.skin.osu_skin_name = source_canonical.filename().u8string();
-            ++imported_count;
-            return true;
-        }
-
-        int suffix = 2;
-        while (fs::exists(destination, ec)) {
-            if (!ec) {
-                destination = import_root / path_from_utf8(base_name + " (" + std::to_string(suffix) + ")");
-                ++suffix;
-                continue;
-            }
-            ec.clear();
-            return false;
-        }
-
-        fs::copy(skin_dir, destination, fs::copy_options::recursive, ec);
-        if (ec) {
-            std::cerr << "[warn] Failed to import osu skin: " << skin_dir.u8string()
-                      << " -> " << destination.u8string() << std::endl;
-            return false;
-        }
-
-        config_.skin.osu_skin_name = destination.filename().u8string();
-        ++imported_count;
-        return true;
-    };
-
-    bool imported = import_single_skin(source);
-    if (!imported) {
-        for (const auto& skin_name : list_osu_skin_names(normalized_source)) {
-            imported |= import_single_skin(source / path_from_utf8(skin_name));
-        }
-    }
-    if (!imported) {
-        return false;
-    }
-
-    refresh_available_osu_skins();
-    skin_dirty_ = true;
-    std::cerr << "[info] Imported " << imported_count << " osu skin(s)." << std::endl;
-    return true;
 }
 
 bool MenuApp::import_lr2_skin_path(std::string_view source_path) {
@@ -518,31 +295,6 @@ bool MenuApp::import_lr2_skin_path(std::string_view source_path) {
 }
 
 bool MenuApp::import_skin_path_auto(std::string_view source_path) {
-    const std::string active_source = config::normalize_skin_source_token(config_.skin.source);
-    if (active_source == "osu") {
-        if (import_osu_skin_path(source_path)) {
-            return true;
-        }
-        if (import_lr2_skin_path(source_path)) {
-            config_.skin.source = "lr2";
-            return true;
-        }
-        return false;
-    }
-    if (active_source == "lr2") {
-        if (import_lr2_skin_path(source_path)) {
-            return true;
-        }
-        if (import_osu_skin_path(source_path)) {
-            config_.skin.source = "osu";
-            return true;
-        }
-        return false;
-    }
-    if (import_osu_skin_path(source_path)) {
-        config_.skin.source = "osu";
-        return true;
-    }
     if (import_lr2_skin_path(source_path)) {
         config_.skin.source = "lr2";
         return true;
@@ -552,9 +304,6 @@ bool MenuApp::import_skin_path_auto(std::string_view source_path) {
 
 std::string MenuApp::active_external_skin_root() const {
     const std::string source = config::normalize_skin_source_token(config_.skin.source);
-    if (source == "osu") {
-        return available_osu_skin_root_;
-    }
     if (source == "lr2") {
         return available_lr2_skin_root_;
     }
@@ -563,9 +312,6 @@ std::string MenuApp::active_external_skin_root() const {
 
 std::string MenuApp::active_external_skin_name() const {
     const std::string source = config::normalize_skin_source_token(config_.skin.source);
-    if (source == "osu") {
-        return config_.skin.osu_skin_name;
-    }
     if (source == "lr2") {
         return config_.skin.lr2_skin_name;
     }
@@ -634,35 +380,29 @@ void MenuApp::handle_skins_settings_input(uint32_t keycode) {
             --settings_cursor_;
         }
         settings_cursor_ = clamp_int(settings_cursor_, 0, new_item_count - 1);
-        refresh_available_osu_skins();
         refresh_available_lr2_skins();
         skin_dirty_ = true;
         publish_snapshot();
         return;
     }
     if (settings_cursor_ == imported_skin_row && (keycode == key_left_ || keycode == key_right_)) {
-        auto* names = &available_osu_skin_names_;
-        auto* selected_name = &config_.skin.osu_skin_name;
-        if (active_skin_source == "lr2") {
-            names = &available_lr2_skin_names_;
-            selected_name = &config_.skin.lr2_skin_name;
-        }
-        if (active_skin_source != "native" && !names->empty()) {
+        auto& names = available_lr2_skin_names_;
+        auto& selected_name = config_.skin.lr2_skin_name;
+        if (active_skin_source == "lr2" && !names.empty()) {
             int current_index = 0;
-            for (int i = 0; i < static_cast<int>(names->size()); ++i) {
-                if ((*names)[static_cast<std::size_t>(i)] == *selected_name) {
+            for (int i = 0; i < static_cast<int>(names.size()); ++i) {
+                if (names[static_cast<std::size_t>(i)] == selected_name) {
                     current_index = i;
                     break;
                 }
             }
             current_index += (keycode == key_left_) ? -1 : 1;
             if (current_index < 0) {
-                current_index = static_cast<int>(names->size()) - 1;
-            } else if (current_index >= static_cast<int>(names->size())) {
+                current_index = static_cast<int>(names.size()) - 1;
+            } else if (current_index >= static_cast<int>(names.size())) {
                 current_index = 0;
             }
-            *selected_name = (*names)[static_cast<std::size_t>(current_index)];
-            refresh_available_osu_skins();
+            selected_name = names[static_cast<std::size_t>(current_index)];
             refresh_available_lr2_skins();
             skin_dirty_ = true;
         }
@@ -678,11 +418,10 @@ void MenuApp::handle_skins_settings_input(uint32_t keycode) {
     }
     if (settings_cursor_ == import_skin_row && keycode == key_enter_) {
 #ifdef _WIN32
-        const bool pick_osk = active_skin_source != "lr2";
-        const auto picked_path = pick_osk ? pick_osk_dialog_utf8() : pick_folder_dialog_utf8();
+        const auto picked_path = pick_folder_dialog_utf8();
         if (picked_path.has_value()) {
             if (!import_skin_path_auto(*picked_path)) {
-                std::cerr << "[warn] Selected path is not a supported osu!mania or LR2 skin package: "
+                std::cerr << "[warn] Selected path is not a supported LR2 skin folder: "
                           << *picked_path << std::endl;
             }
             publish_snapshot();
@@ -1024,17 +763,9 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
     const std::string active_skin_source = config::normalize_skin_source_token(config_.skin.source);
     const bool lr2_source = active_skin_source == "lr2";
     const int lr2_shift = lr2_source ? 1 : 0;
-    const std::string imported_skin_row_label =
-        (active_skin_source == "osu") ? ui_text("OSU Skin", "OSU 스킨")
-                                      : ((active_skin_source == "lr2") ? ui_text("LR2 Skin", "LR2 스킨")
-                                                                       : ui_text("Imported Skin", "가져온 스킨"));
+    const std::string imported_skin_row_label = ui_text("LR2 Skin", "LR2 스킨");
     std::string imported_skin_value = ui_text("N/A", "없음");
-    if (active_skin_source == "osu") {
-        imported_skin_value = available_osu_skin_names_.empty()
-                                  ? ui_text("Not Found", "없음")
-                                  : (config_.skin.osu_skin_name.empty() ? available_osu_skin_names_.front()
-                                                                        : config_.skin.osu_skin_name);
-    } else if (active_skin_source == "lr2") {
+    if (active_skin_source == "lr2") {
         imported_skin_value = available_lr2_skin_names_.empty()
                                   ? ui_text("Not Found", "없음")
                                   : (config_.skin.lr2_skin_name.empty() ? available_lr2_skin_names_.front()
@@ -1055,8 +786,7 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
                         settings_cursor_ == 2, render::MenuHitTargetKind::SettingsRow, 2, false, true);
     }
     append_menu_row(render.generic, ui_text("Import Skin", "스킨 가져오기"),
-                    active_skin_source == "lr2" ? ui_text("Open Folder", "폴더 열기")
-                                                 : ui_text("Open OSK / drop folder", "OSK 열기 / 폴더 놓기"),
+                    ui_text("Open Folder", "폴더 열기"),
                     settings_cursor_ == 2 + lr2_shift,
                     render::MenuHitTargetKind::SettingsRow, 2 + lr2_shift, true, false);
     append_menu_row(render.generic, ui_text("Key Mode", "키 모드"), ui_key_mode_label(skin_edit_mode_), settings_cursor_ == 3 + lr2_shift,
@@ -1215,23 +945,15 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
             config::skin_color_rgb(preview_lane_colors[static_cast<std::size_t>(lane)]);
     }
 
-    render.generic.notes.push_back(ui_text("Skin Source switches between the native vector skin, imported osu!mania PNG skins, and imported LR2 playskins.",
-                                           "스킨 소스는 기본 벡터 스킨, 가져온 osu!mania PNG 스킨, 가져온 LR2 플레이스킨 사이를 전환합니다."));
-    render.generic.notes.push_back(ui_text("Imported OSU skins scan profile skins first, then build/Release/test-skins-osu as a fallback test root.",
-                                           "가져온 OSU 스킨은 먼저 프로필 스킨 폴더를 찾고, 없으면 build/Release/test-skins-osu를 테스트 루트로 사용합니다."));
+    render.generic.notes.push_back(ui_text("Skin Source switches between the native vector skin and imported LR2 playskins.",
+                                           "스킨 소스는 기본 벡터 스킨과 가져온 LR2 플레이스킨 사이를 전환합니다."));
     render.generic.notes.push_back(ui_text("Imported LR2 skins scan profile skins first, then build/Release/test-skins-lr2 as a fallback test root.",
                                            "가져온 LR2 스킨은 먼저 프로필 스킨 폴더를 찾고, 없으면 build/Release/test-skins-lr2를 테스트 루트로 사용합니다."));
     render.generic.notes.push_back(ui_text("LR2 Resolution overrides the imported LR2 family before the auto-detected layout is applied.",
                                            "LR2 해상도는 자동 감지 레이아웃을 적용하기 전에 가져온 LR2 계열 해상도를 덮어씁니다."));
-    if (active_skin_source == "lr2") {
-        render.generic.notes.push_back(ui_text(
-            "Import Skin opens a folder picker. You can also drag and drop an LR2 skin folder onto this screen.",
-            "스킨 가져오기는 폴더 선택 창을 엽니다. 이 화면에 LR2 스킨 폴더를 드래그 앤 드롭해도 됩니다."));
-    } else {
-        render.generic.notes.push_back(ui_text(
-            "Import Skin opens an OSK file picker. You can also drag and drop an OSK package or osu! skin folder onto this screen.",
-            "스킨 가져오기는 OSK 파일 선택 창을 엽니다. 이 화면에 OSK 패키지나 osu! 스킨 폴더를 드래그 앤 드롭해도 됩니다."));
-    }
+    render.generic.notes.push_back(ui_text(
+        "Import Skin opens a folder picker. You can also drag and drop an LR2 skin folder onto this screen.",
+        "스킨 가져오기는 폴더 선택 창을 엽니다. 이 화면에 LR2 스킨 폴더를 드래그 앤 드롭해도 됩니다."));
     render.generic.notes.push_back(ui_text("LR2 porting imports note, LN, lane-gap, and destination-size data from default active branches in the playskin.",
                                            "LR2 포팅은 플레이스킨의 기본 활성 브랜치에서 노트, LN, 레인 간격, 대상 크기 데이터를 가져옵니다."));
     render.generic.notes.push_back(ui_text("Image Aspect keeps imported head and tail art from stretching to the gameplay note box.",

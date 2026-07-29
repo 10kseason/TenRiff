@@ -1,6 +1,8 @@
 #include "app/SongIndex.h"
 #include "app/SongIndexBudget.h"
 #include "app/MenuSongUtils.h"
+#include "app/ChartFileHash.h"
+#include "app/DifficultyTable.h"
 
 #include <algorithm>
 #include <atomic>
@@ -23,7 +25,6 @@
 #include "chart/BmsParser.h"
 #include "chart/BmsTimeline.h"
 #include "chart/OsuDifficulty.h"
-#include "chart/OsuManiaLoader.h"
 #include "config/SimpleJson.h"
 #include "util/Utf8Compat.h"
 
@@ -35,7 +36,7 @@ namespace tenriff::app {
 
 namespace {
 
-constexpr int kSongIndexVersion = 10;
+constexpr int kSongIndexVersion = 11;
 constexpr std::uintmax_t kMaxMetadataChartFileBytes = 8u * 1024u * 1024u;
 
 bool cancel_requested(const SongIndexCancelCallback& cancel) {
@@ -115,14 +116,6 @@ std::string sanitized_metadata_text(std::string_view value) {
     return util::sanitize_ui_text(trim_copy(value));
 }
 
-std::string preferred_osu_metadata_text(std::string_view primary, std::string_view unicode) {
-    std::string preferred = sanitized_metadata_text(unicode);
-    if (!preferred.empty()) {
-        return preferred;
-    }
-    return sanitized_metadata_text(primary);
-}
-
 std::string bms_chart_name_from_headers(const chart::BmsChart& parsed_chart) {
     auto subtitle_it = parsed_chart.headers.find("SUBTITLE");
     if (subtitle_it != parsed_chart.headers.end()) {
@@ -164,33 +157,24 @@ bool is_bms_extension(std::string_view ext) {
     return ext == ".bms" || ext == ".bme" || ext == ".bml" || ext == ".pms";
 }
 
-bool is_osu_extension(std::string_view ext) {
-    return ext == ".osu";
-}
-
 bool is_menu_bms_key_count(int key_count) {
     return (key_count >= 4 && key_count <= 10) || key_count == 16;
 }
 
-bool is_menu_song_entry(const SongEntry& entry, const SongIndexOptions& options) {
+bool is_menu_song_entry(const SongEntry& entry) {
     const std::string format = to_lower(entry.format);
-    if (format == "bms") {
-        return is_menu_bms_key_count(entry.key_count);
-    }
-    if (options.include_osu && format == "osu") {
-        return entry.key_count >= 4 && entry.key_count <= 10;
-    }
-    return false;
+    return format == "bms" && is_menu_bms_key_count(entry.key_count);
 }
 
 bool needs_difficulty_refresh(const SongEntry& entry) {
-    static_cast<void>(entry);
-    return false;
+    return to_lower(entry.format) == "bms" && (entry.md5.size() != 32u || entry.sha256.size() != 64u);
 }
 
-int64_t file_time_seconds(const std::filesystem::file_time_type& time) {
+int64_t file_time_milliseconds(const std::filesystem::file_time_type& time) {
     using namespace std::chrono;
-    return duration_cast<seconds>(time.time_since_epoch()).count();
+    // Milliseconds remain exactly representable by the JSON reader's double
+    // number path while avoiding the old whole-second cache blind spot.
+    return duration_cast<milliseconds>(time.time_since_epoch()).count();
 }
 
 std::string fallback_title(const std::filesystem::path& path) {
@@ -217,19 +201,6 @@ bool ensure_metadata_chart_size_supported(const std::filesystem::path& path, std
         *error = "Skipped oversized metadata chart file (" + std::to_string(bytes) + " bytes)";
     }
     return false;
-}
-
-std::string read_text_file(const std::filesystem::path& path, std::string* error = nullptr) {
-    std::ifstream file(path, std::ios::binary);
-    if (!file) {
-        if (error) {
-            *error = "Failed to open file.";
-        }
-        return {};
-    }
-    std::ostringstream buffer;
-    buffer << file.rdbuf();
-    return buffer.str();
 }
 
 void to_upper_ascii(std::string& value) {
@@ -307,71 +278,6 @@ std::optional<int> difficulty_lane_for_channel(const chart::BmsChart& parsed_cha
         return std::nullopt;
     }
     return static_cast<int>(lane.value() - 1);
-}
-
-struct OsuMenuProbe {
-    std::optional<bool> mania_mode;
-    std::optional<int> key_count;
-};
-
-OsuMenuProbe probe_osu_menu_candidate(std::string_view content) {
-    OsuMenuProbe probe;
-    std::istringstream stream{std::string(content)};
-    std::string line;
-    std::string section;
-    while (std::getline(stream, line)) {
-        if (!line.empty() && line.back() == '\r') {
-            line.pop_back();
-        }
-        const auto comment = line.find("//");
-        if (comment == 0) {
-            continue;
-        }
-        if (comment != std::string::npos) {
-            line.erase(comment);
-        }
-
-        auto trim_in_place = [](std::string& text) {
-            while (!text.empty() && std::isspace(static_cast<unsigned char>(text.front())) != 0) {
-                text.erase(text.begin());
-            }
-            while (!text.empty() && std::isspace(static_cast<unsigned char>(text.back())) != 0) {
-                text.pop_back();
-            }
-        };
-        trim_in_place(line);
-        if (line.empty()) {
-            continue;
-        }
-        if (line.front() == '[' && line.back() == ']') {
-            section = line.substr(1, line.size() - 2);
-            to_upper_ascii(section);
-            continue;
-        }
-
-        const auto sep = line.find(':');
-        if (sep == std::string::npos) {
-            continue;
-        }
-
-        std::string key = line.substr(0, sep);
-        std::string value = line.substr(sep + 1);
-        trim_in_place(key);
-        trim_in_place(value);
-        to_upper_ascii(key);
-        if (section == "GENERAL" && key == "MODE") {
-            try {
-                probe.mania_mode = (std::stoi(value) == 3);
-            } catch (...) {
-            }
-        } else if (section == "DIFFICULTY" && (key == "KEYCOUNT" || key == "CIRCLESIZE")) {
-            try {
-                probe.key_count = std::stoi(value);
-            } catch (...) {
-            }
-        }
-    }
-    return probe;
 }
 
 std::string relative_path_string(const std::filesystem::path& root, const std::filesystem::path& full_path) {
@@ -512,11 +418,13 @@ std::optional<chart::OsuDifficultyMetrics> calculate_bms_difficulty(const chart:
 SongEntry build_bms_entry(std::string relative_path,
                           const std::filesystem::path& full_path,
                           int64_t mtime,
+                          std::uint64_t file_size,
                           std::vector<std::string>& warnings) {
     SongEntry entry;
     entry.path = std::move(relative_path);
     entry.format = "bms";
     entry.mtime = mtime;
+    entry.file_size = file_size;
 
     std::string size_error;
     if (!ensure_metadata_chart_size_supported(full_path, &size_error)) {
@@ -535,6 +443,16 @@ SongEntry build_bms_entry(std::string relative_path,
         warnings.push_back("Failed to parse BMS: " + entry.path);
         entry.title = fallback_title(full_path);
         return entry;
+    }
+
+    std::string hash_error;
+    const ChartFileHashes hashes = hash_chart_file(full_path, &hash_error);
+    if (hashes.valid()) {
+        entry.md5 = hashes.md5;
+        entry.sha256 = hashes.sha256;
+        entry.file_size = hashes.size;
+    } else {
+        warnings.push_back("Failed to hash BMS: " + entry.path + ": " + hash_error);
     }
 
     entry.key_count = parsed.chart.declared_key_count > 0 ? parsed.chart.declared_key_count : 10;
@@ -573,69 +491,54 @@ SongEntry build_bms_entry(std::string relative_path,
     } else {
         entry.level = metadata_level;
     }
+    entry.native_level = entry.level;
     return entry;
 }
 
-SongEntry build_osu_entry(std::string relative_path,
-                          const std::filesystem::path& full_path,
-                          int64_t mtime,
-                          std::vector<std::string>& warnings) {
-    SongEntry entry;
-    entry.path = std::move(relative_path);
-    entry.format = "osu";
-    entry.mtime = mtime;
-
-    std::string size_error;
-    if (!ensure_metadata_chart_size_supported(full_path, &size_error)) {
-        warnings.push_back(size_error + ": " + entry.path);
-        entry.title = fallback_title(full_path);
-        return entry;
+void clear_difficulty_table_metadata(SongEntry& entry) {
+    if (entry.native_level == 0 && entry.level != 0) {
+        entry.native_level = entry.level;
     }
+    entry.level = entry.native_level;
+    entry.difficulty_table_name.clear();
+    entry.difficulty_table_symbol.clear();
+    entry.difficulty_table_level.clear();
+    entry.difficulty_table_order = -1;
+}
 
-    std::string read_error;
-    const std::string content = read_text_file(full_path, &read_error);
-    if (content.empty() && !read_error.empty()) {
-        warnings.push_back("Failed to read osu!mania chart: " + entry.path);
-        entry.title = fallback_title(full_path);
-        return entry;
+void apply_difficulty_table(SongEntry& entry, const DifficultyTable* table) {
+    clear_difficulty_table_metadata(entry);
+    if (!table) {
+        return;
     }
 
-    const OsuMenuProbe probe = probe_osu_menu_candidate(content);
-    if (probe.mania_mode.has_value() && !probe.mania_mode.value()) {
-        return SongEntry{};
-    }
-    if (probe.key_count.has_value() && (probe.key_count.value() < 4 || probe.key_count.value() > 10)) {
-        return SongEntry{};
+    const auto match = table->lookup(entry.md5, entry.sha256);
+    if (!match.has_value()) {
+        return;
     }
 
-    chart::OsuManiaLoader loader;
-    auto parsed = loader.parse(content);
-    if (!parsed.success()) {
-        warnings.push_back("Failed to parse osu!mania chart: " + entry.path);
-        entry.title = fallback_title(full_path);
-        return entry;
-    }
-    if (parsed.chart.key_count < 4 || parsed.chart.key_count > 10) {
-        return SongEntry{};
+    entry.difficulty_table_name = util::sanitize_ui_text(match->name);
+    entry.difficulty_table_symbol = util::sanitize_ui_text(match->symbol);
+    entry.difficulty_table_level = util::sanitize_ui_text(match->level);
+    entry.difficulty_table_order = match->order;
+}
+
+std::optional<DifficultyTable> load_selected_difficulty_table(
+    const SongIndexOptions& options,
+    std::vector<std::string>& warnings) {
+    if (options.difficulty_table_path.empty()) {
+        return std::nullopt;
     }
 
-    entry.key_count = parsed.chart.key_count;
-    entry.title = preferred_osu_metadata_text(parsed.chart.title, parsed.chart.title_unicode);
-    if (entry.title.empty()) {
-        entry.title = fallback_title(full_path);
+    DifficultyTableLoadResult loaded = load_difficulty_table_utf8(options.difficulty_table_path);
+    for (const auto& warning : loaded.warnings) {
+        warnings.push_back("Difficulty table: " + warning);
     }
-    entry.artist = preferred_osu_metadata_text(parsed.chart.artist, parsed.chart.artist_unicode);
-    entry.chart_name = sanitized_metadata_text(parsed.chart.version);
-    entry.bpm = parsed.chart.base_bpm;
-    entry.background_preview_path =
-        menu_songs::resolve_osu_background_preview_path(full_path, parsed.chart.background_filename);
-
-    const auto difficulty = chart::calculate_osu_mania_difficulty(parsed.chart);
-    if (difficulty.note_count > 0) {
-        entry.level = difficulty.revive_level;
-        entry.rating = difficulty.circus_rating;
+    if (!loaded.success()) {
+        warnings.push_back("Difficulty table disabled: " + loaded.error);
+        return std::nullopt;
     }
-    return entry;
+    return std::move(loaded.table);
 }
 
 const config::JsonObject* get_object(const config::JsonObject& root, std::string_view key) {
@@ -728,10 +631,10 @@ struct SongIndexCandidate {
     std::filesystem::path full_path;
     std::string relative_path;
     int64_t mtime = 0;
+    std::uint64_t file_size = 0;
 };
 
 bool enumerate_song_candidates(const std::filesystem::path& root_dir,
-                               bool include_osu,
                                std::vector<std::string>* warnings,
                                const std::function<void(SongIndexCandidate&&)>& on_candidate,
                                std::uint64_t* out_candidate_count = nullptr,
@@ -791,7 +694,7 @@ bool enumerate_song_candidates(const std::filesystem::path& root_dir,
         ec.clear();
 
         const std::string ext = to_lower(entry.path().extension().u8string());
-        if (!is_bms_extension(ext) && !(include_osu && is_osu_extension(ext))) {
+        if (!is_bms_extension(ext)) {
             it.increment(ec);
             continue;
         }
@@ -801,7 +704,15 @@ bool enumerate_song_candidates(const std::filesystem::path& root_dir,
         candidate.relative_path = relative_path_string(root_dir, candidate.full_path);
         auto mtime = entry.last_write_time(ec);
         if (!ec) {
-            candidate.mtime = file_time_seconds(mtime);
+            candidate.mtime = file_time_milliseconds(mtime);
+        } else {
+            ec.clear();
+        }
+        const std::uintmax_t file_size = entry.file_size(ec);
+        if (!ec) {
+            candidate.file_size = static_cast<std::uint64_t>((std::min)(
+                file_size,
+                static_cast<std::uintmax_t>((std::numeric_limits<std::uint64_t>::max)())));
         } else {
             ec.clear();
         }
@@ -825,6 +736,7 @@ void process_song_index_batch(std::vector<SongIndexCandidate>& batch,
                               std::vector<std::string>& warnings,
                               SongIndex& result,
                               const SongIndexOptions& options,
+                              const DifficultyTable* difficulty_table,
                               std::atomic<int>& processed,
                               int total_hint,
                               unsigned reported_threads,
@@ -862,25 +774,27 @@ void process_song_index_batch(std::vector<SongIndexCandidate>& batch,
             const auto& candidate = batch[batch_index];
             SongEntry entry;
             auto cached_it = cached.find(candidate.relative_path);
-            if (cached_it != cached.end() && cached_it->second->mtime == candidate.mtime &&
+            if (options.reuse_cached_metadata && cached_it != cached.end() &&
+                cached_it->second->mtime == candidate.mtime &&
+                cached_it->second->file_size == candidate.file_size &&
                 !needs_difficulty_refresh(*cached_it->second)) {
                 entry = *cached_it->second;
             } else {
                 item_warnings.clear();
-                const std::string ext = to_lower(candidate.full_path.extension().u8string());
-                if (is_osu_extension(ext)) {
-                    entry = build_osu_entry(candidate.relative_path, candidate.full_path, candidate.mtime, item_warnings);
-                } else {
-                    entry = build_bms_entry(candidate.relative_path, candidate.full_path, candidate.mtime, item_warnings);
-                }
+                entry = build_bms_entry(candidate.relative_path,
+                                        candidate.full_path,
+                                        candidate.mtime,
+                                        candidate.file_size,
+                                        item_warnings);
                 if (!item_warnings.empty()) {
                     local_warnings.insert(local_warnings.end(), item_warnings.begin(), item_warnings.end());
                 }
             }
 
+            apply_difficulty_table(entry, difficulty_table);
             batch_valid[batch_index] =
-                (!entry.path.empty() && is_menu_song_entry(entry, options)) ? static_cast<uint8_t>(1u)
-                                                                            : static_cast<uint8_t>(0u);
+                (!entry.path.empty() && is_menu_song_entry(entry)) ? static_cast<uint8_t>(1u)
+                                                                   : static_cast<uint8_t>(0u);
             batch_entries[batch_index] = std::move(entry);
 
             const int current = processed.fetch_add(1, std::memory_order_relaxed) + 1;
@@ -937,10 +851,9 @@ public:
 
     [[nodiscard]] const std::string& error() const { return error_; }
     [[nodiscard]] int version() const { return version_; }
-    [[nodiscard]] bool cache_includes_osu() const { return cache_includes_osu_; }
     [[nodiscard]] const std::vector<SongEntry>& entries() const { return entries_; }
 
-    bool parse(const SongIndexOptions& options) {
+    bool parse() {
         if (!expect('{', "Song index root must be an object.")) {
             return false;
         }
@@ -968,22 +881,12 @@ public:
                 if (version_ != kSongIndexVersion) {
                     return true;
                 }
-            } else if (*key == "include_osu") {
-                auto value = parse_bool();
-                if (!value.has_value()) {
-                    return false;
-                }
-                cache_includes_osu_ = value.value();
             } else if (*key == "entries") {
                 if (version_ != kSongIndexVersion) {
                     if (!skip_value()) {
                         return false;
                     }
-                } else if (options.include_osu && !cache_includes_osu_) {
-                    if (!skip_value()) {
-                        return false;
-                    }
-                } else if (!parse_entries_array(options)) {
+                } else if (!parse_entries_array()) {
                     return false;
                 }
             } else {
@@ -1011,7 +914,6 @@ private:
     std::istream& stream_;
     std::string error_;
     int version_ = 0;
-    bool cache_includes_osu_ = false;
     std::vector<SongEntry> entries_;
 
     [[nodiscard]] bool good() const {
@@ -1264,7 +1166,7 @@ private:
         }
     }
 
-    bool parse_entries_array(const SongIndexOptions& options) {
+    bool parse_entries_array() {
         if (!expect('[', "Song index entries must be an array.")) {
             return false;
         }
@@ -1278,7 +1180,10 @@ private:
             if (!parse_entry_object(entry)) {
                 return false;
             }
-            if (!entry.path.empty() && is_menu_song_entry(entry, options)) {
+            if (entry.native_level == 0 && entry.level != 0) {
+                entry.native_level = entry.level;
+            }
+            if (!entry.path.empty() && is_menu_song_entry(entry)) {
                 entries_.push_back(std::move(entry));
             }
 
@@ -1369,6 +1274,12 @@ private:
                     return false;
                 }
                 entry.level = static_cast<int>(std::llround(value.value()));
+            } else if (*key == "native_level") {
+                auto value = parse_number();
+                if (!value.has_value()) {
+                    return false;
+                }
+                entry.native_level = static_cast<int>(std::llround(value.value()));
             } else if (*key == "rating") {
                 auto value = parse_number();
                 if (!value.has_value()) {
@@ -1387,6 +1298,48 @@ private:
                     return false;
                 }
                 entry.mtime = static_cast<int64_t>(std::llround(value.value()));
+            } else if (*key == "file_size") {
+                auto value = parse_number();
+                if (!value.has_value() || !std::isfinite(value.value()) || value.value() < 0.0) {
+                    return false;
+                }
+                entry.file_size = static_cast<std::uint64_t>(std::llround(value.value()));
+            } else if (*key == "md5") {
+                auto value = parse_string();
+                if (!value.has_value()) {
+                    return false;
+                }
+                entry.md5 = to_lower(trim_copy(value.value()));
+            } else if (*key == "sha256") {
+                auto value = parse_string();
+                if (!value.has_value()) {
+                    return false;
+                }
+                entry.sha256 = to_lower(trim_copy(value.value()));
+            } else if (*key == "difficulty_table_name") {
+                auto value = parse_string();
+                if (!value.has_value()) {
+                    return false;
+                }
+                entry.difficulty_table_name = util::sanitize_ui_text(value.value());
+            } else if (*key == "difficulty_table_symbol") {
+                auto value = parse_string();
+                if (!value.has_value()) {
+                    return false;
+                }
+                entry.difficulty_table_symbol = util::sanitize_ui_text(value.value());
+            } else if (*key == "difficulty_table_level") {
+                auto value = parse_string();
+                if (!value.has_value()) {
+                    return false;
+                }
+                entry.difficulty_table_level = util::sanitize_ui_text(value.value());
+            } else if (*key == "difficulty_table_order") {
+                auto value = parse_number();
+                if (!value.has_value()) {
+                    return false;
+                }
+                entry.difficulty_table_order = static_cast<int>(std::llround(value.value()));
             } else {
                 if (!skip_value()) {
                     return false;
@@ -1447,7 +1400,7 @@ SongIndexLoadResult load_song_index(const std::string& path, const SongIndexOpti
     }
 
     SongIndexStreamReader reader(file);
-    if (!reader.parse(options)) {
+    if (!reader.parse()) {
         result.error = reader.error().empty() ? "Failed to parse song index." : reader.error();
         return result;
     }
@@ -1455,18 +1408,20 @@ SongIndexLoadResult load_song_index(const std::string& path, const SongIndexOpti
     if (reader.version() != kSongIndexVersion) {
         return result;
     }
-    if (options.include_osu && !reader.cache_includes_osu()) {
-        return result;
-    }
 
     result.loaded_from_file = true;
     result.index.entries = reader.entries();
+    const auto difficulty_table = load_selected_difficulty_table(options, result.warnings);
+    const DifficultyTable* selected_table = difficulty_table.has_value() ? &difficulty_table.value() : nullptr;
+    for (auto& entry : result.index.entries) {
+        apply_difficulty_table(entry, selected_table);
+    }
     return result;
 }
 
 bool save_song_index(const std::string& path,
                      const SongIndex& index,
-                     const SongIndexOptions& options,
+                     const SongIndexOptions&,
                      std::string* error,
                      SongIndexProgressCallback progress,
                      SongIndexCancelCallback cancel) {
@@ -1513,7 +1468,6 @@ bool save_song_index(const std::string& path,
 
     file << "{\n";
     file << "  \"version\": " << kSongIndexVersion << ",\n";
-    file << "  \"include_osu\": " << (options.include_osu ? "true" : "false") << ",\n";
     file << "  \"entries\": [\n";
 
     for (std::size_t i = 0; i < index.entries.size(); ++i) {
@@ -1547,9 +1501,22 @@ bool save_song_index(const std::string& path,
         write_json_string(file, entry.background_preview_path);
         file << ",\"key_count\":" << entry.key_count;
         file << ",\"level\":" << entry.level;
+        file << ",\"native_level\":" << entry.native_level;
         file << ",\"rating\":" << entry.rating;
         file << ",\"bpm\":" << entry.bpm;
         file << ",\"mtime\":" << entry.mtime;
+        file << ",\"md5\":";
+        write_json_string(file, entry.md5);
+        file << R"(,"file_size":)" << entry.file_size;
+        file << ",\"sha256\":";
+        write_json_string(file, entry.sha256);
+        file << ",\"difficulty_table_name\":";
+        write_json_string(file, entry.difficulty_table_name);
+        file << ",\"difficulty_table_symbol\":";
+        write_json_string(file, entry.difficulty_table_symbol);
+        file << ",\"difficulty_table_level\":";
+        write_json_string(file, entry.difficulty_table_level);
+        file << ",\"difficulty_table_order\":" << entry.difficulty_table_order;
         file << "}";
 
         const int processed = static_cast<int>(i + 1);
@@ -1592,6 +1559,9 @@ SongIndex scan_songs(const std::string& root_path,
         return result;
     }
 
+    const auto difficulty_table = load_selected_difficulty_table(options, warnings);
+    const DifficultyTable* selected_table = difficulty_table.has_value() ? &difficulty_table.value() : nullptr;
+
     std::unordered_map<std::string_view, const SongEntry*> cached;
     if (cache) {
         cached.reserve(cache->entries.size());
@@ -1602,7 +1572,7 @@ SongIndex scan_songs(const std::string& root_path,
 
     std::uint64_t total_candidates_u64 = 0;
     const bool count_completed = enumerate_song_candidates(
-        root_dir, options.include_osu, nullptr, [](SongIndexCandidate&&) {}, &total_candidates_u64, progress, cancel);
+        root_dir, nullptr, [](SongIndexCandidate&&) {}, &total_candidates_u64, progress, cancel);
     if (!count_completed || cancel_requested(cancel)) {
         return result;
     }
@@ -1627,13 +1597,12 @@ SongIndex scan_songs(const std::string& root_path,
 
         enumerate_song_candidates(
             root_dir,
-            options.include_osu,
             &warnings,
             [&](SongIndexCandidate&& candidate) {
                 batch.push_back(std::move(candidate));
                 if (batch.size() >= batch_limit) {
-                    process_song_index_batch(batch, cached, warnings, result, options, processed, total, hc, progress,
-                                             cancel);
+                    process_song_index_batch(batch, cached, warnings, result, options, selected_table, processed, total,
+                                             hc, progress, cancel);
                     const int processed_now = processed.load(std::memory_order_acquire);
                     if (should_trim_song_index_process_memory(options.profile, processed_now, total)) {
                         trim_song_index_process_memory();
@@ -1662,7 +1631,8 @@ SongIndex scan_songs(const std::string& root_path,
             return result;
         }
 
-        process_song_index_batch(batch, cached, warnings, result, options, processed, total, hc, progress, cancel);
+        process_song_index_batch(
+            batch, cached, warnings, result, options, selected_table, processed, total, hc, progress, cancel);
         const int processed_now = processed.load(std::memory_order_acquire);
         if (should_trim_song_index_process_memory(options.profile, processed_now, total)) {
             trim_song_index_process_memory();

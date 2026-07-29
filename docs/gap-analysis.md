@@ -21,7 +21,7 @@
 - BMS 파서/노멀라이즈/타임라인(샘플 타임) 구축
 - 기본 10키 채널 매핑 구현
 - SpeedManager/ GaugeManager 기본 스펙 반영
-- osu!mania 로더(모드/키/타이밍 포인트/노트) 구현
+- BMS 계열 전용 차트 로더·인덱서 구현
 - RawInput + InputThread + SPSCQueue + ClockSync 스캐폴딩
 - 입력 폴링(1000/2000/4000/8000Hz) + RenderThread 분리
 - WASAPI 백엔드 + AudioThread 뼈대
@@ -77,13 +77,13 @@
 - 관련 파일: `src/app/MenuApp.*`, `src/app/GameSession.*`, `src/gameplay/Replay.*`, `src/gameplay/ResultStats.*`
 - 픽스 방향(요약): 향후 리플레이 재생/검증용 로더 추가
 
-### 7) osu!mania 로더의 공통 파이프라인 연결 미구현
-- 요구사항: BMS와 동일한 노멀라이즈/스케줄링 경로
-- 현재 상태: osu!mania → GameplayChart 변환 경로 연결됨
-- 갭: BMS 노멀라이즈/타임라인과 동일한 중간 모델로의 통합은 미완
-- 심각도: Medium
-- 관련 파일: `src/chart/OsuManiaLoader.*`, `src/gameplay/GameplayChart.*`
-- 픽스 방향(요약): 공통 노멀라이즈 중간 모델 정의 후 BMS/OSU 공통화
+### 7) 차트 입력 범위
+- 요구사항: BMS 계열 전용 로딩/인덱싱
+- 현재 상태: `.bms/.bme/.bml/.pms`만 지원하며 osu 로더와 가져오기 경로는 제거됨
+- 갭: 없음
+- 심각도: 해결
+- 관련 파일: `src/chart/BmsParser.*`, `src/app/ChartLoader.*`, `src/app/SongIndex.*`
+- 픽스 방향(요약): BMS 파서·타임라인·실차트 회귀 테스트 유지
 
 ### 8) 판정 규칙(윈도우/마스크/LN 처리) 미구현
 - 요구사항: PG/GR/GD/BD/PR 윈도우, 30ms 레인 마스크, LN 유지/이탈 규칙

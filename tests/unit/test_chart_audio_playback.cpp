@@ -50,3 +50,26 @@ TEST_CASE("chart audio mix interpolates when playback rate is slower") {
     CHECK(output[6] == doctest::Approx(4.0f));
     CHECK(output[7] == doctest::Approx(40.0f));
 }
+
+TEST_CASE("late realtime keysounds start at the writable buffer boundary") {
+    const std::vector<float> short_clip = {
+        1.0f, 1.0f,
+        0.5f, 0.5f,
+    };
+    std::vector<float> output(4, 0.0f);
+
+    const int64_t buffer_start = 1'000;
+    const int64_t original_input_sample = 900;
+    CHECK(tenriff::app::mix_chart_audio_clip_linear(
+              short_clip, original_input_sample, 1.0, 1.0f,
+              output.data(), 2, buffer_start) == 0);
+
+    const int64_t audible_sample = tenriff::app::pin_realtime_audio_start_sample(
+        original_input_sample, buffer_start);
+    CHECK(audible_sample == buffer_start);
+    CHECK(tenriff::app::mix_chart_audio_clip_linear(
+              short_clip, audible_sample, 1.0, 1.0f,
+              output.data(), 2, buffer_start) == 2);
+    CHECK(output[0] == doctest::Approx(1.0f));
+    CHECK(output[1] == doctest::Approx(1.0f));
+}

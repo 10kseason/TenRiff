@@ -185,6 +185,39 @@ TEST_CASE("lr2 skin resolver follows includes, custom files, and note destinatio
     CHECK(resolved.key_images[0].path.find("default.png") != std::string::npos);
 }
 
+TEST_CASE("lr2 skin image slots survive missing assets and include boundaries") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+
+    const auto root = temp.path / "skins";
+    const auto skin = root / "StableSlots";
+    std::filesystem::create_directories(skin / "csv");
+    std::filesystem::create_directories(skin / "img");
+
+    write_file(skin / "play.lr2skin",
+               "#INFORMATION,0,Stable Slots,Tester\n"
+               "#ENDOFHEADER\n"
+               "#IMAGE,LR2Files\\Theme\\StableSlots\\img\\missing.png\n"
+               "#INCLUDE,LR2Files\\Theme\\StableSlots\\csv\\included.csv\n"
+               "#IMAGE,LR2Files\\Theme\\StableSlots\\img\\parent.png\n"
+               "#SRC_NOTE,1,2,30,0,30,22,1,1,0,0\n"
+               "#DST_NOTE,1,0,140,400,30,22,0,255,255,255,255,0,0,0,0,0,0,0,0,0\n");
+    write_file(skin / "csv" / "included.csv",
+               "#IMAGE,LR2Files\\Theme\\StableSlots\\img\\included.png\n"
+               "#SRC_NOTE,0,1,0,0,30,22,1,1,0,0\n"
+               "#DST_NOTE,0,0,100,400,30,22,0,255,255,255,255,0,0,0,0,0,0,0,0,0\n");
+    write_file(skin / "img" / "included.png");
+    write_file(skin / "img" / "parent.png");
+
+    const auto resolved = tenriff::app::resolve_lr2_play_skin(
+        root.u8string(), "StableSlots", 2);
+    REQUIRE(resolved.found);
+    REQUIRE(resolved.note_images.size() == 2u);
+    CHECK(resolved.note_images[0].path.find("included.png") != std::string::npos);
+    CHECK(resolved.note_images[1].path.find("parent.png") != std::string::npos);
+}
+
 TEST_CASE("lr2 skin resolver handles multi-option branches, customfile directories, and normalized lane order") {
     TempDirGuard temp;
     temp.path = make_temp_dir();

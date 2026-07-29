@@ -24,9 +24,17 @@ struct SongEntry {
     std::string background_preview_path;
     int key_count = 0;
     int level = 0;
+    int native_level = 0;
     double rating = 0.0;
     double bpm = 0.0;
     int64_t mtime = 0;
+    std::uint64_t file_size = 0;
+    std::string md5;
+    std::string sha256;
+    std::string difficulty_table_name;
+    std::string difficulty_table_symbol;
+    std::string difficulty_table_level;
+    int difficulty_table_order = -1;
 };
 
 struct SongIndex {
@@ -34,8 +42,11 @@ struct SongIndex {
 };
 
 struct SongIndexOptions {
-    bool include_osu = false;
     SongIndexProfile profile = SongIndexProfile::Safe;
+    std::string difficulty_table_path;
+    // F5/manual full rescans disable this so timestamp-preserving replacements
+    // cannot keep stale metadata or difficulty-table hashes.
+    bool reuse_cached_metadata = true;
 };
 
 enum class SongIndexProgressStage {

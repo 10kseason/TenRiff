@@ -21,7 +21,7 @@
 - 已搭建 BMS parser/normalize/timeline（sample time）
 - 已实现基础 10K channel mapping
 - 已反映 SpeedManager / GaugeManager 基本规格
-- 已实现 osu!mania loader（mode/key/timing points/note）
+- 已实现仅支持 BMS family 的谱面 loader 与 indexer
 - 已实现 RawInput + InputThread + SPSCQueue + ClockSync scaffolding
 - 已实现输入 polling（1000/2000/4000/8000Hz）与 RenderThread 分离
 - 已有 WASAPI backend + AudioThread 骨架
@@ -77,13 +77,13 @@
 - 相关文件：`src/app/MenuApp.*`、`src/app/GameSession.*`、`src/gameplay/Replay.*`、`src/gameplay/ResultStats.*`
 - 修复方向（摘要）：未来为 replay 回放/验证增加 loader
 
-### 7) osu!mania loader 的公共 pipeline 连接尚未实现
-- 要求：与 BMS 相同的 normalise/scheduling 路径
-- 当前状态：已连接 osu!mania → GameplayChart 的转换路径
-- 差距：尚未统一到与 BMS normalise/timeline 相同的中间模型
-- 严重度：Medium
-- 相关文件：`src/chart/OsuManiaLoader.*`、`src/gameplay/GameplayChart.*`
-- 修复方向（摘要）：定义通用 normalized middle model，然后把 BMS/OSU 共通化
+### 7) 谱面输入范围
+- 要求：仅加载和索引 BMS family
+- 当前状态：只支持 `.bms/.bme/.bml/.pms`，osu loader 与导入路径已移除
+- 差距：无
+- 严重度：已解决
+- 相关文件：`src/chart/BmsParser.*`、`src/app/ChartLoader.*`、`src/app/SongIndex.*`
+- 修复方向（摘要）：保留 BMS parser、timeline 和真实谱面回归测试
 
 ### 8) 判定规则（窗口/遮罩/LN 处理）未实现
 - 要求：PG/GR/GD/BD/PR 窗口、30ms lane mask、LN 维持/离开规则

@@ -27,6 +27,7 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
     target.background_overlay_start_sample = gameplay_hud_.background_overlay_start_sample;
     target.background_upscale_mode = config_.graphics.background_upscale_mode;
     target.background_upscale_model_path = config_.graphics.background_upscale_model_path;
+    target.background_upscale_prefer_npu = config_.graphics.background_upscale_prefer_npu;
     const double clamped_judgement_line_position = std::clamp(
         config_.skin.judgement_line_position,
         config::kJudgementLinePositionMin,
@@ -430,6 +431,7 @@ void MenuApp::sync_menu_music() {
           screen_ == Screen::ModeMods ||
           screen_ == Screen::Keymap ||
           screen_ == Screen::KeymapConfirm ||
+          screen_ == Screen::OnnxUpscalerConfirm ||
           screen_ == Screen::KeymapTest) &&
          submenu_return_screen_ == Screen::SongSelect);
 
@@ -567,7 +569,7 @@ void MenuApp::populate_title_render_data(render::MenuRenderData& render,
         no_songs_indexed
             ? ui_text("PLAY becomes Add Songs Folder until a library is indexed",
                       "라이브러리가 생기기 전까지 PLAY가 곡 폴더 추가로 바뀝니다")
-            : ui_text("F2 selects a songs folder; Shift+F2 imports OSZ", "F2로 곡 폴더 선택, Shift+F2로 OSZ 가져오기"),
+            : ui_text("F2 selects a songs folder; -/+ adjusts Rate", "F2로 곡 폴더 선택, -/+로 배속 조절"),
         ui_text("F5 refreshes the current song source", "F5로 현재 곡 소스를 새로고침"),
         ui_text("F1 opens the control help overlay", "F1로 조작 도움말 열기"),
         ui_text("ESC exits from the title menu", "ESC로 타이틀 메뉴 종료"),
@@ -894,6 +896,8 @@ void MenuApp::populate_generic_screen_render_data(render::MenuRenderData& render
         populate_keymap_render_data(render);
     } else if (screen_ == Screen::KeymapConfirm) {
         populate_keymap_confirm_render_data(render);
+    } else if (screen_ == Screen::OnnxUpscalerConfirm) {
+        populate_onnx_upscaler_confirm_render_data(render);
     } else if (screen_ == Screen::KeymapTest) {
         populate_keymap_test_render_data(render);
     }
@@ -1685,6 +1689,8 @@ std::string MenuApp::screen_title() const {
         case Screen::ModeMods: return ui_text("Mod Manager", "모드 관리자");
         case Screen::Keymap: return ui_text("Keymap", "키 설정");
         case Screen::KeymapConfirm: return ui_text("Keymap Confirm", "키 설정 확인");
+        case Screen::OnnxUpscalerConfirm:
+            return ui_text("Enable ONNX Upscaler?", "ONNX 업스케일러를 켤까요?");
         case Screen::KeymapTest: return "NKRO Test";
         case Screen::Result: return ui_text("Result", "결과");
         default: return ui_text("Menu", "메뉴");
@@ -1737,8 +1743,8 @@ void MenuApp::populate_help_overlay(render::HelpOverlayData& target) const {
                         "Enter 또는 더블클릭으로 선택한 버튼을 엽니다."),
                 ui_text("If no songs are indexed yet, PLAY becomes Add Songs Folder so recovery stays visible on the first screen.",
                         "아직 인덱싱된 곡이 없으면 PLAY가 곡 폴더 추가로 바뀌어 첫 화면에서 바로 복구할 수 있습니다."),
-                ui_text("F2 opens the songs-folder picker, Shift+F2 imports OSZ, and F5 refreshes the source.",
-                        "F2는 곡 폴더 선택, Shift+F2는 OSZ 가져오기, F5는 소스 새로고침입니다."),
+                ui_text("F2 opens the songs-folder picker, -/+ adjusts Rate, and F5 refreshes the source.",
+                        "F2는 곡 폴더 선택, -/+는 배속 조절, F5는 소스 새로고침입니다."),
             };
             target.footer = ui_text("Esc exits TenRiff. Press F1 again to close help.",
                                     "Esc로 TenRiff를 종료합니다. 도움말을 닫으려면 F1을 다시 누르세요.");
@@ -1773,8 +1779,8 @@ void MenuApp::populate_help_overlay(render::HelpOverlayData& target) const {
                         "SEARCH는 제목, 아티스트, 경로를 검색하고 FILTER는 정렬, 그룹, 키, 난이도, 컬렉션을 담당합니다."),
                 ui_text("Backspace returns from Sources or Records to Songs. Esc returns to the title screen.",
                         "Backspace는 Sources나 Records에서 Songs로 돌아가고 Esc는 타이틀 화면으로 돌아갑니다."),
-                ui_text("F2 chooses a songs folder. Shift+F2 imports OSZ. F5 refreshes the active source.",
-                        "F2로 곡 폴더 선택, Shift+F2로 OSZ 가져오기, F5로 활성 소스를 새로고침합니다."),
+                ui_text("F2 chooses a songs folder. -/+ adjusts Rate. F5 refreshes the active source.",
+                        "F2로 곡 폴더 선택, -/+로 배속 조절, F5로 활성 소스를 새로고침합니다."),
                 ui_text("Safe indexing lowers RAM use for very large libraries. Fast rescans quicker on high-memory PCs.",
                         "안전 인덱싱은 매우 큰 라이브러리에서 RAM 사용량을 줄이고, 빠름은 메모리가 많은 PC에서 재스캔 속도를 높입니다."),
             };
@@ -1833,10 +1839,10 @@ void MenuApp::populate_help_overlay(render::HelpOverlayData& target) const {
             target.lines = {
                 ui_text("Up / Down or the mouse wheel selects a row. Long skin lists now scroll with a right-side scrollbar.",
                         "위 / 아래 키 또는 마우스 휠로 행을 선택합니다. 긴 스킨 목록은 오른쪽 스크롤바로 스크롤됩니다."),
-                ui_text("Skin Source swaps between the native vector skin and imported osu!mania assets.",
-                        "스킨 소스는 기본 벡터 스킨과 가져온 osu!mania 자산 사이를 전환합니다."),
-                ui_text("Import OSU Skin opens a folder picker. Drag-and-drop also works on this screen.",
-                        "OSU 스킨 가져오기는 폴더 선택 창을 엽니다. 이 화면에서는 드래그 앤 드롭도 지원합니다."),
+                ui_text("Skin Source swaps between the native vector skin and imported LR2 playskins.",
+                        "스킨 소스는 기본 벡터 스킨과 가져온 LR2 플레이스킨 사이를 전환합니다."),
+                ui_text("Import Skin opens an LR2 folder picker. Drag-and-drop also works on this screen.",
+                        "스킨 가져오기는 LR2 폴더 선택 창을 엽니다. 이 화면에서는 드래그 앤 드롭도 지원합니다."),
                 ui_text("Image Aspect keeps imported note heads and tails from stretching to the gameplay note box.",
                         "이미지 비율은 가져온 노트 헤드와 테일이 게임 노트 박스에 맞춰 늘어나지 않게 유지합니다."),
                 ui_text("The right preview shows the native fallback lane colors and sizing per layout.",
@@ -1886,8 +1892,8 @@ void MenuApp::populate_help_overlay(render::HelpOverlayData& target) const {
                         "고스트 배틀, 오토플레이, 연습 모드, 서든 데스, 게이지, 랜덤, 모드, Rate, Hi-Speed는 다음 곡의 비교/플레이 감각을 바꿉니다."),
                 ui_text("Indexing Safe minimizes RAM for huge libraries. Fast spends more RAM to speed up rescans.",
                         "인덱싱 안전은 큰 라이브러리에서 RAM 사용을 줄이고, 빠름은 더 많은 RAM으로 재스캔을 빠르게 합니다."),
-                ui_text("Chart Filter decides whether Song Select shows BMS, OSU, or both when OSU indexing is enabled.",
-                        "Chart Filter는 OSU 인덱싱이 켜졌을 때 Song Select에 BMS, OSU, 둘 다 표시할지 정합니다."),
+                ui_text("TenRiff 1.2.6 indexes and plays BMS-family charts only.",
+                        "TenRiff 1.2.6은 BMS 계열 차트만 인덱싱하고 플레이합니다."),
                 ui_text("Ghost Battle uses the selected chart's best compatible replay when one exists; turn it off to keep single-field play.",
                         "고스트 배틀은 선택한 차트의 호환되는 최고 리플레이가 있으면 사용하며, 끄면 단일 플레이 필드로 유지됩니다."),
                 ui_text("Autoplay and Practice are assist modes for QA. Their results are marked ASSIST and are not used as default ghost bests.",

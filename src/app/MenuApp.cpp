@@ -29,6 +29,7 @@
 #endif
 
 #include "app/GameSession.h"
+#include "app/DifficultyTable.h"
 #include "app/GameplayHudRevisions.h"
 #include "app/GraphicsTiming.h"
 #include "app/MenuAppSettingsUtils.h"
@@ -38,7 +39,6 @@
 #include "app/ModeManager.h"
 #include "app/MenuRecordUtils.h"
 #include "app/MenuSongUtils.h"
-#include "app/OsuArchiveImport.h"
 #include "app/PersistedRuntimeConfig.h"
 #include "app/PeerBattleRuntimeRules.h"
 #include "app/ProfileSetupFlow.h"
@@ -64,7 +64,7 @@ using menu_song_select::song_title_for_ui;
 constexpr int kSnapshotSongCount = 10;
 constexpr int kSongSelectVisibleCardCount = 5;
 constexpr int kSongSelectNavLastIndex = 5;
-constexpr int kSongBrowserRowCount = 10;
+constexpr int kSongBrowserRowCount = 11;
 constexpr int64_t kSongSelectRepeatInitialDelayNs = 250'000'000LL;
 constexpr int64_t kSongSelectRepeatIntervalNs = 45'000'000LL;
 constexpr std::size_t kRecentSongSourceLimit = 12;
@@ -280,61 +280,69 @@ std::string browse_for_folder(const std::string& title) {
     return result;
 }
 
-std::string browse_for_osz(const std::string& title) {
+std::string browse_for_json_file(const std::string& title) {
     std::string result;
+
     const HRESULT init_hr = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
-    const bool should_uninitialize = SUCCEEDED(init_hr);
-
-    Microsoft::WRL::ComPtr<IFileOpenDialog> dialog;
-    if (FAILED(CoCreateInstance(CLSID_FileOpenDialog,
-                                nullptr,
-                                CLSCTX_INPROC_SERVER,
-                                IID_PPV_ARGS(&dialog))) ||
-        !dialog) {
-        if (should_uninitialize) {
-            CoUninitialize();
-        }
+    if (FAILED(init_hr)) {
         return result;
     }
-    DWORD options = 0;
-    if (FAILED(dialog->GetOptions(&options))) {
-        if (should_uninitialize) {
-            CoUninitialize();
-        }
-        return result;
-    }
-    dialog->SetOptions(options | FOS_FORCEFILESYSTEM | FOS_FILEMUSTEXIST | FOS_PATHMUSTEXIST);
-    const COMDLG_FILTERSPEC filters[] = {
-        {L"osu! beatmap package (*.osz)", L"*.osz"},
-        {L"All files (*.*)", L"*.*"},
-    };
-    dialog->SetFileTypes(static_cast<UINT>(std::size(filters)), filters);
-    dialog->SetFileTypeIndex(1);
-    dialog->SetDefaultExtension(L"osz");
 
-    const std::wstring wide_title = util::wide_from_multibyte(title, CP_UTF8);
-    if (!wide_title.empty()) {
-        dialog->SetTitle(wide_title.c_str());
-    }
-    if (SUCCEEDED(dialog->Show(nullptr))) {
-        Microsoft::WRL::ComPtr<IShellItem> item;
-        if (SUCCEEDED(dialog->GetResult(&item)) && item) {
-            PWSTR raw_path = nullptr;
-            if (SUCCEEDED(item->GetDisplayName(SIGDN_FILESYSPATH, &raw_path)) && raw_path) {
-                result = std::filesystem::path(raw_path).u8string();
-                CoTaskMemFree(raw_path);
+    IFileOpenDialog* dialog = nullptr;
+    HRESULT hr = CoCreateInstance(CLSID_FileOpenDialog, nullptr, CLSCTX_ALL,
+                                  IID_IFileOpenDialog, reinterpret_cast<void**>(&dialog));
+    if (SUCCEEDED(hr)) {
+        DWORD options = 0;
+        dialog->GetOptions(&options);
+        dialog->SetOptions(options | FOS_FORCEFILESYSTEM | FOS_FILEMUSTEXIST | FOS_PATHMUSTEXIST);
+
+        const COMDLG_FILTERSPEC filters[] = {
+            {L"BMS difficulty table JSON", L"*.json"},
+            {L"All files", L"*.*"},
+        };
+        dialog->SetFileTypes(static_cast<UINT>(std::size(filters)), filters);
+        dialog->SetFileTypeIndex(1);
+
+        std::wstring wide_title;
+        if (!title.empty()) {
+            const int count = MultiByteToWideChar(CP_UTF8, 0, title.c_str(), -1, nullptr, 0);
+            if (count > 0) {
+                wide_title.resize(static_cast<std::size_t>(count));
+                MultiByteToWideChar(CP_UTF8, 0, title.c_str(), -1, wide_title.data(), count);
             }
         }
+        if (!wide_title.empty()) {
+            dialog->SetTitle(wide_title.c_str());
+        }
+
+        hr = dialog->Show(nullptr);
+        if (SUCCEEDED(hr)) {
+            IShellItem* item = nullptr;
+            hr = dialog->GetResult(&item);
+            if (SUCCEEDED(hr)) {
+                PWSTR path = nullptr;
+                hr = item->GetDisplayName(SIGDN_FILESYSPATH, &path);
+                if (SUCCEEDED(hr) && path) {
+                    const int length = WideCharToMultiByte(CP_UTF8, 0, path, -1, nullptr, 0, nullptr, nullptr);
+                    if (length > 0) {
+                        result.resize(static_cast<std::size_t>(length));
+                        WideCharToMultiByte(CP_UTF8, 0, path, -1, result.data(), length, nullptr, nullptr);
+                        if (!result.empty() && result.back() == '\0') {
+                            result.pop_back();
+                        }
+                    }
+                    CoTaskMemFree(path);
+                }
+                item->Release();
+            }
+        }
+        dialog->Release();
     }
-    if (should_uninitialize) {
-        CoUninitialize();
-    }
+
+    CoUninitialize();
     return result;
 }
 
-bool shift_key_is_down() {
-    return (GetAsyncKeyState(VK_SHIFT) & 0x8000) != 0;
-}
 #endif
 
 std::string gauge_type_label(game::GaugeType type) {
@@ -614,17 +622,6 @@ std::string MenuApp::ui_song_index_profile_label(std::string_view token) const {
     return ui_text("Safe", "안전");
 }
 
-std::string MenuApp::ui_chart_filter_label(std::string_view token) const {
-    const std::string normalized = normalize_chart_filter(std::string(token));
-    if (normalized == "bms") {
-        return "BMS";
-    }
-    if (normalized == "osu") {
-        return "OSU";
-    }
-    return ui_text("All", "전체");
-}
-
 std::string MenuApp::ui_key_mode_label(std::string_view token) const {
     const std::string normalized = normalize_runtime_key_mode(std::string(token));
     if (normalized == "none") {
@@ -663,9 +660,6 @@ std::string MenuApp::ui_random_label(std::string_view token) const {
 
 std::string MenuApp::ui_skin_source_label(std::string_view token) const {
     const std::string normalized = config::normalize_skin_source_token(token);
-    if (normalized == "osu") {
-        return "osu!mania";
-    }
     if (normalized == "lr2") {
         return "LR2";
     }
@@ -829,7 +823,6 @@ bool MenuApp::initialize(const CommandLineOptions& options) {
         clamp_int(config_.graphics.refresh_hz, kGraphicsRefreshHzMin, kGraphicsRefreshHzMax);
     config_.graphics.resolution = normalize_resolution_preset(config_.graphics.resolution);
     refresh_song_collection_membership_cache();
-    refresh_available_osu_skins();
     refresh_available_lr2_skins();
 
     config::KeymapManager keymap_manager;
@@ -867,6 +860,8 @@ bool MenuApp::initialize(const CommandLineOptions& options) {
     key_f2_ = config::KeycodeMap::to_keycode("F2").value_or(0);
     key_f5_ = config::KeycodeMap::to_keycode("F5").value_or(0);
     key_f9_ = config::KeycodeMap::to_keycode("F9").value_or(0);
+    key_minus_ = config::KeycodeMap::to_keycode("Minus").value_or(0);
+    key_plus_ = config::KeycodeMap::to_keycode("Plus").value_or(0);
 
     {
         config::KeymapManager keymap_manager;
@@ -1149,7 +1144,7 @@ void MenuApp::restart_input_thread(bool retry_configured_backend) {
 
 std::vector<uint32_t> MenuApp::current_menu_probe_keycodes() const {
     std::vector<uint32_t> fixed_menu_keys;
-    fixed_menu_keys.reserve(14);
+    fixed_menu_keys.reserve(16);
     auto append_fixed_key = [&fixed_menu_keys](uint32_t keycode) {
         if (keycode != 0) {
             fixed_menu_keys.push_back(keycode);
@@ -1170,6 +1165,8 @@ std::vector<uint32_t> MenuApp::current_menu_probe_keycodes() const {
     append_fixed_key(key_f2_);
     append_fixed_key(key_f5_);
     append_fixed_key(key_f9_);
+    append_fixed_key(key_minus_);
+    append_fixed_key(key_plus_);
 
     const bool include_keymap_bindings =
         screen_ == Screen::Keymap || screen_ == Screen::KeymapTest;
@@ -1456,36 +1453,6 @@ void MenuApp::persist_runtime_config() {
     }
 }
 
-bool MenuApp::import_osz_path(std::string_view source_path) {
-    if (source_path.empty() || songs_path_.empty()) {
-        return false;
-    }
-
-    OsuArchiveImportLimits limits;
-    limits.max_archive_bytes = 4ull * 1024ull * 1024ull * 1024ull;
-    limits.max_file_bytes = 2ull * 1024ull * 1024ull * 1024ull;
-    limits.max_total_uncompressed_bytes = 8ull * 1024ull * 1024ull * 1024ull;
-    limits.max_entries = 16384;
-    limits.max_path_components = 64;
-    const OsuArchiveImportResult result = import_osu_archive(
-        source_path, songs_path_, OsuArchiveKind::Osz, limits);
-    if (!result.success) {
-        std::cerr << "[warn] Failed to import OSZ package: " << result.error << std::endl;
-        return false;
-    }
-
-    config_.mode.enable_osu_charts = true;
-    if (to_lower_ascii(config_.mode.format) == "bms") {
-        config_.mode.format = "auto";
-    }
-    persist_runtime_config();
-    std::cerr << "[info] Imported OSZ beatmap set '" << result.display_name << "' ("
-              << result.extracted_file_count << " files, " << result.extracted_bytes
-              << " bytes)." << std::endl;
-    switch_song_source(songs_path_, true);
-    return true;
-}
-
 void MenuApp::refresh_song_source(bool force_reindex) {
     switch_song_source(songs_path_, force_reindex);
 }
@@ -1504,7 +1471,8 @@ void MenuApp::switch_song_source(const std::string& new_songs_path, bool force_r
     last_indexer_snapshot_ns_ = 0;
     song_indexer_.stop();
     SongIndexOptions index_options;
-    index_options.include_osu = config_.mode.enable_osu_charts;
+    index_options.difficulty_table_path = config_.ui.difficulty_table_path;
+    index_options.reuse_cached_metadata = !force_reindex;
     index_options.profile = (config::normalize_song_index_profile_token(config_.mode.song_index_profile) == "fast")
                                 ? SongIndexProfile::Fast
                                 : SongIndexProfile::Safe;
@@ -1633,6 +1601,9 @@ void MenuApp::handle_input_event(const input::InputEvent& event) {
         case Screen::KeymapConfirm:
             handle_keymap_confirm_input(event.keycode);
             break;
+        case Screen::OnnxUpscalerConfirm:
+            handle_onnx_upscaler_confirm_input(event.keycode);
+            break;
         case Screen::KeymapTest:
             handle_keymap_test_input(event.keycode);
             break;
@@ -1685,6 +1656,9 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
                         break;
                     case Screen::SettingsGraphics:
                         handle_graphics_settings_input(direction_key);
+                        break;
+                    case Screen::OnnxUpscalerConfirm:
+                        handle_onnx_upscaler_confirm_input(direction_key);
                         break;
                     case Screen::SettingsSkins:
                         handle_skins_settings_input(direction_key);
@@ -1747,37 +1721,14 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
         }
         if (screen_ == Screen::SettingsGraphics && dropped_extension == ".onnx") {
             config_.graphics.background_upscale_model_path = event.path;
-            config_.graphics.background_upscale_mode = "onnx";
             graphics_dirty_ = true;
             persist_runtime_config();
             publish_snapshot();
             return;
         }
-        if (dropped_extension == ".osk") {
-            if (!import_osu_skin_path(event.path)) {
-                std::cerr << "[warn] Ignored invalid or unsupported OSK package: " << event.path << std::endl;
-                return;
-            }
-            config_.skin.source = "osu";
-            persist_runtime_config();
-            publish_snapshot();
-            return;
-        }
-        if (dropped_extension == ".osz") {
-            if (!import_osz_path(event.path)) {
-                std::cerr << "[warn] Ignored invalid or unsupported OSZ package: " << event.path << std::endl;
-                return;
-            }
-            screen_ = Screen::SongSelect;
-            song_select_search_active_ = false;
-            song_select_focus_ = SongSelectFocus::SongList;
-            song_select_view_ = SongSelectView::Songs;
-            publish_snapshot();
-            return;
-        }
         if (screen_ == Screen::SettingsSkins) {
             if (!import_skin_path_auto(event.path)) {
-                std::cerr << "[warn] Ignored dropped path (expected an OSK package, an osu!mania/LR2 skin folder, or a folder containing skins): "
+                std::cerr << "[warn] Ignored dropped path (expected an LR2 skin folder or a folder containing LR2 skins): "
                           << event.path << std::endl;
                 return;
             }
@@ -1840,7 +1791,7 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
                 (event.part == render::MenuHitPart::Decrement) ? (event.index - 1) : event.index,
                 0,
                 kSongSelectNavLastIndex);
-            if (song_select_nav_cursor_ != 6) {
+            if (song_select_nav_cursor_ != 2) {
                 song_select_search_active_ = false;
             }
             publish_snapshot();
@@ -1949,7 +1900,7 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
             handle_audio_settings_input(action_key);
             return;
         case Screen::SettingsGraphics:
-            settings_cursor_ = clamp_int(event.index, 0, 9);
+            settings_cursor_ = clamp_int(event.index, 0, 10);
             handle_graphics_settings_input(action_key);
             return;
         case Screen::SongBrowser:
@@ -1958,7 +1909,7 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
             return;
         case Screen::SettingsSkins:
             settings_cursor_ = clamp_int(event.index, 0,
-                                         31 + (config::normalize_skin_source_token(config_.skin.source) == "lr2" ? 1 : 0));
+                                         32 + (config::normalize_skin_source_token(config_.skin.source) == "lr2" ? 1 : 0));
             handle_skins_settings_input(action_key);
             return;
         case Screen::SettingsInput:
@@ -1970,7 +1921,7 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
             handle_calibration_settings_input(action_key);
             return;
         case Screen::ModeSelect:
-            settings_cursor_ = clamp_int(event.index, 0, 13);
+            settings_cursor_ = clamp_int(event.index, 0, 12);
             handle_mode_settings_input(action_key);
             return;
         case Screen::ModeMods:
@@ -1990,6 +1941,10 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
             } else if (event.index == 1) {
                 handle_keymap_confirm_input(key_escape_);
             }
+            return;
+        case Screen::OnnxUpscalerConfirm:
+            onnx_upscaler_confirm_cursor_ = clamp_int(event.index, 0, 1);
+            handle_onnx_upscaler_confirm_input(key_enter_);
             return;
         case Screen::KeymapTest:
             handle_keymap_test_input(key_escape_);
@@ -2013,18 +1968,6 @@ void MenuApp::handle_title_input(uint32_t keycode) {
     }
 #ifdef _WIN32
     if (keycode == key_f2_) {
-        if (shift_key_is_down()) {
-            const std::string package_path =
-                browse_for_osz(ui_text("Import OSZ Beatmap Package", "OSZ 비트맵 패키지 가져오기"));
-            if (!package_path.empty() && import_osz_path(package_path)) {
-                reset_multiplayer_for_single_player();
-                screen_ = Screen::SongSelect;
-                song_select_focus_ = SongSelectFocus::SongList;
-                song_select_view_ = SongSelectView::Songs;
-                publish_snapshot();
-            }
-            return;
-        }
         std::string new_path = browse_for_folder(ui_text("Select Songs Folder", "곡 폴더 선택"));
         if (!new_path.empty()) {
             switch_song_source(new_path, false);
@@ -2222,7 +2165,6 @@ void MenuApp::handle_options_hub_input(uint32_t keycode) {
                 skin_edit_mode_ = normalize_skin_edit_mode(config_.mode.key_mode);
                 skin_edit_lane_ = 0;
                 skin_edit_gap_ = 0;
-                refresh_available_osu_skins();
                 refresh_available_lr2_skins();
                 break;
             case 3:
@@ -2273,6 +2215,17 @@ void MenuApp::handle_song_select_input(uint32_t keycode) {
     };
     const bool search_nav_selected =
         song_select_focus_ == SongSelectFocus::LeftNav && song_select_nav_cursor_ == 2;
+    if (!song_select_search_active_ && !search_nav_selected &&
+        (keycode == key_minus_ || keycode == key_plus_)) {
+        const double direction = keycode == key_minus_ ? -1.0 : 1.0;
+        config_.speed.rate = clamp_step_value(config_.speed.rate + direction * kRateStep,
+                                              kRateMin,
+                                              kRateMax,
+                                              kRateStep);
+        persist_runtime_config();
+        publish_snapshot();
+        return;
+    }
     if (song_select_search_active_) {
         if (keycode == key_enter_ || keycode == key_escape_) {
             song_select_search_active_ = false;
@@ -2338,15 +2291,6 @@ void MenuApp::handle_song_select_input(uint32_t keycode) {
 #ifdef _WIN32
     if (keycode == key_f2_) {
         song_select_search_active_ = false;
-        if (shift_key_is_down()) {
-            const std::string package_path =
-                browse_for_osz(ui_text("Import OSZ Beatmap Package", "OSZ 비트맵 패키지 가져오기"));
-            if (!package_path.empty() && import_osz_path(package_path)) {
-                song_select_view_ = SongSelectView::Songs;
-                publish_snapshot();
-            }
-            return;
-        }
         std::string new_path = browse_for_folder(ui_text("Select Songs Folder", "곡 폴더 선택"));
         if (!new_path.empty()) {
             switch_song_source(new_path, false);
@@ -2574,7 +2518,44 @@ void MenuApp::handle_song_browser_input(uint32_t keycode) {
         apply_filter_refresh();
         return;
     }
-    if (settings_cursor_ == 5 && (keycode == key_left_ || keycode == key_right_)) {
+    if (settings_cursor_ == 5 &&
+        (keycode == key_left_ || keycode == key_right_ || keycode == key_enter_)) {
+        std::string selected_path = config_.ui.difficulty_table_path;
+        if (keycode == key_left_) {
+            selected_path.clear();
+        } else {
+#ifdef _WIN32
+            const std::string picked = browse_for_json_file(
+                ui_text("Select Local BMS Difficulty Table", "로컬 BMS 난이도표 선택"));
+            if (picked.empty()) {
+                return;
+            }
+            const DifficultyTableLoadResult loaded = load_difficulty_table_utf8(picked);
+            if (!loaded.success()) {
+                std::cerr << "[warn] Difficulty table was not selected: "
+                          << loaded.error << std::endl;
+                publish_snapshot();
+                return;
+            }
+            for (const auto& warning : loaded.warnings) {
+                std::cerr << "[warn] Difficulty table: " << warning << std::endl;
+            }
+            selected_path = picked;
+#else
+            return;
+#endif
+        }
+        if (selected_path != config_.ui.difficulty_table_path) {
+            config_.ui.difficulty_table_path = std::move(selected_path);
+            persist_runtime_config();
+            // Loading the cache reapplies the selected table to its stored chart
+            // hashes, so changing tables need not reparse a large library.
+            refresh_song_source(false);
+            publish_snapshot();
+        }
+        return;
+    }
+    if (settings_cursor_ == 6 && (keycode == key_left_ || keycode == key_right_)) {
         const int direction = (keycode == key_left_) ? -1 : 1;
         cycle_song_collection_filter(direction);
         persist_runtime_config();
@@ -2583,7 +2564,7 @@ void MenuApp::handle_song_browser_input(uint32_t keycode) {
     }
 
     if (keycode == key_enter_) {
-        if (settings_cursor_ == 6) {
+        if (settings_cursor_ == 7) {
             const std::string named_collection = current_named_song_collection();
             bool changed = false;
             if (!named_collection.empty()) {
@@ -2602,13 +2583,13 @@ void MenuApp::handle_song_browser_input(uint32_t keycode) {
             }
             return;
         }
-        if (settings_cursor_ == 7) {
+        if (settings_cursor_ == 8) {
             create_next_song_collection();
             persist_runtime_config();
             apply_filter_refresh();
             return;
         }
-        if (settings_cursor_ == 8) {
+        if (settings_cursor_ == 9) {
             song_key_filter_ = 0;
             song_level_min_filter_ = 0;
             song_level_max_filter_ = 0;
@@ -2617,7 +2598,7 @@ void MenuApp::handle_song_browser_input(uint32_t keycode) {
             apply_filter_refresh();
             return;
         }
-        if (settings_cursor_ == 9) {
+        if (settings_cursor_ == 10) {
             screen_ = submenu_return_screen_;
             settings_cursor_ = 0;
             publish_snapshot();

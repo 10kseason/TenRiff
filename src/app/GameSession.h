@@ -275,7 +275,9 @@ private:
     void process_countdown_input_queue();
     void process_paused_input_queue();
     void rebaseline_gameplay_start_input_state(int64_t sample);
-    void process_future_events(int64_t buffer_end_samples, int64_t lookahead_samples);
+    void process_future_events(int64_t buffer_start_samples,
+                               int64_t buffer_end_samples,
+                               int64_t lookahead_samples);
     void process_input_queue(int64_t buffer_start_samples, int64_t buffer_end_samples, int64_t lookahead_samples);
     [[nodiscard]] bool handle_control_input(const input::InputEvent& event);
     void rebuild_input_thread_config(input::InputThreadConfig& config) const;
@@ -283,7 +285,10 @@ private:
     void rebuild_polled_gameplay_keys();
     void update_lane_feedback(int lane, input::InputState state);
     void trigger_lane_hit_effect(int lane);
-    void dispatch_lane_input(int lane, input::InputState state, int64_t sample);
+    void dispatch_lane_input(int lane,
+                             input::InputState state,
+                             int64_t sample,
+                             int64_t audio_buffer_start_sample);
     void catch_up_lane_input(int lane, input::InputState state, int64_t sample);
     void schedule_note_guides(int64_t buffer_start_samples, int64_t buffer_end_samples);
     void schedule_note_keysound(const gameplay::NoteEvent& note, int64_t sample);
@@ -310,7 +315,9 @@ private:
                                                            int64_t replay_sample) const;
     void build_autoplay_events();
     void process_replay_input_queue(int64_t buffer_start_samples, int64_t buffer_end_samples, int64_t lookahead_samples);
-    void process_autoplay_queue(int64_t buffer_end_samples, int64_t lookahead_samples);
+    void process_autoplay_queue(int64_t buffer_start_samples,
+                                int64_t buffer_end_samples,
+                                int64_t lookahead_samples);
     void process_ghost_replay_queue(int64_t buffer_end_samples, int64_t lookahead_samples);
     void dispatch_ghost_lane_input(int lane, input::InputState state, int64_t sample);
 

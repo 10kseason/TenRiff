@@ -2,17 +2,16 @@
 
 Language: Korean | [English](README.en.md) | [简体中文](README.zh-CN.md) | [日本語](README.ja.md)
 
-TenRiff는 Windows GUI 기반 BMS-first 리듬게임 런타임/런처 프로젝트입니다. 현재 정식 프로젝트 버전은 `1.2.5`이며, Graphics Settings에서 권리 정리된 외부 ONNX 업스케일러를 직접 선택하거나 .onnx 파일을 드롭해 BGA/BGI 확대에 사용할 수 있습니다. 공개 패키지에는 모델을 넣지 않고 기본값은 `off`입니다. 현재 지원 계약은 고정 960x540 RGB residual x2이며, 35 FPS 벤치마크 또는 로드·계약·추론에 실패하면 native BGA scaling을 유지합니다. MIT 라이선스를 사용하며, 번들된 서드파티 고지는 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)에 정리합니다.
+TenRiff는 Windows GUI 기반 BMS 리듬게임 런타임/런처 프로젝트입니다. 현재 정식 프로젝트 버전은 `1.2.6`이며, 차트 입력은 BMS 계열(`.bms/.bme/.bml/.pms`)만 지원합니다. Graphics Settings에서 권리 정리된 외부 ONNX 모델을 선택한 뒤 `BGA Upscaler`를 직접 켜고 고사양 경고를 확인해 BGA/BGI 확대에 사용할 수 있습니다. 공개 패키지에는 모델을 넣지 않고 기본값은 `off`이며, 별도 성능 벤치마크 없이 로드·계약·추론 실패 시 native scaling을 유지합니다. `NPU 우선(실험)`은 ONNX 사용 시 Windows ML에 저전력 장치를 우선 요청하지만 실제 장치는 Windows/드라이버가 결정하며, 세션 생성 실패 시 고성능 DirectX 경로로 폴백합니다. MIT 라이선스를 사용하며, 번들된 서드파티 고지는 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)에 정리합니다.
 
-이 README는 "프로젝트를 처음 열었을 때 무엇을 보면 되는지"를 설명하는 입문 문서입니다. 더 자세한 현재 동작, 현재 `1.2.5` 프로젝트 상태, `1.1.2 final stable` 기준선, 설정 구조, 설계 문서는 [`docs/README.md`](docs/README.md)부터 이어서 읽는 구조를 기준으로 작성했습니다.
+이 README는 "프로젝트를 처음 열었을 때 무엇을 보면 되는지"를 설명하는 입문 문서입니다. 더 자세한 현재 동작, 현재 `1.2.6` 프로젝트 상태, `1.1.2 final stable` 기준선, 설정 구조, 설계 문서는 [`docs/README.md`](docs/README.md)부터 이어서 읽는 구조를 기준으로 작성했습니다.
 
 TenRiff 코드는 전통적인 장기 설계 문서 중심 개발만으로 쌓인 프로젝트가 아니라, 빠른 반복과 실험을 중시한 `vibe coding` 성격이 강한 작품이라는 점을 명시합니다.
 
 ## 프로젝트 한눈에 보기
 
 - 기본 타깃 플랫폼: Windows
-- 기본 차트 표면: BMS-first
-- 선택 지원 차트: `.osu` osu!mania 4K~10K
+- 지원 차트: BMS 계열(`.bms/.bme/.bml/.pms`) 전용
 - 그래픽 경로: D3D11 + Direct2D/DirectWrite
 - 오디오 경로: WASAPI
 - 입력 경로: RawInput 또는 고주사율 polling
@@ -52,15 +51,16 @@ OpenAI Codex, ChatGPT, Claude Code, Gemini, 그리고 프로젝트를 함께 검
   - MP3는 Windows Media Foundation fallback
   - 필요 시 `ffmpeg.exe` fallback
   - keysound 모드 `follow / autoplay / ignore`
+  - 늦게 도착한 실시간 입력도 판정 시각은 유지하면서 가청 키음만 현재 쓰기 가능한 버퍼 경계에 붙여 짧은 키음이 통째로 누락되는 현상을 방지
 - Song Select
   - 캐시 우선 로드
-  - `F5` 강제 재인덱싱
+  - `F5` 강제 재인덱싱과 화면 중앙의 stage/퍼센트/ETA 진행 표시
   - 검색, 키수 필터, 난이도 필터
   - `LV ASC/DESC`, `TITLE A-Z/Z-A` 정렬
   - 외부 폴더/BMS drag-and-drop
-  - `Shift+F2` 파일 선택 또는 drag-and-drop으로 `.osz`를 활성 songs source에 설치하고 osu chart 활성화 후 재인덱싱
   - recent source 저장/재열기
-  - `BMS / OSU / All` 필터
+  - `-` / `+`로 다음 플레이의 Rate 즉시 조정
+  - Browse에서 로컬 BMS 난이도표 JSON을 선택해 MD5/SHA-256 일치 곡에 표 레벨 적용
 - Gameplay / HUD
   - 실시간 HUD
   - staged chart loading progress
@@ -73,9 +73,8 @@ OpenAI Codex, ChatGPT, Claude Code, Gemini, 그리고 프로젝트를 함께 검
   - Hi-Speed, Rate, EX-Hard/Hard/Normal/Easy gauge, audio, input, graphics 설정
   - `Skins` 화면에서 판정선 위치, 노트 가로/세로 크기
   - `5K~10K` lane color 편집 + 실시간 프리뷰
-  - `.osk` 파일 선택/drag-and-drop으로 활성 프로필에 설치
-  - osu!mania note/LN 이미지와 `ColumnWidth`, `ColumnSpacing`, `ColumnLineWidth`, `HitPosition` 반영
-  - OSK/OSZ는 staging 검증 후 설치하고 기존 폴더는 덮어쓰지 않으며, `.osu` 자산 참조의 패키지 밖 경로 탈출을 차단하고 현재 표시하지 않는 다른 osu! mode 자산도 원본 파일은 보존
+  - native 벡터 스킨과 LR2 playskin만 지원
+  - LR2 스킨 폴더 선택/drag-and-drop으로 활성 프로필에 복사하고 note/LN/lane-gap/destination-size 정보를 반영
 - 결과 / 로컬 기록
   - 결과 화면
   - replay/result JSON export
@@ -88,7 +87,7 @@ OpenAI Codex, ChatGPT, Claude Code, Gemini, 그리고 프로젝트를 함께 검
 
 - Windows GUI가 메인 경로입니다.
 - Linux GUI/audio/input 백엔드는 아직 완성되지 않았습니다.
-- osu skin import는 TenRiff가 지원하는 osu!mania gameplay 요소를 적용하는 기능이며, 모든 osu! mode의 화면을 원본과 픽셀 단위로 재현하는 기능은 아닙니다.
+- LR2 playskin은 지원되는 gameplay 요소를 이식하는 기능이며, LR2 전체 UI를 픽셀 단위로 재현하는 기능은 아닙니다.
 - 일부 GUI 경로는 빌드/테스트 위주로 검증되어 있고, 실기 수동 검증은 계속 남아 있습니다.
 - 오래된 설계 문서와 현재 구현이 일부 다를 수 있으므로, 현재 동작 기준 문서는 반드시 [`docs/current-state.md`](docs/current-state.md)를 우선 봐야 합니다.
 

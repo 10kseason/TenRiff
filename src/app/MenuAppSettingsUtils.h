@@ -222,16 +222,6 @@ inline std::string resolution_label(std::string_view preset) {
     return "Monitor Native";
 }
 
-inline std::string format_label(const std::string& value) {
-    if (value == "bms") {
-        return "BMS";
-    }
-    if (value == "osu") {
-        return "OSU";
-    }
-    return "All";
-}
-
 inline std::string song_index_profile_label(const std::string& value) {
     const std::string normalized = config::normalize_song_index_profile_token(value);
     if (normalized == "fast") {
@@ -384,33 +374,6 @@ inline std::string cycle_bms_keysound_policy(std::string_view current, int direc
         index = 0;
     }
     return kPolicies[index];
-}
-
-inline std::string normalize_chart_filter(std::string value) {
-    value = to_lower_ascii(std::move(value));
-    if (value == "bms" || value == "osu") {
-        return value;
-    }
-    return "auto";
-}
-
-inline std::string cycle_chart_filter(std::string_view current, int direction) {
-    static constexpr const char* kFilters[] = {"auto", "bms", "osu"};
-    int index = 0;
-    const std::string normalized = normalize_chart_filter(std::string(current));
-    for (int i = 0; i < 3; ++i) {
-        if (normalized == kFilters[i]) {
-            index = i;
-            break;
-        }
-    }
-    index += direction;
-    if (index < 0) {
-        index = 2;
-    } else if (index >= 3) {
-        index = 0;
-    }
-    return kFilters[index];
 }
 
 }  // namespace tenriff::app

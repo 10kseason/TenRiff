@@ -66,12 +66,9 @@ void MenuApp::rebuild_visible_song_list(const std::string* selected_path) {
 
     visible_song_indices_.clear();
     visible_song_indices_.reserve(indexed_songs_.size());
-    const std::string chart_filter =
-        config_.mode.enable_osu_charts ? normalize_chart_filter(config_.mode.format) : std::string("bms");
     for (std::size_t index = 0; index < indexed_songs_.size(); ++index) {
         const SongEntry& entry = indexed_songs_[index];
-        if (song_entry_matches_chart_filter(entry, chart_filter) &&
-            song_entry_matches_search(entry, song_search_query_) &&
+        if (song_entry_matches_search(entry, song_search_query_) &&
             song_entry_matches_key_filter(entry, song_key_filter_) &&
             song_entry_matches_level_filter(entry, song_level_min_filter_, song_level_max_filter_) &&
             song_entry_matches_collection_filter(entry)) {

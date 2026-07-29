@@ -149,13 +149,6 @@ load_multiplayer_chart_candidates_from_profile_cache(
     }
 
     SongIndexLoadResult loaded = load_song_index(cache_path, options);
-    // A cache made before OSU indexing was enabled still contains valid BMS
-    // entries. Let those remain searchable without broadening the disk scope.
-    if ((!loaded.success() || !loaded.loaded_from_file) && options.include_osu) {
-        SongIndexOptions bms_only_options = options;
-        bms_only_options.include_osu = false;
-        loaded = load_song_index(cache_path, bms_only_options);
-    }
     if (!loaded.success()) {
         result.error = std::move(loaded.error);
         return result;

@@ -8,7 +8,6 @@
 #include <vector>
 
 #include "chart/BmsTimeline.h"
-#include "chart/OsuManiaLoader.h"
 
 namespace tenriff::gameplay {
 
@@ -81,6 +80,5 @@ struct GameplayChart {
 void offset_gameplay_chart_samples(GameplayChart& chart, int64_t sample_offset);
 
 GameplayChart from_bms_timeline(const chart::BmsTimeline& timeline, double rate);
-GameplayChart from_osu_mania(const chart::OsuManiaChart& chart, int sample_rate, double rate);
 
 }  // namespace tenriff::gameplay

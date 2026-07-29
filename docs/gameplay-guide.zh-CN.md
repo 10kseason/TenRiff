@@ -48,17 +48,20 @@ TenRiff 的基础游玩流程如下：
 - `Enter`：开始当前歌曲
 - `Left` / `Right`：切换左侧菜单焦点
 - `Esc`：返回上一个画面
-- `F5`：重新索引曲库
+- `-` / `+`：立即调整下一次游玩的 Rate
+- `F5`：重新索引曲库；运行时会居中显示 stage / percent / ETA 与 progress bar
+- `Browse > Difficulty Table`：选择或清除本地 BMS 难度表 header JSON
 
 ### Song Select 中常用的设置页面
 - `Mode`
-  - 调整 Ghost Battle、Autoplay、Practice、Sudden Death、Key Mode、Gauge、Random、Mods、Rate、Hi-Speed、OSU Charts、Chart Filter
+  - 调整 Ghost Battle、Autoplay、Practice、Sudden Death、Key Mode、Gauge、Random、Mods、Rate、Hi-Speed
 - `Audio`
   - 调整 Master/BGM/Keysound 音量以及 BMS keysound policy
 - `Graphics`
-  - 调整 VSync、Refresh Hz、Performance HUD、Display Offset
+  - 调整 VSync、Refresh Hz、Performance HUD、Display Offset、外部 ONNX BGA Upscaler
+  - 选择 model 后仍需明确开启 upscaler 并确认高配置警告；实验性 `优先 NPU` 只有在 Windows/driver 实际选择 NPU 时才会使用 NPU
 - `Skins`
-  - 调整判定线位置、note 大小、LN body 宽度、lane color
+  - 切换 native/LR2 skin、导入 LR2 folder，并调整判定线位置、note 大小、LN body 宽度、lane color
 - `Keymap`
   - 调整按键布局并做 NKRO 测试
 
@@ -67,7 +70,7 @@ TenRiff 的基础游玩流程如下：
 刚开始时，可以从下面这样的配置入手：
 
 - `Mode > Gauge`：`normal`
-- `Mode > Sudden Death`：仅在需要首次 osu!mania OD8 `MISS` 即结束的挑战时打开
+- `Mode > Sudden Death`：仅在需要首次 OD8 换算 `MISS` 即结束的挑战时打开
 - `Mode > Rate`：`1.0x`
 - `Mode > Hi-Speed`：先保持默认
 - `Graphics > Display`：使用 Discord voice overlay 时推荐 `Borderless`
@@ -101,8 +104,7 @@ Discord 客户端的设置方法请参考[官方 Game Overlay 指南](https://su
 ## 6. 开始游玩前要知道的事
 
 ### 谱面格式
-- 默认过滤器以 BMS 为中心。
-- 如果在选项里启用 osu!mania，就可以索引并游玩 `4K` 到 `10K` 的谱面。
+- TenRiff 1.2.6 只索引和游玩 BMS family（`.bms/.bme/.bml/.pms`）。
 
 ### 加载
 - 刚开始歌曲时，可能会显示谱面加载进度。
@@ -171,7 +173,7 @@ Rate 只改变歌曲播放速度和谱面时间轴；在相同 Hi-Speed 下，�
 - `easy`：到 `0%` 立即 Game Over
 
 游玩过程中不会再发生自动 gauge 降级。
-`Sudden Death (1 MISS)` 不是 gauge 类型，而是在首次 osu!mania OD8 对象 `MISS` 时把 gauge 置零并立即结束的规则。仅原生 `BAD` timing 不会触发，空按产生的 `POOR` 也不计入，并且不能与 Practice No-Fail 同时启用。
+`Sudden Death (1 MISS)` 不是 gauge 类型，而是在首次 OD8 换算对象 `MISS` 时把 gauge 置零并立即结束的规则。仅原生 `BAD` timing 不会触发，空按产生的 `POOR` 也不计入，并且不能与 Practice No-Fail 同时启用。
 
 ## 10. Result 画面
 
@@ -208,6 +210,8 @@ Rate 只改变歌曲播放速度和谱面时间轴；在相同 Hi-Speed 下，�
 ### BMS 中的键音太大或太小
 - 调整 `Audio > Keysound Volume`
 - 可以和 BGM 分开调节
+- 1.2.6 已修复 `follow` 下晚到输入可能无声的路径：判定时间保持不变，只把可听起点固定到当前可写 buffer
+- 如果仍然无声，请检查 `Keysound Mode=follow`、非零音量以及谱面的 `#WAV` asset path
 
 ### 输入不稳定或怀疑有按键冲突
 - 在 `Options > Keymap > NKRO Test` 里同时按多个键检查

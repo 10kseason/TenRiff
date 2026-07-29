@@ -305,9 +305,6 @@ std::string normalize_gameplay_skin_source(std::string_view value) {
     std::string normalized(value);
     std::transform(normalized.begin(), normalized.end(), normalized.begin(),
                    [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
-    if (normalized == "osu") {
-        return "osu";
-    }
     if (normalized == "lr2") {
         return "lr2";
     }
@@ -2558,18 +2555,20 @@ void MenuWindow::invalidate_gameplay_background_cache() {
     }
 }
 
-void MenuWindow::set_background_upscale_model_path(std::string model_path) {
-    if (active_background_upscale_model_path_ == model_path) {
+void MenuWindow::set_background_upscale_model_path(std::string model_path, bool prefer_npu) {
+    if (active_background_upscale_model_path_ == model_path &&
+        active_background_upscale_prefer_npu_ == prefer_npu) {
         return;
     }
 
     active_background_upscale_model_path_ = std::move(model_path);
+    active_background_upscale_prefer_npu_ = prefer_npu;
     gameplay_background_upscaler_ =
-        std::make_unique<OnnxBackgroundUpscaler>(active_background_upscale_model_path_);
+        std::make_unique<OnnxBackgroundUpscaler>(active_background_upscale_model_path_, prefer_npu);
     gameplay_overlay_background_upscaler_ =
-        std::make_unique<OnnxBackgroundUpscaler>(active_background_upscale_model_path_);
+        std::make_unique<OnnxBackgroundUpscaler>(active_background_upscale_model_path_, prefer_npu);
     song_select_background_upscaler_ =
-        std::make_unique<OnnxBackgroundUpscaler>(active_background_upscale_model_path_);
+        std::make_unique<OnnxBackgroundUpscaler>(active_background_upscale_model_path_, prefer_npu);
     gameplay_background_cache_ = GameplayBackgroundCache{};
     song_select_preview_cache_ = SongSelectPreviewCache{};
     if (d2d_) {
@@ -2581,7 +2580,8 @@ void MenuWindow::set_background_upscale_model_path(std::string model_path) {
 
 bool MenuWindow::ensure_gameplay_background_bitmap(const GameplayHudData& data) {
     set_background_upscale_model_path(
-        data.background_upscale_mode == "onnx" ? data.background_upscale_model_path : "");
+        data.background_upscale_mode == "onnx" ? data.background_upscale_model_path : "",
+        data.background_upscale_prefer_npu);
     if (!d2d_ || !d2d_->wic_factory || !d2d_->d2d_context ||
         !gameplay_base_video_decoder_ || !gameplay_overlay_video_decoder_ ||
         !gameplay_background_upscaler_ || !gameplay_overlay_background_upscaler_) {
@@ -2769,7 +2769,8 @@ void MenuWindow::invalidate_song_select_preview_cache() {
 
 bool MenuWindow::ensure_song_select_preview_bitmap(const SongSelectData& data) {
     set_background_upscale_model_path(
-        data.background_upscale_mode == "onnx" ? data.background_upscale_model_path : "");
+        data.background_upscale_mode == "onnx" ? data.background_upscale_model_path : "",
+        data.background_upscale_prefer_npu);
     if (!d2d_ || !d2d_->wic_factory || !d2d_->d2d_context ||
         !song_select_background_upscaler_) {
         return false;

@@ -394,8 +394,7 @@ bool GameSession::initialize(const CommandLineOptions& options) {
     auto load_chart_for_session_rate = [this](ChartLoadResult& out_result) -> bool {
         ChartLoader loader;
         out_result = loader.load(chart_path_, sample_rate_, config_.speed.rate,
-                                 config_.audio_ui.bms_keysound_policy,
-                                 config_.mode.enable_osu_charts);
+                                  config_.audio_ui.bms_keysound_policy);
         for (const auto& message : out_result.messages) {
             std::cerr << "[warn] " << message << std::endl;
         }
@@ -429,8 +428,7 @@ bool GameSession::initialize(const CommandLineOptions& options) {
         return false;
     }
     std::string preferred_rate_diagnostic;
-    const auto preferred_rate = detect_chart_preferred_sample_rate(chart_result.format,
-                                                                   chart_result.chart,
+    const auto preferred_rate = detect_chart_preferred_sample_rate(chart_result.chart,
                                                                    &preferred_rate_diagnostic);
     if (preferred_rate.has_value() && *preferred_rate != sample_rate_) {
         const int previous_actual_rate = sample_rate_;
@@ -2005,7 +2003,9 @@ void GameSession::audio_callback(float* output,
             }
 
             schedule_note_guides(logical_buffer_start_samples, buffer_end_samples);
-            process_future_events(buffer_end_samples, lookahead_samples);
+            process_future_events(logical_buffer_start_samples,
+                                  buffer_end_samples,
+                                  lookahead_samples);
             process_input_queue(logical_buffer_start_samples, buffer_end_samples, lookahead_samples);
 
             if (paused_.load(std::memory_order_acquire)) {
@@ -2018,7 +2018,9 @@ void GameSession::audio_callback(float* output,
                 paused_callback = true;
             } else {
                 service_hispeed_repeat(now_ns);
-                process_autoplay_queue(buffer_end_samples, lookahead_samples);
+                process_autoplay_queue(logical_buffer_start_samples,
+                                       buffer_end_samples,
+                                       lookahead_samples);
                 process_ghost_replay_queue(buffer_end_samples, lookahead_samples);
                 engine_->advance(buffer_end_samples);
                 if (ghost_engine_) {
@@ -2104,9 +2106,9 @@ void GameSession::run_judgement_loop(int64_t buffer_start_samples,
     while (tick_cursor < buffer_end_samples) {
         const int64_t step_samples = next_judgement_loop_step_samples();
         const int64_t tick_end_samples = std::min(buffer_end_samples, tick_cursor + step_samples);
-        process_future_events(tick_end_samples, lookahead_samples);
+        process_future_events(tick_cursor, tick_end_samples, lookahead_samples);
         process_input_queue(tick_cursor, tick_end_samples, lookahead_samples);
-        process_autoplay_queue(tick_end_samples, lookahead_samples);
+        process_autoplay_queue(tick_cursor, tick_end_samples, lookahead_samples);
         process_ghost_replay_queue(tick_end_samples, lookahead_samples);
         engine_->advance(tick_end_samples);
         if (ghost_engine_) {
@@ -2303,10 +2305,15 @@ void GameSession::trigger_lane_hit_effect(int lane) {
     lane_activity_[static_cast<std::size_t>(lane_index)] = 1.0f;
 }
 
-void GameSession::dispatch_lane_input(int lane, input::InputState state, int64_t sample) {
+void GameSession::dispatch_lane_input(int lane,
+                                      input::InputState state,
+                                      int64_t sample,
+                                      int64_t audio_buffer_start_sample) {
     update_lane_feedback(lane, state);
+    const int64_t audible_sample = pin_realtime_audio_start_sample(sample,
+                                                                   audio_buffer_start_sample);
     if (state == input::InputState::Pressed) {
-        schedule_tone(lane, sample, false);
+        schedule_tone(lane, audible_sample, false);
     }
 
     auto hit_note = engine_->handle_input(lane, state, sample);
@@ -2315,7 +2322,7 @@ void GameSession::dispatch_lane_input(int lane, input::InputState state, int64_t
         if (hit_note->note_id < hidden_hit_note_ids_.size()) {
             hidden_hit_note_ids_[hit_note->note_id] = 1;
         }
-        schedule_note_keysound(hit_note.value(), sample);
+        schedule_note_keysound(hit_note.value(), audible_sample);
     }
 }
 
@@ -2324,7 +2331,9 @@ void GameSession::catch_up_lane_input(int lane, input::InputState state, int64_t
     engine_->sync_input_state(lane, state, sample);
 }
 
-void GameSession::process_future_events(int64_t buffer_end_samples, int64_t lookahead_samples) {
+void GameSession::process_future_events(int64_t buffer_start_samples,
+                                        int64_t buffer_end_samples,
+                                        int64_t lookahead_samples) {
     while (true) {
         auto next = future_events_.pop();
         if (!next.has_value()) {
@@ -2343,7 +2352,10 @@ void GameSession::process_future_events(int64_t buffer_end_samples, int64_t look
             continue;
         }
         if (auto lane = lane_from_keycode(next->event.keycode)) {
-            dispatch_lane_input(lane.value(), next->event.state, next->sample);
+            dispatch_lane_input(lane.value(),
+                                next->event.state,
+                                next->sample,
+                                buffer_start_samples);
         }
     }
 }
@@ -2433,7 +2445,10 @@ void GameSession::process_input_queue(int64_t buffer_start_samples, int64_t buff
     }
 
     for (const auto& buffered : pending_input_events_) {
-        dispatch_lane_input(buffered.lane, buffered.state, buffered.sample);
+        dispatch_lane_input(buffered.lane,
+                            buffered.state,
+                            buffered.sample,
+                            buffer_start_samples);
     }
 }
 
@@ -2476,7 +2491,9 @@ void GameSession::build_autoplay_events() {
                      });
 }
 
-void GameSession::process_autoplay_queue(int64_t buffer_end_samples, int64_t lookahead_samples) {
+void GameSession::process_autoplay_queue(int64_t buffer_start_samples,
+                                         int64_t buffer_end_samples,
+                                         int64_t lookahead_samples) {
     if (!autoplay_enabled_ || !engine_) {
         return;
     }
@@ -2486,7 +2503,10 @@ void GameSession::process_autoplay_queue(int64_t buffer_end_samples, int64_t loo
         if (autoplay_event.sample > buffer_end_samples + lookahead_samples) {
             break;
         }
-        dispatch_lane_input(autoplay_event.lane, autoplay_event.state, autoplay_event.sample);
+        dispatch_lane_input(autoplay_event.lane,
+                            autoplay_event.state,
+                            autoplay_event.sample,
+                            buffer_start_samples);
         ++autoplay_event_index_;
     }
 }
@@ -2507,7 +2527,6 @@ int64_t GameSession::playback_sample_for_replay_event(const gameplay::ReplayFile
 void GameSession::process_replay_input_queue(int64_t buffer_start_samples,
                                              int64_t buffer_end_samples,
                                              int64_t lookahead_samples) {
-    static_cast<void>(buffer_start_samples);
 
     while (true) {
         auto maybe_event = input_thread_.queue().pop();
@@ -2527,7 +2546,10 @@ void GameSession::process_replay_input_queue(int64_t buffer_start_samples,
         if (playback_sample > buffer_end_samples + lookahead_samples) {
             break;
         }
-        dispatch_lane_input(replay_event.lane, replay_event.state, playback_sample);
+        dispatch_lane_input(replay_event.lane,
+                            replay_event.state,
+                            playback_sample,
+                            buffer_start_samples);
         ++replay_event_index_;
     }
 }

@@ -23,12 +23,7 @@ bool is_valid_bms_keysound_policy(std::string_view value) {
     return token == "follow" || token == "autoplay" || token == "ignore" || token == "off";
 }
 
-bool is_valid_chart_filter(std::string_view value) {
-    const std::string token = to_lower_copy(value);
-    return token.empty() || token == "auto" || token == "bms" || token == "osu";
-}
-
-bool is_valid_osu_key_mode(std::string_view value) {
+bool is_valid_key_mode(std::string_view value) {
     const std::string token = to_lower_copy(value);
     return token.empty() || token == "auto" || token == "none" || token == "4k" || token == "5k" || token == "6k" ||
            token == "7k" || token == "8k" || token == "9k" || token == "10k" || token == "16k";
@@ -180,24 +175,9 @@ bool matches_legacy_default_off_vsync_graphics(const config::RuntimeConfig& conf
 bool migrate_bms_first_runtime_config(config::RuntimeConfig& config) {
     bool changed = false;
 
-    if (config.mode.enable_osu_charts) {
-        if (!is_valid_chart_filter(config.mode.format)) {
-            config.mode.format = "auto";
-            changed = true;
-        }
-        if (!is_valid_osu_key_mode(config.mode.key_mode)) {
-            config.mode.key_mode = "none";
-            changed = true;
-        }
-    } else {
-        if (to_lower_copy(config.mode.format) != "bms") {
-            config.mode.format = "bms";
-            changed = true;
-        }
-        if (!is_valid_osu_key_mode(config.mode.key_mode)) {
-            config.mode.key_mode = "none";
-            changed = true;
-        }
+    if (!is_valid_key_mode(config.mode.key_mode)) {
+        config.mode.key_mode = "none";
+        changed = true;
     }
     if (!is_valid_bms_keysound_policy(config.audio_ui.bms_keysound_policy)) {
         config.audio_ui.bms_keysound_policy = "follow";

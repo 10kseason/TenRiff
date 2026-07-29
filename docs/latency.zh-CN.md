@@ -3,7 +3,7 @@
 TenRiff 以最小输入到判定到声音的延迟（端到端 <20 ms）为优先目标。这份笔记汇总了来自四份开发手册的后续项，用来在保持“Raw Input → SPSC queue → Audio thread 判定”哲学不变的前提下收紧整个管线。
 
 ## 输入管线与时间戳
-- 在加载时把 BMS/osu! 时间线标准化为 **sample positions (int64)**，让判定、keysound 和 mixer 都运行在同一条确定性时钟上。
+- 在加载时把 BMS 时间线标准化为 **sample positions (int64)**，让判定、keysound 和 mixer 都运行在同一条确定性时钟上。
 - **按 profile 的输入偏移**：在 `profiles/<name>/config.json` 中加入 `input_offset_ms`（±10 ms 微调），用于抵消设备/驱动延迟。
 - **游戏内 loopback 校准器**：提供自动模式，在按键时发出短 beep，通过麦克风 loopback 测量返回峰值，并给出建议的 `input_offset_ms`。
 - **HUD 判定窗口**：显示当前 PG/GR/GD/BD 窗口（按 `window_base / rate` 缩放），方便玩家把主观延迟感和更快速度下更紧的窗口联系起来。

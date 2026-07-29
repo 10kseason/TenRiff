@@ -40,7 +40,7 @@ If a profile does not exist, it is created automatically on first launch.
 
 - `backend` (string)
   - `polling | rawinput`
-  - defaults to `rawinput` on the current `1.2.5` release line
+  - defaults to `rawinput` on the current `1.2.6` release line
   - selectable per profile under `Options -> Input Settings -> Backend` or `Options -> Profile Setup -> Input Backend`
   - runtime fallback never rewrites the saved value to `polling`
   - a confirmed RawInput startup failure, registration-target loss, or message-window exit latches Polling across menu and subsequent gameplay sessions for the current app run
@@ -60,7 +60,7 @@ If a profile does not exist, it is created automatically on first launch.
 - `judgement_hz` (int)
   - `1000 | 2000 | 4000 | 8000`
   - compatibility field kept in the input config
-  - the current `1.2.5` runtime no longer drives a separate audio-thread judgement sub-step loop from this value
+  - the current `1.2.6` runtime no longer drives a separate audio-thread judgement sub-step loop from this value
   - default is `4000` (`0.25ms`)
 - `debounce_ms` (double)
   - real Press/Release transitions are preserved; only duplicate same-state events are removed from pressed-state tracking
@@ -114,19 +114,23 @@ If a profile does not exist, it is created automatically on first launch.
   - defaults to `false`; it occupies the top-right corner and can overlap a Discord Voice widget placed there
 - `background_upscale_mode` (string)
   - `onnx | off`; legacy `lunasr` values migrate to `onnx`
-  - defaults to `off`; no model load or benchmark runs while disabled
+  - defaults to `off`; users switch it explicitly through `BGA Upscaler` in Graphics Settings
+  - enabling it requires confirmation of a high-spec warning; no automatic performance benchmark runs
 - `background_upscale_model_path` (string)
-  - selected from Graphics Settings > `ONNX Model`, or set by dropping an `.onnx` file on that screen
+  - selected from Graphics Settings > `ONNX Model`, or set by dropping an `.onnx` file on that screen; selecting only stores the path and does not enable the upscaler
   - accepts an absolute path or a path relative to the executable/current directory; public packages include no model
   - current contract: float32 NCHW `rgb_lr [1,3,540,960]` -> `rgb_residual_x2 [1,3,1080,1920]` residual x2
-  - benchmark, load, contract, or inference failure keeps native scaling
+  - load, contract, or inference failure keeps native scaling
   - users are responsible for model rights, quality, and performance; see `tools/onnx_upscaler/README.md`
+- `background_upscale_prefer_npu` (bool)
+  - defaults to `true`, but only has an effect while `background_upscale_mode=onnx`
+  - can be disabled through experimental `Prefer NPU` in Graphics Settings
+  - requests a Windows ML `DirectXMinPower` device; Windows and the driver still choose whether an NPU is actually used
+  - failure to create the low-power session falls back to the existing high-performance DirectX path
 
 ### `mode`
-- `format` (string)
-  - used together with chart filtering by default
-  - `bms | osu | auto`
-  - `auto` effectively means `All`
+The chart loader and indexer are BMS-family only (`.bms/.bme/.bml/.pms`); `format` and `enable_osu_charts` are no longer saved or used.
+
 - `key_mode` (string)
   - `none | auto | 4k | 5k | 6k | 7k | 8k | 9k | 10k | 16k`
   - `none` means using the chart's original key count as-is
@@ -140,7 +144,6 @@ If a profile does not exist, it is created automatically on first launch.
   - Note Structure accepts one of `full_long_notes`, `ln_mix_10` through `ln_mix_90`, or `full_short_notes`
   - LN Mix considers only taps that can form a hold of at least 50ms while leaving 50ms before the next same-lane note, rounds the requested eligible-tap percentage, and converts that many into standard holds
   - existing holds are preserved, heads overlapping an existing same-lane span are excluded, and the same `random_seed` selects the same taps
-- `enable_osu_charts` (bool)
 - `ghost_battle_enabled` (bool)
   - defaults to `false`
   - when `true`, TenRiff auto-loads the selected chart's best compatible replay for ghost comparison
@@ -154,7 +157,7 @@ If a profile does not exist, it is created automatically on first launch.
   - when `true`, gauge-based early failure is disabled while judgement and result export still run to chart end
   - the result is tagged with `ASSIST`
 - `one_miss_fail_enabled` (bool)
-  - when `true`, the first osu!mania OD8 object `MISS` forces the gauge to zero and ends the run immediately
+  - when `true`, the first OD8-converted object `MISS` forces the gauge to zero and ends the run immediately
   - native `BAD` timing alone and empty-key `POOR` judgements do not trigger it
   - enabling it in Mode Settings automatically disables `practice_no_fail_enabled`
 - `song_index_profile` (string)
@@ -173,12 +176,14 @@ If a profile does not exist, it is created automatically on first launch.
   - the last song root that was opened
 - `recent_song_sources` (array of string)
   - recent external/internal song source list
+- `difficulty_table_path` (string)
+  - path to a local BMS difficulty-table header JSON selected from Browse
+  - the header uses `name`, `symbol`, and a local relative `data_url`; data-array entries use `md5` or `sha256` plus `level`
+  - network URLs are never fetched; selecting or clearing the table reindexes the current source and displays table levels for matching charts
 
 ### `skin`
 - `source` (string)
-  - `native | osu | lr2`
-- `osu_skin_name` (string)
-  - imported osu!mania skin name
+  - `native | lr2`
 - `lr2_skin_name` (string)
   - imported LR2 playskin name
 - `lr2_resolution_mode` (string)
@@ -217,7 +222,7 @@ If a profile does not exist, it is created automatically on first launch.
   - shared scale for the white lane separator lines
   - clamped to the `0.00..2.00` range
   - applied uniformly across all key modes
-  - native skin multiplies the default `1px` divider by this value, and osu/lr2 skins also multiply any imported divider widths by it
+  - native skin multiplies the default `1px` divider by this value, and LR2 skins also multiply any imported divider widths by it
 - `lane_center_gap_scale` (double)
   - center-gap scale between the left and right halves of the 16K field
   - clamped to the `0.00..2.00` range
@@ -265,5 +270,5 @@ If a profile does not exist, it is created automatically on first launch.
 
 ## Runtime Migration Notes
 - Stale profiles are automatically corrected for some values.
-- In particular, BMS-first defaults, osu key-mode mismatch, and keysound policy values are migration targets.
+- In particular, BMS defaults and keysound-policy values are migration targets; legacy osu chart/skin fields are no longer saved.
 - If the config file does not exist, the app starts with defaults and immediately saves the profile.

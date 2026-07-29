@@ -40,7 +40,7 @@
 
 - `backend` (string)
   - `polling | rawinput`
-  - 현재 `1.2.5` 릴리스 라인의 기본값은 `rawinput`
+  - 현재 `1.2.6` 릴리스 라인의 기본값은 `rawinput`
   - `Options -> Input Settings -> Backend` 또는 `Options -> Profile Setup -> Input Backend`에서 프로필별로 RawInput/Polling을 직접 선택 가능
   - 저장값은 런타임 fallback 때문에 자동으로 `polling`으로 덮어쓰지 않음
   - RawInput 시작 실패, 등록 대상 손실, 메시지 창 종료가 확인되면 현재 앱 실행 동안 메뉴와 다음 gameplay 세션 모두 Polling을 유지
@@ -60,7 +60,7 @@
 - `judgement_hz` (int)
   - `1000 | 2000 | 4000 | 8000`
   - 호환성용으로 남아 있는 입력 설정 필드
-  - 현재 `1.2.5` runtime은 별도 오디오 판정 서브루프를 이 값으로 구동하지 않음
+  - 현재 `1.2.6` runtime은 별도 오디오 판정 서브루프를 이 값으로 구동하지 않음
   - 기본값은 `4000` (`0.25ms`)
 - `debounce_ms` (double)
   - 실제 Press/Release 전환은 버리지 않고 같은 상태의 중복 이벤트만 상태 추적에서 제거
@@ -114,19 +114,23 @@
   - 기본값은 `false`; 우상단을 사용하므로 Discord Voice 위젯을 같은 모서리에 두면 겹칠 수 있음
 - `background_upscale_mode` (string)
   - `onnx | off`; 기존 `lunasr` 값은 호환을 위해 `onnx`로 마이그레이션
-  - 기본값은 `off`; 모드가 꺼져 있으면 모델을 로드하거나 벤치마크하지 않음
+  - 기본값은 `off`; Graphics Settings의 `BGA Upscaler`에서 ON/OFF를 직접 바꿈
+  - ON으로 바꿀 때 고사양 기능 경고를 확인해야 하며 자동 성능 벤치마크는 실행하지 않음
 - `background_upscale_model_path` (string)
-  - Graphics Settings의 `ONNX Model`에서 파일을 선택하거나 해당 화면에 `.onnx`를 드롭하면 저장됨
+  - Graphics Settings의 `ONNX Model`에서 파일을 선택하거나 해당 화면에 `.onnx`를 드롭하면 경로만 저장되며 업스케일러를 자동으로 켜지는 않음
   - 절대 경로 또는 실행 파일/현재 작업 폴더 기준 상대 경로를 허용하며 공개 패키지에는 모델을 포함하지 않음
   - 현재 계약은 float32 NCHW `rgb_lr [1,3,540,960]` -> `rgb_residual_x2 [1,3,1080,1920]` residual x2
-  - 35 FPS 벤치마크, 모델 로드, 입출력 계약 또는 추론 실패 시 native scaling 유지
+  - 모델 로드, 입출력 계약 또는 추론 실패 시 native scaling 유지
   - 사용자 모델의 권리·품질·성능은 사용자가 확인해야 하며 상세 계약은 `tools/onnx_upscaler/README.md`
+- `background_upscale_prefer_npu` (bool)
+  - 기본값은 `true`지만 `background_upscale_mode=onnx`일 때만 효력이 있음
+  - Graphics Settings의 `NPU 우선(실험)`에서 끌 수 있음
+  - Windows ML에 `DirectXMinPower` device를 우선 요청할 뿐 실제 NPU 사용 여부는 Windows와 드라이버가 결정함
+  - 저전력 session 생성에 실패하면 기존 high-performance DirectX 경로로 폴백
 
 ### `mode`
-- `format` (string)
-  - 기본은 차트 필터와 같이 씀
-  - `bms | osu | auto`
-  - `auto`는 실질적으로 `All`
+차트 로더와 인덱서는 BMS 계열(`.bms/.bme/.bml/.pms`) 전용이며, `format`과 `enable_osu_charts`는 더 이상 저장하거나 사용하지 않습니다.
+
 - `key_mode` (string)
   - `none | auto | 4k | 5k | 6k | 7k | 8k | 9k | 10k | 16k`
   - `none`은 차트 원래 키 수를 그대로 사용
@@ -141,7 +145,6 @@
   - Note Structure에서 `full_long_notes`, `ln_mix_10`~`ln_mix_90`, `full_short_notes` 중 하나를 선택 가능
   - LN Mix는 50ms 이상 길이와 다음 동일 레인 노트 전 50ms 여유를 모두 확보할 수 있는 단노트만 후보로 삼고, 요청 비율만큼 정확히 반올림해 일반 롱노트로 변환
   - 기존 롱노트는 보존하고 같은 레인의 기존 span과 겹치는 head는 제외하며, 같은 `random_seed`에서는 같은 단노트가 변환됨
-- `enable_osu_charts` (bool)
 - `ghost_battle_enabled` (bool)
   - 기본값은 `false`
   - `true`면 선택한 차트의 최고 호환 replay를 자동 ghost 비교 대상으로 불러옴
@@ -155,7 +158,7 @@
   - `true`면 gauge 기반 조기 실패를 막고 차트 끝까지 판정/결과 저장을 유지함
   - 결과에는 `ASSIST` clear status가 붙음
 - `one_miss_fail_enabled` (bool)
-  - `true`면 첫 osu!mania OD8 객체 `MISS`에서 게이지가 0이 되고 즉시 실패함
+  - `true`면 첫 OD8 환산 객체 `MISS`에서 게이지가 0이 되고 즉시 실패함
   - 네이티브 `BAD`만으로는 즉사하지 않으며 빈 키 입력의 `POOR`도 즉사 조건에 포함하지 않음
   - Mode Settings에서 활성화하면 `practice_no_fail_enabled`가 자동으로 꺼짐
 - `song_index_profile` (string)
@@ -174,12 +177,14 @@
   - 마지막으로 연 곡 루트
 - `recent_song_sources` (array of string)
   - 최근 외부/내부 song source 목록
+- `difficulty_table_path` (string)
+  - Browse 화면에서 고른 로컬 BMS 난이도표 header JSON 경로
+  - header는 `name`, `symbol`, 로컬 상대경로 `data_url`을 사용하고, data array entry는 `md5` 또는 `sha256`과 `level`을 사용
+  - 네트워크 URL은 가져오지 않으며 선택/해제 시 현재 song source를 재인덱싱해 일치 곡의 표 레벨을 표시
 
 ### `skin`
 - `source` (string)
-  - `native | osu | lr2`
-- `osu_skin_name` (string)
-  - imported osu!mania skin name
+  - `native | lr2`
 - `lr2_skin_name` (string)
   - imported LR2 playskin name
 - `lr2_resolution_mode` (string)
@@ -240,7 +245,7 @@
   - lane 사이 흰 separator 선의 공용 배율
   - `0.00..2.00` 범위로 clamp
   - 모든 key mode에 동일하게 적용됨
-  - native skin은 기본 `1px` divider에 곱하고, osu/lr2 skin은 가져온 divider 폭이 있을 때 그 값에도 곱함
+  - native skin은 기본 `1px` divider에 곱하고, LR2 skin은 가져온 divider 폭이 있을 때 그 값에도 곱함
 - `lane_center_gap_scale` (double)
   - 16K 필드의 좌우 블록 사이 중앙 간격 배율
   - `0.00..2.00` 범위로 clamp
@@ -288,5 +293,5 @@
 
 ## Runtime Migration Notes
 - stale profile은 일부 값이 자동 교정됩니다.
-- 특히 BMS-first default, osu key-mode mismatch, keysound policy 관련 값은 런타임 migration 대상입니다.
+- 특히 BMS 기본값과 keysound policy 관련 값은 런타임 migration 대상이며, 예전 osu chart/skin 필드는 더 이상 저장되지 않습니다.
 - config 파일이 없으면 defaults로 시작하고 즉시 profile이 저장됩니다.

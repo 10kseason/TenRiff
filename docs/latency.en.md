@@ -3,7 +3,7 @@
 TenRiff prioritizes minimal input-to-judgement-to-sound latency (<20 ms end-to-end). This note consolidates the follow-up items from the four development manuals to tighten the pipeline while keeping the "Raw Input -> SPSC queue -> Audio thread judgement" philosophy intact.
 
 ## Input Pipeline and Timestamping
-- Normalize BMS / osu! timelines into **sample positions (int64)** at load time so judgement, keysounds, and the mixer all operate on the same deterministic clock.
+- Normalize BMS timelines into **sample positions (int64)** at load time so judgement, keysounds, and the mixer all operate on the same deterministic clock.
 - **Per-profile input offset**: add `input_offset_ms` to `profiles/<name>/config.json` (±10 ms fine tuning) so users can compensate for device / driver delay.
 - **In-game loopback calibrator**: provide an automatic mode that emits a short beep on key press, measures the return peak through mic loopback, and proposes an `input_offset_ms` value.
 - **HUD judgement windows**: display the current PG / GR / GD / BD windows (scaled by `window_base / rate`) so players can correlate perceived lag with the tighter window when speeding up.

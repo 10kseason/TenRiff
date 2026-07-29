@@ -131,9 +131,7 @@ score に影響する mod なら、`rate_score_multiplier(...)`、`mod_score_mul
 - `tests/unit/test_replay_export.cpp`
   - replay/result JSON field と restore behavior
 - `tests/smoke/bms_mode_smoke.cpp`
-  - 実譜面での key mode、random、mods 組み合わせ
-- `tests/smoke/n2nc_compare_smoke.cpp`
-  - key-mode remap の既知ケース比較
+  - 実 BMS 譜面での key mode、random、mods、既知 lane-remap ケース
 
 docs は `docs/current-state.md`、`docs/config.md`、`docs/README.md`、その後 feature-specific docs の順で考えると漏れにくいです。
 

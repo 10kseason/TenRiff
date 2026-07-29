@@ -40,7 +40,7 @@
 
 - `backend` (string)
   - `polling | rawinput`
-  - 当前 `1.2.5` 发布线默认值为 `rawinput`
+  - 当前 `1.2.6` 发布线默认值为 `rawinput`
   - 可在 `Options -> Input Settings -> Backend` 或 `Options -> Profile Setup -> Input Backend` 中按 profile 选择
   - runtime fallback 不会把已保存值改写为 `polling`
   - 确认 RawInput 启动失败、注册目标丢失或 message window 退出后，本次应用运行期间 menu 与后续 gameplay 都会保持 Polling
@@ -114,19 +114,23 @@
   - 默认值为 `false`；它位于右上角，可能会与放在同一角落的 Discord Voice widget 重叠
 - `background_upscale_mode` (string)
   - `onnx | off`；旧 `lunasr` 值会迁移为 `onnx`
-  - 默认值为 `off`；关闭时不加载模型，也不运行基准
+  - 默认值为 `off`；通过 Graphics Settings 中的 `BGA Upscaler` 明确切换 ON/OFF
+  - 开启时必须确认高配置警告；不会自动运行性能 benchmark
 - `background_upscale_model_path` (string)
-  - 可在 Graphics Settings 的 `ONNX Model` 中选择，或把 `.onnx` 文件拖入该页面
+  - 可在 Graphics Settings 的 `ONNX Model` 中选择，或把 `.onnx` 文件拖入该页面；选择只保存路径，不会自动开启 upscaler
   - 支持绝对路径，或相对于可执行文件/当前目录的路径；公开包不包含模型
   - 当前契约：float32 NCHW `rgb_lr [1,3,540,960]` -> `rgb_residual_x2 [1,3,1080,1920]` residual x2
-  - 基准、加载、契约或推理失败时保持 native scaling
+  - 加载、契约或推理失败时保持 native scaling
   - 用户需自行确认模型权利、质量与性能；详见 `tools/onnx_upscaler/README.md`
+- `background_upscale_prefer_npu` (bool)
+  - 默认值为 `true`，但仅在 `background_upscale_mode=onnx` 时生效
+  - 可在 Graphics Settings 的实验性 `优先 NPU` 中关闭
+  - 只会请求 Windows ML 的 `DirectXMinPower` device；是否实际使用 NPU 由 Windows/driver 决定
+  - 创建低功耗 session 失败时回退到现有高性能 DirectX 路径
 
 ### `mode`
-- `format` (string)
-  - 默认也会与谱面过滤一起使用
-  - `bms | osu | auto`
-  - `auto` 实际上表示 `All`
+chart loader/indexer 仅支持 BMS family（`.bms/.bme/.bml/.pms`）；不再保存或使用 `format` 与 `enable_osu_charts`。
+
 - `key_mode` (string)
   - `none | auto | 4k | 5k | 6k | 7k | 8k | 9k | 10k | 16k`
   - `none` 表示直接沿用谱面的原始键数
@@ -140,7 +144,6 @@
   - Note Structure 可在 `full_long_notes`、`ln_mix_10` 到 `ln_mix_90`、`full_short_notes` 中选择一个
   - LN Mix 仅把既能形成至少 50ms hold、又能在同 lane 下一音符前保留 50ms 间隔的 tap 作为候选，并按指定比例四舍五入后转换为普通 hold
   - 已有 hold 会保留，与同 lane 已有 span 重叠的 head 会被排除，相同 `random_seed` 会选择相同 tap
-- `enable_osu_charts` (bool)
 - `ghost_battle_enabled` (bool)
   - 默认值为 `false`
   - `true` 时会自动加载当前选中谱面的最佳兼容 replay 作为 ghost 对比
@@ -154,7 +157,7 @@
   - `true` 时会禁止基于 gauge 的提前失败，但仍保留判定与结果导出直到谱面结束
   - 结果会带上 `ASSIST` clear status
 - `one_miss_fail_enabled` (bool)
-  - `true` 时首次出现 osu!mania OD8 对象 `MISS` 就会把 gauge 归零并立即失败
+  - `true` 时首次出现 OD8 换算对象 `MISS` 就会把 gauge 归零并立即失败
   - 仅原生 `BAD` timing 不会触发，空键输入产生的 `POOR` 也不会触发该模式
   - 在 Mode Settings 中启用后会自动关闭 `practice_no_fail_enabled`
 - `song_index_profile` (string)
@@ -173,12 +176,14 @@
   - 最近一次打开的 song root
 - `recent_song_sources` (array of string)
   - 最近使用过的外部/内部 song source 列表
+- `difficulty_table_path` (string)
+  - 在 Browse 中选择的本地 BMS 难度表 header JSON 路径
+  - header 使用 `name`、`symbol` 与本地相对 `data_url`；data array entry 使用 `md5` 或 `sha256` 加 `level`
+  - 不会获取网络 URL；选择或清除后会重新索引当前 source，并给匹配谱面显示表等级
 
 ### `skin`
 - `source` (string)
-  - `native | osu | lr2`
-- `osu_skin_name` (string)
-  - 导入的 osu!mania skin 名称
+  - `native | lr2`
 - `lr2_skin_name` (string)
   - 导入的 LR2 playskin 名称
 - `lr2_resolution_mode` (string)
@@ -217,7 +222,7 @@
   - 白色 lane 分隔线的共享宽度缩放
   - 会被 clamp 在 `0.00..2.00`
   - 会统一应用到所有 key mode
-  - native skin 会乘到默认 `1px` divider 上；osu/lr2 skin 如果带有导入 divider 宽度，也会一起乘上这个值
+  - native skin 会乘到默认 `1px` divider 上；LR2 skin 如果带有导入 divider 宽度，也会一起乘上这个值
 - `lane_center_gap_scale` (double)
   - 16K 场地左右两半之间的中央间隔缩放
   - 会被 clamp 在 `0.00..2.00`
@@ -265,5 +270,5 @@
 
 ## 运行时迁移说明
 - stale profile 的部分值会被自动修正。
-- 尤其是 BMS-first default、osu key-mode mismatch、keysound policy 相关值，都会进入运行时迁移流程。
+- 尤其是 BMS default 与 keysound policy 相关值会进入运行时迁移；旧 osu chart/skin 字段不再保存。
 - 如果配置文件不存在，会先使用默认值启动，并立即保存 profile。

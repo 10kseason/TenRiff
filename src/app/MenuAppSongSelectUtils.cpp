@@ -1,6 +1,8 @@
 #include "app/MenuAppSongSelectUtils.h"
 
 #include <algorithm>
+#include <charconv>
+#include <limits>
 
 #include "app/MenuAppSettingsUtils.h"
 #include "util/Utf8Compat.h"
@@ -90,20 +92,31 @@ std::string song_group_artist_key(const SongEntry& entry) {
 }
 
 std::string song_group_level_key(const SongEntry& entry) {
+    if (!entry.difficulty_table_level.empty()) {
+        if (entry.difficulty_table_order >= 0) {
+            const int clamped_order = std::clamp(entry.difficulty_table_order, 0, 999999);
+            std::string key = "0table:";
+            const std::string digits = std::to_string(clamped_order);
+            key.append(6u - std::min<std::size_t>(6u, digits.size()), '0');
+            key += digits;
+            return key;
+        }
+        return "0table:zz:" + to_lower_ascii(entry.difficulty_table_level);
+    }
     if (entry.level > 0) {
         const int clamped_level = std::clamp(entry.level, 0, 9999);
         const int thousands = clamped_level / 1000;
         const int hundreds = (clamped_level / 100) % 10;
         const int tens = (clamped_level / 10) % 10;
         const int ones = clamped_level % 10;
-        std::string key = "lv:";
+        std::string key = "1native:";
         key.push_back(static_cast<char>('0' + thousands));
         key.push_back(static_cast<char>('0' + hundreds));
         key.push_back(static_cast<char>('0' + tens));
         key.push_back(static_cast<char>('0' + ones));
         return key;
     }
-    return "lv:9999";
+    return "1native:9999";
 }
 
 std::string song_group_folder_label(const SongEntry& entry) {
@@ -128,12 +141,31 @@ std::string song_group_folder_key(const SongEntry& entry) {
 }
 
 std::string song_detail_label(const SongEntry& entry) {
-    std::string detail = song_layout_label(entry) + " " + format_label(to_lower_ascii(entry.format));
+    std::string detail = song_layout_label(entry) + " BMS";
     const std::string chart_name = safe_ui_text(entry.chart_name);
     if (!chart_name.empty()) {
         detail += " / " + chart_name;
     }
+    if (!entry.difficulty_table_level.empty()) {
+        const std::string table_name = safe_ui_text(entry.difficulty_table_name);
+        detail += " / ";
+        if (!table_name.empty()) {
+            detail += table_name + " ";
+        }
+        detail += song_difficulty_label(entry);
+    }
     return detail;
+}
+
+std::string song_difficulty_label(const SongEntry& entry) {
+    if (!entry.difficulty_table_level.empty()) {
+        return safe_ui_text(entry.difficulty_table_symbol) +
+               safe_ui_text(entry.difficulty_table_level);
+    }
+    if (entry.level > 0) {
+        return "LV " + std::to_string(entry.level);
+    }
+    return {};
 }
 
 std::string song_index_stage_label(SongIndexProgressStage stage) {
@@ -191,14 +223,6 @@ std::string format_int_with_commas(int64_t value) {
     return out;
 }
 
-bool song_entry_matches_chart_filter(const SongEntry& entry, std::string_view filter) {
-    const std::string normalized_filter = normalize_chart_filter(std::string(filter));
-    if (normalized_filter == "auto") {
-        return true;
-    }
-    return to_lower_ascii(entry.format) == normalized_filter;
-}
-
 bool song_entry_matches_search(const SongEntry& entry, std::string_view query) {
     const std::string normalized_query = to_lower_ascii(std::string(query));
     if (normalized_query.empty()) {
@@ -225,19 +249,49 @@ bool song_entry_matches_level_filter(const SongEntry& entry, int level_min, int 
     if (level_min <= 0 && level_max <= 0) {
         return true;
     }
-    if (entry.level <= 0) {
+    int effective_level = entry.level;
+    if (!entry.difficulty_table_level.empty()) {
+        const std::string& table_level = entry.difficulty_table_level;
+        int parsed_level = 0;
+        const auto parsed = std::from_chars(table_level.data(),
+                                            table_level.data() + table_level.size(),
+                                            parsed_level);
+        if (parsed.ec == std::errc{} && parsed.ptr != table_level.data()) {
+            effective_level = parsed_level;
+        }
+    }
+    if (effective_level <= 0) {
         return false;
     }
-    if (level_min > 0 && entry.level < level_min) {
+    if (level_min > 0 && effective_level < level_min) {
         return false;
     }
-    if (level_max > 0 && entry.level > level_max) {
+    if (level_max > 0 && effective_level > level_max) {
         return false;
     }
     return true;
 }
 
 bool song_entry_less_by_difficulty_asc(const SongEntry& lhs, const SongEntry& rhs) {
+    const bool lhs_table = !lhs.difficulty_table_level.empty();
+    const bool rhs_table = !rhs.difficulty_table_level.empty();
+    if (lhs_table != rhs_table) {
+        return lhs_table;
+    }
+    if (lhs_table) {
+        const int lhs_order = lhs.difficulty_table_order >= 0
+                                  ? lhs.difficulty_table_order
+                                  : (std::numeric_limits<int>::max)();
+        const int rhs_order = rhs.difficulty_table_order >= 0
+                                  ? rhs.difficulty_table_order
+                                  : (std::numeric_limits<int>::max)();
+        if (lhs_order != rhs_order) {
+            return lhs_order < rhs_order;
+        }
+        if (lhs.difficulty_table_level != rhs.difficulty_table_level) {
+            return lhs.difficulty_table_level < rhs.difficulty_table_level;
+        }
+    }
     const int lhs_level = lhs.level > 0 ? lhs.level : 9999;
     const int rhs_level = rhs.level > 0 ? rhs.level : 9999;
     if (lhs_level != rhs_level) {
@@ -255,6 +309,25 @@ bool song_entry_less_by_difficulty_asc(const SongEntry& lhs, const SongEntry& rh
 }
 
 bool song_entry_less_by_difficulty_desc(const SongEntry& lhs, const SongEntry& rhs) {
+    const bool lhs_table = !lhs.difficulty_table_level.empty();
+    const bool rhs_table = !rhs.difficulty_table_level.empty();
+    if (lhs_table != rhs_table) {
+        return lhs_table;
+    }
+    if (lhs_table) {
+        const int lhs_order = lhs.difficulty_table_order >= 0
+                                  ? lhs.difficulty_table_order
+                                  : (std::numeric_limits<int>::min)();
+        const int rhs_order = rhs.difficulty_table_order >= 0
+                                  ? rhs.difficulty_table_order
+                                  : (std::numeric_limits<int>::min)();
+        if (lhs_order != rhs_order) {
+            return lhs_order > rhs_order;
+        }
+        if (lhs.difficulty_table_level != rhs.difficulty_table_level) {
+            return lhs.difficulty_table_level > rhs.difficulty_table_level;
+        }
+    }
     if (lhs.level != rhs.level) {
         return lhs.level > rhs.level;
     }

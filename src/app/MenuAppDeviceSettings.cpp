@@ -118,7 +118,7 @@ int next_option_index(const int* options, int count, int current, int direction)
 }  // namespace
 
 void MenuApp::handle_graphics_settings_input(uint32_t keycode) {
-    const int item_count = 10;
+    const int item_count = 11;
     if (keycode == key_up_) {
         settings_cursor_ = clamp_int(settings_cursor_ - 1, 0, item_count - 1);
         publish_snapshot();
@@ -171,11 +171,24 @@ void MenuApp::handle_graphics_settings_input(uint32_t keycode) {
     }
     if (settings_cursor_ == 5 &&
         (keycode == key_left_ || keycode == key_right_ || keycode == key_enter_)) {
-        config_.graphics.background_upscale_mode =
-            config::normalize_background_upscale_mode(config_.graphics.background_upscale_mode) == "onnx"
-                ? "off"
-                : "onnx";
-        graphics_dirty_ = true;
+        if (config::normalize_background_upscale_mode(config_.graphics.background_upscale_mode) == "onnx") {
+            config_.graphics.background_upscale_mode = "off";
+            graphics_dirty_ = true;
+        } else {
+#ifdef _WIN32
+            if (config_.graphics.background_upscale_model_path.empty()) {
+                const auto selected = pick_onnx_model_dialog_utf8();
+                if (!selected.has_value()) {
+                    publish_snapshot();
+                    return;
+                }
+                config_.graphics.background_upscale_model_path = selected.value();
+                graphics_dirty_ = true;
+            }
+#endif
+            onnx_upscaler_confirm_cursor_ = 1;
+            screen_ = Screen::OnnxUpscalerConfirm;
+        }
         publish_snapshot();
         return;
     }
@@ -184,7 +197,6 @@ void MenuApp::handle_graphics_settings_input(uint32_t keycode) {
 #ifdef _WIN32
         if (const auto selected = pick_onnx_model_dialog_utf8(); selected.has_value()) {
             config_.graphics.background_upscale_model_path = selected.value();
-            config_.graphics.background_upscale_mode = "onnx";
             graphics_dirty_ = true;
         }
 #endif
@@ -192,13 +204,20 @@ void MenuApp::handle_graphics_settings_input(uint32_t keycode) {
         return;
     }
     if (settings_cursor_ == 7 && (keycode == key_left_ || keycode == key_right_)) {
+        config_.graphics.background_upscale_prefer_npu =
+            !config_.graphics.background_upscale_prefer_npu;
+        graphics_dirty_ = true;
+        publish_snapshot();
+        return;
+    }
+    if (settings_cursor_ == 8 && (keycode == key_left_ || keycode == key_right_)) {
         config_.ui.language =
             (config::normalize_ui_language_token(config_.ui.language) == "ko") ? "en" : "ko";
         graphics_dirty_ = true;
         publish_snapshot();
         return;
     }
-    if (settings_cursor_ == 8 && (keycode == key_left_ || keycode == key_right_)) {
+    if (settings_cursor_ == 9 && (keycode == key_left_ || keycode == key_right_)) {
         const int direction = (keycode == key_left_) ? -1 : 1;
         config_.visual_offset_ms = clamp_step_value(
             config_.visual_offset_ms + static_cast<double>(direction) * kVisualOffsetStep,
@@ -351,6 +370,32 @@ void MenuApp::handle_calibration_settings_input(uint32_t keycode) {
     }
 }
 
+void MenuApp::handle_onnx_upscaler_confirm_input(uint32_t keycode) {
+    if (keycode == key_up_ || keycode == key_down_ ||
+        keycode == key_left_ || keycode == key_right_) {
+        onnx_upscaler_confirm_cursor_ = 1 - onnx_upscaler_confirm_cursor_;
+        publish_snapshot();
+        return;
+    }
+
+    if (keycode == key_enter_) {
+        if (onnx_upscaler_confirm_cursor_ == 0) {
+            config_.graphics.background_upscale_mode = "onnx";
+            graphics_dirty_ = true;
+        }
+        screen_ = Screen::SettingsGraphics;
+        settings_cursor_ = 5;
+        publish_snapshot();
+        return;
+    }
+
+    if (keycode == key_escape_ || keycode == key_backspace_) {
+        screen_ = Screen::SettingsGraphics;
+        settings_cursor_ = 5;
+        publish_snapshot();
+    }
+}
+
 void MenuApp::populate_graphics_settings_render_data(render::MenuRenderData& render) {
     append_menu_row(render.generic, ui_text("Display", "표시 모드"), ui_display_mode_label(config_.graphics.display_mode), settings_cursor_ == 0,
                     render::MenuHitTargetKind::SettingsRow, 0, false, true);
@@ -363,9 +408,8 @@ void MenuApp::populate_graphics_settings_render_data(render::MenuRenderData& ren
     append_menu_row(render.generic, ui_text("Performance HUD", "성능 HUD"), ui_on_off(config_.graphics.performance_overlay), settings_cursor_ == 4,
                     render::MenuHitTargetKind::SettingsRow, 4, false, true);
     append_menu_row(render.generic, ui_text("BGA Upscaler", "BGA 업스케일러"),
-                    config::normalize_background_upscale_mode(config_.graphics.background_upscale_mode) == "onnx"
-                        ? "External ONNX"
-                        : ui_text("Native", "원본"),
+                    ui_on_off(config::normalize_background_upscale_mode(
+                                  config_.graphics.background_upscale_mode) == "onnx"),
                     settings_cursor_ == 5,
                     render::MenuHitTargetKind::SettingsRow, 5, false, true);
     append_menu_row(render.generic, ui_text("ONNX Model", "ONNX 모델"),
@@ -373,11 +417,15 @@ void MenuApp::populate_graphics_settings_render_data(render::MenuRenderData& ren
                                      ui_text("Select...", "선택...")),
                     settings_cursor_ == 6,
                     render::MenuHitTargetKind::SettingsRow, 6, false, false);
-    append_menu_row(render.generic, ui_text("Language", "언어"), ui_language_label(config_.ui.language), settings_cursor_ == 7,
+    append_menu_row(render.generic, ui_text("Prefer NPU (Experimental)", "NPU 우선 (실험)"),
+                    ui_on_off(config_.graphics.background_upscale_prefer_npu),
+                    settings_cursor_ == 7,
                     render::MenuHitTargetKind::SettingsRow, 7, false, true);
-    append_menu_row(render.generic, ui_text("Display Offset", "표시 오프셋"), format_signed_offset_ms(config_.visual_offset_ms), settings_cursor_ == 8,
+    append_menu_row(render.generic, ui_text("Language", "언어"), ui_language_label(config_.ui.language), settings_cursor_ == 8,
                     render::MenuHitTargetKind::SettingsRow, 8, false, true);
-    append_menu_row(render.generic, ui_text("Back", "뒤로"), "", settings_cursor_ == 9, render::MenuHitTargetKind::SettingsRow, 9, true, false);
+    append_menu_row(render.generic, ui_text("Display Offset", "표시 오프셋"), format_signed_offset_ms(config_.visual_offset_ms), settings_cursor_ == 9,
+                    render::MenuHitTargetKind::SettingsRow, 9, false, true);
+    append_menu_row(render.generic, ui_text("Back", "뒤로"), "", settings_cursor_ == 10, render::MenuHitTargetKind::SettingsRow, 10, true, false);
     if (normalize_display_mode(config_.graphics.display_mode) == "fullscreen") {
         render.generic.notes.push_back(ui_text(
             "Discord's current voice overlay does not work in Exclusive Fullscreen. Switch Display to Borderless or Windowed.",
@@ -394,15 +442,47 @@ void MenuApp::populate_graphics_settings_render_data(render::MenuRenderData& ren
     render.generic.notes.push_back(ui_text("Menu rendering is capped at 300 Hz. Gameplay uses the configured value up to 1050 Hz.",
                                            "메뉴 렌더링은 300Hz까지 제한되고, 게임플레이는 설정값을 최대 1050Hz까지 사용합니다."));
     render.generic.notes.push_back(ui_text(
-        "Choose a compatible RGB residual x2 ONNX model. It runs only after the 35 FPS benchmark passes; any load, contract, or inference failure keeps native scaling.",
-        "호환되는 RGB residual x2 ONNX 모델을 지정하세요. 35 FPS 벤치마크 통과 후에만 실행되며 로드·계약·추론 실패 시 원본 확대를 유지합니다."));
+        "The ONNX upscaler has no automatic performance benchmark. It is intended for high-spec systems and may cause stutter or heavy accelerator load.",
+        "ONNX 업스케일러는 자동 성능 벤치마크 없이 실행됩니다. 고사양 시스템용이며 끊김이나 높은 가속기 부하가 생길 수 있습니다."));
     render.generic.notes.push_back(ui_text(
-        "Press Enter on ONNX Model or drop an .onnx file on this screen. Public packages do not include a model.",
-        "ONNX 모델에서 Enter를 누르거나 이 화면에 .onnx 파일을 놓으세요. 공개 패키지에는 모델이 포함되지 않습니다."));
+        "Selecting or dropping an .onnx file changes only the model path. Turn BGA Upscaler ON separately and confirm the warning. Failures keep native scaling.",
+        "ONNX 파일 선택·드롭은 모델 경로만 바꿉니다. BGA 업스케일러를 별도로 켜고 경고를 확인하세요. 실패 시 원본 확대를 유지합니다."));
+    render.generic.notes.push_back(ui_text(
+        "Prefer NPU asks Windows for its low-power DirectX ML device. Windows and the driver choose the actual device; unsupported models fall back to high-performance DirectX.",
+        "NPU 우선은 Windows의 저전력 DirectX ML 장치를 요청합니다. 실제 장치는 Windows와 드라이버가 고르며, 미지원 모델은 고성능 DirectX로 폴백합니다."));
     render.generic.notes.push_back(ui_text("Language changes the menu UI immediately. Display Offset shifts only visuals from -500ms to +500ms.",
                                            "언어는 메뉴 UI에 즉시 반영됩니다. 표시 오프셋은 시각 요소만 -500ms~+500ms 범위에서 이동합니다."));
     render.generic.notes.push_back(ui_text("Display, Resolution, Refresh Hz, and VSync apply immediately. Back saves and returns.",
                                            "표시 모드, 해상도, 주사율, VSync는 즉시 적용됩니다. 뒤로 가면 저장 후 돌아갑니다."));
+}
+
+void MenuApp::populate_onnx_upscaler_confirm_render_data(render::MenuRenderData& render) {
+    render.generic.footer_reserved_lines = 3;
+    append_menu_row(render.generic,
+                    ui_text("Yes, enable ONNX", "예, ONNX 켜기"),
+                    ui_text("High-spec mode", "고사양 모드"),
+                    onnx_upscaler_confirm_cursor_ == 0,
+                    render::MenuHitTargetKind::SettingsRow,
+                    0,
+                    true,
+                    false);
+    append_menu_row(render.generic,
+                    ui_text("No, keep native", "아니오, 원본 유지"),
+                    ui_text("Recommended default", "권장 기본값"),
+                    onnx_upscaler_confirm_cursor_ == 1,
+                    render::MenuHitTargetKind::SettingsRow,
+                    1,
+                    true,
+                    false);
+    render.generic.notes.push_back(ui_text(
+        "This feature runs the selected ONNX model without a benchmark cutoff.",
+        "이 기능은 선택한 ONNX 모델을 벤치마크 차단 없이 실행합니다."));
+    render.generic.notes.push_back(ui_text(
+        "A high-spec GPU/accelerator is recommended. Slow models can reduce menu or gameplay smoothness.",
+        "고사양 GPU/가속기를 권장합니다. 느린 모델은 메뉴나 플레이 화면을 끊기게 할 수 있습니다."));
+    render.generic.notes.push_back(ui_text(
+        "Yes applies now. No, Esc, or Backspace leaves the upscaler OFF.",
+        "예를 누르면 바로 적용합니다. 아니오, Esc, Backspace는 업스케일러를 끈 상태로 둡니다."));
 }
 
 void MenuApp::populate_input_settings_render_data(render::MenuRenderData& render) {

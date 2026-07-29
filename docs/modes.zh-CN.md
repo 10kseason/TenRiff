@@ -1,4 +1,4 @@
-# 模式系统（Format / Key / Gauge / Random / Mods）
+# 模式系统（Key / Gauge / Random / Mods）
 
 这份文档概述当前已经实现的模式系统、lane transform/随机规则（Mirror/FR/SR）以及 note structure mod。
 
@@ -8,13 +8,11 @@
 
 ```json
 "mode": {
-  "format": "auto",
   "key_mode": "none",
   "gauge": "normal",
   "random": "off",
   "random_seed": 0,
   "mods": [],
-  "enable_osu_charts": false,
   "ghost_battle_enabled": false,
   "autoplay_enabled": false,
   "practice_no_fail_enabled": false,
@@ -24,25 +22,26 @@
 ```
 
 ## 模式含义
-- `format`：`auto | bms | osu`
+- 谱面输入仅支持 BMS family（`.bms/.bme/.bml/.pms`）；`format` 与 `enable_osu_charts` 设置已经移除
 - `key_mode`：`none | auto | 4k | 5k | 6k | 7k | 8k | 9k | 10k | 16k`
 - `gauge`：`normal | hard | ex_hard | easy`
 - `random`：`off | mirror | fr | sr`
 - `random_seed`：FR/SR、强制 key-mode 变换和 LN Mix 目标选择使用的固定 seed（`0` 也视为固定值）
 - `mods`：由 Mod Manager 规范化并保存的 mod token 数组
-- `enable_osu_charts`：`false | true`
 - `ghost_battle_enabled`：`false | true`
   - 默认值为 `false`
   - `true`：自动加载当前选中谱面的最佳兼容 replay 进行 ghost 对比
   - `false`：保持普通单场地游玩
 - `autoplay_enabled`：自动处理可判定 note，并把结果标为 `ASSIST`
 - `practice_no_fail_enabled`：阻止 gauge 导致的提前失败，继续游玩到谱面结束
-- `one_miss_fail_enabled`：首次 osu!mania OD8 对象 `MISS` 即失败的 `Sudden Death (1 MISS)`
+- `one_miss_fail_enabled`：首次 OD8 换算对象 `MISS` 即失败的 `Sudden Death (1 MISS)`
   - 仅原生 `BAD` timing 不会触发，空按产生的 `POOR` 也不会触发
   - 在 Mode Settings 中与 Practice No-Fail 互斥
 - `song_index_profile`：`safe | fast`
   - `safe`：优先降低 large-library RAM high-water 的默认值
   - `fast`：面向 32GB+ 环境，追求更快重索引的选项
+
+`Rate` 保存在 `speed.rate` 而不是 `mode`。可在 Mode Settings 中调整；未进行搜索文字输入时，也可在 Song Select 中用 `-` / `+` 直接改变下一次游玩的值。
 
 ## Lane Transform / 随机规则
 - **Mirror**：在 key-mode 变换完成后，确定性地反转最终 lane
@@ -70,7 +69,7 @@
 - 所有 gauge 都从 `100%` 开始，并在到达 `0%` 时立即失败。
 - `ex_hard` 是挑战用 gauge，回复低于 Hard，`BAD` / `POOR` 损失更大。
 - clear status 会区分为 `EX-HARD CLEAR`、`HARD CLEAR`、`CLEAR`、`EASY CLEAR`。
-- `Sudden Death (1 MISS)` 不是 gauge 类型，而是首次 osu!mania OD8 对象 `MISS` 时把当前 gauge 置零并立即结束的独立失败规则。
+- `Sudden Death (1 MISS)` 不是 gauge 类型，而是首次 OD8 换算对象 `MISS` 时把当前 gauge 置零并立即结束的独立失败规则。
 
 ## 实现位置
 - 模式解析：`src/gameplay/ModeSettings.*`、`src/app/ModeResolver.*`

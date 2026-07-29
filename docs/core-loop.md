@@ -16,14 +16,14 @@
   - `keymap.json` 로드 및 기본 키맵 생성
   - `KeycodeMap`으로 키 문자열 → 키코드 변환
 - `gameplay/GameplayChart.*`
-  - BMS/OSU 타임라인을 **샘플 타임 기반 노트 이벤트**로 변환
+  - BMS 타임라인을 **샘플 타임 기반 노트 이벤트**로 변환
   - `rate` 적용 시 스케줄을 `t' = t / rate`로 스케일
 - `gameplay/GameplayEngine.*`
   - 판정 윈도우( PG/GR/GD/BD )와 마스크(30ms) 적용
   - 넓은 BD 창 안의 이전 노트가 다음 정확 입력을 가로채지 않도록, 바로 다음 노트가 GD 이상으로 명확한 경우 이전 노트를 miss 처리하고 현재 입력을 다음 노트에 배정
   - POOR 발생 시 레인 마스크 적용
   - **Hold 규칙**: 조기 릴리즈는 BAD
-  - **Hold Tail 규칙**: osu!mania hold와 BMS `#LNMODE 2` charge note만 릴리즈 타이밍을 일반 판정 윈도우로 평가(헤드/테일 50:50)
+  - **Hold Tail 규칙**: BMS `#LNMODE 2` charge note만 릴리즈 타이밍을 일반 판정 윈도우로 평가(헤드/테일 50:50)
   - 일반 BMS long note는 끝까지 유지하면 tail이 자동 처리되고, tail release timing 판정은 사용하지 않음
   - 결과 통계(콤보, 판정 카운트, 평균/표준편차) 수집
 - `app/GameSession.*`
@@ -33,7 +33,7 @@
   - 판정/미스/홀드 갱신은 별도 `input.judgement_hz`(`1000~8000Hz`) 기준 내부 미니 틱으로 세분화되어 버퍼 전체를 한 번에 처리하지 않음
 
 ## 판정 관련 초기 정책(확인 필요)
-- **Hold Tail 판정**은 osu!mania hold와 BMS `#LNMODE 2` charge note에만 적용되며, 조기 릴리즈는 BAD 처리
+- **Hold Tail 판정**은 BMS `#LNMODE 2` charge note에만 적용되며, 조기 릴리즈는 BAD 처리
 
 ## 향후 연결 예정
 - 메뉴 상태 머신(Title/SongSelect/Gameplay/Result)

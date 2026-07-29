@@ -46,24 +46,27 @@ Windows では通常、次のどちらかで起動します。
 - `Enter`: 現在選択中の曲を開始
 - `Left` / `Right`: 左側メニューのフォーカス切り替え
 - `Esc`: 前の画面に戻る
-- `F5`: 曲ライブラリを再インデックス
+- `-` / `+`: 次の play の Rate を即時調整
+- `F5`: 曲ライブラリを再インデックス。実行中は stage / percent / ETA と progress bar を中央表示
+- `Browse > Difficulty Table`: local BMS difficulty-table header JSON を選択/解除
 
 ### Song Select からよく使う画面
 - `Mode`
-  - Ghost Battle、Autoplay、Practice、Sudden Death、Key Mode、Gauge、Random、Mods、Rate、Hi-Speed、OSU Charts、Chart Filter を調整
+  - Ghost Battle、Autoplay、Practice、Sudden Death、Key Mode、Gauge、Random、Mods、Rate、Hi-Speed を調整
 - `Audio`
   - Master / BGM / Keysound volume と BMS keysound policy を調整
 - `Graphics`
-  - VSync、Refresh Hz、Performance HUD、Display Offset を調整
+  - VSync、Refresh Hz、Performance HUD、Display Offset、external ONNX BGA Upscaler を調整
+  - model 選択後に upscaler を明示的に ON にして high-spec 警告を確認する。実験的 `NPU 優先` は Windows/driver が実際に NPU を選択した場合だけ NPU を使う
 - `Skins`
-  - judge line 位置、note size、LN body width、lane colors を調整
+  - native/LR2 skin 切り替え、LR2 folder import、judge line 位置、note size、LN body width、lane colors を調整
 - `Keymap`
   - key binding 変更と NKRO test 実行
 
 ## 4. 初期設定のおすすめ
 
 - `Mode > Gauge`: `normal`
-- `Mode > Sudden Death`: 最初の osu!mania OD8 `MISS` で終了する challenge が必要なときだけ有効化
+- `Mode > Sudden Death`: 最初の OD8 換算 `MISS` で終了する challenge が必要なときだけ有効化
 - `Mode > Rate`: `1.0x`
 - `Mode > Hi-Speed`: まずは既定値
 - `Graphics > Display`: Discord voice overlay を使う場合は `Borderless` を推奨
@@ -95,8 +98,7 @@ client 側の設定は Discord の [公式 Game Overlay guide](https://support.d
 ## 6. プレイ開始前に知っておくこと
 
 ### Chart format
-- 既定フィルタは BMS 寄りです。
-- osu!mania はオプションで有効化すれば `4K` から `10K` までインデックス/プレイできます。
+- TenRiff 1.2.6 は BMS family（`.bms/.bme/.bml/.pms`）だけをインデックス/プレイします。
 
 ### Loading
 - 曲開始直後に chart-loading progress が表示されることがあります。
@@ -159,7 +161,7 @@ Rate は曲の再生速度と譜面スケジュールだけを変え、同じ Hi
 - `easy`: `0%` で即 Game Over
 
 automatic gauge shifting はありません。
-`Sudden Death (1 MISS)` は gauge type ではなく、最初の osu!mania OD8 object `MISS` で gauge を 0 にして即終了する rule です。native `BAD` timing だけでは発動せず、空打ちの `POOR` も対象外で、Practice No-Fail と同時には有効化できません。
+`Sudden Death (1 MISS)` は gauge type ではなく、最初の OD8 換算 object `MISS` で gauge を 0 にして即終了する rule です。native `BAD` timing だけでは発動せず、空打ちの `POOR` も対象外で、Practice No-Fail と同時には有効化できません。
 
 ## 10. Result 画面
 
@@ -193,6 +195,8 @@ automatic gauge shifting はありません。
 ### BMS keysound が大きすぎる/小さすぎる
 - `Audio > Keysound Volume` を調整する
 - BGM と別々に調整できる
+- `follow` でも無音になり得た late-input 経路は 1.2.6 で修正され、判定時刻は維持したまま可聴開始だけを現在書き込み可能な buffer へ固定する
+- まだ無音なら `Keysound Mode=follow`、0 以外の volume、譜面の `#WAV` asset path を確認する
 
 ### 入力が不安定、またはキー競合が疑わしい
 - `Options > Keymap > NKRO Test` で複数キー同時押しを確認する

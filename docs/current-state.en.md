@@ -3,20 +3,20 @@
 This is the document that the next agent or any new contributor should read first. Its goal is to quickly answer: "what is this project now, where should I look, and what is still unverified?"
 
 ## Baseline
-- Current project version: `1.2.5 stable`
+- Current project version: `1.2.6 stable`
 - Direct-IP multiplayer and the preview r5 input-backend lifecycle fixes are integrated into `1.1.8 stable`
 - `1.1.8` adds an osu!mania OD8 auxiliary score, first-native-`BAD` `Sudden Death (1 MISS)`, and deterministic `LN Mix 10%-90%` on top of the 1.1.7 visual refresh
 - `1.2.0` connects BMS channel `04/07` and osu!mania backgrounds to the gameplay sample timeline and asynchronously upscales sub-FHD image backgrounds through LunaSR on Windows ML
 - `1.2.1` switches the runtime to LunaSR `basic_v2`, applies it to gameplay BGA layers and the selected Song Select BGI, adds the single-player Esc pause menu, and adds polygon note shapes plus an optional LN tail cap.
 - `1.2.2` normalizes procedural circle/polygon skins to the full 100% bar width, adds MPG/MPEG video BGA decoding with an FFmpeg fallback, and switches LunaSR to the staged32 RGB FP16 model behind a mandatory 200 FPS benchmark gate.
-- `1.2.3` lowers the fixed RGB x2 LunaSR performance gate from 200 FPS to 35 FPS.
+- `1.2.3` relaxes the then-current fixed RGB x2 LunaSR performance gate.
 - `1.2.4` removes rights-unclear LunaSR ONNX and model-specific metadata from public distribution and retains only an opt-in user-supplied-model integration that defaults to `off`.
-- `1.2.5` replaces the model-branded integration with a generic External ONNX Upscaler, adds Graphics Settings selection/.onnx drop, saves a per-profile model path, and creates model-specific WinML sessions and 35 FPS gates.
+- `1.2.5` replaces the model-branded integration with a generic External ONNX Upscaler, adds Graphics Settings selection/.onnx drop, saves a per-profile model path, and creates model-specific WinML sessions.
+- `1.2.6` makes the playable surface BMS-family only, retains native/LR2 skins, and adds manual ONNX upscaler enablement with an experimental NPU preference, Song Select Rate controls, centered indexing progress, local JSON difficulty tables, and the BMS keysound late-input hotfix.
 - Baseline companion document for follow-up work: `docs/baseline-1.1.2.en.md`
 - Windows GUI build is the main target
 - Linux exists only as a preview-level package at `Baepoks-Linuxs/TenRiff-0.5.0-linux-preview`
-- Default surface is BMS-first
-- `.osu` can be re-enabled as an option and supports 4K-10K
+- The supported chart surface is BMS-family only (`.bms/.bme/.bml/.pms`)
 - The `1.2.4 stable` runtime keeps RawInput primary while continuously running a bound-key polling shadow in the same `InputThread`; startup failure or an unexpected message-pump exit switches that producer to Polling without resetting its queue or pressed state
 - Menu input keeps the foreground process/root-window boundary. A RawInput startup failure, process-global registration-target loss, or hidden message-window exit switches it to Polling without waiting for a user key.
 - A confirmed fallback stays active across menu and subsequent gameplay sessions for the current app run without rewriting the profile; app restart or an explicit `Options -> Input Settings -> Backend` change retries it.
@@ -54,6 +54,7 @@ This is the document that the next agent or any new contributor should read firs
   - `follow`
   - `autoplay`
   - `ignore`
+  - late real-time input keeps its original sample timestamp for judgement while the audible keysound start is pinned to the current writable-buffer boundary
 - BMS long notes:
   - LN channels (`51`-`55`, `61`-`65`)
   - `#LNOBJ`
@@ -69,19 +70,18 @@ This is the document that the next agent or any new contributor should read firs
   - mouse-wheel navigation
   - left-side `KEY` quick filter toggle
   - external folder / BMS drag-and-drop
-  - `.osz` files install into the active songs source through `Shift+F2` or drag-and-drop, enable osu charts, and reindex that source
-  - OSZ installation preflights the complete archive, extracts through staging, commits atomically, never overwrites an existing folder, and contains `.osu` background/audio/hitsound references to the chart directory
   - recent source persistence and reopening
-  - BMS / OSU / All filtering
   - difficulty / title sorting
-- osu!mania:
-  - 4K-10K load / launch support
+  - when search is inactive, `-`/`+` adjust the current play Rate
+  - indexing stage, percentage, processed/total, ETA, song count, and a progress bar are centered below the header
+  - Browse can select a local difficulty-table header JSON; MD5/SHA-256 matches supply levels/symbols and changing the table reindexes
+- BMS key modes:
   - separate keymaps per key mode
-  - 4K-10K chart difficulty calculation
+  - chart difficulty calculation across supported key counts
   - `mode.key_mode` uses an N2NC-style lane remap to convert key counts
   - `mode.key_mode=none` keeps the chart's original key count and base pattern layout intact
 - Native difficulty:
-  - BMS/osu!mania LV/CR calculation evaluates only LN head/tail miss-ms at 0.5x, so `300ms` is treated as `150ms`; runtime gameplay judgement windows remain unchanged
+  - BMS LV/CR calculation evaluates only LN head/tail miss-ms at 0.5x, so `300ms` is treated as `150ms`; runtime gameplay judgement windows remain unchanged
 - Lane transform:
   - Random supports `Off / Mirror / FR / SR`; Mirror reverses the final lanes after key-mode conversion, with 10K/16K mirrored independently inside each player half
   - Mod Manager `LN Mix 10%-90%` preserves existing holds, excludes heads overlapping an existing same-lane span, and uses `Random Seed` to deterministically convert the requested share of taps that can form a hold of at least 50ms while leaving 50ms before the next same-lane note
@@ -91,9 +91,8 @@ This is the document that the next agent or any new contributor should read firs
   - combo Y adjustment
   - judge line / lane width / lane spacing / note width / divider width / 16K center gap / note height / LN body width adjustment
   - per-key-mode lane-width arrays and inter-lane spacing arrays are persisted and applied through the same layout math in preview, live gameplay, and the ghost field
-  - `.osk` files install into the active profile's `skins` directory through the Skins file picker or drag-and-drop, using the same transactional, no-overwrite archive policy as OSZ
-  - supported osu!mania note/LN images and `ColumnWidth`, `ColumnSpacing`, `ColumnLineWidth`, and `HitPosition` are applied to the gameplay layout
-  - every valid archive file is preserved, but TenRiff does not claim pixel-perfect rendering of unsupported osu! modes or UI assets
+  - supported skin routes are `native` and LR2 playskin only; selecting or dropping an LR2 folder in Skins imports it into the active profile
+  - LR2 note/LN images, lane gaps, and destination sizes are applied to gameplay layout
   - `skin.lr2_resolution_mode` stores LR2 playskin resolution override tokens as `auto / sd / hd / fhd`
   - LR2 auto-detect uses the playskin `#DST_NOTE` coordinate range instead of asset names
   - eased future-note entry from above the field
@@ -106,11 +105,11 @@ This is the document that the next agent or any new contributor should read firs
   - very early non-consuming presses are handled as LR2-style `POOR` and are visible again in result / replay / UI paths
   - `POOR` preserves combo, stays out of score / accuracy totals, and uses dedicated `PR` gauge damage values
   - gauge modes support `EX-Hard / Hard / Normal / Easy`; all start at `100%` and fail immediately at `0%`
-  - `Sudden Death (1 MISS)` fails immediately on the first osu!mania OD8 object `MISS`; native `BAD` timing alone and empty-key `POOR` are ignored, and the option is mutually exclusive with Practice No-Fail
+  - `Sudden Death (1 MISS)` fails immediately on the first OD8-converted object `MISS`; native `BAD` timing alone and empty-key `POOR` are ignored, and the option is mutually exclusive with Practice No-Fail
   - Gameplay and Result show an auxiliary `OSU OD8` score converted from real input timing with osu!mania stable OD8 windows and ScoreV1 (maximum 1,000,000); native TenRiff score and ranking stay unchanged
   - live gameplay `ClockSync` uses centered anchor regression instead of large absolute Windows QPC values and automatically rebases after sustained clock discontinuities
   - stale backlog is classified from QPC event age and the `BAD` window; a fresh input whose sample mapping drifts far from the current playback anchor falls back to that anchor instead of becoming permanently non-scoring catch-up
-  - tail release timing applies only to osu hold and BMS `#LNMODE 2` charge notes
+  - tail release timing applies only to BMS `#LNMODE 2` charge notes
   - when two keyboards press the same key, the logical `Pressed` state remains active until the last input source releases it
 - Graphics:
   - resolution presets (`720p`, `1080p`, `qhd`, `native`)
@@ -119,14 +118,16 @@ This is the document that the next agent or any new contributor should read firs
   - VSync on: present refresh follows the active monitor Hz and render pacing targets `monitor_hz * 2` (`1050` clamp)
   - `visual_offset_ms`
   - `performance_overlay`
-  - `background_upscale_mode=onnx|off` plus `background_upscale_model_path`: defaults to `off`; select or drop a compatible ONNX in Graphics Settings; public packages include no model
-  - current contract is 960x540 RGB residual x2; users own model rights/quality/performance, and load, contract, benchmark, or inference failure keeps native scaling
+  - `background_upscale_model_path` only stores the compatible ONNX selected or dropped in Graphics Settings; public packages include no model
+  - BGA Upscaler defaults to `off`; the user must explicitly turn it on and acknowledge the high-spec warning, with no automatic benchmark gate
+  - current contract is 960x540 RGB residual x2; users own model rights/quality/performance, and load, contract, decode, or inference failure keeps native scaling
+  - experimental `background_upscale_prefer_npu=true` first requests a WinML `DirectXMinPower` session while the upscaler is on. Windows/the driver chooses the actual NPU or GPU; session failure falls back to the existing high-performance DirectX route and normal DirectX fallback
 - Gameplay performance:
   - static playfield command-list cache
   - note head / tail bitmap cache
   - fixed-size HUD note transport
 - Loading UX:
-  - Song Select indexing progress display
+  - centered Song Select indexing stage/percentage/processed/total/ETA/song count and progress bar below the header
   - gameplay chart-loading progress display
   - `Esc` cancel during gameplay loading
 - Profile UX:
@@ -160,13 +161,13 @@ This is the document that the next agent or any new contributor should read firs
   - peak memory roughly `working set 453MB`, `private 524MB`
   - on a 1024-chart sample from the same library, fast-profile throughput is about `2.05x` vs safe
 - Cache schema:
-  - `version = 10`
-  - includes `include_osu`
+  - `version = 11`
   - optional `layout_label`
+  - `native_level`, `md5`, `sha256`, and difficulty-table name/symbol/level/order metadata
 
 ## Runtime / Packaging Rules
 - New user profiles are created automatically
-- The current official P2P distribution line is `TenRiff 1.2.5 stable`
+- The current official P2P distribution line is `TenRiff 1.2.6 stable`
 - Distribution packages do not include `Songs`
 - Distribution packages include the runtime `Mainmusic/` assets used for menu BGM
 - Distribution updates include only built artifacts and required runtime assets
@@ -180,9 +181,8 @@ This is the document that the next agent or any new contributor should read firs
 - The keymap lives in `profiles/<name>/keymap.json`
 - `keymap.json` has a `modes.{4k..10k}` per-mode binding structure
 - Stale profiles are partially corrected by runtime migration
-  - BMS-first default
   - keysound policy
-  - osu key-mode mismatch, etc.
+  - removed osu fields are no longer persisted
 
 ## High-Value Files
 - `src/app/MenuApp.cpp`
@@ -211,7 +211,8 @@ This is the document that the next agent or any new contributor should read firs
 - gameplay low-FPS / 0.1% / 0.01% low verification
 - coexistence with OBS / Discord / Game Bar while live-applying graphics settings
 - GUI verification for drag-and-drop / external Korean-path sources
-- separate keymap verification for 4K-10K `.osu`
+- verify `Prefer NPU (experimental)` on/off and WinML device fallback on a real NPU-capable Windows PC
+- verify hash matching, reindexing, and display order after changing a local difficulty table
 - Linux is still not a real runnable build
 
 ## Best Next Read

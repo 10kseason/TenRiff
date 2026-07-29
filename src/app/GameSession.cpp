@@ -843,7 +843,7 @@ std::uint64_t estimate_audio_decoded_bytes(const std::string& path, int target_s
     return estimate_audio_bytes_from_file_size(path);
 }
 
-std::optional<std::string> select_primary_audio_path(ChartFormat format, const gameplay::GameplayChart& chart) {
+std::optional<std::string> select_primary_audio_path(const gameplay::GameplayChart& chart) {
     std::unordered_set<std::string> seen;
     std::optional<std::string> best_path;
     std::uintmax_t best_size = 0;
@@ -865,12 +865,6 @@ std::optional<std::string> select_primary_audio_path(ChartFormat format, const g
             best_size = ec ? 0 : size;
         }
     };
-
-    if (format == ChartFormat::OsuMania && !chart.audio_cues.empty()) {
-        if (const std::string* path = chart.audio_asset_path(chart.audio_cues.front().asset_id)) {
-            return *path;
-        }
-    }
 
     for (const auto& cue : chart.audio_cues) {
         if (const std::string* path = chart.audio_asset_path(cue.asset_id)) {
@@ -905,10 +899,9 @@ std::optional<std::string> select_primary_audio_path(ChartFormat format, const g
     return std::nullopt;
 }
 
-std::optional<int> detect_chart_preferred_sample_rate(ChartFormat format,
-                                                      const gameplay::GameplayChart& chart,
+std::optional<int> detect_chart_preferred_sample_rate(const gameplay::GameplayChart& chart,
                                                       std::string* diagnostic) {
-    auto primary_path = select_primary_audio_path(format, chart);
+    auto primary_path = select_primary_audio_path(chart);
     if (!primary_path.has_value()) {
         return std::nullopt;
     }
@@ -1158,7 +1151,6 @@ std::optional<game::GaugeType> parse_gauge_type(std::string_view value) {
 std::string chart_format_token(ChartFormat format) {
     switch (format) {
         case ChartFormat::Bms: return "bms";
-        case ChartFormat::OsuMania: return "osu";
         case ChartFormat::Unknown:
         default: return "unknown";
     }

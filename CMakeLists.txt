@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(TenRiff VERSION 1.2.5 LANGUAGES C CXX)
+project(TenRiff VERSION 1.2.6 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -13,24 +13,10 @@ endif()
 option(TENRIFF_ENABLE_TESTS "Build TenRiff unit tests" ON)
 option(TENRIFF_ENABLE_ONNX_UPSCALER "Enable the optional user-selected WinML ONNX background upscaler" ON)
 
-# Pinned vendored miniz is used only for local .osk/.osz ZIP package import.
-add_library(tenriff_miniz STATIC
-    external/miniz/miniz.c
-    external/miniz/miniz_tdef.c
-    external/miniz/miniz_tinfl.c
-    external/miniz/miniz_zip.c
-)
-
-target_include_directories(tenriff_miniz
-    PUBLIC
-        ${CMAKE_CURRENT_SOURCE_DIR}/external/miniz
-)
-
 add_library(tenriff_chart
     src/chart/BmsParser.cpp
     src/chart/BmsChartNorm.cpp
     src/chart/BmsTimeline.cpp
-    src/chart/OsuManiaLoader.cpp
     src/chart/OsuDifficulty.cpp
     src/chart/NoteLaneMapping.cpp
 )
@@ -85,9 +71,11 @@ add_library(tenriff_core
     src/network/PeerSession.cpp
     src/app/BmsGameplayBuilder.cpp
     src/app/BmsKeyConverter.cpp
+    src/app/ChartFileHash.cpp
     src/app/ChartLoader.cpp
     src/app/CommandLine.cpp
     src/app/CrashLogger.cpp
+    src/app/DifficultyTable.cpp
     src/app/GraphicsTiming.cpp
     src/app/ImportedGameplaySkin.cpp
     src/app/Lr2Skin.cpp
@@ -96,9 +84,6 @@ add_library(tenriff_core
     src/app/MultiplayerChartSearch.cpp
     src/app/ModeManager.cpp
     src/app/ModeResolver.cpp
-    src/app/OsuArchiveImport.cpp
-    src/app/OsuHitsoundResolver.cpp
-    src/app/OsuSkin.cpp
     src/app/PersistedRuntimeConfig.cpp
     src/app/RuntimeConfigMigration.cpp
     src/app/SongIndex.cpp
@@ -117,8 +102,6 @@ target_link_libraries(tenriff_core
         tenriff_chart
         tenriff_game
         tenriff_runtime
-    PRIVATE
-        tenriff_miniz
 )
 
 if(WIN32)
@@ -337,15 +320,6 @@ if(TENRIFF_ENABLE_TESTS)
     )
     target_link_libraries(gameplay_judgement_benchmark PRIVATE tenriff_core)
 
-    add_executable(n2nc_compare_smoke
-        tests/smoke/n2nc_compare_smoke.cpp
-    )
-    target_include_directories(n2nc_compare_smoke
-        PRIVATE
-            ${CMAKE_CURRENT_SOURCE_DIR}/src
-    )
-    target_link_libraries(n2nc_compare_smoke PRIVATE tenriff_core)
-
     add_executable(bms_parser_tests
         tests/unit/test_bms_parser.cpp
         tests/unit/test_bms_normalizer.cpp
@@ -353,7 +327,6 @@ if(TENRIFF_ENABLE_TESTS)
         tests/unit/test_bms_timeline.cpp
         tests/unit/test_speed_manager.cpp
         tests/unit/test_gauge_manager.cpp
-        tests/unit/test_osu_mania_loader.cpp
         tests/unit/test_clock_sync.cpp
         tests/unit/test_key_state_tracker.cpp
         tests/unit/test_input_thread.cpp
@@ -379,8 +352,7 @@ if(TENRIFF_ENABLE_TESTS)
         tests/unit/test_input_backend_status.cpp
         tests/unit/test_profile_setup_flow.cpp
         tests/unit/test_lr2_skin.cpp
-        tests/unit/test_osu_archive_import.cpp
-        tests/unit/test_osu_skin.cpp
+        tests/unit/test_difficulty_table.cpp
         tests/unit/test_game_session_hud.cpp
         tests/unit/test_graphics_timing.cpp
         tests/unit/test_render_performance.cpp
@@ -393,7 +365,6 @@ if(TENRIFF_ENABLE_TESTS)
     target_include_directories(bms_parser_tests
         PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/external
-            ${CMAKE_CURRENT_SOURCE_DIR}/external/miniz
             ${CMAKE_CURRENT_SOURCE_DIR}/src
     )
     if(WIN32)

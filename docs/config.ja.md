@@ -40,7 +40,7 @@ profile が存在しない場合は初回起動時に自動生成されます。
 
 - `backend` (string)
   - `polling | rawinput`
-  - 現行 `1.2.5` リリースラインの既定値は `rawinput`
+  - 現行 `1.2.6` リリースラインの既定値は `rawinput`
   - `Options -> Input Settings -> Backend` または `Options -> Profile Setup -> Input Backend` で profile ごとに選択可能
   - runtime fallback は保存済みの値を `polling` に書き換えない
   - RawInput の起動失敗、登録先の消失、message window の終了を確認すると、そのアプリ実行中は menu と後続 gameplay の両方で Polling を維持する
@@ -114,19 +114,23 @@ profile が存在しない場合は初回起動時に自動生成されます。
   - 既定値は `false`。右上を使うため、同じ角に置いた Discord Voice widget と重なる場合がある
 - `background_upscale_mode` (string)
   - `onnx | off`。旧 `lunasr` 値は互換性のため `onnx` に移行
-  - 既定値は `off`。無効時は model load と benchmark を実行しない
+  - 既定値は `off`。Graphics Settings の `BGA Upscaler` で明示的に ON/OFF
+  - ON 時は high-spec 警告の確認が必要で、自動 performance benchmark は実行しない
 - `background_upscale_model_path` (string)
-  - Graphics Settings の `ONNX Model` で選択するか、その画面に `.onnx` file を drop
+  - Graphics Settings の `ONNX Model` で選択するか、その画面に `.onnx` file を drop。選択は path だけを保存し、upscaler を自動で ON にしない
   - 絶対 path または executable/current directory 基準の相対 path。公開 package は model を含まない
   - 現在の契約: float32 NCHW `rgb_lr [1,3,540,960]` -> `rgb_residual_x2 [1,3,1080,1920]` residual x2
-  - benchmark・load・contract・inference 失敗時は native scaling を維持
+  - load・contract・inference 失敗時は native scaling を維持
   - model の権利・品質・性能は user が確認。詳細は `tools/onnx_upscaler/README.md`
+- `background_upscale_prefer_npu` (bool)
+  - 既定値は `true` だが、`background_upscale_mode=onnx` のときだけ有効
+  - Graphics Settings の実験的な `NPU 優先` で無効化できる
+  - Windows ML の `DirectXMinPower` device を要求するだけで、実際に NPU を使うかは Windows/driver が決定
+  - low-power session 作成失敗時は既存の high-performance DirectX 経路へ fallback
 
 ### `mode`
-- `format` (string)
-  - chart filtering とあわせて使う
-  - `bms | osu | auto`
-  - `auto` は実質 `All`
+chart loader/indexer は BMS family（`.bms/.bme/.bml/.pms`）専用で、`format` と `enable_osu_charts` は保存・使用しません。
+
 - `key_mode` (string)
   - `none | auto | 4k | 5k | 6k | 7k | 8k | 9k | 10k | 16k`
   - `none` は譜面本来の key count をそのまま使う
@@ -140,7 +144,6 @@ profile が存在しない場合は初回起動時に自動生成されます。
   - Note Structure では `full_long_notes`、`ln_mix_10`～`ln_mix_90`、`full_short_notes` のいずれか一つを選択できる
   - LN Mix は 50ms 以上の hold と同じ lane の次ノート前 50ms の余裕を両方確保できる tap のみを候補にし、指定割合を丸めた個数だけ standard hold に変換する
   - 既存 hold は維持され、同じ lane の既存 span と重なる head は除外され、同じ `random_seed` では同じ tap が選択される
-- `enable_osu_charts` (bool)
 - `ghost_battle_enabled` (bool)
   - 既定値は `false`
   - `true` のとき、選択譜面の互換性ある best replay を自動ロードして ghost 比較を行う
@@ -154,7 +157,7 @@ profile が存在しない場合は初回起動時に自動生成されます。
   - `true` のとき gauge による早期失敗を無効化し、判定と result export は最後まで継続
   - result には `ASSIST` が付く
 - `one_miss_fail_enabled` (bool)
-  - `true` のとき最初の osu!mania OD8 object `MISS` で gauge が 0 になり、即座に失敗する
+  - `true` のとき最初の OD8 換算 object `MISS` で gauge が 0 になり、即座に失敗する
   - native `BAD` timing だけでは発動せず、空打ちの `POOR` も即死条件に含めない
   - Mode Settings で有効にすると `practice_no_fail_enabled` は自動的に無効になる
 - `song_index_profile` (string)
@@ -173,12 +176,14 @@ profile が存在しない場合は初回起動時に自動生成されます。
   - 最後に開いた song root
 - `recent_song_sources` (array of string)
   - recent external/internal song source 一覧
+- `difficulty_table_path` (string)
+  - Browse で選択した local BMS difficulty-table header JSON の path
+  - header は `name`, `symbol`, local relative `data_url`、data array entry は `md5` または `sha256` と `level` を使用
+  - network URL は取得せず、選択/解除時に現在の source を再インデックスして一致譜面へ table level を表示
 
 ### `skin`
 - `source` (string)
-  - `native | osu | lr2`
-- `osu_skin_name` (string)
-  - 取り込んだ osu!mania skin 名
+  - `native | lr2`
 - `lr2_skin_name` (string)
   - 取り込んだ LR2 playskin 名
 - `lr2_resolution_mode` (string)
@@ -262,5 +267,5 @@ profile が存在しない場合は初回起動時に自動生成されます。
 
 ## Runtime Migration Notes
 - 古い profile は一部値を自動補正される。
-- とくに BMS-first defaults、osu key-mode mismatch、keysound policy が migration 対象。
+- とくに BMS defaults と keysound policy が migration 対象で、旧 osu chart/skin field は保存されない。
 - config file が存在しない場合、app は defaults で起動して直ちに profile を保存する。

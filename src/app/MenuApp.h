@@ -75,6 +75,7 @@ private:
         ModeMods,
         Keymap,
         KeymapConfirm,
+        OnnxUpscalerConfirm,
         KeymapTest,
         Result,
     };
@@ -229,6 +230,7 @@ private:
     void handle_mode_mods_input(uint32_t keycode);
     void handle_keymap_input(uint32_t keycode);
     void handle_keymap_confirm_input(uint32_t keycode);
+    void handle_onnx_upscaler_confirm_input(uint32_t keycode);
     void handle_keymap_test_input(uint32_t keycode);
     void handle_result_input(uint32_t keycode);
 
@@ -254,6 +256,7 @@ private:
     void populate_skin_settings_render_data(render::MenuRenderData& render);
     void populate_keymap_render_data(render::MenuRenderData& render);
     void populate_keymap_confirm_render_data(render::MenuRenderData& render);
+    void populate_onnx_upscaler_confirm_render_data(render::MenuRenderData& render);
     void populate_keymap_test_render_data(render::MenuRenderData& render);
     void populate_generic_screen_render_data(render::MenuRenderData& render);
     void render_tick();
@@ -313,12 +316,9 @@ private:
                                        uint64_t* out_text_revision = nullptr);
     void update_gameplay_loading_state(int percent, std::string_view stage);
     void refresh_keymap_lane_list();
-    void refresh_available_osu_skins();
     void refresh_available_lr2_skins();
-    [[nodiscard]] bool import_osu_skin_path(std::string_view source_path);
     [[nodiscard]] bool import_lr2_skin_path(std::string_view source_path);
     [[nodiscard]] bool import_skin_path_auto(std::string_view source_path);
-    [[nodiscard]] bool import_osz_path(std::string_view source_path);
     [[nodiscard]] std::string active_external_skin_root() const;
     [[nodiscard]] std::string active_external_skin_name() const;
     [[nodiscard]] const struct LocalPlayRecord* current_selected_record() const;
@@ -357,7 +357,6 @@ private:
     [[nodiscard]] std::string ui_preset_label(std::string_view token) const;
     [[nodiscard]] std::string ui_keysound_policy_label(std::string_view token) const;
     [[nodiscard]] std::string ui_song_index_profile_label(std::string_view token) const;
-    [[nodiscard]] std::string ui_chart_filter_label(std::string_view token) const;
     [[nodiscard]] std::string ui_key_mode_label(std::string_view token) const;
     [[nodiscard]] std::string ui_gauge_label(std::string_view token) const;
     [[nodiscard]] std::string ui_random_label(std::string_view token) const;
@@ -502,6 +501,7 @@ private:
     SongSelectView song_select_view_ = SongSelectView::Songs;
     int song_select_nav_cursor_ = 0;
     int keymap_cursor_ = 0;
+    int onnx_upscaler_confirm_cursor_ = 1;
     int skin_edit_lane_ = 0;
     int skin_edit_gap_ = 0;
     bool keymap_dirty_ = false;
@@ -516,9 +516,6 @@ private:
     int64_t keymap_status_deadline_ns_ = 0;
     bool first_run_profile_ = false;
     bool help_overlay_visible_ = false;
-    std::string available_osu_skin_root_;
-    std::vector<std::string> available_osu_skin_names_{};
-    std::unordered_map<std::string, std::string> available_osu_skin_roots_by_name_{};
     std::string available_lr2_skin_root_;
     std::vector<std::string> available_lr2_skin_names_{};
     std::unordered_map<std::string, std::string> available_lr2_skin_roots_by_name_{};
@@ -595,6 +592,8 @@ private:
     uint32_t key_f2_ = 0;
     uint32_t key_f5_ = 0;
     uint32_t key_f9_ = 0;
+    uint32_t key_minus_ = 0;
+    uint32_t key_plus_ = 0;
     input::RawInputHealthProbe input_backend_probe_{};
     std::unordered_map<uint32_t, bool> input_probe_polled_states_{};
     InputBackendFallbackPolicy input_backend_fallback_policy_{};

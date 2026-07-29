@@ -90,6 +90,7 @@ struct SongCardData {
     std::string detail;
     std::string background_path;
     std::string lamp;
+    std::string level_label;
     int level = 0;
     double rating = 0.0;
     int song_index = -1;
@@ -119,6 +120,7 @@ struct SongSelectData {
     std::string selected_song_background_path;
     std::string background_upscale_mode = "off";
     std::string background_upscale_model_path;
+    bool background_upscale_prefer_npu = true;
     std::string selected_song_lamp;
     bool selected_song_favorite = false;
     std::string selected_song_collection_filter;
@@ -266,6 +268,7 @@ struct GameplayHudData {
     int64_t background_overlay_start_sample = 0;
     std::string background_upscale_mode = "off";
     std::string background_upscale_model_path;
+    bool background_upscale_prefer_npu = true;
     double judgement_line_position = 0.82;
     double combo_position = 0.24;
     std::size_t lane_width_scale_count = 0;
@@ -536,7 +539,7 @@ private:
     void invalidate_gameplay_note_sprite_cache();
     [[nodiscard]] bool ensure_gameplay_note_sprites(const GameplayHudData& data);
     void invalidate_gameplay_background_cache();
-    void set_background_upscale_model_path(std::string model_path);
+    void set_background_upscale_model_path(std::string model_path, bool prefer_npu);
     [[nodiscard]] bool ensure_gameplay_background_bitmap(const GameplayHudData& data);
     void invalidate_song_select_preview_cache();
     [[nodiscard]] bool ensure_song_select_preview_bitmap(const SongSelectData& data);
@@ -740,6 +743,7 @@ private:
     GameplayNoteSpriteCache gameplay_note_sprite_cache_{};
     GameplayBackgroundCache gameplay_background_cache_{};
     std::string active_background_upscale_model_path_{};
+    bool active_background_upscale_prefer_npu_ = true;
     std::unique_ptr<BgaVideoDecoder> gameplay_base_video_decoder_{};
     std::unique_ptr<BgaVideoDecoder> gameplay_overlay_video_decoder_{};
     std::unique_ptr<OnnxBackgroundUpscaler> gameplay_background_upscaler_{};

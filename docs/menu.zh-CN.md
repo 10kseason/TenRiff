@@ -9,16 +9,17 @@
 - `Options -> Profile Setup` 会重新打开当前 profile 的首次设置页面，并立即保存 language/audio/input/graphics/keymap
 - 开始游玩时，当前实现会停止菜单线程并单独运行 `GameSession`
 - **Windows 菜单 UI 基于 D3D11 + Direct2D/DirectWrite**，会渲染标题/选歌（青色布局）以及其他设置页面（列表 UI）
-- 可通过 Skins 页面的文件选择或 `.osk` drag-and-drop 安装到当前 profile 的 `skins`
-- 可通过 `Shift+F2` 或 `.osz` drag-and-drop 安装到当前 songs source；随后会启用 osu chart 并重新索引该 source
-- OSK/OSZ 会先预检整个 archive，再通过 staging 解压并原子提交，且不会覆盖已有文件夹
+- Skins 仅支持 native/LR2；选择或拖放 LR2 playskin folder 会复制到当前 profile 的 `skins`
+- Song Select 在重新索引时会居中显示 stage / percent / ETA 与 progress bar
+- Browse 可选择本地 BMS 难度表 header JSON，并重新索引当前 source，让 hash 匹配谱面获得表等级
+- 选择 ONNX model 只保存路径；用户需明确开启 `BGA Upscaler` 并确认高配置警告，实验性 `优先 NPU` 也不能强制 Windows/driver 最终选择的实际设备
 - 输入键摘要：
-  - Title：`↑/↓` 移动，`Enter` 选择（PLAY/EDIT/OPTIONS/EXIT），`F2` 浏览 songs 文件夹，`Shift+F2` 导入 OSZ，`Esc` 退出
-  - Song Select：`↑/↓` 移动歌曲，`←/→` 切换左侧菜单焦点，`Enter` 选择/开始，`Shift+F2` 导入 OSZ，`Esc` 返回
+  - Title：`↑/↓` 移动，`Enter` 选择（PLAY/EDIT/OPTIONS/EXIT），`F2` 浏览 songs 文件夹，`F5` 重索引，`Esc` 退出
+  - Song Select：`↑/↓` 移动歌曲，`←/→` 切换左侧菜单焦点，`Enter` 选择/开始，`- / +` 调整 Rate，`Esc` 返回
   - Settings/Mode：`↑/↓` 移动项目，`←/→` 改变数值，`Enter/Esc` 返回
   - Keymap：`↑/↓` 选择，`Enter` 捕获绑定，`Esc` 返回
   - Result：只能用 `Enter` 返回 Song Select
-  - 共享功能键：`F1` 帮助，`F2` songs-folder browse，`Shift+F2` OSZ import，`F5` refresh/reindex，`F9` screenshot
+  - 共享功能键：`F1` 帮助，`F2` songs-folder browse，`F5` refresh/reindex，`F9` screenshot
 
 ## 不可妥协的规则
 - **保持菜单中的音频设备处于打开状态。** 在进入菜单时初始化音频 backend，并运行静音回调（零缓冲），这样在 gameplay 开始之前 `playhead_samples` / `buffer_start_samples` 仍然有效。开始歌曲时不要重新打开设备，以避免 warm-up 抖动。
@@ -39,10 +40,12 @@
 `Title → SongSelect → Gameplay → Result` 是最小可游玩的闭环。每次切换都应复用 live audio clock，并保持 InputThread 持续运行。
 
 ## 无卡顿的 Song Select
-- **SongIndexerThread** 扫描文件夹，提取 path/title/artist/BPM/key count/mode/preview audio。进度会发回 UI，交互必须保持响应。
+- **SongIndexerThread** 扫描 BMS-family 文件，提取 path/title/artist/BPM/key count/mode/preview audio。stage / percent / ETA 与 progress bar 会在 Song Select header 下方居中显示，交互保持响应。
 - **缓存索引**（`song_index.json` 或 SQLite）通过 mtime/hash 检查避免全量重扫。首次运行可能较慢；后续应该接近瞬时。
 - **预览音频** 通过音频引擎调度：UI 只负责 enqueue preview request，AudioThread 负责混音，确保时序一致。
-- Empty-state 页面应提供持续可见的 `Add Songs Folder` 动作；外部文件夹、BMS 文件和 `.osz` archive 也支持 drag-and-drop。
+- Empty-state 页面应提供持续可见的 `Add Songs Folder` 动作；外部文件夹和 BMS 文件也支持 drag-and-drop。
+- Browse 可选择或清除本地 BMS 难度表 header JSON。路径保存在 `ui.difficulty_table_path`；更改后会重新索引，让 MD5/SHA-256 匹配谱面获得表等级。
+- Song Select 的 `-` / `+` 会在未输入搜索文字时立即更改并保存 `speed.rate`。
 
 ## 设置：以延迟优先为中心
 把这些放在第一页，让用户第一时间看到与延迟相关的开关：

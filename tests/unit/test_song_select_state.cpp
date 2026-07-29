@@ -14,6 +14,10 @@ using tenriff::app::menu_song_select::build_song_collection_membership_lookup;
 using tenriff::app::menu_song_select::build_song_membership_set;
 using tenriff::app::menu_song_select::count_song_membership_matches;
 using tenriff::app::menu_song_select::song_collection_membership_contains;
+using tenriff::app::menu_song_select::song_difficulty_label;
+using tenriff::app::menu_song_select::song_entry_less_by_difficulty_asc;
+using tenriff::app::menu_song_select::song_entry_less_by_difficulty_desc;
+using tenriff::app::menu_song_select::song_entry_matches_level_filter;
 using tenriff::app::menu_song_select::song_entry_less_by_artist_asc;
 using tenriff::app::menu_song_select::song_entry_matches_search;
 using tenriff::app::menu_song_select::song_group_folder_label;
@@ -157,4 +161,39 @@ TEST_CASE("song level group key keeps numeric ordering stable") {
 
     CHECK(song_group_level_key(low) < song_group_level_key(high));
     CHECK(song_group_level_key(high) < song_group_level_key(unknown));
+}
+
+TEST_CASE("difficulty-table metadata drives labels groups sorting and numeric filters") {
+    SongEntry table_low;
+    table_low.title = "Table Low";
+    table_low.level = 18;
+    table_low.difficulty_table_name = "Local Satellite";
+    table_low.difficulty_table_symbol = "sl";
+    table_low.difficulty_table_level = "2+";
+    table_low.difficulty_table_order = 1;
+
+    SongEntry table_high = table_low;
+    table_high.title = "Table High";
+    table_high.difficulty_table_level = "10";
+    table_high.difficulty_table_order = 4;
+
+    SongEntry native;
+    native.title = "Native";
+    native.level = 1;
+
+    CHECK(song_difficulty_label(table_low) == "sl2+");
+    CHECK(song_group_level_key(table_low) < song_group_level_key(native));
+    CHECK(song_entry_matches_level_filter(table_low, 2, 2));
+    CHECK_FALSE(song_entry_matches_level_filter(table_low, 3, 50));
+
+    std::vector<SongEntry> ascending = {native, table_high, table_low};
+    std::stable_sort(ascending.begin(), ascending.end(), song_entry_less_by_difficulty_asc);
+    CHECK(ascending[0].title == "Table Low");
+    CHECK(ascending[1].title == "Table High");
+    CHECK(ascending[2].title == "Native");
+
+    std::stable_sort(ascending.begin(), ascending.end(), song_entry_less_by_difficulty_desc);
+    CHECK(ascending[0].title == "Table High");
+    CHECK(ascending[1].title == "Table Low");
+    CHECK(ascending[2].title == "Native");
 }

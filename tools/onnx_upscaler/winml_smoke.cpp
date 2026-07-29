@@ -126,7 +126,6 @@ int wmain(int argc, wchar_t** argv) {
 
         std::shared_ptr<const tenriff::render::OnnxUpscaleFrame> frame;
         std::shared_ptr<const tenriff::render::OnnxUpscaleFrame> warm_frame;
-        tenriff::render::OnnxUpscaleBenchmarkStatus benchmark;
         const auto pipeline_started = std::chrono::steady_clock::now();
         auto pipeline_finished = pipeline_started;
         auto warm_started = pipeline_started;
@@ -156,19 +155,11 @@ int wmain(int argc, wchar_t** argv) {
                 }
                 warm_finished = std::chrono::steady_clock::now();
             }
-            benchmark = upscaler.benchmark_status();
         }
         std::error_code remove_error;
         std::filesystem::remove(image_path, remove_error);
         remove_error.clear();
         std::filesystem::remove(warm_image_path, remove_error);
-        if (benchmark.state == tenriff::render::OnnxUpscaleBenchmarkState::Failed &&
-            !tenriff::render::OnnxBackgroundUpscaler::meets_performance_gate(benchmark.fps)) {
-            std::cout << "External ONNX upscaler performance gate correctly disabled x2: fps=" << benchmark.fps
-                      << " required=" << tenriff::render::kOnnxUpscaleMinimumBenchmarkFps
-                      << " detail=" << benchmark.detail << '\n';
-            return 0;
-        }
         if (!frame || !warm_frame ||
             frame->width != tenriff::render::kOnnxUpscaleTargetWidth ||
             frame->height != tenriff::render::kOnnxUpscaleTargetHeight ||
