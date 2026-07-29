@@ -4,6 +4,8 @@ TenRiff의 사용자/배포 관점에서 의미 있는 변경만 간단히 기�
 
 ## [Unreleased]
 
+## [1.2.7] - 2026-07-30
+
 ### Fixed
 
 - External ONNX Upscaler가 모델의 tensor type을 확인하지 않고 항상 FP32로 바인딩해 FP16 입출력 모델이 즉시 실패하던 문제 수정

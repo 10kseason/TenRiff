@@ -3,7 +3,7 @@
 This is the document that the next agent or any new contributor should read first. Its goal is to quickly answer: "what is this project now, where should I look, and what is still unverified?"
 
 ## Baseline
-- Current project version: `1.2.6 stable`
+- Current project version: `1.2.7 stable`
 - Direct-IP multiplayer and the preview r5 input-backend lifecycle fixes are integrated into `1.1.8 stable`
 - `1.1.8` adds an osu!mania OD8 auxiliary score, first-native-`BAD` `Sudden Death (1 MISS)`, and deterministic `LN Mix 10%-90%` on top of the 1.1.7 visual refresh
 - `1.2.0` connects BMS channel `04/07` and osu!mania backgrounds to the gameplay sample timeline and asynchronously upscales sub-FHD image backgrounds through LunaSR on Windows ML
@@ -13,6 +13,7 @@ This is the document that the next agent or any new contributor should read firs
 - `1.2.4` removes rights-unclear LunaSR ONNX and model-specific metadata from public distribution and retains only an opt-in user-supplied-model integration that defaults to `off`.
 - `1.2.5` replaces the model-branded integration with a generic External ONNX Upscaler, adds Graphics Settings selection/.onnx drop, saves a per-profile model path, and creates model-specific WinML sessions.
 - `1.2.6` makes the playable surface BMS-family only, retains native/LR2 skins, and adds manual ONNX upscaler enablement with an experimental NPU preference, Song Select Rate controls, centered indexing progress, local JSON difficulty tables, and the BMS keysound late-input hotfix.
+- `1.2.7` fixes External ONNX Upscaler FP16 binding, float-boundary INT8 QDQ detection, the high-performance DirectX GPU default, and one-in-flight video-BGA backpressure.
 - Baseline companion document for follow-up work: `docs/baseline-1.1.2.en.md`
 - Windows GUI build is the main target
 - Linux exists only as a preview-level package at `Baepoks-Linuxs/TenRiff-0.5.0-linux-preview`
@@ -167,7 +168,7 @@ This is the document that the next agent or any new contributor should read firs
 
 ## Runtime / Packaging Rules
 - New user profiles are created automatically
-- The current official P2P distribution line is `TenRiff 1.2.6 stable`
+- The current official P2P distribution line is `TenRiff 1.2.7 stable`
 - Distribution packages do not include `Songs`
 - Distribution packages include the runtime `Mainmusic/` assets used for menu BGM
 - Distribution updates include only built artifacts and required runtime assets
