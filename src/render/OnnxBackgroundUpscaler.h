@@ -24,17 +24,17 @@ struct OnnxUpscaleFrame {
 // until a completed FHD frame is available.
 class OnnxBackgroundUpscaler {
 public:
-    explicit OnnxBackgroundUpscaler(std::string model_path = {}, bool prefer_npu = true);
+    explicit OnnxBackgroundUpscaler(std::string model_path = {}, bool prefer_npu = false);
     ~OnnxBackgroundUpscaler();
 
     OnnxBackgroundUpscaler(const OnnxBackgroundUpscaler&) = delete;
     OnnxBackgroundUpscaler& operator=(const OnnxBackgroundUpscaler&) = delete;
 
     void request(std::string path);
-    void request_bgra(std::string source_key,
-                      std::uint32_t width,
-                      std::uint32_t height,
-                      const std::vector<std::uint8_t>& bgra);
+    [[nodiscard]] bool request_bgra(std::string source_key,
+                                    std::uint32_t width,
+                                    std::uint32_t height,
+                                    const std::vector<std::uint8_t>& bgra);
     [[nodiscard]] std::shared_ptr<const OnnxUpscaleFrame> take_ready();
     void clear();
 

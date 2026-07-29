@@ -120,8 +120,8 @@ This is the document that the next agent or any new contributor should read firs
   - `performance_overlay`
   - `background_upscale_model_path` only stores the compatible ONNX selected or dropped in Graphics Settings; public packages include no model
   - BGA Upscaler defaults to `off`; the user must explicitly turn it on and acknowledge the high-spec warning, with no automatic benchmark gate
-  - current contract is 960x540 RGB residual x2; users own model rights/quality/performance, and load, contract, decode, or inference failure keeps native scaling
-  - experimental `background_upscale_prefer_npu=true` first requests a WinML `DirectXMinPower` session while the upscaler is on. Windows/the driver chooses the actual NPU or GPU; session failure falls back to the existing high-performance DirectX route and normal DirectX fallback
+  - current contract is 960x540 RGB residual x2 with automatic FP32/FP16 boundary and float-boundary INT8 QDQ metadata detection; users own model rights/quality/performance, and load, contract, decode, or inference failure keeps native scaling
+  - high-performance DirectX GPU is the default; experimental `background_upscale_prefer_npu=true` opt-in first requests a WinML `DirectXMinPower` session while the upscaler is on. Windows/the driver chooses the actual NPU or GPU; creation/evaluation failure falls back to high-performance DirectX and normal DirectX
 - Gameplay performance:
   - static playfield command-list cache
   - note head / tail bitmap cache

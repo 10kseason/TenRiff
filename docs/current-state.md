@@ -125,8 +125,8 @@
   - `performance_overlay`
   - `background_upscale_model_path`는 Graphics Settings에서 선택하거나 드롭한 호환 ONNX 경로만 저장하며 공개 모델은 포함하지 않음
   - BGA Upscaler는 기본 `off`; 사용자가 명시적으로 켜고 고사양 경고를 확인해야 하며 자동 benchmark gate는 없음
-  - 현재 지원 계약은 960x540 RGB residual x2이며 모델 권리·품질·성능은 사용자가 확인; 로드·계약·decode·추론 실패 시 native scaling 유지
-  - `background_upscale_prefer_npu=true`는 업스케일러가 켜졌을 때만 WinML `DirectXMinPower` session을 먼저 요청하는 실험 옵션. 실제 NPU/GPU 선택은 Windows/driver가 결정하며, 생성 실패 시 기존 고성능 DirectX 경로와 일반 DirectX fallback을 사용
+  - 현재 지원 계약은 960x540 RGB residual x2이며 FP32/FP16 입출력과 float 경계 INT8 QDQ metadata를 자동 감지. 모델 권리·품질·성능은 사용자가 확인; 로드·계약·decode·추론 실패 시 native scaling 유지
+  - 기본값은 고성능 DirectX GPU이고, `background_upscale_prefer_npu=true`는 업스케일러가 켜졌을 때만 WinML `DirectXMinPower` session을 먼저 요청하는 opt-in 실험 옵션. 실제 NPU/GPU 선택은 Windows/driver가 결정하며, 생성·평가 실패 시 고성능 DirectX 경로와 일반 DirectX fallback을 사용
 - Gameplay performance:
   - static playfield command-list cache
   - note head/tail bitmap cache

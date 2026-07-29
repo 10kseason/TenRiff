@@ -2679,11 +2679,14 @@ bool MenuWindow::ensure_gameplay_background_bitmap(const GameplayHudData& data) 
                 if (upscale_mode == "onnx" &&
                     OnnxBackgroundUpscaler::should_upscale(
                         frame->width, frame->height, upscale_mode)) {
-                    requested_key = frame_key;
-                    upscaler->request_bgra(frame_key,
-                                           frame->width,
-                                           frame->height,
-                                           frame->bgra);
+                    // Keep one video inference in flight. Replacing the request id every
+                    // decoded frame made every slower-than-video GPU result look stale.
+                    if (upscaler->request_bgra(frame_key,
+                                               frame->width,
+                                               frame->height,
+                                               frame->bgra)) {
+                        requested_key = frame_key;
+                    }
                 } else {
                     requested_key.clear();
                     upscaler->clear();

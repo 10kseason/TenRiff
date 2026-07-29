@@ -119,12 +119,12 @@
 - `background_upscale_model_path` (string)
   - Graphics Settings의 `ONNX Model`에서 파일을 선택하거나 해당 화면에 `.onnx`를 드롭하면 경로만 저장되며 업스케일러를 자동으로 켜지는 않음
   - 절대 경로 또는 실행 파일/현재 작업 폴더 기준 상대 경로를 허용하며 공개 패키지에는 모델을 포함하지 않음
-  - 현재 계약은 float32 NCHW `rgb_lr [1,3,540,960]` -> `rgb_residual_x2 [1,3,1080,1920]` residual x2
+  - 현재 계약은 float32 또는 float16 NCHW `rgb_lr [1,3,540,960]` -> `rgb_residual_x2 [1,3,1080,1920]` residual x2; 외부 경계를 float로 유지하는 INT8 QDQ 모델은 내부 양자화를 감지해 지원
   - 모델 로드, 입출력 계약 또는 추론 실패 시 native scaling 유지
   - 사용자 모델의 권리·품질·성능은 사용자가 확인해야 하며 상세 계약은 `tools/onnx_upscaler/README.md`
 - `background_upscale_prefer_npu` (bool)
-  - 기본값은 `true`지만 `background_upscale_mode=onnx`일 때만 효력이 있음
-  - Graphics Settings의 `NPU 우선(실험)`에서 끌 수 있음
+  - 기본값은 `false`이며 기본 경로는 high-performance DirectX GPU를 요청함
+  - `background_upscale_mode=onnx`일 때 Graphics Settings의 `NPU 우선(실험)`에서 명시적으로 켤 수 있음
   - Windows ML에 `DirectXMinPower` device를 우선 요청할 뿐 실제 NPU 사용 여부는 Windows와 드라이버가 결정함
   - 저전력 session 생성에 실패하면 기존 high-performance DirectX 경로로 폴백
 

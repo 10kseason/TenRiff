@@ -119,12 +119,12 @@ profile が存在しない場合は初回起動時に自動生成されます。
 - `background_upscale_model_path` (string)
   - Graphics Settings の `ONNX Model` で選択するか、その画面に `.onnx` file を drop。選択は path だけを保存し、upscaler を自動で ON にしない
   - 絶対 path または executable/current directory 基準の相対 path。公開 package は model を含まない
-  - 現在の契約: float32 NCHW `rgb_lr [1,3,540,960]` -> `rgb_residual_x2 [1,3,1080,1920]` residual x2
+  - 現在の契約: float32 または float16 NCHW `rgb_lr [1,3,540,960]` -> `rgb_residual_x2 [1,3,1080,1920]` residual x2。外部 boundary を float のままにする INT8 QDQ model は内部量子化を検出して対応
   - load・contract・inference 失敗時は native scaling を維持
   - model の権利・品質・性能は user が確認。詳細は `tools/onnx_upscaler/README.md`
 - `background_upscale_prefer_npu` (bool)
-  - 既定値は `true` だが、`background_upscale_mode=onnx` のときだけ有効
-  - Graphics Settings の実験的な `NPU 優先` で無効化できる
+  - 既定値は `false` で、default path は high-performance DirectX GPU を要求
+  - `background_upscale_mode=onnx` のとき Graphics Settings の実験的な `NPU 優先` で明示的に有効化できる
   - Windows ML の `DirectXMinPower` device を要求するだけで、実際に NPU を使うかは Windows/driver が決定
   - low-power session 作成失敗時は既存の high-performance DirectX 経路へ fallback
 

@@ -4,6 +4,16 @@ TenRiff의 사용자/배포 관점에서 의미 있는 변경만 간단히 기�
 
 ## [Unreleased]
 
+### Fixed
+
+- External ONNX Upscaler가 모델의 tensor type을 확인하지 않고 항상 FP32로 바인딩해 FP16 입출력 모델이 즉시 실패하던 문제 수정
+- 외부 FP32/FP16 경계를 유지하는 INT8 QDQ 모델의 `tenriff.quantization` metadata를 감지해 내부 INT8 양자화를 로그에 명시하고, raw INT8/UINT8 경계는 scale/zero-point 계약이 없음을 정확히 안내
+- 동영상 BGA가 추론 중에도 매 프레임 요청 ID를 덮어써 완료된 GPU 결과를 계속 stale 처리하던 문제를 one-in-flight backpressure로 수정
+
+### Changed
+
+- External ONNX Upscaler 기본 장치를 고성능 DirectX GPU로 변경하고, 저전력/NPU 선호는 Graphics Settings에서 명시적으로 켜는 실험 옵션으로 전환
+
 ## [1.2.6] - 2026-07-29
 
 ### Added

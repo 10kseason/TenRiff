@@ -119,12 +119,12 @@ If a profile does not exist, it is created automatically on first launch.
 - `background_upscale_model_path` (string)
   - selected from Graphics Settings > `ONNX Model`, or set by dropping an `.onnx` file on that screen; selecting only stores the path and does not enable the upscaler
   - accepts an absolute path or a path relative to the executable/current directory; public packages include no model
-  - current contract: float32 NCHW `rgb_lr [1,3,540,960]` -> `rgb_residual_x2 [1,3,1080,1920]` residual x2
+  - current contract: float32 or float16 NCHW `rgb_lr [1,3,540,960]` -> `rgb_residual_x2 [1,3,1080,1920]` residual x2; INT8 QDQ models with floating external boundaries are detected and supported
   - load, contract, or inference failure keeps native scaling
   - users are responsible for model rights, quality, and performance; see `tools/onnx_upscaler/README.md`
 - `background_upscale_prefer_npu` (bool)
-  - defaults to `true`, but only has an effect while `background_upscale_mode=onnx`
-  - can be disabled through experimental `Prefer NPU` in Graphics Settings
+  - defaults to `false`; the default path requests a high-performance DirectX GPU
+  - can be explicitly enabled through experimental `Prefer NPU` in Graphics Settings while `background_upscale_mode=onnx`
   - requests a Windows ML `DirectXMinPower` device; Windows and the driver still choose whether an NPU is actually used
   - failure to create the low-power session falls back to the existing high-performance DirectX path
 

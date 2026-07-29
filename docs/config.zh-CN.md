@@ -119,12 +119,12 @@
 - `background_upscale_model_path` (string)
   - 可在 Graphics Settings 的 `ONNX Model` 中选择，或把 `.onnx` 文件拖入该页面；选择只保存路径，不会自动开启 upscaler
   - 支持绝对路径，或相对于可执行文件/当前目录的路径；公开包不包含模型
-  - 当前契约：float32 NCHW `rgb_lr [1,3,540,960]` -> `rgb_residual_x2 [1,3,1080,1920]` residual x2
+  - 当前契约：float32 或 float16 NCHW `rgb_lr [1,3,540,960]` -> `rgb_residual_x2 [1,3,1080,1920]` residual x2；支持并检测外部边界保持浮点的 INT8 QDQ 模型
   - 加载、契约或推理失败时保持 native scaling
   - 用户需自行确认模型权利、质量与性能；详见 `tools/onnx_upscaler/README.md`
 - `background_upscale_prefer_npu` (bool)
-  - 默认值为 `true`，但仅在 `background_upscale_mode=onnx` 时生效
-  - 可在 Graphics Settings 的实验性 `优先 NPU` 中关闭
+  - 默认值为 `false`，默认路径会请求高性能 DirectX GPU
+  - 在 `background_upscale_mode=onnx` 时，可通过 Graphics Settings 的实验性 `优先 NPU` 明确开启
   - 只会请求 Windows ML 的 `DirectXMinPower` device；是否实际使用 NPU 由 Windows/driver 决定
   - 创建低功耗 session 失败时回退到现有高性能 DirectX 路径
 

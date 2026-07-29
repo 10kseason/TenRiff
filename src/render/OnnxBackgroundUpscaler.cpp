@@ -10,6 +10,7 @@
 #include <iostream>
 #include <mutex>
 #include <optional>
+#include <stdexcept>
 #include <thread>
 #include <unordered_map>
 #include <utility>
@@ -340,6 +341,7 @@ struct OnnxBackgroundUpscaler::Impl {
     std::uint32_t pending_width = 0;
     std::uint32_t pending_height = 0;
     std::vector<std::uint8_t> pending_bgra;
+    bool bgra_in_flight = false;
     std::uint64_t request_id = 0;
     std::uint64_t pending_id = 0;
     std::shared_ptr<const OnnxUpscaleFrame> ready;
@@ -393,17 +395,86 @@ struct OnnxBackgroundUpscaler::Impl {
 
             namespace ml = winrt::Windows::AI::MachineLearning;
             const ml::LearningModel model = ml::LearningModel::LoadFromFilePath(resolved_model_path->c_str());
+            const auto find_tensor_descriptor =
+                [](const auto& features, const wchar_t* expected_name) {
+                    for (const auto& feature : features) {
+                        if (feature.Name() != expected_name) {
+                            continue;
+                        }
+                        const auto tensor = feature.template try_as<ml::TensorFeatureDescriptor>();
+                        if (!tensor) {
+                            throw std::runtime_error("ONNX feature is not a tensor");
+                        }
+                        return tensor;
+                    }
+                    throw std::runtime_error("ONNX model is missing a required tensor");
+                };
+            const auto input_descriptor =
+                find_tensor_descriptor(model.InputFeatures(), L"rgb_lr");
+            const auto output_descriptor =
+                find_tensor_descriptor(model.OutputFeatures(), L"rgb_residual_x2");
+            const ml::TensorKind input_kind = input_descriptor.TensorKind();
+            const ml::TensorKind output_kind = output_descriptor.TensorKind();
+            const auto tensor_kind_label = [](ml::TensorKind kind) {
+                switch (kind) {
+                    case ml::TensorKind::Float:
+                        return "FP32";
+                    case ml::TensorKind::Float16:
+                        return "FP16";
+                    case ml::TensorKind::Int8:
+                        return "INT8";
+                    case ml::TensorKind::UInt8:
+                        return "UINT8";
+                    default:
+                        return "UNSUPPORTED";
+                }
+            };
+            const auto is_supported_float_kind = [](ml::TensorKind kind) {
+                return kind == ml::TensorKind::Float || kind == ml::TensorKind::Float16;
+            };
+            if (!is_supported_float_kind(input_kind) ||
+                !is_supported_float_kind(output_kind)) {
+                throw std::runtime_error(std::string("ONNX boundary detected as rgb_lr=") +
+                                         tensor_kind_label(input_kind) +
+                                         ", rgb_residual_x2=" +
+                                         tensor_kind_label(output_kind) +
+                                         "; raw INT8/UINT8 boundaries need scale and zero-point "
+                                         "metadata, so use an INT8 QDQ model with FP32/FP16 boundaries");
+            }
+            std::string quantization;
+            const auto metadata = model.Metadata();
+            if (metadata.HasKey(L"tenriff.quantization")) {
+                quantization = winrt::to_string(metadata.Lookup(L"tenriff.quantization"));
+            }
+            const std::string quantization_lower = lower_ascii(quantization);
+            const bool internal_int8 =
+                quantization_lower.find("int8") != std::string::npos ||
+                quantization_lower.find("s8") != std::string::npos ||
+                quantization_lower.find("u8") != std::string::npos ||
+                quantization_lower.find("qdq") != std::string::npos;
+            std::cerr << "[ONNX Upscaler] Model contract accepted: rgb_lr="
+                      << tensor_kind_label(input_kind)
+                      << ", rgb_residual_x2=" << tensor_kind_label(output_kind)
+                      << (internal_int8
+                              ? ", internal quantization=INT8/QDQ (" + quantization + ")"
+                              : "")
+                      << ".\n";
             ml::LearningModelSession session{nullptr};
             bool using_low_power_preference = false;
             const auto make_high_performance_session = [&]() {
                 try {
-                    return ml::LearningModelSession(
+                    auto high_performance = ml::LearningModelSession(
                         model,
                         ml::LearningModelDevice(ml::LearningModelDeviceKind::DirectXHighPerformance));
+                    std::cerr << "[ONNX Upscaler] Using high-performance DirectX GPU session.\n";
+                    return high_performance;
                 } catch (const winrt::hresult_error&) {
-                    return ml::LearningModelSession(
+                    auto directx = ml::LearningModelSession(
                         model,
                         ml::LearningModelDevice(ml::LearningModelDeviceKind::DirectX));
+                    std::cerr << "[ONNX Upscaler] High-performance GPU session unavailable; "
+                                 "using the default DirectX device.\n";
+                    return directx;
                 }
             };
             if (prefer_npu) {
@@ -452,7 +523,15 @@ struct OnnxBackgroundUpscaler::Impl {
                     pending_is_bgra = false;
                     pending_width = 0;
                     pending_height = 0;
+                    bgra_in_flight = is_bgra;
                 }
+                const auto finish_bgra_request = [&]() {
+                    if (!is_bgra) {
+                        return;
+                    }
+                    std::lock_guard<std::mutex> lock(mutex);
+                    bgra_in_flight = false;
+                };
 
                 std::vector<std::uint8_t> low_bgra;
                 const bool decoded = is_bgra
@@ -464,31 +543,57 @@ struct OnnxBackgroundUpscaler::Impl {
                 if (!decoded) {
                     std::cerr << "[ONNX Upscaler] Could not decode background; keeping native bitmap: "
                               << path << '\n';
+                    finish_bgra_request();
                     continue;
                 }
 
                 std::vector<float> rgb = bgra_to_nchw_rgb(low_bgra);
                 if (rgb.empty()) {
+                    finish_bgra_request();
                     continue;
                 }
 
                 const auto evaluate_residual = [&](const ml::LearningModelSession& active_session) {
-                    const ml::TensorFloat input_tensor =
-                        ml::TensorFloat::CreateFromArray(input_shape, rgb);
-                    const ml::TensorFloat output_tensor =
-                        ml::TensorFloat::Create(output_shape);
-                    ml::LearningModelBinding binding(active_session);
-                    binding.Bind(L"rgb_lr", input_tensor);
-                    binding.Bind(L"rgb_residual_x2", output_tensor);
-                    active_session.Evaluate(binding, L"tenriff-onnx-upscaler-background");
+                    const auto bind_and_evaluate =
+                        [&](const auto& input_tensor, const auto& output_tensor) {
+                            ml::LearningModelBinding binding(active_session);
+                            binding.Bind(L"rgb_lr", input_tensor);
+                            binding.Bind(L"rgb_residual_x2", output_tensor);
+                            active_session.Evaluate(
+                                binding,
+                                L"tenriff-onnx-upscaler-background");
 
-                    std::vector<float> residual(static_cast<std::size_t>(kOnnxUpscaleTargetWidth) *
-                                                kOnnxUpscaleTargetHeight * 3);
-                    const auto residual_view = output_tensor.GetAsVectorView();
-                    if (residual_view.GetMany(0, residual) != residual.size()) {
-                        residual.clear();
+                            std::vector<float> residual(
+                                static_cast<std::size_t>(kOnnxUpscaleTargetWidth) *
+                                kOnnxUpscaleTargetHeight * 3);
+                            const auto residual_view = output_tensor.GetAsVectorView();
+                            if (residual_view.GetMany(0, residual) != residual.size()) {
+                                residual.clear();
+                            }
+                            return residual;
+                        };
+
+                    if (input_kind == ml::TensorKind::Float16) {
+                        const auto input_tensor =
+                            ml::TensorFloat16Bit::CreateFromArray(input_shape, rgb);
+                        if (output_kind == ml::TensorKind::Float16) {
+                            const auto output_tensor =
+                                ml::TensorFloat16Bit::Create(output_shape);
+                            return bind_and_evaluate(input_tensor, output_tensor);
+                        }
+                        const auto output_tensor = ml::TensorFloat::Create(output_shape);
+                        return bind_and_evaluate(input_tensor, output_tensor);
                     }
-                    return residual;
+
+                    const auto input_tensor =
+                        ml::TensorFloat::CreateFromArray(input_shape, rgb);
+                    if (output_kind == ml::TensorKind::Float16) {
+                        const auto output_tensor =
+                            ml::TensorFloat16Bit::Create(output_shape);
+                        return bind_and_evaluate(input_tensor, output_tensor);
+                    }
+                    const auto output_tensor = ml::TensorFloat::Create(output_shape);
+                    return bind_and_evaluate(input_tensor, output_tensor);
                 };
 
                 std::vector<float> residual;
@@ -507,12 +612,14 @@ struct OnnxBackgroundUpscaler::Impl {
                 if (residual.empty()) {
                     std::cerr << "[ONNX Upscaler] WinML returned an incomplete frame; "
                                  "keeping native bitmap.\n";
+                    finish_bgra_request();
                     continue;
                 }
 
                 std::vector<std::uint8_t> output =
                     compose_onnx_residual_bgra(low_bgra, residual);
                 if (output.empty()) {
+                    finish_bgra_request();
                     continue;
                 }
 
@@ -533,6 +640,7 @@ struct OnnxBackgroundUpscaler::Impl {
                         ready = std::move(frame);
                     }
                 }
+                finish_bgra_request();
             }
         } catch (const winrt::hresult_error& error) {
             std::wcerr << L"[ONNX Upscaler] WinML disabled after error 0x" << std::hex
@@ -582,17 +690,18 @@ void OnnxBackgroundUpscaler::request(std::string path) {
     impl_->wake.notify_one();
 }
 
-void OnnxBackgroundUpscaler::request_bgra(std::string source_key,
-                                             std::uint32_t width,
-                                             std::uint32_t height,
-                                             const std::vector<std::uint8_t>& bgra) {
+bool OnnxBackgroundUpscaler::request_bgra(std::string source_key,
+                                           std::uint32_t width,
+                                           std::uint32_t height,
+                                           const std::vector<std::uint8_t>& bgra) {
     const std::size_t expected = static_cast<std::size_t>(width) * height * 4;
     if (!impl_ || source_key.empty() || width == 0 || height == 0 || bgra.size() != expected) {
-        return;
+        return false;
     }
     std::lock_guard<std::mutex> lock(impl_->mutex);
-    if (source_key == impl_->requested_path) {
-        return;
+    if (source_key == impl_->requested_path || impl_->bgra_in_flight ||
+        !impl_->pending_path.empty() || impl_->ready) {
+        return false;
     }
     impl_->requested_path = std::move(source_key);
     impl_->pending_path = impl_->requested_path;
@@ -603,6 +712,7 @@ void OnnxBackgroundUpscaler::request_bgra(std::string source_key,
     impl_->pending_id = ++impl_->request_id;
     impl_->ready.reset();
     impl_->wake.notify_one();
+    return true;
 }
 
 std::shared_ptr<const OnnxUpscaleFrame> OnnxBackgroundUpscaler::take_ready() {

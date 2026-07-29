@@ -448,8 +448,8 @@ void MenuApp::populate_graphics_settings_render_data(render::MenuRenderData& ren
         "Selecting or dropping an .onnx file changes only the model path. Turn BGA Upscaler ON separately and confirm the warning. Failures keep native scaling.",
         "ONNX 파일 선택·드롭은 모델 경로만 바꿉니다. BGA 업스케일러를 별도로 켜고 경고를 확인하세요. 실패 시 원본 확대를 유지합니다."));
     render.generic.notes.push_back(ui_text(
-        "Prefer NPU asks Windows for its low-power DirectX ML device. Windows and the driver choose the actual device; unsupported models fall back to high-performance DirectX.",
-        "NPU 우선은 Windows의 저전력 DirectX ML 장치를 요청합니다. 실제 장치는 Windows와 드라이버가 고르며, 미지원 모델은 고성능 DirectX로 폴백합니다."));
+        "FP32/FP16 model I/O and float-boundary INT8 QDQ metadata are detected automatically. The default uses a high-performance DirectX GPU; Prefer NPU opts into the low-power device request.",
+        "FP32/FP16 모델 입출력과 float 경계 INT8 QDQ 메타데이터를 자동 감지합니다. 기본값은 고성능 DirectX GPU이며, NPU 우선은 저전력 장치 요청을 명시적으로 켭니다."));
     render.generic.notes.push_back(ui_text("Language changes the menu UI immediately. Display Offset shifts only visuals from -500ms to +500ms.",
                                            "언어는 메뉴 UI에 즉시 반영됩니다. 표시 오프셋은 시각 요소만 -500ms~+500ms 범위에서 이동합니다."));
     render.generic.notes.push_back(ui_text("Display, Resolution, Refresh Hz, and VSync apply immediately. Back saves and returns.",

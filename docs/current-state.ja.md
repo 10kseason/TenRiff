@@ -120,8 +120,8 @@
   - `performance_overlay`
   - `background_upscale_model_path` は Graphics Settings で選択/drop した互換 ONNX の path だけを保存。公開 model は同梱しない
   - BGA Upscaler は既定 `off`。user が明示的に on にして high-spec warning を確認する必要があり、自動 benchmark gate はない
-  - 現在の契約は 960x540 RGB residual x2。model の権利・品質・性能は user が確認し、load・contract・decode・inference 失敗時は native scaling
-  - 実験的 `background_upscale_prefer_npu=true` は upscaler on 時だけ WinML `DirectXMinPower` session を先に要求する。実際の NPU/GPU は Windows/driver が選択し、session 作成失敗時は既存の high-performance DirectX route と通常 DirectX fallback を使用
+  - 現在の契約は 960x540 RGB residual x2 で FP32/FP16 boundary と float boundary INT8 QDQ metadata を自動検出。model の権利・品質・性能は user が確認し、load・contract・decode・inference 失敗時は native scaling
+  - default は high-performance DirectX GPU。実験的 `background_upscale_prefer_npu=true` opt-in は upscaler on 時だけ WinML `DirectXMinPower` session を先に要求する。実際の NPU/GPU は Windows/driver が選択し、作成・評価失敗時は high-performance DirectX と通常 DirectX fallback を使用
 - Gameplay performance:
   - static playfield command-list cache
   - note head / tail bitmap cache

@@ -120,8 +120,8 @@
   - `performance_overlay`
   - `background_upscale_model_path` 只保存从 Graphics Settings 选择或拖入的兼容 ONNX 路径；公开包不包含模型
   - BGA Upscaler 默认为 `off`；用户必须明确开启并确认 high-spec warning，不存在自动 benchmark gate
-  - 当前契约为 960x540 RGB residual x2；用户负责模型权利、质量和性能，加载、契约、decode 或推理失败时保持 native scaling
-  - 实验性 `background_upscale_prefer_npu=true` 仅在 upscaler 开启时优先请求 WinML `DirectXMinPower` session。实际使用 NPU 或 GPU 由 Windows/driver 决定；session 创建失败时会回退到现有 high-performance DirectX route 与普通 DirectX fallback
+  - 当前契约为 960x540 RGB residual x2，并自动检测 FP32/FP16 边界与浮点边界 INT8 QDQ metadata；用户负责模型权利、质量和性能，加载、契约、decode 或推理失败时保持 native scaling
+  - 默认使用高性能 DirectX GPU；实验性 `background_upscale_prefer_npu=true` opt-in 仅在 upscaler 开启时优先请求 WinML `DirectXMinPower` session。实际使用 NPU 或 GPU 由 Windows/driver 决定；创建或评估失败时会回退到高性能 DirectX 与普通 DirectX
 - Gameplay performance：
   - static playfield command-list cache
   - note head/tail bitmap cache
