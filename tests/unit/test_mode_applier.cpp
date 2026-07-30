@@ -349,6 +349,15 @@ TEST_CASE("key mode parser accepts none plus 4K through 16K") {
     CHECK(parse_key_mode("16k").value() == KeyMode::Keys16);
 }
 
+TEST_CASE("gauge mode parser accepts the Gauge Shift token") {
+    using tenriff::gameplay::GaugeMode;
+    using tenriff::gameplay::parse_gauge_mode;
+
+    REQUIRE(parse_gauge_mode("shift").has_value());
+    CHECK(parse_gauge_mode("shift").value() == GaugeMode::Shift);
+    REQUIRE(parse_gauge_mode("gauge_shift").has_value());
+    CHECK(parse_gauge_mode("gauge_shift").value() == GaugeMode::Shift);
+}
 TEST_CASE("key mode converter preserves notes when reducing lanes") {
     using namespace tenriff::gameplay;
 

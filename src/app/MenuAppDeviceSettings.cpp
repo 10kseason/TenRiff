@@ -118,7 +118,7 @@ int next_option_index(const int* options, int count, int current, int direction)
 }  // namespace
 
 void MenuApp::handle_graphics_settings_input(uint32_t keycode) {
-    const int item_count = 11;
+    const int item_count = 12;
     if (keycode == key_up_) {
         settings_cursor_ = clamp_int(settings_cursor_ - 1, 0, item_count - 1);
         publish_snapshot();
@@ -171,6 +171,13 @@ void MenuApp::handle_graphics_settings_input(uint32_t keycode) {
     }
     if (settings_cursor_ == 5 &&
         (keycode == key_left_ || keycode == key_right_ || keycode == key_enter_)) {
+        config_.graphics.bga_enabled = !config_.graphics.bga_enabled;
+        graphics_dirty_ = true;
+        publish_snapshot();
+        return;
+    }
+    if (settings_cursor_ == 6 &&
+        (keycode == key_left_ || keycode == key_right_ || keycode == key_enter_)) {
         if (config::normalize_background_upscale_mode(config_.graphics.background_upscale_mode) == "onnx") {
             config_.graphics.background_upscale_mode = "off";
             graphics_dirty_ = true;
@@ -192,7 +199,7 @@ void MenuApp::handle_graphics_settings_input(uint32_t keycode) {
         publish_snapshot();
         return;
     }
-    if (settings_cursor_ == 6 &&
+    if (settings_cursor_ == 7 &&
         (keycode == key_left_ || keycode == key_right_ || keycode == key_enter_)) {
 #ifdef _WIN32
         if (const auto selected = pick_onnx_model_dialog_utf8(); selected.has_value()) {
@@ -203,21 +210,21 @@ void MenuApp::handle_graphics_settings_input(uint32_t keycode) {
         publish_snapshot();
         return;
     }
-    if (settings_cursor_ == 7 && (keycode == key_left_ || keycode == key_right_)) {
+    if (settings_cursor_ == 8 && (keycode == key_left_ || keycode == key_right_)) {
         config_.graphics.background_upscale_prefer_npu =
             !config_.graphics.background_upscale_prefer_npu;
         graphics_dirty_ = true;
         publish_snapshot();
         return;
     }
-    if (settings_cursor_ == 8 && (keycode == key_left_ || keycode == key_right_)) {
+    if (settings_cursor_ == 9 && (keycode == key_left_ || keycode == key_right_)) {
         config_.ui.language =
             (config::normalize_ui_language_token(config_.ui.language) == "ko") ? "en" : "ko";
         graphics_dirty_ = true;
         publish_snapshot();
         return;
     }
-    if (settings_cursor_ == 9 && (keycode == key_left_ || keycode == key_right_)) {
+    if (settings_cursor_ == 10 && (keycode == key_left_ || keycode == key_right_)) {
         const int direction = (keycode == key_left_) ? -1 : 1;
         config_.visual_offset_ms = clamp_step_value(
             config_.visual_offset_ms + static_cast<double>(direction) * kVisualOffsetStep,
@@ -384,14 +391,14 @@ void MenuApp::handle_onnx_upscaler_confirm_input(uint32_t keycode) {
             graphics_dirty_ = true;
         }
         screen_ = Screen::SettingsGraphics;
-        settings_cursor_ = 5;
+        settings_cursor_ = 6;
         publish_snapshot();
         return;
     }
 
     if (keycode == key_escape_ || keycode == key_backspace_) {
         screen_ = Screen::SettingsGraphics;
-        settings_cursor_ = 5;
+        settings_cursor_ = 6;
         publish_snapshot();
     }
 }
@@ -407,25 +414,27 @@ void MenuApp::populate_graphics_settings_render_data(render::MenuRenderData& ren
                     render::MenuHitTargetKind::SettingsRow, 3, false, true);
     append_menu_row(render.generic, ui_text("Performance HUD", "성능 HUD"), ui_on_off(config_.graphics.performance_overlay), settings_cursor_ == 4,
                     render::MenuHitTargetKind::SettingsRow, 4, false, true);
+    append_menu_row(render.generic, ui_text("BGA", "BGA 표시"), ui_on_off(config_.graphics.bga_enabled), settings_cursor_ == 5,
+                    render::MenuHitTargetKind::SettingsRow, 5, false, true);
     append_menu_row(render.generic, ui_text("BGA Upscaler", "BGA 업스케일러"),
                     ui_on_off(config::normalize_background_upscale_mode(
                                   config_.graphics.background_upscale_mode) == "onnx"),
-                    settings_cursor_ == 5,
-                    render::MenuHitTargetKind::SettingsRow, 5, false, true);
+                    settings_cursor_ == 6,
+                    render::MenuHitTargetKind::SettingsRow, 6, false, true);
     append_menu_row(render.generic, ui_text("ONNX Model", "ONNX 모델"),
                     onnx_model_label(config_.graphics.background_upscale_model_path,
                                      ui_text("Select...", "선택...")),
-                    settings_cursor_ == 6,
-                    render::MenuHitTargetKind::SettingsRow, 6, false, false);
+                    settings_cursor_ == 7,
+                    render::MenuHitTargetKind::SettingsRow, 7, false, false);
     append_menu_row(render.generic, ui_text("Prefer NPU (Experimental)", "NPU 우선 (실험)"),
                     ui_on_off(config_.graphics.background_upscale_prefer_npu),
-                    settings_cursor_ == 7,
-                    render::MenuHitTargetKind::SettingsRow, 7, false, true);
-    append_menu_row(render.generic, ui_text("Language", "언어"), ui_language_label(config_.ui.language), settings_cursor_ == 8,
+                    settings_cursor_ == 8,
                     render::MenuHitTargetKind::SettingsRow, 8, false, true);
-    append_menu_row(render.generic, ui_text("Display Offset", "표시 오프셋"), format_signed_offset_ms(config_.visual_offset_ms), settings_cursor_ == 9,
+    append_menu_row(render.generic, ui_text("Language", "언어"), ui_language_label(config_.ui.language), settings_cursor_ == 9,
                     render::MenuHitTargetKind::SettingsRow, 9, false, true);
-    append_menu_row(render.generic, ui_text("Back", "뒤로"), "", settings_cursor_ == 10, render::MenuHitTargetKind::SettingsRow, 10, true, false);
+    append_menu_row(render.generic, ui_text("Display Offset", "표시 오프셋"), format_signed_offset_ms(config_.visual_offset_ms), settings_cursor_ == 10,
+                    render::MenuHitTargetKind::SettingsRow, 10, false, true);
+    append_menu_row(render.generic, ui_text("Back", "뒤로"), "", settings_cursor_ == 11, render::MenuHitTargetKind::SettingsRow, 11, true, false);
     if (normalize_display_mode(config_.graphics.display_mode) == "fullscreen") {
         render.generic.notes.push_back(ui_text(
             "Discord's current voice overlay does not work in Exclusive Fullscreen. Switch Display to Borderless or Windowed.",
@@ -437,6 +446,9 @@ void MenuApp::populate_graphics_settings_render_data(render::MenuRenderData& ren
     }
     render.generic.notes.push_back(ui_text("Performance HUD shows frame graph, AVG ms/FPS, 0.1%/0.01% lows, and max FPS.",
                                            "성능 HUD는 프레임 그래프, 평균 ms/FPS, 0.1%/0.01% low, 최대 FPS를 표시합니다."));
+    render.generic.notes.push_back(ui_text(
+        "BGA OFF suppresses gameplay image/video backgrounds and disables their decoder/upscaler work. Song Select background previews remain visible.",
+        "BGA를 끄면 게임플레이 이미지/영상 배경과 디코더/업스케일러 작업이 비활성화됩니다. 선곡 배경 미리보기는 유지됩니다."));
     render.generic.notes.push_back(ui_text("Resolution cycles 720p, 1080p, QHD, or the current monitor native size. Refresh Hz ranges from 60 to 1050.",
                                            "해상도는 720p, 1080p, QHD, 모니터 기본 크기를 순환합니다. 주사율은 60~1050Hz 범위입니다."));
     render.generic.notes.push_back(ui_text("Menu rendering is capped at 300 Hz. Gameplay uses the configured value up to 1050 Hz.",

@@ -24,7 +24,7 @@
 ## Mode Meanings
 - chart input は BMS family（`.bms/.bme/.bml/.pms`）専用で、`format` と `enable_osu_charts` setting は削除済み
 - `key_mode`: `none | auto | 4k | 5k | 6k | 7k | 8k | 9k | 10k | 16k`
-- `gauge`: `normal | hard | ex_hard | easy`
+- `gauge`: `normal | hard | ex_hard | easy | shift`
 - `random`: `off | mirror | fr | sr`
 - `random_seed`: FR/SR、強制 key-mode 変換、LN Mix 対象選択の固定 seed（`0` も固定値として扱う）
 - `mods`: Mod Manager が正規化して保存する mod token 配列
@@ -55,7 +55,7 @@
 
 ## Note-Structure Mods
 - **Full LN**: 対象 tap を同じ lane の次 note 直前までの standard hold に変換
-- **LN Mix 10%～90%**: 既存 hold を維持し、同じ lane の既存 span と重なる head を除外したうえで、50ms 以上の hold と次 note 前 50ms の余裕を確保できる tap から設定割合を `random_seed` で決定的に選択
+- **LN Mix 10%～90%**: 既存 hold を維持し、同じ lane の既存 span と重なる head を除外する。base BPM 基準の 1/8-note hold が次の同一 lane note より 50ms 以上前に終わる tap から設定割合を `random_seed` で選択し、すべての Mix 段階で長さを 1/16-note 70% / 1/8-note 20% / 1/24・1/32-note 10% に決定的に配分
 - **Full Tap**: すべての hold tail を削除して tap に変換
 - 三つは同じ `Note Structure` category のため一つだけ有効。同じ譜面と seed では同じ LN Mix 結果を再現する
 
@@ -66,9 +66,10 @@
 - `4k..16k` は N2NC ベースの lane remap で key count を合わせる
 
 ## Gauge Rules
-- すべての gauge は `100%` で開始し、`0%` に到達すると即失敗する。
+- 固定 gauge（`ex_hard / hard / normal / easy`）は `100%` で開始し、`0%` で即失敗して type は変化しない。
+- `shift` は EX-Hard / Hard / Normal / Easy をそれぞれ 100% から独立して並列計算し、現在の tier が脱落すると同じ判定履歴を累積した次の生存 tier を選び、終了時の最上位生存 tier で確定する。
 - `ex_hard` は Hard より回復が低く、`BAD` / `POOR` の損失が大きい challenge gauge。
-- clear status は `EX-HARD CLEAR`, `HARD CLEAR`, `CLEAR`, `EASY CLEAR` として区別される。
+- clear status は固定 gauge の結果と、最終 Shift tier の `GAUGE SHIFT EX-HARD / HARD / NORMAL / EASY CLEAR` を区別する。
 - `Sudden Death (1 MISS)` は gauge type ではなく、最初の OD8 換算 object `MISS` で現在 gauge を 0 にして即終了する別の failure rule。
 
 ## Implementation Location

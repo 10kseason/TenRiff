@@ -120,6 +120,19 @@ TEST_CASE("gameplay hud revisions ignore sample-only updates for text caches") {
     CHECK_FALSE(diff.text_changed);
 }
 
+TEST_CASE("gameplay hud revisions refresh motion when note pending state changes") {
+    tenriff::app::GameplayHudRevisionInput previous;
+    previous.note_count = 1;
+    previous.notes[0] = {1, 1000, 1600, true, true, true};
+
+    auto next = previous;
+    next.notes[0].pending = false;
+
+    const auto diff = tenriff::app::diff_gameplay_hud_revisions(previous, next);
+    CHECK(diff.motion_changed);
+    CHECK_FALSE(diff.text_changed);
+}
+
 TEST_CASE("gameplay hud revisions bump text caches for score and feedback changes") {
     tenriff::app::GameplayHudRevisionInput previous;
     previous.combo = 7;

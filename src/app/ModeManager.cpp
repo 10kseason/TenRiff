@@ -1,6 +1,7 @@
 #include "app/ModeManager.h"
 
 #include <algorithm>
+#include <array>
 #include <cctype>
 #include <cstdint>
 #include <cmath>
@@ -203,9 +204,60 @@ int selected_long_note_mix_percent(const std::vector<std::string>& active_mods) 
     return 0;
 }
 
+struct LongNoteMixDurationCounts {
+    std::size_t sixteenth = 0;
+    std::size_t eighth = 0;
+    std::size_t dense = 0;
+};
+
+// Largest-remainder allocation preserves the 70/20/10 target as closely as
+// integer note counts allow, with stable tie-breaking toward common 1/16 lengths.
+LongNoteMixDurationCounts allocate_long_note_mix_durations(std::size_t total) {
+    constexpr std::array<std::size_t, 3> kWeights = {70u, 20u, 10u};
+    std::array<std::size_t, 3> counts{};
+    std::array<std::size_t, 3> remainders{};
+    const std::size_t hundreds = total / 100u;
+    const std::size_t tail = total % 100u;
+
+    std::size_t assigned = 0;
+    for (std::size_t i = 0; i < kWeights.size(); ++i) {
+        counts[i] = hundreds * kWeights[i] + (tail * kWeights[i]) / 100u;
+        remainders[i] = (tail * kWeights[i]) % 100u;
+        assigned += counts[i];
+    }
+    while (assigned < total) {
+        std::size_t best = 0;
+        for (std::size_t i = 1; i < remainders.size(); ++i) {
+            if (remainders[i] > remainders[best]) {
+                best = i;
+            }
+        }
+        ++counts[best];
+        remainders[best] = 0;
+        ++assigned;
+    }
+    return {counts[0], counts[1], counts[2]};
+}
+
+int64_t long_note_subdivision_samples(int sample_rate, double base_bpm, int subdivision) {
+    constexpr int kFallbackSampleRate = 44100;
+    constexpr double kFallbackBpm = 180.0;
+    const int effective_sample_rate = sample_rate > 0 ? sample_rate : kFallbackSampleRate;
+    const double effective_bpm =
+        std::isfinite(base_bpm) && base_bpm > 0.0 ? base_bpm : kFallbackBpm;
+    const double duration = static_cast<double>(effective_sample_rate) * 60.0 /
+                            effective_bpm * 4.0 / static_cast<double>(subdivision);
+    if (!std::isfinite(duration) || duration <= 1.0) {
+        return 1;
+    }
+    const double safe_max = static_cast<double>((std::numeric_limits<int64_t>::max)() / 4);
+    return static_cast<int64_t>(std::llround(std::min(duration, safe_max)));
+}
+
 void apply_mixed_long_notes(gameplay::GameplayChart& chart,
                             int percent,
                             uint32_t random_seed,
+                            double base_bpm,
                             int sample_rate) {
     percent = std::clamp(percent, 0, 100);
     if (percent <= 0 || chart.notes.empty()) {
@@ -226,6 +278,7 @@ void apply_mixed_long_notes(gameplay::GameplayChart& chart,
         std::size_t note_index = 0;
         int64_t end_sample = 0;
         uint64_t selection_key = 0;
+        uint64_t duration_key = 0;
     };
 
     std::vector<std::vector<std::size_t>> lanes(static_cast<std::size_t>(lane_count) + 1u);
@@ -238,9 +291,12 @@ void apply_mixed_long_notes(gameplay::GameplayChart& chart,
 
     constexpr int kFallbackSampleRate = 44100;
     const int effective_sample_rate = sample_rate > 0 ? sample_rate : kFallbackSampleRate;
-    const int64_t minimum_length_samples =
+    const int64_t same_lane_clearance_samples =
         std::max<int64_t>(1, static_cast<int64_t>(std::llround(effective_sample_rate * 0.05)));
-    const int64_t same_lane_clearance_samples = minimum_length_samples;
+    const int64_t eighth_samples = long_note_subdivision_samples(sample_rate, base_bpm, 8);
+    const int64_t sixteenth_samples = long_note_subdivision_samples(sample_rate, base_bpm, 16);
+    const int64_t twenty_fourth_samples = long_note_subdivision_samples(sample_rate, base_bpm, 24);
+    const int64_t thirty_second_samples = long_note_subdivision_samples(sample_rate, base_bpm, 32);
     std::vector<Candidate> candidates;
     candidates.reserve(chart.notes.size());
 
@@ -277,7 +333,9 @@ void apply_mixed_long_notes(gameplay::GameplayChart& chart,
                 end_sample =
                     chart.notes[indices[position + 1]].start_sample - same_lane_clearance_samples;
             }
-            if (end_sample - note.start_sample < minimum_length_samples) {
+            // Every candidate must fit the longest bucket so the requested ratio never
+            // changes through tail clamping on dense same-lane patterns.
+            if (end_sample <= note.start_sample || end_sample - note.start_sample < eighth_samples) {
                 continue;
             }
 
@@ -285,7 +343,10 @@ void apply_mixed_long_notes(gameplay::GameplayChart& chart,
             material ^= static_cast<uint64_t>(note.start_sample) + 0x9E3779B97F4A7C15ull;
             material ^= static_cast<uint64_t>(note.lane) * 0xBF58476D1CE4E5B9ull;
             material ^= static_cast<uint64_t>(note_index) * 0x94D049BB133111EBull;
-            candidates.push_back(Candidate{note_index, end_sample, mix_long_note_hash(material)});
+            const uint64_t selection_key = mix_long_note_hash(material);
+            const uint64_t duration_key =
+                mix_long_note_hash(selection_key ^ 0xD1B54A32D192ED03ull);
+            candidates.push_back(Candidate{note_index, end_sample, selection_key, duration_key});
         }
     }
 
@@ -300,9 +361,32 @@ void apply_mixed_long_notes(gameplay::GameplayChart& chart,
         return lhs.note_index < rhs.note_index;
     });
 
-    for (std::size_t i = 0; i < selected_count; ++i) {
-        auto& note = chart.notes[candidates[i].note_index];
-        note.end_sample = candidates[i].end_sample;
+    std::vector<Candidate> selected(candidates.begin(), candidates.begin() + selected_count);
+    std::sort(selected.begin(), selected.end(), [](const Candidate& lhs, const Candidate& rhs) {
+        if (lhs.duration_key != rhs.duration_key) {
+            return lhs.duration_key < rhs.duration_key;
+        }
+        return lhs.note_index < rhs.note_index;
+    });
+    const LongNoteMixDurationCounts duration_counts =
+        allocate_long_note_mix_durations(selected.size());
+
+    for (std::size_t i = 0; i < selected.size(); ++i) {
+        const Candidate& candidate = selected[i];
+        auto& note = chart.notes[candidate.note_index];
+        int64_t duration_samples = sixteenth_samples;
+        if (i >= duration_counts.sixteenth &&
+            i < duration_counts.sixteenth + duration_counts.eighth) {
+            duration_samples = eighth_samples;
+        } else if (i >= duration_counts.sixteenth + duration_counts.eighth) {
+            // Alternate the dense bucket between musical 1/24 and 1/32 lengths.
+            const std::size_t dense_index =
+                i - duration_counts.sixteenth - duration_counts.eighth;
+            duration_samples = dense_index % 2u == 0u
+                                   ? twenty_fourth_samples
+                                   : thirty_second_samples;
+        }
+        note.end_sample = std::min(candidate.end_sample, note.start_sample + duration_samples);
         note.release_required = false;
     }
 }
@@ -497,7 +581,8 @@ ModeManagerResult manage_modes(const gameplay::GameplayChart& chart,
             apply_full_long_notes(result.chart);
         } else if (const int mix_percent = selected_long_note_mix_percent(result.active_mods);
                    mix_percent > 0) {
-            apply_mixed_long_notes(result.chart, mix_percent, config.random_seed, sample_rate);
+            apply_mixed_long_notes(
+                result.chart, mix_percent, config.random_seed, base_bpm, sample_rate);
         }
         if (has_mod_token(result.active_mods, "no_ln_release")) {
             apply_no_ln_release(result.chart);

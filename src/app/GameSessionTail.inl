@@ -160,6 +160,7 @@ bool GameSession::initialize(const CommandLineOptions& options) {
     autoplay_event_index_ = 0;
     practice_no_fail_enabled_ = false;
     one_miss_fail_enabled_ = false;
+    gauge_shift_enabled_ = false;
     ghost_replay_source_ = {};
     ghost_replay_enabled_ = false;
     ghost_replay_event_index_ = 0;
@@ -483,12 +484,15 @@ bool GameSession::initialize(const CommandLineOptions& options) {
     gameplay_config.rate = config_.speed.rate;
     gameplay_config.judge = mode_result.judge;
     gameplay_config.gauge = config_.gauge;
-    gameplay_config.gauge_policy.normal_to_easy_shift = peer_battle_mode_;
     gameplay_config.input_offset_ms = config_.input_offset_ms;
     gameplay_config.practice_no_fail_enabled = practice_no_fail_enabled_;
     gameplay_config.one_miss_fail_enabled = one_miss_fail_enabled_;
+    gauge_shift_enabled_ = mode_result.settings.gauge == gameplay::GaugeMode::Shift;
     switch (mode_result.settings.gauge) {
         case gameplay::GaugeMode::ExHard:
+            gameplay_config.initial_gauge = game::GaugeType::ExHard;
+            break;
+        case gameplay::GaugeMode::Shift:
             gameplay_config.initial_gauge = game::GaugeType::ExHard;
             break;
         case gameplay::GaugeMode::Hard:
@@ -503,11 +507,22 @@ bool GameSession::initialize(const CommandLineOptions& options) {
             break;
     }
     if (options.has_gauge) {
-        auto gauge = parse_gauge_type(options.gauge);
-        if (gauge.has_value()) {
+        if (is_gauge_shift_token(options.gauge)) {
+            gauge_shift_enabled_ = true;
+            gameplay_config.initial_gauge = game::GaugeType::ExHard;
+        } else if (auto gauge = parse_gauge_type(options.gauge)) {
+            gauge_shift_enabled_ = false;
             gameplay_config.initial_gauge = gauge.value();
         }
     }
+    if (peer_battle_mode_) {
+        // Multiplayer uses the same four-way parallel Gauge Shift rules as
+        // single-player, regardless of the local profile or launch options.
+        gauge_shift_enabled_ = true;
+        gameplay_config.initial_gauge = game::GaugeType::ExHard;
+    }
+    gameplay_config.gauge_shift_enabled = gauge_shift_enabled_;
+    gameplay_config.gauge_policy = {};
 
     active_mods_ = mode_result.active_mods;
     rate_multiplier_ = mode_result.rate_multiplier;
@@ -652,8 +667,14 @@ bool GameSession::initialize(const CommandLineOptions& options) {
     engine_ = std::make_unique<gameplay::GameplayEngine>(chart_, gameplay_config);
     if (ghost_replay_enabled_) {
         gameplay::GameplayConfig ghost_config = gameplay_config;
+        ghost_config.gauge_shift_enabled = false;
+        ghost_config.gauge_policy = {};
         if (!ghost_replay_source_.mode.gauge.empty()) {
-            if (auto gauge = parse_gauge_type(ghost_replay_source_.mode.gauge)) {
+            const bool ghost_gauge_shift = is_gauge_shift_token(ghost_replay_source_.mode.gauge);
+            ghost_config.gauge_shift_enabled = ghost_gauge_shift;
+            if (ghost_gauge_shift) {
+                ghost_config.initial_gauge = game::GaugeType::ExHard;
+            } else if (auto gauge = parse_gauge_type(ghost_replay_source_.mode.gauge)) {
                 ghost_config.initial_gauge = gauge.value();
             }
         }
@@ -921,9 +942,8 @@ GameSession::HudSnapshot GameSession::hud_snapshot() {
         snapshot.combo = stats.combo;
         snapshot.max_combo = stats.max_combo;
         snapshot.counts = stats.counts;
-        snapshot.score = std::max<int64_t>(
-            0,
-            static_cast<int64_t>(std::llround(static_cast<double>(stats.raw_score) * score_multiplier_)));
+        snapshot.score = gameplay::scale_native_score(stats.raw_score, score_multiplier_);
+        snapshot.accuracy = stats.accuracy_percent();
         snapshot.osu_od8_score_available = stats.osu_od8.available;
         snapshot.osu_od8_score = stats.osu_od8.score;
 
@@ -954,6 +974,7 @@ GameSession::HudSnapshot GameSession::hud_snapshot() {
             snapshot.ghost_max_combo = ghost_stats.max_combo;
             snapshot.ghost_counts = ghost_stats.counts;
             snapshot.ghost_score = ghost_stats.raw_score;
+            snapshot.ghost_accuracy = ghost_stats.accuracy_percent();
             snapshot.ghost_osu_od8_score_available = ghost_stats.osu_od8.available;
             snapshot.ghost_osu_od8_score = ghost_stats.osu_od8.score;
 
@@ -1031,6 +1052,7 @@ GameSession::HudSnapshot GameSession::hud_snapshot() {
         hud_note.tail_sample = std::max(hold.end_sample, snapshot.current_sample);
         hud_note.hold = true;
         hud_note.head_visible = false;
+        hud_note.pending = false;
         snapshot.notes[snapshot.note_count++] = hud_note;
     }
 
@@ -1052,6 +1074,7 @@ GameSession::HudSnapshot GameSession::hud_snapshot() {
         hud_note.tail_sample = note_visible_end_sample(note);
         hud_note.hold = note.end_sample.has_value();
         hud_note.head_visible = true;
+        hud_note.pending = engine_->is_note_pending(note.lane, note.note_id);
         snapshot.notes[snapshot.note_count++] = hud_note;
         if (snapshot.note_count >= kGameplayHudMaxNotes) {
             break;
@@ -1086,6 +1109,7 @@ GameSession::HudSnapshot GameSession::hud_snapshot() {
             hud_note.tail_sample = std::max(hold.end_sample, snapshot.current_sample);
             hud_note.hold = true;
             hud_note.head_visible = false;
+            hud_note.pending = false;
             snapshot.ghost_notes[snapshot.ghost_note_count++] = hud_note;
         }
 
@@ -1107,6 +1131,7 @@ GameSession::HudSnapshot GameSession::hud_snapshot() {
             hud_note.tail_sample = note_visible_end_sample(note);
             hud_note.hold = note.end_sample.has_value();
             hud_note.head_visible = true;
+            hud_note.pending = ghost_engine_->is_note_pending(note.lane, note.note_id);
             snapshot.ghost_notes[snapshot.ghost_note_count++] = hud_note;
             if (snapshot.ghost_note_count >= kGameplayHudMaxNotes) {
                 break;
@@ -1751,6 +1776,7 @@ void GameSession::shutdown() {
             final_gauge = engine_->gauge_state().type;
         }
         result_.finished = engine_finished;
+        result_.final_gauge = gauge_type_token(final_gauge);
         result_.clear_status = gameplay_session_clear_status(
             engine_finished,
             engine_game_over,
@@ -1758,7 +1784,8 @@ void GameSession::shutdown() {
             final_gauge,
             autoplay_enabled_,
             practice_no_fail_enabled_,
-            one_miss_fail_enabled_);
+            one_miss_fail_enabled_,
+            gauge_shift_enabled_);
         result_.game_over = !gameplay_session_cleared(
             engine_finished,
             engine_game_over,
@@ -1766,10 +1793,7 @@ void GameSession::shutdown() {
         result_.mods = active_mods_;
         result_.rate_multiplier = rate_multiplier_;
         result_.score_multiplier = score_multiplier_;
-        result_.final_score = std::max<int64_t>(
-            0,
-            static_cast<int64_t>(std::llround(static_cast<double>(result_.stats.raw_score) *
-                                              result_.score_multiplier)));
+        result_.final_score = gameplay::scale_native_score(result_.stats.raw_score, result_.score_multiplier);
         result_.has_value = true;
 
         const std::string format_token = chart_format_token(chart_format_);
@@ -1905,6 +1929,7 @@ void GameSession::shutdown() {
     autoplay_event_index_ = 0;
     practice_no_fail_enabled_ = false;
     one_miss_fail_enabled_ = false;
+    gauge_shift_enabled_ = false;
     lane_activity_.clear();
     hidden_hit_note_ids_.clear();
     active_holds_buffer_.clear();

@@ -1147,6 +1147,16 @@ std::optional<game::GaugeType> parse_gauge_type(std::string_view value) {
     }
     return std::nullopt;
 }
+bool is_gauge_shift_token(std::string_view value) {
+    std::string token(value);
+    std::transform(token.begin(), token.end(), token.begin(), [](unsigned char ch) {
+        return static_cast<char>(std::tolower(ch));
+    });
+    token.erase(std::remove_if(token.begin(), token.end(), [](unsigned char ch) {
+        return ch == '-' || ch == '_' || ch == ' ' || ch == '\t';
+    }), token.end());
+    return token == "shift" || token == "gaugeshift";
+}
 
 std::string chart_format_token(ChartFormat format) {
     switch (format) {

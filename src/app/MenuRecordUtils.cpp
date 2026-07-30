@@ -122,8 +122,7 @@ std::vector<std::string> read_json_string_array(const config::JsonObject& root, 
 }
 
 int64_t clamp_final_score(int64_t raw_score, double multiplier) {
-    const double safe_multiplier = (std::isfinite(multiplier) && multiplier > 0.0) ? multiplier : 1.0;
-    return std::max<int64_t>(0, static_cast<int64_t>(std::llround(static_cast<double>(raw_score) * safe_multiplier)));
+    return gameplay::scale_native_score(raw_score, multiplier);
 }
 
 }  // namespace
@@ -155,6 +154,13 @@ int clear_status_priority(std::string_view clear_status, bool game_over, std::st
     }
     if (clear_status_is_assist(clear_status)) {
         return 1;
+    }
+    if (status.find("gauge shift") != std::string::npos) {
+        const std::string gauge = to_lower_ascii(std::string(final_gauge));
+        if (gauge == "easy") return 2;
+        if (gauge == "normal") return 3;
+        if (gauge == "hard") return 4;
+        return 5;
     }
     if (status.find("sudden death") != std::string::npos) {
         return 6;
@@ -213,15 +219,7 @@ std::string compact_timestamp_label(std::string_view created_utc) {
 }
 
 double calculate_accuracy(const gameplay::ResultStats& stats) {
-    const int judged = judged_total(stats.counts);
-    if (judged <= 0) {
-        return 0.0;
-    }
-    const double weighted = static_cast<double>(stats.counts.pg) +
-                            static_cast<double>(stats.counts.gr) * 0.80 +
-                            static_cast<double>(stats.counts.gd) * 0.50 +
-                            static_cast<double>(stats.counts.bd) * 0.20;
-    return std::clamp(weighted / static_cast<double>(judged) * 100.0, 0.0, 100.0);
+    return stats.accuracy_percent();
 }
 
 int64_t calculate_score(const gameplay::ResultStats& stats) {
@@ -244,7 +242,10 @@ bool infer_game_over(const gameplay::ResultStats& stats) {
     if (judged <= 0) {
         return true;
     }
-    if (stats.total_notes > 0 && judged < stats.total_notes) {
+    const double judged_weight = stats.accuracy_weight > 0.0
+                                      ? stats.accuracy_weight
+                                      : static_cast<double>(judged);
+    if (stats.total_notes > 0 && judged_weight + 1e-9 < static_cast<double>(stats.total_notes)) {
         return true;
     }
     return false;
@@ -259,22 +260,31 @@ std::string calculate_rank(const gameplay::ResultStats& stats, bool game_over) {
         return "--";
     }
     const double accuracy = calculate_accuracy(stats);
-    if (accuracy >= 99.0 && stats.counts.bd == 0) {
+    if (accuracy >= 99.75) {
+        return "SSS";
+    }
+    if (accuracy >= 99.0) {
         return "SS";
     }
-    if (accuracy >= 95.0) {
-        return "S";
+    if (accuracy >= 98.0) {
+        return "AA";
+    }
+    if (accuracy >= 95.5) {
+        return "S+";
     }
     if (accuracy >= 90.0) {
+        return "S";
+    }
+    if (accuracy >= 86.5) {
+        return "A+";
+    }
+    if (accuracy >= 80.5) {
         return "A";
     }
-    if (accuracy >= 80.0) {
+    if (accuracy >= 75.0) {
         return "B";
     }
-    if (accuracy >= 70.0) {
-        return "C";
-    }
-    return "D";
+    return "F";
 }
 
 bool is_better_record(int64_t candidate_score,
@@ -362,8 +372,21 @@ std::optional<ParsedResultRecord> parse_result_file(const std::filesystem::path&
     }
     out.stats.max_combo = read_json_int(*stats_obj, "max_combo", 0);
     out.stats.total_notes = read_json_int(*stats_obj, "total_notes", 0);
+    out.stats.total_combo_steps = read_json_int(*stats_obj, "total_combo_steps", out.stats.total_notes);
     out.stats.raw_score = static_cast<int64_t>(std::llround(
         read_json_number(*stats_obj, "raw_score", static_cast<double>(calculate_score(out.stats)))));
+    out.stats.raw_score_accumulator = out.stats.raw_score;
+    out.stats.judgement_score_points = read_json_number(*stats_obj, "judgement_score_points", 0.0);
+    out.stats.combo_score_units = static_cast<int64_t>(std::llround(
+        read_json_number(*stats_obj, "combo_score_units", 0.0)));
+    out.stats.accuracy_points = read_json_number(*stats_obj, "accuracy_points", 0.0);
+    out.stats.accuracy_weight = read_json_number(*stats_obj, "accuracy_weight", 0.0);
+    out.stats.highest_judgement_timing_weight =
+        read_json_number(*stats_obj, "highest_judgement_timing_weight", 0.0);
+    out.stats.highest_judgement_min_delta_ms =
+        read_json_number(*stats_obj, "highest_judgement_min_delta_ms", 0.0);
+    out.stats.highest_judgement_max_delta_ms =
+        read_json_number(*stats_obj, "highest_judgement_max_delta_ms", 0.0);
     if (const auto* osu_od8 = find_json_object(*stats_obj, "osu_od8")) {
         out.stats.osu_od8.available = read_json_bool(*osu_od8, "available", true);
         out.stats.osu_od8.total_objects = read_json_int(*osu_od8, "total_objects", out.stats.total_notes);

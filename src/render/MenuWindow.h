@@ -57,6 +57,7 @@ enum class MenuHitPart {
     Activate,
     Increment,
     Decrement,
+    SelectOnly,
 };
 
 struct MenuClickEvent {
@@ -238,6 +239,7 @@ struct GameplayNoteData {
     int64_t tail_sample = 0;
     bool hold = false;
     bool head_visible = true;
+    bool pending = false;
 };
 
 struct GameplayHudData {

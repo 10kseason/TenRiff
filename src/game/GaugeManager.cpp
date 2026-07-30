@@ -73,17 +73,30 @@ GaugeResult GaugeManager::applyJudgementWeighted(GaugeState& state, Judgement ju
     }
     state.value = std::clamp(state.value + delta, kMinGauge, max_gauge_for(state.type));
 
+    const auto shift_to = [&](GaugeType destination) {
+        state.type = destination;
+        if (policy_.refill_on_shift) {
+            state.value = max_gauge_for(destination);
+        } else {
+            state.value = std::clamp(state.value, kMinGauge, max_gauge_for(destination));
+        }
+        state.game_over = false;
+        result.downshifted = true;
+    };
+
+    const double hard_to_normal_threshold =
+        std::clamp(policy_.hard_to_normal_threshold, kMinGauge, kGaugeMax);
+    if (policy_.hard_to_normal_shift && state.type == GaugeType::Hard &&
+        state.value <= hard_to_normal_threshold) {
+        shift_to(GaugeType::Normal);
+        return result;
+    }
+
     const double normal_to_easy_threshold =
         std::clamp(policy_.normal_to_easy_threshold, kMinGauge, kGaugeMax);
     if (policy_.normal_to_easy_shift && state.type == GaugeType::Normal &&
         state.value <= normal_to_easy_threshold) {
-        state.type = GaugeType::Easy;
-        // The legacy auto-shift behavior restarted the destination gauge at its
-        // cap. The current Easy cap is 100%, while subsequent Easy depletion
-        // still follows the normal zero-gauge game-over path below.
-        state.value = max_gauge_for(state.type);
-        state.game_over = false;
-        result.downshifted = true;
+        shift_to(GaugeType::Easy);
         return result;
     }
 

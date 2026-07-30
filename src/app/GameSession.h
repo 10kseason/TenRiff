@@ -41,6 +41,7 @@ public:
         int64_t tail_sample = 0;
         bool hold = false;
         bool head_visible = true;
+        bool pending = false;
     };
 
     struct HudSnapshot {
@@ -72,6 +73,7 @@ public:
         int max_combo = 0;
         gameplay::JudgementCounts counts;
         int64_t score = 0;
+        double accuracy = 0.0;
         bool osu_od8_score_available = false;
         int64_t osu_od8_score = 0;
 
@@ -94,6 +96,7 @@ public:
 
         bool ghost_visible = false;
         int64_t ghost_score = 0;
+        double ghost_accuracy = 0.0;
         bool ghost_osu_od8_score_available = false;
         int64_t ghost_osu_od8_score = 0;
         int ghost_combo = 0;
@@ -131,6 +134,7 @@ public:
         bool game_over = false;
         bool finished = false;
         std::string clear_status = "FAILED";
+        std::string final_gauge = "normal";
         gameplay::ResultStats stats;
         std::vector<std::string> mods;
         double rate_multiplier = 1.0;
@@ -344,6 +348,7 @@ private:
     std::size_t autoplay_event_index_ = 0;
     bool practice_no_fail_enabled_ = false;
     bool one_miss_fail_enabled_ = false;
+    bool gauge_shift_enabled_ = false;
     gameplay::ReplayFile ghost_replay_source_{};
     bool ghost_replay_enabled_ = false;
     std::size_t ghost_replay_event_index_ = 0;

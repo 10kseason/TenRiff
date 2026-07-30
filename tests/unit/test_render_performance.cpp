@@ -2,6 +2,7 @@
 
 #include "render/BgaVideoDecoder.h"
 #include "render/GameplayMotion.h"
+#include "render/GameplayBackgroundPolicy.h"
 #include "render/RenderPacing.h"
 #include "render/RenderThread.h"
 #include "render/OnnxBackgroundUpscaler.h"
@@ -166,24 +167,26 @@ TEST_CASE("gameplay rendering keeps a hold body continuous across the active-hol
     CHECK(tenriff::render::gameplay_hold_handoff_grace_samples(1000, 24) == handoff_grace_samples);
     CHECK(tenriff::render::gameplay_hold_handoff_grace_samples(1000, 1000) == 64);
 
-    CHECK(tenriff::render::should_render_gameplay_note(1000, 1000, false, true, 1000, 1000,
+    CHECK(tenriff::render::should_render_gameplay_note(1000, 1000, false, true, false, 1000, 1000,
                                                        handoff_grace_samples));
-    CHECK_FALSE(tenriff::render::should_render_gameplay_note(999, 999, false, true, 999, 1000,
+    CHECK_FALSE(tenriff::render::should_render_gameplay_note(999, 999, false, true, false, 999, 1000,
                                                              handoff_grace_samples));
 
-    CHECK(tenriff::render::should_render_gameplay_note(1000, 1600, true, true, 999, 1032,
+    CHECK(tenriff::render::should_render_gameplay_note(1000, 1600, true, true, false, 999, 1032,
                                                        handoff_grace_samples));
-    CHECK(tenriff::render::should_render_gameplay_note(1000, 1600, true, false, 1032, 1032,
+    CHECK(tenriff::render::should_render_gameplay_note(1000, 1600, true, false, false, 1032, 1032,
                                                        handoff_grace_samples));
-    CHECK_FALSE(tenriff::render::should_render_gameplay_note(1000, 1600, true, true, 999, 1033,
+    CHECK_FALSE(tenriff::render::should_render_gameplay_note(1000, 1600, true, true, false, 999, 1033,
                                                              handoff_grace_samples));
-    CHECK_FALSE(tenriff::render::should_render_gameplay_note(1000, 1600, true, true, 1001, 1001,
-                                                             handoff_grace_samples));
-    CHECK_FALSE(tenriff::render::should_render_gameplay_note(999, 999, true, true, 999, 1000,
-                                                             handoff_grace_samples));
-    CHECK(tenriff::render::should_render_gameplay_note(999, 1600, true, false, 1600, 1600,
+    CHECK(tenriff::render::should_render_gameplay_note(1000, 1600, true, true, true, 1001, 1001,
                                                        handoff_grace_samples));
-    CHECK_FALSE(tenriff::render::should_render_gameplay_note(999, 1600, true, false, 1601, 1601,
+    CHECK_FALSE(tenriff::render::should_render_gameplay_note(1000, 1600, true, true, false, 1001, 1001,
+                                                             handoff_grace_samples));
+    CHECK_FALSE(tenriff::render::should_render_gameplay_note(999, 999, true, true, true, 999, 1000,
+                                                             handoff_grace_samples));
+    CHECK(tenriff::render::should_render_gameplay_note(999, 1600, true, false, false, 1600, 1600,
+                                                       handoff_grace_samples));
+    CHECK_FALSE(tenriff::render::should_render_gameplay_note(999, 1600, true, false, false, 1601, 1601,
                                                              handoff_grace_samples));
 
     CHECK(tenriff::render::should_render_gameplay_note_head(1000, true, 1000));
@@ -222,6 +225,30 @@ TEST_CASE("external ONNX background policy only targets low-resolution images in
     CHECK(OnnxBackgroundUpscaler::should_upscale(1280, 720, "onnx"));
     CHECK_FALSE(OnnxBackgroundUpscaler::should_upscale(1920, 1080, "onnx"));
     CHECK_FALSE(OnnxBackgroundUpscaler::should_upscale(1280, 720, "off"));
+}
+
+TEST_CASE("gameplay BGA policy supports off and on transitions") {
+    const auto enabled = tenriff::render::resolve_gameplay_background_policy(
+        true, "base.mp4", "overlay.png", 120, 240, "onnx");
+    CHECK(enabled.base_path == "base.mp4");
+    CHECK(enabled.overlay_path == "overlay.png");
+    CHECK(enabled.base_start_sample == 120);
+    CHECK(enabled.overlay_start_sample == 240);
+    CHECK(enabled.upscale_mode == "onnx");
+
+    const auto disabled = tenriff::render::resolve_gameplay_background_policy(
+        false, "base.mp4", "overlay.png", 120, 240, "onnx");
+    CHECK(disabled.base_path.empty());
+    CHECK(disabled.overlay_path.empty());
+    CHECK(disabled.base_start_sample == 0);
+    CHECK(disabled.overlay_start_sample == 0);
+    CHECK(disabled.upscale_mode == "off");
+
+    const auto reenabled = tenriff::render::resolve_gameplay_background_policy(
+        true, "base.mp4", "overlay.png", 120, 240, "onnx");
+    CHECK(reenabled.base_path == enabled.base_path);
+    CHECK(reenabled.overlay_path == enabled.overlay_path);
+    CHECK(reenabled.upscale_mode == enabled.upscale_mode);
 }
 TEST_CASE("procedural circle and polygon skins use the full 100 percent bar width") {
     using tenriff::render::gameplay_note_shape_extents;

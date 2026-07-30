@@ -579,6 +579,27 @@
                                                   d2d_->accent_brush.Get());
                         d2d_->accent_brush->SetOpacity(1.0f);
                     }
+
+                    // The generic scrollbar used to be visual-only. Divide its
+                    // enlarged hit area into absolute row slots so a click can
+                    // move selection without also activating or adjusting it.
+                    const float hit_left = track_rect.left - 8.0f;
+                    const float hit_right = track_rect.right + 8.0f;
+                    for (std::size_t i = 0; i < data.generic.rows.size(); ++i) {
+                        const auto& target_row = data.generic.rows[i];
+                        if (target_row.target_kind != MenuHitTargetKind::SettingsRow &&
+                            target_row.target_kind != MenuHitTargetKind::OptionsItem) {
+                            continue;
+                        }
+                        const float slot_top =
+                            track_rect.top + track_height * static_cast<float>(i) / total_rows;
+                        const float slot_bottom =
+                            track_rect.top + track_height * static_cast<float>(i + 1) / total_rows;
+                        register_hit(D2D1::RectF(hit_left, slot_top, hit_right, slot_bottom),
+                                     target_row.target_kind,
+                                     target_row.row_index,
+                                     MenuHitPart::SelectOnly);
+                    }
                 }
             }
 
@@ -592,7 +613,17 @@
                     d2d_->button_border_brush->SetOpacity(1.0f);
                 }
                 for (int i = 0; i < displayed_note_count; ++i) {
-                    const std::wstring note_w = to_wide(data.generic.notes[static_cast<std::size_t>(i)]);
+                    std::string note_text = data.generic.notes[static_cast<std::size_t>(i)];
+                    if (displayed_note_count >= 2 &&
+                        displayed_note_count < static_cast<int>(data.generic.notes.size()) &&
+                        i == displayed_note_count - 1) {
+                        const int hidden_count =
+                            static_cast<int>(data.generic.notes.size()) - (displayed_note_count - 1);
+                        note_text = data.ui_korean
+                                        ? ("F1: 도움말 " + std::to_string(hidden_count) + "줄 더 보기")
+                                        : ("F1: " + std::to_string(hidden_count) + " more help lines");
+                    }
+                    const std::wstring note_w = to_wide(note_text);
                     const D2D1_RECT_F note_rect =
                         D2D1::RectF(row_left + 6.0f, note_y, row_right - 6.0f, note_y + 30.0f);
                     if (row_format && d2d_->muted_brush) {

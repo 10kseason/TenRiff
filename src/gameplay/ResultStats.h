@@ -8,6 +8,8 @@
 
 namespace tenriff::gameplay {
 
+inline constexpr int64_t kNativeScoreMaximum = 100'000;
+
 struct JudgementCounts {
     int pg = 0;
     int gr = 0;
@@ -38,8 +40,16 @@ struct ResultStats {
     int combo = 0;
     int max_combo = 0;
     int total_notes = 0;
+    int total_combo_steps = 0;
     int64_t raw_score = 0;
     int64_t raw_score_accumulator = 0;
+    double judgement_score_points = 0.0;
+    int64_t combo_score_units = 0;
+    double accuracy_points = 0.0;
+    double accuracy_weight = 0.0;
+    double highest_judgement_timing_weight = 0.0;
+    double highest_judgement_min_delta_ms = 0.0;
+    double highest_judgement_max_delta_ms = 0.0;
     OsuManiaScoreV1 osu_od8;
 
     double mean_delta_ms = 0.0;
@@ -51,12 +61,19 @@ struct ResultStats {
     std::vector<GaugeSample> gauge_history;
     std::vector<ShiftEvent> shifts;
 
-    void record_judgement(game::Judgement judgement, double delta_ms, ComboImpact combo_impact, double weight = 1.0);
-    void record_note_total(int count);
+    void record_judgement(game::Judgement judgement,
+                          double delta_ms,
+                          ComboImpact combo_impact,
+                          double weight = 1.0,
+                          double accuracy_credit = -1.0);
+    void record_note_total(int count, int combo_steps = 0);
     void record_gauge_sample(int64_t sample, double value);
     void record_shift(int64_t sample, game::GaugeType from, game::GaugeType to);
 
+    [[nodiscard]] double accuracy_percent() const;
     [[nodiscard]] double stddev_delta_ms() const;
 };
+
+[[nodiscard]] int64_t scale_native_score(int64_t raw_score, double multiplier);
 
 }  // namespace tenriff::gameplay

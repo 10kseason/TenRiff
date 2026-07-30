@@ -50,7 +50,7 @@ The standard TenRiff play flow is:
 - `Esc`: return to the previous screen
 - `-` / `+`: adjust the next-play Rate immediately
 - `F5`: reindex the song library; centered stage / percent / ETA and a progress bar appear while it runs
-- `Browse > Difficulty Table`: select or clear a local BMS difficulty-table header JSON
+- `Browse > Difficulty Table`: copy a BMSTable HTML/header link and press `Enter` to import, use `Right` for local JSON, or `Left` to clear
 
 ### Screens commonly used from Song Select
 - `Mode`
@@ -58,7 +58,8 @@ The standard TenRiff play flow is:
 - `Audio`
   - Adjust Master / BGM / Keysound volume and the BMS keysound policy
 - `Graphics`
-  - Adjust VSync, Refresh Hz, Performance HUD, Display Offset, and the external ONNX BGA Upscaler
+  - Adjust VSync, Refresh Hz, Performance HUD, Display Offset, BGA visibility, and the external ONNX BGA Upscaler
+  - Turning `BGA` off disables gameplay image/video backgrounds and their decoder/upscaler work; Song Select previews remain visible
   - Selecting a model is separate from enabling the upscaler and accepting its high-spec warning. Experimental `Prefer NPU` only uses an NPU when Windows/the driver actually select one
 - `Skins`
   - Switch native/LR2 skins, import an LR2 folder, and adjust judgement-line position, note size, LN body width, and lane colors
@@ -104,7 +105,7 @@ If this is not the layout you want, you can change it in `Options > Keymap`.
 ## 6. Things to Know Before Starting Play
 
 ### Chart format
-- TenRiff 1.2.7 indexes and plays only BMS-family charts (`.bms/.bme/.bml/.pms`).
+- TenRiff 1.2.8 indexes and plays only BMS-family charts (`.bms/.bme/.bml/.pms`).
 
 ### Loading
 - Right after song start, chart-loading progress may be shown.
@@ -157,22 +158,30 @@ The current default judgement labels use the following abbreviations:
 
 The `OSU OD8` value is an auxiliary comparison score capped at 1,000,000; it does not change TenRiff's native score, rank, or clear result.
 
+Native Score is 90,000 judgement points plus 10,000 cumulative-combo points. An all-`PG` full combo is exactly 100,000, and an LN is one object whose head and tail each carry 0.5 weight.
+
+Accuracy starts from `PG / GR / GD / BD = 100 / 80 / 50 / 20%` and removes up to another 0.5 percentage points according to timing inside each judgement band. Even an all-`PG` run cannot exceed 99.5% when its PG timing span is wider than 8ms.
+
+Rank uses `<75 F`, `75 B`, `80.5 A`, `86.5 A+`, `90 S`, `95.5 S+`, `98 AA`, `99 SS`, and `99.75 SSS` boundaries.
+
 ### Gauge
-The four default gauge types are:
+The five selectable gauge types are:
 
 - `ex_hard`
 - `hard`
 - `normal`
 - `easy`
+- `shift`
 
-The selected gauge always starts at `100%` at the beginning of the song.
+Fixed gauges (`ex_hard / hard / normal / easy`) start at `100%` and never change type during play.
 
 - `ex_hard`: lower recovery and heavier `BAD` / `POOR` damage than Hard; immediate Game Over at `0%`
 - `hard`: immediate Game Over at `0%`
 - `normal`: immediate Game Over at `0%`
 - `easy`: immediate Game Over at `0%`
+- `shift`: simulates EX-Hard / Hard / Normal / Easy independently from 100%; when the current tier dies, it selects the next tier that has survived the same judgement history, and the highest surviving tier is final
 
-There is no automatic gauge shifting during play.
+Gauge transitions occur only when `shift` is explicitly selected.
 `Sudden Death (1 MISS)` is not a gauge type: it forces the gauge to zero and ends the run on the first OD8-converted object `MISS`. Native `BAD` timing alone and empty-key `POOR` do not count, and it cannot be enabled together with Practice No-Fail.
 
 ## 10. Result Screen

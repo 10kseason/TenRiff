@@ -125,8 +125,7 @@ int64_t derived_raw_score(const ResultStats& stats) {
 }
 
 int64_t clamp_final_score(int64_t raw_score, double multiplier) {
-    const double safe_multiplier = (std::isfinite(multiplier) && multiplier > 0.0) ? multiplier : 1.0;
-    return std::max<int64_t>(0, static_cast<int64_t>(std::llround(static_cast<double>(raw_score) * safe_multiplier)));
+    return scale_native_score(raw_score, multiplier);
 }
 
 config::JsonValue build_counts_json(const JudgementCounts& counts) {
@@ -200,7 +199,15 @@ config::JsonValue build_stats_json(const ResultStats& stats) {
     obj.emplace("combo", config::JsonValue{static_cast<double>(stats.combo)});
     obj.emplace("max_combo", config::JsonValue{static_cast<double>(stats.max_combo)});
     obj.emplace("total_notes", config::JsonValue{static_cast<double>(stats.total_notes)});
+    obj.emplace("total_combo_steps", config::JsonValue{static_cast<double>(stats.total_combo_steps)});
     obj.emplace("raw_score", config::JsonValue{static_cast<double>(stats.raw_score)});
+    obj.emplace("judgement_score_points", config::JsonValue{stats.judgement_score_points});
+    obj.emplace("combo_score_units", config::JsonValue{static_cast<double>(stats.combo_score_units)});
+    obj.emplace("accuracy_points", config::JsonValue{stats.accuracy_points});
+    obj.emplace("accuracy_weight", config::JsonValue{stats.accuracy_weight});
+    obj.emplace("highest_judgement_timing_weight", config::JsonValue{stats.highest_judgement_timing_weight});
+    obj.emplace("highest_judgement_min_delta_ms", config::JsonValue{stats.highest_judgement_min_delta_ms});
+    obj.emplace("highest_judgement_max_delta_ms", config::JsonValue{stats.highest_judgement_max_delta_ms});
     obj.emplace("osu_od8", build_osu_od8_json(stats.osu_od8));
     obj.emplace("mean_delta_ms", config::JsonValue{stats.mean_delta_ms});
     obj.emplace("stddev_delta_ms", config::JsonValue{stats.stddev_delta_ms()});
@@ -427,7 +434,19 @@ ReplayLoadResult load_replay_json(const std::string& path) {
         replay.stats.combo = read_json_int(*stats, "combo", 0);
         replay.stats.max_combo = read_json_int(*stats, "max_combo", replay.stats.combo);
         replay.stats.total_notes = read_json_int(*stats, "total_notes", 0);
+        replay.stats.total_combo_steps = read_json_int(*stats, "total_combo_steps", replay.stats.total_notes);
         replay.stats.raw_score = read_json_i64(*stats, "raw_score", derived_raw_score(replay.stats));
+        replay.stats.raw_score_accumulator = replay.stats.raw_score;
+        replay.stats.judgement_score_points = read_json_number(*stats, "judgement_score_points", 0.0);
+        replay.stats.combo_score_units = read_json_i64(*stats, "combo_score_units", 0);
+        replay.stats.accuracy_points = read_json_number(*stats, "accuracy_points", 0.0);
+        replay.stats.accuracy_weight = read_json_number(*stats, "accuracy_weight", 0.0);
+        replay.stats.highest_judgement_timing_weight =
+            read_json_number(*stats, "highest_judgement_timing_weight", 0.0);
+        replay.stats.highest_judgement_min_delta_ms =
+            read_json_number(*stats, "highest_judgement_min_delta_ms", 0.0);
+        replay.stats.highest_judgement_max_delta_ms =
+            read_json_number(*stats, "highest_judgement_max_delta_ms", 0.0);
         if (const auto* osu_od8 = find_json_object(*stats, "osu_od8")) {
             replay.stats.osu_od8.available = read_json_bool(*osu_od8, "available", true);
             replay.stats.osu_od8.total_objects = read_json_int(*osu_od8, "total_objects", replay.stats.total_notes);

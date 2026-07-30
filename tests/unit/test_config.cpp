@@ -96,6 +96,7 @@ TEST_CASE("config defaults prefer 44100 Hz audio") {
     CHECK(tenriff::config::kJudgementLinePositionMax == doctest::Approx(1.0));
     CHECK_FALSE(config.graphics.vsync);
     CHECK(config.graphics.refresh_hz == 300);
+    CHECK(config.graphics.bga_enabled);
     CHECK(config.graphics.background_upscale_mode == "off");
     CHECK(config.graphics.background_upscale_model_path.empty());
     CHECK_FALSE(config.graphics.background_upscale_prefer_npu);
@@ -165,6 +166,7 @@ TEST_CASE("config defaults prefer 44100 Hz audio") {
     CHECK(config.ui.collections.empty());
     CHECK(config.ui.song_collection_filter == "all");
     CHECK(config.ui.difficulty_table_path.empty());
+    CHECK(config.ui.difficulty_table_url.empty());
     CHECK(tenriff::config::resolved_skin_lane_colors(config.skin, "16k").size() == 16u);
 }
 
@@ -187,6 +189,7 @@ TEST_CASE("config save and load preserve favorites and collections") {
     };
     config.ui.song_collection_filter = "Practice";
     config.ui.difficulty_table_path = "tables/insane.json";
+    config.ui.difficulty_table_url = "https://example.test/insane/";
 
     std::string error;
     REQUIRE(loader.save_profile("profiles/test", config, &error));
@@ -198,6 +201,7 @@ TEST_CASE("config save and load preserve favorites and collections") {
     CHECK(result.config.ui.collections == config.ui.collections);
     CHECK(result.config.ui.song_collection_filter == "Practice");
     CHECK(result.config.ui.difficulty_table_path == "tables/insane.json");
+    CHECK(result.config.ui.difficulty_table_url == "https://example.test/insane/");
 }
 
 TEST_CASE("config load folds deprecated indirect miss into the bad window") {
@@ -380,6 +384,7 @@ TEST_CASE("config save and load preserve volume and speed settings") {
     config.speed.hi_speed = 4.75;
     config.mode.ghost_battle_enabled = true;
     config.mode.song_index_profile = "fast";
+    config.mode.gauge = "shift";
 
     std::string error;
     REQUIRE(loader.save_profile("profiles/test", config, &error));
@@ -395,6 +400,7 @@ TEST_CASE("config save and load preserve volume and speed settings") {
     CHECK(result.config.speed.hi_speed == doctest::Approx(4.75));
     CHECK(result.config.mode.ghost_battle_enabled);
     CHECK(result.config.mode.song_index_profile == "fast");
+    CHECK(result.config.mode.gauge == "shift");
 }
 
 TEST_CASE("config save and load normalize mode mods") {
@@ -505,6 +511,7 @@ TEST_CASE("config save and load preserve graphics display settings") {
     config.graphics.vsync = true;
     config.graphics.refresh_hz = 240;
     config.graphics.performance_overlay = true;
+    config.graphics.bga_enabled = false;
     config.graphics.background_upscale_mode = "onnx";
     config.graphics.background_upscale_model_path = "models/custom-upscaler.onnx";
     config.graphics.background_upscale_prefer_npu = false;
@@ -520,6 +527,7 @@ TEST_CASE("config save and load preserve graphics display settings") {
     CHECK(result.config.graphics.vsync);
     CHECK(result.config.graphics.refresh_hz == 240);
     CHECK(result.config.graphics.performance_overlay);
+    CHECK_FALSE(result.config.graphics.bga_enabled);
     CHECK(result.config.graphics.background_upscale_mode == "onnx");
     CHECK(result.config.graphics.background_upscale_model_path == "models/custom-upscaler.onnx");
     CHECK_FALSE(result.config.graphics.background_upscale_prefer_npu);

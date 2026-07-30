@@ -185,9 +185,9 @@ TEST_CASE("mode manager converts taps into standard holds for full long notes") 
 TEST_CASE("mode manager converts an exact deterministic percentage of taps into mixed long notes") {
     tenriff::gameplay::GameplayChart chart;
     chart.lane_count = 2;
-    chart.duration_samples = 1200;
+    chart.duration_samples = 4100;
     for (int i = 0; i < 10; ++i) {
-        append_note(chart, 1, 100 + static_cast<int64_t>(i) * 100);
+        append_note(chart, 1, 100 + static_cast<int64_t>(i) * 400);
     }
     append_note(chart, 2, 150, 260, true);
 
@@ -259,6 +259,71 @@ TEST_CASE("mode manager converts an exact deterministic percentage of taps into 
     CHECK(reseeded_starts != converted_starts);
 }
 
+TEST_CASE("mode manager keeps the 70 20 10 LN duration mix at ten and fifty percent") {
+    tenriff::gameplay::GameplayChart chart;
+    chart.lane_count = 1;
+    constexpr int64_t kStart = 1000;
+    constexpr int64_t kSpacing = 1500;
+    for (int i = 0; i < 100; ++i) {
+        append_note(chart, 1, kStart + static_cast<int64_t>(i) * kSpacing);
+    }
+    chart.duration_samples = kStart + 100 * kSpacing;
+
+    const auto verify_mix = [&](std::string_view mod,
+                                int expected_total,
+                                int expected_sixteenth,
+                                int expected_eighth,
+                                int expected_dense) {
+        tenriff::config::ModeConfig mode;
+        mode.random_seed = 24680;
+        mode.mods = {std::string(mod)};
+        const auto result = tenriff::app::manage_modes(
+            chart,
+            tenriff::app::ChartFormat::Bms,
+            mode,
+            make_judge_config(),
+            1.0,
+            120.0,
+            4800);
+
+        int converted = 0;
+        int sixteenth = 0;
+        int eighth = 0;
+        int twenty_fourth = 0;
+        int thirty_second = 0;
+        for (const auto& note : result.chart.notes) {
+            if (!note.end_sample.has_value()) {
+                continue;
+            }
+            ++converted;
+            const int64_t duration = note.end_sample.value() - note.start_sample;
+            CHECK((duration == 600 || duration == 1200 || duration == 400 || duration == 300));
+            if (duration == 600) {
+                ++sixteenth;
+            } else if (duration == 1200) {
+                ++eighth;
+            } else if (duration == 400) {
+                ++twenty_fourth;
+            } else if (duration == 300) {
+                ++thirty_second;
+            }
+            CHECK_FALSE(note.release_required);
+        }
+
+        CHECK(converted == expected_total);
+        CHECK(sixteenth == expected_sixteenth);
+        CHECK(eighth == expected_eighth);
+        CHECK(twenty_fourth + thirty_second == expected_dense);
+        if (expected_dense >= 2) {
+            CHECK(twenty_fourth > 0);
+            CHECK(thirty_second > 0);
+        }
+        CHECK_FALSE(has_lane_overlap(result.chart));
+    };
+
+    verify_mix("ln_mix_10", 10, 7, 2, 1);
+    verify_mix("ln_mix_50", 50, 35, 10, 5);
+}
 TEST_CASE("mode manager keeps LN mix exclusive with full note structure conversions") {
     const auto active = tenriff::app::normalize_mode_mod_tokens(
         {"full_long_notes", "full_short_notes", "ln_mix_40"});
@@ -273,10 +338,10 @@ TEST_CASE("mode manager keeps LN mix exclusive with full note structure conversi
 TEST_CASE("mode manager LN mix leaves fifty milliseconds before the next same-lane note") {
     tenriff::gameplay::GameplayChart chart;
     chart.lane_count = 1;
-    chart.duration_samples = 500;
+    chart.duration_samples = 1000;
     append_note(chart, 1, 100);
-    append_note(chart, 1, 120);
-    append_note(chart, 1, 300);
+    append_note(chart, 1, 400);
+    append_note(chart, 1, 700);
 
     tenriff::config::ModeConfig mode;
     mode.mods = {"ln_mix_90"};
@@ -287,26 +352,33 @@ TEST_CASE("mode manager LN mix leaves fifty milliseconds before the next same-la
         mode,
         make_judge_config(),
         1.0,
-        180.0,
+        120.0,
         1000);
 
     REQUIRE(result.chart.notes.size() == 3u);
-    CHECK_FALSE(result.chart.notes[0].end_sample.has_value());
-    REQUIRE(result.chart.notes[1].end_sample.has_value());
-    REQUIRE(result.chart.notes[2].end_sample.has_value());
-    CHECK(result.chart.notes[1].end_sample.value() == 250);
-    CHECK(result.chart.notes[2].start_sample - result.chart.notes[1].end_sample.value() == 50);
-    CHECK(result.chart.notes[2].end_sample.value() == 500);
+    int sixteenth = 0;
+    int eighth = 0;
+    for (std::size_t i = 0; i < result.chart.notes.size(); ++i) {
+        const auto& note = result.chart.notes[i];
+        REQUIRE(note.end_sample.has_value());
+        const int64_t duration = note.end_sample.value() - note.start_sample;
+        sixteenth += duration == 125 ? 1 : 0;
+        eighth += duration == 250 ? 1 : 0;
+        if (i + 1 < result.chart.notes.size()) {
+            CHECK(result.chart.notes[i + 1].start_sample - note.end_sample.value() >= 50);
+        }
+    }
+    CHECK(sixteenth == 2);
+    CHECK(eighth == 1);
     CHECK_FALSE(has_lane_overlap(result.chart));
 }
-
-TEST_CASE("mode manager LN mix defaults its tail clearance to 44.1 kHz") {
+TEST_CASE("mode manager LN mix defaults its timing basis to 44.1 kHz and 180 BPM") {
     tenriff::gameplay::GameplayChart chart;
     chart.lane_count = 1;
     chart.duration_samples = 44100;
     append_note(chart, 1, 4410);
-    append_note(chart, 1, 13230);
-    append_note(chart, 1, 26460);
+    append_note(chart, 1, 17640);
+    append_note(chart, 1, 30870);
 
     tenriff::config::ModeConfig mode;
     mode.mods = {"ln_mix_90"};
@@ -319,18 +391,22 @@ TEST_CASE("mode manager LN mix defaults its tail clearance to 44.1 kHz") {
         1.0);
 
     REQUIRE(result.chart.notes.size() == 3u);
+    int sixteenth = 0;
+    int eighth = 0;
     for (const auto& note : result.chart.notes) {
         REQUIRE(note.end_sample.has_value());
+        const int64_t duration = note.end_sample.value() - note.start_sample;
+        sixteenth += duration == 3675 ? 1 : 0;
+        eighth += duration == 7350 ? 1 : 0;
     }
-    CHECK(result.chart.notes[1].start_sample - result.chart.notes[0].end_sample.value() == 2205);
-    CHECK(result.chart.notes[2].start_sample - result.chart.notes[1].end_sample.value() == 2205);
+    CHECK(sixteenth == 2);
+    CHECK(eighth == 1);
     CHECK_FALSE(has_lane_overlap(result.chart));
 }
-
 TEST_CASE("mode manager LN mix does not extend duplicate same-lane heads") {
     tenriff::gameplay::GameplayChart chart;
     chart.lane_count = 1;
-    chart.duration_samples = 500;
+    chart.duration_samples = 700;
     append_note(chart, 1, 100);
     append_note(chart, 1, 100);
     append_note(chart, 1, 300);
@@ -344,16 +420,15 @@ TEST_CASE("mode manager LN mix does not extend duplicate same-lane heads") {
         mode,
         make_judge_config(),
         1.0,
-        180.0,
+        120.0,
         1000);
 
     REQUIRE(result.chart.notes.size() == 3u);
     CHECK_FALSE(result.chart.notes[0].end_sample.has_value());
     CHECK_FALSE(result.chart.notes[1].end_sample.has_value());
     REQUIRE(result.chart.notes[2].end_sample.has_value());
-    CHECK(result.chart.notes[2].end_sample.value() == 500);
+    CHECK(result.chart.notes[2].end_sample.value() == 425);
 }
-
 TEST_CASE("mode manager LN mix does not extend a tap inside an existing same-lane hold") {
     tenriff::gameplay::GameplayChart chart;
     chart.lane_count = 1;
@@ -380,9 +455,8 @@ TEST_CASE("mode manager LN mix does not extend a tap inside an existing same-lan
     CHECK(result.chart.notes[0].release_required);
     CHECK_FALSE(result.chart.notes[1].end_sample.has_value());
     REQUIRE(result.chart.notes[2].end_sample.has_value());
-    CHECK(result.chart.notes[2].end_sample.value() == 700);
+    CHECK(result.chart.notes[2].end_sample.value() == 583);
 }
-
 TEST_CASE("mode manager removes no-ln-release when full short notes is active") {
     tenriff::gameplay::GameplayChart chart;
     chart.lane_count = 1;

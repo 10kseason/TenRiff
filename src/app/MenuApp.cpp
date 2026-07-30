@@ -30,6 +30,7 @@
 
 #include "app/GameSession.h"
 #include "app/DifficultyTable.h"
+#include "app/DifficultyTableLink.h"
 #include "app/GameplayHudRevisions.h"
 #include "app/GraphicsTiming.h"
 #include "app/MenuAppSettingsUtils.h"
@@ -47,6 +48,7 @@
 #include "game/SpeedManager.h"
 #include "gameplay/Replay.h"
 #include "render/GameplayMotion.h"
+#include "render/GameplayBackgroundPolicy.h"
 #include "timing/HighResClock.h"
 #include "util/Utf8Compat.h"
 
@@ -80,6 +82,60 @@ bool is_current_process_foreground_menu() {
     return process_id == GetCurrentProcessId();
 #else
     return true;
+#endif
+}
+
+std::optional<std::string> difficulty_table_url_from_clipboard() {
+#ifdef _WIN32
+    if (!IsClipboardFormatAvailable(CF_UNICODETEXT) || !OpenClipboard(nullptr)) {
+        return std::nullopt;
+    }
+    HANDLE data = GetClipboardData(CF_UNICODETEXT);
+    const wchar_t* text = data ? static_cast<const wchar_t*>(GlobalLock(data)) : nullptr;
+    std::wstring value = text ? std::wstring(text) : std::wstring{};
+    if (text) {
+        GlobalUnlock(data);
+    }
+    CloseClipboard();
+
+    const auto is_space = [](wchar_t ch) {
+        return ch == L' ' || ch == L'\t' || ch == L'\r' || ch == L'\n';
+    };
+    while (!value.empty() && is_space(value.front())) {
+        value.erase(value.begin());
+    }
+    while (!value.empty() && is_space(value.back())) {
+        value.pop_back();
+    }
+    if (value.empty()) {
+        return std::nullopt;
+    }
+    const int byte_count = WideCharToMultiByte(
+        CP_UTF8, 0, value.data(), static_cast<int>(value.size()), nullptr, 0, nullptr, nullptr);
+    if (byte_count <= 0) {
+        return std::nullopt;
+    }
+    std::string utf8(static_cast<std::size_t>(byte_count), '\0');
+    if (WideCharToMultiByte(CP_UTF8,
+                            0,
+                            value.data(),
+                            static_cast<int>(value.size()),
+                            utf8.data(),
+                            byte_count,
+                            nullptr,
+                            nullptr) != byte_count) {
+        return std::nullopt;
+    }
+    std::string lower = utf8;
+    std::transform(lower.begin(), lower.end(), lower.begin(), [](unsigned char ch) {
+        return static_cast<char>(std::tolower(ch));
+    });
+    if (lower.rfind("http://", 0) != 0 && lower.rfind("https://", 0) != 0) {
+        return std::nullopt;
+    }
+    return utf8;
+#else
+    return std::nullopt;
 #endif
 }
 
@@ -469,6 +525,9 @@ game::GaugeType gauge_type_from_mode_string(std::string_view value) {
     if (normalized == "ex_hard") {
         return game::GaugeType::ExHard;
     }
+    if (normalized == "shift") {
+        return game::GaugeType::ExHard;
+    }
     if (normalized == "hard") {
         return game::GaugeType::Hard;
     }
@@ -635,6 +694,9 @@ std::string MenuApp::ui_gauge_label(std::string_view token) const {
     if (normalized == "ex_hard") {
         return ui_text("EX-Hard", "EX-하드");
     }
+    if (normalized == "shift") {
+        return ui_text("Gauge Shift", "게이지 시프트");
+    }
     if (normalized == "hard") {
         return ui_text("Hard", "하드");
     }
@@ -724,6 +786,7 @@ GameplayHudRevisionInput MenuApp::gameplay_hud_revision_input(const GameplayHudS
             state.notes[i].tail_sample,
             state.notes[i].hold,
             state.notes[i].head_visible,
+            state.notes[i].pending,
         };
     }
     input.ghost_visible = state.ghost_visible;
@@ -756,6 +819,7 @@ GameplayHudRevisionInput MenuApp::gameplay_hud_revision_input(const GameplayHudS
             state.ghost_notes[i].tail_sample,
             state.ghost_notes[i].hold,
             state.ghost_notes[i].head_visible,
+            state.ghost_notes[i].pending,
         };
     }
     return input;
@@ -1780,6 +1844,10 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
                 return;
             }
             options_cursor_ = clamp_int(event.index, 0, profile_setup::kOptionsHubRowCount - 1);
+            if (event.part == render::MenuHitPart::SelectOnly) {
+                publish_snapshot();
+                return;
+            }
             handle_options_hub_input(key_enter_);
             return;
         case render::MenuHitTargetKind::SongNavButton:
@@ -1886,6 +1954,13 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
     const uint32_t action_key = (event.part == render::MenuHitPart::Increment)
                                     ? key_right_
                                     : (event.part == render::MenuHitPart::Decrement ? key_left_ : key_enter_);
+    const auto finish_selection_only = [&]() {
+        if (event.part != render::MenuHitPart::SelectOnly) {
+            return false;
+        }
+        publish_snapshot();
+        return true;
+    };
 
     switch (screen_) {
         case Screen::QuickSetup:
@@ -1893,43 +1968,73 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
                 event.index,
                 0,
                 profile_setup::row_count(profile_setup::entry(first_run_profile_)) - 1);
+            if (finish_selection_only()) {
+                return;
+            }
             handle_quick_setup_input(action_key);
             return;
         case Screen::SettingsAudio:
             settings_cursor_ = clamp_int(event.index, 0, 6);
+            if (finish_selection_only()) {
+                return;
+            }
             handle_audio_settings_input(action_key);
             return;
         case Screen::SettingsGraphics:
-            settings_cursor_ = clamp_int(event.index, 0, 10);
+            settings_cursor_ = clamp_int(event.index, 0, 11);
+            if (finish_selection_only()) {
+                return;
+            }
             handle_graphics_settings_input(action_key);
             return;
         case Screen::SongBrowser:
             settings_cursor_ = clamp_int(event.index, 0, kSongBrowserRowCount - 1);
+            if (finish_selection_only()) {
+                return;
+            }
             handle_song_browser_input(action_key);
             return;
         case Screen::SettingsSkins:
             settings_cursor_ = clamp_int(event.index, 0,
                                          32 + (config::normalize_skin_source_token(config_.skin.source) == "lr2" ? 1 : 0));
+            if (finish_selection_only()) {
+                return;
+            }
             handle_skins_settings_input(action_key);
             return;
         case Screen::SettingsInput:
             settings_cursor_ = clamp_int(event.index, 0, 3);
+            if (finish_selection_only()) {
+                return;
+            }
             handle_input_settings_input(action_key);
             return;
         case Screen::SettingsCalibration:
             settings_cursor_ = clamp_int(event.index, 0, 4);
+            if (finish_selection_only()) {
+                return;
+            }
             handle_calibration_settings_input(action_key);
             return;
         case Screen::ModeSelect:
             settings_cursor_ = clamp_int(event.index, 0, 12);
+            if (finish_selection_only()) {
+                return;
+            }
             handle_mode_settings_input(action_key);
             return;
         case Screen::ModeMods:
             settings_cursor_ = clamp_int(event.index, 0, static_cast<int>(mode_mod_categories().size()));
+            if (finish_selection_only()) {
+                return;
+            }
             handle_mode_mods_input(action_key);
             return;
         case Screen::Multiplayer:
             multiplayer_menu_.cursor = clamp_multiplayer_menu_cursor(event.index);
+            if (finish_selection_only()) {
+                return;
+            }
             handle_multiplayer_input(action_key);
             return;
         case Screen::Result:
@@ -2521,32 +2626,57 @@ void MenuApp::handle_song_browser_input(uint32_t keycode) {
     if (settings_cursor_ == 5 &&
         (keycode == key_left_ || keycode == key_right_ || keycode == key_enter_)) {
         std::string selected_path = config_.ui.difficulty_table_path;
+        std::string selected_url = config_.ui.difficulty_table_url;
         if (keycode == key_left_) {
             selected_path.clear();
+            selected_url.clear();
         } else {
 #ifdef _WIN32
-            const std::string picked = browse_for_json_file(
-                ui_text("Select Local BMS Difficulty Table", "로컬 BMS 난이도표 선택"));
-            if (picked.empty()) {
-                return;
+            const auto clipboard_url =
+                keycode == key_enter_ ? difficulty_table_url_from_clipboard() : std::nullopt;
+            if (clipboard_url.has_value()) {
+                const DifficultyTableLinkImportResult imported =
+                    import_difficulty_table_link(
+                        *clipboard_url,
+                        path_from_utf8(profile_dir_) / "difficulty_tables");
+                if (!imported.success()) {
+                    std::cerr << "[warn] Difficulty-table link was not imported: "
+                              << imported.error << std::endl;
+                    publish_snapshot();
+                    return;
+                }
+                for (const auto& warning : imported.warnings) {
+                    std::cerr << "[warn] Difficulty table: " << warning << std::endl;
+                }
+                selected_path = imported.cached_header_path;
+                selected_url = imported.source_url;
+            } else {
+                const std::string picked = browse_for_json_file(
+                    ui_text("Select Local BMS Difficulty Table", "로컬 BMS 난이도표 선택"));
+                if (picked.empty()) {
+                    return;
+                }
+                const DifficultyTableLoadResult loaded = load_difficulty_table_utf8(picked);
+                if (!loaded.success()) {
+                    std::cerr << "[warn] Difficulty table was not selected: "
+                              << loaded.error << std::endl;
+                    publish_snapshot();
+                    return;
+                }
+                for (const auto& warning : loaded.warnings) {
+                    std::cerr << "[warn] Difficulty table: " << warning << std::endl;
+                }
+                selected_path = picked;
+                selected_url.clear();
             }
-            const DifficultyTableLoadResult loaded = load_difficulty_table_utf8(picked);
-            if (!loaded.success()) {
-                std::cerr << "[warn] Difficulty table was not selected: "
-                          << loaded.error << std::endl;
-                publish_snapshot();
-                return;
-            }
-            for (const auto& warning : loaded.warnings) {
-                std::cerr << "[warn] Difficulty table: " << warning << std::endl;
-            }
-            selected_path = picked;
 #else
             return;
 #endif
         }
-        if (selected_path != config_.ui.difficulty_table_path) {
+        if (selected_path != config_.ui.difficulty_table_path ||
+            selected_url != config_.ui.difficulty_table_url) {
             config_.ui.difficulty_table_path = std::move(selected_path);
+            config_.ui.difficulty_table_url = std::move(selected_url);
             persist_runtime_config();
             // Loading the cache reapplies the selected table to its stored chart
             // hashes, so changing tables need not reparse a large library.

@@ -2,6 +2,20 @@
 
 #include "app/SessionResultStatus.h"
 
+TEST_CASE("session result status labels the final surviving gauge shift tier") {
+    CHECK(tenriff::app::gameplay_session_clear_status(
+              true, false, false, tenriff::game::GaugeType::ExHard,
+              false, false, false, true) == "GAUGE SHIFT EX-HARD CLEAR");
+    CHECK(tenriff::app::gameplay_session_clear_status(
+              true, false, false, tenriff::game::GaugeType::Hard,
+              false, false, false, true) == "GAUGE SHIFT HARD CLEAR");
+    CHECK(tenriff::app::gameplay_session_clear_status(
+              true, false, false, tenriff::game::GaugeType::Normal,
+              false, false, false, true) == "GAUGE SHIFT NORMAL CLEAR");
+    CHECK(tenriff::app::gameplay_session_clear_status(
+              true, false, false, tenriff::game::GaugeType::Easy,
+              false, false, false, true) == "GAUGE SHIFT EASY CLEAR");
+}
 TEST_CASE("completed gameplay without fail counts as clear") {
     CHECK(tenriff::app::gameplay_session_cleared(true, false, false));
     CHECK(tenriff::app::gameplay_session_clear_status(

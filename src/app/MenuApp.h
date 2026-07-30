@@ -120,6 +120,7 @@ private:
             int64_t tail_sample = 0;
             bool hold = false;
             bool head_visible = true;
+            bool pending = false;
         };
 
         bool active = false;
@@ -153,6 +154,7 @@ private:
         int max_combo = 0;
         gameplay::JudgementCounts counts;
         int64_t score = 0;
+        double accuracy = 0.0;
         bool osu_od8_score_available = false;
         int64_t osu_od8_score = 0;
 
@@ -178,6 +180,7 @@ private:
 
         bool ghost_visible = false;
         int64_t ghost_score = 0;
+        double ghost_accuracy = 0.0;
         bool ghost_osu_od8_score_available = false;
         int64_t ghost_osu_od8_score = 0;
         int ghost_combo = 0;
@@ -448,6 +451,7 @@ private:
     std::string last_replay_path_;
     std::string last_result_path_;
     std::string last_clear_status_;
+    std::string last_final_gauge_ = "normal";
     std::vector<std::string> last_export_warnings_;
     std::vector<std::string> last_result_mods_{};
     double last_result_rate_multiplier_ = 1.0;
@@ -540,6 +544,9 @@ private:
     input::InputThread input_thread_{};
     audio::AudioThread audio_thread_{};
     MenuMusicController menu_music_{};
+    std::string menu_music_scene_key_{};
+    std::string menu_music_scene_path_{};
+    std::unordered_map<std::string, std::size_t> menu_music_variant_cursors_{};
     render::RenderThread render_thread_{};
     render::MenuWindow menu_window_{};
 

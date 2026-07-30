@@ -11,12 +11,14 @@
 - **Windows 菜单 UI 基于 D3D11 + Direct2D/DirectWrite**，会渲染标题/选歌（青色布局）以及其他设置页面（列表 UI）
 - Skins 仅支持 native/LR2；选择或拖放 LR2 playskin folder 会复制到当前 profile 的 `skins`
 - Song Select 在重新索引时会居中显示 stage / percent / ETA 与 progress bar
-- Browse 可选择本地 BMS 难度表 header JSON，并重新索引当前 source，让 hash 匹配谱面获得表等级
-- 选择 ONNX model 只保存路径；用户需明确开启 `BGA Upscaler` 并确认高配置警告，实验性 `优先 NPU` 也不能强制 Windows/driver 最终选择的实际设备
+- Browse 可选择本地 header JSON，或导入剪贴板中的 http(s) BMSTable HTML/header 链接，并重新索引当前 source，让 hash 匹配谱面获得表等级
+- Graphics 的 `BGA` 会完全关闭 gameplay 图片/视频背景，同时保留 Song Select 预览。选择 ONNX model 只保存路径，仍需另行开启 `BGA Upscaler` 并确认高配置警告
 - 输入键摘要：
   - Title：`↑/↓` 移动，`Enter` 选择（PLAY/EDIT/OPTIONS/EXIT），`F2` 浏览 songs 文件夹，`F5` 重索引，`Esc` 退出
   - Song Select：`↑/↓` 移动歌曲，`←/→` 切换左侧菜单焦点，`Enter` 选择/开始，`- / +` 调整 Rate，`Esc` 返回
   - Settings/Mode：`↑/↓` 移动项目，`←/→` 改变数值，`Enter/Esc` 返回
+    - 较长的设置列表可点击右侧滚动条直接跳转，单击不会执行或修改所选项目。
+    - 如果屏幕空间不足而省略说明，最后一条可见说明会显示 `F1` 和剩余帮助行数。
   - Keymap：`↑/↓` 选择，`Enter` 捕获绑定，`Esc` 返回
   - Result：只能用 `Enter` 返回 Song Select
   - 共享功能键：`F1` 帮助，`F2` songs-folder browse，`F5` refresh/reindex，`F9` screenshot
@@ -44,7 +46,7 @@
 - **缓存索引**（`song_index.json` 或 SQLite）通过 mtime/hash 检查避免全量重扫。首次运行可能较慢；后续应该接近瞬时。
 - **预览音频** 通过音频引擎调度：UI 只负责 enqueue preview request，AudioThread 负责混音，确保时序一致。
 - Empty-state 页面应提供持续可见的 `Add Songs Folder` 动作；外部文件夹和 BMS 文件也支持 drag-and-drop。
-- Browse 可选择或清除本地 BMS 难度表 header JSON。路径保存在 `ui.difficulty_table_path`；更改后会重新索引，让 MD5/SHA-256 匹配谱面获得表等级。
+- 在 Browse > Difficulty Table 中，把 http(s) BMSTable 页面/header 链接复制到剪贴板后按 `Enter`，即可导入 profile cache。`Right` 选择本地 header JSON，`Left` 清除；更改后会重新应用 MD5/SHA-256 匹配等级。
 - Song Select 的 `-` / `+` 会在未输入搜索文字时立即更改并保存 `speed.rate`。
 
 ## 设置：以延迟优先为中心

@@ -4,9 +4,12 @@
 #include <filesystem>
 #include <fstream>
 #include <string>
+#include <unordered_map>
+#include <vector>
 
 #include "app/ChartFileHash.h"
 #include "app/DifficultyTable.h"
+#include "app/DifficultyTableLink.h"
 
 namespace {
 
@@ -214,4 +217,111 @@ TEST_CASE("difficulty table keeps network fetching and ambiguous arrays out of t
     result = tenriff::app::load_difficulty_table(absolute_header);
     CHECK_FALSE(result.success());
     CHECK(result.error.find("local relative path") != std::string::npos);
+}
+
+TEST_CASE("difficulty table link parser reads standard BMSTable HTML metadata") {
+    const auto link = tenriff::app::extract_bmstable_header_url(
+        "<html><head><META CONTENT='headers/main.json?x=1&amp;y=2' NAME=BMSTABLE></head></html>");
+    REQUIRE(link.has_value());
+    CHECK(*link == "headers/main.json?x=1&y=2");
+    CHECK_FALSE(tenriff::app::extract_bmstable_header_url(
+                    "<meta name=\"description\" content=\"bmstable\">")
+                    .has_value());
+}
+
+TEST_CASE("difficulty table link resolver handles relative HTTP paths") {
+    const auto relative = tenriff::app::resolve_difficulty_table_url(
+        "https://example.test/tables/page/index.html?old=1",
+        "../header.json?q=1#ignored");
+    REQUIRE(relative.has_value());
+    CHECK(*relative == "https://example.test/tables/header.json?q=1");
+
+    const auto root = tenriff::app::resolve_difficulty_table_url(
+        "https://example.test/tables/index.html", "/data/table.json");
+    REQUIRE(root.has_value());
+    CHECK(*root == "https://example.test/data/table.json");
+
+    const auto scheme_relative = tenriff::app::resolve_difficulty_table_url(
+        "https://example.test/tables/index.html", "//cdn.example.test/header.json");
+    REQUIRE(scheme_relative.has_value());
+    CHECK(*scheme_relative == "https://cdn.example.test/header.json");
+    CHECK_FALSE(tenriff::app::resolve_difficulty_table_url(
+                    "file:///table/index.html", "header.json")
+                    .has_value());
+}
+
+TEST_CASE("difficulty table link import caches HTML header and data for the local loader") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+
+    const std::unordered_map<std::string, std::string> documents{
+        {"https://example.test/table/index.html",
+         "<html><head><meta name=\"bmstable\" content=\"header.json\"></head></html>"},
+        {"https://example.test/table/header.json",
+         "{\"name\":\"Remote Table\",\"symbol\":\"rt\","
+         "\"data_url\":\"data/charts.json\",\"level_order\":[\"1\",\"2\"]}"},
+        {"https://example.test/table/data/charts.json",
+         "[{\"sha256\":\"ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad\","
+         "\"level\":\"2\"}]"},
+    };
+    std::vector<std::string> requested;
+    auto fetch = [&](std::string_view url, std::size_t max_bytes) {
+        requested.emplace_back(url);
+        const auto it = documents.find(std::string(url));
+        if (it == documents.end()) {
+            return tenriff::app::DifficultyTableHttpResponse{
+                404, std::string(url), {}, {}};
+        }
+        CHECK(it->second.size() <= max_bytes);
+        return tenriff::app::DifficultyTableHttpResponse{
+            200, std::string(url), it->second, {}};
+    };
+
+    const auto imported = tenriff::app::import_difficulty_table_link(
+        "https://example.test/table/index.html#page",
+        temp.path / "cache",
+        fetch);
+    REQUIRE(imported.success());
+    CHECK(imported.source_url == "https://example.test/table/index.html");
+    CHECK(imported.table_name == "Remote Table");
+    CHECK((requested == std::vector<std::string>{
+                            "https://example.test/table/index.html",
+                            "https://example.test/table/header.json",
+                            "https://example.test/table/data/charts.json"}));
+    CHECK(std::filesystem::exists(std::filesystem::u8path(imported.cached_header_path)));
+
+    const auto loaded = tenriff::app::load_difficulty_table_utf8(imported.cached_header_path);
+    REQUIRE(loaded.success());
+    const auto match = loaded.table.lookup(
+        "",
+        "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
+    REQUIRE(match.has_value());
+    CHECK(match->name == "Remote Table");
+    CHECK(match->label() == "rt2");
+    CHECK(match->order == 1);
+
+    requested.clear();
+    const auto direct_header = tenriff::app::import_difficulty_table_link(
+        "https://example.test/table/header.json",
+        temp.path / "direct-cache",
+        fetch);
+    REQUIRE(direct_header.success());
+    CHECK((requested == std::vector<std::string>{
+                            "https://example.test/table/header.json",
+                            "https://example.test/table/data/charts.json"}));
+}
+
+TEST_CASE("difficulty table link import rejects pages without BMSTable metadata") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+    auto fetch = [](std::string_view url, std::size_t) {
+        return tenriff::app::DifficultyTableHttpResponse{
+            200, std::string(url), "<html><head></head></html>", {}};
+    };
+    const auto imported = tenriff::app::import_difficulty_table_link(
+        "https://example.test/not-a-table", temp.path / "cache", fetch);
+    CHECK_FALSE(imported.success());
+    CHECK(imported.error.find("BMSTable meta") != std::string::npos);
 }

@@ -308,8 +308,8 @@ void MenuApp::populate_mode_mods_render_data(render::MenuRenderData& render) {
     render.generic.notes.push_back(ui_text("Final score uses the lowest multiplier between active mods and the current Rate.",
                                            "최종 점수는 활성 모드와 현재 Rate 중 더 낮은 배율을 사용합니다."));
     render.generic.notes.push_back(ui_text(
-        "LN Mix converts 10%-90% of eligible taps into standard holds. It uses Random Seed even when Random is Off.",
-        "LN Mix는 변환 가능한 단노트의 10%~90%를 일반 롱노트로 바꿉니다. Random이 꺼져 있어도 Random Seed를 사용합니다."));
+        "LN Mix lengths use 70% 1/16, 20% 1/8, and 10% alternating 1/24-1/32 notes. Random Seed keeps the result deterministic.",
+        "LN Mix 길이는 16비트 70%, 8비트 20%, 24~32비트 10%로 배분합니다. Random Seed로 같은 결과를 재현합니다."));
     render.generic.notes.push_back(ui_text("Current: ", "현재: ") + mode_score_summary(config_.mode.mods, config_.speed.rate));
     std::vector<std::string> mod_warnings;
     (void)normalize_mode_mod_tokens(config_.mode.mods, &mod_warnings);

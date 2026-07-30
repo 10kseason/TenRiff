@@ -40,7 +40,7 @@
 
 - `backend` (string)
   - `polling | rawinput`
-  - 当前 `1.2.7` 发布线默认值为 `rawinput`
+  - 当前 `1.2.8` 发布线默认值为 `rawinput`
   - 可在 `Options -> Input Settings -> Backend` 或 `Options -> Profile Setup -> Input Backend` 中按 profile 选择
   - runtime fallback 不会把已保存值改写为 `polling`
   - 确认 RawInput 启动失败、注册目标丢失或 message window 退出后，本次应用运行期间 menu 与后续 gameplay 都会保持 Polling
@@ -89,7 +89,8 @@
 - `target_scroll_bps` (double)
 
 ### `gauge`
-- 不再有自动 gauge shift。所选 gauge 类型会一直保持到歌曲结束或失败。
+- `normal | hard | ex_hard | easy` 会固定到歌曲结束或失败。
+- `shift` 会让 EX-Hard / Hard / Normal / Easy 分别从 100% 开始独立并行计算。当前 tier 到达 0% 后，会选择已累计相同判定的下一档存活 tier；结束时仍存活的最高 tier 会成为最终 gauge。
 - EX-Hard / Hard / Normal / Easy 都从 `100%` 开始，并在到达 `0%` 时立即失败。
 - `delta`
   - `ex_hard`, `hard`, `normal`, `easy`
@@ -112,6 +113,9 @@
   - `vsync=true` 时，present refresh 以当前活动显示器 Hz 为准，render pacing 的目标是 `monitor_hz * 2`（上限 `1050`）
 - `performance_overlay` (bool)
   - 默认值为 `false`；它位于右上角，可能会与放在同一角落的 Discord Voice widget 重叠
+- `bga_enabled` (bool)
+  - 默认值为 `true`；设为 `false` 会关闭 gameplay 图片/视频 BGA 及其 decoder/upscaler 工作
+  - Song Select 背景预览属于独立功能，因此仍会显示
 - `background_upscale_mode` (string)
   - `onnx | off`；旧 `lunasr` 值会迁移为 `onnx`
   - 默认值为 `off`；通过 Graphics Settings 中的 `BGA Upscaler` 明确切换 ON/OFF
@@ -135,14 +139,14 @@ chart loader/indexer 仅支持 BMS family（`.bms/.bme/.bml/.pms`）；不再保
   - `none | auto | 4k | 5k | 6k | 7k | 8k | 9k | 10k | 16k`
   - `none` 表示直接沿用谱面的原始键数
 - `gauge` (string)
-  - `normal | hard | ex_hard | easy`
+  - `normal | hard | ex_hard | easy | shift`
 - `random` (string)
   - `off | mirror | fr | sr`
 - `random_seed` (int)
   - FR/SR、强制 key-mode 变换和 LN Mix 目标选择使用的固定 seed；Mirror 变换本身不使用
 - `mods` (string array)
   - Note Structure 可在 `full_long_notes`、`ln_mix_10` 到 `ln_mix_90`、`full_short_notes` 中选择一个
-  - LN Mix 仅把既能形成至少 50ms hold、又能在同 lane 下一音符前保留 50ms 间隔的 tap 作为候选，并按指定比例四舍五入后转换为普通 hold
+  - LN Mix 仅把按 base BPM 计算的 1/8-note hold 能在同 lane 下一音符前至少 50ms 结束的 tap 作为候选，并把所选 hold 的长度分配为 70% 1/16-note、20% 1/8-note、10% 交替的 1/24 与 1/32-note
   - 已有 hold 会保留，与同 lane 已有 span 重叠的 head 会被排除，相同 `random_seed` 会选择相同 tap
 - `ghost_battle_enabled` (bool)
   - 默认值为 `false`
@@ -177,9 +181,12 @@ chart loader/indexer 仅支持 BMS family（`.bms/.bme/.bml/.pms`）；不再保
 - `recent_song_sources` (array of string)
   - 最近使用过的外部/内部 song source 列表
 - `difficulty_table_path` (string)
-  - 在 Browse 中选择的本地 BMS 难度表 header JSON 路径
+  - 在 Browse 中选择的本地 BMS 难度表 header JSON，或从链接生成的 profile cache header 路径
   - header 使用 `name`、`symbol` 与本地相对 `data_url`；data array entry 使用 `md5` 或 `sha256` 加 `level`
-  - 不会获取网络 URL；选择或清除后会重新索引当前 source，并给匹配谱面显示表等级
+  - 选择或清除后会重新索引当前 source，并给匹配谱面显示表等级
+- `difficulty_table_url` (string)
+  - 从 Browse 导入的 http(s) BMSTable HTML 页面或 header JSON 原始链接
+  - 解析标准 `<meta name="bmstable" content="...">`，并把 header/data JSON 缓存到 profile 的 `difficulty_tables` 目录；选择本地 JSON 时清空
 
 ### `skin`
 - `source` (string)

@@ -40,7 +40,7 @@
 
 - `backend` (string)
   - `polling | rawinput`
-  - 현재 `1.2.7` 릴리스 라인의 기본값은 `rawinput`
+  - 현재 `1.2.8` 릴리스 라인의 기본값은 `rawinput`
   - `Options -> Input Settings -> Backend` 또는 `Options -> Profile Setup -> Input Backend`에서 프로필별로 RawInput/Polling을 직접 선택 가능
   - 저장값은 런타임 fallback 때문에 자동으로 `polling`으로 덮어쓰지 않음
   - RawInput 시작 실패, 등록 대상 손실, 메시지 창 종료가 확인되면 현재 앱 실행 동안 메뉴와 다음 gameplay 세션 모두 Polling을 유지
@@ -60,7 +60,7 @@
 - `judgement_hz` (int)
   - `1000 | 2000 | 4000 | 8000`
   - 호환성용으로 남아 있는 입력 설정 필드
-  - 현재 `1.2.7` runtime은 별도 오디오 판정 서브루프를 이 값으로 구동하지 않음
+  - 현재 `1.2.8` runtime은 별도 오디오 판정 서브루프를 이 값으로 구동하지 않음
   - 기본값은 `4000` (`0.25ms`)
 - `debounce_ms` (double)
   - 실제 Press/Release 전환은 버리지 않고 같은 상태의 중복 이벤트만 상태 추적에서 제거
@@ -89,7 +89,8 @@
 - `target_scroll_bps` (double)
 
 ### `gauge`
-- 자동 gauge shift는 없습니다. 선택한 gauge 타입은 곡이 끝나거나 실패할 때까지 유지됩니다.
+- `normal | hard | ex_hard | easy`는 곡이 끝나거나 실패할 때까지 타입이 고정됩니다.
+- `shift`는 EX-Hard / Hard / Normal / Easy를 각각 100%에서 동시에 계산합니다. 현재 게이지가 0%로 탈락하면 이미 같은 판정을 누적한 바로 아래 생존 게이지를 선택하며, 종료 시 살아남은 가장 높은 게이지가 최종 게이지가 됩니다.
 - EX-Hard / Hard / Normal / Easy는 모두 `100%`에서 시작하고 `0%`가 되면 즉시 실패합니다.
 - `delta`
   - `ex_hard`, `hard`, `normal`, `easy`
@@ -112,6 +113,9 @@
   - `vsync=true`면 present refresh는 active monitor Hz를 따르고, render pacing은 `monitor_hz * 2`를 목표로 함 (`1050` clamp)
 - `performance_overlay` (bool)
   - 기본값은 `false`; 우상단을 사용하므로 Discord Voice 위젯을 같은 모서리에 두면 겹칠 수 있음
+- `bga_enabled` (bool)
+  - 기본값은 `true`; `false`면 게임플레이의 이미지/영상 BGA와 관련 디코더·업스케일러 작업을 끔
+  - Song Select 배경 미리보기는 별도 기능이므로 계속 표시됨
 - `background_upscale_mode` (string)
   - `onnx | off`; 기존 `lunasr` 값은 호환을 위해 `onnx`로 마이그레이션
   - 기본값은 `off`; Graphics Settings의 `BGA Upscaler`에서 ON/OFF를 직접 바꿈
@@ -136,14 +140,14 @@
   - `none`은 차트 원래 키 수를 그대로 사용
   - `10k` 변환은 standalone BMS key converter의 krrcream식 10K preset과 맞춰 `max_keys=10`, `min_keys=1`, `transform_speed_slot=5`, `seed=0`으로 적용
 - `gauge` (string)
-  - `normal | hard | ex_hard | easy`
+  - `normal | hard | ex_hard | easy | shift`
 - `random` (string)
   - `off | mirror | fr | sr`
 - `random_seed` (int)
   - FR/SR, 강제 key-mode 변환, LN Mix 대상 선택의 고정 seed이며 Mirror 레인 반전 자체는 사용하지 않음
 - `mods` (string array)
   - Note Structure에서 `full_long_notes`, `ln_mix_10`~`ln_mix_90`, `full_short_notes` 중 하나를 선택 가능
-  - LN Mix는 50ms 이상 길이와 다음 동일 레인 노트 전 50ms 여유를 모두 확보할 수 있는 단노트만 후보로 삼고, 요청 비율만큼 정확히 반올림해 일반 롱노트로 변환
+  - LN Mix는 base BPM 기준 8비트 LN도 다음 동일 레인 노트보다 50ms 먼저 끝낼 수 있는 단노트만 후보로 삼고, 요청 비율만큼 선택한 LN 길이를 16비트 70% / 8비트 20% / 24·32비트 10%로 배분
   - 기존 롱노트는 보존하고 같은 레인의 기존 span과 겹치는 head는 제외하며, 같은 `random_seed`에서는 같은 단노트가 변환됨
 - `ghost_battle_enabled` (bool)
   - 기본값은 `false`
@@ -178,9 +182,12 @@
 - `recent_song_sources` (array of string)
   - 최근 외부/내부 song source 목록
 - `difficulty_table_path` (string)
-  - Browse 화면에서 고른 로컬 BMS 난이도표 header JSON 경로
+  - Browse 화면에서 고른 로컬 BMS 난이도표 header JSON 또는 링크에서 내려받은 프로필 캐시 header 경로
   - header는 `name`, `symbol`, 로컬 상대경로 `data_url`을 사용하고, data array entry는 `md5` 또는 `sha256`과 `level`을 사용
-  - 네트워크 URL은 가져오지 않으며 선택/해제 시 현재 song source를 재인덱싱해 일치 곡의 표 레벨을 표시
+  - 선택/해제 시 현재 song source를 재인덱싱해 일치 곡의 표 레벨을 표시
+- `difficulty_table_url` (string)
+  - Browse에서 가져온 http(s) BMSTable HTML 페이지 또는 header JSON 원본 링크
+  - 표준 `<meta name="bmstable" content="...">`를 해석해 header/data JSON을 프로필의 `difficulty_tables` 캐시에 저장하며, 로컬 JSON 선택 시에는 비워짐
 
 ### `skin`
 - `source` (string)

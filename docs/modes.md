@@ -24,7 +24,7 @@
 ## 모드 의미
 - 차트 입력은 BMS 계열(`.bms/.bme/.bml/.pms`) 전용이며 `format`과 `enable_osu_charts` 설정은 제거됨
 - `key_mode`: `none | auto | 4k | 5k | 6k | 7k | 8k | 9k | 10k | 16k`
-- `gauge`: `normal | hard | ex_hard | easy`
+- `gauge`: `normal | hard | ex_hard | easy | shift`
 - `random`: `off | mirror | fr | sr`
 - `random_seed`: FR/SR, 강제 key-mode 변환, LN Mix 대상 선택의 고정 시드 (0도 고정 값으로 취급)
 - `mods`: Mod Manager에서 정규화해 저장하는 mod token 배열
@@ -55,7 +55,7 @@
 
 ## 노트 구조 Mod
 - **Full LN**: 변환 가능한 단노트를 다음 동일 레인 노트 직전까지의 일반 롱노트로 바꿈
-- **LN Mix 10%~90%**: 기존 롱노트를 보존하고 같은 레인의 기존 span과 겹치는 head는 제외하며, 50ms 이상 길이와 다음 동일 레인 노트 전 50ms 여유를 확보할 수 있는 단노트 중 설정 비율을 `random_seed`로 결정적으로 선택
+- **LN Mix 10%~90%**: 기존 롱노트를 보존하고 같은 레인의 기존 span과 겹치는 head를 제외한다. base BPM 기준 8비트 LN도 다음 동일 레인 노트보다 50ms 먼저 끝낼 수 있는 단노트 중 설정 비율을 `random_seed`로 선택하고, 선택된 LN 길이는 모든 Mix 단계에서 16비트 70% / 8비트 20% / 24·32비트 10%로 결정적으로 배분
 - **Full Tap**: 모든 롱노트 tail을 제거해 단노트로 바꿈
 - 세 항목은 같은 `Note Structure` 카테고리라 하나만 활성화되며, 같은 seed와 차트에서는 LN Mix 결과가 재현됨
 
@@ -66,9 +66,10 @@
 - key-mode 변환은 Mirror/FR/SR보다 먼저 적용
 
 ## 게이지 규칙
-- 모든 게이지는 `100%`에서 시작하고 `0%`에 도달하면 즉시 실패합니다.
+- 고정 게이지(`ex_hard / hard / normal / easy`)는 `100%`에서 시작하고 `0%`에 도달하면 즉시 실패하며 타입이 바뀌지 않습니다.
+- `shift`는 EX-Hard / Hard / Normal / Easy를 각각 100%에서 병렬 계산하고, 현재 tier가 탈락하면 같은 판정 이력을 누적한 다음 생존 tier를 선택하며 종료 시 가장 높은 생존 tier로 확정합니다.
 - `ex_hard`는 Hard보다 회복이 낮고 `BAD`/`POOR` 손실이 더 큰 도전용 게이지입니다.
-- clear status는 `EX-HARD CLEAR`, `HARD CLEAR`, `CLEAR`, `EASY CLEAR` 순으로 구분됩니다.
+- clear status는 고정 게이지 결과와 `GAUGE SHIFT EX-HARD / HARD / NORMAL / EASY CLEAR`로 최종 생존 tier를 구분합니다.
 - `Sudden Death (1 MISS)`는 게이지 종류가 아니라 첫 OD8 환산 객체 `MISS`에서 현재 게이지를 0으로 만들고 즉시 종료하는 별도 실패 규칙입니다.
 
 ## 구현 위치
