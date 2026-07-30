@@ -11,12 +11,14 @@ main menu も gameplay と同じ低遅延思想に従う必要があります。
 - **Windows menu UI は D3D11 + Direct2D / DirectWrite** ベースで、Title / Song Select と各種 settings screen を描画する。
 - Skins は native/LR2 専用で、LR2 playskin folder の選択または drag-and-drop により現在の profile の `skins` へコピーする。
 - Song Select は再インデックス中の stage / percent / ETA と progress bar を中央表示する。
-- Browse で local BMS difficulty-table header JSON を選ぶと、現在の source を再インデックスして hash 一致譜面へ table level を適用する。
-- ONNX model 選択は path だけを保存する。`BGA Upscaler` を明示的に ON にして high-spec 警告を確認し、実験的 `NPU 優先` でも Windows/driver の実 device 選択は強制できない。
+- Browse では local header JSON の選択、または clipboard の http(s) BMSTable HTML/header link の import ができ、現在の source を再インデックスして hash 一致譜面へ table level を適用する。
+- Graphics の `BGA` は gameplay image/video background を完全に無効化し、Song Select preview は維持する。ONNX model 選択は path だけを保存するため、`BGA Upscaler` は別途 ON にして警告を確認する。
 - Input summary:
   - Title: `↑ / ↓` move, `Enter` select (`PLAY / EDIT / OPTIONS / EXIT`), `F2` songs-folder browse, `F5` reindex, `Esc` quit
   - Song Select: `↑ / ↓` song movement, `← / →` left menu focus 切り替え, `Enter` select / play, `- / +` Rate 調整, `Esc` back
   - Settings / Mode: `↑ / ↓` item 移動, `← / →` 値変更, `Enter / Esc` で戻る
+    - 長い settings list は右側 scrollbar の click-to-jump に対応し、click だけでは選択 row の値変更や実行を行わない。
+    - 画面領域の不足で説明を省略した場合、最後の表示行に `F1` と残り help line 数を表示する。
   - Keymap: `↑ / ↓` select, `Enter` capture binding, `Esc` return
   - Result: `Enter` で Song Select に戻る
   - Shared utility keys: `F1` help, `F2` songs-folder browse, `F5` refresh / reindex, `F9` screenshot
@@ -43,7 +45,7 @@ main menu も gameplay と同じ低遅延思想に従う必要があります。
 - **Cache index**（`song_index.json` または SQLite）を mtime / hash と合わせて使い、毎回 full rescan しない。初回は遅くてよいが、次回以降は即時性を目指す。
 - **Preview audio** は audio engine 経由でスケジュールする。UI は preview request を enqueue し、AudioThread が mix して timing を合わせる。
 - empty-state 画面には常設の `Add Songs Folder` action を置き、外部 folder と BMS file の drag-and-drop に対応する。
-- Browse で local BMS difficulty-table header JSON を選択/解除できる。path は `ui.difficulty_table_path` に保存され、変更時は再インデックスして MD5/SHA-256 一致譜面へ table level を適用する。
+- Browse > Difficulty Table で http(s) BMSTable page/header link を clipboard にコピーして `Enter` を押すと profile cache へ import する。`Right` は local header JSON 選択、`Left` は解除で、変更時は MD5/SHA-256 一致 level を再適用する。
 - Song Select の `-` / `+` は、検索文字入力中でない場合に `speed.rate` を即時変更・保存する。
 
 ## Settings: Latency-First Surface

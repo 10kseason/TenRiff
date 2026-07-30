@@ -944,6 +944,7 @@
                     note.tail_sample,
                     note.hold,
                     note.head_visible,
+                    note.pending,
                     data.gameplay.current_sample,
                     display_sample,
                     hold_handoff_grace_samples)) {
@@ -1575,6 +1576,7 @@
                         note.tail_sample,
                         note.hold,
                         note.head_visible,
+                        note.pending,
                         data.gameplay.current_sample,
                         display_sample,
                         hold_handoff_grace_samples)) {

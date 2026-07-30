@@ -50,7 +50,7 @@ TenRiff의 기본 플레이 흐름은 아래 순서입니다.
 - `Esc`: 이전 화면으로 복귀
 - `-` / `+`: 다음 플레이의 Rate 즉시 조정
 - `F5`: 곡 라이브러리 재인덱싱; 실행 중에는 stage/퍼센트/ETA와 progress bar가 화면 중앙에 표시됨
-- `Browse > Difficulty Table`: 로컬 BMS 난이도표 header JSON 선택 또는 해제
+- `Browse > Difficulty Table`: 링크를 복사한 뒤 `Enter`로 BMSTable HTML/header 가져오기, `Right`로 로컬 JSON 선택, `Left`로 해제
 
 ### Song Select에서 자주 쓰는 화면
 - `Mode`
@@ -58,7 +58,8 @@ TenRiff의 기본 플레이 흐름은 아래 순서입니다.
 - `Audio`
   - Master/BGM/Keysound 볼륨과 BMS keysound 정책 조정
 - `Graphics`
-  - VSync, Refresh Hz, Performance HUD, Display Offset, 외부 ONNX BGA Upscaler 조정
+  - VSync, Refresh Hz, Performance HUD, Display Offset, BGA 표시, 외부 ONNX BGA Upscaler 조정
+  - `BGA`를 끄면 게임플레이 이미지/영상과 관련 디코더·업스케일러 작업이 꺼지며 Song Select 미리보기는 유지됨
   - 모델 선택 후 Upscaler를 직접 켜고 고사양 경고를 확인해야 함. `NPU 우선(실험)`은 Windows/드라이버가 실제 NPU를 선택할 수 있을 때만 사용됨
 - `Skins`
   - native/LR2 스킨 전환, LR2 폴더 가져오기, 판정선 위치, 노트 크기, LN 몸통 폭, lane color 조정
@@ -104,7 +105,7 @@ Discord 설정 방법은 [공식 Game Overlay 안내](https://support.discord.co
 ## 6. 플레이 시작 전 알아둘 점
 
 ### 차트 형식
-- TenRiff 1.2.7은 BMS 계열(`.bms/.bme/.bml/.pms`)만 인덱싱하고 플레이합니다.
+- TenRiff 1.2.8은 BMS 계열(`.bms/.bme/.bml/.pms`)만 인덱싱하고 플레이합니다.
 
 ### 로딩
 - 곡 시작 직후에는 차트 로딩 진행 상태가 표시될 수 있습니다.
@@ -157,22 +158,30 @@ Rate는 곡 재생 속도와 차트 스케줄만 바꾸며, 같은 Hi-Speed에�
 
 `OSU OD8`은 최대 1,000,000점인 보조 비교 점수이며, TenRiff의 native Score·랭크·클리어 판정을 바꾸지 않습니다.
 
+네이티브 Score는 판정 90,000점 + 누적 Combo 10,000점으로 구성됩니다. 전부 `PG`인 풀콤보는 정확히 100,000점이며, LN은 머리와 꼬리를 각각 0.5 가중치로 계산해 한 객체가 됩니다.
+
+Accuracy는 `PG / GR / GD / BD = 100 / 80 / 50 / 20%`를 기준으로 각 판정 구간 안의 실제 타이밍에 따라 최대 0.5%p를 더 감점합니다. 전부 `PG`여도 PG 타이밍 범위가 8ms를 넘으면 99.5%를 초과하지 않습니다.
+
+Rank는 `<75 F`, `75 B`, `80.5 A`, `86.5 A+`, `90 S`, `95.5 S+`, `98 AA`, `99 SS`, `99.75 SSS` 경계를 사용합니다.
+
 ### 게이지
-선택 가능한 기본 게이지는 아래 네 가지입니다.
+선택 가능한 게이지는 아래 다섯 가지입니다.
 
 - `ex_hard`
 - `hard`
 - `normal`
 - `easy`
+- `shift`
 
-선택한 게이지는 곡 시작 시 항상 `100%`에서 시작합니다.
+고정 게이지(`ex_hard / hard / normal / easy`)는 곡 시작 시 `100%`에서 시작하며 플레이 중 타입이 바뀌지 않습니다.
 
 - `ex_hard`: Hard보다 회복이 낮고 `BAD`/`POOR` 손실이 더 큰 도전용 게이지. `0%`가 되는 즉시 Game Over
 - `hard`: `0%`가 되는 즉시 Game Over
 - `normal`: `0%`가 되는 즉시 Game Over
 - `easy`: `0%`가 되는 즉시 Game Over
+- `shift`: EX-Hard / Hard / Normal / Easy를 각각 100%에서 병렬 계산. 현재 tier가 0%로 탈락하면 같은 판정을 누적해 온 다음 생존 tier를 선택하고, 종료 시 가장 높은 생존 tier로 확정
 
-플레이 중 자동 단계 시프트는 없습니다.
+플레이 중 단계 전환은 `shift`를 명시적으로 선택했을 때만 적용됩니다.
 `Sudden Death (1 MISS)`는 게이지 종류가 아니라 첫 OD8 환산 객체 `MISS`에서 게이지를 0으로 만들고 즉시 종료하는 규칙입니다. 네이티브 `BAD`만으로는 즉사하지 않고 빈 키 `POOR`도 세지 않으며 Practice No-Fail과 동시에 켤 수 없습니다.
 
 ## 10. Result 화면

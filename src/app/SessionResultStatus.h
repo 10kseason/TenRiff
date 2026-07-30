@@ -36,7 +36,8 @@ inline std::string gameplay_session_clear_status(bool finished,
                                                  game::GaugeType final_gauge,
                                                  bool autoplay_enabled = false,
                                                  bool practice_no_fail_enabled = false,
-                                                 bool one_miss_fail_enabled = false) {
+                                                 bool one_miss_fail_enabled = false,
+                                                 bool gauge_shift_enabled = false) {
     if (user_aborted) {
         return "ABORTED";
     }
@@ -47,6 +48,15 @@ inline std::string gameplay_session_clear_status(bool finished,
         gameplay_session_assist_prefix(autoplay_enabled, practice_no_fail_enabled);
     if (one_miss_fail_enabled) {
         return assist_prefix + "SUDDEN DEATH CLEAR";
+    }
+    if (gauge_shift_enabled) {
+        switch (final_gauge) {
+            case game::GaugeType::ExHard: return assist_prefix + "GAUGE SHIFT EX-HARD CLEAR";
+            case game::GaugeType::Hard: return assist_prefix + "GAUGE SHIFT HARD CLEAR";
+            case game::GaugeType::Normal: return assist_prefix + "GAUGE SHIFT NORMAL CLEAR";
+            case game::GaugeType::Easy:
+            default: return assist_prefix + "GAUGE SHIFT EASY CLEAR";
+        }
     }
     switch (final_gauge) {
         case game::GaugeType::ExHard: return assist_prefix + "EX-HARD CLEAR";

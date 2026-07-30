@@ -595,6 +595,8 @@ void apply_config_object(const JsonObject& root, RuntimeConfig& config) {
         config.graphics.refresh_hz = static_cast<int>(fallback_refresh);
         config.graphics.performance_overlay =
             get_bool(*graphics, "performance_overlay", config.graphics.performance_overlay);
+        config.graphics.bga_enabled =
+            get_bool(*graphics, "bga_enabled", config.graphics.bga_enabled);
         config.graphics.background_upscale_mode = normalize_background_upscale_mode(
             get_string(*graphics,
                        "background_upscale_mode",
@@ -656,6 +658,8 @@ void apply_config_object(const JsonObject& root, RuntimeConfig& config) {
             get_string(*ui, "song_collection_filter", config.ui.song_collection_filter));
         config.ui.difficulty_table_path =
             get_string(*ui, "difficulty_table_path", config.ui.difficulty_table_path);
+        config.ui.difficulty_table_url =
+            get_string(*ui, "difficulty_table_url", config.ui.difficulty_table_url);
     }
 
     if (auto* skin = get_object(root, "skin")) {
@@ -966,6 +970,7 @@ JsonValue build_json_root(const RuntimeConfig& config) {
     graphics.emplace("vsync", JsonValue{config.graphics.vsync});
     graphics.emplace("refresh_hz", JsonValue{static_cast<double>(config.graphics.refresh_hz)});
     graphics.emplace("performance_overlay", JsonValue{config.graphics.performance_overlay});
+    graphics.emplace("bga_enabled", JsonValue{config.graphics.bga_enabled});
     graphics.emplace("background_upscale_mode",
                      JsonValue{normalize_background_upscale_mode(
                          config.graphics.background_upscale_mode)});
@@ -1026,6 +1031,7 @@ JsonValue build_json_root(const RuntimeConfig& config) {
     ui.emplace("collections", JsonValue{std::move(collections)});
     ui.emplace("song_collection_filter", JsonValue{normalize_song_collection_filter(config.ui.song_collection_filter)});
     ui.emplace("difficulty_table_path", JsonValue{config.ui.difficulty_table_path});
+    ui.emplace("difficulty_table_url", JsonValue{config.ui.difficulty_table_url});
     root.emplace("ui", JsonValue{std::move(ui)});
 
     JsonObject skin;
@@ -1479,6 +1485,7 @@ RuntimeConfig ConfigLoader::defaults() const {
     config.graphics.vsync = false;
     config.graphics.refresh_hz = kDefaultGraphicsRefreshHz;
     config.graphics.performance_overlay = false;
+    config.graphics.bga_enabled = true;
     config.graphics.background_upscale_mode = "off";
     config.graphics.background_upscale_model_path.clear();
     config.graphics.background_upscale_prefer_npu = false;
@@ -1501,6 +1508,7 @@ RuntimeConfig ConfigLoader::defaults() const {
     config.ui.collections.clear();
     config.ui.song_collection_filter = "all";
     config.ui.difficulty_table_path.clear();
+    config.ui.difficulty_table_url.clear();
 
     config.skin = {};
     sanitize_skin_config(config.skin);

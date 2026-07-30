@@ -3,7 +3,7 @@
 这份文档是下一位 agent 或新任务接手时应该最先阅读的当前状态文档。目标是快速说明“这个项目现在是什么、应该先看哪里、还有哪些内容尚未验证”。
 
 ## 基线
-- 当前项目版本为 `1.2.7 stable`
+- 当前项目版本与公开稳定版均为 `1.2.8 stable`
 - direct-IP multiplayer 与 preview r5 的输入 backend 生命周期修复已整合进 `1.1.8 stable`
 - `1.1.8` 在 1.1.7 视觉更新基础上加入 osu!mania OD8 辅助分数、首次原生 `BAD` 即结束的 `Sudden Death (1 MISS)`，以及确定性的 `LN Mix 10%～90%`
 - `1.2.0` 把 BMS 通道 `04/07` 和 osu!mania 背景接入 gameplay sample timeline，并通过 Windows ML 上的 LunaSR 异步放大低于 FHD 的图片背景
@@ -14,6 +14,7 @@
 - `1.2.5` 将带模型品牌的集成改为通用 External ONNX Upscaler，加入 Graphics Settings 文件选择/.onnx 拖放、profile 模型路径，以及按模型建立的 WinML session。
 - `1.2.6` 将可运行谱面限定为 BMS family，仅保留 native/LR2 skin，并加入 ONNX upscaler 手动启用、实验性 NPU 优先、Song Select Rate 调整、中央索引进度、local JSON 难度表及 BMS keysound late-input hotfix。
 - `1.2.7` 修复 External ONNX Upscaler 的 FP16 binding、浮点边界 INT8 QDQ 检测、高性能 DirectX GPU 默认路径，以及视频 BGA one-in-flight backpressure。
+- `1.2.8` 汇总了长按音符整体闪烁修复、gameplay BGA toggle、BMSTable HTML/header link 导入，以及长设置页面的 scrollbar UX 改进。
 - 后续工作的基准文档是 [`docs/baseline-1.1.2.zh-CN.md`](baseline-1.1.2.zh-CN.md)
 - Windows GUI 构建是主目标
 - Linux 仅存在 `Baepoks-Linuxs/TenRiff-0.5.0-linux-preview` 级别的 preview
@@ -75,7 +76,7 @@
   - difficulty/title 排序
   - search 未激活时可用 `-`/`+` 调整当前 play Rate
   - 索引时在 header 下方中央显示 stage、percentage、processed/total、ETA、song count 与 progress bar
-  - Browse 可选择 local difficulty-table header JSON；通过 MD5/SHA-256 匹配 level/symbol，更换后会重新索引
+  - Browse 可选择 local header JSON，或把剪贴板中的 http(s) BMSTable HTML/header 链接导入 profile cache；通过 MD5/SHA-256 匹配 level/symbol，更换后会重新索引
 - BMS key mode：
   - 按 key mode 分开的 keymap
   - 对支持 key count 进行 chart difficulty 计算
@@ -85,7 +86,7 @@
   - BMS 的 LV/CR 计算仅将 long-note Head/Tail 的 miss-ms 按 0.5倍评估，使 `300ms`按`150ms`处理；实际 gameplay 判定范围保持不变
 - Lane transform：
   - Random 支持 `Off / Mirror / FR / SR`；Mirror 在 key-mode 变换后反转最终 lane，10K/16K 则在每个 player half 内独立反转
-  - Mod Manager 的 `LN Mix 10%～90%` 会保留已有 hold，排除与同 lane 已有 span 重叠的 head，并通过 `Random Seed` 从既能形成至少 50ms hold、又能在下一音符前保留 50ms 间隔的 tap 中确定性选择指定比例
+  - Mod Manager 的 `LN Mix 10%～90%` 会保留已有 hold，并排除与同 lane 已有 span 重叠的 head；它通过 `Random Seed` 从按 base BPM 计算的 1/8-note hold 能在下一同 lane note 前至少 50ms 结束的 tap 中选择指定比例，并在所有 Mix 档位中把长度分配为 70% 1/16-note、20% 1/8-note、10% 交替的 1/24 与 1/32-note
 - Skins / Gameplay feel：
   - `rect / triangle / pentagon / hexagon / circle` 音符形状；procedural 圆形/多边形在 100% 下使用与 rect 条相同的完整宽度
   - note border 开关
@@ -105,9 +106,13 @@
   - 会真正消耗 note 的失败（auto-miss、过早吃掉 note、hold break / tail miss）仍然记为 `BAD`
   - 非消耗型的超早输入会按 LR2 风格记为 `POOR`，并重新出现在结果 / replay / UI 中
   - `POOR` 不会断 combo，不计入 score / accuracy 总数，并使用独立的 `PR` gauge 损失值
-  - gauge 模式支持 `EX-Hard / Hard / Normal / Easy`，全部从 `100%` 开始，并在 `0%` 时立即失败
+  - gauge 模式支持 `EX-Hard / Hard / Normal / Easy / Gauge Shift`；固定 gauge 从 `100%` 开始，在 `0%` 时立即失败且不会改变类型
+  - `Gauge Shift` 会让 EX-Hard / Hard / Normal / Easy 分别从 100% 开始独立并行计算；当前 tier 到达 0% 后选择已累计相同判定历史的下一档存活 tier，并以结束时最高的存活 tier 为最终结果
   - `Sudden Death (1 MISS)` 会在首次 OD8 换算对象 `MISS` 时立即失败；仅原生 `BAD` timing 不会触发，空按产生的 `POOR` 也不触发，并且该选项与 Practice No-Fail 互斥
   - Gameplay 与 Result 会显示按 osu!mania stable OD8 判定窗和 ScoreV1（最高 1,000,000）换算真实输入 timing 的辅助 `OSU OD8` 分数；TenRiff 原生分数与排名保持不变
+  - 原生分数按判定 90,000 分 + 累积 combo 10,000 分归一化；全 PG full combo 恰好为 100,000 分，LN head / tail 各按 0.5 权重组成一个对象
+  - accuracy 以 PG/GR/GD/BD 的 100/80/50/20% 为基础，在每个判定区间内按 timing 最多再扣 0.5 个百分点；若全 PG 的 timing span 超过 8ms，则上限为 99.5%
+  - rank 边界为 `<75 F / 75 B / 80.5 A / 86.5 A+ / 90 S / 95.5 S+ / 98 AA / 99 SS / 99.75 SSS`
   - live gameplay 的 `ClockSync` 使用 centered anchor regression，避免大型 Windows QPC 绝对值造成精度损失，并在持续 clock discontinuity 后自动 rebase
   - stale backlog 按 QPC event age 与 `BAD` window 判定；若 fresh input 的 sample mapping 与当前 playback anchor 偏差过大，则 fallback 到 anchor
   - tail release timing 仅适用于 BMS `#LNMODE 2` charge note
@@ -119,6 +124,7 @@
   - VSync on：present refresh 跟随活动显示器 Hz，render pacing 目标为 `monitor_hz * 2`（上限 `1050`）
   - `visual_offset_ms`
   - `performance_overlay`
+  - `bga_enabled=false` 会禁用 gameplay 图片/视频 BGA 及 decoder/upscaler 工作，同时保留 Song Select 预览
   - `background_upscale_model_path` 只保存从 Graphics Settings 选择或拖入的兼容 ONNX 路径；公开包不包含模型
   - BGA Upscaler 默认为 `off`；用户必须明确开启并确认 high-spec warning，不存在自动 benchmark gate
   - 当前契约为 960x540 RGB residual x2，并自动检测 FP32/FP16 边界与浮点边界 INT8 QDQ metadata；用户负责模型权利、质量和性能，加载、契约、decode 或推理失败时保持 native scaling
@@ -164,9 +170,9 @@
 
 ## 运行时 / 打包规则
 - 新用户 profile 会自动创建
-- 当前正式 P2P 发布线为 `TenRiff 1.2.7 stable`
+- 当前正式 P2P 发布线为 `TenRiff 1.2.8 stable`
 - 发布包不包含 `Songs`
-- 发布包会同时包含用于菜单 BGM 的 `Mainmusic/` 运行时资源
+- 发布包包含 `Main Menu / Options / Song Selecte / Multiplayer Lobby / Clear / Failed` 这些 `Mainmusic/` 场景槽位；每个 `Name.mp3` 及 `Name 2.mp3`～`Name 64.mp3` 会自动发现，并在重新进入场景时轮换
 - 发布更新只包含已构建产物和必要的运行时资源
 - source-only/public handoff 前先确认 include/exclude 列表
 - preview source branch 和 tag 与 stable release 分开管理

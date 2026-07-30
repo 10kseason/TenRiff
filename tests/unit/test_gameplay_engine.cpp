@@ -35,6 +35,119 @@ TEST_CASE("gameplay engine scores a basic hit") {
     CHECK(engine.stats().max_combo == 1);
 }
 
+TEST_CASE("native score is normalized to one hundred thousand with a combo component") {
+    GameplayChart chart;
+    chart.lane_count = 1;
+    chart.duration_samples = 4000;
+    chart.notes.push_back(NoteEvent{1, 1000, std::nullopt});
+    chart.notes.push_back(NoteEvent{1, 2000, std::nullopt});
+    chart.notes.push_back(NoteEvent{1, 3000, std::nullopt});
+
+    GameplayConfig config;
+    config.sample_rate = 1000;
+    config.judge.pg_ms = 10.0;
+    config.judge.gr_ms = 20.0;
+    config.judge.gd_ms = 30.0;
+    config.judge.bd_ms = 40.0;
+
+    GameplayEngine engine(chart, config);
+    (void)engine.handle_input(1, InputState::Pressed, 1000);
+    engine.advance(2100);
+    (void)engine.handle_input(1, InputState::Pressed, 3000);
+    engine.advance(4000);
+
+    CHECK(engine.stats().counts.pg == 2);
+    CHECK(engine.stats().counts.bd == 1);
+    CHECK(engine.stats().combo_score_units == 2);
+    CHECK(engine.stats().raw_score == 63'333);
+}
+
+TEST_CASE("native accuracy rewards timing inside every judgement band and caps loose PG clusters") {
+    GameplayChart chart;
+    chart.lane_count = 1;
+    chart.duration_samples = 3000;
+    chart.notes.push_back(NoteEvent{1, 1000, std::nullopt});
+    chart.notes.push_back(NoteEvent{1, 2000, std::nullopt});
+
+    GameplayConfig config;
+    config.sample_rate = 1000;
+    config.judge.pg_ms = 10.0;
+    config.judge.gr_ms = 20.0;
+    config.judge.gd_ms = 30.0;
+    config.judge.bd_ms = 40.0;
+
+    GameplayEngine exact(chart, config);
+    (void)exact.handle_input(1, InputState::Pressed, 1000);
+    (void)exact.handle_input(1, InputState::Pressed, 2000);
+    CHECK(exact.stats().accuracy_percent() == doctest::Approx(100.0));
+
+    GameplayEngine loose(chart, config);
+    (void)loose.handle_input(1, InputState::Pressed, 995);
+    (void)loose.handle_input(1, InputState::Pressed, 2005);
+    CHECK(loose.stats().counts.pg == 2);
+    CHECK(loose.stats().accuracy_percent() == doctest::Approx(99.5));
+
+    GameplayChart gr_chart;
+    gr_chart.lane_count = 1;
+    gr_chart.duration_samples = 2000;
+    gr_chart.notes.push_back(NoteEvent{1, 1000, std::nullopt});
+    GameplayEngine gr_engine(gr_chart, config);
+    (void)gr_engine.handle_input(1, InputState::Pressed, 1015);
+    CHECK(gr_engine.stats().counts.gr == 1);
+    CHECK(gr_engine.stats().accuracy_percent() == doctest::Approx(79.75));
+}
+
+TEST_CASE("native accuracy counts a long note as one weighted object") {
+    GameplayChart chart;
+    chart.lane_count = 1;
+    chart.duration_samples = 3500;
+    chart.notes.push_back(NoteEvent{1, 1000, 1500});
+    chart.notes.push_back(NoteEvent{1, 2500, std::nullopt});
+
+    GameplayConfig config;
+    config.sample_rate = 1000;
+    config.judge.pg_ms = 10.0;
+    config.judge.gr_ms = 20.0;
+    config.judge.gd_ms = 30.0;
+    config.judge.bd_ms = 40.0;
+
+    GameplayEngine engine(chart, config);
+    (void)engine.handle_input(1, InputState::Pressed, 1000);
+    engine.advance(1500);
+    (void)engine.handle_input(1, InputState::Pressed, 2515);
+
+    CHECK(engine.stats().counts.pg == 2);
+    CHECK(engine.stats().counts.gr == 1);
+    CHECK(engine.stats().accuracy_weight == doctest::Approx(2.0));
+    CHECK(engine.stats().accuracy_percent() == doctest::Approx(89.875));
+}
+TEST_CASE("gameplay engine reports whether an original note is still pending") {
+    GameplayChart chart;
+    chart.lane_count = 1;
+    chart.duration_samples = 2000;
+    NoteEvent note;
+    note.lane = 1;
+    note.start_sample = 1000;
+    note.end_sample = 1600;
+    note.note_id = 42;
+    chart.notes.push_back(note);
+
+    GameplayConfig config;
+    config.sample_rate = 1000;
+    config.judge.pg_ms = 10.0;
+    config.judge.gr_ms = 20.0;
+    config.judge.gd_ms = 30.0;
+    config.judge.bd_ms = 40.0;
+
+    GameplayEngine engine(chart, config);
+    CHECK(engine.is_note_pending(1, 42));
+    CHECK_FALSE(engine.is_note_pending(2, 42));
+    CHECK_FALSE(engine.is_note_pending(1, 7));
+
+    (void)engine.handle_input(1, InputState::Pressed, 1000);
+    CHECK_FALSE(engine.is_note_pending(1, 42));
+}
+
 TEST_CASE("gameplay engine keeps real-time judge windows unchanged at faster rate") {
     GameplayChart chart;
     chart.lane_count = 1;
@@ -107,7 +220,7 @@ TEST_CASE("gameplay engine raw score keeps earlier penalties after later hits") 
     CHECK(engine.stats().counts.bd == 0);
     CHECK(engine.stats().counts.pr == 1);
     CHECK(engine.stats().counts.pg == 1);
-    CHECK(engine.stats().raw_score == 1000);
+    CHECK(engine.stats().raw_score == 100'000);
 }
 
 TEST_CASE("gameplay engine ignores inputs that are too early for LR2 poor") {
@@ -263,7 +376,7 @@ TEST_CASE("gameplay engine auto-clears standard hold tails without release timin
 
     CHECK(engine.stats().counts.pg == 2);
     CHECK(engine.stats().counts.bd == 0);
-    CHECK(engine.stats().raw_score == 1000);
+    CHECK(engine.stats().raw_score == 100'000);
 }
 
 TEST_CASE("gameplay engine keeps the latest one hundred timing deltas in order") {
@@ -809,7 +922,107 @@ TEST_CASE("gameplay engine exposes OD8 ScoreV1 and scores a hold as one osu obje
     CHECK(engine.stats().osu_od8.score == 1'000'000);
 }
 
-TEST_CASE("gameplay engine records one multiplayer gauge shift before Easy game over") {
+TEST_CASE("parallel gauge shift keeps Ex-Hard when it survives") {
+    GameplayChart chart;
+    chart.lane_count = 1;
+    chart.duration_samples = 2000;
+    chart.notes.push_back(NoteEvent{1, 1000, std::nullopt});
+
+    GameplayConfig config;
+    config.sample_rate = 1000;
+    config.judge.pg_ms = 10.0;
+    config.judge.gr_ms = 20.0;
+    config.judge.gd_ms = 30.0;
+    config.judge.bd_ms = 40.0;
+    config.gauge_shift_enabled = true;
+
+    GameplayEngine engine(chart, config);
+    (void)engine.handle_input(1, InputState::Pressed, 1000);
+    engine.advance(1500);
+
+    CHECK(engine.is_finished());
+    CHECK_FALSE(engine.is_game_over());
+    CHECK(engine.gauge_state().type == tenriff::game::GaugeType::ExHard);
+    CHECK(engine.gauge_state().value == doctest::Approx(100.0));
+    CHECK(engine.stats().shifts.empty());
+}
+TEST_CASE("parallel gauge shift selects the highest independently surviving gauge") {
+    GameplayChart chart;
+    chart.lane_count = 1;
+    chart.duration_samples = 5000;
+    chart.notes.push_back(NoteEvent{1, 1000, std::nullopt});
+    chart.notes.push_back(NoteEvent{1, 2000, std::nullopt});
+    chart.notes.push_back(NoteEvent{1, 3000, std::nullopt});
+    chart.notes.push_back(NoteEvent{1, 4000, std::nullopt});
+
+    GameplayConfig config;
+    config.sample_rate = 1000;
+    config.judge.pg_ms = 10.0;
+    config.judge.gr_ms = 20.0;
+    config.judge.gd_ms = 30.0;
+    config.judge.bd_ms = 40.0;
+    config.gauge_shift_enabled = true;
+    config.gauge.ex_hard.bd = -100.0;
+    config.gauge.hard.bd = -60.0;
+    config.gauge.normal.bd = -40.0;
+    config.gauge.easy.bd = -20.0;
+
+    GameplayEngine engine(chart, config);
+    CHECK(engine.gauge_state().type == tenriff::game::GaugeType::ExHard);
+    CHECK(engine.gauge_state().value == doctest::Approx(100.0));
+
+    engine.advance(1041);
+    REQUIRE(engine.stats().shifts.size() == 1u);
+    CHECK(engine.stats().shifts[0].from == tenriff::game::GaugeType::ExHard);
+    CHECK(engine.stats().shifts[0].to == tenriff::game::GaugeType::Hard);
+    CHECK(engine.gauge_state().type == tenriff::game::GaugeType::Hard);
+    CHECK(engine.gauge_state().value == doctest::Approx(40.0));
+
+    engine.advance(2041);
+    REQUIRE(engine.stats().shifts.size() == 2u);
+    CHECK(engine.stats().shifts[1].from == tenriff::game::GaugeType::Hard);
+    CHECK(engine.stats().shifts[1].to == tenriff::game::GaugeType::Normal);
+    CHECK(engine.gauge_state().value == doctest::Approx(20.0));
+
+    engine.advance(3041);
+    REQUIRE(engine.stats().shifts.size() == 3u);
+    CHECK(engine.stats().shifts[2].from == tenriff::game::GaugeType::Normal);
+    CHECK(engine.stats().shifts[2].to == tenriff::game::GaugeType::Easy);
+    CHECK(engine.gauge_state().value == doctest::Approx(40.0));
+
+    engine.advance(4041);
+    CHECK(engine.is_finished());
+    CHECK_FALSE(engine.is_game_over());
+    CHECK(engine.gauge_state().type == tenriff::game::GaugeType::Easy);
+    CHECK(engine.gauge_state().value == doctest::Approx(20.0));
+}
+
+TEST_CASE("parallel gauge shift fails only after every gauge has died") {
+    GameplayChart chart;
+    chart.lane_count = 1;
+    chart.duration_samples = 2000;
+    chart.notes.push_back(NoteEvent{1, 1000, std::nullopt});
+
+    GameplayConfig config;
+    config.sample_rate = 1000;
+    config.judge.pg_ms = 10.0;
+    config.judge.gr_ms = 20.0;
+    config.judge.gd_ms = 30.0;
+    config.judge.bd_ms = 40.0;
+    config.gauge_shift_enabled = true;
+    config.gauge.ex_hard.bd = -100.0;
+    config.gauge.hard.bd = -100.0;
+    config.gauge.normal.bd = -100.0;
+    config.gauge.easy.bd = -100.0;
+
+    GameplayEngine engine(chart, config);
+    engine.advance(1041);
+
+    CHECK(engine.is_game_over());
+    CHECK(engine.gauge_state().type == tenriff::game::GaugeType::Easy);
+    CHECK(engine.gauge_state().value == doctest::Approx(0.0));
+}
+TEST_CASE("gameplay engine records one legacy threshold-policy shift before Easy game over") {
     GameplayChart chart;
     chart.lane_count = 1;
     chart.duration_samples = 4000;
@@ -1050,7 +1263,7 @@ TEST_CASE("full long notes preserve raw score potential during gameplay") {
     engine.advance(2500);
 
     CHECK(engine.stats().counts.pg == 2);
-    CHECK(engine.stats().raw_score == 1000);
+    CHECK(engine.stats().raw_score == 100'000);
 }
 
 TEST_CASE("LN mix hold heads respect OD8 sudden-death boundaries during gameplay") {

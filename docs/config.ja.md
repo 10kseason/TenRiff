@@ -40,7 +40,7 @@ profile が存在しない場合は初回起動時に自動生成されます。
 
 - `backend` (string)
   - `polling | rawinput`
-  - 現行 `1.2.7` リリースラインの既定値は `rawinput`
+  - 現行 `1.2.8` リリースラインの既定値は `rawinput`
   - `Options -> Input Settings -> Backend` または `Options -> Profile Setup -> Input Backend` で profile ごとに選択可能
   - runtime fallback は保存済みの値を `polling` に書き換えない
   - RawInput の起動失敗、登録先の消失、message window の終了を確認すると、そのアプリ実行中は menu と後続 gameplay の両方で Polling を維持する
@@ -89,7 +89,8 @@ profile が存在しない場合は初回起動時に自動生成されます。
 - `target_scroll_bps` (double)
 
 ### `gauge`
-- automatic gauge shift はありません。選択した gauge type は曲終了または失敗まで固定です。
+- `normal | hard | ex_hard | easy` は曲終了または失敗まで type が固定です。
+- `shift` は EX-Hard / Hard / Normal / Easy をそれぞれ 100% から独立して同時に計算します。現在の tier が 0% で脱落すると、同じ判定をすでに累積している次の生存 tier を選び、終了時に生存している最上位 tier が最終 gauge になります。
 - EX-Hard、Hard、Normal、Easy はすべて `100%` で開始し、`0%` で即失敗します。
 - `delta`
   - `ex_hard`, `hard`, `normal`, `easy`
@@ -112,6 +113,9 @@ profile が存在しない場合は初回起動時に自動生成されます。
   - `vsync=true` では present refresh は active monitor Hz に従い、render pacing は `monitor_hz * 2` を狙う（`1050` clamp）
 - `performance_overlay` (bool)
   - 既定値は `false`。右上を使うため、同じ角に置いた Discord Voice widget と重なる場合がある
+- `bga_enabled` (bool)
+  - 既定値は `true`。`false` では gameplay の image/video BGA と decoder/upscaler 処理を無効化
+  - Song Select の background preview は別機能なので表示を維持
 - `background_upscale_mode` (string)
   - `onnx | off`。旧 `lunasr` 値は互換性のため `onnx` に移行
   - 既定値は `off`。Graphics Settings の `BGA Upscaler` で明示的に ON/OFF
@@ -135,14 +139,14 @@ chart loader/indexer は BMS family（`.bms/.bme/.bml/.pms`）専用で、`forma
   - `none | auto | 4k | 5k | 6k | 7k | 8k | 9k | 10k | 16k`
   - `none` は譜面本来の key count をそのまま使う
 - `gauge` (string)
-  - `normal | hard | ex_hard | easy`
+  - `normal | hard | ex_hard | easy | shift`
 - `random` (string)
   - `off | mirror | fr | sr`
 - `random_seed` (int)
   - FR/SR、強制 key-mode 変換、LN Mix 対象選択の固定 seed。Mirror 変換自体は使用しない
 - `mods` (string array)
   - Note Structure では `full_long_notes`、`ln_mix_10`～`ln_mix_90`、`full_short_notes` のいずれか一つを選択できる
-  - LN Mix は 50ms 以上の hold と同じ lane の次ノート前 50ms の余裕を両方確保できる tap のみを候補にし、指定割合を丸めた個数だけ standard hold に変換する
+  - LN Mix は base BPM 基準の 1/8-note hold が次の同一 lane note より 50ms 以上前に終わる tap のみを候補にし、選択した hold の長さを 1/16-note 70% / 1/8-note 20% / 1/24・1/32-note 10% に配分する
   - 既存 hold は維持され、同じ lane の既存 span と重なる head は除外され、同じ `random_seed` では同じ tap が選択される
 - `ghost_battle_enabled` (bool)
   - 既定値は `false`
@@ -177,9 +181,12 @@ chart loader/indexer は BMS family（`.bms/.bme/.bml/.pms`）専用で、`forma
 - `recent_song_sources` (array of string)
   - recent external/internal song source 一覧
 - `difficulty_table_path` (string)
-  - Browse で選択した local BMS difficulty-table header JSON の path
+  - Browse で選択した local BMS difficulty-table header JSON、または link から作成した profile cache header の path
   - header は `name`, `symbol`, local relative `data_url`、data array entry は `md5` または `sha256` と `level` を使用
-  - network URL は取得せず、選択/解除時に現在の source を再インデックスして一致譜面へ table level を表示
+  - 選択/解除時に現在の source を再インデックスして一致譜面へ table level を表示
+- `difficulty_table_url` (string)
+  - Browse から import した http(s) BMSTable HTML page または header JSON の元 link
+  - 標準 `<meta name="bmstable" content="...">` を解決して header/data JSON を profile の `difficulty_tables` cache に保存。local JSON 選択時は空になる
 
 ### `skin`
 - `source` (string)

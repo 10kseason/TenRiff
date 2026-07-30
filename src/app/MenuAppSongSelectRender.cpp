@@ -103,7 +103,11 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
         }
         if (!config_.ui.difficulty_table_path.empty()) {
             parts.push_back(ui_text("TABLE ", "난이도표 ") +
-                            safe_ui_text(filename_only(config_.ui.difficulty_table_path), "JSON"));
+                            safe_ui_text(
+                                config_.ui.difficulty_table_url.empty()
+                                    ? filename_only(config_.ui.difficulty_table_path)
+                                    : config_.ui.difficulty_table_url,
+                                config_.ui.difficulty_table_url.empty() ? "JSON" : "LINK"));
         }
         if (parts.empty()) {
             return ui_text("NO FILTER", "필터 없음");
@@ -519,7 +523,11 @@ void MenuApp::populate_song_browser_render_data(render::MenuRenderData& render) 
                     ui_text("Difficulty Table", "난이도표"),
                     config_.ui.difficulty_table_path.empty()
                         ? ui_text("Native LV", "기본 LV")
-                        : safe_ui_text(filename_only(config_.ui.difficulty_table_path), "JSON"),
+                        : safe_ui_text(
+                              config_.ui.difficulty_table_url.empty()
+                                  ? filename_only(config_.ui.difficulty_table_path)
+                                  : config_.ui.difficulty_table_url,
+                              config_.ui.difficulty_table_url.empty() ? "JSON" : "LINK"),
                     settings_cursor_ == 5,
                     render::MenuHitTargetKind::SettingsRow,
                     5,
@@ -578,8 +586,8 @@ void MenuApp::populate_song_browser_render_data(render::MenuRenderData& render) 
     render.generic.notes.push_back(ui_text("Sort and Group moved here so the left rail only separates Songs, Sources, Search, Filter, Records, and Options.",
                                            "왼쪽 레일이 곡/소스/검색/필터/기록/옵션만 남도록 정렬과 그룹을 이 화면으로 옮겼습니다."));
     render.generic.notes.push_back(ui_text(
-        "Difficulty Table selects a local standard BMS table header JSON. Right/Enter chooses a file; Left clears it. Matching levels drive badges, grouping, sorting, and numeric filters.",
-        "난이도표는 로컬 표준 BMS 난이도표 헤더 JSON을 선택합니다. 오른쪽/Enter로 선택하고 왼쪽으로 해제합니다. 일치한 레벨은 배지·그룹·정렬·숫자 필터에 연동됩니다."));
+        "Difficulty Table: copy an http(s) BMSTable page/header link and press Enter, or press Right to select local JSON. Left clears it. Matching levels drive badges, grouping, sorting, and numeric filters.",
+        "난이도표: http(s) BMSTable 페이지/헤더 링크를 복사하고 Enter를 누르거나, 오른쪽 키로 로컬 JSON을 고릅니다. 왼쪽 키는 해제입니다. 일치 레벨은 배지·그룹·정렬·숫자 필터에 반영됩니다."));
     render.generic.notes.push_back(ui_text("Collection Filter cycles All, Favorites, and any named collections you created.",
                                            "컬렉션 필터는 전체, 페이보릿, 생성한 컬렉션들을 순환합니다."));
     render.generic.notes.push_back(ui_text("Toggle Favorite works from All/Favorites. When a named collection is selected it toggles membership in that collection.",

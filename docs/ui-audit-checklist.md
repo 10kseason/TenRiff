@@ -53,6 +53,8 @@
   - 실제 PNG 노트, LN head/body/tail, key 이미지와 lane fallback이 gameplay에서 의도대로 보이는지 확인
 - `Generic/settings lists`
   - row label/value, notes/help text, scrollbar, `+ / -` 버튼이 서로 겹치지 않는지 확인
+  - 긴 목록의 scrollbar track을 클릭하면 해당 위치의 row가 선택만 되고 값 변경이나 화면 진입은 일어나지 않는지 확인
+  - 공간 때문에 help text가 생략되면 마지막 보이는 줄에 `F1`과 남은 줄 수가 표시되는지 확인
   - Performance HUD가 켜져 있을 때 우상단 영역이 option row를 가리지 않는지 확인
 - `Gameplay`
   - `Loading`, `Countdown`, `Live HUD` 모두 Performance HUD와 분리되어 보이는지 확인

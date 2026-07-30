@@ -11,12 +11,14 @@ The main menu must follow the same low-latency philosophy as gameplay: audio run
 - The **Windows menu UI is built on D3D11 + Direct2D / DirectWrite** and renders Title / Song Select (cyan layout) and other settings screens (list UI).
 - Skins are native/LR2-only; selecting or dropping an LR2 playskin folder copies it into the active profile's `skins` directory.
 - Song Select centers indexing stage / percent / ETA and a progress bar while a reindex is running.
-- Browse selects a local BMS difficulty-table header JSON and reindexes the current source so hash matches receive table levels.
-- Selecting an ONNX model only stores its path. Users explicitly enable `BGA Upscaler` and confirm the high-spec warning; experimental `Prefer NPU` cannot force the device Windows/the driver ultimately select.
+- Browse can select local header JSON or import a clipboard http(s) BMSTable HTML/header link, then reindexes the current source so hash matches receive table levels.
+- Graphics `BGA` fully disables gameplay image/video backgrounds while keeping Song Select previews. Selecting an ONNX model only stores its path; users enable `BGA Upscaler` separately and confirm the high-spec warning.
 - Input summary:
   - Title: `↑ / ↓` move, `Enter` select (PLAY / EDIT / OPTIONS / EXIT), `F2` songs-folder browse, `F5` reindex, `Esc` quit
   - Song Select: `↑ / ↓` song movement, `← / →` switch focus on the left menu, `Enter` select / play, `- / +` adjust Rate, `Esc` back
   - Settings / Mode: `↑ / ↓` move items, `← / →` change values, `Enter / Esc` return
+    - Long settings lists support click-to-jump on the right scrollbar without activating or changing the selected row.
+    - When space hides some descriptions, the final visible line shows `F1` and the remaining help-line count.
   - Keymap: `↑ / ↓` select, `Enter` capture binding, `Esc` return
   - Result: return to Song Select with `Enter` only
   - Shared utility keys: `F1` help, `F2` songs-folder browse, `F5` refresh / reindex, `F9` screenshot
@@ -44,7 +46,7 @@ States render UI and consume already-timestamped input events; heavyweight work 
 - **Cache index** (`song_index.json` or SQLite) with mtime / hash checks to avoid full rescans. First run can be slow; subsequent runs should be instant.
 - **Preview audio** is scheduled through the audio engine: the UI enqueues preview requests, and AudioThread mixes them so timing stays aligned.
 - Empty-state screens should expose a persistent `Add Songs Folder` action; external folders and BMS files also support drag-and-drop.
-- Browse can select or clear a local BMS difficulty-table header JSON. Its path is saved in `ui.difficulty_table_path`; changing it reindexes so MD5/SHA-256 matches receive table levels.
+- In Browse > Difficulty Table, copy an http(s) BMSTable page/header link and press `Enter` to import it into the profile cache. `Right` selects local header JSON and `Left` clears it; changes reapply levels to MD5/SHA-256 matches.
 - Song Select `-` / `+` changes and saves `speed.rate` immediately unless search text entry is active.
 
 ## Settings: Latency-First Surface

@@ -21,11 +21,19 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
     target.audio_buffer_frames = gameplay_hud_.audio_buffer_frames;
     target.lookahead_samples = gameplay_hud_.lookahead_samples;
     target.past_samples = gameplay_hud_.past_samples;
-    target.background_base_path = gameplay_hud_.background_base_path;
-    target.background_overlay_path = gameplay_hud_.background_overlay_path;
-    target.background_base_start_sample = gameplay_hud_.background_base_start_sample;
-    target.background_overlay_start_sample = gameplay_hud_.background_overlay_start_sample;
-    target.background_upscale_mode = config_.graphics.background_upscale_mode;
+    const render::GameplayBackgroundPolicy background_policy =
+        render::resolve_gameplay_background_policy(
+            config_.graphics.bga_enabled,
+            gameplay_hud_.background_base_path,
+            gameplay_hud_.background_overlay_path,
+            gameplay_hud_.background_base_start_sample,
+            gameplay_hud_.background_overlay_start_sample,
+            config_.graphics.background_upscale_mode);
+    target.background_base_path = background_policy.base_path;
+    target.background_overlay_path = background_policy.overlay_path;
+    target.background_base_start_sample = background_policy.base_start_sample;
+    target.background_overlay_start_sample = background_policy.overlay_start_sample;
+    target.background_upscale_mode = background_policy.upscale_mode;
     target.background_upscale_model_path = config_.graphics.background_upscale_model_path;
     target.background_upscale_prefer_npu = config_.graphics.background_upscale_prefer_npu;
     const double clamped_judgement_line_position = std::clamp(
@@ -264,23 +272,14 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
         out_note.tail_sample = note.tail_sample;
         out_note.hold = note.hold;
         out_note.head_visible = note.head_visible;
+        out_note.pending = note.pending;
         target.notes[i] = out_note;
     }
     target.score = gameplay_hud_.score;
     target.osu_od8_score_available = gameplay_hud_.osu_od8_score_available;
     target.osu_od8_score = gameplay_hud_.osu_od8_score;
 
-    const int judged_total = gameplay_hud_.counts.pg + gameplay_hud_.counts.gr + gameplay_hud_.counts.gd +
-                             gameplay_hud_.counts.bd;
-    if (judged_total > 0) {
-        const double weighted = gameplay_hud_.counts.pg * 1.0 +
-                                gameplay_hud_.counts.gr * 0.80 +
-                                gameplay_hud_.counts.gd * 0.50 +
-                                gameplay_hud_.counts.bd * 0.20;
-        target.accuracy = std::clamp(weighted / static_cast<double>(judged_total) * 100.0, 0.0, 100.0);
-    } else {
-        target.accuracy = 0.0;
-    }
+    target.accuracy = gameplay_hud_.accuracy;
 
     if (target.spectating_peer && target.peer_score_available) {
         // Render-only perspective switch. Local result data stays untouched,
@@ -351,19 +350,10 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
         out_note.tail_sample = note.tail_sample;
         out_note.hold = note.hold;
         out_note.head_visible = note.head_visible;
+        out_note.pending = note.pending;
         target.ghost_notes[i] = out_note;
     }
-    const int ghost_judged_total = gameplay_hud_.ghost_counts.pg + gameplay_hud_.ghost_counts.gr +
-                                   gameplay_hud_.ghost_counts.gd + gameplay_hud_.ghost_counts.bd;
-    if (ghost_judged_total > 0) {
-        const double weighted = gameplay_hud_.ghost_counts.pg * 1.0 +
-                                gameplay_hud_.ghost_counts.gr * 0.80 +
-                                gameplay_hud_.ghost_counts.gd * 0.50 +
-                                gameplay_hud_.ghost_counts.bd * 0.20;
-        target.ghost_accuracy = std::clamp(weighted / static_cast<double>(ghost_judged_total) * 100.0, 0.0, 100.0);
-    } else {
-        target.ghost_accuracy = 0.0;
-    }
+    target.ghost_accuracy = gameplay_hud_.ghost_accuracy;
 
     if (out_motion_revision) {
         *out_motion_revision = gameplay_hud_.motion_revision;
@@ -415,30 +405,89 @@ std::string MenuApp::current_track_label() const {
 void MenuApp::sync_menu_music() {
     if (screen_ == Screen::Gameplay) {
         menu_music_.stop();
+        menu_music_scene_key_.clear();
+        menu_music_scene_path_.clear();
         return;
     }
 
-    const bool song_select_context =
-        screen_ == Screen::SongSelect ||
-        screen_ == Screen::SongBrowser ||
-        screen_ == Screen::Result ||
-        ((screen_ == Screen::OptionsHub ||
-          screen_ == Screen::SettingsAudio ||
-          screen_ == Screen::SettingsGraphics ||
-          screen_ == Screen::SettingsSkins ||
-          screen_ == Screen::SettingsInput ||
-          screen_ == Screen::ModeSelect ||
-          screen_ == Screen::ModeMods ||
-          screen_ == Screen::Keymap ||
-          screen_ == Screen::KeymapConfirm ||
-          screen_ == Screen::OnnxUpscalerConfirm ||
-          screen_ == Screen::KeymapTest) &&
-         submenu_return_screen_ == Screen::SongSelect);
+    // Mainmusic filenames are stable scene slots. Numbered siblings such as
+    // "Main Menu 2.mp3" are discovered automatically and rotate per visit.
+    const auto resolve_variants = [](std::string_view filename) {
+        std::vector<std::string> paths;
+        const auto add_if_present = [&](std::string_view candidate) {
+            std::string path = resolve_menu_music_file_path(candidate);
+            if (!path.empty()) paths.push_back(std::move(path));
+        };
 
-    std::string music_path = resolve_menu_music_file_path(song_select_context ? "Song Selecte.mp3" : "Main Menu.mp3");
-    if (music_path.empty() && song_select_context) {
-        music_path = resolve_menu_music_file_path("Song Select.mp3");
+        add_if_present(filename);
+        const std::string base(filename);
+        const std::size_t extension_offset = base.find_last_of('.');
+        if (extension_offset == std::string::npos) return paths;
+
+        const std::string stem = base.substr(0, extension_offset);
+        const std::string extension = base.substr(extension_offset);
+        for (int variant = 2; variant <= 64; ++variant) {
+            add_if_present(stem + " " + std::to_string(variant) + extension);
+        }
+        return paths;
+    };
+
+    const auto select_scene_slot = [&](std::string_view scene_key,
+                                       std::string_view primary,
+                                       std::string_view fallback = {},
+                                       std::string_view final_fallback = {}) {
+        if (menu_music_scene_key_ == scene_key) {
+            return menu_music_scene_path_;
+        }
+
+        std::vector<std::string> paths = resolve_variants(primary);
+        if (paths.empty() && !fallback.empty()) paths = resolve_variants(fallback);
+        if (paths.empty() && !final_fallback.empty()) paths = resolve_variants(final_fallback);
+
+        menu_music_scene_key_ = std::string(scene_key);
+        menu_music_scene_path_.clear();
+        if (!paths.empty()) {
+            std::size_t& cursor = menu_music_variant_cursors_[menu_music_scene_key_];
+            menu_music_scene_path_ = paths[cursor % paths.size()];
+            cursor = (cursor + 1) % paths.size();
+        }
+        return menu_music_scene_path_;
+    };
+
+    const bool options_screen =
+        screen_ == Screen::OptionsHub ||
+        screen_ == Screen::SettingsAudio ||
+        screen_ == Screen::SettingsGraphics ||
+        screen_ == Screen::SettingsSkins ||
+        screen_ == Screen::SettingsInput ||
+        screen_ == Screen::SettingsCalibration ||
+        screen_ == Screen::ModeSelect ||
+        screen_ == Screen::ModeMods ||
+        screen_ == Screen::Keymap ||
+        screen_ == Screen::KeymapConfirm ||
+        screen_ == Screen::OnnxUpscalerConfirm ||
+        screen_ == Screen::KeymapTest;
+
+    std::string music_path;
+    if (screen_ == Screen::Result) {
+        const bool failed = last_game_over_ || last_clear_status_ == "FAILED";
+        music_path = failed
+                         ? select_scene_slot("result_failed", "Failed.mp3", "Song Selecte.mp3", "Main Menu.mp3")
+                         : select_scene_slot("result_clear", "Clear.mp3", "Song Selecte.mp3", "Main Menu.mp3");
+    } else if (screen_ == Screen::Multiplayer) {
+        music_path = select_scene_slot("multiplayer", "Multiplayer Lobby.mp3", {}, "Main Menu.mp3");
+    } else if (options_screen) {
+        const std::string_view fallback =
+            submenu_return_screen_ == Screen::SongSelect ? "Song Selecte.mp3" : "Main Menu.mp3";
+        music_path = select_scene_slot("options", "Options.mp3", fallback, "Main Menu.mp3");
+    } else if (screen_ == Screen::SongSelect || screen_ == Screen::SongBrowser) {
+        music_path = select_scene_slot("song_select", "Song Selecte.mp3", "Song Select.mp3", "Main Menu.mp3");
+    } else if (screen_ == Screen::QuickSetup) {
+        music_path = select_scene_slot("quick_setup", "Main Menu.mp3");
+    } else {
+        music_path = select_scene_slot("title", "Main Menu.mp3");
     }
+
     if (music_path.empty()) {
         menu_music_.stop();
         return;
@@ -605,10 +654,7 @@ void MenuApp::populate_result_render_data(render::MenuRenderData& render, const 
     const int total_notes = (last_result_.total_notes > 0) ? last_result_.total_notes : judged;
     const double accuracy = menu_records::calculate_accuracy(last_result_);
 
-    game::GaugeType final_gauge_type = gauge_type_from_mode_string(config_.mode.gauge);
-    if (!last_result_.shifts.empty()) {
-        final_gauge_type = last_result_.shifts.back().to;
-    }
+    const game::GaugeType final_gauge_type = gauge_type_from_mode_string(last_final_gauge_);
 
     render.result.rank = menu_records::calculate_rank(last_result_, last_game_over_);
     render.result.status = !last_clear_status_.empty() ? last_clear_status_
@@ -1324,6 +1370,7 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
                 hud.notes[i].tail_sample,
                 hud.notes[i].hold,
                 hud.notes[i].head_visible,
+                hud.notes[i].pending,
             };
         }
         next.ghost_visible = hud.ghost_visible;
@@ -1358,6 +1405,7 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
                 hud.ghost_notes[i].tail_sample,
                 hud.ghost_notes[i].hold,
                 hud.ghost_notes[i].head_visible,
+                hud.ghost_notes[i].pending,
             };
         }
         const GameplayHudRevisionFlags diff = diff_gameplay_hud_revisions(previous, next);
@@ -1391,6 +1439,7 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
         gameplay_hud_.max_combo = hud.max_combo;
         gameplay_hud_.counts = hud.counts;
         gameplay_hud_.score = hud.score;
+        gameplay_hud_.accuracy = hud.accuracy;
         gameplay_hud_.osu_od8_score_available = hud.osu_od8_score_available;
         gameplay_hud_.osu_od8_score = hud.osu_od8_score;
         gameplay_hud_.gauge = hud.gauge;
@@ -1418,10 +1467,12 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
             out.tail_sample = hud.notes[i].tail_sample;
             out.hold = hud.notes[i].hold;
             out.head_visible = hud.notes[i].head_visible;
+            out.pending = hud.notes[i].pending;
             gameplay_hud_.notes[i] = out;
         }
         gameplay_hud_.ghost_visible = hud.ghost_visible;
         gameplay_hud_.ghost_score = hud.ghost_score;
+        gameplay_hud_.ghost_accuracy = hud.ghost_accuracy;
         gameplay_hud_.ghost_osu_od8_score_available = hud.ghost_osu_od8_score_available;
         gameplay_hud_.ghost_osu_od8_score = hud.ghost_osu_od8_score;
         gameplay_hud_.ghost_combo = hud.ghost_combo;
@@ -1452,6 +1503,7 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
             out.tail_sample = hud.ghost_notes[i].tail_sample;
             out.hold = hud.ghost_notes[i].hold;
             out.head_visible = hud.ghost_notes[i].head_visible;
+            out.pending = hud.ghost_notes[i].pending;
             gameplay_hud_.ghost_notes[i] = out;
         }
         advance_gameplay_hud_revisions(gameplay_hud_, diff.motion_changed, diff.text_changed);
@@ -1568,6 +1620,7 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
         restart_audio_thread();
         has_result_ = false;
         last_clear_status_.clear();
+        last_final_gauge_ = "normal";
         last_result_mods_.clear();
         last_result_rate_multiplier_ = 1.0;
         last_result_score_multiplier_ = 1.0;
@@ -1625,6 +1678,7 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
         last_result_ = result.stats;
         last_game_over_ = result.game_over;
         last_clear_status_ = result.clear_status;
+        last_final_gauge_ = result.final_gauge;
         has_result_ = true;
         last_result_mods_ = result.mods;
         last_result_rate_multiplier_ = result.rate_multiplier;
@@ -1639,6 +1693,7 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
     } else {
         has_result_ = false;
         last_clear_status_.clear();
+        last_final_gauge_ = "normal";
         last_result_mods_.clear();
         last_result_rate_multiplier_ = 1.0;
         last_result_score_multiplier_ = 1.0;
@@ -1792,8 +1847,8 @@ void MenuApp::populate_help_overlay(render::HelpOverlayData& target) const {
             target.lines = {
                 ui_text("This screen now handles filters only. Search moved to the Song Select SEARCH item.",
                         "이 화면은 이제 필터 전용입니다. 검색은 Song Select의 SEARCH 항목으로 이동했습니다."),
-                ui_text("Up / Down or the mouse wheel moves the selection. Long lists now show a scrollbar on the right.",
-                        "위 / 아래 키 또는 마우스 휠로 선택을 이동합니다. 긴 목록은 오른쪽 스크롤바가 표시됩니다."),
+                ui_text("Up / Down or the mouse wheel moves the selection. Long lists show a clickable scrollbar on the right.",
+                        "위 / 아래 키 또는 마우스 휠로 선택을 이동합니다. 긴 목록은 오른쪽의 클릭 가능한 스크롤바를 표시합니다."),
                 ui_text("Left / Right adjusts sort, group, key, difficulty, and collection filters in place.",
                         "좌 / 우 키로 정렬, 그룹, 키 수, 난이도, 컬렉션 필터를 이 화면에서 바로 조정합니다."),
                 ui_text("Enter toggles collection membership, creates the next collection, clears filters, or goes back.",
@@ -1805,8 +1860,8 @@ void MenuApp::populate_help_overlay(render::HelpOverlayData& target) const {
         case Screen::SettingsAudio:
             target.title = ui_text("Audio Settings", "오디오 설정");
             target.lines = {
-                ui_text("Up / Down or the mouse wheel selects a row. Long lists show a scrollbar on the right.",
-                        "위 / 아래 키 또는 마우스 휠로 행을 선택합니다. 긴 목록은 오른쪽 스크롤바가 표시됩니다."),
+                ui_text("Up / Down or the mouse wheel selects a row. Long lists show a clickable scrollbar on the right.",
+                        "위 / 아래 키 또는 마우스 휠로 행을 선택합니다. 긴 목록은 오른쪽의 클릭 가능한 스크롤바를 표시합니다."),
                 ui_text("Left / Right or the +/- buttons changes the current value.",
                         "좌 / 우 키 또는 +/- 버튼으로 현재 값을 변경합니다."),
                 ui_text("Follow keeps note keysounds tied to your hits. Autoplay mixes them into background audio instead.",
@@ -1820,8 +1875,8 @@ void MenuApp::populate_help_overlay(render::HelpOverlayData& target) const {
         case Screen::SettingsGraphics:
             target.title = ui_text("Graphics Settings", "그래픽 설정");
             target.lines = {
-                ui_text("Up / Down or the mouse wheel selects a row. Long lists show a scrollbar on the right.",
-                        "위 / 아래 키 또는 마우스 휠로 행을 선택합니다. 긴 목록은 오른쪽 스크롤바가 표시됩니다."),
+                ui_text("Up / Down or the mouse wheel selects a row. Long lists show a clickable scrollbar on the right.",
+                        "위 / 아래 키 또는 마우스 휠로 행을 선택합니다. 긴 목록은 오른쪽의 클릭 가능한 스크롤바를 표시합니다."),
                 ui_text("Display, Resolution, Refresh Hz, and VSync apply live while you adjust them.",
                         "표시 모드, 해상도, 주사율, VSync는 조정 중에도 즉시 적용됩니다."),
                 ui_text("Language switches the menu UI immediately. Display Offset shifts visuals only.",
@@ -1837,8 +1892,8 @@ void MenuApp::populate_help_overlay(render::HelpOverlayData& target) const {
         case Screen::SettingsSkins:
             target.title = ui_text("Skin Settings", "스킨 설정");
             target.lines = {
-                ui_text("Up / Down or the mouse wheel selects a row. Long skin lists now scroll with a right-side scrollbar.",
-                        "위 / 아래 키 또는 마우스 휠로 행을 선택합니다. 긴 스킨 목록은 오른쪽 스크롤바로 스크롤됩니다."),
+                ui_text("Up / Down or the mouse wheel selects a row. Long skin lists have a clickable scrollbar on the right.",
+                        "위 / 아래 키 또는 마우스 휠로 행을 선택합니다. 긴 스킨 목록은 오른쪽의 클릭 가능한 스크롤바를 표시합니다."),
                 ui_text("Skin Source swaps between the native vector skin and imported LR2 playskins.",
                         "스킨 소스는 기본 벡터 스킨과 가져온 LR2 플레이스킨 사이를 전환합니다."),
                 ui_text("Import Skin opens an LR2 folder picker. Drag-and-drop also works on this screen.",
@@ -1886,14 +1941,14 @@ void MenuApp::populate_help_overlay(render::HelpOverlayData& target) const {
         case Screen::ModeSelect:
             target.title = ui_text("Mode Settings", "모드 설정");
             target.lines = {
-                ui_text("Up / Down or the mouse wheel selects a row. Long lists show a scrollbar on the right.",
-                        "위 / 아래 키 또는 마우스 휠로 행을 선택합니다. 긴 목록은 오른쪽 스크롤바가 표시됩니다."),
+                ui_text("Up / Down or the mouse wheel selects a row. Long lists show a clickable scrollbar on the right.",
+                        "위 / 아래 키 또는 마우스 휠로 행을 선택합니다. 긴 목록은 오른쪽의 클릭 가능한 스크롤바를 표시합니다."),
                 ui_text("Ghost Battle, Autoplay, Practice, Sudden Death, Gauge, Random, Mods, Rate, and Hi-Speed change the next-song compare/play feel.",
                         "고스트 배틀, 오토플레이, 연습 모드, 서든 데스, 게이지, 랜덤, 모드, Rate, Hi-Speed는 다음 곡의 비교/플레이 감각을 바꿉니다."),
                 ui_text("Indexing Safe minimizes RAM for huge libraries. Fast spends more RAM to speed up rescans.",
                         "인덱싱 안전은 큰 라이브러리에서 RAM 사용을 줄이고, 빠름은 더 많은 RAM으로 재스캔을 빠르게 합니다."),
-                ui_text("TenRiff 1.2.7 indexes and plays BMS-family charts only.",
-                        "TenRiff 1.2.7은 BMS 계열 차트만 인덱싱하고 플레이합니다."),
+                ui_text("TenRiff 1.2.8 indexes and plays BMS-family charts only.",
+                        "TenRiff 1.2.8은 BMS 계열 차트만 인덱싱하고 플레이합니다."),
                 ui_text("Ghost Battle uses the selected chart's best compatible replay when one exists; turn it off to keep single-field play.",
                         "고스트 배틀은 선택한 차트의 호환되는 최고 리플레이가 있으면 사용하며, 끄면 단일 플레이 필드로 유지됩니다."),
                 ui_text("Autoplay and Practice are assist modes for QA. Their results are marked ASSIST and are not used as default ghost bests.",

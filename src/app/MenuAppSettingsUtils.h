@@ -293,6 +293,9 @@ inline std::string gauge_label(const std::string& value) {
     if (normalized == "ex_hard" || normalized == "ex-hard" || normalized == "exhard") {
         return "EX-Hard";
     }
+    if (normalized == "shift" || normalized == "gauge_shift" || normalized == "gauge-shift") {
+        return "Gauge Shift";
+    }
     if (normalized == "hard") {
         return "Hard";
     }
@@ -307,6 +310,9 @@ inline std::string normalize_gauge_mode(std::string value) {
     if (value == "ex_hard" || value == "ex-hard" || value == "exhard") {
         return "ex_hard";
     }
+    if (value == "shift" || value == "gauge_shift" || value == "gauge-shift") {
+        return "shift";
+    }
     if (value == "hard" || value == "easy") {
         return value;
     }
@@ -314,7 +320,7 @@ inline std::string normalize_gauge_mode(std::string value) {
 }
 
 inline std::string cycle_gauge_mode(std::string current, int direction) {
-    static constexpr const char* kGauges[] = {"normal", "hard", "ex_hard", "easy"};
+    static constexpr const char* kGauges[] = {"normal", "shift", "hard", "ex_hard", "easy"};
     const int option_count = static_cast<int>(sizeof(kGauges) / sizeof(kGauges[0]));
     current = normalize_gauge_mode(std::move(current));
     int index = 0;

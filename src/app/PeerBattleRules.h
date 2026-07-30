@@ -12,7 +12,7 @@ inline void apply_peer_battle_rules(config::RuntimeConfig& config) {
     config.gauge = defaults.gauge;
     config.speed.rate = 1.0;
     config.mode.key_mode = "none";
-    config.mode.gauge = "normal";
+    config.mode.gauge = "shift";
     config.mode.random = "off";
     config.mode.random_seed = 0;
     config.mode.mods.clear();

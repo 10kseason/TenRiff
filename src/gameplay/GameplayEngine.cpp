@@ -15,6 +15,13 @@ double clamp_rate(double rate) {
     return rate;
 }
 
+constexpr std::array<game::GaugeType, 4> kGaugeShiftPriority{
+    game::GaugeType::ExHard,
+    game::GaugeType::Hard,
+    game::GaugeType::Normal,
+    game::GaugeType::Easy,
+};
+
 }  // namespace
 
 GameplayEngine::GameplayEngine(const GameplayChart& chart, const GameplayConfig& config)
@@ -23,7 +30,8 @@ GameplayEngine::GameplayEngine(const GameplayChart& chart, const GameplayConfig&
       rate_(clamp_rate(config.rate)),
       duration_samples_(chart.duration_samples),
       windows_(build_windows(config.judge, config.rate)),
-      gauge_manager_(config.gauge, config.gauge_policy),
+      gauge_manager_(config.gauge, config.gauge_shift_enabled ? game::GaugeRuntimePolicy{} : config.gauge_policy),
+      gauge_shift_enabled_(config.gauge_shift_enabled),
       practice_no_fail_enabled_(config.practice_no_fail_enabled),
       one_miss_fail_enabled_(config.one_miss_fail_enabled) {
     if (lane_count_ <= 0) {
@@ -31,11 +39,15 @@ GameplayEngine::GameplayEngine(const GameplayChart& chart, const GameplayConfig&
     }
     lanes_.resize(static_cast<std::size_t>(lane_count_));
 
+    int playable_note_count = 0;
+    int total_combo_steps = 0;
     for (const auto& note : chart.notes) {
         if (note.lane <= 0 || note.lane > lane_count_) {
             continue;
         }
         lanes_[static_cast<std::size_t>(note.lane - 1)].notes.push_back(note);
+        ++playable_note_count;
+        total_combo_steps += note.end_sample.has_value() ? 2 : 1;
     }
 
     for (auto& lane : lanes_) {
@@ -44,8 +56,15 @@ GameplayEngine::GameplayEngine(const GameplayChart& chart, const GameplayConfig&
         });
     }
 
-    stats_.record_note_total(static_cast<int>(chart.notes.size()));
-    gauge_state_ = gauge_manager_.initialState(config.initial_gauge);
+    stats_.record_note_total(playable_note_count, total_combo_steps);
+    if (gauge_shift_enabled_) {
+        for (std::size_t i = 0; i < kGaugeShiftPriority.size(); ++i) {
+            gauge_shift_states_[i] = gauge_manager_.initialState(kGaugeShiftPriority[i]);
+        }
+        gauge_state_ = gauge_shift_states_.front();
+    } else {
+        gauge_state_ = gauge_manager_.initialState(config.initial_gauge);
+    }
 
     replay_.sample_rate = sample_rate_;
     replay_.rate = rate_;
@@ -117,6 +136,15 @@ void GameplayEngine::advance(int64_t current_sample) {
     finalize_if_done(current_sample);
 }
 
+bool GameplayEngine::is_note_pending(int lane, std::size_t note_id) const {
+    if (lane <= 0 || lane > lane_count_) {
+        return false;
+    }
+    const auto& lane_state = lanes_[static_cast<std::size_t>(lane - 1)];
+    return lane_state.next_index < lane_state.notes.size() &&
+           lane_state.notes[lane_state.next_index].note_id == note_id;
+}
+
 void GameplayEngine::collect_active_holds(std::vector<ActiveHoldView>& out) const {
     out.clear();
     out.reserve(lanes_.size());
@@ -160,9 +188,28 @@ void GameplayEngine::apply_judgement(game::Judgement judgement, double delta_ms,
         push_recent_timing_delta(delta_ms);
     }
 
-    double time_ms = samples_to_ms(sample);
-    auto previous_type = gauge_state_.type;
-    auto result = gauge_manager_.applyJudgementWeighted(gauge_state_, judgement, time_ms, weight);
+    const double time_ms = samples_to_ms(sample);
+    const auto previous_type = gauge_state_.type;
+    game::GaugeResult result{};
+    if (gauge_shift_enabled_) {
+        bool survivor_found = false;
+        for (auto& state : gauge_shift_states_) {
+            gauge_manager_.applyJudgementWeighted(state, judgement, time_ms, weight);
+            if (!survivor_found && !state.game_over) {
+                gauge_state_ = state;
+                survivor_found = true;
+            }
+        }
+        if (!survivor_found) {
+            // Keep Easy visible at zero when every independently simulated
+            // gauge has died so the final failure state remains unambiguous.
+            gauge_state_ = gauge_shift_states_.back();
+        }
+        result.downshifted = gauge_state_.type != previous_type;
+        result.game_over = !survivor_found;
+    } else {
+        result = gauge_manager_.applyJudgementWeighted(gauge_state_, judgement, time_ms, weight);
+    }
 
     // Native BAD includes hittable timing errors, so it is not equivalent to
     // an osu!mania miss. Sudden Death follows the OD8 object judgement that is
@@ -174,7 +221,7 @@ void GameplayEngine::apply_judgement(game::Judgement judgement, double delta_ms,
         result.game_over = true;
     }
 
-    stats_.record_judgement(judgement, delta_ms, combo_impact, weight);
+    stats_.record_judgement(judgement, delta_ms, combo_impact, weight, accuracy_credit_for(judgement, delta_ms));
     stats_.record_gauge_sample(sample, gauge_state_.value);
 
     if (result.downshifted) {
@@ -184,6 +231,52 @@ void GameplayEngine::apply_judgement(game::Judgement judgement, double delta_ms,
     if (sudden_death_triggered || (result.game_over && !practice_no_fail_enabled_)) {
         game_over_ = true;
     }
+}
+
+double GameplayEngine::accuracy_credit_for(game::Judgement judgement, double delta_ms) const {
+    if (judgement == game::Judgement::PR) {
+        return 0.0;
+    }
+    if (!std::isfinite(delta_ms)) {
+        return 0.0;
+    }
+
+    double base_credit = 0.0;
+    int64_t inner_window = 0;
+    int64_t outer_window = windows_.bd;
+    switch (judgement) {
+        case game::Judgement::PG:
+            base_credit = 1.0;
+            outer_window = windows_.pg;
+            break;
+        case game::Judgement::GR:
+            base_credit = 0.80;
+            inner_window = windows_.pg;
+            outer_window = windows_.gr;
+            break;
+        case game::Judgement::GD:
+            base_credit = 0.50;
+            inner_window = windows_.gr;
+            outer_window = windows_.gd;
+            break;
+        case game::Judgement::BD:
+            base_credit = 0.20;
+            inner_window = windows_.gd;
+            outer_window = windows_.bd;
+            break;
+        case game::Judgement::PR:
+            return 0.0;
+    }
+
+    const double inner_ms = std::abs(samples_to_ms(inner_window));
+    const double outer_ms = std::max(inner_ms, std::abs(samples_to_ms(outer_window)));
+    const double band_width_ms = outer_ms - inner_ms;
+    const double band_progress = band_width_ms > 0.0
+                                     ? std::clamp((std::abs(delta_ms) - inner_ms) / band_width_ms, 0.0, 1.0)
+                                     : 1.0;
+    // Every judgement loses up to half a percentage point across its own
+    // timing band, so identical labels still reward steadier input.
+    return std::clamp(base_credit - 0.005 * band_progress, 0.0, 1.0);
 }
 
 void GameplayEngine::push_recent_timing_delta(double delta_ms) {

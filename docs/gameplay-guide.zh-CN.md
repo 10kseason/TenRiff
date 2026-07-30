@@ -50,7 +50,7 @@ TenRiff 的基础游玩流程如下：
 - `Esc`：返回上一个画面
 - `-` / `+`：立即调整下一次游玩的 Rate
 - `F5`：重新索引曲库；运行时会居中显示 stage / percent / ETA 与 progress bar
-- `Browse > Difficulty Table`：选择或清除本地 BMS 难度表 header JSON
+- `Browse > Difficulty Table`：复制 BMSTable HTML/header 链接后按 `Enter` 导入，`Right` 选择本地 JSON，`Left` 清除
 
 ### Song Select 中常用的设置页面
 - `Mode`
@@ -58,7 +58,8 @@ TenRiff 的基础游玩流程如下：
 - `Audio`
   - 调整 Master/BGM/Keysound 音量以及 BMS keysound policy
 - `Graphics`
-  - 调整 VSync、Refresh Hz、Performance HUD、Display Offset、外部 ONNX BGA Upscaler
+  - 调整 VSync、Refresh Hz、Performance HUD、Display Offset、BGA 显示与外部 ONNX BGA Upscaler
+  - 关闭 `BGA` 会禁用 gameplay 图片/视频背景及其 decoder/upscaler 工作；Song Select 预览仍会显示
   - 选择 model 后仍需明确开启 upscaler 并确认高配置警告；实验性 `优先 NPU` 只有在 Windows/driver 实际选择 NPU 时才会使用 NPU
 - `Skins`
   - 切换 native/LR2 skin、导入 LR2 folder，并调整判定线位置、note 大小、LN body 宽度、lane color
@@ -104,7 +105,7 @@ Discord 客户端的设置方法请参考[官方 Game Overlay 指南](https://su
 ## 6. 开始游玩前要知道的事
 
 ### 谱面格式
-- TenRiff 1.2.7 只索引和游玩 BMS family（`.bms/.bme/.bml/.pms`）。
+- TenRiff 1.2.8 只索引和游玩 BMS family（`.bms/.bme/.bml/.pms`）。
 
 ### 加载
 - 刚开始歌曲时，可能会显示谱面加载进度。
@@ -157,22 +158,30 @@ Rate 只改变歌曲播放速度和谱面时间轴；在相同 Hi-Speed 下，�
 
 `OSU OD8` 是最高 1,000,000 的辅助比较分数，不会改变 TenRiff 的原生分数、排名或 clear 结果。
 
+原生 Score 由判定 90,000 分 + 累积 Combo 10,000 分组成。全 `PG` full combo 恰好是 100,000 分；LN 视为一个对象，head / tail 各按 0.5 权重计算。
+
+Accuracy 以 `PG / GR / GD / BD = 100 / 80 / 50 / 20%` 为基础，并根据每个判定区间内的 timing 最多再扣 0.5 个百分点。即使全 `PG`，只要 PG timing span 超过 8ms，也不会高于 99.5%。
+
+Rank 使用 `<75 F`、`75 B`、`80.5 A`、`86.5 A+`、`90 S`、`95.5 S+`、`98 AA`、`99 SS`、`99.75 SSS` 边界。
+
 ### Gauge
-可选的基础 gauge 有以下四种：
+可选 gauge 有以下五种：
 
 - `ex_hard`
 - `hard`
 - `normal`
 - `easy`
+- `shift`
 
-所选 gauge 会在歌曲开始时固定从 `100%` 起步。
+固定 gauge（`ex_hard / hard / normal / easy`）在歌曲开始时从 `100%` 起步，游玩中不会改变类型。
 
 - `ex_hard`：回复低于 Hard，`BAD` / `POOR` 损失更大；到 `0%` 立即 Game Over
 - `hard`：到 `0%` 立即 Game Over
 - `normal`：到 `0%` 立即 Game Over
 - `easy`：到 `0%` 立即 Game Over
+- `shift`：EX-Hard / Hard / Normal / Easy 分别从 100% 开始独立并行计算；当前 tier 淘汰后，选择已累计相同判定历史的下一档存活 tier，并以结束时最高的存活 tier 为最终结果
 
-游玩过程中不会再发生自动 gauge 降级。
+只有明确选择 `shift` 时，游玩中才会发生 gauge 转换。
 `Sudden Death (1 MISS)` 不是 gauge 类型，而是在首次 OD8 换算对象 `MISS` 时把 gauge 置零并立即结束的规则。仅原生 `BAD` timing 不会触发，空按产生的 `POOR` 也不计入，并且不能与 Practice No-Fail 同时启用。
 
 ## 10. Result 画面

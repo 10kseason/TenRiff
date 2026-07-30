@@ -3,7 +3,7 @@
 This is the document that the next agent or any new contributor should read first. Its goal is to quickly answer: "what is this project now, where should I look, and what is still unverified?"
 
 ## Baseline
-- Current project version: `1.2.7 stable`
+- Current project and public stable version: `1.2.8 stable`
 - Direct-IP multiplayer and the preview r5 input-backend lifecycle fixes are integrated into `1.1.8 stable`
 - `1.1.8` adds an osu!mania OD8 auxiliary score, first-native-`BAD` `Sudden Death (1 MISS)`, and deterministic `LN Mix 10%-90%` on top of the 1.1.7 visual refresh
 - `1.2.0` connects BMS channel `04/07` and osu!mania backgrounds to the gameplay sample timeline and asynchronously upscales sub-FHD image backgrounds through LunaSR on Windows ML
@@ -14,6 +14,7 @@ This is the document that the next agent or any new contributor should read firs
 - `1.2.5` replaces the model-branded integration with a generic External ONNX Upscaler, adds Graphics Settings selection/.onnx drop, saves a per-profile model path, and creates model-specific WinML sessions.
 - `1.2.6` makes the playable surface BMS-family only, retains native/LR2 skins, and adds manual ONNX upscaler enablement with an experimental NPU preference, Song Select Rate controls, centered indexing progress, local JSON difficulty tables, and the BMS keysound late-input hotfix.
 - `1.2.7` fixes External ONNX Upscaler FP16 binding, float-boundary INT8 QDQ detection, the high-performance DirectX GPU default, and one-in-flight video-BGA backpressure.
+- `1.2.8` combines the whole-long-note blink fix, a gameplay BGA toggle, BMSTable HTML/header-link import, and long-settings scrollbar UX improvements.
 - Baseline companion document for follow-up work: `docs/baseline-1.1.2.en.md`
 - Windows GUI build is the main target
 - Linux exists only as a preview-level package at `Baepoks-Linuxs/TenRiff-0.5.0-linux-preview`
@@ -75,7 +76,7 @@ This is the document that the next agent or any new contributor should read firs
   - difficulty / title sorting
   - when search is inactive, `-`/`+` adjust the current play Rate
   - indexing stage, percentage, processed/total, ETA, song count, and a progress bar are centered below the header
-  - Browse can select a local difficulty-table header JSON; MD5/SHA-256 matches supply levels/symbols and changing the table reindexes
+  - Browse can select local header JSON or import a clipboard http(s) BMSTable HTML/header link into the profile cache; MD5/SHA-256 matches supply levels/symbols and changing the table reindexes
 - BMS key modes:
   - separate keymaps per key mode
   - chart difficulty calculation across supported key counts
@@ -85,7 +86,7 @@ This is the document that the next agent or any new contributor should read firs
   - BMS LV/CR calculation evaluates only LN head/tail miss-ms at 0.5x, so `300ms` is treated as `150ms`; runtime gameplay judgement windows remain unchanged
 - Lane transform:
   - Random supports `Off / Mirror / FR / SR`; Mirror reverses the final lanes after key-mode conversion, with 10K/16K mirrored independently inside each player half
-  - Mod Manager `LN Mix 10%-90%` preserves existing holds, excludes heads overlapping an existing same-lane span, and uses `Random Seed` to deterministically convert the requested share of taps that can form a hold of at least 50ms while leaving 50ms before the next same-lane note
+  - Mod Manager `LN Mix 10%-90%` preserves existing holds and excludes heads overlapping an existing same-lane span. It selects the requested share of taps that can fit a base-BPM 1/8-note hold while ending at least 50ms before the next same-lane note, then deterministically assigns every Mix level 70% 1/16-note, 20% 1/8-note, and 10% alternating 1/24- and 1/32-note lengths
 - Skins / gameplay feel:
   - `rect / triangle / pentagon / hexagon / circle` note shapes; procedural circles and polygons use the full rect-bar width at 100%
   - note border on/off
@@ -105,9 +106,13 @@ This is the document that the next agent or any new contributor should read firs
   - note-consuming failures (auto-miss, too-early consume, hold break / tail miss) stay `BAD`
   - very early non-consuming presses are handled as LR2-style `POOR` and are visible again in result / replay / UI paths
   - `POOR` preserves combo, stays out of score / accuracy totals, and uses dedicated `PR` gauge damage values
-  - gauge modes support `EX-Hard / Hard / Normal / Easy`; all start at `100%` and fail immediately at `0%`
+  - gauge modes support `EX-Hard / Hard / Normal / Easy / Gauge Shift`; fixed gauges start at `100%`, fail immediately at `0%`, and never change type
+  - `Gauge Shift` independently simulates EX-Hard / Hard / Normal / Easy from 100%; when the current tier reaches 0%, it selects the next tier that survived the same judgement history, and the highest surviving tier becomes final
   - `Sudden Death (1 MISS)` fails immediately on the first OD8-converted object `MISS`; native `BAD` timing alone and empty-key `POOR` are ignored, and the option is mutually exclusive with Practice No-Fail
   - Gameplay and Result show an auxiliary `OSU OD8` score converted from real input timing with osu!mania stable OD8 windows and ScoreV1 (maximum 1,000,000); native TenRiff score and ranking stay unchanged
+  - native score is normalized as 90,000 judgement points plus 10,000 cumulative-combo points, so an all-PG full combo is exactly 100,000; LN heads and tails each carry 0.5 weight and form one object
+  - accuracy starts from PG/GR/GD/BD bases of 100/80/50/20%, removes up to 0.5 percentage points across each judgement band, and caps an all-PG run at 99.5% when its PG timing span exceeds 8ms
+  - rank boundaries are `<75 F / 75 B / 80.5 A / 86.5 A+ / 90 S / 95.5 S+ / 98 AA / 99 SS / 99.75 SSS`
   - live gameplay `ClockSync` uses centered anchor regression instead of large absolute Windows QPC values and automatically rebases after sustained clock discontinuities
   - stale backlog is classified from QPC event age and the `BAD` window; a fresh input whose sample mapping drifts far from the current playback anchor falls back to that anchor instead of becoming permanently non-scoring catch-up
   - tail release timing applies only to BMS `#LNMODE 2` charge notes
@@ -119,6 +124,7 @@ This is the document that the next agent or any new contributor should read firs
   - VSync on: present refresh follows the active monitor Hz and render pacing targets `monitor_hz * 2` (`1050` clamp)
   - `visual_offset_ms`
   - `performance_overlay`
+  - `bga_enabled=false` disables gameplay image/video BGA and decoder/upscaler work while keeping Song Select previews
   - `background_upscale_model_path` only stores the compatible ONNX selected or dropped in Graphics Settings; public packages include no model
   - BGA Upscaler defaults to `off`; the user must explicitly turn it on and acknowledge the high-spec warning, with no automatic benchmark gate
   - current contract is 960x540 RGB residual x2 with automatic FP32/FP16 boundary and float-boundary INT8 QDQ metadata detection; users own model rights/quality/performance, and load, contract, decode, or inference failure keeps native scaling
@@ -136,7 +142,7 @@ This is the document that the next agent or any new contributor should read firs
 - Direct-IP multiplayer:
   - A joiner matches the host chart by exact hash and size across the active source and existing profile-local caches for `recent_song_sources`
   - It never scans the whole disk or starts a rescan, and cached paths outside their source root are rejected
-  - The multiplayer-only gauge is a one-way shift: `Normal` at or below `33%` changes once to `Easy 100%`, never shifts back, and reaching `Easy 0%` gives that player GAME OVER
+  - Multiplayer uses the same parallel Gauge Shift as single-player: EX-Hard / Hard / Normal / Easy accumulate independently, and that player reaches GAME OVER only after every tier has died
   - The live score-gap bar is local-player-relative: `-10,000 / 0 / +10,000` map to the `LOSS` endpoint, center, and `WIN` endpoint; reaching an endpoint is display-only and never ends the match
   - If one player reaches GAME OVER first, the other player continues; the defeated player waits on an aggregate spectator surface showing peer score, combo, gauge, and status until both results are ready
   - The peer protocol does not transport exact lane input, per-note judgement, or hold state, so it does not render a guessed remote note field
@@ -168,9 +174,9 @@ This is the document that the next agent or any new contributor should read firs
 
 ## Runtime / Packaging Rules
 - New user profiles are created automatically
-- The current official P2P distribution line is `TenRiff 1.2.7 stable`
+- The current official P2P distribution line is `TenRiff 1.2.8 stable`
 - Distribution packages do not include `Songs`
-- Distribution packages include the runtime `Mainmusic/` assets used for menu BGM
+- Distribution packages include the `Mainmusic/` scene slots `Main Menu / Options / Song Selecte / Multiplayer Lobby / Clear / Failed`; each `Name.mp3` plus numbered `Name 2.mp3` through `Name 64.mp3` siblings is discovered automatically and rotates on scene re-entry
 - Distribution updates include only built artifacts and required runtime assets
 - Confirm the include/exclude list before a source-only or public handoff
 - Keep preview source branches and tags versioned separately from stable releases

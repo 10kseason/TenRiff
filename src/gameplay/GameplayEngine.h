@@ -50,6 +50,7 @@ struct GameplayConfig {
     game::GaugeConfig gauge;
     game::GaugeRuntimePolicy gauge_policy;
     game::GaugeType initial_gauge = game::GaugeType::Normal;
+    bool gauge_shift_enabled = false;
     double input_offset_ms = 0.0;
     bool practice_no_fail_enabled = false;
     bool one_miss_fail_enabled = false;
@@ -82,6 +83,7 @@ public:
     [[nodiscard]] const game::GaugeState& gauge_state() const { return gauge_state_; }
     [[nodiscard]] const ReplayTrace& replay() const { return replay_; }
     [[nodiscard]] const LiveJudgementFeedback& live_feedback() const { return live_feedback_; }
+    [[nodiscard]] bool is_note_pending(int lane, std::size_t note_id) const;
     void collect_active_holds(std::vector<ActiveHoldView>& out) const;
     void collect_recent_timing_deltas(std::array<double, kGameplayTimingHistoryMaxEntries>& out,
                                       std::size_t* out_count) const;
@@ -110,6 +112,7 @@ private:
     void push_recent_timing_delta(double delta_ms);
 
     [[nodiscard]] double samples_to_ms(int64_t samples) const;
+    [[nodiscard]] double accuracy_credit_for(game::Judgement judgement, double delta_ms) const;
     [[nodiscard]] JudgeWindowSamples build_windows(const config::JudgeConfig& judge, double rate) const;
     [[nodiscard]] game::Judgement classify_judgement(int64_t delta_samples) const;
     [[nodiscard]] game::Judgement classify_hold_tail_judgement(int64_t delta_samples) const;
@@ -125,6 +128,8 @@ private:
 
     game::GaugeManager gauge_manager_;
     game::GaugeState gauge_state_;
+    std::array<game::GaugeState, 4> gauge_shift_states_{};
+    bool gauge_shift_enabled_ = false;
 
     ResultStats stats_;
     ReplayTrace replay_;

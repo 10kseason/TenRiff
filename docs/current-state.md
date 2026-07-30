@@ -3,7 +3,7 @@
 이 문서는 다음 에이전트나 새 작업자가 가장 먼저 읽어야 하는 현재 상태 문서입니다. 목표는 "지금 이 프로젝트가 무엇이고, 어디를 보면 되고, 무엇이 아직 미검증인지"를 빠르게 파악하게 하는 것입니다.
 
 ## Baseline
-- 현재 프로젝트 버전은 `1.2.7 stable`
+- 현재 프로젝트 버전과 공개 안정판은 `1.2.8 stable`
 - 직접 IP 멀티플레이와 preview r5의 입력 backend 수명주기 수정은 `1.1.8 stable`에 통합
 - `1.1.8`은 1.1.7의 시각 개선에 osu!mania OD8 보조 점수, 첫 네이티브 `BAD` 즉사 `Sudden Death (1 MISS)`, 결정적 `LN Mix 10%~90%`를 추가
 - `1.2.0`은 BMS 채널 `04/07` 및 osu!mania 배경을 gameplay sample timeline에 연결하고, FHD 미만 이미지 배경을 Windows ML 기반 LunaSR로 비동기 보간
@@ -14,6 +14,7 @@
 - `1.2.5`는 모델명을 노출하던 연동을 generic External ONNX Upscaler로 교체하고, Graphics Settings 파일 선택/.onnx 드롭, 프로필별 모델 경로와 모델별 WinML session을 추가.
 - `1.2.6`은 실행 가능한 차트를 BMS 계열로 한정하고 native/LR2 스킨만 유지하며, ONNX 업스케일러 수동 활성화와 실험적 NPU 우선 옵션, Song Select Rate 조절, 중앙 인덱싱 진행 표시, 로컬 JSON 난이도표, BMS 키음 지연 입력 핫픽스를 추가.
 - `1.2.7`은 External ONNX Upscaler의 FP16 binding, float 경계 INT8 QDQ 감지, 고성능 DirectX GPU 기본값, 동영상 BGA one-in-flight backpressure를 수정.
+- `1.2.8`는 롱노트 전체 깜빡임 수정, 게임플레이 BGA 토글, BMSTable HTML/header 링크 가져오기, 긴 설정 화면 스크롤 UX 개선을 묶은 배포 전 후보.
 - 후속 작업의 기준선 문서는 `docs/baseline-1.1.2.md`
 - Windows GUI 빌드가 메인 타깃
 - Linux는 `Baepoks-Linuxs/TenRiff-0.5.0-linux-preview` 수준의 preview만 존재
@@ -75,7 +76,7 @@
   - difficulty/title 정렬
   - 검색 입력 중이 아닐 때 `-`/`+`로 현재 플레이 Rate 조절
   - 인덱싱 중 stage, percent, 처리량, ETA, 곡 수와 bar를 헤더 아래 중앙에 표시
-  - Browse에서 로컬 난이도표 header JSON을 선택하고 MD5/SHA-256으로 매칭한 난이도·심볼을 표시; 변경 시 재인덱싱
+  - Browse에서 로컬 header JSON을 고르거나 클립보드의 http(s) BMSTable HTML/header 링크를 profile cache로 가져오고, MD5/SHA-256으로 매칭한 난이도·심볼을 표시; 변경 시 재인덱싱
 - BMS key mode:
   - 키모드별 별도 keymap
   - 지원 키 수에 대한 chart difficulty 계산
@@ -86,7 +87,7 @@
   - BMS LV/CR 계산에서 롱노트 Head/Tail의 miss-ms만 0.5배로 평가해 `300ms`를 `150ms`처럼 완화하며, 실제 gameplay 판정창은 그대로 유지
 - Lane transform:
   - Random은 `Off / Mirror / FR / SR`를 지원하며, Mirror는 key-mode 변환 뒤 최종 레인을 반전하고 10K/16K는 각 플레이어 절반을 독립적으로 반전
-  - Mod Manager의 `LN Mix 10%~90%`는 기존 롱노트를 보존하고 같은 레인의 기존 span과 겹치는 head는 제외하면서, 50ms 이상 길이와 다음 동일 레인 노트 전 50ms 여유를 확보할 수 있는 단노트 중 설정 비율을 `Random Seed` 기반으로 골라 일반 롱노트로 변환
+  - Mod Manager의 `LN Mix 10%~90%`는 기존 롱노트를 보존하고 같은 레인의 기존 span과 겹치는 head를 제외한다. base BPM 기준 8비트 LN도 다음 동일 레인 노트보다 50ms 먼저 끝낼 수 있는 단노트 중 설정 비율을 `Random Seed`로 고르고, 선택된 LN 길이는 모든 Mix 단계에서 16비트 70% / 8비트 20% / 24·32비트 10%로 배분
 - Skins / Gameplay feel:
   - `Classic`, `Neon`, `Minimal`, `TenRiff` visual presets
   - `rect / triangle / pentagon / hexagon / circle` 노트 모양; procedural 원·다각형은 100%에서 rect 막대와 같은 전체 폭 사용
@@ -104,9 +105,13 @@
   - 미래 노트 상단 진입 easing
   - 마지막 판정 노트 처리 직후 플레이 종료
 - Judge:
-  - 게이지 모드는 `EX-Hard / Hard / Normal / Easy`를 지원하며 모두 `100%`에서 시작하고 `0%`에서 즉시 실패함
+  - 게이지 모드는 `EX-Hard / Hard / Normal / Easy / Gauge Shift`를 지원함. 고정 게이지는 `100%`에서 시작해 `0%`에서 즉시 실패하고 타입이 바뀌지 않음
+  - `Gauge Shift`는 EX-Hard / Hard / Normal / Easy를 각각 100%에서 독립적으로 병렬 계산하고, 현재 tier가 0%로 탈락하면 같은 판정 이력을 누적한 다음 생존 tier를 선택하며 종료 시 가장 높은 생존 tier로 확정함
   - `Sudden Death (1 MISS)`는 첫 OD8 환산 객체 `MISS`에서 즉시 실패하며, 네이티브 `BAD`만으로는 발동하지 않고 빈 키 `POOR`도 무시하며 Practice No-Fail과 상호 배타적으로 동작
   - 인게임/결과 화면에 실제 입력 타이밍을 osu!mania stable OD8 판정창과 ScoreV1(최대 1,000,000)으로 환산한 보조 `OSU OD8` 점수를 표시하며, 네이티브 TenRiff 점수와 랭킹은 변경하지 않음
+  - 네이티브 점수는 판정 90,000점 + 누적 콤보 10,000점으로 정규화되어 전부 PG인 풀콤보가 정확히 100,000점이며, LN 머리/꼬리는 각각 0.5 가중치로 한 객체를 구성함
+  - 정확도는 PG/GR/GD/BD 기준 100/80/50/20%에 각 판정 구간 내부 타이밍으로 최대 0.5%p를 감산하고, PG 타이밍 범위가 8ms를 넘으면 전부 PG여도 99.5%로 제한함
+  - 랭크 경계는 `<75 F / 75 B / 80.5 A / 86.5 A+ / 90 S / 95.5 S+ / 98 AA / 99 SS / 99.75 SSS`
   - 기본 `GOOD` 범위는 `75ms`
   - 기본 `BAD` 범위는 `340ms`
   - 같은 레인에서 이전 노트가 이미 `BAD`이고 바로 다음 노트가 `GOOD` 이상으로 명확하면, 이전 노트는 미스로 정리하고 현재 입력은 다음 노트에 배정해 한 번의 누락이 연속 `BAD`로 고정되지 않게 함
@@ -124,6 +129,7 @@
   - VSync on: present refresh는 active monitor Hz를 따라가고 render pacing은 `monitor_hz * 2`를 목표로 함 (`1050` clamp)
   - `visual_offset_ms`
   - `performance_overlay`
+  - `bga_enabled=false`는 게임플레이 이미지/영상 BGA와 디코더·업스케일러 작업을 끄며 Song Select 미리보기는 유지
   - `background_upscale_model_path`는 Graphics Settings에서 선택하거나 드롭한 호환 ONNX 경로만 저장하며 공개 모델은 포함하지 않음
   - BGA Upscaler는 기본 `off`; 사용자가 명시적으로 켜고 고사양 경고를 확인해야 하며 자동 benchmark gate는 없음
   - 현재 지원 계약은 960x540 RGB residual x2이며 FP32/FP16 입출력과 float 경계 INT8 QDQ metadata를 자동 감지. 모델 권리·품질·성능은 사용자가 확인; 로드·계약·decode·추론 실패 시 native scaling 유지
@@ -143,7 +149,7 @@
   - 호스트만 선곡하며 참가자는 현재 source와 profile의 `recent_song_sources`에 기록된 폴더의 기존 캐시를 순서대로 열어 hash+size가 일치하는 차트를 자동 선택
   - 최근 source 검색은 profile-local cache만 읽고 전체 디스크 탐색이나 자동 재인덱싱은 하지 않으며, 캐시의 source 밖 경로는 거부
   - Options 진입 시 Ready 해제, 양쪽 chart load 완료 후 시작 barrier
-  - 멀티 전용 게이지는 `Normal`이 `33%` 이하가 되면 `Easy 100%`로 한 번만 시프트하고, Easy에서는 되돌아가지 않으며 `0%`에서 해당 플레이어가 Game Over
+  - 멀티 게이지도 싱글 `Gauge Shift`와 동일하게 EX-Hard / Hard / Normal / Easy를 병렬 계산하고, 모든 tier가 탈락했을 때 해당 플레이어가 Game Over
   - 플레이 중 상대 점수/콤보/게이지/상태 HUD와 로컬 관점 score-gap bar를 표시하며, `-10,000 / 0 / +10,000`을 `LOSS 끝 / 중앙 / WIN 끝`으로 clamp
   - score-gap 끝단은 표시 전용이며 경기 종료나 결과 확정 조건이 아님
   - 한쪽이 먼저 Game Over되면 다른 플레이어는 계속 진행하고, 사망한 쪽은 상대의 aggregate 점수/콤보/게이지/상태를 보며 기다린 뒤 양쪽 종료 후 비교 결과로 이동
@@ -151,7 +157,7 @@
   - protocol v2의 모든 경기 프레임에 round nonce를 붙이고 RoundCancel/ACK 순서를 보장해 지연 패킷과 Ready/Launch 교차를 연결 해제 없이 정리
   - 전용 RoundReset으로 양쪽이 모두 Result를 나가기 전에는 다음 선곡/Ready/Options를 막고 상대 결과를 보존
   - heartbeat RTT의 절반을 시작 카운트다운에 보정해 직접 IP 연결의 양쪽 시작 시점 오차를 줄임
-  - Rate 1.0, 원본 키 수, `Normal <= 33% -> Easy 100%` 단방향 게이지, 기본 판정, Random/Mods/Assist off를 세션에만 적용
+  - Rate 1.0, 원본 키 수, 네 tier 병렬 `Gauge Shift`, 기본 판정, Random/Mods/Assist off를 세션에만 적용
   - 차트 전송, NAT traversal, 릴레이/매치메이킹, 암호화/인증, 안티치트, 자동 재접속은 미지원
   - 상세 사용/보안 경계는 `docs/multiplayer.md`
 
@@ -182,9 +188,9 @@
 
 ## Runtime / Packaging Rules
 - 새 사용자 프로필은 자동 생성
-- 현재 정식 P2P 배포 라인은 `TenRiff 1.2.7 stable`
+- 현재 정식 P2P 배포 라인은 `TenRiff 1.2.8 stable`
 - 배포 패키지에는 `Songs`를 넣지 않음
-- 배포 패키지는 메뉴 BGM용 `Mainmusic/` 런타임 자산을 함께 포함
+- 배포 패키지는 `Main Menu / Options / Song Selecte / Multiplayer Lobby / Clear / Failed` 이름의 `Mainmusic/` 화면 슬롯을 포함하며, 각 `이름.mp3`와 번호가 붙은 `이름 2.mp3`~`이름 64.mp3`를 자동 수집해 화면 재진입마다 순환
 - 배포 업데이트에는 built artifacts와 필요한 런타임 자산만 포함
 - source-only/public handoff 전에는 include/exclude 목록을 먼저 확정
 - preview source branch와 tag는 stable 릴리스와 분리해 버전별로 관리

@@ -184,6 +184,32 @@ TEST_CASE("selected gauge type stays fixed while surviving") {
     CHECK(almost_equal(state.value, 56.26));
 }
 
+TEST_CASE("threshold runtime policy carries value through Hard Normal and Easy without refills") {
+    GaugeRuntimePolicy policy;
+    policy.hard_to_normal_shift = true;
+    policy.hard_to_normal_threshold = 66.0;
+    policy.normal_to_easy_shift = true;
+    policy.normal_to_easy_threshold = 33.0;
+    policy.refill_on_shift = false;
+
+    tenriff::game::GaugeConfig config;
+    config.hard.bd = -40.0;
+    config.normal.bd = -30.0;
+    GaugeManager manager(config, policy);
+    auto state = manager.initialState(GaugeType::Hard);
+
+    const auto normal_shift = manager.applyJudgement(state, Judgement::BD, 0.0);
+    CHECK(normal_shift.downshifted);
+    CHECK_FALSE(normal_shift.game_over);
+    CHECK(state.type == GaugeType::Normal);
+    CHECK(state.value == doctest::Approx(60.0));
+
+    const auto easy_shift = manager.applyJudgement(state, Judgement::BD, 1.0);
+    CHECK(easy_shift.downshifted);
+    CHECK_FALSE(easy_shift.game_over);
+    CHECK(state.type == GaugeType::Easy);
+    CHECK(state.value == doctest::Approx(30.0));
+}
 TEST_CASE("normal gauge remains fixed when the runtime shift policy is disabled") {
     GaugeManager manager;
     auto state = manager.initialState(GaugeType::Normal);

@@ -82,6 +82,7 @@ inline bool should_render_gameplay_note(int64_t start_sample,
                                         int64_t tail_sample,
                                         bool hold,
                                         bool head_visible,
+                                        bool pending,
                                         int64_t snapshot_sample,
                                         int64_t display_sample,
                                         int64_t handoff_grace_samples) {
@@ -92,6 +93,9 @@ inline bool should_render_gameplay_note(int64_t start_sample,
         return tail_sample >= display_sample;
     }
     if (start_sample >= display_sample) {
+        return true;
+    }
+    if (pending && tail_sample >= display_sample) {
         return true;
     }
 

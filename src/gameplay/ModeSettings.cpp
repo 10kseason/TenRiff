@@ -22,6 +22,7 @@ std::string to_string(GaugeMode mode) {
     switch (mode) {
         case GaugeMode::ExHard: return "EX-HARD";
         case GaugeMode::Hard: return "HARD";
+        case GaugeMode::Shift: return "SHIFT";
         case GaugeMode::Easy: return "EASY";
         case GaugeMode::Normal: default: return "NORMAL";
     }
@@ -96,6 +97,9 @@ std::optional<GaugeMode> parse_gauge_mode(std::string_view token) {
     }
     if (normalized == "NORMAL") {
         return GaugeMode::Normal;
+    }
+    if (normalized == "SHIFT" || normalized == "GAUGESHIFT" || normalized == "GAUGE_SHIFT") {
+        return GaugeMode::Shift;
     }
     if (normalized == "EASY") {
         return GaugeMode::Easy;

@@ -23,6 +23,7 @@ enum class GaugeMode {
     ExHard,
     Hard,
     Normal,
+    Shift,
     Easy,
 };
 

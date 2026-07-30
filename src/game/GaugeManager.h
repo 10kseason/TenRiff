@@ -35,8 +35,11 @@ struct GaugeConfig {
 // Session-only gauge behavior. Keep this separate from GaugeConfig so battle
 // rules can opt in without changing persisted single-player gauge tuning.
 struct GaugeRuntimePolicy {
+    bool hard_to_normal_shift = false;
+    double hard_to_normal_threshold = 66.0;
     bool normal_to_easy_shift = false;
     double normal_to_easy_threshold = 33.0;
+    bool refill_on_shift = true;
 };
 
 struct GaugeState {

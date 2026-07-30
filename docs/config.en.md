@@ -40,7 +40,7 @@ If a profile does not exist, it is created automatically on first launch.
 
 - `backend` (string)
   - `polling | rawinput`
-  - defaults to `rawinput` on the current `1.2.7` release line
+  - defaults to `rawinput` on the current `1.2.8` release line
   - selectable per profile under `Options -> Input Settings -> Backend` or `Options -> Profile Setup -> Input Backend`
   - runtime fallback never rewrites the saved value to `polling`
   - a confirmed RawInput startup failure, registration-target loss, or message-window exit latches Polling across menu and subsequent gameplay sessions for the current app run
@@ -60,7 +60,7 @@ If a profile does not exist, it is created automatically on first launch.
 - `judgement_hz` (int)
   - `1000 | 2000 | 4000 | 8000`
   - compatibility field kept in the input config
-  - the current `1.2.7` runtime no longer drives a separate audio-thread judgement sub-step loop from this value
+  - the current `1.2.8` runtime no longer drives a separate audio-thread judgement sub-step loop from this value
   - default is `4000` (`0.25ms`)
 - `debounce_ms` (double)
   - real Press/Release transitions are preserved; only duplicate same-state events are removed from pressed-state tracking
@@ -89,7 +89,8 @@ If a profile does not exist, it is created automatically on first launch.
 - `target_scroll_bps` (double)
 
 ### `gauge`
-- There is no automatic gauge shift. The selected gauge type stays fixed until the song ends or fails.
+- `normal | hard | ex_hard | easy` stay fixed until the song ends or fails.
+- `shift` simulates EX-Hard, Hard, Normal, and Easy independently from 100%. When the current tier reaches 0%, it selects the next surviving tier with its already accumulated value; the highest tier still alive at the end becomes the final gauge.
 - EX-Hard, Hard, Normal, and Easy all start at `100%` and fail immediately at `0%`.
 - `delta`
   - `ex_hard`, `hard`, `normal`, `easy`
@@ -112,6 +113,9 @@ If a profile does not exist, it is created automatically on first launch.
   - when `vsync=true`, the present refresh follows the active monitor Hz and render pacing targets `monitor_hz * 2` (`1050` clamp)
 - `performance_overlay` (bool)
   - defaults to `false`; it occupies the top-right corner and can overlap a Discord Voice widget placed there
+- `bga_enabled` (bool)
+  - defaults to `true`; `false` disables gameplay image/video BGA plus its decoder and upscaler work
+  - Song Select background previews remain visible because they are a separate feature
 - `background_upscale_mode` (string)
   - `onnx | off`; legacy `lunasr` values migrate to `onnx`
   - defaults to `off`; users switch it explicitly through `BGA Upscaler` in Graphics Settings
@@ -135,14 +139,14 @@ The chart loader and indexer are BMS-family only (`.bms/.bme/.bml/.pms`); `forma
   - `none | auto | 4k | 5k | 6k | 7k | 8k | 9k | 10k | 16k`
   - `none` means using the chart's original key count as-is
 - `gauge` (string)
-  - `normal | hard | ex_hard | easy`
+  - `normal | hard | ex_hard | easy | shift`
 - `random` (string)
   - `off | mirror | fr | sr`
 - `random_seed` (int)
   - fixed seed for FR/SR, forced key-mode conversion, and LN Mix selection; the Mirror transform itself does not use it
 - `mods` (string array)
   - Note Structure accepts one of `full_long_notes`, `ln_mix_10` through `ln_mix_90`, or `full_short_notes`
-  - LN Mix considers only taps that can form a hold of at least 50ms while leaving 50ms before the next same-lane note, rounds the requested eligible-tap percentage, and converts that many into standard holds
+  - LN Mix considers only taps that can fit a base-BPM 1/8-note hold while ending at least 50ms before the next same-lane note, then assigns the selected holds 70% 1/16-note, 20% 1/8-note, and 10% alternating 1/24- and 1/32-note lengths
   - existing holds are preserved, heads overlapping an existing same-lane span are excluded, and the same `random_seed` selects the same taps
 - `ghost_battle_enabled` (bool)
   - defaults to `false`
@@ -177,9 +181,12 @@ The chart loader and indexer are BMS-family only (`.bms/.bme/.bml/.pms`); `forma
 - `recent_song_sources` (array of string)
   - recent external/internal song source list
 - `difficulty_table_path` (string)
-  - path to a local BMS difficulty-table header JSON selected from Browse
+  - path to a local BMS difficulty-table header JSON selected from Browse, or to the profile cache created from a link
   - the header uses `name`, `symbol`, and a local relative `data_url`; data-array entries use `md5` or `sha256` plus `level`
-  - network URLs are never fetched; selecting or clearing the table reindexes the current source and displays table levels for matching charts
+  - selecting or clearing the table reindexes the current source and displays table levels for matching charts
+- `difficulty_table_url` (string)
+  - original http(s) BMSTable HTML page or header JSON link imported from Browse
+  - standard `<meta name="bmstable" content="...">` metadata is resolved and the header/data JSON is cached under the profile `difficulty_tables` directory; local JSON selection clears this field
 
 ### `skin`
 - `source` (string)

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(TenRiff VERSION 1.2.7 LANGUAGES C CXX)
+project(TenRiff VERSION 1.2.8 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -76,6 +76,7 @@ add_library(tenriff_core
     src/app/CommandLine.cpp
     src/app/CrashLogger.cpp
     src/app/DifficultyTable.cpp
+    src/app/DifficultyTableLink.cpp
     src/app/GraphicsTiming.cpp
     src/app/ImportedGameplaySkin.cpp
     src/app/Lr2Skin.cpp
@@ -105,7 +106,7 @@ target_link_libraries(tenriff_core
 )
 
 if(WIN32)
-    target_link_libraries(tenriff_core PUBLIC ws2_32)
+    target_link_libraries(tenriff_core PUBLIC ws2_32 winhttp)
 endif()
 
 add_library(tenriff_bms_key_converter_core
@@ -232,6 +233,18 @@ add_executable(tenriff
 )
 
 set_target_properties(tenriff PROPERTIES OUTPUT_NAME "TenRiff")
+
+# Keep menu music beside the runnable binary. Copying the directory as a
+# post-build step also makes newly added numbered variants available without
+# maintaining an asset list in CMake.
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/Mainmusic")
+    add_custom_command(TARGET tenriff POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+            "${CMAKE_CURRENT_SOURCE_DIR}/Mainmusic"
+            "$<TARGET_FILE_DIR:tenriff>/Mainmusic"
+        COMMENT "Copying Mainmusic assets"
+    )
+endif()
 
 if(WIN32)
     target_link_libraries(tenriff PRIVATE tenriff_chart tenriff_game tenriff_runtime tenriff_core tenriff_audio tenriff_app)

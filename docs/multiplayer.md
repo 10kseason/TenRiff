@@ -28,7 +28,7 @@ TenRiff의 멀티플레이는 서버 계정 없이 한 명이 호스트가 되�
 공정한 비교를 위해 다음 항목은 대전 중 고정됩니다.
 
 - Rate `1.0`, 차트 원래 키 모드
-- 멀티 전용 단방향 게이지 시프트와 기본 판정 설정: `Normal`이 `33%` 이하가 되면 `Easy 100%`로 한 번 전환되고, Easy에서는 Normal로 돌아가지 않으며 `0%`에서 Game Over
+- 멀티도 싱글 `Gauge Shift`와 동일하게 EX-Hard / Hard / Normal / Easy를 각각 100%에서 병렬 계산하고, 현재 tier가 탈락하면 다음 생존 tier를 사용하며 네 tier가 모두 탈락하면 Game Over
 - Random 및 기타 모드 수정자 끔
 - Autoplay, Practice, Ghost 끔
 

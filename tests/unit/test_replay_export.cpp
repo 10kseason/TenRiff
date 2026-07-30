@@ -36,6 +36,25 @@ void write_file(const std::filesystem::path& path, const std::string& content) {
 
 }  // namespace
 
+TEST_CASE("native rank thresholds match the TenRiff accuracy ladder") {
+    const auto rank_for = [](double accuracy) {
+        tenriff::gameplay::ResultStats stats;
+        stats.counts.pg = 1;
+        stats.accuracy_points = accuracy / 100.0;
+        stats.accuracy_weight = 1.0;
+        return tenriff::app::menu_records::calculate_rank(stats, false);
+    };
+
+    CHECK(rank_for(74.999) == "F");
+    CHECK(rank_for(75.0) == "B");
+    CHECK(rank_for(80.5) == "A");
+    CHECK(rank_for(86.5) == "A+");
+    CHECK(rank_for(90.0) == "S");
+    CHECK(rank_for(95.5) == "S+");
+    CHECK(rank_for(98.0) == "AA");
+    CHECK(rank_for(99.0) == "SS");
+    CHECK(rank_for(99.75) == "SSS");
+}
 TEST_CASE("replay export writes JSON with trace events") {
     ReplayFile replay;
     replay.chart_path = "Songs/test.bms";
@@ -51,7 +70,7 @@ TEST_CASE("replay export writes JSON with trace events") {
     replay.mode.key_mode = "6k";
     replay.mode.random = "mirror";
     replay.mode.random_seed = 4123;
-    replay.mode.gauge = "easy";
+    replay.mode.gauge = "shift";
     replay.mode.autoplay_enabled = true;
     replay.mode.practice_no_fail_enabled = true;
     replay.mode.one_miss_fail_enabled = true;
@@ -115,7 +134,7 @@ TEST_CASE("replay export writes JSON with trace events") {
     CHECK(mode->find("key_mode")->second.as_string() == "6k");
     CHECK(mode->find("random")->second.as_string() == "mirror");
     CHECK(mode->find("random_seed")->second.as_number() == doctest::Approx(4123.0));
-    CHECK(mode->find("gauge")->second.as_string() == "easy");
+    CHECK(mode->find("gauge")->second.as_string() == "shift");
     CHECK(mode->find("autoplay_enabled")->second.as_bool(false));
     CHECK(mode->find("practice_no_fail_enabled")->second.as_bool(false));
     CHECK(mode->find("one_miss_fail_enabled")->second.as_bool(false));
@@ -142,7 +161,7 @@ TEST_CASE("replay export writes JSON with trace events") {
     CHECK(loaded_replay.replay->mode.random == "mirror");
     REQUIRE(loaded_replay.replay->mode.random_seed.has_value());
     CHECK(loaded_replay.replay->mode.random_seed.value() == 4123);
-    CHECK(loaded_replay.replay->mode.gauge == "easy");
+    CHECK(loaded_replay.replay->mode.gauge == "shift");
     CHECK(loaded_replay.replay->mode.autoplay_enabled);
     CHECK(loaded_replay.replay->mode.practice_no_fail_enabled);
     CHECK(loaded_replay.replay->mode.one_miss_fail_enabled);
@@ -335,6 +354,13 @@ TEST_CASE("legacy replay loading succeeds without embedded mode metadata") {
     std::filesystem::remove(path, ec);
 }
 
+TEST_CASE("gauge shift record priority follows the final surviving tier") {
+    using tenriff::app::menu_records::clear_status_priority;
+    CHECK(clear_status_priority("GAUGE SHIFT EASY CLEAR", false, "easy") == 2);
+    CHECK(clear_status_priority("GAUGE SHIFT NORMAL CLEAR", false, "normal") == 3);
+    CHECK(clear_status_priority("GAUGE SHIFT HARD CLEAR", false, "hard") == 4);
+    CHECK(clear_status_priority("GAUGE SHIFT EX-HARD CLEAR", false, "ex_hard") == 5);
+}
 TEST_CASE("assist replays are excluded from default ghost selection") {
     CHECK(tenriff::app::menu_records::default_ghost_replay_allowed(false, false, "HARD CLEAR"));
     CHECK_FALSE(tenriff::app::menu_records::default_ghost_replay_allowed(true, false, "CLEAR"));

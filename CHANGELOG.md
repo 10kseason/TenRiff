@@ -4,6 +4,30 @@ TenRiff의 사용자/배포 관점에서 의미 있는 변경만 간단히 기�
 
 ## [Unreleased]
 
+## [1.2.8] - 2026-07-30
+
+### Added
+
+- `Gauge Shift`를 EX-Hard / Hard / Normal / Easy 병렬 연산 방식으로 변경: 네 게이지를 100%에서 동시에 계산하고 탈락하지 않은 가장 높은 게이지를 실시간 표시·최종 확정하며 멀티플레이도 같은 규칙을 사용
+- `Mainmusic/`의 Title/Quick Setup/Options/Song Select/Multiplayer/Result 성공·실패 슬롯을 연결하고, `이름.mp3`와 `이름 2.mp3`~`이름 64.mp3`를 자동 수집해 화면 재진입마다 순환하며 누락 슬롯은 기존 곡으로 폴백
+- Graphics Settings에 게임플레이 이미지/영상 BGA와 관련 디코더·업스케일러 작업을 함께 끄는 `BGA` 토글 추가; Song Select 미리보기는 유지
+- Browse의 Difficulty Table에서 클립보드에 복사한 BMSTable HTML 페이지 또는 header JSON 링크를 profile-local cache로 가져오는 기능 추가
+
+### Fixed
+
+- 롱노트 머리에서 active hold로 넘어가는 프레임에 synthetic hold가 생략되어 롱노트 전체가 한 프레임 깜빡이던 문제 수정
+
+### Changed
+
+- 네이티브 점수를 판정 90,000점 + 누적 콤보 10,000점의 최대 100,000점 구조로 정규화하고, LN 머리/꼬리 각각 0.5 가중치, 판정 구간 내부 타이밍 정확도, 느슨한 PG 분포의 99.5% 상한, 새 랭크 경계를 결과·리플레이·HUD에 일관 적용
+- 긴 설정 화면의 오른쪽 스크롤바를 클릭해 항목으로 바로 이동할 수 있게 하고, 스크롤 클릭만으로 설정값이 실행되지 않도록 선택/활성 동작을 분리
+- 화면 공간 때문에 도움말이 잘리면 마지막 표시 줄에 `F1`과 숨겨진 도움말 줄 수를 안내
+- LN Mix로 선택된 롱노트 길이를 모든 Mix 단계에서 base BPM 기준 16비트 70% / 8비트 20% / 24·32비트 10%로 결정적 배분
+
+### Packaging
+
+- Windows `TenRiff-1.2.8.zip`, 공개 소스 `TenRiff-1.2.8-source.zip`, `TenRiff-1.2.8-SHA256SUMS.txt`를 정식 배포 자산으로 구성하고 stage/ZIP/해시 일치를 검증
+
 ## [1.2.7] - 2026-07-30
 
 ### Fixed

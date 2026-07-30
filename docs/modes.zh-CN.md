@@ -24,7 +24,7 @@
 ## 模式含义
 - 谱面输入仅支持 BMS family（`.bms/.bme/.bml/.pms`）；`format` 与 `enable_osu_charts` 设置已经移除
 - `key_mode`：`none | auto | 4k | 5k | 6k | 7k | 8k | 9k | 10k | 16k`
-- `gauge`：`normal | hard | ex_hard | easy`
+- `gauge`：`normal | hard | ex_hard | easy | shift`
 - `random`：`off | mirror | fr | sr`
 - `random_seed`：FR/SR、强制 key-mode 变换和 LN Mix 目标选择使用的固定 seed（`0` 也视为固定值）
 - `mods`：由 Mod Manager 规范化并保存的 mod token 数组
@@ -55,7 +55,7 @@
 
 ## Note Structure Mod
 - **Full LN**：把可转换 tap 变成在同 lane 下一 note 前结束的普通 hold
-- **LN Mix 10%～90%**：保留已有 hold，排除与同 lane 已有 span 重叠的 head，并用 `random_seed` 从既能形成至少 50ms hold、又能在下一 note 前保留 50ms 间隔的 tap 中确定性选择指定比例
+- **LN Mix 10%～90%**：保留已有 hold，并排除与同 lane 已有 span 重叠的 head。使用 `random_seed` 从按 base BPM 计算的 1/8-note hold 能在下一同 lane note 前至少 50ms 结束的 tap 中选择指定比例，并在所有 Mix 档位中把长度确定性分配为 70% 1/16-note、20% 1/8-note、10% 交替的 1/24 与 1/32-note
 - **Full Tap**：移除所有 hold tail，把 hold 转换为 tap
 - 三项属于同一个 `Note Structure` category，因此只会启用一个；同一谱面和 seed 会复现相同的 LN Mix 结果
 
@@ -66,9 +66,10 @@
 - `4k..16k` 会通过基于 N2NC 的 lane remap 来匹配目标键数
 
 ## Gauge 规则
-- 所有 gauge 都从 `100%` 开始，并在到达 `0%` 时立即失败。
+- 固定 gauge（`ex_hard / hard / normal / easy`）从 `100%` 开始，在 `0%` 时立即失败且不会改变类型。
+- `shift` 会让 EX-Hard / Hard / Normal / Easy 分别从 100% 开始独立并行计算；当前 tier 淘汰后选择已累计相同判定历史的下一档存活 tier，并以结束时最高的存活 tier 为最终结果。
 - `ex_hard` 是挑战用 gauge，回复低于 Hard，`BAD` / `POOR` 损失更大。
-- clear status 会区分为 `EX-HARD CLEAR`、`HARD CLEAR`、`CLEAR`、`EASY CLEAR`。
+- clear status 会区分固定 gauge 结果，以及最终 Shift tier 的 `GAUGE SHIFT EX-HARD / HARD / NORMAL / EASY CLEAR`。
 - `Sudden Death (1 MISS)` 不是 gauge 类型，而是首次 OD8 换算对象 `MISS` 时把当前 gauge 置零并立即结束的独立失败规则。
 
 ## 实现位置

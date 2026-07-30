@@ -24,7 +24,7 @@ This document summarizes the implemented mode system, lane-transform/random rule
 ## Mode Meanings
 - Chart input is BMS-family only (`.bms/.bme/.bml/.pms`); the `format` and `enable_osu_charts` settings have been removed
 - `key_mode`: `none | auto | 4k | 5k | 6k | 7k | 8k | 9k | 10k | 16k`
-- `gauge`: `normal | hard | ex_hard | easy`
+- `gauge`: `normal | hard | ex_hard | easy | shift`
 - `random`: `off | mirror | fr | sr`
 - `random_seed`: fixed seed for FR/SR, forced key-mode conversion, and LN Mix selection (`0` is also fixed)
 - `mods`: normalized mod-token array saved by the Mod Manager
@@ -55,7 +55,7 @@ This document summarizes the implemented mode system, lane-transform/random rule
 
 ## Note-Structure Mods
 - **Full LN**: converts eligible taps into standard holds ending just before the next note in the same lane
-- **LN Mix 10%-90%**: preserves existing holds, excludes heads overlapping an existing same-lane span, and uses `random_seed` to deterministically select the requested share of taps that can form a hold of at least 50ms while leaving 50ms before the next same-lane note
+- **LN Mix 10%-90%**: preserves existing holds and excludes heads overlapping an existing same-lane span. It uses `random_seed` to select the requested share of taps that can fit a base-BPM 1/8-note hold while ending at least 50ms before the next same-lane note, then deterministically assigns every Mix level 70% 1/16-note, 20% 1/8-note, and 10% alternating 1/24- and 1/32-note lengths
 - **Full Tap**: removes every hold tail and converts all holds into taps
 - These options share the `Note Structure` category, so only one is active; the same chart and seed reproduce the same LN Mix result.
 
@@ -66,9 +66,10 @@ This document summarizes the implemented mode system, lane-transform/random rule
 - `4k..16k` match the key count through N2NC-based lane remapping
 
 ## Gauge Rules
-- All gauges start at `100%` and fail immediately at `0%`.
+- Fixed gauges (`ex_hard / hard / normal / easy`) start at `100%`, fail immediately at `0%`, and never change type.
+- `shift` independently simulates EX-Hard / Hard / Normal / Easy from 100%, selects the next tier that survived the same judgement history when the current tier dies, and finishes on the highest surviving tier.
 - `ex_hard` is a challenge gauge with lower recovery and heavier `BAD` / `POOR` loss than Hard.
-- Clear status is separated as `EX-HARD CLEAR`, `HARD CLEAR`, `CLEAR`, and `EASY CLEAR`.
+- Clear status distinguishes fixed-gauge results and the final Shift tier as `GAUGE SHIFT EX-HARD / HARD / NORMAL / EASY CLEAR`.
 - `Sudden Death (1 MISS)` is not a gauge type; it is a separate failure rule that forces the current gauge to zero and ends the run on the first OD8-converted object `MISS`.
 
 ## Implementation Location

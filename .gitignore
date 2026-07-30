@@ -27,6 +27,7 @@
 /P_DA.bme
 /models/
 /tools/onnx_upscaler/model/
+/tools/lunasr/
 *.onnx
 *.pt
 *.pth

@@ -48,7 +48,7 @@ Windows では通常、次のどちらかで起動します。
 - `Esc`: 前の画面に戻る
 - `-` / `+`: 次の play の Rate を即時調整
 - `F5`: 曲ライブラリを再インデックス。実行中は stage / percent / ETA と progress bar を中央表示
-- `Browse > Difficulty Table`: local BMS difficulty-table header JSON を選択/解除
+- `Browse > Difficulty Table`: BMSTable HTML/header link をコピーして `Enter` で import、`Right` で local JSON 選択、`Left` で解除
 
 ### Song Select からよく使う画面
 - `Mode`
@@ -56,7 +56,8 @@ Windows では通常、次のどちらかで起動します。
 - `Audio`
   - Master / BGM / Keysound volume と BMS keysound policy を調整
 - `Graphics`
-  - VSync、Refresh Hz、Performance HUD、Display Offset、external ONNX BGA Upscaler を調整
+  - VSync、Refresh Hz、Performance HUD、Display Offset、BGA 表示、external ONNX BGA Upscaler を調整
+  - `BGA` を off にすると gameplay image/video background と decoder/upscaler 処理を無効化し、Song Select preview は維持
   - model 選択後に upscaler を明示的に ON にして high-spec 警告を確認する。実験的 `NPU 優先` は Windows/driver が実際に NPU を選択した場合だけ NPU を使う
 - `Skins`
   - native/LR2 skin 切り替え、LR2 folder import、judge line 位置、note size、LN body width、lane colors を調整
@@ -98,7 +99,7 @@ client 側の設定は Discord の [公式 Game Overlay guide](https://support.d
 ## 6. プレイ開始前に知っておくこと
 
 ### Chart format
-- TenRiff 1.2.7 は BMS family（`.bms/.bme/.bml/.pms`）だけをインデックス/プレイします。
+- TenRiff 1.2.8 は BMS family（`.bms/.bme/.bml/.pms`）だけをインデックス/プレイします。
 
 ### Loading
 - 曲開始直後に chart-loading progress が表示されることがあります。
@@ -147,20 +148,28 @@ Rate は曲の再生速度と譜面スケジュールだけを変え、同じ Hi
 
 `OSU OD8` は最大 1,000,000 の補助比較 score であり、TenRiff の native score、rank、clear result は変更しません。
 
+native Score は judgement 90,000 点 + 累積 Combo 10,000 点で構成されます。全 `PG` の full combo は正確に 100,000 点で、LN は head / tail を各 0.5 weight とする 1 object です。
+
+Accuracy は `PG / GR / GD / BD = 100 / 80 / 50 / 20%` を基準に、各 judgement band 内の timing に応じて最大 0.5 percentage point を追加減算します。全 `PG` でも PG timing span が 8ms を超えると 99.5% を超えません。
+
+Rank は `<75 F`, `75 B`, `80.5 A`, `86.5 A+`, `90 S`, `95.5 S+`, `98 AA`, `99 SS`, `99.75 SSS` の境界を使います。
+
 ### Gauge
 - `ex_hard`
 - `hard`
 - `normal`
 - `easy`
+- `shift`
 
-選択した gauge は曲開始時に常に `100%` で始まります。
+固定 gauge（`ex_hard / hard / normal / easy`）は曲開始時に `100%` で始まり、play 中に type は変わりません。
 
 - `ex_hard`: Hard より回復が低く `BAD` / `POOR` damage が大きい。 `0%` で即 Game Over
 - `hard`: `0%` で即 Game Over
 - `normal`: `0%` で即 Game Over
 - `easy`: `0%` で即 Game Over
+- `shift`: EX-Hard / Hard / Normal / Easy をそれぞれ 100% から独立して並列計算。現在の tier が脱落すると、同じ判定履歴を累積した次の生存 tier を選び、終了時の最上位生存 tier で確定
 
-automatic gauge shifting はありません。
+gauge transition は `shift` を明示的に選択した場合だけ発生します。
 `Sudden Death (1 MISS)` は gauge type ではなく、最初の OD8 換算 object `MISS` で gauge を 0 にして即終了する rule です。native `BAD` timing だけでは発動せず、空打ちの `POOR` も対象外で、Practice No-Fail と同時には有効化できません。
 
 ## 10. Result 画面

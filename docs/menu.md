@@ -11,8 +11,8 @@ The main menu must honor the same low-latency philosophy as gameplay: audio runs
 - **Windows 메뉴 UI는 D3D11 + Direct2D/DirectWrite 기반**으로 타이틀/곡선택(시안 레이아웃)과 기타 설정 화면(리스트 UI)을 렌더링한다.
 - Skins는 native/LR2 전용이며, LR2 playskin 폴더 선택 또는 drag-and-drop으로 활성 프로필의 `skins`에 복사한다.
 - Song Select 재인덱싱 중 stage/percent/ETA와 progress bar를 화면 중앙에 표시한다.
-- Browse에서 로컬 BMS 난이도표 header JSON을 선택하면 현재 source를 재인덱싱해 hash 일치 곡에 표 레벨을 적용한다.
-- Graphics의 ONNX 모델 선택은 경로만 저장한다. `BGA Upscaler`를 직접 켜고 고사양 경고를 확인해야 하며, `NPU 우선(실험)`은 Windows/드라이버의 실제 장치 선택을 강제하지 않는다.
+- Browse에서 로컬 header JSON을 고르거나 클립보드의 http(s) BMSTable HTML/header 링크를 가져오면 현재 source를 재인덱싱해 hash 일치 곡에 표 레벨을 적용한다.
+- Graphics의 `BGA` 토글은 게임플레이 이미지/영상을 완전히 끄며 선곡 미리보기는 유지한다. ONNX 모델 선택은 경로만 저장하므로 `BGA Upscaler`를 별도로 켜고 고사양 경고를 확인해야 한다.
 - 입력 키 요약:
   - Title: `↑/↓` 이동, `Enter` 선택(PLAY/EDIT/OPTIONS/EXIT), `F2` 곡 폴더 선택, `F5` 새로고침, `Esc` 종료
     - 곡이 하나도 인덱싱되지 않았으면 첫 버튼은 `PLAY` 대신 `Add Songs Folder`로 보인다.
@@ -20,6 +20,8 @@ The main menu must honor the same low-latency philosophy as gameplay: audio runs
     - 좌측 메뉴는 `Songs / Sources / Search / Filter / Records / Options`만 유지한다.
     - `Backspace`는 `Sources` 또는 `Records`에서 `Songs`로 되돌아갈 때만 쓴다.
   - Settings/Mode: `↑/↓` 항목 이동, `←/→` 값 변경, `Enter/Esc` 복귀
+    - 긴 설정 목록은 우측 스크롤바를 클릭해 해당 위치로 바로 이동할 수 있으며, 클릭만으로 값이 바뀌지는 않는다.
+    - 화면 공간 때문에 설명 일부가 생략되면 마지막 설명 줄에 `F1`과 남은 도움말 줄 수를 표시한다.
   - Keymap: `↑/↓` 선택, `Enter` 바인딩 캡처, `Esc` 복귀
     - 캡처 성공 시 즉시 `keymap.json`에 저장된다.
     - Song Select에서 열면 선택한 차트의 lane count를 우선 기준으로 편집 모드를 잡는다.
@@ -49,7 +51,7 @@ States render UI and consume already-timestamped input events; heavyweight work 
 - **Cache index** (`song_index.json` or SQLite) with mtime/hash checks to avoid full rescans. First run can be slow; subsequent runs should be instant.
 - **Preview audio** is scheduled through the audio engine: UI enqueues preview requests, AudioThread mixes them so timing stays aligned.
 - Empty-state screens should expose a persistent `Add Songs Folder` action; external folders and BMS files also support drag-and-drop.
-- Browse can select or clear a local BMS difficulty-table header JSON. The path is saved in `ui.difficulty_table_path`, and changing it triggers a reindex so MD5/SHA-256 matches receive table levels.
+- Browse의 Difficulty Table에서 http(s) BMSTable 페이지/header 링크를 클립보드에 복사하고 `Enter`를 누르면 profile cache로 가져온다. `Right`는 로컬 header JSON 선택, `Left`는 해제이며 변경 시 MD5/SHA-256 일치 레벨을 다시 적용한다.
 - Song Select `-` / `+` changes and saves `speed.rate` immediately unless search text entry is active.
 - RawInput 스레드나 이벤트 전달이 메뉴에서 비정상적으로 멎으면 멀티플레이/리절트를 포함한 메뉴 화면 전체에서 현재 세션만 자동으로 폴링으로 폴백하고, 저장된 backend 설정은 바꾸지 않는다.
 

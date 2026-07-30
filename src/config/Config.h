@@ -72,6 +72,7 @@ struct GraphicsConfig {
     bool vsync = false;
     int refresh_hz = 300;
     bool performance_overlay = false;
+    bool bga_enabled = true;
     std::string background_upscale_mode = "off";
     std::string background_upscale_model_path;
     bool background_upscale_prefer_npu = false;
@@ -96,6 +97,7 @@ struct UiConfig {
     std::unordered_map<std::string, std::vector<std::string>> collections;
     std::string song_collection_filter = "all";
     std::string difficulty_table_path;
+    std::string difficulty_table_url;
 };
 
 struct SkinConfig {

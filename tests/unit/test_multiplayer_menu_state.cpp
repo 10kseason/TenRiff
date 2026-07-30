@@ -170,7 +170,7 @@ TEST_CASE("peer battle rules fix scoring while preserving local presentation") {
     CHECK(config.gauge.normal.pg == defaults.gauge.normal.pg);
     CHECK(config.speed.rate == doctest::Approx(1.0));
     CHECK(config.mode.key_mode == "none");
-    CHECK(config.mode.gauge == "normal");
+    CHECK(config.mode.gauge == "shift");
     CHECK(config.mode.random == "off");
     CHECK(config.mode.random_seed == 0);
     CHECK(config.mode.mods.empty());

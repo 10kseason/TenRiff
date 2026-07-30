@@ -17,6 +17,7 @@ struct GameplayHudRevisionNote {
     int64_t tail_sample = 0;
     bool hold = false;
     bool head_visible = true;
+    bool pending = false;
 };
 
 struct GameplayHudRevisionInput {
@@ -106,7 +107,8 @@ inline bool gameplay_hud_notes_equal(const GameplayHudRevisionInput& lhs, const 
                                  left.start_sample == right.start_sample &&
                                  left.tail_sample == right.tail_sample &&
                                  left.hold == right.hold &&
-                                 left.head_visible == right.head_visible;
+                                 left.head_visible == right.head_visible &&
+                                 left.pending == right.pending;
                       });
 }
 
@@ -144,7 +146,8 @@ inline bool gameplay_hud_ghost_notes_equal(const GameplayHudRevisionInput& lhs,
                                  left.start_sample == right.start_sample &&
                                  left.tail_sample == right.tail_sample &&
                                  left.hold == right.hold &&
-                                 left.head_visible == right.head_visible;
+                                 left.head_visible == right.head_visible &&
+                                 left.pending == right.pending;
                       });
 }
 

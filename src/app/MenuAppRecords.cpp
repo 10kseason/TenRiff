@@ -287,6 +287,7 @@ bool MenuApp::open_selected_record_result() {
     last_result_ = parsed->stats;
     last_game_over_ = parsed->game_over;
     last_clear_status_ = parsed->clear_status;
+    last_final_gauge_ = parsed->final_gauge;
     has_result_ = true;
     last_result_mods_ = parsed->mods;
     last_result_rate_multiplier_ = parsed->rate_multiplier;
