@@ -7,30 +7,30 @@
 #include "gameplay/GameplayChart.h"
 
 namespace tenriff::gameplay {
-
-enum class KeyModeConversionStyle {
-    KrrLegacy,
-    TenKeySplit,
+enum class KeyModeConversionAlgorithm {
+  Krrcream,
+  NK2,
 };
 
 struct KeyModeConverterOptions {
-    int target_lane_count = 0;
-    int max_keys = 0;
-    int min_keys = 0;
-    int transform_speed_slot = 4;
-    uint32_t seed = 0;
-    double base_bpm = 180.0;
-    int sample_rate = 44100;
-    KeyModeConversionStyle style = KeyModeConversionStyle::KrrLegacy;
+  int target_lane_count = 0;
+  int max_keys = 0;
+  int min_keys = 0;
+  int transform_speed_slot = 4;
+  uint32_t seed = 0;
+  double base_bpm = 180.0;
+  int sample_rate = 44100;
+  KeyModeConversionAlgorithm algorithm = KeyModeConversionAlgorithm::Krrcream;
 };
 
 struct KeyModeConverterResult {
-    GameplayChart chart;
-    bool converted = false;
-    std::vector<std::string> warnings;
+  GameplayChart chart;
+  bool converted = false;
+  std::vector<std::string> warnings;
 };
 
-[[nodiscard]] KeyModeConverterResult convert_key_mode_chart(const GameplayChart& chart,
-                                                           const KeyModeConverterOptions& options);
+[[nodiscard]] KeyModeConverterResult
+convert_key_mode_chart(const GameplayChart &chart,
+                       const KeyModeConverterOptions &options);
 
-}  // namespace tenriff::gameplay
+} // namespace tenriff::gameplay

@@ -10,6 +10,19 @@ if(MSVC)
 endif()
 
 set(TENRIFF_SOURCE_ROOT "${CMAKE_CURRENT_LIST_DIR}/../.." CACHE PATH "Path to the TenRiff source root")
+add_library(bms_key_converter_nk2
+    "${TENRIFF_SOURCE_ROOT}/nk2/intent_graph.cpp"
+    "${TENRIFF_SOURCE_ROOT}/nk2/layout_model.cpp"
+    "${TENRIFF_SOURCE_ROOT}/nk2/nk2_convert.cpp"
+    "${TENRIFF_SOURCE_ROOT}/nk2/nk2_report.cpp"
+)
+
+target_include_directories(bms_key_converter_nk2
+    PUBLIC
+        "${TENRIFF_SOURCE_ROOT}"
+)
+
+target_compile_features(bms_key_converter_nk2 PUBLIC cxx_std_17)
 
 add_library(bms_key_converter_core
     "${TENRIFF_SOURCE_ROOT}/src/app/BmsKeyConverter.cpp"
@@ -20,6 +33,7 @@ add_library(bms_key_converter_core
     "${TENRIFF_SOURCE_ROOT}/src/chart/NoteLaneMapping.cpp"
     "${TENRIFF_SOURCE_ROOT}/src/gameplay/GameplayChart.cpp"
     "${TENRIFF_SOURCE_ROOT}/src/gameplay/KeyModeConverter.cpp"
+    "${TENRIFF_SOURCE_ROOT}/src/gameplay/Nk2KeyModeAdapter.cpp"
 )
 
 target_include_directories(bms_key_converter_core
@@ -28,6 +42,8 @@ target_include_directories(bms_key_converter_core
 )
 
 target_compile_features(bms_key_converter_core PUBLIC cxx_std_17)
+target_link_libraries(bms_key_converter_core PUBLIC bms_key_converter_nk2)
+
 
 add_executable(bms_key_converter
     "${TENRIFF_SOURCE_ROOT}/src/bms_key_converter_main.cpp"

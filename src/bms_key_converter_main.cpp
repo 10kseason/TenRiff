@@ -72,11 +72,12 @@ void print_usage() {
     std::cout << ">]\n"
         << "                         [--max-keys <n>] [--min-keys <n>]\n"
         << "                         [--transform-speed-slot <0-8>] [--seed <u32>]\n"
-        << "                         [--sample-rate <hz|auto>] [--algorithm <krr|10k-split>]\n"
+        << "                         [--sample-rate <hz|auto>] [--algorithm <krrcream|nk2>]\n"
         << "Preset applies the original krrcream Toolkit target/max/min/speed defaults.\n"
         << "Preset 10k uses target=10, max=10, min=1, speed slot 5 (2 bars), and fixed seed 0.\n"
         << "Sample rate defaults to auto and is detected from referenced BMS keysounds before falling back to 44100 Hz.\n"
-        << "Algorithm krr preserves the legacy N2NC flow; 10k-split requires target 10K and keeps source halves on 1-5 / 6-10.\n"
+        << "Algorithm defaults to krrcream; nk2 uses its deterministic native 50/50 profile.\n"
+        << "Krrcream tuning flags are accepted but ignored when --algorithm nk2 is selected.\n"
         << "Explicit --target-keys/--max-keys/--min-keys/--transform-speed-slot override preset values.\n";
 }
 
@@ -144,7 +145,7 @@ int main(int argc, char** argv) {
             continue;
         }
         if (arg == "--algorithm" && i + 1 < argc) {
-            options.conversion_style = argv[++i];
+            options.conversion_algorithm = argv[++i];
             continue;
         }
         if (arg == "--seed" && i + 1 < argc) {

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(TenRiff VERSION 1.2.9 LANGUAGES C CXX)
+project(TenRiff VERSION 1.2.92 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -52,6 +52,19 @@ target_include_directories(tenriff_runtime
 )
 
 target_compile_features(tenriff_runtime PUBLIC cxx_std_17)
+add_library(tenriff_nk2
+    nk2/intent_graph.cpp
+    nk2/layout_model.cpp
+    nk2/nk2_convert.cpp
+    nk2/nk2_report.cpp
+)
+
+target_include_directories(tenriff_nk2
+    PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}
+)
+
+target_compile_features(tenriff_nk2 PUBLIC cxx_std_17)
 
 add_library(tenriff_core
     src/config/SimpleJson.cpp
@@ -62,6 +75,7 @@ add_library(tenriff_core
     src/gameplay/GameplayChart.cpp
     src/gameplay/GameplayEngine.cpp
     src/gameplay/KeyModeConverter.cpp
+    src/gameplay/Nk2KeyModeAdapter.cpp
     src/gameplay/ModeApplier.cpp
     src/gameplay/ModeSettings.cpp
     src/gameplay/OsuManiaScore.cpp
@@ -100,6 +114,7 @@ target_compile_features(tenriff_core PUBLIC cxx_std_17)
 
 target_link_libraries(tenriff_core
     PUBLIC
+        tenriff_nk2
         tenriff_chart
         tenriff_game
         tenriff_runtime
@@ -118,6 +133,7 @@ add_library(tenriff_bms_key_converter_core
     src/chart/NoteLaneMapping.cpp
     src/gameplay/GameplayChart.cpp
     src/gameplay/KeyModeConverter.cpp
+    src/gameplay/Nk2KeyModeAdapter.cpp
 )
 
 target_include_directories(tenriff_bms_key_converter_core
@@ -126,6 +142,8 @@ target_include_directories(tenriff_bms_key_converter_core
 )
 
 target_compile_features(tenriff_bms_key_converter_core PUBLIC cxx_std_17)
+target_link_libraries(tenriff_bms_key_converter_core PUBLIC tenriff_nk2)
+
 
 # Audio and input subsystem (Windows-specific for now).
 if(WIN32)

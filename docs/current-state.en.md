@@ -3,7 +3,7 @@
 This is the document that the next agent or any new contributor should read first. Its goal is to quickly answer: "what is this project now, where should I look, and what is still unverified?"
 
 ## Baseline
-- Current project and public stable version: `1.2.9 stable`
+- Current project and public stable version: `1.2.92 stable`
 - Direct-IP multiplayer and the preview r5 input-backend lifecycle fixes are integrated into `1.1.8 stable`
 - `1.1.8` adds an osu!mania OD8 auxiliary score, first-native-`BAD` `Sudden Death (1 MISS)`, and deterministic `LN Mix 10%-90%` on top of the 1.1.7 visual refresh
 - `1.2.0` connects BMS channel `04/07` and osu!mania backgrounds to the gameplay sample timeline and asynchronously upscales sub-FHD image backgrounds through LunaSR on Windows ML
@@ -82,6 +82,7 @@ This is the document that the next agent or any new contributor should read firs
   - separate keymaps per key mode
   - chart difficulty calculation across supported key counts
   - `mode.key_mode` uses an N2NC-style lane remap to convert key counts
+  - the standalone BMS key converter CLI/GUI can select the default `krrcream` path or deterministic `nK2 Native 50/50`; nK2 ignores Krrcream-only tuning controls
   - `mode.key_mode=none` keeps the chart's original key count and base pattern layout intact
 - Native difficulty:
   - BMS LV/CR calculation evaluates only LN head/tail miss-ms at 0.5x, so `300ms` is treated as `150ms`; runtime gameplay judgement windows remain unchanged
@@ -179,7 +180,7 @@ This is the document that the next agent or any new contributor should read firs
 
 ## Runtime / Packaging Rules
 - New user profiles are created automatically
-- The current official P2P distribution line is `TenRiff 1.2.9 stable`
+- The current official P2P distribution line is `TenRiff 1.2.92 stable`
 - Distribution packages do not include `Songs`
 - Distribution packages include the `Mainmusic/` scene slots `Main Menu / Options / Song Selecte / Multiplayer Lobby / Clear / Failed`; each `Name.mp3` plus numbered `Name 2.mp3` through `Name 64.mp3` siblings is discovered automatically and rotates on scene re-entry
 - Distribution updates include only built artifacts and required runtime assets

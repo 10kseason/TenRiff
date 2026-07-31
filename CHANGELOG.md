@@ -4,6 +4,24 @@ TenRiff의 사용자/배포 관점에서 의미 있는 변경만 간단히 기�
 
 ## [Unreleased]
 
+## [1.2.92] - 2026-08-01
+
+### Added
+
+- The standalone BMS key-mode converter can now select either the existing Krrcream path or the deterministic `nK2 Native 50/50` algorithm from both the CLI and Win32 GUI
+- Added a self-contained TenRiff adapter and minimal chart model for nK2, covering tap notes, long notes, generated support notes, source metadata recovery, and output duration updates
+- Added direct nK2 selection, determinism, invalid-algorithm rejection, and BMS write/reparse regression coverage
+
+### Changed
+
+- Krrcream remains the default; nK2 deliberately ignores the Krrcream-only Max/Min/Speed/Seed controls, which are disabled in the GUI while nK2 is selected
+- Generated or shifted nK2 notes are quantized from their converted sample positions when writing BMS output, including long-note tails
+- The nK2 build is self-contained and does not depend on another key-converter source tree
+
+### Packaging
+
+- Windows `TenRiff-1.2.92.zip`, public source `TenRiff-1.2.92-source.zip`, and `TenRiff-1.2.92-SHA256SUMS.txt` are the formal release assets; no ONNX model, private checkpoint, user profile, song, or log is bundled
+
 ## [1.2.9] - 2026-07-31
 
 ### Added

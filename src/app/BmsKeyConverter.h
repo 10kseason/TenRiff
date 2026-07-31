@@ -27,9 +27,9 @@ struct BmsKeyConverterOptions {
     int max_keys = 0;
     int min_keys = 0;
     int transform_speed_slot = 4;
+    std::string conversion_algorithm = "krrcream";
     uint32_t seed = 0;
     int sample_rate = 0;
-    std::string conversion_style = "krr";
 };
 
 struct BmsKeyConverterResult {

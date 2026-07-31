@@ -664,26 +664,20 @@ bool preset_matches_token(const BmsKeyConverterPreset& preset, std::string_view 
 
     return false;
 }
-
-std::optional<gameplay::KeyModeConversionStyle> parse_conversion_style(std::string_view token) {
+std::optional<gameplay::KeyModeConversionAlgorithm> parse_conversion_algorithm(std::string_view token) {
     const std::string normalized = normalize_preset_token(token);
-    if (normalized.empty() ||
-        normalized == "krr" ||
-        normalized == "legacy" ||
-        normalized == "krrlegacy" ||
-        normalized == "n2nc") {
-        return gameplay::KeyModeConversionStyle::KrrLegacy;
+    if (normalized.empty() || normalized == "krr" || normalized == "krrcream" ||
+        normalized == "legacy" || normalized == "krrlegacy" || normalized == "n2nc") {
+        return gameplay::KeyModeConversionAlgorithm::Krrcream;
     }
-
-    if (normalized == "10ksplit" ||
-        normalized == "split10k" ||
-        normalized == "tenkeysplit" ||
-        normalized == "leftright10k" ||
-        normalized == "balanced10k") {
-        return gameplay::KeyModeConversionStyle::TenKeySplit;
+    if (normalized == "nk2" || normalized == "nativek2") {
+        return gameplay::KeyModeConversionAlgorithm::NK2;
     }
-
     return std::nullopt;
+}
+
+std::string conversion_algorithm_name(gameplay::KeyModeConversionAlgorithm algorithm) {
+    return algorithm == gameplay::KeyModeConversionAlgorithm::NK2 ? "nK2" : "krrcream";
 }
 
 LayoutDefinition resolve_layout_definition(int lane_count) {
@@ -1189,8 +1183,20 @@ std::string build_bms_text(const chart::BmsChart& parsed_chart,
         }
 
         const auto& source = placements[note.note_id];
+        BmsPositionSlot start_slot = source.start;
+        if (note.start_sample != source.start_sample) {
+            const double absolute_position = position_map.position_for_sample(note.start_sample);
+            const auto quantized_start =
+                quantize_position_to_slot(normalized_chart, absolute_position, kQuantizeSliceCount);
+            if (!quantized_start.has_value()) {
+                warnings.push_back("Skipped a converted note because its generated start could not be represented in BMS.");
+                continue;
+            }
+            start_slot = *quantized_start;
+        }
+
         const std::string& channel = layout.lane_channels[static_cast<std::size_t>(note.lane - 1)];
-        generated_events.push_back(OutputEvent{source.start, channel, source.object_id});
+        generated_events.push_back(OutputEvent{start_slot, channel, source.object_id});
 
         if (!note.end_sample.has_value() || !lnobj_token.has_value()) {
             continue;
@@ -1204,7 +1210,7 @@ std::string build_bms_text(const chart::BmsChart& parsed_chart,
             end_slot = quantize_position_to_slot(normalized_chart, absolute_position, kQuantizeSliceCount);
         }
 
-        if (!end_slot.has_value() || !position_after(end_slot.value(), source.start)) {
+        if (!end_slot.has_value() || !position_after(end_slot.value(), start_slot)) {
             warnings.push_back("Converted a clipped long note to a tap because its tail could not be represented in BMS.");
             continue;
         }
@@ -1418,17 +1424,11 @@ BmsKeyConverterResult convert_bms_chart_file(const BmsKeyConverterOptions& optio
         return result;
     }
 
-    const std::optional<gameplay::KeyModeConversionStyle> conversion_style =
-        parse_conversion_style(options.conversion_style);
-    if (!conversion_style.has_value()) {
-        result.error = "Unsupported conversion algorithm. Supported values: krr, 10k-split.";
+    const auto conversion_algorithm = parse_conversion_algorithm(options.conversion_algorithm);
+    if (!conversion_algorithm.has_value()) {
+        result.error = "Unsupported conversion algorithm. Supported values: krrcream, nk2.";
         return result;
     }
-    if (conversion_style.value() == gameplay::KeyModeConversionStyle::TenKeySplit && layout.lane_count != 10) {
-        result.error = "The 10k-split conversion algorithm requires target 10K.";
-        return result;
-    }
-
     chart::BmsParser parser;
     chart::BmsParseResult parsed = parser.parseFile(options.input_path);
     if (!parsed.success()) {
@@ -1488,28 +1488,29 @@ BmsKeyConverterResult convert_bms_chart_file(const BmsKeyConverterOptions& optio
                                   options.seed,
                                   normalization.chart.base_bpm,
                                   effective_sample_rate);
-    const bool tenkey_split_style = conversion_style.value() == gameplay::KeyModeConversionStyle::TenKeySplit;
     if (options.max_keys > 0) {
         converter_options.max_keys = options.max_keys;
-    } else if (tenkey_split_style) {
-        converter_options.max_keys = std::min(layout.lane_count, 8);
     }
     if (options.min_keys > 0) {
         converter_options.min_keys = options.min_keys;
-    } else if (tenkey_split_style) {
-        converter_options.min_keys = std::min(layout.lane_count, 2);
     }
     converter_options.transform_speed_slot = options.transform_speed_slot;
-    converter_options.style = conversion_style.value();
+    converter_options.algorithm = *conversion_algorithm;
 
     gameplay::KeyModeConverterResult converted =
         gameplay::convert_key_mode_chart(source_build.chart, converter_options);
+    if (*conversion_algorithm == gameplay::KeyModeConversionAlgorithm::NK2) {
+        result.warnings.push_back(
+            "nK2 uses its native 50/50 profile; Krrcream Max/Min/Speed/Seed tuning is not applied.");
+    }
     result.warnings.insert(result.warnings.end(), converted.warnings.begin(), converted.warnings.end());
 
     if (!converted.converted) {
         result.error = "The BMS chart was not converted. Check the target lane count and input chart lanes.";
         return result;
     }
+
+    result.warnings.push_back("Conversion algorithm: " + conversion_algorithm_name(*conversion_algorithm) + ".");
 
     const std::string output_text =
         build_bms_text(parsed.chart, normalization.chart, placements, converted.chart, layout, effective_sample_rate, result.warnings);
