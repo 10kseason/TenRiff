@@ -244,10 +244,21 @@ int selected_target_keys(const AppState& state) {
 std::string selected_algorithm(const AppState& state) {
     const int selection = static_cast<int>(SendMessageW(state.algorithm_combo, CB_GETCURSEL, 0, 0));
     if (selection == CB_ERR) {
-        return "krr";
+        return "krrcream";
     }
     const LRESULT item_data = SendMessageW(state.algorithm_combo, CB_GETITEMDATA, selection, 0);
-    return item_data == 1 ? "10k-split" : "krr";
+    return item_data == 1 ? "nk2" : "krrcream";
+}
+
+void update_algorithm_controls(AppState& state) {
+    const bool nk2 = selected_algorithm(state) == "nk2";
+    EnableWindow(state.max_keys_edit, nk2 ? FALSE : TRUE);
+    EnableWindow(state.min_keys_edit, nk2 ? FALSE : TRUE);
+    EnableWindow(state.speed_slot_edit, nk2 ? FALSE : TRUE);
+    EnableWindow(state.seed_edit, nk2 ? FALSE : TRUE);
+    set_window_text_copy(state.hint_label,
+                         nk2 ? L"nK2: native 50/50 profile."
+                             : L"Krrcream: preset tuning active.");
 }
 
 bool select_target_keys(AppState& state, int target_keys) {
@@ -397,8 +408,7 @@ bool collect_options(const AppState& state, tenriff::app::BmsKeyConverterOptions
     options.input_path = tenriff::util::utf8_from_wide_lossy(input_path);
     options.output_path = tenriff::util::utf8_from_wide_lossy(output_path);
     options.target_lane_count = selected_target_keys(state);
-    options.conversion_style = selected_algorithm(state);
-
+    options.conversion_algorithm = selected_algorithm(state);
     if (options.input_path.empty()) {
         error = L"Failed to encode the input path as UTF-8.";
         return false;
@@ -501,19 +511,26 @@ void initialize_target_combo(AppState& state) {
 }
 
 void initialize_algorithm_combo(AppState& state) {
-    const LRESULT legacy_index =
-        SendMessageW(state.algorithm_combo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(L"Krr Legacy"));
-    if (legacy_index != CB_ERR && legacy_index != CB_ERRSPACE) {
-        SendMessageW(state.algorithm_combo, CB_SETITEMDATA, static_cast<WPARAM>(legacy_index), static_cast<LPARAM>(0));
+    const LRESULT krrcream_index =
+        SendMessageW(state.algorithm_combo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(L"Krrcream"));
+    if (krrcream_index != CB_ERR && krrcream_index != CB_ERRSPACE) {
+        SendMessageW(state.algorithm_combo,
+                     CB_SETITEMDATA,
+                     static_cast<WPARAM>(krrcream_index),
+                     static_cast<LPARAM>(0));
     }
 
-    const LRESULT split_index =
-        SendMessageW(state.algorithm_combo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(L"10K Split"));
-    if (split_index != CB_ERR && split_index != CB_ERRSPACE) {
-        SendMessageW(state.algorithm_combo, CB_SETITEMDATA, static_cast<WPARAM>(split_index), static_cast<LPARAM>(1));
+    const LRESULT nk2_index =
+        SendMessageW(state.algorithm_combo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(L"nK2 (Native 50/50)"));
+    if (nk2_index != CB_ERR && nk2_index != CB_ERRSPACE) {
+        SendMessageW(state.algorithm_combo,
+                     CB_SETITEMDATA,
+                     static_cast<WPARAM>(nk2_index),
+                     static_cast<LPARAM>(1));
     }
 
     SendMessageW(state.algorithm_combo, CB_SETCURSEL, 0, 0);
+    update_algorithm_controls(state);
 }
 
 void initialize_preset_combo(AppState& state) {
@@ -622,7 +639,7 @@ void create_controls(HWND window, AppState& state) {
                                     WS_CHILD | WS_VISIBLE | WS_TABSTOP | ES_AUTOHSCROLL,
                                     kIdSampleRateEdit);
     state.hint_label =
-        create(0, L"STATIC", L"Krr is legacy; 10K Split expands each source hand into 5 lanes.", WS_CHILD | WS_VISIBLE, 0);
+        create(0, L"STATIC", L"Krrcream: preset tuning active.", WS_CHILD | WS_VISIBLE, 0);
     state.convert_button = create(0,
                                   L"BUTTON",
                                   L"Convert",
@@ -646,7 +663,8 @@ void create_controls(HWND window, AppState& state) {
 
     append_log(state, L"Select a BMS-family chart or drag one into this window.");
     append_log(state, L"Supported targets: 4K, 5K, 6K, 8K, 9K, 10K, 16K.");
-    append_log(state, L"Krr Legacy preserves the original N2NC path; 10K Split expands source halves across lanes 1-5 / 6-10.");
+    append_log(state, L"Algorithm: Krrcream or nK2 native 50/50.");
+    append_log(state, L"nK2 ignores Krrcream Max/Min/Speed/Seed tuning fields.");
 }
 
 void log_conversion_result(AppState& state,
@@ -773,6 +791,11 @@ LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM w_param, LPARAM l
         case kIdPresetCombo:
             if (HIWORD(w_param) == CBN_SELCHANGE) {
                 apply_selected_preset(*state);
+            }
+            return 0;
+        case kIdAlgorithmCombo:
+            if (HIWORD(w_param) == CBN_SELCHANGE) {
+                update_algorithm_controls(*state);
             }
             return 0;
         case kIdTargetCombo:

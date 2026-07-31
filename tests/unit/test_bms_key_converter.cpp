@@ -242,3 +242,59 @@ TEST_CASE("bms key converter exposes original toolkit presets") {
     REQUIRE(tenriff::app::find_bms_key_converter_preset("7k", preset));
     CHECK_FALSE(preset.supported_output);
 }
+TEST_CASE("bms key converter rejects unknown conversion algorithms") {
+    tenriff::app::BmsKeyConverterOptions options;
+    options.input_path = "input.bms";
+    options.output_path = "output.bms";
+    options.target_lane_count = 4;
+    options.conversion_algorithm = "unknown";
+
+    const auto result = tenriff::app::convert_bms_chart_file(options);
+    CHECK_FALSE(result.success);
+    CHECK(result.error.find("Unsupported conversion algorithm") != std::string::npos);
+}
+
+TEST_CASE("bms key converter writes reparsable nK2 output") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+
+    const auto input_path = temp.path / "source_nk2.bms";
+    const auto output_path = temp.path / "converted_nk2.bms";
+
+    {
+        std::ofstream chart_file(input_path, std::ios::binary);
+        REQUIRE(chart_file.good());
+        chart_file << "#TITLE nK2 Convert\n"
+                      "#BPM 120\n"
+                      "#4K\n"
+                      "#00111:01\n"
+                      "#00212:01\n"
+                      "#00313:01\n"
+                      "#00414:01\n"
+                      "#00511:01\n"
+                      "#00612:01\n"
+                      "#00713:01\n"
+                      "#00814:01\n";
+    }
+
+    tenriff::app::BmsKeyConverterOptions options;
+    options.input_path = input_path.u8string();
+    options.output_path = output_path.u8string();
+    options.target_lane_count = 8;
+    options.conversion_algorithm = "nk2";
+
+    const auto convert_result = tenriff::app::convert_bms_chart_file(options);
+    REQUIRE(convert_result.success);
+    CHECK(convert_result.target_lane_count == 8);
+    CHECK(convert_result.note_count >= 8u);
+    CHECK(std::any_of(convert_result.warnings.begin(), convert_result.warnings.end(), [](const std::string& warning) {
+        return warning.find("Conversion algorithm: nK2") != std::string::npos;
+    }));
+
+    tenriff::app::ChartLoader loader;
+    const auto load_result = loader.load(output_path.u8string(), 44100, 1.0, "ignore");
+    CHECK(load_result.success());
+    CHECK(load_result.chart.lane_count == 8);
+    CHECK_FALSE(load_result.chart.notes.empty());
+}
