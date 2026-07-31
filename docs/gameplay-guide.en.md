@@ -60,7 +60,7 @@ The standard TenRiff play flow is:
 - `Graphics`
   - Adjust VSync, Refresh Hz, Performance HUD, Display Offset, BGA visibility, and the external ONNX BGA Upscaler
   - Turning `BGA` off disables gameplay image/video backgrounds and their decoder/upscaler work; Song Select previews remain visible
-  - Selecting a model is separate from enabling the upscaler and accepting its high-spec warning. Experimental `Prefer NPU` only uses an NPU when Windows/the driver actually select one
+  - Selecting a model is separate from enabling the upscaler and accepting its high-spec warning. Experimental `Low-Power DirectX` only requests DirectXMinPower and does not explicitly select or verify an NPU
 - `Skins`
   - Switch native/LR2 skins, import an LR2 folder, and adjust judgement-line position, note size, LN body width, and lane colors
 - `Keymap`
@@ -105,7 +105,7 @@ If this is not the layout you want, you can change it in `Options > Keymap`.
 ## 6. Things to Know Before Starting Play
 
 ### Chart format
-- TenRiff 1.2.8 indexes and plays only BMS-family charts (`.bms/.bme/.bml/.pms`).
+- TenRiff 1.2.9 indexes and plays only BMS-family charts (`.bms/.bme/.bml/.pms`).
 
 ### Loading
 - Right after song start, chart-loading progress may be shown.

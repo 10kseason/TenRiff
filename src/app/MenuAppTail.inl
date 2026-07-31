@@ -402,6 +402,58 @@ std::string MenuApp::current_track_label() const {
     return "-";
 }
 
+void MenuApp::service_song_preview() {
+    constexpr int64_t kPreviewDelayNs = 750'000'000LL;
+    const int64_t now_ns = timing::HighResClock::now_ns();
+
+    const SongEntry* entry = nullptr;
+    if (screen_ == Screen::SongSelect &&
+        song_select_view_ == SongSelectView::Songs &&
+        config_.audio_ui.background_sound_enabled &&
+        selected_song_ >= 0) {
+        entry = visible_song_entry(static_cast<std::size_t>(selected_song_));
+    }
+
+    const std::string preview_path = entry ? entry->audio_preview_path : std::string{};
+    const std::string selection_key =
+        entry ? entry->path + "\n" + preview_path : std::string{};
+
+    if (!entry || preview_path.empty()) {
+        const bool was_active = !song_preview_active_path_.empty();
+        song_preview_selection_key_.clear();
+        song_preview_active_path_.clear();
+        song_preview_due_ns_ = 0;
+        song_preview_pending_ = false;
+        if (was_active) {
+            sync_menu_music();
+        }
+        return;
+    }
+
+    if (selection_key != song_preview_selection_key_) {
+        const bool was_active = !song_preview_active_path_.empty();
+        song_preview_selection_key_ = selection_key;
+        song_preview_active_path_.clear();
+        song_preview_due_ns_ = now_ns + kPreviewDelayNs;
+        song_preview_pending_ = true;
+        if (was_active) {
+            sync_menu_music();
+        }
+        return;
+    }
+
+    if (!song_preview_pending_ || now_ns < song_preview_due_ns_) {
+        return;
+    }
+
+    song_preview_pending_ = false;
+    song_preview_active_path_ = preview_path;
+    const double gain = std::clamp(
+        config_.audio_ui.master_volume * config_.audio_ui.bgm_volume, 0.0, 1.0);
+    menu_music_.play_looping_file(song_preview_active_path_, gain);
+}
+
+
 void MenuApp::sync_menu_music() {
     if (screen_ == Screen::Gameplay) {
         menu_music_.stop();
@@ -409,6 +461,18 @@ void MenuApp::sync_menu_music() {
         menu_music_scene_path_.clear();
         return;
     }
+
+    if (screen_ == Screen::SongSelect && !song_preview_active_path_.empty()) {
+        if (!config_.audio_ui.background_sound_enabled) {
+            menu_music_.stop();
+            return;
+        }
+        const double gain = std::clamp(
+            config_.audio_ui.master_volume * config_.audio_ui.bgm_volume, 0.0, 1.0);
+        menu_music_.play_looping_file(song_preview_active_path_, gain);
+        return;
+    }
+
 
     // Mainmusic filenames are stable scene slots. Numbered siblings such as
     // "Main Menu 2.mp3" are discovered automatically and rotate per visit.
@@ -563,6 +627,14 @@ void MenuApp::populate_quick_setup_render_data(render::MenuRenderData& render) {
                     false,
                     true);
     append_menu_row(render.generic,
+                    ui_text("Nickname", "닉네임"),
+                    profile_display_name() + (profile_nickname_edit_active_ ? " _" : ""),
+                    settings_cursor_ == profile_setup::kNicknameRow,
+                    render::MenuHitTargetKind::SettingsRow,
+                    profile_setup::kNicknameRow,
+                    true,
+                    false);
+    append_menu_row(render.generic,
                     first_run ? ui_text("Continue to Song Select", "곡 선택으로 계속")
                               : ui_text("Done", "완료"),
                     "",
@@ -587,6 +659,8 @@ void MenuApp::populate_quick_setup_render_data(render::MenuRenderData& render) {
         render.generic.notes.push_back(ui_text("Changes on this screen are saved immediately to the active profile.",
                                                "이 화면의 변경 사항은 현재 프로필에 즉시 저장됩니다."));
     }
+    render.generic.notes.push_back(ui_text("Nickname is shown in saved records and multiplayer. Enter edits; Esc cancels.",
+                                           "닉네임은 저장 기록과 멀티플레이에 표시됩니다. Enter로 편집하고 Esc로 취소합니다."));
     render.generic.notes.push_back(ui_text("Recommended start: Gauge Normal, Rate 1.00x, Display Offset 0ms, BMS Keysound Follow.",
                                            "권장 시작값: 노말 게이지, Rate 1.00x, 표시 오프셋 0ms, BMS 키음 연동."));
     render.generic.notes.push_back(ui_text("Songs Folder opens a picker on Enter or F2. You can also drag and drop a folder later.",
@@ -599,7 +673,7 @@ void MenuApp::populate_title_render_data(render::MenuRenderData& render,
                                          const std::string& current_track,
                                          const MenuApp::BestResultRecord& current_best) {
     render.kind = render::MenuScreenKind::TitleMenu;
-    render.title.profile = options_.profile;
+    render.title.profile = profile_display_name();
     render.title.track = current_track;
     render.title.high_score = current_best.has_value ? current_best.best_score : 0;
     const bool no_songs_indexed = visible_song_count() == 0;
@@ -638,10 +712,35 @@ void MenuApp::populate_result_render_data(render::MenuRenderData& render, const 
 
     render.kind = render::MenuScreenKind::ResultScreen;
     render.result.peer_battle = last_game_was_multiplayer_;
-    render.result.profile = options_.profile;
+    render.result.profile =
+        last_result_player_name_.empty() ? profile_display_name() : last_result_player_name_;
     render.result.track = last_chart_title_.empty() ? current_track : last_chart_title_;
     render.result.title = last_chart_title_.empty() ? ui_text("Unknown Chart", "알 수 없는 차트") : last_chart_title_;
     render.result.artist = last_chart_artist_;
+    if (last_chart_entry_valid_) {
+        render.result.background_path =
+            song_background_preview_path_for_entry(last_chart_entry_);
+        render.result.chart_name = last_chart_entry_.chart_name;
+        render.result.layout_label = last_chart_entry_.layout_label;
+        render.result.key_count = last_chart_entry_.key_count;
+        render.result.level = last_chart_entry_.level;
+        render.result.native_level = last_chart_entry_.native_level;
+        render.result.rating = last_chart_entry_.rating;
+        render.result.bpm = last_chart_entry_.bpm;
+        if (!last_chart_entry_.difficulty_table_level.empty()) {
+            render.result.difficulty_table_label =
+                last_chart_entry_.difficulty_table_symbol +
+                last_chart_entry_.difficulty_table_level;
+            if (!last_chart_entry_.difficulty_table_name.empty()) {
+                render.result.difficulty_table_label += " / " +
+                    last_chart_entry_.difficulty_table_name;
+            }
+        }
+    } else if (!last_chart_path_.empty()) {
+        render.result.background_path =
+            menu_songs::resolve_song_background_preview_path(last_chart_path_);
+        render.result.bpm = last_chart_bpm_;
+    }
 
     if (!has_result_) {
         render.result.notes.push_back(ui_text("No result data is available for this run.", "이번 플레이의 결과 데이터가 없습니다."));
@@ -961,6 +1060,7 @@ void MenuApp::publish_snapshot() {
     if (screen_ == Screen::SongSelect) {
         sync_song_select_state();
     }
+    service_song_preview();
     sync_menu_music();
 
     MenuSnapshot snapshot;
@@ -1215,23 +1315,13 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
         reset_multiplayer_for_single_player();
     }
     const std::string preserved_result_path = last_result_path_;
-    last_chart_path_ = chart_path;
-    if (peer_battle) {
-        last_chart_title_ = multiplayer_chart_title_.empty()
-                                ? filename_only(chart_path)
-                                : multiplayer_chart_title_;
-        last_chart_artist_.clear();
-        last_chart_bpm_ = 0.0;
-    } else if (selected_song_ >= 0 && selected_song_ < static_cast<int>(visible_song_count())) {
-        if (const SongEntry* entry = visible_song_entry(static_cast<std::size_t>(selected_song_))) {
-            last_chart_title_ = entry->title.empty() ? entry->path : entry->title;
-            last_chart_artist_ = entry->artist;
-            last_chart_bpm_ = entry->bpm;
-        }
-    } else {
-        last_chart_title_.clear();
-        last_chart_artist_.clear();
-        last_chart_bpm_ = 0.0;
+    const SongEntry* selected_entry =
+        (selected_song_ >= 0 && selected_song_ < static_cast<int>(visible_song_count()))
+            ? visible_song_entry(static_cast<std::size_t>(selected_song_))
+            : nullptr;
+    update_last_chart_metadata(chart_path, selected_entry);
+    if (peer_battle && !last_chart_entry_valid_ && !multiplayer_chart_title_.empty()) {
+        last_chart_title_ = multiplayer_chart_title_;
     }
 
     screen_ = Screen::Gameplay;
@@ -1625,6 +1715,7 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
         last_result_rate_multiplier_ = 1.0;
         last_result_score_multiplier_ = 1.0;
         last_result_final_score_ = 0;
+        last_result_player_name_.clear();
         last_replay_path_.clear();
         last_result_path_.clear();
         last_export_warnings_.clear();
@@ -1684,6 +1775,8 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
         last_result_rate_multiplier_ = result.rate_multiplier;
         last_result_score_multiplier_ = result.score_multiplier;
         last_result_final_score_ = result.final_score;
+        last_result_player_name_ =
+            result.player_name.empty() ? profile_display_name() : result.player_name;
         last_replay_path_ = result.replay_path;
         last_result_path_ = (!result.result_path.empty() || !replay_playback) ? result.result_path : preserved_result_path;
         last_export_warnings_ = result.export_warnings;
@@ -1698,6 +1791,7 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
         last_result_rate_multiplier_ = 1.0;
         last_result_score_multiplier_ = 1.0;
         last_result_final_score_ = 0;
+        last_result_player_name_.clear();
         last_replay_path_.clear();
         last_result_path_.clear();
         last_export_warnings_.clear();
@@ -1977,8 +2071,8 @@ void MenuApp::populate_help_overlay(render::HelpOverlayData& target) const {
             target.lines = {
                 ui_text("Up / Down selects a lane. Enter starts key capture for that lane.",
                         "위 / 아래 키로 레인을 선택하고, Enter로 해당 레인의 키 입력 대기를 시작합니다."),
-                ui_text("Left / Right on Key Mode switches which 4K-10K or 16K layout you are editing.",
-                        "Key Mode에서 좌 / 우 키를 누르면 편집할 4K~10K 또는 16K 레이아웃을 바꿉니다."),
+                ui_text("Left / Right on Key Mode switches among 4K-10K, 12K, 14K, and 16K layouts.",
+                        "Key Mode에서 좌 / 우 키를 누르면 4K~10K, 12K, 14K, 16K 레이아웃을 바꿉니다."),
                 ui_text("Captured keys save immediately. Reset also saves immediately, and NKRO Test stays visible as a normal button.",
                         "입력한 키는 즉시 저장됩니다. 초기화도 바로 저장되고 NKRO Test는 일반 버튼으로 계속 보입니다."),
                 ui_text("When you opened Keymap from Song Select, the editor defaults to the selected chart's key mode.",

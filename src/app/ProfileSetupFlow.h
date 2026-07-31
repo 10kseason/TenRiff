@@ -15,8 +15,9 @@ enum class Destination {
 };
 
 inline constexpr int kBackendRow = 5;
-inline constexpr int kDoneRow = 6;
-inline constexpr int kFirstRunSkipRow = 7;
+inline constexpr int kNicknameRow = 6;
+inline constexpr int kDoneRow = 7;
+inline constexpr int kFirstRunSkipRow = 8;
 inline constexpr int kOptionsHubRowCount = 9;
 inline constexpr int kOptionsProfileSetupRow = 7;
 inline constexpr int kOptionsBackRow = 8;
@@ -26,7 +27,7 @@ inline constexpr int kOptionsBackRow = 8;
 }
 
 [[nodiscard]] inline constexpr int row_count(Entry source) {
-    return source == Entry::FirstRun ? 8 : 7;
+    return source == Entry::FirstRun ? 9 : 8;
 }
 
 [[nodiscard]] inline constexpr Destination enter_destination(Entry source, int cursor) {

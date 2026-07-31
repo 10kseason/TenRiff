@@ -3,7 +3,7 @@
 This is the document that the next agent or any new contributor should read first. Its goal is to quickly answer: "what is this project now, where should I look, and what is still unverified?"
 
 ## Baseline
-- Current project and public stable version: `1.2.8 stable`
+- Current project and public stable version: `1.2.9 stable`
 - Direct-IP multiplayer and the preview r5 input-backend lifecycle fixes are integrated into `1.1.8 stable`
 - `1.1.8` adds an osu!mania OD8 auxiliary score, first-native-`BAD` `Sudden Death (1 MISS)`, and deterministic `LN Mix 10%-90%` on top of the 1.1.7 visual refresh
 - `1.2.0` connects BMS channel `04/07` and osu!mania backgrounds to the gameplay sample timeline and asynchronously upscales sub-FHD image backgrounds through LunaSR on Windows ML
@@ -15,6 +15,7 @@ This is the document that the next agent or any new contributor should read firs
 - `1.2.6` makes the playable surface BMS-family only, retains native/LR2 skins, and adds manual ONNX upscaler enablement with an experimental NPU preference, Song Select Rate controls, centered indexing progress, local JSON difficulty tables, and the BMS keysound late-input hotfix.
 - `1.2.7` fixes External ONNX Upscaler FP16 binding, float-boundary INT8 QDQ detection, the high-performance DirectX GPU default, and one-in-flight video-BGA backpressure.
 - `1.2.8` combines the whole-long-note blink fix, a gameplay BGA toggle, BMSTable HTML/header-link import, and long-settings scrollbar UX improvements.
+- `1.2.9` adds 12K/14K and scratch-aware key conversion, R-Random/DP Flip/Note Add, delayed Song Select preview, richer image-backed results, profile nicknames, stable native video-BGA frames, and accurate `DirectXMinPower` wording.
 - Baseline companion document for follow-up work: `docs/baseline-1.1.2.en.md`
 - Windows GUI build is the main target
 - Linux exists only as a preview-level package at `Baepoks-Linuxs/TenRiff-0.5.0-linux-preview`
@@ -128,7 +129,8 @@ This is the document that the next agent or any new contributor should read firs
   - `background_upscale_model_path` only stores the compatible ONNX selected or dropped in Graphics Settings; public packages include no model
   - BGA Upscaler defaults to `off`; the user must explicitly turn it on and acknowledge the high-spec warning, with no automatic benchmark gate
   - current contract is 960x540 RGB residual x2 with automatic FP32/FP16 boundary and float-boundary INT8 QDQ metadata detection; users own model rights/quality/performance, and load, contract, decode, or inference failure keeps native scaling
-  - high-performance DirectX GPU is the default; experimental `background_upscale_prefer_npu=true` opt-in first requests a WinML `DirectXMinPower` session while the upscaler is on. Windows/the driver chooses the actual NPU or GPU; creation/evaluation failure falls back to high-performance DirectX and normal DirectX
+  - static image BGA remains asynchronously ONNX-upscaled; video BGA displays native decoded frames so a late older inference result cannot overwrite a newer frame and cause visible shaking
+  - high-performance DirectX GPU is the default. `background_upscale_prefer_npu=true` only requests legacy WinML `DirectXMinPower`; it neither explicitly selects an NPU nor verifies endpoint placement and is not treated as NPU success
 - Gameplay performance:
   - static playfield command-list cache
   - note head / tail bitmap cache
@@ -137,8 +139,11 @@ This is the document that the next agent or any new contributor should read firs
   - centered Song Select indexing stage/percentage/processed/total/ETA/song count and progress bar below the header
   - gameplay chart-loading progress display
   - `Esc` cancel during gameplay loading
+  - holding one Song Select choice for 750ms plays its explicit BMS preview or local-audio fallback at menu volume
+  - Result shows song art plus chart/key/BPM/LV/CR/difficulty-table metadata
 - Profile UX:
   - `Options -> Profile Setup` reopens the first-run setup surface for the active profile and saves language, audio, input, graphics, and keymap changes immediately
+  - an editable 48-byte profile nickname is used in later saved records and direct-IP multiplayer display names
 - Direct-IP multiplayer:
   - A joiner matches the host chart by exact hash and size across the active source and existing profile-local caches for `recent_song_sources`
   - It never scans the whole disk or starts a rescan, and cached paths outside their source root are rejected
@@ -174,7 +179,7 @@ This is the document that the next agent or any new contributor should read firs
 
 ## Runtime / Packaging Rules
 - New user profiles are created automatically
-- The current official P2P distribution line is `TenRiff 1.2.8 stable`
+- The current official P2P distribution line is `TenRiff 1.2.9 stable`
 - Distribution packages do not include `Songs`
 - Distribution packages include the `Mainmusic/` scene slots `Main Menu / Options / Song Selecte / Multiplayer Lobby / Clear / Failed`; each `Name.mp3` plus numbered `Name 2.mp3` through `Name 64.mp3` siblings is discovered automatically and rotates on scene re-entry
 - Distribution updates include only built artifacts and required runtime assets
@@ -218,7 +223,7 @@ This is the document that the next agent or any new contributor should read firs
 - gameplay low-FPS / 0.1% / 0.01% low verification
 - coexistence with OBS / Discord / Game Bar while live-applying graphics settings
 - GUI verification for drag-and-drop / external Korean-path sources
-- verify `Prefer NPU (experimental)` on/off and WinML device fallback on a real NPU-capable Windows PC
+- implement OpenVINO EP device enumeration, NPU endpoint placement, and disabled CPU fallback, then run the `--require-npu` smoke on a real NPU Windows PC
 - verify hash matching, reindexing, and display order after changing a local difficulty table
 - Linux is still not a real runnable build
 

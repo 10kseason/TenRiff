@@ -23,10 +23,10 @@
 
 ## 模式含义
 - 谱面输入仅支持 BMS family（`.bms/.bme/.bml/.pms`）；`format` 与 `enable_osu_charts` 设置已经移除
-- `key_mode`：`none | auto | 4k | 5k | 6k | 7k | 8k | 9k | 10k | 16k`
+- `key_mode`：`none | auto | 4k | 5k | 6k | 7k | 8k | 9k | 10k | 12k | 14k | 16k`
 - `gauge`：`normal | hard | ex_hard | easy | shift`
-- `random`：`off | mirror | fr | sr`
-- `random_seed`：FR/SR、强制 key-mode 变换和 LN Mix 目标选择使用的固定 seed（`0` 也视为固定值）
+- `random`：`off | mirror | rr | fr | sr`
+- `random_seed`：RR/FR/SR、强制 key-mode 变换、Note Add 和 LN Mix 目标选择使用的固定 seed（`0` 也视为固定值）
 - `mods`：由 Mod Manager 规范化并保存的 mod token 数组
 - `ghost_battle_enabled`：`false | true`
   - 默认值为 `false`
@@ -44,9 +44,11 @@
 `Rate` 保存在 `speed.rate` 而不是 `mode`。可在 Mode Settings 中调整；未进行搜索文字输入时，也可在 Song Select 中用 `-` / `+` 直接改变下一次游玩的值。
 
 ## Lane Transform / 随机规则
+- **DP Flip**：交换 DP 左右两个完整 player field，同时保持各 field 内部 lane 顺序
 - **Mirror**：在 key-mode 变换完成后，确定性地反转最终 lane
-  - 10K/16K 不交换两个 player field，而是在各自 half 内独立反转
+  - DP layout 不交换两个 player field，而是在各自 field 内独立反转
   - Mirror 本身不使用 `random_seed`，但先执行的强制 key-mode 变换仍可能使用 seed
+- **RR（R-Random）**：固定皿键，并按 seed 偏移旋转各 playable lane group；DP 左右区域独立处理
 - **FR（Full Random）**：把整条 lane 替换为随机 **permutation**
 - **SR（Super Random）**：按 note 级别随机摆放
   - 选择候选 lane 时，确保同一 lane 上 **不重叠**（包括同一时刻）
@@ -54,6 +56,7 @@
   - 如果没有可用候选 lane，就保持原始 lane 并记录警告
 
 ## Note Structure Mod
+- **Note Add 10%～100%**：在已有 note 时刻确定性加入无声和弦 note，并避开皿键、hold body、同 lane 重复和过大和弦。结果会保留在 Records 中，但不会覆盖普通最佳记录
 - **Full LN**：把可转换 tap 变成在同 lane 下一 note 前结束的普通 hold
 - **LN Mix 10%～90%**：保留已有 hold，并排除与同 lane 已有 span 重叠的 head。使用 `random_seed` 从按 base BPM 计算的 1/8-note hold 能在下一同 lane note 前至少 50ms 结束的 tap 中选择指定比例，并在所有 Mix 档位中把长度确定性分配为 70% 1/16-note、20% 1/8-note、10% 交替的 1/24 与 1/32-note
 - **Full Tap**：移除所有 hold tail，把 hold 转换为 tap
@@ -62,8 +65,10 @@
 ## Key mode 处理
 - `none` 表示直接使用谱面的原始 lane 数和基础 pattern 布局
 - `auto` 作为 legacy alias 保留，当前行为与 `none` 相同
-- key-mode 变换先于 Mirror / FR / SR 执行
-- `4k..16k` 会通过基于 N2NC 的 lane remap 来匹配目标键数
+- `4k..10k`、`12k`、`14k`、`16k` 会通过基于 N2NC 的 lane remap 匹配目标键数
+- 强制转换 `5+1 SP` / `7+1 SP` 时只重新映射除皿键外的键盘部分；`follow` 皿键音效移至自动播放
+- `10+2 DP` / `14+2 DP` 同样排除两个皿键，并独立转换左右键盘区域
+- 应用顺序：key-mode 变换 → DP Flip → Mirror/RR/FR/SR → Note Add → LN/Full Tap 结构变换
 
 ## Gauge 规则
 - 固定 gauge（`ex_hard / hard / normal / easy`）从 `100%` 开始，在 `0%` 时立即失败且不会改变类型。

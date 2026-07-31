@@ -257,15 +257,81 @@
         }
 
         const D2D1_RECT_F summary_rect = D2D1::RectF(100.0f, 180.0f, 730.0f, 930.0f);
-        const D2D1_RECT_F gauge_rect =
-            D2D1::RectF(770.0f, 180.0f, std::min(1820.0f, performance_overlay_safe_left(24.0f)), 500.0f);
+        const D2D1_RECT_F gauge_rect = D2D1::RectF(770.0f, 180.0f, 1285.0f, 500.0f);
+        const D2D1_RECT_F song_rect = D2D1::RectF(1315.0f, 180.0f, 1820.0f, 500.0f);
         const D2D1_RECT_F breakdown_rect = D2D1::RectF(770.0f, 530.0f, 1285.0f, 930.0f);
         const D2D1_RECT_F detail_rect = D2D1::RectF(1315.0f, 530.0f, 1820.0f, 930.0f);
         draw_panel(summary_rect, true);
         draw_panel(gauge_rect, true);
+        draw_panel(song_rect, true);
         draw_panel(breakdown_rect);
         draw_panel(detail_rect);
 
+
+        const D2D1_RECT_F song_image_rect =
+            D2D1::RectF(song_rect.left + 20.0f, song_rect.top + 20.0f,
+                        song_rect.left + 238.0f, song_rect.bottom - 20.0f);
+        if (ID2D1Bitmap* song_bitmap =
+                find_song_card_preview_bitmap(data.result.background_path)) {
+            const D2D1_RECT_F source_rect =
+                centered_bitmap_source_rect(song_bitmap->GetSize(), song_image_rect);
+            ctx->DrawBitmap(song_bitmap,
+                            song_image_rect,
+                            0.96f,
+                            D2D1_BITMAP_INTERPOLATION_MODE_LINEAR,
+                            &source_rect);
+        } else if (d2d_->card_brush) {
+            const float saved_opacity = d2d_->card_brush->GetOpacity();
+            d2d_->card_brush->SetOpacity(0.46f);
+            ctx->FillRoundedRectangle(D2D1::RoundedRect(song_image_rect, 12.0f, 12.0f),
+                                      d2d_->card_brush.Get());
+            d2d_->card_brush->SetOpacity(saved_opacity);
+        }
+
+        const float song_info_left = song_rect.left + 258.0f;
+        const float song_info_right = song_rect.right - 18.0f;
+        if (d2d_->hud_format && d2d_->accent_brush) {
+            draw_text_clipped(wloc("CHART INFO", "차트 정보"),
+                              d2d_->hud_format.Get(),
+                              D2D1::RectF(song_info_left, song_rect.top + 20.0f,
+                                          song_info_right, song_rect.top + 52.0f),
+                              d2d_->accent_brush.Get());
+        }
+        auto draw_song_info_line = [&](float y, std::string text, bool muted = false) {
+            if (!d2d_->body_format) {
+                return;
+            }
+            ID2D1Brush* brush = muted ? static_cast<ID2D1Brush*>(d2d_->muted_brush.Get())
+                                      : static_cast<ID2D1Brush*>(d2d_->text_brush.Get());
+            if (brush) {
+                draw_text_clipped(to_wide(text),
+                                  d2d_->body_format.Get(),
+                                  D2D1::RectF(song_info_left, y, song_info_right, y + 32.0f),
+                                  brush);
+            }
+        };
+        const std::string chart_label =
+            !data.result.chart_name.empty() ? data.result.chart_name : data.result.layout_label;
+        draw_song_info_line(song_rect.top + 62.0f, chart_label.empty() ? "--" : chart_label);
+        const std::string key_layout =
+            (data.result.key_count > 0 ? std::to_string(data.result.key_count) + "K" : "--") +
+            (data.result.layout_label.empty() ? std::string{} : " / " + data.result.layout_label);
+        draw_song_info_line(song_rect.top + 104.0f, key_layout, true);
+        draw_song_info_line(song_rect.top + 146.0f,
+                            "BPM " + (data.result.bpm > 0.0 ? format_decimal(data.result.bpm) : "--"),
+                            true);
+        const int display_level =
+            data.result.level > 0 ? data.result.level : data.result.native_level;
+        draw_song_info_line(song_rect.top + 188.0f,
+                            "LV " + (display_level > 0 ? std::to_string(display_level) : "--") +
+                                " / CR " +
+                                (data.result.rating > 0.0 ? format_decimal(data.result.rating) : "--"),
+                            true);
+        if (!data.result.difficulty_table_label.empty()) {
+            draw_song_info_line(song_rect.top + 230.0f,
+                                data.result.difficulty_table_label,
+                                true);
+        }
         const std::wstring title_w = to_wide(data.result.title.empty() ? loc("Unknown Chart", "알 수 없는 차트") : data.result.title);
         const std::wstring artist_w = to_wide(data.result.artist.empty() ? loc("Unknown Artist", "알 수 없는 아티스트") : data.result.artist);
         if (d2d_->song_title_format && d2d_->text_brush) {

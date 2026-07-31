@@ -84,7 +84,7 @@ std::string normalize_runtime_key_mode_local(std::string value) {
         return "none";
     }
     if (value == "4k" || value == "5k" || value == "6k" || value == "7k" || value == "8k" ||
-        value == "9k" || value == "10k" || value == "16k") {
+        value == "9k" || value == "10k" || value == "12k" || value == "14k" || value == "16k") {
         return value;
     }
     return "none";

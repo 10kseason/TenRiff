@@ -255,15 +255,15 @@ inline std::string normalize_runtime_key_mode(std::string value) {
         return "none";
     }
     if (value == "4k" || value == "5k" || value == "6k" || value == "7k" || value == "8k" ||
-        value == "9k" || value == "10k" || value == "16k") {
+        value == "9k" || value == "10k" || value == "12k" || value == "14k" || value == "16k") {
         return value;
     }
     return "none";
 }
 
 inline std::string cycle_runtime_key_mode(std::string_view current, int direction, bool allow_auto) {
-    static constexpr const char* kAutoModes[] = {"none", "4k", "5k", "6k", "7k", "8k", "9k", "10k", "16k"};
-    static constexpr const char* kConcreteModes[] = {"4k", "5k", "6k", "7k", "8k", "9k", "10k", "16k"};
+    static constexpr const char* kAutoModes[] = {"none", "4k", "5k", "6k", "7k", "8k", "9k", "10k", "12k", "14k", "16k"};
+    static constexpr const char* kConcreteModes[] = {"4k", "5k", "6k", "7k", "8k", "9k", "10k", "12k", "14k", "16k"};
     const auto* options = allow_auto ? kAutoModes : kConcreteModes;
     const int option_count = allow_auto ? static_cast<int>(sizeof(kAutoModes) / sizeof(kAutoModes[0]))
                                         : static_cast<int>(sizeof(kConcreteModes) / sizeof(kConcreteModes[0]));
@@ -342,6 +342,9 @@ inline std::string cycle_gauge_mode(std::string current, int direction) {
 inline std::string random_label(const std::string& value) {
     if (value == "mirror") {
         return "Mirror";
+    }
+    if (value == "rr") {
+        return "R-Random";
     }
     if (value == "fr") {
         return "FR";

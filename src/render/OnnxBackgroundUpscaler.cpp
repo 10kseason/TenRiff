@@ -479,17 +479,17 @@ struct OnnxBackgroundUpscaler::Impl {
             };
             if (prefer_npu) {
                 try {
-                    // Legacy WinML cannot name an NPU directly. DirectXMinPower asks Windows for
-                    // its lowest-power compatible ML device, which can be an NPU when the OS and
-                    // driver expose one. We keep a deterministic GPU fallback below.
+                    // Legacy WinML cannot name or verify an NPU. DirectXMinPower requests the
+                    // lowest-power compatible DirectX ML device, so this path must not be logged
+                    // as proof of NPU execution. A deterministic GPU fallback remains below.
                     session = ml::LearningModelSession(
                         model,
                         ml::LearningModelDevice(ml::LearningModelDeviceKind::DirectXMinPower));
                     using_low_power_preference = true;
-                    std::cerr << "[ONNX Upscaler] Requested the Windows low-power AI device "
-                                 "(NPU when available).\n";
+                    std::cerr << "[ONNX Upscaler] Requested Windows DirectXMinPower; "
+                                 "this is not an explicit or verified NPU selection.\n";
                 } catch (const winrt::hresult_error&) {
-                    std::cerr << "[ONNX Upscaler] Low-power/NPU-preferred session unavailable; "
+                    std::cerr << "[ONNX Upscaler] DirectXMinPower session unavailable; "
                                  "falling back to high-performance DirectX.\n";
                 }
             }
@@ -743,6 +743,13 @@ bool OnnxBackgroundUpscaler::should_upscale(std::uint32_t width,
                                               std::string_view mode) {
     return lower_ascii(mode) == "onnx" && width > 0 && height > 0 &&
            (width < kOnnxUpscaleTargetWidth || height < kOnnxUpscaleTargetHeight);
+}
+
+bool OnnxBackgroundUpscaler::should_upscale_realtime_video(std::string_view) {
+    // The worker returns frames asynchronously. Applying a completed video frame after
+    // newer native frames have already been presented makes the BGA jump backward in time.
+    // Keep real-time video native until a timestamp-aware ordered output queue exists.
+    return false;
 }
 
 }  // namespace tenriff::render

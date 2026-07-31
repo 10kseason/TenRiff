@@ -345,6 +345,10 @@ TEST_CASE("key mode parser accepts none plus 4K through 16K") {
     CHECK(parse_key_mode("9k").value() == KeyMode::Keys9);
     REQUIRE(parse_key_mode("10k").has_value());
     CHECK(parse_key_mode("10k").value() == KeyMode::Keys10);
+    REQUIRE(parse_key_mode("12k").has_value());
+    CHECK(parse_key_mode("12k").value() == KeyMode::Keys12);
+    REQUIRE(parse_key_mode("14k").has_value());
+    CHECK(parse_key_mode("14k").value() == KeyMode::Keys14);
     REQUIRE(parse_key_mode("16k").has_value());
     CHECK(parse_key_mode("16k").value() == KeyMode::Keys16);
 }
@@ -419,6 +423,54 @@ TEST_CASE("key mode converter expands into new lanes when increasing lanes") {
         CHECK(note.lane >= 1);
         CHECK(note.lane <= 7);
     }
+}
+
+TEST_CASE("7+1 SP to 8K converts only the seven key lanes and autoplays scratch keysounds") {
+    using namespace tenriff::gameplay;
+
+    GameplayChart chart;
+    chart.lane_count = 8;
+    chart.scratch_lanes = {1};
+    const std::size_t scratch_asset = chart.intern_audio_asset("scratch.wav");
+
+    append_note(chart, 1, 100);
+    chart.notes.back().audio_asset_id = scratch_asset;
+    for (int lane = 2; lane <= 8; ++lane) {
+        append_note(chart, lane, static_cast<int64_t>(lane) * 10000);
+    }
+
+    const auto result = apply_key_mode(chart, KeyMode::Keys8, 4242, 176.0);
+
+    CHECK(result.chart.lane_count == 8);
+    CHECK(result.chart.scratch_lanes.empty());
+    REQUIRE(result.chart.notes.size() >= 7u);
+    CHECK(std::none_of(result.chart.notes.begin(), result.chart.notes.end(), [](const NoteEvent& note) {
+        return note.note_id == 1u;
+    }));
+    for (std::size_t key_note_id = 2; key_note_id <= 8; ++key_note_id) {
+        CHECK(std::count_if(result.chart.notes.begin(), result.chart.notes.end(), [key_note_id](const NoteEvent& note) {
+            return note.note_id == key_note_id;
+        }) == 1);
+    }
+    for (const auto& note : result.chart.notes) {
+        CHECK(note.lane >= 1);
+        CHECK(note.lane <= 8);
+    }
+
+    REQUIRE(result.chart.audio_cues.size() == 1u);
+    CHECK(result.chart.audio_cues.front().start_sample == 100);
+    CHECK(result.chart.audio_cues.front().asset_id == scratch_asset);
+    CHECK(contains_warning(result.warnings, "remapped only the key lanes"));
+}
+
+TEST_CASE("native 8K remains unchanged when it has no scratch lane metadata") {
+    using namespace tenriff::gameplay;
+
+    const GameplayChart chart = make_representative_chart(8);
+    const auto result = apply_key_mode(chart, KeyMode::Keys8, 4242, 176.0);
+
+    CHECK(chart_signature(result.chart) == chart_signature(chart));
+    CHECK(result.warnings.empty());
 }
 
 TEST_CASE("key mode converter keeps representative conversion cases valid") {
@@ -803,4 +855,148 @@ TEST_CASE("key mode conversion followed by super random stays within target lane
         CHECK(note.lane >= 1);
         CHECK(note.lane <= 4);
     }
+}
+
+TEST_CASE("5+1 SP forced key mode removes scratch and converts only five key lanes") {
+    using namespace tenriff::gameplay;
+
+    GameplayChart chart;
+    chart.lane_count = 6;
+    chart.scratch_lanes = {6};
+    const std::size_t scratch_asset = chart.intern_audio_asset("scratch-5k.wav");
+    append_note(chart, 6, 100);
+    chart.notes.back().audio_asset_id = scratch_asset;
+    const std::size_t scratch_note_id = chart.notes.back().note_id;
+    for (int lane = 1; lane <= 5; ++lane) {
+        append_note(chart, lane, 1000 + lane * 1000);
+    }
+
+    const auto result = apply_key_mode(chart, KeyMode::Keys8, 55, 180.0);
+    CHECK(result.chart.lane_count == 8);
+    CHECK(result.chart.scratch_lanes.empty());
+    CHECK(std::none_of(result.chart.notes.begin(), result.chart.notes.end(),
+                       [scratch_note_id](const NoteEvent& note) {
+                           return note.note_id == scratch_note_id;
+                       }));
+    REQUIRE(result.chart.audio_cues.size() == 1u);
+    CHECK(result.chart.audio_cues.front().asset_id == scratch_asset);
+}
+
+TEST_CASE("10+2 DP to 12K removes both scratches and converts player halves independently") {
+    using namespace tenriff::gameplay;
+
+    GameplayChart chart;
+    chart.lane_count = 12;
+    chart.lane_group_size = 6;
+    chart.scratch_lanes = {6, 12};
+    const std::size_t scratch_asset = chart.intern_audio_asset("dp-scratch.wav");
+    append_note(chart, 6, 100);
+    chart.notes.back().audio_asset_id = scratch_asset;
+    append_note(chart, 12, 200);
+    chart.notes.back().audio_asset_id = scratch_asset;
+    for (int lane = 1; lane <= 5; ++lane) {
+        append_note(chart, lane, 1000 + lane * 1000);
+    }
+    for (int lane = 7; lane <= 11; ++lane) {
+        append_note(chart, lane, 10000 + lane * 1000);
+    }
+
+    const auto result = apply_key_mode(chart, KeyMode::Keys12, 2026, 180.0);
+    CHECK(result.chart.lane_count == 12);
+    CHECK(result.chart.lane_group_size == 6);
+    CHECK(result.chart.scratch_lanes.empty());
+    REQUIRE(result.chart.audio_cues.size() == 2u);
+    for (const auto& note : result.chart.notes) {
+        REQUIRE(note.note_id >= 3u);
+        if (note.note_id <= 7u) {
+            CHECK(note.lane >= 1);
+            CHECK(note.lane <= 6);
+        } else {
+            CHECK(note.lane >= 7);
+            CHECK(note.lane <= 12);
+        }
+    }
+}
+
+TEST_CASE("14+2 DP supports scratch-free 14K and independent 16K expansion") {
+    using namespace tenriff::gameplay;
+
+    GameplayChart chart;
+    chart.lane_count = 16;
+    chart.lane_group_size = 8;
+    chart.scratch_lanes = {6, 14};
+    for (int lane = 1; lane <= 16; ++lane) {
+        append_note(chart, lane, 1000 + lane * 1000);
+    }
+
+    const auto fourteen = apply_key_mode(chart, KeyMode::Keys14, 14, 180.0);
+    CHECK(fourteen.chart.lane_count == 14);
+    CHECK(fourteen.chart.lane_group_size == 7);
+    CHECK(fourteen.chart.scratch_lanes.empty());
+    CHECK(fourteen.chart.notes.size() == 14u);
+
+    const auto sixteen = apply_key_mode(chart, KeyMode::Keys16, 16, 180.0);
+    CHECK(sixteen.chart.lane_count == 16);
+    CHECK(sixteen.chart.lane_group_size == 8);
+    CHECK(sixteen.chart.scratch_lanes.empty());
+    for (const auto& note : sixteen.chart.notes) {
+        if (note.note_id <= 8u && note.note_id != 6u) {
+            CHECK(note.lane <= 8);
+        } else if (note.note_id > 8u && note.note_id != 14u) {
+            CHECK(note.lane >= 9);
+        }
+    }
+}
+
+TEST_CASE("R-Random keeps scratches fixed and rotates DP halves independently") {
+    using namespace tenriff::gameplay;
+
+    GameplayChart chart;
+    chart.lane_count = 16;
+    chart.lane_group_size = 8;
+    chart.scratch_lanes = {6, 14};
+    for (int lane = 1; lane <= 16; ++lane) {
+        append_note(chart, lane, 100);
+    }
+
+    ModeSettings settings;
+    settings.random = RandomMode::RotateRandom;
+    settings.random_seed = 77;
+    const auto first = apply_mode_settings(chart, settings);
+    const auto second = apply_mode_settings(chart, settings);
+    CHECK(chart_signature(first.chart) == chart_signature(second.chart));
+
+    for (const auto& original : chart.notes) {
+        const auto transformed = std::find_if(
+            first.chart.notes.begin(), first.chart.notes.end(), [&](const NoteEvent& note) {
+                return note.note_id == original.note_id;
+            });
+        REQUIRE(transformed != first.chart.notes.end());
+        if (original.lane == 6 || original.lane == 14) {
+            CHECK(transformed->lane == original.lane);
+        } else {
+            CHECK((transformed->lane <= 8) == (original.lane <= 8));
+        }
+    }
+}
+
+TEST_CASE("DP Flip swaps player fields without changing note timing") {
+    using namespace tenriff::gameplay;
+
+    GameplayChart chart;
+    chart.lane_count = 14;
+    chart.lane_group_size = 7;
+    append_note(chart, 1, 100);
+    append_note(chart, 8, 200);
+
+    ModeSettings settings;
+    settings.dp_flip = true;
+    const auto result = apply_mode_settings(chart, settings);
+    REQUIRE(result.chart.notes.size() == 2u);
+    CHECK(result.chart.notes[0].note_id == 1u);
+    CHECK(result.chart.notes[0].lane == 8);
+    CHECK(result.chart.notes[0].start_sample == 100);
+    CHECK(result.chart.notes[1].note_id == 2u);
+    CHECK(result.chart.notes[1].lane == 1);
+    CHECK(result.chart.notes[1].start_sample == 200);
 }

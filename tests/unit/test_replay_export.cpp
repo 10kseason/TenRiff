@@ -179,6 +179,7 @@ TEST_CASE("replay export writes JSON with trace events") {
 
 TEST_CASE("result export writes JSON with replay reference") {
     ResultFile result;
+    result.player_name = "Luna Pilot";
     result.chart_path = "Songs/test.bms";
     result.chart_format = "bms";
     result.created_utc = "20250101_000000Z";
@@ -215,6 +216,10 @@ TEST_CASE("result export writes JSON with replay reference") {
     const auto* root = parsed.root->as_object();
     REQUIRE(root != nullptr);
 
+    auto player_name_it = root->find("player_name");
+    REQUIRE(player_name_it != root->end());
+    CHECK(player_name_it->second.as_string() == result.player_name);
+
     auto replay_path_it = root->find("replay_path");
     REQUIRE(replay_path_it != root->end());
     CHECK(replay_path_it->second.as_string() == result.replay_path);
@@ -236,6 +241,7 @@ TEST_CASE("result export writes JSON with replay reference") {
 
     auto parsed_result = tenriff::app::menu_records::parse_result_file(path, nullptr);
     REQUIRE(parsed_result.has_value());
+    CHECK(parsed_result->player_name == "Luna Pilot");
     CHECK(parsed_result->mods.size() == 1u);
     CHECK(parsed_result->mods[0] == "ln_mix_30");
     CHECK(parsed_result->stats.raw_score == 1800);
@@ -272,6 +278,7 @@ TEST_CASE("legacy result parsing falls back to derived score metadata") {
 
     auto parsed = tenriff::app::menu_records::parse_result_file(path, nullptr);
     REQUIRE(parsed.has_value());
+    CHECK(parsed->player_name.empty());
     CHECK(parsed->mods.empty());
     CHECK(parsed->rate_multiplier == doctest::Approx(1.0));
     CHECK(parsed->score_multiplier == doctest::Approx(1.0));

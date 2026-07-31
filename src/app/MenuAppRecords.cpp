@@ -8,6 +8,7 @@
 #include "app/MenuAppSongSelectUtils.h"
 #include "app/MenuRecordUtils.h"
 #include "app/MenuSongUtils.h"
+#include "app/ModeManager.h"
 #include "gameplay/Replay.h"
 
 namespace tenriff::app {
@@ -85,6 +86,8 @@ void MenuApp::reload_chart_best_results() {
         record.chart_path = parsed->chart_path;
         record.chart_format = parsed->chart_format;
         record.created_utc = parsed->created_utc;
+        record.player_name =
+            parsed->player_name.empty() ? profile_display_name() : parsed->player_name;
         record.result_path = entry.path().u8string();
         record.replay_path = parsed->replay_path;
         record.rank = candidate.rank;
@@ -111,11 +114,15 @@ void MenuApp::reload_chart_best_results() {
         record.stddev_delta_ms = parsed->stats.stddev_delta_ms();
         const std::size_t record_index = local_play_records_.size();
         local_play_records_.push_back(record);
+        const bool note_count_modified = mode_mod_adds_notes(parsed->mods);
 
         // Fan results out across all normalized path keys so old exports still match
         // after source-root changes or relative/absolute-path differences.
         for (const auto& key : menu_songs::build_chart_path_keys(parsed->chart_path, songs_path_)) {
             chart_play_record_indices_[key].push_back(record_index);
+            if (note_count_modified) {
+                continue;
+            }
             auto existing = chart_best_results_.find(key);
             if (existing == chart_best_results_.end()) {
                 chart_best_results_.emplace(key, candidate);
@@ -293,20 +300,16 @@ bool MenuApp::open_selected_record_result() {
     last_result_rate_multiplier_ = parsed->rate_multiplier;
     last_result_score_multiplier_ = parsed->score_multiplier;
     last_result_final_score_ = parsed->final_score;
+    last_result_player_name_ =
+        parsed->player_name.empty() ? profile_display_name() : parsed->player_name;
     last_replay_path_ = record->replay_path;
     last_result_path_ = record->result_path;
     last_export_warnings_.clear();
     last_session_replay_playback_ = false;
-    if (const SongEntry* entry = (selected_song_ >= 0) ? visible_song_entry(static_cast<std::size_t>(selected_song_))
-                                                       : nullptr) {
-        last_chart_title_ = entry->title.empty() ? entry->path : entry->title;
-        last_chart_artist_ = entry->artist;
-        last_chart_bpm_ = entry->bpm;
-    } else {
-        last_chart_title_ = filename_only(parsed->chart_path);
-        last_chart_artist_.clear();
-        last_chart_bpm_ = 0.0;
-    }
+    const SongEntry* entry = (selected_song_ >= 0)
+                                 ? visible_song_entry(static_cast<std::size_t>(selected_song_))
+                                 : nullptr;
+    update_last_chart_metadata(parsed->chart_path, entry);
     screen_ = Screen::Result;
     return true;
 }
@@ -404,6 +407,49 @@ std::string MenuApp::song_absolute_path(const SongEntry& entry) const {
     }
     return candidate.u8string();
 }
+
+void MenuApp::update_last_chart_metadata(const std::string& chart_path,
+                                         const SongEntry* preferred_entry) {
+    last_chart_path_ = chart_path;
+    last_chart_entry_ = {};
+    last_chart_entry_valid_ = false;
+
+    const auto target_keys = menu_songs::build_chart_path_keys(chart_path, songs_path_);
+    const std::unordered_set<std::string> target_key_set(target_keys.begin(), target_keys.end());
+    const auto matches_chart = [&](const SongEntry& entry) {
+        for (const auto& key : menu_songs::build_chart_path_keys(song_absolute_path(entry), songs_path_)) {
+            if (target_key_set.find(key) != target_key_set.end()) {
+                return true;
+            }
+        }
+        return false;
+    };
+    const auto assign_entry = [&](const SongEntry& entry) {
+        last_chart_entry_ = entry;
+        last_chart_entry_valid_ = true;
+        last_chart_title_ = entry.title.empty()
+                                ? menu_song_select::filename_only(chart_path)
+                                : entry.title;
+        last_chart_artist_ = entry.artist;
+        last_chart_bpm_ = entry.bpm;
+    };
+
+    if (preferred_entry && matches_chart(*preferred_entry)) {
+        assign_entry(*preferred_entry);
+        return;
+    }
+    for (const auto& entry : indexed_songs_) {
+        if (matches_chart(entry)) {
+            assign_entry(entry);
+            return;
+        }
+    }
+
+    last_chart_title_ = menu_song_select::filename_only(chart_path);
+    last_chart_artist_.clear();
+    last_chart_bpm_ = 0.0;
+}
+
 
 std::string MenuApp::song_background_preview_path_for_entry(const SongEntry& entry) {
     return entry.background_preview_path;

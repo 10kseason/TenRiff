@@ -185,6 +185,15 @@ struct ResultScreenData {
     std::string track;
     std::string title;
     std::string artist;
+    std::string background_path;
+    std::string chart_name;
+    std::string layout_label;
+    std::string difficulty_table_label;
+    int key_count = 0;
+    int level = 0;
+    int native_level = 0;
+    double rating = 0.0;
+    double bpm = 0.0;
 
     std::string rank = "--";
     std::string status = "NO DATA";
@@ -517,8 +526,10 @@ public:
     void on_mouse_move(int window_x, int window_y);
     void on_mouse_wheel(int wheel_delta);
     void on_file_drop(std::string path);
+    void on_text_input(wchar_t character);
 
     [[nodiscard]] std::optional<MenuClickEvent> poll_click_event();
+    [[nodiscard]] std::optional<std::string> poll_text_input();
     [[nodiscard]] bool cursor_hidden() const { return cursor_hidden_; }
 
     [[nodiscard]] bool should_close() const { return should_close_.load(std::memory_order_acquire); }
@@ -563,6 +574,7 @@ private:
     [[nodiscard]] bool resize_swap_chain(unsigned int width, unsigned int height);
     [[nodiscard]] bool enter_fullscreen_mode(unsigned int width, unsigned int height, const char* log_context);
     void push_click_event(MenuClickEvent event);
+    void push_text_input(std::string text);
     void clear_song_scrollbar_state();
     [[nodiscard]] bool translate_window_point(int window_x, int window_y, float* out_x, float* out_y) const;
     [[nodiscard]] int song_scrollbar_target_index(float y, float drag_offset, int selected_offset) const;
@@ -608,6 +620,9 @@ private:
     std::vector<HitRegion> hit_regions_{};
     std::mutex click_events_mutex_{};
     std::deque<MenuClickEvent> click_events_{};
+    std::mutex text_input_mutex_{};
+    std::deque<std::string> text_input_events_{};
+    wchar_t pending_high_surrogate_ = 0;
 
     struct PerformanceOverlayCache {
         uint64_t graph_revision = 0;

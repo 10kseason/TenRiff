@@ -60,7 +60,7 @@ TenRiff의 기본 플레이 흐름은 아래 순서입니다.
 - `Graphics`
   - VSync, Refresh Hz, Performance HUD, Display Offset, BGA 표시, 외부 ONNX BGA Upscaler 조정
   - `BGA`를 끄면 게임플레이 이미지/영상과 관련 디코더·업스케일러 작업이 꺼지며 Song Select 미리보기는 유지됨
-  - 모델 선택 후 Upscaler를 직접 켜고 고사양 경고를 확인해야 함. `NPU 우선(실험)`은 Windows/드라이버가 실제 NPU를 선택할 수 있을 때만 사용됨
+  - 모델 선택 후 Upscaler를 직접 켜고 고사양 경고를 확인해야 함. `저전력 DirectX(실험)`은 DirectXMinPower 요청일 뿐 NPU를 명시 선택하거나 검증하지 않음
 - `Skins`
   - native/LR2 스킨 전환, LR2 폴더 가져오기, 판정선 위치, 노트 크기, LN 몸통 폭, lane color 조정
 - `Keymap`
@@ -105,7 +105,7 @@ Discord 설정 방법은 [공식 Game Overlay 안내](https://support.discord.co
 ## 6. 플레이 시작 전 알아둘 점
 
 ### 차트 형식
-- TenRiff 1.2.8은 BMS 계열(`.bms/.bme/.bml/.pms`)만 인덱싱하고 플레이합니다.
+- TenRiff 1.2.9은 BMS 계열(`.bms/.bme/.bml/.pms`)만 인덱싱하고 플레이합니다.
 
 ### 로딩
 - 곡 시작 직후에는 차트 로딩 진행 상태가 표시될 수 있습니다.

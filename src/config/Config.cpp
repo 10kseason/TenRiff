@@ -11,6 +11,7 @@
 #include "app/RuntimeConfigMigration.h"
 #include "app/ModeManager.h"
 #include "config/SimpleJson.h"
+#include "util/Utf8Compat.h"
 
 namespace tenriff::config {
 
@@ -76,6 +77,12 @@ int lane_count_for_skin_mode_token(std::string_view key_mode) {
     if (normalized == "9k") {
         return 9;
     }
+    if (normalized == "12k") {
+        return 12;
+    }
+    if (normalized == "14k") {
+        return 14;
+    }
     if (normalized == "16k") {
         return 16;
     }
@@ -85,6 +92,10 @@ int lane_count_for_skin_mode_token(std::string_view key_mode) {
 const std::unordered_map<std::string, std::vector<std::string>>& default_skin_lane_color_map() {
     static const std::unordered_map<std::string, std::vector<std::string>> kDefaults = {
         {"4k", {"ice", "azure", "azure", "ice"}},
+        {"12k", {"ice", "azure", "ice", "azure", "ice", "teal",
+                  "teal", "ice", "azure", "ice", "azure", "ice"}},
+        {"14k", {"ice", "azure", "ice", "azure", "ice", "teal", "gold",
+                  "gold", "teal", "ice", "azure", "ice", "azure", "ice"}},
         {"5k", {"ice", "azure", "gold", "azure", "ice"}},
         {"6k", {"ice", "azure", "ice", "ice", "azure", "ice"}},
         {"7k", {"ice", "azure", "ice", "gold", "ice", "azure", "ice"}},
@@ -634,6 +645,8 @@ void apply_config_object(const JsonObject& root, RuntimeConfig& config) {
     }
 
     if (auto* ui = get_object(root, "ui")) {
+        config.ui.profile_nickname =
+            normalize_profile_nickname(get_string(*ui, "profile_nickname", config.ui.profile_nickname));
         config.ui.language = normalize_ui_language(get_string(*ui, "language", config.ui.language));
         config.ui.result_tail_ms = get_number(*ui, "result_tail_ms", config.ui.result_tail_ms);
         config.ui.require_enter_to_exit = get_bool(*ui, "require_enter_to_exit", config.ui.require_enter_to_exit);
@@ -1000,6 +1013,7 @@ JsonValue build_json_root(const RuntimeConfig& config) {
     root.emplace("mode", JsonValue{std::move(mode)});
 
     JsonObject ui;
+    ui.emplace("profile_nickname", JsonValue{normalize_profile_nickname(config.ui.profile_nickname)});
     ui.emplace("language", JsonValue{normalize_ui_language(config.ui.language)});
     ui.emplace("result_tail_ms", JsonValue{config.ui.result_tail_ms});
     ui.emplace("require_enter_to_exit", JsonValue{config.ui.require_enter_to_exit});
@@ -1147,11 +1161,18 @@ std::string normalize_skin_mode_token(std::string_view key_mode) {
     if (normalized == "10" || normalized == "10key" || normalized == "keys10") {
         return "10k";
     }
+    if (normalized == "12" || normalized == "12key" || normalized == "keys12") {
+        return "12k";
+    }
+    if (normalized == "14" || normalized == "14key" || normalized == "keys14") {
+        return "14k";
+    }
     if (normalized == "16" || normalized == "16key" || normalized == "keys16") {
         return "16k";
     }
     if (normalized == "4k" || normalized == "5k" || normalized == "6k" || normalized == "7k" ||
-        normalized == "8k" || normalized == "9k" || normalized == "10k" || normalized == "16k") {
+        normalized == "8k" || normalized == "9k" || normalized == "10k" || normalized == "12k" ||
+        normalized == "14k" || normalized == "16k") {
         return normalized;
     }
     return "10k";
@@ -1161,12 +1182,28 @@ std::string normalize_song_index_profile_token(std::string_view token) {
     return normalize_song_index_profile(std::string(token));
 }
 
+std::string normalize_profile_nickname(std::string_view value) {
+    constexpr std::size_t kMaxNicknameBytes = 48;
+    std::string nickname = util::sanitize_ui_text(value);
+    if (nickname.size() <= kMaxNicknameBytes) {
+        return nickname;
+    }
+
+    std::size_t cut = kMaxNicknameBytes;
+    while (cut > 0 &&
+           (static_cast<unsigned char>(nickname[cut]) & 0xC0u) == 0x80u) {
+        --cut;
+    }
+    nickname.resize(cut);
+    return nickname;
+}
+
 std::string normalize_ui_language_token(std::string_view token) {
     return normalize_ui_language(std::string(token));
 }
 
 std::vector<std::string> supported_skin_mode_tokens() {
-    return {"4k", "5k", "6k", "7k", "8k", "9k", "10k", "16k"};
+    return {"4k", "5k", "6k", "7k", "8k", "9k", "10k", "12k", "14k", "16k"};
 }
 
 std::vector<std::string> supported_skin_color_tokens() {

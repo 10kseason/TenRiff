@@ -36,19 +36,19 @@ Relative model paths are resolved from the executable directory and current
 working directory. The file is loaded only while mode is onnx; changing the
 selected path creates a fresh WinML session.
 
-## Experimental NPU preference
+## Legacy low-power DirectX preference
 
 graphics.background_upscale_prefer_npu defaults to false and has no effect while
 the upscaler is off. The default path requests a Windows ML
-DirectXHighPerformance GPU device. When the experimental preference is enabled,
-TenRiff first requests DirectXMinPower. This is an NPU preference, not an NPU
-guarantee: Windows and the installed driver choose the actual accelerator. If
-the low-power session cannot be created or evaluate the model, TenRiff falls
-back to DirectXHighPerformance and then the normal DirectX fallback.
+DirectXHighPerformance GPU device. When the experimental low-power preference is
+enabled, TenRiff first requests DirectXMinPower. Legacy WinML cannot explicitly
+select or verify an NPU, so this path must not be treated as NPU success. If the
+low-power session cannot be created or evaluate the model, TenRiff falls back to
+DirectXHighPerformance and then the normal DirectX fallback.
 
-Dynamic video BGA uses one in-flight inference request. New decoded frames are
-temporarily rejected while the accelerator is busy so a completed frame is not
-discarded only because a newer request ID arrived.
+Static image BGA remains eligible for asynchronous ONNX upscaling. Dynamic video
+BGA stays on native decoded frames because an older asynchronous inference result
+can otherwise overwrite a newer frame and make the background visibly jump.
 
 ## Verification
 

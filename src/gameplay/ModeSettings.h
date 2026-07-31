@@ -16,6 +16,8 @@ enum class KeyMode {
     Keys8,
     Keys9,
     Keys10,
+    Keys12,
+    Keys14,
     Keys16,
 };
 
@@ -30,6 +32,7 @@ enum class GaugeMode {
 enum class RandomMode {
     Off,
     Mirror,
+    RotateRandom,
     FullRandom,
     SuperRandom,
 };
@@ -39,6 +42,7 @@ struct ModeSettings {
     GaugeMode gauge = GaugeMode::Normal;
     RandomMode random = RandomMode::Off;
     uint32_t random_seed = 0;
+    bool dp_flip = false;
 };
 
 std::string to_string(KeyMode mode);

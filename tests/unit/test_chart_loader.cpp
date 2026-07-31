@@ -456,6 +456,8 @@ TEST_CASE("chart loader compacts BMS lanes for explicit 5+1 and 7+1 SP charts") 
         for (int lane = 0; lane < case_data.lane_count; ++lane) {
             CHECK(result.chart.notes[static_cast<std::size_t>(lane)].lane == lane + 1);
         }
+        REQUIRE(result.chart.scratch_lanes.size() == 1u);
+        CHECK(result.chart.scratch_lanes.front() == (case_data.lane_count == 6 ? 6 : 1));
     }
 }
 
@@ -519,6 +521,8 @@ TEST_CASE("chart loader auto-detects headerless player-one 7+1 SP charts") {
     CHECK(result.success());
     CHECK(result.format == ChartFormat::Bms);
     CHECK(result.chart.lane_count == 8);
+    REQUIRE(result.chart.scratch_lanes.size() == 1u);
+    CHECK(result.chart.scratch_lanes.front() == 1);
     REQUIRE(result.chart.notes.size() == 8u);
     for (int lane = 0; lane < 8; ++lane) {
         CHECK(result.chart.notes[static_cast<std::size_t>(lane)].lane == lane + 1);
@@ -548,6 +552,8 @@ TEST_CASE("chart loader maps 7+1 SP scratch to the first gameplay lane") {
     CHECK(result.success());
     CHECK(result.format == ChartFormat::Bms);
     CHECK(result.chart.lane_count == 8);
+    REQUIRE(result.chart.scratch_lanes.size() == 1u);
+    CHECK(result.chart.scratch_lanes.front() == 1);
     REQUIRE(result.chart.notes.size() == 3u);
     CHECK(result.chart.notes[0].lane == 1);
     CHECK(result.chart.notes[1].lane == 2);
@@ -610,6 +616,9 @@ TEST_CASE("chart loader preserves 14+2 DP lane positions") {
     CHECK(result.success());
     CHECK(result.format == ChartFormat::Bms);
     CHECK(result.chart.lane_count == 16);
+    REQUIRE((result.chart.scratch_lanes == std::vector<int>{6, 14}));
+    CHECK(result.chart.lane_group_size == 8);
+
     REQUIRE(result.chart.notes.size() == 6u);
     CHECK(result.chart.notes[0].lane == 1);
     CHECK(result.chart.notes[1].lane == 6);
@@ -618,6 +627,47 @@ TEST_CASE("chart loader preserves 14+2 DP lane positions") {
     CHECK(result.chart.notes[4].lane == 14);
     CHECK(result.chart.notes[5].lane == 16);
 }
+
+TEST_CASE("chart loader detects 10+2 DP and marks both scratch lanes") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+
+    const auto chart_path = temp.path / "dp10_plus_two.bms";
+    {
+        std::ofstream chart_file(chart_path, std::ios::binary);
+        REQUIRE(chart_file.good());
+        chart_file << "#TITLE 10 Plus 2 DP\n"
+                      "#PLAYER 3\n"
+                      "#BPM 120\n"
+                      "#00111:01\n"
+                      "#00112:01\n"
+                      "#00113:01\n"
+                      "#00114:01\n"
+                      "#00115:01\n"
+                      "#00116:01\n"
+                      "#00121:01\n"
+                      "#00122:01\n"
+                      "#00123:01\n"
+                      "#00124:01\n"
+                      "#00125:01\n"
+                      "#00126:01\n";
+    }
+
+    ChartLoader loader;
+    const ChartLoadResult result =
+        loader.load(chart_path.u8string(), 48000, 1.0, "ignore");
+    CHECK(result.success());
+    CHECK(result.format == ChartFormat::Bms);
+    CHECK(result.chart.lane_count == 12);
+    CHECK(result.chart.lane_group_size == 6);
+    CHECK((result.chart.scratch_lanes == std::vector<int>{6, 12}));
+    REQUIRE(result.chart.notes.size() == 12u);
+    for (int lane = 0; lane < 12; ++lane) {
+        CHECK(result.chart.notes[static_cast<std::size_t>(lane)].lane == lane + 1);
+    }
+}
+
 
 TEST_CASE("chart loader builds hold notes from BMS long-note channels") {
     TempDirGuard temp;

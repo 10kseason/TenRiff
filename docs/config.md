@@ -40,7 +40,7 @@
 
 - `backend` (string)
   - `polling | rawinput`
-  - 현재 `1.2.8` 릴리스 라인의 기본값은 `rawinput`
+  - 현재 `1.2.9` 릴리스 라인의 기본값은 `rawinput`
   - `Options -> Input Settings -> Backend` 또는 `Options -> Profile Setup -> Input Backend`에서 프로필별로 RawInput/Polling을 직접 선택 가능
   - 저장값은 런타임 fallback 때문에 자동으로 `polling`으로 덮어쓰지 않음
   - RawInput 시작 실패, 등록 대상 손실, 메시지 창 종료가 확인되면 현재 앱 실행 동안 메뉴와 다음 gameplay 세션 모두 Polling을 유지
@@ -60,7 +60,7 @@
 - `judgement_hz` (int)
   - `1000 | 2000 | 4000 | 8000`
   - 호환성용으로 남아 있는 입력 설정 필드
-  - 현재 `1.2.8` runtime은 별도 오디오 판정 서브루프를 이 값으로 구동하지 않음
+  - 현재 `1.2.9` runtime은 별도 오디오 판정 서브루프를 이 값으로 구동하지 않음
   - 기본값은 `4000` (`0.25ms`)
 - `debounce_ms` (double)
   - 실제 Press/Release 전환은 버리지 않고 같은 상태의 중복 이벤트만 상태 추적에서 제거
@@ -128,8 +128,8 @@
   - 사용자 모델의 권리·품질·성능은 사용자가 확인해야 하며 상세 계약은 `tools/onnx_upscaler/README.md`
 - `background_upscale_prefer_npu` (bool)
   - 기본값은 `false`이며 기본 경로는 high-performance DirectX GPU를 요청함
-  - `background_upscale_mode=onnx`일 때 Graphics Settings의 `NPU 우선(실험)`에서 명시적으로 켤 수 있음
-  - Windows ML에 `DirectXMinPower` device를 우선 요청할 뿐 실제 NPU 사용 여부는 Windows와 드라이버가 결정함
+  - Graphics Settings의 `저전력 DirectX(실험)`에서 `DirectXMinPower` 요청을 켬
+  - 레거시 WinML 경로는 NPU를 명시 선택하거나 검증하지 못하므로 이 옵션을 NPU 성공 근거로 사용하면 안 됨
   - 저전력 session 생성에 실패하면 기존 high-performance DirectX 경로로 폴백
 
 ### `mode`
@@ -171,6 +171,9 @@
   - `fast`는 32GB+ 환경에서 더 높은 worker/batch budget으로 재스캔 속도를 높이는 선택값
 
 ### `ui`
+- `profile_nickname` (string)
+  - Quick Setup에서 편집하며 저장 기록과 멀티플레이 표시 이름으로 사용
+  - 제어문자/중복 공백을 정리하고 UTF-8 기준 최대 48바이트로 제한; 비어 있으면 프로필 ID를 표시
 - `language` (string)
   - `en | ko`
   - 잘못된 값은 로드 시 `en`으로 정규화

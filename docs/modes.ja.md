@@ -23,10 +23,10 @@
 
 ## Mode Meanings
 - chart input は BMS family（`.bms/.bme/.bml/.pms`）専用で、`format` と `enable_osu_charts` setting は削除済み
-- `key_mode`: `none | auto | 4k | 5k | 6k | 7k | 8k | 9k | 10k | 16k`
+- `key_mode`: `none | auto | 4k | 5k | 6k | 7k | 8k | 9k | 10k | 12k | 14k | 16k`
 - `gauge`: `normal | hard | ex_hard | easy | shift`
-- `random`: `off | mirror | fr | sr`
-- `random_seed`: FR/SR、強制 key-mode 変換、LN Mix 対象選択の固定 seed（`0` も固定値として扱う）
+- `random`: `off | mirror | rr | fr | sr`
+- `random_seed`: RR/FR/SR、強制 key-mode 変換、Note Add、LN Mix 対象選択の固定 seed（`0` も固定値として扱う）
 - `mods`: Mod Manager が正規化して保存する mod token 配列
 - `ghost_battle_enabled`: `false | true`
   - 既定値は `false`
@@ -44,9 +44,11 @@
 `Rate` は `mode` ではなく `speed.rate` に保存されます。Mode Settings で変更でき、検索入力中でなければ Song Select の `-` / `+` でも次の play 値を直接変更できます。
 
 ## Lane Transform / Random Rules
+- **DP Flip**: DP の左右 player field 全体を交換し、各 field 内の lane 順は維持
 - **Mirror**: key-mode 変換後の最終 lane を決定的に反転
-  - 10K/16K は二つの player field を交換せず、各 half 内で独立して反転
+  - DP layout は二つの player field を交換せず、各 field 内で独立して反転
   - Mirror 自体は `random_seed` を使わないが、先に行う強制 key-mode 変換は seed を使用する場合がある
+- **RR (R-Random)**: scratch を固定し、playable lane group ごとに seed 付き offset で回転。DP の左右は独立処理
 - **FR (Full Random)**: lane 集合全体を random permutation で置き換える
 - **SR (Super Random)**: note ごとに random placement
   - 同時刻も含めて同一 lane overlap が起きないよう candidate lane を選ぶ
@@ -54,6 +56,7 @@
   - 候補 lane がない場合は元の lane を維持し、warning を出す
 
 ## Note-Structure Mods
+- **Note Add 10%～100%**: 既存 note 時刻に無音の chord note を決定的に追加し、scratch、hold body、同 lane 重複、過大 chord を避ける。Records には残るが通常 best record は更新しない
 - **Full LN**: 対象 tap を同じ lane の次 note 直前までの standard hold に変換
 - **LN Mix 10%～90%**: 既存 hold を維持し、同じ lane の既存 span と重なる head を除外する。base BPM 基準の 1/8-note hold が次の同一 lane note より 50ms 以上前に終わる tap から設定割合を `random_seed` で選択し、すべての Mix 段階で長さを 1/16-note 70% / 1/8-note 20% / 1/24・1/32-note 10% に決定的に配分
 - **Full Tap**: すべての hold tail を削除して tap に変換
@@ -62,8 +65,10 @@
 ## Key-Mode Handling
 - `none` は譜面の lane count と base pattern layout をそのまま維持する
 - `auto` は legacy alias で、現状は `none` と同じ挙動
-- key-mode 変換は Mirror / FR / SR より先に適用
-- `4k..16k` は N2NC ベースの lane remap で key count を合わせる
+- `4k..10k`、`12k`、`14k`、`16k` は N2NC ベースの lane remap で key count を合わせる
+- `5+1 SP` / `7+1 SP` の強制変換は scratch を除く鍵盤部だけを再配置し、`follow` の scratch keysound は autoplay へ移す
+- `10+2 DP` / `14+2 DP` も両 scratch を除外し、左右の鍵盤部を独立変換
+- 適用順: key-mode 変換 → DP Flip → Mirror/RR/FR/SR → Note Add → LN/Full Tap 構造変換
 
 ## Gauge Rules
 - 固定 gauge（`ex_hard / hard / normal / easy`）は `100%` で開始し、`0%` で即失敗して type は変化しない。

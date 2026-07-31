@@ -3,7 +3,7 @@
 이 문서는 다음 에이전트나 새 작업자가 가장 먼저 읽어야 하는 현재 상태 문서입니다. 목표는 "지금 이 프로젝트가 무엇이고, 어디를 보면 되고, 무엇이 아직 미검증인지"를 빠르게 파악하게 하는 것입니다.
 
 ## Baseline
-- 현재 프로젝트 버전과 공개 안정판은 `1.2.8 stable`
+- 현재 프로젝트 버전과 공개 안정판은 `1.2.9 stable`
 - 직접 IP 멀티플레이와 preview r5의 입력 backend 수명주기 수정은 `1.1.8 stable`에 통합
 - `1.1.8`은 1.1.7의 시각 개선에 osu!mania OD8 보조 점수, 첫 네이티브 `BAD` 즉사 `Sudden Death (1 MISS)`, 결정적 `LN Mix 10%~90%`를 추가
 - `1.2.0`은 BMS 채널 `04/07` 및 osu!mania 배경을 gameplay sample timeline에 연결하고, FHD 미만 이미지 배경을 Windows ML 기반 LunaSR로 비동기 보간
@@ -15,6 +15,7 @@
 - `1.2.6`은 실행 가능한 차트를 BMS 계열로 한정하고 native/LR2 스킨만 유지하며, ONNX 업스케일러 수동 활성화와 실험적 NPU 우선 옵션, Song Select Rate 조절, 중앙 인덱싱 진행 표시, 로컬 JSON 난이도표, BMS 키음 지연 입력 핫픽스를 추가.
 - `1.2.7`은 External ONNX Upscaler의 FP16 binding, float 경계 INT8 QDQ 감지, 고성능 DirectX GPU 기본값, 동영상 BGA one-in-flight backpressure를 수정.
 - `1.2.8`는 롱노트 전체 깜빡임 수정, 게임플레이 BGA 토글, BMSTable HTML/header 링크 가져오기, 긴 설정 화면 스크롤 UX 개선을 묶은 배포 전 후보.
+- `1.2.9`는 12K/14K와 scratch-aware key conversion, R-Random/DP Flip/Note Add, Song Select 자동 프리뷰, 상세 Result/곡 이미지, 프로필 닉네임, 동영상 BGA 흔들림 방지 및 정확한 `DirectXMinPower` 표기를 추가.
 - 후속 작업의 기준선 문서는 `docs/baseline-1.1.2.md`
 - Windows GUI 빌드가 메인 타깃
 - Linux는 `Baepoks-Linuxs/TenRiff-0.5.0-linux-preview` 수준의 preview만 존재
@@ -133,7 +134,8 @@
   - `background_upscale_model_path`는 Graphics Settings에서 선택하거나 드롭한 호환 ONNX 경로만 저장하며 공개 모델은 포함하지 않음
   - BGA Upscaler는 기본 `off`; 사용자가 명시적으로 켜고 고사양 경고를 확인해야 하며 자동 benchmark gate는 없음
   - 현재 지원 계약은 960x540 RGB residual x2이며 FP32/FP16 입출력과 float 경계 INT8 QDQ metadata를 자동 감지. 모델 권리·품질·성능은 사용자가 확인; 로드·계약·decode·추론 실패 시 native scaling 유지
-  - 기본값은 고성능 DirectX GPU이고, `background_upscale_prefer_npu=true`는 업스케일러가 켜졌을 때만 WinML `DirectXMinPower` session을 먼저 요청하는 opt-in 실험 옵션. 실제 NPU/GPU 선택은 Windows/driver가 결정하며, 생성·평가 실패 시 고성능 DirectX 경로와 일반 DirectX fallback을 사용
+  - 정지 이미지 BGA는 비동기 ONNX 업스케일을 유지하고, 영상 BGA는 늦은 과거 추론 프레임이 최신 프레임을 덮어 흔들리지 않도록 native decode 프레임만 표시
+  - 기본값은 고성능 DirectX GPU. `background_upscale_prefer_npu=true`는 레거시 WinML `DirectXMinPower` 요청일 뿐 NPU를 명시 선택하거나 endpoint로 검증하지 않으므로 NPU 성공으로 간주하지 않음
 - Gameplay performance:
   - static playfield command-list cache
   - note head/tail bitmap cache
@@ -142,8 +144,11 @@
   - Song Select 헤더 아래 중앙에 indexing stage/percent/processed/total/ETA/song count와 progress bar 표시
   - gameplay chart loading progress 표시
   - gameplay loading 중 `Esc` cancel
+  - Song Select에서 같은 곡을 750ms 유지하면 해당 BMS의 명시적 preview 또는 로컬 오디오 fallback을 메뉴 음량으로 재생
+  - Result는 곡 이미지와 chart/key/BPM/LV/CR/난이도표 정보를 함께 표시
 - Profile UX:
   - `Options -> Profile Setup`에서 현재 프로필의 언어, 오디오, 입력 백엔드, 그래픽, 키맵을 첫 실행용 Quick Setup 화면으로 다시 조정하고 즉시 저장
+  - 최대 48바이트의 프로필 닉네임을 편집하며 이후 저장 기록과 직접 IP 멀티플레이 표시 이름으로 사용
 - 직접 IP 멀티플레이:
   - Windows에서 1 호스트 + 1 참가자 TCP 연결, 기본 `27300/TCP`
   - 호스트만 선곡하며 참가자는 현재 source와 profile의 `recent_song_sources`에 기록된 폴더의 기존 캐시를 순서대로 열어 hash+size가 일치하는 차트를 자동 선택
@@ -188,7 +193,7 @@
 
 ## Runtime / Packaging Rules
 - 새 사용자 프로필은 자동 생성
-- 현재 정식 P2P 배포 라인은 `TenRiff 1.2.8 stable`
+- 현재 정식 P2P 배포 라인은 `TenRiff 1.2.9 stable`
 - 배포 패키지에는 `Songs`를 넣지 않음
 - 배포 패키지는 `Main Menu / Options / Song Selecte / Multiplayer Lobby / Clear / Failed` 이름의 `Mainmusic/` 화면 슬롯을 포함하며, 각 `이름.mp3`와 번호가 붙은 `이름 2.mp3`~`이름 64.mp3`를 자동 수집해 화면 재진입마다 순환
 - 배포 업데이트에는 built artifacts와 필요한 런타임 자산만 포함
@@ -236,7 +241,7 @@
 - gameplay low-FPS/0.1%/0.01% low 확인
 - OBS/Discord/Game Bar와 graphics live-apply 공존 확인
 - drag-and-drop / external Korean-path sources GUI 확인
-- 실제 NPU 탑재 Windows PC에서 `NPU 우선(실험)` on/off와 WinML device fallback 확인
+- OpenVINO EP device 열거, NPU endpoint 배치, CPU fallback 차단을 구현한 뒤 실제 NPU Windows PC에서 `--require-npu` 스모크 검증
 - 로컬 난이도표 교체 후 해시 매칭·재인덱싱·표시 순서 GUI 확인
 - 서로 다른 두 Windows PC/LAN 및 공인 IP 포트 포워딩 환경의 P2P 실기 확인
 - Linux는 아직 실제 실행판이 아님

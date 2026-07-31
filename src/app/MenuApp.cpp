@@ -423,7 +423,7 @@ std::string judgement_label(game::Judgement judgement) {
 }
 
 int cycle_key_filter_value(int key_filter, int direction) {
-    static constexpr int kKeyFilters[] = {0, 4, 5, 6, 7, 8, 9, 10, 16};
+    static constexpr int kKeyFilters[] = {0, 4, 5, 6, 7, 8, 9, 10, 12, 14, 16};
     const int option_count = static_cast<int>(sizeof(kKeyFilters) / sizeof(kKeyFilters[0]));
     int index = 0;
     for (int i = 0; i < option_count; ++i) {
@@ -611,6 +611,16 @@ std::vector<uint32_t> build_menu_probe_keycodes(const std::vector<uint32_t>& fix
 
 MenuApp::MenuApp() = default;
 
+std::string MenuApp::profile_display_name() const {
+    const std::string nickname =
+        config::normalize_profile_nickname(config_.ui.profile_nickname);
+    if (!nickname.empty()) {
+        return nickname;
+    }
+    return options_.profile.empty() ? std::string("Player") : options_.profile;
+}
+
+
 bool MenuApp::ui_uses_korean() const {
     return config::normalize_ui_language_token(config_.ui.language) == "ko";
 }
@@ -710,6 +720,9 @@ std::string MenuApp::ui_random_label(std::string_view token) const {
     const std::string normalized = to_lower_ascii(std::string(token));
     if (normalized == "mirror") {
         return ui_text("Mirror", "미러");
+    }
+    if (normalized == "rr") {
+        return "R-Random";
     }
     if (normalized == "fr") {
         return "FR";
@@ -1017,6 +1030,13 @@ void MenuApp::run() {
             }
             handle_menu_click(click.value());
         }
+        while (true) {
+            auto text = menu_window_.poll_text_input();
+            if (!text.has_value()) {
+                break;
+            }
+            handle_text_input(text.value());
+        }
         service_multiplayer();
 
         SongIndex updated;
@@ -1031,6 +1051,7 @@ void MenuApp::run() {
 
         update_keymap_capture_timeout();
         update_song_select_repeat();
+        service_song_preview();
 
         if (screen_ == Screen::SongSelect && song_indexer_.is_running()) {
             const int64_t now_ns = timing::HighResClock::now_ns();
@@ -2130,9 +2151,54 @@ void MenuApp::handle_title_input(uint32_t keycode) {
     }
 }
 
+void MenuApp::handle_text_input(std::string_view text) {
+    if (screen_ != Screen::QuickSetup || !profile_nickname_edit_active_ || text.empty()) {
+        return;
+    }
+
+    config_.ui.profile_nickname = config::normalize_profile_nickname(
+        config_.ui.profile_nickname + std::string(text));
+    publish_snapshot();
+}
+
 void MenuApp::handle_quick_setup_input(uint32_t keycode) {
     const auto setup_entry = profile_setup::entry(first_run_profile_);
     const int item_count = profile_setup::row_count(setup_entry);
+    if (profile_nickname_edit_active_) {
+        if (keycode == key_enter_) {
+            profile_nickname_edit_active_ = false;
+            config_.ui.profile_nickname =
+                config::normalize_profile_nickname(config_.ui.profile_nickname);
+            persist_runtime_config();
+            publish_snapshot();
+            return;
+        }
+        if (keycode == key_escape_) {
+            config_.ui.profile_nickname = profile_nickname_before_edit_;
+            profile_nickname_edit_active_ = false;
+            publish_snapshot();
+            return;
+        }
+        if (keycode == key_delete_) {
+            config_.ui.profile_nickname.clear();
+            publish_snapshot();
+            return;
+        }
+        if (keycode == key_backspace_) {
+            std::string& nickname = config_.ui.profile_nickname;
+            if (!nickname.empty()) {
+                std::size_t erase_from = nickname.size() - 1;
+                while (erase_from > 0 &&
+                       (static_cast<unsigned char>(nickname[erase_from]) & 0xC0u) == 0x80u) {
+                    --erase_from;
+                }
+                nickname.erase(erase_from);
+                publish_snapshot();
+            }
+            return;
+        }
+        return;
+    }
     if (keycode == key_up_) {
         settings_cursor_ = clamp_int(settings_cursor_ - 1, 0, item_count - 1);
         publish_snapshot();
@@ -2204,6 +2270,12 @@ void MenuApp::handle_quick_setup_input(uint32_t keycode) {
     }
 
     if (keycode == key_enter_) {
+        if (settings_cursor_ == profile_setup::kNicknameRow) {
+            profile_nickname_before_edit_ = config_.ui.profile_nickname;
+            profile_nickname_edit_active_ = true;
+            publish_snapshot();
+            return;
+        }
         const auto destination = profile_setup::enter_destination(setup_entry, settings_cursor_);
         if (destination != profile_setup::Destination::Stay) {
             first_run_profile_ = false;
