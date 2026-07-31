@@ -40,7 +40,7 @@
 
 - `backend` (string)
   - `polling | rawinput`
-  - 当前 `1.2.8` 发布线默认值为 `rawinput`
+  - 当前 `1.2.9` 发布线默认值为 `rawinput`
   - 可在 `Options -> Input Settings -> Backend` 或 `Options -> Profile Setup -> Input Backend` 中按 profile 选择
   - runtime fallback 不会把已保存值改写为 `polling`
   - 确认 RawInput 启动失败、注册目标丢失或 message window 退出后，本次应用运行期间 menu 与后续 gameplay 都会保持 Polling
@@ -128,8 +128,8 @@
   - 用户需自行确认模型权利、质量与性能；详见 `tools/onnx_upscaler/README.md`
 - `background_upscale_prefer_npu` (bool)
   - 默认值为 `false`，默认路径会请求高性能 DirectX GPU
-  - 在 `background_upscale_mode=onnx` 时，可通过 Graphics Settings 的实验性 `优先 NPU` 明确开启
-  - 只会请求 Windows ML 的 `DirectXMinPower` device；是否实际使用 NPU 由 Windows/driver 决定
+  - Graphics Settings 的实验性 `Low-Power DirectX` 会请求 `DirectXMinPower`
+  - legacy WinML 路径既不能明确选择也不能验证 NPU，因此该选项不能作为 NPU 执行证据
   - 创建低功耗 session 失败时回退到现有高性能 DirectX 路径
 
 ### `mode`
@@ -170,6 +170,9 @@ chart loader/indexer 仅支持 BMS family（`.bms/.bme/.bml/.pms`）；不再保
   - `fast` 是面向 32GB+ 环境、用更高 worker/batch budget 提升重扫速度的可选值
 
 ### `ui`
+- `profile_nickname` (string)
+  - 可在 Quick Setup 中编辑，用作已保存记录和 multiplayer 的显示名
+  - 清理控制字符与重复空格，UTF-8 最长48字节；空值时回退到 profile ID
 - `language` (string)
   - `en | ko`
   - 非法值会在加载时规范化为 `en`

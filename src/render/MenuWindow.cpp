@@ -1788,6 +1788,12 @@ LRESULT CALLBACK menu_window_proc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lpa
                 window->queue_resize(LOWORD(lparam), HIWORD(lparam));
             }
             return 0;
+        case WM_CHAR:
+            if (window) {
+                window->on_text_input(static_cast<wchar_t>(wparam));
+                return 0;
+            }
+            break;
         case WM_LBUTTONDOWN:
             if (window) {
                 window->on_mouse_button_down(GET_X_LPARAM(lparam), GET_Y_LPARAM(lparam));
@@ -2664,6 +2670,8 @@ bool MenuWindow::ensure_gameplay_background_bitmap(const GameplayHudData& data) 
         if (!decoder || !upscaler || !BgaVideoDecoder::is_supported_video_path(path)) {
             return;
         }
+        const bool upscale_realtime_video =
+            OnnxBackgroundUpscaler::should_upscale_realtime_video(upscale_mode);
         const double sample_rate = static_cast<double>(std::max(1, data.sample_rate));
         const double playback_rate = std::clamp(data.rate, 0.05, 4.0);
         const double position_seconds =
@@ -2676,7 +2684,7 @@ bool MenuWindow::ensure_gameplay_background_bitmap(const GameplayHudData& data) 
                 upscaled_key.clear();
                 const std::string frame_key =
                     path + "|mf|" + std::to_string(frame->timestamp_100ns);
-                if (upscale_mode == "onnx" &&
+                if (upscale_realtime_video &&
                     OnnxBackgroundUpscaler::should_upscale(
                         frame->width, frame->height, upscale_mode)) {
                     // Keep one video inference in flight. Replacing the request id every
@@ -2692,6 +2700,9 @@ bool MenuWindow::ensure_gameplay_background_bitmap(const GameplayHudData& data) 
                     upscaler->clear();
                 }
             }
+        }
+        if (!upscale_realtime_video) {
+            return;
         }
         if (const auto frame = upscaler->take_ready();
             frame && frame->source_path == requested_key && !frame->bgra.empty() &&
@@ -3577,7 +3588,46 @@ void MenuWindow::on_file_drop(std::string path) {
     push_click_event(std::move(event));
 }
 
+void MenuWindow::on_text_input(wchar_t character) {
+    if (character < 0x20) {
+        return;
+    }
+
+    std::wstring text;
+    const bool high_surrogate = character >= 0xD800 && character <= 0xDBFF;
+    const bool low_surrogate = character >= 0xDC00 && character <= 0xDFFF;
+    if (high_surrogate) {
+        pending_high_surrogate_ = character;
+        return;
+    }
+    if (low_surrogate) {
+        if (pending_high_surrogate_ == 0) {
+            return;
+        }
+        text.push_back(pending_high_surrogate_);
+        text.push_back(character);
+        pending_high_surrogate_ = 0;
+    } else {
+        pending_high_surrogate_ = 0;
+        text.push_back(character);
+    }
+
+    push_text_input(wide_to_utf8(text));
+}
+
+void MenuWindow::push_text_input(std::string text) {
+    if (text.empty()) {
+        return;
+    }
+    std::lock_guard<std::mutex> lock(text_input_mutex_);
+    if (text_input_events_.size() >= 64) {
+        text_input_events_.pop_front();
+    }
+    text_input_events_.push_back(std::move(text));
+}
+
 void MenuWindow::render(const MenuRenderData& data) {
+
     apply_pending_config();
     update_cursor_visibility(data.kind == MenuScreenKind::GameplayHud);
     static int skip_log_count = 0;
@@ -3829,6 +3879,17 @@ std::optional<MenuClickEvent> MenuWindow::poll_click_event() {
     click_events_.pop_front();
     return event;
 }
+
+std::optional<std::string> MenuWindow::poll_text_input() {
+    std::lock_guard<std::mutex> lock(text_input_mutex_);
+    if (text_input_events_.empty()) {
+        return std::nullopt;
+    }
+    std::string text = std::move(text_input_events_.front());
+    text_input_events_.pop_front();
+    return text;
+}
+
 
 void MenuWindow::push_click_event(MenuClickEvent event) {
     const bool is_virtual_event = event.kind == MenuHitTargetKind::MouseWheel || event.kind == MenuHitTargetKind::FileDrop;

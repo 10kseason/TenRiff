@@ -210,6 +210,7 @@ void MenuApp::populate_multiplayer_render_data(render::MenuRenderData& render) {
                     false);
 
     std::string connection_line = ui_text("Connection: ", "연결: ") + peer_session_state_label(peer.state);
+    connection_line += " / " + ui_text("You: ", "나: ") + profile_display_name();
     if (!peer.peer_name.empty()) {
         connection_line += " / " + ui_text("Peer: ", "상대: ") + peer.peer_name;
     }
@@ -339,7 +340,7 @@ void MenuApp::handle_multiplayer_input(uint32_t keycode) {
         if (row == MultiplayerMenuRow::Host) {
             multiplayer_menu_.role = MultiplayerRole::Host;
             reset_multiplayer_chart_match_search();
-            accepted = peer_session_.host(*port, options_.profile);
+            accepted = peer_session_.host(*port, profile_display_name());
         } else {
             multiplayer_menu_.role = MultiplayerRole::Join;
             peer_session_.clear_local_chart();
@@ -349,7 +350,7 @@ void MenuApp::handle_multiplayer_input(uint32_t keycode) {
             multiplayer_menu_.local_chart_fingerprint = 0;
             multiplayer_menu_.local_chart_size = 0;
             reset_multiplayer_chart_match_search();
-            accepted = peer_session_.join(multiplayer_menu_.address, *port, options_.profile);
+            accepted = peer_session_.join(multiplayer_menu_.address, *port, profile_display_name());
         }
         if (!accepted) {
             multiplayer_status_message_ = ui_text("Could not start the network worker.",

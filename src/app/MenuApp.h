@@ -218,6 +218,7 @@ private:
 
     void handle_input_event(const input::InputEvent& event);
     void handle_menu_click(const render::MenuClickEvent& event);
+    void handle_text_input(std::string_view text);
     void handle_quick_setup_input(uint32_t keycode);
     void handle_title_input(uint32_t keycode);
     void handle_options_hub_input(uint32_t keycode);
@@ -331,6 +332,9 @@ private:
     [[nodiscard]] bool move_song_select_selection(int delta);
     [[nodiscard]] bool handle_settings_shortcut(uint32_t keycode, Screen return_screen);
     [[nodiscard]] std::string song_absolute_path(const SongEntry& entry) const;
+    void update_last_chart_metadata(const std::string& chart_path,
+                                    const SongEntry* preferred_entry = nullptr);
+    [[nodiscard]] std::string profile_display_name() const;
     [[nodiscard]] std::string song_background_preview_path_for_entry(const SongEntry& entry);
     [[nodiscard]] std::string selected_song_absolute_path() const;
     [[nodiscard]] std::string selected_song_storage_key() const;
@@ -346,6 +350,7 @@ private:
     [[nodiscard]] bool toggle_selected_song_in_collection(std::string_view name);
     [[nodiscard]] std::string selected_song_background_preview_path();
     void sync_menu_music();
+    void service_song_preview();
     void open_keymap_screen(Screen return_screen);
     void clear_keymap_status_message();
     void show_keymap_status_message(std::string message);
@@ -390,6 +395,7 @@ private:
         std::string chart_path;
         std::string chart_format;
         std::string created_utc;
+        std::string player_name;
         std::string result_path;
         std::string replay_path;
         std::string rank = "--";
@@ -448,6 +454,9 @@ private:
     std::string last_chart_path_;
     std::string last_chart_title_;
     std::string last_chart_artist_;
+    SongEntry last_chart_entry_{};
+    bool last_chart_entry_valid_ = false;
+    std::string last_result_player_name_;
     std::string last_replay_path_;
     std::string last_result_path_;
     std::string last_clear_status_;
@@ -519,6 +528,8 @@ private:
     std::string keymap_status_message_;
     int64_t keymap_status_deadline_ns_ = 0;
     bool first_run_profile_ = false;
+    bool profile_nickname_edit_active_ = false;
+    std::string profile_nickname_before_edit_;
     bool help_overlay_visible_ = false;
     std::string available_lr2_skin_root_;
     std::vector<std::string> available_lr2_skin_names_{};
@@ -547,6 +558,10 @@ private:
     std::string menu_music_scene_key_{};
     std::string menu_music_scene_path_{};
     std::unordered_map<std::string, std::size_t> menu_music_variant_cursors_{};
+    std::string song_preview_selection_key_{};
+    std::string song_preview_active_path_{};
+    int64_t song_preview_due_ns_ = 0;
+    bool song_preview_pending_ = false;
     render::RenderThread render_thread_{};
     render::MenuWindow menu_window_{};
 

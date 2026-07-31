@@ -36,7 +36,7 @@ namespace tenriff::app {
 
 namespace {
 
-constexpr int kSongIndexVersion = 11;
+constexpr int kSongIndexVersion = 12;
 constexpr std::uintmax_t kMaxMetadataChartFileBytes = 8u * 1024u * 1024u;
 
 bool cancel_requested(const SongIndexCancelCallback& cancel) {
@@ -483,6 +483,8 @@ SongEntry build_bms_entry(std::string relative_path,
     entry.bpm = parsed.chart.base_bpm;
     entry.background_preview_path =
         menu_songs::resolve_bms_background_preview_path(full_path, parsed.chart);
+    entry.audio_preview_path =
+        menu_songs::resolve_bms_audio_preview_path(full_path, parsed.chart);
     const int metadata_level = entry.level;
     auto difficulty = calculate_bms_difficulty(parsed.chart);
     if (difficulty.has_value() && difficulty->note_count > 0) {
@@ -1262,6 +1264,12 @@ private:
                     return false;
                 }
                 entry.background_preview_path = util::ensure_utf8_text(value.value());
+            } else if (*key == "audio_preview_path") {
+                auto value = parse_string();
+                if (!value.has_value()) {
+                    return false;
+                }
+                entry.audio_preview_path = util::ensure_utf8_text(value.value());
             } else if (*key == "key_count") {
                 auto value = parse_number();
                 if (!value.has_value()) {
@@ -1499,6 +1507,8 @@ bool save_song_index(const std::string& path,
         write_json_string(file, entry.layout_label);
         file << ",\"background_preview_path\":";
         write_json_string(file, entry.background_preview_path);
+        file << R"(,"audio_preview_path":)";
+        write_json_string(file, entry.audio_preview_path);
         file << ",\"key_count\":" << entry.key_count;
         file << ",\"level\":" << entry.level;
         file << ",\"native_level\":" << entry.native_level;

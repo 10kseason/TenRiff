@@ -160,6 +160,7 @@ TEST_CASE("config defaults prefer 44100 Hz audio") {
     REQUIRE(default_lane_spacing_10k.size() == 9u);
     CHECK(default_lane_spacing_10k[0] == doctest::Approx(tenriff::config::kLaneSpacingScaleDefault));
     CHECK(default_lane_spacing_10k[8] == doctest::Approx(tenriff::config::kLaneSpacingScaleDefault));
+    CHECK(config.ui.profile_nickname.empty());
     CHECK(config.ui.language == "en");
     CHECK(config.ui.result_tail_ms == doctest::Approx(3000.0));
     CHECK(config.ui.favorite_chart_keys.empty());
@@ -188,6 +189,7 @@ TEST_CASE("config save and load preserve favorites and collections") {
         {"Practice", {"songB", "songC"}},
     };
     config.ui.song_collection_filter = "Practice";
+    config.ui.profile_nickname = "Luna Pilot";
     config.ui.difficulty_table_path = "tables/insane.json";
     config.ui.difficulty_table_url = "https://example.test/insane/";
 
@@ -200,8 +202,17 @@ TEST_CASE("config save and load preserve favorites and collections") {
     CHECK(result.config.ui.favorite_chart_keys == config.ui.favorite_chart_keys);
     CHECK(result.config.ui.collections == config.ui.collections);
     CHECK(result.config.ui.song_collection_filter == "Practice");
+    CHECK(result.config.ui.profile_nickname == "Luna Pilot");
     CHECK(result.config.ui.difficulty_table_path == "tables/insane.json");
     CHECK(result.config.ui.difficulty_table_url == "https://example.test/insane/");
+
+}
+TEST_CASE("profile nickname normalization is UI-safe and UTF-8 bounded") {
+    CHECK(tenriff::config::normalize_profile_nickname("  Luna\n\tPilot  ") ==
+          "Luna Pilot");
+    const std::string long_korean = u8"가나다라마바사아자차카타파하가나다라";
+    const std::string normalized = tenriff::config::normalize_profile_nickname(long_korean);
+    CHECK(normalized == u8"가나다라마바사아자차카타파하가나");
 }
 
 TEST_CASE("config load folds deprecated indirect miss into the bad window") {

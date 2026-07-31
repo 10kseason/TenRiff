@@ -3,7 +3,7 @@
 这份文档是下一位 agent 或新任务接手时应该最先阅读的当前状态文档。目标是快速说明“这个项目现在是什么、应该先看哪里、还有哪些内容尚未验证”。
 
 ## 基线
-- 当前项目版本与公开稳定版均为 `1.2.8 stable`
+- 当前项目版本与公开稳定版均为 `1.2.9 stable`
 - direct-IP multiplayer 与 preview r5 的输入 backend 生命周期修复已整合进 `1.1.8 stable`
 - `1.1.8` 在 1.1.7 视觉更新基础上加入 osu!mania OD8 辅助分数、首次原生 `BAD` 即结束的 `Sudden Death (1 MISS)`，以及确定性的 `LN Mix 10%～90%`
 - `1.2.0` 把 BMS 通道 `04/07` 和 osu!mania 背景接入 gameplay sample timeline，并通过 Windows ML 上的 LunaSR 异步放大低于 FHD 的图片背景
@@ -15,6 +15,7 @@
 - `1.2.6` 将可运行谱面限定为 BMS family，仅保留 native/LR2 skin，并加入 ONNX upscaler 手动启用、实验性 NPU 优先、Song Select Rate 调整、中央索引进度、local JSON 难度表及 BMS keysound late-input hotfix。
 - `1.2.7` 修复 External ONNX Upscaler 的 FP16 binding、浮点边界 INT8 QDQ 检测、高性能 DirectX GPU 默认路径，以及视频 BGA one-in-flight backpressure。
 - `1.2.8` 汇总了长按音符整体闪烁修复、gameplay BGA toggle、BMSTable HTML/header link 导入，以及长设置页面的 scrollbar UX 改进。
+- `1.2.9` 加入 12K/14K 与 scratch-aware key conversion、R-Random/DP Flip/Note Add、Song Select 自动预览、带曲图的详细 Result、profile nickname、video BGA 防抖，以及准确的 `DirectXMinPower` 表述。
 - 后续工作的基准文档是 [`docs/baseline-1.1.2.zh-CN.md`](baseline-1.1.2.zh-CN.md)
 - Windows GUI 构建是主目标
 - Linux 仅存在 `Baepoks-Linuxs/TenRiff-0.5.0-linux-preview` 级别的 preview
@@ -128,7 +129,8 @@
   - `background_upscale_model_path` 只保存从 Graphics Settings 选择或拖入的兼容 ONNX 路径；公开包不包含模型
   - BGA Upscaler 默认为 `off`；用户必须明确开启并确认 high-spec warning，不存在自动 benchmark gate
   - 当前契约为 960x540 RGB residual x2，并自动检测 FP32/FP16 边界与浮点边界 INT8 QDQ metadata；用户负责模型权利、质量和性能，加载、契约、decode 或推理失败时保持 native scaling
-  - 默认使用高性能 DirectX GPU；实验性 `background_upscale_prefer_npu=true` opt-in 仅在 upscaler 开启时优先请求 WinML `DirectXMinPower` session。实际使用 NPU 或 GPU 由 Windows/driver 决定；创建或评估失败时会回退到高性能 DirectX 与普通 DirectX
+  - 静态 image BGA 保留异步 ONNX upscale；video BGA 只显示 native decode frame，避免迟到的旧推理 frame 覆盖新 frame 并造成画面抖动
+  - 默认使用高性能 DirectX GPU。`background_upscale_prefer_npu=true` 只是 legacy WinML `DirectXMinPower` 请求，不会明确选择 NPU 或验证 endpoint
 - Gameplay performance：
   - static playfield command-list cache
   - note head/tail bitmap cache
@@ -137,8 +139,11 @@
   - 在 Song Select header 下方中央显示 indexing stage/percentage/processed/total/ETA/song count 与 progress bar
   - gameplay chart loading progress
   - gameplay loading 时 `Esc` 取消
+  - 在 Song Select 中保持同一曲目750ms后播放其明确 preview 或本地音频 fallback
+  - Result 显示曲图及 chart/key/BPM/LV/CR/难度表信息
 - Profile UX：
   - 可从 `Options -> Profile Setup` 重新打开当前 profile 的首次设置页面，并立即保存 language/audio/input/graphics/keymap
+  - 可编辑最多48字节的 nickname，用于已保存记录和 direct-IP multiplayer 显示名
 - Direct-IP multiplayer：
   - joiner 只在 active source 和 `recent_song_sources` 的现有 profile-local cache 中按 host chart 的 hash + size 查找
   - 不进行全盘扫描或自动重扫，并拒绝 cache 中指向 source root 外部的路径
@@ -170,7 +175,7 @@
 
 ## 运行时 / 打包规则
 - 新用户 profile 会自动创建
-- 当前正式 P2P 发布线为 `TenRiff 1.2.8 stable`
+- 当前正式 P2P 发布线为 `TenRiff 1.2.9 stable`
 - 发布包不包含 `Songs`
 - 发布包包含 `Main Menu / Options / Song Selecte / Multiplayer Lobby / Clear / Failed` 这些 `Mainmusic/` 场景槽位；每个 `Name.mp3` 及 `Name 2.mp3`～`Name 64.mp3` 会自动发现，并在重新进入场景时轮换
 - 发布更新只包含已构建产物和必要的运行时资源

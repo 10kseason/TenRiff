@@ -2,6 +2,7 @@
 #include <limits>
 #include <optional>
 #include <string>
+#include <set>
 #include <string_view>
 #include <vector>
 
@@ -772,4 +773,98 @@ TEST_CASE("mode manager key mode combo matrix preserves chart invariants") {
             }
         }
     }
+}
+
+TEST_CASE("Note Add creates deterministic silent chords without duplicates or hold-body conflicts") {
+    using namespace tenriff;
+
+    gameplay::GameplayChart chart;
+    chart.lane_count = 4;
+    for (int index = 0; index < 8; ++index) {
+        append_note(chart, index % 4 + 1, 100 + index * 100);
+        chart.notes.back().note_id = static_cast<std::size_t>(index + 1);
+    }
+    chart.notes.front().end_sample = 450;
+
+    config::ModeConfig mode;
+    mode.key_mode = "none";
+    mode.random = "off";
+    mode.random_seed = 4242;
+    mode.mods = {"note_add_100"};
+
+    const auto first = app::manage_modes(
+        chart, app::ChartFormat::Bms, mode, make_judge_config(), 1.0, 180.0, 44100);
+    const auto second = app::manage_modes(
+        chart, app::ChartFormat::Bms, mode, make_judge_config(), 1.0, 180.0, 44100);
+
+    REQUIRE(first.chart.notes.size() == 16u);
+    REQUIRE(second.chart.notes.size() == first.chart.notes.size());
+    CHECK(app::mode_mod_adds_notes(first.active_mods));
+    CHECK(app::equivalent_mode_mod_tokens(first.active_mods, {"note_add_100"}));
+
+    std::set<std::pair<int64_t, int>> occupied;
+    std::size_t generated_count = 0;
+    for (std::size_t index = 0; index < first.chart.notes.size(); ++index) {
+        const auto& note = first.chart.notes[index];
+        CHECK(occupied.emplace(note.start_sample, note.lane).second);
+        CHECK(note.lane == second.chart.notes[index].lane);
+        CHECK(note.start_sample == second.chart.notes[index].start_sample);
+        if (note.note_id > 8u) {
+            ++generated_count;
+            CHECK(gameplay::note_audio_asset_count(note) == 0u);
+            CHECK_FALSE(note.lane == 1 && note.start_sample > 100 && note.start_sample <= 450);
+        }
+    }
+    CHECK(generated_count == 8u);
+}
+
+TEST_CASE("Note Add runs before Full LN so generated chord notes receive LN structure") {
+    using namespace tenriff;
+
+    gameplay::GameplayChart chart;
+    chart.lane_count = 4;
+    for (int index = 0; index < 8; ++index) {
+        append_note(chart, index % 4 + 1, 100 + index * 100);
+        chart.notes.back().note_id = static_cast<std::size_t>(index + 1);
+    }
+
+    config::ModeConfig mode;
+    mode.key_mode = "none";
+    mode.random = "off";
+    mode.random_seed = 99;
+    mode.mods = {"note_add_50", "full_long_notes"};
+
+    const auto result = app::manage_modes(
+        chart, app::ChartFormat::Bms, mode, make_judge_config(), 1.0, 180.0, 44100);
+    REQUIRE(result.chart.notes.size() == 12u);
+    CHECK(contains_token(result.active_mods, "note_add_50"));
+    CHECK(contains_token(result.active_mods, "full_long_notes"));
+    for (const auto& note : result.chart.notes) {
+        CHECK(note.end_sample.has_value());
+    }
+}
+
+TEST_CASE("DP Flip mod is normalized and applied before other note structure mods") {
+    using namespace tenriff;
+
+    gameplay::GameplayChart chart;
+    chart.lane_count = 14;
+    chart.lane_group_size = 7;
+    append_note(chart, 1, 100);
+    chart.notes.back().note_id = 1;
+    append_note(chart, 8, 200);
+    chart.notes.back().note_id = 2;
+
+    config::ModeConfig mode;
+    mode.key_mode = "none";
+    mode.random = "off";
+    mode.mods = {"dp_flip"};
+
+    const auto result = app::manage_modes(
+        chart, app::ChartFormat::Bms, mode, make_judge_config(), 1.0, 180.0, 44100);
+    CHECK(result.settings.dp_flip);
+    CHECK(contains_token(result.active_mods, "dp_flip"));
+    REQUIRE(result.chart.notes.size() == 2u);
+    CHECK(result.chart.notes[0].lane == 8);
+    CHECK(result.chart.notes[1].lane == 1);
 }

@@ -4,6 +4,30 @@ TenRiff의 사용자/배포 관점에서 의미 있는 변경만 간단히 기�
 
 ## [Unreleased]
 
+## [1.2.9] - 2026-07-31
+
+### Added
+
+- BMS key-mode conversion now supports `12K` and `14K`; scratch layouts such as `7+1 SP` convert only the seven keyboard lanes into the target key count while keeping scratch out of the lane remap, and DP layouts process both keyboard halves independently
+- Added `R-Random`, `DP Flip`, and deterministic `Note Add 10%..100%`; Note Add creates silent chord notes, avoids scratch/LN bodies/duplicates/excessive chord sizes, and its results do not overwrite normal best records
+- Song Select starts a chart preview after the selection stays stable for 750 ms, using explicit BMS preview audio first and safe chart-audio fallbacks otherwise
+- Result now shows the song image plus chart/key/BPM/LV/CR/difficulty-table metadata
+- Quick Setup now edits a UTF-8-safe profile nickname that is saved in the profile and exported to results and multiplayer identity
+
+### Fixed
+
+- Video BGA no longer enters asynchronous real-time ONNX upscaling, preventing frame-to-frame geometry changes that appeared as screen shaking; static image BGA can still use the external upscaler
+- Replaced the legacy NPU-success wording with accurate `DirectXMinPower` wording: this path is a low-power DirectX request, not an explicit or verified NPU selection
+
+### Changed
+
+- Expanded per-mode keymaps and skin lane palettes through `14K`, including migration-safe defaults for existing profiles
+- Improved existing long-note handling alongside the new lane conversion and Note Add rules
+
+### Packaging
+
+- Windows `TenRiff-1.2.9.zip`, public source `TenRiff-1.2.9-source.zip`, and `TenRiff-1.2.9-SHA256SUMS.txt` are the formal release assets; no ONNX model or private checkpoint is bundled
+
 ## [1.2.8] - 2026-07-30
 
 ### Added

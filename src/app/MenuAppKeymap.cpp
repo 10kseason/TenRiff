@@ -18,7 +18,8 @@ constexpr int kKeymapFooterReservedLines = 6;
 
 bool is_concrete_keymap_mode(std::string_view token) {
     return token == "4k" || token == "5k" || token == "6k" || token == "7k" ||
-           token == "8k" || token == "9k" || token == "10k" || token == "16k";
+           token == "8k" || token == "9k" || token == "10k" || token == "12k" ||
+           token == "14k" || token == "16k";
 }
 
 }
@@ -28,7 +29,8 @@ std::string resolve_keymap_edit_mode_for_menu(std::optional<int> selected_chart_
     config::KeymapManager manager;
     if (selected_chart_key_count.has_value()) {
         const int key_count = selected_chart_key_count.value();
-        if ((key_count >= 4 && key_count <= 10) || key_count == 16) {
+        if ((key_count >= 4 && key_count <= 10) || key_count == 12 ||
+            key_count == 14 || key_count == 16) {
             return manager.normalize_mode_token(std::to_string(key_count) + "k");
         }
     }
@@ -149,8 +151,8 @@ void MenuApp::populate_keymap_render_data(render::MenuRenderData& render) {
                     kKeymapButtonBack,
                     !keymap_capture_active_,
                     false);
-    render.generic.footer_notes.push_back(ui_text("Left/Right on Key Mode selects which 4K-10K or 16K layout you are editing.",
-                                                  "키 모드에서 좌우 키를 누르면 편집할 4K~10K 또는 16K 레이아웃을 고릅니다."));
+    render.generic.footer_notes.push_back(ui_text("Left/Right on Key Mode selects a 4K-10K, 12K, 14K, or 16K layout.",
+                                                  "키 모드에서 좌우 키를 누르면 4K~10K, 12K, 14K 또는 16K 레이아웃을 고릅니다."));
     render.generic.footer_notes.push_back(ui_text("Enter binds the selected lane and saves immediately. Reset also saves immediately.",
                                                   "Enter로 선택 레인에 키를 할당하면 즉시 저장됩니다. 초기화도 바로 저장됩니다."));
 }

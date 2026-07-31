@@ -352,6 +352,7 @@ std::optional<ParsedResultRecord> parse_result_file(const std::filesystem::path&
     out.chart_path = read_json_string(*root, "chart_path");
     out.chart_format = read_json_string(*root, "chart_format");
     out.created_utc = read_json_string(*root, "created_utc");
+    out.player_name = read_json_string(*root, "player_name");
     out.replay_path = read_json_string(*root, "replay_path");
     out.clear_status = read_json_string(*root, "clear_status");
     out.final_gauge = read_json_string(*root, "final_gauge");

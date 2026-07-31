@@ -41,6 +41,7 @@ public:
     [[nodiscard]] static bool should_upscale(std::uint32_t width,
                                              std::uint32_t height,
                                              std::string_view mode);
+    [[nodiscard]] static bool should_upscale_realtime_video(std::string_view mode);
 private:
     struct Impl;
     std::unique_ptr<Impl> impl_;

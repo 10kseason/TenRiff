@@ -176,6 +176,20 @@ BmsGameplayBuildResult build_bms_gameplay_chart(const chart::BmsTimeline& timeli
     if (result.chart.lane_count <= 0) {
         result.chart.lane_count = 10;
     }
+    if (parsed_chart.layout_label == "5+1 SP") {
+        result.chart.scratch_lanes = {6};
+    } else if (parsed_chart.layout_label == "7+1 SP") {
+        // The parser's compact 7+1 layout always places BMS channel 16 first.
+        // Preserve that semantic so an explicit 8K key-mode transform can use
+        // only the seven keyboard lanes instead of treating scratch as a key.
+        result.chart.scratch_lanes = {1};
+    } else if (parsed_chart.layout_label == "10+2 DP") {
+        result.chart.scratch_lanes = {6, 12};
+        result.chart.lane_group_size = 6;
+    } else if (parsed_chart.layout_label == "14+2 DP") {
+        result.chart.scratch_lanes = {6, 14};
+        result.chart.lane_group_size = 8;
+    }
     result.chart.duration_samples = std::max<int64_t>(0, scale_samples(timeline.duration_samples, rate));
     result.chart.notes.reserve(entries.size());
     result.note_object_ids.reserve(entries.size());

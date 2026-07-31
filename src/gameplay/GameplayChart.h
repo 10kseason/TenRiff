@@ -61,6 +61,12 @@ struct VisualCueEvent {
 
 struct GameplayChart {
     int lane_count = 0;
+    // 1-based source lanes with scratch semantics. This lets key-mode transforms
+    // distinguish 7+1 SP from a native eight-key chart after BMS normalization.
+    std::vector<int> scratch_lanes;
+    // Size of each player field for DP layouts. Zero means a single field.
+    // Scratch-aware conversion strips scratches before updating this value.
+    int lane_group_size = 0;
     int64_t duration_samples = 0;
     std::vector<AudioAsset> audio_assets;
     std::vector<NoteEvent> notes;

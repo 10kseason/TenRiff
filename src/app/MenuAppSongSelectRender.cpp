@@ -323,7 +323,8 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
                     local_play_records_[current_song_record_indices_[static_cast<std::size_t>(i)]];
                 render::SongCardData card;
                 card.title = menu_records::compact_timestamp_label(record.created_utc);
-                card.artist = record.clear_status + "  " + record.rank + "  " + ui_text("SCORE ", "점수 ") +
+                card.artist = record.player_name + "  " + record.clear_status + "  " +
+                              record.rank + "  " + ui_text("SCORE ", "점수 ") +
                               format_int_with_commas(record.score);
                 card.detail = record.replay_path.empty()
                                   ? ui_text("RESULT ONLY", "결과만 있음")
@@ -444,7 +445,8 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
             render.song_select.accuracy = selected_record->accuracy;
             render.song_select.selected_record_created_utc =
                 menu_records::compact_timestamp_label(selected_record->created_utc);
-            render.song_select.selected_record_status = selected_record->clear_status;
+            render.song_select.selected_record_status =
+                selected_record->player_name + " / " + selected_record->clear_status;
             render.song_select.selected_record_replay_file = filename_only(selected_record->replay_path);
             if (const ReplaySummary* replay = replay_summary_for_path(selected_record->replay_path)) {
                 render.song_select.selected_record_replay_lane_count = replay->lane_count;
@@ -592,8 +594,8 @@ void MenuApp::populate_song_browser_render_data(render::MenuRenderData& render) 
                                            "컬렉션 필터는 전체, 페이보릿, 생성한 컬렉션들을 순환합니다."));
     render.generic.notes.push_back(ui_text("Toggle Favorite works from All/Favorites. When a named collection is selected it toggles membership in that collection.",
                                            "전체/페이보릿에서는 페이보릿을 토글하고, 이름 있는 컬렉션이 선택된 상태에서는 그 컬렉션 포함 여부를 토글합니다."));
-    render.generic.notes.push_back(ui_text("Key Filter supports All plus 4K through 10K and 16K.",
-                                           "키 필터는 전체, 4K~10K, 16K를 지원합니다."));
+    render.generic.notes.push_back(ui_text("Key Filter supports All plus 4K-10K, 12K, 14K, and 16K.",
+                                           "키 필터는 전체, 4K~10K, 12K, 14K, 16K를 지원합니다."));
 }
 
 }  // namespace tenriff::app

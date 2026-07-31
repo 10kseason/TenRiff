@@ -129,9 +129,11 @@ void MenuApp::handle_mode_settings_input(uint32_t keycode) {
             if (config_.mode.random == "off") {
                 config_.mode.random = (direction > 0) ? "mirror" : "sr";
             } else if (config_.mode.random == "mirror") {
-                config_.mode.random = (direction > 0) ? "fr" : "off";
+                config_.mode.random = (direction > 0) ? "rr" : "off";
+            } else if (config_.mode.random == "rr") {
+                config_.mode.random = (direction > 0) ? "fr" : "mirror";
             } else if (config_.mode.random == "fr") {
-                config_.mode.random = (direction > 0) ? "sr" : "mirror";
+                config_.mode.random = (direction > 0) ? "sr" : "rr";
             } else {
                 config_.mode.random = (direction > 0) ? "off" : "fr";
             }
@@ -272,8 +274,8 @@ void MenuApp::populate_mode_settings_render_data(render::MenuRenderData& render)
                                            "연습 모드(실패 없음)는 중간 게임오버를 막지만 판정, 게이지, 리플레이, 결과 저장은 끝까지 유지합니다."));
     render.generic.notes.push_back(ui_text("Sudden Death ends the run on the first osu!mania OD8 MISS. Native BAD timing alone and empty-key POOR judgements do not trigger it, and enabling it disables Practice No-Fail.",
                                            "서든 데스는 첫 osu!mania OD8 MISS에서 즉시 종료합니다. 네이티브 BAD만으로는 즉사하지 않고 빈 키 POOR도 세지 않으며, 켜면 연습 모드가 꺼집니다."));
-    render.generic.notes.push_back(ui_text("Key Mode selects None/native plus 4K-10K/16K runtime layouts for BMS charts.",
-                                           "키 모드는 BMS 차트의 원본 또는 4K~10K/16K 런타임 레이아웃을 고릅니다."));
+    render.generic.notes.push_back(ui_text("Key Mode selects None/native plus 4K-10K, 12K, 14K, or 16K BMS layouts.",
+                                           "키 모드는 BMS 차트의 원본 또는 4K~10K, 12K, 14K, 16K 레이아웃을 고릅니다."));
     render.generic.notes.push_back(ui_text("None keeps the chart's original key count and pattern layout instead of forcing a conversion.",
                                            "원본은 강제 변환 없이 차트의 원래 키 수와 패턴 배치를 유지합니다."));
     render.generic.notes.push_back(ui_text(

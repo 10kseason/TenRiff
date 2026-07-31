@@ -13,6 +13,8 @@ std::string to_string(KeyMode mode) {
         case KeyMode::Keys8: return "8K";
         case KeyMode::Keys9: return "9K";
         case KeyMode::Keys10: return "10K";
+        case KeyMode::Keys12: return "12K";
+        case KeyMode::Keys14: return "14K";
         case KeyMode::Keys16: return "16K";
         case KeyMode::Auto: default: return "NONE";
     }
@@ -31,6 +33,7 @@ std::string to_string(GaugeMode mode) {
 std::string to_string(RandomMode mode) {
     switch (mode) {
         case RandomMode::Mirror: return "MIRROR";
+        case RandomMode::RotateRandom: return "R-RANDOM";
         case RandomMode::FullRandom: return "FR";
         case RandomMode::SuperRandom: return "SR";
         case RandomMode::Off: default: return "OFF";
@@ -81,6 +84,12 @@ std::optional<KeyMode> parse_key_mode(std::string_view token) {
     if (normalized == "10K" || normalized == "10KEY" || normalized == "KEYS10") {
         return KeyMode::Keys10;
     }
+    if (normalized == "12K" || normalized == "12KEY" || normalized == "KEYS12") {
+        return KeyMode::Keys12;
+    }
+    if (normalized == "14K" || normalized == "14KEY" || normalized == "KEYS14") {
+        return KeyMode::Keys14;
+    }
     if (normalized == "16K" || normalized == "16KEY" || normalized == "KEYS16") {
         return KeyMode::Keys16;
     }
@@ -114,6 +123,9 @@ std::optional<RandomMode> parse_random_mode(std::string_view token) {
     }
     if (normalized == "MIRROR") {
         return RandomMode::Mirror;
+    }
+    if (normalized == "RR" || normalized == "R-RANDOM" || normalized == "ROTATERANDOM") {
+        return RandomMode::RotateRandom;
     }
     if (normalized == "FR" || normalized == "FULLRANDOM" || normalized == "FULL_RANDOM") {
         return RandomMode::FullRandom;

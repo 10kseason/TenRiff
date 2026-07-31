@@ -225,6 +225,10 @@ TEST_CASE("external ONNX background policy only targets low-resolution images in
     CHECK(OnnxBackgroundUpscaler::should_upscale(1280, 720, "onnx"));
     CHECK_FALSE(OnnxBackgroundUpscaler::should_upscale(1920, 1080, "onnx"));
     CHECK_FALSE(OnnxBackgroundUpscaler::should_upscale(1280, 720, "off"));
+
+    // Asynchronous video results must not overwrite newer native frames.
+    CHECK_FALSE(OnnxBackgroundUpscaler::should_upscale_realtime_video("onnx"));
+    CHECK_FALSE(OnnxBackgroundUpscaler::should_upscale_realtime_video("off"));
 }
 
 TEST_CASE("gameplay BGA policy supports off and on transitions") {

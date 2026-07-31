@@ -14,6 +14,7 @@ struct ParsedResultRecord {
     std::string chart_path;
     std::string chart_format;
     std::string created_utc;
+    std::string player_name;
     std::string replay_path;
     std::string clear_status;
     std::string final_gauge;

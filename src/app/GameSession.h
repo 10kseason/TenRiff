@@ -135,6 +135,7 @@ public:
         bool finished = false;
         std::string clear_status = "FAILED";
         std::string final_gauge = "normal";
+        std::string player_name;
         gameplay::ResultStats stats;
         std::vector<std::string> mods;
         double rate_multiplier = 1.0;

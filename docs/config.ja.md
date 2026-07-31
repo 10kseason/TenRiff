@@ -40,7 +40,7 @@ profile が存在しない場合は初回起動時に自動生成されます。
 
 - `backend` (string)
   - `polling | rawinput`
-  - 現行 `1.2.8` リリースラインの既定値は `rawinput`
+  - 現行 `1.2.9` リリースラインの既定値は `rawinput`
   - `Options -> Input Settings -> Backend` または `Options -> Profile Setup -> Input Backend` で profile ごとに選択可能
   - runtime fallback は保存済みの値を `polling` に書き換えない
   - RawInput の起動失敗、登録先の消失、message window の終了を確認すると、そのアプリ実行中は menu と後続 gameplay の両方で Polling を維持する
@@ -128,8 +128,8 @@ profile が存在しない場合は初回起動時に自動生成されます。
   - model の権利・品質・性能は user が確認。詳細は `tools/onnx_upscaler/README.md`
 - `background_upscale_prefer_npu` (bool)
   - 既定値は `false` で、default path は high-performance DirectX GPU を要求
-  - `background_upscale_mode=onnx` のとき Graphics Settings の実験的な `NPU 優先` で明示的に有効化できる
-  - Windows ML の `DirectXMinPower` device を要求するだけで、実際に NPU を使うかは Windows/driver が決定
+  - Graphics Settings の実験的な `Low-Power DirectX` で `DirectXMinPower` を要求
+  - legacy WinML path は NPU を明示選択・検証できないため、この option は NPU 実行の証拠にならない
   - low-power session 作成失敗時は既存の high-performance DirectX 経路へ fallback
 
 ### `mode`
@@ -170,6 +170,9 @@ chart loader/indexer は BMS family（`.bms/.bme/.bml/.pms`）専用で、`forma
   - `fast` は 32GB+ 環境向けに worker/batch 予算を増やして再スキャン高速化を狙う任意値
 
 ### `ui`
+- `profile_nickname` (string)
+  - Quick Setup で編集し、保存 record と multiplayer の表示名に使用
+  - control 文字と重複空白を除去し UTF-8 で最大48 byte。空なら profile ID を表示
 - `language` (string)
   - `en | ko`
   - 無効値は load 時に `en` へ正規化

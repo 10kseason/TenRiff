@@ -300,6 +300,12 @@ int key_count_from_mode_token(std::string_view token) {
     if (normalized == "10K" || normalized == "10KEY" || normalized == "10KEYS" || normalized == "KEYS10") {
         return 10;
     }
+    if (normalized == "12K" || normalized == "12KEY" || normalized == "12KEYS" || normalized == "KEYS12") {
+        return 12;
+    }
+    if (normalized == "14K" || normalized == "14KEY" || normalized == "14KEYS" || normalized == "KEYS14") {
+        return 14;
+    }
     if (normalized == "16K" || normalized == "16KEY" || normalized == "16KEYS" || normalized == "KEYS16") {
         return 16;
     }
@@ -309,7 +315,8 @@ int key_count_from_mode_token(std::string_view token) {
 bool should_store_index_header(std::string_view key) {
     if (key == "BPM" || key == "PLAYER" || key == "GENRE" || key == "TITLE" || key == "ARTIST" ||
         key == "SUBTITLE" || key == "DIFFICULTY" || key == "PLAYLEVEL" || key == "RANK" ||
-        key == "TOTAL" || key == "VOLWAV" || key == "LNOBJ" || key == "STAGEFILE" || key == "BACKBMP") {
+        key == "TOTAL" || key == "VOLWAV" || key == "LNOBJ" || key == "STAGEFILE" || key == "BACKBMP" ||
+        key == "PREVIEW" || key == "PREVIEWFILE") {
         return true;
     }
     if (key_count_from_mode_token(key) > 0) {
@@ -457,6 +464,8 @@ DeclaredLayout detect_declared_layout(const BmsChart& chart, std::string_view so
     static constexpr std::array<std::string_view, 8> kSpSevenTemplate = {"11", "12", "13", "14", "15", "16", "18", "19"};
     static constexpr std::array<std::string_view, 10> kDpTenTemplate = {"11", "12", "13", "14", "15",
                                                                         "21", "22", "23", "24", "25"};
+    static constexpr std::array<std::string_view, 12> kDpTenPlusTwoTemplate = {"11", "12", "13", "14", "15", "16",
+                                                                              "21", "22", "23", "24", "25", "26"};
     static constexpr std::array<std::string_view, 16> kDpFourteenPlusTwoTemplate = {"11", "12", "13", "14", "15", "16", "18", "19",
                                                                                     "21", "22", "23", "24", "25", "26", "28", "29"};
     static constexpr std::array<std::string_view, 9> kPmsNativeTemplate = {"11", "12", "13", "14", "15", "22", "23", "24", "25"};
@@ -481,6 +490,10 @@ DeclaredLayout detect_declared_layout(const BmsChart& chart, std::string_view so
     const bool uses_pms_bme_channels =
         matches_only_allowed_channels(lane_channels, kPmsBmeTemplate) &&
         (contains_any_channel(lane_channels, {"16", "17", "18", "19"}) || is_pms_source || explicit_key_count == 9);
+    const bool uses_dp10_plus_two_channels =
+        has_two_player_channels &&
+        matches_only_allowed_channels(lane_channels, kDpTenPlusTwoTemplate) &&
+        contains_channel(lane_channels, "16") && contains_channel(lane_channels, "26");
     const bool uses_dp14_plus_two_channels =
         has_two_player_channels &&
         matches_only_allowed_channels(lane_channels, kDpFourteenPlusTwoTemplate) &&
@@ -488,6 +501,8 @@ DeclaredLayout detect_declared_layout(const BmsChart& chart, std::string_view so
         contains_any_channel(lane_channels, {"26", "28", "29"});
     const bool fits_standard_sp_five = matches_only_allowed_channels(lane_channels, kSpFiveTemplate);
     const bool fits_standard_sp_seven = matches_only_allowed_channels(lane_channels, kSpSevenTemplate);
+    const bool fits_standard_dp_ten_plus_two = has_two_player_channels &&
+                                               matches_only_allowed_channels(lane_channels, kDpTenPlusTwoTemplate);
     const bool fits_standard_dp_ten = has_two_player_channels &&
                                       matches_only_allowed_channels(lane_channels, kDpTenTemplate);
     const bool fits_standard_dp_fourteen_plus_two = has_two_player_channels &&
@@ -507,6 +522,9 @@ DeclaredLayout detect_declared_layout(const BmsChart& chart, std::string_view so
     }
     if ((explicit_key_count == 9 || is_pms_source) && uses_pms_bme_channels) {
         return DeclaredLayout{9, "PMS 9K", {"11", "12", "13", "14", "15", "16", "17", "18", "19"}};
+    }
+    if ((explicit_key_count == 10 || explicit_key_count == 12 || uses_dp10_plus_two_channels) && uses_dp10_plus_two_channels) {
+        return DeclaredLayout{12, "10+2 DP", {"11", "12", "13", "14", "15", "16", "21", "22", "23", "24", "25", "26"}};
     }
     if ((explicit_key_count == 16 || uses_dp14_plus_two_channels) && uses_dp14_plus_two_channels) {
         return DeclaredLayout{16, "14+2 DP", {"11", "12", "13", "14", "15", "16", "18", "19",
@@ -532,6 +550,9 @@ DeclaredLayout detect_declared_layout(const BmsChart& chart, std::string_view so
     }
     if (!has_two_player_channels && fits_standard_sp_five && contains_channel(lane_channels, "16")) {
         return DeclaredLayout{6, "5+1 SP", std::vector<std::string>(kSpFiveTemplate.begin(), kSpFiveTemplate.end())};
+    }
+    if (fits_standard_dp_ten_plus_two && contains_channel(lane_channels, "16") && contains_channel(lane_channels, "26")) {
+        return DeclaredLayout{12, "10+2 DP", std::vector<std::string>(kDpTenPlusTwoTemplate.begin(), kDpTenPlusTwoTemplate.end())};
     }
     if (fits_standard_dp_fourteen_plus_two &&
         contains_any_channel(lane_channels, {"16", "18", "19", "26", "28", "29"})) {

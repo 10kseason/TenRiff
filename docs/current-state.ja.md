@@ -3,7 +3,7 @@
 この文書は、次のエージェントや新しい作業者が最初に読むべき current-state 文書です。目的は、「このプロジェクトは今どういう状態で、どこを見ればよく、何がまだ未検証か」を素早く把握できるようにすることです。
 
 ## Baseline
-- 現在のプロジェクト版と公開 stable 版は `1.2.8 stable`
+- 現在のプロジェクト版と公開 stable 版は `1.2.9 stable`
 - direct-IP multiplayer と preview r5 の input-backend lifecycle 修正は `1.1.8 stable` に統合
 - `1.1.8` は 1.1.7 の visual refresh に osu!mania OD8 補助スコア、最初の native `BAD` で終了する `Sudden Death (1 MISS)`、決定的な `LN Mix 10%～90%` を追加
 - `1.2.0` は BMS channel `04/07` と osu!mania 背景を gameplay sample timeline に接続し、FHD 未満の画像背景を Windows ML 上の LunaSR で非同期補間
@@ -15,6 +15,7 @@
 - `1.2.6` は playable chart を BMS family のみにし、native/LR2 skin だけを維持。ONNX upscaler の手動有効化と実験的 NPU 優先、Song Select の Rate 調整、中央 indexing progress、local JSON 難易度表、BMS keysound late-input hotfix を追加。
 - `1.2.7` は External ONNX Upscaler の FP16 binding、float boundary INT8 QDQ 検出、high-performance DirectX GPU default、動画 BGA one-in-flight backpressure を修正。
 - `1.2.8` は LN 全体の一瞬の点滅修正、gameplay BGA toggle、BMSTable HTML/header link import、長い settings 画面の scrollbar UX 改善をまとめた配布前候補。
+- `1.2.9` は 12K/14K と scratch-aware key conversion、R-Random/DP Flip/Note Add、Song Select preview、画像付き詳細 Result、profile nickname、video BGA 揺れ防止、正確な `DirectXMinPower` 表記を追加。
 - 後続作業の基準文書は `docs/baseline-1.1.2.ja.md`
 - Windows GUI ビルドが主対象
 - Linux は `Baepoks-Linuxs/TenRiff-0.5.0-linux-preview` レベルの preview のみ
@@ -128,7 +129,8 @@
   - `background_upscale_model_path` は Graphics Settings で選択/drop した互換 ONNX の path だけを保存。公開 model は同梱しない
   - BGA Upscaler は既定 `off`。user が明示的に on にして high-spec warning を確認する必要があり、自動 benchmark gate はない
   - 現在の契約は 960x540 RGB residual x2 で FP32/FP16 boundary と float boundary INT8 QDQ metadata を自動検出。model の権利・品質・性能は user が確認し、load・contract・decode・inference 失敗時は native scaling
-  - default は high-performance DirectX GPU。実験的 `background_upscale_prefer_npu=true` opt-in は upscaler on 時だけ WinML `DirectXMinPower` session を先に要求する。実際の NPU/GPU は Windows/driver が選択し、作成・評価失敗時は high-performance DirectX と通常 DirectX fallback を使用
+  - 静止 image BGA は非同期 ONNX upscale を維持し、video BGA は遅延した過去の推論 frame が新しい frame を上書きしないよう native decode frame のみ表示
+  - default は high-performance DirectX GPU。`background_upscale_prefer_npu=true` は legacy WinML `DirectXMinPower` request に過ぎず、NPU の明示選択・endpoint 検証は行わない
 - Gameplay performance:
   - static playfield command-list cache
   - note head / tail bitmap cache
@@ -137,8 +139,11 @@
   - Song Select header 下部中央に indexing stage/percentage/processed/total/ETA/song count と progress bar を表示
   - gameplay chart-loading progress 表示
   - gameplay loading 中の `Esc` cancel
+  - Song Select で同じ曲を750ms選択すると明示 preview または local audio fallback を再生
+  - Result に song image と chart/key/BPM/LV/CR/difficulty-table 情報を表示
 - Profile UX:
   - `Options -> Profile Setup` から現在の profile の初回 setup 画面を開き直し、language / audio / input / graphics / keymap を即時保存できる
+  - 最大48 byte の nickname を編集し、保存 record と direct-IP multiplayer 表示名に使用
 - Direct-IP multiplayer:
   - joiner は active source と `recent_song_sources` の既存 profile-local cache だけを対象に、host chart の hash + size を照合する
   - 全 disk scan や自動 rescan は行わず、source root 外を指す cache path は拒否する
@@ -170,7 +175,7 @@
 
 ## Runtime / Packaging Rules
 - 新しい user profile は自動生成される
-- 現在の正式 P2P 配布ラインは `TenRiff 1.2.8 stable`
+- 現在の正式 P2P 配布ラインは `TenRiff 1.2.9 stable`
 - distribution package には `Songs` を含めない
 - distribution package には `Main Menu / Options / Song Selecte / Multiplayer Lobby / Clear / Failed` の `Mainmusic/` scene slot を含め、各 `Name.mp3` と `Name 2.mp3`～`Name 64.mp3` を自動検出して scene 再入場ごとに循環する
 - distribution 更新には built artifact と必要な runtime asset だけを含める

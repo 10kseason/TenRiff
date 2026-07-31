@@ -299,6 +299,181 @@ std::vector<std::string> collect_bms_preview_references(const chart::BmsChart& c
     return references;
 }
 
+bool is_preview_audio_extension(std::string_view ext) {
+    return ext == ".ogg" || ext == ".wav" || ext == ".wave" || ext == ".mp3";
+}
+
+std::vector<std::filesystem::path> build_audio_reference_candidates(const std::string& reference) {
+    namespace fs = std::filesystem;
+    static constexpr std::string_view kAudioExtensions[] = {".ogg", ".wav", ".wave", ".mp3"};
+
+    const std::string normalized = normalize_asset_reference(reference);
+    if (normalized.empty()) {
+        return {};
+    }
+#ifdef _WIN32
+    fs::path reference_path = fs::u8path(normalized);
+#else
+    fs::path reference_path(normalized);
+#endif
+
+    std::vector<fs::path> candidates;
+    std::unordered_set<std::string> seen;
+    const auto append = [&](const fs::path& candidate, auto& self) -> void {
+        const std::string key = normalize_asset_lookup_key(candidate.generic_u8string());
+        if (seen.emplace(key).second) {
+            candidates.push_back(candidate);
+        }
+        (void)self;
+    };
+
+    append(reference_path, append);
+    const std::string extension = to_lower_ascii(reference_path.extension().u8string());
+    if (extension.empty()) {
+        for (const std::string_view audio_extension : kAudioExtensions) {
+            fs::path candidate = reference_path;
+            candidate += audio_extension;
+            append(candidate, append);
+        }
+    } else if (is_preview_audio_extension(extension)) {
+        for (const std::string_view audio_extension : kAudioExtensions) {
+            if (audio_extension == extension) {
+                continue;
+            }
+            fs::path candidate = reference_path;
+            candidate.replace_extension(audio_extension);
+            append(candidate, append);
+        }
+    }
+    return candidates;
+}
+
+std::optional<std::filesystem::path> resolve_audio_reference_path(
+    const std::filesystem::path& chart_path,
+    const std::string& reference) {
+    namespace fs = std::filesystem;
+    const fs::path root = chart_path.parent_path();
+    if (root.empty()) {
+        return std::nullopt;
+    }
+
+    const auto candidates = build_audio_reference_candidates(reference);
+    for (const auto& candidate : candidates) {
+        const fs::path direct = candidate.is_absolute()
+                                    ? candidate.lexically_normal()
+                                    : (root / candidate).lexically_normal();
+        std::error_code ec;
+        if (fs::is_regular_file(direct, ec) && !ec &&
+            is_preview_audio_extension(to_lower_ascii(direct.extension().u8string()))) {
+            return normalize_resolved_preview_path(direct);
+        }
+    }
+
+    std::unordered_set<std::string> relative_keys;
+    std::unordered_set<std::string> filename_keys;
+    for (const auto& candidate : candidates) {
+        relative_keys.emplace(normalize_asset_lookup_key(candidate.generic_u8string()));
+        filename_keys.emplace(normalize_asset_lookup_key(candidate.filename().u8string()));
+    }
+
+    std::error_code ec;
+    fs::recursive_directory_iterator iterator(
+        root, fs::directory_options::skip_permission_denied, ec);
+    const fs::recursive_directory_iterator end;
+    while (iterator != end) {
+        if (ec) {
+            ec.clear();
+            iterator.increment(ec);
+            continue;
+        }
+
+        const fs::directory_entry entry = *iterator;
+        iterator.increment(ec);
+        if (!entry.is_regular_file(ec)) {
+            ec.clear();
+            continue;
+        }
+        ec.clear();
+
+        const fs::path candidate_path = entry.path();
+        if (!is_preview_audio_extension(
+                to_lower_ascii(candidate_path.extension().u8string()))) {
+            continue;
+        }
+
+        fs::path relative = fs::relative(candidate_path, root, ec);
+        if (ec || relative.empty()) {
+            ec.clear();
+            relative = candidate_path.lexically_relative(root);
+        }
+        const std::string relative_key =
+            normalize_asset_lookup_key(relative.generic_u8string());
+        const std::string filename_key =
+            normalize_asset_lookup_key(candidate_path.filename().u8string());
+        if (relative_keys.find(relative_key) != relative_keys.end() ||
+            filename_keys.find(filename_key) != filename_keys.end()) {
+            return normalize_resolved_preview_path(candidate_path);
+        }
+    }
+    return std::nullopt;
+}
+
+std::optional<std::filesystem::path> largest_local_audio_file(
+    const std::filesystem::path& chart_path) {
+    namespace fs = std::filesystem;
+    const fs::path root = chart_path.parent_path();
+    if (root.empty()) {
+        return std::nullopt;
+    }
+
+    std::error_code ec;
+    fs::directory_iterator iterator(
+        root, fs::directory_options::skip_permission_denied, ec);
+    const fs::directory_iterator end;
+    fs::path best_path;
+    std::uintmax_t best_size = 0;
+
+    while (iterator != end) {
+        if (ec) {
+            ec.clear();
+            iterator.increment(ec);
+            continue;
+        }
+
+        const fs::directory_entry entry = *iterator;
+        iterator.increment(ec);
+        if (!entry.is_regular_file(ec)) {
+            ec.clear();
+            continue;
+        }
+        ec.clear();
+        if (!is_preview_audio_extension(
+                to_lower_ascii(entry.path().extension().u8string()))) {
+            continue;
+        }
+
+        const std::uintmax_t size = entry.file_size(ec);
+        if (ec) {
+            ec.clear();
+            continue;
+        }
+        const std::string candidate_key =
+            normalize_asset_lookup_key(entry.path().generic_u8string());
+        const std::string best_key =
+            normalize_asset_lookup_key(best_path.generic_u8string());
+        if (best_path.empty() || size > best_size ||
+            (size == best_size && candidate_key < best_key)) {
+            best_path = entry.path();
+            best_size = size;
+        }
+    }
+
+    if (best_path.empty()) {
+        return std::nullopt;
+    }
+    return normalize_resolved_preview_path(best_path);
+}
+
 void append_unique_key(std::vector<std::string>& keys, const std::string& key) {
     if (key.empty()) {
         return;
@@ -518,6 +693,49 @@ std::string resolve_song_background_preview_path(const std::string& chart_path) 
     options.tolerant = true;
     const auto parsed = parser.parseFile(chart_path, options);
     return resolve_bms_background_preview_path(chart_fs_path, parsed.chart);
+}
+
+std::string resolve_bms_audio_preview_path(const std::filesystem::path& chart_path,
+                                           const chart::BmsChart& chart) {
+    if (chart_path.empty()) {
+        return {};
+    }
+
+    for (const std::string_view header_key : {"PREVIEW", "PREVIEWFILE"}) {
+        const auto header = chart.headers.find(std::string(header_key));
+        if (header == chart.headers.end()) {
+            continue;
+        }
+        if (auto resolved = resolve_audio_reference_path(chart_path, header->second);
+            resolved.has_value()) {
+            return resolved->u8string();
+        }
+    }
+
+    if (auto fallback = largest_local_audio_file(chart_path); fallback.has_value()) {
+        return fallback->u8string();
+    }
+    return {};
+}
+
+std::string resolve_song_audio_preview_path(const std::string& chart_path) {
+    if (chart_path.empty()) {
+        return {};
+    }
+
+    const std::filesystem::path chart_fs_path = path_from_utf8(chart_path);
+    if (!is_bms_chart_extension(
+            to_lower_ascii(chart_fs_path.extension().u8string()))) {
+        return {};
+    }
+
+    chart::BmsParser parser;
+    chart::BmsParserOptions options;
+    options.tolerant = true;
+    options.retain_unknown_headers = false;
+    options.retain_nonessential_commands = false;
+    const auto parsed = parser.parseFile(chart_path, options);
+    return resolve_bms_audio_preview_path(chart_fs_path, parsed.chart);
 }
 
 }  // namespace tenriff::app::menu_songs

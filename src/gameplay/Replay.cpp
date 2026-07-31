@@ -319,6 +319,7 @@ ExportResult save_result_json(const std::string& path, const ResultFile& result_
     obj.emplace("chart_path", config::JsonValue{result_file.chart_path});
     obj.emplace("chart_format", config::JsonValue{result_file.chart_format});
     obj.emplace("created_utc", config::JsonValue{result_file.created_utc});
+    obj.emplace("player_name", config::JsonValue{result_file.player_name});
     obj.emplace("replay_path", config::JsonValue{result_file.replay_path});
     obj.emplace("clear_status", config::JsonValue{result_file.clear_status});
     obj.emplace("final_gauge", config::JsonValue{result_file.final_gauge});

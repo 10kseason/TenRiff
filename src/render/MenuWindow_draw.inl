@@ -48,6 +48,9 @@ void MenuWindow::draw(const MenuRenderData& data) {
     } else if (data.kind == MenuScreenKind::SongSelect) {
         update_song_select_preview_loading_state(data.song_select, render_now_ns);
         pump_song_select_preview_loads(data.song_select, render_now_ns);
+    } else if (data.kind == MenuScreenKind::ResultScreen &&
+               !data.result.background_path.empty()) {
+        static_cast<void>(load_song_card_preview_bitmap(data.result.background_path));
     } else {
         song_select_preview_signature_.clear();
         song_select_preview_load_hold_until_ns_ = 0;

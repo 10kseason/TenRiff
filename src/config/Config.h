@@ -88,6 +88,7 @@ struct AudioUiConfig {
 };
 
 struct UiConfig {
+    std::string profile_nickname;
     std::string language = "en";
     double result_tail_ms = 500.0;
     bool require_enter_to_exit = true;
@@ -199,6 +200,7 @@ public:
 [[nodiscard]] std::string normalize_skin_mode_token(std::string_view key_mode);
 [[nodiscard]] std::string normalize_ui_language_token(std::string_view token);
 [[nodiscard]] std::string normalize_song_index_profile_token(std::string_view token);
+[[nodiscard]] std::string normalize_profile_nickname(std::string_view value);
 [[nodiscard]] std::string normalize_background_upscale_mode(std::string_view token);
 [[nodiscard]] std::vector<std::string> supported_skin_mode_tokens();
 [[nodiscard]] std::vector<std::string> supported_skin_color_tokens();

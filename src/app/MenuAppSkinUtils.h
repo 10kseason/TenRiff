@@ -79,6 +79,12 @@ inline std::string key_mode_label(const std::string& value) {
     if (value == "10k") {
         return "10K";
     }
+    if (value == "12k") {
+        return "12K";
+    }
+    if (value == "14k") {
+        return "14K";
+    }
     if (value == "16k") {
         return "16K";
     }
@@ -88,14 +94,14 @@ inline std::string key_mode_label(const std::string& value) {
 inline std::string normalize_skin_edit_mode(std::string value) {
     value = config::normalize_skin_mode_token(value);
     if (value == "4k" || value == "5k" || value == "6k" || value == "7k" || value == "8k" ||
-        value == "9k" || value == "10k" || value == "16k") {
+        value == "9k" || value == "10k" || value == "12k" || value == "14k" || value == "16k") {
         return value;
     }
     return "10k";
 }
 
 inline std::string cycle_skin_edit_mode(std::string_view current, int direction) {
-    static constexpr const char* kSkinModes[] = {"4k", "5k", "6k", "7k", "8k", "9k", "10k", "16k"};
+    static constexpr const char* kSkinModes[] = {"4k", "5k", "6k", "7k", "8k", "9k", "10k", "12k", "14k", "16k"};
     const int option_count = static_cast<int>(sizeof(kSkinModes) / sizeof(kSkinModes[0]));
     std::string normalized = normalize_skin_edit_mode(std::string(current));
     int index = option_count - 1;
@@ -130,6 +136,12 @@ inline int lane_count_for_skin_mode(std::string_view key_mode) {
     }
     if (normalized == "9k") {
         return 9;
+    }
+    if (normalized == "12k") {
+        return 12;
+    }
+    if (normalized == "14k") {
+        return 14;
     }
     if (normalized == "16k") {
         return 16;

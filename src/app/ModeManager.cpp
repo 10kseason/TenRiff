@@ -7,6 +7,7 @@
 #include <cmath>
 #include <limits>
 #include <unordered_map>
+#include <unordered_set>
 
 #include "app/ModeResolver.h"
 #include "gameplay/ModeApplier.h"
@@ -32,6 +33,17 @@ const std::vector<ModeModDescriptor>& registry_storage() {
     static const std::vector<ModeModDescriptor> kRegistry = {
         {"judge_easy", "Judge Easy", "Judge Easy", "judge_window", "Judge Window", 0.85},
         {"judge_hard", "Judge Hard", "Judge Hard", "judge_window", "Judge Window", 1.10},
+        {"dp_flip", "DP Flip", "DP Flip", "dp_layout", "DP Layout", 1.00},
+        {"note_add_10", "Note Add 10%", "Add 10%", "note_add", "Note Add", 1.00, 0, 10},
+        {"note_add_20", "Note Add 20%", "Add 20%", "note_add", "Note Add", 1.00, 0, 20},
+        {"note_add_30", "Note Add 30%", "Add 30%", "note_add", "Note Add", 1.00, 0, 30},
+        {"note_add_40", "Note Add 40%", "Add 40%", "note_add", "Note Add", 1.00, 0, 40},
+        {"note_add_50", "Note Add 50%", "Add 50%", "note_add", "Note Add", 1.00, 0, 50},
+        {"note_add_60", "Note Add 60%", "Add 60%", "note_add", "Note Add", 1.00, 0, 60},
+        {"note_add_70", "Note Add 70%", "Add 70%", "note_add", "Note Add", 1.00, 0, 70},
+        {"note_add_80", "Note Add 80%", "Add 80%", "note_add", "Note Add", 1.00, 0, 80},
+        {"note_add_90", "Note Add 90%", "Add 90%", "note_add", "Note Add", 1.00, 0, 90},
+        {"note_add_100", "Note Add 100%", "Add 100%", "note_add", "Note Add", 1.00, 0, 100},
         {"full_long_notes", "Full Long Notes", "Full LN", "note_structure", "Note Structure", 1.00},
         {"ln_mix_10", "LN Mix 10%", "LN 10%", "note_structure", "Note Structure", 1.00, 10},
         {"ln_mix_20", "LN Mix 20%", "LN 20%", "note_structure", "Note Structure", 1.00, 20},
@@ -102,6 +114,8 @@ int target_lane_count(KeyMode mode) {
         case KeyMode::Keys8: return 8;
         case KeyMode::Keys9: return 9;
         case KeyMode::Keys10: return 10;
+        case KeyMode::Keys12: return 12;
+        case KeyMode::Keys14: return 14;
         case KeyMode::Keys16: return 16;
         case KeyMode::Auto:
         default:
@@ -118,6 +132,8 @@ KeyMode key_mode_for_lane_count(int lane_count) {
         case 8: return KeyMode::Keys8;
         case 9: return KeyMode::Keys9;
         case 10: return KeyMode::Keys10;
+        case 12: return KeyMode::Keys12;
+        case 14: return KeyMode::Keys14;
         case 16: return KeyMode::Keys16;
         default: return KeyMode::Auto;
     }
@@ -199,6 +215,16 @@ int selected_long_note_mix_percent(const std::vector<std::string>& active_mods) 
         const auto* descriptor = find_mode_mod_descriptor(token);
         if (descriptor && descriptor->long_note_mix_percent > 0) {
             return descriptor->long_note_mix_percent;
+        }
+    }
+    return 0;
+}
+
+int selected_note_add_percent(const std::vector<std::string>& active_mods) {
+    for (const auto& token : active_mods) {
+        const auto* descriptor = find_mode_mod_descriptor(token);
+        if (descriptor && descriptor->note_add_percent > 0) {
+            return descriptor->note_add_percent;
         }
     }
     return 0;
@@ -391,6 +417,221 @@ void apply_mixed_long_notes(gameplay::GameplayChart& chart,
     }
 }
 
+void apply_note_additions(gameplay::GameplayChart& chart,
+                          int percent,
+                          uint32_t random_seed,
+                          std::vector<std::string>& warnings) {
+    percent = std::clamp(percent, 0, 100);
+    if (percent <= 0 || chart.notes.empty()) {
+        return;
+    }
+
+    int lane_count = chart.lane_count;
+    if (lane_count <= 0) {
+        for (const auto& note : chart.notes) {
+            lane_count = std::max(lane_count, note.lane);
+        }
+    }
+    if (lane_count <= 0) {
+        return;
+    }
+
+    const auto is_scratch = [&chart](int lane) {
+        return std::find(chart.scratch_lanes.begin(), chart.scratch_lanes.end(), lane) !=
+               chart.scratch_lanes.end();
+    };
+
+    std::vector<int> playable_lanes;
+    playable_lanes.reserve(static_cast<std::size_t>(lane_count));
+    for (int lane = 1; lane <= lane_count; ++lane) {
+        if (!is_scratch(lane)) {
+            playable_lanes.push_back(lane);
+        }
+    }
+    if (playable_lanes.empty()) {
+        return;
+    }
+
+    std::vector<int64_t> timestamps;
+    timestamps.reserve(chart.notes.size());
+    std::vector<std::vector<std::size_t>> notes_by_lane(static_cast<std::size_t>(lane_count) + 1u);
+    std::vector<std::size_t> lane_usage(static_cast<std::size_t>(lane_count) + 1u, 0u);
+    std::size_t original_playable_notes = 0;
+    std::size_t next_note_id = 0;
+    for (std::size_t index = 0; index < chart.notes.size(); ++index) {
+        const auto& note = chart.notes[index];
+        next_note_id = std::max(next_note_id, note.note_id);
+        if (note.lane <= 0 || note.lane > lane_count || is_scratch(note.lane)) {
+            continue;
+        }
+        timestamps.push_back(note.start_sample);
+        notes_by_lane[static_cast<std::size_t>(note.lane)].push_back(index);
+        ++lane_usage[static_cast<std::size_t>(note.lane)];
+        ++original_playable_notes;
+    }
+    if (original_playable_notes == 0 || timestamps.empty()) {
+        return;
+    }
+
+    std::sort(timestamps.begin(), timestamps.end());
+    timestamps.erase(std::unique(timestamps.begin(), timestamps.end()), timestamps.end());
+
+    std::unordered_map<int64_t, std::size_t> time_index;
+    time_index.reserve(timestamps.size());
+    for (std::size_t index = 0; index < timestamps.size(); ++index) {
+        time_index.emplace(timestamps[index], index);
+    }
+
+    const std::size_t lane_stride = static_cast<std::size_t>(lane_count) + 1u;
+    const auto occupancy_key = [lane_stride](std::size_t timestamp_index, int lane) {
+        return timestamp_index * lane_stride + static_cast<std::size_t>(lane);
+    };
+    std::unordered_set<std::size_t> occupied;
+    occupied.reserve(original_playable_notes * 2u);
+    std::vector<int> chord_sizes(timestamps.size(), 0);
+    for (const auto& note : chart.notes) {
+        if (note.lane <= 0 || note.lane > lane_count || is_scratch(note.lane)) {
+            continue;
+        }
+        const auto found = time_index.find(note.start_sample);
+        if (found == time_index.end()) {
+            continue;
+        }
+        if (occupied.insert(occupancy_key(found->second, note.lane)).second) {
+            ++chord_sizes[found->second];
+        }
+    }
+
+    struct Candidate {
+        std::size_t timestamp_index = 0;
+        int lane = 0;
+        uint64_t key = 0;
+    };
+
+    const int chord_cap = std::min<int>(
+        static_cast<int>(playable_lanes.size()),
+        std::max(2, (static_cast<int>(playable_lanes.size()) + 1) / 2));
+    std::vector<std::vector<Candidate>> candidates_by_lane(
+        static_cast<std::size_t>(lane_count) + 1u);
+
+    for (const int lane : playable_lanes) {
+        auto& lane_notes = notes_by_lane[static_cast<std::size_t>(lane)];
+        std::stable_sort(lane_notes.begin(), lane_notes.end(), [&](std::size_t lhs, std::size_t rhs) {
+            if (chart.notes[lhs].start_sample != chart.notes[rhs].start_sample) {
+                return chart.notes[lhs].start_sample < chart.notes[rhs].start_sample;
+            }
+            return lhs < rhs;
+        });
+
+        std::size_t note_cursor = 0;
+        int64_t active_hold_end = (std::numeric_limits<int64_t>::min)();
+        auto& lane_candidates = candidates_by_lane[static_cast<std::size_t>(lane)];
+        lane_candidates.reserve(timestamps.size());
+
+        for (std::size_t timestamp_index = 0; timestamp_index < timestamps.size(); ++timestamp_index) {
+            const int64_t timestamp = timestamps[timestamp_index];
+            while (note_cursor < lane_notes.size() &&
+                   chart.notes[lane_notes[note_cursor]].start_sample < timestamp) {
+                const auto& previous = chart.notes[lane_notes[note_cursor]];
+                if (previous.end_sample.has_value()) {
+                    active_hold_end = std::max(active_hold_end, previous.end_sample.value());
+                }
+                ++note_cursor;
+            }
+
+            if (active_hold_end >= timestamp ||
+                chord_sizes[timestamp_index] >= chord_cap ||
+                occupied.find(occupancy_key(timestamp_index, lane)) != occupied.end()) {
+                continue;
+            }
+
+            uint64_t material = static_cast<uint64_t>(random_seed) ^ 0xA0761D6478BD642Full;
+            material ^= static_cast<uint64_t>(timestamp) + 0xE7037ED1A0B428DBull;
+            material ^= static_cast<uint64_t>(lane) * 0x8EBC6AF09C88C6E3ull;
+            lane_candidates.push_back(
+                Candidate{timestamp_index, lane, mix_long_note_hash(material)});
+        }
+
+        std::stable_sort(lane_candidates.begin(), lane_candidates.end(),
+                         [](const Candidate& lhs, const Candidate& rhs) {
+                             if (lhs.key != rhs.key) {
+                                 return lhs.key < rhs.key;
+                             }
+                             return lhs.timestamp_index < rhs.timestamp_index;
+                         });
+    }
+
+    const std::size_t requested_additions = static_cast<std::size_t>(std::llround(
+        static_cast<double>(original_playable_notes) * static_cast<double>(percent) / 100.0));
+    std::vector<std::size_t> candidate_cursor(static_cast<std::size_t>(lane_count) + 1u, 0u);
+    std::size_t added = 0;
+
+    while (added < requested_additions) {
+        int best_lane = 0;
+        uint64_t best_key = (std::numeric_limits<uint64_t>::max)();
+
+        for (const int lane : playable_lanes) {
+            auto& lane_candidates = candidates_by_lane[static_cast<std::size_t>(lane)];
+            auto& cursor = candidate_cursor[static_cast<std::size_t>(lane)];
+            while (cursor < lane_candidates.size() &&
+                   chord_sizes[lane_candidates[cursor].timestamp_index] >= chord_cap) {
+                ++cursor;
+            }
+            if (cursor >= lane_candidates.size()) {
+                continue;
+            }
+
+            const auto& candidate = lane_candidates[cursor];
+            if (best_lane == 0 ||
+                lane_usage[static_cast<std::size_t>(lane)] <
+                    lane_usage[static_cast<std::size_t>(best_lane)] ||
+                (lane_usage[static_cast<std::size_t>(lane)] ==
+                     lane_usage[static_cast<std::size_t>(best_lane)] &&
+                 candidate.key < best_key)) {
+                best_lane = lane;
+                best_key = candidate.key;
+            }
+        }
+
+        if (best_lane == 0) {
+            break;
+        }
+
+        auto& cursor = candidate_cursor[static_cast<std::size_t>(best_lane)];
+        const Candidate candidate =
+            candidates_by_lane[static_cast<std::size_t>(best_lane)][cursor++];
+        ++chord_sizes[candidate.timestamp_index];
+        ++lane_usage[static_cast<std::size_t>(best_lane)];
+
+        gameplay::NoteEvent note;
+        note.lane = best_lane;
+        note.start_sample = timestamps[candidate.timestamp_index];
+        note.note_id = ++next_note_id;
+        note.clear_audio_assets();
+        chart.notes.push_back(std::move(note));
+        ++added;
+    }
+
+    std::stable_sort(chart.notes.begin(), chart.notes.end(),
+                     [](const gameplay::NoteEvent& lhs, const gameplay::NoteEvent& rhs) {
+                         if (lhs.start_sample != rhs.start_sample) {
+                             return lhs.start_sample < rhs.start_sample;
+                         }
+                         if (lhs.lane != rhs.lane) {
+                             return lhs.lane < rhs.lane;
+                         }
+                         return lhs.end_sample.value_or(lhs.start_sample) <
+                                rhs.end_sample.value_or(rhs.start_sample);
+                     });
+
+    if (added < requested_additions) {
+        warnings.push_back(
+            "Note Add placed " + std::to_string(added) + " of " +
+            std::to_string(requested_additions) +
+            " requested silent chord note(s); hold-body, duplicate, and chord-size guards blocked the rest.");
+    }
+}
+
 void scale_judge_windows(config::JudgeConfig& judge, double scale) {
     if (!std::isfinite(scale) || scale <= 0.0 || std::abs(scale - 1.0) < 1e-9) {
         return;
@@ -486,6 +727,14 @@ bool equivalent_mode_mod_tokens(const std::vector<std::string>& lhs,
     return normalize_mode_mod_tokens(lhs) == normalize_mode_mod_tokens(rhs);
 }
 
+bool mode_mod_adds_notes(const std::vector<std::string>& tokens) {
+    const auto normalized = normalize_mode_mod_tokens(tokens);
+    return std::any_of(normalized.begin(), normalized.end(), [](const std::string& token) {
+        const auto* descriptor = find_mode_mod_descriptor(token);
+        return descriptor && descriptor->note_add_percent > 0;
+    });
+}
+
 std::string mode_mod_summary(const std::vector<std::string>& tokens) {
     const std::vector<std::string> normalized = normalize_mode_mod_tokens(tokens);
     std::vector<std::string> labels;
@@ -560,6 +809,7 @@ ModeManagerResult manage_modes(const gameplay::GameplayChart& chart,
                                double rate,
                                double base_bpm,
                                int sample_rate) {
+    (void)chart_format;
     ModeManagerResult result;
     result.chart = chart;
     result.judge = judge;
@@ -568,11 +818,17 @@ ModeManagerResult manage_modes(const gameplay::GameplayChart& chart,
     result.settings = resolved.settings;
     result.warnings.insert(result.warnings.end(), resolved.warnings.begin(), resolved.warnings.end());
 
+    result.active_mods = normalize_mode_mod_tokens(config.mods, &result.warnings);
+    result.settings.dp_flip = has_mod_token(result.active_mods, "dp_flip");
+
     const auto applied = gameplay::apply_mode_settings(result.chart, result.settings, {base_bpm, sample_rate});
     result.chart = applied.chart;
     result.warnings.insert(result.warnings.end(), applied.warnings.begin(), applied.warnings.end());
 
-    result.active_mods = normalize_mode_mod_tokens(config.mods, &result.warnings);
+    if (const int note_add_percent = selected_note_add_percent(result.active_mods);
+        note_add_percent > 0) {
+        apply_note_additions(result.chart, note_add_percent, config.random_seed, result.warnings);
+    }
 
     if (has_mod_token(result.active_mods, "full_short_notes")) {
         apply_full_short_notes(result.chart);

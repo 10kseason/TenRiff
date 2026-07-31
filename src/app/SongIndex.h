@@ -22,6 +22,7 @@ struct SongEntry {
     std::string format;
     std::string layout_label;
     std::string background_preview_path;
+    std::string audio_preview_path;
     int key_count = 0;
     int level = 0;
     int native_level = 0;

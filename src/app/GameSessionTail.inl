@@ -1791,6 +1791,10 @@ void GameSession::shutdown() {
             engine_game_over,
             user_aborted_.load(std::memory_order_acquire));
         result_.mods = active_mods_;
+        result_.player_name = config::normalize_profile_nickname(config_.ui.profile_nickname);
+        if (result_.player_name.empty()) {
+            result_.player_name = options_.profile;
+        }
         result_.rate_multiplier = rate_multiplier_;
         result_.score_multiplier = score_multiplier_;
         result_.final_score = gameplay::scale_native_score(result_.stats.raw_score, result_.score_multiplier);
@@ -1845,6 +1849,7 @@ void GameSession::shutdown() {
             exported_result.chart_path = chart_path_;
             exported_result.chart_format = format_token;
             exported_result.created_utc = created_utc;
+            exported_result.player_name = result_.player_name;
             exported_result.replay_path = result_.replay_path;
             exported_result.clear_status = result_.clear_status;
             exported_result.final_gauge = gauge_type_token(final_gauge);
