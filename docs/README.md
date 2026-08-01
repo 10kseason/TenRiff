@@ -16,7 +16,7 @@ Language: Korean | [English](README.en.md) | [简体中文](README.zh-CN.md) | [
 4. `docs/gameplay-guide.md`
    - 실제 플레이 기준의 시작 방법, 곡 선택, 조작, HUD, 판정, 결과 화면 안내
 5. `docs/multiplayer.md`
-   - 1:1 직접 IP 멀티플레이의 호스트/참가 절차, 포트 설정, 고정 규칙, 보안 및 네트워크 제한
+   - 최대 8인 직접 IP 멀티플레이의 접속, BMS 전용 공통곡, 회전 선곡권, 보안 및 네트워크 제한
 6. `docs/config.md`
    - 실제 설정/프로필/키맵 구조
 7. `docs/localization.md`

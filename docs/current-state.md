@@ -3,7 +3,7 @@
 이 문서는 다음 에이전트나 새 작업자가 가장 먼저 읽어야 하는 현재 상태 문서입니다. 목표는 "지금 이 프로젝트가 무엇이고, 어디를 보면 되고, 무엇이 아직 미검증인지"를 빠르게 파악하게 하는 것입니다.
 
 ## Baseline
-- 현재 프로젝트 버전과 공개 안정판은 `1.2.96 stable`
+- 현재 프로젝트 버전과 공개 안정판은 `1.2.98 stable`
 - 직접 IP 멀티플레이와 preview r5의 입력 backend 수명주기 수정은 `1.1.8 stable`에 통합
 - `1.1.8`은 1.1.7의 시각 개선에 osu!mania OD8 보조 점수, 첫 네이티브 `BAD` 즉사 `Sudden Death (1 MISS)`, 결정적 `LN Mix 10%~90%`를 추가
 - `1.2.0`은 BMS 채널 `04/07` 및 osu!mania 배경을 gameplay sample timeline에 연결하고, FHD 미만 이미지 배경을 Windows ML 기반 LunaSR로 비동기 보간
@@ -159,20 +159,17 @@
   - `Options -> Profile Setup`에서 현재 프로필의 언어, 오디오, 입력 백엔드, 그래픽, 키맵을 첫 실행용 Quick Setup 화면으로 다시 조정하고 즉시 저장
   - 최대 48바이트의 프로필 닉네임을 편집하며 이후 저장 기록과 직접 IP 멀티플레이 표시 이름으로 사용
 - 직접 IP 멀티플레이:
-  - Windows에서 1 호스트 + 1 참가자 TCP 연결, 기본 `27300/TCP`
-  - protocol v3는 연결 뒤 각 PC의 현재 indexed source에서 유효한 SHA-256만 최대 512개씩 청크로 교환하며, 호스트 Song Select에는 양쪽에 바이트 단위로 동일한 공통곡만 표시
-  - 호스트만 공통곡 목록에서 선곡하며 참가자는 현재 source와 profile의 `recent_song_sources`에 기록된 폴더의 기존 캐시를 순서대로 열어 hash+size가 일치하는 차트를 자동 선택
-  - 최근 source 검색은 profile-local cache만 읽고 전체 디스크 탐색이나 자동 재인덱싱은 하지 않으며, 캐시의 source 밖 경로는 거부
-  - Options 진입 시 Ready 해제, 양쪽 chart load 완료 후 시작 barrier
-  - 멀티 게이지도 싱글 `Gauge Shift`와 동일하게 EX-Hard / Hard / Normal / Easy를 병렬 계산하고, 모든 tier가 탈락했을 때 해당 플레이어가 Game Over
-  - 플레이 중 상대 점수/콤보/게이지/상태 HUD와 로컬 관점 score-gap bar를 표시하며, `-10,000 / 0 / +10,000`을 `LOSS 끝 / 중앙 / WIN 끝`으로 clamp
-  - score-gap 끝단은 표시 전용이며 경기 종료나 결과 확정 조건이 아님
-  - 한쪽이 먼저 Game Over되면 다른 플레이어는 계속 진행하고, 사망한 쪽은 상대의 aggregate 점수/콤보/게이지/상태를 보며 기다린 뒤 양쪽 종료 후 비교 결과로 이동
-  - peer protocol은 정확한 lane input이나 note별 판정/hold state를 전송하지 않으므로 상대 플레이필드는 추측 렌더하지 않음
-  - protocol v3의 모든 경기 프레임에 round nonce를 붙이고 RoundCancel/ACK 순서를 보장해 지연 패킷과 Ready/Launch 교차를 연결 해제 없이 정리하며, 이전 protocol 버전과는 연결하지 않음
-  - 전용 RoundReset으로 양쪽이 모두 Result를 나가기 전에는 다음 선곡/Ready/Options를 막고 상대 결과를 보존
-  - heartbeat RTT의 절반을 시작 카운트다운에 보정해 직접 IP 연결의 양쪽 시작 시점 오차를 줄임
-  - Rate 1.0, 원본 키 수, 네 tier 병렬 `Gauge Shift`, 기본 판정, Random/Mods/Assist off를 세션에만 적용
+  - Windows에서 고정 TCP 코디네이터 1대에 최대 7명이 참가해 총 8명까지 연결, 기본 `27300/TCP`
+  - protocol v4는 각 참가자의 indexed BMS SHA-256 목록을 최대 512개씩 받고 현재 접속자 전원이 가진 차트의 교집합만 공통곡으로 배포; osu!mania `.osu`는 멀티 후보에서 제외
+  - 초기 선곡권자는 호스트이며, 모든 플레이어가 Result를 나간 뒤 입장 순서의 다음 연결 플레이어로 선곡권을 회전
+  - 선곡권자가 나가면 다음 연결 플레이어를 즉시 선택하고, 고정 네트워크 호스트가 나가면 방 전체를 종료
+  - 방이 8/8이거나 경기가 진행 중이면 신규 참가자를 거부
+  - 현재 선곡권자만 전원 공통 BMS를 선택하고 전원 Ready일 때 START 요청 가능; 코디네이터 승인 Launch와 전원 chart-load barrier 뒤 시작
+  - 참가자는 현재 source와 profile의 `recent_song_sources`에 기록된 기존 캐시만 순서대로 열어 hash+size 일치 BMS를 자동 선택; 전체 디스크 탐색이나 자동 재인덱싱은 하지 않고 source 밖 cache 경로는 거부
+  - 멀티 게이지도 싱글 `Gauge Shift`와 동일하게 EX-Hard / Hard / Normal / Easy를 병렬 계산하고 모든 tier 탈락 시 해당 플레이어가 Game Over
+  - 플레이 중 기존 점수차 HUD는 대표 상대를 표시하고 Result는 전 참가자 최종 점수 순위를 표시; protocol은 정확한 lane input/note별 판정/hold state를 전송하지 않음
+  - 모든 경기 프레임은 round nonce를 사용하고 전원 최종 결과 및 전원 RoundReset을 다음 선곡/Ready 해제 조건으로 사용
+  - Rate 1.0, 원본 키 수, 기본 판정, Random/Mods/Assist off를 세션에만 적용
   - 차트 전송, NAT traversal, 릴레이/매치메이킹, 암호화/인증, 안티치트, 자동 재접속은 미지원
   - 상세 사용/보안 경계는 `docs/multiplayer.md`
 
@@ -203,7 +200,7 @@
 
 ## Runtime / Packaging Rules
 - 새 사용자 프로필은 자동 생성
-- 현재 정식 P2P 배포 라인은 `TenRiff 1.2.96 stable`
+- 현재 정식 P2P 배포 라인은 `TenRiff 1.2.98 stable`
 - 배포 패키지에는 `Songs`를 넣지 않음
 - 배포 패키지는 `Main Menu / Options / Song Selecte / Multiplayer Lobby / Clear / Failed` 이름의 `Mainmusic/` 화면 슬롯을 포함하며, 각 `이름.mp3`와 번호가 붙은 `이름 2.mp3`~`이름 64.mp3`를 자동 수집해 화면 재진입마다 순환
 - 배포 업데이트에는 built artifacts와 필요한 런타임 자산만 포함

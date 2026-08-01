@@ -37,6 +37,20 @@ struct PeerChartInfo {
     std::string name;
 };
 
+struct PeerParticipantSnapshot {
+    uint8_t player_id = 0;
+    std::string name;
+    bool local = false;
+    bool leader = false;
+    bool ready = false;
+    bool loaded = false;
+    bool round_reset = false;
+    PeerChartInfo chart;
+    bool has_score = false;
+    PeerScore latest_score;
+    uint32_t estimated_rtt_ms = 0;
+};
+
 struct PeerSessionSnapshot {
     PeerRole role = PeerRole::None;
     PeerSessionState state = PeerSessionState::Idle;
@@ -46,6 +60,12 @@ struct PeerSessionSnapshot {
     std::string peer_name;
     std::string status_detail;
 
+    uint8_t local_player_id = 0;
+    uint8_t leader_player_id = 0;
+    std::size_t participant_count = 0;
+    bool local_is_leader = false;
+    std::vector<PeerParticipantSnapshot> participants;
+
     bool remote_library_ready = false;
     std::size_t remote_library_count = 0;
     uint64_t remote_library_revision = 0;
@@ -53,6 +73,7 @@ struct PeerSessionSnapshot {
 
     PeerChartInfo local_chart;
     PeerChartInfo remote_chart;
+    PeerChartInfo selected_chart;
     bool local_ready = false;
     bool remote_ready = false;
     bool local_loaded = false;
@@ -65,11 +86,13 @@ struct PeerSessionSnapshot {
     bool remote_round_reset = false;
 
     bool has_remote_score = false;
+    bool all_remote_finished = false;
     PeerScore latest_remote_score;
 };
 
-/// One-host/one-joiner TCP session. All socket work stays on one background
-/// thread; callers interact through commands, snapshots, and bounded waits.
+/// Direct-IP TCP room for up to eight players. The network host remains the
+/// coordinator while chart/start leadership rotates after completed rounds.
+/// Socket work stays on one background thread; callers use snapshots and commands.
 class PeerSession {
 public:
     PeerSession();
@@ -102,7 +125,7 @@ public:
     void clear_local_chart();
     [[nodiscard]] bool set_ready(bool ready);
 
-    /// Host-only launch barrier. The current chart must match and both peers must
+    /// Leader-only launch barrier. The current chart must match and every participant must
     /// be ready. The joiner consumes the chart hash through poll_launch().
     [[nodiscard]] bool send_launch();
     [[nodiscard]] std::optional<uint64_t> poll_launch();
@@ -110,7 +133,7 @@ public:
     [[nodiscard]] bool mark_loaded();
     [[nodiscard]] bool wait_for_peer_loaded(std::chrono::milliseconds timeout);
 
-    /// Host-only begin command, normally sent after both peers report Loaded.
+    /// Leader-only begin command, normally sent after every participant reports Loaded.
     [[nodiscard]] bool send_begin(uint32_t delay_ms);
     [[nodiscard]] bool wait_for_begin(std::chrono::milliseconds timeout,
                                       uint32_t& out_delay_ms);
@@ -120,7 +143,7 @@ public:
     [[nodiscard]] bool publish_score(const PeerScore& score, bool final = false);
 
     /// Leaves the current result/round while keeping the connection and chart.
-    /// A launched round finishes resetting only after both peers call this.
+    /// A launched round finishes resetting only after every connected player calls this.
     void reset_round();
 
 private:

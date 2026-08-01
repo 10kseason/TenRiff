@@ -2,9 +2,9 @@
 
 Language: [한국어](README.md) | [English](README.en.md) | [简体中文](README.zh-CN.md) | [日本語](README.ja.md)
 
-TenRiff is a Windows GUI BMS rhythm-game runtime/launcher. The current stable version is `1.2.96`, and chart input defaults to the BMS family (`.bms/.bme/.bml/.pms`); enabling `OSU Charts` in Mode Settings also indexes and plays 4K-10K osu!mania `.osu` files through TenRiff's own parser. Graphics Settings lets users select a rights-cleared external ONNX model, then explicitly enable `BGA Upscaler` and accept a high-spec warning. Public packages contain no model and the feature defaults to `off`; there is no performance benchmark gate, and load, contract, or inference failure keeps native scaling. The default accelerator route is a high-performance DirectX GPU, with automatic FP32/FP16 boundary and float-boundary INT8 QDQ metadata detection. Experimental `Low-Power DirectX` requests `DirectXMinPower`; it is not an explicit or verified NPU selection. The project uses the MIT License, and bundled third-party notices are collected in [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
+TenRiff is a Windows GUI BMS rhythm-game runtime/launcher. The current stable version is `1.2.98`, and chart input defaults to the BMS family (`.bms/.bme/.bml/.pms`); enabling `OSU Charts` in Mode Settings also indexes and plays 4K-10K osu!mania `.osu` files through TenRiff's own parser. Graphics Settings lets users select a rights-cleared external ONNX model, then explicitly enable `BGA Upscaler` and accept a high-spec warning. Public packages contain no model and the feature defaults to `off`; there is no performance benchmark gate, and load, contract, or inference failure keeps native scaling. The default accelerator route is a high-performance DirectX GPU, with automatic FP32/FP16 boundary and float-boundary INT8 QDQ metadata detection. Experimental `Low-Power DirectX` requests `DirectXMinPower`; it is not an explicit or verified NPU selection. The project uses the MIT License, and bundled third-party notices are collected in [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
 
-This README is an introduction that explains "what to look at first when you open the project." For current behavior, the `1.2.96 stable` project state, the `1.1.2 final stable` baseline, configuration, and design documents, continue from [`docs/README.en.md`](docs/README.en.md).
+This README is an introduction that explains "what to look at first when you open the project." For current behavior, the `1.2.98 stable` project state, the `1.1.2 final stable` baseline, configuration, and design documents, continue from [`docs/README.en.md`](docs/README.en.md).
 
 TenRiff should also be read as a `vibe coding` work: it was shaped through fast iteration and experimentation rather than only through a traditional long-form design-first process.
 
@@ -15,7 +15,7 @@ TenRiff should also be read as a `vibe coding` work: it was shaped through fast 
 - Graphics path: D3D11 + Direct2D/DirectWrite
 - Audio path: WASAPI
 - Input path: RawInput or high-rate polling
-- Direct-IP multiplayer: one host plus one joiner over TCP (default `27300/TCP`; see [usage](docs/multiplayer.md))
+- Direct-IP multiplayer: fixed-host TCP coordinator for up to 8 players; multiplayer chart selection is BMS-only (default `27300/TCP`; see [usage](docs/multiplayer.md))
 - License: [MIT](LICENSE)
 - Third-party notices: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
 - Release changelog: [CHANGELOG.md](CHANGELOG.md)

@@ -2,10 +2,13 @@
 
 #include "network/PeerSession.h"
 
+#include <algorithm>
 #include <chrono>
 #include <functional>
+#include <memory>
 #include <optional>
 #include <thread>
+#include <vector>
 
 namespace {
 
@@ -97,10 +100,10 @@ TEST_CASE("peer session localhost round reaches final score and clean shutdown")
     REQUIRE(host_library.remote_library_sha256);
     REQUIRE(joiner_library.remote_library_sha256);
     CHECK(host_library.remote_library_count == 1u);
-    CHECK(joiner_library.remote_library_count == 2u);
+    CHECK(joiner_library.remote_library_count == 1u);
     CHECK(host_library.remote_library_sha256->count(shared_sha) == 1u);
     CHECK(joiner_library.remote_library_sha256->count(shared_sha) == 1u);
-    CHECK(joiner_library.remote_library_sha256->count(host_only_sha) == 1u);
+    CHECK(joiner_library.remote_library_sha256->count(host_only_sha) == 0u);
     REQUIRE(wait_until([&]() {
         return host.snapshot().estimated_rtt_ms > 0 &&
                joiner.snapshot().estimated_rtt_ms > 0;
@@ -201,6 +204,12 @@ TEST_CASE("peer session localhost round reaches final score and clean shutdown")
     CHECK_FALSE(host.snapshot().can_start);
 
     joiner.reset_round();
+    REQUIRE(wait_until([&]() {
+        return !host.snapshot().round_active &&
+               !joiner.snapshot().round_active &&
+               host.snapshot().leader_player_id == 2 &&
+               joiner.snapshot().local_is_leader;
+    }));
     const ChartFingerprint rematch_chart{0x9988776655443322ull, 8192};
     REQUIRE(joiner.set_local_chart(rematch_chart, "Immediate Rematch Chart"));
     REQUIRE(wait_until([&]() {
@@ -219,75 +228,37 @@ TEST_CASE("peer session localhost round reaches final score and clean shutdown")
     }));
     REQUIRE(host.set_ready(true));
     REQUIRE(joiner.set_ready(true));
-    REQUIRE(wait_until([&]() { return host.snapshot().can_start; }));
+    REQUIRE(wait_until([&]() { return joiner.snapshot().can_start; }));
+    CHECK_FALSE(host.snapshot().can_start);
 
-    // Ready(false) and Launch travel in opposite TCP directions. If they cross,
-    // the lobby unready must cancel the pending launch, never masquerade as a
-    // completed-result RoundReset or disconnect either peer.
-    REQUIRE(joiner.set_ready(false));
-    const bool crossed_launch = host.send_launch();
-    if (crossed_launch) {
-        // If this queues before Ready(false) reaches the host, the resulting
-        // stale Loaded frame must be ignored by the joiner's closed nonce.
-        (void)host.mark_loaded();
-        REQUIRE(wait_until([&]() {
-            const auto host_state = host.snapshot();
-            const auto joiner_state = joiner.snapshot();
-            return host_state.state == PeerSessionState::Connected &&
-                   joiner_state.state == PeerSessionState::Connected &&
-                   !host_state.round_active && !joiner_state.round_active &&
-                   !host_state.round_transition_pending &&
-                   !host_state.local_ready && !host_state.remote_ready &&
-                   !joiner_state.local_ready && !joiner_state.remote_ready &&
-                   joiner_state.status_detail.find("canceled because readiness changed") !=
-                       std::string::npos;
-        }));
-        CHECK_FALSE(joiner.poll_launch().has_value());
-        CHECK_FALSE(host.snapshot().can_start);
-    } else {
-        REQUIRE(wait_until([&]() { return !host.snapshot().remote_ready; }));
-    }
-
-    // A rapid false -> true flip may straddle Launch and RoundCancel. After the
-    // ordered cancellation ACK settles, the peers must be either consistently
-    // canceled, consistently ready in the lobby, or consistently in the same
-    // active round -- never a stale host-only can_start state.
+    // START is only actionable after the coordinator validates the latest
+    // all-player Ready roster. A crossed follower Ready(false) may make the
+    // leader's local request look valid, but it must never launch either side.
     REQUIRE(host.set_ready(false));
-    REQUIRE(joiner.set_ready(false));
-    REQUIRE(wait_until([&]() {
-        return !host.snapshot().remote_ready && !joiner.snapshot().remote_ready;
-    }));
-    REQUIRE(host.set_ready(true));
-    REQUIRE(joiner.set_ready(true));
-    REQUIRE(wait_until([&]() { return host.snapshot().can_start; }));
-    REQUIRE(joiner.set_ready(false));
-    REQUIRE(joiner.set_ready(true));
-    const bool rapid_flip_launch = host.send_launch();
-    if (rapid_flip_launch) {
-        (void)host.mark_loaded();
+    const bool crossed_launch = joiner.send_launch();
+    if (crossed_launch) {
+        REQUIRE(wait_until([&]() {
+            return !host.snapshot().local_ready &&
+                   !joiner.snapshot().remote_ready &&
+                   !host.snapshot().round_active &&
+                   !joiner.snapshot().round_active;
+        }));
+        CHECK_FALSE(host.poll_launch().has_value());
+        CHECK_FALSE(joiner.poll_launch().has_value());
     }
-    std::this_thread::sleep_for(300ms);
-    const auto rapid_host = host.snapshot();
-    const auto rapid_joiner = joiner.snapshot();
-    CHECK(rapid_host.state == PeerSessionState::Connected);
-    CHECK(rapid_joiner.state == PeerSessionState::Connected);
-    CHECK_FALSE(rapid_host.round_transition_pending);
-    const bool canceled_baseline =
-        !rapid_host.round_active && !rapid_joiner.round_active &&
-        !rapid_host.local_ready && !rapid_host.remote_ready &&
-        !rapid_joiner.local_ready && !rapid_joiner.remote_ready;
-    const bool ready_lobby =
-        !rapid_host.round_active && !rapid_joiner.round_active &&
-        rapid_host.local_ready && rapid_host.remote_ready &&
-        rapid_joiner.local_ready && rapid_joiner.remote_ready &&
-        rapid_host.can_start;
-    const bool active_round =
-        rapid_host.round_active && rapid_joiner.round_active &&
-        rapid_host.local_ready && rapid_host.remote_ready &&
-        rapid_joiner.local_ready && rapid_joiner.remote_ready &&
-        !rapid_host.can_start;
-    CHECK(canceled_baseline || ready_lobby || active_round);
 
+    REQUIRE(host.set_ready(true));
+    REQUIRE(wait_until([&]() { return joiner.snapshot().can_start; }));
+    REQUIRE(joiner.send_launch());
+    std::optional<uint64_t> host_launch;
+    std::optional<uint64_t> leader_launch;
+    REQUIRE(wait_until([&]() {
+        if (!host_launch) host_launch = host.poll_launch();
+        if (!leader_launch) leader_launch = joiner.poll_launch();
+        return host_launch && leader_launch;
+    }));
+    CHECK(*host_launch == rematch_chart.hash);
+    CHECK(*leader_launch == rematch_chart.hash);
     host.disconnect("Loopback test complete");
     joiner.disconnect();
     CHECK(host.snapshot().state == PeerSessionState::Disconnected);
@@ -295,6 +266,234 @@ TEST_CASE("peer session localhost round reaches final score and clean shutdown")
 #endif
 }
 
+TEST_CASE("peer room coordinates four players and rotates leader in join order") {
+#ifndef _WIN32
+    return;
+#else
+    using tenriff::network::ChartFingerprint;
+    using tenriff::network::PeerScore;
+    using tenriff::network::PeerSession;
+    using tenriff::network::PeerSessionState;
+
+    PeerSession host;
+    PeerSession player_two;
+    PeerSession player_three;
+    PeerSession player_four;
+    const ChartFingerprint chart{0x8877665544332211ull, 77777};
+    const std::string common_sha =
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+    const std::string partial_sha =
+        "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+    host.set_local_library({common_sha, partial_sha});
+    player_two.set_local_library({common_sha, partial_sha});
+    player_three.set_local_library({common_sha});
+    player_four.set_local_library({common_sha});
+    REQUIRE(host.set_local_chart(chart, "Four Player BMS"));
+    REQUIRE(host.host(0, "Player One"));
+    REQUIRE(wait_until([&]() {
+        const auto room = host.snapshot();
+        return room.state == PeerSessionState::Listening && room.local_port != 0;
+    }));
+
+    const uint16_t port = host.snapshot().local_port;
+    REQUIRE(player_two.join("localhost", port, "Player Two"));
+    REQUIRE(wait_until([&]() {
+        return host.snapshot().participant_count == 2 &&
+               player_two.snapshot().local_player_id == 2;
+    }, 5000ms));
+    REQUIRE(player_three.join("localhost", port, "Player Three"));
+    REQUIRE(wait_until([&]() {
+        return host.snapshot().participant_count == 3 &&
+               player_three.snapshot().local_player_id == 3;
+    }, 5000ms));
+    REQUIRE(player_four.join("localhost", port, "Player Four"));
+    REQUIRE(wait_until([&]() {
+        return host.snapshot().participant_count == 4 &&
+               player_two.snapshot().participant_count == 4 &&
+               player_three.snapshot().participant_count == 4 &&
+               player_four.snapshot().participant_count == 4;
+    }, 5000ms));
+
+    CHECK(host.snapshot().local_player_id == 1);
+    CHECK(player_two.snapshot().local_player_id == 2);
+    CHECK(player_three.snapshot().local_player_id == 3);
+    CHECK(player_four.snapshot().local_player_id == 4);
+    CHECK(host.snapshot().leader_player_id == 1);
+    CHECK(host.snapshot().local_is_leader);
+    CHECK_FALSE(player_two.snapshot().local_is_leader);
+
+    REQUIRE(wait_until([&]() {
+        return host.snapshot().remote_library_ready &&
+               player_two.snapshot().remote_library_ready &&
+               player_three.snapshot().remote_library_ready &&
+               player_four.snapshot().remote_library_ready;
+    }, 5000ms));
+    CHECK(host.snapshot().remote_library_count == 1u);
+    CHECK(player_two.snapshot().remote_library_count == 1u);
+    REQUIRE(host.snapshot().remote_library_sha256);
+    CHECK(host.snapshot().remote_library_sha256->count(common_sha) == 1u);
+    CHECK(host.snapshot().remote_library_sha256->count(partial_sha) == 0u);
+
+    REQUIRE(wait_until([&]() {
+        return player_two.snapshot().selected_chart.fingerprint.hash == chart.hash &&
+               player_three.snapshot().selected_chart.fingerprint.hash == chart.hash &&
+               player_four.snapshot().selected_chart.fingerprint.hash == chart.hash;
+    }));
+    REQUIRE(player_two.set_local_chart(chart, "Four Player BMS"));
+    REQUIRE(player_three.set_local_chart(chart, "Four Player BMS"));
+    REQUIRE(player_four.set_local_chart(chart, "Four Player BMS"));
+    REQUIRE(wait_until([&]() {
+        const auto room = host.snapshot();
+        return room.participants.size() == 4 &&
+               std::all_of(room.participants.begin(),
+                           room.participants.end(),
+                           [&](const auto& participant) {
+                               return participant.chart.fingerprint.hash == chart.hash;
+                           });
+    }));
+
+    REQUIRE(host.set_ready(true));
+    REQUIRE(player_two.set_ready(true));
+    REQUIRE(player_three.set_ready(true));
+    REQUIRE(player_four.set_ready(true));
+    REQUIRE(wait_until([&]() { return host.snapshot().can_start; }));
+    CHECK_FALSE(player_two.snapshot().can_start);
+
+    REQUIRE(host.send_launch());
+    std::optional<uint64_t> launch_two;
+    std::optional<uint64_t> launch_three;
+    std::optional<uint64_t> launch_four;
+    REQUIRE(wait_until([&]() {
+        if (!launch_two) launch_two = player_two.poll_launch();
+        if (!launch_three) launch_three = player_three.poll_launch();
+        if (!launch_four) launch_four = player_four.poll_launch();
+        return launch_two && launch_three && launch_four;
+    }));
+    CHECK(*launch_two == chart.hash);
+    CHECK(*launch_three == chart.hash);
+    CHECK(*launch_four == chart.hash);
+
+    REQUIRE(host.mark_loaded());
+    REQUIRE(player_two.mark_loaded());
+    REQUIRE(player_three.mark_loaded());
+    REQUIRE(player_four.mark_loaded());
+    REQUIRE(host.wait_for_peer_loaded(3000ms));
+    REQUIRE(player_two.wait_for_peer_loaded(3000ms));
+    REQUIRE(player_three.wait_for_peer_loaded(3000ms));
+    REQUIRE(player_four.wait_for_peer_loaded(3000ms));
+
+    REQUIRE(host.send_begin(900));
+    uint32_t begin_two = 0;
+    uint32_t begin_three = 0;
+    uint32_t begin_four = 0;
+    REQUIRE(player_two.wait_for_begin(3000ms, begin_two));
+    REQUIRE(player_three.wait_for_begin(3000ms, begin_three));
+    REQUIRE(player_four.wait_for_begin(3000ms, begin_four));
+    CHECK(begin_two == 900);
+    CHECK(begin_three == 900);
+    CHECK(begin_four == 900);
+
+    PeerScore final;
+    final.finished = true;
+    final.max_combo = 100;
+    final.score = 1000;
+    REQUIRE(host.publish_score(final, true));
+    final.score = 2000;
+    REQUIRE(player_two.publish_score(final, true));
+    final.score = 3000;
+    REQUIRE(player_three.publish_score(final, true));
+    final.score = 4000;
+    REQUIRE(player_four.publish_score(final, true));
+    REQUIRE(wait_until([&]() {
+        return host.snapshot().all_remote_finished &&
+               player_two.snapshot().all_remote_finished &&
+               player_three.snapshot().all_remote_finished &&
+               player_four.snapshot().all_remote_finished;
+    }, 5000ms));
+
+    host.reset_round();
+    player_two.reset_round();
+    player_three.reset_round();
+    player_four.reset_round();
+    REQUIRE(wait_until([&]() {
+        return !host.snapshot().round_active &&
+               !player_two.snapshot().round_active &&
+               !player_three.snapshot().round_active &&
+               !player_four.snapshot().round_active &&
+               host.snapshot().leader_player_id == 2 &&
+               player_two.snapshot().local_is_leader;
+    }, 5000ms));
+
+    player_two.disconnect("Leader leaves room");
+    REQUIRE(wait_until([&]() {
+        return host.snapshot().participant_count == 3 &&
+               player_three.snapshot().participant_count == 3 &&
+               player_four.snapshot().participant_count == 3 &&
+               host.snapshot().leader_player_id == 3 &&
+               player_three.snapshot().local_is_leader;
+    }, 5000ms));
+
+    player_three.disconnect();
+    player_four.disconnect();
+    host.disconnect("Four-player room test complete");
+#endif
+}
+TEST_CASE("peer room accepts eight players and rejects a ninth") {
+#ifndef _WIN32
+    return;
+#else
+    using tenriff::network::PeerSession;
+    using tenriff::network::PeerSessionState;
+
+    PeerSession host;
+    host.set_local_library({});
+    REQUIRE(host.host(0, "Capacity Host"));
+    REQUIRE(wait_until([&]() {
+        const auto room = host.snapshot();
+        return room.state == PeerSessionState::Listening && room.local_port != 0;
+    }));
+
+    const uint16_t port = host.snapshot().local_port;
+    std::vector<std::unique_ptr<PeerSession>> joiners;
+    joiners.reserve(7);
+    for (std::size_t index = 0; index < 7; ++index) {
+        auto joiner = std::make_unique<PeerSession>();
+        joiner->set_local_library({});
+        REQUIRE(joiner->join("localhost",
+                             port,
+                             "Capacity Player " + std::to_string(index + 2)));
+        const auto expected_count = static_cast<uint8_t>(index + 2);
+        REQUIRE(wait_until([&]() {
+            return host.snapshot().participant_count == expected_count &&
+                   joiner->snapshot().local_player_id == expected_count;
+        }, 5000ms));
+        joiners.push_back(std::move(joiner));
+    }
+
+    REQUIRE(wait_until([&]() {
+        return host.snapshot().participant_count ==
+                   tenriff::network::kPeerMaxPlayers &&
+               std::all_of(joiners.begin(), joiners.end(), [](const auto& joiner) {
+                   return joiner->snapshot().participant_count ==
+                          tenriff::network::kPeerMaxPlayers;
+               });
+    }, 5000ms));
+
+    PeerSession overflow;
+    overflow.set_local_library({});
+    REQUIRE(overflow.join("localhost", port, "Capacity Overflow"));
+    REQUIRE(wait_until([&]() {
+        const auto state = overflow.snapshot().state;
+        return state == PeerSessionState::Disconnected ||
+               state == PeerSessionState::Failed;
+    }, 5000ms));
+    CHECK(host.snapshot().participant_count == tenriff::network::kPeerMaxPlayers);
+
+    overflow.disconnect();
+    for (auto& joiner : joiners) joiner->disconnect();
+    host.disconnect("Capacity test complete");
+#endif
+}
 TEST_CASE("peer session discards a queued launch when the connection closes") {
 #ifndef _WIN32
     return;

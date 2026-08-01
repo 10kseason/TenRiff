@@ -96,10 +96,10 @@ void MenuApp::populate_multiplayer_render_data(render::MenuRenderData& render) {
     const bool connected = peer.state == network::PeerSessionState::Connected;
     const bool chart_matches = multiplayer_chart_fingerprints_match(multiplayer_menu_);
     const bool round_active = last_game_was_multiplayer_ || peer_round_ui_locked(peer);
-    const bool host_can_choose_chart =
-        !round_active && multiplayer_host_can_choose_chart(multiplayer_menu_) &&
+    const bool leader_can_choose_chart =
+        !round_active && multiplayer_leader_can_choose_chart(multiplayer_menu_) &&
         peer.remote_library_ready && multiplayer_common_chart_count_ > 0;
-    const bool can_start = !round_active && multiplayer_host_can_start(multiplayer_menu_);
+    const bool can_start = !round_active && multiplayer_leader_can_start(multiplayer_menu_);
 
     const auto row_selected = [this](MultiplayerMenuRow row) {
         return multiplayer_menu_.cursor == static_cast<int>(row);
@@ -144,7 +144,7 @@ void MenuApp::populate_multiplayer_render_data(render::MenuRenderData& render) {
                     true,
                     false);
     std::string chart_value;
-    if (multiplayer_menu_.role == MultiplayerRole::Host) {
+    if (multiplayer_menu_.local_is_leader) {
         if (!connected || !peer.remote_library_ready) {
             chart_value = ui_text("Syncing song libraries", "곡 목록 동기화 중");
         } else if (multiplayer_common_chart_count_ == 0) {
@@ -154,15 +154,15 @@ void MenuApp::populate_multiplayer_render_data(render::MenuRenderData& render) {
                               ? ui_text("Choose Shared Song", "공통 곡 선택")
                               : multiplayer_chart_title_;
         }
-    } else if (peer.remote_chart.fingerprint.valid()) {
-        chart_value = peer.remote_chart.name.empty()
-                          ? ui_text("Matching host HASH", "호스트 HASH 곡 검색 중")
-                          : peer.remote_chart.name;
+    } else if (peer.selected_chart.fingerprint.valid()) {
+        chart_value = peer.selected_chart.name.empty()
+                          ? ui_text("Matching leader HASH", "리더 HASH 곡 검색 중")
+                          : peer.selected_chart.name;
         if (chart_matches && !multiplayer_chart_path_.empty()) {
             chart_value += ui_text(" / HASH MATCH", " / HASH 일치");
         }
     } else {
-        chart_value = ui_text("Waiting for host", "호스트 선곡 대기");
+        chart_value = ui_text("Waiting for leader", "리더 선곡 대기");
     }
     append_menu_row(render.generic,
                     ui_text("Battle Chart", "대전 차트"),
@@ -170,7 +170,7 @@ void MenuApp::populate_multiplayer_render_data(render::MenuRenderData& render) {
                     row_selected(MultiplayerMenuRow::Chart),
                     render::MenuHitTargetKind::SettingsRow,
                     static_cast<int>(MultiplayerMenuRow::Chart),
-                    host_can_choose_chart,
+                    leader_can_choose_chart,
                     false);
 
     std::string ready_value = round_active
@@ -178,8 +178,8 @@ void MenuApp::populate_multiplayer_render_data(render::MenuRenderData& render) {
                                   : (multiplayer_menu_.local_ready ? ui_text("YOU READY", "나 준비")
                                                                    : ui_text("YOU WAIT", "나 대기"));
     ready_value += " / ";
-    ready_value += multiplayer_menu_.peer_ready ? ui_text("PEER READY", "상대 준비")
-                                                 : ui_text("PEER WAIT", "상대 대기");
+    ready_value += multiplayer_menu_.peer_ready ? ui_text("ALL READY", "상대 준비")
+                                                 : ui_text("PLAYERS WAIT", "상대 대기");
     append_menu_row(render.generic,
                     ui_text("Ready", "준비"),
                     ready_value,
@@ -191,7 +191,7 @@ void MenuApp::populate_multiplayer_render_data(render::MenuRenderData& render) {
     append_menu_row(render.generic,
                     ui_text("Start Match", "대전 시작"),
                     can_start ? ui_text("READY TO START", "시작 가능")
-                              : ui_text("HOST + BOTH READY", "호스트 + 양쪽 준비 필요"),
+                              : ui_text("LEADER + ALL READY", "리더 + 전원 준비 필요"),
                     row_selected(MultiplayerMenuRow::Start),
                     render::MenuHitTargetKind::SettingsRow,
                     static_cast<int>(MultiplayerMenuRow::Start),
@@ -216,39 +216,47 @@ void MenuApp::populate_multiplayer_render_data(render::MenuRenderData& render) {
                     true,
                     false);
 
-    std::string connection_line = ui_text("Connection: ", "연결: ") + peer_session_state_label(peer.state);
-    connection_line += " / " + ui_text("You: ", "나: ") + profile_display_name();
-    if (!peer.peer_name.empty()) {
-        connection_line += " / " + ui_text("Peer: ", "상대: ") + peer.peer_name;
-    }
+    std::string connection_line =
+        ui_text("Connection: ", "연결: ") + peer_session_state_label(peer.state);
+    connection_line += " / " + ui_text("Players: ", "인원: ") +
+                       std::to_string(peer.participant_count) + "/8";
     render.generic.notes.push_back(std::move(connection_line));
-    if (!peer.status_detail.empty()) {
+    for (const auto& participant : peer.participants) {
+        std::string player_line =
+            "#" + std::to_string(participant.player_id) + " " + participant.name;
+        if (participant.local) player_line += ui_text(" [YOU]", " [나]");
+        if (participant.leader) player_line += ui_text(" [LEADER]", " [리더]");
+        player_line += participant.ready
+                           ? ui_text(" / READY", " / 준비")
+                           : ui_text(" / WAIT", " / 대기");
+        render.generic.notes.push_back(std::move(player_line));
+    }    if (!peer.status_detail.empty()) {
         render.generic.notes.push_back(peer.status_detail);
     }
     if (connected) {
         if (peer.remote_library_ready) {
             render.generic.notes.push_back(
-                ui_text("Shared charts in current source: ", "현재 소스 공통 차트: ") +
+                ui_text("Shared BMS charts for all players: ", "전원 공통 BMS: ") +
                 std::to_string(multiplayer_common_chart_count_) + " / " +
                 std::to_string(indexed_songs_.size()));
         } else {
             render.generic.notes.push_back(
-                ui_text("Syncing exact chart hashes with peer...", "상대와 정확한 차트 HASH 동기화 중..."));
+                ui_text("Syncing exact BMS chart hashes for every player...", "전원의 정확한 BMS 차트 HASH 동기화 중..."));
         }
     }
     if (!multiplayer_status_message_.empty()) {
         render.generic.notes.push_back(multiplayer_status_message_);
     }
-    if (connected && multiplayer_menu_.role == MultiplayerRole::Join &&
-        peer.remote_chart.fingerprint.valid() && !chart_matches) {
-        render.generic.notes.push_back(ui_text("Finding the host chart in this PC by exact HASH.",
-                                               "호스트 곡을 이 PC에서 정확한 HASH로 찾는 중입니다."));
+    if (connected && !multiplayer_menu_.local_is_leader &&
+        peer.selected_chart.fingerprint.valid() && !chart_matches) {
+        render.generic.notes.push_back(ui_text("Finding the leader BMS chart on this PC by exact HASH.",
+                                               "리더 BMS를 이 PC에서 정확한 HASH로 찾는 중입니다."));
     } else if (connected && !multiplayer_menu_.local_chart_fingerprint) {
-        render.generic.notes.push_back(ui_text("The host chooses the chart; the joiner matches it automatically by HASH.",
-                                               "호스트만 곡을 고르고 참가자는 HASH로 자동 선택합니다."));
+        render.generic.notes.push_back(ui_text("The current leader chooses a BMS chart; every other player matches it by HASH.",
+                                               "현재 리더만 BMS를 고르고 나머지는 HASH로 자동 선택합니다."));
     } else if (connected && multiplayer_menu_.local_chart_fingerprint && !chart_matches) {
-        render.generic.notes.push_back(ui_text("Chart mismatch: both players must select identical chart bytes.",
-                                               "차트 불일치: 양쪽이 완전히 같은 차트 파일을 선택해야 합니다."));
+        render.generic.notes.push_back(ui_text("Chart mismatch: every player must resolve identical BMS bytes.",
+                                               "차트 불일치: 전원이 완전히 같은 BMS 파일을 선택해야 합니다."));
     } else if (connected && chart_matches) {
         render.generic.notes.push_back(ui_text("Chart match confirmed.", "차트 일치가 확인되었습니다."));
     }
@@ -385,11 +393,10 @@ void MenuApp::handle_multiplayer_input(uint32_t keycode) {
         return;
     }
     if (row == MultiplayerMenuRow::Chart) {
-        if (!multiplayer_host_can_choose_chart(multiplayer_menu_) ||
-            peer.role != network::PeerRole::Host) {
+        if (!multiplayer_leader_can_choose_chart(multiplayer_menu_)) {
             multiplayer_status_message_ =
-                ui_text("Only the host chooses the chart. Joiners match it automatically by HASH.",
-                        "호스트만 곡을 선택합니다. 참가자는 HASH로 자동 선택합니다.");
+                ui_text("Only the current leader chooses the BMS chart. Other players match it automatically by HASH.",
+                        "현재 리더만 BMS를 선택합니다. 나머지는 HASH로 자동 선택합니다.");
             publish_snapshot();
             return;
         }
@@ -401,15 +408,15 @@ void MenuApp::handle_multiplayer_input(uint32_t keycode) {
         }
         if (multiplayer_common_chart_count_ == 0) {
             multiplayer_status_message_ =
-                ui_text("No identical charts exist in both current song sources.",
-                        "양쪽의 현재 곡 소스에 동일한 차트가 없습니다.");
+                ui_text("No identical BMS charts exist across all connected players.",
+                        "현재 접속자 전원이 가진 동일한 BMS가 없습니다.");
             publish_snapshot();
             return;
         }
         if (round_active) {
             multiplayer_status_message_ =
-                ui_text("Wait for both players to leave the result before changing charts.",
-                        "양쪽 모두 리절트에서 나온 뒤 차트를 변경할 수 있습니다.");
+                ui_text("Wait for every player to leave the result before changing charts.",
+                        "전원이 리절트에서 나온 뒤 차트를 변경할 수 있습니다.");
             publish_snapshot();
             return;
         }
@@ -424,8 +431,8 @@ void MenuApp::handle_multiplayer_input(uint32_t keycode) {
     }
     if (row == MultiplayerMenuRow::Ready) {
         if (round_active) {
-            multiplayer_status_message_ = ui_text("Wait for both players to finish the current round.",
-                                                  "현재 대전이 양쪽에서 끝날 때까지 기다려주세요.");
+            multiplayer_status_message_ = ui_text("Wait for every player to finish the current round.",
+                                                  "현재 대전이 전원에게서 끝날 때까지 기다려주세요.");
         } else if (!multiplayer_ready_gate_open(multiplayer_menu_)) {
             multiplayer_status_message_ = ui_text("Connect and confirm a matching chart first.",
                                                   "먼저 연결하고 같은 차트인지 확인하세요.");
@@ -438,9 +445,9 @@ void MenuApp::handle_multiplayer_input(uint32_t keycode) {
         return;
     }
     if (row == MultiplayerMenuRow::Start) {
-        if (!multiplayer_host_can_start(multiplayer_menu_) || multiplayer_chart_path_.empty()) {
-            multiplayer_status_message_ = ui_text("Only the host can start after both players are ready.",
-                                                  "양쪽이 준비된 뒤 호스트만 시작할 수 있습니다.");
+        if (!multiplayer_leader_can_start(multiplayer_menu_) || multiplayer_chart_path_.empty()) {
+            multiplayer_status_message_ = ui_text("Only the current leader can start after every player is ready.",
+                                                  "전원이 준비된 뒤 현재 리더만 시작할 수 있습니다.");
             publish_snapshot();
             return;
         }
@@ -449,10 +456,10 @@ void MenuApp::handle_multiplayer_input(uint32_t keycode) {
             publish_snapshot();
             return;
         }
-        multiplayer_match_active_ = true;
-        last_game_was_multiplayer_ = true;
-        multiplayer_waiting_for_result_exit_ = false;
-        launch_gameplay(multiplayer_chart_path_, {}, GameplayLaunchKind::PeerBattle);
+        multiplayer_status_message_ =
+            ui_text("Start requested; waiting for room coordinator.",
+                    "시작 요청을 보냈습니다. 방장 승인을 기다립니다.");
+        publish_snapshot();
         return;
     }
     if (row == MultiplayerMenuRow::Options) {
@@ -466,11 +473,11 @@ void MenuApp::handle_multiplayer_input(uint32_t keycode) {
 
 void MenuApp::select_multiplayer_chart() {
     const network::PeerSessionSnapshot peer = peer_session_.snapshot();
-    if (peer.role != network::PeerRole::Host || peer_round_ui_locked(peer) ||
-        !multiplayer_host_can_choose_chart(multiplayer_menu_)) {
+    if (peer_round_ui_locked(peer) ||
+        !multiplayer_leader_can_choose_chart(multiplayer_menu_)) {
         multiplayer_status_message_ =
-            ui_text("Chart selection was canceled because only the host may choose.",
-                    "호스트만 선곡할 수 있어 곡 선택을 취소했습니다.");
+            ui_text("Chart selection was canceled because only the current leader may choose.",
+                    "현재 리더만 BMS를 선곡할 수 있어 곡 선택을 취소했습니다.");
         multiplayer_selecting_chart_ = false;
         rebuild_visible_song_list();
         screen_ = Screen::Multiplayer;
@@ -480,6 +487,18 @@ void MenuApp::select_multiplayer_chart() {
     const std::string chart_path = selected_song_absolute_path();
     if (chart_path.empty()) return;
 
+    const SongEntry* selected_entry =
+        visible_song_entry(static_cast<std::size_t>(std::max(0, selected_song_)));
+    if (!selected_entry || selected_entry->format != "bms") {
+        multiplayer_status_message_ =
+            ui_text("Multiplayer supports BMS charts only.",
+                    "멀티플레이에서는 BMS 곡만 선택할 수 있습니다.");
+        multiplayer_selecting_chart_ = false;
+        rebuild_visible_song_list();
+        screen_ = Screen::Multiplayer;
+        publish_snapshot();
+        return;
+    }
     std::string error;
     const network::ChartFingerprint fingerprint = network::fingerprint_chart_file(chart_path, &error);
     if (!fingerprint.valid()) {
@@ -494,12 +513,9 @@ void MenuApp::select_multiplayer_chart() {
         return;
     }
 
-    std::string chart_title;
-    if (const SongEntry* entry = visible_song_entry(static_cast<std::size_t>(std::max(0, selected_song_)))) {
-        chart_title = entry->title.empty() ? entry->path : entry->title;
-    } else {
-        chart_title = chart_path;
-    }
+    std::string chart_title = selected_entry->title.empty()
+                                  ? selected_entry->path
+                                  : selected_entry->title;
     if (!peer_session_.set_local_chart(fingerprint, chart_title)) {
         multiplayer_status_message_ =
             ui_text("Chart selection expired. Wait for the current round to finish.",
@@ -536,14 +552,14 @@ void MenuApp::reset_multiplayer_chart_match_search() {
 }
 
 void MenuApp::service_multiplayer_chart_match(const network::PeerSessionSnapshot& peer) {
-    if (peer.role != network::PeerRole::Joiner ||
+    if (peer.local_is_leader ||
         peer.state != network::PeerSessionState::Connected ||
-        !peer.remote_chart.fingerprint.valid() ||
+        !peer.selected_chart.fingerprint.valid() ||
         (last_game_was_multiplayer_ || peer_round_ui_locked(peer))) {
         return;
     }
 
-    const network::ChartFingerprint target = peer.remote_chart.fingerprint;
+    const network::ChartFingerprint target = peer.selected_chart.fingerprint;
     std::vector<std::string> source_inputs;
     source_inputs.reserve(config_.ui.recent_song_sources.size() + 1);
     source_inputs.push_back(songs_path_);
@@ -578,7 +594,7 @@ void MenuApp::service_multiplayer_chart_match(const network::PeerSessionSnapshot
         }
         multiplayer_chart_path_.clear();
         multiplayer_chart_fingerprint_ = {};
-        multiplayer_chart_title_ = peer.remote_chart.name;
+        multiplayer_chart_title_ = peer.selected_chart.name;
         multiplayer_menu_.local_chart_fingerprint = 0;
         multiplayer_menu_.local_chart_size = 0;
 
@@ -592,8 +608,8 @@ void MenuApp::service_multiplayer_chart_match(const network::PeerSessionSnapshot
         multiplayer_chart_match_cursor_ = 0;
         multiplayer_chart_match_active_ = true;
         multiplayer_status_message_ =
-            ui_text("Searching loaded song folders for the host chart HASH...",
-                    "로드한 곡 폴더에서 호스트 차트 HASH를 찾는 중...");
+            ui_text("Searching loaded song folders for the leader BMS HASH...",
+                    "로드한 곡 폴더에서 리더 BMS HASH를 찾는 중...");
         publish_snapshot();
     }
 
@@ -616,7 +632,7 @@ void MenuApp::service_multiplayer_chart_match(const network::PeerSessionSnapshot
                 menu_songs::normalize_path_key(util::path_from_utf8_lossy(songs_path_));
             if (!source_key.empty() && source_key == active_key) {
                 multiplayer_chart_match_candidates_ = build_multiplayer_chart_candidates(
-                    indexed_songs_, source, peer.remote_chart.name);
+                    indexed_songs_, source, peer.selected_chart.name);
             } else {
                 SongIndexOptions index_options;
                 index_options.include_osu = config_.mode.enable_osu_charts;
@@ -626,7 +642,7 @@ void MenuApp::service_multiplayer_chart_match(const network::PeerSessionSnapshot
                         ? SongIndexProfile::Fast
                         : SongIndexProfile::Safe;
                 auto loaded = load_multiplayer_chart_candidates_from_profile_cache(
-                    profile_dir_, source, index_options, peer.remote_chart.name);
+                    profile_dir_, source, index_options, peer.selected_chart.name);
                 if (!loaded.error.empty()) {
                     std::cerr << "[warn] Multiplayer chart cache skipped: "
                               << loaded.error << std::endl;
@@ -680,13 +696,13 @@ void MenuApp::service_multiplayer_chart_match(const network::PeerSessionSnapshot
         if (fingerprint.hash != target.hash || fingerprint.size != target.size) {
             continue;
         }
-        const std::string title = peer.remote_chart.name.empty()
+        const std::string title = peer.selected_chart.name.empty()
                                       ? candidate.title
-                                      : peer.remote_chart.name;
+                                      : peer.selected_chart.name;
         if (!peer_session_.set_local_chart(fingerprint, title)) {
             multiplayer_status_message_ =
-                ui_text("The matched chart could not be announced to the host.",
-                        "일치한 차트를 호스트에게 전달하지 못했습니다.");
+                ui_text("The matched BMS could not be announced to the room coordinator.",
+                        "일치한 BMS를 방 코디네이터에 전달하지 못했습니다.");
             multiplayer_chart_match_active_ = false;
             publish_snapshot();
             return;
@@ -699,8 +715,8 @@ void MenuApp::service_multiplayer_chart_match(const network::PeerSessionSnapshot
         multiplayer_menu_.local_chart_size = fingerprint.size;
         multiplayer_menu_.local_ready = false;
         multiplayer_status_message_ =
-            ui_text("Host chart matched automatically by HASH.",
-                    "호스트 곡을 HASH로 자동 선택했습니다.");
+            ui_text("Leader BMS matched automatically by HASH.",
+                    "리더 BMS를 HASH로 자동 선택했습니다.");
         multiplayer_chart_match_candidates_.clear();
         multiplayer_chart_match_cursor_ = 0;
         multiplayer_chart_match_active_ = false;
@@ -758,10 +774,15 @@ void MenuApp::service_multiplayer() {
     multiplayer_menu_.connected = peer.state == network::PeerSessionState::Connected;
     multiplayer_menu_.local_ready = peer.local_ready;
     multiplayer_menu_.peer_ready = peer.remote_ready;
+    multiplayer_menu_.local_player_id = peer.local_player_id;
+    multiplayer_menu_.leader_player_id = peer.leader_player_id;
+    multiplayer_menu_.player_count = static_cast<uint8_t>(
+        std::min<std::size_t>(peer.participant_count, network::kPeerMaxPlayers));
+    multiplayer_menu_.local_is_leader = peer.local_is_leader;
     multiplayer_menu_.local_chart_fingerprint = peer.local_chart.fingerprint.hash;
     multiplayer_menu_.local_chart_size = peer.local_chart.fingerprint.size;
-    multiplayer_menu_.peer_chart_fingerprint = peer.remote_chart.fingerprint.hash;
-    multiplayer_menu_.peer_chart_size = peer.remote_chart.fingerprint.size;
+    multiplayer_menu_.peer_chart_fingerprint = peer.selected_chart.fingerprint.hash;
+    multiplayer_menu_.peer_chart_size = peer.selected_chart.fingerprint.size;
     if (peer.role == network::PeerRole::Host) multiplayer_menu_.role = MultiplayerRole::Host;
     if (peer.role == network::PeerRole::Joiner) multiplayer_menu_.role = MultiplayerRole::Join;
 
@@ -807,7 +828,7 @@ void MenuApp::service_multiplayer() {
 
     if (last_game_was_multiplayer_ && screen_ == Screen::Multiplayer) {
         const bool peer_finished =
-            peer.has_remote_score && peer.latest_remote_score.finished;
+            peer.all_remote_finished;
         const bool disconnected = peer.state != network::PeerSessionState::Connected;
         if (peer_finished || disconnected) {
             peer_session_.reset_round();
@@ -831,7 +852,7 @@ void MenuApp::service_multiplayer() {
     // the UI boundary as well as inside PeerSession so a stale launch cannot
     // turn a disconnected lobby into a local gameplay session.
     if (peer.state == network::PeerSessionState::Connected &&
-        peer.role == network::PeerRole::Joiner && peer.round_active) {
+        peer.round_active) {
         while (const std::optional<uint64_t> launch = peer_session_.poll_launch()) {
             if (*launch == multiplayer_menu_.local_chart_fingerprint &&
                 !multiplayer_chart_path_.empty()) {
@@ -863,7 +884,7 @@ bool MenuApp::coordinate_multiplayer_start() {
         return false;
     }
 
-    update_gameplay_loading_state(100, ui_text("Waiting for peer chart load", "상대 차트 로딩 대기 중"));
+    update_gameplay_loading_state(100, ui_text("Waiting for all player chart loads", "상대 차트 로딩 대기 중"));
     const auto timeout_at = std::chrono::steady_clock::now() + 60s;
 #ifdef _WIN32
     bool escape_was_down = (GetAsyncKeyState(VK_ESCAPE) & 0x8000) != 0;
@@ -883,33 +904,32 @@ bool MenuApp::coordinate_multiplayer_start() {
         return peer.state != network::PeerSessionState::Connected || !peer.round_active;
     };
 
-    const network::PeerRole role = peer_session_.snapshot().role;
+    const network::PeerSessionSnapshot room = peer_session_.snapshot();
     uint32_t delay_ms = 0;
-    if (role == network::PeerRole::Host) {
-        bool peer_loaded = false;
+    if (room.local_is_leader) {
+        bool all_loaded = false;
         while (std::chrono::steady_clock::now() < timeout_at) {
             if (peer_session_.wait_for_peer_loaded(50ms)) {
-                peer_loaded = true;
+                all_loaded = true;
                 break;
             }
             if (canceled_or_disconnected()) break;
         }
-        if (!peer_loaded) {
-            multiplayer_status_message_ = ui_text("Peer load wait timed out or was canceled.",
-                                                  "상대 로딩 대기가 시간 초과되었거나 취소되었습니다.");
+        if (!all_loaded) {
+            multiplayer_status_message_ =
+                ui_text("Player load wait timed out or was canceled.",
+                        "참가자 로딩 대기가 시간 초과되었거나 취소되었습니다.");
             return false;
         }
-        constexpr uint32_t kHostBeginDelayMs = 1500;
-        const uint32_t peer_delay_ms = multiplayer_compensated_peer_begin_delay_ms(
-            kHostBeginDelayMs,
-            peer_session_.snapshot().estimated_rtt_ms);
-        if (!peer_session_.send_begin(peer_delay_ms)) {
-            multiplayer_status_message_ = ui_text("Could not send synchronized start.",
-                                                  "동기 시작 신호를 보내지 못했습니다.");
+        constexpr uint32_t kRoomBeginDelayMs = 1500;
+        if (!peer_session_.send_begin(kRoomBeginDelayMs)) {
+            multiplayer_status_message_ =
+                ui_text("Could not send synchronized room start.",
+                        "동기화된 방 시작 신호를 보내지 못했습니다.");
             return false;
         }
-        delay_ms = kHostBeginDelayMs;
-    } else if (role == network::PeerRole::Joiner) {
+        delay_ms = kRoomBeginDelayMs;
+    } else if (room.local_player_id != 0) {
         bool begin_received = false;
         while (std::chrono::steady_clock::now() < timeout_at) {
             if (peer_session_.wait_for_begin(50ms, delay_ms)) {
@@ -919,15 +939,17 @@ bool MenuApp::coordinate_multiplayer_start() {
             if (canceled_or_disconnected()) break;
         }
         if (!begin_received) {
-            multiplayer_status_message_ = ui_text("Host start wait timed out or was canceled.",
-                                                  "호스트 시작 대기가 시간 초과되었거나 취소되었습니다.");
+            multiplayer_status_message_ =
+                ui_text("Leader start wait timed out or was canceled.",
+                        "리더 시작 대기가 시간 초과되었거나 취소되었습니다.");
             return false;
         }
     } else {
-        multiplayer_status_message_ = ui_text("Multiplayer role is unavailable.", "멀티플레이 역할이 없습니다.");
+        multiplayer_status_message_ =
+            ui_text("Multiplayer player id is unavailable.",
+                    "멀티플레이 참가자 ID가 없습니다.");
         return false;
     }
-
     update_gameplay_loading_state(100, ui_text("Synchronized countdown starting", "동기 카운트다운 시작 중"));
     const auto begin_at = std::chrono::steady_clock::now() + std::chrono::milliseconds(delay_ms);
     while (std::chrono::steady_clock::now() < begin_at) {
@@ -945,7 +967,7 @@ bool MenuApp::wait_for_multiplayer_result() {
 
     update_gameplay_loading_state(
         100,
-        ui_text("Local result ready - waiting for opponent result",
+        ui_text("Local result ready - waiting for all player results",
                 "내 결과 준비 완료 - 상대 결과 대기 중"));
     const auto timeout_at = std::chrono::steady_clock::now() + std::chrono::minutes(15);
     auto next_status_update = std::chrono::steady_clock::now();
@@ -964,9 +986,9 @@ bool MenuApp::wait_for_multiplayer_result() {
             return false;
         }
         const network::PeerSessionSnapshot peer = peer_session_.snapshot();
-        if (peer.has_remote_score && peer.latest_remote_score.finished) {
+        if (peer.all_remote_finished) {
             multiplayer_status_message_ =
-                ui_text("Both results received.", "양쪽 결과를 모두 받았습니다.");
+                ui_text("All player results received.", "전원 결과를 모두 받았습니다.");
             return true;
         }
         if (peer.state != network::PeerSessionState::Connected) {
@@ -990,7 +1012,7 @@ bool MenuApp::wait_for_multiplayer_result() {
         const auto now = std::chrono::steady_clock::now();
         if (now >= next_status_update) {
             std::string stage =
-                ui_text("Waiting for opponent result", "상대 결과 대기 중");
+                ui_text("Waiting for all player results", "상대 결과 대기 중");
             if (peer.has_remote_score) {
                 stage += " / " + ui_text("Score ", "점수 ") +
                          std::to_string(peer.latest_remote_score.score);

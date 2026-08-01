@@ -2872,7 +2872,7 @@ void MenuApp::handle_result_input(uint32_t keycode) {
         if (keycode == key_enter_ || keycode == key_escape_ || keycode == key_backspace_) {
             const network::PeerSessionSnapshot peer = peer_session_.snapshot();
             const bool peer_finished =
-                peer.has_remote_score && peer.latest_remote_score.finished;
+                peer.all_remote_finished;
             const bool disconnected = peer.state != network::PeerSessionState::Connected;
             if (peer_finished || disconnected) {
                 peer_session_.reset_round();

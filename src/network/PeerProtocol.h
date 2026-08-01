@@ -8,7 +8,8 @@
 
 namespace tenriff::network {
 
-constexpr uint16_t kPeerProtocolVersion = 3;
+constexpr uint16_t kPeerProtocolVersion = 4;
+constexpr uint8_t kPeerMaxPlayers = 8;
 constexpr std::size_t kPeerLibraryHashesPerChunk = 512;
 constexpr std::size_t kPeerLibraryMaxCharts = 250'000;
 constexpr std::size_t kPeerFrameHeaderSize = 12;
@@ -32,6 +33,11 @@ enum class PeerMessageType : uint16_t {
     LibraryBegin = 15,
     LibraryChunk = 16,
     LibraryEnd = 17,
+    RoomWelcome = 18,
+    RoomRoster = 19,
+    CommonLibraryBegin = 20,
+    CommonLibraryChunk = 21,
+    CommonLibraryEnd = 22,
 };
 
 struct PeerScore {
@@ -50,6 +56,17 @@ struct PeerScore {
     bool aborted = false;
 };
 
+struct PeerParticipantWire {
+    uint8_t player_id = 0;
+    std::string name;
+    bool ready = false;
+    bool loaded = false;
+    bool round_reset = false;
+    uint64_t chart_hash = 0;
+    uint64_t chart_size = 0;
+    std::string chart_name;
+};
+
 struct PeerMessage {
     PeerMessageType type = PeerMessageType::Hello;
     std::string text;
@@ -58,9 +75,13 @@ struct PeerMessage {
     uint64_t nonce = 0;
     uint32_t delay_ms = 0;
     bool ready = false;
+    uint8_t player_id = 0;
+    uint8_t leader_id = 0;
+    bool round_active = false;
     PeerScore score;
     uint32_t library_count = 0;
     std::vector<std::string> chart_sha256;
+    std::vector<PeerParticipantWire> participants;
 };
 
 enum class PeerDecodeStatus {

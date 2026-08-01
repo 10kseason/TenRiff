@@ -887,32 +887,38 @@ void MenuApp::populate_result_render_data(render::MenuRenderData& render, const 
             render.result.peer_outcome = "NO CONTEST";
         }
         std::vector<std::string> peer_notes;
-        if (peer.has_remote_score) {
-            const network::PeerScore& score = peer.latest_remote_score;
-            std::string summary = peer_label + " / " +
-                                  ui_text("Score ", "점수 ") + std::to_string(score.score) +
-                                  " / " + ui_text("Max Combo ", "최대 콤보 ") +
-                                  std::to_string(score.max_combo);
-            summary += score.finished ? ui_text(" / FINISHED", " / 종료")
-                                      : ui_text(" / PLAYING", " / 플레이 중");
-            peer_notes.push_back(std::move(summary));
-            if (score.finished) {
-                const std::string outcome =
-                    last_result_final_score_ > score.score
-                        ? ui_text("Peer result: WIN", "P2P 결과: 승리")
-                        : (last_result_final_score_ < score.score
-                               ? ui_text("Peer result: LOSE", "P2P 결과: 패배")
-                               : ui_text("Peer result: DRAW", "P2P 결과: 무승부"));
-                peer_notes.push_back(outcome);
-            }
-        } else if (peer.state == network::PeerSessionState::Connected) {
-            peer_notes.push_back(ui_text("Opponent is still playing. Live result is pending.",
-                                         "상대가 아직 플레이 중입니다. 최종 결과를 기다리는 중입니다."));
-        } else {
-            peer_notes.push_back(ui_text("Opponent disconnected before the final result arrived.",
-                                         "최종 결과를 받기 전에 상대 연결이 끊겼습니다."));
+        std::vector<const network::PeerParticipantSnapshot*> standings;
+        standings.reserve(peer.participants.size());
+        for (const auto& participant : peer.participants) {
+            standings.push_back(&participant);
         }
-        peer_notes.push_back(ui_text("Enter or Esc returns to the multiplayer lobby.",
+        std::stable_sort(
+            standings.begin(), standings.end(),
+            [](const auto* lhs, const auto* rhs) {
+                if (lhs->has_score != rhs->has_score) return lhs->has_score;
+                if (lhs->has_score &&
+                    lhs->latest_score.score != rhs->latest_score.score) {
+                    return lhs->latest_score.score > rhs->latest_score.score;
+                }
+                return lhs->player_id < rhs->player_id;
+            });
+        for (std::size_t index = 0; index < standings.size(); ++index) {
+            const auto& participant = *standings[index];
+            std::string summary =
+                std::to_string(index + 1) + ". #" +
+                std::to_string(participant.player_id) + " " + participant.name;
+            if (participant.local) summary += ui_text(" [YOU]", " [나]");
+            if (participant.has_score) {
+                summary += " / " + ui_text("Score ", "점수 ") +
+                           std::to_string(participant.latest_score.score);
+                summary += participant.latest_score.finished
+                               ? ui_text(" / FINISHED", " / 종료")
+                               : ui_text(" / PLAYING", " / 플레이 중");
+            } else {
+                summary += ui_text(" / RESULT WAIT", " / 결과 대기");
+            }
+            peer_notes.push_back(std::move(summary));
+        }        peer_notes.push_back(ui_text("Enter or Esc returns to the multiplayer lobby.",
                                      "Enter 또는 Esc로 멀티플레이 로비로 돌아갑니다."));
         render.result.notes.insert(render.result.notes.begin(),
                                    std::make_move_iterator(peer_notes.begin()),
@@ -1902,17 +1908,17 @@ void MenuApp::populate_help_overlay(render::HelpOverlayData& target) const {
         case Screen::Multiplayer:
             target.title = ui_text("Peer Multiplayer", "P2P 멀티플레이");
             target.lines = {
-                ui_text("Host opens one direct TCP session; Join connects to the host IP and port.",
-                        "호스트는 TCP 세션을 열고, 참가자는 호스트 IP와 포트로 직접 연결합니다."),
-                ui_text("Both PCs must select an identical chart file before Ready becomes available.",
-                        "준비하려면 두 PC에서 완전히 동일한 차트 파일을 선택해야 합니다."),
-                ui_text("The host starts after both players are ready. Esc disconnects and returns to Title.",
-                        "양쪽 준비 후 호스트가 시작합니다. Esc는 연결을 끊고 타이틀로 돌아갑니다."),
+                ui_text("Host runs the direct TCP room coordinator; up to seven others join its IP and port.",
+                        "호스트는 TCP 방 코디네이터를 열고, 최대 7명이 호스트 IP와 포트로 연결합니다."),
+                ui_text("Only byte-identical BMS charts owned by every player can be selected.",
+                        "전원이 바이트 단위로 동일한 BMS를 가져야 선곡할 수 있습니다."),
+                ui_text("The current leader starts after every player is ready. Esc disconnects and returns to Title.",
+                        "전원 준비 후 현재 리더가 시작합니다. Esc는 연결을 끊고 타이틀로 돌아갑니다."),
                 ui_text("Internet play needs router TCP forwarding and a firewall rule on the host.",
                         "인터넷 대전은 호스트 공유기의 TCP 포트 포워딩과 방화벽 허용이 필요합니다."),
             };
             target.footer = ui_text("This is direct-IP play for trusted peers; charts are not transferred.",
-                                    "신뢰하는 상대와 쓰는 직접 IP 연결이며 차트 파일은 전송하지 않습니다.");
+                                    "신뢰하는 사람들과 쓰는 직접 IP 연결이며 BMS 파일은 전송하지 않습니다.");
             return;
         case Screen::SongSelect:
             target.title = ui_text("Song Select Controls", "곡 선택 조작");

@@ -4,6 +4,18 @@ TenRiff의 사용자/배포 관점에서 의미 있는 변경만 간단히 기�
 
 ## [Unreleased]
 
+## [1.2.98] - 2026-08-01
+
+### Added
+
+- Direct-IP multiplayer protocol v4 uses one fixed TCP room coordinator and supports up to eight total players; chart/start leadership rotates in join order after every completed round and skips disconnected leaders
+- Multiplayer song inventory is BMS-only and exposes only the exact SHA-256 intersection owned by every connected player; optional osu!mania charts remain available in single-player but are excluded from multiplayer
+- Room-wide Ready, chart-load, final-result, and Result-exit barriers coordinate all connected players; full rooms and mid-round joins are rejected
+- Multiplayer lobby state and Result standings identify up to eight participants, the local player, and the current rotating leader
+
+### Packaging
+
+- Windows `TenRiff-1.2.98.zip`, public source `TenRiff-1.2.98-source.zip`, and `TenRiff-1.2.98-SHA256SUMS.txt` are the formal release assets; no ONNX model, private checkpoint, user profile, song, or log is bundled
 ## [1.2.96] - 2026-08-01
 
 ### Added

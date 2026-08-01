@@ -33,8 +33,8 @@ using tenriff::app::multiplayer_chart_path_for_source;
 using tenriff::app::multiplayer_loaded_song_sources;
 using tenriff::app::load_multiplayer_chart_candidates_from_profile_cache;
 using tenriff::app::multiplayer_compensated_peer_begin_delay_ms;
-using tenriff::app::multiplayer_host_can_choose_chart;
-using tenriff::app::multiplayer_host_can_start;
+using tenriff::app::multiplayer_leader_can_choose_chart;
+using tenriff::app::multiplayer_leader_can_start;
 using tenriff::app::multiplayer_ready_gate_open;
 using tenriff::app::multiplayer_start_gate_open;
 using tenriff::app::parse_multiplayer_port;
@@ -220,7 +220,7 @@ TEST_CASE("multiplayer readiness requires a connection and matching nonzero char
     CHECK_FALSE(multiplayer_chart_fingerprints_match(state));
 }
 
-TEST_CASE("multiplayer start gate requires both ready and host authority") {
+TEST_CASE("multiplayer start gate requires all ready and rotating leader authority") {
     MultiplayerMenuState state;
     state.connected = true;
     state.local_chart_fingerprint = 42;
@@ -230,29 +230,30 @@ TEST_CASE("multiplayer start gate requires both ready and host authority") {
     state.local_ready = true;
     state.peer_ready = true;
 
-    state.role = MultiplayerRole::Join;
+    state.local_is_leader = false;
     CHECK(multiplayer_start_gate_open(state));
-    CHECK_FALSE(multiplayer_host_can_start(state));
+    CHECK_FALSE(multiplayer_leader_can_start(state));
 
-    state.role = MultiplayerRole::Host;
-    CHECK(multiplayer_host_can_start(state));
+    state.local_is_leader = true;
+    CHECK(multiplayer_leader_can_start(state));
 
     state.peer_ready = false;
     CHECK_FALSE(multiplayer_start_gate_open(state));
-    CHECK_FALSE(multiplayer_host_can_start(state));
+    CHECK_FALSE(multiplayer_leader_can_start(state));
 
     state.peer_ready = true;
     state.peer_chart_fingerprint = 43;
     CHECK_FALSE(multiplayer_start_gate_open(state));
-    CHECK_FALSE(multiplayer_host_can_start(state));
+    CHECK_FALSE(multiplayer_leader_can_start(state));
 }
 
-TEST_CASE("only the host has manual chart selection authority") {
+TEST_CASE("only the rotating leader has manual chart selection authority") {
     MultiplayerMenuState state;
-    state.role = MultiplayerRole::Join;
-    CHECK_FALSE(multiplayer_host_can_choose_chart(state));
     state.role = MultiplayerRole::Host;
-    CHECK(multiplayer_host_can_choose_chart(state));
+    CHECK_FALSE(multiplayer_leader_can_choose_chart(state));
+    state.role = MultiplayerRole::Join;
+    state.local_is_leader = true;
+    CHECK(multiplayer_leader_can_choose_chart(state));
 }
 
 TEST_CASE("chart name matching only prioritizes candidates and remains case insensitive") {
@@ -265,17 +266,24 @@ TEST_CASE("chart name matching only prioritizes candidates and remains case inse
 TEST_CASE("multiplayer shared-song inventory uses exact normalized SHA-256 identities") {
     tenriff::app::SongEntry shared;
     shared.path = "shared.bms";
+    shared.format = "bms";
     shared.sha256 =
         "ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789";
     tenriff::app::SongEntry local_only;
     local_only.path = "local.bms";
+    local_only.format = "bms";
     local_only.sha256 =
         "1111111111111111111111111111111111111111111111111111111111111111";
     tenriff::app::SongEntry invalid;
     invalid.path = "invalid.bms";
+    invalid.format = "bms";
     invalid.sha256 = "missing";
 
-    const std::vector<tenriff::app::SongEntry> entries = {shared, local_only, invalid, shared};
+    tenriff::app::SongEntry osu = shared;
+    osu.path = "shared.osu";
+    osu.format = "osu";
+    const std::vector<tenriff::app::SongEntry> entries =
+        {shared, local_only, invalid, shared, osu};
     const auto inventory = tenriff::app::build_multiplayer_chart_sha256_inventory(entries);
     REQUIRE(inventory.size() == 2u);
     CHECK(inventory[0] ==
@@ -287,6 +295,7 @@ TEST_CASE("multiplayer shared-song inventory uses exact normalized SHA-256 ident
     CHECK(tenriff::app::multiplayer_chart_is_shared(shared, remote));
     CHECK_FALSE(tenriff::app::multiplayer_chart_is_shared(local_only, remote));
     CHECK_FALSE(tenriff::app::multiplayer_chart_is_shared(invalid, remote));
+    CHECK_FALSE(tenriff::app::multiplayer_chart_is_shared(osu, remote));
     CHECK(tenriff::app::count_shared_multiplayer_charts(
               {shared, local_only, invalid}, remote) == 1u);
 }
@@ -317,9 +326,11 @@ TEST_CASE("multiplayer chart candidates resolve relative paths against their own
     const fs::path source = fs::temp_directory_path() / "tenriff_multiplayer_recent_pack";
     tenriff::app::SongEntry other;
     other.path = "charts/other.bms";
+    other.format = "bms";
     other.title = "Other";
     tenriff::app::SongEntry target;
     target.path = "charts/target.bms";
+    target.format = "bms";
     target.title = "Host Target";
 
     const auto candidates = build_multiplayer_chart_candidates(
