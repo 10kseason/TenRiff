@@ -68,6 +68,7 @@ TEST_CASE("replay export writes JSON with trace events") {
     replay.score_multiplier = 0.75;
     replay.final_score = 1234;
     replay.mode.key_mode = "6k";
+    replay.mode.key_conversion_algorithm = "nk2";
     replay.mode.random = "mirror";
     replay.mode.random_seed = 4123;
     replay.mode.gauge = "shift";
@@ -132,6 +133,7 @@ TEST_CASE("replay export writes JSON with trace events") {
     const auto* mode = mode_it->second.as_object();
     REQUIRE(mode != nullptr);
     CHECK(mode->find("key_mode")->second.as_string() == "6k");
+    CHECK(mode->find("key_conversion_algorithm")->second.as_string() == "nk2");
     CHECK(mode->find("random")->second.as_string() == "mirror");
     CHECK(mode->find("random_seed")->second.as_number() == doctest::Approx(4123.0));
     CHECK(mode->find("gauge")->second.as_string() == "shift");
@@ -158,6 +160,7 @@ TEST_CASE("replay export writes JSON with trace events") {
     REQUIRE(loaded_replay.replay->mods.size() == 3u);
     CHECK(loaded_replay.replay->mods[1] == "ln_mix_30");
     CHECK(loaded_replay.replay->mode.key_mode == "6k");
+    CHECK(loaded_replay.replay->mode.key_conversion_algorithm == "nk2");
     CHECK(loaded_replay.replay->mode.random == "mirror");
     REQUIRE(loaded_replay.replay->mode.random_seed.has_value());
     CHECK(loaded_replay.replay->mode.random_seed.value() == 4123);
@@ -351,6 +354,7 @@ TEST_CASE("legacy replay loading succeeds without embedded mode metadata") {
     REQUIRE(loaded.success());
     REQUIRE(loaded.replay.has_value());
     CHECK(loaded.replay->mode.key_mode.empty());
+    CHECK(loaded.replay->mode.key_conversion_algorithm.empty());
     CHECK(loaded.replay->mode.random.empty());
     CHECK_FALSE(loaded.replay->mode.random_seed.has_value());
     CHECK(loaded.replay->trace.lane_count == 4);

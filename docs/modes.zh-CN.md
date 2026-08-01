@@ -9,6 +9,7 @@
 ```json
 "mode": {
   "key_mode": "none",
+  "key_conversion_algorithm": "krrcream",
   "gauge": "normal",
   "random": "off",
   "random_seed": 0,
@@ -24,6 +25,7 @@
 ## 模式含义
 - 谱面输入仅支持 BMS family（`.bms/.bme/.bml/.pms`）；`format` 与 `enable_osu_charts` 设置已经移除
 - `key_mode`：`none | auto | 4k | 5k | 6k | 7k | 8k | 9k | 10k | 12k | 14k | 16k`
+- `key_conversion_algorithm`：`krrcream | nk2`（默认 `krrcream`；在游戏内 Key Converter 中选择，仅用于实际键数变换）
 - `gauge`：`normal | hard | ex_hard | easy | shift`
 - `random`：`off | mirror | rr | fr | sr`
 - `random_seed`：RR/FR/SR、强制 key-mode 变换、Note Add 和 LN Mix 目标选择使用的固定 seed（`0` 也视为固定值）

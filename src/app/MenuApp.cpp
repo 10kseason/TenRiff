@@ -699,6 +699,13 @@ std::string MenuApp::ui_key_mode_label(std::string_view token) const {
     return key_mode_label(normalized);
 }
 
+std::string MenuApp::ui_key_conversion_algorithm_label(std::string_view token) const {
+    if (normalize_key_conversion_algorithm(std::string(token)) == "nk2") {
+        return "KeyWeaver nK2";
+    }
+    return "Krrcream";
+}
+
 std::string MenuApp::ui_gauge_label(std::string_view token) const {
     const std::string normalized = normalize_gauge_mode(std::string(token));
     if (normalized == "ex_hard") {
@@ -2038,7 +2045,7 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
             handle_calibration_settings_input(action_key);
             return;
         case Screen::ModeSelect:
-            settings_cursor_ = clamp_int(event.index, 0, 12);
+            settings_cursor_ = clamp_int(event.index, 0, 13);
             if (finish_selection_only()) {
                 return;
             }

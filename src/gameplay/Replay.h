@@ -26,6 +26,7 @@ struct ReplayTrace {
 
 struct ReplayModeSettings {
     std::string key_mode;
+    std::string key_conversion_algorithm;
     std::string random;
     std::optional<int> random_seed;
     std::string gauge;

@@ -105,7 +105,7 @@ Discord 설정 방법은 [공식 Game Overlay 안내](https://support.discord.co
 ## 6. 플레이 시작 전 알아둘 점
 
 ### 차트 형식
-- TenRiff 1.2.92은 BMS 계열(`.bms/.bme/.bml/.pms`)만 인덱싱하고 플레이합니다.
+- TenRiff 1.2.93은 BMS 계열(`.bms/.bme/.bml/.pms`)만 인덱싱하고 플레이합니다.
 
 ### 로딩
 - 곡 시작 직후에는 차트 로딩 진행 상태가 표시될 수 있습니다.

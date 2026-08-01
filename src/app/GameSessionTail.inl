@@ -325,6 +325,9 @@ bool GameSession::initialize(const CommandLineOptions& options) {
                 config_.mode.key_mode = inferred_key_mode;
             }
         }
+        if (!replay_source_.mode.key_conversion_algorithm.empty()) {
+            config_.mode.key_conversion_algorithm = replay_source_.mode.key_conversion_algorithm;
+        }
         if (!replay_source_.mode.random.empty()) {
             config_.mode.random = replay_source_.mode.random;
         } else if (config_.mode.random != "off") {
@@ -555,6 +558,11 @@ bool GameSession::initialize(const CommandLineOptions& options) {
         if (ghost_compatible && !ghost_replay_source_.mode.key_mode.empty() &&
             normalize_runtime_key_mode_local(ghost_replay_source_.mode.key_mode) !=
                 normalize_runtime_key_mode_local(config_.mode.key_mode)) {
+            ghost_compatible = false;
+        }
+        if (ghost_compatible && !ghost_replay_source_.mode.key_conversion_algorithm.empty() &&
+            ghost_replay_source_.mode.key_conversion_algorithm !=
+                config_.mode.key_conversion_algorithm) {
             ghost_compatible = false;
         }
         if (ghost_compatible && !ghost_replay_source_.mode.random.empty() &&
@@ -1821,6 +1829,7 @@ void GameSession::shutdown() {
             replay.score_multiplier = result_.score_multiplier;
             replay.final_score = result_.final_score;
             replay.mode.key_mode = config_.mode.key_mode;
+            replay.mode.key_conversion_algorithm = config_.mode.key_conversion_algorithm;
             replay.mode.random = config_.mode.random;
             replay.mode.random_seed = config_.mode.random_seed;
             replay.mode.gauge = config_.mode.gauge;

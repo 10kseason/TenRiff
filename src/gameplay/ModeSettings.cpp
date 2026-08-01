@@ -4,6 +4,13 @@
 
 namespace tenriff::gameplay {
 
+std::string to_string(KeyModeConversionAlgorithm algorithm) {
+    switch (algorithm) {
+        case KeyModeConversionAlgorithm::NK2: return "nk2";
+        case KeyModeConversionAlgorithm::Krrcream: default: return "krrcream";
+    }
+}
+
 std::string to_string(KeyMode mode) {
     switch (mode) {
         case KeyMode::Keys4: return "4K";
@@ -57,6 +64,19 @@ std::string normalize(std::string_view token) {
 }
 
 }  // namespace
+
+std::optional<KeyModeConversionAlgorithm> parse_key_mode_conversion_algorithm(std::string_view token) {
+    const std::string normalized = normalize(token);
+    if (normalized.empty() || normalized == "KRR" || normalized == "KRRCREAM" ||
+        normalized == "LEGACY" || normalized == "N2NC") {
+        return KeyModeConversionAlgorithm::Krrcream;
+    }
+    if (normalized == "NK2" || normalized == "NATIVEK2" ||
+        normalized == "KEYWEAVER" || normalized == "KEYWEAVERNK2") {
+        return KeyModeConversionAlgorithm::NK2;
+    }
+    return std::nullopt;
+}
 
 std::optional<KeyMode> parse_key_mode(std::string_view token) {
     std::string normalized = normalize(token);

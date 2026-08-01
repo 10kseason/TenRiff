@@ -4,6 +4,16 @@ TenRiff의 사용자/배포 관점에서 의미 있는 변경만 간단히 기�
 
 ## [Unreleased]
 
+## [1.2.93] - 2026-08-01
+
+### Added
+
+- In-game Mode Settings now exposes `Key Converter` with `Krrcream` and embedded `KeyWeaver nK2` choices; the selection is saved in config/replay metadata and applied to runtime key-mode conversion
+
+### Packaging
+
+- Windows `TenRiff-1.2.93.zip`, public source `TenRiff-1.2.93-source.zip`, and `TenRiff-1.2.93-SHA256SUMS.txt` are the formal release assets; no ONNX model, private checkpoint, user profile, song, or log is bundled
+
 ## [1.2.92] - 2026-08-01
 
 ### Added

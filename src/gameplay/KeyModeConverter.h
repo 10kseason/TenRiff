@@ -5,12 +5,9 @@
 #include <vector>
 
 #include "gameplay/GameplayChart.h"
+#include "gameplay/ModeSettings.h"
 
 namespace tenriff::gameplay {
-enum class KeyModeConversionAlgorithm {
-  Krrcream,
-  NK2,
-};
 
 struct KeyModeConverterOptions {
   int target_lane_count = 0;

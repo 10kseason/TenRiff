@@ -9,6 +9,7 @@ This document summarizes the implemented mode system, lane-transform/random rule
 ```json
 "mode": {
   "key_mode": "none",
+  "key_conversion_algorithm": "krrcream",
   "gauge": "normal",
   "random": "off",
   "random_seed": 0,
@@ -24,6 +25,7 @@ This document summarizes the implemented mode system, lane-transform/random rule
 ## Mode Meanings
 - Chart input is BMS-family only (`.bms/.bme/.bml/.pms`); the `format` and `enable_osu_charts` settings have been removed
 - `key_mode`: `none | auto | 4k | 5k | 6k | 7k | 8k | 9k | 10k | 12k | 14k | 16k`
+- `key_conversion_algorithm`: `krrcream | nk2` (defaults to `krrcream`; selected in the in-game Key Converter row and used only for actual key-count conversion)
 - `gauge`: `normal | hard | ex_hard | easy | shift`
 - `random`: `off | mirror | rr | fr | sr`
 - `random_seed`: fixed seed for RR/FR/SR, forced key-mode conversion, Note Add, and LN Mix selection (`0` is also fixed)

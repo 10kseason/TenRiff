@@ -554,6 +554,31 @@ TEST_CASE("mode manager safely combines key mode, super random, full long notes,
     }
 }
 
+TEST_CASE("mode manager routes KeyWeaver nK2 from config into gameplay") {
+    tenriff::gameplay::GameplayChart chart = make_dense_tap_chart(4);
+
+    tenriff::config::ModeConfig mode;
+    mode.key_mode = "8k";
+    mode.key_conversion_algorithm = "nk2";
+    mode.random_seed = 2024;
+
+    const auto result = tenriff::app::manage_modes(
+        chart,
+        tenriff::app::ChartFormat::Bms,
+        mode,
+        make_judge_config(),
+        1.0,
+        120.0,
+        1000);
+
+    CHECK(result.settings.key_conversion_algorithm ==
+          tenriff::gameplay::KeyModeConversionAlgorithm::NK2);
+    CHECK(result.chart.lane_count == 8);
+    CHECK_FALSE(result.chart.notes.empty());
+    CHECK_FALSE(has_lane_overlap(result.chart));
+    CHECK(contains_warning(result.warnings, "nK2 remapped"));
+}
+
 TEST_CASE("mode manager keeps the original lane count when key mode is none") {
     tenriff::gameplay::GameplayChart chart = make_hold_mix_chart(7);
 

@@ -624,6 +624,8 @@ void apply_config_object(const JsonObject& root, RuntimeConfig& config) {
 
     if (auto* mode = get_object(root, "mode")) {
         config.mode.key_mode = get_string(*mode, "key_mode", config.mode.key_mode);
+        config.mode.key_conversion_algorithm =
+            get_string(*mode, "key_conversion_algorithm", config.mode.key_conversion_algorithm);
         config.mode.gauge = get_string(*mode, "gauge", config.mode.gauge);
         config.mode.random = get_string(*mode, "random", config.mode.random);
         config.mode.random_seed = static_cast<uint32_t>(get_number(*mode, "random_seed", config.mode.random_seed));
@@ -995,6 +997,7 @@ JsonValue build_json_root(const RuntimeConfig& config) {
 
     JsonObject mode;
     mode.emplace("key_mode", JsonValue{config.mode.key_mode});
+    mode.emplace("key_conversion_algorithm", JsonValue{config.mode.key_conversion_algorithm});
     mode.emplace("gauge", JsonValue{config.mode.gauge});
     mode.emplace("random", JsonValue{config.mode.random});
     mode.emplace("random_seed", JsonValue{static_cast<double>(config.mode.random_seed)});
@@ -1528,6 +1531,7 @@ RuntimeConfig ConfigLoader::defaults() const {
     config.graphics.background_upscale_prefer_npu = false;
 
     config.mode.key_mode = "none";
+    config.mode.key_conversion_algorithm = "krrcream";
     config.mode.gauge = "normal";
     config.mode.random = "off";
     config.mode.random_seed = 0;
