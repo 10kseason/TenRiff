@@ -4,6 +4,20 @@ TenRiff의 사용자/배포 관점에서 의미 있는 변경만 간단히 기�
 
 ## [Unreleased]
 
+## [1.2.99] - 2026-08-02
+
+### Fixed
+
+- nK2로 키 수를 줄일 때 소스 노트 타이밍을 보존해 실시간 판정과 표시 박자가 어긋나 MISS가 발생하던 문제를 수정
+
+### Changed
+
+- LN Mix의 8·16·24·32비트 길이는 유지하고, 선택된 롱노트의 길이 비율을 긴 60% / 중간 20% / 짧은 20%로 조정
+
+### Packaging
+
+- Windows `TenRiff-1.2.99.zip`, public source `TenRiff-1.2.99-source.zip`, and `TenRiff-1.2.99-SHA256SUMS.txt` are the formal release assets; no ONNX model, private checkpoint, user profile, song, or log is bundled
+
 ## [1.2.98] - 2026-08-01
 
 ### Added

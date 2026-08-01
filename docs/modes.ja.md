@@ -61,7 +61,7 @@
 ## Note-Structure Mods
 - **Note Add 10%～100%**: 既存 note 時刻に無音の chord note を決定的に追加し、scratch、hold body、同 lane 重複、過大 chord を避ける。Records には残るが通常 best record は更新しない
 - **Full LN**: 対象 tap を同じ lane の次 note 直前までの standard hold に変換
-- **LN Mix 10%～90%**: 既存 hold を維持し、同じ lane の既存 span と重なる head を除外する。base BPM 基準の 1/8-note hold が次の同一 lane note より 50ms 以上前に終わる tap から設定割合を `random_seed` で選択し、すべての Mix 段階で長さを 1/16-note 70% / 1/8-note 20% / 1/24・1/32-note 10% に決定的に配分
+- **LN Mix 10%～90%**: 既存 hold を維持し、同じ lane の既存 span と重なる head を除外する。base BPM 基準の 1/8-note hold が次の同一 lane note より 50ms 以上前に終わる tap から設定割合を `random_seed` で選択し、すべての Mix 段階で長い 1/8-note 60% / 中間 1/16-note 20% / 短い 1/24・1/32-note 20% に決定的に配分
 - **Full Tap**: すべての hold tail を削除して tap に変換
 - 三つは同じ `Note Structure` category のため一つだけ有効。同じ譜面と seed では同じ LN Mix 結果を再現する
 

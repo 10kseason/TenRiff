@@ -3,7 +3,7 @@
 이 문서는 다음 에이전트나 새 작업자가 가장 먼저 읽어야 하는 현재 상태 문서입니다. 목표는 "지금 이 프로젝트가 무엇이고, 어디를 보면 되고, 무엇이 아직 미검증인지"를 빠르게 파악하게 하는 것입니다.
 
 ## Baseline
-- 현재 프로젝트 버전과 공개 안정판은 `1.2.98 stable`
+- 현재 프로젝트 버전과 공개 안정판은 `1.2.99 stable`
 - 직접 IP 멀티플레이와 preview r5의 입력 backend 수명주기 수정은 `1.1.8 stable`에 통합
 - `1.1.8`은 1.1.7의 시각 개선에 osu!mania OD8 보조 점수, 첫 네이티브 `BAD` 즉사 `Sudden Death (1 MISS)`, 결정적 `LN Mix 10%~90%`를 추가
 - `1.2.0`은 BMS 채널 `04/07` 및 osu!mania 배경을 gameplay sample timeline에 연결하고, FHD 미만 이미지 배경을 Windows ML 기반 LunaSR로 비동기 보간
@@ -93,7 +93,7 @@
   - BMS LV/CR 계산에서 롱노트 Head/Tail의 miss-ms만 0.5배로 평가해 `300ms`를 `150ms`처럼 완화하며, 실제 gameplay 판정창은 그대로 유지
 - Lane transform:
   - Random은 `Off / Mirror / FR / SR`를 지원하며, Mirror는 key-mode 변환 뒤 최종 레인을 반전하고 10K/16K는 각 플레이어 절반을 독립적으로 반전
-  - Mod Manager의 `LN Mix 10%~90%`는 기존 롱노트를 보존하고 같은 레인의 기존 span과 겹치는 head를 제외한다. base BPM 기준 8비트 LN도 다음 동일 레인 노트보다 50ms 먼저 끝낼 수 있는 단노트 중 설정 비율을 `Random Seed`로 고르고, 선택된 LN 길이는 모든 Mix 단계에서 16비트 70% / 8비트 20% / 24·32비트 10%로 배분
+  - Mod Manager의 `LN Mix 10%~90%`는 기존 롱노트를 보존하고 같은 레인의 기존 span과 겹치는 head를 제외한다. base BPM 기준 8비트 LN도 다음 동일 레인 노트보다 50ms 먼저 끝낼 수 있는 단노트 중 설정 비율을 `Random Seed`로 고르고, 선택된 LN 길이는 모든 Mix 단계에서 긴 8비트 60% / 중간 16비트 20% / 짧은 24·32비트 20%로 배분
 - Skins / Gameplay feel:
   - `Classic`, `Neon`, `Minimal`, `TenRiff` visual presets
   - `rect / triangle / pentagon / hexagon / circle` 노트 모양; procedural 원·다각형은 100%에서 rect 막대와 같은 전체 폭 사용
@@ -200,7 +200,7 @@
 
 ## Runtime / Packaging Rules
 - 새 사용자 프로필은 자동 생성
-- 현재 정식 P2P 배포 라인은 `TenRiff 1.2.98 stable`
+- 현재 정식 P2P 배포 라인은 `TenRiff 1.2.99 stable`
 - 배포 패키지에는 `Songs`를 넣지 않음
 - 배포 패키지는 `Main Menu / Options / Song Selecte / Multiplayer Lobby / Clear / Failed` 이름의 `Mainmusic/` 화면 슬롯을 포함하며, 각 `이름.mp3`와 번호가 붙은 `이름 2.mp3`~`이름 64.mp3`를 자동 수집해 화면 재진입마다 순환
 - 배포 업데이트에는 built artifacts와 필요한 런타임 자산만 포함

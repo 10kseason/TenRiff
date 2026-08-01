@@ -61,7 +61,7 @@ This document summarizes the implemented mode system, lane-transform/random rule
 ## Note-Structure Mods
 - **Note Add 10%-100%**: deterministically adds silent chord notes at existing note times while avoiding scratches, hold bodies, same-lane duplicates, and excessive chord size. Runs remain in Records but cannot replace a normal best record.
 - **Full LN**: converts eligible taps into standard holds ending just before the next note in the same lane
-- **LN Mix 10%-90%**: preserves existing holds and excludes heads overlapping an existing same-lane span. It uses `random_seed` to select the requested share of taps that can fit a base-BPM 1/8-note hold while ending at least 50ms before the next same-lane note, then deterministically assigns every Mix level 70% 1/16-note, 20% 1/8-note, and 10% alternating 1/24- and 1/32-note lengths
+- **LN Mix 10%-90%**: preserves existing holds and excludes heads overlapping an existing same-lane span. It uses `random_seed` to select the requested share of taps that can fit a base-BPM 1/8-note hold while ending at least 50ms before the next same-lane note, then deterministically assigns every Mix level 60% long 1/8-note, 20% medium 1/16-note, and 20% short alternating 1/24- and 1/32-note lengths
 - **Full Tap**: removes every hold tail and converts all holds into taps
 - These options share the `Note Structure` category, so only one is active; the same chart and seed reproduce the same LN Mix result.
 
