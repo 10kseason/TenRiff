@@ -249,6 +249,21 @@ inline std::string cycle_song_index_profile(std::string current, int direction) 
     return kProfiles[current_index];
 }
 
+inline std::string normalize_key_conversion_algorithm(std::string value) {
+    value = to_lower_ascii(std::move(value));
+    if (value == "nk2" || value == "nativek2" || value == "keyweaver" ||
+        value == "keyweaver_nk2") {
+        return "nk2";
+    }
+    return "krrcream";
+}
+
+inline std::string cycle_key_conversion_algorithm(std::string_view current) {
+    return normalize_key_conversion_algorithm(std::string(current)) == "nk2"
+               ? "krrcream"
+               : "nk2";
+}
+
 inline std::string normalize_runtime_key_mode(std::string value) {
     value = to_lower_ascii(std::move(value));
     if (value == "none" || value == "auto") {

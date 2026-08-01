@@ -3,7 +3,7 @@
 这份文档是下一位 agent 或新任务接手时应该最先阅读的当前状态文档。目标是快速说明“这个项目现在是什么、应该先看哪里、还有哪些内容尚未验证”。
 
 ## 基线
-- 当前项目版本与公开稳定版均为 `1.2.92 stable`
+- 当前项目版本与公开稳定版均为 `1.2.93 stable`
 - direct-IP multiplayer 与 preview r5 的输入 backend 生命周期修复已整合进 `1.1.8 stable`
 - `1.1.8` 在 1.1.7 视觉更新基础上加入 osu!mania OD8 辅助分数、首次原生 `BAD` 即结束的 `Sudden Death (1 MISS)`，以及确定性的 `LN Mix 10%～90%`
 - `1.2.0` 把 BMS 通道 `04/07` 和 osu!mania 背景接入 gameplay sample timeline，并通过 Windows ML 上的 LunaSR 异步放大低于 FHD 的图片背景
@@ -16,6 +16,8 @@
 - `1.2.7` 修复 External ONNX Upscaler 的 FP16 binding、浮点边界 INT8 QDQ 检测、高性能 DirectX GPU 默认路径，以及视频 BGA one-in-flight backpressure。
 - `1.2.8` 汇总了长按音符整体闪烁修复、gameplay BGA toggle、BMSTable HTML/header link 导入，以及长设置页面的 scrollbar UX 改进。
 - `1.2.9` 加入 12K/14K 与 scratch-aware key conversion、R-Random/DP Flip/Note Add、Song Select 自动预览、带曲图的详细 Result、profile nickname、video BGA 防抖，以及准确的 `DirectXMinPower` 表述。
+- `1.2.92` 为 standalone BMS key converter 加入默认 Krrcream 与确定性 `nK2 Native 50/50` 选择。
+- `1.2.93` 在游戏内 Mode Settings 加入 `Key Converter`，将 `Krrcream`/`KeyWeaver nK2` 选择保存到设置与 replay metadata，并用于 runtime key-mode 变换。
 - 后续工作的基准文档是 [`docs/baseline-1.1.2.zh-CN.md`](baseline-1.1.2.zh-CN.md)
 - Windows GUI 构建是主目标
 - Linux 仅存在 `Baepoks-Linuxs/TenRiff-0.5.0-linux-preview` 级别的 preview
@@ -82,6 +84,7 @@
   - 按 key mode 分开的 keymap
   - 对支持 key count 进行 chart difficulty 计算
   - `mode.key_mode` 通过 N2NC 风格的 lane remap 进行键数变换
+  - 游戏内 Mode Settings 的 `Key Converter` 可选择默认 `Krrcream` 或内置确定性 `KeyWeaver nK2`，并写入设置与 replay metadata
   - `mode.key_mode=none` 表示保持谱面的原始键数与基础 pattern 布局不变
 - Native difficulty：
   - BMS 的 LV/CR 计算仅将 long-note Head/Tail 的 miss-ms 按 0.5倍评估，使 `300ms`按`150ms`处理；实际 gameplay 判定范围保持不变
@@ -175,7 +178,7 @@
 
 ## 运行时 / 打包规则
 - 新用户 profile 会自动创建
-- 当前正式 P2P 发布线为 `TenRiff 1.2.92 stable`
+- 当前正式 P2P 发布线为 `TenRiff 1.2.93 stable`
 - 发布包不包含 `Songs`
 - 发布包包含 `Main Menu / Options / Song Selecte / Multiplayer Lobby / Clear / Failed` 这些 `Mainmusic/` 场景槽位；每个 `Name.mp3` 及 `Name 2.mp3`～`Name 64.mp3` 会自动发现，并在重新进入场景时轮换
 - 发布更新只包含已构建产物和必要的运行时资源

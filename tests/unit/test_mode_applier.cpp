@@ -353,6 +353,22 @@ TEST_CASE("key mode parser accepts none plus 4K through 16K") {
     CHECK(parse_key_mode("16k").value() == KeyMode::Keys16);
 }
 
+TEST_CASE("key conversion algorithm parser accepts Krrcream and KeyWeaver nK2 aliases") {
+    using tenriff::gameplay::KeyModeConversionAlgorithm;
+    using tenriff::gameplay::parse_key_mode_conversion_algorithm;
+
+    REQUIRE(parse_key_mode_conversion_algorithm("krrcream").has_value());
+    CHECK(parse_key_mode_conversion_algorithm("krrcream").value() ==
+          KeyModeConversionAlgorithm::Krrcream);
+    REQUIRE(parse_key_mode_conversion_algorithm("keyweaver").has_value());
+    CHECK(parse_key_mode_conversion_algorithm("keyweaver").value() ==
+          KeyModeConversionAlgorithm::NK2);
+    REQUIRE(parse_key_mode_conversion_algorithm("nk2").has_value());
+    CHECK(parse_key_mode_conversion_algorithm("nk2").value() ==
+          KeyModeConversionAlgorithm::NK2);
+    CHECK_FALSE(parse_key_mode_conversion_algorithm("unknown").has_value());
+}
+
 TEST_CASE("gauge mode parser accepts the Gauge Shift token") {
     using tenriff::gameplay::GaugeMode;
     using tenriff::gameplay::parse_gauge_mode;
@@ -639,6 +655,29 @@ TEST_CASE("runtime 10K key mode uses krrcream 10K preset defaults") {
     CHECK(chart_signature(runtime_result.chart) == chart_signature(expected_result.chart));
     CHECK(contains_warning(runtime_result.warnings, "Key mode converter remapped"));
 }
+TEST_CASE("runtime mode settings use the selected KeyWeaver nK2 converter") {
+    using namespace tenriff::gameplay;
+
+    const GameplayChart chart = make_representative_chart(4);
+
+    ModeSettings settings;
+    settings.key_mode = KeyMode::Keys8;
+    settings.key_conversion_algorithm = KeyModeConversionAlgorithm::NK2;
+    settings.random_seed = 999;
+
+    ModeApplyContext context;
+    context.base_bpm = 120.0;
+    context.sample_rate = 1000;
+
+    const auto result = apply_mode_settings(chart, settings, context);
+
+    REQUIRE(result.chart.lane_count == 8);
+    CHECK_FALSE(result.chart.notes.empty());
+    CHECK(is_time_sorted(result.chart));
+    CHECK_FALSE(has_lane_overlap(result.chart));
+    CHECK(contains_warning(result.warnings, "nK2 remapped"));
+}
+
 TEST_CASE("nK2 converter is selectable and ignores Krrcream-only tuning fields") {
     using namespace tenriff::gameplay;
 

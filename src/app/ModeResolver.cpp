@@ -13,6 +13,13 @@ ModeResolveResult resolve_mode_settings(const config::ModeConfig& config) {
         result.warnings.push_back("mode.key_mode not recognized; using AUTO.");
     }
 
+    if (auto parsed = gameplay::parse_key_mode_conversion_algorithm(config.key_conversion_algorithm)) {
+        result.settings.key_conversion_algorithm = parsed.value();
+    } else if (!config.key_conversion_algorithm.empty()) {
+        result.warnings.push_back(
+            "mode.key_conversion_algorithm not recognized; using KRRCREAM.");
+    }
+
     if (auto parsed = gameplay::parse_gauge_mode(config.gauge)) {
         result.settings.gauge = parsed.value();
     } else if (!config.gauge.empty()) {

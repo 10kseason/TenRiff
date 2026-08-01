@@ -40,7 +40,7 @@ If a profile does not exist, it is created automatically on first launch.
 
 - `backend` (string)
   - `polling | rawinput`
-  - defaults to `rawinput` on the current `1.2.92` release line
+  - defaults to `rawinput` on the current `1.2.93` release line
   - selectable per profile under `Options -> Input Settings -> Backend` or `Options -> Profile Setup -> Input Backend`
   - runtime fallback never rewrites the saved value to `polling`
   - a confirmed RawInput startup failure, registration-target loss, or message-window exit latches Polling across menu and subsequent gameplay sessions for the current app run
@@ -60,7 +60,7 @@ If a profile does not exist, it is created automatically on first launch.
 - `judgement_hz` (int)
   - `1000 | 2000 | 4000 | 8000`
   - compatibility field kept in the input config
-  - the current `1.2.92` runtime no longer drives a separate audio-thread judgement sub-step loop from this value
+  - the current `1.2.93` runtime no longer drives a separate audio-thread judgement sub-step loop from this value
   - default is `4000` (`0.25ms`)
 - `debounce_ms` (double)
   - real Press/Release transitions are preserved; only duplicate same-state events are removed from pressed-state tracking
@@ -136,8 +136,12 @@ If a profile does not exist, it is created automatically on first launch.
 The chart loader and indexer are BMS-family only (`.bms/.bme/.bml/.pms`); `format` and `enable_osu_charts` are no longer saved or used.
 
 - `key_mode` (string)
-  - `none | auto | 4k | 5k | 6k | 7k | 8k | 9k | 10k | 16k`
+  - `none | auto | 4k | 5k | 6k | 7k | 8k | 9k | 10k | 12k | 14k | 16k`
   - `none` means using the chart's original key count as-is
+- `key_conversion_algorithm` (string)
+  - `krrcream | nk2`
+  - select `Krrcream` or `KeyWeaver nK2` from in-game `Mode Settings > Key Converter`
+  - defaults to `krrcream` and applies only when `key_mode` changes the source lane count
 - `gauge` (string)
   - `normal | hard | ex_hard | easy | shift`
 - `random` (string)

@@ -192,12 +192,14 @@ ScratchExtraction extract_key_part(const GameplayChart& source) {
 KeyModeConverterOptions default_converter_options(int source_lane_count,
                                                   int target_lane_count,
                                                   uint32_t seed,
+                                                  KeyModeConversionAlgorithm algorithm,
                                                   const ModeApplyContext& context) {
     KeyModeConverterOptions options;
     options.target_lane_count = target_lane_count;
     options.seed = normalize_seed(seed);
     options.base_bpm = context.base_bpm;
     options.sample_rate = context.sample_rate;
+    options.algorithm = algorithm;
 
     if (target_lane_count == 10) {
         options.max_keys = 10;
@@ -237,6 +239,7 @@ KeyModeConverterOptions default_converter_options(int source_lane_count,
 bool convert_grouped_chart(const GameplayChart& source,
                            int target_count,
                            uint32_t seed,
+                           KeyModeConversionAlgorithm algorithm,
                            const ModeApplyContext& context,
                            GameplayChart& output,
                            std::vector<std::string>& warnings) {
@@ -280,6 +283,7 @@ bool convert_grouped_chart(const GameplayChart& source,
                 default_converter_options(source_group_size,
                                           target_group_size,
                                           seed ^ (0x9E3779B9u * static_cast<uint32_t>(group + 1)),
+                                          algorithm,
                                           context));
             for (auto& warning : converted.warnings) {
                 warnings.push_back((group == 0 ? "1P: " : "2P: ") + warning);
@@ -515,6 +519,7 @@ ModeApplyResult apply_mode_settings(const GameplayChart& chart,
                 if (convert_grouped_chart(*conversion_source,
                                           target_count,
                                           settings.random_seed,
+                                          settings.key_conversion_algorithm,
                                           context,
                                           grouped_chart,
                                           result.warnings)) {
@@ -527,6 +532,7 @@ ModeApplyResult apply_mode_settings(const GameplayChart& chart,
                     default_converter_options(conversion_source->lane_count,
                                               target_count,
                                               settings.random_seed,
+                                              settings.key_conversion_algorithm,
                                               context));
                 result.warnings.insert(result.warnings.end(),
                                        converted.warnings.begin(),

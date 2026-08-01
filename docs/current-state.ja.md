@@ -3,7 +3,7 @@
 この文書は、次のエージェントや新しい作業者が最初に読むべき current-state 文書です。目的は、「このプロジェクトは今どういう状態で、どこを見ればよく、何がまだ未検証か」を素早く把握できるようにすることです。
 
 ## Baseline
-- 現在のプロジェクト版と公開 stable 版は `1.2.92 stable`
+- 現在のプロジェクト版と公開 stable 版は `1.2.93 stable`
 - direct-IP multiplayer と preview r5 の input-backend lifecycle 修正は `1.1.8 stable` に統合
 - `1.1.8` は 1.1.7 の visual refresh に osu!mania OD8 補助スコア、最初の native `BAD` で終了する `Sudden Death (1 MISS)`、決定的な `LN Mix 10%～90%` を追加
 - `1.2.0` は BMS channel `04/07` と osu!mania 背景を gameplay sample timeline に接続し、FHD 未満の画像背景を Windows ML 上の LunaSR で非同期補間
@@ -16,6 +16,8 @@
 - `1.2.7` は External ONNX Upscaler の FP16 binding、float boundary INT8 QDQ 検出、high-performance DirectX GPU default、動画 BGA one-in-flight backpressure を修正。
 - `1.2.8` は LN 全体の一瞬の点滅修正、gameplay BGA toggle、BMSTable HTML/header link import、長い settings 画面の scrollbar UX 改善をまとめた配布前候補。
 - `1.2.9` は 12K/14K と scratch-aware key conversion、R-Random/DP Flip/Note Add、Song Select preview、画像付き詳細 Result、profile nickname、video BGA 揺れ防止、正確な `DirectXMinPower` 表記を追加。
+- `1.2.92` は standalone BMS key converter に既定の Krrcream と決定論的 `nK2 Native 50/50` の選択を追加。
+- `1.2.93` はゲーム内 Mode Settings に `Key Converter` を追加し、`Krrcream`/`KeyWeaver nK2` の選択を設定・replay metadata に保存して runtime key-mode 変換へ適用。
 - 後続作業の基準文書は `docs/baseline-1.1.2.ja.md`
 - Windows GUI ビルドが主対象
 - Linux は `Baepoks-Linuxs/TenRiff-0.5.0-linux-preview` レベルの preview のみ
@@ -82,6 +84,7 @@
   - キーモードごとの separate keymaps
   - 対応 key count の chart difficulty calculation
   - `mode.key_mode` は N2NC スタイルの lane remap でキー数を変換
+  - ゲーム内 Mode Settings の `Key Converter` で既定の `Krrcream` または内蔵の決定論的 `KeyWeaver nK2` を選択し、設定と replay metadata に保存
   - `mode.key_mode=none` は元のキー数と基本パターンレイアウトを維持
 - Native difficulty:
   - BMS の LV/CR 計算では long-note Head/Tail の miss-ms だけを 0.5倍で評価し、`300ms`を`150ms`として緩和する。実際の gameplay 判定 window は変更しない
@@ -175,7 +178,7 @@
 
 ## Runtime / Packaging Rules
 - 新しい user profile は自動生成される
-- 現在の正式 P2P 配布ラインは `TenRiff 1.2.92 stable`
+- 現在の正式 P2P 配布ラインは `TenRiff 1.2.93 stable`
 - distribution package には `Songs` を含めない
 - distribution package には `Main Menu / Options / Song Selecte / Multiplayer Lobby / Clear / Failed` の `Mainmusic/` scene slot を含め、各 `Name.mp3` と `Name 2.mp3`～`Name 64.mp3` を自動検出して scene 再入場ごとに循環する
 - distribution 更新には built artifact と必要な runtime asset だけを含める

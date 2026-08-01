@@ -40,7 +40,7 @@
 
 - `backend` (string)
   - `polling | rawinput`
-  - 当前 `1.2.92` 发布线默认值为 `rawinput`
+  - 当前 `1.2.93` 发布线默认值为 `rawinput`
   - 可在 `Options -> Input Settings -> Backend` 或 `Options -> Profile Setup -> Input Backend` 中按 profile 选择
   - runtime fallback 不会把已保存值改写为 `polling`
   - 确认 RawInput 启动失败、注册目标丢失或 message window 退出后，本次应用运行期间 menu 与后续 gameplay 都会保持 Polling
@@ -136,8 +136,12 @@
 chart loader/indexer 仅支持 BMS family（`.bms/.bme/.bml/.pms`）；不再保存或使用 `format` 与 `enable_osu_charts`。
 
 - `key_mode` (string)
-  - `none | auto | 4k | 5k | 6k | 7k | 8k | 9k | 10k | 16k`
+  - `none | auto | 4k | 5k | 6k | 7k | 8k | 9k | 10k | 12k | 14k | 16k`
   - `none` 表示直接沿用谱面的原始键数
+- `key_conversion_algorithm` (string)
+  - `krrcream | nk2`
+  - 在游戏内 `Mode Settings > Key Converter` 中选择 `Krrcream` 或 `KeyWeaver nK2`
+  - 默认值为 `krrcream`，仅在 `key_mode` 改变原始 lane count 时生效
 - `gauge` (string)
   - `normal | hard | ex_hard | easy | shift`
 - `random` (string)

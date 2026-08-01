@@ -90,6 +90,7 @@ TEST_CASE("config defaults prefer 44100 Hz audio") {
     CHECK(config.input.debounce_ms == doctest::Approx(8.0));
     CHECK_FALSE(config.mode.ghost_battle_enabled);
     CHECK(config.mode.song_index_profile == "safe");
+    CHECK(config.mode.key_conversion_algorithm == "krrcream");
     CHECK(config.graphics.resolution == "native");
     CHECK(config.graphics.display_mode == "borderless");
     CHECK(tenriff::config::kJudgementLinePositionMin == doctest::Approx(0.0));
@@ -395,6 +396,7 @@ TEST_CASE("config save and load preserve volume and speed settings") {
     config.speed.hi_speed = 4.75;
     config.mode.ghost_battle_enabled = true;
     config.mode.song_index_profile = "fast";
+    config.mode.key_conversion_algorithm = "nk2";
     config.mode.gauge = "shift";
 
     std::string error;
@@ -411,6 +413,7 @@ TEST_CASE("config save and load preserve volume and speed settings") {
     CHECK(result.config.speed.hi_speed == doctest::Approx(4.75));
     CHECK(result.config.mode.ghost_battle_enabled);
     CHECK(result.config.mode.song_index_profile == "fast");
+    CHECK(result.config.mode.key_conversion_algorithm == "nk2");
     CHECK(result.config.mode.gauge == "shift");
 }
 
@@ -1139,6 +1142,7 @@ TEST_CASE("bms-first runtime migration preserves valid keysound and key mode set
     config.audio_ui.preset = "basic";
     config.audio_ui.bms_keysound_policy = "autoplay";
     config.mode.key_mode = "none";
+    config.mode.key_conversion_algorithm = "krrcream";
 
     const bool changed = tenriff::app::migrate_bms_first_runtime_config(config);
 
@@ -1146,6 +1150,18 @@ TEST_CASE("bms-first runtime migration preserves valid keysound and key mode set
     CHECK(config.audio_ui.preset == "basic");
     CHECK(config.audio_ui.bms_keysound_policy == "autoplay");
     CHECK(config.mode.key_mode == "none");
+    CHECK(config.mode.key_conversion_algorithm == "krrcream");
+}
+
+TEST_CASE("runtime migration normalizes KeyWeaver converter aliases") {
+    ConfigLoader loader;
+    auto config = loader.defaults();
+    config.mode.key_conversion_algorithm = "keyweaver";
+
+    const bool changed = tenriff::app::migrate_bms_first_runtime_config(config);
+
+    CHECK(changed);
+    CHECK(config.mode.key_conversion_algorithm == "nk2");
 }
 
 TEST_CASE("runtime migration replaces invalid key mode tokens with none") {

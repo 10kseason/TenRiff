@@ -40,7 +40,7 @@ profile が存在しない場合は初回起動時に自動生成されます。
 
 - `backend` (string)
   - `polling | rawinput`
-  - 現行 `1.2.92` リリースラインの既定値は `rawinput`
+  - 現行 `1.2.93` リリースラインの既定値は `rawinput`
   - `Options -> Input Settings -> Backend` または `Options -> Profile Setup -> Input Backend` で profile ごとに選択可能
   - runtime fallback は保存済みの値を `polling` に書き換えない
   - RawInput の起動失敗、登録先の消失、message window の終了を確認すると、そのアプリ実行中は menu と後続 gameplay の両方で Polling を維持する
@@ -136,8 +136,12 @@ profile が存在しない場合は初回起動時に自動生成されます。
 chart loader/indexer は BMS family（`.bms/.bme/.bml/.pms`）専用で、`format` と `enable_osu_charts` は保存・使用しません。
 
 - `key_mode` (string)
-  - `none | auto | 4k | 5k | 6k | 7k | 8k | 9k | 10k | 16k`
+  - `none | auto | 4k | 5k | 6k | 7k | 8k | 9k | 10k | 12k | 14k | 16k`
   - `none` は譜面本来の key count をそのまま使う
+- `key_conversion_algorithm` (string)
+  - `krrcream | nk2`
+  - ゲーム内の `Mode Settings > Key Converter` で `Krrcream` または `KeyWeaver nK2` を選択
+  - 既定値は `krrcream`。`key_mode` が元の lane count を変更する場合のみ適用
 - `gauge` (string)
   - `normal | hard | ex_hard | easy | shift`
 - `random` (string)

@@ -57,6 +57,7 @@
   },
   "mode": {
     "key_mode": "none",
+    "key_conversion_algorithm": "krrcream",
     "gauge": "normal",
     "random": "off",
     "random_seed": 0,

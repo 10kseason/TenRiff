@@ -9,6 +9,7 @@
 ```json
 "mode": {
   "key_mode": "none",
+  "key_conversion_algorithm": "krrcream",
   "gauge": "normal",
   "random": "off",
   "random_seed": 0,
@@ -24,6 +25,7 @@
 ## 모드 의미
 - 차트 입력은 BMS 계열(`.bms/.bme/.bml/.pms`) 전용이며 `format`과 `enable_osu_charts` 설정은 제거됨
 - `key_mode`: `none | auto | 4k | 5k | 6k | 7k | 8k | 9k | 10k | 12k | 14k | 16k`
+- `key_conversion_algorithm`: `krrcream | nk2` (기본 `krrcream`; 게임 내 Key Converter에서 선택하며 실제 키수 변환 때만 적용)
 - `gauge`: `normal | hard | ex_hard | easy | shift`
 - `random`: `off | mirror | rr | fr | sr`
 - `random_seed`: RR/FR/SR, 강제 key-mode 변환, Note Add, LN Mix 대상 선택의 고정 시드 (0도 고정 값으로 취급)

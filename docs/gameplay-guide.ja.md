@@ -99,7 +99,7 @@ client 側の設定は Discord の [公式 Game Overlay guide](https://support.d
 ## 6. プレイ開始前に知っておくこと
 
 ### Chart format
-- TenRiff 1.2.92 は BMS family（`.bms/.bme/.bml/.pms`）だけをインデックス/プレイします。
+- TenRiff 1.2.93 は BMS family（`.bms/.bme/.bml/.pms`）だけをインデックス/プレイします。
 
 ### Loading
 - 曲開始直後に chart-loading progress が表示されることがあります。

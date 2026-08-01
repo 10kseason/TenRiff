@@ -246,6 +246,9 @@ config::JsonValue build_mode_json(const ReplayModeSettings& mode) {
     if (!mode.key_mode.empty()) {
         obj.emplace("key_mode", config::JsonValue{mode.key_mode});
     }
+    if (!mode.key_conversion_algorithm.empty()) {
+        obj.emplace("key_conversion_algorithm", config::JsonValue{mode.key_conversion_algorithm});
+    }
     if (!mode.random.empty()) {
         obj.emplace("random", config::JsonValue{mode.random});
     }
@@ -385,6 +388,8 @@ ReplayLoadResult load_replay_json(const std::string& path) {
 
     if (const auto* mode = find_json_object(*root, "mode")) {
         replay.mode.key_mode = read_json_string(*mode, "key_mode");
+        replay.mode.key_conversion_algorithm =
+            read_json_string(*mode, "key_conversion_algorithm");
         replay.mode.random = read_json_string(*mode, "random");
         if (find_json_value(*mode, "random_seed")) {
             replay.mode.random_seed = read_json_int(*mode, "random_seed", 0);
