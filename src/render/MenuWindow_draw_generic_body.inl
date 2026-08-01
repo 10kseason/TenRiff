@@ -150,6 +150,10 @@
             if (d2d_->card_brush) {
                 ctx->FillRoundedRectangle(field_rr, d2d_->card_brush.Get());
             }
+            if (preview.black_playfield_enabled && d2d_->note_fill_brush) {
+                d2d_->note_fill_brush->SetColor(D2D1::ColorF(0x000000, 1.0f));
+                ctx->FillRoundedRectangle(field_rr, d2d_->note_fill_brush.Get());
+            }
             if (d2d_->button_border_brush) {
                 ctx->DrawRoundedRectangle(field_rr, d2d_->button_border_brush.Get(), 1.1f);
             }
@@ -158,7 +162,7 @@
                 const float x0 = gameplay_lane_left(field_layout, lane);
                 const float x1 = gameplay_lane_right(field_layout, lane);
                 const uint32_t rgb = preview.lane_colors[static_cast<std::size_t>(lane)];
-                if (d2d_->note_fill_brush) {
+                if (!preview.black_playfield_enabled && d2d_->note_fill_brush) {
                     d2d_->note_fill_brush->SetColor(
                         gameplay_lane_preview_fill(rgb, lane + 1 == preview.selected_lane, preview_lane_bg_opacity));
                     ctx->FillRoundedRectangle(

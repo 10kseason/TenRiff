@@ -62,7 +62,7 @@ TenRiff의 기본 플레이 흐름은 아래 순서입니다.
   - `BGA`를 끄면 게임플레이 이미지/영상과 관련 디코더·업스케일러 작업이 꺼지며 Song Select 미리보기는 유지됨
   - 모델 선택 후 Upscaler를 직접 켜고 고사양 경고를 확인해야 함. `저전력 DirectX(실험)`은 DirectXMinPower 요청일 뿐 NPU를 명시 선택하거나 검증하지 않음
 - `Skins`
-  - native/LR2 스킨 전환, LR2 폴더 가져오기, 판정선 위치, 노트 크기, LN 몸통 폭, lane color 조정
+  - native/LR2 스킨 전환, LR2 폴더 가져오기, 고정 레인선 기준 노트 간격·크기, 검은 플레이필드, 판정선 위치, LN 몸통 폭, lane color 조정
 - `Keymap`
   - 키 배치 변경과 NKRO 테스트
 
@@ -105,7 +105,7 @@ Discord 설정 방법은 [공식 Game Overlay 안내](https://support.discord.co
 ## 6. 플레이 시작 전 알아둘 점
 
 ### 차트 형식
-- TenRiff 1.2.93은 BMS 계열(`.bms/.bme/.bml/.pms`)만 인덱싱하고 플레이합니다.
+- 기본은 BMS 계열(`.bms/.bme/.bml/.pms`)이며, Mode Settings에서 `OSU Charts`를 켜면 osu!mania 4K~10K `.osu`도 인덱싱하고 플레이합니다.
 
 ### 로딩
 - 곡 시작 직후에는 차트 로딩 진행 상태가 표시될 수 있습니다.
@@ -142,6 +142,8 @@ Rate는 곡 재생 속도와 차트 스케줄만 바꾸며, 같은 Hi-Speed에�
 - Combo
 - 최근 판정(`PG / GR / GD / BD / PR`)
 - 타이밍 편차(ms)
+
+정타에서 벗어난 입력은 판정명 아래에 조기 입력 `FAST -12 ms`, 지연 입력 `SLOW +18 ms`처럼 부호와 함께 표시됩니다. `0 ms`로 반올림되는 입력은 타이밍 문구를 생략합니다.
 
 `Graphics > Performance HUD`를 켜면 프레임 그래프와 평균 FPS, low FPS, gameplay timing 디버그 정보도 볼 수 있습니다.
 

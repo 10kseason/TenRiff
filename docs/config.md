@@ -40,7 +40,7 @@
 
 - `backend` (string)
   - `polling | rawinput`
-  - 현재 `1.2.93` 릴리스 라인의 기본값은 `rawinput`
+  - 현재 `1.2.95` 릴리스 라인의 기본값은 `rawinput`
   - `Options -> Input Settings -> Backend` 또는 `Options -> Profile Setup -> Input Backend`에서 프로필별로 RawInput/Polling을 직접 선택 가능
   - 저장값은 런타임 fallback 때문에 자동으로 `polling`으로 덮어쓰지 않음
   - RawInput 시작 실패, 등록 대상 손실, 메시지 창 종료가 확인되면 현재 앱 실행 동안 메뉴와 다음 gameplay 세션 모두 Polling을 유지
@@ -60,7 +60,7 @@
 - `judgement_hz` (int)
   - `1000 | 2000 | 4000 | 8000`
   - 호환성용으로 남아 있는 입력 설정 필드
-  - 현재 `1.2.93` runtime은 별도 오디오 판정 서브루프를 이 값으로 구동하지 않음
+  - 현재 `1.2.95` runtime은 별도 오디오 판정 서브루프를 이 값으로 구동하지 않음
   - 기본값은 `4000` (`0.25ms`)
 - `debounce_ms` (double)
   - 실제 Press/Release 전환은 버리지 않고 같은 상태의 중복 이벤트만 상태 추적에서 제거
@@ -69,7 +69,8 @@
 ### `judge`
 - `pg`, `gr`, `gd`, `bd` (double, ms)
 - 기본 `gd`는 `75ms`
-- 기본 `bd`는 `340ms`
+- 기본 `bd`는 `210ms`
+- `Judge Easy`는 기존 `1.25x` 배율로 `bd=262.5ms`, `Judge Hard`는 `bd=340ms`를 사용함; PG/GR/GD와 LN tail 창은 Hard에서 기본값 유지
 - `indirect_miss` (double, ms)
   - 입력이 전혀 들어오지 않았을 때 노트를 자동 미스로 처리하는 간접 미스 기준
   - 현재 런타임에서는 저장값과 무관하게 항상 `bd`와 같은 값으로 접힘
@@ -133,7 +134,7 @@
   - 저전력 session 생성에 실패하면 기존 high-performance DirectX 경로로 폴백
 
 ### `mode`
-차트 로더와 인덱서는 BMS 계열(`.bms/.bme/.bml/.pms`) 전용이며, `format`과 `enable_osu_charts`는 더 이상 저장하거나 사용하지 않습니다.
+차트 로더와 인덱서는 BMS 계열(`.bms/.bme/.bml/.pms`)을 기본으로 사용합니다. `enable_osu_charts=true`이면 자체 파서로 osu!mania 4K~10K `.osu`도 포함하며, `format` 필터는 사용하지 않습니다.
 
 - `key_mode` (string)
   - `none | auto | 4k | 5k | 6k | 7k | 8k | 9k | 10k | 12k | 14k | 16k`
@@ -217,6 +218,9 @@
 - `lane_background_opacity` (double)
   - lane별 반투명 배경 alpha
   - `0.00..0.45` 범위로 clamp
+- `black_playfield_enabled` (bool)
+  - `true`이면 lane spacing 구간까지 포함한 player/ghost 플레이필드 전체를 완전한 검정으로 표시
+  - 기본값은 `false`
 - `visual_opacity` (double)
   - note/receptor/key-label 계열 전체 opacity 배율
   - `0.20..1.00` 범위로 clamp
@@ -246,7 +250,8 @@
   - 각 mode 값은 lane 수만큼의 number array
   - 각 값은 `0.50..1.75` 범위로 clamp
 - `note_width_scale` (double)
-  - 노트 머리/꼬리 가로 배율
+  - 고정된 lane divider 중심을 기준으로 노트 머리/꼬리 너비만 조절하는 배율
+  - 100%에서 인접 노트 사이 기본 합산 여백은 `24px`
   - `0.50..1.40` 범위로 clamp
 - `lane_spacing_scales` (object)
   - key mode별 lane 사이 빈 간격 배율 배열

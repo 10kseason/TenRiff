@@ -62,7 +62,7 @@ The standard TenRiff play flow is:
   - Turning `BGA` off disables gameplay image/video backgrounds and their decoder/upscaler work; Song Select previews remain visible
   - Selecting a model is separate from enabling the upscaler and accepting its high-spec warning. Experimental `Low-Power DirectX` only requests DirectXMinPower and does not explicitly select or verify an NPU
 - `Skins`
-  - Switch native/LR2 skins, import an LR2 folder, and adjust judgement-line position, note size, LN body width, and lane colors
+  - Switch native/LR2 skins, import an LR2 folder, and adjust fixed-divider note gaps/size, Black Playfield, judgement-line position, LN body width, and lane colors
 - `Keymap`
   - Change key bindings and run the NKRO test
 
@@ -105,7 +105,7 @@ If this is not the layout you want, you can change it in `Options > Keymap`.
 ## 6. Things to Know Before Starting Play
 
 ### Chart format
-- TenRiff 1.2.93 indexes and plays only BMS-family charts (`.bms/.bme/.bml/.pms`).
+- BMS-family charts (`.bms/.bme/.bml/.pms`) are the default; enabling `OSU Charts` in Mode Settings also indexes and plays 4K-10K osu!mania `.osu`.
 
 ### Loading
 - Right after song start, chart-loading progress may be shown.
@@ -142,6 +142,8 @@ The in-game HUD usually shows:
 - Combo
 - Recent judgement (`PG / GR / GD / BD / PR`)
 - Timing deviation in milliseconds
+
+Off-center hits show a signed timing label below the judgement: `FAST -12 ms` for early input and `SLOW +18 ms` for late input. Hits that round to `0 ms` omit the timing label.
 
 If you enable `Graphics > Performance HUD`, you can also see the frame graph, average FPS, low FPS, and gameplay timing debug information.
 

@@ -193,6 +193,7 @@ inline GameplayHudRevisionFlags diff_gameplay_hud_revisions(const GameplayHudRev
         previous.hispeed != next.hispeed ||
         previous.has_feedback != next.has_feedback ||
         previous.feedback != next.feedback ||
+        previous.feedback_delta_ms != next.feedback_delta_ms ||
         previous.paused != next.paused ||
         previous.pause_menu_cursor != next.pause_menu_cursor ||
         previous.spectating_peer != next.spectating_peer ||
@@ -211,7 +212,8 @@ inline GameplayHudRevisionFlags diff_gameplay_hud_revisions(const GameplayHudRev
         previous.ghost_gauge != next.ghost_gauge ||
         previous.ghost_gauge_type != next.ghost_gauge_type ||
         previous.ghost_has_feedback != next.ghost_has_feedback ||
-        previous.ghost_feedback != next.ghost_feedback;
+        previous.ghost_feedback != next.ghost_feedback ||
+        previous.ghost_feedback_delta_ms != next.ghost_feedback_delta_ms;
 
     flags.motion_changed =
         previous.active != next.active ||

@@ -1192,7 +1192,7 @@ TEST_CASE("judge easy mod expands charge hold tail windows during gameplay") {
     CHECK(engine.stats().counts.gr == 0);
 }
 
-TEST_CASE("judge hard mod shrinks charge hold tail windows during gameplay") {
+TEST_CASE("judge hard mod leaves charge hold tail windows at their base values") {
     GameplayChart chart;
     chart.lane_count = 1;
     chart.duration_samples = 3000;
@@ -1227,8 +1227,10 @@ TEST_CASE("judge hard mod shrinks charge hold tail windows during gameplay") {
     (void)engine.handle_input(1, InputState::Released, 2018);
     engine.advance(2500);
 
-    CHECK(engine.stats().counts.pg == 1);
-    CHECK(engine.stats().counts.gr == 1);
+    CHECK(mode_result.judge.hold_grace_ms == doctest::Approx(judge.hold_grace_ms));
+    CHECK(mode_result.judge.hold_break_ms == doctest::Approx(judge.hold_break_ms));
+    CHECK(engine.stats().counts.pg == 2);
+    CHECK(engine.stats().counts.gr == 0);
 }
 
 TEST_CASE("full long notes preserve raw score potential during gameplay") {

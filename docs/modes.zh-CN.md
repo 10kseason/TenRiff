@@ -10,6 +10,7 @@
 "mode": {
   "key_mode": "none",
   "key_conversion_algorithm": "krrcream",
+  "enable_osu_charts": false,
   "gauge": "normal",
   "random": "off",
   "random_seed": 0,
@@ -23,7 +24,7 @@
 ```
 
 ## 模式含义
-- 谱面输入仅支持 BMS family（`.bms/.bme/.bml/.pms`）；`format` 与 `enable_osu_charts` 设置已经移除
+- `enable_osu_charts`：默认 `false`；在 Mode Settings 打开 `OSU Charts` 后可索引并游玩 osu!mania 4K～10K `.osu`，同时刷新曲库
 - `key_mode`：`none | auto | 4k | 5k | 6k | 7k | 8k | 9k | 10k | 12k | 14k | 16k`
 - `key_conversion_algorithm`：`krrcream | nk2`（默认 `krrcream`；在游戏内 Key Converter 中选择，仅用于实际键数变换）
 - `gauge`：`normal | hard | ex_hard | easy | shift`

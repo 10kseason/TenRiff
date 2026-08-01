@@ -845,12 +845,19 @@ ModeManagerResult manage_modes(const gameplay::GameplayChart& chart,
         }
     }
 
-    if (has_mod_token(result.active_mods, "judge_easy")) {
+    const bool judge_easy = has_mod_token(result.active_mods, "judge_easy");
+    const bool judge_hard = has_mod_token(result.active_mods, "judge_hard");
+    if (judge_easy) {
         result.judge_window_scale = 1.25;
-    } else if (has_mod_token(result.active_mods, "judge_hard")) {
-        result.judge_window_scale = 0.85;
     }
     scale_judge_windows(result.judge, result.judge_window_scale);
+
+    // BAD is a separate tier policy: Easy follows its existing 1.25x scale, while Hard uses
+    // an exact 340ms BAD window without changing PG/GR/GD or long-note tail windows.
+    if (judge_hard) {
+        result.judge.bd_ms = 340.0;
+    }
+    result.judge.indirect_miss_ms = result.judge.bd_ms;
 
     result.rate_multiplier = rate_score_multiplier(rate);
     result.mod_multiplier = mod_score_multiplier(result.active_mods);

@@ -3,7 +3,7 @@
 이 문서는 다음 에이전트나 새 작업자가 가장 먼저 읽어야 하는 현재 상태 문서입니다. 목표는 "지금 이 프로젝트가 무엇이고, 어디를 보면 되고, 무엇이 아직 미검증인지"를 빠르게 파악하게 하는 것입니다.
 
 ## Baseline
-- 현재 프로젝트 버전과 공개 안정판은 `1.2.93 stable`
+- 현재 프로젝트 버전과 공개 안정판은 `1.2.95 stable`
 - 직접 IP 멀티플레이와 preview r5의 입력 backend 수명주기 수정은 `1.1.8 stable`에 통합
 - `1.1.8`은 1.1.7의 시각 개선에 osu!mania OD8 보조 점수, 첫 네이티브 `BAD` 즉사 `Sudden Death (1 MISS)`, 결정적 `LN Mix 10%~90%`를 추가
 - `1.2.0`은 BMS 채널 `04/07` 및 osu!mania 배경을 gameplay sample timeline에 연결하고, FHD 미만 이미지 배경을 Windows ML 기반 LunaSR로 비동기 보간
@@ -18,10 +18,11 @@
 - `1.2.9`는 12K/14K와 scratch-aware key conversion, R-Random/DP Flip/Note Add, Song Select 자동 프리뷰, 상세 Result/곡 이미지, 프로필 닉네임, 동영상 BGA 흔들림 방지 및 정확한 `DirectXMinPower` 표기를 추가.
 - `1.2.92`는 standalone BMS key converter에 기본 Krrcream과 결정론적 `nK2 Native 50/50` 선택을 추가.
 - `1.2.93`은 게임 내 Mode Settings의 `Key Converter`에서 `Krrcream`/`KeyWeaver nK2`를 선택하고 설정·리플레이에 저장해 실제 key-mode 변환에 적용.
+- `1.2.95`: Mode Settings의 `OSU Charts`를 켜면 자체 파서로 osu!mania 4K~10K `.osu`를 인덱싱·플레이합니다. BMS가 기본이며 `.osz`/osu 스킨 가져오기는 복구하지 않았습니다.
 - 후속 작업의 기준선 문서는 `docs/baseline-1.1.2.md`
 - Windows GUI 빌드가 메인 타깃
 - Linux는 `Baepoks-Linuxs/TenRiff-0.5.0-linux-preview` 수준의 preview만 존재
-- 지원 차트 표면은 BMS 계열(`.bms/.bme/.bml/.pms`) 전용
+- 지원 차트 표면은 BMS 계열(`.bms/.bme/.bml/.pms`) 기본 + 선택형 osu!mania 4K~10K `.osu`
 - `1.2.4 stable`의 gameplay live 입력은 저장된 RawInput을 우선하면서 같은 `InputThread`의 bound-key polling shadow를 항상 유지하고, 시작 실패뿐 아니라 message pump의 예기치 않은 종료도 queue/state reset 없이 현재 producer thread에서 Polling으로 전환함
 - 메뉴 입력은 기존 foreground process/root-window 경계를 유지한다. RawInput 시작 실패, process-global 등록 대상 손실, 숨은 message window 종료를 감지하면 사용자 키 입력을 기다리지 않고 Polling으로 전환한다.
 - 확인된 fallback은 profile 값을 덮어쓰지 않은 채 현재 앱 실행의 메뉴와 다음 gameplay까지 유지한다. 앱 재시작 또는 `Options -> Input Settings -> Backend`의 명시적 변경만 재시도한다.
@@ -101,7 +102,9 @@
   - judgement-line glow and short per-key press pulse controls
   - small key labels can be shown at the lane top/bottom or hidden
   - combo Y 조절
-  - judge line / lane width / lane spacing / note width / divider width / 16K center gap / note height / LN body width 조절
+  - judge line / lane width / lane spacing / note size(width) / divider width / 16K center gap / note height / LN body width 조절
+  - 노트 너비는 고정된 lane divider 중심을 움직이지 않고 조절되며, 100%에서 인접 노트 사이 기본 합산 여백은 24px
+  - Black Playfield를 켜면 lane spacing을 포함한 player/ghost 플레이필드 전체를 완전한 검정으로 렌더링
   - key mode별 개별 lane 폭과 lane 사이 간격을 각각 저장하고 미리보기/실플레이/ghost field에 같은 레이아웃 계산을 적용
   - 지원 스킨 경로는 `native`와 LR2 playskin뿐이며, Skins 화면에서 LR2 폴더를 선택하거나 드롭하면 활성 프로필로 가져옴
   - LR2 note/LN 이미지, lane gap, destination size를 gameplay 레이아웃에 반영
@@ -118,7 +121,8 @@
   - 정확도는 PG/GR/GD/BD 기준 100/80/50/20%에 각 판정 구간 내부 타이밍으로 최대 0.5%p를 감산하고, PG 타이밍 범위가 8ms를 넘으면 전부 PG여도 99.5%로 제한함
   - 랭크 경계는 `<75 F / 75 B / 80.5 A / 86.5 A+ / 90 S / 95.5 S+ / 98 AA / 99 SS / 99.75 SSS`
   - 기본 `GOOD` 범위는 `75ms`
-  - 기본 `BAD` 범위는 `340ms`
+  - 기본 `BAD` 범위는 `210ms`, `Judge Easy`는 `262.5ms`, `Judge Hard`는 `340ms`
+  - `Judge Hard`는 PG/GR/GD 및 LN tail 창은 기본값을 유지하고 BAD 경계만 좁힘
   - 같은 레인에서 이전 노트가 이미 `BAD`이고 바로 다음 노트가 `GOOD` 이상으로 명확하면, 이전 노트는 미스로 정리하고 현재 입력은 다음 노트에 배정해 한 번의 누락이 연속 `BAD`로 고정되지 않게 함
   - note-consuming 실패(auto-miss, 너무 빨리 눌러 노트를 소모한 경우, hold break/tail miss)는 `BAD`
   - 너무 이른 non-consuming 입력은 LR2 스타일 `POOR`로 처리되고, 결과/리플레이/UI에 다시 표시됨
@@ -197,7 +201,7 @@
 
 ## Runtime / Packaging Rules
 - 새 사용자 프로필은 자동 생성
-- 현재 정식 P2P 배포 라인은 `TenRiff 1.2.93 stable`
+- 현재 정식 P2P 배포 라인은 `TenRiff 1.2.95 stable`
 - 배포 패키지에는 `Songs`를 넣지 않음
 - 배포 패키지는 `Main Menu / Options / Song Selecte / Multiplayer Lobby / Clear / Failed` 이름의 `Mainmusic/` 화면 슬롯을 포함하며, 각 `이름.mp3`와 번호가 붙은 `이름 2.mp3`~`이름 64.mp3`를 자동 수집해 화면 재진입마다 순환
 - 배포 업데이트에는 built artifacts와 필요한 런타임 자산만 포함

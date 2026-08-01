@@ -626,6 +626,8 @@ void apply_config_object(const JsonObject& root, RuntimeConfig& config) {
         config.mode.key_mode = get_string(*mode, "key_mode", config.mode.key_mode);
         config.mode.key_conversion_algorithm =
             get_string(*mode, "key_conversion_algorithm", config.mode.key_conversion_algorithm);
+        config.mode.enable_osu_charts =
+            get_bool(*mode, "enable_osu_charts", config.mode.enable_osu_charts);
         config.mode.gauge = get_string(*mode, "gauge", config.mode.gauge);
         config.mode.random = get_string(*mode, "random", config.mode.random);
         config.mode.random_seed = static_cast<uint32_t>(get_number(*mode, "random_seed", config.mode.random_seed));
@@ -721,6 +723,8 @@ void apply_config_object(const JsonObject& root, RuntimeConfig& config) {
             kSkinLaneBackgroundOpacityMin,
             kSkinLaneBackgroundOpacityMax,
             kSkinLaneBackgroundOpacityDefault);
+        config.skin.black_playfield_enabled =
+            get_bool(*skin, "black_playfield_enabled", config.skin.black_playfield_enabled);
         config.skin.visual_opacity = clamp_finite(
             get_number(*skin, "visual_opacity", config.skin.visual_opacity),
             kSkinVisualOpacityMin,
@@ -998,6 +1002,7 @@ JsonValue build_json_root(const RuntimeConfig& config) {
     JsonObject mode;
     mode.emplace("key_mode", JsonValue{config.mode.key_mode});
     mode.emplace("key_conversion_algorithm", JsonValue{config.mode.key_conversion_algorithm});
+    mode.emplace("enable_osu_charts", JsonValue{config.mode.enable_osu_charts});
     mode.emplace("gauge", JsonValue{config.mode.gauge});
     mode.emplace("random", JsonValue{config.mode.random});
     mode.emplace("random_seed", JsonValue{static_cast<double>(config.mode.random_seed)});
@@ -1073,6 +1078,7 @@ JsonValue build_json_root(const RuntimeConfig& config) {
     skin.emplace("judgement_line_position", JsonValue{config.skin.judgement_line_position});
     skin.emplace("combo_position", JsonValue{config.skin.combo_position});
     skin.emplace("lane_background_opacity", JsonValue{config.skin.lane_background_opacity});
+    skin.emplace("black_playfield_enabled", JsonValue{config.skin.black_playfield_enabled});
     skin.emplace("visual_opacity", JsonValue{config.skin.visual_opacity});
     skin.emplace("note_outline_opacity", JsonValue{config.skin.note_outline_opacity});
     skin.emplace("hold_body_opacity", JsonValue{config.skin.hold_body_opacity});
@@ -1532,6 +1538,7 @@ RuntimeConfig ConfigLoader::defaults() const {
 
     config.mode.key_mode = "none";
     config.mode.key_conversion_algorithm = "krrcream";
+    config.mode.enable_osu_charts = false;
     config.mode.gauge = "normal";
     config.mode.random = "off";
     config.mode.random_seed = 0;

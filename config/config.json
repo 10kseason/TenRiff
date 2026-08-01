@@ -26,7 +26,7 @@
     "pg": 15.5,
     "gr": 31.0,
     "gd": 75.0,
-    "bd": 340.0,
+    "bd": 210.0,
     "hold_grace": 80,
     "hold_break": 200,
     "mask": 30
@@ -58,6 +58,7 @@
   "mode": {
     "key_mode": "none",
     "key_conversion_algorithm": "krrcream",
+    "enable_osu_charts": false,
     "gauge": "normal",
     "random": "off",
     "random_seed": 0,
@@ -91,6 +92,7 @@
     "judgement_line_position": 0.82,
     "combo_position": 0.24,
     "lane_background_opacity": 0.18,
+    "black_playfield_enabled": false,
     "visual_opacity": 0.96,
     "note_outline_opacity": 0.78,
     "hold_body_opacity": 0.24,

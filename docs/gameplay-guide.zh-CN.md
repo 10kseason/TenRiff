@@ -62,7 +62,7 @@ TenRiff 的基础游玩流程如下：
   - 关闭 `BGA` 会禁用 gameplay 图片/视频背景及其 decoder/upscaler 工作；Song Select 预览仍会显示
   - 选择 model 后仍需明确开启 upscaler 并确认高配置警告；实验性 `优先 NPU` 只有在 Windows/driver 实际选择 NPU 时才会使用 NPU
 - `Skins`
-  - 切换 native/LR2 skin、导入 LR2 folder，并调整判定线位置、note 大小、LN body 宽度、lane color
+  - 切换 native/LR2 skin、导入 LR2 folder，并调整固定 divider 基准的 note 间距/大小、Black Playfield、判定线位置、LN body 宽度与 lane color
 - `Keymap`
   - 调整按键布局并做 NKRO 测试
 
@@ -105,7 +105,7 @@ Discord 客户端的设置方法请参考[官方 Game Overlay 指南](https://su
 ## 6. 开始游玩前要知道的事
 
 ### 谱面格式
-- TenRiff 1.2.93 只索引和游玩 BMS family（`.bms/.bme/.bml/.pms`）。
+- 默认索引并游玩 BMS family（`.bms/.bme/.bml/.pms`）；在 Mode Settings 打开 `OSU Charts` 后也支持 osu!mania 4K～10K `.osu`。
 
 ### 加载
 - 刚开始歌曲时，可能会显示谱面加载进度。
@@ -142,6 +142,8 @@ Rate 只改变歌曲播放速度和谱面时间轴；在相同 Hi-Speed 下，�
 - Combo
 - 最近判定（`PG / GR / GD / BD / PR`）
 - 时间偏差（ms）
+
+偏离中心的输入会在判定名下显示带符号的 timing：提前输入显示 `FAST -12 ms`，延后输入显示 `SLOW +18 ms`；四舍五入为 `0 ms` 时不显示 timing 文本。
 
 如果打开 `Graphics > Performance HUD`，还能看到帧率图、平均 FPS、低 FPS 以及 gameplay timing 调试信息。
 

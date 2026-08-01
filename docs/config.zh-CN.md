@@ -40,7 +40,7 @@
 
 - `backend` (string)
   - `polling | rawinput`
-  - 当前 `1.2.93` 发布线默认值为 `rawinput`
+  - 当前 `1.2.95` 发布线默认值为 `rawinput`
   - 可在 `Options -> Input Settings -> Backend` 或 `Options -> Profile Setup -> Input Backend` 中按 profile 选择
   - runtime fallback 不会把已保存值改写为 `polling`
   - 确认 RawInput 启动失败、注册目标丢失或 message window 退出后，本次应用运行期间 menu 与后续 gameplay 都会保持 Polling
@@ -69,7 +69,8 @@
 ### `judge`
 - `pg`, `gr`, `gd`, `bd` (double, ms)
 - 默认 `gd` 为 `75ms`
-- 默认 `bd` 为 `340ms`
+- 默认 `bd` 为 `210ms`
+- `Judge Easy` 沿用现有 `1.25x` 倍率（`bd=262.5ms`），`Judge Hard` 使用 `bd=340ms`；Hard 不会收紧 PG/GR/GD 与长按尾部判定窗
 - `indirect_miss` (double, ms)
   - 在完全没有输入时将 note 自动判为 miss 的间接 miss 标准
   - 当前运行时里不管保存值是什么，都会固定折叠到与 `bd` 相同的值
@@ -133,7 +134,7 @@
   - 创建低功耗 session 失败时回退到现有高性能 DirectX 路径
 
 ### `mode`
-chart loader/indexer 仅支持 BMS family（`.bms/.bme/.bml/.pms`）；不再保存或使用 `format` 与 `enable_osu_charts`。
+chart loader/indexer 默认使用 BMS family（`.bms/.bme/.bml/.pms`）。设置 `enable_osu_charts=true` 后，自有 parser 也会包含 osu!mania 4K～10K `.osu`；旧 `format` filter 仍不使用。
 
 - `key_mode` (string)
   - `none | auto | 4k | 5k | 6k | 7k | 8k | 9k | 10k | 12k | 14k | 16k`
@@ -210,6 +211,9 @@ chart loader/indexer 仅支持 BMS family（`.bms/.bme/.bml/.pms`）；不再保
 - `show_hold_tail` (bool)
   - 不改变长按音符判定和 body 连续性，仅显示或隐藏 tail cap
 - `note_border_enabled` (bool)
+- `black_playfield_enabled` (bool)
+  - 为 `true` 时，将包含 lane spacing 在内的 player/ghost playfield 全部显示为纯黑
+  - 默认值为 `false`
 - `judgement_line_position` (double)
   - gameplay 判定线的垂直位置比例
   - 会被 clamp 在 `0.00..1.00`（0%～100%）
@@ -223,7 +227,8 @@ chart loader/indexer 仅支持 BMS family（`.bms/.bme/.bml/.pms`）；不再保
   - 每个 mode 的值都是按 lane 数量排列的 number array
   - 每个值都会被 clamp 到 `0.50..1.75`
 - `note_width_scale` (double)
-  - note head/tail 的横向缩放
+  - 以固定的 lane divider 中心为基准，只调整 note head/tail 的宽度
+  - 在 100% 下，相邻 note 边缘之间的默认总间距为 `24px`
   - 会被 clamp 在 `0.50..1.40`
 - `lane_spacing_scales` (object)
   - 按 key mode 保存的 lane 之间空白间距缩放数组

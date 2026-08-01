@@ -40,7 +40,7 @@ If a profile does not exist, it is created automatically on first launch.
 
 - `backend` (string)
   - `polling | rawinput`
-  - defaults to `rawinput` on the current `1.2.93` release line
+  - defaults to `rawinput` on the current `1.2.95` release line
   - selectable per profile under `Options -> Input Settings -> Backend` or `Options -> Profile Setup -> Input Backend`
   - runtime fallback never rewrites the saved value to `polling`
   - a confirmed RawInput startup failure, registration-target loss, or message-window exit latches Polling across menu and subsequent gameplay sessions for the current app run
@@ -60,7 +60,7 @@ If a profile does not exist, it is created automatically on first launch.
 - `judgement_hz` (int)
   - `1000 | 2000 | 4000 | 8000`
   - compatibility field kept in the input config
-  - the current `1.2.93` runtime no longer drives a separate audio-thread judgement sub-step loop from this value
+  - the current `1.2.95` runtime no longer drives a separate audio-thread judgement sub-step loop from this value
   - default is `4000` (`0.25ms`)
 - `debounce_ms` (double)
   - real Press/Release transitions are preserved; only duplicate same-state events are removed from pressed-state tracking
@@ -69,7 +69,8 @@ If a profile does not exist, it is created automatically on first launch.
 ### `judge`
 - `pg`, `gr`, `gd`, `bd` (double, ms)
 - default `gd` is `75ms`
-- default `bd` is `340ms`
+- default `bd` is `210ms`
+- `Judge Easy` follows its existing `1.25x` scale (`bd=262.5ms`), while `Judge Hard` uses `bd=340ms`; Hard leaves PG/GR/GD and long-note tail windows at their base values
 - `indirect_miss` (double, ms)
   - the indirect-miss threshold used when no input arrives at all and a note is auto-missed
   - in the current runtime this is always folded into the same value as `bd`, regardless of what is stored
@@ -133,7 +134,7 @@ If a profile does not exist, it is created automatically on first launch.
   - failure to create the low-power session falls back to the existing high-performance DirectX path
 
 ### `mode`
-The chart loader and indexer are BMS-family only (`.bms/.bme/.bml/.pms`); `format` and `enable_osu_charts` are no longer saved or used.
+The chart loader and indexer default to BMS-family files (`.bms/.bme/.bml/.pms`). With `enable_osu_charts=true`, TenRiff's own parser also includes 4K-10K osu!mania `.osu`; the old `format` filter remains unused.
 
 - `key_mode` (string)
   - `none | auto | 4k | 5k | 6k | 7k | 8k | 9k | 10k | 12k | 14k | 16k`
@@ -210,6 +211,9 @@ The chart loader and indexer are BMS-family only (`.bms/.bme/.bml/.pms`); `forma
 - `show_hold_tail` (bool)
   - shows or hides the long-note tail cap without changing hold judgement/body continuity
 - `note_border_enabled` (bool)
+- `black_playfield_enabled` (bool)
+  - when true, fills the complete player/ghost playfield, including lane-spacing gaps, with solid black
+  - defaults to `false`
 - `judgement_line_position` (double)
   - vertical position ratio of the gameplay judgement line
   - clamped to the `0.00..1.00` range (0% to 100%)
@@ -223,7 +227,8 @@ The chart loader and indexer are BMS-family only (`.bms/.bme/.bml/.pms`); `forma
   - each mode value is a number array with one entry per lane
   - each value is clamped to the `0.50..1.75` range
 - `note_width_scale` (double)
-  - width scale for note heads / tails
+  - scales only note-head/tail width around fixed lane-divider centers
+  - the default combined edge gap between adjacent notes is `24px` at 100%
   - clamped to the `0.50..1.40` range
 - `lane_spacing_scales` (object)
   - per-key-mode arrays for blank spacing between lanes

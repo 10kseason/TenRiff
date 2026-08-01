@@ -1,4 +1,4 @@
-TenRiff 1.2.93 stable open-source source package scope
+TenRiff 1.2.95 stable open-source source package scope
 
 Included in versioned source bundles:
 - CHANGELOG.md

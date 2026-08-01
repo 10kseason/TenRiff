@@ -500,6 +500,8 @@ TEST_CASE("mode manager scales judge windows without touching the mask window") 
         1.0);
     CHECK(easy.judge_window_scale == doctest::Approx(1.25));
     CHECK(easy.judge.pg_ms == doctest::Approx(12.5));
+    CHECK(easy.judge.bd_ms == doctest::Approx(50.0));
+    CHECK(easy.judge.indirect_miss_ms == doctest::Approx(50.0));
     CHECK(easy.judge.hold_grace_ms == doctest::Approx(25.0));
     CHECK(easy.judge.hold_break_ms == doctest::Approx(50.0));
     CHECK(easy.judge.mask_ms == doctest::Approx(30.0));
@@ -512,11 +514,41 @@ TEST_CASE("mode manager scales judge windows without touching the mask window") 
         hard_mode,
         make_judge_config(),
         1.0);
-    CHECK(hard.judge_window_scale == doctest::Approx(0.85));
-    CHECK(hard.judge.pg_ms == doctest::Approx(8.5));
-    CHECK(hard.judge.hold_grace_ms == doctest::Approx(17.0));
-    CHECK(hard.judge.hold_break_ms == doctest::Approx(34.0));
+    CHECK(hard.judge_window_scale == doctest::Approx(1.0));
+    CHECK(hard.judge.pg_ms == doctest::Approx(10.0));
+    CHECK(hard.judge.bd_ms == doctest::Approx(340.0));
+    CHECK(hard.judge.indirect_miss_ms == doctest::Approx(340.0));
+    CHECK(hard.judge.hold_grace_ms == doctest::Approx(20.0));
+    CHECK(hard.judge.hold_break_ms == doctest::Approx(40.0));
     CHECK(hard.judge.mask_ms == doctest::Approx(30.0));
+}
+
+TEST_CASE("current BAD tiers use 210ms by default, 262.5ms on Easy, and 340ms on Hard") {
+    tenriff::gameplay::GameplayChart chart;
+    chart.lane_count = 1;
+
+    const tenriff::config::JudgeConfig base_judge;
+    tenriff::config::ModeConfig normal_mode;
+    tenriff::config::ModeConfig easy_mode;
+    easy_mode.mods = {"judge_easy"};
+    tenriff::config::ModeConfig hard_mode;
+    hard_mode.mods = {"judge_hard"};
+
+    const auto normal = tenriff::app::manage_modes(
+        chart, tenriff::app::ChartFormat::Bms, normal_mode, base_judge, 1.0);
+    const auto easy = tenriff::app::manage_modes(
+        chart, tenriff::app::ChartFormat::Bms, easy_mode, base_judge, 1.0);
+    const auto hard = tenriff::app::manage_modes(
+        chart, tenriff::app::ChartFormat::Bms, hard_mode, base_judge, 1.0);
+
+    CHECK(normal.judge.bd_ms == doctest::Approx(210.0));
+    CHECK(easy.judge.bd_ms == doctest::Approx(262.5));
+    CHECK(hard.judge.bd_ms == doctest::Approx(340.0));
+    CHECK(hard.judge.pg_ms == doctest::Approx(base_judge.pg_ms));
+    CHECK(hard.judge.gr_ms == doctest::Approx(base_judge.gr_ms));
+    CHECK(hard.judge.gd_ms == doctest::Approx(base_judge.gd_ms));
+    CHECK(hard.judge.hold_grace_ms == doctest::Approx(base_judge.hold_grace_ms));
+    CHECK(hard.judge.hold_break_ms == doctest::Approx(base_judge.hold_break_ms));
 }
 
 TEST_CASE("mode manager safely combines key mode, super random, full long notes, and judge hard") {
@@ -542,8 +574,9 @@ TEST_CASE("mode manager safely combines key mode, super random, full long notes,
     CHECK_FALSE(has_lane_overlap(result.chart));
     CHECK(contains_token(result.active_mods, "full_long_notes"));
     CHECK(contains_token(result.active_mods, "judge_hard"));
-    CHECK(result.judge_window_scale == doctest::Approx(0.85));
-    CHECK(result.judge.pg_ms == doctest::Approx(8.5));
+    CHECK(result.judge_window_scale == doctest::Approx(1.0));
+    CHECK(result.judge.pg_ms == doctest::Approx(10.0));
+    CHECK(result.judge.bd_ms == doctest::Approx(340.0));
 
     for (const auto& note : result.chart.notes) {
         CHECK(note.lane >= 1);
@@ -696,7 +729,7 @@ TEST_CASE("mode manager converts BMS key mode downward with randomization while 
 
     CHECK(result.chart.lane_count == 4);
     CHECK(result.settings.key_mode == tenriff::gameplay::KeyMode::Keys4);
-    CHECK(result.judge_window_scale == doctest::Approx(0.85));
+    CHECK(result.judge_window_scale == doctest::Approx(1.0));
     CHECK_FALSE(has_lane_overlap(result.chart));
 
     for (const auto& note : result.chart.notes) {
@@ -727,7 +760,7 @@ TEST_CASE("mode manager handles empty charts with key mode and mods without cras
     CHECK(result.chart.notes.empty());
     CHECK(contains_token(result.active_mods, "full_long_notes"));
     CHECK(contains_token(result.active_mods, "judge_hard"));
-    CHECK(result.judge_window_scale == doctest::Approx(0.85));
+    CHECK(result.judge_window_scale == doctest::Approx(1.0));
 }
 
 TEST_CASE("mode manager key mode combo matrix preserves chart invariants") {
@@ -744,8 +777,8 @@ TEST_CASE("mode manager key mode combo matrix preserves chart invariants") {
         {make_dense_tap_chart(8), "4k", "off", {}, 4, 1.0},
         {make_dense_tap_chart(8), "4k", "super_random", {"full_long_notes"}, 4, 1.0},
         {make_hold_mix_chart(8), "4k", "full_random", {"full_short_notes"}, 4, 1.0},
-        {make_hold_mix_chart(8), "6k", "super_random", {"no_ln_release", "judge_hard"}, 6, 0.85},
-        {make_hold_mix_chart(7), "4k", "mirror", {"judge_hard"}, 4, 0.85},
+        {make_hold_mix_chart(8), "6k", "super_random", {"no_ln_release", "judge_hard"}, 6, 1.0},
+        {make_hold_mix_chart(7), "4k", "mirror", {"judge_hard"}, 4, 1.0},
         {make_dense_tap_chart(4), "16k", "off", {"judge_easy"}, 16, 1.25}
     };
 
