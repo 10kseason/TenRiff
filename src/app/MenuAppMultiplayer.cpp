@@ -97,7 +97,8 @@ void MenuApp::populate_multiplayer_render_data(render::MenuRenderData& render) {
     const bool chart_matches = multiplayer_chart_fingerprints_match(multiplayer_menu_);
     const bool round_active = last_game_was_multiplayer_ || peer_round_ui_locked(peer);
     const bool host_can_choose_chart =
-        !round_active && multiplayer_host_can_choose_chart(multiplayer_menu_);
+        !round_active && multiplayer_host_can_choose_chart(multiplayer_menu_) &&
+        peer.remote_library_ready && multiplayer_common_chart_count_ > 0;
     const bool can_start = !round_active && multiplayer_host_can_start(multiplayer_menu_);
 
     const auto row_selected = [this](MultiplayerMenuRow row) {
@@ -144,9 +145,15 @@ void MenuApp::populate_multiplayer_render_data(render::MenuRenderData& render) {
                     false);
     std::string chart_value;
     if (multiplayer_menu_.role == MultiplayerRole::Host) {
-        chart_value = multiplayer_chart_title_.empty()
-                          ? ui_text("Choose Song", "곡 선택")
-                          : multiplayer_chart_title_;
+        if (!connected || !peer.remote_library_ready) {
+            chart_value = ui_text("Syncing song libraries", "곡 목록 동기화 중");
+        } else if (multiplayer_common_chart_count_ == 0) {
+            chart_value = ui_text("No shared songs", "공통 보유곡 없음");
+        } else {
+            chart_value = multiplayer_chart_title_.empty()
+                              ? ui_text("Choose Shared Song", "공통 곡 선택")
+                              : multiplayer_chart_title_;
+        }
     } else if (peer.remote_chart.fingerprint.valid()) {
         chart_value = peer.remote_chart.name.empty()
                           ? ui_text("Matching host HASH", "호스트 HASH 곡 검색 중")
@@ -217,6 +224,17 @@ void MenuApp::populate_multiplayer_render_data(render::MenuRenderData& render) {
     render.generic.notes.push_back(std::move(connection_line));
     if (!peer.status_detail.empty()) {
         render.generic.notes.push_back(peer.status_detail);
+    }
+    if (connected) {
+        if (peer.remote_library_ready) {
+            render.generic.notes.push_back(
+                ui_text("Shared charts in current source: ", "현재 소스 공통 차트: ") +
+                std::to_string(multiplayer_common_chart_count_) + " / " +
+                std::to_string(indexed_songs_.size()));
+        } else {
+            render.generic.notes.push_back(
+                ui_text("Syncing exact chart hashes with peer...", "상대와 정확한 차트 HASH 동기화 중..."));
+        }
     }
     if (!multiplayer_status_message_.empty()) {
         render.generic.notes.push_back(multiplayer_status_message_);
@@ -336,6 +354,12 @@ void MenuApp::handle_multiplayer_input(uint32_t keycode) {
         }
 
         multiplayer_status_message_.clear();
+        peer_session_.set_local_library(
+            build_multiplayer_chart_sha256_inventory(indexed_songs_));
+        multiplayer_local_library_index_revision_ = song_index_revision_;
+        multiplayer_remote_library_revision_ = 0;
+        multiplayer_remote_library_ready_ = false;
+        multiplayer_common_chart_count_ = 0;
         bool accepted = false;
         if (row == MultiplayerMenuRow::Host) {
             multiplayer_menu_.role = MultiplayerRole::Host;
@@ -369,6 +393,19 @@ void MenuApp::handle_multiplayer_input(uint32_t keycode) {
             publish_snapshot();
             return;
         }
+        if (!peer.remote_library_ready) {
+            multiplayer_status_message_ =
+                ui_text("Wait for song-library sync to finish.", "곡 목록 동기화가 끝날 때까지 기다리세요.");
+            publish_snapshot();
+            return;
+        }
+        if (multiplayer_common_chart_count_ == 0) {
+            multiplayer_status_message_ =
+                ui_text("No identical charts exist in both current song sources.",
+                        "양쪽의 현재 곡 소스에 동일한 차트가 없습니다.");
+            publish_snapshot();
+            return;
+        }
         if (round_active) {
             multiplayer_status_message_ =
                 ui_text("Wait for both players to leave the result before changing charts.",
@@ -377,6 +414,7 @@ void MenuApp::handle_multiplayer_input(uint32_t keycode) {
             return;
         }
         multiplayer_selecting_chart_ = true;
+        rebuild_visible_song_list();
         song_select_view_ = SongSelectView::Songs;
         song_select_focus_ = SongSelectFocus::SongList;
         song_select_search_active_ = false;
@@ -434,6 +472,7 @@ void MenuApp::select_multiplayer_chart() {
             ui_text("Chart selection was canceled because only the host may choose.",
                     "호스트만 선곡할 수 있어 곡 선택을 취소했습니다.");
         multiplayer_selecting_chart_ = false;
+        rebuild_visible_song_list();
         screen_ = Screen::Multiplayer;
         publish_snapshot();
         return;
@@ -449,6 +488,7 @@ void MenuApp::select_multiplayer_chart() {
                                                     "선택한 차트의 동일성 값을 만들지 못했습니다.")
                                           : error;
         multiplayer_selecting_chart_ = false;
+        rebuild_visible_song_list();
         screen_ = Screen::Multiplayer;
         publish_snapshot();
         return;
@@ -465,6 +505,7 @@ void MenuApp::select_multiplayer_chart() {
             ui_text("Chart selection expired. Wait for the current round to finish.",
                     "선곡 시간이 만료되었습니다. 현재 대전이 끝날 때까지 기다려주세요.");
         multiplayer_selecting_chart_ = false;
+        rebuild_visible_song_list();
         screen_ = Screen::Multiplayer;
         publish_snapshot();
         return;
@@ -478,6 +519,7 @@ void MenuApp::select_multiplayer_chart() {
     multiplayer_menu_.local_ready = false;
     multiplayer_status_message_.clear();
     multiplayer_selecting_chart_ = false;
+    rebuild_visible_song_list();
     screen_ = Screen::Multiplayer;
     publish_snapshot();
 }
@@ -723,6 +765,30 @@ void MenuApp::service_multiplayer() {
     if (peer.role == network::PeerRole::Host) multiplayer_menu_.role = MultiplayerRole::Host;
     if (peer.role == network::PeerRole::Joiner) multiplayer_menu_.role = MultiplayerRole::Join;
 
+    const bool local_library_changed =
+        peer_session_is_active(peer.state) &&
+        song_index_revision_ != multiplayer_local_library_index_revision_;
+    if (local_library_changed) {
+        peer_session_.set_local_library(
+            build_multiplayer_chart_sha256_inventory(indexed_songs_));
+        multiplayer_local_library_index_revision_ = song_index_revision_;
+    }
+    const bool library_state_changed =
+        local_library_changed ||
+        peer.remote_library_ready != multiplayer_remote_library_ready_ ||
+        peer.remote_library_revision != multiplayer_remote_library_revision_;
+    if (library_state_changed) {
+        multiplayer_remote_library_ready_ = peer.remote_library_ready;
+        multiplayer_remote_library_revision_ = peer.remote_library_revision;
+        multiplayer_common_chart_count_ =
+            peer.remote_library_ready && peer.remote_library_sha256
+                ? count_shared_multiplayer_charts(indexed_songs_, *peer.remote_library_sha256)
+                : 0;
+        if (multiplayer_selecting_chart_ && screen_ == Screen::SongSelect) {
+            rebuild_visible_song_list();
+        }
+    }
+
     service_multiplayer_chart_match(peer);
 
     if (multiplayer_waiting_for_result_exit_) {
@@ -782,7 +848,8 @@ void MenuApp::service_multiplayer() {
 
     if (peer.revision != multiplayer_last_revision_) {
         multiplayer_last_revision_ = peer.revision;
-        if (screen_ == Screen::Multiplayer || screen_ == Screen::Result) {
+        if (screen_ == Screen::Multiplayer || screen_ == Screen::Result ||
+            (screen_ == Screen::SongSelect && multiplayer_selecting_chart_)) {
             publish_snapshot();
         }
     }
@@ -955,6 +1022,10 @@ void MenuApp::reset_multiplayer_for_single_player() {
     last_game_was_multiplayer_ = false;
     multiplayer_waiting_for_result_exit_ = false;
     multiplayer_last_revision_ = 0;
+    multiplayer_local_library_index_revision_ = 0;
+    multiplayer_remote_library_revision_ = 0;
+    multiplayer_remote_library_ready_ = false;
+    multiplayer_common_chart_count_ = 0;
 }
 
 void MenuApp::leave_multiplayer() {

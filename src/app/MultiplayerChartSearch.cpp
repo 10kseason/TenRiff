@@ -17,6 +17,52 @@ std::string normalized_source_key(std::string_view source) {
 
 }  // namespace
 
+std::string normalize_multiplayer_chart_sha256(std::string_view sha256) {
+    if (sha256.size() != 64u) return {};
+    std::string normalized;
+    normalized.reserve(sha256.size());
+    for (char ch : sha256) {
+        if (ch >= '0' && ch <= '9') {
+            normalized.push_back(ch);
+        } else if (ch >= 'a' && ch <= 'f') {
+            normalized.push_back(ch);
+        } else if (ch >= 'A' && ch <= 'F') {
+            normalized.push_back(static_cast<char>(ch - 'A' + 'a'));
+        } else {
+            return {};
+        }
+    }
+    return normalized;
+}
+
+std::vector<std::string> build_multiplayer_chart_sha256_inventory(
+    const std::vector<SongEntry>& entries) {
+    std::vector<std::string> hashes;
+    hashes.reserve(entries.size());
+    for (const auto& entry : entries) {
+        std::string normalized = normalize_multiplayer_chart_sha256(entry.sha256);
+        if (!normalized.empty()) hashes.push_back(std::move(normalized));
+    }
+    std::sort(hashes.begin(), hashes.end());
+    hashes.erase(std::unique(hashes.begin(), hashes.end()), hashes.end());
+    return hashes;
+}
+
+bool multiplayer_chart_is_shared(const SongEntry& entry,
+                                 const MultiplayerChartHashSet& remote_sha256) {
+    const std::string normalized = normalize_multiplayer_chart_sha256(entry.sha256);
+    return !normalized.empty() && remote_sha256.find(normalized) != remote_sha256.end();
+}
+
+std::size_t count_shared_multiplayer_charts(
+    const std::vector<SongEntry>& entries,
+    const MultiplayerChartHashSet& remote_sha256) {
+    return static_cast<std::size_t>(std::count_if(
+        entries.begin(), entries.end(), [&](const SongEntry& entry) {
+            return multiplayer_chart_is_shared(entry, remote_sha256);
+        }));
+}
+
 std::vector<std::string> multiplayer_loaded_song_sources(
     std::string_view active_source,
     const std::vector<std::string>& recent_sources) {

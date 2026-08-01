@@ -212,7 +212,7 @@ Rank는 `<75 F`, `75 B`, `80.5 A`, `86.5 A+`, `90 S`, `95.5 S+`, `98 AA`, `99 SS
 
 ### 노트가 너무 촘촘하거나 읽기 어렵다
 - `Hi-Speed`를 올립니다.
-- 필요하면 `Skins > Note Width / Note Height / Judge Line`도 같이 조정합니다.
+- 필요하면 `Skins > Note & Field Size / Note Height / Judge Line`도 같이 조정합니다.
 
 ### 판정은 맞는 것 같은데 화면이 늦거나 빠르게 보인다
 - `Graphics > Display Offset`을 조정합니다.

@@ -3,7 +3,7 @@
 この文書は、次のエージェントや新しい作業者が最初に読むべき current-state 文書です。目的は、「このプロジェクトは今どういう状態で、どこを見ればよく、何がまだ未検証か」を素早く把握できるようにすることです。
 
 ## Baseline
-- 現在のプロジェクト版と公開 stable 版は `1.2.95 stable`
+- 現在のプロジェクト版と公開 stable 版は `1.2.96 stable`
 - direct-IP multiplayer と preview r5 の input-backend lifecycle 修正は `1.1.8 stable` に統合
 - `1.1.8` は 1.1.7 の visual refresh に osu!mania OD8 補助スコア、最初の native `BAD` で終了する `Sudden Death (1 MISS)`、決定的な `LN Mix 10%～90%` を追加
 - `1.2.0` は BMS channel `04/07` と osu!mania 背景を gameplay sample timeline に接続し、FHD 未満の画像背景を Windows ML 上の LunaSR で非同期補間
@@ -96,8 +96,9 @@
   - `rect / triangle / pentagon / hexagon / circle` note shape。procedural 円・多角形は 100% で rect bar と同じ全幅を使用
   - note border on/off
   - combo Y adjustment
-  - judge line / lane width / lane spacing / note size (width) / divider width / 16K center gap / note height / LN body width adjustment
-  - note width は固定された lane divider 中心を動かさずに調整され、100% では隣接 note 間の合計 gap が既定で 24px
+  - 新しい判定 label / FAST・SLOW の ms 数値は 220ms、combo 数値は 150ms の render-only pop animation
+  - judge line / lane width / lane spacing / note & field size / divider width / 16K center gap / note height / LN body width adjustment
+  - `Note & Field Size` は中央を固定したまま playfield、lane/divider、note、隣接 gauge を 50%～140% でまとめて拡大・縮小し、100% では隣接 note 間の合計 gap が既定で 24px
   - Black Playfield は lane spacing を含む player/ghost playfield 全体を完全な黒で表示
   - キーモードごとの lane-width 配列と inter-lane spacing 配列が保存され、preview / live gameplay / ghost field の同じレイアウト計算に適用される
   - 対応 skin route は `native` と LR2 playskin のみ。Skins で LR2 folder を選択または drop すると active profile に取り込む
@@ -152,6 +153,8 @@
   - `Options -> Profile Setup` から現在の profile の初回 setup 画面を開き直し、language / audio / input / graphics / keymap を即時保存できる
   - 最大48 byte の nickname を編集し、保存 record と direct-IP multiplayer 表示名に使用
 - Direct-IP multiplayer:
+  - protocol v3 は各 PC の current indexed source にある有効な SHA-256 だけを最大 512 件の chunk で交換し、host Song Select には両方に存在する byte-identical chart だけを表示
+  - 両 peer は同じ protocol-v3 release が必要で、旧版は handshake で拒否
   - joiner は active source と `recent_song_sources` の既存 profile-local cache だけを対象に、host chart の hash + size を照合する
   - 全 disk scan や自動 rescan は行わず、source root 外を指す cache path は拒否する
 
@@ -182,7 +185,7 @@
 
 ## Runtime / Packaging Rules
 - 新しい user profile は自動生成される
-- 現在の正式 P2P 配布ラインは `TenRiff 1.2.95 stable`
+- 現在の正式 P2P 配布ラインは `TenRiff 1.2.96 stable`
 - distribution package には `Songs` を含めない
 - distribution package には `Main Menu / Options / Song Selecte / Multiplayer Lobby / Clear / Failed` の `Mainmusic/` scene slot を含め、各 `Name.mp3` と `Name 2.mp3`～`Name 64.mp3` を自動検出して scene 再入場ごとに循環する
 - distribution 更新には built artifact と必要な runtime asset だけを含める

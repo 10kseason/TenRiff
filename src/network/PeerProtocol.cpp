@@ -60,6 +60,30 @@ bool append_string(std::vector<uint8_t>& out, const std::string& value, std::str
     return true;
 }
 
+int hex_nibble(char ch) {
+    if (ch >= '0' && ch <= '9') return ch - '0';
+    if (ch >= 'a' && ch <= 'f') return ch - 'a' + 10;
+    if (ch >= 'A' && ch <= 'F') return ch - 'A' + 10;
+    return -1;
+}
+
+bool append_sha256(std::vector<uint8_t>& out, const std::string& value, std::string* error) {
+    if (value.size() != 64u) {
+        set_error(error, "Library SHA-256 values must contain 64 hex characters.");
+        return false;
+    }
+    for (std::size_t index = 0; index < value.size(); index += 2) {
+        const int high = hex_nibble(value[index]);
+        const int low = hex_nibble(value[index + 1]);
+        if (high < 0 || low < 0) {
+            set_error(error, "Library SHA-256 values must be hexadecimal.");
+            return false;
+        }
+        out.push_back(static_cast<uint8_t>((high << 4) | low));
+    }
+    return true;
+}
+
 class Reader {
 public:
     Reader(const std::vector<uint8_t>& bytes, std::size_t offset, std::size_t limit)
@@ -121,6 +145,19 @@ public:
         return true;
     }
 
+    bool read_sha256(std::string& value) {
+        constexpr char kHex[] = "0123456789abcdef";
+        constexpr std::size_t kHashBytes = 32;
+        if (cursor_ + kHashBytes > limit_) return false;
+        value.resize(kHashBytes * 2);
+        for (std::size_t index = 0; index < kHashBytes; ++index) {
+            const uint8_t byte = bytes_[cursor_++];
+            value[index * 2] = kHex[(byte >> 4u) & 0x0fu];
+            value[index * 2 + 1] = kHex[byte & 0x0fu];
+        }
+        return true;
+    }
+
     [[nodiscard]] bool at_end() const { return cursor_ == limit_; }
 
 private:
@@ -131,7 +168,7 @@ private:
 
 bool is_known_type(uint16_t raw) {
     return raw >= static_cast<uint16_t>(PeerMessageType::Hello) &&
-           raw <= static_cast<uint16_t>(PeerMessageType::RoundCancelAck);
+           raw <= static_cast<uint16_t>(PeerMessageType::LibraryEnd);
 }
 
 bool decode_score(Reader& reader, PeerScore& score) {
@@ -236,6 +273,26 @@ std::vector<uint8_t> encode_peer_message(const PeerMessage& message, std::string
                 return {};
             }
             append_u64(payload, message.nonce);
+            break;
+        case PeerMessageType::LibraryBegin:
+            if (message.library_count > kPeerLibraryMaxCharts) {
+                set_error(error, "Peer library exceeds the chart limit.");
+                return {};
+            }
+            append_u32(payload, message.library_count);
+            break;
+        case PeerMessageType::LibraryChunk:
+            if (message.chart_sha256.empty() ||
+                message.chart_sha256.size() > kPeerLibraryHashesPerChunk) {
+                set_error(error, "Peer library chunk has an invalid hash count.");
+                return {};
+            }
+            append_u16(payload, static_cast<uint16_t>(message.chart_sha256.size()));
+            for (const auto& sha256 : message.chart_sha256) {
+                if (!append_sha256(payload, sha256, error)) return {};
+            }
+            break;
+        case PeerMessageType::LibraryEnd:
             break;
         default:
             set_error(error, "Unknown peer protocol message type.");
@@ -345,6 +402,25 @@ PeerDecodeStatus decode_peer_message(const std::vector<uint8_t>& bytes,
         case PeerMessageType::RoundCancel:
         case PeerMessageType::RoundCancelAck:
             valid = payload.read_u64(decoded.nonce) && decoded.nonce != 0;
+            break;
+        case PeerMessageType::LibraryBegin:
+            valid = payload.read_u32(decoded.library_count) &&
+                    decoded.library_count <= kPeerLibraryMaxCharts;
+            break;
+        case PeerMessageType::LibraryChunk: {
+            uint16_t count = 0;
+            valid = payload.read_u16(count) && count > 0 &&
+                    count <= kPeerLibraryHashesPerChunk;
+            decoded.chart_sha256.clear();
+            if (valid) decoded.chart_sha256.reserve(count);
+            for (uint16_t index = 0; valid && index < count; ++index) {
+                std::string sha256;
+                valid = payload.read_sha256(sha256);
+                if (valid) decoded.chart_sha256.push_back(std::move(sha256));
+            }
+            break;
+        }
+        case PeerMessageType::LibraryEnd:
             break;
         default:
             valid = false;

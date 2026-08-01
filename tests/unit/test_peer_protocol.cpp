@@ -85,6 +85,33 @@ TEST_CASE("peer protocol round-trips lobby messages") {
     CHECK(round_trip(round_cancel_ack).nonce == 78);
 }
 
+TEST_CASE("peer protocol round-trips bounded chart-library messages") {
+    PeerMessage begin;
+    begin.type = PeerMessageType::LibraryBegin;
+    begin.library_count = 2;
+    CHECK(round_trip(begin).library_count == 2u);
+
+    PeerMessage chunk;
+    chunk.type = PeerMessageType::LibraryChunk;
+    chunk.chart_sha256 = {
+        "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+        "ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789",
+    };
+    const PeerMessage chunk_result = round_trip(chunk);
+    REQUIRE(chunk_result.chart_sha256.size() == 2u);
+    CHECK(chunk_result.chart_sha256[0] == chunk.chart_sha256[0]);
+    CHECK(chunk_result.chart_sha256[1] ==
+          "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789");
+
+    PeerMessage end;
+    end.type = PeerMessageType::LibraryEnd;
+    CHECK(round_trip(end).type == PeerMessageType::LibraryEnd);
+
+    std::string error;
+    chunk.chart_sha256 = {"not-a-sha256"};
+    CHECK(tenriff::network::encode_peer_message(chunk, &error).empty());
+    CHECK_FALSE(error.empty());
+}
 TEST_CASE("peer protocol round-trips live score state") {
     PeerMessage score;
     score.type = PeerMessageType::FinalScore;

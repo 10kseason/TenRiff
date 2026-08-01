@@ -40,7 +40,7 @@
 
 - `backend` (string)
   - `polling | rawinput`
-  - 当前 `1.2.95` 发布线默认值为 `rawinput`
+  - 当前 `1.2.96` 发布线默认值为 `rawinput`
   - 可在 `Options -> Input Settings -> Backend` 或 `Options -> Profile Setup -> Input Backend` 中按 profile 选择
   - runtime fallback 不会把已保存值改写为 `polling`
   - 确认 RawInput 启动失败、注册目标丢失或 message window 退出后，本次应用运行期间 menu 与后续 gameplay 都会保持 Polling
@@ -227,7 +227,7 @@ chart loader/indexer 默认使用 BMS family（`.bms/.bme/.bml/.pms`）。设置
   - 每个 mode 的值都是按 lane 数量排列的 number array
   - 每个值都会被 clamp 到 `0.50..1.75`
 - `note_width_scale` (double)
-  - 以固定的 lane divider 中心为基准，只调整 note head/tail 的宽度
+  - 以中心为基准，同时缩放整个 playfield、lane/divider、note head/tail 与相邻 gauge（`0.50..1.40`）
   - 在 100% 下，相邻 note 边缘之间的默认总间距为 `24px`
   - 会被 clamp 在 `0.50..1.40`
 - `lane_spacing_scales` (object)

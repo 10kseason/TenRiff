@@ -197,7 +197,7 @@ gauge transition は `shift` を明示的に選択した場合だけ発生しま
 
 ### ノートが詰まって見え、読みにくい
 - `Hi-Speed` を上げる
-- 必要なら `Skins > Note Width / Note Height / Judge Line` も調整する
+- 必要なら `Skins > Note & Field Size / Note Height / Judge Line` も調整する
 
 ### 判定は合っているのに見た目だけ遅い/早い
 - `Graphics > Display Offset` を調整する

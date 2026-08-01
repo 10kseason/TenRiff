@@ -3,7 +3,7 @@
 这份文档是下一位 agent 或新任务接手时应该最先阅读的当前状态文档。目标是快速说明“这个项目现在是什么、应该先看哪里、还有哪些内容尚未验证”。
 
 ## 基线
-- 当前项目版本与公开稳定版均为 `1.2.95 stable`
+- 当前项目版本与公开稳定版均为 `1.2.96 stable`
 - direct-IP multiplayer 与 preview r5 的输入 backend 生命周期修复已整合进 `1.1.8 stable`
 - `1.1.8` 在 1.1.7 视觉更新基础上加入 osu!mania OD8 辅助分数、首次原生 `BAD` 即结束的 `Sudden Death (1 MISS)`，以及确定性的 `LN Mix 10%～90%`
 - `1.2.0` 把 BMS 通道 `04/07` 和 osu!mania 背景接入 gameplay sample timeline，并通过 Windows ML 上的 LunaSR 异步放大低于 FHD 的图片背景
@@ -96,8 +96,9 @@
   - `rect / triangle / pentagon / hexagon / circle` 音符形状；procedural 圆形/多边形在 100% 下使用与 rect 条相同的完整宽度
   - note border 开关
   - combo Y 调整
-  - judge line / lane width / lane spacing / note size (width) / divider width / 16K center gap / note height 调整
-  - 调整 note 宽度时固定 lane divider 中心不移动；100% 下相邻 note 边缘的默认总间距为 24px
+  - 新判定标签/FAST·SLOW 毫秒数字使用 220ms 弹出动画，combo 数字使用 150ms 弹出动画；二者都只影响渲染
+  - judge line / lane width / lane spacing / note & field size / divider width / 16K center gap / note height 调整
+  - `Note & Field Size` 以中心为基准，将 playfield、lane/divider、note 与相邻 gauge 一起按 50%～140% 缩放；100% 下相邻 note 边缘的默认总间距为 24px
   - Black Playfield 会将包含 lane spacing 在内的 player/ghost playfield 全部显示为纯黑
   - 会按 key mode 保存单独的 lane 宽度数组和 lane 间距数组，并在 preview、实际 gameplay、ghost field 中共用同一套布局计算
   - 支持的 skin route 仅有 `native` 与 LR2 playskin；可在 Skins 中选择或拖入 LR2 folder 并导入当前 profile
@@ -152,6 +153,8 @@
   - 可从 `Options -> Profile Setup` 重新打开当前 profile 的首次设置页面，并立即保存 language/audio/input/graphics/keymap
   - 可编辑最多48字节的 nickname，用于已保存记录和 direct-IP multiplayer 显示名
 - Direct-IP multiplayer：
+  - protocol v3 只会以最多 512 个一组的 chunk 交换双方当前 indexed source 中的有效 SHA-256；host Song Select 仅显示两台 PC 都拥有且字节完全相同的 chart
+  - 双方必须使用同一 protocol-v3 release；旧版本会在 handshake 阶段被拒绝
   - joiner 只在 active source 和 `recent_song_sources` 的现有 profile-local cache 中按 host chart 的 hash + size 查找
   - 不进行全盘扫描或自动重扫，并拒绝 cache 中指向 source root 外部的路径
 
@@ -182,7 +185,7 @@
 
 ## 运行时 / 打包规则
 - 新用户 profile 会自动创建
-- 当前正式 P2P 发布线为 `TenRiff 1.2.95 stable`
+- 当前正式 P2P 发布线为 `TenRiff 1.2.96 stable`
 - 发布包不包含 `Songs`
 - 发布包包含 `Main Menu / Options / Song Selecte / Multiplayer Lobby / Clear / Failed` 这些 `Mainmusic/` 场景槽位；每个 `Name.mp3` 及 `Name 2.mp3`～`Name 64.mp3` 会自动发现，并在重新进入场景时轮换
 - 发布更新只包含已构建产物和必要的运行时资源

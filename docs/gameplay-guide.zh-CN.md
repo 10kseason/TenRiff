@@ -212,7 +212,7 @@ Rank 使用 `<75 F`、`75 B`、`80.5 A`、`86.5 A+`、`90 S`、`95.5 S+`、`98 A
 
 ### note 太密、难以读谱
 - 提高 `Hi-Speed`
-- 需要时再一起调整 `Skins > Note Width / Note Height / Judge Line`
+- 需要时再一起调整 `Skins > Note & Field Size / Note Height / Judge Line`
 
 ### 判定感觉对，但画面看起来偏慢或偏快
 - 调整 `Graphics > Display Offset`

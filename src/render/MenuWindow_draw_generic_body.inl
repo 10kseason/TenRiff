@@ -84,10 +84,9 @@
                     imported_lane_divider_widths[divider] = skin.lane_divider_widths[divider];
                 }
             }
-            const float note_width_scale = effective_gameplay_note_width_scale(
-                preview.note_width_scale,
-                imported_note_width_ratio,
-                use_imported_metrics);
+            const float note_width_scale = clamp_gameplay_note_width_scale(preview.note_width_scale);
+            const float note_art_width_ratio = effective_gameplay_note_art_width_ratio(
+                imported_note_width_ratio, use_imported_metrics);
             const float note_height_scale = effective_gameplay_note_height_scale(
                 preview.note_height_scale,
                 imported_note_height_ratio,
@@ -100,6 +99,7 @@
                 field_bottom,
                 lane_count,
                 note_width_scale,
+                note_art_width_ratio,
                 preview.lane_width_scale_count,
                 preview.lane_width_scales,
                 preview.lane_spacing_scale_count,

@@ -643,6 +643,11 @@ private:
 
     struct GameplayHudCache {
         uint64_t text_revision = 0;
+        bool animation_initialized = false;
+        int animated_combo = 0;
+        int animated_judgement_count = 0;
+        int64_t combo_animation_started_ns = 0;
+        int64_t judgement_animation_started_ns = 0;
         std::wstring title_text{};
         std::wstring artist_text{};
         std::wstring speed_text{};
@@ -677,6 +682,7 @@ private:
         int lane_count = 0;
         double judgement_line_position = 0.82;
         double note_width_scale = 1.0;
+        double note_art_width_ratio = 1.0;
         double note_height_scale = 1.8;
         std::size_t lane_width_scale_count = 0;
         std::array<double, kGameplayHudMaxLanes> lane_width_scales{};

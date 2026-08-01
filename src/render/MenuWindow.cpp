@@ -103,7 +103,6 @@ constexpr double kGameplayComboPositionMin = 0.10;
 constexpr double kGameplayComboPositionMax = 0.78;
 constexpr double kGameplayComboPositionDefault = 0.24;
 constexpr float kGameplayComboWideCenterGapThreshold = 1.05f;
-constexpr float kGameplayDefaultNoteGapPx = 24.0f;
 constexpr float kGameplayLaneDividerBaseWidth = 1.0f;
 constexpr float kGameplayLaneDividerWidthMaxPx = 16.0f;
 
@@ -410,12 +409,8 @@ float sanitize_gameplay_imported_scale_ratio(float value) {
     return std::clamp(value, 0.25f, 4.0f);
 }
 
-float effective_gameplay_note_width_scale(double value, float imported_ratio, bool apply_imported_ratio) {
-    float scale = clamp_gameplay_note_width_scale(value);
-    if (apply_imported_ratio) {
-        scale *= sanitize_gameplay_imported_scale_ratio(imported_ratio);
-    }
-    return std::clamp(scale, 0.25f, 4.0f);
+float effective_gameplay_note_art_width_ratio(float imported_ratio, bool apply_imported_ratio) {
+    return apply_imported_ratio ? sanitize_gameplay_imported_scale_ratio(imported_ratio) : 1.0f;
 }
 
 float effective_gameplay_note_height_scale(double value, float imported_ratio, bool apply_imported_ratio) {
@@ -616,15 +611,6 @@ void draw_gameplay_hold_body(ID2D1RenderTarget* target,
     target->FillGeometry(geometry.Get(), brush);
 }
 
-float gameplay_note_draw_width(float lane_width, double note_width_scale) {
-    const float safe_lane_width = std::max(24.0f, lane_width);
-    // Keep note edges symmetric around the lane center/divider geometry. Width scaling must not move the field.
-    const float base_note_width = std::max(16.0f, safe_lane_width - kGameplayDefaultNoteGapPx);
-    return std::clamp(base_note_width * clamp_gameplay_note_width_scale(note_width_scale),
-                      16.0f,
-                      std::max(16.0f, safe_lane_width - 4.0f));
-}
-
 struct GameplayFieldLayout {
     float left = 0.0f;
     float right = 0.0f;
@@ -658,6 +644,7 @@ GameplayFieldLayout build_gameplay_field_layout(float bounds_left,
                                                 float bottom,
                                                 int lane_count,
                                                 double note_width_scale,
+                                                double note_art_width_ratio,
                                                 std::size_t lane_width_scale_count,
                                                 const std::array<double, kGameplayHudMaxLanes>& lane_width_scales,
                                                 std::size_t lane_spacing_scale_count,
@@ -693,8 +680,8 @@ GameplayFieldLayout build_gameplay_field_layout(float bounds_left,
         total_gap_units += gap_unit;
     }
     const float effective_lane_units = std::max(1.0f, total_lane_units + total_gap_units);
-    // Divider positions define the playfield. Note Width only scales note art inside those fixed lane boundaries.
-    const float field_width = bounds_width;
+    // Note Size scales the complete field around its center so lanes, gaps, and note art stay linked.
+    const float field_width = compute_gameplay_playfield_width(bounds_width, note_width_scale);
     const float center_x = (bounds_left + bounds_right) * 0.5f;
     const float unit_width = field_width / effective_lane_units;
     const float center_gap_only = (use_center_gap ? unit_width * center_gap_scale : 0.0f);
@@ -716,11 +703,8 @@ GameplayFieldLayout build_gameplay_field_layout(float bounds_left,
         const float lane_width_px = unit_width * lane_units[index];
         layout.lane_lefts[index] = cursor;
         layout.lane_widths[index] = lane_width_px;
-        const float desired_lane_note_width = gameplay_note_draw_width(lane_width_px, note_width_scale);
-        layout.note_widths[index] = std::clamp(
-            desired_lane_note_width,
-            8.0f,
-            std::max(8.0f, lane_width_px - 4.0f));
+        layout.note_widths[index] = compute_gameplay_note_draw_width(
+            lane_width_px, note_width_scale, note_art_width_ratio);
         total_lane_width += lane_width_px;
         total_note_width += layout.note_widths[index];
         cursor += lane_width_px;
@@ -738,6 +722,7 @@ GameplayFieldLayout build_gameplay_field_layout(float bounds_left,
 
 GameplaySurfaceLayout build_gameplay_surface_layout(int lane_count,
                                                     double note_width_scale,
+                                                    double note_art_width_ratio,
                                                     std::size_t lane_width_scale_count,
                                                     const std::array<double, kGameplayHudMaxLanes>& lane_width_scales,
                                                     std::size_t lane_spacing_scale_count,
@@ -753,6 +738,7 @@ GameplaySurfaceLayout build_gameplay_surface_layout(int lane_count,
                                                           kGameplayFieldBottom,
                                                           lane_count,
                                                           note_width_scale,
+                                                          note_art_width_ratio,
                                                           lane_width_scale_count,
                                                           lane_width_scales,
                                                           lane_spacing_scale_count,
@@ -764,13 +750,16 @@ GameplaySurfaceLayout build_gameplay_surface_layout(int lane_count,
                                                          kGameplayFieldBottom,
                                                          lane_count,
                                                          note_width_scale,
+                                                         note_art_width_ratio,
                                                          lane_width_scale_count,
                                                          lane_width_scales,
                                                          lane_spacing_scale_count,
                                                          lane_spacing_scales,
                                                          lane_center_gap_scale);
-        layout.player_gauge_left = kGameplaySplitPlayerGaugeLeft;
-        layout.ghost_gauge_left = kGameplaySplitGhostGaugeLeft;
+        layout.player_gauge_left =
+            layout.player_field.left - (kGameplaySplitPlayerFieldLeft - kGameplaySplitPlayerGaugeLeft);
+        layout.ghost_gauge_left =
+            layout.ghost_field.right + (kGameplaySplitGhostGaugeLeft - kGameplaySplitGhostFieldRight);
     } else {
         layout.player_field = build_gameplay_field_layout(kGameplayFieldLeft,
                                                           kGameplayFieldRight,
@@ -778,12 +767,14 @@ GameplaySurfaceLayout build_gameplay_surface_layout(int lane_count,
                                                           kGameplayFieldBottom,
                                                           lane_count,
                                                           note_width_scale,
+                                                          note_art_width_ratio,
                                                           lane_width_scale_count,
                                                           lane_width_scales,
                                                           lane_spacing_scale_count,
                                                           lane_spacing_scales,
                                                           lane_center_gap_scale);
-        layout.player_gauge_left = kGameplayGaugeLeft;
+        layout.player_gauge_left =
+            layout.player_field.right + (kGameplayGaugeLeft - kGameplayFieldRight);
     }
     return layout;
 }
@@ -3042,10 +3033,9 @@ bool MenuWindow::ensure_gameplay_static_cache(const GameplayHudData& data) {
         gameplay_note_sprite_cache_.has_imported_judgement_line_position
             ? gameplay_note_sprite_cache_.imported_judgement_line_position
             : clamp_gameplay_judgement_line(data.judgement_line_position);
-    desired.note_width_scale = effective_gameplay_note_width_scale(
-        data.note_width_scale,
-        gameplay_note_sprite_cache_.imported_note_width_ratio,
-        use_imported_metrics);
+    desired.note_width_scale = clamp_gameplay_note_width_scale(data.note_width_scale);
+    desired.note_art_width_ratio = effective_gameplay_note_art_width_ratio(
+        gameplay_note_sprite_cache_.imported_note_width_ratio, use_imported_metrics);
     desired.note_height_scale = effective_gameplay_note_height_scale(
         data.note_height_scale,
         gameplay_note_sprite_cache_.imported_note_height_ratio,
@@ -3110,6 +3100,7 @@ bool MenuWindow::ensure_gameplay_static_cache(const GameplayHudData& data) {
         gameplay_static_cache_.lane_count == desired.lane_count &&
         gameplay_static_cache_.judgement_line_position == desired.judgement_line_position &&
         gameplay_static_cache_.note_width_scale == desired.note_width_scale &&
+        gameplay_static_cache_.note_art_width_ratio == desired.note_art_width_ratio &&
         gameplay_static_cache_.note_height_scale == desired.note_height_scale &&
         gameplay_static_cache_.lane_width_scale_count == desired.lane_width_scale_count &&
         gameplay_static_cache_.lane_width_scales == desired.lane_width_scales &&
@@ -3154,6 +3145,7 @@ bool MenuWindow::ensure_gameplay_static_cache(const GameplayHudData& data) {
         build_gameplay_surface_layout(
             desired.lane_count,
             note_width_scale,
+            desired.note_art_width_ratio,
             desired.lane_width_scale_count,
             desired.lane_width_scales,
             desired.lane_spacing_scale_count,

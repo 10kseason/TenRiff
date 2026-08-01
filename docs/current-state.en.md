@@ -3,7 +3,7 @@
 This is the document that the next agent or any new contributor should read first. Its goal is to quickly answer: "what is this project now, where should I look, and what is still unverified?"
 
 ## Baseline
-- Current project and public stable version: `1.2.95 stable`
+- Current project and public stable version: `1.2.96 stable`
 - Direct-IP multiplayer and the preview r5 input-backend lifecycle fixes are integrated into `1.1.8 stable`
 - `1.1.8` adds an osu!mania OD8 auxiliary score, first-native-`BAD` `Sudden Death (1 MISS)`, and deterministic `LN Mix 10%-90%` on top of the 1.1.7 visual refresh
 - `1.2.0` connects BMS channel `04/07` and osu!mania backgrounds to the gameplay sample timeline and asynchronously upscales sub-FHD image backgrounds through LunaSR on Windows ML
@@ -97,8 +97,9 @@ This is the document that the next agent or any new contributor should read firs
   - `rect / triangle / pentagon / hexagon / circle` note shapes; procedural circles and polygons use the full rect-bar width at 100%
   - note border on/off
   - combo Y adjustment
-  - judge line / lane width / lane spacing / note size (width) / divider width / 16K center gap / note height / LN body width adjustment
-  - note width changes around fixed lane-divider centers, with a default 24px combined gap between adjacent notes at 100%
+  - new judgement labels/FAST-SLOW millisecond numbers pop for 220ms, while combo numbers pop for 150ms; both animations are render-only
+  - judge line / lane width / lane spacing / note & field size / divider width / 16K center gap / note height / LN body width adjustment
+  - `Note & Field Size` scales the centered playfield, lanes/dividers, notes, and adjacent gauges together from 50% to 140%; adjacent notes keep a default combined 24px gap at 100%
   - Black Playfield fills the complete player/ghost playfield, including lane-spacing gaps, with solid black
   - per-key-mode lane-width arrays and inter-lane spacing arrays are persisted and applied through the same layout math in preview, live gameplay, and the ghost field
   - supported skin routes are `native` and LR2 playskin only; selecting or dropping an LR2 folder in Skins imports it into the active profile
@@ -153,6 +154,8 @@ This is the document that the next agent or any new contributor should read firs
   - `Options -> Profile Setup` reopens the first-run setup surface for the active profile and saves language, audio, input, graphics, and keymap changes immediately
   - an editable 48-byte profile nickname is used in later saved records and direct-IP multiplayer display names
 - Direct-IP multiplayer:
+  - protocol v3 exchanges only valid SHA-256 identities from each current indexed source in chunks of at most 512, and the host Song Select shows only byte-identical charts present on both PCs
+  - both peers must run the same protocol-v3 release; older peer versions are rejected during handshake
   - A joiner matches the host chart by exact hash and size across the active source and existing profile-local caches for `recent_song_sources`
   - It never scans the whole disk or starts a rescan, and cached paths outside their source root are rejected
   - Multiplayer uses the same parallel Gauge Shift as single-player: EX-Hard / Hard / Normal / Easy accumulate independently, and that player reaches GAME OVER only after every tier has died
@@ -187,7 +190,7 @@ This is the document that the next agent or any new contributor should read firs
 
 ## Runtime / Packaging Rules
 - New user profiles are created automatically
-- The current official P2P distribution line is `TenRiff 1.2.95 stable`
+- The current official P2P distribution line is `TenRiff 1.2.96 stable`
 - Distribution packages do not include `Songs`
 - Distribution packages include the `Mainmusic/` scene slots `Main Menu / Options / Song Selecte / Multiplayer Lobby / Clear / Failed`; each `Name.mp3` plus numbered `Name 2.mp3` through `Name 64.mp3` siblings is discovered automatically and rotates on scene re-entry
 - Distribution updates include only built artifacts and required runtime assets
