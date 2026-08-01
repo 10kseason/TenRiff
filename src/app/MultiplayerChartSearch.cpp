@@ -40,6 +40,7 @@ std::vector<std::string> build_multiplayer_chart_sha256_inventory(
     std::vector<std::string> hashes;
     hashes.reserve(entries.size());
     for (const auto& entry : entries) {
+        if (entry.format != "bms") continue;
         std::string normalized = normalize_multiplayer_chart_sha256(entry.sha256);
         if (!normalized.empty()) hashes.push_back(std::move(normalized));
     }
@@ -50,6 +51,7 @@ std::vector<std::string> build_multiplayer_chart_sha256_inventory(
 
 bool multiplayer_chart_is_shared(const SongEntry& entry,
                                  const MultiplayerChartHashSet& remote_sha256) {
+    if (entry.format != "bms") return false;
     const std::string normalized = normalize_multiplayer_chart_sha256(entry.sha256);
     return !normalized.empty() && remote_sha256.find(normalized) != remote_sha256.end();
 }
@@ -161,6 +163,7 @@ std::vector<MultiplayerChartSearchCandidate> build_multiplayer_chart_candidates(
     }
 
     for (const auto& entry : entries) {
+        if (entry.format != "bms") continue;
         if (entry.path.empty()) {
             continue;
         }

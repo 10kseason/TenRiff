@@ -3,7 +3,7 @@
 This is the document that the next agent or any new contributor should read first. Its goal is to quickly answer: "what is this project now, where should I look, and what is still unverified?"
 
 ## Baseline
-- Current project and public stable version: `1.2.96 stable`
+- Current project and public stable version: `1.2.98 stable`
 - Direct-IP multiplayer and the preview r5 input-backend lifecycle fixes are integrated into `1.1.8 stable`
 - `1.1.8` adds an osu!mania OD8 auxiliary score, first-native-`BAD` `Sudden Death (1 MISS)`, and deterministic `LN Mix 10%-90%` on top of the 1.1.7 visual refresh
 - `1.2.0` connects BMS channel `04/07` and osu!mania backgrounds to the gameplay sample timeline and asynchronously upscales sub-FHD image backgrounds through LunaSR on Windows ML
@@ -154,14 +154,12 @@ This is the document that the next agent or any new contributor should read firs
   - `Options -> Profile Setup` reopens the first-run setup surface for the active profile and saves language, audio, input, graphics, and keymap changes immediately
   - an editable 48-byte profile nickname is used in later saved records and direct-IP multiplayer display names
 - Direct-IP multiplayer:
-  - protocol v3 exchanges only valid SHA-256 identities from each current indexed source in chunks of at most 512, and the host Song Select shows only byte-identical charts present on both PCs
-  - both peers must run the same protocol-v3 release; older peer versions are rejected during handshake
-  - A joiner matches the host chart by exact hash and size across the active source and existing profile-local caches for `recent_song_sources`
-  - It never scans the whole disk or starts a rescan, and cached paths outside their source root are rejected
-  - Multiplayer uses the same parallel Gauge Shift as single-player: EX-Hard / Hard / Normal / Easy accumulate independently, and that player reaches GAME OVER only after every tier has died
-  - The live score-gap bar is local-player-relative: `-10,000 / 0 / +10,000` map to the `LOSS` endpoint, center, and `WIN` endpoint; reaching an endpoint is display-only and never ends the match
-  - If one player reaches GAME OVER first, the other player continues; the defeated player waits on an aggregate spectator surface showing peer score, combo, gauge, and status until both results are ready
-  - The peer protocol does not transport exact lane input, per-note judgement, or hold state, so it does not render a guessed remote note field
+  - protocol v4 uses one fixed TCP coordinator and supports up to 8 total players on Windows (default `27300/TCP`)
+  - only indexed BMS-family charts are eligible; the room library is the exact SHA-256 intersection across every connected player, and `.osu` charts are excluded
+  - chart-selection authority starts with the host and rotates through connected players in join order after every player leaves Result; a disconnected leader is skipped, while host disconnect closes the room
+  - only the current leader may select a common BMS and request START after everyone is Ready; play begins after coordinator approval and the all-player load barrier
+  - mid-round and ninth-player joins are rejected; Result lists all final scores
+  - no chart transfer, NAT traversal, relay/matchmaking, encryption/authentication, anti-cheat, or automatic reconnect
 
 ## Song Indexing Model
 - When the song source changes, the profile-local cache at `profiles/<name>/.tenriff/song-index/<source-hash>.json` is read first
@@ -190,7 +188,7 @@ This is the document that the next agent or any new contributor should read firs
 
 ## Runtime / Packaging Rules
 - New user profiles are created automatically
-- The current official P2P distribution line is `TenRiff 1.2.96 stable`
+- The current official P2P distribution line is `TenRiff 1.2.98 stable`
 - Distribution packages do not include `Songs`
 - Distribution packages include the `Mainmusic/` scene slots `Main Menu / Options / Song Selecte / Multiplayer Lobby / Clear / Failed`; each `Name.mp3` plus numbered `Name 2.mp3` through `Name 64.mp3` siblings is discovered automatically and rotates on scene re-entry
 - Distribution updates include only built artifacts and required runtime assets

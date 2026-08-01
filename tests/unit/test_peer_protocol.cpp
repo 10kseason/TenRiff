@@ -85,6 +85,56 @@ TEST_CASE("peer protocol round-trips lobby messages") {
     CHECK(round_trip(round_cancel_ack).nonce == 78);
 }
 
+TEST_CASE("peer protocol round-trips eight-player room metadata") {
+    PeerMessage welcome;
+    welcome.type = PeerMessageType::RoomWelcome;
+    welcome.player_id = 7;
+    welcome.leader_id = 3;
+    const PeerMessage welcome_result = round_trip(welcome);
+    CHECK(welcome_result.player_id == 7);
+    CHECK(welcome_result.leader_id == 3);
+
+    PeerMessage roster;
+    roster.type = PeerMessageType::RoomRoster;
+    roster.leader_id = 2;
+    roster.round_active = true;
+    roster.nonce = 1234;
+    tenriff::network::PeerParticipantWire leader;
+    leader.player_id = 2;
+    leader.name = "Leader";
+    leader.ready = true;
+    leader.loaded = true;
+    leader.chart_hash = 0x99887766u;
+    leader.chart_size = 4096;
+    leader.chart_name = "Shared BMS";
+    tenriff::network::PeerParticipantWire waiting;
+    waiting.player_id = 5;
+    waiting.name = "Waiting";
+    waiting.round_reset = true;
+    roster.participants = {leader, waiting};
+
+    const PeerMessage result = round_trip(roster);
+    CHECK(result.leader_id == 2);
+    CHECK(result.round_active);
+    CHECK(result.nonce == 1234);
+    REQUIRE(result.participants.size() == 2u);
+    CHECK(result.participants[0].player_id == 2);
+    CHECK(result.participants[0].ready);
+    CHECK(result.participants[0].loaded);
+    CHECK(result.participants[0].chart_hash == leader.chart_hash);
+    CHECK(result.participants[0].chart_name == "Shared BMS");
+    CHECK(result.participants[1].player_id == 5);
+    CHECK(result.participants[1].round_reset);
+
+    PeerMessage attributed_score;
+    attributed_score.type = PeerMessageType::Score;
+    attributed_score.player_id = 8;
+    attributed_score.nonce = 55;
+    attributed_score.score.score = 123456;
+    const PeerMessage score_result = round_trip(attributed_score);
+    CHECK(score_result.player_id == 8);
+    CHECK(score_result.score.score == 123456);
+}
 TEST_CASE("peer protocol round-trips bounded chart-library messages") {
     PeerMessage begin;
     begin.type = PeerMessageType::LibraryBegin;

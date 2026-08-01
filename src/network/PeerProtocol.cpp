@@ -168,7 +168,7 @@ private:
 
 bool is_known_type(uint16_t raw) {
     return raw >= static_cast<uint16_t>(PeerMessageType::Hello) &&
-           raw <= static_cast<uint16_t>(PeerMessageType::LibraryEnd);
+           raw <= static_cast<uint16_t>(PeerMessageType::CommonLibraryEnd);
 }
 
 bool decode_score(Reader& reader, PeerScore& score) {
@@ -208,11 +208,13 @@ std::vector<uint8_t> encode_peer_message(const PeerMessage& message, std::string
                 set_error(error, "Chart messages require a non-zero fingerprint.");
                 return {};
             }
+            append_u8(payload, message.player_id);
             append_u64(payload, message.chart_hash);
             append_u64(payload, message.chart_size);
             if (!append_string(payload, message.text, error)) return {};
             break;
         case PeerMessageType::Ready:
+            append_u8(payload, message.player_id);
             append_u8(payload, message.ready ? 1u : 0u);
             break;
         case PeerMessageType::Launch:
@@ -220,6 +222,7 @@ std::vector<uint8_t> encode_peer_message(const PeerMessage& message, std::string
                 set_error(error, "Launch messages require a non-zero fingerprint and round nonce.");
                 return {};
             }
+            append_u8(payload, message.player_id);
             append_u64(payload, message.chart_hash);
             append_u64(payload, message.nonce);
             break;
@@ -228,6 +231,7 @@ std::vector<uint8_t> encode_peer_message(const PeerMessage& message, std::string
                 set_error(error, "Loaded messages require a non-zero round nonce.");
                 return {};
             }
+            append_u8(payload, message.player_id);
             append_u64(payload, message.nonce);
             break;
         case PeerMessageType::Begin:
@@ -235,6 +239,7 @@ std::vector<uint8_t> encode_peer_message(const PeerMessage& message, std::string
                 set_error(error, "Begin messages require a non-zero round nonce.");
                 return {};
             }
+            append_u8(payload, message.player_id);
             append_u64(payload, message.nonce);
             append_u32(payload, message.delay_ms);
             break;
@@ -244,6 +249,7 @@ std::vector<uint8_t> encode_peer_message(const PeerMessage& message, std::string
                 set_error(error, "Score messages require a non-zero round nonce.");
                 return {};
             }
+            append_u8(payload, message.player_id);
             append_u64(payload, message.nonce);
             append_i64(payload, message.score.score);
             append_i64(payload, message.score.current_sample);
@@ -272,9 +278,11 @@ std::vector<uint8_t> encode_peer_message(const PeerMessage& message, std::string
                 set_error(error, "Round control messages require a non-zero round nonce.");
                 return {};
             }
+            append_u8(payload, message.player_id);
             append_u64(payload, message.nonce);
             break;
         case PeerMessageType::LibraryBegin:
+        case PeerMessageType::CommonLibraryBegin:
             if (message.library_count > kPeerLibraryMaxCharts) {
                 set_error(error, "Peer library exceeds the chart limit.");
                 return {};
@@ -282,6 +290,7 @@ std::vector<uint8_t> encode_peer_message(const PeerMessage& message, std::string
             append_u32(payload, message.library_count);
             break;
         case PeerMessageType::LibraryChunk:
+        case PeerMessageType::CommonLibraryChunk:
             if (message.chart_sha256.empty() ||
                 message.chart_sha256.size() > kPeerLibraryHashesPerChunk) {
                 set_error(error, "Peer library chunk has an invalid hash count.");
@@ -293,12 +302,50 @@ std::vector<uint8_t> encode_peer_message(const PeerMessage& message, std::string
             }
             break;
         case PeerMessageType::LibraryEnd:
+        case PeerMessageType::CommonLibraryEnd:
+            break;
+        case PeerMessageType::RoomWelcome:
+            if (message.player_id == 0 || message.player_id > kPeerMaxPlayers ||
+                message.leader_id == 0 || message.leader_id > kPeerMaxPlayers) {
+                set_error(error, "Room welcome contains an invalid player id.");
+                return {};
+            }
+            append_u8(payload, message.player_id);
+            append_u8(payload, message.leader_id);
+            break;
+        case PeerMessageType::RoomRoster:
+            if (message.leader_id == 0 || message.leader_id > kPeerMaxPlayers ||
+                message.participants.empty() || message.participants.size() > kPeerMaxPlayers) {
+                set_error(error, "Room roster has invalid player metadata.");
+                return {};
+            }
+            append_u8(payload, message.leader_id);
+            append_u8(payload, message.round_active ? 1u : 0u);
+            append_u64(payload, message.nonce);
+            append_u8(payload, static_cast<uint8_t>(message.participants.size()));
+            for (const auto& participant : message.participants) {
+                if (participant.player_id == 0 || participant.player_id > kPeerMaxPlayers) {
+                    set_error(error, "Room roster contains an invalid player id.");
+                    return {};
+                }
+                append_u8(payload, participant.player_id);
+                const uint8_t flags = (participant.ready ? 0x01u : 0u) |
+                                      (participant.loaded ? 0x02u : 0u) |
+                                      (participant.round_reset ? 0x04u : 0u) |
+                                      (participant.chart_hash != 0 ? 0x08u : 0u);
+                append_u8(payload, flags);
+                if (!append_string(payload, participant.name, error)) return {};
+                if (participant.chart_hash != 0) {
+                    append_u64(payload, participant.chart_hash);
+                    append_u64(payload, participant.chart_size);
+                    if (!append_string(payload, participant.chart_name, error)) return {};
+                }
+            }
             break;
         default:
             set_error(error, "Unknown peer protocol message type.");
             return {};
     }
-
     if (payload.size() > kPeerMaxPayloadSize) {
         set_error(error, "Peer protocol payload exceeds the size limit.");
         return {};
@@ -366,31 +413,36 @@ PeerDecodeStatus decode_peer_message(const std::vector<uint8_t>& bytes,
             valid = payload.read_string(decoded.text);
             break;
         case PeerMessageType::Chart:
-            valid = payload.read_u64(decoded.chart_hash) &&
+            valid = payload.read_u8(decoded.player_id) &&
+                    payload.read_u64(decoded.chart_hash) && decoded.chart_hash != 0 &&
                     payload.read_u64(decoded.chart_size) &&
-                    decoded.chart_hash != 0 &&
                     payload.read_string(decoded.text);
             break;
         case PeerMessageType::Ready: {
             uint8_t value = 0;
-            valid = payload.read_u8(value) && value <= 1;
+            valid = payload.read_u8(decoded.player_id) &&
+                    payload.read_u8(value) && value <= 1;
             decoded.ready = value != 0;
             break;
         }
         case PeerMessageType::Launch:
-            valid = payload.read_u64(decoded.chart_hash) && decoded.chart_hash != 0 &&
+            valid = payload.read_u8(decoded.player_id) &&
+                    payload.read_u64(decoded.chart_hash) && decoded.chart_hash != 0 &&
                     payload.read_u64(decoded.nonce) && decoded.nonce != 0;
             break;
         case PeerMessageType::Loaded:
-            valid = payload.read_u64(decoded.nonce) && decoded.nonce != 0;
+            valid = payload.read_u8(decoded.player_id) &&
+                    payload.read_u64(decoded.nonce) && decoded.nonce != 0;
             break;
         case PeerMessageType::Begin:
-            valid = payload.read_u64(decoded.nonce) && decoded.nonce != 0 &&
+            valid = payload.read_u8(decoded.player_id) &&
+                    payload.read_u64(decoded.nonce) && decoded.nonce != 0 &&
                     payload.read_u32(decoded.delay_ms);
             break;
         case PeerMessageType::Score:
         case PeerMessageType::FinalScore:
-            valid = payload.read_u64(decoded.nonce) && decoded.nonce != 0 &&
+            valid = payload.read_u8(decoded.player_id) &&
+                    payload.read_u64(decoded.nonce) && decoded.nonce != 0 &&
                     decode_score(payload, decoded.score);
             if (decoded.type == PeerMessageType::FinalScore) decoded.score.finished = true;
             break;
@@ -401,13 +453,16 @@ PeerDecodeStatus decode_peer_message(const std::vector<uint8_t>& bytes,
         case PeerMessageType::RoundReset:
         case PeerMessageType::RoundCancel:
         case PeerMessageType::RoundCancelAck:
-            valid = payload.read_u64(decoded.nonce) && decoded.nonce != 0;
+            valid = payload.read_u8(decoded.player_id) &&
+                    payload.read_u64(decoded.nonce) && decoded.nonce != 0;
             break;
         case PeerMessageType::LibraryBegin:
+        case PeerMessageType::CommonLibraryBegin:
             valid = payload.read_u32(decoded.library_count) &&
                     decoded.library_count <= kPeerLibraryMaxCharts;
             break;
-        case PeerMessageType::LibraryChunk: {
+        case PeerMessageType::LibraryChunk:
+        case PeerMessageType::CommonLibraryChunk: {
             uint16_t count = 0;
             valid = payload.read_u16(count) && count > 0 &&
                     count <= kPeerLibraryHashesPerChunk;
@@ -421,12 +476,49 @@ PeerDecodeStatus decode_peer_message(const std::vector<uint8_t>& bytes,
             break;
         }
         case PeerMessageType::LibraryEnd:
+        case PeerMessageType::CommonLibraryEnd:
             break;
+        case PeerMessageType::RoomWelcome:
+            valid = payload.read_u8(decoded.player_id) &&
+                    decoded.player_id > 0 && decoded.player_id <= kPeerMaxPlayers &&
+                    payload.read_u8(decoded.leader_id) &&
+                    decoded.leader_id > 0 && decoded.leader_id <= kPeerMaxPlayers;
+            break;
+        case PeerMessageType::RoomRoster: {
+            uint8_t active = 0;
+            uint8_t count = 0;
+            valid = payload.read_u8(decoded.leader_id) &&
+                    decoded.leader_id > 0 && decoded.leader_id <= kPeerMaxPlayers &&
+                    payload.read_u8(active) && active <= 1 &&
+                    payload.read_u64(decoded.nonce) &&
+                    payload.read_u8(count) && count > 0 && count <= kPeerMaxPlayers;
+            decoded.round_active = active != 0;
+            decoded.participants.clear();
+            if (valid) decoded.participants.reserve(count);
+            for (uint8_t index = 0; valid && index < count; ++index) {
+                PeerParticipantWire participant;
+                uint8_t flags = 0;
+                valid = payload.read_u8(participant.player_id) &&
+                        participant.player_id > 0 && participant.player_id <= kPeerMaxPlayers &&
+                        payload.read_u8(flags) &&
+                        payload.read_string(participant.name);
+                participant.ready = (flags & 0x01u) != 0u;
+                participant.loaded = (flags & 0x02u) != 0u;
+                participant.round_reset = (flags & 0x04u) != 0u;
+                if (valid && (flags & 0x08u) != 0u) {
+                    valid = payload.read_u64(participant.chart_hash) &&
+                            participant.chart_hash != 0 &&
+                            payload.read_u64(participant.chart_size) &&
+                            payload.read_string(participant.chart_name);
+                }
+                if (valid) decoded.participants.push_back(std::move(participant));
+            }
+            break;
+        }
         default:
             valid = false;
             break;
     }
-
     if (!valid || !payload.at_end()) {
         error = "Malformed peer protocol payload.";
         return PeerDecodeStatus::Error;

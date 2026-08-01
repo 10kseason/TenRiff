@@ -2,9 +2,9 @@
 
 Language: [한국어](README.md) | [English](README.en.md) | [简体中文](README.zh-CN.md) | 日本語
 
-TenRiff は Windows GUI ベースの BMS リズムゲーム runtime/launcher です。現在の stable 版は `1.2.96` で、譜面入力は BMS family（`.bms/.bme/.bml/.pms`）が既定です。Mode Settings の `OSU Charts` を ON にすると、TenRiff 独自 parser で osu!mania 4K～10K の `.osu` も index/play します。Graphics Settings で権利処理済みの外部 ONNX model を選び、`BGA Upscaler` を明示的に ON にして high-spec 警告を確認すると BGA/BGI に使用できます。公開 package は model を含まず既定値は `off`、performance benchmark gate はありません。load・contract・inference の失敗時は native scaling を維持します。既定の accelerator は high-performance DirectX GPU で、FP32/FP16 boundary と float boundary INT8 QDQ metadata を自動検出します。実験的な `Low-Power DirectX` は `DirectXMinPower` を要求するだけで、明示的または検証済みの NPU 選択ではありません。license は MIT です。
+TenRiff は Windows GUI ベースの BMS リズムゲーム runtime/launcher です。現在の stable 版は `1.2.98` で、譜面入力は BMS family（`.bms/.bme/.bml/.pms`）が既定です。Mode Settings の `OSU Charts` を ON にすると、TenRiff 独自 parser で osu!mania 4K～10K の `.osu` も index/play します。Graphics Settings で権利処理済みの外部 ONNX model を選び、`BGA Upscaler` を明示的に ON にして high-spec 警告を確認すると BGA/BGI に使用できます。公開 package は model を含まず既定値は `off`、performance benchmark gate はありません。load・contract・inference の失敗時は native scaling を維持します。既定の accelerator は high-performance DirectX GPU で、FP32/FP16 boundary と float boundary INT8 QDQ metadata を自動検出します。実験的な `Low-Power DirectX` は `DirectXMinPower` を要求するだけで、明示的または検証済みの NPU 選択ではありません。license は MIT です。
 
-この README は導入文書です。現在の挙動、`1.2.96 stable` project state、`1.1.2 final stable` baseline、設定と設計文書は [`docs/README.ja.md`](docs/README.ja.md) から参照してください。
+この README は導入文書です。現在の挙動、`1.2.98 stable` project state、`1.1.2 final stable` baseline、設定と設計文書は [`docs/README.ja.md`](docs/README.ja.md) から参照してください。
 
 TenRiff のコードベースは、伝統的な長文設計書主導だけで積み上がったものではなく、高速な反復と実験を重視した `vibe coding` 的な性格を持つ作品でもあります。
 
@@ -15,7 +15,7 @@ TenRiff のコードベースは、伝統的な長文設計書主導だけで積
 - グラフィックス経路: D3D11 + Direct2D/DirectWrite
 - オーディオ経路: WASAPI
 - 入力経路: RawInput または高ポーリング polling
-- direct-IP multiplayer: host 1 人 + joiner 1 人の TCP 対戦（既定 `27300/TCP`、[利用案内](docs/multiplayer.md)）
+- direct-IP multiplayer: 固定 host の TCP coordinator 方式で最大8人、multiplayer の選曲は BMS のみ（既定 `27300/TCP`、[利用案内](docs/multiplayer.md)）
 - ライセンス: [MIT](LICENSE)
 - サードパーティ通知: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
 - リリース変更履歴: [CHANGELOG.md](CHANGELOG.md)

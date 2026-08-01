@@ -3,7 +3,7 @@
 这份文档是下一位 agent 或新任务接手时应该最先阅读的当前状态文档。目标是快速说明“这个项目现在是什么、应该先看哪里、还有哪些内容尚未验证”。
 
 ## 基线
-- 当前项目版本与公开稳定版均为 `1.2.96 stable`
+- 当前项目版本与公开稳定版均为 `1.2.98 stable`
 - direct-IP multiplayer 与 preview r5 的输入 backend 生命周期修复已整合进 `1.1.8 stable`
 - `1.1.8` 在 1.1.7 视觉更新基础上加入 osu!mania OD8 辅助分数、首次原生 `BAD` 即结束的 `Sudden Death (1 MISS)`，以及确定性的 `LN Mix 10%～90%`
 - `1.2.0` 把 BMS 通道 `04/07` 和 osu!mania 背景接入 gameplay sample timeline，并通过 Windows ML 上的 LunaSR 异步放大低于 FHD 的图片背景
@@ -153,10 +153,12 @@
   - 可从 `Options -> Profile Setup` 重新打开当前 profile 的首次设置页面，并立即保存 language/audio/input/graphics/keymap
   - 可编辑最多48字节的 nickname，用于已保存记录和 direct-IP multiplayer 显示名
 - Direct-IP multiplayer：
-  - protocol v3 只会以最多 512 个一组的 chunk 交换双方当前 indexed source 中的有效 SHA-256；host Song Select 仅显示两台 PC 都拥有且字节完全相同的 chart
-  - 双方必须使用同一 protocol-v3 release；旧版本会在 handshake 阶段被拒绝
-  - joiner 只在 active source 和 `recent_song_sources` 的现有 profile-local cache 中按 host chart 的 hash + size 查找
-  - 不进行全盘扫描或自动重扫，并拒绝 cache 中指向 source root 外部的路径
+  - protocol v4 使用一台固定 TCP coordinator，Windows 下最多8人（默认 `27300/TCP`）
+  - multiplayer 只允许已索引的 BMS 系 chart；公共曲库是所有在线玩家 SHA-256 的严格交集，并排除 `.osu`
+  - 选曲权从 host 开始，在所有玩家离开 Result 后按加入顺序轮换；leader 断开时跳到下一位，host 断开时关闭整个房间
+  - 只有当前 leader 可选择公共 BMS，并在全员 Ready 后请求 START；经 coordinator 批准和全员 load barrier 后开始
+  - 对局中加入和第9名玩家都会被拒绝；Result 显示所有玩家的最终分数
+  - 不支持 chart 传输、NAT traversal、relay/matchmaking、加密/认证、anti-cheat 或自动重连
 
 ## 曲目索引模型
 - 在切换 song source 时，会优先读取 profile-local 的 `profiles/<name>/.tenriff/song-index/<source-hash>.json` 缓存
@@ -185,7 +187,7 @@
 
 ## 运行时 / 打包规则
 - 新用户 profile 会自动创建
-- 当前正式 P2P 发布线为 `TenRiff 1.2.96 stable`
+- 当前正式 P2P 发布线为 `TenRiff 1.2.98 stable`
 - 发布包不包含 `Songs`
 - 发布包包含 `Main Menu / Options / Song Selecte / Multiplayer Lobby / Clear / Failed` 这些 `Mainmusic/` 场景槽位；每个 `Name.mp3` 及 `Name 2.mp3`～`Name 64.mp3` 会自动发现，并在重新进入场景时轮换
 - 发布更新只包含已构建产物和必要的运行时资源

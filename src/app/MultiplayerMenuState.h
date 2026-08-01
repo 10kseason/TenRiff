@@ -52,7 +52,11 @@ struct MultiplayerMenuState {
 
     bool connected = false;
     bool local_ready = false;
-    bool peer_ready = false;
+    bool peer_ready = false;  // All other connected players are ready.
+    uint8_t local_player_id = 0;
+    uint8_t leader_player_id = 0;
+    uint8_t player_count = 0;
+    bool local_is_leader = false;
     uint64_t local_chart_fingerprint = 0;
     uint64_t local_chart_size = 0;
     uint64_t peer_chart_fingerprint = 0;
@@ -147,9 +151,9 @@ inline bool try_append_multiplayer_port_character(std::string& port_text, char c
            state.local_chart_size == state.peer_chart_size;
 }
 
-[[nodiscard]] inline constexpr bool multiplayer_host_can_choose_chart(
+[[nodiscard]] inline constexpr bool multiplayer_leader_can_choose_chart(
     const MultiplayerMenuState& state) {
-    return state.role == MultiplayerRole::Host;
+    return state.local_is_leader;
 }
 
 [[nodiscard]] inline constexpr bool multiplayer_ready_gate_open(const MultiplayerMenuState& state) {
@@ -160,11 +164,11 @@ inline bool try_append_multiplayer_port_character(std::string& port_text, char c
     return multiplayer_ready_gate_open(state) && state.local_ready && state.peer_ready;
 }
 
-[[nodiscard]] inline constexpr bool multiplayer_host_can_start(const MultiplayerMenuState& state) {
-    return state.role == MultiplayerRole::Host && multiplayer_start_gate_open(state);
+[[nodiscard]] inline constexpr bool multiplayer_leader_can_start(const MultiplayerMenuState& state) {
+    return state.local_is_leader && multiplayer_start_gate_open(state);
 }
 
-/// Host starts its local countdown from the send point. The joiner receives the
+/// The coordinator sends Begin from the leader request. Other players receive the
 /// Begin frame later, so subtract half the measured RTT as a symmetric-path
 /// estimate while preserving at least 500 ms of visible countdown.
 [[nodiscard]] inline constexpr uint32_t multiplayer_compensated_peer_begin_delay_ms(
