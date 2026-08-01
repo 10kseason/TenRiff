@@ -35,6 +35,59 @@ struct GameplayNoteShapeExtents {
     float half_width = 0.0f;
     float half_height = 0.0f;
 };
+struct GameplayTextPopAnimation {
+    float scale = 1.0f;
+    float offset_y = 0.0f;
+    float opacity = 1.0f;
+};
+
+inline GameplayTextPopAnimation compute_gameplay_text_pop_animation(
+    double age_ms,
+    double duration_ms,
+    float initial_scale,
+    float initial_offset_y) {
+    if (!std::isfinite(age_ms) || !std::isfinite(duration_ms) || duration_ms <= 0.0) {
+        return {};
+    }
+    const double progress = std::clamp(age_ms / duration_ms, 0.0, 1.0);
+    const float remaining = static_cast<float>(1.0 - progress);
+    const float eased = remaining * remaining;
+    GameplayTextPopAnimation animation;
+    animation.scale = 1.0f + (std::max(1.0f, initial_scale) - 1.0f) * eased;
+    animation.offset_y = initial_offset_y * eased;
+    animation.opacity = 1.0f - 0.12f * eased;
+    return animation;
+}
+
+inline float gameplay_playfield_scale(double note_width_scale) {
+    constexpr double kMinScale = 0.50;
+    constexpr double kMaxScale = 1.40;
+    if (!std::isfinite(note_width_scale)) {
+        return 1.0f;
+    }
+    return static_cast<float>(std::clamp(note_width_scale, kMinScale, kMaxScale));
+}
+
+inline float compute_gameplay_playfield_width(float baseline_width, double note_width_scale) {
+    return std::max(1.0f, baseline_width) * gameplay_playfield_scale(note_width_scale);
+}
+
+inline float compute_gameplay_note_draw_width(float lane_width,
+                                              double note_width_scale,
+                                              double imported_note_width_ratio = 1.0) {
+    constexpr float kDefaultNoteGapPx = 24.0f;
+    const float field_scale = gameplay_playfield_scale(note_width_scale);
+    const float scaled_minimum_width = 16.0f * field_scale;
+    const float safe_lane_width = std::max(scaled_minimum_width, lane_width);
+    const float base_note_width =
+        std::max(scaled_minimum_width, safe_lane_width - kDefaultNoteGapPx * field_scale);
+    const float imported_ratio =
+        (!std::isfinite(imported_note_width_ratio) || imported_note_width_ratio <= 0.0)
+            ? 1.0f
+            : static_cast<float>(std::clamp(imported_note_width_ratio, 0.25, 4.0));
+    const float maximum_width = std::max(scaled_minimum_width, safe_lane_width - 4.0f * field_scale);
+    return std::clamp(base_note_width * imported_ratio, scaled_minimum_width, maximum_width);
+}
 
 inline GameplayNoteShapeExtents gameplay_note_shape_extents(float width,
                                                             float height,

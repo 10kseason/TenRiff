@@ -1,10 +1,13 @@
 #pragma once
 
 #include <chrono>
+#include <cstddef>
 #include <cstdint>
 #include <memory>
 #include <optional>
 #include <string>
+#include <unordered_set>
+#include <vector>
 
 #include "network/PeerProtocol.h"
 
@@ -42,6 +45,11 @@ struct PeerSessionSnapshot {
 
     std::string peer_name;
     std::string status_detail;
+
+    bool remote_library_ready = false;
+    std::size_t remote_library_count = 0;
+    uint64_t remote_library_revision = 0;
+    std::shared_ptr<const std::unordered_set<std::string>> remote_library_sha256;
 
     PeerChartInfo local_chart;
     PeerChartInfo remote_chart;
@@ -81,6 +89,10 @@ public:
     void disconnect(std::string reason = "Local disconnect");
 
     [[nodiscard]] PeerSessionSnapshot snapshot() const;
+
+    /// Replaces the locally indexed chart inventory. Valid SHA-256 values are
+    /// deduplicated and announced in bounded chunks after the handshake.
+    void set_local_library(std::vector<std::string> chart_sha256);
 
     /// Publishes the locally selected chart and invalidates round readiness.
     [[nodiscard]] bool set_local_chart(const ChartFingerprint& fingerprint,

@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <string>
 #include <string_view>
+#include <unordered_set>
 #include <vector>
 
 #include "app/SongIndex.h"
@@ -16,6 +17,24 @@ struct MultiplayerChartSearchCandidate {
 };
 
 inline constexpr std::size_t kMultiplayerLoadedSongSourceLimit = 12;
+
+using MultiplayerChartHashSet = std::unordered_set<std::string>;
+
+/// Normalizes an exact SHA-256 chart identity to lowercase hexadecimal.
+/// Invalid or incomplete values return an empty string.
+[[nodiscard]] std::string normalize_multiplayer_chart_sha256(std::string_view sha256);
+
+/// Builds the compact, sorted inventory announced to the connected peer.
+[[nodiscard]] std::vector<std::string> build_multiplayer_chart_sha256_inventory(
+    const std::vector<SongEntry>& entries);
+
+[[nodiscard]] bool multiplayer_chart_is_shared(
+    const SongEntry& entry,
+    const MultiplayerChartHashSet& remote_sha256);
+
+[[nodiscard]] std::size_t count_shared_multiplayer_charts(
+    const std::vector<SongEntry>& entries,
+    const MultiplayerChartHashSet& remote_sha256);
 
 struct MultiplayerChartCandidateLoadResult {
     std::vector<MultiplayerChartSearchCandidate> candidates;

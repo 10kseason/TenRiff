@@ -478,6 +478,10 @@ private:
     network::ChartFingerprint multiplayer_chart_fingerprint_{};
     std::string multiplayer_status_message_{};
     uint64_t multiplayer_last_revision_ = 0;
+    uint64_t multiplayer_local_library_index_revision_ = 0;
+    uint64_t multiplayer_remote_library_revision_ = 0;
+    bool multiplayer_remote_library_ready_ = false;
+    std::size_t multiplayer_common_chart_count_ = 0;
     network::ChartFingerprint multiplayer_chart_match_target_{};
     uint64_t multiplayer_chart_match_index_revision_ = 0;
     std::vector<std::string> multiplayer_chart_match_source_inputs_{};

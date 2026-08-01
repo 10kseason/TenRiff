@@ -8,7 +8,9 @@
 
 namespace tenriff::network {
 
-constexpr uint16_t kPeerProtocolVersion = 2;
+constexpr uint16_t kPeerProtocolVersion = 3;
+constexpr std::size_t kPeerLibraryHashesPerChunk = 512;
+constexpr std::size_t kPeerLibraryMaxCharts = 250'000;
 constexpr std::size_t kPeerFrameHeaderSize = 12;
 constexpr std::size_t kPeerMaxPayloadSize = 64 * 1024;
 
@@ -27,6 +29,9 @@ enum class PeerMessageType : uint16_t {
     RoundReset = 12,
     RoundCancel = 13,
     RoundCancelAck = 14,
+    LibraryBegin = 15,
+    LibraryChunk = 16,
+    LibraryEnd = 17,
 };
 
 struct PeerScore {
@@ -54,6 +59,8 @@ struct PeerMessage {
     uint32_t delay_ms = 0;
     bool ready = false;
     PeerScore score;
+    uint32_t library_count = 0;
+    std::vector<std::string> chart_sha256;
 };
 
 enum class PeerDecodeStatus {

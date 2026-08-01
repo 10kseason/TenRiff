@@ -267,6 +267,39 @@ TEST_CASE("procedural circle and polygon skins use the full 100 percent bar widt
         CHECK(extents.half_height == doctest::Approx(36.0f));
     }
 }
+TEST_CASE("note width scale resizes the playfield and notes together") {
+    using tenriff::render::compute_gameplay_note_draw_width;
+    using tenriff::render::compute_gameplay_playfield_width;
+
+    CHECK(compute_gameplay_playfield_width(980.0f, 0.50) == doctest::Approx(490.0f));
+    CHECK(compute_gameplay_playfield_width(980.0f, 1.00) == doctest::Approx(980.0f));
+    CHECK(compute_gameplay_playfield_width(980.0f, 1.40) == doctest::Approx(1372.0f));
+
+    CHECK(compute_gameplay_note_draw_width(49.0f, 0.50) == doctest::Approx(37.0f));
+    CHECK(compute_gameplay_note_draw_width(98.0f, 1.00) == doctest::Approx(74.0f));
+    CHECK(compute_gameplay_note_draw_width(137.2f, 1.40) == doctest::Approx(103.6f));
+
+    // Imported LR2 art may still narrow inside the linked field without changing field scale.
+    CHECK(compute_gameplay_note_draw_width(98.0f, 1.00, 0.50) == doctest::Approx(37.0f));
+}
+TEST_CASE("gameplay text pop animation settles deterministically") {
+    using tenriff::render::compute_gameplay_text_pop_animation;
+
+    const auto initial = compute_gameplay_text_pop_animation(0.0, 200.0, 1.20f, -8.0f);
+    CHECK(initial.scale == doctest::Approx(1.20f));
+    CHECK(initial.offset_y == doctest::Approx(-8.0f));
+    CHECK(initial.opacity == doctest::Approx(0.88f));
+
+    const auto midpoint = compute_gameplay_text_pop_animation(100.0, 200.0, 1.20f, -8.0f);
+    CHECK(midpoint.scale == doctest::Approx(1.05f));
+    CHECK(midpoint.offset_y == doctest::Approx(-2.0f));
+    CHECK(midpoint.opacity == doctest::Approx(0.97f));
+
+    const auto settled = compute_gameplay_text_pop_animation(300.0, 200.0, 1.20f, -8.0f);
+    CHECK(settled.scale == doctest::Approx(1.0f));
+    CHECK(settled.offset_y == doctest::Approx(0.0f));
+    CHECK(settled.opacity == doctest::Approx(1.0f));
+}
 TEST_CASE("Media Foundation BGA video extension policy accepts MPG and common containers") {
     using tenriff::render::BgaVideoDecoder;
 

@@ -4,6 +4,18 @@ TenRiff의 사용자/배포 관점에서 의미 있는 변경만 간단히 기�
 
 ## [Unreleased]
 
+## [1.2.96] - 2026-08-01
+
+### Added
+
+- `Note & Field Size` now scales the centered playfield, lane dividers, notes, and adjacent gauges together from 50% to 140%
+- Multiplayer protocol v3 exchanges bounded SHA-256 inventory chunks and limits the host song list to charts both players own, without sending chart paths or file contents
+- Judgement feedback uses a 220ms pop animation and combo numbers use a 150ms pop animation, affecting rendering only
+
+### Packaging
+
+- Windows `TenRiff-1.2.96.zip`, public source `TenRiff-1.2.96-source.zip`, and `TenRiff-1.2.96-SHA256SUMS.txt` are the formal release assets; no ONNX model, private checkpoint, user profile, song, or log is bundled
+
 ## [1.2.95] - 2026-08-01
 
 ### Added

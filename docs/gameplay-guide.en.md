@@ -212,7 +212,7 @@ The return keys are:
 
 ### The notes feel too dense or hard to read
 - Increase `Hi-Speed`.
-- If needed, also adjust `Skins > Note Width / Note Height / Judge Line`.
+- If needed, also adjust `Skins > Note & Field Size / Note Height / Judge Line`.
 
 ### The judgement feels right, but the visuals look late or early
 - Adjust `Graphics > Display Offset`.

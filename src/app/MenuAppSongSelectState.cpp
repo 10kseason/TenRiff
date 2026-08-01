@@ -64,10 +64,20 @@ void MenuApp::rebuild_visible_song_list(const std::string* selected_path) {
         preserved_path = selected_song_path();
     }
 
+    std::shared_ptr<const MultiplayerChartHashSet> remote_library;
+    if (multiplayer_selecting_chart_) {
+        const network::PeerSessionSnapshot peer = peer_session_.snapshot();
+        if (peer.remote_library_ready) remote_library = peer.remote_library_sha256;
+    }
+
     visible_song_indices_.clear();
     visible_song_indices_.reserve(indexed_songs_.size());
     for (std::size_t index = 0; index < indexed_songs_.size(); ++index) {
         const SongEntry& entry = indexed_songs_[index];
+        if (multiplayer_selecting_chart_ &&
+            (!remote_library || !multiplayer_chart_is_shared(entry, *remote_library))) {
+            continue;
+        }
         if (song_entry_matches_search(entry, song_search_query_) &&
             song_entry_matches_key_filter(entry, song_key_filter_) &&
             song_entry_matches_level_filter(entry, song_level_min_filter_, song_level_max_filter_) &&
@@ -108,7 +118,7 @@ void MenuApp::rebuild_visible_song_list(const std::string* selected_path) {
     if (visible_song_indices_.empty()) {
         selected_song_ = 0;
         sync_song_select_state();
-        if (!songs_path_.empty()) {
+        if (!multiplayer_selecting_chart_ && !songs_path_.empty()) {
             source_song_counts_[menu_songs::normalize_path_key(path_from_utf8(songs_path_))] = 0;
         }
         return;
@@ -127,8 +137,10 @@ void MenuApp::rebuild_visible_song_list(const std::string* selected_path) {
     sync_song_select_state();
     rebuild_current_song_record_indices();
 
-    source_song_counts_[menu_songs::normalize_path_key(path_from_utf8(songs_path_))] =
-        static_cast<int>(visible_song_count());
+    if (!multiplayer_selecting_chart_) {
+        source_song_counts_[menu_songs::normalize_path_key(path_from_utf8(songs_path_))] =
+            static_cast<int>(visible_song_count());
+    }
     log_memory_phase("MenuApp",
                      "visible-list-rebuilt",
                      query_process_memory_snapshot(),

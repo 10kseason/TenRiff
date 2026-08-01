@@ -3,7 +3,7 @@
 이 문서는 다음 에이전트나 새 작업자가 가장 먼저 읽어야 하는 현재 상태 문서입니다. 목표는 "지금 이 프로젝트가 무엇이고, 어디를 보면 되고, 무엇이 아직 미검증인지"를 빠르게 파악하게 하는 것입니다.
 
 ## Baseline
-- 현재 프로젝트 버전과 공개 안정판은 `1.2.95 stable`
+- 현재 프로젝트 버전과 공개 안정판은 `1.2.96 stable`
 - 직접 IP 멀티플레이와 preview r5의 입력 backend 수명주기 수정은 `1.1.8 stable`에 통합
 - `1.1.8`은 1.1.7의 시각 개선에 osu!mania OD8 보조 점수, 첫 네이티브 `BAD` 즉사 `Sudden Death (1 MISS)`, 결정적 `LN Mix 10%~90%`를 추가
 - `1.2.0`은 BMS 채널 `04/07` 및 osu!mania 배경을 gameplay sample timeline에 연결하고, FHD 미만 이미지 배경을 Windows ML 기반 LunaSR로 비동기 보간
@@ -100,10 +100,11 @@
   - note border on/off plus thin outline alpha
   - lane background alpha, overall visual opacity, and lower LN body alpha controls
   - judgement-line glow and short per-key press pulse controls
+  - 새 판정 라벨/FAST·SLOW 밀리초 숫자는 220ms, 콤보 숫자는 150ms 동안 확대·상승 후 안정되는 렌더 전용 팝 애니메이션
   - small key labels can be shown at the lane top/bottom or hidden
   - combo Y 조절
-  - judge line / lane width / lane spacing / note size(width) / divider width / 16K center gap / note height / LN body width 조절
-  - 노트 너비는 고정된 lane divider 중심을 움직이지 않고 조절되며, 100%에서 인접 노트 사이 기본 합산 여백은 24px
+  - judge line / lane width / lane spacing / note & field size / divider width / 16K center gap / note height / LN body width 조절
+  - `Note & Field Size`는 중앙을 고정한 채 플레이필드·lane/divider·노트·인접 게이지를 함께 `50%..140%`로 조절하며, 100%에서 인접 노트 사이 기본 합산 여백은 24px
   - Black Playfield를 켜면 lane spacing을 포함한 player/ghost 플레이필드 전체를 완전한 검정으로 렌더링
   - key mode별 개별 lane 폭과 lane 사이 간격을 각각 저장하고 미리보기/실플레이/ghost field에 같은 레이아웃 계산을 적용
   - 지원 스킨 경로는 `native`와 LR2 playskin뿐이며, Skins 화면에서 LR2 폴더를 선택하거나 드롭하면 활성 프로필로 가져옴
@@ -159,7 +160,8 @@
   - 최대 48바이트의 프로필 닉네임을 편집하며 이후 저장 기록과 직접 IP 멀티플레이 표시 이름으로 사용
 - 직접 IP 멀티플레이:
   - Windows에서 1 호스트 + 1 참가자 TCP 연결, 기본 `27300/TCP`
-  - 호스트만 선곡하며 참가자는 현재 source와 profile의 `recent_song_sources`에 기록된 폴더의 기존 캐시를 순서대로 열어 hash+size가 일치하는 차트를 자동 선택
+  - protocol v3는 연결 뒤 각 PC의 현재 indexed source에서 유효한 SHA-256만 최대 512개씩 청크로 교환하며, 호스트 Song Select에는 양쪽에 바이트 단위로 동일한 공통곡만 표시
+  - 호스트만 공통곡 목록에서 선곡하며 참가자는 현재 source와 profile의 `recent_song_sources`에 기록된 폴더의 기존 캐시를 순서대로 열어 hash+size가 일치하는 차트를 자동 선택
   - 최근 source 검색은 profile-local cache만 읽고 전체 디스크 탐색이나 자동 재인덱싱은 하지 않으며, 캐시의 source 밖 경로는 거부
   - Options 진입 시 Ready 해제, 양쪽 chart load 완료 후 시작 barrier
   - 멀티 게이지도 싱글 `Gauge Shift`와 동일하게 EX-Hard / Hard / Normal / Easy를 병렬 계산하고, 모든 tier가 탈락했을 때 해당 플레이어가 Game Over
@@ -167,7 +169,7 @@
   - score-gap 끝단은 표시 전용이며 경기 종료나 결과 확정 조건이 아님
   - 한쪽이 먼저 Game Over되면 다른 플레이어는 계속 진행하고, 사망한 쪽은 상대의 aggregate 점수/콤보/게이지/상태를 보며 기다린 뒤 양쪽 종료 후 비교 결과로 이동
   - peer protocol은 정확한 lane input이나 note별 판정/hold state를 전송하지 않으므로 상대 플레이필드는 추측 렌더하지 않음
-  - protocol v2의 모든 경기 프레임에 round nonce를 붙이고 RoundCancel/ACK 순서를 보장해 지연 패킷과 Ready/Launch 교차를 연결 해제 없이 정리
+  - protocol v3의 모든 경기 프레임에 round nonce를 붙이고 RoundCancel/ACK 순서를 보장해 지연 패킷과 Ready/Launch 교차를 연결 해제 없이 정리하며, 이전 protocol 버전과는 연결하지 않음
   - 전용 RoundReset으로 양쪽이 모두 Result를 나가기 전에는 다음 선곡/Ready/Options를 막고 상대 결과를 보존
   - heartbeat RTT의 절반을 시작 카운트다운에 보정해 직접 IP 연결의 양쪽 시작 시점 오차를 줄임
   - Rate 1.0, 원본 키 수, 네 tier 병렬 `Gauge Shift`, 기본 판정, Random/Mods/Assist off를 세션에만 적용
@@ -201,7 +203,7 @@
 
 ## Runtime / Packaging Rules
 - 새 사용자 프로필은 자동 생성
-- 현재 정식 P2P 배포 라인은 `TenRiff 1.2.95 stable`
+- 현재 정식 P2P 배포 라인은 `TenRiff 1.2.96 stable`
 - 배포 패키지에는 `Songs`를 넣지 않음
 - 배포 패키지는 `Main Menu / Options / Song Selecte / Multiplayer Lobby / Clear / Failed` 이름의 `Mainmusic/` 화면 슬롯을 포함하며, 각 `이름.mp3`와 번호가 붙은 `이름 2.mp3`~`이름 64.mp3`를 자동 수집해 화면 재진입마다 순환
 - 배포 업데이트에는 built artifacts와 필요한 런타임 자산만 포함

@@ -387,7 +387,12 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
             }
         }
         if (total == 0) {
-            if (!song_search_query_.empty() || song_key_filter_ > 0 || song_level_min_filter_ > 0 ||
+            if (multiplayer_selecting_chart_) {
+                render.song_select.empty_title = ui_text("NO SHARED CHARTS", "공통 보유 차트 없음");
+                render.song_select.empty_message =
+                    ui_text("Only byte-identical charts owned by both players are shown. Change song sources or reindex to refresh the shared list.",
+                            "양쪽이 모두 가진 바이트 단위 동일 차트만 표시합니다. 곡 소스를 바꾸거나 재인덱스해 공통 목록을 갱신하세요.");
+            } else if (!song_search_query_.empty() || song_key_filter_ > 0 || song_level_min_filter_ > 0 ||
                 song_level_max_filter_ > 0) {
                 render.song_select.empty_title = ui_text("NO CHARTS MATCH", "일치하는 차트 없음");
                 render.song_select.empty_message =

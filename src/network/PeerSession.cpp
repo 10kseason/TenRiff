@@ -8,6 +8,7 @@
 #include <limits>
 #include <mutex>
 #include <thread>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -33,6 +34,21 @@ constexpr std::size_t kMaxWireBytes = 128 * 1024;
 constexpr std::size_t kMaxReceiveBytes = 2 * kPeerMaxPayloadSize + kPeerFrameHeaderSize;
 constexpr auto kIoPollInterval = std::chrono::milliseconds(20);
 constexpr auto kConnectTimeout = std::chrono::seconds(5);
+
+bool normalize_library_sha256(std::string& value) {
+    if (value.size() != 64u) return false;
+    for (char& ch : value) {
+        if (ch >= '0' && ch <= '9') continue;
+        if (ch >= 'a' && ch <= 'f') continue;
+        if (ch >= 'A' && ch <= 'F') {
+            ch = static_cast<char>(ch - 'A' + 'a');
+            continue;
+        }
+        return false;
+    }
+    return true;
+}
+
 constexpr auto kHandshakeTimeout = std::chrono::seconds(5);
 constexpr auto kHeartbeatInterval = std::chrono::seconds(2);
 constexpr auto kPeerTimeout = std::chrono::seconds(10);
@@ -220,6 +236,13 @@ struct PeerSession::Impl {
 
     std::deque<PeerMessage> controls;
     bool chart_announcement_pending = false;
+    std::vector<std::string> local_library_sha256;
+    std::size_t local_library_cursor = 0;
+    bool library_begin_pending = false;
+    bool library_end_pending = false;
+    bool remote_library_receiving = false;
+    uint32_t remote_library_expected = 0;
+    std::vector<std::string> remote_library_builder;
     std::optional<PeerScore> pending_score;
     bool pending_score_dirty = false;
 
@@ -332,6 +355,12 @@ struct PeerSession::Impl {
             local_name = std::move(name);
             controls.clear();
             chart_announcement_pending = retained_chart.fingerprint.valid();
+            local_library_cursor = 0;
+            library_begin_pending = true;
+            library_end_pending = true;
+            remote_library_receiving = false;
+            remote_library_expected = 0;
+            remote_library_builder.clear();
             pending_score.reset();
             pending_score_dirty = false;
             pending_launch.reset();
@@ -631,6 +660,50 @@ struct PeerSession::Impl {
                     touch_locked();
                 }
                 return IncomingResult::Continue;
+            case PeerMessageType::LibraryBegin:
+                remote_library_receiving = true;
+                remote_library_expected = message.library_count;
+                remote_library_builder.clear();
+                remote_library_builder.reserve(message.library_count);
+                current.remote_library_ready = false;
+                current.remote_library_count = 0;
+                current.remote_library_sha256.reset();
+                touch_locked();
+                return IncomingResult::Continue;
+            case PeerMessageType::LibraryChunk:
+                if (!remote_library_receiving || message.chart_sha256.empty() ||
+                    remote_library_builder.size() + message.chart_sha256.size() > remote_library_expected) {
+                    error = "Peer sent an unexpected library chunk.";
+                    return IncomingResult::ProtocolError;
+                }
+                remote_library_builder.insert(remote_library_builder.end(),
+                                              message.chart_sha256.begin(),
+                                              message.chart_sha256.end());
+                return IncomingResult::Continue;
+            case PeerMessageType::LibraryEnd: {
+                if (!remote_library_receiving ||
+                    remote_library_builder.size() != remote_library_expected) {
+                    error = "Peer library transfer ended with the wrong chart count.";
+                    return IncomingResult::ProtocolError;
+                }
+                auto hashes = std::make_shared<std::unordered_set<std::string>>();
+                hashes->reserve(remote_library_builder.size());
+                for (const auto& sha256 : remote_library_builder) {
+                    if (!hashes->insert(sha256).second) {
+                        error = "Peer library transfer contains duplicate chart hashes.";
+                        return IncomingResult::ProtocolError;
+                    }
+                }
+                current.remote_library_sha256 = std::move(hashes);
+                current.remote_library_count = remote_library_builder.size();
+                current.remote_library_ready = true;
+                ++current.remote_library_revision;
+                remote_library_receiving = false;
+                remote_library_expected = 0;
+                remote_library_builder.clear();
+                touch_locked();
+                return IncomingResult::Continue;
+            }
             case PeerMessageType::Disconnect:
                 set_state_locked(PeerSessionState::Disconnected,
                                  message.text.empty() ? "Peer disconnected."
@@ -672,6 +745,32 @@ struct PeerSession::Impl {
                 chart.text = current.local_chart.name;
                 messages.push_back(std::move(chart));
                 chart_announcement_pending = false;
+            }
+
+            if (handshake_complete && current.state != PeerSessionState::Closing &&
+                !graceful_stop.load(std::memory_order_acquire)) {
+                if (library_begin_pending) {
+                    PeerMessage begin;
+                    begin.type = PeerMessageType::LibraryBegin;
+                    begin.library_count = static_cast<uint32_t>(local_library_sha256.size());
+                    messages.push_back(std::move(begin));
+                    library_begin_pending = false;
+                } else if (local_library_cursor < local_library_sha256.size()) {
+                    const std::size_t end = std::min(
+                        local_library_sha256.size(),
+                        local_library_cursor + kPeerLibraryHashesPerChunk);
+                    PeerMessage chunk;
+                    chunk.type = PeerMessageType::LibraryChunk;
+                    chunk.chart_sha256.assign(local_library_sha256.begin() + local_library_cursor,
+                                               local_library_sha256.begin() + end);
+                    messages.push_back(std::move(chunk));
+                    local_library_cursor = end;
+                } else if (library_end_pending) {
+                    PeerMessage end;
+                    end.type = PeerMessageType::LibraryEnd;
+                    messages.push_back(std::move(end));
+                    library_end_pending = false;
+                }
             }
 
             if (handshake_complete && !graceful_stop.load(std::memory_order_acquire) &&
@@ -1129,6 +1228,28 @@ void PeerSession::disconnect(std::string reason) {
 PeerSessionSnapshot PeerSession::snapshot() const {
     std::lock_guard<std::mutex> lock(impl_->mutex);
     return impl_->current;
+}
+
+void PeerSession::set_local_library(std::vector<std::string> chart_sha256) {
+    std::vector<std::string> normalized;
+    normalized.reserve(std::min(chart_sha256.size(), kPeerLibraryMaxCharts));
+    for (auto& sha256 : chart_sha256) {
+        if (normalize_library_sha256(sha256)) {
+            normalized.push_back(std::move(sha256));
+        }
+    }
+    std::sort(normalized.begin(), normalized.end());
+    normalized.erase(std::unique(normalized.begin(), normalized.end()), normalized.end());
+    if (normalized.size() > kPeerLibraryMaxCharts) {
+        normalized.resize(kPeerLibraryMaxCharts);
+    }
+
+    std::lock_guard<std::mutex> lock(impl_->mutex);
+    impl_->local_library_sha256 = std::move(normalized);
+    impl_->local_library_cursor = 0;
+    impl_->library_begin_pending = true;
+    impl_->library_end_pending = true;
+    impl_->state_cv.notify_all();
 }
 
 bool PeerSession::set_local_chart(const ChartFingerprint& fingerprint, std::string display_name) {

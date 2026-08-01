@@ -66,6 +66,12 @@ TEST_CASE("peer session localhost round reaches final score and clean shutdown")
     PeerSession host;
     PeerSession joiner;
     const ChartFingerprint chart{0x123456789abcdef0ull, 54321};
+    const std::string shared_sha =
+        "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789";
+    const std::string host_only_sha =
+        "1111111111111111111111111111111111111111111111111111111111111111";
+    host.set_local_library({shared_sha, host_only_sha, shared_sha, "invalid"});
+    joiner.set_local_library({shared_sha});
 
     REQUIRE(host.set_local_chart(chart, "Loopback Chart"));
     REQUIRE(host.host(0, "Host"));
@@ -82,6 +88,19 @@ TEST_CASE("peer session localhost round reaches final score and clean shutdown")
     }));
     CHECK(host.snapshot().peer_name == "Joiner");
     CHECK(joiner.snapshot().peer_name == "Host");
+    REQUIRE(wait_until([&]() {
+        return host.snapshot().remote_library_ready &&
+               joiner.snapshot().remote_library_ready;
+    }));
+    const auto host_library = host.snapshot();
+    const auto joiner_library = joiner.snapshot();
+    REQUIRE(host_library.remote_library_sha256);
+    REQUIRE(joiner_library.remote_library_sha256);
+    CHECK(host_library.remote_library_count == 1u);
+    CHECK(joiner_library.remote_library_count == 2u);
+    CHECK(host_library.remote_library_sha256->count(shared_sha) == 1u);
+    CHECK(joiner_library.remote_library_sha256->count(shared_sha) == 1u);
+    CHECK(joiner_library.remote_library_sha256->count(host_only_sha) == 1u);
     REQUIRE(wait_until([&]() {
         return host.snapshot().estimated_rtt_ms > 0 &&
                joiner.snapshot().estimated_rtt_ms > 0;

@@ -262,6 +262,34 @@ TEST_CASE("chart name matching only prioritizes candidates and remains case inse
     CHECK_FALSE(multiplayer_chart_candidate_name_matches("Other", "pack/chart.bms", ""));
 }
 
+TEST_CASE("multiplayer shared-song inventory uses exact normalized SHA-256 identities") {
+    tenriff::app::SongEntry shared;
+    shared.path = "shared.bms";
+    shared.sha256 =
+        "ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789";
+    tenriff::app::SongEntry local_only;
+    local_only.path = "local.bms";
+    local_only.sha256 =
+        "1111111111111111111111111111111111111111111111111111111111111111";
+    tenriff::app::SongEntry invalid;
+    invalid.path = "invalid.bms";
+    invalid.sha256 = "missing";
+
+    const std::vector<tenriff::app::SongEntry> entries = {shared, local_only, invalid, shared};
+    const auto inventory = tenriff::app::build_multiplayer_chart_sha256_inventory(entries);
+    REQUIRE(inventory.size() == 2u);
+    CHECK(inventory[0] ==
+          "1111111111111111111111111111111111111111111111111111111111111111");
+    CHECK(inventory[1] ==
+          "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789");
+
+    tenriff::app::MultiplayerChartHashSet remote = {inventory[1]};
+    CHECK(tenriff::app::multiplayer_chart_is_shared(shared, remote));
+    CHECK_FALSE(tenriff::app::multiplayer_chart_is_shared(local_only, remote));
+    CHECK_FALSE(tenriff::app::multiplayer_chart_is_shared(invalid, remote));
+    CHECK(tenriff::app::count_shared_multiplayer_charts(
+              {shared, local_only, invalid}, remote) == 1u);
+}
 TEST_CASE("multiplayer chart lookup is limited to active and recent loaded sources") {
     namespace fs = std::filesystem;
     const fs::path base = fs::temp_directory_path() / "tenriff_multiplayer_loaded_sources";

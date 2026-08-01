@@ -1,3 +1,4 @@
+        const int64_t render_now_ns = timing::HighResClock::now_ns();
         const float header_left = 84.0f;
         const float header_top = 42.0f;
         const float header_right = kBaseWidth - 84.0f;
@@ -11,10 +12,9 @@
                 ? gameplay_note_sprite_cache_.imported_judgement_line_position
                 : clamp_gameplay_judgement_line(data.gameplay.judgement_line_position);
         const double combo_position = clamp_gameplay_combo_position(data.gameplay.combo_position);
-        const float note_width_scale = effective_gameplay_note_width_scale(
-            data.gameplay.note_width_scale,
-            gameplay_note_sprite_cache_.imported_note_width_ratio,
-            use_imported_metrics);
+        const float note_width_scale = clamp_gameplay_note_width_scale(data.gameplay.note_width_scale);
+        const float note_art_width_ratio = effective_gameplay_note_art_width_ratio(
+            gameplay_note_sprite_cache_.imported_note_width_ratio, use_imported_metrics);
         const float note_height_scale = effective_gameplay_note_height_scale(
             data.gameplay.note_height_scale,
             gameplay_note_sprite_cache_.imported_note_height_ratio,
@@ -48,7 +48,7 @@
                 data.gameplay.finished || data.gameplay.paused,
                 data.gameplay.game_over && !data.gameplay.spectating_peer,
             },
-            timing::HighResClock::now_ns());
+            render_now_ns);
         const int64_t display_sample = motion_diagnostics.display_sample;
         const int64_t hold_handoff_grace_samples = gameplay_hold_handoff_grace_samples(
             data.gameplay.sample_rate,
@@ -346,6 +346,23 @@
         };
 
         if (gameplay_hud_cache_.text_revision != data.gameplay.text_revision) {
+            const int judgement_count =
+                data.gameplay.pg + data.gameplay.gr + data.gameplay.gd +
+                data.gameplay.bd + data.gameplay.pr;
+            if (!gameplay_hud_cache_.animation_initialized) {
+                gameplay_hud_cache_.animation_initialized = true;
+            } else {
+                if (data.gameplay.combo > 0 &&
+                    data.gameplay.combo != gameplay_hud_cache_.animated_combo) {
+                    gameplay_hud_cache_.combo_animation_started_ns = render_now_ns;
+                }
+                if (data.gameplay.has_feedback &&
+                    judgement_count > gameplay_hud_cache_.animated_judgement_count) {
+                    gameplay_hud_cache_.judgement_animation_started_ns = render_now_ns;
+                }
+            }
+            gameplay_hud_cache_.animated_combo = data.gameplay.combo;
+            gameplay_hud_cache_.animated_judgement_count = judgement_count;
             const std::string title = data.gameplay.title.empty() ? loc("Unknown Track", "알 수 없는 곡") : data.gameplay.title;
             const std::string artist = data.gameplay.artist.empty() ? loc("Unknown Artist", "알 수 없는 아티스트") : data.gameplay.artist;
             std::string gauge_label = data.gameplay.gauge_label;
@@ -482,6 +499,30 @@
             }
             gameplay_hud_cache_.text_revision = data.gameplay.text_revision;
         }
+
+        constexpr double kComboAnimationDurationMs = 150.0;
+        constexpr double kJudgementAnimationDurationMs = 220.0;
+        const auto animation_age_ms = [render_now_ns](int64_t started_ns, double duration_ms) {
+            if (started_ns <= 0) return duration_ms;
+            return std::clamp(
+                static_cast<double>(render_now_ns - started_ns) / 1'000'000.0,
+                0.0,
+                duration_ms);
+        };
+        const GameplayTextPopAnimation combo_text_animation =
+            compute_gameplay_text_pop_animation(
+                animation_age_ms(gameplay_hud_cache_.combo_animation_started_ns,
+                                 kComboAnimationDurationMs),
+                kComboAnimationDurationMs,
+                1.16f,
+                -5.0f);
+        const GameplayTextPopAnimation judgement_text_animation =
+            compute_gameplay_text_pop_animation(
+                animation_age_ms(gameplay_hud_cache_.judgement_animation_started_ns,
+                                 kJudgementAnimationDurationMs),
+                kJudgementAnimationDurationMs,
+                1.22f,
+                -8.0f);
 
         if (data.gameplay.loading && !data.gameplay.active) {
             draw_gameplay_header();
@@ -697,6 +738,7 @@
             build_gameplay_surface_layout(
                 lane_count,
                 note_width_scale,
+                note_art_width_ratio,
                 effective_lane_width_scale_count,
                 effective_lane_width_scales,
                 effective_lane_spacing_scale_count,
@@ -824,7 +866,8 @@
                                       const std::wstring& combo_label_text,
                                       float top_safe_margin,
                                       float bottom_safe_margin,
-                                      float vertical_offset) {
+                                      float vertical_offset,
+                                      const GameplayTextPopAnimation& animation) {
             if (combo_value_text.empty() || !d2d_->accent_brush || !d2d_->gameplay_combo_format) {
                 return;
             }
@@ -839,7 +882,19 @@
                                             vertical_offset,
                                             8.0f,
                                             kComboLabelExtension);
+            D2D1_MATRIX_3X2_F saved_transform{};
+            ctx->GetTransform(&saved_transform);
+            const D2D1_POINT_2F animation_center = D2D1::Point2F(
+                (combo_rect.left + combo_rect.right) * 0.5f,
+                (combo_rect.top + combo_rect.bottom) * 0.5f);
+            const D2D1_MATRIX_3X2_F animation_transform =
+                D2D1::Matrix3x2F::Scale(animation.scale, animation.scale, animation_center) *
+                D2D1::Matrix3x2F::Translation(0.0f, animation.offset_y) *
+                saved_transform;
+            ctx->SetTransform(animation_transform);
             if (d2d_->footer_brush) {
+                const float saved_footer_opacity = d2d_->footer_brush->GetOpacity();
+                d2d_->footer_brush->SetOpacity(saved_footer_opacity * animation.opacity);
                 const D2D1_RECT_F shadow_rect =
                     D2D1::RectF(combo_rect.left + 2.0f,
                                 combo_rect.top + 3.0f,
@@ -850,9 +905,10 @@
                                           shadow_rect,
                                           d2d_->footer_brush.Get(),
                                           DWRITE_TEXT_ALIGNMENT_CENTER);
+                d2d_->footer_brush->SetOpacity(saved_footer_opacity);
             }
             const float saved_opacity = d2d_->accent_brush->GetOpacity();
-            d2d_->accent_brush->SetOpacity(0.94f);
+            d2d_->accent_brush->SetOpacity(0.94f * animation.opacity);
             draw_text_clipped_aligned(combo_value_text,
                                       d2d_->gameplay_combo_format.Get(),
                                       combo_rect,
@@ -860,6 +916,8 @@
                                       DWRITE_TEXT_ALIGNMENT_CENTER);
             d2d_->accent_brush->SetOpacity(saved_opacity);
             if (d2d_->hud_format && d2d_->muted_brush) {
+                const float saved_muted_opacity = d2d_->muted_brush->GetOpacity();
+                d2d_->muted_brush->SetOpacity(saved_muted_opacity * animation.opacity);
                 draw_text_clipped_aligned(combo_label_text,
                                           d2d_->hud_format.Get(),
                                           D2D1::RectF(combo_rect.left,
@@ -868,7 +926,9 @@
                                                       combo_rect.bottom + kComboLabelExtension),
                                           d2d_->muted_brush.Get(),
                                           DWRITE_TEXT_ALIGNMENT_CENTER);
+                d2d_->muted_brush->SetOpacity(saved_muted_opacity);
             }
+            ctx->SetTransform(saved_transform);
         };
         if (d2d_->gameplay_static_command_list) {
             ctx->DrawImage(d2d_->gameplay_static_command_list.Get());
@@ -1103,6 +1163,20 @@
                 const D2D1_RECT_F feedback_rect =
                     gameplay_centered_overlay_rect(field_layout, combo_anchor_y - 34.0f, 40.0f, -24.0f);
                 const D2D1_COLOR_F saved_text_color = d2d_->text_brush->GetColor();
+                const float saved_text_opacity = d2d_->text_brush->GetOpacity();
+                D2D1_MATRIX_3X2_F saved_feedback_transform{};
+                ctx->GetTransform(&saved_feedback_transform);
+                const D2D1_POINT_2F feedback_animation_center = D2D1::Point2F(
+                    (feedback_rect.left + feedback_rect.right) * 0.5f,
+                    (feedback_rect.top + feedback_rect.bottom) * 0.5f + 12.0f);
+                const D2D1_MATRIX_3X2_F feedback_animation_transform =
+                    D2D1::Matrix3x2F::Scale(judgement_text_animation.scale,
+                                            judgement_text_animation.scale,
+                                            feedback_animation_center) *
+                    D2D1::Matrix3x2F::Translation(0.0f, judgement_text_animation.offset_y) *
+                    saved_feedback_transform;
+                ctx->SetTransform(feedback_animation_transform);
+                d2d_->text_brush->SetOpacity(saved_text_opacity * judgement_text_animation.opacity);
 
                 d2d_->text_brush->SetColor(D2D1::ColorF(0x061118, 0.78f));
                 const D2D1_RECT_F feedback_shadow_rect =
@@ -1137,6 +1211,8 @@
                                               DWRITE_TEXT_ALIGNMENT_CENTER);
                 }
                 d2d_->text_brush->SetColor(saved_text_color);
+                d2d_->text_brush->SetOpacity(saved_text_opacity);
+                ctx->SetTransform(saved_feedback_transform);
             }
 
             draw_timing_indicator(field_left,
@@ -1154,7 +1230,8 @@
                                gameplay_hud_cache_.combo_label_text,
                                combo_anchor_top_safe,
                                combo_anchor_bottom_safe,
-                               show_feedback_overlay ? 60.0f : 0.0f);
+                               show_feedback_overlay ? 60.0f : 0.0f,
+                               combo_text_animation);
         }
 
         draw_gameplay_header();
@@ -1805,7 +1882,8 @@
                                    gameplay_hud_cache_.combo_label_text,
                                    ghost_combo_anchor_top_safe,
                                    ghost_combo_anchor_bottom_safe,
-                                   show_ghost_feedback_overlay ? 60.0f : 0.0f);
+                                   show_ghost_feedback_overlay ? 60.0f : 0.0f,
+                                   GameplayTextPopAnimation{});
             }
 
             if (data.gameplay.key_pulse_enabled && d2d_->note_fill_brush && data.gameplay.ghost_lane_activity_count > 0) {

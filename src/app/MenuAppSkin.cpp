@@ -857,7 +857,7 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
                     settings_cursor_ == 23 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 23 + lr2_shift, false, true);
     append_menu_row(render.generic, ui_text("Lane Width", "레인 너비"), format_percent(preview_lane_width_scale),
                     settings_cursor_ == 24 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 24 + lr2_shift, false, true);
-    append_menu_row(render.generic, ui_text("Note Size (Width)", "노트 크기(너비)"), format_percent(preview_note_width_scale),
+    append_menu_row(render.generic, ui_text("Note & Field Size", "노트·필드 크기"), format_percent(preview_note_width_scale),
                     settings_cursor_ == 25 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 25 + lr2_shift, false, true);
     append_menu_row(render.generic, ui_text("Lane Spacing", "레인 간격"), format_percent(preview_lane_spacing_scale),
                     settings_cursor_ == 26 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 26 + lr2_shift, false, gap_count > 0);
@@ -975,8 +975,8 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
                                            "LN 꼬리 테이퍼는 시각 효과만 바꿉니다. 판정이나 히트박스는 그대로 두고 홀드 몸통만 꼬리 쪽으로 좁아집니다."));
     render.generic.notes.push_back(ui_text("Divider Width is shared across all key modes, and it scales the white lane separators plus any imported divider widths.",
                                            "구분선 너비는 모든 키 모드에 공용으로 적용되며, 흰 레인 구분선과 외부 스킨이 제공하는 구분선 폭에 함께 배율로 적용됩니다."));
-    render.generic.notes.push_back(ui_text("Lane Width changes the selected lane's field width. Note Size changes only note width around fixed lane-divider centers.",
-                                           "레인 너비는 선택한 레인의 필드 폭을 바꿉니다. 노트 크기는 고정된 레인 구분선 중심을 기준으로 노트 너비만 조절합니다."));
+    render.generic.notes.push_back(ui_text("Lane Width changes one lane's share. Note & Field Size scales the complete centered playfield, notes, and gauges together.",
+                                           "레인 너비는 개별 레인의 비중을 바꿉니다. 노트·필드 크기는 중앙 기준 플레이필드와 노트, 게이지를 함께 확대·축소합니다."));
     render.generic.notes.push_back(ui_text("Lane Spacing adds blank space after the selected gap, so you can open individual separators without changing note timing.",
                                            "레인 간격은 선택한 구간 뒤에 빈 공간을 더해 개별 구분 간격을 벌리며, 노트 타이밍에는 영향을 주지 않습니다."));
     render.generic.notes.push_back(ui_text("16K Center Gap inserts a blank center lane-width gap between the left and right halves of the 16-key field.",

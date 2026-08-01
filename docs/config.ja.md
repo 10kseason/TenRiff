@@ -40,7 +40,7 @@ profile が存在しない場合は初回起動時に自動生成されます。
 
 - `backend` (string)
   - `polling | rawinput`
-  - 現行 `1.2.95` リリースラインの既定値は `rawinput`
+  - 現行 `1.2.96` リリースラインの既定値は `rawinput`
   - `Options -> Input Settings -> Backend` または `Options -> Profile Setup -> Input Backend` で profile ごとに選択可能
   - runtime fallback は保存済みの値を `polling` に書き換えない
   - RawInput の起動失敗、登録先の消失、message window の終了を確認すると、そのアプリ実行中は menu と後続 gameplay の両方で Polling を維持する
@@ -227,7 +227,7 @@ chart loader/indexer は BMS family（`.bms/.bme/.bml/.pms`）が既定です。
   - 各 mode 値は lane ごとに 1 要素を持つ数値配列
   - 各値は `0.50..1.75` に clamp
 - `note_width_scale` (double)
-  - 固定された lane divider 中心を基準に note head / tail の幅だけを調整
+  - 中央基準の playfield 全体、lane/divider、note head/tail、隣接 gauge をまとめて拡大・縮小する (`0.50..1.40`)
   - 100% で隣接 note 間の既定合計 gap は `24px`
   - `0.50..1.40` に clamp
 - `lane_spacing_scales` (object)

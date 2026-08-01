@@ -2629,6 +2629,7 @@ void MenuApp::handle_song_select_input(uint32_t keycode) {
         }
         if (multiplayer_selecting_chart_) {
             multiplayer_selecting_chart_ = false;
+            rebuild_visible_song_list();
             screen_ = Screen::Multiplayer;
             publish_snapshot();
             return;
@@ -2641,6 +2642,7 @@ void MenuApp::handle_song_select_input(uint32_t keycode) {
         song_select_search_active_ = false;
         if (multiplayer_selecting_chart_) {
             multiplayer_selecting_chart_ = false;
+            rebuild_visible_song_list();
             screen_ = Screen::Multiplayer;
             publish_snapshot();
             return;
