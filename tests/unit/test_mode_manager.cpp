@@ -260,7 +260,7 @@ TEST_CASE("mode manager converts an exact deterministic percentage of taps into 
     CHECK(reseeded_starts != converted_starts);
 }
 
-TEST_CASE("mode manager keeps the 70 20 10 LN duration mix at ten and fifty percent") {
+TEST_CASE("mode manager keeps the long 60 medium 20 short 20 LN duration mix") {
     tenriff::gameplay::GameplayChart chart;
     chart.lane_count = 1;
     constexpr int64_t kStart = 1000;
@@ -322,8 +322,8 @@ TEST_CASE("mode manager keeps the 70 20 10 LN duration mix at ten and fifty perc
         CHECK_FALSE(has_lane_overlap(result.chart));
     };
 
-    verify_mix("ln_mix_10", 10, 7, 2, 1);
-    verify_mix("ln_mix_50", 50, 35, 10, 5);
+    verify_mix("ln_mix_10", 10, 2, 6, 2);
+    verify_mix("ln_mix_50", 50, 10, 30, 10);
 }
 TEST_CASE("mode manager keeps LN mix exclusive with full note structure conversions") {
     const auto active = tenriff::app::normalize_mode_mod_tokens(
@@ -369,8 +369,8 @@ TEST_CASE("mode manager LN mix leaves fifty milliseconds before the next same-la
             CHECK(result.chart.notes[i + 1].start_sample - note.end_sample.value() >= 50);
         }
     }
-    CHECK(sixteenth == 2);
-    CHECK(eighth == 1);
+    CHECK(sixteenth == 1);
+    CHECK(eighth == 2);
     CHECK_FALSE(has_lane_overlap(result.chart));
 }
 TEST_CASE("mode manager LN mix defaults its timing basis to 44.1 kHz and 180 BPM") {
@@ -400,8 +400,8 @@ TEST_CASE("mode manager LN mix defaults its timing basis to 44.1 kHz and 180 BPM
         sixteenth += duration == 3675 ? 1 : 0;
         eighth += duration == 7350 ? 1 : 0;
     }
-    CHECK(sixteenth == 2);
-    CHECK(eighth == 1);
+    CHECK(sixteenth == 1);
+    CHECK(eighth == 2);
     CHECK_FALSE(has_lane_overlap(result.chart));
 }
 TEST_CASE("mode manager LN mix does not extend duplicate same-lane heads") {
@@ -428,7 +428,7 @@ TEST_CASE("mode manager LN mix does not extend duplicate same-lane heads") {
     CHECK_FALSE(result.chart.notes[0].end_sample.has_value());
     CHECK_FALSE(result.chart.notes[1].end_sample.has_value());
     REQUIRE(result.chart.notes[2].end_sample.has_value());
-    CHECK(result.chart.notes[2].end_sample.value() == 425);
+    CHECK(result.chart.notes[2].end_sample.value() == 550);
 }
 TEST_CASE("mode manager LN mix does not extend a tap inside an existing same-lane hold") {
     tenriff::gameplay::GameplayChart chart;
@@ -456,7 +456,7 @@ TEST_CASE("mode manager LN mix does not extend a tap inside an existing same-lan
     CHECK(result.chart.notes[0].release_required);
     CHECK_FALSE(result.chart.notes[1].end_sample.has_value());
     REQUIRE(result.chart.notes[2].end_sample.has_value());
-    CHECK(result.chart.notes[2].end_sample.value() == 583);
+    CHECK(result.chart.notes[2].end_sample.value() == 667);
 }
 TEST_CASE("mode manager removes no-ln-release when full short notes is active") {
     tenriff::gameplay::GameplayChart chart;

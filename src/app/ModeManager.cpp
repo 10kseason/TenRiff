@@ -236,10 +236,12 @@ struct LongNoteMixDurationCounts {
     std::size_t dense = 0;
 };
 
-// Largest-remainder allocation preserves the 70/20/10 target as closely as
-// integer note counts allow, with stable tie-breaking toward common 1/16 lengths.
+// Largest-remainder allocation preserves the long/medium/short 60/20/20 target
+// as closely as integer note counts allow. The existing musical subdivisions
+// remain 1/8 (long), 1/16 (medium), and alternating 1/24-1/32 (short).
 LongNoteMixDurationCounts allocate_long_note_mix_durations(std::size_t total) {
-    constexpr std::array<std::size_t, 3> kWeights = {70u, 20u, 10u};
+    // Storage order follows LongNoteMixDurationCounts: medium, long, short.
+    constexpr std::array<std::size_t, 3> kWeights = {20u, 60u, 20u};
     std::array<std::size_t, 3> counts{};
     std::array<std::size_t, 3> remainders{};
     const std::size_t hundreds = total / 100u;

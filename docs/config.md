@@ -40,7 +40,7 @@
 
 - `backend` (string)
   - `polling | rawinput`
-  - 현재 `1.2.98` 릴리스 라인의 기본값은 `rawinput`
+  - 현재 `1.2.99` 릴리스 라인의 기본값은 `rawinput`
   - `Options -> Input Settings -> Backend` 또는 `Options -> Profile Setup -> Input Backend`에서 프로필별로 RawInput/Polling을 직접 선택 가능
   - 저장값은 런타임 fallback 때문에 자동으로 `polling`으로 덮어쓰지 않음
   - RawInput 시작 실패, 등록 대상 손실, 메시지 창 종료가 확인되면 현재 앱 실행 동안 메뉴와 다음 gameplay 세션 모두 Polling을 유지
@@ -60,7 +60,7 @@
 - `judgement_hz` (int)
   - `1000 | 2000 | 4000 | 8000`
   - 호환성용으로 남아 있는 입력 설정 필드
-  - 현재 `1.2.98` runtime은 별도 오디오 판정 서브루프를 이 값으로 구동하지 않음
+  - 현재 `1.2.99` runtime은 별도 오디오 판정 서브루프를 이 값으로 구동하지 않음
   - 기본값은 `4000` (`0.25ms`)
 - `debounce_ms` (double)
   - 실제 Press/Release 전환은 버리지 않고 같은 상태의 중복 이벤트만 상태 추적에서 제거
@@ -152,7 +152,7 @@
   - FR/SR, 강제 key-mode 변환, LN Mix 대상 선택의 고정 seed이며 Mirror 레인 반전 자체는 사용하지 않음
 - `mods` (string array)
   - Note Structure에서 `full_long_notes`, `ln_mix_10`~`ln_mix_90`, `full_short_notes` 중 하나를 선택 가능
-  - LN Mix는 base BPM 기준 8비트 LN도 다음 동일 레인 노트보다 50ms 먼저 끝낼 수 있는 단노트만 후보로 삼고, 요청 비율만큼 선택한 LN 길이를 16비트 70% / 8비트 20% / 24·32비트 10%로 배분
+  - LN Mix는 base BPM 기준 8비트 LN도 다음 동일 레인 노트보다 50ms 먼저 끝낼 수 있는 단노트만 후보로 삼고, 요청 비율만큼 선택한 LN 길이를 긴 8비트 60% / 중간 16비트 20% / 짧은 24·32비트 20%로 배분
   - 기존 롱노트는 보존하고 같은 레인의 기존 span과 겹치는 head는 제외하며, 같은 `random_seed`에서는 같은 단노트가 변환됨
 - `ghost_battle_enabled` (bool)
   - 기본값은 `false`

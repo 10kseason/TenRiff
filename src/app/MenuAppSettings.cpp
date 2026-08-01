@@ -327,8 +327,8 @@ void MenuApp::populate_mode_mods_render_data(render::MenuRenderData& render) {
     render.generic.notes.push_back(ui_text("Final score uses the lowest multiplier between active mods and the current Rate.",
                                            "최종 점수는 활성 모드와 현재 Rate 중 더 낮은 배율을 사용합니다."));
     render.generic.notes.push_back(ui_text(
-        "LN Mix lengths use 70% 1/16, 20% 1/8, and 10% alternating 1/24-1/32 notes. Random Seed keeps the result deterministic.",
-        "LN Mix 길이는 16비트 70%, 8비트 20%, 24~32비트 10%로 배분합니다. Random Seed로 같은 결과를 재현합니다."));
+        "LN Mix lengths use 60% long (1/8), 20% medium (1/16), and 20% short (alternating 1/24-1/32) notes. Random Seed keeps the result deterministic.",
+        "LN Mix 길이는 긴 8비트 60%, 중간 16비트 20%, 짧은 24~32비트 20%로 배분합니다. Random Seed로 같은 결과를 재현합니다."));
     render.generic.notes.push_back(ui_text("Current: ", "현재: ") + mode_score_summary(config_.mode.mods, config_.speed.rate));
     std::vector<std::string> mod_warnings;
     (void)normalize_mode_mod_tokens(config_.mode.mods, &mod_warnings);

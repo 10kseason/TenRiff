@@ -9,6 +9,7 @@
 
 #include "doctest/doctest.h"
 
+#include "gameplay/GameplayEngine.h"
 #include "gameplay/KeyModeConverter.h"
 #include "gameplay/ModeApplier.h"
 
@@ -676,6 +677,48 @@ TEST_CASE("runtime mode settings use the selected KeyWeaver nK2 converter") {
     CHECK(is_time_sorted(result.chart));
     CHECK_FALSE(has_lane_overlap(result.chart));
     CHECK(contains_warning(result.warnings, "nK2 remapped"));
+}
+
+TEST_CASE("nK2 key-count reduction preserves source timing and remains hittable") {
+    using namespace tenriff::gameplay;
+
+    GameplayChart chart;
+    chart.lane_count = 8;
+    chart.duration_samples = 2000;
+    for (int lane = 1; lane <= chart.lane_count; ++lane) {
+        append_note(chart, lane, 1000);
+    }
+
+    KeyModeConverterOptions options;
+    options.target_lane_count = 4;
+    options.base_bpm = 120.0;
+    options.sample_rate = 1000;
+    options.algorithm = KeyModeConversionAlgorithm::NK2;
+
+    const auto result = convert_key_mode_chart(chart, options);
+    REQUIRE(result.converted);
+    CHECK(result.chart.lane_count == 4);
+    REQUIRE_FALSE(result.chart.notes.empty());
+
+    std::set<int> hit_lanes;
+    for (const auto& note : result.chart.notes) {
+        CHECK(note.start_sample == 1000);
+        CHECK_FALSE(note.end_sample.has_value());
+        CHECK(hit_lanes.insert(note.lane).second);
+    }
+    CHECK(hit_lanes.size() == result.chart.notes.size());
+    CHECK(hit_lanes.size() <= 4u);
+
+    GameplayConfig gameplay_config;
+    gameplay_config.sample_rate = 1000;
+    GameplayEngine engine(result.chart, gameplay_config);
+    for (const int lane : hit_lanes) {
+        const auto hit = engine.handle_input(lane, tenriff::input::InputState::Pressed, 1000);
+        REQUIRE(hit.has_value());
+        CHECK(hit->start_sample == 1000);
+    }
+    CHECK(engine.stats().counts.pg == static_cast<int>(result.chart.notes.size()));
+    CHECK(engine.stats().counts.pr == 0);
 }
 
 TEST_CASE("nK2 converter is selectable and ignores Krrcream-only tuning fields") {

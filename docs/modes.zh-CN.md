@@ -61,7 +61,7 @@
 ## Note Structure Mod
 - **Note Add 10%～100%**：在已有 note 时刻确定性加入无声和弦 note，并避开皿键、hold body、同 lane 重复和过大和弦。结果会保留在 Records 中，但不会覆盖普通最佳记录
 - **Full LN**：把可转换 tap 变成在同 lane 下一 note 前结束的普通 hold
-- **LN Mix 10%～90%**：保留已有 hold，并排除与同 lane 已有 span 重叠的 head。使用 `random_seed` 从按 base BPM 计算的 1/8-note hold 能在下一同 lane note 前至少 50ms 结束的 tap 中选择指定比例，并在所有 Mix 档位中把长度确定性分配为 70% 1/16-note、20% 1/8-note、10% 交替的 1/24 与 1/32-note
+- **LN Mix 10%～90%**：保留已有 hold，并排除与同 lane 已有 span 重叠的 head。使用 `random_seed` 从按 base BPM 计算的 1/8-note hold 能在下一同 lane note 前至少 50ms 结束的 tap 中选择指定比例，并在所有 Mix 档位中把长度确定性分配为 60% 长 1/8-note、20% 中 1/16-note、20% 短且交替的 1/24 与 1/32-note
 - **Full Tap**：移除所有 hold tail，把 hold 转换为 tap
 - 三项属于同一个 `Note Structure` category，因此只会启用一个；同一谱面和 seed 会复现相同的 LN Mix 结果
 

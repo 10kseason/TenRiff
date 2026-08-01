@@ -3,7 +3,7 @@
 This is the document that the next agent or any new contributor should read first. Its goal is to quickly answer: "what is this project now, where should I look, and what is still unverified?"
 
 ## Baseline
-- Current project and public stable version: `1.2.98 stable`
+- Current project and public stable version: `1.2.99 stable`
 - Direct-IP multiplayer and the preview r5 input-backend lifecycle fixes are integrated into `1.1.8 stable`
 - `1.1.8` adds an osu!mania OD8 auxiliary score, first-native-`BAD` `Sudden Death (1 MISS)`, and deterministic `LN Mix 10%-90%` on top of the 1.1.7 visual refresh
 - `1.2.0` connects BMS channel `04/07` and osu!mania backgrounds to the gameplay sample timeline and asynchronously upscales sub-FHD image backgrounds through LunaSR on Windows ML
@@ -92,7 +92,7 @@ This is the document that the next agent or any new contributor should read firs
   - BMS LV/CR calculation evaluates only LN head/tail miss-ms at 0.5x, so `300ms` is treated as `150ms`; runtime gameplay judgement windows remain unchanged
 - Lane transform:
   - Random supports `Off / Mirror / FR / SR`; Mirror reverses the final lanes after key-mode conversion, with 10K/16K mirrored independently inside each player half
-  - Mod Manager `LN Mix 10%-90%` preserves existing holds and excludes heads overlapping an existing same-lane span. It selects the requested share of taps that can fit a base-BPM 1/8-note hold while ending at least 50ms before the next same-lane note, then deterministically assigns every Mix level 70% 1/16-note, 20% 1/8-note, and 10% alternating 1/24- and 1/32-note lengths
+  - Mod Manager `LN Mix 10%-90%` preserves existing holds and excludes heads overlapping an existing same-lane span. It selects the requested share of taps that can fit a base-BPM 1/8-note hold while ending at least 50ms before the next same-lane note, then deterministically assigns every Mix level 60% long 1/8-note, 20% medium 1/16-note, and 20% short alternating 1/24- and 1/32-note lengths
 - Skins / gameplay feel:
   - `rect / triangle / pentagon / hexagon / circle` note shapes; procedural circles and polygons use the full rect-bar width at 100%
   - note border on/off
@@ -188,7 +188,7 @@ This is the document that the next agent or any new contributor should read firs
 
 ## Runtime / Packaging Rules
 - New user profiles are created automatically
-- The current official P2P distribution line is `TenRiff 1.2.98 stable`
+- The current official P2P distribution line is `TenRiff 1.2.99 stable`
 - Distribution packages do not include `Songs`
 - Distribution packages include the `Mainmusic/` scene slots `Main Menu / Options / Song Selecte / Multiplayer Lobby / Clear / Failed`; each `Name.mp3` plus numbered `Name 2.mp3` through `Name 64.mp3` siblings is discovered automatically and rotates on scene re-entry
 - Distribution updates include only built artifacts and required runtime assets

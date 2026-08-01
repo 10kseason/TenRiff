@@ -127,6 +127,11 @@ convert_key_mode_chart_nk2(const GameplayChart &chart,
   result.chart = chart;
 
   const int source_lane_count = resolve_lane_count(chart);
+  // Runtime key-count reduction must only relane source notes. nK2 may roll
+  // overflowing chord notes by a few milliseconds, which makes the rendered
+  // chart and realtime judgement disagree with the source beat.
+  const bool preserve_source_timing =
+      options.target_lane_count > 0 && options.target_lane_count < source_lane_count;
   if (source_lane_count <= 0 || chart.notes.empty() ||
       options.target_lane_count <= 0 ||
       options.target_lane_count == source_lane_count) {
@@ -186,14 +191,18 @@ convert_key_mode_chart_nk2(const GameplayChart &chart,
     NoteEvent mapped = source;
     mapped.lane = nk2_note.lane + 1;
     mapped.start_sample =
-        mapped_sample_time(nk2_note.time, source.start_sample, sample_rate);
+        preserve_source_timing
+            ? source.start_sample
+            : mapped_sample_time(nk2_note.time, source.start_sample, sample_rate);
 
     if (nk2_note.type == keyconv::NoteType::Hold &&
         nk2_note.endTime.has_value() && *nk2_note.endTime > nk2_note.time) {
       const int64_t source_end =
           source.end_sample.value_or(source.start_sample);
       mapped.end_sample =
-          mapped_sample_time(*nk2_note.endTime, source_end, sample_rate);
+          preserve_source_timing
+              ? source_end
+              : mapped_sample_time(*nk2_note.endTime, source_end, sample_rate);
       mapped.release_required = source.release_required;
     } else {
       mapped.end_sample.reset();
