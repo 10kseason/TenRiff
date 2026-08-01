@@ -1161,6 +1161,7 @@ bool is_gauge_shift_token(std::string_view value) {
 std::string chart_format_token(ChartFormat format) {
     switch (format) {
         case ChartFormat::Bms: return "bms";
+        case ChartFormat::OsuMania: return "osu";
         case ChartFormat::Unknown:
         default: return "unknown";
     }

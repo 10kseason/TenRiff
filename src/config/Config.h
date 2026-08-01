@@ -53,8 +53,8 @@ struct JudgeConfig {
     double pg_ms = 15.5;
     double gr_ms = 31.0;
     double gd_ms = 75.0;
-    double bd_ms = 340.0;
-    double indirect_miss_ms = 340.0;
+    double bd_ms = 210.0;
+    double indirect_miss_ms = 210.0;
     double hold_grace_ms = 80.0;
     double hold_break_ms = 200.0;
     double mask_ms = 30.0;
@@ -120,6 +120,7 @@ struct SkinConfig {
     double judgement_line_position = kJudgementLinePositionDefault;
     double combo_position = kComboPositionDefault;
     double lane_background_opacity = kSkinLaneBackgroundOpacityDefault;
+    bool black_playfield_enabled = false;
     double visual_opacity = kSkinVisualOpacityDefault;
     double note_outline_opacity = kSkinNoteOutlineOpacityDefault;
     double hold_body_opacity = kSkinHoldBodyOpacityDefault;
@@ -151,6 +152,7 @@ struct InputConfig {
 struct ModeConfig {
     std::string key_mode = "auto";
     std::string key_conversion_algorithm = "krrcream";
+    bool enable_osu_charts = false;
     std::string gauge = "normal";
     std::string random = "off";
     uint32_t random_seed = 0;

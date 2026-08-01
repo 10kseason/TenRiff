@@ -103,6 +103,14 @@ int64_t scale_samples(int64_t samples, double rate) {
     return static_cast<int64_t>(std::llround(static_cast<double>(samples) / rate));
 }
 
+int64_t ms_to_samples(double time_ms, int sample_rate, double rate) {
+    if (sample_rate <= 0) {
+        return 0;
+    }
+    const double scaled_ms = (rate > 0.0 && std::isfinite(rate)) ? (time_ms / rate) : time_ms;
+    return static_cast<int64_t>(std::llround(scaled_ms * static_cast<double>(sample_rate) / 1000.0));
+}
+
 int64_t add_sample_offset(int64_t sample, int64_t sample_offset) {
     if (sample_offset <= 0) {
         return sample;
@@ -164,6 +172,35 @@ GameplayChart from_bms_timeline(const chart::BmsTimeline& timeline, double rate)
         return lhs.lane < rhs.lane;
     });
 
+    return chart;
+}
+
+GameplayChart from_osu_mania(const chart::OsuManiaChart& chart_data, int sample_rate, double rate) {
+    GameplayChart chart;
+    chart.lane_count = chart_data.key_count;
+
+    int64_t max_sample = 0;
+    for (std::size_t i = 0; i < chart_data.notes.size(); ++i) {
+        const auto& note_data = chart_data.notes[i];
+        NoteEvent note;
+        note.lane = note_data.column + 1;
+        note.start_sample = ms_to_samples(static_cast<double>(note_data.start_time_ms), sample_rate, rate);
+        note.note_id = i;
+        if (note_data.end_time_ms.has_value()) {
+            note.end_sample = ms_to_samples(static_cast<double>(note_data.end_time_ms.value()), sample_rate, rate);
+            note.release_required = true;
+        }
+        chart.notes.push_back(note);
+        max_sample = std::max(max_sample, note.end_sample.value_or(note.start_sample));
+    }
+
+    chart.duration_samples = max_sample;
+    std::stable_sort(chart.notes.begin(), chart.notes.end(), [](const NoteEvent& lhs, const NoteEvent& rhs) {
+        if (lhs.start_sample != rhs.start_sample) {
+            return lhs.start_sample < rhs.start_sample;
+        }
+        return lhs.lane < rhs.lane;
+    });
     return chart;
 }
 

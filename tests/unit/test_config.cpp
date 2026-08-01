@@ -91,6 +91,7 @@ TEST_CASE("config defaults prefer 44100 Hz audio") {
     CHECK_FALSE(config.mode.ghost_battle_enabled);
     CHECK(config.mode.song_index_profile == "safe");
     CHECK(config.mode.key_conversion_algorithm == "krrcream");
+    CHECK_FALSE(config.mode.enable_osu_charts);
     CHECK(config.graphics.resolution == "native");
     CHECK(config.graphics.display_mode == "borderless");
     CHECK(tenriff::config::kJudgementLinePositionMin == doctest::Approx(0.0));
@@ -126,8 +127,8 @@ TEST_CASE("config defaults prefer 44100 Hz audio") {
     CHECK(config.gauge.easy.bd == doctest::Approx(kCurrentEasyBd));
     CHECK(config.gauge.easy.pr == doctest::Approx(kCurrentEasyPr));
     CHECK(config.judge.gd_ms == doctest::Approx(75.0));
-    CHECK(config.judge.bd_ms == doctest::Approx(340.0));
-    CHECK(config.judge.indirect_miss_ms == doctest::Approx(340.0));
+    CHECK(config.judge.bd_ms == doctest::Approx(210.0));
+    CHECK(config.judge.indirect_miss_ms == doctest::Approx(210.0));
     CHECK(config.judge.hold_grace_ms == doctest::Approx(80.0));
     CHECK(config.judge.hold_break_ms == doctest::Approx(200.0));
     CHECK(config.skin.note_shape == "rect");
@@ -147,6 +148,7 @@ TEST_CASE("config defaults prefer 44100 Hz audio") {
     CHECK(config.skin.key_label_position == "bottom");
     CHECK(config.skin.combo_position == doctest::Approx(tenriff::config::kComboPositionDefault));
     CHECK(config.skin.lane_background_opacity == doctest::Approx(tenriff::config::kSkinLaneBackgroundOpacityDefault));
+    CHECK_FALSE(config.skin.black_playfield_enabled);
     CHECK(config.skin.visual_opacity == doctest::Approx(tenriff::config::kSkinVisualOpacityDefault));
     CHECK(config.skin.note_outline_opacity == doctest::Approx(tenriff::config::kSkinNoteOutlineOpacityDefault));
     CHECK(config.skin.hold_body_opacity == doctest::Approx(tenriff::config::kSkinHoldBodyOpacityDefault));
@@ -293,7 +295,7 @@ TEST_CASE("config load migrates an existing stale profile before returning it") 
     CHECK_FALSE(result.used_defaults);
     CHECK(result.migrated);
     CHECK(result.config.judge.gd_ms == doctest::Approx(75.0));
-    CHECK(result.config.judge.bd_ms == doctest::Approx(340.0));
+    CHECK(result.config.judge.bd_ms == doctest::Approx(210.0));
     CHECK(result.config.judge.hold_grace_ms == doctest::Approx(80.0));
     CHECK(result.config.judge.hold_break_ms == doctest::Approx(200.0));
     CHECK(result.config.gauge.ex_hard.pg == doctest::Approx(kCurrentExHardPg));
@@ -397,6 +399,7 @@ TEST_CASE("config save and load preserve volume and speed settings") {
     config.mode.ghost_battle_enabled = true;
     config.mode.song_index_profile = "fast";
     config.mode.key_conversion_algorithm = "nk2";
+    config.mode.enable_osu_charts = true;
     config.mode.gauge = "shift";
 
     std::string error;
@@ -414,6 +417,7 @@ TEST_CASE("config save and load preserve volume and speed settings") {
     CHECK(result.config.mode.ghost_battle_enabled);
     CHECK(result.config.mode.song_index_profile == "fast");
     CHECK(result.config.mode.key_conversion_algorithm == "nk2");
+    CHECK(result.config.mode.enable_osu_charts);
     CHECK(result.config.mode.gauge == "shift");
 }
 
@@ -685,6 +689,7 @@ TEST_CASE("config save and load preserve skin visual preset controls") {
     auto config = loader.defaults();
     config.skin.visual_preset = "neon";
     config.skin.lane_background_opacity = 0.25;
+    config.skin.black_playfield_enabled = true;
     config.skin.visual_opacity = 0.85;
     config.skin.note_outline_opacity = 0.55;
     config.skin.hold_body_opacity = 0.20;
@@ -700,6 +705,7 @@ TEST_CASE("config save and load preserve skin visual preset controls") {
     REQUIRE(result.success());
     CHECK(result.config.skin.visual_preset == "neon");
     CHECK(result.config.skin.lane_background_opacity == doctest::Approx(0.25));
+    CHECK(result.config.skin.black_playfield_enabled);
     CHECK(result.config.skin.visual_opacity == doctest::Approx(0.85));
     CHECK(result.config.skin.note_outline_opacity == doctest::Approx(0.55));
     CHECK(result.config.skin.hold_body_opacity == doctest::Approx(0.20));
@@ -1186,8 +1192,8 @@ TEST_CASE("runtime migration upgrades old judge defaults into the current bad-on
 
     CHECK(changed);
     CHECK(config.judge.gd_ms == doctest::Approx(75.0));
-    CHECK(config.judge.bd_ms == doctest::Approx(340.0));
-    CHECK(config.judge.indirect_miss_ms == doctest::Approx(340.0));
+    CHECK(config.judge.bd_ms == doctest::Approx(210.0));
+    CHECK(config.judge.indirect_miss_ms == doctest::Approx(210.0));
 }
 
 TEST_CASE("runtime migration upgrades legacy default gauge deltas to the harsher table") {

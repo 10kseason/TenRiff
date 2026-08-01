@@ -60,7 +60,7 @@ Windows では通常、次のどちらかで起動します。
   - `BGA` を off にすると gameplay image/video background と decoder/upscaler 処理を無効化し、Song Select preview は維持
   - model 選択後に upscaler を明示的に ON にして high-spec 警告を確認する。実験的 `NPU 優先` は Windows/driver が実際に NPU を選択した場合だけ NPU を使う
 - `Skins`
-  - native/LR2 skin 切り替え、LR2 folder import、judge line 位置、note size、LN body width、lane colors を調整
+  - native/LR2 skin 切り替え、LR2 folder import、固定 divider 基準の note gap/size、Black Playfield、judge line 位置、LN body width、lane colors を調整
 - `Keymap`
   - key binding 変更と NKRO test 実行
 
@@ -99,7 +99,7 @@ client 側の設定は Discord の [公式 Game Overlay guide](https://support.d
 ## 6. プレイ開始前に知っておくこと
 
 ### Chart format
-- TenRiff 1.2.93 は BMS family（`.bms/.bme/.bml/.pms`）だけをインデックス/プレイします。
+- BMS family（`.bms/.bme/.bml/.pms`）が既定です。Mode Settings の `OSU Charts` を ON にすると osu!mania 4K～10K `.osu` も index/play します。
 
 ### Loading
 - 曲開始直後に chart-loading progress が表示されることがあります。
@@ -134,6 +134,8 @@ Rate は曲の再生速度と譜面スケジュールだけを変え、同じ Hi
 - Combo
 - 直近 judgement (`PG / GR / GD / BD / PR`)
 - タイミングずれ（ms）
+
+中心からずれた入力は judgement の下に符号付きで表示されます。早い入力は `FAST -12 ms`、遅い入力は `SLOW +18 ms` となり、`0 ms` に丸められる入力では timing 表示を省略します。
 
 `Graphics > Performance HUD` を有効にすると、frame graph、average FPS、low FPS、gameplay timing debug 情報も見られます。
 

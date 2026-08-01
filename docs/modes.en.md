@@ -10,6 +10,7 @@ This document summarizes the implemented mode system, lane-transform/random rule
 "mode": {
   "key_mode": "none",
   "key_conversion_algorithm": "krrcream",
+  "enable_osu_charts": false,
   "gauge": "normal",
   "random": "off",
   "random_seed": 0,
@@ -23,7 +24,7 @@ This document summarizes the implemented mode system, lane-transform/random rule
 ```
 
 ## Mode Meanings
-- Chart input is BMS-family only (`.bms/.bme/.bml/.pms`); the `format` and `enable_osu_charts` settings have been removed
+- `enable_osu_charts`: defaults to `false`; Mode Settings > `OSU Charts` enables indexing and play for 4K-10K osu!mania `.osu` and refreshes the library
 - `key_mode`: `none | auto | 4k | 5k | 6k | 7k | 8k | 9k | 10k | 12k | 14k | 16k`
 - `key_conversion_algorithm`: `krrcream | nk2` (defaults to `krrcream`; selected in the in-game Key Converter row and used only for actual key-count conversion)
 - `gauge`: `normal | hard | ex_hard | easy | shift`

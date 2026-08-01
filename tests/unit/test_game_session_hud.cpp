@@ -9,6 +9,7 @@
 #include "app/GameplayHudWindow.h"
 #include "gameplay/GameplayEngine.h"
 #include "gameplay/GameplayChart.h"
+#include "render/GameplayFeedbackText.h"
 
 namespace {
 
@@ -156,6 +157,26 @@ TEST_CASE("gameplay hud revisions bump text caches for score and feedback change
 
     const auto diff = tenriff::app::diff_gameplay_hud_revisions(previous, next);
     CHECK(diff.text_changed);
+}
+
+TEST_CASE("gameplay timing feedback formats early and late hits with signed milliseconds") {
+    CHECK(tenriff::render::gameplay_timing_feedback_text(-12.4) == L"FAST -12 ms");
+    CHECK(tenriff::render::gameplay_timing_feedback_text(18.6) == L"SLOW +19 ms");
+    CHECK(tenriff::render::gameplay_timing_feedback_text(0.49).empty());
+}
+
+TEST_CASE("gameplay hud revisions refresh timing text for repeated judgement grades") {
+    tenriff::app::GameplayHudRevisionInput previous;
+    previous.has_feedback = true;
+    previous.feedback = tenriff::game::Judgement::GR;
+    previous.feedback_delta_ms = -12.0;
+
+    auto next = previous;
+    next.feedback_delta_ms = 18.0;
+
+    const auto diff = tenriff::app::diff_gameplay_hud_revisions(previous, next);
+    CHECK(diff.text_changed);
+    CHECK(diff.motion_changed);
 }
 
 TEST_CASE("gameplay hud revisions refresh peer text and spectator presentation") {

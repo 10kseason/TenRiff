@@ -3,7 +3,7 @@
 この文書は、次のエージェントや新しい作業者が最初に読むべき current-state 文書です。目的は、「このプロジェクトは今どういう状態で、どこを見ればよく、何がまだ未検証か」を素早く把握できるようにすることです。
 
 ## Baseline
-- 現在のプロジェクト版と公開 stable 版は `1.2.93 stable`
+- 現在のプロジェクト版と公開 stable 版は `1.2.95 stable`
 - direct-IP multiplayer と preview r5 の input-backend lifecycle 修正は `1.1.8 stable` に統合
 - `1.1.8` は 1.1.7 の visual refresh に osu!mania OD8 補助スコア、最初の native `BAD` で終了する `Sudden Death (1 MISS)`、決定的な `LN Mix 10%～90%` を追加
 - `1.2.0` は BMS channel `04/07` と osu!mania 背景を gameplay sample timeline に接続し、FHD 未満の画像背景を Windows ML 上の LunaSR で非同期補間
@@ -18,10 +18,11 @@
 - `1.2.9` は 12K/14K と scratch-aware key conversion、R-Random/DP Flip/Note Add、Song Select preview、画像付き詳細 Result、profile nickname、video BGA 揺れ防止、正確な `DirectXMinPower` 表記を追加。
 - `1.2.92` は standalone BMS key converter に既定の Krrcream と決定論的 `nK2 Native 50/50` の選択を追加。
 - `1.2.93` はゲーム内 Mode Settings に `Key Converter` を追加し、`Krrcream`/`KeyWeaver nK2` の選択を設定・replay metadata に保存して runtime key-mode 変換へ適用。
+- `1.2.95`: Mode Settings の `OSU Charts` を ON にすると、独自 parser で osu!mania 4K～10K `.osu` を index/play。BMS が既定で、`.osz`/osu skin import は復元していません。
 - 後続作業の基準文書は `docs/baseline-1.1.2.ja.md`
 - Windows GUI ビルドが主対象
 - Linux は `Baepoks-Linuxs/TenRiff-0.5.0-linux-preview` レベルの preview のみ
-- 対応 chart surface は BMS family（`.bms/.bme/.bml/.pms`）のみ
+- 対応 chart surface は BMS family（`.bms/.bme/.bml/.pms`）が既定で、osu!mania 4K～10K `.osu` は選択式
 - `1.2.4 stable` の gameplay 入力は RawInput を優先しつつ、同じ `InputThread` で bound-key polling shadow を常時動作させる。起動失敗または message pump の予期しない終了時も queue / pressed state を reset せず、その producer を Polling に切り替える
 - menu 入力は従来の foreground process/root-window 境界を維持する。RawInput の起動失敗、process-global 登録先の消失、hidden message window の終了を検知すると、ユーザー入力を待たず Polling に切り替える。
 - 確認済み fallback は profile を書き換えず、そのアプリ実行中の menu と後続 gameplay に維持する。アプリ再起動または `Options -> Input Settings -> Backend` の明示変更で再試行する。
@@ -95,7 +96,9 @@
   - `rect / triangle / pentagon / hexagon / circle` note shape。procedural 円・多角形は 100% で rect bar と同じ全幅を使用
   - note border on/off
   - combo Y adjustment
-  - judge line / lane width / lane spacing / note width / divider width / 16K center gap / note height / LN body width adjustment
+  - judge line / lane width / lane spacing / note size (width) / divider width / 16K center gap / note height / LN body width adjustment
+  - note width は固定された lane divider 中心を動かさずに調整され、100% では隣接 note 間の合計 gap が既定で 24px
+  - Black Playfield は lane spacing を含む player/ghost playfield 全体を完全な黒で表示
   - キーモードごとの lane-width 配列と inter-lane spacing 配列が保存され、preview / live gameplay / ghost field の同じレイアウト計算に適用される
   - 対応 skin route は `native` と LR2 playskin のみ。Skins で LR2 folder を選択または drop すると active profile に取り込む
   - LR2 note/LN image、lane gap、destination size を gameplay layout に反映
@@ -105,7 +108,8 @@
   - 最後の判定ノート処理直後に gameplay が終了
 - Judge:
   - 既定 `GOOD` window は `75ms`
-  - 既定 `BAD` window は `340ms`
+  - 既定の `BAD` window は `210ms`、`Judge Easy` は `262.5ms`、`Judge Hard` は `340ms`
+  - `Judge Hard` は BAD 境界だけを狭め、PG/GR/GD と LN tail window は基本値を維持
   - 同一 lane の pending note がすでに `BAD` で、直後の note が明確に `GOOD` 以上なら、pending note を miss として記録し、現在の press を次の note に割り当てて連続 `BAD` lock を防ぐ
   - note-consuming failure（auto-miss、早すぎる消費、hold break / tail miss）は `BAD`
   - かなり早い non-consuming press は LR2 スタイル `POOR` として扱われ、result / replay / UI に再表示される
@@ -178,7 +182,7 @@
 
 ## Runtime / Packaging Rules
 - 新しい user profile は自動生成される
-- 現在の正式 P2P 配布ラインは `TenRiff 1.2.93 stable`
+- 現在の正式 P2P 配布ラインは `TenRiff 1.2.95 stable`
 - distribution package には `Songs` を含めない
 - distribution package には `Main Menu / Options / Song Selecte / Multiplayer Lobby / Clear / Failed` の `Mainmusic/` scene slot を含め、各 `Name.mp3` と `Name 2.mp3`～`Name 64.mp3` を自動検出して scene 再入場ごとに循環する
 - distribution 更新には built artifact と必要な runtime asset だけを含める

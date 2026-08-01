@@ -32,10 +32,10 @@ bool is_valid_key_mode(std::string_view value) {
 
 constexpr double kLegacyBadWindowMs = 200.0;
 constexpr double kPreviousBadWindowMs = 95.0;
-constexpr double kPreviousCurrentBadWindowMs = 210.0;
+constexpr double kPreviousDefaultBadWindowMs = 340.0;
 constexpr double kLegacyGoodWindowMs = 55.0;
 constexpr double kCurrentGoodWindowMs = 75.0;
-constexpr double kCurrentBadWindowMs = 340.0;
+constexpr double kCurrentBadWindowMs = 210.0;
 constexpr double kLegacyHoldGraceMs = 20.0;
 constexpr double kPreviousCurrentHoldGraceMs = 45.0;
 constexpr double kCurrentHoldGraceMs = 80.0;
@@ -204,7 +204,7 @@ bool migrate_bms_first_runtime_config(config::RuntimeConfig& config) {
     }
     if (std::abs(config.judge.bd_ms - kLegacyBadWindowMs) <= kJudgeWindowToleranceMs ||
         std::abs(config.judge.bd_ms - kPreviousBadWindowMs) <= kJudgeWindowToleranceMs ||
-        std::abs(config.judge.bd_ms - kPreviousCurrentBadWindowMs) <= kJudgeWindowToleranceMs) {
+        std::abs(config.judge.bd_ms - kPreviousDefaultBadWindowMs) <= kJudgeWindowToleranceMs) {
         config.judge.bd_ms = kCurrentBadWindowMs;
         changed = true;
     }

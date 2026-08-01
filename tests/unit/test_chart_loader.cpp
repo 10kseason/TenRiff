@@ -46,6 +46,12 @@ std::filesystem::path make_temp_dir() {
     return {};
 }
 
+void write_file(const std::filesystem::path& path, const std::string& content) {
+    std::ofstream out(path, std::ios::binary);
+    REQUIRE(out.good());
+    out << content;
+}
+
 std::string chart_audio_path(const tenriff::gameplay::GameplayChart& chart, std::size_t asset_id) {
     const std::string* path = chart.audio_asset_path(asset_id);
     return path ? *path : std::string{};
@@ -236,7 +242,7 @@ TEST_CASE("chart loader keeps wav when ogg fallback is unavailable") {
     CHECK(chart_audio_path(result.chart, result.chart.audio_cues.front().asset_id) == wav_path.u8string());
 }
 
-TEST_CASE("chart loader rejects unsupported osu chart files") {
+TEST_CASE("chart loader keeps osu charts disabled unless the option is enabled") {
     TempDirGuard temp;
     temp.path = make_temp_dir();
     REQUIRE_FALSE(temp.path.empty());
@@ -259,10 +265,57 @@ TEST_CASE("chart loader rejects unsupported osu chart files") {
     ChartLoadResult result = loader.load(chart_path.u8string(), 48000, 1.0, "ignore");
 
     CHECK_FALSE(result.success());
-    CHECK(result.error == "Unsupported chart extension.");
+    CHECK(result.error == "osu!mania charts are disabled in settings.");
     CHECK(result.format == ChartFormat::Unknown);
 }
 
+TEST_CASE("chart loader loads enabled osu mania notes, audio, and background") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+
+    const auto chart_path = temp.path / "enabled.osu";
+    const auto audio_path = temp.path / "music.ogg";
+    const auto background_path = temp.path / "cover.jpg";
+    {
+        std::ofstream chart_file(chart_path, std::ios::binary);
+        REQUIRE(chart_file.good());
+        chart_file << "osu file format v14\n"
+                      "[General]\n"
+                      "AudioFilename:music.ogg\n"
+                      "Mode:3\n"
+                      "[Metadata]\n"
+                      "Title:Enabled\n"
+                      "Artist:Composer\n"
+                      "[Difficulty]\n"
+                      "CircleSize:10\n"
+                      "[Events]\n"
+                      "0,0,\"cover.jpg\",0,0\n"
+                      "[TimingPoints]\n"
+                      "0,500,4,0,0,100,1,0\n"
+                      "[HitObjects]\n"
+                      "0,0,0,1,0,0:0:0:0:\n"
+                      "511,0,500,128,0,1000:0:0:0:\n";
+    }
+    write_file(audio_path, "OggS");
+    write_file(background_path, "image");
+
+    ChartLoader loader;
+    const ChartLoadResult result = loader.load(chart_path.u8string(), 48000, 1.0, "ignore", true);
+
+    CHECK(result.success());
+    CHECK(result.format == ChartFormat::OsuMania);
+    REQUIRE(result.chart.notes.size() == 2u);
+    CHECK(result.chart.lane_count == 10);
+    CHECK_FALSE(result.chart.notes[0].release_required);
+    CHECK(result.chart.notes[1].release_required);
+    REQUIRE(result.chart.audio_cues.size() == 1u);
+    CHECK(chart_audio_path(result.chart, result.chart.audio_cues.front().asset_id) ==
+          std::filesystem::weakly_canonical(audio_path).u8string());
+    REQUIRE(result.chart.visual_cues.size() == 1u);
+    CHECK(chart_visual_path(result.chart, result.chart.visual_cues.front().asset_id) ==
+          std::filesystem::weakly_canonical(background_path).u8string());
+}
 TEST_CASE("chart loader schedules BMS base and overlay BGA images") {
     TempDirGuard temp;
     temp.path = make_temp_dir();

@@ -10,6 +10,7 @@
 "mode": {
   "key_mode": "none",
   "key_conversion_algorithm": "krrcream",
+  "enable_osu_charts": false,
   "gauge": "normal",
   "random": "off",
   "random_seed": 0,
@@ -23,7 +24,7 @@
 ```
 
 ## Mode Meanings
-- chart input は BMS family（`.bms/.bme/.bml/.pms`）専用で、`format` と `enable_osu_charts` setting は削除済み
+- `enable_osu_charts`: 既定 `false`。Mode Settings の `OSU Charts` で osu!mania 4K～10K `.osu` の index/play を有効にし、library を再 scan
 - `key_mode`: `none | auto | 4k | 5k | 6k | 7k | 8k | 9k | 10k | 12k | 14k | 16k`
 - `key_conversion_algorithm`: `krrcream | nk2`（既定値は `krrcream`。ゲーム内 Key Converter で選択し、実際のキー数変換時のみ使用）
 - `gauge`: `normal | hard | ex_hard | easy | shift`

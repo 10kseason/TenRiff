@@ -43,6 +43,7 @@ struct SongIndex {
 };
 
 struct SongIndexOptions {
+    bool include_osu = false;
     SongIndexProfile profile = SongIndexProfile::Safe;
     std::string difficulty_table_path;
     // F5/manual full rescans disable this so timestamp-preserving replacements

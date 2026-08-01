@@ -322,7 +322,7 @@ void MenuApp::handle_skins_settings_input(uint32_t keycode) {
     const std::string active_skin_source = config::normalize_skin_source_token(config_.skin.source);
     const bool lr2_source = active_skin_source == "lr2";
     const int lr2_shift = lr2_source ? 1 : 0;
-    const int item_count = 33 + lr2_shift;
+    const int item_count = 34 + lr2_shift;
     const int imported_skin_row = 1;
     const int lr2_resolution_row = lr2_source ? 2 : -1;
     const int import_skin_row = 2 + lr2_shift;
@@ -355,7 +355,8 @@ void MenuApp::handle_skins_settings_input(uint32_t keycode) {
     const int ln_body_width_row = 29 + lr2_shift;
     const int note_height_row = 30 + lr2_shift;
     const int combo_y_row = 31 + lr2_shift;
-    const int back_row = 32 + lr2_shift;
+    const int black_playfield_row = 32 + lr2_shift;
+    const int back_row = 33 + lr2_shift;
 
     if (keycode == key_up_) {
         settings_cursor_ = clamp_int(settings_cursor_ - 1, 0, item_count - 1);
@@ -373,7 +374,7 @@ void MenuApp::handle_skins_settings_input(uint32_t keycode) {
         const bool was_lr2 = active_skin_source == "lr2";
         config_.skin.source = cycle_skin_source(config_.skin.source, direction);
         const bool is_lr2 = config::normalize_skin_source_token(config_.skin.source) == "lr2";
-        const int new_item_count = 33 + (is_lr2 ? 1 : 0);
+        const int new_item_count = 34 + (is_lr2 ? 1 : 0);
         if (!was_lr2 && is_lr2 && settings_cursor_ >= imported_skin_row) {
             ++settings_cursor_;
         } else if (was_lr2 && !is_lr2 && settings_cursor_ >= import_skin_row) {
@@ -722,6 +723,12 @@ void MenuApp::handle_skins_settings_input(uint32_t keycode) {
         publish_snapshot();
         return;
     }
+    if (settings_cursor_ == black_playfield_row && (keycode == key_left_ || keycode == key_right_)) {
+        config_.skin.black_playfield_enabled = !config_.skin.black_playfield_enabled;
+        skin_dirty_ = true;
+        publish_snapshot();
+        return;
+    }
 
     if ((keycode == key_enter_ && settings_cursor_ == back_row) ||
         keycode == key_escape_ ||
@@ -850,7 +857,7 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
                     settings_cursor_ == 23 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 23 + lr2_shift, false, true);
     append_menu_row(render.generic, ui_text("Lane Width", "레인 너비"), format_percent(preview_lane_width_scale),
                     settings_cursor_ == 24 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 24 + lr2_shift, false, true);
-    append_menu_row(render.generic, ui_text("Note Width", "노트 너비"), format_percent(preview_note_width_scale),
+    append_menu_row(render.generic, ui_text("Note Size (Width)", "노트 크기(너비)"), format_percent(preview_note_width_scale),
                     settings_cursor_ == 25 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 25 + lr2_shift, false, true);
     append_menu_row(render.generic, ui_text("Lane Spacing", "레인 간격"), format_percent(preview_lane_spacing_scale),
                     settings_cursor_ == 26 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 26 + lr2_shift, false, gap_count > 0);
@@ -870,8 +877,11 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
                     settings_cursor_ == 30 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 30 + lr2_shift, false, true);
     append_menu_row(render.generic, ui_text("Combo Y", "콤보 Y"), format_percent(config_.skin.combo_position),
                     settings_cursor_ == 31 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 31 + lr2_shift, false, true);
-    append_menu_row(render.generic, ui_text("Back", "뒤로"), "", settings_cursor_ == 32 + lr2_shift,
-                    render::MenuHitTargetKind::SettingsRow, 32 + lr2_shift, true, false);
+    append_menu_row(render.generic, ui_text("Black Playfield", "검정 플레이필드"),
+                    ui_on_off(config_.skin.black_playfield_enabled),
+                    settings_cursor_ == 32 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 32 + lr2_shift, false, true);
+    append_menu_row(render.generic, ui_text("Back", "뒤로"), "", settings_cursor_ == 33 + lr2_shift,
+                    render::MenuHitTargetKind::SettingsRow, 33 + lr2_shift, true, false);
 
     render.generic.skin_preview.visible = true;
     render.generic.skin_preview.mode_label = ui_key_mode_label(skin_edit_mode_);
@@ -927,6 +937,7 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
         config_.skin.lane_background_opacity,
         config::kSkinLaneBackgroundOpacityMin,
         config::kSkinLaneBackgroundOpacityMax);
+    render.generic.skin_preview.black_playfield_enabled = config_.skin.black_playfield_enabled;
     render.generic.skin_preview.visual_opacity = std::clamp(
         config_.skin.visual_opacity,
         config::kSkinVisualOpacityMin,
@@ -964,12 +975,14 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
                                            "LN 꼬리 테이퍼는 시각 효과만 바꿉니다. 판정이나 히트박스는 그대로 두고 홀드 몸통만 꼬리 쪽으로 좁아집니다."));
     render.generic.notes.push_back(ui_text("Divider Width is shared across all key modes, and it scales the white lane separators plus any imported divider widths.",
                                            "구분선 너비는 모든 키 모드에 공용으로 적용되며, 흰 레인 구분선과 외부 스킨이 제공하는 구분선 폭에 함께 배율로 적용됩니다."));
-    render.generic.notes.push_back(ui_text("Lane Width changes the selected lane's field width, while Note Width still scales the note body inside each lane.",
-                                           "레인 너비는 선택한 레인의 필드 폭을 바꾸고, 노트 너비는 각 레인 안의 노트 폭만 따로 조절합니다."));
+    render.generic.notes.push_back(ui_text("Lane Width changes the selected lane's field width. Note Size changes only note width around fixed lane-divider centers.",
+                                           "레인 너비는 선택한 레인의 필드 폭을 바꿉니다. 노트 크기는 고정된 레인 구분선 중심을 기준으로 노트 너비만 조절합니다."));
     render.generic.notes.push_back(ui_text("Lane Spacing adds blank space after the selected gap, so you can open individual separators without changing note timing.",
                                            "레인 간격은 선택한 구간 뒤에 빈 공간을 더해 개별 구분 간격을 벌리며, 노트 타이밍에는 영향을 주지 않습니다."));
     render.generic.notes.push_back(ui_text("16K Center Gap inserts a blank center lane-width gap between the left and right halves of the 16-key field.",
                                            "16K 중앙 간격은 16키 필드의 좌우 묶음 사이에 빈 중앙 간격을 추가합니다."));
+    render.generic.notes.push_back(ui_text("Black Playfield forces the complete lane field, including spacing gaps, to solid black.",
+                                           "검정 플레이필드는 간격 구간까지 포함한 전체 레인 필드를 완전한 검정으로 표시합니다."));
     render.generic.notes.push_back(ui_text("Key Mode, Target Lane, and Target Gap edit per-layout fallback geometry before imported divider art is applied.",
                                            "키 모드, 대상 레인, 대상 간격은 외부 스킨 구분선 아트를 적용하기 전 레이아웃별 기본 지오메트리를 편집합니다."));
 }

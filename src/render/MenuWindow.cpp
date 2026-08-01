@@ -1,4 +1,5 @@
 #include "render/MenuWindow.h"
+#include "render/GameplayFeedbackText.h"
 
 #ifdef _WIN32
 
@@ -102,6 +103,7 @@ constexpr double kGameplayComboPositionMin = 0.10;
 constexpr double kGameplayComboPositionMax = 0.78;
 constexpr double kGameplayComboPositionDefault = 0.24;
 constexpr float kGameplayComboWideCenterGapThreshold = 1.05f;
+constexpr float kGameplayDefaultNoteGapPx = 24.0f;
 constexpr float kGameplayLaneDividerBaseWidth = 1.0f;
 constexpr float kGameplayLaneDividerWidthMaxPx = 16.0f;
 
@@ -616,7 +618,8 @@ void draw_gameplay_hold_body(ID2D1RenderTarget* target,
 
 float gameplay_note_draw_width(float lane_width, double note_width_scale) {
     const float safe_lane_width = std::max(24.0f, lane_width);
-    const float base_note_width = std::max(16.0f, safe_lane_width - 16.0f);
+    // Keep note edges symmetric around the lane center/divider geometry. Width scaling must not move the field.
+    const float base_note_width = std::max(16.0f, safe_lane_width - kGameplayDefaultNoteGapPx);
     return std::clamp(base_note_width * clamp_gameplay_note_width_scale(note_width_scale),
                       16.0f,
                       std::max(16.0f, safe_lane_width - 4.0f));
@@ -690,12 +693,8 @@ GameplayFieldLayout build_gameplay_field_layout(float bounds_left,
         total_gap_units += gap_unit;
     }
     const float effective_lane_units = std::max(1.0f, total_lane_units + total_gap_units);
-    const float base_lane_width = bounds_width / effective_lane_units;
-    const float default_note_width = gameplay_note_draw_width(base_lane_width, 1.0);
-    const float desired_note_width = gameplay_note_draw_width(base_lane_width, note_width_scale);
-    const float shrink_ratio =
-        (default_note_width > 1.0f) ? std::clamp(desired_note_width / default_note_width, 0.35f, 1.0f) : 1.0f;
-    const float field_width = bounds_width * shrink_ratio;
+    // Divider positions define the playfield. Note Width only scales note art inside those fixed lane boundaries.
+    const float field_width = bounds_width;
     const float center_x = (bounds_left + bounds_right) * 0.5f;
     const float unit_width = field_width / effective_lane_units;
     const float center_gap_only = (use_center_gap ? unit_width * center_gap_scale : 0.0f);
@@ -3091,6 +3090,7 @@ bool MenuWindow::ensure_gameplay_static_cache(const GameplayHudData& data) {
     desired.show_gear_boundary_line = data.show_gear_boundary_line;
     desired.judgement_line_glow_enabled = data.judgement_line_glow_enabled;
     desired.lane_background_opacity = std::clamp(data.lane_background_opacity, 0.0, 0.45);
+    desired.black_playfield_enabled = data.black_playfield_enabled;
     desired.visual_opacity = std::clamp(data.visual_opacity, 0.20, 1.0);
     desired.ghost_visible = data.ghost_visible;
     desired.lane_color_count = std::min(data.lane_color_count, desired.lane_colors.size());
@@ -3122,6 +3122,7 @@ bool MenuWindow::ensure_gameplay_static_cache(const GameplayHudData& data) {
         gameplay_static_cache_.show_gear_boundary_line == desired.show_gear_boundary_line &&
         gameplay_static_cache_.judgement_line_glow_enabled == desired.judgement_line_glow_enabled &&
         gameplay_static_cache_.lane_background_opacity == desired.lane_background_opacity &&
+        gameplay_static_cache_.black_playfield_enabled == desired.black_playfield_enabled &&
         gameplay_static_cache_.visual_opacity == desired.visual_opacity &&
         gameplay_static_cache_.ghost_visible == desired.ghost_visible &&
         gameplay_static_cache_.lane_color_count == desired.lane_color_count &&
@@ -3194,7 +3195,12 @@ bool MenuWindow::ensure_gameplay_static_cache(const GameplayHudData& data) {
                 D2D1::RoundedRect(field_rect, 16.0f, 16.0f), d2d_->panel_brush.Get());
             d2d_->panel_brush->SetOpacity(1.0f);
         }
-        if (d2d_->note_fill_brush) {
+        if (desired.black_playfield_enabled && d2d_->note_fill_brush) {
+            d2d_->note_fill_brush->SetColor(D2D1::ColorF(0x000000, 1.0f));
+            d2d_->d2d_context->FillRoundedRectangle(
+                D2D1::RoundedRect(field_rect, 16.0f, 16.0f), d2d_->note_fill_brush.Get());
+        }
+        if (!desired.black_playfield_enabled && d2d_->note_fill_brush) {
             const float lane_bg_opacity = static_cast<float>(
                 std::clamp(desired.lane_background_opacity * desired.visual_opacity, 0.0, 0.50));
             for (int lane = 0; lane < desired.lane_count; ++lane) {

@@ -465,14 +465,20 @@
 
             if (data.gameplay.has_feedback) {
                 gameplay_hud_cache_.feedback_text = gameplay_feedback_overlay_text(data.gameplay.feedback);
+                gameplay_hud_cache_.feedback_timing_text =
+                    gameplay_timing_feedback_text(data.gameplay.feedback_delta_ms);
             } else {
                 gameplay_hud_cache_.feedback_text.clear();
+                gameplay_hud_cache_.feedback_timing_text.clear();
             }
             if (data.gameplay.ghost_has_feedback) {
                 gameplay_hud_cache_.ghost_feedback_text =
                     gameplay_feedback_overlay_text(data.gameplay.ghost_feedback);
+                gameplay_hud_cache_.ghost_feedback_timing_text =
+                    gameplay_timing_feedback_text(data.gameplay.ghost_feedback_delta_ms);
             } else {
                 gameplay_hud_cache_.ghost_feedback_text.clear();
+                gameplay_hud_cache_.ghost_feedback_timing_text.clear();
             }
             gameplay_hud_cache_.text_revision = data.gameplay.text_revision;
         }
@@ -1114,6 +1120,22 @@
                                           feedback_rect,
                                           d2d_->text_brush.Get(),
                                           DWRITE_TEXT_ALIGNMENT_CENTER);
+                if (!gameplay_hud_cache_.feedback_timing_text.empty() && d2d_->body_format) {
+                    const D2D1_RECT_F timing_text_rect =
+                        D2D1::RectF(feedback_rect.left,
+                                    feedback_rect.top + 54.0f,
+                                    feedback_rect.right,
+                                    feedback_rect.bottom + 8.0f);
+                    d2d_->text_brush->SetColor(
+                        data.gameplay.feedback_delta_ms < 0.0
+                            ? D2D1::ColorF(0x5DA9FF, 0.98f)
+                            : D2D1::ColorF(0xFF5A6B, 0.98f));
+                    draw_text_clipped_aligned(gameplay_hud_cache_.feedback_timing_text,
+                                              d2d_->body_format.Get(),
+                                              timing_text_rect,
+                                              d2d_->text_brush.Get(),
+                                              DWRITE_TEXT_ALIGNMENT_CENTER);
+                }
                 d2d_->text_brush->SetColor(saved_text_color);
             }
 
@@ -1750,6 +1772,22 @@
                                               feedback_rect,
                                               d2d_->text_brush.Get(),
                                               DWRITE_TEXT_ALIGNMENT_CENTER);
+                    if (!gameplay_hud_cache_.ghost_feedback_timing_text.empty() && d2d_->body_format) {
+                        const D2D1_RECT_F timing_text_rect =
+                            D2D1::RectF(feedback_rect.left,
+                                        feedback_rect.top + 54.0f,
+                                        feedback_rect.right,
+                                        feedback_rect.bottom + 8.0f);
+                        d2d_->text_brush->SetColor(
+                            data.gameplay.ghost_feedback_delta_ms < 0.0
+                                ? D2D1::ColorF(0x5DA9FF, 0.98f)
+                                : D2D1::ColorF(0xFF5A6B, 0.98f));
+                        draw_text_clipped_aligned(gameplay_hud_cache_.ghost_feedback_timing_text,
+                                                  d2d_->body_format.Get(),
+                                                  timing_text_rect,
+                                                  d2d_->text_brush.Get(),
+                                                  DWRITE_TEXT_ALIGNMENT_CENTER);
+                    }
                     d2d_->text_brush->SetColor(saved_text_color);
                 }
 

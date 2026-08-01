@@ -3,7 +3,7 @@
 This is the document that the next agent or any new contributor should read first. Its goal is to quickly answer: "what is this project now, where should I look, and what is still unverified?"
 
 ## Baseline
-- Current project and public stable version: `1.2.93 stable`
+- Current project and public stable version: `1.2.95 stable`
 - Direct-IP multiplayer and the preview r5 input-backend lifecycle fixes are integrated into `1.1.8 stable`
 - `1.1.8` adds an osu!mania OD8 auxiliary score, first-native-`BAD` `Sudden Death (1 MISS)`, and deterministic `LN Mix 10%-90%` on top of the 1.1.7 visual refresh
 - `1.2.0` connects BMS channel `04/07` and osu!mania backgrounds to the gameplay sample timeline and asynchronously upscales sub-FHD image backgrounds through LunaSR on Windows ML
@@ -18,10 +18,11 @@ This is the document that the next agent or any new contributor should read firs
 - `1.2.9` adds 12K/14K and scratch-aware key conversion, R-Random/DP Flip/Note Add, delayed Song Select preview, richer image-backed results, profile nicknames, stable native video-BGA frames, and accurate `DirectXMinPower` wording.
 - `1.2.92` adds selectable default Krrcream and deterministic `nK2 Native 50/50` paths to the standalone BMS key converter.
 - `1.2.93` adds an in-game `Key Converter` row for `Krrcream`/`KeyWeaver nK2`, persists the choice in config/replay metadata, and applies it to runtime key-mode conversion.
+- `1.2.95`: enabling `OSU Charts` in Mode Settings uses TenRiff's in-tree parser to index and play 4K-10K osu!mania `.osu`. BMS stays the default; `.osz` and osu skin import remain out of scope.
 - Baseline companion document for follow-up work: `docs/baseline-1.1.2.en.md`
 - Windows GUI build is the main target
 - Linux exists only as a preview-level package at `Baepoks-Linuxs/TenRiff-0.5.0-linux-preview`
-- The supported chart surface is BMS-family only (`.bms/.bme/.bml/.pms`)
+- The supported chart surface is BMS-family (`.bms/.bme/.bml/.pms`) by default, plus optional 4K-10K osu!mania `.osu`
 - The `1.2.4 stable` runtime keeps RawInput primary while continuously running a bound-key polling shadow in the same `InputThread`; startup failure or an unexpected message-pump exit switches that producer to Polling without resetting its queue or pressed state
 - Menu input keeps the foreground process/root-window boundary. A RawInput startup failure, process-global registration-target loss, or hidden message-window exit switches it to Polling without waiting for a user key.
 - A confirmed fallback stays active across menu and subsequent gameplay sessions for the current app run without rewriting the profile; app restart or an explicit `Options -> Input Settings -> Backend` change retries it.
@@ -96,7 +97,9 @@ This is the document that the next agent or any new contributor should read firs
   - `rect / triangle / pentagon / hexagon / circle` note shapes; procedural circles and polygons use the full rect-bar width at 100%
   - note border on/off
   - combo Y adjustment
-  - judge line / lane width / lane spacing / note width / divider width / 16K center gap / note height / LN body width adjustment
+  - judge line / lane width / lane spacing / note size (width) / divider width / 16K center gap / note height / LN body width adjustment
+  - note width changes around fixed lane-divider centers, with a default 24px combined gap between adjacent notes at 100%
+  - Black Playfield fills the complete player/ghost playfield, including lane-spacing gaps, with solid black
   - per-key-mode lane-width arrays and inter-lane spacing arrays are persisted and applied through the same layout math in preview, live gameplay, and the ghost field
   - supported skin routes are `native` and LR2 playskin only; selecting or dropping an LR2 folder in Skins imports it into the active profile
   - LR2 note/LN images, lane gaps, and destination sizes are applied to gameplay layout
@@ -106,7 +109,8 @@ This is the document that the next agent or any new contributor should read firs
   - gameplay ends right after the last judged note is handled
 - Judge:
   - default `GOOD` window is `75ms`
-  - default `BAD` window is `340ms`
+  - the default `BAD` window is `210ms`, `Judge Easy` uses `262.5ms`, and `Judge Hard` uses `340ms`
+  - `Judge Hard` narrows only the BAD boundary and leaves PG/GR/GD plus long-note tail windows at their base values
   - if the pending same-lane note is already a `BAD` while the immediate next note is clearly `GOOD` or better, the pending note is recorded as a miss and the current press scores the next note instead of locking the stream into repeated `BAD`s
   - note-consuming failures (auto-miss, too-early consume, hold break / tail miss) stay `BAD`
   - very early non-consuming presses are handled as LR2-style `POOR` and are visible again in result / replay / UI paths
@@ -183,7 +187,7 @@ This is the document that the next agent or any new contributor should read firs
 
 ## Runtime / Packaging Rules
 - New user profiles are created automatically
-- The current official P2P distribution line is `TenRiff 1.2.93 stable`
+- The current official P2P distribution line is `TenRiff 1.2.95 stable`
 - Distribution packages do not include `Songs`
 - Distribution packages include the `Mainmusic/` scene slots `Main Menu / Options / Song Selecte / Multiplayer Lobby / Clear / Failed`; each `Name.mp3` plus numbered `Name 2.mp3` through `Name 64.mp3` siblings is discovered automatically and rotates on scene re-entry
 - Distribution updates include only built artifacts and required runtime assets

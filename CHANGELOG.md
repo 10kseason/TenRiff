@@ -4,6 +4,20 @@ TenRiff의 사용자/배포 관점에서 의미 있는 변경만 간단히 기�
 
 ## [Unreleased]
 
+## [1.2.95] - 2026-08-01
+
+### Added
+
+- Gameplay judgement feedback now shows signed timing detail: early hits use `FAST -12 ms`, late hits use `SLOW +18 ms`, and hits rounded to `0 ms` omit the timing label
+- The default `BAD` window is now `210ms`; Judge Easy follows its existing `1.25x` scale (`262.5ms`), while Judge Hard uses an exact `340ms` BAD window without changing PG/GR/GD or long-note tail windows
+- Native note spacing now keeps lane-divider geometry fixed, widens the default note-edge gap from 16px to 24px, and applies the per-mode `Note Size (Width)` scale only inside each lane
+- Skins now includes a persisted `Black Playfield` toggle that fills the complete player/ghost lane field, including configured spacing gaps, with solid black
+- Restored TenRiff's in-tree osu!mania parser as an optional `OSU Charts` Mode Settings path for raw 4K-10K `.osu` files, including indexing, native difficulty, main audio, background image, hold-note runtime conversion, and cache invalidation; BMS remains the default and `.osz`/osu skin import are not restored
+
+### Packaging
+
+- Windows `TenRiff-1.2.95.zip`, public source `TenRiff-1.2.95-source.zip`, and `TenRiff-1.2.95-SHA256SUMS.txt` are the formal release assets; no ONNX model, private checkpoint, user profile, song, or log is bundled
+
 ## [1.2.93] - 2026-08-01
 
 ### Added

@@ -84,7 +84,7 @@ void MenuApp::handle_audio_settings_input(uint32_t keycode) {
 }
 
 void MenuApp::handle_mode_settings_input(uint32_t keycode) {
-    const int item_count = 14;
+    const int item_count = 15;
     if (keycode == key_up_) {
         settings_cursor_ = clamp_int(settings_cursor_ - 1, 0, item_count - 1);
         publish_snapshot();
@@ -159,6 +159,10 @@ void MenuApp::handle_mode_settings_input(uint32_t keycode) {
                 config_.speed.hi_speed + static_cast<double>(direction) * kHiSpeedStep,
                 kHiSpeedMin, kHiSpeedMax, kHiSpeedStep);
             mode_dirty_ = true;
+        } else if (settings_cursor_ == 13) {
+            config_.mode.enable_osu_charts = !config_.mode.enable_osu_charts;
+            mode_dirty_ = true;
+            mode_library_dirty_ = true;
         }
         publish_snapshot();
         return;
@@ -270,7 +274,9 @@ void MenuApp::populate_mode_settings_render_data(render::MenuRenderData& render)
                     render::MenuHitTargetKind::SettingsRow, 11, false, true);
     append_menu_row(render.generic, ui_text("Hi-Speed", "하이스피드"), format_decimal(config_.speed.hi_speed), settings_cursor_ == 12,
                     render::MenuHitTargetKind::SettingsRow, 12, false, true);
-    append_menu_row(render.generic, ui_text("Back", "뒤로"), "", settings_cursor_ == 13, render::MenuHitTargetKind::SettingsRow, 13, true, false);
+    append_menu_row(render.generic, ui_text("OSU Charts", "OSU 차트"), ui_on_off(config_.mode.enable_osu_charts), settings_cursor_ == 13,
+                    render::MenuHitTargetKind::SettingsRow, 13, false, true);
+    append_menu_row(render.generic, ui_text("Back", "뒤로"), "", settings_cursor_ == 14, render::MenuHitTargetKind::SettingsRow, 14, true, false);
     render.generic.notes.push_back(ui_text("Indexing Safe keeps RAM low for large scans; Fast uses more RAM for quicker rescans on 32GB+ PCs.",
                                            "인덱싱 안전은 대형 스캔에서 RAM 사용을 낮추고, 빠름은 32GB+ 환경에서 더 많은 RAM으로 재스캔을 가속합니다."));
     render.generic.notes.push_back(ui_text("Ghost Battle automatically loads the selected chart's best compatible replay into the split ghost comparison view.",
@@ -292,6 +298,8 @@ void MenuApp::populate_mode_settings_render_data(render::MenuRenderData& render)
         "미러 자체는 시드를 쓰지 않지만, 먼저 실행되는 키 모드 변환은 랜덤 시드를 사용할 수 있습니다."));
     render.generic.notes.push_back(ui_text("Mods opens the registry-backed Mod Manager and shows the current score multiplier.",
                                            "모드는 현재 점수 배율을 보여주고, 등록 기반 Mod Manager를 엽니다."));
+    render.generic.notes.push_back(ui_text("OSU Charts adds 4K-10K .osu beatmaps to indexing and runtime loading after Back refreshes the library.",
+                                           "OSU 차트를 켜면 뒤로 나갈 때 라이브러리를 갱신하고 4K~10K .osu 비트맵을 인덱싱·실행합니다."));
     render.generic.notes.push_back(ui_text("Back saves the current mode settings.",
                                            "뒤로 가면 현재 모드 설정을 저장합니다."));
 }

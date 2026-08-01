@@ -40,7 +40,7 @@ profile が存在しない場合は初回起動時に自動生成されます。
 
 - `backend` (string)
   - `polling | rawinput`
-  - 現行 `1.2.93` リリースラインの既定値は `rawinput`
+  - 現行 `1.2.95` リリースラインの既定値は `rawinput`
   - `Options -> Input Settings -> Backend` または `Options -> Profile Setup -> Input Backend` で profile ごとに選択可能
   - runtime fallback は保存済みの値を `polling` に書き換えない
   - RawInput の起動失敗、登録先の消失、message window の終了を確認すると、そのアプリ実行中は menu と後続 gameplay の両方で Polling を維持する
@@ -69,7 +69,8 @@ profile が存在しない場合は初回起動時に自動生成されます。
 ### `judge`
 - `pg`, `gr`, `gd`, `bd` (double, ms)
 - 既定 `gd` は `75ms`
-- 既定 `bd` は `340ms`
+- 既定 `bd` は `210ms`
+- `Judge Easy` は従来の `1.25x` 倍率で `bd=262.5ms`、`Judge Hard` は `bd=340ms` を使用。Hard でも PG/GR/GD と LN tail window は基本値のまま
 - `indirect_miss` (double, ms)
   - 入力が来ないまま note が auto-miss になるときの閾値
   - 現在の runtime では保存値に関係なく常に `bd` と同値へ折りたたまれる
@@ -133,7 +134,7 @@ profile が存在しない場合は初回起動時に自動生成されます。
   - low-power session 作成失敗時は既存の high-performance DirectX 経路へ fallback
 
 ### `mode`
-chart loader/indexer は BMS family（`.bms/.bme/.bml/.pms`）専用で、`format` と `enable_osu_charts` は保存・使用しません。
+chart loader/indexer は BMS family（`.bms/.bme/.bml/.pms`）が既定です。`enable_osu_charts=true` なら独自 parser で osu!mania 4K～10K `.osu` も含め、旧 `format` filter は使用しません。
 
 - `key_mode` (string)
   - `none | auto | 4k | 5k | 6k | 7k | 8k | 9k | 10k | 12k | 14k | 16k`
@@ -210,6 +211,9 @@ chart loader/indexer は BMS family（`.bms/.bme/.bml/.pms`）専用で、`forma
 - `show_hold_tail` (bool)
   - long-note の判定と body の連続性を変えず、tail cap だけを表示または非表示にする
 - `note_border_enabled` (bool)
+- `black_playfield_enabled` (bool)
+  - `true` の場合、lane spacing を含む player/ghost playfield 全体を完全な黒で表示
+  - 既定値は `false`
 - `judgement_line_position` (double)
   - gameplay judgement line の縦位置比率
   - `0.00..1.00`（0%～100%）に clamp
@@ -223,7 +227,8 @@ chart loader/indexer は BMS family（`.bms/.bme/.bml/.pms`）専用で、`forma
   - 各 mode 値は lane ごとに 1 要素を持つ数値配列
   - 各値は `0.50..1.75` に clamp
 - `note_width_scale` (double)
-  - note head / tail の幅スケール
+  - 固定された lane divider 中心を基準に note head / tail の幅だけを調整
+  - 100% で隣接 note 間の既定合計 gap は `24px`
   - `0.50..1.40` に clamp
 - `lane_spacing_scales` (object)
   - キーモードごとの lane 間空白スケール配列

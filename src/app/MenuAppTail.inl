@@ -99,6 +99,7 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
         config_.skin.lane_background_opacity,
         config::kSkinLaneBackgroundOpacityMin,
         config::kSkinLaneBackgroundOpacityMax);
+    target.black_playfield_enabled = config_.skin.black_playfield_enabled;
     target.visual_opacity = std::clamp(
         config_.skin.visual_opacity,
         config::kSkinVisualOpacityMin,

@@ -307,6 +307,7 @@ struct GameplayHudData {
     std::string external_skin_name;
     std::string lr2_resolution_override = "auto";
     double lane_background_opacity = 0.18;
+    bool black_playfield_enabled = false;
     double visual_opacity = 0.96;
     double note_outline_opacity = 0.78;
     double hold_body_opacity = 0.24;
@@ -447,6 +448,7 @@ struct SkinPreviewData {
     std::string external_skin_name;
     std::string lr2_resolution_override = "auto";
     double lane_background_opacity = 0.18;
+    bool black_playfield_enabled = false;
     double visual_opacity = 0.96;
     double note_outline_opacity = 0.78;
     double hold_body_opacity = 0.24;
@@ -652,6 +654,7 @@ private:
         std::wstring gauge_label_text{};
         std::wstring gauge_value_text{};
         std::wstring feedback_text{};
+        std::wstring feedback_timing_text{};
         std::wstring peer_name_text{};
         std::wstring peer_status_text{};
         std::wstring peer_score_text{};
@@ -667,6 +670,7 @@ private:
         std::wstring ghost_gauge_label_text{};
         std::wstring ghost_gauge_value_text{};
         std::wstring ghost_feedback_text{};
+        std::wstring ghost_feedback_timing_text{};
     };
 
     struct GameplayStaticCache {
@@ -685,6 +689,7 @@ private:
         bool show_gear_boundary_line = false;
         bool judgement_line_glow_enabled = true;
         double lane_background_opacity = 0.18;
+        bool black_playfield_enabled = false;
         double visual_opacity = 0.96;
         bool ghost_visible = false;
         std::size_t lane_color_count = 0;
