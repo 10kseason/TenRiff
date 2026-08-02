@@ -10,6 +10,7 @@ This document summarizes the implemented mode system, lane-transform/random rule
 "mode": {
   "key_mode": "none",
   "key_conversion_algorithm": "krrcream",
+  "key_conversion_note_add_mode": "default",
   "enable_osu_charts": false,
   "gauge": "normal",
   "random": "off",
@@ -19,7 +20,8 @@ This document summarizes the implemented mode system, lane-transform/random rule
   "autoplay_enabled": false,
   "practice_no_fail_enabled": false,
   "one_miss_fail_enabled": false,
-  "song_index_profile": "safe"
+  "song_index_profile": "safe",
+  "calculate_song_index_difficulty": false
 }
 ```
 
@@ -27,6 +29,7 @@ This document summarizes the implemented mode system, lane-transform/random rule
 - `enable_osu_charts`: defaults to `false`; Mode Settings > `OSU Charts` enables indexing and play for 4K-10K osu!mania `.osu` and refreshes the library
 - `key_mode`: `none | auto | 4k | 5k | 6k | 7k | 8k | 9k | 10k | 12k | 14k | 16k`
 - `key_conversion_algorithm`: `krrcream | nk2` (defaults to `krrcream`; selected in the in-game Key Converter row and used only for actual key-count conversion)
+- `key_conversion_note_add_mode`: `default | add_25_plus` (defaults to `default`; only an actual playable-key-count change requests at least 25% more notes than the converter baseline)
 - `gauge`: `normal | hard | ex_hard | easy | shift`
 - `random`: `off | mirror | rr | fr | sr`
 - `random_seed`: fixed seed for RR/FR/SR, forced key-mode conversion, Note Add, and LN Mix selection (`0` is also fixed)
@@ -43,6 +46,9 @@ This document summarizes the implemented mode system, lane-transform/random rule
 - `song_index_profile`: `safe | fast`
   - `safe`: the default that prioritizes lowering large-library RAM high-water usage
   - `fast`: the optional choice that aims for faster reindexing in 32GB+ environments
+- `calculate_song_index_difficulty`: `false | true`
+  - default `false`: keep BMS `#PLAYLEVEL` and skip native LV/CR calculation
+  - `true`: calculate Revive LV/Circus Rating during a full reindex
 
 `Rate` is stored under `speed.rate`, not `mode`. It can be changed in Mode Settings or directly from Song Select with `-` / `+` while search text entry is inactive.
 
@@ -71,6 +77,7 @@ This document summarizes the implemented mode system, lane-transform/random rule
 - `4k..10k`, `12k`, `14k`, and `16k` match the key count through N2NC-based lane remapping
 - forced conversion of `5+1 SP` and `7+1 SP` remaps only the keyboard part; followed scratch keysounds move to autoplay
 - forced conversion of `10+2 DP` and `14+2 DP` likewise excludes both scratches and converts the two keyboard halves independently
+- `add_25_plus` requests at least 25% safe silent chords at existing times after baseline conversion; a higher Note Add mod replaces that percentage instead of stacking another pass. The run remains in Records but cannot replace a normal best record.
 - application order: key-mode conversion → DP Flip → Mirror/RR/FR/SR → Note Add → LN/Full Tap structure transform
 
 ## Gauge Rules

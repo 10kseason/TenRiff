@@ -123,6 +123,26 @@ int target_lane_count(KeyMode mode) {
     }
 }
 
+int resolved_playable_lane_count(const gameplay::GameplayChart& chart) {
+    int lane_count = chart.lane_count;
+    if (lane_count <= 0) {
+        for (const auto& note : chart.notes) {
+            lane_count = std::max(lane_count, note.lane);
+        }
+    }
+    if (lane_count <= 0 || chart.scratch_lanes.empty()) {
+        return std::max(0, lane_count);
+    }
+
+    std::unordered_set<int> scratch_lanes;
+    for (const int lane : chart.scratch_lanes) {
+        if (lane > 0 && lane <= lane_count) {
+            scratch_lanes.insert(lane);
+        }
+    }
+    return std::max(0, lane_count - static_cast<int>(scratch_lanes.size()));
+}
+
 KeyMode key_mode_for_lane_count(int lane_count) {
     switch (lane_count) {
         case 4: return KeyMode::Keys4;
@@ -422,6 +442,7 @@ void apply_mixed_long_notes(gameplay::GameplayChart& chart,
 void apply_note_additions(gameplay::GameplayChart& chart,
                           int percent,
                           uint32_t random_seed,
+                          bool round_up_to_minimum,
                           std::vector<std::string>& warnings) {
     percent = std::clamp(percent, 0, 100);
     if (percent <= 0 || chart.notes.empty()) {
@@ -563,8 +584,11 @@ void apply_note_additions(gameplay::GameplayChart& chart,
                          });
     }
 
-    const std::size_t requested_additions = static_cast<std::size_t>(std::llround(
-        static_cast<double>(original_playable_notes) * static_cast<double>(percent) / 100.0));
+    const double requested_addition_count =
+        static_cast<double>(original_playable_notes) * static_cast<double>(percent) / 100.0;
+    const std::size_t requested_additions = static_cast<std::size_t>(
+        round_up_to_minimum ? std::ceil(requested_addition_count)
+                            : std::llround(requested_addition_count));
     std::vector<std::size_t> candidate_cursor(static_cast<std::size_t>(lane_count) + 1u, 0u);
     std::size_t added = 0;
 
@@ -823,13 +847,27 @@ ModeManagerResult manage_modes(const gameplay::GameplayChart& chart,
     result.active_mods = normalize_mode_mod_tokens(config.mods, &result.warnings);
     result.settings.dp_flip = has_mod_token(result.active_mods, "dp_flip");
 
+    const int source_playable_lane_count = resolved_playable_lane_count(result.chart);
+    const int requested_lane_count = target_lane_count(result.settings.key_mode);
     const auto applied = gameplay::apply_mode_settings(result.chart, result.settings, {base_bpm, sample_rate});
     result.chart = applied.chart;
     result.warnings.insert(result.warnings.end(), applied.warnings.begin(), applied.warnings.end());
 
-    if (const int note_add_percent = selected_note_add_percent(result.active_mods);
-        note_add_percent > 0) {
-        apply_note_additions(result.chart, note_add_percent, config.random_seed, result.warnings);
+    const bool key_count_changed =
+        requested_lane_count > 0 && requested_lane_count != source_playable_lane_count &&
+        result.chart.lane_count == requested_lane_count;
+    const bool conversion_note_add_enabled =
+        key_count_changed &&
+        ::tenriff::config::normalize_key_conversion_note_add_mode(config.key_conversion_note_add_mode) ==
+            "add_25_plus";
+    const int note_add_percent = std::max(
+        selected_note_add_percent(result.active_mods), conversion_note_add_enabled ? 25 : 0);
+    if (note_add_percent > 0) {
+        apply_note_additions(result.chart,
+                             note_add_percent,
+                             config.random_seed,
+                             conversion_note_add_enabled,
+                             result.warnings);
     }
 
     if (has_mod_token(result.active_mods, "full_short_notes")) {

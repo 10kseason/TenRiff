@@ -92,7 +92,20 @@ void MenuMusicController::play_looping_file(const std::string& path, double gain
         return;
     }
 
-    if (requested_path_ == path && open_) {
+    const bool requested_path_matches = requested_path_ == path;
+    const auto action = menu_music_detail::playback_action(open_, requested_path_matches, clamped_gain);
+    if (action == menu_music_detail::PlaybackAction::Close) {
+        // Do not create or retain a muted MCI session. Some Windows MCI drivers do not
+        // reliably recover when a file was opened and started at volume zero.
+        close_locked();
+        requested_path_ = path;
+        gain_ = 0.0;
+        open_failed_ = false;
+        retry_allowed_at_ = {};
+        return;
+    }
+
+    if (action == menu_music_detail::PlaybackAction::UpdateGain) {
         gain_ = clamped_gain;
         apply_gain_locked();
         return;

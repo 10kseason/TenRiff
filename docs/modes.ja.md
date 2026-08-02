@@ -10,6 +10,7 @@
 "mode": {
   "key_mode": "none",
   "key_conversion_algorithm": "krrcream",
+  "key_conversion_note_add_mode": "default",
   "enable_osu_charts": false,
   "gauge": "normal",
   "random": "off",
@@ -19,7 +20,8 @@
   "autoplay_enabled": false,
   "practice_no_fail_enabled": false,
   "one_miss_fail_enabled": false,
-  "song_index_profile": "safe"
+  "song_index_profile": "safe",
+  "calculate_song_index_difficulty": false
 }
 ```
 
@@ -27,6 +29,7 @@
 - `enable_osu_charts`: 既定 `false`。Mode Settings の `OSU Charts` で osu!mania 4K～10K `.osu` の index/play を有効にし、library を再 scan
 - `key_mode`: `none | auto | 4k | 5k | 6k | 7k | 8k | 9k | 10k | 12k | 14k | 16k`
 - `key_conversion_algorithm`: `krrcream | nk2`（既定値は `krrcream`。ゲーム内 Key Converter で選択し、実際のキー数変換時のみ使用）
+- `key_conversion_note_add_mode`: `default | add_25_plus`（既定 `default`。playable key count が実際に変わる時だけ converter 基準より最低25%多い note を要求）
 - `gauge`: `normal | hard | ex_hard | easy | shift`
 - `random`: `off | mirror | rr | fr | sr`
 - `random_seed`: RR/FR/SR、強制 key-mode 変換、Note Add、LN Mix 対象選択の固定 seed（`0` も固定値として扱う）
@@ -43,6 +46,9 @@
 - `song_index_profile`: `safe | fast`
   - `safe`: 大規模ライブラリでの RAM high-water 抑制を優先する既定値
   - `fast`: 32GB+ 環境で再インデックス高速化を狙う任意値
+- `calculate_song_index_difficulty`: `false | true`
+  - 既定 `false`: BMS `#PLAYLEVEL` を保持し、native LV/CR 計算を省略
+  - `true`: full reindex で Revive LV/Circus Rating を計算
 
 `Rate` は `mode` ではなく `speed.rate` に保存されます。Mode Settings で変更でき、検索入力中でなければ Song Select の `-` / `+` でも次の play 値を直接変更できます。
 
@@ -71,6 +77,7 @@
 - `4k..10k`、`12k`、`14k`、`16k` は N2NC ベースの lane remap で key count を合わせる
 - `5+1 SP` / `7+1 SP` の強制変換は scratch を除く鍵盤部だけを再配置し、`follow` の scratch keysound は autoplay へ移す
 - `10+2 DP` / `14+2 DP` も両 scratch を除外し、左右の鍵盤部を独立変換
+- `add_25_plus` は基本変換後の既存時刻へ安全な無音 chord を最低25%追加要求し、より高い Note Add Mod があればその比率だけを一度適用。記録一覧には残るが通常の best record は更新しない
 - 適用順: key-mode 変換 → DP Flip → Mirror/RR/FR/SR → Note Add → LN/Full Tap 構造変換
 
 ## Gauge Rules

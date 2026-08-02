@@ -4,6 +4,24 @@ TenRiff의 사용자/배포 관점에서 의미 있는 변경만 간단히 기�
 
 ## [Unreleased]
 
+## [1.2.101] - 2026-08-03
+
+### Added
+
+- Mode Settings의 키 변환에 `변환 노트 추가: 기본 / 25% 이상 추가`를 추가; 실제 건반 수가 바뀔 때만 기본 변환 결과보다 안전한 무음 화음을 최소 25% 더 요청하고, 더 높은 Note Add Mod와 중복 적용하지 않으며, 리플레이/결과 메타데이터에 저장해 일반 최고기록에서 제외
+
+### Changed
+
+- 곡 인덱싱의 자체 LV/CR 계산을 기본 비활성화하고 Mode Settings의 `Index Difficulty`에서 선택적으로 켜도록 변경; 끈 상태에서는 BMS `#PLAYLEVEL`을 유지하며 계산 모드가 다른 캐시는 자동 재인덱싱
+
+### Fixed
+
+- 마스터 볼륨 0 상태로 재시작한 뒤 음량을 올려도 메뉴 음악이 복구되지 않던 Windows MCI 경로를 수정; 무음 상태에서는 재생 세션을 만들거나 유지하지 않고 음량이 다시 올라가면 새 세션으로 재생
+
+### Release
+
+- Windows `TenRiff-1.2.101.zip`, public source `TenRiff-1.2.101-source.zip`, and `TenRiff-1.2.101-SHA256SUMS.txt` are the formal release assets; no ONNX model, private checkpoint, user profile, song, or log is bundled
+
 ## [1.2.100] - 2026-08-02
 
 ### Added

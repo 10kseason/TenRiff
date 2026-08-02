@@ -1571,6 +1571,7 @@ void MenuApp::switch_song_source(const std::string& new_songs_path, bool force_r
     SongIndexOptions index_options;
     index_options.include_osu = config_.mode.enable_osu_charts;
     index_options.difficulty_table_path = config_.ui.difficulty_table_path;
+    index_options.calculate_difficulty = config_.mode.calculate_song_index_difficulty;
     index_options.reuse_cached_metadata = !force_reindex;
     index_options.profile = (config::normalize_song_index_profile_token(config_.mode.song_index_profile) == "fast")
                                 ? SongIndexProfile::Fast
@@ -2052,7 +2053,7 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
             handle_calibration_settings_input(action_key);
             return;
         case Screen::ModeSelect:
-            settings_cursor_ = clamp_int(event.index, 0, 13);
+            settings_cursor_ = clamp_int(event.index, 0, 16);
             if (finish_selection_only()) {
                 return;
             }

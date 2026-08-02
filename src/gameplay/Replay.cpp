@@ -249,6 +249,10 @@ config::JsonValue build_mode_json(const ReplayModeSettings& mode) {
     if (!mode.key_conversion_algorithm.empty()) {
         obj.emplace("key_conversion_algorithm", config::JsonValue{mode.key_conversion_algorithm});
     }
+    if (!mode.key_conversion_note_add_mode.empty()) {
+        obj.emplace("key_conversion_note_add_mode",
+                    config::JsonValue{mode.key_conversion_note_add_mode});
+    }
     if (!mode.random.empty()) {
         obj.emplace("random", config::JsonValue{mode.random});
     }
@@ -324,6 +328,8 @@ ExportResult save_result_json(const std::string& path, const ResultFile& result_
     obj.emplace("created_utc", config::JsonValue{result_file.created_utc});
     obj.emplace("player_name", config::JsonValue{result_file.player_name});
     obj.emplace("replay_path", config::JsonValue{result_file.replay_path});
+    obj.emplace("key_conversion_note_add_mode",
+                config::JsonValue{result_file.key_conversion_note_add_mode});
     obj.emplace("clear_status", config::JsonValue{result_file.clear_status});
     obj.emplace("final_gauge", config::JsonValue{result_file.final_gauge});
     obj.emplace("sample_rate", config::JsonValue{static_cast<double>(result_file.sample_rate)});
@@ -390,6 +396,8 @@ ReplayLoadResult load_replay_json(const std::string& path) {
         replay.mode.key_mode = read_json_string(*mode, "key_mode");
         replay.mode.key_conversion_algorithm =
             read_json_string(*mode, "key_conversion_algorithm");
+        replay.mode.key_conversion_note_add_mode =
+            read_json_string(*mode, "key_conversion_note_add_mode");
         replay.mode.random = read_json_string(*mode, "random");
         if (find_json_value(*mode, "random_seed")) {
             replay.mode.random_seed = read_json_int(*mode, "random_seed", 0);

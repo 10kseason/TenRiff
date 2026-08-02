@@ -735,6 +735,7 @@ void MenuApp::service_multiplayer_chart_match(const network::PeerSessionSnapshot
                 SongIndexOptions index_options;
                 index_options.include_osu = config_.mode.enable_osu_charts;
                 index_options.difficulty_table_path = config_.ui.difficulty_table_path;
+                index_options.calculate_difficulty = config_.mode.calculate_song_index_difficulty;
                 index_options.profile =
                     (config::normalize_song_index_profile_token(config_.mode.song_index_profile) == "fast")
                         ? SongIndexProfile::Fast
