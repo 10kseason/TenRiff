@@ -8,8 +8,10 @@
 
 namespace tenriff::network {
 
-constexpr uint16_t kPeerProtocolVersion = 4;
+constexpr uint16_t kPeerProtocolVersion = 5;
 constexpr uint8_t kPeerMaxPlayers = 8;
+constexpr std::size_t kPeerChatMaxBytes = 256;
+constexpr std::size_t kPeerChatHistoryLimit = 32;
 constexpr std::size_t kPeerLibraryHashesPerChunk = 512;
 constexpr std::size_t kPeerLibraryMaxCharts = 250'000;
 constexpr std::size_t kPeerFrameHeaderSize = 12;
@@ -38,6 +40,7 @@ enum class PeerMessageType : uint16_t {
     CommonLibraryBegin = 20,
     CommonLibraryChunk = 21,
     CommonLibraryEnd = 22,
+    Chat = 23,
 };
 
 struct PeerScore {

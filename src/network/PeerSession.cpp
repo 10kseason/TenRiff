@@ -10,6 +10,8 @@
 #include <thread>
 #include <unordered_set>
 #include <utility>
+
+#include "util/Utf8Compat.h"
 #include <vector>
 
 #ifdef _WIN32
@@ -290,6 +292,47 @@ struct PeerSession::Impl {
             if (participant.player_id == id) return &participant;
         }
         return nullptr;
+    }
+
+    static std::string normalize_chat_text(std::string_view value) {
+        const std::string cleaned = util::sanitize_ui_text(value);
+        std::size_t cursor = 0;
+        std::size_t accepted = 0;
+        while (cursor < cleaned.size() && cursor < kPeerChatMaxBytes) {
+            const unsigned char lead = static_cast<unsigned char>(cleaned[cursor]);
+            std::size_t length = 1;
+            if ((lead & 0x80u) == 0u) {
+                length = 1;
+            } else if ((lead & 0xE0u) == 0xC0u) {
+                length = 2;
+            } else if ((lead & 0xF0u) == 0xE0u) {
+                length = 3;
+            } else if ((lead & 0xF8u) == 0xF0u) {
+                length = 4;
+            }
+            if (cursor + length > cleaned.size() ||
+                cursor + length > kPeerChatMaxBytes) {
+                break;
+            }
+            accepted = cursor + length;
+            cursor += length;
+        }
+        return cleaned.substr(0, accepted);
+    }
+
+    bool append_chat_locked(uint8_t player_id, std::string_view text) {
+        if (!participant_locked(player_id)) return false;
+        std::string normalized = normalize_chat_text(text);
+        if (normalized.empty()) return false;
+        current.chat_messages.push_back(PeerChatEntry{player_id, std::move(normalized)});
+        if (current.chat_messages.size() > kPeerChatHistoryLimit) {
+            current.chat_messages.erase(
+                current.chat_messages.begin(),
+                current.chat_messages.begin() +
+                    static_cast<std::ptrdiff_t>(current.chat_messages.size() -
+                                                kPeerChatHistoryLimit));
+        }
+        return true;
     }
 
     uint8_t next_available_id_locked() const {
@@ -746,6 +789,14 @@ struct PeerSession::Impl {
                 begin_sent = true;
                 touch_locked();
                 return true;
+            case PeerMessageType::Chat:
+                if (message.player_id == 0 ||
+                    !append_chat_locked(message.player_id, message.text)) {
+                    error = "Room chat message is invalid.";
+                    return false;
+                }
+                touch_locked();
+                return true;
             case PeerMessageType::Score:
             case PeerMessageType::FinalScore:
                 if (message.nonce != active_round_nonce) {
@@ -834,6 +885,15 @@ struct PeerSession::Impl {
         }
         message.player_id = source_id;
         switch (message.type) {
+            case PeerMessageType::Chat:
+                if (!append_chat_locked(source_id, message.text)) {
+                    error = "Chat message is empty or invalid.";
+                    return false;
+                }
+                message.text = current.chat_messages.back().text;
+                broadcasts.push_back(std::move(message));
+                touch_locked();
+                return true;
             case PeerMessageType::Chart:
                 if (active_round_nonce != 0) {
                     // A pre-launch chart confirmation can cross the canonical
@@ -2144,6 +2204,21 @@ bool PeerSession::set_ready(bool ready) {
     if (!ready) local->loaded = false;
     impl_->touch_locked();
     return true;
+}
+
+bool PeerSession::send_chat(std::string text) {
+    std::lock_guard<std::mutex> lock(impl_->mutex);
+    if (impl_->current.state != PeerSessionState::Connected) {
+        return false;
+    }
+    text = Impl::normalize_chat_text(text);
+    if (text.empty()) {
+        return false;
+    }
+    PeerMessage message;
+    message.type = PeerMessageType::Chat;
+    message.text = std::move(text);
+    return impl_->queue_control_locked(std::move(message));
 }
 
 bool PeerSession::send_launch() {

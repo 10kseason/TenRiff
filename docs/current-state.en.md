@@ -3,7 +3,7 @@
 This is the document that the next agent or any new contributor should read first. Its goal is to quickly answer: "what is this project now, where should I look, and what is still unverified?"
 
 ## Baseline
-- Current project and public stable version: `1.2.99 stable`
+- Current project and public stable version: `1.2.100 stable`
 - Direct-IP multiplayer and the preview r5 input-backend lifecycle fixes are integrated into `1.1.8 stable`
 - `1.1.8` adds an osu!mania OD8 auxiliary score, first-native-`BAD` `Sudden Death (1 MISS)`, and deterministic `LN Mix 10%-90%` on top of the 1.1.7 visual refresh
 - `1.2.0` connects BMS channel `04/07` and osu!mania backgrounds to the gameplay sample timeline and asynchronously upscales sub-FHD image backgrounds through LunaSR on Windows ML
@@ -24,7 +24,7 @@ This is the document that the next agent or any new contributor should read firs
 - Linux exists only as a preview-level package at `Baepoks-Linuxs/TenRiff-0.5.0-linux-preview`
 - The supported chart surface is BMS-family (`.bms/.bme/.bml/.pms`) by default, plus optional 4K-10K osu!mania `.osu`
 - The `1.2.4 stable` runtime keeps RawInput primary while continuously running a bound-key polling shadow in the same `InputThread`; startup failure or an unexpected message-pump exit switches that producer to Polling without resetting its queue or pressed state
-- Menu input keeps the foreground process/root-window boundary. A RawInput startup failure, process-global registration-target loss, or hidden message-window exit switches it to Polling without waiting for a user key.
+- Menu and gameplay input collection keep the foreground-process boundary, while MenuWindow UI also checks the root-window boundary. Losing focus resets key state and drops background lane/Esc input. A RawInput startup failure, process-global registration-target loss, or hidden message-window exit switches it to Polling without waiting for a user key.
 - A confirmed fallback stays active across menu and subsequent gameplay sessions for the current app run without rewriting the profile; app restart or an explicit `Options -> Input Settings -> Backend` change retries it.
 
 ## Core Architecture
@@ -102,8 +102,10 @@ This is the document that the next agent or any new contributor should read firs
   - `Note & Field Size` scales the centered playfield, lanes/dividers, notes, and adjacent gauges together from 50% to 140%; adjacent notes keep a default combined 24px gap at 100%
   - Black Playfield fills the complete player/ghost playfield, including lane-spacing gaps, with solid black
   - per-key-mode lane-width arrays and inter-lane spacing arrays are persisted and applied through the same layout math in preview, live gameplay, and the ghost field
-  - supported skin routes are `native` and LR2 playskin only; selecting or dropping an LR2 folder in Skins imports it into the active profile
-  - LR2 note/LN images, lane gaps, and destination sizes are applied to gameplay layout
+  - supported skin routes are `native` and LR2 playskin only; selecting or dropping one LR2 folder imports it into the active profile
+  - selecting a standard `LR2files` or `Theme` root batch-imports each independent non-IIDX theme as a separate skin and skips themes that reference excluded IIDX assets, preserves sibling-theme paths, skips symlinks, and never overwrites an existing folder
+  - LR2 note/LN images, lane gaps, and destination sizes are applied; lower `play/Gear` frames enlarge with field size as one aspect-preserving overlay clipped below the judgement line, `#CUSTOMFILE` wildcard defaults are resolved, and falling note/LN-head art is never reused as a receptor when Gear is absent
+  - the native skin draws a digital piano key at the bottom of each lane; a key stays depressed only while its input is held, emits a short cyan/magenta glitch pulse on impact, and clears held visuals when the process loses foreground
   - `skin.lr2_resolution_mode` stores LR2 playskin resolution override tokens as `auto / sd / hd / fhd`
   - LR2 auto-detect uses the playskin `#DST_NOTE` coordinate range instead of asset names
   - eased future-note entry from above the field
@@ -116,7 +118,7 @@ This is the document that the next agent or any new contributor should read firs
   - note-consuming failures (auto-miss, too-early consume, hold break / tail miss) stay `BAD`
   - very early non-consuming presses are handled as LR2-style `POOR` and are visible again in result / replay / UI paths
   - `POOR` preserves combo, stays out of score / accuracy totals, and uses dedicated `PR` gauge damage values
-  - gauge modes support `EX-Hard / Hard / Normal / Easy / Gauge Shift`; fixed gauges start at `100%`, fail immediately at `0%`, and never change type
+  - gauge modes support `EX-Hard / Hard / Normal / Easy / Gauge Shift`; fixed gauges start at `100%`, fail immediately at `0%`, and never change type, while EX-Hard uses a near-black gray palette distinct from Hard
   - `Gauge Shift` independently simulates EX-Hard / Hard / Normal / Easy from 100%; when the current tier reaches 0%, it selects the next tier that survived the same judgement history, and the highest surviving tier becomes final
   - `Sudden Death (1 MISS)` fails immediately on the first OD8-converted object `MISS`; native `BAD` timing alone and empty-key `POOR` are ignored, and the option is mutually exclusive with Practice No-Fail
   - Gameplay and Result show an auxiliary `OSU OD8` score converted from real input timing with osu!mania stable OD8 windows and ScoreV1 (maximum 1,000,000); native TenRiff score and ranking stay unchanged
@@ -154,8 +156,10 @@ This is the document that the next agent or any new contributor should read firs
   - `Options -> Profile Setup` reopens the first-run setup surface for the active profile and saves language, audio, input, graphics, and keymap changes immediately
   - an editable 48-byte profile nickname is used in later saved records and direct-IP multiplayer display names
 - Direct-IP multiplayer:
-  - protocol v4 uses one fixed TCP coordinator and supports up to 8 total players on Windows (default `27300/TCP`)
+  - protocol v5 uses one fixed TCP coordinator and supports up to 8 total players on Windows (default `27300/TCP`)
   - only indexed BMS-family charts are eligible; the room library is the exact SHA-256 intersection across every connected player, and `.osu` charts are excluded
+  - the lobby `ROOM CHAT` accepts UTF-8 messages up to 256 bytes, keeps only the latest 32 in session memory, and labels message count, local player, and leader
+  - Rate 1.0, judgement, Gauge Shift, Random/Mods/Assist remain fixed while each player may use local key-mode conversion
   - chart-selection authority starts with the host and rotates through connected players in join order after every player leaves Result; a disconnected leader is skipped, while host disconnect closes the room
   - only the current leader may select a common BMS and request START after everyone is Ready; play begins after coordinator approval and the all-player load barrier
   - mid-round and ninth-player joins are rejected; Result lists all final scores
@@ -188,7 +192,7 @@ This is the document that the next agent or any new contributor should read firs
 
 ## Runtime / Packaging Rules
 - New user profiles are created automatically
-- The current official P2P distribution line is `TenRiff 1.2.99 stable`
+- The current official P2P distribution line is `TenRiff 1.2.100 stable`
 - Distribution packages do not include `Songs`
 - Distribution packages include the `Mainmusic/` scene slots `Main Menu / Options / Song Selecte / Multiplayer Lobby / Clear / Failed`; each `Name.mp3` plus numbered `Name 2.mp3` through `Name 64.mp3` siblings is discovered automatically and rotates on scene re-entry
 - Distribution updates include only built artifacts and required runtime assets

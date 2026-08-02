@@ -33,8 +33,8 @@ void GameSession::FutureQueue::consume() {
 void GameSession::rebuild_input_thread_config(input::InputThreadConfig& input_config) const {
     input_config.backend = config_.input.rawinput ? input::InputBackend::RawInput
                                                   : input::InputBackend::Polling;
-    input_config.gate_policy = input::InputGatePolicy::AlwaysAllow;
-    // Gameplay always keeps a bound-key polling shadow inside InputThread.
+    input_config.gate_policy = gameplay_input_gate_policy();
+    // Gameplay keeps a bound-key polling shadow inside InputThread.
     // RawInput remains the low-latency primary path, while the same single
     // KeyStateTracker deduplicates polling edges if WM_INPUT silently stops.
     input_config.rawinput_polling_shadow = config_.input.rawinput;
@@ -198,6 +198,8 @@ bool GameSession::initialize(const CommandLineOptions& options) {
     chart_ = {};
     lane_activity_.clear();
     ghost_lane_activity_.clear();
+    lane_pressed_.clear();
+    ghost_lane_pressed_.clear();
     pending_input_events_.reserve(64);
     last_loading_percent_ = -1;
     last_loading_stage_.clear();
@@ -641,7 +643,7 @@ bool GameSession::initialize(const CommandLineOptions& options) {
     rebuild_input_thread_config(input_config);
     std::cerr << "[info] Gameplay input startup requested="
               << input_backend_name(input_config.backend)
-              << " gate=always polling_keys=" << input_config.polling_keys.size()
+              << " gate=foreground-process polling_keys=" << input_config.polling_keys.size()
               << " polling_shadow="
               << (input_config.backend == input::InputBackend::Polling
                       ? "primary"
@@ -672,6 +674,8 @@ bool GameSession::initialize(const CommandLineOptions& options) {
     chart_audio_voices_.reserve(std::max<std::size_t>(128, chart_.notes.size() / 16));
     lane_activity_.assign(static_cast<std::size_t>(std::max(1, chart_.lane_count)), 0.0f);
     ghost_lane_activity_.assign(static_cast<std::size_t>(std::max(1, chart_.lane_count)), 0.0f);
+    lane_pressed_.assign(static_cast<std::size_t>(std::max(1, chart_.lane_count)), 0);
+    ghost_lane_pressed_.assign(static_cast<std::size_t>(std::max(1, chart_.lane_count)), 0);
 
     engine_ = std::make_unique<gameplay::GameplayEngine>(chart_, gameplay_config);
     if (ghost_replay_enabled_) {
@@ -719,7 +723,7 @@ bool GameSession::initialize(const CommandLineOptions& options) {
     std::cerr << "[info] Gameplay input active configured="
               << input_backend_name(input_backend_state_.configured_backend)
               << " effective=" << input_backend_name(input_backend_state_.effective_backend)
-              << " gate=always polling_keys=" << input_config.polling_keys.size()
+              << " gate=foreground-process polling_keys=" << input_config.polling_keys.size()
               << " polling_shadow="
               << (input_config.backend == input::InputBackend::Polling
                       ? "primary"
@@ -969,9 +973,16 @@ GameSession::HudSnapshot GameSession::hud_snapshot() {
         snapshot.feedback_delta_ms = snapshot.has_feedback ? feedback.delta_ms : 0.0;
         engine_->collect_recent_timing_deltas(snapshot.timing_history_delta_ms, &snapshot.timing_history_count);
         engine_->collect_active_holds(active_holds_buffer_);
+        if (!process_owns_foreground_window()) {
+            std::fill(lane_pressed_.begin(), lane_pressed_.end(), 0);
+            std::fill(ghost_lane_pressed_.begin(), ghost_lane_pressed_.end(), 0);
+        }
         snapshot.lane_activity.fill(0.0f);
         snapshot.lane_activity_count = std::min<std::size_t>(lane_activity_.size(), kGameplayHudMaxLanes);
         std::copy_n(lane_activity_.begin(), snapshot.lane_activity_count, snapshot.lane_activity.begin());
+        snapshot.lane_pressed.fill(0);
+        snapshot.lane_pressed_count = std::min<std::size_t>(lane_pressed_.size(), kGameplayHudMaxLanes);
+        std::copy_n(lane_pressed_.begin(), snapshot.lane_pressed_count, snapshot.lane_pressed.begin());
 
         if (ghost_engine_) {
             snapshot.ghost_visible = true;
@@ -1008,6 +1019,12 @@ GameSession::HudSnapshot GameSession::hud_snapshot() {
             std::copy_n(ghost_lane_activity_.begin(),
                         snapshot.ghost_lane_activity_count,
                         snapshot.ghost_lane_activity.begin());
+            snapshot.ghost_lane_pressed.fill(0);
+            snapshot.ghost_lane_pressed_count =
+                std::min<std::size_t>(ghost_lane_pressed_.size(), kGameplayHudMaxLanes);
+            std::copy_n(ghost_lane_pressed_.begin(),
+                        snapshot.ghost_lane_pressed_count,
+                        snapshot.ghost_lane_pressed.begin());
         }
 
     const double scroll_scale =
@@ -1946,9 +1963,11 @@ void GameSession::shutdown() {
     one_miss_fail_enabled_ = false;
     gauge_shift_enabled_ = false;
     lane_activity_.clear();
+    lane_pressed_.clear();
     hidden_hit_note_ids_.clear();
     active_holds_buffer_.clear();
     ghost_lane_activity_.clear();
+    ghost_lane_pressed_.clear();
     ghost_hidden_hit_note_ids_.clear();
     ghost_active_holds_buffer_.clear();
     polled_gameplay_keys_.clear();
@@ -2174,6 +2193,7 @@ void GameSession::process_countdown_input_queue() {
     }
 
     std::fill(lane_activity_.begin(), lane_activity_.end(), 0.0f);
+    std::fill(lane_pressed_.begin(), lane_pressed_.end(), 0);
 }
 
 void GameSession::process_paused_input_queue() {
@@ -2192,6 +2212,8 @@ void GameSession::process_paused_input_queue() {
     hispeed_increase_held_ = false;
     std::fill(lane_activity_.begin(), lane_activity_.end(), 0.0f);
     std::fill(ghost_lane_activity_.begin(), ghost_lane_activity_.end(), 0.0f);
+    std::fill(lane_pressed_.begin(), lane_pressed_.end(), 0);
+    std::fill(ghost_lane_pressed_.begin(), ghost_lane_pressed_.end(), 0);
 }
 
 void GameSession::rebaseline_gameplay_start_input_state(int64_t sample) {
@@ -2206,6 +2228,7 @@ void GameSession::rebaseline_gameplay_start_input_state(int64_t sample) {
     hispeed_decrease_next_repeat_ns_ = 0;
     hispeed_increase_next_repeat_ns_ = 0;
 
+    std::fill(lane_pressed_.begin(), lane_pressed_.end(), 0);
     const int64_t baseline_time_ns = timing::HighResClock::now_ns();
     for (auto& tracked : polled_gameplay_keys_) {
         bool pressed = false;
@@ -2331,6 +2354,8 @@ void GameSession::update_lane_feedback(int lane, input::InputState state) {
         return;
     }
 
+    lane_pressed_[static_cast<std::size_t>(lane_index)] =
+        state == input::InputState::Pressed ? 1 : 0;
     if (state == input::InputState::Pressed) {
         lane_activity_[static_cast<std::size_t>(lane_index)] = 1.0f;
     }
@@ -2599,6 +2624,11 @@ void GameSession::dispatch_ghost_lane_input(int lane, input::InputState state, i
         return;
     }
 
+    const int pressed_lane_index = lane - 1;
+    if (pressed_lane_index >= 0 && pressed_lane_index < static_cast<int>(ghost_lane_pressed_.size())) {
+        ghost_lane_pressed_[static_cast<std::size_t>(pressed_lane_index)] =
+            state == input::InputState::Pressed ? 1 : 0;
+    }
     if (state == input::InputState::Pressed) {
         const int lane_index = lane - 1;
         if (lane_index >= 0 && lane_index < static_cast<int>(ghost_lane_activity_.size())) {

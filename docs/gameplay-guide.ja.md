@@ -60,7 +60,7 @@ Windows では通常、次のどちらかで起動します。
   - `BGA` を off にすると gameplay image/video background と decoder/upscaler 処理を無効化し、Song Select preview は維持
   - model 選択後に upscaler を明示的に ON にして high-spec 警告を確認する。実験的 `NPU 優先` は Windows/driver が実際に NPU を選択した場合だけ NPU を使う
 - `Skins`
-  - native/LR2 skin 切り替え、LR2 folder import、固定 divider 基準の note gap/size、Black Playfield、judge line 位置、LN body width、lane colors を調整
+  - native/LR2 skin 切り替え、hold depth と打鍵 glitch を持つ native 下部 digital-piano key、LR2 folder 単体または 独立した non-IIDX `LR2files/Theme` の一括 import（IIDX 依存 theme は除外）、field size に連動して拡大し判定線の下へ clip する aspect ratio 維持の下部 Gear frame、固定 divider 基準の note gap/size、Black Playfield、judge line 位置、LN body width、lane colors を調整
 - `Keymap`
   - key binding 変更と NKRO test 実行
 
@@ -165,7 +165,7 @@ Rank は `<75 F`, `75 B`, `80.5 A`, `86.5 A+`, `90 S`, `95.5 S+`, `98 AA`, `99 S
 
 固定 gauge（`ex_hard / hard / normal / easy`）は曲開始時に `100%` で始まり、play 中に type は変わりません。
 
-- `ex_hard`: Hard より回復が低く `BAD` / `POOR` damage が大きい。 `0%` で即 Game Over
+- `ex_hard`: Hard より回復が低く `BAD` / `POOR` damage が大きい。Hard と異なる黒に近い gray palette で表示し、`0%` で即 Game Over
 - `hard`: `0%` で即 Game Over
 - `normal`: `0%` で即 Game Over
 - `easy`: `0%` で即 Game Over

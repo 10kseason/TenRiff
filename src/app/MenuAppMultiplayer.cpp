@@ -110,6 +110,17 @@ void MenuApp::populate_multiplayer_render_data(render::MenuRenderData& render) {
     const std::string port_value =
         multiplayer_menu_.port_text +
         (multiplayer_menu_.edit_field == MultiplayerEditField::Port ? " _" : "");
+    std::string chat_value;
+    if (!connected) {
+        chat_value = ui_text("CONNECT FIRST", "먼저 연결");
+    } else if (multiplayer_menu_.chat_input.empty()) {
+        chat_value = ui_text("ENTER TO CHAT", "ENTER로 채팅");
+    } else {
+        chat_value = "> " + multiplayer_menu_.chat_input;
+    }
+    if (multiplayer_menu_.edit_field == MultiplayerEditField::Chat) {
+        chat_value += " _";
+    }
 
     append_menu_row(render.generic,
                     ui_text("Server IP / Hostname", "서버 IP / 호스트명"),
@@ -198,6 +209,14 @@ void MenuApp::populate_multiplayer_render_data(render::MenuRenderData& render) {
                     can_start,
                     false);
     append_menu_row(render.generic,
+                    ui_text("Room Chat", "방 채팅"),
+                    chat_value,
+                    row_selected(MultiplayerMenuRow::Chat),
+                    render::MenuHitTargetKind::SettingsRow,
+                    static_cast<int>(MultiplayerMenuRow::Chat),
+                    connected,
+                    false);
+    append_menu_row(render.generic,
                     ui_text("Options", "옵션"),
                     multiplayer_menu_.local_ready
                         ? ui_text("READY WILL BE CLEARED", "진입 시 준비 해제")
@@ -230,7 +249,8 @@ void MenuApp::populate_multiplayer_render_data(render::MenuRenderData& render) {
                            ? ui_text(" / READY", " / 준비")
                            : ui_text(" / WAIT", " / 대기");
         render.generic.notes.push_back(std::move(player_line));
-    }    if (!peer.status_detail.empty()) {
+    }
+    if (!peer.status_detail.empty()) {
         render.generic.notes.push_back(peer.status_detail);
     }
     if (connected) {
@@ -261,17 +281,83 @@ void MenuApp::populate_multiplayer_render_data(render::MenuRenderData& render) {
         render.generic.notes.push_back(ui_text("Chart match confirmed.", "차트 일치가 확인되었습니다."));
     }
     render.generic.notes.push_back(ui_text(
-        "Peer battle fixes Rate 1.00x, native keys, Normal gauge, default judge windows, Random/Mods/Assist off.",
-        "P2P 대전은 Rate 1.00x, 원본 키, Normal 게이지, 기본 판정, 랜덤/모드/어시스트 끔으로 고정됩니다."));
+        "Peer battle fixes Rate 1.00x, Gauge Shift, default judge windows, and Random/Mods/Assist off; local key-mode conversion is allowed.",
+        "P2P 대전은 Rate 1.00x, Gauge Shift, 기본 판정, 랜덤/모드/어시스트 끔을 사용하며 로컬 키모드 변환은 허용합니다."));
     render.generic.notes.push_back(ui_text(
         "Host: share this PC's IPv4 and TCP port. Internet play also needs router port forwarding.",
         "호스트: 이 PC의 IPv4와 TCP 포트를 알려주세요. 인터넷 연결은 공유기 포트 포워딩도 필요합니다."));
+    render.generic.footer_reserved_lines = 6;
+    render.generic.footer_notes.push_back(
+        ui_text("ROOM CHAT", "방 채팅") + "  " +
+        std::to_string(peer.chat_messages.size()) + "/" +
+        std::to_string(network::kPeerChatHistoryLimit));
+    const std::size_t chat_begin = peer.chat_messages.size() > 4
+                                       ? peer.chat_messages.size() - 4
+                                       : 0;
+    for (std::size_t i = chat_begin; i < peer.chat_messages.size(); ++i) {
+        const auto& chat = peer.chat_messages[i];
+        const auto sender = std::find_if(
+            peer.participants.begin(), peer.participants.end(),
+            [&chat](const network::PeerParticipantSnapshot& participant) {
+                return participant.player_id == chat.player_id;
+            });
+        std::string sender_name =
+            sender == peer.participants.end()
+                ? "#" + std::to_string(chat.player_id)
+                : sender->name;
+        if (sender != peer.participants.end() && sender->local) {
+            sender_name += ui_text(" [YOU]", " [나]");
+        }
+        if (sender != peer.participants.end() && sender->leader) {
+            sender_name += ui_text(" [LEADER]", " [리더]");
+        }
+        render.generic.footer_notes.push_back(sender_name + ": " + chat.text);
+    }
+    if (peer.chat_messages.empty()) {
+        render.generic.footer_notes.push_back(
+            ui_text("No room messages yet.", "아직 방 메시지가 없습니다."));
+    }
     render.generic.footer_notes.push_back(ui_text(
-        "Enter edits/selects. Delete clears an edit field. Esc disconnects and returns to Title.",
-        "Enter로 편집/선택합니다. Delete는 편집 칸을 지웁니다. Esc는 연결을 끊고 타이틀로 돌아갑니다."));
+        "Enter edits/selects/sends chat. Delete clears an edit field. Esc closes editing or leaves Multiplayer.",
+        "Enter로 편집/선택/채팅 전송합니다. Delete는 편집 칸을 지웁니다. Esc는 편집을 닫거나 멀티플레이를 나갑니다."));
 }
 
 void MenuApp::handle_multiplayer_input(uint32_t keycode) {
+    if (multiplayer_menu_.edit_field == MultiplayerEditField::Chat) {
+        if (keycode == key_enter_) {
+            const std::string message = util::sanitize_ui_text(multiplayer_menu_.chat_input);
+            if (message.empty()) {
+                multiplayer_status_message_ =
+                    ui_text("Type a message before sending.",
+                            "전송할 메시지를 먼저 입력하세요.");
+            } else if (peer_session_.send_chat(message)) {
+                multiplayer_menu_.chat_input.clear();
+                multiplayer_status_message_.clear();
+            } else {
+                multiplayer_status_message_ =
+                    ui_text("Room chat is unavailable because the connection closed.",
+                            "연결이 종료되어 방 채팅을 사용할 수 없습니다.");
+            }
+            publish_snapshot();
+            return;
+        }
+        if (keycode == key_escape_) {
+            multiplayer_menu_.edit_field = MultiplayerEditField::None;
+            publish_snapshot();
+            return;
+        }
+        if (keycode == key_backspace_) {
+            erase_last_multiplayer_utf8_character(multiplayer_menu_.chat_input);
+            publish_snapshot();
+            return;
+        }
+        if (keycode == key_delete_) {
+            multiplayer_menu_.chat_input.clear();
+            publish_snapshot();
+            return;
+        }
+        return;
+    }
     if (multiplayer_menu_.edit_field != MultiplayerEditField::None) {
         if (keycode == key_enter_) {
             multiplayer_menu_.edit_field = MultiplayerEditField::None;
@@ -459,6 +545,18 @@ void MenuApp::handle_multiplayer_input(uint32_t keycode) {
         multiplayer_status_message_ =
             ui_text("Start requested; waiting for room coordinator.",
                     "시작 요청을 보냈습니다. 방장 승인을 기다립니다.");
+        publish_snapshot();
+        return;
+    }
+    if (row == MultiplayerMenuRow::Chat) {
+        if (peer.state != network::PeerSessionState::Connected) {
+            multiplayer_status_message_ =
+                ui_text("Connect to a room before using chat.",
+                        "채팅을 사용하려면 먼저 방에 연결하세요.");
+        } else {
+            multiplayer_menu_.edit_field = MultiplayerEditField::Chat;
+            multiplayer_status_message_.clear();
+        }
         publish_snapshot();
         return;
     }

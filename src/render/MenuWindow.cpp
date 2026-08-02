@@ -48,7 +48,10 @@
 #include "app/ImportedGameplaySkin.h"
 #include "config/Config.h"
 #include "input/InputThread.h"
+#include "render/GameplayGaugePalette.h"
+#include "render/GameplayGearLayout.h"
 #include "render/GameplayMotion.h"
+#include "render/GameplayNativeDigitalKey.h"
 #include "timing/HighResClock.h"
 #include "util/Utf8Compat.h"
 
@@ -1940,6 +1943,8 @@ struct MenuWindow::D2DResources {
     std::array<D2D1_RECT_F, kGameplayHudMaxLanes> lane_key_idle_source_rects{};
     std::array<Microsoft::WRL::ComPtr<ID2D1Bitmap>, kGameplayHudMaxLanes> lane_key_pressed_bitmaps{};
     std::array<D2D1_RECT_F, kGameplayHudMaxLanes> lane_key_pressed_source_rects{};
+    Microsoft::WRL::ComPtr<ID2D1Bitmap> gameplay_gear_overlay_bitmap;
+    D2D1_RECT_F gameplay_gear_overlay_source_rect{};
     Microsoft::WRL::ComPtr<ID2D1Bitmap> song_select_preview_bitmap;
     Microsoft::WRL::ComPtr<ID2D1Bitmap> gameplay_background_base_bitmap;
     Microsoft::WRL::ComPtr<ID2D1Bitmap> gameplay_background_overlay_bitmap;
@@ -2348,6 +2353,9 @@ void MenuWindow::invalidate_gameplay_note_sprite_cache() {
     for (auto& rect : d2d_->lane_key_pressed_source_rects) {
         rect = D2D1::RectF(0.0f, 0.0f, 0.0f, 0.0f);
     }
+    d2d_->gameplay_gear_overlay_bitmap.Reset();
+    d2d_->gameplay_gear_overlay_source_rect =
+        D2D1::RectF(0.0f, 0.0f, 0.0f, 0.0f);
 }
 
 bool MenuWindow::ensure_gameplay_note_sprites(const GameplayHudData& data) {
@@ -2517,6 +2525,15 @@ bool MenuWindow::ensure_gameplay_note_sprites(const GameplayHudData& data) {
                                         rect_out,
                                         true);
     };
+
+    if (!imported.gear_overlay_image.path.empty()) {
+        load_bitmap_from_imported_asset(d2d_->wic_factory.Get(),
+                                        d2d_->d2d_context.Get(),
+                                        imported.gear_overlay_image,
+                                        d2d_->gameplay_gear_overlay_bitmap,
+                                        &d2d_->gameplay_gear_overlay_source_rect,
+                                        false);
+    }
 
     for (int lane = 0; lane < lane_count; ++lane) {
         const std::size_t index = static_cast<std::size_t>(lane);

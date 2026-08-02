@@ -75,6 +75,10 @@ private:
     return backend == input::InputBackend::RawInput ? "RawInput" : "Polling";
 }
 
+[[nodiscard]] constexpr input::InputGatePolicy gameplay_input_gate_policy() noexcept {
+    return input::InputGatePolicy::ForegroundProcess;
+}
+
 [[nodiscard]] inline input::InputBackend input_backend_for_event(const input::InputEvent& event) {
     return event.device_id == input::kPollingAggregateDeviceId
                ? input::InputBackend::Polling

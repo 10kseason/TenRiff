@@ -53,21 +53,16 @@ void apply_asset_fallbacks(ImportedGameplaySkinDefinition& definition) {
     };
 
     for (std::size_t lane = 0; lane < lane_count; ++lane) {
-        const ImportedSkinImageAsset* note = asset_at(definition.note_images, lane);
         const ImportedSkinImageAsset* hold_head = asset_at(definition.hold_head_images, lane);
 
         if (definition.hold_tail_images[lane].path.empty() && hold_head != nullptr) {
             definition.hold_tail_images[lane] = *hold_head;
         }
-        if (definition.key_images[lane].path.empty() && note != nullptr) {
-            definition.key_images[lane] = *note;
-        }
-        if (definition.key_pressed_images[lane].path.empty()) {
-            if (hold_head != nullptr) {
-                definition.key_pressed_images[lane] = *hold_head;
-            } else if (note != nullptr) {
-                definition.key_pressed_images[lane] = *note;
-            }
+        // Falling-note art is not a receptor. Reusing it here leaves a note or
+        // LN head parked on the judgement line for the duration of a hold.
+        if (definition.key_pressed_images[lane].path.empty() &&
+            !definition.key_images[lane].path.empty()) {
+            definition.key_pressed_images[lane] = definition.key_images[lane];
         }
     }
 }
@@ -94,10 +89,11 @@ ImportedGameplaySkinDefinition resolve_imported_gameplay_skin(std::string_view s
         definition.hold_tail_images = lr2.hold_tail_images;
         definition.key_images = lr2.key_images;
         definition.key_pressed_images = lr2.key_pressed_images;
+        definition.gear_overlay_image = lr2.gear_overlay_image;
         definition.lane_divider_widths = lr2.lane_divider_widths;
         definition.imported_note_width_ratio = lr2.imported_note_width_ratio;
         definition.imported_note_height_ratio = lr2.imported_note_height_ratio;
-        definition.use_full_lane_receptor_layout = false;
+        definition.use_full_lane_receptor_layout = lr2.use_full_lane_receptor_layout;
         apply_asset_fallbacks(definition);
         return definition;
     }

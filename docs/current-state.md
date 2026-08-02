@@ -3,7 +3,7 @@
 이 문서는 다음 에이전트나 새 작업자가 가장 먼저 읽어야 하는 현재 상태 문서입니다. 목표는 "지금 이 프로젝트가 무엇이고, 어디를 보면 되고, 무엇이 아직 미검증인지"를 빠르게 파악하게 하는 것입니다.
 
 ## Baseline
-- 현재 프로젝트 버전과 공개 안정판은 `1.2.99 stable`
+- 현재 프로젝트 버전과 공개 안정판은 `1.2.100 stable`
 - 직접 IP 멀티플레이와 preview r5의 입력 backend 수명주기 수정은 `1.1.8 stable`에 통합
 - `1.1.8`은 1.1.7의 시각 개선에 osu!mania OD8 보조 점수, 첫 네이티브 `BAD` 즉사 `Sudden Death (1 MISS)`, 결정적 `LN Mix 10%~90%`를 추가
 - `1.2.0`은 BMS 채널 `04/07` 및 osu!mania 배경을 gameplay sample timeline에 연결하고, FHD 미만 이미지 배경을 Windows ML 기반 LunaSR로 비동기 보간
@@ -24,7 +24,7 @@
 - Linux는 `Baepoks-Linuxs/TenRiff-0.5.0-linux-preview` 수준의 preview만 존재
 - 지원 차트 표면은 BMS 계열(`.bms/.bme/.bml/.pms`) 기본 + 선택형 osu!mania 4K~10K `.osu`
 - `1.2.4 stable`의 gameplay live 입력은 저장된 RawInput을 우선하면서 같은 `InputThread`의 bound-key polling shadow를 항상 유지하고, 시작 실패뿐 아니라 message pump의 예기치 않은 종료도 queue/state reset 없이 현재 producer thread에서 Polling으로 전환함
-- 메뉴 입력은 기존 foreground process/root-window 경계를 유지한다. RawInput 시작 실패, process-global 등록 대상 손실, 숨은 message window 종료를 감지하면 사용자 키 입력을 기다리지 않고 Polling으로 전환한다.
+- 메뉴와 gameplay 입력 수집은 foreground process 경계를 유지하며 MenuWindow UI는 root-window 경계도 확인한다. 포커스를 잃으면 키 상태를 초기화하고 background의 lane/Esc 입력을 버린다. RawInput 시작 실패, process-global 등록 대상 손실, 숨은 message window 종료를 감지하면 사용자 키 입력을 기다리지 않고 Polling으로 전환한다.
 - 확인된 fallback은 profile 값을 덮어쓰지 않은 채 현재 앱 실행의 메뉴와 다음 gameplay까지 유지한다. 앱 재시작 또는 `Options -> Input Settings -> Backend`의 명시적 변경만 재시도한다.
 
 ## Core Architecture
@@ -107,14 +107,16 @@
   - `Note & Field Size`는 중앙을 고정한 채 플레이필드·lane/divider·노트·인접 게이지를 함께 `50%..140%`로 조절하며, 100%에서 인접 노트 사이 기본 합산 여백은 24px
   - Black Playfield를 켜면 lane spacing을 포함한 player/ghost 플레이필드 전체를 완전한 검정으로 렌더링
   - key mode별 개별 lane 폭과 lane 사이 간격을 각각 저장하고 미리보기/실플레이/ghost field에 같은 레이아웃 계산을 적용
-  - 지원 스킨 경로는 `native`와 LR2 playskin뿐이며, Skins 화면에서 LR2 폴더를 선택하거나 드롭하면 활성 프로필로 가져옴
-  - LR2 note/LN 이미지, lane gap, destination size를 gameplay 레이아웃에 반영
+  - 지원 스킨 경로는 `native`와 LR2 playskin뿐이며, Skins 화면에서 LR2 폴더 하나를 선택하거나 드롭하면 활성 프로필로 이식
+  - 표준 `LR2files` 또는 `Theme` 루트를 고르면 정확한 `IIDX` 폴더와 IIDX 자산 의존 테마를 제외한 바로 아래 테마를 별도 스킨으로 일괄 설치하고, 형제 테마 경로를 유지하며, 심볼릭 링크를 건너뛰고, 기존 폴더를 덮어쓰지 않음
+  - LR2 note/LN 이미지, lane gap, destination size를 반영하고 `play/Gear` 하단 프레임은 원본 종횡비를 유지한 채 필드 크기에 연동해 확대하고 판정선 아래로 clip하는 단일 오버레이로 표시하며 `#CUSTOMFILE` 와일드카드 include의 기본 선택을 해석. Gear가 없으면 낙하 노트/LN 머리를 receptor로 재사용하지 않음
+  - native 기본 스킨은 하단 레인마다 디지털 피아노 건반을 표시하고, 실제 키를 누르는 동안 건반이 내려가며 입력 순간에는 짧은 cyan/magenta 글리치 펄스를 표시. foreground를 잃으면 홀드 시각 상태도 초기화
   - `skin.lr2_resolution_mode`는 `auto / sd / hd / fhd`로 LR2 playskin 해상도 override 토큰을 저장
   - LR2 auto-detect는 asset 이름이 아니라 playskin `#DST_NOTE` 좌표 범위를 기준으로 SD/HD/FHD를 판정
   - 미래 노트 상단 진입 easing
   - 마지막 판정 노트 처리 직후 플레이 종료
 - Judge:
-  - 게이지 모드는 `EX-Hard / Hard / Normal / Easy / Gauge Shift`를 지원함. 고정 게이지는 `100%`에서 시작해 `0%`에서 즉시 실패하고 타입이 바뀌지 않음
+  - 게이지 모드는 `EX-Hard / Hard / Normal / Easy / Gauge Shift`를 지원함. 고정 게이지는 `100%`에서 시작해 `0%`에서 즉시 실패하고 타입이 바뀌지 않으며, EX-Hard는 Hard와 구분되는 짙은 흑회색으로 표시
   - `Gauge Shift`는 EX-Hard / Hard / Normal / Easy를 각각 100%에서 독립적으로 병렬 계산하고, 현재 tier가 0%로 탈락하면 같은 판정 이력을 누적한 다음 생존 tier를 선택하며 종료 시 가장 높은 생존 tier로 확정함
   - `Sudden Death (1 MISS)`는 첫 OD8 환산 객체 `MISS`에서 즉시 실패하며, 네이티브 `BAD`만으로는 발동하지 않고 빈 키 `POOR`도 무시하며 Practice No-Fail과 상호 배타적으로 동작
   - 인게임/결과 화면에 실제 입력 타이밍을 osu!mania stable OD8 판정창과 ScoreV1(최대 1,000,000)으로 환산한 보조 `OSU OD8` 점수를 표시하며, 네이티브 TenRiff 점수와 랭킹은 변경하지 않음
@@ -160,7 +162,8 @@
   - 최대 48바이트의 프로필 닉네임을 편집하며 이후 저장 기록과 직접 IP 멀티플레이 표시 이름으로 사용
 - 직접 IP 멀티플레이:
   - Windows에서 고정 TCP 코디네이터 1대에 최대 7명이 참가해 총 8명까지 연결, 기본 `27300/TCP`
-  - protocol v4는 각 참가자의 indexed BMS SHA-256 목록을 최대 512개씩 받고 현재 접속자 전원이 가진 차트의 교집합만 공통곡으로 배포; osu!mania `.osu`는 멀티 후보에서 제외
+  - protocol v5는 각 참가자의 indexed BMS SHA-256 목록을 최대 512개씩 받고 현재 접속자 전원이 가진 차트의 교집합만 공통곡으로 배포; osu!mania `.osu`는 멀티 후보에서 제외
+  - 로비 `ROOM CHAT`은 UTF-8 메시지를 256바이트까지 전송하고 최근 32개만 세션 메모리에 보관하며 메시지 수와 본인/리더 표식을 표시
   - 초기 선곡권자는 호스트이며, 모든 플레이어가 Result를 나간 뒤 입장 순서의 다음 연결 플레이어로 선곡권을 회전
   - 선곡권자가 나가면 다음 연결 플레이어를 즉시 선택하고, 고정 네트워크 호스트가 나가면 방 전체를 종료
   - 방이 8/8이거나 경기가 진행 중이면 신규 참가자를 거부
@@ -169,7 +172,7 @@
   - 멀티 게이지도 싱글 `Gauge Shift`와 동일하게 EX-Hard / Hard / Normal / Easy를 병렬 계산하고 모든 tier 탈락 시 해당 플레이어가 Game Over
   - 플레이 중 기존 점수차 HUD는 대표 상대를 표시하고 Result는 전 참가자 최종 점수 순위를 표시; protocol은 정확한 lane input/note별 판정/hold state를 전송하지 않음
   - 모든 경기 프레임은 round nonce를 사용하고 전원 최종 결과 및 전원 RoundReset을 다음 선곡/Ready 해제 조건으로 사용
-  - Rate 1.0, 원본 키 수, 기본 판정, Random/Mods/Assist off를 세션에만 적용
+  - Rate 1.0, 기본 판정, Random/Mods/Assist off를 세션에만 적용하며 각 플레이어의 로컬 키모드 변환은 허용
   - 차트 전송, NAT traversal, 릴레이/매치메이킹, 암호화/인증, 안티치트, 자동 재접속은 미지원
   - 상세 사용/보안 경계는 `docs/multiplayer.md`
 
@@ -200,7 +203,7 @@
 
 ## Runtime / Packaging Rules
 - 새 사용자 프로필은 자동 생성
-- 현재 정식 P2P 배포 라인은 `TenRiff 1.2.99 stable`
+- 현재 정식 P2P 배포 라인은 `TenRiff 1.2.100 stable`
 - 배포 패키지에는 `Songs`를 넣지 않음
 - 배포 패키지는 `Main Menu / Options / Song Selecte / Multiplayer Lobby / Clear / Failed` 이름의 `Mainmusic/` 화면 슬롯을 포함하며, 각 `이름.mp3`와 번호가 붙은 `이름 2.mp3`~`이름 64.mp3`를 자동 수집해 화면 재진입마다 순환
 - 배포 업데이트에는 built artifacts와 필요한 런타임 자산만 포함

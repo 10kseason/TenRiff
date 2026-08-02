@@ -43,33 +43,6 @@ fs::path path_from_utf8(std::string_view value) {
     }
 }
 
-std::string normalize_filesystem_display_name(std::string value) {
-    value = util::sanitize_ui_text(value);
-    if (value.empty()) {
-        return "Imported Skin";
-    }
-    for (char& ch : value) {
-        switch (ch) {
-            case '<':
-            case '>':
-            case ':':
-            case '"':
-            case '/':
-            case '\\':
-            case '|':
-            case '?':
-            case '*':
-                ch = '_';
-                break;
-            default:
-                break;
-        }
-    }
-    while (!value.empty() && (value.back() == ' ' || value.back() == '.')) {
-        value.pop_back();
-    }
-    return value.empty() ? "Imported Skin" : value;
-}
 
 std::string lr2_resolution_mode_label(std::string_view value) {
     const std::string normalized = config::normalize_skin_lr2_resolution_mode_token(value);
@@ -162,6 +135,7 @@ std::optional<std::string> pick_folder_dialog_utf8() {
     return result;
 }
 
+
 #endif
 
 }  // namespace
@@ -215,82 +189,25 @@ bool MenuApp::import_lr2_skin_path(std::string_view source_path) {
         return false;
     }
 
-    const fs::path source = path_from_utf8(normalized_source);
-    std::error_code ec;
-    if (!fs::is_directory(source, ec)) {
-        return false;
-    }
-
     const fs::path import_root = lr2_skin_import_root_path(profile_dir_);
-    fs::create_directories(import_root, ec);
-    if (ec) {
-        std::cerr << "[warn] Failed to create LR2 skin import root: " << import_root.u8string() << std::endl;
+    const Lr2SkinImportResult imported =
+        import_lr2_skin_tree(normalized_source, import_root.u8string());
+    for (const auto& warning : imported.warnings) {
+        std::cerr << "[warn] " << warning << std::endl;
+    }
+    if (!imported.success()) {
         return false;
     }
 
-    int imported_count = 0;
-    auto import_single_skin = [&](const fs::path& skin_dir) -> bool {
-        const std::string source_skin_path = menu_songs::normalize_song_source_path(skin_dir.u8string());
-        if (source_skin_path.empty() || !is_lr2_skin_directory(source_skin_path)) {
-            return false;
-        }
-
-        const std::string base_name = normalize_filesystem_display_name(skin_dir.filename().u8string());
-        fs::path destination = import_root / path_from_utf8(base_name);
-        std::error_code path_ec;
-        const fs::path source_canonical = fs::weakly_canonical(skin_dir, path_ec);
-        path_ec.clear();
-        const fs::path import_root_canonical = fs::weakly_canonical(import_root, path_ec);
-        path_ec.clear();
-
-        if (!source_canonical.empty() &&
-            !import_root_canonical.empty() &&
-            source_canonical.parent_path() == import_root_canonical) {
-            config_.skin.lr2_skin_name = source_canonical.filename().u8string();
-            ++imported_count;
-            return true;
-        }
-
-        int suffix = 2;
-        while (fs::exists(destination, ec)) {
-            if (!ec) {
-                destination = import_root / path_from_utf8(base_name + " (" + std::to_string(suffix) + ")");
-                ++suffix;
-                continue;
-            }
-            ec.clear();
-            return false;
-        }
-
-        fs::copy(skin_dir, destination, fs::copy_options::recursive, ec);
-        if (ec) {
-            std::cerr << "[warn] Failed to import LR2 skin: " << skin_dir.u8string()
-                      << " -> " << destination.u8string() << std::endl;
-            return false;
-        }
-
-        config_.skin.lr2_skin_name = destination.filename().u8string();
-        ++imported_count;
-        return true;
-    };
-
-    bool imported = import_single_skin(source);
-    if (!imported) {
-        std::error_code scan_ec;
-        for (fs::directory_iterator it(source, scan_ec), end; !scan_ec && it != end; it.increment(scan_ec)) {
-            if (!it->is_directory(scan_ec)) {
-                continue;
-            }
-            imported |= import_single_skin(it->path());
-        }
-    }
-    if (!imported) {
-        return false;
-    }
-
+    // Candidate ordering is deterministic. A Theme bundle activates its first
+    // installed playskin while leaving every imported sibling available in the
+    // Imported Skin row.
+    config_.skin.lr2_skin_name = imported.skin_names.front();
     refresh_available_lr2_skins();
     skin_dirty_ = true;
-    std::cerr << "[info] Imported " << imported_count << " LR2 skin(s)." << std::endl;
+    std::cerr << "[info] Imported " << imported.skin_names.size()
+              << " LR2 skin(s), files=" << imported.copied_files
+              << " bytes=" << imported.copied_bytes << "." << std::endl;
     return true;
 }
 
@@ -965,8 +882,11 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
     render.generic.notes.push_back(ui_text(
         "Import Skin opens a folder picker. You can also drag and drop an LR2 skin folder onto this screen.",
         "스킨 가져오기는 폴더 선택 창을 엽니다. 이 화면에 LR2 스킨 폴더를 드래그 앤 드롭해도 됩니다."));
-    render.generic.notes.push_back(ui_text("LR2 porting imports note, LN, lane-gap, and destination-size data from default active branches in the playskin.",
-                                           "LR2 포팅은 플레이스킨의 기본 활성 브랜치에서 노트, LN, 레인 간격, 대상 크기 데이터를 가져옵니다."));
+    render.generic.notes.push_back(ui_text(
+        "Selecting LR2files or Theme imports each independent non-IIDX theme separately; IIDX-dependent themes are skipped.",
+        "LR2files 또는 Theme을 고르면 독립적인 non-IIDX 테마를 각각 이식하며, IIDX 의존 테마는 건너뜁니다."));
+    render.generic.notes.push_back(ui_text("LR2 porting imports note, LN, lower Gear, lane-gap, and destination-size data from default active branches in the playskin.",
+                                           "LR2 포팅은 플레이스킨의 기본 활성 브랜치에서 노트, LN, 하단 Gear, 레인 간격, 대상 크기 데이터를 가져옵니다."));
     render.generic.notes.push_back(ui_text("Image Aspect keeps imported head and tail art from stretching to the gameplay note box.",
                                            "이미지 비율은 가져온 헤드/테일 이미지를 게임 노트 박스에 맞출 때 늘어나지 않도록 유지합니다."));
     render.generic.notes.push_back(ui_text("White Dividers, Judgement Line, and Gear Boundary can be toggled independently.",

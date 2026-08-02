@@ -62,7 +62,7 @@ The standard TenRiff play flow is:
   - Turning `BGA` off disables gameplay image/video backgrounds and their decoder/upscaler work; Song Select previews remain visible
   - Selecting a model is separate from enabling the upscaler and accepting its high-spec warning. Experimental `Low-Power DirectX` only requests DirectXMinPower and does not explicitly select or verify an NPU
 - `Skins`
-  - Switch native/LR2 skins, import an LR2 folder, and adjust fixed-divider note gaps/size, Black Playfield, judgement-line position, LN body width, and lane colors
+  - Switch native/LR2 skins, use native lower digital-piano keys with held depth and impact glitches, import one LR2 folder or batch-import an independent non-IIDX `LR2files/Theme` root (IIDX-dependent themes are skipped), port aspect-preserved lower Gear frames that enlarge with field size and clip below the judgement line, and adjust fixed-divider note gaps/size, Black Playfield, judgement-line position, LN body width, and lane colors
 - `Keymap`
   - Change key bindings and run the NKRO test
 
@@ -177,7 +177,7 @@ The five selectable gauge types are:
 
 Fixed gauges (`ex_hard / hard / normal / easy`) start at `100%` and never change type during play.
 
-- `ex_hard`: lower recovery and heavier `BAD` / `POOR` damage than Hard; immediate Game Over at `0%`
+- `ex_hard`: lower recovery and heavier `BAD` / `POOR` damage than Hard; shown with a near-black gray palette distinct from Hard; immediate Game Over at `0%`
 - `hard`: immediate Game Over at `0%`
 - `normal`: immediate Game Over at `0%`
 - `easy`: immediate Game Over at `0%`

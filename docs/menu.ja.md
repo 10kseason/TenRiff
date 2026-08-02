@@ -9,7 +9,7 @@ main menu も gameplay と同じ低遅延思想に従う必要があります。
 - `Options -> Profile Setup` は現在の profile の初回 setup を開き直し、language / audio / input / graphics / keymap を即時保存する。
 - play 開始時、現行実装は menu thread を止めて `GameSession` を別実行する。
 - **Windows menu UI は D3D11 + Direct2D / DirectWrite** ベースで、Title / Song Select と各種 settings screen を描画する。
-- Skins は native/LR2 専用で、LR2 playskin folder の選択または drag-and-drop により現在の profile の `skins` へコピーする。
+- Skins は native/LR2 専用。LR2 playskin を一つ選択または drop すると active profile へ移植し、`LR2files` または `Theme` を選ぶと、`IIDX` folder と IIDX asset に依存する theme を除いた直下の theme を個別に install する。sibling-theme reference を維持し、既存 folder は上書きしない。
 - Song Select は再インデックス中の stage / percent / ETA と progress bar を中央表示する。
 - Browse では local header JSON の選択、または clipboard の http(s) BMSTable HTML/header link の import ができ、現在の source を再インデックスして hash 一致譜面へ table level を適用する。
 - Graphics の `BGA` は gameplay image/video background を完全に無効化し、Song Select preview は維持する。ONNX model 選択は path だけを保存するため、`BGA Upscaler` は別途 ON にして警告を確認する。

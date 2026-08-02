@@ -42,6 +42,11 @@ struct Lr2DestinationNote {
     bool valid = false;
 };
 
+struct Lr2StaticImageLayer {
+    Lr2SourceSlice source;
+    Lr2DestinationNote destination;
+};
+
 struct CustomFileSelection {
     std::string wildcard_path;
     std::string default_name;
@@ -56,6 +61,7 @@ struct Lr2ParseState {
     std::unordered_map<int, Lr2SourceSlice> hold_body_slices;
     std::unordered_map<int, Lr2SourceSlice> hold_tail_slices;
     std::unordered_map<int, Lr2DestinationNote> dst_notes;
+    std::vector<Lr2StaticImageLayer> gear_layers;
     std::unordered_map<std::string, CustomFileSelection> custom_files;
     std::set<int> active_options;
     std::set<std::string> visited_files;
@@ -102,6 +108,7 @@ struct Lr2CandidateInfo {
 };
 
 fs::path relativize_theme_path(const fs::path& skin_dir, const fs::path& candidate);
+fs::path relativize_theme_root_path(const fs::path& skin_dir, const fs::path& candidate);
 
 std::string to_lower_ascii(std::string value) {
     std::transform(value.begin(), value.end(), value.begin(), [](unsigned char ch) {
@@ -175,6 +182,10 @@ std::vector<fs::path> build_lr2_path_candidates(const fs::path& skin_dir,
     const fs::path theme_relative = relativize_theme_path(skin_dir, token_path);
     if (theme_relative != token_path) {
         candidates.push_back(theme_relative);
+    }
+    const fs::path theme_root_relative = relativize_theme_root_path(skin_dir, token_path);
+    if (theme_root_relative != token_path) {
+        candidates.push_back(theme_root_relative);
     }
     return candidates;
 }
@@ -346,6 +357,32 @@ fs::path relativize_theme_path(const fs::path& skin_dir, const fs::path& candida
         }
         if (!relative.empty()) {
             return skin_dir / relative;
+        }
+    }
+    return candidate;
+}
+
+fs::path relativize_theme_root_path(const fs::path& skin_dir, const fs::path& candidate) {
+    std::vector<fs::path> parts;
+    for (const auto& part : candidate) {
+        parts.push_back(part);
+    }
+    std::size_t start = 0u;
+    while (start < parts.size() && parts[start].u8string() == ".") {
+        ++start;
+    }
+    if (parts.size() >= start + 3u &&
+        to_lower_ascii(parts[start].u8string()) == "lr2files" &&
+        to_lower_ascii(parts[start + 1u].u8string()) == "theme") {
+        fs::path relative;
+        // Keep the skin-name component so references to a sibling theme stay
+        // inside the imported Theme namespace instead of being folded into the
+        // currently selected skin directory.
+        for (std::size_t i = start + 2u; i < parts.size(); ++i) {
+            relative /= parts[i];
+        }
+        if (!relative.empty()) {
+            return skin_dir.parent_path() / relative;
         }
     }
     return candidate;
@@ -558,6 +595,10 @@ bool parse_lr2_file(const fs::path& file_path, Lr2ParseState& state, bool is_top
 
     const fs::path current_dir = file_path.parent_path();
     std::vector<ConditionalFrame> conditionals;
+    std::unordered_map<int, Lr2SourceSlice> pending_static_images;
+    const std::string generic_file_path = to_lower_ascii(file_path.generic_u8string());
+    const bool gear_file = generic_file_path.find("/gear/") != std::string::npos ||
+                           to_lower_ascii(file_path.stem().u8string()) == "gear";
 
     auto current_active = [&]() {
         return conditionals.empty() ? true : conditionals.back().current_active;
@@ -670,9 +711,15 @@ bool parse_lr2_file(const fs::path& file_path, Lr2ParseState& state, bool is_top
             if (tokens.size() < 2u) {
                 continue;
             }
-            if (const auto include_path =
-                    resolve_existing_lr2_path(state.skin_dir, current_dir, tokens[1u]);
-                include_path.has_value()) {
+            const std::string include_token = normalize_lr2_token(tokens[1u]);
+            const std::string customized_token = apply_custom_file_selection(state, include_token);
+            auto include_path = resolve_lr2_wildcard_path(
+                state.skin_dir, current_dir, customized_token, {});
+            if (!include_path.has_value() && customized_token != include_token) {
+                include_path = resolve_lr2_wildcard_path(
+                    state.skin_dir, current_dir, include_token, {});
+            }
+            if (include_path.has_value()) {
                 parse_lr2_file(*include_path, state, false);
             }
             continue;
@@ -719,6 +766,30 @@ bool parse_lr2_file(const fs::path& file_path, Lr2ParseState& state, bool is_top
             destination[*lane] = Lr2SourceSlice{*group_index, *x, *y, *width, *height, true};
         };
 
+        if (command == "#src_image") {
+            parse_source_slice(pending_static_images);
+            continue;
+        }
+        if (command == "#dst_image") {
+            const auto source_index = parse_int_token(tokens, 1u);
+            const auto time = parse_int_token(tokens, 2u);
+            const auto x = parse_float_token(tokens, 3u);
+            const auto y = parse_float_token(tokens, 4u);
+            const auto width = parse_float_token(tokens, 5u);
+            const auto height = parse_float_token(tokens, 6u);
+            if (!gear_file || !source_index.has_value() || !time.has_value() || *time != 0 ||
+                !x.has_value() || !y.has_value() || !width.has_value() || !height.has_value()) {
+                continue;
+            }
+            const auto source_it = pending_static_images.find(*source_index);
+            if (source_it == pending_static_images.end() || !source_it->second.valid) {
+                continue;
+            }
+            state.gear_layers.push_back(
+                Lr2StaticImageLayer{source_it->second,
+                                    Lr2DestinationNote{*x, *y, *width, *height, true}});
+            continue;
+        }
         if (command == "#src_note") {
             parse_source_slice(state.note_slices);
             continue;
@@ -749,6 +820,298 @@ bool parse_lr2_file(const fs::path& file_path, Lr2ParseState& state, bool is_top
         }
     }
 
+    return true;
+}
+
+fs::path normalized_absolute_path(const fs::path& path) {
+    std::error_code ec;
+    fs::path normalized = fs::weakly_canonical(path, ec);
+    if (!ec && !normalized.empty()) {
+        return normalized;
+    }
+    ec.clear();
+    normalized = fs::absolute(path, ec);
+    return (!ec && !normalized.empty()) ? normalized.lexically_normal() : path.lexically_normal();
+}
+
+bool path_component_equal(const fs::path& lhs, const fs::path& rhs) {
+#ifdef _WIN32
+    return to_lower_ascii(lhs.u8string()) == to_lower_ascii(rhs.u8string());
+#else
+    return lhs == rhs;
+#endif
+}
+
+bool path_is_same_or_child(const fs::path& child, const fs::path& parent) {
+    const fs::path normalized_child = normalized_absolute_path(child);
+    const fs::path normalized_parent = normalized_absolute_path(parent);
+    auto child_it = normalized_child.begin();
+    auto parent_it = normalized_parent.begin();
+    for (; parent_it != normalized_parent.end(); ++parent_it, ++child_it) {
+        if (child_it == normalized_child.end() || !path_component_equal(*child_it, *parent_it)) {
+            return false;
+        }
+    }
+    return true;
+}
+
+bool paths_equivalent_or_equal(const fs::path& lhs, const fs::path& rhs) {
+    std::error_code ec;
+    if (fs::equivalent(lhs, rhs, ec) && !ec) {
+        return true;
+    }
+    return path_is_same_or_child(lhs, rhs) && path_is_same_or_child(rhs, lhs);
+}
+
+std::string portable_lr2_skin_name(std::string value) {
+    value = util::sanitize_ui_text(value);
+    if (value.empty()) {
+        value = "Imported Skin";
+    }
+    for (char& ch : value) {
+        switch (ch) {
+            case '<':
+            case '>':
+            case ':':
+            case '"':
+            case '/':
+            case '\\':
+            case '|':
+            case '?':
+            case '*':
+                ch = '_';
+                break;
+            default:
+                break;
+        }
+    }
+    while (!value.empty() && (value.back() == ' ' || value.back() == '.')) {
+        value.pop_back();
+    }
+    if (value.empty() || value == "." || value == "..") {
+        value = "Imported Skin";
+    }
+
+    const std::string lower = to_lower_ascii(value.substr(0, value.find('.')));
+    const bool reserved = lower == "con" || lower == "prn" || lower == "aux" || lower == "nul" ||
+                          (lower.size() == 4u &&
+                           ((lower.rfind("com", 0) == 0 || lower.rfind("lpt", 0) == 0) &&
+                            lower[3] >= '1' && lower[3] <= '9'));
+    if (reserved) {
+        value += '_';
+    }
+    return value;
+}
+
+std::optional<fs::path> standard_lr2_theme_root(const fs::path& source) {
+    std::error_code ec;
+    if (to_lower_ascii(source.filename().u8string()) == "theme" && fs::is_directory(source, ec)) {
+        return source;
+    }
+    ec.clear();
+    if (to_lower_ascii(source.filename().u8string()) == "lr2files") {
+        const fs::path theme = source / "Theme";
+        if (fs::is_directory(theme, ec)) {
+            return theme;
+        }
+    }
+    ec.clear();
+    const fs::path nested_theme = source / "LR2files" / "Theme";
+    if (fs::is_directory(nested_theme, ec)) {
+        return nested_theme;
+    }
+    return std::nullopt;
+}
+
+bool excluded_lr2_theme_name(const fs::path& path) {
+    return to_lower_ascii(path.filename().u8string()) == "iidx";
+}
+
+bool lr2_text_references_excluded_iidx(const fs::path& path) {
+    const std::string extension = to_lower_ascii(path.extension().u8string());
+    if (extension != ".lr2skin" && extension != ".csv") {
+        return false;
+    }
+    std::ifstream file(path, std::ios::binary);
+    if (!file) {
+        return false;
+    }
+    std::string line;
+    constexpr std::string_view kPrefix = "lr2files/theme/iidx";
+    while (std::getline(file, line)) {
+        line = to_lower_ascii(normalize_lr2_token(std::move(line)));
+        const std::size_t match = line.find(kPrefix);
+        if (match == std::string::npos) {
+            continue;
+        }
+        const std::size_t boundary = match + kPrefix.size();
+        if (boundary == line.size() || line[boundary] == '/' || line[boundary] == ',' ||
+            std::isspace(static_cast<unsigned char>(line[boundary])) != 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool lr2_theme_depends_on_excluded_iidx(const fs::path& path) {
+    std::error_code ec;
+    for (fs::recursive_directory_iterator it(path, ec), end; !ec && it != end; it.increment(ec)) {
+        if (it->is_regular_file(ec) && lr2_text_references_excluded_iidx(it->path())) {
+            return true;
+        }
+        ec.clear();
+    }
+    return false;
+}
+
+std::vector<fs::path> collect_child_lr2_skins(const fs::path& root,
+                                              std::vector<std::string>& warnings) {
+    std::vector<fs::path> candidates;
+    std::error_code ec;
+    for (fs::directory_iterator it(root, ec), end; !ec && it != end; it.increment(ec)) {
+        if (!it->is_directory(ec) || !has_lr2_skin_assets(it->path())) {
+            ec.clear();
+            continue;
+        }
+        if (excluded_lr2_theme_name(it->path())) {
+            warnings.push_back("Skipped excluded LR2 theme: " + it->path().filename().u8string());
+        } else if (lr2_theme_depends_on_excluded_iidx(it->path())) {
+            warnings.push_back("Skipped LR2 theme that depends on excluded IIDX assets: " +
+                               it->path().filename().u8string());
+        } else {
+            candidates.push_back(it->path());
+        }
+        ec.clear();
+    }
+    std::sort(candidates.begin(), candidates.end(), [](const fs::path& lhs, const fs::path& rhs) {
+        return to_lower_ascii(lhs.filename().u8string()) < to_lower_ascii(rhs.filename().u8string());
+    });
+    return candidates;
+}
+
+std::vector<fs::path> collect_lr2_import_candidates(const fs::path& source,
+                                                    const fs::path& destination_root,
+                                                    std::vector<std::string>& warnings) {
+    if (paths_equivalent_or_equal(source, destination_root)) {
+        return collect_child_lr2_skins(source, warnings);
+    }
+    if (const auto theme_root = standard_lr2_theme_root(source); theme_root.has_value()) {
+        return collect_child_lr2_skins(*theme_root, warnings);
+    }
+    if (excluded_lr2_theme_name(source)) {
+        warnings.push_back("Skipped excluded LR2 theme: " + source.filename().u8string());
+        return {};
+    }
+    if (has_lr2_skin_assets(source)) {
+        if (lr2_theme_depends_on_excluded_iidx(source)) {
+            warnings.push_back("Skipped LR2 theme that depends on excluded IIDX assets: " +
+                               source.filename().u8string());
+            return {};
+        }
+        return {source};
+    }
+    return {};
+}
+
+fs::path next_lr2_import_destination(const fs::path& root, std::string_view requested_name) {
+    const std::string base_name = portable_lr2_skin_name(std::string(requested_name));
+    fs::path candidate = root / util::path_from_utf8_lossy(base_name);
+    std::error_code ec;
+    int suffix = 2;
+    while (fs::exists(candidate, ec) && !ec) {
+        candidate = root / util::path_from_utf8_lossy(base_name + " (" + std::to_string(suffix) + ")");
+        ++suffix;
+    }
+    return ec ? fs::path{} : candidate;
+}
+
+bool safe_relative_import_path(const fs::path& relative) {
+    if (relative.empty() || relative.is_absolute()) {
+        return false;
+    }
+    for (const auto& part : relative) {
+        if (part == "..") {
+            return false;
+        }
+    }
+    return true;
+}
+
+bool copy_lr2_skin_portable(const fs::path& source,
+                            const fs::path& destination,
+                            Lr2SkinImportResult& result) {
+    std::error_code ec;
+    if (!fs::create_directory(destination, ec) || ec) {
+        result.warnings.push_back("Failed to create LR2 import folder: " + destination.u8string());
+        return false;
+    }
+
+    const auto fail_and_cleanup = [&](std::string message) {
+        result.warnings.push_back(std::move(message));
+        std::error_code cleanup_ec;
+        fs::remove_all(destination, cleanup_ec);
+        if (cleanup_ec) {
+            result.warnings.push_back("Failed to remove partial LR2 import: " + destination.u8string());
+        }
+        return false;
+    };
+
+    std::size_t copied_files = 0;
+    std::uintmax_t copied_bytes = 0;
+    fs::recursive_directory_iterator it(source, fs::directory_options::none, ec), end;
+    if (ec) {
+        return fail_and_cleanup("Failed to enumerate LR2 skin: " + source.u8string());
+    }
+    while (it != end) {
+        const fs::path entry_path = it->path();
+        const fs::file_status status = it->symlink_status(ec);
+        if (ec) {
+            return fail_and_cleanup("Failed to inspect LR2 skin entry: " + entry_path.u8string());
+        }
+        const fs::path relative = entry_path.lexically_relative(source);
+        if (!safe_relative_import_path(relative)) {
+            return fail_and_cleanup("Unsafe LR2 skin entry path: " + entry_path.u8string());
+        }
+        const fs::path target = destination / relative;
+
+        if (fs::is_symlink(status)) {
+            if (fs::is_directory(entry_path, ec)) {
+                it.disable_recursion_pending();
+            }
+            ec.clear();
+            result.warnings.push_back("Skipped non-portable LR2 symlink: " + entry_path.u8string());
+        } else if (fs::is_directory(status)) {
+            fs::create_directories(target, ec);
+            if (ec) {
+                return fail_and_cleanup("Failed to create LR2 import subfolder: " + target.u8string());
+            }
+        } else if (fs::is_regular_file(status)) {
+            fs::create_directories(target.parent_path(), ec);
+            if (ec) {
+                return fail_and_cleanup("Failed to create LR2 asset folder: " + target.parent_path().u8string());
+            }
+            fs::copy_file(entry_path, target, fs::copy_options::none, ec);
+            if (ec) {
+                return fail_and_cleanup("Failed to copy LR2 asset: " + entry_path.u8string());
+            }
+            ++copied_files;
+            const std::uintmax_t size = fs::file_size(entry_path, ec);
+            if (!ec) {
+                copied_bytes += size;
+            }
+            ec.clear();
+        } else {
+            result.warnings.push_back("Skipped unsupported LR2 filesystem entry: " + entry_path.u8string());
+        }
+
+        it.increment(ec);
+        if (ec) {
+            return fail_and_cleanup("Failed while enumerating LR2 skin: " + source.u8string());
+        }
+    }
+
+    result.copied_files += copied_files;
+    result.copied_bytes += copied_bytes;
     return true;
 }
 
@@ -797,6 +1160,61 @@ std::vector<std::string> list_lr2_skin_names(std::string_view root_utf8) {
     }
     std::sort(names.begin(), names.end());
     return names;
+}
+
+Lr2SkinImportResult import_lr2_skin_tree(std::string_view source_utf8,
+                                         std::string_view destination_root_utf8) {
+    Lr2SkinImportResult result;
+    if (source_utf8.empty() || destination_root_utf8.empty()) {
+        result.warnings.push_back("LR2 import source and destination must not be empty.");
+        return result;
+    }
+
+    const fs::path source = util::path_from_utf8_lossy(source_utf8);
+    const fs::path destination_root = util::path_from_utf8_lossy(destination_root_utf8);
+    std::error_code ec;
+    if (!fs::is_directory(source, ec)) {
+        result.warnings.push_back("LR2 import source is not a directory: " + source.u8string());
+        return result;
+    }
+    ec.clear();
+    fs::create_directories(destination_root, ec);
+    if (ec) {
+        result.warnings.push_back("Failed to create LR2 import root: " + destination_root.u8string());
+        return result;
+    }
+
+    const auto candidates = collect_lr2_import_candidates(source, destination_root, result.warnings);
+    if (candidates.empty()) {
+        result.warnings.push_back("No supported non-IIDX LR2 playskin folders were found below: " + source.u8string());
+        return result;
+    }
+
+    for (const auto& candidate : candidates) {
+        const fs::path normalized_candidate = normalized_absolute_path(candidate);
+        const fs::path normalized_destination_root = normalized_absolute_path(destination_root);
+        if (paths_equivalent_or_equal(normalized_candidate.parent_path(), normalized_destination_root)) {
+            result.skin_names.push_back(normalized_candidate.filename().u8string());
+            continue;
+        }
+        if (path_is_same_or_child(normalized_destination_root, normalized_candidate)) {
+            result.warnings.push_back("Refused recursive LR2 import into its own source: " + candidate.u8string());
+            continue;
+        }
+
+        const fs::path destination = next_lr2_import_destination(
+            destination_root, candidate.filename().u8string());
+        if (destination.empty()) {
+            result.warnings.push_back("Failed to choose LR2 import destination for: " + candidate.u8string());
+            continue;
+        }
+        if (!copy_lr2_skin_portable(candidate, destination, result)) {
+            continue;
+        }
+        result.skin_names.push_back(destination.filename().u8string());
+    }
+
+    return result;
 }
 
 namespace {
@@ -919,6 +1337,104 @@ void resize_lane_assets(std::vector<ImportedSkinImageAsset>& assets, int lane_co
     assets.resize(static_cast<std::size_t>(lane_count));
 }
 
+void populate_gear_key_assets(Lr2PlaySkinDefinition& definition,
+                              const Lr2ParseState& state,
+                              const Lr2RawPlayLayout& layout) {
+    const Lr2StaticImageLayer* best_layer = nullptr;
+    int best_coverage = 0;
+    float best_area = 0.0f;
+    for (const auto& layer : state.gear_layers) {
+        if (!layer.source.valid || !layer.destination.valid ||
+            layer.source.width <= 0.0f || layer.source.height <= 0.0f ||
+            layer.destination.width <= 0.0f || layer.destination.height <= 0.0f) {
+            continue;
+        }
+        const auto image_it = state.image_paths.find(layer.source.group_index);
+        if (image_it == state.image_paths.end() || image_it->second.empty()) {
+            continue;
+        }
+        const float right = layer.destination.x + layer.destination.width;
+        const float bottom = layer.destination.y + layer.destination.height;
+        int coverage = 0;
+        for (int raw_lane : layout.lane_order) {
+            const auto dst_it = state.dst_notes.find(raw_lane);
+            if (dst_it == state.dst_notes.end() || !dst_it->second.valid) {
+                continue;
+            }
+            const auto& dst = dst_it->second;
+            const float center_x = dst.x + dst.width * 0.5f;
+            if (center_x >= layer.destination.x && center_x <= right &&
+                dst.y >= layer.destination.y && dst.y < bottom) {
+                ++coverage;
+            }
+        }
+        const float area = layer.destination.width * layer.destination.height;
+        if (coverage > best_coverage || (coverage == best_coverage && coverage > 0 && area > best_area)) {
+            best_layer = &layer;
+            best_coverage = coverage;
+            best_area = area;
+        }
+    }
+    if (!best_layer || best_coverage <= 0) {
+        return;
+    }
+
+    const auto image_it = state.image_paths.find(best_layer->source.group_index);
+    if (image_it == state.image_paths.end() || image_it->second.empty()) {
+        return;
+    }
+
+    // Keep the complete static Gear frame as one asset. Per-lane stretching
+    // distorts logos and text because LR2 Gear panels are authored as a single
+    // destination rectangle with their own aspect ratio.
+    definition.gear_overlay_image.path = image_it->second;
+    definition.gear_overlay_image.source_x = best_layer->source.x;
+    definition.gear_overlay_image.source_y = best_layer->source.y;
+    definition.gear_overlay_image.source_width = best_layer->source.width;
+    definition.gear_overlay_image.source_height = best_layer->source.height;
+    definition.gear_overlay_image.has_source_rect = true;
+
+    resize_lane_assets(definition.key_images, definition.keys);
+    resize_lane_assets(definition.key_pressed_images, definition.keys);
+    const float dst_left = best_layer->destination.x;
+    const float dst_top = best_layer->destination.y;
+    const float dst_right = dst_left + best_layer->destination.width;
+    const float dst_bottom = dst_top + best_layer->destination.height;
+    bool populated = false;
+    for (int lane = 0; lane < definition.keys; ++lane) {
+        const int raw_lane = layout.lane_order[static_cast<std::size_t>(lane)];
+        const auto dst_it = state.dst_notes.find(raw_lane);
+        if (dst_it == state.dst_notes.end() || !dst_it->second.valid) {
+            continue;
+        }
+        const auto& lane_dst = dst_it->second;
+        const float lane_left = std::max(dst_left, lane_dst.x);
+        const float lane_right = std::min(dst_right, lane_dst.x + lane_dst.width);
+        const float gear_top = std::clamp(lane_dst.y, dst_top, dst_bottom);
+        if (lane_right <= lane_left || dst_bottom <= gear_top) {
+            continue;
+        }
+
+        ImportedSkinImageAsset asset;
+        asset.path = image_it->second;
+        asset.source_x = best_layer->source.x +
+                         ((lane_left - dst_left) / best_layer->destination.width) * best_layer->source.width;
+        asset.source_y = best_layer->source.y +
+                         ((gear_top - dst_top) / best_layer->destination.height) * best_layer->source.height;
+        asset.source_width = ((lane_right - lane_left) / best_layer->destination.width) * best_layer->source.width;
+        asset.source_height = ((dst_bottom - gear_top) / best_layer->destination.height) * best_layer->source.height;
+        asset.has_source_rect = asset.source_width > 0.0f && asset.source_height > 0.0f;
+        if (!asset.has_source_rect) {
+            continue;
+        }
+        const std::size_t index = static_cast<std::size_t>(lane);
+        definition.key_images[index] = asset;
+        definition.key_pressed_images[index] = asset;
+        populated = true;
+    }
+    definition.use_full_lane_receptor_layout = populated;
+}
+
 void finalize_key_fallbacks(Lr2PlaySkinDefinition& definition) {
     resize_lane_assets(definition.note_images, definition.keys);
     resize_lane_assets(definition.hold_head_images, definition.keys);
@@ -928,13 +1444,9 @@ void finalize_key_fallbacks(Lr2PlaySkinDefinition& definition) {
     resize_lane_assets(definition.key_pressed_images, definition.keys);
     for (int lane = 0; lane < definition.keys; ++lane) {
         const std::size_t index = static_cast<std::size_t>(lane);
-        if (definition.key_images[index].path.empty()) {
-            definition.key_images[index] = definition.note_images[index];
-        }
-        if (definition.key_pressed_images[index].path.empty()) {
-            definition.key_pressed_images[index] =
-                !definition.hold_head_images[index].path.empty() ? definition.hold_head_images[index]
-                                                                  : definition.note_images[index];
+        if (definition.key_pressed_images[index].path.empty() &&
+            !definition.key_images[index].path.empty()) {
+            definition.key_pressed_images[index] = definition.key_images[index];
         }
     }
 }
@@ -998,6 +1510,7 @@ Lr2PlaySkinDefinition build_lr2_definition(const Lr2ParseState& state,
             make_asset_from_slice(state.image_paths, state.hold_tail_slices, raw_lane);
     }
 
+    populate_gear_key_assets(definition, state, layout);
     finalize_key_fallbacks(definition);
     return definition;
 }

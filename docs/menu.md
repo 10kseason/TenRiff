@@ -9,7 +9,7 @@ The main menu must honor the same low-latency philosophy as gameplay: audio runs
 - `Options -> Profile Setup`은 현재 프로필의 첫 실행 설정 화면을 다시 열어 언어/오디오/입력/그래픽/키맵을 즉시 저장한다.
 - 플레이 시작 시에는 현재 구현상 메뉴 스레드를 중지하고 `GameSession`을 별도로 실행한다.
 - **Windows 메뉴 UI는 D3D11 + Direct2D/DirectWrite 기반**으로 타이틀/곡선택(시안 레이아웃)과 기타 설정 화면(리스트 UI)을 렌더링한다.
-- Skins는 native/LR2 전용이며, LR2 playskin 폴더 선택 또는 drag-and-drop으로 활성 프로필의 `skins`에 복사한다.
+- Skins는 native/LR2 전용이다. LR2 playskin 하나를 선택하거나 드롭하면 활성 프로필로 이식하고, `LR2files` 또는 `Theme`을 선택하면 정확한 `IIDX` 폴더와 IIDX 자산 의존 테마를 제외한 바로 아래 테마를 각각 설치한다. 형제 테마 참조를 유지하며 기존 폴더는 덮어쓰지 않는다.
 - Song Select 재인덱싱 중 stage/percent/ETA와 progress bar를 화면 중앙에 표시한다.
 - Browse에서 로컬 header JSON을 고르거나 클립보드의 http(s) BMSTable HTML/header 링크를 가져오면 현재 source를 재인덱싱해 hash 일치 곡에 표 레벨을 적용한다.
 - Graphics의 `BGA` 토글은 게임플레이 이미지/영상을 완전히 끄며 선곡 미리보기는 유지한다. ONNX 모델 선택은 경로만 저장하므로 `BGA Upscaler`를 별도로 켜고 고사양 경고를 확인해야 한다.

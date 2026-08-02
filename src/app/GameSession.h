@@ -91,6 +91,8 @@ public:
 
         std::size_t lane_activity_count = 0;
         std::array<float, kGameplayHudMaxLanes> lane_activity{};
+        std::size_t lane_pressed_count = 0;
+        std::array<uint8_t, kGameplayHudMaxLanes> lane_pressed{};
         std::size_t note_count = 0;
         std::array<HudNote, kGameplayHudMaxNotes> notes{};
 
@@ -113,6 +115,8 @@ public:
         bool ghost_game_over = false;
         std::size_t ghost_lane_activity_count = 0;
         std::array<float, kGameplayHudMaxLanes> ghost_lane_activity{};
+        std::size_t ghost_lane_pressed_count = 0;
+        std::array<uint8_t, kGameplayHudMaxLanes> ghost_lane_pressed{};
         std::size_t ghost_note_count = 0;
         std::array<HudNote, kGameplayHudMaxNotes> ghost_notes{};
     };
@@ -443,6 +447,8 @@ private:
     bool audio_timing_diagnostics_logged_ = false;
     std::vector<float> lane_activity_;
     std::vector<float> ghost_lane_activity_;
+    std::vector<uint8_t> lane_pressed_;
+    std::vector<uint8_t> ghost_lane_pressed_;
     HudCallback hud_callback_;
     LoadingProgressCallback loading_progress_callback_;
     LoadingCancelCallback loading_cancel_callback_;

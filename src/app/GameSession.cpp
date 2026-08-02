@@ -76,6 +76,20 @@ constexpr int64_t kHispeedRepeatIntervalMs = 45;
 constexpr std::size_t kMaxToneVoices = 256;
 constexpr double kTwoPi = 6.28318530717958647692;
 
+bool process_owns_foreground_window() {
+#ifdef _WIN32
+    const HWND foreground = GetForegroundWindow();
+    if (!foreground) {
+        return false;
+    }
+    DWORD foreground_process_id = 0;
+    GetWindowThreadProcessId(foreground, &foreground_process_id);
+    return foreground_process_id == GetCurrentProcessId();
+#else
+    return true;
+#endif
+}
+
 std::string normalize_runtime_key_mode_local(std::string value) {
     std::transform(value.begin(), value.end(), value.begin(), [](unsigned char ch) {
         return static_cast<char>(std::tolower(ch));

@@ -62,7 +62,7 @@ TenRiff의 기본 플레이 흐름은 아래 순서입니다.
   - `BGA`를 끄면 게임플레이 이미지/영상과 관련 디코더·업스케일러 작업이 꺼지며 Song Select 미리보기는 유지됨
   - 모델 선택 후 Upscaler를 직접 켜고 고사양 경고를 확인해야 함. `저전력 DirectX(실험)`은 DirectXMinPower 요청일 뿐 NPU를 명시 선택하거나 검증하지 않음
 - `Skins`
-  - native/LR2 스킨 전환, LR2 폴더 가져오기, 고정 레인선 기준 노트 간격·크기, 검은 플레이필드, 판정선 위치, LN 몸통 폭, lane color 조정
+  - native/LR2 스킨 전환, native 하단 디지털 피아노 건반(홀드 눌림·타격 글리치), LR2 폴더 하나 이식 또는 독립적인 non-IIDX `LR2files/Theme` 일괄 이식(IIDX 의존 테마 제외), 필드 크기에 연동해 확대되고 판정선 아래로 clip되는 원본 종횡비 하단 Gear 프레임, 고정 레인선 기준 노트 간격·크기, 검은 플레이필드, 판정선 위치, LN 몸통 폭, lane color 조정
 - `Keymap`
   - 키 배치 변경과 NKRO 테스트
 
@@ -177,7 +177,7 @@ Rank는 `<75 F`, `75 B`, `80.5 A`, `86.5 A+`, `90 S`, `95.5 S+`, `98 AA`, `99 SS
 
 고정 게이지(`ex_hard / hard / normal / easy`)는 곡 시작 시 `100%`에서 시작하며 플레이 중 타입이 바뀌지 않습니다.
 
-- `ex_hard`: Hard보다 회복이 낮고 `BAD`/`POOR` 손실이 더 큰 도전용 게이지. `0%`가 되는 즉시 Game Over
+- `ex_hard`: Hard보다 회복이 낮고 `BAD`/`POOR` 손실이 더 큰 도전용 게이지. Hard의 붉은색과 다른 짙은 흑회색으로 표시하며 `0%`가 되는 즉시 Game Over
 - `hard`: `0%`가 되는 즉시 Game Over
 - `normal`: `0%`가 되는 즉시 Game Over
 - `easy`: `0%`가 되는 즉시 Game Over

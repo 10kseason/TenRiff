@@ -1,5 +1,7 @@
 #include "doctest/doctest.h"
 
+#include <algorithm>
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <string>
@@ -133,6 +135,110 @@ TEST_CASE("lr2 skin detector recognizes a direct skin folder") {
     CHECK_FALSE(tenriff::app::is_lr2_skin_directory((temp.path / "MissingSkin").u8string()));
 }
 
+TEST_CASE("lr2 Theme importer installs child skins separately and keeps sibling references") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+
+    const auto source_root = temp.path / "source";
+    const auto theme_root = source_root / "LR2files" / "Theme";
+    const auto primary = theme_root / "Primary";
+    const auto shared = theme_root / "Shared";
+    const auto excluded_iidx = theme_root / "IIDX";
+    const auto iidx_dependent = theme_root / "IIDX Dependent";
+    const auto imported_root = temp.path / "profile" / "skins" / "lr2";
+    std::filesystem::create_directories(primary);
+    std::filesystem::create_directories(shared);
+    std::filesystem::create_directories(excluded_iidx);
+    std::filesystem::create_directories(iidx_dependent);
+
+    write_file(primary / "play.lr2skin",
+               "#INFORMATION,0,Primary,Tester\n"
+               "#ENDOFHEADER\n"
+               "#INCLUDE,LR2files\\Theme\\Shared\\layout.csv\n");
+    write_file(shared / "shared.lr2skin", "#INFORMATION,0,Shared,Tester\n");
+    write_file(shared / "layout.csv",
+               "#IMAGE,LR2files\\Theme\\Shared\\note.png\n"
+               "#SRC_NOTE,0,0,0,0,30,22,1,1,0,0\n"
+               "#SRC_NOTE,1,0,30,0,30,22,1,1,0,0\n"
+               "#DST_NOTE,0,0,100,400,30,22,0,255,255,255,255,0,0,0,0,0,0,0,0,0\n"
+               "#DST_NOTE,1,0,132,400,30,22,0,255,255,255,255,0,0,0,0,0,0,0,0,0\n");
+    write_file(shared / "note.png", "portable sibling asset");
+    write_file(excluded_iidx / "play.lr2skin", "#INFORMATION,0,Excluded IIDX,Tester\n");
+    write_file(iidx_dependent / "play.lr2skin",
+               "#INFORMATION,3,Dependent 10K,Tester\n"
+               "#INCLUDE,LR2files\\Theme\\IIDX\\csv\\play.csv\n");
+
+    const auto imported = tenriff::app::import_lr2_skin_tree(
+        theme_root.u8string(), imported_root.u8string());
+    REQUIRE(imported.success());
+    REQUIRE(imported.skin_names.size() == 2u);
+    CHECK(imported.skin_names[0] == "Primary");
+    CHECK(imported.skin_names[1] == "Shared");
+    CHECK(imported.copied_files == 4u);
+    CHECK(imported.copied_bytes > 0u);
+    CHECK(std::filesystem::is_regular_file(imported_root / "Primary" / "play.lr2skin"));
+    CHECK(std::filesystem::is_regular_file(imported_root / "Shared" / "note.png"));
+    CHECK_FALSE(std::filesystem::exists(imported_root / "Theme"));
+    CHECK_FALSE(std::filesystem::exists(imported_root / "IIDX"));
+    CHECK_FALSE(std::filesystem::exists(imported_root / "IIDX Dependent"));
+    CHECK(std::any_of(imported.warnings.begin(), imported.warnings.end(), [](const std::string& warning) {
+        return warning.find("depends on excluded IIDX") != std::string::npos;
+    }));
+
+    const auto imported_from_lr2_root = tenriff::app::import_lr2_skin_tree(
+        source_root.u8string(), (temp.path / "imported-from-lr2-root").u8string());
+    REQUIRE(imported_from_lr2_root.success());
+    CHECK(imported_from_lr2_root.skin_names == imported.skin_names);
+    CHECK_FALSE(std::filesystem::exists(temp.path / "imported-from-lr2-root" / "IIDX"));
+
+    const auto rejected_iidx = tenriff::app::import_lr2_skin_tree(
+        excluded_iidx.u8string(), (temp.path / "rejected-iidx").u8string());
+    CHECK_FALSE(rejected_iidx.success());
+    CHECK_FALSE(std::filesystem::exists(temp.path / "rejected-iidx" / "IIDX"));
+
+    const auto resolved = tenriff::app::resolve_lr2_play_skin(
+        imported_root.u8string(), "Primary", 2);
+    REQUIRE(resolved.found);
+    REQUIRE(resolved.note_images.size() == 2u);
+    CHECK(resolved.note_images[0].path.find("Shared") != std::string::npos);
+    CHECK(resolved.note_images[0].path.find("note.png") != std::string::npos);
+
+    write_file(imported_root / "Primary" / "keep.txt", "original");
+    const auto duplicate = tenriff::app::import_lr2_skin_tree(
+        primary.u8string(), imported_root.u8string());
+    REQUIRE(duplicate.success());
+    REQUIRE(duplicate.skin_names.size() == 1u);
+    CHECK(duplicate.skin_names[0] == "Primary (2)");
+    CHECK(std::filesystem::is_regular_file(imported_root / "Primary (2)" / "play.lr2skin"));
+    std::ifstream kept(imported_root / "Primary" / "keep.txt", std::ios::binary);
+    std::string kept_text;
+    kept >> kept_text;
+    CHECK(kept_text == "original");
+}
+
+TEST_CASE("lr2 importer keeps a direct skin with nested screen files as one unit") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+
+    const auto direct = temp.path / "Direct";
+    const auto imported_root = temp.path / "imported";
+    std::filesystem::create_directories(direct / "Play");
+    std::filesystem::create_directories(direct / "Result");
+    write_file(direct / "Play" / "play.lr2skin", "#INFORMATION,0,Direct Play,Tester\n");
+    write_file(direct / "Result" / "result.lr2skin", "#INFORMATION,7,Direct Result,Tester\n");
+
+    const auto imported = tenriff::app::import_lr2_skin_tree(
+        direct.u8string(), imported_root.u8string());
+    REQUIRE(imported.success());
+    REQUIRE(imported.skin_names.size() == 1u);
+    CHECK(imported.skin_names[0] == "Direct");
+    CHECK(std::filesystem::is_regular_file(imported_root / "Direct" / "Play" / "play.lr2skin"));
+    CHECK(std::filesystem::is_regular_file(imported_root / "Direct" / "Result" / "result.lr2skin"));
+    CHECK_FALSE(std::filesystem::exists(imported_root / "Play"));
+}
+
 TEST_CASE("lr2 skin resolver follows includes, custom files, and note destinations") {
     TempDirGuard temp;
     temp.path = make_temp_dir();
@@ -182,7 +288,9 @@ TEST_CASE("lr2 skin resolver follows includes, custom files, and note destinatio
     CHECK(resolved.imported_note_width_ratio == doctest::Approx(25.0f / 30.0f));
     CHECK(resolved.imported_note_height_ratio == doctest::Approx(8.0f / 22.0f));
     REQUIRE(resolved.key_images.size() == 4u);
-    CHECK(resolved.key_images[0].path.find("default.png") != std::string::npos);
+    CHECK(resolved.key_images[0].path.empty());
+    CHECK(resolved.key_pressed_images[0].path.empty());
+    CHECK(resolved.gear_overlay_image.path.empty());
 }
 
 TEST_CASE("lr2 skin image slots survive missing assets and include boundaries") {
@@ -261,6 +369,55 @@ TEST_CASE("lr2 skin resolver handles multi-option branches, customfile directori
     CHECK(resolved.lane_divider_widths[1] == doctest::Approx(2.0f));
 }
 
+TEST_CASE("lr2 gear wildcard include supplies full-lane receptor art") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+
+    const auto root = temp.path / "skins";
+    const auto skin = root / "GearSkin";
+    std::filesystem::create_directories(skin / "play" / "Gear" / "Default");
+    std::filesystem::create_directories(skin / "play" / "Note");
+
+    write_file(skin / "play_7.lr2skin",
+               "#INFORMATION,0,Gear Skin,Tester\n"
+               "#RESOLUTION,1\n"
+               "#CUSTOMOPTION,PlaySide,900,1P\n"
+               "#CUSTOMFILE,Gear,LR2files\\Theme\\GearSkin\\play\\Gear\\*,Default\n"
+               "#ENDOFHEADER\n"
+               "#IMAGE,LR2files\\Theme\\GearSkin\\play\\Gear\\*\\Gear.png\n"
+               "#IMAGE,LR2files\\Theme\\GearSkin\\play\\Note\\Note.png\n"
+               "#INCLUDE,LR2files\\Theme\\GearSkin\\play\\layout.csv\n"
+               "#INCLUDE,LR2files\\Theme\\GearSkin\\play\\Gear\\*\\Gear.csv\n");
+    write_file(skin / "play" / "layout.csv",
+               "#SRC_NOTE,0,1,0,0,30,20,1,1,0,0\n"
+               "#SRC_NOTE,1,1,30,0,30,20,1,1,0,0\n"
+               "#DST_NOTE,0,0,100,400,30,20,0,255,255,255,255,0,0,0,0,0,0,0,0,0\n"
+               "#DST_NOTE,1,0,130,400,30,20,0,255,255,255,255,0,0,0,0,0,0,0,0,0\n");
+    write_file(skin / "play" / "Gear" / "Default" / "Gear.csv",
+               "#SRC_IMAGE,0,0,0,0,80,480,1,1,0,0,0,0,0\n"
+               "#DST_IMAGE,0,0,90,0,80,480,0,255,255,255,255,1,0,0,0,0,0,0,0,0\n");
+    write_file(skin / "play" / "Gear" / "Default" / "Gear.png");
+    write_file(skin / "play" / "Note" / "Note.png");
+
+    const auto resolved = tenriff::app::resolve_lr2_play_skin(root.u8string(), "GearSkin", 2);
+    REQUIRE(resolved.found);
+    REQUIRE(resolved.note_images.size() == 2u);
+    CHECK(resolved.note_images[0].path.find("Note.png") != std::string::npos);
+    REQUIRE(resolved.key_images.size() == 2u);
+    CHECK(resolved.key_images[0].path.find("Gear.png") != std::string::npos);
+    CHECK(resolved.key_images[0].source_x == doctest::Approx(10.0f));
+    CHECK(resolved.key_images[0].source_y == doctest::Approx(400.0f));
+    CHECK(resolved.key_images[0].source_width == doctest::Approx(30.0f));
+    CHECK(resolved.key_images[0].source_height == doctest::Approx(80.0f));
+    CHECK(resolved.use_full_lane_receptor_layout);
+    CHECK(resolved.gear_overlay_image.path.find("Gear.png") != std::string::npos);
+    CHECK(resolved.gear_overlay_image.has_source_rect);
+    CHECK(resolved.gear_overlay_image.source_x == doctest::Approx(0.0f));
+    CHECK(resolved.gear_overlay_image.source_y == doctest::Approx(0.0f));
+    CHECK(resolved.gear_overlay_image.source_width == doctest::Approx(80.0f));
+    CHECK(resolved.gear_overlay_image.source_height == doctest::Approx(480.0f));
+}
 TEST_CASE("lr2 skin resolver honors explicit resolution headers") {
     TempDirGuard temp;
     temp.path = make_temp_dir();
@@ -342,6 +499,45 @@ TEST_CASE("lr2 skin resolver ignores hd asset names when auto-detecting layout f
     REQUIRE(resolved.found);
     CHECK(resolved.resolution_family == tenriff::app::Lr2ResolutionFamily::Sd);
     CHECK(resolved.note_images[0].path.find("Snow_HD.png") != std::string::npos);
+}
+
+TEST_CASE("lr2 external Theme sample resolves independent non-IIDX playskins when configured") {
+    const char* configured_root = std::getenv("TENRIFF_LR2_THEME_ROOT");
+    if (configured_root == nullptr || *configured_root == '\0') {
+        return;
+    }
+
+    const std::filesystem::path root(configured_root);
+    REQUIRE(std::filesystem::is_directory(root));
+    const auto names = tenriff::app::list_lr2_skin_names(root.u8string());
+    CHECK(names.size() >= 5u);
+    CHECK(std::find(names.begin(), names.end(), "LR2") != names.end());
+    CHECK(std::find(names.begin(), names.end(), "WMIX_HD") != names.end());
+
+    const auto standard = tenriff::app::resolve_lr2_play_skin(root.u8string(), "LR2", 8);
+    REQUIRE(standard.found);
+    CHECK(standard.keys == 8);
+    CHECK(std::any_of(standard.note_images.begin(), standard.note_images.end(), [](const auto& asset) {
+        return !asset.path.empty();
+    }));
+
+    const auto alternate = tenriff::app::resolve_lr2_play_skin(root.u8string(), "WMIX_HD", 8);
+    REQUIRE(alternate.found);
+    CHECK(alternate.keys == 8);
+    CHECK(std::any_of(alternate.note_images.begin(), alternate.note_images.end(), [](const auto& asset) {
+        return !asset.path.empty();
+    }));
+
+    if (std::find(names.begin(), names.end(), "FT") != names.end()) {
+        const auto ft = tenriff::app::resolve_lr2_play_skin(root.u8string(), "FT", 8);
+        REQUIRE(ft.found);
+        REQUIRE(ft.note_images.size() == 8u);
+        CHECK(ft.note_images[0].path.find("Note.png") != std::string::npos);
+        CHECK(ft.note_images[0].path.find("Numbers.png") == std::string::npos);
+        REQUIRE(ft.key_images.size() == 8u);
+        CHECK(ft.key_images[0].path.find("Gear.png") != std::string::npos);
+        CHECK(ft.use_full_lane_receptor_layout);
+    }
 }
 
 TEST_CASE("lr2 sample FT skin resolves note directory customfile patterns") {

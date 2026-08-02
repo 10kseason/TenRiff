@@ -798,6 +798,8 @@ GameplayHudRevisionInput MenuApp::gameplay_hud_revision_input(const GameplayHudS
                 input.timing_history_delta_ms.begin());
     input.lane_activity_count = state.lane_activity_count;
     std::copy_n(state.lane_activity.begin(), state.lane_activity_count, input.lane_activity.begin());
+    input.lane_pressed_count = state.lane_pressed_count;
+    std::copy_n(state.lane_pressed.begin(), state.lane_pressed_count, input.lane_pressed.begin());
     input.note_count = state.note_count;
     for (std::size_t i = 0; i < state.note_count; ++i) {
         input.notes[i] = GameplayHudRevisionNote{
@@ -831,6 +833,10 @@ GameplayHudRevisionInput MenuApp::gameplay_hud_revision_input(const GameplayHudS
     std::copy_n(state.ghost_lane_activity.begin(),
                 state.ghost_lane_activity_count,
                 input.ghost_lane_activity.begin());
+    input.ghost_lane_pressed_count = state.ghost_lane_pressed_count;
+    std::copy_n(state.ghost_lane_pressed.begin(),
+                state.ghost_lane_pressed_count,
+                input.ghost_lane_pressed.begin());
     input.ghost_note_count = state.ghost_note_count;
     for (std::size_t i = 0; i < state.ghost_note_count; ++i) {
         input.ghost_notes[i] = GameplayHudRevisionNote{
@@ -2160,6 +2166,24 @@ void MenuApp::handle_title_input(uint32_t keycode) {
 }
 
 void MenuApp::handle_text_input(std::string_view text) {
+    if (screen_ == Screen::Multiplayer &&
+        multiplayer_menu_.edit_field == MultiplayerEditField::Chat &&
+        !text.empty()) {
+        const std::string utf8 = util::ensure_utf8_text(text);
+        std::string printable;
+        printable.reserve(utf8.size());
+        for (unsigned char ch : utf8) {
+            if (ch >= 0x20u && ch != 0x7Fu) {
+                printable.push_back(static_cast<char>(ch));
+            }
+        }
+        if (try_append_multiplayer_chat_text(
+                multiplayer_menu_.chat_input, printable)) {
+            publish_snapshot();
+        }
+        return;
+    }
+
     if (screen_ != Screen::QuickSetup || !profile_nickname_edit_active_ || text.empty()) {
         return;
     }
