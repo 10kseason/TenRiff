@@ -29,7 +29,7 @@
 - `enable_osu_charts`：默认 `false`；在 Mode Settings 打开 `OSU Charts` 后可索引并游玩 osu!mania 4K～10K `.osu`，同时刷新曲库
 - `key_mode`：`none | auto | 4k | 5k | 6k | 7k | 8k | 9k | 10k | 12k | 14k | 16k`
 - `key_conversion_algorithm`：`krrcream | nk2`（默认 `krrcream`；在游戏内 Key Converter 中选择，仅用于实际键数变换）
-- `key_conversion_note_add_mode`：`default | add_25_plus`（默认 `default`；仅在 playable key count 实际变化时，相对 converter 基础结果请求至少增加25%的 note）
+- `key_conversion_note_add_mode`：`default | add_25_plus`（默认 `default`；仅在 playable key count 变化时先向原始 pattern 请求至少25%的 note，再交给 key converter）
 - `gauge`：`normal | hard | ex_hard | easy | shift`
 - `random`：`off | mirror | rr | fr | sr`
 - `random_seed`：RR/FR/SR、强制 key-mode 变换、Note Add 和 LN Mix 目标选择使用的固定 seed（`0` 也视为固定值）
@@ -77,7 +77,7 @@
 - `4k..10k`、`12k`、`14k`、`16k` 会通过基于 N2NC 的 lane remap 匹配目标键数
 - 强制转换 `5+1 SP` / `7+1 SP` 时只重新映射除皿键外的键盘部分；`follow` 皿键音效移至自动播放
 - `10+2 DP` / `14+2 DP` 同样排除两个皿键，并独立转换左右键盘区域
-- `add_25_plus` 在基础转换后于既有时刻请求至少增加25%的安全无声和弦；若有更高的 Note Add Mod，则只应用一次较高比例。该成绩保留在记录列表中，但不能替换普通最佳记录
+- `add_25_plus` 先在原始 pattern 的既有时刻请求至少25%的安全无声和弦，再由 key converter 根据全部 note 生成最终 layout；若有更高的 Note Add Mod，则只应用一次较高比例。该成绩保留在记录列表中，但不能替换普通最佳记录
 - 应用顺序：key-mode 变换 → DP Flip → Mirror/RR/FR/SR → Note Add → LN/Full Tap 结构变换
 
 ## Gauge 规则

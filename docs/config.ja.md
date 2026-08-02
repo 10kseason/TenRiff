@@ -40,7 +40,7 @@ profile が存在しない場合は初回起動時に自動生成されます。
 
 - `backend` (string)
   - `polling | rawinput`
-  - 現行 `1.2.101` リリースラインの既定値は `rawinput`
+  - 現行 `1.2.102` リリースラインの既定値は `rawinput`
   - `Options -> Input Settings -> Backend` または `Options -> Profile Setup -> Input Backend` で profile ごとに選択可能
   - runtime fallback は保存済みの値を `polling` に書き換えない
   - RawInput の起動失敗、登録先の消失、message window の終了を確認すると、そのアプリ実行中は menu と後続 gameplay の両方で Polling を維持する
@@ -145,7 +145,7 @@ chart loader/indexer は BMS family（`.bms/.bme/.bml/.pms`）が既定です。
   - 既定値は `krrcream`。`key_mode` が元の lane count を変更する場合のみ適用
 - `key_conversion_note_add_mode` (string)
   - `default | add_25_plus`
-  - `default` は converter の基本 pattern を維持し、`add_25_plus` は実際の playable key count が変わる時に基本変換結果より無音 chord note を最低25%多く要求
+  - `default` は元 pattern を維持し、`add_25_plus` は playable key count が変わる時に元 pattern へ無音 chord note を最低25%先に要求してから、その拡張 pattern を key converter の入力に使用
   - Mod Manager の Note Add が25%より高い場合は高い方を一度だけ適用し、peer battle では `default` に固定
 - `gauge` (string)
   - `normal | hard | ex_hard | easy | shift`

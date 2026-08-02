@@ -40,7 +40,7 @@
 
 - `backend` (string)
   - `polling | rawinput`
-  - 当前 `1.2.101` 发布线默认值为 `rawinput`
+  - 当前 `1.2.102` 发布线默认值为 `rawinput`
   - 可在 `Options -> Input Settings -> Backend` 或 `Options -> Profile Setup -> Input Backend` 中按 profile 选择
   - runtime fallback 不会把已保存值改写为 `polling`
   - 确认 RawInput 启动失败、注册目标丢失或 message window 退出后，本次应用运行期间 menu 与后续 gameplay 都会保持 Polling
@@ -145,7 +145,7 @@ chart loader/indexer 默认使用 BMS family（`.bms/.bme/.bml/.pms`）。设置
   - 默认值为 `krrcream`，仅在 `key_mode` 改变原始 lane count 时生效
 - `key_conversion_note_add_mode` (string)
   - `default | add_25_plus`
-  - `default` 保留 converter 的基础 pattern；`add_25_plus` 仅在 playable key count 实际变化时，相对基础转换结果请求至少增加25%的无声和弦 note
+  - `default` 保留原始 pattern；`add_25_plus` 仅在 playable key count 变化时先向原始 pattern 请求至少25%的安全无声和弦，再把扩展后的 pattern 交给 key converter
   - 若 Mod Manager 的 Note Add 高于25%，只应用一次较高比例；peer battle 固定为 `default`
 - `gauge` (string)
   - `normal | hard | ex_hard | easy | shift`

@@ -4,6 +4,16 @@ TenRiff의 사용자/배포 관점에서 의미 있는 변경만 간단히 기�
 
 ## [Unreleased]
 
+## [1.2.102] - 2026-08-03
+
+### Fixed
+
+- 키모드 변환의 Note Add 순서를 `키컨버터 → 노트 추가`에서 `원본 패턴 노트 추가 → 키컨버터 → 게임플레이`로 수정해, 추가된 노트도 컨버터가 최종 레이아웃에 함께 배치하도록 변경
+
+### Release
+
+- Windows `TenRiff-1.2.102.zip`, public source `TenRiff-1.2.102-source.zip`, and `TenRiff-1.2.102-SHA256SUMS.txt` are the formal release assets; no ONNX model, private checkpoint, user profile, song, or log is bundled
+
 ## [1.2.101] - 2026-08-03
 
 ### Added

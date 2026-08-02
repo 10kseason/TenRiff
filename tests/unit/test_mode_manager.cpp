@@ -876,7 +876,7 @@ TEST_CASE("Note Add creates deterministic silent chords without duplicates or ho
     CHECK(generated_count == 8u);
 }
 
-TEST_CASE("key conversion Note Add mode keeps default patterns and adds at least 25 percent") {
+TEST_CASE("key conversion Note Add mode adds source notes before the converter") {
     using namespace tenriff;
 
     gameplay::GameplayChart chart;
@@ -895,6 +895,9 @@ TEST_CASE("key conversion Note Add mode keeps default patterns and adds at least
         chart, app::ChartFormat::Bms, mode, make_judge_config(), 1.0, 180.0, 44100);
     REQUIRE(baseline.chart.lane_count == 6);
     REQUIRE_FALSE(baseline.chart.notes.empty());
+    for (const auto& note : baseline.chart.notes) {
+        CHECK(note.note_id <= chart.notes.size());
+    }
 
     mode.key_conversion_note_add_mode = "add_25_plus";
     const auto enhanced = app::manage_modes(
@@ -902,13 +905,20 @@ TEST_CASE("key conversion Note Add mode keeps default patterns and adds at least
     const auto repeated = app::manage_modes(
         chart, app::ChartFormat::Bms, mode, make_judge_config(), 1.0, 180.0, 44100);
 
-    const std::size_t minimum_additions = (baseline.chart.notes.size() + 3u) / 4u;
-    REQUIRE(enhanced.chart.notes.size() >= baseline.chart.notes.size() + minimum_additions);
     REQUIRE(repeated.chart.notes.size() == enhanced.chart.notes.size());
+    std::set<std::size_t> generated_note_ids;
     for (std::size_t index = 0; index < enhanced.chart.notes.size(); ++index) {
-        CHECK(repeated.chart.notes[index].lane == enhanced.chart.notes[index].lane);
-        CHECK(repeated.chart.notes[index].start_sample == enhanced.chart.notes[index].start_sample);
+        const auto& note = enhanced.chart.notes[index];
+        if (note.note_id > chart.notes.size()) {
+            generated_note_ids.insert(note.note_id);
+        }
+        CHECK(note.lane == repeated.chart.notes[index].lane);
+        CHECK(note.start_sample == repeated.chart.notes[index].start_sample);
+        CHECK(note.note_id == repeated.chart.notes[index].note_id);
     }
+    const std::size_t requested_source_additions = (chart.notes.size() + 3u) / 4u;
+    CHECK_FALSE(generated_note_ids.empty());
+    CHECK(generated_note_ids.size() <= requested_source_additions);
 
     mode.key_mode = "none";
     const auto no_conversion = app::manage_modes(
@@ -916,30 +926,59 @@ TEST_CASE("key conversion Note Add mode keeps default patterns and adds at least
     CHECK(no_conversion.chart.notes.size() == chart.notes.size());
 }
 
-TEST_CASE("key conversion Note Add mode uses a higher Note Add mod without double-adding") {
+TEST_CASE("key conversion Note Add uses the higher source percentage once before conversion") {
     using namespace tenriff;
 
     gameplay::GameplayChart chart;
     chart.lane_count = 4;
     for (int index = 0; index < 8; ++index) {
         append_note(chart, index % 4 + 1, 100 + index * 100);
+        chart.notes.back().note_id = static_cast<std::size_t>(index + 1);
     }
 
-    config::ModeConfig mode;
-    mode.key_mode = "6k";
-    mode.random_seed = 77;
+    config::ModeConfig pre_add_mode;
+    pre_add_mode.key_mode = "none";
+    pre_add_mode.random = "off";
+    pre_add_mode.random_seed = 77;
+    pre_add_mode.mods = {"note_add_50"};
+    const auto pre_added = app::manage_modes(
+        chart, app::ChartFormat::Bms, pre_add_mode, make_judge_config(), 1.0, 180.0, 44100);
+    REQUIRE(pre_added.chart.notes.size() == 12u);
 
-    const auto baseline = app::manage_modes(
-        chart, app::ChartFormat::Bms, mode, make_judge_config(), 1.0, 180.0, 44100);
+    config::ModeConfig convert_only_mode;
+    convert_only_mode.key_mode = "6k";
+    convert_only_mode.random = "off";
+    convert_only_mode.random_seed = 77;
+    const auto expected = app::manage_modes(
+        pre_added.chart,
+        app::ChartFormat::Bms,
+        convert_only_mode,
+        make_judge_config(),
+        1.0,
+        180.0,
+        44100);
 
-    mode.key_conversion_note_add_mode = "add_25_plus";
-    mode.mods = {"note_add_50"};
-    const auto result = app::manage_modes(
-        chart, app::ChartFormat::Bms, mode, make_judge_config(), 1.0, 180.0, 44100);
+    config::ModeConfig single_pass_mode = convert_only_mode;
+    single_pass_mode.key_conversion_note_add_mode = "add_25_plus";
+    single_pass_mode.mods = {"note_add_50"};
+    const auto actual = app::manage_modes(
+        chart, app::ChartFormat::Bms, single_pass_mode, make_judge_config(), 1.0, 180.0, 44100);
 
-    const std::size_t expected_additions = (baseline.chart.notes.size() + 1u) / 2u;
-    CHECK(result.chart.notes.size() == baseline.chart.notes.size() + expected_additions);
+    REQUIRE(actual.chart.lane_count == expected.chart.lane_count);
+    REQUIRE(actual.chart.notes.size() == expected.chart.notes.size());
+    for (std::size_t index = 0; index < actual.chart.notes.size(); ++index) {
+        const auto& actual_note = actual.chart.notes[index];
+        const auto& expected_note = expected.chart.notes[index];
+        CHECK(actual_note.lane == expected_note.lane);
+        CHECK(actual_note.start_sample == expected_note.start_sample);
+        CHECK(actual_note.end_sample == expected_note.end_sample);
+        CHECK(actual_note.release_required == expected_note.release_required);
+        CHECK(actual_note.note_id == expected_note.note_id);
+        CHECK(gameplay::note_audio_asset_count(actual_note) ==
+              gameplay::note_audio_asset_count(expected_note));
+    }
 }
+
 TEST_CASE("Note Add runs before Full LN so generated chord notes receive LN structure") {
     using namespace tenriff;
 

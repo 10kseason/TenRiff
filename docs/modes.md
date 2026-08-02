@@ -29,7 +29,7 @@
 - `enable_osu_charts`: 기본 `false`; Mode Settings의 `OSU Charts`로 켜면 osu!mania 4K~10K `.osu`를 인덱싱·플레이하고 라이브러리를 재스캔함
 - `key_mode`: `none | auto | 4k | 5k | 6k | 7k | 8k | 9k | 10k | 12k | 14k | 16k`
 - `key_conversion_algorithm`: `krrcream | nk2` (기본 `krrcream`; 게임 내 Key Converter에서 선택하며 실제 키수 변환 때만 적용)
-- `key_conversion_note_add_mode`: `default | add_25_plus` (기본 `default`; 실제 건반 수가 바뀔 때만 기본 변환 결과보다 최소 25% 노트 추가를 요청)
+- `key_conversion_note_add_mode`: `default | add_25_plus` (기본 `default`; 실제 건반 수가 바뀔 때만 원본 패턴에 최소 25% 노트 추가를 먼저 요청하고 그 결과를 키컨버터로 전달)
 - `gauge`: `normal | hard | ex_hard | easy | shift`
 - `random`: `off | mirror | rr | fr | sr`
 - `random_seed`: RR/FR/SR, 강제 key-mode 변환, Note Add, LN Mix 대상 선택의 고정 시드 (0도 고정 값으로 취급)
@@ -77,7 +77,7 @@
 - `4k..10k`, `12k`, `14k`, `16k`는 N2NC 기반 lane remap으로 키 수를 맞춤
 - `5+1 SP`와 `7+1 SP` 강제 변환은 스크래치를 제외한 건반부만 목표 키 수로 재배치하며, `follow` 스크래치 키사운드는 자동 재생 큐로 이동
 - `10+2 DP`와 `14+2 DP` 강제 변환도 두 스크래치를 제외하고 좌우 건반부를 독립적으로 변환
-- `add_25_plus`는 기본 키 변환 뒤 기존 시각에 안전한 무음 화음을 최소 25% 추가 요청하며, 더 높은 Note Add Mod가 있으면 그 비율만 한 번 적용. 해당 결과는 기록 목록에는 남지만 일반 최고기록을 덮지 않음
+- `add_25_plus`는 원본 패턴의 기존 시각에 안전한 무음 화음을 최소 25% 먼저 요청하고 키컨버터가 추가 노트까지 포함해 최종 레이아웃을 생성함. 더 높은 Note Add Mod가 있으면 그 비율만 한 번 적용하며, 해당 결과는 기록 목록에는 남지만 일반 최고기록을 덮지 않음
 - 적용 순서: key-mode 변환 → DP Flip → Mirror/RR/FR/SR → Note Add → LN/Full Tap 구조 변환
 
 ## 게이지 규칙

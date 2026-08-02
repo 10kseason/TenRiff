@@ -3,7 +3,7 @@
 この文書は、次のエージェントや新しい作業者が最初に読むべき current-state 文書です。目的は、「このプロジェクトは今どういう状態で、どこを見ればよく、何がまだ未検証か」を素早く把握できるようにすることです。
 
 ## Baseline
-- 現在のプロジェクト版と公開 stable 版は `1.2.101 stable`
+- 現在のプロジェクト版と公開 stable 版は `1.2.102 stable`
 - direct-IP multiplayer と preview r5 の input-backend lifecycle 修正は `1.1.8 stable` に統合
 - `1.1.8` は 1.1.7 の visual refresh に osu!mania OD8 補助スコア、最初の native `BAD` で終了する `Sudden Death (1 MISS)`、決定的な `LN Mix 10%～90%` を追加
 - `1.2.0` は BMS channel `04/07` と osu!mania 背景を gameplay sample timeline に接続し、FHD 未満の画像背景を Windows ML 上の LunaSR で非同期補間
@@ -86,7 +86,7 @@
   - 対応 key count の chart difficulty calculation
   - `mode.key_mode` は N2NC スタイルの lane remap でキー数を変換
   - ゲーム内 Mode Settings の `Key Converter` で既定の `Krrcream` または内蔵の決定論的 `KeyWeaver nK2` を選択し、設定と replay metadata に保存
-  - `Conversion Note Add` は `Default` / `Add 25%+` を提供し、後者は playable key count が変わる時だけ基本変換結果へ安全な無音 chord を最低25%追加要求し、replay/result metadata に保存して通常の best record 更新から除外
+  - `Conversion Note Add` は `Default` / `Add 25%+` を提供し、後者は playable key count が変わる時に元 pattern へ安全な無音 chord を先に追加要求してから key converter が最終 layout を作り、replay/result metadata に保存して通常の best record 更新から除外
   - `mode.key_mode=none` は元のキー数と基本パターンレイアウトを維持
 - Native difficulty:
   - BMS の LV/CR 計算では long-note Head/Tail の miss-ms だけを 0.5倍で評価し、`300ms`を`150ms`として緩和する。実際の gameplay 判定 window は変更しない
@@ -196,7 +196,7 @@
 
 ## Runtime / Packaging Rules
 - 新しい user profile は自動生成される
-- 現在の正式 P2P 配布ラインは `TenRiff 1.2.101 stable`
+- 現在の正式 P2P 配布ラインは `TenRiff 1.2.102 stable`
 - distribution package には `Songs` を含めない
 - distribution package には `Main Menu / Options / Song Selecte / Multiplayer Lobby / Clear / Failed` の `Mainmusic/` scene slot を含め、各 `Name.mp3` と `Name 2.mp3`～`Name 64.mp3` を自動検出して scene 再入場ごとに循環する
 - distribution 更新には built artifact と必要な runtime asset だけを含める
