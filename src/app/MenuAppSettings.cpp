@@ -311,8 +311,8 @@ void MenuApp::populate_mode_settings_render_data(render::MenuRenderData& render)
                                            "원본은 강제 변환 없이 차트의 원래 키 수와 패턴 배치를 유지합니다."));
     render.generic.notes.push_back(ui_text("Key Converter selects the legacy Krrcream path or the embedded deterministic KeyWeaver nK2 engine when Key Mode changes the lane count.",
                                            "키 컨버터는 키 모드가 레인 수를 바꿀 때 기존 Krrcream 또는 내장된 결정론적 KeyWeaver nK2 엔진을 선택합니다."));
-    render.generic.notes.push_back(ui_text("Conversion Note Add defaults to the converted pattern; Add 25%+ requests at least 25% silent chord notes only when the playable key count changes. A higher Note Add mod wins without double-adding.",
-                                           "변환 노트 추가는 기본값에서 변환 패턴을 그대로 쓰며, 25% 이상 추가는 실제 건반 수가 바뀔 때만 무음 화음 노트를 최소 25% 요청합니다. 더 높은 Note Add 모드는 중복 적용 없이 높은 비율을 사용합니다."));
+    render.generic.notes.push_back(ui_text("Conversion Note Add leaves the source pattern unchanged by default; Add 25%+ adds silent chord notes to the source only when the playable key count changes, then sends that expanded pattern through the key converter. A higher Note Add mod wins without double-adding.",
+                                           "변환 노트 추가는 기본값에서 원본 패턴을 그대로 쓰며, 25% 이상 추가는 실제 건반 수가 바뀔 때 원본에 무음 화음을 먼저 추가한 뒤 확장된 패턴을 키컨버터로 보냅니다. 더 높은 Note Add 모드는 중복 적용 없이 높은 비율을 사용합니다."));
     render.generic.notes.push_back(ui_text(
         "Mirror itself is seedless. Key Mode conversion runs first and may still use Random Seed.",
         "미러 자체는 시드를 쓰지 않지만, 먼저 실행되는 키 모드 변환은 랜덤 시드를 사용할 수 있습니다."));

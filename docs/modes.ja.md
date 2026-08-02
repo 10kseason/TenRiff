@@ -29,7 +29,7 @@
 - `enable_osu_charts`: 既定 `false`。Mode Settings の `OSU Charts` で osu!mania 4K～10K `.osu` の index/play を有効にし、library を再 scan
 - `key_mode`: `none | auto | 4k | 5k | 6k | 7k | 8k | 9k | 10k | 12k | 14k | 16k`
 - `key_conversion_algorithm`: `krrcream | nk2`（既定値は `krrcream`。ゲーム内 Key Converter で選択し、実際のキー数変換時のみ使用）
-- `key_conversion_note_add_mode`: `default | add_25_plus`（既定 `default`。playable key count が実際に変わる時だけ converter 基準より最低25%多い note を要求）
+- `key_conversion_note_add_mode`: `default | add_25_plus`（既定 `default`。playable key count が変わる時だけ元 pattern に最低25%の note を先に要求し、その結果を key converter へ渡す）
 - `gauge`: `normal | hard | ex_hard | easy | shift`
 - `random`: `off | mirror | rr | fr | sr`
 - `random_seed`: RR/FR/SR、強制 key-mode 変換、Note Add、LN Mix 対象選択の固定 seed（`0` も固定値として扱う）
@@ -77,7 +77,7 @@
 - `4k..10k`、`12k`、`14k`、`16k` は N2NC ベースの lane remap で key count を合わせる
 - `5+1 SP` / `7+1 SP` の強制変換は scratch を除く鍵盤部だけを再配置し、`follow` の scratch keysound は autoplay へ移す
 - `10+2 DP` / `14+2 DP` も両 scratch を除外し、左右の鍵盤部を独立変換
-- `add_25_plus` は基本変換後の既存時刻へ安全な無音 chord を最低25%追加要求し、より高い Note Add Mod があればその比率だけを一度適用。記録一覧には残るが通常の best record は更新しない
+- `add_25_plus` は元 pattern の既存時刻へ安全な無音 chord を最低25%先に要求し、key converter が追加 note を含む最終 layout を生成する。より高い Note Add Mod があればその比率だけを一度適用し、記録一覧には残るが通常の best record は更新しない
 - 適用順: key-mode 変換 → DP Flip → Mirror/RR/FR/SR → Note Add → LN/Full Tap 構造変換
 
 ## Gauge Rules

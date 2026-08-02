@@ -40,7 +40,7 @@ If a profile does not exist, it is created automatically on first launch.
 
 - `backend` (string)
   - `polling | rawinput`
-  - defaults to `rawinput` on the current `1.2.101` release line
+  - defaults to `rawinput` on the current `1.2.102` release line
   - selectable per profile under `Options -> Input Settings -> Backend` or `Options -> Profile Setup -> Input Backend`
   - runtime fallback never rewrites the saved value to `polling`
   - a confirmed RawInput startup failure, registration-target loss, or message-window exit latches Polling across menu and subsequent gameplay sessions for the current app run
@@ -60,7 +60,7 @@ If a profile does not exist, it is created automatically on first launch.
 - `judgement_hz` (int)
   - `1000 | 2000 | 4000 | 8000`
   - compatibility field kept in the input config
-  - the current `1.2.101` runtime no longer drives a separate audio-thread judgement sub-step loop from this value
+  - the current `1.2.102` runtime no longer drives a separate audio-thread judgement sub-step loop from this value
   - default is `4000` (`0.25ms`)
 - `debounce_ms` (double)
   - real Press/Release transitions are preserved; only duplicate same-state events are removed from pressed-state tracking
@@ -145,7 +145,7 @@ The chart loader and indexer default to BMS-family files (`.bms/.bme/.bml/.pms`)
   - defaults to `krrcream` and applies only when `key_mode` changes the source lane count
 - `key_conversion_note_add_mode` (string)
   - `default | add_25_plus`
-  - `default` keeps the converter baseline; `add_25_plus` requests at least 25% more silent chord notes than the baseline whenever the playable key count actually changes
+  - `default` leaves the source pattern unchanged; `add_25_plus` requests at least 25% safe silent chord notes on the source when the playable key count changes, then uses that expanded pattern as key-converter input
   - a higher Note Add mod wins and runs once; peer battle forces `default`
 - `gauge` (string)
   - `normal | hard | ex_hard | easy | shift`
