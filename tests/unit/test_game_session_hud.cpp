@@ -418,3 +418,15 @@ TEST_CASE("fresh gameplay input recovers from a drifted ClockSync estimate") {
     CHECK(tenriff::app::reconcile_fresh_gameplay_input_sample(
               500, anchor_sample, true, 340.0, 1'000) == 500);
 }
+
+TEST_CASE("gameplay hud revisions refresh motion for held lane state") {
+    tenriff::app::GameplayHudRevisionInput previous;
+    previous.lane_pressed_count = 2;
+
+    auto next = previous;
+    next.lane_pressed[1] = 1;
+
+    const auto diff = tenriff::app::diff_gameplay_hud_revisions(previous, next);
+    CHECK(diff.motion_changed);
+    CHECK_FALSE(diff.text_changed);
+}

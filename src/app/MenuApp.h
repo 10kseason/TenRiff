@@ -175,6 +175,8 @@ private:
 
         std::size_t lane_activity_count = 0;
         std::array<float, kGameplayHudMaxLanes> lane_activity{};
+        std::size_t lane_pressed_count = 0;
+        std::array<uint8_t, kGameplayHudMaxLanes> lane_pressed{};
         std::size_t note_count = 0;
         std::array<Note, kGameplayHudMaxNotes> notes{};
 
@@ -197,6 +199,8 @@ private:
         bool ghost_game_over = false;
         std::size_t ghost_lane_activity_count = 0;
         std::array<float, kGameplayHudMaxLanes> ghost_lane_activity{};
+        std::size_t ghost_lane_pressed_count = 0;
+        std::array<uint8_t, kGameplayHudMaxLanes> ghost_lane_pressed{};
         std::size_t ghost_note_count = 0;
         std::array<Note, kGameplayHudMaxNotes> ghost_notes{};
     };

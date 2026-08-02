@@ -9,7 +9,7 @@ The main menu must follow the same low-latency philosophy as gameplay: audio run
 - `Options -> Profile Setup` reopens first-run setup for the active profile and immediately saves language, audio, input, graphics, and keymap changes.
 - When play starts, the current implementation stops the menu thread and runs `GameSession` separately.
 - The **Windows menu UI is built on D3D11 + Direct2D / DirectWrite** and renders Title / Song Select (cyan layout) and other settings screens (list UI).
-- Skins are native/LR2-only; selecting or dropping an LR2 playskin folder copies it into the active profile's `skins` directory.
+- Skins are native/LR2-only. Selecting or dropping one playskin imports it into the active profile; selecting `LR2files` or `Theme` imports each independent non-IIDX theme separately, skips themes that reference excluded IIDX assets, preserves sibling-theme references, and never overwrites an existing folder.
 - Song Select centers indexing stage / percent / ETA and a progress bar while a reindex is running.
 - Browse can select local header JSON or import a clipboard http(s) BMSTable HTML/header link, then reindexes the current source so hash matches receive table levels.
 - Graphics `BGA` fully disables gameplay image/video backgrounds while keeping Song Select previews. Selecting an ONNX model only stores its path; users enable `BGA Upscaler` separately and confirm the high-spec warning.

@@ -3,7 +3,7 @@
 这份文档是下一位 agent 或新任务接手时应该最先阅读的当前状态文档。目标是快速说明“这个项目现在是什么、应该先看哪里、还有哪些内容尚未验证”。
 
 ## 基线
-- 当前项目版本与公开稳定版均为 `1.2.99 stable`
+- 当前项目版本与公开稳定版均为 `1.2.100 stable`
 - direct-IP multiplayer 与 preview r5 的输入 backend 生命周期修复已整合进 `1.1.8 stable`
 - `1.1.8` 在 1.1.7 视觉更新基础上加入 osu!mania OD8 辅助分数、首次原生 `BAD` 即结束的 `Sudden Death (1 MISS)`，以及确定性的 `LN Mix 10%～90%`
 - `1.2.0` 把 BMS 通道 `04/07` 和 osu!mania 背景接入 gameplay sample timeline，并通过 Windows ML 上的 LunaSR 异步放大低于 FHD 的图片背景
@@ -24,7 +24,7 @@
 - Linux 仅存在 `Baepoks-Linuxs/TenRiff-0.5.0-linux-preview` 级别的 preview
 - 支持的 chart surface 默认为 BMS family（`.bms/.bme/.bml/.pms`），另可选择 osu!mania 4K～10K `.osu`
 - `1.2.4 stable` 的 gameplay 输入优先使用 RawInput，同时在同一 `InputThread` 中持续运行 bound-key polling shadow；启动失败或 message pump 意外退出时，会在不重置 queue/pressed state 的情况下把该 producer 切换到 Polling
-- menu 输入保持 foreground process/root-window 边界。检测到 RawInput 启动失败、process-global 注册目标丢失或 hidden message window 退出时，无需等待用户按键即可切换到 Polling。
+- menu 与 gameplay 输入采集保持 foreground process 边界，MenuWindow UI 还会检查 root-window 边界。失去焦点时会重置 key state，并丢弃 background 的 lane/Esc 输入。检测到 RawInput 启动失败、process-global 注册目标丢失或 hidden message window 退出时，无需等待用户按键即可切换到 Polling。
 - 已确认的 fallback 不会改写 profile，并在本次应用运行期间持续用于 menu 与后续 gameplay；重启应用或明确更改 `Options -> Input Settings -> Backend` 后才会重试。
 
 ## 核心架构
@@ -101,8 +101,10 @@
   - `Note & Field Size` 以中心为基准，将 playfield、lane/divider、note 与相邻 gauge 一起按 50%～140% 缩放；100% 下相邻 note 边缘的默认总间距为 24px
   - Black Playfield 会将包含 lane spacing 在内的 player/ghost playfield 全部显示为纯黑
   - 会按 key mode 保存单独的 lane 宽度数组和 lane 间距数组，并在 preview、实际 gameplay、ghost field 中共用同一套布局计算
-  - 支持的 skin route 仅有 `native` 与 LR2 playskin；可在 Skins 中选择或拖入 LR2 folder 并导入当前 profile
-  - 将 LR2 note/LN 图片、lane gap 与 destination size 应用到 gameplay 布局
+  - 支持的 skin route 仅有 `native` 与 LR2 playskin；在 Skins 中选择或拖入单个 LR2 folder 会导入当前 profile
+  - 选择标准 `LR2files` 或 `Theme` root 时，会把其下除精确名为 `IIDX` 以及依赖 IIDX 资源之外的 theme 分别安装为独立 skin，保留 sibling-theme 路径，跳过 symlink，且不覆盖已有文件夹
+  - 应用 LR2 note/LN 图片、lane gap 与 destination size；`play/Gear` 下部 frame 随 field size 放大，并作为保持原始宽高比且裁切在判定线下方的单一 overlay 显示，解析 `#CUSTOMFILE` wildcard include 默认选择，并在缺少 Gear 时不把 falling note / LN head 复用为 receptor
+  - native skin 在每条 lane 底部绘制 digital piano key；仅在实际按住输入时下压，击键瞬间显示短暂 cyan/magenta glitch pulse，进程失去 foreground 时会清除 hold 视觉状态
   - `skin.lr2_resolution_mode` 以 `auto / sd / hd / fhd` 保存 LR2 playskin 的分辨率 override token
   - LR2 auto-detect 以 playskin `#DST_NOTE` 的坐标范围而不是 asset 名称来判断 SD/HD/FHD family
   - future note 的上方进入 easing
@@ -115,7 +117,7 @@
   - 会真正消耗 note 的失败（auto-miss、过早吃掉 note、hold break / tail miss）仍然记为 `BAD`
   - 非消耗型的超早输入会按 LR2 风格记为 `POOR`，并重新出现在结果 / replay / UI 中
   - `POOR` 不会断 combo，不计入 score / accuracy 总数，并使用独立的 `PR` gauge 损失值
-  - gauge 模式支持 `EX-Hard / Hard / Normal / Easy / Gauge Shift`；固定 gauge 从 `100%` 开始，在 `0%` 时立即失败且不会改变类型
+  - gauge 模式支持 `EX-Hard / Hard / Normal / Easy / Gauge Shift`；固定 gauge 从 `100%` 开始，在 `0%` 时立即失败且不会改变类型，EX-Hard 使用与 Hard 区分的近黑深灰配色
   - `Gauge Shift` 会让 EX-Hard / Hard / Normal / Easy 分别从 100% 开始独立并行计算；当前 tier 到达 0% 后选择已累计相同判定历史的下一档存活 tier，并以结束时最高的存活 tier 为最终结果
   - `Sudden Death (1 MISS)` 会在首次 OD8 换算对象 `MISS` 时立即失败；仅原生 `BAD` timing 不会触发，空按产生的 `POOR` 也不触发，并且该选项与 Practice No-Fail 互斥
   - Gameplay 与 Result 会显示按 osu!mania stable OD8 判定窗和 ScoreV1（最高 1,000,000）换算真实输入 timing 的辅助 `OSU OD8` 分数；TenRiff 原生分数与排名保持不变
@@ -153,8 +155,10 @@
   - 可从 `Options -> Profile Setup` 重新打开当前 profile 的首次设置页面，并立即保存 language/audio/input/graphics/keymap
   - 可编辑最多48字节的 nickname，用于已保存记录和 direct-IP multiplayer 显示名
 - Direct-IP multiplayer：
-  - protocol v4 使用一台固定 TCP coordinator，Windows 下最多8人（默认 `27300/TCP`）
+  - protocol v5 使用一台固定 TCP coordinator，Windows 下最多8人（默认 `27300/TCP`）
   - multiplayer 只允许已索引的 BMS 系 chart；公共曲库是所有在线玩家 SHA-256 的严格交集，并排除 `.osu`
+  - lobby `ROOM CHAT` 支持最多256字节的 UTF-8 消息，只在会话内保留最近32条，并显示消息数与本地玩家/leader 标记
+  - Rate 1.0、判定、Gauge Shift、Random/Mods/Assist 保持固定，但允许每位玩家使用本地 key-mode conversion
   - 选曲权从 host 开始，在所有玩家离开 Result 后按加入顺序轮换；leader 断开时跳到下一位，host 断开时关闭整个房间
   - 只有当前 leader 可选择公共 BMS，并在全员 Ready 后请求 START；经 coordinator 批准和全员 load barrier 后开始
   - 对局中加入和第9名玩家都会被拒绝；Result 显示所有玩家的最终分数
@@ -187,7 +191,7 @@
 
 ## 运行时 / 打包规则
 - 新用户 profile 会自动创建
-- 当前正式 P2P 发布线为 `TenRiff 1.2.99 stable`
+- 当前正式 P2P 发布线为 `TenRiff 1.2.100 stable`
 - 发布包不包含 `Songs`
 - 发布包包含 `Main Menu / Options / Song Selecte / Multiplayer Lobby / Clear / Failed` 这些 `Mainmusic/` 场景槽位；每个 `Name.mp3` 及 `Name 2.mp3`～`Name 64.mp3` 会自动发现，并在重新进入场景时轮换
 - 发布更新只包含已构建产物和必要的运行时资源

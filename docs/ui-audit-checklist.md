@@ -50,6 +50,8 @@
   - combo 숫자가 preview 중앙에 정렬되고 좌측으로 쏠리지 않는지 확인
   - LR2 playskin 폴더 선택과 drag-and-drop 모두 가져오기 후 새 스킨을 즉시 활성화하는지 확인
   - 같은 이름의 LR2 스킨이 이미 있으면 기존 폴더를 덮어쓰지 않고 충돌 없는 새 폴더에 설치하는지 확인
+  - `LR2files`/`Theme` 루트 선택 시 정확한 `IIDX` 폴더와 IIDX 자산 의존 테마는 제외하고 바로 아래 스킨을 각각 설치하는지 확인
+  - 서로 다른 Theme 하위 폴더를 가리키는 `LR2files\\Theme\\...` include/image 경로가 이식 뒤에도 해석되는지 확인
   - 실제 PNG 노트, LN head/body/tail, key 이미지와 lane fallback이 gameplay에서 의도대로 보이는지 확인
 - `Generic/settings lists`
   - row label/value, notes/help text, scrollbar, `+ / -` 버튼이 서로 겹치지 않는지 확인

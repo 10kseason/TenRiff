@@ -32,6 +32,7 @@ TEST_CASE("peer session rejects invalid startup and chart inputs") {
     CHECK_FALSE(session.join({}, 12345, "Joiner"));
     CHECK_FALSE(session.join("localhost", 0, "Joiner"));
     CHECK_FALSE(session.set_local_chart({}, "No chart"));
+    CHECK_FALSE(session.send_chat("Not connected"));
 
     const auto snapshot = session.snapshot();
     CHECK(snapshot.role == tenriff::network::PeerRole::None);
@@ -91,6 +92,21 @@ TEST_CASE("peer session localhost round reaches final score and clean shutdown")
     }));
     CHECK(host.snapshot().peer_name == "Joiner");
     CHECK(joiner.snapshot().peer_name == "Host");
+    REQUIRE(host.send_chat("Welcome to the room"));
+    REQUIRE(wait_until([&]() {
+        return host.snapshot().chat_messages.size() == 1u &&
+               joiner.snapshot().chat_messages.size() == 1u;
+    }));
+    CHECK(host.snapshot().chat_messages[0].player_id == 1);
+    CHECK(joiner.snapshot().chat_messages[0].text == "Welcome to the room");
+
+    REQUIRE(joiner.send_chat("안녕하세요"));
+    REQUIRE(wait_until([&]() {
+        return host.snapshot().chat_messages.size() == 2u &&
+               joiner.snapshot().chat_messages.size() == 2u;
+    }));
+    CHECK(host.snapshot().chat_messages[1].player_id == 2);
+    CHECK(host.snapshot().chat_messages[1].text == "안녕하세요");
     REQUIRE(wait_until([&]() {
         return host.snapshot().remote_library_ready &&
                joiner.snapshot().remote_library_ready;

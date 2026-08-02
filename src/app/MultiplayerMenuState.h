@@ -29,6 +29,7 @@ enum class MultiplayerMenuRow : uint8_t {
     Chart,
     Ready,
     Start,
+    Chat,
     Options,
     Back,
 };
@@ -37,11 +38,13 @@ enum class MultiplayerEditField : uint8_t {
     None,
     Address,
     Port,
+    Chat,
 };
 
-inline constexpr int kMultiplayerMenuRowCount = 9;
+inline constexpr int kMultiplayerMenuRowCount = 10;
 inline constexpr std::size_t kMultiplayerAddressMaxLength = 255;
 inline constexpr std::size_t kMultiplayerPortTextMaxLength = 5;
+inline constexpr std::size_t kMultiplayerChatInputMaxBytes = 256;
 
 struct MultiplayerMenuState {
     MultiplayerRole role = MultiplayerRole::Join;
@@ -49,6 +52,7 @@ struct MultiplayerMenuState {
     MultiplayerEditField edit_field = MultiplayerEditField::None;
     std::string address = "127.0.0.1";
     std::string port_text = "27300";
+    std::string chat_input;
 
     bool connected = false;
     bool local_ready = false;
@@ -119,6 +123,48 @@ inline bool try_append_multiplayer_port_character(std::string& port_text, char c
         return false;
     }
     port_text.push_back(ch);
+    return true;
+}
+
+inline void erase_last_multiplayer_utf8_character(std::string& text) {
+    if (text.empty()) return;
+    std::size_t erase_from = text.size() - 1;
+    while (erase_from > 0 &&
+           (static_cast<unsigned char>(text[erase_from]) & 0xC0u) == 0x80u) {
+        --erase_from;
+    }
+    text.erase(erase_from);
+}
+
+inline bool try_append_multiplayer_chat_text(std::string& target,
+                                             std::string_view fragment) {
+    if (fragment.empty() || target.size() >= kMultiplayerChatInputMaxBytes) {
+        return false;
+    }
+    const std::size_t available = kMultiplayerChatInputMaxBytes - target.size();
+    std::size_t cursor = 0;
+    std::size_t accepted = 0;
+    while (cursor < fragment.size() && cursor < available) {
+        const unsigned char lead = static_cast<unsigned char>(fragment[cursor]);
+        std::size_t length = 1;
+        if ((lead & 0x80u) == 0u) {
+            length = 1;
+        } else if ((lead & 0xE0u) == 0xC0u) {
+            length = 2;
+        } else if ((lead & 0xF0u) == 0xE0u) {
+            length = 3;
+        } else if ((lead & 0xF8u) == 0xF0u) {
+            length = 4;
+        }
+        if (cursor + length > fragment.size() ||
+            cursor + length > available) {
+            break;
+        }
+        accepted = cursor + length;
+        cursor += length;
+    }
+    if (accepted == 0) return false;
+    target.append(fragment.substr(0, accepted));
     return true;
 }
 

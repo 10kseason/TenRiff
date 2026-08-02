@@ -65,6 +65,8 @@ struct GameplayHudRevisionInput {
 
     std::size_t lane_activity_count = 0;
     std::array<float, kGameplayHudMaxLanes> lane_activity{};
+    std::size_t lane_pressed_count = 0;
+    std::array<uint8_t, kGameplayHudMaxLanes> lane_pressed{};
     std::size_t note_count = 0;
     std::array<GameplayHudRevisionNote, kGameplayHudMaxNotes> notes{};
 
@@ -86,6 +88,8 @@ struct GameplayHudRevisionInput {
     bool ghost_game_over = false;
     std::size_t ghost_lane_activity_count = 0;
     std::array<float, kGameplayHudMaxLanes> ghost_lane_activity{};
+    std::size_t ghost_lane_pressed_count = 0;
+    std::array<uint8_t, kGameplayHudMaxLanes> ghost_lane_pressed{};
     std::size_t ghost_note_count = 0;
     std::array<GameplayHudRevisionNote, kGameplayHudMaxNotes> ghost_notes{};
 };
@@ -120,6 +124,16 @@ inline bool gameplay_hud_lane_activity_equal(const GameplayHudRevisionInput& lhs
     return std::equal(lhs.lane_activity.begin(),
                       lhs.lane_activity.begin() + static_cast<std::ptrdiff_t>(lhs.lane_activity_count),
                       rhs.lane_activity.begin());
+}
+
+inline bool gameplay_hud_lane_pressed_equal(const GameplayHudRevisionInput& lhs,
+                                            const GameplayHudRevisionInput& rhs) {
+    if (lhs.lane_pressed_count != rhs.lane_pressed_count) {
+        return false;
+    }
+    return std::equal(lhs.lane_pressed.begin(),
+                      lhs.lane_pressed.begin() + static_cast<std::ptrdiff_t>(lhs.lane_pressed_count),
+                      rhs.lane_pressed.begin());
 }
 
 inline bool gameplay_hud_timing_history_equal(const GameplayHudRevisionInput& lhs,
@@ -160,6 +174,17 @@ inline bool gameplay_hud_ghost_lane_activity_equal(const GameplayHudRevisionInpu
                       lhs.ghost_lane_activity.begin() +
                           static_cast<std::ptrdiff_t>(lhs.ghost_lane_activity_count),
                       rhs.ghost_lane_activity.begin());
+}
+
+inline bool gameplay_hud_ghost_lane_pressed_equal(const GameplayHudRevisionInput& lhs,
+                                                  const GameplayHudRevisionInput& rhs) {
+    if (lhs.ghost_lane_pressed_count != rhs.ghost_lane_pressed_count) {
+        return false;
+    }
+    return std::equal(lhs.ghost_lane_pressed.begin(),
+                      lhs.ghost_lane_pressed.begin() +
+                          static_cast<std::ptrdiff_t>(lhs.ghost_lane_pressed_count),
+                      rhs.ghost_lane_pressed.begin());
 }
 
 inline bool gameplay_hud_ghost_timing_history_equal(const GameplayHudRevisionInput& lhs,
@@ -238,12 +263,14 @@ inline GameplayHudRevisionFlags diff_gameplay_hud_revisions(const GameplayHudRev
         previous.feedback_delta_ms != next.feedback_delta_ms ||
         !gameplay_hud_timing_history_equal(previous, next) ||
         !gameplay_hud_lane_activity_equal(previous, next) ||
+        !gameplay_hud_lane_pressed_equal(previous, next) ||
         !gameplay_hud_notes_equal(previous, next) ||
         previous.ghost_finished != next.ghost_finished ||
         previous.ghost_game_over != next.ghost_game_over ||
         previous.ghost_feedback_delta_ms != next.ghost_feedback_delta_ms ||
         !gameplay_hud_ghost_timing_history_equal(previous, next) ||
         !gameplay_hud_ghost_lane_activity_equal(previous, next) ||
+        !gameplay_hud_ghost_lane_pressed_equal(previous, next) ||
         !gameplay_hud_ghost_notes_equal(previous, next);
 
     return flags;

@@ -24,6 +24,7 @@ using tenriff::app::compare_multiplayer_scores;
 using tenriff::app::gameplay_launch_uses_peer_battle;
 using tenriff::app::is_valid_multiplayer_address_text;
 using tenriff::app::kMultiplayerAddressMaxLength;
+using tenriff::app::kMultiplayerChatInputMaxBytes;
 using tenriff::app::kMultiplayerMenuRowCount;
 using tenriff::app::move_multiplayer_menu_cursor;
 using tenriff::app::multiplayer_chart_fingerprints_match;
@@ -42,13 +43,15 @@ using tenriff::app::peer_battle_score_lead;
 using tenriff::app::peer_battle_spectator_decision;
 using tenriff::app::reset_multiplayer_menu_session;
 using tenriff::app::try_append_multiplayer_address_character;
+using tenriff::app::try_append_multiplayer_chat_text;
 using tenriff::app::try_append_multiplayer_port_character;
+using tenriff::app::erase_last_multiplayer_utf8_character;
 
 static_assert(static_cast<int>(MultiplayerMenuRow::Address) == 0);
 static_assert(static_cast<int>(MultiplayerMenuRow::Back) == kMultiplayerMenuRowCount - 1);
 
-TEST_CASE("multiplayer menu exposes nine stable rows") {
-    CHECK(kMultiplayerMenuRowCount == 9);
+TEST_CASE("multiplayer menu exposes ten stable rows including chat") {
+    CHECK(kMultiplayerMenuRowCount == 10);
     CHECK(static_cast<int>(MultiplayerMenuRow::Address) == 0);
     CHECK(static_cast<int>(MultiplayerMenuRow::Port) == 1);
     CHECK(static_cast<int>(MultiplayerMenuRow::Host) == 2);
@@ -56,8 +59,9 @@ TEST_CASE("multiplayer menu exposes nine stable rows") {
     CHECK(static_cast<int>(MultiplayerMenuRow::Chart) == 4);
     CHECK(static_cast<int>(MultiplayerMenuRow::Ready) == 5);
     CHECK(static_cast<int>(MultiplayerMenuRow::Start) == 6);
-    CHECK(static_cast<int>(MultiplayerMenuRow::Options) == 7);
-    CHECK(static_cast<int>(MultiplayerMenuRow::Back) == 8);
+    CHECK(static_cast<int>(MultiplayerMenuRow::Chat) == 7);
+    CHECK(static_cast<int>(MultiplayerMenuRow::Options) == 8);
+    CHECK(static_cast<int>(MultiplayerMenuRow::Back) == 9);
 }
 
 TEST_CASE("gameplay launch intent cannot promote a single-player run to peer battle") {
@@ -78,11 +82,12 @@ TEST_CASE("leaving multiplayer clears session state but keeps connection fields"
     state.local_chart_size = 22;
     state.peer_chart_fingerprint = 11;
     state.peer_chart_size = 22;
-
+    state.chat_input = "draft";
     reset_multiplayer_menu_session(state);
 
     CHECK(state.address == "192.168.0.25");
     CHECK(state.port_text == "31415");
+    CHECK(state.chat_input.empty());
     CHECK_FALSE(state.connected);
     CHECK_FALSE(state.local_ready);
     CHECK_FALSE(state.peer_ready);
@@ -95,12 +100,12 @@ TEST_CASE("leaving multiplayer clears session state but keeps connection fields"
 TEST_CASE("multiplayer menu cursor clamps and moves within the row range") {
     CHECK(clamp_multiplayer_menu_cursor(-4) == 0);
     CHECK(clamp_multiplayer_menu_cursor(3) == 3);
-    CHECK(clamp_multiplayer_menu_cursor(99) == 8);
+    CHECK(clamp_multiplayer_menu_cursor(99) == 9);
 
     CHECK(move_multiplayer_menu_cursor(0, -1) == 0);
     CHECK(move_multiplayer_menu_cursor(0, 3) == 3);
     CHECK(move_multiplayer_menu_cursor(6, 1) == 7);
-    CHECK(move_multiplayer_menu_cursor(8, 1) == 8);
+    CHECK(move_multiplayer_menu_cursor(9, 1) == 9);
     CHECK(move_multiplayer_menu_cursor(-20, 1) == 1);
 }
 
@@ -169,7 +174,7 @@ TEST_CASE("peer battle rules fix scoring while preserving local presentation") {
     CHECK(config.judge.pg_ms == defaults.judge.pg_ms);
     CHECK(config.gauge.normal.pg == defaults.gauge.normal.pg);
     CHECK(config.speed.rate == doctest::Approx(1.0));
-    CHECK(config.mode.key_mode == "none");
+    CHECK(config.mode.key_mode == "7k");
     CHECK(config.mode.gauge == "shift");
     CHECK(config.mode.random == "off");
     CHECK(config.mode.random_seed == 0);
@@ -194,6 +199,22 @@ TEST_CASE("multiplayer port editing accepts digits and limits the field to five 
     CHECK(port_text == "27300");
 }
 
+TEST_CASE("multiplayer chat input keeps UTF-8 boundaries and byte cap") {
+    std::string input;
+    CHECK(try_append_multiplayer_chat_text(input, "hello "));
+    CHECK(try_append_multiplayer_chat_text(input, "안녕"));
+    CHECK(input == "hello 안녕");
+
+    erase_last_multiplayer_utf8_character(input);
+    CHECK(input == "hello 안");
+
+    std::string capped(kMultiplayerChatInputMaxBytes - 1, 'x');
+    CHECK_FALSE(try_append_multiplayer_chat_text(capped, "한"));
+    CHECK(capped.size() == kMultiplayerChatInputMaxBytes - 1);
+    CHECK(try_append_multiplayer_chat_text(capped, "y"));
+    CHECK(capped.size() == kMultiplayerChatInputMaxBytes);
+    CHECK_FALSE(try_append_multiplayer_chat_text(capped, "z"));
+}
 TEST_CASE("multiplayer readiness requires a connection and matching nonzero chart fingerprints") {
     MultiplayerMenuState state;
     state.local_chart_fingerprint = 0xABCDEFu;

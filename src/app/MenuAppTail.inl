@@ -198,6 +198,10 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
     target.lane_activity.fill(0.0f);
     std::copy_n(gameplay_hud_.lane_activity.begin(), gameplay_hud_.lane_activity_count, target.lane_activity.begin());
 
+    target.lane_pressed_count = gameplay_hud_.lane_pressed_count;
+    target.lane_pressed.fill(0);
+    std::copy_n(gameplay_hud_.lane_pressed.begin(), gameplay_hud_.lane_pressed_count, target.lane_pressed.begin());
+
     target.lane_color_count = 0;
     target.lane_colors.fill(0);
     const auto lane_colors = config::resolved_skin_lane_colors(config_.skin, skin_mode);
@@ -301,6 +305,7 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
         target.has_feedback = false;
         target.timing_history_count = 0;
         target.lane_activity_count = 0;
+        target.lane_pressed_count = 0;
         const int peer_judged_total =
             target.peer_pg + target.peer_gr + target.peer_gd + target.peer_bd;
         if (peer_judged_total > 0) {
@@ -342,6 +347,11 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
     std::copy_n(gameplay_hud_.ghost_lane_activity.begin(),
                 gameplay_hud_.ghost_lane_activity_count,
                 target.ghost_lane_activity.begin());
+    target.ghost_lane_pressed_count = gameplay_hud_.ghost_lane_pressed_count;
+    target.ghost_lane_pressed.fill(0);
+    std::copy_n(gameplay_hud_.ghost_lane_pressed.begin(),
+                gameplay_hud_.ghost_lane_pressed_count,
+                target.ghost_lane_pressed.begin());
     target.ghost_note_count = gameplay_hud_.ghost_note_count;
     for (std::size_t i = 0; i < gameplay_hud_.ghost_note_count; ++i) {
         const auto& note = gameplay_hud_.ghost_notes[i];
@@ -1459,6 +1469,9 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
         next.lane_activity_count = hud.lane_activity_count;
         next.lane_activity.fill(0.0f);
         std::copy_n(hud.lane_activity.begin(), hud.lane_activity_count, next.lane_activity.begin());
+        next.lane_pressed_count = hud.lane_pressed_count;
+        next.lane_pressed.fill(0);
+        std::copy_n(hud.lane_pressed.begin(), hud.lane_pressed_count, next.lane_pressed.begin());
         next.note_count = hud.note_count;
         for (std::size_t i = 0; i < hud.note_count; ++i) {
             next.notes[i] = GameplayHudRevisionNote{
@@ -1494,6 +1507,11 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
         std::copy_n(hud.ghost_lane_activity.begin(),
                     hud.ghost_lane_activity_count,
                     next.ghost_lane_activity.begin());
+        next.ghost_lane_pressed_count = hud.ghost_lane_pressed_count;
+        next.ghost_lane_pressed.fill(0);
+        std::copy_n(hud.ghost_lane_pressed.begin(),
+                    hud.ghost_lane_pressed_count,
+                    next.ghost_lane_pressed.begin());
         next.ghost_note_count = hud.ghost_note_count;
         for (std::size_t i = 0; i < hud.ghost_note_count; ++i) {
             next.ghost_notes[i] = GameplayHudRevisionNote{
@@ -1556,6 +1574,10 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
         gameplay_hud_.lane_activity.fill(0.0f);
         std::copy_n(hud.lane_activity.begin(), hud.lane_activity_count, gameplay_hud_.lane_activity.begin());
 
+        gameplay_hud_.lane_pressed_count = hud.lane_pressed_count;
+        gameplay_hud_.lane_pressed.fill(0);
+        std::copy_n(hud.lane_pressed.begin(), hud.lane_pressed_count, gameplay_hud_.lane_pressed.begin());
+
         gameplay_hud_.note_count = hud.note_count;
         for (std::size_t i = 0; i < hud.note_count; ++i) {
             GameplayHudState::Note out;
@@ -1592,6 +1614,11 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
         std::copy_n(hud.ghost_lane_activity.begin(),
                     hud.ghost_lane_activity_count,
                     gameplay_hud_.ghost_lane_activity.begin());
+        gameplay_hud_.ghost_lane_pressed_count = hud.ghost_lane_pressed_count;
+        gameplay_hud_.ghost_lane_pressed.fill(0);
+        std::copy_n(hud.ghost_lane_pressed.begin(),
+                    hud.ghost_lane_pressed_count,
+                    gameplay_hud_.ghost_lane_pressed.begin());
         gameplay_hud_.ghost_note_count = hud.ghost_note_count;
         for (std::size_t i = 0; i < hud.ghost_note_count; ++i) {
             GameplayHudState::Note out;

@@ -43,6 +43,14 @@ TEST_CASE("peer protocol round-trips lobby messages") {
     CHECK(chart_result.chart_size == chart.chart_size);
     CHECK(chart_result.text == chart.text);
 
+    PeerMessage chat;
+    chat.type = PeerMessageType::Chat;
+    chat.player_id = 3;
+    chat.text = "안녕하세요, room!";
+    const PeerMessage chat_result = round_trip(chat);
+    CHECK(chat_result.player_id == 3);
+    CHECK(chat_result.text == chat.text);
+
     PeerMessage ready;
     ready.type = PeerMessageType::Ready;
     ready.ready = true;
@@ -85,6 +93,18 @@ TEST_CASE("peer protocol round-trips lobby messages") {
     CHECK(round_trip(round_cancel_ack).nonce == 78);
 }
 
+TEST_CASE("peer protocol rejects empty and oversized chat frames") {
+    std::string error;
+    PeerMessage chat;
+    chat.type = PeerMessageType::Chat;
+    chat.text = "";
+    CHECK(tenriff::network::encode_peer_message(chat, &error).empty());
+    CHECK_FALSE(error.empty());
+
+    chat.text.assign(tenriff::network::kPeerChatMaxBytes + 1, 'x');
+    CHECK(tenriff::network::encode_peer_message(chat, &error).empty());
+    CHECK_FALSE(error.empty());
+}
 TEST_CASE("peer protocol round-trips eight-player room metadata") {
     PeerMessage welcome;
     welcome.type = PeerMessageType::RoomWelcome;

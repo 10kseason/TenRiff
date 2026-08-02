@@ -51,6 +51,11 @@ struct PeerParticipantSnapshot {
     uint32_t estimated_rtt_ms = 0;
 };
 
+struct PeerChatEntry {
+    uint8_t player_id = 0;
+    std::string text;
+};
+
 struct PeerSessionSnapshot {
     PeerRole role = PeerRole::None;
     PeerSessionState state = PeerSessionState::Idle;
@@ -65,6 +70,7 @@ struct PeerSessionSnapshot {
     std::size_t participant_count = 0;
     bool local_is_leader = false;
     std::vector<PeerParticipantSnapshot> participants;
+    std::vector<PeerChatEntry> chat_messages;
 
     bool remote_library_ready = false;
     std::size_t remote_library_count = 0;
@@ -124,6 +130,10 @@ public:
     /// later join cannot announce a stale chart chosen in an earlier session.
     void clear_local_chart();
     [[nodiscard]] bool set_ready(bool ready);
+
+    /// Sends a bounded room-chat line. The coordinator attributes the sender
+    /// from the authenticated room link before broadcasting it.
+    [[nodiscard]] bool send_chat(std::string text);
 
     /// Leader-only launch barrier. The current chart must match and every participant must
     /// be ready. The joiner consumes the chart hash through poll_launch().

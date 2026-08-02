@@ -3,6 +3,7 @@
 #include <chrono>
 #include <thread>
 
+#include "app/InputBackendStatus.h"
 #include "input/InputThread.h"
 
 #if defined(_WIN32)
@@ -64,9 +65,11 @@ bool wait_for_backend(tenriff::input::InputThread& input_thread,
 }  // namespace
 #endif
 
-TEST_CASE("input gate policy keeps menu foreground-only and gameplay always-allow") {
+TEST_CASE("input gate policy rejects background events unless explicitly overridden") {
     CHECK(tenriff::input::input_gate_policy_allows(tenriff::input::InputGatePolicy::ForegroundProcess, true));
     CHECK_FALSE(tenriff::input::input_gate_policy_allows(tenriff::input::InputGatePolicy::ForegroundProcess, false));
+    CHECK(tenriff::app::gameplay_input_gate_policy() ==
+          tenriff::input::InputGatePolicy::ForegroundProcess);
     CHECK(tenriff::input::input_gate_policy_allows(tenriff::input::InputGatePolicy::AlwaysAllow, true));
     CHECK(tenriff::input::input_gate_policy_allows(tenriff::input::InputGatePolicy::AlwaysAllow, false));
 }

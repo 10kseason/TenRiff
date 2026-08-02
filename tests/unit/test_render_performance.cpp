@@ -1,7 +1,10 @@
 #include "doctest/doctest.h"
 
 #include "render/BgaVideoDecoder.h"
+#include "render/GameplayGaugePalette.h"
+#include "render/GameplayGearLayout.h"
 #include "render/GameplayMotion.h"
+#include "render/GameplayNativeDigitalKey.h"
 #include "render/GameplayBackgroundPolicy.h"
 #include "render/RenderPacing.h"
 #include "render/RenderThread.h"
@@ -307,4 +310,74 @@ TEST_CASE("Media Foundation BGA video extension policy accepts MPG and common co
     CHECK(BgaVideoDecoder::is_supported_video_path("MOVIE.MPEG"));
     CHECK(BgaVideoDecoder::is_supported_video_path("clip.mp4"));
     CHECK_FALSE(BgaVideoDecoder::is_supported_video_path("still.png"));
+}
+
+TEST_CASE("LR2 Gear fits as one bottom-anchored panel without distortion") {
+    using tenriff::render::GameplayGearRect;
+    using tenriff::render::fit_gameplay_gear_rect;
+
+    const auto fitted = fit_gameplay_gear_rect(
+        GameplayGearRect{0.0f, 0.0f, 1412.0f, 205.0f}, 506.0f, 142.0f);
+    CHECK(fitted.left == doctest::Approx(340.7535f).epsilon(0.0001));
+    CHECK(fitted.top == doctest::Approx(0.0f));
+    CHECK(fitted.right == doctest::Approx(1071.2465f).epsilon(0.0001));
+    CHECK(fitted.bottom == doctest::Approx(205.0f));
+    CHECK((fitted.right - fitted.left) / (fitted.bottom - fitted.top) ==
+          doctest::Approx(506.0f / 142.0f));
+
+    const auto width_limited = fit_gameplay_gear_rect(
+        GameplayGearRect{0.0f, 0.0f, 1000.0f, 100.0f}, 1000.0f, 50.0f);
+    CHECK(width_limited.left == doctest::Approx(0.0f));
+    CHECK(width_limited.top == doctest::Approx(50.0f));
+    CHECK(width_limited.right == doctest::Approx(1000.0f));
+    CHECK(width_limited.bottom == doctest::Approx(100.0f));
+}
+
+TEST_CASE("LR2 Gear can overscale below the judgement line without widening distortion") {
+    using tenriff::render::GameplayGearRect;
+    using tenriff::render::fit_gameplay_gear_rect;
+    using tenriff::render::gameplay_gear_scale_multiplier;
+
+    CHECK(gameplay_gear_scale_multiplier(0.5) == doctest::Approx(1.25f));
+    CHECK(gameplay_gear_scale_multiplier(1.0) == doctest::Approx(2.0f));
+    CHECK(gameplay_gear_scale_multiplier(1.4) == doctest::Approx(2.8f));
+
+    const auto enlarged = fit_gameplay_gear_rect(
+        GameplayGearRect{0.0f, 0.0f, 1000.0f, 205.0f}, 80.0f, 480.0f, 2.0f);
+    CHECK(enlarged.left == doctest::Approx(465.8333f).epsilon(0.0001));
+    CHECK(enlarged.top == doctest::Approx(-205.0f));
+    CHECK(enlarged.right == doctest::Approx(534.1667f).epsilon(0.0001));
+    CHECK(enlarged.bottom == doctest::Approx(205.0f));
+    CHECK((enlarged.right - enlarged.left) / (enlarged.bottom - enlarged.top) ==
+          doctest::Approx(80.0f / 480.0f));
+}
+
+TEST_CASE("imported pressed art is a transient hit pulse instead of an LN hold state") {
+    CHECK_FALSE(tenriff::render::should_use_imported_pressed_key(0.0f));
+    CHECK_FALSE(tenriff::render::should_use_imported_pressed_key(0.05f));
+    CHECK(tenriff::render::should_use_imported_pressed_key(0.051f));
+    CHECK(tenriff::render::should_use_imported_pressed_key(1.5f));
+}
+
+TEST_CASE("EX-HARD gauge uses its own near-black gray palette") {
+    CHECK(tenriff::render::gameplay_gauge_color("EX-HARD") == 0x292C31u);
+    CHECK(tenriff::render::gameplay_gauge_color("HARD") == 0xFF4D6Du);
+    CHECK(tenriff::render::gameplay_gauge_color("EASY") == 0x89D185u);
+    CHECK(tenriff::render::gameplay_gauge_color("NORMAL") == 0xFFB703u);
+    CHECK(tenriff::render::gameplay_gauge_color("EX-HARD") !=
+          tenriff::render::gameplay_gauge_color("HARD"));
+}
+
+TEST_CASE("native digital keys separate held depth from hit glitch") {
+    const auto idle = tenriff::render::resolve_native_digital_key_visual(false, 0.0f, 80.0f);
+    CHECK(idle.press_offset == doctest::Approx(0.0f));
+    CHECK(idle.glitch_strength == doctest::Approx(0.0f));
+
+    const auto held = tenriff::render::resolve_native_digital_key_visual(true, 0.25f, 80.0f);
+    CHECK(held.press_offset == doctest::Approx(6.0f));
+    CHECK(held.glitch_strength == doctest::Approx(0.0625f));
+
+    const auto released_hit = tenriff::render::resolve_native_digital_key_visual(false, 1.5f, 24.0f);
+    CHECK(released_hit.press_offset == doctest::Approx(0.0f));
+    CHECK(released_hit.glitch_strength == doctest::Approx(1.0f));
 }

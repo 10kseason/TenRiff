@@ -168,7 +168,7 @@ private:
 
 bool is_known_type(uint16_t raw) {
     return raw >= static_cast<uint16_t>(PeerMessageType::Hello) &&
-           raw <= static_cast<uint16_t>(PeerMessageType::CommonLibraryEnd);
+           raw <= static_cast<uint16_t>(PeerMessageType::Chat);
 }
 
 bool decode_score(Reader& reader, PeerScore& score) {
@@ -201,6 +201,14 @@ std::vector<uint8_t> encode_peer_message(const PeerMessage& message, std::string
     switch (message.type) {
         case PeerMessageType::Hello:
         case PeerMessageType::Disconnect:
+            if (!append_string(payload, message.text, error)) return {};
+            break;
+        case PeerMessageType::Chat:
+            if (message.text.empty() || message.text.size() > kPeerChatMaxBytes) {
+                set_error(error, "Peer chat message is empty or too long.");
+                return {};
+            }
+            append_u8(payload, message.player_id);
             if (!append_string(payload, message.text, error)) return {};
             break;
         case PeerMessageType::Chart:
@@ -411,6 +419,12 @@ PeerDecodeStatus decode_peer_message(const std::vector<uint8_t>& bytes,
         case PeerMessageType::Hello:
         case PeerMessageType::Disconnect:
             valid = payload.read_string(decoded.text);
+            break;
+        case PeerMessageType::Chat:
+            valid = payload.read_u8(decoded.player_id) &&
+                    payload.read_string(decoded.text) &&
+                    !decoded.text.empty() &&
+                    decoded.text.size() <= kPeerChatMaxBytes;
             break;
         case PeerMessageType::Chart:
             valid = payload.read_u8(decoded.player_id) &&

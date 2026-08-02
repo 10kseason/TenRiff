@@ -24,6 +24,7 @@ struct ImportedGameplaySkinDefinition {
     std::vector<ImportedSkinImageAsset> hold_tail_images;
     std::vector<ImportedSkinImageAsset> key_images;
     std::vector<ImportedSkinImageAsset> key_pressed_images;
+    ImportedSkinImageAsset gear_overlay_image;
     std::vector<float> lane_divider_widths;
     std::vector<float> column_widths;
     std::vector<float> column_spacings;

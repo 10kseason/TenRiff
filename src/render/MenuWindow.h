@@ -368,6 +368,8 @@ struct GameplayHudData {
 
     std::size_t lane_activity_count = 0;
     std::array<float, kGameplayHudMaxLanes> lane_activity{};
+    std::size_t lane_pressed_count = 0;
+    std::array<uint8_t, kGameplayHudMaxLanes> lane_pressed{};
     std::size_t lane_color_count = 0;
     std::array<uint32_t, kGameplayHudMaxLanes> lane_colors{};
     std::size_t key_label_count = 0;
@@ -398,6 +400,8 @@ struct GameplayHudData {
     bool ghost_game_over = false;
     std::size_t ghost_lane_activity_count = 0;
     std::array<float, kGameplayHudMaxLanes> ghost_lane_activity{};
+    std::size_t ghost_lane_pressed_count = 0;
+    std::array<uint8_t, kGameplayHudMaxLanes> ghost_lane_pressed{};
     std::size_t ghost_note_count = 0;
     std::array<GameplayNoteData, kGameplayHudMaxNotes> ghost_notes{};
 };

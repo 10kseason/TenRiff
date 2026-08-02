@@ -11,7 +11,8 @@ inline void apply_peer_battle_rules(config::RuntimeConfig& config) {
     config.judge = defaults.judge;
     config.gauge = defaults.gauge;
     config.speed.rate = 1.0;
-    config.mode.key_mode = "none";
+    // Key-count conversion is a local accessibility/presentation choice. The
+    // room still validates identical source chart bytes before Ready.
     config.mode.gauge = "shift";
     config.mode.random = "off";
     config.mode.random_seed = 0;

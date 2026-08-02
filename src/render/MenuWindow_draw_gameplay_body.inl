@@ -765,12 +765,7 @@
                 static_cast<float>(std::clamp(gauge_value / 100.0, 0.0, 1.0));
             const float fill_top =
                 kGameplayGaugeBottom - (kGameplayGaugeBottom - kGameplayGaugeTop) * gauge_ratio;
-            uint32_t gauge_rgb = 0xFFB703;
-            if (gauge_token == "HARD" || gauge_token == "EX-HARD") {
-                gauge_rgb = 0xFF4D6D;
-            } else if (gauge_token == "EASY") {
-                gauge_rgb = 0x89D185;
-            }
+            const uint32_t gauge_rgb = gameplay_gauge_color(gauge_token);
 
             if (d2d_->accent_brush && gauge_ratio > 0.0f) {
                 const D2D1_COLOR_F saved_color = d2d_->accent_brush->GetColor();
@@ -966,17 +961,174 @@
             d2d_->text_brush->SetColor(saved_text_color);
         };
 
+        auto draw_native_digital_key = [&](const GameplayFieldLayout& key_field_layout,
+                                           float key_hit_line_y,
+                                           int lane,
+                                           bool pressed,
+                                           float activity) {
+            if (use_imported_metrics || !d2d_->note_fill_brush) {
+                return;
+            }
+            const float lane_left = gameplay_lane_left(key_field_layout, lane) + 2.0f;
+            const float lane_right = gameplay_lane_right(key_field_layout, lane) - 2.0f;
+            const float raw_gear_top = gameplay_osu_gear_top(key_field_layout, key_hit_line_y, note_height_scale);
+            const float gear_bottom = key_field_layout.bottom - 3.0f;
+            const float key_height = std::clamp(gear_bottom - raw_gear_top, 48.0f, 180.0f);
+            const float gear_top = gear_bottom - key_height;
+            const NativeDigitalKeyVisual key_visual =
+                resolve_native_digital_key_visual(pressed, activity, key_height);
+            uint32_t lane_color = 0xF6F8FF;
+            const std::size_t lane_index = static_cast<std::size_t>(lane);
+            if (lane_index < data.gameplay.lane_color_count) {
+                lane_color = data.gameplay.lane_colors[lane_index];
+            } else if (!gameplay_lane_uses_white_note(lane + 1)) {
+                lane_color = 0x4F80FF;
+            }
+
+            ID2D1SolidColorBrush* fill = d2d_->note_fill_brush.Get();
+            const D2D1_COLOR_F saved_fill_color = fill->GetColor();
+            const float saved_fill_opacity = fill->GetOpacity();
+            const D2D1_RECT_F housing =
+                D2D1::RectF(lane_left, gear_top + 1.0f, lane_right, gear_bottom);
+            fill->SetColor(color_from_rgb(0x03070C, 0.96f * visual_opacity));
+            ctx->FillRoundedRectangle(D2D1::RoundedRect(housing, 5.0f, 5.0f), fill);
+
+            const D2D1_RECT_F surface = D2D1::RectF(
+                lane_left + 2.0f,
+                gear_top + 4.0f + key_visual.press_offset,
+                lane_right - 2.0f,
+                gear_bottom - 2.0f);
+            const uint32_t surface_color = pressed
+                ? blend_rgb(lane_color, 0x36E1F2, 0.30f)
+                : blend_rgb(lane_color, 0x07131E, 0.78f);
+            fill->SetColor(color_from_rgb(surface_color, (pressed ? 0.96f : 0.88f) * visual_opacity));
+            ctx->FillRoundedRectangle(D2D1::RoundedRect(surface, 4.0f, 4.0f), fill);
+
+            const float lip_height = pressed ? 2.0f : 5.0f;
+            fill->SetColor(color_from_rgb(
+                blend_rgb(lane_color, pressed ? 0xFFFFFF : 0x6EE7F2, pressed ? 0.48f : 0.25f),
+                (pressed ? 0.86f : 0.52f) * visual_opacity));
+            ctx->FillRectangle(D2D1::RectF(surface.left + 2.0f,
+                                           surface.top + 2.0f,
+                                           surface.right - 2.0f,
+                                           std::min(surface.bottom, surface.top + 2.0f + lip_height)),
+                               fill);
+
+            fill->SetColor(color_from_rgb(0x9BDDE8, 0.10f * visual_opacity));
+            const float scan_step = std::max(8.0f, key_height / 7.0f);
+            for (float y = surface.top + 14.0f; y < surface.bottom - 4.0f; y += scan_step) {
+                ctx->FillRectangle(D2D1::RectF(surface.left + 4.0f, y, surface.right - 4.0f, y + 1.0f), fill);
+            }
+
+            if (key_visual.glitch_strength > 0.02f) {
+                const float glitch = key_visual.glitch_strength;
+                const float glitch_y = std::clamp(
+                    surface.top + 18.0f + static_cast<float>((lane * 29) % 61),
+                    surface.top + 8.0f,
+                    surface.bottom - 8.0f);
+                const float shift = 2.0f + 5.0f * glitch;
+                fill->SetColor(color_from_rgb(0x55F5FF, 0.78f * glitch * visual_opacity));
+                ctx->FillRectangle(D2D1::RectF(surface.left + 5.0f + shift,
+                                               glitch_y,
+                                               surface.right - 5.0f,
+                                               glitch_y + 3.0f),
+                                   fill);
+                fill->SetColor(color_from_rgb(0xFF4FD8, 0.58f * glitch * visual_opacity));
+                ctx->FillRectangle(D2D1::RectF(surface.left + 5.0f,
+                                               glitch_y + 5.0f,
+                                               surface.right - 5.0f - shift,
+                                               glitch_y + 7.0f),
+                                   fill);
+            }
+
+            if (d2d_->button_border_brush) {
+                const float saved_border_opacity = d2d_->button_border_brush->GetOpacity();
+                d2d_->button_border_brush->SetOpacity((pressed ? 0.82f : 0.42f) * visual_opacity);
+                ctx->DrawRoundedRectangle(D2D1::RoundedRect(surface, 4.0f, 4.0f),
+                                          d2d_->button_border_brush.Get(),
+                                          pressed ? 1.8f : 1.0f);
+                d2d_->button_border_brush->SetOpacity(saved_border_opacity);
+            }
+            fill->SetColor(saved_fill_color);
+            fill->SetOpacity(saved_fill_opacity);
+        };
+
+        auto draw_imported_gear_overlay = [&](const GameplayFieldLayout& gear_field_layout,
+                                              float gear_hit_line_y) {
+            ID2D1Bitmap* bitmap = d2d_->gameplay_gear_overlay_bitmap.Get();
+            if (!bitmap) {
+                return false;
+            }
+            const D2D1_RECT_F* source_rect =
+                bitmap_source_rect_or_null(d2d_->gameplay_gear_overlay_source_rect);
+            const D2D1_SIZE_F bitmap_size = bitmap->GetSize();
+            const float source_width = source_rect
+                ? source_rect->right - source_rect->left
+                : bitmap_size.width;
+            const float source_height = source_rect
+                ? source_rect->bottom - source_rect->top
+                : bitmap_size.height;
+            const GameplayGearRect bounds{
+                gear_field_layout.left + 2.0f,
+                gameplay_osu_gear_top(gear_field_layout,
+                                      gear_hit_line_y,
+                                      note_height_scale),
+                gear_field_layout.right - 2.0f,
+                gear_field_layout.bottom - 2.0f,
+            };
+            const GameplayGearRect fitted =
+                fit_gameplay_gear_rect(bounds,
+                                       source_width,
+                                       source_height,
+                                       gameplay_gear_scale_multiplier(note_width_scale));
+            ctx->PushAxisAlignedClip(D2D1::RectF(bounds.left,
+                                                 bounds.top,
+                                                 bounds.right,
+                                                 bounds.bottom),
+                                     D2D1_ANTIALIAS_MODE_ALIASED);
+            ctx->DrawBitmap(bitmap,
+                            D2D1::RectF(fitted.left,
+                                        fitted.top,
+                                        fitted.right,
+                                        fitted.bottom),
+                            visual_opacity,
+                            D2D1_BITMAP_INTERPOLATION_MODE_LINEAR,
+                            source_rect);
+            ctx->PopAxisAlignedClip();
+            return true;
+        };
+
         const D2D1_ANTIALIAS_MODE saved_antialias = ctx->GetAntialiasMode();
         ctx->PushAxisAlignedClip(field_clip_rect, D2D1_ANTIALIAS_MODE_ALIASED);
-        draw_key_labels(field_layout);
+        const bool player_has_gear_overlay =
+            draw_imported_gear_overlay(field_layout, hit_line_y);
+        if (use_imported_metrics) {
+            draw_key_labels(field_layout);
+        }
         ctx->SetAntialiasMode(D2D1_ANTIALIAS_MODE_ALIASED);
         for (int lane = 0; lane < lane_count; ++lane) {
             const std::size_t lane_index = static_cast<std::size_t>(lane);
+            if (player_has_gear_overlay) {
+                continue;
+            }
+            const bool lane_is_pressed =
+                lane_index < data.gameplay.lane_pressed_count &&
+                data.gameplay.lane_pressed[lane_index] != 0;
+            const float lane_activity = lane_index < data.gameplay.lane_activity_count
+                ? data.gameplay.lane_activity[lane_index]
+                : 0.0f;
             ID2D1Bitmap* key_bitmap = d2d_->lane_key_idle_bitmaps[lane_index].Get();
-            if (lane_index < data.gameplay.lane_activity_count &&
-                data.gameplay.lane_activity[lane_index] > 0.05f &&
+            if (should_use_imported_pressed_key(lane_activity) &&
                 d2d_->lane_key_pressed_bitmaps[lane_index]) {
                 key_bitmap = d2d_->lane_key_pressed_bitmaps[lane_index].Get();
+            }
+            if (!key_bitmap && !use_imported_metrics) {
+                draw_native_digital_key(field_layout,
+                                        hit_line_y,
+                                        lane,
+                                        lane_is_pressed,
+                                        lane_activity);
+                continue;
             }
             if (!key_bitmap) {
                 continue;
@@ -1002,6 +1154,9 @@
                 key_source_rect = bitmap_source_rect_or_null(d2d_->lane_key_idle_source_rects[lane_index]);
             }
             ctx->DrawBitmap(key_bitmap, receptor_rect, visual_opacity, D2D1_BITMAP_INTERPOLATION_MODE_LINEAR, key_source_rect);
+        }
+        if (!use_imported_metrics) {
+            draw_key_labels(field_layout);
         }
         for (std::size_t note_index = 0; note_index < data.gameplay.note_count; ++note_index) {
             const auto& note = data.gameplay.notes[note_index];
@@ -1633,15 +1788,35 @@
 
             const D2D1_ANTIALIAS_MODE ghost_saved_antialias = ctx->GetAntialiasMode();
             ctx->PushAxisAlignedClip(ghost_field_clip_rect, D2D1_ANTIALIAS_MODE_ALIASED);
-            draw_key_labels(ghost_field_layout);
+            const bool ghost_has_gear_overlay =
+                draw_imported_gear_overlay(ghost_field_layout, ghost_hit_line_y);
+            if (use_imported_metrics) {
+                draw_key_labels(ghost_field_layout);
+            }
             ctx->SetAntialiasMode(D2D1_ANTIALIAS_MODE_ALIASED);
             for (int lane = 0; lane < lane_count; ++lane) {
                 const std::size_t lane_index = static_cast<std::size_t>(lane);
+                if (ghost_has_gear_overlay) {
+                    continue;
+                }
+                const bool lane_is_pressed =
+                    lane_index < data.gameplay.ghost_lane_pressed_count &&
+                    data.gameplay.ghost_lane_pressed[lane_index] != 0;
+                const float lane_activity = lane_index < data.gameplay.ghost_lane_activity_count
+                    ? data.gameplay.ghost_lane_activity[lane_index]
+                    : 0.0f;
                 ID2D1Bitmap* key_bitmap = d2d_->lane_key_idle_bitmaps[lane_index].Get();
-                if (lane_index < data.gameplay.ghost_lane_activity_count &&
-                    data.gameplay.ghost_lane_activity[lane_index] > 0.05f &&
+                if (should_use_imported_pressed_key(lane_activity) &&
                     d2d_->lane_key_pressed_bitmaps[lane_index]) {
                     key_bitmap = d2d_->lane_key_pressed_bitmaps[lane_index].Get();
+                }
+                if (!key_bitmap && !use_imported_metrics) {
+                    draw_native_digital_key(ghost_field_layout,
+                                            ghost_hit_line_y,
+                                            lane,
+                                            lane_is_pressed,
+                                            lane_activity);
+                    continue;
                 }
                 if (!key_bitmap) {
                     continue;
@@ -1667,6 +1842,9 @@
                     key_source_rect = bitmap_source_rect_or_null(d2d_->lane_key_idle_source_rects[lane_index]);
                 }
                 ctx->DrawBitmap(key_bitmap, receptor_rect, visual_opacity, D2D1_BITMAP_INTERPOLATION_MODE_LINEAR, key_source_rect);
+            }
+            if (!use_imported_metrics) {
+                draw_key_labels(ghost_field_layout);
             }
             for (std::size_t note_index = 0; note_index < data.gameplay.ghost_note_count; ++note_index) {
                 const auto& note = data.gameplay.ghost_notes[note_index];

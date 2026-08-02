@@ -62,7 +62,7 @@ TenRiff 的基础游玩流程如下：
   - 关闭 `BGA` 会禁用 gameplay 图片/视频背景及其 decoder/upscaler 工作；Song Select 预览仍会显示
   - 选择 model 后仍需明确开启 upscaler 并确认高配置警告；实验性 `优先 NPU` 只有在 Windows/driver 实际选择 NPU 时才会使用 NPU
 - `Skins`
-  - 切换 native/LR2 skin、导入 LR2 folder，并调整固定 divider 基准的 note 间距/大小、Black Playfield、判定线位置、LN body 宽度与 lane color
+  - 切换 native/LR2 skin、使用带 hold 下压与击键 glitch 的 native 下部 digital-piano key、导入单个 LR2 folder 或批量导入独立的 non-IIDX `LR2files/Theme`（跳过依赖 IIDX 的 theme），移植随 field size 放大并裁切在判定线下方的保持原始宽高比下部 Gear frame，并调整固定 divider 基准的 note 间距/大小、Black Playfield、判定线位置、LN body 宽度与 lane color
 - `Keymap`
   - 调整按键布局并做 NKRO 测试
 
@@ -177,7 +177,7 @@ Rank 使用 `<75 F`、`75 B`、`80.5 A`、`86.5 A+`、`90 S`、`95.5 S+`、`98 A
 
 固定 gauge（`ex_hard / hard / normal / easy`）在歌曲开始时从 `100%` 起步，游玩中不会改变类型。
 
-- `ex_hard`：回复低于 Hard，`BAD` / `POOR` 损失更大；到 `0%` 立即 Game Over
+- `ex_hard`：回复低于 Hard，`BAD` / `POOR` 损失更大；使用区别于 Hard 的近黑深灰配色；到 `0%` 立即 Game Over
 - `hard`：到 `0%` 立即 Game Over
 - `normal`：到 `0%` 立即 Game Over
 - `easy`：到 `0%` 立即 Game Over

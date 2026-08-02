@@ -9,7 +9,7 @@
 - `Options -> Profile Setup` 会重新打开当前 profile 的首次设置页面，并立即保存 language/audio/input/graphics/keymap
 - 开始游玩时，当前实现会停止菜单线程并单独运行 `GameSession`
 - **Windows 菜单 UI 基于 D3D11 + Direct2D/DirectWrite**，会渲染标题/选歌（青色布局）以及其他设置页面（列表 UI）
-- Skins 仅支持 native/LR2；选择或拖放 LR2 playskin folder 会复制到当前 profile 的 `skins`
+- Skins 仅支持 native/LR2。选择或拖入单个 LR2 playskin 会导入当前 profile；选择 `LR2files` 或 `Theme` 时，会分别安装其下除精确名为 `IIDX` 以及依赖 IIDX 资源之外的 theme，保留 sibling-theme 引用且不覆盖已有文件夹。
 - Song Select 在重新索引时会居中显示 stage / percent / ETA 与 progress bar
 - Browse 可选择本地 header JSON，或导入剪贴板中的 http(s) BMSTable HTML/header 链接，并重新索引当前 source，让 hash 匹配谱面获得表等级
 - Graphics 的 `BGA` 会完全关闭 gameplay 图片/视频背景，同时保留 Song Select 预览。选择 ONNX model 只保存路径，仍需另行开启 `BGA Upscaler` 并确认高配置警告

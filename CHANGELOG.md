@@ -4,6 +4,34 @@ TenRiff의 사용자/배포 관점에서 의미 있는 변경만 간단히 기�
 
 ## [Unreleased]
 
+## [1.2.100] - 2026-08-02
+
+### Added
+
+- LR2 스킨 가져오기가 표준 `LR2files`/`Theme` 루트를 인식해 정확한 `IIDX` 폴더와 IIDX 자산 의존 테마를 제외한 하위 테마를 개별 설치하고, 형제 테마 참조와 기존 설치본을 보존하는 안전한 이식 경로를 지원
+
+- LR2 playskin의 `play/Gear` 정적 프레임을 원본 종횡비를 유지하는 단일 하단 오버레이로 이식해 실제 스킨의 키 기어를 gameplay에 렌더링
+- native 기본 스킨 하단에 레인별 디지털 피아노 건반을 추가하고, 실제 키 홀드 동안의 눌림 깊이와 타격 순간 cyan/magenta 글리치 펄스를 분리해 렌더링
+- protocol v5 멀티플레이 방에 최대 256바이트 UTF-8 메시지와 최근 32개 제한을 둔 로비 채팅창을 추가
+
+### Changed
+
+- EX-Hard 게이지를 Hard의 붉은색과 구분되는 짙은 흑회색 팔레트로 변경
+- LR2 Gear를 원본 종횡비 그대로 기본 약 2배 확대하고 Note & Field Size에 따라 1.25~2.8배로 연동하되 판정선 아래 영역에서만 렌더링
+- 멀티플레이 채팅에 최근 메시지 수, 본인/리더 표식, 연결 전·빈 메시지·연결 종료 상태 안내를 추가
+- 멀티플레이 공정 규칙은 동일 BMS 바이트·Rate·게이지·판정·랜덤/어시스트를 계속 고정하되, 각 플레이어의 로컬 키모드 변환은 허용
+
+### Fixed
+
+- LR2 `#INCLUDE`가 `#CUSTOMFILE` 와일드카드 기본 선택을 적용하도록 수정해 FT 스킨의 실제 Note CSV가 빠지고 `Numbers.png`가 낙하 노트로 사용되던 문제를 해결
+- LR2 Gear를 레인별로 늘려 로고와 패널이 찌그러지던 문제를 수정하고, Gear가 없는 스킨은 낙하 노트/LN 머리를 receptor 대용으로 쓰지 않도록 변경
+- LR2 눌림 이미지는 실제 홀드 상태가 아니라 짧은 타격 펄스에만 반응하게 해 롱노트 유지 중 판정선에 노트 효과가 계속 남던 문제를 수정
+- gameplay 입력도 foreground process gate를 사용하도록 수정해 로딩/플레이 중 다른 창으로 전환했을 때 background의 lane 및 `Esc` 입력을 무시
+
+### Packaging
+
+- Windows TenRiff-1.2.100.zip, public source TenRiff-1.2.100-source.zip, and TenRiff-1.2.100-SHA256SUMS.txt are the formal release assets; no ONNX model, private checkpoint, user profile, song, or log is bundled
+
 ## [1.2.99] - 2026-08-02
 
 ### Fixed
