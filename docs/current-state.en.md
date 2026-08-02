@@ -3,7 +3,7 @@
 This is the document that the next agent or any new contributor should read first. Its goal is to quickly answer: "what is this project now, where should I look, and what is still unverified?"
 
 ## Baseline
-- Current project and public stable version: `1.2.100 stable`
+- Current project and public stable version: `1.2.101 stable`
 - Direct-IP multiplayer and the preview r5 input-backend lifecycle fixes are integrated into `1.1.8 stable`
 - `1.1.8` adds an osu!mania OD8 auxiliary score, first-native-`BAD` `Sudden Death (1 MISS)`, and deterministic `LN Mix 10%-90%` on top of the 1.1.7 visual refresh
 - `1.2.0` connects BMS channel `04/07` and osu!mania backgrounds to the gameplay sample timeline and asynchronously upscales sub-FHD image backgrounds through LunaSR on Windows ML
@@ -86,6 +86,7 @@ This is the document that the next agent or any new contributor should read firs
   - chart difficulty calculation across supported key counts
   - `mode.key_mode` uses an N2NC-style lane remap to convert key counts
   - in-game Mode Settings exposes `Key Converter` with default `Krrcream` and embedded deterministic `KeyWeaver nK2`; the runtime choice is saved in config and replay metadata
+  - `Conversion Note Add` offers `Default` and `Add 25%+`; the latter requests at least 25% safe silent chords over the baseline result only when the playable key count changes, is saved in replay/result metadata, and cannot replace a normal best record
   - the standalone BMS key converter CLI/GUI can select the default `krrcream` path or deterministic `nK2 Native 50/50`; nK2 ignores Krrcream-only tuning controls
   - `mode.key_mode=none` keeps the chart's original key count and base pattern layout intact
 - Native difficulty:
@@ -172,6 +173,10 @@ This is the document that the next agent or any new contributor should read firs
   - `safe` as the default
   - `fast` as the optional choice
   - controlled by the Mode Settings `Indexing` row and `config.mode.song_index_profile`
+- Difficulty calculation:
+  - controlled by Mode Settings `Index Difficulty` and `config.mode.calculate_song_index_difficulty`
+  - default `off` keeps BMS `#PLAYLEVEL` and skips native LV/CR calculation
+  - `on` calculates Revive LV/Circus Rating; caches from the other calculation mode are not reused
 - Indexing stages:
   - `SCANNING FILES`
   - `BUILDING METADATA`
@@ -186,13 +191,13 @@ This is the document that the next agent or any new contributor should read firs
   - peak memory roughly `working set 453MB`, `private 524MB`
   - on a 1024-chart sample from the same library, fast-profile throughput is about `2.05x` vs safe
 - Cache schema:
-  - `version = 11`
+  - `version = 12`
   - optional `layout_label`
-  - `native_level`, `md5`, `sha256`, and difficulty-table name/symbol/level/order metadata
+  - `calculate_difficulty`, `native_level`, `md5`, `sha256`, and difficulty-table name/symbol/level/order metadata
 
 ## Runtime / Packaging Rules
 - New user profiles are created automatically
-- The current official P2P distribution line is `TenRiff 1.2.100 stable`
+- The current official P2P distribution line is `TenRiff 1.2.101 stable`
 - Distribution packages do not include `Songs`
 - Distribution packages include the `Mainmusic/` scene slots `Main Menu / Options / Song Selecte / Multiplayer Lobby / Clear / Failed`; each `Name.mp3` plus numbered `Name 2.mp3` through `Name 64.mp3` siblings is discovered automatically and rotates on scene re-entry
 - Distribution updates include only built artifacts and required runtime assets

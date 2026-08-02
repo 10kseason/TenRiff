@@ -69,6 +69,7 @@ TEST_CASE("replay export writes JSON with trace events") {
     replay.final_score = 1234;
     replay.mode.key_mode = "6k";
     replay.mode.key_conversion_algorithm = "nk2";
+    replay.mode.key_conversion_note_add_mode = "add_25_plus";
     replay.mode.random = "mirror";
     replay.mode.random_seed = 4123;
     replay.mode.gauge = "shift";
@@ -134,6 +135,7 @@ TEST_CASE("replay export writes JSON with trace events") {
     REQUIRE(mode != nullptr);
     CHECK(mode->find("key_mode")->second.as_string() == "6k");
     CHECK(mode->find("key_conversion_algorithm")->second.as_string() == "nk2");
+    CHECK(mode->find("key_conversion_note_add_mode")->second.as_string() == "add_25_plus");
     CHECK(mode->find("random")->second.as_string() == "mirror");
     CHECK(mode->find("random_seed")->second.as_number() == doctest::Approx(4123.0));
     CHECK(mode->find("gauge")->second.as_string() == "shift");
@@ -161,6 +163,7 @@ TEST_CASE("replay export writes JSON with trace events") {
     CHECK(loaded_replay.replay->mods[1] == "ln_mix_30");
     CHECK(loaded_replay.replay->mode.key_mode == "6k");
     CHECK(loaded_replay.replay->mode.key_conversion_algorithm == "nk2");
+    CHECK(loaded_replay.replay->mode.key_conversion_note_add_mode == "add_25_plus");
     CHECK(loaded_replay.replay->mode.random == "mirror");
     REQUIRE(loaded_replay.replay->mode.random_seed.has_value());
     CHECK(loaded_replay.replay->mode.random_seed.value() == 4123);
@@ -187,6 +190,7 @@ TEST_CASE("result export writes JSON with replay reference") {
     result.chart_format = "bms";
     result.created_utc = "20250101_000000Z";
     result.replay_path = "profiles/default/replays/replay_20250101_000000Z.json";
+    result.key_conversion_note_add_mode = "add_25_plus";
     result.clear_status = "CLEAR";
     result.final_gauge = "normal";
     result.sample_rate = 48000;
@@ -226,6 +230,8 @@ TEST_CASE("result export writes JSON with replay reference") {
     auto replay_path_it = root->find("replay_path");
     REQUIRE(replay_path_it != root->end());
     CHECK(replay_path_it->second.as_string() == result.replay_path);
+    CHECK(root->find("key_conversion_note_add_mode")->second.as_string() ==
+          result.key_conversion_note_add_mode);
 
     auto clear_status_it = root->find("clear_status");
     REQUIRE(clear_status_it != root->end());
@@ -247,6 +253,7 @@ TEST_CASE("result export writes JSON with replay reference") {
     CHECK(parsed_result->player_name == "Luna Pilot");
     CHECK(parsed_result->mods.size() == 1u);
     CHECK(parsed_result->mods[0] == "ln_mix_30");
+    CHECK(parsed_result->key_conversion_note_add_mode == "add_25_plus");
     CHECK(parsed_result->stats.raw_score == 1800);
     CHECK(parsed_result->stats.counts.pr == 3);
     CHECK(parsed_result->rate_multiplier == doctest::Approx(1.05));
@@ -283,6 +290,7 @@ TEST_CASE("legacy result parsing falls back to derived score metadata") {
     REQUIRE(parsed.has_value());
     CHECK(parsed->player_name.empty());
     CHECK(parsed->mods.empty());
+    CHECK(parsed->key_conversion_note_add_mode.empty());
     CHECK(parsed->rate_multiplier == doctest::Approx(1.0));
     CHECK(parsed->score_multiplier == doctest::Approx(1.0));
     CHECK(parsed->stats.raw_score == 1800);
@@ -355,6 +363,7 @@ TEST_CASE("legacy replay loading succeeds without embedded mode metadata") {
     REQUIRE(loaded.replay.has_value());
     CHECK(loaded.replay->mode.key_mode.empty());
     CHECK(loaded.replay->mode.key_conversion_algorithm.empty());
+    CHECK(loaded.replay->mode.key_conversion_note_add_mode.empty());
     CHECK(loaded.replay->mode.random.empty());
     CHECK_FALSE(loaded.replay->mode.random_seed.has_value());
     CHECK(loaded.replay->trace.lane_count == 4);

@@ -90,7 +90,9 @@ TEST_CASE("config defaults prefer 44100 Hz audio") {
     CHECK(config.input.debounce_ms == doctest::Approx(8.0));
     CHECK_FALSE(config.mode.ghost_battle_enabled);
     CHECK(config.mode.song_index_profile == "safe");
+    CHECK_FALSE(config.mode.calculate_song_index_difficulty);
     CHECK(config.mode.key_conversion_algorithm == "krrcream");
+    CHECK(config.mode.key_conversion_note_add_mode == "default");
     CHECK_FALSE(config.mode.enable_osu_charts);
     CHECK(config.graphics.resolution == "native");
     CHECK(config.graphics.display_mode == "borderless");
@@ -398,7 +400,9 @@ TEST_CASE("config save and load preserve volume and speed settings") {
     config.speed.hi_speed = 4.75;
     config.mode.ghost_battle_enabled = true;
     config.mode.song_index_profile = "fast";
+    config.mode.calculate_song_index_difficulty = true;
     config.mode.key_conversion_algorithm = "nk2";
+    config.mode.key_conversion_note_add_mode = "add_25_plus";
     config.mode.enable_osu_charts = true;
     config.mode.gauge = "shift";
 
@@ -416,7 +420,9 @@ TEST_CASE("config save and load preserve volume and speed settings") {
     CHECK(result.config.speed.hi_speed == doctest::Approx(4.75));
     CHECK(result.config.mode.ghost_battle_enabled);
     CHECK(result.config.mode.song_index_profile == "fast");
+    CHECK(result.config.mode.calculate_song_index_difficulty);
     CHECK(result.config.mode.key_conversion_algorithm == "nk2");
+    CHECK(result.config.mode.key_conversion_note_add_mode == "add_25_plus");
     CHECK(result.config.mode.enable_osu_charts);
     CHECK(result.config.mode.gauge == "shift");
 }
@@ -1168,6 +1174,23 @@ TEST_CASE("runtime migration normalizes KeyWeaver converter aliases") {
 
     CHECK(changed);
     CHECK(config.mode.key_conversion_algorithm == "nk2");
+}
+
+TEST_CASE("runtime migration normalizes key conversion Note Add mode") {
+    ConfigLoader loader;
+    auto config = loader.defaults();
+    config.mode.key_conversion_note_add_mode = "25%+";
+
+    const bool alias_changed = tenriff::app::migrate_bms_first_runtime_config(config);
+
+    CHECK(alias_changed);
+    CHECK(config.mode.key_conversion_note_add_mode == "add_25_plus");
+
+    config.mode.key_conversion_note_add_mode = "invalid";
+    const bool invalid_changed = tenriff::app::migrate_bms_first_runtime_config(config);
+
+    CHECK(invalid_changed);
+    CHECK(config.mode.key_conversion_note_add_mode == "default");
 }
 
 TEST_CASE("runtime migration replaces invalid key mode tokens with none") {

@@ -114,7 +114,10 @@ void MenuApp::reload_chart_best_results() {
         record.stddev_delta_ms = parsed->stats.stddev_delta_ms();
         const std::size_t record_index = local_play_records_.size();
         local_play_records_.push_back(record);
-        const bool note_count_modified = mode_mod_adds_notes(parsed->mods);
+        const bool note_count_modified =
+            mode_mod_adds_notes(parsed->mods) ||
+            config::normalize_key_conversion_note_add_mode(
+                parsed->key_conversion_note_add_mode) == "add_25_plus";
 
         // Fan results out across all normalized path keys so old exports still match
         // after source-root changes or relative/absolute-path differences.

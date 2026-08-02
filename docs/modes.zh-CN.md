@@ -10,6 +10,7 @@
 "mode": {
   "key_mode": "none",
   "key_conversion_algorithm": "krrcream",
+  "key_conversion_note_add_mode": "default",
   "enable_osu_charts": false,
   "gauge": "normal",
   "random": "off",
@@ -19,7 +20,8 @@
   "autoplay_enabled": false,
   "practice_no_fail_enabled": false,
   "one_miss_fail_enabled": false,
-  "song_index_profile": "safe"
+  "song_index_profile": "safe",
+  "calculate_song_index_difficulty": false
 }
 ```
 
@@ -27,6 +29,7 @@
 - `enable_osu_charts`：默认 `false`；在 Mode Settings 打开 `OSU Charts` 后可索引并游玩 osu!mania 4K～10K `.osu`，同时刷新曲库
 - `key_mode`：`none | auto | 4k | 5k | 6k | 7k | 8k | 9k | 10k | 12k | 14k | 16k`
 - `key_conversion_algorithm`：`krrcream | nk2`（默认 `krrcream`；在游戏内 Key Converter 中选择，仅用于实际键数变换）
+- `key_conversion_note_add_mode`：`default | add_25_plus`（默认 `default`；仅在 playable key count 实际变化时，相对 converter 基础结果请求至少增加25%的 note）
 - `gauge`：`normal | hard | ex_hard | easy | shift`
 - `random`：`off | mirror | rr | fr | sr`
 - `random_seed`：RR/FR/SR、强制 key-mode 变换、Note Add 和 LN Mix 目标选择使用的固定 seed（`0` 也视为固定值）
@@ -43,6 +46,9 @@
 - `song_index_profile`：`safe | fast`
   - `safe`：优先降低 large-library RAM high-water 的默认值
   - `fast`：面向 32GB+ 环境，追求更快重索引的选项
+- `calculate_song_index_difficulty`：`false | true`
+  - 默认 `false`：保留 BMS `#PLAYLEVEL`，跳过原生 LV/CR 计算
+  - `true`：在完整重索引中计算 Revive LV/Circus Rating
 
 `Rate` 保存在 `speed.rate` 而不是 `mode`。可在 Mode Settings 中调整；未进行搜索文字输入时，也可在 Song Select 中用 `-` / `+` 直接改变下一次游玩的值。
 
@@ -71,6 +77,7 @@
 - `4k..10k`、`12k`、`14k`、`16k` 会通过基于 N2NC 的 lane remap 匹配目标键数
 - 强制转换 `5+1 SP` / `7+1 SP` 时只重新映射除皿键外的键盘部分；`follow` 皿键音效移至自动播放
 - `10+2 DP` / `14+2 DP` 同样排除两个皿键，并独立转换左右键盘区域
+- `add_25_plus` 在基础转换后于既有时刻请求至少增加25%的安全无声和弦；若有更高的 Note Add Mod，则只应用一次较高比例。该成绩保留在记录列表中，但不能替换普通最佳记录
 - 应用顺序：key-mode 变换 → DP Flip → Mirror/RR/FR/SR → Note Add → LN/Full Tap 结构变换
 
 ## Gauge 规则

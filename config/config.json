@@ -58,13 +58,15 @@
   "mode": {
     "key_mode": "none",
     "key_conversion_algorithm": "krrcream",
+    "key_conversion_note_add_mode": "default",
     "enable_osu_charts": false,
     "gauge": "normal",
     "random": "off",
     "random_seed": 0,
     "ghost_battle_enabled": false,
     "one_miss_fail_enabled": false,
-    "song_index_profile": "safe"
+    "song_index_profile": "safe",
+    "calculate_song_index_difficulty": false
   },
   "ui": {
     "profile_nickname": "",

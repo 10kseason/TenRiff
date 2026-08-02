@@ -6,6 +6,25 @@
 
 namespace tenriff::app {
 
+namespace menu_music_detail {
+
+enum class PlaybackAction {
+    Close,
+    Open,
+    UpdateGain,
+};
+
+[[nodiscard]] constexpr PlaybackAction playback_action(bool open,
+                                                       bool requested_path_matches,
+                                                       double gain) noexcept {
+    if (!(gain > 0.0)) {
+        return PlaybackAction::Close;
+    }
+    return open && requested_path_matches ? PlaybackAction::UpdateGain : PlaybackAction::Open;
+}
+
+}  // namespace menu_music_detail
+
 class MenuMusicController {
 public:
     MenuMusicController() = default;

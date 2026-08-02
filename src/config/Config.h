@@ -152,6 +152,7 @@ struct InputConfig {
 struct ModeConfig {
     std::string key_mode = "auto";
     std::string key_conversion_algorithm = "krrcream";
+    std::string key_conversion_note_add_mode = "default";
     bool enable_osu_charts = false;
     std::string gauge = "normal";
     std::string random = "off";
@@ -162,6 +163,7 @@ struct ModeConfig {
     bool practice_no_fail_enabled = false;
     bool one_miss_fail_enabled = false;
     std::string song_index_profile = "safe";
+    bool calculate_song_index_difficulty = false;
 };
 
 struct RuntimeConfig {
@@ -203,6 +205,7 @@ public:
 [[nodiscard]] std::string normalize_skin_mode_token(std::string_view key_mode);
 [[nodiscard]] std::string normalize_ui_language_token(std::string_view token);
 [[nodiscard]] std::string normalize_song_index_profile_token(std::string_view token);
+[[nodiscard]] std::string normalize_key_conversion_note_add_mode(std::string_view token);
 [[nodiscard]] std::string normalize_profile_nickname(std::string_view value);
 [[nodiscard]] std::string normalize_background_upscale_mode(std::string_view token);
 [[nodiscard]] std::vector<std::string> supported_skin_mode_tokens();

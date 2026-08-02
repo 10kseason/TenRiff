@@ -552,7 +552,9 @@ int run_compare(const Options& options, const char* argv0) {
     }
 
     std::vector<std::string> warnings;
-    SongIndex index = scan_songs(songs_root->u8string(), nullptr, warnings, {}, SongIndexOptions{});
+    SongIndexOptions index_options;
+    index_options.calculate_difficulty = true;
+    SongIndex index = scan_songs(songs_root->u8string(), nullptr, warnings, {}, index_options);
     if (!warnings.empty()) {
         std::cout << "[warn] scan warnings: " << warnings.size() << '\n';
     }

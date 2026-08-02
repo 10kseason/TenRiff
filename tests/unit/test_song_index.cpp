@@ -97,6 +97,12 @@ std::string dense_bms_chart(const std::string& title, int playlevel) {
            "#00212:0001000100010001\n";
 }
 
+SongIndexOptions difficulty_scan_options() {
+    SongIndexOptions options;
+    options.calculate_difficulty = true;
+    return options;
+}
+
 }  // namespace
 
 TEST_CASE("song scan only exposes BMS-family charts in the menu index") {
@@ -345,6 +351,29 @@ TEST_CASE("BMS background traversal compatibility remains unchanged") {
           std::filesystem::weakly_canonical(outside_image).u8string());
 }
 
+TEST_CASE("song scan skips native difficulty by default and keeps BMS PLAYLEVEL") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+
+    write_file(temp.path / "dense.bms", dense_bms_chart("Dense", 20));
+
+    std::vector<std::string> warnings;
+    const SongIndex fast_index = scan_songs(temp.path.u8string(), nullptr, warnings);
+    REQUIRE(warnings.empty());
+    REQUIRE(fast_index.entries.size() == 1u);
+    CHECK(fast_index.entries.front().level == 20);
+    CHECK(fast_index.entries.front().native_level == 20);
+    CHECK(fast_index.entries.front().rating == doctest::Approx(0.0));
+
+    warnings.clear();
+    const SongIndex calculated_index =
+        scan_songs(temp.path.u8string(), nullptr, warnings, {}, difficulty_scan_options());
+    REQUIRE(warnings.empty());
+    REQUIRE(calculated_index.entries.size() == 1u);
+    CHECK(calculated_index.entries.front().rating > 0.0);
+}
+
 TEST_CASE("song scan computes 10k-calc difficulty for BMS entries") {
     TempDirGuard temp;
     temp.path = make_temp_dir();
@@ -354,7 +383,7 @@ TEST_CASE("song scan computes 10k-calc difficulty for BMS entries") {
     write_file(temp.path / "dense.bms", dense_bms_chart("Dense", 1));
 
     std::vector<std::string> warnings;
-    SongIndex index = scan_songs(temp.path.u8string(), nullptr, warnings);
+    SongIndex index = scan_songs(temp.path.u8string(), nullptr, warnings, {}, difficulty_scan_options());
 
     REQUIRE(index.entries.size() == 2u);
     CHECK(warnings.empty());
@@ -436,7 +465,7 @@ TEST_CASE("song scan computes difficulty for non-10K charts") {
                "511,0,630,1,0,0:0:0:0:\n");
 
     std::vector<std::string> warnings;
-    SongIndex index = scan_songs(temp.path.u8string(), nullptr, warnings);
+    SongIndex index = scan_songs(temp.path.u8string(), nullptr, warnings, {}, difficulty_scan_options());
 
     REQUIRE(index.entries.size() == 1u);
     CHECK(warnings.empty());
@@ -469,7 +498,7 @@ TEST_CASE("song scan exposes BMS SP layouts with compact lane counts and labels"
                "#00116:01\n");
 
     std::vector<std::string> warnings;
-    SongIndex index = scan_songs(temp.path.u8string(), nullptr, warnings);
+    SongIndex index = scan_songs(temp.path.u8string(), nullptr, warnings, {}, difficulty_scan_options());
 
     REQUIRE(index.entries.size() == 1u);
     CHECK(warnings.empty());
@@ -508,7 +537,7 @@ TEST_CASE("song scan exposes PMS and 14+2 DP BMS layouts") {
                "#00129:01\n");
 
     std::vector<std::string> warnings;
-    SongIndex index = scan_songs(temp.path.u8string(), nullptr, warnings);
+    SongIndex index = scan_songs(temp.path.u8string(), nullptr, warnings, {}, difficulty_scan_options());
 
     REQUIRE(index.entries.size() == 2u);
     CHECK(warnings.empty());
@@ -746,7 +775,7 @@ TEST_CASE("cached song index load drops non-BMS menu entries") {
                "  ]\n"
                "}\n");
 
-    SongIndexLoadResult result = load_song_index(index_path.u8string());
+    SongIndexLoadResult result = load_song_index(index_path.u8string(), difficulty_scan_options());
 
     CHECK(result.success());
     CHECK(result.loaded_from_file);
@@ -780,7 +809,7 @@ TEST_CASE("cached song index filters non-BMS entries") {
                "  ]\n"
                "}\n");
 
-    SongIndexLoadResult result = load_song_index(index_path.u8string());
+    SongIndexLoadResult result = load_song_index(index_path.u8string(), difficulty_scan_options());
 
     CHECK(result.success());
     CHECK(result.loaded_from_file);
@@ -800,7 +829,7 @@ TEST_CASE("streaming song index loader parses compact single-line schema 12 cach
                "{\"path\":\"ignored.osu\",\"title\":\"Ignored\",\"artist\":\"Mapper\",\"format\":\"osu\",\"key_count\":10,\"level\":13,\"rating\":8.5,\"bpm\":180,\"mtime\":2}"
                "]}");
 
-    SongIndexLoadResult result = load_song_index(index_path.u8string());
+    SongIndexLoadResult result = load_song_index(index_path.u8string(), difficulty_scan_options());
 
     CHECK(result.success());
     CHECK(result.loaded_from_file);
@@ -852,6 +881,13 @@ TEST_CASE("song index save and load support UTF-8 cache paths") {
     CHECK(result.index.entries.front().layout_label == "7+1 SP");
     CHECK(result.index.entries.front().background_preview_path == entry.background_preview_path);
     CHECK(result.index.entries.front().audio_preview_path == entry.audio_preview_path);
+
+    SongIndexOptions calculated_options;
+    calculated_options.calculate_difficulty = true;
+    const SongIndexLoadResult mode_mismatch = load_song_index(index_path.u8string(), calculated_options);
+    CHECK(mode_mismatch.success());
+    CHECK_FALSE(mode_mismatch.loaded_from_file);
+    CHECK(mode_mismatch.index.entries.empty());
 }
 
 TEST_CASE("song index cache stays profile-local and does not create cache folders in the song source") {
@@ -938,7 +974,7 @@ TEST_CASE("cached song index sanitizes control heavy metadata on load") {
                "  ]\n"
                "}\n");
 
-    SongIndexLoadResult result = load_song_index(index_path.u8string());
+    SongIndexLoadResult result = load_song_index(index_path.u8string(), difficulty_scan_options());
 
     CHECK(result.success());
     CHECK(result.loaded_from_file);

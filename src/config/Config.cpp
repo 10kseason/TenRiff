@@ -626,6 +626,8 @@ void apply_config_object(const JsonObject& root, RuntimeConfig& config) {
         config.mode.key_mode = get_string(*mode, "key_mode", config.mode.key_mode);
         config.mode.key_conversion_algorithm =
             get_string(*mode, "key_conversion_algorithm", config.mode.key_conversion_algorithm);
+        config.mode.key_conversion_note_add_mode = normalize_key_conversion_note_add_mode(
+            get_string(*mode, "key_conversion_note_add_mode", config.mode.key_conversion_note_add_mode));
         config.mode.enable_osu_charts =
             get_bool(*mode, "enable_osu_charts", config.mode.enable_osu_charts);
         config.mode.gauge = get_string(*mode, "gauge", config.mode.gauge);
@@ -646,6 +648,8 @@ void apply_config_object(const JsonObject& root, RuntimeConfig& config) {
             get_bool(*mode, "one_miss_fail_enabled", config.mode.one_miss_fail_enabled);
         config.mode.song_index_profile =
             normalize_song_index_profile(get_string(*mode, "song_index_profile", config.mode.song_index_profile));
+        config.mode.calculate_song_index_difficulty =
+            get_bool(*mode, "calculate_song_index_difficulty", config.mode.calculate_song_index_difficulty);
     }
 
     if (auto* ui = get_object(root, "ui")) {
@@ -1002,6 +1006,9 @@ JsonValue build_json_root(const RuntimeConfig& config) {
     JsonObject mode;
     mode.emplace("key_mode", JsonValue{config.mode.key_mode});
     mode.emplace("key_conversion_algorithm", JsonValue{config.mode.key_conversion_algorithm});
+    mode.emplace("key_conversion_note_add_mode",
+                 JsonValue{normalize_key_conversion_note_add_mode(
+                     config.mode.key_conversion_note_add_mode)});
     mode.emplace("enable_osu_charts", JsonValue{config.mode.enable_osu_charts});
     mode.emplace("gauge", JsonValue{config.mode.gauge});
     mode.emplace("random", JsonValue{config.mode.random});
@@ -1018,6 +1025,7 @@ JsonValue build_json_root(const RuntimeConfig& config) {
     mode.emplace("practice_no_fail_enabled", JsonValue{config.mode.practice_no_fail_enabled});
     mode.emplace("one_miss_fail_enabled", JsonValue{config.mode.one_miss_fail_enabled});
     mode.emplace("song_index_profile", JsonValue{normalize_song_index_profile(config.mode.song_index_profile)});
+    mode.emplace("calculate_song_index_difficulty", JsonValue{config.mode.calculate_song_index_difficulty});
     root.emplace("mode", JsonValue{std::move(mode)});
 
     JsonObject ui;
@@ -1189,6 +1197,15 @@ std::string normalize_skin_mode_token(std::string_view key_mode) {
 
 std::string normalize_song_index_profile_token(std::string_view token) {
     return normalize_song_index_profile(std::string(token));
+}
+
+std::string normalize_key_conversion_note_add_mode(std::string_view token) {
+    const std::string normalized = to_lower_ascii(std::string(token));
+    if (normalized == "add_25_plus" || normalized == "add25plus" ||
+        normalized == "25_plus" || normalized == "25%+") {
+        return "add_25_plus";
+    }
+    return "default";
 }
 
 std::string normalize_profile_nickname(std::string_view value) {
@@ -1538,6 +1555,7 @@ RuntimeConfig ConfigLoader::defaults() const {
 
     config.mode.key_mode = "none";
     config.mode.key_conversion_algorithm = "krrcream";
+    config.mode.key_conversion_note_add_mode = "default";
     config.mode.enable_osu_charts = false;
     config.mode.gauge = "normal";
     config.mode.random = "off";
@@ -1548,6 +1566,7 @@ RuntimeConfig ConfigLoader::defaults() const {
     config.mode.practice_no_fail_enabled = false;
     config.mode.one_miss_fail_enabled = false;
     config.mode.song_index_profile = "safe";
+    config.mode.calculate_song_index_difficulty = false;
 
     config.ui.language = "en";
     config.ui.result_tail_ms = 3000.0;

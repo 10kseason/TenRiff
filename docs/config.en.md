@@ -40,7 +40,7 @@ If a profile does not exist, it is created automatically on first launch.
 
 - `backend` (string)
   - `polling | rawinput`
-  - defaults to `rawinput` on the current `1.2.100` release line
+  - defaults to `rawinput` on the current `1.2.101` release line
   - selectable per profile under `Options -> Input Settings -> Backend` or `Options -> Profile Setup -> Input Backend`
   - runtime fallback never rewrites the saved value to `polling`
   - a confirmed RawInput startup failure, registration-target loss, or message-window exit latches Polling across menu and subsequent gameplay sessions for the current app run
@@ -60,7 +60,7 @@ If a profile does not exist, it is created automatically on first launch.
 - `judgement_hz` (int)
   - `1000 | 2000 | 4000 | 8000`
   - compatibility field kept in the input config
-  - the current `1.2.100` runtime no longer drives a separate audio-thread judgement sub-step loop from this value
+  - the current `1.2.101` runtime no longer drives a separate audio-thread judgement sub-step loop from this value
   - default is `4000` (`0.25ms`)
 - `debounce_ms` (double)
   - real Press/Release transitions are preserved; only duplicate same-state events are removed from pressed-state tracking
@@ -143,6 +143,10 @@ The chart loader and indexer default to BMS-family files (`.bms/.bme/.bml/.pms`)
   - `krrcream | nk2`
   - select `Krrcream` or `KeyWeaver nK2` from in-game `Mode Settings > Key Converter`
   - defaults to `krrcream` and applies only when `key_mode` changes the source lane count
+- `key_conversion_note_add_mode` (string)
+  - `default | add_25_plus`
+  - `default` keeps the converter baseline; `add_25_plus` requests at least 25% more silent chord notes than the baseline whenever the playable key count actually changes
+  - a higher Note Add mod wins and runs once; peer battle forces `default`
 - `gauge` (string)
   - `normal | hard | ex_hard | easy | shift`
 - `random` (string)
@@ -173,6 +177,11 @@ The chart loader and indexer default to BMS-family files (`.bms/.bme/.bml/.pms`)
   - `safe | fast`
   - `safe` is the default that prioritizes lower RAM high-water usage on large libraries
   - `fast` is the optional choice that aims for faster rescans with a higher worker/batch budget in 32GB+ environments
+- `calculate_song_index_difficulty` (bool)
+  - defaults to `false`
+  - `false` keeps BMS `#PLAYLEVEL` as the menu LV and skips the CPU-heavy native LV/CR calculation
+  - `true` calculates the existing Revive LV/Circus Rating during a full index
+  - changing the setting separates cache modes and triggers a full reindex of the current song source
 
 ### `ui`
 - `profile_nickname` (string)

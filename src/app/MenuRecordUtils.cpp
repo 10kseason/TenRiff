@@ -354,6 +354,8 @@ std::optional<ParsedResultRecord> parse_result_file(const std::filesystem::path&
     out.created_utc = read_json_string(*root, "created_utc");
     out.player_name = read_json_string(*root, "player_name");
     out.replay_path = read_json_string(*root, "replay_path");
+    out.key_conversion_note_add_mode =
+        read_json_string(*root, "key_conversion_note_add_mode");
     out.clear_status = read_json_string(*root, "clear_status");
     out.final_gauge = read_json_string(*root, "final_gauge");
     if (out.chart_path.empty()) {

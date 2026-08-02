@@ -16,6 +16,7 @@ struct ParsedResultRecord {
     std::string created_utc;
     std::string player_name;
     std::string replay_path;
+    std::string key_conversion_note_add_mode;
     std::string clear_status;
     std::string final_gauge;
     std::vector<std::string> mods;

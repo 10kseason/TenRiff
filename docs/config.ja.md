@@ -40,7 +40,7 @@ profile が存在しない場合は初回起動時に自動生成されます。
 
 - `backend` (string)
   - `polling | rawinput`
-  - 現行 `1.2.100` リリースラインの既定値は `rawinput`
+  - 現行 `1.2.101` リリースラインの既定値は `rawinput`
   - `Options -> Input Settings -> Backend` または `Options -> Profile Setup -> Input Backend` で profile ごとに選択可能
   - runtime fallback は保存済みの値を `polling` に書き換えない
   - RawInput の起動失敗、登録先の消失、message window の終了を確認すると、そのアプリ実行中は menu と後続 gameplay の両方で Polling を維持する
@@ -143,6 +143,10 @@ chart loader/indexer は BMS family（`.bms/.bme/.bml/.pms`）が既定です。
   - `krrcream | nk2`
   - ゲーム内の `Mode Settings > Key Converter` で `Krrcream` または `KeyWeaver nK2` を選択
   - 既定値は `krrcream`。`key_mode` が元の lane count を変更する場合のみ適用
+- `key_conversion_note_add_mode` (string)
+  - `default | add_25_plus`
+  - `default` は converter の基本 pattern を維持し、`add_25_plus` は実際の playable key count が変わる時に基本変換結果より無音 chord note を最低25%多く要求
+  - Mod Manager の Note Add が25%より高い場合は高い方を一度だけ適用し、peer battle では `default` に固定
 - `gauge` (string)
   - `normal | hard | ex_hard | easy | shift`
 - `random` (string)
@@ -173,6 +177,11 @@ chart loader/indexer は BMS family（`.bms/.bme/.bml/.pms`）が既定です。
   - `safe | fast`
   - `safe` は大規模ライブラリで RAM high-water を抑える既定値
   - `fast` は 32GB+ 環境向けに worker/batch 予算を増やして再スキャン高速化を狙う任意値
+- `calculate_song_index_difficulty` (bool)
+  - 既定値は `false`
+  - `false` は BMS `#PLAYLEVEL` を menu LV として保持し、CPU 負荷の高い native LV/CR 計算を省略
+  - `true` は full index 中に Revive LV/Circus Rating を計算
+  - 設定変更時は cache mode を分離し、現在の song source を full reindex
 
 ### `ui`
 - `profile_nickname` (string)

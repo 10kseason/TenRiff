@@ -264,6 +264,12 @@ inline std::string cycle_key_conversion_algorithm(std::string_view current) {
                : "nk2";
 }
 
+inline std::string cycle_key_conversion_note_add_mode(std::string_view current) {
+    return config::normalize_key_conversion_note_add_mode(current) == "add_25_plus"
+               ? "default"
+               : "add_25_plus";
+}
+
 inline std::string normalize_runtime_key_mode(std::string value) {
     value = to_lower_ascii(std::move(value));
     if (value == "none" || value == "auto") {
