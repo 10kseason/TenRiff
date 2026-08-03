@@ -413,6 +413,7 @@ std::optional<ParsedResultRecord> parse_result_file(const std::filesystem::path&
     out.mods = read_json_string_array(*root, "mods");
     out.rate_multiplier = read_json_number(*root, "rate_multiplier", 1.0);
     out.score_multiplier = read_json_number(*root, "score_multiplier", 1.0);
+    out.pause_used = read_json_bool(*root, "pause_used", false);
     out.autoplay_enabled = read_json_bool(*root, "autoplay_enabled", clear_status_is_assist(out.clear_status));
     out.practice_no_fail_enabled =
         read_json_bool(*root, "practice_no_fail_enabled", clear_status_is_assist(out.clear_status));
@@ -485,6 +486,7 @@ std::optional<ParsedReplayRecord> parse_replay_file(const std::filesystem::path&
     out.mods = replay.mods;
     out.rate_multiplier = replay.rate_multiplier;
     out.score_multiplier = replay.score_multiplier;
+    out.pause_used = replay.pause_used;
     out.lane_count = replay.trace.lane_count;
     out.duration_samples = replay.trace.duration_samples;
     out.raw_score = calculate_score(replay.stats);

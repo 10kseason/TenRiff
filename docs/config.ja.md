@@ -40,7 +40,7 @@ profile が存在しない場合は初回起動時に自動生成されます。
 
 - `backend` (string)
   - `polling | rawinput`
-  - 現行 `1.2.104` リリースラインの既定値は `rawinput`
+  - 現行 `1.3.0` リリースラインの既定値は `rawinput`
   - `Options -> Input Settings -> Backend` または `Options -> Profile Setup -> Input Backend` で profile ごとに選択可能
   - runtime fallback は保存済みの値を `polling` に書き換えない
   - RawInput の起動失敗、登録先の消失、message window の終了を確認すると、そのアプリ実行中は menu と後続 gameplay の両方で Polling を維持する
@@ -223,7 +223,7 @@ chart loader/indexer は BMS family（`.bms/.bme/.bml/.pms`）が既定です。
 - `note_border_enabled` (bool)
 - `black_playfield_enabled` (bool)
   - `true` の場合、lane spacing を含む player/ghost playfield 全体を完全な黒で表示
-  - 既定値は `false`
+  - 既定値は `true`。既存プロファイルで明示された `false` は維持される
 - `judgement_line_position` (double)
   - gameplay judgement line の縦位置比率
   - `0.00..1.00`（0%～100%）に clamp

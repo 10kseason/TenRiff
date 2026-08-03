@@ -3,7 +3,7 @@
 This is the document that the next agent or any new contributor should read first. Its goal is to quickly answer: "what is this project now, where should I look, and what is still unverified?"
 
 ## Baseline
-- Current project and public stable version: `1.2.104 stable`
+- Current project and public stable version: `1.3.0 stable`
 - Direct-IP multiplayer and the preview r5 input-backend lifecycle fixes are integrated into `1.1.8 stable`
 - `1.1.8` adds an osu!mania OD8 auxiliary score, first-native-`BAD` `Sudden Death (1 MISS)`, and deterministic `LN Mix 10%-90%` on top of the 1.1.7 visual refresh
 - `1.2.0` connects BMS channel `04/07` and osu!mania backgrounds to the gameplay sample timeline and asynchronously upscales sub-FHD image backgrounds through LunaSR on Windows ML
@@ -32,6 +32,7 @@ This is the document that the next agent or any new contributor should read firs
   - Center of the menu state machine
   - Manages entry into Song Select, Options, Keymap, Result, and Gameplay launch
   - Recent maintenance refactors split Song Select record/keymap/render/state boundaries into dedicated `.cpp` files
+  - Song Select's best-score card and record list share the saved-Result opening path in `MenuAppRecords`, then lead to the Result replay button
   - Optional Python-reference checks can now skip cleanly so the open-source source package can run the core test suite without a local `10k-calc` checkout
 - `SongIndexerThread`
   - Background thread dedicated to chart indexing
@@ -123,7 +124,7 @@ This is the document that the next agent or any new contributor should read firs
   - gauge modes support `EX-Hard / Hard / Normal / Easy / Gauge Shift`; fixed gauges start at `100%`, fail immediately at `0%`, and never change type, while EX-Hard uses a near-black gray palette distinct from Hard
   - `Gauge Shift` independently simulates EX-Hard / Hard / Normal / Easy from 100%; when the current tier reaches 0%, it selects the next tier that survived the same judgement history, and the highest surviving tier becomes final
   - `Sudden Death (1 MISS)` fails immediately on the first OD8-converted object `MISS`; native `BAD` timing alone and empty-key `POOR` are ignored, and the option is mutually exclusive with Practice No-Fail
-  - Gameplay and Result show an auxiliary `OSU OD8` score converted from real input timing with osu!mania stable OD8 windows and ScoreV1 (maximum 1,000,000); native TenRiff score and ranking stay unchanged
+  - OD8 conversion remains internal for Sudden Death and legacy replay compatibility; Gameplay and Result show only the native TenRiff score
   - native score is normalized as 90,000 judgement points plus 10,000 cumulative-combo points, so an all-PG full combo is exactly 100,000; LN heads and tails each carry 0.5 weight and form one object
   - accuracy starts from PG/GR/GD/BD bases of 100/80/50/20%, removes up to 0.5 percentage points across each judgement band, and caps an all-PG run at 99.5% when its PG timing span exceeds 8ms
   - rank boundaries are `<75 F / 75 B / 80.5 A / 86.5 A+ / 90 S / 95.5 S+ / 98 AA / 99 SS / 99.75 SSS`
@@ -199,7 +200,7 @@ This is the document that the next agent or any new contributor should read firs
 
 ## Runtime / Packaging Rules
 - New user profiles are created automatically
-- The current official P2P distribution line is `TenRiff 1.2.104 stable`
+- The current official P2P distribution line is `TenRiff 1.3.0 stable`
 - Distribution packages do not include `Songs`
 - Distribution packages include the `Mainmusic/` scene slots `Main Menu / Options / Song Selecte / Multiplayer Lobby / Clear / Failed`; each `Name.mp3` plus numbered `Name 2.mp3` through `Name 64.mp3` siblings is discovered automatically and rotates on scene re-entry
 - Distribution updates include only built artifacts and required runtime assets

@@ -3,7 +3,7 @@
 この文書は、次のエージェントや新しい作業者が最初に読むべき current-state 文書です。目的は、「このプロジェクトは今どういう状態で、どこを見ればよく、何がまだ未検証か」を素早く把握できるようにすることです。
 
 ## Baseline
-- 現在のプロジェクト版と公開 stable 版は `1.2.104 stable`
+- 現在のプロジェクト版と公開 stable 版は `1.3.0 stable`
 - direct-IP multiplayer と preview r5 の input-backend lifecycle 修正は `1.1.8 stable` に統合
 - `1.1.8` は 1.1.7 の visual refresh に osu!mania OD8 補助スコア、最初の native `BAD` で終了する `Sudden Death (1 MISS)`、決定的な `LN Mix 10%～90%` を追加
 - `1.2.0` は BMS channel `04/07` と osu!mania 背景を gameplay sample timeline に接続し、FHD 未満の画像背景を Windows ML 上の LunaSR で非同期補間
@@ -32,6 +32,7 @@
   - menu state machine の中心
   - Song Select、Options、Keymap、Result、Gameplay 起動への遷移を管理
   - 最近の保守リファクタで Song Select の record/keymap/render/state 境界が専用 `.cpp` に分離された
+  - Song Select の最高 score card と record list は `MenuAppRecords` の共通 saved-Result open path を使い、Result の Replay button へつながる
   - open-source source package でもローカル `10k-calc` なしでコアテストが動くよう、optional な Python-reference チェックは skip 可能
 - `SongIndexerThread`
   - 譜面インデックス専用のバックグラウンドスレッド
@@ -122,7 +123,7 @@
   - gauge mode は `EX-Hard / Hard / Normal / Easy / Gauge Shift` をサポートする。固定 gauge は `100%` で開始し、`0%` で即失敗して type は変化せず、EX-Hard は Hard と異なる黒に近い gray palette で表示
   - `Gauge Shift` は EX-Hard / Hard / Normal / Easy をそれぞれ 100% から独立して並列計算し、現在の tier が 0% で脱落すると同じ判定履歴を累積した次の生存 tier を選び、終了時の最上位生存 tier で確定する
   - `Sudden Death (1 MISS)` は最初の OD8 換算 object `MISS` で即失敗する。native `BAD` timing だけでは発動せず、空打ちの `POOR` も無視し、Practice No-Fail とは排他的に動作する
-  - Gameplay / Result に実入力 timing を osu!mania stable OD8 window と ScoreV1（最大 1,000,000）で換算した補助 `OSU OD8` score を表示し、TenRiff native score / ranking は変更しない
+  - OD8 換算は Sudden Death と既存 replay 互換用の内部統計として維持し、Gameplay / Result UI は TenRiff native score のみ表示
   - native score は judgement 90,000 点 + 累積 combo 10,000 点で正規化され、全 PG の full combo は正確に 100,000 点。LN head / tail は各 0.5 weight で 1 object を構成する
   - accuracy は PG/GR/GD/BD の基準 100/80/50/20% から各 judgement band 内 timing に応じて最大 0.5 percentage point を減算し、PG timing span が 8ms を超える全 PG run は 99.5% 上限となる
   - rank 境界は `<75 F / 75 B / 80.5 A / 86.5 A+ / 90 S / 95.5 S+ / 98 AA / 99 SS / 99.75 SSS`
@@ -198,7 +199,7 @@
 
 ## Runtime / Packaging Rules
 - 新しい user profile は自動生成される
-- 現在の正式 P2P 配布ラインは `TenRiff 1.2.104 stable`
+- 現在の正式 P2P 配布ラインは `TenRiff 1.3.0 stable`
 - distribution package には `Songs` を含めない
 - distribution package には `Main Menu / Options / Song Selecte / Multiplayer Lobby / Clear / Failed` の `Mainmusic/` scene slot を含め、各 `Name.mp3` と `Name 2.mp3`～`Name 64.mp3` を自動検出して scene 再入場ごとに循環する
 - distribution 更新には built artifact と必要な runtime asset だけを含める

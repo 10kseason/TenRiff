@@ -48,6 +48,7 @@ enum class MenuHitTargetKind {
     TitleButton,
     SongNavButton,
     SongCard,
+    SongResultPanel,
     OptionsItem,
     SettingsRow,
     KeymapButton,
@@ -108,6 +109,7 @@ struct SongSelectData {
     int record_count = 0;
     bool showing_sources = false;
     bool showing_records = false;
+    bool result_available = false;
     std::string current_source_name;
     std::string current_source_path;
     std::string index_profile_label;
@@ -200,8 +202,7 @@ struct ResultScreenData {
     std::string gauge_label = "NORMAL";
 
     int64_t score = 0;
-    bool osu_od8_score_available = false;
-    int64_t osu_od8_score = 0;
+    bool pause_used = false;
     double accuracy = 0.0;
     double gauge_value = 0.0;
     int max_combo = 0;

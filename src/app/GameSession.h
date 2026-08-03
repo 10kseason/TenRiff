@@ -145,6 +145,7 @@ public:
         double rate_multiplier = 1.0;
         double score_multiplier = 1.0;
         int64_t final_score = 0;
+        bool pause_used = false;
         std::string replay_path;
         std::string result_path;
         std::vector<std::string> export_warnings;
@@ -373,6 +374,7 @@ private:
     std::atomic<bool> spectating_peer_{false};
     std::atomic<bool> user_aborted_{false};
     std::atomic<bool> paused_{false};
+    std::atomic<bool> pause_used_{false};
     std::atomic<bool> pause_resume_requested_{false};
     std::atomic<bool> restart_requested_{false};
     std::atomic<bool> exit_requested_{false};

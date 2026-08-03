@@ -40,7 +40,7 @@ If a profile does not exist, it is created automatically on first launch.
 
 - `backend` (string)
   - `polling | rawinput`
-  - defaults to `rawinput` on the current `1.2.104` release line
+  - defaults to `rawinput` on the current `1.3.0` release line
   - selectable per profile under `Options -> Input Settings -> Backend` or `Options -> Profile Setup -> Input Backend`
   - runtime fallback never rewrites the saved value to `polling`
   - a confirmed RawInput startup failure, registration-target loss, or message-window exit latches Polling across menu and subsequent gameplay sessions for the current app run
@@ -60,7 +60,7 @@ If a profile does not exist, it is created automatically on first launch.
 - `judgement_hz` (int)
   - `1000 | 2000 | 4000 | 8000`
   - compatibility field kept in the input config
-  - the current `1.2.104` runtime no longer drives a separate audio-thread judgement sub-step loop from this value
+  - the current `1.3.0` runtime no longer drives a separate audio-thread judgement sub-step loop from this value
   - default is `4000` (`0.25ms`)
 - `debounce_ms` (double)
   - real Press/Release transitions are preserved; only duplicate same-state events are removed from pressed-state tracking
@@ -223,7 +223,7 @@ The chart loader and indexer default to BMS-family files (`.bms/.bme/.bml/.pms`)
 - `note_border_enabled` (bool)
 - `black_playfield_enabled` (bool)
   - when true, fills the complete player/ghost playfield, including lane-spacing gaps, with solid black
-  - defaults to `false`
+  - defaults to `true`; an explicit `false` in an existing profile is preserved
 - `judgement_line_position` (double)
   - vertical position ratio of the gameplay judgement line
   - clamped to the `0.00..1.00` range (0% to 100%)

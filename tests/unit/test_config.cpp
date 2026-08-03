@@ -150,7 +150,7 @@ TEST_CASE("config defaults prefer 44100 Hz audio") {
     CHECK(config.skin.key_label_position == "bottom");
     CHECK(config.skin.combo_position == doctest::Approx(tenriff::config::kComboPositionDefault));
     CHECK(config.skin.lane_background_opacity == doctest::Approx(tenriff::config::kSkinLaneBackgroundOpacityDefault));
-    CHECK_FALSE(config.skin.black_playfield_enabled);
+    CHECK(config.skin.black_playfield_enabled);
     CHECK(config.skin.visual_opacity == doctest::Approx(tenriff::config::kSkinVisualOpacityDefault));
     CHECK(config.skin.note_outline_opacity == doctest::Approx(tenriff::config::kSkinNoteOutlineOpacityDefault));
     CHECK(config.skin.hold_body_opacity == doctest::Approx(tenriff::config::kSkinHoldBodyOpacityDefault));
@@ -695,7 +695,7 @@ TEST_CASE("config save and load preserve skin visual preset controls") {
     auto config = loader.defaults();
     config.skin.visual_preset = "neon";
     config.skin.lane_background_opacity = 0.25;
-    config.skin.black_playfield_enabled = true;
+    config.skin.black_playfield_enabled = false;
     config.skin.visual_opacity = 0.85;
     config.skin.note_outline_opacity = 0.55;
     config.skin.hold_body_opacity = 0.20;
@@ -711,7 +711,7 @@ TEST_CASE("config save and load preserve skin visual preset controls") {
     REQUIRE(result.success());
     CHECK(result.config.skin.visual_preset == "neon");
     CHECK(result.config.skin.lane_background_opacity == doctest::Approx(0.25));
-    CHECK(result.config.skin.black_playfield_enabled);
+    CHECK_FALSE(result.config.skin.black_playfield_enabled);
     CHECK(result.config.skin.visual_opacity == doctest::Approx(0.85));
     CHECK(result.config.skin.note_outline_opacity == doctest::Approx(0.55));
     CHECK(result.config.skin.hold_body_opacity == doctest::Approx(0.20));

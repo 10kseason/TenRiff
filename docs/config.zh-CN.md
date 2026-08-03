@@ -40,7 +40,7 @@
 
 - `backend` (string)
   - `polling | rawinput`
-  - 当前 `1.2.104` 发布线默认值为 `rawinput`
+  - 当前 `1.3.0` 发布线默认值为 `rawinput`
   - 可在 `Options -> Input Settings -> Backend` 或 `Options -> Profile Setup -> Input Backend` 中按 profile 选择
   - runtime fallback 不会把已保存值改写为 `polling`
   - 确认 RawInput 启动失败、注册目标丢失或 message window 退出后，本次应用运行期间 menu 与后续 gameplay 都会保持 Polling
@@ -223,7 +223,7 @@ chart loader/indexer 默认使用 BMS family（`.bms/.bme/.bml/.pms`）。设置
 - `note_border_enabled` (bool)
 - `black_playfield_enabled` (bool)
   - 为 `true` 时，将包含 lane spacing 在内的 player/ghost playfield 全部显示为纯黑
-  - 默认值为 `false`
+  - 默认值为 `true`；现有配置中明确设置的 `false` 会被保留
 - `judgement_line_position` (double)
   - gameplay 判定线的垂直位置比例
   - 会被 clamp 在 `0.00..1.00`（0%～100%）

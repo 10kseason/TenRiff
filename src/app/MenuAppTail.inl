@@ -378,17 +378,12 @@ void MenuApp::update_gameplay_loading_state(int percent, std::string_view stage)
     {
         std::lock_guard<std::mutex> lock(gameplay_hud_mutex_);
         const GameplayHudRevisionInput previous = gameplay_hud_revision_input(gameplay_hud_);
-        GameplayHudRevisionInput next = previous;
-        next.loading = true;
-        next.active = false;
-        next.loading_percent = clamp_int(percent, 0, 100);
-        next.loading_stage = std::string(stage);
-        const GameplayHudRevisionFlags diff = diff_gameplay_hud_revisions(previous, next);
-
-        gameplay_hud_.loading = next.loading;
+        gameplay_hud_.loading = true;
         gameplay_hud_.active = false;
-        gameplay_hud_.loading_percent = next.loading_percent;
-        gameplay_hud_.loading_stage = next.loading_stage;
+        gameplay_hud_.loading_percent = clamp_int(percent, 0, 100);
+        gameplay_hud_.loading_stage = std::string(stage);
+        const GameplayHudRevisionInput next = gameplay_hud_revision_input(gameplay_hud_);
+        const GameplayHudRevisionFlags diff = diff_gameplay_hud_revisions(previous, next);
         advance_gameplay_hud_revisions(gameplay_hud_, diff.motion_changed, false);
     }
     publish_snapshot();
@@ -771,8 +766,7 @@ void MenuApp::populate_result_render_data(render::MenuRenderData& render, const 
                                                        : (last_game_over_ ? "GAME OVER" : "CLEAR");
     render.result.gauge_label = gauge_type_label(final_gauge_type);
     render.result.score = last_result_final_score_;
-    render.result.osu_od8_score_available = last_result_.osu_od8.available;
-    render.result.osu_od8_score = last_result_.osu_od8.score;
+    render.result.pause_used = last_pause_used_;
     render.result.accuracy = accuracy;
     render.result.gauge_value =
         last_result_.gauge_history.empty() ? 0.0 : last_result_.gauge_history.back().value;
@@ -1324,6 +1318,8 @@ bool MenuApp::is_song_select_repeat_key(uint32_t keycode) const {
 void MenuApp::launch_gameplay(const std::string& chart_path,
                               const std::string& replay_path,
                               GameplayLaunchKind launch_kind) {
+    // Restart iteratively so each completed GameSession leaves the stack before relaunch.
+    for (;;) {
     const bool replay_playback = !replay_path.empty();
     // The caller owns the launch intent. Inferring it from lobby flags makes a
     // stale multiplayer screen/result state capable of hijacking a local run.
@@ -1426,104 +1422,7 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
         }
         std::lock_guard<std::mutex> lock(gameplay_hud_mutex_);
         const GameplayHudRevisionInput previous = gameplay_hud_revision_input(gameplay_hud_);
-        GameplayHudRevisionInput next = previous;
-        next.loading = false;
-        next.loading_percent = 100;
-        next.loading_stage = "Ready";
-        next.active = hud.active;
-        next.finished = hud.finished;
-        next.game_over = hud.game_over;
-        next.spectating_peer = hud.spectating_peer;
-        next.user_aborted = hud.user_aborted;
-        next.paused = hud.paused;
-        next.pause_menu_cursor = hud.pause_menu_cursor;
-        next.countdown_active = hud.countdown_active;
-        next.countdown_value = hud.countdown_value;
-        next.lane_count = hud.lane_count;
-        next.current_sample = hud.current_sample;
-        next.duration_samples = hud.duration_samples;
-        next.sample_rate = hud.sample_rate;
-        next.audio_sample_time_ns = hud.audio_sample_time_ns;
-        next.audio_buffer_frames = hud.audio_buffer_frames;
-        next.lookahead_samples = hud.lookahead_samples;
-        next.past_samples = hud.past_samples;
-        next.combo = hud.combo;
-        next.max_combo = hud.max_combo;
-        next.counts = hud.counts;
-        next.score = hud.score;
-        next.osu_od8_score_available = hud.osu_od8_score_available;
-        next.osu_od8_score = hud.osu_od8_score;
-        next.gauge = hud.gauge;
-        next.gauge_type = hud.gauge_type;
-        next.rate = hud.rate;
-        next.hispeed = hud.hispeed;
-        next.has_feedback = hud.has_feedback;
-        next.feedback = hud.feedback_judgement;
-        next.feedback_delta_ms = hud.feedback_delta_ms;
-        next.peer_revision = peer_revision;
-        next.timing_history_count = hud.timing_history_count;
-        next.timing_history_delta_ms.fill(0.0);
-        std::copy_n(hud.timing_history_delta_ms.begin(),
-                    hud.timing_history_count,
-                    next.timing_history_delta_ms.begin());
-        next.lane_activity_count = hud.lane_activity_count;
-        next.lane_activity.fill(0.0f);
-        std::copy_n(hud.lane_activity.begin(), hud.lane_activity_count, next.lane_activity.begin());
-        next.lane_pressed_count = hud.lane_pressed_count;
-        next.lane_pressed.fill(0);
-        std::copy_n(hud.lane_pressed.begin(), hud.lane_pressed_count, next.lane_pressed.begin());
-        next.note_count = hud.note_count;
-        for (std::size_t i = 0; i < hud.note_count; ++i) {
-            next.notes[i] = GameplayHudRevisionNote{
-                hud.notes[i].lane,
-                hud.notes[i].start_sample,
-                hud.notes[i].tail_sample,
-                hud.notes[i].hold,
-                hud.notes[i].head_visible,
-                hud.notes[i].pending,
-            };
-        }
-        next.ghost_visible = hud.ghost_visible;
-        next.ghost_score = hud.ghost_score;
-        next.ghost_osu_od8_score_available = hud.ghost_osu_od8_score_available;
-        next.ghost_osu_od8_score = hud.ghost_osu_od8_score;
-        next.ghost_combo = hud.ghost_combo;
-        next.ghost_max_combo = hud.ghost_max_combo;
-        next.ghost_counts = hud.ghost_counts;
-        next.ghost_gauge = hud.ghost_gauge;
-        next.ghost_gauge_type = hud.ghost_gauge_type;
-        next.ghost_has_feedback = hud.ghost_has_feedback;
-        next.ghost_feedback = hud.ghost_feedback_judgement;
-        next.ghost_feedback_delta_ms = hud.ghost_feedback_delta_ms;
-        next.ghost_timing_history_count = hud.ghost_timing_history_count;
-        next.ghost_timing_history_delta_ms.fill(0.0);
-        std::copy_n(hud.ghost_timing_history_delta_ms.begin(),
-                    hud.ghost_timing_history_count,
-                    next.ghost_timing_history_delta_ms.begin());
-        next.ghost_finished = hud.ghost_finished;
-        next.ghost_game_over = hud.ghost_game_over;
-        next.ghost_lane_activity_count = hud.ghost_lane_activity_count;
-        next.ghost_lane_activity.fill(0.0f);
-        std::copy_n(hud.ghost_lane_activity.begin(),
-                    hud.ghost_lane_activity_count,
-                    next.ghost_lane_activity.begin());
-        next.ghost_lane_pressed_count = hud.ghost_lane_pressed_count;
-        next.ghost_lane_pressed.fill(0);
-        std::copy_n(hud.ghost_lane_pressed.begin(),
-                    hud.ghost_lane_pressed_count,
-                    next.ghost_lane_pressed.begin());
-        next.ghost_note_count = hud.ghost_note_count;
-        for (std::size_t i = 0; i < hud.ghost_note_count; ++i) {
-            next.ghost_notes[i] = GameplayHudRevisionNote{
-                hud.ghost_notes[i].lane,
-                hud.ghost_notes[i].start_sample,
-                hud.ghost_notes[i].tail_sample,
-                hud.ghost_notes[i].hold,
-                hud.ghost_notes[i].head_visible,
-                hud.ghost_notes[i].pending,
-            };
-        }
-        const GameplayHudRevisionFlags diff = diff_gameplay_hud_revisions(previous, next);
+
 
         gameplay_hud_.loading = false;
         gameplay_hud_.loading_percent = 100;
@@ -1630,6 +1529,8 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
             out.pending = hud.ghost_notes[i].pending;
             gameplay_hud_.ghost_notes[i] = out;
         }
+        const GameplayHudRevisionInput next = gameplay_hud_revision_input(gameplay_hud_);
+        const GameplayHudRevisionFlags diff = diff_gameplay_hud_revisions(previous, next);
         advance_gameplay_hud_revisions(gameplay_hud_, diff.motion_changed, diff.text_changed);
     });
 
@@ -1736,8 +1637,7 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
             gameplay_hud_.loading_stage = "Restarting gameplay";
         }
         publish_snapshot();
-        launch_gameplay(chart_path, replay_path, launch_kind);
-        return;
+        continue;
     }
     if (session_exit_requested) {
         restart_input_thread();
@@ -1749,6 +1649,7 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
         last_result_rate_multiplier_ = 1.0;
         last_result_score_multiplier_ = 1.0;
         last_result_final_score_ = 0;
+        last_pause_used_ = false;
         last_result_player_name_.clear();
         last_replay_path_.clear();
         last_result_path_.clear();
@@ -1809,6 +1710,7 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
         last_result_rate_multiplier_ = result.rate_multiplier;
         last_result_score_multiplier_ = result.score_multiplier;
         last_result_final_score_ = result.final_score;
+        last_pause_used_ = result.pause_used;
         last_result_player_name_ =
             result.player_name.empty() ? profile_display_name() : result.player_name;
         last_replay_path_ = result.replay_path;
@@ -1825,6 +1727,7 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
         last_result_rate_multiplier_ = 1.0;
         last_result_score_multiplier_ = 1.0;
         last_result_final_score_ = 0;
+        last_pause_used_ = false;
         last_result_player_name_.clear();
         last_replay_path_.clear();
         last_result_path_.clear();
@@ -1843,6 +1746,8 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
         reset_gameplay_hud_state(gameplay_hud_);
     }
     publish_snapshot();
+        return;
+    }
 }
 
 std::string MenuApp::screen_title() const {

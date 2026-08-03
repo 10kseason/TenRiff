@@ -125,6 +125,7 @@ bool GameSession::initialize(const CommandLineOptions& options) {
     spectating_peer_.store(false, std::memory_order_release);
     user_aborted_.store(false, std::memory_order_release);
     paused_.store(false, std::memory_order_release);
+    pause_used_.store(false, std::memory_order_release);
     pause_resume_requested_.store(false, std::memory_order_release);
     restart_requested_.store(false, std::memory_order_release);
     exit_requested_.store(false, std::memory_order_release);
@@ -307,6 +308,7 @@ bool GameSession::initialize(const CommandLineOptions& options) {
             return false;
         }
         replay_source_ = std::move(replay_load.replay.value());
+        pause_used_.store(replay_source_.pause_used, std::memory_order_release);
         replay_source_path_ = options.replay_path;
         replay_playback_enabled_ = true;
         replay_event_index_ = 0;
@@ -1847,6 +1849,9 @@ void GameSession::shutdown() {
         result_.rate_multiplier = rate_multiplier_;
         result_.score_multiplier = score_multiplier_;
         result_.final_score = gameplay::scale_native_score(result_.stats.raw_score, result_.score_multiplier);
+        result_.pause_used = replay_playback_enabled_
+                                 ? replay_source_.pause_used
+                                 : pause_used_.load(std::memory_order_acquire);
         result_.has_value = true;
 
         const std::string format_token = chart_format_token(chart_format_);
@@ -1869,6 +1874,7 @@ void GameSession::shutdown() {
             replay.rate_multiplier = result_.rate_multiplier;
             replay.score_multiplier = result_.score_multiplier;
             replay.final_score = result_.final_score;
+            replay.pause_used = result_.pause_used;
             replay.mode.key_mode = config_.mode.key_mode;
             replay.mode.key_conversion_algorithm = config_.mode.key_conversion_algorithm;
             replay.mode.key_conversion_nk2_preset = config_.mode.key_conversion_nk2_preset;
@@ -1911,6 +1917,7 @@ void GameSession::shutdown() {
             exported_result.rate_multiplier = result_.rate_multiplier;
             exported_result.score_multiplier = result_.score_multiplier;
             exported_result.final_score = result_.final_score;
+            exported_result.pause_used = result_.pause_used;
             exported_result.autoplay_enabled = autoplay_enabled_;
             exported_result.practice_no_fail_enabled = practice_no_fail_enabled_;
             exported_result.one_miss_fail_enabled = one_miss_fail_enabled_;
@@ -2363,6 +2370,7 @@ bool GameSession::handle_control_input(const input::InputEvent& event) {
         } else {
             pause_menu_cursor_.store(0, std::memory_order_release);
             pause_resume_requested_.store(false, std::memory_order_release);
+            pause_used_.store(true, std::memory_order_release);
             paused_.store(true, std::memory_order_release);
             hispeed_decrease_held_ = false;
             hispeed_increase_held_ = false;

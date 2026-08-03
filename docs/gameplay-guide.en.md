@@ -46,6 +46,8 @@ The standard TenRiff play flow is:
 - Left click: select song
 - Double click: start song
 - `Enter`: start the currently selected song
+- Left-click the right-side `BEST SCORE` card: open the chart's best saved Result; use `WATCH REPLAY` or `F1` there to play its replay
+- Left-side `RECORDS`: browse the current chart's local plays and use `OPEN RESULT` for the selected result
 - `Left` / `Right`: switch focus on the left-side menu
 - `Esc`: return to the previous screen
 - `-` / `+`: adjust the next-play Rate immediately
@@ -138,7 +140,6 @@ The in-game HUD usually shows:
 - Current `Hi-Speed`
 - Gauge value and current gauge type
 - Native TenRiff Score
-- Auxiliary `OSU OD8` score converted from real input timing with osu!mania stable OD8 / ScoreV1
 - Combo
 - Recent judgement (`PG / GR / GD / BD / PR`)
 - Timing deviation in milliseconds
@@ -158,7 +159,7 @@ The current default judgement labels use the following abbreviations:
 - `BD`: Bad
 - `PR`: Poor / Miss
 
-The `OSU OD8` value is an auxiliary comparison score capped at 1,000,000; it does not change TenRiff's native score, rank, or clear result.
+OD8 conversion statistics remain inside JSON for Sudden Death and legacy replay compatibility, but are not shown on Gameplay or Result screens.
 
 Native Score is 90,000 judgement points plus 10,000 cumulative-combo points. An all-`PG` full combo is exactly 100,000, and an LN is one object whose head and tail each carry 0.5 weight.
 
@@ -193,7 +194,7 @@ After play ends, the Result screen shows:
 - Clear / Game Over status
 - Rank
 - Native TenRiff Score
-- Auxiliary `OSU OD8` score and converted judgement totals
+- Whether pause was used during the recorded play
 - Accuracy
 - Max Combo
 - PG / GR / GD / BD / PR totals

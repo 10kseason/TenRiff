@@ -751,7 +751,7 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
     append_menu_row(render.generic, ui_text("Visual Preset", "비주얼 프리셋"),
                     config::skin_visual_preset_label(config_.skin.visual_preset),
                     settings_cursor_ == 15 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 15 + lr2_shift, false, true);
-    append_menu_row(render.generic, ui_text("Lane BG Alpha", "레인 배경 투명도"),
+    append_menu_row(render.generic, ui_text("Lane Tint Opacity", "레인 색상 농도"),
                     format_percent(config_.skin.lane_background_opacity),
                     settings_cursor_ == 16 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 16 + lr2_shift, false, true);
     append_menu_row(render.generic, ui_text("Visual Opacity", "전체 투명도"),
@@ -794,7 +794,7 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
                     settings_cursor_ == 30 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 30 + lr2_shift, false, true);
     append_menu_row(render.generic, ui_text("Combo Y", "콤보 Y"), format_percent(config_.skin.combo_position),
                     settings_cursor_ == 31 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 31 + lr2_shift, false, true);
-    append_menu_row(render.generic, ui_text("Black Playfield", "검정 플레이필드"),
+    append_menu_row(render.generic, ui_text("Opaque Playfield", "기어 뒤 BGA 가림"),
                     ui_on_off(config_.skin.black_playfield_enabled),
                     settings_cursor_ == 32 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 32 + lr2_shift, false, true);
     append_menu_row(render.generic, ui_text("Back", "뒤로"), "", settings_cursor_ == 33 + lr2_shift,
@@ -901,8 +901,8 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
                                            "레인 간격은 선택한 구간 뒤에 빈 공간을 더해 개별 구분 간격을 벌리며, 노트 타이밍에는 영향을 주지 않습니다."));
     render.generic.notes.push_back(ui_text("16K Center Gap inserts a blank center lane-width gap between the left and right halves of the 16-key field.",
                                            "16K 중앙 간격은 16키 필드의 좌우 묶음 사이에 빈 중앙 간격을 추가합니다."));
-    render.generic.notes.push_back(ui_text("Black Playfield forces the complete lane field, including spacing gaps, to solid black.",
-                                           "검정 플레이필드는 간격 구간까지 포함한 전체 레인 필드를 완전한 검정으로 표시합니다."));
+    render.generic.notes.push_back(ui_text("Opaque Playfield keeps BGA outside the lanes but blocks it behind the complete playfield, including spacing gaps.",
+                                           "기어 뒤 BGA 가림은 바깥 BGA는 유지하고 간격까지 포함한 노트 영역 뒤를 완전한 검정으로 가립니다."));
     render.generic.notes.push_back(ui_text("Key Mode, Target Lane, and Target Gap edit per-layout fallback geometry before imported divider art is applied.",
                                            "키 모드, 대상 레인, 대상 간격은 외부 스킨 구분선 아트를 적용하기 전 레이아웃별 기본 지오메트리를 편집합니다."));
 }

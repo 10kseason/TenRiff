@@ -46,6 +46,8 @@ TenRiff 的基础游玩流程如下：
 - 左键：选择歌曲
 - 双击：开始歌曲
 - `Enter`：开始当前歌曲
+- 左键点击右侧 `BEST SCORE` 卡片：打开当前歌曲的最佳 Result；在 Result 中使用 `WATCH REPLAY` 或 `F1` 播放 replay
+- 左侧 `RECORDS`：浏览当前歌曲的本地记录，并用 `OPEN RESULT` 打开所选结果
 - `Left` / `Right`：切换左侧菜单焦点
 - `Esc`：返回上一个画面
 - `-` / `+`：立即调整下一次游玩的 Rate
@@ -138,7 +140,6 @@ Rate 只改变歌曲播放速度和谱面时间轴；在相同 Hi-Speed 下，�
 - 当前 `Hi-Speed`
 - Gauge 数值与当前 Gauge 类型
 - TenRiff 原生 Score
-- 按 osu!mania stable OD8 / ScoreV1 换算真实输入 timing 的辅助 `OSU OD8` 分数
 - Combo
 - 最近判定（`PG / GR / GD / BD / PR`）
 - 时间偏差（ms）
@@ -158,7 +159,7 @@ Rate 只改变歌曲播放速度和谱面时间轴；在相同 Hi-Speed 下，�
 - `BD`：Bad
 - `PR`：Poor / Miss
 
-`OSU OD8` 是最高 1,000,000 的辅助比较分数，不会改变 TenRiff 的原生分数、排名或 clear 结果。
+OD8 换算统计为 Sudden Death 与旧 replay 兼容保留在 JSON 内部，但不再显示于 Gameplay 或 Result 画面。
 
 原生 Score 由判定 90,000 分 + 累积 Combo 10,000 分组成。全 `PG` full combo 恰好是 100,000 分；LN 视为一个对象，head / tail 各按 0.5 权重计算。
 
@@ -193,7 +194,7 @@ Rank 使用 `<75 F`、`75 B`、`80.5 A`、`86.5 A+`、`90 S`、`95.5 S+`、`98 A
 - Clear / Game Over 状态
 - Rank
 - TenRiff 原生 Score
-- `OSU OD8` 辅助分数与换算判定统计
+- 该次记录是否使用了 pause
 - Accuracy
 - Max Combo
 - PG / GR / GD / BD / PR 统计

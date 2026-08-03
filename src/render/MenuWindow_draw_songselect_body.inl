@@ -726,11 +726,24 @@
                 const std::wstring status_w = to_wide(data.song_select.selected_record_status);
                 const std::wstring time_w = to_wide(data.song_select.selected_record_created_utc);
                 const D2D1_RECT_F status_rect =
-                    D2D1::RectF(showcase_rect.left + 20.0f, showcase_rect.top + 134.0f, showcase_rect.right - 20.0f, showcase_rect.top + 164.0f);
+                    D2D1::RectF(showcase_rect.left + 20.0f, showcase_rect.top + 116.0f, showcase_rect.right - 20.0f, showcase_rect.top + 144.0f);
                 const D2D1_RECT_F time_rect =
-                    D2D1::RectF(showcase_rect.left + 20.0f, showcase_rect.top + 162.0f, showcase_rect.right - 20.0f, showcase_rect.top + 190.0f);
+                    D2D1::RectF(showcase_rect.left + 20.0f, showcase_rect.top + 142.0f, showcase_rect.right - 20.0f, showcase_rect.top + 170.0f);
                 draw_text_clipped(status_w, d2d_->body_format.Get(), status_rect, d2d_->muted_brush.Get());
                 draw_text_clipped(time_w, d2d_->body_format.Get(), time_rect, d2d_->muted_brush.Get());
+            }
+            if (data.song_select.result_available) {
+                const D2D1_RECT_F open_result_rect =
+                    D2D1::RectF(showcase_rect.left + 18.0f, showcase_rect.bottom - 42.0f,
+                                showcase_rect.right - 18.0f, showcase_rect.bottom - 10.0f);
+                register_hit(open_result_rect, MenuHitTargetKind::SongResultPanel, 0);
+                draw_glass_panel(open_result_rect, 10.0f, 0.86f, 0.62f, true, 3.0f);
+                if (d2d_->body_format && d2d_->text_brush) {
+                    d2d_->body_format->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_CENTER);
+                    draw_text_clipped(wloc("OPEN RESULT", "결과 열기"),
+                                      d2d_->body_format.Get(), open_result_rect, d2d_->text_brush.Get());
+                    d2d_->body_format->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_LEADING);
+                }
             }
 
             stats_y = draw_stat_section(showcase_rect.bottom + 20.0f, loc("SESSION", "세션"), stats_left, stats_right);
@@ -880,21 +893,65 @@
                                    ? loc("NONE", "없음")
                                    : data.song_select.selected_song_ghost_status);
             draw_stat_text_row(loc("COLLECTION", "컬렉션"), data.song_select.selected_song_collection_filter.empty() ? loc("ALL", "전체") : data.song_select.selected_song_collection_filter);
-            draw_stat_text_row(loc("GROUP", "그룹"), data.song_select.group_summary);
-            draw_stat_text_row(loc("SORT", "정렬"), data.song_select.sort_summary);
-            draw_stat_text_row(loc("FILTER", "필터"), data.song_select.browser_summary);
-            stats_y += 6.0f;
-            draw_section_divider(stats_y, stats_left, stats_right, 0.28f);
+
             stats_y += 12.0f;
-            stats_y = draw_stat_section(stats_y, loc("BEST RECORD", "최고 기록"), stats_left, stats_right);
-            row_h = 24.0f;
-            draw_stat_row(loc("BEST", "최고"), data.song_select.best_score);
-            draw_stat_row(loc("MAX COMBO", "최대 콤보"), data.song_select.max_combo);
-            draw_stat_row(loc("PERFECT", "퍼펙트"), data.song_select.perfect);
-            draw_stat_row(loc("GREAT", "그레이트"), data.song_select.great);
-            draw_stat_row(loc("GOOD", "굿"), data.song_select.good);
-            draw_stat_row("BAD", data.song_select.bad);
-            draw_stat_row("POOR", data.song_select.poor);
+            const D2D1_RECT_F best_result_rect =
+                D2D1::RectF(stats_left - 8.0f, stats_y, stats_right + 8.0f,
+                            std::min(stats_y + 112.0f, right_rect.bottom - 16.0f));
+            draw_glass_panel(best_result_rect,
+                             14.0f,
+                             data.song_select.result_available ? 0.88f : 0.66f,
+                             data.song_select.result_available ? 0.58f : 0.12f,
+                             data.song_select.result_available,
+                             4.0f);
+            if (data.song_select.result_available) {
+                register_hit(best_result_rect, MenuHitTargetKind::SongResultPanel, 0);
+            }
+
+            if (d2d_->body_format && d2d_->text_brush) {
+                draw_text_clipped(wloc("BEST SCORE", "최고 점수"),
+                                  d2d_->body_format.Get(),
+                                  D2D1::RectF(best_result_rect.left + 14.0f, best_result_rect.top + 8.0f,
+                                              best_result_rect.left + 170.0f, best_result_rect.top + 36.0f),
+                                  d2d_->muted_brush ? d2d_->muted_brush.Get() : d2d_->text_brush.Get());
+            }
+            if (d2d_->song_title_format && d2d_->text_brush) {
+                d2d_->song_title_format->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_TRAILING);
+                draw_text_clipped(to_wide(data.song_select.result_available
+                                              ? format_int_with_commas(data.song_select.best_score)
+                                              : std::string("--")),
+                                  d2d_->song_title_format.Get(),
+                                  D2D1::RectF(best_result_rect.left + 170.0f, best_result_rect.top + 6.0f,
+                                              best_result_rect.right - 14.0f, best_result_rect.top + 40.0f),
+                                  d2d_->text_brush.Get());
+                d2d_->song_title_format->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_LEADING);
+            }
+            if (d2d_->hud_format && d2d_->muted_brush) {
+                const std::string summary =
+                    data.song_select.result_available
+                        ? ((data.song_select.rank.empty() ? std::string("--") : data.song_select.rank) +
+                           " / " + loc("MAX COMBO ", "최대 콤보 ") +
+                           format_int_with_commas(data.song_select.max_combo))
+                        : loc("Play once to create a local result.", "플레이하면 로컬 결과가 생성됩니다.");
+                draw_text_clipped(to_wide(summary),
+                                  d2d_->hud_format.Get(),
+                                  D2D1::RectF(best_result_rect.left + 14.0f, best_result_rect.top + 42.0f,
+                                              best_result_rect.right - 14.0f, best_result_rect.top + 70.0f),
+                                  d2d_->muted_brush.Get());
+            }
+            if (d2d_->body_format && d2d_->text_brush) {
+                d2d_->body_format->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_CENTER);
+                draw_text_clipped(data.song_select.result_available
+                                      ? wloc("OPEN RESULT", "결과 열기")
+                                      : wloc("NO SAVED RESULT", "저장된 결과 없음"),
+                                  d2d_->body_format.Get(),
+                                  D2D1::RectF(best_result_rect.left + 12.0f, best_result_rect.top + 74.0f,
+                                              best_result_rect.right - 12.0f, best_result_rect.bottom - 6.0f),
+                                  data.song_select.result_available
+                                      ? static_cast<ID2D1Brush*>(d2d_->text_brush.Get())
+                                      : static_cast<ID2D1Brush*>(d2d_->muted_brush.Get()));
+                d2d_->body_format->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_LEADING);
+            }
         }
 
         ctx->PopAxisAlignedClip();

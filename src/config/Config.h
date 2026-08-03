@@ -122,7 +122,7 @@ struct SkinConfig {
     double judgement_line_position = kJudgementLinePositionDefault;
     double combo_position = kComboPositionDefault;
     double lane_background_opacity = kSkinLaneBackgroundOpacityDefault;
-    bool black_playfield_enabled = false;
+    bool black_playfield_enabled = true;
     double visual_opacity = kSkinVisualOpacityDefault;
     double note_outline_opacity = kSkinNoteOutlineOpacityDefault;
     double hold_body_opacity = kSkinHoldBodyOpacityDefault;

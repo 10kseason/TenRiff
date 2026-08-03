@@ -317,6 +317,7 @@ ExportResult save_replay_json(const std::string& path, const ReplayFile& replay,
     obj.emplace("rate_multiplier", config::JsonValue{replay.rate_multiplier});
     obj.emplace("score_multiplier", config::JsonValue{replay.score_multiplier});
     obj.emplace("final_score", config::JsonValue{static_cast<double>(replay.final_score)});
+    obj.emplace("pause_used", config::JsonValue{replay.pause_used});
     obj.emplace("mode", build_mode_json(replay.mode));
     obj.emplace("trace", build_trace_json(replay.trace));
     obj.emplace("stats", build_stats_json(replay.stats));
@@ -344,6 +345,7 @@ ExportResult save_result_json(const std::string& path, const ResultFile& result_
     obj.emplace("rate_multiplier", config::JsonValue{result_file.rate_multiplier});
     obj.emplace("score_multiplier", config::JsonValue{result_file.score_multiplier});
     obj.emplace("final_score", config::JsonValue{static_cast<double>(result_file.final_score)});
+    obj.emplace("pause_used", config::JsonValue{result_file.pause_used});
     obj.emplace("autoplay_enabled", config::JsonValue{result_file.autoplay_enabled});
     obj.emplace("practice_no_fail_enabled", config::JsonValue{result_file.practice_no_fail_enabled});
     obj.emplace("one_miss_fail_enabled", config::JsonValue{result_file.one_miss_fail_enabled});
@@ -396,6 +398,7 @@ ReplayLoadResult load_replay_json(const std::string& path) {
     replay.mods = read_json_string_array(*root, "mods");
     replay.rate_multiplier = read_json_number(*root, "rate_multiplier", 1.0);
     replay.score_multiplier = read_json_number(*root, "score_multiplier", 1.0);
+    replay.pause_used = read_json_bool(*root, "pause_used", false);
 
     if (const auto* mode = find_json_object(*root, "mode")) {
         replay.mode.key_mode = read_json_string(*mode, "key_mode");

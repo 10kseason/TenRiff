@@ -3,7 +3,7 @@
 这份文档是下一位 agent 或新任务接手时应该最先阅读的当前状态文档。目标是快速说明“这个项目现在是什么、应该先看哪里、还有哪些内容尚未验证”。
 
 ## 基线
-- 当前项目版本与公开稳定版均为 `1.2.104 stable`
+- 当前项目版本与公开稳定版均为 `1.3.0 stable`
 - direct-IP multiplayer 与 preview r5 的输入 backend 生命周期修复已整合进 `1.1.8 stable`
 - `1.1.8` 在 1.1.7 视觉更新基础上加入 osu!mania OD8 辅助分数、首次原生 `BAD` 即结束的 `Sudden Death (1 MISS)`，以及确定性的 `LN Mix 10%～90%`
 - `1.2.0` 把 BMS 通道 `04/07` 和 osu!mania 背景接入 gameplay sample timeline，并通过 Windows ML 上的 LunaSR 异步放大低于 FHD 的图片背景
@@ -32,6 +32,7 @@
   - 菜单状态机的中心
   - 负责 Song Select、Options、Keymap、Result、Gameplay 启动入口的管理
   - 最近的维护性重构已把 Song Select 的 record/keymap/render/state 边界拆到专用 `.cpp` 文件中
+  - Song Select 的最佳分数卡片与记录列表共用 `MenuAppRecords` 中的 saved-Result 打开路径，并进入 Result 的 Replay 按钮
   - 现在即使没有本地 `10k-calc` Python 参考实现，开源源码包也能通过 skip optional reference test 来运行核心测试集
 - `SongIndexerThread`
   - 专用于曲目索引的后台线程
@@ -122,7 +123,7 @@
   - gauge 模式支持 `EX-Hard / Hard / Normal / Easy / Gauge Shift`；固定 gauge 从 `100%` 开始，在 `0%` 时立即失败且不会改变类型，EX-Hard 使用与 Hard 区分的近黑深灰配色
   - `Gauge Shift` 会让 EX-Hard / Hard / Normal / Easy 分别从 100% 开始独立并行计算；当前 tier 到达 0% 后选择已累计相同判定历史的下一档存活 tier，并以结束时最高的存活 tier 为最终结果
   - `Sudden Death (1 MISS)` 会在首次 OD8 换算对象 `MISS` 时立即失败；仅原生 `BAD` timing 不会触发，空按产生的 `POOR` 也不触发，并且该选项与 Practice No-Fail 互斥
-  - Gameplay 与 Result 会显示按 osu!mania stable OD8 判定窗和 ScoreV1（最高 1,000,000）换算真实输入 timing 的辅助 `OSU OD8` 分数；TenRiff 原生分数与排名保持不变
+  - OD8 换算仅作为 Sudden Death 与旧 replay 兼容的内部统计保留；Gameplay 与 Result UI 只显示 TenRiff 原生分数
   - 原生分数按判定 90,000 分 + 累积 combo 10,000 分归一化；全 PG full combo 恰好为 100,000 分，LN head / tail 各按 0.5 权重组成一个对象
   - accuracy 以 PG/GR/GD/BD 的 100/80/50/20% 为基础，在每个判定区间内按 timing 最多再扣 0.5 个百分点；若全 PG 的 timing span 超过 8ms，则上限为 99.5%
   - rank 边界为 `<75 F / 75 B / 80.5 A / 86.5 A+ / 90 S / 95.5 S+ / 98 AA / 99 SS / 99.75 SSS`
@@ -198,7 +199,7 @@
 
 ## 运行时 / 打包规则
 - 新用户 profile 会自动创建
-- 当前正式 P2P 发布线为 `TenRiff 1.2.104 stable`
+- 当前正式 P2P 发布线为 `TenRiff 1.3.0 stable`
 - 发布包不包含 `Songs`
 - 发布包包含 `Main Menu / Options / Song Selecte / Multiplayer Lobby / Clear / Failed` 这些 `Mainmusic/` 场景槽位；每个 `Name.mp3` 及 `Name 2.mp3`～`Name 64.mp3` 会自动发现，并在重新进入场景时轮换
 - 发布更新只包含已构建产物和必要的运行时资源
