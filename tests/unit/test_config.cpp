@@ -92,6 +92,7 @@ TEST_CASE("config defaults prefer 44100 Hz audio") {
     CHECK(config.mode.song_index_profile == "safe");
     CHECK_FALSE(config.mode.calculate_song_index_difficulty);
     CHECK(config.mode.key_conversion_algorithm == "krrcream");
+    CHECK(config.mode.key_conversion_nk2_preset == "native");
     CHECK_FALSE(config.mode.enable_osu_charts);
     CHECK(config.graphics.resolution == "native");
     CHECK(config.graphics.display_mode == "borderless");
@@ -401,6 +402,7 @@ TEST_CASE("config save and load preserve volume and speed settings") {
     config.mode.song_index_profile = "fast";
     config.mode.calculate_song_index_difficulty = true;
     config.mode.key_conversion_algorithm = "nk2";
+    config.mode.key_conversion_nk2_preset = "transform";
     config.mode.enable_osu_charts = true;
     config.mode.gauge = "shift";
 
@@ -420,6 +422,7 @@ TEST_CASE("config save and load preserve volume and speed settings") {
     CHECK(result.config.mode.song_index_profile == "fast");
     CHECK(result.config.mode.calculate_song_index_difficulty);
     CHECK(result.config.mode.key_conversion_algorithm == "nk2");
+    CHECK(result.config.mode.key_conversion_nk2_preset == "transform");
     CHECK(result.config.mode.enable_osu_charts);
     CHECK(result.config.mode.gauge == "shift");
 }
@@ -1171,6 +1174,19 @@ TEST_CASE("runtime migration normalizes KeyWeaver converter aliases") {
 
     CHECK(changed);
     CHECK(config.mode.key_conversion_algorithm == "nk2");
+}
+
+TEST_CASE("runtime migration normalizes nK2 preset aliases and rejects invalid values") {
+    ConfigLoader loader;
+    auto config = loader.defaults();
+    config.mode.key_conversion_nk2_preset = "transform35";
+
+    CHECK(tenriff::app::migrate_bms_first_runtime_config(config));
+    CHECK(config.mode.key_conversion_nk2_preset == "transform");
+
+    config.mode.key_conversion_nk2_preset = "unsupported";
+    CHECK(tenriff::app::migrate_bms_first_runtime_config(config));
+    CHECK(config.mode.key_conversion_nk2_preset == "native");
 }
 
 TEST_CASE("runtime migration replaces invalid key mode tokens with none") {

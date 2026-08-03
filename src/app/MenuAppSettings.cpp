@@ -84,7 +84,7 @@ void MenuApp::handle_audio_settings_input(uint32_t keycode) {
 }
 
 void MenuApp::handle_mode_settings_input(uint32_t keycode) {
-    const int item_count = 16;
+    const int item_count = 17;
     if (keycode == key_up_) {
         settings_cursor_ = clamp_int(settings_cursor_ - 1, 0, item_count - 1);
         publish_snapshot();
@@ -132,9 +132,15 @@ void MenuApp::handle_mode_settings_input(uint32_t keycode) {
                 cycle_key_conversion_algorithm(config_.mode.key_conversion_algorithm);
             mode_dirty_ = true;
         } else if (settings_cursor_ == 8) {
+            if (normalize_key_conversion_algorithm(config_.mode.key_conversion_algorithm) == "nk2") {
+                config_.mode.key_conversion_nk2_preset =
+                    cycle_key_conversion_nk2_preset(config_.mode.key_conversion_nk2_preset);
+                mode_dirty_ = true;
+            }
+        } else if (settings_cursor_ == 9) {
             config_.mode.gauge = cycle_gauge_mode(config_.mode.gauge, direction);
             mode_dirty_ = true;
-        } else if (settings_cursor_ == 9) {
+        } else if (settings_cursor_ == 10) {
             if (config_.mode.random == "off") {
                 config_.mode.random = (direction > 0) ? "mirror" : "sr";
             } else if (config_.mode.random == "mirror") {
@@ -147,24 +153,24 @@ void MenuApp::handle_mode_settings_input(uint32_t keycode) {
                 config_.mode.random = (direction > 0) ? "off" : "fr";
             }
             mode_dirty_ = true;
-        } else if (settings_cursor_ == 10) {
+        } else if (settings_cursor_ == 11) {
             int next_value = static_cast<int>(config_.mode.random_seed) + direction;
             next_value = clamp_int(next_value, kSeedMin, kSeedMax);
             config_.mode.random_seed = static_cast<uint32_t>(next_value);
             mode_dirty_ = true;
-        } else if (settings_cursor_ == 11) {
+        } else if (settings_cursor_ == 12) {
             publish_snapshot();
             return;
-        } else if (settings_cursor_ == 12) {
+        } else if (settings_cursor_ == 13) {
             config_.speed.rate = clamp_step_value(config_.speed.rate + static_cast<double>(direction) * kRateStep,
                                                    kRateMin, kRateMax, kRateStep);
             mode_dirty_ = true;
-        } else if (settings_cursor_ == 13) {
+        } else if (settings_cursor_ == 14) {
             config_.speed.hi_speed = clamp_step_value(
                 config_.speed.hi_speed + static_cast<double>(direction) * kHiSpeedStep,
                 kHiSpeedMin, kHiSpeedMax, kHiSpeedStep);
             mode_dirty_ = true;
-        } else if (settings_cursor_ == 14) {
+        } else if (settings_cursor_ == 15) {
             config_.mode.enable_osu_charts = !config_.mode.enable_osu_charts;
             mode_dirty_ = true;
             mode_library_dirty_ = true;
@@ -174,7 +180,7 @@ void MenuApp::handle_mode_settings_input(uint32_t keycode) {
     }
 
     if (keycode == key_enter_ || keycode == key_escape_ || keycode == key_backspace_) {
-        if (keycode == key_enter_ && settings_cursor_ == 11) {
+        if (keycode == key_enter_ && settings_cursor_ == 12) {
             screen_ = Screen::ModeMods;
             settings_cursor_ = 0;
             publish_snapshot();
@@ -217,7 +223,7 @@ void MenuApp::handle_mode_mods_input(uint32_t keycode) {
 
     if (keycode == key_enter_ || keycode == key_escape_ || keycode == key_backspace_) {
         screen_ = Screen::ModeSelect;
-        settings_cursor_ = 11;
+        settings_cursor_ = 12;
         publish_snapshot();
     }
 }
@@ -269,21 +275,29 @@ void MenuApp::populate_mode_settings_render_data(render::MenuRenderData& render)
     append_menu_row(render.generic, ui_text("Key Converter", "키 컨버터"),
                     ui_key_conversion_algorithm_label(config_.mode.key_conversion_algorithm),
                     settings_cursor_ == 7, render::MenuHitTargetKind::SettingsRow, 7, false, true);
-    append_menu_row(render.generic, ui_text("Gauge", "게이지"), ui_gauge_label(config_.mode.gauge), settings_cursor_ == 8,
-                    render::MenuHitTargetKind::SettingsRow, 8, false, true);
-    append_menu_row(render.generic, ui_text("Random", "랜덤"), ui_random_label(config_.mode.random), settings_cursor_ == 9,
+    const bool nk2_selected =
+        normalize_key_conversion_algorithm(config_.mode.key_conversion_algorithm) == "nk2";
+    append_menu_row(render.generic, "nK2 Preset",
+                    nk2_selected
+                        ? ui_key_conversion_nk2_preset_label(config_.mode.key_conversion_nk2_preset)
+                        : ui_text("Locked (Krrcream)", "잠김 (Krrcream)"),
+                    settings_cursor_ == 8, render::MenuHitTargetKind::SettingsRow, 8,
+                    false, nk2_selected);
+    append_menu_row(render.generic, ui_text("Gauge", "게이지"), ui_gauge_label(config_.mode.gauge), settings_cursor_ == 9,
                     render::MenuHitTargetKind::SettingsRow, 9, false, true);
-    append_menu_row(render.generic, ui_text("Random Seed", "랜덤 시드"), std::to_string(config_.mode.random_seed), settings_cursor_ == 10,
+    append_menu_row(render.generic, ui_text("Random", "랜덤"), ui_random_label(config_.mode.random), settings_cursor_ == 10,
                     render::MenuHitTargetKind::SettingsRow, 10, false, true);
+    append_menu_row(render.generic, ui_text("Random Seed", "랜덤 시드"), std::to_string(config_.mode.random_seed), settings_cursor_ == 11,
+                    render::MenuHitTargetKind::SettingsRow, 11, false, true);
     append_menu_row(render.generic, ui_text("Mods", "모드"), mode_score_summary(config_.mode.mods, config_.speed.rate),
-                    settings_cursor_ == 11, render::MenuHitTargetKind::SettingsRow, 11, true, false);
-    append_menu_row(render.generic, "Rate", format_multiplier(config_.speed.rate), settings_cursor_ == 12,
-                    render::MenuHitTargetKind::SettingsRow, 12, false, true);
-    append_menu_row(render.generic, ui_text("Hi-Speed", "하이스피드"), format_decimal(config_.speed.hi_speed), settings_cursor_ == 13,
+                    settings_cursor_ == 12, render::MenuHitTargetKind::SettingsRow, 12, true, false);
+    append_menu_row(render.generic, "Rate", format_multiplier(config_.speed.rate), settings_cursor_ == 13,
                     render::MenuHitTargetKind::SettingsRow, 13, false, true);
-    append_menu_row(render.generic, ui_text("OSU Charts", "OSU 차트"), ui_on_off(config_.mode.enable_osu_charts), settings_cursor_ == 14,
+    append_menu_row(render.generic, ui_text("Hi-Speed", "하이스피드"), format_decimal(config_.speed.hi_speed), settings_cursor_ == 14,
                     render::MenuHitTargetKind::SettingsRow, 14, false, true);
-    append_menu_row(render.generic, ui_text("Back", "뒤로"), "", settings_cursor_ == 15, render::MenuHitTargetKind::SettingsRow, 15, true, false);
+    append_menu_row(render.generic, ui_text("OSU Charts", "OSU 차트"), ui_on_off(config_.mode.enable_osu_charts), settings_cursor_ == 15,
+                    render::MenuHitTargetKind::SettingsRow, 15, false, true);
+    append_menu_row(render.generic, ui_text("Back", "뒤로"), "", settings_cursor_ == 16, render::MenuHitTargetKind::SettingsRow, 16, true, false);
     render.generic.notes.push_back(ui_text("Fast (Minimal) keeps title, artist, key count, level, and BPM only; it skips hashes, previews, difficulty tables, and native LV/CR.",
                                            "빠름(최소)은 제목, 아티스트, 키 수, 레벨, BPM만 유지하고 해시, 미리보기, 난이도표, 자체 LV/CR을 건너뜁니다."));
     render.generic.notes.push_back(ui_text("Index Difficulty applies to Safe scans. Fast always skips native LV/CR even when this option is On.",
@@ -300,8 +314,8 @@ void MenuApp::populate_mode_settings_render_data(render::MenuRenderData& render)
                                            "키 모드는 BMS 차트의 원본 또는 4K~10K, 12K, 14K, 16K 레이아웃을 고릅니다."));
     render.generic.notes.push_back(ui_text("None keeps the chart's original key count and pattern layout instead of forcing a conversion.",
                                            "원본은 강제 변환 없이 차트의 원래 키 수와 패턴 배치를 유지합니다."));
-    render.generic.notes.push_back(ui_text("Krrcream remaps source notes only. When Key Mode expands the lane count, KeyWeaver nK2 creates safe support notes directly in the target layout during conversion instead of pre-adding notes to the source chart.",
-                                           "Krrcream은 원본 노트만 재배치합니다. 키 모드가 레인 수를 늘릴 때 KeyWeaver nK2는 원본 차트에 먼저 노트를 붙이지 않고 변환 중 목표 레이아웃에 안전한 보조 노트를 직접 생성합니다."));
+    render.generic.notes.push_back(ui_text("Krrcream uses locked shipped tuning and remaps source notes only. nK2 Native targets 12% support notes; Transform targets 35%, subject to the same safety filters.",
+                                           "Krrcream은 배포 고정 튜닝을 사용하며 원본 노트만 재배치합니다. nK2 Native는 보조 노트 12%, Transform은 35%를 목표로 하며 동일한 안전 필터를 통과해야 합니다."));
     render.generic.notes.push_back(ui_text(
         "Mirror itself is seedless. Key Mode conversion runs first and may still use Random Seed.",
         "미러 자체는 시드를 쓰지 않지만, 먼저 실행되는 키 모드 변환은 랜덤 시드를 사용할 수 있습니다."));

@@ -252,13 +252,15 @@ std::string selected_algorithm(const AppState& state) {
 
 void update_algorithm_controls(AppState& state) {
     const bool nk2 = selected_algorithm(state) == "nk2";
-    EnableWindow(state.max_keys_edit, nk2 ? FALSE : TRUE);
-    EnableWindow(state.min_keys_edit, nk2 ? FALSE : TRUE);
-    EnableWindow(state.speed_slot_edit, nk2 ? FALSE : TRUE);
-    EnableWindow(state.seed_edit, nk2 ? FALSE : TRUE);
+    // Shipped Krrcream tuning is intentionally read-only in the GUI. nK2 ignores
+    // these fields, so neither algorithm exposes misleading mutable controls.
+    EnableWindow(state.max_keys_edit, FALSE);
+    EnableWindow(state.min_keys_edit, FALSE);
+    EnableWindow(state.speed_slot_edit, FALSE);
+    EnableWindow(state.seed_edit, FALSE);
     set_window_text_copy(state.hint_label,
-                         nk2 ? L"nK2: native 50/50 profile."
-                             : L"Krrcream: preset tuning active.");
+                         nk2 ? L"nK2: native profile; Krrcream tuning locked."
+                             : L"Krrcream: shipped preset tuning locked.");
 }
 
 bool select_target_keys(AppState& state, int target_keys) {
@@ -663,7 +665,7 @@ void create_controls(HWND window, AppState& state) {
 
     append_log(state, L"Select a BMS-family chart or drag one into this window.");
     append_log(state, L"Supported targets: 4K, 5K, 6K, 8K, 9K, 10K, 16K.");
-    append_log(state, L"Algorithm: Krrcream or nK2 native 50/50.");
+    append_log(state, L"Algorithm: Krrcream or nK2 native; Krrcream tuning is locked.");
     append_log(state, L"nK2 ignores Krrcream Max/Min/Speed/Seed tuning fields.");
 }
 

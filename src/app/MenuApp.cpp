@@ -706,6 +706,12 @@ std::string MenuApp::ui_key_conversion_algorithm_label(std::string_view token) c
     return "Krrcream";
 }
 
+std::string MenuApp::ui_key_conversion_nk2_preset_label(std::string_view token) const {
+    return normalize_key_conversion_nk2_preset(std::string(token)) == "transform"
+               ? "Transform (35%)"
+               : "Native (12%)";
+}
+
 std::string MenuApp::ui_gauge_label(std::string_view token) const {
     const std::string normalized = normalize_gauge_mode(std::string(token));
     if (normalized == "ex_hard") {

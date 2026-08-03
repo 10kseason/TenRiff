@@ -40,7 +40,7 @@
 
 - `backend` (string)
   - `polling | rawinput`
-  - 현재 `1.2.103` 릴리스 라인의 기본값은 `rawinput`
+  - 현재 `1.2.104` 릴리스 라인의 기본값은 `rawinput`
   - `Options -> Input Settings -> Backend` 또는 `Options -> Profile Setup -> Input Backend`에서 프로필별로 RawInput/Polling을 직접 선택 가능
   - 저장값은 런타임 fallback 때문에 자동으로 `polling`으로 덮어쓰지 않음
   - RawInput 시작 실패, 등록 대상 손실, 메시지 창 종료가 확인되면 현재 앱 실행 동안 메뉴와 다음 gameplay 세션 모두 Polling을 유지
@@ -60,7 +60,7 @@
 - `judgement_hz` (int)
   - `1000 | 2000 | 4000 | 8000`
   - 호환성용으로 남아 있는 입력 설정 필드
-  - 현재 `1.2.103` runtime은 별도 오디오 판정 서브루프를 이 값으로 구동하지 않음
+  - 현재 `1.2.104` runtime은 별도 오디오 판정 서브루프를 이 값으로 구동하지 않음
   - 기본값은 `4000` (`0.25ms`)
 - `debounce_ms` (double)
   - 실제 Press/Release 전환은 버리지 않고 같은 상태의 중복 이벤트만 상태 추적에서 제거
@@ -146,6 +146,9 @@
   - 기본값은 `krrcream`이며, `key_mode`가 원본 레인 수를 바꾸는 경우에만 적용
   - Krrcream은 원본 노트만 목표 레인으로 재배치
   - nK2는 키 수 확장 시 원본에 먼저 노트를 붙이지 않고, 변환 중 목표 레이아웃에 안전한 보조 노트를 직접 생성
+- `key_conversion_nk2_preset` (string)
+  - `native | transform`; 기본값은 `native`
+  - nK2에서 `Native (12%)` 또는 `Transform (35%)`를 선택하며, Krrcream에서는 설정 행이 잠김
 - `gauge` (string)
   - `normal | hard | ex_hard | easy | shift`
 - `random` (string)

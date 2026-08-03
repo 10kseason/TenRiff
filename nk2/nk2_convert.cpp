@@ -34,6 +34,7 @@ struct PlacedNote {
 };
 
 constexpr double kFourToFiveFillAddedRatio = 0.12;
+constexpr double kTransformAddedRatio = 0.35;
 constexpr double kFourToFiveFillPhraseRatio = 0.30;
 constexpr int kFourToFiveFillMinimumBudget = 8;
 constexpr int kFourToFiveFillMinimumPhraseBudget = 3;
@@ -1623,11 +1624,14 @@ int supportBudgetFor(const NK2Options& options, int sourceNoteCount) {
         return 0;
     }
     if (fourToFiveFill) {
+        const double ratio =
+            options.mode == Mode::Transform ? kTransformAddedRatio : kFourToFiveFillAddedRatio;
         return std::max(kFourToFiveFillMinimumBudget,
-                        static_cast<int>(std::ceil(static_cast<double>(sourceNoteCount) *
-                                                   kFourToFiveFillAddedRatio)));
+                        static_cast<int>(std::ceil(static_cast<double>(sourceNoteCount) * ratio)));
     }
-    const double ratio = options.mode == Mode::Harder ? 0.18 : 0.12;
+    const double ratio = options.mode == Mode::Transform
+                             ? kTransformAddedRatio
+                             : (options.mode == Mode::Harder ? 0.18 : 0.12);
     const int minimum = options.mode == Mode::Harder ? 2 : 1;
     return std::max(minimum, static_cast<int>(std::ceil(static_cast<double>(sourceNoteCount) * ratio)));
 }
@@ -1651,16 +1655,20 @@ int phraseSupportBudgetFor(const NK2Options& options, int sourceNoteCount) {
     }
     const int safeSourceNoteCount = std::max(1, sourceNoteCount);
     if (fourToFiveFill) {
+        const double ratio = options.mode == Mode::Transform
+                                 ? kTransformAddedRatio
+                                 : kFourToFiveFillPhraseRatio;
         const int budget = std::max(
             kFourToFiveFillMinimumPhraseBudget,
-            static_cast<int>(std::ceil(static_cast<double>(safeSourceNoteCount) *
-                                       kFourToFiveFillPhraseRatio)));
+            static_cast<int>(std::ceil(static_cast<double>(safeSourceNoteCount) * ratio)));
         return clampInt(
             budget, kFourToFiveFillMinimumPhraseBudget, kFourToFiveFillMaximumPhraseBudget);
     }
-    const double ratio = options.mode == Mode::Harder ? 0.18 : 0.12;
+    const double ratio = options.mode == Mode::Transform
+                             ? kTransformAddedRatio
+                             : (options.mode == Mode::Harder ? 0.18 : 0.12);
     const int minimum = options.mode == Mode::Harder ? 2 : 1;
-    const int maximum = options.mode == Mode::Harder ? 6 : 4;
+    const int maximum = options.mode == Mode::Transform ? 12 : (options.mode == Mode::Harder ? 6 : 4);
     const int budget = std::max(
         minimum, static_cast<int>(std::ceil(static_cast<double>(safeSourceNoteCount) * ratio)));
     return clampInt(budget, minimum, maximum);

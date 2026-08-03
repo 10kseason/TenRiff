@@ -58,6 +58,7 @@
   "mode": {
     "key_mode": "none",
     "key_conversion_algorithm": "krrcream",
+    "key_conversion_nk2_preset": "native",
     "enable_osu_charts": false,
     "gauge": "normal",
     "random": "off",

@@ -249,6 +249,9 @@ config::JsonValue build_mode_json(const ReplayModeSettings& mode) {
     if (!mode.key_conversion_algorithm.empty()) {
         obj.emplace("key_conversion_algorithm", config::JsonValue{mode.key_conversion_algorithm});
     }
+    if (!mode.key_conversion_nk2_preset.empty()) {
+        obj.emplace("key_conversion_nk2_preset", config::JsonValue{mode.key_conversion_nk2_preset});
+    }
     if (!mode.key_conversion_note_add_mode.empty()) {
         obj.emplace("key_conversion_note_add_mode",
                     config::JsonValue{mode.key_conversion_note_add_mode});
@@ -398,6 +401,8 @@ ReplayLoadResult load_replay_json(const std::string& path) {
         replay.mode.key_mode = read_json_string(*mode, "key_mode");
         replay.mode.key_conversion_algorithm =
             read_json_string(*mode, "key_conversion_algorithm");
+        replay.mode.key_conversion_nk2_preset =
+            read_json_string(*mode, "key_conversion_nk2_preset");
         replay.mode.key_conversion_note_add_mode =
             read_json_string(*mode, "key_conversion_note_add_mode");
         replay.mode.random = read_json_string(*mode, "random");

@@ -10,6 +10,7 @@
 "mode": {
   "key_mode": "none",
   "key_conversion_algorithm": "krrcream",
+  "key_conversion_nk2_preset": "native",
   "enable_osu_charts": false,
   "gauge": "normal",
   "random": "off",
@@ -28,6 +29,7 @@
 - `enable_osu_charts`：默认 `false`；在 Mode Settings 打开 `OSU Charts` 后可索引并游玩 osu!mania 4K～10K `.osu`，同时刷新曲库
 - `key_mode`：`none | auto | 4k | 5k | 6k | 7k | 8k | 9k | 10k | 12k | 14k | 16k`
 - `key_conversion_algorithm`：`krrcream | nk2`（默认 `krrcream`；Krrcream 只重排原始 note，nK2 在扩展键数时直接向目标 layout 生成安全的辅助 note）
+- `key_conversion_nk2_preset`：`native | transform`（默认 `native`；选择 nK2 时可用 `Native (12%)` / `Transform (35%)`，选择 Krrcream 时锁定该行）
 - `gauge`：`normal | hard | ex_hard | easy | shift`
 - `random`：`off | mirror | rr | fr | sr`
 - `random_seed`：RR/FR/SR、强制 key-mode 变换、Note Add 和 LN Mix 目标选择使用的固定 seed（`0` 也视为固定值）

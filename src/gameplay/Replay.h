@@ -27,6 +27,7 @@ struct ReplayTrace {
 struct ReplayModeSettings {
     std::string key_mode;
     std::string key_conversion_algorithm;
+    std::string key_conversion_nk2_preset;
     // Legacy read-only metadata; current exports leave this field empty.
     std::string key_conversion_note_add_mode;
     std::string random;

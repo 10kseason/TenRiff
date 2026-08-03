@@ -198,6 +198,21 @@ bool migrate_bms_first_runtime_config(config::RuntimeConfig& config) {
         config.mode.key_conversion_algorithm = "krrcream";
         changed = true;
     }
+    const std::string nk2_preset = to_lower_copy(config.mode.key_conversion_nk2_preset);
+    if (nk2_preset == "transform" || nk2_preset == "transform35") {
+        if (config.mode.key_conversion_nk2_preset != "transform") {
+            config.mode.key_conversion_nk2_preset = "transform";
+            changed = true;
+        }
+    } else if (nk2_preset == "native" || nk2_preset == "native12" || nk2_preset.empty()) {
+        if (config.mode.key_conversion_nk2_preset != "native") {
+            config.mode.key_conversion_nk2_preset = "native";
+            changed = true;
+        }
+    } else {
+        config.mode.key_conversion_nk2_preset = "native";
+        changed = true;
+    }
     if (!is_valid_bms_keysound_policy(config.audio_ui.bms_keysound_policy)) {
         config.audio_ui.bms_keysound_policy = "follow";
         changed = true;
