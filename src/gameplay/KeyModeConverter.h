@@ -18,6 +18,7 @@ struct KeyModeConverterOptions {
   double base_bpm = 180.0;
   int sample_rate = 44100;
   KeyModeConversionAlgorithm algorithm = KeyModeConversionAlgorithm::Krrcream;
+  Nk2Preset nk2_preset = Nk2Preset::Native;
 };
 
 struct KeyModeConverterResult {

@@ -10,6 +10,7 @@ This document summarizes the implemented mode system, lane-transform/random rule
 "mode": {
   "key_mode": "none",
   "key_conversion_algorithm": "krrcream",
+  "key_conversion_nk2_preset": "native",
   "enable_osu_charts": false,
   "gauge": "normal",
   "random": "off",
@@ -28,6 +29,7 @@ This document summarizes the implemented mode system, lane-transform/random rule
 - `enable_osu_charts`: defaults to `false`; Mode Settings > `OSU Charts` enables indexing and play for 4K-10K osu!mania `.osu` and refreshes the library
 - `key_mode`: `none | auto | 4k | 5k | 6k | 7k | 8k | 9k | 10k | 12k | 14k | 16k`
 - `key_conversion_algorithm`: `krrcream | nk2` (defaults to `krrcream`; Krrcream only remaps source notes, while nK2 directly creates safe support notes in the target layout during key-count expansion)
+- `key_conversion_nk2_preset`: `native | transform` (defaults to `native`; choose `Native (12%)` or `Transform (35%)` with nK2; the row is locked with Krrcream)
 - `gauge`: `normal | hard | ex_hard | easy | shift`
 - `random`: `off | mirror | rr | fr | sr`
 - `random_seed`: fixed seed for RR/FR/SR, forced key-mode conversion, Note Add, and LN Mix selection (`0` is also fixed)

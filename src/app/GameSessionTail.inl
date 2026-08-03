@@ -330,6 +330,13 @@ bool GameSession::initialize(const CommandLineOptions& options) {
         if (!replay_source_.mode.key_conversion_algorithm.empty()) {
             config_.mode.key_conversion_algorithm = replay_source_.mode.key_conversion_algorithm;
         }
+        if (!replay_source_.mode.key_conversion_nk2_preset.empty()) {
+            config_.mode.key_conversion_nk2_preset =
+                normalize_nk2_preset_local(replay_source_.mode.key_conversion_nk2_preset);
+        } else if (config_.mode.key_conversion_algorithm == "nk2") {
+            // Replays written before the preset field existed used Native 12%.
+            config_.mode.key_conversion_nk2_preset = "native";
+        }
         if (!replay_source_.mode.key_conversion_note_add_mode.empty() &&
             replay_source_.mode.key_conversion_note_add_mode != "default") {
             std::cerr << "[warn] Replay uses the removed Conversion Note Add option and cannot be reproduced."
@@ -572,6 +579,11 @@ bool GameSession::initialize(const CommandLineOptions& options) {
         if (ghost_compatible && !ghost_replay_source_.mode.key_conversion_algorithm.empty() &&
             ghost_replay_source_.mode.key_conversion_algorithm !=
                 config_.mode.key_conversion_algorithm) {
+            ghost_compatible = false;
+        }
+        if (ghost_compatible && config_.mode.key_conversion_algorithm == "nk2" &&
+            normalize_nk2_preset_local(ghost_replay_source_.mode.key_conversion_nk2_preset) !=
+                normalize_nk2_preset_local(config_.mode.key_conversion_nk2_preset)) {
             ghost_compatible = false;
         }
         if (ghost_compatible &&
@@ -1859,6 +1871,7 @@ void GameSession::shutdown() {
             replay.final_score = result_.final_score;
             replay.mode.key_mode = config_.mode.key_mode;
             replay.mode.key_conversion_algorithm = config_.mode.key_conversion_algorithm;
+            replay.mode.key_conversion_nk2_preset = config_.mode.key_conversion_nk2_preset;
             replay.mode.random = config_.mode.random;
             replay.mode.random_seed = config_.mode.random_seed;
             replay.mode.gauge = config_.mode.gauge;

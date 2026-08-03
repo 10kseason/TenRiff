@@ -371,6 +371,7 @@ private:
     [[nodiscard]] std::string ui_song_index_profile_label(std::string_view token) const;
     [[nodiscard]] std::string ui_key_mode_label(std::string_view token) const;
     [[nodiscard]] std::string ui_key_conversion_algorithm_label(std::string_view token) const;
+    [[nodiscard]] std::string ui_key_conversion_nk2_preset_label(std::string_view token) const;
     [[nodiscard]] std::string ui_gauge_label(std::string_view token) const;
     [[nodiscard]] std::string ui_random_label(std::string_view token) const;
     [[nodiscard]] std::string ui_skin_source_label(std::string_view token) const;

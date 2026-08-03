@@ -595,6 +595,7 @@ TEST_CASE("mode manager routes KeyWeaver nK2 from config into gameplay") {
     tenriff::config::ModeConfig mode;
     mode.key_mode = "8k";
     mode.key_conversion_algorithm = "nk2";
+    mode.key_conversion_nk2_preset = "transform";
     mode.random_seed = 2024;
 
     const auto result = tenriff::app::manage_modes(
@@ -608,6 +609,8 @@ TEST_CASE("mode manager routes KeyWeaver nK2 from config into gameplay") {
 
     CHECK(result.settings.key_conversion_algorithm ==
           tenriff::gameplay::KeyModeConversionAlgorithm::NK2);
+    CHECK(result.settings.key_conversion_nk2_preset ==
+          tenriff::gameplay::Nk2Preset::Transform);
     CHECK(result.chart.lane_count == 8);
     CHECK_FALSE(result.chart.notes.empty());
     CHECK_FALSE(has_lane_overlap(result.chart));

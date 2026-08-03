@@ -20,6 +20,13 @@ ModeResolveResult resolve_mode_settings(const config::ModeConfig& config) {
             "mode.key_conversion_algorithm not recognized; using KRRCREAM.");
     }
 
+    if (auto parsed = gameplay::parse_nk2_preset(config.key_conversion_nk2_preset)) {
+        result.settings.key_conversion_nk2_preset = parsed.value();
+    } else if (!config.key_conversion_nk2_preset.empty()) {
+        result.warnings.push_back(
+            "mode.key_conversion_nk2_preset not recognized; using NATIVE.");
+    }
+
     if (auto parsed = gameplay::parse_gauge_mode(config.gauge)) {
         result.settings.gauge = parsed.value();
     } else if (!config.gauge.empty()) {

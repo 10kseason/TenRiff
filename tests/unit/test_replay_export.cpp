@@ -69,6 +69,7 @@ TEST_CASE("replay export writes JSON with trace events") {
     replay.final_score = 1234;
     replay.mode.key_mode = "6k";
     replay.mode.key_conversion_algorithm = "nk2";
+    replay.mode.key_conversion_nk2_preset = "transform";
     replay.mode.random = "mirror";
     replay.mode.random_seed = 4123;
     replay.mode.gauge = "shift";
@@ -134,6 +135,7 @@ TEST_CASE("replay export writes JSON with trace events") {
     REQUIRE(mode != nullptr);
     CHECK(mode->find("key_mode")->second.as_string() == "6k");
     CHECK(mode->find("key_conversion_algorithm")->second.as_string() == "nk2");
+    CHECK(mode->find("key_conversion_nk2_preset")->second.as_string() == "transform");
     CHECK(mode->find("key_conversion_note_add_mode") == mode->end());
     CHECK(mode->find("random")->second.as_string() == "mirror");
     CHECK(mode->find("random_seed")->second.as_number() == doctest::Approx(4123.0));
@@ -162,6 +164,7 @@ TEST_CASE("replay export writes JSON with trace events") {
     CHECK(loaded_replay.replay->mods[1] == "ln_mix_30");
     CHECK(loaded_replay.replay->mode.key_mode == "6k");
     CHECK(loaded_replay.replay->mode.key_conversion_algorithm == "nk2");
+    CHECK(loaded_replay.replay->mode.key_conversion_nk2_preset == "transform");
     CHECK(loaded_replay.replay->mode.key_conversion_note_add_mode.empty());
     CHECK(loaded_replay.replay->mode.random == "mirror");
     REQUIRE(loaded_replay.replay->mode.random_seed.has_value());
@@ -362,6 +365,7 @@ TEST_CASE("legacy replay loading preserves removed conversion Note Add metadata"
     REQUIRE(loaded.replay.has_value());
     CHECK(loaded.replay->mode.key_mode.empty());
     CHECK(loaded.replay->mode.key_conversion_algorithm.empty());
+    CHECK(loaded.replay->mode.key_conversion_nk2_preset.empty());
     CHECK(loaded.replay->mode.key_conversion_note_add_mode == "add_25_plus");
     CHECK(loaded.replay->mode.random.empty());
     CHECK_FALSE(loaded.replay->mode.random_seed.has_value());

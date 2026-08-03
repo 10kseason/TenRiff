@@ -40,7 +40,7 @@ profile が存在しない場合は初回起動時に自動生成されます。
 
 - `backend` (string)
   - `polling | rawinput`
-  - 現行 `1.2.103` リリースラインの既定値は `rawinput`
+  - 現行 `1.2.104` リリースラインの既定値は `rawinput`
   - `Options -> Input Settings -> Backend` または `Options -> Profile Setup -> Input Backend` で profile ごとに選択可能
   - runtime fallback は保存済みの値を `polling` に書き換えない
   - RawInput の起動失敗、登録先の消失、message window の終了を確認すると、そのアプリ実行中は menu と後続 gameplay の両方で Polling を維持する
@@ -145,6 +145,9 @@ chart loader/indexer は BMS family（`.bms/.bme/.bml/.pms`）が既定です。
   - 既定値は `krrcream`。`key_mode` が元の lane count を変更する場合のみ適用
   - Krrcream は元 note を target lane へ再配置するだけ
   - nK2 は key count 拡張時、元 pattern へ先に note を追加せず、変換中に target layout へ安全な support note を直接生成
+- `key_conversion_nk2_preset` (string)
+  - `native | transform`。既定値は `native`
+  - nK2 の `Native (12%)` / `Transform (35%)` を選択し、Krrcream では設定 row を lock
 - `gauge` (string)
   - `normal | hard | ex_hard | easy | shift`
 - `random` (string)

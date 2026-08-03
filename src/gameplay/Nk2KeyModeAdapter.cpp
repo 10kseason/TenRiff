@@ -152,7 +152,9 @@ convert_key_mode_chart_nk2(const GameplayChart &chart,
   keyconv::nk2::NK2Options nk2_options;
   nk2_options.sourceKeyCount = source_lane_count;
   nk2_options.targetKeyCount = options.target_lane_count;
-  nk2_options.mode = keyconv::nk2::Mode::Native;
+  nk2_options.mode = options.nk2_preset == Nk2Preset::Transform
+                         ? keyconv::nk2::Mode::Transform
+                         : keyconv::nk2::Mode::Native;
   nk2_options.nativeWeight = 0.5;
   nk2_options.remixWeight = 0.5;
 
@@ -238,11 +240,12 @@ convert_key_mode_chart_nk2(const GameplayChart &chart,
 
   result.chart = std::move(rebuilt);
   result.converted = true;
+  const std::string preset_label =
+      options.nk2_preset == Nk2Preset::Transform ? "Transform 35%" : "Native 12%";
   result.warnings.push_back(
       "nK2 remapped " + std::to_string(source_lane_count) + "K to " +
-      std::to_string(options.target_lane_count) +
-      "K using the native 50/50 profile " +
-      "(added=" + std::to_string(converted.report.addedNotes) +
+      std::to_string(options.target_lane_count) + "K using the " + preset_label +
+      " preset (added=" + std::to_string(converted.report.addedNotes) +
       ", dropped=" + std::to_string(converted.report.droppedNotes) + ").");
   return result;
 }

@@ -370,6 +370,16 @@ TEST_CASE("key conversion algorithm parser accepts Krrcream and KeyWeaver nK2 al
     CHECK_FALSE(parse_key_mode_conversion_algorithm("unknown").has_value());
 }
 
+TEST_CASE("nK2 preset parser accepts Native 12 and Transform 35 tokens") {
+    using tenriff::gameplay::Nk2Preset;
+    using tenriff::gameplay::parse_nk2_preset;
+
+    REQUIRE(parse_nk2_preset("native").has_value());
+    CHECK(parse_nk2_preset("native12").value() == Nk2Preset::Native);
+    REQUIRE(parse_nk2_preset("transform").has_value());
+    CHECK(parse_nk2_preset("transform35").value() == Nk2Preset::Transform);
+    CHECK_FALSE(parse_nk2_preset("harder").has_value());
+}
 TEST_CASE("gauge mode parser accepts the Gauge Shift token") {
     using tenriff::gameplay::GaugeMode;
     using tenriff::gameplay::parse_gauge_mode;
@@ -679,6 +689,38 @@ TEST_CASE("runtime mode settings use the selected KeyWeaver nK2 converter") {
     CHECK(contains_warning(result.warnings, "nK2 remapped"));
 }
 
+TEST_CASE("nK2 Native adds 12 percent while Transform adds 35 percent") {
+    using namespace tenriff::gameplay;
+
+    GameplayChart chart;
+    chart.lane_count = 4;
+    chart.duration_samples = 102000;
+    for (int index = 0; index < 100; ++index) {
+        append_note(chart, index % 4 + 1, static_cast<int64_t>(index + 1) * 1000);
+    }
+
+    KeyModeConverterOptions native_options;
+    native_options.target_lane_count = 8;
+    native_options.base_bpm = 120.0;
+    native_options.sample_rate = 1000;
+    native_options.algorithm = KeyModeConversionAlgorithm::NK2;
+    native_options.nk2_preset = Nk2Preset::Native;
+
+    KeyModeConverterOptions transform_options = native_options;
+    transform_options.nk2_preset = Nk2Preset::Transform;
+
+    const auto native_result = convert_key_mode_chart(chart, native_options);
+    const auto transform_result = convert_key_mode_chart(chart, transform_options);
+
+    REQUIRE(native_result.converted);
+    REQUIRE(transform_result.converted);
+    CHECK(native_result.chart.notes.size() == chart.notes.size() + 12u);
+    CHECK(transform_result.chart.notes.size() == chart.notes.size() + 35u);
+    CHECK(contains_warning(native_result.warnings, "Native 12%"));
+    CHECK(contains_warning(transform_result.warnings, "Transform 35%"));
+    CHECK_FALSE(has_lane_overlap(native_result.chart));
+    CHECK_FALSE(has_lane_overlap(transform_result.chart));
+}
 TEST_CASE("nK2 key-count reduction preserves source timing and remains hittable") {
     using namespace tenriff::gameplay;
 

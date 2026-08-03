@@ -264,6 +264,16 @@ inline std::string cycle_key_conversion_algorithm(std::string_view current) {
                : "nk2";
 }
 
+inline std::string normalize_key_conversion_nk2_preset(std::string value) {
+    value = to_lower_ascii(std::move(value));
+    return value == "transform" || value == "transform35" ? "transform" : "native";
+}
+
+inline std::string cycle_key_conversion_nk2_preset(std::string_view current) {
+    return normalize_key_conversion_nk2_preset(std::string(current)) == "transform"
+               ? "native"
+               : "transform";
+}
 
 inline std::string normalize_runtime_key_mode(std::string value) {
     value = to_lower_ascii(std::move(value));

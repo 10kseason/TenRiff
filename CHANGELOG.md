@@ -4,6 +4,20 @@ TenRiff의 사용자/배포 관점에서 의미 있는 변경만 간단히 기�
 
 ## [Unreleased]
 
+## [1.2.104] - 2026-08-03
+
+### Added
+
+- Mode Settings의 nK2 프리셋에 기본 `Native (12%)`와 `Transform (35%)` 선택을 추가하고 설정·리플레이에 저장한다. 이전 nK2 리플레이는 `Native`로 재현한다.
+
+### Changed
+
+- `Krrcream` 선택 시 nK2 프리셋 행을 잠그고, standalone converter GUI에서도 Krrcream의 Max/Min/Speed/Seed 튜닝 입력을 읽기 전용으로 고정한다.
+
+### Release
+
+- Windows `TenRiff-1.2.104.zip`, public source `TenRiff-1.2.104-source.zip`, and `TenRiff-1.2.104-SHA256SUMS.txt` are the formal hotfix release assets; no ONNX model, private checkpoint, user profile, song, or log is bundled
+
 ## [1.2.103] - 2026-08-03
 
 ### Changed
