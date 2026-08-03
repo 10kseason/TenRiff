@@ -1308,3 +1308,42 @@ TEST_CASE("LN mix hold heads respect OD8 sudden-death boundaries during gameplay
     CHECK(active_holds.size() == 1u);
     CHECK_FALSE(engine.is_game_over());
 }
+
+TEST_CASE("judge hard records an unplayed note as an indirect poor") {
+    GameplayChart chart;
+    chart.lane_count = 1;
+    chart.duration_samples = 3000;
+    chart.notes.push_back(NoteEvent{1, 1000, std::nullopt});
+
+    tenriff::config::ModeConfig mode;
+    mode.mods = {"judge_hard"};
+    tenriff::config::JudgeConfig judge;
+    judge.pg_ms = 10.0;
+    judge.gr_ms = 20.0;
+    judge.gd_ms = 30.0;
+    judge.bd_ms = 40.0;
+    judge.indirect_miss_ms = 40.0;
+
+    const auto mode_result = tenriff::app::manage_modes(
+        chart, tenriff::app::ChartFormat::Bms, mode, judge, 1.0);
+    REQUIRE(mode_result.judge.indirect_miss_enabled);
+
+    GameplayConfig hard_config;
+    hard_config.sample_rate = 1000;
+    hard_config.judge = mode_result.judge;
+    GameplayEngine hard_engine(chart, hard_config);
+    hard_engine.advance(1340);
+    CHECK(hard_engine.stats().counts.pr == 0);
+    hard_engine.advance(1341);
+    CHECK(hard_engine.stats().counts.pr == 1);
+    CHECK(hard_engine.stats().counts.bd == 0);
+    CHECK(hard_engine.stats().osu_od8.counts.miss == 1);
+
+    GameplayConfig normal_config;
+    normal_config.sample_rate = 1000;
+    normal_config.judge = judge;
+    GameplayEngine normal_engine(chart, normal_config);
+    normal_engine.advance(1041);
+    CHECK(normal_engine.stats().counts.bd == 1);
+    CHECK(normal_engine.stats().counts.pr == 0);
+}

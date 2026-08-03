@@ -4,6 +4,20 @@ TenRiff의 사용자/배포 관점에서 의미 있는 변경만 간단히 기�
 
 ## [Unreleased]
 
+## [1.2.103] - 2026-08-03
+
+### Changed
+
+- Mode Settings의 별도 `변환 노트 추가` 옵션과 신규 저장 메타데이터를 제거했다. Krrcream은 원본 노트만 재배치하고, nK2는 키 수 확장 중 변환된 목표 레이아웃에 안전한 보조 노트를 직접 생성하며, 일반 Note Add Mod는 키 변환 뒤에 별도로 적용된다.
+
+- Mode Settings의 `Indexing: Fast`를 최소 메타데이터 모드로 변경했다. 제목/아티스트/키 수/#PLAYLEVEL/BPM만 유지하고 파일 해시, 배경·오디오 미리보기 탐색, 난이도표 매칭, 자체 LV/CR을 생략하며 Safe/Fast 캐시를 분리한다.
+
+- `Judge Hard`에서 입력 없이 지나간 노트를 BAD 대신 콤보 브레이크 간접 `POOR`이자 OD8 `MISS`로 기록한다.
+
+### Release
+
+- Windows `TenRiff-1.2.103.zip`, public source `TenRiff-1.2.103-source.zip`, and `TenRiff-1.2.103-SHA256SUMS.txt` are the formal release assets; no ONNX model, private checkpoint, user profile, song, or log is bundled
+
 ## [1.2.102] - 2026-08-03
 
 ### Fixed

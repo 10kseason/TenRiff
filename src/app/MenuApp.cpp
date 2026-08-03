@@ -686,7 +686,7 @@ std::string MenuApp::ui_keysound_policy_label(std::string_view token) const {
 
 std::string MenuApp::ui_song_index_profile_label(std::string_view token) const {
     if (config::normalize_song_index_profile_token(token) == "fast") {
-        return ui_text("Fast", "빠름");
+        return ui_text("Fast (Minimal)", "빠름(최소)");
     }
     return ui_text("Safe", "안전");
 }

@@ -3,7 +3,7 @@
 이 문서는 다음 에이전트나 새 작업자가 가장 먼저 읽어야 하는 현재 상태 문서입니다. 목표는 "지금 이 프로젝트가 무엇이고, 어디를 보면 되고, 무엇이 아직 미검증인지"를 빠르게 파악하게 하는 것입니다.
 
 ## Baseline
-- 현재 프로젝트 버전과 공개 안정판은 `1.2.102 stable`
+- 현재 프로젝트 버전과 공개 안정판은 `1.2.103 stable`
 - 직접 IP 멀티플레이와 preview r5의 입력 backend 수명주기 수정은 `1.1.8 stable`에 통합
 - `1.1.8`은 1.1.7의 시각 개선에 osu!mania OD8 보조 점수, 첫 네이티브 `BAD` 즉사 `Sudden Death (1 MISS)`, 결정적 `LN Mix 10%~90%`를 추가
 - `1.2.0`은 BMS 채널 `04/07` 및 osu!mania 배경을 gameplay sample timeline에 연결하고, FHD 미만 이미지 배경을 Windows ML 기반 LunaSR로 비동기 보간
@@ -87,7 +87,7 @@
   - `mode.key_mode`는 N2NC 스타일 lane remap 기반으로 키수를 변환
   - `mode.key_mode=10k` 변환은 standalone converter의 krrcream식 10K preset과 맞춰 `target=10`, `max_keys=10`, `min_keys=1`, `transform_speed_slot=5`, `seed=0`을 기본으로 사용
   - 게임 내 Mode Settings의 `Key Converter`에서 기본 `Krrcream`과 내장 결정론적 `KeyWeaver nK2`를 선택하며, 실제 키수 변환에 적용하고 설정·리플레이 메타데이터에 저장
-  - `변환 노트 추가`는 기본값 `기본`과 `25% 이상 추가`를 제공하며, 후자는 실제 건반 수가 바뀔 때 원본 패턴에 안전한 무음 화음을 최소 25% 먼저 요청한 뒤 키컨버터가 최종 레이아웃을 만들고, 설정은 리플레이/결과 메타데이터에 저장되며 일반 최고기록에서는 제외
+  - 별도 `변환 노트 추가` 옵션은 제거했으며, Krrcream은 원본 노트만 재배치하고 nK2는 키 수 확장 시 변환된 목표 레이아웃에 안전한 보조 노트를 직접 생성한다.
   - 독립 BMS key converter의 CLI/GUI는 기본 `krrcream`과 결정론적 `nK2 Native 50/50` 알고리즘을 선택 지원하며, nK2 선택 시 krrcream 전용 튜닝 필드는 적용하지 않음
   - `mode.key_mode=none`은 차트의 원래 키 수와 기본 패턴 레이아웃을 그대로 유지
 - Native difficulty:
@@ -128,9 +128,9 @@
   - 기본 `BAD` 범위는 `210ms`, `Judge Easy`는 `262.5ms`, `Judge Hard`는 `340ms`
   - `Judge Hard`는 PG/GR/GD 및 LN tail 창은 기본값을 유지하고 BAD 경계만 좁힘
   - 같은 레인에서 이전 노트가 이미 `BAD`이고 바로 다음 노트가 `GOOD` 이상으로 명확하면, 이전 노트는 미스로 정리하고 현재 입력은 다음 노트에 배정해 한 번의 누락이 연속 `BAD`로 고정되지 않게 함
-  - note-consuming 실패(auto-miss, 너무 빨리 눌러 노트를 소모한 경우, hold break/tail miss)는 `BAD`
+  - `Judge Hard`에서 입력 없이 지나간 노트는 콤보를 끊는 간접 `POOR`이자 OD8 `MISS`로 기록되며, 다른 note-consuming 실패는 `BAD` 유지
   - 너무 이른 non-consuming 입력은 LR2 스타일 `POOR`로 처리되고, 결과/리플레이/UI에 다시 표시됨
-  - `POOR`는 콤보를 끊지 않고 점수/정확도 집계에는 들어가지 않으며, gauge는 전용 `PR` 감소값을 사용
+  - 빈 키 `POOR`는 콤보를 유지하고, Hard 간접 `POOR`는 콤보를 끊는다. 둘 다 점수/정확도 집계에는 들어가지 않고 전용 `PR` gauge 감소값을 사용
   - gameplay live input의 `ClockSync`는 큰 Windows QPC 절대값 대신 centered anchor 회귀를 사용하고, 연속 시계 이상치 뒤 자동 재기준화함
   - backlog stale 여부는 QPC 이벤트 나이와 `BAD` 창으로 판정하며, 실제로 fresh인 입력의 sample 매핑이 현재 playback anchor와 크게 어긋나면 anchor 값으로 복구해 비채점 catch-up 고정을 방지
   - tail release timing은 BMS `#LNMODE 2` charge note에만 적용
@@ -182,12 +182,13 @@
 - 캐시가 없거나 무효하면 백그라운드 인덱싱 시작
 - indexing profile:
   - `safe` 기본값
-  - `fast` 선택값
+  - `fast`는 곡 목록용 최소 메타데이터(제목/아티스트/키 수/#PLAYLEVEL/BPM)만 수집
   - Mode Settings의 `Indexing` row와 `config.mode.song_index_profile`로 제어
+  - `fast`는 파일 해시, 배경/오디오 미리보기 탐색, 난이도표 매칭, 자체 LV/CR 계산을 생략
 - difficulty calculation:
   - Mode Settings의 `Index Difficulty`와 `config.mode.calculate_song_index_difficulty`로 제어
   - 기본 `off`는 BMS `#PLAYLEVEL`만 유지하고 자체 LV/CR 계산을 생략
-  - `on`은 Revive LV/Circus Rating을 계산하며, 계산 모드가 다른 캐시는 재사용하지 않음
+  - `on`은 `safe`에서 Revive LV/Circus Rating을 계산하며, `fast`에서는 항상 생략
 - 인덱싱 stage:
   - `SCANNING FILES`
   - `BUILDING METADATA`
@@ -200,15 +201,16 @@
 - 실측:
   - 46k-chart Windows benchmark library safe full-index 기준 `46,636` candidate / `46,602` indexed entries
   - peak memory 약 `working set 453MB`, `private 524MB`
-  - 같은 라이브러리 1024-chart sample에서 fast profile throughput은 safe 대비 약 `2.05x`
+
 - cache schema:
   - `version = 12`
   - optional `layout_label` 포함
-  - `calculate_difficulty`, `native_level`, `md5`, `sha256`와 난이도표 이름/심볼/레벨/정렬값 포함
+  - `minimal_metadata`로 Safe/Fast 캐시를 구분
+  - Safe 캐시는 `calculate_difficulty`, `native_level`, `md5`, `sha256`와 난이도표 이름/심볼/레벨/정렬값 포함
 
 ## Runtime / Packaging Rules
 - 새 사용자 프로필은 자동 생성
-- 현재 정식 P2P 배포 라인은 `TenRiff 1.2.102 stable`
+- 현재 정식 P2P 배포 라인은 `TenRiff 1.2.103 stable`
 - 배포 패키지에는 `Songs`를 넣지 않음
 - 배포 패키지는 `Main Menu / Options / Song Selecte / Multiplayer Lobby / Clear / Failed` 이름의 `Mainmusic/` 화면 슬롯을 포함하며, 각 `이름.mp3`와 번호가 붙은 `이름 2.mp3`~`이름 64.mp3`를 자동 수집해 화면 재진입마다 순환
 - 배포 업데이트에는 built artifacts와 필요한 런타임 자산만 포함

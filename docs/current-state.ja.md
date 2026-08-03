@@ -3,7 +3,7 @@
 この文書は、次のエージェントや新しい作業者が最初に読むべき current-state 文書です。目的は、「このプロジェクトは今どういう状態で、どこを見ればよく、何がまだ未検証か」を素早く把握できるようにすることです。
 
 ## Baseline
-- 現在のプロジェクト版と公開 stable 版は `1.2.102 stable`
+- 現在のプロジェクト版と公開 stable 版は `1.2.103 stable`
 - direct-IP multiplayer と preview r5 の input-backend lifecycle 修正は `1.1.8 stable` に統合
 - `1.1.8` は 1.1.7 の visual refresh に osu!mania OD8 補助スコア、最初の native `BAD` で終了する `Sudden Death (1 MISS)`、決定的な `LN Mix 10%～90%` を追加
 - `1.2.0` は BMS channel `04/07` と osu!mania 背景を gameplay sample timeline に接続し、FHD 未満の画像背景を Windows ML 上の LunaSR で非同期補間
@@ -86,7 +86,7 @@
   - 対応 key count の chart difficulty calculation
   - `mode.key_mode` は N2NC スタイルの lane remap でキー数を変換
   - ゲーム内 Mode Settings の `Key Converter` で既定の `Krrcream` または内蔵の決定論的 `KeyWeaver nK2` を選択し、設定と replay metadata に保存
-  - `Conversion Note Add` は `Default` / `Add 25%+` を提供し、後者は playable key count が変わる時に元 pattern へ安全な無音 chord を先に追加要求してから key converter が最終 layout を作り、replay/result metadata に保存して通常の best record 更新から除外
+  - 個別の `Conversion Note Add` 設定は削除。Krrcream は元 note の再配置のみを行い、nK2 は key count 拡張時に変換後の target layout へ安全な support note を直接生成する。
   - `mode.key_mode=none` は元のキー数と基本パターンレイアウトを維持
 - Native difficulty:
   - BMS の LV/CR 計算では long-note Head/Tail の miss-ms だけを 0.5倍で評価し、`300ms`を`150ms`として緩和する。実際の gameplay 判定 window は変更しない
@@ -115,9 +115,9 @@
   - 既定の `BAD` window は `210ms`、`Judge Easy` は `262.5ms`、`Judge Hard` は `340ms`
   - `Judge Hard` は BAD 境界だけを狭め、PG/GR/GD と LN tail window は基本値を維持
   - 同一 lane の pending note がすでに `BAD` で、直後の note が明確に `GOOD` 以上なら、pending note を miss として記録し、現在の press を次の note に割り当てて連続 `BAD` lock を防ぐ
-  - note-consuming failure（auto-miss、早すぎる消費、hold break / tail miss）は `BAD`
+  - `Judge Hard` では未入力の object を combo-breaking indirect `POOR` かつ OD8 `MISS` として記録し、その他の note-consuming failure は `BAD` のまま
   - かなり早い non-consuming press は LR2 スタイル `POOR` として扱われ、result / replay / UI に再表示される
-  - `POOR` は combo を切らず、score / accuracy には入らず、専用 `PR` gauge damage を使う
+  - 空打ち `POOR` は combo を維持し、Hard indirect `POOR` は combo を切る。両方とも score / accuracy には入らず、専用 `PR` gauge damage を使う
   - gauge mode は `EX-Hard / Hard / Normal / Easy / Gauge Shift` をサポートする。固定 gauge は `100%` で開始し、`0%` で即失敗して type は変化せず、EX-Hard は Hard と異なる黒に近い gray palette で表示
   - `Gauge Shift` は EX-Hard / Hard / Normal / Easy をそれぞれ 100% から独立して並列計算し、現在の tier が 0% で脱落すると同じ判定履歴を累積した次の生存 tier を選び、終了時の最上位生存 tier で確定する
   - `Sudden Death (1 MISS)` は最初の OD8 換算 object `MISS` で即失敗する。native `BAD` timing だけでは発動せず、空打ちの `POOR` も無視し、Practice No-Fail とは排他的に動作する
@@ -170,12 +170,13 @@
 - cache が無いか無効ならバックグラウンドインデックスを開始
 - Indexing profiles:
   - `safe` が既定
-  - `fast` が任意選択
+  - `fast` は song list 用の最小 metadata（title/artist/key count/#PLAYLEVEL/BPM）のみ収集
   - Mode Settings の `Indexing` 行と `config.mode.song_index_profile` で制御
+  - `fast` は file hash、背景/音声 preview 解決、difficulty-table matching、native LV/CR を省略
 - Difficulty calculation:
   - Mode Settings の `Index Difficulty` と `config.mode.calculate_song_index_difficulty` で制御
   - 既定 `off` は BMS `#PLAYLEVEL` を保持し、native LV/CR 計算を省略
-  - `on` は Revive LV/Circus Rating を計算し、異なる計算 mode の cache は再利用しない
+  - `on` は `safe` で Revive LV/Circus Rating を計算し、`fast` では常に省略
 - Indexing stages:
   - `SCANNING FILES`
   - `BUILDING METADATA`
@@ -188,15 +189,15 @@
 - 実測:
   - 46k-chart Windows benchmark library の safe full-index で `46,636` candidates / `46,602` indexed entries
   - peak memory はおよそ `working set 453MB`, `private 524MB`
-  - 同ライブラリの 1024-chart sample では fast profile throughput が safe 比で約 `2.05x`
+
 - Cache schema:
   - `version = 12`
   - optional `layout_label`
-  - `calculate_difficulty`、`native_level`、`md5`、`sha256`、difficulty-table name/symbol/level/order metadata
+  - `minimal_metadata` で Safe/Fast cache を分離
 
 ## Runtime / Packaging Rules
 - 新しい user profile は自動生成される
-- 現在の正式 P2P 配布ラインは `TenRiff 1.2.102 stable`
+- 現在の正式 P2P 配布ラインは `TenRiff 1.2.103 stable`
 - distribution package には `Songs` を含めない
 - distribution package には `Main Menu / Options / Song Selecte / Multiplayer Lobby / Clear / Failed` の `Mainmusic/` scene slot を含め、各 `Name.mp3` と `Name 2.mp3`～`Name 64.mp3` を自動検出して scene 再入場ごとに循環する
 - distribution 更新には built artifact と必要な runtime asset だけを含める

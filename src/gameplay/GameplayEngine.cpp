@@ -297,7 +297,7 @@ std::optional<NoteEvent> GameplayEngine::try_hit_note(LaneState& lane, int64_t i
         int64_t delta_samples = input_sample - note.start_sample;
 
         if (delta_samples > windows_.bd) {
-            apply_bad_miss(note, note.start_sample);
+            apply_missed_note(note, note.start_sample);
             lane.mask_until = std::max(lane.mask_until, note.start_sample + windows_.mask);
             ++lane.next_index;
             if (game_over_) {
@@ -318,7 +318,7 @@ std::optional<NoteEvent> GameplayEngine::try_hit_note(LaneState& lane, int64_t i
             // A wide BAD window must not let one missed note steal every later exact press in a dense stream.
             // Recover only when the immediate next note is unambiguously inside the non-BAD window.
             if (std::abs(next_delta_samples) <= windows_.gd) {
-                apply_bad_miss(note, note.start_sample);
+                apply_missed_note(note, note.start_sample);
                 lane.mask_until = std::max(lane.mask_until, note.start_sample + windows_.mask);
                 ++lane.next_index;
                 if (game_over_) {
@@ -360,10 +360,29 @@ std::optional<NoteEvent> GameplayEngine::try_hit_note(LaneState& lane, int64_t i
     return std::nullopt;
 }
 
+void GameplayEngine::apply_missed_note(const NoteEvent& note, int64_t sample) {
+    if (windows_.indirect_miss_enabled) {
+        apply_indirect_miss(note, sample);
+    } else {
+        apply_bad_miss(note, sample);
+    }
+}
+
 void GameplayEngine::apply_bad_miss(const NoteEvent& note, int64_t sample) {
     static_cast<void>(note);
     record_osu_mania_od8_judgement(stats_.osu_od8, OsuManiaJudgement::Miss);
     apply_judgement(game::Judgement::BD,
+                    std::numeric_limits<double>::quiet_NaN(),
+                    sample,
+                    1.0,
+                    ComboImpact::Break,
+                    true);
+}
+
+void GameplayEngine::apply_indirect_miss(const NoteEvent& note, int64_t sample) {
+    static_cast<void>(note);
+    record_osu_mania_od8_judgement(stats_.osu_od8, OsuManiaJudgement::Miss);
+    apply_judgement(game::Judgement::PR,
                     std::numeric_limits<double>::quiet_NaN(),
                     sample,
                     1.0,
@@ -395,10 +414,11 @@ OsuManiaJudgement GameplayEngine::record_osu_hold(const HoldState& hold,
 void GameplayEngine::update_miss(LaneState& lane, int64_t current_sample) {
     while (lane.next_index < lane.notes.size()) {
         const auto& note = lane.notes[lane.next_index];
-        if (current_sample <= note.start_sample + windows_.bd) {
+        const int64_t miss_window = windows_.indirect_miss_enabled ? windows_.indirect_miss : windows_.bd;
+        if (current_sample <= note.start_sample + miss_window) {
             break;
         }
-        apply_bad_miss(note, note.start_sample);
+        apply_missed_note(note, note.start_sample);
         lane.mask_until = note.start_sample + windows_.mask;
         ++lane.next_index;
         if (game_over_) {
@@ -541,7 +561,9 @@ JudgeWindowSamples GameplayEngine::build_windows(const config::JudgeConfig& judg
     windows.gr = to_samples(judge.gr_ms);
     windows.gd = to_samples(judge.gd_ms);
     windows.bd = to_samples(judge.bd_ms);
+    windows.indirect_miss = to_samples(std::max(judge.indirect_miss_ms, judge.bd_ms));
     windows.pr_early = to_samples(1000.0);
+    windows.indirect_miss_enabled = judge.indirect_miss_enabled;
     windows.hold_grace = to_samples(judge.hold_grace_ms);
     windows.hold_break = to_samples(judge.hold_break_ms);
     windows.mask = to_samples(judge.mask_ms);

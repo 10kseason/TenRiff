@@ -3,7 +3,7 @@
 This is the document that the next agent or any new contributor should read first. Its goal is to quickly answer: "what is this project now, where should I look, and what is still unverified?"
 
 ## Baseline
-- Current project and public stable version: `1.2.102 stable`
+- Current project and public stable version: `1.2.103 stable`
 - Direct-IP multiplayer and the preview r5 input-backend lifecycle fixes are integrated into `1.1.8 stable`
 - `1.1.8` adds an osu!mania OD8 auxiliary score, first-native-`BAD` `Sudden Death (1 MISS)`, and deterministic `LN Mix 10%-90%` on top of the 1.1.7 visual refresh
 - `1.2.0` connects BMS channel `04/07` and osu!mania backgrounds to the gameplay sample timeline and asynchronously upscales sub-FHD image backgrounds through LunaSR on Windows ML
@@ -86,7 +86,7 @@ This is the document that the next agent or any new contributor should read firs
   - chart difficulty calculation across supported key counts
   - `mode.key_mode` uses an N2NC-style lane remap to convert key counts
   - in-game Mode Settings exposes `Key Converter` with default `Krrcream` and embedded deterministic `KeyWeaver nK2`; the runtime choice is saved in config and replay metadata
-  - `Conversion Note Add` offers `Default` and `Add 25%+`; the latter adds safe silent chords to the source pattern before the key converter produces the final layout, is saved in replay/result metadata, and cannot replace a normal best record
+  - the separate `Conversion Note Add` option is removed: Krrcream only remaps source notes, while nK2 creates safe support notes directly in the converted target layout when expanding the key count.
   - the standalone BMS key converter CLI/GUI can select the default `krrcream` path or deterministic `nK2 Native 50/50`; nK2 ignores Krrcream-only tuning controls
   - `mode.key_mode=none` keeps the chart's original key count and base pattern layout intact
 - Native difficulty:
@@ -116,9 +116,9 @@ This is the document that the next agent or any new contributor should read firs
   - the default `BAD` window is `210ms`, `Judge Easy` uses `262.5ms`, and `Judge Hard` uses `340ms`
   - `Judge Hard` narrows only the BAD boundary and leaves PG/GR/GD plus long-note tail windows at their base values
   - if the pending same-lane note is already a `BAD` while the immediate next note is clearly `GOOD` or better, the pending note is recorded as a miss and the current press scores the next note instead of locking the stream into repeated `BAD`s
-  - note-consuming failures (auto-miss, too-early consume, hold break / tail miss) stay `BAD`
+  - under `Judge Hard`, an unplayed object becomes a combo-breaking indirect `POOR` and OD8 `MISS`; other note-consuming failures stay `BAD`
   - very early non-consuming presses are handled as LR2-style `POOR` and are visible again in result / replay / UI paths
-  - `POOR` preserves combo, stays out of score / accuracy totals, and uses dedicated `PR` gauge damage values
+  - empty-key `POOR` preserves combo, while Hard indirect `POOR` breaks combo; both stay out of score / accuracy totals and use dedicated `PR` gauge damage
   - gauge modes support `EX-Hard / Hard / Normal / Easy / Gauge Shift`; fixed gauges start at `100%`, fail immediately at `0%`, and never change type, while EX-Hard uses a near-black gray palette distinct from Hard
   - `Gauge Shift` independently simulates EX-Hard / Hard / Normal / Easy from 100%; when the current tier reaches 0%, it selects the next tier that survived the same judgement history, and the highest surviving tier becomes final
   - `Sudden Death (1 MISS)` fails immediately on the first OD8-converted object `MISS`; native `BAD` timing alone and empty-key `POOR` are ignored, and the option is mutually exclusive with Practice No-Fail
@@ -171,12 +171,13 @@ This is the document that the next agent or any new contributor should read firs
 - If the cache is missing or invalid, background indexing starts
 - Indexing profiles:
   - `safe` as the default
-  - `fast` as the optional choice
+  - `fast` collects only song-list metadata (title/artist/key count/#PLAYLEVEL/BPM)
   - controlled by the Mode Settings `Indexing` row and `config.mode.song_index_profile`
+  - `fast` skips file hashes, background/audio preview resolution, difficulty-table matching, and native LV/CR
 - Difficulty calculation:
   - controlled by Mode Settings `Index Difficulty` and `config.mode.calculate_song_index_difficulty`
   - default `off` keeps BMS `#PLAYLEVEL` and skips native LV/CR calculation
-  - `on` calculates Revive LV/Circus Rating; caches from the other calculation mode are not reused
+  - `on` calculates Revive LV/Circus Rating in `safe`; `fast` always skips it
 - Indexing stages:
   - `SCANNING FILES`
   - `BUILDING METADATA`
@@ -189,15 +190,15 @@ This is the document that the next agent or any new contributor should read firs
 - Measurement:
   - on a 46k-chart Windows benchmark library safe full-index, `46,636` candidates / `46,602` indexed entries
   - peak memory roughly `working set 453MB`, `private 524MB`
-  - on a 1024-chart sample from the same library, fast-profile throughput is about `2.05x` vs safe
+
 - Cache schema:
   - `version = 12`
   - optional `layout_label`
-  - `calculate_difficulty`, `native_level`, `md5`, `sha256`, and difficulty-table name/symbol/level/order metadata
+  - `minimal_metadata` keeps Safe and Fast caches separate
 
 ## Runtime / Packaging Rules
 - New user profiles are created automatically
-- The current official P2P distribution line is `TenRiff 1.2.102 stable`
+- The current official P2P distribution line is `TenRiff 1.2.103 stable`
 - Distribution packages do not include `Songs`
 - Distribution packages include the `Mainmusic/` scene slots `Main Menu / Options / Song Selecte / Multiplayer Lobby / Clear / Failed`; each `Name.mp3` plus numbered `Name 2.mp3` through `Name 64.mp3` siblings is discovered automatically and rotates on scene re-entry
 - Distribution updates include only built artifacts and required runtime assets

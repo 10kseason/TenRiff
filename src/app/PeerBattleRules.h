@@ -16,7 +16,6 @@ inline void apply_peer_battle_rules(config::RuntimeConfig& config) {
     config.mode.gauge = "shift";
     config.mode.random = "off";
     config.mode.random_seed = 0;
-    config.mode.key_conversion_note_add_mode = "default";
     config.mode.mods.clear();
     config.mode.ghost_battle_enabled = false;
     config.mode.autoplay_enabled = false;

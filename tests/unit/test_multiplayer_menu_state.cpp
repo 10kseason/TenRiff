@@ -159,7 +159,6 @@ TEST_CASE("peer battle rules fix scoring while preserving local presentation") {
     config.mode.gauge = "hard";
     config.mode.random = "sr";
     config.mode.random_seed = 42;
-    config.mode.key_conversion_note_add_mode = "add_25_plus";
     config.mode.mods = {"judge_easy", "full_long_notes"};
     config.mode.ghost_battle_enabled = true;
     config.mode.autoplay_enabled = true;
@@ -179,7 +178,6 @@ TEST_CASE("peer battle rules fix scoring while preserving local presentation") {
     CHECK(config.mode.gauge == "shift");
     CHECK(config.mode.random == "off");
     CHECK(config.mode.random_seed == 0);
-    CHECK(config.mode.key_conversion_note_add_mode == "default");
     CHECK(config.mode.mods.empty());
     CHECK_FALSE(config.mode.ghost_battle_enabled);
     CHECK_FALSE(config.mode.autoplay_enabled);

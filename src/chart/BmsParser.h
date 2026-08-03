@@ -17,6 +17,9 @@ struct BmsParserOptions {
     bool retain_wav_bmp = true;
     bool retain_unknown_headers = true;
     bool retain_nonessential_commands = true;
+    // Keep only unique note-lane channels plus index headers. This preserves
+    // menu key-mode inference without retaining measure payloads.
+    bool metadata_only = false;
 };
 
 enum class BmsParseSeverity {

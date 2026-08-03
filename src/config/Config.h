@@ -55,6 +55,8 @@ struct JudgeConfig {
     double gd_ms = 75.0;
     double bd_ms = 210.0;
     double indirect_miss_ms = 210.0;
+    // Runtime mode policy: Judge Hard turns an unplayed object into an indirect POOR.
+    bool indirect_miss_enabled = false;
     double hold_grace_ms = 80.0;
     double hold_break_ms = 200.0;
     double mask_ms = 30.0;
@@ -152,7 +154,6 @@ struct InputConfig {
 struct ModeConfig {
     std::string key_mode = "auto";
     std::string key_conversion_algorithm = "krrcream";
-    std::string key_conversion_note_add_mode = "default";
     bool enable_osu_charts = false;
     std::string gauge = "normal";
     std::string random = "off";
@@ -205,7 +206,6 @@ public:
 [[nodiscard]] std::string normalize_skin_mode_token(std::string_view key_mode);
 [[nodiscard]] std::string normalize_ui_language_token(std::string_view token);
 [[nodiscard]] std::string normalize_song_index_profile_token(std::string_view token);
-[[nodiscard]] std::string normalize_key_conversion_note_add_mode(std::string_view token);
 [[nodiscard]] std::string normalize_profile_nickname(std::string_view value);
 [[nodiscard]] std::string normalize_background_upscale_mode(std::string_view token);
 [[nodiscard]] std::vector<std::string> supported_skin_mode_tokens();

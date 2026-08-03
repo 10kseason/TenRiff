@@ -654,6 +654,7 @@ bool BmsParseResult::success() const {
 BmsParseResult BmsParser::parse(std::string_view content, const BmsParserOptions& options) const {
     BmsParseResult result;
     std::string cleaned = remove_bom(normalize_bms_text(content));
+    std::unordered_set<std::string> metadata_lane_channels;
 
     std::istringstream stream(cleaned);
     std::string line;
@@ -710,6 +711,16 @@ BmsParseResult BmsParser::parse(std::string_view content, const BmsParserOptions
             if (channel_token.size() != 2) {
                 add_message(result.messages, BmsParseSeverity::Error, line_number,
                             "Channel token must have length 2.");
+                continue;
+            }
+
+            if (options.metadata_only) {
+                if (is_note_lane_channel(channel_token)) {
+                    const std::string canonical = canonical_lane_channel(channel_token);
+                    if (!canonical.empty() && metadata_lane_channels.emplace(canonical).second) {
+                        result.chart.commands.push_back(BmsMeasureCommand{measure_index, channel_token, {}});
+                    }
+                }
                 continue;
             }
 

@@ -328,8 +328,10 @@ ExportResult save_result_json(const std::string& path, const ResultFile& result_
     obj.emplace("created_utc", config::JsonValue{result_file.created_utc});
     obj.emplace("player_name", config::JsonValue{result_file.player_name});
     obj.emplace("replay_path", config::JsonValue{result_file.replay_path});
-    obj.emplace("key_conversion_note_add_mode",
-                config::JsonValue{result_file.key_conversion_note_add_mode});
+    if (!result_file.key_conversion_note_add_mode.empty()) {
+        obj.emplace("key_conversion_note_add_mode",
+                    config::JsonValue{result_file.key_conversion_note_add_mode});
+    }
     obj.emplace("clear_status", config::JsonValue{result_file.clear_status});
     obj.emplace("final_gauge", config::JsonValue{result_file.final_gauge});
     obj.emplace("sample_rate", config::JsonValue{static_cast<double>(result_file.sample_rate)});

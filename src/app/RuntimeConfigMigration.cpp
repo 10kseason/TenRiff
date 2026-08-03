@@ -198,12 +198,6 @@ bool migrate_bms_first_runtime_config(config::RuntimeConfig& config) {
         config.mode.key_conversion_algorithm = "krrcream";
         changed = true;
     }
-    const std::string key_conversion_note_add_mode =
-        config::normalize_key_conversion_note_add_mode(config.mode.key_conversion_note_add_mode);
-    if (config.mode.key_conversion_note_add_mode != key_conversion_note_add_mode) {
-        config.mode.key_conversion_note_add_mode = key_conversion_note_add_mode;
-        changed = true;
-    }
     if (!is_valid_bms_keysound_policy(config.audio_ui.bms_keysound_policy)) {
         config.audio_ui.bms_keysound_policy = "follow";
         changed = true;

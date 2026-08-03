@@ -330,9 +330,12 @@ bool GameSession::initialize(const CommandLineOptions& options) {
         if (!replay_source_.mode.key_conversion_algorithm.empty()) {
             config_.mode.key_conversion_algorithm = replay_source_.mode.key_conversion_algorithm;
         }
-        config_.mode.key_conversion_note_add_mode =
-            config::normalize_key_conversion_note_add_mode(
-                replay_source_.mode.key_conversion_note_add_mode);
+        if (!replay_source_.mode.key_conversion_note_add_mode.empty() &&
+            replay_source_.mode.key_conversion_note_add_mode != "default") {
+            std::cerr << "[warn] Replay uses the removed Conversion Note Add option and cannot be reproduced."
+                      << std::endl;
+            return false;
+        }
         if (!replay_source_.mode.random.empty()) {
             config_.mode.random = replay_source_.mode.random;
         } else if (config_.mode.random != "off") {
@@ -572,10 +575,8 @@ bool GameSession::initialize(const CommandLineOptions& options) {
             ghost_compatible = false;
         }
         if (ghost_compatible &&
-            config::normalize_key_conversion_note_add_mode(
-                ghost_replay_source_.mode.key_conversion_note_add_mode) !=
-                config::normalize_key_conversion_note_add_mode(
-                    config_.mode.key_conversion_note_add_mode)) {
+            !ghost_replay_source_.mode.key_conversion_note_add_mode.empty() &&
+            ghost_replay_source_.mode.key_conversion_note_add_mode != "default") {
             ghost_compatible = false;
         }
         if (ghost_compatible && !ghost_replay_source_.mode.random.empty() &&
@@ -1858,9 +1859,6 @@ void GameSession::shutdown() {
             replay.final_score = result_.final_score;
             replay.mode.key_mode = config_.mode.key_mode;
             replay.mode.key_conversion_algorithm = config_.mode.key_conversion_algorithm;
-            replay.mode.key_conversion_note_add_mode =
-                config::normalize_key_conversion_note_add_mode(
-                    config_.mode.key_conversion_note_add_mode);
             replay.mode.random = config_.mode.random;
             replay.mode.random_seed = config_.mode.random_seed;
             replay.mode.gauge = config_.mode.gauge;
@@ -1891,9 +1889,6 @@ void GameSession::shutdown() {
             exported_result.created_utc = created_utc;
             exported_result.player_name = result_.player_name;
             exported_result.replay_path = result_.replay_path;
-            exported_result.key_conversion_note_add_mode =
-                config::normalize_key_conversion_note_add_mode(
-                    config_.mode.key_conversion_note_add_mode);
             exported_result.clear_status = result_.clear_status;
             exported_result.final_gauge = gauge_type_token(final_gauge);
             exported_result.sample_rate = sample_rate_;
