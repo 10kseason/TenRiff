@@ -225,7 +225,7 @@ inline std::string resolution_label(std::string_view preset) {
 inline std::string song_index_profile_label(const std::string& value) {
     const std::string normalized = config::normalize_song_index_profile_token(value);
     if (normalized == "fast") {
-        return "Fast";
+        return "Fast (Minimal)";
     }
     return "Safe";
 }
@@ -264,11 +264,6 @@ inline std::string cycle_key_conversion_algorithm(std::string_view current) {
                : "nk2";
 }
 
-inline std::string cycle_key_conversion_note_add_mode(std::string_view current) {
-    return config::normalize_key_conversion_note_add_mode(current) == "add_25_plus"
-               ? "default"
-               : "add_25_plus";
-}
 
 inline std::string normalize_runtime_key_mode(std::string value) {
     value = to_lower_ascii(std::move(value));

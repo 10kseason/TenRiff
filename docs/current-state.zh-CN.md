@@ -3,7 +3,7 @@
 这份文档是下一位 agent 或新任务接手时应该最先阅读的当前状态文档。目标是快速说明“这个项目现在是什么、应该先看哪里、还有哪些内容尚未验证”。
 
 ## 基线
-- 当前项目版本与公开稳定版均为 `1.2.102 stable`
+- 当前项目版本与公开稳定版均为 `1.2.103 stable`
 - direct-IP multiplayer 与 preview r5 的输入 backend 生命周期修复已整合进 `1.1.8 stable`
 - `1.1.8` 在 1.1.7 视觉更新基础上加入 osu!mania OD8 辅助分数、首次原生 `BAD` 即结束的 `Sudden Death (1 MISS)`，以及确定性的 `LN Mix 10%～90%`
 - `1.2.0` 把 BMS 通道 `04/07` 和 osu!mania 背景接入 gameplay sample timeline，并通过 Windows ML 上的 LunaSR 异步放大低于 FHD 的图片背景
@@ -86,7 +86,7 @@
   - 对支持 key count 进行 chart difficulty 计算
   - `mode.key_mode` 通过 N2NC 风格的 lane remap 进行键数变换
   - 游戏内 Mode Settings 的 `Key Converter` 可选择默认 `Krrcream` 或内置确定性 `KeyWeaver nK2`，并写入设置与 replay metadata
-  - `Conversion Note Add` 提供 `Default` / `Add 25%+`；后者仅在 playable key count 改变时先向原始 pattern 请求安全无声和弦，再由 key converter 生成最终 layout，写入 replay/result metadata，且不能替换普通最佳记录
+  - 已移除独立的 `Conversion Note Add` 选项：Krrcream 只重排原始 note，nK2 在扩展键数时直接向转换后的目标 layout 生成安全的辅助 note。
   - `mode.key_mode=none` 表示保持谱面的原始键数与基础 pattern 布局不变
 - Native difficulty：
   - BMS 的 LV/CR 计算仅将 long-note Head/Tail 的 miss-ms 按 0.5倍评估，使 `300ms`按`150ms`处理；实际 gameplay 判定范围保持不变
@@ -115,9 +115,9 @@
   - 默认 `BAD` 范围为 `210ms`，`Judge Easy` 为 `262.5ms`，`Judge Hard` 为 `340ms`
   - `Judge Hard` 只收紧 BAD 边界，PG/GR/GD 与长按尾部判定窗保持基础值
   - 当同一 lane 的 pending note 已经是 `BAD`，而紧接的下一 note 明确可判为 `GOOD` 或更高时，前一 note 会记为 miss，当前按键则分配给下一 note，避免一次漏键锁成连续 `BAD`
-  - 会真正消耗 note 的失败（auto-miss、过早吃掉 note、hold break / tail miss）仍然记为 `BAD`
+  - 在 `Judge Hard` 下，未输入而漏掉的对象会记为断 combo 的间接 `POOR` 和 OD8 `MISS`；其他会消耗 note 的失败仍记为 `BAD`
   - 非消耗型的超早输入会按 LR2 风格记为 `POOR`，并重新出现在结果 / replay / UI 中
-  - `POOR` 不会断 combo，不计入 score / accuracy 总数，并使用独立的 `PR` gauge 损失值
+  - 空按 `POOR` 不会断 combo，Hard 间接 `POOR` 会断 combo；两者均不计入 score / accuracy，并使用独立的 `PR` gauge 损失值
   - gauge 模式支持 `EX-Hard / Hard / Normal / Easy / Gauge Shift`；固定 gauge 从 `100%` 开始，在 `0%` 时立即失败且不会改变类型，EX-Hard 使用与 Hard 区分的近黑深灰配色
   - `Gauge Shift` 会让 EX-Hard / Hard / Normal / Easy 分别从 100% 开始独立并行计算；当前 tier 到达 0% 后选择已累计相同判定历史的下一档存活 tier，并以结束时最高的存活 tier 为最终结果
   - `Sudden Death (1 MISS)` 会在首次 OD8 换算对象 `MISS` 时立即失败；仅原生 `BAD` timing 不会触发，空按产生的 `POOR` 也不触发，并且该选项与 Practice No-Fail 互斥
@@ -170,12 +170,13 @@
 - 如果缓存不存在或无效，就会启动后台索引
 - indexing profile：
   - `safe` 是默认值
-  - `fast` 是可选值
+  - `fast` 仅收集歌曲列表所需的最小 metadata（title/artist/key count/#PLAYLEVEL/BPM）
   - 由 Mode Settings 的 `Indexing` row 和 `config.mode.song_index_profile` 控制
+  - `fast` 跳过文件 hash、背景/音频 preview 解析、难度表匹配和原生 LV/CR
 - difficulty calculation：
   - 由 Mode Settings 的 `Index Difficulty` 和 `config.mode.calculate_song_index_difficulty` 控制
   - 默认 `off` 保留 BMS `#PLAYLEVEL`，跳过原生 LV/CR 计算
-  - `on` 计算 Revive LV/Circus Rating，不复用其他计算模式的缓存
+  - `on` 仅在 `safe` 中计算 Revive LV/Circus Rating；`fast` 始终跳过
 - 索引阶段：
   - `SCANNING FILES`
   - `BUILDING METADATA`
@@ -188,15 +189,15 @@
 - 实测：
   - 46k-chart Windows benchmark library 的 safe full-index 基准为 `46,636` 个 candidate / `46,602` 个 indexed entries
   - 峰值内存大约为 `working set 453MB`、`private 524MB`
-  - 同一库 1024-chart sample 下，fast profile 吞吐量约为 safe 的 `2.05x`
+
 - cache schema：
   - `version = 12`
   - 可选包含 `layout_label`
-  - 包含 `calculate_difficulty`、`native_level`、`md5`、`sha256` 及 difficulty-table name/symbol/level/order metadata
+  - 通过 `minimal_metadata` 区分 Safe/Fast 缓存
 
 ## 运行时 / 打包规则
 - 新用户 profile 会自动创建
-- 当前正式 P2P 发布线为 `TenRiff 1.2.102 stable`
+- 当前正式 P2P 发布线为 `TenRiff 1.2.103 stable`
 - 发布包不包含 `Songs`
 - 发布包包含 `Main Menu / Options / Song Selecte / Multiplayer Lobby / Clear / Failed` 这些 `Mainmusic/` 场景槽位；每个 `Name.mp3` 及 `Name 2.mp3`～`Name 64.mp3` 会自动发现，并在重新进入场景时轮换
 - 发布更新只包含已构建产物和必要的运行时资源

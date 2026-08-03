@@ -1167,3 +1167,89 @@ TEST_CASE("missing song index reports not loaded from file") {
     CHECK(result.index.entries.empty());
     CHECK_FALSE(result.warnings.empty());
 }
+
+TEST_CASE("fast song scan retains only song-list metadata") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+
+    write_file(temp.path / "preview.png", "preview");
+    write_file(temp.path / "sample.wav", "sample");
+    write_file(temp.path / "fast.bms",
+               "#TITLE Fast Metadata\n"
+               "#ARTIST Composer\n"
+               "#PLAYLEVEL 12\n"
+               "#BPM 150\n"
+               "#STAGEFILE preview.png\n"
+               "#WAV01 sample.wav\n"
+               "#00111:01010101\n"
+               "#00112:01010101\n"
+               "#00113:01010101\n"
+               "#00114:01010101\n");
+
+    SongIndexOptions fast_options;
+    fast_options.profile = tenriff::app::SongIndexProfile::Fast;
+    fast_options.calculate_difficulty = true;
+    std::vector<std::string> fast_warnings;
+    const SongIndex fast = scan_songs(
+        temp.path.u8string(), nullptr, fast_warnings, {}, fast_options);
+
+    REQUIRE(fast.entries.size() == 1u);
+    CHECK(fast_warnings.empty());
+    const auto& entry = fast.entries.front();
+    CHECK(entry.title == "Fast Metadata");
+    CHECK(entry.artist == "Composer");
+    CHECK(entry.key_count == 4);
+    CHECK(entry.level == 12);
+    CHECK(entry.native_level == 12);
+    CHECK(entry.bpm == doctest::Approx(150.0));
+    CHECK(entry.md5.empty());
+    CHECK(entry.sha256.empty());
+    CHECK(entry.background_preview_path.empty());
+    CHECK(entry.audio_preview_path.empty());
+    CHECK(entry.rating == doctest::Approx(0.0));
+
+    SongIndexOptions safe_options;
+    std::vector<std::string> safe_warnings;
+    const SongIndex safe = scan_songs(
+        temp.path.u8string(), nullptr, safe_warnings, {}, safe_options);
+    REQUIRE(safe.entries.size() == 1u);
+    CHECK(safe.entries.front().md5.size() == 32u);
+    CHECK(safe.entries.front().sha256.size() == 64u);
+    CHECK_FALSE(safe.entries.front().background_preview_path.empty());
+    CHECK_FALSE(safe.entries.front().audio_preview_path.empty());
+}
+
+TEST_CASE("song index cache rejects Safe and Fast profile mismatches") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+
+    SongIndex index;
+    tenriff::app::SongEntry entry;
+    entry.path = "minimal.bms";
+    entry.title = "Minimal";
+    entry.format = "bms";
+    entry.key_count = 10;
+    entry.level = 10;
+    entry.native_level = 10;
+    entry.file_size = 123;
+    index.entries.push_back(entry);
+
+    SongIndexOptions fast_options;
+    fast_options.profile = tenriff::app::SongIndexProfile::Fast;
+    fast_options.calculate_difficulty = true;
+    const auto cache_path = temp.path / "song_index.json";
+    std::string error;
+    REQUIRE(save_song_index(cache_path.u8string(), index, fast_options, &error));
+
+    const auto fast_loaded = load_song_index(cache_path.u8string(), fast_options);
+    CHECK(fast_loaded.success());
+    CHECK(fast_loaded.loaded_from_file);
+
+    SongIndexOptions safe_options;
+    const auto safe_loaded = load_song_index(cache_path.u8string(), safe_options);
+    CHECK(safe_loaded.success());
+    CHECK_FALSE(safe_loaded.loaded_from_file);
+    CHECK(safe_loaded.index.entries.empty());
+}

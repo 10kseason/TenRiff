@@ -27,6 +27,7 @@ struct ReplayTrace {
 struct ReplayModeSettings {
     std::string key_mode;
     std::string key_conversion_algorithm;
+    // Legacy read-only metadata; current exports leave this field empty.
     std::string key_conversion_note_add_mode;
     std::string random;
     std::optional<int> random_seed;
@@ -62,6 +63,7 @@ struct ResultFile {
     std::string created_utc;
     std::string player_name;
     std::string replay_path;
+    // Legacy read-only metadata; current exports leave this field empty.
     std::string key_conversion_note_add_mode;
     std::string clear_status;
     std::string final_gauge;

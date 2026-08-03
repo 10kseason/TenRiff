@@ -19,7 +19,9 @@ struct JudgeWindowSamples {
     int64_t gr = 0;
     int64_t gd = 0;
     int64_t bd = 0;
+    int64_t indirect_miss = 0;
     int64_t pr_early = 0;
+    bool indirect_miss_enabled = false;
     int64_t hold_grace = 0;
     int64_t hold_break = 0;
     int64_t mask = 0;
@@ -99,7 +101,9 @@ private:
                          ComboImpact combo_impact,
                          bool osu_miss);
     [[nodiscard]] std::optional<NoteEvent> try_hit_note(LaneState& lane, int64_t input_sample);
+    void apply_missed_note(const NoteEvent& note, int64_t sample);
     void apply_bad_miss(const NoteEvent& note, int64_t sample);
+    void apply_indirect_miss(const NoteEvent& note, int64_t sample);
     void apply_empty_poor(int64_t sample);
     [[nodiscard]] OsuManiaJudgement record_osu_hold(const HoldState& hold,
                                                      int64_t release_sample,

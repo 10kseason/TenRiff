@@ -40,7 +40,7 @@ If a profile does not exist, it is created automatically on first launch.
 
 - `backend` (string)
   - `polling | rawinput`
-  - defaults to `rawinput` on the current `1.2.102` release line
+  - defaults to `rawinput` on the current `1.2.103` release line
   - selectable per profile under `Options -> Input Settings -> Backend` or `Options -> Profile Setup -> Input Backend`
   - runtime fallback never rewrites the saved value to `polling`
   - a confirmed RawInput startup failure, registration-target loss, or message-window exit latches Polling across menu and subsequent gameplay sessions for the current app run
@@ -60,7 +60,7 @@ If a profile does not exist, it is created automatically on first launch.
 - `judgement_hz` (int)
   - `1000 | 2000 | 4000 | 8000`
   - compatibility field kept in the input config
-  - the current `1.2.102` runtime no longer drives a separate audio-thread judgement sub-step loop from this value
+  - the current `1.2.103` runtime no longer drives a separate audio-thread judgement sub-step loop from this value
   - default is `4000` (`0.25ms`)
 - `debounce_ms` (double)
   - real Press/Release transitions are preserved; only duplicate same-state events are removed from pressed-state tracking
@@ -73,7 +73,7 @@ If a profile does not exist, it is created automatically on first launch.
 - `Judge Easy` follows its existing `1.25x` scale (`bd=262.5ms`), while `Judge Hard` uses `bd=340ms`; Hard leaves PG/GR/GD and long-note tail windows at their base values
 - `indirect_miss` (double, ms)
   - the indirect-miss threshold used when no input arrives at all and a note is auto-missed
-  - in the current runtime this is always folded into the same value as `bd`, regardless of what is stored
+  - its timing is aligned with `bd`; under `Judge Hard`, an unplayed note is recorded as a combo-breaking indirect `POOR` / OD8 `MISS` instead of BAD
 - `hold_grace` (double, ms)
   - the dedicated window used to treat long-note tail release as `PG`
   - default value is `80ms`
@@ -143,10 +143,8 @@ The chart loader and indexer default to BMS-family files (`.bms/.bme/.bml/.pms`)
   - `krrcream | nk2`
   - select `Krrcream` or `KeyWeaver nK2` from in-game `Mode Settings > Key Converter`
   - defaults to `krrcream` and applies only when `key_mode` changes the source lane count
-- `key_conversion_note_add_mode` (string)
-  - `default | add_25_plus`
-  - `default` leaves the source pattern unchanged; `add_25_plus` requests at least 25% safe silent chord notes on the source when the playable key count changes, then uses that expanded pattern as key-converter input
-  - a higher Note Add mod wins and runs once; peer battle forces `default`
+  - Krrcream only remaps source notes into target lanes
+  - when expanding the key count, nK2 creates safe support notes directly in the target layout during conversion instead of pre-adding notes to the source
 - `gauge` (string)
   - `normal | hard | ex_hard | easy | shift`
 - `random` (string)
@@ -176,11 +174,11 @@ The chart loader and indexer default to BMS-family files (`.bms/.bme/.bml/.pms`)
 - `song_index_profile` (string)
   - `safe | fast`
   - `safe` is the default that prioritizes lower RAM high-water usage on large libraries
-  - `fast` is the optional choice that aims for faster rescans with a higher worker/batch budget in 32GB+ environments
+  - `fast` is the optional minimal profile that skips file hashes, previews, difficulty tables, and native LV/CR
 - `calculate_song_index_difficulty` (bool)
   - defaults to `false`
   - `false` keeps BMS `#PLAYLEVEL` as the menu LV and skips the CPU-heavy native LV/CR calculation
-  - `true` calculates the existing Revive LV/Circus Rating during a full index
+  - `true` calculates Revive LV/Circus Rating during a full `safe` index; `fast` always skips it
   - changing the setting separates cache modes and triggers a full reindex of the current song source
 
 ### `ui`

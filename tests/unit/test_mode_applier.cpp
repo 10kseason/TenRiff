@@ -749,20 +749,26 @@ TEST_CASE("nK2 converter is selectable and ignores Krrcream-only tuning fields")
     const auto first = convert_key_mode_chart(chart, options);
     REQUIRE(first.converted);
     CHECK(first.chart.lane_count == 8);
-    CHECK_FALSE(first.chart.notes.empty());
+    CHECK(first.chart.notes.size() > chart.notes.size());
     CHECK(is_time_sorted(first.chart));
     CHECK_FALSE(has_lane_overlap(first.chart));
     CHECK(contains_warning(first.warnings, "nK2 remapped"));
+    CHECK(contains_warning(first.warnings, "added="));
     CHECK(std::any_of(first.chart.notes.begin(), first.chart.notes.end(), [](const NoteEvent& note) {
         return note.end_sample.has_value() && *note.end_sample == 1220 && note.release_required;
     }));
+    std::set<std::size_t> source_note_ids;
+    bool found_generated_support_note = false;
     for (const auto& note : first.chart.notes) {
         CHECK(note.lane >= 1);
         CHECK(note.lane <= 8);
         CHECK(note.note_id >= 1u);
         CHECK(note.note_id <= chart.notes.size());
+        if (!source_note_ids.insert(note.note_id).second) {
+            found_generated_support_note = true;
+        }
     }
-
+    CHECK(found_generated_support_note);
     options.max_keys = 8;
     options.min_keys = 8;
     options.transform_speed_slot = 8;

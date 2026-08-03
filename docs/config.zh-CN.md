@@ -40,7 +40,7 @@
 
 - `backend` (string)
   - `polling | rawinput`
-  - 当前 `1.2.102` 发布线默认值为 `rawinput`
+  - 当前 `1.2.103` 发布线默认值为 `rawinput`
   - 可在 `Options -> Input Settings -> Backend` 或 `Options -> Profile Setup -> Input Backend` 中按 profile 选择
   - runtime fallback 不会把已保存值改写为 `polling`
   - 确认 RawInput 启动失败、注册目标丢失或 message window 退出后，本次应用运行期间 menu 与后续 gameplay 都会保持 Polling
@@ -73,7 +73,7 @@
 - `Judge Easy` 沿用现有 `1.25x` 倍率（`bd=262.5ms`），`Judge Hard` 使用 `bd=340ms`；Hard 不会收紧 PG/GR/GD 与长按尾部判定窗
 - `indirect_miss` (double, ms)
   - 在完全没有输入时将 note 自动判为 miss 的间接 miss 标准
-  - 当前运行时里不管保存值是什么，都会固定折叠到与 `bd` 相同的值
+  - timing 与 `bd` 对齐；在 `Judge Hard` 下，未输入 note 会记为断 combo 的间接 `POOR` / OD8 `MISS`，而不是 BAD
 - `hold_grace` (double, ms)
   - 将 long note tail release 判为 `PG` 的专用宽限窗口
   - 默认值为 `80ms`
@@ -143,10 +143,8 @@ chart loader/indexer 默认使用 BMS family（`.bms/.bme/.bml/.pms`）。设置
   - `krrcream | nk2`
   - 在游戏内 `Mode Settings > Key Converter` 中选择 `Krrcream` 或 `KeyWeaver nK2`
   - 默认值为 `krrcream`，仅在 `key_mode` 改变原始 lane count 时生效
-- `key_conversion_note_add_mode` (string)
-  - `default | add_25_plus`
-  - `default` 保留原始 pattern；`add_25_plus` 仅在 playable key count 变化时先向原始 pattern 请求至少25%的安全无声和弦，再把扩展后的 pattern 交给 key converter
-  - 若 Mod Manager 的 Note Add 高于25%，只应用一次较高比例；peer battle 固定为 `default`
+  - Krrcream 只把原始 note 重排到目标 lane
+  - nK2 在扩展键数时不会先向原始 pattern 加 note，而是在转换过程中直接向目标 layout 生成安全的辅助 note
 - `gauge` (string)
   - `normal | hard | ex_hard | easy | shift`
 - `random` (string)
@@ -176,11 +174,11 @@ chart loader/indexer 默认使用 BMS family（`.bms/.bme/.bml/.pms`）。设置
 - `song_index_profile` (string)
   - `safe | fast`
   - `safe` 是优先降低大型曲库 RAM high-water 的默认值
-  - `fast` 是面向 32GB+ 环境、用更高 worker/batch budget 提升重扫速度的可选值
+  - `fast` 是跳过文件 hash、preview、难度表和原生 LV/CR 的可选最小 profile
 - `calculate_song_index_difficulty` (bool)
   - 默认值为 `false`
   - `false` 保留 BMS `#PLAYLEVEL` 作为菜单 LV，并跳过 CPU 开销较高的原生 LV/CR 计算
-  - `true` 在完整索引期间计算 Revive LV/Circus Rating
+  - `true` 仅在完整 `safe` 索引中计算 Revive LV/Circus Rating；`fast` 始终跳过
   - 修改设置后会区分缓存模式，并对当前 song source 执行完整重索引
 
 ### `ui`

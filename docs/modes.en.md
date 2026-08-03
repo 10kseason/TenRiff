@@ -10,7 +10,6 @@ This document summarizes the implemented mode system, lane-transform/random rule
 "mode": {
   "key_mode": "none",
   "key_conversion_algorithm": "krrcream",
-  "key_conversion_note_add_mode": "default",
   "enable_osu_charts": false,
   "gauge": "normal",
   "random": "off",
@@ -28,8 +27,7 @@ This document summarizes the implemented mode system, lane-transform/random rule
 ## Mode Meanings
 - `enable_osu_charts`: defaults to `false`; Mode Settings > `OSU Charts` enables indexing and play for 4K-10K osu!mania `.osu` and refreshes the library
 - `key_mode`: `none | auto | 4k | 5k | 6k | 7k | 8k | 9k | 10k | 12k | 14k | 16k`
-- `key_conversion_algorithm`: `krrcream | nk2` (defaults to `krrcream`; selected in the in-game Key Converter row and used only for actual key-count conversion)
-- `key_conversion_note_add_mode`: `default | add_25_plus` (defaults to `default`; only an actual playable-key-count change first requests at least 25% more source-pattern notes and then passes them through the key converter)
+- `key_conversion_algorithm`: `krrcream | nk2` (defaults to `krrcream`; Krrcream only remaps source notes, while nK2 directly creates safe support notes in the target layout during key-count expansion)
 - `gauge`: `normal | hard | ex_hard | easy | shift`
 - `random`: `off | mirror | rr | fr | sr`
 - `random_seed`: fixed seed for RR/FR/SR, forced key-mode conversion, Note Add, and LN Mix selection (`0` is also fixed)
@@ -45,10 +43,10 @@ This document summarizes the implemented mode system, lane-transform/random rule
   - mutually exclusive with Practice No-Fail in Mode Settings
 - `song_index_profile`: `safe | fast`
   - `safe`: the default that prioritizes lowering large-library RAM high-water usage
-  - `fast`: the optional choice that aims for faster reindexing in 32GB+ environments
+  - `fast`: minimal indexing that keeps title/artist/key count/#PLAYLEVEL/BPM and skips hashes, previews, difficulty tables, and native LV/CR
 - `calculate_song_index_difficulty`: `false | true`
   - default `false`: keep BMS `#PLAYLEVEL` and skip native LV/CR calculation
-  - `true`: calculate Revive LV/Circus Rating during a full reindex
+  - `true`: calculate Revive LV/Circus Rating during a full `safe` reindex; `fast` always skips it
 
 `Rate` is stored under `speed.rate`, not `mode`. It can be changed in Mode Settings or directly from Song Select with `-` / `+` while search text entry is inactive.
 
@@ -77,8 +75,8 @@ This document summarizes the implemented mode system, lane-transform/random rule
 - `4k..10k`, `12k`, `14k`, and `16k` match the key count through N2NC-based lane remapping
 - forced conversion of `5+1 SP` and `7+1 SP` remaps only the keyboard part; followed scratch keysounds move to autoplay
 - forced conversion of `10+2 DP` and `14+2 DP` likewise excludes both scratches and converts the two keyboard halves independently
-- `add_25_plus` first requests at least 25% safe silent chords at existing source-pattern times, then the key converter produces the final layout from all notes; a higher Note Add mod replaces that percentage instead of stacking another pass. The run remains in Records but cannot replace a normal best record.
-- application order: key-mode conversion → DP Flip → Mirror/RR/FR/SR → Note Add → LN/Full Tap structure transform
+- nK2 expansion first lays out source notes on the target keys and then generates support notes in that same target layout; it never pre-adds notes to the source chart and reconverts them
+- application order: key-mode conversion (including nK2 target-layout support generation) → DP Flip → Mirror/RR/FR/SR → Note Add → LN/Full Tap structure transform
 
 ## Gauge Rules
 - Fixed gauges (`ex_hard / hard / normal / easy`) start at `100%`, fail immediately at `0%`, and never change type.

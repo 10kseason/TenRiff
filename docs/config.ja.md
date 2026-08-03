@@ -40,7 +40,7 @@ profile が存在しない場合は初回起動時に自動生成されます。
 
 - `backend` (string)
   - `polling | rawinput`
-  - 現行 `1.2.102` リリースラインの既定値は `rawinput`
+  - 現行 `1.2.103` リリースラインの既定値は `rawinput`
   - `Options -> Input Settings -> Backend` または `Options -> Profile Setup -> Input Backend` で profile ごとに選択可能
   - runtime fallback は保存済みの値を `polling` に書き換えない
   - RawInput の起動失敗、登録先の消失、message window の終了を確認すると、そのアプリ実行中は menu と後続 gameplay の両方で Polling を維持する
@@ -73,7 +73,7 @@ profile が存在しない場合は初回起動時に自動生成されます。
 - `Judge Easy` は従来の `1.25x` 倍率で `bd=262.5ms`、`Judge Hard` は `bd=340ms` を使用。Hard でも PG/GR/GD と LN tail window は基本値のまま
 - `indirect_miss` (double, ms)
   - 入力が来ないまま note が auto-miss になるときの閾値
-  - 現在の runtime では保存値に関係なく常に `bd` と同値へ折りたたまれる
+  - timing は `bd` に合わせ、`Judge Hard` では未入力 note を BAD ではなく combo-breaking indirect `POOR` / OD8 `MISS` として記録
 - `hold_grace` (double, ms)
   - long-note tail release を `PG` とみなす専用 window
   - 既定値は `80ms`
@@ -143,10 +143,8 @@ chart loader/indexer は BMS family（`.bms/.bme/.bml/.pms`）が既定です。
   - `krrcream | nk2`
   - ゲーム内の `Mode Settings > Key Converter` で `Krrcream` または `KeyWeaver nK2` を選択
   - 既定値は `krrcream`。`key_mode` が元の lane count を変更する場合のみ適用
-- `key_conversion_note_add_mode` (string)
-  - `default | add_25_plus`
-  - `default` は元 pattern を維持し、`add_25_plus` は playable key count が変わる時に元 pattern へ無音 chord note を最低25%先に要求してから、その拡張 pattern を key converter の入力に使用
-  - Mod Manager の Note Add が25%より高い場合は高い方を一度だけ適用し、peer battle では `default` に固定
+  - Krrcream は元 note を target lane へ再配置するだけ
+  - nK2 は key count 拡張時、元 pattern へ先に note を追加せず、変換中に target layout へ安全な support note を直接生成
 - `gauge` (string)
   - `normal | hard | ex_hard | easy | shift`
 - `random` (string)
@@ -176,11 +174,11 @@ chart loader/indexer は BMS family（`.bms/.bme/.bml/.pms`）が既定です。
 - `song_index_profile` (string)
   - `safe | fast`
   - `safe` は大規模ライブラリで RAM high-water を抑える既定値
-  - `fast` は 32GB+ 環境向けに worker/batch 予算を増やして再スキャン高速化を狙う任意値
+  - `fast` は file hash、preview、difficulty table、native LV/CR を省略する任意の最小 profile
 - `calculate_song_index_difficulty` (bool)
   - 既定値は `false`
   - `false` は BMS `#PLAYLEVEL` を menu LV として保持し、CPU 負荷の高い native LV/CR 計算を省略
-  - `true` は full index 中に Revive LV/Circus Rating を計算
+  - `true` は full `safe` index 中に Revive LV/Circus Rating を計算し、`fast` では常に省略
   - 設定変更時は cache mode を分離し、現在の song source を full reindex
 
 ### `ui`

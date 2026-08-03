@@ -10,7 +10,6 @@
 "mode": {
   "key_mode": "none",
   "key_conversion_algorithm": "krrcream",
-  "key_conversion_note_add_mode": "default",
   "enable_osu_charts": false,
   "gauge": "normal",
   "random": "off",
@@ -28,8 +27,7 @@
 ## 모드 의미
 - `enable_osu_charts`: 기본 `false`; Mode Settings의 `OSU Charts`로 켜면 osu!mania 4K~10K `.osu`를 인덱싱·플레이하고 라이브러리를 재스캔함
 - `key_mode`: `none | auto | 4k | 5k | 6k | 7k | 8k | 9k | 10k | 12k | 14k | 16k`
-- `key_conversion_algorithm`: `krrcream | nk2` (기본 `krrcream`; 게임 내 Key Converter에서 선택하며 실제 키수 변환 때만 적용)
-- `key_conversion_note_add_mode`: `default | add_25_plus` (기본 `default`; 실제 건반 수가 바뀔 때만 원본 패턴에 최소 25% 노트 추가를 먼저 요청하고 그 결과를 키컨버터로 전달)
+- `key_conversion_algorithm`: `krrcream | nk2` (기본 `krrcream`; Krrcream은 원본 노트만 재배치하고 nK2는 키 수 확장 중 목표 레이아웃에 안전한 보조 노트를 직접 생성)
 - `gauge`: `normal | hard | ex_hard | easy | shift`
 - `random`: `off | mirror | rr | fr | sr`
 - `random_seed`: RR/FR/SR, 강제 key-mode 변환, Note Add, LN Mix 대상 선택의 고정 시드 (0도 고정 값으로 취급)
@@ -45,10 +43,10 @@
   - Mode Settings에서 Practice No-Fail과 상호 배타적
 - `song_index_profile`: `safe | fast`
   - `safe`: large-library RAM high-water를 우선 낮추는 기본값
-  - `fast`: 32GB+ 환경에서 더 빠른 재인덱싱을 노리는 선택값
+  - `fast`: 제목/아티스트/키 수/#PLAYLEVEL/BPM만 유지하고 해시·미리보기·난이도표·자체 LV/CR을 생략하는 최소 인덱싱
 - `calculate_song_index_difficulty`: `false | true`
   - 기본 `false`: BMS `#PLAYLEVEL`을 유지하고 자체 LV/CR 계산 생략
-  - `true`: 전체 재인덱싱에서 Revive LV/Circus Rating 계산
+  - `true`: `safe` 전체 재인덱싱에서 Revive LV/Circus Rating 계산; `fast`는 항상 생략
 
 `Rate`는 `mode`가 아니라 `speed.rate`에 저장됩니다. Mode Settings에서 조정할 수 있고, Song Select에서는 검색 입력 중이 아닐 때 `-` / `+`로 다음 플레이 값을 바로 바꿀 수 있습니다.
 
@@ -77,8 +75,8 @@
 - `4k..10k`, `12k`, `14k`, `16k`는 N2NC 기반 lane remap으로 키 수를 맞춤
 - `5+1 SP`와 `7+1 SP` 강제 변환은 스크래치를 제외한 건반부만 목표 키 수로 재배치하며, `follow` 스크래치 키사운드는 자동 재생 큐로 이동
 - `10+2 DP`와 `14+2 DP` 강제 변환도 두 스크래치를 제외하고 좌우 건반부를 독립적으로 변환
-- `add_25_plus`는 원본 패턴의 기존 시각에 안전한 무음 화음을 최소 25% 먼저 요청하고 키컨버터가 추가 노트까지 포함해 최종 레이아웃을 생성함. 더 높은 Note Add Mod가 있으면 그 비율만 한 번 적용하며, 해당 결과는 기록 목록에는 남지만 일반 최고기록을 덮지 않음
-- 적용 순서: key-mode 변환 → DP Flip → Mirror/RR/FR/SR → Note Add → LN/Full Tap 구조 변환
+- nK2 확장은 원본 노트를 목표 키에 먼저 배치한 뒤 같은 목표 레이아웃에 보조 노트를 생성하며, 원본 4K 등에 노트를 미리 추가한 뒤 다시 변환하지 않음
+- 적용 순서: key-mode 변환(nK2 목표 레이아웃 보조 노트 생성 포함) → DP Flip → Mirror/RR/FR/SR → Note Add → LN/Full Tap 구조 변환
 
 ## 게이지 규칙
 - 고정 게이지(`ex_hard / hard / normal / easy`)는 `100%`에서 시작하고 `0%`에 도달하면 즉시 실패하며 타입이 바뀌지 않습니다.

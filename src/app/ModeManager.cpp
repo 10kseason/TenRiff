@@ -847,29 +847,17 @@ ModeManagerResult manage_modes(const gameplay::GameplayChart& chart,
     result.active_mods = normalize_mode_mod_tokens(config.mods, &result.warnings);
     result.settings.dp_flip = has_mod_token(result.active_mods, "dp_flip");
 
-    const int source_playable_lane_count = resolved_playable_lane_count(result.chart);
-    const int requested_lane_count = target_lane_count(result.settings.key_mode);
-    const bool key_count_conversion_requested =
-        requested_lane_count > 0 && requested_lane_count != source_playable_lane_count;
-    const bool conversion_note_add_enabled =
-        key_count_conversion_requested &&
-        ::tenriff::config::normalize_key_conversion_note_add_mode(config.key_conversion_note_add_mode) ==
-            "add_25_plus";
-    const int note_add_percent = std::max(
-        selected_note_add_percent(result.active_mods), conversion_note_add_enabled ? 25 : 0);
-    if (note_add_percent > 0) {
-        apply_note_additions(result.chart,
-                             note_add_percent,
-                             config.random_seed,
-                             conversion_note_add_enabled,
-                             result.warnings);
-    }
-
-    // Note Add changes the source pattern. The key converter must consume those generated notes
-    // instead of receiving a finished chart and having new notes appended after conversion.
     const auto applied = gameplay::apply_mode_settings(result.chart, result.settings, {base_bpm, sample_rate});
     result.chart = applied.chart;
     result.warnings.insert(result.warnings.end(), applied.warnings.begin(), applied.warnings.end());
+
+    // Generic Note Add remains a separate post-conversion mod. nK2 owns support-note
+    // generation inside its target-layout conversion instead of pre-expanding the source chart.
+    if (const int note_add_percent = selected_note_add_percent(result.active_mods);
+        note_add_percent > 0) {
+        apply_note_additions(
+            result.chart, note_add_percent, config.random_seed, false, result.warnings);
+    }
 
     if (has_mod_token(result.active_mods, "full_short_notes")) {
         apply_full_short_notes(result.chart);
@@ -899,6 +887,7 @@ ModeManagerResult manage_modes(const gameplay::GameplayChart& chart,
         result.judge.bd_ms = 340.0;
     }
     result.judge.indirect_miss_ms = result.judge.bd_ms;
+    result.judge.indirect_miss_enabled = judge_hard;
 
     result.rate_multiplier = rate_score_multiplier(rate);
     result.mod_multiplier = mod_score_multiplier(result.active_mods);
