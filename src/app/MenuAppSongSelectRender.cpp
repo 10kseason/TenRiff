@@ -79,6 +79,11 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
     render.song_select.record_count = static_cast<int>(current_song_record_indices_.size());
     render.song_select.showing_sources = (song_select_view_ == SongSelectView::Sources);
     render.song_select.showing_records = (song_select_view_ == SongSelectView::Records);
+    render.song_select.result_available =
+        render.song_select.showing_records
+            ? (selected_record && !selected_record->result_path.empty())
+            : (!render.song_select.showing_sources && current_best.has_value &&
+               !current_best.result_path.empty());
     const bool korean = ui_uses_korean();
     const auto key_filter_summary = [&]() {
         return song_key_filter_ <= 0 ? ui_text("All Keys", "전체 키") : key_mode_label(std::to_string(song_key_filter_) + "k");
@@ -156,8 +161,11 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
             : (render.song_select.showing_records
                    ? ui_text("UP/DOWN or wheel  MOVE     ENTER / dbl-click  OPEN RESULT     PGUP/PGDN  PAGE",
                              "위/아래 또는 휠  이동     ENTER / 더블클릭  결과 열기     PGUP/PGDN  페이지")
-                   : ui_text("UP/DOWN or wheel  MOVE     ENTER / dbl-click  PLAY     PGUP/PGDN  PAGE",
-                             "위/아래 또는 휠  이동     ENTER / 더블클릭  플레이     PGUP/PGDN  페이지")));
+                   : (render.song_select.result_available
+                          ? ui_text("UP/DOWN or wheel  MOVE     ENTER / dbl-click  PLAY     CLICK BEST SCORE  RESULT",
+                                    "위/아래 또는 휠  이동     ENTER / 더블클릭  플레이     최고 점수 클릭  결과")
+                          : ui_text("UP/DOWN or wheel  MOVE     ENTER / dbl-click  PLAY     PGUP/PGDN  PAGE",
+                                    "위/아래 또는 휠  이동     ENTER / 더블클릭  플레이     PGUP/PGDN  페이지"))));
     render.song_select.secondary_hint =
         multiplayer_selecting_chart_
             ? ui_text("ESC / BACKSPACE  BACK TO MULTIPLAYER LOBBY",
@@ -228,15 +236,15 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
     }
 
     render.song_select.left_nav = {
-        render::MenuButtonData{ui_text("SONGS", "곡 목록"), "S", song_select_nav_cursor_ == 0,
+        render::MenuButtonData{ui_text("SONGS", "곡 목록"), u8"♫", song_select_nav_cursor_ == 0,
                                render.song_select.showing_sources || render.song_select.showing_records
                                    ? (std::to_string(render.song_select.song_count) + " " + ui_text("CHARTS", "차트"))
                                    : ui_text("ACTIVE", "활성")},
-        render::MenuButtonData{ui_text("SOURCES", "소스"), "D", song_select_nav_cursor_ == 1,
+        render::MenuButtonData{ui_text("SOURCES", "소스"), u8"▣", song_select_nav_cursor_ == 1,
                                config_.ui.recent_song_sources.empty()
                                    ? ui_text("ADD FOLDER", "폴더 추가")
                                    : (render.song_select.showing_sources ? ui_text("ACTIVE", "활성") : source_detail)},
-        render::MenuButtonData{ui_text("SEARCH", "검색"), "F", song_select_nav_cursor_ == 2,
+        render::MenuButtonData{ui_text("SEARCH", "검색"), u8"⌕", song_select_nav_cursor_ == 2,
                                song_search_query_.empty()
                                    ? (song_select_search_active_
                                           ? ui_text("<typing>", "<입력 중>")
@@ -245,10 +253,10 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
                                           ? ui_text("Q ", "검색 ") + safe_ui_text(song_search_query_) + "  " +
                                                 ui_text("(typing)", "(입력 중)")
                                           : ui_text("Q ", "검색 ") + safe_ui_text(song_search_query_))},
-        render::MenuButtonData{ui_text("FILTER", "필터"), "=", song_select_nav_cursor_ == 3, browser_detail},
-        render::MenuButtonData{ui_text("RECORDS", "기록"), "R", song_select_nav_cursor_ == 4,
+        render::MenuButtonData{ui_text("FILTER", "필터"), u8"≡", song_select_nav_cursor_ == 3, browser_detail},
+        render::MenuButtonData{ui_text("RECORDS", "기록"), u8"▤", song_select_nav_cursor_ == 4,
                                render.song_select.showing_records ? ui_text("ACTIVE", "활성") : records_detail},
-        render::MenuButtonData{ui_text("OPTIONS", "옵션"), "O", song_select_nav_cursor_ == 5,
+        render::MenuButtonData{ui_text("OPTIONS", "옵션"), u8"⚙", song_select_nav_cursor_ == 5,
                                format_multiplier(config_.speed.rate) + " / HS " +
                                    format_decimal(config_.speed.hi_speed)},
     };
@@ -329,6 +337,9 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
                 card.detail = record.replay_path.empty()
                                   ? ui_text("RESULT ONLY", "결과만 있음")
                                   : ui_text("REPLAY ", "리플레이 ") + filename_only(record.replay_path);
+                if (record.pause_used) {
+                    card.detail += ui_text(" / PAUSED", " / 퍼즈 사용");
+                }
                 card.song_index = i;
                 card.selected = (i == selected_record_);
                 render.song_select.songs.push_back(std::move(card));
@@ -463,7 +474,9 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
                 } else {
                     render.song_select.selected_record_replay_detail =
                         format_multiplier(replay->rate) + " / " +
-                        format_signed_offset_ms(replay->input_offset_ms);
+                        format_signed_offset_ms(replay->input_offset_ms) +
+                        (replay->pause_used ? ui_text(" / PAUSED", " / 퍼즈 사용")
+                                            : std::string{});
                 }
             } else {
                 render.song_select.selected_record_replay_detail = ui_text("No replay", "리플레이 없음");

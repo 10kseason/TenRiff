@@ -67,6 +67,7 @@ TEST_CASE("replay export writes JSON with trace events") {
     replay.rate_multiplier = 0.75;
     replay.score_multiplier = 0.75;
     replay.final_score = 1234;
+    replay.pause_used = true;
     replay.mode.key_mode = "6k";
     replay.mode.key_conversion_algorithm = "nk2";
     replay.mode.key_conversion_nk2_preset = "transform";
@@ -129,6 +130,7 @@ TEST_CASE("replay export writes JSON with trace events") {
     CHECK(root->find("rate_multiplier")->second.as_number() == doctest::Approx(0.75));
     CHECK(root->find("score_multiplier")->second.as_number() == doctest::Approx(0.75));
     CHECK(root->find("final_score")->second.as_number() == doctest::Approx(1234.0));
+    CHECK(root->find("pause_used")->second.as_bool(false));
     auto mode_it = root->find("mode");
     REQUIRE(mode_it != root->end());
     const auto* mode = mode_it->second.as_object();
@@ -152,6 +154,7 @@ TEST_CASE("replay export writes JSON with trace events") {
     CHECK(parsed_replay->score_multiplier == doctest::Approx(0.75));
     CHECK(parsed_replay->raw_score == 1645);
     CHECK(parsed_replay->final_score == 1234);
+    CHECK(parsed_replay->pause_used);
     CHECK(parsed_replay->autoplay_enabled);
     CHECK(parsed_replay->practice_no_fail_enabled);
     CHECK(parsed_replay->one_miss_fail_enabled);
@@ -176,6 +179,7 @@ TEST_CASE("replay export writes JSON with trace events") {
     CHECK(loaded_replay.replay->stats.osu_od8.available);
     CHECK(loaded_replay.replay->stats.osu_od8.score == 1'000'000);
     CHECK(loaded_replay.replay->stats.osu_od8.counts.perfect == 1);
+    CHECK(loaded_replay.replay->pause_used);
     CHECK(loaded_replay.replay->trace.events.size() == 2u);
     CHECK(loaded_replay.replay->trace.events[0].lane == 1);
     CHECK(loaded_replay.replay->trace.events[0].state == InputState::Pressed);
@@ -201,6 +205,7 @@ TEST_CASE("result export writes JSON with replay reference") {
     result.rate_multiplier = 1.05;
     result.score_multiplier = 0.50;
     result.final_score = 900;
+    result.pause_used = true;
     result.autoplay_enabled = false;
     result.practice_no_fail_enabled = true;
     result.one_miss_fail_enabled = true;
@@ -247,6 +252,7 @@ TEST_CASE("result export writes JSON with replay reference") {
     CHECK(root->find("autoplay_enabled")->second.as_bool(true) == result.autoplay_enabled);
     CHECK(root->find("practice_no_fail_enabled")->second.as_bool(false) == result.practice_no_fail_enabled);
     CHECK(root->find("one_miss_fail_enabled")->second.as_bool(false) == result.one_miss_fail_enabled);
+    CHECK(root->find("pause_used")->second.as_bool(false));
 
     auto parsed_result = tenriff::app::menu_records::parse_result_file(path, nullptr);
     REQUIRE(parsed_result.has_value());
@@ -259,6 +265,7 @@ TEST_CASE("result export writes JSON with replay reference") {
     CHECK(parsed_result->rate_multiplier == doctest::Approx(1.05));
     CHECK(parsed_result->score_multiplier == doctest::Approx(0.50));
     CHECK(parsed_result->final_score == 900);
+    CHECK(parsed_result->pause_used);
     CHECK_FALSE(parsed_result->autoplay_enabled);
     CHECK(parsed_result->practice_no_fail_enabled);
     CHECK(parsed_result->one_miss_fail_enabled);
@@ -296,6 +303,7 @@ TEST_CASE("legacy result parsing falls back to derived score metadata") {
     CHECK(parsed->score_multiplier == doctest::Approx(1.0));
     CHECK(parsed->stats.raw_score == 1800);
     CHECK(parsed->final_score == 1800);
+    CHECK_FALSE(parsed->pause_used);
 
     std::error_code ec;
     std::filesystem::remove(path, ec);
@@ -329,6 +337,7 @@ TEST_CASE("legacy replay parsing falls back to derived final score") {
     CHECK(parsed->score_multiplier == doctest::Approx(1.0));
     CHECK(parsed->raw_score == 1500);
     CHECK(parsed->final_score == 1500);
+    CHECK_FALSE(parsed->pause_used);
 
     std::error_code ec;
     std::filesystem::remove(path, ec);

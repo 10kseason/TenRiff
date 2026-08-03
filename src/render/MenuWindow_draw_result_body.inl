@@ -448,10 +448,8 @@
                        std::to_string(data.result.judged_notes));
         draw_panel_row(summary_rect, summary_stats_top + summary_stats_step * 2.0f, loc("Total Notes", "전체 노트"),
                        std::to_string(data.result.total_notes));
-        draw_panel_row(summary_rect, summary_stats_top + summary_stats_step * 3.0f, "OSU OD8",
-                       data.result.osu_od8_score_available
-                           ? format_int_with_commas(data.result.osu_od8_score)
-                           : "--");
+        draw_panel_row(summary_rect, summary_stats_top + summary_stats_step * 3.0f,
+                       loc("Pause Used", "퍼즈 사용"), data.result.pause_used ? "USED" : "--");
 
         if (d2d_->body_format && d2d_->muted_brush) {
             const std::wstring detail_w =

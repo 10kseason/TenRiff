@@ -330,7 +330,10 @@ private:
     [[nodiscard]] std::string active_external_skin_root() const;
     [[nodiscard]] std::string active_external_skin_name() const;
     [[nodiscard]] const struct LocalPlayRecord* current_selected_record() const;
+    [[nodiscard]] bool open_result_record(const std::string& result_path,
+                                          const std::string& replay_path);
     [[nodiscard]] bool open_selected_record_result();
+    [[nodiscard]] bool open_current_song_best_result();
     [[nodiscard]] const ReplaySummary* replay_summary_for_path(const std::string& path);
     [[nodiscard]] std::string best_replay_path_for_selected_song() const;
     [[nodiscard]] bool move_song_select_selection(int delta);
@@ -395,6 +398,8 @@ private:
         int bad = 0;
         int poor = 0;
         std::string created_utc;
+        std::string result_path;
+        std::string replay_path;
     };
 
     struct LocalPlayRecord {
@@ -411,6 +416,7 @@ private:
         std::vector<std::string> mods;
         double rate_multiplier = 1.0;
         double score_multiplier = 1.0;
+        bool pause_used = false;
         bool autoplay_enabled = false;
         bool practice_no_fail_enabled = false;
         int64_t raw_score = 0;
@@ -440,6 +446,7 @@ private:
         std::vector<std::string> mods;
         double rate_multiplier = 1.0;
         double score_multiplier = 1.0;
+        bool pause_used = false;
         int64_t final_score = 0;
         std::string error;
     };
@@ -472,6 +479,7 @@ private:
     double last_result_rate_multiplier_ = 1.0;
     double last_result_score_multiplier_ = 1.0;
     int64_t last_result_final_score_ = 0;
+    bool last_pause_used_ = false;
     bool last_session_replay_playback_ = false;
     double last_chart_bpm_ = 0.0;
     GameplayHudState gameplay_hud_{};

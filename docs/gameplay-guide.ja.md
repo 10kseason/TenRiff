@@ -44,6 +44,8 @@ Windows では通常、次のどちらかで起動します。
 - 左クリック: 曲選択
 - ダブルクリック: 曲開始
 - `Enter`: 現在選択中の曲を開始
+- 右側の `BEST SCORE` card を左クリック: その曲の最高 Result を開き、`WATCH REPLAY` または `F1` で replay を再生
+- 左側の `RECORDS`: 現在の曲の local play を確認し、`OPEN RESULT` で選択結果を開く
 - `Left` / `Right`: 左側メニューのフォーカス切り替え
 - `Esc`: 前の画面に戻る
 - `-` / `+`: 次の play の Rate を即時調整
@@ -130,7 +132,6 @@ Rate は曲の再生速度と譜面スケジュールだけを変え、同じ Hi
 - 現在の `Hi-Speed`
 - Gauge 値と現在の gauge type
 - TenRiff native Score
-- 実入力 timing を osu!mania stable OD8 / ScoreV1 で換算した補助 `OSU OD8` score
 - Combo
 - 直近 judgement (`PG / GR / GD / BD / PR`)
 - タイミングずれ（ms）
@@ -148,7 +149,7 @@ Rate は曲の再生速度と譜面スケジュールだけを変え、同じ Hi
 - `BD`: Bad
 - `PR`: Poor / Miss
 
-`OSU OD8` は最大 1,000,000 の補助比較 score であり、TenRiff の native score、rank、clear result は変更しません。
+OD8 換算統計は Sudden Death と既存 replay 互換のため JSON 内部に維持されますが、Gameplay / Result 画面には表示しません。
 
 native Score は judgement 90,000 点 + 累積 Combo 10,000 点で構成されます。全 `PG` の full combo は正確に 100,000 点で、LN は head / tail を各 0.5 weight とする 1 object です。
 
@@ -179,7 +180,7 @@ gauge transition は `shift` を明示的に選択した場合だけ発生しま
 - Clear / Game Over 状態
 - Rank
 - TenRiff native Score
-- `OSU OD8` 補助 score と換算 judgement 集計
+- 記録された play で pause を使用したか
 - Accuracy
 - Max Combo
 - PG / GR / GD / BD / PR の合計

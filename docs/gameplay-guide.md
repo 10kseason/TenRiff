@@ -46,6 +46,8 @@ TenRiff의 기본 플레이 흐름은 아래 순서입니다.
 - 좌클릭: 곡 선택
 - 더블클릭: 곡 시작
 - `Enter`: 현재 곡 시작
+- 우측 `BEST SCORE` 카드 좌클릭: 현재 곡의 최고 Result 열기; Result의 `WATCH REPLAY` 또는 `F1`로 리플레이 재생
+- 좌측 `RECORDS`: 현재 곡의 로컬 기록을 둘러보고 `OPEN RESULT`로 선택한 결과 열기
 - `Left` / `Right`: 좌측 메뉴 포커스 전환
 - `Esc`: 이전 화면으로 복귀
 - `-` / `+`: 다음 플레이의 Rate 즉시 조정
@@ -138,7 +140,6 @@ Rate는 곡 재생 속도와 차트 스케줄만 바꾸며, 같은 Hi-Speed에�
 - 현재 `Hi-Speed`
 - Gauge 값과 현재 Gauge 종류
 - TenRiff native Score
-- 실제 입력 timing을 osu!mania stable OD8/ScoreV1로 환산한 보조 `OSU OD8` 점수
 - Combo
 - 최근 판정(`PG / GR / GD / BD / PR`)
 - 타이밍 편차(ms)
@@ -158,7 +159,7 @@ Rate는 곡 재생 속도와 차트 스케줄만 바꾸며, 같은 Hi-Speed에�
 - `BD`: Bad
 - `PR`: Poor / Miss
 
-`OSU OD8`은 최대 1,000,000점인 보조 비교 점수이며, TenRiff의 native Score·랭크·클리어 판정을 바꾸지 않습니다.
+OD8 환산 통계는 Sudden Death 판정과 기존 replay 호환을 위해 JSON 내부에 유지되지만 게임플레이·결과 화면에는 표시하지 않습니다.
 
 네이티브 Score는 판정 90,000점 + 누적 Combo 10,000점으로 구성됩니다. 전부 `PG`인 풀콤보는 정확히 100,000점이며, LN은 머리와 꼬리를 각각 0.5 가중치로 계산해 한 객체가 됩니다.
 
@@ -193,7 +194,7 @@ Rank는 `<75 F`, `75 B`, `80.5 A`, `86.5 A+`, `90 S`, `95.5 S+`, `98 AA`, `99 SS
 - Clear / Game Over 상태
 - Rank
 - TenRiff native Score
-- `OSU OD8` 보조 점수와 환산 판정 집계
+- 해당 플레이의 퍼즈 사용 여부
 - Accuracy
 - Max Combo
 - PG / GR / GD / BD / PR 집계

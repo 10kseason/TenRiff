@@ -78,6 +78,8 @@ void MenuApp::reload_chart_best_results() {
         candidate.bad = parsed->stats.counts.bd;
         candidate.poor = parsed->stats.counts.pr;
         candidate.created_utc = parsed->created_utc;
+        candidate.result_path = entry.path().u8string();
+        candidate.replay_path = parsed->replay_path;
         const int candidate_judged = menu_records::judged_total(parsed->stats.counts);
         const int candidate_clear_priority =
             menu_records::clear_status_priority(parsed->clear_status, parsed->game_over, parsed->final_gauge);
@@ -97,6 +99,7 @@ void MenuApp::reload_chart_best_results() {
         record.mods = parsed->mods;
         record.rate_multiplier = parsed->rate_multiplier;
         record.score_multiplier = parsed->score_multiplier;
+        record.pause_used = parsed->pause_used;
         record.autoplay_enabled = parsed->autoplay_enabled;
         record.practice_no_fail_enabled = parsed->practice_no_fail_enabled;
         record.raw_score = parsed->stats.raw_score;
@@ -253,6 +256,7 @@ const MenuApp::ReplaySummary* MenuApp::replay_summary_for_path(const std::string
             summary.mods = parsed->mods;
             summary.rate_multiplier = parsed->rate_multiplier;
             summary.score_multiplier = parsed->score_multiplier;
+            summary.pause_used = parsed->pause_used;
             summary.final_score = parsed->final_score;
         } else {
             summary.error = parse_error;
@@ -274,20 +278,19 @@ MenuApp::BestResultRecord MenuApp::current_song_best_result() const {
     return entry ? best_result_for_song_entry(*entry) : BestResultRecord{};
 }
 
-bool MenuApp::open_selected_record_result() {
+bool MenuApp::open_result_record(const std::string& result_path,
+                                 const std::string& replay_path) {
     using namespace menu_song_select;
 
-    rebuild_current_song_record_indices();
-    const LocalPlayRecord* record = current_selected_record();
-    if (!record || record->result_path.empty()) {
+    if (result_path.empty()) {
         return false;
     }
 
     std::string parse_error;
-    auto parsed = menu_records::parse_result_file(path_from_utf8(record->result_path), &parse_error);
+    auto parsed = menu_records::parse_result_file(path_from_utf8(result_path), &parse_error);
     if (!parsed.has_value()) {
         if (!parse_error.empty()) {
-            std::cerr << "[warn] Failed to open saved result " << record->result_path
+            std::cerr << "[warn] Failed to open saved result " << result_path
                       << ": " << parse_error << std::endl;
         }
         return false;
@@ -302,10 +305,11 @@ bool MenuApp::open_selected_record_result() {
     last_result_rate_multiplier_ = parsed->rate_multiplier;
     last_result_score_multiplier_ = parsed->score_multiplier;
     last_result_final_score_ = parsed->final_score;
+    last_pause_used_ = parsed->pause_used;
     last_result_player_name_ =
         parsed->player_name.empty() ? profile_display_name() : parsed->player_name;
-    last_replay_path_ = record->replay_path;
-    last_result_path_ = record->result_path;
+    last_replay_path_ = replay_path.empty() ? parsed->replay_path : replay_path;
+    last_result_path_ = result_path;
     last_export_warnings_.clear();
     last_session_replay_playback_ = false;
     const SongEntry* entry = (selected_song_ >= 0)
@@ -314,6 +318,17 @@ bool MenuApp::open_selected_record_result() {
     update_last_chart_metadata(parsed->chart_path, entry);
     screen_ = Screen::Result;
     return true;
+}
+
+bool MenuApp::open_selected_record_result() {
+    rebuild_current_song_record_indices();
+    const LocalPlayRecord* record = current_selected_record();
+    return record && open_result_record(record->result_path, record->replay_path);
+}
+
+bool MenuApp::open_current_song_best_result() {
+    const BestResultRecord best = current_song_best_result();
+    return best.has_value && open_result_record(best.result_path, best.replay_path);
 }
 
 bool MenuApp::launch_replay_from_path(const std::string& replay_path, const std::string& fallback_chart_path) {

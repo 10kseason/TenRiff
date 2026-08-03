@@ -3,7 +3,7 @@
 이 문서는 다음 에이전트나 새 작업자가 가장 먼저 읽어야 하는 현재 상태 문서입니다. 목표는 "지금 이 프로젝트가 무엇이고, 어디를 보면 되고, 무엇이 아직 미검증인지"를 빠르게 파악하게 하는 것입니다.
 
 ## Baseline
-- 현재 프로젝트 버전과 공개 안정판은 `1.2.104 stable`
+- 현재 프로젝트 버전과 공개 안정판은 `1.3.0 stable`
 - 직접 IP 멀티플레이와 preview r5의 입력 backend 수명주기 수정은 `1.1.8 stable`에 통합
 - `1.1.8`은 1.1.7의 시각 개선에 osu!mania OD8 보조 점수, 첫 네이티브 `BAD` 즉사 `Sudden Death (1 MISS)`, 결정적 `LN Mix 10%~90%`를 추가
 - `1.2.0`은 BMS 채널 `04/07` 및 osu!mania 배경을 gameplay sample timeline에 연결하고, FHD 미만 이미지 배경을 Windows ML 기반 LunaSR로 비동기 보간
@@ -32,6 +32,7 @@
   - 메뉴 상태머신의 중심
   - Song Select, Options, Keymap, Result, Gameplay launch 진입 관리
   - 최근 유지보수 리팩터에서 Song Select record/keymap/render/state 경계를 전용 `.cpp` 파일로 분리
+  - Song Select의 최고 점수 카드와 기록 목록은 `MenuAppRecords`의 공용 저장 Result 열기 경로를 사용하며 Result의 Replay 버튼으로 이어짐
   - `10k-calc` Python reference 없이도 오픈소스 소스패키지에서 핵심 테스트 실행이 가능하도록 optional reference test는 skip 가능
 - `SongIndexerThread`
   - 곡 인덱싱 전용 백그라운드 스레드
@@ -121,7 +122,7 @@
   - 게이지 모드는 `EX-Hard / Hard / Normal / Easy / Gauge Shift`를 지원함. 고정 게이지는 `100%`에서 시작해 `0%`에서 즉시 실패하고 타입이 바뀌지 않으며, EX-Hard는 Hard와 구분되는 짙은 흑회색으로 표시
   - `Gauge Shift`는 EX-Hard / Hard / Normal / Easy를 각각 100%에서 독립적으로 병렬 계산하고, 현재 tier가 0%로 탈락하면 같은 판정 이력을 누적한 다음 생존 tier를 선택하며 종료 시 가장 높은 생존 tier로 확정함
   - `Sudden Death (1 MISS)`는 첫 OD8 환산 객체 `MISS`에서 즉시 실패하며, 네이티브 `BAD`만으로는 발동하지 않고 빈 키 `POOR`도 무시하며 Practice No-Fail과 상호 배타적으로 동작
-  - 인게임/결과 화면에 실제 입력 타이밍을 osu!mania stable OD8 판정창과 ScoreV1(최대 1,000,000)으로 환산한 보조 `OSU OD8` 점수를 표시하며, 네이티브 TenRiff 점수와 랭킹은 변경하지 않음
+  - OD8 환산은 Sudden Death와 기존 리플레이 호환을 위한 내부 통계로 유지하며, 인게임/결과 UI는 TenRiff native Score만 표시
   - 네이티브 점수는 판정 90,000점 + 누적 콤보 10,000점으로 정규화되어 전부 PG인 풀콤보가 정확히 100,000점이며, LN 머리/꼬리는 각각 0.5 가중치로 한 객체를 구성함
   - 정확도는 PG/GR/GD/BD 기준 100/80/50/20%에 각 판정 구간 내부 타이밍으로 최대 0.5%p를 감산하고, PG 타이밍 범위가 8ms를 넘으면 전부 PG여도 99.5%로 제한함
   - 랭크 경계는 `<75 F / 75 B / 80.5 A / 86.5 A+ / 90 S / 95.5 S+ / 98 AA / 99 SS / 99.75 SSS`
@@ -131,7 +132,7 @@
   - 같은 레인에서 이전 노트가 이미 `BAD`이고 바로 다음 노트가 `GOOD` 이상으로 명확하면, 이전 노트는 미스로 정리하고 현재 입력은 다음 노트에 배정해 한 번의 누락이 연속 `BAD`로 고정되지 않게 함
   - `Judge Hard`에서 입력 없이 지나간 노트는 콤보를 끊는 간접 `POOR`이자 OD8 `MISS`로 기록되며, 다른 note-consuming 실패는 `BAD` 유지
   - 너무 이른 non-consuming 입력은 LR2 스타일 `POOR`로 처리되고, 결과/리플레이/UI에 다시 표시됨
-  - 빈 키 `POOR`는 콤보를 유지하고, Hard 간접 `POOR`는 콤보를 끊는다. 둘 다 점수/정확도 집계에는 들어가지 않고 전용 `PR` gauge 감소값을 사용
+  - 빈 키 `POOR` 자체는 콤보·점수·정확도에 영향이 없고, Hard 간접 `POOR`는 노트를 소비하며 콤보를 끊어 해당 노트가 0점으로 반영된다. 둘 다 전용 `PR` gauge 감소값을 사용
   - gameplay live input의 `ClockSync`는 큰 Windows QPC 절대값 대신 centered anchor 회귀를 사용하고, 연속 시계 이상치 뒤 자동 재기준화함
   - backlog stale 여부는 QPC 이벤트 나이와 `BAD` 창으로 판정하며, 실제로 fresh인 입력의 sample 매핑이 현재 playback anchor와 크게 어긋나면 anchor 값으로 복구해 비채점 catch-up 고정을 방지
   - tail release timing은 BMS `#LNMODE 2` charge note에만 적용
@@ -211,7 +212,7 @@
 
 ## Runtime / Packaging Rules
 - 새 사용자 프로필은 자동 생성
-- 현재 정식 P2P 배포 라인은 `TenRiff 1.2.104 stable`
+- 현재 정식 P2P 배포 라인은 `TenRiff 1.3.0 stable`
 - 배포 패키지에는 `Songs`를 넣지 않음
 - 배포 패키지는 `Main Menu / Options / Song Selecte / Multiplayer Lobby / Clear / Failed` 이름의 `Mainmusic/` 화면 슬롯을 포함하며, 각 `이름.mp3`와 번호가 붙은 `이름 2.mp3`~`이름 64.mp3`를 자동 수집해 화면 재진입마다 순환
 - 배포 업데이트에는 built artifacts와 필요한 런타임 자산만 포함

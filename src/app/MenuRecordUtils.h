@@ -23,6 +23,7 @@ struct ParsedResultRecord {
     double rate_multiplier = 1.0;
     double score_multiplier = 1.0;
     int64_t final_score = 0;
+    bool pause_used = false;
     gameplay::ResultStats stats;
     bool game_over = false;
     bool autoplay_enabled = false;
@@ -42,6 +43,7 @@ struct ParsedReplayRecord {
     double rate_multiplier = 1.0;
     double score_multiplier = 1.0;
     int64_t final_score = 0;
+    bool pause_used = false;
     bool autoplay_enabled = false;
     bool practice_no_fail_enabled = false;
     bool one_miss_fail_enabled = false;

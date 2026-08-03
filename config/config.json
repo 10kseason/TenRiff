@@ -94,7 +94,7 @@
     "judgement_line_position": 0.82,
     "combo_position": 0.24,
     "lane_background_opacity": 0.18,
-    "black_playfield_enabled": false,
+    "black_playfield_enabled": true,
     "visual_opacity": 0.96,
     "note_outline_opacity": 0.78,
     "hold_body_opacity": 0.24,

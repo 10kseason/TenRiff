@@ -4,6 +4,25 @@ TenRiff의 사용자/배포 관점에서 의미 있는 변경만 간단히 기�
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-08-04
+
+### Added
+
+- Song Select 우측에 익숙한 `BEST SCORE` 카드를 배치하고, 카드 클릭에서 저장 Result를 거쳐 큰 `WATCH REPLAY` 버튼으로 이어지는 기록·리플레이 발견 경로를 추가했다.
+- Song Select 좌측 탐색에 곡·소스·검색·필터·기록·설정을 구분하는 심볼 아이콘을 적용하고, Records 화면에도 명시적인 `OPEN RESULT` 동작을 추가했다.
+- 카운트다운 화면에 인게임 Hi-Speed 단축키(`F3/F4`, `F5/F6`)를 표시하고, Graphics Settings에 밝은 BGA를 노트 영역 뒤에서만 차단하는 `BGA Behind Notes` 옵션을 추가했다.
+- 일시정지 사용 여부를 Result/Replay JSON과 로컬 기록에 저장하고 Result 화면에 `Pause Used`로 표시한다. 이전 JSON은 `false`로 호환 로드한다.
+
+### Changed
+
+- 새 설정의 `Opaque Playfield` 기본값을 켜서 기어 뒤 BGA 방해를 줄였다. 기존 프로필에 명시된 값은 유지한다.
+- osu!mania OD8 환산 값은 Sudden Death와 기존 리플레이 호환용 내부 통계로 유지하되 Gameplay/Result UI에서는 제거해 기록되지 않는 보조 점수의 노출을 정리했다.
+- 최고 기록 카드와 Records 목록이 하나의 저장 Result 로딩 경로를 공유하도록 통합하고, Gameplay 재시작을 재귀 호출에서 반복 구조로 바꾸며 HUD revision 비교용 중복 상태 복사를 제거했다.
+
+### Release
+
+- Windows `TenRiff-1.3.0.zip`, public source `TenRiff-1.3.0-source.zip`, and `TenRiff-1.3.0-SHA256SUMS.txt` are the formal stable release assets; no ONNX model, private checkpoint, user profile, song, log, or local UI-audit artifact is bundled.
+
 ## [1.2.104] - 2026-08-03
 
 ### Added

@@ -394,10 +394,6 @@
                         " / " + loc("Scroll ", "스크롤 ") + std::to_string(static_cast<int>(std::llround(data.gameplay.scroll_speed))));
             std::string score_summary =
                 loc("SCORE  ", "점수  ") + format_int_with_commas(data.gameplay.score);
-            if (data.gameplay.osu_od8_score_available) {
-                score_summary += "  /  OSU OD8  " +
-                                 format_int_with_commas(data.gameplay.osu_od8_score);
-            }
             gameplay_hud_cache_.score_text = to_wide(score_summary);
             gameplay_hud_cache_.combo_text =
                 to_wide(loc("COMBO ", "콤보 ") + std::to_string(data.gameplay.combo) +
@@ -459,10 +455,6 @@
                              : data.gameplay.peer_name));
             std::string ghost_score_summary =
                 loc("SCORE  ", "점수  ") + format_int_with_commas(data.gameplay.ghost_score);
-            if (data.gameplay.ghost_osu_od8_score_available) {
-                ghost_score_summary += "  /  OSU OD8  " +
-                                       format_int_with_commas(data.gameplay.ghost_osu_od8_score);
-            }
             gameplay_hud_cache_.ghost_score_text = to_wide(ghost_score_summary);
             gameplay_hud_cache_.ghost_combo_text =
                 to_wide(loc("COMBO ", "콤보 ") + std::to_string(data.gameplay.ghost_combo) +
@@ -689,6 +681,19 @@
                                                       panel_rect.right - 24.0f, panel_rect.bottom - 64.0f),
                                           d2d_->text_brush.Get(),
                                           DWRITE_TEXT_ALIGNMENT_CENTER);
+            }
+
+            if (d2d_->body_format && d2d_->muted_brush) {
+                const std::wstring hispeed_hint_w =
+                    wloc("HI-SPEED  F3/F4  FINE +/-0.25   F5/F6  COARSE +/-10",
+                         "노트 배속  F3/F4  미세 +/-0.25   F5/F6  크게 +/-10");
+                draw_text_clipped_aligned(
+                    hispeed_hint_w,
+                    d2d_->body_format.Get(),
+                    D2D1::RectF(panel_rect.left + 24.0f, panel_rect.bottom - 62.0f,
+                                panel_rect.right - 24.0f, panel_rect.bottom - 20.0f),
+                    d2d_->muted_brush.Get(),
+                    DWRITE_TEXT_ALIGNMENT_CENTER);
             }
 
             return;

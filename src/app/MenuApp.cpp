@@ -1951,6 +1951,17 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
                 launch_selected_song();
             }
             return;
+        case render::MenuHitTargetKind::SongResultPanel:
+            if (screen_ != Screen::SongSelect) {
+                return;
+            }
+            if (song_select_view_ == SongSelectView::Records) {
+                (void)open_selected_record_result();
+            } else if (song_select_view_ == SongSelectView::Songs) {
+                (void)open_current_song_best_result();
+            }
+            publish_snapshot();
+            return;
         case render::MenuHitTargetKind::SettingsRow:
             break;
         case render::MenuHitTargetKind::KeymapButton:
