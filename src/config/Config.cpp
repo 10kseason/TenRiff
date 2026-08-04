@@ -628,8 +628,6 @@ void apply_config_object(const JsonObject& root, RuntimeConfig& config) {
             get_string(*mode, "key_conversion_algorithm", config.mode.key_conversion_algorithm);
         config.mode.key_conversion_nk2_preset =
             get_string(*mode, "key_conversion_nk2_preset", config.mode.key_conversion_nk2_preset);
-        config.mode.enable_osu_charts =
-            get_bool(*mode, "enable_osu_charts", config.mode.enable_osu_charts);
         config.mode.gauge = get_string(*mode, "gauge", config.mode.gauge);
         config.mode.random = get_string(*mode, "random", config.mode.random);
         config.mode.random_seed = static_cast<uint32_t>(get_number(*mode, "random_seed", config.mode.random_seed));
@@ -1011,7 +1009,6 @@ JsonValue build_json_root(const RuntimeConfig& config) {
     mode.emplace("key_mode", JsonValue{config.mode.key_mode});
     mode.emplace("key_conversion_algorithm", JsonValue{config.mode.key_conversion_algorithm});
     mode.emplace("key_conversion_nk2_preset", JsonValue{config.mode.key_conversion_nk2_preset});
-    mode.emplace("enable_osu_charts", JsonValue{config.mode.enable_osu_charts});
     mode.emplace("gauge", JsonValue{config.mode.gauge});
     mode.emplace("random", JsonValue{config.mode.random});
     mode.emplace("random_seed", JsonValue{static_cast<double>(config.mode.random_seed)});
@@ -1571,7 +1568,6 @@ RuntimeConfig ConfigLoader::defaults() const {
     config.mode.key_mode = "none";
     config.mode.key_conversion_algorithm = "krrcream";
     config.mode.key_conversion_nk2_preset = "native";
-    config.mode.enable_osu_charts = false;
     config.mode.gauge = "normal";
     config.mode.random = "off";
     config.mode.random_seed = 0;

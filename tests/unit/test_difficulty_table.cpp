@@ -1,6 +1,7 @@
 #include "doctest/doctest.h"
 
 #include <algorithm>
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <string>
@@ -324,4 +325,33 @@ TEST_CASE("difficulty table link import rejects pages without BMSTable metadata"
         "https://example.test/not-a-table", temp.path / "cache", fetch);
     CHECK_FALSE(imported.success());
     CHECK(imported.error.find("BMSTable meta") != std::string::npos);
+}
+
+TEST_CASE("difficulty table live link import smoke is opt-in") {
+    const char* live_url = std::getenv("TENRIFF_LIVE_BMSTABLE_URL");
+    if (!live_url || *live_url == '\0') {
+        return;
+    }
+
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+    const auto imported = tenriff::app::import_difficulty_table_link(
+        live_url, temp.path / "live-cache");
+    if (!imported.success()) {
+        std::cerr << "[live BMSTable import] " << imported.error << '\n';
+    }
+    REQUIRE(imported.success());
+    CHECK_FALSE(imported.table_name.empty());
+    if (std::string(live_url).find("asumatoki.kr/table/aery/") != std::string::npos) {
+        const auto loaded = tenriff::app::load_difficulty_table_utf8(imported.cached_header_path);
+        REQUIRE(loaded.success());
+        const auto match = loaded.table.lookup(
+            "1d99a3728312c6b689b6a6dc51770732",
+            "");
+        REQUIRE(match.has_value());
+        CHECK(match->level == "LEVEL 13");
+        CHECK(match->label() == "⑤LEVEL 13");
+        CHECK(match->order >= 0);
+    }
 }

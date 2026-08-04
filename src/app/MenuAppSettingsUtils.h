@@ -249,6 +249,16 @@ inline std::string cycle_song_index_profile(std::string current, int direction) 
     return kProfiles[current_index];
 }
 
+inline bool ensure_difficulty_table_indexing(config::RuntimeConfig& runtime) {
+    if (config::normalize_song_index_profile_token(runtime.mode.song_index_profile) != "fast") {
+        return false;
+    }
+    // Fast deliberately omits file hashes, so a BMSTable can download successfully
+    // while matching zero charts. Selecting a table means the player chose matching.
+    runtime.mode.song_index_profile = "safe";
+    return true;
+}
+
 inline std::string normalize_key_conversion_algorithm(std::string value) {
     value = to_lower_ascii(std::move(value));
     if (value == "nk2" || value == "nativek2" || value == "keyweaver" ||

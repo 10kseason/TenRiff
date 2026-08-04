@@ -134,7 +134,7 @@
   - 저전력 session 생성에 실패하면 기존 high-performance DirectX 경로로 폴백
 
 ### `mode`
-차트 로더와 인덱서는 BMS 계열(`.bms/.bme/.bml/.pms`)을 기본으로 사용합니다. `enable_osu_charts=true`이면 자체 파서로 osu!mania 4K~10K `.osu`도 포함하며, `format` 필터는 사용하지 않습니다.
+차트 로더와 인덱서는 BMS 계열(`.bms/.bme/.bml/.pms`) 전용입니다. 예전 `enable_osu_charts`와 `format` 값은 읽더라도 무시하며 다시 저장하지 않습니다.
 
 - `key_mode` (string)
   - `none | auto | 4k | 5k | 6k | 7k | 8k | 9k | 10k | 12k | 14k | 16k`
@@ -205,7 +205,7 @@
 - `difficulty_table_path` (string)
   - Browse 화면에서 고른 로컬 BMS 난이도표 header JSON 또는 링크에서 내려받은 프로필 캐시 header 경로
   - header는 `name`, `symbol`, 로컬 상대경로 `data_url`을 사용하고, data array entry는 `md5` 또는 `sha256`과 `level`을 사용
-  - 선택/해제 시 현재 song source를 재인덱싱해 일치 곡의 표 레벨을 표시
+  - 선택/해제 시 현재 song source를 재인덱싱해 일치 곡의 표 레벨을 표시하며, 표 선택 시 해시가 필요한 `safe` 인덱스로 자동 전환
 - `difficulty_table_url` (string)
   - Browse에서 가져온 http(s) BMSTable HTML 페이지 또는 header JSON 원본 링크
   - 표준 `<meta name="bmstable" content="...">`를 해석해 header/data JSON을 프로필의 `difficulty_tables` 캐시에 저장하며, 로컬 JSON 선택 시에는 비워짐

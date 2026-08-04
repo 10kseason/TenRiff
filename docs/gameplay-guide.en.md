@@ -107,7 +107,7 @@ If this is not the layout you want, you can change it in `Options > Keymap`.
 ## 6. Things to Know Before Starting Play
 
 ### Chart format
-- BMS-family charts (`.bms/.bme/.bml/.pms`) are the default; enabling `OSU Charts` in Mode Settings also indexes and plays 4K-10K osu!mania `.osu`.
+- Chart indexing and play are limited to the BMS family (`.bms/.bme/.bml/.pms`); `.osu` files are unsupported.
 
 ### Loading
 - Right after song start, chart-loading progress may be shown.

@@ -17,7 +17,6 @@ add_library(tenriff_chart
     src/chart/BmsParser.cpp
     src/chart/BmsChartNorm.cpp
     src/chart/BmsTimeline.cpp
-    src/chart/OsuManiaLoader.cpp
     src/chart/OsuDifficulty.cpp
     src/chart/NoteLaneMapping.cpp
 )
@@ -359,7 +358,6 @@ if(TENRIFF_ENABLE_TESTS)
         tests/unit/test_bms_normalizer.cpp
         tests/unit/test_note_lane_mapping.cpp
         tests/unit/test_bms_timeline.cpp
-        tests/unit/test_osu_mania_loader.cpp
         tests/unit/test_speed_manager.cpp
         tests/unit/test_gauge_manager.cpp
         tests/unit/test_clock_sync.cpp

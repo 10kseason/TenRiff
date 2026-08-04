@@ -4,9 +4,7 @@
 #include <cctype>
 #include <cmath>
 #include <filesystem>
-#include <fstream>
 #include <optional>
-#include <sstream>
 #include <unordered_map>
 #include <unordered_set>
 
@@ -15,7 +13,6 @@
 #include "chart/BmsChartNorm.h"
 #include "chart/BmsParser.h"
 #include "chart/BmsTimeline.h"
-#include "chart/OsuManiaLoader.h"
 namespace tenriff::app {
 
 namespace {
@@ -251,68 +248,6 @@ std::optional<std::filesystem::path> resolve_asset_path_with_fallback(const std:
     return std::nullopt;
 }
 
-int audio_extension_priority(std::string_view ext) {
-    if (ext == ".ogg") return 0;
-    if (ext == ".wav") return 1;
-    if (ext == ".wave") return 2;
-    if (ext == ".mp3") return 3;
-    return 4;
-}
-
-std::optional<std::filesystem::path> choose_preferred_audio_path(
-    std::vector<std::filesystem::path> candidates) {
-    if (candidates.empty()) {
-        return std::nullopt;
-    }
-    std::stable_sort(candidates.begin(), candidates.end(), [](const auto& lhs, const auto& rhs) {
-        const int lhs_priority = audio_extension_priority(to_lower(lhs.extension().u8string()));
-        const int rhs_priority = audio_extension_priority(to_lower(rhs.extension().u8string()));
-        if (lhs_priority != rhs_priority) {
-            return lhs_priority < rhs_priority;
-        }
-        return lhs.generic_u8string() < rhs.generic_u8string();
-    });
-    return candidates.front();
-}
-
-std::optional<std::filesystem::path> resolve_osu_main_audio_path(
-    const std::filesystem::path& chart_path,
-    std::string_view audio_filename,
-    AssetLookupIndex& lookup) {
-    const std::string audio_ref = normalize_asset_reference(std::string(audio_filename));
-    if (!audio_ref.empty()) {
-        if (auto resolved = resolve_asset_path_with_fallback(chart_path, audio_ref, lookup); resolved.has_value()) {
-            return resolved;
-        }
-    }
-
-    const std::string stem = chart_path.stem().u8string();
-    if (!stem.empty()) {
-        for (std::string_view ext : {".ogg", ".wav", ".wave", ".mp3"}) {
-            if (auto resolved = lookup_asset_path_candidate(
-                    chart_path, std::filesystem::path(stem + std::string(ext)), lookup);
-                resolved.has_value()) {
-                return resolved;
-            }
-        }
-    }
-
-    build_asset_lookup(chart_path, lookup);
-    std::vector<std::filesystem::path> matching_stem;
-    for (const auto& candidate : lookup.audio_files) {
-        if (to_lower(candidate.stem().u8string()) == to_lower(stem)) {
-            matching_stem.push_back(candidate);
-        }
-    }
-    if (auto resolved = choose_preferred_audio_path(std::move(matching_stem)); resolved.has_value()) {
-        return resolved;
-    }
-    if (lookup.audio_files.size() == 1u) {
-        return lookup.audio_files.front();
-    }
-    return std::nullopt;
-}
-
 enum class BmsKeysoundPolicy {
     Ignore,
     Follow,
@@ -348,25 +283,6 @@ void append_norm_messages(std::vector<std::string>& out, const std::vector<chart
     for (const auto& msg : messages) {
         out.push_back(msg.text);
     }
-}
-
-void append_osu_messages(std::vector<std::string>& out, const std::vector<chart::OsuParseMessage>& messages) {
-    for (const auto& msg : messages) {
-        out.push_back(msg.text);
-    }
-}
-
-std::string read_text_file(const std::filesystem::path& path, std::string* error) {
-    std::ifstream file(path, std::ios::binary);
-    if (!file) {
-        if (error) {
-            *error = "Failed to open chart file.";
-        }
-        return {};
-    }
-    std::ostringstream buffer;
-    buffer << file.rdbuf();
-    return buffer.str();
 }
 
 void append_timeline_messages(std::vector<std::string>& out, const std::vector<chart::BmsTimelineMessage>& messages) {
@@ -466,8 +382,7 @@ std::optional<std::string> resolve_bms_visual_path(
 ChartLoadResult ChartLoader::load(const std::string& path,
                                   int sample_rate,
                                   double rate,
-                                  std::string_view bms_keysound_policy,
-                                  bool enable_osu_charts) const {
+                                  std::string_view bms_keysound_policy) const {
     ChartLoadResult result;
     AssetLookupIndex asset_lookup;
 
@@ -477,68 +392,6 @@ ChartLoadResult ChartLoader::load(const std::string& path,
     std::filesystem::path file_path(path);
 #endif
     auto ext = to_lower(file_path.extension().u8string());
-
-    if (ext == ".osu") {
-        if (!enable_osu_charts) {
-            result.error = "osu!mania charts are disabled in settings.";
-            return result;
-        }
-
-        std::string read_error;
-        const std::string content = read_text_file(file_path, &read_error);
-        if (!read_error.empty()) {
-            result.error = read_error;
-            return result;
-        }
-
-        chart::OsuManiaLoader loader;
-        auto parse_result = loader.parse(content);
-        append_osu_messages(result.messages, parse_result.messages);
-        if (!parse_result.success()) {
-            result.error = "Failed to parse osu!mania chart.";
-            return result;
-        }
-        if (parse_result.chart.key_count < 4 || parse_result.chart.key_count > 10) {
-            result.error = "Only 4K-10K osu!mania charts are supported.";
-            return result;
-        }
-
-        result.chart = gameplay::from_osu_mania(parse_result.chart, sample_rate, rate);
-        result.base_bpm = parse_result.chart.base_bpm;
-        const std::string audio_ref = normalize_asset_reference(parse_result.chart.audio_filename);
-        if (auto resolved = resolve_osu_main_audio_path(file_path, parse_result.chart.audio_filename, asset_lookup);
-            resolved.has_value()) {
-            gameplay::AudioCueEvent cue;
-            cue.start_sample = 0;
-            cue.asset_id = result.chart.intern_audio_asset(resolved->u8string());
-            result.chart.audio_cues.push_back(std::move(cue));
-        } else if (!audio_ref.empty()) {
-            result.messages.push_back("Main audio file not found: " + audio_ref);
-        }
-
-        const std::string background_ref = normalize_asset_reference(parse_result.chart.background_filename);
-        if (!background_ref.empty()) {
-#ifdef _WIN32
-            const std::filesystem::path background_path = std::filesystem::u8path(background_ref);
-#else
-            const std::filesystem::path background_path(background_ref);
-#endif
-            if (auto resolved = lookup_asset_path_candidate(file_path, background_path, asset_lookup);
-                resolved.has_value()) {
-                gameplay::VisualCueEvent cue;
-                cue.start_sample = 0;
-                cue.asset_id = result.chart.intern_visual_asset(resolved->u8string());
-                cue.layer = gameplay::VisualLayer::Base;
-                result.chart.visual_cues.push_back(std::move(cue));
-            } else {
-                result.messages.push_back("Background image file not found: " + background_ref);
-            }
-        }
-
-        result.format = ChartFormat::OsuMania;
-        return result;
-    }
-
     if (!is_bms_extension(ext)) {
         result.error = "Unsupported chart extension.";
         return result;

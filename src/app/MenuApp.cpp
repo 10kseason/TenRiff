@@ -1641,7 +1641,6 @@ void MenuApp::switch_song_source(const std::string& new_songs_path, bool force_r
     last_indexer_snapshot_ns_ = 0;
     song_indexer_.stop();
     SongIndexOptions index_options;
-    index_options.include_osu = config_.mode.enable_osu_charts;
     index_options.difficulty_table_path = config_.ui.difficulty_table_path;
     index_options.calculate_difficulty = config_.mode.calculate_song_index_difficulty;
     index_options.reuse_cached_metadata = !force_reindex;
@@ -2884,6 +2883,7 @@ void MenuApp::handle_song_browser_input(uint32_t keycode) {
     }
     if (settings_cursor_ == 5 &&
         (keycode == key_left_ || keycode == key_right_ || keycode == key_enter_)) {
+        bool force_table_reindex = false;
         std::string selected_path = config_.ui.difficulty_table_path;
         std::string selected_url = config_.ui.difficulty_table_url;
         if (keycode == key_left_) {
@@ -2909,6 +2909,7 @@ void MenuApp::handle_song_browser_input(uint32_t keycode) {
                 }
                 selected_path = imported.cached_header_path;
                 selected_url = imported.source_url;
+                force_table_reindex = ensure_difficulty_table_indexing(config_);
             } else {
                 const std::string picked = browse_for_json_file(
                     ui_text("Select Local BMS Difficulty Table", "로컬 BMS 난이도표 선택"));
@@ -2927,6 +2928,7 @@ void MenuApp::handle_song_browser_input(uint32_t keycode) {
                 }
                 selected_path = picked;
                 selected_url.clear();
+                force_table_reindex = ensure_difficulty_table_indexing(config_);
             }
 #else
             return;
@@ -2939,7 +2941,7 @@ void MenuApp::handle_song_browser_input(uint32_t keycode) {
             persist_runtime_config();
             // Loading the cache reapplies the selected table to its stored chart
             // hashes, so changing tables need not reparse a large library.
-            refresh_song_source(false);
+            refresh_song_source(force_table_reindex);
             publish_snapshot();
         }
         return;

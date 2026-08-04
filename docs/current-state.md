@@ -7,6 +7,7 @@
 - UI-r2 Result는 2.2초 타임라인으로 프리즘·점수·등급·상태·통계·그래프를 순차 공개하며, Space로 연출을 건너뛸 수 있고 CONTINUE/RETRY/Replay 입력은 공개 완료 전 잠김
 - UI-r2 Song Select는 상단 탭, 7행 재킷 라이브러리, 대형 선택 이미지, 최고 기록 카드, 차트/모드 패널, 실제 동작하는 START 버튼 구조로 개편되며 Collection/Store/재화/글로벌 랭킹 가상 기능은 표시하지 않음
 - Song Select 우측의 배속·하이스피드·게이지·랜덤 셀은 좌클릭으로 증가/다음, 우클릭으로 감소/이전을 적용하고 즉시 저장함. 현재 차트 키수는 잘림 없이 표시되며 최고 기록은 점수·정확도·최대 콤보를 함께 표시
+- 1.3.1은 외부 `.osu` 파서·인덱싱·설정 토글을 제거해 차트 표면을 다시 BMS 전용으로 고정하고, BMSTable 선택 시 해시 매칭을 위해 Fast에서 Safe로 자동 전환함. Aery 실서버와 CG901B MD5→`⑤LEVEL 13` 매칭으로 확인
 - Profile Setup은 선택적 로컬 PNG/JPG 프사 경로를 프로필별로 저장하며 Song Select 프로필 카드는 이를 표시하고 클릭 시 프로필 편집으로 연결
 - 직접 IP 멀티플레이와 preview r5의 입력 backend 수명주기 수정은 `1.1.8 stable`에 통합
 - `1.1.8`은 1.1.7의 시각 개선에 osu!mania OD8 보조 점수, 첫 네이티브 `BAD` 즉사 `Sudden Death (1 MISS)`, 결정적 `LN Mix 10%~90%`를 추가
@@ -22,11 +23,11 @@
 - `1.2.9`는 12K/14K와 scratch-aware key conversion, R-Random/DP Flip/Note Add, Song Select 자동 프리뷰, 상세 Result/곡 이미지, 프로필 닉네임, 동영상 BGA 흔들림 방지 및 정확한 `DirectXMinPower` 표기를 추가.
 - `1.2.92`는 standalone BMS key converter에 기본 Krrcream과 결정론적 `nK2 Native 50/50` 선택을 추가.
 - `1.2.93`은 게임 내 Mode Settings의 `Key Converter`에서 `Krrcream`/`KeyWeaver nK2`를 선택하고 설정·리플레이에 저장해 실제 key-mode 변환에 적용.
-- `1.2.95`: Mode Settings의 `OSU Charts`를 켜면 자체 파서로 osu!mania 4K~10K `.osu`를 인덱싱·플레이합니다. BMS가 기본이며 `.osz`/osu 스킨 가져오기는 복구하지 않았습니다.
+- `1.2.95`에서 Mode Settings의 `OSU Charts`로 osu!mania 4K~10K `.osu` 인덱싱·플레이를 잠시 복구했으나, 이 경로는 1.3.1에서 다시 제거되었습니다.
 - 후속 작업의 기준선 문서는 `docs/baseline-1.1.2.md`
 - Windows GUI 빌드가 메인 타깃
 - Linux는 `Baepoks-Linuxs/TenRiff-0.5.0-linux-preview` 수준의 preview만 존재
-- 지원 차트 표면은 BMS 계열(`.bms/.bme/.bml/.pms`) 기본 + 선택형 osu!mania 4K~10K `.osu`
+- 지원 차트 표면은 BMS 계열(`.bms/.bme/.bml/.pms`) 전용
 - `1.2.4 stable`의 gameplay live 입력은 저장된 RawInput을 우선하면서 같은 `InputThread`의 bound-key polling shadow를 항상 유지하고, 시작 실패뿐 아니라 message pump의 예기치 않은 종료도 queue/state reset 없이 현재 producer thread에서 Polling으로 전환함
 - 메뉴와 gameplay 입력 수집은 foreground process 경계를 유지하며 MenuWindow UI는 root-window 경계도 확인한다. 포커스를 잃으면 키 상태를 초기화하고 background의 lane/Esc 입력을 버린다. RawInput 시작 실패, process-global 등록 대상 손실, 숨은 message window 종료를 감지하면 사용자 키 입력을 기다리지 않고 Polling으로 전환한다.
 - 확인된 fallback은 profile 값을 덮어쓰지 않은 채 현재 앱 실행의 메뉴와 다음 gameplay까지 유지한다. 앱 재시작 또는 `Options -> Input Settings -> Backend`의 명시적 변경만 재시도한다.

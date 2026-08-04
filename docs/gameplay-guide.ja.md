@@ -101,7 +101,7 @@ client 側の設定は Discord の [公式 Game Overlay guide](https://support.d
 ## 6. プレイ開始前に知っておくこと
 
 ### Chart format
-- BMS family（`.bms/.bme/.bml/.pms`）が既定です。Mode Settings の `OSU Charts` を ON にすると osu!mania 4K～10K `.osu` も index/play します。
+- chart の index/play は BMS family（`.bms/.bme/.bml/.pms`）専用で、`.osu` は非対応です。
 
 ### Loading
 - 曲開始直後に chart-loading progress が表示されることがあります。

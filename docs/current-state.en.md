@@ -7,6 +7,7 @@ This is the document that the next agent or any new contributor should read firs
 - The UI-r2 Result screen uses a 2.2-second timeline for the prism, score, rank, clear status, statistics, and graphs. Space skips the reveal; Continue/Retry/Replay stay locked until it completes.
 - UI-r2 Song Select uses a reference-led top navigation, seven-row jacket library, large selected artwork, best-record card, chart/mode panel, and a prominent working Start action. Collection/store/currency/global-ranking placeholders are not shown.
 - The Song Select Rate, Hi-Speed, Gauge, and Random cells apply increase/next on left click and decrease/previous on right click, then save immediately. The current-chart key count no longer clips, and best records show score, accuracy, and max combo together.
+- 1.3.1 removes the external `.osu` parser, indexing path, and settings toggle to make the chart surface BMS-only again. Selecting a BMSTable now switches Fast to Safe automatically for hash matching; the live Aery server and the CG901B MD5→`⑤LEVEL 13` match were verified.
 - Profile Setup now saves an optional local PNG/JPG avatar path; the Song Select profile card displays it and opens profile editing when clicked.
 - Direct-IP multiplayer and the preview r5 input-backend lifecycle fixes are integrated into `1.1.8 stable`
 - `1.1.8` adds an osu!mania OD8 auxiliary score, first-native-`BAD` `Sudden Death (1 MISS)`, and deterministic `LN Mix 10%-90%` on top of the 1.1.7 visual refresh
@@ -22,11 +23,11 @@ This is the document that the next agent or any new contributor should read firs
 - `1.2.9` adds 12K/14K and scratch-aware key conversion, R-Random/DP Flip/Note Add, delayed Song Select preview, richer image-backed results, profile nicknames, stable native video-BGA frames, and accurate `DirectXMinPower` wording.
 - `1.2.92` adds selectable default Krrcream and deterministic `nK2 Native 50/50` paths to the standalone BMS key converter.
 - `1.2.93` adds an in-game `Key Converter` row for `Krrcream`/`KeyWeaver nK2`, persists the choice in config/replay metadata, and applies it to runtime key-mode conversion.
-- `1.2.95`: enabling `OSU Charts` in Mode Settings uses TenRiff's in-tree parser to index and play 4K-10K osu!mania `.osu`. BMS stays the default; `.osz` and osu skin import remain out of scope.
+- `1.2.95` briefly restored 4K-10K osu!mania `.osu` indexing and play through `OSU Charts`; that path is removed again in 1.3.1.
 - Baseline companion document for follow-up work: `docs/baseline-1.1.2.en.md`
 - Windows GUI build is the main target
 - Linux exists only as a preview-level package at `Baepoks-Linuxs/TenRiff-0.5.0-linux-preview`
-- The supported chart surface is BMS-family (`.bms/.bme/.bml/.pms`) by default, plus optional 4K-10K osu!mania `.osu`
+- The supported chart surface is limited to the BMS family (`.bms/.bme/.bml/.pms`)
 - The `1.2.4 stable` runtime keeps RawInput primary while continuously running a bound-key polling shadow in the same `InputThread`; startup failure or an unexpected message-pump exit switches that producer to Polling without resetting its queue or pressed state
 - Menu and gameplay input collection keep the foreground-process boundary, while MenuWindow UI also checks the root-window boundary. Losing focus resets key state and drops background lane/Esc input. A RawInput startup failure, process-global registration-target loss, or hidden message-window exit switches it to Polling without waiting for a user key.
 - A confirmed fallback stays active across menu and subsequent gameplay sessions for the current app run without rewriting the profile; app restart or an explicit `Options -> Input Settings -> Backend` change retries it.

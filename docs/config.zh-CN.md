@@ -134,7 +134,7 @@
   - 创建低功耗 session 失败时回退到现有高性能 DirectX 路径
 
 ### `mode`
-chart loader/indexer 默认使用 BMS family（`.bms/.bme/.bml/.pms`）。设置 `enable_osu_charts=true` 后，自有 parser 也会包含 osu!mania 4K～10K `.osu`；旧 `format` filter 仍不使用。
+chart loader/indexer 仅支持 BMS family（`.bms/.bme/.bml/.pms`）。旧 `enable_osu_charts` 与 `format` 值即使被读取也会忽略，且不会再次保存。
 
 - `key_mode` (string)
   - `none | auto | 4k | 5k | 6k | 7k | 8k | 9k | 10k | 12k | 14k | 16k`
@@ -204,7 +204,7 @@ chart loader/indexer 默认使用 BMS family（`.bms/.bme/.bml/.pms`）。设置
 - `difficulty_table_path` (string)
   - 在 Browse 中选择的本地 BMS 难度表 header JSON，或从链接生成的 profile cache header 路径
   - header 使用 `name`、`symbol` 与本地相对 `data_url`；data array entry 使用 `md5` 或 `sha256` 加 `level`
-  - 选择或清除后会重新索引当前 source，并给匹配谱面显示表等级
+  - 选择或清除后会重新索引当前 source，并给匹配谱面显示表等级；选择难度表时会自动切换到需要 hash 的 `safe` 索引
 - `difficulty_table_url` (string)
   - 从 Browse 导入的 http(s) BMSTable HTML 页面或 header JSON 原始链接
   - 解析标准 `<meta name="bmstable" content="...">`，并把 header/data JSON 缓存到 profile 的 `difficulty_tables` 目录；选择本地 JSON 时清空

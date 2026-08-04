@@ -107,7 +107,7 @@ Discord 설정 방법은 [공식 Game Overlay 안내](https://support.discord.co
 ## 6. 플레이 시작 전 알아둘 점
 
 ### 차트 형식
-- 기본은 BMS 계열(`.bms/.bme/.bml/.pms`)이며, Mode Settings에서 `OSU Charts`를 켜면 osu!mania 4K~10K `.osu`도 인덱싱하고 플레이합니다.
+- 차트 인덱싱과 플레이는 BMS 계열(`.bms/.bme/.bml/.pms`) 전용이며 `.osu`는 지원하지 않습니다.
 
 ### 로딩
 - 곡 시작 직후에는 차트 로딩 진행 상태가 표시될 수 있습니다.

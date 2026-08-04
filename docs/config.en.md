@@ -134,7 +134,7 @@ If a profile does not exist, it is created automatically on first launch.
   - failure to create the low-power session falls back to the existing high-performance DirectX path
 
 ### `mode`
-The chart loader and indexer default to BMS-family files (`.bms/.bme/.bml/.pms`). With `enable_osu_charts=true`, TenRiff's own parser also includes 4K-10K osu!mania `.osu`; the old `format` filter remains unused.
+The chart loader and indexer are limited to BMS-family files (`.bms/.bme/.bml/.pms`). Legacy `enable_osu_charts` and `format` values are ignored when read and are not saved again.
 
 - `key_mode` (string)
   - `none | auto | 4k | 5k | 6k | 7k | 8k | 9k | 10k | 12k | 14k | 16k`
@@ -204,7 +204,7 @@ The chart loader and indexer default to BMS-family files (`.bms/.bme/.bml/.pms`)
 - `difficulty_table_path` (string)
   - path to a local BMS difficulty-table header JSON selected from Browse, or to the profile cache created from a link
   - the header uses `name`, `symbol`, and a local relative `data_url`; data-array entries use `md5` or `sha256` plus `level`
-  - selecting or clearing the table reindexes the current source and displays table levels for matching charts
+  - selecting or clearing the table reindexes the current source and displays table levels for matching charts; selecting one automatically switches indexing to `safe` because hashes are required
 - `difficulty_table_url` (string)
   - original http(s) BMSTable HTML page or header JSON link imported from Browse
   - standard `<meta name="bmstable" content="...">` metadata is resolved and the header/data JSON is cached under the profile `difficulty_tables` directory; local JSON selection clears this field

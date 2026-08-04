@@ -5,9 +5,23 @@
 #include <string>
 #include <vector>
 
-#include "chart/OsuManiaLoader.h"
-
 namespace tenriff::chart {
+
+// These compact event types belong to the internal difficulty model. They are
+// intentionally independent from any external chart parser.
+struct OsuManiaNote {
+    int column = 0;
+    int64_t start_time_ms = 0;
+    std::optional<int64_t> end_time_ms;
+    int hit_sound = 0;
+};
+
+struct OsuManiaChart {
+    int key_count = 0;
+    double base_bpm = 0.0;
+    double overall_difficulty = 8.0;
+    std::vector<OsuManiaNote> notes;
+};
 
 
 enum class DifficultyPreset {

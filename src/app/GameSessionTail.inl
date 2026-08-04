@@ -415,8 +415,7 @@ bool GameSession::initialize(const CommandLineOptions& options) {
     auto load_chart_for_session_rate = [this](ChartLoadResult& out_result) -> bool {
         ChartLoader loader;
         out_result = loader.load(chart_path_, sample_rate_, config_.speed.rate,
-                                  config_.audio_ui.bms_keysound_policy,
-                                  config_.mode.enable_osu_charts);
+                                  config_.audio_ui.bms_keysound_policy);
         for (const auto& message : out_result.messages) {
             std::cerr << "[warn] " << message << std::endl;
         }
@@ -2819,10 +2818,7 @@ std::string GameSession::find_first_chart(const std::string& root_path) const {
         return {};
     }
 
-    std::vector<std::string> extensions = {".bms", ".bme", ".bml", ".pms"};
-    if (config_.mode.enable_osu_charts) {
-        extensions.push_back(".osu");
-    }
+    const std::vector<std::string> extensions = {".bms", ".bme", ".bml", ".pms"};
 
     fs::directory_options options = fs::directory_options::skip_permission_denied;
     fs::recursive_directory_iterator it(root_dir, options, ec);

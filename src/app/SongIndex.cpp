@@ -25,7 +25,6 @@
 #include "chart/BmsParser.h"
 #include "chart/BmsTimeline.h"
 #include "chart/OsuDifficulty.h"
-#include "chart/OsuManiaLoader.h"
 #include "config/SimpleJson.h"
 #include "util/Utf8Compat.h"
 
@@ -117,13 +116,6 @@ std::string sanitized_metadata_text(std::string_view value) {
     return util::sanitize_ui_text(trim_copy(value));
 }
 
-std::string preferred_osu_metadata_text(std::string_view primary, std::string_view unicode) {
-    std::string preferred = sanitized_metadata_text(unicode);
-    if (!preferred.empty()) {
-        return preferred;
-    }
-    return sanitized_metadata_text(primary);
-}
 std::string bms_chart_name_from_headers(const chart::BmsChart& parsed_chart) {
     auto subtitle_it = parsed_chart.headers.find("SUBTITLE");
     if (subtitle_it != parsed_chart.headers.end()) {
@@ -165,26 +157,19 @@ bool is_bms_extension(std::string_view ext) {
     return ext == ".bms" || ext == ".bme" || ext == ".bml" || ext == ".pms";
 }
 
-bool is_osu_extension(std::string_view ext) {
-    return ext == ".osu";
-}
 
 bool is_menu_bms_key_count(int key_count) {
     return (key_count >= 4 && key_count <= 10) || key_count == 16;
 }
 
-bool is_menu_song_entry(const SongEntry& entry, const SongIndexOptions& options) {
+bool is_menu_song_entry(const SongEntry& entry) {
     const std::string format = to_lower(entry.format);
-    if (format == "bms") {
-        return is_menu_bms_key_count(entry.key_count);
-    }
-    return options.include_osu && format == "osu" && entry.key_count >= 4 && entry.key_count <= 10;
+    return format == "bms" && is_menu_bms_key_count(entry.key_count);
 }
 
 bool needs_difficulty_refresh(const SongEntry& entry) {
     const std::string format = to_lower(entry.format);
-    return (format == "bms" || format == "osu") &&
-           (entry.md5.size() != 32u || entry.sha256.size() != 64u);
+    return format == "bms" && (entry.md5.size() != 32u || entry.sha256.size() != 64u);
 }
 
 bool uses_minimal_metadata(const SongIndexOptions& options) {
@@ -327,82 +312,6 @@ std::optional<int> difficulty_lane_for_channel(const chart::BmsChart& parsed_cha
     return static_cast<int>(lane.value() - 1);
 }
 
-struct OsuMenuProbe {
-    std::optional<bool> mania_mode;
-    std::optional<int> key_count;
-    std::optional<double> bpm;
-    std::string title;
-    std::string title_unicode;
-    std::string artist;
-    std::string artist_unicode;
-    std::string version;
-};
-
-OsuMenuProbe probe_osu_menu_candidate(std::string_view content) {
-    OsuMenuProbe probe;
-    std::istringstream stream{std::string(content)};
-    std::string line;
-    std::string section;
-    while (std::getline(stream, line)) {
-        if (!line.empty() && line.back() == '\r') {
-            line.pop_back();
-        }
-        const auto comment = line.find("//");
-        if (comment == 0) {
-            continue;
-        }
-        if (comment != std::string::npos) {
-            line.erase(comment);
-        }
-        line = trim_copy(line);
-        if (line.empty()) {
-            continue;
-        }
-        if (line.front() == '[' && line.back() == ']') {
-            section = line.substr(1, line.size() - 2);
-            to_upper_ascii(section);
-            continue;
-        }
-        if (section == "TIMINGPOINTS" && !probe.bpm.has_value()) {
-            const auto comma = line.find(',');
-            if (comma != std::string::npos) {
-                try {
-                    const double beat_length = std::stod(trim_copy(line.substr(comma + 1)));
-                    if (std::isfinite(beat_length) && beat_length > 0.0) {
-                        probe.bpm = 60000.0 / beat_length;
-                    }
-                } catch (...) {
-                }
-            }
-        }
-        const auto sep = line.find(':');
-        if (sep == std::string::npos) {
-            continue;
-        }
-        std::string key = trim_copy(line.substr(0, sep));
-        const std::string value = trim_copy(line.substr(sep + 1));
-        to_upper_ascii(key);
-        try {
-            if (section == "GENERAL" && key == "MODE") {
-                probe.mania_mode = (std::stoi(value) == 3);
-            } else if (section == "DIFFICULTY" && (key == "KEYCOUNT" || key == "CIRCLESIZE")) {
-                probe.key_count = std::stoi(value);
-            } else if (section == "METADATA" && key == "TITLE") {
-                probe.title = value;
-            } else if (section == "METADATA" && key == "TITLEUNICODE") {
-                probe.title_unicode = value;
-            } else if (section == "METADATA" && key == "ARTIST") {
-                probe.artist = value;
-            } else if (section == "METADATA" && key == "ARTISTUNICODE") {
-                probe.artist_unicode = value;
-            } else if (section == "METADATA" && key == "VERSION") {
-                probe.version = value;
-            }
-        } catch (...) {
-        }
-    }
-    return probe;
-}
 std::string relative_path_string(const std::filesystem::path& root, const std::filesystem::path& full_path) {
     namespace fs = std::filesystem;
     std::error_code ec;
@@ -626,103 +535,6 @@ SongEntry build_bms_entry(std::string relative_path,
     return entry;
 }
 
-SongEntry build_osu_entry(std::string relative_path,
-                          const std::filesystem::path& full_path,
-                          int64_t mtime,
-                          std::uint64_t file_size,
-                          bool calculate_difficulty,
-                          bool minimal_metadata,
-                          std::vector<std::string>& warnings) {
-    SongEntry entry;
-    entry.path = std::move(relative_path);
-    entry.format = "osu";
-    entry.mtime = mtime;
-    entry.file_size = file_size;
-
-    std::string size_error;
-    if (!ensure_metadata_chart_size_supported(full_path, &size_error)) {
-        warnings.push_back(size_error + ": " + entry.path);
-        entry.title = fallback_title(full_path);
-        return entry;
-    }
-
-    std::string read_error;
-    const std::string content = read_text_file(full_path, &read_error);
-    if (content.empty() && !read_error.empty()) {
-        warnings.push_back("Failed to read osu!mania chart: " + entry.path);
-        entry.title = fallback_title(full_path);
-        return entry;
-    }
-
-    const OsuMenuProbe probe = probe_osu_menu_candidate(content);
-    if (probe.mania_mode.has_value() && !probe.mania_mode.value()) {
-        return SongEntry{};
-    }
-    if (probe.key_count.has_value() && (probe.key_count.value() < 4 || probe.key_count.value() > 10)) {
-        return SongEntry{};
-    }
-
-    if (minimal_metadata) {
-        if (!probe.mania_mode.value_or(false) || !probe.key_count.has_value()) {
-            return SongEntry{};
-        }
-        entry.key_count = probe.key_count.value();
-        entry.layout_label = std::to_string(entry.key_count) + "K osu!mania";
-        entry.title = preferred_osu_metadata_text(probe.title, probe.title_unicode);
-        if (entry.title.empty()) {
-            entry.title = fallback_title(full_path);
-        }
-        entry.artist = preferred_osu_metadata_text(probe.artist, probe.artist_unicode);
-        entry.chart_name = sanitized_metadata_text(probe.version);
-        entry.bpm = probe.bpm.value_or(0.0);
-        return entry;
-    }
-
-    chart::OsuManiaLoader loader;
-    auto parsed = loader.parse(content);
-    if (!parsed.success()) {
-        warnings.push_back("Failed to parse osu!mania chart: " + entry.path);
-        entry.title = fallback_title(full_path);
-        return entry;
-    }
-    if (parsed.chart.key_count < 4 || parsed.chart.key_count > 10) {
-        return SongEntry{};
-    }
-
-    std::string hash_error;
-    const ChartFileHashes hashes = hash_chart_file(full_path, &hash_error);
-    if (hashes.valid()) {
-        entry.md5 = hashes.md5;
-        entry.sha256 = hashes.sha256;
-        entry.file_size = hashes.size;
-    } else {
-        warnings.push_back("Failed to hash osu!mania chart: " + entry.path + ": " + hash_error);
-    }
-
-    entry.key_count = parsed.chart.key_count;
-    entry.layout_label = std::to_string(entry.key_count) + "K osu!mania";
-    entry.title = preferred_osu_metadata_text(parsed.chart.title, parsed.chart.title_unicode);
-    if (entry.title.empty()) {
-        entry.title = fallback_title(full_path);
-    }
-    entry.artist = preferred_osu_metadata_text(parsed.chart.artist, parsed.chart.artist_unicode);
-    entry.chart_name = sanitized_metadata_text(parsed.chart.version);
-    entry.bpm = parsed.chart.base_bpm;
-    entry.background_preview_path =
-        menu_songs::resolve_osu_background_preview_path(full_path, parsed.chart.background_filename);
-    entry.audio_preview_path =
-        menu_songs::resolve_osu_audio_preview_path(full_path, parsed.chart.audio_filename);
-
-    if (calculate_difficulty) {
-        const auto difficulty = chart::calculate_osu_mania_difficulty(parsed.chart);
-        if (difficulty.note_count > 0) {
-            entry.level = difficulty.revive_level;
-            entry.rating = difficulty.circus_rating;
-        }
-    }
-    entry.native_level = entry.level;
-    return entry;
-}
 void clear_difficulty_table_metadata(SongEntry& entry) {
     if (entry.native_level == 0 && entry.level != 0) {
         entry.native_level = entry.level;
@@ -863,7 +675,6 @@ struct SongIndexCandidate {
 };
 
 bool enumerate_song_candidates(const std::filesystem::path& root_dir,
-                               bool include_osu,
                                std::vector<std::string>* warnings,
                                const std::function<void(SongIndexCandidate&&)>& on_candidate,
                                std::uint64_t* out_candidate_count = nullptr,
@@ -923,7 +734,7 @@ bool enumerate_song_candidates(const std::filesystem::path& root_dir,
         ec.clear();
 
         const std::string ext = to_lower(entry.path().extension().u8string());
-        if (!is_bms_extension(ext) && !(include_osu && is_osu_extension(ext))) {
+        if (!is_bms_extension(ext)) {
             it.increment(ec);
             continue;
         }
@@ -1010,24 +821,13 @@ void process_song_index_batch(std::vector<SongIndexCandidate>& batch,
                 entry = *cached_it->second;
             } else {
                 item_warnings.clear();
-                const std::string ext = to_lower(candidate.full_path.extension().u8string());
-                if (is_osu_extension(ext)) {
-                    entry = build_osu_entry(candidate.relative_path,
-                                            candidate.full_path,
-                                            candidate.mtime,
-                                            candidate.file_size,
-                                            effective_calculate_difficulty(options),
-                                            uses_minimal_metadata(options),
-                                            item_warnings);
-                } else {
-                    entry = build_bms_entry(candidate.relative_path,
-                                            candidate.full_path,
-                                            candidate.mtime,
-                                            candidate.file_size,
-                                            effective_calculate_difficulty(options),
-                                            uses_minimal_metadata(options),
-                                            item_warnings);
-                }
+                entry = build_bms_entry(candidate.relative_path,
+                                        candidate.full_path,
+                                        candidate.mtime,
+                                        candidate.file_size,
+                                        effective_calculate_difficulty(options),
+                                        uses_minimal_metadata(options),
+                                        item_warnings);
                 if (!item_warnings.empty()) {
                     local_warnings.insert(local_warnings.end(), item_warnings.begin(), item_warnings.end());
                 }
@@ -1035,7 +835,7 @@ void process_song_index_batch(std::vector<SongIndexCandidate>& batch,
 
             apply_difficulty_table(entry, difficulty_table);
             batch_valid[batch_index] =
-                (!entry.path.empty() && is_menu_song_entry(entry, options)) ? static_cast<uint8_t>(1u)
+                (!entry.path.empty() && is_menu_song_entry(entry)) ? static_cast<uint8_t>(1u)
                                                                    : static_cast<uint8_t>(0u);
             batch_entries[batch_index] = std::move(entry);
 
@@ -1093,12 +893,11 @@ public:
 
     [[nodiscard]] const std::string& error() const { return error_; }
     [[nodiscard]] int version() const { return version_; }
-    [[nodiscard]] bool cache_includes_osu() const { return cache_includes_osu_; }
     [[nodiscard]] bool cache_calculates_difficulty() const { return cache_calculates_difficulty_; }
     [[nodiscard]] bool cache_uses_minimal_metadata() const { return cache_uses_minimal_metadata_; }
     [[nodiscard]] const std::vector<SongEntry>& entries() const { return entries_; }
 
-    bool parse(const SongIndexOptions& options) {
+    bool parse() {
         if (!expect('{', "Song index root must be an object.")) {
             return false;
         }
@@ -1126,12 +925,6 @@ public:
                 if (version_ != kSongIndexVersion) {
                     return true;
                 }
-            } else if (*key == "include_osu") {
-                auto value = parse_bool();
-                if (!value.has_value()) {
-                    return false;
-                }
-                cache_includes_osu_ = value.value();
             } else if (*key == "calculate_difficulty") {
                 auto value = parse_bool();
                 if (!value.has_value()) {
@@ -1149,7 +942,7 @@ public:
                     if (!skip_value()) {
                         return false;
                     }
-                } else if (!parse_entries_array(options)) {
+                } else if (!parse_entries_array()) {
                     return false;
                 }
             } else {
@@ -1177,7 +970,6 @@ private:
     std::istream& stream_;
     std::string error_;
     int version_ = 0;
-    bool cache_includes_osu_ = false;
     // Schema-12 caches predate this field and always calculated LV/CR.
     bool cache_calculates_difficulty_ = true;
     // Caches created before Fast became metadata-minimal are full Safe caches.
@@ -1434,7 +1226,7 @@ private:
         }
     }
 
-    bool parse_entries_array(const SongIndexOptions& options) {
+    bool parse_entries_array() {
         if (!expect('[', "Song index entries must be an array.")) {
             return false;
         }
@@ -1451,7 +1243,7 @@ private:
             if (entry.native_level == 0 && entry.level != 0) {
                 entry.native_level = entry.level;
             }
-            if (!entry.path.empty() && is_menu_song_entry(entry, options)) {
+            if (!entry.path.empty() && is_menu_song_entry(entry)) {
                 entries_.push_back(std::move(entry));
             }
 
@@ -1674,15 +1466,12 @@ SongIndexLoadResult load_song_index(const std::string& path, const SongIndexOpti
     }
 
     SongIndexStreamReader reader(file);
-    if (!reader.parse(options)) {
+    if (!reader.parse()) {
         result.error = reader.error().empty() ? "Failed to parse song index." : reader.error();
         return result;
     }
 
     if (reader.version() != kSongIndexVersion) {
-        return result;
-    }
-    if (options.include_osu && !reader.cache_includes_osu()) {
         return result;
     }
     if (effective_calculate_difficulty(options) != reader.cache_calculates_difficulty()) {
@@ -1753,7 +1542,6 @@ bool save_song_index(const std::string& path,
 
     file << "{\n";
     file << "  \"version\": " << kSongIndexVersion << ",\n";
-    file << "  \"include_osu\": " << (options.include_osu ? "true" : "false") << ",\n";
     file << "  \"calculate_difficulty\": "
          << (effective_calculate_difficulty(options) ? "true" : "false") << ",\n";
     file << "  \"minimal_metadata\": " << (uses_minimal_metadata(options) ? "true" : "false") << ",\n";
@@ -1865,7 +1653,7 @@ SongIndex scan_songs(const std::string& root_path,
 
     std::uint64_t total_candidates_u64 = 0;
     const bool count_completed = enumerate_song_candidates(
-        root_dir, options.include_osu, nullptr, [](SongIndexCandidate&&) {}, &total_candidates_u64, progress, cancel);
+        root_dir, nullptr, [](SongIndexCandidate&&) {}, &total_candidates_u64, progress, cancel);
     if (!count_completed || cancel_requested(cancel)) {
         return result;
     }
@@ -1890,7 +1678,6 @@ SongIndex scan_songs(const std::string& root_path,
 
         enumerate_song_candidates(
             root_dir,
-            options.include_osu,
             &warnings,
             [&](SongIndexCandidate&& candidate) {
                 batch.push_back(std::move(candidate));

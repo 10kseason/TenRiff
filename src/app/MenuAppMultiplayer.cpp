@@ -733,7 +733,6 @@ void MenuApp::service_multiplayer_chart_match(const network::PeerSessionSnapshot
                     indexed_songs_, source, peer.selected_chart.name);
             } else {
                 SongIndexOptions index_options;
-                index_options.include_osu = config_.mode.enable_osu_charts;
                 index_options.difficulty_table_path = config_.ui.difficulty_table_path;
                 index_options.calculate_difficulty = config_.mode.calculate_song_index_difficulty;
                 index_options.profile =

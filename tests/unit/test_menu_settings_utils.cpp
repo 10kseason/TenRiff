@@ -49,3 +49,16 @@ TEST_CASE("Song Select quick settings map left and right clicks to all four valu
     CHECK(runtime.mode.random == "off");
     CHECK_FALSE(tenriff::app::adjust_song_quick_setting(runtime, 4, 1));
 }
+
+TEST_CASE("difficulty table selection upgrades hashless Fast indexing") {
+    tenriff::config::RuntimeConfig runtime;
+    runtime.mode.song_index_profile = "fast";
+
+    CHECK(tenriff::app::ensure_difficulty_table_indexing(runtime));
+    CHECK(runtime.mode.song_index_profile == "safe");
+    CHECK_FALSE(tenriff::app::ensure_difficulty_table_indexing(runtime));
+    CHECK(runtime.mode.song_index_profile == "safe");
+
+    runtime.mode.song_index_profile = "invalid";
+    CHECK_FALSE(tenriff::app::ensure_difficulty_table_indexing(runtime));
+}
