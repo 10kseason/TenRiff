@@ -22,6 +22,7 @@
 #include "GameplayHudLimits.h"
 #include "app/SongIndex.h"
 #include "app/SongIndexerThread.h"
+#include "app/TenRiffSkin.h"
 #include "audio/AudioThread.h"
 #include "config/Config.h"
 #include "config/Keymap.h"
@@ -241,6 +242,7 @@ private:
     void handle_onnx_upscaler_confirm_input(uint32_t keycode);
     void handle_keymap_test_input(uint32_t keycode);
     void handle_result_input(uint32_t keycode);
+    [[nodiscard]] bool result_presentation_ready() const;
 
     void publish_snapshot();
     [[nodiscard]] std::string current_track_label() const;
@@ -325,7 +327,9 @@ private:
     void update_gameplay_loading_state(int percent, std::string_view stage);
     void refresh_keymap_lane_list();
     void refresh_available_lr2_skins();
+    void refresh_available_tenriff_skins();
     [[nodiscard]] bool import_lr2_skin_path(std::string_view source_path);
+    [[nodiscard]] bool import_tenriff_skin_path(std::string_view source_path);
     [[nodiscard]] bool import_skin_path_auto(std::string_view source_path);
     [[nodiscard]] std::string active_external_skin_root() const;
     [[nodiscard]] std::string active_external_skin_name() const;
@@ -552,10 +556,15 @@ private:
     std::string available_lr2_skin_root_;
     std::vector<std::string> available_lr2_skin_names_{};
     std::unordered_map<std::string, std::string> available_lr2_skin_roots_by_name_{};
+    std::string available_tenriff_skin_root_;
+    std::vector<std::string> available_tenriff_skin_names_{};
+    TenRiffSkinDefinition active_tenriff_skin_{};
 
     bool has_result_ = false;
     bool last_game_over_ = false;
     gameplay::ResultStats last_result_{};
+    int64_t result_presentation_start_ns_ = 0;
+    bool result_presentation_skipped_ = false;
 
     bool input_dirty_ = false;
     bool input_backend_dirty_ = false;
@@ -619,6 +628,7 @@ private:
     uint32_t key_page_up_ = 0;
     uint32_t key_page_down_ = 0;
     uint32_t key_enter_ = 0;
+    uint32_t key_space_ = 0;
     uint32_t key_escape_ = 0;
     uint32_t key_backspace_ = 0;
     uint32_t key_delete_ = 0;

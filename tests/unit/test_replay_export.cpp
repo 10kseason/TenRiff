@@ -309,6 +309,34 @@ TEST_CASE("legacy result parsing falls back to derived score metadata") {
     std::filesystem::remove(path, ec);
 }
 
+TEST_CASE("legacy autoplay clear is normalized to an unranked result") {
+    const std::filesystem::path path = "legacy_autoplay_result_test.json";
+    write_file(path,
+               R"JSON({
+  "chart_path": "Songs/test.bms",
+  "chart_format": "bms",
+  "created_utc": "20250101_000000Z",
+  "clear_status": "ASSIST AUTOPLAY EX-HARD CLEAR",
+  "final_gauge": "ex_hard",
+  "game_over": false,
+  "stats": {
+    "counts": {"pg": 4},
+    "max_combo": 4,
+    "total_notes": 4
+  }
+})JSON");
+
+    auto parsed = tenriff::app::menu_records::parse_result_file(path, nullptr);
+    REQUIRE(parsed.has_value());
+    CHECK(parsed->autoplay_enabled);
+    CHECK_FALSE(parsed->practice_no_fail_enabled);
+    CHECK(parsed->game_over);
+    CHECK(parsed->clear_status == "AUTOPLAY");
+
+    std::error_code ec;
+    std::filesystem::remove(path, ec);
+}
+
 TEST_CASE("legacy replay parsing falls back to derived final score") {
     const std::filesystem::path path = "legacy_replay_test.json";
     write_file(path,
@@ -393,10 +421,17 @@ TEST_CASE("gauge shift record priority follows the final surviving tier") {
     CHECK(clear_status_priority("GAUGE SHIFT HARD CLEAR", false, "hard") == 4);
     CHECK(clear_status_priority("GAUGE SHIFT EX-HARD CLEAR", false, "ex_hard") == 5);
 }
+TEST_CASE("autoplay result status never receives clear priority") {
+    using tenriff::app::menu_records::clear_status_priority;
+    CHECK(clear_status_priority("AUTOPLAY", false, "ex_hard") == 0);
+    CHECK(clear_status_priority("ASSIST AUTOPLAY EX-HARD CLEAR", false, "ex_hard") == 0);
+}
+
 TEST_CASE("assist replays are excluded from default ghost selection") {
     CHECK(tenriff::app::menu_records::default_ghost_replay_allowed(false, false, "HARD CLEAR"));
     CHECK_FALSE(tenriff::app::menu_records::default_ghost_replay_allowed(true, false, "CLEAR"));
     CHECK_FALSE(tenriff::app::menu_records::default_ghost_replay_allowed(false, true, "CLEAR"));
     CHECK_FALSE(tenriff::app::menu_records::default_ghost_replay_allowed(false, false,
                                                                          "ASSIST AUTOPLAY CLEAR"));
+    CHECK_FALSE(tenriff::app::menu_records::default_ghost_replay_allowed(false, false, "AUTOPLAY"));
 }

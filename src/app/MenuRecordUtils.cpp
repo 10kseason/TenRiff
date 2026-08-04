@@ -136,6 +136,16 @@ bool clear_status_is_assist(std::string_view clear_status) {
     return status.find("assist") != std::string::npos;
 }
 
+bool clear_status_is_autoplay(std::string_view clear_status) {
+    const std::string status = to_lower_ascii(std::string(clear_status));
+    return status.find("autoplay") != std::string::npos;
+}
+
+bool clear_status_is_practice(std::string_view clear_status) {
+    const std::string status = to_lower_ascii(std::string(clear_status));
+    return status.find("practice") != std::string::npos;
+}
+
 bool assist_flags_active(bool autoplay_enabled, bool practice_no_fail_enabled) {
     return autoplay_enabled || practice_no_fail_enabled;
 }
@@ -144,12 +154,13 @@ bool default_ghost_replay_allowed(bool autoplay_enabled,
                                   bool practice_no_fail_enabled,
                                   std::string_view clear_status) {
     return !assist_flags_active(autoplay_enabled, practice_no_fail_enabled) &&
+           !clear_status_is_autoplay(clear_status) &&
            !clear_status_is_assist(clear_status);
 }
 
 int clear_status_priority(std::string_view clear_status, bool game_over, std::string_view final_gauge) {
     const std::string status = to_lower_ascii(std::string(clear_status));
-    if (game_over) {
+    if (game_over || clear_status_is_autoplay(clear_status)) {
         return 0;
     }
     if (clear_status_is_assist(clear_status)) {
@@ -414,9 +425,9 @@ std::optional<ParsedResultRecord> parse_result_file(const std::filesystem::path&
     out.rate_multiplier = read_json_number(*root, "rate_multiplier", 1.0);
     out.score_multiplier = read_json_number(*root, "score_multiplier", 1.0);
     out.pause_used = read_json_bool(*root, "pause_used", false);
-    out.autoplay_enabled = read_json_bool(*root, "autoplay_enabled", clear_status_is_assist(out.clear_status));
+    out.autoplay_enabled = read_json_bool(*root, "autoplay_enabled", clear_status_is_autoplay(out.clear_status));
     out.practice_no_fail_enabled =
-        read_json_bool(*root, "practice_no_fail_enabled", clear_status_is_assist(out.clear_status));
+        read_json_bool(*root, "practice_no_fail_enabled", clear_status_is_practice(out.clear_status));
     out.one_miss_fail_enabled = read_json_bool(*root, "one_miss_fail_enabled", false);
 
     if (const auto* gauge_history = find_json_value(*stats_obj, "gauge_history")) {
@@ -465,7 +476,15 @@ std::optional<ParsedResultRecord> parse_result_file(const std::filesystem::path&
         "final_score",
         static_cast<double>(clamp_final_score(out.stats.raw_score, out.score_multiplier)))));
     out.game_over = read_json_bool(*root, "game_over", infer_game_over(out.stats));
-    out.clear_status = normalized_clear_status(out.clear_status, out.game_over, out.final_gauge);
+    // Normalize legacy ASSIST AUTOPLAY ... CLEAR exports at load time so they
+    // cannot keep an old clear lamp or outrank a failed manual play.
+    if (out.autoplay_enabled || clear_status_is_autoplay(out.clear_status)) {
+        out.autoplay_enabled = true;
+        out.game_over = true;
+        out.clear_status = "AUTOPLAY";
+    } else {
+        out.clear_status = normalized_clear_status(out.clear_status, out.game_over, out.final_gauge);
+    }
     return out;
 }
 

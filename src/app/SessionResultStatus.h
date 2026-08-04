@@ -6,8 +6,12 @@
 
 namespace tenriff::app {
 
-inline bool gameplay_session_cleared(bool finished, bool game_over, bool user_aborted) {
-    return finished && !game_over && !user_aborted;
+inline bool gameplay_session_cleared(bool finished,
+                                     bool game_over,
+                                     bool user_aborted,
+                                     bool autoplay_enabled = false) {
+    // Autoplay may finish the chart, but it must never award an official clear.
+    return finished && !game_over && !user_aborted && !autoplay_enabled;
 }
 
 inline bool gameplay_session_assist_active(bool autoplay_enabled, bool practice_no_fail_enabled) {
@@ -43,6 +47,9 @@ inline std::string gameplay_session_clear_status(bool finished,
     }
     if (!finished || game_over) {
         return "FAILED";
+    }
+    if (autoplay_enabled) {
+        return "AUTOPLAY";
     }
     const std::string assist_prefix =
         gameplay_session_assist_prefix(autoplay_enabled, practice_no_fail_enabled);

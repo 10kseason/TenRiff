@@ -163,9 +163,9 @@ chart loader/indexer 默认使用 BMS family（`.bms/.bme/.bml/.pms`）。设置
   - `true` 时会自动加载当前选中谱面的最佳兼容 replay 作为 ghost 对比
   - `false` 时普通游玩保持单场地显示
 - `autoplay_enabled` (bool)
-  - QA 用 assist 模式
-  - `true` 时会自动处理可判定的按键输入，结果会带上 `ASSIST` clear status
-  - 默认 ghost / replay 对比流程会将其视为非竞争性运行
+  - QA 用非竞争自动游玩模式
+  - `true` 时会自动处理可判定的按键输入，并将结果保存为 `AUTOPLAY`
+  - 不计入正式 clear、best score、clear lamp 或默认 ghost，但保留本地结果与 replay 历史
 - `practice_no_fail_enabled` (bool)
   - QA 用 assist 模式
   - `true` 时会禁止基于 gauge 的提前失败，但仍保留判定与结果导出直到谱面结束
@@ -188,6 +188,9 @@ chart loader/indexer 默认使用 BMS family（`.bms/.bme/.bml/.pms`）。设置
 - `profile_nickname` (string)
   - 可在 Quick Setup 中编辑，用作已保存记录和 multiplayer 的显示名
   - 清理控制字符与重复空格，UTF-8 最长48字节；空值时回退到 profile ID
+- `profile_avatar_path` (string)
+  - 在 Profile Setup 中选择的本地 PNG/JPG 路径；为空时使用 TenRiff 默认标记
+  - 按 profile 保存，并规范为 UI-safe、最多 2048 UTF-8 字节
 - `language` (string)
   - `en | ko`
   - 非法值会在加载时规范化为 `en`
@@ -208,7 +211,9 @@ chart loader/indexer 默认使用 BMS family（`.bms/.bme/.bml/.pms`）。设置
 
 ### `skin`
 - `source` (string)
-  - `native | lr2`
+  - `native | tenriff | lr2`
+- `tenriff_skin_name` (string)
+  - 导入的 TenRiff `skin.json` 皮肤文件夹名称
 - `lr2_skin_name` (string)
   - 导入的 LR2 playskin 名称
 - `lr2_resolution_mode` (string)

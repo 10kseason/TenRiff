@@ -93,6 +93,14 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
     target.skin_source = config::normalize_skin_source_token(config_.skin.source);
     target.external_skin_root = active_external_skin_root();
     target.external_skin_name = active_external_skin_name();
+    target.skin_background_path =
+        (target.skin_source == "tenriff" && active_tenriff_skin_.found)
+            ? active_tenriff_skin_.gameplay_background_path
+            : std::string{};
+    target.skin_background_opacity =
+        (target.skin_source == "tenriff" && active_tenriff_skin_.found)
+            ? active_tenriff_skin_.gameplay_background_opacity
+            : 0.66f;
     target.lr2_resolution_override =
         config::normalize_skin_lr2_resolution_mode_token(config_.skin.lr2_resolution_mode);
     target.lane_background_opacity = std::clamp(
@@ -641,6 +649,24 @@ void MenuApp::populate_quick_setup_render_data(render::MenuRenderData& render) {
                     true,
                     false);
     append_menu_row(render.generic,
+                    ui_text("Avatar Image", "프로필 사진"),
+                    config_.ui.profile_avatar_path.empty()
+                        ? ui_text("Select PNG/JPG", "PNG/JPG 선택")
+                        : safe_ui_text(filename_only(config_.ui.profile_avatar_path), "<image>"),
+                    settings_cursor_ == profile_setup::kAvatarRow,
+                    render::MenuHitTargetKind::SettingsRow,
+                    profile_setup::kAvatarRow,
+                    true,
+                    false);
+    append_menu_row(render.generic,
+                    ui_text("Clear Avatar", "프로필 사진 지우기"),
+                    config_.ui.profile_avatar_path.empty() ? ui_text("Not set", "설정 안 됨") : ui_text("Ready", "사용 중"),
+                    settings_cursor_ == profile_setup::kClearAvatarRow,
+                    render::MenuHitTargetKind::SettingsRow,
+                    profile_setup::kClearAvatarRow,
+                    !config_.ui.profile_avatar_path.empty(),
+                    false);
+    append_menu_row(render.generic,
                     first_run ? ui_text("Continue to Song Select", "곡 선택으로 계속")
                               : ui_text("Done", "완료"),
                     "",
@@ -665,8 +691,8 @@ void MenuApp::populate_quick_setup_render_data(render::MenuRenderData& render) {
         render.generic.notes.push_back(ui_text("Changes on this screen are saved immediately to the active profile.",
                                                "이 화면의 변경 사항은 현재 프로필에 즉시 저장됩니다."));
     }
-    render.generic.notes.push_back(ui_text("Nickname is shown in saved records and multiplayer. Enter edits; Esc cancels.",
-                                           "닉네임은 저장 기록과 멀티플레이에 표시됩니다. Enter로 편집하고 Esc로 취소합니다."));
+    render.generic.notes.push_back(ui_text("Nickname is shown in saved records and multiplayer. Avatar Image accepts local PNG/JPG files.",
+                                           "닉네임은 저장 기록과 멀티플레이에 표시됩니다. 프로필 사진은 로컬 PNG/JPG 파일을 사용합니다."));
     render.generic.notes.push_back(ui_text("Recommended start: Gauge Normal, Rate 1.00x, Display Offset 0ms, BMS Keysound Follow.",
                                            "권장 시작값: 노말 게이지, Rate 1.00x, 표시 오프셋 0ms, BMS 키음 연동."));
     render.generic.notes.push_back(ui_text("Songs Folder opens a picker on Enter or F2. You can also drag and drop a folder later.",
@@ -718,6 +744,9 @@ void MenuApp::populate_result_render_data(render::MenuRenderData& render, const 
 
     render.kind = render::MenuScreenKind::ResultScreen;
     render.result.peer_battle = last_game_was_multiplayer_;
+    render.result.profile_avatar_path = config_.ui.profile_avatar_path;
+    render.result.presentation_start_ns = result_presentation_start_ns_;
+    render.result.presentation_skipped = result_presentation_skipped_;
     render.result.profile =
         last_result_player_name_.empty() ? profile_display_name() : last_result_player_name_;
     render.result.track = last_chart_title_.empty() ? current_track : last_chart_title_;
@@ -761,10 +790,14 @@ void MenuApp::populate_result_render_data(render::MenuRenderData& render, const 
 
     const game::GaugeType final_gauge_type = gauge_type_from_mode_string(last_final_gauge_);
 
-    render.result.rank = menu_records::calculate_rank(last_result_, last_game_over_);
+    render.result.rank = last_clear_status_ == "AUTOPLAY"
+                             ? "AUTO"
+                             : menu_records::calculate_rank(last_result_, last_game_over_);
     render.result.status = !last_clear_status_.empty() ? last_clear_status_
                                                        : (last_game_over_ ? "GAME OVER" : "CLEAR");
     render.result.gauge_label = gauge_type_label(final_gauge_type);
+    render.result.cleared = !last_game_over_ &&
+                            !menu_records::clear_status_is_autoplay(last_clear_status_);
     render.result.score = last_result_final_score_;
     render.result.pause_used = last_pause_used_;
     render.result.accuracy = accuracy;
@@ -778,6 +811,16 @@ void MenuApp::populate_result_render_data(render::MenuRenderData& render, const 
     render.result.good = last_result_.counts.gd;
     render.result.bad = last_result_.counts.bd;
     render.result.poor = last_result_.counts.pr;
+    const int combo_target =
+        last_result_.total_combo_steps > 0 ? last_result_.total_combo_steps : total_notes;
+    render.result.full_combo =
+        render.result.cleared && combo_target > 0 &&
+        last_result_.max_combo >= combo_target && last_result_.counts.bd == 0;
+    render.result.all_perfect =
+        render.result.cleared && judged > 0 &&
+        last_result_.counts.pg == judged && last_result_.counts.gr == 0 &&
+        last_result_.counts.gd == 0 && last_result_.counts.bd == 0 &&
+        last_result_.counts.pr == 0;
     render.result.mean_delta_ms = last_result_.mean_delta_ms;
     render.result.stddev_delta_ms = last_result_.stddev_delta_ms();
     render.result.shift_count = static_cast<int>(last_result_.shifts.size());
@@ -1077,6 +1120,13 @@ void MenuApp::publish_snapshot() {
     MenuSnapshot snapshot;
     render::MenuRenderData render;
     render.ui_korean = ui_uses_korean();
+    if (config::normalize_skin_source_token(config_.skin.source) == "tenriff" &&
+        active_tenriff_skin_.found) {
+        render.lobby_skin.enabled = true;
+        render.lobby_skin.background_path = active_tenriff_skin_.lobby_background_path;
+        render.lobby_skin.logo_path = active_tenriff_skin_.lobby_logo_path;
+        render.lobby_skin.background_opacity = active_tenriff_skin_.lobby_background_opacity;
+    }
     render.screen_title = screen_title();
     render.performance.visible = config_.graphics.performance_overlay;
 
@@ -1718,6 +1768,8 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
         last_export_warnings_ = result.export_warnings;
         last_session_replay_playback_ = replay_playback;
         reload_chart_best_results();
+        result_presentation_start_ns_ = timing::HighResClock::now_ns();
+        result_presentation_skipped_ = false;
         screen_ = Screen::Result;
     } else {
         has_result_ = false;
@@ -1927,10 +1979,10 @@ void MenuApp::populate_help_overlay(render::HelpOverlayData& target) const {
             target.lines = {
                 ui_text("Up / Down or the mouse wheel selects a row. Long skin lists have a clickable scrollbar on the right.",
                         "위 / 아래 키 또는 마우스 휠로 행을 선택합니다. 긴 스킨 목록은 오른쪽의 클릭 가능한 스크롤바를 표시합니다."),
-                ui_text("Skin Source swaps between the native vector skin and imported LR2 playskins.",
-                        "스킨 소스는 기본 벡터 스킨과 가져온 LR2 플레이스킨 사이를 전환합니다."),
-                ui_text("Import Skin opens an LR2 folder picker. Drag-and-drop also works on this screen.",
-                        "스킨 가져오기는 LR2 폴더 선택 창을 엽니다. 이 화면에서는 드래그 앤 드롭도 지원합니다."),
+                ui_text("Skin Source swaps between Native, TenRiff skin.json, and imported LR2 playskins.",
+                        "스킨 소스는 Native, TenRiff skin.json, 가져온 LR2 플레이스킨을 전환합니다."),
+                ui_text("Import Skin accepts a TenRiff skin.json folder or an LR2 folder. Drag-and-drop also works.",
+                        "스킨 가져오기는 TenRiff skin.json 또는 LR2 폴더를 받으며 드래그 앤 드롭도 지원합니다."),
                 ui_text("Image Aspect keeps imported note heads and tails from stretching to the gameplay note box.",
                         "이미지 비율은 가져온 노트 헤드와 테일이 게임 노트 박스에 맞춰 늘어나지 않게 유지합니다."),
                 ui_text("The right preview shows the native fallback lane colors and sizing per layout.",
@@ -1984,8 +2036,8 @@ void MenuApp::populate_help_overlay(render::HelpOverlayData& target) const {
                         "TenRiff 1.2.92는 BMS 계열 차트만 인덱싱하고 플레이합니다."),
                 ui_text("Ghost Battle uses the selected chart's best compatible replay when one exists; turn it off to keep single-field play.",
                         "고스트 배틀은 선택한 차트의 호환되는 최고 리플레이가 있으면 사용하며, 끄면 단일 플레이 필드로 유지됩니다."),
-                ui_text("Autoplay and Practice are assist modes for QA. Their results are marked ASSIST and are not used as default ghost bests.",
-                        "오토플레이와 연습 모드는 QA용 보조 기능입니다. 결과는 ASSIST로 표시되고 기본 고스트 최고 기록으로 쓰이지 않습니다."),
+                ui_text("Autoplay is saved as AUTOPLAY but never awards a clear. Practice remains an ASSIST clear; neither is used as a default ghost best.",
+                        "오토플레이 결과는 AUTOPLAY로 저장되지만 클리어로 인정되지 않습니다. 연습 모드는 ASSIST 클리어로 남으며 둘 다 기본 고스트 최고 기록으로 쓰이지 않습니다."),
                 ui_text("Enter on Mods opens the registry-backed Mod Manager for score-multiplier presets.",
                         "Mods에서 Enter를 누르면 점수 배율 프리셋용 Mod Manager를 엽니다."),
             };

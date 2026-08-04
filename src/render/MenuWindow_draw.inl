@@ -48,12 +48,22 @@ void MenuWindow::draw(const MenuRenderData& data) {
     } else if (data.kind == MenuScreenKind::SongSelect) {
         update_song_select_preview_loading_state(data.song_select, render_now_ns);
         pump_song_select_preview_loads(data.song_select, render_now_ns);
-    } else if (data.kind == MenuScreenKind::ResultScreen &&
-               !data.result.background_path.empty()) {
-        static_cast<void>(load_song_card_preview_bitmap(data.result.background_path));
+    } else if (data.kind == MenuScreenKind::ResultScreen) {
+        if (!data.result.background_path.empty()) {
+            static_cast<void>(load_song_card_preview_bitmap(data.result.background_path));
+        }
+        if (!data.result.profile_avatar_path.empty()) {
+            static_cast<void>(load_song_card_preview_bitmap(data.result.profile_avatar_path));
+        }
     } else {
         song_select_preview_signature_.clear();
         song_select_preview_load_hold_until_ns_ = 0;
+    }
+    if (data.kind != MenuScreenKind::GameplayHud && data.lobby_skin.enabled) {
+        static_cast<void>(load_song_card_preview_bitmap(data.lobby_skin.background_path));
+        static_cast<void>(load_song_card_preview_bitmap(data.lobby_skin.logo_path));
+    } else if (data.kind == MenuScreenKind::GameplayHud) {
+        static_cast<void>(load_song_card_preview_bitmap(data.gameplay.skin_background_path));
     }
     ctx->BeginDraw();
 
@@ -77,7 +87,31 @@ void MenuWindow::draw(const MenuRenderData& data) {
         D2D1::Matrix3x2F(scale_, 0.0f, 0.0f, scale_, offset_x_, offset_y_);
     ctx->SetTransform(transform);
 
+    const D2D1_RECT_F full_screen_rect =
+        D2D1::RectF(0.0f, 0.0f, kBaseWidth, kBaseHeight);
+    if (data.kind != MenuScreenKind::GameplayHud && data.lobby_skin.enabled) {
+        if (ID2D1Bitmap* bitmap = find_song_card_preview_bitmap(data.lobby_skin.background_path)) {
+            const D2D1_RECT_F source_rect =
+                centered_bitmap_source_rect(bitmap->GetSize(), full_screen_rect);
+            ctx->DrawBitmap(bitmap,
+                            full_screen_rect,
+                            std::clamp(data.lobby_skin.background_opacity, 0.0f, 1.0f),
+                            D2D1_BITMAP_INTERPOLATION_MODE_LINEAR,
+                            &source_rect);
+        }
+    }
+
+
     if (data.kind == MenuScreenKind::GameplayHud) {
+        if (ID2D1Bitmap* bitmap = find_song_card_preview_bitmap(data.gameplay.skin_background_path)) {
+            const D2D1_RECT_F source_rect =
+                centered_bitmap_source_rect(bitmap->GetSize(), full_screen_rect);
+            ctx->DrawBitmap(bitmap,
+                            full_screen_rect,
+                            std::clamp(data.gameplay.skin_background_opacity, 0.0f, 1.0f),
+                            D2D1_BITMAP_INTERPOLATION_MODE_LINEAR,
+                            &source_rect);
+        }
         const D2D1_RECT_F background_rect =
             D2D1::RectF(0.0f, 0.0f, kBaseWidth, kBaseHeight);
         if (d2d_->gameplay_background_base_bitmap) {

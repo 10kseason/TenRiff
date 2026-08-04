@@ -10,6 +10,7 @@
 #include "app/MenuSongUtils.h"
 #include "app/ModeManager.h"
 #include "gameplay/Replay.h"
+#include "timing/HighResClock.h"
 
 namespace tenriff::app {
 
@@ -125,7 +126,9 @@ void MenuApp::reload_chart_best_results() {
         // after source-root changes or relative/absolute-path differences.
         for (const auto& key : menu_songs::build_chart_path_keys(parsed->chart_path, songs_path_)) {
             chart_play_record_indices_[key].push_back(record_index);
-            if (note_count_modified) {
+            // Keep autoplay runs in local history/replay browsing, but never let
+            // them become the chart's official best score or clear lamp.
+            if (note_count_modified || parsed->autoplay_enabled) {
                 continue;
             }
             auto existing = chart_best_results_.find(key);
@@ -316,6 +319,8 @@ bool MenuApp::open_result_record(const std::string& result_path,
                                  ? visible_song_entry(static_cast<std::size_t>(selected_song_))
                                  : nullptr;
     update_last_chart_metadata(parsed->chart_path, entry);
+    result_presentation_start_ns_ = timing::HighResClock::now_ns();
+    result_presentation_skipped_ = false;
     screen_ = Screen::Result;
     return true;
 }

@@ -163,9 +163,9 @@ chart loader/indexer は BMS family（`.bms/.bme/.bml/.pms`）が既定です。
   - `true` のとき、選択譜面の互換性ある best replay を自動ロードして ghost 比較を行う
   - `false` のとき、通常 gameplay は single-field のまま
 - `autoplay_enabled` (bool)
-  - QA assist mode
-  - `true` のとき playable note 入力を自動処理し、result には `ASSIST` が付く
-  - 既定の ghost/replay 比較フローには入れない前提
+  - QA 用の非競争 automatic play mode
+  - `true` のとき playable note 入力を自動処理し、result を `AUTOPLAY` として保存
+  - official clear、best score、clear lamp、既定 ghost の対象外だが、local result/replay history は保持
 - `practice_no_fail_enabled` (bool)
   - QA assist mode
   - `true` のとき gauge による早期失敗を無効化し、判定と result export は最後まで継続
@@ -188,6 +188,9 @@ chart loader/indexer は BMS family（`.bms/.bme/.bml/.pms`）が既定です。
 - `profile_nickname` (string)
   - Quick Setup で編集し、保存 record と multiplayer の表示名に使用
   - control 文字と重複空白を除去し UTF-8 で最大48 byte。空なら profile ID を表示
+- `profile_avatar_path` (string)
+  - Profile Setup で選択したローカル PNG/JPG パス。空の場合は TenRiff の既定表示を使用
+  - profile ごとに保存し、UI-safe な UTF-8 最大 2048 byte に正規化
 - `language` (string)
   - `en | ko`
   - 無効値は load 時に `en` へ正規化
@@ -208,7 +211,9 @@ chart loader/indexer は BMS family（`.bms/.bme/.bml/.pms`）が既定です。
 
 ### `skin`
 - `source` (string)
-  - `native | lr2`
+  - `native | tenriff | lr2`
+- `tenriff_skin_name` (string)
+  - 取り込んだ TenRiff `skin.json` スキンフォルダー名
 - `lr2_skin_name` (string)
   - 取り込んだ LR2 playskin 名
 - `lr2_resolution_mode` (string)

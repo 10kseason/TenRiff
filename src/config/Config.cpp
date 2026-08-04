@@ -655,6 +655,8 @@ void apply_config_object(const JsonObject& root, RuntimeConfig& config) {
     if (auto* ui = get_object(root, "ui")) {
         config.ui.profile_nickname =
             normalize_profile_nickname(get_string(*ui, "profile_nickname", config.ui.profile_nickname));
+        config.ui.profile_avatar_path =
+            normalize_profile_avatar_path(get_string(*ui, "profile_avatar_path", config.ui.profile_avatar_path));
         config.ui.language = normalize_ui_language(get_string(*ui, "language", config.ui.language));
         config.ui.result_tail_ms = get_number(*ui, "result_tail_ms", config.ui.result_tail_ms);
         config.ui.require_enter_to_exit = get_bool(*ui, "require_enter_to_exit", config.ui.require_enter_to_exit);
@@ -686,6 +688,8 @@ void apply_config_object(const JsonObject& root, RuntimeConfig& config) {
     if (auto* skin = get_object(root, "skin")) {
         config.skin.source =
             normalize_skin_source_token(get_string(*skin, "source", config.skin.source));
+        config.skin.tenriff_skin_name =
+            get_string(*skin, "tenriff_skin_name", config.skin.tenriff_skin_name);
         config.skin.lr2_skin_name =
             get_string(*skin, "lr2_skin_name", config.skin.lr2_skin_name);
         config.skin.lr2_resolution_mode = normalize_skin_lr2_resolution_mode_token(
@@ -1028,6 +1032,7 @@ JsonValue build_json_root(const RuntimeConfig& config) {
 
     JsonObject ui;
     ui.emplace("profile_nickname", JsonValue{normalize_profile_nickname(config.ui.profile_nickname)});
+    ui.emplace("profile_avatar_path", JsonValue{normalize_profile_avatar_path(config.ui.profile_avatar_path)});
     ui.emplace("language", JsonValue{normalize_ui_language(config.ui.language)});
     ui.emplace("result_tail_ms", JsonValue{config.ui.result_tail_ms});
     ui.emplace("require_enter_to_exit", JsonValue{config.ui.require_enter_to_exit});
@@ -1064,6 +1069,7 @@ JsonValue build_json_root(const RuntimeConfig& config) {
 
     JsonObject skin;
     skin.emplace("source", JsonValue{normalize_skin_source_token(config.skin.source)});
+    skin.emplace("tenriff_skin_name", JsonValue{config.skin.tenriff_skin_name});
     skin.emplace("lr2_skin_name", JsonValue{config.skin.lr2_skin_name});
     skin.emplace("lr2_resolution_mode",
                  JsonValue{normalize_skin_lr2_resolution_mode_token(config.skin.lr2_resolution_mode)});
@@ -1214,6 +1220,22 @@ std::string normalize_profile_nickname(std::string_view value) {
     return nickname;
 }
 
+std::string normalize_profile_avatar_path(std::string_view value) {
+    constexpr std::size_t kMaxAvatarPathBytes = 2048;
+    std::string path = util::sanitize_ui_text(value);
+    if (path.size() <= kMaxAvatarPathBytes) {
+        return path;
+    }
+
+    std::size_t cut = kMaxAvatarPathBytes;
+    while (cut > 0 &&
+           (static_cast<unsigned char>(path[cut]) & 0xC0u) == 0x80u) {
+        --cut;
+    }
+    path.resize(cut);
+    return path;
+}
+
 std::string normalize_ui_language_token(std::string_view token) {
     return normalize_ui_language(std::string(token));
 }
@@ -1235,6 +1257,9 @@ std::string normalize_skin_source_token(std::string_view token) {
     const std::string normalized = to_lower_ascii(std::string(token));
     if (normalized == "lr2" || normalized == "lunaticrave2" || normalized == "lr2skin") {
         return "lr2";
+    }
+    if (normalized == "tenriff" || normalized == "tenriff-skin" || normalized == "trskin") {
+        return "tenriff";
     }
     return "native";
 }
@@ -1558,6 +1583,8 @@ RuntimeConfig ConfigLoader::defaults() const {
     config.mode.song_index_profile = "safe";
     config.mode.calculate_song_index_difficulty = false;
 
+    config.ui.profile_nickname.clear();
+    config.ui.profile_avatar_path.clear();
     config.ui.language = "en";
     config.ui.result_tail_ms = 3000.0;
     config.ui.require_enter_to_exit = true;

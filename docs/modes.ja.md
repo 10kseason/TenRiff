@@ -38,7 +38,7 @@
   - 既定値は `false`
   - `true`: 選択譜面の best compatible replay を自動ロードして ghost 比較する
   - `false`: 通常 gameplay を single-field のままにする
-- `autoplay_enabled`: 判定可能な note を自動処理し、result を `ASSIST` として表示
+- `autoplay_enabled`: 判定可能な note を自動処理し、`AUTOPLAY` result を保存するが official clear・best score・clear lamp の対象外
 - `practice_no_fail_enabled`: gauge による途中失敗を防ぎ、譜面末尾まで継続
 - `one_miss_fail_enabled`: 最初の OD8 換算 object `MISS` で即失敗する `Sudden Death (1 MISS)`
   - native `BAD` timing だけでは発動せず、空打ちの `POOR` も発動条件ではない

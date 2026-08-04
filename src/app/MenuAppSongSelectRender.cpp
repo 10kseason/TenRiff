@@ -14,7 +14,7 @@ namespace tenriff::app {
 
 namespace {
 
-constexpr int kSongSelectVisibleCardCount = 5;
+constexpr int kSongSelectVisibleCardCount = 7;
 
 std::string song_sort_detail_label(MenuApp::SongSortMode mode, bool korean) {
     switch (mode) {
@@ -72,7 +72,8 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
     // Song Select, Sources, and Records intentionally share one render payload so the
     // renderer can switch views without a second screen-specific data model.
     render.kind = render::MenuScreenKind::SongSelect;
-    render.song_select.profile = options_.profile;
+    render.song_select.profile = profile_display_name();
+    render.song_select.profile_avatar_path = config_.ui.profile_avatar_path;
     render.song_select.track = current_track;
     render.song_select.song_count = static_cast<int>(visible_song_count());
     render.song_select.source_count = static_cast<int>(config_.ui.recent_song_sources.size());
@@ -430,6 +431,18 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
             render.song_select.selected_song_title = song_title_for_ui(*entry);
             render.song_select.selected_song_artist = song_artist_for_ui(*entry);
             render.song_select.selected_song_detail = safe_ui_text_or_placeholder(song_detail_label(*entry), "-");
+            render.song_select.selected_song_layout = safe_ui_text_or_placeholder(
+                entry->layout_label.empty()
+                    ? key_mode_label(std::to_string(std::max(1, entry->key_count)) + "k")
+                    : entry->layout_label,
+                "--");
+            render.song_select.selected_song_chart_name = safe_ui_text(entry->chart_name);
+            render.song_select.selected_song_difficulty = safe_ui_text(song_difficulty_label(*entry));
+            render.song_select.selected_song_bpm = entry->bpm;
+            render.song_select.current_rate = format_multiplier(config_.speed.rate);
+            render.song_select.current_hi_speed = format_decimal(config_.speed.hi_speed);
+            render.song_select.current_gauge = ui_gauge_label(config_.mode.gauge);
+            render.song_select.current_random = safe_ui_text(config_.mode.random);
             render.song_select.selected_song_background_path = selected_song_background_preview_path();
             render.song_select.background_upscale_mode = config_.graphics.background_upscale_mode;
             render.song_select.background_upscale_model_path =

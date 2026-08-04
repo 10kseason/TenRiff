@@ -6,6 +6,7 @@
 #include <string_view>
 
 #include "app/Lr2Skin.h"
+#include "app/TenRiffSkin.h"
 
 namespace tenriff::app {
 
@@ -94,6 +95,16 @@ ImportedGameplaySkinDefinition resolve_imported_gameplay_skin(std::string_view s
         definition.imported_note_width_ratio = lr2.imported_note_width_ratio;
         definition.imported_note_height_ratio = lr2.imported_note_height_ratio;
         definition.use_full_lane_receptor_layout = lr2.use_full_lane_receptor_layout;
+        apply_asset_fallbacks(definition);
+        return definition;
+    }
+
+    if (source == "tenriff") {
+        const auto skin = resolve_tenriff_skin(root_utf8, skin_name, keys);
+        if (!skin.found || !skin.gameplay.found) {
+            return definition;
+        }
+        definition = skin.gameplay;
         apply_asset_fallbacks(definition);
         return definition;
     }

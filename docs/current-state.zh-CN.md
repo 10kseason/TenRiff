@@ -3,7 +3,10 @@
 这份文档是下一位 agent 或新任务接手时应该最先阅读的当前状态文档。目标是快速说明“这个项目现在是什么、应该先看哪里、还有哪些内容尚未验证”。
 
 ## 基线
-- 当前项目版本与公开稳定版均为 `1.3.0 stable`
+- 当前项目版本与公开稳定版均为 `1.3.0 (UI-r2)`
+- UI-r2 Result 使用 2.2 秒时间线依次展示棱镜、分数、等级、通关状态、判定统计和图表；可用 Space 跳过，在演出结束前锁定 Continue/Retry/Replay 输入。
+- UI-r2 Song Select 使用顶部标签、7 行封面曲库、大幅选中图片、最佳记录卡、谱面/模式面板和可实际启动的 START 按钮；不显示 Collection/Store/货币/全球排名等虚构功能
+- Profile Setup 可按 profile 保存可选的本地 PNG/JPG 头像路径，Song Select 的 profile card 可显示并点击编辑
 - direct-IP multiplayer 与 preview r5 的输入 backend 生命周期修复已整合进 `1.1.8 stable`
 - `1.1.8` 在 1.1.7 视觉更新基础上加入 osu!mania OD8 辅助分数、首次原生 `BAD` 即结束的 `Sudden Death (1 MISS)`，以及确定性的 `LN Mix 10%～90%`
 - `1.2.0` 把 BMS 通道 `04/07` 和 osu!mania 背景接入 gameplay sample timeline，并通过 Windows ML 上的 LunaSR 异步放大低于 FHD 的图片背景
@@ -104,7 +107,7 @@
   - `Note & Field Size` 以中心为基准，将 playfield、lane/divider、note 与相邻 gauge 一起按 50%～140% 缩放；100% 下相邻 note 边缘的默认总间距为 24px
   - Black Playfield 会将包含 lane spacing 在内的 player/ghost playfield 全部显示为纯黑
   - 会按 key mode 保存单独的 lane 宽度数组和 lane 间距数组，并在 preview、实际 gameplay、ghost field 中共用同一套布局计算
-  - 支持的 skin route 仅有 `native` 与 LR2 playskin；在 Skins 中选择或拖入单个 LR2 folder 会导入当前 profile
+  - 支持的 skin route 包含 `native`、TenRiff `skin.json` v1 与 LR2 playskin；在 Skins 中选择或拖入 TenRiff/LR2 folder 会导入当前 profile 且不覆盖已有安装
   - 选择标准 `LR2files` 或 `Theme` root 时，会把其下除精确名为 `IIDX` 以及依赖 IIDX 资源之外的 theme 分别安装为独立 skin，保留 sibling-theme 路径，跳过 symlink，且不覆盖已有文件夹
   - 应用 LR2 note/LN 图片、lane gap 与 destination size；`play/Gear` 下部 frame 随 field size 放大，并作为保持原始宽高比且裁切在判定线下方的单一 overlay 显示，解析 `#CUSTOMFILE` wildcard include 默认选择，并在缺少 Gear 时不把 falling note / LN head 复用为 receptor
   - native skin 在每条 lane 底部绘制 digital piano key；仅在实际按住输入时下压，击键瞬间显示短暂 cyan/magenta glitch pulse，进程失去 foreground 时会清除 hold 视觉状态
@@ -199,7 +202,7 @@
 
 ## 运行时 / 打包规则
 - 新用户 profile 会自动创建
-- 当前正式 P2P 发布线为 `TenRiff 1.3.0 stable`
+- 当前正式 P2P 发布线为 `TenRiff 1.3.0 (UI-r2)`
 - 发布包不包含 `Songs`
 - 发布包包含 `Main Menu / Options / Song Selecte / Multiplayer Lobby / Clear / Failed` 这些 `Mainmusic/` 场景槽位；每个 `Name.mp3` 及 `Name 2.mp3`～`Name 64.mp3` 会自动发现，并在重新进入场景时轮换
 - 发布更新只包含已构建产物和必要的运行时资源

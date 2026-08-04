@@ -3,7 +3,10 @@
 이 문서는 다음 에이전트나 새 작업자가 가장 먼저 읽어야 하는 현재 상태 문서입니다. 목표는 "지금 이 프로젝트가 무엇이고, 어디를 보면 되고, 무엇이 아직 미검증인지"를 빠르게 파악하게 하는 것입니다.
 
 ## Baseline
-- 현재 프로젝트 버전과 공개 안정판은 `1.3.0 stable`
+- 현재 프로젝트 버전과 공개 안정판은 `1.3.0 (UI-r2)`
+- UI-r2 Result는 2.2초 타임라인으로 프리즘·점수·등급·상태·통계·그래프를 순차 공개하며, Space로 연출을 건너뛸 수 있고 CONTINUE/RETRY/Replay 입력은 공개 완료 전 잠김
+- UI-r2 Song Select는 상단 탭, 7행 재킷 라이브러리, 대형 선택 이미지, 최고 기록 카드, 차트/모드 패널, 실제 동작하는 START 버튼 구조로 개편되며 Collection/Store/재화/글로벌 랭킹 가상 기능은 표시하지 않음
+- Profile Setup은 선택적 로컬 PNG/JPG 프사 경로를 프로필별로 저장하며 Song Select 프로필 카드는 이를 표시하고 클릭 시 프로필 편집으로 연결
 - 직접 IP 멀티플레이와 preview r5의 입력 backend 수명주기 수정은 `1.1.8 stable`에 통합
 - `1.1.8`은 1.1.7의 시각 개선에 osu!mania OD8 보조 점수, 첫 네이티브 `BAD` 즉사 `Sudden Death (1 MISS)`, 결정적 `LN Mix 10%~90%`를 추가
 - `1.2.0`은 BMS 채널 `04/07` 및 osu!mania 배경을 gameplay sample timeline에 연결하고, FHD 미만 이미지 배경을 Windows ML 기반 LunaSR로 비동기 보간
@@ -110,7 +113,7 @@
   - `Note & Field Size`는 중앙을 고정한 채 플레이필드·lane/divider·노트·인접 게이지를 함께 `50%..140%`로 조절하며, 100%에서 인접 노트 사이 기본 합산 여백은 24px
   - Black Playfield를 켜면 lane spacing을 포함한 player/ghost 플레이필드 전체를 완전한 검정으로 렌더링
   - key mode별 개별 lane 폭과 lane 사이 간격을 각각 저장하고 미리보기/실플레이/ghost field에 같은 레이아웃 계산을 적용
-  - 지원 스킨 경로는 `native`와 LR2 playskin뿐이며, Skins 화면에서 LR2 폴더 하나를 선택하거나 드롭하면 활성 프로필로 이식
+  - 지원 스킨 경로는 `native`, TenRiff `skin.json` v1, LR2 playskin이며, Skins 화면에서 TenRiff/LR2 폴더를 선택하거나 드롭하면 활성 프로필에 덮어쓰기 없이 이식
   - 표준 `LR2files` 또는 `Theme` 루트를 고르면 정확한 `IIDX` 폴더와 IIDX 자산 의존 테마를 제외한 바로 아래 테마를 별도 스킨으로 일괄 설치하고, 형제 테마 경로를 유지하며, 심볼릭 링크를 건너뛰고, 기존 폴더를 덮어쓰지 않음
   - LR2 note/LN 이미지, lane gap, destination size를 반영하고 `play/Gear` 하단 프레임은 원본 종횡비를 유지한 채 필드 크기에 연동해 확대하고 판정선 아래로 clip하는 단일 오버레이로 표시하며 `#CUSTOMFILE` 와일드카드 include의 기본 선택을 해석. Gear가 없으면 낙하 노트/LN 머리를 receptor로 재사용하지 않음
   - native 기본 스킨은 하단 레인마다 디지털 피아노 건반을 표시하고, 실제 키를 누르는 동안 건반이 내려가며 입력 순간에는 짧은 cyan/magenta 글리치 펄스를 표시. foreground를 잃으면 홀드 시각 상태도 초기화
@@ -212,7 +215,7 @@
 
 ## Runtime / Packaging Rules
 - 새 사용자 프로필은 자동 생성
-- 현재 정식 P2P 배포 라인은 `TenRiff 1.3.0 stable`
+- 현재 정식 P2P 배포 라인은 `TenRiff 1.3.0 (UI-r2)`
 - 배포 패키지에는 `Songs`를 넣지 않음
 - 배포 패키지는 `Main Menu / Options / Song Selecte / Multiplayer Lobby / Clear / Failed` 이름의 `Mainmusic/` 화면 슬롯을 포함하며, 각 `이름.mp3`와 번호가 붙은 `이름 2.mp3`~`이름 64.mp3`를 자동 수집해 화면 재진입마다 순환
 - 배포 업데이트에는 built artifacts와 필요한 런타임 자산만 포함

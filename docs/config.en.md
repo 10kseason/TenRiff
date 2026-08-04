@@ -163,9 +163,9 @@ The chart loader and indexer default to BMS-family files (`.bms/.bme/.bml/.pms`)
   - when `true`, TenRiff auto-loads the selected chart's best compatible replay for ghost comparison
   - when `false`, normal gameplay stays single-field
 - `autoplay_enabled` (bool)
-  - QA assist mode
-  - when `true`, playable note input is handled automatically and the result is tagged with `ASSIST`
-  - intended to stay out of the default ghost / replay comparison flow
+  - non-competitive automatic play mode for QA
+  - when `true`, playable note input is handled automatically and the result is saved as `AUTOPLAY`
+  - never awards an official clear, best score, clear lamp, or default ghost; local result/replay history is retained
 - `practice_no_fail_enabled` (bool)
   - QA assist mode
   - when `true`, gauge-based early failure is disabled while judgement and result export still run to chart end
@@ -188,6 +188,9 @@ The chart loader and indexer default to BMS-family files (`.bms/.bme/.bml/.pms`)
 - `profile_nickname` (string)
   - editable in Quick Setup and used as the display name in saved records and multiplayer
   - controls/duplicate whitespace are sanitized and UTF-8 length is limited to 48 bytes; an empty value falls back to the profile ID
+- `profile_avatar_path` (string)
+  - optional local PNG/JPG path selected from Profile Setup; empty uses the built-in TenRiff fallback mark
+  - the path is saved per profile and UI-sanitized to at most 2048 UTF-8 bytes
 - `language` (string)
   - `en | ko`
   - invalid values are normalized to `en` on load
@@ -208,7 +211,9 @@ The chart loader and indexer default to BMS-family files (`.bms/.bme/.bml/.pms`)
 
 ### `skin`
 - `source` (string)
-  - `native | lr2`
+  - `native | tenriff | lr2`
+- `tenriff_skin_name` (string)
+  - imported TenRiff `skin.json` skin folder name
 - `lr2_skin_name` (string)
   - imported LR2 playskin name
 - `lr2_resolution_mode` (string)
