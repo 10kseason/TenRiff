@@ -28,6 +28,16 @@ TEST_CASE("completed gameplay without fail counts as clear") {
               true, false, false, tenriff::game::GaugeType::Easy) == "EASY CLEAR");
 }
 
+TEST_CASE("autoplay completion never counts as a clear") {
+    CHECK_FALSE(tenriff::app::gameplay_session_cleared(true, false, false, true));
+    CHECK(tenriff::app::gameplay_session_clear_status(
+              true, false, false, tenriff::game::GaugeType::Normal, true, false) ==
+          "AUTOPLAY");
+    CHECK(tenriff::app::gameplay_session_clear_status(
+              true, false, false, tenriff::game::GaugeType::ExHard, true, true, true, true) ==
+          "AUTOPLAY");
+}
+
 TEST_CASE("unfinished or aborted gameplay never counts as clear") {
     CHECK_FALSE(tenriff::app::gameplay_session_cleared(false, false, false));
     CHECK(tenriff::app::gameplay_session_clear_status(
@@ -42,19 +52,10 @@ TEST_CASE("unfinished or aborted gameplay never counts as clear") {
               true, false, true, tenriff::game::GaugeType::Normal) == "ABORTED");
 }
 
-TEST_CASE("assist clears are labeled explicitly") {
-    CHECK(tenriff::app::gameplay_session_clear_status(
-              true, false, false, tenriff::game::GaugeType::Normal, true, false) ==
-          "ASSIST AUTOPLAY CLEAR");
+TEST_CASE("practice assist clears are labeled explicitly") {
     CHECK(tenriff::app::gameplay_session_clear_status(
               true, false, false, tenriff::game::GaugeType::Hard, false, true) ==
           "ASSIST PRACTICE HARD CLEAR");
-    CHECK(tenriff::app::gameplay_session_clear_status(
-              true, false, false, tenriff::game::GaugeType::ExHard, true, false) ==
-          "ASSIST AUTOPLAY EX-HARD CLEAR");
-    CHECK(tenriff::app::gameplay_session_clear_status(
-              true, false, false, tenriff::game::GaugeType::Easy, true, true) ==
-          "ASSIST AUTOPLAY PRACTICE EASY CLEAR");
     CHECK(tenriff::app::gameplay_session_clear_status(
               false, false, false, tenriff::game::GaugeType::Normal, true, false) == "FAILED");
 }
@@ -65,5 +66,5 @@ TEST_CASE("sudden death clears are labeled above the underlying gauge") {
           "SUDDEN DEATH CLEAR");
     CHECK(tenriff::app::gameplay_session_clear_status(
               true, false, false, tenriff::game::GaugeType::Hard, true, false, true) ==
-          "ASSIST AUTOPLAY SUDDEN DEATH CLEAR");
+          "AUTOPLAY");
 }

@@ -51,6 +51,8 @@ struct ParsedReplayRecord {
 
 int judged_total(const gameplay::JudgementCounts& counts);
 bool clear_status_is_assist(std::string_view clear_status);
+bool clear_status_is_autoplay(std::string_view clear_status);
+bool clear_status_is_practice(std::string_view clear_status);
 bool assist_flags_active(bool autoplay_enabled, bool practice_no_fail_enabled);
 bool default_ghost_replay_allowed(bool autoplay_enabled,
                                   bool practice_no_fail_enabled,

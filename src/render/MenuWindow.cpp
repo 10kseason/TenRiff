@@ -52,6 +52,7 @@
 #include "render/GameplayGearLayout.h"
 #include "render/GameplayMotion.h"
 #include "render/GameplayNativeDigitalKey.h"
+#include "render/ResultPresentation.h"
 #include "timing/HighResClock.h"
 #include "util/Utf8Compat.h"
 
@@ -311,6 +312,9 @@ std::string normalize_gameplay_skin_source(std::string_view value) {
                    [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
     if (normalized == "lr2") {
         return "lr2";
+    }
+    if (normalized == "tenriff") {
+        return "tenriff";
     }
     return "native";
 }
@@ -2986,8 +2990,20 @@ bool MenuWindow::load_selected_song_preview_bitmap(const SongSelectData& data, i
 }
 
 void MenuWindow::pump_song_select_preview_loads(const SongSelectData& data, int64_t now_ns) {
-    if (!d2d_ || !d2d_->d2d_context || !d2d_->wic_factory ||
-        data.showing_sources || data.showing_records ||
+    if (!d2d_ || !d2d_->d2d_context || !d2d_->wic_factory) {
+        return;
+    }
+
+    if (!data.profile_avatar_path.empty()) {
+        const std::string avatar_key(data.profile_avatar_path);
+        auto avatar_it = d2d_->song_card_preview_bitmaps.find(avatar_key);
+        if (avatar_it == d2d_->song_card_preview_bitmaps.end()) {
+            static_cast<void>(load_song_card_preview_bitmap(avatar_key));
+            return;
+        }
+        touch_song_card_preview_lru(avatar_key);
+    }
+    if (data.showing_sources || data.showing_records ||
         song_select_preview_loading_deferred(now_ns)) {
         return;
     }

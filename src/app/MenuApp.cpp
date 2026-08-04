@@ -49,6 +49,7 @@
 #include "gameplay/Replay.h"
 #include "render/GameplayMotion.h"
 #include "render/GameplayBackgroundPolicy.h"
+#include "render/ResultPresentation.h"
 #include "timing/HighResClock.h"
 #include "util/Utf8Compat.h"
 
@@ -64,7 +65,7 @@ using menu_song_select::song_artist_for_ui;
 using menu_song_select::song_title_for_ui;
 
 constexpr int kSnapshotSongCount = 10;
-constexpr int kSongSelectVisibleCardCount = 5;
+constexpr int kSongSelectVisibleCardCount = 7;
 constexpr int kSongSelectNavLastIndex = 5;
 constexpr int kSongBrowserRowCount = 11;
 constexpr int64_t kSongSelectRepeatInitialDelayNs = 250'000'000LL;
@@ -336,6 +337,66 @@ std::string browse_for_folder(const std::string& title) {
     return result;
 }
 
+std::string browse_for_image_file(const std::string& title) {
+    std::string result;
+
+    const HRESULT init_hr = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
+    if (FAILED(init_hr)) {
+        return result;
+    }
+
+    IFileOpenDialog* dialog = nullptr;
+    HRESULT hr = CoCreateInstance(CLSID_FileOpenDialog, nullptr, CLSCTX_ALL,
+                                  IID_IFileOpenDialog, reinterpret_cast<void**>(&dialog));
+    if (SUCCEEDED(hr)) {
+        DWORD options = 0;
+        dialog->GetOptions(&options);
+        dialog->SetOptions(options | FOS_FORCEFILESYSTEM | FOS_FILEMUSTEXIST | FOS_PATHMUSTEXIST);
+
+        const COMDLG_FILTERSPEC filters[] = {
+            {L"Profile images (*.png;*.jpg;*.jpeg)", L"*.png;*.jpg;*.jpeg"},
+            {L"PNG images (*.png)", L"*.png"},
+            {L"JPEG images (*.jpg;*.jpeg)", L"*.jpg;*.jpeg"},
+        };
+        dialog->SetFileTypes(static_cast<UINT>(std::size(filters)), filters);
+        dialog->SetFileTypeIndex(1);
+
+        std::wstring wide_title;
+        if (!title.empty()) {
+            const int count = MultiByteToWideChar(CP_UTF8, 0, title.c_str(), -1, nullptr, 0);
+            if (count > 0) {
+                wide_title.resize(static_cast<std::size_t>(count));
+                MultiByteToWideChar(CP_UTF8, 0, title.c_str(), -1, wide_title.data(), count);
+            }
+        }
+        if (!wide_title.empty()) {
+            dialog->SetTitle(wide_title.c_str());
+        }
+
+        if (SUCCEEDED(dialog->Show(nullptr))) {
+            IShellItem* item = nullptr;
+            if (SUCCEEDED(dialog->GetResult(&item)) && item) {
+                PWSTR path = nullptr;
+                if (SUCCEEDED(item->GetDisplayName(SIGDN_FILESYSPATH, &path)) && path) {
+                    const int length = WideCharToMultiByte(CP_UTF8, 0, path, -1, nullptr, 0, nullptr, nullptr);
+                    if (length > 0) {
+                        result.resize(static_cast<std::size_t>(length));
+                        WideCharToMultiByte(CP_UTF8, 0, path, -1, result.data(), length, nullptr, nullptr);
+                        if (!result.empty() && result.back() == '\0') {
+                            result.pop_back();
+                        }
+                    }
+                    CoTaskMemFree(path);
+                }
+                item->Release();
+            }
+        }
+        dialog->Release();
+    }
+
+    CoUninitialize();
+    return result;
+}
 std::string browse_for_json_file(const std::string& title) {
     std::string result;
 
@@ -751,6 +812,9 @@ std::string MenuApp::ui_skin_source_label(std::string_view token) const {
     if (normalized == "lr2") {
         return "LR2";
     }
+    if (normalized == "tenriff") {
+        return "TenRiff";
+    }
     return ui_text("Native", "기본");
 }
 
@@ -920,6 +984,7 @@ bool MenuApp::initialize(const CommandLineOptions& options) {
     config_.graphics.resolution = normalize_resolution_preset(config_.graphics.resolution);
     refresh_song_collection_membership_cache();
     refresh_available_lr2_skins();
+    refresh_available_tenriff_skins();
 
     config::KeymapManager keymap_manager;
     auto keymap_result = keymap_manager.load_profile(profile_dir_);
@@ -943,6 +1008,7 @@ bool MenuApp::initialize(const CommandLineOptions& options) {
     key_page_up_ = config::KeycodeMap::to_keycode("PageUp").value_or(0);
     key_page_down_ = config::KeycodeMap::to_keycode("PageDown").value_or(0);
     key_enter_ = config::KeycodeMap::to_keycode("Enter").value_or(0);
+    key_space_ = config::KeycodeMap::to_keycode("Space").value_or(0);
     key_escape_ = config::KeycodeMap::to_keycode("Esc").value_or(0);
     key_backspace_ = config::KeycodeMap::to_keycode("Backspace").value_or(0);
     key_delete_ = config::KeycodeMap::to_keycode("Delete").value_or(0);
@@ -1834,7 +1900,7 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
         }
         if (screen_ == Screen::SettingsSkins) {
             if (!import_skin_path_auto(event.path)) {
-                std::cerr << "[warn] Ignored dropped path (expected an LR2 skin folder or a folder containing LR2 skins): "
+                std::cerr << "[warn] Ignored dropped path (expected a TenRiff skin folder or a folder containing LR2 skins): "
                           << event.path << std::endl;
                 return;
             }
@@ -1962,6 +2028,31 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
             }
             publish_snapshot();
             return;
+        case render::MenuHitTargetKind::SongStartButton:
+            if (screen_ != Screen::SongSelect) {
+                return;
+            }
+            song_select_search_active_ = false;
+            song_select_focus_ = SongSelectFocus::SongList;
+            handle_song_select_input(key_enter_);
+            return;
+        case render::MenuHitTargetKind::SongBackButton:
+            if (screen_ != Screen::SongSelect) {
+                return;
+            }
+            handle_song_select_input(key_backspace_);
+            return;
+        case render::MenuHitTargetKind::SongProfilePanel:
+            if (screen_ != Screen::SongSelect) {
+                return;
+            }
+            song_select_search_active_ = false;
+            submenu_return_screen_ = Screen::SongSelect;
+            first_run_profile_ = false;
+            screen_ = Screen::QuickSetup;
+            settings_cursor_ = profile_setup::kAvatarRow;
+            publish_snapshot();
+            return;
         case render::MenuHitTargetKind::SettingsRow:
             break;
         case render::MenuHitTargetKind::KeymapButton:
@@ -1993,8 +2084,13 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
     }
 
     if (screen_ == Screen::Result) {
+        if (!last_game_was_multiplayer_ && !result_presentation_ready()) {
+            return;
+        }
         if (event.index == 1 && !last_game_was_multiplayer_) {
             (void)launch_last_result_replay();
+        } else if (event.index == 2 && !last_game_was_multiplayer_) {
+            handle_result_input(key_left_);
         } else {
             // Keep mouse and keyboard result exits on the same path. The old
             // direct SongSelect jump left multiplayer round flags behind, so
@@ -2271,6 +2367,25 @@ void MenuApp::handle_quick_setup_input(uint32_t keycode) {
     }
 #endif
 
+#ifdef _WIN32
+    if (keycode == key_enter_ && settings_cursor_ == profile_setup::kAvatarRow) {
+        const std::string avatar_path = browse_for_image_file(
+            ui_text("Select Profile Image", "프로필 사진 선택"));
+        if (!avatar_path.empty()) {
+            config_.ui.profile_avatar_path =
+                config::normalize_profile_avatar_path(avatar_path);
+            persist_runtime_config();
+        }
+        publish_snapshot();
+        return;
+    }
+#endif
+    if (keycode == key_enter_ && settings_cursor_ == profile_setup::kClearAvatarRow) {
+        config_.ui.profile_avatar_path.clear();
+        persist_runtime_config();
+        publish_snapshot();
+        return;
+    }
     if (keycode == key_left_ || keycode == key_right_) {
         const int direction = (keycode == key_left_) ? -1 : 1;
         if (settings_cursor_ == 1) {
@@ -2334,6 +2449,9 @@ void MenuApp::handle_quick_setup_input(uint32_t keycode) {
                 song_select_focus_ = SongSelectFocus::SongList;
             } else if (destination == profile_setup::Destination::Title) {
                 screen_ = Screen::Title;
+            } else if (submenu_return_screen_ == Screen::SongSelect) {
+                screen_ = Screen::SongSelect;
+                song_select_focus_ = SongSelectFocus::SongList;
             } else {
                 screen_ = Screen::OptionsHub;
                 options_cursor_ = profile_setup::kOptionsProfileSetupRow;
@@ -2347,9 +2465,13 @@ void MenuApp::handle_quick_setup_input(uint32_t keycode) {
     if (keycode == key_escape_ || keycode == key_backspace_) {
         const auto destination = profile_setup::cancel_destination(setup_entry);
         first_run_profile_ = false;
-        if (destination == profile_setup::Destination::OptionsHub) {
+        if (destination == profile_setup::Destination::OptionsHub &&
+            submenu_return_screen_ != Screen::SongSelect) {
             screen_ = Screen::OptionsHub;
             options_cursor_ = profile_setup::kOptionsProfileSetupRow;
+        } else if (destination == profile_setup::Destination::OptionsHub) {
+            screen_ = Screen::SongSelect;
+            song_select_focus_ = SongSelectFocus::SongList;
         } else {
             screen_ = Screen::Title;
         }
@@ -2393,6 +2515,7 @@ void MenuApp::handle_options_hub_input(uint32_t keycode) {
                 skin_edit_lane_ = 0;
                 skin_edit_gap_ = 0;
                 refresh_available_lr2_skins();
+                refresh_available_tenriff_skins();
                 break;
             case 3:
                 submenu_return_screen_ = return_screen;
@@ -2909,7 +3032,21 @@ bool MenuApp::move_song_select_selection(int delta) {
     return selected_song_ != previous;
 }
 
+bool MenuApp::result_presentation_ready() const {
+    return result_presentation_skipped_ ||
+           (result_presentation_start_ns_ > 0 &&
+            timing::HighResClock::now_ns() - result_presentation_start_ns_ >=
+                render::kResultPresentationDurationNs);
+}
+
 void MenuApp::handle_result_input(uint32_t keycode) {
+    if (!last_game_was_multiplayer_ && !result_presentation_ready()) {
+        if (keycode == key_space_) {
+            result_presentation_skipped_ = true;
+            publish_snapshot();
+        }
+        return;
+    }
     if (last_game_was_multiplayer_) {
         if (keycode == key_enter_ || keycode == key_escape_ || keycode == key_backspace_) {
             const network::PeerSessionSnapshot peer = peer_session_.snapshot();

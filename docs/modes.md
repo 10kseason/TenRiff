@@ -38,7 +38,7 @@
   - 기본값은 `false`
   - `true`: 선택한 차트의 최고 호환 replay를 자동으로 ghost 비교에 사용
   - `false`: ghost 비교 없이 일반 단일 필드 플레이
-- `autoplay_enabled`: 판정 가능한 노트를 자동 처리하고 결과를 `ASSIST`로 표시
+- `autoplay_enabled`: 판정 가능한 노트를 자동 처리하고 결과를 `AUTOPLAY`로 저장하되 공식 클리어·최고 점수·클리어 램프에서는 제외
 - `practice_no_fail_enabled`: 게이지 기반 조기 실패를 막고 차트 끝까지 진행
 - `one_miss_fail_enabled`: 첫 OD8 환산 객체 `MISS`에서 즉시 실패하는 `Sudden Death (1 MISS)`
   - 네이티브 `BAD`만으로는 즉사하지 않으며 빈 키 입력의 `POOR`도 즉사 조건이 아님

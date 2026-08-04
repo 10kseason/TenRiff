@@ -38,7 +38,7 @@
   - 默认值为 `false`
   - `true`：自动加载当前选中谱面的最佳兼容 replay 进行 ghost 对比
   - `false`：保持普通单场地游玩
-- `autoplay_enabled`：自动处理可判定 note，并把结果标为 `ASSIST`
+- `autoplay_enabled`：自动处理可判定 note，并保存为 `AUTOPLAY`，但不计入正式 clear、best score 或 clear lamp
 - `practice_no_fail_enabled`：阻止 gauge 导致的提前失败，继续游玩到谱面结束
 - `one_miss_fail_enabled`：首次 OD8 换算对象 `MISS` 即失败的 `Sudden Death (1 MISS)`
   - 仅原生 `BAD` timing 不会触发，空按产生的 `POOR` 也不会触发

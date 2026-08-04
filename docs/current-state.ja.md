@@ -3,7 +3,10 @@
 この文書は、次のエージェントや新しい作業者が最初に読むべき current-state 文書です。目的は、「このプロジェクトは今どういう状態で、どこを見ればよく、何がまだ未検証か」を素早く把握できるようにすることです。
 
 ## Baseline
-- 現在のプロジェクト版と公開 stable 版は `1.3.0 stable`
+- 現在のプロジェクト版と公開 stable 版は `1.3.0 (UI-r2)`
+- UI-r2 の Result は 2.2 秒の timeline で prism、score、rank、clear status、statistics、graphs を順に表示する。Space で演出を skip でき、完了までは Continue/Retry/Replay 入力を lock する。
+- UI-r2 Song Select は top tab、7-row jacket library、大きな selected artwork、best-record card、chart/mode panel、実動する START action を使用し、Collection/Store/currency/global ranking の仮 UI は表示しない
+- Profile Setup は任意の local PNG/JPG avatar path を profile ごとに保存し、Song Select の profile card から編集できる
 - direct-IP multiplayer と preview r5 の input-backend lifecycle 修正は `1.1.8 stable` に統合
 - `1.1.8` は 1.1.7 の visual refresh に osu!mania OD8 補助スコア、最初の native `BAD` で終了する `Sudden Death (1 MISS)`、決定的な `LN Mix 10%～90%` を追加
 - `1.2.0` は BMS channel `04/07` と osu!mania 背景を gameplay sample timeline に接続し、FHD 未満の画像背景を Windows ML 上の LunaSR で非同期補間
@@ -104,7 +107,7 @@
   - `Note & Field Size` は中央を固定したまま playfield、lane/divider、note、隣接 gauge を 50%～140% でまとめて拡大・縮小し、100% では隣接 note 間の合計 gap が既定で 24px
   - Black Playfield は lane spacing を含む player/ghost playfield 全体を完全な黒で表示
   - キーモードごとの lane-width 配列と inter-lane spacing 配列が保存され、preview / live gameplay / ghost field の同じレイアウト計算に適用される
-  - 対応 skin route は `native` と LR2 playskin のみ。Skins で LR2 folder を一つ選択または drop すると active profile へ移植
+  - 対応 skin route は `native`、TenRiff `skin.json` v1、LR2 playskin。Skins で TenRiff/LR2 folder を選択または drop すると既存 install を上書きせず active profile へ移植
   - 標準 `LR2files` または `Theme` root を選ぶと、`IIDX` folder と IIDX asset に依存する theme を除いた直下の theme を別 skin として一括 install し、sibling-theme path を維持する。symlink は skip し、既存 folder は上書きしない
   - LR2 note/LN image、lane gap、destination size を反映し、`play/Gear` 下部 frame は field size に連動して拡大し、aspect ratio を維持したまま判定線の下に clip する単一 overlay として表示する。`#CUSTOMFILE` wildcard include の default 選択を解決し、Gear がない場合は falling note / LN head を receptor に再利用しない
   - native skin は各 lane 下部に digital piano key を表示し、入力を hold している間だけ key が沈む。打鍵時は短い cyan/magenta glitch pulse を表示し、process が foreground を失うと hold visual も reset
@@ -199,7 +202,7 @@
 
 ## Runtime / Packaging Rules
 - 新しい user profile は自動生成される
-- 現在の正式 P2P 配布ラインは `TenRiff 1.3.0 stable`
+- 現在の正式 P2P 配布ラインは `TenRiff 1.3.0 (UI-r2)`
 - distribution package には `Songs` を含めない
 - distribution package には `Main Menu / Options / Song Selecte / Multiplayer Lobby / Clear / Failed` の `Mainmusic/` scene slot を含め、各 `Name.mp3` と `Name 2.mp3`～`Name 64.mp3` を自動検出して scene 再入場ごとに循環する
 - distribution 更新には built artifact と必要な runtime asset だけを含める

@@ -1,0 +1,27 @@
+{
+  "$schema": "../../../docs/tenriff-skin.schema.json",
+  "format": "tenriff-skin",
+  "version": 1,
+  "name": "TenRiff Example",
+  "author": "Your Name",
+  "lobby": {
+    "background": "",
+    "logo": "",
+    "background_opacity": 0.72
+  },
+  "gameplay": {
+    "background": "",
+    "background_opacity": 0.66,
+    "gear": "",
+    "note": "",
+    "hold_head": "",
+    "hold_body": "",
+    "hold_tail": "",
+    "key_idle": "",
+    "key_pressed": "",
+    "note_width_ratio": 1.0,
+    "note_height_ratio": 1.0,
+    "judgement_line_position": 0.82,
+    "full_lane_receptors": false
+  }
+}

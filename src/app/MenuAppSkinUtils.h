@@ -1,6 +1,7 @@
 #pragma once
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <string>
 #include <string_view>
@@ -161,15 +162,28 @@ inline std::string skin_source_label(std::string_view value) {
     if (normalized == "lr2") {
         return "LR2";
     }
+    if (normalized == "tenriff") {
+        return "TenRiff";
+    }
     return "Native";
 }
 
 inline std::string cycle_skin_source(std::string_view value, int direction) {
+    static constexpr std::array<std::string_view, 3> kSources = {"native", "tenriff", "lr2"};
     const std::string normalized = config::normalize_skin_source_token(value);
-    if (direction == 0) {
-        return normalized;
+    int index = 0;
+    for (int i = 0; i < static_cast<int>(kSources.size()); ++i) {
+        if (kSources[static_cast<std::size_t>(i)] == normalized) {
+            index = i;
+            break;
+        }
     }
-    return normalized == "lr2" ? "native" : "lr2";
+    if (direction == 0) {
+        return std::string(kSources[static_cast<std::size_t>(index)]);
+    }
+    index = (index + (direction < 0 ? -1 : 1) + static_cast<int>(kSources.size())) %
+            static_cast<int>(kSources.size());
+    return std::string(kSources[static_cast<std::size_t>(index)]);
 }
 
 inline std::string cycle_skin_visual_preset(std::string_view value, int direction) {

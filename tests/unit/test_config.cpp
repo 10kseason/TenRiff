@@ -135,6 +135,7 @@ TEST_CASE("config defaults prefer 44100 Hz audio") {
     CHECK(config.judge.hold_break_ms == doctest::Approx(200.0));
     CHECK(config.skin.note_shape == "rect");
     CHECK(config.skin.source == "native");
+    CHECK(config.skin.tenriff_skin_name.empty());
     CHECK(config.skin.lr2_skin_name.empty());
     CHECK(config.skin.lr2_resolution_mode == "auto");
     CHECK(config.skin.visual_preset == "tenriff");
@@ -166,6 +167,7 @@ TEST_CASE("config defaults prefer 44100 Hz audio") {
     CHECK(default_lane_spacing_10k[0] == doctest::Approx(tenriff::config::kLaneSpacingScaleDefault));
     CHECK(default_lane_spacing_10k[8] == doctest::Approx(tenriff::config::kLaneSpacingScaleDefault));
     CHECK(config.ui.profile_nickname.empty());
+    CHECK(config.ui.profile_avatar_path.empty());
     CHECK(config.ui.language == "en");
     CHECK(config.ui.result_tail_ms == doctest::Approx(3000.0));
     CHECK(config.ui.favorite_chart_keys.empty());
@@ -195,6 +197,7 @@ TEST_CASE("config save and load preserve favorites and collections") {
     };
     config.ui.song_collection_filter = "Practice";
     config.ui.profile_nickname = "Luna Pilot";
+    config.ui.profile_avatar_path = "D:/avatars/luna.png";
     config.ui.difficulty_table_path = "tables/insane.json";
     config.ui.difficulty_table_url = "https://example.test/insane/";
 
@@ -208,6 +211,7 @@ TEST_CASE("config save and load preserve favorites and collections") {
     CHECK(result.config.ui.collections == config.ui.collections);
     CHECK(result.config.ui.song_collection_filter == "Practice");
     CHECK(result.config.ui.profile_nickname == "Luna Pilot");
+    CHECK(result.config.ui.profile_avatar_path == "D:/avatars/luna.png");
     CHECK(result.config.ui.difficulty_table_path == "tables/insane.json");
     CHECK(result.config.ui.difficulty_table_url == "https://example.test/insane/");
 
@@ -218,6 +222,11 @@ TEST_CASE("profile nickname normalization is UI-safe and UTF-8 bounded") {
     const std::string long_korean = u8"가나다라마바사아자차카타파하가나다라";
     const std::string normalized = tenriff::config::normalize_profile_nickname(long_korean);
     CHECK(normalized == u8"가나다라마바사아자차카타파하가나");
+}
+
+TEST_CASE("profile avatar path normalization is UI-safe") {
+    CHECK(tenriff::config::normalize_profile_avatar_path("  D:/avatars/luna.png\n") ==
+          "D:/avatars/luna.png");
 }
 
 TEST_CASE("config load folds deprecated indirect miss into the bad window") {
@@ -631,6 +640,31 @@ TEST_CASE("config save and load normalize unsupported skin sources to native") {
     CHECK(result.config.skin.lr2_skin_name.empty());
 }
 
+TEST_CASE("config save and load preserve TenRiff skin selection") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+
+    CurrentPathGuard cwd;
+    std::error_code ec;
+    std::filesystem::current_path(temp.path, ec);
+    REQUIRE_FALSE(static_cast<bool>(ec));
+
+    ConfigLoader loader;
+    auto config = loader.defaults();
+    config.skin.source = "tenriff";
+    config.skin.tenriff_skin_name = "Aurora-Glass";
+
+    std::string error;
+    REQUIRE(loader.save_profile("profiles/test", config, &error));
+    CHECK(error.empty());
+
+    const auto result = loader.load_profile("profiles/test");
+    REQUIRE(result.success());
+    CHECK(result.config.skin.source == "tenriff");
+    CHECK(result.config.skin.tenriff_skin_name == "Aurora-Glass");
+    CHECK(tenriff::config::normalize_skin_source_token("trskin") == "tenriff");
+}
 TEST_CASE("config save and load preserve lr2 skin selection") {
     TempDirGuard temp;
     temp.path = make_temp_dir();

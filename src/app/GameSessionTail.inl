@@ -1840,7 +1840,8 @@ void GameSession::shutdown() {
         result_.game_over = !gameplay_session_cleared(
             engine_finished,
             engine_game_over,
-            user_aborted_.load(std::memory_order_acquire));
+            user_aborted_.load(std::memory_order_acquire),
+            autoplay_enabled_);
         result_.mods = active_mods_;
         result_.player_name = config::normalize_profile_nickname(config_.ui.profile_nickname);
         if (result_.player_name.empty()) {

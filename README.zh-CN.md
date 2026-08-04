@@ -2,9 +2,9 @@
 
 Language: [한국어](README.md) | [English](README.en.md) | [简体中文](README.zh-CN.md) | [日本語](README.ja.md)
 
-TenRiff 是一个 Windows GUI BMS 节奏游戏运行时/启动器。当前 stable 版本为 `1.3.0`，谱面输入默认支持 BMS family（`.bms/.bme/.bml/.pms`）；在 Mode Settings 中打开 `OSU Charts` 后，也会通过 TenRiff 自有 parser 索引并游玩 osu!mania 4K～10K `.osu`。用户可在 Graphics Settings 中选择权利已厘清的外部 ONNX model，然后明确打开 `BGA Upscaler` 并确认高配置警告。公开包不包含模型，默认值为 `off`；不再设置性能 benchmark gate，加载、契约或推理失败时继续使用 native scaling。默认加速路径为高性能 DirectX GPU，并自动检测 FP32/FP16 边界与浮点边界 INT8 QDQ metadata。实验性的 `Low-Power DirectX` 只请求 `DirectXMinPower`，并非明确或已验证的 NPU 选择。项目采用 MIT 许可证。
+TenRiff 是一个 Windows GUI BMS 节奏游戏运行时/启动器。当前 stable 版本为 `1.3.0 (UI-r2)`，谱面输入默认支持 BMS family（`.bms/.bme/.bml/.pms`）；在 Mode Settings 中打开 `OSU Charts` 后，也会通过 TenRiff 自有 parser 索引并游玩 osu!mania 4K～10K `.osu`。用户可在 Graphics Settings 中选择权利已厘清的外部 ONNX model，然后明确打开 `BGA Upscaler` 并确认高配置警告。公开包不包含模型，默认值为 `off`；不再设置性能 benchmark gate，加载、契约或推理失败时继续使用 native scaling。默认加速路径为高性能 DirectX GPU，并自动检测 FP32/FP16 边界与浮点边界 INT8 QDQ metadata。实验性的 `Low-Power DirectX` 只请求 `DirectXMinPower`，并非明确或已验证的 NPU 选择。项目采用 MIT 许可证。
 
-这份 README 是入门文档。关于当前行为、`1.3.0 stable` 项目状态、`1.1.2 final stable` 基准、配置和设计文档，请继续阅读 [`docs/README.zh-CN.md`](docs/README.zh-CN.md)。
+这份 README 是入门文档。关于当前行为、`1.3.0 (UI-r2)` 项目状态、`1.1.2 final stable` 基准、配置和设计文档，请继续阅读 [`docs/README.zh-CN.md`](docs/README.zh-CN.md)。
 
 TenRiff 也明确属于一种 `vibe coding` 作品：它更多是在快速迭代和实验中成形，而不是只按照传统的长篇设计先行流程推进。
 

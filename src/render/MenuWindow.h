@@ -49,6 +49,9 @@ enum class MenuHitTargetKind {
     SongNavButton,
     SongCard,
     SongResultPanel,
+    SongStartButton,
+    SongBackButton,
+    SongProfilePanel,
     OptionsItem,
     SettingsRow,
     KeymapButton,
@@ -102,6 +105,7 @@ struct SongCardData {
 
 struct SongSelectData {
     std::string profile;
+    std::string profile_avatar_path;
     std::string track;
     int64_t high_score = 0;
     int song_count = 0;
@@ -120,6 +124,14 @@ struct SongSelectData {
     std::string selected_song_title;
     std::string selected_song_artist;
     std::string selected_song_detail;
+    std::string selected_song_layout;
+    std::string selected_song_chart_name;
+    std::string selected_song_difficulty;
+    double selected_song_bpm = 0.0;
+    std::string current_rate;
+    std::string current_hi_speed;
+    std::string current_gauge;
+    std::string current_random;
     std::string selected_song_background_path;
     std::string background_upscale_mode = "off";
     std::string background_upscale_model_path;
@@ -181,6 +193,7 @@ struct ResultScreenData {
     bool peer_battle = false;
     bool peer_result_available = false;
     std::string profile;
+    std::string profile_avatar_path;
     std::string peer_name;
     std::string peer_status = "WAITING";
     std::string peer_outcome;
@@ -200,6 +213,11 @@ struct ResultScreenData {
     std::string rank = "--";
     std::string status = "NO DATA";
     std::string gauge_label = "NORMAL";
+    bool cleared = false;
+    bool all_perfect = false;
+    bool full_combo = false;
+    int64_t presentation_start_ns = 0;
+    bool presentation_skipped = false;
 
     int64_t score = 0;
     bool pause_used = false;
@@ -306,6 +324,8 @@ struct GameplayHudData {
     std::string skin_source = "native";
     std::string external_skin_root;
     std::string external_skin_name;
+    std::string skin_background_path;
+    float skin_background_opacity = 0.66f;
     std::string lr2_resolution_override = "auto";
     double lane_background_opacity = 0.18;
     bool black_playfield_enabled = false;
@@ -451,6 +471,8 @@ struct SkinPreviewData {
     std::string skin_source = "native";
     std::string external_skin_root;
     std::string external_skin_name;
+    std::string skin_background_path;
+    float skin_background_opacity = 0.66f;
     std::string lr2_resolution_override = "auto";
     double lane_background_opacity = 0.18;
     bool black_playfield_enabled = false;
@@ -497,9 +519,17 @@ struct PerformanceOverlayData {
     std::array<float, kPerformanceGraphSamples> frame_times_ms{};
 };
 
+struct LobbySkinData {
+    bool enabled = false;
+    std::string background_path;
+    std::string logo_path;
+    float background_opacity = 0.72f;
+};
+
 struct MenuRenderData {
     MenuScreenKind kind = MenuScreenKind::GenericList;
     bool ui_korean = false;
+    LobbySkinData lobby_skin;
 
     std::string screen_title;
     std::vector<std::string> lines;

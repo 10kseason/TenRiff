@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cctype>
 #include <filesystem>
 #include <iostream>
 #include <iterator>
@@ -42,6 +43,13 @@ fs::path path_from_utf8(std::string_view value) {
         return {};
     }
 }
+std::string lower_ascii(std::string value) {
+    std::transform(value.begin(), value.end(), value.begin(), [](unsigned char ch) {
+        return static_cast<char>(std::tolower(ch));
+    });
+    return value;
+}
+
 
 
 std::string lr2_resolution_mode_label(std::string_view value) {
@@ -79,6 +87,10 @@ std::string cycle_lr2_resolution_mode(std::string_view value, int direction) {
 
 fs::path lr2_skin_import_root_path(std::string_view profile_dir) {
     return path_from_utf8(profile_dir) / "skins" / "lr2";
+}
+
+fs::path tenriff_skin_import_root_path(std::string_view profile_dir) {
+    return path_from_utf8(profile_dir) / "skins" / "tenriff";
 }
 
 #ifdef _WIN32
@@ -183,6 +195,28 @@ void MenuApp::refresh_available_lr2_skins() {
     }
 }
 
+void MenuApp::refresh_available_tenriff_skins() {
+    available_tenriff_skin_root_ = tenriff_skin_import_root_path(profile_dir_).u8string();
+    available_tenriff_skin_names_ = list_tenriff_skin_names(available_tenriff_skin_root_);
+    active_tenriff_skin_ = {};
+
+    if (available_tenriff_skin_names_.empty()) {
+        config_.skin.tenriff_skin_name.clear();
+        return;
+    }
+    if (config_.skin.tenriff_skin_name.empty() ||
+        std::find(available_tenriff_skin_names_.begin(),
+                  available_tenriff_skin_names_.end(),
+                  config_.skin.tenriff_skin_name) == available_tenriff_skin_names_.end()) {
+        config_.skin.tenriff_skin_name = available_tenriff_skin_names_.front();
+    }
+    active_tenriff_skin_ = resolve_tenriff_skin(
+        available_tenriff_skin_root_, config_.skin.tenriff_skin_name, 10);
+    for (const auto& warning : active_tenriff_skin_.warnings) {
+        std::cerr << "[warn] TenRiff skin: " << warning << std::endl;
+    }
+}
+
 bool MenuApp::import_lr2_skin_path(std::string_view source_path) {
     const std::string normalized_source = menu_songs::normalize_song_source_path(std::string(source_path));
     if (normalized_source.empty()) {
@@ -204,6 +238,7 @@ bool MenuApp::import_lr2_skin_path(std::string_view source_path) {
     // Imported Skin row.
     config_.skin.lr2_skin_name = imported.skin_names.front();
     refresh_available_lr2_skins();
+    refresh_available_tenriff_skins();
     skin_dirty_ = true;
     std::cerr << "[info] Imported " << imported.skin_names.size()
               << " LR2 skin(s), files=" << imported.copied_files
@@ -211,7 +246,38 @@ bool MenuApp::import_lr2_skin_path(std::string_view source_path) {
     return true;
 }
 
+bool MenuApp::import_tenriff_skin_path(std::string_view source_path) {
+    const TenRiffSkinImportResult imported = import_tenriff_skin(
+        source_path, tenriff_skin_import_root_path(profile_dir_).u8string());
+    for (const auto& warning : imported.warnings) {
+        std::cerr << "[warn] " << warning << std::endl;
+    }
+    if (!imported.success()) {
+        return false;
+    }
+
+    config_.skin.tenriff_skin_name = imported.skin_name;
+    refresh_available_tenriff_skins();
+    skin_dirty_ = true;
+    std::cerr << "[info] Imported TenRiff skin " << imported.skin_name
+              << ", files=" << imported.copied_files
+              << " bytes=" << imported.copied_bytes << "." << std::endl;
+    return true;
+}
+
 bool MenuApp::import_skin_path_auto(std::string_view source_path) {
+    fs::path candidate = path_from_utf8(source_path);
+    std::error_code ec;
+    const bool tenriff_manifest_selected =
+        lower_ascii(candidate.filename().u8string()) == "skin.json";
+    if (!tenriff_manifest_selected && fs::is_directory(candidate, ec) && !ec) {
+        candidate /= "skin.json";
+    }
+    if ((tenriff_manifest_selected || fs::is_regular_file(candidate, ec)) && !ec &&
+        import_tenriff_skin_path(source_path)) {
+        config_.skin.source = "tenriff";
+        return true;
+    }
     if (import_lr2_skin_path(source_path)) {
         config_.skin.source = "lr2";
         return true;
@@ -224,6 +290,9 @@ std::string MenuApp::active_external_skin_root() const {
     if (source == "lr2") {
         return available_lr2_skin_root_;
     }
+    if (source == "tenriff") {
+        return available_tenriff_skin_root_;
+    }
     return {};
 }
 
@@ -231,6 +300,9 @@ std::string MenuApp::active_external_skin_name() const {
     const std::string source = config::normalize_skin_source_token(config_.skin.source);
     if (source == "lr2") {
         return config_.skin.lr2_skin_name;
+    }
+    if (source == "tenriff") {
+        return config_.skin.tenriff_skin_name;
     }
     return {};
 }
@@ -299,35 +371,46 @@ void MenuApp::handle_skins_settings_input(uint32_t keycode) {
         }
         settings_cursor_ = clamp_int(settings_cursor_, 0, new_item_count - 1);
         refresh_available_lr2_skins();
+        refresh_available_tenriff_skins();
         skin_dirty_ = true;
         publish_snapshot();
         return;
     }
     if (settings_cursor_ == imported_skin_row && (keycode == key_left_ || keycode == key_right_)) {
-        auto& names = available_lr2_skin_names_;
-        auto& selected_name = config_.skin.lr2_skin_name;
-        if (active_skin_source == "lr2" && !names.empty()) {
+        std::vector<std::string>* names = nullptr;
+        std::string* selected_name = nullptr;
+        if (active_skin_source == "lr2") {
+            names = &available_lr2_skin_names_;
+            selected_name = &config_.skin.lr2_skin_name;
+        } else if (active_skin_source == "tenriff") {
+            names = &available_tenriff_skin_names_;
+            selected_name = &config_.skin.tenriff_skin_name;
+        }
+        if (names != nullptr && selected_name != nullptr && !names->empty()) {
             int current_index = 0;
-            for (int i = 0; i < static_cast<int>(names.size()); ++i) {
-                if (names[static_cast<std::size_t>(i)] == selected_name) {
+            for (int i = 0; i < static_cast<int>(names->size()); ++i) {
+                if ((*names)[static_cast<std::size_t>(i)] == *selected_name) {
                     current_index = i;
                     break;
                 }
             }
             current_index += (keycode == key_left_) ? -1 : 1;
             if (current_index < 0) {
-                current_index = static_cast<int>(names.size()) - 1;
-            } else if (current_index >= static_cast<int>(names.size())) {
+                current_index = static_cast<int>(names->size()) - 1;
+            } else if (current_index >= static_cast<int>(names->size())) {
                 current_index = 0;
             }
-            selected_name = names[static_cast<std::size_t>(current_index)];
-            refresh_available_lr2_skins();
+            *selected_name = (*names)[static_cast<std::size_t>(current_index)];
+            if (active_skin_source == "lr2") {
+                refresh_available_lr2_skins();
+            } else {
+                refresh_available_tenriff_skins();
+            }
             skin_dirty_ = true;
         }
         publish_snapshot();
         return;
-    }
-    if (settings_cursor_ == lr2_resolution_row && (keycode == key_left_ || keycode == key_right_)) {
+    }    if (settings_cursor_ == lr2_resolution_row && (keycode == key_left_ || keycode == key_right_)) {
         const int direction = (keycode == key_left_) ? -1 : 1;
         config_.skin.lr2_resolution_mode = cycle_lr2_resolution_mode(config_.skin.lr2_resolution_mode, direction);
         skin_dirty_ = true;
@@ -339,7 +422,7 @@ void MenuApp::handle_skins_settings_input(uint32_t keycode) {
         const auto picked_path = pick_folder_dialog_utf8();
         if (picked_path.has_value()) {
             if (!import_skin_path_auto(*picked_path)) {
-                std::cerr << "[warn] Selected path is not a supported LR2 skin folder: "
+                std::cerr << "[warn] Selected path is not a supported TenRiff or LR2 skin folder: "
                           << *picked_path << std::endl;
             }
             publish_snapshot();
@@ -687,15 +770,23 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
     const std::string active_skin_source = config::normalize_skin_source_token(config_.skin.source);
     const bool lr2_source = active_skin_source == "lr2";
     const int lr2_shift = lr2_source ? 1 : 0;
-    const std::string imported_skin_row_label = ui_text("LR2 Skin", "LR2 스킨");
+    const std::string imported_skin_row_label =
+        active_skin_source == "tenriff" ? ui_text("TenRiff Skin", "TenRiff 스킨")
+                                         : (active_skin_source == "lr2"
+                                                ? ui_text("LR2 Skin", "LR2 스킨")
+                                                : ui_text("Imported Skin", "가져온 스킨"));
     std::string imported_skin_value = ui_text("N/A", "없음");
     if (active_skin_source == "lr2") {
         imported_skin_value = available_lr2_skin_names_.empty()
                                   ? ui_text("Not Found", "없음")
                                   : (config_.skin.lr2_skin_name.empty() ? available_lr2_skin_names_.front()
                                                                         : config_.skin.lr2_skin_name);
+    } else if (active_skin_source == "tenriff") {
+        imported_skin_value = available_tenriff_skin_names_.empty()
+                                  ? ui_text("Not Found", "없음")
+                                  : (config_.skin.tenriff_skin_name.empty() ? available_tenriff_skin_names_.front()
+                                                                            : config_.skin.tenriff_skin_name);
     }
-
     append_menu_row(render.generic, ui_text("Skin Source", "스킨 소스"), ui_skin_source_label(active_skin_source), settings_cursor_ == 0,
                     render::MenuHitTargetKind::SettingsRow, 0, false, true);
     append_menu_row(render.generic, imported_skin_row_label, imported_skin_value, settings_cursor_ == 1,
@@ -873,14 +964,14 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
             config::skin_color_rgb(preview_lane_colors[static_cast<std::size_t>(lane)]);
     }
 
-    render.generic.notes.push_back(ui_text("Skin Source switches between the native vector skin and imported LR2 playskins.",
-                                           "스킨 소스는 기본 벡터 스킨과 가져온 LR2 플레이스킨 사이를 전환합니다."));
+    render.generic.notes.push_back(ui_text("Skin Source switches between Native, TenRiff skin.json, and imported LR2 playskins.",
+                                           "스킨 소스는 Native, TenRiff skin.json, 가져온 LR2 플레이스킨을 전환합니다."));
     render.generic.notes.push_back(ui_text("Imported LR2 skins scan profile skins first, then build/Release/test-skins-lr2 as a fallback test root.",
                                            "가져온 LR2 스킨은 먼저 프로필 스킨 폴더를 찾고, 없으면 build/Release/test-skins-lr2를 테스트 루트로 사용합니다."));
     render.generic.notes.push_back(ui_text("LR2 Resolution overrides the imported LR2 family before the auto-detected layout is applied.",
                                            "LR2 해상도는 자동 감지 레이아웃을 적용하기 전에 가져온 LR2 계열 해상도를 덮어씁니다."));
     render.generic.notes.push_back(ui_text(
-        "Import Skin opens a folder picker. You can also drag and drop an LR2 skin folder onto this screen.",
+        "Import Skin accepts a TenRiff skin.json folder or an LR2 skin folder. Drag-and-drop also works.",
         "스킨 가져오기는 폴더 선택 창을 엽니다. 이 화면에 LR2 스킨 폴더를 드래그 앤 드롭해도 됩니다."));
     render.generic.notes.push_back(ui_text(
         "Selecting LR2files or Theme imports each independent non-IIDX theme separately; IIDX-dependent themes are skipped.",

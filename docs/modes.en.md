@@ -38,7 +38,7 @@ This document summarizes the implemented mode system, lane-transform/random rule
   - defaults to `false`
   - `true`: auto-load the selected chart's best compatible replay for ghost comparison
   - `false`: keep normal gameplay in the single-field layout
-- `autoplay_enabled`: automatically handles hittable notes and marks the result as `ASSIST`
+- `autoplay_enabled`: automatically handles hittable notes and saves an `AUTOPLAY` result without awarding an official clear, best score, or clear lamp
 - `practice_no_fail_enabled`: prevents gauge-based early failure and keeps playing to the chart end
 - `one_miss_fail_enabled`: `Sudden Death (1 MISS)`, which fails immediately on the first OD8-converted object `MISS`
   - native `BAD` timing alone and empty-key `POOR` do not trigger it

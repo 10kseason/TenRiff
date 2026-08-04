@@ -62,3 +62,8 @@ Language: Korean | [English](README.en.md) | [简体中文](README.zh-CN.md) | [
 - 현재 동작을 확인할 때는 `docs/current-state.md`를 우선 봅니다.
 - 어떤 기준선 위에서 작업을 쌓는지 정할 때는 `docs/baseline-1.1.2.md`를 같이 봅니다.
 - 오래된 설계와 현재 코드가 다를 수 있으므로, 충돌하면 현재 코드는 `docs/current-state.md`, `docs/config.md` 순으로 해석합니다.
+
+## Skin Customization
+
+- `docs/skin-format.md`: TenRiff `skin.json` v1 로비/인게임 스킨 제작 및 가져오기 가이드
+- `docs/tenriff-skin.schema.json`: 편집기 자동 완성 및 구조 검증용 JSON Schema

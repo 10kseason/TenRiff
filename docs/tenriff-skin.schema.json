@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tenriff.local/schema/tenriff-skin-v1.json",
+  "title": "TenRiff Skin",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["format", "version", "name"],
+  "$defs": {
+    "assetPath": {
+      "type": "string",
+      "description": "Path relative to skin.json. Empty means use the built-in fallback."
+    },
+    "laneAssets": {
+      "oneOf": [
+        { "$ref": "#/$defs/assetPath" },
+        {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 16,
+          "items": { "$ref": "#/$defs/assetPath" }
+        }
+      ]
+    }
+  },
+  "properties": {
+    "$schema": { "type": "string" },
+    "format": { "const": "tenriff-skin" },
+    "version": { "const": 1 },
+    "name": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "author": { "type": "string", "maxLength": 128 },
+    "lobby": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "background": { "$ref": "#/$defs/assetPath" },
+        "logo": { "$ref": "#/$defs/assetPath" },
+        "background_opacity": { "type": "number", "minimum": 0.0, "maximum": 1.0 }
+      }
+    },
+    "gameplay": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "background": { "$ref": "#/$defs/assetPath" },
+        "background_opacity": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+        "gear": { "$ref": "#/$defs/assetPath" },
+        "note": { "$ref": "#/$defs/laneAssets" },
+        "hold_head": { "$ref": "#/$defs/laneAssets" },
+        "hold_body": { "$ref": "#/$defs/laneAssets" },
+        "hold_tail": { "$ref": "#/$defs/laneAssets" },
+        "key_idle": { "$ref": "#/$defs/laneAssets" },
+        "key_pressed": { "$ref": "#/$defs/laneAssets" },
+        "note_width_ratio": { "type": "number", "minimum": 0.1, "maximum": 4.0 },
+        "note_height_ratio": { "type": "number", "minimum": 0.1, "maximum": 4.0 },
+        "judgement_line_position": { "type": "number", "minimum": 0.05, "maximum": 0.98 },
+        "full_lane_receptors": { "type": "boolean" },
+        "column_widths": {
+          "type": "array",
+          "maxItems": 16,
+          "items": { "type": "number", "exclusiveMinimum": 0.0 }
+        },
+        "column_spacings": {
+          "type": "array",
+          "maxItems": 15,
+          "items": { "type": "number", "minimum": 0.0 }
+        }
+      }
+    }
+  }
+}

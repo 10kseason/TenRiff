@@ -3,7 +3,10 @@
 This is the document that the next agent or any new contributor should read first. Its goal is to quickly answer: "what is this project now, where should I look, and what is still unverified?"
 
 ## Baseline
-- Current project and public stable version: `1.3.0 stable`
+- Current project and public stable version: `1.3.0 (UI-r2)`
+- The UI-r2 Result screen uses a 2.2-second timeline for the prism, score, rank, clear status, statistics, and graphs. Space skips the reveal; Continue/Retry/Replay stay locked until it completes.
+- UI-r2 Song Select uses a reference-led top navigation, seven-row jacket library, large selected artwork, best-record card, chart/mode panel, and a prominent working Start action. Collection/store/currency/global-ranking placeholders are not shown.
+- Profile Setup now saves an optional local PNG/JPG avatar path; the Song Select profile card displays it and opens profile editing when clicked.
 - Direct-IP multiplayer and the preview r5 input-backend lifecycle fixes are integrated into `1.1.8 stable`
 - `1.1.8` adds an osu!mania OD8 auxiliary score, first-native-`BAD` `Sudden Death (1 MISS)`, and deterministic `LN Mix 10%-90%` on top of the 1.1.7 visual refresh
 - `1.2.0` connects BMS channel `04/07` and osu!mania backgrounds to the gameplay sample timeline and asynchronously upscales sub-FHD image backgrounds through LunaSR on Windows ML
@@ -105,7 +108,7 @@ This is the document that the next agent or any new contributor should read firs
   - `Note & Field Size` scales the centered playfield, lanes/dividers, notes, and adjacent gauges together from 50% to 140%; adjacent notes keep a default combined 24px gap at 100%
   - Black Playfield fills the complete player/ghost playfield, including lane-spacing gaps, with solid black
   - per-key-mode lane-width arrays and inter-lane spacing arrays are persisted and applied through the same layout math in preview, live gameplay, and the ghost field
-  - supported skin routes are `native` and LR2 playskin only; selecting or dropping one LR2 folder imports it into the active profile
+  - supported skin routes are `native`, TenRiff `skin.json` v1, and LR2 playskin; selecting or dropping a TenRiff/LR2 folder imports it into the active profile without overwriting an existing install
   - selecting a standard `LR2files` or `Theme` root batch-imports each independent non-IIDX theme as a separate skin and skips themes that reference excluded IIDX assets, preserves sibling-theme paths, skips symlinks, and never overwrites an existing folder
   - LR2 note/LN images, lane gaps, and destination sizes are applied; lower `play/Gear` frames enlarge with field size as one aspect-preserving overlay clipped below the judgement line, `#CUSTOMFILE` wildcard defaults are resolved, and falling note/LN-head art is never reused as a receptor when Gear is absent
   - the native skin draws a digital piano key at the bottom of each lane; a key stays depressed only while its input is held, emits a short cyan/magenta glitch pulse on impact, and clears held visuals when the process loses foreground
@@ -200,7 +203,7 @@ This is the document that the next agent or any new contributor should read firs
 
 ## Runtime / Packaging Rules
 - New user profiles are created automatically
-- The current official P2P distribution line is `TenRiff 1.3.0 stable`
+- The current official P2P distribution line is `TenRiff 1.3.0 (UI-r2)`
 - Distribution packages do not include `Songs`
 - Distribution packages include the `Mainmusic/` scene slots `Main Menu / Options / Song Selecte / Multiplayer Lobby / Clear / Failed`; each `Name.mp3` plus numbered `Name 2.mp3` through `Name 64.mp3` siblings is discovered automatically and rotates on scene re-entry
 - Distribution updates include only built artifacts and required runtime assets

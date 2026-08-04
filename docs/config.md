@@ -164,9 +164,9 @@
   - `true`면 선택한 차트의 최고 호환 replay를 자동 ghost 비교 대상으로 불러옴
   - `false`면 일반 플레이를 단일 필드로 유지
 - `autoplay_enabled` (bool)
-  - QA용 assist 모드
-  - `true`면 판정 가능한 노트 입력을 자동으로 처리하고 결과에는 `ASSIST` clear status가 붙음
-  - 기본 ghost/replay 비교 대상에서는 제외되는 쪽으로 사용됨
+  - QA용 비경쟁 자동 플레이 모드
+  - `true`면 판정 가능한 노트 입력을 자동으로 처리하고 결과를 `AUTOPLAY`로 저장함
+  - 공식 클리어, 최고 점수, 클리어 램프, 기본 ghost 비교 대상에서는 제외되며 로컬 기록/리플레이는 남음
 - `practice_no_fail_enabled` (bool)
   - QA용 assist 모드
   - `true`면 gauge 기반 조기 실패를 막고 차트 끝까지 판정/결과 저장을 유지함
@@ -189,6 +189,9 @@
 - `profile_nickname` (string)
   - Quick Setup에서 편집하며 저장 기록과 멀티플레이 표시 이름으로 사용
   - 제어문자/중복 공백을 정리하고 UTF-8 기준 최대 48바이트로 제한; 비어 있으면 프로필 ID를 표시
+- `profile_avatar_path` (string)
+  - Profile Setup에서 선택한 로컬 PNG/JPG 경로; 비어 있으면 TenRiff 기본 표시 사용
+  - 프로필별로 저장하며 UI 안전 문자열과 UTF-8 최대 2048바이트로 정규화
 - `language` (string)
   - `en | ko`
   - 잘못된 값은 로드 시 `en`으로 정규화
@@ -209,7 +212,9 @@
 
 ### `skin`
 - `source` (string)
-  - `native | lr2`
+  - `native | tenriff | lr2`
+- `tenriff_skin_name` (string)
+  - 가져온 TenRiff `skin.json` 스킨 폴더 이름
 - `lr2_skin_name` (string)
   - imported LR2 playskin name
 - `lr2_resolution_mode` (string)

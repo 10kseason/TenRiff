@@ -95,6 +95,7 @@ add_library(tenriff_core
     src/app/GraphicsTiming.cpp
     src/app/ImportedGameplaySkin.cpp
     src/app/Lr2Skin.cpp
+    src/app/TenRiffSkin.cpp
     src/app/MenuRecordUtils.cpp
     src/app/MenuSongUtils.cpp
     src/app/MultiplayerChartSearch.cpp
@@ -194,6 +195,7 @@ if(WIN32)
         src/render/BgaVideoDecoder.cpp
         src/render/BgaVideoFfmpeg.cpp
         src/render/OnnxBackgroundUpscaler.cpp
+        src/render/ResultPresentation.cpp
         src/render/MenuWindow.cpp
     )
 
@@ -386,10 +388,12 @@ if(TENRIFF_ENABLE_TESTS)
         tests/unit/test_input_backend_status.cpp
         tests/unit/test_profile_setup_flow.cpp
         tests/unit/test_lr2_skin.cpp
+        tests/unit/test_tenriff_skin.cpp
         tests/unit/test_difficulty_table.cpp
         tests/unit/test_game_session_hud.cpp
         tests/unit/test_graphics_timing.cpp
         tests/unit/test_render_performance.cpp
+        tests/unit/test_result_presentation.cpp
         tests/unit/test_peer_protocol.cpp
         tests/unit/test_peer_session.cpp
         tests/unit/test_multiplayer_menu_state.cpp

@@ -4,10 +4,32 @@ TenRiff의 사용자/배포 관점에서 의미 있는 변경만 간단히 기�
 
 ## [Unreleased]
 
+## [1.3.0 UI-r2] - 2026-08-04
+
+### Added
+
+- Result 화면을 2.2초 순차 연출로 재구성했습니다. 곡 이미지 전환, 중앙 프리즘 조립, 감속 점수 카운트업, 등급 충격파, 판정 통계 순차 표시, 타이밍·게이지 그래프, ALL PERFECT/FULL COMBO 효과와 Space 스킵 후 입력 잠금 해제를 포함합니다.
+
+- Song Select 프로필 카드와 Profile Setup에 로컬 PNG/JPG 프로필 사진 선택·교체·삭제 기능을 추가했습니다.
+
+### Changed
+
+- Song Select를 상단 탭, 좌측 7곡 재킷 목록, 중앙 선택 이미지·최고 기록, 우측 차트/모드·START 중심의 3열 레이아웃으로 개편했습니다.
+- Collection, Store, 재화, 글로벌 랭킹처럼 현재 구현되지 않은 참조 화면 요소는 추가하지 않았습니다.
+
+### Fixed
+
+- Autoplay 완료 결과를 `AUTOPLAY` 비경쟁 기록으로 저장하고 공식 클리어·최고 점수·클리어 램프에서 제외했습니다. 구형 `ASSIST AUTOPLAY ... CLEAR` 결과도 로드 시 같은 규칙으로 교정합니다.
+
+### Release
+
+- Windows `TenRiff-1.3.0-UI-r2.zip`, public source `TenRiff-1.3.0-UI-r2-source.zip`, and `TenRiff-1.3.0-UI-r2-SHA256SUMS.txt` are the UI-r2 release assets; no ONNX model, private checkpoint, user profile, song, log, or local UI-audit artifact is bundled.
+
 ## [1.3.0] - 2026-08-04
 
 ### Added
 
+- 로비 배경·로고와 인게임 배경·기어·노트·LN·키 이미지를 하나의 `skin.json`으로 교체하는 TenRiff 스킨 포맷 v1, 안전한 프로필 가져오기, 예제·JSON Schema를 추가했습니다.
 - Song Select 우측에 익숙한 `BEST SCORE` 카드를 배치하고, 카드 클릭에서 저장 Result를 거쳐 큰 `WATCH REPLAY` 버튼으로 이어지는 기록·리플레이 발견 경로를 추가했다.
 - Song Select 좌측 탐색에 곡·소스·검색·필터·기록·설정을 구분하는 심볼 아이콘을 적용하고, Records 화면에도 명시적인 `OPEN RESULT` 동작을 추가했다.
 - 카운트다운 화면에 인게임 Hi-Speed 단축키(`F3/F4`, `F5/F6`)를 표시하고, Graphics Settings에 밝은 BGA를 노트 영역 뒤에서만 차단하는 `BGA Behind Notes` 옵션을 추가했다.
