@@ -49,6 +49,7 @@ enum class MenuHitTargetKind {
     SongNavButton,
     SongCard,
     SongResultPanel,
+    SongQuickSetting,
     SongStartButton,
     SongBackButton,
     SongProfilePanel,

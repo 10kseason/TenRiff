@@ -69,6 +69,7 @@ void MenuApp::reload_chart_best_results() {
         candidate.has_value = true;
         candidate.rank = menu_records::calculate_rank(parsed->stats, parsed->game_over);
         candidate.best_score = parsed->final_score;
+        candidate.accuracy = menu_records::calculate_accuracy(parsed->stats);
         candidate.clear_status = parsed->clear_status;
         candidate.final_gauge = parsed->final_gauge;
         candidate.game_over = parsed->game_over;

@@ -392,6 +392,7 @@ private:
         bool has_value = false;
         std::string rank = "--";
         int64_t best_score = 0;
+        double accuracy = 0.0;
         std::string clear_status = "FAILED";
         std::string final_gauge = "normal";
         bool game_over = true;

@@ -3,9 +3,10 @@
 这份文档是下一位 agent 或新任务接手时应该最先阅读的当前状态文档。目标是快速说明“这个项目现在是什么、应该先看哪里、还有哪些内容尚未验证”。
 
 ## 基线
-- 当前项目版本与公开稳定版均为 `1.3.0 (UI-r2)`
+- 当前项目版本与公开稳定版均为 `1.3.1 (UI-r2)`
 - UI-r2 Result 使用 2.2 秒时间线依次展示棱镜、分数、等级、通关状态、判定统计和图表；可用 Space 跳过，在演出结束前锁定 Continue/Retry/Replay 输入。
 - UI-r2 Song Select 使用顶部标签、7 行封面曲库、大幅选中图片、最佳记录卡、谱面/模式面板和可实际启动的 START 按钮；不显示 Collection/Store/货币/全球排名等虚构功能
+- Song Select 的 Rate、Hi-Speed、Gauge、Random 单元格支持左键增加/下一项、右键减少/上一项并立即保存；当前谱面键数不再被裁切，最佳记录会同时显示分数、准确率和最大连击。
 - Profile Setup 可按 profile 保存可选的本地 PNG/JPG 头像路径，Song Select 的 profile card 可显示并点击编辑
 - direct-IP multiplayer 与 preview r5 的输入 backend 生命周期修复已整合进 `1.1.8 stable`
 - `1.1.8` 在 1.1.7 视觉更新基础上加入 osu!mania OD8 辅助分数、首次原生 `BAD` 即结束的 `Sudden Death (1 MISS)`，以及确定性的 `LN Mix 10%～90%`
@@ -202,7 +203,7 @@
 
 ## 运行时 / 打包规则
 - 新用户 profile 会自动创建
-- 当前正式 P2P 发布线为 `TenRiff 1.3.0 (UI-r2)`
+- 当前正式 P2P 发布线为 `TenRiff 1.3.1 (UI-r2)`
 - 发布包不包含 `Songs`
 - 发布包包含 `Main Menu / Options / Song Selecte / Multiplayer Lobby / Clear / Failed` 这些 `Mainmusic/` 场景槽位；每个 `Name.mp3` 及 `Name 2.mp3`～`Name 64.mp3` 会自动发现，并在重新进入场景时轮换
 - 发布更新只包含已构建产物和必要的运行时资源

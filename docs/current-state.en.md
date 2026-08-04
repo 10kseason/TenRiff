@@ -3,9 +3,10 @@
 This is the document that the next agent or any new contributor should read first. Its goal is to quickly answer: "what is this project now, where should I look, and what is still unverified?"
 
 ## Baseline
-- Current project and public stable version: `1.3.0 (UI-r2)`
+- Current project and public stable version: `1.3.1 (UI-r2)`
 - The UI-r2 Result screen uses a 2.2-second timeline for the prism, score, rank, clear status, statistics, and graphs. Space skips the reveal; Continue/Retry/Replay stay locked until it completes.
 - UI-r2 Song Select uses a reference-led top navigation, seven-row jacket library, large selected artwork, best-record card, chart/mode panel, and a prominent working Start action. Collection/store/currency/global-ranking placeholders are not shown.
+- The Song Select Rate, Hi-Speed, Gauge, and Random cells apply increase/next on left click and decrease/previous on right click, then save immediately. The current-chart key count no longer clips, and best records show score, accuracy, and max combo together.
 - Profile Setup now saves an optional local PNG/JPG avatar path; the Song Select profile card displays it and opens profile editing when clicked.
 - Direct-IP multiplayer and the preview r5 input-backend lifecycle fixes are integrated into `1.1.8 stable`
 - `1.1.8` adds an osu!mania OD8 auxiliary score, first-native-`BAD` `Sudden Death (1 MISS)`, and deterministic `LN Mix 10%-90%` on top of the 1.1.7 visual refresh
@@ -203,7 +204,7 @@ This is the document that the next agent or any new contributor should read firs
 
 ## Runtime / Packaging Rules
 - New user profiles are created automatically
-- The current official P2P distribution line is `TenRiff 1.3.0 (UI-r2)`
+- The current official P2P distribution line is `TenRiff 1.3.1 (UI-r2)`
 - Distribution packages do not include `Songs`
 - Distribution packages include the `Mainmusic/` scene slots `Main Menu / Options / Song Selecte / Multiplayer Lobby / Clear / Failed`; each `Name.mp3` plus numbered `Name 2.mp3` through `Name 64.mp3` siblings is discovered automatically and rotates on scene re-entry
 - Distribution updates include only built artifacts and required runtime assets

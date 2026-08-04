@@ -576,9 +576,9 @@
                                               difficulty_card.top + 40.0f),
                                   d2d_->muted_brush.Get());
             }
-            if (d2d_->rank_format && d2d_->accent_brush) {
+            if (d2d_->header_format && d2d_->accent_brush) {
                 draw_centered_text(to_wide(data.song_select.selected_song_layout),
-                                   d2d_->rank_format.Get(),
+                                   d2d_->header_format.Get(),
                                    D2D1::RectF(difficulty_card.left + 18.0f,
                                                difficulty_card.top + 38.0f,
                                                difficulty_card.right - 18.0f,
@@ -620,6 +620,8 @@
                                 mode_area.top + row * (mode_height + mode_gap),
                                 mode_area.left + col * (mode_width + mode_gap) + mode_width,
                                 mode_area.top + row * (mode_height + mode_gap) + mode_height);
+                register_hit(cell, MenuHitTargetKind::SongQuickSetting,
+                             static_cast<int>(i), MenuHitPart::Increment);
                 draw_glass_panel(cell, 9.0f, 0.62f, 0.08f, false, 1.0f);
                 if (d2d_->hud_format && d2d_->muted_brush) {
                     draw_text_clipped(to_wide(mode_values[i].first), d2d_->hud_format.Get(),

@@ -795,14 +795,14 @@ std::string MenuApp::ui_random_label(std::string_view token) const {
     if (normalized == "mirror") {
         return ui_text("Mirror", "미러");
     }
+    if (normalized == "fr") {
+        return ui_text("Random", "??");
+    }
     if (normalized == "rr") {
         return "R-Random";
     }
-    if (normalized == "fr") {
-        return "FR";
-    }
     if (normalized == "sr") {
-        return "SR";
+        return "S-Random";
     }
     return ui_text("Off", "끔");
 }
@@ -2028,6 +2028,18 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
             }
             publish_snapshot();
             return;
+        case render::MenuHitTargetKind::SongQuickSetting: {
+            if (screen_ != Screen::SongSelect || song_select_view_ != SongSelectView::Songs) {
+                return;
+            }
+            const int direction = event.part == render::MenuHitPart::Decrement ? -1 : 1;
+            if (!adjust_song_quick_setting(config_, event.index, direction)) {
+                return;
+            }
+            persist_runtime_config();
+            publish_snapshot();
+            return;
+        }
         case render::MenuHitTargetKind::SongStartButton:
             if (screen_ != Screen::SongSelect) {
                 return;

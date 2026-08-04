@@ -141,17 +141,7 @@ void MenuApp::handle_mode_settings_input(uint32_t keycode) {
             config_.mode.gauge = cycle_gauge_mode(config_.mode.gauge, direction);
             mode_dirty_ = true;
         } else if (settings_cursor_ == 10) {
-            if (config_.mode.random == "off") {
-                config_.mode.random = (direction > 0) ? "mirror" : "sr";
-            } else if (config_.mode.random == "mirror") {
-                config_.mode.random = (direction > 0) ? "rr" : "off";
-            } else if (config_.mode.random == "rr") {
-                config_.mode.random = (direction > 0) ? "fr" : "mirror";
-            } else if (config_.mode.random == "fr") {
-                config_.mode.random = (direction > 0) ? "sr" : "rr";
-            } else {
-                config_.mode.random = (direction > 0) ? "off" : "fr";
-            }
+            config_.mode.random = cycle_random_mode(config_.mode.random, direction);
             mode_dirty_ = true;
         } else if (settings_cursor_ == 11) {
             int next_value = static_cast<int>(config_.mode.random_seed) + direction;
