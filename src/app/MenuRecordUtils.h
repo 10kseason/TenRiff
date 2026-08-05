@@ -61,17 +61,23 @@ int clear_status_priority(std::string_view clear_status, bool game_over, std::st
 std::string normalized_clear_status(std::string_view clear_status, bool game_over, std::string_view final_gauge);
 std::string compact_timestamp_label(std::string_view created_utc);
 double calculate_accuracy(const gameplay::ResultStats& stats);
+double calculate_detailed_accuracy(const gameplay::ResultStats& stats);
 int64_t calculate_score(const gameplay::ResultStats& stats);
+int64_t calculate_detail_score(const gameplay::ResultStats& stats);
 int64_t calculate_final_score(const gameplay::ResultStats& stats, double multiplier);
 bool infer_game_over(const gameplay::ResultStats& stats);
 std::string calculate_rank(const gameplay::ResultStats& stats, bool game_over);
 bool is_better_record(int64_t candidate_score,
                       int candidate_clear_priority,
+                       int64_t candidate_detail_score,
+                       double candidate_detailed_accuracy,
                       int candidate_combo,
                       int candidate_judged,
                       std::string_view candidate_created,
                       int64_t current_score,
                       int current_clear_priority,
+                       int64_t current_detail_score,
+                       double current_detailed_accuracy,
                       int current_combo,
                       int current_judged,
                       std::string_view current_created);

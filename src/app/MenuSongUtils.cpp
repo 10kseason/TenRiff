@@ -3,15 +3,12 @@
 #include <algorithm>
 #include <cctype>
 #include <filesystem>
-#include <fstream>
 #include <optional>
-#include <sstream>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
 #include "chart/BmsParser.h"
-#include "chart/OsuManiaLoader.h"
 #include "util/Utf8Compat.h"
 
 namespace tenriff::app::menu_songs {
@@ -504,7 +501,7 @@ bool is_bms_chart_extension(std::string_view ext) {
 }
 
 bool is_supported_chart_extension(std::string_view ext) {
-    return is_bms_chart_extension(ext) || ext == ".osu";
+    return is_bms_chart_extension(ext);
 }
 
 std::optional<std::string> normalize_dropped_song_source(const std::string& raw_path) {
@@ -664,17 +661,6 @@ std::vector<std::string> build_chart_path_keys(const std::string& chart_path, co
     return keys;
 }
 
-std::string resolve_osu_background_preview_path(const std::filesystem::path& chart_path,
-                                                std::string_view background_filename) {
-    if (chart_path.empty() || background_filename.empty()) {
-        return {};
-    }
-    if (auto preview = resolve_preview_asset_path(chart_path, std::string(background_filename));
-        preview.has_value()) {
-        return preview->u8string();
-    }
-    return {};
-}
 std::string resolve_bms_background_preview_path(const std::filesystem::path& chart_path,
                                                 const chart::BmsChart& chart) {
     if (chart_path.empty()) {
@@ -697,18 +683,6 @@ std::string resolve_song_background_preview_path(const std::string& chart_path) 
     namespace fs = std::filesystem;
     const fs::path chart_fs_path = path_from_utf8(chart_path);
     const std::string chart_ext = to_lower_ascii(chart_fs_path.extension().u8string());
-
-    if (chart_ext == ".osu") {
-        std::ifstream file(chart_fs_path, std::ios::binary);
-        if (!file) {
-            return {};
-        }
-        std::ostringstream buffer;
-        buffer << file.rdbuf();
-        chart::OsuManiaLoader loader;
-        const auto parsed = loader.parse(buffer.str());
-        return resolve_osu_background_preview_path(chart_fs_path, parsed.chart.background_filename);
-    }
     if (!is_bms_chart_extension(chart_ext)) {
         return {};
     }
@@ -720,20 +694,6 @@ std::string resolve_song_background_preview_path(const std::string& chart_path) 
     return resolve_bms_background_preview_path(chart_fs_path, parsed.chart);
 }
 
-std::string resolve_osu_audio_preview_path(const std::filesystem::path& chart_path,
-                                           std::string_view audio_filename) {
-    if (chart_path.empty()) {
-        return {};
-    }
-    if (auto resolved = resolve_audio_reference_path(chart_path, std::string(audio_filename));
-        resolved.has_value()) {
-        return resolved->u8string();
-    }
-    if (auto fallback = largest_local_audio_file(chart_path); fallback.has_value()) {
-        return fallback->u8string();
-    }
-    return {};
-}
 std::string resolve_bms_audio_preview_path(const std::filesystem::path& chart_path,
                                            const chart::BmsChart& chart) {
     if (chart_path.empty()) {
@@ -763,19 +723,7 @@ std::string resolve_song_audio_preview_path(const std::string& chart_path) {
     }
 
     const std::filesystem::path chart_fs_path = path_from_utf8(chart_path);
-    const std::string chart_ext = to_lower_ascii(chart_fs_path.extension().u8string());
-    if (chart_ext == ".osu") {
-        std::ifstream file(chart_fs_path, std::ios::binary);
-        if (!file) {
-            return {};
-        }
-        std::ostringstream buffer;
-        buffer << file.rdbuf();
-        chart::OsuManiaLoader loader;
-        const auto parsed = loader.parse(buffer.str());
-        return resolve_osu_audio_preview_path(chart_fs_path, parsed.chart.audio_filename);
-    }
-    if (!is_bms_chart_extension(chart_ext)) {
+    const std::string chart_ext = to_lower_ascii(chart_fs_path.extension().u8string());    if (!is_bms_chart_extension(chart_ext)) {
         return {};
     }
 

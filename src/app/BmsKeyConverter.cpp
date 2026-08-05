@@ -101,6 +101,19 @@ bool is_note_lane_channel(std::string_view channel) {
     return channel.size() == 2 && (channel[0] == '1' || channel[0] == '2' || channel[0] == '5' || channel[0] == '6');
 }
 
+bool is_mine_lane_channel(std::string_view channel) {
+    return channel.size() == 2 && (channel[0] == 'D' || channel[0] == 'E');
+}
+
+std::string mine_channel_for_note_channel(std::string_view channel) {
+    if (channel.size() != 2 || (channel[0] != '1' && channel[0] != '2')) {
+        return {};
+    }
+    std::string mine_channel(channel);
+    mine_channel[0] = channel[0] == '1' ? 'D' : 'E';
+    return mine_channel;
+}
+
 bool is_mode_token(std::string_view token) {
     if (token.empty()) {
         return false;
@@ -606,6 +619,12 @@ struct SourceNotePlacement {
     bool release_required = false;
 };
 
+struct SourceMinePlacement {
+    int64_t sample = 0;
+    BmsPositionSlot slot;
+    std::string object_id;
+};
+
 struct PendingLongNote {
     int lane = 0;
     int64_t start_sample = 0;
@@ -865,6 +884,23 @@ std::vector<SourceNotePlacement> build_source_note_placements(const chart::BmsTi
     placements.reserve(entries.size());
     for (auto& entry : entries) {
         placements.push_back(std::move(entry.placement));
+    }
+    return placements;
+}
+
+std::vector<SourceMinePlacement> build_source_mine_placements(const chart::BmsTimeline& timeline,
+                                                              double rate) {
+    std::vector<SourceMinePlacement> placements;
+    for (const auto& scheduled : timeline.events) {
+        if (scheduled.event.type != chart::BmsNormalizedEventType::Mine ||
+            !scheduled.event.lane.has_value()) {
+            continue;
+        }
+        SourceMinePlacement placement;
+        placement.sample = std::max<int64_t>(0, scale_samples(scheduled.time_samples, rate));
+        placement.slot = make_slot_from_event(scheduled.event);
+        placement.object_id = to_upper_ascii(scheduled.event.object_id);
+        placements.push_back(std::move(placement));
     }
     return placements;
 }
@@ -1157,6 +1193,7 @@ std::string build_measure_data(const std::vector<OutputEvent>& events, std::vect
 std::string build_bms_text(const chart::BmsChart& parsed_chart,
                            const chart::BmsNormalizedChart& normalized_chart,
                            const std::vector<SourceNotePlacement>& placements,
+                           const std::vector<SourceMinePlacement>& mine_placements,
                            const gameplay::GameplayChart& converted_chart,
                            const LayoutDefinition& layout,
                            int sample_rate,
@@ -1170,7 +1207,7 @@ std::string build_bms_text(const chart::BmsChart& parsed_chart,
     SamplePositionMap position_map = build_sample_position_map(normalized_chart, sample_rate);
 
     std::vector<OutputEvent> generated_events;
-    generated_events.reserve(converted_chart.notes.size() * 2u);
+    generated_events.reserve(converted_chart.notes.size() * 2u + converted_chart.mines.size());
 
     for (const auto& note : converted_chart.notes) {
         if (note.lane <= 0 || note.lane > static_cast<int>(layout.lane_channels.size())) {
@@ -1218,6 +1255,37 @@ std::string build_bms_text(const chart::BmsChart& parsed_chart,
         generated_events.push_back(OutputEvent{end_slot.value(), channel, lnobj_token.value()});
     }
 
+    for (const auto& mine : converted_chart.mines) {
+        if (mine.lane <= 0 || mine.lane > static_cast<int>(layout.lane_channels.size())) {
+            warnings.push_back("Skipped a converted mine because its lane was outside the target layout.");
+            continue;
+        }
+        if (mine.mine_id >= mine_placements.size()) {
+            warnings.push_back("Skipped a converted mine because its source placement could not be resolved.");
+            continue;
+        }
+
+        const auto& source = mine_placements[mine.mine_id];
+        BmsPositionSlot slot = source.slot;
+        if (mine.sample != source.sample) {
+            const double absolute_position = position_map.position_for_sample(mine.sample);
+            const auto quantized = quantize_position_to_slot(normalized_chart, absolute_position, kQuantizeSliceCount);
+            if (!quantized.has_value()) {
+                warnings.push_back("Skipped a converted mine because its position could not be represented in BMS.");
+                continue;
+            }
+            slot = *quantized;
+        }
+
+        const std::string channel =
+            mine_channel_for_note_channel(layout.lane_channels[static_cast<std::size_t>(mine.lane - 1)]);
+        if (channel.empty()) {
+            warnings.push_back("Skipped a converted mine because the target lane has no BMS mine channel.");
+            continue;
+        }
+        generated_events.push_back(OutputEvent{slot, channel, source.object_id});
+    }
+
     std::map<int, std::map<std::string, std::vector<OutputEvent>>> generated_by_measure;
     for (const auto& event : generated_events) {
         generated_by_measure[event.slot.measure][event.channel].push_back(event);
@@ -1226,7 +1294,7 @@ std::string build_bms_text(const chart::BmsChart& parsed_chart,
     std::vector<chart::BmsMeasureCommand> commands;
     commands.reserve(parsed_chart.commands.size() + generated_by_measure.size() * 2u);
     for (const auto& command : parsed_chart.commands) {
-        if (is_note_lane_channel(command.channel)) {
+        if (is_note_lane_channel(command.channel) || is_mine_lane_channel(command.channel)) {
             continue;
         }
         commands.push_back(command);
@@ -1351,6 +1419,7 @@ std::string build_bms_text(const chart::BmsChart& parsed_chart,
     emit_dictionary("BMP", parsed_chart.bmp);
     emit_numeric_dictionary("BPM", parsed_chart.bpm);
     emit_numeric_dictionary("STOP", parsed_chart.stop);
+    emit_numeric_dictionary("SCROLL", parsed_chart.scroll);
 
     out << '\n';
 
@@ -1466,8 +1535,13 @@ BmsKeyConverterResult convert_bms_chart_file(const BmsKeyConverterOptions& optio
 
     BmsGameplayBuildResult source_build = build_bms_gameplay_chart(timeline.timeline, parsed.chart, 1.0);
     std::vector<SourceNotePlacement> placements = build_source_note_placements(timeline.timeline, parsed.chart, 1.0);
+    std::vector<SourceMinePlacement> mine_placements = build_source_mine_placements(timeline.timeline, 1.0);
     if (placements.size() != source_build.chart.notes.size()) {
         result.error = "Internal note-mapping mismatch while preparing the BMS conversion.";
+        return result;
+    }
+    if (mine_placements.size() != source_build.chart.mines.size()) {
+        result.error = "Internal mine-mapping mismatch while preparing the BMS conversion.";
         return result;
     }
 
@@ -1510,10 +1584,25 @@ BmsKeyConverterResult convert_bms_chart_file(const BmsKeyConverterOptions& optio
         return result;
     }
 
+    if (source_build.chart.lane_count > 0 && converted.chart.lane_count > 0 &&
+        source_build.chart.lane_count != converted.chart.lane_count) {
+        for (auto& mine : converted.chart.mines) {
+            if (mine.lane <= 0 || mine.lane > source_build.chart.lane_count) {
+                continue;
+            }
+            const double normalized =
+                (static_cast<double>(mine.lane) - 0.5) / static_cast<double>(source_build.chart.lane_count);
+            mine.lane = std::clamp(
+                static_cast<int>(std::floor(normalized * static_cast<double>(converted.chart.lane_count))) + 1,
+                1, converted.chart.lane_count);
+        }
+    }
+
     result.warnings.push_back("Conversion algorithm: " + conversion_algorithm_name(*conversion_algorithm) + ".");
 
     const std::string output_text =
-        build_bms_text(parsed.chart, normalization.chart, placements, converted.chart, layout, effective_sample_rate, result.warnings);
+        build_bms_text(parsed.chart, normalization.chart, placements, mine_placements, converted.chart, layout,
+                       effective_sample_rate, result.warnings);
 
     std::string write_error;
     if (!write_text_file(options.output_path, output_text, write_error)) {

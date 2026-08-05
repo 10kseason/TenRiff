@@ -99,6 +99,26 @@ std::optional<int> parse_int_base16(std::string_view token) {
     }
     return value;
 }
+std::optional<int> parse_int_base36(std::string_view token) {
+    if (token.empty()) {
+        return std::nullopt;
+    }
+    int value = 0;
+    for (char ch : token) {
+        value *= 36;
+        if (ch >= '0' && ch <= '9') {
+            value += ch - '0';
+        } else if (ch >= 'A' && ch <= 'Z') {
+            value += 10 + (ch - 'A');
+        } else if (ch >= 'a' && ch <= 'z') {
+            value += 10 + (ch - 'a');
+        } else {
+            return std::nullopt;
+        }
+    }
+    return value;
+}
+
 
 bool is_potential_note_channel(std::string_view channel) {
     if (channel.size() != 2) {
@@ -107,6 +127,19 @@ bool is_potential_note_channel(std::string_view channel) {
     char first = channel[0];
     return first == '1' || first == '2' || first == '5' || first == '6';
 }
+std::optional<std::size_t> mine_lane_for_channel(const NoteLaneMapping& mapping,
+                                                 std::string_view channel) {
+    if (channel.size() != 2 ||
+        (channel[0] != 'D' && channel[0] != 'E') ||
+        channel[1] < '1' || channel[1] > '9') {
+        return std::nullopt;
+    }
+    std::string visible_channel;
+    visible_channel.push_back(channel[0] == 'D' ? '1' : '2');
+    visible_channel.push_back(channel[1]);
+    return mapping.laneForChannel(visible_channel);
+}
+
 
 }  // namespace
 
@@ -173,6 +206,14 @@ BmsNormalizationResult BmsChartNormalizer::normalize(const BmsChart& chart) cons
         }
         return std::nullopt;
     };
+    auto handle_scroll_reference = [&](const std::string& token) -> std::optional<double> {
+        const auto lookup = chart.scroll.find(token);
+        if (lookup != chart.scroll.end()) {
+            return lookup->second;
+        }
+        return std::nullopt;
+    };
+
 
     for (const auto& command : chart.commands) {
         if (command.channel == "02") {
@@ -263,6 +304,31 @@ BmsNormalizationResult BmsChartNormalizer::normalize(const BmsChart& chart) cons
                     continue;
                 }
                 event.value = stop_it->second;
+            } else if (command.channel == "SC") {
+                event.type = BmsNormalizedEventType::Scroll;
+                auto scroll_value = handle_scroll_reference(normalized_token);
+                if (!scroll_value.has_value()) {
+                    add_message(result.messages, BmsParseSeverity::Error, command.measure,
+                                "SCROLL references undefined value '" + normalized_token + "'.");
+                    continue;
+                }
+                if (!std::isfinite(scroll_value.value())) {
+                    add_message(result.messages, BmsParseSeverity::Error, command.measure,
+                                "SCROLL value must be finite: '" + normalized_token + "'.");
+                    continue;
+                }
+                event.value = scroll_value.value();
+            } else if (auto mine_lane = mine_lane_for_channel(chart.lane_mapping, command.channel);
+                       mine_lane.has_value()) {
+                auto damage_value = parse_int_base36(normalized_token);
+                if (!damage_value.has_value() || damage_value.value() <= 0) {
+                    add_message(result.messages, BmsParseSeverity::Error, command.measure,
+                                "Landmine damage token must be base-36 01-ZZ: '" + normalized_token + "'.");
+                    continue;
+                }
+                event.type = BmsNormalizedEventType::Mine;
+                event.lane = mine_lane;
+                event.value = static_cast<double>(damage_value.value()) / 2.0;
             } else {
                 auto lane = chart.lane_mapping.laneForChannel(command.channel);
                 if (lane.has_value()) {

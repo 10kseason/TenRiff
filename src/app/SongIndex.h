@@ -43,12 +43,11 @@ struct SongIndex {
 };
 
 struct SongIndexOptions {
-    bool include_osu = false;
     SongIndexProfile profile = SongIndexProfile::Safe;
     std::string difficulty_table_path;
     // Native difficulty calculation is intentionally opt-in because it is the
     // most CPU-intensive part of a cold metadata scan. When disabled, BMS
-    // entries keep their #PLAYLEVEL and osu!mania entries leave LV/CR unset.
+    // entries keep their #PLAYLEVEL and leave LV/CR unset.
     bool calculate_difficulty = false;
     // F5/manual full rescans disable this so timestamp-preserving replacements
     // cannot keep stale metadata or difficulty-table hashes.

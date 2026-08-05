@@ -249,6 +249,16 @@ inline std::string cycle_song_index_profile(std::string current, int direction) 
     return kProfiles[current_index];
 }
 
+inline bool ensure_difficulty_table_indexing(config::RuntimeConfig& runtime) {
+    if (config::normalize_song_index_profile_token(runtime.mode.song_index_profile) != "fast") {
+        return false;
+    }
+    // Fast deliberately omits file hashes, so a BMSTable can download successfully
+    // while matching zero charts. Selecting a table means the player chose matching.
+    runtime.mode.song_index_profile = "safe";
+    return true;
+}
+
 inline std::string normalize_key_conversion_algorithm(std::string value) {
     value = to_lower_ascii(std::move(value));
     if (value == "nk2" || value == "nativek2" || value == "keyweaver" ||
@@ -346,7 +356,9 @@ inline std::string normalize_gauge_mode(std::string value) {
 }
 
 inline std::string cycle_gauge_mode(std::string current, int direction) {
-    static constexpr const char* kGauges[] = {"normal", "shift", "hard", "ex_hard", "easy"};
+    // Song Select and Mode Settings share the player-facing order:
+    // Easy -> Normal -> Hard -> EX-Hard -> Gauge Shift.
+    static constexpr const char* kGauges[] = {"easy", "normal", "hard", "ex_hard", "shift"};
     const int option_count = static_cast<int>(sizeof(kGauges) / sizeof(kGauges[0]));
     current = normalize_gauge_mode(std::move(current));
     int index = 0;
@@ -366,19 +378,65 @@ inline std::string cycle_gauge_mode(std::string current, int direction) {
 }
 
 inline std::string random_label(const std::string& value) {
-    if (value == "mirror") {
+    const std::string normalized = to_lower_ascii(value);
+    if (normalized == "mirror") {
         return "Mirror";
     }
-    if (value == "rr") {
+    if (normalized == "fr") {
+        return "Random";
+    }
+    if (normalized == "rr") {
         return "R-Random";
     }
-    if (value == "fr") {
-        return "FR";
-    }
-    if (value == "sr") {
-        return "SR";
+    if (normalized == "sr") {
+        return "S-Random";
     }
     return "Off";
+}
+
+inline std::string cycle_random_mode(std::string current, int direction) {
+    static constexpr const char* kRandomModes[] = {"off", "mirror", "fr", "rr", "sr"};
+    const int option_count = static_cast<int>(sizeof(kRandomModes) / sizeof(kRandomModes[0]));
+    current = to_lower_ascii(std::move(current));
+    int index = 0;
+    for (int i = 0; i < option_count; ++i) {
+        if (current == kRandomModes[i]) {
+            index = i;
+            break;
+        }
+    }
+    index += direction;
+    if (index < 0) {
+        index = option_count - 1;
+    } else if (index >= option_count) {
+        index = 0;
+    }
+    return kRandomModes[index];
+}
+
+inline bool adjust_song_quick_setting(config::RuntimeConfig& runtime, int setting_index, int direction) {
+    const int step_direction = direction < 0 ? -1 : 1;
+    switch (setting_index) {
+        case 0:
+            runtime.speed.rate = clamp_step_value(
+                runtime.speed.rate + static_cast<double>(step_direction) * kRateStep,
+                kRateMin, kRateMax, kRateStep);
+            break;
+        case 1:
+            runtime.speed.hi_speed = clamp_step_value(
+                runtime.speed.hi_speed + static_cast<double>(step_direction) * kHiSpeedStep,
+                kHiSpeedMin, kHiSpeedMax, kHiSpeedStep);
+            break;
+        case 2:
+            runtime.mode.gauge = cycle_gauge_mode(runtime.mode.gauge, step_direction);
+            break;
+        case 3:
+            runtime.mode.random = cycle_random_mode(runtime.mode.random, step_direction);
+            break;
+        default:
+            return false;
+    }
+    return true;
 }
 
 inline std::string keysound_policy_label(std::string_view policy) {

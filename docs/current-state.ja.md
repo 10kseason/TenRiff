@@ -3,9 +3,11 @@
 この文書は、次のエージェントや新しい作業者が最初に読むべき current-state 文書です。目的は、「このプロジェクトは今どういう状態で、どこを見ればよく、何がまだ未検証か」を素早く把握できるようにすることです。
 
 ## Baseline
-- 現在のプロジェクト版と公開 stable 版は `1.3.0 (UI-r2)`
+- 現在のプロジェクト版と公開 stable 版は `1.3.1 (UI-r2)`
 - UI-r2 の Result は 2.2 秒の timeline で prism、score、rank、clear status、statistics、graphs を順に表示する。Space で演出を skip でき、完了までは Continue/Retry/Replay 入力を lock する。
 - UI-r2 Song Select は top tab、7-row jacket library、大きな selected artwork、best-record card、chart/mode panel、実動する START action を使用し、Collection/Store/currency/global ranking の仮 UI は表示しない
+- Song Select の Rate、Hi-Speed、Gauge、Random cell は左 click で増加/次、右 click で減少/前を適用して即時保存する。current chart の key count は欠けず、best record は score・accuracy・max combo を同時に表示する。
+- 1.3.1 は外部 `.osu` parser・index 経路・settings toggle を削除して chart surface を再び BMS 専用に固定。BMSTable 選択時は hash matching のため Fast から Safe へ自動切替し、Aery live server と CG901B MD5→`⑤LEVEL 13` match で確認
 - Profile Setup は任意の local PNG/JPG avatar path を profile ごとに保存し、Song Select の profile card から編集できる
 - direct-IP multiplayer と preview r5 の input-backend lifecycle 修正は `1.1.8 stable` に統合
 - `1.1.8` は 1.1.7 の visual refresh に osu!mania OD8 補助スコア、最初の native `BAD` で終了する `Sudden Death (1 MISS)`、決定的な `LN Mix 10%～90%` を追加
@@ -21,11 +23,11 @@
 - `1.2.9` は 12K/14K と scratch-aware key conversion、R-Random/DP Flip/Note Add、Song Select preview、画像付き詳細 Result、profile nickname、video BGA 揺れ防止、正確な `DirectXMinPower` 表記を追加。
 - `1.2.92` は standalone BMS key converter に既定の Krrcream と決定論的 `nK2 Native 50/50` の選択を追加。
 - `1.2.93` はゲーム内 Mode Settings に `Key Converter` を追加し、`Krrcream`/`KeyWeaver nK2` の選択を設定・replay metadata に保存して runtime key-mode 変換へ適用。
-- `1.2.95`: Mode Settings の `OSU Charts` を ON にすると、独自 parser で osu!mania 4K～10K `.osu` を index/play。BMS が既定で、`.osz`/osu skin import は復元していません。
+- `1.2.95` では `OSU Charts` で osu!mania 4K～10K `.osu` の index/play を一時的に復元しましたが、この経路は 1.3.1 で再び削除されました。
 - 後続作業の基準文書は `docs/baseline-1.1.2.ja.md`
 - Windows GUI ビルドが主対象
 - Linux は `Baepoks-Linuxs/TenRiff-0.5.0-linux-preview` レベルの preview のみ
-- 対応 chart surface は BMS family（`.bms/.bme/.bml/.pms`）が既定で、osu!mania 4K～10K `.osu` は選択式
+- 対応 chart surface は BMS family（`.bms/.bme/.bml/.pms`）専用
 - `1.2.4 stable` の gameplay 入力は RawInput を優先しつつ、同じ `InputThread` で bound-key polling shadow を常時動作させる。起動失敗または message pump の予期しない終了時も queue / pressed state を reset せず、その producer を Polling に切り替える
 - menu と gameplay の入力収集は foreground process 境界を維持し、MenuWindow UI は root-window 境界も確認する。focus を失うと key state を初期化し、background の lane/Esc 入力を破棄する。RawInput の起動失敗、process-global 登録先の消失、hidden message window の終了を検知すると、ユーザー入力を待たず Polling に切り替える。
 - 確認済み fallback は profile を書き換えず、そのアプリ実行中の menu と後続 gameplay に維持する。アプリ再起動または `Options -> Input Settings -> Backend` の明示変更で再試行する。
@@ -202,7 +204,7 @@
 
 ## Runtime / Packaging Rules
 - 新しい user profile は自動生成される
-- 現在の正式 P2P 配布ラインは `TenRiff 1.3.0 (UI-r2)`
+- 現在の正式 P2P 配布ラインは `TenRiff 1.3.1 (UI-r2)`
 - distribution package には `Songs` を含めない
 - distribution package には `Main Menu / Options / Song Selecte / Multiplayer Lobby / Clear / Failed` の `Mainmusic/` scene slot を含め、各 `Name.mp3` と `Name 2.mp3`～`Name 64.mp3` を自動検出して scene 再入場ごとに循環する
 - distribution 更新には built artifact と必要な runtime asset だけを含める

@@ -1,5 +1,6 @@
 #include "doctest/doctest.h"
 
+#include <algorithm>
 #include <cmath>
 #include <string>
 
@@ -185,4 +186,43 @@ TEST_CASE("reports normalization errors for undefined channel 08 BPM references"
         }
     }
     CHECK(found_undefined_bpm_error);
+}
+
+TEST_CASE("normalizes BMS scroll factors and landmine damage") {
+    BmsChart chart;
+    chart.base_bpm = 120.0;
+    chart.scroll["01"] = -1.5;
+    chart.commands.push_back({0, "SC", "0100"});
+    chart.commands.push_back({0, "D1", "0A00"});
+    chart.commands.push_back({0, "E1", "00ZZ"});
+
+    BmsChartNormalizer normalizer;
+    const auto result = normalizer.normalize(chart);
+
+    CHECK(result.success());
+    REQUIRE(result.chart.events.size() == 3u);
+
+    const auto scroll = std::find_if(result.chart.events.begin(), result.chart.events.end(), [](const auto& event) {
+        return event.type == BmsNormalizedEventType::Scroll;
+    });
+    REQUIRE(scroll != result.chart.events.end());
+    REQUIRE(scroll->value.has_value());
+    CHECK(scroll->value.value() == doctest::Approx(-1.5));
+
+    const auto finite_mine = std::find_if(result.chart.events.begin(), result.chart.events.end(), [](const auto& event) {
+        return event.type == BmsNormalizedEventType::Mine && event.object_id == "0A";
+    });
+    REQUIRE(finite_mine != result.chart.events.end());
+    REQUIRE(finite_mine->lane.has_value());
+    REQUIRE(finite_mine->value.has_value());
+    CHECK(finite_mine->lane.value() == 1u);
+    CHECK(finite_mine->value.value() == doctest::Approx(5.0));
+
+    const auto fatal_mine = std::find_if(result.chart.events.begin(), result.chart.events.end(), [](const auto& event) {
+        return event.type == BmsNormalizedEventType::Mine && event.object_id == "ZZ";
+    });
+    REQUIRE(fatal_mine != result.chart.events.end());
+    REQUIRE(fatal_mine->lane.has_value());
+    CHECK(fatal_mine->lane.value() == 6u);
+    CHECK(fatal_mine->position == doctest::Approx(0.5));
 }

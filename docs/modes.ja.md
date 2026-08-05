@@ -11,7 +11,6 @@
   "key_mode": "none",
   "key_conversion_algorithm": "krrcream",
   "key_conversion_nk2_preset": "native",
-  "enable_osu_charts": false,
   "gauge": "normal",
   "random": "off",
   "random_seed": 0,
@@ -26,7 +25,7 @@
 ```
 
 ## Mode Meanings
-- `enable_osu_charts`: 既定 `false`。Mode Settings の `OSU Charts` で osu!mania 4K～10K `.osu` の index/play を有効にし、library を再 scan
+- chart input は BMS family（`.bms/.bme/.bml/.pms`）専用で、旧 osu toggle は表示・保存しない
 - `key_mode`: `none | auto | 4k | 5k | 6k | 7k | 8k | 9k | 10k | 12k | 14k | 16k`
 - `key_conversion_algorithm`: `krrcream | nk2`（既定値は `krrcream`。Krrcream は元 note の再配置のみを行い、nK2 は key count 拡張中に target layout へ安全な support note を直接生成）
 - `key_conversion_nk2_preset`: `native | transform`（既定は `native`。nK2 選択時は `Native (12%)` / `Transform (35%)`、Krrcream 選択時は row を lock）

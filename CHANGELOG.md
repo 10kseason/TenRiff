@@ -4,6 +4,32 @@ TenRiff의 사용자/배포 관점에서 의미 있는 변경만 간단히 기�
 
 ## [Unreleased]
 
+## [1.3.1] - 2026-08-05
+
+### Added
+
+- Added BMS `#SCROLLxx` / `#xxxSC` playback visuals, including faster, stopped, and reverse scroll segments without changing judgement or audio timing.
+- Added BMS landmine channels `D1-D9` / `E1-E9`, `#WAV00` explosion keysounds, percentage gauge damage, and `ZZ` instant-fail mines. Lane randomization and standalone BMS key conversion preserve mines.
+- Added a separate detail score (`PG=5`, `GREAT=3`, `GOOD=1`, `BAD/POOR=0`) and detailed accuracy. Native accuracy remains judgement-grade based, while detailed accuracy averages continuous timing precision so steadier hits rank higher.
+
+### Changed
+
+- Song Select 우측의 배속·하이스피드·게이지·랜덤 셀을 직접 조작할 수 있게 변경했습니다. 좌클릭은 증가/다음, 우클릭은 감소/이전을 적용하고 즉시 저장합니다.
+- 게이지는 `Easy → Normal → Hard → EX-Hard → Gauge Shift`, 랜덤은 `Off → Mirror → Random → R-Random → S-Random` 순서로 순환합니다.
+- 외부 `.osu` 차트의 파서·인덱싱·로딩·Mode Settings 토글을 제거하고 지원 차트를 BMS 계열(`.bms/.bme/.bml/.pms`) 전용으로 정리했습니다. BMS 난이도와 기존 기록 호환에 쓰이는 내부 OD8/난이도 수학 모델은 유지합니다.
+
+### Fixed
+
+- `현재 차트` 키 수가 128px 랭크 셀용 글꼴로 그려져 패널 밖으로 잘리던 문제를 수정했습니다.
+- 저장된 최고 기록이 있는 Song Select 카드에서 정확도가 누락되던 문제를 수정했습니다.
+- Song Select 랜덤 모드 내부 값(`off`, `fr`, `rr`, `sr`)을 사용자용 이름으로 표시하도록 수정했습니다.
+- Aery BMSTable의 URL·data JSON·CG901B MD5 매칭을 실서버로 검증하고, 난이도표 선택 시 해시가 없는 Fast 인덱스에서 Safe 인덱스로 자동 전환해 재스캔하도록 수정했습니다.
+
+### Release
+
+- Windows `TenRiff-1.3.1.zip`, public source `TenRiff-1.3.1-source.zip`, and `TenRiff-1.3.1-SHA256SUMS.txt` are the formal hotfix release assets; no ONNX model, private checkpoint, user profile, song, log, or local UI-audit artifact is bundled.
+
+
 ## [1.3.0 UI-r2] - 2026-08-04
 
 ### Added

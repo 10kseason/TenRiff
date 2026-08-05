@@ -124,7 +124,12 @@ TEST_CASE("gameplay hud revisions ignore sample-only updates for text caches") {
 TEST_CASE("gameplay hud revisions refresh motion when note pending state changes") {
     tenriff::app::GameplayHudRevisionInput previous;
     previous.note_count = 1;
-    previous.notes[0] = {1, 1000, 1600, true, true, true};
+    previous.notes[0].lane = 1;
+    previous.notes[0].start_sample = 1000;
+    previous.notes[0].tail_sample = 1600;
+    previous.notes[0].hold = true;
+    previous.notes[0].head_visible = true;
+    previous.notes[0].pending = true;
 
     auto next = previous;
     next.notes[0].pending = false;

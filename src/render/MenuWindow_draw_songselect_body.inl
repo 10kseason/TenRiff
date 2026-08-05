@@ -476,12 +476,14 @@
                                    best_panel.left + 420.0f, best_panel.bottom - 18.0f),
                        loc("SCORE", "점수"),
                        data.song_select.result_available
-                           ? format_int_with_commas(data.song_select.best_score) : "--");
+                           ? format_int_with_commas(data.song_select.best_score) + " / D " +
+                                 format_int_with_commas(data.song_select.detail_score) : "--");
         draw_meta_pair(D2D1::RectF(best_panel.left + 430.0f, best_panel.top + 48.0f,
                                    best_panel.left + 575.0f, best_panel.bottom - 18.0f),
                        loc("ACCURACY", "정확도"),
                        data.song_select.result_available
-                           ? format_decimal(data.song_select.accuracy, 2) + "%" : "--");
+                           ? format_decimal(data.song_select.accuracy, 2) + "% / D " +
+                                 format_decimal(data.song_select.detailed_accuracy, 2) + "%" : "--");
         draw_meta_pair(D2D1::RectF(best_panel.left + 585.0f, best_panel.top + 48.0f,
                                    best_panel.right - 20.0f, best_panel.bottom - 18.0f),
                        loc("MAX COMBO", "최대 콤보"),
@@ -576,9 +578,9 @@
                                               difficulty_card.top + 40.0f),
                                   d2d_->muted_brush.Get());
             }
-            if (d2d_->rank_format && d2d_->accent_brush) {
+            if (d2d_->header_format && d2d_->accent_brush) {
                 draw_centered_text(to_wide(data.song_select.selected_song_layout),
-                                   d2d_->rank_format.Get(),
+                                   d2d_->header_format.Get(),
                                    D2D1::RectF(difficulty_card.left + 18.0f,
                                                difficulty_card.top + 38.0f,
                                                difficulty_card.right - 18.0f,
@@ -620,6 +622,8 @@
                                 mode_area.top + row * (mode_height + mode_gap),
                                 mode_area.left + col * (mode_width + mode_gap) + mode_width,
                                 mode_area.top + row * (mode_height + mode_gap) + mode_height);
+                register_hit(cell, MenuHitTargetKind::SongQuickSetting,
+                             static_cast<int>(i), MenuHitPart::Increment);
                 draw_glass_panel(cell, 9.0f, 0.62f, 0.08f, false, 1.0f);
                 if (d2d_->hud_format && d2d_->muted_brush) {
                     draw_text_clipped(to_wide(mode_values[i].first), d2d_->hud_format.Get(),
@@ -672,11 +676,13 @@
             draw_meta_pair(D2D1::RectF(right_left, right_panel.top + 162.0f,
                                        right_left + 190.0f, right_panel.top + 238.0f),
                            loc("SCORE", "점수"),
-                           format_int_with_commas(data.song_select.best_score), true);
+                           format_int_with_commas(data.song_select.best_score) + " / D " +
+                               format_int_with_commas(data.song_select.detail_score), true);
             draw_meta_pair(D2D1::RectF(right_left + 220.0f, right_panel.top + 162.0f,
                                        right_left + 380.0f, right_panel.top + 238.0f),
                            loc("ACCURACY", "정확도"),
-                           format_decimal(data.song_select.accuracy, 2) + "%");
+                           format_decimal(data.song_select.accuracy, 2) + "% / D " +
+                               format_decimal(data.song_select.detailed_accuracy, 2) + "%");
             draw_meta_pair(D2D1::RectF(right_left + 410.0f, right_panel.top + 162.0f,
                                        right_right, right_panel.top + 238.0f),
                            loc("COMBO", "콤보"),

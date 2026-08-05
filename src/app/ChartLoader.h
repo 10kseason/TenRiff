@@ -11,7 +11,6 @@ namespace tenriff::app {
 enum class ChartFormat {
     Unknown,
     Bms,
-    OsuMania,
 };
 
 struct ChartLoadResult {
@@ -29,8 +28,7 @@ public:
     [[nodiscard]] ChartLoadResult load(const std::string& path,
                                        int sample_rate,
                                        double rate,
-                                       std::string_view bms_keysound_policy = "ignore",
-                                       bool enable_osu_charts = false) const;
+                                       std::string_view bms_keysound_policy = "ignore") const;
 };
 
 }  // namespace tenriff::app

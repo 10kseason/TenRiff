@@ -7,6 +7,7 @@
 
 using tenriff::gameplay::GameplayChart;
 using tenriff::gameplay::GameplayConfig;
+using tenriff::gameplay::MineEvent;
 using tenriff::gameplay::NoteEvent;
 using tenriff::gameplay::GameplayEngine;
 using tenriff::input::InputState;
@@ -35,7 +36,7 @@ TEST_CASE("gameplay engine scores a basic hit") {
     CHECK(engine.stats().max_combo == 1);
 }
 
-TEST_CASE("native score is normalized to one hundred thousand with a combo component") {
+TEST_CASE("native score is fixed by judgement value and independent of combo order") {
     GameplayChart chart;
     chart.lane_count = 1;
     chart.duration_samples = 4000;
@@ -59,10 +60,11 @@ TEST_CASE("native score is normalized to one hundred thousand with a combo compo
     CHECK(engine.stats().counts.pg == 2);
     CHECK(engine.stats().counts.bd == 1);
     CHECK(engine.stats().combo_score_units == 2);
-    CHECK(engine.stats().raw_score == 63'333);
+    CHECK(engine.stats().raw_score == 66'667);
+    CHECK(engine.stats().detail_score == 10);
 }
 
-TEST_CASE("native accuracy rewards timing inside every judgement band and caps loose PG clusters") {
+TEST_CASE("native accuracy is categorical while detail accuracy rewards steadier timing") {
     GameplayChart chart;
     chart.lane_count = 1;
     chart.duration_samples = 3000;
@@ -80,12 +82,15 @@ TEST_CASE("native accuracy rewards timing inside every judgement band and caps l
     (void)exact.handle_input(1, InputState::Pressed, 1000);
     (void)exact.handle_input(1, InputState::Pressed, 2000);
     CHECK(exact.stats().accuracy_percent() == doctest::Approx(100.0));
+    CHECK(exact.stats().detailed_accuracy_percent() == doctest::Approx(100.0));
 
     GameplayEngine loose(chart, config);
     (void)loose.handle_input(1, InputState::Pressed, 995);
     (void)loose.handle_input(1, InputState::Pressed, 2005);
     CHECK(loose.stats().counts.pg == 2);
-    CHECK(loose.stats().accuracy_percent() == doctest::Approx(99.5));
+    CHECK(loose.stats().accuracy_percent() == doctest::Approx(100.0));
+    CHECK(loose.stats().detailed_accuracy_percent() < exact.stats().detailed_accuracy_percent());
+    CHECK(loose.stats().detailed_accuracy_percent() == doctest::Approx(96.9233).epsilon(0.0001));
 
     GameplayChart gr_chart;
     gr_chart.lane_count = 1;
@@ -94,7 +99,8 @@ TEST_CASE("native accuracy rewards timing inside every judgement band and caps l
     GameplayEngine gr_engine(gr_chart, config);
     (void)gr_engine.handle_input(1, InputState::Pressed, 1015);
     CHECK(gr_engine.stats().counts.gr == 1);
-    CHECK(gr_engine.stats().accuracy_percent() == doctest::Approx(79.75));
+    CHECK(gr_engine.stats().accuracy_percent() == doctest::Approx(80.0));
+    CHECK(gr_engine.stats().detailed_accuracy_percent() == doctest::Approx(75.4839).epsilon(0.0001));
 }
 
 TEST_CASE("native accuracy counts a long note as one weighted object") {
@@ -119,7 +125,9 @@ TEST_CASE("native accuracy counts a long note as one weighted object") {
     CHECK(engine.stats().counts.pg == 2);
     CHECK(engine.stats().counts.gr == 1);
     CHECK(engine.stats().accuracy_weight == doctest::Approx(2.0));
-    CHECK(engine.stats().accuracy_percent() == doctest::Approx(89.875));
+    CHECK(engine.stats().accuracy_percent() == doctest::Approx(90.0));
+    CHECK(engine.stats().detail_score == 13);
+    CHECK(engine.stats().detailed_accuracy_percent() == doctest::Approx(87.7419).epsilon(0.0001));
 }
 TEST_CASE("gameplay engine reports whether an original note is still pending") {
     GameplayChart chart;
@@ -1346,4 +1354,76 @@ TEST_CASE("judge hard records an unplayed note as an indirect poor") {
     normal_engine.advance(1041);
     CHECK(normal_engine.stats().counts.bd == 1);
     CHECK(normal_engine.stats().counts.pr == 0);
+}
+
+TEST_CASE("gameplay landmines damage held lanes without affecting score or judgement counts") {
+    GameplayChart chart;
+    chart.lane_count = 1;
+    chart.duration_samples = 3000;
+    chart.notes.push_back(NoteEvent{1, 2500, std::nullopt});
+    chart.mines.push_back(MineEvent{1, 1000, 5.0, false, 7, 42});
+
+    GameplayConfig config;
+    config.sample_rate = 1000;
+    GameplayEngine engine(chart, config);
+
+    (void)engine.handle_input(1, InputState::Pressed, 500);
+    engine.advance(1000);
+
+    CHECK(engine.gauge_state().value == doctest::Approx(95.0));
+    CHECK(engine.stats().counts.pg + engine.stats().counts.gr + engine.stats().counts.gd +
+              engine.stats().counts.bd + engine.stats().counts.pr == 0);
+    CHECK(engine.stats().raw_score == 0);
+    CHECK_FALSE(engine.is_mine_pending(1, 42));
+
+    std::vector<tenriff::gameplay::MineTrigger> triggers;
+    engine.drain_mine_triggers(triggers);
+    REQUIRE(triggers.size() == 1u);
+    CHECK(triggers[0].mine_id == 42u);
+    CHECK(triggers[0].audio_asset_id == 7u);
+}
+
+TEST_CASE("gameplay landmine boundary detonates on press and is avoided on release") {
+    GameplayChart chart;
+    chart.lane_count = 1;
+    chart.duration_samples = 3000;
+    chart.notes.push_back(NoteEvent{1, 2500, std::nullopt});
+    chart.mines.push_back(MineEvent{1, 1000, 5.0, false, 7, 1});
+
+    GameplayConfig config;
+    config.sample_rate = 1000;
+
+    GameplayEngine pressed(chart, config);
+    (void)pressed.handle_input(1, InputState::Pressed, 1000);
+    CHECK(pressed.gauge_state().value == doctest::Approx(95.0));
+
+    GameplayEngine released(chart, config);
+    (void)released.handle_input(1, InputState::Pressed, 500);
+    (void)released.handle_input(1, InputState::Released, 1000);
+    CHECK(released.gauge_state().value == doctest::Approx(100.0));
+
+    std::vector<tenriff::gameplay::MineTrigger> triggers;
+    released.drain_mine_triggers(triggers);
+    CHECK(triggers.empty());
+}
+
+TEST_CASE("ZZ gameplay landmine forces game over only when triggered") {
+    GameplayChart chart;
+    chart.lane_count = 1;
+    chart.duration_samples = 3000;
+    chart.notes.push_back(NoteEvent{1, 2500, std::nullopt});
+    chart.mines.push_back(MineEvent{1, 1000, 647.5, true, 9, 2});
+
+    GameplayConfig config;
+    config.sample_rate = 1000;
+
+    GameplayEngine safe(chart, config);
+    safe.advance(1000);
+    CHECK_FALSE(safe.is_game_over());
+    CHECK(safe.gauge_state().value == doctest::Approx(100.0));
+
+    GameplayEngine triggered(chart, config);
+    (void)triggered.handle_input(1, InputState::Pressed, 1000);
+    CHECK(triggered.is_game_over());
+    CHECK(triggered.gauge_state().value == doctest::Approx(0.0));
 }

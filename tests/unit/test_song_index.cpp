@@ -183,23 +183,6 @@ TEST_CASE("song scan remains BMS-only when osu files are present") {
     REQUIRE(by_path.count("legacy.bms") == 1u);
     CHECK(by_path.count("four.osu") == 0u);
     CHECK(by_path.count("ten.osu") == 0u);
-    SongIndexOptions osu_options;
-    osu_options.include_osu = true;
-    std::vector<std::string> osu_warnings;
-    SongIndex with_osu = scan_songs(temp.path.u8string(), nullptr, osu_warnings, {}, osu_options);
-    REQUIRE(with_osu.entries.size() == 3u);
-    CHECK(osu_warnings.empty());
-    by_path.clear();
-    for (const auto& entry : with_osu.entries) {
-        by_path.emplace(entry.path, entry);
-    }
-    REQUIRE(by_path.count("four.osu") == 1u);
-    REQUIRE(by_path.count("ten.osu") == 1u);
-    CHECK(by_path.at("four.osu").format == "osu");
-    CHECK(by_path.at("four.osu").key_count == 4);
-    CHECK(by_path.at("ten.osu").key_count == 10);
-    CHECK(by_path.at("ten.osu").md5.size() == 32u);
-    CHECK(by_path.at("ten.osu").sha256.size() == 64u);
 }
 
 TEST_CASE("song scan keeps chart names for BMS subtitles") {

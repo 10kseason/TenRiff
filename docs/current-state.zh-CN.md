@@ -3,9 +3,11 @@
 这份文档是下一位 agent 或新任务接手时应该最先阅读的当前状态文档。目标是快速说明“这个项目现在是什么、应该先看哪里、还有哪些内容尚未验证”。
 
 ## 基线
-- 当前项目版本与公开稳定版均为 `1.3.0 (UI-r2)`
+- 当前项目版本与公开稳定版均为 `1.3.1 (UI-r2)`
 - UI-r2 Result 使用 2.2 秒时间线依次展示棱镜、分数、等级、通关状态、判定统计和图表；可用 Space 跳过，在演出结束前锁定 Continue/Retry/Replay 输入。
 - UI-r2 Song Select 使用顶部标签、7 行封面曲库、大幅选中图片、最佳记录卡、谱面/模式面板和可实际启动的 START 按钮；不显示 Collection/Store/货币/全球排名等虚构功能
+- Song Select 的 Rate、Hi-Speed、Gauge、Random 单元格支持左键增加/下一项、右键减少/上一项并立即保存；当前谱面键数不再被裁切，最佳记录会同时显示分数、准确率和最大连击。
+- 1.3.1 删除外部 `.osu` parser、索引路径与 settings 开关，使 chart surface 再次限定为 BMS；选择 BMSTable 时会为 hash 匹配自动从 Fast 切换到 Safe，并已通过 Aery 实时服务器与 CG901B MD5→`⑤LEVEL 13` 匹配验证
 - Profile Setup 可按 profile 保存可选的本地 PNG/JPG 头像路径，Song Select 的 profile card 可显示并点击编辑
 - direct-IP multiplayer 与 preview r5 的输入 backend 生命周期修复已整合进 `1.1.8 stable`
 - `1.1.8` 在 1.1.7 视觉更新基础上加入 osu!mania OD8 辅助分数、首次原生 `BAD` 即结束的 `Sudden Death (1 MISS)`，以及确定性的 `LN Mix 10%～90%`
@@ -21,11 +23,11 @@
 - `1.2.9` 加入 12K/14K 与 scratch-aware key conversion、R-Random/DP Flip/Note Add、Song Select 自动预览、带曲图的详细 Result、profile nickname、video BGA 防抖，以及准确的 `DirectXMinPower` 表述。
 - `1.2.92` 为 standalone BMS key converter 加入默认 Krrcream 与确定性 `nK2 Native 50/50` 选择。
 - `1.2.93` 在游戏内 Mode Settings 加入 `Key Converter`，将 `Krrcream`/`KeyWeaver nK2` 选择保存到设置与 replay metadata，并用于 runtime key-mode 变换。
-- `1.2.95`：在 Mode Settings 打开 `OSU Charts` 后，使用自有 parser 索引并游玩 osu!mania 4K～10K `.osu`。BMS 仍是默认，未恢复 `.osz`/osu skin 导入。
+- `1.2.95` 曾通过 `OSU Charts` 暂时恢复 osu!mania 4K～10K `.osu` 的索引与游玩；该路径在 1.3.1 中再次移除。
 - 后续工作的基准文档是 [`docs/baseline-1.1.2.zh-CN.md`](baseline-1.1.2.zh-CN.md)
 - Windows GUI 构建是主目标
 - Linux 仅存在 `Baepoks-Linuxs/TenRiff-0.5.0-linux-preview` 级别的 preview
-- 支持的 chart surface 默认为 BMS family（`.bms/.bme/.bml/.pms`），另可选择 osu!mania 4K～10K `.osu`
+- 支持的 chart surface 仅限 BMS family（`.bms/.bme/.bml/.pms`）
 - `1.2.4 stable` 的 gameplay 输入优先使用 RawInput，同时在同一 `InputThread` 中持续运行 bound-key polling shadow；启动失败或 message pump 意外退出时，会在不重置 queue/pressed state 的情况下把该 producer 切换到 Polling
 - menu 与 gameplay 输入采集保持 foreground process 边界，MenuWindow UI 还会检查 root-window 边界。失去焦点时会重置 key state，并丢弃 background 的 lane/Esc 输入。检测到 RawInput 启动失败、process-global 注册目标丢失或 hidden message window 退出时，无需等待用户按键即可切换到 Polling。
 - 已确认的 fallback 不会改写 profile，并在本次应用运行期间持续用于 menu 与后续 gameplay；重启应用或明确更改 `Options -> Input Settings -> Backend` 后才会重试。
@@ -202,7 +204,7 @@
 
 ## 运行时 / 打包规则
 - 新用户 profile 会自动创建
-- 当前正式 P2P 发布线为 `TenRiff 1.3.0 (UI-r2)`
+- 当前正式 P2P 发布线为 `TenRiff 1.3.1 (UI-r2)`
 - 发布包不包含 `Songs`
 - 发布包包含 `Main Menu / Options / Song Selecte / Multiplayer Lobby / Clear / Failed` 这些 `Mainmusic/` 场景槽位；每个 `Name.mp3` 及 `Name 2.mp3`～`Name 64.mp3` 会自动发现，并在重新进入场景时轮换
 - 发布更新只包含已构建产物和必要的运行时资源

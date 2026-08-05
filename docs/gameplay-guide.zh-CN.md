@@ -107,7 +107,7 @@ Discord 客户端的设置方法请参考[官方 Game Overlay 指南](https://su
 ## 6. 开始游玩前要知道的事
 
 ### 谱面格式
-- 默认索引并游玩 BMS family（`.bms/.bme/.bml/.pms`）；在 Mode Settings 打开 `OSU Charts` 后也支持 osu!mania 4K～10K `.osu`。
+- chart 索引与游玩仅支持 BMS family（`.bms/.bme/.bml/.pms`），不支持 `.osu`。
 
 ### 加载
 - 刚开始歌曲时，可能会显示谱面加载进度。

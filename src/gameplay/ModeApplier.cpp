@@ -105,6 +105,11 @@ void apply_lane_map(GameplayChart& chart, const std::vector<int>& lane_map) {
             note.lane = lane_map[static_cast<std::size_t>(note.lane)];
         }
     }
+    for (auto& mine : chart.mines) {
+        if (mine.lane > 0 && mine.lane < static_cast<int>(lane_map.size())) {
+            mine.lane = lane_map[static_cast<std::size_t>(mine.lane)];
+        }
+    }
     for (auto& scratch_lane : chart.scratch_lanes) {
         if (scratch_lane > 0 && scratch_lane < static_cast<int>(lane_map.size())) {
             scratch_lane = lane_map[static_cast<std::size_t>(scratch_lane)];
@@ -164,6 +169,18 @@ ScratchExtraction extract_key_part(const GameplayChart& source) {
         key_notes.push_back(std::move(key_note));
     }
 
+    std::vector<MineEvent> key_mines;
+    key_mines.reserve(source.mines.size());
+    for (const auto& source_mine : source.mines) {
+        if (source_mine.lane <= 0 || source_mine.lane > source.lane_count ||
+            std::binary_search(scratches.begin(), scratches.end(), source_mine.lane)) {
+            continue;
+        }
+        MineEvent mine = source_mine;
+        mine.lane = lane_map[static_cast<std::size_t>(source_mine.lane)];
+        key_mines.push_back(std::move(mine));
+    }
+    result.chart.mines = std::move(key_mines);
     result.chart.notes = std::move(key_notes);
     result.chart.lane_count = next_lane;
     result.chart.scratch_lanes.clear();
@@ -335,6 +352,23 @@ void apply_legacy_key_mode_fallback(GameplayChart& chart,
     warnings.push_back("Key mode fallback kept the original lane count.");
 }
 
+void remap_mines_proportionally(GameplayChart& chart, int source_lane_count) {
+    if (source_lane_count <= 0 || chart.lane_count <= 0 ||
+        source_lane_count == chart.lane_count) {
+        return;
+    }
+    for (auto& mine : chart.mines) {
+        if (mine.lane <= 0 || mine.lane > source_lane_count) {
+            continue;
+        }
+        const double normalized =
+            (static_cast<double>(mine.lane) - 0.5) / static_cast<double>(source_lane_count);
+        mine.lane = std::clamp(
+            static_cast<int>(std::floor(normalized * static_cast<double>(chart.lane_count))) + 1,
+            1, chart.lane_count);
+    }
+}
+
 void apply_dp_flip(GameplayChart& chart) {
     const int group_size = effective_group_size(chart);
     if (group_size <= 0 || chart.lane_count != group_size * 2) {
@@ -482,6 +516,20 @@ void apply_super_random(GameplayChart& chart, uint32_t seed, std::vector<std::st
         lane_end[lane_index] = std::max(lane_end[lane_index], span.end);
     }
 
+    for (auto& mine : chart.mines) {
+        if (mine.lane <= 0 || mine.lane > lane_count || is_scratch_lane(chart, mine.lane)) {
+            continue;
+        }
+        const int group_index = group_by_lane[static_cast<std::size_t>(mine.lane)];
+        if (group_index < 0 || group_index >= static_cast<int>(groups.size()) ||
+            groups[static_cast<std::size_t>(group_index)].empty()) {
+            continue;
+        }
+        const auto& group = groups[static_cast<std::size_t>(group_index)];
+        std::uniform_int_distribution<std::size_t> dist(0, group.size() - 1);
+        mine.lane = group[dist(rng)];
+    }
+
     sort_notes_for_gameplay(chart);
     if (fallback_count > 0) {
         warnings.push_back("SR fallback: overlapping notes could not be fully avoided (count=" +
@@ -509,6 +557,7 @@ ModeApplyResult apply_mode_settings(const GameplayChart& chart,
             scratch_extracted = true;
         }
     }
+    const int conversion_source_lane_count = conversion_source->lane_count;
 
     bool conversion_succeeded = target_count <= 0;
     if (target_count > 0) {
@@ -571,6 +620,10 @@ ModeApplyResult apply_mode_settings(const GameplayChart& chart,
 
     if (settings.dp_flip) {
         apply_dp_flip(result.chart);
+    }
+
+    if (target_count > 0 && conversion_succeeded) {
+        remap_mines_proportionally(result.chart, conversion_source_lane_count);
     }
 
     if (settings.random == RandomMode::Mirror) {

@@ -84,7 +84,7 @@ void MenuApp::handle_audio_settings_input(uint32_t keycode) {
 }
 
 void MenuApp::handle_mode_settings_input(uint32_t keycode) {
-    const int item_count = 17;
+    const int item_count = 16;
     if (keycode == key_up_) {
         settings_cursor_ = clamp_int(settings_cursor_ - 1, 0, item_count - 1);
         publish_snapshot();
@@ -141,17 +141,7 @@ void MenuApp::handle_mode_settings_input(uint32_t keycode) {
             config_.mode.gauge = cycle_gauge_mode(config_.mode.gauge, direction);
             mode_dirty_ = true;
         } else if (settings_cursor_ == 10) {
-            if (config_.mode.random == "off") {
-                config_.mode.random = (direction > 0) ? "mirror" : "sr";
-            } else if (config_.mode.random == "mirror") {
-                config_.mode.random = (direction > 0) ? "rr" : "off";
-            } else if (config_.mode.random == "rr") {
-                config_.mode.random = (direction > 0) ? "fr" : "mirror";
-            } else if (config_.mode.random == "fr") {
-                config_.mode.random = (direction > 0) ? "sr" : "rr";
-            } else {
-                config_.mode.random = (direction > 0) ? "off" : "fr";
-            }
+            config_.mode.random = cycle_random_mode(config_.mode.random, direction);
             mode_dirty_ = true;
         } else if (settings_cursor_ == 11) {
             int next_value = static_cast<int>(config_.mode.random_seed) + direction;
@@ -170,10 +160,6 @@ void MenuApp::handle_mode_settings_input(uint32_t keycode) {
                 config_.speed.hi_speed + static_cast<double>(direction) * kHiSpeedStep,
                 kHiSpeedMin, kHiSpeedMax, kHiSpeedStep);
             mode_dirty_ = true;
-        } else if (settings_cursor_ == 15) {
-            config_.mode.enable_osu_charts = !config_.mode.enable_osu_charts;
-            mode_dirty_ = true;
-            mode_library_dirty_ = true;
         }
         publish_snapshot();
         return;
@@ -295,11 +281,11 @@ void MenuApp::populate_mode_settings_render_data(render::MenuRenderData& render)
                     render::MenuHitTargetKind::SettingsRow, 13, false, true);
     append_menu_row(render.generic, ui_text("Hi-Speed", "하이스피드"), format_decimal(config_.speed.hi_speed), settings_cursor_ == 14,
                     render::MenuHitTargetKind::SettingsRow, 14, false, true);
-    append_menu_row(render.generic, ui_text("OSU Charts", "OSU 차트"), ui_on_off(config_.mode.enable_osu_charts), settings_cursor_ == 15,
-                    render::MenuHitTargetKind::SettingsRow, 15, false, true);
-    append_menu_row(render.generic, ui_text("Back", "뒤로"), "", settings_cursor_ == 16, render::MenuHitTargetKind::SettingsRow, 16, true, false);
+    append_menu_row(render.generic, ui_text("Back", "뒤로"), "", settings_cursor_ == 15, render::MenuHitTargetKind::SettingsRow, 15, true, false);
     render.generic.notes.push_back(ui_text("Fast (Minimal) keeps title, artist, key count, level, and BPM only; it skips hashes, previews, difficulty tables, and native LV/CR.",
                                            "빠름(최소)은 제목, 아티스트, 키 수, 레벨, BPM만 유지하고 해시, 미리보기, 난이도표, 자체 LV/CR을 건너뜁니다."));
+    render.generic.notes.push_back(ui_text("Choosing a difficulty table automatically switches Fast to Safe so MD5/SHA-256 matches can be applied.",
+                                           "난이도표를 선택하면 MD5/SHA-256 매칭을 위해 빠름에서 안전으로 자동 전환합니다."));
     render.generic.notes.push_back(ui_text("Index Difficulty applies to Safe scans. Fast always skips native LV/CR even when this option is On.",
                                            "인덱스 난이도는 안전 스캔에 적용되며, 빠름은 이 옵션을 켜도 자체 LV/CR을 항상 건너뜁니다."));
     render.generic.notes.push_back(ui_text("Ghost Battle automatically loads the selected chart's best compatible replay into the split ghost comparison view.",
@@ -321,8 +307,6 @@ void MenuApp::populate_mode_settings_render_data(render::MenuRenderData& render)
         "미러 자체는 시드를 쓰지 않지만, 먼저 실행되는 키 모드 변환은 랜덤 시드를 사용할 수 있습니다."));
     render.generic.notes.push_back(ui_text("Mods opens the registry-backed Mod Manager and shows the current score multiplier.",
                                            "모드는 현재 점수 배율을 보여주고, 등록 기반 Mod Manager를 엽니다."));
-    render.generic.notes.push_back(ui_text("OSU Charts adds 4K-10K .osu beatmaps to indexing and runtime loading after Back refreshes the library.",
-                                           "OSU 차트를 켜면 뒤로 이동할 때 라이브러리를 갱신하고 4K~10K .osu 비트맵을 인덱싱하고 불러옵니다."));
     render.generic.notes.push_back(ui_text("Back saves the current mode settings.",
                                            "뒤로 가면 현재 모드 설정을 저장합니다."));
 }

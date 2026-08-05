@@ -203,8 +203,11 @@ config::JsonValue build_stats_json(const ResultStats& stats) {
     obj.emplace("raw_score", config::JsonValue{static_cast<double>(stats.raw_score)});
     obj.emplace("judgement_score_points", config::JsonValue{stats.judgement_score_points});
     obj.emplace("combo_score_units", config::JsonValue{static_cast<double>(stats.combo_score_units)});
+    obj.emplace("detail_score", config::JsonValue{static_cast<double>(stats.detail_score)});
     obj.emplace("accuracy_points", config::JsonValue{stats.accuracy_points});
     obj.emplace("accuracy_weight", config::JsonValue{stats.accuracy_weight});
+    obj.emplace("detailed_accuracy_points", config::JsonValue{stats.detailed_accuracy_points});
+    obj.emplace("detailed_accuracy_weight", config::JsonValue{stats.detailed_accuracy_weight});
     obj.emplace("highest_judgement_timing_weight", config::JsonValue{stats.highest_judgement_timing_weight});
     obj.emplace("highest_judgement_min_delta_ms", config::JsonValue{stats.highest_judgement_min_delta_ms});
     obj.emplace("highest_judgement_max_delta_ms", config::JsonValue{stats.highest_judgement_max_delta_ms});
@@ -463,8 +466,30 @@ ReplayLoadResult load_replay_json(const std::string& path) {
         replay.stats.raw_score_accumulator = replay.stats.raw_score;
         replay.stats.judgement_score_points = read_json_number(*stats, "judgement_score_points", 0.0);
         replay.stats.combo_score_units = read_json_i64(*stats, "combo_score_units", 0);
-        replay.stats.accuracy_points = read_json_number(*stats, "accuracy_points", 0.0);
-        replay.stats.accuracy_weight = read_json_number(*stats, "accuracy_weight", 0.0);
+        const int64_t derived_detail_score = static_cast<int64_t>(replay.stats.counts.pg) * 5 +
+                                             static_cast<int64_t>(replay.stats.counts.gr) * 3 +
+                                             static_cast<int64_t>(replay.stats.counts.gd);
+        replay.stats.detail_score = read_json_i64(*stats, "detail_score", derived_detail_score);
+        const double stored_accuracy_points = read_json_number(*stats, "accuracy_points", 0.0);
+        const double stored_accuracy_weight = read_json_number(*stats, "accuracy_weight", 0.0);
+        if (find_json_value(*stats, "detailed_accuracy_points")) {
+            replay.stats.accuracy_points = stored_accuracy_points;
+            replay.stats.accuracy_weight = stored_accuracy_weight;
+            replay.stats.detailed_accuracy_points =
+                read_json_number(*stats, "detailed_accuracy_points", 0.0);
+            replay.stats.detailed_accuracy_weight =
+                read_json_number(*stats, "detailed_accuracy_weight", 0.0);
+        } else {
+            replay.stats.detailed_accuracy_points = stored_accuracy_points;
+            replay.stats.detailed_accuracy_weight = stored_accuracy_weight;
+            replay.stats.accuracy_points = static_cast<double>(replay.stats.counts.pg) +
+                                           static_cast<double>(replay.stats.counts.gr) * 0.80 +
+                                           static_cast<double>(replay.stats.counts.gd) * 0.50 +
+                                           static_cast<double>(replay.stats.counts.bd) * 0.20;
+            replay.stats.accuracy_weight = static_cast<double>(replay.stats.counts.pg + replay.stats.counts.gr +
+                                                                replay.stats.counts.gd + replay.stats.counts.bd +
+                                                                replay.stats.counts.pr);
+        }
         replay.stats.highest_judgement_timing_weight =
             read_json_number(*stats, "highest_judgement_timing_weight", 0.0);
         replay.stats.highest_judgement_min_delta_ms =

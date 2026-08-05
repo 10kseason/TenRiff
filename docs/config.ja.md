@@ -40,7 +40,7 @@ profile が存在しない場合は初回起動時に自動生成されます。
 
 - `backend` (string)
   - `polling | rawinput`
-  - 現行 `1.3.0` リリースラインの既定値は `rawinput`
+  - 現行 `1.3.1` リリースラインの既定値は `rawinput`
   - `Options -> Input Settings -> Backend` または `Options -> Profile Setup -> Input Backend` で profile ごとに選択可能
   - runtime fallback は保存済みの値を `polling` に書き換えない
   - RawInput の起動失敗、登録先の消失、message window の終了を確認すると、そのアプリ実行中は menu と後続 gameplay の両方で Polling を維持する
@@ -134,7 +134,7 @@ profile が存在しない場合は初回起動時に自動生成されます。
   - low-power session 作成失敗時は既存の high-performance DirectX 経路へ fallback
 
 ### `mode`
-chart loader/indexer は BMS family（`.bms/.bme/.bml/.pms`）が既定です。`enable_osu_charts=true` なら独自 parser で osu!mania 4K～10K `.osu` も含め、旧 `format` filter は使用しません。
+chart loader/indexer は BMS family（`.bms/.bme/.bml/.pms`）専用です。旧 `enable_osu_charts` と `format` の値は読み込み時に無視し、再保存しません。
 
 - `key_mode` (string)
   - `none | auto | 4k | 5k | 6k | 7k | 8k | 9k | 10k | 12k | 14k | 16k`
@@ -204,7 +204,7 @@ chart loader/indexer は BMS family（`.bms/.bme/.bml/.pms`）が既定です。
 - `difficulty_table_path` (string)
   - Browse で選択した local BMS difficulty-table header JSON、または link から作成した profile cache header の path
   - header は `name`, `symbol`, local relative `data_url`、data array entry は `md5` または `sha256` と `level` を使用
-  - 選択/解除時に現在の source を再インデックスして一致譜面へ table level を表示
+  - 選択/解除時に現在の source を再インデックスして一致譜面へ table level を表示し、選択時は hash が必要な `safe` index へ自動切替
 - `difficulty_table_url` (string)
   - Browse から import した http(s) BMSTable HTML page または header JSON の元 link
   - 標準 `<meta name="bmstable" content="...">` を解決して header/data JSON を profile の `difficulty_tables` cache に保存。local JSON 選択時は空になる

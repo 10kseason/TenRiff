@@ -49,6 +49,7 @@ enum class MenuHitTargetKind {
     SongNavButton,
     SongCard,
     SongResultPanel,
+    SongQuickSetting,
     SongStartButton,
     SongBackButton,
     SongProfilePanel,
@@ -164,6 +165,7 @@ struct SongSelectData {
 
     std::string rank;
     int64_t best_score = 0;
+    int64_t detail_score = 0;
     int max_combo = 0;
     int perfect = 0;
     int great = 0;
@@ -171,6 +173,7 @@ struct SongSelectData {
     int bad = 0;
     int poor = 0;
     double accuracy = 0.0;
+    double detailed_accuracy = 0.0;
     std::string selected_record_created_utc;
     std::string selected_record_status;
     std::string selected_record_replay_file;
@@ -220,8 +223,10 @@ struct ResultScreenData {
     bool presentation_skipped = false;
 
     int64_t score = 0;
+    int64_t detail_score = 0;
     bool pause_used = false;
     double accuracy = 0.0;
+    double detailed_accuracy = 0.0;
     double gauge_value = 0.0;
     int max_combo = 0;
     int total_notes = 0;
@@ -268,6 +273,9 @@ struct GameplayNoteData {
     bool hold = false;
     bool head_visible = true;
     bool pending = false;
+    bool mine = false;
+    double visual_position = 0.0;
+    double tail_visual_position = 0.0;
 };
 
 struct GameplayHudData {
@@ -289,6 +297,10 @@ struct GameplayHudData {
     int64_t duration_samples = 0;
     int sample_rate = 48000;
     int64_t audio_sample_time_ns = 0;
+    double current_visual_position = 0.0;
+    double visual_velocity = 1.0;
+    double future_visual_span = 1.0;
+    double past_visual_span = 1.0;
     uint32_t audio_buffer_frames = 0;
     int64_t lookahead_samples = 0;
     int64_t past_samples = 0;
@@ -346,6 +358,7 @@ struct GameplayHudData {
     int max_combo = 0;
     int total_notes = 0;
     double accuracy = 0.0;
+    double detailed_accuracy = 0.0;
 
     int pg = 0;
     int gr = 0;
@@ -405,6 +418,7 @@ struct GameplayHudData {
     int ghost_combo = 0;
     int ghost_max_combo = 0;
     double ghost_accuracy = 0.0;
+    double ghost_detailed_accuracy = 0.0;
     int ghost_pg = 0;
     int ghost_gr = 0;
     int ghost_gd = 0;

@@ -69,6 +69,9 @@ void MenuApp::reload_chart_best_results() {
         candidate.has_value = true;
         candidate.rank = menu_records::calculate_rank(parsed->stats, parsed->game_over);
         candidate.best_score = parsed->final_score;
+        candidate.detail_score = menu_records::calculate_detail_score(parsed->stats);
+        candidate.accuracy = menu_records::calculate_accuracy(parsed->stats);
+        candidate.detailed_accuracy = menu_records::calculate_detailed_accuracy(parsed->stats);
         candidate.clear_status = parsed->clear_status;
         candidate.final_gauge = parsed->final_gauge;
         candidate.game_over = parsed->game_over;
@@ -105,7 +108,9 @@ void MenuApp::reload_chart_best_results() {
         record.practice_no_fail_enabled = parsed->practice_no_fail_enabled;
         record.raw_score = parsed->stats.raw_score;
         record.score = candidate.best_score;
+        record.detail_score = candidate.detail_score;
         record.accuracy = menu_records::calculate_accuracy(parsed->stats);
+        record.detailed_accuracy = menu_records::calculate_detailed_accuracy(parsed->stats);
         record.max_combo = parsed->stats.max_combo;
         record.total_notes = parsed->stats.total_notes;
         record.judged_notes = candidate_judged;
@@ -145,11 +150,15 @@ void MenuApp::reload_chart_best_results() {
                                                     existing->second.final_gauge);
             if (menu_records::is_better_record(candidate.best_score,
                                                candidate_clear_priority,
+                                               candidate.detail_score,
+                                               candidate.detailed_accuracy,
                                                candidate.max_combo,
                                                candidate_judged,
                                                candidate.created_utc,
                                                existing->second.best_score,
                                                existing_clear_priority,
+                                               existing->second.detail_score,
+                                               existing->second.detailed_accuracy,
                                                existing->second.max_combo,
                                                existing_judged,
                                                existing->second.created_utc)) {

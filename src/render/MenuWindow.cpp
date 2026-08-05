@@ -3557,9 +3557,15 @@ void MenuWindow::on_mouse_secondary_click(int window_x, int window_y) {
         if (x < it->left || x > it->right || y < it->top || y > it->bottom) {
             continue;
         }
-        if ((it->kind == MenuHitTargetKind::TitleButton ||
-             it->kind == MenuHitTargetKind::SongNavButton) &&
-            it->index > 0) {
+        if (it->kind == MenuHitTargetKind::SongQuickSetting) {
+            MenuClickEvent event;
+            event.kind = it->kind;
+            event.index = it->index;
+            event.part = MenuHitPart::Decrement;
+            push_click_event(std::move(event));
+        } else if ((it->kind == MenuHitTargetKind::TitleButton ||
+                    it->kind == MenuHitTargetKind::SongNavButton) &&
+                   it->index > 0) {
             MenuClickEvent event;
             event.kind = it->kind;
             event.index = it->index - 1;

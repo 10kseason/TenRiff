@@ -177,8 +177,8 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
             : (render.song_select.showing_records
                    ? ui_text("LEFT/RIGHT  NAV FOCUS     BACKSPACE  BACK     ESC  TITLE     F1  HELP",
                              "좌/우  탐색 전환     BACKSPACE  뒤로     ESC  타이틀     F1  도움말")
-                   : ui_text("LEFT/RIGHT NAV     ENTER SEARCH     F2 FOLDER     -/+ RATE     F5 REINDEX     F1 HELP",
-                             "좌/우 탐색     ENTER 검색     F2 폴더     -/+ 배속     F5 재인덱스     F1 도움말")));
+                   : ui_text("MODE CELLS: LEFT +/NEXT, RIGHT -/PREV     F2 FOLDER     F5 REINDEX     F1 HELP",
+                             "모드 셀: 좌클릭 +/다음, 우클릭 -/이전     F2 폴더     F5 재인덱스     F1 도움말")));
 
     const std::string source_detail =
         std::to_string(render.song_select.source_count) + " " +
@@ -442,7 +442,7 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
             render.song_select.current_rate = format_multiplier(config_.speed.rate);
             render.song_select.current_hi_speed = format_decimal(config_.speed.hi_speed);
             render.song_select.current_gauge = ui_gauge_label(config_.mode.gauge);
-            render.song_select.current_random = safe_ui_text(config_.mode.random);
+            render.song_select.current_random = ui_random_label(config_.mode.random);
             render.song_select.selected_song_background_path = selected_song_background_preview_path();
             render.song_select.background_upscale_mode = config_.graphics.background_upscale_mode;
             render.song_select.background_upscale_model_path =
@@ -465,6 +465,7 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
         if (selected_record) {
             render.song_select.rank = selected_record->rank;
             render.song_select.best_score = selected_record->score;
+            render.song_select.detail_score = selected_record->detail_score;
             render.song_select.max_combo = selected_record->max_combo;
             render.song_select.perfect = selected_record->perfect;
             render.song_select.great = selected_record->great;
@@ -472,6 +473,7 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
             render.song_select.bad = selected_record->bad;
             render.song_select.poor = selected_record->poor;
             render.song_select.accuracy = selected_record->accuracy;
+            render.song_select.detailed_accuracy = selected_record->detailed_accuracy;
             render.song_select.selected_record_created_utc =
                 menu_records::compact_timestamp_label(selected_record->created_utc);
             render.song_select.selected_record_status =
@@ -498,6 +500,9 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
     } else if (!render.song_select.showing_sources) {
         render.song_select.rank = current_best.has_value ? current_best.rank : "--";
         render.song_select.best_score = current_best.has_value ? current_best.best_score : 0;
+        render.song_select.detail_score = current_best.has_value ? current_best.detail_score : 0;
+        render.song_select.accuracy = current_best.has_value ? current_best.accuracy : 0.0;
+        render.song_select.detailed_accuracy = current_best.has_value ? current_best.detailed_accuracy : 0.0;
         render.song_select.max_combo = current_best.has_value ? current_best.max_combo : 0;
         render.song_select.perfect = current_best.has_value ? current_best.perfect : 0;
         render.song_select.great = current_best.has_value ? current_best.great : 0;

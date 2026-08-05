@@ -233,6 +233,10 @@ double calculate_accuracy(const gameplay::ResultStats& stats) {
     return stats.accuracy_percent();
 }
 
+double calculate_detailed_accuracy(const gameplay::ResultStats& stats) {
+    return stats.detailed_accuracy_percent();
+}
+
 int64_t calculate_score(const gameplay::ResultStats& stats) {
     if (stats.raw_score > 0) {
         return stats.raw_score;
@@ -242,6 +246,15 @@ int64_t calculate_score(const gameplay::ResultStats& stats) {
                     static_cast<int64_t>(stats.counts.gd) * 300;
     score -= static_cast<int64_t>(stats.counts.bd) * 200;
     return std::max<int64_t>(0, score);
+}
+
+int64_t calculate_detail_score(const gameplay::ResultStats& stats) {
+    if (stats.detail_score > 0) {
+        return stats.detail_score;
+    }
+    return static_cast<int64_t>(stats.counts.pg) * 5 +
+           static_cast<int64_t>(stats.counts.gr) * 3 +
+           static_cast<int64_t>(stats.counts.gd);
 }
 
 int64_t calculate_final_score(const gameplay::ResultStats& stats, double multiplier) {
@@ -300,11 +313,15 @@ std::string calculate_rank(const gameplay::ResultStats& stats, bool game_over) {
 
 bool is_better_record(int64_t candidate_score,
                       int candidate_clear_priority,
+                      int64_t candidate_detail_score,
+                      double candidate_detailed_accuracy,
                       int candidate_combo,
                       int candidate_judged,
                       std::string_view candidate_created,
                       int64_t current_score,
                       int current_clear_priority,
+                      int64_t current_detail_score,
+                      double current_detailed_accuracy,
                       int current_combo,
                       int current_judged,
                       std::string_view current_created) {
@@ -313,6 +330,12 @@ bool is_better_record(int64_t candidate_score,
     }
     if (candidate_score != current_score) {
         return candidate_score > current_score;
+    }
+    if (candidate_detail_score != current_detail_score) {
+        return candidate_detail_score > current_detail_score;
+    }
+    if (std::abs(candidate_detailed_accuracy - current_detailed_accuracy) > 1e-9) {
+        return candidate_detailed_accuracy > current_detailed_accuracy;
     }
     if (candidate_combo != current_combo) {
         return candidate_combo > current_combo;
@@ -393,8 +416,28 @@ std::optional<ParsedResultRecord> parse_result_file(const std::filesystem::path&
     out.stats.judgement_score_points = read_json_number(*stats_obj, "judgement_score_points", 0.0);
     out.stats.combo_score_units = static_cast<int64_t>(std::llround(
         read_json_number(*stats_obj, "combo_score_units", 0.0)));
-    out.stats.accuracy_points = read_json_number(*stats_obj, "accuracy_points", 0.0);
-    out.stats.accuracy_weight = read_json_number(*stats_obj, "accuracy_weight", 0.0);
+    out.stats.detail_score = static_cast<int64_t>(std::llround(
+        read_json_number(*stats_obj, "detail_score", static_cast<double>(calculate_detail_score(out.stats)))));
+    const double stored_accuracy_points = read_json_number(*stats_obj, "accuracy_points", 0.0);
+    const double stored_accuracy_weight = read_json_number(*stats_obj, "accuracy_weight", 0.0);
+    if (find_json_value(*stats_obj, "detailed_accuracy_points")) {
+        out.stats.accuracy_points = stored_accuracy_points;
+        out.stats.accuracy_weight = stored_accuracy_weight;
+        out.stats.detailed_accuracy_points =
+            read_json_number(*stats_obj, "detailed_accuracy_points", 0.0);
+        out.stats.detailed_accuracy_weight =
+            read_json_number(*stats_obj, "detailed_accuracy_weight", 0.0);
+    } else {
+        out.stats.detailed_accuracy_points = stored_accuracy_points;
+        out.stats.detailed_accuracy_weight = stored_accuracy_weight;
+        out.stats.accuracy_points = static_cast<double>(out.stats.counts.pg) +
+                                    static_cast<double>(out.stats.counts.gr) * 0.80 +
+                                    static_cast<double>(out.stats.counts.gd) * 0.50 +
+                                    static_cast<double>(out.stats.counts.bd) * 0.20;
+        out.stats.accuracy_weight = static_cast<double>(out.stats.counts.pg + out.stats.counts.gr +
+                                                        out.stats.counts.gd + out.stats.counts.bd +
+                                                        out.stats.counts.pr);
+    }
     out.stats.highest_judgement_timing_weight =
         read_json_number(*stats_obj, "highest_judgement_timing_weight", 0.0);
     out.stats.highest_judgement_min_delta_ms =

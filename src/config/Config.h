@@ -157,7 +157,6 @@ struct ModeConfig {
     std::string key_mode = "auto";
     std::string key_conversion_algorithm = "krrcream";
     std::string key_conversion_nk2_preset = "native";
-    bool enable_osu_charts = false;
     std::string gauge = "normal";
     std::string random = "off";
     uint32_t random_seed = 0;

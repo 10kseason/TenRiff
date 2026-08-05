@@ -93,7 +93,6 @@ TEST_CASE("config defaults prefer 44100 Hz audio") {
     CHECK_FALSE(config.mode.calculate_song_index_difficulty);
     CHECK(config.mode.key_conversion_algorithm == "krrcream");
     CHECK(config.mode.key_conversion_nk2_preset == "native");
-    CHECK_FALSE(config.mode.enable_osu_charts);
     CHECK(config.graphics.resolution == "native");
     CHECK(config.graphics.display_mode == "borderless");
     CHECK(tenriff::config::kJudgementLinePositionMin == doctest::Approx(0.0));
@@ -412,7 +411,6 @@ TEST_CASE("config save and load preserve volume and speed settings") {
     config.mode.calculate_song_index_difficulty = true;
     config.mode.key_conversion_algorithm = "nk2";
     config.mode.key_conversion_nk2_preset = "transform";
-    config.mode.enable_osu_charts = true;
     config.mode.gauge = "shift";
 
     std::string error;
@@ -432,7 +430,6 @@ TEST_CASE("config save and load preserve volume and speed settings") {
     CHECK(result.config.mode.calculate_song_index_difficulty);
     CHECK(result.config.mode.key_conversion_algorithm == "nk2");
     CHECK(result.config.mode.key_conversion_nk2_preset == "transform");
-    CHECK(result.config.mode.enable_osu_charts);
     CHECK(result.config.mode.gauge == "shift");
 }
 

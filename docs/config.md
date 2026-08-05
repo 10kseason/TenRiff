@@ -40,7 +40,7 @@
 
 - `backend` (string)
   - `polling | rawinput`
-  - 현재 `1.3.0` 릴리스 라인의 기본값은 `rawinput`
+  - 현재 `1.3.1` 릴리스 라인의 기본값은 `rawinput`
   - `Options -> Input Settings -> Backend` 또는 `Options -> Profile Setup -> Input Backend`에서 프로필별로 RawInput/Polling을 직접 선택 가능
   - 저장값은 런타임 fallback 때문에 자동으로 `polling`으로 덮어쓰지 않음
   - RawInput 시작 실패, 등록 대상 손실, 메시지 창 종료가 확인되면 현재 앱 실행 동안 메뉴와 다음 gameplay 세션 모두 Polling을 유지
@@ -60,7 +60,7 @@
 - `judgement_hz` (int)
   - `1000 | 2000 | 4000 | 8000`
   - 호환성용으로 남아 있는 입력 설정 필드
-  - 현재 `1.3.0` runtime은 별도 오디오 판정 서브루프를 이 값으로 구동하지 않음
+  - 현재 `1.3.1` runtime은 별도 오디오 판정 서브루프를 이 값으로 구동하지 않음
   - 기본값은 `4000` (`0.25ms`)
 - `debounce_ms` (double)
   - 실제 Press/Release 전환은 버리지 않고 같은 상태의 중복 이벤트만 상태 추적에서 제거
@@ -134,7 +134,7 @@
   - 저전력 session 생성에 실패하면 기존 high-performance DirectX 경로로 폴백
 
 ### `mode`
-차트 로더와 인덱서는 BMS 계열(`.bms/.bme/.bml/.pms`)을 기본으로 사용합니다. `enable_osu_charts=true`이면 자체 파서로 osu!mania 4K~10K `.osu`도 포함하며, `format` 필터는 사용하지 않습니다.
+차트 로더와 인덱서는 BMS 계열(`.bms/.bme/.bml/.pms`) 전용입니다. 예전 `enable_osu_charts`와 `format` 값은 읽더라도 무시하며 다시 저장하지 않습니다.
 
 - `key_mode` (string)
   - `none | auto | 4k | 5k | 6k | 7k | 8k | 9k | 10k | 12k | 14k | 16k`
@@ -205,7 +205,7 @@
 - `difficulty_table_path` (string)
   - Browse 화면에서 고른 로컬 BMS 난이도표 header JSON 또는 링크에서 내려받은 프로필 캐시 header 경로
   - header는 `name`, `symbol`, 로컬 상대경로 `data_url`을 사용하고, data array entry는 `md5` 또는 `sha256`과 `level`을 사용
-  - 선택/해제 시 현재 song source를 재인덱싱해 일치 곡의 표 레벨을 표시
+  - 선택/해제 시 현재 song source를 재인덱싱해 일치 곡의 표 레벨을 표시하며, 표 선택 시 해시가 필요한 `safe` 인덱스로 자동 전환
 - `difficulty_table_url` (string)
   - Browse에서 가져온 http(s) BMSTable HTML 페이지 또는 header JSON 원본 링크
   - 표준 `<meta name="bmstable" content="...">`를 해석해 header/data JSON을 프로필의 `difficulty_tables` 캐시에 저장하며, 로컬 JSON 선택 시에는 비워짐

@@ -45,8 +45,11 @@ struct ResultStats {
     int64_t raw_score_accumulator = 0;
     double judgement_score_points = 0.0;
     int64_t combo_score_units = 0;
+    int64_t detail_score = 0;
     double accuracy_points = 0.0;
     double accuracy_weight = 0.0;
+    double detailed_accuracy_points = 0.0;
+    double detailed_accuracy_weight = 0.0;
     double highest_judgement_timing_weight = 0.0;
     double highest_judgement_min_delta_ms = 0.0;
     double highest_judgement_max_delta_ms = 0.0;
@@ -65,12 +68,13 @@ struct ResultStats {
                           double delta_ms,
                           ComboImpact combo_impact,
                           double weight = 1.0,
-                          double accuracy_credit = -1.0);
+                          double detailed_accuracy_credit = -1.0);
     void record_note_total(int count, int combo_steps = 0);
     void record_gauge_sample(int64_t sample, double value);
     void record_shift(int64_t sample, game::GaugeType from, game::GaugeType to);
 
     [[nodiscard]] double accuracy_percent() const;
+    [[nodiscard]] double detailed_accuracy_percent() const;
     [[nodiscard]] double stddev_delta_ms() const;
 };
 

@@ -39,7 +39,9 @@ struct HoldState {
 
 struct LaneState {
     std::vector<NoteEvent> notes;
+    std::vector<MineEvent> mines;
     std::size_t next_index = 0;
+    std::size_t next_mine_index = 0;
     int64_t mask_until = 0;
     bool key_down = false;
     std::optional<HoldState> hold;
@@ -70,6 +72,13 @@ struct ActiveHoldView {
     int64_t end_sample = 0;
 };
 
+struct MineTrigger {
+    int lane = 0;
+    int64_t sample = 0;
+    std::size_t mine_id = 0;
+    std::size_t audio_asset_id = kInvalidAudioAssetId;
+};
+
 class GameplayEngine {
 public:
     GameplayEngine(const GameplayChart& chart, const GameplayConfig& config);
@@ -86,6 +95,8 @@ public:
     [[nodiscard]] const ReplayTrace& replay() const { return replay_; }
     [[nodiscard]] const LiveJudgementFeedback& live_feedback() const { return live_feedback_; }
     [[nodiscard]] bool is_note_pending(int lane, std::size_t note_id) const;
+    [[nodiscard]] bool is_mine_pending(int lane, std::size_t mine_id) const;
+    void drain_mine_triggers(std::vector<MineTrigger>& out);
     void collect_active_holds(std::vector<ActiveHoldView>& out) const;
     void collect_recent_timing_deltas(std::array<double, kGameplayTimingHistoryMaxEntries>& out,
                                       std::size_t* out_count) const;
@@ -105,6 +116,8 @@ private:
     void apply_bad_miss(const NoteEvent& note, int64_t sample);
     void apply_indirect_miss(const NoteEvent& note, int64_t sample);
     void apply_empty_poor(int64_t sample);
+    bool process_mines_until(LaneState& lane, int lane_number, int64_t sample);
+    void detonate_mine(const MineEvent& mine, int lane_number);
     [[nodiscard]] OsuManiaJudgement record_osu_hold(const HoldState& hold,
                                                      int64_t release_sample,
                                                      bool forced_miss = false);
@@ -116,7 +129,7 @@ private:
     void push_recent_timing_delta(double delta_ms);
 
     [[nodiscard]] double samples_to_ms(int64_t samples) const;
-    [[nodiscard]] double accuracy_credit_for(game::Judgement judgement, double delta_ms) const;
+    [[nodiscard]] double detailed_accuracy_credit_for(game::Judgement judgement, double delta_ms) const;
     [[nodiscard]] JudgeWindowSamples build_windows(const config::JudgeConfig& judge, double rate) const;
     [[nodiscard]] game::Judgement classify_judgement(int64_t delta_samples) const;
     [[nodiscard]] game::Judgement classify_hold_tail_judgement(int64_t delta_samples) const;
@@ -138,6 +151,7 @@ private:
     ResultStats stats_;
     ReplayTrace replay_;
     LiveJudgementFeedback live_feedback_;
+    std::vector<MineTrigger> pending_mine_triggers_;
     std::array<double, kGameplayTimingHistoryMaxEntries> recent_timing_deltas_{};
     std::size_t recent_timing_delta_count_ = 0;
     std::size_t recent_timing_delta_head_ = 0;

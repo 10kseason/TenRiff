@@ -108,6 +108,27 @@ TEST_CASE("parses basic headers and dictionaries") {
     CHECK_EQ(result.chart.stop.at("BB"), 96.0);
 }
 
+TEST_CASE("parses BMS scroll extensions and landmine channels") {
+    const char* data =
+        "#BPM 120\n"
+        "#WAV00 mine.wav\n"
+        "#SCROLL01 -1.5\n"
+        "#000SC:01\n"
+        "#000D1:0A\n"
+        "#000E1:ZZ\n";
+
+    BmsParser parser;
+    const auto result = parser.parse(data);
+
+    CHECK(result.success());
+    CHECK_EQ(result.chart.wav.at("00"), "mine.wav");
+    CHECK(result.chart.scroll.at("01") == doctest::Approx(-1.5));
+    REQUIRE(result.chart.commands.size() == 3u);
+    CHECK_EQ(result.chart.commands[0].channel, "SC");
+    CHECK_EQ(result.chart.commands[1].channel, "D1");
+    CHECK_EQ(result.chart.commands[2].channel, "E1");
+}
+
 TEST_CASE("parses measure commands with even tokens") {
     const char* data =
         "#00111:0100\n"

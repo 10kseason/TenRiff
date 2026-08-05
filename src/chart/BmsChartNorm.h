@@ -15,8 +15,10 @@ enum class BmsNormalizedEventType {
     Bga,
     Poor,
     Note,
+    Mine,
     BpmChange,
     Stop,
+    Scroll,
 };
 
 struct BmsMeasureTiming {

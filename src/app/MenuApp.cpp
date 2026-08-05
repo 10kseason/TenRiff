@@ -795,14 +795,14 @@ std::string MenuApp::ui_random_label(std::string_view token) const {
     if (normalized == "mirror") {
         return ui_text("Mirror", "미러");
     }
+    if (normalized == "fr") {
+        return ui_text("Random", "??");
+    }
     if (normalized == "rr") {
         return "R-Random";
     }
-    if (normalized == "fr") {
-        return "FR";
-    }
     if (normalized == "sr") {
-        return "SR";
+        return "S-Random";
     }
     return ui_text("Off", "끔");
 }
@@ -848,6 +848,10 @@ GameplayHudRevisionInput MenuApp::gameplay_hud_revision_input(const GameplayHudS
     input.audio_buffer_frames = state.audio_buffer_frames;
     input.lookahead_samples = state.lookahead_samples;
     input.past_samples = state.past_samples;
+    input.current_visual_position = state.current_visual_position;
+    input.visual_velocity = state.visual_velocity;
+    input.future_visual_span = state.future_visual_span;
+    input.past_visual_span = state.past_visual_span;
     input.combo = state.combo;
     input.max_combo = state.max_combo;
     input.counts = state.counts;
@@ -880,6 +884,9 @@ GameplayHudRevisionInput MenuApp::gameplay_hud_revision_input(const GameplayHudS
             state.notes[i].head_visible,
             state.notes[i].pending,
         };
+        input.notes[i].mine = state.notes[i].mine;
+        input.notes[i].visual_position = state.notes[i].visual_position;
+        input.notes[i].tail_visual_position = state.notes[i].tail_visual_position;
     }
     input.ghost_visible = state.ghost_visible;
     input.ghost_score = state.ghost_score;
@@ -917,6 +924,9 @@ GameplayHudRevisionInput MenuApp::gameplay_hud_revision_input(const GameplayHudS
             state.ghost_notes[i].head_visible,
             state.ghost_notes[i].pending,
         };
+        input.ghost_notes[i].mine = state.ghost_notes[i].mine;
+        input.ghost_notes[i].visual_position = state.ghost_notes[i].visual_position;
+        input.ghost_notes[i].tail_visual_position = state.ghost_notes[i].tail_visual_position;
     }
     return input;
 }
@@ -1641,7 +1651,6 @@ void MenuApp::switch_song_source(const std::string& new_songs_path, bool force_r
     last_indexer_snapshot_ns_ = 0;
     song_indexer_.stop();
     SongIndexOptions index_options;
-    index_options.include_osu = config_.mode.enable_osu_charts;
     index_options.difficulty_table_path = config_.ui.difficulty_table_path;
     index_options.calculate_difficulty = config_.mode.calculate_song_index_difficulty;
     index_options.reuse_cached_metadata = !force_reindex;
@@ -2028,6 +2037,18 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
             }
             publish_snapshot();
             return;
+        case render::MenuHitTargetKind::SongQuickSetting: {
+            if (screen_ != Screen::SongSelect || song_select_view_ != SongSelectView::Songs) {
+                return;
+            }
+            const int direction = event.part == render::MenuHitPart::Decrement ? -1 : 1;
+            if (!adjust_song_quick_setting(config_, event.index, direction)) {
+                return;
+            }
+            persist_runtime_config();
+            publish_snapshot();
+            return;
+        }
         case render::MenuHitTargetKind::SongStartButton:
             if (screen_ != Screen::SongSelect) {
                 return;
@@ -2872,6 +2893,7 @@ void MenuApp::handle_song_browser_input(uint32_t keycode) {
     }
     if (settings_cursor_ == 5 &&
         (keycode == key_left_ || keycode == key_right_ || keycode == key_enter_)) {
+        bool force_table_reindex = false;
         std::string selected_path = config_.ui.difficulty_table_path;
         std::string selected_url = config_.ui.difficulty_table_url;
         if (keycode == key_left_) {
@@ -2897,6 +2919,7 @@ void MenuApp::handle_song_browser_input(uint32_t keycode) {
                 }
                 selected_path = imported.cached_header_path;
                 selected_url = imported.source_url;
+                force_table_reindex = ensure_difficulty_table_indexing(config_);
             } else {
                 const std::string picked = browse_for_json_file(
                     ui_text("Select Local BMS Difficulty Table", "로컬 BMS 난이도표 선택"));
@@ -2915,6 +2938,7 @@ void MenuApp::handle_song_browser_input(uint32_t keycode) {
                 }
                 selected_path = picked;
                 selected_url.clear();
+                force_table_reindex = ensure_difficulty_table_indexing(config_);
             }
 #else
             return;
@@ -2927,7 +2951,7 @@ void MenuApp::handle_song_browser_input(uint32_t keycode) {
             persist_runtime_config();
             // Loading the cache reapplies the selected table to its stored chart
             // hashes, so changing tables need not reparse a large library.
-            refresh_song_source(false);
+            refresh_song_source(force_table_reindex);
             publish_snapshot();
         }
         return;
