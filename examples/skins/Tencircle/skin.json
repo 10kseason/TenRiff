@@ -1,0 +1,18 @@
+{
+  "$schema": "../../../docs/tenriff-skin.schema.json",
+  "format": "tenriff-skin",
+  "version": 1,
+  "name": "Tencircle",
+  "author": "",
+  "lobby": {
+    "background": "lobby/background.png",
+    "logo": "lobby/logo.png",
+    "background_opacity": 0.95
+  },
+  "layout": {
+    "song_select": {
+      "center_panel": [1126, 152, 1882, 922],
+      "right_panel": [510, 152, 1102, 922]
+    }
+  }
+}

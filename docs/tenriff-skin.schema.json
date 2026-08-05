@@ -20,6 +20,13 @@
           "items": { "$ref": "#/$defs/assetPath" }
         }
       ]
+    },
+    "layoutRect": {
+      "type": "array",
+      "description": "[left, top, right, bottom] in the 1920x1080 base coordinate space.",
+      "minItems": 4,
+      "maxItems": 4,
+      "items": { "type": "number", "minimum": -8192.0, "maximum": 8192.0 }
     }
   },
   "properties": {
@@ -37,6 +44,38 @@
         "background_opacity": { "type": "number", "minimum": 0.0, "maximum": 1.0 }
       }
     },
+    "layout": {
+      "type": "object",
+      "description": "Moves built-in menu rects. Omitted slots keep their default position.",
+      "additionalProperties": false,
+      "properties": {
+        "title": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "spectrum": { "$ref": "#/$defs/layoutRect" },
+            "logo": { "$ref": "#/$defs/layoutRect" },
+            "buttons": { "$ref": "#/$defs/layoutRect" },
+            "guide": { "$ref": "#/$defs/layoutRect" },
+            "footer": { "$ref": "#/$defs/layoutRect" }
+          }
+        },
+        "song_select": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "top_bar": { "$ref": "#/$defs/layoutRect" },
+            "logo": { "$ref": "#/$defs/layoutRect" },
+            "nav": { "$ref": "#/$defs/layoutRect" },
+            "profile": { "$ref": "#/$defs/layoutRect" },
+            "left_panel": { "$ref": "#/$defs/layoutRect" },
+            "center_panel": { "$ref": "#/$defs/layoutRect" },
+            "right_panel": { "$ref": "#/$defs/layoutRect" },
+            "bottom_bar": { "$ref": "#/$defs/layoutRect" }
+          }
+        }
+      }
+    },
     "gameplay": {
       "type": "object",
       "additionalProperties": false,
@@ -52,6 +91,22 @@
         "key_pressed": { "$ref": "#/$defs/laneAssets" },
         "note_width_ratio": { "type": "number", "minimum": 0.1, "maximum": 4.0 },
         "note_height_ratio": { "type": "number", "minimum": 0.1, "maximum": 4.0 },
+        "note_aspect": {
+          "description": "How note art fills its lane rect. 'width' keeps arrows square.",
+          "enum": ["stretch", "contain", "width"]
+        },
+        "note_rotations": {
+          "description": "Per-lane note rotation in degrees clockwise.",
+          "type": "array",
+          "maxItems": 16,
+          "items": { "type": "number" }
+        },
+        "key_rotations": {
+          "description": "Per-lane receptor rotation in degrees. Omitted means follow note_rotations.",
+          "type": "array",
+          "maxItems": 16,
+          "items": { "type": "number" }
+        },
         "judgement_line_position": { "type": "number", "minimum": 0.05, "maximum": 0.98 },
         "full_lane_receptors": { "type": "boolean" },
         "column_widths": {

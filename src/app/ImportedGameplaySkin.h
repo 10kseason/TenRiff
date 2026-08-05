@@ -28,6 +28,14 @@ struct ImportedGameplaySkinDefinition {
     std::vector<float> lane_divider_widths;
     std::vector<float> column_widths;
     std::vector<float> column_spacings;
+    // Per-lane sprite rotation in degrees clockwise about the sprite centre, so
+    // one arrow image can serve every lane. Empty means no rotation.
+    std::vector<float> note_rotations;
+    std::vector<float> key_rotations;
+    // "stretch" | "contain" | "width". Empty means the skin said nothing and the
+    // player's Image Aspect option decides. Arrow skins want "width", which sizes
+    // the sprite by lane width and derives its height from the image aspect.
+    std::string note_aspect;
     float hit_position = 0.0f;
     bool has_hit_position = false;
     float imported_note_width_ratio = 1.0f;

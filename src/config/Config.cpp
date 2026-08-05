@@ -164,6 +164,18 @@ void sanitize_skin_config(SkinConfig& skin) {
         kSkinVisualOpacityMin,
         kSkinVisualOpacityMax,
         kSkinVisualOpacityDefault);
+    // key_pulse_enabled is the legacy on/off mirror of the brightness slider:
+    // switching it off pulls brightness to zero, and zero brightness reads back
+    // as off, so callers may set either one.
+    if (!skin.key_pulse_enabled) {
+        skin.key_pulse_brightness = kSkinKeyPulseBrightnessMin;
+    }
+    skin.key_pulse_brightness = clamp_finite(
+        skin.key_pulse_brightness,
+        kSkinKeyPulseBrightnessMin,
+        kSkinKeyPulseBrightnessMax,
+        kSkinKeyPulseBrightnessDefault);
+    skin.key_pulse_enabled = skin.key_pulse_brightness > 0.0;
     skin.note_outline_opacity = clamp_finite(
         skin.note_outline_opacity,
         kSkinNoteOutlineOpacityMin,
@@ -716,6 +728,12 @@ void apply_config_object(const JsonObject& root, RuntimeConfig& config) {
             get_bool(*skin, "judgement_line_glow_enabled", config.skin.judgement_line_glow_enabled);
         config.skin.key_pulse_enabled =
             get_bool(*skin, "key_pulse_enabled", config.skin.key_pulse_enabled);
+        // Configs written before the brightness slider only carry the on/off form.
+        config.skin.key_pulse_brightness = std::clamp(
+            get_number(*skin, "key_pulse_brightness",
+                       config.skin.key_pulse_enabled ? kSkinKeyPulseBrightnessMax
+                                                     : kSkinKeyPulseBrightnessMin),
+            kSkinKeyPulseBrightnessMin, kSkinKeyPulseBrightnessMax);
         config.skin.key_label_position = normalize_skin_key_label_position_token(
             get_string(*skin, "key_label_position", config.skin.key_label_position));
         config.skin.judgement_line_position = std::clamp(
@@ -1081,7 +1099,12 @@ JsonValue build_json_root(const RuntimeConfig& config) {
     skin.emplace("show_hold_tail", JsonValue{config.skin.show_hold_tail});
     skin.emplace("hold_tail_taper_enabled", JsonValue{config.skin.hold_tail_taper_enabled});
     skin.emplace("judgement_line_glow_enabled", JsonValue{config.skin.judgement_line_glow_enabled});
-    skin.emplace("key_pulse_enabled", JsonValue{config.skin.key_pulse_enabled});
+    // Either form can be the one a caller set, so an "off" in either wins.
+    const bool key_pulse_on =
+        config.skin.key_pulse_enabled && config.skin.key_pulse_brightness > 0.0;
+    skin.emplace("key_pulse_enabled", JsonValue{key_pulse_on});
+    skin.emplace("key_pulse_brightness",
+                 JsonValue{key_pulse_on ? config.skin.key_pulse_brightness : 0.0});
     skin.emplace("key_label_position",
                  JsonValue{normalize_skin_key_label_position_token(config.skin.key_label_position)});
     skin.emplace("judgement_line_position", JsonValue{config.skin.judgement_line_position});
@@ -1310,6 +1333,7 @@ void apply_skin_visual_preset(SkinConfig& skin, std::string_view token) {
         skin.hold_body_opacity = 0.34;
         skin.judgement_line_glow_enabled = false;
         skin.key_pulse_enabled = false;
+        skin.key_pulse_brightness = kSkinKeyPulseBrightnessMin;
         skin.key_label_position = "bottom";
     } else if (preset == "neon") {
         skin.show_lane_dividers = true;
@@ -1319,6 +1343,7 @@ void apply_skin_visual_preset(SkinConfig& skin, std::string_view token) {
         skin.hold_body_opacity = 0.28;
         skin.judgement_line_glow_enabled = true;
         skin.key_pulse_enabled = true;
+        skin.key_pulse_brightness = kSkinKeyPulseBrightnessMax;
         skin.key_label_position = "bottom";
     } else if (preset == "minimal") {
         skin.show_lane_dividers = false;
@@ -1328,6 +1353,7 @@ void apply_skin_visual_preset(SkinConfig& skin, std::string_view token) {
         skin.hold_body_opacity = 0.15;
         skin.judgement_line_glow_enabled = false;
         skin.key_pulse_enabled = false;
+        skin.key_pulse_brightness = kSkinKeyPulseBrightnessMin;
         skin.key_label_position = "top";
     } else {
         skin.show_lane_dividers = true;
@@ -1337,6 +1363,7 @@ void apply_skin_visual_preset(SkinConfig& skin, std::string_view token) {
         skin.hold_body_opacity = kSkinHoldBodyOpacityDefault;
         skin.judgement_line_glow_enabled = true;
         skin.key_pulse_enabled = true;
+        skin.key_pulse_brightness = kSkinKeyPulseBrightnessDefault;
         skin.key_label_position = "bottom";
     }
 

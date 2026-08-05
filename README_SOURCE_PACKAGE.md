@@ -1,10 +1,10 @@
-TenRiff source package notes (`1.3.1`)
+TenRiff source package notes (`1.3.2`)
 
 - This folder is a curated source-only staging area for public/open-source distribution.
 - It intentionally excludes local build trees, packaged binaries, caches, user profiles, logs, and private working notes.
 - Internal agent workflow files such as `AGENTS.md` are not part of the public source bundle.
 - The included `SOURCE_PACKAGE_SCOPE.txt` file defines the exact include/exclude rules used for the staged bundle.
-- The current source line is `1.3.1`; it carries the UI-r2 Song Select and animated Result flows, adds direct left/right quick-setting controls and record/layout fixes, and keeps optional local profile avatars, the TenRiff skin format, and ranked-clear exclusion for Autoplay.
+- The current source line is `1.3.2`; it carries the UI-r2 Song Select and animated Result flows, adds direct left/right quick-setting controls and record/layout fixes, and keeps optional local profile avatars, the TenRiff skin format, and ranked-clear exclusion for Autoplay.
 - It supports BMS-family charts, 4K through 14K key modes, and native/LR2/TenRiff skins, keeps MPG/MPEG video BGA decoding with an FFmpeg fallback, and exposes an External ONNX Upscaler that remains off until the user enables it and acknowledges the high-spec warning.
 - The repository license is MIT. Keep the top-level `LICENSE` file with any redistributed source bundle.
 - The source bundle includes the code/docs/dependencies needed for a standalone Windows configure/build, but it does not ship the local `10k-calc/` reference checkout or `external/llama.cpp/`.

@@ -610,7 +610,13 @@ void MenuApp::handle_skins_settings_input(uint32_t keycode) {
         return;
     }
     if (settings_cursor_ == key_pulse_row && (keycode == key_left_ || keycode == key_right_)) {
-        config_.skin.key_pulse_enabled = !config_.skin.key_pulse_enabled;
+        const int direction = (keycode == key_left_) ? -1 : 1;
+        config_.skin.key_pulse_brightness = clamp_step_value(
+            config_.skin.key_pulse_brightness + static_cast<double>(direction) * kSkinOpacityStep,
+            config::kSkinKeyPulseBrightnessMin,
+            config::kSkinKeyPulseBrightnessMax,
+            kSkinOpacityStep);
+        config_.skin.key_pulse_enabled = config_.skin.key_pulse_brightness > 0.0;
         skin_dirty_ = true;
         publish_snapshot();
         return;
@@ -856,7 +862,8 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
                     settings_cursor_ == 19 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 19 + lr2_shift, false, true);
     append_menu_row(render.generic, ui_text("Judge Glow", "판정선 글로우"), ui_on_off(config_.skin.judgement_line_glow_enabled),
                     settings_cursor_ == 20 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 20 + lr2_shift, false, true);
-    append_menu_row(render.generic, ui_text("Key Pulse", "키 펄스"), ui_on_off(config_.skin.key_pulse_enabled),
+    append_menu_row(render.generic, ui_text("Hit Burst", "폭발 이펙트"),
+                    format_percent(config_.skin.key_pulse_brightness),
                     settings_cursor_ == 21 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 21 + lr2_shift, false, true);
     append_menu_row(render.generic, ui_text("Key Labels", "키 이름"),
                     config::skin_key_label_position_label(config_.skin.key_label_position),
@@ -930,6 +937,8 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
     render.generic.skin_preview.hold_tail_taper_enabled = config_.skin.hold_tail_taper_enabled;
     render.generic.skin_preview.judgement_line_glow_enabled = config_.skin.judgement_line_glow_enabled;
     render.generic.skin_preview.key_pulse_enabled = config_.skin.key_pulse_enabled;
+    render.generic.skin_preview.key_pulse_brightness =
+        static_cast<float>(config_.skin.key_pulse_brightness);
     render.generic.skin_preview.key_label_position =
         config::normalize_skin_key_label_position_token(config_.skin.key_label_position);
     render.generic.skin_preview.note_border_enabled = config_.skin.note_border_enabled;

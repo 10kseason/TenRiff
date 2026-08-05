@@ -193,6 +193,84 @@ std::vector<float> parse_positive_number_array(const config::JsonObject& object,
     return values;
 }
 
+// Degrees clockwise, wrapped into [0, 360). Any finite value is legal, so this
+// cannot reuse parse_positive_number_array.
+std::vector<float> parse_rotation_array(const config::JsonObject& object,
+                                        std::string_view key,
+                                        std::size_t max_count) {
+    std::vector<float> values;
+    const config::JsonValue* value = object_value(object, key);
+    const auto* array = value ? value->as_array() : nullptr;
+    if (!array) {
+        return values;
+    }
+    values.reserve(std::min(array->size(), max_count));
+    for (std::size_t i = 0; i < array->size() && i < max_count; ++i) {
+        const double degrees = (*array)[i].as_number(0.0);
+        if (!std::isfinite(degrees)) {
+            values.push_back(0.0f);
+            continue;
+        }
+        double wrapped = std::fmod(degrees, 360.0);
+        if (wrapped < 0.0) {
+            wrapped += 360.0;
+        }
+        values.push_back(static_cast<float>(wrapped));
+    }
+    return values;
+}
+
+constexpr double kMaxLayoutCoordinate = 8192.0;
+
+bool parse_layout_rect(const config::JsonValue& value, SkinLayoutRect& out) {
+    const auto* array = value.as_array();
+    if (!array || array->size() != 4u) {
+        return false;
+    }
+    std::array<float, 4> edges{};
+    for (std::size_t i = 0; i < edges.size(); ++i) {
+        if (!(*array)[i].is_number()) {
+            return false;
+        }
+        const double number = (*array)[i].as_number(0.0);
+        if (!std::isfinite(number) || std::abs(number) > kMaxLayoutCoordinate) {
+            return false;
+        }
+        edges[i] = static_cast<float>(number);
+    }
+    if (edges[2] <= edges[0] || edges[3] <= edges[1]) {
+        return false;
+    }
+    out = SkinLayoutRect{edges[0], edges[1], edges[2], edges[3]};
+    return true;
+}
+
+void parse_layout_section(const config::JsonObject& layout, TenRiffSkinDefinition& definition) {
+    for (const auto& [screen, screen_value] : layout) {
+        const auto* slots = screen_value.as_object();
+        if (!slots) {
+            definition.warnings.push_back("layout." + screen +
+                                          " must be an object of rect entries.");
+            continue;
+        }
+        for (const auto& [slot, rect_value] : *slots) {
+            const std::string key = screen + "." + slot;
+            if (!is_tenriff_skin_layout_slot(key)) {
+                definition.warnings.push_back("layout." + key + " is not a layout slot.");
+                continue;
+            }
+            SkinLayoutRect rect;
+            if (!parse_layout_rect(rect_value, rect)) {
+                definition.warnings.push_back(
+                    "layout." + key +
+                    " must be [left, top, right, bottom] with right > left and bottom > top.");
+                continue;
+            }
+            definition.layout_rects[key] = rect;
+        }
+    }
+}
+
 std::string safe_folder_name(std::string value) {
     constexpr std::size_t kMaxFolderNameBytes = 96u;
     value = util::sanitize_ui_text(value);
@@ -222,6 +300,11 @@ std::string safe_folder_name(std::string value) {
     return out.empty() ? "custom-skin" : out;
 }
 }  // namespace
+
+bool is_tenriff_skin_layout_slot(std::string_view key) {
+    return std::find(kTenRiffSkinLayoutSlots.begin(), kTenRiffSkinLayoutSlots.end(), key) !=
+           kTenRiffSkinLayoutSlots.end();
+}
 
 TenRiffSkinDefinition load_tenriff_skin_folder(std::string_view folder_utf8, int keys) {
     TenRiffSkinDefinition definition;
@@ -289,6 +372,10 @@ TenRiffSkinDefinition load_tenriff_skin_folder(std::string_view folder_utf8, int
             0.0, 1.0));
     }
 
+    if (const auto* layout = child_object(*manifest, "layout")) {
+        parse_layout_section(*layout, definition);
+    }
+
     if (const auto* gameplay = child_object(*manifest, "gameplay")) {
         definition.gameplay.note_images = parse_asset_list(*gameplay, "note", root, definition);
         definition.gameplay.hold_head_images = parse_asset_list(*gameplay, "hold_head", root, definition);
@@ -317,6 +404,17 @@ TenRiffSkinDefinition load_tenriff_skin_folder(std::string_view folder_utf8, int
             parse_positive_number_array(*gameplay, "column_widths", 16u);
         definition.gameplay.column_spacings =
             parse_positive_number_array(*gameplay, "column_spacings", 15u);
+        definition.gameplay.note_rotations =
+            parse_rotation_array(*gameplay, "note_rotations", 16u);
+        definition.gameplay.key_rotations =
+            parse_rotation_array(*gameplay, "key_rotations", 16u);
+        const std::string note_aspect = lower_ascii(string_value(*gameplay, "note_aspect"));
+        if (note_aspect == "stretch" || note_aspect == "contain" || note_aspect == "width") {
+            definition.gameplay.note_aspect = note_aspect;
+        } else if (!note_aspect.empty()) {
+            definition.warnings.push_back(
+                "gameplay.note_aspect must be stretch, contain, or width.");
+        }
         const double judgement_line = number_value(*gameplay, "judgement_line_position", -1.0);
         if (std::isfinite(judgement_line) && judgement_line >= 0.05 && judgement_line <= 0.98) {
             definition.gameplay.has_hit_position = true;

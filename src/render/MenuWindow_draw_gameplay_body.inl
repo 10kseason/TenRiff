@@ -22,6 +22,16 @@
         const float hold_body_width_scale =
             clamp_gameplay_hold_body_width_scale(data.gameplay.hold_body_width_scale);
         const bool note_border_enabled = data.gameplay.note_border_enabled;
+        // A skin that declares note_aspect knows its own art, so it wins over the
+        // player's Image Aspect toggle; otherwise that toggle picks contain/stretch.
+        const NoteImageAspect note_image_aspect =
+            use_imported_metrics && gameplay_note_sprite_cache_.has_imported_note_aspect
+                ? gameplay_note_sprite_cache_.imported_note_aspect
+                : (data.gameplay.preserve_note_image_aspect_ratio ? NoteImageAspect::Contain
+                                                                  : NoteImageAspect::Stretch);
+        // Hit-burst brightness, 0% turns the explosion off entirely.
+        const float key_pulse_brightness =
+            std::clamp(data.gameplay.key_pulse_brightness, 0.0f, 1.0f);
         const std::string note_shape = normalize_gameplay_note_shape(data.gameplay.note_shape);
         ID2D1Geometry* note_polygon_geometry = gameplay_note_polygon_geometry(
             d2d_->gameplay_note_shape_geometries, note_shape);
@@ -1182,7 +1192,12 @@
             } else if (lane_index < d2d_->lane_key_idle_source_rects.size()) {
                 key_source_rect = bitmap_source_rect_or_null(d2d_->lane_key_idle_source_rects[lane_index]);
             }
-            ctx->DrawBitmap(key_bitmap, receptor_rect, visual_opacity, D2D1_BITMAP_INTERPOLATION_MODE_LINEAR, key_source_rect);
+            draw_gameplay_sprite(ctx, key_bitmap, receptor_rect, visual_opacity,
+                                 key_source_rect,
+                                 gameplay_lane_sprite_rotation(
+                                     gameplay_note_sprite_cache_.key_rotations,
+                                     gameplay_note_sprite_cache_.key_rotation_count,
+                                     lane_index));
         }
         if (!use_imported_metrics) {
             draw_key_labels(field_layout);
@@ -1304,12 +1319,16 @@
                                                        note_hold_tail_bitmap,
                                                        tail_source_rect,
                                                        note_shape,
-                                                       data.gameplay.preserve_note_image_aspect_ratio);
-                    ctx->DrawBitmap(note_hold_tail_bitmap,
-                                    tail_bitmap_rect,
-                                    visual_opacity,
-                                    D2D1_BITMAP_INTERPOLATION_MODE_LINEAR,
-                                    tail_source_rect);
+                                                       note_image_aspect);
+                    draw_gameplay_sprite(ctx,
+                                         note_hold_tail_bitmap,
+                                         tail_bitmap_rect,
+                                         visual_opacity,
+                                         tail_source_rect,
+                                         gameplay_lane_sprite_rotation(
+                                             gameplay_note_sprite_cache_.note_rotations,
+                                             gameplay_note_sprite_cache_.note_rotation_count,
+                                             lane_index));
                 } else if (note_fill) {
                     ID2D1Brush* tail_fill = configure_gameplay_material_brush(
                         note_material, note_fill, tail_rect, visual_opacity, false);
@@ -1339,9 +1358,13 @@
                                                        head_bitmap,
                                                        head_source_rect,
                                                        note_shape,
-                                                       data.gameplay.preserve_note_image_aspect_ratio);
-                    ctx->DrawBitmap(head_bitmap, bitmap_rect, visual_opacity,
-                                    D2D1_BITMAP_INTERPOLATION_MODE_LINEAR, head_source_rect);
+                                                       note_image_aspect);
+                    draw_gameplay_sprite(ctx, head_bitmap, bitmap_rect, visual_opacity,
+                                         head_source_rect,
+                                         gameplay_lane_sprite_rotation(
+                                             gameplay_note_sprite_cache_.note_rotations,
+                                             gameplay_note_sprite_cache_.note_rotation_count,
+                                             lane_index));
                 } else {
                     if (note_fill) {
                         ID2D1Brush* head_fill = configure_gameplay_material_brush(
@@ -1757,7 +1780,7 @@
                                gameplay_hud_cache_.ghost_judge_stats_text);
         }
 
-        if (data.gameplay.key_pulse_enabled && d2d_->note_fill_brush && data.gameplay.lane_activity_count > 0) {
+        if (key_pulse_brightness > 0.0f && d2d_->note_fill_brush && data.gameplay.lane_activity_count > 0) {
             const std::size_t count =
                 std::min(data.gameplay.lane_activity_count, static_cast<std::size_t>(lane_count));
             for (std::size_t lane = 0; lane < count; ++lane) {
@@ -1787,12 +1810,12 @@
                 }
                 d2d_->note_fill_brush->SetColor(
                     color_from_rgb(blend_rgb(pulse_color, 0x6EE7F2, 0.38f),
-                                   (0.025f + 0.085f * pulse) * visual_opacity));
+                                   (0.025f + 0.085f * pulse) * visual_opacity * key_pulse_brightness));
                 ctx->FillRoundedRectangle(D2D1::RoundedRect(beam_rect, 9.0f, 9.0f),
                                           d2d_->note_fill_brush.Get());
                 d2d_->note_fill_brush->SetColor(
                     color_from_rgb(blend_rgb(pulse_color, 0xFFFFFF, 0.22f),
-                                   (0.10f + 0.24f * pulse) * visual_opacity));
+                                   (0.10f + 0.24f * pulse) * visual_opacity * key_pulse_brightness));
                 ctx->FillRoundedRectangle(D2D1::RoundedRect(glow_rect, 6.0f, 6.0f),
                                           d2d_->note_fill_brush.Get());
             }
@@ -1891,7 +1914,12 @@
                 } else if (lane_index < d2d_->lane_key_idle_source_rects.size()) {
                     key_source_rect = bitmap_source_rect_or_null(d2d_->lane_key_idle_source_rects[lane_index]);
                 }
-                ctx->DrawBitmap(key_bitmap, receptor_rect, visual_opacity, D2D1_BITMAP_INTERPOLATION_MODE_LINEAR, key_source_rect);
+                draw_gameplay_sprite(ctx, key_bitmap, receptor_rect, visual_opacity,
+                                     key_source_rect,
+                                     gameplay_lane_sprite_rotation(
+                                         gameplay_note_sprite_cache_.key_rotations,
+                                         gameplay_note_sprite_cache_.key_rotation_count,
+                                         lane_index));
             }
             if (!use_imported_metrics) {
                 draw_key_labels(ghost_field_layout);
@@ -2015,12 +2043,16 @@
                                                            note_hold_tail_bitmap,
                                                            tail_source_rect,
                                                            note_shape,
-                                                           data.gameplay.preserve_note_image_aspect_ratio);
-                        ctx->DrawBitmap(note_hold_tail_bitmap,
-                                        tail_bitmap_rect,
-                                        visual_opacity,
-                                        D2D1_BITMAP_INTERPOLATION_MODE_LINEAR,
-                                        tail_source_rect);
+                                                           note_image_aspect);
+                        draw_gameplay_sprite(ctx,
+                                             note_hold_tail_bitmap,
+                                             tail_bitmap_rect,
+                                             visual_opacity,
+                                             tail_source_rect,
+                                             gameplay_lane_sprite_rotation(
+                                                 gameplay_note_sprite_cache_.note_rotations,
+                                                 gameplay_note_sprite_cache_.note_rotation_count,
+                                                 lane_index));
                     } else if (note_fill) {
                         ID2D1Brush* tail_fill = configure_gameplay_material_brush(
                             note_material, note_fill, tail_rect, visual_opacity, false);
@@ -2050,9 +2082,13 @@
                                                            head_bitmap,
                                                            head_source_rect,
                                                            note_shape,
-                                                           data.gameplay.preserve_note_image_aspect_ratio);
-                        ctx->DrawBitmap(head_bitmap, bitmap_rect, visual_opacity,
-                                        D2D1_BITMAP_INTERPOLATION_MODE_LINEAR, head_source_rect);
+                                                           note_image_aspect);
+                        draw_gameplay_sprite(ctx, head_bitmap, bitmap_rect, visual_opacity,
+                                             head_source_rect,
+                                             gameplay_lane_sprite_rotation(
+                                                 gameplay_note_sprite_cache_.note_rotations,
+                                                 gameplay_note_sprite_cache_.note_rotation_count,
+                                                 lane_index));
                     } else if (note_fill) {
                         ID2D1Brush* head_fill = configure_gameplay_material_brush(
                             note_material, note_fill, note_rect, visual_opacity, false);
@@ -2135,7 +2171,7 @@
                                    GameplayTextPopAnimation{});
             }
 
-            if (data.gameplay.key_pulse_enabled && d2d_->note_fill_brush && data.gameplay.ghost_lane_activity_count > 0) {
+            if (key_pulse_brightness > 0.0f && d2d_->note_fill_brush && data.gameplay.ghost_lane_activity_count > 0) {
                 const std::size_t count =
                     std::min(data.gameplay.ghost_lane_activity_count, static_cast<std::size_t>(lane_count));
                 for (std::size_t lane = 0; lane < count; ++lane) {
@@ -2165,12 +2201,12 @@
                     }
                     d2d_->note_fill_brush->SetColor(
                         color_from_rgb(blend_rgb(pulse_color, 0x6EE7F2, 0.38f),
-                                       (0.025f + 0.085f * pulse) * visual_opacity));
+                                       (0.025f + 0.085f * pulse) * visual_opacity * key_pulse_brightness));
                     ctx->FillRoundedRectangle(D2D1::RoundedRect(beam_rect, 9.0f, 9.0f),
                                               d2d_->note_fill_brush.Get());
                     d2d_->note_fill_brush->SetColor(
                         color_from_rgb(blend_rgb(pulse_color, 0xFFFFFF, 0.22f),
-                                       (0.10f + 0.24f * pulse) * visual_opacity));
+                                       (0.10f + 0.24f * pulse) * visual_opacity * key_pulse_brightness));
                     ctx->FillRoundedRectangle(D2D1::RoundedRect(glow_rect, 6.0f, 6.0f),
                                               d2d_->note_fill_brush.Get());
                 }

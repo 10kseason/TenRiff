@@ -48,6 +48,9 @@ inline constexpr double kSkinNoteOutlineOpacityDefault = 0.78;
 inline constexpr double kSkinHoldBodyOpacityMin = 0.05;
 inline constexpr double kSkinHoldBodyOpacityMax = 0.60;
 inline constexpr double kSkinHoldBodyOpacityDefault = 0.24;
+inline constexpr double kSkinKeyPulseBrightnessMin = 0.00;
+inline constexpr double kSkinKeyPulseBrightnessMax = 1.00;
+inline constexpr double kSkinKeyPulseBrightnessDefault = 1.00;
 
 struct JudgeConfig {
     double pg_ms = 15.5;
@@ -120,6 +123,9 @@ struct SkinConfig {
     bool hold_tail_taper_enabled = false;
     bool judgement_line_glow_enabled = true;
     bool key_pulse_enabled = true;
+    // Hit-explosion brightness, 0.0 (off) .. 1.0. key_pulse_enabled is kept as the
+    // on/off form older builds read, and is written as brightness > 0.
+    double key_pulse_brightness = kSkinKeyPulseBrightnessDefault;
     std::string key_label_position = "bottom";
     double judgement_line_position = kJudgementLinePositionDefault;
     double combo_position = kComboPositionDefault;

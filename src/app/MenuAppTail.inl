@@ -90,6 +90,7 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
     target.hold_tail_taper_enabled = config_.skin.hold_tail_taper_enabled;
     target.judgement_line_glow_enabled = config_.skin.judgement_line_glow_enabled;
     target.key_pulse_enabled = config_.skin.key_pulse_enabled;
+    target.key_pulse_brightness = static_cast<float>(config_.skin.key_pulse_brightness);
     target.key_label_position = config::normalize_skin_key_label_position_token(config_.skin.key_label_position);
     target.note_border_enabled = config_.skin.note_border_enabled;
     target.note_shape = config::normalize_skin_note_shape_token(config_.skin.note_shape);
@@ -1140,6 +1141,11 @@ void MenuApp::publish_snapshot() {
         render.lobby_skin.background_path = active_tenriff_skin_.lobby_background_path;
         render.lobby_skin.logo_path = active_tenriff_skin_.lobby_logo_path;
         render.lobby_skin.background_opacity = active_tenriff_skin_.lobby_background_opacity;
+        render.lobby_skin.layout_rects.reserve(active_tenriff_skin_.layout_rects.size());
+        for (const auto& [key, rect] : active_tenriff_skin_.layout_rects) {
+            render.lobby_skin.layout_rects.insert_or_assign(
+                key, std::array<float, 4>{rect.left, rect.top, rect.right, rect.bottom});
+        }
     }
     render.screen_title = screen_title();
     render.performance.visible = config_.graphics.performance_overlay;

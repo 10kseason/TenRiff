@@ -110,6 +110,21 @@ constexpr float kGameplayComboWideCenterGapThreshold = 1.05f;
 constexpr float kGameplayLaneDividerBaseWidth = 1.0f;
 constexpr float kGameplayLaneDividerWidthMaxPx = 16.0f;
 
+// Menu rects a TenRiff skin may move. Slots the skin left out fall through to
+// the built-in rect, so every caller passes the original literal as `fallback`.
+D2D1_RECT_F skin_layout_rect(const MenuRenderData& data,
+                             std::string_view slot,
+                             const D2D1_RECT_F& fallback) {
+    if (!data.lobby_skin.enabled || data.lobby_skin.layout_rects.empty()) {
+        return fallback;
+    }
+    const auto it = data.lobby_skin.layout_rects.find(std::string(slot));
+    if (it == data.lobby_skin.layout_rects.end()) {
+        return fallback;
+    }
+    return D2D1::RectF(it->second[0], it->second[1], it->second[2], it->second[3]);
+}
+
 struct MenuSceneConstants {
     float resolution[2]{};
     float time_sec = 0.0f;
@@ -989,12 +1004,51 @@ D2D1_RECT_F gameplay_note_bitmap_dest_rect(const D2D1_RECT_F& note_rect,
                                            ID2D1Bitmap* bitmap,
                                            const D2D1_RECT_F* source_rect,
                                            std::string_view note_shape,
-                                           bool preserve_aspect_ratio) {
-    const D2D1_RECT_F base_rect = note_rect;
-    if (!preserve_aspect_ratio || !bitmap) {
-        return base_rect;
+                                           NoteImageAspect aspect) {
+    if (aspect == NoteImageAspect::Stretch || !bitmap) {
+        return note_rect;
     }
-    return fit_rect_preserve_aspect(base_rect, bitmap_source_size(bitmap, source_rect));
+    const D2D1_SIZE_F size = bitmap_source_size(bitmap, source_rect);
+    if (aspect == NoteImageAspect::Contain) {
+        return fit_rect_preserve_aspect(note_rect, size);
+    }
+    if (size.width <= 0.0f || size.height <= 0.0f) {
+        return note_rect;
+    }
+    // Width mode: the lane sets the sprite width and the image aspect sets its
+    // height, so a square arrow stays square however short the note rect is.
+    const float width = note_rect.right - note_rect.left;
+    const float height = width * (size.height / size.width);
+    const float center_y = (note_rect.top + note_rect.bottom) * 0.5f;
+    return D2D1::RectF(note_rect.left, center_y - height * 0.5f, note_rect.right,
+                       center_y + height * 0.5f);
+}
+
+float gameplay_lane_sprite_rotation(const std::array<float, kGameplayHudMaxLanes>& rotations,
+                                    std::size_t count,
+                                    std::size_t lane) {
+    return lane < count ? rotations[lane] : 0.0f;
+}
+
+// Rotation is clockwise about the destination centre, pre-multiplied onto the
+// scene transform so the menu's base-space scaling still applies.
+void draw_gameplay_sprite(ID2D1DeviceContext* ctx,
+                          ID2D1Bitmap* bitmap,
+                          const D2D1_RECT_F& dest,
+                          float opacity,
+                          const D2D1_RECT_F* source_rect,
+                          float rotation_degrees) {
+    if (rotation_degrees == 0.0f) {
+        ctx->DrawBitmap(bitmap, dest, opacity, D2D1_BITMAP_INTERPOLATION_MODE_LINEAR, source_rect);
+        return;
+    }
+    D2D1_MATRIX_3X2_F saved{};
+    ctx->GetTransform(&saved);
+    const D2D1_POINT_2F center =
+        D2D1::Point2F((dest.left + dest.right) * 0.5f, (dest.top + dest.bottom) * 0.5f);
+    ctx->SetTransform(D2D1::Matrix3x2F::Rotation(rotation_degrees, center) * saved);
+    ctx->DrawBitmap(bitmap, dest, opacity, D2D1_BITMAP_INTERPOLATION_MODE_LINEAR, source_rect);
+    ctx->SetTransform(saved);
 }
 
 bool create_composited_gameplay_note_bitmap(ID2D1DeviceContext* d2d_context,
@@ -2394,6 +2448,10 @@ bool MenuWindow::ensure_gameplay_note_sprites(const GameplayHudData& data) {
     gameplay_note_sprite_cache_.external_skin_name = data.external_skin_name;
     gameplay_note_sprite_cache_.lr2_resolution_override = data.lr2_resolution_override;
     gameplay_note_sprite_cache_.lane_colors = data.lane_colors;
+    gameplay_note_sprite_cache_.has_imported_note_aspect = false;
+    gameplay_note_sprite_cache_.imported_note_aspect = NoteImageAspect::Stretch;
+    gameplay_note_sprite_cache_.note_rotation_count = 0;
+    gameplay_note_sprite_cache_.key_rotation_count = 0;
 
     // Native and partial-import fallbacks share cached lane gradients. This keeps the material
     // upgrade inside the existing single fill pass instead of adding a highlight primitive per note.
@@ -2459,6 +2517,28 @@ bool MenuWindow::ensure_gameplay_note_sprites(const GameplayHudData& data) {
     gameplay_note_sprite_cache_.use_full_lane_receptor_layout = imported.use_full_lane_receptor_layout;
     gameplay_note_sprite_cache_.imported_note_width_ratio = imported.imported_note_width_ratio;
     gameplay_note_sprite_cache_.imported_note_height_ratio = imported.imported_note_height_ratio;
+    if (!imported.note_aspect.empty()) {
+        gameplay_note_sprite_cache_.has_imported_note_aspect = true;
+        gameplay_note_sprite_cache_.imported_note_aspect =
+            imported.note_aspect == "width"
+                ? NoteImageAspect::Width
+                : (imported.note_aspect == "contain" ? NoteImageAspect::Contain
+                                                     : NoteImageAspect::Stretch);
+    }
+    gameplay_note_sprite_cache_.note_rotation_count = std::min(
+        imported.note_rotations.size(), gameplay_note_sprite_cache_.note_rotations.size());
+    for (std::size_t i = 0; i < gameplay_note_sprite_cache_.note_rotation_count; ++i) {
+        gameplay_note_sprite_cache_.note_rotations[i] = imported.note_rotations[i];
+    }
+    // key_rotations defaults to note_rotations: arrow receptors point the same
+    // way as the notes falling into them unless the skin says otherwise.
+    const std::vector<float>& key_rotation_source =
+        imported.key_rotations.empty() ? imported.note_rotations : imported.key_rotations;
+    gameplay_note_sprite_cache_.key_rotation_count =
+        std::min(key_rotation_source.size(), gameplay_note_sprite_cache_.key_rotations.size());
+    for (std::size_t i = 0; i < gameplay_note_sprite_cache_.key_rotation_count; ++i) {
+        gameplay_note_sprite_cache_.key_rotations[i] = key_rotation_source[i];
+    }
     gameplay_note_sprite_cache_.lane_divider_width_count =
         std::min(imported.lane_divider_widths.size(), gameplay_note_sprite_cache_.lane_divider_widths.size());
     for (std::size_t i = 0; i < gameplay_note_sprite_cache_.lane_divider_width_count; ++i) {
