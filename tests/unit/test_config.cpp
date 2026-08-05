@@ -712,6 +712,45 @@ TEST_CASE("config save and load preserve lr2 resolution mode") {
     CHECK(result.config.skin.lr2_resolution_mode == "fhd");
 }
 
+TEST_CASE("config save and load preserve hit burst brightness") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+
+    CurrentPathGuard cwd;
+    std::error_code ec;
+    std::filesystem::current_path(temp.path, ec);
+    REQUIRE_FALSE(static_cast<bool>(ec));
+
+    ConfigLoader loader;
+    auto config = loader.defaults();
+    config.skin.key_pulse_brightness = 0.35;
+
+    std::string error;
+    REQUIRE(loader.save_profile("profiles/test", config, &error));
+    const auto result = loader.load_profile("profiles/test");
+    REQUIRE(result.success());
+    CHECK(result.config.skin.key_pulse_brightness == doctest::Approx(0.35));
+    CHECK(result.config.skin.key_pulse_enabled);
+
+    // Zero brightness is the off state, and the legacy flag mirrors it.
+    config.skin.key_pulse_brightness = 0.0;
+    REQUIRE(loader.save_profile("profiles/off", config, &error));
+    const auto off = loader.load_profile("profiles/off");
+    REQUIRE(off.success());
+    CHECK(off.config.skin.key_pulse_brightness == doctest::Approx(0.0));
+    CHECK_FALSE(off.config.skin.key_pulse_enabled);
+
+    // Clearing only the legacy flag still turns the burst off.
+    config.skin.key_pulse_brightness = 0.8;
+    config.skin.key_pulse_enabled = false;
+    REQUIRE(loader.save_profile("profiles/legacy", config, &error));
+    const auto legacy = loader.load_profile("profiles/legacy");
+    REQUIRE(legacy.success());
+    CHECK(legacy.config.skin.key_pulse_brightness == doctest::Approx(0.0));
+    CHECK_FALSE(legacy.config.skin.key_pulse_enabled);
+}
+
 TEST_CASE("config save and load preserve skin visual preset controls") {
     TempDirGuard temp;
     temp.path = make_temp_dir();

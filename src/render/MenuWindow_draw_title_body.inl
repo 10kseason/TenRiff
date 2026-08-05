@@ -1,12 +1,20 @@
         const double tick = static_cast<double>(GetTickCount64()) / 1000.0;
         const float logo_pulse = static_cast<float>(pulse_wave_01(render_now_ns, 5.4, 0.18));
         const float button_pulse = static_cast<float>(pulse_wave_01(render_now_ns, 4.2, 0.46));
-        const float bar_base_y = 150.0f;
-        const int bar_count = 18;
-        const float bar_w = 18.0f;
-        const float bar_gap = 12.0f;
-        const float total_w = bar_count * bar_w + (bar_count - 1) * bar_gap;
-        const float start_x = (kBaseWidth - total_w) * 0.5f;
+        constexpr int bar_count = 18;
+        constexpr float kSpectrumBarWidth = 18.0f;
+        constexpr float kSpectrumBarGap = 12.0f;
+        constexpr float kSpectrumMaxHeight = 84.0f;
+        constexpr float kSpectrumNaturalWidth =
+            bar_count * kSpectrumBarWidth + (bar_count - 1) * kSpectrumBarGap;
+        const D2D1_RECT_F spectrum = skin_layout_rect(
+            data, "title.spectrum",
+            D2D1::RectF((kBaseWidth - kSpectrumNaturalWidth) * 0.5f, 150.0f - kSpectrumMaxHeight,
+                        (kBaseWidth + kSpectrumNaturalWidth) * 0.5f, 150.0f));
+        const float spectrum_scale_x = (spectrum.right - spectrum.left) / kSpectrumNaturalWidth;
+        const float spectrum_scale_y = (spectrum.bottom - spectrum.top) / kSpectrumMaxHeight;
+        const float bar_w = kSpectrumBarWidth * spectrum_scale_x;
+        const float bar_gap = kSpectrumBarGap * spectrum_scale_x;
 
         if (d2d_->accent_brush) {
             const D2D1_COLOR_F saved_color = d2d_->accent_brush->GetColor();
@@ -14,11 +22,13 @@
             d2d_->accent_brush->SetColor(D2D1::ColorF(0x6EE7F2));
             for (int i = 0; i < bar_count; ++i) {
                 const double phase = tick * 2.2 + static_cast<double>(i) * 0.45;
-                const float height = 18.0f + 66.0f * static_cast<float>(0.5 + 0.5 * std::sin(phase));
-                const float x0 = start_x + static_cast<float>(i) * (bar_w + bar_gap);
-                const D2D1_ROUNDED_RECT bar =
-                    D2D1::RoundedRect(D2D1::RectF(x0, bar_base_y - height, x0 + bar_w, bar_base_y),
-                                      4.0f, 4.0f);
+                const float height =
+                    (18.0f + 66.0f * static_cast<float>(0.5 + 0.5 * std::sin(phase))) *
+                    spectrum_scale_y;
+                const float x0 = spectrum.left + static_cast<float>(i) * (bar_w + bar_gap);
+                const D2D1_ROUNDED_RECT bar = D2D1::RoundedRect(
+                    D2D1::RectF(x0, spectrum.bottom - height, x0 + bar_w, spectrum.bottom),
+                    4.0f, 4.0f);
                 d2d_->accent_brush->SetOpacity(0.42f + 0.18f * static_cast<float>(std::sin(phase) * 0.5 + 0.5));
                 ctx->FillRoundedRectangle(bar, d2d_->accent_brush.Get());
             }
@@ -55,8 +65,15 @@
                 }
             }
         }
-        const D2D1_RECT_F logo_rect =
-            D2D1::RectF(logo_left, kLogoTop, logo_left + logo_width, kLogoTop + std::max(96.0f, logo_height));
+        const D2D1_RECT_F logo_rect = skin_layout_rect(
+            data, "title.logo",
+            D2D1::RectF(logo_left, kLogoTop, logo_left + logo_width,
+                        kLogoTop + std::max(96.0f, logo_height)));
+        // The layout path draws from a point, so centre the measured wordmark in
+        // whatever box it ends up in.
+        const float logo_draw_left =
+            logo_rect.left +
+            std::max(0.0f, ((logo_rect.right - logo_rect.left) - logo_width) * 0.5f);
         const D2D1_RECT_F logo_shadow_rect = offset_rect(logo_rect, 0.0f, 6.0f);
         const float logo_rule_y = logo_rect.bottom + 18.0f;
         const float logo_rule_gap = 42.0f;
@@ -84,7 +101,7 @@
             d2d_->accent_brush->SetOpacity(0.14f + logo_pulse * 0.06f);
             if (d2d_->logo_format) {
                 if (logo_layout) {
-                    ctx->DrawTextLayout(D2D1::Point2F(logo_shadow_rect.left, logo_shadow_rect.top),
+                    ctx->DrawTextLayout(D2D1::Point2F(logo_draw_left, logo_shadow_rect.top),
                                         logo_layout.Get(),
                                         d2d_->accent_brush.Get(),
                                         D2D1_DRAW_TEXT_OPTIONS_CLIP);
@@ -106,7 +123,7 @@
             }
             if (brush) {
                 if (logo_layout) {
-                    ctx->DrawTextLayout(D2D1::Point2F(logo_rect.left, logo_rect.top),
+                    ctx->DrawTextLayout(D2D1::Point2F(logo_draw_left, logo_rect.top),
                                         logo_layout.Get(),
                                         brush,
                                         D2D1_DRAW_TEXT_OPTIONS_CLIP);
@@ -120,12 +137,16 @@
             }
         }
 
-        const float button_w = 980.0f;
+        const D2D1_RECT_F buttons_area = skin_layout_rect(
+            data, "title.buttons",
+            D2D1::RectF((kBaseWidth - 980.0f) * 0.5f, std::max(360.0f, bands.body_top - 6.0f),
+                        (kBaseWidth + 980.0f) * 0.5f, bands.body_bottom - 8.0f));
+        const float button_w = buttons_area.right - buttons_area.left;
         float button_h = 120.0f;
         float button_gap = 26.0f;
-        const float button_left = (kBaseWidth - button_w) * 0.5f;
-        const float button_stack_top = std::max(360.0f, bands.body_top - 6.0f);
-        const float button_stack_bottom = bands.body_bottom - 8.0f;
+        const float button_left = buttons_area.left;
+        const float button_stack_top = buttons_area.top;
+        const float button_stack_bottom = buttons_area.bottom;
         const float natural_stack_height =
             button_h * static_cast<float>(data.title.buttons.size()) +
             button_gap * static_cast<float>(data.title.buttons.empty() ? 0 : data.title.buttons.size() - 1);
@@ -214,7 +235,9 @@
                 data.performance.visible ? std::max(button_stack_top + 26.0f, overlay_rect.bottom + 26.0f)
                                          : (button_stack_top + 26.0f);
             const float guide_bottom = std::max(guide_top + 220.0f, bands.body_bottom - 24.0f);
-            const D2D1_RECT_F guide_rect = D2D1::RectF(1492.0f, guide_top, 1834.0f, guide_bottom);
+            const D2D1_RECT_F guide_rect =
+                skin_layout_rect(data, "title.guide",
+                                 D2D1::RectF(1492.0f, guide_top, 1834.0f, guide_bottom));
             draw_glass_panel(guide_rect, 18.0f, 0.76f, 0.24f + logo_pulse * 0.10f, false, 8.0f);
 
             const D2D1_RECT_F guide_header_rect =

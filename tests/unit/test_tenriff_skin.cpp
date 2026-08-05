@@ -94,6 +94,94 @@ TEST_CASE("TenRiff skin manifest resolves lobby and gameplay assets") {
     CHECK(loaded.gameplay.imported_note_height_ratio == doctest::Approx(0.8f));
     CHECK(loaded.gameplay.has_hit_position);
     CHECK(loaded.referenced_asset_paths.size() == 5u);
+    CHECK(loaded.layout_rects.empty());
+}
+
+TEST_CASE("TenRiff skin arrow options parse aspect mode and per-lane rotations") {
+    TempDirGuard temp{make_temp_dir()};
+    REQUIRE(!temp.path.empty());
+    const auto skin = temp.path / "Arrows";
+    write_file(skin / "gameplay" / "arrow.png");
+    write_file(skin / "skin.json",
+               "{\n"
+               "  \"format\": \"tenriff-skin\",\n"
+               "  \"version\": 1,\n"
+               "  \"name\": \"Arrows\",\n"
+               "  \"gameplay\": {\n"
+               "    \"note\": \"gameplay/arrow.png\",\n"
+               "    \"note_aspect\": \"width\",\n"
+               "    \"note_rotations\": [270, 180, 0, -90]\n"
+               "  }\n"
+               "}\n");
+
+    const auto loaded = tenriff::app::load_tenriff_skin_folder(skin.u8string(), 4);
+    REQUIRE(loaded.found);
+    CHECK(loaded.gameplay.note_aspect == "width");
+    REQUIRE(loaded.gameplay.note_rotations.size() == 4u);
+    CHECK(loaded.gameplay.note_rotations[0] == doctest::Approx(270.0f));
+    CHECK(loaded.gameplay.note_rotations[1] == doctest::Approx(180.0f));
+    CHECK(loaded.gameplay.note_rotations[2] == doctest::Approx(0.0f));
+    // Negative degrees wrap into [0, 360) so the renderer never sees a sign.
+    CHECK(loaded.gameplay.note_rotations[3] == doctest::Approx(270.0f));
+    // key_rotations stays empty; the renderer falls back to note_rotations.
+    CHECK(loaded.gameplay.key_rotations.empty());
+    CHECK(loaded.warnings.empty());
+}
+
+TEST_CASE("TenRiff skin rejects an unknown note_aspect and keeps the default") {
+    TempDirGuard temp{make_temp_dir()};
+    REQUIRE(!temp.path.empty());
+    const auto skin = temp.path / "BadAspect";
+    std::filesystem::create_directories(skin);
+    write_file(skin / "skin.json",
+               "{\n"
+               "  \"format\": \"tenriff-skin\",\n"
+               "  \"version\": 1,\n"
+               "  \"name\": \"BadAspect\",\n"
+               "  \"gameplay\": { \"note_aspect\": \"squish\" }\n"
+               "}\n");
+
+    const auto loaded = tenriff::app::load_tenriff_skin_folder(skin.u8string(), 4);
+    REQUIRE(loaded.found);
+    CHECK(loaded.gameplay.note_aspect.empty());
+    CHECK(loaded.warnings.size() == 1u);
+}
+
+TEST_CASE("TenRiff skin layout keeps known slots and drops malformed ones") {
+    TempDirGuard temp{make_temp_dir()};
+    REQUIRE(!temp.path.empty());
+    const auto skin = temp.path / "Layout";
+    std::filesystem::create_directories(skin);
+    write_file(skin / "skin.json",
+               "{\n"
+               "  \"format\": \"tenriff-skin\",\n"
+               "  \"version\": 1,\n"
+               "  \"name\": \"Layout\",\n"
+               "  \"layout\": {\n"
+               "    \"song_select\": {\n"
+               "      \"center_panel\": [1126, 152, 1882, 922],\n"
+               "      \"left_panel\": [486, 152, 38, 922],\n"
+               "      \"sidebar\": [0, 0, 10, 10]\n"
+               "    },\n"
+               "    \"title\": { \"buttons\": [470, 360, 1450] }\n"
+               "  }\n"
+               "}\n");
+
+    const auto loaded = tenriff::app::load_tenriff_skin_folder(skin.u8string(), 4);
+    REQUIRE(loaded.found);
+    REQUIRE(loaded.layout_rects.count("song_select.center_panel") == 1u);
+    const auto& rect = loaded.layout_rects.at("song_select.center_panel");
+    CHECK(rect.left == doctest::Approx(1126.0f));
+    CHECK(rect.top == doctest::Approx(152.0f));
+    CHECK(rect.right == doctest::Approx(1882.0f));
+    CHECK(rect.bottom == doctest::Approx(922.0f));
+
+    // right <= left, an unknown slot name, and a three-number rect are all dropped.
+    CHECK(loaded.layout_rects.count("song_select.left_panel") == 0u);
+    CHECK(loaded.layout_rects.count("song_select.sidebar") == 0u);
+    CHECK(loaded.layout_rects.count("title.buttons") == 0u);
+    CHECK(loaded.layout_rects.size() == 1u);
+    CHECK(loaded.warnings.size() == 3u);
 }
 
 TEST_CASE("TenRiff skin assets cannot escape their manifest folder") {

@@ -16,12 +16,20 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
 struct ID2D1Bitmap;
 
 namespace tenriff::render {
+
+// How a note/receptor image is fitted into its lane rect.
+//   Stretch — fill the rect, ignoring the image aspect (default; bar notes).
+//   Contain — shrink the image inside the rect, keeping its aspect.
+//   Width   — keep the rect's width and derive height from the image aspect,
+//             so square arrow art stays square however short the note rect is.
+enum class NoteImageAspect { Stretch, Contain, Width };
 
 struct MenuWindowConfig {
     std::string title = "TenRiff";
@@ -329,6 +337,7 @@ struct GameplayHudData {
     bool hold_tail_taper_enabled = false;
     bool judgement_line_glow_enabled = true;
     bool key_pulse_enabled = true;
+    float key_pulse_brightness = 1.0f;
     std::string key_label_position = "bottom";
     bool note_border_enabled = true;
     std::string note_shape = "rect";
@@ -478,6 +487,7 @@ struct SkinPreviewData {
     bool hold_tail_taper_enabled = false;
     bool judgement_line_glow_enabled = true;
     bool key_pulse_enabled = true;
+    float key_pulse_brightness = 1.0f;
     std::string key_label_position = "bottom";
     bool note_border_enabled = true;
     std::string note_shape = "rect";
@@ -538,6 +548,9 @@ struct LobbySkinData {
     std::string background_path;
     std::string logo_path;
     float background_opacity = 0.72f;
+    // "<screen>.<slot>" -> {left, top, right, bottom} in base 1920x1080 space.
+    // Missing entries keep the built-in rect.
+    std::unordered_map<std::string, std::array<float, 4>> layout_rects;
 };
 
 struct MenuRenderData {
@@ -773,6 +786,12 @@ private:
         double imported_judgement_line_position = 0.82;
         float imported_note_width_ratio = 1.0f;
         float imported_note_height_ratio = 1.0f;
+        bool has_imported_note_aspect = false;
+        NoteImageAspect imported_note_aspect = NoteImageAspect::Stretch;
+        std::size_t note_rotation_count = 0;
+        std::array<float, kGameplayHudMaxLanes> note_rotations{};
+        std::size_t key_rotation_count = 0;
+        std::array<float, kGameplayHudMaxLanes> key_rotations{};
         std::array<uint32_t, kGameplayHudMaxLanes> lane_colors{};
     };
 

@@ -70,22 +70,26 @@
             d2d_->accent_brush->SetOpacity(saved_opacity);
         }
 
-        const D2D1_RECT_F top_bar = D2D1::RectF(0.0f, 0.0f, kBaseWidth, 126.0f);
+        const D2D1_RECT_F top_bar =
+            skin_layout_rect(data, "song_select.top_bar",
+                             D2D1::RectF(0.0f, 0.0f, kBaseWidth, 126.0f));
         if (d2d_->panel_brush) {
             const float saved = d2d_->panel_brush->GetOpacity();
             d2d_->panel_brush->SetOpacity(0.88f);
             ctx->FillRectangle(top_bar, d2d_->panel_brush.Get());
             d2d_->panel_brush->SetOpacity(saved);
         }
-        draw_rule(0.0f, top_bar.bottom, kBaseWidth, 0.56f);
+        draw_rule(top_bar.left, top_bar.bottom, top_bar.right, 0.56f);
 
         ID2D1Bitmap* lobby_logo_bitmap =
             data.lobby_skin.enabled
                 ? find_song_card_preview_bitmap(data.lobby_skin.logo_path)
                 : nullptr;
+        const D2D1_RECT_F logo_slot =
+            skin_layout_rect(data, "song_select.logo",
+                             D2D1::RectF(48.0f, 18.0f, 388.0f, 108.0f));
         if (lobby_logo_bitmap) {
             const D2D1_SIZE_F logo_size = lobby_logo_bitmap->GetSize();
-            const D2D1_RECT_F logo_slot = D2D1::RectF(48.0f, 18.0f, 388.0f, 108.0f);
             const D2D1_RECT_F logo_rect = fit_rect_preserve_aspect(logo_slot, logo_size);
             ctx->DrawBitmap(lobby_logo_bitmap, logo_rect, 1.0f,
                             D2D1_BITMAP_INTERPOLATION_MODE_LINEAR);
@@ -93,26 +97,34 @@
         if (!lobby_logo_bitmap && d2d_->header_format && d2d_->text_brush) {
             draw_text_clipped(L"TENRIFF",
                               d2d_->header_format.Get(),
-                              D2D1::RectF(52.0f, 24.0f, 382.0f, 84.0f),
+                              D2D1::RectF(logo_slot.left + 4.0f, logo_slot.top + 6.0f,
+                                          logo_slot.right - 6.0f, logo_slot.top + 66.0f),
                               d2d_->text_brush.Get());
         }
         if (!lobby_logo_bitmap && d2d_->hud_format && d2d_->muted_brush) {
             draw_text_clipped(wloc("RHYTHM ENGINE", "리듬 엔진"),
                               d2d_->hud_format.Get(),
-                              D2D1::RectF(56.0f, 82.0f, 390.0f, 108.0f),
+                              D2D1::RectF(logo_slot.left + 8.0f, logo_slot.top + 64.0f,
+                                          logo_slot.right + 2.0f, logo_slot.bottom),
                               d2d_->muted_brush.Get());
         }
         if (d2d_->button_border_brush) {
             const float saved = d2d_->button_border_brush->GetOpacity();
+            const float divider_x = logo_slot.right + 22.0f;
             d2d_->button_border_brush->SetOpacity(0.34f);
-            ctx->DrawLine(D2D1::Point2F(410.0f, 32.0f), D2D1::Point2F(410.0f, 96.0f),
+            ctx->DrawLine(D2D1::Point2F(divider_x, logo_slot.top + 14.0f),
+                          D2D1::Point2F(divider_x, logo_slot.bottom - 12.0f),
                           d2d_->button_border_brush.Get(), 1.0f);
             d2d_->button_border_brush->SetOpacity(saved);
         }
 
         const std::array<int, 4> top_nav_indices = {0, 1, 4, 5};
-        const float nav_left = 492.0f;
-        const float nav_width = 188.0f;
+        const D2D1_RECT_F nav_bar =
+            skin_layout_rect(data, "song_select.nav",
+                             D2D1::RectF(492.0f, 12.0f, 1244.0f, 126.0f));
+        const float nav_left = nav_bar.left;
+        const float nav_width =
+            (nav_bar.right - nav_bar.left) / static_cast<float>(top_nav_indices.size());
         for (std::size_t i = 0; i < top_nav_indices.size(); ++i) {
             const int source_index = top_nav_indices[i];
             if (source_index >= static_cast<int>(data.song_select.left_nav.size())) {
@@ -120,7 +132,8 @@
             }
             const auto& item = data.song_select.left_nav[static_cast<std::size_t>(source_index)];
             const float x0 = nav_left + static_cast<float>(i) * nav_width;
-            const D2D1_RECT_F tab = D2D1::RectF(x0, 12.0f, x0 + nav_width - 8.0f, 126.0f);
+            const D2D1_RECT_F tab =
+                D2D1::RectF(x0, nav_bar.top, x0 + nav_width - 8.0f, nav_bar.bottom);
             const bool route_active =
                 (source_index == 0 && !data.song_select.showing_sources &&
                  !data.song_select.showing_records) ||
@@ -147,7 +160,9 @@
             }
         }
 
-        const D2D1_RECT_F profile_panel = D2D1::RectF(1518.0f, 16.0f, 1880.0f, 112.0f);
+        const D2D1_RECT_F profile_panel =
+            skin_layout_rect(data, "song_select.profile",
+                             D2D1::RectF(1518.0f, 16.0f, 1880.0f, 112.0f));
         register_hit(profile_panel, MenuHitTargetKind::SongProfilePanel, 0);
         draw_glass_panel(profile_panel, 14.0f, 0.78f, 0.24f, false, 3.0f);
         const D2D1_RECT_F avatar_rect =
@@ -188,9 +203,15 @@
                               d2d_->muted_brush.Get());
         }
 
-        const D2D1_RECT_F left_panel = D2D1::RectF(38.0f, 152.0f, 486.0f, 922.0f);
-        const D2D1_RECT_F center_panel = D2D1::RectF(510.0f, 152.0f, 1266.0f, 922.0f);
-        const D2D1_RECT_F right_panel = D2D1::RectF(1290.0f, 152.0f, 1882.0f, 922.0f);
+        const D2D1_RECT_F left_panel =
+            skin_layout_rect(data, "song_select.left_panel",
+                             D2D1::RectF(38.0f, 152.0f, 486.0f, 922.0f));
+        const D2D1_RECT_F center_panel =
+            skin_layout_rect(data, "song_select.center_panel",
+                             D2D1::RectF(510.0f, 152.0f, 1266.0f, 922.0f));
+        const D2D1_RECT_F right_panel =
+            skin_layout_rect(data, "song_select.right_panel",
+                             D2D1::RectF(1290.0f, 152.0f, 1882.0f, 922.0f));
 
         draw_glass_panel(left_panel, 12.0f, 0.78f, 0.20f, false, 5.0f);
         if (d2d_->title_format && d2d_->text_brush) {
@@ -735,7 +756,9 @@
                                    : static_cast<ID2D1Brush*>(d2d_->muted_brush.Get()));
         }
 
-        const D2D1_RECT_F bottom_bar = D2D1::RectF(38.0f, 944.0f, 1882.0f, 1048.0f);
+        const D2D1_RECT_F bottom_bar =
+            skin_layout_rect(data, "song_select.bottom_bar",
+                             D2D1::RectF(38.0f, 944.0f, 1882.0f, 1048.0f));
         draw_glass_panel(bottom_bar, 12.0f, 0.82f, 0.18f, false, 4.0f);
         const D2D1_RECT_F back_button =
             D2D1::RectF(bottom_bar.left + 12.0f, bottom_bar.top + 12.0f,

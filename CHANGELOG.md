@@ -4,10 +4,18 @@ TenRiff의 사용자/배포 관점에서 의미 있는 변경만 간단히 기�
 
 ## [Unreleased]
 
+## [1.3.2] - 2026-08-06
+
+### Added
+
+- TenRiff 스킨에 `layout` 섹션을 추가했습니다. 타이틀 화면(`spectrum`, `logo`, `buttons`, `guide`, `footer`)과 Song Select(`top_bar`, `logo`, `nav`, `profile`, `left_panel`, `center_panel`, `right_panel`, `bottom_bar`) 13개 슬롯의 위치를 `[left, top, right, bottom]`(1920x1080 기준 좌표)으로 옮길 수 있습니다. 패널 안의 내용과 클릭 판정 영역이 함께 따라가고, 적지 않은 슬롯은 기존 위치를 그대로 씁니다.
+- 화살표 스킨 지원을 추가했습니다. `gameplay.note_aspect`(`stretch`/`contain`/`width`)로 노트 이미지가 레인 사각형을 채우는 방식을 고르고, `gameplay.note_rotations`와 `gameplay.key_rotations`로 레인별 회전 각도(도, 시계 방향)를 지정합니다. 위를 향한 화살표 이미지 하나로 모든 레인을 처리할 수 있어 레인마다 미리 돌려 둔 이미지를 만들지 않아도 됩니다.
+- osu!에서 넘어오는 사람들을 위한 로비 전용 예제 스킨 `Tencircle`을 추가했습니다. 삼각형 배경, 히트서클 링, 히트서클 워드마크로 구성했고 `layout`으로 곡 목록을 화면 오른쪽에 배치합니다.
+- 노트를 칠 때 판정선에서 터지는 폭발 이펙트의 밝기를 `0~100%`로 조절할 수 있게 했습니다. `Options > Skins`의 기존 `Key Pulse` on/off 행이 `Hit Burst / 폭발 이펙트` 백분율 행으로 바뀌었고 5% 단위로 움직입니다. `0%`가 곧 끄기이며, 기존 config의 `key_pulse_enabled`는 그대로 읽어 켜짐은 `100%`, 꺼짐은 `0%`로 옮깁니다.
+
 ### Fixed
 
-- Fixed TenRiff skin `gear` images rendering as a bottom-anchored panel through the LR2 gear fit; they now stretch across the full playfield as the skin format documents.
-- Fixed TenRiff skin `key_idle` / `key_pressed` receptors never rendering while a `gear` image was set. Gear art replacing the receptors now only applies to LR2 skins, whose gear panels bake the key art in.
+- 정사각형에 가까운 화살표 노트 이미지가 노트 사각형(레인 폭 × 노트 높이)에 그대로 늘어나 세로로 눌려 보이던 문제를 수정했습니다. 스킨에서 `note_aspect: "width"`를 지정하면 폭은 레인에 맞추고 높이를 이미지 비율에서 계산합니다. 스킨이 `note_aspect`를 적으면 `Options > Skins > Image Aspect` 토글보다 우선합니다.
 
 ## [1.3.1] - 2026-08-05
 

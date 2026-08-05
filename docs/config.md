@@ -247,8 +247,13 @@
   - `0.05..0.60` 범위로 clamp
 - `judgement_line_glow_enabled` (bool)
   - 판정선 주변 glow 표시
+- `key_pulse_brightness` (double)
+  - 노트를 칠 때 판정선에서 터지는 폭발 이펙트의 밝기
+  - `0.00..1.00` 범위로 clamp하며 `0.00`이면 이펙트를 끈다
+  - Options에서는 `Skins > Hit Burst / 폭발 이펙트` 행에서 5% 단위로 조절
 - `key_pulse_enabled` (bool)
-  - 입력 순간 판정선 근처에 짧은 lane pulse 표시
+  - `key_pulse_brightness`의 on/off 형태. 구버전 config 호환용으로 함께 저장한다
+  - 둘 중 하나라도 꺼져 있으면 꺼진 것으로 처리한다
 - `key_label_position` (string)
   - `bottom | top | off`
   - gameplay lane 안쪽에 현재 keymap의 키 이름을 작게 표시

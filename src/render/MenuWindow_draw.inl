@@ -339,7 +339,9 @@ void MenuWindow::draw(const MenuRenderData& data) {
         const float bar_height = song_select_style ? 78.0f : 84.0f;
         const float bar_bottom = kBaseHeight - (song_select_style ? 20.0f : 24.0f);
         const float bar_top = bar_bottom - bar_height;
-        const D2D1_RECT_F rect = D2D1::RectF(margin, bar_top, kBaseWidth - margin, bar_bottom);
+        const D2D1_RECT_F rect =
+            skin_layout_rect(data, "title.footer",
+                             D2D1::RectF(margin, bar_top, kBaseWidth - margin, bar_bottom));
         const D2D1_ROUNDED_RECT rr = D2D1::RoundedRect(rect, 18.0f, 18.0f);
         if (song_select_style) {
             draw_glass_panel(rect, 18.0f, 0.82f, 0.72f, true, 6.0f);
@@ -397,7 +399,11 @@ void MenuWindow::draw(const MenuRenderData& data) {
         const float margin = song_select_style ? 26.0f : 80.0f;
         const float bar_height = song_select_style ? 78.0f : 84.0f;
         const float bar_bottom = kBaseHeight - (song_select_style ? 20.0f : 24.0f);
-        return D2D1::RectF(margin, bar_bottom - bar_height, kBaseWidth - margin, bar_bottom);
+        const D2D1_RECT_F rect =
+            D2D1::RectF(margin, bar_bottom - bar_height, kBaseWidth - margin, bar_bottom);
+        // Content bands measure against this, so a moved footer also moves what
+        // sits above it. Only draw_footer's non-song-select form is skinnable.
+        return song_select_style ? rect : skin_layout_rect(data, "title.footer", rect);
     };
 
     struct ScreenContentBands {
