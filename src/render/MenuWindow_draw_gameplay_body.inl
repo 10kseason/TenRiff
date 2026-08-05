@@ -1067,6 +1067,10 @@
             fill->SetOpacity(saved_fill_opacity);
         };
 
+        // LR2 gear art is a bottom panel with the receptor art baked in; TenRiff
+        // skins declare gear as a full-playfield overlay with separate key slots.
+        const bool tenriff_gear_overlay =
+            gameplay_note_sprite_cache_.skin_source == "tenriff";
         auto draw_imported_gear_overlay = [&](const GameplayFieldLayout& gear_field_layout,
                                               float gear_hit_line_y) {
             ID2D1Bitmap* bitmap = d2d_->gameplay_gear_overlay_bitmap.Get();
@@ -1075,6 +1079,17 @@
             }
             const D2D1_RECT_F* source_rect =
                 bitmap_source_rect_or_null(d2d_->gameplay_gear_overlay_source_rect);
+            if (tenriff_gear_overlay) {
+                ctx->DrawBitmap(bitmap,
+                                D2D1::RectF(gear_field_layout.left,
+                                            gear_field_layout.top,
+                                            gear_field_layout.right,
+                                            gear_field_layout.bottom),
+                                visual_opacity,
+                                D2D1_BITMAP_INTERPOLATION_MODE_LINEAR,
+                                source_rect);
+                return true;
+            }
             const D2D1_SIZE_F bitmap_size = bitmap->GetSize();
             const float source_width = source_rect
                 ? source_rect->right - source_rect->left
@@ -1122,7 +1137,7 @@
         ctx->SetAntialiasMode(D2D1_ANTIALIAS_MODE_ALIASED);
         for (int lane = 0; lane < lane_count; ++lane) {
             const std::size_t lane_index = static_cast<std::size_t>(lane);
-            if (player_has_gear_overlay) {
+            if (player_has_gear_overlay && !tenriff_gear_overlay) {
                 continue;
             }
             const bool lane_is_pressed =
@@ -1831,7 +1846,7 @@
             ctx->SetAntialiasMode(D2D1_ANTIALIAS_MODE_ALIASED);
             for (int lane = 0; lane < lane_count; ++lane) {
                 const std::size_t lane_index = static_cast<std::size_t>(lane);
-                if (ghost_has_gear_overlay) {
+                if (ghost_has_gear_overlay && !tenriff_gear_overlay) {
                     continue;
                 }
                 const bool lane_is_pressed =

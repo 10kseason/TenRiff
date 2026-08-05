@@ -4,6 +4,11 @@ TenRiff의 사용자/배포 관점에서 의미 있는 변경만 간단히 기�
 
 ## [Unreleased]
 
+### Fixed
+
+- Fixed TenRiff skin `gear` images rendering as a bottom-anchored panel through the LR2 gear fit; they now stretch across the full playfield as the skin format documents.
+- Fixed TenRiff skin `key_idle` / `key_pressed` receptors never rendering while a `gear` image was set. Gear art replacing the receptors now only applies to LR2 skins, whose gear panels bake the key art in.
+
 ## [1.3.1] - 2026-08-05
 
 ### Added
