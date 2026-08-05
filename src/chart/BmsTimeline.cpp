@@ -59,6 +59,26 @@ BmsTimelineResult BmsTimelineBuilder::build(const BmsNormalizedChart& chart, int
     double current_bpm = chart.base_bpm;
     double current_position = 0.0;
     double current_time_samples = 0.0;
+    double current_scroll = 1.0;
+    double current_visual_position = 0.0;
+
+    auto append_scroll_segment = [&](double start_sample,
+                                     double end_sample,
+                                     double start_position,
+                                     double end_position) {
+        const int64_t rounded_start = static_cast<int64_t>(std::llround(start_sample));
+        const int64_t rounded_end = static_cast<int64_t>(std::llround(end_sample));
+        if (rounded_end <= rounded_start) {
+            return;
+        }
+        result.timeline.scroll_segments.push_back(BmsScrollSegment{
+            rounded_start,
+            rounded_end,
+            start_position,
+            end_position,
+        });
+    };
+
 
     const auto& events = chart.events;
     std::size_t index = 0;
@@ -79,7 +99,12 @@ BmsTimelineResult BmsTimelineBuilder::build(const BmsNormalizedChart& chart, int
                 break;
             }
             double delta_time_seconds = seconds_from_position_delta(delta_position, current_bpm);
+            const double segment_start_sample = current_time_samples;
+            const double segment_start_position = current_visual_position;
             current_time_samples += delta_time_seconds * sample_rate;
+            current_visual_position += delta_position * current_scroll;
+            append_scroll_segment(segment_start_sample, current_time_samples,
+                                  segment_start_position, current_visual_position);
             current_position = group_position;
         }
 
@@ -109,6 +134,13 @@ BmsTimelineResult BmsTimelineBuilder::build(const BmsNormalizedChart& chart, int
                     continue;
                 }
                 current_bpm = bpm;
+            } else if (event.type == BmsNormalizedEventType::Scroll) {
+                if (!event.value.has_value() || !std::isfinite(event.value.value())) {
+                    add_message(result.messages, BmsParseSeverity::Error, event.measure,
+                                "SCROLL event is missing a finite factor.");
+                    continue;
+                }
+                current_scroll = event.value.value();
             } else if (event.type == BmsNormalizedEventType::Stop) {
                 if (!event.value.has_value()) {
                     add_message(result.messages, BmsParseSeverity::Error, event.measure,
@@ -130,7 +162,12 @@ BmsTimelineResult BmsTimelineBuilder::build(const BmsNormalizedChart& chart, int
             }
         }
 
-        current_time_samples += stop_accumulated * sample_rate;
+        const double stop_samples = stop_accumulated * sample_rate;
+        if (stop_samples > 0.0) {
+            append_scroll_segment(current_time_samples, current_time_samples + stop_samples,
+                                  current_visual_position, current_visual_position);
+            current_time_samples += stop_samples;
+        }
         index = group_end;
     }
 
@@ -146,7 +183,12 @@ BmsTimelineResult BmsTimelineBuilder::build(const BmsNormalizedChart& chart, int
                         "Cannot determine chart duration because BPM is not positive.");
         } else {
             double delta_time_seconds = seconds_from_position_delta(remaining, current_bpm);
+            const double segment_start_sample = current_time_samples;
+            const double segment_start_position = current_visual_position;
             current_time_samples += delta_time_seconds * sample_rate;
+            current_visual_position += remaining * current_scroll;
+            append_scroll_segment(segment_start_sample, current_time_samples,
+                                  segment_start_position, current_visual_position);
             current_position = chart_end_position;
         }
     }

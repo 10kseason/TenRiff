@@ -1,5 +1,6 @@
 #include "doctest/doctest.h"
 
+#include <algorithm>
 #include <cmath>
 
 #include "chart/BmsChartNorm.h"
@@ -197,4 +198,50 @@ TEST_CASE("timeline builder applies fractional channel 08 BPM references before 
         }
     }
     CHECK(found_note);
+}
+
+TEST_CASE("timeline scroll segments support speed changes stops and reverse motion") {
+    BmsChart chart;
+    chart.base_bpm = 120.0;
+    chart.scroll["01"] = 2.0;
+    chart.scroll["02"] = 0.0;
+    chart.scroll["03"] = -1.0;
+    chart.commands.push_back({0, "SC", "01"});
+    chart.commands.push_back({1, "SC", "02"});
+    chart.commands.push_back({2, "SC", "03"});
+    chart.commands.push_back({3, "11", "01"});
+
+    BmsChartNormalizer normalizer;
+    const auto normalization = normalizer.normalize(chart);
+    REQUIRE(normalization.success());
+
+    BmsTimelineBuilder builder;
+    const auto timeline = builder.build(normalization.chart, 1000);
+    REQUIRE(timeline.success());
+    REQUIRE(timeline.timeline.scroll_segments.size() == 4u);
+
+    const auto& fast = timeline.timeline.scroll_segments[0];
+    CHECK(fast.start_sample == 0);
+    CHECK(fast.end_sample == 2000);
+    CHECK(fast.start_position == doctest::Approx(0.0));
+    CHECK(fast.end_position == doctest::Approx(2.0));
+
+    const auto& frozen = timeline.timeline.scroll_segments[1];
+    CHECK(frozen.start_sample == 2000);
+    CHECK(frozen.end_sample == 4000);
+    CHECK(frozen.start_position == doctest::Approx(2.0));
+    CHECK(frozen.end_position == doctest::Approx(2.0));
+
+    const auto& reverse = timeline.timeline.scroll_segments[2];
+    CHECK(reverse.start_sample == 4000);
+    CHECK(reverse.end_sample == 6000);
+    CHECK(reverse.start_position == doctest::Approx(2.0));
+    CHECK(reverse.end_position == doctest::Approx(1.0));
+
+    const auto note = std::find_if(timeline.timeline.events.begin(), timeline.timeline.events.end(), [](const auto& event) {
+        return event.event.type == BmsNormalizedEventType::Note;
+    });
+    REQUIRE(note != timeline.timeline.events.end());
+    CHECK(note->time_samples == 6000);
+    CHECK(timeline.timeline.duration_samples == 8000);
 }

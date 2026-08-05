@@ -21,6 +21,10 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
     target.audio_buffer_frames = gameplay_hud_.audio_buffer_frames;
     target.lookahead_samples = gameplay_hud_.lookahead_samples;
     target.past_samples = gameplay_hud_.past_samples;
+    target.current_visual_position = gameplay_hud_.current_visual_position;
+    target.visual_velocity = gameplay_hud_.visual_velocity;
+    target.future_visual_span = gameplay_hud_.future_visual_span;
+    target.past_visual_span = gameplay_hud_.past_visual_span;
     const render::GameplayBackgroundPolicy background_policy =
         render::resolve_gameplay_background_policy(
             config_.graphics.bga_enabled,
@@ -286,6 +290,9 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
         out_note.hold = note.hold;
         out_note.head_visible = note.head_visible;
         out_note.pending = note.pending;
+        out_note.mine = note.mine;
+        out_note.visual_position = note.visual_position;
+        out_note.tail_visual_position = note.tail_visual_position;
         target.notes[i] = out_note;
     }
     target.score = gameplay_hud_.score;
@@ -293,6 +300,7 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
     target.osu_od8_score = gameplay_hud_.osu_od8_score;
 
     target.accuracy = gameplay_hud_.accuracy;
+    target.detailed_accuracy = gameplay_hud_.detailed_accuracy;
 
     if (target.spectating_peer && target.peer_score_available) {
         // Render-only perspective switch. Local result data stays untouched,
@@ -370,9 +378,13 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
         out_note.hold = note.hold;
         out_note.head_visible = note.head_visible;
         out_note.pending = note.pending;
+        out_note.mine = note.mine;
+        out_note.visual_position = note.visual_position;
+        out_note.tail_visual_position = note.tail_visual_position;
         target.ghost_notes[i] = out_note;
     }
     target.ghost_accuracy = gameplay_hud_.ghost_accuracy;
+    target.ghost_detailed_accuracy = gameplay_hud_.ghost_detailed_accuracy;
 
     if (out_motion_revision) {
         *out_motion_revision = gameplay_hud_.motion_revision;
@@ -799,8 +811,10 @@ void MenuApp::populate_result_render_data(render::MenuRenderData& render, const 
     render.result.cleared = !last_game_over_ &&
                             !menu_records::clear_status_is_autoplay(last_clear_status_);
     render.result.score = last_result_final_score_;
+    render.result.detail_score = menu_records::calculate_detail_score(last_result_);
     render.result.pause_used = last_pause_used_;
     render.result.accuracy = accuracy;
+    render.result.detailed_accuracy = menu_records::calculate_detailed_accuracy(last_result_);
     render.result.gauge_value =
         last_result_.gauge_history.empty() ? 0.0 : last_result_.gauge_history.back().value;
     render.result.max_combo = last_result_.max_combo;
@@ -1495,6 +1509,10 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
         gameplay_hud_.audio_buffer_frames = hud.audio_buffer_frames;
         gameplay_hud_.lookahead_samples = hud.lookahead_samples;
         gameplay_hud_.past_samples = hud.past_samples;
+        gameplay_hud_.current_visual_position = hud.current_visual_position;
+        gameplay_hud_.visual_velocity = hud.visual_velocity;
+        gameplay_hud_.future_visual_span = hud.future_visual_span;
+        gameplay_hud_.past_visual_span = hud.past_visual_span;
         gameplay_hud_.background_base_path = hud.background_base_path;
         gameplay_hud_.background_overlay_path = hud.background_overlay_path;
         gameplay_hud_.background_base_start_sample = hud.background_base_start_sample;
@@ -1504,6 +1522,7 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
         gameplay_hud_.counts = hud.counts;
         gameplay_hud_.score = hud.score;
         gameplay_hud_.accuracy = hud.accuracy;
+        gameplay_hud_.detailed_accuracy = hud.detailed_accuracy;
         gameplay_hud_.osu_od8_score_available = hud.osu_od8_score_available;
         gameplay_hud_.osu_od8_score = hud.osu_od8_score;
         gameplay_hud_.gauge = hud.gauge;
@@ -1536,11 +1555,15 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
             out.hold = hud.notes[i].hold;
             out.head_visible = hud.notes[i].head_visible;
             out.pending = hud.notes[i].pending;
+            out.mine = hud.notes[i].mine;
+            out.visual_position = hud.notes[i].visual_position;
+            out.tail_visual_position = hud.notes[i].tail_visual_position;
             gameplay_hud_.notes[i] = out;
         }
         gameplay_hud_.ghost_visible = hud.ghost_visible;
         gameplay_hud_.ghost_score = hud.ghost_score;
         gameplay_hud_.ghost_accuracy = hud.ghost_accuracy;
+        gameplay_hud_.ghost_detailed_accuracy = hud.ghost_detailed_accuracy;
         gameplay_hud_.ghost_osu_od8_score_available = hud.ghost_osu_od8_score_available;
         gameplay_hud_.ghost_osu_od8_score = hud.ghost_osu_od8_score;
         gameplay_hud_.ghost_combo = hud.ghost_combo;
@@ -1577,6 +1600,9 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
             out.hold = hud.ghost_notes[i].hold;
             out.head_visible = hud.ghost_notes[i].head_visible;
             out.pending = hud.ghost_notes[i].pending;
+            out.mine = hud.ghost_notes[i].mine;
+            out.visual_position = hud.ghost_notes[i].visual_position;
+            out.tail_visual_position = hud.ghost_notes[i].tail_visual_position;
             gameplay_hud_.ghost_notes[i] = out;
         }
         const GameplayHudRevisionInput next = gameplay_hud_revision_input(gameplay_hud_);

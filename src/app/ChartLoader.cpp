@@ -527,6 +527,24 @@ ChartLoadResult ChartLoader::load(const std::string& path,
         }
     }
 
+    if (!result.chart.mines.empty() && parse_result.chart.wav.find("00") != parse_result.chart.wav.end()) {
+        auto resolved_path = resolve_bms_audio_path(file_path,
+                                                    parse_result.chart,
+                                                    "00",
+                                                    "Landmine",
+                                                    asset_lookup,
+                                                    resolved_wav_cache,
+                                                    warned_missing_wav_id,
+                                                    warned_missing_file_ref,
+                                                    result.messages);
+        if (resolved_path.has_value()) {
+            const std::size_t asset_id = result.chart.intern_audio_asset(resolved_path.value());
+            for (auto& mine : result.chart.mines) {
+                mine.audio_asset_id = asset_id;
+            }
+        }
+    }
+
     std::stable_sort(result.chart.audio_cues.begin(), result.chart.audio_cues.end(),
                      [&result](const gameplay::AudioCueEvent& lhs, const gameplay::AudioCueEvent& rhs) {
                          if (lhs.start_sample != rhs.start_sample) {

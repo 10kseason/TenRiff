@@ -330,6 +330,13 @@
                          d2d_->muted_brush.Get(),
                          score_alpha,
                          DWRITE_TEXT_ALIGNMENT_CENTER);
+        draw_result_text("DETAIL SCORE  " + format_int_with_commas(data.result.detail_score),
+                         d2d_->hud_format.Get(),
+                         D2D1::RectF(prism_center.x - 180.0f, 238.0f,
+                                     prism_center.x + 180.0f, 268.0f),
+                         d2d_->accent_brush.Get(),
+                         score_alpha,
+                         DWRITE_TEXT_ALIGNMENT_CENTER);
 
         const std::string rank_text = data.result.rank.empty() ? std::string("--") : data.result.rank;
         const D2D1_RECT_F rank_rect =
@@ -562,7 +569,8 @@
             {"BAD", std::to_string(data.result.bad), percent_for(data.result.bad), D2D1::ColorF(0xF2B84B)},
             {"POOR", std::to_string(data.result.poor), percent_for(data.result.poor), D2D1::ColorF(0xFF6B7D)},
             {"MAX COMBO", std::to_string(data.result.max_combo), data.result.full_combo ? "FULL COMBO" : "/ " + std::to_string(data.result.total_notes), D2D1::ColorF(0xF7FAFD)},
-            {"ACCURACY", format_decimal(data.result.accuracy) + "%", format_signed_ms(data.result.mean_delta_ms), D2D1::ColorF(0x63E9FF)},
+            {"ACCURACY", format_decimal(data.result.accuracy) + "%",
+             "DETAIL " + format_decimal(data.result.detailed_accuracy) + "%", D2D1::ColorF(0x63E9FF)},
         }};
         const float statistic_width = (stats_panel.right - stats_panel.left) /
                                       static_cast<float>(result_statistics.size());

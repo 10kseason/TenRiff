@@ -44,6 +44,22 @@ struct AudioCueEvent {
     std::size_t asset_id = kInvalidAudioAssetId;
 };
 
+struct MineEvent {
+    int lane = 0;
+    int64_t sample = 0;
+    double damage_percent = 0.0;
+    bool instant_kill = false;
+    std::size_t audio_asset_id = kInvalidAudioAssetId;
+    std::size_t mine_id = 0;
+};
+
+struct ScrollSegment {
+    int64_t start_sample = 0;
+    int64_t end_sample = 0;
+    double start_position = 0.0;
+    double end_position = 0.0;
+};
+
 enum class VisualLayer {
     Base,
     Overlay,
@@ -70,6 +86,8 @@ struct GameplayChart {
     int64_t duration_samples = 0;
     std::vector<AudioAsset> audio_assets;
     std::vector<NoteEvent> notes;
+    std::vector<MineEvent> mines;
+    std::vector<ScrollSegment> scroll_segments;
     std::vector<AudioCueEvent> audio_cues;
     std::vector<VisualAsset> visual_assets;
     std::vector<VisualCueEvent> visual_cues;
@@ -78,6 +96,8 @@ struct GameplayChart {
     [[nodiscard]] const std::string* audio_asset_path(std::size_t asset_id) const;
     [[nodiscard]] std::size_t intern_visual_asset(std::string path);
     [[nodiscard]] const std::string* visual_asset_path(std::size_t asset_id) const;
+    [[nodiscard]] double visual_position_at(int64_t sample) const;
+    [[nodiscard]] double visual_velocity_at(int64_t sample) const;
 };
 
 [[nodiscard]] std::size_t note_audio_asset_count(const NoteEvent& note);

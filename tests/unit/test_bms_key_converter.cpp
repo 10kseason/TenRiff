@@ -85,11 +85,14 @@ TEST_CASE("bms key converter writes a reparsable converted chart") {
         REQUIRE(chart_file.good());
         chart_file << "#TITLE Convert Me\n"
                       "#BPM 120\n"
+                      "#SCROLL01 -1.5\n"
+                      "#000SC:01\n"
                       "#00111:01\n"
                       "#00212:01\n"
                       "#00313:01\n"
                       "#00414:01\n"
                       "#00515:01\n"
+                      "#005E5:0A\n"
                       "#00621:01\n"
                       "#00722:01\n"
                       "#00823:01\n"
@@ -112,6 +115,11 @@ TEST_CASE("bms key converter writes a reparsable converted chart") {
     CHECK(load_result.success());
     CHECK(load_result.chart.lane_count == 4);
     CHECK_FALSE(load_result.chart.notes.empty());
+    REQUIRE(load_result.chart.mines.size() == 1u);
+    CHECK(load_result.chart.mines[0].lane == 4);
+    CHECK(load_result.chart.mines[0].damage_percent == doctest::Approx(5.0));
+    CHECK_FALSE(load_result.chart.scroll_segments.empty());
+    CHECK(load_result.chart.visual_velocity_at(0) < 0.0);
 }
 
 TEST_CASE("bms key converter keeps long notes via LNOBJ output") {

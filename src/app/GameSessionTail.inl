@@ -981,6 +981,7 @@ GameSession::HudSnapshot GameSession::hud_snapshot() {
         snapshot.counts = stats.counts;
         snapshot.score = gameplay::scale_native_score(stats.raw_score, score_multiplier_);
         snapshot.accuracy = stats.accuracy_percent();
+        snapshot.detailed_accuracy = stats.detailed_accuracy_percent();
         snapshot.osu_od8_score_available = stats.osu_od8.available;
         snapshot.osu_od8_score = stats.osu_od8.score;
 
@@ -1019,6 +1020,7 @@ GameSession::HudSnapshot GameSession::hud_snapshot() {
             snapshot.ghost_counts = ghost_stats.counts;
             snapshot.ghost_score = ghost_stats.raw_score;
             snapshot.ghost_accuracy = ghost_stats.accuracy_percent();
+            snapshot.ghost_detailed_accuracy = ghost_stats.detailed_accuracy_percent();
             snapshot.ghost_osu_od8_score_available = ghost_stats.osu_od8.available;
             snapshot.ghost_osu_od8_score = ghost_stats.osu_od8.score;
 
@@ -1069,6 +1071,19 @@ GameSession::HudSnapshot GameSession::hud_snapshot() {
         kHudRenderSlackMs);
     snapshot.past_samples = past_samples;
     snapshot.lookahead_samples = lookahead_samples;
+    const int64_t visual_future_sample = std::min<int64_t>(
+        snapshot.duration_samples,
+        snapshot.current_sample + expanded_window.lookahead_samples);
+    const int64_t visual_past_sample = std::max<int64_t>(
+        0, snapshot.current_sample - expanded_window.past_samples);
+    snapshot.current_visual_position = chart_.visual_position_at(snapshot.current_sample);
+    snapshot.visual_velocity = chart_.visual_velocity_at(snapshot.current_sample);
+    snapshot.future_visual_span = std::max(
+        1e-9,
+        std::abs(chart_.visual_position_at(visual_future_sample) - snapshot.current_visual_position));
+    snapshot.past_visual_span = std::max(
+        1e-9,
+        std::abs(snapshot.current_visual_position - chart_.visual_position_at(visual_past_sample)));
     snapshot.lane_activity_count = std::max<std::size_t>(
         snapshot.lane_activity_count,
         std::min<std::size_t>(static_cast<std::size_t>(snapshot.lane_count), kGameplayHudMaxLanes));
@@ -1101,6 +1116,8 @@ GameSession::HudSnapshot GameSession::hud_snapshot() {
         hud_note.start_sample = snapshot.current_sample;
         hud_note.tail_sample = std::max(hold.end_sample, snapshot.current_sample);
         hud_note.hold = true;
+        hud_note.visual_position = chart_.visual_position_at(hud_note.start_sample);
+        hud_note.tail_visual_position = chart_.visual_position_at(hud_note.tail_sample);
         hud_note.head_visible = false;
         hud_note.pending = false;
         snapshot.notes[snapshot.note_count++] = hud_note;
@@ -1123,12 +1140,38 @@ GameSession::HudSnapshot GameSession::hud_snapshot() {
         hud_note.start_sample = note.start_sample;
         hud_note.tail_sample = note_visible_end_sample(note);
         hud_note.hold = note.end_sample.has_value();
+        hud_note.visual_position = chart_.visual_position_at(hud_note.start_sample);
+        hud_note.tail_visual_position = chart_.visual_position_at(hud_note.tail_sample);
         hud_note.head_visible = true;
         hud_note.pending = engine_->is_note_pending(note.lane, note.note_id);
         snapshot.notes[snapshot.note_count++] = hud_note;
         if (snapshot.note_count >= kGameplayHudMaxNotes) {
             break;
         }
+    }
+    for (const auto& mine : chart_.mines) {
+        if (snapshot.note_count >= kGameplayHudMaxNotes) {
+            break;
+        }
+        if (mine.sample < snapshot.current_sample - expanded_window.past_samples) {
+            continue;
+        }
+        if (mine.sample > snapshot.current_sample + expanded_window.lookahead_samples) {
+            break;
+        }
+        if (mine.lane <= 0 || mine.lane > snapshot.lane_count ||
+            !engine_->is_mine_pending(mine.lane, mine.mine_id)) {
+            continue;
+        }
+        HudNote hud_note;
+        hud_note.lane = mine.lane;
+        hud_note.start_sample = mine.sample;
+        hud_note.tail_sample = mine.sample;
+        hud_note.mine = true;
+        hud_note.visual_position = chart_.visual_position_at(mine.sample);
+        hud_note.tail_visual_position = hud_note.visual_position;
+        hud_note.pending = true;
+        snapshot.notes[snapshot.note_count++] = hud_note;
     }
 
     if (snapshot.ghost_visible) {
@@ -1158,6 +1201,8 @@ GameSession::HudSnapshot GameSession::hud_snapshot() {
             hud_note.start_sample = snapshot.current_sample;
             hud_note.tail_sample = std::max(hold.end_sample, snapshot.current_sample);
             hud_note.hold = true;
+            hud_note.visual_position = chart_.visual_position_at(hud_note.start_sample);
+            hud_note.tail_visual_position = chart_.visual_position_at(hud_note.tail_sample);
             hud_note.head_visible = false;
             hud_note.pending = false;
             snapshot.ghost_notes[snapshot.ghost_note_count++] = hud_note;
@@ -1180,6 +1225,8 @@ GameSession::HudSnapshot GameSession::hud_snapshot() {
             hud_note.start_sample = note.start_sample;
             hud_note.tail_sample = note_visible_end_sample(note);
             hud_note.hold = note.end_sample.has_value();
+            hud_note.visual_position = chart_.visual_position_at(hud_note.start_sample);
+            hud_note.tail_visual_position = chart_.visual_position_at(hud_note.tail_sample);
             hud_note.head_visible = true;
             hud_note.pending = ghost_engine_->is_note_pending(note.lane, note.note_id);
             snapshot.ghost_notes[snapshot.ghost_note_count++] = hud_note;
@@ -1187,6 +1234,31 @@ GameSession::HudSnapshot GameSession::hud_snapshot() {
                 break;
             }
         }
+        for (const auto& mine : chart_.mines) {
+            if (snapshot.ghost_note_count >= kGameplayHudMaxNotes) {
+                break;
+            }
+            if (mine.sample < snapshot.current_sample - expanded_window.past_samples) {
+                continue;
+            }
+            if (mine.sample > snapshot.current_sample + expanded_window.lookahead_samples) {
+                break;
+            }
+            if (mine.lane <= 0 || mine.lane > snapshot.lane_count ||
+                !ghost_engine_->is_mine_pending(mine.lane, mine.mine_id)) {
+                continue;
+            }
+            HudNote hud_note;
+            hud_note.lane = mine.lane;
+            hud_note.start_sample = mine.sample;
+            hud_note.tail_sample = mine.sample;
+            hud_note.mine = true;
+            hud_note.visual_position = chart_.visual_position_at(mine.sample);
+            hud_note.tail_visual_position = hud_note.visual_position;
+            hud_note.pending = true;
+            snapshot.ghost_notes[snapshot.ghost_note_count++] = hud_note;
+        }
+
     }
     }
 
@@ -1337,6 +1409,18 @@ bool GameSession::prepare_chart_audio() {
             asset.last_use_sample = (std::max)(asset.last_use_sample, sample);
             ++asset.use_count;
         });
+    }
+    for (const auto& mine : chart_.mines) {
+        if (mine.audio_asset_id >= chart_audio_assets_.size()) {
+            continue;
+        }
+        auto& asset = chart_audio_assets_[mine.audio_asset_id];
+        const int64_t sample = std::max<int64_t>(0, mine.sample);
+        asset.has_keysound = true;
+        asset.use_samples.push_back(sample);
+        asset.first_use_sample = (std::min)(asset.first_use_sample, sample);
+        asset.last_use_sample = (std::max)(asset.last_use_sample, sample);
+        ++asset.use_count;
     }
 
     for (auto& asset : chart_audio_assets_) {
@@ -1704,6 +1788,18 @@ void GameSession::schedule_note_keysound(const gameplay::NoteEvent& note, int64_
         }
         chart_audio_voices_.push_back(
             ChartAudioVoice{start_sample, asset_id, ChartAudioEvent::Kind::Keysound, gain});
+    });
+}
+
+void GameSession::schedule_mine_keysound(const gameplay::MineTrigger& trigger, int64_t sample) {
+    if (trigger.audio_asset_id >= chart_audio_assets_.size()) {
+        return;
+    }
+    chart_audio_voices_.push_back(ChartAudioVoice{
+        std::max<int64_t>(0, sample),
+        trigger.audio_asset_id,
+        ChartAudioEvent::Kind::Keysound,
+        1.0f,
     });
 }
 
@@ -2201,8 +2297,18 @@ void GameSession::run_judgement_loop(int64_t buffer_start_samples,
         process_autoplay_queue(tick_cursor, tick_end_samples, lookahead_samples);
         process_ghost_replay_queue(tick_end_samples, lookahead_samples);
         engine_->advance(tick_end_samples);
+        mine_trigger_buffer_.clear();
+        engine_->drain_mine_triggers(mine_trigger_buffer_);
+        for (const auto& trigger : mine_trigger_buffer_) {
+            trigger_lane_hit_effect(trigger.lane);
+            const int64_t audible_sample =
+                pin_realtime_audio_start_sample(trigger.sample, tick_cursor);
+            schedule_mine_keysound(trigger, audible_sample);
+        }
         if (ghost_engine_) {
             ghost_engine_->advance(tick_end_samples);
+            ghost_mine_trigger_buffer_.clear();
+            ghost_engine_->drain_mine_triggers(ghost_mine_trigger_buffer_);
         }
         tick_cursor = tick_end_samples;
     }

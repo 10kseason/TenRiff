@@ -49,10 +49,20 @@ GameplayEngine::GameplayEngine(const GameplayChart& chart, const GameplayConfig&
         ++playable_note_count;
         total_combo_steps += note.end_sample.has_value() ? 2 : 1;
     }
+    for (const auto& mine : chart.mines) {
+        if (mine.lane <= 0 || mine.lane > lane_count_) {
+            continue;
+        }
+        lanes_[static_cast<std::size_t>(mine.lane - 1)].mines.push_back(mine);
+    }
+
 
     for (auto& lane : lanes_) {
         std::stable_sort(lane.notes.begin(), lane.notes.end(), [](const NoteEvent& lhs, const NoteEvent& rhs) {
             return lhs.start_sample < rhs.start_sample;
+        });
+        std::stable_sort(lane.mines.begin(), lane.mines.end(), [](const MineEvent& lhs, const MineEvent& rhs) {
+            return lhs.sample < rhs.sample;
         });
     }
 
@@ -84,7 +94,15 @@ std::optional<NoteEvent> GameplayEngine::handle_input(int lane, input::InputStat
     replay_.events.push_back(ReplayEvent{lane, state, input_sample});
 
     auto& lane_state = lanes_[static_cast<std::size_t>(lane - 1)];
+    bool mine_detonated = false;
+    if (input_sample > (std::numeric_limits<int64_t>::min)()) {
+        mine_detonated = process_mines_until(lane_state, lane, input_sample - 1);
+    }
     update_lane_input_state(lane_state, state, input_sample);
+    mine_detonated = process_mines_until(lane_state, lane, input_sample) || mine_detonated;
+    if (mine_detonated || game_over_) {
+        return std::nullopt;
+    }
     if (state == input::InputState::Pressed) {
         if (lane_state.mask_until > input_sample) {
             return std::nullopt;
@@ -122,7 +140,12 @@ void GameplayEngine::advance(int64_t current_sample) {
         return;
     }
 
-    for (auto& lane : lanes_) {
+    for (std::size_t lane_index = 0; lane_index < lanes_.size(); ++lane_index) {
+        auto& lane = lanes_[lane_index];
+        process_mines_until(lane, static_cast<int>(lane_index) + 1, current_sample);
+        if (game_over_) {
+            break;
+        }
         update_miss(lane, current_sample);
         if (game_over_) {
             break;
@@ -143,6 +166,22 @@ bool GameplayEngine::is_note_pending(int lane, std::size_t note_id) const {
     const auto& lane_state = lanes_[static_cast<std::size_t>(lane - 1)];
     return lane_state.next_index < lane_state.notes.size() &&
            lane_state.notes[lane_state.next_index].note_id == note_id;
+}
+
+bool GameplayEngine::is_mine_pending(int lane, std::size_t mine_id) const {
+    if (lane <= 0 || lane > lane_count_) {
+        return false;
+    }
+    const auto& lane_state = lanes_[static_cast<std::size_t>(lane - 1)];
+    return std::any_of(
+        lane_state.mines.begin() + static_cast<std::ptrdiff_t>(lane_state.next_mine_index),
+        lane_state.mines.end(),
+        [mine_id](const MineEvent& mine) { return mine.mine_id == mine_id; });
+}
+
+void GameplayEngine::drain_mine_triggers(std::vector<MineTrigger>& out) {
+    out = std::move(pending_mine_triggers_);
+    pending_mine_triggers_.clear();
 }
 
 void GameplayEngine::collect_active_holds(std::vector<ActiveHoldView>& out) const {
@@ -175,6 +214,70 @@ void GameplayEngine::collect_recent_timing_deltas(std::array<double, kGameplayTi
         (recent_timing_delta_head_ + recent_timing_deltas_.size() - count) % recent_timing_deltas_.size();
     for (std::size_t i = 0; i < count; ++i) {
         out[i] = recent_timing_deltas_[(start + i) % recent_timing_deltas_.size()];
+    }
+}
+
+bool GameplayEngine::process_mines_until(LaneState& lane, int lane_number, int64_t sample) {
+    bool detonated = false;
+    while (lane.next_mine_index < lane.mines.size() &&
+           lane.mines[lane.next_mine_index].sample <= sample) {
+        const MineEvent& mine = lane.mines[lane.next_mine_index++];
+        if (!lane.key_down) {
+            continue;
+        }
+        detonate_mine(mine, lane_number);
+        lane.key_down = false;
+        detonated = true;
+        if (game_over_) {
+            break;
+        }
+    }
+    return detonated;
+}
+
+void GameplayEngine::detonate_mine(const MineEvent& mine, int lane_number) {
+    pending_mine_triggers_.push_back(MineTrigger{
+        lane_number, mine.sample, mine.mine_id, mine.audio_asset_id});
+
+    const auto previous_type = gauge_state_.type;
+    game::GaugeResult result{};
+    if (mine.instant_kill) {
+        if (gauge_shift_enabled_) {
+            for (auto& state : gauge_shift_states_) {
+                state.value = 0.0;
+                state.game_over = true;
+            }
+            gauge_state_ = gauge_shift_states_.back();
+        } else {
+            gauge_state_.value = 0.0;
+            gauge_state_.game_over = true;
+        }
+        result.game_over = true;
+    } else if (gauge_shift_enabled_) {
+        bool survivor_found = false;
+        for (auto& state : gauge_shift_states_) {
+            gauge_manager_.applyDamage(state, mine.damage_percent, samples_to_ms(mine.sample));
+            if (!survivor_found && !state.game_over) {
+                gauge_state_ = state;
+                survivor_found = true;
+            }
+        }
+        if (!survivor_found) {
+            gauge_state_ = gauge_shift_states_.back();
+        }
+        result.downshifted = gauge_state_.type != previous_type;
+        result.game_over = !survivor_found;
+    } else {
+        result = gauge_manager_.applyDamage(
+            gauge_state_, mine.damage_percent, samples_to_ms(mine.sample));
+    }
+
+    stats_.record_gauge_sample(mine.sample, gauge_state_.value);
+    if (result.downshifted) {
+        stats_.record_shift(mine.sample, previous_type, gauge_state_.type);
+    }
+    if (mine.instant_kill || (result.game_over && !practice_no_fail_enabled_)) {
+        game_over_ = true;
     }
 }
 
@@ -221,7 +324,11 @@ void GameplayEngine::apply_judgement(game::Judgement judgement, double delta_ms,
         result.game_over = true;
     }
 
-    stats_.record_judgement(judgement, delta_ms, combo_impact, weight, accuracy_credit_for(judgement, delta_ms));
+    stats_.record_judgement(judgement,
+                            delta_ms,
+                            combo_impact,
+                            weight,
+                            detailed_accuracy_credit_for(judgement, delta_ms));
     stats_.record_gauge_sample(sample, gauge_state_.value);
 
     if (result.downshifted) {
@@ -233,7 +340,7 @@ void GameplayEngine::apply_judgement(game::Judgement judgement, double delta_ms,
     }
 }
 
-double GameplayEngine::accuracy_credit_for(game::Judgement judgement, double delta_ms) const {
+double GameplayEngine::detailed_accuracy_credit_for(game::Judgement judgement, double delta_ms) const {
     if (judgement == game::Judgement::PR) {
         return 0.0;
     }
@@ -241,42 +348,12 @@ double GameplayEngine::accuracy_credit_for(game::Judgement judgement, double del
         return 0.0;
     }
 
-    double base_credit = 0.0;
-    int64_t inner_window = 0;
-    int64_t outer_window = windows_.bd;
-    switch (judgement) {
-        case game::Judgement::PG:
-            base_credit = 1.0;
-            outer_window = windows_.pg;
-            break;
-        case game::Judgement::GR:
-            base_credit = 0.80;
-            inner_window = windows_.pg;
-            outer_window = windows_.gr;
-            break;
-        case game::Judgement::GD:
-            base_credit = 0.50;
-            inner_window = windows_.gr;
-            outer_window = windows_.gd;
-            break;
-        case game::Judgement::BD:
-            base_credit = 0.20;
-            inner_window = windows_.gd;
-            outer_window = windows_.bd;
-            break;
-        case game::Judgement::PR:
-            return 0.0;
-    }
-
-    const double inner_ms = std::abs(samples_to_ms(inner_window));
-    const double outer_ms = std::max(inner_ms, std::abs(samples_to_ms(outer_window)));
-    const double band_width_ms = outer_ms - inner_ms;
-    const double band_progress = band_width_ms > 0.0
-                                     ? std::clamp((std::abs(delta_ms) - inner_ms) / band_width_ms, 0.0, 1.0)
-                                     : 1.0;
-    // Every judgement loses up to half a percentage point across its own
-    // timing band, so identical labels still reward steadier input.
-    return std::clamp(base_credit - 0.005 * band_progress, 0.0, 1.0);
+    const double pg_window_ms = std::max(0.001, std::abs(samples_to_ms(windows_.pg)));
+    const double normalized_error = std::abs(delta_ms) / pg_window_ms;
+    // Detail accuracy is independent from the categorical label. Averaging
+    // this smooth precision curve rewards smaller, steadier timing errors even
+    // when two plays receive the same highest judgement counts.
+    return std::clamp(std::exp(-0.125 * normalized_error * normalized_error), 0.0, 1.0);
 }
 
 void GameplayEngine::push_recent_timing_delta(double delta_ms) {

@@ -41,6 +41,9 @@ public:
         int64_t tail_sample = 0;
         bool hold = false;
         bool head_visible = true;
+        bool mine = false;
+        double visual_position = 0.0;
+        double tail_visual_position = 0.0;
         bool pending = false;
     };
 
@@ -60,6 +63,10 @@ public:
         int64_t duration_samples = 0;
         int sample_rate = 48000;
         int64_t audio_sample_time_ns = 0;
+        double current_visual_position = 0.0;
+        double visual_velocity = 1.0;
+        double future_visual_span = 1.0;
+        double past_visual_span = 1.0;
         int64_t hud_publish_time_ns = 0;
         uint32_t audio_buffer_frames = 0;
         int64_t lookahead_samples = 0;
@@ -74,6 +81,7 @@ public:
         gameplay::JudgementCounts counts;
         int64_t score = 0;
         double accuracy = 0.0;
+        double detailed_accuracy = 0.0;
         bool osu_od8_score_available = false;
         int64_t osu_od8_score = 0;
 
@@ -99,6 +107,7 @@ public:
         bool ghost_visible = false;
         int64_t ghost_score = 0;
         double ghost_accuracy = 0.0;
+        double ghost_detailed_accuracy = 0.0;
         bool ghost_osu_od8_score_available = false;
         int64_t ghost_osu_od8_score = 0;
         int ghost_combo = 0;
@@ -302,6 +311,7 @@ private:
     void catch_up_lane_input(int lane, input::InputState state, int64_t sample);
     void schedule_note_guides(int64_t buffer_start_samples, int64_t buffer_end_samples);
     void schedule_note_keysound(const gameplay::NoteEvent& note, int64_t sample);
+    void schedule_mine_keysound(const gameplay::MineTrigger& trigger, int64_t sample);
     void schedule_tone(int lane, int64_t sample, bool guide);
     void adjust_hispeed(double delta);
     void update_hispeed_repeat_state(uint32_t keycode, input::InputState state, int64_t event_time_ns);
@@ -435,6 +445,8 @@ private:
     std::vector<uint8_t> ghost_hidden_hit_note_ids_;
     std::vector<gameplay::ActiveHoldView> active_holds_buffer_;
     std::vector<gameplay::ActiveHoldView> ghost_active_holds_buffer_;
+    std::vector<gameplay::MineTrigger> mine_trigger_buffer_;
+    std::vector<gameplay::MineTrigger> ghost_mine_trigger_buffer_;
     std::size_t next_chart_audio_event_ = 0;
     std::uint64_t startup_preload_budget_bytes_ = 0;
     std::uint64_t runtime_chart_audio_budget_bytes_ = 0;

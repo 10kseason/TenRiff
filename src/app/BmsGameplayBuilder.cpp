@@ -87,15 +87,29 @@ BmsGameplayBuildResult build_bms_gameplay_chart(const chart::BmsTimeline& timeli
     int max_lane = 0;
     std::size_t sequence = 0;
     for (const auto& scheduled : timeline.events) {
-        if (scheduled.event.type != chart::BmsNormalizedEventType::Note || !scheduled.event.lane.has_value()) {
+        if (!scheduled.event.lane.has_value()) {
             continue;
         }
 
         const int lane = static_cast<int>(scheduled.event.lane.value());
         const int64_t sample = std::max<int64_t>(0, scale_samples(scheduled.time_samples, rate));
-        const std::string object_id = to_upper_ascii(scheduled.event.object_id);
-
         max_lane = std::max(max_lane, lane);
+
+        if (scheduled.event.type == chart::BmsNormalizedEventType::Mine) {
+            gameplay::MineEvent mine;
+            mine.lane = lane;
+            mine.sample = sample;
+            mine.damage_percent = scheduled.event.value.value_or(0.0);
+            mine.instant_kill = to_upper_ascii(scheduled.event.object_id) == "ZZ";
+            mine.mine_id = result.chart.mines.size();
+            result.chart.mines.push_back(std::move(mine));
+            continue;
+        }
+        if (scheduled.event.type != chart::BmsNormalizedEventType::Note) {
+            continue;
+        }
+
+        const std::string object_id = to_upper_ascii(scheduled.event.object_id);
 
         if (is_long_note_channel(scheduled.event.channel)) {
             auto pending_it = pending_long_notes_by_lane.find(lane);
@@ -191,6 +205,15 @@ BmsGameplayBuildResult build_bms_gameplay_chart(const chart::BmsTimeline& timeli
         result.chart.lane_group_size = 8;
     }
     result.chart.duration_samples = std::max<int64_t>(0, scale_samples(timeline.duration_samples, rate));
+    result.chart.scroll_segments.reserve(timeline.scroll_segments.size());
+    for (const auto& segment : timeline.scroll_segments) {
+        result.chart.scroll_segments.push_back(gameplay::ScrollSegment{
+            scale_samples(segment.start_sample, rate),
+            scale_samples(segment.end_sample, rate),
+            segment.start_position,
+            segment.end_position,
+        });
+    }
     result.chart.notes.reserve(entries.size());
     result.note_object_ids.reserve(entries.size());
 

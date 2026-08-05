@@ -44,6 +44,8 @@ OpenAI Codex, ChatGPT, Claude Code, Gemini, 그리고 프로젝트를 함께 검
   - `#MEASURE` 분수 처리
   - `#4K / #6K / #8K` header가 있으면 해당 키수로 compact lane mapping
   - `#LNOBJ`, LN 채널(`51`-`55`, `61`-`65`) 처리
+  - `#SCROLLxx` / `#xxxSC` variable scroll, including stop and reverse visual motion
+  - Landmine channels `D1-D9` / `E1-E9`, `#WAV00`, gauge damage, and `ZZ` instant fail
   - CP932(Shift-JIS) 기반 레거시 BMS 텍스트 대응
 - BMS 오디오 처리
   - WAV 자체 디코드

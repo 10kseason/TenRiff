@@ -90,6 +90,11 @@ TEST_CASE("replay export writes JSON with trace events") {
     replay.stats.max_combo = 1;
     replay.stats.total_notes = 1;
     replay.stats.raw_score = 1645;
+    replay.stats.detail_score = 5;
+    replay.stats.accuracy_points = 0.8;
+    replay.stats.accuracy_weight = 1.0;
+    replay.stats.detailed_accuracy_points = 0.9375;
+    replay.stats.detailed_accuracy_weight = 1.0;
     replay.stats.mean_delta_ms = 1.25;
     replay.stats.osu_od8.available = true;
     replay.stats.osu_od8.total_objects = 1;
@@ -179,6 +184,9 @@ TEST_CASE("replay export writes JSON with trace events") {
     CHECK(loaded_replay.replay->stats.osu_od8.available);
     CHECK(loaded_replay.replay->stats.osu_od8.score == 1'000'000);
     CHECK(loaded_replay.replay->stats.osu_od8.counts.perfect == 1);
+    CHECK(loaded_replay.replay->stats.detail_score == 5);
+    CHECK(loaded_replay.replay->stats.accuracy_percent() == doctest::Approx(80.0));
+    CHECK(loaded_replay.replay->stats.detailed_accuracy_percent() == doctest::Approx(93.75));
     CHECK(loaded_replay.replay->pause_used);
     CHECK(loaded_replay.replay->trace.events.size() == 2u);
     CHECK(loaded_replay.replay->trace.events[0].lane == 1);
@@ -214,6 +222,11 @@ TEST_CASE("result export writes JSON with replay reference") {
     result.stats.max_combo = 5;
     result.stats.total_notes = 5;
     result.stats.raw_score = 1800;
+    result.stats.detail_score = 25;
+    result.stats.accuracy_points = 4.0;
+    result.stats.accuracy_weight = 5.0;
+    result.stats.detailed_accuracy_points = 4.75;
+    result.stats.detailed_accuracy_weight = 5.0;
     result.stats.osu_od8.available = true;
     result.stats.osu_od8.total_objects = 5;
     result.stats.osu_od8.judged_objects = 5;
@@ -262,6 +275,9 @@ TEST_CASE("result export writes JSON with replay reference") {
     CHECK(parsed_result->key_conversion_note_add_mode.empty());
     CHECK(parsed_result->stats.raw_score == 1800);
     CHECK(parsed_result->stats.counts.pr == 3);
+    CHECK(parsed_result->stats.detail_score == 25);
+    CHECK(parsed_result->stats.accuracy_percent() == doctest::Approx(80.0));
+    CHECK(parsed_result->stats.detailed_accuracy_percent() == doctest::Approx(95.0));
     CHECK(parsed_result->rate_multiplier == doctest::Approx(1.05));
     CHECK(parsed_result->score_multiplier == doctest::Approx(0.50));
     CHECK(parsed_result->final_score == 900);
@@ -434,4 +450,15 @@ TEST_CASE("assist replays are excluded from default ghost selection") {
     CHECK_FALSE(tenriff::app::menu_records::default_ghost_replay_allowed(false, false,
                                                                          "ASSIST AUTOPLAY CLEAR"));
     CHECK_FALSE(tenriff::app::menu_records::default_ghost_replay_allowed(false, false, "AUTOPLAY"));
+}
+
+TEST_CASE("record ties use detail score before detailed accuracy") {
+    using tenriff::app::menu_records::is_better_record;
+
+    CHECK(is_better_record(1000, 3, 11, 90.0, 50, 100, "20250102",
+                           1000, 3, 10, 99.0, 50, 100, "20250101"));
+    CHECK(is_better_record(1000, 3, 11, 95.0, 50, 100, "20250102",
+                           1000, 3, 11, 90.0, 50, 100, "20250101"));
+    CHECK_FALSE(is_better_record(1000, 3, 10, 100.0, 50, 100, "20250102",
+                                 1000, 3, 11, 90.0, 50, 100, "20250101"));
 }

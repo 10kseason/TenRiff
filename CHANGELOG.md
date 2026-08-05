@@ -6,6 +6,12 @@ TenRiff의 사용자/배포 관점에서 의미 있는 변경만 간단히 기�
 
 ## [1.3.1] - 2026-08-05
 
+### Added
+
+- Added BMS `#SCROLLxx` / `#xxxSC` playback visuals, including faster, stopped, and reverse scroll segments without changing judgement or audio timing.
+- Added BMS landmine channels `D1-D9` / `E1-E9`, `#WAV00` explosion keysounds, percentage gauge damage, and `ZZ` instant-fail mines. Lane randomization and standalone BMS key conversion preserve mines.
+- Added a separate detail score (`PG=5`, `GREAT=3`, `GOOD=1`, `BAD/POOR=0`) and detailed accuracy. Native accuracy remains judgement-grade based, while detailed accuracy averages continuous timing precision so steadier hits rank higher.
+
 ### Changed
 
 - Song Select 우측의 배속·하이스피드·게이지·랜덤 셀을 직접 조작할 수 있게 변경했습니다. 좌클릭은 증가/다음, 우클릭은 감소/이전을 적용하고 즉시 저장합니다.

@@ -57,12 +57,17 @@
         constexpr float kGameplayTimingIndicatorHalfWidth = 124.0f;
         constexpr float kGameplayTimingIndicatorHeight = 8.0f;
 
-        auto sample_to_y = [&](int64_t sample) -> float {
-            return static_cast<float>(compute_gameplay_note_y_normalized(sample,
-                                                                         display_sample,
-                                                                         data.gameplay.lookahead_samples,
-                                                                         data.gameplay.past_samples,
-                                                                         judgement_line_position));
+        const double display_visual_position =
+            data.gameplay.current_visual_position +
+            data.gameplay.visual_velocity *
+                static_cast<double>(display_sample - data.gameplay.current_sample);
+        auto visual_to_y = [&](double position) -> float {
+            return static_cast<float>(compute_gameplay_visual_y_normalized(
+                position,
+                display_visual_position,
+                data.gameplay.future_visual_span,
+                data.gameplay.past_visual_span,
+                judgement_line_position));
         };
 
         auto draw_timing_indicator = [&](float indicator_left,
@@ -399,6 +404,8 @@
                 to_wide(loc("COMBO ", "콤보 ") + std::to_string(data.gameplay.combo) +
                         "   " + loc("MAX ", "최대 ") + std::to_string(data.gameplay.max_combo) +
                         "   " + loc("ACC ", "정확도 ") + format_decimal(data.gameplay.accuracy, 2) + "%");
+            gameplay_hud_cache_.combo_text +=
+                to_wide(" / DETAIL " + format_decimal(data.gameplay.detailed_accuracy, 2) + "%");
             gameplay_hud_cache_.combo_value_text = to_wide(std::to_string(data.gameplay.combo));
             gameplay_hud_cache_.combo_label_text = wloc("COMBO", "콤보");
             gameplay_hud_cache_.judge_stats_text =
@@ -460,6 +467,8 @@
                 to_wide(loc("COMBO ", "콤보 ") + std::to_string(data.gameplay.ghost_combo) +
                         "   " + loc("MAX ", "최대 ") + std::to_string(data.gameplay.ghost_max_combo) +
                         "   " + loc("ACC ", "정확도 ") + format_decimal(data.gameplay.ghost_accuracy, 2) + "%");
+            gameplay_hud_cache_.ghost_combo_text +=
+                to_wide(" / DETAIL " + format_decimal(data.gameplay.ghost_detailed_accuracy, 2) + "%");
             gameplay_hud_cache_.ghost_combo_value_text =
                 to_wide(std::to_string(data.gameplay.ghost_combo));
             gameplay_hud_cache_.ghost_judge_stats_text =
@@ -1184,10 +1193,13 @@
             const float note_width = gameplay_note_width(field_layout, lane - 1);
             const float x0 = lane_center - note_width * 0.5f;
             const float x1 = lane_center + note_width * 0.5f;
-            const int64_t render_sample =
-                gameplay_note_render_sample(note.start_sample, note.hold, note.head_visible, display_sample);
-            const float y = gameplay_field_y(field_top, field_height, sample_to_y(render_sample));
-            const float tail_y = gameplay_field_y(field_top, field_height, sample_to_y(note.tail_sample));
+            const double render_visual_position =
+                gameplay_note_anchors_to_judgement_line(note.hold, note.head_visible)
+                    ? display_visual_position
+                    : note.visual_position;
+            const float y = gameplay_field_y(field_top, field_height, visual_to_y(render_visual_position));
+            const float tail_y =
+                gameplay_field_y(field_top, field_height, visual_to_y(note.tail_visual_position));
             const float head_half_h = gameplay_note_head_half_height(note_height_scale);
             const float tail_half_h = gameplay_note_tail_half_height(note_height_scale);
             uint32_t lane_color = 0xF6F8FF;
@@ -1217,6 +1229,24 @@
                 d2d_->lane_note_hold_body_bitmaps[lane_index].Get();
             ID2D1Bitmap* note_hold_tail_bitmap =
                 d2d_->lane_note_tail_bitmaps[lane_index].Get();
+
+            if (note.mine) {
+                const float mine_half_h = std::max(7.0f, head_half_h * 1.15f);
+                const D2D1_RECT_F mine_rect = D2D1::RectF(x0, y - mine_half_h, x1, y + mine_half_h);
+                if (note_fill) {
+                    note_fill->SetColor(D2D1::ColorF(0.96f, 0.08f, 0.15f, visual_opacity));
+                    ctx->FillRectangle(mine_rect, note_fill);
+                }
+                if (note_border) {
+                    note_border->SetColor(D2D1::ColorF(1.0f, 0.82f, 0.20f, visual_opacity));
+                    ctx->DrawRectangle(mine_rect, note_border, 2.0f);
+                    ctx->DrawLine(D2D1::Point2F(x0, y - mine_half_h),
+                                  D2D1::Point2F(x1, y + mine_half_h), note_border, 2.0f);
+                    ctx->DrawLine(D2D1::Point2F(x1, y - mine_half_h),
+                                  D2D1::Point2F(x0, y + mine_half_h), note_border, 2.0f);
+                }
+                continue;
+            }
 
             if (note.hold && note_hold_fill) {
                 const float head_body_inset = gameplay_hold_body_cap_inset(note_shape, head_half_h);
@@ -1872,11 +1902,14 @@
                 const float ghost_note_width = gameplay_note_width(ghost_field_layout, lane - 1);
                 const float x0 = lane_center - ghost_note_width * 0.5f;
                 const float x1 = lane_center + ghost_note_width * 0.5f;
-                const int64_t render_sample =
-                    gameplay_note_render_sample(note.start_sample, note.hold, note.head_visible, display_sample);
-                const float y = gameplay_field_y(ghost_field_top, ghost_field_height, sample_to_y(render_sample));
-                const float tail_y =
-                    gameplay_field_y(ghost_field_top, ghost_field_height, sample_to_y(note.tail_sample));
+                const double render_visual_position =
+                    gameplay_note_anchors_to_judgement_line(note.hold, note.head_visible)
+                        ? display_visual_position
+                        : note.visual_position;
+                const float y =
+                    gameplay_field_y(ghost_field_top, ghost_field_height, visual_to_y(render_visual_position));
+                const float tail_y = gameplay_field_y(
+                    ghost_field_top, ghost_field_height, visual_to_y(note.tail_visual_position));
                 const float head_half_h = gameplay_note_head_half_height(note_height_scale);
                 const float tail_half_h = gameplay_note_tail_half_height(note_height_scale);
                 uint32_t lane_color = 0xF6F8FF;
@@ -1906,6 +1939,24 @@
                     d2d_->lane_note_hold_body_bitmaps[lane_index].Get();
                 ID2D1Bitmap* note_hold_tail_bitmap =
                     d2d_->lane_note_tail_bitmaps[lane_index].Get();
+
+                if (note.mine) {
+                    const float mine_half_h = std::max(7.0f, head_half_h * 1.15f);
+                    const D2D1_RECT_F mine_rect = D2D1::RectF(x0, y - mine_half_h, x1, y + mine_half_h);
+                    if (note_fill) {
+                        note_fill->SetColor(D2D1::ColorF(0.96f, 0.08f, 0.15f, visual_opacity));
+                        ctx->FillRectangle(mine_rect, note_fill);
+                    }
+                    if (note_border) {
+                        note_border->SetColor(D2D1::ColorF(1.0f, 0.82f, 0.20f, visual_opacity));
+                        ctx->DrawRectangle(mine_rect, note_border, 2.0f);
+                        ctx->DrawLine(D2D1::Point2F(x0, y - mine_half_h),
+                                      D2D1::Point2F(x1, y + mine_half_h), note_border, 2.0f);
+                        ctx->DrawLine(D2D1::Point2F(x1, y - mine_half_h),
+                                      D2D1::Point2F(x0, y + mine_half_h), note_border, 2.0f);
+                    }
+                    continue;
+                }
 
                 if (note.hold && note_hold_fill) {
                     const float head_body_inset =

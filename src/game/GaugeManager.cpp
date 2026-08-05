@@ -108,6 +108,50 @@ GaugeResult GaugeManager::applyJudgementWeighted(GaugeState& state, Judgement ju
     return result;
 }
 
+GaugeResult GaugeManager::applyDamage(GaugeState& state, double damage_percent, double time_ms) const {
+    static_cast<void>(time_ms);
+    GaugeResult result{};
+    if (state.game_over) {
+        result.game_over = true;
+        return result;
+    }
+
+    const double safe_damage =
+        std::isfinite(damage_percent) ? std::max(0.0, damage_percent) : kGaugeMax;
+    state.value = std::clamp(state.value - safe_damage, kMinGauge, max_gauge_for(state.type));
+
+    const auto shift_to = [&](GaugeType destination) {
+        state.type = destination;
+        if (policy_.refill_on_shift) {
+            state.value = max_gauge_for(destination);
+        } else {
+            state.value = std::clamp(state.value, kMinGauge, max_gauge_for(destination));
+        }
+        state.game_over = false;
+        result.downshifted = true;
+    };
+
+    const double hard_threshold =
+        std::clamp(policy_.hard_to_normal_threshold, kMinGauge, kGaugeMax);
+    if (policy_.hard_to_normal_shift && state.type == GaugeType::Hard &&
+        state.value <= hard_threshold) {
+        shift_to(GaugeType::Normal);
+        return result;
+    }
+    const double normal_threshold =
+        std::clamp(policy_.normal_to_easy_threshold, kMinGauge, kGaugeMax);
+    if (policy_.normal_to_easy_shift && state.type == GaugeType::Normal &&
+        state.value <= normal_threshold) {
+        shift_to(GaugeType::Easy);
+        return result;
+    }
+    if (state.value <= 0.0) {
+        state.game_over = true;
+        result.game_over = true;
+    }
+    return result;
+}
+
 double GaugeManager::deltaFor(GaugeType type, Judgement judgement) const noexcept {
     auto table = tableFor(type);
     switch (judgement) {

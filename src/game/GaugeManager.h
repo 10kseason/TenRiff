@@ -63,6 +63,7 @@ public:
     [[nodiscard]] GaugeState initialState(GaugeType type) const noexcept;
 
     GaugeResult applyJudgement(GaugeState& state, Judgement judgement, double time_ms) const;
+    GaugeResult applyDamage(GaugeState& state, double damage_percent, double time_ms = 0.0) const;
     GaugeResult applyJudgementWeighted(GaugeState& state, Judgement judgement, double time_ms, double weight) const;
 
 private:

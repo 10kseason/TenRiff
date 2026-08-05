@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <iterator>
 
 namespace tenriff::gameplay {
 
@@ -67,6 +68,51 @@ std::size_t GameplayChart::intern_visual_asset(std::string path) {
     return visual_assets.size() - 1;
 }
 
+double GameplayChart::visual_position_at(int64_t sample) const {
+    if (scroll_segments.empty()) {
+        return static_cast<double>(sample);
+    }
+    const auto it = std::upper_bound(
+        scroll_segments.begin(), scroll_segments.end(), sample,
+        [](int64_t value, const ScrollSegment& segment) { return value < segment.start_sample; });
+    const ScrollSegment* segment = nullptr;
+    if (it == scroll_segments.begin()) {
+        segment = &scroll_segments.front();
+        if (sample <= segment->start_sample) {
+            return segment->start_position;
+        }
+    } else {
+        segment = &*std::prev(it);
+    }
+    const int64_t duration = segment->end_sample - segment->start_sample;
+    if (duration <= 0 || sample >= segment->end_sample) {
+        return segment->end_position;
+    }
+    const double progress = std::clamp(
+        static_cast<double>(sample - segment->start_sample) / static_cast<double>(duration),
+        0.0, 1.0);
+    return segment->start_position +
+           (segment->end_position - segment->start_position) * progress;
+}
+
+double GameplayChart::visual_velocity_at(int64_t sample) const {
+    if (scroll_segments.empty()) {
+        return 1.0;
+    }
+    const auto it = std::upper_bound(
+        scroll_segments.begin(), scroll_segments.end(), sample,
+        [](int64_t value, const ScrollSegment& segment) { return value < segment.start_sample; });
+    const ScrollSegment& segment =
+        it == scroll_segments.begin() ? scroll_segments.front() : *std::prev(it);
+    if (sample < segment.start_sample || sample >= segment.end_sample) {
+        return 0.0;
+    }
+    const int64_t duration = segment.end_sample - segment.start_sample;
+    return duration > 0
+               ? (segment.end_position - segment.start_position) / static_cast<double>(duration)
+               : 0.0;
+}
+
 const std::string* GameplayChart::visual_asset_path(std::size_t asset_id) const {
     if (asset_id >= visual_assets.size()) {
         return nullptr;
@@ -128,6 +174,13 @@ void offset_gameplay_chart_samples(GameplayChart& chart, int64_t sample_offset) 
             note.end_sample = add_sample_offset(note.end_sample.value(), sample_offset);
         }
     }
+    for (auto& mine : chart.mines) {
+        mine.sample = add_sample_offset(mine.sample, sample_offset);
+    }
+    for (auto& segment : chart.scroll_segments) {
+        segment.start_sample = add_sample_offset(segment.start_sample, sample_offset);
+        segment.end_sample = add_sample_offset(segment.end_sample, sample_offset);
+    }
     for (auto& cue : chart.audio_cues) {
         cue.start_sample = add_sample_offset(cue.start_sample, sample_offset);
     }
@@ -155,6 +208,16 @@ GameplayChart from_bms_timeline(const chart::BmsTimeline& timeline, double rate)
     }
 
     chart.lane_count = max_lane > 0 ? max_lane : 10;
+    chart.scroll_segments.reserve(timeline.scroll_segments.size());
+    for (const auto& segment : timeline.scroll_segments) {
+        chart.scroll_segments.push_back(ScrollSegment{
+            scale_samples(segment.start_sample, rate),
+            scale_samples(segment.end_sample, rate),
+            segment.start_position,
+            segment.end_position,
+        });
+    }
+
     chart.duration_samples = scale_samples(timeline.duration_samples, rate);
 
     std::stable_sort(chart.notes.begin(), chart.notes.end(), [](const NoteEvent& lhs, const NoteEvent& rhs) {

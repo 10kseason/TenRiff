@@ -122,6 +122,9 @@ private:
             bool hold = false;
             bool head_visible = true;
             bool pending = false;
+        bool mine = false;
+        double visual_position = 0.0;
+        double tail_visual_position = 0.0;
         };
 
         bool active = false;
@@ -146,6 +149,10 @@ private:
         uint32_t audio_buffer_frames = 0;
         int64_t lookahead_samples = 0;
         int64_t past_samples = 0;
+        double current_visual_position = 0.0;
+        double visual_velocity = 1.0;
+        double future_visual_span = 1.0;
+        double past_visual_span = 1.0;
         std::string background_base_path;
         std::string background_overlay_path;
         int64_t background_base_start_sample = 0;
@@ -156,6 +163,7 @@ private:
         gameplay::JudgementCounts counts;
         int64_t score = 0;
         double accuracy = 0.0;
+        double detailed_accuracy = 0.0;
         bool osu_od8_score_available = false;
         int64_t osu_od8_score = 0;
 
@@ -184,6 +192,7 @@ private:
         bool ghost_visible = false;
         int64_t ghost_score = 0;
         double ghost_accuracy = 0.0;
+        double ghost_detailed_accuracy = 0.0;
         bool ghost_osu_od8_score_available = false;
         int64_t ghost_osu_od8_score = 0;
         int ghost_combo = 0;
@@ -392,7 +401,9 @@ private:
         bool has_value = false;
         std::string rank = "--";
         int64_t best_score = 0;
+        int64_t detail_score = 0;
         double accuracy = 0.0;
+        double detailed_accuracy = 0.0;
         std::string clear_status = "FAILED";
         std::string final_gauge = "normal";
         bool game_over = true;
@@ -426,7 +437,9 @@ private:
         bool practice_no_fail_enabled = false;
         int64_t raw_score = 0;
         int64_t score = 0;
+        int64_t detail_score = 0;
         double accuracy = 0.0;
+        double detailed_accuracy = 0.0;
         int max_combo = 0;
         int total_notes = 0;
         int judged_notes = 0;

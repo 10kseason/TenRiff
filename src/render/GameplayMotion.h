@@ -131,6 +131,25 @@ inline double compute_gameplay_note_y_normalized(int64_t sample,
     return std::clamp(clamped_judgement_line + t * (1.0 - clamped_judgement_line), 0.0, 1.0);
 }
 
+inline double compute_gameplay_visual_y_normalized(double position,
+                                                   double display_position,
+                                                   double future_span,
+                                                   double past_span,
+                                                   double judgement_line_position) {
+    constexpr double kFutureEntryOvershoot = 0.12;
+    const double line = std::clamp(judgement_line_position, 0.0, 1.0);
+    const double delta = position - display_position;
+    if (delta >= 0.0) {
+        const double span = std::max(1e-9, std::abs(future_span));
+        const double t = std::clamp(delta / span, 0.0, 1.0);
+        return std::clamp(line - t * (line + kFutureEntryOvershoot),
+                          -kFutureEntryOvershoot, 1.0);
+    }
+    const double span = std::max(1e-9, std::abs(past_span));
+    const double t = std::clamp((-delta) / span, 0.0, 1.0);
+    return std::clamp(line + t * (1.0 - line), 0.0, 1.0);
+}
+
 inline bool should_render_gameplay_note(int64_t start_sample,
                                         int64_t tail_sample,
                                         bool hold,

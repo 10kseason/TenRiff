@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <array>
 #include <cctype>
+#include <cmath>
 #include <charconv>
 #include <filesystem>
 #include <fstream>
@@ -327,7 +328,7 @@ bool should_store_index_header(std::string_view key) {
 }
 
 bool should_retain_command_for_index(std::string_view channel) {
-    if (channel == "02" || channel == "03" || channel == "04" ||
+    if (channel == "02" || channel == "03" || channel == "04" || channel == "SC" ||
         channel == "06" || channel == "07" || channel == "08" || channel == "09") {
         return true;
     }
@@ -821,6 +822,24 @@ BmsParseResult BmsParser::parse(std::string_view content, const BmsParserOptions
                 continue;
             }
             result.chart.stop[slot] = value_ms;
+            continue;
+        }
+
+        if (key.rfind("SCROLL", 0) == 0) {
+            std::string slot = key.substr(6);
+            if (slot.empty()) {
+                add_message(result.messages, BmsParseSeverity::Error, line_number,
+                            "#SCROLL entry missing identifier.");
+                continue;
+            }
+            bool ok = false;
+            const double scroll_value = parse_double(value, ok);
+            if (!ok || !std::isfinite(scroll_value)) {
+                add_message(result.messages, BmsParseSeverity::Error, line_number,
+                            "Failed to parse #SCROLLxx value as a finite number.");
+                continue;
+            }
+            result.chart.scroll[slot] = scroll_value;
             continue;
         }
 

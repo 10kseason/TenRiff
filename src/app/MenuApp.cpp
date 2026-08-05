@@ -848,6 +848,10 @@ GameplayHudRevisionInput MenuApp::gameplay_hud_revision_input(const GameplayHudS
     input.audio_buffer_frames = state.audio_buffer_frames;
     input.lookahead_samples = state.lookahead_samples;
     input.past_samples = state.past_samples;
+    input.current_visual_position = state.current_visual_position;
+    input.visual_velocity = state.visual_velocity;
+    input.future_visual_span = state.future_visual_span;
+    input.past_visual_span = state.past_visual_span;
     input.combo = state.combo;
     input.max_combo = state.max_combo;
     input.counts = state.counts;
@@ -880,6 +884,9 @@ GameplayHudRevisionInput MenuApp::gameplay_hud_revision_input(const GameplayHudS
             state.notes[i].head_visible,
             state.notes[i].pending,
         };
+        input.notes[i].mine = state.notes[i].mine;
+        input.notes[i].visual_position = state.notes[i].visual_position;
+        input.notes[i].tail_visual_position = state.notes[i].tail_visual_position;
     }
     input.ghost_visible = state.ghost_visible;
     input.ghost_score = state.ghost_score;
@@ -917,6 +924,9 @@ GameplayHudRevisionInput MenuApp::gameplay_hud_revision_input(const GameplayHudS
             state.ghost_notes[i].head_visible,
             state.ghost_notes[i].pending,
         };
+        input.ghost_notes[i].mine = state.ghost_notes[i].mine;
+        input.ghost_notes[i].visual_position = state.ghost_notes[i].visual_position;
+        input.ghost_notes[i].tail_visual_position = state.ghost_notes[i].tail_visual_position;
     }
     return input;
 }

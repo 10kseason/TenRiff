@@ -17,6 +17,9 @@ struct GameplayHudRevisionNote {
     int64_t tail_sample = 0;
     bool hold = false;
     bool head_visible = true;
+    bool mine = false;
+    double visual_position = 0.0;
+    double tail_visual_position = 0.0;
     bool pending = false;
 };
 
@@ -41,6 +44,10 @@ struct GameplayHudRevisionInput {
     int64_t audio_sample_time_ns = 0;
     uint32_t audio_buffer_frames = 0;
     int64_t lookahead_samples = 0;
+    double current_visual_position = 0.0;
+    double visual_velocity = 1.0;
+    double future_visual_span = 1.0;
+    double past_visual_span = 1.0;
     int64_t past_samples = 0;
 
     int combo = 0;
@@ -112,7 +119,10 @@ inline bool gameplay_hud_notes_equal(const GameplayHudRevisionInput& lhs, const 
                                  left.tail_sample == right.tail_sample &&
                                  left.hold == right.hold &&
                                  left.head_visible == right.head_visible &&
-                                 left.pending == right.pending;
+                                 left.pending == right.pending &&
+                                 left.mine == right.mine &&
+                                 left.visual_position == right.visual_position &&
+                                 left.tail_visual_position == right.tail_visual_position;
                       });
 }
 
@@ -161,7 +171,10 @@ inline bool gameplay_hud_ghost_notes_equal(const GameplayHudRevisionInput& lhs,
                                  left.tail_sample == right.tail_sample &&
                                  left.hold == right.hold &&
                                  left.head_visible == right.head_visible &&
-                                 left.pending == right.pending;
+                                 left.pending == right.pending &&
+                                 left.mine == right.mine &&
+                                 left.visual_position == right.visual_position &&
+                                 left.tail_visual_position == right.tail_visual_position;
                       });
 }
 
@@ -260,6 +273,10 @@ inline GameplayHudRevisionFlags diff_gameplay_hud_revisions(const GameplayHudRev
         previous.audio_buffer_frames != next.audio_buffer_frames ||
         previous.lookahead_samples != next.lookahead_samples ||
         previous.past_samples != next.past_samples ||
+        previous.current_visual_position != next.current_visual_position ||
+        previous.visual_velocity != next.visual_velocity ||
+        previous.future_visual_span != next.future_visual_span ||
+        previous.past_visual_span != next.past_visual_span ||
         previous.feedback_delta_ms != next.feedback_delta_ms ||
         !gameplay_hud_timing_history_equal(previous, next) ||
         !gameplay_hud_lane_activity_equal(previous, next) ||

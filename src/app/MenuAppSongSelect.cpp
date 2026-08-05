@@ -162,6 +162,8 @@ MenuApp::BestResultRecord MenuApp::best_result_for_song_entry(const SongEntry& e
                                                menu_records::clear_status_priority(found->second.clear_status,
                                                                                    found->second.game_over,
                                                                                    found->second.final_gauge),
+                                               found->second.detail_score,
+                                               found->second.detailed_accuracy,
                                                found->second.max_combo,
                                                found_judged,
                                                found->second.created_utc,
@@ -169,6 +171,8 @@ MenuApp::BestResultRecord MenuApp::best_result_for_song_entry(const SongEntry& e
                                                menu_records::clear_status_priority(best.clear_status,
                                                                                    best.game_over,
                                                                                    best.final_gauge),
+                                               best.detail_score,
+                                               best.detailed_accuracy,
                                                best.max_combo,
                                                best_judged,
                                                best.created_utc)) {

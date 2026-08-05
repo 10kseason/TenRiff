@@ -218,6 +218,7 @@ TEST_CASE("Mirror reverses lanes deterministically while preserving note metadat
     append_note(chart, 2, 400);
     append_note(chart, 3, 700, 940, false);
     append_note(chart, 5, 1200);
+    chart.mines.push_back(MineEvent{1, 500, 5.0, false, 3, 77});
     chart.notes[0].audio_asset_id = 7;
     chart.notes[0].audio_gain = 0.65f;
 
@@ -233,6 +234,10 @@ TEST_CASE("Mirror reverses lanes deterministically while preserving note metadat
     CHECK(chart_signature(first.chart) == chart_signature(second.chart));
     CHECK(is_time_sorted(first.chart));
     REQUIRE(first.chart.notes.size() == chart.notes.size());
+    REQUIRE(first.chart.mines.size() == 1u);
+    REQUIRE(second.chart.mines.size() == 1u);
+    CHECK(first.chart.mines[0].lane == 5);
+    CHECK(second.chart.mines[0].lane == 5);
 
     for (const auto& original : chart.notes) {
         const auto mirrored = std::find_if(first.chart.notes.begin(), first.chart.notes.end(), [&](const auto& note) {
@@ -249,6 +254,8 @@ TEST_CASE("Mirror reverses lanes deterministically while preserving note metadat
 
     const auto restored = apply_mode_settings(first.chart, settings);
     CHECK(chart_signature(restored.chart) == chart_signature(chart));
+    REQUIRE(restored.chart.mines.size() == 1u);
+    CHECK(restored.chart.mines[0].lane == 1);
 }
 
 TEST_CASE("random mode parser accepts Mirror tokens") {
@@ -294,7 +301,8 @@ TEST_CASE("Mirror preserves player halves for 10K and 16K layouts") {
 TEST_CASE("key mode conversion runs before Mirror") {
     using namespace tenriff::gameplay;
 
-    const GameplayChart chart = make_hold_chart(8);
+    GameplayChart chart = make_hold_chart(8);
+    chart.mines.push_back(MineEvent{8, 1500, 5.0, false, 4, 91});
     ModeApplyContext context;
     context.base_bpm = 176.0;
     context.sample_rate = 44100;
@@ -311,6 +319,10 @@ TEST_CASE("key mode conversion runs before Mirror") {
     REQUIRE(converted.chart.lane_count == 4);
     REQUIRE(mirrored.chart.lane_count == converted.chart.lane_count);
     REQUIRE(mirrored.chart.notes.size() == converted.chart.notes.size());
+    REQUIRE(converted.chart.mines.size() == 1u);
+    REQUIRE(mirrored.chart.mines.size() == 1u);
+    CHECK(converted.chart.mines[0].lane == 4);
+    CHECK(mirrored.chart.mines[0].lane == 1);
     for (const auto& converted_note : converted.chart.notes) {
         const auto mirrored_note = std::find_if(
             mirrored.chart.notes.begin(), mirrored.chart.notes.end(), [&](const auto& note) {
