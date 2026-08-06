@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(TenRiff VERSION 1.3.3 LANGUAGES C CXX)
+project(TenRiff VERSION 1.3.4 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -191,6 +191,7 @@ if(WIN32)
         src/app/MenuAppSongSelectUtils.cpp
         src/app/MenuAppSettings.cpp
         src/app/MenuAppSkin.cpp
+        src/render/BgaImageLoader.cpp
         src/render/BgaVideoDecoder.cpp
         src/render/BgaVideoFfmpeg.cpp
         src/render/OnnxBackgroundUpscaler.cpp
@@ -219,6 +220,7 @@ if(WIN32)
             mfreadwrite
             mfuuid
             winmm
+            windowscodecs
     )
     add_executable(bga_video_smoke
         tools/bga_video_smoke.cpp
@@ -392,6 +394,7 @@ if(TENRIFF_ENABLE_TESTS)
         tests/unit/test_game_session_hud.cpp
         tests/unit/test_graphics_timing.cpp
         tests/unit/test_render_performance.cpp
+        tests/unit/test_bga_image_loader.cpp
         tests/unit/test_result_presentation.cpp
         tests/unit/test_peer_protocol.cpp
         tests/unit/test_peer_session.cpp

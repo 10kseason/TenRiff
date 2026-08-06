@@ -9,8 +9,7 @@ Design system (Tailwind-ish):
 import os
 from PIL import Image, ImageChops, ImageDraw, ImageFilter, ImageFont, ImageOps
 
-SKIN = r"D:\tenriff\examples\skins\Tengear"
-SCRATCH = os.path.dirname(os.path.abspath(__file__))
+SKIN = os.path.dirname(os.path.abspath(__file__))
 
 # ---------- palette ----------
 SLATE_950 = (7, 11, 20)

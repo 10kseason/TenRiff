@@ -1795,6 +1795,24 @@ void MenuApp::handle_input_event(const input::InputEvent& event) {
 }
 
 void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
+    if (event.kind == render::MenuHitTargetKind::GameplayFieldDrag) {
+        const double requested_offset =
+            std::isfinite(event.value) ? event.value : config::kGameplayFieldOffsetXDefault;
+        const double clamped_offset = std::clamp(
+            requested_offset,
+            config::kGameplayFieldOffsetXMin,
+            config::kGameplayFieldOffsetXMax);
+        const bool changed =
+            std::abs(config_.skin.gameplay_field_offset_x - clamped_offset) > 0.001;
+        config_.skin.gameplay_field_offset_x = clamped_offset;
+        if (event.part == render::MenuHitPart::Activate) {
+            persist_runtime_config();
+        }
+        if (changed) {
+            publish_snapshot();
+        }
+        return;
+    }
     if (screen_ == Screen::Gameplay) {
         return;
     }
@@ -2166,7 +2184,7 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
             return;
         case Screen::SettingsSkins:
             settings_cursor_ = clamp_int(event.index, 0,
-                                         32 + (config::normalize_skin_source_token(config_.skin.source) == "lr2" ? 1 : 0));
+                                         35 + (config::normalize_skin_source_token(config_.skin.source) == "lr2" ? 1 : 0));
             if (finish_selection_only()) {
                 return;
             }

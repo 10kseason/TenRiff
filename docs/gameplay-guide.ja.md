@@ -58,11 +58,11 @@ Windows では通常、次のどちらかで起動します。
 - `Audio`
   - Master / BGM / Keysound volume と BMS keysound policy を調整
 - `Graphics`
-  - VSync、Refresh Hz、Performance HUD、Display Offset、BGA 表示、external ONNX BGA Upscaler を調整
+  - VSync、Refresh Hz、Performance HUD、BGA 表示、external ONNX BGA Upscaler を調整
   - `BGA` を off にすると gameplay image/video background と decoder/upscaler 処理を無効化し、Song Select preview は維持
   - model 選択後に upscaler を明示的に ON にして high-spec 警告を確認する。実験的 `NPU 優先` は Windows/driver が実際に NPU を選択した場合だけ NPU を使う
 - `Skins`
-  - native/LR2 skin 切り替え、hold depth と打鍵 glitch を持つ native 下部 digital-piano key、LR2 folder 単体または 独立した non-IIDX `LR2files/Theme` の一括 import（IIDX 依存 theme は除外）、field size に連動して拡大し判定線の下へ clip する aspect ratio 維持の下部 Gear frame、固定 divider 基準の note gap/size、Black Playfield、judge line 位置、LN body width、lane colors を調整
+  - native/LR2 skin 切り替え、Visual Latency、hold depth と打鍵 glitch を持つ native 下部 digital-piano key、LR2 folder 単体または 独立した non-IIDX `LR2files/Theme` の一括 import（IIDX 依存 theme は除外）、field size に連動して拡大し判定線の下へ clip する aspect ratio 維持の下部 Gear frame、固定 divider 基準の note gap/size、Black Playfield、judge line 位置、LN body width、lane colors を調整
 - `Keymap`
   - key binding 変更と NKRO test 実行
 
@@ -74,10 +74,10 @@ Windows では通常、次のどちらかで起動します。
 - `Mode > Hi-Speed`: まずは既定値
 - `Graphics > Display`: Discord voice overlay を使う場合は `Borderless` を推奨
 - `Graphics > Performance HUD`: 必要なときだけ on
-- `Graphics > Display Offset`: 最初は `0ms`
+- `Skins > Visual Latency`: 最初は `0ms`
 - `Audio > Keysound Mode`: BMS では `follow` 推奨
 
-ノートが遅すぎる/速すぎるなら、まず `Hi-Speed` だけを調整してください。判定は合っているのに見た目だけ遅い/早い場合は `Display Offset` を調整します。
+ノートが遅すぎる/速すぎるなら、まず `Hi-Speed` だけを調整してください。判定は合っているのに見た目だけ遅い/早い場合は `Visual Latency` を調整します。
 
 ### Discord voice overlay
 
@@ -201,7 +201,7 @@ gauge transition は `shift` を明示的に選択した場合だけ発生しま
 - 必要なら `Skins > Note & Field Size / Note Height / Judge Line` も調整する
 
 ### 判定は合っているのに見た目だけ遅い/早い
-- `Graphics > Display Offset` を調整する
+- `Skins > Visual Latency` を調整する
 - 正の値はノートをより早く描画する
 
 ### BMS keysound が大きすぎる/小さすぎる
@@ -219,7 +219,7 @@ gauge transition は `shift` を明示的に選択した場合だけ発生しま
 1. `Song Select` で簡単な曲を選ぶ
 2. `Mode` で `Gauge=Normal` と `Rate=1.0x` を確認する
 3. プレイ後、まず `Hi-Speed` だけ調整する
-4. まだ違和感があるなら `Display Offset` を調整する
+4. まだ違和感があるなら `Skins > Visual Latency` を調整する
 5. 手の配置が合わなければ `Keymap` を変える
 6. 最後に `Skins` で note size と judge line 位置を調整する
 

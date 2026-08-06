@@ -127,7 +127,9 @@ TEST_CASE("config defaults prefer 44100 Hz audio") {
     CHECK(config.gauge.easy.gd == doctest::Approx(kCurrentEasyGd));
     CHECK(config.gauge.easy.bd == doctest::Approx(kCurrentEasyBd));
     CHECK(config.gauge.easy.pr == doctest::Approx(kCurrentEasyPr));
-    CHECK(config.judge.gd_ms == doctest::Approx(75.0));
+    CHECK(config.judge.pg_ms == doctest::Approx(20.0));
+    CHECK(config.judge.gr_ms == doctest::Approx(45.0));
+    CHECK(config.judge.gd_ms == doctest::Approx(90.0));
     CHECK(config.judge.bd_ms == doctest::Approx(210.0));
     CHECK(config.judge.indirect_miss_ms == doctest::Approx(210.0));
     CHECK(config.judge.hold_grace_ms == doctest::Approx(80.0));
@@ -148,6 +150,8 @@ TEST_CASE("config defaults prefer 44100 Hz audio") {
     CHECK(config.skin.judgement_line_glow_enabled);
     CHECK(config.skin.key_pulse_enabled);
     CHECK(config.skin.key_label_position == "bottom");
+    CHECK(config.skin.gameplay_field_offset_x ==
+          doctest::Approx(tenriff::config::kGameplayFieldOffsetXDefault));
     CHECK(config.skin.combo_position == doctest::Approx(tenriff::config::kComboPositionDefault));
     CHECK(config.skin.lane_background_opacity == doctest::Approx(tenriff::config::kSkinLaneBackgroundOpacityDefault));
     CHECK(config.skin.black_playfield_enabled);
@@ -304,7 +308,7 @@ TEST_CASE("config load migrates an existing stale profile before returning it") 
     REQUIRE(result.success());
     CHECK_FALSE(result.used_defaults);
     CHECK(result.migrated);
-    CHECK(result.config.judge.gd_ms == doctest::Approx(75.0));
+    CHECK(result.config.judge.gd_ms == doctest::Approx(90.0));
     CHECK(result.config.judge.bd_ms == doctest::Approx(210.0));
     CHECK(result.config.judge.hold_grace_ms == doctest::Approx(80.0));
     CHECK(result.config.judge.hold_break_ms == doctest::Approx(200.0));
@@ -970,6 +974,7 @@ TEST_CASE("config save and load preserve skin gameplay settings") {
     config.skin.show_hold_tail = false;
     config.skin.hold_tail_taper_enabled = true;
     config.skin.judgement_line_position = 0.0;
+    config.skin.gameplay_field_offset_x = -275.0;
     config.skin.combo_position = 0.52;
     config.skin.lane_width_scales["4k"] = {0.75, 1.10, 1.10, 0.75};
     config.skin.note_width_scale = 1.15;
@@ -1002,6 +1007,7 @@ TEST_CASE("config save and load preserve skin gameplay settings") {
     CHECK_FALSE(result.config.skin.show_hold_tail);
     CHECK(result.config.skin.hold_tail_taper_enabled);
     CHECK(result.config.skin.judgement_line_position == doctest::Approx(0.0));
+    CHECK(result.config.skin.gameplay_field_offset_x == doctest::Approx(-275.0));
     CHECK(result.config.skin.combo_position == doctest::Approx(0.52));
     const auto saved_lane_widths_4k = tenriff::config::resolved_skin_lane_width_scales(result.config.skin, "4k");
     REQUIRE(saved_lane_widths_4k.size() == 4u);
@@ -1060,6 +1066,7 @@ TEST_CASE("config clamps skin gameplay settings into supported range") {
                "    \"note_shape\": \"star\",\n"
                "    \"note_border_enabled\": false,\n"
                "    \"judgement_line_position\": 1.5,\n"
+               "    \"gameplay_field_offset_x\": 9999.0,\n"
                "    \"combo_position\": 9.0,\n"
                "    \"lane_width_scales\": {\n"
                "      \"4k\": [0.1, 5.0, 1.2],\n"
@@ -1105,6 +1112,8 @@ TEST_CASE("config clamps skin gameplay settings into supported range") {
     CHECK_FALSE(result.config.skin.note_border_enabled);
     CHECK(result.config.skin.judgement_line_position ==
           doctest::Approx(tenriff::config::kJudgementLinePositionMax));
+    CHECK(result.config.skin.gameplay_field_offset_x ==
+          doctest::Approx(tenriff::config::kGameplayFieldOffsetXMax));
     CHECK(result.config.skin.combo_position == doctest::Approx(tenriff::config::kComboPositionMax));
     const auto clamped_lane_widths_4k = tenriff::config::resolved_skin_lane_width_scales(result.config.skin, "4k");
     REQUIRE(clamped_lane_widths_4k.size() == 4u);
@@ -1270,7 +1279,7 @@ TEST_CASE("runtime migration replaces invalid key mode tokens with none") {
     CHECK(config.mode.key_mode == "none");
 }
 
-TEST_CASE("runtime migration upgrades old judge defaults into the current bad-only window") {
+TEST_CASE("runtime migration upgrades old judge defaults into the current windows") {
     ConfigLoader loader;
     auto config = loader.defaults();
     config.judge.gd_ms = 55.0;
@@ -1280,7 +1289,9 @@ TEST_CASE("runtime migration upgrades old judge defaults into the current bad-on
     const bool changed = tenriff::app::migrate_bms_first_runtime_config(config);
 
     CHECK(changed);
-    CHECK(config.judge.gd_ms == doctest::Approx(75.0));
+    CHECK(config.judge.pg_ms == doctest::Approx(20.0));
+    CHECK(config.judge.gr_ms == doctest::Approx(45.0));
+    CHECK(config.judge.gd_ms == doctest::Approx(90.0));
     CHECK(config.judge.bd_ms == doctest::Approx(210.0));
     CHECK(config.judge.indirect_miss_ms == doctest::Approx(210.0));
 }

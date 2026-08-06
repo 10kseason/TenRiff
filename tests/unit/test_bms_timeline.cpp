@@ -245,3 +245,34 @@ TEST_CASE("timeline scroll segments support speed changes stops and reverse moti
     CHECK(note->time_samples == 6000);
     CHECK(timeline.timeline.duration_samples == 8000);
 }
+
+TEST_CASE("timeline keeps visual velocity anchored to the starting BPM") {
+    BmsChart chart;
+    chart.base_bpm = 200.0;
+    chart.bpm["01"] = 100.0;
+    chart.commands.push_back({1, "08", "01"});
+    chart.commands.push_back({2, "11", "01"});
+
+    BmsChartNormalizer normalizer;
+    const auto normalization = normalizer.normalize(chart);
+    REQUIRE(normalization.success());
+
+    BmsTimelineBuilder builder;
+    const auto timeline = builder.build(normalization.chart, 1000);
+    REQUIRE(timeline.success());
+    REQUIRE(timeline.timeline.scroll_segments.size() >= 2u);
+
+    const auto& before_change = timeline.timeline.scroll_segments[0];
+    const auto& after_change = timeline.timeline.scroll_segments[1];
+    const double before_velocity =
+        (before_change.end_position - before_change.start_position) /
+        static_cast<double>(before_change.end_sample - before_change.start_sample);
+    const double after_velocity =
+        (after_change.end_position - after_change.start_position) /
+        static_cast<double>(after_change.end_sample - after_change.start_sample);
+
+    CHECK(before_change.end_sample == 1200);
+    CHECK(after_change.end_sample - after_change.start_sample == 2400);
+    CHECK(after_change.end_position - after_change.start_position == doctest::Approx(2.0));
+    CHECK(after_velocity == doctest::Approx(before_velocity));
+}

@@ -1,3 +1,6 @@
+        if (!gameplay_field_drag_state_.active) {
+            gameplay_field_drag_state_.visible = false;
+        }
         const int64_t render_now_ns = timing::HighResClock::now_ns();
         const float header_left = 84.0f;
         const float header_top = 42.0f;
@@ -768,7 +771,22 @@
                 effective_lane_spacing_scale_count,
                 effective_lane_spacing_scales,
                 data.gameplay.ghost_visible,
-                data.gameplay.lane_center_gap_scale);
+                data.gameplay.lane_center_gap_scale,
+                gameplay_field_drag_state_.has_local_override
+                    ? gameplay_field_drag_state_.offset_x
+                    : data.gameplay.gameplay_field_offset_x);
+        gameplay_field_drag_state_.visible = data.gameplay.active && !data.gameplay.loading;
+        gameplay_field_drag_state_.left =
+            surface_layout.player_field.right + kGameplayFieldDragHandleGap;
+        gameplay_field_drag_state_.top =
+            surface_layout.player_field.top + kGameplayFieldDragHandleTop;
+        gameplay_field_drag_state_.right =
+            gameplay_field_drag_state_.left + kGameplayFieldDragHandleWidth;
+        gameplay_field_drag_state_.bottom =
+            gameplay_field_drag_state_.top + kGameplayFieldDragHandleHeight;
+        gameplay_field_drag_state_.offset_x = surface_layout.offset_x;
+        gameplay_field_drag_state_.min_offset_x = surface_layout.min_offset_x;
+        gameplay_field_drag_state_.max_offset_x = surface_layout.max_offset_x;
         const GameplayFieldLayout field_layout = surface_layout.player_field;
         const float field_left = field_layout.left;
         const float field_right = field_layout.right;
@@ -2314,6 +2332,42 @@
 
             d2d_->panel_brush->SetOpacity(saved_panel_opacity);
             d2d_->card_brush->SetOpacity(saved_card_opacity);
+            d2d_->text_brush->SetColor(saved_text_color);
+            d2d_->text_brush->SetOpacity(saved_text_opacity);
+        }
+
+        if (gameplay_field_drag_state_.visible && d2d_->card_brush &&
+            d2d_->text_brush && d2d_->body_format) {
+            const D2D1_RECT_F handle_rect = D2D1::RectF(
+                gameplay_field_drag_state_.left,
+                gameplay_field_drag_state_.top,
+                gameplay_field_drag_state_.right,
+                gameplay_field_drag_state_.bottom);
+            const D2D1_ROUNDED_RECT handle = D2D1::RoundedRect(handle_rect, 11.0f, 11.0f);
+            const bool highlighted = gameplay_field_drag_state_.hovered ||
+                                     gameplay_field_drag_state_.active;
+            const float saved_card_opacity = d2d_->card_brush->GetOpacity();
+            const D2D1_COLOR_F saved_text_color = d2d_->text_brush->GetColor();
+            const float saved_text_opacity = d2d_->text_brush->GetOpacity();
+
+            d2d_->card_brush->SetOpacity(highlighted ? 0.98f : 0.84f);
+            ctx->FillRoundedRectangle(handle, d2d_->card_brush.Get());
+            d2d_->card_brush->SetOpacity(saved_card_opacity);
+            if (d2d_->accent_brush) {
+                const float saved_accent_opacity = d2d_->accent_brush->GetOpacity();
+                d2d_->accent_brush->SetOpacity(highlighted ? 1.0f : 0.72f);
+                ctx->DrawRoundedRectangle(handle,
+                                          d2d_->accent_brush.Get(),
+                                          highlighted ? 2.4f : 1.6f);
+                d2d_->accent_brush->SetOpacity(saved_accent_opacity);
+            }
+            d2d_->text_brush->SetColor(D2D1::ColorF(0xFFFFFF, 1.0f));
+            d2d_->text_brush->SetOpacity(1.0f);
+            draw_text_clipped_aligned(L"\u2194",
+                                      d2d_->body_format.Get(),
+                                      handle_rect,
+                                      d2d_->text_brush.Get(),
+                                      DWRITE_TEXT_ALIGNMENT_CENTER);
             d2d_->text_brush->SetColor(saved_text_color);
             d2d_->text_brush->SetOpacity(saved_text_opacity);
         }

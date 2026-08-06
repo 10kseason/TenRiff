@@ -68,7 +68,7 @@
   - 기본값은 `8ms`
 ### `judge`
 - `pg`, `gr`, `gd`, `bd` (double, ms)
-- 기본 `gd`는 `75ms`
+- 기본 `pg / gr / gd`는 각각 `20ms / 45ms / 90ms`
 - 기본 `bd`는 `210ms`
 - `Judge Easy`는 기존 `1.25x` 배율로 `bd=262.5ms`, `Judge Hard`는 `bd=340ms`를 사용함; PG/GR/GD와 LN tail 창은 Hard에서 기본값 유지
 - `indirect_miss` (double, ms)
@@ -88,6 +88,7 @@
 - `rate` (double)
 - `hispeed` (double)
 - `target_scroll_bps` (double)
+- 시각 스크롤은 곡 시작 BPM에 고정되며 이후 BPM 변속으로 초당 이동 속도가 보정되지 않음; 명시적 `#SCROLL`, 정지, 역주행은 유지
 
 ### `gauge`
 - `normal | hard | ex_hard | easy`는 곡이 끝나거나 실패할 때까지 타입이 고정됩니다.
@@ -266,6 +267,10 @@
   - gameplay 판정선의 세로 위치 비율
   - `0.00..1.00` 범위(0%~100%)로 clamp
   - 기본값은 `0.82`
+- `gameplay_field_offset_x` (double)
+  - gameplay 기어 오른쪽 위의 `↔` 핸들을 드래그해 정하는 가로 위치
+  - 1920x1080 기준 `-720..720` 범위이며, 실제 화면에서는 기어와 핸들이 보이는 범위로 한 번 더 제한된다
+  - 기본값은 `0.0`
 - `combo_position` (double)
   - gameplay 필드 내부 콤보 표시의 세로 위치 비율
   - `0.10..0.78` 범위로 clamp
@@ -318,6 +323,7 @@
 - `input` (double)
 - `visual` (double)
   - `-500..500` 범위로 clamp
+  - 설정 키와 동작은 유지하며 UI에서는 `Skins > Visual Latency`로 표시
 
 ## `keymap.json`
 

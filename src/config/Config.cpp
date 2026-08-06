@@ -153,6 +153,11 @@ void sanitize_skin_config(SkinConfig& skin) {
     skin.ui_font = normalize_skin_ui_font_token(skin.ui_font);
     skin.judgement_line_position = std::clamp(
         skin.judgement_line_position, kJudgementLinePositionMin, kJudgementLinePositionMax);
+    skin.gameplay_field_offset_x = clamp_finite(
+        skin.gameplay_field_offset_x,
+        kGameplayFieldOffsetXMin,
+        kGameplayFieldOffsetXMax,
+        kGameplayFieldOffsetXDefault);
     skin.combo_position = std::clamp(
         skin.combo_position, kComboPositionMin, kComboPositionMax);
     skin.lane_background_opacity = clamp_finite(
@@ -742,6 +747,11 @@ void apply_config_object(const JsonObject& root, RuntimeConfig& config) {
         config.skin.judgement_line_position = std::clamp(
             get_number(*skin, "judgement_line_position", config.skin.judgement_line_position),
             kJudgementLinePositionMin, kJudgementLinePositionMax);
+        config.skin.gameplay_field_offset_x = clamp_finite(
+            get_number(*skin, "gameplay_field_offset_x", config.skin.gameplay_field_offset_x),
+            kGameplayFieldOffsetXMin,
+            kGameplayFieldOffsetXMax,
+            kGameplayFieldOffsetXDefault);
         config.skin.combo_position = std::clamp(
             get_number(*skin, "combo_position", config.skin.combo_position),
             kComboPositionMin, kComboPositionMax);
@@ -1112,6 +1122,7 @@ JsonValue build_json_root(const RuntimeConfig& config) {
                  JsonValue{normalize_skin_key_label_position_token(config.skin.key_label_position)});
     skin.emplace("ui_font", JsonValue{normalize_skin_ui_font_token(config.skin.ui_font)});
     skin.emplace("judgement_line_position", JsonValue{config.skin.judgement_line_position});
+    skin.emplace("gameplay_field_offset_x", JsonValue{config.skin.gameplay_field_offset_x});
     skin.emplace("combo_position", JsonValue{config.skin.combo_position});
     skin.emplace("lane_background_opacity", JsonValue{config.skin.lane_background_opacity});
     skin.emplace("black_playfield_enabled", JsonValue{config.skin.black_playfield_enabled});

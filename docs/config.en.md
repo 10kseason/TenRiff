@@ -68,7 +68,7 @@ If a profile does not exist, it is created automatically on first launch.
   - default value is `8ms`
 ### `judge`
 - `pg`, `gr`, `gd`, `bd` (double, ms)
-- default `gd` is `75ms`
+- default `pg / gr / gd` values are `20ms / 45ms / 90ms`
 - default `bd` is `210ms`
 - `Judge Easy` follows its existing `1.25x` scale (`bd=262.5ms`), while `Judge Hard` uses `bd=340ms`; Hard leaves PG/GR/GD and long-note tail windows at their base values
 - `indirect_miss` (double, ms)
@@ -88,6 +88,7 @@ If a profile does not exist, it is created automatically on first launch.
 - `rate` (double)
 - `hispeed` (double)
 - `target_scroll_bps` (double)
+- visual scroll stays anchored to the chart's starting BPM; later BPM changes do not correct pixels per second, while explicit `#SCROLL`, stops, and reverse motion remain active
 
 ### `gauge`
 - `normal | hard | ex_hard | easy` stay fixed until the song ends or fails.
@@ -285,6 +286,7 @@ The chart loader and indexer are limited to BMS-family files (`.bms/.bme/.bml/.p
 - `input` (double)
 - `visual` (double)
   - clamped to the `-500..500` range
+  - the storage key and behavior are unchanged; the UI exposes it as `Skins > Visual Latency`
 
 ## `keymap.json`
 

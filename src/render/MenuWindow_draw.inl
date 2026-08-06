@@ -160,6 +160,10 @@ void MenuWindow::draw(const MenuRenderData& data) {
     if (data.kind != MenuScreenKind::SongSelect) {
         clear_song_scrollbar_state();
     }
+    if (data.kind != MenuScreenKind::GameplayHud && !gameplay_field_drag_state_.active) {
+        gameplay_field_drag_state_.visible = false;
+        gameplay_field_drag_state_.hovered = false;
+    }
     auto register_hit = [this](const D2D1_RECT_F& rect,
                                MenuHitTargetKind kind,
                                int index,

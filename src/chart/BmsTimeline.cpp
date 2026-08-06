@@ -61,6 +61,7 @@ BmsTimelineResult BmsTimelineBuilder::build(const BmsNormalizedChart& chart, int
     double current_time_samples = 0.0;
     double current_scroll = 1.0;
     double current_visual_position = 0.0;
+    const double reference_bpm = chart.base_bpm;
 
     auto append_scroll_segment = [&](double start_sample,
                                      double end_sample,
@@ -102,7 +103,13 @@ BmsTimelineResult BmsTimelineBuilder::build(const BmsNormalizedChart& chart, int
             const double segment_start_sample = current_time_samples;
             const double segment_start_position = current_visual_position;
             current_time_samples += delta_time_seconds * sample_rate;
-            current_visual_position += delta_position * current_scroll;
+            // Keep the selected Hi-Speed anchored to the chart's starting BPM.
+            // BPM changes still alter event timing, but no longer change visual
+            // pixels-per-second. Explicit #SCROLL factors, stops, and reverse
+            // motion remain represented by current_scroll.
+            current_visual_position +=
+                delta_time_seconds * reference_bpm /
+                (kBeatsPerMeasure * 60.0) * current_scroll;
             append_scroll_segment(segment_start_sample, current_time_samples,
                                   segment_start_position, current_visual_position);
             current_position = group_position;
@@ -186,7 +193,9 @@ BmsTimelineResult BmsTimelineBuilder::build(const BmsNormalizedChart& chart, int
             const double segment_start_sample = current_time_samples;
             const double segment_start_position = current_visual_position;
             current_time_samples += delta_time_seconds * sample_rate;
-            current_visual_position += remaining * current_scroll;
+            current_visual_position +=
+                delta_time_seconds * reference_bpm /
+                (kBeatsPerMeasure * 60.0) * current_scroll;
             append_scroll_segment(segment_start_sample, current_time_samples,
                                   segment_start_position, current_visual_position);
             current_position = chart_end_position;
