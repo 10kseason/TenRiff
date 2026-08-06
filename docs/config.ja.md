@@ -114,6 +114,7 @@ profile が存在しない場合は初回起動時に自動生成されます。
   - `vsync=true` では present refresh は active monitor Hz に従い、render pacing は `monitor_hz * 2` を狙う（`1050` clamp）
 - `performance_overlay` (bool)
   - 既定値は `false`。右上を使うため、同じ角に置いた Discord Voice widget と重なる場合がある
+  - gameplay frame pacing は成功した DXGI `Present()` 完了時刻の間隔を測定し、HUD update cadence は FPS sample に使用しない
 - `bga_enabled` (bool)
   - 既定値は `true`。`false` では gameplay の image/video BGA と decoder/upscaler 処理を無効化
   - Song Select の background preview は別機能なので表示を維持

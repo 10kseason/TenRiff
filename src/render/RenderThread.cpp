@@ -357,6 +357,14 @@ void RenderThread::update_config(const RenderConfig& config) {
     config_ = config;
 }
 
+void RenderThread::record_presented_frame_ns(int64_t present_completion_ns) {
+    if (present_completion_ns <= 0) {
+        return;
+    }
+    std::lock_guard<std::mutex> lock(performance_mutex_);
+    performance_tracker_.record_frame_start_ns(present_completion_ns);
+}
+
 RenderPerformanceSnapshot RenderThread::performance_snapshot() const {
     std::lock_guard<std::mutex> lock(performance_mutex_);
     return performance_tracker_.snapshot();
@@ -407,12 +415,6 @@ void RenderThread::thread_main() {
 #endif
             );
             continue;
-        }
-
-        const int64_t frame_start_ns = now_ns;
-        {
-            std::lock_guard<std::mutex> lock(performance_mutex_);
-            performance_tracker_.record_frame_start_ns(frame_start_ns);
         }
 
         callback_();

@@ -4,6 +4,10 @@ TenRiff의 사용자/배포 관점에서 의미 있는 변경만 간단히 기�
 
 ## [Unreleased]
 
+### Changed
+
+- 인게임 `FRAME PACING`을 HUD 업데이트 주기가 아니라 성공한 DXGI `Present()` 완료 프레임 간격으로 측정하도록 변경했습니다. 가려짐·모드 전환·실패한 present는 샘플에서 제외합니다.
+
 ## [1.3.6] - 2026-08-07
 
 ### Added

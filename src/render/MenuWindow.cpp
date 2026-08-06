@@ -2238,6 +2238,7 @@ void MenuWindow::shutdown() {
     initialized_.store(false, std::memory_order_release);
     init_success_.store(false, std::memory_order_release);
     screenshot_requested_.store(false, std::memory_order_release);
+    last_present_completion_ns_.store(0, std::memory_order_release);
     update_cursor_visibility(false);
     clear_song_scrollbar_state();
     hit_regions_.clear();
@@ -4119,7 +4120,7 @@ void MenuWindow::push_text_input(std::string text) {
 }
 
 void MenuWindow::render(const MenuRenderData& data) {
-
+    last_present_completion_ns_.store(0, std::memory_order_release);
     apply_pending_config();
     update_cursor_visibility(data.kind == MenuScreenKind::GameplayHud &&
                              !data.gameplay.show_cursor_in_gameplay &&

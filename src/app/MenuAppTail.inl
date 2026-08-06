@@ -1250,22 +1250,12 @@ void MenuApp::render_tick() {
             gameplay_hud_publish_time_ns = gameplay_hud_.hud_publish_time_ns;
             gameplay_perf_active = gameplay_hud_.active && !gameplay_hud_.loading;
         }
-        if (gameplay_perf_active) {
-            if (!gameplay_performance_active_) {
-                gameplay_performance_tracker_.reset();
-                gameplay_performance_last_motion_revision_ = 0;
-                gameplay_performance_active_ = true;
-            }
-            if (gameplay_hud_publish_time_ns > 0 && gameplay_motion_revision != 0 &&
-                gameplay_motion_revision != gameplay_performance_last_motion_revision_) {
-                gameplay_performance_tracker_.record_frame_start_ns(gameplay_hud_publish_time_ns);
-                gameplay_performance_last_motion_revision_ = gameplay_motion_revision;
-            }
-            perf_snapshot = gameplay_performance_tracker_.snapshot();
-        } else if (gameplay_performance_active_) {
-            gameplay_performance_tracker_.reset();
-            gameplay_performance_last_motion_revision_ = 0;
-            gameplay_performance_active_ = false;
+        if (gameplay_perf_active && !gameplay_present_performance_active_) {
+            render_thread_.reset_performance_tracking();
+            perf_snapshot = {};
+            gameplay_present_performance_active_ = true;
+        } else if (!gameplay_perf_active) {
+            gameplay_present_performance_active_ = false;
         }
         if (snapshot_changed ||
             rendered_gameplay_motion_version_ != gameplay_motion_revision ||
@@ -1316,11 +1306,7 @@ void MenuApp::render_tick() {
             render_cache_.performance.gameplay_buffer_ms = 0.0;
         }
     } else {
-        if (gameplay_performance_active_) {
-            gameplay_performance_tracker_.reset();
-            gameplay_performance_last_motion_revision_ = 0;
-            gameplay_performance_active_ = false;
-        }
+        gameplay_present_performance_active_ = false;
         render_cache_.performance.gameplay_metrics_visible = false;
         render_cache_.performance.gameplay_metrics_revision = 0;
         render_cache_.performance.gameplay_audio_age_ms = 0.0;
@@ -1343,6 +1329,7 @@ void MenuApp::render_tick() {
     render_cache_.performance.fps_0_01_low = perf_snapshot.fps_0_01_low;
     render_cache_.performance.frame_times_ms = perf_snapshot.frame_times_ms;
     menu_window_.render(render_cache_);
+    render_thread_.record_presented_frame_ns(menu_window_.last_present_completion_ns());
 }
 
 void MenuApp::render_snapshot(const MenuSnapshot& snapshot) {

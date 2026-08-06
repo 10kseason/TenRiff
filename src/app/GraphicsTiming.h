@@ -23,11 +23,12 @@ inline constexpr int kGraphicsOffVsyncGameplayMonitorMultiplier = 2;
                                              int detected_monitor_refresh_hz,
                                              bool gameplay_active);
 [[nodiscard]] bool should_allow_tearing_present(bool vsync_enabled,
-                                                bool fullscreen_exclusive,
-                                                bool swap_chain_allows_tearing);
+                                                 bool fullscreen_exclusive,
+                                                 bool swap_chain_allows_tearing);
+[[nodiscard]] bool should_record_presented_frame(std::uint32_t present_hr);
 [[nodiscard]] bool should_treat_present_failure_as_transient(std::uint32_t present_hr,
-                                                             bool fullscreen_requested,
-                                                             bool window_in_foreground,
+                                                              bool fullscreen_requested,
+                                                              bool window_in_foreground,
                                                              bool window_minimized);
 
 } // namespace tenriff::app

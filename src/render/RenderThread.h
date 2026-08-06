@@ -77,12 +77,13 @@ public:
     void stop();
     void shutdown();
     void update_config(const RenderConfig& config);
+    void record_presented_frame_ns(int64_t present_completion_ns);
+    void reset_performance_tracking();
     [[nodiscard]] RenderPerformanceSnapshot performance_snapshot() const;
 
     [[nodiscard]] bool is_running() const { return is_running_.load(std::memory_order_acquire); }
 
 private:
-    void reset_performance_tracking();
     [[nodiscard]] RenderConfig current_config() const;
     void thread_main();
 

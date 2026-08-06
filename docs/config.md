@@ -115,6 +115,7 @@
   - `vsync=true`면 present refresh는 active monitor Hz를 따르고, render pacing은 `monitor_hz * 2`를 목표로 함 (`1050` clamp)
 - `performance_overlay` (bool)
   - 기본값은 `false`; 우상단을 사용하므로 Discord Voice 위젯을 같은 모서리에 두면 겹칠 수 있음
+  - 인게임 frame pacing은 성공한 DXGI `Present()` 완료 시각 사이의 간격을 측정하며, HUD 업데이트 주기는 FPS 샘플로 사용하지 않음
 - `bga_enabled` (bool)
   - 기본값은 `true`; `false`면 게임플레이의 이미지/영상 BGA와 관련 디코더·업스케일러 작업을 끔
   - Song Select 배경 미리보기는 별도 기능이므로 계속 표시됨

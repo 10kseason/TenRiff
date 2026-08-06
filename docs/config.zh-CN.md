@@ -114,6 +114,7 @@
   - `vsync=true` 时，present refresh 以当前活动显示器 Hz 为准，render pacing 的目标是 `monitor_hz * 2`（上限 `1050`）
 - `performance_overlay` (bool)
   - 默认值为 `false`；它位于右上角，可能会与放在同一角落的 Discord Voice widget 重叠
+  - gameplay frame pacing 测量成功 DXGI `Present()` 完成时间之间的间隔，不再把 HUD 更新节奏作为 FPS sample
 - `bga_enabled` (bool)
   - 默认值为 `true`；设为 `false` 会关闭 gameplay 图片/视频 BGA 及其 decoder/upscaler 工作
   - Song Select 背景预览属于独立功能，因此仍会显示

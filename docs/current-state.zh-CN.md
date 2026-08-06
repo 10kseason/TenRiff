@@ -142,7 +142,7 @@
   - VSync off：menu 有效上限 `300`；gameplay 在 `0` 时取消 pacing，或使用数值配置目标
   - VSync on：present refresh 跟随活动显示器 Hz，render pacing 目标为 `monitor_hz * 2`（上限 `1050`）
   - `visual_offset_ms`
-  - `performance_overlay`
+  - `performance_overlay`（gameplay FPS/frame time 使用成功 DXGI `Present()` 的完成间隔；HUD 更新节奏仅保留为独立 gameplay diagnostics）
   - `bga_enabled=false` 会禁用 gameplay 图片/视频 BGA 及 decoder/upscaler 工作，同时保留 Song Select 预览
   - `background_upscale_model_path` 只保存从 Graphics Settings 选择或拖入的兼容 ONNX 路径；公开包不包含模型
   - BGA Upscaler 默认为 `off`；用户必须明确开启并确认 high-spec warning，不存在自动 benchmark gate

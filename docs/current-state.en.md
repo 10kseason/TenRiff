@@ -143,7 +143,7 @@ This is the document that the next agent or any new contributor should read firs
   - VSync off: menu effective cap `300`; gameplay either disables pacing at `0` or uses the numeric configured target
   - VSync on: present refresh follows the active monitor Hz and render pacing targets `monitor_hz * 2` (`1050` clamp)
   - `visual_offset_ms`
-  - `performance_overlay`
+  - `performance_overlay` (in-game FPS/frame time uses successful DXGI `Present()` completion intervals; HUD update cadence remains separate gameplay diagnostics)
   - `bga_enabled=false` disables gameplay image/video BGA and decoder/upscaler work while keeping Song Select previews
   - `background_upscale_model_path` only stores the compatible ONNX selected or dropped in Graphics Settings; public packages include no model
   - BGA Upscaler defaults to `off`; the user must explicitly turn it on and acknowledge the high-spec warning, with no automatic benchmark gate

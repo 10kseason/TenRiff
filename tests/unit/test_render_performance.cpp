@@ -106,6 +106,22 @@ TEST_CASE("render pacing treats zero fps as unlimited only without vsync") {
     CHECK_FALSE(tenriff::render::should_use_unlimited_render_pacing(false, 300));
 }
 
+TEST_CASE("render thread performance metrics use explicit present completions") {
+    tenriff::render::RenderThread render_thread;
+
+    render_thread.record_presented_frame_ns(0);
+    CHECK_FALSE(render_thread.performance_snapshot().valid);
+
+    render_thread.record_presented_frame_ns(100'000'000);
+    render_thread.record_presented_frame_ns(104'000'000);
+
+    const auto snapshot = render_thread.performance_snapshot();
+    CHECK(snapshot.valid);
+    CHECK(snapshot.sample_count == 1u);
+    CHECK(snapshot.average_frame_ms == doctest::Approx(4.0));
+    CHECK(snapshot.average_fps == doctest::Approx(250.0));
+}
+
 TEST_CASE("gameplay motion extrapolates from audio sample time and clamps stale HUD drift") {
     tenriff::render::GameplayMotionState state;
     state.current_sample = 1000;
