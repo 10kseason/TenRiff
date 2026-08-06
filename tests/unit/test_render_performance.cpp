@@ -100,6 +100,12 @@ TEST_CASE("render wait policy shrinks the busy tail for high off-vsync fps") {
     CHECK(vsync_policy.yield_threshold_ns == baseline.yield_threshold_ns);
 }
 
+TEST_CASE("render pacing treats zero fps as unlimited only without vsync") {
+    CHECK(tenriff::render::should_use_unlimited_render_pacing(false, 0));
+    CHECK_FALSE(tenriff::render::should_use_unlimited_render_pacing(true, 0));
+    CHECK_FALSE(tenriff::render::should_use_unlimited_render_pacing(false, 300));
+}
+
 TEST_CASE("gameplay motion extrapolates from audio sample time and clamps stale HUD drift") {
     tenriff::render::GameplayMotionState state;
     state.current_sample = 1000;

@@ -17,6 +17,10 @@ struct RenderWaitPolicy {
     int64_t yield_threshold_ns = kRenderDefaultYieldThresholdNs;
 };
 
+inline bool should_use_unlimited_render_pacing(bool vsync_enabled, int target_fps) {
+    return !vsync_enabled && target_fps <= 0;
+}
+
 inline RenderWaitPolicy render_wait_policy(bool vsync_enabled, int target_fps) {
     RenderWaitPolicy policy;
     if (vsync_enabled || target_fps <= kRenderAdaptiveWaitThresholdFps) {

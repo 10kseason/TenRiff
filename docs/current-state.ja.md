@@ -138,8 +138,8 @@
   - 2 台のキーボードが同じキーを押しても、最後の入力ソースが離すまで論理 `Pressed` は維持される
 - Graphics:
   - resolution presets (`720p`, `1080p`, `qhd`, `native`)
-  - `refresh_hz` (`60..1050`, default `300`)
-  - VSync off: menu effective cap `300`, gameplay は設定値を `1050` まで使用可能
+  - `refresh_hz` (`0` = `Unlimited`、数値は `60..1050`、default `300`)
+  - VSync off: menu effective cap `300`、gameplay は `0` で pacing を解除、または数値の設定値を使用
   - VSync on: present refresh は active monitor Hz に追従し、render pacing は `monitor_hz * 2` を目標にする（`1050` clamp）
   - `visual_offset_ms`
   - `performance_overlay`
