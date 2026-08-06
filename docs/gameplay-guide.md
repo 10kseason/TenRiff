@@ -60,11 +60,11 @@ TenRiff의 기본 플레이 흐름은 아래 순서입니다.
 - `Audio`
   - Master/BGM/Keysound 볼륨과 BMS keysound 정책 조정
 - `Graphics`
-  - VSync, Refresh Hz, Performance HUD, Display Offset, BGA 표시, 외부 ONNX BGA Upscaler 조정
+  - VSync, Refresh Hz, Performance HUD, BGA 표시, 외부 ONNX BGA Upscaler 조정
   - `BGA`를 끄면 게임플레이 이미지/영상과 관련 디코더·업스케일러 작업이 꺼지며 Song Select 미리보기는 유지됨
   - 모델 선택 후 Upscaler를 직접 켜고 고사양 경고를 확인해야 함. `저전력 DirectX(실험)`은 DirectXMinPower 요청일 뿐 NPU를 명시 선택하거나 검증하지 않음
 - `Skins`
-  - native/LR2 스킨 전환, native 하단 디지털 피아노 건반(홀드 눌림·타격 글리치), LR2 폴더 하나 이식 또는 독립적인 non-IIDX `LR2files/Theme` 일괄 이식(IIDX 의존 테마 제외), 필드 크기에 연동해 확대되고 판정선 아래로 clip되는 원본 종횡비 하단 Gear 프레임, 고정 레인선 기준 노트 간격·크기, 검은 플레이필드, 판정선 위치, LN 몸통 폭, lane color 조정
+  - native/LR2 스킨 전환, 비주얼 레이턴시, native 하단 디지털 피아노 건반(홀드 눌림·타격 글리치), LR2 폴더 하나 이식 또는 독립적인 non-IIDX `LR2files/Theme` 일괄 이식(IIDX 의존 테마 제외), 필드 크기에 연동해 확대되고 판정선 아래로 clip되는 원본 종횡비 하단 Gear 프레임, 고정 레인선 기준 노트 간격·크기, 검은 플레이필드, 판정선 위치, LN 몸통 폭, lane color 조정
 - `Keymap`
   - 키 배치 변경과 NKRO 테스트
 
@@ -78,10 +78,10 @@ TenRiff의 기본 플레이 흐름은 아래 순서입니다.
 - `Mode > Hi-Speed`: 기본값 그대로 시작
 - `Graphics > Display`: Discord 음성 오버레이를 쓸 때는 `Borderless` 권장
 - `Graphics > Performance HUD`: 필요할 때만 켜기
-- `Graphics > Display Offset`: 기본값 `0ms`에서 시작
+- `Skins > Visual Latency`: 기본값 `0ms`에서 시작
 - `Audio > Keysound Mode`: BMS는 `follow` 권장
 
-노트가 너무 느리거나 빠르게 보이면 우선 `Hi-Speed`만 조정하고, 판정은 맞는데 화면만 늦거나 빠르게 보이면 `Display Offset`을 조정하는 식으로 접근하면 됩니다.
+노트가 너무 느리거나 빠르게 보이면 우선 `Hi-Speed`만 조정하고, 판정은 맞는데 화면만 늦거나 빠르게 보이면 `Visual Latency`를 조정하는 식으로 접근하면 됩니다.
 
 ### Discord 음성 오버레이
 
@@ -129,6 +129,7 @@ Discord 설정 방법은 [공식 Game Overlay 안내](https://support.discord.co
 
 Hi-Speed는 시각 스크롤 속도만 바꾸고, 판정 타이밍 자체를 바꾸지는 않습니다.
 Rate는 곡 재생 속도와 차트 스케줄만 바꾸며, 같은 Hi-Speed에서 시각 스크롤 속도를 바꾸지 않습니다.
+BPM 변속이 있어도 곡 시작 BPM에 맞춘 초당 스크롤 속도를 유지하며, 차트의 명시적 `#SCROLL`·정지·역주행 효과는 그대로 적용됩니다.
 
 ## 8. HUD 읽는 법
 
@@ -216,7 +217,7 @@ Rank는 `<75 F`, `75 B`, `80.5 A`, `86.5 A+`, `90 S`, `95.5 S+`, `98 AA`, `99 SS
 - 필요하면 `Skins > Note & Field Size / Note Height / Judge Line`도 같이 조정합니다.
 
 ### 판정은 맞는 것 같은데 화면이 늦거나 빠르게 보인다
-- `Graphics > Display Offset`을 조정합니다.
+- `Skins > Visual Latency`를 조정합니다.
 - 양수는 노트를 더 일찍 그립니다.
 
 ### BMS에서 건반음이 너무 크거나 작다
@@ -236,7 +237,7 @@ Rank는 `<75 F`, `75 B`, `80.5 A`, `86.5 A+`, `90 S`, `95.5 S+`, `98 AA`, `99 SS
 1. `Song Select`에서 쉬운 곡 하나 선택
 2. `Mode`에서 `Gauge=Normal`, `Rate=1.0x` 확인
 3. 플레이 후 `Hi-Speed`만 먼저 조정
-4. 그래도 어색하면 `Display Offset` 조정
+4. 그래도 어색하면 `Skins > Visual Latency` 조정
 5. 손이 불편하면 `Keymap` 수정
 6. 마지막에 `Skins`로 노트 크기와 판정선 위치 조정
 

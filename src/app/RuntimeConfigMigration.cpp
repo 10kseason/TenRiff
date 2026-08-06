@@ -34,7 +34,12 @@ constexpr double kLegacyBadWindowMs = 200.0;
 constexpr double kPreviousBadWindowMs = 95.0;
 constexpr double kPreviousDefaultBadWindowMs = 340.0;
 constexpr double kLegacyGoodWindowMs = 55.0;
-constexpr double kCurrentGoodWindowMs = 75.0;
+constexpr double kPreviousPerfectWindowMs = 15.5;
+constexpr double kPreviousGreatWindowMs = 31.0;
+constexpr double kPreviousGoodWindowMs = 75.0;
+constexpr double kCurrentPerfectWindowMs = 20.0;
+constexpr double kCurrentGreatWindowMs = 45.0;
+constexpr double kCurrentGoodWindowMs = 90.0;
 constexpr double kCurrentBadWindowMs = 210.0;
 constexpr double kLegacyHoldGraceMs = 20.0;
 constexpr double kPreviousCurrentHoldGraceMs = 45.0;
@@ -223,7 +228,16 @@ bool migrate_bms_first_runtime_config(config::RuntimeConfig& config) {
         config.judge.bd_ms = kCurrentBadWindowMs;
         changed = true;
     }
-    if (std::abs(config.judge.gd_ms - kLegacyGoodWindowMs) <= kJudgeWindowToleranceMs) {
+    if (std::abs(config.judge.pg_ms - kPreviousPerfectWindowMs) <= kJudgeWindowToleranceMs) {
+        config.judge.pg_ms = kCurrentPerfectWindowMs;
+        changed = true;
+    }
+    if (std::abs(config.judge.gr_ms - kPreviousGreatWindowMs) <= kJudgeWindowToleranceMs) {
+        config.judge.gr_ms = kCurrentGreatWindowMs;
+        changed = true;
+    }
+    if (std::abs(config.judge.gd_ms - kLegacyGoodWindowMs) <= kJudgeWindowToleranceMs ||
+        std::abs(config.judge.gd_ms - kPreviousGoodWindowMs) <= kJudgeWindowToleranceMs) {
         config.judge.gd_ms = kCurrentGoodWindowMs;
         changed = true;
     }

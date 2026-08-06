@@ -118,7 +118,7 @@ int next_option_index(const int* options, int count, int current, int direction)
 }  // namespace
 
 void MenuApp::handle_graphics_settings_input(uint32_t keycode) {
-    const int item_count = 13;
+    const int item_count = 12;
     if (keycode == key_up_) {
         settings_cursor_ = clamp_int(settings_cursor_ - 1, 0, item_count - 1);
         publish_snapshot();
@@ -130,7 +130,8 @@ void MenuApp::handle_graphics_settings_input(uint32_t keycode) {
         return;
     }
 
-    if (settings_cursor_ == 0 && (keycode == key_left_ || keycode == key_right_)) {
+    if (settings_cursor_ == 0 &&
+        (keycode == key_left_ || keycode == key_right_ || keycode == key_enter_)) {
         const int direction = (keycode == key_left_) ? -1 : 1;
         config_.graphics.display_mode = cycle_display_mode(config_.graphics.display_mode, direction);
         graphics_dirty_ = true;
@@ -138,7 +139,8 @@ void MenuApp::handle_graphics_settings_input(uint32_t keycode) {
         publish_snapshot();
         return;
     }
-    if (settings_cursor_ == 1 && (keycode == key_left_ || keycode == key_right_)) {
+    if (settings_cursor_ == 1 &&
+        (keycode == key_left_ || keycode == key_right_ || keycode == key_enter_)) {
         const int direction = (keycode == key_left_) ? -1 : 1;
         config_.graphics.resolution = cycle_resolution_preset(config_.graphics.resolution, direction);
         graphics_dirty_ = true;
@@ -146,7 +148,8 @@ void MenuApp::handle_graphics_settings_input(uint32_t keycode) {
         publish_snapshot();
         return;
     }
-    if (settings_cursor_ == 2 && (keycode == key_left_ || keycode == key_right_)) {
+    if (settings_cursor_ == 2 &&
+        (keycode == key_left_ || keycode == key_right_ || keycode == key_enter_)) {
         const int direction = (keycode == key_left_) ? -1 : 1;
         int next_value = config_.graphics.refresh_hz + direction * kRefreshHzStep;
         next_value = clamp_int(next_value, kGraphicsRefreshHzMin, kGraphicsRefreshHzMax);
@@ -156,14 +159,16 @@ void MenuApp::handle_graphics_settings_input(uint32_t keycode) {
         publish_snapshot();
         return;
     }
-    if (settings_cursor_ == 3 && (keycode == key_left_ || keycode == key_right_)) {
+    if (settings_cursor_ == 3 &&
+        (keycode == key_left_ || keycode == key_right_ || keycode == key_enter_)) {
         config_.graphics.vsync = !config_.graphics.vsync;
         graphics_dirty_ = true;
         apply_runtime_graphics_config();
         publish_snapshot();
         return;
     }
-    if (settings_cursor_ == 4 && (keycode == key_left_ || keycode == key_right_)) {
+    if (settings_cursor_ == 4 &&
+        (keycode == key_left_ || keycode == key_right_ || keycode == key_enter_)) {
         config_.graphics.performance_overlay = !config_.graphics.performance_overlay;
         graphics_dirty_ = true;
         publish_snapshot();
@@ -218,30 +223,22 @@ void MenuApp::handle_graphics_settings_input(uint32_t keycode) {
         publish_snapshot();
         return;
     }
-    if (settings_cursor_ == 9 && (keycode == key_left_ || keycode == key_right_)) {
+    if (settings_cursor_ == 9 &&
+        (keycode == key_left_ || keycode == key_right_ || keycode == key_enter_)) {
         config_.graphics.background_upscale_prefer_npu =
             !config_.graphics.background_upscale_prefer_npu;
         graphics_dirty_ = true;
         publish_snapshot();
         return;
     }
-    if (settings_cursor_ == 10 && (keycode == key_left_ || keycode == key_right_)) {
+    if (settings_cursor_ == 10 &&
+        (keycode == key_left_ || keycode == key_right_ || keycode == key_enter_)) {
         config_.ui.language =
             (config::normalize_ui_language_token(config_.ui.language) == "ko") ? "en" : "ko";
         graphics_dirty_ = true;
         publish_snapshot();
         return;
     }
-    if (settings_cursor_ == 11 && (keycode == key_left_ || keycode == key_right_)) {
-        const int direction = (keycode == key_left_) ? -1 : 1;
-        config_.visual_offset_ms = clamp_step_value(
-            config_.visual_offset_ms + static_cast<double>(direction) * kVisualOffsetStep,
-            kVisualOffsetMin, kVisualOffsetMax, kVisualOffsetStep);
-        graphics_dirty_ = true;
-        publish_snapshot();
-        return;
-    }
-
     const bool back_requested = keycode == key_escape_ || keycode == key_backspace_ ||
                                 (keycode == key_enter_ && settings_cursor_ == item_count - 1);
     if (back_requested) {
@@ -437,16 +434,15 @@ void MenuApp::populate_graphics_settings_render_data(render::MenuRenderData& ren
                     onnx_model_label(config_.graphics.background_upscale_model_path,
                                      ui_text("Select...", "선택...")),
                     settings_cursor_ == 8,
-                    render::MenuHitTargetKind::SettingsRow, 8, false, false);
+                    render::MenuHitTargetKind::SettingsRow, 8, true, false);
     append_menu_row(render.generic, ui_text("Low-Power DirectX (Experimental)", "저전력 DirectX (실험)"),
                     ui_on_off(config_.graphics.background_upscale_prefer_npu),
                     settings_cursor_ == 9,
                     render::MenuHitTargetKind::SettingsRow, 9, false, true);
     append_menu_row(render.generic, ui_text("Language", "언어"), ui_language_label(config_.ui.language), settings_cursor_ == 10,
                     render::MenuHitTargetKind::SettingsRow, 10, false, true);
-    append_menu_row(render.generic, ui_text("Display Offset", "표시 오프셋"), format_signed_offset_ms(config_.visual_offset_ms), settings_cursor_ == 11,
-                    render::MenuHitTargetKind::SettingsRow, 11, false, true);
-    append_menu_row(render.generic, ui_text("Back", "뒤로"), "", settings_cursor_ == 12, render::MenuHitTargetKind::SettingsRow, 12, true, false);
+    append_menu_row(render.generic, ui_text("Back", "뒤로"), "", settings_cursor_ == 11,
+                    render::MenuHitTargetKind::SettingsRow, 11, true, false);
     if (normalize_display_mode(config_.graphics.display_mode) == "fullscreen") {
         render.generic.notes.push_back(ui_text(
             "Discord's current voice overlay does not work in Exclusive Fullscreen. Switch Display to Borderless or Windowed.",
@@ -477,8 +473,8 @@ void MenuApp::populate_graphics_settings_render_data(render::MenuRenderData& ren
     render.generic.notes.push_back(ui_text(
         "FP32/FP16 model I/O and float-boundary INT8 QDQ metadata are detected automatically. Low-Power DirectX requests DirectXMinPower; it does not select or verify an NPU.",
         "FP32/FP16 모델 입출력과 float 경계 INT8 QDQ 메타데이터를 자동 감지합니다. 저전력 DirectX는 DirectXMinPower 요청이며 NPU를 명시 선택하거나 검증하지 않습니다."));
-    render.generic.notes.push_back(ui_text("Language changes the menu UI immediately. Display Offset shifts only visuals from -500ms to +500ms.",
-                                           "언어는 메뉴 UI에 즉시 반영됩니다. 표시 오프셋은 시각 요소만 -500ms~+500ms 범위에서 이동합니다."));
+    render.generic.notes.push_back(ui_text("Language changes the menu UI immediately. Visual Latency is available in Skin Settings.",
+                                           "언어는 메뉴 UI에 즉시 반영됩니다. 비주얼 레이턴시는 스킨 설정에서 조정합니다."));
     render.generic.notes.push_back(ui_text("Display, Resolution, Refresh Hz, and VSync apply immediately. Back saves and returns.",
                                            "표시 모드, 해상도, 주사율, VSync는 즉시 적용됩니다. 뒤로 가면 저장 후 돌아갑니다."));
 }
@@ -554,7 +550,7 @@ void MenuApp::populate_calibration_settings_render_data(render::MenuRenderData& 
                     1,
                     false,
                     true);
-    append_menu_row(render.generic, ui_text("Display Offset", "표시 오프셋"),
+    append_menu_row(render.generic, ui_text("Visual Latency", "비주얼 레이턴시"),
                     format_signed_offset_ms(config_.visual_offset_ms),
                     settings_cursor_ == 2,
                     render::MenuHitTargetKind::SettingsRow,
@@ -578,8 +574,8 @@ void MenuApp::populate_calibration_settings_render_data(render::MenuRenderData& 
 
     render.generic.notes.push_back(ui_text("Step 1: use Input Offset to match your actual key hit timing to the judgement windows.",
                                            "1단계: 입력 오프셋으로 실제 타건 타이밍을 판정창에 맞추세요."));
-    render.generic.notes.push_back(ui_text("Step 2: use Display Offset only for what you see. Positive values draw notes earlier.",
-                                           "2단계: 표시 오프셋은 화면만 조정합니다. 양수일수록 노트가 더 일찍 보입니다."));
+    render.generic.notes.push_back(ui_text("Step 2: use Visual Latency only for what you see. Positive values draw notes earlier.",
+                                           "2단계: 비주얼 레이턴시는 화면만 조정합니다. 양수일수록 노트가 더 일찍 보입니다."));
     render.generic.notes.push_back(ui_text("Use a familiar chart, retry quickly from Result, and compare fast/slow feedback until both feel centered.",
                                            "익숙한 차트를 고른 뒤 결과 화면에서 빠르게 재시작하면서 빠름/느림 피드백이 중앙에 모일 때까지 조정하세요."));
     render.generic.notes.push_back(ui_text("Changes save immediately so the next launch uses the same calibration.",

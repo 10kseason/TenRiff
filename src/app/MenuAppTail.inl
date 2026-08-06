@@ -49,6 +49,10 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
         config::kComboPositionMin,
         config::kComboPositionMax);
     target.judgement_line_position = clamped_judgement_line_position;
+    target.gameplay_field_offset_x = std::clamp(
+        config_.skin.gameplay_field_offset_x,
+        config::kGameplayFieldOffsetXMin,
+        config::kGameplayFieldOffsetXMax);
     target.combo_position = clamped_combo_position;
     const std::string skin_mode = std::to_string(target.lane_count) + "k";
     const auto resolved_lane_widths = config::resolved_skin_lane_width_scales(config_.skin, skin_mode);
@@ -626,7 +630,7 @@ void MenuApp::populate_quick_setup_render_data(render::MenuRenderData& render) {
                     false,
                     true);
     append_menu_row(render.generic,
-                    ui_text("Display Offset", "표시 오프셋"),
+                    ui_text("Visual Latency", "비주얼 레이턴시"),
                     format_signed_offset_ms(config_.visual_offset_ms),
                     settings_cursor_ == 3,
                     render::MenuHitTargetKind::SettingsRow,
@@ -706,8 +710,8 @@ void MenuApp::populate_quick_setup_render_data(render::MenuRenderData& render) {
     }
     render.generic.notes.push_back(ui_text("Nickname is shown in saved records and multiplayer. Avatar Image accepts local PNG/JPG files.",
                                            "닉네임은 저장 기록과 멀티플레이에 표시됩니다. 프로필 사진은 로컬 PNG/JPG 파일을 사용합니다."));
-    render.generic.notes.push_back(ui_text("Recommended start: Gauge Normal, Rate 1.00x, Display Offset 0ms, BMS Keysound Follow.",
-                                           "권장 시작값: 노말 게이지, Rate 1.00x, 표시 오프셋 0ms, BMS 키음 연동."));
+    render.generic.notes.push_back(ui_text("Recommended start: Gauge Normal, Rate 1.00x, Visual Latency 0ms, BMS Keysound Follow.",
+                                           "권장 시작값: 노말 게이지, Rate 1.00x, 비주얼 레이턴시 0ms, BMS 키음 연동."));
     render.generic.notes.push_back(ui_text("Songs Folder opens a picker on Enter or F2. You can also drag and drop a folder later.",
                                            "곡 폴더는 Enter 또는 F2로 선택 창을 엽니다. 나중에 폴더를 드래그 앤 드롭해도 됩니다."));
     render.generic.notes.push_back(ui_text("You can keep adjusting these later from Song Select > Options and Mode Settings.",
@@ -887,8 +891,8 @@ void MenuApp::populate_result_render_data(render::MenuRenderData& render, const 
                 ui_text("Step 1: Skins > Judge Line -> move '-' first.",
                         "1단계: Skins > 판정선 위치를 먼저 '-' 쪽으로 조절하세요.");
             render.result.timing_guidance_detail =
-                ui_text("Step 2: If '+' still stays dominant, Graphics > Display Offset -> move '+'.",
-                        "2단계: 그래도 '+' 쪽이 남으면 Graphics > 표시 오프셋을 '+' 쪽으로 조절하세요.");
+                ui_text("Step 2: If '+' still stays dominant, Skins > Visual Latency -> move '+'.",
+                        "2단계: 그래도 '+' 쪽이 남으면 스킨 > 비주얼 레이턴시를 '+' 쪽으로 조절하세요.");
         } else {
             render.result.timing_guidance_title =
                 ui_text("Timing Advice ", "타이밍 알림 ") + "(" + bias_summary + ")";
@@ -896,8 +900,8 @@ void MenuApp::populate_result_render_data(render::MenuRenderData& render, const 
                 ui_text("Step 1: Skins > Judge Line -> move '+' first.",
                         "1단계: Skins > 판정선 위치를 먼저 '+' 쪽으로 조절하세요.");
             render.result.timing_guidance_detail =
-                ui_text("Step 2: If '-' still stays dominant, Graphics > Display Offset -> move '-'.",
-                        "2단계: 그래도 '-' 쪽이 남으면 Graphics > 표시 오프셋을 '-' 쪽으로 조절하세요.");
+                ui_text("Step 2: If '-' still stays dominant, Skins > Visual Latency -> move '-'.",
+                        "2단계: 그래도 '-' 쪽이 남으면 스킨 > 비주얼 레이턴시를 '-' 쪽으로 조절하세요.");
         }
     }
 
@@ -1491,7 +1495,7 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
             (void)peer_session_.publish_score(score, false);
             peer_revision = peer_session_.snapshot().revision;
         }
-        std::lock_guard<std::mutex> lock(gameplay_hud_mutex_);
+        std::unique_lock<std::mutex> lock(gameplay_hud_mutex_);
         const GameplayHudRevisionInput previous = gameplay_hud_revision_input(gameplay_hud_);
 
 
@@ -1615,6 +1619,15 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
         const GameplayHudRevisionInput next = gameplay_hud_revision_input(gameplay_hud_);
         const GameplayHudRevisionFlags diff = diff_gameplay_hud_revisions(previous, next);
         advance_gameplay_hud_revisions(gameplay_hud_, diff.motion_changed, diff.text_changed);
+        lock.unlock();
+
+        while (true) {
+            auto click = menu_window_.poll_click_event();
+            if (!click.has_value()) {
+                break;
+            }
+            handle_menu_click(click.value());
+        }
     });
 
     CommandLineOptions play_options = options_;
@@ -1886,8 +1899,8 @@ void MenuApp::populate_help_overlay(render::HelpOverlayData& target) const {
                             "TenRiff가 첫 실행용 기본 프로필과 기본 키 설정을 만들었습니다."),
                     ui_text("Songs Folder opens a picker on Enter or F2. You can also drag and drop a folder later.",
                             "곡 폴더는 Enter 또는 F2로 선택 창을 엽니다. 나중에 폴더를 드래그 앤 드롭해도 됩니다."),
-                    ui_text("Recommended starting values are Gauge Normal, Rate 1.00x, Display Offset 0ms, and BMS Keysound Follow.",
-                            "권장 시작값은 노말 게이지, Rate 1.00x, 표시 오프셋 0ms, BMS 키음 연동입니다."),
+                    ui_text("Recommended starting values are Gauge Normal, Rate 1.00x, Visual Latency 0ms, and BMS Keysound Follow.",
+                            "권장 시작값은 노말 게이지, Rate 1.00x, 비주얼 레이턴시 0ms, BMS 키음 연동입니다."),
                     ui_text("Left / Right changes the highlighted setting. Continue opens Song Select.",
                             "좌우 키로 선택된 설정을 바꾸고, 계속을 누르면 곡 선택으로 이동합니다."),
                 };
@@ -1898,8 +1911,8 @@ void MenuApp::populate_help_overlay(render::HelpOverlayData& target) const {
                 target.lines = {
                     ui_text("This screen edits the active profile shown at the top of the list.",
                             "이 화면은 목록 위에 표시된 현재 프로필을 편집합니다."),
-                    ui_text("Songs Folder, Gauge, Rate, Display Offset, and BMS Keysound are saved immediately.",
-                            "곡 폴더, 게이지, Rate, 표시 오프셋, BMS 키음 설정은 즉시 저장됩니다."),
+                    ui_text("Songs Folder, Gauge, Rate, Visual Latency, and BMS Keysound are saved immediately.",
+                            "곡 폴더, 게이지, Rate, 비주얼 레이턴시, BMS 키음 설정은 즉시 저장됩니다."),
                     ui_text("Use Keymap and the other Options screens for the remaining profile settings.",
                             "나머지 프로필 설정은 키 설정과 다른 옵션 화면에서 조정할 수 있습니다."),
                 };
@@ -1997,8 +2010,8 @@ void MenuApp::populate_help_overlay(render::HelpOverlayData& target) const {
                         "위 / 아래 키 또는 마우스 휠로 행을 선택합니다. 긴 목록은 오른쪽의 클릭 가능한 스크롤바를 표시합니다."),
                 ui_text("Display, Resolution, Refresh Hz, and VSync apply live while you adjust them.",
                         "표시 모드, 해상도, 주사율, VSync는 조정 중에도 즉시 적용됩니다."),
-                ui_text("Language switches the menu UI immediately. Display Offset shifts visuals only.",
-                        "언어는 메뉴 UI에 즉시 반영되고, 표시 오프셋은 시각 요소만 이동합니다."),
+                ui_text("Language switches the menu UI immediately. Visual Latency is in Skin Settings.",
+                        "언어는 메뉴 UI에 즉시 반영되고, 비주얼 레이턴시는 스킨 설정에 있습니다."),
                 ui_text("For Discord voice overlay, use Borderless or Windowed and pin the Voice widget at bottom-left.",
                         "Discord 음성 오버레이는 테두리 없음 또는 창 모드를 쓰고 Voice 위젯을 좌하단에 고정하세요."),
                 ui_text("Esc or Backspace saves and returns.",
@@ -2014,6 +2027,8 @@ void MenuApp::populate_help_overlay(render::HelpOverlayData& target) const {
                         "위 / 아래 키 또는 마우스 휠로 행을 선택합니다. 긴 스킨 목록은 오른쪽의 클릭 가능한 스크롤바를 표시합니다."),
                 ui_text("Skin Source swaps between Native, TenRiff skin.json, and imported LR2 playskins.",
                         "스킨 소스는 Native, TenRiff skin.json, 가져온 LR2 플레이스킨을 전환합니다."),
+                ui_text("Visual Latency keeps the existing visual-only offset and saved value.",
+                        "비주얼 레이턴시는 기존 화면 전용 보정값과 저장값을 그대로 사용합니다."),
                 ui_text("Import Skin accepts a TenRiff skin.json folder or an LR2 folder. Drag-and-drop also works.",
                         "스킨 가져오기는 TenRiff skin.json 또는 LR2 폴더를 받으며 드래그 앤 드롭도 지원합니다."),
                 ui_text("Image Aspect keeps imported note heads and tails from stretching to the gameplay note box.",
@@ -2046,8 +2061,8 @@ void MenuApp::populate_help_overlay(render::HelpOverlayData& target) const {
             target.lines = {
                 ui_text("Adjustment Step changes how much each Left / Right press moves the offset rows.",
                         "조정 단위는 좌 / 우 키 한 번에 오프셋이 얼마나 움직일지 정합니다."),
-                ui_text("Input Offset changes judgement timing. Display Offset changes only visuals.",
-                        "입력 오프셋은 판정 타이밍을 바꾸고, 표시 오프셋은 화면만 바꿉니다."),
+                ui_text("Input Offset changes judgement timing. Visual Latency changes only visuals.",
+                        "입력 오프셋은 판정 타이밍을 바꾸고, 비주얼 레이턴시는 화면만 바꿉니다."),
                 ui_text("Use a familiar chart, retry quickly from Result, and keep adjusting until fast/slow feedback feels centered.",
                         "익숙한 차트를 고른 뒤 결과 화면에서 빠르게 재시작하면서 빠름/느림 피드백이 중앙에 올 때까지 조정하세요."),
                 ui_text("Reset Offsets returns both values to 0 ms immediately.",

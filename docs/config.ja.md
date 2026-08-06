@@ -68,7 +68,7 @@ profile が存在しない場合は初回起動時に自動生成されます。
   - 既定値は `8ms`
 ### `judge`
 - `pg`, `gr`, `gd`, `bd` (double, ms)
-- 既定 `gd` は `75ms`
+- 既定 `pg / gr / gd` は `20ms / 45ms / 90ms`
 - 既定 `bd` は `210ms`
 - `Judge Easy` は従来の `1.25x` 倍率で `bd=262.5ms`、`Judge Hard` は `bd=340ms` を使用。Hard でも PG/GR/GD と LN tail window は基本値のまま
 - `indirect_miss` (double, ms)

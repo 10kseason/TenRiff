@@ -2,9 +2,9 @@
 
 Language: Korean | [English](README.en.md) | [简体中文](README.zh-CN.md) | [日本語](README.ja.md)
 
-TenRiff는 Windows GUI 기반 BMS 리듬게임 런타임/런처 프로젝트입니다. 현재 정식 프로젝트 버전은 `1.3.3 (UI-r2)`이며, 차트 입력은 BMS 계열(`.bms/.bme/.bml/.pms`) 전용입니다. Graphics Settings에서 권리 정리된 외부 ONNX 모델을 선택한 뒤 `BGA Upscaler`를 직접 켜고 고사양 경고를 확인해 BGA/BGI 확대에 사용할 수 있습니다. 공개 패키지에는 모델을 넣지 않고 기본값은 `off`이며, 별도 성능 벤치마크 없이 로드·계약·추론 실패 시 native scaling을 유지합니다. 기본 가속 경로는 고성능 DirectX GPU이며 FP32/FP16 경계와 float 경계 INT8 QDQ metadata를 감지합니다. `저전력 DirectX(실험)`은 `DirectXMinPower`를 요청할 뿐 명시적이거나 검증된 NPU 선택이 아닙니다. MIT 라이선스를 사용하며, 번들된 서드파티 고지는 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)에 정리합니다.
+TenRiff는 Windows GUI 기반 BMS 리듬게임 런타임/런처 프로젝트입니다. 현재 정식 프로젝트 버전은 `1.3.4`이며, 차트 입력은 BMS 계열(`.bms/.bme/.bml/.pms`) 전용입니다. Graphics Settings에서 권리 정리된 외부 ONNX 모델을 선택한 뒤 `BGA Upscaler`를 직접 켜고 고사양 경고를 확인해 BGA/BGI 확대에 사용할 수 있습니다. 공개 패키지에는 모델을 넣지 않고 기본값은 `off`이며, 별도 성능 벤치마크 없이 로드·계약·추론 실패 시 native scaling을 유지합니다. 기본 가속 경로는 고성능 DirectX GPU이며 FP32/FP16 경계와 float 경계 INT8 QDQ metadata를 감지합니다. `저전력 DirectX(실험)`은 `DirectXMinPower`를 요청할 뿐 명시적이거나 검증된 NPU 선택이 아닙니다. MIT 라이선스를 사용하며, 번들된 서드파티 고지는 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)에 정리합니다.
 
-이 README는 "프로젝트를 처음 열었을 때 무엇을 보면 되는지"를 설명하는 입문 문서입니다. 더 자세한 현재 동작, 현재 `1.3.1 (UI-r2)` 프로젝트 상태, `1.1.2 final stable` 기준선, 설정 구조, 설계 문서는 [`docs/README.md`](docs/README.md)부터 이어서 읽는 구조를 기준으로 작성했습니다.
+이 README는 "프로젝트를 처음 열었을 때 무엇을 보면 되는지"를 설명하는 입문 문서입니다. 더 자세한 현재 동작, 현재 `1.3.4` 프로젝트 상태, `1.1.2 final stable` 기준선, 설정 구조, 설계 문서는 [`docs/README.md`](docs/README.md)부터 이어서 읽는 구조를 기준으로 작성했습니다.
 
 TenRiff 코드는 전통적인 장기 설계 문서 중심 개발만으로 쌓인 프로젝트가 아니라, 빠른 반복과 실험을 중시한 `vibe coding` 성격이 강한 작품이라는 점을 명시합니다.
 

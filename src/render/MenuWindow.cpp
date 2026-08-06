@@ -78,6 +78,11 @@ constexpr float kGameplaySplitPlayerGaugeLeft = 188.0f;
 constexpr float kGameplaySplitGhostGaugeLeft = 1708.0f;
 constexpr float kGameplayGaugeTop = 210.0f;
 constexpr float kGameplayGaugeBottom = 910.0f;
+constexpr float kGameplayFieldDragHandleGap = 12.0f;
+constexpr float kGameplayFieldDragHandleWidth = 72.0f;
+constexpr float kGameplayFieldDragHandleHeight = 42.0f;
+constexpr float kGameplayFieldDragHandleTop = 16.0f;
+constexpr float kGameplayFieldDragCanvasMargin = 12.0f;
 constexpr float kGameplayHoldTailTaperRatio = 0.55f;
 constexpr float kGameplayGaugeWidth = 46.0f;
 constexpr double kGameplayJudgementLineMin = config::kJudgementLinePositionMin;
@@ -670,8 +675,21 @@ struct GameplaySurfaceLayout {
     GameplayFieldLayout ghost_field{};
     float player_gauge_left = 0.0f;
     float ghost_gauge_left = 0.0f;
+    float offset_x = 0.0f;
+    float min_offset_x = 0.0f;
+    float max_offset_x = 0.0f;
     bool ghost_visible = false;
 };
+
+void translate_gameplay_field_layout(GameplayFieldLayout& layout, float offset_x) {
+    layout.left += offset_x;
+    layout.right += offset_x;
+    const std::size_t lane_count = std::min(
+        static_cast<std::size_t>(std::max(0, layout.lane_count)), layout.lane_lefts.size());
+    for (std::size_t lane = 0; lane < lane_count; ++lane) {
+        layout.lane_lefts[lane] += offset_x;
+    }
+}
 
 GameplayFieldLayout build_gameplay_field_layout(float bounds_left,
                                                 float bounds_right,
@@ -763,7 +781,8 @@ GameplaySurfaceLayout build_gameplay_surface_layout(int lane_count,
                                                     std::size_t lane_spacing_scale_count,
                                                     const std::array<double, kGameplayHudMaxLanes>& lane_spacing_scales,
                                                     bool ghost_visible,
-                                                    double lane_center_gap_scale = 0.0) {
+                                                    double lane_center_gap_scale = 0.0,
+                                                    double requested_offset_x = 0.0) {
     GameplaySurfaceLayout layout;
     layout.ghost_visible = ghost_visible;
     if (ghost_visible) {
@@ -810,6 +829,38 @@ GameplaySurfaceLayout build_gameplay_surface_layout(int lane_count,
                                                           lane_center_gap_scale);
         layout.player_gauge_left =
             layout.player_field.right + (kGameplayGaugeLeft - kGameplayFieldRight);
+    }
+
+    float surface_left = std::min(layout.player_field.left, layout.player_gauge_left);
+    float surface_right = std::max(
+        layout.player_field.right + kGameplayFieldDragHandleGap + kGameplayFieldDragHandleWidth,
+        layout.player_gauge_left + kGameplayGaugeWidth);
+    if (layout.ghost_visible) {
+        surface_left = std::min(
+            surface_left, std::min(layout.ghost_field.left, layout.ghost_gauge_left));
+        surface_right = std::max(
+            surface_right,
+            std::max(layout.ghost_field.right, layout.ghost_gauge_left + kGameplayGaugeWidth));
+    }
+
+    layout.min_offset_x = kGameplayFieldDragCanvasMargin - surface_left;
+    layout.max_offset_x = kBaseWidth - kGameplayFieldDragCanvasMargin - surface_right;
+    const double finite_requested =
+        std::isfinite(requested_offset_x) ? requested_offset_x : config::kGameplayFieldOffsetXDefault;
+    const float config_clamped_offset = static_cast<float>(std::clamp(
+        finite_requested,
+        config::kGameplayFieldOffsetXMin,
+        config::kGameplayFieldOffsetXMax));
+    layout.offset_x = layout.min_offset_x <= layout.max_offset_x
+                          ? std::clamp(config_clamped_offset,
+                                       layout.min_offset_x,
+                                       layout.max_offset_x)
+                          : (layout.min_offset_x + layout.max_offset_x) * 0.5f;
+    translate_gameplay_field_layout(layout.player_field, layout.offset_x);
+    layout.player_gauge_left += layout.offset_x;
+    if (layout.ghost_visible) {
+        translate_gameplay_field_layout(layout.ghost_field, layout.offset_x);
+        layout.ghost_gauge_left += layout.offset_x;
     }
     return layout;
 }
@@ -1839,6 +1890,10 @@ LRESULT CALLBACK menu_window_proc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lpa
             DestroyWindow(hwnd);
             return 0;
         case WM_SETCURSOR:
+            if (window && window->horizontal_drag_cursor()) {
+                SetCursor(LoadCursor(nullptr, IDC_SIZEWE));
+                return TRUE;
+            }
             if (window && window->cursor_hidden()) {
                 SetCursor(nullptr);
                 return TRUE;
@@ -1895,6 +1950,9 @@ LRESULT CALLBACK menu_window_proc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lpa
             }
             break;
         case WM_CAPTURECHANGED:
+            if (window) {
+                window->on_mouse_capture_changed();
+            }
             return 0;
         case WM_DROPFILES:
             if (window) {
@@ -1953,6 +2011,11 @@ void configure_low_latency_presentation(IDXGIDevice* dxgi_device, IDXGISwapChain
 struct MenuWindow::D2DResources {
     struct SongCardPreviewBitmapEntry {
         bool attempted = false;
+        Microsoft::WRL::ComPtr<ID2D1Bitmap> bitmap;
+    };
+
+    struct GameplayBackgroundBitmapEntry {
+        std::size_t decoded_bytes = 0;
         Microsoft::WRL::ComPtr<ID2D1Bitmap> bitmap;
     };
 
@@ -2020,6 +2083,10 @@ struct MenuWindow::D2DResources {
     Microsoft::WRL::ComPtr<ID2D1Bitmap> song_select_preview_bitmap;
     Microsoft::WRL::ComPtr<ID2D1Bitmap> gameplay_background_base_bitmap;
     Microsoft::WRL::ComPtr<ID2D1Bitmap> gameplay_background_overlay_bitmap;
+    std::unordered_map<std::string, GameplayBackgroundBitmapEntry>
+        gameplay_background_bitmaps{};
+    std::deque<std::string> gameplay_background_lru{};
+    std::size_t gameplay_background_bitmap_bytes = 0;
     std::unordered_map<std::string, SongCardPreviewBitmapEntry> song_card_preview_bitmaps{};
     std::deque<std::string> song_card_preview_lru{};
     Microsoft::WRL::ComPtr<ID2D1GradientStopCollection> glow_stops;
@@ -2046,6 +2113,8 @@ MenuWindow::MenuWindow()
     : d2d_(std::make_unique<D2DResources>()),
       gameplay_base_video_decoder_(std::make_unique<BgaVideoDecoder>()),
       gameplay_overlay_video_decoder_(std::make_unique<BgaVideoDecoder>()),
+      gameplay_base_image_loader_(std::make_unique<BgaImageLoader>()),
+      gameplay_overlay_image_loader_(std::make_unique<BgaImageLoader>()),
       gameplay_background_upscaler_(std::make_unique<OnnxBackgroundUpscaler>()),
       gameplay_overlay_background_upscaler_(std::make_unique<OnnxBackgroundUpscaler>()),
       song_select_background_upscaler_(std::make_unique<OnnxBackgroundUpscaler>()) {}
@@ -2618,6 +2687,12 @@ void MenuWindow::invalidate_gameplay_background_cache() {
     if (gameplay_overlay_video_decoder_) {
         gameplay_overlay_video_decoder_->clear();
     }
+    if (gameplay_base_image_loader_) {
+        gameplay_base_image_loader_->clear();
+    }
+    if (gameplay_overlay_image_loader_) {
+        gameplay_overlay_image_loader_->clear();
+    }
     if (gameplay_background_upscaler_) {
         gameplay_background_upscaler_->clear();
     }
@@ -2659,12 +2734,31 @@ bool MenuWindow::ensure_gameplay_background_bitmap(const GameplayHudData& data) 
         data.background_upscale_prefer_npu);
     if (!d2d_ || !d2d_->wic_factory || !d2d_->d2d_context ||
         !gameplay_base_video_decoder_ || !gameplay_overlay_video_decoder_ ||
+        !gameplay_base_image_loader_ || !gameplay_overlay_image_loader_ ||
         !gameplay_background_upscaler_ || !gameplay_overlay_background_upscaler_) {
         return false;
     }
 
     const std::string upscale_mode =
         data.background_upscale_mode == "onnx" ? "onnx" : "off";
+    const auto touch_background_bitmap = [&](const std::string& path) {
+        auto& lru = d2d_->gameplay_background_lru;
+        const auto existing = std::find(lru.begin(), lru.end(), path);
+        if (existing != lru.end()) {
+            lru.erase(existing);
+        }
+        lru.push_back(path);
+    };
+    const auto use_cached_background_bitmap =
+        [&](const std::string& path, Microsoft::WRL::ComPtr<ID2D1Bitmap>& destination) {
+            const auto found = d2d_->gameplay_background_bitmaps.find(path);
+            if (found == d2d_->gameplay_background_bitmaps.end() || !found->second.bitmap) {
+                return false;
+            }
+            destination = found->second.bitmap;
+            touch_background_bitmap(path);
+            return true;
+        };
     const bool paths_changed =
         gameplay_background_cache_.base_path != data.background_base_path ||
         gameplay_background_cache_.overlay_path != data.background_overlay_path ||
@@ -2674,6 +2768,8 @@ bool MenuWindow::ensure_gameplay_background_bitmap(const GameplayHudData& data) 
     if (paths_changed || mode_changed) {
         gameplay_base_video_decoder_->clear();
         gameplay_overlay_video_decoder_->clear();
+        gameplay_base_image_loader_->clear();
+        gameplay_overlay_image_loader_->clear();
         gameplay_background_upscaler_->clear();
         gameplay_overlay_background_upscaler_->clear();
         gameplay_background_cache_ = GameplayBackgroundCache{};
@@ -2683,24 +2779,26 @@ bool MenuWindow::ensure_gameplay_background_bitmap(const GameplayHudData& data) 
         gameplay_background_cache_.overlay_start_sample = data.background_overlay_start_sample;
         gameplay_background_cache_.upscale_mode = upscale_mode;
 
-        d2d_->gameplay_background_base_bitmap.Reset();
-        d2d_->gameplay_background_overlay_bitmap.Reset();
-        if (!data.background_base_path.empty() &&
-            !BgaVideoDecoder::is_supported_video_path(data.background_base_path)) {
-            static_cast<void>(load_bitmap_from_utf8_path(
-                d2d_->wic_factory.Get(),
-                d2d_->d2d_context.Get(),
-                data.background_base_path,
-                d2d_->gameplay_background_base_bitmap));
-        }
-        if (!data.background_overlay_path.empty() &&
-            !BgaVideoDecoder::is_supported_video_path(data.background_overlay_path)) {
-            static_cast<void>(load_bitmap_from_utf8_path(
-                d2d_->wic_factory.Get(),
-                d2d_->d2d_context.Get(),
-                data.background_overlay_path,
-                d2d_->gameplay_background_overlay_bitmap));
-        }
+        const auto prepare_static_layer =
+            [&](const std::string& path,
+                BgaImageLoader* loader,
+                Microsoft::WRL::ComPtr<ID2D1Bitmap>& destination) {
+                if (path.empty() || BgaVideoDecoder::is_supported_video_path(path)) {
+                    destination.Reset();
+                    return;
+                }
+                if (!use_cached_background_bitmap(path, destination)) {
+                    // Keep the previous frame visible while the new image is
+                    // decoded. The render thread never performs file I/O here.
+                    loader->request(path);
+                }
+            };
+        prepare_static_layer(data.background_base_path,
+                             gameplay_base_image_loader_.get(),
+                             d2d_->gameplay_background_base_bitmap);
+        prepare_static_layer(data.background_overlay_path,
+                             gameplay_overlay_image_loader_.get(),
+                             d2d_->gameplay_background_overlay_bitmap);
     }
 
     const auto upload_bgra = [&](std::uint32_t width,
@@ -2727,6 +2825,65 @@ bool MenuWindow::ensure_gameplay_background_bitmap(const GameplayHudData& data) 
         destination = std::move(bitmap);
         return true;
     };
+
+    const auto cache_ready_image =
+        [&](BgaImageLoader* loader,
+            const std::string& active_path,
+            Microsoft::WRL::ComPtr<ID2D1Bitmap>& destination) {
+            const auto frame = loader ? loader->take_ready() : nullptr;
+            if (!frame) {
+                return;
+            }
+            if (frame->bgra.empty()) {
+                if (frame->source_path == active_path) {
+                    destination.Reset();
+                }
+                return;
+            }
+
+            Microsoft::WRL::ComPtr<ID2D1Bitmap> bitmap;
+            if (!upload_bgra(frame->width, frame->height, frame->bgra, bitmap)) {
+                return;
+            }
+            constexpr std::size_t kMaxCachedBackgroundBitmaps = 256;
+            constexpr std::size_t kMaxCachedBackgroundBytes = 192ull * 1024ull * 1024ull;
+            auto existing = d2d_->gameplay_background_bitmaps.find(frame->source_path);
+            if (existing != d2d_->gameplay_background_bitmaps.end()) {
+                d2d_->gameplay_background_bitmap_bytes -= existing->second.decoded_bytes;
+                existing->second = D2DResources::GameplayBackgroundBitmapEntry{
+                    frame->bgra.size(), bitmap};
+            } else {
+                d2d_->gameplay_background_bitmaps.emplace(
+                    frame->source_path,
+                    D2DResources::GameplayBackgroundBitmapEntry{frame->bgra.size(), bitmap});
+            }
+            d2d_->gameplay_background_bitmap_bytes += frame->bgra.size();
+            touch_background_bitmap(frame->source_path);
+
+            while ((!d2d_->gameplay_background_lru.empty()) &&
+                   (d2d_->gameplay_background_bitmaps.size() > kMaxCachedBackgroundBitmaps ||
+                    d2d_->gameplay_background_bitmap_bytes > kMaxCachedBackgroundBytes)) {
+                const std::string oldest = d2d_->gameplay_background_lru.front();
+                d2d_->gameplay_background_lru.pop_front();
+                const auto victim = d2d_->gameplay_background_bitmaps.find(oldest);
+                if (victim == d2d_->gameplay_background_bitmaps.end()) {
+                    continue;
+                }
+                d2d_->gameplay_background_bitmap_bytes -= victim->second.decoded_bytes;
+                d2d_->gameplay_background_bitmaps.erase(victim);
+            }
+
+            if (frame->source_path == active_path) {
+                destination = std::move(bitmap);
+            }
+        };
+
+    cache_ready_image(gameplay_base_image_loader_.get(),
+                      gameplay_background_cache_.base_path,
+                      d2d_->gameplay_background_base_bitmap);
+    cache_ready_image(gameplay_overlay_image_loader_.get(),
+                      gameplay_background_cache_.overlay_path,
+                      d2d_->gameplay_background_overlay_bitmap);
 
     const auto process_video_layer = [&](const std::string& path,
                                          int64_t start_sample,
@@ -3119,6 +3276,14 @@ bool MenuWindow::ensure_gameplay_static_cache(const GameplayHudData& data) {
 
     GameplayStaticCache desired{};
     desired.lane_count = std::clamp(data.lane_count, 1, static_cast<int>(kGameplayHudMaxLanes));
+    if (gameplay_field_drag_state_.has_local_override &&
+        !gameplay_field_drag_state_.active &&
+        std::abs(data.gameplay_field_offset_x - gameplay_field_drag_state_.offset_x) < 0.5) {
+        gameplay_field_drag_state_.has_local_override = false;
+    }
+    desired.gameplay_field_offset_x = gameplay_field_drag_state_.has_local_override
+                                         ? gameplay_field_drag_state_.offset_x
+                                         : data.gameplay_field_offset_x;
     const bool use_imported_metrics = normalize_gameplay_skin_source(data.skin_source) != "native";
     desired.judgement_line_position =
         gameplay_note_sprite_cache_.has_imported_judgement_line_position
@@ -3190,6 +3355,7 @@ bool MenuWindow::ensure_gameplay_static_cache(const GameplayHudData& data) {
         d2d_->gameplay_static_command_list &&
         gameplay_static_cache_.lane_count == desired.lane_count &&
         gameplay_static_cache_.judgement_line_position == desired.judgement_line_position &&
+        gameplay_static_cache_.gameplay_field_offset_x == desired.gameplay_field_offset_x &&
         gameplay_static_cache_.note_width_scale == desired.note_width_scale &&
         gameplay_static_cache_.note_art_width_ratio == desired.note_art_width_ratio &&
         gameplay_static_cache_.note_height_scale == desired.note_height_scale &&
@@ -3242,7 +3408,8 @@ bool MenuWindow::ensure_gameplay_static_cache(const GameplayHudData& data) {
             desired.lane_spacing_scale_count,
             desired.lane_spacing_scales,
             desired.ghost_visible,
-            desired.lane_center_gap_scale);
+            desired.lane_center_gap_scale,
+            desired.gameplay_field_offset_x);
     auto build_gauge_grid = [&](std::size_t index, float gauge_left) {
         Microsoft::WRL::ComPtr<ID2D1PathGeometry> geometry;
         if (FAILED(d2d_->d2d_factory->CreatePathGeometry(geometry.ReleaseAndGetAddressOf())) || !geometry) {
@@ -3514,6 +3681,23 @@ void MenuWindow::on_mouse_button_down(int window_x, int window_y) {
         return;
     }
 
+    if (gameplay_field_drag_state_.visible &&
+        x >= gameplay_field_drag_state_.left && x <= gameplay_field_drag_state_.right &&
+        y >= gameplay_field_drag_state_.top && y <= gameplay_field_drag_state_.bottom) {
+        gameplay_field_drag_state_.active = true;
+        gameplay_field_drag_state_.hovered = true;
+        gameplay_field_drag_state_.has_local_override = true;
+        gameplay_field_drag_state_.drag_start_x = x;
+        gameplay_field_drag_state_.drag_start_offset_x = gameplay_field_drag_state_.offset_x;
+        suppress_next_left_button_up_ = true;
+        update_cursor_visibility(false);
+        SetCursor(LoadCursor(nullptr, IDC_SIZEWE));
+        if (hwnd_) {
+            SetCapture(static_cast<HWND>(hwnd_));
+        }
+        return;
+    }
+
     if (!song_scrollbar_state_.visible ||
         x < song_scrollbar_state_.left || x > song_scrollbar_state_.right ||
         y < song_scrollbar_state_.top || y > song_scrollbar_state_.bottom) {
@@ -3551,6 +3735,41 @@ void MenuWindow::on_mouse_button_down(int window_x, int window_y) {
 }
 
 void MenuWindow::on_mouse_click(int window_x, int window_y, bool double_click) {
+    if (gameplay_field_drag_state_.active) {
+        float x = 0.0f;
+        float y = 0.0f;
+        static_cast<void>(translate_window_point(window_x, window_y, &x, &y));
+        const double requested_offset = gameplay_field_drag_state_.drag_start_offset_x +
+                                        static_cast<double>(x - gameplay_field_drag_state_.drag_start_x);
+        gameplay_field_drag_state_.offset_x = std::clamp(
+            std::round(requested_offset),
+            gameplay_field_drag_state_.min_offset_x,
+            gameplay_field_drag_state_.max_offset_x);
+        gameplay_field_drag_state_.has_local_override = true;
+        gameplay_field_drag_state_.active = false;
+        gameplay_field_drag_state_.hovered =
+            x >= gameplay_field_drag_state_.left && x <= gameplay_field_drag_state_.right &&
+            y >= gameplay_field_drag_state_.top && y <= gameplay_field_drag_state_.bottom;
+
+        MenuClickEvent event;
+        event.kind = MenuHitTargetKind::GameplayFieldDrag;
+        event.index = 0;
+        event.part = MenuHitPart::Activate;
+        event.value = gameplay_field_drag_state_.offset_x;
+        push_click_event(std::move(event));
+
+        if (hwnd_ && GetCapture() == static_cast<HWND>(hwnd_)) {
+            ReleaseCapture();
+        }
+        update_cursor_visibility(
+            gameplay_field_drag_state_.visible && !gameplay_field_drag_state_.hovered);
+        if (gameplay_field_drag_state_.hovered) {
+            SetCursor(LoadCursor(nullptr, IDC_SIZEWE));
+        }
+        suppress_next_left_button_up_ = false;
+        return;
+    }
+
     if (song_scroll_drag_active_) {
         song_scroll_drag_active_ = false;
         if (hwnd_ && GetCapture() == static_cast<HWND>(hwnd_)) {
@@ -3634,13 +3853,38 @@ void MenuWindow::on_mouse_secondary_click(int window_x, int window_y) {
 }
 
 void MenuWindow::on_mouse_move(int window_x, int window_y) {
-    if (!song_scroll_drag_active_) {
-        return;
-    }
-
     float x = 0.0f;
     float y = 0.0f;
     static_cast<void>(translate_window_point(window_x, window_y, &x, &y));
+
+    if (gameplay_field_drag_state_.active) {
+        const double requested_offset = gameplay_field_drag_state_.drag_start_offset_x +
+                                        static_cast<double>(x - gameplay_field_drag_state_.drag_start_x);
+        gameplay_field_drag_state_.offset_x = std::clamp(
+            std::round(requested_offset),
+            gameplay_field_drag_state_.min_offset_x,
+            gameplay_field_drag_state_.max_offset_x);
+        gameplay_field_drag_state_.has_local_override = true;
+        gameplay_field_drag_state_.hovered = true;
+        update_cursor_visibility(false);
+        SetCursor(LoadCursor(nullptr, IDC_SIZEWE));
+        return;
+    }
+
+    if (gameplay_field_drag_state_.visible) {
+        gameplay_field_drag_state_.hovered =
+            x >= gameplay_field_drag_state_.left && x <= gameplay_field_drag_state_.right &&
+            y >= gameplay_field_drag_state_.top && y <= gameplay_field_drag_state_.bottom;
+        update_cursor_visibility(!gameplay_field_drag_state_.hovered);
+        if (gameplay_field_drag_state_.hovered) {
+            SetCursor(LoadCursor(nullptr, IDC_SIZEWE));
+        }
+        return;
+    }
+
+    if (!song_scroll_drag_active_) {
+        return;
+    }
     const int target_index =
         song_scrollbar_target_index(y, song_scroll_drag_offset_y_, song_scroll_drag_selected_offset_);
     if (target_index < 0 || target_index == song_scroll_drag_last_index_) {
@@ -3652,6 +3896,29 @@ void MenuWindow::on_mouse_move(int window_x, int window_y) {
     event.index = target_index;
     push_click_event(std::move(event));
     song_scroll_drag_last_index_ = target_index;
+}
+
+void MenuWindow::on_mouse_capture_changed() {
+    const bool lost_gameplay_drag = gameplay_field_drag_state_.active;
+    const bool lost_song_drag = song_scroll_drag_active_;
+    if (gameplay_field_drag_state_.active) {
+        gameplay_field_drag_state_.active = false;
+        gameplay_field_drag_state_.hovered = false;
+        gameplay_field_drag_state_.has_local_override = true;
+        MenuClickEvent event;
+        event.kind = MenuHitTargetKind::GameplayFieldDrag;
+        event.index = 0;
+        event.part = MenuHitPart::Activate;
+        event.value = gameplay_field_drag_state_.offset_x;
+        push_click_event(std::move(event));
+    }
+    song_scroll_drag_active_ = false;
+    if (lost_gameplay_drag || lost_song_drag) {
+        suppress_next_left_button_up_ = false;
+    }
+    if (gameplay_field_drag_state_.visible) {
+        update_cursor_visibility(true);
+    }
 }
 
 void MenuWindow::on_mouse_wheel(int wheel_delta) {
@@ -3724,7 +3991,8 @@ void MenuWindow::push_text_input(std::string text) {
 void MenuWindow::render(const MenuRenderData& data) {
 
     apply_pending_config();
-    update_cursor_visibility(data.kind == MenuScreenKind::GameplayHud);
+    update_cursor_visibility(data.kind == MenuScreenKind::GameplayHud &&
+                             !horizontal_drag_cursor());
     static int skip_log_count = 0;
     const bool initialized = initialized_.load(std::memory_order_acquire);
     const bool should_close = should_close_.load(std::memory_order_acquire);

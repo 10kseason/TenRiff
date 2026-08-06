@@ -3,6 +3,7 @@
 #ifdef _WIN32
 
 #include "GameplayHudLimits.h"
+#include "render/BgaImageLoader.h"
 #include "render/BgaVideoDecoder.h"
 #include "render/OnnxBackgroundUpscaler.h"
 #include "render/RenderThread.h"
@@ -53,6 +54,7 @@ enum class MenuHitTargetKind {
     MouseWheel,
     FileDrop,
     SongScrollbar,
+    GameplayFieldDrag,
     TitleButton,
     SongNavButton,
     SongCard,
@@ -79,6 +81,7 @@ struct MenuClickEvent {
     MenuHitPart part = MenuHitPart::Activate;
     bool double_click = false;
     int wheel_steps = 0;
+    double value = 0.0;
     std::string path;
 };
 
@@ -320,6 +323,7 @@ struct GameplayHudData {
     std::string background_upscale_model_path;
     bool background_upscale_prefer_npu = false;
     double judgement_line_position = 0.82;
+    double gameplay_field_offset_x = 0.0;
     double combo_position = 0.24;
     std::size_t lane_width_scale_count = 0;
     std::array<double, kGameplayHudMaxLanes> lane_width_scales{};
@@ -589,6 +593,7 @@ public:
     void on_mouse_click(int window_x, int window_y, bool double_click);
     void on_mouse_secondary_click(int window_x, int window_y);
     void on_mouse_move(int window_x, int window_y);
+    void on_mouse_capture_changed();
     void on_mouse_wheel(int wheel_delta);
     void on_file_drop(std::string path);
     void on_text_input(wchar_t character);
@@ -596,6 +601,10 @@ public:
     [[nodiscard]] std::optional<MenuClickEvent> poll_click_event();
     [[nodiscard]] std::optional<std::string> poll_text_input();
     [[nodiscard]] bool cursor_hidden() const { return cursor_hidden_; }
+    [[nodiscard]] bool horizontal_drag_cursor() const {
+        return gameplay_field_drag_state_.visible &&
+               (gameplay_field_drag_state_.hovered || gameplay_field_drag_state_.active);
+    }
 
     [[nodiscard]] bool should_close() const { return should_close_.load(std::memory_order_acquire); }
     [[nodiscard]] bool init_done() const { return init_done_.load(std::memory_order_acquire); }
@@ -745,6 +754,7 @@ private:
     struct GameplayStaticCache {
         int lane_count = 0;
         double judgement_line_position = 0.82;
+        double gameplay_field_offset_x = 0.0;
         double note_width_scale = 1.0;
         double note_art_width_ratio = 1.0;
         double note_height_scale = 1.8;
@@ -833,6 +843,22 @@ private:
         int selected_index = -1;
     };
 
+    struct GameplayFieldDragState {
+        bool visible = false;
+        bool hovered = false;
+        bool active = false;
+        bool has_local_override = false;
+        float left = 0.0f;
+        float top = 0.0f;
+        float right = 0.0f;
+        float bottom = 0.0f;
+        double offset_x = 0.0;
+        double min_offset_x = 0.0;
+        double max_offset_x = 0.0;
+        float drag_start_x = 0.0f;
+        double drag_start_offset_x = 0.0;
+    };
+
     struct D2DResources;
     std::unique_ptr<D2DResources> d2d_;
     PerformanceOverlayCache performance_overlay_cache_{};
@@ -844,6 +870,8 @@ private:
     bool active_background_upscale_prefer_npu_ = false;
     std::unique_ptr<BgaVideoDecoder> gameplay_base_video_decoder_{};
     std::unique_ptr<BgaVideoDecoder> gameplay_overlay_video_decoder_{};
+    std::unique_ptr<BgaImageLoader> gameplay_base_image_loader_{};
+    std::unique_ptr<BgaImageLoader> gameplay_overlay_image_loader_{};
     std::unique_ptr<OnnxBackgroundUpscaler> gameplay_background_upscaler_{};
     std::unique_ptr<OnnxBackgroundUpscaler> gameplay_overlay_background_upscaler_{};
     std::unique_ptr<OnnxBackgroundUpscaler> song_select_background_upscaler_{};
@@ -853,6 +881,7 @@ private:
     std::unordered_set<std::string> song_select_preview_warned_decode_failures_{};
     std::unordered_set<std::string> song_select_preview_warned_slow_paths_{};
     SongScrollbarState song_scrollbar_state_{};
+    GameplayFieldDragState gameplay_field_drag_state_{};
     bool song_scroll_drag_active_ = false;
     float song_scroll_drag_offset_y_ = 0.0f;
     int song_scroll_drag_selected_offset_ = 0;

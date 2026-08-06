@@ -60,11 +60,11 @@ The standard TenRiff play flow is:
 - `Audio`
   - Adjust Master / BGM / Keysound volume and the BMS keysound policy
 - `Graphics`
-  - Adjust VSync, Refresh Hz, Performance HUD, Display Offset, BGA visibility, and the external ONNX BGA Upscaler
+  - Adjust VSync, Refresh Hz, Performance HUD, BGA visibility, and the external ONNX BGA Upscaler
   - Turning `BGA` off disables gameplay image/video backgrounds and their decoder/upscaler work; Song Select previews remain visible
   - Selecting a model is separate from enabling the upscaler and accepting its high-spec warning. Experimental `Low-Power DirectX` only requests DirectXMinPower and does not explicitly select or verify an NPU
 - `Skins`
-  - Switch native/LR2 skins, use native lower digital-piano keys with held depth and impact glitches, import one LR2 folder or batch-import an independent non-IIDX `LR2files/Theme` root (IIDX-dependent themes are skipped), port aspect-preserved lower Gear frames that enlarge with field size and clip below the judgement line, and adjust fixed-divider note gaps/size, Black Playfield, judgement-line position, LN body width, and lane colors
+  - Switch native/LR2 skins, adjust Visual Latency, use native lower digital-piano keys with held depth and impact glitches, import one LR2 folder or batch-import an independent non-IIDX `LR2files/Theme` root (IIDX-dependent themes are skipped), port aspect-preserved lower Gear frames that enlarge with field size and clip below the judgement line, and adjust fixed-divider note gaps/size, Black Playfield, judgement-line position, LN body width, and lane colors
 - `Keymap`
   - Change key bindings and run the NKRO test
 
@@ -78,10 +78,10 @@ These settings are a good starting point:
 - `Mode > Hi-Speed`: start with the default value
 - `Graphics > Display`: use `Borderless` when using Discord voice overlay
 - `Graphics > Performance HUD`: turn it on only when needed
-- `Graphics > Display Offset`: start at the default `0ms`
+- `Skins > Visual Latency`: start at the default `0ms`
 - `Audio > Keysound Mode`: `follow` is recommended for BMS
 
-If the notes look too slow or too fast, adjust only `Hi-Speed` first. If the judgement feels correct but the visuals look late or early, adjust `Display Offset`.
+If the notes look too slow or too fast, adjust only `Hi-Speed` first. If the judgement feels correct but the visuals look late or early, adjust `Visual Latency`.
 
 ### Discord voice overlay
 
@@ -129,6 +129,7 @@ If this is not the layout you want, you can change it in `Options > Keymap`.
 
 Hi-Speed changes only the visual scroll speed; it does not change the judgement timing itself.
 Rate changes playback tempo and chart scheduling, but it does not change visual scroll speed at the same Hi-Speed.
+BPM changes keep the pixels-per-second speed anchored to the chart's starting BPM; explicit `#SCROLL`, stops, and reverse motion still apply.
 
 ## 8. How to Read the HUD
 
@@ -216,7 +217,7 @@ The return keys are:
 - If needed, also adjust `Skins > Note & Field Size / Note Height / Judge Line`.
 
 ### The judgement feels right, but the visuals look late or early
-- Adjust `Graphics > Display Offset`.
+- Adjust `Skins > Visual Latency`.
 - Positive values draw the notes earlier.
 
 ### BMS keysounds are too loud or too quiet
@@ -236,7 +237,7 @@ When you start, the easiest order is:
 1. Choose an easy song in `Song Select`
 2. In `Mode`, confirm `Gauge=Normal` and `Rate=1.0x`
 3. After playing, adjust only `Hi-Speed` first
-4. If it still feels off, adjust `Display Offset`
+4. If it still feels off, adjust `Skins > Visual Latency`
 5. If your hand position feels uncomfortable, change the `Keymap`
 6. Finally, use `Skins` to adjust note size and judgement-line position
 

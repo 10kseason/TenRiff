@@ -68,7 +68,7 @@
   - 默认值为 `8ms`
 ### `judge`
 - `pg`, `gr`, `gd`, `bd` (double, ms)
-- 默认 `gd` 为 `75ms`
+- 默认 `pg / gr / gd` 分别为 `20ms / 45ms / 90ms`
 - 默认 `bd` 为 `210ms`
 - `Judge Easy` 沿用现有 `1.25x` 倍率（`bd=262.5ms`），`Judge Hard` 使用 `bd=340ms`；Hard 不会收紧 PG/GR/GD 与长按尾部判定窗
 - `indirect_miss` (double, ms)

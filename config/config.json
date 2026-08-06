@@ -23,9 +23,9 @@
     "debounce_ms": 8.0
   },
   "judge": {
-    "pg": 15.5,
-    "gr": 31.0,
-    "gd": 75.0,
+    "pg": 20.0,
+    "gr": 45.0,
+    "gd": 90.0,
     "bd": 210.0,
     "hold_grace": 80,
     "hold_break": 200,
@@ -91,6 +91,7 @@
     "key_pulse_enabled": true,
     "key_label_position": "bottom",
     "judgement_line_position": 0.82,
+    "gameplay_field_offset_x": 0.0,
     "combo_position": 0.24,
     "lane_background_opacity": 0.18,
     "black_playfield_enabled": true,

@@ -14,6 +14,9 @@ namespace tenriff::config {
 inline constexpr double kJudgementLinePositionMin = 0.00;
 inline constexpr double kJudgementLinePositionMax = 1.00;
 inline constexpr double kJudgementLinePositionDefault = 0.82;
+inline constexpr double kGameplayFieldOffsetXMin = -720.0;
+inline constexpr double kGameplayFieldOffsetXMax = 720.0;
+inline constexpr double kGameplayFieldOffsetXDefault = 0.0;
 inline constexpr double kLaneWidthScaleMin = 0.50;
 inline constexpr double kLaneWidthScaleMax = 1.75;
 inline constexpr double kLaneWidthScaleDefault = 1.00;
@@ -53,9 +56,9 @@ inline constexpr double kSkinKeyPulseBrightnessMax = 1.00;
 inline constexpr double kSkinKeyPulseBrightnessDefault = 1.00;
 
 struct JudgeConfig {
-    double pg_ms = 15.5;
-    double gr_ms = 31.0;
-    double gd_ms = 75.0;
+    double pg_ms = 20.0;
+    double gr_ms = 45.0;
+    double gd_ms = 90.0;
     double bd_ms = 210.0;
     double indirect_miss_ms = 210.0;
     // Runtime mode policy: Judge Hard turns an unplayed object into an indirect POOR.
@@ -130,6 +133,8 @@ struct SkinConfig {
     // UI text font token: default | malgun | bahnschrift | consolas.
     std::string ui_font = "default";
     double judgement_line_position = kJudgementLinePositionDefault;
+    // Horizontal gameplay-field offset in the renderer's 1920x1080 base space.
+    double gameplay_field_offset_x = kGameplayFieldOffsetXDefault;
     double combo_position = kComboPositionDefault;
     double lane_background_opacity = kSkinLaneBackgroundOpacityDefault;
     bool black_playfield_enabled = true;

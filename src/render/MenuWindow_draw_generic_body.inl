@@ -25,7 +25,9 @@
 
         const bool has_skin_preview = data.generic.skin_preview.visible;
         const float preview_gap = has_skin_preview ? 28.0f : 0.0f;
-        const float preview_width = has_skin_preview ? 620.0f : 0.0f;
+        const float preview_width = has_skin_preview
+                                        ? std::max(360.0f, ((right - left - 48.0f) - preview_gap) * 0.5f)
+                                        : 0.0f;
 
         auto draw_skin_preview_panel = [&](const SkinPreviewData& preview, const D2D1_RECT_F& rect) {
             const D2D1_ROUNDED_RECT panel_rr = D2D1::RoundedRect(rect, 18.0f, 18.0f);
@@ -527,6 +529,11 @@
                             D2D1::RectF(minus_left, row_y + 6.0f, minus_left + action_width, row_y + row_height - 6.0f);
                         const D2D1_RECT_F plus_rect =
                             D2D1::RectF(plus_left, row_y + 6.0f, plus_left + action_width, row_y + row_height - 6.0f);
+                        // Treat the label/value portion like pressing Enter. Register it
+                        // before +/- so the more specific action buttons win hit testing.
+                        register_hit(D2D1::RectF(row_rect.left, row_rect.top,
+                                                 minus_rect.left - action_gap * 0.5f, row_rect.bottom),
+                                     row.target_kind, row.row_index, MenuHitPart::Activate);
                         draw_action(minus_rect, L'-', MenuHitPart::Decrement, row.decrement_enabled);
                         draw_action(plus_rect, L'+', MenuHitPart::Increment, row.increment_enabled);
                     } else {

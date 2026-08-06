@@ -20,6 +20,7 @@
 #endif
 
 #include "app/Lr2Skin.h"
+#include "app/MenuAppSettingsUtils.h"
 #include "app/MenuAppSkinUtils.h"
 #include "app/MenuSongUtils.h"
 #include "util/Utf8Compat.h"
@@ -311,7 +312,7 @@ void MenuApp::handle_skins_settings_input(uint32_t keycode) {
     const std::string active_skin_source = config::normalize_skin_source_token(config_.skin.source);
     const bool lr2_source = active_skin_source == "lr2";
     const int lr2_shift = lr2_source ? 1 : 0;
-    const int item_count = 35 + lr2_shift;
+    const int item_count = 36 + lr2_shift;
     const int imported_skin_row = 1;
     const int lr2_resolution_row = lr2_source ? 2 : -1;
     const int import_skin_row = 2 + lr2_shift;
@@ -346,7 +347,8 @@ void MenuApp::handle_skins_settings_input(uint32_t keycode) {
     const int combo_y_row = 31 + lr2_shift;
     const int black_playfield_row = 32 + lr2_shift;
     const int ui_font_row = 33 + lr2_shift;
-    const int back_row = 34 + lr2_shift;
+    const int visual_latency_row = 34 + lr2_shift;
+    const int back_row = 35 + lr2_shift;
 
     if (keycode == key_up_) {
         settings_cursor_ = clamp_int(settings_cursor_ - 1, 0, item_count - 1);
@@ -364,7 +366,7 @@ void MenuApp::handle_skins_settings_input(uint32_t keycode) {
         const bool was_lr2 = active_skin_source == "lr2";
         config_.skin.source = cycle_skin_source(config_.skin.source, direction);
         const bool is_lr2 = config::normalize_skin_source_token(config_.skin.source) == "lr2";
-        const int new_item_count = 35 + (is_lr2 ? 1 : 0);
+        const int new_item_count = 36 + (is_lr2 ? 1 : 0);
         if (!was_lr2 && is_lr2 && settings_cursor_ >= imported_skin_row) {
             ++settings_cursor_;
         } else if (was_lr2 && !is_lr2 && settings_cursor_ >= import_skin_row) {
@@ -743,6 +745,16 @@ void MenuApp::handle_skins_settings_input(uint32_t keycode) {
         publish_snapshot();
         return;
     }
+    if (settings_cursor_ == visual_latency_row &&
+        (keycode == key_left_ || keycode == key_right_ || keycode == key_enter_)) {
+        const int direction = (keycode == key_left_) ? -1 : 1;
+        config_.visual_offset_ms = clamp_step_value(
+            config_.visual_offset_ms + static_cast<double>(direction) * kVisualOffsetStep,
+            kVisualOffsetMin, kVisualOffsetMax, kVisualOffsetStep);
+        skin_dirty_ = true;
+        publish_snapshot();
+        return;
+    }
 
     if ((keycode == key_enter_ && settings_cursor_ == back_row) ||
         keycode == key_escape_ ||
@@ -907,8 +919,12 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
                     config::skin_ui_font_label(config_.skin.ui_font),
                     settings_cursor_ == 33 + lr2_shift, render::MenuHitTargetKind::SettingsRow,
                     33 + lr2_shift, false, true);
-    append_menu_row(render.generic, ui_text("Back", "뒤로"), "", settings_cursor_ == 34 + lr2_shift,
-                    render::MenuHitTargetKind::SettingsRow, 34 + lr2_shift, true, false);
+    append_menu_row(render.generic, ui_text("Visual Latency", "비주얼 레이턴시"),
+                    format_signed_offset_ms(config_.visual_offset_ms),
+                    settings_cursor_ == 34 + lr2_shift, render::MenuHitTargetKind::SettingsRow,
+                    34 + lr2_shift, false, true);
+    append_menu_row(render.generic, ui_text("Back", "뒤로"), "", settings_cursor_ == 35 + lr2_shift,
+                    render::MenuHitTargetKind::SettingsRow, 35 + lr2_shift, true, false);
 
     render.generic.skin_preview.visible = true;
     render.generic.skin_preview.mode_label = ui_key_mode_label(skin_edit_mode_);

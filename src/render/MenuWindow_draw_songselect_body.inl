@@ -365,7 +365,7 @@
         }
 
         if (data.song_select.list_total_count > data.song_select.list_visible_count &&
-            data.song_select.list_visible_count > 0 && d2d_->button_border_brush) {
+            data.song_select.list_visible_count > 0 && d2d_->text_brush) {
             const D2D1_RECT_F track =
                 D2D1::RectF(left_panel.right - 10.0f, card_top,
                             left_panel.right - 6.0f, left_panel.bottom - 14.0f);
@@ -383,14 +383,17 @@
                 track.top + (track_height - thumb_height) * start_ratio;
             const D2D1_RECT_F thumb =
                 D2D1::RectF(track.left, thumb_top, track.right, thumb_top + thumb_height);
-            const float saved = d2d_->button_border_brush->GetOpacity();
-            d2d_->button_border_brush->SetOpacity(0.26f);
+            const D2D1_COLOR_F saved_color = d2d_->text_brush->GetColor();
+            const float saved_opacity = d2d_->text_brush->GetOpacity();
+            d2d_->text_brush->SetColor(D2D1::ColorF(0xF4F1FF));
+            d2d_->text_brush->SetOpacity(0.24f);
             ctx->FillRoundedRectangle(D2D1::RoundedRect(track, 2.0f, 2.0f),
-                                      d2d_->button_border_brush.Get());
-            d2d_->button_border_brush->SetOpacity(0.82f);
+                                      d2d_->text_brush.Get());
+            d2d_->text_brush->SetOpacity(0.88f);
             ctx->FillRoundedRectangle(D2D1::RoundedRect(thumb, 2.0f, 2.0f),
-                                      d2d_->button_border_brush.Get());
-            d2d_->button_border_brush->SetOpacity(saved);
+                                      d2d_->text_brush.Get());
+            d2d_->text_brush->SetOpacity(saved_opacity);
+            d2d_->text_brush->SetColor(saved_color);
 
             song_scrollbar_state_.visible = true;
             song_scrollbar_state_.left = track.left - 8.0f;

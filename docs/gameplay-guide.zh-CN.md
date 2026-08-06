@@ -60,11 +60,11 @@ TenRiff 的基础游玩流程如下：
 - `Audio`
   - 调整 Master/BGM/Keysound 音量以及 BMS keysound policy
 - `Graphics`
-  - 调整 VSync、Refresh Hz、Performance HUD、Display Offset、BGA 显示与外部 ONNX BGA Upscaler
+  - 调整 VSync、Refresh Hz、Performance HUD、BGA 显示与外部 ONNX BGA Upscaler
   - 关闭 `BGA` 会禁用 gameplay 图片/视频背景及其 decoder/upscaler 工作；Song Select 预览仍会显示
   - 选择 model 后仍需明确开启 upscaler 并确认高配置警告；实验性 `优先 NPU` 只有在 Windows/driver 实际选择 NPU 时才会使用 NPU
 - `Skins`
-  - 切换 native/LR2 skin、使用带 hold 下压与击键 glitch 的 native 下部 digital-piano key、导入单个 LR2 folder 或批量导入独立的 non-IIDX `LR2files/Theme`（跳过依赖 IIDX 的 theme），移植随 field size 放大并裁切在判定线下方的保持原始宽高比下部 Gear frame，并调整固定 divider 基准的 note 间距/大小、Black Playfield、判定线位置、LN body 宽度与 lane color
+  - 切换 native/LR2 skin、调整 Visual Latency、使用带 hold 下压与击键 glitch 的 native 下部 digital-piano key、导入单个 LR2 folder 或批量导入独立的 non-IIDX `LR2files/Theme`（跳过依赖 IIDX 的 theme），移植随 field size 放大并裁切在判定线下方的保持原始宽高比下部 Gear frame，并调整固定 divider 基准的 note 间距/大小、Black Playfield、判定线位置、LN body 宽度与 lane color
 - `Keymap`
   - 调整按键布局并做 NKRO 测试
 
@@ -78,10 +78,10 @@ TenRiff 的基础游玩流程如下：
 - `Mode > Hi-Speed`：先保持默认
 - `Graphics > Display`：使用 Discord voice overlay 时推荐 `Borderless`
 - `Graphics > Performance HUD`：只在需要时打开
-- `Graphics > Display Offset`：从默认 `0ms` 开始
+- `Skins > Visual Latency`：从默认 `0ms` 开始
 - `Audio > Keysound Mode`：BMS 推荐 `follow`
 
-如果 note 看起来太慢或太快，先调整 `Hi-Speed`；如果判定感觉没问题，但画面看起来偏慢或偏快，则调整 `Display Offset`。
+如果 note 看起来太慢或太快，先调整 `Hi-Speed`；如果判定感觉没问题，但画面看起来偏慢或偏快，则调整 `Visual Latency`。
 
 ### Discord voice overlay
 
@@ -216,7 +216,7 @@ Rank 使用 `<75 F`、`75 B`、`80.5 A`、`86.5 A+`、`90 S`、`95.5 S+`、`98 A
 - 需要时再一起调整 `Skins > Note & Field Size / Note Height / Judge Line`
 
 ### 判定感觉对，但画面看起来偏慢或偏快
-- 调整 `Graphics > Display Offset`
+- 调整 `Skins > Visual Latency`
 - 正值会让 note 更早被画出来
 
 ### BMS 中的键音太大或太小
@@ -236,7 +236,7 @@ Rank 使用 `<75 F`、`75 B`、`80.5 A`、`86.5 A+`、`90 S`、`95.5 S+`、`98 A
 1. 在 `Song Select` 里先选一首简单的歌
 2. 在 `Mode` 里确认 `Gauge=Normal`、`Rate=1.0x`
 3. 先只调整 `Hi-Speed`
-4. 如果还是不顺手，再调整 `Display Offset`
+4. 如果还是不顺手，再调整 `Skins > Visual Latency`
 5. 如果手感不舒服，再改 `Keymap`
 6. 最后用 `Skins` 调整 note 大小和判定线位置
 
