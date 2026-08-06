@@ -151,6 +151,8 @@ void sanitize_skin_config(SkinConfig& skin) {
     skin.ui_font = normalize_skin_ui_font_token(skin.ui_font);
     skin.judgement_line_position = std::clamp(
         skin.judgement_line_position, kJudgementLinePositionMin, kJudgementLinePositionMax);
+    skin.note_divider_gap_px =
+        std::clamp(skin.note_divider_gap_px, kNoteDividerGapPxMin, kNoteDividerGapPxMax);
     skin.gameplay_field_offset_x = clamp_finite(
         skin.gameplay_field_offset_x,
         kGameplayFieldOffsetXMin,
@@ -720,10 +722,22 @@ void apply_config_object(const JsonObject& root, RuntimeConfig& config) {
             get_bool(*skin,
                      "preserve_note_image_aspect_ratio",
                      config.skin.preserve_note_image_aspect_ratio);
+        // The boolean only distinguishes stretch from contain, so it seeds the
+        // three-way value and the explicit token then overrides it.
+        config.skin.note_image_aspect =
+            config.skin.preserve_note_image_aspect_ratio ? "contain" : "stretch";
+        config.skin.note_image_aspect = normalize_skin_note_image_aspect_token(
+            get_string(*skin, "note_image_aspect", config.skin.note_image_aspect));
         config.skin.show_lane_dividers =
             get_bool(*skin, "show_lane_dividers", config.skin.show_lane_dividers);
-        config.skin.expand_notes_to_dividers =
-            get_bool(*skin, "expand_notes_to_dividers", config.skin.expand_notes_to_dividers);
+        // Configs written while this was a plain on/off carry the boolean form.
+        if (get_bool(*skin, "expand_notes_to_dividers", false)) {
+            config.skin.note_divider_gap_px = 0.0;
+        }
+        config.skin.note_divider_gap_px = std::clamp(
+            get_number(*skin, "note_divider_gap_px", config.skin.note_divider_gap_px),
+            kNoteDividerGapPxMin,
+            kNoteDividerGapPxMax);
         config.skin.show_judgement_line =
             get_bool(*skin, "show_judgement_line", config.skin.show_judgement_line);
         config.skin.show_gear_boundary_line =
@@ -1107,10 +1121,13 @@ JsonValue build_json_root(const RuntimeConfig& config) {
     skin.emplace("visual_preset", JsonValue{normalize_skin_visual_preset_token(config.skin.visual_preset)});
     skin.emplace("note_shape", JsonValue{normalize_skin_note_shape_token(config.skin.note_shape)});
     skin.emplace("note_border_enabled", JsonValue{config.skin.note_border_enabled});
-    skin.emplace("preserve_note_image_aspect_ratio",
-                 JsonValue{config.skin.preserve_note_image_aspect_ratio});
+    const std::string note_image_aspect =
+        normalize_skin_note_image_aspect_token(config.skin.note_image_aspect);
+    skin.emplace("note_image_aspect", JsonValue{note_image_aspect});
+    // Older builds read only the boolean, so keep it in step with the token.
+    skin.emplace("preserve_note_image_aspect_ratio", JsonValue{note_image_aspect != "stretch"});
     skin.emplace("show_lane_dividers", JsonValue{config.skin.show_lane_dividers});
-    skin.emplace("expand_notes_to_dividers", JsonValue{config.skin.expand_notes_to_dividers});
+    skin.emplace("note_divider_gap_px", JsonValue{config.skin.note_divider_gap_px});
     skin.emplace("show_judgement_line", JsonValue{config.skin.show_judgement_line});
     skin.emplace("show_gear_boundary_line", JsonValue{config.skin.show_gear_boundary_line});
     skin.emplace("show_hold_tail", JsonValue{config.skin.show_hold_tail});
@@ -1452,7 +1469,8 @@ std::string normalize_skin_color_token(std::string_view token) {
 std::string normalize_skin_note_shape_token(std::string_view token) {
     const std::string normalized = to_lower_ascii(std::string(token));
     if (normalized == "circle" || normalized == "triangle" || normalized == "pentagon" ||
-        normalized == "hexagon") {
+        normalized == "hexagon" || normalized == "square" || normalized == "diamond" ||
+        normalized == "arrow") {
         return normalized;
     }
     if (normalized == "rectangle") {
@@ -1461,12 +1479,30 @@ std::string normalize_skin_note_shape_token(std::string_view token) {
     return "rect";
 }
 
+std::string normalize_skin_note_image_aspect_token(std::string_view token) {
+    const std::string normalized = to_lower_ascii(std::string(token));
+    if (normalized == "contain" || normalized == "width") {
+        return normalized;
+    }
+    return "stretch";
+}
+
+std::string skin_note_image_aspect_label(std::string_view token) {
+    const std::string normalized = normalize_skin_note_image_aspect_token(token);
+    if (normalized == "contain") return "Contain";
+    if (normalized == "width") return "Width";
+    return "Stretch";
+}
+
 std::string skin_note_shape_label(std::string_view token) {
     const std::string normalized = normalize_skin_note_shape_token(token);
     if (normalized == "circle") return "Circle";
     if (normalized == "triangle") return "Triangle";
     if (normalized == "pentagon") return "Pentagon";
     if (normalized == "hexagon") return "Hexagon";
+    if (normalized == "square") return "Square";
+    if (normalized == "diamond") return "Diamond";
+    if (normalized == "arrow") return "Arrow";
     return "Rect";
 }
 std::string skin_color_label(std::string_view token) {

@@ -505,17 +505,22 @@ std::string normalize_gameplay_note_shape(std::string_view value) {
         return static_cast<char>(std::tolower(ch));
     });
     if (normalized == "circle" || normalized == "triangle" || normalized == "pentagon" ||
-        normalized == "hexagon") {
+        normalized == "hexagon" || normalized == "square" || normalized == "diamond" ||
+        normalized == "arrow") {
         return normalized;
     }
     return "rect";
 }
 
+// Index into the cached unit geometries. Square and circle are drawn from
+// primitives instead, so they have no entry here.
 std::optional<std::size_t> gameplay_note_polygon_index(std::string_view note_shape) {
     const std::string normalized = normalize_gameplay_note_shape(note_shape);
     if (normalized == "triangle") return 0;
     if (normalized == "pentagon") return 1;
     if (normalized == "hexagon") return 2;
+    if (normalized == "diamond") return 3;
+    if (normalized == "arrow") return 4;
     return std::nullopt;
 }
 
@@ -565,6 +570,45 @@ bool create_unit_note_polygon_geometry(ID2D1Factory1* factory,
     }
     sink->BeginFigure(points.front(), D2D1_FIGURE_BEGIN_FILLED);
     sink->AddLines(points.data() + 1, static_cast<UINT32>(points.size() - 1));
+    sink->EndFigure(D2D1_FIGURE_END_CLOSED);
+    if (FAILED(sink->Close())) {
+        return false;
+    }
+
+    *out_geometry = geometry.Detach();
+    return true;
+}
+
+// An upward chevron in the same unit box the regular polygons use: one lane wide,
+// centred on the origin. Lane rotation then aims it wherever the skin wants.
+bool create_unit_note_arrow_geometry(ID2D1Factory1* factory, ID2D1PathGeometry** out_geometry) {
+    if (!factory || !out_geometry) {
+        return false;
+    }
+    *out_geometry = nullptr;
+
+    Microsoft::WRL::ComPtr<ID2D1PathGeometry> geometry;
+    if (FAILED(factory->CreatePathGeometry(geometry.ReleaseAndGetAddressOf())) || !geometry) {
+        return false;
+    }
+    Microsoft::WRL::ComPtr<ID2D1GeometrySink> sink;
+    if (FAILED(geometry->Open(sink.ReleaseAndGetAddressOf())) || !sink) {
+        return false;
+    }
+
+    constexpr float kShaftHalfWidth = 0.18f;
+    constexpr float kHeadY = -0.04f;
+    const D2D1_POINT_2F points[] = {
+        D2D1::Point2F(0.0f, -0.5f),               // tip
+        D2D1::Point2F(0.5f, kHeadY),              // right barb
+        D2D1::Point2F(kShaftHalfWidth, kHeadY),   // right shoulder
+        D2D1::Point2F(kShaftHalfWidth, 0.5f),     // right shaft
+        D2D1::Point2F(-kShaftHalfWidth, 0.5f),    // left shaft
+        D2D1::Point2F(-kShaftHalfWidth, kHeadY),  // left shoulder
+        D2D1::Point2F(-0.5f, kHeadY),             // left barb
+    };
+    sink->BeginFigure(points[0], D2D1_FIGURE_BEGIN_FILLED);
+    sink->AddLines(points + 1, static_cast<UINT32>(std::size(points) - 1));
     sink->EndFigure(D2D1_FIGURE_END_CLOSED);
     if (FAILED(sink->Close())) {
         return false;
@@ -707,7 +751,7 @@ GameplayFieldLayout build_gameplay_field_layout(float bounds_left,
                                                 std::size_t lane_spacing_scale_count,
                                                 const std::array<double, kGameplayHudMaxLanes>& lane_spacing_scales,
                                                 double lane_center_gap_scale = 0.0,
-                                                bool expand_notes_to_dividers = false) {
+                                                double note_divider_gap_px = kGameplayNoteDividerGapPxDefault) {
     const int clamped_lane_count = std::max(1, lane_count);
     const float bounds_width = std::max(160.0f, bounds_right - bounds_left);
     const bool use_center_gap = clamped_lane_count == 16;
@@ -761,17 +805,17 @@ GameplayFieldLayout build_gameplay_field_layout(float bounds_left,
         const float lane_width_px = unit_width * lane_units[index];
         layout.lane_lefts[index] = cursor;
         layout.lane_widths[index] = lane_width_px;
-        if (expand_notes_to_dividers) {
-            // The divider line sits at the middle of the gap on either side, so
-            // reaching it means growing by one gap. Take the wider neighbouring gap
-            // so the note stays centred on its lane and every lane matches.
-            const float gap_before = lane > 0 ? gap_units[static_cast<std::size_t>(lane - 1)] : 0.0f;
-            const float gap_after = (lane + 1 < clamped_lane_count) ? gap_units[index] : 0.0f;
-            layout.note_widths[index] = lane_width_px + unit_width * std::max(gap_before, gap_after);
-        } else {
-            layout.note_widths[index] = compute_gameplay_note_draw_width(
-                lane_width_px, note_width_scale, note_art_width_ratio);
-        }
+        // The divider line sits at the middle of the gap on either side. Take the
+        // wider neighbouring gap so the note stays centred on its lane and every
+        // lane ends up the same width.
+        const float gap_before = lane > 0 ? gap_units[static_cast<std::size_t>(lane - 1)] : 0.0f;
+        const float gap_after = (lane + 1 < clamped_lane_count) ? gap_units[index] : 0.0f;
+        layout.note_widths[index] = compute_gameplay_note_draw_width(
+            lane_width_px,
+            note_width_scale,
+            note_art_width_ratio,
+            note_divider_gap_px,
+            unit_width * std::max(gap_before, gap_after));
         total_lane_width += lane_width_px;
         total_note_width += layout.note_widths[index];
         cursor += lane_width_px;
@@ -797,7 +841,7 @@ GameplaySurfaceLayout build_gameplay_surface_layout(int lane_count,
                                                     bool ghost_visible,
                                                     double lane_center_gap_scale = 0.0,
                                                     double requested_offset_x = 0.0,
-                                                    bool expand_notes_to_dividers = false) {
+                                                    double note_divider_gap_px = kGameplayNoteDividerGapPxDefault) {
     GameplaySurfaceLayout layout;
     layout.ghost_visible = ghost_visible;
     if (ghost_visible) {
@@ -813,7 +857,7 @@ GameplaySurfaceLayout build_gameplay_surface_layout(int lane_count,
                                                           lane_spacing_scale_count,
                                                           lane_spacing_scales,
                                                           lane_center_gap_scale,
-                                                          expand_notes_to_dividers);
+                                                          note_divider_gap_px);
         layout.ghost_field = build_gameplay_field_layout(kGameplaySplitGhostFieldLeft,
                                                          kGameplaySplitGhostFieldRight,
                                                          kGameplayFieldTop,
@@ -826,7 +870,7 @@ GameplaySurfaceLayout build_gameplay_surface_layout(int lane_count,
                                                          lane_spacing_scale_count,
                                                          lane_spacing_scales,
                                                          lane_center_gap_scale,
-                                                         expand_notes_to_dividers);
+                                                         note_divider_gap_px);
         layout.player_gauge_left =
             layout.player_field.left - (kGameplaySplitPlayerFieldLeft - kGameplaySplitPlayerGaugeLeft);
         layout.ghost_gauge_left =
@@ -844,7 +888,7 @@ GameplaySurfaceLayout build_gameplay_surface_layout(int lane_count,
                                                           lane_spacing_scale_count,
                                                           lane_spacing_scales,
                                                           lane_center_gap_scale,
-                                                          expand_notes_to_dividers);
+                                                          note_divider_gap_px);
         layout.player_gauge_left =
             layout.player_field.right + (kGameplayGaugeLeft - kGameplayFieldRight);
     }
@@ -2172,7 +2216,8 @@ struct MenuWindow::D2DResources {
     Microsoft::WRL::ComPtr<ID2D1PathGeometry> performance_graph_geometry;
     Microsoft::WRL::ComPtr<ID2D1CommandList> gameplay_static_command_list;
     std::array<Microsoft::WRL::ComPtr<ID2D1PathGeometry>, 2> gameplay_gauge_grid_geometries{};
-    std::array<Microsoft::WRL::ComPtr<ID2D1PathGeometry>, 3> gameplay_note_shape_geometries{};
+    // Indexed by gameplay_note_polygon_index: triangle, pentagon, hexagon, diamond, arrow.
+    std::array<Microsoft::WRL::ComPtr<ID2D1PathGeometry>, 5> gameplay_note_shape_geometries{};
 };
 
 MenuWindow::MenuWindow()
@@ -2397,13 +2442,18 @@ bool MenuWindow::initialize(const MenuWindowConfig& config) {
         destroy_window();
         return fail_fatal("Failed to create the Direct2D factory.");
     }
-    constexpr std::array<int, 3> kNotePolygonSides{3, 5, 6};
+    // A regular quad with its first vertex at the top is a diamond, so the shared
+    // polygon builder covers it; the arrow needs its own path.
+    constexpr std::array<int, 4> kNotePolygonSides{3, 5, 6, 4};
     for (std::size_t index = 0; index < kNotePolygonSides.size(); ++index) {
         static_cast<void>(create_unit_note_polygon_geometry(
             d2d_->d2d_factory.Get(),
             kNotePolygonSides[index],
             d2d_->gameplay_note_shape_geometries[index].ReleaseAndGetAddressOf()));
     }
+    static_cast<void>(create_unit_note_arrow_geometry(
+        d2d_->d2d_factory.Get(),
+        d2d_->gameplay_note_shape_geometries[4].ReleaseAndGetAddressOf()));
     if (FAILED(d2d_->d2d_factory->CreateDevice(dxgi_device.Get(), d2d_->d2d_device.ReleaseAndGetAddressOf())) ||
         !d2d_->d2d_device ||
         FAILED(d2d_->d2d_device->CreateDeviceContext(D2D1_DEVICE_CONTEXT_OPTIONS_NONE,
@@ -2541,7 +2591,7 @@ bool MenuWindow::ensure_gameplay_note_sprites(const GameplayHudData& data) {
         gameplay_note_sprite_cache_.lane_count == lane_count &&
         gameplay_note_sprite_cache_.note_border_enabled == data.note_border_enabled &&
         gameplay_note_sprite_cache_.note_shape == note_shape &&
-        gameplay_note_sprite_cache_.preserve_note_image_aspect_ratio == data.preserve_note_image_aspect_ratio &&
+        gameplay_note_sprite_cache_.note_image_aspect == data.note_image_aspect &&
         gameplay_note_sprite_cache_.skin_source == source &&
         gameplay_note_sprite_cache_.external_skin_root == data.external_skin_root &&
         gameplay_note_sprite_cache_.external_skin_name == data.external_skin_name &&
@@ -2555,7 +2605,7 @@ bool MenuWindow::ensure_gameplay_note_sprites(const GameplayHudData& data) {
     gameplay_note_sprite_cache_.lane_count = lane_count;
     gameplay_note_sprite_cache_.note_border_enabled = data.note_border_enabled;
     gameplay_note_sprite_cache_.note_shape = note_shape;
-    gameplay_note_sprite_cache_.preserve_note_image_aspect_ratio = data.preserve_note_image_aspect_ratio;
+    gameplay_note_sprite_cache_.note_image_aspect = data.note_image_aspect;
     gameplay_note_sprite_cache_.skin_source = source;
     gameplay_note_sprite_cache_.external_skin_root = data.external_skin_root;
     gameplay_note_sprite_cache_.external_skin_name = data.external_skin_name;
@@ -3410,7 +3460,7 @@ bool MenuWindow::ensure_gameplay_static_cache(const GameplayHudData& data) {
     desired.lane_center_gap_scale = data.lane_center_gap_scale;
     desired.show_lane_dividers = data.show_lane_dividers;
     desired.show_judgement_line = data.show_judgement_line;
-    desired.expand_notes_to_dividers = data.expand_notes_to_dividers;
+    desired.note_divider_gap_px = data.note_divider_gap_px;
     desired.show_gear_boundary_line = data.show_gear_boundary_line;
     desired.judgement_line_glow_enabled = data.judgement_line_glow_enabled;
     desired.lane_background_opacity = std::clamp(data.lane_background_opacity, 0.0, 0.45);
@@ -3445,7 +3495,7 @@ bool MenuWindow::ensure_gameplay_static_cache(const GameplayHudData& data) {
         gameplay_static_cache_.lane_center_gap_scale == desired.lane_center_gap_scale &&
         gameplay_static_cache_.show_lane_dividers == desired.show_lane_dividers &&
         gameplay_static_cache_.show_judgement_line == desired.show_judgement_line &&
-        gameplay_static_cache_.expand_notes_to_dividers == desired.expand_notes_to_dividers &&
+        gameplay_static_cache_.note_divider_gap_px == desired.note_divider_gap_px &&
         gameplay_static_cache_.show_gear_boundary_line == desired.show_gear_boundary_line &&
         gameplay_static_cache_.judgement_line_glow_enabled == desired.judgement_line_glow_enabled &&
         gameplay_static_cache_.lane_background_opacity == desired.lane_background_opacity &&
@@ -3489,7 +3539,7 @@ bool MenuWindow::ensure_gameplay_static_cache(const GameplayHudData& data) {
             desired.ghost_visible,
             desired.lane_center_gap_scale,
             desired.gameplay_field_offset_x,
-            desired.expand_notes_to_dividers);
+            desired.note_divider_gap_px);
     auto build_gauge_grid = [&](std::size_t index, float gauge_left) {
         Microsoft::WRL::ComPtr<ID2D1PathGeometry> geometry;
         if (FAILED(d2d_->d2d_factory->CreatePathGeometry(geometry.ReleaseAndGetAddressOf())) || !geometry) {

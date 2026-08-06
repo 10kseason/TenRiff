@@ -26,12 +26,11 @@
             clamp_gameplay_hold_body_width_scale(data.gameplay.hold_body_width_scale);
         const bool note_border_enabled = data.gameplay.note_border_enabled;
         // A skin that declares note_aspect knows its own art, so it wins over the
-        // player's Image Aspect toggle; otherwise that toggle picks contain/stretch.
+        // player's Image Aspect setting; otherwise that setting decides.
         const NoteImageAspect note_image_aspect =
             use_imported_metrics && gameplay_note_sprite_cache_.has_imported_note_aspect
                 ? gameplay_note_sprite_cache_.imported_note_aspect
-                : (data.gameplay.preserve_note_image_aspect_ratio ? NoteImageAspect::Contain
-                                                                  : NoteImageAspect::Stretch);
+                : data.gameplay.note_image_aspect;
         // Hit-burst brightness, 0% turns the explosion off entirely.
         const float key_pulse_brightness =
             std::clamp(data.gameplay.key_pulse_brightness, 0.0f, 1.0f);
@@ -789,7 +788,7 @@
                 gameplay_field_drag_state_.has_local_override
                     ? gameplay_field_drag_state_.offset_x
                     : data.gameplay.gameplay_field_offset_x,
-                data.gameplay.expand_notes_to_dividers);
+                data.gameplay.note_divider_gap_px);
         gameplay_field_drag_state_.visible = data.gameplay.active && !data.gameplay.loading;
         gameplay_field_drag_state_.left =
             surface_layout.player_field.right + kGameplayFieldDragHandleGap;

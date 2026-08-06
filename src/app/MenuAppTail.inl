@@ -92,7 +92,10 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
         config::kHoldBodyWidthScaleMax);
     target.show_cursor_in_gameplay = config_.ui.show_cursor_in_gameplay;
     target.show_lane_dividers = config_.skin.show_lane_dividers;
-    target.expand_notes_to_dividers = config_.skin.expand_notes_to_dividers;
+    target.note_divider_gap_px = std::clamp(
+        config_.skin.note_divider_gap_px,
+        config::kNoteDividerGapPxMin,
+        config::kNoteDividerGapPxMax);
     target.show_judgement_line = config_.skin.show_judgement_line;
     target.show_gear_boundary_line = config_.skin.show_gear_boundary_line;
     target.show_hold_tail = config_.skin.show_hold_tail;
@@ -103,7 +106,7 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
     target.key_label_position = config::normalize_skin_key_label_position_token(config_.skin.key_label_position);
     target.note_border_enabled = config_.skin.note_border_enabled;
     target.note_shape = config::normalize_skin_note_shape_token(config_.skin.note_shape);
-    target.preserve_note_image_aspect_ratio = config_.skin.preserve_note_image_aspect_ratio;
+    target.note_image_aspect = render_note_image_aspect(config_.skin.note_image_aspect);
     target.skin_source = config::normalize_skin_source_token(config_.skin.source);
     target.external_skin_root = active_external_skin_root();
     target.external_skin_name = active_external_skin_name();

@@ -144,6 +144,8 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
     render.song_select.background_upscale_prefer_npu = config_.graphics.background_upscale_prefer_npu;
     render.song_select.group_summary = song_group_detail_label(song_group_mode_, korean);
     render.song_select.browser_summary = browser_summary();
+    render.song_select.search_query = safe_ui_text(song_search_query_);
+    render.song_select.search_active = song_select_search_active_;
     const std::string input_backend_label = current_input_backend_status_label();
     if (!input_backend_label.empty()) {
         if (!render.song_select.browser_summary.empty()) {
@@ -559,13 +561,17 @@ void MenuApp::populate_song_browser_render_data(render::MenuRenderData& render) 
                     true);
     append_menu_row(render.generic,
                     ui_text("Difficulty Table", "난이도표"),
-                    config_.ui.difficulty_table_path.empty()
-                        ? ui_text("Native LV", "기본 LV")
-                        : safe_ui_text(
-                              config_.ui.difficulty_table_url.empty()
-                                  ? filename_only(config_.ui.difficulty_table_path)
-                                  : config_.ui.difficulty_table_url,
-                              config_.ui.difficulty_table_url.empty() ? "JSON" : "LINK"),
+                    difficulty_table_url_editing_
+                        ? (safe_ui_text(difficulty_table_url_input_,
+                                        ui_text("URL", "URL")) +
+                           "|")
+                        : (config_.ui.difficulty_table_path.empty()
+                               ? ui_text("Native LV / Enter: URL", "기본 LV / Enter: URL 입력")
+                               : safe_ui_text(
+                                     config_.ui.difficulty_table_url.empty()
+                                         ? filename_only(config_.ui.difficulty_table_path)
+                                         : config_.ui.difficulty_table_url,
+                                     config_.ui.difficulty_table_url.empty() ? "JSON" : "LINK")),
                     settings_cursor_ == 5,
                     render::MenuHitTargetKind::SettingsRow,
                     5,

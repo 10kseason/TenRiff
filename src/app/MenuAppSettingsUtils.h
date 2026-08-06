@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cmath>
 #include <ios>
 #include <ostream>
 #include <sstream>
@@ -113,6 +114,10 @@ inline std::vector<std::string> cycle_mode_mod_category(const std::vector<std::s
         normalized.push_back(std::string(category.mods[static_cast<std::size_t>(next_index - 1)]->token));
     }
     return normalize_mode_mod_tokens(normalized);
+}
+
+inline std::string format_pixels(double value) {
+    return std::to_string(static_cast<int>(std::lround(value))) + " px";
 }
 
 inline std::string format_signed_offset_ms(double value) {

@@ -142,6 +142,8 @@ TEST_CASE("config defaults prefer 44100 Hz audio") {
     CHECK(config.skin.visual_preset == "tenriff");
     CHECK(config.skin.note_border_enabled);
     CHECK_FALSE(config.skin.preserve_note_image_aspect_ratio);
+    CHECK(config.skin.note_image_aspect == "stretch");
+    CHECK(config.skin.note_divider_gap_px == doctest::Approx(12.0));
     CHECK(config.skin.show_lane_dividers);
     CHECK(config.skin.show_judgement_line);
     CHECK_FALSE(config.skin.show_gear_boundary_line);
@@ -967,7 +969,7 @@ TEST_CASE("config save and load preserve skin gameplay settings") {
     auto config = loader.defaults();
     config.skin.note_shape = "circle";
     config.skin.note_border_enabled = false;
-    config.skin.preserve_note_image_aspect_ratio = true;
+    config.skin.note_image_aspect = "width";
     config.skin.show_lane_dividers = false;
     config.skin.show_judgement_line = false;
     config.skin.show_gear_boundary_line = true;
@@ -1000,6 +1002,8 @@ TEST_CASE("config save and load preserve skin gameplay settings") {
     REQUIRE(result.success());
     CHECK(result.config.skin.note_shape == "circle");
     CHECK_FALSE(result.config.skin.note_border_enabled);
+    CHECK(result.config.skin.note_image_aspect == "width");
+    // The legacy boolean is written in step so older builds still see a sane value.
     CHECK(result.config.skin.preserve_note_image_aspect_ratio);
     CHECK_FALSE(result.config.skin.show_lane_dividers);
     CHECK_FALSE(result.config.skin.show_judgement_line);

@@ -5,6 +5,7 @@
 #include "GameplayHudLimits.h"
 #include "render/BgaImageLoader.h"
 #include "render/BgaVideoDecoder.h"
+#include "render/GameplayMotion.h"
 #include "render/OnnxBackgroundUpscaler.h"
 #include "render/RenderThread.h"
 
@@ -152,6 +153,10 @@ struct SongSelectData {
     bool selected_song_favorite = false;
     std::string selected_song_collection_filter;
     std::string selected_song_ghost_status;
+    // Live search text, shown on the search control so the player can see what they
+    // are typing instead of only its effect on the list.
+    std::string search_query;
+    bool search_active = false;
     std::string group_summary;
     std::string browser_summary;
     std::string sort_summary;
@@ -336,7 +341,7 @@ struct GameplayHudData {
     double lane_center_gap_scale = 0.0;
     double hold_body_width_scale = 0.60;
     bool show_lane_dividers = true;
-    bool expand_notes_to_dividers = false;
+    double note_divider_gap_px = kGameplayNoteDividerGapPxDefault;
     bool show_judgement_line = true;
     bool show_gear_boundary_line = false;
     bool show_hold_tail = true;
@@ -347,7 +352,7 @@ struct GameplayHudData {
     std::string key_label_position = "bottom";
     bool note_border_enabled = true;
     std::string note_shape = "rect";
-    bool preserve_note_image_aspect_ratio = false;
+    NoteImageAspect note_image_aspect = NoteImageAspect::Stretch;
     std::string skin_source = "native";
     std::string external_skin_root;
     std::string external_skin_name;
@@ -487,7 +492,7 @@ struct SkinPreviewData {
     double lane_center_gap_scale = 0.0;
     double hold_body_width_scale = 0.60;
     bool show_lane_dividers = true;
-    bool expand_notes_to_dividers = false;
+    double note_divider_gap_px = kGameplayNoteDividerGapPxDefault;
     bool show_judgement_line = true;
     bool show_gear_boundary_line = false;
     bool show_hold_tail = true;
@@ -498,7 +503,7 @@ struct SkinPreviewData {
     std::string key_label_position = "bottom";
     bool note_border_enabled = true;
     std::string note_shape = "rect";
-    bool preserve_note_image_aspect_ratio = false;
+    NoteImageAspect note_image_aspect = NoteImageAspect::Stretch;
     std::string skin_source = "native";
     std::string external_skin_root;
     std::string external_skin_name;
@@ -768,7 +773,7 @@ private:
         double lane_divider_width_scale = 1.0;
         double lane_center_gap_scale = 0.0;
         bool show_lane_dividers = true;
-        bool expand_notes_to_dividers = false;
+        double note_divider_gap_px = kGameplayNoteDividerGapPxDefault;
         bool show_judgement_line = true;
         bool show_gear_boundary_line = false;
         bool judgement_line_glow_enabled = true;
@@ -786,7 +791,7 @@ private:
         int lane_count = 0;
         bool note_border_enabled = true;
         std::string note_shape = "rect";
-        bool preserve_note_image_aspect_ratio = false;
+        NoteImageAspect note_image_aspect = NoteImageAspect::Stretch;
         std::string skin_source = "native";
         std::string external_skin_root;
         std::string external_skin_name;

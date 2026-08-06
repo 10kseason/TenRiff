@@ -205,6 +205,21 @@ inline std::string cycle_skin_visual_preset(std::string_view value, int directio
     return presets[static_cast<std::size_t>(index)];
 }
 
+inline std::string cycle_skin_note_image_aspect(std::string_view value, int direction) {
+    static constexpr const char* kAspects[] = {"stretch", "contain", "width"};
+    constexpr int kCount = 3;
+    int index = 0;
+    const std::string normalized = config::normalize_skin_note_image_aspect_token(value);
+    for (int i = 0; i < kCount; ++i) {
+        if (normalized == kAspects[i]) {
+            index = i;
+            break;
+        }
+    }
+    index = (index + direction % kCount + kCount) % kCount;
+    return kAspects[index];
+}
+
 inline std::string cycle_skin_ui_font(std::string_view value, int direction) {
     static constexpr const char* kFonts[] = {"default", "malgun", "bahnschrift", "consolas"};
     constexpr int kCount = 4;

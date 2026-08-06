@@ -72,21 +72,38 @@ inline float compute_gameplay_playfield_width(float baseline_width, double note_
     return std::max(1.0f, baseline_width) * gameplay_playfield_scale(note_width_scale);
 }
 
+// Clearance between a note edge and the lane divider line, in base-space pixels at
+// 100% note size. The default of 12 per side reproduces the historic 24px inset.
+inline constexpr double kGameplayNoteDividerGapPxDefault = 12.0;
+inline constexpr double kGameplayNoteDividerGapPxMin = 0.0;
+inline constexpr double kGameplayNoteDividerGapPxMax = 40.0;
+
+// The divider line sits half a lane gap outside the lane box, so lane width plus
+// the adjacent gap is the slot a note may fill. `divider_gap_px` takes clearance
+// off both edges of that slot; an imported skin's authored ratio then fills what
+// remains, which is why LR2 art can still render narrower than the setting.
 inline float compute_gameplay_note_draw_width(float lane_width,
                                               double note_width_scale,
-                                              double imported_note_width_ratio = 1.0) {
-    constexpr float kDefaultNoteGapPx = 24.0f;
+                                              double imported_note_width_ratio = 1.0,
+                                              double divider_gap_px = kGameplayNoteDividerGapPxDefault,
+                                              float adjacent_lane_gap_px = 0.0f) {
     const float field_scale = gameplay_playfield_scale(note_width_scale);
     const float scaled_minimum_width = 16.0f * field_scale;
     const float safe_lane_width = std::max(scaled_minimum_width, lane_width);
-    const float base_note_width =
-        std::max(scaled_minimum_width, safe_lane_width - kDefaultNoteGapPx * field_scale);
+    const float safe_adjacent_gap =
+        (std::isfinite(adjacent_lane_gap_px) && adjacent_lane_gap_px > 0.0f) ? adjacent_lane_gap_px : 0.0f;
+    const float slot_width = safe_lane_width + safe_adjacent_gap;
+    const double clamped_gap_px =
+        std::isfinite(divider_gap_px)
+            ? std::clamp(divider_gap_px, kGameplayNoteDividerGapPxMin, kGameplayNoteDividerGapPxMax)
+            : kGameplayNoteDividerGapPxDefault;
+    const float base_note_width = std::max(
+        scaled_minimum_width, slot_width - 2.0f * static_cast<float>(clamped_gap_px) * field_scale);
     const float imported_ratio =
         (!std::isfinite(imported_note_width_ratio) || imported_note_width_ratio <= 0.0)
             ? 1.0f
             : static_cast<float>(std::clamp(imported_note_width_ratio, 0.25, 4.0));
-    const float maximum_width = std::max(scaled_minimum_width, safe_lane_width - 4.0f * field_scale);
-    return std::clamp(base_note_width * imported_ratio, scaled_minimum_width, maximum_width);
+    return std::clamp(base_note_width * imported_ratio, scaled_minimum_width, slot_width);
 }
 
 inline GameplayNoteShapeExtents gameplay_note_shape_extents(float width,
@@ -98,8 +115,12 @@ inline GameplayNoteShapeExtents gameplay_note_shape_extents(float width,
     });
     const float safe_width = std::max(2.0f, width);
     const float safe_height = std::max(2.0f, height);
+    // These shapes are drawn inside a square box so they stay regular, taking the
+    // lane width as their side rather than the note rect's height.
     const bool lane_width_shape = normalized == "circle" || normalized == "triangle" ||
-                                  normalized == "pentagon" || normalized == "hexagon";
+                                  normalized == "pentagon" || normalized == "hexagon" ||
+                                  normalized == "square" || normalized == "diamond" ||
+                                  normalized == "arrow";
     return GameplayNoteShapeExtents{
         safe_width * 0.5f,
         (lane_width_shape ? safe_width : safe_height) * 0.5f,
