@@ -254,6 +254,11 @@
 - `key_pulse_enabled` (bool)
   - `key_pulse_brightness`의 on/off 형태. 구버전 config 호환용으로 함께 저장한다
   - 둘 중 하나라도 꺼져 있으면 꺼진 것으로 처리한다
+- `ui_font` (string)
+  - 메뉴 텍스트에 쓰는 글꼴
+  - `default`(Segoe UI) | `malgun`(Malgun Gothic) | `bahnschrift` | `consolas`
+  - Options의 `Skins > UI Font / UI 폰트` 행에서 바꾸며 즉시 적용된다
+  - 로고·랭크·콤보 숫자와 디버그 readout은 자체 글꼴을 유지한다
 - `key_label_position` (string)
   - `bottom | top | off`
   - gameplay lane 안쪽에 현재 keymap의 키 이름을 작게 표시

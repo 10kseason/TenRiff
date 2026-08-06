@@ -1,0 +1,92 @@
+{
+  "$schema": "../../../docs/tenriff-skin.schema.json",
+  "format": "tenriff-skin",
+  "version": 1,
+  "name": "SunShine Light-er",
+  "author": "Luna × 윾이",
+  "lobby": {
+    "background": "lobby/background.jpg",
+    "logo": "lobby/logo.png",
+    "background_opacity": 0.74
+  },
+  "gameplay": {
+    "background": "gameplay/background.jpg",
+    "background_opacity": 0.56,
+    "gear": "gameplay/gear.png",
+    "note": [
+      "gameplay/note-white-l.png",
+      "gameplay/note-orange-l.png",
+      "gameplay/note-cyan-l.png",
+      "gameplay/note-sun-center.png",
+      "gameplay/note-cyan-r.png",
+      "gameplay/note-orange-r.png",
+      "gameplay/note-white-r.png"
+    ],
+    "hold_head": [
+      "gameplay/hold-head-white-l.png",
+      "gameplay/hold-head-orange-l.png",
+      "gameplay/hold-head-cyan-l.png",
+      "gameplay/hold-head-sun-center.png",
+      "gameplay/hold-head-cyan-r.png",
+      "gameplay/hold-head-orange-r.png",
+      "gameplay/hold-head-white-r.png"
+    ],
+    "hold_body": [
+      "gameplay/hold-body-white-l.png",
+      "gameplay/hold-body-orange-l.png",
+      "gameplay/hold-body-cyan-l.png",
+      "gameplay/hold-body-sun-center.png",
+      "gameplay/hold-body-cyan-r.png",
+      "gameplay/hold-body-orange-r.png",
+      "gameplay/hold-body-white-r.png"
+    ],
+    "hold_tail": [
+      "gameplay/hold-tail-white-l.png",
+      "gameplay/hold-tail-orange-l.png",
+      "gameplay/hold-tail-cyan-l.png",
+      "gameplay/hold-tail-sun-center.png",
+      "gameplay/hold-tail-cyan-r.png",
+      "gameplay/hold-tail-orange-r.png",
+      "gameplay/hold-tail-white-r.png"
+    ],
+    "key_idle": [
+      "gameplay/key-idle-white-l.png",
+      "gameplay/key-idle-orange-l.png",
+      "gameplay/key-idle-cyan-l.png",
+      "gameplay/key-idle-sun-center.png",
+      "gameplay/key-idle-cyan-r.png",
+      "gameplay/key-idle-orange-r.png",
+      "gameplay/key-idle-white-r.png"
+    ],
+    "key_pressed": [
+      "gameplay/key-pressed-white-l.png",
+      "gameplay/key-pressed-orange-l.png",
+      "gameplay/key-pressed-cyan-l.png",
+      "gameplay/key-pressed-sun-center.png",
+      "gameplay/key-pressed-cyan-r.png",
+      "gameplay/key-pressed-orange-r.png",
+      "gameplay/key-pressed-white-r.png"
+    ],
+    "note_width_ratio": 0.96,
+    "note_height_ratio": 0.92,
+    "judgement_line_position": 0.825,
+    "full_lane_receptors": true,
+    "column_widths": [
+      1.0,
+      1.0,
+      1.0,
+      1.12,
+      1.0,
+      1.0,
+      1.0
+    ],
+    "column_spacings": [
+      0.03,
+      0.03,
+      0.05,
+      0.05,
+      0.03,
+      0.03
+    ]
+  }
+}

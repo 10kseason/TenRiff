@@ -556,6 +556,7 @@ struct LobbySkinData {
 struct MenuRenderData {
     MenuScreenKind kind = MenuScreenKind::GenericList;
     bool ui_korean = false;
+    std::string ui_font = "default";
     LobbySkinData lobby_skin;
 
     std::string screen_title;
@@ -631,6 +632,7 @@ private:
     void trim_song_card_preview_cache();
     void invalidate_gameplay_static_cache();
     [[nodiscard]] bool ensure_gameplay_static_cache(const GameplayHudData& data);
+    [[nodiscard]] bool create_text_formats(const wchar_t* ui_family);
     [[nodiscard]] bool recreate_targets();
     [[nodiscard]] bool save_screenshot_to_png();
     [[nodiscard]] bool is_input_foreground() const;

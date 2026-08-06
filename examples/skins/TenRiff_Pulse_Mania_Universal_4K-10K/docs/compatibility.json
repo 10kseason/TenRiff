@@ -1,0 +1,21 @@
+{
+  "declared_range": {
+    "min_keys": 4,
+    "max_keys": 10
+  },
+  "lane_asset_mode": "single shared asset path",
+  "fixed_lane_arrays": false,
+  "fixed_column_widths": false,
+  "fixed_column_spacings": false,
+  "fixed_lane_lines_in_gear": false,
+  "tested_structurally": [
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10
+  ],
+  "note": "Actual renderer smoke-test is still recommended."
+}

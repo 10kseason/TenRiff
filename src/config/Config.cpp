@@ -150,6 +150,7 @@ void sanitize_skin_config(SkinConfig& skin) {
     skin.visual_preset = normalize_skin_visual_preset_token(skin.visual_preset);
     skin.note_shape = normalize_skin_note_shape_token(skin.note_shape);
     skin.key_label_position = normalize_skin_key_label_position_token(skin.key_label_position);
+    skin.ui_font = normalize_skin_ui_font_token(skin.ui_font);
     skin.judgement_line_position = std::clamp(
         skin.judgement_line_position, kJudgementLinePositionMin, kJudgementLinePositionMax);
     skin.combo_position = std::clamp(
@@ -734,6 +735,8 @@ void apply_config_object(const JsonObject& root, RuntimeConfig& config) {
                        config.skin.key_pulse_enabled ? kSkinKeyPulseBrightnessMax
                                                      : kSkinKeyPulseBrightnessMin),
             kSkinKeyPulseBrightnessMin, kSkinKeyPulseBrightnessMax);
+        config.skin.ui_font = normalize_skin_ui_font_token(
+            get_string(*skin, "ui_font", config.skin.ui_font));
         config.skin.key_label_position = normalize_skin_key_label_position_token(
             get_string(*skin, "key_label_position", config.skin.key_label_position));
         config.skin.judgement_line_position = std::clamp(
@@ -1107,6 +1110,7 @@ JsonValue build_json_root(const RuntimeConfig& config) {
                  JsonValue{key_pulse_on ? config.skin.key_pulse_brightness : 0.0});
     skin.emplace("key_label_position",
                  JsonValue{normalize_skin_key_label_position_token(config.skin.key_label_position)});
+    skin.emplace("ui_font", JsonValue{normalize_skin_ui_font_token(config.skin.ui_font)});
     skin.emplace("judgement_line_position", JsonValue{config.skin.judgement_line_position});
     skin.emplace("combo_position", JsonValue{config.skin.combo_position});
     skin.emplace("lane_background_opacity", JsonValue{config.skin.lane_background_opacity});
@@ -1379,6 +1383,34 @@ std::string normalize_skin_key_label_position_token(std::string_view token) {
         return "off";
     }
     return "bottom";
+}
+
+std::string normalize_skin_ui_font_token(std::string_view token) {
+    const std::string normalized = to_lower_ascii(std::string(token));
+    if (normalized == "malgun" || normalized == "malgun gothic") {
+        return "malgun";
+    }
+    if (normalized == "bahnschrift") {
+        return "bahnschrift";
+    }
+    if (normalized == "consolas") {
+        return "consolas";
+    }
+    return "default";
+}
+
+std::string skin_ui_font_label(std::string_view token) {
+    const std::string normalized = normalize_skin_ui_font_token(token);
+    if (normalized == "malgun") {
+        return "Malgun Gothic";
+    }
+    if (normalized == "bahnschrift") {
+        return "Bahnschrift";
+    }
+    if (normalized == "consolas") {
+        return "Consolas";
+    }
+    return "Segoe UI";
 }
 
 std::string skin_key_label_position_label(std::string_view token) {

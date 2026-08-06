@@ -2,7 +2,7 @@
 
 Language: [한국어](README.md) | [English](README.en.md) | [简体中文](README.zh-CN.md) | [日本語](README.ja.md)
 
-TenRiff 是一个 Windows GUI BMS 节奏游戏运行时/启动器。当前 stable 版本为 `1.3.2 (UI-r2)`，谱面输入仅支持 BMS family（`.bms/.bme/.bml/.pms`）。用户可在 Graphics Settings 中选择权利已厘清的外部 ONNX model，然后明确打开 `BGA Upscaler` 并确认高配置警告。公开包不包含模型，默认值为 `off`；不再设置性能 benchmark gate，加载、契约或推理失败时继续使用 native scaling。默认加速路径为高性能 DirectX GPU，并自动检测 FP32/FP16 边界与浮点边界 INT8 QDQ metadata。实验性的 `Low-Power DirectX` 只请求 `DirectXMinPower`，并非明确或已验证的 NPU 选择。项目采用 MIT 许可证。
+TenRiff 是一个 Windows GUI BMS 节奏游戏运行时/启动器。当前 stable 版本为 `1.3.3 (UI-r2)`，谱面输入仅支持 BMS family（`.bms/.bme/.bml/.pms`）。用户可在 Graphics Settings 中选择权利已厘清的外部 ONNX model，然后明确打开 `BGA Upscaler` 并确认高配置警告。公开包不包含模型，默认值为 `off`；不再设置性能 benchmark gate，加载、契约或推理失败时继续使用 native scaling。默认加速路径为高性能 DirectX GPU，并自动检测 FP32/FP16 边界与浮点边界 INT8 QDQ metadata。实验性的 `Low-Power DirectX` 只请求 `DirectXMinPower`，并非明确或已验证的 NPU 选择。项目采用 MIT 许可证。
 
 这份 README 是入门文档。关于当前行为、`1.3.1 (UI-r2)` 项目状态、`1.1.2 final stable` 基准、配置和设计文档，请继续阅读 [`docs/README.zh-CN.md`](docs/README.zh-CN.md)。
 

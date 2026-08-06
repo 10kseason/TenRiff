@@ -149,11 +149,11 @@
                                    d2d_->accent_brush.Get());
                 d2d_->accent_brush->SetOpacity(saved);
             }
-            if (d2d_->body_format && d2d_->text_brush) {
+            if (d2d_->song_title_format && d2d_->text_brush) {
                 draw_centered_text(to_wide(item.label),
-                                   d2d_->body_format.Get(),
-                                   D2D1::RectF(tab.left + 8.0f, tab.top + 48.0f,
-                                               tab.right - 8.0f, tab.bottom - 12.0f),
+                                   d2d_->song_title_format.Get(),
+                                   D2D1::RectF(tab.left + 8.0f, tab.top + 44.0f,
+                                               tab.right - 8.0f, tab.bottom - 10.0f),
                                    route_active && d2d_->accent_brush
                                        ? static_cast<ID2D1Brush*>(d2d_->accent_brush.Get())
                                        : static_cast<ID2D1Brush*>(d2d_->text_brush.Get()));
@@ -421,8 +421,22 @@
         if (has_selected_preview_art) {
             const D2D1_RECT_F source =
                 centered_bitmap_source_rect(d2d_->song_select_preview_bitmap->GetSize(), preview);
+            // Round the jacket to match the glass frame around it; a square bitmap
+            // inside a rounded panel leaves the corners sticking out.
+            Microsoft::WRL::ComPtr<ID2D1RoundedRectangleGeometry> preview_clip;
+            if (d2d_->d2d_factory) {
+                static_cast<void>(d2d_->d2d_factory->CreateRoundedRectangleGeometry(
+                    D2D1::RoundedRect(preview, 8.0f, 8.0f),
+                    preview_clip.ReleaseAndGetAddressOf()));
+            }
+            if (preview_clip) {
+                ctx->PushLayer(D2D1::LayerParameters(preview, preview_clip.Get()), nullptr);
+            }
             ctx->DrawBitmap(d2d_->song_select_preview_bitmap.Get(), preview, 0.98f,
                             D2D1_BITMAP_INTERPOLATION_MODE_LINEAR, &source);
+            if (preview_clip) {
+                ctx->PopLayer();
+            }
         } else if (!data.song_select.showing_sources &&
                    !data.song_select.showing_records && d2d_->card_brush) {
             const D2D1_COLOR_F fallback = jacket_color(data.song_select.selected_song_title);
@@ -493,23 +507,61 @@
                                           best_panel.left + 190.0f, best_panel.bottom - 12.0f),
                               d2d_->accent_brush.Get());
         }
-        draw_meta_pair(D2D1::RectF(best_panel.left + 205.0f, best_panel.top + 48.0f,
-                                   best_panel.left + 420.0f, best_panel.bottom - 18.0f),
-                       loc("SCORE", "점수"),
-                       data.song_select.result_available
-                           ? format_int_with_commas(data.song_select.best_score) + " / D " +
-                                 format_int_with_commas(data.song_select.detail_score) : "--");
-        draw_meta_pair(D2D1::RectF(best_panel.left + 430.0f, best_panel.top + 48.0f,
-                                   best_panel.left + 575.0f, best_panel.bottom - 18.0f),
-                       loc("ACCURACY", "정확도"),
-                       data.song_select.result_available
-                           ? format_decimal(data.song_select.accuracy, 2) + "% / D " +
-                                 format_decimal(data.song_select.detailed_accuracy, 2) + "%" : "--");
-        draw_meta_pair(D2D1::RectF(best_panel.left + 585.0f, best_panel.top + 48.0f,
-                                   best_panel.right - 20.0f, best_panel.bottom - 18.0f),
-                       loc("MAX COMBO", "최대 콤보"),
-                       data.song_select.result_available
-                           ? format_int_with_commas(data.song_select.max_combo) : "--");
+        // Three evenly spaced columns, each stacking label / value / detail. The
+        // old "value / D detail" strings overran their column and ran into the
+        // next one, which is what made this row hard to read.
+        const float best_columns_left = best_panel.left + 205.0f;
+        const float best_columns_right = best_panel.right - 20.0f;
+        const float best_column_gap = 18.0f;
+        const float best_column_width =
+            (best_columns_right - best_columns_left - best_column_gap * 2.0f) / 3.0f;
+        const std::array<std::array<std::string, 3>, 3> best_columns = {{
+            {loc("SCORE", "점수"),
+             data.song_select.result_available
+                 ? format_int_with_commas(data.song_select.best_score)
+                 : std::string("--"),
+             data.song_select.result_available
+                 ? "DETAIL " + format_int_with_commas(data.song_select.detail_score)
+                 : std::string()},
+            {loc("ACCURACY", "정확도"),
+             data.song_select.result_available
+                 ? format_decimal(data.song_select.accuracy, 2) + "%"
+                 : std::string("--"),
+             data.song_select.result_available
+                 ? "DETAIL " + format_decimal(data.song_select.detailed_accuracy, 2) + "%"
+                 : std::string()},
+            {loc("MAX COMBO", "최대 콤보"),
+             data.song_select.result_available
+                 ? format_int_with_commas(data.song_select.max_combo)
+                 : std::string("--"),
+             std::string()},
+        }};
+        for (std::size_t i = 0; i < best_columns.size(); ++i) {
+            const float column_left =
+                best_columns_left + static_cast<float>(i) * (best_column_width + best_column_gap);
+            const float column_right = column_left + best_column_width;
+            if (d2d_->hud_format && d2d_->muted_brush) {
+                draw_text_clipped(to_wide(best_columns[i][0]),
+                                  d2d_->hud_format.Get(),
+                                  D2D1::RectF(column_left, best_panel.top + 48.0f,
+                                              column_right, best_panel.top + 70.0f),
+                                  d2d_->muted_brush.Get());
+            }
+            if (d2d_->title_format && d2d_->text_brush) {
+                draw_text_clipped(to_wide(best_columns[i][1]),
+                                  d2d_->title_format.Get(),
+                                  D2D1::RectF(column_left, best_panel.top + 70.0f,
+                                              column_right, best_panel.top + 112.0f),
+                                  d2d_->text_brush.Get());
+            }
+            if (!best_columns[i][2].empty() && d2d_->hud_format && d2d_->muted_brush) {
+                draw_text_clipped(to_wide(best_columns[i][2]),
+                                  d2d_->hud_format.Get(),
+                                  D2D1::RectF(column_left, best_panel.top + 114.0f,
+                                              column_right, best_panel.bottom - 16.0f),
+                                  d2d_->muted_brush.Get());
+            }
+        }
 
         const D2D1_RECT_F action_strip =
             D2D1::RectF(center_panel.left, best_panel.bottom + 18.0f,
@@ -525,8 +577,10 @@
                         action_strip.right, action_strip.bottom);
         register_hit(search_button, MenuHitTargetKind::SongNavButton, 2);
         register_hit(filter_button, MenuHitTargetKind::SongNavButton, 3);
-        draw_glass_panel(search_button, 10.0f, 0.72f, 0.16f, false, 2.0f);
-        draw_glass_panel(filter_button, 10.0f, 0.72f, 0.16f, false, 2.0f);
+        // Accent border marks the two clickable controls; the status readout
+        // beside them stays plain so the difference is visible at a glance.
+        draw_glass_panel(search_button, 10.0f, 0.76f, 0.40f, true, 2.0f);
+        draw_glass_panel(filter_button, 10.0f, 0.76f, 0.40f, true, 2.0f);
         draw_glass_panel(library_status, 10.0f, 0.58f, 0.06f, false, 2.0f);
         if (d2d_->body_format && d2d_->text_brush) {
             draw_centered_text(wloc("SEARCH", "검색"), d2d_->body_format.Get(),
@@ -645,17 +699,21 @@
                                 mode_area.top + row * (mode_height + mode_gap) + mode_height);
                 register_hit(cell, MenuHitTargetKind::SongQuickSetting,
                              static_cast<int>(i), MenuHitPart::Increment);
-                draw_glass_panel(cell, 9.0f, 0.62f, 0.08f, false, 1.0f);
-                if (d2d_->hud_format && d2d_->muted_brush) {
-                    draw_text_clipped(to_wide(mode_values[i].first), d2d_->hud_format.Get(),
-                                      D2D1::RectF(cell.left + 12.0f, cell.top + 7.0f,
-                                                  cell.right - 12.0f, cell.top + 27.0f),
+                // These cells take clicks, so they carry the accent border the
+                // read-only readouts around them do not.
+                draw_glass_panel(cell, 9.0f, 0.70f, 0.40f, true, 2.0f);
+                if (d2d_->stats_value_format && d2d_->muted_brush) {
+                    draw_text_clipped(to_wide(mode_values[i].first),
+                                      d2d_->stats_value_format.Get(),
+                                      D2D1::RectF(cell.left + 12.0f, cell.top + 5.0f,
+                                                  cell.right - 12.0f, cell.top + 29.0f),
                                       d2d_->muted_brush.Get());
                 }
-                if (d2d_->body_format && d2d_->text_brush) {
-                    draw_trailing_text(to_wide(mode_values[i].second), d2d_->body_format.Get(),
-                                       D2D1::RectF(cell.left + 12.0f, cell.top + 22.0f,
-                                                   cell.right - 12.0f, cell.bottom - 6.0f),
+                if (d2d_->song_title_format && d2d_->text_brush) {
+                    draw_trailing_text(to_wide(mode_values[i].second),
+                                       d2d_->song_title_format.Get(),
+                                       D2D1::RectF(cell.left + 12.0f, cell.top + 26.0f,
+                                                   cell.right - 12.0f, cell.bottom - 4.0f),
                                        d2d_->text_brush.Get());
                 }
             }
@@ -764,7 +822,7 @@
             D2D1::RectF(bottom_bar.left + 12.0f, bottom_bar.top + 12.0f,
                         bottom_bar.left + 260.0f, bottom_bar.bottom - 12.0f);
         register_hit(back_button, MenuHitTargetKind::SongBackButton, 0);
-        draw_glass_panel(back_button, 10.0f, 0.72f, 0.12f, false, 1.0f);
+        draw_glass_panel(back_button, 10.0f, 0.76f, 0.40f, true, 2.0f);
         if (d2d_->body_format && d2d_->text_brush) {
             draw_centered_text(wloc("BACK", "뒤로"), d2d_->body_format.Get(),
                                back_button, d2d_->text_brush.Get());

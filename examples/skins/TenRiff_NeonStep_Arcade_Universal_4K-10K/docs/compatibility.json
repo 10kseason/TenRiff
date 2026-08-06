@@ -1,0 +1,15 @@
+{
+  "format": "tenriff-skin",
+  "version": 1,
+  "declared_key_range": [
+    4,
+    10
+  ],
+  "lane_asset_entries": 10,
+  "array_application": "left-to-right; first N entries for N-key charts",
+  "fixed_column_widths": false,
+  "fixed_column_spacings": false,
+  "fixed_lane_separators_in_gear": false,
+  "schema_validation": "passed against uploaded TenRiff v1 schema",
+  "renderer_smoke_test": "recommended"
+}

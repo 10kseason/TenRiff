@@ -1,7 +1,7 @@
 void MenuWindow::draw(const MenuRenderData& data) {
     static int draw_count = 0;
     if (draw_count++ < 5) {
-        std::cerr << "[MenuWindow::draw] called, d2d_=" << (d2d_ ? "yes" : "no") 
+        std::cerr << "[MenuWindow::draw] called, d2d_=" << (d2d_ ? "yes" : "no")
                   << ", d2d_context=" << (d2d_ && d2d_->d2d_context ? "yes" : "no")
                   << ", swap_chain=" << (d2d_ && d2d_->swap_chain ? "yes" : "no")
                   << ", target=" << (d2d_ && d2d_->d2d_target ? "yes" : "no") << std::endl;
@@ -64,6 +64,11 @@ void MenuWindow::draw(const MenuRenderData& data) {
         static_cast<void>(load_song_card_preview_bitmap(data.lobby_skin.logo_path));
     } else if (data.kind == MenuScreenKind::GameplayHud) {
         static_cast<void>(load_song_card_preview_bitmap(data.gameplay.skin_background_path));
+    }
+    // Rebuild the text formats when the player picks a different UI font.
+    if (const wchar_t* ui_family = ui_font_family_for_token(data.ui_font);
+        d2d_->ui_font_family != ui_family) {
+        static_cast<void>(create_text_formats(ui_family));
     }
     ctx->BeginDraw();
 

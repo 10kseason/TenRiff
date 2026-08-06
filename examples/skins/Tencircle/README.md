@@ -3,9 +3,8 @@
 osu!에서 넘어온 사람들을 위한 **로비 전용** TenRiff 스킨.
 
 로비/메뉴 화면만 바꾼다. 게임플레이(기어, 노트, 판정선)는 손대지 않으므로
-TenRiff 네이티브 렌더링 그대로 돌아간다. 게임플레이까지 바꾸려면 이 폴더의
-`skin.json`에 `gameplay` 섹션을 추가하면 된다. 슬롯 목록은
-[`docs/skin-format.md`](../../../docs/skin-format.md)에 있다.
+TenRiff 네이티브 렌더링 그대로 돌아간다. 게임플레이까지 바꾸고 싶으면
+[`Tengear`](../Tengear)를 쓰거나 이 폴더의 `skin.json`에 `gameplay` 섹션을 추가하면 된다.
 
 ## 무엇이 익숙하게 보이는가
 

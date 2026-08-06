@@ -1,0 +1,45 @@
+{
+  "$schema": "../../../docs/tenriff-skin.schema.json",
+  "format": "tenriff-skin",
+  "version": 1,
+  "name": "Tengear",
+  "author": "",
+  "lobby": {
+    "background": "lobby/background.png",
+    "logo": "lobby/logo.png",
+    "background_opacity": 0.72
+  },
+  "gameplay": {
+    "background": "gameplay/background.png",
+    "background_opacity": 0.66,
+    "gear": "gameplay/gear.png",
+    "note": [
+      "gameplay/note-neutral.png",
+      "gameplay/note-primary.png",
+      "gameplay/note-neutral.png",
+      "gameplay/note-primary.png",
+      "gameplay/note-neutral.png"
+    ],
+    "hold_head": "gameplay/hold-head.png",
+    "hold_body": "gameplay/hold-body.png",
+    "hold_tail": "gameplay/hold-tail.png",
+    "key_idle": [
+      "gameplay/key-idle-neutral.png",
+      "gameplay/key-idle-primary.png",
+      "gameplay/key-idle-neutral.png",
+      "gameplay/key-idle-primary.png",
+      "gameplay/key-idle-neutral.png"
+    ],
+    "key_pressed": [
+      "gameplay/key-pressed-neutral.png",
+      "gameplay/key-pressed-primary.png",
+      "gameplay/key-pressed-neutral.png",
+      "gameplay/key-pressed-primary.png",
+      "gameplay/key-pressed-neutral.png"
+    ],
+    "note_width_ratio": 1.0,
+    "note_height_ratio": 1.0,
+    "judgement_line_position": 0.72,
+    "full_lane_receptors": true
+  }
+}

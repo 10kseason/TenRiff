@@ -127,6 +127,8 @@ struct SkinConfig {
     // on/off form older builds read, and is written as brightness > 0.
     double key_pulse_brightness = kSkinKeyPulseBrightnessDefault;
     std::string key_label_position = "bottom";
+    // UI text font token: default | malgun | bahnschrift | consolas.
+    std::string ui_font = "default";
     double judgement_line_position = kJudgementLinePositionDefault;
     double combo_position = kComboPositionDefault;
     double lane_background_opacity = kSkinLaneBackgroundOpacityDefault;
@@ -227,6 +229,8 @@ public:
 void apply_skin_visual_preset(SkinConfig& skin, std::string_view token);
 [[nodiscard]] std::string normalize_skin_key_label_position_token(std::string_view token);
 [[nodiscard]] std::string skin_key_label_position_label(std::string_view token);
+[[nodiscard]] std::string normalize_skin_ui_font_token(std::string_view token);
+[[nodiscard]] std::string skin_ui_font_label(std::string_view token);
 [[nodiscard]] std::string normalize_skin_color_token(std::string_view token);
 [[nodiscard]] std::string normalize_skin_note_shape_token(std::string_view token);
 [[nodiscard]] std::string skin_note_shape_label(std::string_view token);
