@@ -34,8 +34,6 @@ inline constexpr double kHiSpeedMax = 50.0;
 inline constexpr double kHiSpeedStep = 0.25;
 inline constexpr int kSeedMin = 0;
 inline constexpr int kSeedMax = 9999;
-inline constexpr int kRefreshHzStep = 10;
-
 inline std::string to_lower_ascii(std::string value) {
     std::transform(value.begin(), value.end(), value.begin(), [](unsigned char ch) {
         if (ch >= static_cast<unsigned char>('A') && ch <= static_cast<unsigned char>('Z')) {

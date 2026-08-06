@@ -6,6 +6,8 @@ namespace {
 
 using tenriff::app::effective_present_refresh_hz;
 using tenriff::app::effective_render_fps_limit;
+using tenriff::app::cycle_graphics_refresh_hz;
+using tenriff::app::normalize_graphics_refresh_hz;
 using tenriff::app::should_allow_tearing_present;
 using tenriff::app::should_treat_present_failure_as_transient;
 
@@ -17,6 +19,23 @@ TEST_CASE("graphics timing keeps the configured cap when vsync is disabled") {
     CHECK(effective_render_fps_limit(false, 1050, 144, true) == 300);
     CHECK(effective_render_fps_limit(false, 1050, 240, true) == 480);
     CHECK(effective_render_fps_limit(false, 720, 360, true) == 720);
+}
+
+TEST_CASE("graphics timing cycles and preserves the unlimited sentinel") {
+    CHECK(cycle_graphics_refresh_hz(60, -1) == 0);
+    CHECK(cycle_graphics_refresh_hz(0, -1) == 1050);
+    CHECK(cycle_graphics_refresh_hz(1050, 1) == 0);
+    CHECK(cycle_graphics_refresh_hz(0, 1) == 60);
+    CHECK(normalize_graphics_refresh_hz(0) == 0);
+    CHECK(normalize_graphics_refresh_hz(5000) == 1050);
+}
+
+TEST_CASE("unlimited removes only off-vsync gameplay render pacing") {
+    CHECK(effective_present_refresh_hz(false, 0, 144, true) == 144);
+    CHECK(effective_render_fps_limit(false, 0, 144, true) == 0);
+    CHECK(effective_render_fps_limit(false, 0, 144, false) == 300);
+    CHECK(effective_present_refresh_hz(true, 0, 144, true) == 144);
+    CHECK(effective_render_fps_limit(true, 0, 144, true) == 288);
 }
 
 TEST_CASE("graphics timing uses the detected monitor refresh when vsync is enabled") {

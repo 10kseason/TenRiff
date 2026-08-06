@@ -1003,8 +1003,7 @@ bool MenuApp::initialize(const CommandLineOptions& options) {
         const config::RuntimeConfig persisted = build_persisted_runtime_config(config_);
         config_loader.save_profile(profile_dir_, persisted);
     }
-    config_.graphics.refresh_hz =
-        clamp_int(config_.graphics.refresh_hz, kGraphicsRefreshHzMin, kGraphicsRefreshHzMax);
+    config_.graphics.refresh_hz = normalize_graphics_refresh_hz(config_.graphics.refresh_hz);
     config_.graphics.resolution = normalize_resolution_preset(config_.graphics.resolution);
     refresh_song_collection_membership_cache();
     refresh_available_lr2_skins();

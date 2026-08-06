@@ -108,10 +108,10 @@
   - `native | 720p | 1080p | qhd`
 - `vsync` (bool)
 - `refresh_hz` (int)
-  - `60..1050` 범위로 clamp
+  - `0`은 `무제한`, 숫자 제한은 `60..1050` 범위로 clamp
   - 기본값은 `300`
   - `vsync=false`일 때만 직접적인 FPS cap 역할을 함
-  - `vsync=false`면 menu는 effective cap `300`, gameplay render pacing은 `min(configured target, max(300, monitor_hz * 2))`로 safety clamp됨
+  - `vsync=false`면 menu는 effective cap `300`; gameplay는 `0`일 때 render pacing을 해제하고 숫자 값은 `min(configured target, max(300, monitor_hz * 2))`로 safety clamp됨
   - `vsync=true`면 present refresh는 active monitor Hz를 따르고, render pacing은 `monitor_hz * 2`를 목표로 함 (`1050` clamp)
 - `performance_overlay` (bool)
   - 기본값은 `false`; 우상단을 사용하므로 Discord Voice 위젯을 같은 모서리에 두면 겹칠 수 있음

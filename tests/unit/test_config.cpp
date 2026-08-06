@@ -569,6 +569,29 @@ TEST_CASE("config save and load preserve graphics display settings") {
     CHECK_FALSE(result.config.graphics.background_upscale_prefer_npu);
 }
 
+TEST_CASE("config save and load preserve unlimited graphics refresh") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+
+    CurrentPathGuard cwd;
+    std::error_code ec;
+    std::filesystem::current_path(temp.path, ec);
+    REQUIRE_FALSE(static_cast<bool>(ec));
+
+    ConfigLoader loader;
+    auto config = loader.defaults();
+    config.graphics.refresh_hz = 0;
+
+    std::string error;
+    REQUIRE(loader.save_profile("profiles/test", config, &error));
+    CHECK(error.empty());
+
+    const auto result = loader.load_profile("profiles/test");
+    REQUIRE(result.success());
+    CHECK(result.config.graphics.refresh_hz == 0);
+}
+
 TEST_CASE("config save and load preserve ui language setting") {
     TempDirGuard temp;
     temp.path = make_temp_dir();

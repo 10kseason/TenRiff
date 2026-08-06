@@ -381,18 +381,21 @@ void RenderThread::thread_main() {
 
     while (!should_stop_.load(std::memory_order_acquire)) {
         const RenderConfig config = current_config();
+        const bool unlimited = should_use_unlimited_render_pacing(config.vsync, config.fps_limit);
         int target_fps = config.fps_limit;
         if (config.vsync && target_fps <= 0) {
             target_fps = 60;
         }
-        if (target_fps <= 0) {
+        if (!unlimited && target_fps <= 0) {
             target_fps = 60;
         }
-        const RenderWaitPolicy wait_policy = render_wait_policy(config.vsync, target_fps);
-        const int64_t frame_interval_ns = 1'000'000'000LL / target_fps;
+        const RenderWaitPolicy wait_policy =
+            unlimited ? RenderWaitPolicy{} : render_wait_policy(config.vsync, target_fps);
+        const int64_t frame_interval_ns =
+            unlimited ? 0 : 1'000'000'000LL / target_fps;
 
         const int64_t now_ns = timing::HighResClock::now_ns();
-        if (now_ns < next_tick_ns) {
+        if (!unlimited && now_ns < next_tick_ns) {
             precise_wait_until_ns(
                 next_tick_ns,
                 &oversleep_estimate_ns,
@@ -415,7 +418,12 @@ void RenderThread::thread_main() {
         callback_();
 
         const int64_t after_callback_ns = timing::HighResClock::now_ns();
-        next_tick_ns = advance_frame_deadline_ns(next_tick_ns, frame_interval_ns, after_callback_ns);
+        if (unlimited) {
+            next_tick_ns = after_callback_ns;
+            oversleep_estimate_ns = 0;
+        } else {
+            next_tick_ns = advance_frame_deadline_ns(next_tick_ns, frame_interval_ns, after_callback_ns);
+        }
     }
 
     if (shutdown_callback_) {

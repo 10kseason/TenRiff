@@ -107,10 +107,10 @@ profile が存在しない場合は初回起動時に自動生成されます。
   - `native | 720p | 1080p | qhd`
 - `vsync` (bool)
 - `refresh_hz` (int)
-  - `60..1050` に clamp
+  - `0` は `Unlimited`、数値制限は `60..1050` に clamp
   - 既定値は `300`
   - `vsync=false` のときだけ直接 FPS cap として使われる
-  - `vsync=false` では menu は実効 `300` cap、gameplay は `min(configured target, max(300, monitor_hz * 2))` で safety clamp
+  - `vsync=false` では menu は実効 `300` cap。gameplay は `0` のとき render pacing を解除し、数値は `min(configured target, max(300, monitor_hz * 2))` で safety clamp
   - `vsync=true` では present refresh は active monitor Hz に従い、render pacing は `monitor_hz * 2` を狙う（`1050` clamp）
 - `performance_overlay` (bool)
   - 既定値は `false`。右上を使うため、同じ角に置いた Discord Voice widget と重なる場合がある

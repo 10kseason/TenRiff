@@ -147,8 +147,8 @@
   - 같은 키를 두 키보드가 동시에 눌러도 마지막 입력 소스가 해제될 때까지 논리적 `Pressed` 상태를 유지
 - Graphics:
   - resolution preset (`720p`, `1080p`, `qhd`, `native`)
-  - `refresh_hz` (`60..1050`, 기본 `300`)
-  - VSync off: menu effective cap `300`, gameplay configured target 최대 `1050`
+  - `refresh_hz` (`0` = `무제한`, 숫자는 `60..1050`, 기본 `300`)
+  - VSync off: menu effective cap `300`, gameplay는 `0`에서 pacing 해제 또는 숫자 configured target 사용
   - VSync on: present refresh는 active monitor Hz를 따라가고 render pacing은 `monitor_hz * 2`를 목표로 함 (`1050` clamp)
   - `visual_offset_ms`
   - `performance_overlay`

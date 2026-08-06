@@ -151,9 +151,8 @@ void MenuApp::handle_graphics_settings_input(uint32_t keycode) {
     if (settings_cursor_ == 2 &&
         (keycode == key_left_ || keycode == key_right_ || keycode == key_enter_)) {
         const int direction = (keycode == key_left_) ? -1 : 1;
-        int next_value = config_.graphics.refresh_hz + direction * kRefreshHzStep;
-        next_value = clamp_int(next_value, kGraphicsRefreshHzMin, kGraphicsRefreshHzMax);
-        config_.graphics.refresh_hz = next_value;
+        config_.graphics.refresh_hz =
+            cycle_graphics_refresh_hz(config_.graphics.refresh_hz, direction);
         graphics_dirty_ = true;
         apply_runtime_graphics_config();
         publish_snapshot();
@@ -409,11 +408,15 @@ void MenuApp::handle_onnx_upscaler_confirm_input(uint32_t keycode) {
 }
 
 void MenuApp::populate_graphics_settings_render_data(render::MenuRenderData& render) {
+    const std::string refresh_hz_label =
+        config_.graphics.refresh_hz == kGraphicsRefreshHzUnlimited
+            ? ui_text("Unlimited", "무제한")
+            : std::to_string(config_.graphics.refresh_hz);
     append_menu_row(render.generic, ui_text("Display", "표시 모드"), ui_display_mode_label(config_.graphics.display_mode), settings_cursor_ == 0,
                     render::MenuHitTargetKind::SettingsRow, 0, false, true);
     append_menu_row(render.generic, ui_text("Resolution", "해상도"), ui_resolution_label(config_.graphics.resolution), settings_cursor_ == 1,
                     render::MenuHitTargetKind::SettingsRow, 1, false, true);
-    append_menu_row(render.generic, ui_text("Refresh Hz", "주사율"), std::to_string(config_.graphics.refresh_hz), settings_cursor_ == 2,
+    append_menu_row(render.generic, ui_text("Refresh Hz", "주사율"), refresh_hz_label, settings_cursor_ == 2,
                     render::MenuHitTargetKind::SettingsRow, 2, false, true);
     append_menu_row(render.generic, "VSync", ui_on_off(config_.graphics.vsync), settings_cursor_ == 3,
                     render::MenuHitTargetKind::SettingsRow, 3, false, true);
@@ -457,13 +460,13 @@ void MenuApp::populate_graphics_settings_render_data(render::MenuRenderData& ren
     render.generic.notes.push_back(ui_text(
         "BGA OFF suppresses gameplay image/video backgrounds and disables their decoder/upscaler work. Song Select background previews remain visible.",
         "BGA를 끄면 게임플레이 이미지/영상 배경과 디코더/업스케일러 작업이 비활성화됩니다. 선곡 배경 미리보기는 유지됩니다."));
-    render.generic.notes.push_back(ui_text("Resolution cycles 720p, 1080p, QHD, or the current monitor native size. Refresh Hz ranges from 60 to 1050.",
-                                           "해상도는 720p, 1080p, QHD, 모니터 기본 크기를 순환합니다. 주사율은 60~1050Hz 범위입니다."));
+    render.generic.notes.push_back(ui_text("Resolution cycles 720p, 1080p, QHD, or the current monitor native size. Refresh Hz ranges from 60 to 1050 or Unlimited.",
+                                           "해상도는 720p, 1080p, QHD, 모니터 기본 크기를 순환합니다. 주사율은 60~1050Hz 또는 무제한입니다."));
     render.generic.notes.push_back(ui_text(
         "BGA Behind Notes blocks bright backgrounds only under the playfield while keeping BGA visible outside it.",
         "기어 뒤 BGA를 가리면 바깥 BGA는 유지하면서 노트 영역 아래의 밝은 배경만 차단합니다."));
-    render.generic.notes.push_back(ui_text("Menu rendering is capped at 300 Hz. Gameplay uses the configured value up to 1050 Hz.",
-                                           "메뉴 렌더링은 300Hz까지 제한되고, 게임플레이는 설정값을 최대 1050Hz까지 사용합니다."));
+    render.generic.notes.push_back(ui_text("Menu rendering stays capped at 300 FPS. Unlimited removes gameplay pacing when VSync is off.",
+                                           "메뉴 렌더링은 300 FPS로 유지됩니다. 무제한은 VSync가 꺼진 게임플레이의 프레임 대기를 해제합니다."));
     render.generic.notes.push_back(ui_text(
         "The ONNX upscaler has no automatic performance benchmark. It is intended for high-spec systems and may cause stutter or heavy accelerator load.",
         "ONNX 업스케일러는 자동 성능 벤치마크 없이 실행됩니다. 고사양 시스템용이며 끊김이나 높은 가속기 부하가 생길 수 있습니다."));

@@ -382,10 +382,10 @@ std::string normalize_ui_language(std::string value) {
 }
 
 int sanitize_refresh_hz(int value, std::vector<std::string>& warnings) {
-    if (value >= kRefreshHzMin && value <= kRefreshHzMax) {
+    if (value == 0 || (value >= kRefreshHzMin && value <= kRefreshHzMax)) {
         return value;
     }
-    warnings.push_back("graphics.refresh_hz must be between 60 and 1050; clamping into range.");
+    warnings.push_back("graphics.refresh_hz must be 0 (Unlimited) or between 60 and 1050; clamping into range.");
     return std::clamp(value, kRefreshHzMin, kRefreshHzMax);
 }
 

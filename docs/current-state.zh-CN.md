@@ -138,8 +138,8 @@
   - 当两把键盘同时按住同一个键时，逻辑 `Pressed` 状态会一直保持到最后一个输入源释放为止
 - Graphics：
   - 分辨率预设（`720p`、`1080p`、`qhd`、`native`）
-  - `refresh_hz`（`60..1050`，默认 `300`）
-  - VSync off：menu 有效上限 `300`，gameplay 最多使用配置值到 `1050`
+  - `refresh_hz`（`0` = `Unlimited`，数值为 `60..1050`，默认 `300`）
+  - VSync off：menu 有效上限 `300`；gameplay 在 `0` 时取消 pacing，或使用数值配置目标
   - VSync on：present refresh 跟随活动显示器 Hz，render pacing 目标为 `monitor_hz * 2`（上限 `1050`）
   - `visual_offset_ms`
   - `performance_overlay`

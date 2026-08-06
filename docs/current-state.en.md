@@ -139,8 +139,8 @@ This is the document that the next agent or any new contributor should read firs
   - when two keyboards press the same key, the logical `Pressed` state remains active until the last input source releases it
 - Graphics:
   - resolution presets (`720p`, `1080p`, `qhd`, `native`)
-  - `refresh_hz` (`60..1050`, default `300`)
-  - VSync off: menu effective cap `300`, gameplay can use the configured target up to `1050`
+  - `refresh_hz` (`0` = `Unlimited`, numeric values `60..1050`, default `300`)
+  - VSync off: menu effective cap `300`; gameplay either disables pacing at `0` or uses the numeric configured target
   - VSync on: present refresh follows the active monitor Hz and render pacing targets `monitor_hz * 2` (`1050` clamp)
   - `visual_offset_ms`
   - `performance_overlay`

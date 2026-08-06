@@ -17,7 +17,33 @@ int clamp_graphics_refresh_hz(int value) {
     return std::clamp(value, kGraphicsRefreshHzMin, kGraphicsRefreshHzMax);
 }
 
+int normalize_graphics_refresh_hz(int value) {
+    if (value == kGraphicsRefreshHzUnlimited) {
+        return kGraphicsRefreshHzUnlimited;
+    }
+    return clamp_graphics_refresh_hz(value);
+}
+
+int cycle_graphics_refresh_hz(int value, int direction) {
+    if (value == kGraphicsRefreshHzUnlimited) {
+        return direction < 0 ? kGraphicsRefreshHzMax : kGraphicsRefreshHzMin;
+    }
+
+    const int configured = clamp_graphics_refresh_hz(value);
+    if (direction < 0 && configured == kGraphicsRefreshHzMin) {
+        return kGraphicsRefreshHzUnlimited;
+    }
+    if (direction >= 0 && configured == kGraphicsRefreshHzMax) {
+        return kGraphicsRefreshHzUnlimited;
+    }
+    const int step = direction < 0 ? -kGraphicsRefreshHzStep : kGraphicsRefreshHzStep;
+    return clamp_graphics_refresh_hz(configured + step);
+}
+
 int effective_configured_refresh_hz(int configured_refresh_hz, bool gameplay_active) {
+    if (configured_refresh_hz == kGraphicsRefreshHzUnlimited) {
+        return gameplay_active ? kGraphicsRefreshHzUnlimited : kGraphicsMenuRefreshHzCap;
+    }
     const int configured = clamp_graphics_refresh_hz(configured_refresh_hz);
     if (gameplay_active) {
         return configured;
@@ -40,6 +66,9 @@ int safe_off_vsync_gameplay_render_fps_limit(int configured_refresh_hz,
 int effective_present_refresh_hz(bool vsync_enabled, int configured_refresh_hz,
                                  int detected_monitor_refresh_hz, bool gameplay_active) {
     if (!vsync_enabled) {
+        if (configured_refresh_hz == kGraphicsRefreshHzUnlimited) {
+            return clamp_graphics_refresh_hz(detected_monitor_refresh_hz);
+        }
         return effective_configured_refresh_hz(configured_refresh_hz, gameplay_active);
     }
     return clamp_graphics_refresh_hz(detected_monitor_refresh_hz);
@@ -48,6 +77,9 @@ int effective_present_refresh_hz(bool vsync_enabled, int configured_refresh_hz,
 int effective_render_fps_limit(bool vsync_enabled, int configured_refresh_hz,
                                int detected_monitor_refresh_hz, bool gameplay_active) {
     if (!vsync_enabled) {
+        if (configured_refresh_hz == kGraphicsRefreshHzUnlimited) {
+            return gameplay_active ? kGraphicsRefreshHzUnlimited : kGraphicsMenuRefreshHzCap;
+        }
         if (gameplay_active) {
             return safe_off_vsync_gameplay_render_fps_limit(
                 configured_refresh_hz,

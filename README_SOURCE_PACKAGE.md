@@ -1,10 +1,10 @@
-TenRiff source package notes (`1.3.4`)
+TenRiff source package notes (`1.3.6`)
 
 - This folder is a curated source-only staging area for public/open-source distribution.
 - It intentionally excludes local build trees, packaged binaries, caches, user profiles, logs, and private working notes.
 - Internal agent workflow files such as `AGENTS.md` are not part of the public source bundle.
 - The included `SOURCE_PACKAGE_SCOPE.txt` file defines the exact include/exclude rules used for the staged bundle.
-- The current source line is `1.3.4`; it adds a live gameplay-field drag handle, stable BPM-anchored scrolling, revised judgement defaults, scrollable compact skin settings, preserved Visual Latency behavior, and asynchronous cached image-layer BGA decoding.
+- The current source line is `1.3.6`; it adds an osu!-style `Unlimited` graphics limit that removes gameplay render pacing while preserving the menu's 300 FPS cap.
 - It supports BMS-family charts, 4K through 14K key modes, and native/LR2/TenRiff skins, keeps MPG/MPEG video BGA decoding with an FFmpeg fallback, and exposes an External ONNX Upscaler that remains off until the user enables it and acknowledges the high-spec warning.
 - The repository license is MIT. Keep the top-level `LICENSE` file with any redistributed source bundle.
 - The source bundle includes the code/docs/dependencies needed for a standalone Windows configure/build, but it does not ship the local `10k-calc/` reference checkout or `external/llama.cpp/`.
