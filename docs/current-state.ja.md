@@ -142,7 +142,7 @@
   - VSync off: menu effective cap `300`、gameplay は `0` で pacing を解除、または数値の設定値を使用
   - VSync on: present refresh は active monitor Hz に追従し、render pacing は `monitor_hz * 2` を目標にする（`1050` clamp）
   - `visual_offset_ms`
-  - `performance_overlay`
+  - `performance_overlay` (gameplay FPS/frame time は成功した DXGI `Present()` 完了間隔を使用し、HUD update cadence は別の gameplay diagnostics として維持)
   - `bga_enabled=false` は gameplay image/video BGA と decoder/upscaler 処理を無効化し、Song Select preview は維持
   - `background_upscale_model_path` は Graphics Settings で選択/drop した互換 ONNX の path だけを保存。公開 model は同梱しない
   - BGA Upscaler は既定 `off`。user が明示的に on にして high-spec warning を確認する必要があり、自動 benchmark gate はない

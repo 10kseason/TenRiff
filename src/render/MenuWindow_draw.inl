@@ -934,4 +934,7 @@ void MenuWindow::draw(const MenuRenderData& data) {
         shutdown();
         return;
     }
+    if (app::should_record_presented_frame(static_cast<std::uint32_t>(present_hr))) {
+        last_present_completion_ns_.store(timing::HighResClock::now_ns(), std::memory_order_release);
+    }
 }

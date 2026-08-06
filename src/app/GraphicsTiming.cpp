@@ -100,6 +100,10 @@ bool should_allow_tearing_present(bool vsync_enabled,
     return !vsync_enabled && !fullscreen_exclusive && swap_chain_allows_tearing;
 }
 
+bool should_record_presented_frame(std::uint32_t present_hr) {
+    return present_hr == 0u;
+}
+
 bool should_treat_present_failure_as_transient(std::uint32_t present_hr,
                                                bool fullscreen_requested,
                                                bool window_in_foreground,

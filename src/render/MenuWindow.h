@@ -618,6 +618,9 @@ public:
     [[nodiscard]] bool init_done() const { return init_done_.load(std::memory_order_acquire); }
     [[nodiscard]] bool init_success() const { return init_success_.load(std::memory_order_acquire); }
     [[nodiscard]] bool had_fatal_error() const { return fatal_error_.load(std::memory_order_acquire); }
+    [[nodiscard]] int64_t last_present_completion_ns() const {
+        return last_present_completion_ns_.load(std::memory_order_acquire);
+    }
 
 private:
     bool initialize(const MenuWindowConfig& config);
@@ -673,6 +676,7 @@ private:
     std::atomic<bool> init_success_{false};
     std::atomic<bool> fatal_error_{false};
     std::atomic<bool> screenshot_requested_{false};
+    std::atomic<int64_t> last_present_completion_ns_{0};
     bool fullscreen_ = false;
     bool fullscreen_restore_pending_ = false;
     bool com_initialized_ = false;

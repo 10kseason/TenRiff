@@ -115,6 +115,7 @@ If a profile does not exist, it is created automatically on first launch.
   - when `vsync=true`, the present refresh follows the active monitor Hz and render pacing targets `monitor_hz * 2` (`1050` clamp)
 - `performance_overlay` (bool)
   - defaults to `false`; it occupies the top-right corner and can overlap a Discord Voice widget placed there
+  - in-game frame pacing measures intervals between successful DXGI `Present()` completions; HUD update cadence is not used as an FPS sample
 - `bga_enabled` (bool)
   - defaults to `true`; `false` disables gameplay image/video BGA plus its decoder and upscaler work
   - Song Select background previews remain visible because they are a separate feature

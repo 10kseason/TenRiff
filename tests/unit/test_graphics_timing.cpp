@@ -9,6 +9,7 @@ using tenriff::app::effective_render_fps_limit;
 using tenriff::app::cycle_graphics_refresh_hz;
 using tenriff::app::normalize_graphics_refresh_hz;
 using tenriff::app::should_allow_tearing_present;
+using tenriff::app::should_record_presented_frame;
 using tenriff::app::should_treat_present_failure_as_transient;
 
 TEST_CASE("graphics timing keeps the configured cap when vsync is disabled") {
@@ -55,6 +56,13 @@ TEST_CASE("fullscreen present disables tearing even when vsync is off") {
     CHECK_FALSE(should_allow_tearing_present(false, true, true));
     CHECK_FALSE(should_allow_tearing_present(true, false, true));
     CHECK_FALSE(should_allow_tearing_present(false, false, false));
+}
+
+TEST_CASE("performance tracking accepts only fully presented GPU frames") {
+    CHECK(should_record_presented_frame(0x00000000u));
+    CHECK_FALSE(should_record_presented_frame(0x087A0001u));
+    CHECK_FALSE(should_record_presented_frame(0x087A0007u));
+    CHECK_FALSE(should_record_presented_frame(0x887A0001u));
 }
 
 TEST_CASE("alt-tab fullscreen present failures are treated as transient") {
