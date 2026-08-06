@@ -824,7 +824,19 @@ std::string MenuApp::ui_skin_note_shape_label(std::string_view token) const {
     if (normalized == "triangle") return ui_text("Triangle", "\uC0BC\uAC01\uD615");
     if (normalized == "pentagon") return ui_text("Pentagon", "\uC624\uAC01\uD615");
     if (normalized == "hexagon") return ui_text("Hexagon", "\uC721\uAC01\uD615");
+    if (normalized == "square") return ui_text("Square", "\uC815\uC0AC\uAC01\uD615");
+    if (normalized == "diamond") return ui_text("Diamond", "\uB9C8\uB984\uBAA8");
+    if (normalized == "arrow") return ui_text("Arrow", "\uD654\uC0B4\uD45C");
     return ui_text("Rect", "\uC0AC\uAC01\uD615");
+}
+
+std::string MenuApp::ui_skin_note_image_aspect_label(std::string_view token) const {
+    const std::string normalized = config::normalize_skin_note_image_aspect_token(token);
+    // Width keeps the lane width and derives height from the art, which is what
+    // arrow and circle sprites need to stay round.
+    if (normalized == "width") return ui_text("Width", "\uB108\uBE44 \uAE30\uC900");
+    if (normalized == "contain") return ui_text("Contain", "\uB9DE\uCD94\uAE30");
+    return ui_text("Stretch", "\uB298\uC774\uAE30");
 }
 GameplayHudRevisionInput MenuApp::gameplay_hud_revision_input(const GameplayHudState& state) {
     GameplayHudRevisionInput input;
@@ -862,6 +874,8 @@ GameplayHudRevisionInput MenuApp::gameplay_hud_revision_input(const GameplayHudS
     input.gauge_type = state.gauge_type;
     input.rate = state.rate;
     input.hispeed = state.hispeed;
+    input.judgement_line_position = state.judgement_line_position;
+    input.visual_offset_ms = state.visual_offset_ms;
     input.has_feedback = state.has_feedback;
     input.feedback = state.feedback;
     input.feedback_delta_ms = state.feedback_delta_ms;
@@ -2337,6 +2351,18 @@ void MenuApp::handle_text_input(std::string_view text) {
         return;
     }
 
+    if (difficulty_table_url_editing_ && !text.empty()) {
+        const std::string utf8 = util::ensure_utf8_text(text);
+        for (unsigned char ch : utf8) {
+            // URLs are ASCII; anything else would only break the request.
+            if (ch > 0x20u && ch != 0x7Fu && difficulty_table_url_input_.size() < 512u) {
+                difficulty_table_url_input_.push_back(static_cast<char>(ch));
+            }
+        }
+        publish_snapshot();
+        return;
+    }
+
     if (screen_ != Screen::QuickSetup || !profile_nickname_edit_active_ || text.empty()) {
         return;
     }
@@ -2856,8 +2882,63 @@ void MenuApp::handle_song_select_input(uint32_t keycode) {
     }
 }
 
+void MenuApp::apply_difficulty_table_url(std::string_view url) {
+    std::string trimmed(url);
+    while (!trimmed.empty() && static_cast<unsigned char>(trimmed.back()) <= 0x20u) {
+        trimmed.pop_back();
+    }
+    const std::size_t begin = trimmed.find_first_not_of(" \t");
+    trimmed = (begin == std::string::npos) ? std::string{} : trimmed.substr(begin);
+    if (trimmed.empty()) {
+        publish_snapshot();
+        return;
+    }
+
+    const DifficultyTableLinkImportResult imported = import_difficulty_table_link(
+        trimmed, path_from_utf8(profile_dir_) / "difficulty_tables");
+    if (!imported.success()) {
+        std::cerr << "[warn] Difficulty-table link was not imported: " << imported.error << std::endl;
+        publish_snapshot();
+        return;
+    }
+    for (const auto& warning : imported.warnings) {
+        std::cerr << "[warn] Difficulty table: " << warning << std::endl;
+    }
+    const bool force_table_reindex = ensure_difficulty_table_indexing(config_);
+    if (imported.cached_header_path != config_.ui.difficulty_table_path ||
+        imported.source_url != config_.ui.difficulty_table_url) {
+        config_.ui.difficulty_table_path = imported.cached_header_path;
+        config_.ui.difficulty_table_url = imported.source_url;
+        persist_runtime_config();
+        refresh_song_source(force_table_reindex);
+    }
+    publish_snapshot();
+}
+
 void MenuApp::handle_song_browser_input(uint32_t keycode) {
     const int item_count = kSongBrowserRowCount;
+    if (difficulty_table_url_editing_) {
+        if (keycode == key_escape_) {
+            difficulty_table_url_editing_ = false;
+            publish_snapshot();
+            return;
+        }
+        if (keycode == key_backspace_) {
+            if (!difficulty_table_url_input_.empty()) {
+                difficulty_table_url_input_.pop_back();
+            }
+            publish_snapshot();
+            return;
+        }
+        if (keycode == key_enter_) {
+            difficulty_table_url_editing_ = false;
+            apply_difficulty_table_url(difficulty_table_url_input_);
+            return;
+        }
+        // Everything else is swallowed so arrow keys cannot move the cursor while
+        // the field has focus.
+        return;
+    }
     if (keycode == key_up_) {
         settings_cursor_ = clamp_int(settings_cursor_ - 1, 0, item_count - 1);
         publish_snapshot();
@@ -2909,8 +2990,21 @@ void MenuApp::handle_song_browser_input(uint32_t keycode) {
         apply_filter_refresh();
         return;
     }
-    if (settings_cursor_ == 5 &&
-        (keycode == key_left_ || keycode == key_right_ || keycode == key_enter_)) {
+    if (settings_cursor_ == 5 && keycode == key_enter_) {
+        // Enter opens the field for typing, seeded from a URL already on the
+        // clipboard so pasting still takes one keypress.
+        difficulty_table_url_editing_ = true;
+        difficulty_table_url_input_ = config_.ui.difficulty_table_url;
+#ifdef _WIN32
+        if (const auto clipboard_url = difficulty_table_url_from_clipboard();
+            clipboard_url.has_value()) {
+            difficulty_table_url_input_ = *clipboard_url;
+        }
+#endif
+        publish_snapshot();
+        return;
+    }
+    if (settings_cursor_ == 5 && (keycode == key_left_ || keycode == key_right_)) {
         bool force_table_reindex = false;
         std::string selected_path = config_.ui.difficulty_table_path;
         std::string selected_url = config_.ui.difficulty_table_url;
@@ -2919,26 +3013,7 @@ void MenuApp::handle_song_browser_input(uint32_t keycode) {
             selected_url.clear();
         } else {
 #ifdef _WIN32
-            const auto clipboard_url =
-                keycode == key_enter_ ? difficulty_table_url_from_clipboard() : std::nullopt;
-            if (clipboard_url.has_value()) {
-                const DifficultyTableLinkImportResult imported =
-                    import_difficulty_table_link(
-                        *clipboard_url,
-                        path_from_utf8(profile_dir_) / "difficulty_tables");
-                if (!imported.success()) {
-                    std::cerr << "[warn] Difficulty-table link was not imported: "
-                              << imported.error << std::endl;
-                    publish_snapshot();
-                    return;
-                }
-                for (const auto& warning : imported.warnings) {
-                    std::cerr << "[warn] Difficulty table: " << warning << std::endl;
-                }
-                selected_path = imported.cached_header_path;
-                selected_url = imported.source_url;
-                force_table_reindex = ensure_difficulty_table_indexing(config_);
-            } else {
+            {
                 const std::string picked = browse_for_json_file(
                     ui_text("Select Local BMS Difficulty Table", "로컬 BMS 난이도표 선택"));
                 if (picked.empty()) {

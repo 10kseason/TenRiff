@@ -90,6 +90,10 @@ public:
 
         double rate = 1.0;
         double hispeed = 3.0;
+        // Live values of the in-play tuning keys, so the renderer follows the
+        // adjustment on the very next frame instead of at the end of the song.
+        double judgement_line_position = config::kJudgementLinePositionDefault;
+        double visual_offset_ms = 0.0;
 
         bool has_feedback = false;
         game::Judgement feedback_judgement = game::Judgement::BD;
@@ -190,6 +194,10 @@ public:
     }
     [[nodiscard]] const GameSessionResult& result() const { return result_; }
     [[nodiscard]] double final_hispeed() const { return config_.speed.hi_speed; }
+    [[nodiscard]] double final_judgement_line_position() const {
+        return config_.skin.judgement_line_position;
+    }
+    [[nodiscard]] double final_visual_offset_ms() const { return config_.visual_offset_ms; }
     [[nodiscard]] bool final_rawinput_enabled() const { return config_.input.rawinput; }
     [[nodiscard]] const InputBackendRuntimeState& input_backend_state() const { return input_backend_state_; }
 
@@ -316,6 +324,14 @@ private:
     void adjust_hispeed(double delta);
     void update_hispeed_repeat_state(uint32_t keycode, input::InputState state, int64_t event_time_ns);
     void service_hispeed_repeat(int64_t now_ns);
+    void adjust_judgement_line_position(double delta);
+    void adjust_visual_offset(double delta);
+    // Returns true when the key belongs to one of the in-play tuning bindings.
+    [[nodiscard]] bool update_tuning_repeat_state(uint32_t keycode,
+                                                 input::InputState state,
+                                                 int64_t event_time_ns);
+    void service_tuning_repeats(int64_t now_ns);
+    void reset_tuning_repeats();
     [[nodiscard]] bool prepare_chart_audio();
     void start_chart_audio_workers(std::size_t worker_count);
     void stop_chart_audio_workers();
@@ -401,11 +417,26 @@ private:
     uint32_t up_keycode_ = 0;
     uint32_t down_keycode_ = 0;
     uint32_t enter_keycode_ = 0;
+    uint32_t f1_keycode_ = 0;
+    uint32_t f2_keycode_ = 0;
     uint32_t f3_keycode_ = 0;
     uint32_t f4_keycode_ = 0;
     uint32_t f5_keycode_ = 0;
     uint32_t f6_keycode_ = 0;
+    uint32_t f7_keycode_ = 0;
+    uint32_t f8_keycode_ = 0;
     uint32_t f9_keycode_ = 0;
+
+    // Judgement-line and visual-latency tuning while the chart plays. Same
+    // press-then-auto-repeat shape as the hi-speed keys.
+    struct TuningRepeat {
+        bool held = false;
+        int64_t next_repeat_ns = 0;
+    };
+    TuningRepeat judgement_line_decrease_repeat_{};
+    TuningRepeat judgement_line_increase_repeat_{};
+    TuningRepeat visual_offset_decrease_repeat_{};
+    TuningRepeat visual_offset_increase_repeat_{};
 
     int64_t input_offset_samples_ = 0;
     int64_t current_playback_sample_ = 0;

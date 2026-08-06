@@ -37,6 +37,17 @@ namespace tenriff::app {
 [[nodiscard]] std::string resolve_keymap_edit_mode_for_menu(std::optional<int> selected_chart_key_count,
                                                             std::string_view runtime_key_mode);
 
+[[nodiscard]] inline render::NoteImageAspect render_note_image_aspect(std::string_view token) {
+    const std::string normalized = config::normalize_skin_note_image_aspect_token(token);
+    if (normalized == "width") {
+        return render::NoteImageAspect::Width;
+    }
+    if (normalized == "contain") {
+        return render::NoteImageAspect::Contain;
+    }
+    return render::NoteImageAspect::Stretch;
+}
+
 class MenuApp {
 public:
     MenuApp();
@@ -172,6 +183,10 @@ private:
 
         double rate = 1.0;
         double hispeed = 3.0;
+        // Mirrors of the in-play tuning keys. Only read while `active`, so the
+        // menu keeps rendering the stored config outside a song.
+        double judgement_line_position = config::kJudgementLinePositionDefault;
+        double visual_offset_ms = 0.0;
 
         bool has_feedback = false;
         game::Judgement feedback = game::Judgement::BD;
@@ -392,6 +407,8 @@ private:
     [[nodiscard]] std::string ui_random_label(std::string_view token) const;
     [[nodiscard]] std::string ui_skin_source_label(std::string_view token) const;
     [[nodiscard]] std::string ui_skin_note_shape_label(std::string_view token) const;
+    [[nodiscard]] std::string ui_skin_note_image_aspect_label(std::string_view token) const;
+    void apply_difficulty_table_url(std::string_view url);
 
     [[nodiscard]] std::string screen_title() const;
     [[nodiscard]] const SongEntry* visible_song_entry(std::size_t visible_index) const;
@@ -629,6 +646,10 @@ private:
 
     std::string song_search_query_{};
     bool song_select_search_active_ = false;
+    // Typed difficulty-table URL. Editing keeps its own buffer so cancelling
+    // leaves the table that is already loaded alone.
+    bool difficulty_table_url_editing_ = false;
+    std::string difficulty_table_url_input_{};
     int song_key_filter_ = 0;
     int song_level_min_filter_ = 0;
     int song_level_max_filter_ = 0;

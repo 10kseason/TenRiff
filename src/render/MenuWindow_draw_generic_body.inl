@@ -106,7 +106,8 @@
                 preview.lane_width_scales,
                 preview.lane_spacing_scale_count,
                 preview.lane_spacing_scales,
-                lane_center_gap_scale);
+                lane_center_gap_scale,
+                preview.note_divider_gap_px);
             const float field_height = field_layout.height;
             const float field_left = field_layout.left;
             const float field_right = field_layout.right;

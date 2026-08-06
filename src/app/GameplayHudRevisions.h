@@ -62,6 +62,8 @@ struct GameplayHudRevisionInput {
 
     double rate = 1.0;
     double hispeed = 3.0;
+    double judgement_line_position = 0.82;
+    double visual_offset_ms = 0.0;
 
     bool has_feedback = false;
     game::Judgement feedback = game::Judgement::BD;
@@ -229,6 +231,8 @@ inline GameplayHudRevisionFlags diff_gameplay_hud_revisions(const GameplayHudRev
         previous.gauge_type != next.gauge_type ||
         previous.rate != next.rate ||
         previous.hispeed != next.hispeed ||
+        previous.judgement_line_position != next.judgement_line_position ||
+        previous.visual_offset_ms != next.visual_offset_ms ||
         previous.has_feedback != next.has_feedback ||
         previous.feedback != next.feedback ||
         previous.feedback_delta_ms != next.feedback_delta_ms ||

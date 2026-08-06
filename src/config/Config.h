@@ -14,6 +14,8 @@ namespace tenriff::config {
 inline constexpr double kJudgementLinePositionMin = 0.00;
 inline constexpr double kJudgementLinePositionMax = 1.00;
 inline constexpr double kJudgementLinePositionDefault = 0.82;
+inline constexpr double kVisualOffsetMin = -500.0;
+inline constexpr double kVisualOffsetMax = 500.0;
 inline constexpr double kGameplayFieldOffsetXMin = -720.0;
 inline constexpr double kGameplayFieldOffsetXMax = 720.0;
 inline constexpr double kGameplayFieldOffsetXDefault = 0.0;
@@ -30,6 +32,10 @@ inline constexpr double kNoteHeightScaleMax = 4.00;
 inline constexpr double kLaneDividerWidthScaleMin = 0.00;
 inline constexpr double kLaneDividerWidthScaleMax = 2.00;
 inline constexpr double kLaneDividerWidthScaleDefault = 1.00;
+inline constexpr double kNoteDividerGapPxMin = 0.0;
+inline constexpr double kNoteDividerGapPxMax = 40.0;
+inline constexpr double kNoteDividerGapPxDefault = 12.0;
+inline constexpr double kNoteDividerGapPxStep = 1.0;
 inline constexpr double kLaneCenterGapScaleMin = 0.00;
 inline constexpr double kLaneCenterGapScaleMax = 2.00;
 inline constexpr double kLaneCenterGapScaleDefault = 0.00;
@@ -101,6 +107,9 @@ struct UiConfig {
     std::string language = "en";
     double result_tail_ms = 500.0;
     bool require_enter_to_exit = true;
+    // Gameplay hides the pointer by default. Keep it on screen for players who
+    // drag the playfield mid-song or run the game in a window alongside overlays.
+    bool show_cursor_in_gameplay = false;
     std::string active_song_source;
     std::vector<std::string> recent_song_sources;
     std::vector<std::string> favorite_chart_keys;
@@ -118,8 +127,16 @@ struct SkinConfig {
     std::string visual_preset = "tenriff";
     std::string note_shape = "rect";
     bool note_border_enabled = true;
+    // How note art fills its rect: "stretch" ignores the image aspect, "contain"
+    // shrinks the image to fit, and "width" keeps the lane width and derives the
+    // height from the image, which is what arrow and circle art needs.
+    std::string note_image_aspect = "stretch";
+    // Retained so builds older than the three-way option keep reading a sane value.
     bool preserve_note_image_aspect_ratio = false;
     bool show_lane_dividers = true;
+    // Clearance in pixels between each note edge and the lane divider line. Zero
+    // makes notes meet the dividers; the default reproduces the historic inset.
+    double note_divider_gap_px = kNoteDividerGapPxDefault;
     bool show_judgement_line = true;
     bool show_gear_boundary_line = false;
     bool show_hold_tail = true;
@@ -239,6 +256,8 @@ void apply_skin_visual_preset(SkinConfig& skin, std::string_view token);
 [[nodiscard]] std::string normalize_skin_color_token(std::string_view token);
 [[nodiscard]] std::string normalize_skin_note_shape_token(std::string_view token);
 [[nodiscard]] std::string skin_note_shape_label(std::string_view token);
+[[nodiscard]] std::string normalize_skin_note_image_aspect_token(std::string_view token);
+[[nodiscard]] std::string skin_note_image_aspect_label(std::string_view token);
 [[nodiscard]] std::string skin_color_label(std::string_view token);
 [[nodiscard]] uint32_t skin_color_rgb(std::string_view token);
 [[nodiscard]] std::vector<double> resolved_skin_lane_width_scales(const SkinConfig& skin, std::string_view key_mode);

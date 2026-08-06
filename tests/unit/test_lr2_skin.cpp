@@ -418,6 +418,183 @@ TEST_CASE("lr2 gear wildcard include supplies full-lane receptor art") {
     CHECK(resolved.gear_overlay_image.source_width == doctest::Approx(80.0f));
     CHECK(resolved.gear_overlay_image.source_height == doctest::Approx(480.0f));
 }
+TEST_CASE("lr2 gear panel declared outside a gear file still imports") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+
+    const auto root = temp.path / "skins";
+    const auto skin = root / "InlineGear";
+    std::filesystem::create_directories(skin / "img");
+
+    // The layer runs as two keyframes and comes to rest on the second, using a
+    // negative height the way LR2 encodes a grow-upward animation. The lane block
+    // spans x 100..160 with the judgement line at y 400.
+    write_file(skin / "play_7.lr2skin",
+               "#INFORMATION,0,Inline Gear,Tester\n"
+               "#ENDOFHEADER\n"
+               "#IMAGE,LR2files\\Theme\\InlineGear\\img\\frame.png\n"
+               "#IMAGE,LR2files\\Theme\\InlineGear\\img\\note.png\n"
+               "#SRC_NOTE,0,1,0,0,30,20,1,1,0,0\n"
+               "#SRC_NOTE,1,1,30,0,30,20,1,1,0,0\n"
+               "#DST_NOTE,0,0,100,400,30,20,0,255,255,255,255,0,0,0,0,0,0,0,0,0\n"
+               "#DST_NOTE,1,0,130,400,30,20,0,255,255,255,255,0,0,0,0,0,0,0,0,0\n"
+               "#SRC_IMAGE,0,0,0,0,90,480,1,1,0,0,0,0,0\n"
+               "#DST_IMAGE,0,0,95,480,90,0,0,255,255,255,255,1,0,0,0,300,0,0,0,0\n"
+               "#DST_IMAGE,0,300,95,480,90,-480,0,255,255,255,255,1,0,0,0,,,,,\n");
+    write_file(skin / "img" / "frame.png");
+    write_file(skin / "img" / "note.png");
+
+    const auto resolved = tenriff::app::resolve_lr2_play_skin(root.u8string(), "InlineGear", 2);
+    REQUIRE(resolved.found);
+    CHECK(resolved.gear_overlay_image.path.find("frame.png") != std::string::npos);
+    CHECK(resolved.gear_overlay_image.has_source_rect);
+    CHECK(resolved.gear_overlay_image.source_width == doctest::Approx(90.0f));
+    CHECK(resolved.gear_overlay_image.source_height == doctest::Approx(480.0f));
+
+    // Lane block width is 60, so the panel sits 5px (=-0.0833 units) left of the
+    // lanes, starts 400px (=-6.667 units) above the judgement line, and is 1.5
+    // lane blocks wide by 8 tall.
+    REQUIRE(resolved.gear_placement.valid);
+    CHECK(resolved.gear_placement.offset_x == doctest::Approx(-5.0f / 60.0f));
+    CHECK(resolved.gear_placement.offset_y == doctest::Approx(-400.0f / 60.0f));
+    CHECK(resolved.gear_placement.width == doctest::Approx(90.0f / 60.0f));
+    CHECK(resolved.gear_placement.height == doctest::Approx(480.0f / 60.0f));
+}
+
+TEST_CASE("lr2 gear picks the panel framing the lanes over a full-screen background") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+
+    const auto root = temp.path / "skins";
+    const auto skin = root / "FramedGear";
+    std::filesystem::create_directories(skin / "img");
+
+    write_file(skin / "play_7.lr2skin",
+               "#INFORMATION,0,Framed Gear,Tester\n"
+               "#ENDOFHEADER\n"
+               "#IMAGE,LR2files\\Theme\\FramedGear\\img\\bg.png\n"
+               "#IMAGE,LR2files\\Theme\\FramedGear\\img\\gear.png\n"
+               "#IMAGE,LR2files\\Theme\\FramedGear\\img\\note.png\n"
+               "#SRC_NOTE,0,2,0,0,30,20,1,1,0,0\n"
+               "#SRC_NOTE,1,2,30,0,30,20,1,1,0,0\n"
+               "#DST_NOTE,0,0,100,400,30,20,0,255,255,255,255,0,0,0,0,0,0,0,0,0\n"
+               "#DST_NOTE,1,0,130,400,30,20,0,255,255,255,255,0,0,0,0,0,0,0,0,0\n"
+               "#SRC_IMAGE,0,0,0,0,-1,-1,1,1,0,0,0,0,0\n"
+               "#DST_IMAGE,0,0,0,0,640,480,0,255,255,255,255,1,0,0,0,0,0,0,0,0\n"
+               "#SRC_IMAGE,1,1,0,0,70,480,1,1,0,0,0,0,0\n"
+               "#DST_IMAGE,1,0,95,0,70,480,0,255,255,255,255,1,0,0,0,0,0,0,0,0\n"
+               "#SRC_IMAGE,2,0,0,0,20,20,1,1,0,0,0,0,0\n"
+               "#DST_IMAGE,2,0,300,300,20,20,0,255,255,255,255,1,0,0,0,0,0,0,0,0\n");
+    write_file(skin / "img" / "bg.png");
+    write_file(skin / "img" / "gear.png");
+    write_file(skin / "img" / "note.png");
+
+    const auto resolved = tenriff::app::resolve_lr2_play_skin(root.u8string(), "FramedGear", 2);
+    REQUIRE(resolved.found);
+    CHECK(resolved.gear_overlay_image.path.find("gear.png") != std::string::npos);
+    REQUIRE(resolved.gear_placement.valid);
+    CHECK(resolved.gear_placement.width == doctest::Approx(70.0f / 60.0f));
+}
+
+TEST_CASE("lr2 gear ignores a layer whose final keyframe fades out") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+
+    const auto root = temp.path / "skins";
+    const auto skin = root / "FadingGear";
+    std::filesystem::create_directories(skin / "img");
+
+    write_file(skin / "play_7.lr2skin",
+               "#INFORMATION,0,Fading Gear,Tester\n"
+               "#ENDOFHEADER\n"
+               "#IMAGE,LR2files\\Theme\\FadingGear\\img\\intro.png\n"
+               "#IMAGE,LR2files\\Theme\\FadingGear\\img\\note.png\n"
+               "#SRC_NOTE,0,1,0,0,30,20,1,1,0,0\n"
+               "#SRC_NOTE,1,1,30,0,30,20,1,1,0,0\n"
+               "#DST_NOTE,0,0,100,400,30,20,0,255,255,255,255,0,0,0,0,0,0,0,0,0\n"
+               "#DST_NOTE,1,0,130,400,30,20,0,255,255,255,255,0,0,0,0,0,0,0,0,0\n"
+               "#SRC_IMAGE,0,0,0,0,90,480,1,1,0,0,0,0,0\n"
+               "#DST_IMAGE,0,0,95,0,90,480,0,255,255,255,255,1,0,0,0,600,0,0,0,0\n"
+               "#DST_IMAGE,0,600,95,0,90,480,0,0,255,255,255,1,0,0,0,,,,,\n");
+    write_file(skin / "img" / "intro.png");
+    write_file(skin / "img" / "note.png");
+
+    const auto resolved = tenriff::app::resolve_lr2_play_skin(root.u8string(), "FadingGear", 2);
+    REQUIRE(resolved.found);
+    CHECK(resolved.gear_overlay_image.path.empty());
+    CHECK_FALSE(resolved.gear_placement.valid);
+}
+
+TEST_CASE("lr2 resolution detection reads the backdrop canvas, not just lane positions") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+
+    const auto root = temp.path / "skins";
+    const auto skin = root / "HdCanvas";
+    std::filesystem::create_directories(skin / "img");
+
+    // Lanes sit well left of x=960, so the lane heuristic alone reads this as SD.
+    // The 1280x720 backdrop is what gives the real canvas away.
+    write_file(skin / "play_7.lr2skin",
+               "#INFORMATION,0,Hd Canvas,Tester\n"
+               "#ENDOFHEADER\n"
+               "#IMAGE,LR2files\\Theme\\HdCanvas\\img\\bg.png\n"
+               "#IMAGE,LR2files\\Theme\\HdCanvas\\img\\note.png\n"
+               "#SRC_IMAGE,0,0,0,0,1280,720,1,1,0,0,0,0,0\n"
+               "#DST_IMAGE,0,0,0,0,1280,720,0,255,255,255,255,1,0,0,0,0,0,0,0,0\n"
+               "#SRC_NOTE,0,1,0,0,60,33,1,1,0,0\n"
+               "#SRC_NOTE,1,1,60,0,60,33,1,1,0,0\n"
+               "#DST_NOTE,0,0,200,500,60,33,0,255,255,255,255,0,0,0,0,0,0,0,0,0\n"
+               "#DST_NOTE,1,0,260,500,60,33,0,255,255,255,255,0,0,0,0,0,0,0,0,0\n");
+    write_file(skin / "img" / "bg.png");
+    write_file(skin / "img" / "note.png");
+
+    const auto resolved = tenriff::app::resolve_lr2_play_skin(root.u8string(), "HdCanvas", 2);
+    REQUIRE(resolved.found);
+    CHECK(resolved.resolution_family == tenriff::app::Lr2ResolutionFamily::Hd);
+    // 60px wide and 33px tall at HD scale is exactly the LR2 default note size.
+    CHECK(resolved.imported_note_width_ratio == doctest::Approx(1.0f));
+    CHECK(resolved.imported_note_height_ratio == doctest::Approx(1.0f));
+}
+
+TEST_CASE("lr2 resolution detection ignores panels parked away from the corner") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+
+    const auto root = temp.path / "skins";
+    const auto skin = root / "SdParked";
+    std::filesystem::create_directories(skin / "img");
+
+    // A lane cover parked below the screen and a backdrop that slides in from above
+    // are both large, but neither is anchored at the corner in its resting frame.
+    write_file(skin / "play_7.lr2skin",
+               "#INFORMATION,0,Sd Parked,Tester\n"
+               "#ENDOFHEADER\n"
+               "#IMAGE,LR2files\\Theme\\SdParked\\img\\cover.png\n"
+               "#IMAGE,LR2files\\Theme\\SdParked\\img\\note.png\n"
+               "#SRC_IMAGE,0,0,0,0,640,360,1,1,0,0,0,0,0\n"
+               "#DST_IMAGE,0,0,0,1335,1280,364,0,255,255,255,255,1,0,0,0,0,0,0,0,0\n"
+               "#SRC_IMAGE,1,0,0,0,640,360,1,1,0,0,0,0,0\n"
+               "#DST_IMAGE,1,0,0,-341,1280,341,0,255,255,255,255,1,0,0,0,0,0,0,0,0\n"
+               "#SRC_NOTE,0,1,0,0,30,22,1,1,0,0\n"
+               "#SRC_NOTE,1,1,30,0,30,22,1,1,0,0\n"
+               "#DST_NOTE,0,0,100,400,30,22,0,255,255,255,255,0,0,0,0,0,0,0,0,0\n"
+               "#DST_NOTE,1,0,130,400,30,22,0,255,255,255,255,0,0,0,0,0,0,0,0,0\n");
+    write_file(skin / "img" / "cover.png");
+    write_file(skin / "img" / "note.png");
+
+    const auto resolved = tenriff::app::resolve_lr2_play_skin(root.u8string(), "SdParked", 2);
+    REQUIRE(resolved.found);
+    CHECK(resolved.resolution_family == tenriff::app::Lr2ResolutionFamily::Sd);
+    CHECK(resolved.imported_note_width_ratio == doctest::Approx(1.0f));
+    CHECK(resolved.imported_note_height_ratio == doctest::Approx(1.0f));
+}
+
 TEST_CASE("lr2 skin resolver honors explicit resolution headers") {
     TempDirGuard temp;
     temp.path = make_temp_dir();

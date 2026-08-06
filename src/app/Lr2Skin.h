@@ -26,6 +26,7 @@ struct Lr2PlaySkinDefinition {
     std::vector<ImportedSkinImageAsset> key_images;
     std::vector<ImportedSkinImageAsset> key_pressed_images;
     ImportedSkinImageAsset gear_overlay_image;
+    ImportedSkinGearPlacement gear_placement;
     std::vector<float> lane_divider_widths;
     float imported_note_width_ratio = 1.0f;
     float imported_note_height_ratio = 1.0f;

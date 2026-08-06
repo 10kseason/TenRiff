@@ -585,16 +585,33 @@
         draw_glass_panel(search_button, 10.0f, 0.76f, 0.40f, true, 2.0f);
         draw_glass_panel(filter_button, 10.0f, 0.76f, 0.40f, true, 2.0f);
         draw_glass_panel(library_status, 10.0f, 0.58f, 0.06f, false, 2.0f);
+        const bool searching =
+            data.song_select.search_active || !data.song_select.search_query.empty();
         if (d2d_->body_format && d2d_->text_brush) {
-            draw_centered_text(wloc("SEARCH", "검색"), d2d_->body_format.Get(),
+            std::wstring search_label = wloc("SEARCH", "검색");
+            if (searching) {
+                search_label = to_wide(data.song_select.search_query);
+                if (search_label.empty()) {
+                    search_label = wloc("TYPE TO SEARCH", "검색어 입력");
+                } else if (data.song_select.search_active) {
+                    // A caret marks the field as still taking keystrokes.
+                    search_label += L"|";
+                }
+            }
+            draw_centered_text(search_label, d2d_->body_format.Get(),
                                search_button, d2d_->text_brush.Get());
             draw_centered_text(wloc("SORT / FILTER", "정렬 / 필터"), d2d_->body_format.Get(),
                                filter_button, d2d_->text_brush.Get());
         }
         if (d2d_->hud_format && d2d_->muted_brush) {
-            draw_centered_text(to_wide(data.song_select.sort_summary + "  /  " +
-                                       data.song_select.group_summary),
-                               d2d_->hud_format.Get(), library_status, d2d_->muted_brush.Get());
+            const std::string status =
+                searching ? (loc("MATCHES ", "검색 결과 ") +
+                             std::to_string(data.song_select.list_total_count) +
+                             loc("", "곡"))
+                          : (data.song_select.sort_summary + "  /  " +
+                             data.song_select.group_summary);
+            draw_centered_text(to_wide(status), d2d_->hud_format.Get(), library_status,
+                               d2d_->muted_brush.Get());
         }
 
         draw_glass_panel(right_panel, 12.0f, 0.76f, 0.22f, false, 5.0f);

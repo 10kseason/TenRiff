@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cmath>
 #include <ios>
 #include <ostream>
 #include <sstream>
@@ -16,8 +17,8 @@
 
 namespace tenriff::app {
 
-inline constexpr double kVisualOffsetMin = -500.0;
-inline constexpr double kVisualOffsetMax = 500.0;
+inline constexpr double kVisualOffsetMin = config::kVisualOffsetMin;
+inline constexpr double kVisualOffsetMax = config::kVisualOffsetMax;
 inline constexpr double kVisualOffsetStep = 5.0;
 inline constexpr double kVolumeMin = 0.0;
 inline constexpr double kVolumeMax = 1.0;
@@ -113,6 +114,10 @@ inline std::vector<std::string> cycle_mode_mod_category(const std::vector<std::s
         normalized.push_back(std::string(category.mods[static_cast<std::size_t>(next_index - 1)]->token));
     }
     return normalize_mode_mod_tokens(normalized);
+}
+
+inline std::string format_pixels(double value) {
+    return std::to_string(static_cast<int>(std::lround(value))) + " px";
 }
 
 inline std::string format_signed_offset_ms(double value) {

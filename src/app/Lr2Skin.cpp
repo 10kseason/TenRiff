@@ -6,6 +6,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <limits>
 #include <optional>
 #include <set>
 #include <string>
@@ -24,6 +25,12 @@ namespace fs = std::filesystem;
 
 constexpr float kDefaultLr2NoteWidth = 30.0f;
 constexpr float kDefaultLr2NoteHeight = 22.0f;
+// A canvas backdrop has to sit in the corner and cover most of the screen. LR2
+// authors at 640x480, 1280x720 or 1920x1080, so anything smaller than this is a
+// panel rather than the canvas.
+constexpr float kLr2CanvasOriginTolerance = 4.0f;
+constexpr float kLr2MinCanvasWidth = 400.0f;
+constexpr float kLr2MinCanvasHeight = 300.0f;
 
 struct Lr2SourceSlice {
     int group_index = -1;
@@ -32,6 +39,9 @@ struct Lr2SourceSlice {
     float width = 0.0f;
     float height = 0.0f;
     bool valid = false;
+    // div_x * div_y from the source command. Anything above one is a sprite sheet
+    // the skin cycles through, not a single still frame.
+    int divisions = 1;
 };
 
 struct Lr2DestinationNote {
@@ -45,6 +55,12 @@ struct Lr2DestinationNote {
 struct Lr2StaticImageLayer {
     Lr2SourceSlice source;
     Lr2DestinationNote destination;
+    // Layers declared inside a Gear-named file are authored gear art. Layers found
+    // anywhere else still qualify, they just lose every tie against these.
+    bool from_gear_file = false;
+    // False when the destination is gated on a timer or an option, which is how
+    // LR2 declares transient art such as the full-combo burst or the stage shutter.
+    bool always_visible = true;
 };
 
 struct CustomFileSelection {
@@ -61,11 +77,17 @@ struct Lr2ParseState {
     std::unordered_map<int, Lr2SourceSlice> hold_body_slices;
     std::unordered_map<int, Lr2SourceSlice> hold_tail_slices;
     std::unordered_map<int, Lr2DestinationNote> dst_notes;
+    // #SRC_IMAGE slots are global in LR2: a slot declared in one file stays
+    // addressable by a #DST_IMAGE in an included file.
+    std::unordered_map<int, Lr2SourceSlice> static_image_slices;
     std::vector<Lr2StaticImageLayer> gear_layers;
     std::unordered_map<std::string, CustomFileSelection> custom_files;
     std::set<int> active_options;
     std::set<std::string> visited_files;
     std::optional<Lr2ResolutionFamily> explicit_resolution_family;
+    // Largest corner-anchored backdrop seen, used to recognise the authoring canvas.
+    float canvas_width_hint = 0.0f;
+    float canvas_height_hint = 0.0f;
     bool top_level_header_open = false;
 };
 
@@ -595,7 +617,15 @@ bool parse_lr2_file(const fs::path& file_path, Lr2ParseState& state, bool is_top
 
     const fs::path current_dir = file_path.parent_path();
     std::vector<ConditionalFrame> conditionals;
-    std::unordered_map<int, Lr2SourceSlice> pending_static_images;
+    // A #SRC_IMAGE followed by one or more #DST_IMAGE lines is one animated layer.
+    // The final keyframe is where the art comes to rest, so later keyframes in the
+    // same run overwrite the layer instead of appending a new one.
+    std::size_t open_gear_layer = std::numeric_limits<std::size_t>::max();
+    int open_gear_layer_source = -1;
+    // Only the first destination line of a run carries the timer and option gates;
+    // the keyframes after it leave those columns blank.
+    bool open_group_always_visible = true;
+    bool open_group_gates_read = false;
     const std::string generic_file_path = to_lower_ascii(file_path.generic_u8string());
     const bool gear_file = generic_file_path.find("/gear/") != std::string::npos ||
                            to_lower_ascii(file_path.stem().u8string()) == "gear";
@@ -763,31 +793,89 @@ bool parse_lr2_file(const fs::path& file_path, Lr2ParseState& state, bool is_top
                 !width.has_value() || !height.has_value()) {
                 return;
             }
-            destination[*lane] = Lr2SourceSlice{*group_index, *x, *y, *width, *height, true};
+            const int div_x = std::max(1, parse_int_token(tokens, 7u).value_or(1));
+            const int div_y = std::max(1, parse_int_token(tokens, 8u).value_or(1));
+            destination[*lane] =
+                Lr2SourceSlice{*group_index, *x, *y, *width, *height, true, div_x * div_y};
         };
 
         if (command == "#src_image") {
-            parse_source_slice(pending_static_images);
+            parse_source_slice(state.static_image_slices);
+            open_gear_layer = std::numeric_limits<std::size_t>::max();
+            open_gear_layer_source = -1;
+            open_group_always_visible = true;
+            open_group_gates_read = false;
             continue;
         }
         if (command == "#dst_image") {
             const auto source_index = parse_int_token(tokens, 1u);
-            const auto time = parse_int_token(tokens, 2u);
             const auto x = parse_float_token(tokens, 3u);
             const auto y = parse_float_token(tokens, 4u);
             const auto width = parse_float_token(tokens, 5u);
             const auto height = parse_float_token(tokens, 6u);
-            if (!gear_file || !source_index.has_value() || !time.has_value() || *time != 0 ||
-                !x.has_value() || !y.has_value() || !width.has_value() || !height.has_value()) {
+            if (!source_index.has_value() || !x.has_value() || !y.has_value() ||
+                !width.has_value() || !height.has_value()) {
                 continue;
             }
-            const auto source_it = pending_static_images.find(*source_index);
-            if (source_it == pending_static_images.end() || !source_it->second.valid) {
+            // A backdrop pinned to the top-left corner is the skin telling us its
+            // canvas size. Every keyframe counts, including ones whose art is
+            // missing or hidden, but only corner-anchored full-size panels: layers
+            // parked off-screen for a slide-in are the wrong shape for this.
+            if (std::abs(*x) <= kLr2CanvasOriginTolerance &&
+                std::abs(*y) <= kLr2CanvasOriginTolerance &&
+                std::abs(*width) >= kLr2MinCanvasWidth && std::abs(*height) >= kLr2MinCanvasHeight) {
+                state.canvas_width_hint = std::max(state.canvas_width_hint, std::abs(*width));
+                state.canvas_height_hint = std::max(state.canvas_height_hint, std::abs(*height));
+            }
+            if (!open_group_gates_read) {
+                // Timer 0 is the scene timer, which runs for the whole song. Any other
+                // timer is an event cue such as the full-combo burst or the shutter.
+                const bool scene_timer = parse_int_token(tokens, 17u).value_or(0) == 0;
+                // A positive option shows the layer while that option is set and a
+                // negative one while it is clear, matching #IF.
+                auto option_holds = [&](std::size_t token_index) {
+                    const int op = parse_int_token(tokens, token_index).value_or(0);
+                    if (op == 0) {
+                        return true;
+                    }
+                    const bool active = state.active_options.find(std::abs(op)) != state.active_options.end();
+                    return op > 0 ? active : !active;
+                };
+                open_group_always_visible = scene_timer && option_holds(18u) &&
+                                            option_holds(19u) && option_holds(20u);
+                open_group_gates_read = true;
+            }
+            const auto source_it = state.static_image_slices.find(*source_index);
+            if (source_it == state.static_image_slices.end() || !source_it->second.valid) {
                 continue;
             }
-            state.gear_layers.push_back(
-                Lr2StaticImageLayer{source_it->second,
-                                    Lr2DestinationNote{*x, *y, *width, *height, true}});
+            // A run that ends fully transparent is a fade-out, not gear art.
+            const auto alpha = parse_int_token(tokens, 8u);
+            if (alpha.has_value() && *alpha <= 0) {
+                if (open_gear_layer < state.gear_layers.size() && open_gear_layer_source == *source_index) {
+                    state.gear_layers[open_gear_layer].destination.valid = false;
+                }
+                continue;
+            }
+            // LR2 encodes flips as negative extents. Normalise to a plain rectangle
+            // so the layer can be compared against the lane block.
+            Lr2DestinationNote destination{*x, *y, *width, *height, true};
+            if (destination.width < 0.0f) {
+                destination.x += destination.width;
+                destination.width = -destination.width;
+            }
+            if (destination.height < 0.0f) {
+                destination.y += destination.height;
+                destination.height = -destination.height;
+            }
+            if (open_gear_layer < state.gear_layers.size() && open_gear_layer_source == *source_index) {
+                state.gear_layers[open_gear_layer].destination = destination;
+                continue;
+            }
+            open_gear_layer = state.gear_layers.size();
+            open_gear_layer_source = *source_index;
+            state.gear_layers.push_back(Lr2StaticImageLayer{
+                source_it->second, destination, gear_file, open_group_always_visible});
             continue;
         }
         if (command == "#src_note") {
@@ -1296,7 +1384,7 @@ Lr2RawPlayLayout collect_lr2_raw_play_layout(const Lr2ParseState& state) {
     return layout;
 }
 
-Lr2ResolutionFamily detect_lr2_auto_resolution_family(const Lr2RawPlayLayout& layout) {
+Lr2ResolutionFamily detect_lr2_lane_resolution_family(const Lr2RawPlayLayout& layout) {
     if (!layout.has_destinations) {
         return Lr2ResolutionFamily::Sd;
     }
@@ -1309,11 +1397,38 @@ Lr2ResolutionFamily detect_lr2_auto_resolution_family(const Lr2RawPlayLayout& la
     return Lr2ResolutionFamily::Fhd;
 }
 
+Lr2ResolutionFamily detect_lr2_canvas_resolution_family(float canvas_width, float canvas_height) {
+    // Midpoints between the three canvases LR2 supports: 640x480, 1280x720, 1920x1080.
+    const auto axis_family = [](float value, float sd_to_hd, float hd_to_fhd) {
+        if (value <= sd_to_hd) {
+            return Lr2ResolutionFamily::Sd;
+        }
+        return value <= hd_to_fhd ? Lr2ResolutionFamily::Hd : Lr2ResolutionFamily::Fhd;
+    };
+    return std::max(axis_family(canvas_width, 960.0f, 1600.0f),
+                    axis_family(canvas_height, 600.0f, 900.0f));
+}
+
+Lr2ResolutionFamily detect_lr2_auto_resolution_family(const Lr2ParseState& state,
+                                                      const Lr2RawPlayLayout& layout) {
+    // Lane positions alone under-report: a 1280x720 skin whose lanes sit left of
+    // x=960 reads as SD and its note art then imports at twice the intended size.
+    // The backdrop the skin draws behind the playfield is the reliable signal, so
+    // take whichever of the two reads higher.
+    const Lr2ResolutionFamily lane_family = detect_lr2_lane_resolution_family(layout);
+    if (state.canvas_width_hint <= 0.0f || state.canvas_height_hint <= 0.0f) {
+        return lane_family;
+    }
+    return std::max(lane_family,
+                    detect_lr2_canvas_resolution_family(state.canvas_width_hint,
+                                                        state.canvas_height_hint));
+}
+
 Lr2ResolutionFamily resolve_lr2_resolution_family(const Lr2ParseState& state,
                                                   const Lr2RawPlayLayout& layout,
                                                   std::string_view override_token,
                                                   const fs::path& skin_file) {
-    const Lr2ResolutionFamily auto_family = detect_lr2_auto_resolution_family(layout);
+    const Lr2ResolutionFamily auto_family = detect_lr2_auto_resolution_family(state, layout);
     if (const auto override_family = parse_lr2_resolution_override_token(override_token); override_family.has_value()) {
         return *override_family;
     }
@@ -1337,15 +1452,53 @@ void resize_lane_assets(std::vector<ImportedSkinImageAsset>& assets, int lane_co
     assets.resize(static_cast<std::size_t>(lane_count));
 }
 
+struct Lr2LaneBlock {
+    float left = 0.0f;
+    float right = 0.0f;
+    float judgement_y = 0.0f;
+    bool valid = false;
+
+    [[nodiscard]] float width() const { return right - left; }
+};
+
+Lr2LaneBlock collect_lr2_lane_block(const Lr2RawPlayLayout& layout) {
+    Lr2LaneBlock block;
+    for (const auto& entry : layout.ordered_destinations) {
+        if (!entry.dst.valid || entry.dst.width <= 0.0f) {
+            continue;
+        }
+        const float lane_right = entry.dst.x + entry.dst.width;
+        if (!block.valid) {
+            block.left = entry.dst.x;
+            block.right = lane_right;
+            block.judgement_y = entry.dst.y;
+            block.valid = true;
+            continue;
+        }
+        block.left = std::min(block.left, entry.dst.x);
+        block.right = std::max(block.right, lane_right);
+        // Lanes share one judgement line; take the lowest so a decorative lane
+        // parked higher up cannot drag the anchor off the play line.
+        block.judgement_y = std::max(block.judgement_y, entry.dst.y);
+    }
+    if (block.valid && block.width() <= 0.0f) {
+        block.valid = false;
+    }
+    return block;
+}
+
 void populate_gear_key_assets(Lr2PlaySkinDefinition& definition,
                               const Lr2ParseState& state,
                               const Lr2RawPlayLayout& layout) {
+    const Lr2LaneBlock lane_block = collect_lr2_lane_block(layout);
     const Lr2StaticImageLayer* best_layer = nullptr;
     int best_coverage = 0;
-    float best_area = 0.0f;
+    bool best_from_gear_file = false;
+    float best_width_error = 0.0f;
+    float best_height = 0.0f;
     for (const auto& layer : state.gear_layers) {
-        if (!layer.source.valid || !layer.destination.valid ||
-            layer.source.width <= 0.0f || layer.source.height <= 0.0f ||
+        if (!layer.source.valid || !layer.destination.valid || !layer.always_visible ||
+            layer.source.divisions > 1 ||
             layer.destination.width <= 0.0f || layer.destination.height <= 0.0f) {
             continue;
         }
@@ -1368,14 +1521,32 @@ void populate_gear_key_assets(Lr2PlaySkinDefinition& definition,
                 ++coverage;
             }
         }
-        const float area = layer.destination.width * layer.destination.height;
-        if (coverage > best_coverage || (coverage == best_coverage && coverage > 0 && area > best_area)) {
+        if (coverage <= 0) {
+            continue;
+        }
+        // Gear art authored in a Gear file always wins. Otherwise take the layer
+        // covering the most lanes, then the one framing them most tightly, then the
+        // tallest — that is the lane panel rather than a stripe or a wall of scenery.
+        const float width_error =
+            lane_block.valid ? std::abs(layer.destination.width - lane_block.width()) : 0.0f;
+        const bool ranks_higher =
+            coverage > best_coverage ||
+            (coverage == best_coverage &&
+             (width_error < best_width_error ||
+              (width_error == best_width_error && layer.destination.height > best_height)));
+        const bool better =
+            best_layer == nullptr ||
+            (layer.from_gear_file != best_from_gear_file && layer.from_gear_file) ||
+            (layer.from_gear_file == best_from_gear_file && ranks_higher);
+        if (better) {
             best_layer = &layer;
             best_coverage = coverage;
-            best_area = area;
+            best_from_gear_file = layer.from_gear_file;
+            best_width_error = width_error;
+            best_height = layer.destination.height;
         }
     }
-    if (!best_layer || best_coverage <= 0) {
+    if (!best_layer) {
         return;
     }
 
@@ -1387,20 +1558,43 @@ void populate_gear_key_assets(Lr2PlaySkinDefinition& definition,
     // Keep the complete static Gear frame as one asset. Per-lane stretching
     // distorts logos and text because LR2 Gear panels are authored as a single
     // destination rectangle with their own aspect ratio.
+    const bool has_source_rect =
+        best_layer->source.width > 0.0f && best_layer->source.height > 0.0f;
     definition.gear_overlay_image.path = image_it->second;
     definition.gear_overlay_image.source_x = best_layer->source.x;
     definition.gear_overlay_image.source_y = best_layer->source.y;
     definition.gear_overlay_image.source_width = best_layer->source.width;
     definition.gear_overlay_image.source_height = best_layer->source.height;
-    definition.gear_overlay_image.has_source_rect = true;
+    definition.gear_overlay_image.has_source_rect = has_source_rect;
 
-    resize_lane_assets(definition.key_images, definition.keys);
-    resize_lane_assets(definition.key_pressed_images, definition.keys);
     const float dst_left = best_layer->destination.x;
     const float dst_top = best_layer->destination.y;
     const float dst_right = dst_left + best_layer->destination.width;
     const float dst_bottom = dst_top + best_layer->destination.height;
+
+    // Record the panel in lane-block units so the renderer can reproduce the
+    // authored offset from the lanes instead of guessing a bottom-anchored fit.
+    if (lane_block.valid) {
+        const float unit = lane_block.width();
+        definition.gear_placement.offset_x = (dst_left - lane_block.left) / unit;
+        definition.gear_placement.offset_y = (dst_top - lane_block.judgement_y) / unit;
+        definition.gear_placement.width = best_layer->destination.width / unit;
+        definition.gear_placement.height = best_layer->destination.height / unit;
+        definition.gear_placement.valid = true;
+    }
+
+    resize_lane_assets(definition.key_images, definition.keys);
+    resize_lane_assets(definition.key_pressed_images, definition.keys);
     bool populated = false;
+    // Slicing per-lane receptor art out of the panel only makes sense when the
+    // panel actually reaches below the judgement line. A lane backdrop that stops
+    // at the line would otherwise yield a few-pixel smear.
+    const bool panel_covers_receptors =
+        has_source_rect && lane_block.valid &&
+        (dst_bottom - lane_block.judgement_y) >= lane_block.width() * 0.1f;
+    if (!panel_covers_receptors) {
+        return;
+    }
     for (int lane = 0; lane < definition.keys; ++lane) {
         const int raw_lane = layout.lane_order[static_cast<std::size_t>(lane)];
         const auto dst_it = state.dst_notes.find(raw_lane);

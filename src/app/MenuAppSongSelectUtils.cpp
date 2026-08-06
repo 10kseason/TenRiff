@@ -225,20 +225,51 @@ std::string format_int_with_commas(int64_t value) {
 
 bool song_entry_matches_search(const SongEntry& entry, std::string_view query) {
     const std::string normalized_query = to_lower_ascii(std::string(query));
-    if (normalized_query.empty()) {
+    if (normalized_query.find_first_not_of(" \t") == std::string::npos) {
         return true;
     }
+
+    // Every field the player can see on a card is searchable, so "cn 7k another"
+    // narrows by artist, layout and chart name at once.
     const std::string haystacks[] = {
         to_lower_ascii(song_title_for_ui(entry)),
         to_lower_ascii(song_artist_for_ui(entry)),
         to_lower_ascii(entry.path),
+        to_lower_ascii(entry.chart_name),
+        to_lower_ascii(entry.layout_label),
+        to_lower_ascii(entry.format),
+        to_lower_ascii(entry.difficulty_table_name),
+        to_lower_ascii(entry.difficulty_table_symbol),
+        to_lower_ascii(entry.difficulty_table_level),
+        std::to_string(entry.key_count) + "k",
+        "lv" + std::to_string(entry.level),
     };
-    for (const auto& haystack : haystacks) {
-        if (haystack.find(normalized_query) != std::string::npos) {
-            return true;
+
+    // Space-separated terms all have to land, each in any one field.
+    std::size_t cursor = 0;
+    while (cursor < normalized_query.size()) {
+        const std::size_t begin = normalized_query.find_first_not_of(" \t", cursor);
+        if (begin == std::string::npos) {
+            break;
         }
+        std::size_t end = normalized_query.find_first_of(" \t", begin);
+        if (end == std::string::npos) {
+            end = normalized_query.size();
+        }
+        const std::string_view term(normalized_query.data() + begin, end - begin);
+        bool term_found = false;
+        for (const auto& haystack : haystacks) {
+            if (haystack.find(term) != std::string::npos) {
+                term_found = true;
+                break;
+            }
+        }
+        if (!term_found) {
+            return false;
+        }
+        cursor = end;
     }
-    return false;
+    return true;
 }
 
 bool song_entry_matches_key_filter(const SongEntry& entry, int key_filter) {

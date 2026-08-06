@@ -5,6 +5,7 @@
 #include "GameplayHudLimits.h"
 #include "render/BgaImageLoader.h"
 #include "render/BgaVideoDecoder.h"
+#include "render/GameplayMotion.h"
 #include "render/OnnxBackgroundUpscaler.h"
 #include "render/RenderThread.h"
 
@@ -152,6 +153,10 @@ struct SongSelectData {
     bool selected_song_favorite = false;
     std::string selected_song_collection_filter;
     std::string selected_song_ghost_status;
+    // Live search text, shown on the search control so the player can see what they
+    // are typing instead of only its effect on the list.
+    std::string search_query;
+    bool search_active = false;
     std::string group_summary;
     std::string browser_summary;
     std::string sort_summary;
@@ -322,6 +327,7 @@ struct GameplayHudData {
     std::string background_upscale_mode = "off";
     std::string background_upscale_model_path;
     bool background_upscale_prefer_npu = false;
+    bool show_cursor_in_gameplay = false;
     double judgement_line_position = 0.82;
     double gameplay_field_offset_x = 0.0;
     double combo_position = 0.24;
@@ -335,6 +341,7 @@ struct GameplayHudData {
     double lane_center_gap_scale = 0.0;
     double hold_body_width_scale = 0.60;
     bool show_lane_dividers = true;
+    double note_divider_gap_px = kGameplayNoteDividerGapPxDefault;
     bool show_judgement_line = true;
     bool show_gear_boundary_line = false;
     bool show_hold_tail = true;
@@ -345,7 +352,7 @@ struct GameplayHudData {
     std::string key_label_position = "bottom";
     bool note_border_enabled = true;
     std::string note_shape = "rect";
-    bool preserve_note_image_aspect_ratio = false;
+    NoteImageAspect note_image_aspect = NoteImageAspect::Stretch;
     std::string skin_source = "native";
     std::string external_skin_root;
     std::string external_skin_name;
@@ -485,6 +492,7 @@ struct SkinPreviewData {
     double lane_center_gap_scale = 0.0;
     double hold_body_width_scale = 0.60;
     bool show_lane_dividers = true;
+    double note_divider_gap_px = kGameplayNoteDividerGapPxDefault;
     bool show_judgement_line = true;
     bool show_gear_boundary_line = false;
     bool show_hold_tail = true;
@@ -495,7 +503,7 @@ struct SkinPreviewData {
     std::string key_label_position = "bottom";
     bool note_border_enabled = true;
     std::string note_shape = "rect";
-    bool preserve_note_image_aspect_ratio = false;
+    NoteImageAspect note_image_aspect = NoteImageAspect::Stretch;
     std::string skin_source = "native";
     std::string external_skin_root;
     std::string external_skin_name;
@@ -765,6 +773,7 @@ private:
         double lane_divider_width_scale = 1.0;
         double lane_center_gap_scale = 0.0;
         bool show_lane_dividers = true;
+        double note_divider_gap_px = kGameplayNoteDividerGapPxDefault;
         bool show_judgement_line = true;
         bool show_gear_boundary_line = false;
         bool judgement_line_glow_enabled = true;
@@ -782,12 +791,20 @@ private:
         int lane_count = 0;
         bool note_border_enabled = true;
         std::string note_shape = "rect";
-        bool preserve_note_image_aspect_ratio = false;
+        NoteImageAspect note_image_aspect = NoteImageAspect::Stretch;
         std::string skin_source = "native";
         std::string external_skin_root;
         std::string external_skin_name;
         std::string lr2_resolution_override = "auto";
         bool use_full_lane_receptor_layout = false;
+        // Imported gear panel geometry in lane-block units, anchored at the left
+        // edge of the lanes on the judgement line. Invalid means the skin gave no
+        // placement and the gear falls back to a bottom-anchored fit.
+        bool has_gear_placement = false;
+        float gear_placement_offset_x = 0.0f;
+        float gear_placement_offset_y = 0.0f;
+        float gear_placement_width = 0.0f;
+        float gear_placement_height = 0.0f;
         std::size_t lane_divider_width_count = 0;
         std::array<float, kGameplayHudMaxLanes> lane_divider_widths{};
         std::size_t imported_lane_width_scale_count = 0;

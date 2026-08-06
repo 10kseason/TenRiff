@@ -312,7 +312,7 @@ void MenuApp::handle_skins_settings_input(uint32_t keycode) {
     const std::string active_skin_source = config::normalize_skin_source_token(config_.skin.source);
     const bool lr2_source = active_skin_source == "lr2";
     const int lr2_shift = lr2_source ? 1 : 0;
-    const int item_count = 36 + lr2_shift;
+    const int item_count = 38 + lr2_shift;
     const int imported_skin_row = 1;
     const int lr2_resolution_row = lr2_source ? 2 : -1;
     const int import_skin_row = 2 + lr2_shift;
@@ -348,7 +348,9 @@ void MenuApp::handle_skins_settings_input(uint32_t keycode) {
     const int black_playfield_row = 32 + lr2_shift;
     const int ui_font_row = 33 + lr2_shift;
     const int visual_latency_row = 34 + lr2_shift;
-    const int back_row = 35 + lr2_shift;
+    const int note_gap_row = 35 + lr2_shift;
+    const int gameplay_cursor_row = 36 + lr2_shift;
+    const int back_row = 37 + lr2_shift;
 
     if (keycode == key_up_) {
         settings_cursor_ = clamp_int(settings_cursor_ - 1, 0, item_count - 1);
@@ -366,7 +368,7 @@ void MenuApp::handle_skins_settings_input(uint32_t keycode) {
         const bool was_lr2 = active_skin_source == "lr2";
         config_.skin.source = cycle_skin_source(config_.skin.source, direction);
         const bool is_lr2 = config::normalize_skin_source_token(config_.skin.source) == "lr2";
-        const int new_item_count = 36 + (is_lr2 ? 1 : 0);
+        const int new_item_count = 38 + (is_lr2 ? 1 : 0);
         if (!was_lr2 && is_lr2 && settings_cursor_ >= imported_skin_row) {
             ++settings_cursor_;
         } else if (was_lr2 && !is_lr2 && settings_cursor_ >= import_skin_row) {
@@ -500,8 +502,8 @@ void MenuApp::handle_skins_settings_input(uint32_t keycode) {
         return;
     }
     if (settings_cursor_ == note_shape_row && (keycode == key_left_ || keycode == key_right_)) {
-        constexpr std::array<std::string_view, 5> shapes{
-            "rect", "triangle", "pentagon", "hexagon", "circle"};
+        constexpr std::array<std::string_view, 8> shapes{
+            "rect", "square", "circle", "diamond", "arrow", "triangle", "pentagon", "hexagon"};
         const std::string current = config::normalize_skin_note_shape_token(config_.skin.note_shape);
         auto it = std::find(shapes.begin(), shapes.end(), current);
         int index = (it == shapes.end()) ? 0 : static_cast<int>(std::distance(shapes.begin(), it));
@@ -520,7 +522,10 @@ void MenuApp::handle_skins_settings_input(uint32_t keycode) {
         return;
     }
     if (settings_cursor_ == image_aspect_row && (keycode == key_left_ || keycode == key_right_)) {
-        config_.skin.preserve_note_image_aspect_ratio = !config_.skin.preserve_note_image_aspect_ratio;
+        const int direction = (keycode == key_left_) ? -1 : 1;
+        config_.skin.note_image_aspect =
+            cycle_skin_note_image_aspect(config_.skin.note_image_aspect, direction);
+        config_.skin.preserve_note_image_aspect_ratio = config_.skin.note_image_aspect != "stretch";
         skin_dirty_ = true;
         publish_snapshot();
         return;
@@ -755,6 +760,24 @@ void MenuApp::handle_skins_settings_input(uint32_t keycode) {
         publish_snapshot();
         return;
     }
+    if (settings_cursor_ == note_gap_row && (keycode == key_left_ || keycode == key_right_)) {
+        const int direction = (keycode == key_left_) ? -1 : 1;
+        config_.skin.note_divider_gap_px = clamp_step_value(
+            config_.skin.note_divider_gap_px +
+                static_cast<double>(direction) * config::kNoteDividerGapPxStep,
+            config::kNoteDividerGapPxMin,
+            config::kNoteDividerGapPxMax,
+            config::kNoteDividerGapPxStep);
+        skin_dirty_ = true;
+        publish_snapshot();
+        return;
+    }
+    if (settings_cursor_ == gameplay_cursor_row && (keycode == key_left_ || keycode == key_right_)) {
+        config_.ui.show_cursor_in_gameplay = !config_.ui.show_cursor_in_gameplay;
+        skin_dirty_ = true;
+        publish_snapshot();
+        return;
+    }
 
     if ((keycode == key_enter_ && settings_cursor_ == back_row) ||
         keycode == key_escape_ ||
@@ -853,7 +876,8 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
                     settings_cursor_ == 7 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 7 + lr2_shift, false, true);
     append_menu_row(render.generic, ui_text("Note Border", "노트 테두리"), ui_on_off(config_.skin.note_border_enabled),
                     settings_cursor_ == 8 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 8 + lr2_shift, false, true);
-    append_menu_row(render.generic, ui_text("Image Aspect", "이미지 비율"), ui_on_off(config_.skin.preserve_note_image_aspect_ratio),
+    append_menu_row(render.generic, ui_text("Image Aspect", "이미지 비율"),
+                    ui_skin_note_image_aspect_label(config_.skin.note_image_aspect),
                     settings_cursor_ == 9 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 9 + lr2_shift, false, true);
     append_menu_row(render.generic, ui_text("White Dividers", "흰 레인 구분선"), ui_on_off(config_.skin.show_lane_dividers),
                     settings_cursor_ == 10 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 10 + lr2_shift, false, true);
@@ -923,8 +947,16 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
                     format_signed_offset_ms(config_.visual_offset_ms),
                     settings_cursor_ == 34 + lr2_shift, render::MenuHitTargetKind::SettingsRow,
                     34 + lr2_shift, false, true);
-    append_menu_row(render.generic, ui_text("Back", "뒤로"), "", settings_cursor_ == 35 + lr2_shift,
-                    render::MenuHitTargetKind::SettingsRow, 35 + lr2_shift, true, false);
+    append_menu_row(render.generic, ui_text("Note Gap", "노트 여백"),
+                    format_pixels(config_.skin.note_divider_gap_px),
+                    settings_cursor_ == 35 + lr2_shift, render::MenuHitTargetKind::SettingsRow,
+                    35 + lr2_shift, false, true);
+    append_menu_row(render.generic, ui_text("Gameplay Cursor", "인게임 커서"),
+                    ui_on_off(config_.ui.show_cursor_in_gameplay),
+                    settings_cursor_ == 36 + lr2_shift, render::MenuHitTargetKind::SettingsRow,
+                    36 + lr2_shift, false, true);
+    append_menu_row(render.generic, ui_text("Back", "뒤로"), "", settings_cursor_ == 37 + lr2_shift,
+                    render::MenuHitTargetKind::SettingsRow, 37 + lr2_shift, true, false);
 
     render.generic.skin_preview.visible = true;
     render.generic.skin_preview.mode_label = ui_key_mode_label(skin_edit_mode_);
@@ -959,6 +991,7 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
     render.generic.skin_preview.lane_center_gap_scale = center_gap_available ? preview_lane_center_gap_scale : 0.0;
     render.generic.skin_preview.hold_body_width_scale = config_.skin.hold_body_width_scale;
     render.generic.skin_preview.show_lane_dividers = config_.skin.show_lane_dividers;
+    render.generic.skin_preview.note_divider_gap_px = config_.skin.note_divider_gap_px;
     render.generic.skin_preview.show_judgement_line = config_.skin.show_judgement_line;
     render.generic.skin_preview.show_gear_boundary_line = config_.skin.show_gear_boundary_line;
     render.generic.skin_preview.show_hold_tail = config_.skin.show_hold_tail;
@@ -971,8 +1004,8 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
         config::normalize_skin_key_label_position_token(config_.skin.key_label_position);
     render.generic.skin_preview.note_border_enabled = config_.skin.note_border_enabled;
     render.generic.skin_preview.note_shape = config_.skin.note_shape;
-    render.generic.skin_preview.preserve_note_image_aspect_ratio =
-        config_.skin.preserve_note_image_aspect_ratio;
+    render.generic.skin_preview.note_image_aspect =
+        render_note_image_aspect(config_.skin.note_image_aspect);
     render.generic.skin_preview.skin_source = active_skin_source;
     render.generic.skin_preview.external_skin_root = active_external_skin_root();
     render.generic.skin_preview.external_skin_name = active_external_skin_name();

@@ -23,8 +23,6 @@ constexpr double kChartMixVolumeMin = 0.0;
 constexpr double kChartMixVolumeMax = 2.0;
 constexpr double kInputDebounceWindowMin = 0.0;
 constexpr double kInputDebounceWindowMax = 25.0;
-constexpr double kVisualOffsetMin = -500.0;
-constexpr double kVisualOffsetMax = 500.0;
 constexpr int kRefreshHzMin = 60;
 constexpr int kRefreshHzMax = 1050;
 constexpr int kDefaultGraphicsRefreshHz = 300;
@@ -153,6 +151,8 @@ void sanitize_skin_config(SkinConfig& skin) {
     skin.ui_font = normalize_skin_ui_font_token(skin.ui_font);
     skin.judgement_line_position = std::clamp(
         skin.judgement_line_position, kJudgementLinePositionMin, kJudgementLinePositionMax);
+    skin.note_divider_gap_px =
+        std::clamp(skin.note_divider_gap_px, kNoteDividerGapPxMin, kNoteDividerGapPxMax);
     skin.gameplay_field_offset_x = clamp_finite(
         skin.gameplay_field_offset_x,
         kGameplayFieldOffsetXMin,
@@ -676,6 +676,8 @@ void apply_config_object(const JsonObject& root, RuntimeConfig& config) {
         config.ui.language = normalize_ui_language(get_string(*ui, "language", config.ui.language));
         config.ui.result_tail_ms = get_number(*ui, "result_tail_ms", config.ui.result_tail_ms);
         config.ui.require_enter_to_exit = get_bool(*ui, "require_enter_to_exit", config.ui.require_enter_to_exit);
+        config.ui.show_cursor_in_gameplay =
+            get_bool(*ui, "show_cursor_in_gameplay", config.ui.show_cursor_in_gameplay);
         config.ui.active_song_source =
             get_string(*ui, "active_song_source", config.ui.active_song_source);
         if (const auto* recent_sources = get_value(*ui, "recent_song_sources")) {
@@ -720,8 +722,22 @@ void apply_config_object(const JsonObject& root, RuntimeConfig& config) {
             get_bool(*skin,
                      "preserve_note_image_aspect_ratio",
                      config.skin.preserve_note_image_aspect_ratio);
+        // The boolean only distinguishes stretch from contain, so it seeds the
+        // three-way value and the explicit token then overrides it.
+        config.skin.note_image_aspect =
+            config.skin.preserve_note_image_aspect_ratio ? "contain" : "stretch";
+        config.skin.note_image_aspect = normalize_skin_note_image_aspect_token(
+            get_string(*skin, "note_image_aspect", config.skin.note_image_aspect));
         config.skin.show_lane_dividers =
             get_bool(*skin, "show_lane_dividers", config.skin.show_lane_dividers);
+        // Configs written while this was a plain on/off carry the boolean form.
+        if (get_bool(*skin, "expand_notes_to_dividers", false)) {
+            config.skin.note_divider_gap_px = 0.0;
+        }
+        config.skin.note_divider_gap_px = std::clamp(
+            get_number(*skin, "note_divider_gap_px", config.skin.note_divider_gap_px),
+            kNoteDividerGapPxMin,
+            kNoteDividerGapPxMax);
         config.skin.show_judgement_line =
             get_bool(*skin, "show_judgement_line", config.skin.show_judgement_line);
         config.skin.show_gear_boundary_line =
@@ -1064,6 +1080,7 @@ JsonValue build_json_root(const RuntimeConfig& config) {
     ui.emplace("language", JsonValue{normalize_ui_language(config.ui.language)});
     ui.emplace("result_tail_ms", JsonValue{config.ui.result_tail_ms});
     ui.emplace("require_enter_to_exit", JsonValue{config.ui.require_enter_to_exit});
+    ui.emplace("show_cursor_in_gameplay", JsonValue{config.ui.show_cursor_in_gameplay});
     ui.emplace("active_song_source", JsonValue{config.ui.active_song_source});
     JsonArray recent_song_sources;
     recent_song_sources.reserve(config.ui.recent_song_sources.size());
@@ -1104,9 +1121,13 @@ JsonValue build_json_root(const RuntimeConfig& config) {
     skin.emplace("visual_preset", JsonValue{normalize_skin_visual_preset_token(config.skin.visual_preset)});
     skin.emplace("note_shape", JsonValue{normalize_skin_note_shape_token(config.skin.note_shape)});
     skin.emplace("note_border_enabled", JsonValue{config.skin.note_border_enabled});
-    skin.emplace("preserve_note_image_aspect_ratio",
-                 JsonValue{config.skin.preserve_note_image_aspect_ratio});
+    const std::string note_image_aspect =
+        normalize_skin_note_image_aspect_token(config.skin.note_image_aspect);
+    skin.emplace("note_image_aspect", JsonValue{note_image_aspect});
+    // Older builds read only the boolean, so keep it in step with the token.
+    skin.emplace("preserve_note_image_aspect_ratio", JsonValue{note_image_aspect != "stretch"});
     skin.emplace("show_lane_dividers", JsonValue{config.skin.show_lane_dividers});
+    skin.emplace("note_divider_gap_px", JsonValue{config.skin.note_divider_gap_px});
     skin.emplace("show_judgement_line", JsonValue{config.skin.show_judgement_line});
     skin.emplace("show_gear_boundary_line", JsonValue{config.skin.show_gear_boundary_line});
     skin.emplace("show_hold_tail", JsonValue{config.skin.show_hold_tail});
@@ -1448,7 +1469,8 @@ std::string normalize_skin_color_token(std::string_view token) {
 std::string normalize_skin_note_shape_token(std::string_view token) {
     const std::string normalized = to_lower_ascii(std::string(token));
     if (normalized == "circle" || normalized == "triangle" || normalized == "pentagon" ||
-        normalized == "hexagon") {
+        normalized == "hexagon" || normalized == "square" || normalized == "diamond" ||
+        normalized == "arrow") {
         return normalized;
     }
     if (normalized == "rectangle") {
@@ -1457,12 +1479,30 @@ std::string normalize_skin_note_shape_token(std::string_view token) {
     return "rect";
 }
 
+std::string normalize_skin_note_image_aspect_token(std::string_view token) {
+    const std::string normalized = to_lower_ascii(std::string(token));
+    if (normalized == "contain" || normalized == "width") {
+        return normalized;
+    }
+    return "stretch";
+}
+
+std::string skin_note_image_aspect_label(std::string_view token) {
+    const std::string normalized = normalize_skin_note_image_aspect_token(token);
+    if (normalized == "contain") return "Contain";
+    if (normalized == "width") return "Width";
+    return "Stretch";
+}
+
 std::string skin_note_shape_label(std::string_view token) {
     const std::string normalized = normalize_skin_note_shape_token(token);
     if (normalized == "circle") return "Circle";
     if (normalized == "triangle") return "Triangle";
     if (normalized == "pentagon") return "Pentagon";
     if (normalized == "hexagon") return "Hexagon";
+    if (normalized == "square") return "Square";
+    if (normalized == "diamond") return "Diamond";
+    if (normalized == "arrow") return "Arrow";
     return "Rect";
 }
 std::string skin_color_label(std::string_view token) {
@@ -1654,6 +1694,7 @@ RuntimeConfig ConfigLoader::defaults() const {
     config.ui.language = "en";
     config.ui.result_tail_ms = 3000.0;
     config.ui.require_enter_to_exit = true;
+    config.ui.show_cursor_in_gameplay = false;
     config.ui.favorite_chart_keys.clear();
     config.ui.collections.clear();
     config.ui.song_collection_filter = "all";

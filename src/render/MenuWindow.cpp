@@ -53,6 +53,7 @@
 #include "render/GameplayMotion.h"
 #include "render/GameplayNativeDigitalKey.h"
 #include "render/ResultPresentation.h"
+#include "render/TargaImage.h"
 #include "timing/HighResClock.h"
 #include "util/Utf8Compat.h"
 
@@ -64,6 +65,9 @@ constexpr float kBaseWidth = 1920.0f;
 constexpr float kBaseHeight = 1080.0f;
 constexpr wchar_t kWindowClassName[] = L"TenRiffMenuWindow";
 constexpr float kGameplayFieldLeft = 470.0f;
+// Ceiling for the Targa fallback so a corrupt header cannot make the loader read a
+// huge file into memory. A 4096x4096 32-bit frame is well past anything LR2 ships.
+constexpr std::streamoff kMaxTargaBytes = 96ll * 1024ll * 1024ll;
 constexpr std::uint32_t kDxgiErrorInvalidCall = 0x887A0001u;
 constexpr std::uint32_t kDxgiStatusModeChanged = 0x087A0007u;
 constexpr float kGameplayFieldRight = 1450.0f;
@@ -501,17 +505,22 @@ std::string normalize_gameplay_note_shape(std::string_view value) {
         return static_cast<char>(std::tolower(ch));
     });
     if (normalized == "circle" || normalized == "triangle" || normalized == "pentagon" ||
-        normalized == "hexagon") {
+        normalized == "hexagon" || normalized == "square" || normalized == "diamond" ||
+        normalized == "arrow") {
         return normalized;
     }
     return "rect";
 }
 
+// Index into the cached unit geometries. Square and circle are drawn from
+// primitives instead, so they have no entry here.
 std::optional<std::size_t> gameplay_note_polygon_index(std::string_view note_shape) {
     const std::string normalized = normalize_gameplay_note_shape(note_shape);
     if (normalized == "triangle") return 0;
     if (normalized == "pentagon") return 1;
     if (normalized == "hexagon") return 2;
+    if (normalized == "diamond") return 3;
+    if (normalized == "arrow") return 4;
     return std::nullopt;
 }
 
@@ -561,6 +570,45 @@ bool create_unit_note_polygon_geometry(ID2D1Factory1* factory,
     }
     sink->BeginFigure(points.front(), D2D1_FIGURE_BEGIN_FILLED);
     sink->AddLines(points.data() + 1, static_cast<UINT32>(points.size() - 1));
+    sink->EndFigure(D2D1_FIGURE_END_CLOSED);
+    if (FAILED(sink->Close())) {
+        return false;
+    }
+
+    *out_geometry = geometry.Detach();
+    return true;
+}
+
+// An upward chevron in the same unit box the regular polygons use: one lane wide,
+// centred on the origin. Lane rotation then aims it wherever the skin wants.
+bool create_unit_note_arrow_geometry(ID2D1Factory1* factory, ID2D1PathGeometry** out_geometry) {
+    if (!factory || !out_geometry) {
+        return false;
+    }
+    *out_geometry = nullptr;
+
+    Microsoft::WRL::ComPtr<ID2D1PathGeometry> geometry;
+    if (FAILED(factory->CreatePathGeometry(geometry.ReleaseAndGetAddressOf())) || !geometry) {
+        return false;
+    }
+    Microsoft::WRL::ComPtr<ID2D1GeometrySink> sink;
+    if (FAILED(geometry->Open(sink.ReleaseAndGetAddressOf())) || !sink) {
+        return false;
+    }
+
+    constexpr float kShaftHalfWidth = 0.18f;
+    constexpr float kHeadY = -0.04f;
+    const D2D1_POINT_2F points[] = {
+        D2D1::Point2F(0.0f, -0.5f),               // tip
+        D2D1::Point2F(0.5f, kHeadY),              // right barb
+        D2D1::Point2F(kShaftHalfWidth, kHeadY),   // right shoulder
+        D2D1::Point2F(kShaftHalfWidth, 0.5f),     // right shaft
+        D2D1::Point2F(-kShaftHalfWidth, 0.5f),    // left shaft
+        D2D1::Point2F(-kShaftHalfWidth, kHeadY),  // left shoulder
+        D2D1::Point2F(-0.5f, kHeadY),             // left barb
+    };
+    sink->BeginFigure(points[0], D2D1_FIGURE_BEGIN_FILLED);
+    sink->AddLines(points + 1, static_cast<UINT32>(std::size(points) - 1));
     sink->EndFigure(D2D1_FIGURE_END_CLOSED);
     if (FAILED(sink->Close())) {
         return false;
@@ -702,7 +750,8 @@ GameplayFieldLayout build_gameplay_field_layout(float bounds_left,
                                                 const std::array<double, kGameplayHudMaxLanes>& lane_width_scales,
                                                 std::size_t lane_spacing_scale_count,
                                                 const std::array<double, kGameplayHudMaxLanes>& lane_spacing_scales,
-                                                double lane_center_gap_scale = 0.0) {
+                                                double lane_center_gap_scale = 0.0,
+                                                double note_divider_gap_px = kGameplayNoteDividerGapPxDefault) {
     const int clamped_lane_count = std::max(1, lane_count);
     const float bounds_width = std::max(160.0f, bounds_right - bounds_left);
     const bool use_center_gap = clamped_lane_count == 16;
@@ -756,8 +805,17 @@ GameplayFieldLayout build_gameplay_field_layout(float bounds_left,
         const float lane_width_px = unit_width * lane_units[index];
         layout.lane_lefts[index] = cursor;
         layout.lane_widths[index] = lane_width_px;
+        // The divider line sits at the middle of the gap on either side. Take the
+        // wider neighbouring gap so the note stays centred on its lane and every
+        // lane ends up the same width.
+        const float gap_before = lane > 0 ? gap_units[static_cast<std::size_t>(lane - 1)] : 0.0f;
+        const float gap_after = (lane + 1 < clamped_lane_count) ? gap_units[index] : 0.0f;
         layout.note_widths[index] = compute_gameplay_note_draw_width(
-            lane_width_px, note_width_scale, note_art_width_ratio);
+            lane_width_px,
+            note_width_scale,
+            note_art_width_ratio,
+            note_divider_gap_px,
+            unit_width * std::max(gap_before, gap_after));
         total_lane_width += lane_width_px;
         total_note_width += layout.note_widths[index];
         cursor += lane_width_px;
@@ -782,7 +840,8 @@ GameplaySurfaceLayout build_gameplay_surface_layout(int lane_count,
                                                     const std::array<double, kGameplayHudMaxLanes>& lane_spacing_scales,
                                                     bool ghost_visible,
                                                     double lane_center_gap_scale = 0.0,
-                                                    double requested_offset_x = 0.0) {
+                                                    double requested_offset_x = 0.0,
+                                                    double note_divider_gap_px = kGameplayNoteDividerGapPxDefault) {
     GameplaySurfaceLayout layout;
     layout.ghost_visible = ghost_visible;
     if (ghost_visible) {
@@ -797,7 +856,8 @@ GameplaySurfaceLayout build_gameplay_surface_layout(int lane_count,
                                                           lane_width_scales,
                                                           lane_spacing_scale_count,
                                                           lane_spacing_scales,
-                                                          lane_center_gap_scale);
+                                                          lane_center_gap_scale,
+                                                          note_divider_gap_px);
         layout.ghost_field = build_gameplay_field_layout(kGameplaySplitGhostFieldLeft,
                                                          kGameplaySplitGhostFieldRight,
                                                          kGameplayFieldTop,
@@ -809,7 +869,8 @@ GameplaySurfaceLayout build_gameplay_surface_layout(int lane_count,
                                                          lane_width_scales,
                                                          lane_spacing_scale_count,
                                                          lane_spacing_scales,
-                                                         lane_center_gap_scale);
+                                                         lane_center_gap_scale,
+                                                         note_divider_gap_px);
         layout.player_gauge_left =
             layout.player_field.left - (kGameplaySplitPlayerFieldLeft - kGameplaySplitPlayerGaugeLeft);
         layout.ghost_gauge_left =
@@ -826,7 +887,8 @@ GameplaySurfaceLayout build_gameplay_surface_layout(int lane_count,
                                                           lane_width_scales,
                                                           lane_spacing_scale_count,
                                                           lane_spacing_scales,
-                                                          lane_center_gap_scale);
+                                                          lane_center_gap_scale,
+                                                          note_divider_gap_px);
         layout.player_gauge_left =
             layout.player_field.right + (kGameplayGaugeLeft - kGameplayFieldRight);
     }
@@ -1249,6 +1311,46 @@ bool compute_bitmap_alpha_source_rect(IWICBitmapSource* bitmap_source, D2D1_RECT
     return true;
 }
 
+Microsoft::WRL::ComPtr<IWICBitmapSource> load_targa_as_wic_bitmap(IWICImagingFactory* wic_factory,
+                                                                  const std::filesystem::path& file_path) {
+    Microsoft::WRL::ComPtr<IWICBitmapSource> source;
+    if (!wic_factory) {
+        return source;
+    }
+    std::ifstream file(file_path, std::ios::binary | std::ios::ate);
+    if (!file) {
+        return source;
+    }
+    const std::streamoff byte_count = file.tellg();
+    if (byte_count <= 0 || byte_count > kMaxTargaBytes) {
+        return source;
+    }
+    std::vector<std::uint8_t> bytes(static_cast<std::size_t>(byte_count));
+    file.seekg(0, std::ios::beg);
+    if (!file.read(reinterpret_cast<char*>(bytes.data()), byte_count)) {
+        return source;
+    }
+
+    const TargaImage image = decode_targa(bytes.data(), bytes.size());
+    if (!image.valid) {
+        return source;
+    }
+    const UINT stride = static_cast<UINT>(image.width) * 4u;
+    Microsoft::WRL::ComPtr<IWICBitmap> bitmap;
+    const HRESULT hr = wic_factory->CreateBitmapFromMemory(static_cast<UINT>(image.width),
+                                                           static_cast<UINT>(image.height),
+                                                           GUID_WICPixelFormat32bppPBGRA,
+                                                           stride,
+                                                           static_cast<UINT>(image.pixels.size()),
+                                                           const_cast<BYTE*>(image.pixels.data()),
+                                                           bitmap.ReleaseAndGetAddressOf());
+    if (FAILED(hr) || !bitmap) {
+        return source;
+    }
+    source = bitmap;
+    return source;
+}
+
 bool load_bitmap_from_utf8_path(IWICImagingFactory* wic_factory,
                                 ID2D1DeviceContext* d2d_context,
                                 std::string_view path,
@@ -1259,7 +1361,9 @@ bool load_bitmap_from_utf8_path(IWICImagingFactory* wic_factory,
         return false;
     }
 
-    const std::wstring wide_path = util::path_from_utf8_lossy(path).native();
+    const std::filesystem::path file_path = util::path_from_utf8_lossy(path);
+    const std::wstring wide_path = file_path.native();
+    Microsoft::WRL::ComPtr<IWICBitmapSource> source;
     Microsoft::WRL::ComPtr<IWICBitmapDecoder> decoder;
     const HRESULT decoder_hr = wic_factory->CreateDecoderFromFilename(
         wide_path.c_str(),
@@ -1267,12 +1371,18 @@ bool load_bitmap_from_utf8_path(IWICImagingFactory* wic_factory,
         GENERIC_READ,
         WICDecodeMetadataCacheOnLoad,
         &decoder);
-    if (FAILED(decoder_hr) || !decoder) {
-        return false;
+    if (SUCCEEDED(decoder_hr) && decoder) {
+        Microsoft::WRL::ComPtr<IWICBitmapFrameDecode> frame;
+        if (SUCCEEDED(decoder->GetFrame(0, &frame)) && frame) {
+            source = frame;
+        }
     }
-
-    Microsoft::WRL::ComPtr<IWICBitmapFrameDecode> frame;
-    if (FAILED(decoder->GetFrame(0, &frame)) || !frame) {
+    if (!source) {
+        // Windows has no Targa codec, so classic LR2 themes decode nothing at all
+        // through WIC. Fall back to the in-tree decoder before giving up.
+        source = load_targa_as_wic_bitmap(wic_factory, file_path);
+    }
+    if (!source) {
         return false;
     }
 
@@ -1280,7 +1390,7 @@ bool load_bitmap_from_utf8_path(IWICImagingFactory* wic_factory,
     if (FAILED(wic_factory->CreateFormatConverter(&converter)) || !converter) {
         return false;
     }
-    const HRESULT convert_hr = converter->Initialize(frame.Get(),
+    const HRESULT convert_hr = converter->Initialize(source.Get(),
                                                      GUID_WICPixelFormat32bppPBGRA,
                                                      WICBitmapDitherTypeNone,
                                                      nullptr,
@@ -2106,7 +2216,8 @@ struct MenuWindow::D2DResources {
     Microsoft::WRL::ComPtr<ID2D1PathGeometry> performance_graph_geometry;
     Microsoft::WRL::ComPtr<ID2D1CommandList> gameplay_static_command_list;
     std::array<Microsoft::WRL::ComPtr<ID2D1PathGeometry>, 2> gameplay_gauge_grid_geometries{};
-    std::array<Microsoft::WRL::ComPtr<ID2D1PathGeometry>, 3> gameplay_note_shape_geometries{};
+    // Indexed by gameplay_note_polygon_index: triangle, pentagon, hexagon, diamond, arrow.
+    std::array<Microsoft::WRL::ComPtr<ID2D1PathGeometry>, 5> gameplay_note_shape_geometries{};
 };
 
 MenuWindow::MenuWindow()
@@ -2331,13 +2442,18 @@ bool MenuWindow::initialize(const MenuWindowConfig& config) {
         destroy_window();
         return fail_fatal("Failed to create the Direct2D factory.");
     }
-    constexpr std::array<int, 3> kNotePolygonSides{3, 5, 6};
+    // A regular quad with its first vertex at the top is a diamond, so the shared
+    // polygon builder covers it; the arrow needs its own path.
+    constexpr std::array<int, 4> kNotePolygonSides{3, 5, 6, 4};
     for (std::size_t index = 0; index < kNotePolygonSides.size(); ++index) {
         static_cast<void>(create_unit_note_polygon_geometry(
             d2d_->d2d_factory.Get(),
             kNotePolygonSides[index],
             d2d_->gameplay_note_shape_geometries[index].ReleaseAndGetAddressOf()));
     }
+    static_cast<void>(create_unit_note_arrow_geometry(
+        d2d_->d2d_factory.Get(),
+        d2d_->gameplay_note_shape_geometries[4].ReleaseAndGetAddressOf()));
     if (FAILED(d2d_->d2d_factory->CreateDevice(dxgi_device.Get(), d2d_->d2d_device.ReleaseAndGetAddressOf())) ||
         !d2d_->d2d_device ||
         FAILED(d2d_->d2d_device->CreateDeviceContext(D2D1_DEVICE_CONTEXT_OPTIONS_NONE,
@@ -2475,7 +2591,7 @@ bool MenuWindow::ensure_gameplay_note_sprites(const GameplayHudData& data) {
         gameplay_note_sprite_cache_.lane_count == lane_count &&
         gameplay_note_sprite_cache_.note_border_enabled == data.note_border_enabled &&
         gameplay_note_sprite_cache_.note_shape == note_shape &&
-        gameplay_note_sprite_cache_.preserve_note_image_aspect_ratio == data.preserve_note_image_aspect_ratio &&
+        gameplay_note_sprite_cache_.note_image_aspect == data.note_image_aspect &&
         gameplay_note_sprite_cache_.skin_source == source &&
         gameplay_note_sprite_cache_.external_skin_root == data.external_skin_root &&
         gameplay_note_sprite_cache_.external_skin_name == data.external_skin_name &&
@@ -2489,7 +2605,7 @@ bool MenuWindow::ensure_gameplay_note_sprites(const GameplayHudData& data) {
     gameplay_note_sprite_cache_.lane_count = lane_count;
     gameplay_note_sprite_cache_.note_border_enabled = data.note_border_enabled;
     gameplay_note_sprite_cache_.note_shape = note_shape;
-    gameplay_note_sprite_cache_.preserve_note_image_aspect_ratio = data.preserve_note_image_aspect_ratio;
+    gameplay_note_sprite_cache_.note_image_aspect = data.note_image_aspect;
     gameplay_note_sprite_cache_.skin_source = source;
     gameplay_note_sprite_cache_.external_skin_root = data.external_skin_root;
     gameplay_note_sprite_cache_.external_skin_name = data.external_skin_name;
@@ -2499,6 +2615,7 @@ bool MenuWindow::ensure_gameplay_note_sprites(const GameplayHudData& data) {
     gameplay_note_sprite_cache_.imported_note_aspect = NoteImageAspect::Stretch;
     gameplay_note_sprite_cache_.note_rotation_count = 0;
     gameplay_note_sprite_cache_.key_rotation_count = 0;
+    gameplay_note_sprite_cache_.has_gear_placement = false;
 
     // Native and partial-import fallbacks share cached lane gradients. This keeps the material
     // upgrade inside the existing single fill pass instead of adding a highlight primitive per note.
@@ -2562,6 +2679,16 @@ bool MenuWindow::ensure_gameplay_note_sprites(const GameplayHudData& data) {
     }
 
     gameplay_note_sprite_cache_.use_full_lane_receptor_layout = imported.use_full_lane_receptor_layout;
+    gameplay_note_sprite_cache_.has_gear_placement =
+        imported.gear_placement.valid && std::isfinite(imported.gear_placement.width) &&
+        std::isfinite(imported.gear_placement.height) &&
+        imported.gear_placement.width > 0.0f && imported.gear_placement.height > 0.0f &&
+        std::isfinite(imported.gear_placement.offset_x) &&
+        std::isfinite(imported.gear_placement.offset_y);
+    gameplay_note_sprite_cache_.gear_placement_offset_x = imported.gear_placement.offset_x;
+    gameplay_note_sprite_cache_.gear_placement_offset_y = imported.gear_placement.offset_y;
+    gameplay_note_sprite_cache_.gear_placement_width = imported.gear_placement.width;
+    gameplay_note_sprite_cache_.gear_placement_height = imported.gear_placement.height;
     gameplay_note_sprite_cache_.imported_note_width_ratio = imported.imported_note_width_ratio;
     gameplay_note_sprite_cache_.imported_note_height_ratio = imported.imported_note_height_ratio;
     if (!imported.note_aspect.empty()) {
@@ -3333,6 +3460,7 @@ bool MenuWindow::ensure_gameplay_static_cache(const GameplayHudData& data) {
     desired.lane_center_gap_scale = data.lane_center_gap_scale;
     desired.show_lane_dividers = data.show_lane_dividers;
     desired.show_judgement_line = data.show_judgement_line;
+    desired.note_divider_gap_px = data.note_divider_gap_px;
     desired.show_gear_boundary_line = data.show_gear_boundary_line;
     desired.judgement_line_glow_enabled = data.judgement_line_glow_enabled;
     desired.lane_background_opacity = std::clamp(data.lane_background_opacity, 0.0, 0.45);
@@ -3367,6 +3495,7 @@ bool MenuWindow::ensure_gameplay_static_cache(const GameplayHudData& data) {
         gameplay_static_cache_.lane_center_gap_scale == desired.lane_center_gap_scale &&
         gameplay_static_cache_.show_lane_dividers == desired.show_lane_dividers &&
         gameplay_static_cache_.show_judgement_line == desired.show_judgement_line &&
+        gameplay_static_cache_.note_divider_gap_px == desired.note_divider_gap_px &&
         gameplay_static_cache_.show_gear_boundary_line == desired.show_gear_boundary_line &&
         gameplay_static_cache_.judgement_line_glow_enabled == desired.judgement_line_glow_enabled &&
         gameplay_static_cache_.lane_background_opacity == desired.lane_background_opacity &&
@@ -3409,7 +3538,8 @@ bool MenuWindow::ensure_gameplay_static_cache(const GameplayHudData& data) {
             desired.lane_spacing_scales,
             desired.ghost_visible,
             desired.lane_center_gap_scale,
-            desired.gameplay_field_offset_x);
+            desired.gameplay_field_offset_x,
+            desired.note_divider_gap_px);
     auto build_gauge_grid = [&](std::size_t index, float gauge_left) {
         Microsoft::WRL::ComPtr<ID2D1PathGeometry> geometry;
         if (FAILED(d2d_->d2d_factory->CreatePathGeometry(geometry.ReleaseAndGetAddressOf())) || !geometry) {
@@ -3992,6 +4122,7 @@ void MenuWindow::render(const MenuRenderData& data) {
 
     apply_pending_config();
     update_cursor_visibility(data.kind == MenuScreenKind::GameplayHud &&
+                             !data.gameplay.show_cursor_in_gameplay &&
                              !horizontal_drag_cursor());
     static int skip_log_count = 0;
     const bool initialized = initialized_.load(std::memory_order_acquire);
