@@ -172,6 +172,10 @@ private:
 
         double rate = 1.0;
         double hispeed = 3.0;
+        // Mirrors of the in-play tuning keys. Only read while `active`, so the
+        // menu keeps rendering the stored config outside a song.
+        double judgement_line_position = config::kJudgementLinePositionDefault;
+        double visual_offset_ms = 0.0;
 
         bool has_feedback = false;
         game::Judgement feedback = game::Judgement::BD;

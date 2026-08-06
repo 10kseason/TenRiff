@@ -14,6 +14,8 @@ namespace tenriff::config {
 inline constexpr double kJudgementLinePositionMin = 0.00;
 inline constexpr double kJudgementLinePositionMax = 1.00;
 inline constexpr double kJudgementLinePositionDefault = 0.82;
+inline constexpr double kVisualOffsetMin = -500.0;
+inline constexpr double kVisualOffsetMax = 500.0;
 inline constexpr double kGameplayFieldOffsetXMin = -720.0;
 inline constexpr double kGameplayFieldOffsetXMax = 720.0;
 inline constexpr double kGameplayFieldOffsetXDefault = 0.0;
@@ -101,6 +103,9 @@ struct UiConfig {
     std::string language = "en";
     double result_tail_ms = 500.0;
     bool require_enter_to_exit = true;
+    // Gameplay hides the pointer by default. Keep it on screen for players who
+    // drag the playfield mid-song or run the game in a window alongside overlays.
+    bool show_cursor_in_gameplay = false;
     std::string active_song_source;
     std::vector<std::string> recent_song_sources;
     std::vector<std::string> favorite_chart_keys;
@@ -120,6 +125,10 @@ struct SkinConfig {
     bool note_border_enabled = true;
     bool preserve_note_image_aspect_ratio = false;
     bool show_lane_dividers = true;
+    // Widen every note until it meets the lane divider lines instead of keeping the
+    // default inset. Imported skins otherwise draw notes at their authored width,
+    // which leaves LR2 gear art showing through beside the notes.
+    bool expand_notes_to_dividers = false;
     bool show_judgement_line = true;
     bool show_gear_boundary_line = false;
     bool show_hold_tail = true;

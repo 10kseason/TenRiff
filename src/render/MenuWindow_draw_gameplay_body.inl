@@ -409,7 +409,11 @@
                 to_wide(loc("RATE x", "RATE x") + format_decimal(data.gameplay.rate, 2) +
                         " / HS " + format_decimal(data.gameplay.hispeed, 2) +
                         " / BPM " + std::to_string(static_cast<int>(std::llround(data.gameplay.bpm))) +
-                        " / " + loc("Scroll ", "스크롤 ") + std::to_string(static_cast<int>(std::llround(data.gameplay.scroll_speed))));
+                        " / " + loc("Scroll ", "스크롤 ") + std::to_string(static_cast<int>(std::llround(data.gameplay.scroll_speed))) +
+                        " / " + loc("Line ", "판정선 ") +
+                        std::to_string(static_cast<int>(std::llround(data.gameplay.judgement_line_position * 100.0))) + "%" +
+                        " / " + loc("VL ", "레이턴시 ") +
+                        format_signed_ms(data.gameplay.visual_offset_ms, 0));
             std::string score_summary =
                 loc("SCORE  ", "점수  ") + format_int_with_commas(data.gameplay.score);
             gameplay_hud_cache_.score_text = to_wide(score_summary);
@@ -713,7 +717,17 @@
                     hispeed_hint_w,
                     d2d_->body_format.Get(),
                     D2D1::RectF(panel_rect.left + 24.0f, panel_rect.bottom - 62.0f,
-                                panel_rect.right - 24.0f, panel_rect.bottom - 20.0f),
+                                panel_rect.right - 24.0f, panel_rect.bottom - 40.0f),
+                    d2d_->muted_brush.Get(),
+                    DWRITE_TEXT_ALIGNMENT_CENTER);
+                const std::wstring tuning_hint_w =
+                    wloc("JUDGE LINE  F1/F2  +/-1%   VISUAL LATENCY  F7/F8  +/-1ms",
+                         "판정선 위치  F1/F2  +/-1%   비주얼 레이턴시  F7/F8  +/-1ms");
+                draw_text_clipped_aligned(
+                    tuning_hint_w,
+                    d2d_->body_format.Get(),
+                    D2D1::RectF(panel_rect.left + 24.0f, panel_rect.bottom - 40.0f,
+                                panel_rect.right - 24.0f, panel_rect.bottom - 18.0f),
                     d2d_->muted_brush.Get(),
                     DWRITE_TEXT_ALIGNMENT_CENTER);
             }
@@ -774,7 +788,8 @@
                 data.gameplay.lane_center_gap_scale,
                 gameplay_field_drag_state_.has_local_override
                     ? gameplay_field_drag_state_.offset_x
-                    : data.gameplay.gameplay_field_offset_x);
+                    : data.gameplay.gameplay_field_offset_x,
+                data.gameplay.expand_notes_to_dividers);
         gameplay_field_drag_state_.visible = data.gameplay.active && !data.gameplay.loading;
         gameplay_field_drag_state_.left =
             surface_layout.player_field.right + kGameplayFieldDragHandleGap;
@@ -1113,6 +1128,25 @@
                                             gear_field_layout.top,
                                             gear_field_layout.right,
                                             gear_field_layout.bottom),
+                                visual_opacity,
+                                D2D1_BITMAP_INTERPOLATION_MODE_LINEAR,
+                                source_rect);
+                return true;
+            }
+            // An LR2 gear panel is authored at a fixed offset from its lanes and the
+            // judgement line. Replaying that offset against this playfield keeps the
+            // frame registered with the lanes instead of floating it under them.
+            if (gameplay_note_sprite_cache_.has_gear_placement) {
+                const float unit = gear_field_layout.width;
+                const float gear_left =
+                    gear_field_layout.left + gameplay_note_sprite_cache_.gear_placement_offset_x * unit;
+                const float gear_top =
+                    gear_hit_line_y + gameplay_note_sprite_cache_.gear_placement_offset_y * unit;
+                ctx->DrawBitmap(bitmap,
+                                D2D1::RectF(gear_left,
+                                            gear_top,
+                                            gear_left + gameplay_note_sprite_cache_.gear_placement_width * unit,
+                                            gear_top + gameplay_note_sprite_cache_.gear_placement_height * unit),
                                 visual_opacity,
                                 D2D1_BITMAP_INTERPOLATION_MODE_LINEAR,
                                 source_rect);

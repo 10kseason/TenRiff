@@ -40,8 +40,11 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
     target.background_upscale_mode = background_policy.upscale_mode;
     target.background_upscale_model_path = config_.graphics.background_upscale_model_path;
     target.background_upscale_prefer_npu = config_.graphics.background_upscale_prefer_npu;
+    // While a chart is running the session owns these two: F1/F2 and F7/F8 retune
+    // them mid-song and the stored config only catches up when the song ends.
     const double clamped_judgement_line_position = std::clamp(
-        config_.skin.judgement_line_position,
+        gameplay_hud_.active ? gameplay_hud_.judgement_line_position
+                             : config_.skin.judgement_line_position,
         config::kJudgementLinePositionMin,
         config::kJudgementLinePositionMax);
     const double clamped_combo_position = std::clamp(
@@ -87,7 +90,9 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
         config_.skin.hold_body_width_scale,
         config::kHoldBodyWidthScaleMin,
         config::kHoldBodyWidthScaleMax);
+    target.show_cursor_in_gameplay = config_.ui.show_cursor_in_gameplay;
     target.show_lane_dividers = config_.skin.show_lane_dividers;
+    target.expand_notes_to_dividers = config_.skin.expand_notes_to_dividers;
     target.show_judgement_line = config_.skin.show_judgement_line;
     target.show_gear_boundary_line = config_.skin.show_gear_boundary_line;
     target.show_hold_tail = config_.skin.show_hold_tail;
@@ -129,7 +134,10 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
         config_.skin.hold_body_opacity,
         config::kSkinHoldBodyOpacityMin,
         config::kSkinHoldBodyOpacityMax);
-    target.visual_offset_ms = std::clamp(config_.visual_offset_ms, kVisualOffsetMin, kVisualOffsetMax);
+    target.visual_offset_ms = std::clamp(
+        gameplay_hud_.active ? gameplay_hud_.visual_offset_ms : config_.visual_offset_ms,
+        kVisualOffsetMin,
+        kVisualOffsetMax);
     target.rate = gameplay_hud_.rate;
     target.hispeed = gameplay_hud_.hispeed;
     target.combo = gameplay_hud_.combo;
@@ -1540,6 +1548,8 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
         gameplay_hud_.gauge_type = hud.gauge_type;
         gameplay_hud_.rate = hud.rate;
         gameplay_hud_.hispeed = hud.hispeed;
+        gameplay_hud_.judgement_line_position = hud.judgement_line_position;
+        gameplay_hud_.visual_offset_ms = hud.visual_offset_ms;
         gameplay_hud_.has_feedback = hud.has_feedback;
         gameplay_hud_.feedback = hud.feedback_judgement;
         gameplay_hud_.feedback_delta_ms = hud.feedback_delta_ms;
@@ -1720,8 +1730,22 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
     remember_input_backend_fallback(last_gameplay_input_backend_state_);
 
     const double session_hispeed = session.final_hispeed();
+    const double session_judgement_line = session.final_judgement_line_position();
+    const double session_visual_offset = session.final_visual_offset_ms();
+    bool tuning_changed = false;
     if (std::abs(session_hispeed - config_.speed.hi_speed) > 0.0001) {
         config_.speed.hi_speed = session_hispeed;
+        tuning_changed = true;
+    }
+    if (std::abs(session_judgement_line - config_.skin.judgement_line_position) > 0.0001) {
+        config_.skin.judgement_line_position = session_judgement_line;
+        tuning_changed = true;
+    }
+    if (std::abs(session_visual_offset - config_.visual_offset_ms) > 0.0001) {
+        config_.visual_offset_ms = session_visual_offset;
+        tuning_changed = true;
+    }
+    if (tuning_changed) {
         persist_runtime_config();
     }
     if (session_restart_requested) {

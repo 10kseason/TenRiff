@@ -862,6 +862,8 @@ GameplayHudRevisionInput MenuApp::gameplay_hud_revision_input(const GameplayHudS
     input.gauge_type = state.gauge_type;
     input.rate = state.rate;
     input.hispeed = state.hispeed;
+    input.judgement_line_position = state.judgement_line_position;
+    input.visual_offset_ms = state.visual_offset_ms;
     input.has_feedback = state.has_feedback;
     input.feedback = state.feedback;
     input.feedback_delta_ms = state.feedback_delta_ms;

@@ -73,6 +73,13 @@ constexpr double kHispeedStep = 0.25;
 constexpr double kHispeedStepCoarse = 10.0;
 constexpr int64_t kHispeedRepeatInitialDelayMs = 180;
 constexpr int64_t kHispeedRepeatIntervalMs = 45;
+// In-play tuning steps. The judgement line moves in 1% of the playfield height and
+// the visual offset in 1 ms, both finer than the menu steps because the player is
+// watching the chart scroll while they nudge it.
+constexpr double kJudgementLinePositionStep = 0.01;
+constexpr double kInPlayVisualOffsetStep = 1.0;
+constexpr double kVisualOffsetMin = config::kVisualOffsetMin;
+constexpr double kVisualOffsetMax = config::kVisualOffsetMax;
 constexpr std::size_t kMaxToneVoices = 256;
 constexpr double kTwoPi = 6.28318530717958647692;
 

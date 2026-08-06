@@ -15,6 +15,18 @@ struct ImportedSkinImageAsset {
     bool has_source_rect = false;
 };
 
+// Where an imported gear panel sits relative to the lanes it was authored around.
+// The origin is the left edge of the lane block on the judgement line and one unit
+// is the lane block width, so the placement survives any source resolution and any
+// playfield width the renderer ends up using.
+struct ImportedSkinGearPlacement {
+    float offset_x = 0.0f;
+    float offset_y = 0.0f;
+    float width = 0.0f;
+    float height = 0.0f;
+    bool valid = false;
+};
+
 struct ImportedGameplaySkinDefinition {
     bool found = false;
     int keys = 0;
@@ -25,6 +37,7 @@ struct ImportedGameplaySkinDefinition {
     std::vector<ImportedSkinImageAsset> key_images;
     std::vector<ImportedSkinImageAsset> key_pressed_images;
     ImportedSkinImageAsset gear_overlay_image;
+    ImportedSkinGearPlacement gear_placement;
     std::vector<float> lane_divider_widths;
     std::vector<float> column_widths;
     std::vector<float> column_spacings;

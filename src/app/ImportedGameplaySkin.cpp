@@ -91,6 +91,7 @@ ImportedGameplaySkinDefinition resolve_imported_gameplay_skin(std::string_view s
         definition.key_images = lr2.key_images;
         definition.key_pressed_images = lr2.key_pressed_images;
         definition.gear_overlay_image = lr2.gear_overlay_image;
+        definition.gear_placement = lr2.gear_placement;
         definition.lane_divider_widths = lr2.lane_divider_widths;
         definition.imported_note_width_ratio = lr2.imported_note_width_ratio;
         definition.imported_note_height_ratio = lr2.imported_note_height_ratio;

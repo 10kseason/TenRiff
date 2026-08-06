@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(TenRiff VERSION 1.3.4 LANGUAGES C CXX)
+project(TenRiff VERSION 1.3.5 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -395,6 +395,7 @@ if(TENRIFF_ENABLE_TESTS)
         tests/unit/test_graphics_timing.cpp
         tests/unit/test_render_performance.cpp
         tests/unit/test_bga_image_loader.cpp
+        tests/unit/test_targa_image.cpp
         tests/unit/test_result_presentation.cpp
         tests/unit/test_peer_protocol.cpp
         tests/unit/test_peer_session.cpp
