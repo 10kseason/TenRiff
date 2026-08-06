@@ -3103,7 +3103,7 @@ void MenuApp::handle_result_input(uint32_t keycode) {
         }
         return;
     }
-    if (keycode == key_left_) {
+    if (keycode == key_left_ || (key_r_ != 0 && keycode == key_r_)) {
         if (!last_chart_path_.empty()) {
             launch_gameplay(last_chart_path_);
         } else {

@@ -110,6 +110,19 @@ constexpr float kGameplayComboWideCenterGapThreshold = 1.05f;
 constexpr float kGameplayLaneDividerBaseWidth = 1.0f;
 constexpr float kGameplayLaneDividerWidthMaxPx = 16.0f;
 
+const wchar_t* ui_font_family_for_token(std::string_view token) {
+    if (token == "malgun") {
+        return L"Malgun Gothic";
+    }
+    if (token == "bahnschrift") {
+        return L"Bahnschrift";
+    }
+    if (token == "consolas") {
+        return L"Consolas";
+    }
+    return L"Segoe UI";
+}
+
 // Menu rects a TenRiff skin may move. Slots the skin left out fall through to
 // the built-in rect, so every caller passes the original literal as `fallback`.
 D2D1_RECT_F skin_layout_rect(const MenuRenderData& data,
@@ -1956,6 +1969,7 @@ struct MenuWindow::D2DResources {
     Microsoft::WRL::ComPtr<ID2D1Bitmap1> d2d_target;
     Microsoft::WRL::ComPtr<IDWriteFactory> dwrite_factory;
     Microsoft::WRL::ComPtr<IWICImagingFactory> wic_factory;
+    std::wstring ui_font_family;
     Microsoft::WRL::ComPtr<IDWriteTextFormat> title_format;
     Microsoft::WRL::ComPtr<IDWriteTextFormat> option_format;
     Microsoft::WRL::ComPtr<IDWriteTextFormat> body_format;
@@ -2280,43 +2294,7 @@ bool MenuWindow::initialize(const MenuWindowConfig& config) {
         return fail_fatal("Failed to create the WIC imaging factory.");
     }
 
-    auto create_text_format = [this](const wchar_t* family,
-                                     DWRITE_FONT_WEIGHT weight,
-                                     float size,
-                                     Microsoft::WRL::ComPtr<IDWriteTextFormat>* out_format) -> bool {
-        Microsoft::WRL::ComPtr<IDWriteTextFormat> format;
-        const HRESULT hr = d2d_->dwrite_factory->CreateTextFormat(family,
-                                                                  nullptr,
-                                                                  weight,
-                                                                  DWRITE_FONT_STYLE_NORMAL,
-                                                                  DWRITE_FONT_STRETCH_NORMAL,
-                                                                  size,
-                                                                  L"",
-                                                                  format.ReleaseAndGetAddressOf());
-        if (FAILED(hr) || !format) {
-            return false;
-        }
-        format->SetWordWrapping(DWRITE_WORD_WRAPPING_NO_WRAP);
-        *out_format = std::move(format);
-        return true;
-    };
-
-    if (!create_text_format(L"Segoe UI", DWRITE_FONT_WEIGHT_SEMI_BOLD, 30.0f, &d2d_->title_format) ||
-        !create_text_format(L"Segoe UI", DWRITE_FONT_WEIGHT_NORMAL, 22.0f, &d2d_->option_format) ||
-        !create_text_format(L"Segoe UI", DWRITE_FONT_WEIGHT_NORMAL, 18.0f, &d2d_->body_format) ||
-        !create_text_format(L"Consolas", DWRITE_FONT_WEIGHT_NORMAL, 16.0f, &d2d_->mono_format) ||
-        !create_text_format(L"Bahnschrift SemiBold", DWRITE_FONT_WEIGHT_SEMI_BOLD, 82.0f, &d2d_->logo_format) ||
-        !create_text_format(L"Segoe UI Semibold", DWRITE_FONT_WEIGHT_SEMI_BOLD, 34.0f, &d2d_->menu_button_format) ||
-        !create_text_format(L"Segoe UI Symbol", DWRITE_FONT_WEIGHT_NORMAL, 26.0f, &d2d_->menu_icon_format) ||
-        !create_text_format(L"Segoe UI Semibold", DWRITE_FONT_WEIGHT_SEMI_BOLD, 52.0f, &d2d_->header_format) ||
-        !create_text_format(L"Bahnschrift SemiBold", DWRITE_FONT_WEIGHT_SEMI_BOLD, 42.0f,
-                            &d2d_->gameplay_combo_format) ||
-        !create_text_format(L"Segoe UI Semibold", DWRITE_FONT_WEIGHT_SEMI_BOLD, 24.0f, &d2d_->song_title_format) ||
-        !create_text_format(L"Segoe UI", DWRITE_FONT_WEIGHT_NORMAL, 18.0f, &d2d_->song_artist_format) ||
-        !create_text_format(L"Segoe UI", DWRITE_FONT_WEIGHT_NORMAL, 16.0f, &d2d_->hud_format) ||
-        !create_text_format(L"Bahnschrift SemiBold", DWRITE_FONT_WEIGHT_SEMI_BOLD, 128.0f, &d2d_->rank_format) ||
-        !create_text_format(L"Segoe UI", DWRITE_FONT_WEIGHT_NORMAL, 16.0f, &d2d_->stats_label_format) ||
-        !create_text_format(L"Segoe UI Semibold", DWRITE_FONT_WEIGHT_SEMI_BOLD, 18.0f, &d2d_->stats_value_format)) {
+    if (!create_text_formats(L"Segoe UI")) {
         destroy_window();
         return fail_fatal("Failed to create one or more text formats.");
     }
@@ -4042,6 +4020,56 @@ void MenuWindow::update_cursor_visibility(bool hidden) {
     } else {
         SetCursor(LoadCursor(nullptr, IDC_ARROW));
     }
+}
+
+bool MenuWindow::create_text_formats(const wchar_t* ui_family) {
+    if (!d2d_ || !d2d_->dwrite_factory || !ui_family) {
+        return false;
+    }
+    auto create_text_format = [this](const wchar_t* family,
+                                     DWRITE_FONT_WEIGHT weight,
+                                     float size,
+                                     Microsoft::WRL::ComPtr<IDWriteTextFormat>* out_format) -> bool {
+        Microsoft::WRL::ComPtr<IDWriteTextFormat> format;
+        const HRESULT hr = d2d_->dwrite_factory->CreateTextFormat(family,
+                                                                  nullptr,
+                                                                  weight,
+                                                                  DWRITE_FONT_STYLE_NORMAL,
+                                                                  DWRITE_FONT_STRETCH_NORMAL,
+                                                                  size,
+                                                                  L"",
+                                                                  format.ReleaseAndGetAddressOf());
+        if (FAILED(hr) || !format) {
+            return false;
+        }
+        format->SetWordWrapping(DWRITE_WORD_WRAPPING_NO_WRAP);
+        *out_format = std::move(format);
+        return true;
+    };
+
+    // Text roles follow the player's font choice. Logo, rank and combo stay on
+    // Bahnschrift and the debug readout on Consolas: those are display numerals
+    // whose layouts are built around their metrics, not UI copy.
+    if (!create_text_format(ui_family, DWRITE_FONT_WEIGHT_SEMI_BOLD, 30.0f, &d2d_->title_format) ||
+        !create_text_format(ui_family, DWRITE_FONT_WEIGHT_NORMAL, 22.0f, &d2d_->option_format) ||
+        !create_text_format(ui_family, DWRITE_FONT_WEIGHT_NORMAL, 18.0f, &d2d_->body_format) ||
+        !create_text_format(L"Consolas", DWRITE_FONT_WEIGHT_NORMAL, 16.0f, &d2d_->mono_format) ||
+        !create_text_format(L"Bahnschrift SemiBold", DWRITE_FONT_WEIGHT_SEMI_BOLD, 82.0f, &d2d_->logo_format) ||
+        !create_text_format(ui_family, DWRITE_FONT_WEIGHT_SEMI_BOLD, 34.0f, &d2d_->menu_button_format) ||
+        !create_text_format(L"Segoe UI Symbol", DWRITE_FONT_WEIGHT_NORMAL, 26.0f, &d2d_->menu_icon_format) ||
+        !create_text_format(ui_family, DWRITE_FONT_WEIGHT_SEMI_BOLD, 52.0f, &d2d_->header_format) ||
+        !create_text_format(L"Bahnschrift SemiBold", DWRITE_FONT_WEIGHT_SEMI_BOLD, 42.0f,
+                            &d2d_->gameplay_combo_format) ||
+        !create_text_format(ui_family, DWRITE_FONT_WEIGHT_SEMI_BOLD, 24.0f, &d2d_->song_title_format) ||
+        !create_text_format(ui_family, DWRITE_FONT_WEIGHT_NORMAL, 18.0f, &d2d_->song_artist_format) ||
+        !create_text_format(ui_family, DWRITE_FONT_WEIGHT_NORMAL, 16.0f, &d2d_->hud_format) ||
+        !create_text_format(L"Bahnschrift SemiBold", DWRITE_FONT_WEIGHT_SEMI_BOLD, 128.0f, &d2d_->rank_format) ||
+        !create_text_format(ui_family, DWRITE_FONT_WEIGHT_NORMAL, 16.0f, &d2d_->stats_label_format) ||
+        !create_text_format(ui_family, DWRITE_FONT_WEIGHT_SEMI_BOLD, 18.0f, &d2d_->stats_value_format)) {
+        return false;
+    }
+    d2d_->ui_font_family = ui_family;
+    return true;
 }
 
 #include "MenuWindow_draw.inl"

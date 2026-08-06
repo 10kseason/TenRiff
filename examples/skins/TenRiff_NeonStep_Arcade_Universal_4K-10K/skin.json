@@ -1,0 +1,177 @@
+{
+  "$schema": "../../../docs/tenriff-skin.schema.json",
+  "format": "tenriff-skin",
+  "version": 1,
+  "name": "NEON STEP // Arcade Matrix 4K-10K",
+  "author": "Luna x 윾이",
+  "lobby": {
+    "background": "lobby/background.jpg",
+    "logo": "lobby/logo.png",
+    "background_opacity": 0.84
+  },
+  "layout": {
+    "title": {
+      "spectrum": [
+        620,
+        54,
+        1300,
+        138
+      ],
+      "logo": [
+        470,
+        138,
+        1450,
+        440
+      ],
+      "buttons": [
+        536,
+        410,
+        1384,
+        930
+      ],
+      "guide": [
+        1438,
+        410,
+        1848,
+        930
+      ],
+      "footer": [
+        72,
+        972,
+        1848,
+        1056
+      ]
+    },
+    "song_select": {
+      "top_bar": [
+        0,
+        0,
+        1920,
+        126
+      ],
+      "logo": [
+        40,
+        14,
+        430,
+        118
+      ],
+      "nav": [
+        458,
+        10,
+        1270,
+        126
+      ],
+      "profile": [
+        1510,
+        14,
+        1882,
+        114
+      ],
+      "left_panel": [
+        32,
+        148,
+        484,
+        928
+      ],
+      "center_panel": [
+        504,
+        148,
+        1276,
+        928
+      ],
+      "right_panel": [
+        1296,
+        148,
+        1888,
+        928
+      ],
+      "bottom_bar": [
+        32,
+        944,
+        1888,
+        1054
+      ]
+    }
+  },
+  "gameplay": {
+    "background": "gameplay/background.jpg",
+    "background_opacity": 0.7,
+    "gear": "gameplay/gear.png",
+    "note": [
+      "gameplay/notes/note-01-left.png",
+      "gameplay/notes/note-02-down.png",
+      "gameplay/notes/note-03-up.png",
+      "gameplay/notes/note-04-right.png",
+      "gameplay/notes/note-05-down-left.png",
+      "gameplay/notes/note-06-up-left.png",
+      "gameplay/notes/note-07-up-right.png",
+      "gameplay/notes/note-08-down-right.png",
+      "gameplay/notes/note-09-center-down.png",
+      "gameplay/notes/note-10-center-up.png"
+    ],
+    "hold_head": [
+      "gameplay/holds/head-01-left.png",
+      "gameplay/holds/head-02-down.png",
+      "gameplay/holds/head-03-up.png",
+      "gameplay/holds/head-04-right.png",
+      "gameplay/holds/head-05-down-left.png",
+      "gameplay/holds/head-06-up-left.png",
+      "gameplay/holds/head-07-up-right.png",
+      "gameplay/holds/head-08-down-right.png",
+      "gameplay/holds/head-09-center-down.png",
+      "gameplay/holds/head-10-center-up.png"
+    ],
+    "hold_body": [
+      "gameplay/holds/body-01-left.png",
+      "gameplay/holds/body-02-down.png",
+      "gameplay/holds/body-03-up.png",
+      "gameplay/holds/body-04-right.png",
+      "gameplay/holds/body-05-down-left.png",
+      "gameplay/holds/body-06-up-left.png",
+      "gameplay/holds/body-07-up-right.png",
+      "gameplay/holds/body-08-down-right.png",
+      "gameplay/holds/body-09-center-down.png",
+      "gameplay/holds/body-10-center-up.png"
+    ],
+    "hold_tail": [
+      "gameplay/holds/tail-01-left.png",
+      "gameplay/holds/tail-02-down.png",
+      "gameplay/holds/tail-03-up.png",
+      "gameplay/holds/tail-04-right.png",
+      "gameplay/holds/tail-05-down-left.png",
+      "gameplay/holds/tail-06-up-left.png",
+      "gameplay/holds/tail-07-up-right.png",
+      "gameplay/holds/tail-08-down-right.png",
+      "gameplay/holds/tail-09-center-down.png",
+      "gameplay/holds/tail-10-center-up.png"
+    ],
+    "key_idle": [
+      "gameplay/receptors/idle-01-left.png",
+      "gameplay/receptors/idle-02-down.png",
+      "gameplay/receptors/idle-03-up.png",
+      "gameplay/receptors/idle-04-right.png",
+      "gameplay/receptors/idle-05-down-left.png",
+      "gameplay/receptors/idle-06-up-left.png",
+      "gameplay/receptors/idle-07-up-right.png",
+      "gameplay/receptors/idle-08-down-right.png",
+      "gameplay/receptors/idle-09-center-down.png",
+      "gameplay/receptors/idle-10-center-up.png"
+    ],
+    "key_pressed": [
+      "gameplay/receptors/pressed-01-left.png",
+      "gameplay/receptors/pressed-02-down.png",
+      "gameplay/receptors/pressed-03-up.png",
+      "gameplay/receptors/pressed-04-right.png",
+      "gameplay/receptors/pressed-05-down-left.png",
+      "gameplay/receptors/pressed-06-up-left.png",
+      "gameplay/receptors/pressed-07-up-right.png",
+      "gameplay/receptors/pressed-08-down-right.png",
+      "gameplay/receptors/pressed-09-center-down.png",
+      "gameplay/receptors/pressed-10-center-up.png"
+    ],
+    "note_width_ratio": 0.94,
+    "note_height_ratio": 0.94,
+    "judgement_line_position": 0.82,
+    "full_lane_receptors": true
+  }
+}

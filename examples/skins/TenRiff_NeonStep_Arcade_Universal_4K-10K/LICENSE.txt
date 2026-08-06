@@ -1,0 +1,9 @@
+NEON STEP // Arcade Matrix Asset License
+
+Copyright (c) 2026 Luna x 윾이
+
+Permission is granted to use, modify, and redistribute the original visual
+assets and configuration in this skin pack with attribution.
+
+This license does not grant rights to StepMania, Dance Dance Revolution,
+TenRiff, or third-party names, logos, trademarks, music, sounds, or assets.

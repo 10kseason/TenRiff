@@ -1,0 +1,27 @@
+{
+  "$schema": "../../../docs/tenriff-skin.schema.json",
+  "format": "tenriff-skin",
+  "version": 1,
+  "name": "PULSE MANIA // Universal 4K-10K",
+  "author": "Luna × 윾이",
+  "lobby": {
+    "background": "lobby/background.jpg",
+    "logo": "lobby/logo.png",
+    "background_opacity": 0.76
+  },
+  "gameplay": {
+    "background": "gameplay/background.jpg",
+    "background_opacity": 0.68,
+    "gear": "gameplay/gear.png",
+    "note": "gameplay/note.png",
+    "hold_head": "gameplay/hold-head.png",
+    "hold_body": "gameplay/hold-body.png",
+    "hold_tail": "gameplay/hold-tail.png",
+    "key_idle": "gameplay/key-idle.png",
+    "key_pressed": "gameplay/key-pressed.png",
+    "note_width_ratio": 0.94,
+    "note_height_ratio": 0.86,
+    "judgement_line_position": 0.84,
+    "full_lane_receptors": true
+  }
+}

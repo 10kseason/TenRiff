@@ -47,6 +47,31 @@
             }
         };
 
+        // Clickable controls get an accent wash and a thicker accent border so they
+        // read as buttons instead of blending into the static analysis panels.
+        auto draw_action_button = [&](const D2D1_RECT_F& rect, float alpha, bool enabled) {
+            alpha = std::clamp(alpha, 0.0f, 1.0f);
+            const D2D1_ROUNDED_RECT rounded = D2D1::RoundedRect(rect, 12.0f, 12.0f);
+            if (d2d_->panel_brush) {
+                const float saved_opacity = d2d_->panel_brush->GetOpacity();
+                d2d_->panel_brush->SetOpacity(saved_opacity * alpha * 0.94f);
+                ctx->FillRoundedRectangle(rounded, d2d_->panel_brush.Get());
+                d2d_->panel_brush->SetOpacity(saved_opacity);
+            }
+            if (enabled && d2d_->button_selected_brush) {
+                const float saved_opacity = d2d_->button_selected_brush->GetOpacity();
+                d2d_->button_selected_brush->SetOpacity(saved_opacity * alpha);
+                ctx->FillRoundedRectangle(rounded, d2d_->button_selected_brush.Get());
+                d2d_->button_selected_brush->SetOpacity(saved_opacity);
+            }
+            if (d2d_->accent_brush) {
+                const float saved_opacity = d2d_->accent_brush->GetOpacity();
+                d2d_->accent_brush->SetOpacity(saved_opacity * alpha * (enabled ? 0.90f : 0.32f));
+                ctx->DrawRoundedRectangle(rounded, d2d_->accent_brush.Get(), 2.0f);
+                d2d_->accent_brush->SetOpacity(saved_opacity);
+            }
+        };
+
         ID2D1Bitmap* result_art =
             find_song_card_preview_bitmap(data.result.background_path);
         const D2D1_RECT_F full_result_rect = D2D1::RectF(0.0f, 0.0f, kBaseWidth, kBaseHeight);
@@ -563,7 +588,7 @@
                                   static_cast<double>(judged_total)) + "%";
         };
         const std::array<ResultStatistic, 7> result_statistics = {{
-            {"P GREAT", std::to_string(data.result.perfect), percent_for(data.result.perfect), D2D1::ColorF(0x63E9FF)},
+            {"P-GREAT", std::to_string(data.result.perfect), percent_for(data.result.perfect), D2D1::ColorF(0x63E9FF)},
             {"GREAT", std::to_string(data.result.great), percent_for(data.result.great), D2D1::ColorF(0x73DDF5)},
             {"GOOD", std::to_string(data.result.good), percent_for(data.result.good), D2D1::ColorF(0xA8EA58)},
             {"BAD", std::to_string(data.result.bad), percent_for(data.result.bad), D2D1::ColorF(0xF2B84B)},
@@ -646,8 +671,8 @@
         }
 
         const D2D1_RECT_F continue_rect = D2D1::RectF(1320.0f, 770.0f, 1848.0f, 856.0f);
-        const D2D1_RECT_F replay_rect = D2D1::RectF(1320.0f, 878.0f, 1570.0f, 936.0f);
-        const D2D1_RECT_F retry_rect = D2D1::RectF(1590.0f, 878.0f, 1848.0f, 936.0f);
+        const D2D1_RECT_F replay_rect = D2D1::RectF(1320.0f, 872.0f, 1574.0f, 942.0f);
+        const D2D1_RECT_F retry_rect = D2D1::RectF(1594.0f, 872.0f, 1848.0f, 942.0f);
         const float controls_alpha = presentation.interaction_ready
                                          ? std::max(0.35f, presentation.controls)
                                          : 0.16f;
@@ -668,30 +693,30 @@
         } else {
             draw_result_panel(continue_rect, controls_alpha, true);
         }
-        draw_result_text("CONTINUE  >",
+        draw_result_text("CONTINUE  \xE2\x9E\xA1",
                          d2d_->menu_button_format.Get(),
                          continue_rect,
                          d2d_->text_brush.Get(),
                          controls_alpha,
                          DWRITE_TEXT_ALIGNMENT_CENTER);
-        draw_result_panel(replay_rect, controls_alpha * (data.result.replay_available ? 1.0f : 0.45f), false);
-        draw_result_panel(retry_rect, controls_alpha, false);
-        draw_result_text(data.result.replay_available ? "WATCH REPLAY" : "REPLAY UNAVAILABLE",
-                         d2d_->body_format.Get(),
+        draw_action_button(replay_rect, controls_alpha, data.result.replay_available);
+        draw_action_button(retry_rect, controls_alpha, true);
+        draw_result_text(data.result.replay_available ? "\xE2\x96\xB6  WATCH REPLAY" : "REPLAY UNAVAILABLE",
+                         d2d_->stats_value_format.Get(),
                          replay_rect,
                          data.result.replay_available
                              ? static_cast<ID2D1Brush*>(d2d_->text_brush.Get())
                              : static_cast<ID2D1Brush*>(d2d_->muted_brush.Get()),
                          controls_alpha,
                          DWRITE_TEXT_ALIGNMENT_CENTER);
-        draw_result_text("RETRY",
-                         d2d_->body_format.Get(),
+        draw_result_text("\xE2\x86\xBB  RETRY",
+                         d2d_->stats_value_format.Get(),
                          retry_rect,
                          d2d_->text_brush.Get(),
                          controls_alpha,
                          DWRITE_TEXT_ALIGNMENT_CENTER);
         draw_result_text(presentation.interaction_ready
-                             ? "ENTER / Continue    LEFT / Retry    F1 / Replay"
+                             ? "ENTER / Continue    R / Retry    F1 / Replay"
                              : "SPACE / Skip result reveal",
                          d2d_->hud_format.Get(),
                          D2D1::RectF(1320.0f, 952.0f, 1848.0f, 982.0f),

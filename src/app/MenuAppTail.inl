@@ -1135,6 +1135,7 @@ void MenuApp::publish_snapshot() {
     MenuSnapshot snapshot;
     render::MenuRenderData render;
     render.ui_korean = ui_uses_korean();
+    render.ui_font = config::normalize_skin_ui_font_token(config_.skin.ui_font);
     if (config::normalize_skin_source_token(config_.skin.source) == "tenriff" &&
         active_tenriff_skin_.found) {
         render.lobby_skin.enabled = true;
