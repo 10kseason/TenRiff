@@ -148,8 +148,10 @@ The chart loader and indexer are limited to BMS-family files (`.bms/.bme/.bml/.p
   - Krrcream only remaps source notes into target lanes
   - when expanding the key count, nK2 creates safe support notes directly in the target layout during conversion instead of pre-adding notes to the source
 - `key_conversion_nk2_preset` (string)
-  - `native | transform`; defaults to `native`
-  - selects nK2 `Native (12%)` or `Transform (35%)`; the setting row is locked for Krrcream
+  - `native | transform | remaster`; defaults to `native`
+  - selects nK2 `Native (12%)`, `Transform (35%)` or `Remaster (65%)`; the setting row is locked for Krrcream
+  - `Remaster` raises the budget while keeping the source placement, and fills LN sections with holds of the same length
+  - all three are caps; how much actually lands depends on the source density and the safety windows
 - `gauge` (string)
   - `normal | hard | ex_hard | easy | shift`
 - `random` (string)

@@ -35,6 +35,7 @@ struct PlacedNote {
 
 constexpr double kFourToFiveFillAddedRatio = 0.12;
 constexpr double kTransformAddedRatio = 0.35;
+constexpr double kRemixedRemasteredAddedRatio = 0.65;
 constexpr double kFourToFiveFillPhraseRatio = 0.30;
 constexpr int kFourToFiveFillMinimumBudget = 8;
 constexpr int kFourToFiveFillMinimumPhraseBudget = 3;
@@ -43,6 +44,17 @@ constexpr int kDefaultSupportJackWindowMs = 500;
 constexpr int kFourToFiveSupportJackWindowMs = 240;
 constexpr int kDefaultSupportSameSourceGapMs = 120;
 constexpr int kFourToFiveSupportSameSourceGapMs = 80;
+// The 500ms default rejects almost every candidate in a dense chart, so the
+// 65% budget below would never be reachable without loosening these too.
+constexpr int kRemixedRemasteredSupportJackWindowMs = 200;
+constexpr int kRemixedRemasteredSupportSameSourceGapMs = 70;
+constexpr int kRemixedRemasteredPhraseMaximum = 20;
+// Source density at which the support budget stops being tapered. Above this
+// the safety windows are the real limit anyway.
+constexpr double kSupportDensityReferenceNps = 10.0;
+// Largest shift tryRollLowerKeyOverflowTap may apply, which is how far out of
+// time order the placed-note list can get.
+constexpr int kMaxRollOffsetMs = 96;
 constexpr int kMaxKeyCount = kMaxSupportedKeyCount;
 
 using LaneMask = std::uint32_t;
@@ -104,6 +116,8 @@ struct SupportEvent {
     int time = 0;
     int sourceLane = 0;
     int anchorLane = 0;
+    // Set only on an LN head event: the span a fill note may copy.
+    int anchorEndTime = 0;
     std::string anchorId;
 };
 
@@ -157,9 +171,55 @@ bool isFourToFiveFillOptions(const NK2Options& options) {
     return options.sourceKeyCount == 4 && options.targetKeyCount == 5 && options.mode != Mode::Report;
 }
 
+// Modes that rewrite the chart rather than relane it. They may run even when
+// the key count does not change.
+bool isRemixMode(Mode mode) {
+    return mode == Mode::Transform || mode == Mode::RemixedRemastered ||
+           mode == Mode::Remaster;
+}
+
+// Support-note budget as a fraction of the source note count.
+double supportAddedRatioForMode(Mode mode) {
+    switch (mode) {
+        case Mode::RemixedRemastered:
+        case Mode::Remaster:
+            return kRemixedRemasteredAddedRatio;
+        case Mode::Transform:
+            return kTransformAddedRatio;
+        case Mode::Harder:
+            return 0.18;
+        default:
+            return 0.12;
+    }
+}
+
+// An explicit budget overrides the mode's, so a preset can be dialled back
+// without changing anything else about it.
+double supportAddedRatioFor(const NK2Options& options) {
+    return options.supportBudgetRatio > 0.0 ? options.supportBudgetRatio
+                                            : supportAddedRatioForMode(options.mode);
+}
+
 int supportJackWindowMsFor(const NK2Options& options) {
+    if (options.supportJackWindowMs > 0) {
+        return options.supportJackWindowMs;
+    }
+    if (isRemixMode(options.mode) && options.mode != Mode::Transform) {
+        return kRemixedRemasteredSupportJackWindowMs;
+    }
     return isFourToFiveFillOptions(options) ? kFourToFiveSupportJackWindowMs
                                            : kDefaultSupportJackWindowMs;
+}
+
+int supportSameSourceGapMsFor(const NK2Options& options) {
+    if (options.supportSameSourceGapMs > 0) {
+        return options.supportSameSourceGapMs;
+    }
+    if (isRemixMode(options.mode) && options.mode != Mode::Transform) {
+        return kRemixedRemasteredSupportSameSourceGapMs;
+    }
+    return isFourToFiveFillOptions(options) ? kFourToFiveSupportSameSourceGapMs
+                                           : kDefaultSupportSameSourceGapMs;
 }
 
 int directLane(int sourceLane, int sourceKeyCount, int targetKeyCount) {
@@ -294,6 +354,21 @@ bool laneInSourcePanel(int sourceLane,
     return sourceSide == targetSide;
 }
 
+// directLane rounds, so widening the field by one or two lanes leaves target
+// lanes that no source lane maps onto - 4K->5K never lands on lane 2. Those
+// lanes have no anchor pull, so a high anchor bias leaves them carrying nothing
+// but support notes and the chart reads as the source with a dead column.
+LaneMask directImageLanes(int sourceKeyCount, int targetKeyCount) {
+    LaneMask mask = 0;
+    for (int source = 0; source < sourceKeyCount && source < kMaxKeyCount; ++source) {
+        const int lane = directLane(source, sourceKeyCount, targetKeyCount);
+        if (lane >= 0 && lane < kMaxKeyCount) {
+            mask |= (LaneMask{1} << lane);
+        }
+    }
+    return mask;
+}
+
 bool laneInBridge(int lane, int targetKeyCount) {
     return laneIsInBridge(buildKeyLayoutProfile(targetKeyCount), lane);
 }
@@ -302,12 +377,16 @@ bool sameDirection(int lhs, int rhs) {
     return lhs != 0 && rhs != 0 && (lhs > 0) == (rhs > 0);
 }
 
-double desiredLaneShare(int lane, int targetKeyCount, const LayoutWeights& weights) {
+// anchorBias fades out the 8K-only "spread across the whole field" tuning.
+double desiredLaneShare(int lane,
+                        int targetKeyCount,
+                        const LayoutWeights& weights,
+                        double anchorBias = 0.0) {
     const double weighted = desiredLaneShareFor(buildKeyLayoutProfile(targetKeyCount, weights), lane);
     if (targetKeyCount == 8) {
-        constexpr double kWholeFieldBlend = 0.35;
+        const double blend = 0.35 * (1.0 - clamp01(anchorBias));
         const double uniform = 1.0 / static_cast<double>(targetKeyCount);
-        return weighted * (1.0 - kWholeFieldBlend) + uniform * kWholeFieldBlend;
+        return weighted * (1.0 - blend) + uniform * blend;
     }
     return weighted;
 }
@@ -327,6 +406,17 @@ double genericTargetAnchorLockMultiplier(int targetKeyCount) {
         return 0.62;
     }
     return 1.0;
+}
+
+// anchorBias 1.0 fades both multipliers back to neutral, undoing the extra
+// relaning freedom the 8K target is tuned for.
+double genericTargetFreedomMultiplier(int targetKeyCount, double anchorBias) {
+    return 1.0 + (genericTargetFreedomMultiplier(targetKeyCount) - 1.0) * (1.0 - clamp01(anchorBias));
+}
+
+double genericTargetAnchorLockMultiplier(int targetKeyCount, double anchorBias) {
+    const double base = genericTargetAnchorLockMultiplier(targetKeyCount);
+    return base + (1.0 - base) * clamp01(anchorBias);
 }
 
 int holdDurationMs(const Note& note) {
@@ -489,6 +579,7 @@ int mirrorCadenceSide(std::size_t placedOriginalNotes) {
 struct LaneUseContext {
     int sourceKeyCount = 0;
     int targetKeyCount = 0;
+    double anchorBias = 0.0;
     LayoutWeights weights;
     std::array<int, kMaxKeyCount> use{};
     std::array<double, kMaxKeyCount> desiredShare{};
@@ -500,16 +591,19 @@ struct LaneUseContext {
 LaneUseContext buildLaneUseContext(const std::vector<int>& laneUse,
                                    int sourceKeyCount,
                                    int targetKeyCount,
-                                   const LayoutWeights& weights) {
+                                   const LayoutWeights& weights,
+                                   double anchorBias = 0.0) {
     LaneUseContext context;
     context.sourceKeyCount = std::max(0, std::min(kMaxKeyCount, sourceKeyCount));
     context.targetKeyCount = std::max(0, std::min(kMaxKeyCount, targetKeyCount));
+    context.anchorBias = clamp01(anchorBias);
     context.weights = weights;
     const auto targetLayout = buildKeyLayoutProfile(context.targetKeyCount, weights);
     for (int lane = 0; lane < context.targetKeyCount; ++lane) {
         const int count = lane < static_cast<int>(laneUse.size()) ? laneUse[static_cast<std::size_t>(lane)] : 0;
         context.use[static_cast<std::size_t>(lane)] = count;
-        context.desiredShare[static_cast<std::size_t>(lane)] = desiredLaneShare(lane, targetKeyCount, weights);
+        context.desiredShare[static_cast<std::size_t>(lane)] =
+            desiredLaneShare(lane, targetKeyCount, weights, context.anchorBias);
         context.total += count;
         const auto side = laneSideFor(targetLayout, lane);
         if (side == LaneSide::Left) {
@@ -586,7 +680,8 @@ double panelLaneNeedScoreFast(const LaneUseContext& context, int lane) {
 double laneCoveragePreferenceFast(const LaneUseContext& context, int lane) {
     const double globalNeed = laneCoverageNeedScoreFast(context, lane);
     const double panelNeed = panelLaneNeedScoreFast(context, lane);
-    const double freedomBoost = genericTargetFreedomMultiplier(context.targetKeyCount) - 1.0;
+    const double freedomBoost =
+        genericTargetFreedomMultiplier(context.targetKeyCount, context.anchorBias) - 1.0;
     const double wholeFieldNeed = wholeFieldNeedScoreFast(context, lane);
     const double combinedNeed = std::max(
         -1.0, std::min(1.0, globalNeed + panelNeed * 0.45 + freedomBoost * wholeFieldNeed));
@@ -751,13 +846,16 @@ bool wouldCreateNewJack(const std::vector<PlacedNote>& placed,
                         int time,
                         int lane,
                         int jackWindowMs) {
+    // `placed` is only approximately time-ordered: rolling an unplaceable note
+    // moves it up to kMaxRollOffsetMs off its slice, so stopping at the first
+    // entry outside the window would skip the notes behind it.
     for (auto it = placed.rbegin(); it != placed.rend(); ++it) {
         const int dt = time - it->time;
-        if (dt <= 0) {
-            continue;
-        }
-        if (dt > jackWindowMs) {
+        if (dt > jackWindowMs + kMaxRollOffsetMs) {
             break;
+        }
+        if (dt <= 0 || dt > jackWindowMs) {
+            continue;
         }
         if (it->lane == lane && it->sourceLane != sourceLane) {
             return true;
@@ -964,7 +1062,7 @@ double motifScoreAdjustment(MotifKind motif,
             }
             break;
         case MotifKind::LnAnchor:
-            score += lane == direct ? 0.05 * genericTargetAnchorLockMultiplier(options.targetKeyCount) : 0.0;
+            score += lane == direct ? 0.05 * genericTargetAnchorLockMultiplier(options.targetKeyCount, options.anchorBias) : 0.0;
             score += 0.45 * longHoldSpreadScale * laneCoverageNeedScoreFast(laneContext, lane);
             score += 0.20 * longHoldSpreadScale * panelLaneNeedScoreFast(laneContext, lane);
             if (!laneInSourcePanel(
@@ -976,7 +1074,7 @@ double motifScoreAdjustment(MotifKind motif,
             }
             break;
         case MotifKind::Neutral:
-            score += lane == direct ? 0.02 * genericTargetAnchorLockMultiplier(options.targetKeyCount) : 0.0;
+            score += lane == direct ? 0.02 * genericTargetAnchorLockMultiplier(options.targetKeyCount, options.anchorBias) : 0.0;
             score += 0.45 * laneCoverageNeedScoreFast(laneContext, lane);
             if (!laneInSourcePanel(
                     sourceLane, lane, options.sourceKeyCount, options.targetKeyCount)) {
@@ -986,7 +1084,7 @@ double motifScoreAdjustment(MotifKind motif,
     }
 
     if (note.type == NoteType::Hold && motif != MotifKind::LnAnchor) {
-        score += lane == direct ? 0.10 * genericTargetAnchorLockMultiplier(options.targetKeyCount) : 0.0;
+        score += lane == direct ? 0.10 * genericTargetAnchorLockMultiplier(options.targetKeyCount, options.anchorBias) : 0.0;
     }
     return score;
 }
@@ -1006,15 +1104,20 @@ CandidateList rankedCandidates(const Note& note,
     const auto laneContext = buildLaneUseContext(laneUse,
                                                  options.sourceKeyCount,
                                                  options.targetKeyCount,
-                                                 options.layoutWeights);
+                                                 options.layoutWeights,
+                                                 options.anchorBias);
     const int direct = directLane(sourceLane, options.sourceKeyCount, options.targetKeyCount);
     const double totalBlend = std::max(0.001, options.nativeWeight + options.remixWeight);
-    const double freedomMultiplier = genericTargetFreedomMultiplier(options.targetKeyCount);
+    const double freedomMultiplier = genericTargetFreedomMultiplier(options.targetKeyCount, options.anchorBias);
     const double freedomBoost = freedomMultiplier - 1.0;
     const double anchorLockScale =
-        genericTargetAnchorLockMultiplier(options.targetKeyCount) / freedomMultiplier;
-    const bool sameKeyTransform = options.mode == Mode::Transform &&
-                                  options.sourceKeyCount == options.targetKeyCount;
+        genericTargetAnchorLockMultiplier(options.targetKeyCount, options.anchorBias) / freedomMultiplier;
+    const double anchorBias = clamp01(options.anchorBias);
+    const LaneMask imageLanes = options.gapLaneBoost > 0.0
+                                    ? directImageLanes(options.sourceKeyCount, options.targetKeyCount)
+                                    : LaneMask{0};
+    const bool sameKeyTransform =
+        isRemixMode(options.mode) && options.sourceKeyCount == options.targetKeyCount;
     const bool longHoldCopy = isLongHoldForAdjacentCopy(note);
     const double longHoldSpreadScale = longHoldCopy ? 0.25 : 1.0;
     LanePool adjacentCopyLanes;
@@ -1034,21 +1137,33 @@ CandidateList rankedCandidates(const Note& note,
         const int lane = pool.lanes[static_cast<std::size_t>(poolIndex)];
         const bool freeOriginalTap =
             note.type == NoteType::Tap && (motif == MotifKind::Neutral || motif == MotifKind::Stream);
+        // Holds never qualify as a free tap, so every budget below uses the
+        // pinned constant and they stay glued to their source lane. lnSpread
+        // slides a hold along to the free-tap constant instead.
+        const double holdFreedom =
+            note.type == NoteType::Hold ? clamp01(options.lnSpread) : 0.0;
+        const auto freeLerp = [&](double pinned, double freed) {
+            return freeOriginalTap ? freed : pinned + (freed - pinned) * holdFreedom;
+        };
         const double distance = std::abs(lane - direct);
         const double fieldScale = std::max(1.0, static_cast<double>(options.targetKeyCount) / 10.0);
-        const double nativeDistance =
-            (freeOriginalTap ? 7.0 : 4.0) * fieldScale * freedomMultiplier;
+        // Undoing the per-target freedom multiplier only helps the key counts
+        // that have one. Narrowing the falloff works for every target, so the
+        // anchor bias reads the same at 4K as it does at 8K.
+        const double nativeDistance = freeLerp(4.0, 7.0) * fieldScale * freedomMultiplier *
+                                      (1.0 - 0.35 * anchorBias);
         const double rawNativeScore = std::max(0.0, 1.0 - distance / nativeDistance);
-        const double nativeAnchorContrast = options.targetKeyCount == 8 ? 0.55 : 1.0;
+        const double nativeAnchorContrast =
+            options.targetKeyCount == 8 ? 0.55 + 0.45 * clamp01(options.anchorBias) : 1.0;
         const double nativeScore = 0.5 + (rawNativeScore - 0.5) * nativeAnchorContrast;
         const double remixScore = remixScoreForLaneFast(sourceLane, lane, laneContext);
         const double coverageNeed = laneCoverageNeedScoreFast(laneContext, lane);
         const double panelNeed = panelLaneNeedScoreFast(laneContext, lane);
         const double wholeFieldNeed = wholeFieldNeedScoreFast(laneContext, lane);
         double score = (options.nativeWeight * nativeScore + options.remixWeight * remixScore) / totalBlend;
-        score += (options.remixWeight / totalBlend) * (freeOriginalTap ? 1.35 : 1.0) * coverageNeed;
-        score += (options.remixWeight / totalBlend) * freedomBoost *
-                 (freeOriginalTap ? 2.35 : 1.55) * wholeFieldNeed * longHoldSpreadScale;
+        score += (options.remixWeight / totalBlend) * freeLerp(1.0, 1.35) * coverageNeed;
+        score += (options.remixWeight / totalBlend) * freedomBoost * freeLerp(1.55, 2.35) *
+                 wholeFieldNeed * longHoldSpreadScale;
         if (longHoldCopy) {
             score += adjacentCopyPreferenceScore(lane, adjacentCopyLanes);
         }
@@ -1060,10 +1175,9 @@ CandidateList rankedCandidates(const Note& note,
         }
         if (laneInSourcePanel(
                 sourceLane, lane, options.sourceKeyCount, options.targetKeyCount)) {
-            score += (options.nativeWeight / totalBlend) * (freeOriginalTap ? 0.10 : 0.35) *
+            score += (options.nativeWeight / totalBlend) * freeLerp(0.35, 0.10) *
                      panelNeed * anchorLockScale;
-            score += (options.remixWeight / totalBlend) * (freeOriginalTap ? 0.35 : 0.70) *
-                     panelNeed;
+            score += (options.remixWeight / totalBlend) * freeLerp(0.70, 0.35) * panelNeed;
         }
 
         const bool freeLnAnchor = motif == MotifKind::LnAnchor;
@@ -1074,8 +1188,16 @@ CandidateList rankedCandidates(const Note& note,
                 0.5 + 0.5 * panelLaneNeedScoreFast(laneContext, lane));
             const double anchorScale = clamp01(0.10 + 0.90 * anchorPreference);
             score += (freerAnchor ? 0.10 : 0.45) * anchorScale * anchorLockScale;
+            // Target-agnostic pull toward the source lane.
+            score += 0.60 * anchorBias;
+        }
+        if (options.gapLaneBoost > 0.0 && lane < kMaxKeyCount &&
+            (imageLanes & (LaneMask{1} << lane)) == 0) {
+            // Scaled by how far below its share the lane is, so the boost fades
+            // once the lane is pulling its weight instead of over-filling it.
+            score += options.gapLaneBoost * laneCoverageNeedScoreFast(laneContext, lane);
             if (options.targetKeyCount == 8 && !sourceJackContinuation && motif != MotifKind::Jack) {
-                score -= freerAnchor ? 0.16 : 0.09;
+                score -= (freerAnchor ? 0.16 : 0.09) * (1.0 - anchorBias);
             }
         }
         if (laneInSourcePanel(
@@ -1391,16 +1513,25 @@ PlacementStats collectPlacementStats(const Chart& converted,
         return lhs->id < rhs->id;
     });
 
-    for (std::size_t i = 1; i < convertedSorted.size(); ++i) {
-        const auto* previous = convertedSorted[i - 1];
-        const auto* current = convertedSorted[i];
-        const int dt = current->time - previous->time;
-        if (dt <= 0 || dt > createdJackWindowMs || current->lane != previous->lane) {
+    // A jack is a repeat in one lane, so compare each note with the previous
+    // note in its own lane. Walking neighbours of the globally sorted list only
+    // catches pairs that happen to be adjacent there, which silently undercounts
+    // every time another lane has a note in between.
+    std::array<const Note*, kMaxKeyCount> lastByLane{};
+    for (const auto* current : convertedSorted) {
+        if (current->lane < 0 || current->lane >= kMaxKeyCount) {
             continue;
         }
-        const int previousSource = sourceLaneOf(*previous);
-        const int currentSource = sourceLaneOf(*current);
-        if (previousSource == currentSource) {
+        const auto* previous = lastByLane[static_cast<std::size_t>(current->lane)];
+        lastByLane[static_cast<std::size_t>(current->lane)] = current;
+        if (previous == nullptr) {
+            continue;
+        }
+        const int dt = current->time - previous->time;
+        if (dt <= 0 || dt > createdJackWindowMs) {
+            continue;
+        }
+        if (sourceLaneOf(*previous) == sourceLaneOf(*current)) {
             ++stats.preservedSourceJacks;
         } else {
             ++stats.createdJacks;
@@ -1614,7 +1745,24 @@ void fillDistributionAndSafety(NK2Report& report, const Chart& converted) {
     fillPhraseProfileScores(report, converted);
 }
 
-int supportBudgetFor(const NK2Options& options, int sourceNoteCount) {
+// A sparse chart has plenty of room for support notes, so nothing throttles
+// them and the full budget lands - which turns an Easy chart into a Normal.
+// Dense material never gets near its budget because the safety windows cap it
+// first. Scaling the budget by how busy the source already is closes that gap.
+double supportDensityScale(const NK2Options& options, double sourceNps) {
+    if (options.supportDensityReferenceNps < 0.0) {
+        return 1.0;  // negative disables the taper
+    }
+    const double reference = options.supportDensityReferenceNps > 0.0
+                                 ? options.supportDensityReferenceNps
+                                 : kSupportDensityReferenceNps;
+    if (reference <= 0.0 || sourceNps <= 0.0) {
+        return 1.0;
+    }
+    return clamp01(sourceNps / reference);
+}
+
+int supportBudgetFor(const NK2Options& options, int sourceNoteCount, double sourceNps) {
     const bool fourToFiveFill = isFourToFiveFillOptions(options);
     if (options.targetKeyCount <= options.sourceKeyCount ||
         (!fourToFiveFill && options.mode == Mode::Faithful) || options.mode == Mode::Report) {
@@ -1623,15 +1771,15 @@ int supportBudgetFor(const NK2Options& options, int sourceNoteCount) {
     if (sourceNoteCount <= 0) {
         return 0;
     }
+    const double densityScale = supportDensityScale(options, sourceNps);
     if (fourToFiveFill) {
-        const double ratio =
-            options.mode == Mode::Transform ? kTransformAddedRatio : kFourToFiveFillAddedRatio;
+        const double ratio = (isRemixMode(options.mode) ? supportAddedRatioFor(options)
+                                                        : kFourToFiveFillAddedRatio) *
+                             densityScale;
         return std::max(kFourToFiveFillMinimumBudget,
                         static_cast<int>(std::ceil(static_cast<double>(sourceNoteCount) * ratio)));
     }
-    const double ratio = options.mode == Mode::Transform
-                             ? kTransformAddedRatio
-                             : (options.mode == Mode::Harder ? 0.18 : 0.12);
+    const double ratio = supportAddedRatioFor(options) * densityScale;
     const int minimum = options.mode == Mode::Harder ? 2 : 1;
     return std::max(minimum, static_cast<int>(std::ceil(static_cast<double>(sourceNoteCount) * ratio)));
 }
@@ -1654,21 +1802,26 @@ int phraseSupportBudgetFor(const NK2Options& options, int sourceNoteCount) {
         return 0;
     }
     const int safeSourceNoteCount = std::max(1, sourceNoteCount);
+    // The phrase window is a fixed span, so its note count is its density.
+    const double phraseNps = static_cast<double>(sourceNoteCount) * 1000.0 /
+                             static_cast<double>(supportPhraseWindowMs());
+    const double densityScale = supportDensityScale(options, phraseNps);
     if (fourToFiveFill) {
-        const double ratio = options.mode == Mode::Transform
-                                 ? kTransformAddedRatio
-                                 : kFourToFiveFillPhraseRatio;
+        const double ratio = (isRemixMode(options.mode) ? supportAddedRatioFor(options)
+                                                        : kFourToFiveFillPhraseRatio) *
+                             densityScale;
         const int budget = std::max(
             kFourToFiveFillMinimumPhraseBudget,
             static_cast<int>(std::ceil(static_cast<double>(safeSourceNoteCount) * ratio)));
         return clampInt(
             budget, kFourToFiveFillMinimumPhraseBudget, kFourToFiveFillMaximumPhraseBudget);
     }
-    const double ratio = options.mode == Mode::Transform
-                             ? kTransformAddedRatio
-                             : (options.mode == Mode::Harder ? 0.18 : 0.12);
+    const double ratio = supportAddedRatioFor(options) * densityScale;
     const int minimum = options.mode == Mode::Harder ? 2 : 1;
-    const int maximum = options.mode == Mode::Transform ? 12 : (options.mode == Mode::Harder ? 6 : 4);
+    const int maximum = (isRemixMode(options.mode) && options.mode != Mode::Transform)
+                            ? kRemixedRemasteredPhraseMaximum
+                            : (options.mode == Mode::Transform ? 12
+                                                               : (options.mode == Mode::Harder ? 6 : 4));
     const int budget = std::max(
         minimum, static_cast<int>(std::ceil(static_cast<double>(safeSourceNoteCount) * ratio)));
     return clampInt(budget, minimum, maximum);
@@ -1706,7 +1859,8 @@ CandidateList rankedSupportLanes(const SupportEvent& event,
     const auto laneContext = buildLaneUseContext(laneUse,
                                                  options.sourceKeyCount,
                                                  options.targetKeyCount,
-                                                 options.layoutWeights);
+                                                 options.layoutWeights,
+                                                 options.anchorBias);
     const int mirrorLane = options.targetKeyCount - 1 - event.anchorLane;
     auto pool = candidatePoolFor(event.sourceLane, options.sourceKeyCount, options.targetKeyCount);
     if (event.kind == SupportKind::Mirror) {
@@ -1837,6 +1991,9 @@ std::vector<SupportEvent> buildSupportEvents(const Chart& placed, const NK2Optio
                 event.time = endpoint.first;
                 event.sourceLane = sourceLane;
                 event.anchorLane = note.lane;
+                if (endpoint.second == "head") {
+                    event.anchorEndTime = *note.endTime;
+                }
                 event.anchorId = note.id + "-" + endpoint.second;
                 if (emitted.insert({event.time, "ln:" + event.anchorId}).second) {
                     events.push_back(std::move(event));
@@ -1896,12 +2053,16 @@ bool supportCandidateIsSafe(const SupportSafetyIndex& index,
         return false;
     }
     const auto& laneNotes = index.lanes[static_cast<std::size_t>(candidate.lane)];
+    const int candidateEnd = candidate.endTime.value_or(candidate.time);
     for (const auto& note : laneNotes) {
         if (note.time == candidate.time) {
             return false;
         }
-        if (note.type == NoteType::Hold && note.endTime.has_value() &&
-            candidate.time > note.time && candidate.time <= *note.endTime) {
+        // Reject any span overlap in the lane. A tap is a zero-length span, so
+        // this still covers "tap lands inside an existing hold" while also
+        // guarding fill notes that carry a span of their own.
+        const int noteEnd = note.endTime.value_or(note.time);
+        if (candidate.time <= noteEnd && note.time <= candidateEnd) {
             return false;
         }
         const int dt = std::abs(note.time - candidate.time);
@@ -1988,11 +2149,16 @@ bool tryAcceptSupportEvent(Chart& chart,
         candidate.lane = candidateLane.lane;
         candidate.sourceLane = event.sourceLane;
         candidate.type = NoteType::Tap;
+        // Fill an LN section with a parallel hold instead of a lone tap, so the
+        // added note reads as part of the chord rather than a stray hit.
+        if (options.lnFill && event.kind == SupportKind::Ln &&
+            event.anchorEndTime > event.time) {
+            candidate.type = NoteType::Hold;
+            candidate.endTime = event.anchorEndTime;
+        }
 
-        const bool fourToFiveFill = isFourToFiveFillOptions(options);
         const int supportJackWindowMs = supportJackWindowMsFor(options);
-        const int sameSourceGapMs =
-            fourToFiveFill ? kFourToFiveSupportSameSourceGapMs : kDefaultSupportSameSourceGapMs;
+        const int sameSourceGapMs = supportSameSourceGapMsFor(options);
         if (!supportCandidateIsSafe(safetyIndex, candidate, supportJackWindowMs, sameSourceGapMs)) {
             continue;
         }
@@ -2013,8 +2179,38 @@ bool tryAcceptSupportEvent(Chart& chart,
     return false;
 }
 
+// Notes per second across the playable span, ignoring the generated notes that
+// have already been placed.
+double sourceDensityNps(const Chart& chart) {
+    int first = 0;
+    int last = 0;
+    bool seen = false;
+    int count = 0;
+    for (const auto& note : chart.notes) {
+        if (isNk2GeneratedNote(note)) {
+            continue;
+        }
+        ++count;
+        const int end = note.endTime.value_or(note.time);
+        if (!seen) {
+            first = note.time;
+            last = end;
+            seen = true;
+            continue;
+        }
+        first = std::min(first, note.time);
+        last = std::max(last, end);
+    }
+    const double span = static_cast<double>(last - first) / 1000.0;
+    if (!seen || span <= 0.0) {
+        return 0.0;
+    }
+    return static_cast<double>(count) / span;
+}
+
 void applySupportNotes(Chart& chart, NK2Report& report, const NK2Options& options) {
-    const int budget = supportBudgetFor(options, report.intent.totalNotes);
+    const int budget =
+        supportBudgetFor(options, report.intent.totalNotes, sourceDensityNps(chart));
     const auto events = buildSupportEvents(chart, options);
     const auto sourceNotesByPhrase = sourceNoteCountsBySupportPhrase(chart);
     report.supportPhraseWindows = static_cast<int>(sourceNotesByPhrase.size());
@@ -2058,7 +2254,7 @@ NK2Report buildBaseReport(const Chart& chart, const NK2Options& options) {
                                             options.sameTimeEpsilonMs);
     report.outputNotes = report.intent.totalNotes;
 
-    if (options.sourceKeyCount == options.targetKeyCount && options.mode != Mode::Transform) {
+    if (options.sourceKeyCount == options.targetKeyCount && !isRemixMode(options.mode)) {
         report.noOp = true;
         report.noOpReason = "same key count without an explicit transform mode";
     }
@@ -2076,7 +2272,7 @@ bool supportsSevenToTenPrototype(const NK2Options& options) {
 bool supportsGenericPrototype(const NK2Options& options) {
     return options.sourceKeyCount > 0 && options.sourceKeyCount <= kMaxKeyCount &&
            options.targetKeyCount > 0 && options.targetKeyCount <= kMaxKeyCount &&
-           (options.sourceKeyCount != options.targetKeyCount || options.mode == Mode::Transform) &&
+           (options.sourceKeyCount != options.targetKeyCount || isRemixMode(options.mode)) &&
            options.mode != Mode::Report;
 }
 

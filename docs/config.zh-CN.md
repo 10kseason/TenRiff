@@ -147,8 +147,10 @@ chart loader/indexer 仅支持 BMS family（`.bms/.bme/.bml/.pms`）。旧 `enab
   - Krrcream 只把原始 note 重排到目标 lane
   - nK2 在扩展键数时不会先向原始 pattern 加 note，而是在转换过程中直接向目标 layout 生成安全的辅助 note
 - `key_conversion_nk2_preset` (string)
-  - `native | transform`；默认值为 `native`
-  - 选择 nK2 的 `Native (12%)` 或 `Transform (35%)`；Krrcream 下锁定该设置行
+  - `native | transform | remaster`；默认值为 `native`
+  - 选择 nK2 的 `Native (12%)`、`Transform (35%)` 或 `Remaster (65%)`；Krrcream 下锁定该设置行
+  - `Remaster` 在提高预算的同时保留原曲排布，并用等长长条填充 LN 区间的辅助 note
+  - 三者均为上限，实际增加量会因原谱密度与安全窗口而更低
 - `gauge` (string)
   - `normal | hard | ex_hard | easy | shift`
 - `random` (string)

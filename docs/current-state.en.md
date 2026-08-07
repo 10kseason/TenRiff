@@ -93,7 +93,7 @@ This is the document that the next agent or any new contributor should read firs
   - `mode.key_mode` uses an N2NC-style lane remap to convert key counts
   - in-game Mode Settings exposes `Key Converter` with default `Krrcream` and embedded deterministic `KeyWeaver nK2`; the runtime choice is saved in config and replay metadata
   - the separate `Conversion Note Add` option is removed: Krrcream only remaps source notes, while nK2 creates safe support notes directly in the converted target layout when expanding the key count.
-  - nK2 offers `Native (12%)` by default and `Transform (35%)`; the row is locked for Krrcream, and the standalone converter GUI also locks Krrcream Max/Min/Speed/Seed tuning.
+  - nK2 offers `Native (12%)` by default, `Transform (35%)` and `Remaster (65%)`; `Remaster` raises the budget while locking the anchor so the source placement survives, and fills LN sections with holds of the same length. All three are caps - the source density and the safety windows decide how much actually lands. The row is locked for Krrcream, and the standalone converter GUI also locks Krrcream Max/Min/Speed/Seed tuning.
   - the standalone BMS key converter CLI/GUI can select the default `krrcream` path or deterministic `nK2 Native 50/50`; nK2 ignores Krrcream-only tuning controls
   - `mode.key_mode=none` keeps the chart's original key count and base pattern layout intact
 - Native difficulty:

@@ -56,6 +56,10 @@ std::string toString(Mode mode) {
             return "harder";
         case Mode::Transform:
             return "transform";
+        case Mode::RemixedRemastered:
+            return "remixed-remastered";
+        case Mode::Remaster:
+            return "remaster";
         case Mode::Report:
             return "report";
     }
@@ -74,6 +78,12 @@ Mode parseModeOrThrow(const std::string& value) {
     }
     if (value == "transform") {
         return Mode::Transform;
+    }
+    if (value == "remixed-remastered" || value == "remixed-remasterd" || value == "rr") {
+        return Mode::RemixedRemastered;
+    }
+    if (value == "remaster" || value == "rm") {
+        return Mode::Remaster;
     }
     if (value == "report") {
         return Mode::Report;
@@ -234,7 +244,7 @@ std::string reportToText(const NK2Report& report) {
         out << "No-op: " << report.noOpReason << "\n";
     }
     out << "Native/remix weights: " << report.options.nativeWeight << " / "
-        << report.options.remixWeight << "\n";
+        << report.options.remixWeight << "  LN spread: " << report.options.lnSpread << "\n";
     out << "Layout: " << layoutKindName(report.layout)
         << " panel/bridge/full-field=" << report.options.layoutWeights.panel << "/"
         << report.options.layoutWeights.bridge << "/" << report.options.layoutWeights.fullField << "\n";

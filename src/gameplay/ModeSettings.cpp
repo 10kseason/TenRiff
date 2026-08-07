@@ -12,7 +12,12 @@ std::string to_string(KeyModeConversionAlgorithm algorithm) {
 }
 
 std::string to_string(Nk2Preset preset) {
-    return preset == Nk2Preset::Transform ? "transform" : "native";
+    switch (preset) {
+        case Nk2Preset::Transform: return "transform";
+        case Nk2Preset::Remaster: return "remaster";
+        case Nk2Preset::Native: break;
+    }
+    return "native";
 }
 
 std::string to_string(KeyMode mode) {
@@ -89,6 +94,9 @@ std::optional<Nk2Preset> parse_nk2_preset(std::string_view token) {
     }
     if (normalized == "TRANSFORM" || normalized == "TRANSFORM35") {
         return Nk2Preset::Transform;
+    }
+    if (normalized == "REMASTER" || normalized == "REMASTER65" || normalized == "RM") {
+        return Nk2Preset::Remaster;
     }
     return std::nullopt;
 }

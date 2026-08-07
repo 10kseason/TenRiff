@@ -93,7 +93,7 @@
   - `mode.key_mode` 通过 N2NC 风格的 lane remap 进行键数变换
   - 游戏内 Mode Settings 的 `Key Converter` 可选择默认 `Krrcream` 或内置确定性 `KeyWeaver nK2`，并写入设置与 replay metadata
   - 已移除独立的 `Conversion Note Add` 选项：Krrcream 只重排原始 note，nK2 在扩展键数时直接向转换后的目标 layout 生成安全的辅助 note。
-  - nK2 preset 可选择默认 `Native (12%)` 或 `Transform (35%)`；Krrcream 下锁定该行，standalone converter GUI 的 Krrcream Max/Min/Speed/Seed 也不可修改。
+  - nK2 preset 可选择默认 `Native (12%)`、`Transform (35%)` 或 `Remaster (65%)`；`Remaster` 在提高预算的同时锁定 anchor 以保留原曲排布，并用等长长条填充 LN 区间。三者均为上限，实际增加量取决于原谱密度与安全窗口。Krrcream 下锁定该行，standalone converter GUI 的 Krrcream Max/Min/Speed/Seed 也不可修改。
   - `mode.key_mode=none` 表示保持谱面的原始键数与基础 pattern 布局不变
 - Native difficulty：
   - BMS 的 LV/CR 计算仅将 long-note Head/Tail 的 miss-ms 按 0.5倍评估，使 `300ms`按`150ms`处理；实际 gameplay 判定范围保持不变

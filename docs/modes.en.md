@@ -28,7 +28,7 @@ This document summarizes the implemented mode system, lane-transform/random rule
 - Chart input is limited to BMS-family files (`.bms/.bme/.bml/.pms`); the former osu toggle is no longer exposed or persisted
 - `key_mode`: `none | auto | 4k | 5k | 6k | 7k | 8k | 9k | 10k | 12k | 14k | 16k`
 - `key_conversion_algorithm`: `krrcream | nk2` (defaults to `krrcream`; Krrcream only remaps source notes, while nK2 directly creates safe support notes in the target layout during key-count expansion)
-- `key_conversion_nk2_preset`: `native | transform` (defaults to `native`; choose `Native (12%)` or `Transform (35%)` with nK2; the row is locked with Krrcream)
+- `key_conversion_nk2_preset`: `native | transform | remaster` (defaults to `native`; choose `Native (12%)`, `Transform (35%)` or `Remaster (65%)` with nK2; the row is locked with Krrcream)
 - `gauge`: `normal | hard | ex_hard | easy | shift`
 - `random`: `off | mirror | rr | fr | sr`
 - `random_seed`: fixed seed for RR/FR/SR, forced key-mode conversion, Note Add, and LN Mix selection (`0` is also fixed)

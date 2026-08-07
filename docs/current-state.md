@@ -97,7 +97,7 @@
   - `mode.key_mode=10k` 변환은 standalone converter의 krrcream식 10K preset과 맞춰 `target=10`, `max_keys=10`, `min_keys=1`, `transform_speed_slot=5`, `seed=0`을 기본으로 사용
   - 게임 내 Mode Settings의 `Key Converter`에서 기본 `Krrcream`과 내장 결정론적 `KeyWeaver nK2`를 선택하며, 실제 키수 변환에 적용하고 설정·리플레이 메타데이터에 저장
   - 별도 `변환 노트 추가` 옵션은 제거했으며, Krrcream은 원본 노트만 재배치하고 nK2는 키 수 확장 시 변환된 목표 레이아웃에 안전한 보조 노트를 직접 생성한다.
-  - nK2 프리셋은 기본 `Native (12%)`와 `Transform (35%)` 중 선택한다. Krrcream 선택 시 해당 행은 잠기며, standalone converter GUI의 Krrcream Max/Min/Speed/Seed도 수정할 수 없다.
+  - nK2 프리셋은 기본 `Native (12%)`, `Transform (35%)`, `Remaster (65%)` 중 선택한다. `Remaster`는 예산을 올리면서도 앵커를 잠가 원곡 배치를 유지하고 롱노트 구간을 같은 길이의 롱노트로 채운다. 세 값은 상한이며 실제 추가량은 원본 밀도와 안전창에 따라 낮아진다. Krrcream 선택 시 해당 행은 잠기며, standalone converter GUI의 Krrcream Max/Min/Speed/Seed도 수정할 수 없다.
   - 독립 BMS key converter의 CLI/GUI는 기본 `krrcream`과 결정론적 `nK2 Native 50/50` 알고리즘을 선택 지원하며, nK2 선택 시 krrcream 전용 튜닝 필드는 적용하지 않음
   - `mode.key_mode=none`은 차트의 원래 키 수와 기본 패턴 레이아웃을 그대로 유지
 - Native difficulty:

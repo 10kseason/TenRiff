@@ -147,8 +147,10 @@ chart loader/indexer は BMS family（`.bms/.bme/.bml/.pms`）専用です。旧
   - Krrcream は元 note を target lane へ再配置するだけ
   - nK2 は key count 拡張時、元 pattern へ先に note を追加せず、変換中に target layout へ安全な support note を直接生成
 - `key_conversion_nk2_preset` (string)
-  - `native | transform`。既定値は `native`
-  - nK2 の `Native (12%)` / `Transform (35%)` を選択し、Krrcream では設定 row を lock
+  - `native | transform | remaster`。既定値は `native`
+  - nK2 の `Native (12%)` / `Transform (35%)` / `Remaster (65%)` を選択し、Krrcream では設定 row を lock
+  - `Remaster` は budget を上げつつ原曲の配置を保ち、LN 区間の support note を同じ長さの LN で埋める
+  - 3 つとも上限であり、実際の追加量は原曲の密度と safety window によってさらに低くなる
 - `gauge` (string)
   - `normal | hard | ex_hard | easy | shift`
 - `random` (string)
