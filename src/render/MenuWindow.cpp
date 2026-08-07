@@ -4479,4 +4479,3 @@ bool MenuWindow::create_text_formats(const wchar_t* ui_family) {
 }  // namespace tenriff::render
 
 #endif  // _WIN32
-

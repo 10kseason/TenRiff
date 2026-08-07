@@ -100,28 +100,6 @@ TEST_CASE("render wait policy shrinks the busy tail for high off-vsync fps") {
     CHECK(vsync_policy.yield_threshold_ns == baseline.yield_threshold_ns);
 }
 
-TEST_CASE("render pacing treats zero fps as unlimited only without vsync") {
-    CHECK(tenriff::render::should_use_unlimited_render_pacing(false, 0));
-    CHECK_FALSE(tenriff::render::should_use_unlimited_render_pacing(true, 0));
-    CHECK_FALSE(tenriff::render::should_use_unlimited_render_pacing(false, 300));
-}
-
-TEST_CASE("render thread performance metrics use explicit present completions") {
-    tenriff::render::RenderThread render_thread;
-
-    render_thread.record_presented_frame_ns(0);
-    CHECK_FALSE(render_thread.performance_snapshot().valid);
-
-    render_thread.record_presented_frame_ns(100'000'000);
-    render_thread.record_presented_frame_ns(104'000'000);
-
-    const auto snapshot = render_thread.performance_snapshot();
-    CHECK(snapshot.valid);
-    CHECK(snapshot.sample_count == 1u);
-    CHECK(snapshot.average_frame_ms == doctest::Approx(4.0));
-    CHECK(snapshot.average_fps == doctest::Approx(250.0));
-}
-
 TEST_CASE("gameplay motion extrapolates from audio sample time and clamps stale HUD drift") {
     tenriff::render::GameplayMotionState state;
     state.current_sample = 1000;
@@ -402,4 +380,26 @@ TEST_CASE("native digital keys separate held depth from hit glitch") {
     const auto released_hit = tenriff::render::resolve_native_digital_key_visual(false, 1.5f, 24.0f);
     CHECK(released_hit.press_offset == doctest::Approx(0.0f));
     CHECK(released_hit.glitch_strength == doctest::Approx(1.0f));
+}
+
+TEST_CASE("render thread performance metrics use explicit present completions") {
+    tenriff::render::RenderThread render_thread;
+
+    render_thread.record_presented_frame_ns(0);
+    CHECK_FALSE(render_thread.performance_snapshot().valid);
+
+    render_thread.record_presented_frame_ns(100'000'000);
+    render_thread.record_presented_frame_ns(104'000'000);
+
+    const auto snapshot = render_thread.performance_snapshot();
+    CHECK(snapshot.valid);
+    CHECK(snapshot.sample_count == 1u);
+    CHECK(snapshot.average_frame_ms == doctest::Approx(4.0));
+    CHECK(snapshot.average_fps == doctest::Approx(250.0));
+}
+
+TEST_CASE("render pacing treats zero fps as unlimited only without vsync") {
+    CHECK(tenriff::render::should_use_unlimited_render_pacing(false, 0));
+    CHECK_FALSE(tenriff::render::should_use_unlimited_render_pacing(true, 0));
+    CHECK_FALSE(tenriff::render::should_use_unlimited_render_pacing(false, 300));
 }

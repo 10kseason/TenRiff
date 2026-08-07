@@ -1660,7 +1660,7 @@ RuntimeConfig ConfigLoader::defaults() const {
 
     config.judge = {};
     config.speed.rate = 1.0;
-    config.speed.hi_speed = 3.0;
+    config.speed.hi_speed = 10.0;
     config.speed.target_scroll_bps = 380.0;
 
     config.gauge = {};
@@ -1694,7 +1694,7 @@ RuntimeConfig ConfigLoader::defaults() const {
     config.ui.language = "en";
     config.ui.result_tail_ms = 3000.0;
     config.ui.require_enter_to_exit = true;
-    config.ui.show_cursor_in_gameplay = false;
+    config.ui.show_cursor_in_gameplay = true;
     config.ui.favorite_chart_keys.clear();
     config.ui.collections.clear();
     config.ui.song_collection_filter = "all";

@@ -34,6 +34,49 @@
         // Hit-burst brightness, 0% turns the explosion off entirely.
         const float key_pulse_brightness =
             std::clamp(data.gameplay.key_pulse_brightness, 0.0f, 1.0f);
+        // The hit burst is stacked from a wide outer bloom, a lane-coloured beam, a
+        // bright glow slab and a white-hot core at the judgement line. Player and
+        // ghost fields draw the identical stack so both read the same.
+        auto draw_gameplay_hit_burst = [&](ID2D1DeviceContext* burst_ctx,
+                                           float lane_center,
+                                           float burst_note_width,
+                                           float burst_hit_line_y,
+                                           float burst_field_top,
+                                           float burst_field_bottom,
+                                           float pulse,
+                                           uint32_t pulse_color,
+                                           float burst_opacity) {
+            if (!burst_ctx || !d2d_->note_fill_brush || burst_opacity <= 0.0f) {
+                return;
+            }
+            const float top_limit = burst_field_top + 2.0f;
+            const float bottom_limit = burst_field_bottom - 2.0f;
+            auto fill_band = [&](float half_width, float half_height, float radius,
+                                 uint32_t color, float alpha) {
+                if (alpha <= 0.002f) {
+                    return;
+                }
+                const D2D1_RECT_F rect =
+                    D2D1::RectF(lane_center - half_width,
+                                std::max(top_limit, burst_hit_line_y - half_height),
+                                lane_center + half_width,
+                                std::min(bottom_limit, burst_hit_line_y + half_height));
+                d2d_->note_fill_brush->SetColor(
+                    color_from_rgb(color, std::min(1.0f, alpha) * burst_opacity));
+                burst_ctx->FillRoundedRectangle(D2D1::RoundedRect(rect, radius, radius),
+                                                d2d_->note_fill_brush.Get());
+            };
+
+            const float half_w = burst_note_width * (0.52f + 0.18f * pulse);
+            fill_band(half_w * 1.42f, 34.0f + 62.0f * pulse, 14.0f,
+                      blend_rgb(pulse_color, 0x6EE7F2, 0.30f), 0.07f + 0.22f * pulse);
+            fill_band(half_w * 0.86f, 24.0f + 46.0f * pulse, 10.0f,
+                      blend_rgb(pulse_color, 0x9AF2FF, 0.34f), 0.14f + 0.44f * pulse);
+            fill_band(half_w, 7.0f + 13.0f * pulse, 7.0f,
+                      blend_rgb(pulse_color, 0xFFFFFF, 0.46f), 0.30f + 0.60f * pulse);
+            fill_band(half_w * 0.62f, 3.0f + 6.0f * pulse, 4.0f,
+                      blend_rgb(pulse_color, 0xFFFFFF, 0.86f), 0.40f + 0.60f * pulse);
+        };
         const std::string note_shape = normalize_gameplay_note_shape(data.gameplay.note_shape);
         ID2D1Geometry* note_polygon_geometry = gameplay_note_polygon_geometry(
             d2d_->gameplay_note_shape_geometries, note_shape);
@@ -500,7 +543,8 @@
             if (data.gameplay.has_feedback) {
                 gameplay_hud_cache_.feedback_text = gameplay_feedback_overlay_text(data.gameplay.feedback);
                 gameplay_hud_cache_.feedback_timing_text =
-                    gameplay_timing_feedback_text(data.gameplay.feedback_delta_ms);
+                    gameplay_timing_feedback_text(data.gameplay.feedback_delta_ms,
+                                                  data.gameplay.feedback);
             } else {
                 gameplay_hud_cache_.feedback_text.clear();
                 gameplay_hud_cache_.feedback_timing_text.clear();
@@ -509,7 +553,8 @@
                 gameplay_hud_cache_.ghost_feedback_text =
                     gameplay_feedback_overlay_text(data.gameplay.ghost_feedback);
                 gameplay_hud_cache_.ghost_feedback_timing_text =
-                    gameplay_timing_feedback_text(data.gameplay.ghost_feedback_delta_ms);
+                    gameplay_timing_feedback_text(data.gameplay.ghost_feedback_delta_ms,
+                                                  data.gameplay.ghost_feedback);
             } else {
                 gameplay_hud_cache_.ghost_feedback_text.clear();
                 gameplay_hud_cache_.ghost_feedback_timing_text.clear();
@@ -1842,33 +1887,19 @@
                 }
                 const float lane_center = gameplay_lane_center(field_layout, static_cast<int>(lane));
                 const float note_width = gameplay_note_width(field_layout, static_cast<int>(lane));
-                const float pulse_half_w = note_width * (0.50f + 0.09f * pulse);
-                const float pulse_half_h = 5.0f + 8.0f * pulse;
-                const float beam_half_h = 20.0f + 38.0f * pulse;
-                const D2D1_RECT_F beam_rect =
-                    D2D1::RectF(lane_center - pulse_half_w * 0.78f,
-                                std::max(field_top + 2.0f, hit_line_y - beam_half_h),
-                                lane_center + pulse_half_w * 0.78f,
-                                std::min(field_bottom - 2.0f, hit_line_y + beam_half_h));
-                const D2D1_RECT_F glow_rect =
-                    D2D1::RectF(lane_center - pulse_half_w,
-                                std::max(field_top + 2.0f, hit_line_y - pulse_half_h),
-                                lane_center + pulse_half_w,
-                                std::min(field_bottom - 2.0f, hit_line_y + pulse_half_h));
                 uint32_t pulse_color = 0x6EE7F2;
                 if (lane < data.gameplay.lane_color_count) {
                     pulse_color = data.gameplay.lane_colors[lane];
                 }
-                d2d_->note_fill_brush->SetColor(
-                    color_from_rgb(blend_rgb(pulse_color, 0x6EE7F2, 0.38f),
-                                   (0.025f + 0.085f * pulse) * visual_opacity * key_pulse_brightness));
-                ctx->FillRoundedRectangle(D2D1::RoundedRect(beam_rect, 9.0f, 9.0f),
-                                          d2d_->note_fill_brush.Get());
-                d2d_->note_fill_brush->SetColor(
-                    color_from_rgb(blend_rgb(pulse_color, 0xFFFFFF, 0.22f),
-                                   (0.10f + 0.24f * pulse) * visual_opacity * key_pulse_brightness));
-                ctx->FillRoundedRectangle(D2D1::RoundedRect(glow_rect, 6.0f, 6.0f),
-                                          d2d_->note_fill_brush.Get());
+                draw_gameplay_hit_burst(ctx,
+                                        lane_center,
+                                        note_width,
+                                        hit_line_y,
+                                        field_top,
+                                        field_bottom,
+                                        pulse,
+                                        pulse_color,
+                                        visual_opacity * key_pulse_brightness);
             }
         }
 
@@ -2233,33 +2264,19 @@
                     }
                     const float lane_center = gameplay_lane_center(ghost_field_layout, static_cast<int>(lane));
                     const float ghost_note_width = gameplay_note_width(ghost_field_layout, static_cast<int>(lane));
-                    const float pulse_half_w = ghost_note_width * (0.50f + 0.09f * pulse);
-                    const float pulse_half_h = 5.0f + 8.0f * pulse;
-                    const float beam_half_h = 20.0f + 38.0f * pulse;
-                    const D2D1_RECT_F beam_rect =
-                        D2D1::RectF(lane_center - pulse_half_w * 0.78f,
-                                    std::max(ghost_field_top + 2.0f, ghost_hit_line_y - beam_half_h),
-                                    lane_center + pulse_half_w * 0.78f,
-                                    std::min(ghost_field_bottom - 2.0f, ghost_hit_line_y + beam_half_h));
-                    const D2D1_RECT_F glow_rect =
-                        D2D1::RectF(lane_center - pulse_half_w,
-                                    std::max(ghost_field_top + 2.0f, ghost_hit_line_y - pulse_half_h),
-                                    lane_center + pulse_half_w,
-                                    std::min(ghost_field_bottom - 2.0f, ghost_hit_line_y + pulse_half_h));
                     uint32_t pulse_color = 0x6EE7F2;
                     if (lane < data.gameplay.lane_color_count) {
                         pulse_color = data.gameplay.lane_colors[lane];
                     }
-                    d2d_->note_fill_brush->SetColor(
-                        color_from_rgb(blend_rgb(pulse_color, 0x6EE7F2, 0.38f),
-                                       (0.025f + 0.085f * pulse) * visual_opacity * key_pulse_brightness));
-                    ctx->FillRoundedRectangle(D2D1::RoundedRect(beam_rect, 9.0f, 9.0f),
-                                              d2d_->note_fill_brush.Get());
-                    d2d_->note_fill_brush->SetColor(
-                        color_from_rgb(blend_rgb(pulse_color, 0xFFFFFF, 0.22f),
-                                       (0.10f + 0.24f * pulse) * visual_opacity * key_pulse_brightness));
-                    ctx->FillRoundedRectangle(D2D1::RoundedRect(glow_rect, 6.0f, 6.0f),
-                                              d2d_->note_fill_brush.Get());
+                    draw_gameplay_hit_burst(ctx,
+                                            lane_center,
+                                            ghost_note_width,
+                                            ghost_hit_line_y,
+                                            ghost_field_top,
+                                            ghost_field_bottom,
+                                            pulse,
+                                            pulse_color,
+                                            visual_opacity * key_pulse_brightness);
                 }
             }
 
@@ -2292,7 +2309,8 @@
         if (data.gameplay.paused && d2d_->panel_brush && d2d_->card_brush &&
             d2d_->text_brush && d2d_->header_format && d2d_->body_format) {
             const D2D1_RECT_F screen_overlay = D2D1::RectF(0.0f, 0.0f, kBaseWidth, kBaseHeight);
-            const D2D1_RECT_F pause_panel = D2D1::RectF(650.0f, 210.0f, 1270.0f, 870.0f);
+            // Tall enough to seat the three menu rows and the live tuning readout.
+            const D2D1_RECT_F pause_panel = D2D1::RectF(650.0f, 210.0f, 1270.0f, 960.0f);
             const float saved_panel_opacity = d2d_->panel_brush->GetOpacity();
             const float saved_card_opacity = d2d_->card_brush->GetOpacity();
             const D2D1_COLOR_F saved_text_color = d2d_->text_brush->GetColor();
@@ -2351,6 +2369,61 @@
                                           row_rect,
                                           d2d_->text_brush.Get(),
                                           DWRITE_TEXT_ALIGNMENT_CENTER);
+            }
+
+            // The pause screen doubles as the tuning screen, so the three values the
+            // F-keys drive are shown live with the keys that move them.
+            {
+                const float tuning_top = pause_panel.top + 518.0f;
+                const D2D1_RECT_F tuning_rect =
+                    D2D1::RectF(pause_panel.left + 40.0f, tuning_top,
+                                pause_panel.right - 40.0f, tuning_top + 132.0f);
+                if (d2d_->button_border_brush) {
+                    ctx->DrawLine(D2D1::Point2F(tuning_rect.left, tuning_rect.top - 12.0f),
+                                  D2D1::Point2F(tuning_rect.right, tuning_rect.top - 12.0f),
+                                  d2d_->button_border_brush.Get(),
+                                  1.0f);
+                }
+                struct PauseTuningRow {
+                    const wchar_t* label;
+                    std::wstring value;
+                    const wchar_t* keys;
+                };
+                const std::array<PauseTuningRow, 3> tuning_rows{{
+                    {L"\uD310\uC815\uC120",
+                     to_wide(format_decimal(data.gameplay.judgement_line_position * 100.0) + "%"),
+                     L"F1 / F2"},
+                    {L"\uC18D\uB3C4",
+                     to_wide(format_decimal(data.gameplay.hispeed)),
+                     L"F3 / F4  (F5 / F6)"},
+                    {L"\uB808\uC774\uD134\uC2DC",
+                     to_wide(format_signed_ms(data.gameplay.visual_offset_ms)),
+                     L"F7 / F8"},
+                }};
+                for (std::size_t row = 0; row < tuning_rows.size(); ++row) {
+                    const float top = tuning_rect.top + static_cast<float>(row) * 42.0f;
+                    const D2D1_RECT_F line_rect =
+                        D2D1::RectF(tuning_rect.left, top, tuning_rect.right, top + 36.0f);
+                    d2d_->text_brush->SetColor(D2D1::ColorF(0xAAB7C4, 0.92f));
+                    draw_text_clipped_aligned(std::wstring(tuning_rows[row].label),
+                                              d2d_->body_format.Get(),
+                                              line_rect,
+                                              d2d_->text_brush.Get(),
+                                              DWRITE_TEXT_ALIGNMENT_LEADING);
+                    d2d_->text_brush->SetColor(D2D1::ColorF(0xFFFFFF, 1.0f));
+                    draw_text_clipped_aligned(tuning_rows[row].value,
+                                              d2d_->body_format.Get(),
+                                              D2D1::RectF(line_rect.left, line_rect.top,
+                                                          line_rect.right - 210.0f, line_rect.bottom),
+                                              d2d_->text_brush.Get(),
+                                              DWRITE_TEXT_ALIGNMENT_TRAILING);
+                    d2d_->text_brush->SetColor(D2D1::ColorF(0x7F8C9B, 0.92f));
+                    draw_text_clipped_aligned(std::wstring(tuning_rows[row].keys),
+                                              d2d_->hud_format.Get(),
+                                              line_rect,
+                                              d2d_->text_brush.Get(),
+                                              DWRITE_TEXT_ALIGNMENT_TRAILING);
+                }
             }
 
             d2d_->text_brush->SetColor(D2D1::ColorF(0x94A3B8, 0.92f));

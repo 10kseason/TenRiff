@@ -187,6 +187,7 @@ bool GameSession::initialize(const CommandLineOptions& options) {
     chart_audio_voices_.clear();
     chart_audio_load_queue_.clear();
     chart_audio_active_until_samples_.reset();
+    last_keysound_chart_samples_.clear();
     pending_input_events_.clear();
     hidden_hit_note_ids_.clear();
     ghost_hidden_hit_note_ids_.clear();
@@ -1452,6 +1453,7 @@ bool GameSession::prepare_chart_audio() {
     chart_audio_voices_.clear();
     chart_audio_load_queue_.clear();
     chart_audio_active_until_samples_.reset();
+    last_keysound_chart_samples_.clear();
     next_chart_audio_event_ = 0;
     startup_preload_budget_bytes_ = 0;
     runtime_chart_audio_budget_bytes_ = 0;
@@ -1473,6 +1475,7 @@ bool GameSession::prepare_chart_audio() {
     }
 
     chart_audio_assets_.resize(asset_count);
+    last_keysound_chart_samples_.assign(asset_count, (std::numeric_limits<int64_t>::min)());
     chart_audio_active_until_samples_ = std::make_unique<std::atomic<int64_t>[]>(asset_count);
     for (std::size_t i = 0; i < asset_count; ++i) {
         chart_audio_assets_[i].path = chart_.audio_assets[i].path;
@@ -1574,6 +1577,7 @@ bool GameSession::prepare_chart_audio() {
         chart_audio_events_.clear();
         chart_audio_voices_.clear();
         chart_audio_active_until_samples_.reset();
+        last_keysound_chart_samples_.clear();
         return false;
     }
 
@@ -1886,6 +1890,14 @@ void GameSession::schedule_note_keysound(const gameplay::NoteEvent& note, int64_
         if (asset_id >= chart_audio_assets_.size()) {
             return;
         }
+        // Chord members share one chart timestamp, so a keysound already voiced for
+        // this timestamp is the same hit arriving on another lane. Play it once.
+        if (asset_id < last_keysound_chart_samples_.size()) {
+            if (last_keysound_chart_samples_[asset_id] == note.start_sample) {
+                return;
+            }
+            last_keysound_chart_samples_[asset_id] = note.start_sample;
+        }
         chart_audio_voices_.push_back(
             ChartAudioVoice{start_sample, asset_id, ChartAudioEvent::Kind::Keysound, gain});
     });
@@ -2164,6 +2176,7 @@ void GameSession::shutdown() {
     chart_audio_voices_.clear();
     chart_audio_load_queue_.clear();
     chart_audio_active_until_samples_.reset();
+    last_keysound_chart_samples_.clear();
     next_chart_audio_event_ = 0;
     startup_preload_budget_bytes_ = 0;
     runtime_chart_audio_budget_bytes_ = 0;
@@ -2516,6 +2529,41 @@ bool GameSession::handle_control_input(const input::InputEvent& event) {
         }
         if (escape_keycode_ != 0 && event.keycode == escape_keycode_) {
             pause_resume_requested_.store(true, std::memory_order_release);
+            return true;
+        }
+        // The pause screen is where these are easiest to judge, so the in-play
+        // tuning keys keep working here. Auto-repeat stays off: the menu shows the
+        // live value, so one step per press is precise enough.
+        if (f1_keycode_ != 0 && event.keycode == f1_keycode_) {
+            adjust_judgement_line_position(-kJudgementLinePositionStep);
+            return true;
+        }
+        if (f2_keycode_ != 0 && event.keycode == f2_keycode_) {
+            adjust_judgement_line_position(kJudgementLinePositionStep);
+            return true;
+        }
+        if (f3_keycode_ != 0 && event.keycode == f3_keycode_) {
+            adjust_hispeed(-kHispeedStep);
+            return true;
+        }
+        if (f4_keycode_ != 0 && event.keycode == f4_keycode_) {
+            adjust_hispeed(kHispeedStep);
+            return true;
+        }
+        if (f5_keycode_ != 0 && event.keycode == f5_keycode_) {
+            adjust_hispeed(-kHispeedStepCoarse);
+            return true;
+        }
+        if (f6_keycode_ != 0 && event.keycode == f6_keycode_) {
+            adjust_hispeed(kHispeedStepCoarse);
+            return true;
+        }
+        if (f7_keycode_ != 0 && event.keycode == f7_keycode_) {
+            adjust_visual_offset(-kInPlayVisualOffsetStep);
+            return true;
+        }
+        if (f8_keycode_ != 0 && event.keycode == f8_keycode_) {
+            adjust_visual_offset(kInPlayVisualOffsetStep);
             return true;
         }
         if (up_keycode_ != 0 && event.keycode == up_keycode_) {

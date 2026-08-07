@@ -266,6 +266,8 @@ struct ResultScreenData {
 
     double mean_delta_ms = 0.0;
     double stddev_delta_ms = 0.0;
+    int fast_count = 0;
+    int slow_count = 0;
     int shift_count = 0;
     int export_warning_count = 0;
     bool timing_guidance_visible = false;
@@ -327,7 +329,7 @@ struct GameplayHudData {
     std::string background_upscale_mode = "off";
     std::string background_upscale_model_path;
     bool background_upscale_prefer_npu = false;
-    bool show_cursor_in_gameplay = false;
+    bool show_cursor_in_gameplay = true;
     double judgement_line_position = 0.82;
     double gameplay_field_offset_x = 0.0;
     double combo_position = 0.24;
@@ -344,7 +346,7 @@ struct GameplayHudData {
     double note_divider_gap_px = kGameplayNoteDividerGapPxDefault;
     bool show_judgement_line = true;
     bool show_gear_boundary_line = false;
-    bool show_hold_tail = true;
+    bool show_hold_tail = false;
     bool hold_tail_taper_enabled = false;
     bool judgement_line_glow_enabled = true;
     bool key_pulse_enabled = true;
@@ -368,7 +370,7 @@ struct GameplayHudData {
 
     double bpm = 0.0;
     double rate = 1.0;
-    double hispeed = 3.0;
+    double hispeed = 10.0;
     double scroll_speed = 0.0;
 
     int64_t score = 0;
@@ -495,7 +497,7 @@ struct SkinPreviewData {
     double note_divider_gap_px = kGameplayNoteDividerGapPxDefault;
     bool show_judgement_line = true;
     bool show_gear_boundary_line = false;
-    bool show_hold_tail = true;
+    bool show_hold_tail = false;
     bool hold_tail_taper_enabled = false;
     bool judgement_line_glow_enabled = true;
     bool key_pulse_enabled = true;

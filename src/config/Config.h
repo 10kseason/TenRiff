@@ -63,8 +63,8 @@ inline constexpr double kSkinKeyPulseBrightnessDefault = 1.00;
 
 struct JudgeConfig {
     double pg_ms = 20.0;
-    double gr_ms = 45.0;
-    double gd_ms = 90.0;
+    double gr_ms = 65.0;
+    double gd_ms = 115.0;
     double bd_ms = 210.0;
     double indirect_miss_ms = 210.0;
     // Runtime mode policy: Judge Hard turns an unplayed object into an indirect POOR.
@@ -76,7 +76,7 @@ struct JudgeConfig {
 
 struct SpeedConfig {
     double rate = 1.0;
-    double hi_speed = 3.0;
+    double hi_speed = 10.0;
     double target_scroll_bps = 380.0;
 };
 
@@ -107,9 +107,9 @@ struct UiConfig {
     std::string language = "en";
     double result_tail_ms = 500.0;
     bool require_enter_to_exit = true;
-    // Gameplay hides the pointer by default. Keep it on screen for players who
-    // drag the playfield mid-song or run the game in a window alongside overlays.
-    bool show_cursor_in_gameplay = false;
+    // Gameplay keeps the skin pointer on screen by default so players can drag the
+    // playfield mid-song or run the game in a window alongside overlays.
+    bool show_cursor_in_gameplay = true;
     std::string active_song_source;
     std::vector<std::string> recent_song_sources;
     std::vector<std::string> favorite_chart_keys;
@@ -139,7 +139,7 @@ struct SkinConfig {
     double note_divider_gap_px = kNoteDividerGapPxDefault;
     bool show_judgement_line = true;
     bool show_gear_boundary_line = false;
-    bool show_hold_tail = true;
+    bool show_hold_tail = false;
     bool hold_tail_taper_enabled = false;
     bool judgement_line_glow_enabled = true;
     bool key_pulse_enabled = true;

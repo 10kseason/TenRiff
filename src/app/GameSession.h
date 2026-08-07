@@ -471,6 +471,9 @@ private:
     std::deque<std::size_t> chart_audio_load_queue_;
     std::vector<std::thread> chart_audio_loader_threads_;
     std::unique_ptr<std::atomic<int64_t>[]> chart_audio_active_until_samples_;
+    // Chart sample each keysound asset was last voiced at, so a chord that assigns
+    // the same sound to several lanes is heard once instead of stacking gain.
+    std::vector<int64_t> last_keysound_chart_samples_;
     std::vector<BufferedLaneInput> pending_input_events_;
     std::vector<uint8_t> hidden_hit_note_ids_;
     std::vector<uint8_t> ghost_hidden_hit_note_ids_;
