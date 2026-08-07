@@ -514,8 +514,8 @@ void GameplayEngine::update_hold(LaneState& lane, int64_t current_sample) {
 
     if (hold.release_active) {
         if (hold.release_required) {
-            const int64_t delta_samples = quantize_hold_tail_delta(hold.release_sample - hold.end_sample);
-            const auto judgement = classify_hold_tail_judgement(delta_samples);
+            const int64_t delta_samples = hold.release_sample - hold.end_sample;
+            const auto judgement = classify_judgement(delta_samples);
             double delta_ms = static_cast<double>(delta_samples) * 1000.0 / static_cast<double>(sample_rate_);
             const ComboImpact combo_impact =
                 (judgement == game::Judgement::BD) ? ComboImpact::Break : ComboImpact::Increment;
@@ -531,8 +531,8 @@ void GameplayEngine::update_hold(LaneState& lane, int64_t current_sample) {
         }
 
         if (current_sample >= hold.end_sample) {
-            const int64_t delta_samples = quantize_hold_tail_delta(hold.release_sample - hold.end_sample);
-            const auto judgement = classify_hold_tail_judgement(delta_samples);
+            const int64_t delta_samples = hold.release_sample - hold.end_sample;
+            const auto judgement = classify_judgement(delta_samples);
             double delta_ms = static_cast<double>(delta_samples) * 1000.0 / static_cast<double>(sample_rate_);
             const ComboImpact combo_impact =
                 (judgement == game::Judgement::BD) ? ComboImpact::Break : ComboImpact::Increment;
@@ -565,8 +565,8 @@ void GameplayEngine::update_hold(LaneState& lane, int64_t current_sample) {
     if (current_sample >= hold.end_sample) {
         if (!hold.broken) {
             const int64_t delta_samples =
-                hold.release_active ? quantize_hold_tail_delta(hold.release_sample - hold.end_sample) : 0;
-            const auto judgement = classify_hold_tail_judgement(delta_samples);
+                hold.release_active ? (hold.release_sample - hold.end_sample) : 0;
+            const auto judgement = classify_judgement(delta_samples);
             const double delta_ms = static_cast<double>(delta_samples) * 1000.0 / static_cast<double>(sample_rate_);
             const ComboImpact combo_impact =
                 (judgement == game::Judgement::BD) ? ComboImpact::Break : ComboImpact::Increment;
@@ -671,24 +671,6 @@ game::Judgement GameplayEngine::classify_judgement(int64_t delta_samples) const 
         return game::Judgement::BD;
     }
     return game::Judgement::BD;
-}
-
-game::Judgement GameplayEngine::classify_hold_tail_judgement(int64_t delta_samples) const {
-    const int64_t abs_delta = std::abs(delta_samples);
-    if (abs_delta <= windows_.hold_grace) {
-        return game::Judgement::PG;
-    }
-    if (abs_delta <= windows_.hold_break) {
-        return game::Judgement::GR;
-    }
-    return game::Judgement::BD;
-}
-
-int64_t GameplayEngine::quantize_hold_tail_delta(int64_t delta_samples) const {
-    if (std::abs(delta_samples) <= windows_.hold_grace) {
-        return 0;
-    }
-    return delta_samples;
 }
 
 double GameplayEngine::samples_to_ms(int64_t samples) const {

@@ -560,7 +560,7 @@ private:
     int selected_record_ = 0;
     int settings_cursor_ = 0;
     int options_cursor_ = 0;
-    int calibration_step_ms_ = 5;
+    int calibration_step_ms_ = 1;
     SongSelectFocus song_select_focus_ = SongSelectFocus::SongList;
     SongSortMode song_sort_mode_ = SongSortMode::DifficultyAsc;
     SongGroupMode song_group_mode_ = SongGroupMode::None;

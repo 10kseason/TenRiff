@@ -128,8 +128,8 @@ TEST_CASE("config defaults prefer 44100 Hz audio") {
     CHECK(config.gauge.easy.bd == doctest::Approx(kCurrentEasyBd));
     CHECK(config.gauge.easy.pr == doctest::Approx(kCurrentEasyPr));
     CHECK(config.judge.pg_ms == doctest::Approx(20.0));
-    CHECK(config.judge.gr_ms == doctest::Approx(45.0));
-    CHECK(config.judge.gd_ms == doctest::Approx(90.0));
+    CHECK(config.judge.gr_ms == doctest::Approx(65.0));
+    CHECK(config.judge.gd_ms == doctest::Approx(115.0));
     CHECK(config.judge.bd_ms == doctest::Approx(210.0));
     CHECK(config.judge.indirect_miss_ms == doctest::Approx(210.0));
     CHECK(config.judge.hold_grace_ms == doctest::Approx(80.0));
@@ -147,7 +147,7 @@ TEST_CASE("config defaults prefer 44100 Hz audio") {
     CHECK(config.skin.show_lane_dividers);
     CHECK(config.skin.show_judgement_line);
     CHECK_FALSE(config.skin.show_gear_boundary_line);
-    CHECK(config.skin.show_hold_tail);
+    CHECK_FALSE(config.skin.show_hold_tail);
     CHECK_FALSE(config.skin.hold_tail_taper_enabled);
     CHECK(config.skin.judgement_line_glow_enabled);
     CHECK(config.skin.key_pulse_enabled);
@@ -310,7 +310,7 @@ TEST_CASE("config load migrates an existing stale profile before returning it") 
     REQUIRE(result.success());
     CHECK_FALSE(result.used_defaults);
     CHECK(result.migrated);
-    CHECK(result.config.judge.gd_ms == doctest::Approx(90.0));
+    CHECK(result.config.judge.gd_ms == doctest::Approx(115.0));
     CHECK(result.config.judge.bd_ms == doctest::Approx(210.0));
     CHECK(result.config.judge.hold_grace_ms == doctest::Approx(80.0));
     CHECK(result.config.judge.hold_break_ms == doctest::Approx(200.0));
@@ -1317,8 +1317,8 @@ TEST_CASE("runtime migration upgrades old judge defaults into the current window
 
     CHECK(changed);
     CHECK(config.judge.pg_ms == doctest::Approx(20.0));
-    CHECK(config.judge.gr_ms == doctest::Approx(45.0));
-    CHECK(config.judge.gd_ms == doctest::Approx(90.0));
+    CHECK(config.judge.gr_ms == doctest::Approx(65.0));
+    CHECK(config.judge.gd_ms == doctest::Approx(115.0));
     CHECK(config.judge.bd_ms == doctest::Approx(210.0));
     CHECK(config.judge.indirect_miss_ms == doctest::Approx(210.0));
 }

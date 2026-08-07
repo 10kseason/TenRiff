@@ -462,7 +462,9 @@
             d2d_->accent_brush->SetOpacity(saved_opacity);
         }
 
-        const D2D1_RECT_F analysis_panel = D2D1::RectF(1190.0f, 154.0f, 1848.0f, 704.0f);
+        // Left edge shares the CONTINUE/REPLAY/RETRY column below it so the right
+        // half of the screen reads as one column instead of two ragged ones.
+        const D2D1_RECT_F analysis_panel = D2D1::RectF(1320.0f, 154.0f, 1848.0f, 704.0f);
         draw_result_panel(analysis_panel, presentation.graph, false);
         draw_result_text("// PERFORMANCE ANALYSIS",
                          d2d_->hud_format.Get(),
@@ -492,10 +494,12 @@
             const float saved_opacity = d2d_->accent_brush->GetOpacity();
             const float spread = static_cast<float>(std::clamp(data.result.stddev_delta_ms, 1.0, 65.0));
             const float mean = static_cast<float>(std::clamp(data.result.mean_delta_ms, -80.0, 80.0));
+            // Derived from the track so the 57 bars always land inside it.
+            const float bar_spacing = (timing_track.right - timing_track.left - 24.0f) / 56.0f;
             for (int bar = -28; bar <= 28; ++bar) {
                 const float delta = static_cast<float>(bar) * 2.8f;
                 const float gaussian = std::exp(-0.5f * ((delta - mean) / spread) * ((delta - mean) / spread));
-                const float x = center_x + static_cast<float>(bar) * 9.2f;
+                const float x = center_x + static_cast<float>(bar) * bar_spacing;
                 const float height = gaussian * 76.0f * presentation.graph;
                 d2d_->accent_brush->SetColor(bar < 0 ? D2D1::ColorF(0x54E9FF)
                                                       : D2D1::ColorF(0xA56BFF));
@@ -509,6 +513,34 @@
             ctx->DrawLine(D2D1::Point2F(center_x, timing_track.top + 8.0f),
                           D2D1::Point2F(center_x, timing_track.bottom - 8.0f),
                           d2d_->accent_brush.Get(), 1.0f);
+            d2d_->accent_brush->SetColor(saved_color);
+            d2d_->accent_brush->SetOpacity(saved_opacity);
+        }
+        // The histogram halves already encode direction by colour; naming them and
+        // printing the hit counts is what makes the split readable at a glance.
+        if (d2d_->accent_brush) {
+            const D2D1_COLOR_F saved_color = d2d_->accent_brush->GetColor();
+            const float saved_opacity = d2d_->accent_brush->GetOpacity();
+            const D2D1_RECT_F fast_rect =
+                D2D1::RectF(timing_track.left + 12.0f, timing_track.top + 8.0f,
+                            center_x - 12.0f, timing_track.top + 38.0f);
+            const D2D1_RECT_F slow_rect =
+                D2D1::RectF(center_x + 12.0f, timing_track.top + 8.0f,
+                            timing_track.right - 12.0f, timing_track.top + 38.0f);
+            d2d_->accent_brush->SetColor(D2D1::ColorF(0x54E9FF));
+            draw_result_text("FAST  " + std::to_string(data.result.fast_count),
+                             d2d_->hud_format.Get(),
+                             fast_rect,
+                             d2d_->accent_brush.Get(),
+                             presentation.graph,
+                             DWRITE_TEXT_ALIGNMENT_LEADING);
+            d2d_->accent_brush->SetColor(D2D1::ColorF(0xA56BFF));
+            draw_result_text("SLOW  " + std::to_string(data.result.slow_count),
+                             d2d_->hud_format.Get(),
+                             slow_rect,
+                             d2d_->accent_brush.Get(),
+                             presentation.graph,
+                             DWRITE_TEXT_ALIGNMENT_TRAILING);
             d2d_->accent_brush->SetColor(saved_color);
             d2d_->accent_brush->SetOpacity(saved_opacity);
         }
@@ -535,16 +567,34 @@
         const D2D1_RECT_F gauge_plot =
             D2D1::RectF(analysis_panel.left + 30.0f, analysis_panel.top + 332.0f,
                         analysis_panel.right - 30.0f, analysis_panel.bottom - 36.0f);
+        // Gridlines alone do not say what height means, so each one carries its
+        // percentage and the plot keeps a left gutter for those labels.
+        const float gauge_axis_width = 46.0f;
+        const D2D1_RECT_F gauge_track =
+            D2D1::RectF(gauge_plot.left + gauge_axis_width, gauge_plot.top,
+                        gauge_plot.right, gauge_plot.bottom);
         if (d2d_->button_border_brush) {
             const float saved = d2d_->button_border_brush->GetOpacity();
-            d2d_->button_border_brush->SetOpacity(0.28f * presentation.graph);
             for (int line = 0; line <= 4; ++line) {
-                const float y = gauge_plot.top + (gauge_plot.bottom - gauge_plot.top) *
-                                                     static_cast<float>(line) / 4.0f;
-                ctx->DrawLine(D2D1::Point2F(gauge_plot.left, y),
-                              D2D1::Point2F(gauge_plot.right, y),
-                              d2d_->button_border_brush.Get(), 0.8f);
+                const float y = gauge_track.top + (gauge_track.bottom - gauge_track.top) *
+                                                      static_cast<float>(line) / 4.0f;
+                const bool edge = line == 0 || line == 4;
+                d2d_->button_border_brush->SetOpacity((edge ? 0.46f : 0.24f) * presentation.graph);
+                ctx->DrawLine(D2D1::Point2F(gauge_track.left, y),
+                              D2D1::Point2F(gauge_track.right, y),
+                              d2d_->button_border_brush.Get(), edge ? 1.1f : 0.8f);
+                draw_result_text(std::to_string(100 - line * 25) + "%",
+                                 d2d_->hud_format.Get(),
+                                 D2D1::RectF(gauge_plot.left, y - 13.0f,
+                                             gauge_track.left - 8.0f, y + 13.0f),
+                                 d2d_->muted_brush.Get(),
+                                 presentation.graph,
+                                 DWRITE_TEXT_ALIGNMENT_TRAILING);
             }
+            d2d_->button_border_brush->SetOpacity(0.34f * presentation.graph);
+            ctx->DrawLine(D2D1::Point2F(gauge_track.left, gauge_track.top),
+                          D2D1::Point2F(gauge_track.left, gauge_track.bottom),
+                          d2d_->button_border_brush.Get(), 1.1f);
             d2d_->button_border_brush->SetOpacity(saved);
         }
         if (data.result.gauge_points.size() >= 2 && d2d_->accent_brush) {
@@ -563,11 +613,11 @@
                     continue;
                 }
                 const D2D1_POINT_2F p0 = D2D1::Point2F(
-                    gauge_plot.left + previous.position * (gauge_plot.right - gauge_plot.left),
-                    gauge_plot.bottom - previous.value * (gauge_plot.bottom - gauge_plot.top));
+                    gauge_track.left + previous.position * (gauge_track.right - gauge_track.left),
+                    gauge_track.bottom - previous.value * (gauge_track.bottom - gauge_track.top));
                 const D2D1_POINT_2F p1 = D2D1::Point2F(
-                    gauge_plot.left + current.position * (gauge_plot.right - gauge_plot.left),
-                    gauge_plot.bottom - current.value * (gauge_plot.bottom - gauge_plot.top));
+                    gauge_track.left + current.position * (gauge_track.right - gauge_track.left),
+                    gauge_track.bottom - current.value * (gauge_track.bottom - gauge_track.top));
                 ctx->DrawLine(p0, p1, d2d_->accent_brush.Get(), 2.2f);
             }
             d2d_->accent_brush->SetColor(saved_color);

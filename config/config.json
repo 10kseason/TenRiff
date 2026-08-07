@@ -24,8 +24,8 @@
   },
   "judge": {
     "pg": 20.0,
-    "gr": 45.0,
-    "gd": 90.0,
+    "gr": 65.0,
+    "gd": 115.0,
     "bd": 210.0,
     "hold_grace": 80,
     "hold_break": 200,
@@ -33,7 +33,7 @@
   },
   "speed": {
     "rate": 1.0,
-    "hispeed": 3.0,
+    "hispeed": 10.0,
     "target_scroll_bps": 380
   },
   "gauge": {
@@ -85,7 +85,7 @@
     "show_lane_dividers": true,
     "show_judgement_line": true,
     "show_gear_boundary_line": false,
-    "show_hold_tail": true,
+    "show_hold_tail": false,
     "hold_tail_taper_enabled": false,
     "judgement_line_glow_enabled": true,
     "key_pulse_enabled": true,

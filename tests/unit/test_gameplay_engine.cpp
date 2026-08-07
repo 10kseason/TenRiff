@@ -302,7 +302,7 @@ TEST_CASE("gameplay engine scores hold tail based on release timing") {
     CHECK(engine.stats().counts.bd == 0);
 }
 
-TEST_CASE("gameplay engine gives charge holds a grace window around the tail") {
+TEST_CASE("gameplay engine judges charge hold tails with the standard windows") {
     GameplayChart chart;
     chart.lane_count = 1;
     chart.duration_samples = 3000;
@@ -325,15 +325,17 @@ TEST_CASE("gameplay engine gives charge holds a grace window around the tail") {
 
     GameplayEngine engine(chart, config);
     (void)engine.handle_input(1, InputState::Pressed, 1000);
-    (void)engine.handle_input(1, InputState::Released, 1970);
+    (void)engine.handle_input(1, InputState::Released, 1985);
     engine.advance(2500);
 
-    CHECK(engine.stats().counts.pg == 2);
-    CHECK(engine.stats().counts.gr == 0);
+    // Tails run through the same windows as taps, so a 15 ms early release is a
+    // GREAT rather than being snapped up to PGREAT by a hold-only grace window.
+    CHECK(engine.stats().counts.pg == 1);
+    CHECK(engine.stats().counts.gr == 1);
     CHECK(engine.stats().counts.bd == 0);
 }
 
-TEST_CASE("gameplay engine gives charge holds a softer bad window before the tail") {
+TEST_CASE("gameplay engine breaks charge hold tails released past the good window") {
     GameplayChart chart;
     chart.lane_count = 1;
     chart.duration_samples = 3000;
@@ -359,9 +361,10 @@ TEST_CASE("gameplay engine gives charge holds a softer bad window before the tai
     (void)engine.handle_input(1, InputState::Released, 1935);
     engine.advance(2500);
 
+    // 65 ms early is past the GOOD window, so the tail breaks like any other note.
     CHECK(engine.stats().counts.pg == 1);
-    CHECK(engine.stats().counts.gr == 1);
-    CHECK(engine.stats().counts.bd == 0);
+    CHECK(engine.stats().counts.gr == 0);
+    CHECK(engine.stats().counts.bd == 1);
 }
 
 TEST_CASE("gameplay engine auto-clears standard hold tails without release timing") {
@@ -501,7 +504,7 @@ TEST_CASE("gameplay engine marks early hold release as bad") {
     CHECK(engine.stats().counts.pg == 1);
 }
 
-TEST_CASE("gameplay engine keeps standard holds alive through a short early release") {
+TEST_CASE("gameplay engine still judges standard hold tails after an early release") {
     GameplayChart chart;
     chart.lane_count = 1;
     chart.duration_samples = 3000;
@@ -522,9 +525,11 @@ TEST_CASE("gameplay engine keeps standard holds alive through a short early rele
     (void)engine.handle_input(1, InputState::Released, 1940);
     engine.advance(2500);
 
+    // The hold is not dropped: the tail is still scored, just on the same windows
+    // as any other note, so a 60 ms early release lands outside GOOD.
     CHECK(engine.stats().counts.pg == 1);
-    CHECK(engine.stats().counts.gr == 1);
-    CHECK(engine.stats().counts.bd == 0);
+    CHECK(engine.stats().counts.gr == 0);
+    CHECK(engine.stats().counts.bd == 1);
 }
 
 TEST_CASE("gameplay engine marks unreleased charge hold tails as bad after the tail window") {
@@ -873,7 +878,7 @@ TEST_CASE("sudden death rejects an OD8-missed hold head immediately") {
     CHECK(engine.is_game_over());
 }
 
-TEST_CASE("sudden death catches an OD8 hold-tail miss even when native timing is great") {
+TEST_CASE("sudden death catches an OD8 hold-tail miss even when native timing still scores") {
     GameplayChart chart;
     chart.lane_count = 1;
     chart.duration_samples = 3000;
@@ -883,7 +888,9 @@ TEST_CASE("sudden death catches an OD8 hold-tail miss even when native timing is
     config.sample_rate = 1000;
     config.judge.pg_ms = 15.5;
     config.judge.gr_ms = 31.0;
-    config.judge.gd_ms = 75.0;
+    // Wide enough that the 150 ms early release is still a native GOOD, so the
+    // game over below can only come from the OD8 miss.
+    config.judge.gd_ms = 200.0;
     config.judge.bd_ms = 340.0;
     config.judge.hold_grace_ms = 80.0;
     config.judge.hold_break_ms = 200.0;
@@ -895,7 +902,8 @@ TEST_CASE("sudden death catches an OD8 hold-tail miss even when native timing is
     engine.advance(2000);
 
     CHECK(engine.stats().counts.pg == 1);
-    CHECK(engine.stats().counts.gr == 1);
+    CHECK(engine.stats().counts.gd == 1);
+    CHECK(engine.stats().counts.bd == 0);
     CHECK(engine.stats().osu_od8.counts.miss == 1);
     CHECK(engine.is_game_over());
 }
@@ -1161,7 +1169,7 @@ TEST_CASE("late miss recovery press scores the clearly closer next note") {
     CHECK(engine.stats().combo == 1);
 }
 
-TEST_CASE("judge easy mod expands charge hold tail windows during gameplay") {
+TEST_CASE("judge easy mod expands charge hold tail judgement during gameplay") {
     GameplayChart chart;
     chart.lane_count = 1;
     chart.duration_samples = 3000;
@@ -1193,14 +1201,16 @@ TEST_CASE("judge easy mod expands charge hold tail windows during gameplay") {
 
     GameplayEngine engine(mode_result.chart, config);
     (void)engine.handle_input(1, InputState::Pressed, 1000);
-    (void)engine.handle_input(1, InputState::Released, 2024);
+    (void)engine.handle_input(1, InputState::Released, 2012);
     engine.advance(2500);
 
+    // Tails ride the normal windows, so Judge Easy's 1.25x PGREAT (12.5 ms) is what
+    // turns this 12 ms late release into a PGREAT instead of a GREAT.
     CHECK(engine.stats().counts.pg == 2);
     CHECK(engine.stats().counts.gr == 0);
 }
 
-TEST_CASE("judge hard mod leaves charge hold tail windows at their base values") {
+TEST_CASE("judge hard mod leaves charge hold tail judgement at the base windows") {
     GameplayChart chart;
     chart.lane_count = 1;
     chart.duration_samples = 3000;
@@ -1232,13 +1242,14 @@ TEST_CASE("judge hard mod leaves charge hold tail windows at their base values")
 
     GameplayEngine engine(mode_result.chart, config);
     (void)engine.handle_input(1, InputState::Pressed, 1000);
-    (void)engine.handle_input(1, InputState::Released, 2018);
+    (void)engine.handle_input(1, InputState::Released, 2012);
     engine.advance(2500);
 
-    CHECK(mode_result.judge.hold_grace_ms == doctest::Approx(judge.hold_grace_ms));
-    CHECK(mode_result.judge.hold_break_ms == doctest::Approx(judge.hold_break_ms));
-    CHECK(engine.stats().counts.pg == 2);
-    CHECK(engine.stats().counts.gr == 0);
+    CHECK(mode_result.judge.pg_ms == doctest::Approx(judge.pg_ms));
+    CHECK(mode_result.judge.gr_ms == doctest::Approx(judge.gr_ms));
+    // Same release as the Judge Easy case: without the widened PGREAT it is a GREAT.
+    CHECK(engine.stats().counts.pg == 1);
+    CHECK(engine.stats().counts.gr == 1);
 }
 
 TEST_CASE("full long notes preserve raw score potential during gameplay") {

@@ -796,7 +796,7 @@ std::string MenuApp::ui_random_label(std::string_view token) const {
         return ui_text("Mirror", "미러");
     }
     if (normalized == "fr") {
-        return ui_text("Random", "??");
+        return ui_text("Random", "랜덤");
     }
     if (normalized == "rr") {
         return "R-Random";

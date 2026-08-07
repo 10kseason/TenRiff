@@ -132,8 +132,6 @@ private:
     [[nodiscard]] double detailed_accuracy_credit_for(game::Judgement judgement, double delta_ms) const;
     [[nodiscard]] JudgeWindowSamples build_windows(const config::JudgeConfig& judge, double rate) const;
     [[nodiscard]] game::Judgement classify_judgement(int64_t delta_samples) const;
-    [[nodiscard]] game::Judgement classify_hold_tail_judgement(int64_t delta_samples) const;
-    [[nodiscard]] int64_t quantize_hold_tail_delta(int64_t delta_samples) const;
 
     int lane_count_ = 0;
     int sample_rate_ = 48000;

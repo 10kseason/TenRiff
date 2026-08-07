@@ -853,6 +853,8 @@ void MenuApp::populate_result_render_data(render::MenuRenderData& render, const 
         last_result_.counts.pr == 0;
     render.result.mean_delta_ms = last_result_.mean_delta_ms;
     render.result.stddev_delta_ms = last_result_.stddev_delta_ms();
+    render.result.fast_count = last_result_.negative_delta_count;
+    render.result.slow_count = last_result_.positive_delta_count;
     render.result.shift_count = static_cast<int>(last_result_.shifts.size());
     render.result.export_warning_count = static_cast<int>(last_export_warnings_.size());
     render.result.replay_file = filename_only(last_replay_path_);
