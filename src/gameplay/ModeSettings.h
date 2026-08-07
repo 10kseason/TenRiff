@@ -15,6 +15,8 @@ enum class KeyModeConversionAlgorithm {
 enum class Nk2Preset {
     Native,
     Transform,
+    // 65% support budget aimed at keeping the source placement readable.
+    Remaster,
 };
 
 enum class KeyMode {

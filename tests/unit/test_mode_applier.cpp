@@ -701,7 +701,7 @@ TEST_CASE("runtime mode settings use the selected KeyWeaver nK2 converter") {
     CHECK(contains_warning(result.warnings, "nK2 remapped"));
 }
 
-TEST_CASE("nK2 Native adds 12 percent while Transform adds 35 percent") {
+TEST_CASE("nK2 support budgets taper with source density") {
     using namespace tenriff::gameplay;
 
     GameplayChart chart;
@@ -726,8 +726,13 @@ TEST_CASE("nK2 Native adds 12 percent while Transform adds 35 percent") {
 
     REQUIRE(native_result.converted);
     REQUIRE(transform_result.converted);
-    CHECK(native_result.chart.notes.size() == chart.notes.size() + 12u);
-    CHECK(transform_result.chart.notes.size() == chart.notes.size() + 35u);
+    // The headline 12% / 35% are caps, not targets. 100 notes over 99 seconds is
+    // ~1 note/sec, a tenth of the engine's 10 nps reference, so each preset keeps
+    // a tenth of its budget: 12% -> 2 notes, 35% -> 4. Dense charts run into the
+    // support safety windows well before the budget and are unaffected.
+    CHECK(native_result.chart.notes.size() == chart.notes.size() + 2u);
+    CHECK(transform_result.chart.notes.size() == chart.notes.size() + 4u);
+    CHECK(native_result.chart.notes.size() < transform_result.chart.notes.size());
     CHECK(contains_warning(native_result.warnings, "Native 12%"));
     CHECK(contains_warning(transform_result.warnings, "Transform 35%"));
     CHECK_FALSE(has_lane_overlap(native_result.chart));

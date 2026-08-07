@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(TenRiff VERSION 1.3.7 LANGUAGES C CXX)
+project(TenRiff VERSION 1.3.8 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -288,6 +288,35 @@ if(WIN32)
     target_link_libraries(bms_key_converter PRIVATE tenriff_bms_key_converter_core)
 else()
     target_link_libraries(bms_key_converter PRIVATE tenriff_bms_key_converter_core)
+endif()
+
+# KeyWeaver NK2 - osu!mania front-end for the shared nK2 relaning engine.
+add_library(tenriff_keyweaver_osu_core
+    src/keyweaver/osu_file.cpp
+    src/keyweaver/osu_pipeline.cpp
+)
+
+target_include_directories(tenriff_keyweaver_osu_core
+    PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
+)
+
+target_compile_features(tenriff_keyweaver_osu_core PUBLIC cxx_std_17)
+target_link_libraries(tenriff_keyweaver_osu_core PUBLIC tenriff_nk2)
+
+add_executable(keyweaver_osu
+    src/keyweaver_osu_main.cpp
+)
+
+target_link_libraries(keyweaver_osu PRIVATE tenriff_keyweaver_osu_core)
+
+if(MSVC)
+    target_compile_options(tenriff_keyweaver_osu_core PRIVATE /utf-8)
+    target_compile_options(keyweaver_osu PRIVATE /utf-8)
+    # wmain() keeps dropped paths intact instead of losing them to the ANSI
+    # code page.
+    set_target_properties(keyweaver_osu PROPERTIES LINK_FLAGS "/ENTRY:wmainCRTStartup")
 endif()
 
 if(WIN32)

@@ -115,7 +115,13 @@ std::string normalize_nk2_preset_local(std::string value) {
     std::transform(value.begin(), value.end(), value.begin(), [](unsigned char ch) {
         return static_cast<char>(std::tolower(ch));
     });
-    return value == "transform" || value == "transform35" ? "transform" : "native";
+    if (value == "transform" || value == "transform35") {
+        return "transform";
+    }
+    if (value == "remaster" || value == "remaster65" || value == "rm") {
+        return "remaster";
+    }
+    return "native";
 }
 
 int64_t ms_to_samples(double ms, int sample_rate) {

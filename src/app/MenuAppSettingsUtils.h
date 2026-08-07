@@ -279,13 +279,24 @@ inline std::string cycle_key_conversion_algorithm(std::string_view current) {
 
 inline std::string normalize_key_conversion_nk2_preset(std::string value) {
     value = to_lower_ascii(std::move(value));
-    return value == "transform" || value == "transform35" ? "transform" : "native";
+    if (value == "transform" || value == "transform35") {
+        return "transform";
+    }
+    if (value == "remaster" || value == "remaster65" || value == "rm") {
+        return "remaster";
+    }
+    return "native";
 }
 
 inline std::string cycle_key_conversion_nk2_preset(std::string_view current) {
-    return normalize_key_conversion_nk2_preset(std::string(current)) == "transform"
-               ? "native"
-               : "transform";
+    const std::string normalized = normalize_key_conversion_nk2_preset(std::string(current));
+    if (normalized == "native") {
+        return "transform";
+    }
+    if (normalized == "transform") {
+        return "remaster";
+    }
+    return "native";
 }
 
 inline std::string normalize_runtime_key_mode(std::string value) {

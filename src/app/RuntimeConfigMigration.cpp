@@ -211,6 +211,11 @@ bool migrate_bms_first_runtime_config(config::RuntimeConfig& config) {
             config.mode.key_conversion_nk2_preset = "transform";
             changed = true;
         }
+    } else if (nk2_preset == "remaster" || nk2_preset == "remaster65" || nk2_preset == "rm") {
+        if (config.mode.key_conversion_nk2_preset != "remaster") {
+            config.mode.key_conversion_nk2_preset = "remaster";
+            changed = true;
+        }
     } else if (nk2_preset == "native" || nk2_preset == "native12" || nk2_preset.empty()) {
         if (config.mode.key_conversion_nk2_preset != "native") {
             config.mode.key_conversion_nk2_preset = "native";

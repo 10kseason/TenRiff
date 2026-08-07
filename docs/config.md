@@ -149,8 +149,10 @@
   - Krrcream은 원본 노트만 목표 레인으로 재배치
   - nK2는 키 수 확장 시 원본에 먼저 노트를 붙이지 않고, 변환 중 목표 레이아웃에 안전한 보조 노트를 직접 생성
 - `key_conversion_nk2_preset` (string)
-  - `native | transform`; 기본값은 `native`
-  - nK2에서 `Native (12%)` 또는 `Transform (35%)`를 선택하며, Krrcream에서는 설정 행이 잠김
+  - `native | transform | remaster`; 기본값은 `native`
+  - nK2에서 `Native (12%)`, `Transform (35%)`, `Remaster (65%)`를 선택하며, Krrcream에서는 설정 행이 잠김
+  - `Remaster`는 예산을 올리면서도 원곡 배치를 유지하고, 롱노트 구간의 보조 노트를 같은 길이의 롱노트로 채움
+  - 세 값은 모두 상한이며, 실제 추가량은 원본 밀도와 안전창에 따라 더 낮게 나옴
 - `gauge` (string)
   - `normal | hard | ex_hard | easy | shift`
 - `random` (string)

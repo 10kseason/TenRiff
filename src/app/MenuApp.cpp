@@ -768,9 +768,14 @@ std::string MenuApp::ui_key_conversion_algorithm_label(std::string_view token) c
 }
 
 std::string MenuApp::ui_key_conversion_nk2_preset_label(std::string_view token) const {
-    return normalize_key_conversion_nk2_preset(std::string(token)) == "transform"
-               ? "Transform (35%)"
-               : "Native (12%)";
+    const std::string normalized = normalize_key_conversion_nk2_preset(std::string(token));
+    if (normalized == "transform") {
+        return "Transform (35%)";
+    }
+    if (normalized == "remaster") {
+        return "Remaster (65%)";
+    }
+    return "Native (12%)";
 }
 
 std::string MenuApp::ui_gauge_label(std::string_view token) const {

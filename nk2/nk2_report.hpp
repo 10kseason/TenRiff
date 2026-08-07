@@ -20,6 +20,12 @@ enum class Mode {
     Faithful,
     Harder,
     Transform,
+    // Transform pushed further: a 65% support budget and tighter safety windows,
+    // for a deliberate rewrite rather than a relane.
+    RemixedRemastered,
+    // Same budget as RemixedRemastered, but the caller pairs it with a high
+    // anchor bias so the extra notes land around the original placement.
+    Remaster,
     Report,
 };
 
@@ -32,6 +38,28 @@ struct NK2Options {
     LayoutWeights layoutWeights;
     int sameTimeEpsilonMs = 2;
     bool superSymmetry = false;
+    // Hold notes are excluded from the "free tap" relaning budget, so they stay
+    // near their source lane. 0 keeps that behaviour; 1 gives them the same
+    // freedom an unconstrained tap gets.
+    // Overrides the mode's support-note budget when > 0.
+    double supportBudgetRatio = 0.0;
+    // Override the mode's support safety windows when > 0. The jack window is
+    // the bigger lever on how many support notes actually land.
+    int supportJackWindowMs = 0;
+    int supportSameSourceGapMs = 0;
+    // Source density (notes/sec) at which the support budget stops being
+    // tapered. 0 uses the engine default, negative disables the taper.
+    double supportDensityReferenceNps = 0.0;
+    double lnSpread = 0.0;
+    // 8K targets carry hardcoded tuning that deliberately spreads notes off
+    // their source lane. 0 keeps it; 1 neutralises it so the relane stays
+    // recognisable as the original chart.
+    double anchorBias = 0.0;
+    // Extra pull toward target lanes that no source lane maps onto. 0 disables.
+    double gapLaneBoost = 0.0;
+    // Support notes are always taps. With this on, one anchored to an LN head
+    // becomes a hold spanning the same range, filling the LN section.
+    bool lnFill = false;
 };
 
 struct NK2Report {

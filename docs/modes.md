@@ -28,7 +28,7 @@
 - 차트 입력은 BMS 계열(`.bms/.bme/.bml/.pms`) 전용이며 예전 osu 토글은 더 이상 제공하거나 저장하지 않음
 - `key_mode`: `none | auto | 4k | 5k | 6k | 7k | 8k | 9k | 10k | 12k | 14k | 16k`
 - `key_conversion_algorithm`: `krrcream | nk2` (기본 `krrcream`; Krrcream은 원본 노트만 재배치하고 nK2는 키 수 확장 중 목표 레이아웃에 안전한 보조 노트를 직접 생성)
-- `key_conversion_nk2_preset`: `native | transform` (기본 `native`; nK2 선택 시 `Native (12%)` 또는 `Transform (35%)`, Krrcream 선택 시 행 잠금)
+- `key_conversion_nk2_preset`: `native | transform | remaster` (기본 `native`; nK2 선택 시 `Native (12%)`, `Transform (35%)`, `Remaster (65%)`, Krrcream 선택 시 행 잠금)
 - `gauge`: `normal | hard | ex_hard | easy | shift`
 - `random`: `off | mirror | rr | fr | sr`
 - `random_seed`: RR/FR/SR, 강제 key-mode 변환, Note Add, LN Mix 대상 선택의 고정 시드 (0도 고정 값으로 취급)
