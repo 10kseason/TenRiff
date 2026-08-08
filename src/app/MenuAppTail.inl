@@ -103,6 +103,8 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
     target.judgement_line_glow_enabled = config_.skin.judgement_line_glow_enabled;
     target.key_pulse_enabled = config_.skin.key_pulse_enabled;
     target.key_pulse_brightness = static_cast<float>(config_.skin.key_pulse_brightness);
+    target.hit_burst_style =
+        config::normalize_skin_hit_burst_style_token(config_.skin.hit_burst_style);
     target.key_label_position = config::normalize_skin_key_label_position_token(config_.skin.key_label_position);
     target.note_border_enabled = config_.skin.note_border_enabled;
     target.note_shape = config::normalize_skin_note_shape_token(config_.skin.note_shape);
@@ -828,6 +830,8 @@ void MenuApp::populate_result_render_data(render::MenuRenderData& render, const 
                             !menu_records::clear_status_is_autoplay(last_clear_status_);
     render.result.score = last_result_final_score_;
     render.result.detail_score = menu_records::calculate_detail_score(last_result_);
+    render.result.max_score = gameplay::kNativeScoreMaximum;
+    render.result.max_detail_score = gameplay::maximum_detail_score(last_result_.total_notes);
     render.result.pause_used = last_pause_used_;
     render.result.accuracy = accuracy;
     render.result.detailed_accuracy = menu_records::calculate_detailed_accuracy(last_result_);
@@ -1094,19 +1098,57 @@ void MenuApp::populate_generic_screen_render_data(render::MenuRenderData& render
     render.generic.heading = screen_title();
 
     if (screen_ == Screen::OptionsHub) {
-        append_menu_row(render.generic, ui_text("Audio", "오디오"), "", options_cursor_ == 0, render::MenuHitTargetKind::OptionsItem, 0, true, false);
-        append_menu_row(render.generic, ui_text("Graphics", "그래픽"), "", options_cursor_ == 1, render::MenuHitTargetKind::OptionsItem, 1, true, false);
-        append_menu_row(render.generic, ui_text("Skins", "스킨"), "", options_cursor_ == 2, render::MenuHitTargetKind::OptionsItem, 2, true, false);
-        append_menu_row(render.generic, ui_text("Input", "입력"), "", options_cursor_ == 3, render::MenuHitTargetKind::OptionsItem, 3, true, false);
-        append_menu_row(render.generic, ui_text("Calibration Wizard", "캘리브레이션 위저드"), "", options_cursor_ == 4, render::MenuHitTargetKind::OptionsItem, 4, true, false);
-        append_menu_row(render.generic, ui_text("Mode", "모드"), "", options_cursor_ == 5, render::MenuHitTargetKind::OptionsItem, 5, true, false);
-        append_menu_row(render.generic, ui_text("Keymap", "키 설정"), "", options_cursor_ == 6, render::MenuHitTargetKind::OptionsItem, 6, true, false);
-        append_menu_row(render.generic, ui_text("Profile Setup", "프로필 설정"), safe_ui_text(options_.profile), options_cursor_ == profile_setup::kOptionsProfileSetupRow, render::MenuHitTargetKind::OptionsItem, profile_setup::kOptionsProfileSetupRow, true, false);
-        append_menu_row(render.generic, ui_text("Back", "뒤로"), "", options_cursor_ == profile_setup::kOptionsBackRow, render::MenuHitTargetKind::OptionsItem, profile_setup::kOptionsBackRow, true, false);
-        render.generic.notes.push_back(ui_text("Up/Down to move, Enter to select, Esc to return.",
-                                               "위/아래로 이동하고 Enter로 선택, Esc로 돌아갑니다."));
-        render.generic.notes.push_back(ui_text("Use the listed rows directly here. F1 opens help, F2 opens the songs-folder picker, and F5 refreshes the library.",
-                                               "여기서는 보이는 항목을 직접 여세요. F1은 도움말, F2는 곡 폴더 선택, F5는 라이브러리 새로고침입니다."));
+        render.generic.card_grid = true;
+        append_menu_row(render.generic, ui_text("KEY MODE", "키 모드"),
+                        ui_key_mode_label(config_.mode.key_mode),
+                        options_cursor_ == profile_setup::kOptionsKeyModeRow,
+                        render::MenuHitTargetKind::OptionsItem, profile_setup::kOptionsKeyModeRow, true, false);
+        append_menu_row(render.generic, ui_text("KEYMAP", "키 설정"),
+                        ui_text("Configure", "설정"),
+                        options_cursor_ == profile_setup::kOptionsKeymapRow,
+                        render::MenuHitTargetKind::OptionsItem, profile_setup::kOptionsKeymapRow, true, false);
+        append_menu_row(render.generic, ui_text("SKINS", "스킨"),
+                        ui_skin_source_label(config_.skin.source),
+                        options_cursor_ == profile_setup::kOptionsSkinsRow,
+                        render::MenuHitTargetKind::OptionsItem, profile_setup::kOptionsSkinsRow, true, false);
+        append_menu_row(render.generic, ui_text("GRAPHICS", "그래픽"),
+                        ui_display_mode_label(config_.graphics.display_mode),
+                        options_cursor_ == profile_setup::kOptionsGraphicsRow,
+                        render::MenuHitTargetKind::OptionsItem, profile_setup::kOptionsGraphicsRow, true, false);
+        append_menu_row(render.generic, ui_text("AUDIO", "오디오"),
+                        ui_preset_label(config_.audio_ui.preset),
+                        options_cursor_ == profile_setup::kOptionsAudioRow,
+                        render::MenuHitTargetKind::OptionsItem, profile_setup::kOptionsAudioRow, true, false);
+        append_menu_row(render.generic, ui_text("INPUT", "입력"),
+                        safe_ui_text(config_.input.backend),
+                        options_cursor_ == profile_setup::kOptionsInputRow,
+                        render::MenuHitTargetKind::OptionsItem, profile_setup::kOptionsInputRow, true, false);
+        append_menu_row(render.generic, ui_text("CALIBRATION", "레이턴시"),
+                        format_signed_offset_ms(config_.visual_offset_ms),
+                        options_cursor_ == profile_setup::kOptionsCalibrationRow,
+                        render::MenuHitTargetKind::OptionsItem, profile_setup::kOptionsCalibrationRow, true, false);
+        append_menu_row(render.generic, ui_text("PROFILE", "프로필"),
+                        safe_ui_text(options_.profile),
+                        options_cursor_ == profile_setup::kOptionsProfileSetupRow,
+                        render::MenuHitTargetKind::OptionsItem, profile_setup::kOptionsProfileSetupRow, true, false);
+        render.generic.card_descriptions = {
+            ui_text("Choose the play key mode. The current mode is shown prominently on this first card.",
+                    "플레이 키 모드를 선택합니다. 현재 모드는 첫 카드에 크게 표시됩니다."),
+            ui_text("Assign gameplay keys and test the current mapping.",
+                    "게임 키를 지정하고 현재 키 배치를 테스트합니다."),
+            ui_text("Import and tune TenRiff or LR2 skins, notes, LN colour, and hit bursts.",
+                    "TenRiff·LR2 스킨과 노트, 롱노트 색, 키 폭발을 설정합니다."),
+            ui_text("Set display mode, resolution, frame timing, and background upscaling.",
+                    "화면 모드, 해상도, 프레임 타이밍, 배경 업스케일을 설정합니다."),
+            ui_text("Set keysound policy, volumes, and audio preset.",
+                    "키음 정책, 음량, 오디오 프리셋을 설정합니다."),
+            ui_text("Set input backend, polling, judgement rate, and debounce.",
+                    "입력 백엔드, 폴링, 판정 주기, 디바운스를 설정합니다."),
+            ui_text("Calibrate audio and visual timing. Visual latency changes in 1 ms steps.",
+                    "오디오·비주얼 타이밍을 보정합니다. 비주얼 레이턴시는 1ms씩 조절됩니다."),
+            ui_text("Change profile name, avatar, and device setup.",
+                    "프로필 이름, 아바타, 장치 설정을 변경합니다."),
+        };
     } else if (screen_ == Screen::Multiplayer) {
         populate_multiplayer_render_data(render);
     } else if (screen_ == Screen::SettingsAudio) {

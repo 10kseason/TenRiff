@@ -32,6 +32,16 @@ constexpr float kLr2CanvasOriginTolerance = 4.0f;
 constexpr float kLr2MinCanvasWidth = 400.0f;
 constexpr float kLr2MinCanvasHeight = 300.0f;
 
+std::string utf8_path(const fs::path& path) {
+    return util::path_to_utf8_lossy(path);
+}
+
+std::string utf8_generic_path(const fs::path& path) {
+    std::string value = utf8_path(path);
+    std::replace(value.begin(), value.end(), '\\', '/');
+    return value;
+}
+
 struct Lr2SourceSlice {
     int group_index = -1;
     float x = 0.0f;
@@ -181,7 +191,7 @@ std::string normalize_path_utf8(const fs::path& path) {
     } else {
         normalized = normalized.lexically_normal();
     }
-    return normalized.u8string();
+    return utf8_path(normalized);
 }
 
 std::vector<fs::path> build_lr2_path_candidates(const fs::path& skin_dir,
@@ -221,7 +231,7 @@ bool has_lr2_skin_assets(const fs::path& dir) {
         if (!it->is_regular_file(ec)) {
             continue;
         }
-        if (to_lower_ascii(it->path().extension().u8string()) == ".lr2skin") {
+        if (to_lower_ascii(utf8_path(it->path().extension())) == ".lr2skin") {
             return true;
         }
     }
@@ -367,12 +377,12 @@ fs::path relativize_theme_path(const fs::path& skin_dir, const fs::path& candida
         parts.push_back(part);
     }
     std::size_t start = 0u;
-    while (start < parts.size() && parts[start].u8string() == ".") {
+    while (start < parts.size() && utf8_path(parts[start]) == ".") {
         ++start;
     }
     if (parts.size() >= start + 4u &&
-        to_lower_ascii(parts[start].u8string()) == "lr2files" &&
-        to_lower_ascii(parts[start + 1u].u8string()) == "theme") {
+        to_lower_ascii(utf8_path(parts[start])) == "lr2files" &&
+        to_lower_ascii(utf8_path(parts[start + 1u])) == "theme") {
         fs::path relative;
         for (std::size_t i = start + 3u; i < parts.size(); ++i) {
             relative /= parts[i];
@@ -390,12 +400,12 @@ fs::path relativize_theme_root_path(const fs::path& skin_dir, const fs::path& ca
         parts.push_back(part);
     }
     std::size_t start = 0u;
-    while (start < parts.size() && parts[start].u8string() == ".") {
+    while (start < parts.size() && utf8_path(parts[start]) == ".") {
         ++start;
     }
     if (parts.size() >= start + 3u &&
-        to_lower_ascii(parts[start].u8string()) == "lr2files" &&
-        to_lower_ascii(parts[start + 1u].u8string()) == "theme") {
+        to_lower_ascii(utf8_path(parts[start])) == "lr2files" &&
+        to_lower_ascii(utf8_path(parts[start + 1u])) == "theme") {
         fs::path relative;
         // Keep the skin-name component so references to a sibling theme stay
         // inside the imported Theme namespace instead of being folded into the
@@ -505,7 +515,7 @@ std::vector<fs::path> expand_lr2_pattern_path(const fs::path& pattern_path) {
 
     const fs::path segments = pattern_path.is_absolute() ? pattern_path.relative_path() : pattern_path;
     for (const auto& part : segments) {
-        const std::string segment = part.u8string();
+        const std::string segment = utf8_path(part);
         if (segment.empty() || segment == ".") {
             continue;
         }
@@ -524,7 +534,7 @@ std::vector<fs::path> expand_lr2_pattern_path(const fs::path& pattern_path) {
                     continue;
                 }
                 for (fs::directory_iterator it(prefix, ec), end; !ec && it != end; it.increment(ec)) {
-                    if (wildcard_match(it->path().filename().u8string(), segment)) {
+                    if (wildcard_match(utf8_path(it->path().filename()), segment)) {
                         next.push_back(it->path());
                     }
                 }
@@ -563,16 +573,16 @@ std::optional<fs::path> resolve_lr2_wildcard_path(const fs::path& skin_dir,
     }
 
     std::sort(matches.begin(), matches.end(), [](const fs::path& lhs, const fs::path& rhs) {
-        return to_lower_ascii(lhs.u8string()) < to_lower_ascii(rhs.u8string());
+        return to_lower_ascii(utf8_path(lhs)) < to_lower_ascii(utf8_path(rhs));
     });
     matches.erase(std::unique(matches.begin(), matches.end()), matches.end());
 
     const std::string preferred = to_lower_ascii(normalize_lr2_token(std::string(default_name)));
     if (!preferred.empty()) {
         for (const auto& candidate : matches) {
-            const std::string stem = to_lower_ascii(candidate.stem().u8string());
-            const std::string filename = to_lower_ascii(candidate.filename().u8string());
-            const std::string parent = to_lower_ascii(candidate.parent_path().filename().u8string());
+            const std::string stem = to_lower_ascii(utf8_path(candidate.stem()));
+            const std::string filename = to_lower_ascii(utf8_path(candidate.filename()));
+            const std::string parent = to_lower_ascii(utf8_path(candidate.parent_path().filename()));
             if (stem == preferred || filename == preferred || parent == preferred) {
                 return candidate;
             }
@@ -626,9 +636,9 @@ bool parse_lr2_file(const fs::path& file_path, Lr2ParseState& state, bool is_top
     // the keyframes after it leave those columns blank.
     bool open_group_always_visible = true;
     bool open_group_gates_read = false;
-    const std::string generic_file_path = to_lower_ascii(file_path.generic_u8string());
+    const std::string generic_file_path = to_lower_ascii(utf8_generic_path(file_path));
     const bool gear_file = generic_file_path.find("/gear/") != std::string::npos ||
-                           to_lower_ascii(file_path.stem().u8string()) == "gear";
+                           to_lower_ascii(utf8_path(file_path.stem())) == "gear";
 
     auto current_active = [&]() {
         return conditionals.empty() ? true : conditionals.back().current_active;
@@ -924,7 +934,7 @@ fs::path normalized_absolute_path(const fs::path& path) {
 
 bool path_component_equal(const fs::path& lhs, const fs::path& rhs) {
 #ifdef _WIN32
-    return to_lower_ascii(lhs.u8string()) == to_lower_ascii(rhs.u8string());
+    return to_lower_ascii(utf8_path(lhs)) == to_lower_ascii(utf8_path(rhs));
 #else
     return lhs == rhs;
 #endif
@@ -993,11 +1003,11 @@ std::string portable_lr2_skin_name(std::string value) {
 
 std::optional<fs::path> standard_lr2_theme_root(const fs::path& source) {
     std::error_code ec;
-    if (to_lower_ascii(source.filename().u8string()) == "theme" && fs::is_directory(source, ec)) {
+    if (to_lower_ascii(utf8_path(source.filename())) == "theme" && fs::is_directory(source, ec)) {
         return source;
     }
     ec.clear();
-    if (to_lower_ascii(source.filename().u8string()) == "lr2files") {
+    if (to_lower_ascii(utf8_path(source.filename())) == "lr2files") {
         const fs::path theme = source / "Theme";
         if (fs::is_directory(theme, ec)) {
             return theme;
@@ -1012,11 +1022,11 @@ std::optional<fs::path> standard_lr2_theme_root(const fs::path& source) {
 }
 
 bool excluded_lr2_theme_name(const fs::path& path) {
-    return to_lower_ascii(path.filename().u8string()) == "iidx";
+    return to_lower_ascii(utf8_path(path.filename())) == "iidx";
 }
 
 bool lr2_text_references_excluded_iidx(const fs::path& path) {
-    const std::string extension = to_lower_ascii(path.extension().u8string());
+    const std::string extension = to_lower_ascii(utf8_path(path.extension()));
     if (extension != ".lr2skin" && extension != ".csv") {
         return false;
     }
@@ -1062,17 +1072,17 @@ std::vector<fs::path> collect_child_lr2_skins(const fs::path& root,
             continue;
         }
         if (excluded_lr2_theme_name(it->path())) {
-            warnings.push_back("Skipped excluded LR2 theme: " + it->path().filename().u8string());
+            warnings.push_back("Skipped excluded LR2 theme: " + utf8_path(it->path().filename()));
         } else if (lr2_theme_depends_on_excluded_iidx(it->path())) {
             warnings.push_back("Skipped LR2 theme that depends on excluded IIDX assets: " +
-                               it->path().filename().u8string());
+                               utf8_path(it->path().filename()));
         } else {
             candidates.push_back(it->path());
         }
         ec.clear();
     }
     std::sort(candidates.begin(), candidates.end(), [](const fs::path& lhs, const fs::path& rhs) {
-        return to_lower_ascii(lhs.filename().u8string()) < to_lower_ascii(rhs.filename().u8string());
+        return to_lower_ascii(utf8_path(lhs.filename())) < to_lower_ascii(utf8_path(rhs.filename()));
     });
     return candidates;
 }
@@ -1087,13 +1097,13 @@ std::vector<fs::path> collect_lr2_import_candidates(const fs::path& source,
         return collect_child_lr2_skins(*theme_root, warnings);
     }
     if (excluded_lr2_theme_name(source)) {
-        warnings.push_back("Skipped excluded LR2 theme: " + source.filename().u8string());
+        warnings.push_back("Skipped excluded LR2 theme: " + utf8_path(source.filename()));
         return {};
     }
     if (has_lr2_skin_assets(source)) {
         if (lr2_theme_depends_on_excluded_iidx(source)) {
             warnings.push_back("Skipped LR2 theme that depends on excluded IIDX assets: " +
-                               source.filename().u8string());
+                               utf8_path(source.filename()));
             return {};
         }
         return {source};
@@ -1130,7 +1140,7 @@ bool copy_lr2_skin_portable(const fs::path& source,
                             Lr2SkinImportResult& result) {
     std::error_code ec;
     if (!fs::create_directory(destination, ec) || ec) {
-        result.warnings.push_back("Failed to create LR2 import folder: " + destination.u8string());
+        result.warnings.push_back("Failed to create LR2 import folder: " + utf8_path(destination));
         return false;
     }
 
@@ -1139,7 +1149,7 @@ bool copy_lr2_skin_portable(const fs::path& source,
         std::error_code cleanup_ec;
         fs::remove_all(destination, cleanup_ec);
         if (cleanup_ec) {
-            result.warnings.push_back("Failed to remove partial LR2 import: " + destination.u8string());
+            result.warnings.push_back("Failed to remove partial LR2 import: " + utf8_path(destination));
         }
         return false;
     };
@@ -1148,17 +1158,17 @@ bool copy_lr2_skin_portable(const fs::path& source,
     std::uintmax_t copied_bytes = 0;
     fs::recursive_directory_iterator it(source, fs::directory_options::none, ec), end;
     if (ec) {
-        return fail_and_cleanup("Failed to enumerate LR2 skin: " + source.u8string());
+        return fail_and_cleanup("Failed to enumerate LR2 skin: " + utf8_path(source));
     }
     while (it != end) {
         const fs::path entry_path = it->path();
         const fs::file_status status = it->symlink_status(ec);
         if (ec) {
-            return fail_and_cleanup("Failed to inspect LR2 skin entry: " + entry_path.u8string());
+            return fail_and_cleanup("Failed to inspect LR2 skin entry: " + utf8_path(entry_path));
         }
         const fs::path relative = entry_path.lexically_relative(source);
         if (!safe_relative_import_path(relative)) {
-            return fail_and_cleanup("Unsafe LR2 skin entry path: " + entry_path.u8string());
+            return fail_and_cleanup("Unsafe LR2 skin entry path: " + utf8_path(entry_path));
         }
         const fs::path target = destination / relative;
 
@@ -1167,20 +1177,20 @@ bool copy_lr2_skin_portable(const fs::path& source,
                 it.disable_recursion_pending();
             }
             ec.clear();
-            result.warnings.push_back("Skipped non-portable LR2 symlink: " + entry_path.u8string());
+            result.warnings.push_back("Skipped non-portable LR2 symlink: " + utf8_path(entry_path));
         } else if (fs::is_directory(status)) {
             fs::create_directories(target, ec);
             if (ec) {
-                return fail_and_cleanup("Failed to create LR2 import subfolder: " + target.u8string());
+                return fail_and_cleanup("Failed to create LR2 import subfolder: " + utf8_path(target));
             }
         } else if (fs::is_regular_file(status)) {
             fs::create_directories(target.parent_path(), ec);
             if (ec) {
-                return fail_and_cleanup("Failed to create LR2 asset folder: " + target.parent_path().u8string());
+                return fail_and_cleanup("Failed to create LR2 asset folder: " + utf8_path(target.parent_path()));
             }
             fs::copy_file(entry_path, target, fs::copy_options::none, ec);
             if (ec) {
-                return fail_and_cleanup("Failed to copy LR2 asset: " + entry_path.u8string());
+                return fail_and_cleanup("Failed to copy LR2 asset: " + utf8_path(entry_path));
             }
             ++copied_files;
             const std::uintmax_t size = fs::file_size(entry_path, ec);
@@ -1189,12 +1199,12 @@ bool copy_lr2_skin_portable(const fs::path& source,
             }
             ec.clear();
         } else {
-            result.warnings.push_back("Skipped unsupported LR2 filesystem entry: " + entry_path.u8string());
+            result.warnings.push_back("Skipped unsupported LR2 filesystem entry: " + utf8_path(entry_path));
         }
 
         it.increment(ec);
         if (ec) {
-            return fail_and_cleanup("Failed while enumerating LR2 skin: " + source.u8string());
+            return fail_and_cleanup("Failed while enumerating LR2 skin: " + utf8_path(source));
         }
     }
 
@@ -1243,7 +1253,7 @@ std::vector<std::string> list_lr2_skin_names(std::string_view root_utf8) {
             continue;
         }
         if (has_lr2_skin_assets(it->path())) {
-            names.push_back(it->path().filename().u8string());
+            names.push_back(utf8_path(it->path().filename()));
         }
     }
     std::sort(names.begin(), names.end());
@@ -1262,19 +1272,19 @@ Lr2SkinImportResult import_lr2_skin_tree(std::string_view source_utf8,
     const fs::path destination_root = util::path_from_utf8_lossy(destination_root_utf8);
     std::error_code ec;
     if (!fs::is_directory(source, ec)) {
-        result.warnings.push_back("LR2 import source is not a directory: " + source.u8string());
+        result.warnings.push_back("LR2 import source is not a directory: " + utf8_path(source));
         return result;
     }
     ec.clear();
     fs::create_directories(destination_root, ec);
     if (ec) {
-        result.warnings.push_back("Failed to create LR2 import root: " + destination_root.u8string());
+        result.warnings.push_back("Failed to create LR2 import root: " + utf8_path(destination_root));
         return result;
     }
 
     const auto candidates = collect_lr2_import_candidates(source, destination_root, result.warnings);
     if (candidates.empty()) {
-        result.warnings.push_back("No supported non-IIDX LR2 playskin folders were found below: " + source.u8string());
+        result.warnings.push_back("No supported non-IIDX LR2 playskin folders were found below: " + utf8_path(source));
         return result;
     }
 
@@ -1282,24 +1292,24 @@ Lr2SkinImportResult import_lr2_skin_tree(std::string_view source_utf8,
         const fs::path normalized_candidate = normalized_absolute_path(candidate);
         const fs::path normalized_destination_root = normalized_absolute_path(destination_root);
         if (paths_equivalent_or_equal(normalized_candidate.parent_path(), normalized_destination_root)) {
-            result.skin_names.push_back(normalized_candidate.filename().u8string());
+            result.skin_names.push_back(utf8_path(normalized_candidate.filename()));
             continue;
         }
         if (path_is_same_or_child(normalized_destination_root, normalized_candidate)) {
-            result.warnings.push_back("Refused recursive LR2 import into its own source: " + candidate.u8string());
+            result.warnings.push_back("Refused recursive LR2 import into its own source: " + utf8_path(candidate));
             continue;
         }
 
         const fs::path destination = next_lr2_import_destination(
-            destination_root, candidate.filename().u8string());
+            destination_root, utf8_path(candidate.filename()));
         if (destination.empty()) {
-            result.warnings.push_back("Failed to choose LR2 import destination for: " + candidate.u8string());
+            result.warnings.push_back("Failed to choose LR2 import destination for: " + utf8_path(candidate));
             continue;
         }
         if (!copy_lr2_skin_portable(candidate, destination, result)) {
             continue;
         }
-        result.skin_names.push_back(destination.filename().u8string());
+        result.skin_names.push_back(utf8_path(destination.filename()));
     }
 
     return result;
@@ -1434,7 +1444,7 @@ Lr2ResolutionFamily resolve_lr2_resolution_family(const Lr2ParseState& state,
     }
     if (state.explicit_resolution_family.has_value()) {
         if (*state.explicit_resolution_family != auto_family) {
-            std::cerr << "[warn] LR2 playskin resolution mismatch for " << skin_file.u8string()
+            std::cerr << "[warn] LR2 playskin resolution mismatch for " << utf8_path(skin_file)
                       << ": explicit=" << lr2_resolution_family_label(*state.explicit_resolution_family)
                       << " auto=" << lr2_resolution_family_label(auto_family)
                       << ". Using explicit resolution." << std::endl;
@@ -1719,12 +1729,12 @@ std::vector<fs::path> collect_lr2_skin_files(const fs::path& dir) {
         if (!it->is_regular_file(ec)) {
             continue;
         }
-        if (to_lower_ascii(it->path().extension().u8string()) == ".lr2skin") {
+        if (to_lower_ascii(utf8_path(it->path().extension())) == ".lr2skin") {
             files.push_back(it->path());
         }
     }
     std::sort(files.begin(), files.end(), [](const fs::path& lhs, const fs::path& rhs) {
-        return to_lower_ascii(lhs.u8string()) < to_lower_ascii(rhs.u8string());
+        return to_lower_ascii(utf8_path(lhs)) < to_lower_ascii(utf8_path(rhs));
     });
     return files;
 }
@@ -1746,7 +1756,7 @@ int score_lr2_skin_file_hint(const fs::path& skin_file, int requested_keys) {
         return 0;
     }
 
-    const std::string lower = to_lower_ascii(skin_file.stem().u8string());
+    const std::string lower = to_lower_ascii(utf8_path(skin_file.stem()));
     const std::string hinted = std::to_string(hinted_keys);
     if (lower == "play_" + hinted || lower.find("play_" + hinted) != std::string::npos) {
         return 250;

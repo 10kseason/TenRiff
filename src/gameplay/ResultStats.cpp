@@ -104,10 +104,15 @@ void ResultStats::record_judgement(game::Judgement judgement,
 
     if (std::isfinite(delta_ms)) {
         ++delta_samples;
-        if (delta_ms > 0.05) {
-            ++positive_delta_count;
-        } else if (delta_ms < -0.05) {
-            ++negative_delta_count;
+        // FAST/SLOW is meant to explain judgements outside the top ±20 ms PG
+        // window. Counting PG timing here makes an otherwise perfect play look
+        // biased, so only GR and lower judgements contribute to the aggregate.
+        if (judgement != game::Judgement::PG) {
+            if (delta_ms > 0.05) {
+                ++positive_delta_count;
+            } else if (delta_ms < -0.05) {
+                ++negative_delta_count;
+            }
         }
         double delta = delta_ms - mean_delta_ms;
         mean_delta_ms += delta / static_cast<double>(delta_samples);

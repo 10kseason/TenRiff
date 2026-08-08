@@ -364,6 +364,124 @@
             }
         };
 
+        if (data.generic.card_grid && data.generic.rows.size() == 8) {
+            constexpr float card_side = 330.0f;
+            constexpr float card_gap = 28.0f;
+            const float grid_width = card_side * 4.0f + card_gap * 3.0f;
+            const float grid_left = (kBaseWidth - grid_width) * 0.5f;
+            const float first_row_top = top + 58.0f;
+            const float second_row_top = bottom - card_side - 28.0f;
+
+            if (d2d_->hud_format && d2d_->muted_brush) {
+                draw_text_clipped(wloc("\xE2\x86\x90  ESC / BACKSPACE  BACK",
+                                       "\xE2\x86\x90  ESC / BACKSPACE  뒤로"),
+                                  d2d_->hud_format.Get(),
+                                  D2D1::RectF(left + 24.0f, top + 12.0f,
+                                              left + 410.0f, top + 42.0f),
+                                  d2d_->muted_brush.Get());
+                draw_text_clipped_aligned(wloc("ARROW KEYS / SELECT    ENTER / OPEN",
+                                               "방향키 / 선택    ENTER / 열기"),
+                                          d2d_->hud_format.Get(),
+                                          D2D1::RectF(right - 520.0f, top + 12.0f,
+                                                      right - 24.0f, top + 42.0f),
+                                          d2d_->muted_brush.Get(),
+                                          DWRITE_TEXT_ALIGNMENT_TRAILING);
+            }
+
+            std::size_t selected_index = 0;
+            for (std::size_t index = 0; index < data.generic.rows.size(); ++index) {
+                const auto& row = data.generic.rows[index];
+                if (row.selected) {
+                    selected_index = index;
+                }
+                const float column = static_cast<float>(index % 4);
+                const float row_top = index < 4 ? first_row_top : second_row_top;
+                const D2D1_RECT_F card_rect =
+                    D2D1::RectF(grid_left + column * (card_side + card_gap), row_top,
+                                grid_left + column * (card_side + card_gap) + card_side,
+                                row_top + card_side);
+                const D2D1_ROUNDED_RECT card_rr = D2D1::RoundedRect(card_rect, 16.0f, 16.0f);
+                ID2D1SolidColorBrush* fill = row.selected
+                                                ? d2d_->button_selected_brush.Get()
+                                                : d2d_->panel_brush.Get();
+                if (fill) {
+                    const float saved = fill->GetOpacity();
+                    fill->SetOpacity(row.selected ? 0.92f : 0.78f);
+                    ctx->FillRoundedRectangle(card_rr, fill);
+                    fill->SetOpacity(saved);
+                }
+                ID2D1SolidColorBrush* border = row.selected
+                                                  ? d2d_->accent_brush.Get()
+                                                  : d2d_->button_border_brush.Get();
+                if (border) {
+                    const float saved = border->GetOpacity();
+                    border->SetOpacity(row.selected ? 0.98f : 0.56f);
+                    ctx->DrawRoundedRectangle(card_rr, border, row.selected ? 3.0f : 1.4f);
+                    border->SetOpacity(saved);
+                }
+                if (d2d_->option_format && d2d_->text_brush) {
+                    draw_text_clipped_aligned(to_wide(row.label),
+                                              d2d_->option_format.Get(),
+                                              D2D1::RectF(card_rect.left + 20.0f, card_rect.top + 22.0f,
+                                                          card_rect.right - 20.0f, card_rect.top + 66.0f),
+                                              d2d_->text_brush.Get(),
+                                              DWRITE_TEXT_ALIGNMENT_CENTER);
+                }
+                if (!row.value.empty()) {
+                    IDWriteTextFormat* value_format =
+                        index == 0 && d2d_->rank_format
+                            ? d2d_->rank_format.Get()
+                            : (d2d_->header_format ? d2d_->header_format.Get()
+                                                   : d2d_->title_format.Get());
+                    ID2D1Brush* value_brush = row.selected && d2d_->accent_brush
+                                                  ? static_cast<ID2D1Brush*>(d2d_->accent_brush.Get())
+                                                  : static_cast<ID2D1Brush*>(d2d_->text_brush.Get());
+                    if (value_format && value_brush) {
+                        draw_text_clipped_aligned(to_wide(row.value), value_format,
+                                                  D2D1::RectF(card_rect.left + 18.0f,
+                                                              card_rect.top + 78.0f,
+                                                              card_rect.right - 18.0f,
+                                                              card_rect.bottom - 42.0f),
+                                                  value_brush,
+                                                  DWRITE_TEXT_ALIGNMENT_CENTER);
+                    }
+                }
+                if (row.activatable) {
+                    register_hit(card_rect, row.target_kind, row.row_index, MenuHitPart::Activate);
+                }
+            }
+
+            const D2D1_RECT_F description_rect =
+                D2D1::RectF(left + 205.0f, (top + bottom) * 0.5f - 76.0f,
+                            right - 205.0f, (top + bottom) * 0.5f + 76.0f);
+            if (d2d_->card_brush) {
+                const D2D1_COLOR_F saved_color = d2d_->card_brush->GetColor();
+                const float saved_opacity = d2d_->card_brush->GetOpacity();
+                d2d_->card_brush->SetColor(D2D1::ColorF(0x040B14));
+                d2d_->card_brush->SetOpacity(0.96f);
+                ctx->FillRoundedRectangle(D2D1::RoundedRect(description_rect, 14.0f, 14.0f),
+                                          d2d_->card_brush.Get());
+                d2d_->card_brush->SetColor(saved_color);
+                d2d_->card_brush->SetOpacity(saved_opacity);
+            }
+            if (d2d_->accent_brush) {
+                ctx->DrawRoundedRectangle(D2D1::RoundedRect(description_rect, 14.0f, 14.0f),
+                                          d2d_->accent_brush.Get(), 2.2f);
+            }
+            if (selected_index < data.generic.card_descriptions.size() &&
+                d2d_->body_format && d2d_->text_brush) {
+                draw_text_clipped_aligned(to_wide(data.generic.card_descriptions[selected_index]),
+                                          d2d_->body_format.Get(),
+                                          D2D1::RectF(description_rect.left + 42.0f,
+                                                      description_rect.top + 34.0f,
+                                                      description_rect.right - 42.0f,
+                                                      description_rect.bottom - 28.0f),
+                                          d2d_->text_brush.Get(),
+                                          DWRITE_TEXT_ALIGNMENT_CENTER);
+            }
+            return;
+        }
+
         if (!data.generic.rows.empty() || !data.generic.notes.empty() ||
             !data.generic.footer_notes.empty() || data.generic.footer_reserved_lines > 0) {
             const float row_left = left + 24.0f;
@@ -703,4 +821,3 @@
             }
             line_y += line_height + 8.0f;
         }
-

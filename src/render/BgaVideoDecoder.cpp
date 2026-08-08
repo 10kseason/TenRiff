@@ -105,13 +105,17 @@ bool copy_rgb32_sample(IMFSample* sample,
 
 class MfVideoReader {
 public:
-    bool open(std::string_view path) {
+    void close() {
         reader_.Reset();
         path_.clear();
         width_ = 0;
         height_ = 0;
         stride_ = 0;
         last_timestamp_ = -1;
+    }
+
+    bool open(std::string_view path) {
+        close();
 
         Microsoft::WRL::ComPtr<IMFAttributes> attributes;
         if (FAILED(MFCreateAttributes(&attributes, 2)) || !attributes) {
@@ -305,6 +309,7 @@ struct BgaVideoDecoder::Impl {
         MfVideoReader reader;
         BgaVideoFfmpegReader ffmpeg_reader;
         std::string failed_path;
+        auto failed_retry_after = std::chrono::steady_clock::time_point::min();
         while (true) {
             std::string path;
             std::int64_t timestamp_100ns = 0;
@@ -322,7 +327,8 @@ struct BgaVideoDecoder::Impl {
             }
 
             if (reader.path() != path && ffmpeg_reader.path() != path) {
-                if (failed_path == path) {
+                if (failed_path == path &&
+                    std::chrono::steady_clock::now() < failed_retry_after) {
                     continue;
                 }
                 if (reader.open(path)) {
@@ -334,6 +340,7 @@ struct BgaVideoDecoder::Impl {
                               << path << '\n';
                 } else {
                     failed_path = path;
+                    failed_retry_after = std::chrono::steady_clock::now() + std::chrono::seconds(1);
                     std::cerr << "[BGA Video] No decoder could open: " << path << '\n';
                     continue;
                 }
@@ -341,13 +348,28 @@ struct BgaVideoDecoder::Impl {
             auto frame = reader.path() == path
                 ? reader.read_at(timestamp_100ns)
                 : ffmpeg_reader.read_at(timestamp_100ns);
+            // Media Foundation can accept a container and then fail on its codec.
+            // Retry the same frame through FFmpeg before treating it as unavailable.
+            if ((!frame || frame->bgra.empty()) && reader.path() == path) {
+                reader.close();
+                if (ffmpeg_reader.open(path)) {
+                    frame = ffmpeg_reader.read_at(timestamp_100ns);
+                    std::cerr << "[BGA Video] Media Foundation decode failed; using FFmpeg fallback: "
+                              << path << '\n';
+                }
+            }
             if (!frame || frame->bgra.empty()) {
                 continue;
             }
             frame->request_id = id;
             {
                 std::lock_guard<std::mutex> lock(mutex);
-                if (id == request_id && path == requested_path) {
+                // Rendering requests arrive faster than decoding. Requiring the
+                // completed request to still be the newest one starves playback
+                // forever on a decoder that cannot sustain the render frame rate.
+                // A same-path frame is safe to present while the latest position
+                // remains queued; path changes and clear() still reject stale BGA.
+                if (path == requested_path) {
                     ready = std::move(frame);
                 }
             }
@@ -411,7 +433,9 @@ bool BgaVideoDecoder::is_supported_video_path(std::string_view path) {
     }
     const std::string extension = lower_ascii(path.substr(dot));
     return extension == ".mpg" || extension == ".mpeg" || extension == ".mp4" ||
-           extension == ".m4v" || extension == ".wmv" || extension == ".avi";
+           extension == ".m4v" || extension == ".wmv" || extension == ".avi" ||
+           extension == ".mov" || extension == ".webm" || extension == ".mkv" ||
+           extension == ".flv";
 }
 
 }  // namespace tenriff::render

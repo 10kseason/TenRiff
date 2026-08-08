@@ -151,6 +151,7 @@ TEST_CASE("config defaults prefer 44100 Hz audio") {
     CHECK_FALSE(config.skin.hold_tail_taper_enabled);
     CHECK(config.skin.judgement_line_glow_enabled);
     CHECK(config.skin.key_pulse_enabled);
+    CHECK(config.skin.hit_burst_style == "prism");
     CHECK(config.skin.key_label_position == "bottom");
     CHECK(config.skin.gameplay_field_offset_x ==
           doctest::Approx(tenriff::config::kGameplayFieldOffsetXDefault));
@@ -754,6 +755,7 @@ TEST_CASE("config save and load preserve hit burst brightness") {
     ConfigLoader loader;
     auto config = loader.defaults();
     config.skin.key_pulse_brightness = 0.35;
+    config.skin.hit_burst_style = "spark";
 
     std::string error;
     REQUIRE(loader.save_profile("profiles/test", config, &error));
@@ -761,6 +763,9 @@ TEST_CASE("config save and load preserve hit burst brightness") {
     REQUIRE(result.success());
     CHECK(result.config.skin.key_pulse_brightness == doctest::Approx(0.35));
     CHECK(result.config.skin.key_pulse_enabled);
+    CHECK(result.config.skin.hit_burst_style == "spark");
+    CHECK(tenriff::config::normalize_skin_hit_burst_style_token("circle") == "ring");
+    CHECK(tenriff::config::normalize_skin_hit_burst_style_token("unknown") == "prism");
 
     // Zero brightness is the off state, and the legacy flag mirrors it.
     config.skin.key_pulse_brightness = 0.0;

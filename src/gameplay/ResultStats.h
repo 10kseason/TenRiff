@@ -79,5 +79,8 @@ struct ResultStats {
 };
 
 [[nodiscard]] int64_t scale_native_score(int64_t raw_score, double multiplier);
+[[nodiscard]] constexpr int64_t maximum_detail_score(int total_notes) {
+    return total_notes > 0 ? static_cast<int64_t>(total_notes) * 5 : 0;
+}
 
 }  // namespace tenriff::gameplay

@@ -181,7 +181,9 @@ struct SongSelectData {
 
     std::string rank;
     int64_t best_score = 0;
+    int64_t max_score = 100'000;
     int64_t detail_score = 0;
+    int64_t max_detail_score = 0;
     int max_combo = 0;
     int perfect = 0;
     int great = 0;
@@ -239,7 +241,9 @@ struct ResultScreenData {
     bool presentation_skipped = false;
 
     int64_t score = 0;
+    int64_t max_score = 100'000;
     int64_t detail_score = 0;
+    int64_t max_detail_score = 0;
     bool pause_used = false;
     double accuracy = 0.0;
     double detailed_accuracy = 0.0;
@@ -351,6 +355,7 @@ struct GameplayHudData {
     bool judgement_line_glow_enabled = true;
     bool key_pulse_enabled = true;
     float key_pulse_brightness = 1.0f;
+    std::string hit_burst_style = "prism";
     std::string key_label_position = "bottom";
     bool note_border_enabled = true;
     std::string note_shape = "rect";
@@ -365,7 +370,7 @@ struct GameplayHudData {
     bool black_playfield_enabled = false;
     double visual_opacity = 0.96;
     double note_outline_opacity = 0.78;
-    double hold_body_opacity = 0.24;
+    double hold_body_opacity = 0.55;
     double visual_offset_ms = 0.0;
 
     double bpm = 0.0;
@@ -502,6 +507,7 @@ struct SkinPreviewData {
     bool judgement_line_glow_enabled = true;
     bool key_pulse_enabled = true;
     float key_pulse_brightness = 1.0f;
+    std::string hit_burst_style = "prism";
     std::string key_label_position = "bottom";
     bool note_border_enabled = true;
     std::string note_shape = "rect";
@@ -516,13 +522,15 @@ struct SkinPreviewData {
     bool black_playfield_enabled = false;
     double visual_opacity = 0.96;
     double note_outline_opacity = 0.78;
-    double hold_body_opacity = 0.24;
+    double hold_body_opacity = 0.55;
     std::array<uint32_t, kGameplayHudMaxLanes> lane_colors{};
 };
 
 struct GenericMenuData {
     std::string heading;
     std::vector<MenuRowData> rows;
+    bool card_grid = false;
+    std::vector<std::string> card_descriptions;
     std::vector<std::string> notes;
     std::vector<std::string> footer_notes;
     int footer_reserved_lines = 0;

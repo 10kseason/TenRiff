@@ -419,6 +419,7 @@ private:
         std::string rank = "--";
         int64_t best_score = 0;
         int64_t detail_score = 0;
+        int total_notes = 0;
         double accuracy = 0.0;
         double detailed_accuracy = 0.0;
         std::string clear_status = "FAILED";

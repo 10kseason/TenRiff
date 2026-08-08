@@ -467,7 +467,10 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
         if (selected_record) {
             render.song_select.rank = selected_record->rank;
             render.song_select.best_score = selected_record->score;
+            render.song_select.max_score = gameplay::kNativeScoreMaximum;
             render.song_select.detail_score = selected_record->detail_score;
+            render.song_select.max_detail_score =
+                gameplay::maximum_detail_score(selected_record->total_notes);
             render.song_select.max_combo = selected_record->max_combo;
             render.song_select.perfect = selected_record->perfect;
             render.song_select.great = selected_record->great;
@@ -502,7 +505,11 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
     } else if (!render.song_select.showing_sources) {
         render.song_select.rank = current_best.has_value ? current_best.rank : "--";
         render.song_select.best_score = current_best.has_value ? current_best.best_score : 0;
+        render.song_select.max_score = gameplay::kNativeScoreMaximum;
         render.song_select.detail_score = current_best.has_value ? current_best.detail_score : 0;
+        render.song_select.max_detail_score = current_best.has_value
+                                                  ? gameplay::maximum_detail_score(current_best.total_notes)
+                                                  : 0;
         render.song_select.accuracy = current_best.has_value ? current_best.accuracy : 0.0;
         render.song_select.detailed_accuracy = current_best.has_value ? current_best.detailed_accuracy : 0.0;
         render.song_select.max_combo = current_best.has_value ? current_best.max_combo : 0;

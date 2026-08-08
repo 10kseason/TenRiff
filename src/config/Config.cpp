@@ -182,6 +182,7 @@ void sanitize_skin_config(SkinConfig& skin) {
         kSkinKeyPulseBrightnessMax,
         kSkinKeyPulseBrightnessDefault);
     skin.key_pulse_enabled = skin.key_pulse_brightness > 0.0;
+    skin.hit_burst_style = normalize_skin_hit_burst_style_token(skin.hit_burst_style);
     skin.note_outline_opacity = clamp_finite(
         skin.note_outline_opacity,
         kSkinNoteOutlineOpacityMin,
@@ -756,6 +757,8 @@ void apply_config_object(const JsonObject& root, RuntimeConfig& config) {
                        config.skin.key_pulse_enabled ? kSkinKeyPulseBrightnessMax
                                                      : kSkinKeyPulseBrightnessMin),
             kSkinKeyPulseBrightnessMin, kSkinKeyPulseBrightnessMax);
+        config.skin.hit_burst_style = normalize_skin_hit_burst_style_token(
+            get_string(*skin, "hit_burst_style", config.skin.hit_burst_style));
         config.skin.ui_font = normalize_skin_ui_font_token(
             get_string(*skin, "ui_font", config.skin.ui_font));
         config.skin.key_label_position = normalize_skin_key_label_position_token(
@@ -1139,6 +1142,8 @@ JsonValue build_json_root(const RuntimeConfig& config) {
     skin.emplace("key_pulse_enabled", JsonValue{key_pulse_on});
     skin.emplace("key_pulse_brightness",
                  JsonValue{key_pulse_on ? config.skin.key_pulse_brightness : 0.0});
+    skin.emplace("hit_burst_style",
+                 JsonValue{normalize_skin_hit_burst_style_token(config.skin.hit_burst_style)});
     skin.emplace("key_label_position",
                  JsonValue{normalize_skin_key_label_position_token(config.skin.key_label_position)});
     skin.emplace("ui_font", JsonValue{normalize_skin_ui_font_token(config.skin.ui_font)});
@@ -1370,6 +1375,7 @@ void apply_skin_visual_preset(SkinConfig& skin, std::string_view token) {
         skin.judgement_line_glow_enabled = false;
         skin.key_pulse_enabled = false;
         skin.key_pulse_brightness = kSkinKeyPulseBrightnessMin;
+        skin.hit_burst_style = "ring";
         skin.key_label_position = "bottom";
     } else if (preset == "neon") {
         skin.show_lane_dividers = true;
@@ -1380,6 +1386,7 @@ void apply_skin_visual_preset(SkinConfig& skin, std::string_view token) {
         skin.judgement_line_glow_enabled = true;
         skin.key_pulse_enabled = true;
         skin.key_pulse_brightness = kSkinKeyPulseBrightnessMax;
+        skin.hit_burst_style = "spark";
         skin.key_label_position = "bottom";
     } else if (preset == "minimal") {
         skin.show_lane_dividers = false;
@@ -1390,6 +1397,7 @@ void apply_skin_visual_preset(SkinConfig& skin, std::string_view token) {
         skin.judgement_line_glow_enabled = false;
         skin.key_pulse_enabled = false;
         skin.key_pulse_brightness = kSkinKeyPulseBrightnessMin;
+        skin.hit_burst_style = "ring";
         skin.key_label_position = "top";
     } else {
         skin.show_lane_dividers = true;
@@ -1400,6 +1408,7 @@ void apply_skin_visual_preset(SkinConfig& skin, std::string_view token) {
         skin.judgement_line_glow_enabled = true;
         skin.key_pulse_enabled = true;
         skin.key_pulse_brightness = kSkinKeyPulseBrightnessDefault;
+        skin.hit_burst_style = "prism";
         skin.key_label_position = "bottom";
     }
 
@@ -1415,6 +1424,28 @@ std::string normalize_skin_key_label_position_token(std::string_view token) {
         return "off";
     }
     return "bottom";
+}
+
+std::string normalize_skin_hit_burst_style_token(std::string_view token) {
+    const std::string normalized = to_lower_ascii(std::string(token));
+    if (normalized == "ring" || normalized == "circle") {
+        return "ring";
+    }
+    if (normalized == "spark" || normalized == "rays") {
+        return "spark";
+    }
+    return "prism";
+}
+
+std::string skin_hit_burst_style_label(std::string_view token) {
+    const std::string normalized = normalize_skin_hit_burst_style_token(token);
+    if (normalized == "ring") {
+        return "Ring";
+    }
+    if (normalized == "spark") {
+        return "Spark";
+    }
+    return "Prism";
 }
 
 std::string normalize_skin_ui_font_token(std::string_view token) {

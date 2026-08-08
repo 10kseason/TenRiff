@@ -13,6 +13,19 @@ using tenriff::gameplay::GameplayEngine;
 using tenriff::input::InputState;
 using tenriff::game::Judgement;
 
+TEST_CASE("result fast slow aggregate excludes top judgement timing") {
+    tenriff::gameplay::ResultStats stats;
+    stats.record_note_total(4);
+    stats.record_judgement(Judgement::PG, -10.0, tenriff::gameplay::ComboImpact::Increment);
+    stats.record_judgement(Judgement::PG, 10.0, tenriff::gameplay::ComboImpact::Increment);
+    stats.record_judgement(Judgement::GR, -30.0, tenriff::gameplay::ComboImpact::Increment);
+    stats.record_judgement(Judgement::GD, 70.0, tenriff::gameplay::ComboImpact::Increment);
+
+    CHECK(stats.negative_delta_count == 1);
+    CHECK(stats.positive_delta_count == 1);
+    CHECK(tenriff::gameplay::maximum_detail_score(stats.total_notes) == 20);
+}
+
 TEST_CASE("gameplay engine scores a basic hit") {
     GameplayChart chart;
     chart.lane_count = 1;

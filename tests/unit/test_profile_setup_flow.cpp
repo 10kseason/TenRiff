@@ -22,7 +22,12 @@ TEST_CASE("reopened profile setup returns to the options hub") {
     CHECK(cancel_destination(Entry::Options) == Destination::OptionsHub);
 }
 
-TEST_CASE("options hub profile row remains before the final back row") {
+TEST_CASE("options hub uses an eight-card four-by-two grid") {
+    CHECK(kOptionsHubRowCount == 8);
+    CHECK(kOptionsKeyModeRow == 0);
     CHECK(kOptionsProfileSetupRow == 7);
-    CHECK(kOptionsBackRow == kOptionsHubRowCount - 1);
+    CHECK(move_options_grid_cursor(0, 1, 0) == 1);
+    CHECK(move_options_grid_cursor(3, 1, 0) == 3);
+    CHECK(move_options_grid_cursor(2, 0, 1) == 6);
+    CHECK(move_options_grid_cursor(6, 0, -1) == 2);
 }
