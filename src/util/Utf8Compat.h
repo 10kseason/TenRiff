@@ -143,4 +143,12 @@ inline std::filesystem::path path_from_utf8_lossy(std::string_view value) {
 #endif
 }
 
+inline std::string path_to_utf8_lossy(const std::filesystem::path& value) {
+#ifdef _WIN32
+    return utf8_from_wide_lossy(value.native());
+#else
+    return value.u8string();
+#endif
+}
+
 }  // namespace tenriff::util

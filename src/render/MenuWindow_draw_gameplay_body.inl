@@ -34,6 +34,8 @@
         // Hit-burst brightness, 0% turns the explosion off entirely.
         const float key_pulse_brightness =
             std::clamp(data.gameplay.key_pulse_brightness, 0.0f, 1.0f);
+        const std::string hit_burst_style =
+            config::normalize_skin_hit_burst_style_token(data.gameplay.hit_burst_style);
         // The hit burst is stacked from a wide outer bloom, a lane-coloured beam, a
         // bright glow slab and a white-hot core at the judgement line. Player and
         // ghost fields draw the identical stack so both read the same.
@@ -45,7 +47,8 @@
                                            float burst_field_bottom,
                                            float pulse,
                                            uint32_t pulse_color,
-                                           float burst_opacity) {
+                                           float burst_opacity,
+                                           bool sustained_hold) {
             if (!burst_ctx || !d2d_->note_fill_brush || burst_opacity <= 0.0f) {
                 return;
             }
@@ -68,9 +71,59 @@
             };
 
             const float half_w = burst_note_width * (0.52f + 0.18f * pulse);
-            fill_band(half_w * 1.42f, 34.0f + 62.0f * pulse, 14.0f,
+            if (sustained_hold) {
+                // A held LN gets a stable vertical flame instead of repeatedly
+                // replaying the single-note flash. The small pulse keeps it alive
+                // without masking the judgement line.
+                fill_band(half_w * 0.72f, 48.0f + 16.0f * pulse, 12.0f,
+                          blend_rgb(pulse_color, 0x76E8FF, 0.32f), 0.16f + 0.18f * pulse);
+                fill_band(half_w * 0.92f, 6.0f + 4.0f * pulse, 6.0f,
+                          blend_rgb(pulse_color, 0xFFFFFF, 0.66f), 0.30f + 0.28f * pulse);
+            }
+
+            if (hit_burst_style == "ring") {
+                const float radius_x = half_w * (sustained_hold ? 0.92f : 1.18f + 0.22f * pulse);
+                const float radius_y = sustained_hold ? 14.0f + 5.0f * pulse : 18.0f + 34.0f * pulse;
+                d2d_->note_fill_brush->SetColor(color_from_rgb(
+                    blend_rgb(pulse_color, 0xFFFFFF, 0.55f),
+                    (sustained_hold ? 0.46f : 0.28f + 0.54f * pulse) * burst_opacity));
+                burst_ctx->DrawEllipse(D2D1::Ellipse(D2D1::Point2F(lane_center, burst_hit_line_y),
+                                                     radius_x, radius_y),
+                                       d2d_->note_fill_brush.Get(),
+                                       sustained_hold ? 4.0f : 3.0f + 4.0f * pulse);
+                fill_band(half_w * 0.58f, 3.0f + 4.0f * pulse, 4.0f,
+                          blend_rgb(pulse_color, 0xFFFFFF, 0.82f), 0.36f + 0.42f * pulse);
+                return;
+            }
+
+            if (hit_burst_style == "spark") {
+                const float ray_x = half_w * (sustained_hold ? 0.82f : 1.30f + 0.42f * pulse);
+                const float ray_y = sustained_hold ? 35.0f + 9.0f * pulse : 38.0f + 70.0f * pulse;
+                d2d_->note_fill_brush->SetColor(color_from_rgb(
+                    blend_rgb(pulse_color, 0xFFFFFF, 0.70f),
+                    (sustained_hold ? 0.34f : 0.25f + 0.60f * pulse) * burst_opacity));
+                const float stroke = sustained_hold ? 2.5f : 2.0f + 4.0f * pulse;
+                burst_ctx->DrawLine(D2D1::Point2F(lane_center - ray_x, burst_hit_line_y),
+                                    D2D1::Point2F(lane_center + ray_x, burst_hit_line_y),
+                                    d2d_->note_fill_brush.Get(), stroke);
+                burst_ctx->DrawLine(D2D1::Point2F(lane_center, std::max(top_limit, burst_hit_line_y - ray_y)),
+                                    D2D1::Point2F(lane_center, std::min(bottom_limit, burst_hit_line_y + ray_y)),
+                                    d2d_->note_fill_brush.Get(), stroke);
+                burst_ctx->DrawLine(D2D1::Point2F(lane_center - ray_x * 0.68f, burst_hit_line_y - ray_y * 0.55f),
+                                    D2D1::Point2F(lane_center + ray_x * 0.68f, burst_hit_line_y + ray_y * 0.55f),
+                                    d2d_->note_fill_brush.Get(), stroke * 0.72f);
+                burst_ctx->DrawLine(D2D1::Point2F(lane_center + ray_x * 0.68f, burst_hit_line_y - ray_y * 0.55f),
+                                    D2D1::Point2F(lane_center - ray_x * 0.68f, burst_hit_line_y + ray_y * 0.55f),
+                                    d2d_->note_fill_brush.Get(), stroke * 0.72f);
+                fill_band(half_w * 0.54f, 4.0f + 5.0f * pulse, 4.0f,
+                          blend_rgb(pulse_color, 0xFFFFFF, 0.90f), 0.42f + 0.46f * pulse);
+                return;
+            }
+
+            // Prism: the original layered bloom, retained as the default.
+            fill_band(half_w * 1.42f, (sustained_hold ? 20.0f : 34.0f) + 62.0f * pulse, 14.0f,
                       blend_rgb(pulse_color, 0x6EE7F2, 0.30f), 0.07f + 0.22f * pulse);
-            fill_band(half_w * 0.86f, 24.0f + 46.0f * pulse, 10.0f,
+            fill_band(half_w * 0.86f, (sustained_hold ? 16.0f : 24.0f) + 46.0f * pulse, 10.0f,
                       blend_rgb(pulse_color, 0x9AF2FF, 0.34f), 0.14f + 0.44f * pulse);
             fill_band(half_w, 7.0f + 13.0f * pulse, 7.0f,
                       blend_rgb(pulse_color, 0xFFFFFF, 0.46f), 0.30f + 0.60f * pulse);
@@ -105,6 +158,19 @@
             },
             render_now_ns);
         const int64_t display_sample = motion_diagnostics.display_sample;
+        auto lane_has_active_hold = [&](const auto& notes,
+                                        std::size_t note_count,
+                                        std::size_t lane) {
+            const std::size_t count = std::min(note_count, notes.size());
+            for (std::size_t i = 0; i < count; ++i) {
+                const auto& note = notes[i];
+                if (note.hold && !note.head_visible && note.lane == static_cast<int>(lane + 1) &&
+                    note.tail_sample >= display_sample) {
+                    return true;
+                }
+            }
+            return false;
+        };
         const int64_t hold_handoff_grace_samples = gameplay_hold_handoff_grace_samples(
             data.gameplay.sample_rate,
             motion_diagnostics.extrapolation_limit_samples);
@@ -1881,7 +1947,15 @@
                 std::min(data.gameplay.lane_activity_count, static_cast<std::size_t>(lane_count));
             for (std::size_t lane = 0; lane < count; ++lane) {
                 const float activity = std::clamp(data.gameplay.lane_activity[lane], 0.0f, 1.0f);
-                const float pulse = activity * activity;
+                const bool sustained_hold =
+                    lane < data.gameplay.lane_pressed_count && data.gameplay.lane_pressed[lane] != 0 &&
+                    lane_has_active_hold(data.gameplay.notes, data.gameplay.note_count, lane);
+                const float hold_wave = 0.55f + 0.08f * static_cast<float>(
+                    std::sin(static_cast<double>(render_now_ns) / 180'000'000.0 +
+                             static_cast<double>(lane) * 0.7));
+                const float pulse = sustained_hold
+                                        ? std::max(activity * activity, hold_wave)
+                                        : activity * activity;
                 if (pulse <= 0.02f) {
                     continue;
                 }
@@ -1899,7 +1973,8 @@
                                         field_bottom,
                                         pulse,
                                         pulse_color,
-                                        visual_opacity * key_pulse_brightness);
+                                        visual_opacity * key_pulse_brightness,
+                                        sustained_hold);
             }
         }
 
@@ -2258,7 +2333,18 @@
                     std::min(data.gameplay.ghost_lane_activity_count, static_cast<std::size_t>(lane_count));
                 for (std::size_t lane = 0; lane < count; ++lane) {
                     const float activity = std::clamp(data.gameplay.ghost_lane_activity[lane], 0.0f, 1.0f);
-                    const float pulse = activity * activity;
+                    const bool sustained_hold =
+                        lane < data.gameplay.ghost_lane_pressed_count &&
+                        data.gameplay.ghost_lane_pressed[lane] != 0 &&
+                        lane_has_active_hold(data.gameplay.ghost_notes,
+                                             data.gameplay.ghost_note_count,
+                                             lane);
+                    const float hold_wave = 0.55f + 0.08f * static_cast<float>(
+                        std::sin(static_cast<double>(render_now_ns) / 180'000'000.0 +
+                                 static_cast<double>(lane) * 0.7));
+                    const float pulse = sustained_hold
+                                            ? std::max(activity * activity, hold_wave)
+                                            : activity * activity;
                     if (pulse <= 0.02f) {
                         continue;
                     }
@@ -2276,7 +2362,8 @@
                                             ghost_field_bottom,
                                             pulse,
                                             pulse_color,
-                                            visual_opacity * key_pulse_brightness);
+                                            visual_opacity * key_pulse_brightness,
+                                            sustained_hold);
                 }
             }
 

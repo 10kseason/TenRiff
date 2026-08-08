@@ -9,6 +9,9 @@
         const double presentation_seconds =
             static_cast<double>(presentation_elapsed_ns) / 1'000'000'000.0;
         const bool result_success = data.result.cleared;
+        const auto result_loc = [&](std::string_view english, std::string_view korean) {
+            return std::string(data.ui_korean ? korean : english);
+        };
 
         auto draw_result_text = [&](const std::string& text,
                                     IDWriteTextFormat* format,
@@ -125,12 +128,12 @@
                          D2D1::RectF(70.0f, 36.0f, 360.0f, 100.0f),
                          d2d_->text_brush.Get(),
                          presentation.background);
-        draw_result_text("RESULT",
+        draw_result_text(result_loc("RESULT", "결과"),
                          d2d_->title_format.Get(),
                          D2D1::RectF(410.0f, 44.0f, 600.0f, 84.0f),
                          d2d_->muted_brush.Get(),
                          presentation.background);
-        draw_result_text("AFTER PERFORMANCE",
+        draw_result_text(result_loc("AFTER PERFORMANCE", "플레이 결과"),
                          d2d_->hud_format.Get(),
                          D2D1::RectF(410.0f, 80.0f, 650.0f, 108.0f),
                          d2d_->muted_brush.Get(),
@@ -168,7 +171,7 @@
                          D2D1::RectF(1496.0f, 38.0f, 1825.0f, 72.0f),
                          d2d_->text_brush.Get(),
                          presentation.background);
-        draw_result_text("PERFORMANCE RESULT",
+        draw_result_text(result_loc("PERFORMANCE RESULT", "플레이 기록"),
                          d2d_->hud_format.Get(),
                          D2D1::RectF(1496.0f, 72.0f, 1825.0f, 99.0f),
                          d2d_->muted_brush.Get(),
@@ -190,7 +193,7 @@
                             D2D1_BITMAP_INTERPOLATION_MODE_LINEAR,
                             &source);
         }
-        draw_result_text("// TRACK COMPLETE",
+        draw_result_text(result_loc("// TRACK COMPLETE", "// 플레이 완료"),
                          d2d_->hud_format.Get(),
                          D2D1::RectF(song_panel.left + 230.0f, song_panel.top + 14.0f,
                                      song_panel.right - 24.0f, song_panel.top + 38.0f),
@@ -215,9 +218,9 @@
             data.result.key_count > 0 ? std::to_string(data.result.key_count) + "KEY" : "--";
         const std::array<std::pair<std::string, std::string>, 4> chart_metadata = {{
             {"BPM", data.result.bpm > 0.0 ? format_decimal(data.result.bpm) : "--"},
-            {"MODE", mode_label},
-            {"LEVEL", display_level > 0 ? std::to_string(display_level) : "--"},
-            {"GAUGE", data.result.gauge_label},
+            {result_loc("MODE", "키 모드"), mode_label},
+            {result_loc("LEVEL", "레벨"), display_level > 0 ? std::to_string(display_level) : "--"},
+            {result_loc("GAUGE", "게이지"), data.result.gauge_label},
         }};
         const float metadata_width = (song_panel.right - song_panel.left - 88.0f) / 4.0f;
         for (std::size_t index = 0; index < chart_metadata.size(); ++index) {
@@ -342,20 +345,23 @@
                         158.0f - 5.0f * presentation.score_pulse,
                         prism_center.x + 260.0f,
                         230.0f + 5.0f * presentation.score_pulse);
-        draw_result_text(format_int_with_commas(counted_score),
+        draw_result_text(format_int_with_commas(counted_score) + " / " +
+                             format_int_with_commas(data.result.max_score),
                          d2d_->title_format.Get(),
                          score_rect,
                          d2d_->text_brush.Get(),
                          score_alpha * pulse_scale,
                          DWRITE_TEXT_ALIGNMENT_CENTER);
-        draw_result_text("SCORE",
+        draw_result_text(result_loc("SCORE", "점수"),
                          d2d_->hud_format.Get(),
                          D2D1::RectF(prism_center.x - 120.0f, 132.0f,
                                      prism_center.x + 120.0f, 160.0f),
                          d2d_->muted_brush.Get(),
                          score_alpha,
                          DWRITE_TEXT_ALIGNMENT_CENTER);
-        draw_result_text("DETAIL SCORE  " + format_int_with_commas(data.result.detail_score),
+        draw_result_text(result_loc("DETAIL SCORE", "상세 점수") + "  " +
+                             format_int_with_commas(data.result.detail_score) + " / " +
+                             format_int_with_commas(data.result.max_detail_score),
                          d2d_->hud_format.Get(),
                          D2D1::RectF(prism_center.x - 180.0f, 238.0f,
                                      prism_center.x + 180.0f, 268.0f),
@@ -423,7 +429,7 @@
             d2d_->accent_brush->SetOpacity(saved);
         }
         if (data.result.all_perfect) {
-            draw_result_text("ALL NOTES PERFECTED",
+            draw_result_text(result_loc("ALL NOTES PERFECTED", "모든 노트 퍼펙트"),
                              d2d_->hud_format.Get(),
                              D2D1::RectF(prism_center.x - 210.0f, 590.0f,
                                          prism_center.x + 210.0f, 622.0f),
@@ -431,7 +437,7 @@
                              presentation.all_perfect,
                              DWRITE_TEXT_ALIGNMENT_CENTER);
         } else if (data.result.full_combo) {
-            draw_result_text("FULL COMBO",
+            draw_result_text(result_loc("FULL COMBO", "풀 콤보"),
                              d2d_->hud_format.Get(),
                              D2D1::RectF(prism_center.x - 160.0f, 590.0f,
                                          prism_center.x + 160.0f, 622.0f),
@@ -466,13 +472,13 @@
         // half of the screen reads as one column instead of two ragged ones.
         const D2D1_RECT_F analysis_panel = D2D1::RectF(1320.0f, 154.0f, 1848.0f, 704.0f);
         draw_result_panel(analysis_panel, presentation.graph, false);
-        draw_result_text("// PERFORMANCE ANALYSIS",
+        draw_result_text(result_loc("// PERFORMANCE ANALYSIS", "// 플레이 분석"),
                          d2d_->hud_format.Get(),
                          D2D1::RectF(analysis_panel.left + 24.0f, analysis_panel.top + 18.0f,
                                      analysis_panel.right - 24.0f, analysis_panel.top + 48.0f),
                          d2d_->accent_brush.Get(),
                          presentation.graph);
-        draw_result_text("TIMING SUMMARY",
+        draw_result_text(result_loc("TIMING SUMMARY", "타이밍 요약"),
                          d2d_->body_format.Get(),
                          D2D1::RectF(analysis_panel.left + 26.0f, analysis_panel.top + 66.0f,
                                      analysis_panel.right - 26.0f, analysis_panel.top + 98.0f),
@@ -544,13 +550,14 @@
             d2d_->accent_brush->SetColor(saved_color);
             d2d_->accent_brush->SetOpacity(saved_opacity);
         }
-        draw_result_text("MEAN  " + format_signed_ms(data.result.mean_delta_ms),
+        draw_result_text(result_loc("MEAN", "평균") + "  " + format_signed_ms(data.result.mean_delta_ms),
                          d2d_->hud_format.Get(),
                          D2D1::RectF(timing_track.left, timing_track.bottom + 8.0f,
                                      center_x, timing_track.bottom + 36.0f),
                          d2d_->muted_brush.Get(),
                          presentation.graph);
-        draw_result_text("SPREAD  " + format_decimal(data.result.stddev_delta_ms) + "ms",
+        draw_result_text(result_loc("SPREAD", "분산") + "  " +
+                             format_decimal(data.result.stddev_delta_ms) + "ms",
                          d2d_->hud_format.Get(),
                          D2D1::RectF(center_x, timing_track.bottom + 8.0f,
                                      timing_track.right, timing_track.bottom + 36.0f),
@@ -558,7 +565,7 @@
                          presentation.graph,
                          DWRITE_TEXT_ALIGNMENT_TRAILING);
 
-        draw_result_text("GAUGE CONSISTENCY",
+        draw_result_text(result_loc("GAUGE CONSISTENCY", "게이지 변화"),
                          d2d_->body_format.Get(),
                          D2D1::RectF(analysis_panel.left + 26.0f, analysis_panel.top + 286.0f,
                                      analysis_panel.right - 26.0f, analysis_panel.top + 318.0f),
@@ -627,7 +634,7 @@
         const D2D1_RECT_F stats_panel = D2D1::RectF(70.0f, 770.0f, 1270.0f, 994.0f);
         draw_result_panel(stats_panel, presentation.statistics.front(), true);
         struct ResultStatistic {
-            const char* label;
+            std::string label;
             std::string value;
             std::string detail;
             D2D1_COLOR_F color;
@@ -641,11 +648,12 @@
             {"P-GREAT", std::to_string(data.result.perfect), percent_for(data.result.perfect), D2D1::ColorF(0x63E9FF)},
             {"GREAT", std::to_string(data.result.great), percent_for(data.result.great), D2D1::ColorF(0x73DDF5)},
             {"GOOD", std::to_string(data.result.good), percent_for(data.result.good), D2D1::ColorF(0xA8EA58)},
-            {"BAD", std::to_string(data.result.bad), percent_for(data.result.bad), D2D1::ColorF(0xF2B84B)},
             {"POOR", std::to_string(data.result.poor), percent_for(data.result.poor), D2D1::ColorF(0xFF6B7D)},
-            {"MAX COMBO", std::to_string(data.result.max_combo), data.result.full_combo ? "FULL COMBO" : "/ " + std::to_string(data.result.total_notes), D2D1::ColorF(0xF7FAFD)},
-            {"ACCURACY", format_decimal(data.result.accuracy) + "%",
-             "DETAIL " + format_decimal(data.result.detailed_accuracy) + "%", D2D1::ColorF(0x63E9FF)},
+            {"FAIL", std::to_string(data.result.bad), percent_for(data.result.bad), D2D1::ColorF(0xF2B84B)},
+            {result_loc("MAX COMBO", "최대 콤보"), std::to_string(data.result.max_combo),
+             data.result.full_combo ? result_loc("FULL COMBO", "풀 콤보") : "/ " + std::to_string(data.result.total_notes), D2D1::ColorF(0xF7FAFD)},
+            {result_loc("ACCURACY", "정확도"), format_decimal(data.result.accuracy) + "%",
+             result_loc("DETAIL", "상세") + " " + format_decimal(data.result.detailed_accuracy) + "%", D2D1::ColorF(0x63E9FF)},
         }};
         const float statistic_width = (stats_panel.right - stats_panel.left) /
                                       static_cast<float>(result_statistics.size());
@@ -743,7 +751,7 @@
         } else {
             draw_result_panel(continue_rect, controls_alpha, true);
         }
-        draw_result_text("CONTINUE  \xE2\x9E\xA1",
+        draw_result_text(result_loc("CONTINUE  \xE2\x9E\xA1", "계속  \xE2\x9E\xA1"),
                          d2d_->menu_button_format.Get(),
                          continue_rect,
                          d2d_->text_brush.Get(),
@@ -751,7 +759,9 @@
                          DWRITE_TEXT_ALIGNMENT_CENTER);
         draw_action_button(replay_rect, controls_alpha, data.result.replay_available);
         draw_action_button(retry_rect, controls_alpha, true);
-        draw_result_text(data.result.replay_available ? "\xE2\x96\xB6  WATCH REPLAY" : "REPLAY UNAVAILABLE",
+        draw_result_text(data.result.replay_available
+                             ? result_loc("\xE2\x96\xB6  WATCH REPLAY", "\xE2\x96\xB6  리플레이 보기")
+                             : result_loc("REPLAY UNAVAILABLE", "리플레이 없음"),
                          d2d_->stats_value_format.Get(),
                          replay_rect,
                          data.result.replay_available
@@ -759,15 +769,16 @@
                              : static_cast<ID2D1Brush*>(d2d_->muted_brush.Get()),
                          controls_alpha,
                          DWRITE_TEXT_ALIGNMENT_CENTER);
-        draw_result_text("\xE2\x86\xBB  RETRY",
+        draw_result_text(result_loc("\xE2\x86\xBB  RETRY", "\xE2\x86\xBB  재도전"),
                          d2d_->stats_value_format.Get(),
                          retry_rect,
                          d2d_->text_brush.Get(),
                          controls_alpha,
                          DWRITE_TEXT_ALIGNMENT_CENTER);
         draw_result_text(presentation.interaction_ready
-                             ? "ENTER / Continue    R / Retry    F1 / Replay"
-                             : "SPACE / Skip result reveal",
+                             ? result_loc("ENTER / Continue    R / Retry    F1 / Replay",
+                                          "ENTER / 계속    R / 재도전    F1 / 리플레이")
+                             : result_loc("SPACE / Skip result reveal", "SPACE / 결과 연출 건너뛰기"),
                          d2d_->hud_format.Get(),
                          D2D1::RectF(1320.0f, 952.0f, 1848.0f, 982.0f),
                          d2d_->muted_brush.Get(),

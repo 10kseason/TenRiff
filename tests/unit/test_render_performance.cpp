@@ -309,6 +309,9 @@ TEST_CASE("Media Foundation BGA video extension policy accepts MPG and common co
     CHECK(BgaVideoDecoder::is_supported_video_path("movie.mpg"));
     CHECK(BgaVideoDecoder::is_supported_video_path("MOVIE.MPEG"));
     CHECK(BgaVideoDecoder::is_supported_video_path("clip.mp4"));
+    CHECK(BgaVideoDecoder::is_supported_video_path("clip.webm"));
+    CHECK(BgaVideoDecoder::is_supported_video_path("clip.mkv"));
+    CHECK(BgaVideoDecoder::is_supported_video_path("clip.mov"));
     CHECK_FALSE(BgaVideoDecoder::is_supported_video_path("still.png"));
 }
 

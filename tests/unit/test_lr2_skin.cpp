@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "app/Lr2Skin.h"
+#include "util/Utf8Compat.h"
 
 namespace {
 
@@ -45,16 +46,26 @@ std::filesystem::path make_temp_dir() {
 }
 
 std::filesystem::path find_repo_lr2_sample_root() {
-    const std::vector<std::filesystem::path> candidates = {
-        std::filesystem::current_path() / "LR2-skin-sample",
-        std::filesystem::absolute(std::filesystem::path(__FILE__)).parent_path().parent_path().parent_path() /
-            "LR2-skin-sample",
-    };
-    for (const auto& candidate : candidates) {
-        std::error_code ec;
-        if (std::filesystem::is_directory(candidate, ec)) {
-            return candidate;
+    std::error_code ec;
+    const auto working_tree_candidate =
+        std::filesystem::current_path(ec) / "LR2-skin-sample";
+    if (!ec && std::filesystem::is_directory(working_tree_candidate, ec)) {
+        return working_tree_candidate;
+    }
+
+    // Some MSVC generators embed __FILE__ using the active ANSI code page.
+    // Do not let an unrepresentable non-ASCII checkout path fail otherwise
+    // optional sample tests before the working-tree candidate can be used.
+    try {
+        const auto source_tree_candidate =
+            std::filesystem::absolute(std::filesystem::path(__FILE__))
+                .parent_path().parent_path().parent_path() / "LR2-skin-sample";
+        ec.clear();
+        if (std::filesystem::is_directory(source_tree_candidate, ec)) {
+            return source_tree_candidate;
         }
+    } catch (const std::exception&) {
+        return {};
     }
     return {};
 }
@@ -723,7 +734,8 @@ TEST_CASE("lr2 sample FT skin resolves note directory customfile patterns") {
         return;
     }
 
-    const auto resolved = tenriff::app::resolve_lr2_play_skin(sample_root.u8string(), "FT", 8);
+    const auto resolved = tenriff::app::resolve_lr2_play_skin(
+        tenriff::util::path_to_utf8_lossy(sample_root), "FT", 8);
     REQUIRE(resolved.found);
     CHECK(resolved.keys == 8);
     CHECK(resolved.resolution_family == tenriff::app::Lr2ResolutionFamily::Hd);
@@ -738,7 +750,8 @@ TEST_CASE("lr2 sample standard skin resolves multi-option 7key branch") {
         return;
     }
 
-    const auto resolved = tenriff::app::resolve_lr2_play_skin(sample_root.u8string(), "LR2", 8);
+    const auto resolved = tenriff::app::resolve_lr2_play_skin(
+        tenriff::util::path_to_utf8_lossy(sample_root), "LR2", 8);
     REQUIRE(resolved.found);
     CHECK(resolved.keys == 8);
     CHECK(resolved.resolution_family == tenriff::app::Lr2ResolutionFamily::Sd);

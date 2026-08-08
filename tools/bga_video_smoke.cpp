@@ -5,6 +5,7 @@
 #include <thread>
 
 #include "render/BgaVideoDecoder.h"
+#include "util/Utf8Compat.h"
 
 namespace {
 
@@ -40,14 +41,15 @@ int wmain(int argc, wchar_t** argv) {
     }
 
     tenriff::render::BgaVideoDecoder decoder;
-    decoder.request(path.u8string(), 0.0);
+    const std::string path_utf8 = tenriff::util::path_to_utf8_lossy(path);
+    decoder.request(path_utf8, 0.0);
     const auto first = wait_for_frame(decoder, std::chrono::seconds(10));
     if (!valid_frame(first)) {
         std::cerr << "Media Foundation did not produce the first BGA video frame\n";
         return 3;
     }
 
-    decoder.request(path.u8string(), 0.25);
+    decoder.request(path_utf8, 0.25);
     const auto later = wait_for_frame(decoder, std::chrono::seconds(10));
     if (!valid_frame(later) || later->timestamp_100ns < first->timestamp_100ns) {
         std::cerr << "Media Foundation did not advance the BGA video frame\n";

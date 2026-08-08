@@ -70,6 +70,7 @@ void MenuApp::reload_chart_best_results() {
         candidate.rank = menu_records::calculate_rank(parsed->stats, parsed->game_over);
         candidate.best_score = parsed->final_score;
         candidate.detail_score = menu_records::calculate_detail_score(parsed->stats);
+        candidate.total_notes = parsed->stats.total_notes;
         candidate.accuracy = menu_records::calculate_accuracy(parsed->stats);
         candidate.detailed_accuracy = menu_records::calculate_detailed_accuracy(parsed->stats);
         candidate.clear_status = parsed->clear_status;

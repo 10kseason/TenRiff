@@ -56,7 +56,7 @@ inline constexpr double kSkinNoteOutlineOpacityMax = 1.00;
 inline constexpr double kSkinNoteOutlineOpacityDefault = 0.78;
 inline constexpr double kSkinHoldBodyOpacityMin = 0.05;
 inline constexpr double kSkinHoldBodyOpacityMax = 0.60;
-inline constexpr double kSkinHoldBodyOpacityDefault = 0.24;
+inline constexpr double kSkinHoldBodyOpacityDefault = 0.55;
 inline constexpr double kSkinKeyPulseBrightnessMin = 0.00;
 inline constexpr double kSkinKeyPulseBrightnessMax = 1.00;
 inline constexpr double kSkinKeyPulseBrightnessDefault = 1.00;
@@ -146,6 +146,8 @@ struct SkinConfig {
     // Hit-explosion brightness, 0.0 (off) .. 1.0. key_pulse_enabled is kept as the
     // on/off form older builds read, and is written as brightness > 0.
     double key_pulse_brightness = kSkinKeyPulseBrightnessDefault;
+    // Built-in hit-burst material: prism | ring | spark.
+    std::string hit_burst_style = "prism";
     std::string key_label_position = "bottom";
     // UI text font token: default | malgun | bahnschrift | consolas.
     std::string ui_font = "default";
@@ -251,6 +253,8 @@ public:
 void apply_skin_visual_preset(SkinConfig& skin, std::string_view token);
 [[nodiscard]] std::string normalize_skin_key_label_position_token(std::string_view token);
 [[nodiscard]] std::string skin_key_label_position_label(std::string_view token);
+[[nodiscard]] std::string normalize_skin_hit_burst_style_token(std::string_view token);
+[[nodiscard]] std::string skin_hit_burst_style_label(std::string_view token);
 [[nodiscard]] std::string normalize_skin_ui_font_token(std::string_view token);
 [[nodiscard]] std::string skin_ui_font_label(std::string_view token);
 [[nodiscard]] std::string normalize_skin_color_token(std::string_view token);

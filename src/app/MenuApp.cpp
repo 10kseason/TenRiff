@@ -1752,6 +1752,10 @@ void MenuApp::handle_input_event(const input::InputEvent& event) {
         return;
     }
 
+    if (handle_settings_shortcut(event.keycode, screen_)) {
+        return;
+    }
+
     switch (screen_) {
         case Screen::QuickSetup:
             handle_quick_setup_input(event.keycode);
@@ -2202,7 +2206,7 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
             return;
         case Screen::SettingsSkins:
             settings_cursor_ = clamp_int(event.index, 0,
-                                         35 + (config::normalize_skin_source_token(config_.skin.source) == "lr2" ? 1 : 0));
+                                         38 + (config::normalize_skin_source_token(config_.skin.source) == "lr2" ? 1 : 0));
             if (finish_selection_only()) {
                 return;
             }
@@ -2266,9 +2270,22 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
 }
 
 bool MenuApp::handle_settings_shortcut(uint32_t keycode, Screen return_screen) {
-    static_cast<void>(keycode);
-    static_cast<void>(return_screen);
-    return false;
+    if (key_space_ == 0 || keycode != key_space_) {
+        return false;
+    }
+    if (return_screen != Screen::Title && return_screen != Screen::SongSelect &&
+        return_screen != Screen::Multiplayer) {
+        return false;
+    }
+    if (return_screen == Screen::SongSelect && song_select_search_active_) {
+        return false;
+    }
+    submenu_return_screen_ = return_screen;
+    screen_ = Screen::OptionsHub;
+    options_cursor_ = profile_setup::kOptionsKeyModeRow;
+    help_overlay_visible_ = false;
+    publish_snapshot();
+    return true;
 }
 
 void MenuApp::handle_title_input(uint32_t keycode) {
@@ -2550,32 +2567,39 @@ void MenuApp::handle_quick_setup_input(uint32_t keycode) {
 }
 
 void MenuApp::handle_options_hub_input(uint32_t keycode) {
-    constexpr int item_count = profile_setup::kOptionsHubRowCount;
     const Screen return_screen = submenu_return_screen_;
+    if (keycode == key_left_) {
+        options_cursor_ = profile_setup::move_options_grid_cursor(options_cursor_, -1, 0);
+        publish_snapshot();
+        return;
+    }
+    if (keycode == key_right_) {
+        options_cursor_ = profile_setup::move_options_grid_cursor(options_cursor_, 1, 0);
+        publish_snapshot();
+        return;
+    }
     if (keycode == key_up_) {
-        options_cursor_ = clamp_int(options_cursor_ - 1, 0, item_count - 1);
+        options_cursor_ = profile_setup::move_options_grid_cursor(options_cursor_, 0, -1);
         publish_snapshot();
         return;
     }
     if (keycode == key_down_) {
-        options_cursor_ = clamp_int(options_cursor_ + 1, 0, item_count - 1);
+        options_cursor_ = profile_setup::move_options_grid_cursor(options_cursor_, 0, 1);
         publish_snapshot();
         return;
     }
 
     if (keycode == key_enter_) {
         switch (options_cursor_) {
-            case 0:
+            case profile_setup::kOptionsKeyModeRow:
                 submenu_return_screen_ = return_screen;
-                screen_ = Screen::SettingsAudio;
+                screen_ = Screen::ModeSelect;
                 settings_cursor_ = 0;
                 break;
-            case 1:
-                submenu_return_screen_ = return_screen;
-                screen_ = Screen::SettingsGraphics;
-                settings_cursor_ = 0;
+            case profile_setup::kOptionsKeymapRow:
+                open_keymap_screen(return_screen);
                 break;
-            case 2:
+            case profile_setup::kOptionsSkinsRow:
                 submenu_return_screen_ = return_screen;
                 screen_ = Screen::SettingsSkins;
                 settings_cursor_ = 0;
@@ -2586,31 +2610,31 @@ void MenuApp::handle_options_hub_input(uint32_t keycode) {
                 refresh_available_lr2_skins();
                 refresh_available_tenriff_skins();
                 break;
-            case 3:
+            case profile_setup::kOptionsGraphicsRow:
+                submenu_return_screen_ = return_screen;
+                screen_ = Screen::SettingsGraphics;
+                settings_cursor_ = 0;
+                break;
+            case profile_setup::kOptionsAudioRow:
+                submenu_return_screen_ = return_screen;
+                screen_ = Screen::SettingsAudio;
+                settings_cursor_ = 0;
+                break;
+            case profile_setup::kOptionsInputRow:
                 submenu_return_screen_ = return_screen;
                 screen_ = Screen::SettingsInput;
                 settings_cursor_ = 0;
                 break;
-            case 4:
+            case profile_setup::kOptionsCalibrationRow:
                 submenu_return_screen_ = return_screen;
                 screen_ = Screen::SettingsCalibration;
                 settings_cursor_ = 0;
-                break;
-            case 5:
-                submenu_return_screen_ = return_screen;
-                screen_ = Screen::ModeSelect;
-                settings_cursor_ = 0;
-                break;
-            case 6:
-                open_keymap_screen(return_screen);
                 break;
             case profile_setup::kOptionsProfileSetupRow:
                 screen_ = Screen::QuickSetup;
                 settings_cursor_ = 0;
                 break;
-            default:
-                screen_ = return_screen;
-                break;
+            default: break;
         }
         publish_snapshot();
         return;

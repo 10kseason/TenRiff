@@ -86,6 +86,21 @@ std::string cycle_lr2_resolution_mode(std::string_view value, int direction) {
     return std::string(kModes[static_cast<std::size_t>(index)]);
 }
 
+std::string cycle_hit_burst_style(std::string_view value, int direction) {
+    static constexpr std::array<std::string_view, 3> kStyles = {"prism", "ring", "spark"};
+    const std::string normalized = config::normalize_skin_hit_burst_style_token(value);
+    int index = 0;
+    for (int i = 0; i < static_cast<int>(kStyles.size()); ++i) {
+        if (kStyles[static_cast<std::size_t>(i)] == normalized) {
+            index = i;
+            break;
+        }
+    }
+    index = (index + direction + static_cast<int>(kStyles.size())) %
+            static_cast<int>(kStyles.size());
+    return std::string(kStyles[static_cast<std::size_t>(index)]);
+}
+
 fs::path lr2_skin_import_root_path(std::string_view profile_dir) {
     return path_from_utf8(profile_dir) / "skins" / "lr2";
 }
@@ -312,7 +327,7 @@ void MenuApp::handle_skins_settings_input(uint32_t keycode) {
     const std::string active_skin_source = config::normalize_skin_source_token(config_.skin.source);
     const bool lr2_source = active_skin_source == "lr2";
     const int lr2_shift = lr2_source ? 1 : 0;
-    const int item_count = 38 + lr2_shift;
+    const int item_count = 39 + lr2_shift;
     const int imported_skin_row = 1;
     const int lr2_resolution_row = lr2_source ? 2 : -1;
     const int import_skin_row = 2 + lr2_shift;
@@ -334,23 +349,24 @@ void MenuApp::handle_skins_settings_input(uint32_t keycode) {
     const int note_outline_opacity_row = 18 + lr2_shift;
     const int ln_body_opacity_row = 19 + lr2_shift;
     const int judgement_line_glow_row = 20 + lr2_shift;
-    const int key_pulse_row = 21 + lr2_shift;
-    const int key_label_position_row = 22 + lr2_shift;
-    const int judge_line_row = 23 + lr2_shift;
-    const int lane_width_row = 24 + lr2_shift;
-    const int note_width_row = 25 + lr2_shift;
-    const int lane_spacing_row = 26 + lr2_shift;
-    const int divider_width_row = 27 + lr2_shift;
-    const int center_gap_row = 28 + lr2_shift;
-    const int ln_body_width_row = 29 + lr2_shift;
-    const int note_height_row = 30 + lr2_shift;
-    const int combo_y_row = 31 + lr2_shift;
-    const int black_playfield_row = 32 + lr2_shift;
-    const int ui_font_row = 33 + lr2_shift;
-    const int visual_latency_row = 34 + lr2_shift;
-    const int note_gap_row = 35 + lr2_shift;
-    const int gameplay_cursor_row = 36 + lr2_shift;
-    const int back_row = 37 + lr2_shift;
+    const int hit_burst_style_row = 21 + lr2_shift;
+    const int key_pulse_row = 22 + lr2_shift;
+    const int key_label_position_row = 23 + lr2_shift;
+    const int judge_line_row = 24 + lr2_shift;
+    const int lane_width_row = 25 + lr2_shift;
+    const int note_width_row = 26 + lr2_shift;
+    const int lane_spacing_row = 27 + lr2_shift;
+    const int divider_width_row = 28 + lr2_shift;
+    const int center_gap_row = 29 + lr2_shift;
+    const int ln_body_width_row = 30 + lr2_shift;
+    const int note_height_row = 31 + lr2_shift;
+    const int combo_y_row = 32 + lr2_shift;
+    const int black_playfield_row = 33 + lr2_shift;
+    const int ui_font_row = 34 + lr2_shift;
+    const int visual_latency_row = 35 + lr2_shift;
+    const int note_gap_row = 36 + lr2_shift;
+    const int gameplay_cursor_row = 37 + lr2_shift;
+    const int back_row = 38 + lr2_shift;
 
     if (keycode == key_up_) {
         settings_cursor_ = clamp_int(settings_cursor_ - 1, 0, item_count - 1);
@@ -368,7 +384,7 @@ void MenuApp::handle_skins_settings_input(uint32_t keycode) {
         const bool was_lr2 = active_skin_source == "lr2";
         config_.skin.source = cycle_skin_source(config_.skin.source, direction);
         const bool is_lr2 = config::normalize_skin_source_token(config_.skin.source) == "lr2";
-        const int new_item_count = 38 + (is_lr2 ? 1 : 0);
+        const int new_item_count = 39 + (is_lr2 ? 1 : 0);
         if (!was_lr2 && is_lr2 && settings_cursor_ >= imported_skin_row) {
             ++settings_cursor_;
         } else if (was_lr2 && !is_lr2 && settings_cursor_ >= import_skin_row) {
@@ -613,6 +629,13 @@ void MenuApp::handle_skins_settings_input(uint32_t keycode) {
     }
     if (settings_cursor_ == judgement_line_glow_row && (keycode == key_left_ || keycode == key_right_)) {
         config_.skin.judgement_line_glow_enabled = !config_.skin.judgement_line_glow_enabled;
+        skin_dirty_ = true;
+        publish_snapshot();
+        return;
+    }
+    if (settings_cursor_ == hit_burst_style_row && (keycode == key_left_ || keycode == key_right_)) {
+        const int direction = (keycode == key_left_) ? -1 : 1;
+        config_.skin.hit_burst_style = cycle_hit_burst_style(config_.skin.hit_burst_style, direction);
         skin_dirty_ = true;
         publish_snapshot();
         return;
@@ -906,57 +929,60 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
                     settings_cursor_ == 19 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 19 + lr2_shift, false, true);
     append_menu_row(render.generic, ui_text("Judge Glow", "판정선 글로우"), ui_on_off(config_.skin.judgement_line_glow_enabled),
                     settings_cursor_ == 20 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 20 + lr2_shift, false, true);
-    append_menu_row(render.generic, ui_text("Hit Burst", "폭발 이펙트"),
-                    format_percent(config_.skin.key_pulse_brightness),
+    append_menu_row(render.generic, ui_text("Hit Burst Style", "키 폭발 모양"),
+                    config::skin_hit_burst_style_label(config_.skin.hit_burst_style),
                     settings_cursor_ == 21 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 21 + lr2_shift, false, true);
+    append_menu_row(render.generic, ui_text("Hit Burst Brightness", "키 폭발 밝기"),
+                    format_percent(config_.skin.key_pulse_brightness),
+                    settings_cursor_ == 22 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 22 + lr2_shift, false, true);
     append_menu_row(render.generic, ui_text("Key Labels", "키 이름"),
                     config::skin_key_label_position_label(config_.skin.key_label_position),
-                    settings_cursor_ == 22 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 22 + lr2_shift, false, true);
-    append_menu_row(render.generic, ui_text("Judge Line", "판정선 위치"), format_percent(config_.skin.judgement_line_position),
                     settings_cursor_ == 23 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 23 + lr2_shift, false, true);
-    append_menu_row(render.generic, ui_text("Lane Width", "레인 너비"), format_percent(preview_lane_width_scale),
+    append_menu_row(render.generic, ui_text("Judge Line", "판정선 위치"), format_percent(config_.skin.judgement_line_position),
                     settings_cursor_ == 24 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 24 + lr2_shift, false, true);
-    append_menu_row(render.generic, ui_text("Note & Field Size", "노트·필드 크기"), format_percent(preview_note_width_scale),
+    append_menu_row(render.generic, ui_text("Lane Width", "레인 너비"), format_percent(preview_lane_width_scale),
                     settings_cursor_ == 25 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 25 + lr2_shift, false, true);
+    append_menu_row(render.generic, ui_text("Note & Field Size", "노트·필드 크기"), format_percent(preview_note_width_scale),
+                    settings_cursor_ == 26 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 26 + lr2_shift, false, true);
     append_menu_row(render.generic, ui_text("Lane Spacing", "레인 간격"), format_percent(preview_lane_spacing_scale),
-                    settings_cursor_ == 26 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 26 + lr2_shift, false, gap_count > 0);
+                    settings_cursor_ == 27 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 27 + lr2_shift, false, gap_count > 0);
     append_menu_row(render.generic, ui_text("Divider Width", "구분선 너비"), format_percent(preview_lane_divider_width_scale),
-                    settings_cursor_ == 27 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 27 + lr2_shift, false, true);
+                    settings_cursor_ == 28 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 28 + lr2_shift, false, true);
     append_menu_row(render.generic,
                     ui_text("16K Center Gap", "16K 중앙 간격"),
                     center_gap_available ? format_percent(preview_lane_center_gap_scale) : ui_text("16K Only", "16K 전용"),
-                    settings_cursor_ == 28 + lr2_shift,
+                    settings_cursor_ == 29 + lr2_shift,
                     render::MenuHitTargetKind::SettingsRow,
-                    28 + lr2_shift,
+                    29 + lr2_shift,
                     false,
                     center_gap_available);
     append_menu_row(render.generic, ui_text("LN Body Width", "LN 몸통 너비"), format_percent(config_.skin.hold_body_width_scale),
-                    settings_cursor_ == 29 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 29 + lr2_shift, false, true);
-    append_menu_row(render.generic, ui_text("Note Height", "노트 높이"), format_percent(preview_note_height_scale),
                     settings_cursor_ == 30 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 30 + lr2_shift, false, true);
-    append_menu_row(render.generic, ui_text("Combo Y", "콤보 Y"), format_percent(config_.skin.combo_position),
+    append_menu_row(render.generic, ui_text("Note Height", "노트 높이"), format_percent(preview_note_height_scale),
                     settings_cursor_ == 31 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 31 + lr2_shift, false, true);
+    append_menu_row(render.generic, ui_text("Combo Y", "콤보 Y"), format_percent(config_.skin.combo_position),
+                    settings_cursor_ == 32 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 32 + lr2_shift, false, true);
     append_menu_row(render.generic, ui_text("Opaque Playfield", "기어 뒤 BGA 가림"),
                     ui_on_off(config_.skin.black_playfield_enabled),
-                    settings_cursor_ == 32 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 32 + lr2_shift, false, true);
+                    settings_cursor_ == 33 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 33 + lr2_shift, false, true);
     append_menu_row(render.generic, ui_text("UI Font", "UI 폰트"),
                     config::skin_ui_font_label(config_.skin.ui_font),
-                    settings_cursor_ == 33 + lr2_shift, render::MenuHitTargetKind::SettingsRow,
-                    33 + lr2_shift, false, true);
-    append_menu_row(render.generic, ui_text("Visual Latency", "비주얼 레이턴시"),
-                    format_signed_offset_ms(config_.visual_offset_ms),
                     settings_cursor_ == 34 + lr2_shift, render::MenuHitTargetKind::SettingsRow,
                     34 + lr2_shift, false, true);
-    append_menu_row(render.generic, ui_text("Note Gap", "노트 여백"),
-                    format_pixels(config_.skin.note_divider_gap_px),
+    append_menu_row(render.generic, ui_text("Visual Latency", "비주얼 레이턴시"),
+                    format_signed_offset_ms(config_.visual_offset_ms),
                     settings_cursor_ == 35 + lr2_shift, render::MenuHitTargetKind::SettingsRow,
                     35 + lr2_shift, false, true);
-    append_menu_row(render.generic, ui_text("Gameplay Cursor", "인게임 커서"),
-                    ui_on_off(config_.ui.show_cursor_in_gameplay),
+    append_menu_row(render.generic, ui_text("Note Gap", "노트 여백"),
+                    format_pixels(config_.skin.note_divider_gap_px),
                     settings_cursor_ == 36 + lr2_shift, render::MenuHitTargetKind::SettingsRow,
                     36 + lr2_shift, false, true);
-    append_menu_row(render.generic, ui_text("Back", "뒤로"), "", settings_cursor_ == 37 + lr2_shift,
-                    render::MenuHitTargetKind::SettingsRow, 37 + lr2_shift, true, false);
+    append_menu_row(render.generic, ui_text("Gameplay Cursor", "인게임 커서"),
+                    ui_on_off(config_.ui.show_cursor_in_gameplay),
+                    settings_cursor_ == 37 + lr2_shift, render::MenuHitTargetKind::SettingsRow,
+                    37 + lr2_shift, false, true);
+    append_menu_row(render.generic, ui_text("Back", "뒤로"), "", settings_cursor_ == 38 + lr2_shift,
+                    render::MenuHitTargetKind::SettingsRow, 38 + lr2_shift, true, false);
 
     render.generic.skin_preview.visible = true;
     render.generic.skin_preview.mode_label = ui_key_mode_label(skin_edit_mode_);
@@ -1000,6 +1026,8 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
     render.generic.skin_preview.key_pulse_enabled = config_.skin.key_pulse_enabled;
     render.generic.skin_preview.key_pulse_brightness =
         static_cast<float>(config_.skin.key_pulse_brightness);
+    render.generic.skin_preview.hit_burst_style =
+        config::normalize_skin_hit_burst_style_token(config_.skin.hit_burst_style);
     render.generic.skin_preview.key_label_position =
         config::normalize_skin_key_label_position_token(config_.skin.key_label_position);
     render.generic.skin_preview.note_border_enabled = config_.skin.note_border_enabled;
