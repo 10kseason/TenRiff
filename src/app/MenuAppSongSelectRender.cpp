@@ -153,6 +153,12 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
         }
         render.song_select.browser_summary += input_backend_label;
     }
+    if (!session_mix_status_message_.empty()) {
+        if (!render.song_select.browser_summary.empty()) {
+            render.song_select.browser_summary += " / ";
+        }
+        render.song_select.browser_summary += session_mix_status_message_;
+    }
     render.song_select.sort_summary = song_sort_detail_label(song_sort_mode_, korean);
     render.song_select.primary_hint =
         multiplayer_selecting_chart_
@@ -165,10 +171,10 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
                    ? ui_text("UP/DOWN or wheel  MOVE     ENTER / dbl-click  OPEN RESULT     PGUP/PGDN  PAGE",
                              "위/아래 또는 휠  이동     ENTER / 더블클릭  결과 열기     PGUP/PGDN  페이지")
                    : (render.song_select.result_available
-                          ? ui_text("UP/DOWN or wheel  MOVE     ENTER / dbl-click  PLAY     CLICK BEST SCORE  RESULT",
-                                    "위/아래 또는 휠  이동     ENTER / 더블클릭  플레이     최고 점수 클릭  결과")
-                          : ui_text("UP/DOWN or wheel  MOVE     ENTER / dbl-click  PLAY     PGUP/PGDN  PAGE",
-                                    "위/아래 또는 휠  이동     ENTER / 더블클릭  플레이     PGUP/PGDN  페이지"))));
+                           ? ui_text("UP/DOWN  MOVE     ENTER / dbl-click  PLAY     C  ADD COURSE     DELETE  UNDO",
+                                     "위/아래  이동     ENTER / 더블클릭  플레이     C  코스 추가     DELETE  되돌리기")
+                           : ui_text("UP/DOWN  MOVE     ENTER / dbl-click  PLAY     C  ADD COURSE     DELETE  UNDO",
+                                     "위/아래  이동     ENTER / 더블클릭  플레이     C  코스 추가     DELETE  되돌리기"))));
     render.song_select.secondary_hint =
         multiplayer_selecting_chart_
             ? ui_text("ESC / BACKSPACE  BACK TO MULTIPLAYER LOBBY",
@@ -259,7 +265,11 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
         render::MenuButtonData{ui_text("FILTER", "필터"), u8"≡", song_select_nav_cursor_ == 3, browser_detail},
         render::MenuButtonData{ui_text("RECORDS", "기록"), u8"▤", song_select_nav_cursor_ == 4,
                                render.song_select.showing_records ? ui_text("ACTIVE", "활성") : records_detail},
-        render::MenuButtonData{ui_text("OPTIONS", "옵션"), u8"⚙", song_select_nav_cursor_ == 5,
+        render::MenuButtonData{ui_text("SESSION MIX", "세션 믹스"), u8"▶", song_select_nav_cursor_ == 5,
+                               session_mix_draft_.empty()
+                                   ? (std::to_string(session_mix_minutes_) + ui_text(" MIN", "분"))
+                                   : (ui_text("DRAFT ", "초안 ") + std::to_string(session_mix_draft_.size()))},
+        render::MenuButtonData{ui_text("OPTIONS", "옵션"), u8"⚙", song_select_nav_cursor_ == 6,
                                format_multiplier(config_.speed.rate) + " / HS " +
                                    format_decimal(config_.speed.hi_speed)},
     };

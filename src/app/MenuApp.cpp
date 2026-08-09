@@ -66,7 +66,7 @@ using menu_song_select::song_title_for_ui;
 
 constexpr int kSnapshotSongCount = 10;
 constexpr int kSongSelectVisibleCardCount = 7;
-constexpr int kSongSelectNavLastIndex = 5;
+constexpr int kSongSelectNavLastIndex = 6;
 constexpr int kSongBrowserRowCount = 11;
 constexpr int64_t kSongSelectRepeatInitialDelayNs = 250'000'000LL;
 constexpr int64_t kSongSelectRepeatIntervalNs = 45'000'000LL;
@@ -456,6 +456,123 @@ std::string browse_for_json_file(const std::string& title) {
         dialog->Release();
     }
 
+    CoUninitialize();
+    return result;
+}
+
+std::string browse_for_lr2_course_file(const std::string& title) {
+    std::string result;
+
+    const HRESULT init_hr = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
+    if (FAILED(init_hr)) {
+        return result;
+    }
+
+    IFileOpenDialog* dialog = nullptr;
+    HRESULT hr = CoCreateInstance(CLSID_FileOpenDialog, nullptr, CLSCTX_ALL,
+                                  IID_IFileOpenDialog, reinterpret_cast<void**>(&dialog));
+    if (SUCCEEDED(hr)) {
+        DWORD options = 0;
+        dialog->GetOptions(&options);
+        dialog->SetOptions(options | FOS_FORCEFILESYSTEM | FOS_FILEMUSTEXIST | FOS_PATHMUSTEXIST);
+
+        const COMDLG_FILTERSPEC filters[] = {
+            {L"LR2 course files (*.lr2crs)", L"*.lr2crs"},
+            {L"All files", L"*.*"},
+        };
+        dialog->SetFileTypes(static_cast<UINT>(std::size(filters)), filters);
+        dialog->SetFileTypeIndex(1);
+
+        std::wstring wide_title;
+        if (!title.empty()) {
+            const int count = MultiByteToWideChar(CP_UTF8, 0, title.c_str(), -1, nullptr, 0);
+            if (count > 0) {
+                wide_title.resize(static_cast<std::size_t>(count));
+                MultiByteToWideChar(CP_UTF8, 0, title.c_str(), -1, wide_title.data(), count);
+            }
+        }
+        if (!wide_title.empty()) {
+            dialog->SetTitle(wide_title.c_str());
+        }
+
+        if (SUCCEEDED(dialog->Show(nullptr))) {
+            IShellItem* item = nullptr;
+            if (SUCCEEDED(dialog->GetResult(&item)) && item) {
+                PWSTR path = nullptr;
+                if (SUCCEEDED(item->GetDisplayName(SIGDN_FILESYSPATH, &path)) && path) {
+                    const int length = WideCharToMultiByte(CP_UTF8, 0, path, -1, nullptr, 0, nullptr, nullptr);
+                    if (length > 0) {
+                        result.resize(static_cast<std::size_t>(length));
+                        WideCharToMultiByte(CP_UTF8, 0, path, -1, result.data(), length, nullptr, nullptr);
+                        if (!result.empty() && result.back() == '\0') {
+                            result.pop_back();
+                        }
+                    }
+                    CoTaskMemFree(path);
+                }
+                item->Release();
+            }
+        }
+        dialog->Release();
+    }
+
+    CoUninitialize();
+    return result;
+}
+
+std::string browse_for_lr2_course_save_file(const std::string& title) {
+    std::string result;
+    const HRESULT init_hr = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
+    if (FAILED(init_hr)) {
+        return result;
+    }
+
+    IFileSaveDialog* dialog = nullptr;
+    const HRESULT create_hr = CoCreateInstance(CLSID_FileSaveDialog, nullptr, CLSCTX_ALL,
+                                               IID_IFileSaveDialog,
+                                               reinterpret_cast<void**>(&dialog));
+    if (SUCCEEDED(create_hr) && dialog) {
+        DWORD options = 0;
+        dialog->GetOptions(&options);
+        dialog->SetOptions(options | FOS_FORCEFILESYSTEM | FOS_PATHMUSTEXIST | FOS_OVERWRITEPROMPT);
+        const COMDLG_FILTERSPEC filters[] = {
+            {L"LR2 course files (*.lr2crs)", L"*.lr2crs"},
+            {L"All files", L"*.*"},
+        };
+        dialog->SetFileTypes(static_cast<UINT>(std::size(filters)), filters);
+        dialog->SetFileTypeIndex(1);
+        dialog->SetDefaultExtension(L"lr2crs");
+        dialog->SetFileName(L"TenRiff Custom Course.lr2crs");
+
+        if (!title.empty()) {
+            const int count = MultiByteToWideChar(CP_UTF8, 0, title.c_str(), -1, nullptr, 0);
+            if (count > 0) {
+                std::wstring wide_title(static_cast<std::size_t>(count), L'\0');
+                MultiByteToWideChar(CP_UTF8, 0, title.c_str(), -1, wide_title.data(), count);
+                dialog->SetTitle(wide_title.c_str());
+            }
+        }
+
+        if (SUCCEEDED(dialog->Show(nullptr))) {
+            IShellItem* item = nullptr;
+            if (SUCCEEDED(dialog->GetResult(&item)) && item) {
+                PWSTR path = nullptr;
+                if (SUCCEEDED(item->GetDisplayName(SIGDN_FILESYSPATH, &path)) && path) {
+                    const int length = WideCharToMultiByte(CP_UTF8, 0, path, -1, nullptr, 0, nullptr, nullptr);
+                    if (length > 0) {
+                        result.resize(static_cast<std::size_t>(length));
+                        WideCharToMultiByte(CP_UTF8, 0, path, -1, result.data(), length, nullptr, nullptr);
+                        if (!result.empty() && result.back() == '\0') {
+                            result.pop_back();
+                        }
+                    }
+                    CoTaskMemFree(path);
+                }
+                item->Release();
+            }
+        }
+        dialog->Release();
+    }
     CoUninitialize();
     return result;
 }
@@ -1013,6 +1130,9 @@ bool MenuApp::initialize(const CommandLineOptions& options) {
     refresh_song_collection_membership_cache();
     refresh_available_lr2_skins();
     refresh_available_tenriff_skins();
+    if (!config_.ui.session_mix_lr2_course_path.empty()) {
+        load_session_mix_lr2_course_file(config_.ui.session_mix_lr2_course_path, false);
+    }
 
     config::KeymapManager keymap_manager;
     auto keymap_result = keymap_manager.load_profile(profile_dir_);
@@ -1040,6 +1160,7 @@ bool MenuApp::initialize(const CommandLineOptions& options) {
     key_escape_ = config::KeycodeMap::to_keycode("Esc").value_or(0);
     key_backspace_ = config::KeycodeMap::to_keycode("Backspace").value_or(0);
     key_delete_ = config::KeycodeMap::to_keycode("Delete").value_or(0);
+    key_c_ = config::KeycodeMap::to_keycode("C").value_or(0);
     key_a_ = config::KeycodeMap::to_keycode("A").value_or(0);
     key_g_ = config::KeycodeMap::to_keycode("G").value_or(0);
     key_i_ = config::KeycodeMap::to_keycode("I").value_or(0);
@@ -1359,6 +1480,7 @@ std::vector<uint32_t> MenuApp::current_menu_probe_keycodes() const {
     append_fixed_key(key_escape_);
     append_fixed_key(key_backspace_);
     append_fixed_key(key_delete_);
+    append_fixed_key(key_c_);
     append_fixed_key(key_f1_);
     append_fixed_key(key_f2_);
     append_fixed_key(key_f5_);
@@ -1772,6 +1894,9 @@ void MenuApp::handle_input_event(const input::InputEvent& event) {
         case Screen::SongSelect:
             handle_song_select_input(event.keycode);
             break;
+        case Screen::SessionMix:
+            handle_session_mix_input(event.keycode);
+            break;
         case Screen::SongBrowser:
             handle_song_browser_input(event.keycode);
             break;
@@ -1872,6 +1997,9 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
                     case Screen::SongBrowser:
                         handle_song_browser_input(direction_key);
                         break;
+                    case Screen::SessionMix:
+                        handle_session_mix_input(direction_key);
+                        break;
                     case Screen::SettingsAudio:
                         handle_audio_settings_input(direction_key);
                         break;
@@ -1953,6 +2081,11 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
                           << event.path << std::endl;
                 return;
             }
+            publish_snapshot();
+            return;
+        }
+        if (screen_ == Screen::SessionMix && dropped_extension == ".lr2crs") {
+            load_session_mix_lr2_course_file(event.path);
             publish_snapshot();
             return;
         }
@@ -2203,6 +2336,13 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
                 return;
             }
             handle_song_browser_input(action_key);
+            return;
+        case Screen::SessionMix:
+            settings_cursor_ = clamp_int(event.index, 0, 5);
+            if (finish_selection_only()) {
+                return;
+            }
+            handle_session_mix_input(action_key);
             return;
         case Screen::SettingsSkins:
             settings_cursor_ = clamp_int(event.index, 0,
@@ -2646,6 +2786,80 @@ void MenuApp::handle_options_hub_input(uint32_t keycode) {
     }
 }
 
+void MenuApp::handle_session_mix_input(uint32_t keycode) {
+    if (keycode == key_up_) {
+        settings_cursor_ = clamp_int(settings_cursor_ - 1, 0, 5);
+        publish_snapshot();
+        return;
+    }
+    if (keycode == key_down_) {
+        settings_cursor_ = clamp_int(settings_cursor_ + 1, 0, 5);
+        publish_snapshot();
+        return;
+    }
+    if ((keycode == key_left_ || keycode == key_right_) && settings_cursor_ == 0) {
+        const int option_count = static_cast<int>(session_mix_lr2_courses_.size()) + 2;
+        const int direction = keycode == key_left_ ? -1 : 1;
+        session_mix_source_index_ =
+            (session_mix_source_index_ + direction + option_count) % option_count;
+        session_mix_status_message_.clear();
+        publish_snapshot();
+        return;
+    }
+    if ((keycode == key_left_ || keycode == key_right_) && settings_cursor_ == 1 &&
+        session_mix_source_index_ == 0) {
+        session_mix_minutes_ = cycle_session_mix_minutes(
+            session_mix_minutes_, keycode == key_left_ ? -1 : 1);
+        publish_snapshot();
+        return;
+    }
+    if (keycode == key_enter_) {
+        if (settings_cursor_ == 0) {
+            const int option_count = static_cast<int>(session_mix_lr2_courses_.size()) + 2;
+            session_mix_source_index_ = (session_mix_source_index_ + 1) % option_count;
+            session_mix_status_message_.clear();
+            publish_snapshot();
+        } else if (settings_cursor_ == 1) {
+            if (session_mix_source_index_ == 0) {
+                session_mix_minutes_ = cycle_session_mix_minutes(session_mix_minutes_, 1);
+                publish_snapshot();
+            }
+        } else if (settings_cursor_ == 2) {
+#ifdef _WIN32
+            if (!session_mix_draft_.empty()) {
+                const std::string path = browse_for_lr2_course_save_file(
+                    ui_text("Save LR2 Course File", "LR2 코스 파일 저장"));
+                if (!path.empty()) {
+                    (void)save_session_mix_draft(path);
+                }
+            } else {
+                session_mix_status_message_ = ui_text("Course draft is empty.", "코스 초안이 비어 있습니다.");
+            }
+#endif
+            publish_snapshot();
+        } else if (settings_cursor_ == 3) {
+#ifdef _WIN32
+            const std::string path = browse_for_lr2_course_file(
+                ui_text("Select LR2 Course File", "LR2 코스 파일 선택"));
+            if (!path.empty()) {
+                load_session_mix_lr2_course_file(path);
+            }
+#endif
+            publish_snapshot();
+        } else if (settings_cursor_ == 4) {
+            start_session_mix();
+        } else {
+            screen_ = Screen::SongSelect;
+            publish_snapshot();
+        }
+        return;
+    }
+    if (keycode == key_escape_ || keycode == key_backspace_) {
+        screen_ = Screen::SongSelect;
+        publish_snapshot();
+    }
+}
+
 void MenuApp::handle_song_select_input(uint32_t keycode) {
     sync_song_select_state();
     rebuild_current_song_record_indices();
@@ -2723,6 +2937,21 @@ void MenuApp::handle_song_select_input(uint32_t keycode) {
             apply_song_search_refresh();
             return;
         }
+    }
+
+    if (song_select_view_ == SongSelectView::Songs &&
+        song_select_focus_ == SongSelectFocus::SongList &&
+        key_c_ != 0 && keycode == key_c_) {
+        (void)add_selected_song_to_session_mix_draft();
+        publish_snapshot();
+        return;
+    }
+    if (song_select_view_ == SongSelectView::Songs &&
+        song_select_focus_ == SongSelectFocus::SongList &&
+        key_delete_ != 0 && keycode == key_delete_) {
+        remove_last_session_mix_draft_song();
+        publish_snapshot();
+        return;
     }
 
     if (keycode == key_f5_) {
@@ -2847,6 +3076,12 @@ void MenuApp::handle_song_select_input(uint32_t keycode) {
                     publish_snapshot();
                     return;
                 case 5:
+                    song_select_search_active_ = false;
+                    screen_ = Screen::SessionMix;
+                    settings_cursor_ = 0;
+                    publish_snapshot();
+                    return;
+                case 6:
                     song_select_search_active_ = false;
                     submenu_return_screen_ = Screen::SongSelect;
                     screen_ = Screen::OptionsHub;
@@ -3234,6 +3469,19 @@ void MenuApp::handle_result_input(uint32_t keycode) {
     }
     if (keycode == key_f1_) {
         if (launch_last_result_replay()) {
+            return;
+        }
+    }
+    if (session_mix_active_) {
+        if (keycode == key_enter_) {
+            advance_session_mix_from_result();
+            return;
+        }
+        if (keycode == key_escape_ || keycode == key_backspace_) {
+            record_current_session_mix_result();
+            stop_session_mix(false);
+            screen_ = Screen::SongSelect;
+            publish_snapshot();
             return;
         }
     }

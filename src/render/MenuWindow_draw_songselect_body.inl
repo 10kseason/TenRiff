@@ -118,7 +118,7 @@
             d2d_->button_border_brush->SetOpacity(saved);
         }
 
-        const std::array<int, 4> top_nav_indices = {0, 1, 4, 5};
+        const std::array<int, 5> top_nav_indices = {0, 1, 4, 5, 6};
         const D2D1_RECT_F nav_bar =
             skin_layout_rect(data, "song_select.nav",
                              D2D1::RectF(492.0f, 12.0f, 1244.0f, 126.0f));

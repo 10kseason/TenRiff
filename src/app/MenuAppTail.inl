@@ -155,7 +155,9 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
     target.total_notes = gameplay_hud_.counts.pg + gameplay_hud_.counts.gr +
                          gameplay_hud_.counts.gd + gameplay_hud_.counts.bd;
     target.gauge = gameplay_hud_.gauge;
-    target.gauge_label = gauge_type_label(gameplay_hud_.gauge_type);
+    target.gauge_label = session_mix_active_
+                             ? ui_text("COURSE", "단위인정")
+                             : gauge_type_label(gameplay_hud_.gauge_type);
     target.has_feedback = gameplay_hud_.has_feedback;
     target.feedback = judgement_label(gameplay_hud_.feedback);
     target.feedback_delta_ms = gameplay_hud_.feedback_delta_ms;
@@ -588,7 +590,8 @@ void MenuApp::sync_menu_music() {
         const std::string_view fallback =
             submenu_return_screen_ == Screen::SongSelect ? "Song Selecte.mp3" : "Main Menu.mp3";
         music_path = select_scene_slot("options", "Options.mp3", fallback, "Main Menu.mp3");
-    } else if (screen_ == Screen::SongSelect || screen_ == Screen::SongBrowser) {
+    } else if (screen_ == Screen::SongSelect || screen_ == Screen::SongBrowser ||
+               screen_ == Screen::SessionMix) {
         music_path = select_scene_slot("song_select", "Song Selecte.mp3", "Song Select.mp3", "Main Menu.mp3");
     } else if (screen_ == Screen::QuickSetup) {
         music_path = select_scene_slot("quick_setup", "Main Menu.mp3");
@@ -779,6 +782,34 @@ void MenuApp::populate_result_render_data(render::MenuRenderData& render, const 
     render.result.presentation_skipped = result_presentation_skipped_;
     render.result.profile =
         last_result_player_name_.empty() ? profile_display_name() : last_result_player_name_;
+    if (session_mix_active_ && session_mix_cursor_ < session_mix_plan_.entries.size()) {
+        const std::size_t current = session_mix_cursor_ + 1;
+        const std::size_t total = session_mix_plan_.entries.size();
+        const SessionMixPhase phase = session_mix_plan_.entries[session_mix_cursor_].phase;
+        std::string session_label = ui_text("SESSION MIX ", "세션 믹스 ");
+        if (!session_mix_active_course_title_.empty()) {
+            session_label += safe_ui_text(session_mix_active_course_title_, "LR2 COURSE") + "  ";
+        }
+        render.result.notes.push_back(
+            session_label + std::to_string(current) + "/" +
+            std::to_string(total) + "  " + session_mix_phase_label(phase));
+        if (last_game_over_) {
+            render.result.notes.push_back(ui_text(
+                "Course gauge reached zero. Enter returns to Song Select.",
+                "단위인정 게이지가 0이 되었습니다. Enter로 곡 선택에 돌아갑니다."));
+            render.result.continue_label =
+                ui_text("END FAILED COURSE  \xE2\x9E\xA1", "실패한 코스 종료  \xE2\x9E\xA1");
+        } else {
+            render.result.notes.push_back(
+                ui_text("Enter continues the mix. Esc or Backspace ends it here.",
+                        "Enter로 다음 곡을 진행합니다. Esc 또는 Backspace로 여기서 종료합니다."));
+            render.result.continue_label =
+                current < total
+                    ? (ui_text("NEXT ", "다음 ") + std::to_string(current + 1) + "/" +
+                       std::to_string(total) + "  \xE2\x9E\xA1")
+                    : ui_text("FINISH SESSION  \xE2\x9E\xA1", "세션 완료  \xE2\x9E\xA1");
+        }
+    }
     render.result.track = last_chart_title_.empty() ? current_track : last_chart_title_;
     render.result.title = last_chart_title_.empty() ? ui_text("Unknown Chart", "알 수 없는 차트") : last_chart_title_;
     render.result.artist = last_chart_artist_;
@@ -825,7 +856,9 @@ void MenuApp::populate_result_render_data(render::MenuRenderData& render, const 
                              : menu_records::calculate_rank(last_result_, last_game_over_);
     render.result.status = !last_clear_status_.empty() ? last_clear_status_
                                                        : (last_game_over_ ? "GAME OVER" : "CLEAR");
-    render.result.gauge_label = gauge_type_label(final_gauge_type);
+    render.result.gauge_label = session_mix_active_
+                                    ? ui_text("COURSE", "단위인정")
+                                    : gauge_type_label(final_gauge_type);
     render.result.cleared = !last_game_over_ &&
                             !menu_records::clear_status_is_autoplay(last_clear_status_);
     render.result.score = last_result_final_score_;
@@ -1097,7 +1130,130 @@ void MenuApp::populate_generic_screen_render_data(render::MenuRenderData& render
     render.kind = render::MenuScreenKind::GenericList;
     render.generic.heading = screen_title();
 
-    if (screen_ == Screen::OptionsHub) {
+    if (screen_ == Screen::SessionMix) {
+        const Lr2CourseDefinition* course = selected_session_mix_lr2_course();
+        const bool lr2_course_selected = course != nullptr;
+        const bool draft_selected = session_mix_source_index_ == 1;
+        const Lr2CourseMatch course_match =
+            lr2_course_selected ? match_lr2_course(*course, indexed_songs_) : Lr2CourseMatch{};
+        const SessionMixPhaseCounts counts =
+            session_mix_phase_counts(session_mix_minutes_, visible_song_count());
+        append_menu_row(render.generic,
+                        ui_text("Mix Source", "믹스 소스"),
+                        draft_selected
+                            ? (ui_text("DRAFT COURSE  ", "초안 코스  ") +
+                               std::to_string(session_mix_draft_.size()))
+                            : (lr2_course_selected
+                                   ? ("LR2  " + safe_ui_text(course->title, "<invalid course>"))
+                                   : ui_text("AUTO MIX", "자동 믹스")),
+                        settings_cursor_ == 0,
+                        render::MenuHitTargetKind::SettingsRow,
+                        0,
+                        true,
+                        true);
+        append_menu_row(render.generic,
+                        ui_text("Session Length", "세션 길이"),
+                        draft_selected
+                            ? (std::to_string(session_mix_draft_.size()) + ui_text(" STAGES / ", " 스테이지 / ") +
+                               (session_mix_draft_.empty()
+                                    ? "-"
+                                    : std::to_string(session_mix_draft_.front().key_count) + "K"))
+                            : (lr2_course_selected
+                                   ? (std::to_string(course->chart_md5.size()) + ui_text(" STAGES / ", " 스테이지 / ") +
+                                      std::to_string(course->key_count) + "K")
+                                   : (std::to_string(session_mix_minutes_) + ui_text(" MIN", "분"))),
+                        settings_cursor_ == 1,
+                        render::MenuHitTargetKind::SettingsRow,
+                        1,
+                        !lr2_course_selected && !draft_selected,
+                        !lr2_course_selected && !draft_selected);
+        append_menu_row(render.generic,
+                        ui_text("Save Draft as LR2 Course", "초안을 LR2 코스로 저장"),
+                        std::to_string(session_mix_draft_.size()) + ui_text(" STAGES", " 스테이지"),
+                        settings_cursor_ == 2,
+                        render::MenuHitTargetKind::SettingsRow,
+                        2,
+                        !session_mix_draft_.empty(),
+                        false);
+        append_menu_row(render.generic,
+                        ui_text("Load LR2 Course File", "LR2 코스 파일 불러오기"),
+                        session_mix_lr2_courses_.empty()
+                            ? ui_text("BROWSE OR DROP .LR2CRS", "찾기 또는 .LR2CRS 드롭")
+                            : (std::to_string(session_mix_lr2_courses_.size()) + ui_text(" COURSES", "개 코스")),
+                        settings_cursor_ == 3,
+                        render::MenuHitTargetKind::SettingsRow,
+                        3,
+                        true,
+                        false);
+        const bool can_start = draft_selected
+                                   ? !session_mix_draft_.empty()
+                                   : (lr2_course_selected ? course_match.playable()
+                                                          : visible_song_count() > 0);
+        append_menu_row(render.generic,
+                        ui_text("Start Session Mix", "세션 믹스 시작"),
+                        draft_selected
+                            ? (std::to_string(session_mix_draft_.size()) + ui_text(" DRAFT STAGES", "개 초안 스테이지"))
+                            : (lr2_course_selected
+                                   ? (std::to_string(course_match.song_indices.size()) + ui_text(" COURSE STAGES", "개 코스 스테이지"))
+                                   : (std::to_string(counts.total()) + ui_text(" UNIQUE CHARTS", "개 고유 차트"))),
+                        settings_cursor_ == 4,
+                        render::MenuHitTargetKind::SettingsRow,
+                        4,
+                        can_start,
+                        false);
+        append_menu_row(render.generic,
+                        ui_text("Back to Song Select", "곡 선택으로 돌아가기"),
+                        "",
+                        settings_cursor_ == 5,
+                        render::MenuHitTargetKind::SettingsRow,
+                        5,
+                        true,
+                        false);
+        if (draft_selected) {
+            render.generic.notes.push_back(ui_text(
+                "Song Select C appends stages in order; Delete removes the last stage.",
+                "곡 선택에서 C로 순서대로 추가하고 Delete로 마지막 스테이지를 제거합니다."));
+            render.generic.notes.push_back(ui_text(
+                "Draft order and repeated charts are preserved when played or saved.",
+                "실행하거나 저장할 때 초안 순서와 반복 곡을 그대로 유지합니다."));
+        } else if (lr2_course_selected) {
+            if (course_match.missing_md5.empty()) {
+                render.generic.notes.push_back(ui_text(
+                    "LR2 chart MD5 order is preserved exactly, including repeated stages.",
+                    "반복 스테이지를 포함해 LR2의 차트 MD5 순서를 그대로 유지합니다."));
+            } else {
+                render.generic.notes.push_back(
+                    ui_text("Missing charts in active source: ", "현재 곡 소스의 누락 채보: ") +
+                    std::to_string(course_match.missing_md5.size()) + "/" +
+                    std::to_string(course->chart_md5.size()));
+            }
+        } else {
+            render.generic.notes.push_back(
+                ui_text("Candidate pool: ", "후보 풀: ") + std::to_string(visible_song_count()) +
+                ui_text(" charts from the current search and filters.",
+                        "개 차트 — 현재 검색과 필터 결과를 사용합니다."));
+            render.generic.notes.push_back(
+                session_mix_phase_label(SessionMixPhase::Warmup) + " " + std::to_string(counts.warmup) +
+                "  /  " + session_mix_phase_label(SessionMixPhase::Challenge) + " " +
+                std::to_string(counts.challenge) + "  /  " +
+                session_mix_phase_label(SessionMixPhase::Cooldown) + " " +
+                std::to_string(counts.cooldown));
+            render.generic.notes.push_back(
+                ui_text("Local best results estimate your level; unplayed and uncleared charts feed the challenge phase.",
+                        "로컬 최고 기록으로 수준을 추정하고, 미플레이·미클리어 곡을 도전 구간에 배치합니다."));
+            render.generic.notes.push_back(
+                ui_text("Length is an estimate based on roughly three minutes per chart.",
+                        "길이는 차트당 약 3분을 기준으로 한 목표치입니다."));
+        }
+        if (!session_mix_status_message_.empty()) {
+            render.generic.notes.push_back(session_mix_status_message_);
+        }
+        render.generic.footer_notes = {
+            ui_text("LEFT / RIGHT changes source or auto length", "LEFT / RIGHT로 소스 또는 자동 길이 변경"),
+            ui_text("C adds on Song Select  |  Drop .lr2crs to load  |  ENTER activates",
+                    "곡 선택 C로 추가  |  .lr2crs 드롭으로 로드  |  ENTER 실행"),
+        };
+    } else if (screen_ == Screen::OptionsHub) {
         render.generic.card_grid = true;
         append_menu_row(render.generic, ui_text("KEY MODE", "키 모드"),
                         ui_key_mode_label(config_.mode.key_mode),
@@ -1472,6 +1628,9 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
 
     GameSession session;
     session.set_peer_battle_mode(peer_battle);
+    if (session_mix_active_ && !peer_battle && replay_path.empty()) {
+        session.set_course_gauge(session_mix_gauge_value_);
+    }
     session.set_input_backend_fallback_override(
         input_backend_fallback_policy_.runtime_state(config_.input.rawinput));
     session.set_peer_spectator_done_callback([this, peer_battle]() {
@@ -1677,7 +1836,8 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
     CommandLineOptions play_options = options_;
     play_options.chart_path = chart_path;
     play_options.replay_path = replay_path;
-    if (!peer_battle && replay_path.empty() && config_.mode.ghost_battle_enabled) {
+    if (!peer_battle && !session_mix_active_ && replay_path.empty() &&
+        config_.mode.ghost_battle_enabled) {
         play_options.ghost_replay_path = best_replay_path_for_selected_song();
     }
     if (!session.initialize(play_options)) {
@@ -1855,6 +2015,9 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
     restart_input_thread();
     restart_audio_thread();
     if (result.has_value) {
+        if (session_mix_active_ && !peer_battle && !replay_playback) {
+            session_mix_gauge_value_ = std::clamp(result.final_gauge_value, 0.0, 100.0);
+        }
         last_result_ = result.stats;
         last_game_over_ = result.game_over;
         last_clear_status_ = result.clear_status;
@@ -1922,6 +2085,7 @@ std::string MenuApp::screen_title() const {
                 return ui_text("Local Records", "로컬 기록");
             }
             return ui_text("Song Select", "곡 선택");
+        case Screen::SessionMix: return ui_text("Session Mix", "세션 믹스");
         case Screen::SongBrowser: return ui_text("Song Filters", "곡 필터");
         case Screen::Gameplay: return ui_text("Gameplay", "게임플레이");
         case Screen::SettingsAudio: return ui_text("Audio Settings", "오디오 설정");
@@ -2017,19 +2181,40 @@ void MenuApp::populate_help_overlay(render::HelpOverlayData& target) const {
                         "좌 / 우 키로 왼쪽 내비게이션과 곡 목록 사이의 포커스를 전환합니다."),
                 ui_text("Enter selects the focused item. Double-click on a song launches it immediately.",
                         "Enter는 선택된 항목을 열고, 곡을 더블클릭하면 즉시 시작합니다."),
-                ui_text("The left rail is now just Songs, Sources, Search, Filter, Records, and Options.",
-                        "왼쪽 레일은 이제 Songs, Sources, Search, Filter, Records, Options만 남습니다."),
+                ui_text("The navigation exposes Songs, Sources, Search, Filter, Records, Session Mix, and Options.",
+                        "탐색 메뉴에서 곡, 소스, 검색, 필터, 기록, 세션 믹스, 옵션을 엽니다."),
                 ui_text("SEARCH filters title, artist, and path. FILTER now owns sort, group, key, difficulty, and collections.",
                         "SEARCH는 제목, 아티스트, 경로를 검색하고 FILTER는 정렬, 그룹, 키, 난이도, 컬렉션을 담당합니다."),
                 ui_text("Backspace returns from Sources or Records to Songs. Esc returns to the title screen.",
                         "Backspace는 Sources나 Records에서 Songs로 돌아가고 Esc는 타이틀 화면으로 돌아갑니다."),
                 ui_text("F2 chooses a songs folder. -/+ adjusts Rate. F5 refreshes the active source.",
                         "F2로 곡 폴더 선택, -/+로 배속 조절, F5로 활성 소스를 새로고침합니다."),
+                ui_text("C appends the selected chart to the course draft; Delete removes the last drafted stage.",
+                        "C로 선택한 채보를 코스 초안에 추가하고 Delete로 마지막 스테이지를 제거합니다."),
                 ui_text("Safe indexing lowers RAM use for very large libraries. Fast rescans quicker on high-memory PCs.",
                         "안전 인덱싱은 매우 큰 라이브러리에서 RAM 사용량을 줄이고, 빠름은 메모리가 많은 PC에서 재스캔 속도를 높입니다."),
             };
             target.footer = ui_text("Current source, group, filter, sort, and indexing profile stay visible on the Song Select screen.",
                                     "현재 소스, 그룹, 필터, 정렬, 인덱싱 프로필은 Song Select 화면에 계속 표시됩니다.");
+            return;
+        case Screen::SessionMix:
+            target.title = ui_text("Session Mix", "세션 믹스");
+            target.lines = {
+                ui_text("Choose Auto Mix, the authored draft, or a course from a loaded LR2 .lr2crs file.",
+                        "자동 믹스, 직접 만든 초안, 또는 불러온 LR2 .lr2crs 코스를 선택합니다."),
+                ui_text("Draft stages can be played in order or saved as an LR2 .lr2crs file.",
+                        "초안 스테이지는 순서대로 실행하거나 LR2 .lr2crs 파일로 저장할 수 있습니다."),
+                ui_text("The current Song Select search and filters define the candidate pool.",
+                        "현재 Song Select 검색과 필터 결과가 후보 풀이 됩니다."),
+                ui_text("LR2 courses preserve chart MD5 order and stop before launch if any chart is missing.",
+                        "LR2 코스는 차트 MD5 순서를 유지하며, 누락 채보가 있으면 시작하지 않습니다."),
+                ui_text("Browse for or drop an .lr2crs file; the last loaded path is remembered.",
+                        ".lr2crs 파일을 찾거나 드롭하면 마지막으로 불러온 경로를 기억합니다."),
+                ui_text("All course runs share one gauge: Ex-Hard recovery, Easy damage, and failure at zero.",
+                        "모든 코스는 EX-HARD 회복량과 EASY 감소량을 쓰며 0에서 실패하는 게이지를 이어 씁니다."),
+            };
+            target.footer = ui_text("Result Enter continues; Result Esc or Backspace ends the mix.",
+                                    "Result에서 Enter는 계속, Esc 또는 Backspace는 세션 종료입니다.");
             return;
         case Screen::SongBrowser:
             target.title = ui_text("Filter Help", "필터 도움말");

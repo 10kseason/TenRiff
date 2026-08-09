@@ -210,6 +210,35 @@ TEST_CASE("threshold runtime policy carries value through Hard Normal and Easy w
     CHECK(state.type == GaugeType::Easy);
     CHECK(state.value == doctest::Approx(30.0));
 }
+
+TEST_CASE("course hybrid gauge uses Ex-Hard recovery and Easy damage") {
+    GaugeRuntimePolicy policy;
+    policy.course_hybrid_deltas = true;
+    GaugeManager manager({}, policy);
+    GaugeState state{GaugeType::Normal, 50.0, false};
+
+    manager.applyJudgement(state, Judgement::PG, 0.0);
+    CHECK(state.value == doctest::Approx(50.08));
+    manager.applyJudgement(state, Judgement::GR, 1.0);
+    CHECK(state.value == doctest::Approx(50.12));
+    manager.applyJudgement(state, Judgement::GD, 2.0);
+    CHECK(state.value == doctest::Approx(50.12));
+    manager.applyJudgement(state, Judgement::BD, 3.0);
+    CHECK(state.value == doctest::Approx(46.02));
+    manager.applyJudgement(state, Judgement::PR, 4.0);
+    CHECK(state.value == doctest::Approx(44.42));
+    CHECK(state.type == GaugeType::Normal);
+}
+
+TEST_CASE("course hybrid policy does not change ordinary Normal gauge") {
+    GaugeManager manager;
+    GaugeState state{GaugeType::Normal, 50.0, false};
+
+    manager.applyJudgement(state, Judgement::PG, 0.0);
+    manager.applyJudgement(state, Judgement::BD, 1.0);
+
+    CHECK(state.value == doctest::Approx(43.94));
+}
 TEST_CASE("normal gauge remains fixed when the runtime shift policy is disabled") {
     GaugeManager manager;
     auto state = manager.initialState(GaugeType::Normal);

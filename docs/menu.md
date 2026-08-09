@@ -17,15 +17,19 @@ The main menu must honor the same low-latency philosophy as gameplay: audio runs
   - Title: `↑/↓` 이동, `Enter` 선택(PLAY/EDIT/OPTIONS/EXIT), `F2` 곡 폴더 선택, `F5` 새로고침, `Esc` 종료
     - 곡이 하나도 인덱싱되지 않았으면 첫 버튼은 `PLAY` 대신 `Add Songs Folder`로 보인다.
   - Song Select: `↑/↓` 곡 이동, `PgUp/PgDn` 페이지 이동, `←/→` 좌측 메뉴 포커스 전환, `Enter` 선택/플레이, `-`/`+` Rate 조정, `Esc` 타이틀 복귀
-    - 좌측 메뉴는 `Songs / Sources / Search / Filter / Records / Options`만 유지한다.
+    - 좌측 메뉴는 `Songs / Sources / Search / Filter / Records / Session Mix / Options`를 제공한다.
     - `Backspace`는 `Sources` 또는 `Records`에서 `Songs`로 되돌아갈 때만 쓴다.
+  - Session Mix: `←/→`로 15/30/60분 목표를 고르고 `Enter`로 시작한다.
+    - 현재 Song Select 검색·필터 결과만 후보로 사용하며 같은 차트는 한 번만 선택한다.
+    - 로컬 최고 기록의 클리어 난이도를 기준으로 워밍업·도전·마무리 순서를 구성한다.
+    - 곡 길이는 인덱스에 없으므로 목표 시간은 차트당 약 3분을 기준으로 계산한다.
   - Settings/Mode: `↑/↓` 항목 이동, `←/→` 값 변경, `Enter/Esc` 복귀
     - 긴 설정 목록은 우측 스크롤바를 클릭해 해당 위치로 바로 이동할 수 있으며, 클릭만으로 값이 바뀌지는 않는다.
     - 화면 공간 때문에 설명 일부가 생략되면 마지막 설명 줄에 `F1`과 남은 도움말 줄 수를 표시한다.
   - Keymap: `↑/↓` 선택, `Enter` 바인딩 캡처, `Esc` 복귀
     - 캡처 성공 시 즉시 `keymap.json`에 저장된다.
     - Song Select에서 열면 선택한 차트의 lane count를 우선 기준으로 편집 모드를 잡는다.
-  - Result: `Enter`로만 곡 선택 복귀
+  - Result: 일반 플레이는 `Enter`로 곡 선택에 복귀한다. Session Mix 중에는 `Enter`로 다음 곡을 진행하고 `Esc`/`Backspace`로 세션을 종료한다.
   - Shared utility keys: `F1` 도움말, `F2` songs-folder browse, `F5` refresh/reindex, `F9` screenshot
 
 ## Non-negotiable rules

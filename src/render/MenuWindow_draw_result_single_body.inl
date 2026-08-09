@@ -751,7 +751,9 @@
         } else {
             draw_result_panel(continue_rect, controls_alpha, true);
         }
-        draw_result_text(result_loc("CONTINUE  \xE2\x9E\xA1", "계속  \xE2\x9E\xA1"),
+        draw_result_text(data.result.continue_label.empty()
+                             ? result_loc("CONTINUE  \xE2\x9E\xA1", "계속  \xE2\x9E\xA1")
+                             : data.result.continue_label,
                          d2d_->menu_button_format.Get(),
                          continue_rect,
                          d2d_->text_brush.Get(),

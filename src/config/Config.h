@@ -112,6 +112,7 @@ struct UiConfig {
     bool show_cursor_in_gameplay = true;
     std::string active_song_source;
     std::vector<std::string> recent_song_sources;
+    std::string session_mix_lr2_course_path;
     std::vector<std::string> favorite_chart_keys;
     std::unordered_map<std::string, std::vector<std::string>> collections;
     std::string song_collection_filter = "all";

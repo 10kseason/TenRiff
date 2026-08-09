@@ -283,6 +283,7 @@ struct ResultScreenData {
     std::string replay_file;
     bool replay_available = false;
     std::string result_file;
+    std::string continue_label;
     std::vector<std::string> notes;
     std::vector<ResultGaugePoint> gauge_points;
     std::vector<ResultShiftMarker> gauge_shifts;

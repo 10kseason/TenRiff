@@ -74,6 +74,14 @@ GameplayEngine::GameplayEngine(const GameplayChart& chart, const GameplayConfig&
         gauge_state_ = gauge_shift_states_.front();
     } else {
         gauge_state_ = gauge_manager_.initialState(config.initial_gauge);
+        if (config.initial_gauge_value.has_value()) {
+            const double carried_value = std::isfinite(config.initial_gauge_value.value())
+                                             ? config.initial_gauge_value.value()
+                                             : 100.0;
+            gauge_state_.value = std::clamp(carried_value, 0.0, 100.0);
+            gauge_state_.game_over = gauge_state_.value <= 0.0;
+            game_over_ = gauge_state_.game_over;
+        }
     }
 
     replay_.sample_rate = sample_rate_;

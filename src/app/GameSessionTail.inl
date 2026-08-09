@@ -555,8 +555,16 @@ bool GameSession::initialize(const CommandLineOptions& options) {
         gauge_shift_enabled_ = true;
         gameplay_config.initial_gauge = game::GaugeType::ExHard;
     }
+    if (course_gauge_enabled_ && !peer_battle_mode_ && !replay_playback_enabled_) {
+        gauge_shift_enabled_ = false;
+        gameplay_config.initial_gauge = game::GaugeType::Normal;
+        gameplay_config.initial_gauge_value = std::clamp(course_gauge_initial_value_, 0.0, 100.0);
+        gameplay_config.gauge_policy.course_hybrid_deltas = true;
+    }
     gameplay_config.gauge_shift_enabled = gauge_shift_enabled_;
-    gameplay_config.gauge_policy = {};
+    if (!course_gauge_enabled_ || peer_battle_mode_ || replay_playback_enabled_) {
+        gameplay_config.gauge_policy = {};
+    }
 
     active_mods_ = mode_result.active_mods;
     rate_multiplier_ = mode_result.rate_multiplier;
@@ -2026,15 +2034,18 @@ void GameSession::shutdown() {
         bool engine_game_over = false;
         bool engine_finished = false;
         game::GaugeType final_gauge = game::GaugeType::Normal;
+        double final_gauge_value = 0.0;
         {
             std::lock_guard<std::mutex> lock(engine_mutex_);
             result_.stats = engine_->stats();
             engine_game_over = engine_->is_game_over();
             engine_finished = engine_->is_finished();
             final_gauge = engine_->gauge_state().type;
+            final_gauge_value = engine_->gauge_state().value;
         }
         result_.finished = engine_finished;
         result_.final_gauge = gauge_type_token(final_gauge);
+        result_.final_gauge_value = final_gauge_value;
         result_.clear_status = gameplay_session_clear_status(
             engine_finished,
             engine_game_over,

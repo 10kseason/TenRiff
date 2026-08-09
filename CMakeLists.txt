@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(TenRiff VERSION 1.3.9 LANGUAGES C CXX)
+project(TenRiff VERSION 1.3.10 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -93,6 +93,7 @@ add_library(tenriff_core
     src/app/DifficultyTableLink.cpp
     src/app/GraphicsTiming.cpp
     src/app/ImportedGameplaySkin.cpp
+    src/app/Lr2Course.cpp
     src/app/Lr2Skin.cpp
     src/app/TenRiffSkin.cpp
     src/app/MenuRecordUtils.cpp
@@ -412,6 +413,8 @@ if(TENRIFF_ENABLE_TESTS)
         tests/unit/test_osu_difficulty.cpp
         tests/unit/test_song_index.cpp
         tests/unit/test_song_select_state.cpp
+        tests/unit/test_session_mix.cpp
+        tests/unit/test_lr2_course.cpp
         tests/unit/test_menu_settings_utils.cpp
         tests/unit/test_config.cpp
         tests/unit/test_menu_music_controller.cpp

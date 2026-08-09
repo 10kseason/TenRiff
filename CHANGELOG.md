@@ -2,7 +2,24 @@
 
 TenRiff의 사용자/배포 관점에서 의미 있는 변경만 간단히 기록합니다.
 
-## [Unreleased]
+## [1.3.10] - 2026-08-10
+
+### Fixed
+
+- LR2 playskin에서 `alpha=0`으로 화면 밖에 숨겨 둔 더미 `#DST_NOTE`를 레인과 Gear 폭 계산에서 제외해, Gear 프레임이 한쪽에 좁게 축소되던 문제를 수정했습니다.
+
+### Changed
+
+- LR2 playskin 파일 선택은 5K에서 5키, 8K에서 7키, 10K에서 10키 파일을 우선하며, 해당 파일이 없을 때만 가장 가까운 레이아웃으로 자동 대체합니다.
+
+### Added
+
+- Added an LR2-style course draft: press `C` on Song Select to append stages in order, undo with `Delete`, play the draft in Session Mix, or save it as `.lr2crs`.
+- Dan and Session Mix runs now share a continuous course gauge across stages, using EX-HARD recovery and EASY damage values and failing immediately at zero.
+
+- 세션 믹스에서 LR2 `.lr2crs` 파일을 찾거나 드롭해 코스를 선택할 수 있습니다. 코스의 MD5 스테이지 순서와 반복 곡을 그대로 유지하고, 현재 곡 소스에 누락 채보가 있으면 시작 전에 정확한 누락 수를 표시합니다.
+
+- Song Select에 `Session Mix`를 추가했습니다. 현재 검색·필터 결과에서 중복 없이 15/30/60분 분량의 워밍업·도전·마무리 큐를 만들고, 로컬 최고 기록으로 도전 난이도를 조절합니다. Result의 계속 버튼으로 다음 곡을 진행하며 Esc 또는 Backspace로 세션을 종료할 수 있습니다.
 
 ## [1.3.9] - 2026-08-08
 

@@ -1219,6 +1219,7 @@ TEST_CASE("config save and load preserve recent song sources") {
     auto config = loader.defaults();
     config.ui.active_song_source = "D:/Songs/PackB";
     config.ui.recent_song_sources = {"D:/Songs/PackB", "D:/Songs/PackA"};
+    config.ui.session_mix_lr2_course_path = "D:/Courses/GENOSIDE.lr2crs";
 
     std::string error;
     REQUIRE(loader.save_profile("profiles/test", config, &error));
@@ -1227,6 +1228,7 @@ TEST_CASE("config save and load preserve recent song sources") {
     const auto result = loader.load_profile("profiles/test");
     REQUIRE(result.success());
     CHECK(result.config.ui.active_song_source == "D:/Songs/PackB");
+    CHECK(result.config.ui.session_mix_lr2_course_path == "D:/Courses/GENOSIDE.lr2crs");
     REQUIRE(result.config.ui.recent_song_sources.size() == 2u);
     CHECK(result.config.ui.recent_song_sources[0] == "D:/Songs/PackB");
     CHECK(result.config.ui.recent_song_sources[1] == "D:/Songs/PackA");
