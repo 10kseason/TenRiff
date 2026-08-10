@@ -1,4 +1,6 @@
 #include "app/GameSession.h"
+#include "app/AudioFileDecoder.h"
+#include "app/AudioMixPolicy.h"
 #include "app/ChartAudioPlayback.h"
 #include "app/ChartAudioStreaming.h"
 #include "app/MemoryDiagnostics.h"
@@ -63,7 +65,6 @@ constexpr double kGuideToneMs = 28.0;
 constexpr double kHitToneMs = 44.0;
 constexpr double kGuideToneGain = 0.055;
 constexpr double kHitToneGain = 0.120;
-constexpr float kOutputSoftLimitThreshold = 0.92f;
 constexpr int64_t kChartAudioStartupWindowMs = 3000;
 constexpr int64_t kChartAudioPrefetchWindowMs = 15000;
 constexpr int64_t kChartAudioServiceIntervalMs = 25;
@@ -176,18 +177,6 @@ void for_each_note_audio_path(const gameplay::GameplayChart& chart, const gamepl
             fn(asset_id, *path);
         }
     });
-}
-
-float soft_limit_sample(float sample) {
-    const float abs_sample = std::abs(sample);
-    if (abs_sample <= kOutputSoftLimitThreshold) {
-        return sample;
-    }
-
-    const float excess = abs_sample - kOutputSoftLimitThreshold;
-    const float compressed = kOutputSoftLimitThreshold +
-                             (1.0f - kOutputSoftLimitThreshold) * (excess / (1.0f + excess));
-    return std::copysign(std::min(1.0f, compressed), sample);
 }
 
 uint16_t read_le_u16(const uint8_t* data) {
@@ -370,11 +359,31 @@ float decode_sample(const uint8_t* ptr, uint16_t format, uint16_t bits_per_sampl
     return 0.0f;
 }
 
+std::size_t source_frame_limit_for_output(std::size_t max_output_frames,
+                                          int source_sample_rate,
+                                          int target_sample_rate) {
+    if (max_output_frames == 0 || source_sample_rate <= 0 || target_sample_rate <= 0) {
+        return 0;
+    }
+    if (source_sample_rate == target_sample_rate) {
+        return max_output_frames;
+    }
+    const long double scaled =
+        std::ceil(static_cast<long double>(max_output_frames) *
+                  static_cast<long double>(source_sample_rate) /
+                  static_cast<long double>(target_sample_rate)) +
+        1.0L;
+    return scaled >= static_cast<long double>(std::numeric_limits<std::size_t>::max())
+               ? std::numeric_limits<std::size_t>::max()
+               : static_cast<std::size_t>(scaled);
+}
+
 bool resample_stereo_linear(const std::vector<float>& source,
                             int source_sample_rate,
                             int target_sample_rate,
                             std::vector<float>& out,
-                            std::string* error) {
+                            std::string* error,
+                            std::size_t max_output_frames = 0) {
     if (source.empty()) {
         out.clear();
         return true;
@@ -388,6 +397,9 @@ bool resample_stereo_linear(const std::vector<float>& source,
 
     if (target_sample_rate <= 0 || source_sample_rate <= 0 || target_sample_rate == source_sample_rate) {
         out = source;
+        if (max_output_frames > 0 && out.size() / 2u > max_output_frames) {
+            out.resize(max_output_frames * 2u);
+        }
         return true;
     }
 
@@ -400,9 +412,12 @@ bool resample_stereo_linear(const std::vector<float>& source,
         return false;
     }
 
-    const std::size_t out_frames = std::max<std::size_t>(
+    std::size_t out_frames = std::max<std::size_t>(
         1,
         static_cast<std::size_t>(std::llround(static_cast<double>(frame_count) * ratio)));
+    if (max_output_frames > 0) {
+        out_frames = std::min(out_frames, max_output_frames);
+    }
     out.resize(out_frames * 2);
 
     for (std::size_t i = 0; i < out_frames; ++i) {
@@ -424,9 +439,9 @@ bool resample_stereo_linear(const std::vector<float>& source,
 }
 
 bool decode_wav_stereo_resampled(const std::string& path, int target_sample_rate, std::vector<float>& out,
-                                 std::string* error);
+                                 std::string* error, std::size_t max_output_frames = 0);
 bool decode_ogg_stereo_resampled(const std::string& path, int target_sample_rate, std::vector<float>& out,
-                                 std::string* error);
+                                 std::string* error, std::size_t max_output_frames = 0);
 
 #ifdef _WIN32
 bool ensure_mf_started(std::string* error) {
@@ -491,7 +506,8 @@ std::filesystem::path normalize_media_foundation_path(const std::string& path) {
 bool decode_ffmpeg_stereo_resampled(const std::string& path,
                                     int target_sample_rate,
                                     std::vector<float>& out,
-                                    std::string* error) {
+                                    std::string* error,
+                                    std::size_t max_output_frames = 0) {
     if (target_sample_rate <= 0) {
         if (error) {
             *error = "FFmpeg fallback requires a positive target sample rate.";
@@ -527,8 +543,15 @@ bool decode_ffmpeg_stereo_resampled(const std::string& path,
     std::filesystem::path temp_path(temp_file);
     std::filesystem::path input_path = normalize_media_foundation_path(path);
     std::wstring command = L"\"" + ffmpeg_path.value() + L"\" -v error -y -nostdin -i \"" +
-                           input_path.wstring() + L"\" -f wav -ac 2 -ar " +
-                           std::to_wstring(target_sample_rate) + L" \"" + temp_path.wstring() + L"\"";
+                           input_path.wstring() + L"\"";
+    if (max_output_frames > 0) {
+        const long double duration_seconds =
+            static_cast<long double>(max_output_frames) /
+            static_cast<long double>(target_sample_rate);
+        command += L" -t " + std::to_wstring(static_cast<double>(duration_seconds));
+    }
+    command += L" -f wav -ac 2 -ar " + std::to_wstring(target_sample_rate) +
+               L" \"" + temp_path.wstring() + L"\"";
 
     STARTUPINFOW startup_info{};
     startup_info.cb = sizeof(startup_info);
@@ -564,7 +587,8 @@ bool decode_ffmpeg_stereo_resampled(const std::string& path,
     bool success = false;
     std::string wav_error;
     if (exit_code == 0) {
-        success = decode_wav_stereo_resampled(temp_path.u8string(), target_sample_rate, out, &wav_error);
+        success = decode_wav_stereo_resampled(
+            temp_path.u8string(), target_sample_rate, out, &wav_error, max_output_frames);
     }
 
     std::error_code remove_ec;
@@ -633,7 +657,8 @@ std::optional<int> probe_mf_sample_rate(const std::string& path, std::string* er
 bool decode_mf_stereo_resampled(const std::string& path,
                                 int target_sample_rate,
                                 std::vector<float>& out,
-                                std::string* error) {
+                                std::string* error,
+                                std::size_t max_output_frames = 0) {
     if (!ensure_mf_started(error)) {
         return false;
     }
@@ -723,6 +748,8 @@ bool decode_mf_stereo_resampled(const std::string& path,
     }
 
     const std::size_t bytes_per_sample = static_cast<std::size_t>(bits_per_sample / 8u);
+    const std::size_t max_source_frames = source_frame_limit_for_output(
+        max_output_frames, static_cast<int>(source_sample_rate), target_sample_rate);
     std::vector<float> source;
 
     for (;;) {
@@ -771,7 +798,15 @@ bool decode_mf_stereo_resampled(const std::string& path,
             buffer->Unlock();
             continue;
         }
-        const std::size_t frame_count = static_cast<std::size_t>(cur_len) / frame_stride;
+        std::size_t frame_count = static_cast<std::size_t>(cur_len) / frame_stride;
+        if (max_source_frames > 0) {
+            const std::size_t decoded_frames = source.size() / 2u;
+            if (decoded_frames >= max_source_frames) {
+                buffer->Unlock();
+                break;
+            }
+            frame_count = std::min(frame_count, max_source_frames - decoded_frames);
+        }
         source.reserve(source.size() + frame_count * 2);
 
         for (std::size_t frame = 0; frame < frame_count; ++frame) {
@@ -792,9 +827,17 @@ bool decode_mf_stereo_resampled(const std::string& path,
         }
 
         buffer->Unlock();
+        if (max_source_frames > 0 && source.size() / 2u >= max_source_frames) {
+            break;
+        }
     }
 
-    return resample_stereo_linear(source, static_cast<int>(source_sample_rate), target_sample_rate, out, error);
+    return resample_stereo_linear(source,
+                                  static_cast<int>(source_sample_rate),
+                                  target_sample_rate,
+                                  out,
+                                  error,
+                                  max_output_frames);
 }
 #endif
 
@@ -962,7 +1005,7 @@ std::optional<int> detect_chart_preferred_sample_rate(const gameplay::GameplayCh
 }
 
 bool decode_wav_stereo_resampled(const std::string& path, int target_sample_rate, std::vector<float>& out,
-                                 std::string* error) {
+                                 std::string* error, std::size_t max_output_frames) {
     std::ifstream file;
     WavFileInfo info;
     if (!open_wav_file(path, file, info, error)) {
@@ -970,7 +1013,12 @@ bool decode_wav_stereo_resampled(const std::string& path, int target_sample_rate
     }
 
     const uint16_t bytes_per_sample = static_cast<uint16_t>(info.bits_per_sample / 8u);
-    const std::size_t frame_count = info.data_size / info.block_align;
+    const std::size_t available_frame_count = info.data_size / info.block_align;
+    const std::size_t max_source_frames = source_frame_limit_for_output(
+        max_output_frames, static_cast<int>(info.sample_rate), target_sample_rate);
+    const std::size_t frame_count = max_source_frames > 0
+                                        ? std::min(available_frame_count, max_source_frames)
+                                        : available_frame_count;
     if (frame_count == 0) {
         out.clear();
         return true;
@@ -1032,21 +1080,35 @@ bool decode_wav_stereo_resampled(const std::string& path, int target_sample_rate
     if (!decode_frames(source)) {
         return false;
     }
-    return resample_stereo_linear(source, static_cast<int>(info.sample_rate), target_sample_rate, out, error);
+    return resample_stereo_linear(source,
+                                  static_cast<int>(info.sample_rate),
+                                  target_sample_rate,
+                                  out,
+                                  error,
+                                  max_output_frames);
 }
 
 bool decode_ogg_stereo_resampled(const std::string& path, int target_sample_rate, std::vector<float>& out,
-                                 std::string* error) {
+                                 std::string* error, std::size_t max_output_frames) {
     int source_sample_rate = 0;
+    const auto probed_sample_rate = audio::probe_ogg_vorbis_sample_rate(path, nullptr);
+    const std::size_t max_source_frames = probed_sample_rate.has_value()
+                                              ? source_frame_limit_for_output(
+                                                    max_output_frames,
+                                                    *probed_sample_rate,
+                                                    target_sample_rate)
+                                              : 0;
     std::vector<float> source;
-    if (!audio::decode_ogg_vorbis_stereo(path, &source_sample_rate, source, error)) {
+    if (!audio::decode_ogg_vorbis_stereo(
+            path, &source_sample_rate, source, error, max_source_frames)) {
         return false;
     }
-    return resample_stereo_linear(source, source_sample_rate, target_sample_rate, out, error);
+    return resample_stereo_linear(
+        source, source_sample_rate, target_sample_rate, out, error, max_output_frames);
 }
 
 bool decode_audio_stereo_resampled(const std::string& path, int target_sample_rate, std::vector<float>& out,
-                                   std::string* error) {
+                                   std::string* error, std::size_t max_output_frames = 0) {
     namespace fs = std::filesystem;
 #ifdef _WIN32
     const fs::path fs_path = fs::u8path(path);
@@ -1060,13 +1122,15 @@ bool decode_audio_stereo_resampled(const std::string& path, int target_sample_ra
 
     if (ext == ".wav" || ext == ".wave") {
         std::string wav_error;
-        if (decode_wav_stereo_resampled(path, target_sample_rate, out, &wav_error)) {
+        if (decode_wav_stereo_resampled(
+                path, target_sample_rate, out, &wav_error, max_output_frames)) {
             return true;
         }
 #ifdef _WIN32
         // Some WAV variants are better handled by Media Foundation.
         std::string mf_error;
-        if (decode_mf_stereo_resampled(path, target_sample_rate, out, &mf_error)) {
+        if (decode_mf_stereo_resampled(
+                path, target_sample_rate, out, &mf_error, max_output_frames)) {
             return true;
         }
         if (error) {
@@ -1083,12 +1147,14 @@ bool decode_audio_stereo_resampled(const std::string& path, int target_sample_ra
 
     if (ext == ".ogg") {
         std::string ogg_error;
-        if (decode_ogg_stereo_resampled(path, target_sample_rate, out, &ogg_error)) {
+        if (decode_ogg_stereo_resampled(
+                path, target_sample_rate, out, &ogg_error, max_output_frames)) {
             return true;
         }
 #ifdef _WIN32
         std::string mf_error;
-        if (decode_mf_stereo_resampled(path, target_sample_rate, out, &mf_error)) {
+        if (decode_mf_stereo_resampled(
+                path, target_sample_rate, out, &mf_error, max_output_frames)) {
             return true;
         }
         if (error) {
@@ -1105,11 +1171,13 @@ bool decode_audio_stereo_resampled(const std::string& path, int target_sample_ra
 
 #ifdef _WIN32
     std::string mf_error;
-    if (decode_mf_stereo_resampled(path, target_sample_rate, out, &mf_error)) {
+    if (decode_mf_stereo_resampled(
+            path, target_sample_rate, out, &mf_error, max_output_frames)) {
         return true;
     }
     std::string ffmpeg_error;
-    if (decode_ffmpeg_stereo_resampled(path, target_sample_rate, out, &ffmpeg_error)) {
+    if (decode_ffmpeg_stereo_resampled(
+            path, target_sample_rate, out, &ffmpeg_error, max_output_frames)) {
         return true;
     }
     if (error) {
@@ -1226,5 +1294,14 @@ std::string utc_timestamp_compact() {
 }
 
 }  // namespace
+
+bool decode_audio_file_stereo_resampled(const std::string& path,
+                                        int target_sample_rate,
+                                        std::vector<float>& out,
+                                        std::string* error,
+                                        std::size_t max_output_frames) {
+    return decode_audio_stereo_resampled(
+        path, target_sample_rate, out, error, max_output_frames);
+}
 
 #include "GameSessionTail.inl"

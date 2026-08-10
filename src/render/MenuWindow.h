@@ -150,6 +150,8 @@ struct SongSelectData {
     std::string current_gauge;
     std::string current_gauge_tier = "normal";
     std::string current_random;
+    bool quick_settings_focused = false;
+    int quick_setting_cursor = 0;
     std::string selected_song_background_path;
     std::string background_upscale_mode = "off";
     std::string background_upscale_model_path;
@@ -356,6 +358,7 @@ struct GameplayHudData {
     double note_divider_gap_px = kGameplayNoteDividerGapPxDefault;
     bool show_judgement_line = true;
     bool show_gear_boundary_line = false;
+    bool show_timing_feedback = true;
     bool show_hold_tail = false;
     bool hold_tail_taper_enabled = false;
     bool judgement_line_glow_enabled = true;
@@ -550,6 +553,15 @@ struct HelpOverlayData {
     std::string footer;
 };
 
+struct LoadingProgressData {
+    bool visible = false;
+    int percent = -1;
+    int processed = 0;
+    int total = -1;
+    std::string stage;
+    std::string eta;
+};
+
 struct PerformanceOverlayData {
     bool visible = false;
     bool valid = false;
@@ -591,6 +603,7 @@ struct MenuRenderData {
     std::vector<std::string> lines;
     GenericMenuData generic;
     HelpOverlayData help_overlay;
+    LoadingProgressData loading_progress;
 
     TitleMenuData title;
     SongSelectData song_select;

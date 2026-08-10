@@ -24,6 +24,9 @@ std::string resolve_bms_background_preview_path(const std::filesystem::path& cha
 std::string resolve_song_background_preview_path(const std::string& chart_path);
 std::string resolve_bms_audio_preview_path(const std::filesystem::path& chart_path,
                                            const chart::BmsChart& chart);
+std::string resolve_bms_declared_audio_preview_path(const std::filesystem::path& chart_path,
+                                                    const chart::BmsChart& chart);
 std::string resolve_song_audio_preview_path(const std::string& chart_path);
+std::string resolve_song_declared_audio_preview_path(const std::string& chart_path);
 
 }  // namespace tenriff::app::menu_songs

@@ -40,7 +40,7 @@
 
 - `backend` (string)
   - `polling | rawinput`
-  - 当前 `1.3.1` 发布线默认值为 `rawinput`
+  - 当前 `1.4.0.1` 发布线默认值为 `rawinput`
   - 可在 `Options -> Input Settings -> Backend` 或 `Options -> Profile Setup -> Input Backend` 中按 profile 选择
   - runtime fallback 不会把已保存值改写为 `polling`
   - 确认 RawInput 启动失败、注册目标丢失或 message window 退出后，本次应用运行期间 menu 与后续 gameplay 都会保持 Polling
@@ -107,10 +107,10 @@
   - `native | 720p | 1080p | qhd`
 - `vsync` (bool)
 - `refresh_hz` (int)
-  - `0` 表示 `Unlimited`；数值限制会被 clamp 到 `60..1050`
-  - 默认值为 `300`
+  - `-1` 表示 `Match Display`，`0` 表示 `Unlimited`
+  - 默认值为 `-1`
   - 只有在 `vsync=false` 时才充当直接 FPS 上限
-  - `vsync=false` 时，menu 的有效上限为 `300`；gameplay 在值为 `0` 时取消 render pacing，数值则安全限制到 `min(configured target, max(300, monitor_hz * 2))`
+  - `vsync=false` 时，menu 的有效上限为 `300`；gameplay 在 `-1` 时跟随显示器 Hz，在 `0` 时取消 render pacing
   - `vsync=true` 时，present refresh 以当前活动显示器 Hz 为准，render pacing 的目标是 `monitor_hz * 2`（上限 `1050`）
 - `performance_overlay` (bool)
   - 默认值为 `false`；它位于右上角，可能会与放在同一角落的 Discord Voice widget 重叠

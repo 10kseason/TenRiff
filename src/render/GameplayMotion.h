@@ -43,6 +43,43 @@ struct GameplayHoldBodyGeometry {
     float bottom = 0.0f;
 };
 
+struct GameplayPreviewHoldPlacement {
+    float head_center_y = 0.0f;
+    float tail_center_y = 0.0f;
+};
+
+// Place a synthetic preview LN fully inside the preview field while preserving
+// the same downward head / upward tail ordering used by gameplay. A judgement
+// line at the very top otherwise puts the preview tail below its head and makes
+// the shared body geometry empty.
+inline GameplayPreviewHoldPlacement compute_gameplay_preview_hold_placement(
+    float field_top,
+    float field_bottom,
+    float desired_head_center_y,
+    float head_half_height,
+    float tail_half_height) {
+    constexpr float kEdgePadding = 2.0f;
+    const float top = std::min(field_top, field_bottom);
+    const float bottom = std::max(field_top, field_bottom);
+    const float safe_head_half = std::max(0.0f, head_half_height);
+    const float safe_tail_half = std::max(0.0f, tail_half_height);
+    const float min_tail_center = top + safe_tail_half + kEdgePadding;
+    const float max_head_center = bottom - safe_head_half - kEdgePadding;
+    if (max_head_center <= min_tail_center) {
+        const float center = (top + bottom) * 0.5f;
+        return {center, center};
+    }
+
+    const float available_center_span = max_head_center - min_tail_center;
+    const float minimum_body_span = safe_head_half + safe_tail_half + 2.0f;
+    const float preferred_span = std::max(minimum_body_span, (bottom - top) * 0.18f);
+    const float center_span = std::min(preferred_span, available_center_span);
+    const float min_head_center = min_tail_center + center_span;
+    const float head_center = std::clamp(
+        desired_head_center_y, min_head_center, max_head_center);
+    return {head_center, head_center - center_span};
+}
+
 inline GameplayHoldBodyGeometry compute_gameplay_hold_body_geometry(
     float lane_center,
     float rendered_note_left,

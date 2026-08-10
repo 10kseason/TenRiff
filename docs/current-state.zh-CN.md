@@ -3,7 +3,7 @@
 这份文档是下一位 agent 或新任务接手时应该最先阅读的当前状态文档。目标是快速说明“这个项目现在是什么、应该先看哪里、还有哪些内容尚未验证”。
 
 ## 基线
-- 当前项目版本与公开稳定版均为 `1.3.1 (UI-r2)`
+- 当前项目版本与公开稳定版均为 `1.4.0.1`
 - UI-r2 Result 使用 2.2 秒时间线依次展示棱镜、分数、等级、通关状态、判定统计和图表；可用 Space 跳过，在演出结束前锁定 Continue/Retry/Replay 输入。
 - UI-r2 Song Select 使用顶部标签、7 行封面曲库、大幅选中图片、最佳记录卡、谱面/模式面板和可实际启动的 START 按钮；不显示 Collection/Store/货币/全球排名等虚构功能
 - Song Select 的 Rate、Hi-Speed、Gauge、Random 单元格支持左键增加/下一项、右键减少/上一项并立即保存；当前谱面键数不再被裁切，最佳记录会同时显示分数、准确率和最大连击。
@@ -138,8 +138,8 @@
   - 当两把键盘同时按住同一个键时，逻辑 `Pressed` 状态会一直保持到最后一个输入源释放为止
 - Graphics：
   - 分辨率预设（`720p`、`1080p`、`qhd`、`native`）
-  - `refresh_hz`（`0` = `Unlimited`，数值为 `60..1050`，默认 `300`）
-  - VSync off：menu 有效上限 `300`；gameplay 在 `0` 时取消 pacing，或使用数值配置目标
+  - `refresh_hz`（`-1` = `Match Display`，`0` = `Unlimited`）
+  - VSync off：Match Display 跟随显示器 Hz；Unlimited 取消 gameplay pacing，同时保留 menu 上限 `300`
   - VSync on：present refresh 跟随活动显示器 Hz，render pacing 目标为 `monitor_hz * 2`（上限 `1050`）
   - `visual_offset_ms`
   - `performance_overlay`（gameplay FPS/frame time 使用成功 DXGI `Present()` 的完成间隔；HUD 更新节奏仅保留为独立 gameplay diagnostics）
@@ -204,7 +204,7 @@
 
 ## 运行时 / 打包规则
 - 新用户 profile 会自动创建
-- 当前正式 P2P 发布线为 `TenRiff 1.3.1 (UI-r2)`
+- 当前正式 P2P 发布线为 `TenRiff 1.4.0.1`
 - 发布包不包含 `Songs`
 - 发布包包含 `Main Menu / Options / Song Selecte / Multiplayer Lobby / Clear / Failed` 这些 `Mainmusic/` 场景槽位；每个 `Name.mp3` 及 `Name 2.mp3`～`Name 64.mp3` 会自动发现，并在重新进入场景时轮换
 - 发布更新只包含已构建产物和必要的运行时资源

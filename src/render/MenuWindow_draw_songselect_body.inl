@@ -815,9 +815,18 @@
                                 mode_area.top + row * (mode_height + mode_gap) + mode_height);
                 register_hit(cell, MenuHitTargetKind::SongQuickSetting,
                              static_cast<int>(i), MenuHitPart::Increment);
+                const bool keyboard_selected =
+                    data.song_select.quick_settings_focused &&
+                    data.song_select.quick_setting_cursor == static_cast<int>(i);
                 // These cells take clicks, so they carry the accent border the
                 // read-only readouts around them do not.
                 draw_glass_panel(cell, 9.0f, 0.70f, 0.40f, true, 2.0f);
+                if (keyboard_selected && d2d_->accent_brush) {
+                    ctx->DrawRoundedRectangle(
+                        D2D1::RoundedRect(cell, 9.0f, 9.0f),
+                        d2d_->accent_brush.Get(),
+                        4.0f);
+                }
                 if (d2d_->stats_value_format && d2d_->muted_brush) {
                     draw_text_clipped(to_wide(mode_values[i].first),
                                       d2d_->stats_value_format.Get(),

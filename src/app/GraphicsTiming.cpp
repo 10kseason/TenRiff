@@ -21,55 +21,31 @@ int normalize_graphics_refresh_hz(int value) {
     if (value == kGraphicsRefreshHzUnlimited) {
         return kGraphicsRefreshHzUnlimited;
     }
-    return clamp_graphics_refresh_hz(value);
+    // Positive values are legacy fixed caps. The current UI intentionally has
+    // only Match Display and Unlimited, so migrate every non-zero value.
+    return kGraphicsRefreshHzMatchDisplay;
 }
 
 int cycle_graphics_refresh_hz(int value, int direction) {
-    if (value == kGraphicsRefreshHzUnlimited) {
-        return direction < 0 ? kGraphicsRefreshHzMax : kGraphicsRefreshHzMin;
-    }
-
-    const int configured = clamp_graphics_refresh_hz(value);
-    if (direction < 0 && configured == kGraphicsRefreshHzMin) {
-        return kGraphicsRefreshHzUnlimited;
-    }
-    if (direction >= 0 && configured == kGraphicsRefreshHzMax) {
-        return kGraphicsRefreshHzUnlimited;
-    }
-    const int step = direction < 0 ? -kGraphicsRefreshHzStep : kGraphicsRefreshHzStep;
-    return clamp_graphics_refresh_hz(configured + step);
+    static_cast<void>(direction);
+    return normalize_graphics_refresh_hz(value) == kGraphicsRefreshHzUnlimited
+               ? kGraphicsRefreshHzMatchDisplay
+               : kGraphicsRefreshHzUnlimited;
 }
 
-int effective_configured_refresh_hz(int configured_refresh_hz, bool gameplay_active) {
+int effective_configured_refresh_hz(int configured_refresh_hz,
+                                    int detected_monitor_refresh_hz,
+                                    bool gameplay_active) {
     if (configured_refresh_hz == kGraphicsRefreshHzUnlimited) {
         return gameplay_active ? kGraphicsRefreshHzUnlimited : kGraphicsMenuRefreshHzCap;
     }
-    const int configured = clamp_graphics_refresh_hz(configured_refresh_hz);
-    if (gameplay_active) {
-        return configured;
-    }
-    return std::min(configured, kGraphicsMenuRefreshHzCap);
-}
-
-int safe_off_vsync_gameplay_render_fps_limit(int configured_refresh_hz,
-                                             int detected_monitor_refresh_hz) {
-    const int configured = clamp_graphics_refresh_hz(configured_refresh_hz);
-    const int64_t monitor_cap = std::max<int64_t>(
-        kGraphicsOffVsyncGameplayRefreshHzFloor,
-        static_cast<int64_t>(detected_monitor_refresh_hz) *
-            static_cast<int64_t>(kGraphicsOffVsyncGameplayMonitorMultiplier));
-    const int64_t safe_cap =
-        std::clamp<int64_t>(monitor_cap, kGraphicsOffVsyncGameplayRefreshHzFloor, kGraphicsRefreshHzMax);
-    return static_cast<int>(std::min<int64_t>(configured, safe_cap));
+    return clamp_graphics_refresh_hz(detected_monitor_refresh_hz);
 }
 
 int effective_present_refresh_hz(bool vsync_enabled, int configured_refresh_hz,
                                  int detected_monitor_refresh_hz, bool gameplay_active) {
     if (!vsync_enabled) {
-        if (configured_refresh_hz == kGraphicsRefreshHzUnlimited) {
-            return clamp_graphics_refresh_hz(detected_monitor_refresh_hz);
-        }
-        return effective_configured_refresh_hz(configured_refresh_hz, gameplay_active);
+        return clamp_graphics_refresh_hz(detected_monitor_refresh_hz);
     }
     return clamp_graphics_refresh_hz(detected_monitor_refresh_hz);
 }
@@ -80,12 +56,8 @@ int effective_render_fps_limit(bool vsync_enabled, int configured_refresh_hz,
         if (configured_refresh_hz == kGraphicsRefreshHzUnlimited) {
             return gameplay_active ? kGraphicsRefreshHzUnlimited : kGraphicsMenuRefreshHzCap;
         }
-        if (gameplay_active) {
-            return safe_off_vsync_gameplay_render_fps_limit(
-                configured_refresh_hz,
-                detected_monitor_refresh_hz);
-        }
-        return effective_configured_refresh_hz(configured_refresh_hz, false);
+        return effective_configured_refresh_hz(
+            configured_refresh_hz, detected_monitor_refresh_hz, gameplay_active);
     }
 
     const int present_refresh_hz = effective_present_refresh_hz(

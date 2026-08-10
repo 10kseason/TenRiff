@@ -19,7 +19,7 @@ namespace tenriff::app {
 
 inline constexpr double kVisualOffsetMin = config::kVisualOffsetMin;
 inline constexpr double kVisualOffsetMax = config::kVisualOffsetMax;
-inline constexpr double kVisualOffsetStep = 5.0;
+inline constexpr double kVisualOffsetStep = 1.0;
 inline constexpr double kVolumeMin = 0.0;
 inline constexpr double kVolumeMax = 1.0;
 inline constexpr double kVolumeStep = 0.05;

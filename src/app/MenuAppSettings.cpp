@@ -230,8 +230,9 @@ void MenuApp::populate_audio_settings_render_data(render::MenuRenderData& render
     append_menu_row(render.generic, ui_text("Back", "뒤로"), "", settings_cursor_ == 6, render::MenuHitTargetKind::SettingsRow, 6, true, false);
     render.generic.notes.push_back(ui_text("Follow: note hits trigger keysounds. Autoplay: note keysounds are mixed into background audio.",
                                            "연동: 노트를 칠 때 키음이 납니다. 자동재생: 노트 키음이 배경음에 섞여 재생됩니다."));
-    render.generic.notes.push_back(ui_text("Background Sound controls menu BGM and chart background audio. Keysounds stay separate.",
-                                           "배경음은 메뉴 BGM과 차트 배경음을 켜고 끕니다. 키음은 별도로 유지됩니다."));
+    render.generic.notes.push_back(ui_text(
+        "Background Sound controls menu, result, and song-preview music only. Gameplay chart BGM keeps playing.",
+        "배경음은 메뉴, 결과, 곡 미리듣기 음악만 제어합니다. 게임플레이 차트 BGM은 계속 재생됩니다."));
     render.generic.notes.push_back(ui_text("Off: skip note keysounds. Autoplay mode routes note keysounds through BGM volume.",
                                            "끔: 노트 키음을 재생하지 않습니다. 자동재생에서는 노트 키음이 BGM 볼륨을 따릅니다."));
     render.generic.notes.push_back(ui_text("Left/Right or click +/- to change. Back saves and returns.",

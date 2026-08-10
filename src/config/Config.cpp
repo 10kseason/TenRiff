@@ -383,11 +383,12 @@ std::string normalize_ui_language(std::string value) {
 }
 
 int sanitize_refresh_hz(int value, std::vector<std::string>& warnings) {
-    if (value == 0 || (value >= kRefreshHzMin && value <= kRefreshHzMax)) {
+    if (value == -1 || value == 0) {
         return value;
     }
-    warnings.push_back("graphics.refresh_hz must be 0 (Unlimited) or between 60 and 1050; clamping into range.");
-    return std::clamp(value, kRefreshHzMin, kRefreshHzMax);
+    warnings.push_back(
+        "graphics.refresh_hz fixed caps are deprecated; using -1 (Match Display). Use 0 for Unlimited.");
+    return -1;
 }
 
 std::vector<std::string> get_string_array(const JsonObject& object, std::string_view key) {
@@ -745,6 +746,8 @@ void apply_config_object(const JsonObject& root, RuntimeConfig& config) {
             get_bool(*skin, "show_judgement_line", config.skin.show_judgement_line);
         config.skin.show_gear_boundary_line =
             get_bool(*skin, "show_gear_boundary_line", config.skin.show_gear_boundary_line);
+        config.skin.show_timing_feedback =
+            get_bool(*skin, "show_timing_feedback", config.skin.show_timing_feedback);
         config.skin.show_hold_tail =
             get_bool(*skin, "show_hold_tail", config.skin.show_hold_tail);
         config.skin.hold_tail_taper_enabled =
@@ -1136,6 +1139,7 @@ JsonValue build_json_root(const RuntimeConfig& config) {
     skin.emplace("note_divider_gap_px", JsonValue{config.skin.note_divider_gap_px});
     skin.emplace("show_judgement_line", JsonValue{config.skin.show_judgement_line});
     skin.emplace("show_gear_boundary_line", JsonValue{config.skin.show_gear_boundary_line});
+    skin.emplace("show_timing_feedback", JsonValue{config.skin.show_timing_feedback});
     skin.emplace("show_hold_tail", JsonValue{config.skin.show_hold_tail});
     skin.emplace("hold_tail_taper_enabled", JsonValue{config.skin.hold_tail_taper_enabled});
     skin.emplace("judgement_line_glow_enabled", JsonValue{config.skin.judgement_line_glow_enabled});
@@ -1702,7 +1706,7 @@ RuntimeConfig ConfigLoader::defaults() const {
     config.graphics.display_mode = "borderless";
     config.graphics.resolution = "native";
     config.graphics.vsync = false;
-    config.graphics.refresh_hz = kDefaultGraphicsRefreshHz;
+    config.graphics.refresh_hz = -1;
     config.graphics.performance_overlay = false;
     config.graphics.bga_enabled = true;
     config.graphics.background_upscale_mode = "off";

@@ -84,7 +84,8 @@ struct GraphicsConfig {
     std::string display_mode = "borderless";
     std::string resolution = "native";
     bool vsync = false;
-    int refresh_hz = 300;
+    // -1 follows the active display, 0 removes gameplay pacing when VSync is off.
+    int refresh_hz = -1;
     bool performance_overlay = false;
     bool bga_enabled = true;
     std::string background_upscale_mode = "off";
@@ -140,6 +141,7 @@ struct SkinConfig {
     double note_divider_gap_px = kNoteDividerGapPxDefault;
     bool show_judgement_line = true;
     bool show_gear_boundary_line = false;
+    bool show_timing_feedback = true;
     bool show_hold_tail = false;
     bool hold_tail_taper_enabled = false;
     bool judgement_line_glow_enabled = true;

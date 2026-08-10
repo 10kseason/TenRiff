@@ -244,6 +244,16 @@ TEST_CASE("long-note body touches the rendered head and stops at the tail edge")
     CHECK(active.bottom == doctest::Approx(920.0f));
 }
 
+TEST_CASE("skin preview long-note placement never reverses at extreme judgement lines") {
+    for (const float judgement_y : {100.0f, 510.0f, 900.0f}) {
+        const auto placement = tenriff::render::compute_gameplay_preview_hold_placement(
+            100.0f, 900.0f, judgement_y, 22.0f, 18.0f);
+        CHECK(placement.head_center_y - 22.0f > placement.tail_center_y + 18.0f);
+        CHECK(placement.tail_center_y - 18.0f >= 102.0f);
+        CHECK(placement.head_center_y + 22.0f <= 898.0f);
+    }
+}
+
 }  // namespace
 TEST_CASE("external ONNX background policy only targets low-resolution images in ONNX mode") {
     using tenriff::render::OnnxBackgroundUpscaler;

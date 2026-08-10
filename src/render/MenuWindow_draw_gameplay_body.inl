@@ -609,8 +609,10 @@
             if (data.gameplay.has_feedback) {
                 gameplay_hud_cache_.feedback_text = gameplay_feedback_overlay_text(data.gameplay.feedback);
                 gameplay_hud_cache_.feedback_timing_text =
-                    gameplay_timing_feedback_text(data.gameplay.feedback_delta_ms,
-                                                  data.gameplay.feedback);
+                    data.gameplay.show_timing_feedback
+                        ? gameplay_timing_feedback_text(data.gameplay.feedback_delta_ms,
+                                                        data.gameplay.feedback)
+                        : std::wstring{};
             } else {
                 gameplay_hud_cache_.feedback_text.clear();
                 gameplay_hud_cache_.feedback_timing_text.clear();
@@ -619,8 +621,10 @@
                 gameplay_hud_cache_.ghost_feedback_text =
                     gameplay_feedback_overlay_text(data.gameplay.ghost_feedback);
                 gameplay_hud_cache_.ghost_feedback_timing_text =
-                    gameplay_timing_feedback_text(data.gameplay.ghost_feedback_delta_ms,
-                                                  data.gameplay.ghost_feedback);
+                    data.gameplay.show_timing_feedback
+                        ? gameplay_timing_feedback_text(data.gameplay.ghost_feedback_delta_ms,
+                                                        data.gameplay.ghost_feedback)
+                        : std::wstring{};
             } else {
                 gameplay_hud_cache_.ghost_feedback_text.clear();
                 gameplay_hud_cache_.ghost_feedback_timing_text.clear();
@@ -1555,7 +1559,8 @@
 
         const bool show_feedback_overlay =
             data.gameplay.has_feedback && !gameplay_hud_cache_.feedback_text.empty();
-        const bool has_timing_history = data.gameplay.timing_history_count > 0;
+        const bool has_timing_history =
+            data.gameplay.show_timing_feedback && data.gameplay.timing_history_count > 0;
         const bool reserve_timing_overlay_space = show_feedback_overlay || has_timing_history;
         const float combo_anchor_top_safe = reserve_timing_overlay_space ? 74.0f : 44.0f;
         const float combo_anchor_bottom_safe = reserve_timing_overlay_space ? 82.0f : 44.0f;
@@ -1597,7 +1602,8 @@
                                           feedback_rect,
                                           d2d_->text_brush.Get(),
                                           DWRITE_TEXT_ALIGNMENT_CENTER);
-                if (!gameplay_hud_cache_.feedback_timing_text.empty() && d2d_->body_format) {
+                if (data.gameplay.show_timing_feedback &&
+                    !gameplay_hud_cache_.feedback_timing_text.empty() && d2d_->body_format) {
                     const D2D1_RECT_F timing_text_rect =
                         D2D1::RectF(feedback_rect.left,
                                     feedback_rect.top + 54.0f,
@@ -1618,13 +1624,15 @@
                 ctx->SetTransform(saved_feedback_transform);
             }
 
-            draw_timing_indicator(field_left,
-                                  field_right,
-                                  combo_anchor_y,
-                                  data.gameplay.timing_history_delta_ms,
-                                  data.gameplay.timing_history_count,
-                                  data.gameplay.has_feedback,
-                                  data.gameplay.feedback_delta_ms);
+            if (data.gameplay.show_timing_feedback) {
+                draw_timing_indicator(field_left,
+                                      field_right,
+                                      combo_anchor_y,
+                                      data.gameplay.timing_history_delta_ms,
+                                      data.gameplay.timing_history_count,
+                                      data.gameplay.has_feedback,
+                                      data.gameplay.feedback_delta_ms);
+            }
         }
 
         if (data.gameplay.combo > 0) {
@@ -2284,7 +2292,8 @@
 
             const bool show_ghost_feedback_overlay =
                 data.gameplay.ghost_has_feedback && !gameplay_hud_cache_.ghost_feedback_text.empty();
-            const bool ghost_has_timing_history = data.gameplay.ghost_timing_history_count > 0;
+            const bool ghost_has_timing_history =
+                data.gameplay.show_timing_feedback && data.gameplay.ghost_timing_history_count > 0;
             const bool reserve_ghost_timing_overlay_space =
                 show_ghost_feedback_overlay || ghost_has_timing_history;
             const float ghost_combo_anchor_top_safe = reserve_ghost_timing_overlay_space ? 74.0f : 44.0f;
@@ -2316,7 +2325,8 @@
                                               feedback_rect,
                                               d2d_->text_brush.Get(),
                                               DWRITE_TEXT_ALIGNMENT_CENTER);
-                    if (!gameplay_hud_cache_.ghost_feedback_timing_text.empty() && d2d_->body_format) {
+                    if (data.gameplay.show_timing_feedback &&
+                        !gameplay_hud_cache_.ghost_feedback_timing_text.empty() && d2d_->body_format) {
                         const D2D1_RECT_F timing_text_rect =
                             D2D1::RectF(feedback_rect.left,
                                         feedback_rect.top + 54.0f,
@@ -2335,13 +2345,15 @@
                     d2d_->text_brush->SetColor(saved_text_color);
                 }
 
-                draw_timing_indicator(ghost_field_left,
-                                      ghost_field_right,
-                                      ghost_combo_anchor_y,
-                                      data.gameplay.ghost_timing_history_delta_ms,
-                                      data.gameplay.ghost_timing_history_count,
-                                      data.gameplay.ghost_has_feedback,
-                                      data.gameplay.ghost_feedback_delta_ms);
+                if (data.gameplay.show_timing_feedback) {
+                    draw_timing_indicator(ghost_field_left,
+                                          ghost_field_right,
+                                          ghost_combo_anchor_y,
+                                          data.gameplay.ghost_timing_history_delta_ms,
+                                          data.gameplay.ghost_timing_history_count,
+                                          data.gameplay.ghost_has_feedback,
+                                          data.gameplay.ghost_feedback_delta_ms);
+                }
             }
             if (data.gameplay.ghost_combo > 0) {
                 draw_combo_overlay(ghost_field_layout,
