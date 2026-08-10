@@ -163,7 +163,7 @@ TEST_CASE("config defaults prefer 44100 Hz audio") {
     CHECK(config.skin.hold_body_opacity == doctest::Approx(tenriff::config::kSkinHoldBodyOpacityDefault));
     CHECK(config.skin.note_height_scale == doctest::Approx(1.80));
     CHECK(config.skin.lane_divider_width_scale == doctest::Approx(1.0));
-    CHECK(config.skin.hold_body_width_scale == doctest::Approx(0.60));
+    CHECK(config.skin.hold_body_width_scale == doctest::Approx(1.00));
     const auto default_lane_widths_10k = tenriff::config::resolved_skin_lane_width_scales(config.skin, "10k");
     REQUIRE(default_lane_widths_10k.size() == 10u);
     CHECK(default_lane_widths_10k[0] == doctest::Approx(tenriff::config::kLaneWidthScaleDefault));
@@ -836,7 +836,7 @@ TEST_CASE("skin visual presets apply their bundled gameplay appearance") {
     CHECK_FALSE(config.skin.key_pulse_enabled);
     CHECK(config.skin.key_label_position == "top");
     CHECK(config.skin.visual_opacity == doctest::Approx(0.82));
-    CHECK(config.skin.hold_body_opacity == doctest::Approx(0.15));
+    CHECK(config.skin.hold_body_opacity == doctest::Approx(1.00));
 
     tenriff::config::apply_skin_visual_preset(config.skin, "unknown");
 
@@ -1699,6 +1699,25 @@ TEST_CASE("runtime migration upgrades the old default note height scale to 180 p
     CHECK(config.skin.note_height_scale == doctest::Approx(1.80));
     CHECK(config.skin.note_height_scales["10k"] == doctest::Approx(1.80));
     CHECK(config.skin.note_height_scales["16k"] == doctest::Approx(1.80));
+}
+
+TEST_CASE("runtime migration aligns legacy long-note body width and brightness with notes") {
+    ConfigLoader loader;
+    auto config = loader.defaults();
+    config.skin.hold_body_width_scale = 0.60;
+    config.skin.hold_body_opacity = 0.55;
+
+    const bool changed = tenriff::app::migrate_bms_first_runtime_config(config);
+
+    CHECK(changed);
+    CHECK(config.skin.hold_body_width_scale == doctest::Approx(1.00));
+    CHECK(config.skin.hold_body_opacity == doctest::Approx(1.00));
+
+    auto minimal = loader.defaults();
+    minimal.skin.visual_preset = "minimal";
+    minimal.skin.hold_body_opacity = 0.15;
+    CHECK(tenriff::app::migrate_bms_first_runtime_config(minimal));
+    CHECK(minimal.skin.hold_body_opacity == doctest::Approx(1.00));
 }
 
 TEST_CASE("runtime migration upgrades the old result tail default to three seconds") {

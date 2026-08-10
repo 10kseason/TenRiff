@@ -31,7 +31,9 @@ inline constexpr double kRateMax = 2.0;
 inline constexpr double kRateStep = 0.05;
 inline constexpr double kHiSpeedMin = 0.5;
 inline constexpr double kHiSpeedMax = 50.0;
-inline constexpr double kHiSpeedStep = 0.25;
+// Menu and Song Select adjustments are fine-grained. In-play tuning keeps its
+// independent 0.25 / 10.0 steps in GameSession.
+inline constexpr double kHiSpeedStep = 0.01;
 inline constexpr int kSeedMin = 0;
 inline constexpr int kSeedMax = 9999;
 inline std::string to_lower_ascii(std::string value) {
@@ -341,10 +343,10 @@ inline std::string cycle_runtime_key_mode(std::string_view current, int directio
 inline std::string gauge_label(const std::string& value) {
     const std::string normalized = to_lower_ascii(value);
     if (normalized == "ex_hard" || normalized == "ex-hard" || normalized == "exhard") {
-        return "EX-Hard";
+        return "EX";
     }
     if (normalized == "shift" || normalized == "gauge_shift" || normalized == "gauge-shift") {
-        return "Gauge Shift";
+        return "EX";
     }
     if (normalized == "hard") {
         return "Hard";
@@ -361,7 +363,9 @@ inline std::string normalize_gauge_mode(std::string value) {
         return "ex_hard";
     }
     if (value == "shift" || value == "gauge_shift" || value == "gauge-shift") {
-        return "shift";
+        // Legacy Gauge Shift selections now mean an EX starting tier. Gauge
+        // Shift itself is always enabled by the session runtime.
+        return "ex_hard";
     }
     if (value == "hard" || value == "easy") {
         return value;
@@ -370,9 +374,8 @@ inline std::string normalize_gauge_mode(std::string value) {
 }
 
 inline std::string cycle_gauge_mode(std::string current, int direction) {
-    // Song Select and Mode Settings share the player-facing order:
-    // Easy -> Normal -> Hard -> EX-Hard -> Gauge Shift.
-    static constexpr const char* kGauges[] = {"easy", "normal", "hard", "ex_hard", "shift"};
+    // Gauge Shift is always active; this selection chooses its starting tier.
+    static constexpr const char* kGauges[] = {"easy", "normal", "hard", "ex_hard"};
     const int option_count = static_cast<int>(sizeof(kGauges) / sizeof(kGauges[0]));
     current = normalize_gauge_mode(std::move(current));
     int index = 0;
@@ -432,9 +435,9 @@ inline bool adjust_song_quick_setting(config::RuntimeConfig& runtime, int settin
     const int step_direction = direction < 0 ? -1 : 1;
     switch (setting_index) {
         case 0:
-            runtime.speed.rate = clamp_step_value(
-                runtime.speed.rate + static_cast<double>(step_direction) * kRateStep,
-                kRateMin, kRateMax, kRateStep);
+            runtime.visual_offset_ms = clamp_step_value(
+                runtime.visual_offset_ms + static_cast<double>(step_direction) * kVisualOffsetStep,
+                kVisualOffsetMin, kVisualOffsetMax, kVisualOffsetStep);
             break;
         case 1:
             runtime.speed.hi_speed = clamp_step_value(

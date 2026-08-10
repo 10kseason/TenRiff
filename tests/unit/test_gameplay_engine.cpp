@@ -26,6 +26,22 @@ TEST_CASE("result fast slow aggregate excludes top judgement timing") {
     CHECK(tenriff::gameplay::maximum_detail_score(stats.total_notes) == 20);
 }
 
+TEST_CASE("casual score uses a ten-thousand maximum and six-three-one judgement weights") {
+    const auto score_for = [](Judgement judgement) {
+        tenriff::gameplay::ResultStats stats;
+        stats.record_note_total(1);
+        stats.record_judgement(judgement, 0.0, tenriff::gameplay::ComboImpact::Increment);
+        return stats.raw_score;
+    };
+
+    CHECK(tenriff::gameplay::kNativeScoreMaximum == 10'000);
+    CHECK(score_for(Judgement::PG) == 10'000);
+    CHECK(score_for(Judgement::GR) == 5'000);
+    CHECK(score_for(Judgement::GD) == 1'667);
+    CHECK(score_for(Judgement::BD) == 0);
+    CHECK(score_for(Judgement::PR) == 0);
+}
+
 TEST_CASE("gameplay engine accepts a carried course gauge value") {
     GameplayChart chart;
     chart.lane_count = 1;
@@ -90,7 +106,7 @@ TEST_CASE("native score is fixed by judgement value and independent of combo ord
     CHECK(engine.stats().counts.pg == 2);
     CHECK(engine.stats().counts.bd == 1);
     CHECK(engine.stats().combo_score_units == 2);
-    CHECK(engine.stats().raw_score == 66'667);
+    CHECK(engine.stats().raw_score == 6'667);
     CHECK(engine.stats().detail_score == 10);
 }
 
@@ -258,7 +274,7 @@ TEST_CASE("gameplay engine raw score keeps earlier penalties after later hits") 
     CHECK(engine.stats().counts.bd == 0);
     CHECK(engine.stats().counts.pr == 1);
     CHECK(engine.stats().counts.pg == 1);
-    CHECK(engine.stats().raw_score == 100'000);
+    CHECK(engine.stats().raw_score == 10'000);
 }
 
 TEST_CASE("gameplay engine ignores inputs that are too early for LR2 poor") {
@@ -417,7 +433,7 @@ TEST_CASE("gameplay engine auto-clears standard hold tails without release timin
 
     CHECK(engine.stats().counts.pg == 2);
     CHECK(engine.stats().counts.bd == 0);
-    CHECK(engine.stats().raw_score == 100'000);
+    CHECK(engine.stats().raw_score == 10'000);
 }
 
 TEST_CASE("gameplay engine keeps the latest one hundred timing deltas in order") {
@@ -981,6 +997,7 @@ TEST_CASE("parallel gauge shift keeps Ex-Hard when it survives") {
     config.judge.gd_ms = 30.0;
     config.judge.bd_ms = 40.0;
     config.gauge_shift_enabled = true;
+    config.initial_gauge = tenriff::game::GaugeType::ExHard;
 
     GameplayEngine engine(chart, config);
     (void)engine.handle_input(1, InputState::Pressed, 1000);
@@ -1008,6 +1025,7 @@ TEST_CASE("parallel gauge shift selects the highest independently surviving gaug
     config.judge.gd_ms = 30.0;
     config.judge.bd_ms = 40.0;
     config.gauge_shift_enabled = true;
+    config.initial_gauge = tenriff::game::GaugeType::ExHard;
     config.gauge.ex_hard.bd = -100.0;
     config.gauge.hard.bd = -60.0;
     config.gauge.normal.bd = -40.0;
@@ -1043,6 +1061,36 @@ TEST_CASE("parallel gauge shift selects the highest independently surviving gaug
     CHECK(engine.gauge_state().value == doctest::Approx(20.0));
 }
 
+TEST_CASE("parallel gauge shift begins at the selected tier and only shifts downward") {
+    GameplayChart chart;
+    chart.lane_count = 1;
+    chart.duration_samples = 3000;
+    chart.notes.push_back(NoteEvent{1, 1000, std::nullopt});
+
+    GameplayConfig config;
+    config.sample_rate = 1000;
+    config.judge.pg_ms = 10.0;
+    config.judge.gr_ms = 20.0;
+    config.judge.gd_ms = 30.0;
+    config.judge.bd_ms = 40.0;
+    config.gauge_shift_enabled = true;
+    config.initial_gauge = tenriff::game::GaugeType::Normal;
+    config.gauge.normal.bd = -100.0;
+    config.gauge.easy.bd = -50.0;
+
+    GameplayEngine engine(chart, config);
+    CHECK(engine.gauge_state().type == tenriff::game::GaugeType::Normal);
+
+    engine.advance(1041);
+
+    REQUIRE(engine.stats().shifts.size() == 1u);
+    CHECK(engine.stats().shifts[0].from == tenriff::game::GaugeType::Normal);
+    CHECK(engine.stats().shifts[0].to == tenriff::game::GaugeType::Easy);
+    CHECK(engine.gauge_state().type == tenriff::game::GaugeType::Easy);
+    CHECK(engine.gauge_state().value == doctest::Approx(50.0));
+    CHECK_FALSE(engine.is_game_over());
+}
+
 TEST_CASE("parallel gauge shift fails only after every gauge has died") {
     GameplayChart chart;
     chart.lane_count = 1;
@@ -1056,6 +1104,7 @@ TEST_CASE("parallel gauge shift fails only after every gauge has died") {
     config.judge.gd_ms = 30.0;
     config.judge.bd_ms = 40.0;
     config.gauge_shift_enabled = true;
+    config.initial_gauge = tenriff::game::GaugeType::ExHard;
     config.gauge.ex_hard.bd = -100.0;
     config.gauge.hard.bd = -100.0;
     config.gauge.normal.bd = -100.0;
@@ -1314,7 +1363,7 @@ TEST_CASE("full long notes preserve raw score potential during gameplay") {
     engine.advance(2500);
 
     CHECK(engine.stats().counts.pg == 2);
-    CHECK(engine.stats().raw_score == 100'000);
+    CHECK(engine.stats().raw_score == 10'000);
 }
 
 TEST_CASE("LN mix hold heads respect OD8 sudden-death boundaries during gameplay") {

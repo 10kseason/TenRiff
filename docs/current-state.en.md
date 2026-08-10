@@ -130,7 +130,7 @@ This is the document that the next agent or any new contributor should read firs
   - `Gauge Shift` independently simulates EX-Hard / Hard / Normal / Easy from 100%; when the current tier reaches 0%, it selects the next tier that survived the same judgement history, and the highest surviving tier becomes final
   - `Sudden Death (1 MISS)` fails immediately on the first OD8-converted object `MISS`; native `BAD` timing alone and empty-key `POOR` are ignored, and the option is mutually exclusive with Practice No-Fail
   - OD8 conversion remains internal for Sudden Death and legacy replay compatibility; Gameplay and Result show only the native TenRiff score
-  - native score is normalized as 90,000 judgement points plus 10,000 cumulative-combo points, so an all-PG full combo is exactly 100,000; LN heads and tails each carry 0.5 weight and form one object
+  - casual score is normalized to a 10,000 maximum with `PG 6 / GR 3 / GD 1 / PR 0 / FAIL 0` judgement weights; LN heads and tails each carry 0.5 weight and form one object, while detail score remains separate
   - accuracy starts from PG/GR/GD/BD bases of 100/80/50/20%, removes up to 0.5 percentage points across each judgement band, and caps an all-PG run at 99.5% when its PG timing span exceeds 8ms
   - rank boundaries are `<75 F / 75 B / 80.5 A / 86.5 A+ / 90 S / 95.5 S+ / 98 AA / 99 SS / 99.75 SSS`
   - live gameplay `ClockSync` uses centered anchor regression instead of large absolute Windows QPC values and automatically rebases after sustained clock discontinuities

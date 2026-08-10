@@ -151,7 +151,7 @@ Rate は曲の再生速度と譜面スケジュールだけを変え、同じ Hi
 
 OD8 換算統計は Sudden Death と既存 replay 互換のため JSON 内部に維持されますが、Gameplay / Result 画面には表示しません。
 
-native Score は judgement 90,000 点 + 累積 Combo 10,000 点で構成されます。全 `PG` の full combo は正確に 100,000 点で、LN は head / tail を各 0.5 weight とする 1 object です。
+Casual Score は最大 10,000 点で、judgement weight は `PG 6 / GR 3 / GD 1 / PR 0 / FAIL 0` です。LN は head / tail を各 0.5 weight とする 1 object で、Detail Score は別の計算を維持します。
 
 Accuracy は `PG / GR / GD / BD = 100 / 80 / 50 / 20%` を基準に、各 judgement band 内の timing に応じて最大 0.5 percentage point を追加減算します。全 `PG` でも PG timing span が 8ms を超えると 99.5% を超えません。
 

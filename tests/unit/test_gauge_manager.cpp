@@ -211,22 +211,22 @@ TEST_CASE("threshold runtime policy carries value through Hard Normal and Easy w
     CHECK(state.value == doctest::Approx(30.0));
 }
 
-TEST_CASE("course hybrid gauge uses Ex-Hard recovery and Easy damage") {
+TEST_CASE("course hybrid gauge uses midway Normal-Hard recovery and Easy damage") {
     GaugeRuntimePolicy policy;
     policy.course_hybrid_deltas = true;
     GaugeManager manager({}, policy);
     GaugeState state{GaugeType::Normal, 50.0, false};
 
     manager.applyJudgement(state, Judgement::PG, 0.0);
-    CHECK(state.value == doctest::Approx(50.08));
+    CHECK(state.value == doctest::Approx(50.175));
     manager.applyJudgement(state, Judgement::GR, 1.0);
-    CHECK(state.value == doctest::Approx(50.12));
+    CHECK(state.value == doctest::Approx(50.295));
     manager.applyJudgement(state, Judgement::GD, 2.0);
-    CHECK(state.value == doctest::Approx(50.12));
+    CHECK(state.value == doctest::Approx(50.305));
     manager.applyJudgement(state, Judgement::BD, 3.0);
-    CHECK(state.value == doctest::Approx(46.02));
+    CHECK(state.value == doctest::Approx(46.205));
     manager.applyJudgement(state, Judgement::PR, 4.0);
-    CHECK(state.value == doctest::Approx(44.42));
+    CHECK(state.value == doctest::Approx(44.605));
     CHECK(state.type == GaugeType::Normal);
 }
 

@@ -629,10 +629,6 @@ ID2D1Geometry* gameplay_note_polygon_geometry(
     return geometries[index.value()].Get();
 }
 
-float gameplay_hold_body_cap_inset(std::string_view note_shape, float half_height) {
-    return normalize_gameplay_note_shape(note_shape) == "circle" ? 0.0f : half_height;
-}
-
 float gameplay_hold_body_width_ratio_at_y(float position_y,
                                           float head_y,
                                           float tail_y,
@@ -2152,6 +2148,11 @@ struct MenuWindow::D2DResources {
     Microsoft::WRL::ComPtr<IDWriteTextFormat> menu_icon_format;
     Microsoft::WRL::ComPtr<IDWriteTextFormat> header_format;
     Microsoft::WRL::ComPtr<IDWriteTextFormat> gameplay_combo_format;
+    Microsoft::WRL::ComPtr<IDWriteTextFormat> song_logo_format;
+    Microsoft::WRL::ComPtr<IDWriteTextFormat> song_nav_format;
+    Microsoft::WRL::ComPtr<IDWriteTextFormat> song_record_label_format;
+    Microsoft::WRL::ComPtr<IDWriteTextFormat> song_record_value_format;
+    Microsoft::WRL::ComPtr<IDWriteTextFormat> song_record_detail_format;
     Microsoft::WRL::ComPtr<IDWriteTextFormat> song_title_format;
     Microsoft::WRL::ComPtr<IDWriteTextFormat> song_artist_format;
     Microsoft::WRL::ComPtr<IDWriteTextFormat> hud_format;
@@ -4460,6 +4461,16 @@ bool MenuWindow::create_text_formats(const wchar_t* ui_family) {
         !create_text_format(ui_family, DWRITE_FONT_WEIGHT_SEMI_BOLD, 52.0f, &d2d_->header_format) ||
         !create_text_format(L"Bahnschrift SemiBold", DWRITE_FONT_WEIGHT_SEMI_BOLD, 42.0f,
                             &d2d_->gameplay_combo_format) ||
+        !create_text_format(L"Bahnschrift SemiBold", DWRITE_FONT_WEIGHT_BOLD, 68.0f,
+                            &d2d_->song_logo_format) ||
+        !create_text_format(ui_family, DWRITE_FONT_WEIGHT_SEMI_BOLD, 29.0f,
+                            &d2d_->song_nav_format) ||
+        !create_text_format(ui_family, DWRITE_FONT_WEIGHT_BOLD, 22.0f,
+                            &d2d_->song_record_label_format) ||
+        !create_text_format(ui_family, DWRITE_FONT_WEIGHT_BOLD, 24.0f,
+                            &d2d_->song_record_value_format) ||
+        !create_text_format(ui_family, DWRITE_FONT_WEIGHT_SEMI_BOLD, 18.0f,
+                            &d2d_->song_record_detail_format) ||
         !create_text_format(ui_family, DWRITE_FONT_WEIGHT_SEMI_BOLD, 24.0f, &d2d_->song_title_format) ||
         !create_text_format(ui_family, DWRITE_FONT_WEIGHT_NORMAL, 18.0f, &d2d_->song_artist_format) ||
         !create_text_format(ui_family, DWRITE_FONT_WEIGHT_NORMAL, 16.0f, &d2d_->hud_format) ||

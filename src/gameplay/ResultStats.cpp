@@ -10,8 +10,8 @@ namespace {
 double judgement_score_credit(game::Judgement judgement) {
     switch (judgement) {
         case game::Judgement::PG: return 1.0;
-        case game::Judgement::GR: return 0.7;
-        case game::Judgement::GD: return 0.3;
+        case game::Judgement::GR: return 3.0 / 6.0;
+        case game::Judgement::GD: return 1.0 / 6.0;
         case game::Judgement::BD: return 0.0;
         case game::Judgement::PR:
         default: return 0.0;
@@ -188,6 +188,31 @@ int64_t scale_native_score(int64_t raw_score, double multiplier) {
         static_cast<int64_t>(std::llround(static_cast<double>(raw_score) * safe_multiplier)),
         0,
         kNativeScoreMaximum);
+}
+
+int64_t native_score_from_counts(const JudgementCounts& counts, int total_notes) {
+    const int judged = counts.pg + counts.gr + counts.gd + counts.bd + counts.pr;
+    const int denominator = total_notes > 0 ? total_notes : judged;
+    if (denominator <= 0) {
+        return 0;
+    }
+    const int64_t points = static_cast<int64_t>(counts.pg) * 6 +
+                           static_cast<int64_t>(counts.gr) * 3 +
+                           static_cast<int64_t>(counts.gd);
+    const double ratio = std::clamp(
+        static_cast<double>(points) / (static_cast<double>(denominator) * 6.0), 0.0, 1.0);
+    return static_cast<int64_t>(std::llround(ratio * static_cast<double>(kNativeScoreMaximum)));
+}
+
+int64_t normalize_stored_native_score(int64_t score, int score_version) {
+    if (score_version >= kNativeScoreVersion) {
+        return std::clamp<int64_t>(score, 0, kNativeScoreMaximum);
+    }
+    constexpr int64_t kLegacyNativeScoreMaximum = 100'000;
+    const int64_t legacy_score = std::clamp<int64_t>(score, 0, kLegacyNativeScoreMaximum);
+    return static_cast<int64_t>(std::llround(
+        static_cast<double>(legacy_score) * static_cast<double>(kNativeScoreMaximum) /
+        static_cast<double>(kLegacyNativeScoreMaximum)));
 }
 
 }  // namespace tenriff::gameplay

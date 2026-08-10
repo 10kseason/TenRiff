@@ -18,4 +18,17 @@ inline std::uint32_t gameplay_gauge_color(std::string_view gauge_token) {
     return 0xFFB703;
 }
 
+inline std::uint32_t song_select_gauge_text_color(std::string_view gauge_tier) {
+    if (gauge_tier == "ex_hard") {
+        return 0xFF4D6D;
+    }
+    if (gauge_tier == "hard") {
+        return 0xFF9F43;
+    }
+    if (gauge_tier == "easy") {
+        return 0x5EE59A;
+    }
+    return 0xFFE45E;
+}
+
 }  // namespace tenriff::render

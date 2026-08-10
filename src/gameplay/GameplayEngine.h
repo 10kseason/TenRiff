@@ -145,6 +145,7 @@ private:
     game::GaugeManager gauge_manager_;
     game::GaugeState gauge_state_;
     std::array<game::GaugeState, 4> gauge_shift_states_{};
+    std::size_t gauge_shift_start_index_ = 0;
     bool gauge_shift_enabled_ = false;
 
     ResultStats stats_;

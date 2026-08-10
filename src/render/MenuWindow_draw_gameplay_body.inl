@@ -1421,6 +1421,33 @@
                 d2d_->lane_note_hold_body_bitmaps[lane_index].Get();
             ID2D1Bitmap* note_hold_tail_bitmap =
                 d2d_->lane_note_tail_bitmaps[lane_index].Get();
+            const D2D1_RECT_F note_rect = D2D1::RectF(x0, y - head_half_h, x1, y + head_half_h);
+            const bool using_hold_head_bitmap = note.hold && note_hold_head_bitmap;
+            ID2D1Bitmap* head_bitmap = using_hold_head_bitmap ? note_hold_head_bitmap : note_head_bitmap;
+            const D2D1_RECT_F* head_source_rect =
+                using_hold_head_bitmap
+                    ? bitmap_source_rect_or_null(d2d_->lane_note_hold_head_source_rects[lane_index])
+                    : bitmap_source_rect_or_null(d2d_->lane_note_head_source_rects[lane_index]);
+            const D2D1_RECT_F head_visual_rect =
+                head_bitmap
+                    ? gameplay_note_bitmap_dest_rect(note_rect,
+                                                     head_bitmap,
+                                                     head_source_rect,
+                                                     note_shape,
+                                                     note_image_aspect)
+                    : note_rect;
+            const D2D1_RECT_F tail_rect =
+                D2D1::RectF(x0, tail_y - tail_half_h, x1, tail_y + tail_half_h);
+            const D2D1_RECT_F* tail_source_rect =
+                bitmap_source_rect_or_null(d2d_->lane_note_tail_source_rects[lane_index]);
+            const D2D1_RECT_F tail_visual_rect =
+                note_hold_tail_bitmap
+                    ? gameplay_note_bitmap_dest_rect(tail_rect,
+                                                     note_hold_tail_bitmap,
+                                                     tail_source_rect,
+                                                     note_shape,
+                                                     note_image_aspect)
+                    : tail_rect;
 
             if (note.mine) {
                 const float mine_half_h = std::max(7.0f, head_half_h * 1.15f);
@@ -1441,13 +1468,23 @@
             }
 
             if (note.hold && note_hold_fill) {
-                const float head_body_inset = gameplay_hold_body_cap_inset(note_shape, head_half_h);
-                const float body_top = std::min(y, tail_y);
-                const float body_bottom = std::max(y, tail_y) - (render_head ? head_body_inset : 0.0f);
-                const float hold_half_width = std::max(4.0f, note_width * 0.5f * hold_body_width_scale);
+                const auto body_geometry = compute_gameplay_hold_body_geometry(
+                    lane_center,
+                    head_visual_rect.left,
+                    head_visual_rect.right,
+                    head_visual_rect.top,
+                    y,
+                    tail_visual_rect.bottom,
+                    tail_y,
+                    render_head,
+                    data.gameplay.show_hold_tail,
+                    hold_body_width_scale);
                 const D2D1_RECT_F hold_body =
-                    D2D1::RectF(lane_center - hold_half_width, body_top, lane_center + hold_half_width, body_bottom);
-                if (body_bottom > body_top) {
+                    D2D1::RectF(body_geometry.left,
+                                body_geometry.top,
+                                body_geometry.right,
+                                body_geometry.bottom);
+                if (hold_body.bottom > hold_body.top) {
                     if (note_hold_body_bitmap && !data.gameplay.hold_tail_taper_enabled) {
                         const D2D1_RECT_F* hold_body_source_rect =
                             bitmap_source_rect_or_null(d2d_->lane_note_hold_body_source_rects[lane_index]);
@@ -1463,7 +1500,7 @@
                                                 lane_center,
                                                 y,
                                                 tail_y,
-                                                hold_half_width,
+                                                (body_geometry.right - body_geometry.left) * 0.5f,
                                                 data.gameplay.hold_tail_taper_enabled,
                                                 hold_body_brush);
                     }
@@ -1471,20 +1508,10 @@
             }
 
             if (note.hold && data.gameplay.show_hold_tail) {
-                const D2D1_RECT_F tail_rect =
-                    D2D1::RectF(x0, tail_y - tail_half_h, x1, tail_y + tail_half_h);
                 if (note_hold_tail_bitmap) {
-                    const D2D1_RECT_F* tail_source_rect =
-                        bitmap_source_rect_or_null(d2d_->lane_note_tail_source_rects[lane_index]);
-                    const D2D1_RECT_F tail_bitmap_rect =
-                        gameplay_note_bitmap_dest_rect(tail_rect,
-                                                       note_hold_tail_bitmap,
-                                                       tail_source_rect,
-                                                       note_shape,
-                                                       note_image_aspect);
                     draw_gameplay_sprite(ctx,
                                          note_hold_tail_bitmap,
-                                         tail_bitmap_rect,
+                                         tail_visual_rect,
                                          visual_opacity,
                                          tail_source_rect,
                                          gameplay_lane_sprite_rotation(
@@ -1505,23 +1532,9 @@
                 }
             }
 
-            const D2D1_RECT_F note_rect = D2D1::RectF(x0, y - head_half_h, x1, y + head_half_h);
             if (render_head) {
-                ID2D1Bitmap* head_bitmap = note.hold && note_hold_head_bitmap ? note_hold_head_bitmap : note_head_bitmap;
                 if (head_bitmap) {
-                    const D2D1_RECT_F* head_source_rect =
-                        note.hold
-                            ? bitmap_source_rect_or_null(
-                                  d2d_->lane_note_hold_head_source_rects[lane_index])
-                            : bitmap_source_rect_or_null(
-                                  d2d_->lane_note_head_source_rects[lane_index]);
-                    const D2D1_RECT_F bitmap_rect =
-                        gameplay_note_bitmap_dest_rect(note_rect,
-                                                       head_bitmap,
-                                                       head_source_rect,
-                                                       note_shape,
-                                                       note_image_aspect);
-                    draw_gameplay_sprite(ctx, head_bitmap, bitmap_rect, visual_opacity,
+                    draw_gameplay_sprite(ctx, head_bitmap, head_visual_rect, visual_opacity,
                                          head_source_rect,
                                          gameplay_lane_sprite_rotation(
                                              gameplay_note_sprite_cache_.note_rotations,
@@ -2139,6 +2152,33 @@
                     d2d_->lane_note_hold_body_bitmaps[lane_index].Get();
                 ID2D1Bitmap* note_hold_tail_bitmap =
                     d2d_->lane_note_tail_bitmaps[lane_index].Get();
+                const D2D1_RECT_F note_rect = D2D1::RectF(x0, y - head_half_h, x1, y + head_half_h);
+                const bool using_hold_head_bitmap = note.hold && note_hold_head_bitmap;
+                ID2D1Bitmap* head_bitmap = using_hold_head_bitmap ? note_hold_head_bitmap : note_head_bitmap;
+                const D2D1_RECT_F* head_source_rect =
+                    using_hold_head_bitmap
+                        ? bitmap_source_rect_or_null(d2d_->lane_note_hold_head_source_rects[lane_index])
+                        : bitmap_source_rect_or_null(d2d_->lane_note_head_source_rects[lane_index]);
+                const D2D1_RECT_F head_visual_rect =
+                    head_bitmap
+                        ? gameplay_note_bitmap_dest_rect(note_rect,
+                                                        head_bitmap,
+                                                        head_source_rect,
+                                                        note_shape,
+                                                        note_image_aspect)
+                        : note_rect;
+                const D2D1_RECT_F tail_rect =
+                    D2D1::RectF(x0, tail_y - tail_half_h, x1, tail_y + tail_half_h);
+                const D2D1_RECT_F* tail_source_rect =
+                    bitmap_source_rect_or_null(d2d_->lane_note_tail_source_rects[lane_index]);
+                const D2D1_RECT_F tail_visual_rect =
+                    note_hold_tail_bitmap
+                        ? gameplay_note_bitmap_dest_rect(tail_rect,
+                                                        note_hold_tail_bitmap,
+                                                        tail_source_rect,
+                                                        note_shape,
+                                                        note_image_aspect)
+                        : tail_rect;
 
                 if (note.mine) {
                     const float mine_half_h = std::max(7.0f, head_half_h * 1.15f);
@@ -2159,14 +2199,23 @@
                 }
 
                 if (note.hold && note_hold_fill) {
-                    const float head_body_inset =
-                        gameplay_hold_body_cap_inset(note_shape, gameplay_note_head_half_height(note_height_scale));
-                    const float body_top = std::min(y, tail_y);
-                    const float body_bottom = std::max(y, tail_y) - (render_head ? head_body_inset : 0.0f);
-                    const float hold_half_width = std::max(4.0f, ghost_note_width * 0.5f * hold_body_width_scale);
+                    const auto body_geometry = compute_gameplay_hold_body_geometry(
+                        lane_center,
+                        head_visual_rect.left,
+                        head_visual_rect.right,
+                        head_visual_rect.top,
+                        y,
+                        tail_visual_rect.bottom,
+                        tail_y,
+                        render_head,
+                        data.gameplay.show_hold_tail,
+                        hold_body_width_scale);
                     const D2D1_RECT_F hold_body =
-                        D2D1::RectF(lane_center - hold_half_width, body_top, lane_center + hold_half_width, body_bottom);
-                    if (body_bottom > body_top) {
+                        D2D1::RectF(body_geometry.left,
+                                    body_geometry.top,
+                                    body_geometry.right,
+                                    body_geometry.bottom);
+                    if (hold_body.bottom > hold_body.top) {
                         if (note_hold_body_bitmap && !data.gameplay.hold_tail_taper_enabled) {
                             const D2D1_RECT_F* hold_body_source_rect =
                                 bitmap_source_rect_or_null(d2d_->lane_note_hold_body_source_rects[lane_index]);
@@ -2182,7 +2231,7 @@
                                                     lane_center,
                                                     y,
                                                     tail_y,
-                                                    hold_half_width,
+                                                    (body_geometry.right - body_geometry.left) * 0.5f,
                                                     data.gameplay.hold_tail_taper_enabled,
                                                     hold_body_brush);
                         }
@@ -2190,20 +2239,10 @@
                 }
 
                 if (note.hold && data.gameplay.show_hold_tail) {
-                    const D2D1_RECT_F tail_rect =
-                        D2D1::RectF(x0, tail_y - tail_half_h, x1, tail_y + tail_half_h);
                     if (note_hold_tail_bitmap) {
-                        const D2D1_RECT_F* tail_source_rect =
-                            bitmap_source_rect_or_null(d2d_->lane_note_tail_source_rects[lane_index]);
-                        const D2D1_RECT_F tail_bitmap_rect =
-                            gameplay_note_bitmap_dest_rect(tail_rect,
-                                                           note_hold_tail_bitmap,
-                                                           tail_source_rect,
-                                                           note_shape,
-                                                           note_image_aspect);
                         draw_gameplay_sprite(ctx,
                                              note_hold_tail_bitmap,
-                                             tail_bitmap_rect,
+                                             tail_visual_rect,
                                              visual_opacity,
                                              tail_source_rect,
                                              gameplay_lane_sprite_rotation(
@@ -2224,23 +2263,9 @@
                     }
                 }
 
-                const D2D1_RECT_F note_rect = D2D1::RectF(x0, y - head_half_h, x1, y + head_half_h);
                 if (render_head) {
-                    ID2D1Bitmap* head_bitmap = note.hold && note_hold_head_bitmap ? note_hold_head_bitmap : note_head_bitmap;
                     if (head_bitmap) {
-                        const D2D1_RECT_F* head_source_rect =
-                            note.hold
-                                ? bitmap_source_rect_or_null(
-                                      d2d_->lane_note_hold_head_source_rects[lane_index])
-                                : bitmap_source_rect_or_null(
-                                      d2d_->lane_note_head_source_rects[lane_index]);
-                        const D2D1_RECT_F bitmap_rect =
-                            gameplay_note_bitmap_dest_rect(note_rect,
-                                                           head_bitmap,
-                                                           head_source_rect,
-                                                           note_shape,
-                                                           note_image_aspect);
-                        draw_gameplay_sprite(ctx, head_bitmap, bitmap_rect, visual_opacity,
+                        draw_gameplay_sprite(ctx, head_bitmap, head_visual_rect, visual_opacity,
                                              head_source_rect,
                                              gameplay_lane_sprite_rotation(
                                                  gameplay_note_sprite_cache_.note_rotations,

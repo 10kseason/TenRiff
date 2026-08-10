@@ -581,7 +581,7 @@ std::string browse_for_lr2_course_save_file(const std::string& title) {
 
 std::string gauge_type_label(game::GaugeType type) {
     switch (type) {
-        case game::GaugeType::ExHard: return "EX-HARD";
+        case game::GaugeType::ExHard: return "EX";
         case game::GaugeType::Hard: return "HARD";
         case game::GaugeType::Easy: return "EASY";
         case game::GaugeType::Normal:
@@ -898,7 +898,7 @@ std::string MenuApp::ui_key_conversion_nk2_preset_label(std::string_view token) 
 std::string MenuApp::ui_gauge_label(std::string_view token) const {
     const std::string normalized = normalize_gauge_mode(std::string(token));
     if (normalized == "ex_hard") {
-        return ui_text("EX-Hard", "EX-하드");
+        return "EX";
     }
     if (normalized == "shift") {
         return ui_text("Gauge Shift", "게이지 시프트");

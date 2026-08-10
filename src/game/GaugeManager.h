@@ -36,7 +36,7 @@ struct GaugeConfig {
 // rules can opt in without changing persisted single-player gauge tuning.
 struct GaugeRuntimePolicy {
     // Dan / Session Mix gauge: keep the Normal gauge identity while using
-    // Ex-Hard recovery deltas and Easy damage deltas.
+    // recovery halfway between Normal and Hard plus Easy damage deltas.
     bool course_hybrid_deltas = false;
     bool hard_to_normal_shift = false;
     double hard_to_normal_threshold = 66.0;

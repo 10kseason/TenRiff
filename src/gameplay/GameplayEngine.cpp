@@ -71,7 +71,13 @@ GameplayEngine::GameplayEngine(const GameplayChart& chart, const GameplayConfig&
         for (std::size_t i = 0; i < kGaugeShiftPriority.size(); ++i) {
             gauge_shift_states_[i] = gauge_manager_.initialState(kGaugeShiftPriority[i]);
         }
-        gauge_state_ = gauge_shift_states_.front();
+        const auto start = std::find(
+            kGaugeShiftPriority.begin(), kGaugeShiftPriority.end(), config.initial_gauge);
+        gauge_shift_start_index_ = start == kGaugeShiftPriority.end()
+                                       ? 2u
+                                       : static_cast<std::size_t>(
+                                             std::distance(kGaugeShiftPriority.begin(), start));
+        gauge_state_ = gauge_shift_states_[gauge_shift_start_index_];
     } else {
         gauge_state_ = gauge_manager_.initialState(config.initial_gauge);
         if (config.initial_gauge_value.has_value()) {
@@ -251,7 +257,8 @@ void GameplayEngine::detonate_mine(const MineEvent& mine, int lane_number) {
     game::GaugeResult result{};
     if (mine.instant_kill) {
         if (gauge_shift_enabled_) {
-            for (auto& state : gauge_shift_states_) {
+            for (std::size_t i = gauge_shift_start_index_; i < gauge_shift_states_.size(); ++i) {
+                auto& state = gauge_shift_states_[i];
                 state.value = 0.0;
                 state.game_over = true;
             }
@@ -263,7 +270,8 @@ void GameplayEngine::detonate_mine(const MineEvent& mine, int lane_number) {
         result.game_over = true;
     } else if (gauge_shift_enabled_) {
         bool survivor_found = false;
-        for (auto& state : gauge_shift_states_) {
+        for (std::size_t i = gauge_shift_start_index_; i < gauge_shift_states_.size(); ++i) {
+            auto& state = gauge_shift_states_[i];
             gauge_manager_.applyDamage(state, mine.damage_percent, samples_to_ms(mine.sample));
             if (!survivor_found && !state.game_over) {
                 gauge_state_ = state;
@@ -304,7 +312,8 @@ void GameplayEngine::apply_judgement(game::Judgement judgement, double delta_ms,
     game::GaugeResult result{};
     if (gauge_shift_enabled_) {
         bool survivor_found = false;
-        for (auto& state : gauge_shift_states_) {
+        for (std::size_t i = gauge_shift_start_index_; i < gauge_shift_states_.size(); ++i) {
+            auto& state = gauge_shift_states_[i];
             gauge_manager_.applyJudgementWeighted(state, judgement, time_ms, weight);
             if (!survivor_found && !state.game_over) {
                 gauge_state_ = state;

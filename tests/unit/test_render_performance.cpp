@@ -220,6 +220,30 @@ TEST_CASE("active hold synthetic notes stay anchored to the judgement line") {
     }
 }
 
+TEST_CASE("long-note body touches the rendered head and stops at the tail edge") {
+    const auto body = tenriff::render::compute_gameplay_hold_body_geometry(
+        100.0f,
+        70.0f,
+        130.0f,
+        900.0f,
+        920.0f,
+        310.0f,
+        300.0f,
+        true,
+        true,
+        1.0);
+
+    CHECK(body.left == doctest::Approx(70.0f));
+    CHECK(body.right == doctest::Approx(130.0f));
+    CHECK(body.top == doctest::Approx(310.0f));
+    CHECK(body.bottom == doctest::Approx(900.0f));
+
+    const auto active = tenriff::render::compute_gameplay_hold_body_geometry(
+        100.0f, 70.0f, 130.0f, 900.0f, 920.0f, 310.0f, 300.0f, false, false, 1.0);
+    CHECK(active.top == doctest::Approx(300.0f));
+    CHECK(active.bottom == doctest::Approx(920.0f));
+}
+
 }  // namespace
 TEST_CASE("external ONNX background policy only targets low-resolution images in ONNX mode") {
     using tenriff::render::OnnxBackgroundUpscaler;
@@ -369,6 +393,10 @@ TEST_CASE("EX-HARD gauge uses its own near-black gray palette") {
     CHECK(tenriff::render::gameplay_gauge_color("NORMAL") == 0xFFB703u);
     CHECK(tenriff::render::gameplay_gauge_color("EX-HARD") !=
           tenriff::render::gameplay_gauge_color("HARD"));
+    CHECK(tenriff::render::song_select_gauge_text_color("ex_hard") == 0xFF4D6Du);
+    CHECK(tenriff::render::song_select_gauge_text_color("hard") == 0xFF9F43u);
+    CHECK(tenriff::render::song_select_gauge_text_color("normal") == 0xFFE45Eu);
+    CHECK(tenriff::render::song_select_gauge_text_color("easy") == 0x5EE59Au);
 }
 
 TEST_CASE("native digital keys separate held depth from hit glitch") {

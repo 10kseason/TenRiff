@@ -521,7 +521,9 @@ bool GameSession::initialize(const CommandLineOptions& options) {
     gameplay_config.input_offset_ms = config_.input_offset_ms;
     gameplay_config.practice_no_fail_enabled = practice_no_fail_enabled_;
     gameplay_config.one_miss_fail_enabled = one_miss_fail_enabled_;
-    gauge_shift_enabled_ = mode_result.settings.gauge == gameplay::GaugeMode::Shift;
+    // Gauge Shift is the standard runtime. The selected gauge is its starting
+    // tier; course gauges keep their dedicated carry-over policy below.
+    gauge_shift_enabled_ = true;
     switch (mode_result.settings.gauge) {
         case gameplay::GaugeMode::ExHard:
             gameplay_config.initial_gauge = game::GaugeType::ExHard;
@@ -545,7 +547,7 @@ bool GameSession::initialize(const CommandLineOptions& options) {
             gauge_shift_enabled_ = true;
             gameplay_config.initial_gauge = game::GaugeType::ExHard;
         } else if (auto gauge = parse_gauge_type(options.gauge)) {
-            gauge_shift_enabled_ = false;
+            gauge_shift_enabled_ = true;
             gameplay_config.initial_gauge = gauge.value();
         }
     }
@@ -726,11 +728,10 @@ bool GameSession::initialize(const CommandLineOptions& options) {
     engine_ = std::make_unique<gameplay::GameplayEngine>(chart_, gameplay_config);
     if (ghost_replay_enabled_) {
         gameplay::GameplayConfig ghost_config = gameplay_config;
-        ghost_config.gauge_shift_enabled = false;
+        ghost_config.gauge_shift_enabled = true;
         ghost_config.gauge_policy = {};
         if (!ghost_replay_source_.mode.gauge.empty()) {
             const bool ghost_gauge_shift = is_gauge_shift_token(ghost_replay_source_.mode.gauge);
-            ghost_config.gauge_shift_enabled = ghost_gauge_shift;
             if (ghost_gauge_shift) {
                 ghost_config.initial_gauge = game::GaugeType::ExHard;
             } else if (auto gauge = parse_gauge_type(ghost_replay_source_.mode.gauge)) {

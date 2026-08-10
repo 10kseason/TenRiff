@@ -255,16 +255,30 @@
                         gameplay_note_hold_color(rgb, preview_native_hold_body_opacity));
                 }
 
+                const D2D1_RECT_F note_rect =
+                    D2D1::RectF(x0, y - head_half_h, x1, y + head_half_h);
+                const float tail_y =
+                    std::max(field_layout.top + 20.0f, hit_line_y - field_height * 0.18f);
+                const D2D1_RECT_F tail_rect =
+                    D2D1::RectF(x0, tail_y - tail_half_h, x1, tail_y + tail_half_h);
+
                 if (draw_selected_hold_preview) {
-                    const float tail_y =
-                        std::max(field_layout.top + 20.0f, hit_line_y - field_height * 0.18f);
-                    const float hold_half_width = std::max(4.0f, note_width * 0.5f * hold_body_width_scale);
-                    const float head_body_inset = gameplay_hold_body_cap_inset(note_shape, head_half_h);
+                    const auto body_geometry = compute_gameplay_hold_body_geometry(
+                        lane_center,
+                        note_rect.left,
+                        note_rect.right,
+                        note_rect.top,
+                        y,
+                        tail_rect.bottom,
+                        tail_y,
+                        true,
+                        preview.show_hold_tail,
+                        hold_body_width_scale);
                     const D2D1_RECT_F hold_rect =
-                        D2D1::RectF(lane_center - hold_half_width,
-                                    tail_y,
-                                    lane_center + hold_half_width,
-                                    y - head_body_inset);
+                        D2D1::RectF(body_geometry.left,
+                                    body_geometry.top,
+                                    body_geometry.right,
+                                    body_geometry.bottom);
                     if (hold_rect.bottom > hold_rect.top) {
                         draw_gameplay_hold_body(ctx,
                                                 d2d_->d2d_factory.Get(),
@@ -272,16 +286,13 @@
                                                 lane_center,
                                                 y,
                                                 tail_y,
-                                                hold_half_width,
+                                                (body_geometry.right - body_geometry.left) * 0.5f,
                                                 preview.hold_tail_taper_enabled,
                                                 d2d_->note_hold_brush.Get());
                     }
                 }
 
                 if (draw_selected_hold_preview && preview.show_hold_tail && d2d_->note_fill_brush) {
-                    const float tail_y = std::max(field_layout.top + 20.0f, hit_line_y - field_height * 0.18f);
-                    const D2D1_RECT_F tail_rect =
-                        D2D1::RectF(x0, tail_y - tail_half_h, x1, tail_y + tail_half_h);
                     draw_note_primitive(ctx,
                                         tail_rect,
                                         d2d_->note_fill_brush.Get(),
@@ -291,7 +302,6 @@
                                         note_border_enabled,
                                         note_polygon_geometry);
                 }
-                const D2D1_RECT_F note_rect = D2D1::RectF(x0, y - head_half_h, x1, y + head_half_h);
                 if (d2d_->note_fill_brush) {
                     draw_note_primitive(ctx, note_rect, d2d_->note_fill_brush.Get(), d2d_->note_border_brush.Get(),
                                         0.85f, note_shape, note_border_enabled, note_polygon_geometry);

@@ -269,7 +269,7 @@ void MenuApp::populate_mode_settings_render_data(render::MenuRenderData& render)
                         : ui_text("Locked (Krrcream)", "잠김 (Krrcream)"),
                     settings_cursor_ == 8, render::MenuHitTargetKind::SettingsRow, 8,
                     false, nk2_selected);
-    append_menu_row(render.generic, ui_text("Gauge", "게이지"), ui_gauge_label(config_.mode.gauge), settings_cursor_ == 9,
+    append_menu_row(render.generic, ui_text("Gauge Shift Start", "게이지 시프트 시작"), ui_gauge_label(config_.mode.gauge), settings_cursor_ == 9,
                     render::MenuHitTargetKind::SettingsRow, 9, false, true);
     append_menu_row(render.generic, ui_text("Random", "랜덤"), ui_random_label(config_.mode.random), settings_cursor_ == 10,
                     render::MenuHitTargetKind::SettingsRow, 10, false, true);

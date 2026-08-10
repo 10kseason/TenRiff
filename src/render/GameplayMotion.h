@@ -35,6 +35,37 @@ struct GameplayNoteShapeExtents {
     float half_width = 0.0f;
     float half_height = 0.0f;
 };
+
+struct GameplayHoldBodyGeometry {
+    float left = 0.0f;
+    float top = 0.0f;
+    float right = 0.0f;
+    float bottom = 0.0f;
+};
+
+inline GameplayHoldBodyGeometry compute_gameplay_hold_body_geometry(
+    float lane_center,
+    float rendered_note_left,
+    float rendered_note_right,
+    float rendered_head_top,
+    float head_center_y,
+    float rendered_tail_bottom,
+    float tail_center_y,
+    bool render_head,
+    bool render_tail,
+    double width_scale) {
+    const float rendered_note_width = std::max(1.0f, rendered_note_right - rendered_note_left);
+    const float safe_width_scale = std::isfinite(width_scale)
+                                       ? static_cast<float>(std::clamp(width_scale, 0.50, 1.20))
+                                       : 1.0f;
+    const float half_width = std::max(0.5f, rendered_note_width * 0.5f * safe_width_scale);
+    return GameplayHoldBodyGeometry{
+        lane_center - half_width,
+        render_tail ? rendered_tail_bottom : tail_center_y,
+        lane_center + half_width,
+        render_head ? rendered_head_top : head_center_y,
+    };
+}
 struct GameplayTextPopAnimation {
     float scale = 1.0f;
     float offset_y = 0.0f;

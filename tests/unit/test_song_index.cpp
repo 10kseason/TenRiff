@@ -620,7 +620,7 @@ TEST_CASE("song scan hashes BMS and applies a local difficulty table with SHA-25
     CHECK(entry.difficulty_table_order == 1);
 }
 
-TEST_CASE("schema 12 cache persists hashes and reapplies the current local difficulty table") {
+TEST_CASE("schema 13 cache persists hashes and reapplies the current local difficulty table") {
     TempDirGuard temp;
     temp.path = make_temp_dir();
     REQUIRE_FALSE(temp.path.empty());
@@ -750,7 +750,7 @@ TEST_CASE("cached song index load drops non-BMS menu entries") {
     const auto index_path = temp.path / "song_index.json";
     write_file(index_path,
                "{\n"
-               "  \"version\": 12,\n"
+               "  \"version\": 13,\n"
                "  \"entries\": [\n"
                "    {\"path\":\"ten.osu\",\"title\":\"Ten\",\"artist\":\"A\",\"chart_name\":\"MX\",\"format\":\"osu\",\"key_count\":10,\"level\":12,\"rating\":8.25,\"bpm\":180,\"mtime\":1},\n"
                "    {\"path\":\"legacy.bms\",\"title\":\"Legacy\",\"artist\":\"C\",\"chart_name\":\"Another\",\"format\":\"bms\",\"layout_label\":\"5+1 SP\",\"key_count\":6,\"level\":11,\"rating\":6.75,\"bpm\":180,\"mtime\":1},\n"
@@ -785,7 +785,7 @@ TEST_CASE("cached song index filters non-BMS entries") {
     const auto index_path = temp.path / "song_index.json";
     write_file(index_path,
                "{\n"
-               "  \"version\": 12,\n"
+               "  \"version\": 13,\n"
                "  \"entries\": [\n"
                 "    {\"path\":\"ten.osu\",\"title\":\"Ten\",\"artist\":\"A\",\"chart_name\":\"MX\",\"format\":\"osu\",\"key_count\":10,\"level\":12,\"rating\":8.25,\"bpm\":180,\"mtime\":1},\n"
                 "    {\"path\":\"legacy.bms\",\"title\":\"Legacy\",\"artist\":\"C\",\"format\":\"bms\",\"key_count\":10,\"level\":11,\"rating\":6.75,\"bpm\":180,\"mtime\":1}\n"
@@ -800,14 +800,14 @@ TEST_CASE("cached song index filters non-BMS entries") {
     CHECK(result.index.entries.front().path == "legacy.bms");
 }
 
-TEST_CASE("streaming song index loader parses compact single-line schema 12 caches") {
+TEST_CASE("streaming song index loader parses compact single-line schema 13 caches") {
     TempDirGuard temp;
     temp.path = make_temp_dir();
     REQUIRE_FALSE(temp.path.empty());
 
     const auto index_path = temp.path / "song_index.json";
     write_file(index_path,
-               "{\"version\":12,\"entries\":["
+               "{\"version\":13,\"entries\":["
                "{\"path\":\"legacy.bms\",\"title\":\"Legacy\",\"artist\":\"Composer\",\"chart_name\":\"Hyper\",\"format\":\"bms\",\"layout_label\":\"7+1 SP\",\"key_count\":8,\"level\":12,\"rating\":7.5,\"bpm\":150,\"mtime\":1},"
                "{\"path\":\"ignored.osu\",\"title\":\"Ignored\",\"artist\":\"Mapper\",\"format\":\"osu\",\"key_count\":10,\"level\":13,\"rating\":8.5,\"bpm\":180,\"mtime\":2}"
                "]}");
@@ -846,6 +846,9 @@ TEST_CASE("song index save and load support UTF-8 cache paths") {
     entry.level = 12;
     entry.rating = 7.5;
     entry.bpm = 150.0;
+    entry.nps_min = 2.0;
+    entry.nps_median = 5.5;
+    entry.nps_max = 11.0;
     entry.mtime = 1;
     index.entries.push_back(entry);
 
@@ -864,6 +867,9 @@ TEST_CASE("song index save and load support UTF-8 cache paths") {
     CHECK(result.index.entries.front().layout_label == "7+1 SP");
     CHECK(result.index.entries.front().background_preview_path == entry.background_preview_path);
     CHECK(result.index.entries.front().audio_preview_path == entry.audio_preview_path);
+    CHECK(result.index.entries.front().nps_min == doctest::Approx(entry.nps_min));
+    CHECK(result.index.entries.front().nps_median == doctest::Approx(entry.nps_median));
+    CHECK(result.index.entries.front().nps_max == doctest::Approx(entry.nps_max));
 
     SongIndexOptions calculated_options;
     calculated_options.calculate_difficulty = true;
@@ -951,7 +957,7 @@ TEST_CASE("cached song index sanitizes control heavy metadata on load") {
     const auto index_path = temp.path / "song_index.json";
     write_file(index_path,
                "{\n"
-               "  \"version\": 12,\n"
+               "  \"version\": 13,\n"
                "  \"entries\": [\n"
                 "    {\"path\":\"legacy.bms\",\"title\":\"Bad\\nTitle\",\"artist\":\"Artist\\tName\",\"chart_name\":\"Hyper\\r\",\"format\":\"bms\\r\",\"key_count\":10,\"level\":11,\"rating\":6.75,\"bpm\":180,\"mtime\":1}\n"
                "  ]\n"
@@ -1162,13 +1168,13 @@ TEST_CASE("fast song scan retains only song-list metadata") {
                "#TITLE Fast Metadata\n"
                "#ARTIST Composer\n"
                "#PLAYLEVEL 12\n"
-               "#BPM 150\n"
+               "#BPM 240\n"
+               "#4K\n"
                "#STAGEFILE preview.png\n"
                "#WAV01 sample.wav\n"
                "#00111:01010101\n"
-               "#00112:01010101\n"
-               "#00113:01010101\n"
-               "#00114:01010101\n");
+               "#00211:0101\n"
+               "#00311:01\n");
 
     SongIndexOptions fast_options;
     fast_options.profile = tenriff::app::SongIndexProfile::Fast;
@@ -1185,7 +1191,10 @@ TEST_CASE("fast song scan retains only song-list metadata") {
     CHECK(entry.key_count == 4);
     CHECK(entry.level == 12);
     CHECK(entry.native_level == 12);
-    CHECK(entry.bpm == doctest::Approx(150.0));
+    CHECK(entry.bpm == doctest::Approx(240.0));
+    CHECK(entry.nps_min == doctest::Approx(1.0));
+    CHECK(entry.nps_median == doctest::Approx(2.0));
+    CHECK(entry.nps_max == doctest::Approx(4.0));
     CHECK(entry.md5.empty());
     CHECK(entry.sha256.empty());
     CHECK(entry.background_preview_path.empty());
@@ -1201,6 +1210,9 @@ TEST_CASE("fast song scan retains only song-list metadata") {
     CHECK(safe.entries.front().sha256.size() == 64u);
     CHECK_FALSE(safe.entries.front().background_preview_path.empty());
     CHECK_FALSE(safe.entries.front().audio_preview_path.empty());
+    CHECK(safe.entries.front().nps_min == doctest::Approx(entry.nps_min));
+    CHECK(safe.entries.front().nps_median == doctest::Approx(entry.nps_median));
+    CHECK(safe.entries.front().nps_max == doctest::Approx(entry.nps_max));
 }
 
 TEST_CASE("song index cache rejects Safe and Fast profile mismatches") {

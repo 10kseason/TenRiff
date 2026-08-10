@@ -8,7 +8,8 @@
 
 namespace tenriff::gameplay {
 
-inline constexpr int64_t kNativeScoreMaximum = 100'000;
+inline constexpr int kNativeScoreVersion = 2;
+inline constexpr int64_t kNativeScoreMaximum = 10'000;
 
 struct JudgementCounts {
     int pg = 0;
@@ -79,6 +80,8 @@ struct ResultStats {
 };
 
 [[nodiscard]] int64_t scale_native_score(int64_t raw_score, double multiplier);
+[[nodiscard]] int64_t native_score_from_counts(const JudgementCounts& counts, int total_notes);
+[[nodiscard]] int64_t normalize_stored_native_score(int64_t score, int score_version);
 [[nodiscard]] constexpr int64_t maximum_detail_score(int total_notes) {
     return total_notes > 0 ? static_cast<int64_t>(total_notes) * 5 : 0;
 }
