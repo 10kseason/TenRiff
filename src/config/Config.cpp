@@ -1374,7 +1374,7 @@ void apply_skin_visual_preset(SkinConfig& skin, std::string_view token) {
         skin.lane_background_opacity = 0.12;
         skin.visual_opacity = 1.00;
         skin.note_outline_opacity = 0.82;
-        skin.hold_body_opacity = 0.34;
+        skin.hold_body_opacity = 1.00;
         skin.judgement_line_glow_enabled = false;
         skin.key_pulse_enabled = false;
         skin.key_pulse_brightness = kSkinKeyPulseBrightnessMin;
@@ -1385,7 +1385,7 @@ void apply_skin_visual_preset(SkinConfig& skin, std::string_view token) {
         skin.lane_background_opacity = 0.26;
         skin.visual_opacity = 1.00;
         skin.note_outline_opacity = 0.95;
-        skin.hold_body_opacity = 0.28;
+        skin.hold_body_opacity = 1.00;
         skin.judgement_line_glow_enabled = true;
         skin.key_pulse_enabled = true;
         skin.key_pulse_brightness = kSkinKeyPulseBrightnessMax;
@@ -1396,7 +1396,7 @@ void apply_skin_visual_preset(SkinConfig& skin, std::string_view token) {
         skin.lane_background_opacity = 0.06;
         skin.visual_opacity = 0.82;
         skin.note_outline_opacity = 0.40;
-        skin.hold_body_opacity = 0.15;
+        skin.hold_body_opacity = 1.00;
         skin.judgement_line_glow_enabled = false;
         skin.key_pulse_enabled = false;
         skin.key_pulse_brightness = kSkinKeyPulseBrightnessMin;

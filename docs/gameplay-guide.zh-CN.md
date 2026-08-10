@@ -161,7 +161,7 @@ Rate 只改变歌曲播放速度和谱面时间轴；在相同 Hi-Speed 下，�
 
 OD8 换算统计为 Sudden Death 与旧 replay 兼容保留在 JSON 内部，但不再显示于 Gameplay 或 Result 画面。
 
-原生 Score 由判定 90,000 分 + 累积 Combo 10,000 分组成。全 `PG` full combo 恰好是 100,000 分；LN 视为一个对象，head / tail 各按 0.5 权重计算。
+Casual Score 最高为 10,000 分，判定权重为 `PG 6 / GR 3 / GD 1 / PR 0 / FAIL 0`。LN 视为一个对象，head / tail 各按 0.5 权重计算；Detail Score 保持独立计算。
 
 Accuracy 以 `PG / GR / GD / BD = 100 / 80 / 50 / 20%` 为基础，并根据每个判定区间内的 timing 最多再扣 0.5 个百分点。即使全 `PG`，只要 PG timing span 超过 8ms，也不会高于 99.5%。
 

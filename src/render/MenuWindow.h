@@ -140,10 +140,15 @@ struct SongSelectData {
     std::string selected_song_layout;
     std::string selected_song_chart_name;
     std::string selected_song_difficulty;
+    int selected_song_key_count = 0;
     double selected_song_bpm = 0.0;
-    std::string current_rate;
+    double selected_song_nps_min = 0.0;
+    double selected_song_nps_median = 0.0;
+    double selected_song_nps_max = 0.0;
+    std::string current_visual_latency;
     std::string current_hi_speed;
     std::string current_gauge;
+    std::string current_gauge_tier = "normal";
     std::string current_random;
     std::string selected_song_background_path;
     std::string background_upscale_mode = "off";
@@ -181,7 +186,7 @@ struct SongSelectData {
 
     std::string rank;
     int64_t best_score = 0;
-    int64_t max_score = 100'000;
+    int64_t max_score = 10'000;
     int64_t detail_score = 0;
     int64_t max_detail_score = 0;
     int max_combo = 0;
@@ -241,7 +246,7 @@ struct ResultScreenData {
     bool presentation_skipped = false;
 
     int64_t score = 0;
-    int64_t max_score = 100'000;
+    int64_t max_score = 10'000;
     int64_t detail_score = 0;
     int64_t max_detail_score = 0;
     bool pause_used = false;
@@ -346,7 +351,7 @@ struct GameplayHudData {
     double note_height_scale = 1.8;
     double lane_divider_width_scale = 1.0;
     double lane_center_gap_scale = 0.0;
-    double hold_body_width_scale = 0.60;
+    double hold_body_width_scale = 1.00;
     bool show_lane_dividers = true;
     double note_divider_gap_px = kGameplayNoteDividerGapPxDefault;
     bool show_judgement_line = true;
@@ -371,7 +376,7 @@ struct GameplayHudData {
     bool black_playfield_enabled = false;
     double visual_opacity = 0.96;
     double note_outline_opacity = 0.78;
-    double hold_body_opacity = 0.55;
+    double hold_body_opacity = 1.00;
     double visual_offset_ms = 0.0;
 
     double bpm = 0.0;
@@ -498,7 +503,7 @@ struct SkinPreviewData {
     double note_height_scale = 1.8;
     double lane_divider_width_scale = 1.0;
     double lane_center_gap_scale = 0.0;
-    double hold_body_width_scale = 0.60;
+    double hold_body_width_scale = 1.00;
     bool show_lane_dividers = true;
     double note_divider_gap_px = kGameplayNoteDividerGapPxDefault;
     bool show_judgement_line = true;
@@ -523,7 +528,7 @@ struct SkinPreviewData {
     bool black_playfield_enabled = false;
     double visual_opacity = 0.96;
     double note_outline_opacity = 0.78;
-    double hold_body_opacity = 0.55;
+    double hold_body_opacity = 1.00;
     std::array<uint32_t, kGameplayHudMaxLanes> lane_colors{};
 };
 

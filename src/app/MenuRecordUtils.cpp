@@ -241,11 +241,7 @@ int64_t calculate_score(const gameplay::ResultStats& stats) {
     if (stats.raw_score > 0) {
         return stats.raw_score;
     }
-    int64_t score = static_cast<int64_t>(stats.counts.pg) * 1000 +
-                    static_cast<int64_t>(stats.counts.gr) * 700 +
-                    static_cast<int64_t>(stats.counts.gd) * 300;
-    score -= static_cast<int64_t>(stats.counts.bd) * 200;
-    return std::max<int64_t>(0, score);
+    return gameplay::native_score_from_counts(stats.counts, stats.total_notes);
 }
 
 int64_t calculate_detail_score(const gameplay::ResultStats& stats) {
@@ -383,6 +379,7 @@ std::optional<ParsedResultRecord> parse_result_file(const std::filesystem::path&
     }
 
     ParsedResultRecord out;
+    const int score_version = read_json_int(*root, "version", 1);
     out.chart_path = read_json_string(*root, "chart_path");
     out.chart_format = read_json_string(*root, "chart_format");
     out.created_utc = read_json_string(*root, "created_utc");
@@ -410,8 +407,12 @@ std::optional<ParsedResultRecord> parse_result_file(const std::filesystem::path&
     out.stats.max_combo = read_json_int(*stats_obj, "max_combo", 0);
     out.stats.total_notes = read_json_int(*stats_obj, "total_notes", 0);
     out.stats.total_combo_steps = read_json_int(*stats_obj, "total_combo_steps", out.stats.total_notes);
+    const bool has_stored_raw_score = find_json_value(*stats_obj, "raw_score") != nullptr;
     out.stats.raw_score = static_cast<int64_t>(std::llround(
         read_json_number(*stats_obj, "raw_score", static_cast<double>(calculate_score(out.stats)))));
+    if (has_stored_raw_score) {
+        out.stats.raw_score = gameplay::normalize_stored_native_score(out.stats.raw_score, score_version);
+    }
     out.stats.raw_score_accumulator = out.stats.raw_score;
     out.stats.judgement_score_points = read_json_number(*stats_obj, "judgement_score_points", 0.0);
     out.stats.combo_score_units = static_cast<int64_t>(std::llround(
@@ -514,10 +515,14 @@ std::optional<ParsedResultRecord> parse_result_file(const std::filesystem::path&
         out.stats.m2_delta_ms = stddev_delta_ms * stddev_delta_ms *
                                 static_cast<double>(out.stats.delta_samples - 1);
     }
+    const bool has_stored_final_score = find_json_value(*root, "final_score") != nullptr;
     out.final_score = static_cast<int64_t>(std::llround(read_json_number(
         *root,
         "final_score",
         static_cast<double>(clamp_final_score(out.stats.raw_score, out.score_multiplier)))));
+    if (has_stored_final_score) {
+        out.final_score = gameplay::normalize_stored_native_score(out.final_score, score_version);
+    }
     out.game_over = read_json_bool(*root, "game_over", infer_game_over(out.stats));
     // Normalize legacy ASSIST AUTOPLAY ... CLEAR exports at load time so they
     // cannot keep an old clear lamp or outrank a failed manual play.

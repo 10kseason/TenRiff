@@ -239,8 +239,11 @@
                              presentation.information);
         }
 
+        const double score_maximum = data.result.max_score > 0
+                                         ? static_cast<double>(data.result.max_score)
+                                         : 1.0;
         const float score_quality = static_cast<float>(
-            std::clamp(static_cast<double>(data.result.score) / 100'000.0, 0.0, 1.0));
+            std::clamp(static_cast<double>(data.result.score) / score_maximum, 0.0, 1.0));
         const float failed_completion = result_success ? 1.0f : 0.76f;
         const float prism_completion = presentation.prism * failed_completion;
         const float prism_top = 116.0f + (1.0f - score_quality) * 20.0f;

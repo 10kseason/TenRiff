@@ -630,7 +630,7 @@ void MenuApp::populate_quick_setup_render_data(render::MenuRenderData& render) {
                     true,
                     false);
     append_menu_row(render.generic,
-                    ui_text("Gauge", "게이지"),
+                    ui_text("Gauge Shift Start", "게이지 시프트 시작"),
                     ui_gauge_label(config_.mode.gauge),
                     settings_cursor_ == 1,
                     render::MenuHitTargetKind::SettingsRow,
@@ -2210,8 +2210,8 @@ void MenuApp::populate_help_overlay(render::HelpOverlayData& target) const {
                         "LR2 코스는 차트 MD5 순서를 유지하며, 누락 채보가 있으면 시작하지 않습니다."),
                 ui_text("Browse for or drop an .lr2crs file; the last loaded path is remembered.",
                         ".lr2crs 파일을 찾거나 드롭하면 마지막으로 불러온 경로를 기억합니다."),
-                ui_text("All course runs share one gauge: Ex-Hard recovery, Easy damage, and failure at zero.",
-                        "모든 코스는 EX-HARD 회복량과 EASY 감소량을 쓰며 0에서 실패하는 게이지를 이어 씁니다."),
+                ui_text("All course runs share one gauge: midway Normal-Hard recovery, Easy damage, and failure at zero.",
+                        "모든 코스는 NORMAL과 HARD 중간 회복량, EASY 감소량을 쓰며 0에서 실패하는 게이지를 이어 씁니다."),
             };
             target.footer = ui_text("Result Enter continues; Result Esc or Backspace ends the mix.",
                                     "Result에서 Enter는 계속, Esc 또는 Backspace는 세션 종료입니다.");

@@ -117,11 +117,7 @@ int64_t derived_raw_score(const ResultStats& stats) {
     if (stats.raw_score > 0) {
         return stats.raw_score;
     }
-    int64_t score = static_cast<int64_t>(stats.counts.pg) * 1000 +
-                    static_cast<int64_t>(stats.counts.gr) * 700 +
-                    static_cast<int64_t>(stats.counts.gd) * 300;
-    score -= static_cast<int64_t>(stats.counts.bd) * 200;
-    return std::max<int64_t>(0, score);
+    return native_score_from_counts(stats.counts, stats.total_notes);
 }
 
 int64_t clamp_final_score(int64_t raw_score, double multiplier) {
@@ -462,7 +458,11 @@ ReplayLoadResult load_replay_json(const std::string& path) {
         replay.stats.max_combo = read_json_int(*stats, "max_combo", replay.stats.combo);
         replay.stats.total_notes = read_json_int(*stats, "total_notes", 0);
         replay.stats.total_combo_steps = read_json_int(*stats, "total_combo_steps", replay.stats.total_notes);
+        const bool has_stored_raw_score = find_json_value(*stats, "raw_score") != nullptr;
         replay.stats.raw_score = read_json_i64(*stats, "raw_score", derived_raw_score(replay.stats));
+        if (has_stored_raw_score) {
+            replay.stats.raw_score = normalize_stored_native_score(replay.stats.raw_score, replay.version);
+        }
         replay.stats.raw_score_accumulator = replay.stats.raw_score;
         replay.stats.judgement_score_points = read_json_number(*stats, "judgement_score_points", 0.0);
         replay.stats.combo_score_units = read_json_i64(*stats, "combo_score_units", 0);
@@ -554,8 +554,12 @@ ReplayLoadResult load_replay_json(const std::string& path) {
         }
     }
 
+    const bool has_stored_final_score = find_json_value(*root, "final_score") != nullptr;
     replay.final_score = read_json_i64(*root, "final_score",
                                        clamp_final_score(replay.stats.raw_score, replay.score_multiplier));
+    if (has_stored_final_score) {
+        replay.final_score = normalize_stored_native_score(replay.final_score, replay.version);
+    }
     result.replay = std::move(replay);
     return result;
 }

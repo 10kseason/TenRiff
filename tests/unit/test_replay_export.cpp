@@ -111,6 +111,8 @@ TEST_CASE("replay export writes JSON with trace events") {
     REQUIRE(parsed.root.has_value());
     const auto* root = parsed.root->as_object();
     REQUIRE(root != nullptr);
+    CHECK(root->find("version")->second.as_number() ==
+          doctest::Approx(static_cast<double>(tenriff::gameplay::kNativeScoreVersion)));
 
     auto trace_it = root->find("trace");
     REQUIRE(trace_it != root->end());
@@ -241,6 +243,8 @@ TEST_CASE("result export writes JSON with replay reference") {
     REQUIRE(parsed.root.has_value());
     const auto* root = parsed.root->as_object();
     REQUIRE(root != nullptr);
+    CHECK(root->find("version")->second.as_number() ==
+          doctest::Approx(static_cast<double>(tenriff::gameplay::kNativeScoreVersion)));
 
     auto player_name_it = root->find("player_name");
     REQUIRE(player_name_it != root->end());
@@ -317,8 +321,8 @@ TEST_CASE("legacy result parsing falls back to derived score metadata") {
     CHECK(parsed->key_conversion_note_add_mode == "add_25_plus");
     CHECK(parsed->rate_multiplier == doctest::Approx(1.0));
     CHECK(parsed->score_multiplier == doctest::Approx(1.0));
-    CHECK(parsed->stats.raw_score == 1800);
-    CHECK(parsed->final_score == 1800);
+    CHECK(parsed->stats.raw_score == 4167);
+    CHECK(parsed->final_score == 4167);
     CHECK_FALSE(parsed->pause_used);
 
     std::error_code ec;
@@ -379,8 +383,8 @@ TEST_CASE("legacy replay parsing falls back to derived final score") {
     CHECK(parsed->mods.empty());
     CHECK(parsed->rate_multiplier == doctest::Approx(1.0));
     CHECK(parsed->score_multiplier == doctest::Approx(1.0));
-    CHECK(parsed->raw_score == 1500);
-    CHECK(parsed->final_score == 1500);
+    CHECK(parsed->raw_score == 5000);
+    CHECK(parsed->final_score == 5000);
     CHECK_FALSE(parsed->pause_used);
 
     std::error_code ec;
@@ -424,7 +428,8 @@ TEST_CASE("legacy replay loading preserves removed conversion Note Add metadata"
     CHECK_FALSE(loaded.replay->mode.random_seed.has_value());
     CHECK(loaded.replay->trace.lane_count == 4);
     CHECK(loaded.replay->trace.events.size() == 2u);
-    CHECK(loaded.replay->final_score == 2700);
+    CHECK(loaded.replay->stats.raw_score == 270);
+    CHECK(loaded.replay->final_score == 270);
 
     std::error_code ec;
     std::filesystem::remove(path, ec);

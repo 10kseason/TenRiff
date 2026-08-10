@@ -39,7 +39,7 @@ struct ReplayModeSettings {
 };
 
 struct ReplayFile {
-    int version = 1;
+    int version = kNativeScoreVersion;
     std::string chart_path;
     std::string chart_format;
     std::string created_utc;
@@ -59,7 +59,7 @@ struct ReplayFile {
 };
 
 struct ResultFile {
-    int version = 1;
+    int version = kNativeScoreVersion;
     std::string chart_path;
     std::string chart_format;
     std::string created_utc;

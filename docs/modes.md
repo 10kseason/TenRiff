@@ -80,10 +80,10 @@
 - 적용 순서: key-mode 변환(nK2 목표 레이아웃 보조 노트 생성 포함) → DP Flip → Mirror/RR/FR/SR → Note Add → LN/Full Tap 구조 변환
 
 ## 게이지 규칙
-- 고정 게이지(`ex_hard / hard / normal / easy`)는 `100%`에서 시작하고 `0%`에 도달하면 즉시 실패하며 타입이 바뀌지 않습니다.
-- `shift`는 EX-Hard / Hard / Normal / Easy를 각각 100%에서 병렬 계산하고, 현재 tier가 탈락하면 같은 판정 이력을 누적한 다음 생존 tier를 선택하며 종료 시 가장 높은 생존 tier로 확정합니다.
-- `ex_hard`는 Hard보다 회복이 낮고 `BAD`/`POOR` 손실이 더 큰 도전용 게이지입니다.
-- clear status는 고정 게이지 결과와 `GAUGE SHIFT EX-HARD / HARD / NORMAL / EASY CLEAR`로 최종 생존 tier를 구분합니다.
+- `ex_hard / hard / normal / easy`는 항상 적용되는 Gauge Shift의 시작 등급이며 모두 `100%`에서 시작합니다.
+- 선택한 시작 등급부터 Easy까지를 병렬 계산하고, 현재 tier가 탈락하면 같은 판정 이력을 누적한 다음 생존 tier를 선택하며 종료 시 가장 높은 생존 tier로 확정합니다.
+- `ex_hard`는 화면에서 `EX`로 표시하며 Hard보다 회복이 낮고 `BAD`/`POOR` 손실이 더 큰 도전용 시작 등급입니다.
+- clear status는 `GAUGE SHIFT EX / HARD / NORMAL / EASY CLEAR`로 최종 생존 tier를 구분합니다.
 - `Sudden Death (1 MISS)`는 게이지 종류가 아니라 첫 OD8 환산 객체 `MISS`에서 현재 게이지를 0으로 만들고 즉시 종료하는 별도 실패 규칙입니다.
 
 ## 구현 위치

@@ -9,8 +9,8 @@ TEST_CASE("Song Select gauge clicks follow the player-facing gauge order") {
     CHECK(cycle_gauge_mode("easy", 1) == "normal");
     CHECK(cycle_gauge_mode("normal", 1) == "hard");
     CHECK(cycle_gauge_mode("hard", 1) == "ex_hard");
-    CHECK(cycle_gauge_mode("ex_hard", 1) == "shift");
-    CHECK(cycle_gauge_mode("easy", -1) == "shift");
+    CHECK(cycle_gauge_mode("ex_hard", 1) == "easy");
+    CHECK(cycle_gauge_mode("easy", -1) == "ex_hard");
 }
 
 TEST_CASE("Song Select random clicks cycle both directions") {
@@ -26,23 +26,23 @@ TEST_CASE("Song Select random clicks cycle both directions") {
 
 TEST_CASE("Song Select quick settings map left and right clicks to all four values") {
     tenriff::config::RuntimeConfig runtime;
-    runtime.speed.rate = 1.0;
+    runtime.visual_offset_ms = 0.0;
     runtime.speed.hi_speed = 13.25;
-    runtime.mode.gauge = "shift";
+    runtime.mode.gauge = "ex_hard";
     runtime.mode.random = "off";
 
     CHECK(tenriff::app::adjust_song_quick_setting(runtime, 0, 1));
-    CHECK(runtime.speed.rate == doctest::Approx(1.05));
+    CHECK(runtime.visual_offset_ms == doctest::Approx(5.0));
     CHECK(tenriff::app::adjust_song_quick_setting(runtime, 0, -1));
-    CHECK(runtime.speed.rate == doctest::Approx(1.0));
+    CHECK(runtime.visual_offset_ms == doctest::Approx(0.0));
     CHECK(tenriff::app::adjust_song_quick_setting(runtime, 1, 1));
-    CHECK(runtime.speed.hi_speed == doctest::Approx(13.5));
+    CHECK(runtime.speed.hi_speed == doctest::Approx(13.26));
     CHECK(tenriff::app::adjust_song_quick_setting(runtime, 1, -1));
     CHECK(runtime.speed.hi_speed == doctest::Approx(13.25));
     CHECK(tenriff::app::adjust_song_quick_setting(runtime, 2, 1));
     CHECK(runtime.mode.gauge == "easy");
     CHECK(tenriff::app::adjust_song_quick_setting(runtime, 2, -1));
-    CHECK(runtime.mode.gauge == "shift");
+    CHECK(runtime.mode.gauge == "ex_hard");
     CHECK(tenriff::app::adjust_song_quick_setting(runtime, 3, 1));
     CHECK(runtime.mode.random == "mirror");
     CHECK(tenriff::app::adjust_song_quick_setting(runtime, 3, -1));

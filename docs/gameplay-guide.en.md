@@ -162,7 +162,7 @@ The current default judgement labels use the following abbreviations:
 
 OD8 conversion statistics remain inside JSON for Sudden Death and legacy replay compatibility, but are not shown on Gameplay or Result screens.
 
-Native Score is 90,000 judgement points plus 10,000 cumulative-combo points. An all-`PG` full combo is exactly 100,000, and an LN is one object whose head and tail each carry 0.5 weight.
+Casual Score has a 10,000 maximum and uses `PG 6 / GR 3 / GD 1 / PR 0 / FAIL 0` judgement weights. An LN is one object whose head and tail each carry 0.5 weight, while Detail Score keeps its separate calculation.
 
 Accuracy starts from `PG / GR / GD / BD = 100 / 80 / 50 / 20%` and removes up to another 0.5 percentage points according to timing inside each judgement band. Even an all-`PG` run cannot exceed 99.5% when its PG timing span is wider than 8ms.
 

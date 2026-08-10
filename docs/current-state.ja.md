@@ -129,7 +129,7 @@
   - `Gauge Shift` は EX-Hard / Hard / Normal / Easy をそれぞれ 100% から独立して並列計算し、現在の tier が 0% で脱落すると同じ判定履歴を累積した次の生存 tier を選び、終了時の最上位生存 tier で確定する
   - `Sudden Death (1 MISS)` は最初の OD8 換算 object `MISS` で即失敗する。native `BAD` timing だけでは発動せず、空打ちの `POOR` も無視し、Practice No-Fail とは排他的に動作する
   - OD8 換算は Sudden Death と既存 replay 互換用の内部統計として維持し、Gameplay / Result UI は TenRiff native score のみ表示
-  - native score は judgement 90,000 点 + 累積 combo 10,000 点で正規化され、全 PG の full combo は正確に 100,000 点。LN head / tail は各 0.5 weight で 1 object を構成する
+  - casual score は最大 10,000 点で、judgement weight は `PG 6 / GR 3 / GD 1 / PR 0 / FAIL 0`。LN head / tail は各 0.5 weight で 1 object を構成し、detail score は別体系を維持する
   - accuracy は PG/GR/GD/BD の基準 100/80/50/20% から各 judgement band 内 timing に応じて最大 0.5 percentage point を減算し、PG timing span が 8ms を超える全 PG run は 99.5% 上限となる
   - rank 境界は `<75 F / 75 B / 80.5 A / 86.5 A+ / 90 S / 95.5 S+ / 98 AA / 99 SS / 99.75 SSS`
   - live gameplay の `ClockSync` は大きな Windows QPC 絶対値ではなく centered anchor regression を使い、継続する clock discontinuity 後に自動 rebase する

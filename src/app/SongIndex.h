@@ -28,6 +28,9 @@ struct SongEntry {
     int native_level = 0;
     double rating = 0.0;
     double bpm = 0.0;
+    double nps_min = 0.0;
+    double nps_median = 0.0;
+    double nps_max = 0.0;
     int64_t mtime = 0;
     std::uint64_t file_size = 0;
     std::string md5;

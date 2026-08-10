@@ -1,10 +1,10 @@
-TenRiff source package notes (`1.3.10`)
+TenRiff source package notes (`1.4.0`)
 
 - This folder is a curated source-only staging area for public/open-source distribution.
 - It intentionally excludes local build trees, packaged binaries, caches, user profiles, logs, and private working notes.
 - Internal agent workflow files such as `AGENTS.md` are not part of the public source bundle.
 - The included `SOURCE_PACKAGE_SCOPE.txt` file defines the exact include/exclude rules used for the staged bundle.
-- The current source line is `1.3.10`; it fixes narrow LR2 gear panels, maps LR2 playskins to the intended 5K/7K/10K CSV layouts, imports and authors ordered LR2 courses, and carries the Dan/Session Mix hybrid gauge across stages.
+- The current source line is `1.4.0`; it adds 10,000-point casual scoring, continuous Dan/Session Mix gauge behavior, corrected long-note bodies, NPS indexing, and a larger information-dense Song Select lobby with fine 0.01 menu hi-speed control.
 - It supports BMS-family charts, 4K through 14K key modes, and native/LR2/TenRiff skins, keeps MPG/MPEG video BGA decoding with an FFmpeg fallback, and exposes an External ONNX Upscaler that remains off until the user enables it and acknowledges the high-spec warning.
 - The repository license is MIT. Keep the top-level `LICENSE` file with any redistributed source bundle.
 - The source bundle includes the code/docs/dependencies needed for a standalone Windows configure/build, but it does not ship the local `10k-calc/` reference checkout or `external/llama.cpp/`.

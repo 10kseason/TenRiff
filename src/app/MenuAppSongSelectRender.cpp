@@ -450,10 +450,15 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
                 "--");
             render.song_select.selected_song_chart_name = safe_ui_text(entry->chart_name);
             render.song_select.selected_song_difficulty = safe_ui_text(song_difficulty_label(*entry));
+            render.song_select.selected_song_key_count = entry->key_count;
             render.song_select.selected_song_bpm = entry->bpm;
-            render.song_select.current_rate = format_multiplier(config_.speed.rate);
+            render.song_select.selected_song_nps_min = entry->nps_min;
+            render.song_select.selected_song_nps_median = entry->nps_median;
+            render.song_select.selected_song_nps_max = entry->nps_max;
+            render.song_select.current_visual_latency = format_signed_offset_ms(config_.visual_offset_ms);
             render.song_select.current_hi_speed = format_decimal(config_.speed.hi_speed);
             render.song_select.current_gauge = ui_gauge_label(config_.mode.gauge);
+            render.song_select.current_gauge_tier = normalize_gauge_mode(config_.mode.gauge);
             render.song_select.current_random = ui_random_label(config_.mode.random);
             render.song_select.selected_song_background_path = selected_song_background_preview_path();
             render.song_select.background_upscale_mode = config_.graphics.background_upscale_mode;

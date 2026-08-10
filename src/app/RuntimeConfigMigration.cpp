@@ -57,6 +57,11 @@ constexpr int kLegacyGraphicsRefreshHz = 1050;
 constexpr int kCurrentDefaultGraphicsRefreshHz = 300;
 constexpr double kLegacyNoteHeightScale = 1.0;
 constexpr double kCurrentNoteHeightScale = 1.8;
+constexpr double kLegacyHoldBodyWidthScale = 0.60;
+constexpr double kLegacyHoldBodyOpacity = 0.55;
+constexpr double kLegacyClassicHoldBodyOpacity = 0.34;
+constexpr double kLegacyNeonHoldBodyOpacity = 0.28;
+constexpr double kLegacyMinimalHoldBodyOpacity = 0.15;
 constexpr double kJudgeWindowToleranceMs = 0.001;
 constexpr double kInputDebounceToleranceMs = 0.001;
 constexpr double kResultTailToleranceMs = 0.001;
@@ -270,6 +275,23 @@ bool migrate_bms_first_runtime_config(config::RuntimeConfig& config) {
     }
     if (std::abs(config.skin.note_height_scale - kLegacyNoteHeightScale) <= kSkinScaleTolerance) {
         config.skin.note_height_scale = kCurrentNoteHeightScale;
+        changed = true;
+    }
+    if (std::abs(config.skin.hold_body_width_scale - kLegacyHoldBodyWidthScale) <= kSkinScaleTolerance) {
+        config.skin.hold_body_width_scale = config::kHoldBodyWidthScaleDefault;
+        changed = true;
+    }
+    const std::string visual_preset = to_lower_copy(config.skin.visual_preset);
+    const bool legacy_preset_hold_opacity =
+        (visual_preset == "classic" &&
+         std::abs(config.skin.hold_body_opacity - kLegacyClassicHoldBodyOpacity) <= kSkinScaleTolerance) ||
+        (visual_preset == "neon" &&
+         std::abs(config.skin.hold_body_opacity - kLegacyNeonHoldBodyOpacity) <= kSkinScaleTolerance) ||
+        (visual_preset == "minimal" &&
+         std::abs(config.skin.hold_body_opacity - kLegacyMinimalHoldBodyOpacity) <= kSkinScaleTolerance);
+    if (std::abs(config.skin.hold_body_opacity - kLegacyHoldBodyOpacity) <= kSkinScaleTolerance ||
+        legacy_preset_hold_opacity) {
+        config.skin.hold_body_opacity = config::kSkinHoldBodyOpacityDefault;
         changed = true;
     }
     for (auto& [mode, value] : config.skin.note_height_scales) {

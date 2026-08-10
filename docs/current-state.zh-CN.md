@@ -129,7 +129,7 @@
   - `Gauge Shift` 会让 EX-Hard / Hard / Normal / Easy 分别从 100% 开始独立并行计算；当前 tier 到达 0% 后选择已累计相同判定历史的下一档存活 tier，并以结束时最高的存活 tier 为最终结果
   - `Sudden Death (1 MISS)` 会在首次 OD8 换算对象 `MISS` 时立即失败；仅原生 `BAD` timing 不会触发，空按产生的 `POOR` 也不触发，并且该选项与 Practice No-Fail 互斥
   - OD8 换算仅作为 Sudden Death 与旧 replay 兼容的内部统计保留；Gameplay 与 Result UI 只显示 TenRiff 原生分数
-  - 原生分数按判定 90,000 分 + 累积 combo 10,000 分归一化；全 PG full combo 恰好为 100,000 分，LN head / tail 各按 0.5 权重组成一个对象
+  - casual score 最高为 10,000 分，判定权重为 `PG 6 / GR 3 / GD 1 / PR 0 / FAIL 0`；LN head / tail 各按 0.5 权重组成一个对象，detail score 保持独立
   - accuracy 以 PG/GR/GD/BD 的 100/80/50/20% 为基础，在每个判定区间内按 timing 最多再扣 0.5 个百分点；若全 PG 的 timing span 超过 8ms，则上限为 99.5%
   - rank 边界为 `<75 F / 75 B / 80.5 A / 86.5 A+ / 90 S / 95.5 S+ / 98 AA / 99 SS / 99.75 SSS`
   - live gameplay 的 `ClockSync` 使用 centered anchor regression，避免大型 Windows QPC 绝对值造成精度损失，并在持续 clock discontinuity 后自动 rebase

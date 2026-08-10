@@ -36,7 +36,7 @@ namespace tenriff::app {
 
 namespace {
 
-constexpr int kSongIndexVersion = 12;
+constexpr int kSongIndexVersion = 13;
 constexpr std::uintmax_t kMaxMetadataChartFileBytes = 8u * 1024u * 1024u;
 
 bool cancel_requested(const SongIndexCancelCallback& cancel) {
@@ -447,6 +447,59 @@ std::optional<chart::OsuDifficultyMetrics> calculate_bms_difficulty(const chart:
     return chart::calculate_osu_mania_difficulty(difficulty_chart, options);
 }
 
+struct BmsNpsStats {
+    double minimum = 0.0;
+    double median = 0.0;
+    double maximum = 0.0;
+};
+
+std::optional<BmsNpsStats> calculate_bms_nps_stats(const chart::BmsChart& parsed_chart) {
+    chart::BmsChartNormalizer normalizer;
+    auto normalized = normalizer.normalize(parsed_chart);
+    if (!normalized.success()) {
+        return std::nullopt;
+    }
+
+    // Build at 1 kHz so gameplay note start samples map directly to milliseconds.
+    chart::BmsTimelineBuilder timeline_builder;
+    auto timeline = timeline_builder.build(normalized.chart, 1000);
+    if (!timeline.success()) {
+        return std::nullopt;
+    }
+
+    const auto gameplay = build_bms_gameplay_chart(timeline.timeline, parsed_chart, 1.0);
+    if (gameplay.chart.notes.empty()) {
+        return std::nullopt;
+    }
+
+    std::unordered_map<int64_t, int> notes_per_occupied_second;
+    for (const auto& note : gameplay.chart.notes) {
+        const int64_t second = std::max<int64_t>(0, note.start_sample) / 1000;
+        ++notes_per_occupied_second[second];
+    }
+
+    std::vector<int> samples;
+    samples.reserve(notes_per_occupied_second.size());
+    for (const auto& [second, count] : notes_per_occupied_second) {
+        (void)second;
+        samples.push_back(count);
+    }
+    if (samples.empty()) {
+        return std::nullopt;
+    }
+    std::sort(samples.begin(), samples.end());
+
+    BmsNpsStats stats;
+    stats.minimum = static_cast<double>(samples.front());
+    stats.maximum = static_cast<double>(samples.back());
+    const std::size_t middle = samples.size() / 2;
+    stats.median = (samples.size() % 2u) != 0u
+                       ? static_cast<double>(samples[middle])
+                       : (static_cast<double>(samples[middle - 1]) +
+                          static_cast<double>(samples[middle])) * 0.5;
+    return stats;
+}
+
 SongEntry build_bms_entry(std::string relative_path,
                           const std::filesystem::path& full_path,
                           int64_t mtime,
@@ -472,7 +525,10 @@ SongEntry build_bms_entry(std::string relative_path,
     parser_options.retain_wav_bmp = !minimal_metadata;
     parser_options.retain_unknown_headers = false;
     parser_options.retain_nonessential_commands = false;
-    parser_options.metadata_only = minimal_metadata;
+    // Fast indexing still needs timing and note tokens for NPS statistics. It
+    // remains lightweight by excluding media maps, unknown headers, hashes,
+    // previews and native difficulty calculation.
+    parser_options.metadata_only = false;
     auto parsed = parser.parseFile(full_path.u8string(), parser_options);
     if (!parsed.success()) {
         warnings.push_back("Failed to parse BMS: " + entry.path);
@@ -518,6 +574,11 @@ SongEntry build_bms_entry(std::string relative_path,
     }
 
     entry.bpm = parsed.chart.base_bpm;
+    if (const auto nps = calculate_bms_nps_stats(parsed.chart); nps.has_value()) {
+        entry.nps_min = nps->minimum;
+        entry.nps_median = nps->median;
+        entry.nps_max = nps->maximum;
+    }
     if (!minimal_metadata) {
         entry.background_preview_path =
             menu_songs::resolve_bms_background_preview_path(full_path, parsed.chart);
@@ -970,7 +1031,7 @@ private:
     std::istream& stream_;
     std::string error_;
     int version_ = 0;
-    // Schema-12 caches predate this field and always calculated LV/CR.
+    // Caches without this field predate optional native difficulty calculation.
     bool cache_calculates_difficulty_ = true;
     // Caches created before Fast became metadata-minimal are full Safe caches.
     bool cache_uses_minimal_metadata_ = false;
@@ -1358,6 +1419,24 @@ private:
                     return false;
                 }
                 entry.bpm = value.value();
+            } else if (*key == "nps_min") {
+                auto value = parse_number();
+                if (!value.has_value() || !std::isfinite(value.value()) || value.value() < 0.0) {
+                    return false;
+                }
+                entry.nps_min = value.value();
+            } else if (*key == "nps_median") {
+                auto value = parse_number();
+                if (!value.has_value() || !std::isfinite(value.value()) || value.value() < 0.0) {
+                    return false;
+                }
+                entry.nps_median = value.value();
+            } else if (*key == "nps_max") {
+                auto value = parse_number();
+                if (!value.has_value() || !std::isfinite(value.value()) || value.value() < 0.0) {
+                    return false;
+                }
+                entry.nps_max = value.value();
             } else if (*key == "mtime") {
                 auto value = parse_number();
                 if (!value.has_value()) {
@@ -1583,6 +1662,9 @@ bool save_song_index(const std::string& path,
         file << ",\"native_level\":" << entry.native_level;
         file << ",\"rating\":" << entry.rating;
         file << ",\"bpm\":" << entry.bpm;
+        file << ",\"nps_min\":" << entry.nps_min;
+        file << ",\"nps_median\":" << entry.nps_median;
+        file << ",\"nps_max\":" << entry.nps_max;
         file << ",\"mtime\":" << entry.mtime;
         file << ",\"md5\":";
         write_json_string(file, entry.md5);
