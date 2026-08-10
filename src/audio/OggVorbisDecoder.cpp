@@ -115,6 +115,14 @@ bool decode_ogg_vorbis_stereo(const std::string& path,
                               int* out_sample_rate,
                               std::vector<float>& out,
                               std::string* error) {
+    return decode_ogg_vorbis_stereo(path, out_sample_rate, out, error, 0);
+}
+
+bool decode_ogg_vorbis_stereo(const std::string& path,
+                              int* out_sample_rate,
+                              std::vector<float>& out,
+                              std::string* error,
+                              std::size_t max_frames) {
     out.clear();
     if (out_sample_rate) {
         *out_sample_rate = 0;
@@ -141,7 +149,12 @@ bool decode_ogg_vorbis_stereo(const std::string& path,
     const int channel_count = info.channels;
     const int total_samples_per_channel = stb_vorbis_stream_length_in_samples(vorbis);
     if (total_samples_per_channel > 0) {
-        out.reserve(static_cast<std::size_t>(total_samples_per_channel) * 2u);
+        const std::size_t reserve_frames = max_frames > 0
+                                               ? std::min<std::size_t>(
+                                                     static_cast<std::size_t>(total_samples_per_channel),
+                                                     max_frames)
+                                               : static_cast<std::size_t>(total_samples_per_channel);
+        out.reserve(reserve_frames * 2u);
     }
 
     constexpr int kChunkFrames = 4096;
@@ -156,8 +169,14 @@ bool decode_ogg_vorbis_stereo(const std::string& path,
             break;
         }
 
-        out.reserve(out.size() + static_cast<std::size_t>(frames) * 2u);
-        for (int frame = 0; frame < frames; ++frame) {
+        const std::size_t decoded_frames = out.size() / 2u;
+        const std::size_t remaining_frames = max_frames > 0
+                                                 ? max_frames - std::min(max_frames, decoded_frames)
+                                                 : static_cast<std::size_t>(frames);
+        const int frames_to_copy = static_cast<int>(std::min<std::size_t>(
+            static_cast<std::size_t>(frames), remaining_frames));
+        out.reserve(out.size() + static_cast<std::size_t>(frames_to_copy) * 2u);
+        for (int frame = 0; frame < frames_to_copy; ++frame) {
             const float* source = chunk.data() + static_cast<std::size_t>(frame) * static_cast<std::size_t>(channel_count);
             if (channel_count == 1) {
                 out.push_back(source[0]);
@@ -166,6 +185,9 @@ bool decode_ogg_vorbis_stereo(const std::string& path,
                 out.push_back(source[0]);
                 out.push_back(source[1]);
             }
+        }
+        if (max_frames > 0 && out.size() / 2u >= max_frames) {
+            break;
         }
     }
 

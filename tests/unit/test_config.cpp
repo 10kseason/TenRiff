@@ -98,7 +98,7 @@ TEST_CASE("config defaults prefer 44100 Hz audio") {
     CHECK(tenriff::config::kJudgementLinePositionMin == doctest::Approx(0.0));
     CHECK(tenriff::config::kJudgementLinePositionMax == doctest::Approx(1.0));
     CHECK_FALSE(config.graphics.vsync);
-    CHECK(config.graphics.refresh_hz == 300);
+    CHECK(config.graphics.refresh_hz == -1);
     CHECK(config.graphics.bga_enabled);
     CHECK(config.graphics.background_upscale_mode == "off");
     CHECK(config.graphics.background_upscale_model_path.empty());
@@ -146,6 +146,7 @@ TEST_CASE("config defaults prefer 44100 Hz audio") {
     CHECK(config.skin.note_divider_gap_px == doctest::Approx(12.0));
     CHECK(config.skin.show_lane_dividers);
     CHECK(config.skin.show_judgement_line);
+    CHECK(config.skin.show_timing_feedback);
     CHECK_FALSE(config.skin.show_gear_boundary_line);
     CHECK_FALSE(config.skin.show_hold_tail);
     CHECK_FALSE(config.skin.hold_tail_taper_enabled);
@@ -546,7 +547,7 @@ TEST_CASE("config save and load preserve graphics display settings") {
     config.graphics.display_mode = "windowed";
     config.graphics.resolution = "qhd";
     config.graphics.vsync = true;
-    config.graphics.refresh_hz = 240;
+    config.graphics.refresh_hz = -1;
     config.graphics.performance_overlay = true;
     config.graphics.bga_enabled = false;
     config.graphics.background_upscale_mode = "onnx";
@@ -562,7 +563,7 @@ TEST_CASE("config save and load preserve graphics display settings") {
     CHECK(result.config.graphics.display_mode == "windowed");
     CHECK(result.config.graphics.resolution == "qhd");
     CHECK(result.config.graphics.vsync);
-    CHECK(result.config.graphics.refresh_hz == 240);
+    CHECK(result.config.graphics.refresh_hz == -1);
     CHECK(result.config.graphics.performance_overlay);
     CHECK_FALSE(result.config.graphics.bga_enabled);
     CHECK(result.config.graphics.background_upscale_mode == "onnx");
@@ -930,7 +931,7 @@ TEST_CASE("config clamps refresh_hz and normalizes invalid resolution preset") {
     REQUIRE(result.success());
     CHECK(result.config.graphics.display_mode == "borderless");
     CHECK(result.config.graphics.resolution == "native");
-    CHECK(result.config.graphics.refresh_hz == 1050);
+    CHECK(result.config.graphics.refresh_hz == -1);
 }
 
 TEST_CASE("config save and load preserve visual offset setting") {
@@ -1000,6 +1001,7 @@ TEST_CASE("config save and load preserve skin gameplay settings") {
     config.skin.note_image_aspect = "width";
     config.skin.show_lane_dividers = false;
     config.skin.show_judgement_line = false;
+    config.skin.show_timing_feedback = false;
     config.skin.show_gear_boundary_line = true;
     config.skin.show_hold_tail = false;
     config.skin.hold_tail_taper_enabled = true;
@@ -1035,6 +1037,7 @@ TEST_CASE("config save and load preserve skin gameplay settings") {
     CHECK(result.config.skin.preserve_note_image_aspect_ratio);
     CHECK_FALSE(result.config.skin.show_lane_dividers);
     CHECK_FALSE(result.config.skin.show_judgement_line);
+    CHECK_FALSE(result.config.skin.show_timing_feedback);
     CHECK(result.config.skin.show_gear_boundary_line);
     CHECK_FALSE(result.config.skin.show_hold_tail);
     CHECK(result.config.skin.hold_tail_taper_enabled);
@@ -1746,7 +1749,7 @@ TEST_CASE("runtime migration flips the old default vsync preset to off") {
     CHECK_FALSE(config.graphics.vsync);
 }
 
-TEST_CASE("runtime migration lowers the old default off-vsync gameplay cap") {
+TEST_CASE("runtime migration replaces the old fixed cap with match display") {
     ConfigLoader loader;
     auto config = loader.defaults();
     config.graphics.display_mode = "borderless";
@@ -1758,5 +1761,5 @@ TEST_CASE("runtime migration lowers the old default off-vsync gameplay cap") {
     const bool changed = tenriff::app::migrate_bms_first_runtime_config(config);
 
     CHECK(changed);
-    CHECK(config.graphics.refresh_hz == 300);
+    CHECK(config.graphics.refresh_hz == -1);
 }

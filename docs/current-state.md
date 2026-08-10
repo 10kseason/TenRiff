@@ -6,7 +6,7 @@
 - BMS variable scroll is supported through `#SCROLLxx` / `#xxxSC`; visual motion may speed up, stop, or reverse while audio and judgement timing stay sample-accurate.
 - BMS landmines (`D1-D9`, `E1-E9`) are playable, including `#WAV00`, base-36 damage tokens, `ZZ` instant fail, exact press/release boundary behavior, and lane-mod/key-converter remapping.
 - Results and local records expose fixed native score separately from detail score, and categorical native accuracy separately from continuous timing-based detailed accuracy.
-- 현재 프로젝트 버전과 공개 안정판은 `1.3.1 (UI-r2)`
+- 현재 프로젝트 버전과 공개 안정판은 `1.4.0.1`
 - UI-r2 Result는 2.2초 타임라인으로 프리즘·점수·등급·상태·통계·그래프를 순차 공개하며, Space로 연출을 건너뛸 수 있고 CONTINUE/RETRY/Replay 입력은 공개 완료 전 잠김
 - UI-r2 Song Select는 상단 탭, 7행 재킷 라이브러리, 대형 선택 이미지, 최고 기록 카드, 차트/모드 패널, 실제 동작하는 START 버튼 구조로 개편되며 Collection/Store/재화/글로벌 랭킹 가상 기능은 표시하지 않음
 - Song Select 우측의 비주얼 레이턴시·하이스피드·Gauge Shift 시작 등급·랜덤 셀은 좌클릭으로 증가/다음, 우클릭으로 감소/이전을 적용하고 즉시 저장함. 현재 차트 키수는 잘림 없이 표시되며 최고 기록은 점수·정확도·최대 콤보를 함께 표시
@@ -147,8 +147,8 @@
   - 같은 키를 두 키보드가 동시에 눌러도 마지막 입력 소스가 해제될 때까지 논리적 `Pressed` 상태를 유지
 - Graphics:
   - resolution preset (`720p`, `1080p`, `qhd`, `native`)
-  - `refresh_hz` (`0` = `무제한`, 숫자는 `60..1050`, 기본 `300`)
-  - VSync off: menu effective cap `300`, gameplay는 `0`에서 pacing 해제 또는 숫자 configured target 사용
+  - `refresh_hz` (`-1` = `디스플레이에 맞춤`, `0` = `무제한`)
+  - VSync off: 디스플레이에 맞춤은 모니터 주사율을 사용하고, 무제한은 gameplay pacing을 해제하되 menu cap `300`은 유지
   - VSync on: present refresh는 active monitor Hz를 따라가고 render pacing은 `monitor_hz * 2`를 목표로 함 (`1050` clamp)
   - `visual_offset_ms`
   - `performance_overlay` (인게임 FPS/frame-time은 성공한 DXGI `Present()` 완료 간격 기준; HUD update cadence는 별도 gameplay diagnostics로만 유지)
@@ -166,7 +166,7 @@
   - Song Select 헤더 아래 중앙에 indexing stage/percent/processed/total/ETA/song count와 progress bar 표시
   - gameplay chart loading progress 표시
   - gameplay loading 중 `Esc` cancel
-  - Song Select에서 같은 곡을 750ms 유지하면 해당 BMS의 명시적 preview 또는 로컬 오디오 fallback을 메뉴 음량으로 재생
+  - Song Select에서 같은 곡을 750ms 유지하면 명시적 preview를 우선 재생하고, 없으면 BMS BGM·키음 이벤트를 30초 PCM으로 합성해 메뉴 음량으로 반복 재생
   - Result는 곡 이미지와 chart/key/BPM/LV/CR/난이도표 정보를 함께 표시
 - Profile UX:
   - `Options -> Profile Setup`에서 현재 프로필의 언어, 오디오, 입력 백엔드, 그래픽, 키맵을 첫 실행용 Quick Setup 화면으로 다시 조정하고 즉시 저장
@@ -220,7 +220,7 @@
 
 ## Runtime / Packaging Rules
 - 새 사용자 프로필은 자동 생성
-- 현재 정식 P2P 배포 라인은 `TenRiff 1.3.1 (UI-r2)`
+- 현재 정식 P2P 배포 라인은 `TenRiff 1.4.0.1`
 - 배포 패키지에는 `Songs`를 넣지 않음
 - 배포 패키지는 `Main Menu / Options / Song Selecte / Multiplayer Lobby / Clear / Failed` 이름의 `Mainmusic/` 화면 슬롯을 포함하며, 각 `이름.mp3`와 번호가 붙은 `이름 2.mp3`~`이름 64.mp3`를 자동 수집해 화면 재진입마다 순환
 - 배포 업데이트에는 built artifacts와 필요한 런타임 자산만 포함

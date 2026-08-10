@@ -6,6 +6,8 @@
 #include <array>
 #include <atomic>
 #include <cstdint>
+#include <future>
+#include <memory>
 #include <mutex>
 #include <string>
 #include <string_view>
@@ -72,6 +74,14 @@ private:
     struct LocalPlayRecord;
     struct ReplaySummary;
 
+    struct SongPreviewDecodeResult {
+        std::string selection_key;
+        std::string path;
+        std::string error;
+        std::shared_ptr<const std::vector<float>> samples;
+        int sample_rate = 0;
+    };
+
     enum class Screen {
         QuickSetup,
         Title,
@@ -98,6 +108,7 @@ private:
     enum class SongSelectFocus {
         SongList,
         LeftNav,
+        QuickSettings,
     };
 
 public:
@@ -401,6 +412,9 @@ private:
     [[nodiscard]] std::string selected_song_background_preview_path();
     void sync_menu_music();
     void service_song_preview();
+    [[nodiscard]] bool start_song_preview_audio(const SongPreviewDecodeResult& preview);
+    void cancel_song_preview_decode();
+    void stop_song_preview_audio();
     void open_keymap_screen(Screen return_screen);
     void clear_keymap_status_message();
     void show_keymap_status_message(std::string message);
@@ -593,6 +607,7 @@ private:
     int options_cursor_ = 0;
     int calibration_step_ms_ = 1;
     SongSelectFocus song_select_focus_ = SongSelectFocus::SongList;
+    int song_quick_setting_cursor_ = 0;
     SongSortMode song_sort_mode_ = SongSortMode::DifficultyAsc;
     SongGroupMode song_group_mode_ = SongGroupMode::None;
     SongSelectView song_select_view_ = SongSelectView::Songs;
@@ -651,6 +666,9 @@ private:
     std::string song_preview_active_path_{};
     int64_t song_preview_due_ns_ = 0;
     bool song_preview_pending_ = false;
+    std::future<SongPreviewDecodeResult> song_preview_decode_future_{};
+    std::shared_ptr<std::atomic<bool>> song_preview_decode_cancel_{};
+    std::atomic<float> song_preview_gain_{0.0f};
     render::RenderThread render_thread_{};
     render::MenuWindow menu_window_{};
 
@@ -684,6 +702,7 @@ private:
     int song_level_max_filter_ = 0;
     uint32_t song_select_repeat_key_ = 0;
     int64_t song_select_repeat_next_ns_ = 0;
+    Screen song_select_repeat_screen_ = Screen::Title;
 
     uint32_t key_up_ = 0;
     uint32_t key_down_ = 0;
@@ -691,6 +710,7 @@ private:
     uint32_t key_right_ = 0;
     uint32_t key_page_up_ = 0;
     uint32_t key_page_down_ = 0;
+    uint32_t key_tab_ = 0;
     uint32_t key_enter_ = 0;
     uint32_t key_space_ = 0;
     uint32_t key_escape_ = 0;

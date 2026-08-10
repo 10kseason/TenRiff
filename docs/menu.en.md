@@ -10,12 +10,12 @@ The main menu must follow the same low-latency philosophy as gameplay: audio run
 - When play starts, the current implementation stops the menu thread and runs `GameSession` separately.
 - The **Windows menu UI is built on D3D11 + Direct2D / DirectWrite** and renders Title / Song Select (cyan layout) and other settings screens (list UI).
 - Skins are native/LR2-only. Selecting or dropping one playskin imports it into the active profile; selecting `LR2files` or `Theme` imports each independent non-IIDX theme separately, skips themes that reference excluded IIDX assets, preserves sibling-theme references, and never overwrites an existing folder.
-- Song Select centers indexing stage / percent / ETA and a progress bar while a reindex is running.
+- Song Select keeps indexing stage / percent / ETA and a top progress bar visible across every non-gameplay screen.
 - Browse can select local header JSON or import a clipboard http(s) BMSTable HTML/header link, then reindexes the current source so hash matches receive table levels.
 - Graphics `BGA` fully disables gameplay image/video backgrounds while keeping Song Select previews. Selecting an ONNX model only stores its path; users enable `BGA Upscaler` separately and confirm the high-spec warning.
 - Input summary:
   - Title: `↑ / ↓` move, `Enter` select (PLAY / EDIT / OPTIONS / EXIT), `F2` songs-folder browse, `F5` reindex, `Esc` quit
-  - Song Select: `↑ / ↓` song movement, `← / →` switch focus on the left menu, `Enter` select / play, `- / +` adjust Rate, `Esc` back
+  - Song Select: `↑ / ↓` song movement, `← / →` switch focus on the left menu, `Tab` enters quick settings, then `↑ / ↓` selects and `← / →` adjusts Visual Latency / Hi-Speed / Gauge / Random; `Enter` selects / plays, `- / +` adjusts Rate, and `Esc` goes back
   - Settings / Mode: `↑ / ↓` move items, `← / →` change values, `Enter / Esc` return
     - Long settings lists support click-to-jump on the right scrollbar without activating or changing the selected row.
     - When space hides some descriptions, the final visible line shows `F1` and the remaining help-line count.
@@ -42,9 +42,9 @@ States render UI and consume already-timestamped input events; heavyweight work 
 `Title -> SongSelect -> Gameplay -> Result` is the minimal playable loop. Each transition should reuse the live audio clock and keep InputThread running.
 
 ## Song Select Without Hitching
-- **SongIndexerThread** scans BMS-family files for path / title / artist / BPM / key count / mode / preview audio. Stage / percent / ETA and a progress bar are centered under the Song Select header while interaction stays responsive.
+- **SongIndexerThread** scans BMS-family files for path / title / artist / BPM / key count / mode / preview audio. Stage / percent / ETA and a top progress bar remain visible on every non-gameplay screen, including the first folder load.
 - **Cache index** (`song_index.json` or SQLite) with mtime / hash checks to avoid full rescans. First run can be slow; subsequent runs should be instant.
-- **Preview audio** is scheduled through the audio engine: the UI enqueues preview requests, and AudioThread mixes them so timing stays aligned.
+- **Preview audio** is decoded off-thread and mixed by AudioThread. Explicit previews are preferred; fragmented BMS charts fall back to a bounded BGM / keysound event mix.
 - Empty-state screens should expose a persistent `Add Songs Folder` action; external folders and BMS files also support drag-and-drop.
 - In Browse > Difficulty Table, copy an http(s) BMSTable page/header link and press `Enter` to import it into the profile cache. `Right` selects local header JSON and `Left` clears it; changes reapply levels to MD5/SHA-256 matches.
 - Song Select `-` / `+` changes and saves `speed.rate` immediately unless search text entry is active.

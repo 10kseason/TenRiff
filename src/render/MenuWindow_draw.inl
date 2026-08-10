@@ -45,6 +45,28 @@ void MenuWindow::draw(const MenuRenderData& data) {
         if (!ensure_gameplay_static_cache(data.gameplay)) {
             invalidate_gameplay_static_cache();
         }
+    } else if (data.kind == MenuScreenKind::GenericList &&
+               data.generic.skin_preview.visible) {
+        // The live skin preview uses the same imported head/body/tail sprite
+        // cache as gameplay so LR2/TenRiff LN art is not replaced by placeholders.
+        GameplayHudData preview_sprite_data;
+        preview_sprite_data.lane_count = data.generic.skin_preview.lane_count;
+        preview_sprite_data.note_border_enabled =
+            data.generic.skin_preview.note_border_enabled;
+        preview_sprite_data.note_shape = data.generic.skin_preview.note_shape;
+        preview_sprite_data.note_image_aspect =
+            data.generic.skin_preview.note_image_aspect;
+        preview_sprite_data.skin_source = data.generic.skin_preview.skin_source;
+        preview_sprite_data.external_skin_root =
+            data.generic.skin_preview.external_skin_root;
+        preview_sprite_data.external_skin_name =
+            data.generic.skin_preview.external_skin_name;
+        preview_sprite_data.lr2_resolution_override =
+            data.generic.skin_preview.lr2_resolution_override;
+        preview_sprite_data.lane_colors = data.generic.skin_preview.lane_colors;
+        if (!ensure_gameplay_note_sprites(preview_sprite_data)) {
+            invalidate_gameplay_note_sprite_cache();
+        }
     } else if (data.kind == MenuScreenKind::SongSelect) {
         update_song_select_preview_loading_state(data.song_select, render_now_ns);
         pump_song_select_preview_loads(data.song_select, render_now_ns);
@@ -826,6 +848,55 @@ void MenuWindow::draw(const MenuRenderData& data) {
 #include "MenuWindow_draw_gameplay_body.inl"
     };
 
+    auto draw_loading_progress = [&]() {
+        if (!data.loading_progress.visible) {
+            return;
+        }
+        constexpr float bar_height = 12.0f;
+        const D2D1_RECT_F track = D2D1::RectF(0.0f, 0.0f, kBaseWidth, bar_height);
+        if (d2d_->card_brush) {
+            const float saved_opacity = d2d_->card_brush->GetOpacity();
+            d2d_->card_brush->SetOpacity(0.96f);
+            ctx->FillRectangle(track, d2d_->card_brush.Get());
+            d2d_->card_brush->SetOpacity(saved_opacity);
+        }
+        if (d2d_->accent_brush) {
+            D2D1_RECT_F fill = track;
+            if (data.loading_progress.percent >= 0) {
+                const float ratio = static_cast<float>(std::clamp(
+                    data.loading_progress.percent, 0, 100)) / 100.0f;
+                fill.right = kBaseWidth * ratio;
+            } else {
+                constexpr float segment_width = 360.0f;
+                const double seconds = static_cast<double>(render_now_ns) / 1'000'000'000.0;
+                const float phase = static_cast<float>(std::fmod(seconds * 0.65, 1.0));
+                fill.left = phase * (kBaseWidth + segment_width) - segment_width;
+                fill.right = fill.left + segment_width;
+            }
+            ctx->FillRectangle(fill, d2d_->accent_brush.Get());
+        }
+        if (d2d_->hud_format && d2d_->text_brush) {
+            std::string label = data.loading_progress.stage.empty()
+                                    ? std::string("INDEXING")
+                                    : data.loading_progress.stage;
+            if (data.loading_progress.percent >= 0) {
+                label += "  " + std::to_string(data.loading_progress.percent) + "%";
+            }
+            if (data.loading_progress.total > 0) {
+                label += "  " + std::to_string(data.loading_progress.processed) +
+                         "/" + std::to_string(data.loading_progress.total);
+            }
+            if (!data.loading_progress.eta.empty()) {
+                label += "  ETA " + data.loading_progress.eta;
+            }
+            draw_text_clipped_aligned(to_wide(label),
+                                      d2d_->hud_format.Get(),
+                                      D2D1::RectF(24.0f, 14.0f, kBaseWidth - 24.0f, 42.0f),
+                                      d2d_->text_brush.Get(),
+                                      DWRITE_TEXT_ALIGNMENT_TRAILING);
+        }
+    };
+
     switch (data.kind) {
         case MenuScreenKind::TitleMenu:
             draw_title_menu();
@@ -844,6 +915,8 @@ void MenuWindow::draw(const MenuRenderData& data) {
             draw_generic_list();
             break;
     }
+
+    draw_loading_progress();
 
     if (!data.help_overlay.visible) {
         draw_performance_overlay();

@@ -30,7 +30,7 @@ If a profile does not exist, it is created automatically on first launch.
 - `bms_keysound_policy` (string)
   - `follow | autoplay | ignore`
 - `background_sound_enabled` (bool)
-  - turns menu BGM and chart background audio on or off
+  - controls menu, result, and song-preview music only; gameplay chart BGM remains audible
 - `volume` (double)
   - master volume
 - `bgm_volume` (double)
@@ -40,7 +40,7 @@ If a profile does not exist, it is created automatically on first launch.
 
 - `backend` (string)
   - `polling | rawinput`
-  - defaults to `rawinput` on the current `1.3.1` release line
+  - defaults to `rawinput` on the current `1.4.0.1` release line
   - selectable per profile under `Options -> Input Settings -> Backend` or `Options -> Profile Setup -> Input Backend`
   - runtime fallback never rewrites the saved value to `polling`
   - a confirmed RawInput startup failure, registration-target loss, or message-window exit latches Polling across menu and subsequent gameplay sessions for the current app run
@@ -60,7 +60,7 @@ If a profile does not exist, it is created automatically on first launch.
 - `judgement_hz` (int)
   - `1000 | 2000 | 4000 | 8000`
   - compatibility field kept in the input config
-  - the current `1.3.1` runtime no longer drives a separate audio-thread judgement sub-step loop from this value
+  - the current `1.4.0.1` runtime no longer drives a separate audio-thread judgement sub-step loop from this value
   - default is `4000` (`0.25ms`)
 - `debounce_ms` (double)
   - real Press/Release transitions are preserved; only duplicate same-state events are removed from pressed-state tracking
@@ -108,10 +108,9 @@ If a profile does not exist, it is created automatically on first launch.
   - `native | 720p | 1080p | qhd`
 - `vsync` (bool)
 - `refresh_hz` (int)
-  - `0` selects `Unlimited`; numeric limits are clamped to the `60..1050` range
-  - default value is `300`
-  - serves as a direct FPS cap only when `vsync=false`
-  - when `vsync=false`, menu rendering uses an effective cap of `300`; gameplay disables render pacing for `0`, while numeric values are safety-clamped to `min(configured target, max(300, monitor_hz * 2))`
+  - `-1` selects `Match Display`; `0` selects `Unlimited`
+  - legacy fixed numeric limits migrate to `-1`
+  - with `vsync=false`, Unlimited removes gameplay pacing while menu rendering keeps a 300 FPS cap
   - when `vsync=true`, the present refresh follows the active monitor Hz and render pacing targets `monitor_hz * 2` (`1050` clamp)
 - `performance_overlay` (bool)
   - defaults to `false`; it occupies the top-right corner and can overlap a Discord Voice widget placed there

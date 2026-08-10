@@ -10,13 +10,13 @@ The main menu must honor the same low-latency philosophy as gameplay: audio runs
 - 플레이 시작 시에는 현재 구현상 메뉴 스레드를 중지하고 `GameSession`을 별도로 실행한다.
 - **Windows 메뉴 UI는 D3D11 + Direct2D/DirectWrite 기반**으로 타이틀/곡선택(시안 레이아웃)과 기타 설정 화면(리스트 UI)을 렌더링한다.
 - Skins는 native/LR2 전용이다. LR2 playskin 하나를 선택하거나 드롭하면 활성 프로필로 이식하고, `LR2files` 또는 `Theme`을 선택하면 정확한 `IIDX` 폴더와 IIDX 자산 의존 테마를 제외한 바로 아래 테마를 각각 설치한다. 형제 테마 참조를 유지하며 기존 폴더는 덮어쓰지 않는다.
-- Song Select 재인덱싱 중 stage/percent/ETA와 progress bar를 화면 중앙에 표시한다.
+- Song Select 재인덱싱 중 stage/percent/ETA와 상단 progress bar를 게임플레이 외 모든 화면에 표시한다.
 - Browse에서 로컬 header JSON을 고르거나 클립보드의 http(s) BMSTable HTML/header 링크를 가져오면 현재 source를 재인덱싱해 hash 일치 곡에 표 레벨을 적용한다.
 - Graphics의 `BGA` 토글은 게임플레이 이미지/영상을 완전히 끄며 선곡 미리보기는 유지한다. ONNX 모델 선택은 경로만 저장하므로 `BGA Upscaler`를 별도로 켜고 고사양 경고를 확인해야 한다.
 - 입력 키 요약:
   - Title: `↑/↓` 이동, `Enter` 선택(PLAY/EDIT/OPTIONS/EXIT), `F2` 곡 폴더 선택, `F5` 새로고침, `Esc` 종료
     - 곡이 하나도 인덱싱되지 않았으면 첫 버튼은 `PLAY` 대신 `Add Songs Folder`로 보인다.
-  - Song Select: `↑/↓` 곡 이동, `PgUp/PgDn` 페이지 이동, `←/→` 좌측 메뉴 포커스 전환, `Enter` 선택/플레이, `-`/`+` Rate 조정, `Esc` 타이틀 복귀
+  - Song Select: `↑/↓` 곡 이동, `PgUp/PgDn` 페이지 이동, `←/→` 좌측 메뉴 포커스 전환, `Tab` 빠른 설정 진입, 빠른 설정에서 `↑/↓` 항목 선택·`←/→` 값 조정, `Enter` 선택/플레이, `-`/`+` Rate 조정, `Esc` 타이틀 복귀
     - 좌측 메뉴는 `Songs / Sources / Search / Filter / Records / Session Mix / Options`를 제공한다.
     - `Backspace`는 `Sources` 또는 `Records`에서 `Songs`로 되돌아갈 때만 쓴다.
   - Session Mix: `←/→`로 15/30/60분 목표를 고르고 `Enter`로 시작한다.
@@ -51,9 +51,9 @@ States render UI and consume already-timestamped input events; heavyweight work 
 `Title → SongSelect → Gameplay → Result` is the minimal playable loop. Each transition should reuse the live audio clock and keep InputThread running.
 
 ## Song select without hitching
-- **SongIndexerThread** scans BMS-family files for path/title/artist/BPM/key count/mode/preview audio. Stage/percent/ETA and a progress bar are centered below the Song Select header while interaction stays responsive.
+- **SongIndexerThread** scans BMS-family files for path/title/artist/BPM/key count/mode/preview audio. Stage/percent/ETA and a top progress bar stay visible on every non-gameplay screen, including the first folder load.
 - **Cache index** (`song_index.json` or SQLite) with mtime/hash checks to avoid full rescans. First run can be slow; subsequent runs should be instant.
-- **Preview audio** is scheduled through the audio engine: UI enqueues preview requests, AudioThread mixes them so timing stays aligned.
+- **Preview audio** is decoded off-thread and mixed by AudioThread. Explicit previews are preferred; fragmented BMS charts fall back to a bounded BGM/keysound event mix.
 - Empty-state screens should expose a persistent `Add Songs Folder` action; external folders and BMS files also support drag-and-drop.
 - Browse의 Difficulty Table에서 http(s) BMSTable 페이지/header 링크를 클립보드에 복사하고 `Enter`를 누르면 profile cache로 가져온다. `Right`는 로컬 header JSON 선택, `Left`는 해제이며 변경 시 MD5/SHA-256 일치 레벨을 다시 적용한다.
 - Song Select `-` / `+` changes and saves `speed.rate` immediately unless search text entry is active.

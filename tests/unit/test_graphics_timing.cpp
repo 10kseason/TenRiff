@@ -12,23 +12,24 @@ using tenriff::app::should_allow_tearing_present;
 using tenriff::app::should_record_presented_frame;
 using tenriff::app::should_treat_present_failure_as_transient;
 
-TEST_CASE("graphics timing keeps the configured cap when vsync is disabled") {
-    CHECK(effective_present_refresh_hz(false, 1000, 144, false) == 300);
-    CHECK(effective_render_fps_limit(false, 1000, 144, false) == 300);
-    CHECK(effective_present_refresh_hz(false, 240, 144, true) == 240);
-    CHECK(effective_render_fps_limit(false, 240, 144, true) == 240);
-    CHECK(effective_render_fps_limit(false, 1050, 144, true) == 300);
-    CHECK(effective_render_fps_limit(false, 1050, 240, true) == 480);
-    CHECK(effective_render_fps_limit(false, 720, 360, true) == 720);
+TEST_CASE("match display follows the detected refresh when vsync is disabled") {
+    CHECK(effective_present_refresh_hz(false, -1, 144, false) == 144);
+    CHECK(effective_render_fps_limit(false, -1, 144, false) == 144);
+    CHECK(effective_present_refresh_hz(false, -1, 240, true) == 240);
+    CHECK(effective_render_fps_limit(false, -1, 240, true) == 240);
+
+    // Legacy fixed caps are interpreted as Match Display until persisted again.
+    CHECK(effective_render_fps_limit(false, 1050, 144, true) == 144);
 }
 
-TEST_CASE("graphics timing cycles and preserves the unlimited sentinel") {
+TEST_CASE("graphics timing exposes only match display and unlimited") {
     CHECK(cycle_graphics_refresh_hz(60, -1) == 0);
-    CHECK(cycle_graphics_refresh_hz(0, -1) == 1050);
+    CHECK(cycle_graphics_refresh_hz(0, -1) == -1);
     CHECK(cycle_graphics_refresh_hz(1050, 1) == 0);
-    CHECK(cycle_graphics_refresh_hz(0, 1) == 60);
+    CHECK(cycle_graphics_refresh_hz(0, 1) == -1);
     CHECK(normalize_graphics_refresh_hz(0) == 0);
-    CHECK(normalize_graphics_refresh_hz(5000) == 1050);
+    CHECK(normalize_graphics_refresh_hz(-1) == -1);
+    CHECK(normalize_graphics_refresh_hz(5000) == -1);
 }
 
 TEST_CASE("unlimited removes only off-vsync gameplay render pacing") {
@@ -40,10 +41,10 @@ TEST_CASE("unlimited removes only off-vsync gameplay render pacing") {
 }
 
 TEST_CASE("graphics timing uses the detected monitor refresh when vsync is enabled") {
-    CHECK(effective_present_refresh_hz(true, 1050, 144, false) == 144);
-    CHECK(effective_render_fps_limit(true, 1050, 144, false) == 288);
-    CHECK(effective_present_refresh_hz(true, 300, 240, true) == 240);
-    CHECK(effective_render_fps_limit(true, 300, 240, true) == 480);
+    CHECK(effective_present_refresh_hz(true, -1, 144, false) == 144);
+    CHECK(effective_render_fps_limit(true, -1, 144, false) == 288);
+    CHECK(effective_present_refresh_hz(true, 0, 240, true) == 240);
+    CHECK(effective_render_fps_limit(true, 0, 240, true) == 480);
 }
 
 TEST_CASE("graphics timing clamps doubled vsync fps into the supported max") {

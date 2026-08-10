@@ -74,6 +74,11 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
     render.kind = render::MenuScreenKind::SongSelect;
     render.song_select.profile = profile_display_name();
     render.song_select.profile_avatar_path = config_.ui.profile_avatar_path;
+    render.song_select.quick_settings_focused =
+        song_select_view_ == SongSelectView::Songs &&
+        song_select_focus_ == SongSelectFocus::QuickSettings;
+    render.song_select.quick_setting_cursor =
+        std::clamp(song_quick_setting_cursor_, 0, 3);
     render.song_select.track = current_track;
     render.song_select.song_count = static_cast<int>(visible_song_count());
     render.song_select.source_count = static_cast<int>(config_.ui.recent_song_sources.size());
@@ -185,8 +190,8 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
             : (render.song_select.showing_records
                    ? ui_text("LEFT/RIGHT  NAV FOCUS     BACKSPACE  BACK     ESC  TITLE     F1  HELP",
                              "좌/우  탐색 전환     BACKSPACE  뒤로     ESC  타이틀     F1  도움말")
-                   : ui_text("MODE CELLS: LEFT +/NEXT, RIGHT -/PREV     F2 FOLDER     F5 REINDEX     F1 HELP",
-                             "모드 셀: 좌클릭 +/다음, 우클릭 -/이전     F2 폴더     F5 재인덱스     F1 도움말")));
+                   : ui_text("TAB QUICK SETTINGS     UP/DOWN SELECT     LEFT/RIGHT ADJUST     F2 FOLDER     F5 REINDEX     F1 HELP",
+                             "TAB 빠른 설정     위/아래 선택     좌/우 조정     F2 폴더     F5 재인덱스     F1 도움말")));
 
     const std::string source_detail =
         std::to_string(render.song_select.source_count) + " " +

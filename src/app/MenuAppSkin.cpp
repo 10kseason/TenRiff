@@ -3,9 +3,11 @@
 #include <algorithm>
 #include <array>
 #include <cctype>
+#include <cstddef>
 #include <filesystem>
 #include <iostream>
 #include <iterator>
+#include <utility>
 
 #ifdef _WIN32
 #ifndef NOMINMAX
@@ -327,11 +329,12 @@ void MenuApp::handle_skins_settings_input(uint32_t keycode) {
     const std::string active_skin_source = config::normalize_skin_source_token(config_.skin.source);
     const bool lr2_source = active_skin_source == "lr2";
     const int lr2_shift = lr2_source ? 1 : 0;
-    const int item_count = 39 + lr2_shift;
-    const int imported_skin_row = 1;
-    const int lr2_resolution_row = lr2_source ? 2 : -1;
-    const int import_skin_row = 2 + lr2_shift;
-    const int key_mode_row = 3 + lr2_shift;
+    const int item_count = 40 + lr2_shift;
+    const int key_mode_row = 0;
+    const int skin_source_row = 1;
+    const int imported_skin_row = 2;
+    const int lr2_resolution_row = lr2_source ? 3 : -1;
+    const int import_skin_row = 3 + lr2_shift;
     const int target_lane_row = 4 + lr2_shift;
     const int target_gap_row = 5 + lr2_shift;
     const int lane_color_row = 6 + lr2_shift;
@@ -366,7 +369,8 @@ void MenuApp::handle_skins_settings_input(uint32_t keycode) {
     const int visual_latency_row = 35 + lr2_shift;
     const int note_gap_row = 36 + lr2_shift;
     const int gameplay_cursor_row = 37 + lr2_shift;
-    const int back_row = 38 + lr2_shift;
+    const int timing_feedback_row = 38 + lr2_shift;
+    const int back_row = 39 + lr2_shift;
 
     if (keycode == key_up_) {
         settings_cursor_ = clamp_int(settings_cursor_ - 1, 0, item_count - 1);
@@ -379,15 +383,15 @@ void MenuApp::handle_skins_settings_input(uint32_t keycode) {
         return;
     }
 
-    if (settings_cursor_ == 0 && (keycode == key_left_ || keycode == key_right_)) {
+    if (settings_cursor_ == skin_source_row && (keycode == key_left_ || keycode == key_right_)) {
         const int direction = (keycode == key_left_) ? -1 : 1;
         const bool was_lr2 = active_skin_source == "lr2";
         config_.skin.source = cycle_skin_source(config_.skin.source, direction);
         const bool is_lr2 = config::normalize_skin_source_token(config_.skin.source) == "lr2";
-        const int new_item_count = 39 + (is_lr2 ? 1 : 0);
-        if (!was_lr2 && is_lr2 && settings_cursor_ >= imported_skin_row) {
+        const int new_item_count = 40 + (is_lr2 ? 1 : 0);
+        if (!was_lr2 && is_lr2 && settings_cursor_ >= import_skin_row) {
             ++settings_cursor_;
-        } else if (was_lr2 && !is_lr2 && settings_cursor_ >= import_skin_row) {
+        } else if (was_lr2 && !is_lr2 && settings_cursor_ >= lr2_resolution_row) {
             --settings_cursor_;
         }
         settings_cursor_ = clamp_int(settings_cursor_, 0, new_item_count - 1);
@@ -801,6 +805,13 @@ void MenuApp::handle_skins_settings_input(uint32_t keycode) {
         publish_snapshot();
         return;
     }
+    if (settings_cursor_ == timing_feedback_row &&
+        (keycode == key_left_ || keycode == key_right_)) {
+        config_.skin.show_timing_feedback = !config_.skin.show_timing_feedback;
+        skin_dirty_ = true;
+        publish_snapshot();
+        return;
+    }
 
     if ((keycode == key_enter_ && settings_cursor_ == back_row) ||
         keycode == key_escape_ ||
@@ -983,6 +994,35 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
                     37 + lr2_shift, false, true);
     append_menu_row(render.generic, ui_text("Back", "뒤로"), "", settings_cursor_ == 38 + lr2_shift,
                     render::MenuHitTargetKind::SettingsRow, 38 + lr2_shift, true, false);
+
+    // Keep the mode selector first without duplicating the large row-construction
+    // block above. The original first rows are Source, Imported, optional LR2
+    // Resolution, Import, then Key Mode; moving Key Mode to the front preserves
+    // every row from Target Lane onward.
+    append_menu_row(render.generic,
+                    ui_text("FAST/SLOW Display", "FAST/SLOW \uD45C\uC2DC"),
+                    ui_on_off(config_.skin.show_timing_feedback),
+                    false,
+                    render::MenuHitTargetKind::SettingsRow,
+                    39 + lr2_shift,
+                    false,
+                    true);
+    const std::size_t old_key_mode_index = static_cast<std::size_t>(3 + lr2_shift);
+    if (old_key_mode_index < render.generic.rows.size()) {
+        auto key_mode = std::move(render.generic.rows[old_key_mode_index]);
+        render.generic.rows.erase(render.generic.rows.begin() +
+                                  static_cast<std::ptrdiff_t>(old_key_mode_index));
+        render.generic.rows.insert(render.generic.rows.begin(), std::move(key_mode));
+    }
+    const std::size_t timing_index = static_cast<std::size_t>(38 + lr2_shift);
+    const std::size_t back_index = static_cast<std::size_t>(39 + lr2_shift);
+    if (back_index < render.generic.rows.size()) {
+        std::swap(render.generic.rows[timing_index], render.generic.rows[back_index]);
+    }
+    for (std::size_t row = 0; row < render.generic.rows.size(); ++row) {
+        render.generic.rows[row].row_index = static_cast<int>(row);
+        render.generic.rows[row].selected = settings_cursor_ == static_cast<int>(row);
+    }
 
     render.generic.skin_preview.visible = true;
     render.generic.skin_preview.mode_label = ui_key_mode_label(skin_edit_mode_);

@@ -3,7 +3,7 @@
 This is the document that the next agent or any new contributor should read first. Its goal is to quickly answer: "what is this project now, where should I look, and what is still unverified?"
 
 ## Baseline
-- Current project and public stable version: `1.3.1 (UI-r2)`
+- Current project and public stable version: `1.4.0.1`
 - The UI-r2 Result screen uses a 2.2-second timeline for the prism, score, rank, clear status, statistics, and graphs. Space skips the reveal; Continue/Retry/Replay stay locked until it completes.
 - UI-r2 Song Select uses a reference-led top navigation, seven-row jacket library, large selected artwork, best-record card, chart/mode panel, and a prominent working Start action. Collection/store/currency/global-ranking placeholders are not shown.
 - The Song Select Rate, Hi-Speed, Gauge, and Random cells apply increase/next on left click and decrease/previous on right click, then save immediately. The current-chart key count no longer clips, and best records show score, accuracy, and max combo together.
@@ -139,8 +139,8 @@ This is the document that the next agent or any new contributor should read firs
   - when two keyboards press the same key, the logical `Pressed` state remains active until the last input source releases it
 - Graphics:
   - resolution presets (`720p`, `1080p`, `qhd`, `native`)
-  - `refresh_hz` (`0` = `Unlimited`, numeric values `60..1050`, default `300`)
-  - VSync off: menu effective cap `300`; gameplay either disables pacing at `0` or uses the numeric configured target
+  - `refresh_hz` (`-1` = `Match Display`, `0` = `Unlimited`)
+  - VSync off: Match Display follows monitor Hz; Unlimited removes gameplay pacing while keeping the menu cap at `300`
   - VSync on: present refresh follows the active monitor Hz and render pacing targets `monitor_hz * 2` (`1050` clamp)
   - `visual_offset_ms`
   - `performance_overlay` (in-game FPS/frame time uses successful DXGI `Present()` completion intervals; HUD update cadence remains separate gameplay diagnostics)
@@ -158,7 +158,7 @@ This is the document that the next agent or any new contributor should read firs
   - centered Song Select indexing stage/percentage/processed/total/ETA/song count and progress bar below the header
   - gameplay chart-loading progress display
   - `Esc` cancel during gameplay loading
-  - holding one Song Select choice for 750ms plays its explicit BMS preview or local-audio fallback at menu volume
+  - holding one Song Select choice for 750ms prefers its explicit preview, otherwise renders 30 seconds of BMS BGM and keysound events to looping PCM at menu volume
   - Result shows song art plus chart/key/BPM/LV/CR/difficulty-table metadata
 - Profile UX:
   - `Options -> Profile Setup` reopens the first-run setup surface for the active profile and saves language, audio, input, graphics, and keymap changes immediately
@@ -205,7 +205,7 @@ This is the document that the next agent or any new contributor should read firs
 
 ## Runtime / Packaging Rules
 - New user profiles are created automatically
-- The current official P2P distribution line is `TenRiff 1.3.1 (UI-r2)`
+- The current official P2P distribution line is `TenRiff 1.4.0.1`
 - Distribution packages do not include `Songs`
 - Distribution packages include the `Mainmusic/` scene slots `Main Menu / Options / Song Selecte / Multiplayer Lobby / Clear / Failed`; each `Name.mp3` plus numbered `Name 2.mp3` through `Name 64.mp3` siblings is discovered automatically and rotates on scene re-entry
 - Distribution updates include only built artifacts and required runtime assets

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(TenRiff VERSION 1.4.0 LANGUAGES C CXX)
+project(TenRiff VERSION 1.4.0.1 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -180,6 +180,7 @@ if(WIN32)
 
     add_library(tenriff_app
         src/app/MenuMusicController.cpp
+        src/app/SongPreviewBuilder.cpp
         src/app/GameSession.cpp
         src/app/MenuApp.cpp
         src/app/MenuAppMultiplayer.cpp
@@ -235,7 +236,10 @@ if(WIN32)
     target_link_libraries(bga_video_smoke PRIVATE ole32 mfplat mfreadwrite mfuuid)
 
     if(TENRIFF_ENABLE_ONNX_UPSCALER AND MSVC)
-        target_compile_definitions(tenriff_app PRIVATE TENRIFF_ENABLE_ONNX_UPSCALER=1)
+        target_compile_definitions(tenriff_app PRIVATE
+            TENRIFF_ENABLE_ONNX_UPSCALER=1
+            _SILENCE_EXPERIMENTAL_COROUTINE_DEPRECATION_WARNINGS
+        )
         target_link_libraries(tenriff_app PRIVATE windowsapp)
 
         add_executable(onnx_upscaler_winml_smoke
@@ -245,7 +249,10 @@ if(WIN32)
         target_include_directories(onnx_upscaler_winml_smoke PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/src
         )
-        target_compile_definitions(onnx_upscaler_winml_smoke PRIVATE TENRIFF_ENABLE_ONNX_UPSCALER=1)
+        target_compile_definitions(onnx_upscaler_winml_smoke PRIVATE
+            TENRIFF_ENABLE_ONNX_UPSCALER=1
+            _SILENCE_EXPERIMENTAL_COROUTINE_DEPRECATION_WARNINGS
+        )
         target_compile_features(onnx_upscaler_winml_smoke PRIVATE cxx_std_17)
         target_link_libraries(onnx_upscaler_winml_smoke PRIVATE windowsapp ole32 windowscodecs)
     endif()

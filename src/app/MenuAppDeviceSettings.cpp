@@ -411,7 +411,7 @@ void MenuApp::populate_graphics_settings_render_data(render::MenuRenderData& ren
     const std::string refresh_hz_label =
         config_.graphics.refresh_hz == kGraphicsRefreshHzUnlimited
             ? ui_text("Unlimited", "무제한")
-            : std::to_string(config_.graphics.refresh_hz);
+            : ui_text("Match Display", "\uB514\uC2A4\uD50C\uB808\uC774\uC5D0 \uB9DE\uCDA4");
     append_menu_row(render.generic, ui_text("Display", "표시 모드"), ui_display_mode_label(config_.graphics.display_mode), settings_cursor_ == 0,
                     render::MenuHitTargetKind::SettingsRow, 0, false, true);
     append_menu_row(render.generic, ui_text("Resolution", "해상도"), ui_resolution_label(config_.graphics.resolution), settings_cursor_ == 1,
@@ -460,8 +460,8 @@ void MenuApp::populate_graphics_settings_render_data(render::MenuRenderData& ren
     render.generic.notes.push_back(ui_text(
         "BGA OFF suppresses gameplay image/video backgrounds and disables their decoder/upscaler work. Song Select background previews remain visible.",
         "BGA를 끄면 게임플레이 이미지/영상 배경과 디코더/업스케일러 작업이 비활성화됩니다. 선곡 배경 미리보기는 유지됩니다."));
-    render.generic.notes.push_back(ui_text("Resolution cycles 720p, 1080p, QHD, or the current monitor native size. Refresh Hz ranges from 60 to 1050 or Unlimited.",
-                                           "해상도는 720p, 1080p, QHD, 모니터 기본 크기를 순환합니다. 주사율은 60~1050Hz 또는 무제한입니다."));
+    render.generic.notes.push_back(ui_text("Resolution cycles 720p, 1080p, QHD, or the current monitor native size. Refresh Hz is Match Display or Unlimited.",
+                                           "해상도는 720p, 1080p, QHD, 모니터 기본 크기를 순환합니다. 주사율은 디스플레이에 맞춤 또는 무제한입니다."));
     render.generic.notes.push_back(ui_text(
         "BGA Behind Notes blocks bright backgrounds only under the playfield while keeping BGA visible outside it.",
         "기어 뒤 BGA를 가리면 바깥 BGA는 유지하면서 노트 영역 아래의 밝은 배경만 차단합니다."));

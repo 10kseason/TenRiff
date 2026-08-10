@@ -30,7 +30,7 @@
 - `bms_keysound_policy` (string)
   - `follow | autoplay | ignore`
 - `background_sound_enabled` (bool)
-  - 메뉴 BGM과 차트 배경음을 켜고 끔
+  - 메뉴, 결과, 곡 미리듣기 음악만 켜고 끔; 게임플레이 차트 BGM은 유지
 - `volume` (double)
   - master volume
 - `bgm_volume` (double)
@@ -40,7 +40,7 @@
 
 - `backend` (string)
   - `polling | rawinput`
-  - 현재 `1.3.1` 릴리스 라인의 기본값은 `rawinput`
+  - 현재 `1.4.0.1` 릴리스 라인의 기본값은 `rawinput`
   - `Options -> Input Settings -> Backend` 또는 `Options -> Profile Setup -> Input Backend`에서 프로필별로 RawInput/Polling을 직접 선택 가능
   - 저장값은 런타임 fallback 때문에 자동으로 `polling`으로 덮어쓰지 않음
   - RawInput 시작 실패, 등록 대상 손실, 메시지 창 종료가 확인되면 현재 앱 실행 동안 메뉴와 다음 gameplay 세션 모두 Polling을 유지
@@ -60,7 +60,7 @@
 - `judgement_hz` (int)
   - `1000 | 2000 | 4000 | 8000`
   - 호환성용으로 남아 있는 입력 설정 필드
-  - 현재 `1.3.1` runtime은 별도 오디오 판정 서브루프를 이 값으로 구동하지 않음
+  - 현재 `1.4.0.1` runtime은 별도 오디오 판정 서브루프를 이 값으로 구동하지 않음
   - 기본값은 `4000` (`0.25ms`)
 - `debounce_ms` (double)
   - 실제 Press/Release 전환은 버리지 않고 같은 상태의 중복 이벤트만 상태 추적에서 제거
@@ -108,10 +108,10 @@
   - `native | 720p | 1080p | qhd`
 - `vsync` (bool)
 - `refresh_hz` (int)
-  - `0`은 `무제한`, 숫자 제한은 `60..1050` 범위로 clamp
-  - 기본값은 `300`
-  - `vsync=false`일 때만 직접적인 FPS cap 역할을 함
-  - `vsync=false`면 menu는 effective cap `300`; gameplay는 `0`일 때 render pacing을 해제하고 숫자 값은 `min(configured target, max(300, monitor_hz * 2))`로 safety clamp됨
+  - `-1`은 `디스플레이에 맞춤`, `0`은 `무제한`
+  - 고정 숫자 제한은 폐기되었으며 로드 시 `-1`로 이전
+  - `vsync=false`의 무제한은 게임플레이 pacing을 해제하고 메뉴는 300 FPS cap 유지
+  - `vsync=false`면 menu는 effective cap `300`; gameplay는 `-1`일 때 모니터 주사율을 따르고 `0`일 때 render pacing을 해제함
   - `vsync=true`면 present refresh는 active monitor Hz를 따르고, render pacing은 `monitor_hz * 2`를 목표로 함 (`1050` clamp)
 - `performance_overlay` (bool)
   - 기본값은 `false`; 우상단을 사용하므로 Discord Voice 위젯을 같은 모서리에 두면 겹칠 수 있음

@@ -32,7 +32,7 @@ TEST_CASE("Song Select quick settings map left and right clicks to all four valu
     runtime.mode.random = "off";
 
     CHECK(tenriff::app::adjust_song_quick_setting(runtime, 0, 1));
-    CHECK(runtime.visual_offset_ms == doctest::Approx(5.0));
+    CHECK(runtime.visual_offset_ms == doctest::Approx(1.0));
     CHECK(tenriff::app::adjust_song_quick_setting(runtime, 0, -1));
     CHECK(runtime.visual_offset_ms == doctest::Approx(0.0));
     CHECK(tenriff::app::adjust_song_quick_setting(runtime, 1, 1));

@@ -40,7 +40,7 @@ profile が存在しない場合は初回起動時に自動生成されます。
 
 - `backend` (string)
   - `polling | rawinput`
-  - 現行 `1.3.1` リリースラインの既定値は `rawinput`
+  - 現行 `1.4.0.1` リリースラインの既定値は `rawinput`
   - `Options -> Input Settings -> Backend` または `Options -> Profile Setup -> Input Backend` で profile ごとに選択可能
   - runtime fallback は保存済みの値を `polling` に書き換えない
   - RawInput の起動失敗、登録先の消失、message window の終了を確認すると、そのアプリ実行中は menu と後続 gameplay の両方で Polling を維持する
@@ -107,10 +107,10 @@ profile が存在しない場合は初回起動時に自動生成されます。
   - `native | 720p | 1080p | qhd`
 - `vsync` (bool)
 - `refresh_hz` (int)
-  - `0` は `Unlimited`、数値制限は `60..1050` に clamp
-  - 既定値は `300`
+  - `-1` は `Match Display`、`0` は `Unlimited`
+  - 既定値は `-1`
   - `vsync=false` のときだけ直接 FPS cap として使われる
-  - `vsync=false` では menu は実効 `300` cap。gameplay は `0` のとき render pacing を解除し、数値は `min(configured target, max(300, monitor_hz * 2))` で safety clamp
+  - `vsync=false` では menu は実効 `300` cap。gameplay は `-1` で monitor Hz に従い、`0` で render pacing を解除
   - `vsync=true` では present refresh は active monitor Hz に従い、render pacing は `monitor_hz * 2` を狙う（`1050` clamp）
 - `performance_overlay` (bool)
   - 既定値は `false`。右上を使うため、同じ角に置いた Discord Voice widget と重なる場合がある

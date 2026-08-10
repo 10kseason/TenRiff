@@ -29,6 +29,8 @@
 #endif
 
 #include "app/GameSession.h"
+#include "app/AudioFileDecoder.h"
+#include "app/AudioMixPolicy.h"
 #include "app/DifficultyTable.h"
 #include "app/DifficultyTableLink.h"
 #include "app/GameplayHudRevisions.h"
@@ -44,6 +46,8 @@
 #include "app/PeerBattleRuntimeRules.h"
 #include "app/ProfileSetupFlow.h"
 #include "app/RuntimeConfigMigration.h"
+#include "app/SongPreviewPlayback.h"
+#include "app/SongPreviewBuilder.h"
 #include "config/KeycodeMap.h"
 #include "game/SpeedManager.h"
 #include "gameplay/Replay.h"
@@ -1155,6 +1159,7 @@ bool MenuApp::initialize(const CommandLineOptions& options) {
     key_right_ = config::KeycodeMap::to_keycode("Right").value_or(0);
     key_page_up_ = config::KeycodeMap::to_keycode("PageUp").value_or(0);
     key_page_down_ = config::KeycodeMap::to_keycode("PageDown").value_or(0);
+    key_tab_ = config::KeycodeMap::to_keycode("Tab").value_or(0);
     key_enter_ = config::KeycodeMap::to_keycode("Enter").value_or(0);
     key_space_ = config::KeycodeMap::to_keycode("Space").value_or(0);
     key_escape_ = config::KeycodeMap::to_keycode("Esc").value_or(0);
@@ -1287,7 +1292,7 @@ void MenuApp::run() {
         update_song_select_repeat();
         service_song_preview();
 
-        if (screen_ == Screen::SongSelect && song_indexer_.is_running()) {
+        if (screen_ != Screen::Gameplay && song_indexer_.is_running()) {
             const int64_t now_ns = timing::HighResClock::now_ns();
             if (now_ns - last_indexer_snapshot_ns_ >= 200'000'000LL) {
                 last_indexer_snapshot_ns_ = now_ns;
@@ -1390,7 +1395,8 @@ void MenuApp::stop_menu_threads() {
     reset_song_select_repeat();
     render_thread_.stop();
     menu_music_.stop();
-    audio_thread_.shutdown();
+    cancel_song_preview_decode();
+    stop_song_preview_audio();
     input_thread_.stop();
 }
 
@@ -1476,6 +1482,7 @@ std::vector<uint32_t> MenuApp::current_menu_probe_keycodes() const {
     append_fixed_key(key_right_);
     append_fixed_key(key_page_up_);
     append_fixed_key(key_page_down_);
+    append_fixed_key(key_tab_);
     append_fixed_key(key_enter_);
     append_fixed_key(key_escape_);
     append_fixed_key(key_backspace_);
@@ -1657,7 +1664,11 @@ std::string MenuApp::current_input_backend_status_detail() const {
 }
 
 void MenuApp::restart_audio_thread() {
-    audio_thread_.shutdown();
+    cancel_song_preview_decode();
+    stop_song_preview_audio();
+    song_preview_selection_key_.clear();
+    song_preview_due_ns_ = 0;
+    song_preview_pending_ = false;
 }
 
 void MenuApp::restart_render_thread() {
@@ -1683,7 +1694,10 @@ render::RenderConfig MenuApp::current_render_config() const {
 }
 
 int MenuApp::effective_refresh_hz() const {
+    const int detected_monitor_refresh_hz =
+        detect_active_monitor_refresh_hz(kGraphicsRefreshHzMin);
     return effective_configured_refresh_hz(config_.graphics.refresh_hz,
+                                           detected_monitor_refresh_hz,
                                            screen_ == Screen::Gameplay);
 }
 
@@ -2215,6 +2229,8 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
                 return;
             }
             const int direction = event.part == render::MenuHitPart::Decrement ? -1 : 1;
+            song_select_focus_ = SongSelectFocus::QuickSettings;
+            song_quick_setting_cursor_ = clamp_int(event.index, 0, 3);
             if (!adjust_song_quick_setting(config_, event.index, direction)) {
                 return;
             }
@@ -2346,7 +2362,7 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
             return;
         case Screen::SettingsSkins:
             settings_cursor_ = clamp_int(event.index, 0,
-                                         38 + (config::normalize_skin_source_token(config_.skin.source) == "lr2" ? 1 : 0));
+                                         39 + (config::normalize_skin_source_token(config_.skin.source) == "lr2" ? 1 : 0));
             if (finish_selection_only()) {
                 return;
             }
@@ -2972,6 +2988,41 @@ void MenuApp::handle_song_select_input(uint32_t keycode) {
         return;
     }
 #endif
+    if (key_tab_ != 0 && keycode == key_tab_ &&
+        song_select_view_ == SongSelectView::Songs) {
+        song_select_search_active_ = false;
+        song_select_focus_ =
+            song_select_focus_ == SongSelectFocus::QuickSettings
+                ? SongSelectFocus::SongList
+                : SongSelectFocus::QuickSettings;
+        song_quick_setting_cursor_ = clamp_int(song_quick_setting_cursor_, 0, 3);
+        publish_snapshot();
+        return;
+    }
+    if (song_select_focus_ == SongSelectFocus::QuickSettings &&
+        song_select_view_ == SongSelectView::Songs) {
+        if (keycode == key_up_ || keycode == key_down_) {
+            const int direction = keycode == key_up_ ? -1 : 1;
+            song_quick_setting_cursor_ =
+                clamp_int(song_quick_setting_cursor_ + direction, 0, 3);
+            publish_snapshot();
+            return;
+        }
+        if (keycode == key_left_ || keycode == key_right_ || keycode == key_enter_) {
+            const int direction = keycode == key_left_ ? -1 : 1;
+            if (adjust_song_quick_setting(
+                    config_, song_quick_setting_cursor_, direction)) {
+                persist_runtime_config();
+                publish_snapshot();
+            }
+            return;
+        }
+        if (keycode == key_backspace_) {
+            song_select_focus_ = SongSelectFocus::SongList;
+            publish_snapshot();
+            return;
+        }
+    }
     if (keycode == key_left_) {
         song_select_search_active_ = false;
         song_select_focus_ = SongSelectFocus::LeftNav;

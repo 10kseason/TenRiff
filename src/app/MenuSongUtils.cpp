@@ -694,8 +694,9 @@ std::string resolve_song_background_preview_path(const std::string& chart_path) 
     return resolve_bms_background_preview_path(chart_fs_path, parsed.chart);
 }
 
-std::string resolve_bms_audio_preview_path(const std::filesystem::path& chart_path,
-                                           const chart::BmsChart& chart) {
+std::string resolve_bms_declared_audio_preview_path(
+    const std::filesystem::path& chart_path,
+    const chart::BmsChart& chart) {
     if (chart_path.empty()) {
         return {};
     }
@@ -711,6 +712,17 @@ std::string resolve_bms_audio_preview_path(const std::filesystem::path& chart_pa
         }
     }
 
+    return {};
+}
+
+std::string resolve_bms_audio_preview_path(const std::filesystem::path& chart_path,
+                                           const chart::BmsChart& chart) {
+    if (const std::string declared =
+            resolve_bms_declared_audio_preview_path(chart_path, chart);
+        !declared.empty()) {
+        return declared;
+    }
+
     if (auto fallback = largest_local_audio_file(chart_path); fallback.has_value()) {
         return fallback->u8string();
     }
@@ -723,7 +735,8 @@ std::string resolve_song_audio_preview_path(const std::string& chart_path) {
     }
 
     const std::filesystem::path chart_fs_path = path_from_utf8(chart_path);
-    const std::string chart_ext = to_lower_ascii(chart_fs_path.extension().u8string());    if (!is_bms_chart_extension(chart_ext)) {
+    const std::string chart_ext = to_lower_ascii(chart_fs_path.extension().u8string());
+    if (!is_bms_chart_extension(chart_ext)) {
         return {};
     }
 
@@ -734,6 +747,24 @@ std::string resolve_song_audio_preview_path(const std::string& chart_path) {
     options.retain_nonessential_commands = false;
     const auto parsed = parser.parseFile(chart_path, options);
     return resolve_bms_audio_preview_path(chart_fs_path, parsed.chart);
+}
+
+std::string resolve_song_declared_audio_preview_path(const std::string& chart_path) {
+    if (chart_path.empty()) {
+        return {};
+    }
+    const std::filesystem::path chart_fs_path = path_from_utf8(chart_path);
+    const std::string chart_ext = to_lower_ascii(chart_fs_path.extension().u8string());
+    if (!is_bms_chart_extension(chart_ext)) {
+        return {};
+    }
+    chart::BmsParser parser;
+    chart::BmsParserOptions options;
+    options.tolerant = true;
+    options.retain_unknown_headers = false;
+    options.retain_nonessential_commands = false;
+    const auto parsed = parser.parseFile(chart_path, options);
+    return resolve_bms_declared_audio_preview_path(chart_fs_path, parsed.chart);
 }
 
 }  // namespace tenriff::app::menu_songs

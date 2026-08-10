@@ -1940,9 +1940,7 @@ void GameSession::mix_chart_audio(float* output, uint32_t frames, int64_t buffer
         return;
     }
 
-    const float bgm_gain = config_.audio_ui.background_sound_enabled
-                               ? static_cast<float>(std::clamp(config_.audio_ui.bgm_volume, 0.0, 2.0))
-                               : 0.0f;
+    const float bgm_gain = gameplay_bgm_gain(config_.audio_ui.bgm_volume);
     const float keysound_gain = static_cast<float>(std::clamp(config_.audio_ui.keysound_volume, 0.0, 2.0));
     const int64_t buffer_end_samples = buffer_start_samples + static_cast<int64_t>(frames);
     std::size_t write_index = 0;
@@ -2009,7 +2007,7 @@ void GameSession::clamp_output(float* output, uint32_t frames, float master_gain
     }
     const std::size_t sample_count = static_cast<std::size_t>(frames) * 2;
     for (std::size_t i = 0; i < sample_count; ++i) {
-        output[i] = soft_limit_sample(output[i] * master_gain);
+        output[i] = apply_master_volume_to_sample(output[i], master_gain);
     }
 }
 

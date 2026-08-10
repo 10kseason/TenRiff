@@ -98,6 +98,7 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
         config::kNoteDividerGapPxMax);
     target.show_judgement_line = config_.skin.show_judgement_line;
     target.show_gear_boundary_line = config_.skin.show_gear_boundary_line;
+    target.show_timing_feedback = config_.skin.show_timing_feedback;
     target.show_hold_tail = config_.skin.show_hold_tail;
     target.hold_tail_taper_enabled = config_.skin.hold_tail_taper_enabled;
     target.judgement_line_glow_enabled = config_.skin.judgement_line_glow_enabled;
@@ -448,6 +449,76 @@ std::string MenuApp::current_track_label() const {
     return "-";
 }
 
+bool MenuApp::start_song_preview_audio(const SongPreviewDecodeResult& preview) {
+    if (!preview.samples || preview.samples->empty() ||
+        (preview.samples->size() % 2u) != 0u || preview.sample_rate <= 0) {
+        return false;
+    }
+
+    stop_song_preview_audio();
+
+    audio::AudioConfig preview_config = config_.audio;
+    preview_config.sample_rate = static_cast<std::uint32_t>(preview.sample_rate);
+    // Menu preview should coexist with voice chat and other desktop audio. The
+    // gameplay session still follows the user's exclusive/shared setting.
+    preview_config.exclusive_mode = false;
+    song_preview_gain_.store(
+        static_cast<float>(menu_background_gain(
+            config_.audio_ui.background_sound_enabled,
+            config_.audio_ui.master_volume,
+            config_.audio_ui.bgm_volume)),
+        std::memory_order_release);
+
+    const auto samples = preview.samples;
+    const auto initialized = audio_thread_.initialize(
+        preview_config,
+        [this, samples, frame_cursor = std::size_t{0}](
+            float* output,
+            std::uint32_t frames,
+            std::int64_t buffer_start_samples,
+            std::int64_t playback_sample) mutable {
+            static_cast<void>(buffer_start_samples);
+            static_cast<void>(playback_sample);
+            mix_looping_song_preview(
+                *samples,
+                frame_cursor,
+                song_preview_gain_.load(std::memory_order_acquire),
+                output,
+                frames);
+        });
+    if (initialized != audio::AudioResult::Success) {
+        std::cerr << "[warn] Failed to initialize song preview audio (result="
+                  << static_cast<int>(initialized) << ")." << std::endl;
+        audio_thread_.shutdown();
+        sync_menu_music();
+        return false;
+    }
+    menu_music_.stop();
+    const auto started = audio_thread_.start();
+    if (started != audio::AudioResult::Success) {
+        std::cerr << "[warn] Failed to start song preview audio (result="
+                  << static_cast<int>(started) << ")." << std::endl;
+        audio_thread_.shutdown();
+        sync_menu_music();
+        return false;
+    }
+
+    song_preview_active_path_ = preview.path;
+    return true;
+}
+
+void MenuApp::stop_song_preview_audio() {
+    song_preview_gain_.store(0.0f, std::memory_order_release);
+    audio_thread_.shutdown();
+    song_preview_active_path_.clear();
+}
+
+void MenuApp::cancel_song_preview_decode() {
+    if (song_preview_decode_cancel_) {
+        song_preview_decode_cancel_->store(true, std::memory_order_release);
+    }
+}
+
 void MenuApp::service_song_preview() {
     constexpr int64_t kPreviewDelayNs = 750'000'000LL;
     const int64_t now_ns = timing::HighResClock::now_ns();
@@ -460,14 +531,16 @@ void MenuApp::service_song_preview() {
         entry = visible_song_entry(static_cast<std::size_t>(selected_song_));
     }
 
-    const std::string preview_path = entry ? entry->audio_preview_path : std::string{};
-    const std::string selection_key =
-        entry ? entry->path + "\n" + preview_path : std::string{};
+    const std::string chart_path = entry ? song_absolute_path(*entry) : std::string{};
+    const std::string indexed_preview_path = entry ? entry->audio_preview_path : std::string{};
+    const std::string selection_key = entry ? chart_path + "\n" + indexed_preview_path
+                                            : std::string{};
 
-    if (!entry || preview_path.empty()) {
-        const bool was_active = !song_preview_active_path_.empty();
+    if (!entry || chart_path.empty()) {
+        const bool was_active = audio_thread_.is_running() || !song_preview_active_path_.empty();
+        cancel_song_preview_decode();
+        stop_song_preview_audio();
         song_preview_selection_key_.clear();
-        song_preview_active_path_.clear();
         song_preview_due_ns_ = 0;
         song_preview_pending_ = false;
         if (was_active) {
@@ -477,9 +550,10 @@ void MenuApp::service_song_preview() {
     }
 
     if (selection_key != song_preview_selection_key_) {
-        const bool was_active = !song_preview_active_path_.empty();
+        const bool was_active = audio_thread_.is_running() || !song_preview_active_path_.empty();
+        cancel_song_preview_decode();
+        stop_song_preview_audio();
         song_preview_selection_key_ = selection_key;
-        song_preview_active_path_.clear();
         song_preview_due_ns_ = now_ns + kPreviewDelayNs;
         song_preview_pending_ = true;
         if (was_active) {
@@ -488,15 +562,82 @@ void MenuApp::service_song_preview() {
         return;
     }
 
-    if (!song_preview_pending_ || now_ns < song_preview_due_ns_) {
+    if (song_preview_decode_future_.valid() &&
+        song_preview_decode_future_.wait_for(std::chrono::seconds(0)) ==
+            std::future_status::ready) {
+        SongPreviewDecodeResult decoded;
+        try {
+            decoded = song_preview_decode_future_.get();
+        } catch (const std::exception& ex) {
+            decoded.error = ex.what();
+        } catch (...) {
+            decoded.error = "Unknown preview decode error.";
+        }
+        song_preview_decode_cancel_.reset();
+
+        if (decoded.selection_key == selection_key) {
+            if (!decoded.error.empty() && decoded.error != "cancelled") {
+                std::cerr << "[warn] Song preview unavailable: " << decoded.error
+                          << " chart=" << chart_path << std::endl;
+            } else if (start_song_preview_audio(decoded)) {
+                song_preview_pending_ = false;
+                return;
+            }
+        }
+    }
+
+    if (!song_preview_active_path_.empty() && audio_thread_.is_running()) {
+        song_preview_gain_.store(
+            static_cast<float>(menu_background_gain(
+                config_.audio_ui.background_sound_enabled,
+                config_.audio_ui.master_volume,
+                config_.audio_ui.bgm_volume)),
+            std::memory_order_release);
+        return;
+    }
+
+    if (!song_preview_pending_ || now_ns < song_preview_due_ns_ ||
+        song_preview_decode_future_.valid()) {
         return;
     }
 
     song_preview_pending_ = false;
-    song_preview_active_path_ = preview_path;
-    const double gain = std::clamp(
-        config_.audio_ui.master_volume * config_.audio_ui.bgm_volume, 0.0, 1.0);
-    menu_music_.play_looping_file(song_preview_active_path_, gain);
+    const int target_sample_rate = static_cast<int>(std::max<std::uint32_t>(
+        8'000u, config_.audio.sample_rate));
+    auto cancel_flag = std::make_shared<std::atomic<bool>>(false);
+    song_preview_decode_cancel_ = cancel_flag;
+    song_preview_decode_future_ = std::async(
+        std::launch::async,
+        [selection_key,
+         chart_path,
+         indexed_preview_path,
+         target_sample_rate,
+         cancel_flag]() {
+            SongPreviewDecodeResult result;
+            result.selection_key = selection_key;
+            result.sample_rate = target_sample_rate;
+
+            std::vector<float> samples;
+            std::string preview_source;
+            std::string preview_error;
+            if (!build_song_preview_audio(chart_path,
+                                          indexed_preview_path,
+                                          target_sample_rate,
+                                          30,
+                                           samples,
+                                           preview_source,
+                                           &preview_error,
+                                           cancel_flag) ||
+                samples.empty()) {
+                result.error = preview_error;
+                return result;
+            }
+
+            result.path = std::move(preview_source);
+            result.samples =
+                std::make_shared<const std::vector<float>>(std::move(samples));
+            return result;
+        });
 }
 
 
@@ -510,12 +651,17 @@ void MenuApp::sync_menu_music() {
 
     if (screen_ == Screen::SongSelect && !song_preview_active_path_.empty()) {
         if (!config_.audio_ui.background_sound_enabled) {
+            stop_song_preview_audio();
             menu_music_.stop();
             return;
         }
-        const double gain = std::clamp(
-            config_.audio_ui.master_volume * config_.audio_ui.bgm_volume, 0.0, 1.0);
-        menu_music_.play_looping_file(song_preview_active_path_, gain);
+        song_preview_gain_.store(
+            static_cast<float>(menu_background_gain(
+                true,
+                config_.audio_ui.master_volume,
+                config_.audio_ui.bgm_volume)),
+            std::memory_order_release);
+        menu_music_.stop();
         return;
     }
 
@@ -609,7 +755,8 @@ void MenuApp::sync_menu_music() {
         return;
     }
 
-    const double gain = std::clamp(config_.audio_ui.master_volume * config_.audio_ui.bgm_volume, 0.0, 1.0);
+    const double gain = menu_background_gain(
+        true, config_.audio_ui.master_volume, config_.audio_ui.bgm_volume);
     menu_music_.play_looping_file(music_path, gain);
 }
 
@@ -1396,6 +1543,38 @@ void MenuApp::publish_snapshot() {
         populate_generic_screen_render_data(render);
     }
 
+    if (screen_ != Screen::Gameplay && song_indexer_.is_running()) {
+        const auto progress = song_indexer_.progress();
+        render.loading_progress.visible = true;
+        render.loading_progress.stage =
+            menu_song_select::song_index_stage_label(progress.stage);
+        render.loading_progress.processed = std::max(0, progress.processed);
+        render.loading_progress.total = progress.total;
+        if (progress.total > 0) {
+            const int processed = std::clamp(progress.processed, 0, progress.total);
+            render.loading_progress.percent = static_cast<int>(std::llround(
+                100.0 * static_cast<double>(processed) /
+                static_cast<double>(progress.total)));
+            const int remaining = progress.total - processed;
+            const int64_t now_ns = timing::HighResClock::now_ns();
+            const int64_t elapsed_ns =
+                progress.started_ns > 0 && now_ns > progress.started_ns
+                    ? now_ns - progress.started_ns
+                    : 0;
+            if (remaining > 0 && processed > 0 && elapsed_ns > 0) {
+                const double elapsed_seconds =
+                    static_cast<double>(elapsed_ns) / 1'000'000'000.0;
+                const double eta_seconds = elapsed_seconds *
+                    static_cast<double>(remaining) / static_cast<double>(processed);
+                render.loading_progress.eta = menu_song_select::format_eta_seconds(
+                    static_cast<int64_t>(std::llround(eta_seconds)));
+            }
+        } else if (progress.total == 0) {
+            render.loading_progress.percent = 0;
+            render.loading_progress.eta = "0s";
+        }
+    }
+
     populate_help_overlay(render.help_overlay);
     snapshot.render = std::move(render);
     {
@@ -1539,8 +1718,9 @@ void MenuApp::render_snapshot(const MenuSnapshot& snapshot) {
 void MenuApp::update_pressed_keys(const input::InputEvent& event) {
     if (event.state == input::InputState::Pressed) {
         pressed_keys_.insert(event.keycode);
-        if (screen_ == Screen::SongSelect && is_song_select_repeat_key(event.keycode)) {
+        if (is_song_select_repeat_key(event.keycode)) {
             song_select_repeat_key_ = event.keycode;
+            song_select_repeat_screen_ = screen_;
             song_select_repeat_next_ns_ =
                 timing::HighResClock::now_ns() + kSongSelectRepeatInitialDelayNs;
         }
@@ -1556,7 +1736,7 @@ void MenuApp::update_pressed_keys(const input::InputEvent& event) {
 }
 
 void MenuApp::update_song_select_repeat() {
-    if (screen_ != Screen::SongSelect) {
+    if (screen_ != song_select_repeat_screen_) {
         reset_song_select_repeat();
         return;
     }
@@ -1574,7 +1754,53 @@ void MenuApp::update_song_select_repeat() {
         return;
     }
 
-    handle_song_select_input(song_select_repeat_key_);
+    switch (screen_) {
+        case Screen::QuickSetup:
+            handle_quick_setup_input(song_select_repeat_key_);
+            break;
+        case Screen::Title:
+            handle_title_input(song_select_repeat_key_);
+            break;
+        case Screen::OptionsHub:
+            handle_options_hub_input(song_select_repeat_key_);
+            break;
+        case Screen::SongSelect:
+            handle_song_select_input(song_select_repeat_key_);
+            break;
+        case Screen::SessionMix:
+            handle_session_mix_input(song_select_repeat_key_);
+            break;
+        case Screen::SongBrowser:
+            handle_song_browser_input(song_select_repeat_key_);
+            break;
+        case Screen::SettingsAudio:
+            handle_audio_settings_input(song_select_repeat_key_);
+            break;
+        case Screen::SettingsGraphics:
+            handle_graphics_settings_input(song_select_repeat_key_);
+            break;
+        case Screen::SettingsSkins:
+            handle_skins_settings_input(song_select_repeat_key_);
+            break;
+        case Screen::SettingsInput:
+            handle_input_settings_input(song_select_repeat_key_);
+            break;
+        case Screen::SettingsCalibration:
+            handle_calibration_settings_input(song_select_repeat_key_);
+            break;
+        case Screen::ModeSelect:
+            handle_mode_settings_input(song_select_repeat_key_);
+            break;
+        case Screen::ModeMods:
+            handle_mode_mods_input(song_select_repeat_key_);
+            break;
+        case Screen::Keymap:
+            handle_keymap_input(song_select_repeat_key_);
+            break;
+        default:
+            reset_song_select_repeat();
+            return;
+    }
     song_select_repeat_next_ns_ = now_ns + kSongSelectRepeatIntervalNs;
 }
 
@@ -1584,8 +1810,75 @@ void MenuApp::reset_song_select_repeat() {
 }
 
 bool MenuApp::is_song_select_repeat_key(uint32_t keycode) const {
-    return keycode == key_up_ || keycode == key_down_ ||
-           keycode == key_page_up_ || keycode == key_page_down_;
+    if (help_overlay_visible_ || profile_nickname_edit_active_ ||
+        difficulty_table_url_editing_ || song_select_search_active_ ||
+        (screen_ == Screen::Keymap && keymap_capture_active_)) {
+        return false;
+    }
+
+    if (keycode == key_page_up_ || keycode == key_page_down_) {
+        return screen_ == Screen::SongSelect &&
+               song_select_focus_ == SongSelectFocus::SongList;
+    }
+
+    if (keycode == key_up_ || keycode == key_down_) {
+        switch (screen_) {
+            case Screen::QuickSetup:
+            case Screen::Title:
+            case Screen::OptionsHub:
+            case Screen::SongSelect:
+            case Screen::SessionMix:
+            case Screen::SongBrowser:
+            case Screen::SettingsAudio:
+            case Screen::SettingsGraphics:
+            case Screen::SettingsSkins:
+            case Screen::SettingsInput:
+            case Screen::SettingsCalibration:
+            case Screen::ModeSelect:
+            case Screen::ModeMods:
+            case Screen::Keymap:
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    if (keycode != key_left_ && keycode != key_right_) {
+        return false;
+    }
+    switch (screen_) {
+        case Screen::OptionsHub:
+            return true;
+        case Screen::QuickSetup:
+            return settings_cursor_ == 2 || settings_cursor_ == 3;
+        case Screen::SongSelect:
+            return song_select_focus_ == SongSelectFocus::QuickSettings &&
+                   song_quick_setting_cursor_ <= 1;
+        case Screen::SessionMix:
+            return settings_cursor_ == 1;
+        case Screen::SettingsAudio:
+            return settings_cursor_ >= 3 && settings_cursor_ <= 5;
+        case Screen::SettingsSkins: {
+            const int shift =
+                config::normalize_skin_source_token(config_.skin.source) == "lr2" ? 1 : 0;
+            const int row = settings_cursor_ - shift;
+            return settings_cursor_ == 4 + shift || settings_cursor_ == 5 + shift ||
+                   settings_cursor_ == 6 + shift || settings_cursor_ == 7 + shift ||
+                   settings_cursor_ == 9 + shift ||
+                   (row >= 15 && row <= 19) ||
+                   (row >= 21 && row <= 32) ||
+                   (row >= 34 && row <= 36);
+        }
+        case Screen::SettingsInput:
+            return settings_cursor_ == 1 || settings_cursor_ == 2;
+        case Screen::SettingsCalibration:
+            return settings_cursor_ == 1 || settings_cursor_ == 2;
+        case Screen::ModeSelect:
+            return settings_cursor_ == 11 || settings_cursor_ == 13 ||
+                   settings_cursor_ == 14;
+        default:
+            return false;
+    }
 }
 
 void MenuApp::launch_gameplay(const std::string& chart_path,
@@ -1624,7 +1917,8 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
     publish_snapshot();
 
     input_thread_.stop();
-    audio_thread_.shutdown();
+    cancel_song_preview_decode();
+    stop_song_preview_audio();
 
     GameSession session;
     session.set_peer_battle_mode(peer_battle);
