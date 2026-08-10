@@ -913,6 +913,13 @@ bool parse_lr2_file(const fs::path& file_path, Lr2ParseState& state, bool is_top
             if (!lane.has_value() || !x.has_value() || !y.has_value() || !width.has_value() || !height.has_value()) {
                 continue;
             }
+            // Some LR2 playskins park unused lane definitions off-canvas with
+            // alpha 0. They are not part of the active playfield and must not
+            // widen the lane block used to place Gear art.
+            if (parse_int_token(tokens, 8u).value_or(255) <= 0) {
+                state.dst_notes.erase(*lane);
+                continue;
+            }
             state.dst_notes[*lane] = Lr2DestinationNote{*x, *y, *width, *height, true};
             continue;
         }
@@ -1327,11 +1334,15 @@ std::vector<int> collect_lr2_lane_order(const Lr2ParseState& state) {
             indices.insert(index);
         }
     };
-    collect(state.note_slices);
-    collect(state.hold_head_slices);
-    collect(state.hold_body_slices);
-    collect(state.hold_tail_slices);
     collect(state.dst_notes);
+    // A visible #DST_NOTE is the authoritative lane set. Fall back to source
+    // slices only for minimal skins that omit destination metadata entirely.
+    if (indices.empty()) {
+        collect(state.note_slices);
+        collect(state.hold_head_slices);
+        collect(state.hold_body_slices);
+        collect(state.hold_tail_slices);
+    }
 
     std::vector<int> order(indices.begin(), indices.end());
     std::stable_sort(order.begin(), order.end(), [&](int lhs, int rhs) {
@@ -1741,10 +1752,13 @@ std::vector<fs::path> collect_lr2_skin_files(const fs::path& dir) {
 
 int preferred_lr2_file_key_hint(int keys) {
     switch (keys) {
+        case 5:
         case 6:
             return 5;
         case 8:
             return 7;
+        case 10:
+            return 10;
         default:
             return keys;
     }
@@ -1759,11 +1773,11 @@ int score_lr2_skin_file_hint(const fs::path& skin_file, int requested_keys) {
     const std::string lower = to_lower_ascii(utf8_path(skin_file.stem()));
     const std::string hinted = std::to_string(hinted_keys);
     if (lower == "play_" + hinted || lower.find("play_" + hinted) != std::string::npos) {
-        return 250;
+        return 2000;
     }
     if (lower.find(hinted + "key") != std::string::npos ||
         lower.find("_" + hinted) != std::string::npos) {
-        return 100;
+        return 1500;
     }
     return 0;
 }

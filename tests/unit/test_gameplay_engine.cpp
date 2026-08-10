@@ -26,6 +26,23 @@ TEST_CASE("result fast slow aggregate excludes top judgement timing") {
     CHECK(tenriff::gameplay::maximum_detail_score(stats.total_notes) == 20);
 }
 
+TEST_CASE("gameplay engine accepts a carried course gauge value") {
+    GameplayChart chart;
+    chart.lane_count = 1;
+    chart.duration_samples = 1000;
+
+    GameplayConfig config;
+    config.sample_rate = 1000;
+    config.initial_gauge = tenriff::game::GaugeType::Normal;
+    config.initial_gauge_value = 37.5;
+    config.gauge_policy.course_hybrid_deltas = true;
+
+    GameplayEngine engine(chart, config);
+    CHECK(engine.gauge_state().type == tenriff::game::GaugeType::Normal);
+    CHECK(engine.gauge_state().value == doctest::Approx(37.5));
+    CHECK_FALSE(engine.is_game_over());
+}
+
 TEST_CASE("gameplay engine scores a basic hit") {
     GameplayChart chart;
     chart.lane_count = 1;

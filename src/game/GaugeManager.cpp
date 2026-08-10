@@ -35,6 +35,15 @@ GaugeState GaugeManager::initialState(GaugeType type) const noexcept {
 }
 
 GaugeDeltaTable GaugeManager::tableFor(GaugeType type) const noexcept {
+    if (policy_.course_hybrid_deltas && type == GaugeType::Normal) {
+        return GaugeDeltaTable{
+            config_.ex_hard.pg,
+            config_.ex_hard.gr,
+            config_.ex_hard.gd,
+            config_.easy.bd,
+            config_.easy.pr,
+        };
+    }
     switch (type) {
     case GaugeType::ExHard:
         return config_.ex_hard;

@@ -681,6 +681,8 @@ void apply_config_object(const JsonObject& root, RuntimeConfig& config) {
             get_bool(*ui, "show_cursor_in_gameplay", config.ui.show_cursor_in_gameplay);
         config.ui.active_song_source =
             get_string(*ui, "active_song_source", config.ui.active_song_source);
+        config.ui.session_mix_lr2_course_path =
+            get_string(*ui, "session_mix_lr2_course_path", config.ui.session_mix_lr2_course_path);
         if (const auto* recent_sources = get_value(*ui, "recent_song_sources")) {
             if (recent_sources->as_array()) {
                 config.ui.recent_song_sources = get_string_array(*ui, "recent_song_sources");
@@ -1085,6 +1087,7 @@ JsonValue build_json_root(const RuntimeConfig& config) {
     ui.emplace("require_enter_to_exit", JsonValue{config.ui.require_enter_to_exit});
     ui.emplace("show_cursor_in_gameplay", JsonValue{config.ui.show_cursor_in_gameplay});
     ui.emplace("active_song_source", JsonValue{config.ui.active_song_source});
+    ui.emplace("session_mix_lr2_course_path", JsonValue{config.ui.session_mix_lr2_course_path});
     JsonArray recent_song_sources;
     recent_song_sources.reserve(config.ui.recent_song_sources.size());
     for (const auto& source : config.ui.recent_song_sources) {

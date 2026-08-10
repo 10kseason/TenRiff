@@ -54,6 +54,7 @@ struct GameplayConfig {
     game::GaugeConfig gauge;
     game::GaugeRuntimePolicy gauge_policy;
     game::GaugeType initial_gauge = game::GaugeType::Normal;
+    std::optional<double> initial_gauge_value;
     bool gauge_shift_enabled = false;
     double input_offset_ms = 0.0;
     bool practice_no_fail_enabled = false;

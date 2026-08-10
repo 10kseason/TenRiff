@@ -403,8 +403,12 @@ TEST_CASE("lr2 gear wildcard include supplies full-lane receptor art") {
     write_file(skin / "play" / "layout.csv",
                "#SRC_NOTE,0,1,0,0,30,20,1,1,0,0\n"
                "#SRC_NOTE,1,1,30,0,30,20,1,1,0,0\n"
+               "#SRC_NOTE,10,1,0,0,30,20,1,1,0,0\n"
+               "#SRC_NOTE,11,1,30,0,30,20,1,1,0,0\n"
                "#DST_NOTE,0,0,100,400,30,20,0,255,255,255,255,0,0,0,0,0,0,0,0,0\n"
-               "#DST_NOTE,1,0,130,400,30,20,0,255,255,255,255,0,0,0,0,0,0,0,0,0\n");
+               "#DST_NOTE,1,0,130,400,30,20,0,255,255,255,255,0,0,0,0,0,0,0,0,0\n"
+               "#DST_NOTE,10,0,1280,400,30,20,0,0,255,255,255,0,0,0,0,0,0,0,0,0\n"
+               "#DST_NOTE,11,0,1310,400,30,20,0,0,255,255,255,0,0,0,0,0,0,0,0,0\n");
     write_file(skin / "play" / "Gear" / "Default" / "Gear.csv",
                "#SRC_IMAGE,0,0,0,0,80,480,1,1,0,0,0,0,0\n"
                "#DST_IMAGE,0,0,90,0,80,480,0,255,255,255,255,1,0,0,0,0,0,0,0,0\n");
@@ -428,6 +432,87 @@ TEST_CASE("lr2 gear wildcard include supplies full-lane receptor art") {
     CHECK(resolved.gear_overlay_image.source_y == doctest::Approx(0.0f));
     CHECK(resolved.gear_overlay_image.source_width == doctest::Approx(80.0f));
     CHECK(resolved.gear_overlay_image.source_height == doctest::Approx(480.0f));
+    REQUIRE(resolved.gear_placement.valid);
+    CHECK(resolved.gear_placement.offset_x == doctest::Approx(-10.0f / 60.0f));
+    CHECK(resolved.gear_placement.width == doctest::Approx(80.0f / 60.0f));
+}
+
+TEST_CASE("lr2 key modes prefer their named playskin before parsed lane-count fallback") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+
+    const auto root = temp.path / "skins";
+    const auto skin = root / "ModeHints";
+    std::filesystem::create_directories(skin / "img");
+
+    const auto write_mode = [&](std::string_view stem,
+                                std::string_view asset_name,
+                                int parsed_lanes) {
+        std::string contents =
+            "#INFORMATION,0,Mode Hints,Tester\n"
+            "#ENDOFHEADER\n"
+            "#IMAGE,LR2files\\Theme\\ModeHints\\img\\" + std::string(asset_name) + "\n";
+        for (int lane = 0; lane < parsed_lanes; ++lane) {
+            contents += "#SRC_NOTE," + std::to_string(lane) +
+                        ",0,0,0,30,20,1,1,0,0\n";
+            contents += "#DST_NOTE," + std::to_string(lane) + ",0," +
+                        std::to_string(100 + lane * 30) +
+                        ",400,30,20,0,255,255,255,255,0,0,0,0,0,0,0,0,0\n";
+        }
+        write_file(skin / (std::string(stem) + ".lr2skin"), contents);
+        write_file(skin / "img" / std::string(asset_name));
+    };
+
+    // Deliberately give the other files exact parsed lane counts. The named
+    // mode must still win: 5K -> play_5, 8K -> play_7, 10K -> play_10.
+    write_mode("play_5", "five.png", 2);
+    write_mode("play_7", "seven.png", 5);
+    write_mode("play_10", "ten.png", 8);
+
+    const auto five = tenriff::app::resolve_lr2_play_skin(root.u8string(), "ModeHints", 5);
+    REQUIRE(five.found);
+    REQUIRE(five.note_images.size() == 5u);
+    CHECK(five.note_images[0].path.find("five.png") != std::string::npos);
+
+    const auto eight = tenriff::app::resolve_lr2_play_skin(root.u8string(), "ModeHints", 8);
+    REQUIRE(eight.found);
+    REQUIRE(eight.note_images.size() == 8u);
+    CHECK(eight.note_images[0].path.find("seven.png") != std::string::npos);
+
+    const auto ten = tenriff::app::resolve_lr2_play_skin(root.u8string(), "ModeHints", 10);
+    REQUIRE(ten.found);
+    REQUIRE(ten.note_images.size() == 10u);
+    CHECK(ten.note_images[0].path.find("ten.png") != std::string::npos);
+}
+
+TEST_CASE("lr2 key mode falls back to the closest parsed layout when its named file is absent") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+
+    const auto root = temp.path / "skins";
+    const auto skin = root / "ModeFallback";
+    std::filesystem::create_directories(skin / "img");
+    write_file(skin / "img" / "fallback.png");
+
+    std::string contents =
+        "#INFORMATION,0,Mode Fallback,Tester\n"
+        "#ENDOFHEADER\n"
+        "#IMAGE,LR2files\\Theme\\ModeFallback\\img\\fallback.png\n";
+    for (int lane = 0; lane < 10; ++lane) {
+        contents += "#SRC_NOTE," + std::to_string(lane) + ",0,0,0,30,20,1,1,0,0\n";
+        contents += "#DST_NOTE," + std::to_string(lane) + ",0," +
+                    std::to_string(100 + lane * 30) +
+                    ",400,30,20,0,255,255,255,255,0,0,0,0,0,0,0,0,0\n";
+    }
+    write_file(skin / "generic.lr2skin", contents);
+
+    const auto resolved = tenriff::app::resolve_lr2_play_skin(
+        root.u8string(), "ModeFallback", 10);
+    REQUIRE(resolved.found);
+    REQUIRE(resolved.note_images.size() == 10u);
+    CHECK(resolved.note_images[0].path.find("fallback.png") != std::string::npos);
 }
 TEST_CASE("lr2 gear panel declared outside a gear file still imports") {
     TempDirGuard temp;

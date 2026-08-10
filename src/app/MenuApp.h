@@ -16,8 +16,10 @@
 #include "app/CommandLine.h"
 #include "app/GameplayHudRevisions.h"
 #include "app/InputBackendStatus.h"
+#include "app/Lr2Course.h"
 #include "app/MenuMusicController.h"
 #include "app/MultiplayerChartSearch.h"
+#include "app/SessionMix.h"
 #include "app/SongSelectState.h"
 #include "GameplayHudLimits.h"
 #include "app/SongIndex.h"
@@ -76,6 +78,7 @@ private:
         OptionsHub,
         Multiplayer,
         SongSelect,
+        SessionMix,
         SongBrowser,
         Gameplay,
         SettingsAudio,
@@ -253,6 +256,7 @@ private:
     void handle_options_hub_input(uint32_t keycode);
     void handle_multiplayer_input(uint32_t keycode);
     void handle_song_select_input(uint32_t keycode);
+    void handle_session_mix_input(uint32_t keycode);
     void handle_song_browser_input(uint32_t keycode);
     void handle_audio_settings_input(uint32_t keycode);
     void handle_graphics_settings_input(uint32_t keycode);
@@ -315,6 +319,17 @@ private:
                          const std::string& replay_path = {},
                          GameplayLaunchKind launch_kind = GameplayLaunchKind::SinglePlayer);
     void launch_selected_song();
+    void start_session_mix();
+    bool add_selected_song_to_session_mix_draft();
+    void remove_last_session_mix_draft_song();
+    bool save_session_mix_draft(std::string_view path);
+    bool load_session_mix_lr2_course_file(std::string_view path, bool remember_path = true);
+    [[nodiscard]] const Lr2CourseDefinition* selected_session_mix_lr2_course() const;
+    void launch_current_session_mix_song();
+    void advance_session_mix_from_result();
+    void stop_session_mix(bool completed);
+    void record_current_session_mix_result();
+    [[nodiscard]] std::string session_mix_phase_label(SessionMixPhase phase) const;
     void select_multiplayer_chart();
     void service_multiplayer();
     void reset_multiplayer_for_single_player();
@@ -553,6 +568,21 @@ private:
     std::unordered_map<std::string, std::unordered_set<std::string>> song_collection_membership_{};
     int indexed_favorite_count_ = 0;
 
+    int session_mix_minutes_ = 30;
+    int session_mix_source_index_ = 0;
+    std::vector<SessionMixDraftEntry> session_mix_draft_{};
+    std::vector<Lr2CourseDefinition> session_mix_lr2_courses_{};
+    std::string session_mix_active_course_title_{};
+    SessionMixPlan session_mix_plan_{};
+    std::size_t session_mix_cursor_ = 0;
+    int session_mix_completed_ = 0;
+    int session_mix_cleared_ = 0;
+    int64_t session_mix_total_score_ = 0;
+    double session_mix_gauge_value_ = 100.0;
+    bool session_mix_active_ = false;
+    bool session_mix_current_result_recorded_ = false;
+    std::string session_mix_status_message_{};
+
     Screen screen_ = Screen::Title;
     Screen submenu_return_screen_ = Screen::Title;
     int title_cursor_ = 0;
@@ -666,6 +696,7 @@ private:
     uint32_t key_escape_ = 0;
     uint32_t key_backspace_ = 0;
     uint32_t key_delete_ = 0;
+    uint32_t key_c_ = 0;
     uint32_t key_a_ = 0;
     uint32_t key_g_ = 0;
     uint32_t key_i_ = 0;

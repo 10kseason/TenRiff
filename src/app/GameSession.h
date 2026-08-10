@@ -152,6 +152,7 @@ public:
         bool finished = false;
         std::string clear_status = "FAILED";
         std::string final_gauge = "normal";
+        double final_gauge_value = 0.0;
         std::string player_name;
         gameplay::ResultStats stats;
         std::vector<std::string> mods;
@@ -179,6 +180,10 @@ public:
     void set_screenshot_callback(ScreenshotCallback callback);
     void set_peer_spectator_done_callback(PeerSpectatorDoneCallback callback);
     void set_peer_battle_mode(bool enabled) { peer_battle_mode_ = enabled; }
+    void set_course_gauge(double initial_value) {
+        course_gauge_enabled_ = true;
+        course_gauge_initial_value_ = initial_value;
+    }
     void set_input_backend_fallback_override(const InputBackendRuntimeState& state) {
         force_polling_input_ = state.auto_fallback &&
                                state.effective_backend == input::InputBackend::Polling;
@@ -381,6 +386,8 @@ private:
     bool practice_no_fail_enabled_ = false;
     bool one_miss_fail_enabled_ = false;
     bool gauge_shift_enabled_ = false;
+    bool course_gauge_enabled_ = false;
+    double course_gauge_initial_value_ = 100.0;
     gameplay::ReplayFile ghost_replay_source_{};
     bool ghost_replay_enabled_ = false;
     std::size_t ghost_replay_event_index_ = 0;
