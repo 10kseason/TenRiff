@@ -3,7 +3,7 @@
 这份文档是下一位 agent 或新任务接手时应该最先阅读的当前状态文档。目标是快速说明“这个项目现在是什么、应该先看哪里、还有哪些内容尚未验证”。
 
 ## 基线
-- 当前项目版本与公开稳定版均为 `1.4.0.1`
+- 当前项目版本与本地发布版本均为 `1.4.1`
 - UI-r2 Result 使用 2.2 秒时间线依次展示棱镜、分数、等级、通关状态、判定统计和图表；可用 Space 跳过，在演出结束前锁定 Continue/Retry/Replay 输入。
 - UI-r2 Song Select 使用顶部标签、7 行封面曲库、大幅选中图片、最佳记录卡、谱面/模式面板和可实际启动的 START 按钮；不显示 Collection/Store/货币/全球排名等虚构功能
 - Song Select 的 Rate、Hi-Speed、Gauge、Random 单元格支持左键增加/下一项、右键减少/上一项并立即保存；当前谱面键数不再被裁切，最佳记录会同时显示分数、准确率和最大连击。
@@ -101,6 +101,7 @@
   - Random 支持 `Off / Mirror / FR / SR`；Mirror 在 key-mode 变换后反转最终 lane，10K/16K 则在每个 player half 内独立反转
   - Mod Manager 的 `LN Mix 10%～90%` 会保留已有 hold，并排除与同 lane 已有 span 重叠的 head；它通过 `Random Seed` 从按 base BPM 计算的 1/8-note hold 能在下一同 lane note 前至少 50ms 结束的 tap 中选择指定比例，并在所有 Mix 档位中把长度分配为 60% 长 1/8-note、20% 中 1/16-note、20% 短且交替的 1/24 与 1/32-note
 - Skins / Gameplay feel：
+  - 标准 `10+2 DP` chart 会跳过两条 scratch lane，把 `10K` lane-color palette 依次应用到实际十个按键 lane，并与原生 12K palette 保持独立
   - `rect / triangle / pentagon / hexagon / circle` 音符形状；procedural 圆形/多边形在 100% 下使用与 rect 条相同的完整宽度
   - note border 开关
   - combo Y 调整
@@ -204,7 +205,7 @@
 
 ## 运行时 / 打包规则
 - 新用户 profile 会自动创建
-- 当前正式 P2P 发布线为 `TenRiff 1.4.0.1`
+- 当前本地 P2P 发布线为 `TenRiff 1.4.1`
 - 发布包不包含 `Songs`
 - 发布包包含 `Main Menu / Options / Song Selecte / Multiplayer Lobby / Clear / Failed` 这些 `Mainmusic/` 场景槽位；每个 `Name.mp3` 及 `Name 2.mp3`～`Name 64.mp3` 会自动发现，并在重新进入场景时轮换
 - 发布更新只包含已构建产物和必要的运行时资源

@@ -40,7 +40,7 @@ If a profile does not exist, it is created automatically on first launch.
 
 - `backend` (string)
   - `polling | rawinput`
-  - defaults to `rawinput` on the current `1.4.0.1` release line
+  - defaults to `rawinput` on the current `1.4.1` release line
   - selectable per profile under `Options -> Input Settings -> Backend` or `Options -> Profile Setup -> Input Backend`
   - runtime fallback never rewrites the saved value to `polling`
   - a confirmed RawInput startup failure, registration-target loss, or message-window exit latches Polling across menu and subsequent gameplay sessions for the current app run
@@ -60,7 +60,7 @@ If a profile does not exist, it is created automatically on first launch.
 - `judgement_hz` (int)
   - `1000 | 2000 | 4000 | 8000`
   - compatibility field kept in the input config
-  - the current `1.4.0.1` runtime no longer drives a separate audio-thread judgement sub-step loop from this value
+  - the current `1.4.1` runtime no longer drives a separate audio-thread judgement sub-step loop from this value
   - default is `4000` (`0.25ms`)
 - `debounce_ms` (double)
   - real Press/Release transitions are preserved; only duplicate same-state events are removed from pressed-state tracking
@@ -177,6 +177,14 @@ The chart loader and indexer are limited to BMS-family files (`.bms/.bme/.bml/.p
   - when `true`, the first OD8-converted object `MISS` forces the gauge to zero and ends the run immediately
   - native `BAD` timing alone and empty-key `POOR` judgements do not trigger it
   - enabling it in Mode Settings automatically disables `practice_no_fail_enabled`
+- `pacemaker_mode` (string)
+  - `off | accuracy | score`; defaults to `off`
+  - Accuracy/Score modes run to chart end and clear only when the selected result target is met
+  - enabling Pacemaker disables Practice and Sudden Death; replay playback and multiplayer force it off
+- `pacemaker_target_accuracy` (double)
+  - `0..100`, default `90.0`; compares against standard result Accuracy
+- `pacemaker_target_score` (int)
+  - `0..10000`, default `8000`; compares against the displayed final Score after multipliers
 - `song_index_profile` (string)
   - `safe | fast`
   - `safe` is the default that prioritizes lower RAM high-water usage on large libraries

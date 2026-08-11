@@ -50,18 +50,19 @@ using tenriff::app::erase_last_multiplayer_utf8_character;
 static_assert(static_cast<int>(MultiplayerMenuRow::Address) == 0);
 static_assert(static_cast<int>(MultiplayerMenuRow::Back) == kMultiplayerMenuRowCount - 1);
 
-TEST_CASE("multiplayer menu exposes ten stable rows including chat") {
-    CHECK(kMultiplayerMenuRowCount == 10);
+TEST_CASE("multiplayer menu exposes eleven stable rows including LAN rooms and chat") {
+    CHECK(kMultiplayerMenuRowCount == 11);
     CHECK(static_cast<int>(MultiplayerMenuRow::Address) == 0);
     CHECK(static_cast<int>(MultiplayerMenuRow::Port) == 1);
-    CHECK(static_cast<int>(MultiplayerMenuRow::Host) == 2);
-    CHECK(static_cast<int>(MultiplayerMenuRow::Join) == 3);
-    CHECK(static_cast<int>(MultiplayerMenuRow::Chart) == 4);
-    CHECK(static_cast<int>(MultiplayerMenuRow::Ready) == 5);
-    CHECK(static_cast<int>(MultiplayerMenuRow::Start) == 6);
-    CHECK(static_cast<int>(MultiplayerMenuRow::Chat) == 7);
-    CHECK(static_cast<int>(MultiplayerMenuRow::Options) == 8);
-    CHECK(static_cast<int>(MultiplayerMenuRow::Back) == 9);
+    CHECK(static_cast<int>(MultiplayerMenuRow::LanRoom) == 2);
+    CHECK(static_cast<int>(MultiplayerMenuRow::Host) == 3);
+    CHECK(static_cast<int>(MultiplayerMenuRow::Join) == 4);
+    CHECK(static_cast<int>(MultiplayerMenuRow::Chart) == 5);
+    CHECK(static_cast<int>(MultiplayerMenuRow::Ready) == 6);
+    CHECK(static_cast<int>(MultiplayerMenuRow::Start) == 7);
+    CHECK(static_cast<int>(MultiplayerMenuRow::Chat) == 8);
+    CHECK(static_cast<int>(MultiplayerMenuRow::Options) == 9);
+    CHECK(static_cast<int>(MultiplayerMenuRow::Back) == 10);
 }
 
 TEST_CASE("gameplay launch intent cannot promote a single-player run to peer battle") {
@@ -100,12 +101,12 @@ TEST_CASE("leaving multiplayer clears session state but keeps connection fields"
 TEST_CASE("multiplayer menu cursor clamps and moves within the row range") {
     CHECK(clamp_multiplayer_menu_cursor(-4) == 0);
     CHECK(clamp_multiplayer_menu_cursor(3) == 3);
-    CHECK(clamp_multiplayer_menu_cursor(99) == 9);
+    CHECK(clamp_multiplayer_menu_cursor(99) == 10);
 
     CHECK(move_multiplayer_menu_cursor(0, -1) == 0);
     CHECK(move_multiplayer_menu_cursor(0, 3) == 3);
     CHECK(move_multiplayer_menu_cursor(6, 1) == 7);
-    CHECK(move_multiplayer_menu_cursor(9, 1) == 9);
+    CHECK(move_multiplayer_menu_cursor(9, 1) == 10);
     CHECK(move_multiplayer_menu_cursor(-20, 1) == 1);
 }
 
@@ -164,6 +165,7 @@ TEST_CASE("peer battle rules fix scoring while preserving local presentation") {
     config.mode.autoplay_enabled = true;
     config.mode.practice_no_fail_enabled = true;
     config.mode.one_miss_fail_enabled = true;
+    config.mode.pacemaker_mode = "score";
     config.skin.note_height_scale = 2.4;
     config.input_offset_ms = 17.0;
     config.visual_offset_ms = -12.0;
@@ -183,6 +185,7 @@ TEST_CASE("peer battle rules fix scoring while preserving local presentation") {
     CHECK_FALSE(config.mode.autoplay_enabled);
     CHECK_FALSE(config.mode.practice_no_fail_enabled);
     CHECK_FALSE(config.mode.one_miss_fail_enabled);
+    CHECK(config.mode.pacemaker_mode == "off");
 
     CHECK(config.speed.hi_speed == doctest::Approx(6.25));
     CHECK(config.skin.note_height_scale == doctest::Approx(2.4));
@@ -364,8 +367,9 @@ TEST_CASE("multiplayer chart candidates resolve relative paths against their own
         candidates[0].indexed_path, candidates[0].source_root);
     CHECK(tenriff::app::menu_songs::normalize_path_key(fs::path(resolved)) ==
           tenriff::app::menu_songs::normalize_path_key(expected));
-    CHECK(multiplayer_chart_path_for_source(target, source.u8string()) ==
-          resolved);
+    const std::string direct = multiplayer_chart_path_for_source(target, source.u8string());
+    CHECK(tenriff::app::menu_songs::normalize_path_key(fs::path(direct)) ==
+          tenriff::app::menu_songs::normalize_path_key(fs::path(resolved)));
 }
 
 TEST_CASE("multiplayer cached chart paths cannot escape their loaded source") {

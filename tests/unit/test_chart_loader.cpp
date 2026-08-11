@@ -3,6 +3,7 @@
 #include <filesystem>
 #include <fstream>
 #include <string>
+#include <string_view>
 
 #include "app/ChartLoader.h"
 #include "gameplay/GameplayChart.h"
@@ -57,6 +58,16 @@ std::string chart_visual_path(const tenriff::gameplay::GameplayChart& chart, std
     return path ? *path : std::string{};
 }
 
+bool refers_to_same_existing_file(std::string_view actual, const std::filesystem::path& expected) {
+    if (actual.empty()) {
+        return false;
+    }
+    std::error_code ec;
+    const bool equivalent = std::filesystem::equivalent(
+        std::filesystem::u8path(actual), expected, ec);
+    return !ec && equivalent;
+}
+
 }  // namespace
 
 TEST_CASE("chart loader falls back to ogg when referenced wav is missing") {
@@ -88,7 +99,8 @@ TEST_CASE("chart loader falls back to ogg when referenced wav is missing") {
     CHECK(result.success());
     CHECK(result.format == ChartFormat::Bms);
     REQUIRE(result.chart.audio_cues.size() == 1u);
-    CHECK(chart_audio_path(result.chart, result.chart.audio_cues.front().asset_id) == ogg_path.u8string());
+    CHECK(refers_to_same_existing_file(
+        chart_audio_path(result.chart, result.chart.audio_cues.front().asset_id), ogg_path));
 }
 
 TEST_CASE("chart loader resolves audio asset paths to absolute paths for relative chart loads") {
@@ -162,7 +174,8 @@ TEST_CASE("chart loader resolves CP932-encoded BMS audio references") {
 
     CHECK(result.success());
     REQUIRE(result.chart.audio_cues.size() == 1u);
-    CHECK(chart_audio_path(result.chart, result.chart.audio_cues.front().asset_id) == ogg_path.u8string());
+    CHECK(refers_to_same_existing_file(
+        chart_audio_path(result.chart, result.chart.audio_cues.front().asset_id), ogg_path));
 #endif
 }
 
@@ -202,7 +215,8 @@ TEST_CASE("chart loader prefers ogg over wav for BMS wav references") {
     CHECK(result.success());
     CHECK(result.format == ChartFormat::Bms);
     REQUIRE(result.chart.audio_cues.size() == 1u);
-    CHECK(chart_audio_path(result.chart, result.chart.audio_cues.front().asset_id) == ogg_path.u8string());
+    CHECK(refers_to_same_existing_file(
+        chart_audio_path(result.chart, result.chart.audio_cues.front().asset_id), ogg_path));
 }
 
 TEST_CASE("chart loader keeps wav when ogg fallback is unavailable") {
@@ -234,7 +248,8 @@ TEST_CASE("chart loader keeps wav when ogg fallback is unavailable") {
     CHECK(result.success());
     CHECK(result.format == ChartFormat::Bms);
     REQUIRE(result.chart.audio_cues.size() == 1u);
-    CHECK(chart_audio_path(result.chart, result.chart.audio_cues.front().asset_id) == wav_path.u8string());
+    CHECK(refers_to_same_existing_file(
+        chart_audio_path(result.chart, result.chart.audio_cues.front().asset_id), wav_path));
 }
 
 TEST_CASE("chart loader rejects unsupported osu chart files") {
@@ -723,6 +738,34 @@ TEST_CASE("chart loader builds hold notes from BMS LNOBJ markers") {
     CHECK(result.chart.notes.front().end_sample.value() > result.chart.notes.front().start_sample);
 }
 
+TEST_CASE("chart loader builds cross-measure MGQ holds from BMS LNTYPE 2") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+
+    const auto chart_path = temp.path / "lntype2.bms";
+    {
+        std::ofstream chart_file(chart_path, std::ios::binary);
+        REQUIRE(chart_file.good());
+        chart_file << "#TITLE LNTYPE 2\n"
+                      "#BPM 120\n"
+                      "#LNTYPE 2\n"
+                      "#00151:00111111\n"
+                      "#00251:11110000\n";
+    }
+
+    ChartLoader loader;
+    const ChartLoadResult result = loader.load(chart_path.u8string(), 48000, 1.0, "ignore");
+
+    REQUIRE(result.success());
+    CHECK(result.messages.empty());
+    REQUIRE(result.chart.notes.size() == 1u);
+    CHECK(result.chart.notes.front().lane == 1);
+    REQUIRE(result.chart.notes.front().end_sample.has_value());
+    CHECK(result.chart.notes.front().end_sample.value() > result.chart.notes.front().start_sample);
+    CHECK_FALSE(result.chart.notes.front().release_required);
+}
+
 TEST_CASE("chart loader enables release judgement for BMS LNMODE 2 long-note channels") {
     TempDirGuard temp;
     temp.path = make_temp_dir();
@@ -802,7 +845,8 @@ TEST_CASE("chart loader attaches BMS note keysounds when follow policy is enable
 
     CHECK(result.success());
     REQUIRE(result.chart.notes.size() == 1u);
-    CHECK(chart_audio_path(result.chart, result.chart.notes.front().audio_asset_id) == wav_path.u8string());
+    CHECK(refers_to_same_existing_file(
+        chart_audio_path(result.chart, result.chart.notes.front().audio_asset_id), wav_path));
     CHECK(result.chart.audio_cues.empty());
 }
 
@@ -869,7 +913,8 @@ TEST_CASE("chart loader interns repeated BMS keysound assets once") {
     REQUIRE(result.chart.notes.size() == 2u);
     REQUIRE(result.chart.audio_assets.size() == 1u);
     CHECK(result.chart.notes[0].audio_asset_id == result.chart.notes[1].audio_asset_id);
-    CHECK(chart_audio_path(result.chart, result.chart.notes[0].audio_asset_id) == wav_path.u8string());
+    CHECK(refers_to_same_existing_file(
+        chart_audio_path(result.chart, result.chart.notes[0].audio_asset_id), wav_path));
 }
 
 TEST_CASE("chart loader can autoplay BMS note keysounds as background cues") {
@@ -902,6 +947,7 @@ TEST_CASE("chart loader can autoplay BMS note keysounds as background cues") {
     REQUIRE(result.chart.notes.size() == 1u);
     CHECK(result.chart.notes.front().audio_asset_id == tenriff::gameplay::kInvalidAudioAssetId);
     REQUIRE(result.chart.audio_cues.size() == 1u);
-    CHECK(chart_audio_path(result.chart, result.chart.audio_cues.front().asset_id) == wav_path.u8string());
+    CHECK(refers_to_same_existing_file(
+        chart_audio_path(result.chart, result.chart.audio_cues.front().asset_id), wav_path));
     CHECK(result.chart.audio_cues.front().start_sample == result.chart.notes.front().start_sample);
 }

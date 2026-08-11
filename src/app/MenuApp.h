@@ -1,12 +1,12 @@
 #pragma once
 
 #include "app/MultiplayerMenuState.h"
+#include "network/LanDiscovery.h"
 #include "network/PeerSession.h"
 
 #include <array>
 #include <atomic>
 #include <cstdint>
-#include <future>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -23,6 +23,7 @@
 #include "app/MultiplayerChartSearch.h"
 #include "app/SessionMix.h"
 #include "app/SongSelectState.h"
+#include "app/SongSelectScreen.h"
 #include "GameplayHudLimits.h"
 #include "app/SongIndex.h"
 #include "app/SongIndexerThread.h"
@@ -73,14 +74,6 @@ private:
     struct BestResultRecord;
     struct LocalPlayRecord;
     struct ReplaySummary;
-
-    struct SongPreviewDecodeResult {
-        std::string selection_key;
-        std::string path;
-        std::string error;
-        std::shared_ptr<const std::vector<float>> samples;
-        int sample_rate = 0;
-    };
 
     enum class Screen {
         QuickSetup,
@@ -166,6 +159,8 @@ private:
         std::string loading_stage;
 
         int lane_count = 10;
+        std::size_t scratch_lane_count = 0;
+        std::array<int, kGameplayHudMaxLanes> scratch_lanes{};
         int64_t current_sample = 0;
         int64_t duration_samples = 0;
         int sample_rate = 48000;
@@ -412,7 +407,7 @@ private:
     [[nodiscard]] std::string selected_song_background_preview_path();
     void sync_menu_music();
     void service_song_preview();
-    [[nodiscard]] bool start_song_preview_audio(const SongPreviewDecodeResult& preview);
+    [[nodiscard]] bool start_song_preview_audio(const SongSelectScreen::PreviewDecodeResult& preview);
     void cancel_song_preview_decode();
     void stop_song_preview_audio();
     void open_keymap_screen(Screen return_screen);
@@ -550,7 +545,11 @@ private:
     GameplayHudState gameplay_hud_{};
 
     network::PeerSession peer_session_{};
+    network::LanDiscoveryService lan_discovery_{};
     MultiplayerMenuState multiplayer_menu_{};
+    std::vector<network::LanDiscoveredRoom> multiplayer_lan_rooms_{};
+    std::size_t multiplayer_lan_room_index_ = 0;
+    uint64_t multiplayer_lan_discovery_revision_ = 0;
     std::string multiplayer_chart_path_{};
     std::string multiplayer_chart_title_{};
     network::ChartFingerprint multiplayer_chart_fingerprint_{};
@@ -662,13 +661,7 @@ private:
     std::string menu_music_scene_key_{};
     std::string menu_music_scene_path_{};
     std::unordered_map<std::string, std::size_t> menu_music_variant_cursors_{};
-    std::string song_preview_selection_key_{};
-    std::string song_preview_active_path_{};
-    int64_t song_preview_due_ns_ = 0;
-    bool song_preview_pending_ = false;
-    std::future<SongPreviewDecodeResult> song_preview_decode_future_{};
-    std::shared_ptr<std::atomic<bool>> song_preview_decode_cancel_{};
-    std::atomic<float> song_preview_gain_{0.0f};
+    SongSelectScreen song_select_screen_{};
     render::RenderThread render_thread_{};
     render::MenuWindow menu_window_{};
 

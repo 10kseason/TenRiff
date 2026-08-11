@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(TenRiff VERSION 1.4.0.1 LANGUAGES C CXX)
+project(TenRiff VERSION 1.4.1 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -12,6 +12,25 @@ endif()
 
 option(TENRIFF_ENABLE_TESTS "Build TenRiff unit tests" ON)
 option(TENRIFF_ENABLE_ONNX_UPSCALER "Enable the optional user-selected WinML ONNX background upscaler" ON)
+option(TENRIFF_ENABLE_ASAN "Build TenRiff with AddressSanitizer" OFF)
+
+if(TENRIFF_ENABLE_ASAN)
+    if(MSVC)
+        add_compile_options(/fsanitize=address /Zi /FS)
+        add_link_options(/INCREMENTAL:NO)
+        get_filename_component(TENRIFF_ASAN_RUNTIME_DIR "${CMAKE_CXX_COMPILER}" DIRECTORY)
+        set(TENRIFF_ASAN_RUNTIME_DLL
+            "${TENRIFF_ASAN_RUNTIME_DIR}/clang_rt.asan_dynamic-x86_64.dll")
+        if(NOT EXISTS "${TENRIFF_ASAN_RUNTIME_DLL}")
+            message(FATAL_ERROR "MSVC AddressSanitizer runtime DLL was not found")
+        endif()
+    elseif(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
+        add_compile_options(-fsanitize=address -fno-omit-frame-pointer)
+        add_link_options(-fsanitize=address)
+    else()
+        message(FATAL_ERROR "TENRIFF_ENABLE_ASAN is unsupported by this compiler")
+    endif()
+endif()
 
 add_library(tenriff_chart
     src/chart/BmsParser.cpp
@@ -81,6 +100,7 @@ add_library(tenriff_core
     src/gameplay/OsuManiaScore.cpp
     src/gameplay/ResultStats.cpp
     src/gameplay/Replay.cpp
+    src/network/LanDiscovery.cpp
     src/network/PeerProtocol.cpp
     src/network/PeerSession.cpp
     src/app/BmsGameplayBuilder.cpp
@@ -181,6 +201,7 @@ if(WIN32)
     add_library(tenriff_app
         src/app/MenuMusicController.cpp
         src/app/SongPreviewBuilder.cpp
+        src/app/SongSelectScreen.cpp
         src/app/GameSession.cpp
         src/app/MenuApp.cpp
         src/app/MenuAppMultiplayer.cpp
@@ -420,6 +441,7 @@ if(TENRIFF_ENABLE_TESTS)
         tests/unit/test_osu_difficulty.cpp
         tests/unit/test_song_index.cpp
         tests/unit/test_song_select_state.cpp
+        tests/unit/test_song_select_screen.cpp
         tests/unit/test_session_mix.cpp
         tests/unit/test_lr2_course.cpp
         tests/unit/test_menu_settings_utils.cpp
@@ -436,6 +458,7 @@ if(TENRIFF_ENABLE_TESTS)
         tests/unit/test_bga_image_loader.cpp
         tests/unit/test_targa_image.cpp
         tests/unit/test_result_presentation.cpp
+        tests/unit/test_lan_discovery.cpp
         tests/unit/test_peer_protocol.cpp
         tests/unit/test_peer_session.cpp
         tests/unit/test_multiplayer_menu_state.cpp
@@ -452,5 +475,20 @@ if(TENRIFF_ENABLE_TESTS)
     else()
         target_link_libraries(bms_parser_tests PRIVATE tenriff_chart tenriff_game tenriff_runtime tenriff_core)
     endif()
-    add_test(NAME bms_parser_tests COMMAND bms_parser_tests)
+    if(TENRIFF_ENABLE_ASAN AND MSVC)
+        add_custom_command(TARGET bms_parser_tests POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "${TENRIFF_ASAN_RUNTIME_DLL}"
+                "$<TARGET_FILE_DIR:bms_parser_tests>"
+            COMMENT "Copying the MSVC AddressSanitizer runtime")
+    endif()
+    if(TENRIFF_ENABLE_ASAN)
+        add_test(
+            NAME bms_parser_tests_asan
+            COMMAND bms_parser_tests --skip-windows-runtime-integration)
+        set_tests_properties(bms_parser_tests_asan PROPERTIES TIMEOUT 600)
+    else()
+        add_test(NAME bms_parser_tests COMMAND bms_parser_tests)
+        set_tests_properties(bms_parser_tests PROPERTIES TIMEOUT 600)
+    endif()
 endif()

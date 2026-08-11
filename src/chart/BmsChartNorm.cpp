@@ -5,6 +5,7 @@
 #include <cmath>
 #include <iterator>
 #include <string_view>
+#include <unordered_map>
 
 namespace tenriff::chart {
 
@@ -127,6 +128,10 @@ bool is_potential_note_channel(std::string_view channel) {
     char first = channel[0];
     return first == '1' || first == '2' || first == '5' || first == '6';
 }
+
+bool is_long_note_channel(std::string_view channel) {
+    return channel.size() == 2 && (channel[0] == '5' || channel[0] == '6');
+}
 std::optional<std::size_t> mine_lane_for_channel(const NoteLaneMapping& mapping,
                                                  std::string_view channel) {
     if (channel.size() != 2 ||
@@ -214,9 +219,113 @@ BmsNormalizationResult BmsChartNormalizer::normalize(const BmsChart& chart) cons
         return std::nullopt;
     };
 
+    const bool lntype2 = [&chart]() {
+        const auto it = chart.headers.find("LNTYPE");
+        if (it == chart.headers.end()) {
+            return false;
+        }
+        const auto value = parse_double(it->second);
+        return value.has_value() && std::abs(value.value() - 2.0) < 1e-9;
+    }();
+
+    if (lntype2) {
+        std::unordered_map<std::string, std::vector<const BmsMeasureCommand*>> commands_by_channel;
+        for (const auto& command : chart.commands) {
+            if (is_long_note_channel(command.channel)) {
+                commands_by_channel[command.channel].push_back(&command);
+            }
+        }
+
+        for (auto& [channel, commands] : commands_by_channel) {
+            std::stable_sort(commands.begin(), commands.end(), [](const auto* lhs, const auto* rhs) {
+                return lhs->measure < rhs->measure;
+            });
+
+            const auto lane = chart.lane_mapping.laneForChannel(channel);
+            if (!lane.has_value()) {
+                continue;
+            }
+
+            bool active = false;
+            std::string active_object;
+            const BmsMeasureCommand* last_command = nullptr;
+            std::size_t last_slice_count = 0;
+
+            const auto append_endpoint = [&](const BmsMeasureCommand& command,
+                                             std::size_t slice_index,
+                                             std::size_t slice_count,
+                                             double intra_measure,
+                                             std::string_view object_id) {
+                const auto& measure = result.chart.measures[static_cast<std::size_t>(command.measure)];
+                BmsNormalizedEvent event;
+                event.type = BmsNormalizedEventType::Note;
+                event.measure = command.measure;
+                event.slice_index = slice_index;
+                event.slice_count = slice_count;
+                event.intra_measure = intra_measure;
+                event.position = measure.start + measure.length * intra_measure;
+                event.channel = command.channel;
+                event.object_id = std::string(object_id);
+                event.lane = lane;
+                result.chart.events.push_back(std::move(event));
+            };
+
+            for (const BmsMeasureCommand* command : commands) {
+                if (!command || command->data.empty()) {
+                    continue;
+                }
+                if (command->data.size() % 2 != 0) {
+                    add_message(result.messages, BmsParseSeverity::Error, command->measure,
+                                "LNTYPE 2 command data does not consist of pairs of characters.");
+                    continue;
+                }
+
+                const std::size_t slice_count = command->data.size() / 2;
+                if (slice_count == 0) {
+                    continue;
+                }
+
+                if (active && last_command && command->measure > last_command->measure + 1) {
+                    append_endpoint(*last_command, last_slice_count, last_slice_count, 1.0, active_object);
+                    active = false;
+                    active_object.clear();
+                }
+
+                for (std::size_t index = 0; index < slice_count; ++index) {
+                    const std::string token = to_upper_ascii(command->data.substr(index * 2, 2));
+                    const double intra = static_cast<double>(index) / static_cast<double>(slice_count);
+                    if (token != "00") {
+                        if (!active) {
+                            active = true;
+                            active_object = token;
+                            append_endpoint(*command, index, slice_count, intra, active_object);
+                        }
+                    } else if (active) {
+                        append_endpoint(*command, index, slice_count, intra, active_object);
+                        active = false;
+                        active_object.clear();
+                    }
+                }
+
+                last_command = command;
+                last_slice_count = slice_count;
+            }
+
+            if (active && last_command) {
+                append_endpoint(*last_command, last_slice_count, last_slice_count, 1.0, active_object);
+                add_message(result.messages, BmsParseSeverity::Warning, last_command->measure,
+                            "LNTYPE 2 long note reached the end of its last command without an explicit 00; closed at the measure boundary.");
+            }
+        }
+    }
+
 
     for (const auto& command : chart.commands) {
         if (command.channel == "02") {
+            continue;
+        }
+
+        if (lntype2 && is_long_note_channel(command.channel)) {
             continue;
         }
 

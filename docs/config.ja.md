@@ -40,7 +40,7 @@ profile が存在しない場合は初回起動時に自動生成されます。
 
 - `backend` (string)
   - `polling | rawinput`
-  - 現行 `1.4.0.1` リリースラインの既定値は `rawinput`
+  - 現行 `1.4.1` リリースラインの既定値は `rawinput`
   - `Options -> Input Settings -> Backend` または `Options -> Profile Setup -> Input Backend` で profile ごとに選択可能
   - runtime fallback は保存済みの値を `polling` に書き換えない
   - RawInput の起動失敗、登録先の消失、message window の終了を確認すると、そのアプリ実行中は menu と後続 gameplay の両方で Polling を維持する
@@ -177,6 +177,14 @@ chart loader/indexer は BMS family（`.bms/.bme/.bml/.pms`）専用です。旧
   - `true` のとき最初の OD8 換算 object `MISS` で gauge が 0 になり、即座に失敗する
   - native `BAD` timing だけでは発動せず、空打ちの `POOR` も即死条件に含めない
   - Mode Settings で有効にすると `practice_no_fail_enabled` は自動的に無効になる
+- `pacemaker_mode` (string)
+  - `off | accuracy | score`、既定値は `off`
+  - Accuracy/Score mode は譜面末尾まで進み、選択した result target 以上の場合だけ clear
+  - Pacemaker を有効にすると Practice と Sudden Death は無効になり、replay playback と multiplayer では強制 off
+- `pacemaker_target_accuracy` (double)
+  - `0..100`、既定値 `90.0`。標準 result Accuracy と比較
+- `pacemaker_target_score` (int)
+  - `0..10000`、既定値 `8000`。倍率適用後の表示 final Score と比較
 - `song_index_profile` (string)
   - `safe | fast`
   - `safe` は大規模ライブラリで RAM high-water を抑える既定値

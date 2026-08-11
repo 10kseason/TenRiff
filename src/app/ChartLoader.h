@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -28,7 +29,8 @@ public:
     [[nodiscard]] ChartLoadResult load(const std::string& path,
                                        int sample_rate,
                                        double rate,
-                                       std::string_view bms_keysound_policy = "ignore") const;
+                                       std::string_view bms_keysound_policy = "ignore",
+                                       uint32_t bms_random_seed = 0) const;
 };
 
 }  // namespace tenriff::app

@@ -121,6 +121,20 @@ TEST_CASE("gameplay hud revisions ignore sample-only updates for text caches") {
     CHECK_FALSE(diff.text_changed);
 }
 
+TEST_CASE("gameplay hud revisions refresh motion when scratch layout changes") {
+    tenriff::app::GameplayHudRevisionInput previous;
+    previous.lane_count = 12;
+
+    auto next = previous;
+    next.scratch_lane_count = 2;
+    next.scratch_lanes[0] = 6;
+    next.scratch_lanes[1] = 12;
+
+    const auto diff = tenriff::app::diff_gameplay_hud_revisions(previous, next);
+    CHECK(diff.motion_changed);
+    CHECK_FALSE(diff.text_changed);
+}
+
 TEST_CASE("gameplay hud revisions refresh motion when note pending state changes") {
     tenriff::app::GameplayHudRevisionInput previous;
     previous.note_count = 1;

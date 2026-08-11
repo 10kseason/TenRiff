@@ -36,6 +36,8 @@ inline constexpr double kHiSpeedMax = 50.0;
 inline constexpr double kHiSpeedStep = 0.01;
 inline constexpr int kSeedMin = 0;
 inline constexpr int kSeedMax = 9999;
+inline constexpr double kPacemakerAccuracyStep = 0.5;
+inline constexpr int64_t kPacemakerScoreStep = 100;
 inline std::string to_lower_ascii(std::string value) {
     std::transform(value.begin(), value.end(), value.begin(), [](unsigned char ch) {
         if (ch >= static_cast<unsigned char>('A') && ch <= static_cast<unsigned char>('Z')) {
@@ -51,6 +53,18 @@ inline std::string preset_label(const std::string& preset) {
         return "High";
     }
     return "Basic";
+}
+
+inline std::string cycle_pacemaker_mode(std::string_view mode, int direction) {
+    const std::string normalized = config::normalize_pacemaker_mode_token(mode);
+    if (direction < 0) {
+        if (normalized == "off") return "score";
+        if (normalized == "score") return "accuracy";
+        return "off";
+    }
+    if (normalized == "off") return "accuracy";
+    if (normalized == "accuracy") return "score";
+    return "off";
 }
 
 inline void apply_audio_preset(config::RuntimeConfig& config) {

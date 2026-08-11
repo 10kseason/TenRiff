@@ -13,11 +13,10 @@ TEST_CASE("chart audio budget choice clamps startup and runtime budgets") {
     CHECK(budgets.runtime_cache_bytes == 768ull * 1024ull * 1024ull);
 }
 
-TEST_CASE("chart audio startup plan always includes BGM and early assets before deferred assets") {
+TEST_CASE("chart audio startup only blocks on early assets and streams later BGM") {
     using tenriff::app::ChartAudioStartupCandidate;
 
     std::vector<ChartAudioStartupCandidate> candidates(4);
-    candidates[0].has_bgm = true;
     candidates[0].first_use_sample = 40'000;
     candidates[0].estimated_decoded_bytes = 32ull * 1024ull * 1024ull;
     candidates[0].use_count = 1;
@@ -41,7 +40,7 @@ TEST_CASE("chart audio startup plan always includes BGM and early assets before 
 
     REQUIRE(plan.required_assets.size() == candidates.size());
     REQUIRE(plan.queued_assets.size() == candidates.size());
-    CHECK(plan.required_assets[0] == 1);
+    CHECK(plan.required_assets[0] == 0);
     CHECK(plan.required_assets[1] == 1);
     CHECK(plan.queued_assets[0] == 1);
     CHECK(plan.queued_assets[1] == 1);

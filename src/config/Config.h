@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 #include <string>
 #include <string_view>
@@ -60,6 +61,12 @@ inline constexpr double kSkinHoldBodyOpacityDefault = 1.00;
 inline constexpr double kSkinKeyPulseBrightnessMin = 0.00;
 inline constexpr double kSkinKeyPulseBrightnessMax = 1.00;
 inline constexpr double kSkinKeyPulseBrightnessDefault = 1.00;
+inline constexpr double kPacemakerAccuracyMin = 0.0;
+inline constexpr double kPacemakerAccuracyMax = 100.0;
+inline constexpr double kPacemakerAccuracyDefault = 90.0;
+inline constexpr int64_t kPacemakerScoreMin = 0;
+inline constexpr int64_t kPacemakerScoreMax = 10'000;
+inline constexpr int64_t kPacemakerScoreDefault = 8'000;
 
 struct JudgeConfig {
     double pg_ms = 20.0;
@@ -200,6 +207,9 @@ struct ModeConfig {
     bool autoplay_enabled = false;
     bool practice_no_fail_enabled = false;
     bool one_miss_fail_enabled = false;
+    std::string pacemaker_mode = "off";
+    double pacemaker_target_accuracy = kPacemakerAccuracyDefault;
+    int64_t pacemaker_target_score = kPacemakerScoreDefault;
     std::string song_index_profile = "safe";
     bool calculate_song_index_difficulty = false;
 };
@@ -243,6 +253,7 @@ public:
 [[nodiscard]] std::string normalize_skin_mode_token(std::string_view key_mode);
 [[nodiscard]] std::string normalize_ui_language_token(std::string_view token);
 [[nodiscard]] std::string normalize_song_index_profile_token(std::string_view token);
+[[nodiscard]] std::string normalize_pacemaker_mode_token(std::string_view token);
 [[nodiscard]] std::string normalize_profile_nickname(std::string_view value);
 [[nodiscard]] std::string normalize_profile_avatar_path(std::string_view value);
 [[nodiscard]] std::string normalize_background_upscale_mode(std::string_view token);
@@ -275,5 +286,10 @@ void apply_skin_visual_preset(SkinConfig& skin, std::string_view token);
 [[nodiscard]] double resolved_skin_lane_center_gap_scale(const SkinConfig& skin, std::string_view key_mode);
 [[nodiscard]] std::vector<std::string> default_skin_lane_colors(std::string_view key_mode);
 [[nodiscard]] std::vector<std::string> resolved_skin_lane_colors(const SkinConfig& skin, std::string_view key_mode);
+[[nodiscard]] std::vector<std::string> resolved_skin_lane_colors_for_layout(
+    const SkinConfig& skin,
+    int lane_count,
+    const int* scratch_lanes,
+    std::size_t scratch_lane_count);
 
 }  // namespace tenriff::config

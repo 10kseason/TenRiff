@@ -237,7 +237,11 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
 
     target.lane_color_count = 0;
     target.lane_colors.fill(0);
-    const auto lane_colors = config::resolved_skin_lane_colors(config_.skin, skin_mode);
+    const auto lane_colors = config::resolved_skin_lane_colors_for_layout(
+        config_.skin,
+        target.lane_count,
+        gameplay_hud_.scratch_lanes.data(),
+        gameplay_hud_.scratch_lane_count);
     target.lane_color_count = std::min<std::size_t>(lane_colors.size(), static_cast<std::size_t>(target.lane_count));
     for (std::size_t i = 0; i < target.lane_color_count; ++i) {
         target.lane_colors[i] = config::skin_color_rgb(lane_colors[i]);
@@ -449,7 +453,7 @@ std::string MenuApp::current_track_label() const {
     return "-";
 }
 
-bool MenuApp::start_song_preview_audio(const SongPreviewDecodeResult& preview) {
+bool MenuApp::start_song_preview_audio(const SongSelectScreen::PreviewDecodeResult& preview) {
     if (!preview.samples || preview.samples->empty() ||
         (preview.samples->size() % 2u) != 0u || preview.sample_rate <= 0) {
         return false;
@@ -462,7 +466,7 @@ bool MenuApp::start_song_preview_audio(const SongPreviewDecodeResult& preview) {
     // Menu preview should coexist with voice chat and other desktop audio. The
     // gameplay session still follows the user's exclusive/shared setting.
     preview_config.exclusive_mode = false;
-    song_preview_gain_.store(
+    song_select_screen_.preview_gain().store(
         static_cast<float>(menu_background_gain(
             config_.audio_ui.background_sound_enabled,
             config_.audio_ui.master_volume,
@@ -482,7 +486,7 @@ bool MenuApp::start_song_preview_audio(const SongPreviewDecodeResult& preview) {
             mix_looping_song_preview(
                 *samples,
                 frame_cursor,
-                song_preview_gain_.load(std::memory_order_acquire),
+                song_select_screen_.preview_gain().load(std::memory_order_acquire),
                 output,
                 frames);
         });
@@ -503,31 +507,47 @@ bool MenuApp::start_song_preview_audio(const SongPreviewDecodeResult& preview) {
         return false;
     }
 
-    song_preview_active_path_ = preview.path;
+    song_select_screen_.set_preview_active_path(preview.path);
     return true;
 }
 
 void MenuApp::stop_song_preview_audio() {
-    song_preview_gain_.store(0.0f, std::memory_order_release);
+    song_select_screen_.preview_gain().store(0.0f, std::memory_order_release);
     audio_thread_.shutdown();
-    song_preview_active_path_.clear();
+    song_select_screen_.clear_preview_active_path();
 }
 
 void MenuApp::cancel_song_preview_decode() {
-    if (song_preview_decode_cancel_) {
-        song_preview_decode_cancel_->store(true, std::memory_order_release);
-    }
+    song_select_screen_.cancel_preview_decode();
 }
 
 void MenuApp::service_song_preview() {
     constexpr int64_t kPreviewDelayNs = 750'000'000LL;
     const int64_t now_ns = timing::HighResClock::now_ns();
 
-    const SongEntry* entry = nullptr;
-    if (screen_ == Screen::SongSelect &&
+    const bool preview_screen_active =
+        screen_ == Screen::SongSelect &&
         song_select_view_ == SongSelectView::Songs &&
-        config_.audio_ui.background_sound_enabled &&
-        selected_song_ >= 0) {
+        config_.audio_ui.background_sound_enabled;
+    const bool was_preview_screen_active = song_select_screen_.active();
+    song_select_screen_.set_active(preview_screen_active);
+
+    if (was_preview_screen_active && !preview_screen_active) {
+        const bool was_audio_active =
+            audio_thread_.is_running() || !song_select_screen_.preview_active_path().empty();
+        stop_song_preview_audio();
+        if (was_audio_active) {
+            sync_menu_music();
+        }
+    }
+
+    // Always drain a completed future, including after leaving Song Select.
+    // This prevents a cancelled preview worker from remaining owned by
+    // MenuApp until shutdown.
+    auto decoded = song_select_screen_.take_ready_preview_decode();
+
+    const SongEntry* entry = nullptr;
+    if (preview_screen_active && selected_song_ >= 0) {
         entry = visible_song_entry(static_cast<std::size_t>(selected_song_));
     }
 
@@ -537,57 +557,39 @@ void MenuApp::service_song_preview() {
                                             : std::string{};
 
     if (!entry || chart_path.empty()) {
-        const bool was_active = audio_thread_.is_running() || !song_preview_active_path_.empty();
-        cancel_song_preview_decode();
+        const bool was_active =
+            audio_thread_.is_running() || !song_select_screen_.preview_active_path().empty();
+        song_select_screen_.clear_preview_target();
         stop_song_preview_audio();
-        song_preview_selection_key_.clear();
-        song_preview_due_ns_ = 0;
-        song_preview_pending_ = false;
         if (was_active) {
             sync_menu_music();
         }
         return;
     }
 
-    if (selection_key != song_preview_selection_key_) {
-        const bool was_active = audio_thread_.is_running() || !song_preview_active_path_.empty();
-        cancel_song_preview_decode();
+    if (selection_key != song_select_screen_.preview_selection_key()) {
+        const bool was_active =
+            audio_thread_.is_running() || !song_select_screen_.preview_active_path().empty();
         stop_song_preview_audio();
-        song_preview_selection_key_ = selection_key;
-        song_preview_due_ns_ = now_ns + kPreviewDelayNs;
-        song_preview_pending_ = true;
+        song_select_screen_.set_preview_target(selection_key, now_ns + kPreviewDelayNs);
         if (was_active) {
             sync_menu_music();
         }
         return;
     }
 
-    if (song_preview_decode_future_.valid() &&
-        song_preview_decode_future_.wait_for(std::chrono::seconds(0)) ==
-            std::future_status::ready) {
-        SongPreviewDecodeResult decoded;
-        try {
-            decoded = song_preview_decode_future_.get();
-        } catch (const std::exception& ex) {
-            decoded.error = ex.what();
-        } catch (...) {
-            decoded.error = "Unknown preview decode error.";
-        }
-        song_preview_decode_cancel_.reset();
-
-        if (decoded.selection_key == selection_key) {
-            if (!decoded.error.empty() && decoded.error != "cancelled") {
-                std::cerr << "[warn] Song preview unavailable: " << decoded.error
-                          << " chart=" << chart_path << std::endl;
-            } else if (start_song_preview_audio(decoded)) {
-                song_preview_pending_ = false;
-                return;
-            }
+    if (decoded && decoded->selection_key == selection_key) {
+        if (!decoded->error.empty() && decoded->error != "cancelled") {
+            std::cerr << "[warn] Song preview unavailable: " << decoded->error
+                      << " chart=" << chart_path << std::endl;
+        } else if (start_song_preview_audio(*decoded)) {
+            song_select_screen_.set_preview_pending(false);
+            return;
         }
     }
 
-    if (!song_preview_active_path_.empty() && audio_thread_.is_running()) {
-        song_preview_gain_.store(
+    if (!song_select_screen_.preview_active_path().empty() && audio_thread_.is_running()) {
+        song_select_screen_.preview_gain().store(
             static_cast<float>(menu_background_gain(
                 config_.audio_ui.background_sound_enabled,
                 config_.audio_ui.master_volume,
@@ -596,48 +598,16 @@ void MenuApp::service_song_preview() {
         return;
     }
 
-    if (!song_preview_pending_ || now_ns < song_preview_due_ns_ ||
-        song_preview_decode_future_.valid()) {
+    if (!song_select_screen_.preview_pending() ||
+        now_ns < song_select_screen_.preview_due_ns() ||
+        song_select_screen_.preview_decode_in_flight()) {
         return;
     }
 
-    song_preview_pending_ = false;
     const int target_sample_rate = static_cast<int>(std::max<std::uint32_t>(
         8'000u, config_.audio.sample_rate));
-    auto cancel_flag = std::make_shared<std::atomic<bool>>(false);
-    song_preview_decode_cancel_ = cancel_flag;
-    song_preview_decode_future_ = std::async(
-        std::launch::async,
-        [selection_key,
-         chart_path,
-         indexed_preview_path,
-         target_sample_rate,
-         cancel_flag]() {
-            SongPreviewDecodeResult result;
-            result.selection_key = selection_key;
-            result.sample_rate = target_sample_rate;
-
-            std::vector<float> samples;
-            std::string preview_source;
-            std::string preview_error;
-            if (!build_song_preview_audio(chart_path,
-                                          indexed_preview_path,
-                                          target_sample_rate,
-                                          30,
-                                           samples,
-                                           preview_source,
-                                           &preview_error,
-                                           cancel_flag) ||
-                samples.empty()) {
-                result.error = preview_error;
-                return result;
-            }
-
-            result.path = std::move(preview_source);
-            result.samples =
-                std::make_shared<const std::vector<float>>(std::move(samples));
-            return result;
-        });
+    song_select_screen_.begin_preview_decode(
+        selection_key, chart_path, indexed_preview_path, target_sample_rate);
 }
 
 
@@ -649,13 +619,13 @@ void MenuApp::sync_menu_music() {
         return;
     }
 
-    if (screen_ == Screen::SongSelect && !song_preview_active_path_.empty()) {
+    if (screen_ == Screen::SongSelect && !song_select_screen_.preview_active_path().empty()) {
         if (!config_.audio_ui.background_sound_enabled) {
             stop_song_preview_audio();
             menu_music_.stop();
             return;
         }
-        song_preview_gain_.store(
+        song_select_screen_.preview_gain().store(
             static_cast<float>(menu_background_gain(
                 true,
                 config_.audio_ui.master_volume,
@@ -1874,8 +1844,8 @@ bool MenuApp::is_song_select_repeat_key(uint32_t keycode) const {
         case Screen::SettingsCalibration:
             return settings_cursor_ == 1 || settings_cursor_ == 2;
         case Screen::ModeSelect:
-            return settings_cursor_ == 11 || settings_cursor_ == 13 ||
-                   settings_cursor_ == 14;
+            return settings_cursor_ == 7 || settings_cursor_ == 13 ||
+                   settings_cursor_ == 15 || settings_cursor_ == 16;
         default:
             return false;
     }
@@ -2007,6 +1977,11 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
         gameplay_hud_.countdown_active = hud.countdown_active;
         gameplay_hud_.countdown_value = hud.countdown_value;
         gameplay_hud_.lane_count = hud.lane_count;
+        gameplay_hud_.scratch_lane_count = hud.scratch_lane_count;
+        gameplay_hud_.scratch_lanes.fill(0);
+        std::copy_n(hud.scratch_lanes.begin(),
+                    hud.scratch_lane_count,
+                    gameplay_hud_.scratch_lanes.begin());
         gameplay_hud_.current_sample = hud.current_sample;
         gameplay_hud_.duration_samples = hud.duration_samples;
         gameplay_hud_.sample_rate = hud.sample_rate;
@@ -2613,8 +2588,8 @@ void MenuApp::populate_help_overlay(render::HelpOverlayData& target) const {
             target.lines = {
                 ui_text("Up / Down or the mouse wheel selects a row. Long lists show a clickable scrollbar on the right.",
                         "위 / 아래 키 또는 마우스 휠로 행을 선택합니다. 긴 목록은 오른쪽의 클릭 가능한 스크롤바를 표시합니다."),
-                ui_text("Ghost Battle, Autoplay, Practice, Sudden Death, Gauge, Random, Mods, Rate, and Hi-Speed change the next-song compare/play feel.",
-                        "고스트 배틀, 오토플레이, 연습 모드, 서든 데스, 게이지, 랜덤, 모드, Rate, Hi-Speed는 다음 곡의 비교/플레이 감각을 바꿉니다."),
+                ui_text("Ghost Battle, Autoplay, Practice, Sudden Death, Pacemaker, Gauge, Random, Mods, Rate, and Hi-Speed change the next-song compare/play feel.",
+                        "고스트 배틀, 오토플레이, 연습 모드, 서든 데스, 페이스메이커, 게이지, 랜덤, 모드, Rate, Hi-Speed는 다음 곡의 비교/플레이 감각을 바꿉니다."),
                 ui_text("Indexing Safe minimizes RAM for huge libraries. Fast spends more RAM to speed up rescans.",
                         "인덱싱 안전은 큰 라이브러리에서 RAM 사용을 줄이고, 빠름은 더 많은 RAM으로 재스캔을 빠르게 합니다."),
                 ui_text("TenRiff 1.2.92 indexes and plays BMS-family charts only.",

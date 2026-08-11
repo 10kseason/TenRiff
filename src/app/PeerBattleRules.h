@@ -21,6 +21,7 @@ inline void apply_peer_battle_rules(config::RuntimeConfig& config) {
     config.mode.autoplay_enabled = false;
     config.mode.practice_no_fail_enabled = false;
     config.mode.one_miss_fail_enabled = false;
+    config.mode.pacemaker_mode = "off";
 }
 
 }  // namespace tenriff::app

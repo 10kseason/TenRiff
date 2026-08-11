@@ -68,3 +68,24 @@ TEST_CASE("sudden death clears are labeled above the underlying gauge") {
               true, false, false, tenriff::game::GaugeType::Hard, true, false, true) ==
           "AUTOPLAY");
 }
+
+TEST_CASE("pacemaker clears only when the selected end target is met") {
+    using namespace tenriff::app;
+
+    CHECK(pacemaker_target_met("accuracy", 95.0, 7000, 95.0, 8000));
+    CHECK_FALSE(pacemaker_target_met("accuracy", 94.99, 9000, 95.0, 8000));
+    CHECK(pacemaker_target_met("score", 80.0, 8500, 95.0, 8500));
+    CHECK_FALSE(pacemaker_target_met("score", 100.0, 8499, 95.0, 8500));
+
+    CHECK(gameplay_session_pacemaker_cleared(true, false, false, false, true));
+    CHECK_FALSE(gameplay_session_pacemaker_cleared(true, false, false, false, false));
+    CHECK(gameplay_session_pacemaker_status(
+              true, false, false, false, "accuracy", true) ==
+          "PACEMAKER ACCURACY CLEAR");
+    CHECK(gameplay_session_pacemaker_status(
+              true, false, false, false, "score", false) ==
+          "PACEMAKER SCORE FAILED");
+    CHECK(gameplay_session_pacemaker_status(
+              true, false, false, true, "score", true) ==
+          "AUTOPLAY");
+}

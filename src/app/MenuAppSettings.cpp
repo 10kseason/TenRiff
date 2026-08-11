@@ -84,7 +84,7 @@ void MenuApp::handle_audio_settings_input(uint32_t keycode) {
 }
 
 void MenuApp::handle_mode_settings_input(uint32_t keycode) {
-    const int item_count = 16;
+    const int item_count = 18;
     if (keycode == key_up_) {
         settings_cursor_ = clamp_int(settings_cursor_ - 1, 0, item_count - 1);
         publish_snapshot();
@@ -116,46 +116,74 @@ void MenuApp::handle_mode_settings_input(uint32_t keycode) {
             config_.mode.practice_no_fail_enabled = !config_.mode.practice_no_fail_enabled;
             if (config_.mode.practice_no_fail_enabled) {
                 config_.mode.one_miss_fail_enabled = false;
+                config_.mode.pacemaker_mode = "off";
             }
             mode_dirty_ = true;
         } else if (settings_cursor_ == 5) {
             config_.mode.one_miss_fail_enabled = !config_.mode.one_miss_fail_enabled;
             if (config_.mode.one_miss_fail_enabled) {
                 config_.mode.practice_no_fail_enabled = false;
+                config_.mode.pacemaker_mode = "off";
             }
             mode_dirty_ = true;
         } else if (settings_cursor_ == 6) {
-            config_.mode.key_mode = cycle_runtime_key_mode(config_.mode.key_mode, direction, true);
+            config_.mode.pacemaker_mode = cycle_pacemaker_mode(config_.mode.pacemaker_mode, direction);
+            if (config::normalize_pacemaker_mode_token(config_.mode.pacemaker_mode) != "off") {
+                config_.mode.practice_no_fail_enabled = false;
+                config_.mode.one_miss_fail_enabled = false;
+            }
             mode_dirty_ = true;
         } else if (settings_cursor_ == 7) {
+            const std::string pacemaker_mode =
+                config::normalize_pacemaker_mode_token(config_.mode.pacemaker_mode);
+            if (pacemaker_mode == "accuracy") {
+                config_.mode.pacemaker_target_accuracy = clamp_step_value(
+                    config_.mode.pacemaker_target_accuracy +
+                        static_cast<double>(direction) * kPacemakerAccuracyStep,
+                    config::kPacemakerAccuracyMin,
+                    config::kPacemakerAccuracyMax,
+                    kPacemakerAccuracyStep);
+                mode_dirty_ = true;
+            } else if (pacemaker_mode == "score") {
+                config_.mode.pacemaker_target_score = std::clamp(
+                    config_.mode.pacemaker_target_score +
+                        static_cast<int64_t>(direction) * kPacemakerScoreStep,
+                    config::kPacemakerScoreMin,
+                    config::kPacemakerScoreMax);
+                mode_dirty_ = true;
+            }
+        } else if (settings_cursor_ == 8) {
+            config_.mode.key_mode = cycle_runtime_key_mode(config_.mode.key_mode, direction, true);
+            mode_dirty_ = true;
+        } else if (settings_cursor_ == 9) {
             config_.mode.key_conversion_algorithm =
                 cycle_key_conversion_algorithm(config_.mode.key_conversion_algorithm);
             mode_dirty_ = true;
-        } else if (settings_cursor_ == 8) {
+        } else if (settings_cursor_ == 10) {
             if (normalize_key_conversion_algorithm(config_.mode.key_conversion_algorithm) == "nk2") {
                 config_.mode.key_conversion_nk2_preset =
                     cycle_key_conversion_nk2_preset(config_.mode.key_conversion_nk2_preset);
                 mode_dirty_ = true;
             }
-        } else if (settings_cursor_ == 9) {
+        } else if (settings_cursor_ == 11) {
             config_.mode.gauge = cycle_gauge_mode(config_.mode.gauge, direction);
             mode_dirty_ = true;
-        } else if (settings_cursor_ == 10) {
+        } else if (settings_cursor_ == 12) {
             config_.mode.random = cycle_random_mode(config_.mode.random, direction);
             mode_dirty_ = true;
-        } else if (settings_cursor_ == 11) {
+        } else if (settings_cursor_ == 13) {
             int next_value = static_cast<int>(config_.mode.random_seed) + direction;
             next_value = clamp_int(next_value, kSeedMin, kSeedMax);
             config_.mode.random_seed = static_cast<uint32_t>(next_value);
             mode_dirty_ = true;
-        } else if (settings_cursor_ == 12) {
+        } else if (settings_cursor_ == 14) {
             publish_snapshot();
             return;
-        } else if (settings_cursor_ == 13) {
+        } else if (settings_cursor_ == 15) {
             config_.speed.rate = clamp_step_value(config_.speed.rate + static_cast<double>(direction) * kRateStep,
                                                    kRateMin, kRateMax, kRateStep);
             mode_dirty_ = true;
-        } else if (settings_cursor_ == 14) {
+        } else if (settings_cursor_ == 16) {
             config_.speed.hi_speed = clamp_step_value(
                 config_.speed.hi_speed + static_cast<double>(direction) * kHiSpeedStep,
                 kHiSpeedMin, kHiSpeedMax, kHiSpeedStep);
@@ -166,7 +194,7 @@ void MenuApp::handle_mode_settings_input(uint32_t keycode) {
     }
 
     if (keycode == key_enter_ || keycode == key_escape_ || keycode == key_backspace_) {
-        if (keycode == key_enter_ && settings_cursor_ == 12) {
+        if (keycode == key_enter_ && settings_cursor_ == 14) {
             screen_ = Screen::ModeMods;
             settings_cursor_ = 0;
             publish_snapshot();
@@ -209,7 +237,7 @@ void MenuApp::handle_mode_mods_input(uint32_t keycode) {
 
     if (keycode == key_enter_ || keycode == key_escape_ || keycode == key_backspace_) {
         screen_ = Screen::ModeSelect;
-        settings_cursor_ = 12;
+        settings_cursor_ = 14;
         publish_snapshot();
     }
 }
@@ -256,33 +284,50 @@ void MenuApp::populate_mode_settings_render_data(render::MenuRenderData& render)
     append_menu_row(render.generic, ui_text("Sudden Death (1 MISS)", "서든 데스 (1미스 즉사)"),
                     ui_on_off(config_.mode.one_miss_fail_enabled),
                     settings_cursor_ == 5, render::MenuHitTargetKind::SettingsRow, 5, false, true);
+    const std::string pacemaker_mode =
+        config::normalize_pacemaker_mode_token(config_.mode.pacemaker_mode);
+    const std::string pacemaker_mode_label =
+        pacemaker_mode == "accuracy"
+            ? ui_text("Accuracy", "정확도")
+            : (pacemaker_mode == "score" ? ui_text("Score", "점수") : ui_text("Off", "끔"));
+    const std::string pacemaker_target_label =
+        pacemaker_mode == "accuracy"
+            ? (format_decimal(config_.mode.pacemaker_target_accuracy) + "%")
+            : (pacemaker_mode == "score"
+                   ? std::to_string(config_.mode.pacemaker_target_score)
+                   : "-");
+    append_menu_row(render.generic, ui_text("Pacemaker", "페이스메이커"), pacemaker_mode_label,
+                    settings_cursor_ == 6, render::MenuHitTargetKind::SettingsRow, 6, false, true);
+    append_menu_row(render.generic, ui_text("Pacemaker Target", "페이스메이커 목표"), pacemaker_target_label,
+                    settings_cursor_ == 7, render::MenuHitTargetKind::SettingsRow, 7, false,
+                    pacemaker_mode != "off");
     append_menu_row(render.generic, ui_text("Key Mode", "키 모드"),
                     ui_key_mode_label(config_.mode.key_mode),
-                    settings_cursor_ == 6, render::MenuHitTargetKind::SettingsRow, 6, false, true);
+                    settings_cursor_ == 8, render::MenuHitTargetKind::SettingsRow, 8, false, true);
     append_menu_row(render.generic, ui_text("Key Converter", "키 컨버터"),
                     ui_key_conversion_algorithm_label(config_.mode.key_conversion_algorithm),
-                    settings_cursor_ == 7, render::MenuHitTargetKind::SettingsRow, 7, false, true);
+                    settings_cursor_ == 9, render::MenuHitTargetKind::SettingsRow, 9, false, true);
     const bool nk2_selected =
         normalize_key_conversion_algorithm(config_.mode.key_conversion_algorithm) == "nk2";
     append_menu_row(render.generic, "nK2 Preset",
                     nk2_selected
                         ? ui_key_conversion_nk2_preset_label(config_.mode.key_conversion_nk2_preset)
                         : ui_text("Locked (Krrcream)", "잠김 (Krrcream)"),
-                    settings_cursor_ == 8, render::MenuHitTargetKind::SettingsRow, 8,
+                    settings_cursor_ == 10, render::MenuHitTargetKind::SettingsRow, 10,
                     false, nk2_selected);
-    append_menu_row(render.generic, ui_text("Gauge Shift Start", "게이지 시프트 시작"), ui_gauge_label(config_.mode.gauge), settings_cursor_ == 9,
-                    render::MenuHitTargetKind::SettingsRow, 9, false, true);
-    append_menu_row(render.generic, ui_text("Random", "랜덤"), ui_random_label(config_.mode.random), settings_cursor_ == 10,
-                    render::MenuHitTargetKind::SettingsRow, 10, false, true);
-    append_menu_row(render.generic, ui_text("Random Seed", "랜덤 시드"), std::to_string(config_.mode.random_seed), settings_cursor_ == 11,
+    append_menu_row(render.generic, ui_text("Gauge Shift Start", "게이지 시프트 시작"), ui_gauge_label(config_.mode.gauge), settings_cursor_ == 11,
                     render::MenuHitTargetKind::SettingsRow, 11, false, true);
-    append_menu_row(render.generic, ui_text("Mods", "모드"), mode_score_summary(config_.mode.mods, config_.speed.rate),
-                    settings_cursor_ == 12, render::MenuHitTargetKind::SettingsRow, 12, true, false);
-    append_menu_row(render.generic, "Rate", format_multiplier(config_.speed.rate), settings_cursor_ == 13,
+    append_menu_row(render.generic, ui_text("Random", "랜덤"), ui_random_label(config_.mode.random), settings_cursor_ == 12,
+                    render::MenuHitTargetKind::SettingsRow, 12, false, true);
+    append_menu_row(render.generic, ui_text("Random Seed", "랜덤 시드"), std::to_string(config_.mode.random_seed), settings_cursor_ == 13,
                     render::MenuHitTargetKind::SettingsRow, 13, false, true);
-    append_menu_row(render.generic, ui_text("Hi-Speed", "하이스피드"), format_decimal(config_.speed.hi_speed), settings_cursor_ == 14,
-                    render::MenuHitTargetKind::SettingsRow, 14, false, true);
-    append_menu_row(render.generic, ui_text("Back", "뒤로"), "", settings_cursor_ == 15, render::MenuHitTargetKind::SettingsRow, 15, true, false);
+    append_menu_row(render.generic, ui_text("Mods", "모드"), mode_score_summary(config_.mode.mods, config_.speed.rate),
+                    settings_cursor_ == 14, render::MenuHitTargetKind::SettingsRow, 14, true, false);
+    append_menu_row(render.generic, "Rate", format_multiplier(config_.speed.rate), settings_cursor_ == 15,
+                    render::MenuHitTargetKind::SettingsRow, 15, false, true);
+    append_menu_row(render.generic, ui_text("Hi-Speed", "하이스피드"), format_decimal(config_.speed.hi_speed), settings_cursor_ == 16,
+                    render::MenuHitTargetKind::SettingsRow, 16, false, true);
+    append_menu_row(render.generic, ui_text("Back", "뒤로"), "", settings_cursor_ == 17, render::MenuHitTargetKind::SettingsRow, 17, true, false);
     render.generic.notes.push_back(ui_text("Fast (Minimal) keeps title, artist, key count, level, and BPM only; it skips hashes, previews, difficulty tables, and native LV/CR.",
                                            "빠름(최소)은 제목, 아티스트, 키 수, 레벨, BPM만 유지하고 해시, 미리보기, 난이도표, 자체 LV/CR을 건너뜁니다."));
     render.generic.notes.push_back(ui_text("Choosing a difficulty table automatically switches Fast to Safe so MD5/SHA-256 matches can be applied.",
@@ -297,6 +342,9 @@ void MenuApp::populate_mode_settings_render_data(render::MenuRenderData& render)
                                            "연습 모드(실패 없음)는 중간 게임오버를 막지만 판정, 게이지, 리플레이, 결과 저장은 끝까지 유지합니다."));
     render.generic.notes.push_back(ui_text("Sudden Death ends the run on the first osu!mania OD8 MISS. Native BAD timing alone and empty-key POOR judgements do not trigger it, and enabling it disables Practice No-Fail.",
                                            "서든 데스는 첫 osu!mania OD8 MISS에서 즉시 종료합니다. 네이티브 BAD만으로는 즉사하지 않고 빈 키 POOR도 세지 않으며, 켜면 연습 모드가 꺼집니다."));
+    render.generic.notes.push_back(ui_text(
+        "Pacemaker plays through gauge failure and clears only when the final Accuracy or displayed final Score reaches the selected target. It is mutually exclusive with Practice and Sudden Death.",
+        "페이스메이커는 게이지 실패를 넘겨 끝까지 플레이하고, 종료 정확도 또는 화면의 최종 점수가 설정한 목표 이상일 때만 클리어합니다. 연습 모드·서든 데스와는 동시에 사용할 수 없습니다."));
     render.generic.notes.push_back(ui_text("Key Mode selects None/native plus 4K-10K, 12K, 14K, or 16K BMS layouts.",
                                            "키 모드는 BMS 차트의 원본 또는 4K~10K, 12K, 14K, 16K 레이아웃을 고릅니다."));
     render.generic.notes.push_back(ui_text("None keeps the chart's original key count and pattern layout instead of forcing a conversion.",

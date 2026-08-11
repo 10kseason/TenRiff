@@ -24,6 +24,7 @@ enum class GameplayLaunchKind : uint8_t {
 enum class MultiplayerMenuRow : uint8_t {
     Address = 0,
     Port,
+    LanRoom,
     Host,
     Join,
     Chart,
@@ -41,7 +42,7 @@ enum class MultiplayerEditField : uint8_t {
     Chat,
 };
 
-inline constexpr int kMultiplayerMenuRowCount = 10;
+inline constexpr int kMultiplayerMenuRowCount = 11;
 inline constexpr std::size_t kMultiplayerAddressMaxLength = 255;
 inline constexpr std::size_t kMultiplayerPortTextMaxLength = 5;
 inline constexpr std::size_t kMultiplayerChatInputMaxBytes = 256;

@@ -4,6 +4,25 @@ TenRiff의 사용자/배포 관점에서 의미 있는 변경만 간단히 기�
 
 ## [Unreleased]
 
+## [1.4.1] - 2026-08-11
+
+### Added
+
+- 같은 LAN의 TenRiff 호스트를 `27301/UDP`로 자동 검색하고, `LAN 방 자동 검색`에서 IP를 직접 입력하지 않고 기존 TCP 방에 참가할 수 있게 했습니다. 직접 IP 참가 경로는 유지되며 인터넷 중계나 NAT traversal은 포함하지 않습니다.
+- Mode Settings에 `Pacemaker`를 추가했습니다. Accuracy 또는 최종 표시 Score 목표를 고르면 게이지로 조기 종료하지 않고 차트 끝에서 목표 달성 여부를 CLEAR/FAILED로 판정합니다.
+- BMS `#RANDOM/#IF/#ELSEIF/#ELSE`와 `#SWITCH/#CASE/#SKIP/#DEF` 조건 분기를 고정 seed로 해석하고, MGQ 형식의 `#LNTYPE 2` 롱노트를 measure 경계까지 이어서 지원합니다.
+- `CMakePresets.json`의 MSVC AddressSanitizer 구성과 같은 프리셋을 실행하는 GitHub Actions CI를 추가했습니다. 결정적 단위 코어는 공유 포트 간섭 없이 ASan으로 실행하고, MSVC ASan에서 종료가 멎는 Windows RawInput/localhost 통합 8건은 Release 테스트에서 계속 검증합니다.
+
+### Changed
+
+- 차트 시작 시 전체 곡의 BGM을 모두 디코드하지 않고 첫 3초에 필요한 오디오만 필수 준비합니다. 뒤쪽 BGM과 키음은 재생 전에 비동기 prefetch하여 긴 차트의 시작 대기 시간을 줄였습니다.
+- Pacemaker는 Practice·Sudden Death와 상호 배타적이며 리플레이 재생과 공정 규칙이 적용되는 멀티플레이에서는 자동으로 꺼집니다.
+- Song Select 미리듣기 decode future, 취소 토큰, gain, 활성 경로의 소유권을 `MenuApp`에서 `SongSelectScreen`으로 분리했습니다. 화면 이탈 시 decode를 취소하고 완료 future를 반드시 회수합니다.
+
+### Fixed
+
+- BMS 명령과 `#bpm/#BPMxx` 사전 키의 대소문자를 구분하지 않고, 채널 `03` 직접 BPM과 채널 `08` 확장 BPM 변속을 끝까지 sample timeline에 반영하는 회귀 테스트를 추가했습니다.
+
 ## [1.4.0.1] - 2026-08-10
 
 ### Added

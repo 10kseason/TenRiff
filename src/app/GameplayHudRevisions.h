@@ -38,6 +38,8 @@ struct GameplayHudRevisionInput {
     std::string loading_stage;
 
     int lane_count = 10;
+    std::size_t scratch_lane_count = 0;
+    std::array<int, kGameplayHudMaxLanes> scratch_lanes{};
     int64_t current_sample = 0;
     int64_t duration_samples = 0;
     int sample_rate = 48000;
@@ -270,6 +272,11 @@ inline GameplayHudRevisionFlags diff_gameplay_hud_revisions(const GameplayHudRev
         previous.loading_percent != next.loading_percent ||
         previous.loading_stage != next.loading_stage ||
         previous.lane_count != next.lane_count ||
+        previous.scratch_lane_count != next.scratch_lane_count ||
+        !std::equal(previous.scratch_lanes.begin(),
+                    previous.scratch_lanes.begin() +
+                        static_cast<std::ptrdiff_t>(previous.scratch_lane_count),
+                    next.scratch_lanes.begin()) ||
         previous.current_sample != next.current_sample ||
         previous.duration_samples != next.duration_samples ||
         previous.sample_rate != next.sample_rate ||
