@@ -101,6 +101,7 @@
   - Random は `Off / Mirror / FR / SR` に対応。Mirror は key-mode 変換後の最終 lane を反転し、10K/16K は各 player half 内で独立して反転
   - Mod Manager の `LN Mix 10%～90%` は既存 hold を維持し、同じ lane の既存 span と重なる head を除外する。base BPM 基準の 1/8-note hold が次の同一 lane note より 50ms 以上前に終わる tap から設定割合を `Random Seed` で選び、すべての Mix 段階で長い 1/8-note 60% / 中間 1/16-note 20% / 短い 1/24・1/32-note 20% に配分する
 - Skins / gameplay feel:
+  - 標準 `10+2 DP` chart は scratch 2 lane を除く実際の 10 key に `10K` lane-color palette を順番に適用し、native 12K palette とは独立して保持
   - `rect / triangle / pentagon / hexagon / circle` note shape。procedural 円・多角形は 100% で rect bar と同じ全幅を使用
   - note border on/off
   - combo Y adjustment

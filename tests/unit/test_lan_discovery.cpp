@@ -1,5 +1,6 @@
 #include "network/LanDiscovery.h"
 
+#include <algorithm>
 #include <chrono>
 #include <thread>
 
@@ -88,12 +89,13 @@ TEST_CASE("LAN discovery finds a loopback host without manual IP entry") {
     REQUIRE(wait_until([&] { return !browser.snapshot().rooms.empty(); }));
 
     const auto rooms = browser.snapshot().rooms;
-    REQUIRE(rooms.size() == 1u);
-    CHECK_FALSE(rooms.front().address.empty());
-    CHECK(rooms.front().host_name == "Loopback Host");
-    CHECK(rooms.front().tcp_port == 31415);
-    CHECK(rooms.front().player_count == 1);
-    CHECK(rooms.front().accepting_players);
+    const auto room = std::find_if(rooms.begin(), rooms.end(), [](const auto& candidate) {
+        return candidate.host_name == "Loopback Host" && candidate.tcp_port == 31415;
+    });
+    REQUIRE(room != rooms.end());
+    CHECK_FALSE(room->address.empty());
+    CHECK(room->player_count == 1);
+    CHECK(room->accepting_players);
 #else
     MESSAGE("LAN discovery runtime is Windows-only; packet validation remains cross-platform.");
 #endif

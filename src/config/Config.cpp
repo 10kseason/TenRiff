@@ -1708,6 +1708,52 @@ std::vector<std::string> resolved_skin_lane_colors(const SkinConfig& skin, std::
     return resolved;
 }
 
+std::vector<std::string> resolved_skin_lane_colors_for_layout(
+    const SkinConfig& skin,
+    int lane_count,
+    const int* scratch_lanes,
+    std::size_t scratch_lane_count) {
+    const int clamped_lane_count = std::clamp(lane_count, 1, 16);
+    const std::string layout_mode = std::to_string(clamped_lane_count) + "k";
+    std::vector<std::string> resolved = resolved_skin_lane_colors(skin, layout_mode);
+
+    std::vector<bool> scratch_mask(static_cast<std::size_t>(clamped_lane_count), false);
+    int scratch_count = 0;
+    for (std::size_t scratch = 0; scratch < scratch_lane_count; ++scratch) {
+        const int lane = scratch_lanes != nullptr ? scratch_lanes[scratch] : 0;
+        if (lane <= 0 || lane > clamped_lane_count) {
+            continue;
+        }
+        const std::size_t index = static_cast<std::size_t>(lane - 1);
+        if (!scratch_mask[index]) {
+            scratch_mask[index] = true;
+            ++scratch_count;
+        }
+    }
+
+    const int key_count = clamped_lane_count - scratch_count;
+    const std::string key_mode = std::to_string(key_count) + "k";
+    const auto& supported_modes = supported_skin_mode_tokens();
+    if (scratch_count == 0 ||
+        std::find(supported_modes.begin(), supported_modes.end(), key_mode) == supported_modes.end()) {
+        return resolved;
+    }
+
+    resolved.resize(static_cast<std::size_t>(clamped_lane_count), "ice");
+    const std::vector<std::string> key_colors = resolved_skin_lane_colors(skin, key_mode);
+    std::size_t key_index = 0;
+    for (std::size_t lane = 0; lane < resolved.size(); ++lane) {
+        if (scratch_mask[lane]) {
+            continue;
+        }
+        if (key_index < key_colors.size()) {
+            resolved[lane] = key_colors[key_index];
+        }
+        ++key_index;
+    }
+    return resolved;
+}
+
 RuntimeConfig ConfigLoader::defaults() const {
     RuntimeConfig config;
     config.audio.sample_rate = 44100;

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 #include <string>
 #include <string_view>
@@ -285,5 +286,10 @@ void apply_skin_visual_preset(SkinConfig& skin, std::string_view token);
 [[nodiscard]] double resolved_skin_lane_center_gap_scale(const SkinConfig& skin, std::string_view key_mode);
 [[nodiscard]] std::vector<std::string> default_skin_lane_colors(std::string_view key_mode);
 [[nodiscard]] std::vector<std::string> resolved_skin_lane_colors(const SkinConfig& skin, std::string_view key_mode);
+[[nodiscard]] std::vector<std::string> resolved_skin_lane_colors_for_layout(
+    const SkinConfig& skin,
+    int lane_count,
+    const int* scratch_lanes,
+    std::size_t scratch_lane_count);
 
 }  // namespace tenriff::config

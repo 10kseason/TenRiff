@@ -112,6 +112,7 @@
   - Random은 `Off / Mirror / FR / SR`를 지원하며, Mirror는 key-mode 변환 뒤 최종 레인을 반전하고 10K/16K는 각 플레이어 절반을 독립적으로 반전
   - Mod Manager의 `LN Mix 10%~90%`는 기존 롱노트를 보존하고 같은 레인의 기존 span과 겹치는 head를 제외한다. base BPM 기준 8비트 LN도 다음 동일 레인 노트보다 50ms 먼저 끝낼 수 있는 단노트 중 설정 비율을 `Random Seed`로 고르고, 선택된 LN 길이는 모든 Mix 단계에서 긴 8비트 60% / 중간 16비트 20% / 짧은 24·32비트 20%로 배분
 - Skins / Gameplay feel:
+  - 표준 `10+2 DP` 차트는 스크래치 2개를 제외한 실제 10개 키에 `10K` lane color 팔레트를 순서대로 적용하며, native 12K 팔레트와는 독립적으로 유지
   - `Classic`, `Neon`, `Minimal`, `TenRiff` visual presets
   - `rect / triangle / pentagon / hexagon / circle` 노트 모양; procedural 원·다각형은 100%에서 rect 막대와 같은 전체 폭 사용
   - note border on/off plus thin outline alpha

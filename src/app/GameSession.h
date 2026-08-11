@@ -59,6 +59,8 @@ public:
         int countdown_value = 0;
 
         int lane_count = 10;
+        std::size_t scratch_lane_count = 0;
+        std::array<int, kGameplayHudMaxLanes> scratch_lanes{};
         int64_t current_sample = 0;
         int64_t duration_samples = 0;
         int sample_rate = 48000;

@@ -237,7 +237,11 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
 
     target.lane_color_count = 0;
     target.lane_colors.fill(0);
-    const auto lane_colors = config::resolved_skin_lane_colors(config_.skin, skin_mode);
+    const auto lane_colors = config::resolved_skin_lane_colors_for_layout(
+        config_.skin,
+        target.lane_count,
+        gameplay_hud_.scratch_lanes.data(),
+        gameplay_hud_.scratch_lane_count);
     target.lane_color_count = std::min<std::size_t>(lane_colors.size(), static_cast<std::size_t>(target.lane_count));
     for (std::size_t i = 0; i < target.lane_color_count; ++i) {
         target.lane_colors[i] = config::skin_color_rgb(lane_colors[i]);
@@ -1973,6 +1977,11 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
         gameplay_hud_.countdown_active = hud.countdown_active;
         gameplay_hud_.countdown_value = hud.countdown_value;
         gameplay_hud_.lane_count = hud.lane_count;
+        gameplay_hud_.scratch_lane_count = hud.scratch_lane_count;
+        gameplay_hud_.scratch_lanes.fill(0);
+        std::copy_n(hud.scratch_lanes.begin(),
+                    hud.scratch_lane_count,
+                    gameplay_hud_.scratch_lanes.begin());
         gameplay_hud_.current_sample = hud.current_sample;
         gameplay_hud_.duration_samples = hud.duration_samples;
         gameplay_hud_.sample_rate = hud.sample_rate;

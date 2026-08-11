@@ -983,6 +983,11 @@ GameSession::HudSnapshot GameSession::hud_snapshot() {
         snapshot.judgement_line_position = config_.skin.judgement_line_position;
         snapshot.visual_offset_ms = config_.visual_offset_ms;
         snapshot.lane_count = std::max(1, engine_->lane_count());
+        snapshot.scratch_lane_count = std::min(
+            chart_.scratch_lanes.size(), snapshot.scratch_lanes.size());
+        std::copy_n(chart_.scratch_lanes.begin(),
+                    snapshot.scratch_lane_count,
+                    snapshot.scratch_lanes.begin());
         snapshot.duration_samples = engine_->duration_samples();
 
         if (snapshot.current_sample < last_visual_cue_sample_) {

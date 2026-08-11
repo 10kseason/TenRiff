@@ -978,6 +978,10 @@ GameplayHudRevisionInput MenuApp::gameplay_hud_revision_input(const GameplayHudS
     input.loading_percent = state.loading_percent;
     input.loading_stage = state.loading_stage;
     input.lane_count = state.lane_count;
+    input.scratch_lane_count = state.scratch_lane_count;
+    std::copy_n(state.scratch_lanes.begin(),
+                state.scratch_lane_count,
+                input.scratch_lanes.begin());
     input.current_sample = state.current_sample;
     input.duration_samples = state.duration_samples;
     input.sample_rate = state.sample_rate;

@@ -1,5 +1,6 @@
 #include "doctest/doctest.h"
 
+#include <array>
 #include <filesystem>
 #include <fstream>
 #include <string>
@@ -1096,6 +1097,41 @@ TEST_CASE("skin note shape normalization supports polygon choices") {
     CHECK(tenriff::config::normalize_skin_note_shape_token("hexagon") == "hexagon");
     CHECK(tenriff::config::normalize_skin_note_shape_token("rectangle") == "rect");
     CHECK(tenriff::config::normalize_skin_note_shape_token("star") == "rect");
+}
+
+TEST_CASE("10K skin colors map across 10+2 DP key lanes") {
+    tenriff::config::SkinConfig skin;
+    skin.lane_colors["10k"] = {
+        "rose", "mint", "gold", "azure", "ice",
+        "teal", "violet", "orange", "rose", "mint",
+    };
+    skin.lane_colors["12k"] = std::vector<std::string>(12u, "gold");
+
+    const std::array<int, 2> scratch_lanes{6, 12};
+    const auto colors = tenriff::config::resolved_skin_lane_colors_for_layout(
+        skin, 12, scratch_lanes.data(), scratch_lanes.size());
+
+    REQUIRE(colors.size() == 12u);
+    CHECK(colors[0] == "rose");
+    CHECK(colors[4] == "ice");
+    CHECK(colors[5] == "gold");
+    CHECK(colors[6] == "teal");
+    CHECK(colors[10] == "mint");
+    CHECK(colors[11] == "gold");
+}
+
+TEST_CASE("native 12K skin colors stay independent when there are no scratch lanes") {
+    tenriff::config::SkinConfig skin;
+    skin.lane_colors["10k"] = std::vector<std::string>(10u, "rose");
+    skin.lane_colors["12k"] = std::vector<std::string>(12u, "teal");
+
+    const auto colors = tenriff::config::resolved_skin_lane_colors_for_layout(
+        skin, 12, nullptr, 0);
+
+    REQUIRE(colors.size() == 12u);
+    CHECK(std::all_of(colors.begin(), colors.end(), [](const std::string& color) {
+        return color == "teal";
+    }));
 }
 TEST_CASE("config clamps skin gameplay settings into supported range") {
     TempDirGuard temp;

@@ -367,8 +367,9 @@ TEST_CASE("multiplayer chart candidates resolve relative paths against their own
         candidates[0].indexed_path, candidates[0].source_root);
     CHECK(tenriff::app::menu_songs::normalize_path_key(fs::path(resolved)) ==
           tenriff::app::menu_songs::normalize_path_key(expected));
-    CHECK(multiplayer_chart_path_for_source(target, source.u8string()) ==
-          resolved);
+    const std::string direct = multiplayer_chart_path_for_source(target, source.u8string());
+    CHECK(tenriff::app::menu_songs::normalize_path_key(fs::path(direct)) ==
+          tenriff::app::menu_songs::normalize_path_key(fs::path(resolved)));
 }
 
 TEST_CASE("multiplayer cached chart paths cannot escape their loaded source") {

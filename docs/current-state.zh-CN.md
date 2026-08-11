@@ -101,6 +101,7 @@
   - Random 支持 `Off / Mirror / FR / SR`；Mirror 在 key-mode 变换后反转最终 lane，10K/16K 则在每个 player half 内独立反转
   - Mod Manager 的 `LN Mix 10%～90%` 会保留已有 hold，并排除与同 lane 已有 span 重叠的 head；它通过 `Random Seed` 从按 base BPM 计算的 1/8-note hold 能在下一同 lane note 前至少 50ms 结束的 tap 中选择指定比例，并在所有 Mix 档位中把长度分配为 60% 长 1/8-note、20% 中 1/16-note、20% 短且交替的 1/24 与 1/32-note
 - Skins / Gameplay feel：
+  - 标准 `10+2 DP` chart 会跳过两条 scratch lane，把 `10K` lane-color palette 依次应用到实际十个按键 lane，并与原生 12K palette 保持独立
   - `rect / triangle / pentagon / hexagon / circle` 音符形状；procedural 圆形/多边形在 100% 下使用与 rect 条相同的完整宽度
   - note border 开关
   - combo Y 调整

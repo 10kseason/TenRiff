@@ -102,6 +102,7 @@ This is the document that the next agent or any new contributor should read firs
   - Random supports `Off / Mirror / FR / SR`; Mirror reverses the final lanes after key-mode conversion, with 10K/16K mirrored independently inside each player half
   - Mod Manager `LN Mix 10%-90%` preserves existing holds and excludes heads overlapping an existing same-lane span. It selects the requested share of taps that can fit a base-BPM 1/8-note hold while ending at least 50ms before the next same-lane note, then deterministically assigns every Mix level 60% long 1/8-note, 20% medium 1/16-note, and 20% short alternating 1/24- and 1/32-note lengths
 - Skins / gameplay feel:
+  - standard `10+2 DP` charts map the `10K` lane-color palette across the ten playable key lanes while leaving native 12K palettes independent
   - `rect / triangle / pentagon / hexagon / circle` note shapes; procedural circles and polygons use the full rect-bar width at 100%
   - note border on/off
   - combo Y adjustment
