@@ -277,7 +277,7 @@ TEST_CASE("timeline scroll segments support speed changes stops and reverse moti
     CHECK(timeline.timeline.duration_samples == 8000);
 }
 
-TEST_CASE("timeline keeps visual velocity anchored to the starting BPM") {
+TEST_CASE("timeline applies BPM changes to visual velocity") {
     BmsChart chart;
     chart.base_bpm = 200.0;
     chart.bpm["01"] = 100.0;
@@ -304,6 +304,40 @@ TEST_CASE("timeline keeps visual velocity anchored to the starting BPM") {
 
     CHECK(before_change.end_sample == 1200);
     CHECK(after_change.end_sample - after_change.start_sample == 2400);
-    CHECK(after_change.end_position - after_change.start_position == doctest::Approx(2.0));
+    CHECK(before_change.end_position - before_change.start_position == doctest::Approx(1.0));
+    CHECK(after_change.end_position - after_change.start_position == doctest::Approx(1.0));
+    CHECK(after_velocity == doctest::Approx(before_velocity * 0.5));
+}
+
+TEST_CASE("timeline combines BPM changes with BMS scroll factors") {
+    BmsChart chart;
+    chart.base_bpm = 120.0;
+    chart.bpm["01"] = 240.0;
+    chart.scroll["01"] = 0.5;
+    chart.commands.push_back({1, "08", "01"});
+    chart.commands.push_back({1, "SC", "01"});
+    chart.commands.push_back({2, "11", "01"});
+
+    BmsChartNormalizer normalizer;
+    const auto normalization = normalizer.normalize(chart);
+    REQUIRE(normalization.success());
+
+    BmsTimelineBuilder builder;
+    const auto timeline = builder.build(normalization.chart, 1000);
+    REQUIRE(timeline.success());
+    REQUIRE(timeline.timeline.scroll_segments.size() >= 2u);
+
+    const auto& before_change = timeline.timeline.scroll_segments[0];
+    const auto& after_change = timeline.timeline.scroll_segments[1];
+    const double before_velocity =
+        (before_change.end_position - before_change.start_position) /
+        static_cast<double>(before_change.end_sample - before_change.start_sample);
+    const double after_velocity =
+        (after_change.end_position - after_change.start_position) /
+        static_cast<double>(after_change.end_sample - after_change.start_sample);
+
+    CHECK(before_change.end_sample - before_change.start_sample == 2000);
+    CHECK(after_change.end_sample - after_change.start_sample == 1000);
+    CHECK(after_change.end_position - after_change.start_position == doctest::Approx(0.5));
     CHECK(after_velocity == doctest::Approx(before_velocity));
 }

@@ -52,6 +52,26 @@ TEST_CASE("negative display offset keeps past notes alive longer in the HUD") {
     CHECK(window.lookahead_samples == 2224);
 }
 
+TEST_CASE("gameplay visual span stays anchored to base BPM and cancels playback rate") {
+    const double normal_span =
+        tenriff::app::gameplay_reference_visual_span(120.0, 1.0, 1000, 2200);
+    const double double_rate_span =
+        tenriff::app::gameplay_reference_visual_span(120.0, 2.0, 1000, 2200);
+
+    CHECK(normal_span == doctest::Approx(1.1));
+    CHECK(double_rate_span == doctest::Approx(2.2));
+    CHECK(double_rate_span == doctest::Approx(normal_span * 2.0));
+}
+
+TEST_CASE("gameplay visual span rejects invalid timing inputs") {
+    CHECK(tenriff::app::gameplay_reference_visual_span(0.0, 1.0, 1000, 2200) ==
+          doctest::Approx(1.0));
+    CHECK(tenriff::app::gameplay_reference_visual_span(120.0, 0.0, 1000, 2200) ==
+          doctest::Approx(1.0));
+    CHECK(tenriff::app::gameplay_reference_visual_span(120.0, 1.0, 0, 2200) ==
+          doctest::Approx(1.0));
+}
+
 TEST_CASE("gameplay chart sample offsets move notes audio visuals and duration together") {
     tenriff::gameplay::GameplayChart chart;
     chart.duration_samples = 4000;

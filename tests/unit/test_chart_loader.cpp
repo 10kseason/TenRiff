@@ -252,6 +252,40 @@ TEST_CASE("chart loader keeps wav when ogg fallback is unavailable") {
         chart_audio_path(result.chart, result.chart.audio_cues.front().asset_id), wav_path));
 }
 
+TEST_CASE("chart loader preserves channel 08 BPM changes as gameplay visual speed changes") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+
+    const auto chart_path = temp.path / "bpm_change.bms";
+    {
+        std::ofstream chart_file(chart_path, std::ios::binary);
+        REQUIRE(chart_file.good());
+        chart_file << "#TITLE BPM Change\n"
+                      "#BPM 120\n"
+                      "#BPM01 240\n"
+                      "#00108:01\n"
+                      "#00211:01\n";
+    }
+
+    ChartLoader loader;
+    const ChartLoadResult result = loader.load(chart_path.u8string(), 48000, 1.5, "ignore");
+
+    REQUIRE(result.success());
+    CHECK(result.base_bpm == doctest::Approx(120.0));
+    REQUIRE(result.chart.scroll_segments.size() >= 2u);
+    const auto& before_change = result.chart.scroll_segments[0];
+    const auto& after_change = result.chart.scroll_segments[1];
+    const double before_velocity = result.chart.visual_velocity_at(before_change.start_sample);
+    const double after_velocity = result.chart.visual_velocity_at(after_change.start_sample);
+
+    CHECK(before_change.end_position - before_change.start_position == doctest::Approx(1.0));
+    CHECK(after_change.end_position - after_change.start_position == doctest::Approx(1.0));
+    CHECK(after_velocity == doctest::Approx(before_velocity * 2.0));
+    REQUIRE(result.chart.notes.size() == 1u);
+    CHECK(result.chart.notes.front().start_sample == 96000);
+}
+
 TEST_CASE("chart loader rejects unsupported osu chart files") {
     TempDirGuard temp;
     temp.path = make_temp_dir();
