@@ -121,6 +121,17 @@ std::string multiplayer_chart_path_for_source(std::string_view indexed_path,
             root = absolute_root;
         }
         root = root.lexically_normal();
+
+        // Canonicalize the root before canonicalizing the candidate. Windows
+        // temp paths can mix an 8.3 root (RUNNER~1) with an expanded candidate
+        // path, which otherwise looks like a false traversal outside the root.
+        ec.clear();
+        const fs::path canonical_root = fs::weakly_canonical(root, ec);
+        if (!ec && !canonical_root.empty()) {
+            root = canonical_root;
+        } else {
+            ec.clear();
+        }
         if (!candidate.is_absolute()) {
             candidate = root / candidate;
         }
