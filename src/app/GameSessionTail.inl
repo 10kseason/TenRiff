@@ -208,6 +208,7 @@ bool GameSession::initialize(const CommandLineOptions& options) {
     hud_scan_start_ = 0;
     ghost_hud_scan_start_ = 0;
     chart_ = {};
+    chart_base_bpm_ = 0.0;
     lane_activity_.clear();
     ghost_lane_activity_.clear();
     lane_pressed_.clear();
@@ -504,6 +505,7 @@ bool GameSession::initialize(const CommandLineOptions& options) {
     }
 
     chart_format_ = chart_result.format;
+    chart_base_bpm_ = chart_result.base_bpm;
     report_loading_progress(78, "Applying gameplay mode");
     if (loading_cancel_requested()) {
         return false;
@@ -1112,19 +1114,15 @@ GameSession::HudSnapshot GameSession::hud_snapshot() {
         kHudRenderSlackMs);
     snapshot.past_samples = past_samples;
     snapshot.lookahead_samples = lookahead_samples;
-    const int64_t visual_future_sample = std::min<int64_t>(
-        snapshot.duration_samples,
-        snapshot.current_sample + expanded_window.lookahead_samples);
-    const int64_t visual_past_sample = std::max<int64_t>(
-        0, snapshot.current_sample - expanded_window.past_samples);
     snapshot.current_visual_position = chart_.visual_position_at(snapshot.current_sample);
     snapshot.visual_velocity = chart_.visual_velocity_at(snapshot.current_sample);
-    snapshot.future_visual_span = std::max(
-        1e-9,
-        std::abs(chart_.visual_position_at(visual_future_sample) - snapshot.current_visual_position));
-    snapshot.past_visual_span = std::max(
-        1e-9,
-        std::abs(snapshot.current_visual_position - chart_.visual_position_at(visual_past_sample)));
+    // Keep the field scale anchored to the starting BPM. Rate remains visually
+    // neutral at a fixed Hi-Speed, while in-chart BPM and #SCROLL changes alter
+    // the actual note velocity instead of being normalized back to constant speed.
+    snapshot.future_visual_span = gameplay_reference_visual_span(
+        chart_base_bpm_, snapshot.rate, sample_rate_, lookahead_samples);
+    snapshot.past_visual_span = gameplay_reference_visual_span(
+        chart_base_bpm_, snapshot.rate, sample_rate_, past_samples);
     snapshot.lane_activity_count = std::max<std::size_t>(
         snapshot.lane_activity_count,
         std::min<std::size_t>(static_cast<std::size_t>(snapshot.lane_count), kGameplayHudMaxLanes));
@@ -2234,6 +2232,7 @@ void GameSession::shutdown() {
     chart_audio_steady_state_logged_ = false;
     synthetic_tones_enabled_.store(true, std::memory_order_release);
     chart_ = {};
+    chart_base_bpm_ = 0.0;
     next_visual_cue_index_ = 0;
     last_visual_cue_sample_ = -1;
     current_background_base_path_.clear();

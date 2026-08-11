@@ -11,6 +11,22 @@ struct GameplayHudWindow {
     int64_t lookahead_samples = 0;
 };
 
+inline double gameplay_reference_visual_span(double base_bpm,
+                                             double playback_rate,
+                                             int sample_rate,
+                                             int64_t window_samples) {
+    constexpr double kBeatsPerMeasure = 4.0;
+    if (!std::isfinite(base_bpm) || base_bpm <= 0.0 ||
+        !std::isfinite(playback_rate) || playback_rate <= 0.0 ||
+        sample_rate <= 0 || window_samples <= 0) {
+        return 1.0;
+    }
+
+    const double span = static_cast<double>(window_samples) * base_bpm * playback_rate /
+                        (kBeatsPerMeasure * 60.0 * static_cast<double>(sample_rate));
+    return std::max(1e-9, span);
+}
+
 inline GameplayHudWindow expand_gameplay_hud_window(int sample_rate,
                                                     int64_t base_past_samples,
                                                     int64_t base_lookahead_samples,

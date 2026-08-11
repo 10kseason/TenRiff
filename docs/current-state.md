@@ -6,7 +6,7 @@
 - BMS variable scroll is supported through `#SCROLLxx` / `#xxxSC`; visual motion may speed up, stop, or reverse while audio and judgement timing stay sample-accurate.
 - BMS landmines (`D1-D9`, `E1-E9`) are playable, including `#WAV00`, base-36 damage tokens, `ZZ` instant fail, exact press/release boundary behavior, and lane-mod/key-converter remapping.
 - Results and local records expose fixed native score separately from detail score, and categorical native accuracy separately from continuous timing-based detailed accuracy.
-- 현재 프로젝트 버전과 로컬 정식 배포 라인은 `1.4.1`
+- 현재 프로젝트 버전과 로컬 정식 배포 라인은 `1.4.2`
 - UI-r2 Result는 2.2초 타임라인으로 프리즘·점수·등급·상태·통계·그래프를 순차 공개하며, Space로 연출을 건너뛸 수 있고 CONTINUE/RETRY/Replay 입력은 공개 완료 전 잠김
 - UI-r2 Song Select는 상단 탭, 7행 재킷 라이브러리, 대형 선택 이미지, 최고 기록 카드, 차트/모드 패널, 실제 동작하는 START 버튼 구조로 개편되며 Collection/Store/재화/글로벌 랭킹 가상 기능은 표시하지 않음
 - Song Select 우측의 비주얼 레이턴시·하이스피드·Gauge Shift 시작 등급·랜덤 셀은 좌클릭으로 증가/다음, 우클릭으로 감소/이전을 적용하고 즉시 저장함. 현재 차트 키수는 잘림 없이 표시되며 최고 기록은 점수·정확도·최대 콤보를 함께 표시
@@ -227,7 +227,7 @@
 
 ## Runtime / Packaging Rules
 - 새 사용자 프로필은 자동 생성
-- 현재 로컬 정식 P2P 배포 라인은 `TenRiff 1.4.1`
+- 현재 로컬 정식 P2P 배포 라인은 `TenRiff 1.4.2`
 - 배포 패키지에는 `Songs`를 넣지 않음
 - 배포 패키지는 `Main Menu / Options / Song Selecte / Multiplayer Lobby / Clear / Failed` 이름의 `Mainmusic/` 화면 슬롯을 포함하며, 각 `이름.mp3`와 번호가 붙은 `이름 2.mp3`~`이름 64.mp3`를 자동 수집해 화면 재진입마다 순환
 - 배포 업데이트에는 built artifacts와 필요한 런타임 자산만 포함

@@ -376,6 +376,7 @@ private:
     std::string replay_source_path_;
     ChartFormat chart_format_ = ChartFormat::Unknown;
     gameplay::GameplayChart chart_;
+    double chart_base_bpm_ = 0.0;
     std::vector<std::string> active_mods_{};
     double rate_multiplier_ = 1.0;
     double score_multiplier_ = 1.0;
