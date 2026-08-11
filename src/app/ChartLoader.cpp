@@ -382,7 +382,8 @@ std::optional<std::string> resolve_bms_visual_path(
 ChartLoadResult ChartLoader::load(const std::string& path,
                                   int sample_rate,
                                   double rate,
-                                  std::string_view bms_keysound_policy) const {
+                                  std::string_view bms_keysound_policy,
+                                  uint32_t bms_random_seed) const {
     ChartLoadResult result;
     AssetLookupIndex asset_lookup;
 
@@ -398,7 +399,9 @@ ChartLoadResult ChartLoader::load(const std::string& path,
     }
 
     chart::BmsParser parser;
-    auto parse_result = parser.parseFile(file_path.u8string());
+    chart::BmsParserOptions parser_options;
+    parser_options.random_seed = bms_random_seed;
+    auto parse_result = parser.parseFile(file_path.u8string(), parser_options);
     append_bms_messages(result.messages, parse_result.messages);
     if (!parse_result.success()) {
         result.error = "Failed to parse BMS chart.";

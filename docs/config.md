@@ -40,7 +40,7 @@
 
 - `backend` (string)
   - `polling | rawinput`
-  - 현재 `1.4.0.1` 릴리스 라인의 기본값은 `rawinput`
+  - 현재 `1.4.1` 릴리스 라인의 기본값은 `rawinput`
   - `Options -> Input Settings -> Backend` 또는 `Options -> Profile Setup -> Input Backend`에서 프로필별로 RawInput/Polling을 직접 선택 가능
   - 저장값은 런타임 fallback 때문에 자동으로 `polling`으로 덮어쓰지 않음
   - RawInput 시작 실패, 등록 대상 손실, 메시지 창 종료가 확인되면 현재 앱 실행 동안 메뉴와 다음 gameplay 세션 모두 Polling을 유지
@@ -60,7 +60,7 @@
 - `judgement_hz` (int)
   - `1000 | 2000 | 4000 | 8000`
   - 호환성용으로 남아 있는 입력 설정 필드
-  - 현재 `1.4.0.1` runtime은 별도 오디오 판정 서브루프를 이 값으로 구동하지 않음
+  - 현재 `1.4.1` runtime은 별도 오디오 판정 서브루프를 이 값으로 구동하지 않음
   - 기본값은 `4000` (`0.25ms`)
 - `debounce_ms` (double)
   - 실제 Press/Release 전환은 버리지 않고 같은 상태의 중복 이벤트만 상태 추적에서 제거
@@ -179,6 +179,14 @@
   - `true`면 첫 OD8 환산 객체 `MISS`에서 게이지가 0이 되고 즉시 실패함
   - 네이티브 `BAD`만으로는 즉사하지 않으며 빈 키 입력의 `POOR`도 즉사 조건에 포함하지 않음
   - Mode Settings에서 활성화하면 `practice_no_fail_enabled`가 자동으로 꺼짐
+- `pacemaker_mode` (string)
+  - `off | accuracy | score`; 기본값은 `off`
+  - `accuracy` 또는 `score`이면 게이지로 조기 종료하지 않고 차트 끝의 선택 목표 달성 여부로 CLEAR/FAILED를 결정
+  - Pacemaker를 켜면 Practice와 Sudden Death는 꺼지며, 리플레이 재생과 멀티플레이에서는 적용하지 않음
+- `pacemaker_target_accuracy` (double)
+  - `0..100`, 기본값 `90.0`; Result의 표준 Accuracy가 이 값 이상이면 clear
+- `pacemaker_target_score` (int)
+  - `0..10000`, 기본값 `8000`; 배율 적용 뒤 Result에 표시되는 최종 Score가 이 값 이상이면 clear
 - `song_index_profile` (string)
   - `safe | fast`
   - `safe`는 대형 라이브러리에서 RAM high-water를 우선 줄이는 기본값

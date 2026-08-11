@@ -82,6 +82,221 @@ std::string strip_comment(std::string_view view) {
     return trim(view);
 }
 
+void add_message(std::vector<BmsParseMessage>& messages,
+                 BmsParseSeverity severity,
+                 std::size_t line,
+                 std::string text);
+std::string parse_header_value(std::string_view tail);
+
+enum class BmsControlFrameKind {
+    Random,
+    If,
+    Switch,
+};
+
+struct BmsControlFrame {
+    BmsControlFrameKind kind = BmsControlFrameKind::Random;
+    bool parent_active = true;
+    bool active = true;
+    int selected = 0;
+    bool branch_taken = false;
+    bool switch_flowing = false;
+    bool switch_skipped = false;
+};
+
+class BmsControlRandom {
+public:
+    explicit BmsControlRandom(uint32_t seed)
+        : state_(seed ^ 0x9E3779B9u) {
+        if (state_ == 0u) {
+            state_ = 0xA341316Cu;
+        }
+    }
+
+    int choose(int upper_inclusive) {
+        state_ ^= state_ << 13u;
+        state_ ^= state_ >> 17u;
+        state_ ^= state_ << 5u;
+        return 1 + static_cast<int>(state_ % static_cast<uint32_t>(upper_inclusive));
+    }
+
+private:
+    uint32_t state_;
+};
+
+std::string preprocess_bms_control_flow(std::string_view content,
+                                        uint32_t random_seed,
+                                        std::vector<BmsParseMessage>& messages) {
+    std::istringstream input{std::string(content)};
+    std::ostringstream output;
+    std::vector<BmsControlFrame> frames;
+    BmsControlRandom random(random_seed);
+    std::string line;
+    std::size_t line_number = 0;
+
+    const auto current_active = [&frames]() {
+        return frames.empty() || frames.back().active;
+    };
+    const auto warn = [&messages](std::size_t line, std::string text) {
+        add_message(messages, BmsParseSeverity::Warning, line, std::move(text));
+    };
+    const auto parse_positive = [&](std::string_view value, int& parsed) {
+        return parse_int(value, parsed) && parsed > 0;
+    };
+    const auto nearest_selected_random = [&frames]() -> std::optional<int> {
+        for (auto it = frames.rbegin(); it != frames.rend(); ++it) {
+            if (it->kind == BmsControlFrameKind::Random) {
+                return it->selected;
+            }
+        }
+        return std::nullopt;
+    };
+    const auto close_frame = [&](BmsControlFrameKind kind, std::string_view label) {
+        if (frames.empty() || frames.back().kind != kind) {
+            warn(line_number, "Unmatched BMS control-flow terminator #" + std::string(label) + ".");
+            return;
+        }
+        frames.pop_back();
+    };
+
+    while (std::getline(input, line)) {
+        ++line_number;
+        if (!line.empty() && line.back() == '\r') {
+            line.pop_back();
+        }
+
+        std::string candidate = strip_comment(line);
+        std::string key;
+        std::string value;
+        if (!candidate.empty() && candidate.front() == '#') {
+            std::string command = trim(std::string_view(candidate).substr(1));
+            const auto separator = command.find_first_of(" \t:");
+            key = separator == std::string::npos ? command : command.substr(0, separator);
+            value = separator == std::string::npos
+                        ? std::string{}
+                        : parse_header_value(std::string_view(command).substr(separator));
+            to_upper_ascii(key);
+        }
+
+        bool control_line = true;
+        if (key == "RANDOM" || key == "SETRANDOM") {
+            const bool parent_active = current_active();
+            int range_or_value = 0;
+            if (!parse_positive(value, range_or_value)) {
+                warn(line_number, "#" + key + " requires a positive integer; using 1.");
+                range_or_value = 1;
+            }
+            const int selected = parent_active
+                                     ? (key == "RANDOM" ? random.choose(range_or_value) : range_or_value)
+                                     : 0;
+            frames.push_back(BmsControlFrame{
+                BmsControlFrameKind::Random, parent_active, parent_active, selected});
+        } else if (key == "ENDRANDOM") {
+            close_frame(BmsControlFrameKind::Random, key);
+        } else if (key == "IF") {
+            const bool parent_active = current_active();
+            int label = 0;
+            if (!parse_positive(value, label)) {
+                warn(line_number, "#IF requires a positive integer label.");
+            }
+            const auto selected = nearest_selected_random();
+            if (!selected.has_value()) {
+                warn(line_number, "#IF was used without an enclosing #RANDOM or #SETRANDOM.");
+            }
+            const bool matched = parent_active && selected.has_value() && selected.value() == label;
+            frames.push_back(BmsControlFrame{
+                BmsControlFrameKind::If, parent_active, matched, selected.value_or(0), matched});
+        } else if (key == "ELSEIF") {
+            if (frames.empty() || frames.back().kind != BmsControlFrameKind::If) {
+                warn(line_number, "#ELSEIF was used without an open #IF.");
+            } else {
+                auto& frame = frames.back();
+                int label = 0;
+                if (!parse_positive(value, label)) {
+                    warn(line_number, "#ELSEIF requires a positive integer label.");
+                }
+                const bool matched = frame.parent_active && !frame.branch_taken && frame.selected == label;
+                frame.active = matched;
+                frame.branch_taken = frame.branch_taken || matched;
+            }
+        } else if (key == "ELSE") {
+            if (frames.empty() || frames.back().kind != BmsControlFrameKind::If) {
+                warn(line_number, "#ELSE was used without an open #IF.");
+            } else {
+                auto& frame = frames.back();
+                frame.active = frame.parent_active && !frame.branch_taken;
+                frame.branch_taken = true;
+            }
+        } else if (key == "ENDIF") {
+            close_frame(BmsControlFrameKind::If, key);
+        } else if (key == "SWITCH" || key == "SETSWITCH") {
+            const bool parent_active = current_active();
+            int range_or_value = 0;
+            if (!parse_positive(value, range_or_value)) {
+                warn(line_number, "#" + key + " requires a positive integer; using 1.");
+                range_or_value = 1;
+            }
+            const int selected = parent_active
+                                     ? (key == "SWITCH" ? random.choose(range_or_value) : range_or_value)
+                                     : 0;
+            frames.push_back(BmsControlFrame{
+                BmsControlFrameKind::Switch, parent_active, false, selected});
+        } else if (key == "CASE") {
+            if (frames.empty() || frames.back().kind != BmsControlFrameKind::Switch) {
+                warn(line_number, "#CASE was used without an open #SWITCH.");
+            } else {
+                auto& frame = frames.back();
+                int label = 0;
+                if (!parse_positive(value, label)) {
+                    warn(line_number, "#CASE requires a positive integer label.");
+                }
+                if (frame.switch_skipped) {
+                    frame.active = false;
+                } else if (frame.switch_flowing || frame.selected == label) {
+                    frame.switch_flowing = true;
+                    frame.branch_taken = frame.branch_taken || frame.selected == label;
+                    frame.active = frame.parent_active;
+                } else {
+                    frame.active = false;
+                }
+            }
+        } else if (key == "DEF") {
+            if (frames.empty() || frames.back().kind != BmsControlFrameKind::Switch) {
+                warn(line_number, "#DEF was used without an open #SWITCH.");
+            } else {
+                auto& frame = frames.back();
+                if (!frame.switch_skipped && (frame.switch_flowing || !frame.branch_taken)) {
+                    frame.switch_flowing = true;
+                    frame.active = frame.parent_active;
+                } else {
+                    frame.active = false;
+                }
+            }
+        } else if (key == "SKIP") {
+            if (frames.empty() || frames.back().kind != BmsControlFrameKind::Switch) {
+                warn(line_number, "#SKIP was used without an open #SWITCH.");
+            } else if (frames.back().active) {
+                frames.back().switch_skipped = true;
+                frames.back().active = false;
+            }
+        } else if (key == "ENDSW") {
+            close_frame(BmsControlFrameKind::Switch, key);
+        } else {
+            control_line = false;
+        }
+
+        if (!control_line && current_active()) {
+            output << line;
+        }
+        output << '\n';
+    }
+
+    if (!frames.empty()) {
+        warn(line_number, "BMS control-flow block reached end of file without a matching terminator.");
+    }
+    return output.str();
+}
+
 void add_message(std::vector<BmsParseMessage>& messages, BmsParseSeverity severity, std::size_t line, std::string text) {
     messages.push_back(BmsParseMessage{severity, line, std::move(text)});
 }
@@ -316,7 +531,8 @@ int key_count_from_mode_token(std::string_view token) {
 bool should_store_index_header(std::string_view key) {
     if (key == "BPM" || key == "PLAYER" || key == "GENRE" || key == "TITLE" || key == "ARTIST" ||
         key == "SUBTITLE" || key == "DIFFICULTY" || key == "PLAYLEVEL" || key == "RANK" ||
-        key == "TOTAL" || key == "VOLWAV" || key == "LNOBJ" || key == "STAGEFILE" || key == "BACKBMP" ||
+        key == "TOTAL" || key == "VOLWAV" || key == "LNOBJ" || key == "LNTYPE" || key == "LNMODE" ||
+        key == "STAGEFILE" || key == "BACKBMP" ||
         key == "PREVIEW" || key == "PREVIEWFILE") {
         return true;
     }
@@ -655,6 +871,7 @@ bool BmsParseResult::success() const {
 BmsParseResult BmsParser::parse(std::string_view content, const BmsParserOptions& options) const {
     BmsParseResult result;
     std::string cleaned = remove_bom(normalize_bms_text(content));
+    cleaned = preprocess_bms_control_flow(cleaned, options.random_seed, result.messages);
     std::unordered_set<std::string> metadata_lane_channels;
 
     std::istringstream stream(cleaned);

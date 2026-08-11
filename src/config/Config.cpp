@@ -354,6 +354,17 @@ std::string normalize_song_index_profile(std::string value) {
     return "safe";
 }
 
+std::string normalize_pacemaker_mode(std::string value) {
+    value = to_lower_ascii(std::move(value));
+    if (value == "accuracy" || value == "acc") {
+        return "accuracy";
+    }
+    if (value == "score") {
+        return "score";
+    }
+    return "off";
+}
+
 std::string normalize_input_backend(std::string value, std::string_view fallback) {
     value = to_lower_ascii(std::move(value));
     if (value == "rawinput" || value == "raw") {
@@ -664,6 +675,18 @@ void apply_config_object(const JsonObject& root, RuntimeConfig& config) {
             get_bool(*mode, "practice_no_fail_enabled", config.mode.practice_no_fail_enabled);
         config.mode.one_miss_fail_enabled =
             get_bool(*mode, "one_miss_fail_enabled", config.mode.one_miss_fail_enabled);
+        config.mode.pacemaker_mode =
+            normalize_pacemaker_mode(get_string(*mode, "pacemaker_mode", config.mode.pacemaker_mode));
+        config.mode.pacemaker_target_accuracy = clamp_finite(
+            get_number(*mode, "pacemaker_target_accuracy", config.mode.pacemaker_target_accuracy),
+            kPacemakerAccuracyMin,
+            kPacemakerAccuracyMax,
+            kPacemakerAccuracyDefault);
+        config.mode.pacemaker_target_score = static_cast<int64_t>(std::llround(clamp_finite(
+            get_number(*mode, "pacemaker_target_score", static_cast<double>(config.mode.pacemaker_target_score)),
+            static_cast<double>(kPacemakerScoreMin),
+            static_cast<double>(kPacemakerScoreMax),
+            static_cast<double>(kPacemakerScoreDefault))));
         config.mode.song_index_profile =
             normalize_song_index_profile(get_string(*mode, "song_index_profile", config.mode.song_index_profile));
         config.mode.calculate_song_index_difficulty =
@@ -1078,6 +1101,16 @@ JsonValue build_json_root(const RuntimeConfig& config) {
     mode.emplace("autoplay_enabled", JsonValue{config.mode.autoplay_enabled});
     mode.emplace("practice_no_fail_enabled", JsonValue{config.mode.practice_no_fail_enabled});
     mode.emplace("one_miss_fail_enabled", JsonValue{config.mode.one_miss_fail_enabled});
+    mode.emplace("pacemaker_mode", JsonValue{normalize_pacemaker_mode(config.mode.pacemaker_mode)});
+    mode.emplace("pacemaker_target_accuracy", JsonValue{clamp_finite(
+        config.mode.pacemaker_target_accuracy,
+        kPacemakerAccuracyMin,
+        kPacemakerAccuracyMax,
+        kPacemakerAccuracyDefault)});
+    mode.emplace("pacemaker_target_score", JsonValue{static_cast<double>(std::clamp(
+        config.mode.pacemaker_target_score,
+        kPacemakerScoreMin,
+        kPacemakerScoreMax))});
     mode.emplace("song_index_profile", JsonValue{normalize_song_index_profile(config.mode.song_index_profile)});
     mode.emplace("calculate_song_index_difficulty", JsonValue{config.mode.calculate_song_index_difficulty});
     root.emplace("mode", JsonValue{std::move(mode)});
@@ -1269,6 +1302,10 @@ std::string normalize_skin_mode_token(std::string_view key_mode) {
 
 std::string normalize_song_index_profile_token(std::string_view token) {
     return normalize_song_index_profile(std::string(token));
+}
+
+std::string normalize_pacemaker_mode_token(std::string_view token) {
+    return normalize_pacemaker_mode(std::string(token));
 }
 
 
@@ -1724,6 +1761,9 @@ RuntimeConfig ConfigLoader::defaults() const {
     config.mode.autoplay_enabled = false;
     config.mode.practice_no_fail_enabled = false;
     config.mode.one_miss_fail_enabled = false;
+    config.mode.pacemaker_mode = "off";
+    config.mode.pacemaker_target_accuracy = kPacemakerAccuracyDefault;
+    config.mode.pacemaker_target_score = kPacemakerScoreDefault;
     config.mode.song_index_profile = "safe";
     config.mode.calculate_song_index_difficulty = false;
 

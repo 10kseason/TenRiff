@@ -4,6 +4,7 @@
 #include <cmath>
 
 #include "chart/BmsChartNorm.h"
+#include "chart/BmsParser.h"
 #include "chart/BmsTimeline.h"
 
 using tenriff::chart::BmsChart;
@@ -198,6 +199,36 @@ TEST_CASE("timeline builder applies fractional channel 08 BPM references before 
         }
     }
     CHECK(found_note);
+}
+
+TEST_CASE("lowercase BPM headers drive channel 03 and 08 speed changes end to end") {
+    const char* data =
+        "#bpm 120\n"
+        "#bpmaa 240\n"
+        "#00003:F0\n"
+        "#00108:AA\n"
+        "#00211:01\n";
+
+    tenriff::chart::BmsParser parser;
+    const auto parsed = parser.parse(data);
+    REQUIRE(parsed.success());
+
+    BmsChartNormalizer normalizer;
+    const auto normalization = normalizer.normalize(parsed.chart);
+    REQUIRE(normalization.success());
+
+    BmsTimelineBuilder builder;
+    const auto timeline = builder.build(normalization.chart, 48000);
+    REQUIRE(timeline.success());
+
+    const auto note = std::find_if(timeline.timeline.events.begin(), timeline.timeline.events.end(),
+                                   [](const auto& event) {
+                                       return event.event.type == BmsNormalizedEventType::Note;
+                                   });
+    REQUIRE(note != timeline.timeline.events.end());
+    // Channel 03 changes measure 0 to 240 BPM and channel 08 keeps 240 BPM at
+    // measure 1, so two four-beat measures take one second each.
+    CHECK(note->time_samples == 96000);
 }
 
 TEST_CASE("timeline scroll segments support speed changes stops and reverse motion") {

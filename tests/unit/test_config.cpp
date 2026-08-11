@@ -89,6 +89,9 @@ TEST_CASE("config defaults prefer 44100 Hz audio") {
     CHECK(config.input.judgement_hz == 4000);
     CHECK(config.input.debounce_ms == doctest::Approx(8.0));
     CHECK_FALSE(config.mode.ghost_battle_enabled);
+    CHECK(config.mode.pacemaker_mode == "off");
+    CHECK(config.mode.pacemaker_target_accuracy == doctest::Approx(90.0));
+    CHECK(config.mode.pacemaker_target_score == 8000);
     CHECK(config.mode.song_index_profile == "safe");
     CHECK_FALSE(config.mode.calculate_song_index_difficulty);
     CHECK(config.mode.key_conversion_algorithm == "krrcream");
@@ -415,6 +418,9 @@ TEST_CASE("config save and load preserve volume and speed settings") {
     config.speed.rate = 1.25;
     config.speed.hi_speed = 4.75;
     config.mode.ghost_battle_enabled = true;
+    config.mode.pacemaker_mode = "accuracy";
+    config.mode.pacemaker_target_accuracy = 97.5;
+    config.mode.pacemaker_target_score = 9200;
     config.mode.song_index_profile = "fast";
     config.mode.calculate_song_index_difficulty = true;
     config.mode.key_conversion_algorithm = "nk2";
@@ -434,6 +440,9 @@ TEST_CASE("config save and load preserve volume and speed settings") {
     CHECK(result.config.speed.rate == doctest::Approx(1.25));
     CHECK(result.config.speed.hi_speed == doctest::Approx(4.75));
     CHECK(result.config.mode.ghost_battle_enabled);
+    CHECK(result.config.mode.pacemaker_mode == "accuracy");
+    CHECK(result.config.mode.pacemaker_target_accuracy == doctest::Approx(97.5));
+    CHECK(result.config.mode.pacemaker_target_score == 9200);
     CHECK(result.config.mode.song_index_profile == "fast");
     CHECK(result.config.mode.calculate_song_index_difficulty);
     CHECK(result.config.mode.key_conversion_algorithm == "nk2");

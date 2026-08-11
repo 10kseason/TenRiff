@@ -723,6 +723,34 @@ TEST_CASE("chart loader builds hold notes from BMS LNOBJ markers") {
     CHECK(result.chart.notes.front().end_sample.value() > result.chart.notes.front().start_sample);
 }
 
+TEST_CASE("chart loader builds cross-measure MGQ holds from BMS LNTYPE 2") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+
+    const auto chart_path = temp.path / "lntype2.bms";
+    {
+        std::ofstream chart_file(chart_path, std::ios::binary);
+        REQUIRE(chart_file.good());
+        chart_file << "#TITLE LNTYPE 2\n"
+                      "#BPM 120\n"
+                      "#LNTYPE 2\n"
+                      "#00151:00111111\n"
+                      "#00251:11110000\n";
+    }
+
+    ChartLoader loader;
+    const ChartLoadResult result = loader.load(chart_path.u8string(), 48000, 1.0, "ignore");
+
+    REQUIRE(result.success());
+    CHECK(result.messages.empty());
+    REQUIRE(result.chart.notes.size() == 1u);
+    CHECK(result.chart.notes.front().lane == 1);
+    REQUIRE(result.chart.notes.front().end_sample.has_value());
+    CHECK(result.chart.notes.front().end_sample.value() > result.chart.notes.front().start_sample);
+    CHECK_FALSE(result.chart.notes.front().release_required);
+}
+
 TEST_CASE("chart loader enables release judgement for BMS LNMODE 2 long-note channels") {
     TempDirGuard temp;
     temp.path = make_temp_dir();

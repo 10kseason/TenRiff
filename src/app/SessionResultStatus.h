@@ -1,10 +1,62 @@
 #pragma once
 
+#include <cstdint>
 #include <string>
+#include <string_view>
 
 #include "game/GaugeManager.h"
 
 namespace tenriff::app {
+
+inline bool pacemaker_mode_active(std::string_view mode) {
+    return mode == "accuracy" || mode == "score";
+}
+
+inline bool pacemaker_target_met(std::string_view mode,
+                                 double accuracy_percent,
+                                 int64_t final_score,
+                                 double target_accuracy,
+                                 int64_t target_score) {
+    if (mode == "accuracy") {
+        return accuracy_percent >= target_accuracy;
+    }
+    if (mode == "score") {
+        return final_score >= target_score;
+    }
+    return false;
+}
+
+inline bool gameplay_session_pacemaker_cleared(bool finished,
+                                               bool game_over,
+                                               bool user_aborted,
+                                               bool autoplay_enabled,
+                                               bool target_met) {
+    return finished && !game_over && !user_aborted && !autoplay_enabled && target_met;
+}
+
+inline std::string gameplay_session_pacemaker_status(bool finished,
+                                                     bool game_over,
+                                                     bool user_aborted,
+                                                     bool autoplay_enabled,
+                                                     std::string_view mode,
+                                                     bool target_met) {
+    if (user_aborted) {
+        return "ABORTED";
+    }
+    if (!finished || game_over) {
+        return "FAILED";
+    }
+    if (autoplay_enabled) {
+        return "AUTOPLAY";
+    }
+    if (mode == "accuracy") {
+        return target_met ? "PACEMAKER ACCURACY CLEAR" : "PACEMAKER ACCURACY FAILED";
+    }
+    if (mode == "score") {
+        return target_met ? "PACEMAKER SCORE CLEAR" : "PACEMAKER SCORE FAILED";
+    }
+    return "FAILED";
+}
 
 inline bool gameplay_session_cleared(bool finished,
                                      bool game_over,

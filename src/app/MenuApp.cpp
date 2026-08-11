@@ -47,7 +47,6 @@
 #include "app/ProfileSetupFlow.h"
 #include "app/RuntimeConfigMigration.h"
 #include "app/SongPreviewPlayback.h"
-#include "app/SongPreviewBuilder.h"
 #include "config/KeycodeMap.h"
 #include "game/SpeedManager.h"
 #include "gameplay/Replay.h"
@@ -1666,9 +1665,7 @@ std::string MenuApp::current_input_backend_status_detail() const {
 void MenuApp::restart_audio_thread() {
     cancel_song_preview_decode();
     stop_song_preview_audio();
-    song_preview_selection_key_.clear();
-    song_preview_due_ns_ = 0;
-    song_preview_pending_ = false;
+    song_select_screen_.clear_preview_target();
 }
 
 void MenuApp::restart_render_thread() {
@@ -2383,7 +2380,7 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
             handle_calibration_settings_input(action_key);
             return;
         case Screen::ModeSelect:
-            settings_cursor_ = clamp_int(event.index, 0, 16);
+            settings_cursor_ = clamp_int(event.index, 0, 17);
             if (finish_selection_only()) {
                 return;
             }

@@ -1,8 +1,12 @@
 #define DOCTEST_CONFIG_IMPLEMENT
 #include "doctest/doctest.h"
 
+#include <algorithm>
+#include <array>
 #include <filesystem>
 #include <fstream>
+#include <string>
+#include <string_view>
 
 #ifdef _MSC_VER
 #include <crtdbg.h>
@@ -50,11 +54,56 @@ static bool has_message(const BmsParseResult& result, BmsParseSeverity severity)
     return false;
 }
 
+bool is_windows_runtime_integration_test(std::string_view name) {
+    // These tests own real RawInput windows or multi-peer localhost sockets.
+    // They remain part of the normal Release suite, but MSVC ASan can prevent
+    // their worker shutdown from completing. Keep the sanitizer exclusion
+    // exact so new unit coverage cannot be skipped accidentally.
+    static constexpr std::array<std::string_view, 8> kTests = {
+        "raw input thread can stop and restart without silently failing",
+        "second live RawInput owner is rejected until the first owner stops",
+        "RawInput thread falls back in place when its message pump exits",
+        "RawInput window close switches to Polling without key activity",
+        "RawInput target replacement switches to Polling without key activity",
+        "peer session localhost round reaches final score and clean shutdown",
+        "peer room coordinates four players and rotates leader in join order",
+        "peer room accepts eight players and rejects a ninth",
+    };
+    return std::find(kTests.begin(), kTests.end(), name) != kTests.end();
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
-    (void)argc;
-    (void)argv;
+    // Keep CTest diagnostics useful if a sanitizer terminates a long-running
+    // shard before the process gets a chance to flush its normal stream buffer.
+    std::cout << std::unitbuf;
+    std::cerr << std::unitbuf;
+
+    int shard_index = 0;
+    int shard_count = 1;
+    bool skip_windows_runtime_integration = false;
+    constexpr std::string_view kShardIndexPrefix = "--shard-index=";
+    constexpr std::string_view kShardCountPrefix = "--shard-count=";
+    for (int index = 1; index < argc; ++index) {
+        const std::string_view argument(argv[index]);
+        try {
+            if (argument.rfind(kShardIndexPrefix, 0) == 0) {
+                shard_index = std::stoi(std::string(argument.substr(kShardIndexPrefix.size())));
+            } else if (argument.rfind(kShardCountPrefix, 0) == 0) {
+                shard_count = std::stoi(std::string(argument.substr(kShardCountPrefix.size())));
+            } else if (argument == "--skip-windows-runtime-integration") {
+                skip_windows_runtime_integration = true;
+            }
+        } catch (...) {
+            std::cerr << "Invalid test shard argument: " << argument << '\n';
+            return 2;
+        }
+    }
+    if (shard_count <= 0 || shard_index < 0 || shard_index >= shard_count) {
+        std::cerr << "Invalid test shard " << shard_index << '/' << shard_count << '\n';
+        return 2;
+    }
 
 #if defined(_MSC_VER) && defined(_DEBUG)
     _CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
@@ -63,7 +112,24 @@ int main(int argc, char** argv) {
 #endif
 
     int failed = 0;
+    std::size_t registry_index = 0;
+    std::size_t selected_tests = 0;
+    std::size_t skipped_tests = 0;
     for (const auto& test : ::doctest::registry()) {
+        const bool selected =
+            registry_index % static_cast<std::size_t>(shard_count) ==
+            static_cast<std::size_t>(shard_index);
+        ++registry_index;
+        if (!selected) {
+            continue;
+        }
+        ++selected_tests;
+        if (skip_windows_runtime_integration && is_windows_runtime_integration_test(test.name)) {
+            ++skipped_tests;
+            std::cout << "[skip] " << test.name
+                      << " - covered by the normal Release OS-integration suite\n";
+            continue;
+        }
         try {
             test.func();
             std::cout << "[pass] " << test.name << '\n';
@@ -83,7 +149,14 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    std::cout << "All tests passed" << '\n';
+    if (selected_tests == 0) {
+        std::cerr << "Test shard selected no tests" << '\n';
+        return 2;
+    }
+
+    std::cout << "All tests passed (shard " << shard_index + 1 << '/' << shard_count
+              << ", " << (selected_tests - skipped_tests) << " run, "
+              << skipped_tests << " integration skips)" << '\n';
     return 0;
 }
 
@@ -127,6 +200,81 @@ TEST_CASE("parses BMS scroll extensions and landmine channels") {
     CHECK_EQ(result.chart.commands[0].channel, "SC");
     CHECK_EQ(result.chart.commands[1].channel, "D1");
     CHECK_EQ(result.chart.commands[2].channel, "E1");
+}
+
+TEST_CASE("parses lowercase BPM headers and extended BPM dictionaries case insensitively") {
+    const char* data =
+        "#title Lowercase Timing\n"
+        "#bpm 120\n"
+        "#bpmaa 187.5\n"
+        "#00103:7800\n"
+        "#00208:aa00\n";
+
+    BmsParser parser;
+    const auto result = parser.parse(data);
+
+    REQUIRE(result.success());
+    CHECK(result.chart.base_bpm == doctest::Approx(120.0));
+    CHECK(result.chart.bpm.at("AA") == doctest::Approx(187.5));
+    REQUIRE(result.chart.commands.size() == 2u);
+    CHECK(result.chart.commands[0].channel == "03");
+    CHECK(result.chart.commands[1].channel == "08");
+}
+
+TEST_CASE("BMS RANDOM IF ELSEIF and ELSE select one deterministic branch") {
+    const char* data =
+        "#RANDOM 3\n"
+        "#IF 1\n"
+        "#00111:01\n"
+        "#ELSEIF 2\n"
+        "#00112:02\n"
+        "#ELSE\n"
+        "#00113:03\n"
+        "#ENDIF\n"
+        "#ENDRANDOM\n";
+
+    BmsParserOptions options;
+    options.random_seed = 42;
+    BmsParser parser;
+    const auto first = parser.parse(data, options);
+    const auto second = parser.parse(data, options);
+
+    REQUIRE(first.success());
+    REQUIRE(second.success());
+    REQUIRE(first.chart.commands.size() == 1u);
+    REQUIRE(second.chart.commands.size() == 1u);
+    CHECK(first.chart.commands.front().channel == second.chart.commands.front().channel);
+    CHECK(first.chart.commands.front().data == second.chart.commands.front().data);
+}
+
+TEST_CASE("BMS SETRANDOM and SETSWITCH support exact branches skip and default") {
+    const char* data =
+        "#SETRANDOM 2\n"
+        "#IF 1\n"
+        "#TITLE Wrong\n"
+        "#ELSEIF 2\n"
+        "#TITLE Selected\n"
+        "#ENDIF\n"
+        "#ENDRANDOM\n"
+        "#SETSWITCH 2\n"
+        "#CASE 1\n"
+        "#00111:01\n"
+        "#SKIP\n"
+        "#CASE 2\n"
+        "#00112:02\n"
+        "#SKIP\n"
+        "#DEF\n"
+        "#00113:03\n"
+        "#ENDSW\n";
+
+    BmsParser parser;
+    const auto result = parser.parse(data);
+
+    REQUIRE(result.success());
+    CHECK(result.chart.headers.at("TITLE") == "Selected");
+    REQUIRE(result.chart.commands.size() == 1u);
+    CHECK(result.chart.commands.front().channel == "12");
+    CHECK(result.chart.commands.front().data == "02");
 }
 
 TEST_CASE("parses measure commands with even tokens") {

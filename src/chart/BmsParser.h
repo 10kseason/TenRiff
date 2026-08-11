@@ -20,6 +20,10 @@ struct BmsParserOptions {
     // Keep only unique note-lane channels plus index headers. This preserves
     // menu key-mode inference without retaining measure payloads.
     bool metadata_only = false;
+    // BMS control-flow commands use this deterministic seed. Keeping the seed
+    // explicit makes repeated chart loads and replay playback select the same
+    // #RANDOM/#SWITCH branches.
+    uint32_t random_seed = 0;
 };
 
 enum class BmsParseSeverity {

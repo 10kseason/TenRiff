@@ -64,6 +64,9 @@
     "random_seed": 0,
     "ghost_battle_enabled": false,
     "one_miss_fail_enabled": false,
+    "pacemaker_mode": "off",
+    "pacemaker_target_accuracy": 90.0,
+    "pacemaker_target_score": 8000,
     "song_index_profile": "safe",
     "calculate_song_index_difficulty": false
   },

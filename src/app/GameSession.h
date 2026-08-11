@@ -385,6 +385,7 @@ private:
     std::size_t autoplay_event_index_ = 0;
     bool practice_no_fail_enabled_ = false;
     bool one_miss_fail_enabled_ = false;
+    std::string pacemaker_mode_ = "off";
     bool gauge_shift_enabled_ = false;
     bool course_gauge_enabled_ = false;
     double course_gauge_initial_value_ = 100.0;

@@ -56,7 +56,7 @@ TenRiff의 기본 플레이 흐름은 아래 순서입니다.
 
 ### Song Select에서 자주 쓰는 화면
 - `Mode`
-  - Ghost Battle, Autoplay, Practice, Sudden Death, Key Mode, Gauge, Random, Mods, Rate, Hi-Speed 조정
+  - Ghost Battle, Autoplay, Practice, Sudden Death, Pacemaker, Key Mode, Gauge, Random, Mods, Rate, Hi-Speed 조정
 - `Audio`
   - Master/BGM/Keysound 볼륨과 BMS keysound 정책 조정
 - `Graphics`
@@ -74,6 +74,7 @@ TenRiff의 기본 플레이 흐름은 아래 순서입니다.
 
 - `Mode > Gauge Shift Start`: `normal`
 - `Mode > Sudden Death`: 첫 OD8 환산 `MISS` 즉사 도전을 원할 때만 켜기
+- `Mode > Pacemaker`: 곡 끝 Accuracy 또는 Score 목표를 클리어 조건으로 쓰고 싶을 때 선택
 - `Mode > Rate`: `1.0x`
 - `Mode > Hi-Speed`: 기본값 그대로 시작
 - `Graphics > Display`: Discord 음성 오버레이를 쓸 때는 `Borderless` 권장
@@ -108,9 +109,11 @@ Discord 설정 방법은 [공식 Game Overlay 안내](https://support.discord.co
 
 ### 차트 형식
 - 차트 인덱싱과 플레이는 BMS 계열(`.bms/.bme/.bml/.pms`) 전용이며 `.osu`는 지원하지 않습니다.
+- BMS 명령은 대소문자를 구분하지 않으며 `#RANDOM/#IF`, `#SWITCH/#CASE`, MGQ `#LNTYPE 2`, `#BPM` 및 채널 `03/08` 변속을 지원합니다.
 
 ### 로딩
 - 곡 시작 직후에는 차트 로딩 진행 상태가 표시될 수 있습니다.
+- 시작 후 3초 안에 필요한 오디오만 먼저 준비하고, 뒤쪽 BGM/키음은 재생 전 미리 불러와 긴 차트가 전 구간 오디오 때문에 시작을 기다리지 않게 합니다.
 - 로딩 중 `Esc`를 누르면 시작을 취소하고 Song Select로 돌아갑니다.
 
 ### 카운트다운
@@ -165,6 +168,8 @@ OD8 환산 통계는 Sudden Death 판정과 기존 replay 호환을 위해 JSON 
 일반 Score는 최대 10,000점이며 `PG 6 / GR 3 / GD 1 / PR 0 / FAIL 0` 비율로 계산합니다. LN은 머리와 꼬리를 각각 0.5 가중치로 계산해 한 객체가 되며, 상세 점수는 기존의 별도 계산을 유지합니다.
 
 Accuracy는 `PG / GR / GD / BD = 100 / 80 / 50 / 20%`를 기준으로 각 판정 구간 안의 실제 타이밍에 따라 최대 0.5%p를 더 감점합니다. 전부 `PG`여도 PG 타이밍 범위가 8ms를 넘으면 99.5%를 초과하지 않습니다.
+
+Pacemaker는 `Accuracy` 또는 `Score` 중 하나를 고르고 목표값을 설정합니다. 차트는 게이지가 떨어져도 끝까지 진행되며, 종료 시 표준 Accuracy 또는 배율 적용 뒤 표시 Score가 목표 이상일 때만 `PACEMAKER ... CLEAR`로 기록됩니다. 목표 미달은 `FAILED`이며 Practice·Sudden Death와 동시에 쓰지 않습니다.
 
 Rank는 `<75 F`, `75 B`, `80.5 A`, `86.5 A+`, `90 S`, `95.5 S+`, `98 AA`, `99 SS`, `99.75 SSS` 경계를 사용합니다.
 

@@ -16,7 +16,6 @@ struct ChartAudioBudgetChoice {
 
 struct ChartAudioStartupCandidate {
     int64_t first_use_sample = (std::numeric_limits<int64_t>::max)();
-    bool has_bgm = false;
     std::uint64_t estimated_decoded_bytes = 0;
     int use_count = 0;
 };
@@ -63,9 +62,12 @@ inline ChartAudioStartupPlan build_chart_audio_startup_plan(const std::vector<Ch
 
     for (std::size_t asset_id : order) {
         const auto& candidate = candidates[asset_id];
-        const bool required = candidate.has_bgm ||
-                              (candidate.first_use_sample != (std::numeric_limits<int64_t>::max)() &&
-                               candidate.first_use_sample <= startup_window_samples);
+        // Only assets audible inside the startup window may block chart launch.
+        // Later BGM is queued by first-use order here and by the runtime prefetcher
+        // afterwards, so a chart with many late BGM slices does not decode the
+        // entire song before the countdown can begin.
+        const bool required = candidate.first_use_sample != (std::numeric_limits<int64_t>::max)() &&
+                              candidate.first_use_sample <= startup_window_samples;
         if (!required || candidate.use_count <= 0) {
             continue;
         }

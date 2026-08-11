@@ -170,6 +170,7 @@ bool GameSession::initialize(const CommandLineOptions& options) {
     autoplay_event_index_ = 0;
     practice_no_fail_enabled_ = false;
     one_miss_fail_enabled_ = false;
+    pacemaker_mode_ = "off";
     gauge_shift_enabled_ = false;
     ghost_replay_source_ = {};
     ghost_replay_enabled_ = false;
@@ -271,6 +272,11 @@ bool GameSession::initialize(const CommandLineOptions& options) {
     autoplay_enabled_ = config_.mode.autoplay_enabled;
     practice_no_fail_enabled_ = config_.mode.practice_no_fail_enabled;
     one_miss_fail_enabled_ = config_.mode.one_miss_fail_enabled;
+    pacemaker_mode_ = config::normalize_pacemaker_mode_token(config_.mode.pacemaker_mode);
+    if (pacemaker_mode_active(pacemaker_mode_)) {
+        practice_no_fail_enabled_ = false;
+        one_miss_fail_enabled_ = false;
+    }
     report_loading_progress(12, "Loading keymap");
     if (loading_cancel_requested()) {
         return false;
@@ -374,6 +380,7 @@ bool GameSession::initialize(const CommandLineOptions& options) {
         autoplay_enabled_ = false;
         practice_no_fail_enabled_ = replay_source_.mode.practice_no_fail_enabled;
         one_miss_fail_enabled_ = replay_source_.mode.one_miss_fail_enabled;
+        pacemaker_mode_ = "off";
     }
     if (!replay_playback_enabled_ && !options.ghost_replay_path.empty()) {
         auto ghost_load = gameplay::load_replay_json(options.ghost_replay_path);
@@ -429,7 +436,8 @@ bool GameSession::initialize(const CommandLineOptions& options) {
     auto load_chart_for_session_rate = [this](ChartLoadResult& out_result) -> bool {
         ChartLoader loader;
         out_result = loader.load(chart_path_, sample_rate_, config_.speed.rate,
-                                  config_.audio_ui.bms_keysound_policy);
+                                  config_.audio_ui.bms_keysound_policy,
+                                  config_.mode.random_seed);
         for (const auto& message : out_result.messages) {
             std::cerr << "[warn] " << message << std::endl;
         }
@@ -519,7 +527,8 @@ bool GameSession::initialize(const CommandLineOptions& options) {
     gameplay_config.judge = mode_result.judge;
     gameplay_config.gauge = config_.gauge;
     gameplay_config.input_offset_ms = config_.input_offset_ms;
-    gameplay_config.practice_no_fail_enabled = practice_no_fail_enabled_;
+    gameplay_config.practice_no_fail_enabled =
+        practice_no_fail_enabled_ || pacemaker_mode_active(pacemaker_mode_);
     gameplay_config.one_miss_fail_enabled = one_miss_fail_enabled_;
     // Gauge Shift is the standard runtime. The selected gauge is its starting
     // tier; course gauges keep their dedicated carry-over policy below.
@@ -1558,7 +1567,6 @@ bool GameSession::prepare_chart_audio() {
     for (std::size_t asset_id = 0; asset_id < asset_count; ++asset_id) {
         const auto& asset = chart_audio_assets_[asset_id];
         startup_candidates[asset_id].first_use_sample = asset.first_use_sample;
-        startup_candidates[asset_id].has_bgm = asset.has_bgm;
         startup_candidates[asset_id].estimated_decoded_bytes = asset.estimated_decoded_bytes;
         startup_candidates[asset_id].use_count = asset.use_count;
     }
@@ -2045,20 +2053,6 @@ void GameSession::shutdown() {
         result_.finished = engine_finished;
         result_.final_gauge = gauge_type_token(final_gauge);
         result_.final_gauge_value = final_gauge_value;
-        result_.clear_status = gameplay_session_clear_status(
-            engine_finished,
-            engine_game_over,
-            user_aborted_.load(std::memory_order_acquire),
-            final_gauge,
-            autoplay_enabled_,
-            practice_no_fail_enabled_,
-            one_miss_fail_enabled_,
-            gauge_shift_enabled_);
-        result_.game_over = !gameplay_session_cleared(
-            engine_finished,
-            engine_game_over,
-            user_aborted_.load(std::memory_order_acquire),
-            autoplay_enabled_);
         result_.mods = active_mods_;
         result_.player_name = config::normalize_profile_nickname(config_.ui.profile_nickname);
         if (result_.player_name.empty()) {
@@ -2067,6 +2061,43 @@ void GameSession::shutdown() {
         result_.rate_multiplier = rate_multiplier_;
         result_.score_multiplier = score_multiplier_;
         result_.final_score = gameplay::scale_native_score(result_.stats.raw_score, result_.score_multiplier);
+        const bool user_aborted = user_aborted_.load(std::memory_order_acquire);
+        if (pacemaker_mode_active(pacemaker_mode_)) {
+            const bool target_met = pacemaker_target_met(
+                pacemaker_mode_,
+                result_.stats.accuracy_percent(),
+                result_.final_score,
+                config_.mode.pacemaker_target_accuracy,
+                config_.mode.pacemaker_target_score);
+            result_.clear_status = gameplay_session_pacemaker_status(
+                engine_finished,
+                engine_game_over,
+                user_aborted,
+                autoplay_enabled_,
+                pacemaker_mode_,
+                target_met);
+            result_.game_over = !gameplay_session_pacemaker_cleared(
+                engine_finished,
+                engine_game_over,
+                user_aborted,
+                autoplay_enabled_,
+                target_met);
+        } else {
+            result_.clear_status = gameplay_session_clear_status(
+                engine_finished,
+                engine_game_over,
+                user_aborted,
+                final_gauge,
+                autoplay_enabled_,
+                practice_no_fail_enabled_,
+                one_miss_fail_enabled_,
+                gauge_shift_enabled_);
+            result_.game_over = !gameplay_session_cleared(
+                engine_finished,
+                engine_game_over,
+                user_aborted,
+                autoplay_enabled_);
+        }
         result_.pause_used = replay_playback_enabled_
                                  ? replay_source_.pause_used
                                  : pause_used_.load(std::memory_order_acquire);
@@ -2212,6 +2243,7 @@ void GameSession::shutdown() {
     autoplay_event_index_ = 0;
     practice_no_fail_enabled_ = false;
     one_miss_fail_enabled_ = false;
+    pacemaker_mode_ = "off";
     gauge_shift_enabled_ = false;
     lane_activity_.clear();
     lane_pressed_.clear();

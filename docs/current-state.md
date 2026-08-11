@@ -6,7 +6,7 @@
 - BMS variable scroll is supported through `#SCROLLxx` / `#xxxSC`; visual motion may speed up, stop, or reverse while audio and judgement timing stay sample-accurate.
 - BMS landmines (`D1-D9`, `E1-E9`) are playable, including `#WAV00`, base-36 damage tokens, `ZZ` instant fail, exact press/release boundary behavior, and lane-mod/key-converter remapping.
 - Results and local records expose fixed native score separately from detail score, and categorical native accuracy separately from continuous timing-based detailed accuracy.
-- 현재 프로젝트 버전과 공개 안정판은 `1.4.0.1`
+- 현재 프로젝트 버전과 로컬 정식 배포 라인은 `1.4.1`
 - UI-r2 Result는 2.2초 타임라인으로 프리즘·점수·등급·상태·통계·그래프를 순차 공개하며, Space로 연출을 건너뛸 수 있고 CONTINUE/RETRY/Replay 입력은 공개 완료 전 잠김
 - UI-r2 Song Select는 상단 탭, 7행 재킷 라이브러리, 대형 선택 이미지, 최고 기록 카드, 차트/모드 패널, 실제 동작하는 START 버튼 구조로 개편되며 Collection/Store/재화/글로벌 랭킹 가상 기능은 표시하지 않음
 - Song Select 우측의 비주얼 레이턴시·하이스피드·Gauge Shift 시작 등급·랜덤 셀은 좌클릭으로 증가/다음, 우클릭으로 감소/이전을 적용하고 즉시 저장함. 현재 차트 키수는 잘림 없이 표시되며 최고 기록은 점수·정확도·최대 콤보를 함께 표시
@@ -55,9 +55,14 @@
   - 최근 유지보수 리팩터에서 대형 구현 파일을 조각 파일로 분리하는 방향으로 정리 중
 - `GameSession`
   - 차트 로드, gameplay audio prep, HUD snapshot, gameplay 실행 경계
+- `SongSelectScreen`
+  - Song Select 분리의 첫 소유권 경계
+  - 미리듣기 비동기 decode, 취소 token, gain, 활성 경로를 소유하고 화면 이탈 뒤 완료 future를 drain
 
 ## What Works Now
 - BMS parser/normalizer/timeline이 실팩 호환 위주로 강화됨
+- `#RANDOM/#IF/#ELSEIF/#ELSE`, `#SWITCH/#CASE/#SKIP/#DEF` 조건 분기를 고정 seed로 해석하고 명령 대소문자를 구분하지 않음
+- `#LNTYPE 2` MGQ 연속 토큰을 measure 경계를 넘는 롱노트로 정규화하며 `#BPM`, 채널 `03/08` 변속을 sample timeline에 반영
 - BMS explicit key headers:
   - `#4K`
   - `#6K`
@@ -74,6 +79,7 @@
   - LN channel (`51`-`55`, `61`-`65`)
   - `#LNOBJ`
   - `#LNMODE 2` charge note는 tail release timing 판정 사용
+  - `#LNTYPE 2` MGQ 표기 지원
   - 일반 BMS LN은 끝까지 유지 시 tail auto-clear
 - BMS audio decode:
   - WAV native first
@@ -220,7 +226,7 @@
 
 ## Runtime / Packaging Rules
 - 새 사용자 프로필은 자동 생성
-- 현재 정식 P2P 배포 라인은 `TenRiff 1.4.0.1`
+- 현재 로컬 정식 P2P 배포 라인은 `TenRiff 1.4.1`
 - 배포 패키지에는 `Songs`를 넣지 않음
 - 배포 패키지는 `Main Menu / Options / Song Selecte / Multiplayer Lobby / Clear / Failed` 이름의 `Mainmusic/` 화면 슬롯을 포함하며, 각 `이름.mp3`와 번호가 붙은 `이름 2.mp3`~`이름 64.mp3`를 자동 수집해 화면 재진입마다 순환
 - 배포 업데이트에는 built artifacts와 필요한 런타임 자산만 포함
@@ -260,6 +266,11 @@
 - `cmake -S . -B build-check -G "Visual Studio 17 2022" -A x64`
 - `cmake --build build-check --config Release --target bms_parser_tests`
 - `.\build-check\Release\bms_parser_tests.exe`
+- `cmake --preset asan`
+- `cmake --build --preset asan`
+- `ctest --preset asan`
+
+ASan은 공유 포트 간섭을 피하기 위해 결정적 단위 코어를 단일 프로세스로 실행합니다. MSVC ASan에서 worker 종료가 멎는 RawInput/localhost OS 통합 8건은 일반 Release suite에서만 실행합니다.
 
 ## Still Manual-Validation Heavy
 - renderer layout 변경 뒤에는 `docs/ui-audit-checklist.md` 기준으로 `1080p`, `720p windowed`, `Performance HUD on/off` 전수 확인 필요

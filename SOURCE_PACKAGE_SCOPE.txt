@@ -1,8 +1,10 @@
-TenRiff 1.4.0.1 open-source source package scope
+TenRiff 1.4.1 open-source source package scope
 
 Included in versioned source bundles:
 - CHANGELOG.md
 - CMakeLists.txt
+- CMakePresets.json
+- .github/workflows/
 - .gitignore
 - LICENSE
 - README.md
