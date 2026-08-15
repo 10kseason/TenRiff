@@ -17,6 +17,8 @@ inline constexpr double kJudgementLinePositionMax = 1.00;
 inline constexpr double kJudgementLinePositionDefault = 0.82;
 inline constexpr double kVisualOffsetMin = -500.0;
 inline constexpr double kVisualOffsetMax = 500.0;
+inline constexpr double kSoundOffsetMin = -500.0;
+inline constexpr double kSoundOffsetMax = 500.0;
 inline constexpr double kGameplayFieldOffsetXMin = -720.0;
 inline constexpr double kGameplayFieldOffsetXMax = 720.0;
 inline constexpr double kGameplayFieldOffsetXDefault = 0.0;
@@ -181,6 +183,9 @@ struct SkinConfig {
     std::unordered_map<std::string, double> note_height_scales;
     std::unordered_map<std::string, double> lane_divider_width_scales;
     std::unordered_map<std::string, double> lane_center_gap_scales;
+    // "off" preserves the per-lane palettes. A palette token overrides every
+    // rendered lane without destroying those saved per-lane values.
+    std::string single_color = "off";
     std::unordered_map<std::string, std::vector<std::string>> lane_colors;
 };
 
@@ -227,6 +232,7 @@ struct RuntimeConfig {
     SkinConfig skin;
     double input_offset_ms = 0.0;
     double visual_offset_ms = 0.0;
+    double sound_offset_ms = 0.0;
 };
 
 struct ConfigLoadResult {
@@ -272,11 +278,13 @@ void apply_skin_visual_preset(SkinConfig& skin, std::string_view token);
 [[nodiscard]] std::string normalize_skin_ui_font_token(std::string_view token);
 [[nodiscard]] std::string skin_ui_font_label(std::string_view token);
 [[nodiscard]] std::string normalize_skin_color_token(std::string_view token);
+[[nodiscard]] std::string normalize_skin_single_color_token(std::string_view token);
 [[nodiscard]] std::string normalize_skin_note_shape_token(std::string_view token);
 [[nodiscard]] std::string skin_note_shape_label(std::string_view token);
 [[nodiscard]] std::string normalize_skin_note_image_aspect_token(std::string_view token);
 [[nodiscard]] std::string skin_note_image_aspect_label(std::string_view token);
 [[nodiscard]] std::string skin_color_label(std::string_view token);
+[[nodiscard]] std::string skin_single_color_label(std::string_view token);
 [[nodiscard]] uint32_t skin_color_rgb(std::string_view token);
 [[nodiscard]] std::vector<double> resolved_skin_lane_width_scales(const SkinConfig& skin, std::string_view key_mode);
 [[nodiscard]] double resolved_skin_note_width_scale(const SkinConfig& skin, std::string_view key_mode);
@@ -285,6 +293,7 @@ void apply_skin_visual_preset(SkinConfig& skin, std::string_view token);
 [[nodiscard]] double resolved_skin_lane_divider_width_scale(const SkinConfig& skin, std::string_view key_mode);
 [[nodiscard]] double resolved_skin_lane_center_gap_scale(const SkinConfig& skin, std::string_view key_mode);
 [[nodiscard]] std::vector<std::string> default_skin_lane_colors(std::string_view key_mode);
+[[nodiscard]] std::vector<std::string> resolved_skin_lane_palette(const SkinConfig& skin, std::string_view key_mode);
 [[nodiscard]] std::vector<std::string> resolved_skin_lane_colors(const SkinConfig& skin, std::string_view key_mode);
 [[nodiscard]] std::vector<std::string> resolved_skin_lane_colors_for_layout(
     const SkinConfig& skin,

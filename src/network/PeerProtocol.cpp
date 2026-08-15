@@ -189,10 +189,32 @@ bool decode_score(Reader& reader, PeerScore& score) {
     score.finished = (flags & 0x01u) != 0u;
     score.game_over = (flags & 0x02u) != 0u;
     score.aborted = (flags & 0x04u) != 0u;
-    return true;
+    return peer_score_claim_is_sane(score);
 }
 
 }  // namespace
+
+bool peer_score_claim_is_sane(const PeerScore& score) {
+    constexpr int64_t kMaximumAbsoluteSample = 10'000'000'000'000ll;
+    if (score.score < 0 || score.score > kPeerMaximumClaimedScore ||
+        score.current_sample < -kMaximumAbsoluteSample ||
+        score.current_sample > kMaximumAbsoluteSample ||
+        score.combo < 0 || score.max_combo < 0 || score.combo > score.max_combo ||
+        score.max_combo > kPeerMaximumJudgementCount ||
+        score.perfect < 0 || score.great < 0 || score.good < 0 ||
+        score.bad < 0 || score.poor < 0 ||
+        score.perfect > kPeerMaximumJudgementCount ||
+        score.great > kPeerMaximumJudgementCount ||
+        score.good > kPeerMaximumJudgementCount ||
+        score.bad > kPeerMaximumJudgementCount ||
+        score.poor > kPeerMaximumJudgementCount ||
+        score.gauge_milli < 0 || score.gauge_milli > 100'000) {
+        return false;
+    }
+    const int64_t judged = static_cast<int64_t>(score.perfect) + score.great +
+                           score.good + score.bad + score.poor;
+    return judged <= kPeerMaximumJudgementCount;
+}
 
 std::vector<uint8_t> encode_peer_message(const PeerMessage& message, std::string* error) {
     if (error) error->clear();
@@ -255,6 +277,10 @@ std::vector<uint8_t> encode_peer_message(const PeerMessage& message, std::string
         case PeerMessageType::FinalScore: {
             if (message.nonce == 0) {
                 set_error(error, "Score messages require a non-zero round nonce.");
+                return {};
+            }
+            if (!peer_score_claim_is_sane(message.score)) {
+                set_error(error, "Peer score claim is outside the wire safety limits.");
                 return {};
             }
             append_u8(payload, message.player_id);

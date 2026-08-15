@@ -355,6 +355,10 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
                 card.detail = record.replay_path.empty()
                                   ? ui_text("RESULT ONLY", "결과만 있음")
                                   : ui_text("REPLAY ", "리플레이 ") + filename_only(record.replay_path);
+                card.detail = std::string(record.verification_status == "verified"
+                                              ? ui_text("VERIFIED / ", "검증됨 / ")
+                                              : ui_text("UNVERIFIED / ", "미검증 / ")) +
+                              card.detail;
                 if (record.pause_used) {
                     card.detail += ui_text(" / PAUSED", " / 퍼즈 사용");
                 }
@@ -502,7 +506,8 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
             render.song_select.selected_record_created_utc =
                 menu_records::compact_timestamp_label(selected_record->created_utc);
             render.song_select.selected_record_status =
-                selected_record->player_name + " / " + selected_record->clear_status;
+                selected_record->player_name + " / " + selected_record->clear_status + " / " +
+                selected_record->verification_status;
             render.song_select.selected_record_replay_file = filename_only(selected_record->replay_path);
             if (const ReplaySummary* replay = replay_summary_for_path(selected_record->replay_path)) {
                 render.song_select.selected_record_replay_lane_count = replay->lane_count;
@@ -517,6 +522,10 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
                         format_signed_offset_ms(replay->input_offset_ms) +
                         (replay->pause_used ? ui_text(" / PAUSED", " / 퍼즈 사용")
                                             : std::string{});
+                    if (!selected_record->verification_detail.empty()) {
+                        render.song_select.selected_record_replay_detail +=
+                            " / " + selected_record->verification_detail;
+                    }
                 }
             } else {
                 render.song_select.selected_record_replay_detail = ui_text("No replay", "리플레이 없음");

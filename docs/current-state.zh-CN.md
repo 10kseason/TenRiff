@@ -3,10 +3,11 @@
 这份文档是下一位 agent 或新任务接手时应该最先阅读的当前状态文档。目标是快速说明“这个项目现在是什么、应该先看哪里、还有哪些内容尚未验证”。
 
 ## 基线
-- 当前项目版本与本地发布版本均为 `1.4.2`
+- 当前测试项目与预发布版本均为 `1.4.3-test`
 - UI-r2 Result 使用 2.2 秒时间线依次展示棱镜、分数、等级、通关状态、判定统计和图表；可用 Space 跳过，在演出结束前锁定 Continue/Retry/Replay 输入。
 - UI-r2 Song Select 使用顶部标签、7 行封面曲库、大幅选中图片、最佳记录卡、谱面/模式面板和可实际启动的 START 按钮；不显示 Collection/Store/货币/全球排名等虚构功能
 - Song Select 的 Rate、Hi-Speed、Gauge、Random 单元格支持左键增加/下一项、右键减少/上一项并立即保存；当前谱面键数不再被裁切，最佳记录会同时显示分数、准确率和最大连击。
+- Replay evidence v3 会绑定谱面 SHA-256、canonical ruleset 与 result-to-replay SHA-256，并通过无界面引擎重新执行输入 trace。正式本地 best 只使用重新计算后的 verified 结果；legacy、custom-ruleset 与 assist 记录仍作为 unverified history 保留。
 - 1.3.1 删除外部 `.osu` parser、索引路径与 settings 开关，使 chart surface 再次限定为 BMS；选择 BMSTable 时会为 hash 匹配自动从 Fast 切换到 Safe，并已通过 Aery 实时服务器与 CG901B MD5→`⑤LEVEL 13` 匹配验证
 - Profile Setup 可按 profile 保存可选的本地 PNG/JPG 头像路径，Song Select 的 profile card 可显示并点击编辑
 - direct-IP multiplayer 与 preview r5 的输入 backend 生命周期修复已整合进 `1.1.8 stable`
@@ -170,7 +171,7 @@
   - Rate 1.0、判定、Gauge Shift、Random/Mods/Assist 保持固定，但允许每位玩家使用本地 key-mode conversion
   - 选曲权从 host 开始，在所有玩家离开 Result 后按加入顺序轮换；leader 断开时跳到下一位，host 断开时关闭整个房间
   - 只有当前 leader 可选择公共 BMS，并在全员 Ready 后请求 START；经 coordinator 批准和全员 load barrier 后开始
-  - 对局中加入和第9名玩家都会被拒绝；Result 显示所有玩家的最终分数
+  - 对局中加入和第9名玩家都会被拒绝；超出范围的 score claim 也会被拒绝，但由于尚未交换 replay proof，Result 会把对手结果标为 `UNVERIFIED CLAIM`
   - 不支持 chart 传输、NAT traversal、relay/matchmaking、加密/认证、anti-cheat 或自动重连
 
 ## 曲目索引模型
@@ -205,7 +206,7 @@
 
 ## 运行时 / 打包规则
 - 新用户 profile 会自动创建
-- 当前本地 P2P 发布线为 `TenRiff 1.4.2`
+- 当前本地测试 P2P 发布线为 `TenRiff 1.4.3-test`
 - 发布包不包含 `Songs`
 - 发布包包含 `Main Menu / Options / Song Selecte / Multiplayer Lobby / Clear / Failed` 这些 `Mainmusic/` 场景槽位；每个 `Name.mp3` 及 `Name 2.mp3`～`Name 64.mp3` 会自动发现，并在重新进入场景时轮换
 - 发布更新只包含已构建产物和必要的运行时资源

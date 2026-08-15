@@ -183,6 +183,7 @@ void sanitize_skin_config(SkinConfig& skin) {
         kSkinKeyPulseBrightnessDefault);
     skin.key_pulse_enabled = skin.key_pulse_brightness > 0.0;
     skin.hit_burst_style = normalize_skin_hit_burst_style_token(skin.hit_burst_style);
+    skin.single_color = normalize_skin_single_color_token(skin.single_color);
     skin.note_outline_opacity = clamp_finite(
         skin.note_outline_opacity,
         kSkinNoteOutlineOpacityMin,
@@ -275,7 +276,7 @@ void sanitize_skin_config(SkinConfig& skin) {
             std::clamp(value, kLaneCenterGapScaleMin, kLaneCenterGapScaleMax);
     }
     for (const auto& mode : supported_modes) {
-        sanitized_lane_colors.emplace(mode, resolved_skin_lane_colors(skin, mode));
+        sanitized_lane_colors.emplace(mode, resolved_skin_lane_palette(skin, mode));
     }
     skin.lane_width_scales = std::move(sanitized_lane_width_scales);
     skin.note_width_scales = std::move(sanitized_note_width_scales);
@@ -925,6 +926,8 @@ void apply_config_object(const JsonObject& root, RuntimeConfig& config) {
                     kLaneCenterGapScaleMax);
             }
         }
+        config.skin.single_color = normalize_skin_single_color_token(
+            get_string(*skin, "single_color", config.skin.single_color));
         if (const auto* lane_colors = get_object(*skin, "lane_colors")) {
             for (const auto& [mode, value] : *lane_colors) {
                 const auto* array = value.as_array();
@@ -950,6 +953,9 @@ void apply_config_object(const JsonObject& root, RuntimeConfig& config) {
         config.visual_offset_ms = std::clamp(
             get_number(*offsets, "visual", config.visual_offset_ms),
             kVisualOffsetMin, kVisualOffsetMax);
+        config.sound_offset_ms = std::clamp(
+            get_number(*offsets, "sound", config.sound_offset_ms),
+            kSoundOffsetMin, kSoundOffsetMax);
     }
 }
 
@@ -1232,10 +1238,11 @@ JsonValue build_json_root(const RuntimeConfig& config) {
     skin.emplace("note_height_scales", JsonValue{std::move(note_height_scales)});
     skin.emplace("lane_divider_width_scales", JsonValue{std::move(lane_divider_width_scales)});
     skin.emplace("lane_center_gap_scales", JsonValue{std::move(lane_center_gap_scales)});
+    skin.emplace("single_color", JsonValue{normalize_skin_single_color_token(config.skin.single_color)});
     JsonObject lane_colors;
     for (const auto& mode : supported_skin_mode_tokens()) {
         JsonArray colors;
-        const auto resolved = resolved_skin_lane_colors(config.skin, mode);
+        const auto resolved = resolved_skin_lane_palette(config.skin, mode);
         colors.reserve(resolved.size());
         for (const auto& token : resolved) {
             colors.emplace_back(token);
@@ -1248,6 +1255,7 @@ JsonValue build_json_root(const RuntimeConfig& config) {
     JsonObject offsets;
     offsets.emplace("input", JsonValue{config.input_offset_ms});
     offsets.emplace("visual", JsonValue{config.visual_offset_ms});
+    offsets.emplace("sound", JsonValue{config.sound_offset_ms});
     root.emplace("offsets", JsonValue{std::move(offsets)});
 
     return JsonValue{std::move(root)};
@@ -1541,6 +1549,19 @@ std::string normalize_skin_color_token(std::string_view token) {
     return "ice";
 }
 
+std::string normalize_skin_single_color_token(std::string_view token) {
+    const std::string normalized = to_lower_ascii(std::string(token));
+    if (normalized == "off") {
+        return "off";
+    }
+    for (const auto& entry : skin_palette_entries()) {
+        if (normalized == entry.token) {
+            return std::string(entry.token);
+        }
+    }
+    return "off";
+}
+
 std::string normalize_skin_note_shape_token(std::string_view token) {
     const std::string normalized = to_lower_ascii(std::string(token));
     if (normalized == "circle" || normalized == "triangle" || normalized == "pentagon" ||
@@ -1588,6 +1609,11 @@ std::string skin_color_label(std::string_view token) {
         }
     }
     return "Ice";
+}
+
+std::string skin_single_color_label(std::string_view token) {
+    const std::string normalized = normalize_skin_single_color_token(token);
+    return normalized == "off" ? "Off" : skin_color_label(normalized);
 }
 
 uint32_t skin_color_rgb(std::string_view token) {
@@ -1686,7 +1712,7 @@ std::vector<std::string> default_skin_lane_colors(std::string_view key_mode) {
     return defaults.at("10k");
 }
 
-std::vector<std::string> resolved_skin_lane_colors(const SkinConfig& skin, std::string_view key_mode) {
+std::vector<std::string> resolved_skin_lane_palette(const SkinConfig& skin, std::string_view key_mode) {
     const std::string normalized = normalize_skin_mode_token(key_mode);
     std::vector<std::string> resolved = default_skin_lane_colors(normalized);
     const auto it = skin.lane_colors.find(normalized);
@@ -1704,6 +1730,15 @@ std::vector<std::string> resolved_skin_lane_colors(const SkinConfig& skin, std::
         if (lane < static_cast<int>(custom.size())) {
             resolved[static_cast<std::size_t>(lane)] = normalize_skin_color_token(custom[static_cast<std::size_t>(lane)]);
         }
+    }
+    return resolved;
+}
+
+std::vector<std::string> resolved_skin_lane_colors(const SkinConfig& skin, std::string_view key_mode) {
+    std::vector<std::string> resolved = resolved_skin_lane_palette(skin, key_mode);
+    const std::string single_color = normalize_skin_single_color_token(skin.single_color);
+    if (single_color != "off") {
+        std::fill(resolved.begin(), resolved.end(), single_color);
     }
     return resolved;
 }
@@ -1829,6 +1864,7 @@ RuntimeConfig ConfigLoader::defaults() const {
     sanitize_skin_config(config.skin);
     config.input_offset_ms = 0.0;
     config.visual_offset_ms = 0.0;
+    config.sound_offset_ms = 0.0;
     return config;
 }
 

@@ -2363,7 +2363,7 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
             return;
         case Screen::SettingsSkins:
             settings_cursor_ = clamp_int(event.index, 0,
-                                         39 + (config::normalize_skin_source_token(config_.skin.source) == "lr2" ? 1 : 0));
+                                         40 + (config::normalize_skin_source_token(config_.skin.source) == "lr2" ? 1 : 0));
             if (finish_selection_only()) {
                 return;
             }
@@ -2377,7 +2377,7 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
             handle_input_settings_input(action_key);
             return;
         case Screen::SettingsCalibration:
-            settings_cursor_ = clamp_int(event.index, 0, 4);
+            settings_cursor_ = clamp_int(event.index, 0, 5);
             if (finish_selection_only()) {
                 return;
             }

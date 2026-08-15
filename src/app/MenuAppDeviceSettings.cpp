@@ -317,7 +317,7 @@ void MenuApp::handle_input_settings_input(uint32_t keycode) {
 }
 
 void MenuApp::handle_calibration_settings_input(uint32_t keycode) {
-    const int item_count = 5;
+    const int item_count = 6;
     if (keycode == key_up_) {
         settings_cursor_ = clamp_int(settings_cursor_ - 1, 0, item_count - 1);
         publish_snapshot();
@@ -357,16 +357,27 @@ void MenuApp::handle_calibration_settings_input(uint32_t keycode) {
         publish_snapshot();
         return;
     }
+    if (settings_cursor_ == 3 && (keycode == key_left_ || keycode == key_right_)) {
+        const double direction = (keycode == key_left_) ? -1.0 : 1.0;
+        config_.sound_offset_ms = clamp_step_value(config_.sound_offset_ms +
+                                                       direction * static_cast<double>(calibration_step_ms_),
+                                                   kSoundOffsetMin, kSoundOffsetMax,
+                                                   static_cast<double>(calibration_step_ms_));
+        persist_runtime_config();
+        publish_snapshot();
+        return;
+    }
 
     if (keycode == key_enter_) {
-        if (settings_cursor_ == 3) {
+        if (settings_cursor_ == 4) {
             config_.input_offset_ms = 0.0;
             config_.visual_offset_ms = 0.0;
+            config_.sound_offset_ms = 0.0;
             persist_runtime_config();
             publish_snapshot();
             return;
         }
-        if (settings_cursor_ == 4) {
+        if (settings_cursor_ == 5) {
             screen_ = submenu_return_screen_;
             settings_cursor_ = 0;
             publish_snapshot();
@@ -560,18 +571,25 @@ void MenuApp::populate_calibration_settings_render_data(render::MenuRenderData& 
                     2,
                     false,
                     true);
-    append_menu_row(render.generic, ui_text("Reset Offsets", "오프셋 초기화"),
-                    "",
+    append_menu_row(render.generic, ui_text("Sound Offset", "사운드 오프셋"),
+                    format_signed_offset_ms(config_.sound_offset_ms),
                     settings_cursor_ == 3,
                     render::MenuHitTargetKind::SettingsRow,
                     3,
-                    true,
-                    false);
-    append_menu_row(render.generic, ui_text("Back", "뒤로"),
+                    false,
+                    true);
+    append_menu_row(render.generic, ui_text("Reset Offsets", "오프셋 초기화"),
                     "",
                     settings_cursor_ == 4,
                     render::MenuHitTargetKind::SettingsRow,
                     4,
+                    true,
+                    false);
+    append_menu_row(render.generic, ui_text("Back", "뒤로"),
+                    "",
+                    settings_cursor_ == 5,
+                    render::MenuHitTargetKind::SettingsRow,
+                    5,
                     true,
                     false);
 
@@ -579,6 +597,8 @@ void MenuApp::populate_calibration_settings_render_data(render::MenuRenderData& 
                                            "1단계: 입력 오프셋으로 실제 타건 타이밍을 판정창에 맞추세요."));
     render.generic.notes.push_back(ui_text("Step 2: use Visual Latency only for what you see. Positive values draw notes earlier.",
                                            "2단계: 비주얼 레이턴시는 화면만 조정합니다. 양수일수록 노트가 더 일찍 보입니다."));
+    render.generic.notes.push_back(ui_text("Step 3: use Sound Offset for chart BGM/autoplay audio. Positive values delay sound.",
+                                           "3단계: 사운드 오프셋으로 차트 BGM/자동재생 오디오를 조정합니다. 양수일수록 소리가 늦어집니다."));
     render.generic.notes.push_back(ui_text("Use a familiar chart, retry quickly from Result, and compare fast/slow feedback until both feel centered.",
                                            "익숙한 차트를 고른 뒤 결과 화면에서 빠르게 재시작하면서 빠름/느림 피드백이 중앙에 모일 때까지 조정하세요."));
     render.generic.notes.push_back(ui_text("Changes save immediately so the next launch uses the same calibration.",

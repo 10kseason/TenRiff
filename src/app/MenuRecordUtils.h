@@ -11,11 +11,15 @@
 namespace tenriff::app::menu_records {
 
 struct ParsedResultRecord {
+    int replay_format_version = 0;
     std::string chart_path;
     std::string chart_format;
+    std::string chart_sha256;
+    std::string ruleset_id;
     std::string created_utc;
     std::string player_name;
     std::string replay_path;
+    std::string replay_sha256;
     std::string key_conversion_note_add_mode;
     std::string clear_status;
     std::string final_gauge;
@@ -24,6 +28,7 @@ struct ParsedResultRecord {
     double score_multiplier = 1.0;
     int64_t final_score = 0;
     bool pause_used = false;
+    bool aborted = false;
     gameplay::ResultStats stats;
     bool game_over = false;
     bool autoplay_enabled = false;

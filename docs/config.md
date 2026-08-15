@@ -40,7 +40,7 @@
 
 - `backend` (string)
   - `polling | rawinput`
-  - 현재 `1.4.2` 릴리스 라인의 기본값은 `rawinput`
+  - 현재 `1.4.3-test` 릴리스 라인의 기본값은 `rawinput`
   - `Options -> Input Settings -> Backend` 또는 `Options -> Profile Setup -> Input Backend`에서 프로필별로 RawInput/Polling을 직접 선택 가능
   - 저장값은 런타임 fallback 때문에 자동으로 `polling`으로 덮어쓰지 않음
   - RawInput 시작 실패, 등록 대상 손실, 메시지 창 종료가 확인되면 현재 앱 실행 동안 메뉴와 다음 gameplay 세션 모두 Polling을 유지
@@ -60,7 +60,7 @@
 - `judgement_hz` (int)
   - `1000 | 2000 | 4000 | 8000`
   - 호환성용으로 남아 있는 입력 설정 필드
-  - 현재 `1.4.2` runtime은 별도 오디오 판정 서브루프를 이 값으로 구동하지 않음
+  - 현재 `1.4.3-test` runtime은 별도 오디오 판정 서브루프를 이 값으로 구동하지 않음
   - 기본값은 `4000` (`0.25ms`)
 - `debounce_ms` (double)
   - 실제 Press/Release 전환은 버리지 않고 같은 상태의 중복 이벤트만 상태 추적에서 제거
@@ -323,6 +323,10 @@
   - 현재 런타임은 공용 `lane_divider_width_scale`만 사용함
 - `lane_center_gap_scales` (object)
   - key mode별 `lane_center_gap_scale` override
+- `single_color` (string)
+  - `off` 또는 지원 색상 토큰
+  - `off`가 아니면 모든 key mode와 scratch lane을 선택 색으로 표시
+  - 레인별 `lane_colors`는 덮어쓰지 않으므로 `off`로 되돌리면 기존 팔레트가 복원됨
 - `lane_colors` (object)
   - key mode별 lane 색상 팔레트
   - 현재 기본/저장 대상 mode는 `4k..10k`, `16k`
@@ -335,6 +339,9 @@
 - `visual` (double)
   - `-500..500` 범위로 clamp
   - 설정 키와 동작은 유지하며 UI에서는 `Skins > Visual Latency`로 표시
+- `sound` (double, ms)
+  - `-500..500` 범위로 clamp하며 UI에서는 `Audio Settings > Sound Offset`과 `Calibration Wizard`에 표시
+  - 양수는 차트 BGM과 자동재생 키음을 늦추고 음수는 앞당김; 판정, 노트/BGA 위치, 입력에 맞춰 재생되는 `follow` 키음은 변경하지 않음
 
 ## `keymap.json`
 

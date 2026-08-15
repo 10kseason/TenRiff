@@ -329,7 +329,7 @@ void MenuApp::handle_skins_settings_input(uint32_t keycode) {
     const std::string active_skin_source = config::normalize_skin_source_token(config_.skin.source);
     const bool lr2_source = active_skin_source == "lr2";
     const int lr2_shift = lr2_source ? 1 : 0;
-    const int item_count = 40 + lr2_shift;
+    const int item_count = 41 + lr2_shift;
     const int key_mode_row = 0;
     const int skin_source_row = 1;
     const int imported_skin_row = 2;
@@ -338,39 +338,40 @@ void MenuApp::handle_skins_settings_input(uint32_t keycode) {
     const int target_lane_row = 4 + lr2_shift;
     const int target_gap_row = 5 + lr2_shift;
     const int lane_color_row = 6 + lr2_shift;
-    const int note_shape_row = 7 + lr2_shift;
-    const int note_border_row = 8 + lr2_shift;
-    const int image_aspect_row = 9 + lr2_shift;
-    const int lane_dividers_row = 10 + lr2_shift;
-    const int judgement_line_row = 11 + lr2_shift;
-    const int gear_boundary_row = 12 + lr2_shift;
-    const int show_hold_tail_row = 13 + lr2_shift;
-    const int ln_tail_taper_row = 14 + lr2_shift;
-    const int visual_preset_row = 15 + lr2_shift;
-    const int lane_background_opacity_row = 16 + lr2_shift;
-    const int visual_opacity_row = 17 + lr2_shift;
-    const int note_outline_opacity_row = 18 + lr2_shift;
-    const int ln_body_opacity_row = 19 + lr2_shift;
-    const int judgement_line_glow_row = 20 + lr2_shift;
-    const int hit_burst_style_row = 21 + lr2_shift;
-    const int key_pulse_row = 22 + lr2_shift;
-    const int key_label_position_row = 23 + lr2_shift;
-    const int judge_line_row = 24 + lr2_shift;
-    const int lane_width_row = 25 + lr2_shift;
-    const int note_width_row = 26 + lr2_shift;
-    const int lane_spacing_row = 27 + lr2_shift;
-    const int divider_width_row = 28 + lr2_shift;
-    const int center_gap_row = 29 + lr2_shift;
-    const int ln_body_width_row = 30 + lr2_shift;
-    const int note_height_row = 31 + lr2_shift;
-    const int combo_y_row = 32 + lr2_shift;
-    const int black_playfield_row = 33 + lr2_shift;
-    const int ui_font_row = 34 + lr2_shift;
-    const int visual_latency_row = 35 + lr2_shift;
-    const int note_gap_row = 36 + lr2_shift;
-    const int gameplay_cursor_row = 37 + lr2_shift;
-    const int timing_feedback_row = 38 + lr2_shift;
-    const int back_row = 39 + lr2_shift;
+    const int single_color_row = 7 + lr2_shift;
+    const int note_shape_row = 8 + lr2_shift;
+    const int note_border_row = 9 + lr2_shift;
+    const int image_aspect_row = 10 + lr2_shift;
+    const int lane_dividers_row = 11 + lr2_shift;
+    const int judgement_line_row = 12 + lr2_shift;
+    const int gear_boundary_row = 13 + lr2_shift;
+    const int show_hold_tail_row = 14 + lr2_shift;
+    const int ln_tail_taper_row = 15 + lr2_shift;
+    const int visual_preset_row = 16 + lr2_shift;
+    const int lane_background_opacity_row = 17 + lr2_shift;
+    const int visual_opacity_row = 18 + lr2_shift;
+    const int note_outline_opacity_row = 19 + lr2_shift;
+    const int ln_body_opacity_row = 20 + lr2_shift;
+    const int judgement_line_glow_row = 21 + lr2_shift;
+    const int hit_burst_style_row = 22 + lr2_shift;
+    const int key_pulse_row = 23 + lr2_shift;
+    const int key_label_position_row = 24 + lr2_shift;
+    const int judge_line_row = 25 + lr2_shift;
+    const int lane_width_row = 26 + lr2_shift;
+    const int note_width_row = 27 + lr2_shift;
+    const int lane_spacing_row = 28 + lr2_shift;
+    const int divider_width_row = 29 + lr2_shift;
+    const int center_gap_row = 30 + lr2_shift;
+    const int ln_body_width_row = 31 + lr2_shift;
+    const int note_height_row = 32 + lr2_shift;
+    const int combo_y_row = 33 + lr2_shift;
+    const int black_playfield_row = 34 + lr2_shift;
+    const int ui_font_row = 35 + lr2_shift;
+    const int visual_latency_row = 36 + lr2_shift;
+    const int note_gap_row = 37 + lr2_shift;
+    const int gameplay_cursor_row = 38 + lr2_shift;
+    const int timing_feedback_row = 39 + lr2_shift;
+    const int back_row = 40 + lr2_shift;
 
     if (keycode == key_up_) {
         settings_cursor_ = clamp_int(settings_cursor_ - 1, 0, item_count - 1);
@@ -388,7 +389,7 @@ void MenuApp::handle_skins_settings_input(uint32_t keycode) {
         const bool was_lr2 = active_skin_source == "lr2";
         config_.skin.source = cycle_skin_source(config_.skin.source, direction);
         const bool is_lr2 = config::normalize_skin_source_token(config_.skin.source) == "lr2";
-        const int new_item_count = 40 + (is_lr2 ? 1 : 0);
+        const int new_item_count = 41 + (is_lr2 ? 1 : 0);
         if (!was_lr2 && is_lr2 && settings_cursor_ >= import_skin_row) {
             ++settings_cursor_;
         } else if (was_lr2 && !is_lr2 && settings_cursor_ >= lr2_resolution_row) {
@@ -498,6 +499,10 @@ void MenuApp::handle_skins_settings_input(uint32_t keycode) {
         return;
     }
     if (settings_cursor_ == lane_color_row && (keycode == key_left_ || keycode == key_right_)) {
+        if (config::normalize_skin_single_color_token(config_.skin.single_color) != "off") {
+            publish_snapshot();
+            return;
+        }
         const int direction = (keycode == key_left_) ? -1 : 1;
         auto& lane_colors = editable_skin_lane_colors(config_.skin, skin_edit_mode_);
         const auto palette = config::supported_skin_color_tokens();
@@ -517,6 +522,24 @@ void MenuApp::handle_skins_settings_input(uint32_t keycode) {
             index = 0;
         }
         lane_colors[static_cast<std::size_t>(skin_edit_lane_)] = palette[static_cast<std::size_t>(index)];
+        skin_dirty_ = true;
+        publish_snapshot();
+        return;
+    }
+    if (settings_cursor_ == single_color_row && (keycode == key_left_ || keycode == key_right_)) {
+        std::vector<std::string> options{"off"};
+        const auto palette = config::supported_skin_color_tokens();
+        options.insert(options.end(), palette.begin(), palette.end());
+        const std::string current = config::normalize_skin_single_color_token(config_.skin.single_color);
+        auto it = std::find(options.begin(), options.end(), current);
+        int index = it == options.end() ? 0 : static_cast<int>(std::distance(options.begin(), it));
+        index += keycode == key_left_ ? -1 : 1;
+        if (index < 0) {
+            index = static_cast<int>(options.size()) - 1;
+        } else if (index >= static_cast<int>(options.size())) {
+            index = 0;
+        }
+        config_.skin.single_color = options[static_cast<std::size_t>(index)];
         skin_dirty_ = true;
         publish_snapshot();
         return;
@@ -832,7 +855,10 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
     skin_edit_lane_ = clamp_int(skin_edit_lane_, 0, lane_count - 1);
     const int gap_count = std::max(0, lane_count - 1);
     skin_edit_gap_ = clamp_int(skin_edit_gap_, 0, std::max(0, gap_count - 1));
+    const auto preview_lane_palette = config::resolved_skin_lane_palette(config_.skin, skin_edit_mode_);
     const auto preview_lane_colors = config::resolved_skin_lane_colors(config_.skin, skin_edit_mode_);
+    const bool single_color_enabled =
+        config::normalize_skin_single_color_token(config_.skin.single_color) != "off";
     const auto preview_lane_width_scales = config::resolved_skin_lane_width_scales(config_.skin, skin_edit_mode_);
     const double preview_note_width_scale = config::resolved_skin_note_width_scale(config_.skin, skin_edit_mode_);
     const auto preview_lane_spacing_scales = config::resolved_skin_lane_spacing_scales(config_.skin, skin_edit_mode_);
@@ -904,8 +930,11 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
                     false,
                     gap_count > 0);
     append_menu_row(render.generic, ui_text("Lane Color", "레인 색상"),
-                    config::skin_color_label(preview_lane_colors[static_cast<std::size_t>(skin_edit_lane_)]),
-                    settings_cursor_ == 6 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 6 + lr2_shift, false, true);
+                    single_color_enabled
+                        ? ui_text("Single Color Active", "단일 색상 사용 중")
+                        : config::skin_color_label(preview_lane_palette[static_cast<std::size_t>(skin_edit_lane_)]),
+                    settings_cursor_ == 6 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 6 + lr2_shift,
+                    false, !single_color_enabled);
     append_menu_row(render.generic, ui_text("Note Shape", "노트 모양"), ui_skin_note_shape_label(config_.skin.note_shape),
                     settings_cursor_ == 7 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 7 + lr2_shift, false, true);
     append_menu_row(render.generic, ui_text("Note Border", "노트 테두리"), ui_on_off(config_.skin.note_border_enabled),
@@ -1007,6 +1036,14 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
                     39 + lr2_shift,
                     false,
                     true);
+    append_menu_row(render.generic,
+                    ui_text("Single Color", "단일 색상"),
+                    config::skin_single_color_label(config_.skin.single_color),
+                    false,
+                    render::MenuHitTargetKind::SettingsRow,
+                    40 + lr2_shift,
+                    false,
+                    true);
     const std::size_t old_key_mode_index = static_cast<std::size_t>(3 + lr2_shift);
     if (old_key_mode_index < render.generic.rows.size()) {
         auto key_mode = std::move(render.generic.rows[old_key_mode_index]);
@@ -1014,8 +1051,18 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
                                   static_cast<std::ptrdiff_t>(old_key_mode_index));
         render.generic.rows.insert(render.generic.rows.begin(), std::move(key_mode));
     }
-    const std::size_t timing_index = static_cast<std::size_t>(38 + lr2_shift);
-    const std::size_t back_index = static_cast<std::size_t>(39 + lr2_shift);
+    const std::size_t old_single_color_index = static_cast<std::size_t>(40 + lr2_shift);
+    const std::size_t single_color_index = static_cast<std::size_t>(7 + lr2_shift);
+    if (old_single_color_index < render.generic.rows.size()) {
+        auto single_color = std::move(render.generic.rows[old_single_color_index]);
+        render.generic.rows.erase(render.generic.rows.begin() +
+                                  static_cast<std::ptrdiff_t>(old_single_color_index));
+        render.generic.rows.insert(render.generic.rows.begin() +
+                                   static_cast<std::ptrdiff_t>(single_color_index),
+                                   std::move(single_color));
+    }
+    const std::size_t timing_index = static_cast<std::size_t>(39 + lr2_shift);
+    const std::size_t back_index = static_cast<std::size_t>(40 + lr2_shift);
     if (back_index < render.generic.rows.size()) {
         std::swap(render.generic.rows[timing_index], render.generic.rows[back_index]);
     }
@@ -1118,6 +1165,8 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
                                            "LR2 포팅은 플레이스킨의 기본 활성 브랜치에서 노트, LN, 하단 Gear, 레인 간격, 대상 크기 데이터를 가져옵니다."));
     render.generic.notes.push_back(ui_text("Image Aspect keeps imported head and tail art from stretching to the gameplay note box.",
                                            "이미지 비율은 가져온 헤드/테일 이미지를 게임 노트 박스에 맞출 때 늘어나지 않도록 유지합니다."));
+    render.generic.notes.push_back(ui_text("Single Color overrides every lane while preserving the per-lane palette restored by Off.",
+                                           "단일 색상은 레인별 팔레트를 보존한 채 모든 레인을 덮어쓰며, Off로 되돌리면 원래 팔레트가 복원됩니다."));
     render.generic.notes.push_back(ui_text("White Dividers, Judgement Line, and Gear Boundary can be toggled independently.",
                                            "흰 레인 구분선, 판정선, 기어 경계선은 각각 독립적으로 켜고 끌 수 있습니다."));
     render.generic.notes.push_back(ui_text("LN Tail Taper only changes visuals: the hold body narrows toward the tail without changing timing or hitboxes.",

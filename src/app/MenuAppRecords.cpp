@@ -9,10 +9,52 @@
 #include "app/MenuRecordUtils.h"
 #include "app/MenuSongUtils.h"
 #include "app/ModeManager.h"
+#include "app/ReplayVerifier.h"
 #include "gameplay/Replay.h"
 #include "timing/HighResClock.h"
 
 namespace tenriff::app {
+
+namespace {
+
+std::filesystem::path utf8_path_or_empty(std::string_view value) {
+    if (value.empty()) {
+        return {};
+    }
+    try {
+        return std::filesystem::u8path(value.begin(), value.end());
+    } catch (...) {
+        return {};
+    }
+}
+
+std::filesystem::path resolve_record_replay_path(const std::filesystem::path& result_path,
+                                                 const std::filesystem::path& profile_dir,
+                                                 std::string_view stored_path) {
+    const std::filesystem::path direct = utf8_path_or_empty(stored_path);
+    std::error_code ec;
+    if (!direct.empty() && std::filesystem::is_regular_file(direct, ec)) {
+        return direct;
+    }
+    ec.clear();
+    const std::filesystem::path filename = direct.filename();
+    if (filename.empty()) {
+        return direct;
+    }
+    const std::filesystem::path beside_results = result_path.parent_path().parent_path() /
+                                                  "replays" / filename;
+    if (std::filesystem::is_regular_file(beside_results, ec)) {
+        return beside_results;
+    }
+    ec.clear();
+    const std::filesystem::path profile_replay = profile_dir / "replays" / filename;
+    if (std::filesystem::is_regular_file(profile_replay, ec)) {
+        return profile_replay;
+    }
+    return direct;
+}
+
+}  // namespace
 
 void MenuApp::reload_chart_best_results() {
     using namespace menu_song_select;
@@ -65,29 +107,67 @@ void MenuApp::reload_chart_best_results() {
             continue;
         }
 
+        const fs::path replay_path = resolve_record_replay_path(
+            entry.path(), path_from_utf8(profile_dir_), parsed->replay_path);
+        ReplayVerificationResult verification;
+        if (parsed->replay_format_version < gameplay::kReplayFormatVersion) {
+            verification.status = ReplayVerificationStatus::LegacyUnverified;
+            verification.detail = "Legacy result has no replay/chart integrity binding.";
+        } else if (parsed->replay_sha256.empty() || parsed->chart_sha256.empty() ||
+                   parsed->ruleset_id.empty()) {
+            verification.status = ReplayVerificationStatus::MissingEvidence;
+            verification.detail = "Result is missing replay, chart, or ruleset evidence.";
+        } else {
+            verification = verify_replay_file(replay_path,
+                                              utf8_path_or_empty(parsed->chart_path),
+                                              parsed->replay_sha256);
+            if (verification.verified() &&
+                (verification.chart_sha256 != parsed->chart_sha256 ||
+                 parsed->ruleset_id != kCanonicalReplayRulesetId)) {
+                verification.status = ReplayVerificationStatus::Invalid;
+                verification.detail = "Result metadata does not match the verified replay evidence.";
+                verification.official_eligible = false;
+            }
+        }
+
+        const bool replay_verified = verification.verified();
+        const gameplay::ResultStats& effective_stats =
+            replay_verified ? verification.stats : parsed->stats;
+        const int64_t effective_score =
+            replay_verified ? verification.final_score : parsed->final_score;
+        const bool effective_game_over =
+            replay_verified ? verification.game_over : parsed->game_over;
+        const std::string& effective_clear_status =
+            replay_verified ? verification.clear_status : parsed->clear_status;
+        const std::string& effective_final_gauge =
+            replay_verified ? verification.final_gauge : parsed->final_gauge;
+
         BestResultRecord candidate;
         candidate.has_value = true;
-        candidate.rank = menu_records::calculate_rank(parsed->stats, parsed->game_over);
-        candidate.best_score = parsed->final_score;
-        candidate.detail_score = menu_records::calculate_detail_score(parsed->stats);
-        candidate.total_notes = parsed->stats.total_notes;
-        candidate.accuracy = menu_records::calculate_accuracy(parsed->stats);
-        candidate.detailed_accuracy = menu_records::calculate_detailed_accuracy(parsed->stats);
-        candidate.clear_status = parsed->clear_status;
-        candidate.final_gauge = parsed->final_gauge;
-        candidate.game_over = parsed->game_over;
-        candidate.max_combo = parsed->stats.max_combo;
-        candidate.perfect = parsed->stats.counts.pg;
-        candidate.great = parsed->stats.counts.gr;
-        candidate.good = parsed->stats.counts.gd;
-        candidate.bad = parsed->stats.counts.bd;
-        candidate.poor = parsed->stats.counts.pr;
+        candidate.replay_verified = replay_verified;
+        candidate.rank = menu_records::calculate_rank(effective_stats, effective_game_over);
+        candidate.best_score = effective_score;
+        candidate.detail_score = menu_records::calculate_detail_score(effective_stats);
+        candidate.total_notes = effective_stats.total_notes;
+        candidate.accuracy = menu_records::calculate_accuracy(effective_stats);
+        candidate.detailed_accuracy = menu_records::calculate_detailed_accuracy(effective_stats);
+        candidate.clear_status = effective_clear_status;
+        candidate.final_gauge = effective_final_gauge;
+        candidate.game_over = effective_game_over;
+        candidate.max_combo = effective_stats.max_combo;
+        candidate.perfect = effective_stats.counts.pg;
+        candidate.great = effective_stats.counts.gr;
+        candidate.good = effective_stats.counts.gd;
+        candidate.bad = effective_stats.counts.bd;
+        candidate.poor = effective_stats.counts.pr;
         candidate.created_utc = parsed->created_utc;
         candidate.result_path = entry.path().u8string();
-        candidate.replay_path = parsed->replay_path;
-        const int candidate_judged = menu_records::judged_total(parsed->stats.counts);
+        candidate.replay_path = replay_path.empty() ? parsed->replay_path : replay_path.u8string();
+        const int candidate_judged = menu_records::judged_total(effective_stats.counts);
         const int candidate_clear_priority =
-            menu_records::clear_status_priority(parsed->clear_status, parsed->game_over, parsed->final_gauge);
+            menu_records::clear_status_priority(effective_clear_status,
+                                                effective_game_over,
+                                                effective_final_gauge);
 
         LocalPlayRecord record;
         record.chart_path = parsed->chart_path;
@@ -96,32 +176,35 @@ void MenuApp::reload_chart_best_results() {
         record.player_name =
             parsed->player_name.empty() ? profile_display_name() : parsed->player_name;
         record.result_path = entry.path().u8string();
-        record.replay_path = parsed->replay_path;
+        record.replay_path = candidate.replay_path;
         record.rank = candidate.rank;
-        record.clear_status = parsed->clear_status;
-        record.final_gauge = parsed->final_gauge;
-        record.game_over = parsed->game_over;
+        record.clear_status = effective_clear_status;
+        record.final_gauge = effective_final_gauge;
+        record.game_over = effective_game_over;
         record.mods = parsed->mods;
         record.rate_multiplier = parsed->rate_multiplier;
         record.score_multiplier = parsed->score_multiplier;
         record.pause_used = parsed->pause_used;
         record.autoplay_enabled = parsed->autoplay_enabled;
         record.practice_no_fail_enabled = parsed->practice_no_fail_enabled;
-        record.raw_score = parsed->stats.raw_score;
+        record.verification_status = std::string(replay_verification_status_token(verification.status));
+        record.verification_detail = verification.detail;
+        record.replay_claims_match = replay_verified && verification.claims_match;
+        record.raw_score = effective_stats.raw_score;
         record.score = candidate.best_score;
         record.detail_score = candidate.detail_score;
-        record.accuracy = menu_records::calculate_accuracy(parsed->stats);
-        record.detailed_accuracy = menu_records::calculate_detailed_accuracy(parsed->stats);
-        record.max_combo = parsed->stats.max_combo;
-        record.total_notes = parsed->stats.total_notes;
+        record.accuracy = menu_records::calculate_accuracy(effective_stats);
+        record.detailed_accuracy = menu_records::calculate_detailed_accuracy(effective_stats);
+        record.max_combo = effective_stats.max_combo;
+        record.total_notes = effective_stats.total_notes;
         record.judged_notes = candidate_judged;
-        record.perfect = parsed->stats.counts.pg;
-        record.great = parsed->stats.counts.gr;
-        record.good = parsed->stats.counts.gd;
-        record.bad = parsed->stats.counts.bd;
-        record.poor = parsed->stats.counts.pr;
-        record.mean_delta_ms = parsed->stats.mean_delta_ms;
-        record.stddev_delta_ms = parsed->stats.stddev_delta_ms();
+        record.perfect = effective_stats.counts.pg;
+        record.great = effective_stats.counts.gr;
+        record.good = effective_stats.counts.gd;
+        record.bad = effective_stats.counts.bd;
+        record.poor = effective_stats.counts.pr;
+        record.mean_delta_ms = effective_stats.mean_delta_ms;
+        record.stddev_delta_ms = effective_stats.stddev_delta_ms();
         const std::size_t record_index = local_play_records_.size();
         local_play_records_.push_back(record);
         const bool note_count_modified =
@@ -134,7 +217,8 @@ void MenuApp::reload_chart_best_results() {
             chart_play_record_indices_[key].push_back(record_index);
             // Keep autoplay runs in local history/replay browsing, but never let
             // them become the chart's official best score or clear lamp.
-            if (note_count_modified || parsed->autoplay_enabled) {
+            if (note_count_modified || parsed->autoplay_enabled ||
+                parsed->practice_no_fail_enabled || !verification.official_eligible) {
                 continue;
             }
             auto existing = chart_best_results_.find(key);

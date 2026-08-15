@@ -40,7 +40,7 @@ profile が存在しない場合は初回起動時に自動生成されます。
 
 - `backend` (string)
   - `polling | rawinput`
-  - 現行 `1.4.2` リリースラインの既定値は `rawinput`
+  - 現行 `1.4.3-test` リリースラインの既定値は `rawinput`
   - `Options -> Input Settings -> Backend` または `Options -> Profile Setup -> Input Backend` で profile ごとに選択可能
   - runtime fallback は保存済みの値を `polling` に書き換えない
   - RawInput の起動失敗、登録先の消失、message window の終了を確認すると、そのアプリ実行中は menu と後続 gameplay の両方で Polling を維持する
@@ -282,6 +282,10 @@ chart loader/indexer は BMS family（`.bms/.bme/.bml/.pms`）専用です。旧
   - legacy compatibility field
 - `lane_center_gap_scales` (object)
   - キーモードごとの `lane_center_gap_scale` override
+- `single_color` (string)
+  - `off` または対応 color token
+  - color token を選ぶと、すべての key mode と scratch lane を同じ色で表示
+  - lane ごとの `lane_colors` は保持されるため、`off` に戻すと元の palette を復元
 - `lane_colors` (object)
   - キーモードごとの lane color palette
   - 現在の既定/保存 mode は `4k..10k` と `16k`
@@ -293,6 +297,9 @@ chart loader/indexer は BMS family（`.bms/.bme/.bml/.pms`）専用です。旧
 - `input` (double)
 - `visual` (double)
   - `-500..500` に clamp
+- `sound` (double, ms)
+  - `-500..500` に clamp し、UI では `Audio Settings > Sound Offset` と `Calibration Wizard` に表示
+  - 正の値は chart BGM/autoplay keysound を遅らせ、負の値は早める。判定、note/BGA timing、hit-triggered `follow` keysound は移動しない
 
 ## `keymap.json`
 

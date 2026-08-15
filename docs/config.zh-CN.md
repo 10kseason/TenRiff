@@ -40,7 +40,7 @@
 
 - `backend` (string)
   - `polling | rawinput`
-  - 当前 `1.4.2` 发布线默认值为 `rawinput`
+  - 当前 `1.4.3-test` 发布线默认值为 `rawinput`
   - 可在 `Options -> Input Settings -> Backend` 或 `Options -> Profile Setup -> Input Backend` 中按 profile 选择
   - runtime fallback 不会把已保存值改写为 `polling`
   - 确认 RawInput 启动失败、注册目标丢失或 message window 退出后，本次应用运行期间 menu 与后续 gameplay 都会保持 Polling
@@ -285,6 +285,10 @@ chart loader/indexer 仅支持 BMS family（`.bms/.bme/.bml/.pms`）。旧 `enab
   - 当前运行时只使用共享的 `lane_divider_width_scale`
 - `lane_center_gap_scales` (object)
   - 按 key mode 保存的 `lane_center_gap_scale` override
+- `single_color` (string)
+  - `off` 或受支持的颜色 token
+  - 选择颜色 token 后，所有 key mode 与 scratch lane 都使用该颜色
+  - 每个 lane 的 `lane_colors` 会继续保留，因此切回 `off` 时会恢复原有调色板
 - `lane_colors` (object)
   - 按 key mode 保存的 lane 颜色调色板
   - 当前默认/保存对象为 `4k..10k`、`16k`
@@ -296,6 +300,9 @@ chart loader/indexer 仅支持 BMS family（`.bms/.bme/.bml/.pms`）。旧 `enab
 - `input` (double)
 - `visual` (double)
   - 会被 clamp 在 `-500..500`
+- `sound` (double, ms)
+  - clamp 到 `-500..500`，并显示在 `Audio Settings > Sound Offset` 与 `Calibration Wizard` 中
+  - 正值延后 chart BGM/autoplay keysound，负值提前；判定、note/BGA timing 和按键触发的 `follow` keysound 不会移动
 
 ## `keymap.json`
 

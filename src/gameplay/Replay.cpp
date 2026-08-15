@@ -1,8 +1,10 @@
 #include "gameplay/Replay.h"
 
 #include <cmath>
+#include <cctype>
 #include <filesystem>
 #include <fstream>
+#include <limits>
 #include <sstream>
 #include <utility>
 
@@ -86,6 +88,18 @@ bool read_json_bool(const config::JsonObject& root, std::string_view key, bool f
 std::string read_json_string(const config::JsonObject& root, std::string_view key, std::string fallback = {}) {
     const auto* value = find_json_value(root, key);
     return value ? value->as_string(std::move(fallback)) : fallback;
+}
+
+bool is_sha256_hex(std::string_view value) {
+    if (value.size() != 64) {
+        return false;
+    }
+    for (const unsigned char ch : value) {
+        if (!std::isxdigit(ch)) {
+            return false;
+        }
+    }
+    return true;
 }
 
 std::vector<std::string> read_json_string_array(const config::JsonObject& root, std::string_view key) {
@@ -306,8 +320,11 @@ ExportResult save_json_file(const std::string& path, const config::JsonValue& ro
 ExportResult save_replay_json(const std::string& path, const ReplayFile& replay, int indent) {
     config::JsonObject obj;
     obj.emplace("version", config::JsonValue{static_cast<double>(replay.version)});
+    obj.emplace("replay_format_version", config::JsonValue{static_cast<double>(replay.replay_format_version)});
     obj.emplace("chart_path", config::JsonValue{replay.chart_path});
     obj.emplace("chart_format", config::JsonValue{replay.chart_format});
+    obj.emplace("chart_sha256", config::JsonValue{replay.chart_sha256});
+    obj.emplace("ruleset_id", config::JsonValue{replay.ruleset_id});
     obj.emplace("created_utc", config::JsonValue{replay.created_utc});
     obj.emplace("sample_rate", config::JsonValue{static_cast<double>(replay.sample_rate)});
     obj.emplace("rate", config::JsonValue{replay.rate});
@@ -317,6 +334,7 @@ ExportResult save_replay_json(const std::string& path, const ReplayFile& replay,
     obj.emplace("score_multiplier", config::JsonValue{replay.score_multiplier});
     obj.emplace("final_score", config::JsonValue{static_cast<double>(replay.final_score)});
     obj.emplace("pause_used", config::JsonValue{replay.pause_used});
+    obj.emplace("aborted", config::JsonValue{replay.aborted});
     obj.emplace("mode", build_mode_json(replay.mode));
     obj.emplace("trace", build_trace_json(replay.trace));
     obj.emplace("stats", build_stats_json(replay.stats));
@@ -326,11 +344,15 @@ ExportResult save_replay_json(const std::string& path, const ReplayFile& replay,
 ExportResult save_result_json(const std::string& path, const ResultFile& result_file, int indent) {
     config::JsonObject obj;
     obj.emplace("version", config::JsonValue{static_cast<double>(result_file.version)});
+    obj.emplace("replay_format_version", config::JsonValue{static_cast<double>(result_file.replay_format_version)});
     obj.emplace("chart_path", config::JsonValue{result_file.chart_path});
     obj.emplace("chart_format", config::JsonValue{result_file.chart_format});
+    obj.emplace("chart_sha256", config::JsonValue{result_file.chart_sha256});
+    obj.emplace("ruleset_id", config::JsonValue{result_file.ruleset_id});
     obj.emplace("created_utc", config::JsonValue{result_file.created_utc});
     obj.emplace("player_name", config::JsonValue{result_file.player_name});
     obj.emplace("replay_path", config::JsonValue{result_file.replay_path});
+    obj.emplace("replay_sha256", config::JsonValue{result_file.replay_sha256});
     if (!result_file.key_conversion_note_add_mode.empty()) {
         obj.emplace("key_conversion_note_add_mode",
                     config::JsonValue{result_file.key_conversion_note_add_mode});
@@ -345,6 +367,7 @@ ExportResult save_result_json(const std::string& path, const ResultFile& result_
     obj.emplace("score_multiplier", config::JsonValue{result_file.score_multiplier});
     obj.emplace("final_score", config::JsonValue{static_cast<double>(result_file.final_score)});
     obj.emplace("pause_used", config::JsonValue{result_file.pause_used});
+    obj.emplace("aborted", config::JsonValue{result_file.aborted});
     obj.emplace("autoplay_enabled", config::JsonValue{result_file.autoplay_enabled});
     obj.emplace("practice_no_fail_enabled", config::JsonValue{result_file.practice_no_fail_enabled});
     obj.emplace("one_miss_fail_enabled", config::JsonValue{result_file.one_miss_fail_enabled});
@@ -388,8 +411,11 @@ ReplayLoadResult load_replay_json(const std::string& path) {
 
     ReplayFile replay;
     replay.version = read_json_int(*root, "version", 1);
+    replay.replay_format_version = read_json_int(*root, "replay_format_version", 0);
     replay.chart_path = read_json_string(*root, "chart_path");
     replay.chart_format = read_json_string(*root, "chart_format");
+    replay.chart_sha256 = read_json_string(*root, "chart_sha256");
+    replay.ruleset_id = read_json_string(*root, "ruleset_id");
     replay.created_utc = read_json_string(*root, "created_utc");
     replay.sample_rate = read_json_int(*root, "sample_rate", read_json_int(*trace, "sample_rate", 0));
     replay.rate = read_json_number(*root, "rate", read_json_number(*trace, "rate", 1.0));
@@ -398,6 +424,7 @@ ReplayLoadResult load_replay_json(const std::string& path) {
     replay.rate_multiplier = read_json_number(*root, "rate_multiplier", 1.0);
     replay.score_multiplier = read_json_number(*root, "score_multiplier", 1.0);
     replay.pause_used = read_json_bool(*root, "pause_used", false);
+    replay.aborted = read_json_bool(*root, "aborted", false);
 
     if (const auto* mode = find_json_object(*root, "mode")) {
         replay.mode.key_mode = read_json_string(*mode, "key_mode");
@@ -427,6 +454,11 @@ ReplayLoadResult load_replay_json(const std::string& path) {
     const auto* events = find_json_array(*trace, "events");
     if (!events) {
         result.error = "Replay JSON missing trace.events array.";
+        return result;
+    }
+    if (replay.replay_format_version >= kReplayFormatVersion &&
+        events->size() > kReplayMaxEventCount) {
+        result.error = "Replay trace exceeds the event-count safety limit.";
         return result;
     }
     replay.trace.events.reserve(events->size());
@@ -560,7 +592,88 @@ ReplayLoadResult load_replay_json(const std::string& path) {
     if (has_stored_final_score) {
         replay.final_score = normalize_stored_native_score(replay.final_score, replay.version);
     }
+    const ReplayValidationResult validation = validate_replay_evidence(replay);
+    if (!validation.success()) {
+        result.error = validation.error;
+        return result;
+    }
     result.replay = std::move(replay);
+    return result;
+}
+
+ReplayValidationResult validate_replay_evidence(const ReplayFile& replay) {
+    ReplayValidationResult result;
+    if (replay.replay_format_version < kReplayFormatVersion) {
+        return result;
+    }
+    if (!is_sha256_hex(replay.chart_sha256)) {
+        result.error = "Replay v3 requires a 64-character chart SHA-256.";
+        return result;
+    }
+    if (replay.ruleset_id.empty() || replay.ruleset_id.size() > 128) {
+        result.error = "Replay v3 requires a bounded ruleset identifier.";
+        return result;
+    }
+    if (replay.sample_rate < 8'000 || replay.sample_rate > 384'000 ||
+        replay.trace.sample_rate != replay.sample_rate) {
+        result.error = "Replay v3 sample rate is invalid or inconsistent.";
+        return result;
+    }
+    if (!std::isfinite(replay.rate) || replay.rate < 0.25 || replay.rate > 4.0 ||
+        !std::isfinite(replay.trace.rate) || std::abs(replay.trace.rate - replay.rate) > 1e-9) {
+        result.error = "Replay v3 rate is invalid or inconsistent.";
+        return result;
+    }
+    if (!std::isfinite(replay.input_offset_ms) || replay.input_offset_ms < -500.0 ||
+        replay.input_offset_ms > 500.0 || !std::isfinite(replay.rate_multiplier) ||
+        replay.rate_multiplier < 0.0 || replay.rate_multiplier > 10.0 ||
+        !std::isfinite(replay.score_multiplier) || replay.score_multiplier < 0.0 ||
+        replay.score_multiplier > 10.0) {
+        result.error = "Replay v3 contains an invalid scoring number.";
+        return result;
+    }
+    if (replay.trace.lane_count <= 0 || replay.trace.lane_count > 32) {
+        result.error = "Replay v3 lane count is outside the supported range.";
+        return result;
+    }
+    const int64_t maximum_duration = static_cast<int64_t>(replay.sample_rate) * 60 * 60 * 24;
+    if (replay.trace.duration_samples <= 0 || replay.trace.duration_samples > maximum_duration) {
+        result.error = "Replay v3 duration is outside the safety limit.";
+        return result;
+    }
+    if (replay.trace.events.size() > kReplayMaxEventCount) {
+        result.error = "Replay v3 trace exceeds the event-count safety limit.";
+        return result;
+    }
+
+    const int64_t sample_slack = static_cast<int64_t>(replay.sample_rate) * 5;
+    const int64_t minimum_sample = -sample_slack;
+    const int64_t maximum_sample = replay.trace.duration_samples + sample_slack;
+    int64_t previous_sample = (std::numeric_limits<int64_t>::min)();
+    std::vector<input::InputState> lane_states(
+        static_cast<std::size_t>(replay.trace.lane_count), input::InputState::Released);
+    for (std::size_t index = 0; index < replay.trace.events.size(); ++index) {
+        const ReplayEvent& event = replay.trace.events[index];
+        if (event.lane <= 0 || event.lane > replay.trace.lane_count) {
+            result.error = "Replay v3 event lane is outside the declared lane count.";
+            return result;
+        }
+        if (event.sample < previous_sample) {
+            result.error = "Replay v3 events are not ordered by sample.";
+            return result;
+        }
+        if (event.sample < minimum_sample || event.sample > maximum_sample) {
+            result.error = "Replay v3 event sample is outside the bounded chart interval.";
+            return result;
+        }
+        auto& lane_state = lane_states[static_cast<std::size_t>(event.lane - 1)];
+        if (lane_state == event.state) {
+            result.error = "Replay v3 contains a repeated per-lane input state.";
+            return result;
+        }
+        lane_state = event.state;
+        previous_sample = event.sample;
+    }
     return result;
 }
 

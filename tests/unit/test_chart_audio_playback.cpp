@@ -92,6 +92,34 @@ TEST_CASE("chart audio playback duration scales with rate") {
     CHECK(tenriff::app::chart_audio_playback_duration_frames(8, 0.5) == 16);
 }
 
+TEST_CASE("chart sound offset shifts scheduled audio without moving chart time") {
+    CHECK(tenriff::app::chart_audio_start_sample_with_offset(1'000, 125.0, 1'000) == 1'125);
+    CHECK(tenriff::app::chart_audio_start_sample_with_offset(1'000, -250.0, 1'000) == 750);
+    CHECK(tenriff::app::chart_audio_start_sample_with_offset(1'000, 125.0, 0) == 1'000);
+
+    const std::vector<float> clip = {
+        1.0f, 10.0f,
+        2.0f, 20.0f,
+        3.0f, 30.0f,
+        4.0f, 40.0f,
+    };
+    std::vector<float> delayed_output(8, 0.0f);
+    const int64_t delayed_start =
+        tenriff::app::chart_audio_start_sample_with_offset(0, 2.0, 1'000);
+    CHECK(tenriff::app::mix_chart_audio_clip_linear(
+              clip, delayed_start, 1.0, 1.0f, delayed_output.data(), 4, 0) == 2);
+    CHECK(delayed_output[0] == doctest::Approx(0.0f));
+    CHECK(delayed_output[4] == doctest::Approx(1.0f));
+
+    std::vector<float> advanced_output(4, 0.0f);
+    const int64_t advanced_start =
+        tenriff::app::chart_audio_start_sample_with_offset(0, -2.0, 1'000);
+    CHECK(tenriff::app::mix_chart_audio_clip_linear(
+              clip, advanced_start, 1.0, 1.0f, advanced_output.data(), 2, 0) == 2);
+    CHECK(advanced_output[0] == doctest::Approx(3.0f));
+    CHECK(advanced_output[1] == doctest::Approx(30.0f));
+}
+
 TEST_CASE("chart audio mix reads ahead when playback rate is faster") {
     const std::vector<float> clip = {
         1.0f, 10.0f,

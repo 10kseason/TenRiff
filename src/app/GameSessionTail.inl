@@ -1512,7 +1512,8 @@ bool GameSession::prepare_chart_audio() {
             continue;
         }
         auto& asset = chart_audio_assets_[cue.asset_id];
-        const int64_t sample = std::max<int64_t>(0, cue.start_sample);
+        const int64_t sample = chart_audio_start_sample_with_offset(
+            cue.start_sample, config_.sound_offset_ms, sample_rate_);
         asset.has_bgm = true;
         asset.use_samples.push_back(sample);
         asset.first_use_sample = (std::min)(asset.first_use_sample, sample);
@@ -2116,8 +2117,24 @@ void GameSession::shutdown() {
             std::filesystem::path result_path = profile_dir / "results" / ("result_" + created_utc + ".json");
 
             gameplay::ReplayFile replay;
+            std::string chart_hash_error;
+            const ChartFileHashes chart_hashes = hash_chart_file_utf8(chart_path_, &chart_hash_error);
+            if (!chart_hashes.valid()) {
+                // Keep the replay playable as legacy evidence, but never claim a
+                // verifiable v3 binding when the exact chart bytes were unavailable.
+                replay.replay_format_version = 0;
+                result_.export_warnings.push_back(
+                    "Replay verification evidence unavailable: " +
+                    (chart_hash_error.empty() ? std::string("chart hashing failed") : chart_hash_error));
+            }
             replay.chart_path = chart_path_;
             replay.chart_format = format_token;
+            replay.chart_sha256 = chart_hashes.sha256;
+            replay.ruleset_id = replay_ruleset_id_for_runtime(config_.judge,
+                                                              config_.gauge,
+                                                              gauge_shift_enabled_,
+                                                              course_gauge_enabled_,
+                                                              pacemaker_mode_);
             replay.created_utc = created_utc;
             replay.sample_rate = sample_rate_;
             replay.rate = config_.speed.rate;
@@ -2127,6 +2144,7 @@ void GameSession::shutdown() {
             replay.score_multiplier = result_.score_multiplier;
             replay.final_score = result_.final_score;
             replay.pause_used = result_.pause_used;
+            replay.aborted = user_aborted;
             replay.mode.key_mode = config_.mode.key_mode;
             replay.mode.key_conversion_algorithm = config_.mode.key_conversion_algorithm;
             replay.mode.key_conversion_nk2_preset = config_.mode.key_conversion_nk2_preset;
@@ -2149,17 +2167,31 @@ void GameSession::shutdown() {
                                                replay_export.warnings.end());
             } else {
                 result_.replay_path = replay_path.u8string();
+                std::string replay_hash_error;
+                const ChartFileHashes replay_hashes = hash_chart_file(replay_path, &replay_hash_error);
+                if (replay_hashes.valid()) {
+                    result_.replay_sha256 = replay_hashes.sha256;
+                } else {
+                    result_.export_warnings.push_back(
+                        "Replay result binding unavailable: " +
+                        (replay_hash_error.empty() ? std::string("replay hashing failed")
+                                                   : replay_hash_error));
+                }
                 result_.export_warnings.insert(result_.export_warnings.end(),
                                                replay_export.warnings.begin(),
                                                replay_export.warnings.end());
             }
 
             gameplay::ResultFile exported_result;
+            exported_result.replay_format_version = replay.replay_format_version;
             exported_result.chart_path = chart_path_;
             exported_result.chart_format = format_token;
+            exported_result.chart_sha256 = replay.chart_sha256;
+            exported_result.ruleset_id = replay.ruleset_id;
             exported_result.created_utc = created_utc;
             exported_result.player_name = result_.player_name;
             exported_result.replay_path = result_.replay_path;
+            exported_result.replay_sha256 = result_.replay_sha256;
             exported_result.clear_status = result_.clear_status;
             exported_result.final_gauge = gauge_type_token(final_gauge);
             exported_result.sample_rate = sample_rate_;
@@ -2170,6 +2202,7 @@ void GameSession::shutdown() {
             exported_result.score_multiplier = result_.score_multiplier;
             exported_result.final_score = result_.final_score;
             exported_result.pause_used = result_.pause_used;
+            exported_result.aborted = user_aborted;
             exported_result.autoplay_enabled = autoplay_enabled_;
             exported_result.practice_no_fail_enabled = practice_no_fail_enabled_;
             exported_result.one_miss_fail_enabled = one_miss_fail_enabled_;

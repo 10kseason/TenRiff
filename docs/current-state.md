@@ -6,7 +6,8 @@
 - BMS variable scroll is supported through `#SCROLLxx` / `#xxxSC`; visual motion may speed up, stop, or reverse while audio and judgement timing stay sample-accurate.
 - BMS landmines (`D1-D9`, `E1-E9`) are playable, including `#WAV00`, base-36 damage tokens, `ZZ` instant fail, exact press/release boundary behavior, and lane-mod/key-converter remapping.
 - Results and local records expose fixed native score separately from detail score, and categorical native accuracy separately from continuous timing-based detailed accuracy.
-- 현재 프로젝트 버전과 로컬 정식 배포 라인은 `1.4.2`
+- 새 replay evidence v3는 차트 SHA-256, canonical ruleset, result-to-replay SHA-256을 저장하고 입력 trace를 headless 엔진으로 재실행합니다. 공식 로컬 best는 재계산된 verified 결과만 사용하며 legacy/custom/assist 기록은 히스토리에 `unverified`로 남습니다.
+- 현재 테스트 프로젝트와 프리릴리스 배포 라인은 `1.4.3-test`
 - UI-r2 Result는 2.2초 타임라인으로 프리즘·점수·등급·상태·통계·그래프를 순차 공개하며, Space로 연출을 건너뛸 수 있고 CONTINUE/RETRY/Replay 입력은 공개 완료 전 잠김
 - UI-r2 Song Select는 상단 탭, 7행 재킷 라이브러리, 대형 선택 이미지, 최고 기록 카드, 차트/모드 패널, 실제 동작하는 START 버튼 구조로 개편되며 Collection/Store/재화/글로벌 랭킹 가상 기능은 표시하지 않음
 - Song Select 우측의 비주얼 레이턴시·하이스피드·Gauge Shift 시작 등급·랜덤 셀은 좌클릭으로 증가/다음, 우클릭으로 감소/이전을 적용하고 즉시 저장함. 현재 차트 키수는 잘림 없이 표시되며 최고 기록은 점수·정확도·최대 콤보를 함께 표시
@@ -188,7 +189,7 @@
   - 현재 선곡권자만 전원 공통 BMS를 선택하고 전원 Ready일 때 START 요청 가능; 코디네이터 승인 Launch와 전원 chart-load barrier 뒤 시작
   - 참가자는 현재 source와 profile의 `recent_song_sources`에 기록된 기존 캐시만 순서대로 열어 hash+size 일치 BMS를 자동 선택; 전체 디스크 탐색이나 자동 재인덱싱은 하지 않고 source 밖 cache 경로는 거부
   - 멀티 게이지도 싱글 `Gauge Shift`와 동일하게 EX-Hard / Hard / Normal / Easy를 병렬 계산하고 모든 tier 탈락 시 해당 플레이어가 Game Over
-  - 플레이 중 기존 점수차 HUD는 대표 상대를 표시하고 Result는 전 참가자 최종 점수 순위를 표시; protocol은 정확한 lane input/note별 판정/hold state를 전송하지 않음
+  - 플레이 중 기존 점수차 HUD는 대표 상대를 표시하고 Result는 전 참가자 최종 점수 순위를 표시; protocol은 비정상 범위 claim을 거부하지만 replay proof가 없으므로 상대 결과를 `UNVERIFIED CLAIM`으로 표시하고 정확한 lane input/note별 판정/hold state는 전송하지 않음
   - 모든 경기 프레임은 round nonce를 사용하고 전원 최종 결과 및 전원 RoundReset을 다음 선곡/Ready 해제 조건으로 사용
   - Rate 1.0, 기본 판정, Random/Mods/Assist off를 세션에만 적용하며 각 플레이어의 로컬 키모드 변환은 허용
   - 차트 전송, NAT traversal, 릴레이/매치메이킹, 암호화/인증, 안티치트, 자동 재접속은 미지원
@@ -227,7 +228,7 @@
 
 ## Runtime / Packaging Rules
 - 새 사용자 프로필은 자동 생성
-- 현재 로컬 정식 P2P 배포 라인은 `TenRiff 1.4.2`
+- 현재 로컬 테스트 P2P 배포 라인은 `TenRiff 1.4.3-test`
 - 배포 패키지에는 `Songs`를 넣지 않음
 - 배포 패키지는 `Main Menu / Options / Song Selecte / Multiplayer Lobby / Clear / Failed` 이름의 `Mainmusic/` 화면 슬롯을 포함하며, 각 `이름.mp3`와 번호가 붙은 `이름 2.mp3`~`이름 64.mp3`를 자동 수집해 화면 재진입마다 순환
 - 배포 업데이트에는 built artifacts와 필요한 런타임 자산만 포함

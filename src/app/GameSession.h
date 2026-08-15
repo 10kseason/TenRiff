@@ -163,6 +163,7 @@ public:
         int64_t final_score = 0;
         bool pause_used = false;
         std::string replay_path;
+        std::string replay_sha256;
         std::string result_path;
         std::vector<std::string> export_warnings;
     };

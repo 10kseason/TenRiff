@@ -16,6 +16,8 @@ constexpr std::size_t kPeerLibraryHashesPerChunk = 512;
 constexpr std::size_t kPeerLibraryMaxCharts = 250'000;
 constexpr std::size_t kPeerFrameHeaderSize = 12;
 constexpr std::size_t kPeerMaxPayloadSize = 64 * 1024;
+constexpr int64_t kPeerMaximumClaimedScore = 10'000;
+constexpr int kPeerMaximumJudgementCount = 10'000'000;
 
 enum class PeerMessageType : uint16_t {
     Hello = 1,
@@ -58,6 +60,10 @@ struct PeerScore {
     bool game_over = false;
     bool aborted = false;
 };
+
+// This is a wire-safety/consistency bound, not proof that the peer earned the
+// score. Direct-P2P results remain untrusted claims until replay proof exists.
+[[nodiscard]] bool peer_score_claim_is_sane(const PeerScore& score);
 
 struct PeerParticipantWire {
     uint8_t player_id = 0;

@@ -40,7 +40,7 @@ If a profile does not exist, it is created automatically on first launch.
 
 - `backend` (string)
   - `polling | rawinput`
-  - defaults to `rawinput` on the current `1.4.2` release line
+  - defaults to `rawinput` on the current `1.4.3-test` release line
   - selectable per profile under `Options -> Input Settings -> Backend` or `Options -> Profile Setup -> Input Backend`
   - runtime fallback never rewrites the saved value to `polling`
   - a confirmed RawInput startup failure, registration-target loss, or message-window exit latches Polling across menu and subsequent gameplay sessions for the current app run
@@ -60,7 +60,7 @@ If a profile does not exist, it is created automatically on first launch.
 - `judgement_hz` (int)
   - `1000 | 2000 | 4000 | 8000`
   - compatibility field kept in the input config
-  - the current `1.4.2` runtime no longer drives a separate audio-thread judgement sub-step loop from this value
+  - the current `1.4.3-test` runtime no longer drives a separate audio-thread judgement sub-step loop from this value
   - default is `4000` (`0.25ms`)
 - `debounce_ms` (double)
   - real Press/Release transitions are preserved; only duplicate same-state events are removed from pressed-state tracking
@@ -285,6 +285,10 @@ The chart loader and indexer are limited to BMS-family files (`.bms/.bme/.bml/.p
   - the current runtime uses only the shared `lane_divider_width_scale`
 - `lane_center_gap_scales` (object)
   - per-key-mode `lane_center_gap_scale` overrides
+- `single_color` (string)
+  - `off` or one of the supported color tokens
+  - a color token overrides every key mode and scratch lane with that color
+  - the per-lane `lane_colors` remain stored, so selecting `off` restores the previous palettes
 - `lane_colors` (object)
   - per-key-mode lane color palettes
   - current default / persisted modes are `4k..10k` and `16k`
@@ -297,6 +301,9 @@ The chart loader and indexer are limited to BMS-family files (`.bms/.bme/.bml/.p
 - `visual` (double)
   - clamped to the `-500..500` range
   - the storage key and behavior are unchanged; the UI exposes it as `Skins > Visual Latency`
+- `sound` (double, ms)
+  - clamped to `-500..500` and exposed in `Audio Settings > Sound Offset` and the `Calibration Wizard`
+  - positive values delay chart BGM/autoplay keysounds and negative values advance them; judgement, note/BGA timing, and hit-triggered `follow` keysounds do not move
 
 ## `keymap.json`
 

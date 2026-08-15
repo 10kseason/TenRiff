@@ -6,7 +6,7 @@
 namespace tenriff::app {
 
 void MenuApp::handle_audio_settings_input(uint32_t keycode) {
-    const int item_count = 7;
+    const int item_count = 8;
     if (keycode == key_up_) {
         settings_cursor_ = clamp_int(settings_cursor_ - 1, 0, item_count - 1);
         publish_snapshot();
@@ -66,6 +66,16 @@ void MenuApp::handle_audio_settings_input(uint32_t keycode) {
         config_.audio_ui.keysound_volume =
             clamp_step_value(config_.audio_ui.keysound_volume + direction * kChartMixVolumeStep,
                              kChartMixVolumeMin, kChartMixVolumeMax, kChartMixVolumeStep);
+        audio_dirty_ = true;
+        publish_snapshot();
+        return;
+    }
+
+    if (settings_cursor_ == 6 && (keycode == key_left_ || keycode == key_right_)) {
+        const double direction = (keycode == key_left_) ? -1.0 : 1.0;
+        config_.sound_offset_ms = clamp_step_value(
+            config_.sound_offset_ms + direction * kSoundOffsetStep,
+            kSoundOffsetMin, kSoundOffsetMax, kSoundOffsetStep);
         audio_dirty_ = true;
         publish_snapshot();
         return;
@@ -255,7 +265,9 @@ void MenuApp::populate_audio_settings_render_data(render::MenuRenderData& render
                     render::MenuHitTargetKind::SettingsRow, 4, false, true);
     append_menu_row(render.generic, ui_text("Keysound Volume", "키음 볼륨"), format_percent(config_.audio_ui.keysound_volume), settings_cursor_ == 5,
                     render::MenuHitTargetKind::SettingsRow, 5, false, true);
-    append_menu_row(render.generic, ui_text("Back", "뒤로"), "", settings_cursor_ == 6, render::MenuHitTargetKind::SettingsRow, 6, true, false);
+    append_menu_row(render.generic, ui_text("Sound Offset", "사운드 오프셋"), format_signed_offset_ms(config_.sound_offset_ms), settings_cursor_ == 6,
+                    render::MenuHitTargetKind::SettingsRow, 6, false, true);
+    append_menu_row(render.generic, ui_text("Back", "뒤로"), "", settings_cursor_ == 7, render::MenuHitTargetKind::SettingsRow, 7, true, false);
     render.generic.notes.push_back(ui_text("Follow: note hits trigger keysounds. Autoplay: note keysounds are mixed into background audio.",
                                            "연동: 노트를 칠 때 키음이 납니다. 자동재생: 노트 키음이 배경음에 섞여 재생됩니다."));
     render.generic.notes.push_back(ui_text(
@@ -263,6 +275,9 @@ void MenuApp::populate_audio_settings_render_data(render::MenuRenderData& render
         "배경음은 메뉴, 결과, 곡 미리듣기 음악만 제어합니다. 게임플레이 차트 BGM은 계속 재생됩니다."));
     render.generic.notes.push_back(ui_text("Off: skip note keysounds. Autoplay mode routes note keysounds through BGM volume.",
                                            "끔: 노트 키음을 재생하지 않습니다. 자동재생에서는 노트 키음이 BGM 볼륨을 따릅니다."));
+    render.generic.notes.push_back(ui_text(
+        "Sound Offset shifts chart BGM and autoplay keysounds only. Positive delays sound; negative advances it.",
+        "사운드 오프셋은 차트 BGM과 자동재생 키음만 이동합니다. 양수는 소리를 늦추고 음수는 앞당깁니다."));
     render.generic.notes.push_back(ui_text("Left/Right or click +/- to change. Back saves and returns.",
                                            "좌우 키나 +/- 클릭으로 변경합니다. 뒤로 가면 저장 후 돌아갑니다."));
 }

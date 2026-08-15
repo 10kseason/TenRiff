@@ -84,6 +84,7 @@ TEST_CASE("config defaults prefer 44100 Hz audio") {
     CHECK(config.audio_ui.background_sound_enabled);
     CHECK(config.audio_ui.bgm_volume == doctest::Approx(0.75));
     CHECK(config.audio_ui.keysound_volume == doctest::Approx(1.0));
+    CHECK(config.sound_offset_ms == doctest::Approx(0.0));
     CHECK(config.input.rawinput);
     CHECK(config.input.backend == "rawinput");
     CHECK(config.input.polling_hz == 1000);
@@ -169,6 +170,7 @@ TEST_CASE("config defaults prefer 44100 Hz audio") {
     CHECK(config.skin.note_height_scale == doctest::Approx(1.80));
     CHECK(config.skin.lane_divider_width_scale == doctest::Approx(1.0));
     CHECK(config.skin.hold_body_width_scale == doctest::Approx(1.00));
+    CHECK(config.skin.single_color == "off");
     const auto default_lane_widths_10k = tenriff::config::resolved_skin_lane_width_scales(config.skin, "10k");
     REQUIRE(default_lane_widths_10k.size() == 10u);
     CHECK(default_lane_widths_10k[0] == doctest::Approx(tenriff::config::kLaneWidthScaleDefault));
@@ -944,7 +946,7 @@ TEST_CASE("config clamps refresh_hz and normalizes invalid resolution preset") {
     CHECK(result.config.graphics.refresh_hz == -1);
 }
 
-TEST_CASE("config save and load preserve visual offset setting") {
+TEST_CASE("config save and load preserve visual and sound offset settings") {
     TempDirGuard temp;
     temp.path = make_temp_dir();
     REQUIRE_FALSE(temp.path.empty());
@@ -957,6 +959,7 @@ TEST_CASE("config save and load preserve visual offset setting") {
     ConfigLoader loader;
     auto config = loader.defaults();
     config.visual_offset_ms = 85.0;
+    config.sound_offset_ms = -42.0;
 
     std::string error;
     REQUIRE(loader.save_profile("profiles/test", config, &error));
@@ -965,9 +968,10 @@ TEST_CASE("config save and load preserve visual offset setting") {
     const auto result = loader.load_profile("profiles/test");
     REQUIRE(result.success());
     CHECK(result.config.visual_offset_ms == doctest::Approx(85.0));
+    CHECK(result.config.sound_offset_ms == doctest::Approx(-42.0));
 }
 
-TEST_CASE("config clamps visual offset into supported range") {
+TEST_CASE("config clamps visual and sound offsets into supported range") {
     TempDirGuard temp;
     temp.path = make_temp_dir();
     REQUIRE_FALSE(temp.path.empty());
@@ -977,7 +981,8 @@ TEST_CASE("config clamps visual offset into supported range") {
     write_file(temp.path / "config" / "config.json",
                "{\n"
                "  \"offsets\": {\n"
-               "    \"visual\": 999.0\n"
+               "    \"visual\": 999.0,\n"
+               "    \"sound\": -999.0\n"
                "  }\n"
                "}\n");
     write_file(temp.path / "profiles" / "test" / "config.json", "{ }\n");
@@ -992,6 +997,7 @@ TEST_CASE("config clamps visual offset into supported range") {
 
     REQUIRE(result.success());
     CHECK(result.config.visual_offset_ms == doctest::Approx(500.0));
+    CHECK(result.config.sound_offset_ms == doctest::Approx(-500.0));
 }
 
 TEST_CASE("config save and load preserve skin gameplay settings") {
@@ -1033,6 +1039,7 @@ TEST_CASE("config save and load preserve skin gameplay settings") {
     config.skin.lane_colors["5k"] = {"rose", "mint", "gold", "azure", "ice"};
     config.skin.lane_colors["16k"] = {"rose", "mint", "gold", "azure", "ice", "teal", "violet", "orange",
                                       "orange", "violet", "teal", "ice", "azure", "gold", "mint", "rose"};
+    config.skin.single_color = "violet";
 
     std::string error;
     REQUIRE(loader.save_profile("profiles/test", config, &error));
@@ -1054,6 +1061,7 @@ TEST_CASE("config save and load preserve skin gameplay settings") {
     CHECK(result.config.skin.judgement_line_position == doctest::Approx(0.0));
     CHECK(result.config.skin.gameplay_field_offset_x == doctest::Approx(-275.0));
     CHECK(result.config.skin.combo_position == doctest::Approx(0.52));
+    CHECK(result.config.skin.single_color == "violet");
     const auto saved_lane_widths_4k = tenriff::config::resolved_skin_lane_width_scales(result.config.skin, "4k");
     REQUIRE(saved_lane_widths_4k.size() == 4u);
     CHECK(saved_lane_widths_4k[0] == doctest::Approx(0.75));
@@ -1074,21 +1082,26 @@ TEST_CASE("config save and load preserve skin gameplay settings") {
     CHECK(tenriff::config::resolved_skin_note_height_scale(result.config.skin, "10k") == doctest::Approx(1.35));
     CHECK(tenriff::config::resolved_skin_lane_center_gap_scale(result.config.skin, "16k") == doctest::Approx(1.10));
     CHECK(tenriff::config::resolved_skin_lane_center_gap_scale(result.config.skin, "10k") == doctest::Approx(0.25));
-    const auto saved_4k = tenriff::config::resolved_skin_lane_colors(result.config.skin, "4k");
+    const auto saved_4k = tenriff::config::resolved_skin_lane_palette(result.config.skin, "4k");
     REQUIRE(saved_4k.size() == 4u);
     CHECK(saved_4k[0] == "rose");
     CHECK(saved_4k[1] == "gold");
     CHECK(saved_4k[3] == "rose");
-    const auto saved_5k = tenriff::config::resolved_skin_lane_colors(result.config.skin, "5k");
+    const auto saved_5k = tenriff::config::resolved_skin_lane_palette(result.config.skin, "5k");
     REQUIRE(saved_5k.size() == 5u);
     CHECK(saved_5k[0] == "rose");
     CHECK(saved_5k[1] == "mint");
     CHECK(saved_5k[2] == "gold");
-    const auto saved_16k = tenriff::config::resolved_skin_lane_colors(result.config.skin, "16k");
+    const auto saved_16k = tenriff::config::resolved_skin_lane_palette(result.config.skin, "16k");
     REQUIRE(saved_16k.size() == 16u);
     CHECK(saved_16k[0] == "rose");
     CHECK(saved_16k[7] == "orange");
     CHECK(saved_16k[15] == "rose");
+    const auto unified_4k = tenriff::config::resolved_skin_lane_colors(result.config.skin, "4k");
+    REQUIRE(unified_4k.size() == 4u);
+    CHECK(std::all_of(unified_4k.begin(), unified_4k.end(), [](const std::string& color) {
+        return color == "violet";
+    }));
 }
 
 TEST_CASE("skin note shape normalization supports polygon choices") {
@@ -1133,6 +1146,31 @@ TEST_CASE("native 12K skin colors stay independent when there are no scratch lan
         return color == "teal";
     }));
 }
+
+TEST_CASE("single skin color overrides scratch layouts and restores the saved palette when off") {
+    tenriff::config::SkinConfig skin;
+    skin.lane_colors["10k"] = {
+        "rose", "mint", "gold", "azure", "ice",
+        "teal", "violet", "orange", "rose", "mint",
+    };
+    skin.single_color = "teal";
+
+    const std::array<int, 2> scratch_lanes{6, 12};
+    const auto unified = tenriff::config::resolved_skin_lane_colors_for_layout(
+        skin, 12, scratch_lanes.data(), scratch_lanes.size());
+    REQUIRE(unified.size() == 12u);
+    CHECK(std::all_of(unified.begin(), unified.end(), [](const std::string& color) {
+        return color == "teal";
+    }));
+
+    skin.single_color = "off";
+    const auto restored = tenriff::config::resolved_skin_lane_colors_for_layout(
+        skin, 12, scratch_lanes.data(), scratch_lanes.size());
+    REQUIRE(restored.size() == 12u);
+    CHECK(restored[0] == "rose");
+    CHECK(restored[6] == "teal");
+    CHECK(tenriff::config::normalize_skin_single_color_token("unknown") == "off");
+}
 TEST_CASE("config clamps skin gameplay settings into supported range") {
     TempDirGuard temp;
     temp.path = make_temp_dir();
@@ -1171,6 +1209,7 @@ TEST_CASE("config clamps skin gameplay settings into supported range") {
                "    \"lane_center_gap_scales\": {\n"
                "      \"16k\": 9.0\n"
                "    },\n"
+               "    \"single_color\": \"badtoken\",\n"
                "    \"lane_colors\": {\n"
                "      \"5k\": [\"badtoken\", \"azure\"],\n"
                "      \"10k\": [\"rose\", \"mint\", \"gold\", \"azure\", \"ice\", \"ice\", \"azure\", \"gold\", \"mint\", \"rose\"]\n"
@@ -1219,6 +1258,7 @@ TEST_CASE("config clamps skin gameplay settings into supported range") {
           doctest::Approx(tenriff::config::kNoteHeightScaleMax));
     CHECK(tenriff::config::resolved_skin_lane_center_gap_scale(result.config.skin, "16k") ==
           doctest::Approx(tenriff::config::kLaneCenterGapScaleMax));
+    CHECK(result.config.skin.single_color == "off");
     const auto clamped_5k = tenriff::config::resolved_skin_lane_colors(result.config.skin, "5k");
     REQUIRE(clamped_5k.size() == 5u);
     CHECK(clamped_5k[0] == "ice");
