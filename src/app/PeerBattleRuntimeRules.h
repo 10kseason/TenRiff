@@ -66,7 +66,7 @@ struct PeerBattleSpectatorState {
 // Only a locally failed peer-battle session is held open for spectating. A
 // terminal remote state, disconnect, or canceled round releases the session.
 // Treating remote GAME OVER as terminal also prevents simultaneous-failure
-// deadlocks before both sides publish their authoritative FinalScore packets.
+// deadlocks before both sides publish their unverified FinalScore claims.
 [[nodiscard]] inline constexpr PeerBattleSpectatorDecision peer_battle_spectator_decision(
     const PeerBattleSpectatorState& state) noexcept {
     if (!state.local_game_over || !state.peer_connected || !state.round_active ||

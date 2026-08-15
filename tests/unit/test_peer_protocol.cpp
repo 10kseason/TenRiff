@@ -150,10 +150,10 @@ TEST_CASE("peer protocol round-trips eight-player room metadata") {
     attributed_score.type = PeerMessageType::Score;
     attributed_score.player_id = 8;
     attributed_score.nonce = 55;
-    attributed_score.score.score = 123456;
+    attributed_score.score.score = 7654;
     const PeerMessage score_result = round_trip(attributed_score);
     CHECK(score_result.player_id == 8);
-    CHECK(score_result.score.score == 123456);
+    CHECK(score_result.score.score == 7654);
 }
 TEST_CASE("peer protocol round-trips bounded chart-library messages") {
     PeerMessage begin;
@@ -186,7 +186,7 @@ TEST_CASE("peer protocol round-trips live score state") {
     PeerMessage score;
     score.type = PeerMessageType::FinalScore;
     score.nonce = 99;
-    score.score.score = 987654;
+    score.score.score = 9876;
     score.score.current_sample = 1234567;
     score.score.combo = 321;
     score.score.max_combo = 654;
@@ -201,7 +201,7 @@ TEST_CASE("peer protocol round-trips live score state") {
 
     const PeerMessage result = round_trip(score);
     CHECK(result.nonce == 99);
-    CHECK(result.score.score == 987654);
+    CHECK(result.score.score == 9876);
     CHECK(result.score.current_sample == 1234567);
     CHECK(result.score.combo == 321);
     CHECK(result.score.max_combo == 654);
@@ -213,6 +213,27 @@ TEST_CASE("peer protocol round-trips live score state") {
     CHECK(result.score.gauge_milli == 76543);
     CHECK(result.score.finished);
     CHECK(result.score.aborted);
+}
+
+TEST_CASE("peer protocol rejects impossible score claims before display") {
+    PeerMessage score;
+    score.type = PeerMessageType::FinalScore;
+    score.nonce = 99;
+    score.score.score = tenriff::network::kPeerMaximumClaimedScore + 1;
+    std::string error;
+    CHECK(tenriff::network::encode_peer_message(score, &error).empty());
+    CHECK_FALSE(error.empty());
+
+    score.score.score = 9000;
+    score.score.max_combo = 10;
+    score.score.combo = 11;
+    CHECK(tenriff::network::encode_peer_message(score, &error).empty());
+    CHECK_FALSE(error.empty());
+
+    score.score.combo = 10;
+    score.score.gauge_milli = 100001;
+    CHECK(tenriff::network::encode_peer_message(score, &error).empty());
+    CHECK_FALSE(error.empty());
 }
 
 TEST_CASE("peer protocol waits for a complete frame and rejects a bad header") {

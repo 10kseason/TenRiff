@@ -17,17 +17,19 @@ Language: Korean | [English](README.en.md) | [简体中文](README.zh-CN.md) | [
    - 실제 플레이 기준의 시작 방법, 곡 선택, 조작, HUD, 판정, 결과 화면 안내
 5. `docs/multiplayer.md`
    - 최대 8인 직접 IP 멀티플레이의 접속, BMS 전용 공통곡, 회전 선곡권, 보안 및 네트워크 제한
-6. `docs/config.md`
+6. `docs/score-integrity.md`
+   - replay evidence v3, 공식 로컬 베스트 검증, 레거시 상태, P2P와 서버 권위의 보안 경계
+7. `docs/config.md`
    - 실제 설정/프로필/키맵 구조
-7. `docs/localization.md`
+8. `docs/localization.md`
    - 현재 영어/한국어 UI 구조와 이후 다국어 확장 시 건드릴 파일/경계 정리
-8. `docs/menu.md`
+9. `docs/menu.md`
    - 메뉴/상태머신/곡 선택 흐름
-9. `docs/core-loop.md`
+10. `docs/core-loop.md`
    - 플레이 루프와 데이터 흐름
-10. `docs/roadmap.md`
+11. `docs/roadmap.md`
    - 중장기 작업 방향
-11. `docs/developer-extension-guide.md`
+12. `docs/developer-extension-guide.md`
    - 새 mode/mod, UI row, runtime migration, replay/result, 테스트를 어디에 추가해야 하는지 설명하는 개발자 문서
 
 ## Which Docs Are Source Of Truth

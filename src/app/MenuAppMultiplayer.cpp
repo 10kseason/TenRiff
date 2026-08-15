@@ -1250,7 +1250,7 @@ bool MenuApp::wait_for_multiplayer_result() {
             std::string stage =
                 ui_text("Waiting for all player results", "상대 결과 대기 중");
             if (peer.has_remote_score) {
-                stage += " / " + ui_text("Score ", "점수 ") +
+                stage += " / " + ui_text("Claimed Score ", "미검증 점수 ") +
                          std::to_string(peer.latest_remote_score.score);
             }
             update_gameplay_loading_state(100, stage);

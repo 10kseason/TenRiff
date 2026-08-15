@@ -2,7 +2,18 @@
 
 TenRiff의 사용자/배포 관점에서 의미 있는 변경만 간단히 기록합니다.
 
-## [Unreleased]
+## [1.4.3-test] - 2026-08-15
+
+이 빌드는 사운드 오프셋, 단일 색상 스킨, replay evidence v3와 로컬 스코어
+재검증을 먼저 검증하기 위한 GitHub 테스트 프리릴리스입니다.
+
+### Added
+
+- Audio Settings와 Calibration Wizard에 `-500..+500ms` 사운드 오프셋을 추가했습니다. 차트 BGM과 자동재생 키음만 1ms 단위로 앞뒤 이동하며 판정, 노트/BGA 타이밍, 입력 연동 키음은 그대로 유지합니다.
+- Skin Settings에 `Single Color`를 추가했습니다. `Off` 또는 팔레트 색상을 고르면 모든 키 모드와 스크래치 레인을 한 색으로 표시하며, `Off`로 돌아갈 때 기존 레인별 색상 구성을 복원합니다.
+- 새 replay/result에 evidence format v3를 추가했습니다. 차트 SHA-256, 고정 ruleset ID, replay 파일 SHA-256을 결합하고 headless 게임 엔진으로 입력 trace를 재실행해 점수·판정·게이지·clear를 다시 계산합니다. 저장된 `final_score`나 판정 수를 편집해도 공식 로컬 베스트에는 재계산 결과만 사용합니다.
+- 기존 replay, custom judge/gauge ruleset, Autoplay, Practice, 노트 수 변경 기록은 삭제하지 않고 Records에 `unverified` 상태로 보존하되 공식 베스트에서 제외합니다. v3 trace는 lane/sample/state 순서와 크기 상한을 엄격히 검사합니다.
+- 직접 P2P 점수 claim에 native 점수·판정 수·combo·gauge 범위 검사를 추가하고 Result에서 `UNVERIFIED CLAIM`으로 표시합니다. 이는 비정상 패킷 방어이며 replay proof나 서버 권위 안티치트는 아닙니다.
 
 ## [1.4.2] - 2026-08-12
 

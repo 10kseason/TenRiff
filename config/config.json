@@ -107,6 +107,7 @@
     "hold_body_width_scale": 0.6,
     "note_height_scale": 1.8,
     "lane_divider_width_scale": 1.0,
+    "single_color": "off",
     "lane_colors": {
       "4k": ["ice", "azure", "azure", "ice"],
       "5k": ["ice", "azure", "gold", "azure", "ice"],
@@ -120,6 +121,7 @@
   },
   "offsets": {
     "input": 0.0,
-    "visual": 0.0
+    "visual": 0.0,
+    "sound": 0.0
   }
 }

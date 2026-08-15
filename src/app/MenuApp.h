@@ -440,6 +440,7 @@ private:
     [[nodiscard]] std::string selected_song_path() const;
     struct BestResultRecord {
         bool has_value = false;
+        bool replay_verified = false;
         std::string rank = "--";
         int64_t best_score = 0;
         int64_t detail_score = 0;
@@ -477,6 +478,9 @@ private:
         bool pause_used = false;
         bool autoplay_enabled = false;
         bool practice_no_fail_enabled = false;
+        std::string verification_status = "legacy-unverified";
+        std::string verification_detail;
+        bool replay_claims_match = false;
         int64_t raw_score = 0;
         int64_t score = 0;
         int64_t detail_score = 0;

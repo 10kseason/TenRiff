@@ -1106,9 +1106,10 @@ void MenuApp::populate_result_render_data(render::MenuRenderData& render, const 
             render.result.peer_good = peer_score.good;
             render.result.peer_bad = peer_score.bad;
             render.result.peer_poor = peer_score.poor;
-            render.result.peer_status = peer_score.aborted
-                                            ? "ABORTED"
-                                            : (peer_score.game_over ? "GAME OVER" : "FINISHED");
+            render.result.peer_status = "UNVERIFIED CLAIM / ";
+            render.result.peer_status += peer_score.aborted
+                                             ? "ABORTED"
+                                             : (peer_score.game_over ? "GAME OVER" : "FINISHED");
             render.result.peer_outcome =
                 comparison.outcome == MultiplayerScoreOutcome::Win
                     ? "WIN"
@@ -1827,22 +1828,22 @@ bool MenuApp::is_song_select_repeat_key(uint32_t keycode) const {
         case Screen::SessionMix:
             return settings_cursor_ == 1;
         case Screen::SettingsAudio:
-            return settings_cursor_ >= 3 && settings_cursor_ <= 5;
+            return settings_cursor_ >= 3 && settings_cursor_ <= 6;
         case Screen::SettingsSkins: {
             const int shift =
                 config::normalize_skin_source_token(config_.skin.source) == "lr2" ? 1 : 0;
             const int row = settings_cursor_ - shift;
             return settings_cursor_ == 4 + shift || settings_cursor_ == 5 + shift ||
                    settings_cursor_ == 6 + shift || settings_cursor_ == 7 + shift ||
-                   settings_cursor_ == 9 + shift ||
-                   (row >= 15 && row <= 19) ||
-                   (row >= 21 && row <= 32) ||
-                   (row >= 34 && row <= 36);
+                   settings_cursor_ == 8 + shift || settings_cursor_ == 10 + shift ||
+                   (row >= 16 && row <= 20) ||
+                   (row >= 22 && row <= 33) ||
+                   (row >= 35 && row <= 37);
         }
         case Screen::SettingsInput:
             return settings_cursor_ == 1 || settings_cursor_ == 2;
         case Screen::SettingsCalibration:
-            return settings_cursor_ == 1 || settings_cursor_ == 2;
+            return settings_cursor_ >= 1 && settings_cursor_ <= 3;
         case Screen::ModeSelect:
             return settings_cursor_ == 7 || settings_cursor_ == 13 ||
                    settings_cursor_ == 15 || settings_cursor_ == 16;
@@ -1952,8 +1953,8 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
             score.bad = hud.counts.bd;
             score.poor = hud.counts.pr;
             score.gauge_milli = static_cast<int>(std::llround(std::clamp(hud.gauge, 0.0, 100.0) * 1000.0));
-            // Live HUD frames must never become FinalScore. The authoritative
-            // final packet is emitted once after GameSession shutdown/export.
+            // Live HUD frames must never become FinalScore. The final packet is
+            // still a peer claim until a future replay-proof protocol verifies it.
             score.finished = false;
             score.game_over = hud.game_over;
             score.aborted = false;

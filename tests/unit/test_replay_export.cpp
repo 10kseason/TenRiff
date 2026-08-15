@@ -2,10 +2,17 @@
 
 #include <filesystem>
 #include <fstream>
+#include <limits>
 #include <sstream>
 
 #include "app/MenuRecordUtils.h"
+#include "app/ChartFileHash.h"
+#include "app/ChartLoader.h"
+#include "app/ModeManager.h"
+#include "app/ReplayVerifier.h"
 #include "config/SimpleJson.h"
+#include "gameplay/GameplayChart.h"
+#include "gameplay/GameplayEngine.h"
 #include "gameplay/Replay.h"
 
 using tenriff::config::parse_json;
@@ -59,6 +66,8 @@ TEST_CASE("replay export writes JSON with trace events") {
     ReplayFile replay;
     replay.chart_path = "Songs/test.bms";
     replay.chart_format = "bms";
+    replay.chart_sha256 = std::string(64, 'a');
+    replay.ruleset_id = std::string(tenriff::app::kCanonicalReplayRulesetId);
     replay.created_utc = "20250101_000000Z";
     replay.sample_rate = 48000;
     replay.rate = 1.0;
@@ -113,6 +122,10 @@ TEST_CASE("replay export writes JSON with trace events") {
     REQUIRE(root != nullptr);
     CHECK(root->find("version")->second.as_number() ==
           doctest::Approx(static_cast<double>(tenriff::gameplay::kNativeScoreVersion)));
+    CHECK(root->find("replay_format_version")->second.as_number() ==
+          doctest::Approx(static_cast<double>(tenriff::gameplay::kReplayFormatVersion)));
+    CHECK(root->find("chart_sha256")->second.as_string() == replay.chart_sha256);
+    CHECK(root->find("ruleset_id")->second.as_string() == replay.ruleset_id);
 
     auto trace_it = root->find("trace");
     REQUIRE(trace_it != root->end());
@@ -194,9 +207,191 @@ TEST_CASE("replay export writes JSON with trace events") {
     CHECK(loaded_replay.replay->trace.events[0].lane == 1);
     CHECK(loaded_replay.replay->trace.events[0].state == InputState::Pressed);
     CHECK(loaded_replay.replay->trace.events[1].state == InputState::Released);
+    CHECK(loaded_replay.replay->chart_sha256 == replay.chart_sha256);
+    CHECK(loaded_replay.replay->ruleset_id == replay.ruleset_id);
 
     std::error_code ec;
     std::filesystem::remove(path, ec);
+}
+
+TEST_CASE("replay v3 strict validation rejects ambiguous or unbounded traces") {
+    ReplayFile replay;
+    replay.chart_sha256 = std::string(64, 'b');
+    replay.ruleset_id = std::string(tenriff::app::kCanonicalReplayRulesetId);
+    replay.sample_rate = 48000;
+    replay.rate = 1.0;
+    replay.trace.sample_rate = 48000;
+    replay.trace.rate = 1.0;
+    replay.trace.lane_count = 4;
+    replay.trace.duration_samples = 480000;
+    replay.trace.events = {
+        ReplayEvent{1, InputState::Pressed, 100},
+        ReplayEvent{1, InputState::Released, 200},
+    };
+    CHECK(tenriff::gameplay::validate_replay_evidence(replay).success());
+
+    ReplayFile invalid_lane = replay;
+    invalid_lane.trace.events[1].lane = 5;
+    CHECK_FALSE(tenriff::gameplay::validate_replay_evidence(invalid_lane).success());
+
+    ReplayFile decreasing_sample = replay;
+    decreasing_sample.trace.events[1].sample = 99;
+    CHECK_FALSE(tenriff::gameplay::validate_replay_evidence(decreasing_sample).success());
+
+    ReplayFile repeated_state = replay;
+    repeated_state.trace.events[1].state = InputState::Pressed;
+    CHECK_FALSE(tenriff::gameplay::validate_replay_evidence(repeated_state).success());
+
+    ReplayFile non_finite = replay;
+    non_finite.score_multiplier = std::numeric_limits<double>::infinity();
+    CHECK_FALSE(tenriff::gameplay::validate_replay_evidence(non_finite).success());
+}
+
+TEST_CASE("deterministic replay verification ignores edited score claims") {
+    tenriff::gameplay::GameplayChart chart;
+    chart.lane_count = 1;
+    chart.duration_samples = 2000;
+    chart.notes.push_back(tenriff::gameplay::NoteEvent{1, 1000});
+
+    ReplayFile replay;
+    replay.chart_sha256 = std::string(64, 'c');
+    replay.ruleset_id = std::string(tenriff::app::kCanonicalReplayRulesetId);
+    replay.sample_rate = 48000;
+    replay.rate = 1.0;
+    replay.mode.key_mode = "auto";
+    replay.mode.key_conversion_algorithm = "krrcream";
+    replay.mode.random = "off";
+    replay.mode.random_seed = 0;
+    replay.mode.gauge = "normal";
+    replay.trace.sample_rate = 48000;
+    replay.trace.rate = 1.0;
+    replay.trace.lane_count = 1;
+    replay.trace.duration_samples = 146000;
+    replay.trace.events = {
+        ReplayEvent{1, InputState::Pressed, 145000},
+        ReplayEvent{1, InputState::Released, 145010},
+    };
+
+    // These are deliberately forged. Eligibility uses the recomputed engine
+    // result and never promotes the stored score/stat claims.
+    replay.final_score = 1;
+    replay.stats.raw_score = 1;
+    replay.stats.total_notes = 999;
+
+    const auto verified = tenriff::app::verify_replay_against_chart(
+        replay, chart, tenriff::app::ChartFormat::Bms, 120.0);
+    CHECK(verified.verified());
+    CHECK(verified.official_eligible);
+    CHECK_FALSE(verified.claims_match);
+    CHECK(verified.stats.counts.pg == 1);
+    CHECK(verified.stats.total_notes == 1);
+    CHECK(verified.final_score == tenriff::gameplay::kNativeScoreMaximum);
+
+    ReplayFile aborted = replay;
+    aborted.aborted = true;
+    const auto aborted_result = tenriff::app::verify_replay_against_chart(
+        aborted, chart, tenriff::app::ChartFormat::Bms, 120.0);
+    CHECK(aborted_result.verified());
+    CHECK_FALSE(aborted_result.official_eligible);
+    CHECK(aborted_result.clear_status == "ABORTED");
+
+    ReplayFile custom_ruleset = replay;
+    custom_ruleset.ruleset_id = "custom";
+    const auto custom_result = tenriff::app::verify_replay_against_chart(
+        custom_ruleset, chart, tenriff::app::ChartFormat::Bms, 120.0);
+    CHECK(custom_result.status == tenriff::app::ReplayVerificationStatus::CustomRuleset);
+    CHECK_FALSE(custom_result.official_eligible);
+}
+
+TEST_CASE("file replay verification binds the replay and exact chart SHA-256") {
+    const std::filesystem::path chart_path = "replay_verifier_chart.bms";
+    const std::filesystem::path replay_path = "replay_verifier_trace.json";
+    write_file(chart_path,
+               "#PLAYER 1\n"
+               "#TITLE Replay Verifier\n"
+               "#BPM 120\n"
+               "#PLAYLEVEL 1\n"
+               "#00111:01\n");
+
+    tenriff::app::ChartLoader loader;
+    const auto loaded = loader.load(chart_path.string(), 48000, 1.0, "ignore", 0);
+    REQUIRE(loaded.success());
+    tenriff::config::ModeConfig mode;
+    mode.key_mode = "auto";
+    mode.random = "off";
+    mode.random_seed = 0;
+    const auto managed = tenriff::app::manage_modes(
+        loaded.chart, loaded.format, mode, tenriff::config::JudgeConfig{}, 1.0,
+        loaded.base_bpm, 48000);
+
+    auto played_chart = managed.chart;
+    tenriff::gameplay::offset_gameplay_chart_samples(played_chart, 144000);
+    tenriff::gameplay::GameplayConfig gameplay_config;
+    gameplay_config.sample_rate = 48000;
+    gameplay_config.rate = 1.0;
+    gameplay_config.judge = managed.judge;
+    gameplay_config.gauge_shift_enabled = true;
+    gameplay_config.initial_gauge = tenriff::game::GaugeType::Normal;
+    tenriff::gameplay::GameplayEngine engine(played_chart, gameplay_config);
+    for (const auto& note : played_chart.notes) {
+        if (note.start_sample > 0) {
+            engine.advance(note.start_sample - 1);
+        }
+        (void)engine.handle_input(note.lane, InputState::Pressed, note.start_sample);
+        (void)engine.handle_input(note.lane, InputState::Released, note.start_sample + 1);
+    }
+    engine.advance(played_chart.duration_samples + 240000);
+    REQUIRE(engine.is_finished());
+
+    std::string hash_error;
+    const auto chart_hash = tenriff::app::hash_chart_file(chart_path, &hash_error);
+    REQUIRE(chart_hash.valid());
+    ReplayFile replay;
+    replay.chart_path = chart_path.string();
+    replay.chart_format = "bms";
+    replay.chart_sha256 = chart_hash.sha256;
+    replay.ruleset_id = std::string(tenriff::app::kCanonicalReplayRulesetId);
+    replay.sample_rate = 48000;
+    replay.rate = 1.0;
+    replay.mode.key_mode = "auto";
+    replay.mode.key_conversion_algorithm = "krrcream";
+    replay.mode.key_conversion_nk2_preset = "native";
+    replay.mode.random = "off";
+    replay.mode.random_seed = 0;
+    replay.mode.gauge = "normal";
+    replay.trace = engine.replay();
+    replay.stats = engine.stats();
+    replay.rate_multiplier = managed.rate_multiplier;
+    replay.score_multiplier = managed.final_multiplier;
+    replay.final_score = tenriff::gameplay::scale_native_score(
+        replay.stats.raw_score, replay.score_multiplier);
+    REQUIRE(save_replay_json(replay_path.string(), replay).success());
+
+    const auto original_replay_hash = tenriff::app::hash_chart_file(replay_path, &hash_error);
+    REQUIRE(original_replay_hash.valid());
+    const auto verified = tenriff::app::verify_replay_file(
+        replay_path, chart_path, original_replay_hash.sha256);
+    CHECK(verified.verified());
+    CHECK(verified.official_eligible);
+    CHECK(verified.claims_match);
+
+    replay.final_score = 1;
+    replay.stats.raw_score = 1;
+    REQUIRE(save_replay_json(replay_path.string(), replay).success());
+    const auto edited_replay_hash = tenriff::app::hash_chart_file(replay_path, &hash_error);
+    REQUIRE(edited_replay_hash.valid());
+    const auto stale_binding = tenriff::app::verify_replay_file(
+        replay_path, chart_path, original_replay_hash.sha256);
+    CHECK_FALSE(stale_binding.verified());
+    const auto recomputed = tenriff::app::verify_replay_file(
+        replay_path, chart_path, edited_replay_hash.sha256);
+    CHECK(recomputed.verified());
+    CHECK_FALSE(recomputed.claims_match);
+    CHECK(recomputed.final_score == verified.final_score);
+
+    std::error_code ec;
+    std::filesystem::remove(chart_path, ec);
+    std::filesystem::remove(replay_path, ec);
 }
 
 TEST_CASE("result export writes JSON with replay reference") {
@@ -204,8 +399,11 @@ TEST_CASE("result export writes JSON with replay reference") {
     result.player_name = "Luna Pilot";
     result.chart_path = "Songs/test.bms";
     result.chart_format = "bms";
+    result.chart_sha256 = std::string(64, 'd');
+    result.ruleset_id = std::string(tenriff::app::kCanonicalReplayRulesetId);
     result.created_utc = "20250101_000000Z";
     result.replay_path = "profiles/default/replays/replay_20250101_000000Z.json";
+    result.replay_sha256 = std::string(64, 'e');
     result.clear_status = "CLEAR";
     result.final_gauge = "normal";
     result.sample_rate = 48000;
@@ -253,6 +451,9 @@ TEST_CASE("result export writes JSON with replay reference") {
     auto replay_path_it = root->find("replay_path");
     REQUIRE(replay_path_it != root->end());
     CHECK(replay_path_it->second.as_string() == result.replay_path);
+    CHECK(root->find("chart_sha256")->second.as_string() == result.chart_sha256);
+    CHECK(root->find("ruleset_id")->second.as_string() == result.ruleset_id);
+    CHECK(root->find("replay_sha256")->second.as_string() == result.replay_sha256);
     CHECK(root->find("key_conversion_note_add_mode") == root->end());
 
     auto clear_status_it = root->find("clear_status");
@@ -274,6 +475,10 @@ TEST_CASE("result export writes JSON with replay reference") {
     auto parsed_result = tenriff::app::menu_records::parse_result_file(path, nullptr);
     REQUIRE(parsed_result.has_value());
     CHECK(parsed_result->player_name == "Luna Pilot");
+    CHECK(parsed_result->replay_format_version == tenriff::gameplay::kReplayFormatVersion);
+    CHECK(parsed_result->chart_sha256 == result.chart_sha256);
+    CHECK(parsed_result->ruleset_id == result.ruleset_id);
+    CHECK(parsed_result->replay_sha256 == result.replay_sha256);
     CHECK(parsed_result->mods.size() == 1u);
     CHECK(parsed_result->mods[0] == "ln_mix_30");
     CHECK(parsed_result->key_conversion_note_add_mode.empty());

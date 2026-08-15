@@ -1,10 +1,10 @@
-TenRiff source package notes (`1.4.2`)
+TenRiff source package notes (`1.4.3-test`)
 
 - This folder is a curated source-only staging area for public/open-source distribution.
 - It intentionally excludes local build trees, packaged binaries, caches, user profiles, logs, and private working notes.
 - Internal agent workflow files such as `AGENTS.md` are not part of the public source bundle.
 - The included `SOURCE_PACKAGE_SCOPE.txt` file defines the exact include/exclude rules used for the staged bundle.
-- The current source line is `1.4.2`; it completes visual BPM Change handling for base `#BPM`, channel `03`, and `#BPMxx`/channel `08` while preserving starting-BPM Hi-Speed, playback-rate visual neutrality, `#SCROLL`, stops, and reverse motion.
+- The current source line is `1.4.3-test`; it adds chart-audio offset calibration, a single-color skin override, replay evidence v3 with deterministic local score recomputation, and explicit unverified P2P score claims. The previous `1.4.2` visual BPM Change behavior remains included.
 - It supports BMS-family charts, 4K through 14K key modes, and native/LR2/TenRiff skins, keeps MPG/MPEG video BGA decoding with an FFmpeg fallback, and exposes an External ONNX Upscaler that remains off until the user enables it and acknowledges the high-spec warning.
 - The repository license is MIT. Keep the top-level `LICENSE` file with any redistributed source bundle.
 - The source bundle includes the code/docs/dependencies needed for a standalone Windows configure/build, but it does not ship the local `10k-calc/` reference checkout or `external/llama.cpp/`.

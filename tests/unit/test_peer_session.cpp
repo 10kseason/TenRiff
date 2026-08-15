@@ -171,13 +171,14 @@ TEST_CASE("peer session localhost round reaches final score and clean shutdown")
     CHECK(begin_delay_ms == 750);
 
     PeerScore live;
-    live.score = 111111;
+    live.score = 7777;
     live.current_sample = 48000;
     live.combo = 120;
+    live.max_combo = 120;
     REQUIRE(joiner.publish_score(live));
 
     PeerScore final = live;
-    final.score = 987654;
+    final.score = 9876;
     final.max_combo = 432;
     final.perfect = 400;
     final.great = 20;
@@ -191,7 +192,7 @@ TEST_CASE("peer session localhost round reaches final score and clean shutdown")
     CHECK(host.snapshot().latest_remote_score.max_combo == final.max_combo);
 
     PeerScore host_final = final;
-    host_final.score = 1'012'345;
+    host_final.score = 9999;
     host_final.max_combo = 500;
     REQUIRE(host.publish_score(host_final, true));
     REQUIRE(wait_until([&]() {

@@ -22,6 +22,20 @@ inline int64_t chart_audio_playback_duration_frames(int64_t source_frames, doubl
     return (std::max)(int64_t{1}, static_cast<int64_t>(std::ceil(scaled_frames)));
 }
 
+// The sound offset is deliberately separate from chart, judgement, and visual
+// timing. Positive values delay scheduled BGM/autoplay audio; negative values
+// advance it and let the mixer begin partway through a clip when needed.
+inline int64_t chart_audio_start_sample_with_offset(int64_t chart_start_sample,
+                                                    double sound_offset_ms,
+                                                    int sample_rate) {
+    if (sample_rate <= 0 || !std::isfinite(sound_offset_ms)) {
+        return chart_start_sample;
+    }
+    const int64_t offset_samples = static_cast<int64_t>(std::llround(
+        sound_offset_ms * static_cast<double>(sample_rate) / 1000.0));
+    return chart_start_sample + offset_samples;
+}
+
 // Judgement keeps the original input timestamp, but a sound triggered by that
 // input cannot be written into an audio buffer that has already been submitted.
 // Pin only the audible trigger to the current buffer so short keysounds are not

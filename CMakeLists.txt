@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(TenRiff VERSION 1.4.2 LANGUAGES C CXX)
+project(TenRiff VERSION 1.4.3 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -122,6 +122,7 @@ add_library(tenriff_core
     src/app/ModeManager.cpp
     src/app/ModeResolver.cpp
     src/app/PersistedRuntimeConfig.cpp
+    src/app/ReplayVerifier.cpp
     src/app/RuntimeConfigMigration.cpp
     src/app/SongIndex.cpp
     src/app/SongIndexerThread.cpp

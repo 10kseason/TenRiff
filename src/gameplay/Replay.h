@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 #include <optional>
 #include <string>
@@ -9,6 +10,11 @@
 #include "input/InputEvent.h"
 
 namespace tenriff::gameplay {
+
+// Replay evidence evolves independently from the native score formula. Keeping
+// the versions separate lets older scores retain their normalization semantics.
+inline constexpr int kReplayFormatVersion = 3;
+inline constexpr std::size_t kReplayMaxEventCount = 2'000'000;
 
 struct ReplayEvent {
     int lane = 0;
@@ -40,8 +46,11 @@ struct ReplayModeSettings {
 
 struct ReplayFile {
     int version = kNativeScoreVersion;
+    int replay_format_version = kReplayFormatVersion;
     std::string chart_path;
     std::string chart_format;
+    std::string chart_sha256;
+    std::string ruleset_id;
     std::string created_utc;
 
     int sample_rate = 0;
@@ -52,6 +61,7 @@ struct ReplayFile {
     double score_multiplier = 1.0;
     int64_t final_score = 0;
     bool pause_used = false;
+    bool aborted = false;
 
     ReplayModeSettings mode;
     ReplayTrace trace;
@@ -60,11 +70,15 @@ struct ReplayFile {
 
 struct ResultFile {
     int version = kNativeScoreVersion;
+    int replay_format_version = kReplayFormatVersion;
     std::string chart_path;
     std::string chart_format;
+    std::string chart_sha256;
+    std::string ruleset_id;
     std::string created_utc;
     std::string player_name;
     std::string replay_path;
+    std::string replay_sha256;
     // Legacy read-only metadata; current exports leave this field empty.
     std::string key_conversion_note_add_mode;
     std::string clear_status;
@@ -78,6 +92,7 @@ struct ResultFile {
     double score_multiplier = 1.0;
     int64_t final_score = 0;
     bool pause_used = false;
+    bool aborted = false;
     bool autoplay_enabled = false;
     bool practice_no_fail_enabled = false;
     bool one_miss_fail_enabled = false;
@@ -100,8 +115,15 @@ struct ReplayLoadResult {
     [[nodiscard]] bool success() const { return error.empty() && replay.has_value(); }
 };
 
+struct ReplayValidationResult {
+    std::string error;
+
+    [[nodiscard]] bool success() const { return error.empty(); }
+};
+
 [[nodiscard]] ExportResult save_replay_json(const std::string& path, const ReplayFile& replay, int indent = 2);
 [[nodiscard]] ExportResult save_result_json(const std::string& path, const ResultFile& result, int indent = 2);
 [[nodiscard]] ReplayLoadResult load_replay_json(const std::string& path);
+[[nodiscard]] ReplayValidationResult validate_replay_evidence(const ReplayFile& replay);
 
 }  // namespace tenriff::gameplay

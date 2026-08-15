@@ -380,11 +380,15 @@ std::optional<ParsedResultRecord> parse_result_file(const std::filesystem::path&
 
     ParsedResultRecord out;
     const int score_version = read_json_int(*root, "version", 1);
+    out.replay_format_version = read_json_int(*root, "replay_format_version", 0);
     out.chart_path = read_json_string(*root, "chart_path");
     out.chart_format = read_json_string(*root, "chart_format");
+    out.chart_sha256 = read_json_string(*root, "chart_sha256");
+    out.ruleset_id = read_json_string(*root, "ruleset_id");
     out.created_utc = read_json_string(*root, "created_utc");
     out.player_name = read_json_string(*root, "player_name");
     out.replay_path = read_json_string(*root, "replay_path");
+    out.replay_sha256 = read_json_string(*root, "replay_sha256");
     out.key_conversion_note_add_mode =
         read_json_string(*root, "key_conversion_note_add_mode");
     out.clear_status = read_json_string(*root, "clear_status");
@@ -469,6 +473,7 @@ std::optional<ParsedResultRecord> parse_result_file(const std::filesystem::path&
     out.rate_multiplier = read_json_number(*root, "rate_multiplier", 1.0);
     out.score_multiplier = read_json_number(*root, "score_multiplier", 1.0);
     out.pause_used = read_json_bool(*root, "pause_used", false);
+    out.aborted = read_json_bool(*root, "aborted", false);
     out.autoplay_enabled = read_json_bool(*root, "autoplay_enabled", clear_status_is_autoplay(out.clear_status));
     out.practice_no_fail_enabled =
         read_json_bool(*root, "practice_no_fail_enabled", clear_status_is_practice(out.clear_status));
