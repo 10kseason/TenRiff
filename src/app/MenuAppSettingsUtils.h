@@ -287,13 +287,19 @@ inline std::string normalize_key_conversion_algorithm(std::string value) {
         value == "keyweaver_nk2") {
         return "nk2";
     }
+    if (value == "nk3" || value == "keyweaver_nk3" || value == "vcrr") {
+        return "nk3";
+    }
     return "krrcream";
 }
 
 inline std::string cycle_key_conversion_algorithm(std::string_view current) {
-    return normalize_key_conversion_algorithm(std::string(current)) == "nk2"
-               ? "krrcream"
-               : "nk2";
+    const std::string normalized =
+        normalize_key_conversion_algorithm(std::string(current));
+    if (normalized == "krrcream") {
+        return "nk2";
+    }
+    return normalized == "nk2" ? "nk3" : "krrcream";
 }
 
 inline std::string normalize_key_conversion_nk2_preset(std::string value) {

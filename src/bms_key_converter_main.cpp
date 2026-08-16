@@ -1,10 +1,16 @@
 #include <cstdlib>
+#include <exception>
 #include <iostream>
 #include <string>
 #include <string_view>
 #include <vector>
 
 #include "app/BmsKeyConverter.h"
+
+#ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#endif
 
 namespace {
 
@@ -72,18 +78,19 @@ void print_usage() {
     std::cout << ">]\n"
         << "                         [--max-keys <n>] [--min-keys <n>]\n"
         << "                         [--transform-speed-slot <0-8>] [--seed <u32>]\n"
-        << "                         [--sample-rate <hz|auto>] [--algorithm <krrcream|nk2>]\n"
+        << "                         [--sample-rate <hz|auto>] [--algorithm <krrcream|nk2|nk3>]\n"
         << "Preset applies the original krrcream Toolkit target/max/min/speed defaults.\n"
         << "Preset 10k uses target=10, max=10, min=1, speed slot 5 (2 bars), and fixed seed 0.\n"
         << "Sample rate defaults to auto and is detected from referenced BMS keysounds before falling back to 44100 Hz.\n"
-        << "Algorithm defaults to krrcream; nk2 uses its deterministic native 50/50 profile.\n"
-        << "Krrcream tuning flags are accepted but ignored when --algorithm nk2 is selected.\n"
+        << "Algorithm defaults to krrcream; nk2 uses its native profile and nk3 uses P64 hybrid ONNX plus host beam safety.\n"
+        << "NK3 defaults to strict OpenVINO GPU; set TENRIFF_NK3_DEVICE=CPU for strict CPU execution. NPU and automatic fallback are unsupported.\n"
+        << "Krrcream tuning flags are accepted but ignored when --algorithm nk2 or nk3 is selected.\n"
         << "Explicit --target-keys/--max-keys/--min-keys/--transform-speed-slot override preset values.\n";
 }
 
 }  // namespace
 
-int main(int argc, char** argv) {
+int run_main(int argc, const char* const* argv) {
     tenriff::app::BmsKeyConverterOptions options;
     std::string preset_token;
     bool target_keys_specified = false;
@@ -193,7 +200,16 @@ int main(int argc, char** argv) {
         }
     }
 
-    const auto result = tenriff::app::convert_bms_chart_file(options);
+    tenriff::app::BmsKeyConverterResult result;
+    try {
+        result = tenriff::app::convert_bms_chart_file(options);
+    } catch (const std::exception& error) {
+        std::cerr << "[error] BMS conversion failed: " << error.what() << '\n';
+        return 1;
+    } catch (...) {
+        std::cerr << "[error] BMS conversion failed with an unknown exception.\n";
+        return 1;
+    }
     for (const auto& warning : result.warnings) {
         std::cerr << "[warning] " << warning << '\n';
     }
@@ -207,3 +223,47 @@ int main(int argc, char** argv) {
               << ", sample_rate=" << result.sample_rate << (result.sample_rate_auto ? " (auto)" : "") << '\n';
     return 0;
 }
+
+#ifdef _WIN32
+namespace {
+
+std::string utf8_from_wide(const wchar_t* value) {
+    if (!value || *value == L'\0') {
+        return {};
+    }
+    const int required = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, value, -1,
+                                             nullptr, 0, nullptr, nullptr);
+    if (required <= 1) {
+        return {};
+    }
+    std::string converted(static_cast<std::size_t>(required), '\0');
+    const int written = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, value, -1,
+                                            converted.data(), static_cast<int>(converted.size()),
+                                            nullptr, nullptr);
+    if (written != required) {
+        return {};
+    }
+    converted.resize(static_cast<std::size_t>(written - 1));
+    return converted;
+}
+
+}  // namespace
+
+int wmain(int argc, wchar_t** argv) {
+    std::vector<std::string> utf8_args;
+    utf8_args.reserve(static_cast<std::size_t>(argc));
+    for (int i = 0; i < argc; ++i) {
+        utf8_args.push_back(utf8_from_wide(argv[i]));
+    }
+    std::vector<const char*> pointers;
+    pointers.reserve(utf8_args.size());
+    for (const auto& arg : utf8_args) {
+        pointers.push_back(arg.c_str());
+    }
+    return run_main(argc, pointers.data());
+}
+#else
+int main(int argc, char** argv) {
+    return run_main(argc, argv);
+}
+#endif

@@ -692,11 +692,19 @@ std::optional<gameplay::KeyModeConversionAlgorithm> parse_conversion_algorithm(s
     if (normalized == "nk2" || normalized == "nativek2") {
         return gameplay::KeyModeConversionAlgorithm::NK2;
     }
+    if (normalized == "nk3" || normalized == "keyweavernk3" ||
+        normalized == "vcrr") {
+        return gameplay::KeyModeConversionAlgorithm::NK3;
+    }
     return std::nullopt;
 }
 
 std::string conversion_algorithm_name(gameplay::KeyModeConversionAlgorithm algorithm) {
-    return algorithm == gameplay::KeyModeConversionAlgorithm::NK2 ? "nK2" : "krrcream";
+    if (algorithm == gameplay::KeyModeConversionAlgorithm::NK3) {
+        return "NK3";
+    }
+    return algorithm == gameplay::KeyModeConversionAlgorithm::NK2 ? "nK2"
+                                                                   : "krrcream";
 }
 
 LayoutDefinition resolve_layout_definition(int lane_count) {
@@ -1576,6 +1584,10 @@ BmsKeyConverterResult convert_bms_chart_file(const BmsKeyConverterOptions& optio
     if (*conversion_algorithm == gameplay::KeyModeConversionAlgorithm::NK2) {
         result.warnings.push_back(
             "nK2 uses its native 50/50 profile; Krrcream Max/Min/Speed/Seed tuning is not applied.");
+    } else if (*conversion_algorithm == gameplay::KeyModeConversionAlgorithm::NK3) {
+        result.warnings.push_back(
+            "NK3 uses the P64 hybrid ONNX evaluator and host beam safety solver; "
+            "Krrcream Max/Min/Speed/Seed tuning is not applied.");
     }
     result.warnings.insert(result.warnings.end(), converted.warnings.begin(), converted.warnings.end());
 

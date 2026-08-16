@@ -23,8 +23,20 @@ jobs:
       - name: Check out source
         uses: actions/checkout@v4
 
+      - name: Set up Python for OpenVINO
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install OpenVINO runtime
+        shell: pwsh
+        run: |
+          python -m pip install --disable-pip-version-check openvino==2026.2.1
+          $openvinoCmake = python -c "import pathlib, openvino; print(pathlib.Path(openvino.__file__).parent / 'cmake')"
+          "TENRIFF_CI_OPENVINO_DIR=$openvinoCmake" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
       - name: Configure ASan preset
-        run: cmake --preset asan
+        run: cmake --preset asan -DOpenVINO_DIR="$env:TENRIFF_CI_OPENVINO_DIR"
 
       - name: Build unit tests
         run: cmake --build --preset asan
@@ -32,4 +44,5 @@ jobs:
       - name: Run unit tests under ASan
         env:
           ASAN_OPTIONS: halt_on_error=1:abort_on_error=1
+          TENRIFF_NK3_DEVICE: CPU
         run: ctest --preset asan

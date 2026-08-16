@@ -16,6 +16,16 @@ Bundled components
    Copyright: krrcream and contributors
    License: Apache License 2.0
 
+3. OpenVINO 2026.2.1 runtime (Windows binary release only)
+   Upstream: <https://github.com/openvinotoolkit/openvino>
+   Copyright: Intel Corporation and contributors
+   License: Apache License 2.0 and bundled third-party terms
+   Notices: `third_party/openvino-2026.2.1/`
+
+TenRiff source code links OpenVINO only when `TENRIFF_ENABLE_NK3_ONNX` is enabled.
+Windows 1.4.4 binary packages bundle the runtime DLLs required by NK3 together
+with the upstream license and runtime/oneDNN/oneTBB third-party-program notices.
+
 TenRiff's key-mode converter contains an adapted C++ port of the N2NC keymode-conversion logic from
 krrcream's Toolkit. The implementation was integrated and modified for TenRiff's `GameplayChart`
 runtime model and menu/gameplay mode-application flow.

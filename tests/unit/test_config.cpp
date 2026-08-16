@@ -1377,6 +1377,17 @@ TEST_CASE("runtime migration normalizes KeyWeaver converter aliases") {
     CHECK(config.mode.key_conversion_algorithm == "nk2");
 }
 
+TEST_CASE("runtime migration preserves KeyWeaver NK3 aliases") {
+    ConfigLoader loader;
+    auto config = loader.defaults();
+    config.mode.key_conversion_algorithm = "keyweaver_nk3";
+
+    const bool changed = tenriff::app::migrate_bms_first_runtime_config(config);
+
+    CHECK(changed);
+    CHECK(config.mode.key_conversion_algorithm == "nk3");
+}
+
 TEST_CASE("runtime migration normalizes nK2 preset aliases and rejects invalid values") {
     ConfigLoader loader;
     auto config = loader.defaults();

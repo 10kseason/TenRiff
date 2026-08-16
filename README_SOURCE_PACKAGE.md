@@ -1,14 +1,15 @@
-TenRiff source package notes (`1.4.3-test`)
+TenRiff source package notes (`1.4.4`)
 
 - This folder is a curated source-only staging area for public/open-source distribution.
 - It intentionally excludes local build trees, packaged binaries, caches, user profiles, logs, and private working notes.
 - Internal agent workflow files such as `AGENTS.md` are not part of the public source bundle.
 - The included `SOURCE_PACKAGE_SCOPE.txt` file defines the exact include/exclude rules used for the staged bundle.
-- The current source line is `1.4.3-test`; it adds chart-audio offset calibration, a single-color skin override, replay evidence v3 with deterministic local score recomputation, and explicit unverified P2P score claims. The previous `1.4.2` visual BPM Change behavior remains included.
+- The current source line is `1.4.4`; it adds NK3 P64 hybrid ONNX key-mode conversion with a host beam safety solver and keeps the `1.4.3-test` replay, audio-offset, and skin changes.
 - It supports BMS-family charts, 4K through 14K key modes, and native/LR2/TenRiff skins, keeps MPG/MPEG video BGA decoding with an FFmpeg fallback, and exposes an External ONNX Upscaler that remains off until the user enables it and acknowledges the high-spec warning.
 - The repository license is MIT. Keep the top-level `LICENSE` file with any redistributed source bundle.
 - The source bundle includes the code/docs/dependencies needed for a standalone Windows configure/build, but it does not ship the local `10k-calc/` reference checkout or `external/llama.cpp/`.
-- The generic integration and compatibility smoke/quantization tools live under `tools/onnx_upscaler/`, but no ONNX model, checkpoint, training data, or model-specific verification metadata is distributed. Users must supply a rights-cleared model matching the documented 960x540 RGB residual x2 contract. FP32/FP16 boundaries and float-boundary INT8 QDQ metadata are detected automatically. Model selection only stores a path; there is no automatic benchmark gate. The default route requests a high-performance DirectX GPU. The experimental low-power option requests WinML `DirectXMinPower`; it is not an explicit or verified NPU selection and TenRiff falls back to the existing DirectX routes when needed.
+- The generic integration and compatibility smoke/quantization tools live under `tools/onnx_upscaler/`, but no BGA upscaler model, checkpoint, training data, or model-specific verification metadata is distributed. The only bundled ONNX is the deterministic 59KB NK3 decision graph under `models/`; it is not a trained model and contains no dataset-derived weights. BGA upscaler users must still supply a rights-cleared model matching the documented 960x540 RGB residual x2 contract.
+- NK3 requires OpenVINO. Windows release packages bundle the OpenVINO 2026.2.1 GPU/CPU runtime set and its original license notices, without the NPU plugin; source builders can provide `OpenVINO_DIR` or disable `TENRIFF_ENABLE_NK3_ONNX`. NK3 defaults to GPU, accepts `TENRIFF_NK3_DEVICE=CPU`, and does not expose NPU or automatic fallback.
 - The staged docs/readmes now track Korean, English, Simplified Chinese, and Japanese entrypoints.
 - Typical Windows build flow inside the extracted source-package root:
 

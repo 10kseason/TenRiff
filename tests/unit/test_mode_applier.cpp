@@ -366,7 +366,7 @@ TEST_CASE("key mode parser accepts none plus 4K through 16K") {
     CHECK(parse_key_mode("16k").value() == KeyMode::Keys16);
 }
 
-TEST_CASE("key conversion algorithm parser accepts Krrcream and KeyWeaver nK2 aliases") {
+TEST_CASE("key conversion algorithm parser accepts Krrcream, nK2, and NK3 aliases") {
     using tenriff::gameplay::KeyModeConversionAlgorithm;
     using tenriff::gameplay::parse_key_mode_conversion_algorithm;
 
@@ -379,6 +379,12 @@ TEST_CASE("key conversion algorithm parser accepts Krrcream and KeyWeaver nK2 al
     REQUIRE(parse_key_mode_conversion_algorithm("nk2").has_value());
     CHECK(parse_key_mode_conversion_algorithm("nk2").value() ==
           KeyModeConversionAlgorithm::NK2);
+    REQUIRE(parse_key_mode_conversion_algorithm("keyweaver_nk3").has_value());
+    CHECK(parse_key_mode_conversion_algorithm("keyweaver_nk3").value() ==
+          KeyModeConversionAlgorithm::NK3);
+    REQUIRE(parse_key_mode_conversion_algorithm("vcrr").has_value());
+    CHECK(parse_key_mode_conversion_algorithm("vcrr").value() ==
+          KeyModeConversionAlgorithm::NK3);
     CHECK_FALSE(parse_key_mode_conversion_algorithm("unknown").has_value());
 }
 
@@ -699,6 +705,52 @@ TEST_CASE("runtime mode settings use the selected KeyWeaver nK2 converter") {
     CHECK(is_time_sorted(result.chart));
     CHECK_FALSE(has_lane_overlap(result.chart));
     CHECK(contains_warning(result.warnings, "nK2 remapped"));
+}
+
+TEST_CASE("runtime mode settings use the selected KeyWeaver NK3 converter") {
+    using namespace tenriff::gameplay;
+
+    const GameplayChart chart = make_representative_chart(4);
+
+    ModeSettings settings;
+    settings.key_mode = KeyMode::Keys8;
+    settings.key_conversion_algorithm = KeyModeConversionAlgorithm::NK3;
+    settings.key_conversion_nk2_preset = Nk2Preset::Remaster;
+
+    ModeApplyContext context;
+    context.base_bpm = 120.0;
+    context.sample_rate = 1000;
+
+    const auto first = apply_mode_settings(chart, settings, context);
+    const auto second = apply_mode_settings(chart, settings, context);
+
+    REQUIRE(first.chart.lane_count == 8);
+    REQUIRE_FALSE(first.chart.notes.empty());
+    CHECK(is_time_sorted(first.chart));
+    CHECK_FALSE(has_lane_overlap(first.chart));
+    CHECK(chart_signature(first.chart) == chart_signature(second.chart));
+    CHECK(contains_warning(first.warnings, "NK3 remapped"));
+}
+
+TEST_CASE("runtime NK3 remasters a chart even when the target key count is unchanged") {
+    using namespace tenriff::gameplay;
+
+    const GameplayChart chart = make_representative_chart(4);
+    ModeSettings settings;
+    settings.key_mode = KeyMode::Keys4;
+    settings.key_conversion_algorithm = KeyModeConversionAlgorithm::NK3;
+
+    ModeApplyContext context;
+    context.base_bpm = 120.0;
+    context.sample_rate = 1000;
+
+    const auto result = apply_mode_settings(chart, settings, context);
+
+    REQUIRE(result.chart.lane_count == 4);
+    REQUIRE_FALSE(result.chart.notes.empty());
+    CHECK(is_time_sorted(result.chart));
+    CHECK_FALSE(has_lane_overlap(result.chart));
+    CHECK(contains_warning(result.warnings, "NK3 remapped 4K to 4K"));
 }
 
 TEST_CASE("nK2 support budgets taper with source density") {
