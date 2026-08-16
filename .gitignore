@@ -29,6 +29,8 @@
 /tools/onnx_upscaler/model/
 /tools/lunasr/
 *.onnx
+!/models/
+!/models/NK3-P64-hybrid.onnx
 *.pt
 *.pth
 *.ckpt

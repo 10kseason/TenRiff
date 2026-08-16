@@ -40,7 +40,7 @@
 
 - `backend` (string)
   - `polling | rawinput`
-  - 현재 `1.4.3-test` 릴리스 라인의 기본값은 `rawinput`
+  - 현재 `1.4.4` 릴리스 라인의 기본값은 `rawinput`
   - `Options -> Input Settings -> Backend` 또는 `Options -> Profile Setup -> Input Backend`에서 프로필별로 RawInput/Polling을 직접 선택 가능
   - 저장값은 런타임 fallback 때문에 자동으로 `polling`으로 덮어쓰지 않음
   - RawInput 시작 실패, 등록 대상 손실, 메시지 창 종료가 확인되면 현재 앱 실행 동안 메뉴와 다음 gameplay 세션 모두 Polling을 유지
@@ -60,7 +60,7 @@
 - `judgement_hz` (int)
   - `1000 | 2000 | 4000 | 8000`
   - 호환성용으로 남아 있는 입력 설정 필드
-  - 현재 `1.4.3-test` runtime은 별도 오디오 판정 서브루프를 이 값으로 구동하지 않음
+  - 현재 `1.4.4` runtime은 별도 오디오 판정 서브루프를 이 값으로 구동하지 않음
   - 기본값은 `4000` (`0.25ms`)
 - `debounce_ms` (double)
   - 실제 Press/Release 전환은 버리지 않고 같은 상태의 중복 이벤트만 상태 추적에서 제거
@@ -143,11 +143,12 @@
   - `none`은 차트 원래 키 수를 그대로 사용
   - `10k` 변환은 standalone BMS key converter의 krrcream식 10K preset과 맞춰 `max_keys=10`, `min_keys=1`, `transform_speed_slot=5`, `seed=0`으로 적용
 - `key_conversion_algorithm` (string)
-  - `krrcream | nk2`
-  - 게임 내 `Mode Settings > Key Converter`에서 `Krrcream` 또는 `KeyWeaver nK2` 선택
-  - 기본값은 `krrcream`이며, `key_mode`가 원본 레인 수를 바꾸는 경우에만 적용
+  - `krrcream | nk2 | nk3`
+  - 게임 내 `Mode Settings > Key Converter`에서 `Krrcream`, `KeyWeaver nK2`, `KeyWeaver NK3 ONNX` 선택
+  - 기본값은 `krrcream`; NK3는 같은 키 수에서도 리마스터를 실행하고 기본적으로 strict OpenVINO GPU를 사용
   - Krrcream은 원본 노트만 목표 레인으로 재배치
   - nK2는 키 수 확장 시 원본에 먼저 노트를 붙이지 않고, 변환 중 목표 레이아웃에 안전한 보조 노트를 직접 생성
+  - NK3는 P64 hybrid ONNX 평가와 host beam 안전 솔버를 사용하며 `TENRIFF_NK3_DEVICE=CPU`로 CPU를 선택 가능; NPU 및 자동 폴백은 지원하지 않음
 - `key_conversion_nk2_preset` (string)
   - `native | transform | remaster`; 기본값은 `native`
   - nK2에서 `Native (12%)`, `Transform (35%)`, `Remaster (65%)`를 선택하며, Krrcream에서는 설정 행이 잠김

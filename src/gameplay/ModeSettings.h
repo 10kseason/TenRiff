@@ -10,6 +10,7 @@ namespace tenriff::gameplay {
 enum class KeyModeConversionAlgorithm {
     Krrcream,
     NK2,
+    NK3,
 };
 
 enum class Nk2Preset {

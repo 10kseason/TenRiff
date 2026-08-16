@@ -297,7 +297,9 @@ bool convert_grouped_chart(const GameplayChart& source,
         }
 
         GameplayChart converted_half = half;
-        if (source_group_size != target_group_size && !half.notes.empty()) {
+        if ((source_group_size != target_group_size ||
+             algorithm == KeyModeConversionAlgorithm::NK3) &&
+            !half.notes.empty()) {
             auto converted = convert_key_mode_chart(
                 half,
                 default_converter_options(source_group_size,
@@ -561,7 +563,9 @@ ModeApplyResult apply_mode_settings(const GameplayChart& chart,
 
     bool conversion_succeeded = target_count <= 0;
     if (target_count > 0) {
-        if (target_count == conversion_source->lane_count) {
+        const bool nk3_remaster =
+            settings.key_conversion_algorithm == KeyModeConversionAlgorithm::NK3;
+        if (target_count == conversion_source->lane_count && !nk3_remaster) {
             result.chart = *conversion_source;
             conversion_succeeded = true;
         } else {

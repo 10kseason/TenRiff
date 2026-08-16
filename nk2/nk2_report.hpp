@@ -33,6 +33,8 @@ struct NK2Options {
     int sourceKeyCount = 0;
     int targetKeyCount = 0;
     Mode mode = Mode::Native;
+    // Explicit opt-in keeps existing nK2 replay semantics stable.
+    bool useNk3 = false;
     double nativeWeight = 0.5;
     double remixWeight = 0.5;
     LayoutWeights layoutWeights;
@@ -60,6 +62,12 @@ struct NK2Options {
     // Support notes are always taps. With this on, one anchored to an LN head
     // becomes a hold spanning the same range, filling the LN section.
     bool lnFill = false;
+    double relationalFidelity = -1.0;
+    double relationalNovelty = -1.0;
+    double relationalSpread = -1.0;
+    double relationalErgonomics = -1.0;
+    double relationalHandBalance = -1.0;
+    double relationalDifficultyGoal = 1.0;
 };
 
 struct NK2Report {

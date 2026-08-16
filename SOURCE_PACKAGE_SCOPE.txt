@@ -1,4 +1,4 @@
-TenRiff 1.4.3-test open-source source package scope
+TenRiff 1.4.4 open-source source package scope
 
 Included in versioned source bundles:
 - CHANGELOG.md
@@ -17,6 +17,7 @@ Included in versioned source bundles:
 - launch_win.bat
 - launch_linux.sh
 - Mainmusic/
+- models/NK3-P64-hybrid.onnx
 - nk2/
 - config/
 - docs/
@@ -27,6 +28,7 @@ Included in versioned source bundles:
 - tools/bms-key-converter/
 - tools/onnx_upscaler/
 - tools/bga_video_smoke.cpp
+- third_party/openvino-2026.2.1/
 
 Excluded from versioned source bundles:
 - build/
@@ -54,10 +56,10 @@ Excluded from versioned source bundles:
 - Memory for ai and Human Worker.txt
 - P_DA.bme
 - 10k-calc/
-- models/
+- models/ (except `models/NK3-P64-hybrid.onnx`)
 - tools/onnx_upscaler/model/
 - *.pt, *.pth, *.ckpt, *.safetensors (private training checkpoints)
-- *.onnx (all model artifacts, including user-supplied runtime models)
+- *.onnx (except the project-owned deterministic `models/NK3-P64-hybrid.onnx`)
 - *_public.json and *_verification.json (model-specific metadata)
 
 Notes:
@@ -66,4 +68,4 @@ Notes:
 - Local caches, packaged binaries, user profiles, and private working files are intentionally excluded.
 - Local LLM/tooling checkouts such as `external/llama.cpp/` are intentionally excluded from the public source package.
 - The repository license is MIT and should be shipped with both source and binary distributions.
-- The generic External ONNX Upscaler source and compatibility tools are included, but ONNX models, checkpoints, training data, and model-specific verification metadata are excluded.
+- The generic External ONNX Upscaler source and compatibility tools are included, but BGA upscaler models, checkpoints, training data, and model-specific verification metadata are excluded. The only bundled ONNX is the project-owned deterministic NK3 decision graph.

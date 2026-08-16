@@ -881,7 +881,12 @@ std::string MenuApp::ui_key_mode_label(std::string_view token) const {
 }
 
 std::string MenuApp::ui_key_conversion_algorithm_label(std::string_view token) const {
-    if (normalize_key_conversion_algorithm(std::string(token)) == "nk2") {
+    const std::string normalized =
+        normalize_key_conversion_algorithm(std::string(token));
+    if (normalized == "nk3") {
+        return "KeyWeaver NK3 ONNX";
+    }
+    if (normalized == "nk2") {
         return "KeyWeaver nK2";
     }
     return "Krrcream";

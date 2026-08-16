@@ -10,11 +10,27 @@ if(MSVC)
 endif()
 
 set(TENRIFF_SOURCE_ROOT "${CMAKE_CURRENT_LIST_DIR}/../.." CACHE PATH "Path to the TenRiff source root")
+option(TENRIFF_ENABLE_NK3_ONNX "Enable the OpenVINO NK3 P64 hybrid converter" ON)
+set(TENRIFF_NK3_MODEL "${TENRIFF_SOURCE_ROOT}/models/NK3-P64-hybrid.onnx")
+set(TENRIFF_NK3_ONNX_AVAILABLE OFF)
+if(TENRIFF_ENABLE_NK3_ONNX)
+    find_package(OpenVINO QUIET COMPONENTS Runtime)
+    if(OpenVINO_FOUND AND EXISTS "${TENRIFF_NK3_MODEL}")
+        set(TENRIFF_NK3_ONNX_AVAILABLE ON)
+        message(STATUS "NK3 P64 hybrid ONNX enabled via OpenVINO")
+    elseif(NOT OpenVINO_FOUND)
+        message(WARNING "OpenVINO was not found; NK3 ONNX will report unavailable")
+    else()
+        message(WARNING "NK3 model was not found at ${TENRIFF_NK3_MODEL}")
+    endif()
+endif()
+
 add_library(bms_key_converter_nk2
     "${TENRIFF_SOURCE_ROOT}/nk2/intent_graph.cpp"
     "${TENRIFF_SOURCE_ROOT}/nk2/layout_model.cpp"
     "${TENRIFF_SOURCE_ROOT}/nk2/nk2_convert.cpp"
     "${TENRIFF_SOURCE_ROOT}/nk2/nk2_report.cpp"
+    "${TENRIFF_SOURCE_ROOT}/nk2/nk3_relational.cpp"
 )
 
 target_include_directories(bms_key_converter_nk2
@@ -34,6 +50,7 @@ add_library(bms_key_converter_core
     "${TENRIFF_SOURCE_ROOT}/src/gameplay/GameplayChart.cpp"
     "${TENRIFF_SOURCE_ROOT}/src/gameplay/KeyModeConverter.cpp"
     "${TENRIFF_SOURCE_ROOT}/src/gameplay/Nk2KeyModeAdapter.cpp"
+    "${TENRIFF_SOURCE_ROOT}/src/gameplay/Nk3OnnxKeyModeAdapter.cpp"
 )
 
 target_include_directories(bms_key_converter_core
@@ -43,6 +60,11 @@ target_include_directories(bms_key_converter_core
 
 target_compile_features(bms_key_converter_core PUBLIC cxx_std_17)
 target_link_libraries(bms_key_converter_core PUBLIC bms_key_converter_nk2)
+
+if(TENRIFF_NK3_ONNX_AVAILABLE)
+    target_compile_definitions(bms_key_converter_core PRIVATE TENRIFF_ENABLE_NK3_ONNX=1)
+    target_link_libraries(bms_key_converter_core PUBLIC openvino::runtime)
+endif()
 
 
 add_executable(bms_key_converter
@@ -62,4 +84,55 @@ if(WIN32)
             comdlg32
             shell32
     )
+endif()
+
+if(TENRIFF_NK3_ONNX_AVAILABLE)
+    set(TENRIFF_OPENVINO_RUNTIME_DLLS)
+    if(WIN32)
+        set(TENRIFF_OPENVINO_RUNTIME_DIR "${OpenVINO_DIR}/../libs")
+        set(TENRIFF_OPENVINO_REQUIRED_DLL_NAMES
+            openvino.dll
+            openvino_intel_cpu_plugin.dll
+            openvino_intel_gpu_plugin.dll
+            openvino_onnx_frontend.dll
+        )
+        foreach(dll_name IN LISTS TENRIFF_OPENVINO_REQUIRED_DLL_NAMES)
+            set(dll_path "${TENRIFF_OPENVINO_RUNTIME_DIR}/${dll_name}")
+            if(NOT EXISTS "${dll_path}")
+                message(FATAL_ERROR "Required NK3 OpenVINO runtime DLL was not found: ${dll_path}")
+            endif()
+            list(APPEND TENRIFF_OPENVINO_RUNTIME_DLLS "${dll_path}")
+        endforeach()
+        foreach(dll_name tbb12.dll tbbbind_2_5.dll tbbmalloc.dll tbbmalloc_proxy.dll)
+            set(dll_path "${TENRIFF_OPENVINO_RUNTIME_DIR}/${dll_name}")
+            if(EXISTS "${dll_path}")
+                list(APPEND TENRIFF_OPENVINO_RUNTIME_DLLS "${dll_path}")
+            endif()
+        endforeach()
+    endif()
+    foreach(target_name bms_key_converter bms_key_converter_gui)
+        if(TARGET ${target_name})
+            if(WIN32)
+                add_custom_command(TARGET ${target_name} POST_BUILD
+                    COMMAND ${CMAKE_COMMAND} -E make_directory
+                        "$<TARGET_FILE_DIR:${target_name}>/models"
+                    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                        "${TENRIFF_NK3_MODEL}"
+                        "$<TARGET_FILE_DIR:${target_name}>/models/NK3-P64-hybrid.onnx"
+                    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                        ${TENRIFF_OPENVINO_RUNTIME_DLLS}
+                        "$<TARGET_FILE_DIR:${target_name}>"
+                    COMMENT "Copying NK3 model and GPU/CPU OpenVINO runtime for ${target_name}"
+                    COMMAND_EXPAND_LISTS)
+            else()
+                add_custom_command(TARGET ${target_name} POST_BUILD
+                    COMMAND ${CMAKE_COMMAND} -E make_directory
+                        "$<TARGET_FILE_DIR:${target_name}>/models"
+                    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                        "${TENRIFF_NK3_MODEL}"
+                        "$<TARGET_FILE_DIR:${target_name}>/models/NK3-P64-hybrid.onnx"
+                    COMMENT "Copying the NK3 model for ${target_name}")
+            endif()
+        endif()
+    endforeach()
 endif()

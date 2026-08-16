@@ -24,7 +24,7 @@
       "name": "asan",
       "configurePreset": "asan",
       "configuration": "RelWithDebInfo",
-      "targets": ["bms_parser_tests"]
+      "targets": ["bms_parser_tests", "nk3_onnx_smoke"]
     }
   ],
   "testPresets": [

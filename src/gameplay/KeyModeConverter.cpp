@@ -4,6 +4,7 @@
 // See THIRD_PARTY_NOTICES.md for attribution and license details.
 #include "gameplay/KeyModeConverter.h"
 #include "gameplay/Nk2KeyModeAdapter.h"
+#include "gameplay/Nk3OnnxKeyModeAdapter.h"
 
 #include <algorithm>
 #include <array>
@@ -1250,25 +1251,32 @@ struct OverlapResolutionStats {
 }  // namespace
 
 KeyModeConverterResult convert_key_mode_chart(const GameplayChart& chart, const KeyModeConverterOptions& options) {
-    if (options.algorithm == KeyModeConversionAlgorithm::NK2) {
-        KeyModeConverterResult nk2_result = convert_key_mode_chart_nk2(chart, options);
-        if (!nk2_result.converted) {
-            return nk2_result;
+    if (options.algorithm == KeyModeConversionAlgorithm::NK2 ||
+        options.algorithm == KeyModeConversionAlgorithm::NK3) {
+        const bool use_nk3 = options.algorithm == KeyModeConversionAlgorithm::NK3;
+        KeyModeConverterResult conversion_result =
+            use_nk3 ? convert_key_mode_chart_nk3_onnx(chart, options)
+                    : convert_key_mode_chart_nk2(chart, options);
+        if (!conversion_result.converted) {
+            return conversion_result;
         }
 
-        const OverlapResolutionStats overlap_stats = resolve_lane_overlaps(nk2_result.chart);
-        if (nk2_result.chart.notes.empty()) {
-            nk2_result.chart = chart;
-            nk2_result.converted = false;
-            nk2_result.warnings.push_back("nK2 produced no playable notes after overlap repair.");
-            return nk2_result;
+        const OverlapResolutionStats overlap_stats = resolve_lane_overlaps(conversion_result.chart);
+        const std::string engine_name = use_nk3 ? "NK3" : "nK2";
+        if (conversion_result.chart.notes.empty()) {
+            conversion_result.chart = chart;
+            conversion_result.converted = false;
+            conversion_result.warnings.push_back(
+                engine_name + " produced no playable notes after overlap repair.");
+            return conversion_result;
         }
         if (overlap_stats.clipped > 0 || overlap_stats.removed > 0) {
-            nk2_result.warnings.push_back("nK2 resolved lane overlaps (clipped=" +
-                                          std::to_string(overlap_stats.clipped) + ", removed=" +
-                                          std::to_string(overlap_stats.removed) + ").");
+            conversion_result.warnings.push_back(
+                engine_name + " resolved lane overlaps (clipped=" +
+                std::to_string(overlap_stats.clipped) + ", removed=" +
+                std::to_string(overlap_stats.removed) + ").");
         }
-        return nk2_result;
+        return conversion_result;
     }
     KeyModeConverterResult result;
     result.chart = chart;

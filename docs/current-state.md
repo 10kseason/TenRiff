@@ -7,7 +7,7 @@
 - BMS landmines (`D1-D9`, `E1-E9`) are playable, including `#WAV00`, base-36 damage tokens, `ZZ` instant fail, exact press/release boundary behavior, and lane-mod/key-converter remapping.
 - Results and local records expose fixed native score separately from detail score, and categorical native accuracy separately from continuous timing-based detailed accuracy.
 - 새 replay evidence v3는 차트 SHA-256, canonical ruleset, result-to-replay SHA-256을 저장하고 입력 trace를 headless 엔진으로 재실행합니다. 공식 로컬 best는 재계산된 verified 결과만 사용하며 legacy/custom/assist 기록은 히스토리에 `unverified`로 남습니다.
-- 현재 테스트 프로젝트와 프리릴리스 배포 라인은 `1.4.3-test`
+- 현재 안정 배포 라인은 `1.4.4`
 - UI-r2 Result는 2.2초 타임라인으로 프리즘·점수·등급·상태·통계·그래프를 순차 공개하며, Space로 연출을 건너뛸 수 있고 CONTINUE/RETRY/Replay 입력은 공개 완료 전 잠김
 - UI-r2 Song Select는 상단 탭, 7행 재킷 라이브러리, 대형 선택 이미지, 최고 기록 카드, 차트/모드 패널, 실제 동작하는 START 버튼 구조로 개편되며 Collection/Store/재화/글로벌 랭킹 가상 기능은 표시하지 않음
 - Song Select 우측의 비주얼 레이턴시·하이스피드·Gauge Shift 시작 등급·랜덤 셀은 좌클릭으로 증가/다음, 우클릭으로 감소/이전을 적용하고 즉시 저장함. 현재 차트 키수는 잘림 없이 표시되며 최고 기록은 점수·정확도·최대 콤보를 함께 표시
@@ -102,9 +102,10 @@
   - 지원 키 수에 대한 chart difficulty 계산
   - `mode.key_mode`는 N2NC 스타일 lane remap 기반으로 키수를 변환
   - `mode.key_mode=10k` 변환은 standalone converter의 krrcream식 10K preset과 맞춰 `target=10`, `max_keys=10`, `min_keys=1`, `transform_speed_slot=5`, `seed=0`을 기본으로 사용
-  - 게임 내 Mode Settings의 `Key Converter`에서 기본 `Krrcream`과 내장 결정론적 `KeyWeaver nK2`를 선택하며, 실제 키수 변환에 적용하고 설정·리플레이 메타데이터에 저장
+  - 게임 내 Mode Settings의 `Key Converter`에서 `Krrcream`, 내장 결정론적 `KeyWeaver nK2`, `KeyWeaver NK3 ONNX`를 선택하며, 실제 키수 변환에 적용하고 설정·리플레이 메타데이터에 저장
   - 별도 `변환 노트 추가` 옵션은 제거했으며, Krrcream은 원본 노트만 재배치하고 nK2는 키 수 확장 시 변환된 목표 레이아웃에 안전한 보조 노트를 직접 생성한다.
   - nK2 프리셋은 기본 `Native (12%)`, `Transform (35%)`, `Remaster (65%)` 중 선택한다. `Remaster`는 예산을 올리면서도 앵커를 잠가 원곡 배치를 유지하고 롱노트 구간을 같은 길이의 롱노트로 채운다. 세 값은 상한이며 실제 추가량은 원본 밀도와 안전창에 따라 낮아진다. Krrcream 선택 시 해당 행은 잠기며, standalone converter GUI의 Krrcream Max/Min/Speed/Seed도 수정할 수 없다.
+  - NK3는 번들된 `models/NK3-P64-hybrid.onnx`와 host beam32를 사용한다. 기본 장치는 strict GPU이며 `TENRIFF_NK3_DEVICE=CPU`로 CPU를 선택할 수 있다. NPU 및 자동 폴백은 지원하지 않고, 요청한 장치로 실제 실행되지 않으면 실패한다.
   - 독립 BMS key converter의 CLI/GUI는 기본 `krrcream`과 결정론적 `nK2 Native 50/50` 알고리즘을 선택 지원하며, nK2 선택 시 krrcream 전용 튜닝 필드는 적용하지 않음
   - `mode.key_mode=none`은 차트의 원래 키 수와 기본 패턴 레이아웃을 그대로 유지
 - Native difficulty:
@@ -228,7 +229,7 @@
 
 ## Runtime / Packaging Rules
 - 새 사용자 프로필은 자동 생성
-- 현재 로컬 테스트 P2P 배포 라인은 `TenRiff 1.4.3-test`
+- 현재 안정 P2P 배포 라인은 `TenRiff 1.4.4`
 - 배포 패키지에는 `Songs`를 넣지 않음
 - 배포 패키지는 `Main Menu / Options / Song Selecte / Multiplayer Lobby / Clear / Failed` 이름의 `Mainmusic/` 화면 슬롯을 포함하며, 각 `이름.mp3`와 번호가 붙은 `이름 2.mp3`~`이름 64.mp3`를 자동 수집해 화면 재진입마다 순환
 - 배포 업데이트에는 built artifacts와 필요한 런타임 자산만 포함
@@ -281,7 +282,7 @@ ASan은 공유 포트 간섭을 피하기 위해 결정적 단위 코어를 단�
 - gameplay low-FPS/0.1%/0.01% low 확인
 - OBS/Discord/Game Bar와 graphics live-apply 공존 확인
 - drag-and-drop / external Korean-path sources GUI 확인
-- OpenVINO EP device 열거, NPU endpoint 배치, CPU fallback 차단을 구현한 뒤 실제 NPU Windows PC에서 `--require-npu` 스모크 검증
+- 별도 Intel 내장/외장 GPU와 CPU 환경에서 NK3 strict device 스모크 재검증
 - 로컬 난이도표 교체 후 해시 매칭·재인덱싱·표시 순서 GUI 확인
 - 서로 다른 두 Windows PC/LAN 및 공인 IP 포트 포워딩 환경의 P2P 실기 확인
 - Linux는 아직 실제 실행판이 아님

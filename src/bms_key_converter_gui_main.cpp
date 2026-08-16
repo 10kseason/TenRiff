@@ -247,11 +247,14 @@ std::string selected_algorithm(const AppState& state) {
         return "krrcream";
     }
     const LRESULT item_data = SendMessageW(state.algorithm_combo, CB_GETITEMDATA, selection, 0);
+    if (item_data == 2) {
+        return "nk3";
+    }
     return item_data == 1 ? "nk2" : "krrcream";
 }
 
 void update_algorithm_controls(AppState& state) {
-    const bool nk2 = selected_algorithm(state) == "nk2";
+    const std::string algorithm = selected_algorithm(state);
     // Shipped Krrcream tuning is intentionally read-only in the GUI. nK2 ignores
     // these fields, so neither algorithm exposes misleading mutable controls.
     EnableWindow(state.max_keys_edit, FALSE);
@@ -259,8 +262,11 @@ void update_algorithm_controls(AppState& state) {
     EnableWindow(state.speed_slot_edit, FALSE);
     EnableWindow(state.seed_edit, FALSE);
     set_window_text_copy(state.hint_label,
-                         nk2 ? L"nK2: native profile; Krrcream tuning locked."
-                             : L"Krrcream: shipped preset tuning locked.");
+                         algorithm == "nk3"
+                             ? L"NK3: P64 ONNX + host beam; strict GPU by default, CPU by environment."
+                             : algorithm == "nk2"
+                                   ? L"nK2: native profile; Krrcream tuning locked."
+                                   : L"Krrcream: shipped preset tuning locked.");
 }
 
 bool select_target_keys(AppState& state, int target_keys) {
@@ -529,6 +535,16 @@ void initialize_algorithm_combo(AppState& state) {
                      CB_SETITEMDATA,
                      static_cast<WPARAM>(nk2_index),
                      static_cast<LPARAM>(1));
+    }
+
+    const LRESULT nk3_index =
+        SendMessageW(state.algorithm_combo, CB_ADDSTRING, 0,
+                     reinterpret_cast<LPARAM>(L"NK3 (P64 ONNX, NPU)"));
+    if (nk3_index != CB_ERR && nk3_index != CB_ERRSPACE) {
+        SendMessageW(state.algorithm_combo,
+                     CB_SETITEMDATA,
+                     static_cast<WPARAM>(nk3_index),
+                     static_cast<LPARAM>(2));
     }
 
     SendMessageW(state.algorithm_combo, CB_SETCURSEL, 0, 0);

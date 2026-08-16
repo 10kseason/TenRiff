@@ -194,7 +194,13 @@ bool migrate_bms_first_runtime_config(config::RuntimeConfig& config) {
     }
     const std::string key_conversion_algorithm =
         to_lower_copy(config.mode.key_conversion_algorithm);
-    if (key_conversion_algorithm == "nk2" || key_conversion_algorithm == "keyweaver" ||
+    if (key_conversion_algorithm == "nk3" || key_conversion_algorithm == "keyweaver_nk3" ||
+        key_conversion_algorithm == "vcrr") {
+        if (config.mode.key_conversion_algorithm != "nk3") {
+            config.mode.key_conversion_algorithm = "nk3";
+            changed = true;
+        }
+    } else if (key_conversion_algorithm == "nk2" || key_conversion_algorithm == "keyweaver" ||
         key_conversion_algorithm == "keyweaver_nk2" || key_conversion_algorithm == "nativek2") {
         if (config.mode.key_conversion_algorithm != "nk2") {
             config.mode.key_conversion_algorithm = "nk2";

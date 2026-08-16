@@ -170,7 +170,8 @@ void MenuApp::handle_mode_settings_input(uint32_t keycode) {
                 cycle_key_conversion_algorithm(config_.mode.key_conversion_algorithm);
             mode_dirty_ = true;
         } else if (settings_cursor_ == 10) {
-            if (normalize_key_conversion_algorithm(config_.mode.key_conversion_algorithm) == "nk2") {
+            if (normalize_key_conversion_algorithm(config_.mode.key_conversion_algorithm) !=
+                "krrcream") {
                 config_.mode.key_conversion_nk2_preset =
                     cycle_key_conversion_nk2_preset(config_.mode.key_conversion_nk2_preset);
                 mode_dirty_ = true;
@@ -323,7 +324,8 @@ void MenuApp::populate_mode_settings_render_data(render::MenuRenderData& render)
                     ui_key_conversion_algorithm_label(config_.mode.key_conversion_algorithm),
                     settings_cursor_ == 9, render::MenuHitTargetKind::SettingsRow, 9, false, true);
     const bool nk2_selected =
-        normalize_key_conversion_algorithm(config_.mode.key_conversion_algorithm) == "nk2";
+        normalize_key_conversion_algorithm(config_.mode.key_conversion_algorithm) !=
+        "krrcream";
     append_menu_row(render.generic, "nK2 Preset",
                     nk2_selected
                         ? ui_key_conversion_nk2_preset_label(config_.mode.key_conversion_nk2_preset)
@@ -364,8 +366,9 @@ void MenuApp::populate_mode_settings_render_data(render::MenuRenderData& render)
                                            "키 모드는 BMS 차트의 원본 또는 4K~10K, 12K, 14K, 16K 레이아웃을 고릅니다."));
     render.generic.notes.push_back(ui_text("None keeps the chart's original key count and pattern layout instead of forcing a conversion.",
                                            "원본은 강제 변환 없이 차트의 원래 키 수와 패턴 배치를 유지합니다."));
-    render.generic.notes.push_back(ui_text("Krrcream uses locked shipped tuning and remaps source notes only. nK2 Native targets 12% support notes; Transform targets 35%, subject to the same safety filters.",
-                                           "Krrcream은 배포 고정 튜닝을 사용하며 원본 노트만 재배치합니다. nK2 Native는 보조 노트 12%, Transform은 35%를 목표로 하며 동일한 안전 필터를 통과해야 합니다."));
+    render.generic.notes.push_back(ui_text(
+        "Krrcream remaps source notes only. nK2 keeps the legacy engine; NK3 uses the P64 hybrid ONNX evaluator plus the host beam safety solver, with strict GPU execution by default and optional CPU execution.",
+        "Krrcream은 원본 노트만 재배치합니다. nK2는 기존 엔진을 유지하고, NK3는 P64 하이브리드 ONNX 평가기와 호스트 빔 안전 솔버를 사용하며 기본 실행 장치는 엄격한 GPU이고 CPU를 선택할 수 있습니다."));
     render.generic.notes.push_back(ui_text(
         "Mirror itself is seedless. Key Mode conversion runs first and may still use Random Seed.",
         "미러 자체는 시드를 쓰지 않지만, 먼저 실행되는 키 모드 변환은 랜덤 시드를 사용할 수 있습니다."));

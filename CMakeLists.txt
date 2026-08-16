@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(TenRiff VERSION 1.4.3 LANGUAGES C CXX)
+project(TenRiff VERSION 1.4.4 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -12,7 +12,22 @@ endif()
 
 option(TENRIFF_ENABLE_TESTS "Build TenRiff unit tests" ON)
 option(TENRIFF_ENABLE_ONNX_UPSCALER "Enable the optional user-selected WinML ONNX background upscaler" ON)
+option(TENRIFF_ENABLE_NK3_ONNX "Enable the OpenVINO NK3 P64 hybrid key-mode converter" ON)
 option(TENRIFF_ENABLE_ASAN "Build TenRiff with AddressSanitizer" OFF)
+
+set(TENRIFF_NK3_MODEL "${CMAKE_CURRENT_SOURCE_DIR}/models/NK3-P64-hybrid.onnx")
+set(TENRIFF_NK3_ONNX_AVAILABLE OFF)
+if(TENRIFF_ENABLE_NK3_ONNX)
+    find_package(OpenVINO QUIET COMPONENTS Runtime)
+    if(OpenVINO_FOUND AND EXISTS "${TENRIFF_NK3_MODEL}")
+        set(TENRIFF_NK3_ONNX_AVAILABLE ON)
+        message(STATUS "NK3 P64 hybrid ONNX enabled via OpenVINO")
+    elseif(NOT OpenVINO_FOUND)
+        message(WARNING "OpenVINO was not found; NK3 ONNX conversion will report unavailable at runtime")
+    else()
+        message(WARNING "NK3 model was not found at ${TENRIFF_NK3_MODEL}")
+    endif()
+endif()
 
 if(TENRIFF_ENABLE_ASAN)
     if(MSVC)
@@ -76,6 +91,7 @@ add_library(tenriff_nk2
     nk2/layout_model.cpp
     nk2/nk2_convert.cpp
     nk2/nk2_report.cpp
+    nk2/nk3_relational.cpp
 )
 
 target_include_directories(tenriff_nk2
@@ -95,6 +111,7 @@ add_library(tenriff_core
     src/gameplay/GameplayEngine.cpp
     src/gameplay/KeyModeConverter.cpp
     src/gameplay/Nk2KeyModeAdapter.cpp
+    src/gameplay/Nk3OnnxKeyModeAdapter.cpp
     src/gameplay/ModeApplier.cpp
     src/gameplay/ModeSettings.cpp
     src/gameplay/OsuManiaScore.cpp
@@ -143,6 +160,11 @@ target_link_libraries(tenriff_core
         tenriff_runtime
 )
 
+if(TENRIFF_NK3_ONNX_AVAILABLE)
+    target_compile_definitions(tenriff_core PRIVATE TENRIFF_ENABLE_NK3_ONNX=1)
+    target_link_libraries(tenriff_core PUBLIC openvino::runtime)
+endif()
+
 if(WIN32)
     target_link_libraries(tenriff_core PUBLIC ws2_32 winhttp)
 endif()
@@ -157,6 +179,7 @@ add_library(tenriff_bms_key_converter_core
     src/gameplay/GameplayChart.cpp
     src/gameplay/KeyModeConverter.cpp
     src/gameplay/Nk2KeyModeAdapter.cpp
+    src/gameplay/Nk3OnnxKeyModeAdapter.cpp
 )
 
 target_include_directories(tenriff_bms_key_converter_core
@@ -166,6 +189,11 @@ target_include_directories(tenriff_bms_key_converter_core
 
 target_compile_features(tenriff_bms_key_converter_core PUBLIC cxx_std_17)
 target_link_libraries(tenriff_bms_key_converter_core PUBLIC tenriff_nk2)
+
+if(TENRIFF_NK3_ONNX_AVAILABLE)
+    target_compile_definitions(tenriff_bms_key_converter_core PRIVATE TENRIFF_ENABLE_NK3_ONNX=1)
+    target_link_libraries(tenriff_bms_key_converter_core PUBLIC openvino::runtime)
+endif()
 
 
 # Audio and input subsystem (Windows-specific for now).
@@ -320,6 +348,59 @@ else()
     target_link_libraries(bms_key_converter PRIVATE tenriff_bms_key_converter_core)
 endif()
 
+if(TENRIFF_NK3_ONNX_AVAILABLE)
+    set(TENRIFF_OPENVINO_RUNTIME_DLLS)
+    if(WIN32)
+        set(TENRIFF_OPENVINO_RUNTIME_DIR "${OpenVINO_DIR}/../libs")
+        set(TENRIFF_OPENVINO_REQUIRED_DLL_NAMES
+            openvino.dll
+            openvino_intel_cpu_plugin.dll
+            openvino_intel_gpu_plugin.dll
+            openvino_onnx_frontend.dll
+        )
+        foreach(dll_name IN LISTS TENRIFF_OPENVINO_REQUIRED_DLL_NAMES)
+            set(dll_path "${TENRIFF_OPENVINO_RUNTIME_DIR}/${dll_name}")
+            if(NOT EXISTS "${dll_path}")
+                message(FATAL_ERROR "Required NK3 OpenVINO runtime DLL was not found: ${dll_path}")
+            endif()
+            list(APPEND TENRIFF_OPENVINO_RUNTIME_DLLS "${dll_path}")
+        endforeach()
+        foreach(dll_name tbb12.dll tbbbind_2_5.dll tbbmalloc.dll tbbmalloc_proxy.dll)
+            set(dll_path "${TENRIFF_OPENVINO_RUNTIME_DIR}/${dll_name}")
+            if(EXISTS "${dll_path}")
+                list(APPEND TENRIFF_OPENVINO_RUNTIME_DLLS "${dll_path}")
+            endif()
+        endforeach()
+    endif()
+
+    function(tenriff_copy_nk3_runtime target_name)
+        if(WIN32)
+            add_custom_command(TARGET ${target_name} POST_BUILD
+                COMMAND ${CMAKE_COMMAND} -E make_directory
+                    "$<TARGET_FILE_DIR:${target_name}>/models"
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    "${TENRIFF_NK3_MODEL}"
+                    "$<TARGET_FILE_DIR:${target_name}>/models/NK3-P64-hybrid.onnx"
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    ${TENRIFF_OPENVINO_RUNTIME_DLLS}
+                    "$<TARGET_FILE_DIR:${target_name}>"
+                COMMENT "Copying NK3 model and GPU/CPU OpenVINO runtime for ${target_name}"
+                COMMAND_EXPAND_LISTS)
+        else()
+            add_custom_command(TARGET ${target_name} POST_BUILD
+                COMMAND ${CMAKE_COMMAND} -E make_directory
+                    "$<TARGET_FILE_DIR:${target_name}>/models"
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    "${TENRIFF_NK3_MODEL}"
+                    "$<TARGET_FILE_DIR:${target_name}>/models/NK3-P64-hybrid.onnx"
+                COMMENT "Copying the NK3 model for ${target_name}")
+        endif()
+    endfunction()
+
+    tenriff_copy_nk3_runtime(tenriff)
+    tenriff_copy_nk3_runtime(bms_key_converter)
+endif()
+
 # KeyWeaver NK2 - osu!mania front-end for the shared nK2 relaning engine.
 add_library(tenriff_keyweaver_osu_core
     src/keyweaver/osu_file.cpp
@@ -365,10 +446,27 @@ if(WIN32)
             comdlg32
             shell32
     )
+    if(TENRIFF_NK3_ONNX_AVAILABLE)
+        tenriff_copy_nk3_runtime(bms_key_converter_gui)
+    endif()
 endif()
 
 if(TENRIFF_ENABLE_TESTS)
     enable_testing()
+    if(TENRIFF_NK3_ONNX_AVAILABLE)
+        add_executable(nk3_onnx_smoke
+            tests/smoke/nk3_onnx_smoke.cpp
+        )
+        target_include_directories(nk3_onnx_smoke
+            PRIVATE
+                ${CMAKE_CURRENT_SOURCE_DIR}/src
+        )
+        target_link_libraries(nk3_onnx_smoke PRIVATE tenriff_core)
+        tenriff_copy_nk3_runtime(nk3_onnx_smoke)
+        add_test(NAME nk3_onnx_smoke COMMAND nk3_onnx_smoke)
+        set_tests_properties(nk3_onnx_smoke PROPERTIES TIMEOUT 600)
+    endif()
+
     add_executable(bms_realworld_smoke
         tests/smoke/bms_realworld_smoke.cpp
     )
@@ -475,6 +573,9 @@ if(TENRIFF_ENABLE_TESTS)
         target_link_libraries(bms_parser_tests PRIVATE tenriff_chart tenriff_game tenriff_runtime tenriff_core tenriff_audio tenriff_app)
     else()
         target_link_libraries(bms_parser_tests PRIVATE tenriff_chart tenriff_game tenriff_runtime tenriff_core)
+    endif()
+    if(TENRIFF_NK3_ONNX_AVAILABLE)
+        tenriff_copy_nk3_runtime(bms_parser_tests)
     endif()
     if(TENRIFF_ENABLE_ASAN AND MSVC)
         add_custom_command(TARGET bms_parser_tests POST_BUILD

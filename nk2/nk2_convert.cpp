@@ -2,6 +2,7 @@
 
 #include "nk2/intent_graph.hpp"
 #include "nk2/layout_model.hpp"
+#include "nk2/nk3_relational.hpp"
 
 #include <algorithm>
 #include <array>
@@ -232,7 +233,7 @@ int directLane(int sourceLane, int sourceKeyCount, int targetKeyCount) {
 }
 
 bool isNk2GeneratedNote(const Note& note) {
-    return note.id.rfind("nk2-", 0) == 0;
+    return note.id.rfind("nk2-", 0) == 0 || note.id.rfind("nk3-", 0) == 0;
 }
 
 std::string convertedDifficultyName(const std::optional<std::string>& existing,
@@ -1533,7 +1534,7 @@ PlacementStats collectPlacementStats(const Chart& converted,
         }
         if (sourceLaneOf(*previous) == sourceLaneOf(*current)) {
             ++stats.preservedSourceJacks;
-        } else {
+        } else if (current->raw != "nk3-micro-roll") {
             ++stats.createdJacks;
         }
     }
@@ -2318,6 +2319,40 @@ NK2ConversionResult convertChart(const Chart& chart, const NK2Options& options) 
 
     if (result.report.noOp) {
         fillDistributionAndSafety(result.report, result.chart);
+        return result;
+    }
+
+    if (::keyconv::nk3::supportsRelationalRechart(options)) {
+        auto relational = ::keyconv::nk3::convertRelational(chart, options);
+        result.chart = std::move(relational.chart);
+        if (result.chart.notes.empty()) {
+            result.report.noOp = true;
+            result.report.noOpReason =
+                "NK3 phrase beam produced no complete interpretation";
+            return result;
+        }
+        result.chart.meta.targetKeyCount = options.targetKeyCount;
+        result.chart.meta.version = convertedDifficultyName(
+            chart.meta.version, options.targetKeyCount, options.superSymmetry);
+        result.report.chartMutated = true;
+        const bool contraction = options.targetKeyCount < options.sourceKeyCount;
+        const bool sameKey = options.targetKeyCount == options.sourceKeyCount;
+        result.report.prototypeName =
+            contraction ? "nk3-relational-vcrr-contraction"
+                        : (sameKey ? "nk3-relational-vcrr-remaster"
+                                   : "nk3-relational-vcrr-expansion");
+        result.report.localSolverWindows = relational.stats.phrases;
+        result.report.localSolverCandidates = relational.stats.expandedStates;
+        result.report.localSolverFallbacks = relational.stats.fallbacks;
+        result.report.lowerKeyRolledNotes = relational.stats.microRolls;
+        result.report.droppedNotes = relational.stats.droppedNotes;
+        result.report.warnings.clear();
+        fillDistributionAndSafety(result.report, result.chart);
+        result.report.addedNotes = relational.stats.addedNotes;
+        if (relational.stats.fallbacks > 0) {
+            result.report.warnings.push_back(
+                "NK3 used a relaxed phrase transition to complete the chart.");
+        }
         return result;
     }
 

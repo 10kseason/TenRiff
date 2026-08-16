@@ -2,6 +2,25 @@
 
 TenRiff의 사용자/배포 관점에서 의미 있는 변경만 간단히 기록합니다.
 
+## [1.4.4] - 2026-08-16
+
+### Added
+
+- Mode Settings와 standalone BMS 변환기에 `NK3`를 추가했습니다. NK3는 64-slice P64 ONNX 결정 그래프와 host beam32 안전 솔버를 결합하며, 같은 키 수를 선택해도 리마스터를 실행합니다.
+- OpenVINO 실행 장치는 기본적으로 엄격한 `GPU`를 사용합니다. `TENRIFF_NK3_DEVICE=CPU`로 CPU를 명시할 수 있으며 NPU와 자동 장치 폴백은 지원하지 않습니다.
+- 주변 1초 구간의 롱노트 비율과 길이를 참고해 NK3 보조 노트를 롱노트로 생성하고, 새 보조 노트는 같은 손 영역에서 연타가 생기지 않는 레인으로 이동하거나 안전한 레인이 없으면 버립니다.
+- 공개 소스와 Windows 패키지에 학습 데이터나 체크포인트를 사용하지 않는 59KB 결정론적 `NK3-P64-hybrid.onnx`를 포함합니다.
+
+### Fixed
+
+- 고밀도 롱노트와 키 수 축소에서 host beam 전이가 사라지던 경우를 additions 제거/beam256 재시도, 축소 전용 안전 드롭, 확장·동일 키 수의 deterministic base fallback으로 복구합니다.
+- 변환 뒤 동일시각 충돌, 롱노트 겹침, 최소 간격 위반, 불가능한 chord와 원본에 없던 cross-source 연타를 최종 검사해 안전하지 않은 결과를 게임에 적용하지 않습니다.
+- OpenVINO 모델을 변환마다 다시 컴파일하던 문제를 process-local evaluator 재사용으로 수정해 연속 변환의 장치 세션을 안정화했습니다.
+
+### Release
+
+- 정식 자산은 `TenRiff-1.4.4.zip`, `TenRiff-1.4.4-source.zip`, `TenRiff-1.4.4-SHA256SUMS.txt`입니다. Windows ZIP은 NK3 모델, OpenVINO 2026.2.1 GPU/CPU runtime과 원본 라이선스/서드파티 고지를 포함하며 NPU 플러그인은 번들하지 않습니다.
+
 ## [1.4.3-test] - 2026-08-15
 
 이 빌드는 사운드 오프셋, 단일 색상 스킨, replay evidence v3와 로컬 스코어

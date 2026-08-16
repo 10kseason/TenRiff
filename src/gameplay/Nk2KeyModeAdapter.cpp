@@ -152,6 +152,8 @@ convert_key_mode_chart_nk2(const GameplayChart &chart,
   keyconv::nk2::NK2Options nk2_options;
   nk2_options.sourceKeyCount = source_lane_count;
   nk2_options.targetKeyCount = options.target_lane_count;
+  nk2_options.useNk3 =
+      options.algorithm == KeyModeConversionAlgorithm::NK3;
   nk2_options.nativeWeight = 0.5;
   nk2_options.remixWeight = 0.5;
   // directLane rounds, so widening the field leaves target lanes that no source
@@ -180,13 +182,15 @@ convert_key_mode_chart_nk2(const GameplayChart &chart,
   const keyconv::nk2::NK2ConversionResult converted =
       keyconv::nk2::convertChart(nk2_source, nk2_options);
   for (const auto &warning : converted.report.warnings) {
-    result.warnings.push_back("nK2: " + warning);
+    result.warnings.push_back(
+        std::string(nk2_options.useNk3 ? "NK3: " : "nK2: ") + warning);
   }
   if (!converted.report.chartMutated || converted.report.noOp ||
       converted.chart.notes.empty()) {
     if (!converted.report.noOpReason.empty()) {
-      result.warnings.push_back("nK2 did not convert the chart: " +
-                                converted.report.noOpReason + ".");
+      result.warnings.push_back(
+          std::string(nk2_options.useNk3 ? "NK3" : "nK2") +
+          " did not convert the chart: " + converted.report.noOpReason + ".");
     }
     return result;
   }
@@ -248,12 +252,14 @@ convert_key_mode_chart_nk2(const GameplayChart &chart,
 
   if (rebuilt.notes.empty()) {
     result.warnings.push_back(
-        "nK2 produced no TenRiff-compatible playable notes.");
+        std::string(nk2_options.useNk3 ? "NK3" : "nK2") +
+        " produced no TenRiff-compatible playable notes.");
     return result;
   }
   if (unresolved_source_notes > 0) {
     result.warnings.push_back(
-        "nK2 skipped " + std::to_string(unresolved_source_notes) +
+        std::string(nk2_options.useNk3 ? "NK3" : "nK2") + " skipped " +
+        std::to_string(unresolved_source_notes) +
         " note(s) whose source metadata could not be resolved.");
   }
 
@@ -264,7 +270,8 @@ convert_key_mode_chart_nk2(const GameplayChart &chart,
       : options.nk2_preset == Nk2Preset::Remaster ? "Remaster 65%"
                                                   : "Native 12%";
   result.warnings.push_back(
-      "nK2 remapped " + std::to_string(source_lane_count) + "K to " +
+      std::string(nk2_options.useNk3 ? "NK3" : "nK2") + " remapped " +
+      std::to_string(source_lane_count) + "K to " +
       std::to_string(options.target_lane_count) + "K using the " + preset_label +
       " preset (added=" + std::to_string(converted.report.addedNotes) +
       ", dropped=" + std::to_string(converted.report.droppedNotes) + ").");

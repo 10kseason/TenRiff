@@ -3,7 +3,7 @@
 この文書は、次のエージェントや新しい作業者が最初に読むべき current-state 文書です。目的は、「このプロジェクトは今どういう状態で、どこを見ればよく、何がまだ未検証か」を素早く把握できるようにすることです。
 
 ## Baseline
-- 現在の test project 版と prerelease 版は `1.4.3-test`
+- 現在の stable release line は `1.4.4`
 - UI-r2 の Result は 2.2 秒の timeline で prism、score、rank、clear status、statistics、graphs を順に表示する。Space で演出を skip でき、完了までは Continue/Retry/Replay 入力を lock する。
 - UI-r2 Song Select は top tab、7-row jacket library、大きな selected artwork、best-record card、chart/mode panel、実動する START action を使用し、Collection/Store/currency/global ranking の仮 UI は表示しない
 - Song Select の Rate、Hi-Speed、Gauge、Random cell は左 click で増加/次、右 click で減少/前を適用して即時保存する。current chart の key count は欠けず、best record は score・accuracy・max combo を同時に表示する。
@@ -92,9 +92,10 @@
   - キーモードごとの separate keymaps
   - 対応 key count の chart difficulty calculation
   - `mode.key_mode` は N2NC スタイルの lane remap でキー数を変換
-  - ゲーム内 Mode Settings の `Key Converter` で既定の `Krrcream` または内蔵の決定論的 `KeyWeaver nK2` を選択し、設定と replay metadata に保存
+  - ゲーム内 Mode Settings の `Key Converter` で `Krrcream`、内蔵の決定論的 `KeyWeaver nK2`、または `KeyWeaver NK3 ONNX` を選択し、設定と replay metadata に保存
   - 個別の `Conversion Note Add` 設定は削除。Krrcream は元 note の再配置のみを行い、nK2 は key count 拡張時に変換後の target layout へ安全な support note を直接生成する。
   - nK2 preset は既定の `Native (12%)`、`Transform (35%)`、`Remaster (65%)` から選択する。`Remaster` は budget を上げつつ anchor を固定して原曲の配置を残し、LN 区間を同じ長さの LN で埋める。3 つとも上限であり、実際の追加量は原曲の密度と safety window で決まる。Krrcream では row を lock し、standalone converter GUI の Krrcream Max/Min/Speed/Seed も変更不可。
+  - NK3 は同梱の `models/NK3-P64-hybrid.onnx` と host beam32 を使用する。既定は strict GPU。`TENRIFF_NK3_DEVICE=CPU` で strict CPU を選択できる。NPU と自動 fallback は非対応で、指定 device で実行されない場合は失敗する。
   - `mode.key_mode=none` は元のキー数と基本パターンレイアウトを維持
 - Native difficulty:
   - BMS の LV/CR 計算では long-note Head/Tail の miss-ms だけを 0.5倍で評価し、`300ms`を`150ms`として緩和する。実際の gameplay 判定 window は変更しない
@@ -206,7 +207,7 @@
 
 ## Runtime / Packaging Rules
 - 新しい user profile は自動生成される
-- 現在の local test P2P 配布ラインは `TenRiff 1.4.3-test`
+- 現在の stable P2P 配布ラインは `TenRiff 1.4.4`
 - distribution package には `Songs` を含めない
 - distribution package には `Main Menu / Options / Song Selecte / Multiplayer Lobby / Clear / Failed` の `Mainmusic/` scene slot を含め、各 `Name.mp3` と `Name 2.mp3`～`Name 64.mp3` を自動検出して scene 再入場ごとに循環する
 - distribution 更新には built artifact と必要な runtime asset だけを含める

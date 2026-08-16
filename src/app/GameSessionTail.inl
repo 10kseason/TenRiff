@@ -356,7 +356,8 @@ bool GameSession::initialize(const CommandLineOptions& options) {
         if (!replay_source_.mode.key_conversion_nk2_preset.empty()) {
             config_.mode.key_conversion_nk2_preset =
                 normalize_nk2_preset_local(replay_source_.mode.key_conversion_nk2_preset);
-        } else if (config_.mode.key_conversion_algorithm == "nk2") {
+        } else if (config_.mode.key_conversion_algorithm == "nk2" ||
+                   config_.mode.key_conversion_algorithm == "nk3") {
             // Replays written before the preset field existed used Native 12%.
             config_.mode.key_conversion_nk2_preset = "native";
         }
@@ -617,7 +618,9 @@ bool GameSession::initialize(const CommandLineOptions& options) {
                 config_.mode.key_conversion_algorithm) {
             ghost_compatible = false;
         }
-        if (ghost_compatible && config_.mode.key_conversion_algorithm == "nk2" &&
+        if (ghost_compatible &&
+            (config_.mode.key_conversion_algorithm == "nk2" ||
+             config_.mode.key_conversion_algorithm == "nk3") &&
             normalize_nk2_preset_local(ghost_replay_source_.mode.key_conversion_nk2_preset) !=
                 normalize_nk2_preset_local(config_.mode.key_conversion_nk2_preset)) {
             ghost_compatible = false;
