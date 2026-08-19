@@ -617,7 +617,9 @@ if(TENRIFF_ENABLE_TESTS)
     if(TENRIFF_ENABLE_ASAN)
         add_test(
             NAME bms_parser_tests_asan
-            COMMAND bms_parser_tests --skip-windows-runtime-integration)
+            COMMAND bms_parser_tests
+                    --skip-windows-runtime-integration
+                    --skip-nk3-openvino-integration)
         set_tests_properties(bms_parser_tests_asan PROPERTIES TIMEOUT 600)
     else()
         add_test(NAME bms_parser_tests COMMAND bms_parser_tests)

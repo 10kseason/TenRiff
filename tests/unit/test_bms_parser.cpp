@@ -72,6 +72,16 @@ bool is_windows_runtime_integration_test(std::string_view name) {
     return std::find(kTests.begin(), kTests.end(), name) != kTests.end();
 }
 
+bool is_nk3_openvino_integration_test(std::string_view name) {
+    // OpenVINO inference is covered by the dedicated non-ASan CPU smoke job.
+    // Keep this list exact so the sanitizer suite still runs every pure host test.
+    static constexpr std::array<std::string_view, 2> kTests = {
+        "runtime mode settings use the selected KeyWeaver NK3 converter",
+        "runtime NK3 remasters a chart even when the target key count is unchanged",
+    };
+    return std::find(kTests.begin(), kTests.end(), name) != kTests.end();
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -83,6 +93,7 @@ int main(int argc, char** argv) {
     int shard_index = 0;
     int shard_count = 1;
     bool skip_windows_runtime_integration = false;
+    bool skip_nk3_openvino_integration = false;
     constexpr std::string_view kShardIndexPrefix = "--shard-index=";
     constexpr std::string_view kShardCountPrefix = "--shard-count=";
     for (int index = 1; index < argc; ++index) {
@@ -94,6 +105,8 @@ int main(int argc, char** argv) {
                 shard_count = std::stoi(std::string(argument.substr(kShardCountPrefix.size())));
             } else if (argument == "--skip-windows-runtime-integration") {
                 skip_windows_runtime_integration = true;
+            } else if (argument == "--skip-nk3-openvino-integration") {
+                skip_nk3_openvino_integration = true;
             }
         } catch (...) {
             std::cerr << "Invalid test shard argument: " << argument << '\n';
@@ -128,6 +141,12 @@ int main(int argc, char** argv) {
             ++skipped_tests;
             std::cout << "[skip] " << test.name
                       << " - covered by the normal Release OS-integration suite\n";
+            continue;
+        }
+        if (skip_nk3_openvino_integration && is_nk3_openvino_integration_test(test.name)) {
+            ++skipped_tests;
+            std::cout << "[skip] " << test.name
+                      << " - covered by the non-ASan OpenVINO CPU smoke job\n";
             continue;
         }
         try {
