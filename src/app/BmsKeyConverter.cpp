@@ -729,8 +729,45 @@ LayoutDefinition resolve_layout_definition(int lane_count) {
                                      "21", "22", "23", "24", "25", "26", "28", "29"},
                                 std::string("3"), std::make_pair(std::string("PLAYMODE"), std::string("16K")), std::nullopt};
     default:
+        break;
+    }
+
+    if (lane_count < 1 || lane_count > 18) {
         return {};
     }
+
+    // Preserve TenRiff's established standard layouts above. The remaining
+    // counts use every visible BMS lane channel in deterministic left/right
+    // order and carry an explicit key-count header so they round-trip without
+    // relying on a parser's layout heuristic.
+    static constexpr std::array<std::string_view, 9> kPlayerOne = {
+        "11", "12", "13", "14", "15", "16", "17", "18", "19"};
+    static constexpr std::array<std::string_view, 9> kPlayerTwo = {
+        "21", "22", "23", "24", "25", "26", "27", "28", "29"};
+
+    std::vector<std::string> channels;
+    channels.reserve(static_cast<std::size_t>(lane_count));
+    if (lane_count <= 9) {
+        for (int lane = 0; lane < lane_count; ++lane) {
+            channels.emplace_back(kPlayerOne[static_cast<std::size_t>(lane)]);
+        }
+    } else {
+        const int player_one_count = (lane_count + 1) / 2;
+        const int player_two_count = lane_count - player_one_count;
+        for (int lane = 0; lane < player_one_count; ++lane) {
+            channels.emplace_back(kPlayerOne[static_cast<std::size_t>(lane)]);
+        }
+        for (int lane = 0; lane < player_two_count; ++lane) {
+            channels.emplace_back(kPlayerTwo[static_cast<std::size_t>(lane)]);
+        }
+    }
+
+    return LayoutDefinition{lane_count,
+                            std::move(channels),
+                            std::string(lane_count <= 9 ? "1" : "3"),
+                            std::make_pair(std::string("PLAYMODE"),
+                                           std::to_string(lane_count) + "K"),
+                            std::nullopt};
 }
 
 gameplay::KeyModeConverterOptions default_converter_options(int source_lane_count,
@@ -1300,12 +1337,36 @@ std::string build_bms_text(const chart::BmsChart& parsed_chart,
     }
 
     std::vector<chart::BmsMeasureCommand> commands;
-    commands.reserve(parsed_chart.commands.size() + generated_by_measure.size() * 2u);
+    commands.reserve(parsed_chart.commands.size() + generated_by_measure.size() * 2u +
+                     layout.lane_channels.size());
     for (const auto& command : parsed_chart.commands) {
         if (is_note_lane_channel(command.channel) || is_mine_lane_channel(command.channel)) {
             continue;
         }
         commands.push_back(command);
+    }
+
+    // BMS has no separate lane-layout table. Preserve empty target lanes with
+    // zero-only visible-channel declarations so a sparse converted chart still
+    // round-trips at its requested key count. Other players ignore the 00 data.
+    for (const auto& visible_channel : layout.lane_channels) {
+        const bool lane_has_event = std::any_of(
+            generated_events.begin(), generated_events.end(),
+            [&](const OutputEvent& event) {
+                if (event.channel.size() != 2 || visible_channel.size() != 2 ||
+                    event.channel[1] != visible_channel[1]) {
+                    return false;
+                }
+                const char visible_player = visible_channel[0];
+                return event.channel[0] == visible_player ||
+                       (visible_player == '1' &&
+                        (event.channel[0] == '5' || event.channel[0] == 'D')) ||
+                       (visible_player == '2' &&
+                        (event.channel[0] == '6' || event.channel[0] == 'E'));
+            });
+        if (!lane_has_event) {
+            commands.push_back(chart::BmsMeasureCommand{0, visible_channel, "00"});
+        }
     }
 
     for (auto& [measure, channels] : generated_by_measure) {
@@ -1497,7 +1558,7 @@ BmsKeyConverterResult convert_bms_chart_file(const BmsKeyConverterOptions& optio
 
     const LayoutDefinition layout = resolve_layout_definition(options.target_lane_count);
     if (layout.lane_count <= 0) {
-        result.error = "Unsupported target lane count. Supported values: 4, 5, 6, 8, 9, 10, 16.";
+        result.error = "Unsupported target lane count. Supported values: 1 through 18.";
         return result;
     }
 
@@ -1586,7 +1647,7 @@ BmsKeyConverterResult convert_bms_chart_file(const BmsKeyConverterOptions& optio
             "nK2 uses its native 50/50 profile; Krrcream Max/Min/Speed/Seed tuning is not applied.");
     } else if (*conversion_algorithm == gameplay::KeyModeConversionAlgorithm::NK3) {
         result.warnings.push_back(
-            "NK3 uses the P64 hybrid ONNX evaluator and host beam safety solver; "
+            "NK3 uses P64 plus the target-specific generalized pattern MLP and host beam safety solver; "
             "Krrcream Max/Min/Speed/Seed tuning is not applied.");
     }
     result.warnings.insert(result.warnings.end(), converted.warnings.begin(), converted.warnings.end());

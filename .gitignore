@@ -31,6 +31,7 @@
 *.onnx
 !/models/
 !/models/NK3-P64-hybrid.onnx
+!/models/NK3-general-pattern-*.onnx
 *.pt
 *.pth
 *.ckpt

@@ -3,7 +3,7 @@
 This is the document that the next agent or any new contributor should read first. Its goal is to quickly answer: "what is this project now, where should I look, and what is still unverified?"
 
 ## Baseline
-- Current stable release line: `1.4.4`
+- Current stable release line: `1.4.5`
 - The UI-r2 Result screen uses a 2.2-second timeline for the prism, score, rank, clear status, statistics, and graphs. Space skips the reveal; Continue/Retry/Replay stay locked until it completes.
 - UI-r2 Song Select uses a reference-led top navigation, seven-row jacket library, large selected artwork, best-record card, chart/mode panel, and a prominent working Start action. Collection/store/currency/global-ranking placeholders are not shown.
 - The Song Select Rate, Hi-Speed, Gauge, and Random cells apply increase/next on left click and decrease/previous on right click, then save immediately. The current-chart key count no longer clips, and best records show score, accuracy, and max combo together.
@@ -95,8 +95,9 @@ This is the document that the next agent or any new contributor should read firs
   - in-game Mode Settings exposes `Key Converter` with `Krrcream`, embedded deterministic `KeyWeaver nK2`, and `KeyWeaver NK3 ONNX`; the runtime choice is saved in config and replay metadata
   - the separate `Conversion Note Add` option is removed: Krrcream only remaps source notes, while nK2 creates safe support notes directly in the converted target layout when expanding the key count.
   - nK2 offers `Native (12%)` by default, `Transform (35%)` and `Remaster (65%)`; `Remaster` raises the budget while locking the anchor so the source placement survives, and fills LN sections with holds of the same length. All three are caps - the source density and the safety windows decide how much actually lands. The row is locked for Krrcream, and the standalone converter GUI also locks Krrcream Max/Min/Speed/Seed tuning.
-  - NK3 uses the bundled `models/NK3-P64-hybrid.onnx` with host beam32. The default is strict GPU; set `TENRIFF_NK3_DEVICE=CPU` for strict CPU execution. NPU and automatic fallback are unsupported, and conversion fails when execution does not occur on the requested device.
+  - NK3 combines bundled P64 with fixed-target generalized pattern MLP exports for 2K through 18K and host beam32. P64 defaults to strict GPU; `TENRIFF_NK3_DEVICE=CPU` selects strict CPU. The MLP verifies `EXECUTION_DEVICES` and tries NPU, GPU, then CPU; 1K uses P64 alone.
   - the standalone BMS key converter CLI/GUI can select the default `krrcream` path or deterministic `nK2 Native 50/50`; nK2 ignores Krrcream-only tuning controls
+  - official 1.4.5 builds/Windows archives do not build or ship the standalone BMS key-converter CLI/GUI; its top-level CMake option defaults `OFF` and the source is retained only for development regression
   - `mode.key_mode=none` keeps the chart's original key count and base pattern layout intact
 - Native difficulty:
   - BMS LV/CR calculation evaluates only LN head/tail miss-ms at 0.5x, so `300ms` is treated as `150ms`; runtime gameplay judgement windows remain unchanged
@@ -208,7 +209,7 @@ This is the document that the next agent or any new contributor should read firs
 
 ## Runtime / Packaging Rules
 - New user profiles are created automatically
-- The current stable P2P distribution line is `TenRiff 1.4.4`
+- The current stable P2P distribution line is `TenRiff 1.4.5`
 - Distribution packages do not include `Songs`
 - Distribution packages include the `Mainmusic/` scene slots `Main Menu / Options / Song Selecte / Multiplayer Lobby / Clear / Failed`; each `Name.mp3` plus numbered `Name 2.mp3` through `Name 64.mp3` siblings is discovered automatically and rotates on scene re-entry
 - Distribution updates include only built artifacts and required runtime assets

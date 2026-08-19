@@ -40,7 +40,7 @@
 
 - `backend` (string)
   - `polling | rawinput`
-  - 当前 `1.4.4` 发布线默认值为 `rawinput`
+  - 当前 `1.4.5` 发布线默认值为 `rawinput`
   - 可在 `Options -> Input Settings -> Backend` 或 `Options -> Profile Setup -> Input Backend` 中按 profile 选择
   - runtime fallback 不会把已保存值改写为 `polling`
   - 确认 RawInput 启动失败、注册目标丢失或 message window 退出后，本次应用运行期间 menu 与后续 gameplay 都会保持 Polling
@@ -143,10 +143,10 @@ chart loader/indexer 仅支持 BMS family（`.bms/.bme/.bml/.pms`）。旧 `enab
 - `key_conversion_algorithm` (string)
   - `krrcream | nk2 | nk3`
   - 在游戏内 `Mode Settings > Key Converter` 中选择 `Krrcream`、`KeyWeaver nK2` 或 `KeyWeaver NK3 ONNX`
-  - 默认值为 `krrcream`；NK3 在键数不变时也会 remaster，并默认使用 strict OpenVINO GPU
+  - 默认值为 `krrcream`；NK3 在键数不变时也会 remaster，P64 路径默认使用 strict OpenVINO GPU
   - Krrcream 只把原始 note 重排到目标 lane
   - nK2 在扩展键数时不会先向原始 pattern 加 note，而是在转换过程中直接向目标 layout 生成安全的辅助 note
-  - NK3 结合 P64 hybrid ONNX 与 host beam safety solver；可用 `TENRIFF_NK3_DEVICE=CPU` 选择 strict CPU；不支持 NPU 或自动 fallback
+  - NK3 结合 P64、目标专用 generalized MLP 与 host beam safety solver；`TENRIFF_NK3_DEVICE=CPU` 选择 strict P64 CPU，MLP 会验证并按 NPU、GPU、CPU 顺序尝试
 - `key_conversion_nk2_preset` (string)
   - `native | transform | remaster`；默认值为 `native`
   - 选择 nK2 的 `Native (12%)`、`Transform (35%)` 或 `Remaster (65%)`；Krrcream 下锁定该设置行

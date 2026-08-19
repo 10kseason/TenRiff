@@ -40,7 +40,7 @@ If a profile does not exist, it is created automatically on first launch.
 
 - `backend` (string)
   - `polling | rawinput`
-  - defaults to `rawinput` on the current `1.4.4` release line
+  - defaults to `rawinput` on the current `1.4.5` release line
   - selectable per profile under `Options -> Input Settings -> Backend` or `Options -> Profile Setup -> Input Backend`
   - runtime fallback never rewrites the saved value to `polling`
   - a confirmed RawInput startup failure, registration-target loss, or message-window exit latches Polling across menu and subsequent gameplay sessions for the current app run
@@ -60,7 +60,7 @@ If a profile does not exist, it is created automatically on first launch.
 - `judgement_hz` (int)
   - `1000 | 2000 | 4000 | 8000`
   - compatibility field kept in the input config
-  - the current `1.4.4` runtime no longer drives a separate audio-thread judgement sub-step loop from this value
+  - the current `1.4.5` runtime no longer drives a separate audio-thread judgement sub-step loop from this value
   - default is `4000` (`0.25ms`)
 - `debounce_ms` (double)
   - real Press/Release transitions are preserved; only duplicate same-state events are removed from pressed-state tracking
@@ -143,10 +143,10 @@ The chart loader and indexer are limited to BMS-family files (`.bms/.bme/.bml/.p
 - `key_conversion_algorithm` (string)
   - `krrcream | nk2 | nk3`
   - select `Krrcream`, `KeyWeaver nK2`, or `KeyWeaver NK3 ONNX` from in-game `Mode Settings > Key Converter`
-  - defaults to `krrcream`; NK3 also remasters unchanged key counts and uses strict OpenVINO GPU by default
+  - defaults to `krrcream`; NK3 also remasters unchanged key counts and its P64 path uses strict OpenVINO GPU by default
   - Krrcream only remaps source notes into target lanes
   - when expanding the key count, nK2 creates safe support notes directly in the target layout during conversion instead of pre-adding notes to the source
-  - NK3 combines P64 hybrid ONNX evaluation with the host beam safety solver; `TENRIFF_NK3_DEVICE=CPU` selects strict CPU execution; NPU and automatic fallback are unsupported
+  - NK3 combines P64, a target-specific generalized MLP, and the host beam safety solver; `TENRIFF_NK3_DEVICE=CPU` selects strict P64 CPU while the MLP verifies and tries NPU, GPU, then CPU
 - `key_conversion_nk2_preset` (string)
   - `native | transform | remaster`; defaults to `native`
   - selects nK2 `Native (12%)`, `Transform (35%)` or `Remaster (65%)`; the setting row is locked for Krrcream

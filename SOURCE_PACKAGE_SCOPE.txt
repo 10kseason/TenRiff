@@ -1,4 +1,4 @@
-TenRiff 1.4.4 open-source source package scope
+TenRiff 1.4.5 open-source source package scope
 
 Included in versioned source bundles:
 - CHANGELOG.md
@@ -18,6 +18,9 @@ Included in versioned source bundles:
 - launch_linux.sh
 - Mainmusic/
 - models/NK3-P64-hybrid.onnx
+- models/NK3-general-pattern-2K.onnx through models/NK3-general-pattern-18K.onnx
+- models/NK3-GENERAL-MLP-MODEL-CARD.md
+- models/NK3-ONNX-SHA256SUMS.txt
 - nk2/
 - config/
 - docs/
@@ -56,10 +59,10 @@ Excluded from versioned source bundles:
 - Memory for ai and Human Worker.txt
 - P_DA.bme
 - 10k-calc/
-- models/ (except `models/NK3-P64-hybrid.onnx`)
+- models/ (except the listed NK3 P64/generalized MLP release assets and documentation)
 - tools/onnx_upscaler/model/
 - *.pt, *.pth, *.ckpt, *.safetensors (private training checkpoints)
-- *.onnx (except the project-owned deterministic `models/NK3-P64-hybrid.onnx`)
+- *.onnx (except the project-owned NK3 P64 graph and generalized pattern MLP exports under `models/`)
 - *_public.json and *_verification.json (model-specific metadata)
 
 Notes:
@@ -68,4 +71,5 @@ Notes:
 - Local caches, packaged binaries, user profiles, and private working files are intentionally excluded.
 - Local LLM/tooling checkouts such as `external/llama.cpp/` are intentionally excluded from the public source package.
 - The repository license is MIT and should be shipped with both source and binary distributions.
-- The generic External ONNX Upscaler source and compatibility tools are included, but BGA upscaler models, checkpoints, training data, and model-specific verification metadata are excluded. The only bundled ONNX is the project-owned deterministic NK3 decision graph.
+- The generic External ONNX Upscaler source and compatibility tools are included, but BGA upscaler models, checkpoints, training data, and model-specific verification metadata are excluded. Bundled ONNX files are limited to the project-owned NK3 P64 graph and fixed-target generalized pattern MLP inference exports; raw charts, training caches, and checkpoints remain excluded.
+- Standalone BMS key-converter source is retained for development regression only. Official 1.4.5 binary archives do not contain its CLI or GUI executables, and the top-level build option defaults off.
