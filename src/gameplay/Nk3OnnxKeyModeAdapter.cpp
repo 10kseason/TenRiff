@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <cmath>
 #include <cstdint>
 #include <cstdlib>
@@ -47,11 +48,20 @@ constexpr int kCreatedJackWindowMs = 180;
 constexpr double kMinimumGapSeconds = 0.045;
 constexpr double kDistributionWindowSeconds = 2.0;
 constexpr double kCreatedKeepJackWindowSeconds = 0.500;
+constexpr double kTimeComparisonEpsilonSeconds = 1.0e-6;
 constexpr int kGeneratedLnContextMs = 1'000;
 constexpr int kGeneratedLnMinimumCount = 2;
 constexpr double kGeneratedLnMinimumRatio = 0.40;
 constexpr int kGeneratedLnMinimumDurationMs = 60;
 constexpr double kMinusInfinityTime = -1.0e30;
+constexpr int kPatternFeatureDim = 28;
+constexpr int kPatternBatchStates = 32;
+constexpr int kPatternOutputRoles = 2;
+constexpr double kPatternWeight = 0.15;
+constexpr double kPatternMaxResidual = 1.0;
+
+using PatternFeatures = std::array<float, kTargetLanes * kPatternFeatureDim>;
+using PatternScores = std::array<float, kTargetLanes * kCandidateTypes>;
 
 enum class Origin { Original, Shifted, Created };
 
@@ -316,7 +326,7 @@ std::filesystem::path executable_directory() {
     return std::filesystem::current_path();
 }
 
-std::filesystem::path model_path() {
+std::filesystem::path p64_model_path() {
     if (const char* configured = std::getenv("TENRIFF_NK3_MODEL")) {
         if (*configured != '\0') {
             return std::filesystem::path(configured);
@@ -328,6 +338,18 @@ std::filesystem::path model_path() {
     }
     return std::filesystem::current_path() / "models" / "NK3-P64-hybrid.onnx";
 }
+
+std::filesystem::path pattern_model_path(int target_keys) {
+    const std::string filename =
+        "NK3-general-pattern-" + std::to_string(target_keys) + "K.onnx";
+    const auto beside_executable = executable_directory() / "models" / filename;
+    if (std::filesystem::is_regular_file(beside_executable)) {
+        return beside_executable;
+    }
+    return std::filesystem::current_path() / "models" / filename;
+}
+
+class PatternMlpEvaluator;
 
 #if defined(TENRIFF_ENABLE_NK3_ONNX)
 class OpenVinoEvaluator {
@@ -343,7 +365,8 @@ public:
         queried_op_count_ = core_.query_model(model_, device_).size();
         compiled_ = core_.compile_model(model_, device_);
         execution_devices_ = compiled_.get_property(ov::execution_devices);
-        const bool strict = std::any_of(execution_devices_.begin(), execution_devices_.end(),
+        const bool strict = !execution_devices_.empty() &&
+                            std::all_of(execution_devices_.begin(), execution_devices_.end(),
                                         [&](const std::string& execution) {
                                             return execution == device_ ||
                                                    execution.rfind(device_ + ".", 0) == 0;
@@ -448,20 +471,175 @@ OpenVinoEvaluator& shared_evaluator(const std::filesystem::path& path,
     }
     return *evaluator;
 }
+
+class PatternMlpEvaluator {
+public:
+    PatternMlpEvaluator(const std::filesystem::path& path, int target_keys)
+        : target_keys_(target_keys), batch_rows_(target_keys * kPatternBatchStates) {
+        const auto available = core_.get_available_devices();
+        model_ = core_.read_model(path.wstring());
+        model_->reshape({{"features", ov::PartialShape{batch_rows_, kPatternFeatureDim}}});
+        op_count_ = model_->get_ordered_ops().size();
+        std::string failures;
+        for (const std::string candidate : {"NPU", "GPU", "CPU"}) {
+            if (std::find(available.begin(), available.end(), candidate) == available.end()) {
+                if (!failures.empty()) {
+                    failures += "; ";
+                }
+                failures += candidate + ": unavailable";
+                continue;
+            }
+            try {
+                const std::size_t queried = core_.query_model(model_, candidate).size();
+                auto compiled = core_.compile_model(model_, candidate);
+                auto execution_devices = compiled.get_property(ov::execution_devices);
+                const bool strict = !execution_devices.empty() &&
+                                    std::all_of(
+                                        execution_devices.begin(), execution_devices.end(),
+                                        [&](const std::string& execution) {
+                                            return execution == candidate ||
+                                                   execution.rfind(candidate + ".", 0) == 0;
+                                        });
+                if (!strict) {
+                    throw std::runtime_error("execution device mismatch");
+                }
+                device_ = candidate;
+                queried_op_count_ = queried;
+                compiled_ = std::move(compiled);
+                execution_devices_ = std::move(execution_devices);
+                features_ = ov::Tensor(
+                    ov::element::f32,
+                    {static_cast<std::size_t>(batch_rows_), kPatternFeatureDim});
+                request_ = compiled_.create_infer_request();
+                request_.set_tensor("features", features_);
+                return;
+            } catch (const std::exception& error) {
+                if (!failures.empty()) {
+                    failures += "; ";
+                }
+                failures += candidate + ": " + error.what();
+            }
+        }
+        throw std::runtime_error("pattern MLP NPU/GPU/CPU routing failed (" + failures + ")");
+    }
+
+    [[nodiscard]] std::vector<PatternScores> predict_batch(
+        const std::vector<PatternFeatures>& values) {
+        std::vector<PatternScores> result(values.size());
+        if (values.empty()) {
+            return result;
+        }
+        auto maximum = maximum_request_states_.load(std::memory_order_relaxed);
+        while (maximum < values.size() &&
+               !maximum_request_states_.compare_exchange_weak(
+                   maximum, values.size(), std::memory_order_relaxed)) {
+        }
+        std::lock_guard<std::mutex> lock(inference_mutex_);
+        for (std::size_t begin = 0; begin < values.size(); begin += kPatternBatchStates) {
+            const std::size_t count =
+                std::min<std::size_t>(kPatternBatchStates, values.size() - begin);
+            std::fill_n(features_.data<float>(),
+                        static_cast<std::size_t>(batch_rows_) * kPatternFeatureDim, 0.0f);
+            for (std::size_t index = 0; index < count; ++index) {
+                std::copy_n(
+                    values[begin + index].begin(), target_keys_ * kPatternFeatureDim,
+                    features_.data<float>() + index * target_keys_ * kPatternFeatureDim);
+            }
+            request_.infer();
+            const auto logits = request_.get_tensor("logits");
+            if (logits.get_size() <
+                static_cast<std::size_t>(batch_rows_) * kCandidateTypes) {
+                throw std::runtime_error("pattern MLP returned too few candidate logits");
+            }
+            for (std::size_t index = 0; index < count; ++index) {
+                std::copy_n(logits.data<const float>() +
+                                index * target_keys_ * kCandidateTypes,
+                            target_keys_ * kCandidateTypes,
+                            result[begin + index].begin());
+            }
+            inference_count_.fetch_add(1, std::memory_order_relaxed);
+            evaluated_state_count_.fetch_add(count, std::memory_order_relaxed);
+        }
+        return result;
+    }
+
+    [[nodiscard]] std::string evidence() const {
+        std::string devices;
+        for (const auto& device : execution_devices_) {
+            if (!devices.empty()) {
+                devices += ',';
+            }
+            devices += device;
+        }
+        return std::to_string(target_keys_) +
+               "K generalized pattern MLP evaluator=OpenVINO " + device_ +
+               " EXECUTION_DEVICES=" + devices +
+               " query=" + std::to_string(queried_op_count_) + "/" +
+               std::to_string(op_count_) + " inferences=" +
+               std::to_string(inference_count_.load(std::memory_order_relaxed)) +
+               " evaluated-states=" +
+               std::to_string(evaluated_state_count_.load(std::memory_order_relaxed)) +
+               " batch-capacity=" + std::to_string(kPatternBatchStates) +
+               " schema=v3 features=" + std::to_string(kPatternFeatureDim) +
+               " roles=" + std::to_string(kPatternOutputRoles) +
+               " residual-bound=" + std::to_string(kPatternMaxResidual) +
+               " max-requested-states=" +
+               std::to_string(maximum_request_states_.load(std::memory_order_relaxed));
+    }
+
+private:
+    int target_keys_ = 0;
+    std::string device_;
+    ov::Core core_;
+    std::shared_ptr<ov::Model> model_;
+    ov::CompiledModel compiled_;
+    std::size_t op_count_ = 0;
+    std::size_t queried_op_count_ = 0;
+    std::vector<std::string> execution_devices_;
+    int batch_rows_ = 0;
+    ov::Tensor features_;
+    ov::InferRequest request_;
+    std::mutex inference_mutex_;
+    std::atomic<std::uint64_t> inference_count_{0};
+    std::atomic<std::uint64_t> evaluated_state_count_{0};
+    std::atomic<std::size_t> maximum_request_states_{0};
+};
+
+PatternMlpEvaluator& shared_pattern_evaluator(const std::filesystem::path& path,
+                                              int target_keys) {
+    static std::mutex evaluator_mutex;
+    static std::map<std::string, std::unique_ptr<PatternMlpEvaluator>> evaluators;
+    const std::string key = path.u8string() + '\n' + std::to_string(target_keys);
+    std::lock_guard<std::mutex> lock(evaluator_mutex);
+    auto& evaluator = evaluators[key];
+    if (!evaluator) {
+        evaluator = std::make_unique<PatternMlpEvaluator>(path, target_keys);
+    }
+    return *evaluator;
+}
 #endif
 
 std::size_t candidate_offset(int slice, int lane, int type) {
     return (static_cast<std::size_t>(slice) * kTargetLanes + lane) * kCandidateTypes + type;
 }
 
-std::vector<Candidate> ranked_candidates(const BlockOutput& output, int slice,
-                                         int type_begin, int type_end) {
+std::vector<Candidate> ranked_candidates(
+    const BlockOutput& output, int slice, int type_begin, int type_end,
+    const std::array<int64_t, kTargetLanes * kCandidateTypes>* pattern_scores = nullptr) {
     std::vector<Candidate> ranked;
     for (int lane = 0; lane < kTargetLanes; ++lane) {
         for (int type = type_begin; type < type_end; ++type) {
             const std::size_t offset = candidate_offset(slice, lane, type);
             if (output.valid[offset] != 0) {
-                ranked.push_back({output.scores[offset], lane * kCandidateTypes + type, lane});
+                int64_t score = output.scores[offset];
+                if (pattern_scores) {
+                    score += (*pattern_scores)[lane * kCandidateTypes + type];
+                }
+                ranked.push_back({
+                    static_cast<int32_t>(std::clamp<int64_t>(
+                        score, std::numeric_limits<int32_t>::min(),
+                        std::numeric_limits<int32_t>::max())),
+                    lane * kCandidateTypes + type, lane});
             }
         }
     }
@@ -499,6 +677,135 @@ double lane_coverage_need(const std::array<int, kTargetLanes>& lane_use, int tot
     return -std::min(1.0, (ratio - 1.0) * 0.9);
 }
 
+double pattern_gap_feature(double seconds) {
+    if (!std::isfinite(seconds) || seconds >= 1.0e20) {
+        return 1.0;
+    }
+    seconds = std::max(0.0, seconds);
+    return std::min(1.0, std::log1p(seconds * 8.0) / std::log1p(16.0));
+}
+
+PatternFeatures build_pattern_features(
+    const BeamState& state, const std::vector<std::pair<double, int>>& recent_events,
+    int source_lane, int source_keys, double current_time, int target_keys,
+    double source_chord_size_ratio, double local_density, double phase, bool has_hold,
+    double duration) {
+    std::vector<std::pair<double, int>> active_recent;
+    std::array<float, kTargetLanes> recent_counts{};
+    for (const auto& event : recent_events) {
+        if (event.first < current_time - kDistributionWindowSeconds ||
+            event.first >= current_time - 1.0e-7 || event.second < 0 ||
+            event.second >= target_keys) {
+            continue;
+        }
+        active_recent.push_back(event);
+        recent_counts[event.second] += 1.0f;
+    }
+
+    std::vector<int> previous_lanes;
+    if (!active_recent.empty()) {
+        const auto previous = std::max_element(
+            active_recent.begin(), active_recent.end(),
+            [](const auto& lhs, const auto& rhs) { return lhs.first < rhs.first; });
+        for (const auto& event : active_recent) {
+            if (std::abs(event.first - previous->first) <= 1.0e-7) {
+                previous_lanes.push_back(event.second);
+            }
+        }
+    }
+
+    const bool has_previous = !previous_lanes.empty();
+    double previous_center = (target_keys - 1) * 0.5;
+    double previous_spread = 0.0;
+    double previous_size = 0.0;
+    if (has_previous) {
+        previous_center = std::accumulate(previous_lanes.begin(), previous_lanes.end(), 0.0) /
+                          previous_lanes.size();
+        const auto [minimum, maximum] =
+            std::minmax_element(previous_lanes.begin(), previous_lanes.end());
+        previous_spread = static_cast<double>(*maximum - *minimum) /
+                          std::max(1, target_keys - 1);
+        std::set<int> unique(previous_lanes.begin(), previous_lanes.end());
+        previous_size = std::min(1.0, static_cast<double>(unique.size()) / target_keys);
+    }
+
+    const int total_use = std::accumulate(state.lane_use.begin(),
+                                          state.lane_use.begin() + target_keys, 0);
+    const double recent_total = std::accumulate(recent_counts.begin(),
+                                                recent_counts.begin() + target_keys, 0.0);
+    const double lane_scale = std::max(1, target_keys - 1);
+    const double source_position = source_keys > 1
+                                       ? static_cast<double>(source_lane) /
+                                             static_cast<double>(source_keys - 1)
+                                       : 0.5;
+    const int mapped_lane = std::clamp(
+        static_cast<int>(std::nearbyint(source_position * (target_keys - 1))),
+        0, target_keys - 1);
+    const double source_to_target =
+        std::min(2.0, source_keys / static_cast<double>(target_keys)) - 1.0;
+    const double target_to_source =
+        std::min(2.0, target_keys / static_cast<double>(source_keys)) - 1.0;
+    const double key_delta =
+        std::clamp((target_keys - source_keys) / 16.0, -1.0, 1.0);
+    PatternFeatures rows{};
+    for (int lane = 0; lane < target_keys; ++lane) {
+        const double lane_position = lane / lane_scale;
+        const double global_ratio =
+            (state.lane_use[lane] + 0.5) /
+            (total_use + 0.5 * target_keys) * target_keys;
+        const double recent_ratio =
+            (recent_counts[lane] + 0.25) /
+            (recent_total + 0.25 * target_keys) * target_keys;
+        const double left_gap = lane > 0
+                                    ? pattern_gap_feature(
+                                          current_time - state.last_time[lane - 1])
+                                    : 1.0;
+        const double right_gap = lane + 1 < target_keys
+                                     ? pattern_gap_feature(
+                                           current_time - state.last_time[lane + 1])
+                                     : 1.0;
+        const double delta_center = (lane - previous_center) / lane_scale;
+        const double split = target_keys / 2.0;
+        const double same_hand = has_previous
+                                     ? static_cast<double>((lane < split) ==
+                                                           (previous_center < split))
+                                     : 0.0;
+        const std::array<float, kPatternFeatureDim> row = {
+            static_cast<float>(lane_position * 2.0 - 1.0),
+            static_cast<float>(std::min(3.0, global_ratio)),
+            static_cast<float>(std::min(3.0, recent_ratio)),
+            state.lane_use[lane] == 0 ? 1.0f : 0.0f,
+            static_cast<float>(pattern_gap_feature(current_time - state.last_time[lane])),
+            static_cast<float>(left_gap),
+            static_cast<float>(right_gap),
+            static_cast<float>(delta_center),
+            static_cast<float>(std::abs(delta_center)),
+            static_cast<float>(previous_spread),
+            static_cast<float>(previous_size),
+            static_cast<float>(std::clamp(source_chord_size_ratio, 0.0, 1.0)),
+            static_cast<float>(std::clamp(local_density, 0.0, 1.0)),
+            static_cast<float>(std::sin(2.0 * 3.14159265358979323846 * phase)),
+            static_cast<float>(std::cos(2.0 * 3.14159265358979323846 * phase)),
+            has_hold ? 1.0f : 0.0f,
+            static_cast<float>(std::clamp(duration / 2.0, 0.0, 1.0)),
+            lane == 0 || lane == target_keys - 1 ? 1.0f : 0.0f,
+            static_cast<float>(same_hand),
+            has_previous ? 1.0f : 0.0f,
+            static_cast<float>(source_position * 2.0 - 1.0),
+            static_cast<float>(mapped_lane / lane_scale * 2.0 - 1.0),
+            static_cast<float>((lane - mapped_lane) / lane_scale),
+            static_cast<float>(std::abs((lane - mapped_lane) / lane_scale)),
+            static_cast<float>(source_to_target),
+            static_cast<float>(target_to_source),
+            lane == mapped_lane ? 1.0f : 0.0f,
+            static_cast<float>(key_delta),
+        };
+        std::copy(row.begin(), row.end(),
+                  rows.begin() + static_cast<std::ptrdiff_t>(lane * kPatternFeatureDim));
+    }
+    return rows;
+}
+
 BeamState empty_state() {
     BeamState state;
     state.last_time.fill(kMinusInfinityTime);
@@ -518,10 +825,11 @@ bool signature_less(const BeamState& lhs, const BeamState& rhs) {
 
 BeamState solve_candidate_field(const BlockData& block, const BlockOutput& output,
                                 const std::array<int64_t, kSlices>& addition_count,
-                                int target_keys, int beam_width,
+                                int source_keys, int target_keys, int beam_width,
                                 const std::optional<BeamState>& initial_state,
                                 bool allow_source_drops,
-                                const std::array<int, kSlices>* forced_base_lanes) {
+                                const std::array<int, kSlices>* forced_base_lanes,
+                                PatternMlpEvaluator* pattern_mlp) {
     BeamState start = initial_state.value_or(empty_state());
     start.score = 0;
     start.signature.clear();
@@ -537,27 +845,83 @@ BeamState solve_candidate_field(const BlockData& block, const BlockOutput& outpu
             std::max(0.0f, block.solver_notes[slice * kNoteFeatures + 3]);
         const int source_lane =
             static_cast<int>(std::llround(block.solver_notes[slice * kNoteFeatures + 1]));
-        auto base_ranked = best_per_lane(ranked_candidates(output, slice, 0, 2));
-        if (forced_base_lanes && (*forced_base_lanes)[slice] >= 0) {
-            const int forced = (*forced_base_lanes)[slice];
-            base_ranked.erase(
-                std::remove_if(base_ranked.begin(), base_ranked.end(),
-                               [&](const Candidate& candidate) { return candidate.lane != forced; }),
-                base_ranked.end());
-        }
-        auto add_ranked = best_per_lane(ranked_candidates(output, slice, 2, kCandidateTypes));
         std::vector<BeamState> expanded;
 
-        for (const auto& state : beam) {
+        struct PreparedState {
             std::vector<std::pair<double, int>> recent;
             std::array<int, kTargetLanes> recent_use{};
+            std::array<int64_t, kTargetLanes * kCandidateTypes> pattern_scores{};
+        };
+        std::vector<PreparedState> prepared(beam.size());
+#if defined(TENRIFF_ENABLE_NK3_ONNX)
+        std::vector<PatternFeatures> pattern_features;
+        if (pattern_mlp) {
+            pattern_features.reserve(beam.size());
+        }
+#endif
+
+        for (std::size_t state_index = 0; state_index < beam.size(); ++state_index) {
+            const auto& state = beam[state_index];
+            auto& state_data = prepared[state_index];
             for (const auto& event : state.recent_events) {
                 if (event.first >= time - kDistributionWindowSeconds) {
-                    recent.push_back(event);
-                    ++recent_use[event.second];
+                    state_data.recent.push_back(event);
+                    ++state_data.recent_use[event.second];
                 }
             }
+#if defined(TENRIFF_ENABLE_NK3_ONNX)
+            if (pattern_mlp) {
+                pattern_features.push_back(build_pattern_features(
+                    state, state_data.recent, source_lane, source_keys, time, target_keys,
+                    block.solver_notes[slice * kNoteFeatures + 8],
+                    block.solver_notes[slice * kNoteFeatures + 7],
+                    block.solver_notes[slice * kNoteFeatures + 5],
+                    block.solver_notes[slice * kNoteFeatures + 4] > 0.5f,
+                    duration));
+            }
+#endif
+        }
+
+#if defined(TENRIFF_ENABLE_NK3_ONNX)
+        if (pattern_mlp) {
+            const auto pattern_logits = pattern_mlp->predict_batch(pattern_features);
+            for (std::size_t state_index = 0; state_index < beam.size(); ++state_index) {
+                for (int lane = 0; lane < target_keys; ++lane) {
+                    for (int type = 0; type < kCandidateTypes; ++type) {
+                        const std::size_t offset = lane * kCandidateTypes + type;
+                        const double clipped = std::clamp(
+                            static_cast<double>(pattern_logits[state_index][offset]),
+                            -kPatternMaxResidual, kPatternMaxResidual);
+                        prepared[state_index].pattern_scores[offset] =
+                            static_cast<int64_t>(std::nearbyint(
+                                clipped * kPatternWeight * kPressureScale));
+                    }
+                }
+            }
+        }
+#else
+        (void)pattern_mlp;
+#endif
+
+        for (std::size_t state_index = 0; state_index < beam.size(); ++state_index) {
+            const auto& state = beam[state_index];
+            const auto& recent = prepared[state_index].recent;
+            const auto& recent_use = prepared[state_index].recent_use;
             const int recent_total = static_cast<int>(recent.size());
+            const auto& pattern_scores = prepared[state_index].pattern_scores;
+            auto base_ranked = best_per_lane(
+                ranked_candidates(output, slice, 0, 2, &pattern_scores));
+            if (forced_base_lanes && (*forced_base_lanes)[slice] >= 0) {
+                const int forced = (*forced_base_lanes)[slice];
+                base_ranked.erase(
+                    std::remove_if(base_ranked.begin(), base_ranked.end(),
+                                   [&](const Candidate& candidate) {
+                                       return candidate.lane != forced;
+                                   }),
+                    base_ranked.end());
+            }
+            const auto add_ranked = best_per_lane(
+                ranked_candidates(output, slice, 2, kCandidateTypes, &pattern_scores));
             for (const auto& base : base_ranked) {
                 const bool same_source = state.last_source[base.lane] == source_lane;
                 const double inherited_hold_end =
@@ -572,12 +936,15 @@ BeamState solve_candidate_field(const BlockData& block, const BlockOutput& outpu
                 }
                 if (state.last_source[base.lane] >= 0 && !same_source &&
                     time - state.last_time[base.lane] <=
-                        kCreatedJackWindowMs / 1000.0) {
+                        kCreatedJackWindowMs / 1000.0 +
+                            kTimeComparisonEpsilonSeconds) {
                     continue;
                 }
                 if (base.id % kCandidateTypes == 0 && state.last_source[base.lane] >= 0 &&
                     !same_source &&
-                    time - state.last_time[base.lane] <= kCreatedKeepJackWindowSeconds) {
+                    time - state.last_time[base.lane] <=
+                        kCreatedKeepJackWindowSeconds +
+                            kTimeComparisonEpsilonSeconds) {
                     continue;
                 }
 
@@ -591,7 +958,8 @@ BeamState solve_candidate_field(const BlockData& block, const BlockOutput& outpu
                     if (state.last_source[candidate.lane] >= 0 &&
                         state.last_source[candidate.lane] != source_lane &&
                         time - state.last_time[candidate.lane] <=
-                            kCreatedKeepJackWindowSeconds) {
+                            kCreatedKeepJackWindowSeconds +
+                                kTimeComparisonEpsilonSeconds) {
                         continue;
                     }
                     available.push_back(candidate);
@@ -689,12 +1057,14 @@ BeamState solve_candidate_field(const BlockData& block, const BlockOutput& outpu
 }
 
 std::pair<BeamState, bool> solve_with_retry(
-    const BlockData& block, const BlockOutput& output, int target_keys,
+    const BlockData& block, const BlockOutput& output, int source_keys, int target_keys,
     const std::optional<BeamState>& initial_state, bool allow_source_drops,
-    const std::array<int, kSlices>* forced_base_lanes) {
+    const std::array<int, kSlices>* forced_base_lanes,
+    PatternMlpEvaluator* pattern_mlp) {
     try {
-        return {solve_candidate_field(block, output, output.addition_count, target_keys, 32,
-                                      initial_state, false, forced_base_lanes),
+        return {solve_candidate_field(block, output, output.addition_count,
+                                      source_keys, target_keys, 32,
+                                      initial_state, false, forced_base_lanes, pattern_mlp),
                 false};
     } catch (const std::runtime_error& error) {
         if (std::string(error.what()).find("no valid hybrid solver transition") ==
@@ -704,8 +1074,9 @@ std::pair<BeamState, bool> solve_with_retry(
     }
     std::array<int64_t, kSlices> no_additions{};
     try {
-        return {solve_candidate_field(block, output, no_additions, target_keys, 256,
-                                      initial_state, false, forced_base_lanes),
+        return {solve_candidate_field(block, output, no_additions,
+                                      source_keys, target_keys, 256,
+                                      initial_state, false, forced_base_lanes, pattern_mlp),
                 true};
     } catch (const std::runtime_error& error) {
         if (!allow_source_drops ||
@@ -714,8 +1085,9 @@ std::pair<BeamState, bool> solve_with_retry(
             throw;
         }
     }
-    return {solve_candidate_field(block, output, no_additions, target_keys, 256,
-                                  initial_state, true, forced_base_lanes),
+    return {solve_candidate_field(block, output, no_additions,
+                                  source_keys, target_keys, 256,
+                                  initial_state, true, forced_base_lanes, pattern_mlp),
             true};
 }
 
@@ -914,15 +1286,19 @@ repair_created_notes(const std::vector<PlacedNote>& objects, int target_keys) {
     return {std::move(accepted), relocated, dropped};
 }
 
-QualityReport inspect_quality(const std::vector<PlacedNote>& objects, int target_keys) {
+QualityReport inspect_quality(const std::vector<PlacedNote>& objects, int target_keys,
+                              const GameplayChart& source_chart) {
     QualityReport report;
     std::array<std::vector<PlacedNote>, kTargetLanes> by_lane;
     std::map<int64_t, int> by_time;
+    const auto start_sample = [&](const PlacedNote& note) {
+        return source_chart.notes.at(note.source_index).start_sample;
+    };
     for (const auto& note : objects) {
         if (note.output_lane >= 0 && note.output_lane < target_keys) {
             by_lane[note.output_lane].push_back(note);
         }
-        ++by_time[note.time_ms];
+        ++by_time[start_sample(note)];
     }
     for (const auto& [time, count] : by_time) {
         (void)time;
@@ -930,14 +1306,17 @@ QualityReport inspect_quality(const std::vector<PlacedNote>& objects, int target
     }
     for (int lane = 0; lane < target_keys; ++lane) {
         auto& notes = by_lane[lane];
-        std::sort(notes.begin(), notes.end(), [](const PlacedNote& lhs, const PlacedNote& rhs) {
-            return std::tuple{lhs.time_ms, lhs.source_index, static_cast<int>(lhs.origin)} <
-                   std::tuple{rhs.time_ms, rhs.source_index, static_cast<int>(rhs.origin)};
+        std::sort(notes.begin(), notes.end(), [&](const PlacedNote& lhs, const PlacedNote& rhs) {
+            return std::tuple{start_sample(lhs), lhs.source_index,
+                              static_cast<int>(lhs.origin)} <
+                   std::tuple{start_sample(rhs), rhs.source_index,
+                              static_cast<int>(rhs.origin)};
         });
         for (std::size_t index = 1; index < notes.size(); ++index) {
             const auto& earlier = notes[index - 1];
             const auto& later = notes[index];
-            report.same_time_collisions += earlier.time_ms == later.time_ms ? 1 : 0;
+            report.same_time_collisions +=
+                start_sample(earlier) == start_sample(later) ? 1 : 0;
             report.long_note_conflicts +=
                 earlier.hold() && later.time_ms <= earlier.end_ms ? 1 : 0;
             if (later.time_ms - earlier.end_ms < 30 &&
@@ -988,11 +1367,21 @@ convert_key_mode_chart_nk3_onnx(const GameplayChart& chart,
     }
 
     try {
-        const auto path = model_path();
+        const auto path = p64_model_path();
         if (!std::filesystem::is_regular_file(path)) {
             throw std::runtime_error("model not found: " + path.u8string());
         }
         OpenVinoEvaluator& evaluator = shared_evaluator(path, selected_device());
+        PatternMlpEvaluator* pattern_mlp = nullptr;
+        if (options.target_lane_count >= 2) {
+            const auto pattern_path = pattern_model_path(options.target_lane_count);
+            if (!std::filesystem::is_regular_file(pattern_path)) {
+                throw std::runtime_error("generalized pattern MLP model not found: " +
+                                         pattern_path.u8string());
+            }
+            pattern_mlp = &shared_pattern_evaluator(pattern_path,
+                                                    options.target_lane_count);
+        }
         ModelState model_state;
         std::optional<BeamState> solver_state;
         std::vector<PlacedNote> placed;
@@ -1019,8 +1408,8 @@ convert_key_mode_chart_nk3_onnx(const GameplayChart& chart,
             bool retried = false;
             try {
                 std::tie(solved, retried) = solve_with_retry(
-                    block, output, options.target_lane_count, solver_state,
-                    compression, forced ? &*forced : nullptr);
+                    block, output, source_keys, options.target_lane_count, solver_state,
+                    compression, forced ? &*forced : nullptr, pattern_mlp);
             } catch (const std::runtime_error& error) {
                 if (compression || stable_fallback ||
                     std::string(error.what()).find("no valid hybrid solver transition") ==
@@ -1035,8 +1424,8 @@ convert_key_mode_chart_nk3_onnx(const GameplayChart& chart,
                 forced = direct_base_lanes(notes, begin, source_keys,
                                            options.target_lane_count);
                 std::tie(solved, retried) = solve_with_retry(
-                    block, output, options.target_lane_count, solver_state,
-                    false, &*forced);
+                    block, output, source_keys, options.target_lane_count, solver_state,
+                    false, &*forced, pattern_mlp);
             }
             safety_retries += retried ? 1 : 0;
             if (stable_fallback) {
@@ -1100,7 +1489,7 @@ convert_key_mode_chart_nk3_onnx(const GameplayChart& chart,
         int dropped_additions = 0;
         std::tie(placed, relocated, dropped_additions) =
             repair_created_notes(placed, options.target_lane_count);
-        const QualityReport quality = inspect_quality(placed, options.target_lane_count);
+        const QualityReport quality = inspect_quality(placed, options.target_lane_count, chart);
         if (!quality.safe()) {
             throw std::runtime_error(
                 "unsafe output (collisions=" + std::to_string(quality.same_time_collisions) +
@@ -1157,6 +1546,15 @@ convert_key_mode_chart_nk3_onnx(const GameplayChart& chart,
         result.converted = true;
         result.warnings.push_back("NK3 P64 hybrid ONNX + host beam32 " +
                                   evaluator.evidence() + " (strict, no device fallback).");
+        if (pattern_mlp) {
+            result.warnings.push_back(
+                "NK3 target routing: " + pattern_mlp->evidence() +
+                " (NPU preferred, GPU then CPU fallback).");
+        } else {
+            result.warnings.push_back(
+                "NK3 target routing: generalized pattern MLP off for 1K; "
+                "using P64 ONNX only.");
+        }
         result.warnings.push_back(
             "NK3 remapped " + std::to_string(source_keys) + "K to " +
             std::to_string(options.target_lane_count) + "K (source=" +

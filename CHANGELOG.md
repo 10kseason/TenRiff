@@ -2,6 +2,27 @@
 
 TenRiff의 사용자/배포 관점에서 의미 있는 변경만 간단히 기록합니다.
 
+## [1.4.5] - 2026-08-19
+
+### Added
+
+- NK3에 lane-shared schema-v3 일반화 패턴 MLP를 결합하고 2K부터 18K까지 목표 키 수별 고정 ONNX로 배포합니다. v3는 원본 chord 크기 비율을 입력으로 사용하고 addition-role 점수를 target lane 그룹 안에서 중심화합니다.
+- 패턴 MLP는 28개 관계 feature와 8개 후보 role을 batch32로 평가하며, 실제 `EXECUTION_DEVICES`를 확인해 NPU, GPU, CPU 순서로 시도합니다. 1K 목표는 모델 schema 경계 때문에 기존 P64만 사용합니다.
+- 1K–18K source와 1K–18K target의 324개 NK3 경로를 변환 완료와 구조 안전성 기준으로 회귀 검사합니다.
+
+### Changed
+
+- MLP 점수는 최대 1.0, host weight 0.15의 제한된 후보 정렬 residual로만 사용합니다. P64 validity와 host beam/safety retry/final quality 검사가 충돌, 롱노트 겹침, 최소 간격, 불가능 chord, 새 연타 방지의 최종 권한을 유지합니다.
+- 같은 millisecond로 반올림되지만 서로 다른 sample인 노트를 충돌로 오판하지 않도록 최종 검사를 exact source sample 기준으로 수정했습니다.
+
+### Limitations
+
+- 교체된 일반화 MLP는 10K 학습 목표를 선언하지만 제공 NPZ에는 데이터셋 manifest나 학습 metric이 포함되지 않았습니다. 324개 자동 테스트는 통합과 구조 안전을 검증하지만 모든 키 수의 음악적 패턴 품질을 보증하지 않으므로 실제 플레이 검증은 별도입니다.
+
+### Release
+
+- 정식 자산은 `TenRiff-1.4.5.zip`, `TenRiff-1.4.5-source.zip`, `TenRiff-1.4.5-SHA256SUMS.txt`입니다. Windows ZIP은 TenRiff 본체, NK3 P64/일반화 MLP 모델, OpenVINO 2026.2.1 GPU/CPU runtime, 사용 가능한 NPU runtime 구성요소, 원본 라이선스/서드파티 고지를 포함하며 standalone BMS key converter 실행 파일은 포함하지 않습니다.
+
 ## [1.4.4] - 2026-08-16
 
 ### Added

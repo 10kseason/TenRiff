@@ -367,8 +367,8 @@ void MenuApp::populate_mode_settings_render_data(render::MenuRenderData& render)
     render.generic.notes.push_back(ui_text("None keeps the chart's original key count and pattern layout instead of forcing a conversion.",
                                            "원본은 강제 변환 없이 차트의 원래 키 수와 패턴 배치를 유지합니다."));
     render.generic.notes.push_back(ui_text(
-        "Krrcream remaps source notes only. nK2 keeps the legacy engine; NK3 uses the P64 hybrid ONNX evaluator plus the host beam safety solver, with strict GPU execution by default and optional CPU execution.",
-        "Krrcream은 원본 노트만 재배치합니다. nK2는 기존 엔진을 유지하고, NK3는 P64 하이브리드 ONNX 평가기와 호스트 빔 안전 솔버를 사용하며 기본 실행 장치는 엄격한 GPU이고 CPU를 선택할 수 있습니다."));
+        "Krrcream remaps source notes only. nK2 keeps the legacy engine; NK3 combines strict P64 evaluation, a generalized target MLP (NPU/GPU/CPU), and the authoritative host beam safety solver.",
+        "Krrcream은 원본 노트만 재배치합니다. nK2는 기존 엔진을 유지하고, NK3는 strict P64 평가, 일반화 목표 MLP(NPU/GPU/CPU), 최종 호스트 빔 안전 솔버를 결합합니다."));
     render.generic.notes.push_back(ui_text(
         "Mirror itself is seedless. Key Mode conversion runs first and may still use Random Seed.",
         "미러 자체는 시드를 쓰지 않지만, 먼저 실행되는 키 모드 변환은 랜덤 시드를 사용할 수 있습니다."));

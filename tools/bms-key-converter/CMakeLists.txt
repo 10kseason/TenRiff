@@ -10,18 +10,29 @@ if(MSVC)
 endif()
 
 set(TENRIFF_SOURCE_ROOT "${CMAKE_CURRENT_LIST_DIR}/../.." CACHE PATH "Path to the TenRiff source root")
-option(TENRIFF_ENABLE_NK3_ONNX "Enable the OpenVINO NK3 P64 hybrid converter" ON)
+option(TENRIFF_ENABLE_NK3_ONNX "Enable the OpenVINO NK3 P64 + generalized MLP converter" ON)
 set(TENRIFF_NK3_MODEL "${TENRIFF_SOURCE_ROOT}/models/NK3-P64-hybrid.onnx")
+set(TENRIFF_NK3_PATTERN_MODELS)
+foreach(target_keys RANGE 2 18)
+    list(APPEND TENRIFF_NK3_PATTERN_MODELS
+        "${TENRIFF_SOURCE_ROOT}/models/NK3-general-pattern-${target_keys}K.onnx")
+endforeach()
 set(TENRIFF_NK3_ONNX_AVAILABLE OFF)
 if(TENRIFF_ENABLE_NK3_ONNX)
     find_package(OpenVINO QUIET COMPONENTS Runtime)
-    if(OpenVINO_FOUND AND EXISTS "${TENRIFF_NK3_MODEL}")
+    set(TENRIFF_NK3_MODELS_COMPLETE TRUE)
+    foreach(model_path IN LISTS TENRIFF_NK3_PATTERN_MODELS)
+        if(NOT EXISTS "${model_path}")
+            set(TENRIFF_NK3_MODELS_COMPLETE FALSE)
+        endif()
+    endforeach()
+    if(OpenVINO_FOUND AND EXISTS "${TENRIFF_NK3_MODEL}" AND TENRIFF_NK3_MODELS_COMPLETE)
         set(TENRIFF_NK3_ONNX_AVAILABLE ON)
-        message(STATUS "NK3 P64 hybrid ONNX enabled via OpenVINO")
+        message(STATUS "NK3 P64 + generalized 2K-18K MLP enabled via OpenVINO")
     elseif(NOT OpenVINO_FOUND)
         message(WARNING "OpenVINO was not found; NK3 ONNX will report unavailable")
     else()
-        message(WARNING "NK3 model was not found at ${TENRIFF_NK3_MODEL}")
+        message(WARNING "One or more NK3 P64/generalized MLP models were not found")
     endif()
 endif()
 
@@ -109,6 +120,16 @@ if(TENRIFF_NK3_ONNX_AVAILABLE)
                 list(APPEND TENRIFF_OPENVINO_RUNTIME_DLLS "${dll_path}")
             endif()
         endforeach()
+        foreach(runtime_name
+                openvino_intel_npu_plugin.dll
+                openvino_intel_npu_compiler_loader.dll
+                openvino_intel_npu_compiler.dll
+                cache.json)
+            set(runtime_path "${TENRIFF_OPENVINO_RUNTIME_DIR}/${runtime_name}")
+            if(EXISTS "${runtime_path}")
+                list(APPEND TENRIFF_OPENVINO_RUNTIME_DLLS "${runtime_path}")
+            endif()
+        endforeach()
     endif()
     foreach(target_name bms_key_converter bms_key_converter_gui)
         if(TARGET ${target_name})
@@ -120,9 +141,12 @@ if(TENRIFF_NK3_ONNX_AVAILABLE)
                         "${TENRIFF_NK3_MODEL}"
                         "$<TARGET_FILE_DIR:${target_name}>/models/NK3-P64-hybrid.onnx"
                     COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                        ${TENRIFF_NK3_PATTERN_MODELS}
+                        "$<TARGET_FILE_DIR:${target_name}>/models"
+                    COMMAND ${CMAKE_COMMAND} -E copy_if_different
                         ${TENRIFF_OPENVINO_RUNTIME_DLLS}
                         "$<TARGET_FILE_DIR:${target_name}>"
-                    COMMENT "Copying NK3 model and GPU/CPU OpenVINO runtime for ${target_name}"
+                    COMMENT "Copying NK3 models and OpenVINO GPU/CPU/NPU runtime for ${target_name}"
                     COMMAND_EXPAND_LISTS)
             else()
                 add_custom_command(TARGET ${target_name} POST_BUILD
@@ -131,7 +155,11 @@ if(TENRIFF_NK3_ONNX_AVAILABLE)
                     COMMAND ${CMAKE_COMMAND} -E copy_if_different
                         "${TENRIFF_NK3_MODEL}"
                         "$<TARGET_FILE_DIR:${target_name}>/models/NK3-P64-hybrid.onnx"
-                    COMMENT "Copying the NK3 model for ${target_name}")
+                    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                        ${TENRIFF_NK3_PATTERN_MODELS}
+                        "$<TARGET_FILE_DIR:${target_name}>/models"
+                    COMMENT "Copying the NK3 models for ${target_name}"
+                    COMMAND_EXPAND_LISTS)
             endif()
         endif()
     endforeach()

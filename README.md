@@ -2,9 +2,9 @@
 
 Language: Korean | [English](README.en.md) | [简体中文](README.zh-CN.md) | [日本語](README.ja.md)
 
-TenRiff는 Windows GUI 기반 BMS 리듬게임 런타임/런처 프로젝트입니다. 현재 정식 버전은 `1.4.4`이며, 차트 입력은 BMS 계열(`.bms/.bme/.bml/.pms`) 전용입니다. Graphics Settings에서 권리 정리된 외부 ONNX 모델을 선택해 BGA/BGI 확대에 사용할 수 있습니다. 공개 패키지에는 BGA 업스케일러 모델을 넣지 않으며, 키 모드 변환에 필요한 소형 NK3 P64 결정 모델만 포함합니다. MIT 라이선스를 사용하며, 번들된 서드파티 고지는 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)에 정리합니다.
+TenRiff는 Windows GUI 기반 BMS 리듬게임 런타임/런처 프로젝트입니다. 현재 정식 버전은 `1.4.5`이며, 차트 입력은 BMS 계열(`.bms/.bme/.bml/.pms`) 전용입니다. Graphics Settings에서 권리 정리된 외부 ONNX 모델을 선택해 BGA/BGI 확대에 사용할 수 있습니다. 공개 패키지에는 BGA 업스케일러 모델을 넣지 않으며, 키 모드 변환용 NK3 P64 결정 모델과 일반화 패턴 MLP만 포함합니다. MIT 라이선스를 사용하며, 번들된 서드파티 고지는 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)에 정리합니다.
 
-이 README는 "프로젝트를 처음 열었을 때 무엇을 보면 되는지"를 설명하는 입문 문서입니다. 더 자세한 현재 동작, 현재 `1.4.4` 프로젝트 상태, `1.1.2 final stable` 기준선, 설정 구조, 설계 문서는 [`docs/README.md`](docs/README.md)부터 이어서 읽는 구조를 기준으로 작성했습니다.
+이 README는 "프로젝트를 처음 열었을 때 무엇을 보면 되는지"를 설명하는 입문 문서입니다. 더 자세한 현재 동작, 현재 `1.4.5` 프로젝트 상태, `1.1.2 final stable` 기준선, 설정 구조, 설계 문서는 [`docs/README.md`](docs/README.md)부터 이어서 읽는 구조를 기준으로 작성했습니다.
 
 TenRiff 코드는 전통적인 장기 설계 문서 중심 개발만으로 쌓인 프로젝트가 아니라, 빠른 반복과 실험을 중시한 `vibe coding` 성격이 강한 작품이라는 점을 명시합니다.
 
@@ -142,32 +142,11 @@ cmake --build build --config Release --target bms_parser_tests
 .\build-dist\Release\bms_parser_tests.exe
 ```
 
-### 5. BMS 키 컨버터
+### 5. NK3 키 모드 변환
 
-TenRiff에는 게임 런타임과 별도로 빌드할 수 있는 BMS 키 컨버터가 있습니다. 이 도구는 TenRiff의 BMS 파서/타임라인 처리와 `krrcream` N2NC, `nK2`, 또는 P64 hybrid ONNX 기반 `NK3` 변환 코어를 선택해 BMS 차트를 다른 키 수의 BMS 파일로 다시 씁니다. 게임을 실행하지 않고 특정 차트를 `4K / 5K / 6K / 8K / 9K / 10K / 16K` 출력으로 변환하고 싶을 때 쓰는 보조 도구입니다.
+1.4.5 공식 Windows 빌드와 ZIP에는 standalone BMS key converter CLI/GUI를 빌드하거나 포함하지 않습니다. 게임 안의 Mode Settings에서 `NK3`를 선택하면 P64, 목표 키 수별 일반화 패턴 MLP, host beam 안전 솔버가 적용됩니다. P64는 기본 strict OpenVINO GPU이고 `TENRIFF_NK3_DEVICE=CPU`로 strict CPU를 선택하며, 패턴 MLP는 실제 실행 장치를 확인해 NPU, GPU, CPU 순서로 시도합니다.
 
-독립 빌드:
-
-```powershell
-cmake -S tools/bms-key-converter -B build-bms-key-converter -G "Visual Studio 17 2022" -A x64
-cmake --build build-bms-key-converter --config Release --target bms_key_converter
-cmake --build build-bms-key-converter --config Release --target bms_key_converter_gui
-```
-
-CLI 예시:
-
-```powershell
-.\build-bms-key-converter\Release\bms_key_converter.exe --input "chart.bms" --output "chart_10k.bms" --preset 10k
-.\build-bms-key-converter\Release\bms_key_converter.exe --input "chart.bms" --output "chart_8k_nk2.bms" --target-keys 8 --algorithm nk2
-.\build-bms-key-converter\Release\bms_key_converter.exe --input "chart.bms" --output "chart_10k_nk3.bms" --target-keys 10 --algorithm nk3
-```
-
-- 기본 알고리즘은 `krrcream`이며, CLI의 `--algorithm nk2|nk3` 또는 GUI의 Algorithm 콤보로 nK2/NK3를 선택할 수 있습니다. NK3는 기본적으로 strict OpenVINO GPU를 사용하며 `TENRIFF_NK3_DEVICE=CPU`로 CPU를 선택할 수 있습니다. NPU 및 자동 폴백은 지원하지 않습니다.
-- `nK2`는 결정론적 Native 50/50 프로필을 사용하며 krrcream 전용 Max/Min/Speed/Seed 필드는 적용하지 않습니다.
-- sample rate는 기본값 `auto`이며, 참조된 keysound/BGM 오디오에서 먼저 추정하고 실패할 때만 `44100 Hz`로 떨어집니다.
-- Windows에서는 `bms_key_converter_gui.exe`로 간단한 Win32 GUI도 사용할 수 있습니다.
-
-자세한 옵션과 변환 주의사항은 [`tools/bms-key-converter/README.md`](tools/bms-key-converter/README.md)를 참고하세요.
+standalone converter 소스는 개발 회귀용으로만 남겨 두며 기본 CMake 옵션 `TENRIFF_BUILD_STANDALONE_BMS_KEY_CONVERTER=OFF` 상태에서는 실행 파일을 만들지 않습니다.
 
 ### 6. 실행
 

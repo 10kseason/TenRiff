@@ -171,11 +171,65 @@ TEST_CASE("bms key converter keeps long notes via LNOBJ output") {
     CHECK(hold_count >= 1u);
 }
 
-TEST_CASE("bms key converter rejects unsupported target lane counts") {
+TEST_CASE("bms key converter writes every target lane count from 1K through 18K") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+
+    const auto input_path = temp.path / "source_all_targets.bms";
+    const auto alternate_input_path = temp.path / "source_all_targets_5k.bms";
+    {
+        std::ofstream chart_file(input_path, std::ios::binary);
+        REQUIRE(chart_file.good());
+        chart_file << "#TITLE All Targets\n"
+                      "#BPM 120\n"
+                      "#00111:01\n"
+                      "#00212:01\n"
+                      "#00313:01\n"
+                      "#00414:01\n";
+    }
+    {
+        std::ofstream chart_file(alternate_input_path, std::ios::binary);
+        REQUIRE(chart_file.good());
+        chart_file << "#TITLE All Targets Alternate\n"
+                      "#BPM 120\n"
+                      "#00111:01\n"
+                      "#00212:01\n"
+                      "#00313:01\n"
+                      "#00414:01\n"
+                      "#00515:01\n";
+    }
+
+    tenriff::app::ChartLoader loader;
+    for (int target = 1; target <= 18; ++target) {
+        const auto output_path = temp.path / ("converted_" + std::to_string(target) + "k.bms");
+        tenriff::app::BmsKeyConverterOptions options;
+        options.input_path = (target == 4 ? alternate_input_path : input_path).u8string();
+        options.output_path = output_path.u8string();
+        options.target_lane_count = target;
+
+        const auto convert_result = tenriff::app::convert_bms_chart_file(options);
+        if (!convert_result.success) {
+            throw doctest::TestFailure("target=" + std::to_string(target) +
+                                       " conversion failed: " + convert_result.error);
+        }
+
+        const auto load_result = loader.load(output_path.u8string(), 44100, 1.0, "ignore");
+        REQUIRE(load_result.success());
+        if (load_result.chart.lane_count != target) {
+            throw doctest::TestFailure("target=" + std::to_string(target) +
+                                       " round-tripped as " +
+                                       std::to_string(load_result.chart.lane_count) + "K");
+        }
+        CHECK_FALSE(load_result.chart.notes.empty());
+    }
+}
+
+TEST_CASE("bms key converter rejects targets outside the 1K through 18K contract") {
     tenriff::app::BmsKeyConverterOptions options;
     options.input_path = "input.bms";
     options.output_path = "output.bms";
-    options.target_lane_count = 7;
+    options.target_lane_count = 19;
 
     const auto result = tenriff::app::convert_bms_chart_file(options);
     CHECK_FALSE(result.success);

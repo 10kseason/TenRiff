@@ -1,13 +1,21 @@
-# NK3 P64 hybrid ONNX model
+# NK3 ONNX models
 
-`NK3-P64-hybrid.onnx` is TenRiff's deterministic tensor decision graph for the
-NK3 key-mode converter. It is not a trained neural-network checkpoint and was
-constructed from project-owned rules without training data or user charts.
+TenRiff 1.4.5 combines two small ONNX model families for NK3 key-mode
+conversion:
 
-- Input block: 64 note slices plus context, memory, pressure, and constraint tensors
-- Output: fixed-point candidate scores, validity masks, addition counts, and next state
-- Runtime: OpenVINO, strict NPU by default; GPU and CPU can be selected explicitly
-- SHA-256: `C47E07D17A8CB51D3FFF2F15A4778240DE7E8FC7A847AB4A71269A2E60F14063`
+- `NK3-P64-hybrid.onnx` is the deterministic 64-slice decision graph. OpenVINO
+  runs it on strict GPU by default or strict CPU when
+  `TENRIFF_NK3_DEVICE=CPU` is set.
+- `NK3-general-pattern-2K.onnx` through `NK3-general-pattern-18K.onnx` are
+  fixed-target exports of one lane-shared schema-v3 pattern MLP. Its execution
+  preference is verified NPU, then verified GPU, then verified CPU.
+- A 1K target uses P64 without the pattern MLP because schema v3 requires at
+  least two target lanes.
 
-The host beam solver remains authoritative for collision, long-note, minimum-gap,
-hand-region, and novel-jack safety constraints.
+The MLP contributes a bounded candidate-ranking residual only. P64 validity
+masks and the host beam solver remain authoritative for collisions, long-note
+overlap, minimum gaps, hand regions, impossible chords, and newly created
+jacks. See [NK3-GENERAL-MLP-MODEL-CARD.md](NK3-GENERAL-MLP-MODEL-CARD.md) for
+the training/generalization boundary and `NK3-ONNX-SHA256SUMS.txt` for hashes.
+
+No raw chart, training cache, or checkpoint is distributed in this directory.

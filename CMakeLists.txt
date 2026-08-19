@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(TenRiff VERSION 1.4.4 LANGUAGES C CXX)
+project(TenRiff VERSION 1.4.5 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -12,20 +12,32 @@ endif()
 
 option(TENRIFF_ENABLE_TESTS "Build TenRiff unit tests" ON)
 option(TENRIFF_ENABLE_ONNX_UPSCALER "Enable the optional user-selected WinML ONNX background upscaler" ON)
-option(TENRIFF_ENABLE_NK3_ONNX "Enable the OpenVINO NK3 P64 hybrid key-mode converter" ON)
+option(TENRIFF_ENABLE_NK3_ONNX "Enable the OpenVINO NK3 P64 + generalized MLP key-mode converter" ON)
+option(TENRIFF_BUILD_STANDALONE_BMS_KEY_CONVERTER "Build the standalone BMS key-converter CLI/GUI (not shipped)" OFF)
 option(TENRIFF_ENABLE_ASAN "Build TenRiff with AddressSanitizer" OFF)
 
 set(TENRIFF_NK3_MODEL "${CMAKE_CURRENT_SOURCE_DIR}/models/NK3-P64-hybrid.onnx")
+set(TENRIFF_NK3_PATTERN_MODELS)
+set(TENRIFF_NK3_PATTERN_MODELS_AVAILABLE ON)
+foreach(target_keys RANGE 2 18)
+    set(pattern_model
+        "${CMAKE_CURRENT_SOURCE_DIR}/models/NK3-general-pattern-${target_keys}K.onnx")
+    list(APPEND TENRIFF_NK3_PATTERN_MODELS "${pattern_model}")
+    if(NOT EXISTS "${pattern_model}")
+        set(TENRIFF_NK3_PATTERN_MODELS_AVAILABLE OFF)
+    endif()
+endforeach()
 set(TENRIFF_NK3_ONNX_AVAILABLE OFF)
 if(TENRIFF_ENABLE_NK3_ONNX)
     find_package(OpenVINO QUIET COMPONENTS Runtime)
-    if(OpenVINO_FOUND AND EXISTS "${TENRIFF_NK3_MODEL}")
+    if(OpenVINO_FOUND AND EXISTS "${TENRIFF_NK3_MODEL}"
+       AND TENRIFF_NK3_PATTERN_MODELS_AVAILABLE)
         set(TENRIFF_NK3_ONNX_AVAILABLE ON)
-        message(STATUS "NK3 P64 hybrid ONNX enabled via OpenVINO")
+        message(STATUS "NK3 P64 + generalized 2K-18K MLP enabled via OpenVINO")
     elseif(NOT OpenVINO_FOUND)
         message(WARNING "OpenVINO was not found; NK3 ONNX conversion will report unavailable at runtime")
     else()
-        message(WARNING "NK3 model was not found at ${TENRIFF_NK3_MODEL}")
+        message(WARNING "One or more NK3 P64/generalized MLP models are missing")
     endif()
 endif()
 
@@ -169,30 +181,32 @@ if(WIN32)
     target_link_libraries(tenriff_core PUBLIC ws2_32 winhttp)
 endif()
 
-add_library(tenriff_bms_key_converter_core
-    src/app/BmsKeyConverter.cpp
-    src/app/BmsGameplayBuilder.cpp
-    src/chart/BmsParser.cpp
-    src/chart/BmsChartNorm.cpp
-    src/chart/BmsTimeline.cpp
-    src/chart/NoteLaneMapping.cpp
-    src/gameplay/GameplayChart.cpp
-    src/gameplay/KeyModeConverter.cpp
-    src/gameplay/Nk2KeyModeAdapter.cpp
-    src/gameplay/Nk3OnnxKeyModeAdapter.cpp
-)
+if(TENRIFF_BUILD_STANDALONE_BMS_KEY_CONVERTER)
+    add_library(tenriff_bms_key_converter_core
+        src/app/BmsKeyConverter.cpp
+        src/app/BmsGameplayBuilder.cpp
+        src/chart/BmsParser.cpp
+        src/chart/BmsChartNorm.cpp
+        src/chart/BmsTimeline.cpp
+        src/chart/NoteLaneMapping.cpp
+        src/gameplay/GameplayChart.cpp
+        src/gameplay/KeyModeConverter.cpp
+        src/gameplay/Nk2KeyModeAdapter.cpp
+        src/gameplay/Nk3OnnxKeyModeAdapter.cpp
+    )
 
-target_include_directories(tenriff_bms_key_converter_core
-    PUBLIC
-        ${CMAKE_CURRENT_SOURCE_DIR}/src
-)
+    target_include_directories(tenriff_bms_key_converter_core
+        PUBLIC
+            ${CMAKE_CURRENT_SOURCE_DIR}/src
+    )
 
-target_compile_features(tenriff_bms_key_converter_core PUBLIC cxx_std_17)
-target_link_libraries(tenriff_bms_key_converter_core PUBLIC tenriff_nk2)
+    target_compile_features(tenriff_bms_key_converter_core PUBLIC cxx_std_17)
+    target_link_libraries(tenriff_bms_key_converter_core PUBLIC tenriff_nk2)
 
-if(TENRIFF_NK3_ONNX_AVAILABLE)
-    target_compile_definitions(tenriff_bms_key_converter_core PRIVATE TENRIFF_ENABLE_NK3_ONNX=1)
-    target_link_libraries(tenriff_bms_key_converter_core PUBLIC openvino::runtime)
+    if(TENRIFF_NK3_ONNX_AVAILABLE)
+        target_compile_definitions(tenriff_bms_key_converter_core PRIVATE TENRIFF_ENABLE_NK3_ONNX=1)
+        target_link_libraries(tenriff_bms_key_converter_core PUBLIC openvino::runtime)
+    endif()
 endif()
 
 
@@ -333,18 +347,15 @@ else()
 endif()
 
 
-add_executable(bms_key_converter
-    src/bms_key_converter_main.cpp
-)
+if(TENRIFF_BUILD_STANDALONE_BMS_KEY_CONVERTER)
+    add_executable(bms_key_converter
+        src/bms_key_converter_main.cpp
+    )
 
-target_include_directories(bms_key_converter
-    PRIVATE
-        ${CMAKE_CURRENT_SOURCE_DIR}/src
-)
-
-if(WIN32)
-    target_link_libraries(bms_key_converter PRIVATE tenriff_bms_key_converter_core)
-else()
+    target_include_directories(bms_key_converter
+        PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/src
+    )
     target_link_libraries(bms_key_converter PRIVATE tenriff_bms_key_converter_core)
 endif()
 
@@ -371,6 +382,16 @@ if(TENRIFF_NK3_ONNX_AVAILABLE)
                 list(APPEND TENRIFF_OPENVINO_RUNTIME_DLLS "${dll_path}")
             endif()
         endforeach()
+        foreach(dll_name
+                openvino_intel_npu_plugin.dll
+                openvino_intel_npu_compiler_loader.dll
+                openvino_intel_npu_compiler.dll
+                cache.json)
+            set(dll_path "${TENRIFF_OPENVINO_RUNTIME_DIR}/${dll_name}")
+            if(EXISTS "${dll_path}")
+                list(APPEND TENRIFF_OPENVINO_RUNTIME_DLLS "${dll_path}")
+            endif()
+        endforeach()
     endif()
 
     function(tenriff_copy_nk3_runtime target_name)
@@ -382,9 +403,12 @@ if(TENRIFF_NK3_ONNX_AVAILABLE)
                     "${TENRIFF_NK3_MODEL}"
                     "$<TARGET_FILE_DIR:${target_name}>/models/NK3-P64-hybrid.onnx"
                 COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    ${TENRIFF_NK3_PATTERN_MODELS}
+                    "$<TARGET_FILE_DIR:${target_name}>/models"
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
                     ${TENRIFF_OPENVINO_RUNTIME_DLLS}
                     "$<TARGET_FILE_DIR:${target_name}>"
-                COMMENT "Copying NK3 model and GPU/CPU OpenVINO runtime for ${target_name}"
+                COMMENT "Copying NK3 P64/generalized MLP models and OpenVINO runtime for ${target_name}"
                 COMMAND_EXPAND_LISTS)
         else()
             add_custom_command(TARGET ${target_name} POST_BUILD
@@ -393,12 +417,18 @@ if(TENRIFF_NK3_ONNX_AVAILABLE)
                 COMMAND ${CMAKE_COMMAND} -E copy_if_different
                     "${TENRIFF_NK3_MODEL}"
                     "$<TARGET_FILE_DIR:${target_name}>/models/NK3-P64-hybrid.onnx"
-                COMMENT "Copying the NK3 model for ${target_name}")
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    ${TENRIFF_NK3_PATTERN_MODELS}
+                    "$<TARGET_FILE_DIR:${target_name}>/models"
+                COMMENT "Copying NK3 P64/generalized MLP models for ${target_name}"
+                COMMAND_EXPAND_LISTS)
         endif()
     endfunction()
 
     tenriff_copy_nk3_runtime(tenriff)
-    tenriff_copy_nk3_runtime(bms_key_converter)
+    if(TARGET bms_key_converter)
+        tenriff_copy_nk3_runtime(bms_key_converter)
+    endif()
 endif()
 
 # KeyWeaver NK2 - osu!mania front-end for the shared nK2 relaning engine.
@@ -430,7 +460,7 @@ if(MSVC)
     set_target_properties(keyweaver_osu PROPERTIES LINK_FLAGS "/ENTRY:wmainCRTStartup")
 endif()
 
-if(WIN32)
+if(WIN32 AND TENRIFF_BUILD_STANDALONE_BMS_KEY_CONVERTER)
     add_executable(bms_key_converter_gui WIN32
         src/bms_key_converter_gui_main.cpp
     )

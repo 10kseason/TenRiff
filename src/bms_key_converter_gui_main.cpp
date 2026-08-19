@@ -263,7 +263,7 @@ void update_algorithm_controls(AppState& state) {
     EnableWindow(state.seed_edit, FALSE);
     set_window_text_copy(state.hint_label,
                          algorithm == "nk3"
-                             ? L"NK3: P64 ONNX + host beam; strict GPU by default, CPU by environment."
+                             ? L"NK3: P64 + generalized MLP + host beam; MLP prefers NPU."
                              : algorithm == "nk2"
                                    ? L"nK2: native profile; Krrcream tuning locked."
                                    : L"Krrcream: shipped preset tuning locked.");
@@ -507,8 +507,7 @@ void layout_controls(HWND window, AppState& state) {
 }
 
 void initialize_target_combo(AppState& state) {
-    constexpr int kTargets[] = {4, 5, 6, 8, 9, 10, 16};
-    for (int target : kTargets) {
+    for (int target = 1; target <= 18; ++target) {
         const std::wstring label = std::to_wstring(target) + L"K";
         const LRESULT index = SendMessageW(state.target_combo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(label.c_str()));
         if (index != CB_ERR && index != CB_ERRSPACE) {
@@ -539,7 +538,7 @@ void initialize_algorithm_combo(AppState& state) {
 
     const LRESULT nk3_index =
         SendMessageW(state.algorithm_combo, CB_ADDSTRING, 0,
-                     reinterpret_cast<LPARAM>(L"NK3 (P64 ONNX, NPU)"));
+                     reinterpret_cast<LPARAM>(L"NK3 (P64 + generalized MLP)"));
     if (nk3_index != CB_ERR && nk3_index != CB_ERRSPACE) {
         SendMessageW(state.algorithm_combo,
                      CB_SETITEMDATA,
@@ -680,8 +679,8 @@ void create_controls(HWND window, AppState& state) {
     layout_controls(window, state);
 
     append_log(state, L"Select a BMS-family chart or drag one into this window.");
-    append_log(state, L"Supported targets: 4K, 5K, 6K, 8K, 9K, 10K, 16K.");
-    append_log(state, L"Algorithm: Krrcream or nK2 native; Krrcream tuning is locked.");
+    append_log(state, L"Supported targets: every key count from 1K through 18K.");
+    append_log(state, L"Algorithm: Krrcream, nK2 native, or NK3 generalized MLP.");
     append_log(state, L"nK2 ignores Krrcream Max/Min/Speed/Seed tuning fields.");
 }
 

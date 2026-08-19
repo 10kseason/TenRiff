@@ -495,35 +495,31 @@ std::string normalize_mode_token(std::string_view token) {
 
 int key_count_from_mode_token(std::string_view token) {
     const std::string normalized = normalize_mode_token(token);
-    if (normalized == "4K" || normalized == "4KEY" || normalized == "4KEYS" || normalized == "KEYS4") {
-        return 4;
+    const auto parse_supported_count = [](std::string_view digits) {
+        if (digits.empty()) {
+            return 0;
+        }
+        int count = 0;
+        for (char digit : digits) {
+            if (digit < '0' || digit > '9') {
+                return 0;
+            }
+            count = count * 10 + (digit - '0');
+        }
+        return count >= 1 && count <= 18 ? count : 0;
+    };
+
+    if (normalized.rfind("KEYS", 0) == 0) {
+        return parse_supported_count(std::string_view(normalized).substr(4));
     }
-    if (normalized == "5K" || normalized == "5KEY" || normalized == "5KEYS" || normalized == "KEYS5") {
-        return 5;
-    }
-    if (normalized == "6K" || normalized == "6KEY" || normalized == "6KEYS" || normalized == "KEYS6") {
-        return 6;
-    }
-    if (normalized == "7K" || normalized == "7KEY" || normalized == "7KEYS" || normalized == "KEYS7") {
-        return 7;
-    }
-    if (normalized == "8K" || normalized == "8KEY" || normalized == "8KEYS" || normalized == "KEYS8") {
-        return 8;
-    }
-    if (normalized == "9K" || normalized == "9KEY" || normalized == "9KEYS" || normalized == "KEYS9") {
-        return 9;
-    }
-    if (normalized == "10K" || normalized == "10KEY" || normalized == "10KEYS" || normalized == "KEYS10") {
-        return 10;
-    }
-    if (normalized == "12K" || normalized == "12KEY" || normalized == "12KEYS" || normalized == "KEYS12") {
-        return 12;
-    }
-    if (normalized == "14K" || normalized == "14KEY" || normalized == "14KEYS" || normalized == "KEYS14") {
-        return 14;
-    }
-    if (normalized == "16K" || normalized == "16KEY" || normalized == "16KEYS" || normalized == "KEYS16") {
-        return 16;
+    for (std::string_view suffix : {std::string_view("KEYS"),
+                                    std::string_view("KEY"),
+                                    std::string_view("K")}) {
+        if (normalized.size() > suffix.size() &&
+            normalized.compare(normalized.size() - suffix.size(), suffix.size(), suffix) == 0) {
+            return parse_supported_count(
+                std::string_view(normalized).substr(0, normalized.size() - suffix.size()));
+        }
     }
     return 0;
 }

@@ -23,8 +23,10 @@ Bundled components
    Notices: `third_party/openvino-2026.2.1/`
 
 TenRiff source code links OpenVINO only when `TENRIFF_ENABLE_NK3_ONNX` is enabled.
-Windows 1.4.4 binary packages bundle the runtime DLLs required by NK3 together
-with the upstream license and runtime/oneDNN/oneTBB third-party-program notices.
+Windows 1.4.5 binary packages bundle the OpenVINO GPU/CPU runtime and, when
+available in the packaged runtime, the NPU plugin/compiler components required
+by the NK3 pattern MLP. They are shipped with the upstream license and
+runtime/oneDNN/oneTBB third-party-program notices.
 
 TenRiff's key-mode converter contains an adapted C++ port of the N2NC keymode-conversion logic from
 krrcream's Toolkit. The implementation was integrated and modified for TenRiff's `GameplayChart`
