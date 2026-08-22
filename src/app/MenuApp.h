@@ -39,6 +39,12 @@
 
 namespace tenriff::app {
 
+namespace menu_records {
+struct ParsedResultRecord;
+}
+
+struct ReplayVerificationResult;
+
 [[nodiscard]] std::string resolve_keymap_edit_mode_for_menu(std::optional<int> selected_chart_key_count,
                                                             std::string_view runtime_key_mode);
 
@@ -361,6 +367,16 @@ private:
     void switch_song_source(const std::string& new_songs_path, bool force_reindex);
     void exit_keymap_screen();
     void reload_chart_best_results();
+    void append_chart_result_record(const menu_records::ParsedResultRecord& parsed,
+                                    const std::string& result_path,
+                                    const std::string& replay_path,
+                                    const ReplayVerificationResult& verification);
+    void cache_current_session_result(const std::string& chart_path,
+                                      const std::string& result_path,
+                                      const std::string& replay_path,
+                                      std::string_view replay_sha256,
+                                      bool finished,
+                                      bool aborted);
     void sort_song_list_preserving_selection();
     void rebuild_visible_song_list(const std::string* selected_path = nullptr);
     void rebuild_current_song_record_indices();

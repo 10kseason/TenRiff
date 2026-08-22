@@ -73,7 +73,7 @@
   "ui": {
     "profile_nickname": "",
     "language": "en",
-    "result_tail_ms": 3000,
+    "result_tail_ms": 500,
     "require_enter_to_exit": true,
     "difficulty_table_path": "",
     "difficulty_table_url": ""

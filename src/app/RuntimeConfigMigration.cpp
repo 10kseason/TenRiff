@@ -51,8 +51,8 @@ constexpr double kPreviousCurrentHoldBreakMs = 120.0;
 constexpr double kCurrentHoldBreakMs = 200.0;
 constexpr double kLegacyInputDebounceMs = 5.0;
 constexpr double kCurrentInputDebounceMs = 8.0;
-constexpr double kLegacyResultTailMs = 500.0;
-constexpr double kCurrentResultTailMs = 3000.0;
+constexpr double kPreviousResultTailMs = 3000.0;
+constexpr double kCurrentResultTailMs = 500.0;
 constexpr int kLegacyGraphicsRefreshHz = 1050;
 constexpr int kCurrentDefaultGraphicsRefreshHz = -1;
 constexpr double kLegacyNoteHeightScale = 1.0;
@@ -275,7 +275,7 @@ bool migrate_bms_first_runtime_config(config::RuntimeConfig& config) {
         config.input.debounce_ms = kCurrentInputDebounceMs;
         changed = true;
     }
-    if (std::abs(config.ui.result_tail_ms - kLegacyResultTailMs) <= kResultTailToleranceMs) {
+    if (std::abs(config.ui.result_tail_ms - kPreviousResultTailMs) <= kResultTailToleranceMs) {
         config.ui.result_tail_ms = kCurrentResultTailMs;
         changed = true;
     }
