@@ -12,6 +12,7 @@
 #include "gameplay/GameplayEngine.h"
 #include "gameplay/KeyModeConverter.h"
 #include "gameplay/ModeApplier.h"
+#include "gameplay/Nk3OnnxKeyModeAdapter.h"
 
 namespace {
 
@@ -751,6 +752,16 @@ TEST_CASE("runtime NK3 remasters a chart even when the target key count is uncha
     CHECK(is_time_sorted(result.chart));
     CHECK_FALSE(has_lane_overlap(result.chart));
     CHECK(contains_warning(result.warnings, "NK3 remapped 4K to 4K"));
+}
+
+TEST_CASE("NK3 generalized MLP is limited to non-10K sources converted to 10K") {
+    using tenriff::gameplay::nk3_pattern_mlp_route_enabled;
+
+    CHECK(nk3_pattern_mlp_route_enabled(7, 10));
+    CHECK(nk3_pattern_mlp_route_enabled(18, 10));
+    CHECK_FALSE(nk3_pattern_mlp_route_enabled(10, 10));
+    CHECK_FALSE(nk3_pattern_mlp_route_enabled(7, 8));
+    CHECK_FALSE(nk3_pattern_mlp_route_enabled(10, 8));
 }
 
 TEST_CASE("nK2 support budgets taper with source density") {

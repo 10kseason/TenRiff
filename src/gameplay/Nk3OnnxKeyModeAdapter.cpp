@@ -1373,7 +1373,7 @@ convert_key_mode_chart_nk3_onnx(const GameplayChart& chart,
         }
         OpenVinoEvaluator& evaluator = shared_evaluator(path, selected_device());
         PatternMlpEvaluator* pattern_mlp = nullptr;
-        if (options.target_lane_count >= 2) {
+        if (nk3_pattern_mlp_route_enabled(source_keys, options.target_lane_count)) {
             const auto pattern_path = pattern_model_path(options.target_lane_count);
             if (!std::filesystem::is_regular_file(pattern_path)) {
                 throw std::runtime_error("generalized pattern MLP model not found: " +
@@ -1552,8 +1552,10 @@ convert_key_mode_chart_nk3_onnx(const GameplayChart& chart,
                 " (NPU preferred, GPU then CPU fallback).");
         } else {
             result.warnings.push_back(
-                "NK3 target routing: generalized pattern MLP off for 1K; "
-                "using P64 ONNX only.");
+                "NK3 target routing: generalized pattern MLP off for " +
+                std::to_string(source_keys) + "K -> " +
+                std::to_string(options.target_lane_count) +
+                "K; using P64 ONNX only (MLP is limited to non-10K -> 10K).");
         }
         result.warnings.push_back(
             "NK3 remapped " + std::to_string(source_keys) + "K to " +

@@ -144,7 +144,7 @@ cmake --build build --config Release --target bms_parser_tests
 
 ### 5. NK3 키 모드 변환
 
-1.4.5 공식 Windows 빌드와 ZIP에는 standalone BMS key converter CLI/GUI를 빌드하거나 포함하지 않습니다. 게임 안의 Mode Settings에서 `NK3`를 선택하면 P64, 목표 키 수별 일반화 패턴 MLP, host beam 안전 솔버가 적용됩니다. P64는 기본 strict OpenVINO GPU이고 `TENRIFF_NK3_DEVICE=CPU`로 strict CPU를 선택하며, 패턴 MLP는 실제 실행 장치를 확인해 NPU, GPU, CPU 순서로 시도합니다.
+1.4.5 공식 Windows 빌드와 ZIP에는 standalone BMS key converter CLI/GUI를 빌드하거나 포함하지 않습니다. 게임 안의 Mode Settings에서 `NK3`를 선택하면 P64와 host beam 안전 솔버가 항상 적용됩니다. 10K가 아닌 원본을 10K로 변환할 때만 일반화 패턴 MLP를 추가하며, 10→10과 나머지 모든 변환은 P64 ONNX만 사용합니다. P64는 기본 strict OpenVINO GPU이고 `TENRIFF_NK3_DEVICE=CPU`로 strict CPU를 선택하며, 활성화된 MLP는 실제 실행 장치를 확인해 NPU, GPU, CPU 순서로 시도합니다.
 
 standalone converter 소스는 개발 회귀용으로만 남겨 두며 기본 CMake 옵션 `TENRIFF_BUILD_STANDALONE_BMS_KEY_CONVERTER=OFF` 상태에서는 실행 파일을 만들지 않습니다.
 

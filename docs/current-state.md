@@ -105,7 +105,7 @@
   - 게임 내 Mode Settings의 `Key Converter`에서 `Krrcream`, 내장 결정론적 `KeyWeaver nK2`, `KeyWeaver NK3 ONNX`를 선택하며, 실제 키수 변환에 적용하고 설정·리플레이 메타데이터에 저장
   - 별도 `변환 노트 추가` 옵션은 제거했으며, Krrcream은 원본 노트만 재배치하고 nK2는 키 수 확장 시 변환된 목표 레이아웃에 안전한 보조 노트를 직접 생성한다.
   - nK2 프리셋은 기본 `Native (12%)`, `Transform (35%)`, `Remaster (65%)` 중 선택한다. `Remaster`는 예산을 올리면서도 앵커를 잠가 원곡 배치를 유지하고 롱노트 구간을 같은 길이의 롱노트로 채운다. 세 값은 상한이며 실제 추가량은 원본 밀도와 안전창에 따라 낮아진다. Krrcream 선택 시 해당 행은 잠기며, standalone converter GUI의 Krrcream Max/Min/Speed/Seed도 수정할 수 없다.
-  - NK3는 번들된 P64와 2K–18K 목표별 일반화 패턴 MLP를 host beam32에 결합한다. P64는 기본 strict GPU이고 `TENRIFF_NK3_DEVICE=CPU`로 strict CPU를 선택한다. MLP는 실제 `EXECUTION_DEVICES`를 확인하며 NPU, GPU, CPU 순서로 시도하고 1K 목표는 P64만 사용한다.
+  - NK3는 번들된 P64를 host beam32에 항상 결합한다. 10K가 아닌 원본을 10K로 변환할 때만 일반화 패턴 MLP를 추가하고, 10→10과 나머지 모든 경로는 P64만 사용한다. P64는 기본 strict GPU이고 `TENRIFF_NK3_DEVICE=CPU`로 strict CPU를 선택하며, 활성화된 MLP는 실제 `EXECUTION_DEVICES`를 확인해 NPU, GPU, CPU 순서로 시도한다.
   - 독립 BMS key converter의 CLI/GUI는 기본 `krrcream`과 결정론적 `nK2 Native 50/50` 알고리즘을 선택 지원하며, nK2 선택 시 krrcream 전용 튜닝 필드는 적용하지 않음
   - 1.4.5 공식 빌드/Windows ZIP은 standalone BMS key converter CLI/GUI를 만들거나 포함하지 않으며 top-level CMake 옵션도 기본 `OFF`; 소스는 개발 회귀용으로만 유지
   - `mode.key_mode=none`은 차트의 원래 키 수와 기본 패턴 레이아웃을 그대로 유지

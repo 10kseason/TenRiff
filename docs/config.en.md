@@ -146,7 +146,7 @@ The chart loader and indexer are limited to BMS-family files (`.bms/.bme/.bml/.p
   - defaults to `krrcream`; NK3 also remasters unchanged key counts and its P64 path uses strict OpenVINO GPU by default
   - Krrcream only remaps source notes into target lanes
   - when expanding the key count, nK2 creates safe support notes directly in the target layout during conversion instead of pre-adding notes to the source
-  - NK3 combines P64, a target-specific generalized MLP, and the host beam safety solver; `TENRIFF_NK3_DEVICE=CPU` selects strict P64 CPU while the MLP verifies and tries NPU, GPU, then CPU
+  - NK3 always uses P64 and the host beam safety solver, adding the generalized MLP only for non-10K sources converted to 10K; `TENRIFF_NK3_DEVICE=CPU` selects strict P64 CPU while the active MLP verifies and tries NPU, GPU, then CPU
 - `key_conversion_nk2_preset` (string)
   - `native | transform | remaster`; defaults to `native`
   - selects nK2 `Native (12%)`, `Transform (35%)` or `Remaster (65%)`; the setting row is locked for Krrcream

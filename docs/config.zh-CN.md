@@ -146,7 +146,7 @@ chart loader/indexer 仅支持 BMS family（`.bms/.bme/.bml/.pms`）。旧 `enab
   - 默认值为 `krrcream`；NK3 在键数不变时也会 remaster，P64 路径默认使用 strict OpenVINO GPU
   - Krrcream 只把原始 note 重排到目标 lane
   - nK2 在扩展键数时不会先向原始 pattern 加 note，而是在转换过程中直接向目标 layout 生成安全的辅助 note
-  - NK3 结合 P64、目标专用 generalized MLP 与 host beam safety solver；`TENRIFF_NK3_DEVICE=CPU` 选择 strict P64 CPU，MLP 会验证并按 NPU、GPU、CPU 顺序尝试
+  - NK3 始终使用 P64 与 host beam safety solver，仅在非 10K 源谱面转换为 10K 时加入 generalized MLP；`TENRIFF_NK3_DEVICE=CPU` 选择 strict P64 CPU，启用的 MLP 会验证并按 NPU、GPU、CPU 顺序尝试
 - `key_conversion_nk2_preset` (string)
   - `native | transform | remaster`；默认值为 `native`
   - 选择 nK2 的 `Native (12%)`、`Transform (35%)` 或 `Remaster (65%)`；Krrcream 下锁定该设置行

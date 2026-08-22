@@ -1647,7 +1647,7 @@ BmsKeyConverterResult convert_bms_chart_file(const BmsKeyConverterOptions& optio
             "nK2 uses its native 50/50 profile; Krrcream Max/Min/Speed/Seed tuning is not applied.");
     } else if (*conversion_algorithm == gameplay::KeyModeConversionAlgorithm::NK3) {
         result.warnings.push_back(
-            "NK3 uses P64 plus the target-specific generalized pattern MLP and host beam safety solver; "
+            "NK3 uses P64 plus the host beam safety solver; the generalized MLP is limited to non-10K -> 10K; "
             "Krrcream Max/Min/Speed/Seed tuning is not applied.");
     }
     result.warnings.insert(result.warnings.end(), converted.warnings.begin(), converted.warnings.end());

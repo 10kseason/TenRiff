@@ -148,7 +148,7 @@
   - 기본값은 `krrcream`; NK3는 같은 키 수에서도 리마스터를 실행하고 P64는 기본 strict OpenVINO GPU를 사용
   - Krrcream은 원본 노트만 목표 레인으로 재배치
   - nK2는 키 수 확장 시 원본에 먼저 노트를 붙이지 않고, 변환 중 목표 레이아웃에 안전한 보조 노트를 직접 생성
-  - NK3는 P64, 목표별 일반화 MLP, host beam 안전 솔버를 결합한다. `TENRIFF_NK3_DEVICE=CPU`는 P64 strict CPU를 선택하고 MLP는 검증된 NPU, GPU, CPU 순서로 시도
+  - NK3는 P64와 host beam 안전 솔버를 항상 사용하고, 10K가 아닌 원본을 10K로 변환할 때만 일반화 MLP를 추가한다. `TENRIFF_NK3_DEVICE=CPU`는 P64 strict CPU를 선택하고 활성화된 MLP는 검증된 NPU, GPU, CPU 순서로 시도
 - `key_conversion_nk2_preset` (string)
   - `native | transform | remaster`; 기본값은 `native`
   - nK2에서 `Native (12%)`, `Transform (35%)`, `Remaster (65%)`를 선택하며, Krrcream에서는 설정 행이 잠김

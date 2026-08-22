@@ -146,7 +146,7 @@ chart loader/indexer は BMS family（`.bms/.bme/.bml/.pms`）専用です。旧
   - 既定値は `krrcream`。NK3 は同じ key count でも remaster を実行し、P64 path は既定で strict OpenVINO GPU を使用
   - Krrcream は元 note を target lane へ再配置するだけ
   - nK2 は key count 拡張時、元 pattern へ先に note を追加せず、変換中に target layout へ安全な support note を直接生成
-  - NK3 は P64、target 別 generalized MLP、host beam safety solver を組み合わせる。`TENRIFF_NK3_DEVICE=CPU` は strict P64 CPU を選択し、MLP は検証済み NPU、GPU、CPU の順に試行
+  - NK3 は P64 と host beam safety solver を常に使い、10K 以外の source を 10K に変換するときだけ generalized MLP を追加する。`TENRIFF_NK3_DEVICE=CPU` は strict P64 CPU を選択し、有効な MLP は検証済み NPU、GPU、CPU の順に試行
 - `key_conversion_nk2_preset` (string)
   - `native | transform | remaster`。既定値は `native`
   - nK2 の `Native (12%)` / `Transform (35%)` / `Remaster (65%)` を選択し、Krrcream では設定 row を lock

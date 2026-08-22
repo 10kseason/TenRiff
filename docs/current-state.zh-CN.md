@@ -96,7 +96,7 @@
   - 已移除独立的 `Conversion Note Add` 选项：Krrcream 只重排原始 note，nK2 在扩展键数时直接向转换后的目标 layout 生成安全的辅助 note。
   - nK2 preset 可选择默认 `Native (12%)`、`Transform (35%)` 或 `Remaster (65%)`；`Remaster` 在提高预算的同时锁定 anchor 以保留原曲排布，并用等长长条填充 LN 区间。三者均为上限，实际增加量取决于原谱密度与安全窗口。Krrcream 下锁定该行，standalone converter GUI 的 Krrcream Max/Min/Speed/Seed 也不可修改。
   - 1.4.5 官方 build/Windows ZIP 不构建或附带 standalone BMS key-converter CLI/GUI；顶层 CMake 选项默认 `OFF`，源码仅保留用于开发回归
-  - NK3 将随包提供的 P64、2K–18K 目标专用 generalized pattern MLP 与 host beam32 结合。P64 默认 strict GPU，`TENRIFF_NK3_DEVICE=CPU` 选择 strict CPU；MLP 验证 `EXECUTION_DEVICES` 并按 NPU、GPU、CPU 顺序尝试，1K 仅使用 P64。
+  - NK3 始终将随包提供的 P64 与 host beam32 结合。仅当非 10K 源谱面转换为 10K 时才加入 generalized pattern MLP；10K→10K 与其他所有目标仅使用 P64。P64 默认 strict GPU，`TENRIFF_NK3_DEVICE=CPU` 选择 strict CPU；启用的 MLP 会验证 `EXECUTION_DEVICES` 并按 NPU、GPU、CPU 顺序尝试。
   - `mode.key_mode=none` 表示保持谱面的原始键数与基础 pattern 布局不变
 - Native difficulty：
   - BMS 的 LV/CR 计算仅将 long-note Head/Tail 的 miss-ms 按 0.5倍评估，使 `300ms`按`150ms`处理；实际 gameplay 判定范围保持不变
