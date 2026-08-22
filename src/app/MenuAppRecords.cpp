@@ -1,5 +1,7 @@
 #include "app/MenuApp.h"
 
+#include <algorithm>
+#include <cmath>
 #include <filesystem>
 #include <iostream>
 #include <unordered_set>
@@ -54,7 +56,180 @@ std::filesystem::path resolve_record_replay_path(const std::filesystem::path& re
     return direct;
 }
 
+bool ascii_iequals(std::string_view lhs, std::string_view rhs) {
+    if (lhs.size() != rhs.size()) {
+        return false;
+    }
+    for (std::size_t i = 0; i < lhs.size(); ++i) {
+        unsigned char left = static_cast<unsigned char>(lhs[i]);
+        unsigned char right = static_cast<unsigned char>(rhs[i]);
+        if (left >= 'A' && left <= 'Z') {
+            left = static_cast<unsigned char>(left - 'A' + 'a');
+        }
+        if (right >= 'A' && right <= 'Z') {
+            right = static_cast<unsigned char>(right - 'A' + 'a');
+        }
+        if (left != right) {
+            return false;
+        }
+    }
+    return true;
+}
+
+bool live_result_claims_match(const menu_records::ParsedResultRecord& parsed,
+                              const gameplay::ResultStats& stats,
+                              int64_t final_score,
+                              bool game_over,
+                              std::string_view clear_status,
+                              std::string_view final_gauge,
+                              double rate_multiplier,
+                              double score_multiplier) {
+    const auto& stored = parsed.stats;
+    return parsed.final_score == final_score &&
+           parsed.game_over == game_over &&
+           parsed.clear_status == clear_status &&
+           parsed.final_gauge == final_gauge &&
+           std::abs(parsed.rate_multiplier - rate_multiplier) <= 1e-9 &&
+           std::abs(parsed.score_multiplier - score_multiplier) <= 1e-9 &&
+           stored.raw_score == stats.raw_score &&
+           stored.detail_score == stats.detail_score &&
+           stored.total_notes == stats.total_notes &&
+           stored.total_combo_steps == stats.total_combo_steps &&
+           stored.max_combo == stats.max_combo &&
+           stored.counts.pg == stats.counts.pg &&
+           stored.counts.gr == stats.counts.gr &&
+           stored.counts.gd == stats.counts.gd &&
+           stored.counts.bd == stats.counts.bd &&
+           stored.counts.pr == stats.counts.pr;
+}
+
 }  // namespace
+
+void MenuApp::append_chart_result_record(const menu_records::ParsedResultRecord& parsed,
+                                         const std::string& result_path,
+                                         const std::string& replay_path,
+                                         const ReplayVerificationResult& verification) {
+    const bool replay_verified = verification.verified();
+    const gameplay::ResultStats& effective_stats =
+        replay_verified ? verification.stats : parsed.stats;
+    const int64_t effective_score =
+        replay_verified ? verification.final_score : parsed.final_score;
+    const bool effective_game_over =
+        replay_verified ? verification.game_over : parsed.game_over;
+    const std::string& effective_clear_status =
+        replay_verified ? verification.clear_status : parsed.clear_status;
+    const std::string& effective_final_gauge =
+        replay_verified ? verification.final_gauge : parsed.final_gauge;
+
+    BestResultRecord candidate;
+    candidate.has_value = true;
+    candidate.replay_verified = replay_verified;
+    candidate.rank = menu_records::calculate_rank(effective_stats, effective_game_over);
+    candidate.best_score = effective_score;
+    candidate.detail_score = menu_records::calculate_detail_score(effective_stats);
+    candidate.total_notes = effective_stats.total_notes;
+    candidate.accuracy = menu_records::calculate_accuracy(effective_stats);
+    candidate.detailed_accuracy = menu_records::calculate_detailed_accuracy(effective_stats);
+    candidate.clear_status = effective_clear_status;
+    candidate.final_gauge = effective_final_gauge;
+    candidate.game_over = effective_game_over;
+    candidate.max_combo = effective_stats.max_combo;
+    candidate.perfect = effective_stats.counts.pg;
+    candidate.great = effective_stats.counts.gr;
+    candidate.good = effective_stats.counts.gd;
+    candidate.bad = effective_stats.counts.bd;
+    candidate.poor = effective_stats.counts.pr;
+    candidate.created_utc = parsed.created_utc;
+    candidate.result_path = result_path;
+    candidate.replay_path = replay_path;
+    const int candidate_judged = menu_records::judged_total(effective_stats.counts);
+    const int candidate_clear_priority =
+        menu_records::clear_status_priority(effective_clear_status,
+                                            effective_game_over,
+                                            effective_final_gauge);
+
+    LocalPlayRecord record;
+    record.chart_path = parsed.chart_path;
+    record.chart_format = parsed.chart_format;
+    record.created_utc = parsed.created_utc;
+    record.player_name =
+        parsed.player_name.empty() ? profile_display_name() : parsed.player_name;
+    record.result_path = result_path;
+    record.replay_path = candidate.replay_path;
+    record.rank = candidate.rank;
+    record.clear_status = effective_clear_status;
+    record.final_gauge = effective_final_gauge;
+    record.game_over = effective_game_over;
+    record.mods = parsed.mods;
+    record.rate_multiplier = parsed.rate_multiplier;
+    record.score_multiplier = parsed.score_multiplier;
+    record.pause_used = parsed.pause_used;
+    record.autoplay_enabled = parsed.autoplay_enabled;
+    record.practice_no_fail_enabled = parsed.practice_no_fail_enabled;
+    record.verification_status = std::string(replay_verification_status_token(verification.status));
+    record.verification_detail = verification.detail;
+    record.replay_claims_match = replay_verified && verification.claims_match;
+    record.raw_score = effective_stats.raw_score;
+    record.score = candidate.best_score;
+    record.detail_score = candidate.detail_score;
+    record.accuracy = menu_records::calculate_accuracy(effective_stats);
+    record.detailed_accuracy = menu_records::calculate_detailed_accuracy(effective_stats);
+    record.max_combo = effective_stats.max_combo;
+    record.total_notes = effective_stats.total_notes;
+    record.judged_notes = candidate_judged;
+    record.perfect = effective_stats.counts.pg;
+    record.great = effective_stats.counts.gr;
+    record.good = effective_stats.counts.gd;
+    record.bad = effective_stats.counts.bd;
+    record.poor = effective_stats.counts.pr;
+    record.mean_delta_ms = effective_stats.mean_delta_ms;
+    record.stddev_delta_ms = effective_stats.stddev_delta_ms();
+    const std::size_t record_index = local_play_records_.size();
+    local_play_records_.push_back(record);
+    const bool note_count_modified =
+        mode_mod_adds_notes(parsed.mods) ||
+        parsed.key_conversion_note_add_mode == "add_25_plus";
+
+    // Fan results out across all normalized path keys so old exports still match
+    // after source-root changes or relative/absolute-path differences.
+    for (const auto& key : menu_songs::build_chart_path_keys(parsed.chart_path, songs_path_)) {
+        chart_play_record_indices_[key].push_back(record_index);
+        // Keep autoplay runs in local history/replay browsing, but never let
+        // them become the chart's official best score or clear lamp.
+        if (note_count_modified || parsed.autoplay_enabled ||
+            parsed.practice_no_fail_enabled || !verification.official_eligible) {
+            continue;
+        }
+        auto existing = chart_best_results_.find(key);
+        if (existing == chart_best_results_.end()) {
+            chart_best_results_.emplace(key, candidate);
+            continue;
+        }
+
+        const int existing_judged =
+            existing->second.perfect + existing->second.great + existing->second.good + existing->second.bad;
+        const int existing_clear_priority =
+            menu_records::clear_status_priority(existing->second.clear_status,
+                                                existing->second.game_over,
+                                                existing->second.final_gauge);
+        if (menu_records::is_better_record(candidate.best_score,
+                                           candidate_clear_priority,
+                                           candidate.detail_score,
+                                           candidate.detailed_accuracy,
+                                           candidate.max_combo,
+                                           candidate_judged,
+                                           candidate.created_utc,
+                                           existing->second.best_score,
+                                           existing_clear_priority,
+                                           existing->second.detail_score,
+                                           existing->second.detailed_accuracy,
+                                           existing->second.max_combo,
+                                           existing_judged,
+                                           existing->second.created_utc)) {
+            existing->second = candidate;
+        }
+    }
+}
 
 void MenuApp::reload_chart_best_results() {
     using namespace menu_song_select;
@@ -130,130 +305,121 @@ void MenuApp::reload_chart_best_results() {
             }
         }
 
-        const bool replay_verified = verification.verified();
-        const gameplay::ResultStats& effective_stats =
-            replay_verified ? verification.stats : parsed->stats;
-        const int64_t effective_score =
-            replay_verified ? verification.final_score : parsed->final_score;
-        const bool effective_game_over =
-            replay_verified ? verification.game_over : parsed->game_over;
-        const std::string& effective_clear_status =
-            replay_verified ? verification.clear_status : parsed->clear_status;
-        const std::string& effective_final_gauge =
-            replay_verified ? verification.final_gauge : parsed->final_gauge;
-
-        BestResultRecord candidate;
-        candidate.has_value = true;
-        candidate.replay_verified = replay_verified;
-        candidate.rank = menu_records::calculate_rank(effective_stats, effective_game_over);
-        candidate.best_score = effective_score;
-        candidate.detail_score = menu_records::calculate_detail_score(effective_stats);
-        candidate.total_notes = effective_stats.total_notes;
-        candidate.accuracy = menu_records::calculate_accuracy(effective_stats);
-        candidate.detailed_accuracy = menu_records::calculate_detailed_accuracy(effective_stats);
-        candidate.clear_status = effective_clear_status;
-        candidate.final_gauge = effective_final_gauge;
-        candidate.game_over = effective_game_over;
-        candidate.max_combo = effective_stats.max_combo;
-        candidate.perfect = effective_stats.counts.pg;
-        candidate.great = effective_stats.counts.gr;
-        candidate.good = effective_stats.counts.gd;
-        candidate.bad = effective_stats.counts.bd;
-        candidate.poor = effective_stats.counts.pr;
-        candidate.created_utc = parsed->created_utc;
-        candidate.result_path = entry.path().u8string();
-        candidate.replay_path = replay_path.empty() ? parsed->replay_path : replay_path.u8string();
-        const int candidate_judged = menu_records::judged_total(effective_stats.counts);
-        const int candidate_clear_priority =
-            menu_records::clear_status_priority(effective_clear_status,
-                                                effective_game_over,
-                                                effective_final_gauge);
-
-        LocalPlayRecord record;
-        record.chart_path = parsed->chart_path;
-        record.chart_format = parsed->chart_format;
-        record.created_utc = parsed->created_utc;
-        record.player_name =
-            parsed->player_name.empty() ? profile_display_name() : parsed->player_name;
-        record.result_path = entry.path().u8string();
-        record.replay_path = candidate.replay_path;
-        record.rank = candidate.rank;
-        record.clear_status = effective_clear_status;
-        record.final_gauge = effective_final_gauge;
-        record.game_over = effective_game_over;
-        record.mods = parsed->mods;
-        record.rate_multiplier = parsed->rate_multiplier;
-        record.score_multiplier = parsed->score_multiplier;
-        record.pause_used = parsed->pause_used;
-        record.autoplay_enabled = parsed->autoplay_enabled;
-        record.practice_no_fail_enabled = parsed->practice_no_fail_enabled;
-        record.verification_status = std::string(replay_verification_status_token(verification.status));
-        record.verification_detail = verification.detail;
-        record.replay_claims_match = replay_verified && verification.claims_match;
-        record.raw_score = effective_stats.raw_score;
-        record.score = candidate.best_score;
-        record.detail_score = candidate.detail_score;
-        record.accuracy = menu_records::calculate_accuracy(effective_stats);
-        record.detailed_accuracy = menu_records::calculate_detailed_accuracy(effective_stats);
-        record.max_combo = effective_stats.max_combo;
-        record.total_notes = effective_stats.total_notes;
-        record.judged_notes = candidate_judged;
-        record.perfect = effective_stats.counts.pg;
-        record.great = effective_stats.counts.gr;
-        record.good = effective_stats.counts.gd;
-        record.bad = effective_stats.counts.bd;
-        record.poor = effective_stats.counts.pr;
-        record.mean_delta_ms = effective_stats.mean_delta_ms;
-        record.stddev_delta_ms = effective_stats.stddev_delta_ms();
-        const std::size_t record_index = local_play_records_.size();
-        local_play_records_.push_back(record);
-        const bool note_count_modified =
-            mode_mod_adds_notes(parsed->mods) ||
-            parsed->key_conversion_note_add_mode == "add_25_plus";
-
-        // Fan results out across all normalized path keys so old exports still match
-        // after source-root changes or relative/absolute-path differences.
-        for (const auto& key : menu_songs::build_chart_path_keys(parsed->chart_path, songs_path_)) {
-            chart_play_record_indices_[key].push_back(record_index);
-            // Keep autoplay runs in local history/replay browsing, but never let
-            // them become the chart's official best score or clear lamp.
-            if (note_count_modified || parsed->autoplay_enabled ||
-                parsed->practice_no_fail_enabled || !verification.official_eligible) {
-                continue;
-            }
-            auto existing = chart_best_results_.find(key);
-            if (existing == chart_best_results_.end()) {
-                chart_best_results_.emplace(key, candidate);
-                continue;
-            }
-
-            const int existing_judged =
-                existing->second.perfect + existing->second.great + existing->second.good + existing->second.bad;
-            const int existing_clear_priority =
-                menu_records::clear_status_priority(existing->second.clear_status,
-                                                    existing->second.game_over,
-                                                    existing->second.final_gauge);
-            if (menu_records::is_better_record(candidate.best_score,
-                                               candidate_clear_priority,
-                                               candidate.detail_score,
-                                               candidate.detailed_accuracy,
-                                               candidate.max_combo,
-                                               candidate_judged,
-                                               candidate.created_utc,
-                                               existing->second.best_score,
-                                               existing_clear_priority,
-                                               existing->second.detail_score,
-                                               existing->second.detailed_accuracy,
-                                               existing->second.max_combo,
-                                               existing_judged,
-                                               existing->second.created_utc)) {
-                existing->second = candidate;
-            }
-        }
+        append_chart_result_record(
+            *parsed,
+            entry.path().u8string(),
+            replay_path.empty() ? parsed->replay_path : replay_path.u8string(),
+            verification);
 
         it.increment(ec);
     }
 
+    rebuild_current_song_record_indices();
+}
+
+void MenuApp::cache_current_session_result(const std::string& chart_path,
+                                           const std::string& result_path,
+                                           const std::string& replay_path,
+                                           std::string_view replay_sha256,
+                                           bool finished,
+                                           bool aborted) {
+    if (result_path.empty()) {
+        return;
+    }
+    for (const auto& record : local_play_records_) {
+        if (record.result_path == result_path) {
+            return;
+        }
+    }
+
+    const std::filesystem::path result_file = menu_song_select::path_from_utf8(result_path);
+    std::string parse_error;
+    auto parsed = menu_records::parse_result_file(result_file, &parse_error);
+    if (!parsed.has_value()) {
+        std::cerr << "[warn] Failed to cache current result " << result_path;
+        if (!parse_error.empty()) {
+            std::cerr << ": " << parse_error;
+        }
+        std::cerr << std::endl;
+        return;
+    }
+
+    std::filesystem::path resolved_replay = utf8_path_or_empty(replay_path);
+    std::error_code ec;
+    if (resolved_replay.empty() || !std::filesystem::is_regular_file(resolved_replay, ec)) {
+        ec.clear();
+        resolved_replay = resolve_record_replay_path(
+            result_file, menu_song_select::path_from_utf8(profile_dir_), parsed->replay_path);
+    }
+
+    ReplayVerificationResult verification;
+    if (parsed->replay_format_version < gameplay::kReplayFormatVersion) {
+        verification.status = ReplayVerificationStatus::LegacyUnverified;
+        verification.detail = "Current result has no replay/chart integrity binding.";
+    } else if (parsed->replay_sha256.empty() || parsed->chart_sha256.empty() ||
+               parsed->ruleset_id.empty() || replay_sha256.empty() || resolved_replay.empty()) {
+        verification.status = ReplayVerificationStatus::MissingEvidence;
+        verification.detail = "Current result is missing replay, chart, or ruleset evidence.";
+    } else if (parsed->ruleset_id != kCanonicalReplayRulesetId) {
+        verification.status = ReplayVerificationStatus::CustomRuleset;
+        verification.detail = "Current result used a non-canonical score ruleset.";
+    } else {
+        const auto stored_chart_keys =
+            menu_songs::build_chart_path_keys(parsed->chart_path, songs_path_);
+        const auto live_chart_keys =
+            menu_songs::build_chart_path_keys(chart_path, songs_path_);
+        bool chart_matches = false;
+        for (const auto& stored_key : stored_chart_keys) {
+            if (std::find(live_chart_keys.begin(), live_chart_keys.end(), stored_key) !=
+                live_chart_keys.end()) {
+                chart_matches = true;
+                break;
+            }
+        }
+        ec.clear();
+        const bool replay_exists = std::filesystem::is_regular_file(resolved_replay, ec) && !ec;
+        const bool evidence_matches = replay_exists && chart_matches &&
+                                      ascii_iequals(parsed->replay_sha256, replay_sha256);
+        const bool claims_match = live_result_claims_match(*parsed,
+                                                           last_result_,
+                                                           last_result_final_score_,
+                                                           last_game_over_,
+                                                           last_clear_status_,
+                                                           last_final_gauge_,
+                                                           last_result_rate_multiplier_,
+                                                           last_result_score_multiplier_);
+        if (!evidence_matches || !claims_match) {
+            verification.status = ReplayVerificationStatus::Invalid;
+            verification.detail = !evidence_matches
+                                      ? "Current result evidence does not match the live session export."
+                                      : "Current result claims do not match the live engine outcome.";
+        } else {
+            // The engine just produced these stats and exported the bound replay. Replaying every
+            // historical chart here would synchronously invoke NK3/MLP again and block Result.
+            // A later profile reload still performs the full replay reconstruction.
+            verification.status = ReplayVerificationStatus::Verified;
+            verification.detail =
+                "Current session outcome accepted from the live engine; replay reconstruction deferred.";
+            verification.stats = last_result_;
+            verification.clear_status = last_clear_status_;
+            verification.final_gauge = last_final_gauge_;
+            verification.rate_multiplier = last_result_rate_multiplier_;
+            verification.score_multiplier = last_result_score_multiplier_;
+            verification.final_score = last_result_final_score_;
+            verification.game_over = last_game_over_;
+            verification.claims_match = true;
+            verification.official_eligible =
+                (finished || last_game_over_) && !aborted && !parsed->aborted &&
+                !parsed->autoplay_enabled && !parsed->practice_no_fail_enabled &&
+                !mode_mod_adds_notes(parsed->mods);
+        }
+    }
+
+    append_chart_result_record(
+        *parsed,
+        result_path,
+        resolved_replay.empty() ? parsed->replay_path : resolved_replay.u8string(),
+        verification);
     rebuild_current_song_record_indices();
 }
 

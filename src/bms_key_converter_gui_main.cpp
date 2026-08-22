@@ -263,7 +263,7 @@ void update_algorithm_controls(AppState& state) {
     EnableWindow(state.seed_edit, FALSE);
     set_window_text_copy(state.hint_label,
                          algorithm == "nk3"
-                             ? L"NK3: P64 + generalized MLP + host beam; MLP prefers NPU."
+                             ? L"NK3: P64 + host beam; only non-10K to 10K adds the NPU-first MLP."
                              : algorithm == "nk2"
                                    ? L"nK2: native profile; Krrcream tuning locked."
                                    : L"Krrcream: shipped preset tuning locked.");
@@ -538,7 +538,7 @@ void initialize_algorithm_combo(AppState& state) {
 
     const LRESULT nk3_index =
         SendMessageW(state.algorithm_combo, CB_ADDSTRING, 0,
-                     reinterpret_cast<LPARAM>(L"NK3 (P64 + generalized MLP)"));
+                     reinterpret_cast<LPARAM>(L"NK3 (P64; 10K MLP route)"));
     if (nk3_index != CB_ERR && nk3_index != CB_ERRSPACE) {
         SendMessageW(state.algorithm_combo,
                      CB_SETITEMDATA,
@@ -680,7 +680,7 @@ void create_controls(HWND window, AppState& state) {
 
     append_log(state, L"Select a BMS-family chart or drag one into this window.");
     append_log(state, L"Supported targets: every key count from 1K through 18K.");
-    append_log(state, L"Algorithm: Krrcream, nK2 native, or NK3 generalized MLP.");
+    append_log(state, L"Algorithm: Krrcream, nK2 native, or NK3 P64 with an optional 10K MLP route.");
     append_log(state, L"nK2 ignores Krrcream Max/Min/Speed/Seed tuning fields.");
 }
 

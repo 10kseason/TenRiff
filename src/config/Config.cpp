@@ -1851,7 +1851,7 @@ RuntimeConfig ConfigLoader::defaults() const {
     config.ui.profile_nickname.clear();
     config.ui.profile_avatar_path.clear();
     config.ui.language = "en";
-    config.ui.result_tail_ms = 3000.0;
+    config.ui.result_tail_ms = 500.0;
     config.ui.require_enter_to_exit = true;
     config.ui.show_cursor_in_gameplay = true;
     config.ui.favorite_chart_keys.clear();

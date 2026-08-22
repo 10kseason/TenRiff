@@ -2304,7 +2304,14 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
         last_result_path_ = (!result.result_path.empty() || !replay_playback) ? result.result_path : preserved_result_path;
         last_export_warnings_ = result.export_warnings;
         last_session_replay_playback_ = replay_playback;
-        reload_chart_best_results();
+        if (!replay_playback) {
+            cache_current_session_result(chart_path,
+                                         result.result_path,
+                                         result.replay_path,
+                                         result.replay_sha256,
+                                         result.finished,
+                                         session_aborted);
+        }
         result_presentation_start_ns_ = timing::HighResClock::now_ns();
         result_presentation_skipped_ = false;
         screen_ = Screen::Result;

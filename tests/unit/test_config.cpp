@@ -182,7 +182,7 @@ TEST_CASE("config defaults prefer 44100 Hz audio") {
     CHECK(config.ui.profile_nickname.empty());
     CHECK(config.ui.profile_avatar_path.empty());
     CHECK(config.ui.language == "en");
-    CHECK(config.ui.result_tail_ms == doctest::Approx(3000.0));
+    CHECK(config.ui.result_tail_ms == doctest::Approx(500.0));
     CHECK(config.ui.favorite_chart_keys.empty());
     CHECK(config.ui.collections.empty());
     CHECK(config.ui.song_collection_filter == "all");
@@ -300,7 +300,7 @@ TEST_CASE("config load migrates an existing stale profile before returning it") 
                "    \"performance_overlay\": false\n"
                "  },\n"
                "  \"ui\": {\n"
-               "    \"result_tail_ms\": 500.0\n"
+               "    \"result_tail_ms\": 3000.0\n"
                "  },\n"
                "  \"skin\": {\n"
                "    \"note_height_scale\": 1.0\n"
@@ -339,7 +339,7 @@ TEST_CASE("config load migrates an existing stale profile before returning it") 
     CHECK(result.config.gauge.easy.gr == doctest::Approx(kCurrentEasyGr));
     CHECK(result.config.gauge.easy.gd == doctest::Approx(kCurrentEasyGd));
     CHECK(result.config.gauge.easy.bd == doctest::Approx(kCurrentEasyBd));
-    CHECK(result.config.ui.result_tail_ms == doctest::Approx(3000.0));
+    CHECK(result.config.ui.result_tail_ms == doctest::Approx(500.0));
     CHECK(result.config.skin.note_height_scale == doctest::Approx(1.80));
     CHECK_FALSE(result.config.graphics.vsync);
 }
@@ -1819,15 +1819,20 @@ TEST_CASE("runtime migration aligns legacy long-note body width and brightness w
     CHECK(minimal.skin.hold_body_opacity == doctest::Approx(1.00));
 }
 
-TEST_CASE("runtime migration upgrades the old result tail default to three seconds") {
+TEST_CASE("runtime migration shortens the previous three-second result tail default") {
     ConfigLoader loader;
     auto config = loader.defaults();
-    config.ui.result_tail_ms = 500.0;
+    config.ui.result_tail_ms = 3000.0;
 
     const bool changed = tenriff::app::migrate_bms_first_runtime_config(config);
 
     CHECK(changed);
-    CHECK(config.ui.result_tail_ms == doctest::Approx(3000.0));
+    CHECK(config.ui.result_tail_ms == doctest::Approx(500.0));
+
+    auto custom = loader.defaults();
+    custom.ui.result_tail_ms = 1250.0;
+    CHECK_FALSE(tenriff::app::migrate_bms_first_runtime_config(custom));
+    CHECK(custom.ui.result_tail_ms == doctest::Approx(1250.0));
 }
 
 TEST_CASE("runtime migration flips the old default vsync preset to off") {

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(TenRiff VERSION 1.4.5 LANGUAGES C CXX)
+project(TenRiff VERSION 1.4.5.1 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -12,7 +12,7 @@ endif()
 
 option(TENRIFF_ENABLE_TESTS "Build TenRiff unit tests" ON)
 option(TENRIFF_ENABLE_ONNX_UPSCALER "Enable the optional user-selected WinML ONNX background upscaler" ON)
-option(TENRIFF_ENABLE_NK3_ONNX "Enable the OpenVINO NK3 P64 + generalized MLP key-mode converter" ON)
+option(TENRIFF_ENABLE_NK3_ONNX "Enable OpenVINO NK3 P64 with a non-10K to 10K MLP prior" ON)
 option(TENRIFF_BUILD_STANDALONE_BMS_KEY_CONVERTER "Build the standalone BMS key-converter CLI/GUI (not shipped)" OFF)
 option(TENRIFF_ENABLE_ASAN "Build TenRiff with AddressSanitizer" OFF)
 
@@ -33,7 +33,7 @@ if(TENRIFF_ENABLE_NK3_ONNX)
     if(OpenVINO_FOUND AND EXISTS "${TENRIFF_NK3_MODEL}"
        AND TENRIFF_NK3_PATTERN_MODELS_AVAILABLE)
         set(TENRIFF_NK3_ONNX_AVAILABLE ON)
-        message(STATUS "NK3 P64 + generalized 2K-18K MLP enabled via OpenVINO")
+        message(STATUS "NK3 P64 + non-10K to 10K generalized MLP enabled via OpenVINO")
     elseif(NOT OpenVINO_FOUND)
         message(WARNING "OpenVINO was not found; NK3 ONNX conversion will report unavailable at runtime")
     else()

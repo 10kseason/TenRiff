@@ -184,12 +184,17 @@ int main() {
             std::cerr << "NK3 smoke failed for 7K -> " << target << "K\n";
             return 1;
         }
+        const bool expected_mlp = target == 10;
+        const bool route_matches =
+            expected_mlp
+                ? warning_contains(converted.warnings, "10K generalized pattern MLP") &&
+                      warning_contains(converted.warnings, "schema=v3 features=28 roles=2") &&
+                      warning_reports_effective_batching(converted.warnings)
+                : warning_contains(converted.warnings,
+                                   "using P64 ONNX only (MLP is limited to non-10K -> 10K)");
         if (!warning_contains(converted.warnings, "NK3 P64 hybrid ONNX") ||
-            !warning_contains(converted.warnings,
-                              std::to_string(target) + "K generalized pattern MLP") ||
-            !warning_contains(converted.warnings, "schema=v3 features=28 roles=2") ||
-            !warning_reports_effective_batching(converted.warnings)) {
-            std::cerr << "Generalized pattern MLP route missing for " << target << "K\n";
+            !route_matches) {
+            std::cerr << "NK3 P64/MLP route mismatch for 7K -> " << target << "K\n";
             return 1;
         }
     }
@@ -204,10 +209,17 @@ int main() {
 
         const auto converted =
             tenriff::gameplay::convert_key_mode_chart(compression_source, options);
+        const bool expected_route =
+            target == 10
+                ? warning_contains(converted.warnings, "10K generalized pattern MLP") &&
+                      warning_field_greater_than(converted.warnings,
+                                                 "max-requested-states=", 32)
+                : warning_contains(
+                      converted.warnings,
+                      "using P64 ONNX only (MLP is limited to non-10K -> 10K)");
         if (!converted.converted || !structurally_safe(converted.chart, target) ||
             !warning_field_greater_than(converted.warnings, "safety-retry=", 0) ||
-            !warning_field_greater_than(converted.warnings,
-                                        "max-requested-states=", 32)) {
+            !expected_route) {
             std::cerr << "NK3 batched retry smoke failed for 18K -> "
                       << target << "K\n";
             return 1;
@@ -224,7 +236,7 @@ int main() {
     if (!precise_time_converted.converted || precise_time_converted.chart.notes.size() != 2 ||
         !structurally_safe(precise_time_converted.chart, 1) ||
         !warning_contains(precise_time_converted.warnings,
-                          "generalized pattern MLP off for 1K")) {
+                          "using P64 ONNX only (MLP is limited to non-10K -> 10K)")) {
         std::cerr << "NK3 sub-millisecond timing smoke failed\n";
         return 1;
     }
@@ -249,14 +261,14 @@ int main() {
             options.base_bpm = 180.0;
             const auto converted =
                 tenriff::gameplay::convert_key_mode_chart(matrix_source, options);
-            const bool expected_route = target_keys == 1
-                                            ? warning_contains(
-                                                  converted.warnings,
-                                                  "generalized pattern MLP off for 1K")
-                                            : warning_contains(
-                                                  converted.warnings,
-                                                  std::to_string(target_keys) +
-                                                      "K generalized pattern MLP");
+            const bool expected_mlp = source_keys != 10 && target_keys == 10;
+            const bool expected_route =
+                expected_mlp
+                    ? warning_contains(converted.warnings,
+                                       "10K generalized pattern MLP")
+                    : warning_contains(
+                          converted.warnings,
+                          "using P64 ONNX only (MLP is limited to non-10K -> 10K)");
             if (!converted.converted ||
                 !structurally_safe(converted.chart, target_keys) ||
                 !expected_route) {

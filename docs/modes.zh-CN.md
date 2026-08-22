@@ -27,7 +27,7 @@
 ## 模式含义
 - chart input 仅支持 BMS family（`.bms/.bme/.bml/.pms`）；旧 osu 开关不再显示或保存
 - `key_mode`：`none | auto | 4k | 5k | 6k | 7k | 8k | 9k | 10k | 12k | 14k | 16k`
-- `key_conversion_algorithm`：`krrcream | nk2 | nk3`（默认 `krrcream`；Krrcream 只重排原始 note，nK2 生成安全辅助 note，NK3 将随包提供的 P64 与目标专用 generalized MLP 结合到 host beam32）
+- `key_conversion_algorithm`：`krrcream | nk2 | nk3`（默认 `krrcream`；Krrcream 只重排原始 note，nK2 生成安全辅助 note，NK3 始终将随包提供的 P64 与 host beam32 结合，仅在非 10K 源谱面转换为 10K 时加入 generalized MLP）
 - `key_conversion_nk2_preset`：`native | transform | remaster`（默认 `native`；选择 nK2 时可用 `Native (12%)` / `Transform (35%)` / `Remaster (65%)`，选择 Krrcream 时锁定该行）
 - `gauge`：`normal | hard | ex_hard | easy | shift`
 - `random`：`off | mirror | rr | fr | sr`
