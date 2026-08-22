@@ -3,7 +3,7 @@ param(
     [string]$BuildReleaseDirectory,
     [Parameter(Mandatory = $true)]
     [string]$OutputDirectory,
-    [string]$Version = "1.4.5"
+    [string]$Version = "1.4.5.1"
 )
 
 $ErrorActionPreference = "Stop"

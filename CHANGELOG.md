@@ -2,24 +2,30 @@
 
 TenRiff의 사용자/배포 관점에서 의미 있는 변경만 간단히 기록합니다.
 
-## [1.4.5] - 2026-08-19
-
-### Added
-
-- NK3에 lane-shared schema-v3 일반화 패턴 MLP를 결합하고 2K부터 18K까지 목표 키 수별 고정 ONNX로 배포합니다. v3는 원본 chord 크기 비율을 입력으로 사용하고 addition-role 점수를 target lane 그룹 안에서 중심화합니다.
-- 패턴 MLP는 28개 관계 feature와 8개 후보 role을 batch32로 평가하며, 실제 `EXECUTION_DEVICES`를 확인해 NPU, GPU, CPU 순서로 시도합니다. 런타임에서는 10K가 아닌 원본을 10K로 변환할 때만 MLP를 사용하고, 10→10과 나머지 모든 경로는 기존 P64만 사용합니다.
-- 1K–18K source와 1K–18K target의 324개 NK3 경로를 변환 완료와 구조 안전성 기준으로 회귀 검사합니다.
-
-### Changed
-
-- MLP 점수는 최대 1.0, host weight 0.15의 제한된 후보 정렬 residual로만 사용합니다. P64 validity와 host beam/safety retry/final quality 검사가 충돌, 롱노트 겹침, 최소 간격, 불가능 chord, 새 연타 방지의 최종 권한을 유지합니다.
-- 같은 millisecond로 반올림되지만 서로 다른 sample인 노트를 충돌로 오판하지 않도록 최종 검사를 exact source sample 기준으로 수정했습니다.
+## [1.4.5.1] - 2026-08-23
 
 ### Fixed
 
 - 플레이 종료 직전에 저장된 과거 리플레이 전체를 동기식으로 다시 검증하며 NK3 P64/MLP를 반복 실행하던 문제를 수정했습니다. 현재 세션 결과만 증분 캐시에 반영하고 전체 리플레이 재구성은 프로필 로드 시점에만 수행해 결과 화면 진입 중 NPU/GPU 재사용과 긴 대기를 제거합니다.
 - 기본 결과 전환 대기 시간을 3초에서 0.5초로 줄이고, 기존 3초 기본값을 사용 중인 프로필만 0.5초로 마이그레이션하며 사용자 지정 값은 유지합니다.
 - 일반화 MLP 실행 범위를 `source != 10K && target == 10K`로 제한했습니다. 10→10 리마스터와 10K 이외의 모든 목표는 P64 ONNX + host beam 안전 솔버만 사용합니다.
+
+### Release
+
+- 정식 자산은 `TenRiff-1.4.5.1.zip`, `TenRiff-1.4.5.1-source.zip`, `TenRiff-1.4.5.1-SHA256SUMS.txt`입니다. 기존 `1.4.5` 태그와 자산은 변경하지 않습니다.
+
+## [1.4.5] - 2026-08-19
+
+### Added
+
+- NK3에 lane-shared schema-v3 일반화 패턴 MLP를 결합하고 2K부터 18K까지 목표 키 수별 고정 ONNX로 배포합니다. v3는 원본 chord 크기 비율을 입력으로 사용하고 addition-role 점수를 target lane 그룹 안에서 중심화합니다.
+- 패턴 MLP는 28개 관계 feature와 8개 후보 role을 batch32로 평가하며, 실제 `EXECUTION_DEVICES`를 확인해 NPU, GPU, CPU 순서로 시도합니다. 1K 목표는 모델 schema 경계 때문에 기존 P64만 사용합니다.
+- 1K–18K source와 1K–18K target의 324개 NK3 경로를 변환 완료와 구조 안전성 기준으로 회귀 검사합니다.
+
+### Changed
+
+- MLP 점수는 최대 1.0, host weight 0.15의 제한된 후보 정렬 residual로만 사용합니다. P64 validity와 host beam/safety retry/final quality 검사가 충돌, 롱노트 겹침, 최소 간격, 불가능 chord, 새 연타 방지의 최종 권한을 유지합니다.
+- 같은 millisecond로 반올림되지만 서로 다른 sample인 노트를 충돌로 오판하지 않도록 최종 검사를 exact source sample 기준으로 수정했습니다.
 
 ### Limitations
 

@@ -2,7 +2,7 @@
 
 Standalone build entrypoint for TenRiff's BMS NK-to-NK converter.
 
-Development-only: TenRiff 1.4.5 official builds and Windows archives do not
+Development-only: TenRiff 1.4.5.1 official builds and Windows archives do not
 build or ship this CLI/GUI. The top-level CMake option defaults to
 `TENRIFF_BUILD_STANDALONE_BMS_KEY_CONVERTER=OFF`.
 
