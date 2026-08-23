@@ -72,6 +72,23 @@ TEST_CASE("gameplay visual span rejects invalid timing inputs") {
           doctest::Approx(1.0));
 }
 
+TEST_CASE("gameplay visual travel horizon follows speed changes without normalizing them") {
+    tenriff::gameplay::GameplayChart chart;
+    chart.scroll_segments = {
+        {0, 1000, 0.0, 1.0},
+        {1000, 2000, 1.0, 1.0},
+        {2000, 4000, 1.0, 2.0},
+        {4000, 4500, 2.0, 3.0},
+        {4500, 5500, 3.0, 2.0},
+    };
+
+    CHECK(chart.sample_after_visual_travel(0, 1.5) == 3000);
+    CHECK(chart.sample_after_visual_travel(500, 1.0) == 3000);
+    CHECK(chart.sample_after_visual_travel(3000, 1.0) == 4250);
+    CHECK(chart.sample_after_visual_travel(4000, 1.5) == 5000);
+    CHECK(chart.sample_after_visual_travel(5500, 1.0) == 5500);
+}
+
 TEST_CASE("gameplay chart sample offsets move notes audio visuals and duration together") {
     tenriff::gameplay::GameplayChart chart;
     chart.duration_samples = 4000;

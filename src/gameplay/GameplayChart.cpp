@@ -113,6 +113,51 @@ double GameplayChart::visual_velocity_at(int64_t sample) const {
                : 0.0;
 }
 
+int64_t GameplayChart::sample_after_visual_travel(int64_t start_sample,
+                                                  double visual_distance) const {
+    if (scroll_segments.empty() || !std::isfinite(visual_distance) || visual_distance <= 0.0) {
+        return start_sample;
+    }
+
+    double remaining = visual_distance;
+    const auto first = std::lower_bound(
+        scroll_segments.begin(), scroll_segments.end(), start_sample,
+        [](const ScrollSegment& segment, int64_t sample) {
+            return segment.end_sample <= sample;
+        });
+    for (auto it = first; it != scroll_segments.end(); ++it) {
+        const ScrollSegment& segment = *it;
+        const int64_t segment_duration = segment.end_sample - segment.start_sample;
+        const int64_t visible_start = std::max(start_sample, segment.start_sample);
+        const int64_t visible_duration = segment.end_sample - visible_start;
+        if (segment_duration <= 0 || visible_duration <= 0) {
+            continue;
+        }
+
+        const double start_ratio = std::clamp(
+            static_cast<double>(visible_start - segment.start_sample) /
+                static_cast<double>(segment_duration),
+            0.0, 1.0);
+        const double visible_start_position =
+            segment.start_position +
+            (segment.end_position - segment.start_position) * start_ratio;
+        const double available = std::abs(segment.end_position - visible_start_position);
+        if (available <= 1e-12) {
+            continue;
+        }
+        if (available + 1e-12 >= remaining) {
+            const double travel_ratio = std::clamp(remaining / available, 0.0, 1.0);
+            const int64_t sample_offset = static_cast<int64_t>(std::llround(
+                static_cast<double>(visible_duration) * travel_ratio));
+            return std::clamp(visible_start + sample_offset,
+                              visible_start,
+                              segment.end_sample);
+        }
+        remaining -= available;
+    }
+    return std::max(start_sample, scroll_segments.back().end_sample);
+}
+
 const std::string* GameplayChart::visual_asset_path(std::size_t asset_id) const {
     if (asset_id >= visual_assets.size()) {
         return nullptr;
