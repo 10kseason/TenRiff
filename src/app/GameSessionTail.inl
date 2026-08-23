@@ -1108,7 +1108,15 @@ GameSession::HudSnapshot GameSession::hud_snapshot() {
         6000.0);
 
     const int64_t past_samples = ms_to_samples(static_cast<double>(kHudPastMs), sample_rate_);
-    const int64_t lookahead_samples = ms_to_samples(dynamic_lookahead_ms, sample_rate_);
+    const int64_t reference_lookahead_samples = ms_to_samples(dynamic_lookahead_ms, sample_rate_);
+    const double future_visual_span = gameplay_reference_visual_span(
+        chart_base_bpm_, snapshot.rate, sample_rate_, reference_lookahead_samples);
+    int64_t lookahead_samples = reference_lookahead_samples;
+    if (!chart_.scroll_segments.empty()) {
+        const int64_t visual_horizon_sample =
+            chart_.sample_after_visual_travel(snapshot.current_sample, future_visual_span);
+        lookahead_samples = std::max<int64_t>(0, visual_horizon_sample - snapshot.current_sample);
+    }
     const GameplayHudWindow expanded_window = expand_gameplay_hud_window(
         sample_rate_,
         past_samples,
@@ -1119,11 +1127,11 @@ GameSession::HudSnapshot GameSession::hud_snapshot() {
     snapshot.lookahead_samples = lookahead_samples;
     snapshot.current_visual_position = chart_.visual_position_at(snapshot.current_sample);
     snapshot.visual_velocity = chart_.visual_velocity_at(snapshot.current_sample);
-    // Keep the field scale anchored to the starting BPM. Rate remains visually
-    // neutral at a fixed Hi-Speed, while in-chart BPM and #SCROLL changes alter
-    // the actual note velocity instead of being normalized back to constant speed.
-    snapshot.future_visual_span = gameplay_reference_visual_span(
-        chart_base_bpm_, snapshot.rate, sample_rate_, lookahead_samples);
+    // Keep the field scale anchored to the starting BPM. Follow actual visual
+    // travel through BPM, #SCROLL, STOP, and reverse segments when choosing the
+    // HUD horizon so slow sections still enter from the same top edge without
+    // normalizing their on-screen velocity.
+    snapshot.future_visual_span = future_visual_span;
     snapshot.past_visual_span = gameplay_reference_visual_span(
         chart_base_bpm_, snapshot.rate, sample_rate_, past_samples);
     snapshot.lane_activity_count = std::max<std::size_t>(

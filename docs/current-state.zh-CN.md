@@ -3,7 +3,7 @@
 这份文档是下一位 agent 或新任务接手时应该最先阅读的当前状态文档。目标是快速说明“这个项目现在是什么、应该先看哪里、还有哪些内容尚未验证”。
 
 ## 基线
-- 当前稳定发布线为 `1.4.5.1`
+- 当前稳定发布线为 `1.4.5.2`
 - UI-r2 Result 使用 2.2 秒时间线依次展示棱镜、分数、等级、通关状态、判定统计和图表；可用 Space 跳过，在演出结束前锁定 Continue/Retry/Replay 输入。
 - UI-r2 Song Select 使用顶部标签、7 行封面曲库、大幅选中图片、最佳记录卡、谱面/模式面板和可实际启动的 START 按钮；不显示 Collection/Store/货币/全球排名等虚构功能
 - Song Select 的 Rate、Hi-Speed、Gauge、Random 单元格支持左键增加/下一项、右键减少/上一项并立即保存；当前谱面键数不再被裁切，最佳记录会同时显示分数、准确率和最大连击。
@@ -95,7 +95,7 @@
   - 游戏内 Mode Settings 的 `Key Converter` 可选择 `Krrcream`、内置确定性 `KeyWeaver nK2` 或 `KeyWeaver NK3 ONNX`，并写入设置与 replay metadata
   - 已移除独立的 `Conversion Note Add` 选项：Krrcream 只重排原始 note，nK2 在扩展键数时直接向转换后的目标 layout 生成安全的辅助 note。
   - nK2 preset 可选择默认 `Native (12%)`、`Transform (35%)` 或 `Remaster (65%)`；`Remaster` 在提高预算的同时锁定 anchor 以保留原曲排布，并用等长长条填充 LN 区间。三者均为上限，实际增加量取决于原谱密度与安全窗口。Krrcream 下锁定该行，standalone converter GUI 的 Krrcream Max/Min/Speed/Seed 也不可修改。
-  - 1.4.5.1 官方 build/Windows ZIP 不构建或附带 standalone BMS key-converter CLI/GUI；顶层 CMake 选项默认 `OFF`，源码仅保留用于开发回归
+  - 1.4.5.2 官方 build/Windows ZIP 不构建或附带 standalone BMS key-converter CLI/GUI；顶层 CMake 选项默认 `OFF`，源码仅保留用于开发回归
   - NK3 始终将随包提供的 P64 与 host beam32 结合。仅当非 10K 源谱面转换为 10K 时才加入 generalized pattern MLP；10K→10K 与其他所有目标仅使用 P64。P64 默认 strict GPU，`TENRIFF_NK3_DEVICE=CPU` 选择 strict CPU；启用的 MLP 会验证 `EXECUTION_DEVICES` 并按 NPU、GPU、CPU 顺序尝试。
   - `mode.key_mode=none` 表示保持谱面的原始键数与基础 pattern 布局不变
 - Native difficulty：
@@ -208,7 +208,7 @@
 
 ## 运行时 / 打包规则
 - 新用户 profile 会自动创建
-- 当前稳定 P2P 发布线为 `TenRiff 1.4.5.1`
+- 当前稳定 P2P 发布线为 `TenRiff 1.4.5.2`
 - 发布包不包含 `Songs`
 - 发布包包含 `Main Menu / Options / Song Selecte / Multiplayer Lobby / Clear / Failed` 这些 `Mainmusic/` 场景槽位；每个 `Name.mp3` 及 `Name 2.mp3`～`Name 64.mp3` 会自动发现，并在重新进入场景时轮换
 - 发布更新只包含已构建产物和必要的运行时资源

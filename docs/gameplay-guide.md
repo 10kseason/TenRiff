@@ -149,6 +149,7 @@ BPM 변속이 있어도 곡 시작 BPM에 맞춘 초당 스크롤 속도를 유�
 - 타이밍 편차(ms)
 
 정타에서 벗어난 입력은 판정명 아래에 조기 입력 `FAST -12 ms`, 지연 입력 `SLOW +18 ms`처럼 부호와 함께 표시됩니다. `0 ms`로 반올림되는 입력은 타이밍 문구를 생략합니다.
+`Skin Settings > FAST/SLOW Indicator`에서 이 문구와 타이밍 기록 인디케이터를 함께 끄거나 켤 수 있으며, 꺼도 `PG / GR / GD / BD / PR` 판정 등급은 계속 표시됩니다.
 
 `Graphics > Performance HUD`를 켜면 프레임 그래프와 평균 FPS, low FPS, gameplay timing 디버그 정보도 볼 수 있습니다.
 
@@ -162,6 +163,10 @@ BPM 변속이 있어도 곡 시작 BPM에 맞춘 초당 스크롤 속도를 유�
 - `GD`: Good
 - `BD`: Bad
 - `PR`: Poor / Miss
+
+빈 키 공POOR는 다음 노트보다 이른 앞쪽 판정 범위에서만 발생합니다. 이미 소비되거나 판정선을 지나간 노트 뒤 입력에는 별도의 뒷공POOR를 추가하지 않습니다.
+
+`No LN Release` 모드는 charge LN 끝의 떼는 판정을 끄며, 점수 배율은 `1.00x`입니다.
 
 OD8 환산 통계는 Sudden Death 판정과 기존 replay 호환을 위해 JSON 내부에 유지되지만 게임플레이·결과 화면에는 표시하지 않습니다.
 

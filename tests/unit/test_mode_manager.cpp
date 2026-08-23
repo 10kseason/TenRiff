@@ -147,7 +147,9 @@ TEST_CASE("mode manager score multipliers follow the configured boundaries") {
     CHECK(tenriff::app::rate_score_multiplier(2.00) == doctest::Approx(1.15));
 
     CHECK(tenriff::app::mod_score_multiplier({"judge_hard"}) == doctest::Approx(1.10));
+    CHECK(tenriff::app::mod_score_multiplier({"no_ln_release"}) == doctest::Approx(1.00));
     CHECK(tenriff::app::final_score_multiplier({"judge_hard"}, 2.00) == doctest::Approx(1.10));
+    CHECK(tenriff::app::final_score_multiplier({"no_ln_release"}, 1.00) == doctest::Approx(1.00));
     CHECK(tenriff::app::final_score_multiplier({"full_short_notes"}, 0.95) == doctest::Approx(0.50));
 }
 
@@ -483,6 +485,32 @@ TEST_CASE("mode manager removes no-ln-release when full short notes is active") 
         CHECK_FALSE(note.end_sample.has_value());
         CHECK_FALSE(note.release_required);
     }
+}
+
+TEST_CASE("no-ln-release disables charge-tail release judgement at a neutral score multiplier") {
+    tenriff::gameplay::GameplayChart chart;
+    chart.lane_count = 1;
+    chart.duration_samples = 400;
+    chart.notes.push_back(tenriff::gameplay::NoteEvent{1, 100, 300});
+    chart.notes.back().release_required = true;
+
+    tenriff::config::ModeConfig mode;
+    mode.mods = {"no_ln_release"};
+
+    const auto result = tenriff::app::manage_modes(
+        chart,
+        tenriff::app::ChartFormat::Bms,
+        mode,
+        make_judge_config(),
+        1.0);
+
+    REQUIRE(result.active_mods.size() == 1u);
+    CHECK(result.active_mods[0] == "no_ln_release");
+    REQUIRE(result.chart.notes.size() == 1u);
+    REQUIRE(result.chart.notes[0].end_sample.has_value());
+    CHECK_FALSE(result.chart.notes[0].release_required);
+    CHECK(result.mod_multiplier == doctest::Approx(1.0));
+    CHECK(result.final_multiplier == doctest::Approx(1.0));
 }
 
 TEST_CASE("mode manager scales judge windows without touching the mask window") {

@@ -319,6 +319,29 @@ TEST_CASE("note width scale resizes the playfield and notes together") {
     // Imported LR2 art may still narrow inside the linked field without changing field scale.
     CHECK(compute_gameplay_note_draw_width(98.0f, 1.00, 0.50) == doctest::Approx(37.0f));
 }
+TEST_CASE("gameplay progress track stays outside the note fields") {
+    using tenriff::render::compute_gameplay_progress_track_layout;
+
+    const auto single = compute_gameplay_progress_track_layout(
+        84.0f, 1836.0f, 470.0f, 1534.0f, false, 0.0f, 0.0f, 16.0f);
+    CHECK(single.left == doctest::Approx(84.0f));
+    CHECK(single.right == doctest::Approx(454.0f));
+
+    const auto shifted_single = compute_gameplay_progress_track_layout(
+        84.0f, 1836.0f, 12.0f, 1076.0f, false, 0.0f, 0.0f, 16.0f);
+    CHECK(shifted_single.left == doctest::Approx(1092.0f));
+    CHECK(shifted_single.right == doctest::Approx(1836.0f));
+
+    const auto ghost = compute_gameplay_progress_track_layout(
+        84.0f, 1836.0f, 250.0f, 894.0f, true, 1110.0f, 1670.0f, 16.0f);
+    CHECK(ghost.left == doctest::Approx(910.0f));
+    CHECK(ghost.right == doctest::Approx(1094.0f));
+
+    const auto wide_ghost = compute_gameplay_progress_track_layout(
+        84.0f, 1836.0f, 138.0f, 1006.0f, true, 998.0f, 1782.0f, 16.0f);
+    CHECK(wide_ghost.left == doctest::Approx(84.0f));
+    CHECK(wide_ghost.right == doctest::Approx(122.0f));
+}
 TEST_CASE("gameplay text pop animation settles deterministically") {
     using tenriff::render::compute_gameplay_text_pop_animation;
 

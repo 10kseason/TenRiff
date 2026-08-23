@@ -145,6 +145,7 @@ Rate 只改变歌曲播放速度和谱面时间轴；在相同 Hi-Speed 下，�
 - 时间偏差（ms）
 
 偏离中心的输入会在判定名下显示带符号的 timing：提前输入显示 `FAST -12 ms`，延后输入显示 `SLOW +18 ms`；四舍五入为 `0 ms` 时不显示 timing 文本。
+可在 `Skin Settings > FAST/SLOW Indicator` 中同时开关该文本与 timing-history 指示器；关闭后判定等级仍会显示。
 
 如果打开 `Graphics > Performance HUD`，还能看到帧率图、平均 FPS、低 FPS 以及 gameplay timing 调试信息。
 
@@ -158,6 +159,10 @@ Rate 只改变歌曲播放速度和谱面时间轴；在相同 Hi-Speed 下，�
 - `GD`：Good
 - `BD`：Bad
 - `PR`：Poor / Miss
+
+空 POOR 只会出现在下一颗 note 的提前侧。已经消费或已经越过判定线的 note 后方输入不会再追加后空 POOR。
+
+`No LN Release` 会关闭 charge LN 尾端的松键判定，分数倍率固定为 `1.00x`。
 
 OD8 换算统计为 Sudden Death 与旧 replay 兼容保留在 JSON 内部，但不再显示于 Gameplay 或 Result 画面。
 

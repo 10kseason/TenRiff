@@ -146,6 +146,7 @@ The in-game HUD usually shows:
 - Timing deviation in milliseconds
 
 Off-center hits show a signed timing label below the judgement: `FAST -12 ms` for early input and `SLOW +18 ms` for late input. Hits that round to `0 ms` omit the timing label.
+`Skin Settings > FAST/SLOW Indicator` toggles both this label and the timing-history marker. Judgement grades remain visible when it is off.
 
 If you enable `Graphics > Performance HUD`, you can also see the frame graph, average FPS, low FPS, and gameplay timing debug information.
 
@@ -159,6 +160,10 @@ The current default judgement labels use the following abbreviations:
 - `GD`: Good
 - `BD`: Bad
 - `PR`: Poor / Miss
+
+Empty POOR applies only on the early side of the next note. Input behind a consumed or already-passed note never adds a rear empty POOR.
+
+`No LN Release` disables charge-LN tail release judgement and has an exact `1.00x` score multiplier.
 
 OD8 conversion statistics remain inside JSON for Sudden Death and legacy replay compatibility, but are not shown on Gameplay or Result screens.
 

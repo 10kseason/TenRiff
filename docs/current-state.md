@@ -7,7 +7,7 @@
 - BMS landmines (`D1-D9`, `E1-E9`) are playable, including `#WAV00`, base-36 damage tokens, `ZZ` instant fail, exact press/release boundary behavior, and lane-mod/key-converter remapping.
 - Results and local records expose fixed native score separately from detail score, and categorical native accuracy separately from continuous timing-based detailed accuracy.
 - 새 replay evidence v3는 차트 SHA-256, canonical ruleset, result-to-replay SHA-256을 저장하고 입력 trace를 headless 엔진으로 재실행합니다. 공식 로컬 best는 재계산된 verified 결과만 사용하며 legacy/custom/assist 기록은 히스토리에 `unverified`로 남습니다.
-- 현재 안정 배포 라인은 `1.4.5.1`
+- 현재 안정 배포 라인은 `1.4.5.2`
 - UI-r2 Result는 2.2초 타임라인으로 프리즘·점수·등급·상태·통계·그래프를 순차 공개하며, Space로 연출을 건너뛸 수 있고 CONTINUE/RETRY/Replay 입력은 공개 완료 전 잠김
 - UI-r2 Song Select는 상단 탭, 7행 재킷 라이브러리, 대형 선택 이미지, 최고 기록 카드, 차트/모드 패널, 실제 동작하는 START 버튼 구조로 개편되며 Collection/Store/재화/글로벌 랭킹 가상 기능은 표시하지 않음
 - Song Select 우측의 비주얼 레이턴시·하이스피드·Gauge Shift 시작 등급·랜덤 셀은 좌클릭으로 증가/다음, 우클릭으로 감소/이전을 적용하고 즉시 저장함. 현재 차트 키수는 잘림 없이 표시되며 최고 기록은 점수·정확도·최대 콤보를 함께 표시
@@ -107,7 +107,7 @@
   - nK2 프리셋은 기본 `Native (12%)`, `Transform (35%)`, `Remaster (65%)` 중 선택한다. `Remaster`는 예산을 올리면서도 앵커를 잠가 원곡 배치를 유지하고 롱노트 구간을 같은 길이의 롱노트로 채운다. 세 값은 상한이며 실제 추가량은 원본 밀도와 안전창에 따라 낮아진다. Krrcream 선택 시 해당 행은 잠기며, standalone converter GUI의 Krrcream Max/Min/Speed/Seed도 수정할 수 없다.
   - NK3는 번들된 P64를 host beam32에 항상 결합한다. 10K가 아닌 원본을 10K로 변환할 때만 일반화 패턴 MLP를 추가하고, 10→10과 나머지 모든 경로는 P64만 사용한다. P64는 기본 strict GPU이고 `TENRIFF_NK3_DEVICE=CPU`로 strict CPU를 선택하며, 활성화된 MLP는 실제 `EXECUTION_DEVICES`를 확인해 NPU, GPU, CPU 순서로 시도한다.
   - 독립 BMS key converter의 CLI/GUI는 기본 `krrcream`과 결정론적 `nK2 Native 50/50` 알고리즘을 선택 지원하며, nK2 선택 시 krrcream 전용 튜닝 필드는 적용하지 않음
-  - 1.4.5.1 공식 빌드/Windows ZIP은 standalone BMS key converter CLI/GUI를 만들거나 포함하지 않으며 top-level CMake 옵션도 기본 `OFF`; 소스는 개발 회귀용으로만 유지
+  - 1.4.5.2 공식 빌드/Windows ZIP은 standalone BMS key converter CLI/GUI를 만들거나 포함하지 않으며 top-level CMake 옵션도 기본 `OFF`; 소스는 개발 회귀용으로만 유지
   - `mode.key_mode=none`은 차트의 원래 키 수와 기본 패턴 레이아웃을 그대로 유지
 - Native difficulty:
   - BMS LV/CR 계산에서 롱노트 Head/Tail의 miss-ms만 0.5배로 평가해 `300ms`를 `150ms`처럼 완화하며, 실제 gameplay 판정창은 그대로 유지
@@ -230,7 +230,7 @@
 
 ## Runtime / Packaging Rules
 - 새 사용자 프로필은 자동 생성
-- 현재 안정 P2P 배포 라인은 `TenRiff 1.4.5.1`
+- 현재 안정 P2P 배포 라인은 `TenRiff 1.4.5.2`
 - 배포 패키지에는 `Songs`를 넣지 않음
 - 배포 패키지는 `Main Menu / Options / Song Selecte / Multiplayer Lobby / Clear / Failed` 이름의 `Mainmusic/` 화면 슬롯을 포함하며, 각 `이름.mp3`와 번호가 붙은 `이름 2.mp3`~`이름 64.mp3`를 자동 수집해 화면 재진입마다 순환
 - 배포 업데이트에는 built artifacts와 필요한 런타임 자산만 포함

@@ -1,6 +1,6 @@
 # NK3 ONNX models
 
-TenRiff 1.4.5.1 combines two small ONNX model families for NK3 key-mode
+TenRiff 1.4.5.2 combines two small ONNX model families for NK3 key-mode
 conversion:
 
 - `NK3-P64-hybrid.onnx` is the deterministic 64-slice decision graph. OpenVINO

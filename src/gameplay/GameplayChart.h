@@ -98,6 +98,8 @@ struct GameplayChart {
     [[nodiscard]] const std::string* visual_asset_path(std::size_t asset_id) const;
     [[nodiscard]] double visual_position_at(int64_t sample) const;
     [[nodiscard]] double visual_velocity_at(int64_t sample) const;
+    [[nodiscard]] int64_t sample_after_visual_travel(int64_t start_sample,
+                                                     double visual_distance) const;
 };
 
 [[nodiscard]] std::size_t note_audio_asset_count(const NoteEvent& note);
