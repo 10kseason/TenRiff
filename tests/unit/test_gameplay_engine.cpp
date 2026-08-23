@@ -319,6 +319,30 @@ TEST_CASE("gameplay engine does not add LR2 poor after consuming a miss as bad")
     CHECK(engine.stats().counts.pr == 0);
 }
 
+TEST_CASE("gameplay engine never adds empty poor for an input behind a consumed note") {
+    GameplayChart chart;
+    chart.lane_count = 1;
+    chart.duration_samples = 3000;
+    chart.notes.push_back(NoteEvent{1, 1000, std::nullopt});
+
+    GameplayConfig config;
+    config.sample_rate = 1000;
+    config.rate = 1.0;
+    config.judge.pg_ms = 10.0;
+    config.judge.gr_ms = 20.0;
+    config.judge.gd_ms = 30.0;
+    config.judge.bd_ms = 40.0;
+
+    GameplayEngine engine(chart, config);
+    REQUIRE(engine.handle_input(1, InputState::Pressed, 1000).has_value());
+    (void)engine.handle_input(1, InputState::Released, 1010);
+    (void)engine.handle_input(1, InputState::Pressed, 1500);
+
+    CHECK(engine.stats().counts.pg == 1);
+    CHECK(engine.stats().counts.bd == 0);
+    CHECK(engine.stats().counts.pr == 0);
+}
+
 TEST_CASE("gameplay engine scores hold tail based on release timing") {
     GameplayChart chart;
     chart.lane_count = 1;

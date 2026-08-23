@@ -55,7 +55,7 @@ const std::vector<ModeModDescriptor>& registry_storage() {
         {"ln_mix_80", "LN Mix 80%", "LN 80%", "note_structure", "Note Structure", 1.00, 80},
         {"ln_mix_90", "LN Mix 90%", "LN 90%", "note_structure", "Note Structure", 1.00, 90},
         {"full_short_notes", "Full Short Notes", "Full Tap", "note_structure", "Note Structure", 0.50},
-        {"no_ln_release", "No LN Release", "No LN Release", "hold_rule", "Hold Rule", 0.90},
+        {"no_ln_release", "No LN Release", "No LN Release", "hold_rule", "Hold Rule", 1.00},
     };
     return kRegistry;
 }

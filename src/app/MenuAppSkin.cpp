@@ -1029,7 +1029,7 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
     // Resolution, Import, then Key Mode; moving Key Mode to the front preserves
     // every row from Target Lane onward.
     append_menu_row(render.generic,
-                    ui_text("FAST/SLOW Display", "FAST/SLOW \uD45C\uC2DC"),
+                    ui_text("FAST/SLOW Indicator", "FAST/SLOW 인디케이터"),
                     ui_on_off(config_.skin.show_timing_feedback),
                     false,
                     render::MenuHitTargetKind::SettingsRow,
@@ -1181,6 +1181,8 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
                                            "16K 중앙 간격은 16키 필드의 좌우 묶음 사이에 빈 중앙 간격을 추가합니다."));
     render.generic.notes.push_back(ui_text("Opaque Playfield keeps BGA outside the lanes but blocks it behind the complete playfield, including spacing gaps.",
                                            "기어 뒤 BGA 가림은 바깥 BGA는 유지하고 간격까지 포함한 노트 영역 뒤를 완전한 검정으로 가립니다."));
+    render.generic.notes.push_back(ui_text("FAST/SLOW Indicator hides or shows both the live timing text and timing-history marker without hiding judgement grades.",
+                                           "FAST/SLOW 인디케이터는 판정 등급은 유지한 채 실시간 타이밍 문구와 타이밍 기록 표시를 함께 끄거나 켭니다."));
     render.generic.notes.push_back(ui_text("Key Mode, Target Lane, and Target Gap edit per-layout fallback geometry before imported divider art is applied.",
                                            "키 모드, 대상 레인, 대상 간격은 외부 스킨 구분선 아트를 적용하기 전 레이아웃별 기본 지오메트리를 편집합니다."));
 }

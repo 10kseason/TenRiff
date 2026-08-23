@@ -137,6 +137,7 @@ Rate は曲の再生速度と譜面スケジュールだけを変え、同じ Hi
 - タイミングずれ（ms）
 
 中心からずれた入力は judgement の下に符号付きで表示されます。早い入力は `FAST -12 ms`、遅い入力は `SLOW +18 ms` となり、`0 ms` に丸められる入力では timing 表示を省略します。
+`Skin Settings > FAST/SLOW Indicator` でこの表示と timing-history marker をまとめて切り替えられます。Off にしても judgement grade は表示されます。
 
 `Graphics > Performance HUD` を有効にすると、frame graph、average FPS、low FPS、gameplay timing debug 情報も見られます。
 
@@ -148,6 +149,10 @@ Rate は曲の再生速度と譜面スケジュールだけを変え、同じ Hi
 - `GD`: Good
 - `BD`: Bad
 - `PR`: Poor / Miss
+
+空POOR は次の note より早い側だけに適用します。消費済み、または判定線を通過済みの note の後ろで入力しても後ろ空POORは追加しません。
+
+`No LN Release` は charge LN 終端の release judgement を無効化し、score multiplier は正確に `1.00x` です。
 
 OD8 換算統計は Sudden Death と既存 replay 互換のため JSON 内部に維持されますが、Gameplay / Result 画面には表示しません。
 
