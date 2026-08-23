@@ -140,6 +140,44 @@ inline float compute_gameplay_playfield_width(float baseline_width, double note_
     return std::max(1.0f, baseline_width) * gameplay_playfield_scale(note_width_scale);
 }
 
+struct GameplayProgressTrackLayout {
+    float left = 0.0f;
+    float right = 0.0f;
+};
+
+inline GameplayProgressTrackLayout compute_gameplay_progress_track_layout(
+    float content_left,
+    float content_right,
+    float player_field_left,
+    float player_blocked_right,
+    bool ghost_visible,
+    float ghost_field_left,
+    float ghost_field_right,
+    float clearance) {
+    GameplayProgressTrackLayout best{content_left, content_left};
+    float best_width = 0.0f;
+    const float safe_clearance = std::max(0.0f, clearance);
+    const auto consider_gap = [&](float gap_left, float gap_right) {
+        const float safe_left = std::max(content_left, gap_left);
+        const float safe_right = std::min(content_right, gap_right);
+        const float width = safe_right - safe_left;
+        if (width > best_width) {
+            best = {safe_left, safe_right};
+            best_width = width;
+        }
+    };
+
+    consider_gap(content_left, player_field_left - safe_clearance);
+    if (ghost_visible) {
+        consider_gap(player_blocked_right + safe_clearance,
+                     ghost_field_left - safe_clearance);
+        consider_gap(ghost_field_right + safe_clearance, content_right);
+    } else {
+        consider_gap(player_blocked_right + safe_clearance, content_right);
+    }
+    return best;
+}
+
 // Clearance between a note edge and the lane divider line, in base-space pixels at
 // 100% note size. The default of 12 per side reproduces the historic 24px inset.
 inline constexpr double kGameplayNoteDividerGapPxDefault = 12.0;
