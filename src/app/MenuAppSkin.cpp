@@ -17,6 +17,7 @@
 #define WIN32_LEAN_AND_MEAN
 #endif
 #include <windows.h>
+#include <shellapi.h>
 #include <shobjidl.h>
 #include <wrl/client.h>
 #endif
@@ -165,6 +166,21 @@ std::optional<std::string> pick_folder_dialog_utf8() {
     return result;
 }
 
+bool open_folder_in_shell(std::string_view path_utf8) {
+    const fs::path path = path_from_utf8(path_utf8);
+    std::error_code ec;
+    if (path.empty() || !fs::is_directory(path, ec) || ec) {
+        return false;
+    }
+    const HINSTANCE opened = ShellExecuteW(nullptr,
+                                           L"open",
+                                           path.c_str(),
+                                           nullptr,
+                                           nullptr,
+                                           SW_SHOWNORMAL);
+    return reinterpret_cast<INT_PTR>(opened) > 32;
+}
+
 
 #endif
 
@@ -217,9 +233,12 @@ void MenuApp::refresh_available_tenriff_skins() {
     available_tenriff_skin_root_ = tenriff_skin_import_root_path(profile_dir_).u8string();
     available_tenriff_skin_names_ = list_tenriff_skin_names(available_tenriff_skin_root_);
     active_tenriff_skin_ = {};
+    active_tenriff_skin_modes_.fill(TenRiffSkinDefinition{});
+    active_tenriff_gameplay_modes_.fill(nullptr);
 
     if (available_tenriff_skin_names_.empty()) {
         config_.skin.tenriff_skin_name.clear();
+        skin_status_messages_.clear();
         return;
     }
     if (config_.skin.tenriff_skin_name.empty() ||
@@ -228,11 +247,52 @@ void MenuApp::refresh_available_tenriff_skins() {
                   config_.skin.tenriff_skin_name) == available_tenriff_skin_names_.end()) {
         config_.skin.tenriff_skin_name = available_tenriff_skin_names_.front();
     }
-    active_tenriff_skin_ = resolve_tenriff_skin(
-        available_tenriff_skin_root_, config_.skin.tenriff_skin_name, 10);
+    for (int keys = 1; keys <= 16; ++keys) {
+        auto definition = resolve_tenriff_skin(
+            available_tenriff_skin_root_, config_.skin.tenriff_skin_name, keys);
+        if (definition.found) {
+            active_tenriff_gameplay_modes_[static_cast<std::size_t>(keys - 1)] =
+                std::make_shared<const ImportedGameplaySkinDefinition>(definition.gameplay);
+        }
+        active_tenriff_skin_modes_[static_cast<std::size_t>(keys - 1)] =
+            std::move(definition);
+    }
+    if (const auto* selected = active_tenriff_skin_for_keys(
+            lane_count_for_skin_mode(skin_edit_mode_))) {
+        active_tenriff_skin_ = *selected;
+    }
+    for (const auto& mode_definition : active_tenriff_skin_modes_) {
+        for (const auto& path : mode_definition.referenced_asset_paths) {
+            if (std::find(active_tenriff_skin_.referenced_asset_paths.begin(),
+                          active_tenriff_skin_.referenced_asset_paths.end(), path) ==
+                active_tenriff_skin_.referenced_asset_paths.end()) {
+                active_tenriff_skin_.referenced_asset_paths.push_back(path);
+            }
+        }
+    }
+    skin_status_messages_.clear();
     for (const auto& warning : active_tenriff_skin_.warnings) {
         std::cerr << "[warn] TenRiff skin: " << warning << std::endl;
+        if (skin_status_messages_.size() < 4u) {
+            skin_status_messages_.push_back(ui_text("Warning: ", "경고: ") + warning);
+        }
     }
+    if (active_tenriff_skin_.warnings.size() > skin_status_messages_.size()) {
+        skin_status_messages_.push_back(
+            ui_text("More warnings are available in the log.", "추가 경고는 로그에서 확인할 수 있습니다."));
+    }
+}
+
+const TenRiffSkinDefinition* MenuApp::active_tenriff_skin_for_keys(int keys) const {
+    const int clamped = clamp_int(keys, 1, 16);
+    const auto& definition = active_tenriff_skin_modes_[static_cast<std::size_t>(clamped - 1)];
+    return definition.found ? &definition : nullptr;
+}
+
+std::shared_ptr<const ImportedGameplaySkinDefinition>
+MenuApp::active_tenriff_gameplay_for_keys(int keys) const {
+    const int clamped = clamp_int(keys, 1, 16);
+    return active_tenriff_gameplay_modes_[static_cast<std::size_t>(clamped - 1)];
 }
 
 bool MenuApp::import_lr2_skin_path(std::string_view source_path) {
@@ -248,6 +308,11 @@ bool MenuApp::import_lr2_skin_path(std::string_view source_path) {
         std::cerr << "[warn] " << warning << std::endl;
     }
     if (!imported.success()) {
+        skin_status_messages_.clear();
+        for (const auto& warning : imported.warnings) {
+            if (skin_status_messages_.size() >= 4u) break;
+            skin_status_messages_.push_back(ui_text("Import failed: ", "가져오기 실패: ") + warning);
+        }
         return false;
     }
 
@@ -257,6 +322,9 @@ bool MenuApp::import_lr2_skin_path(std::string_view source_path) {
     config_.skin.lr2_skin_name = imported.skin_names.front();
     refresh_available_lr2_skins();
     refresh_available_tenriff_skins();
+    skin_status_messages_ = {
+        ui_text("LR2 skin import completed.", "LR2 스킨 가져오기를 완료했습니다.")
+    };
     skin_dirty_ = true;
     std::cerr << "[info] Imported " << imported.skin_names.size()
               << " LR2 skin(s), files=" << imported.copied_files
@@ -271,11 +339,25 @@ bool MenuApp::import_tenriff_skin_path(std::string_view source_path) {
         std::cerr << "[warn] " << warning << std::endl;
     }
     if (!imported.success()) {
+        skin_status_messages_.clear();
+        for (const auto& warning : imported.warnings) {
+            if (skin_status_messages_.size() >= 4u) break;
+            skin_status_messages_.push_back(ui_text("Import failed: ", "가져오기 실패: ") + warning);
+        }
         return false;
     }
 
     config_.skin.tenriff_skin_name = imported.skin_name;
     refresh_available_tenriff_skins();
+    ++tenriff_skin_revision_;
+    std::vector<std::string> status = {
+        ui_text("Imported and activated: ", "가져오고 활성화했습니다: ") + imported.skin_name
+    };
+    for (const auto& warning : imported.warnings) {
+        if (status.size() >= 4u) break;
+        status.push_back(ui_text("Warning: ", "경고: ") + warning);
+    }
+    skin_status_messages_ = std::move(status);
     skin_dirty_ = true;
     std::cerr << "[info] Imported TenRiff skin " << imported.skin_name
               << ", files=" << imported.copied_files
@@ -328,50 +410,64 @@ std::string MenuApp::active_external_skin_name() const {
 void MenuApp::handle_skins_settings_input(uint32_t keycode) {
     const std::string active_skin_source = config::normalize_skin_source_token(config_.skin.source);
     const bool lr2_source = active_skin_source == "lr2";
-    const int lr2_shift = lr2_source ? 1 : 0;
-    const int item_count = 41 + lr2_shift;
-    const int key_mode_row = 0;
-    const int skin_source_row = 1;
-    const int imported_skin_row = 2;
-    const int lr2_resolution_row = lr2_source ? 3 : -1;
-    const int import_skin_row = 3 + lr2_shift;
-    const int target_lane_row = 4 + lr2_shift;
-    const int target_gap_row = 5 + lr2_shift;
-    const int lane_color_row = 6 + lr2_shift;
-    const int single_color_row = 7 + lr2_shift;
-    const int note_shape_row = 8 + lr2_shift;
-    const int note_border_row = 9 + lr2_shift;
-    const int image_aspect_row = 10 + lr2_shift;
-    const int lane_dividers_row = 11 + lr2_shift;
-    const int judgement_line_row = 12 + lr2_shift;
-    const int gear_boundary_row = 13 + lr2_shift;
-    const int show_hold_tail_row = 14 + lr2_shift;
-    const int ln_tail_taper_row = 15 + lr2_shift;
-    const int visual_preset_row = 16 + lr2_shift;
-    const int lane_background_opacity_row = 17 + lr2_shift;
-    const int visual_opacity_row = 18 + lr2_shift;
-    const int note_outline_opacity_row = 19 + lr2_shift;
-    const int ln_body_opacity_row = 20 + lr2_shift;
-    const int judgement_line_glow_row = 21 + lr2_shift;
-    const int hit_burst_style_row = 22 + lr2_shift;
-    const int key_pulse_row = 23 + lr2_shift;
-    const int key_label_position_row = 24 + lr2_shift;
-    const int judge_line_row = 25 + lr2_shift;
-    const int lane_width_row = 26 + lr2_shift;
-    const int note_width_row = 27 + lr2_shift;
-    const int lane_spacing_row = 28 + lr2_shift;
-    const int divider_width_row = 29 + lr2_shift;
-    const int center_gap_row = 30 + lr2_shift;
-    const int ln_body_width_row = 31 + lr2_shift;
-    const int note_height_row = 32 + lr2_shift;
-    const int combo_y_row = 33 + lr2_shift;
-    const int black_playfield_row = 34 + lr2_shift;
-    const int ui_font_row = 35 + lr2_shift;
-    const int visual_latency_row = 36 + lr2_shift;
-    const int note_gap_row = 37 + lr2_shift;
-    const int gameplay_cursor_row = 38 + lr2_shift;
-    const int timing_feedback_row = 39 + lr2_shift;
-    const int back_row = 40 + lr2_shift;
+    const SkinSettingsRows rows{lr2_source};
+    const int item_count = rows.count();
+    const int key_mode_row = rows.index_of(SkinSettingsRowId::KeyMode);
+    const int skin_source_row = rows.index_of(SkinSettingsRowId::SkinSource);
+    const int imported_skin_row = rows.index_of(SkinSettingsRowId::ImportedSkin);
+    const int lr2_resolution_row = rows.index_of(SkinSettingsRowId::Lr2Resolution);
+    const int import_skin_row = rows.index_of(SkinSettingsRowId::ImportSkin);
+    const int create_skin_row = rows.index_of(SkinSettingsRowId::CreateSkin);
+    const int open_skin_folder_row = rows.index_of(SkinSettingsRowId::OpenSkinFolder);
+    const int reload_skin_row = rows.index_of(SkinSettingsRowId::ReloadSkin);
+    const int target_lane_row = rows.index_of(SkinSettingsRowId::TargetLane);
+    const int target_gap_row = rows.index_of(SkinSettingsRowId::TargetGap);
+    const int lane_color_row = rows.index_of(SkinSettingsRowId::LaneColor);
+    const int single_color_row = rows.index_of(SkinSettingsRowId::SingleColor);
+    const int note_shape_row = rows.index_of(SkinSettingsRowId::NoteShape);
+    const int note_border_row = rows.index_of(SkinSettingsRowId::NoteBorder);
+    const int image_aspect_row = rows.index_of(SkinSettingsRowId::ImageAspect);
+    const int lane_dividers_row = rows.index_of(SkinSettingsRowId::LaneDividers);
+    const int judgement_line_row = rows.index_of(SkinSettingsRowId::JudgementLine);
+    const int gear_boundary_row = rows.index_of(SkinSettingsRowId::GearBoundary);
+    const int show_hold_tail_row = rows.index_of(SkinSettingsRowId::ShowHoldTail);
+    const int ln_tail_taper_row = rows.index_of(SkinSettingsRowId::LnTailTaper);
+    const int visual_preset_row = rows.index_of(SkinSettingsRowId::VisualPreset);
+    const int lane_background_opacity_row = rows.index_of(SkinSettingsRowId::LaneBackgroundOpacity);
+    const int visual_opacity_row = rows.index_of(SkinSettingsRowId::VisualOpacity);
+    const int note_outline_opacity_row = rows.index_of(SkinSettingsRowId::NoteOutlineOpacity);
+    const int ln_body_opacity_row = rows.index_of(SkinSettingsRowId::LnBodyOpacity);
+    const int judgement_line_glow_row = rows.index_of(SkinSettingsRowId::JudgementLineGlow);
+    const int hit_burst_style_row = rows.index_of(SkinSettingsRowId::HitBurstStyle);
+    const int key_pulse_row = rows.index_of(SkinSettingsRowId::KeyPulse);
+    const int key_label_position_row = rows.index_of(SkinSettingsRowId::KeyLabelPosition);
+    const int judge_line_row = rows.index_of(SkinSettingsRowId::JudgeLinePosition);
+    const int lane_width_row = rows.index_of(SkinSettingsRowId::LaneWidth);
+    const int note_width_row = rows.index_of(SkinSettingsRowId::NoteWidth);
+    const int lane_spacing_row = rows.index_of(SkinSettingsRowId::LaneSpacing);
+    const int divider_width_row = rows.index_of(SkinSettingsRowId::DividerWidth);
+    const int center_gap_row = rows.index_of(SkinSettingsRowId::CenterGap);
+    const int ln_body_width_row = rows.index_of(SkinSettingsRowId::LnBodyWidth);
+    const int note_height_row = rows.index_of(SkinSettingsRowId::NoteHeight);
+    const int combo_y_row = rows.index_of(SkinSettingsRowId::ComboY);
+    const int black_playfield_row = rows.index_of(SkinSettingsRowId::BlackPlayfield);
+    const int ui_font_row = rows.index_of(SkinSettingsRowId::UiFont);
+    const int visual_latency_row = rows.index_of(SkinSettingsRowId::VisualLatency);
+    const int note_gap_row = rows.index_of(SkinSettingsRowId::NoteGap);
+    const int gameplay_cursor_row = rows.index_of(SkinSettingsRowId::GameplayCursor);
+    const int timing_feedback_row = rows.index_of(SkinSettingsRowId::TimingFeedback);
+    const int back_row = rows.index_of(SkinSettingsRowId::Back);
+
+    if (keycode == key_f5_) {
+        refresh_available_tenriff_skins();
+        ++tenriff_skin_revision_;
+        skin_status_messages_.insert(
+            skin_status_messages_.begin(),
+            ui_text("Reloaded the current skin from disk.", "현재 스킨을 디스크에서 다시 불러왔습니다."));
+        if (skin_status_messages_.size() > 5u) skin_status_messages_.resize(5u);
+        publish_snapshot();
+        return;
+    }
 
     if (keycode == key_up_) {
         settings_cursor_ = clamp_int(settings_cursor_ - 1, 0, item_count - 1);
@@ -389,7 +485,7 @@ void MenuApp::handle_skins_settings_input(uint32_t keycode) {
         const bool was_lr2 = active_skin_source == "lr2";
         config_.skin.source = cycle_skin_source(config_.skin.source, direction);
         const bool is_lr2 = config::normalize_skin_source_token(config_.skin.source) == "lr2";
-        const int new_item_count = 41 + (is_lr2 ? 1 : 0);
+        const int new_item_count = skin_settings_row_count(is_lr2);
         if (!was_lr2 && is_lr2 && settings_cursor_ >= import_skin_row) {
             ++settings_cursor_;
         } else if (was_lr2 && !is_lr2 && settings_cursor_ >= lr2_resolution_row) {
@@ -398,6 +494,7 @@ void MenuApp::handle_skins_settings_input(uint32_t keycode) {
         settings_cursor_ = clamp_int(settings_cursor_, 0, new_item_count - 1);
         refresh_available_lr2_skins();
         refresh_available_tenriff_skins();
+        ++tenriff_skin_revision_;
         skin_dirty_ = true;
         publish_snapshot();
         return;
@@ -431,12 +528,14 @@ void MenuApp::handle_skins_settings_input(uint32_t keycode) {
                 refresh_available_lr2_skins();
             } else {
                 refresh_available_tenriff_skins();
+                ++tenriff_skin_revision_;
             }
             skin_dirty_ = true;
         }
         publish_snapshot();
         return;
-    }    if (settings_cursor_ == lr2_resolution_row && (keycode == key_left_ || keycode == key_right_)) {
+    }
+    if (settings_cursor_ == lr2_resolution_row && (keycode == key_left_ || keycode == key_right_)) {
         const int direction = (keycode == key_left_) ? -1 : 1;
         config_.skin.lr2_resolution_mode = cycle_lr2_resolution_mode(config_.skin.lr2_resolution_mode, direction);
         skin_dirty_ = true;
@@ -450,10 +549,73 @@ void MenuApp::handle_skins_settings_input(uint32_t keycode) {
             if (!import_skin_path_auto(*picked_path)) {
                 std::cerr << "[warn] Selected path is not a supported TenRiff or LR2 skin folder: "
                           << *picked_path << std::endl;
+                skin_status_messages_ = {
+                    ui_text("Import failed: unsupported or invalid skin folder.",
+                            "가져오기 실패: 지원하지 않거나 잘못된 스킨 폴더입니다.")
+                };
             }
             publish_snapshot();
         }
 #endif
+        return;
+    }
+    if (settings_cursor_ == create_skin_row && keycode == key_enter_) {
+        const TenRiffSkinCreateResult created = create_tenriff_skin_template(
+            tenriff_skin_import_root_path(profile_dir_).u8string());
+        if (!created.success()) {
+            skin_status_messages_.clear();
+            for (const auto& warning : created.warnings) {
+                if (skin_status_messages_.size() >= 4u) break;
+                skin_status_messages_.push_back(ui_text("Create failed: ", "생성 실패: ") + warning);
+            }
+            if (skin_status_messages_.empty()) {
+                skin_status_messages_.push_back(
+                    ui_text("Could not create a new skin.", "새 스킨을 만들 수 없습니다."));
+            }
+            publish_snapshot();
+            return;
+        }
+        config_.skin.source = "tenriff";
+        config_.skin.tenriff_skin_name = created.skin_name;
+        refresh_available_tenriff_skins();
+        ++tenriff_skin_revision_;
+        skin_dirty_ = true;
+        skin_status_messages_ = {
+            ui_text("Created an editable skin: ", "편집 가능한 스킨을 만들었습니다: ") + created.skin_name,
+            ui_text("Add standard-named images, then press F5 to reload.",
+                    "표준 파일명으로 이미지를 넣은 뒤 F5로 다시 불러오세요.")
+        };
+#ifdef _WIN32
+        static_cast<void>(open_folder_in_shell(created.folder_path));
+#endif
+        publish_snapshot();
+        return;
+    }
+    if (settings_cursor_ == open_skin_folder_row && keycode == key_enter_) {
+#ifdef _WIN32
+        bool opened = false;
+        if (active_skin_source == "tenriff" && !config_.skin.tenriff_skin_name.empty()) {
+            opened = open_folder_in_shell(
+                (path_from_utf8(available_tenriff_skin_root_) /
+                 path_from_utf8(config_.skin.tenriff_skin_name)).u8string());
+        }
+        skin_status_messages_ = {
+            opened ? ui_text("Opened the active skin folder.", "현재 스킨 폴더를 열었습니다.")
+                   : ui_text("No editable TenRiff skin folder is active.",
+                             "편집할 TenRiff 스킨 폴더가 활성화되어 있지 않습니다.")
+        };
+#endif
+        publish_snapshot();
+        return;
+    }
+    if (settings_cursor_ == reload_skin_row && keycode == key_enter_) {
+        refresh_available_tenriff_skins();
+        ++tenriff_skin_revision_;
+        skin_status_messages_.insert(
+            skin_status_messages_.begin(),
+            ui_text("Reloaded the current skin from disk.", "현재 스킨을 디스크에서 다시 불러왔습니다."));
+        if (skin_status_messages_.size() > 5u) skin_status_messages_.resize(5u);
+        publish_snapshot();
         return;
     }
     if (settings_cursor_ == key_mode_row && (keycode == key_left_ || keycode == key_right_)) {
@@ -465,6 +627,9 @@ void MenuApp::handle_skins_settings_input(uint32_t keycode) {
         editable_skin_lane_colors(config_.skin, skin_edit_mode_);
         editable_skin_lane_width_scales(config_.skin, skin_edit_mode_);
         editable_skin_lane_spacing_scales(config_.skin, skin_edit_mode_);
+        if (active_skin_source == "tenriff") {
+            refresh_available_tenriff_skins();
+        }
         skin_dirty_ = true;
         publish_snapshot();
         return;
@@ -879,6 +1044,17 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
     const std::string active_skin_source = config::normalize_skin_source_token(config_.skin.source);
     const bool lr2_source = active_skin_source == "lr2";
     const int lr2_shift = lr2_source ? 1 : 0;
+    const SkinSettingsRows stable_rows{lr2_source};
+    const TenRiffSkinGameplayStyle* manifest_style =
+        active_skin_source == "tenriff" && active_tenriff_skin_.found
+            ? &active_tenriff_skin_.gameplay_style
+            : nullptr;
+    auto style_bool = [&](const std::optional<bool>& value, bool fallback) {
+        return manifest_style && value.has_value() ? *value : fallback;
+    };
+    auto style_number = [&](const std::optional<float>& value, double fallback) {
+        return manifest_style && value.has_value() ? static_cast<double>(*value) : fallback;
+    };
     const std::string imported_skin_row_label =
         active_skin_source == "tenriff" ? ui_text("TenRiff Skin", "TenRiff 스킨")
                                          : (active_skin_source == "lr2"
@@ -896,6 +1072,10 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
                                   : (config_.skin.tenriff_skin_name.empty() ? available_tenriff_skin_names_.front()
                                                                             : config_.skin.tenriff_skin_name);
     }
+    append_menu_row(render.generic, ui_text("Key Mode", "키 모드"), ui_key_mode_label(skin_edit_mode_),
+                    settings_cursor_ == stable_rows.index_of(SkinSettingsRowId::KeyMode),
+                    render::MenuHitTargetKind::SettingsRow,
+                    stable_rows.index_of(SkinSettingsRowId::KeyMode), false, true);
     append_menu_row(render.generic, ui_text("Skin Source", "스킨 소스"), ui_skin_source_label(active_skin_source), settings_cursor_ == 0,
                     render::MenuHitTargetKind::SettingsRow, 0, false, true);
     append_menu_row(render.generic, imported_skin_row_label, imported_skin_value, settings_cursor_ == 1,
@@ -913,8 +1093,21 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
                     ui_text("Open Folder", "폴더 열기"),
                     settings_cursor_ == 2 + lr2_shift,
                     render::MenuHitTargetKind::SettingsRow, 2 + lr2_shift, true, false);
-    append_menu_row(render.generic, ui_text("Key Mode", "키 모드"), ui_key_mode_label(skin_edit_mode_), settings_cursor_ == 3 + lr2_shift,
-                    render::MenuHitTargetKind::SettingsRow, 3 + lr2_shift, false, true);
+    append_menu_row(render.generic, ui_text("Create New Skin", "새 스킨 만들기"),
+                    ui_text("Create & Open", "생성 후 열기"),
+                    false, render::MenuHitTargetKind::SettingsRow,
+                    3 + lr2_shift, true, false);
+    const bool editable_tenriff_skin = active_skin_source == "tenriff" &&
+                                       active_tenriff_skin_.found &&
+                                       !config_.skin.tenriff_skin_name.empty();
+    append_menu_row(render.generic, ui_text("Open Skin Folder", "스킨 폴더 열기"),
+                    editable_tenriff_skin ? ui_text("Open", "열기") : ui_text("TenRiff Only", "TenRiff 전용"),
+                    false, render::MenuHitTargetKind::SettingsRow,
+                    4 + lr2_shift, editable_tenriff_skin, false);
+    append_menu_row(render.generic, ui_text("Reload Skin", "스킨 다시 불러오기"),
+                    editable_tenriff_skin ? "F5" : ui_text("TenRiff Only", "TenRiff 전용"),
+                    false, render::MenuHitTargetKind::SettingsRow,
+                    5 + lr2_shift, editable_tenriff_skin, false);
     append_menu_row(render.generic, ui_text("Target Lane", "대상 레인"),
                     ui_text("Lane ", "레인 ") + std::to_string(skin_edit_lane_ + 1) + " / " + std::to_string(lane_count),
                     settings_cursor_ == 4 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 4 + lr2_shift, false, true);
@@ -935,6 +1128,14 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
                         : config::skin_color_label(preview_lane_palette[static_cast<std::size_t>(skin_edit_lane_)]),
                     settings_cursor_ == 6 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 6 + lr2_shift,
                     false, !single_color_enabled);
+    append_menu_row(render.generic,
+                    ui_text("Single Color", "단일 색상"),
+                    config::skin_single_color_label(config_.skin.single_color),
+                    false,
+                    render::MenuHitTargetKind::SettingsRow,
+                    stable_rows.index_of(SkinSettingsRowId::SingleColor),
+                    false,
+                    true);
     append_menu_row(render.generic, ui_text("Note Shape", "노트 모양"), ui_skin_note_shape_label(config_.skin.note_shape),
                     settings_cursor_ == 7 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 7 + lr2_shift, false, true);
     append_menu_row(render.generic, ui_text("Note Border", "노트 테두리"), ui_on_off(config_.skin.note_border_enabled),
@@ -1021,51 +1222,17 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
                     ui_on_off(config_.ui.show_cursor_in_gameplay),
                     settings_cursor_ == 37 + lr2_shift, render::MenuHitTargetKind::SettingsRow,
                     37 + lr2_shift, false, true);
-    append_menu_row(render.generic, ui_text("Back", "뒤로"), "", settings_cursor_ == 38 + lr2_shift,
-                    render::MenuHitTargetKind::SettingsRow, 38 + lr2_shift, true, false);
-
-    // Keep the mode selector first without duplicating the large row-construction
-    // block above. The original first rows are Source, Imported, optional LR2
-    // Resolution, Import, then Key Mode; moving Key Mode to the front preserves
-    // every row from Target Lane onward.
     append_menu_row(render.generic,
                     ui_text("FAST/SLOW Indicator", "FAST/SLOW 인디케이터"),
                     ui_on_off(config_.skin.show_timing_feedback),
                     false,
                     render::MenuHitTargetKind::SettingsRow,
-                    39 + lr2_shift,
+                    stable_rows.index_of(SkinSettingsRowId::TimingFeedback),
                     false,
                     true);
-    append_menu_row(render.generic,
-                    ui_text("Single Color", "단일 색상"),
-                    config::skin_single_color_label(config_.skin.single_color),
-                    false,
+    append_menu_row(render.generic, ui_text("Back", "뒤로"), "", false,
                     render::MenuHitTargetKind::SettingsRow,
-                    40 + lr2_shift,
-                    false,
-                    true);
-    const std::size_t old_key_mode_index = static_cast<std::size_t>(3 + lr2_shift);
-    if (old_key_mode_index < render.generic.rows.size()) {
-        auto key_mode = std::move(render.generic.rows[old_key_mode_index]);
-        render.generic.rows.erase(render.generic.rows.begin() +
-                                  static_cast<std::ptrdiff_t>(old_key_mode_index));
-        render.generic.rows.insert(render.generic.rows.begin(), std::move(key_mode));
-    }
-    const std::size_t old_single_color_index = static_cast<std::size_t>(40 + lr2_shift);
-    const std::size_t single_color_index = static_cast<std::size_t>(7 + lr2_shift);
-    if (old_single_color_index < render.generic.rows.size()) {
-        auto single_color = std::move(render.generic.rows[old_single_color_index]);
-        render.generic.rows.erase(render.generic.rows.begin() +
-                                  static_cast<std::ptrdiff_t>(old_single_color_index));
-        render.generic.rows.insert(render.generic.rows.begin() +
-                                   static_cast<std::ptrdiff_t>(single_color_index),
-                                   std::move(single_color));
-    }
-    const std::size_t timing_index = static_cast<std::size_t>(39 + lr2_shift);
-    const std::size_t back_index = static_cast<std::size_t>(40 + lr2_shift);
-    if (back_index < render.generic.rows.size()) {
-        std::swap(render.generic.rows[timing_index], render.generic.rows[back_index]);
-    }
+                    stable_rows.index_of(SkinSettingsRowId::Back), true, false);
     for (std::size_t row = 0; row < render.generic.rows.size(); ++row) {
         render.generic.rows[row].row_index = static_cast<int>(row);
         render.generic.rows[row].selected = settings_cursor_ == static_cast<int>(row);
@@ -1074,7 +1241,9 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
     render.generic.skin_preview.visible = true;
     render.generic.skin_preview.mode_label = ui_key_mode_label(skin_edit_mode_);
     render.generic.skin_preview.selected_color_label =
-        config::skin_color_label(preview_lane_colors[static_cast<std::size_t>(skin_edit_lane_)]);
+        manifest_style && !manifest_style->lane_colors.empty()
+            ? ui_text("Skin Manifest", "스킨 매니페스트")
+            : config::skin_color_label(preview_lane_colors[static_cast<std::size_t>(skin_edit_lane_)]);
     render.generic.skin_preview.lane_count = lane_count;
     render.generic.skin_preview.selected_lane = clamp_int(skin_edit_lane_ + 1, 1, lane_count);
     render.generic.skin_preview.selected_gap = (gap_count > 0) ? clamp_int(skin_edit_gap_ + 1, 1, gap_count) : -1;
@@ -1103,88 +1272,106 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
     render.generic.skin_preview.lane_divider_width_scale = preview_lane_divider_width_scale;
     render.generic.skin_preview.lane_center_gap_scale = center_gap_available ? preview_lane_center_gap_scale : 0.0;
     render.generic.skin_preview.hold_body_width_scale = config_.skin.hold_body_width_scale;
-    render.generic.skin_preview.show_lane_dividers = config_.skin.show_lane_dividers;
+    render.generic.skin_preview.show_lane_dividers = style_bool(
+        manifest_style ? manifest_style->show_lane_dividers : std::optional<bool>{},
+        config_.skin.show_lane_dividers);
     render.generic.skin_preview.note_divider_gap_px = config_.skin.note_divider_gap_px;
-    render.generic.skin_preview.show_judgement_line = config_.skin.show_judgement_line;
-    render.generic.skin_preview.show_gear_boundary_line = config_.skin.show_gear_boundary_line;
-    render.generic.skin_preview.show_hold_tail = config_.skin.show_hold_tail;
-    render.generic.skin_preview.hold_tail_taper_enabled = config_.skin.hold_tail_taper_enabled;
-    render.generic.skin_preview.judgement_line_glow_enabled = config_.skin.judgement_line_glow_enabled;
-    render.generic.skin_preview.key_pulse_enabled = config_.skin.key_pulse_enabled;
-    render.generic.skin_preview.key_pulse_brightness =
-        static_cast<float>(config_.skin.key_pulse_brightness);
+    render.generic.skin_preview.show_judgement_line = style_bool(
+        manifest_style ? manifest_style->show_judgement_line : std::optional<bool>{},
+        config_.skin.show_judgement_line);
+    render.generic.skin_preview.show_gear_boundary_line = style_bool(
+        manifest_style ? manifest_style->show_gear_boundary_line : std::optional<bool>{},
+        config_.skin.show_gear_boundary_line);
+    render.generic.skin_preview.show_hold_tail = style_bool(
+        manifest_style ? manifest_style->show_hold_tail : std::optional<bool>{},
+        config_.skin.show_hold_tail);
+    render.generic.skin_preview.hold_tail_taper_enabled = style_bool(
+        manifest_style ? manifest_style->hold_tail_taper_enabled : std::optional<bool>{},
+        config_.skin.hold_tail_taper_enabled);
+    render.generic.skin_preview.judgement_line_glow_enabled = style_bool(
+        manifest_style ? manifest_style->judgement_line_glow_enabled : std::optional<bool>{},
+        config_.skin.judgement_line_glow_enabled);
+    render.generic.skin_preview.key_pulse_enabled = style_bool(
+        manifest_style ? manifest_style->key_pulse_enabled : std::optional<bool>{},
+        config_.skin.key_pulse_enabled);
+    render.generic.skin_preview.key_pulse_brightness = static_cast<float>(style_number(
+        manifest_style ? manifest_style->key_pulse_brightness : std::optional<float>{},
+        config_.skin.key_pulse_brightness));
     render.generic.skin_preview.hit_burst_style =
-        config::normalize_skin_hit_burst_style_token(config_.skin.hit_burst_style);
+        manifest_style && manifest_style->hit_burst_style.has_value()
+            ? *manifest_style->hit_burst_style
+            : config::normalize_skin_hit_burst_style_token(config_.skin.hit_burst_style);
     render.generic.skin_preview.key_label_position =
-        config::normalize_skin_key_label_position_token(config_.skin.key_label_position);
-    render.generic.skin_preview.note_border_enabled = config_.skin.note_border_enabled;
-    render.generic.skin_preview.note_shape = config_.skin.note_shape;
+        manifest_style && manifest_style->key_label_position.has_value()
+            ? *manifest_style->key_label_position
+            : config::normalize_skin_key_label_position_token(config_.skin.key_label_position);
+    render.generic.skin_preview.note_border_enabled = style_bool(
+        manifest_style ? manifest_style->note_border_enabled : std::optional<bool>{},
+        config_.skin.note_border_enabled);
+    render.generic.skin_preview.note_shape =
+        manifest_style && manifest_style->note_shape.has_value()
+            ? *manifest_style->note_shape
+            : config_.skin.note_shape;
     render.generic.skin_preview.note_image_aspect =
         render_note_image_aspect(config_.skin.note_image_aspect);
     render.generic.skin_preview.skin_source = active_skin_source;
     render.generic.skin_preview.external_skin_root = active_external_skin_root();
     render.generic.skin_preview.external_skin_name = active_external_skin_name();
+    render.generic.skin_preview.skin_revision = tenriff_skin_revision_;
+    render.generic.skin_preview.resolved_tenriff_skin =
+        active_skin_source == "tenriff"
+            ? active_tenriff_gameplay_for_keys(lane_count)
+            : nullptr;
     render.generic.skin_preview.lr2_resolution_override =
         config::normalize_skin_lr2_resolution_mode_token(config_.skin.lr2_resolution_mode);
     render.generic.skin_preview.lane_background_opacity = std::clamp(
-        config_.skin.lane_background_opacity,
+        style_number(manifest_style ? manifest_style->lane_background_opacity : std::optional<float>{},
+                     config_.skin.lane_background_opacity),
         config::kSkinLaneBackgroundOpacityMin,
         config::kSkinLaneBackgroundOpacityMax);
-    render.generic.skin_preview.black_playfield_enabled = config_.skin.black_playfield_enabled;
+    render.generic.skin_preview.black_playfield_enabled = style_bool(
+        manifest_style ? manifest_style->black_playfield_enabled : std::optional<bool>{},
+        config_.skin.black_playfield_enabled);
     render.generic.skin_preview.visual_opacity = std::clamp(
-        config_.skin.visual_opacity,
+        style_number(manifest_style ? manifest_style->visual_opacity : std::optional<float>{},
+                     config_.skin.visual_opacity),
         config::kSkinVisualOpacityMin,
         config::kSkinVisualOpacityMax);
     render.generic.skin_preview.note_outline_opacity = std::clamp(
-        config_.skin.note_outline_opacity,
+        style_number(manifest_style ? manifest_style->note_outline_opacity : std::optional<float>{},
+                     config_.skin.note_outline_opacity),
         config::kSkinNoteOutlineOpacityMin,
         config::kSkinNoteOutlineOpacityMax);
     render.generic.skin_preview.hold_body_opacity = std::clamp(
-        config_.skin.hold_body_opacity,
+        style_number(manifest_style ? manifest_style->hold_body_opacity : std::optional<float>{},
+                     config_.skin.hold_body_opacity),
         config::kSkinHoldBodyOpacityMin,
         config::kSkinHoldBodyOpacityMax);
     render.generic.skin_preview.lane_colors.fill(0);
     for (int lane = 0; lane < lane_count && lane < static_cast<int>(kGameplayHudMaxLanes); ++lane) {
-        render.generic.skin_preview.lane_colors[static_cast<std::size_t>(lane)] =
-            config::skin_color_rgb(preview_lane_colors[static_cast<std::size_t>(lane)]);
+        const std::size_t lane_index = static_cast<std::size_t>(lane);
+        render.generic.skin_preview.lane_colors[lane_index] =
+            manifest_style && !manifest_style->lane_colors.empty()
+                ? manifest_style->lane_colors[std::min(lane_index, manifest_style->lane_colors.size() - 1u)]
+                : config::skin_color_rgb(preview_lane_colors[lane_index]);
     }
 
-    render.generic.notes.push_back(ui_text("Skin Source switches between Native, TenRiff skin.json, and imported LR2 playskins.",
-                                           "스킨 소스는 Native, TenRiff skin.json, 가져온 LR2 플레이스킨을 전환합니다."));
-    render.generic.notes.push_back(ui_text("Imported LR2 skins scan profile skins first, then build/Release/test-skins-lr2 as a fallback test root.",
-                                           "가져온 LR2 스킨은 먼저 프로필 스킨 폴더를 찾고, 없으면 build/Release/test-skins-lr2를 테스트 루트로 사용합니다."));
-    render.generic.notes.push_back(ui_text("LR2 Resolution overrides the imported LR2 family before the auto-detected layout is applied.",
-                                           "LR2 해상도는 자동 감지 레이아웃을 적용하기 전에 가져온 LR2 계열 해상도를 덮어씁니다."));
-    render.generic.notes.push_back(ui_text(
-        "Import Skin accepts a TenRiff skin.json folder or an LR2 skin folder. Drag-and-drop also works.",
-        "스킨 가져오기는 폴더 선택 창을 엽니다. 이 화면에 LR2 스킨 폴더를 드래그 앤 드롭해도 됩니다."));
-    render.generic.notes.push_back(ui_text(
-        "Selecting LR2files or Theme imports each independent non-IIDX theme separately; IIDX-dependent themes are skipped.",
-        "LR2files 또는 Theme을 고르면 독립적인 non-IIDX 테마를 각각 이식하며, IIDX 의존 테마는 건너뜁니다."));
-    render.generic.notes.push_back(ui_text("LR2 porting imports note, LN, lower Gear, lane-gap, and destination-size data from default active branches in the playskin.",
-                                           "LR2 포팅은 플레이스킨의 기본 활성 브랜치에서 노트, LN, 하단 Gear, 레인 간격, 대상 크기 데이터를 가져옵니다."));
-    render.generic.notes.push_back(ui_text("Image Aspect keeps imported head and tail art from stretching to the gameplay note box.",
-                                           "이미지 비율은 가져온 헤드/테일 이미지를 게임 노트 박스에 맞출 때 늘어나지 않도록 유지합니다."));
-    render.generic.notes.push_back(ui_text("Single Color overrides every lane while preserving the per-lane palette restored by Off.",
-                                           "단일 색상은 레인별 팔레트를 보존한 채 모든 레인을 덮어쓰며, Off로 되돌리면 원래 팔레트가 복원됩니다."));
-    render.generic.notes.push_back(ui_text("White Dividers, Judgement Line, and Gear Boundary can be toggled independently.",
-                                           "흰 레인 구분선, 판정선, 기어 경계선은 각각 독립적으로 켜고 끌 수 있습니다."));
-    render.generic.notes.push_back(ui_text("LN Tail Taper only changes visuals: the hold body narrows toward the tail without changing timing or hitboxes.",
-                                           "LN 꼬리 테이퍼는 시각 효과만 바꿉니다. 판정이나 히트박스는 그대로 두고 홀드 몸통만 꼬리 쪽으로 좁아집니다."));
-    render.generic.notes.push_back(ui_text("Divider Width is shared across all key modes, and it scales the white lane separators plus any imported divider widths.",
-                                           "구분선 너비는 모든 키 모드에 공용으로 적용되며, 흰 레인 구분선과 외부 스킨이 제공하는 구분선 폭에 함께 배율로 적용됩니다."));
-    render.generic.notes.push_back(ui_text("Lane Width changes one lane's share. Note & Field Size scales the complete centered playfield, notes, and gauges together.",
-                                           "레인 너비는 개별 레인의 비중을 바꿉니다. 노트·필드 크기는 중앙 기준 플레이필드와 노트, 게이지를 함께 확대·축소합니다."));
-    render.generic.notes.push_back(ui_text("Lane Spacing adds blank space after the selected gap, so you can open individual separators without changing note timing.",
-                                           "레인 간격은 선택한 구간 뒤에 빈 공간을 더해 개별 구분 간격을 벌리며, 노트 타이밍에는 영향을 주지 않습니다."));
-    render.generic.notes.push_back(ui_text("16K Center Gap inserts a blank center lane-width gap between the left and right halves of the 16-key field.",
-                                           "16K 중앙 간격은 16키 필드의 좌우 묶음 사이에 빈 중앙 간격을 추가합니다."));
-    render.generic.notes.push_back(ui_text("Opaque Playfield keeps BGA outside the lanes but blocks it behind the complete playfield, including spacing gaps.",
-                                           "기어 뒤 BGA 가림은 바깥 BGA는 유지하고 간격까지 포함한 노트 영역 뒤를 완전한 검정으로 가립니다."));
-    render.generic.notes.push_back(ui_text("FAST/SLOW Indicator hides or shows both the live timing text and timing-history marker without hiding judgement grades.",
-                                           "FAST/SLOW 인디케이터는 판정 등급은 유지한 채 실시간 타이밍 문구와 타이밍 기록 표시를 함께 끄거나 켭니다."));
-    render.generic.notes.push_back(ui_text("Key Mode, Target Lane, and Target Gap edit per-layout fallback geometry before imported divider art is applied.",
-                                           "키 모드, 대상 레인, 대상 간격은 외부 스킨 구분선 아트를 적용하기 전 레이아웃별 기본 지오메트리를 편집합니다."));
+    for (const auto& status : skin_status_messages_) {
+        render.generic.notes.push_back(status);
+    }
+    render.generic.notes.push_back(ui_text("Source: Native, TenRiff skin.json, or imported LR2.",
+                                           "소스: Native, TenRiff skin.json, 가져온 LR2."));
+    render.generic.notes.push_back(ui_text("Import or drop a folder. Create New Skin makes an editable template.",
+                                           "폴더를 가져오거나 드롭하세요. 새 스킨 만들기는 편집용 틀을 만듭니다."));
+    render.generic.notes.push_back(ui_text("Use Open Skin Folder, then press F5 to reload changes.",
+                                           "스킨 폴더를 열어 편집한 뒤 F5로 다시 불러오세요."));
+    render.generic.notes.push_back(ui_text("AI authoring guide: docs/skin-agent-guide.md",
+                                           "AI 제작 안내: docs/skin-agent-guide.md"));
+    if (manifest_style) {
+        render.generic.notes.push_back(ui_text(
+            "This skin's gameplay values override matching fallback rows.",
+            "이 스킨의 게임플레이 값은 같은 기본 설정 행보다 우선합니다."));
+    }
 }
 
 }  // namespace tenriff::app

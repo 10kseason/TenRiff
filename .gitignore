@@ -32,6 +32,7 @@
 !/models/
 !/models/NK3-P64-hybrid.onnx
 !/models/NK3-general-pattern-*.onnx
+/models/*.pnnxsim.onnx
 *.pt
 *.pth
 *.ckpt

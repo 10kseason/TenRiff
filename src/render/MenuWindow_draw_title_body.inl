@@ -19,7 +19,6 @@
         if (d2d_->accent_brush) {
             const D2D1_COLOR_F saved_color = d2d_->accent_brush->GetColor();
             const float saved_opacity = d2d_->accent_brush->GetOpacity();
-            d2d_->accent_brush->SetColor(D2D1::ColorF(0x6EE7F2));
             for (int i = 0; i < bar_count; ++i) {
                 const double phase = tick * 2.2 + static_cast<double>(i) * 0.45;
                 const float height =
@@ -75,6 +74,9 @@
             logo_rect.left +
             std::max(0.0f, ((logo_rect.right - logo_rect.left) - logo_width) * 0.5f);
         const D2D1_RECT_F logo_shadow_rect = offset_rect(logo_rect, 0.0f, 6.0f);
+        ID2D1Bitmap* title_logo_bitmap = data.lobby_skin.enabled
+                                             ? find_song_card_preview_bitmap(data.lobby_skin.logo_path)
+                                             : nullptr;
         const float logo_rule_y = logo_rect.bottom + 18.0f;
         const float logo_rule_gap = 42.0f;
         const float logo_rule_width = 280.0f;
@@ -99,7 +101,7 @@
             ctx->FillRoundedRectangle(logo_rule_left, d2d_->accent_brush.Get());
             ctx->FillRoundedRectangle(logo_rule_right, d2d_->accent_brush.Get());
             d2d_->accent_brush->SetOpacity(0.14f + logo_pulse * 0.06f);
-            if (d2d_->logo_format) {
+            if (!title_logo_bitmap && d2d_->logo_format) {
                 if (logo_layout) {
                     ctx->DrawTextLayout(D2D1::Point2F(logo_draw_left, logo_shadow_rect.top),
                                         logo_layout.Get(),
@@ -115,7 +117,14 @@
             }
             d2d_->accent_brush->SetOpacity(saved_opacity);
         }
-        if (d2d_->logo_format && d2d_->text_brush) {
+        if (title_logo_bitmap) {
+            const D2D1_RECT_F fitted_logo = fit_rect_preserve_aspect(logo_rect,
+                                                                     title_logo_bitmap->GetSize());
+            ctx->DrawBitmap(title_logo_bitmap,
+                            fitted_logo,
+                            1.0f,
+                            D2D1_BITMAP_INTERPOLATION_MODE_LINEAR);
+        } else if (d2d_->logo_format && d2d_->text_brush) {
             ID2D1Brush* brush = d2d_->logo_brush ? static_cast<ID2D1Brush*>(d2d_->logo_brush.Get())
                                                  : static_cast<ID2D1Brush*>(d2d_->accent_brush.Get());
             if (d2d_->logo_brush) {

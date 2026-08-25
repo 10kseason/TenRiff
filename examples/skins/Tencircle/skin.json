@@ -1,5 +1,5 @@
 {
-  "$schema": "../../../docs/tenriff-skin.schema.json",
+  "$schema": "https://raw.githubusercontent.com/10kseason/TenRiff/main/docs/tenriff-skin.schema.json",
   "format": "tenriff-skin",
   "version": 1,
   "name": "Tencircle",

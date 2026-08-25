@@ -345,7 +345,9 @@ bool MenuWindow::ensure_menu_scene_resources() {
     return true;
 }
 
-bool MenuWindow::render_menu_scene(MenuScreenKind kind, int64_t now_ns) {
+bool MenuWindow::render_menu_scene(MenuScreenKind kind,
+                                   int64_t now_ns,
+                                   const LobbySkinData& skin) {
     if (!menu_scene_enabled(kind) || !d2d_ || !d2d_->context || !d2d_->menu_scene_target_view) {
         return false;
     }
@@ -379,10 +381,22 @@ bool MenuWindow::render_menu_scene(MenuScreenKind kind, int64_t now_ns) {
         constants.secondary_color[3] = 1.0f;
     }
 
+    auto apply_scene_color = [&](std::string_view key, float (&target)[4]) {
+        if (!skin.enabled) return;
+        const auto it = skin.theme_colors.find(std::string(key));
+        if (it == skin.theme_colors.end()) return;
+        for (std::size_t channel = 0; channel < 4u; ++channel) {
+            target[channel] = it->second[channel];
+        }
+    };
+    apply_scene_color("scene_primary", constants.primary_color);
+    apply_scene_color("scene_secondary", constants.secondary_color);
+
     ID3D11DeviceContext* const context = d2d_->context.Get();
     context->UpdateSubresource(d2d_->menu_scene_constant_buffer.Get(), 0, nullptr, &constants, 0, 0);
 
-    const float clear_color[4] = {0.015f, 0.020f, 0.032f, 1.0f};
+    float clear_color[4] = {0.015f, 0.020f, 0.032f, 1.0f};
+    apply_scene_color("scene_background", clear_color);
     context->ClearRenderTargetView(d2d_->menu_scene_target_view.Get(), clear_color);
 
     ID3D11RenderTargetView* render_target = d2d_->menu_scene_target_view.Get();

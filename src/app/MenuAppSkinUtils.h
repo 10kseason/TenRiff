@@ -12,6 +12,124 @@
 
 namespace tenriff::app {
 
+enum class SkinSettingsRowId {
+    KeyMode,
+    SkinSource,
+    ImportedSkin,
+    Lr2Resolution,
+    ImportSkin,
+    CreateSkin,
+    OpenSkinFolder,
+    ReloadSkin,
+    TargetLane,
+    TargetGap,
+    LaneColor,
+    SingleColor,
+    NoteShape,
+    NoteBorder,
+    ImageAspect,
+    LaneDividers,
+    JudgementLine,
+    GearBoundary,
+    ShowHoldTail,
+    LnTailTaper,
+    VisualPreset,
+    LaneBackgroundOpacity,
+    VisualOpacity,
+    NoteOutlineOpacity,
+    LnBodyOpacity,
+    JudgementLineGlow,
+    HitBurstStyle,
+    KeyPulse,
+    KeyLabelPosition,
+    JudgeLinePosition,
+    LaneWidth,
+    NoteWidth,
+    LaneSpacing,
+    DividerWidth,
+    CenterGap,
+    LnBodyWidth,
+    NoteHeight,
+    ComboY,
+    BlackPlayfield,
+    UiFont,
+    VisualLatency,
+    NoteGap,
+    GameplayCursor,
+    TimingFeedback,
+    Back,
+};
+
+inline constexpr std::array<SkinSettingsRowId, 45> kSkinSettingsRowOrder = {
+    SkinSettingsRowId::KeyMode,
+    SkinSettingsRowId::SkinSource,
+    SkinSettingsRowId::ImportedSkin,
+    SkinSettingsRowId::Lr2Resolution,
+    SkinSettingsRowId::ImportSkin,
+    SkinSettingsRowId::CreateSkin,
+    SkinSettingsRowId::OpenSkinFolder,
+    SkinSettingsRowId::ReloadSkin,
+    SkinSettingsRowId::TargetLane,
+    SkinSettingsRowId::TargetGap,
+    SkinSettingsRowId::LaneColor,
+    SkinSettingsRowId::SingleColor,
+    SkinSettingsRowId::NoteShape,
+    SkinSettingsRowId::NoteBorder,
+    SkinSettingsRowId::ImageAspect,
+    SkinSettingsRowId::LaneDividers,
+    SkinSettingsRowId::JudgementLine,
+    SkinSettingsRowId::GearBoundary,
+    SkinSettingsRowId::ShowHoldTail,
+    SkinSettingsRowId::LnTailTaper,
+    SkinSettingsRowId::VisualPreset,
+    SkinSettingsRowId::LaneBackgroundOpacity,
+    SkinSettingsRowId::VisualOpacity,
+    SkinSettingsRowId::NoteOutlineOpacity,
+    SkinSettingsRowId::LnBodyOpacity,
+    SkinSettingsRowId::JudgementLineGlow,
+    SkinSettingsRowId::HitBurstStyle,
+    SkinSettingsRowId::KeyPulse,
+    SkinSettingsRowId::KeyLabelPosition,
+    SkinSettingsRowId::JudgeLinePosition,
+    SkinSettingsRowId::LaneWidth,
+    SkinSettingsRowId::NoteWidth,
+    SkinSettingsRowId::LaneSpacing,
+    SkinSettingsRowId::DividerWidth,
+    SkinSettingsRowId::CenterGap,
+    SkinSettingsRowId::LnBodyWidth,
+    SkinSettingsRowId::NoteHeight,
+    SkinSettingsRowId::ComboY,
+    SkinSettingsRowId::BlackPlayfield,
+    SkinSettingsRowId::UiFont,
+    SkinSettingsRowId::VisualLatency,
+    SkinSettingsRowId::NoteGap,
+    SkinSettingsRowId::GameplayCursor,
+    SkinSettingsRowId::TimingFeedback,
+    SkinSettingsRowId::Back,
+};
+
+struct SkinSettingsRows {
+    bool lr2_source = false;
+
+    [[nodiscard]] constexpr int count() const {
+        return static_cast<int>(kSkinSettingsRowOrder.size()) - (lr2_source ? 0 : 1);
+    }
+
+    [[nodiscard]] constexpr int index_of(SkinSettingsRowId id) const {
+        int index = 0;
+        for (const auto candidate : kSkinSettingsRowOrder) {
+            if (!lr2_source && candidate == SkinSettingsRowId::Lr2Resolution) continue;
+            if (candidate == id) return index;
+            ++index;
+        }
+        return -1;
+    }
+};
+
+[[nodiscard]] inline constexpr int skin_settings_row_count(bool lr2_source) {
+    return SkinSettingsRows{lr2_source}.count();
+}
+
 inline std::string on_off(bool value) {
     return value ? "On" : "Off";
 }

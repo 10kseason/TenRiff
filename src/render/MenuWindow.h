@@ -3,6 +3,7 @@
 #ifdef _WIN32
 
 #include "GameplayHudLimits.h"
+#include "app/ImportedGameplaySkin.h"
 #include "render/BgaImageLoader.h"
 #include "render/BgaVideoDecoder.h"
 #include "render/GameplayMotion.h"
@@ -372,6 +373,11 @@ struct GameplayHudData {
     std::string skin_source = "native";
     std::string external_skin_root;
     std::string external_skin_name;
+    uint64_t skin_revision = 0;
+    // TenRiff manifests are parsed by MenuApp when the selected skin is refreshed.
+    // The render thread receives an immutable snapshot and never performs JSON or
+    // filesystem discovery in the frame path. LR2 keeps its legacy resolver.
+    std::shared_ptr<const app::ImportedGameplaySkinDefinition> resolved_tenriff_skin;
     std::string skin_background_path;
     float skin_background_opacity = 0.66f;
     std::string lr2_resolution_override = "auto";
@@ -524,6 +530,8 @@ struct SkinPreviewData {
     std::string skin_source = "native";
     std::string external_skin_root;
     std::string external_skin_name;
+    uint64_t skin_revision = 0;
+    std::shared_ptr<const app::ImportedGameplaySkinDefinition> resolved_tenriff_skin;
     std::string skin_background_path;
     float skin_background_opacity = 0.66f;
     std::string lr2_resolution_override = "auto";
@@ -585,12 +593,20 @@ struct PerformanceOverlayData {
 
 struct LobbySkinData {
     bool enabled = false;
+    uint64_t revision = 0;
     std::string background_path;
     std::string logo_path;
+    std::string screen_id;
+    std::string screen_fallback_id;
+    // Complete asset set for revision-based bitmap eviction, including assets
+    // belonging to screens that are not currently visible.
+    std::vector<std::string> referenced_asset_paths;
     float background_opacity = 0.72f;
     // "<screen>.<slot>" -> {left, top, right, bottom} in base 1920x1080 space.
     // Missing entries keep the built-in rect.
     std::unordered_map<std::string, std::array<float, 4>> layout_rects;
+    // UI brush name -> normalized RGBA floats.
+    std::unordered_map<std::string, std::array<float, 4>> theme_colors;
 };
 
 struct MenuRenderData {
@@ -662,7 +678,9 @@ private:
     void update_brushes();
     void invalidate_menu_scene_target();
     [[nodiscard]] bool ensure_menu_scene_resources();
-    [[nodiscard]] bool render_menu_scene(MenuScreenKind kind, int64_t now_ns);
+    [[nodiscard]] bool render_menu_scene(MenuScreenKind kind,
+                                         int64_t now_ns,
+                                         const LobbySkinData& skin);
     void invalidate_gameplay_note_sprite_cache();
     [[nodiscard]] bool ensure_gameplay_note_sprites(const GameplayHudData& data);
     void invalidate_gameplay_background_cache();
@@ -828,6 +846,7 @@ private:
         std::string skin_source = "native";
         std::string external_skin_root;
         std::string external_skin_name;
+        uint64_t skin_revision = 0;
         std::string lr2_resolution_override = "auto";
         bool use_full_lane_receptor_layout = false;
         // Imported gear panel geometry in lane-block units, anchored at the left
@@ -926,6 +945,8 @@ private:
     std::unique_ptr<OnnxBackgroundUpscaler> gameplay_overlay_background_upscaler_{};
     std::unique_ptr<OnnxBackgroundUpscaler> song_select_background_upscaler_{};
     SongSelectPreviewCache song_select_preview_cache_{};
+    uint64_t applied_skin_revision_ = 0;
+    std::unordered_set<std::string> applied_skin_asset_paths_{};
     std::string song_select_preview_signature_{};
     int64_t song_select_preview_load_hold_until_ns_ = 0;
     std::unordered_set<std::string> song_select_preview_warned_decode_failures_{};

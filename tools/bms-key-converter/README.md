@@ -2,7 +2,7 @@
 
 Standalone build entrypoint for TenRiff's BMS NK-to-NK converter.
 
-Development-only: TenRiff 1.4.5.2 official builds and Windows archives do not
+Development-only: TenRiff 1.4.5.3 official builds and Windows archives do not
 build or ship this CLI/GUI. The top-level CMake option defaults to
 `TENRIFF_BUILD_STANDALONE_BMS_KEY_CONVERTER=OFF`.
 
@@ -13,7 +13,7 @@ This tool builds only the BMS parser/timeline, BMS gameplay-note builder, select
 From the TenRiff source root:
 
 ```powershell
-cmake -S tools/bms-key-converter -B build-bms-key-converter -G "Visual Studio 17 2022" -A x64 -DOpenVINO_DIR="C:/path/to/openvino/cmake"
+cmake -S tools/bms-key-converter -B build-bms-key-converter -G "Visual Studio 17 2022" -A x64
 cmake --build build-bms-key-converter --config Release --target bms_key_converter
 cmake --build build-bms-key-converter --config Release --target bms_key_converter_gui
 ```
@@ -62,6 +62,6 @@ The standalone writer accepts every output key count from `1` through `18`. Exis
 - Non-note channels and dictionaries such as `WAV`, `BMP`, `BPM`, and `STOP` are preserved.
 - `krrcream` is the default and preserves the adapted N2NC lane transformation core in `src/gameplay/KeyModeConverter.cpp`.
 - `nk2` selects the deterministic native 50/50 profile through `src/gameplay/Nk2KeyModeAdapter.cpp` and the self-contained `nk2/` module.
-- `nk3` selects P64 evaluation, a fixed-target generalized pattern MLP for 2K through 18K, and the authoritative host beam safety solver. P64 defaults to strict OpenVINO GPU and accepts `TENRIFF_NK3_DEVICE=CPU`; the MLP verifies and tries NPU, GPU, then CPU. A 1K target uses P64 alone.
+- `nk3` selects P64 evaluation, a fixed-target generalized pattern MLP for 2K through 18K, and the authoritative host beam safety solver. It defaults to the bundled ncnn Vulkan runtime for AMD/NVIDIA GPUs. Use `TENRIFF_NK3_BACKEND=AUTO|VULKAN|OPENVINO` and `TENRIFF_NK3_VULKAN_DEVICE=<index>` to select a backend/device. A 1K target uses P64 alone.
 - nK2 and NK3 ignore the Krrcream-only Max Keys, Min Keys, Speed Slot, and Seed controls; the GUI disables those fields.
-- The build has no dependency on another key-converter source tree. NK3 requires the bundled model and OpenVINO runtime.
+- The build has no dependency on another key-converter source tree. NK3 uses the bundled ncnn runtime and converted models; OpenVINO is an optional compatibility fallback.

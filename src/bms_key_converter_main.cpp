@@ -83,7 +83,7 @@ void print_usage() {
         << "Preset 10k uses target=10, max=10, min=1, speed slot 5 (2 bars), and fixed seed 0.\n"
         << "Sample rate defaults to auto and is detected from referenced BMS keysounds before falling back to 44100 Hz.\n"
         << "Algorithm defaults to krrcream; nk2 uses its native profile and nk3 uses P64 plus host beam safety.\n"
-        << "NK3 P64 defaults to strict OpenVINO GPU (TENRIFF_NK3_DEVICE=CPU selects CPU); only non-10K to 10K adds the MLP prior, which tries NPU, GPU, then CPU.\n"
+        << "NK3 defaults to ncnn Vulkan for P64 and its optional MLP on AMD/NVIDIA GPUs. Use TENRIFF_NK3_BACKEND=AUTO|VULKAN|OPENVINO and TENRIFF_NK3_VULKAN_DEVICE=<index> to select the runtime.\n"
         << "Krrcream tuning flags are accepted but ignored when --algorithm nk2 or nk3 is selected.\n"
         << "Explicit --target-keys/--max-keys/--min-keys/--transform-speed-slot override preset values.\n";
 }

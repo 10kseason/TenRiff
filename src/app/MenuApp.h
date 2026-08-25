@@ -389,6 +389,9 @@ private:
     void refresh_keymap_lane_list();
     void refresh_available_lr2_skins();
     void refresh_available_tenriff_skins();
+    [[nodiscard]] const TenRiffSkinDefinition* active_tenriff_skin_for_keys(int keys) const;
+    [[nodiscard]] std::shared_ptr<const ImportedGameplaySkinDefinition>
+        active_tenriff_gameplay_for_keys(int keys) const;
     [[nodiscard]] bool import_lr2_skin_path(std::string_view source_path);
     [[nodiscard]] bool import_tenriff_skin_path(std::string_view source_path);
     [[nodiscard]] bool import_skin_path_auto(std::string_view source_path);
@@ -655,6 +658,11 @@ private:
     std::string available_tenriff_skin_root_;
     std::vector<std::string> available_tenriff_skin_names_{};
     TenRiffSkinDefinition active_tenriff_skin_{};
+    std::array<TenRiffSkinDefinition, 16> active_tenriff_skin_modes_{};
+    std::array<std::shared_ptr<const ImportedGameplaySkinDefinition>, 16>
+        active_tenriff_gameplay_modes_{};
+    std::vector<std::string> skin_status_messages_{};
+    uint64_t tenriff_skin_revision_ = 1;
 
     bool has_result_ = false;
     bool last_game_over_ = false;

@@ -1,0 +1,156 @@
+7767517
+154 184
+Input                    in0                      0 1 in0
+Split                    splitncnn_0              1 2 in0 1 2
+Input                    in1                      0 1 in1
+Input                    in2                      0 1 in2
+Split                    splitncnn_1              1 9 in2 5 6 7 8 9 10 11 12 13
+Input                    in3                      0 1 in3
+Input                    in4                      0 1 in4
+Input                    in5                      0 1 in5
+Split                    splitncnn_2              1 4 in5 17 18 19 20
+Input                    in6                      0 1 in6
+Input                    in7                      0 1 in7
+Crop                     select_0                 1 1 1 23 -23310=1,3 -23311=1,2 -23309=1,2
+Squeeze                  squeeze_19               1 1 23 24 -23303=1,2
+ExpandDims               unsqueeze_38             1 1 in1 25 -23303=1,2
+BinaryOp                 mul_0                    2 1 2 25 26 0=2
+Gemm                     gemm_0                   1 1 26 27 10=4 2=0 3=1 4=0 5=1 6=1 7=64 8=32 9=12
+TanH                     tanh_2                   1 1 27 28
+Split                    splitncnn_3              1 2 28 29 30
+ExpandDims               unsqueeze_39             1 1 in3 31 -23303=1,1
+MemoryData               fast_causal_kernel       0 1 32 0=64 1=64 2=1
+MatMul                   matmul_15                2 1 32 30 33
+MemoryData               fast_prior_decay         0 1 34 0=1 1=64 2=1
+BinaryOp                 mul_1                    2 1 34 31 35 0=2
+BinaryOp                 add_2                    2 1 33 35 36 0=0
+Split                    splitncnn_4              1 5 36 37 38 39 40 41
+ExpandDims               unsqueeze_40             1 1 in4 42 -23303=1,1
+MemoryData               slow_causal_kernel       0 1 43 0=64 1=64 2=1
+MatMul                   matmul_16                2 1 43 29 44
+MemoryData               slow_prior_decay         0 1 45 0=1 1=64 2=1
+BinaryOp                 mul_3                    2 1 45 42 46 0=2
+BinaryOp                 add_4                    2 1 44 46 47 0=0
+Split                    splitncnn_5              1 2 47 48 49
+BinaryOp                 mul_5                    2 1 38 39 50 0=2
+Reduction sum_35 1 1 50 51 0=0 1=0 4=1 5=1 -23303=1,2
+BinaryOp                 add_6                    1 1 51 52 0=0 1=1 2=1.000000e-8
+UnaryOp                  sqrt_7                   1 1 52 53 0=5
+BinaryOp                 div_8                    2 1 40 53 54 0=3
+BinaryOp                 mul_9                    2 1 18 19 55 0=2
+Reduction sum_36 1 1 55 56 0=0 1=0 4=1 5=1 -23303=1,2
+BinaryOp                 add_10                   1 1 56 57 0=0 1=1 2=1.000000e-8
+UnaryOp                  sqrt_11                  1 1 57 58 0=5
+BinaryOp                 div_12                   2 1 20 58 59 0=3
+Split                    splitncnn_6              1 2 59 60 61
+MatMul                   matmultransb_0           2 1 54 60 62 0=1
+Split                    splitncnn_7              1 2 62 63 64
+ExpandDims               unsqueeze_41             1 1 in6 65 -23303=1,1
+Split                    splitncnn_8              1 4 65 66 67 68 69
+BinaryOp                 sub_13                   1 1 66 70 0=7 1=1 2=1.0
+BinaryOp                 mul_14                   1 1 70 71 0=2 1=1 2=-1.000000e9
+BinaryOp                 mul_15                   2 1 67 63 72 0=2
+BinaryOp                 add_16                   2 1 72 71 73 0=0
+Softmax                  softmax_1                1 1 73 74 0=2 1=1
+BinaryOp                 mul_17                   2 1 74 68 75 0=2
+Split                    splitncnn_9              1 2 75 76 77
+Reduction sum_37 1 1 77 78 0=0 1=0 4=1 5=1 -23303=1,2
+BinaryOp                 add_18                   1 1 78 79 0=0 1=1 2=1.000000e-8
+BinaryOp                 div_19                   2 1 76 79 80 0=3
+MatMul                   matmul_18                2 1 80 61 81
+BinaryOp                 mul_21                   1 1 49 82 0=2 1=1 2=0.4
+BinaryOp                 mul_22                   1 1 41 83 0=2 1=1 2=0.6
+BinaryOp                 add_23                   2 1 83 82 84 0=0
+Eltwise                  weighted_sum_0           2 1 84 81 85 0=1 -23301=2,1.0,0.25
+Split                    splitncnn_10             1 2 85 86 87
+Crop                     select_1                 1 1 37 88 -23310=1,64 -23311=1,1 -23309=1,63
+Squeeze                  squeeze_20               1 1 88 89 -23303=1,1
+Squeeze                  squeeze_21               1 1 89 out1 -23303=1,1
+Crop                     select_2                 1 1 48 91 -23310=1,64 -23311=1,1 -23309=1,63
+Squeeze                  squeeze_22               1 1 91 92 -23303=1,1
+Squeeze                  squeeze_23               1 1 92 out2 -23303=1,1
+Crop                     slice_0                  1 1 17 94 -23310=1,64 -23311=1,1 -23309=1,1
+Crop                     select_3                 1 1 87 95 -23310=1,64 -23311=1,1 -23309=1,63
+Squeeze                  squeeze_24               1 1 95 96 -23303=1,1
+Concat                   cat_0                    2 1 94 96 out3 0=1
+Crop                     select_4                 1 1 13 98 -23310=1,5 -23311=1,1 -23309=1,4
+Squeeze                  squeeze_25               1 1 98 99 -23303=1,1
+Reshape                  reshape_5                1 1 99 100 0=1 1=1 11=1 2=1
+Crop                     select_5                 1 1 12 101 -23310=1,3 -23311=1,1 -23309=1,2
+Squeeze                  squeeze_26               1 1 101 102 -23303=1,1
+Reshape                  reshape_6                1 1 102 103 0=1 1=1 11=1 2=1
+Crop                     select_6                 1 1 11 104 -23310=1,4 -23311=1,1 -23309=1,3
+Squeeze                  squeeze_27               1 1 104 105 -23303=1,1
+Reshape                  reshape_7                1 1 105 106 0=1 1=1 11=1 2=1
+Crop                     select_7                 1 1 10 107 -23310=1,6 -23311=1,1 -23309=1,5
+Squeeze                  squeeze_28               1 1 107 108 -23303=1,1
+Reshape                  reshape_8                1 1 108 109 0=1 1=1 11=1 2=1
+Crop                     select_8                 1 1 9 110 -23310=1,7 -23311=1,1 -23309=1,6
+Squeeze                  squeeze_29               1 1 110 111 -23303=1,1
+Reshape                  reshape_9                1 1 111 112 0=1 1=1 11=1 2=1
+Crop                     select_9                 1 1 8 113 -23310=1,8 -23311=1,1 -23309=1,7
+Squeeze                  squeeze_30               1 1 113 114 -23303=1,1
+Reshape                  reshape_10               1 1 114 115 0=1 1=1 11=1 2=1
+Crop                     select_10                1 1 7 116 -23310=1,9 -23311=1,1 -23309=1,8
+Squeeze                  squeeze_31               1 1 116 117 -23303=1,1
+Reshape                  reshape_11               1 1 117 118 0=1 1=1 11=1 2=1
+Crop                     select_11                1 1 6 119 -23310=1,10 -23311=1,1 -23309=1,9
+Squeeze                  squeeze_32               1 1 119 120 -23303=1,1
+Reshape                  reshape_12               1 1 120 121 0=1 1=1 11=1 2=1
+Crop                     select_12                1 1 5 122 -23310=1,2 -23311=1,1 -23309=1,1
+Squeeze                  squeeze_33               1 1 122 123 -23303=1,1
+Reshape                  reshape_13               1 1 123 124 0=1 1=1 11=1 2=1
+BinaryOp                 sub_25                   1 1 124 125 0=1 1=1 2=1.0
+BinaryOp                 max_26                   1 1 125 126 0=4 1=1 2=1.0
+Split                    splitncnn_11             1 3 126 127 128 129
+Reshape                  reshape_14               1 1 24 130 0=1 1=1 11=64 2=1
+MemoryData               candidate_lane_grid      0 1 131 0=1 1=18 11=1 2=1
+Split                    splitncnn_0              1 2 131 132 133
+BinaryOp                 mul_27                   2 1 130 127 134 0=2
+UnaryOp                  round_28                 1 1 134 135 0=18
+BinaryOp                 sub_29                   2 1 132 135 136 0=1
+UnaryOp                  abs_30                   1 1 136 137 0=0
+BinaryOp                 div_31                   2 1 137 128 138 0=3
+Split                    splitncnn_12             1 2 138 139 140
+BinaryOp                 div_32                   2 1 133 129 141 0=3
+BinaryOp                 sub_33                   1 1 141 142 0=1 1=1 2=0.5
+BinaryOp                 mul_34                   1 1 142 143 0=2 1=1 2=2.0
+Split                    splitncnn_13             1 2 143 144 145
+Crop                     select_13                1 1 86 146 -23310=1,1 -23311=1,2 -23309=1,0
+Squeeze                  squeeze_34               1 1 146 147 -23303=1,2
+ExpandDims               unsqueeze_42             1 1 147 148 -23303=1,3
+TanH                     tanh_3                   1 1 148 149
+BinaryOp                 max_35                   1 1 64 150 0=4 1=1 2=0.0
+BinaryOp                 mul_36                   2 1 150 69 151 0=2
+Reduction ReduceMax_84 1 1 151 152 0=4 1=0 4=1 5=1 -23303=1,2
+ExpandDims               unsqueeze_43             1 1 152 153 -23303=1,3
+ExpandDims               unsqueeze_44             1 1 in7 154 -23303=2,2,3
+MemoryData               candidate_type_bias      0 1 155 0=8 1=1 11=1 2=1
+MemoryData               candidate_is_add_f       0 1 156 0=8 1=1 11=1 2=1
+MemoryData               candidate_is_move_or_add_f 0 1 157 0=8 1=1 11=1 2=1
+BinaryOp                 mul_37                   2 1 139 121 158 0=2
+BinaryOp                 mul_38                   1 1 158 159 0=2 1=1 2=0.35
+BinaryOp                 mul_39                   2 1 144 109 160 0=2
+BinaryOp                 mul_40                   1 1 160 161 0=2 1=1 2=0.15
+BinaryOp                 mul_41                   2 1 157 106 162 0=2
+BinaryOp                 mul_42                   1 1 162 163 0=2 1=1 2=0.2
+BinaryOp                 mul_43                   2 1 154 156 164 0=2
+BinaryOp                 mul_44                   2 1 164 112 165 0=2
+BinaryOp                 mul_45                   1 1 165 166 0=2 1=1 2=0.4
+BinaryOp                 mul_46                   2 1 153 118 167 0=2
+BinaryOp                 mul_47                   2 1 149 145 168 0=2
+BinaryOp                 mul_48                   2 1 168 115 169 0=2
+BinaryOp                 mul_49                   2 1 155 103 170 0=2
+BinaryOp                 mul_50                   1 1 100 171 0=2 1=1 2=1.5
+BinaryOp                 add_51                   1 1 171 172 0=0 1=1 2=0.5
+BinaryOp                 mul_52                   2 1 140 172 173 0=2
+UnaryOp                  neg_53                   1 1 173 174 0=1
+BinaryOp                 add_54                   2 1 174 170 175 0=0
+BinaryOp                 add_55                   2 1 175 169 176 0=0
+BinaryOp                 add_56                   2 1 176 167 177 0=0
+BinaryOp                 add_57                   2 1 177 166 178 0=0
+BinaryOp                 add_58                   2 1 178 163 179 0=0
+BinaryOp                 add_59                   2 1 179 161 180 0=0
+BinaryOp                 sub_60                   2 1 180 159 181 0=1
+BinaryOp                 mul_61                   1 1 181 182 0=2 1=1 2=65536.0
+UnaryOp                  round_62                 1 1 182 out0 0=18

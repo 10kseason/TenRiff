@@ -1,0 +1,104 @@
+{
+  "$schema": "https://raw.githubusercontent.com/10kseason/TenRiff/main/docs/tenriff-skin.schema.json",
+  "format": "tenriff-skin",
+  "version": 1,
+  "name": "Agent Prism Universal",
+  "author": "결 (OpenAI Codex)",
+  "lobby": {
+    "background": "lobby/background.png",
+    "background_opacity": 0.82,
+    "screen_backgrounds": {
+      "title": "lobby/background.png",
+      "song_select": "lobby/background.png",
+      "settings_skins": "lobby/background.png",
+      "result": "lobby/background.png"
+    },
+    "screen_opacities": {
+      "title": 0.92,
+      "song_select": 0.72,
+      "settings_skins": 0.60,
+      "result": 0.78
+    }
+  },
+  "theme": {
+    "accent": "#55E7FF",
+    "text": "#F5F8FF",
+    "muted": "#9AA9C8",
+    "card": "#080D1BE8",
+    "panel": "#0D1326E8",
+    "footer": "#070B16F2",
+    "button": "#131A33E8",
+    "button_selected": "#263A64F2",
+    "border": "#53658FA8",
+    "judgement_line": "#FF6E91",
+    "lane_divider": "#C7E9FF",
+    "scene_primary": "#43DDF9",
+    "scene_secondary": "#8A63FF",
+    "scene_background": "#030713"
+  },
+  "layout": {
+    "title": {
+      "spectrum": [620, 70, 1300, 154],
+      "buttons": [430, 352, 1438, 936],
+      "guide": [1470, 368, 1840, 936]
+    },
+    "settings_skins": {
+      "preview": [1040, 164, 1800, 940]
+    }
+  },
+  "gameplay": {
+    "description": "Dark prismatic Native-style gameplay for 1K through 16K.",
+    "background": "gameplay/background.png",
+    "background_opacity": 0.58,
+    "note_width_ratio": 0.92,
+    "note_height_ratio": 1.08,
+    "judgement_line_position": 0.84,
+    "show_lane_dividers": true,
+    "show_judgement_line": true,
+    "show_timing_feedback": true,
+    "show_gear_boundary_line": true,
+    "show_hold_tail": true,
+    "hold_tail_taper": true,
+    "judgement_line_glow": true,
+    "key_pulse": true,
+    "key_pulse_brightness": 0.72,
+    "hit_burst_style": "prism",
+    "key_label_position": "bottom",
+    "note_border": true,
+    "note_shape": "hex",
+    "lane_colors": ["#55E7FF"],
+    "lane_background_opacity": 0.08,
+    "black_playfield": true,
+    "visual_opacity": 0.96,
+    "note_outline_opacity": 0.78,
+    "hold_body_opacity": 0.28,
+    "modes": {
+      "4k": {
+        "description": "Symmetric cyan-violet four-key palette.",
+        "lane_colors": ["#F5F8FF", "#55E7FF", "#8A63FF", "#F5F8FF"]
+      },
+      "5k": {
+        "lane_colors": ["#55E7FF", "#F5F8FF", "#FF6E91", "#F5F8FF", "#8A63FF"]
+      },
+      "7k": {
+        "lane_colors": ["#55E7FF", "#F5F8FF", "#8A63FF", "#FF6E91", "#8A63FF", "#F5F8FF", "#55E7FF"]
+      },
+      "8k": {
+        "lane_colors": ["#55E7FF", "#F5F8FF", "#8A63FF", "#F5F8FF", "#F5F8FF", "#8A63FF", "#F5F8FF", "#55E7FF"]
+      },
+      "10k": {
+        "lane_colors": ["#55E7FF", "#F5F8FF", "#8A63FF", "#F5F8FF", "#FF6E91", "#FF6E91", "#F5F8FF", "#8A63FF", "#F5F8FF", "#55E7FF"]
+      },
+      "12k": {
+        "lane_colors": ["#55E7FF", "#F5F8FF", "#8A63FF", "#F5F8FF", "#55E7FF", "#FF6E91", "#FF6E91", "#55E7FF", "#F5F8FF", "#8A63FF", "#F5F8FF", "#55E7FF"]
+      },
+      "14k": {
+        "lane_colors": ["#55E7FF", "#F5F8FF", "#8A63FF", "#F5F8FF", "#55E7FF", "#F5F8FF", "#FF6E91", "#FF6E91", "#F5F8FF", "#55E7FF", "#F5F8FF", "#8A63FF", "#F5F8FF", "#55E7FF"]
+      },
+      "16k": {
+        "description": "Mirrored two-field sixteen-key palette.",
+        "lane_colors": ["#55E7FF", "#F5F8FF", "#8A63FF", "#F5F8FF", "#55E7FF", "#F5F8FF", "#8A63FF", "#FF6E91", "#FF6E91", "#8A63FF", "#F5F8FF", "#55E7FF", "#F5F8FF", "#8A63FF", "#F5F8FF", "#55E7FF"]
+      }
+    }
+  }
+}

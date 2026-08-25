@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://tenriff.local/schema/tenriff-skin-v1.json",
+  "$id": "https://raw.githubusercontent.com/10kseason/TenRiff/main/docs/tenriff-skin.schema.json",
   "title": "TenRiff Skin",
   "type": "object",
   "additionalProperties": false,
@@ -8,7 +8,7 @@
   "$defs": {
     "assetPath": {
       "type": "string",
-      "description": "Path relative to skin.json. Empty means use the built-in fallback."
+      "description": "Path relative to skin.json. Omit the field to auto-detect its standard filename. Empty means use the built-in fallback."
     },
     "laneAssets": {
       "oneOf": [
@@ -27,6 +27,71 @@
       "minItems": 4,
       "maxItems": 4,
       "items": { "type": "number", "minimum": -8192.0, "maximum": 8192.0 }
+    },
+    "screenLayout": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "content": { "$ref": "#/$defs/layoutRect" },
+        "preview": { "$ref": "#/$defs/layoutRect" }
+      }
+    },
+    "hexColor": {
+      "type": "string",
+      "pattern": "^#?[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?$",
+      "description": "#RRGGBB or #RRGGBBAA"
+    },
+    "laneMap": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 16,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "gameplayMode": {
+      "type": "object",
+      "description": "Shallow per-key-mode override. modes cannot be nested.",
+      "additionalProperties": false,
+      "properties": {
+        "description": { "type": "string" },
+        "background": { "$ref": "#/$defs/assetPath" },
+        "background_opacity": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+        "gear": { "$ref": "#/$defs/assetPath" },
+        "note": { "$ref": "#/$defs/laneAssets" },
+        "hold_head": { "$ref": "#/$defs/laneAssets" },
+        "hold_body": { "$ref": "#/$defs/laneAssets" },
+        "hold_tail": { "$ref": "#/$defs/laneAssets" },
+        "key_idle": { "$ref": "#/$defs/laneAssets" },
+        "key_pressed": { "$ref": "#/$defs/laneAssets" },
+        "lane_map": { "$ref": "#/$defs/laneMap" },
+        "note_width_ratio": { "type": "number", "minimum": 0.1, "maximum": 4.0 },
+        "note_height_ratio": { "type": "number", "minimum": 0.1, "maximum": 4.0 },
+        "note_aspect": { "enum": ["stretch", "contain", "width"] },
+        "note_rotations": { "type": "array", "maxItems": 16, "items": { "type": "number" } },
+        "key_rotations": { "type": "array", "maxItems": 16, "items": { "type": "number" } },
+        "judgement_line_position": { "type": "number", "minimum": 0.05, "maximum": 0.98 },
+        "full_lane_receptors": { "type": "boolean" },
+        "show_lane_dividers": { "type": "boolean" },
+        "show_judgement_line": { "type": "boolean" },
+        "show_timing_feedback": { "type": "boolean" },
+        "show_gear_boundary_line": { "type": "boolean" },
+        "show_hold_tail": { "type": "boolean" },
+        "hold_tail_taper": { "type": "boolean" },
+        "judgement_line_glow": { "type": "boolean" },
+        "key_pulse": { "type": "boolean" },
+        "key_pulse_brightness": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+        "hit_burst_style": { "enum": ["prism", "ring", "spark"] },
+        "key_label_position": { "enum": ["off", "top", "bottom"] },
+        "note_border": { "type": "boolean" },
+        "note_shape": { "enum": ["rect", "circle", "diamond", "hex"] },
+        "lane_colors": { "type": "array", "minItems": 1, "maxItems": 16, "items": { "$ref": "#/$defs/hexColor" } },
+        "lane_background_opacity": { "type": "number", "minimum": 0.0, "maximum": 0.45 },
+        "black_playfield": { "type": "boolean" },
+        "visual_opacity": { "type": "number", "minimum": 0.2, "maximum": 1.0 },
+        "note_outline_opacity": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+        "hold_body_opacity": { "type": "number", "minimum": 0.05, "maximum": 1.0 },
+        "column_widths": { "type": "array", "maxItems": 16, "items": { "type": "number", "exclusiveMinimum": 0.0 } },
+        "column_spacings": { "type": "array", "maxItems": 15, "items": { "type": "number", "minimum": 0.0 } }
+      }
     }
   },
   "properties": {
@@ -41,13 +106,47 @@
       "properties": {
         "background": { "$ref": "#/$defs/assetPath" },
         "logo": { "$ref": "#/$defs/assetPath" },
-        "background_opacity": { "type": "number", "minimum": 0.0, "maximum": 1.0 }
+        "background_opacity": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+        "screen_backgrounds": {
+          "type": "object",
+          "propertyNames": { "enum": ["quick_setup", "title", "options", "multiplayer", "song_select", "session_mix", "song_browser", "settings", "settings_audio", "settings_graphics", "settings_skins", "settings_input", "settings_calibration", "mode_select", "mode_mods", "keymap", "keymap_confirm", "onnx_upscaler_confirm", "keymap_test", "result"] },
+          "additionalProperties": { "$ref": "#/$defs/assetPath" }
+        },
+        "screen_opacities": {
+          "type": "object",
+          "propertyNames": { "enum": ["quick_setup", "title", "options", "multiplayer", "song_select", "session_mix", "song_browser", "settings", "settings_audio", "settings_graphics", "settings_skins", "settings_input", "settings_calibration", "mode_select", "mode_mods", "keymap", "keymap_confirm", "onnx_upscaler_confirm", "keymap_test", "result"] },
+          "additionalProperties": { "type": "number", "minimum": 0.0, "maximum": 1.0 }
+        }
+      }
+    },
+    "theme": {
+      "type": "object",
+      "description": "Optional UI palette. Every omitted color keeps the built-in value.",
+      "additionalProperties": false,
+      "properties": {
+        "accent": { "$ref": "#/$defs/hexColor" },
+        "text": { "$ref": "#/$defs/hexColor" },
+        "muted": { "$ref": "#/$defs/hexColor" },
+        "card": { "$ref": "#/$defs/hexColor" },
+        "panel": { "$ref": "#/$defs/hexColor" },
+        "footer": { "$ref": "#/$defs/hexColor" },
+        "button": { "$ref": "#/$defs/hexColor" },
+        "button_selected": { "$ref": "#/$defs/hexColor" },
+        "border": { "$ref": "#/$defs/hexColor" },
+        "judgement_line": { "$ref": "#/$defs/hexColor" },
+        "lane_divider": { "$ref": "#/$defs/hexColor" },
+        "scene_primary": { "$ref": "#/$defs/hexColor" },
+        "scene_secondary": { "$ref": "#/$defs/hexColor" },
+        "scene_background": { "$ref": "#/$defs/hexColor" }
       }
     },
     "layout": {
       "type": "object",
       "description": "Moves built-in menu rects. Omitted slots keep their default position.",
       "additionalProperties": false,
+      "patternProperties": {
+        "^(quick_setup|options|multiplayer|session_mix|song_browser|settings|settings_audio|settings_graphics|settings_skins|settings_input|settings_calibration|mode_select|mode_mods|keymap|keymap_confirm|onnx_upscaler_confirm|keymap_test)$": { "$ref": "#/$defs/screenLayout" }
+      },
       "properties": {
         "title": {
           "type": "object",
@@ -73,6 +172,27 @@
             "right_panel": { "$ref": "#/$defs/layoutRect" },
             "bottom_bar": { "$ref": "#/$defs/layoutRect" }
           }
+        },
+        "generic": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "content": { "$ref": "#/$defs/layoutRect" },
+            "preview": { "$ref": "#/$defs/layoutRect" }
+          }
+        },
+        "result": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "profile": { "$ref": "#/$defs/layoutRect" },
+            "song_panel": { "$ref": "#/$defs/layoutRect" },
+            "analysis_panel": { "$ref": "#/$defs/layoutRect" },
+            "stats_panel": { "$ref": "#/$defs/layoutRect" },
+            "continue": { "$ref": "#/$defs/layoutRect" },
+            "replay": { "$ref": "#/$defs/layoutRect" },
+            "retry": { "$ref": "#/$defs/layoutRect" }
+          }
         }
       }
     },
@@ -80,6 +200,7 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
+        "description": { "type": "string" },
         "background": { "$ref": "#/$defs/assetPath" },
         "background_opacity": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
         "gear": { "$ref": "#/$defs/assetPath" },
@@ -89,6 +210,13 @@
         "hold_tail": { "$ref": "#/$defs/laneAssets" },
         "key_idle": { "$ref": "#/$defs/laneAssets" },
         "key_pressed": { "$ref": "#/$defs/laneAssets" },
+        "lane_map": { "$ref": "#/$defs/laneMap" },
+        "modes": {
+          "type": "object",
+          "description": "Per-key-mode shallow overrides. The active 1k through 16k object replaces matching gameplay fields.",
+          "propertyNames": { "pattern": "^([1-9]|1[0-6])k$" },
+          "additionalProperties": { "$ref": "#/$defs/gameplayMode" }
+        },
         "note_width_ratio": { "type": "number", "minimum": 0.1, "maximum": 4.0 },
         "note_height_ratio": { "type": "number", "minimum": 0.1, "maximum": 4.0 },
         "note_aspect": {
@@ -109,6 +237,28 @@
         },
         "judgement_line_position": { "type": "number", "minimum": 0.05, "maximum": 0.98 },
         "full_lane_receptors": { "type": "boolean" },
+        "show_lane_dividers": { "type": "boolean" },
+        "show_judgement_line": { "type": "boolean" },
+        "show_timing_feedback": { "type": "boolean" },
+        "show_gear_boundary_line": { "type": "boolean" },
+        "show_hold_tail": { "type": "boolean" },
+        "hold_tail_taper": { "type": "boolean" },
+        "judgement_line_glow": { "type": "boolean" },
+        "key_pulse": { "type": "boolean" },
+        "key_pulse_brightness": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+        "hit_burst_style": { "enum": ["prism", "ring", "spark"] },
+        "key_label_position": { "enum": ["off", "top", "bottom"] },
+        "note_border": { "type": "boolean" },
+        "note_shape": { "enum": ["rect", "circle", "diamond", "hex"] },
+        "lane_colors": {
+          "type": "array", "minItems": 1, "maxItems": 16,
+          "items": { "$ref": "#/$defs/hexColor" }
+        },
+        "lane_background_opacity": { "type": "number", "minimum": 0.0, "maximum": 0.45 },
+        "black_playfield": { "type": "boolean" },
+        "visual_opacity": { "type": "number", "minimum": 0.2, "maximum": 1.0 },
+        "note_outline_opacity": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+        "hold_body_opacity": { "type": "number", "minimum": 0.05, "maximum": 1.0 },
         "column_widths": {
           "type": "array",
           "maxItems": 16,

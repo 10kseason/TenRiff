@@ -2367,8 +2367,10 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
             handle_session_mix_input(action_key);
             return;
         case Screen::SettingsSkins:
-            settings_cursor_ = clamp_int(event.index, 0,
-                                         40 + (config::normalize_skin_source_token(config_.skin.source) == "lr2" ? 1 : 0));
+            settings_cursor_ = clamp_int(
+                event.index, 0,
+                skin_settings_row_count(
+                    config::normalize_skin_source_token(config_.skin.source) == "lr2") - 1);
             if (finish_selection_only()) {
                 return;
             }

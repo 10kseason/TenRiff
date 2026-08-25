@@ -4,11 +4,14 @@ TenRiff 스킨은 한 폴더의 `skin.json`과 PNG/JPG/BMP 이미지로 로비�
 
 ## 빠른 시작
 
-1. [`examples/skins/TenRiff-Example`](../examples/skins/TenRiff-Example) 폴더를 복사한다.
-2. 원하는 이미지를 복사한 폴더 안에 넣는다.
-3. `skin.json`의 빈 문자열을 이미지 상대 경로로 바꾼다.
-4. 게임에서 `Options > Skins > Import Skin`을 누르고 그 폴더를 선택한다.
-5. `Skin Source`를 `TenRiff`로 바꾸고 `TenRiff Skin` 행에서 설치한 스킨을 고른다.
+1. 게임에서 `Options > Skins > Create New Skin`을 누른다.
+2. 자동으로 열린 폴더의 표준 파일명 자리에 이미지를 넣는다.
+3. 게임으로 돌아와 `F5` 또는 `Reload Skin`을 누른다.
+4. 더 세밀하게 바꾸고 싶으면 `skin.json`을 편집한다.
+
+기존 스킨을 시작점으로 삼으려면 [`examples/skins/TenRiff-Example`](../examples/skins/TenRiff-Example)을
+복사한 뒤 `Import Skin`으로 가져와도 된다. `Open Skin Folder`는 현재 선택한 TenRiff 스킨을
+바로 열어 준다.
 
 Skins 화면에 폴더나 `skin.json`을 드래그해도 가져올 수 있다. 가져온 사본은 `profiles/<profile>/skins/tenriff/<skin-name>/`에 저장된다. 같은 이름을 다시 가져오면 기존 폴더를 덮지 않고 `-2`, `-3` 접미사를 붙인다.
 
@@ -20,6 +23,8 @@ MySkin/
   lobby/
     background.png
     logo.png
+    screens/
+      settings_skins.png
   gameplay/
     background.jpg
     gear.png
@@ -35,7 +40,7 @@ MySkin/
 
 ```json
 {
-  "$schema": "../../../docs/tenriff-skin.schema.json",
+  "$schema": "https://raw.githubusercontent.com/10kseason/TenRiff/main/docs/tenriff-skin.schema.json",
   "format": "tenriff-skin",
   "version": 1,
   "name": "My Skin",
@@ -63,12 +68,95 @@ MySkin/
 }
 ```
 
+`lobby/background`, `lobby/logo`, `gameplay/background`, `gameplay/gear`, `gameplay/note`,
+`gameplay/hold-head`, `gameplay/hold-body`, `gameplay/hold-tail`, `gameplay/key-idle`,
+`gameplay/key-pressed`는 확장자만 `.png`, `.jpg`, `.jpeg`, `.bmp` 중 하나로 맞추면
+`skin.json`에 경로를 쓰지 않아도 자동 감지한다.
+
+## 화면별 배경과 색상 테마
+
+`lobby/screens/<화면 ID>.png`를 넣으면 그 화면만 다른 배경을 쓴다. 같은 값은
+`lobby.screen_backgrounds`와 `lobby.screen_opacities`에 직접 적을 수도 있다.
+
+지원 화면 ID는 `quick_setup`, `title`, `options`, `multiplayer`, `song_select`,
+`session_mix`, `song_browser`, `settings`, `settings_audio`, `settings_graphics`,
+`settings_skins`, `settings_input`, `settings_calibration`, `mode_select`, `mode_mods`,
+`keymap`, `keymap_confirm`, `onnx_upscaler_confirm`, `keymap_test`, `result`이다.
+세부 설정 화면에 전용 배경이 없으면 `settings`, 곡 브라우저와 멀티플레이에는
+`song_select`, 마지막으로 공용 `lobby.background` 순서로 대체된다.
+
+```json
+"lobby": {
+  "screen_backgrounds": {
+    "title": "lobby/screens/title.jpg",
+    "settings_skins": "lobby/screens/settings_skins.png"
+  },
+  "screen_opacities": { "title": 0.9, "settings_skins": 0.75 }
+},
+"theme": {
+  "accent": "#6EE7F2",
+  "text": "#F4F7FF",
+  "muted": "#9AA3AD",
+  "card": "#1F2130E8",
+  "panel": "#14141CB8",
+  "button": "#242638",
+  "button_selected": "#6EE7F238",
+  "border": "#31344A",
+  "scene_primary": "#61D6FA",
+  "scene_secondary": "#8F9EFA",
+  "scene_background": "#04081AFF",
+  "judgement_line": "#FF4D6D",
+  "lane_divider": "#F6F8FF"
+}
+```
+
+색은 `#RRGGBB` 또는 `#RRGGBBAA`다. 빠진 항목은 기본 팔레트를 유지한다.
+
+## 키 모드 공통화와 패턴 경로
+
+레인별 파일 이름을 전부 배열로 쓰는 대신 문자열 패턴을 쓸 수 있다.
+
+```json
+"gameplay": {
+  "note": "gameplay/note-{lane}.png",
+  "lane_map": ["left", "down", "up", "right"],
+  "modes": {
+    "4k": {
+      "note": "gameplay/4k/note-{index:02}.png",
+      "note_rotations": [270, 180, 0, 90]
+    },
+    "7k": { "note": "gameplay/7k/note-{index}.png" }
+  }
+}
+```
+
+- `{lane}`: `lane_map`의 현재 값
+- `{index}`: 1부터 시작하는 레인 번호
+- `{index:02}`: 두 자리 레인 번호 (`01`, `02`, ...)
+- `modes`: `1k`부터 `16k`까지의 얕은 덮어쓰기. 공통 항목을 먼저 쓰고 모드마다 다른 항목만 적는다.
+
+가져오기는 현재 선택한 모드뿐 아니라 `1k..16k`의 모든 참조 자산을 함께 복사한다.
+
+## 게임플레이 스타일
+
+스킨은 이미지뿐 아니라 아래 시각 옵션도 기본값으로 지정할 수 있다.
+
+`show_lane_dividers`, `show_judgement_line`, `show_timing_feedback`,
+`show_gear_boundary_line`, `show_hold_tail`, `hold_tail_taper`, `judgement_line_glow`,
+`key_pulse`, `key_pulse_brightness`, `hit_burst_style`, `key_label_position`,
+`note_border`, `note_shape`, `lane_colors`, `lane_background_opacity`, `black_playfield`,
+`visual_opacity`, `note_outline_opacity`, `hold_body_opacity`.
+
+매니페스트에 명시한 값은 스킨 제작자의 의도대로 플레이어의 같은 시각 옵션보다 우선하며,
+누락한 값만 플레이어 설정을 사용한다. 허용 값과 범위는
+[`tenriff-skin.schema.json`](tenriff-skin.schema.json)에 정의돼 있다.
+
 ## 이미지 슬롯
 
 | 섹션 | 키 | 동작 |
 |---|---|---|
 | `lobby` | `background` | 게임플레이를 제외한 로비/메뉴 전체 배경 |
-| `lobby` | `logo` | Song Select 좌측 상단 TenRiff 워드마크 슬롯 |
+| `lobby` | `logo` | Title 중앙 및 Song Select 좌측 상단 워드마크 슬롯 |
 | `gameplay` | `background` | 차트 BGA 아래에 그리는 인게임 기본 배경 |
 | `gameplay` | `gear` | 레인과 판정선 위에 그리는 플레이필드 오버레이 |
 | `gameplay` | `note` | 일반 노트 머리 |
@@ -159,6 +247,12 @@ DDR/StepMania식 화살표 노트는 정사각형에 가까운 이미지를 쓴�
 | `song_select` | `right_panel` | `[1290, 152, 1882, 922]` | 난이도 패널 |
 | `song_select` | `bottom_bar` | `[38, 944, 1882, 1048]` | 하단 바 |
 
+그 밖에도 `generic.content`, `generic.preview`, `result.profile`, `result.song_panel`,
+`result.analysis_panel`, `result.stats_panel`, `result.continue`, `result.replay`,
+`result.retry`를 옮길 수 있다. 목록형 화면 ID에는 `content`와 `preview`를 직접 지정할 수 있다.
+예를 들어 `layout.settings_skins.content`가 있으면 스킨 설정 화면에만 적용하고, 없으면
+`layout.settings.content`, 다시 없으면 `layout.generic.content`를 사용한다.
+
 - 패널 안의 제목, 카드, 버튼은 패널 사각형에서 계산하므로 함께 따라 움직인다.
 - 클릭 판정 영역도 같은 사각형을 쓰므로 마우스 입력이 어긋나지 않는다.
 - `spectrum`과 `nav`는 막대/탭 개수를 유지한 채 사각형에 맞춰 비례 조정된다.
@@ -185,4 +279,7 @@ DDR/StepMania식 화살표 노트는 정사각형에 가까운 이미지를 쓴�
 - 절대 경로와 `..`로 스킨 폴더 밖을 가리키는 경로는 거부된다.
 - 포맷 버전이 지원되지 않거나 필수 메타데이터가 틀리면 스킨을 활성화하지 않는다.
 - 기존 `native` 및 `lr2` 소스와 설정은 그대로 유지된다.
+- 알 수 없는 키, 잘못된 타입, 범위를 벗어난 값은 스킨 설정 화면과 로그에 경고한다.
+- 렌더 스레드는 매니페스트를 직접 읽지 않는다. `Reload Skin` 때 1K~16K 정의를 다시 만들고
+  안전한 스냅샷으로 교체하므로 플레이 중 디스크/JSON 읽기가 끼어들지 않는다.
 - JSON 자동 완성/검증은 [`tenriff-skin.schema.json`](tenriff-skin.schema.json)을 사용할 수 있다.

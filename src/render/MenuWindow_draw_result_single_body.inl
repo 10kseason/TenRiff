@@ -148,9 +148,12 @@
             d2d_->button_border_brush->SetOpacity(saved);
         }
 
-        const D2D1_RECT_F profile_rect = D2D1::RectF(1400.0f, 28.0f, 1848.0f, 108.0f);
+        const D2D1_RECT_F profile_rect = skin_layout_rect(
+            data, "result.profile", D2D1::RectF(1400.0f, 28.0f, 1848.0f, 108.0f));
         draw_result_panel(profile_rect, presentation.background, false);
-        const D2D1_RECT_F avatar_rect = D2D1::RectF(1415.0f, 37.0f, 1477.0f, 99.0f);
+        const D2D1_RECT_F avatar_rect = D2D1::RectF(
+            profile_rect.left + 15.0f, profile_rect.top + 9.0f,
+            profile_rect.left + 77.0f, profile_rect.bottom - 9.0f);
         if (ID2D1Bitmap* avatar =
                 find_song_card_preview_bitmap(data.result.profile_avatar_path)) {
             const D2D1_RECT_F source = centered_bitmap_source_rect(avatar->GetSize(), avatar_rect);
@@ -168,19 +171,22 @@
         }
         draw_result_text(data.result.profile.empty() ? std::string("PLAYER") : data.result.profile,
                          d2d_->title_format.Get(),
-                         D2D1::RectF(1496.0f, 38.0f, 1825.0f, 72.0f),
+                         D2D1::RectF(profile_rect.left + 96.0f, profile_rect.top + 10.0f,
+                                     profile_rect.right - 23.0f, profile_rect.top + 44.0f),
                          d2d_->text_brush.Get(),
                          presentation.background);
         draw_result_text(result_loc("PERFORMANCE RESULT", "플레이 기록"),
                          d2d_->hud_format.Get(),
-                         D2D1::RectF(1496.0f, 72.0f, 1825.0f, 99.0f),
+                         D2D1::RectF(profile_rect.left + 96.0f, profile_rect.top + 44.0f,
+                                     profile_rect.right - 23.0f, profile_rect.bottom - 9.0f),
                          d2d_->muted_brush.Get(),
                          presentation.background);
 
         const float information_slide = 34.0f * (1.0f - presentation.information);
-        const D2D1_RECT_F song_panel =
-            D2D1::RectF(70.0f - information_slide, 154.0f,
-                        590.0f - information_slide, 704.0f);
+        const D2D1_RECT_F song_panel = offset_rect(
+            skin_layout_rect(data, "result.song_panel",
+                             D2D1::RectF(70.0f, 154.0f, 590.0f, 704.0f)),
+            -information_slide, 0.0f);
         draw_result_panel(song_panel, presentation.information, true);
         const D2D1_RECT_F art_rect =
             D2D1::RectF(song_panel.left + 44.0f, song_panel.top + 42.0f,
@@ -473,7 +479,8 @@
 
         // Left edge shares the CONTINUE/REPLAY/RETRY column below it so the right
         // half of the screen reads as one column instead of two ragged ones.
-        const D2D1_RECT_F analysis_panel = D2D1::RectF(1320.0f, 154.0f, 1848.0f, 704.0f);
+        const D2D1_RECT_F analysis_panel = skin_layout_rect(
+            data, "result.analysis_panel", D2D1::RectF(1320.0f, 154.0f, 1848.0f, 704.0f));
         draw_result_panel(analysis_panel, presentation.graph, false);
         draw_result_text(result_loc("// PERFORMANCE ANALYSIS", "// 플레이 분석"),
                          d2d_->hud_format.Get(),
@@ -634,7 +641,8 @@
             d2d_->accent_brush->SetOpacity(saved_opacity);
         }
 
-        const D2D1_RECT_F stats_panel = D2D1::RectF(70.0f, 770.0f, 1270.0f, 994.0f);
+        const D2D1_RECT_F stats_panel = skin_layout_rect(
+            data, "result.stats_panel", D2D1::RectF(70.0f, 770.0f, 1270.0f, 994.0f));
         draw_result_panel(stats_panel, presentation.statistics.front(), true);
         struct ResultStatistic {
             std::string label;
@@ -731,9 +739,12 @@
             d2d_->accent_brush->SetOpacity(saved_opacity);
         }
 
-        const D2D1_RECT_F continue_rect = D2D1::RectF(1320.0f, 770.0f, 1848.0f, 856.0f);
-        const D2D1_RECT_F replay_rect = D2D1::RectF(1320.0f, 872.0f, 1574.0f, 942.0f);
-        const D2D1_RECT_F retry_rect = D2D1::RectF(1594.0f, 872.0f, 1848.0f, 942.0f);
+        const D2D1_RECT_F continue_rect = skin_layout_rect(
+            data, "result.continue", D2D1::RectF(1320.0f, 770.0f, 1848.0f, 856.0f));
+        const D2D1_RECT_F replay_rect = skin_layout_rect(
+            data, "result.replay", D2D1::RectF(1320.0f, 872.0f, 1574.0f, 942.0f));
+        const D2D1_RECT_F retry_rect = skin_layout_rect(
+            data, "result.retry", D2D1::RectF(1594.0f, 872.0f, 1848.0f, 942.0f));
         const float controls_alpha = presentation.interaction_ready
                                          ? std::max(0.35f, presentation.controls)
                                          : 0.16f;

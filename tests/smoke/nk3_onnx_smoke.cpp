@@ -152,14 +152,14 @@ bool warning_field_greater_than(const std::vector<std::string>& warnings,
     return false;
 }
 
-void set_device_environment(const char* value) {
+void set_backend_environment(const char* value) {
 #ifdef _WIN32
-    _putenv_s("TENRIFF_NK3_DEVICE", value ? value : "");
+    _putenv_s("TENRIFF_NK3_BACKEND", value ? value : "");
 #else
     if (value) {
-        setenv("TENRIFF_NK3_DEVICE", value, 1);
+        setenv("TENRIFF_NK3_BACKEND", value, 1);
     } else {
-        unsetenv("TENRIFF_NK3_DEVICE");
+        unsetenv("TENRIFF_NK3_BACKEND");
     }
 #endif
 }
@@ -284,10 +284,10 @@ int main() {
     }
     std::cout << "NK3_ALL_TO_ALL=PASS routes=" << matrix_routes << '\n';
 
-    const char* configured_device = std::getenv("TENRIFF_NK3_DEVICE");
-    const std::optional<std::string> saved_device =
-        configured_device ? std::optional<std::string>{configured_device} : std::nullopt;
-    set_device_environment("NPU");
+    const char* configured_backend = std::getenv("TENRIFF_NK3_BACKEND");
+    const std::optional<std::string> saved_backend =
+        configured_backend ? std::optional<std::string>{configured_backend} : std::nullopt;
+    set_backend_environment("INVALID");
     KeyModeConverterOptions rejected_options;
     rejected_options.algorithm = KeyModeConversionAlgorithm::NK3;
     rejected_options.target_lane_count = 8;
@@ -295,18 +295,19 @@ int main() {
     rejected_options.base_bpm = 180.0;
     const auto rejected =
         tenriff::gameplay::convert_key_mode_chart(source, rejected_options);
-    if (saved_device.has_value()) {
-        set_device_environment(saved_device->c_str());
+    if (saved_backend.has_value()) {
+        set_backend_environment(saved_backend->c_str());
     } else {
-        set_device_environment(nullptr);
+        set_backend_environment(nullptr);
     }
-    const bool explains_device_contract =
+    const bool explains_backend_contract =
         std::any_of(rejected.warnings.begin(), rejected.warnings.end(),
                     [](const std::string& warning) {
-                        return warning.find("must be GPU or CPU") != std::string::npos;
+                        return warning.find("must be AUTO, VULKAN, or OPENVINO") !=
+                               std::string::npos;
                     });
-    if (rejected.converted || !explains_device_contract) {
-        std::cerr << "NK3 accepted the unsupported NPU device\n";
+    if (rejected.converted || !explains_backend_contract) {
+        std::cerr << "NK3 accepted an unsupported inference backend\n";
         return 1;
     }
     std::cout << "NK3_ONNX_SMOKE=PASS\n";

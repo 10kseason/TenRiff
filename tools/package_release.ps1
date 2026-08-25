@@ -3,7 +3,7 @@ param(
     [string]$BuildReleaseDirectory,
     [Parameter(Mandatory = $true)]
     [string]$OutputDirectory,
-    [string]$Version = "1.4.5.2"
+    [string]$Version = "1.4.5.3"
 )
 
 $ErrorActionPreference = "Stop"
@@ -28,6 +28,38 @@ if (Get-ChildItem -LiteralPath $buildRoot -Filter "bms_key_converter*.exe" -Erro
     throw "Standalone BMS key-converter binaries must not be packaged."
 }
 
+$buildTree = Split-Path -Parent $buildRoot
+$cmakeCache = Join-Path $buildTree "CMakeCache.txt"
+if (-not (Test-Path -LiteralPath $cmakeCache -PathType Leaf)) {
+    throw "CMakeCache.txt was not found for the release build: $cmakeCache"
+}
+$ctestCacheEntry = Get-Content -LiteralPath $cmakeCache |
+    Where-Object { $_ -like "CMAKE_CTEST_COMMAND:INTERNAL=*" } |
+    Select-Object -First 1
+if (-not $ctestCacheEntry) {
+    throw "CMAKE_CTEST_COMMAND was not found in: $cmakeCache"
+}
+$ctestCommand = ($ctestCacheEntry -split "=", 2)[1]
+if (-not (Test-Path -LiteralPath $ctestCommand -PathType Leaf)) {
+    throw "CTest executable was not found: $ctestCommand"
+}
+
+$testInventoryJson = & $ctestCommand --test-dir $buildTree -C Release --show-only=json-v1
+if ($LASTEXITCODE -ne 0) {
+    throw "Could not enumerate the release tests."
+}
+$testInventory = ($testInventoryJson -join "`n") | ConvertFrom-Json
+$releaseTestCount = @($testInventory.tests).Count
+if ($releaseTestCount -eq 0) {
+    throw "The release build has no registered CTest tests. Configure with TENRIFF_ENABLE_TESTS=ON."
+}
+
+Write-Host "Running $releaseTestCount release tests before packaging..."
+& $ctestCommand --test-dir $buildTree -C Release --output-on-failure
+if ($LASTEXITCODE -ne 0) {
+    throw "Release tests failed; packaging was stopped."
+}
+
 New-Item -ItemType Directory -Path $binaryRoot, $sourceRoot -Force | Out-Null
 
 $topFiles = @(
@@ -47,26 +79,17 @@ foreach ($relative in $topFiles) {
 foreach ($directory in @("Mainmusic", "config", "docs", "examples", "models")) {
     Copy-Item -LiteralPath (Join-Path $repoRoot $directory) -Destination $binaryRoot -Recurse
 }
-Copy-Item -LiteralPath (Join-Path $repoRoot "third_party\openvino-2026.2.1") `
-    -Destination (Join-Path $binaryRoot "third_party\openvino-2026.2.1") -Recurse
+$ncnnNoticeDirectory = Join-Path $binaryRoot "third_party\ncnn-20260526"
+New-Item -ItemType Directory -Path $ncnnNoticeDirectory -Force | Out-Null
+Copy-Item -LiteralPath (Join-Path $repoRoot "third_party\ncnn-20260526\LICENSE.txt") `
+    -Destination (Join-Path $ncnnNoticeDirectory "LICENSE.txt")
 New-Item -ItemType Directory -Path (Join-Path $binaryRoot "tools\onnx_upscaler") -Force | Out-Null
 Copy-Item -LiteralPath (Join-Path $repoRoot "tools\onnx_upscaler\README.md") `
     -Destination (Join-Path $binaryRoot "tools\onnx_upscaler\README.md")
 
 Copy-Item -LiteralPath (Join-Path $buildRoot "TenRiff.exe") -Destination $binaryRoot
 $runtimeFiles = @(
-    "openvino.dll",
-    "openvino_intel_cpu_plugin.dll",
-    "openvino_intel_gpu_plugin.dll",
-    "openvino_intel_npu_plugin.dll",
-    "openvino_intel_npu_compiler_loader.dll",
-    "openvino_intel_npu_compiler.dll",
-    "openvino_onnx_frontend.dll",
-    "cache.json",
-    "tbb12.dll",
-    "tbbbind_2_5.dll",
-    "tbbmalloc.dll",
-    "tbbmalloc_proxy.dll"
+    "ncnn.dll"
 )
 foreach ($runtime in $runtimeFiles) {
     $runtimePath = Join-Path $buildRoot $runtime

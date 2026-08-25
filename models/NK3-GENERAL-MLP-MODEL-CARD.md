@@ -10,8 +10,8 @@
 - Maximum model residual: 1.0 before host weighting
 - Chord feature: source chord-size ratio
 - Score transform: center the addition-role logit across each target-lane group before `tanh`
-- Device preference: verified OpenVINO NPU, then GPU, then CPU
-- Deployment targets: fixed-target ONNX exports for 2K through 18K
+- Device preference: ncnn Vulkan default; optional OpenVINO compatibility fallback
+- Deployment targets: fixed-target ONNX and derived ncnn exports for 2K through 18K
 
 The lane encoder and pooled context are shared across target lanes. TenRiff
 therefore exports the same trained weights at each supported target width; this

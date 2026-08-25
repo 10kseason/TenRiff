@@ -29,9 +29,14 @@
 #include <windows.h>
 #endif
 
-#if defined(TENRIFF_ENABLE_NK3_ONNX)
+#if defined(TENRIFF_ENABLE_NK3_OPENVINO)
 #include <openvino/openvino.hpp>
 #include <openvino/runtime/properties.hpp>
+#endif
+
+#if defined(TENRIFF_ENABLE_NK3_NCNN)
+#include <gpu.h>
+#include <net.h>
 #endif
 
 namespace tenriff::gameplay {
@@ -314,6 +319,24 @@ std::string selected_device() {
     return device;
 }
 
+enum class Nk3Backend { Auto, OpenVino, Vulkan };
+
+Nk3Backend selected_backend() {
+    const char* configured = std::getenv("TENRIFF_NK3_BACKEND");
+    const std::string backend = upper_ascii(configured ? configured : "AUTO");
+    if (backend == "AUTO") {
+        return Nk3Backend::Auto;
+    }
+    if (backend == "OPENVINO") {
+        return Nk3Backend::OpenVino;
+    }
+    if (backend == "VULKAN" || backend == "NCNN") {
+        return Nk3Backend::Vulkan;
+    }
+    throw std::runtime_error(
+        "TENRIFF_NK3_BACKEND must be AUTO, VULKAN, or OPENVINO");
+}
+
 std::filesystem::path executable_directory() {
 #ifdef _WIN32
     std::wstring path(32'768, L'\0');
@@ -349,10 +372,33 @@ std::filesystem::path pattern_model_path(int target_keys) {
     return std::filesystem::current_path() / "models" / filename;
 }
 
-class PatternMlpEvaluator;
+std::filesystem::path ncnn_model_path(const std::string& filename) {
+    const auto beside_executable = executable_directory() / "models" / "ncnn" / filename;
+    if (std::filesystem::is_regular_file(beside_executable)) {
+        return beside_executable;
+    }
+    return std::filesystem::current_path() / "models" / "ncnn" / filename;
+}
 
-#if defined(TENRIFF_ENABLE_NK3_ONNX)
-class OpenVinoEvaluator {
+class P64Evaluator {
+public:
+    virtual ~P64Evaluator() = default;
+    virtual BlockOutput run(const BlockData& block, const ModelState& state) = 0;
+    [[nodiscard]] virtual std::string evidence() const = 0;
+};
+
+class PatternMlpEvaluator {
+public:
+    virtual ~PatternMlpEvaluator() = default;
+    [[nodiscard]] virtual std::vector<PatternScores> predict_batch(
+        const std::vector<PatternFeatures>& values) = 0;
+    [[nodiscard]] virtual std::string evidence() const = 0;
+};
+
+std::size_t candidate_offset(int slice, int lane, int type);
+
+#if defined(TENRIFF_ENABLE_NK3_OPENVINO)
+class OpenVinoEvaluator final : public P64Evaluator {
 public:
     OpenVinoEvaluator(const std::filesystem::path& path, std::string device)
         : device_(std::move(device)) {
@@ -376,7 +422,7 @@ public:
         }
     }
 
-    BlockOutput run(const BlockData& block, const ModelState& state) {
+    BlockOutput run(const BlockData& block, const ModelState& state) override {
         ov::Tensor notes(ov::element::f32, {1, kSlices, kNoteFeatures});
         ov::Tensor mask(ov::element::boolean, {1, kSlices});
         ov::Tensor parameters(ov::element::f32, {1, 16});
@@ -436,7 +482,7 @@ public:
         return output;
     }
 
-    [[nodiscard]] std::string evidence() const {
+    [[nodiscard]] std::string evidence() const override {
         std::string devices;
         for (const auto& device : execution_devices_) {
             if (!devices.empty()) {
@@ -459,8 +505,8 @@ private:
     std::vector<std::string> execution_devices_;
 };
 
-OpenVinoEvaluator& shared_evaluator(const std::filesystem::path& path,
-                                    const std::string& device) {
+OpenVinoEvaluator& shared_openvino_evaluator(const std::filesystem::path& path,
+                                             const std::string& device) {
     static std::mutex evaluator_mutex;
     static std::map<std::string, std::unique_ptr<OpenVinoEvaluator>> evaluators;
     const std::string key = path.u8string() + '\n' + device;
@@ -472,9 +518,9 @@ OpenVinoEvaluator& shared_evaluator(const std::filesystem::path& path,
     return *evaluator;
 }
 
-class PatternMlpEvaluator {
+class OpenVinoPatternMlpEvaluator final : public PatternMlpEvaluator {
 public:
-    PatternMlpEvaluator(const std::filesystem::path& path, int target_keys)
+    OpenVinoPatternMlpEvaluator(const std::filesystem::path& path, int target_keys)
         : target_keys_(target_keys), batch_rows_(target_keys * kPatternBatchStates) {
         const auto available = core_.get_available_devices();
         model_ = core_.read_model(path.wstring());
@@ -524,7 +570,7 @@ public:
     }
 
     [[nodiscard]] std::vector<PatternScores> predict_batch(
-        const std::vector<PatternFeatures>& values) {
+        const std::vector<PatternFeatures>& values) override {
         std::vector<PatternScores> result(values.size());
         if (values.empty()) {
             return result;
@@ -563,7 +609,7 @@ public:
         return result;
     }
 
-    [[nodiscard]] std::string evidence() const {
+    [[nodiscard]] std::string evidence() const override {
         std::string devices;
         for (const auto& device : execution_devices_) {
             if (!devices.empty()) {
@@ -605,19 +651,459 @@ private:
     std::atomic<std::size_t> maximum_request_states_{0};
 };
 
-PatternMlpEvaluator& shared_pattern_evaluator(const std::filesystem::path& path,
-                                              int target_keys) {
+PatternMlpEvaluator& shared_openvino_pattern_evaluator(
+    const std::filesystem::path& path, int target_keys) {
     static std::mutex evaluator_mutex;
     static std::map<std::string, std::unique_ptr<PatternMlpEvaluator>> evaluators;
     const std::string key = path.u8string() + '\n' + std::to_string(target_keys);
     std::lock_guard<std::mutex> lock(evaluator_mutex);
     auto& evaluator = evaluators[key];
     if (!evaluator) {
-        evaluator = std::make_unique<PatternMlpEvaluator>(path, target_keys);
+        evaluator = std::make_unique<OpenVinoPatternMlpEvaluator>(path, target_keys);
     }
     return *evaluator;
 }
 #endif
+
+#if defined(TENRIFF_ENABLE_NK3_NCNN)
+class NcnnVulkanRuntime {
+public:
+    NcnnVulkanRuntime() {
+        if (ncnn::create_gpu_instance() != 0) {
+            throw std::runtime_error("ncnn could not initialize the Vulkan loader");
+        }
+        const int count = ncnn::get_gpu_count();
+        if (count <= 0) {
+            throw std::runtime_error("ncnn found no Vulkan compute device");
+        }
+        device_index_ = ncnn::get_default_gpu_index();
+        if (const char* configured = std::getenv("TENRIFF_NK3_VULKAN_DEVICE")) {
+            if (*configured != '\0') {
+                std::size_t parsed = 0;
+                device_index_ = std::stoi(configured, &parsed);
+                if (parsed != std::string(configured).size()) {
+                    throw std::runtime_error(
+                        "TENRIFF_NK3_VULKAN_DEVICE must be a numeric device index");
+                }
+            }
+        }
+        if (device_index_ < 0 || device_index_ >= count) {
+            throw std::runtime_error("requested ncnn Vulkan device index is unavailable");
+        }
+        const auto& info = ncnn::get_gpu_info(device_index_);
+        device_name_ = info.device_name() ? info.device_name() : "unknown";
+        vendor_id_ = info.vendor_id();
+    }
+
+    ~NcnnVulkanRuntime() { ncnn::destroy_gpu_instance(); }
+
+    [[nodiscard]] int device_index() const { return device_index_; }
+    [[nodiscard]] const std::string& device_name() const { return device_name_; }
+    [[nodiscard]] uint32_t vendor_id() const { return vendor_id_; }
+
+private:
+    int device_index_ = 0;
+    std::string device_name_;
+    uint32_t vendor_id_ = 0;
+};
+
+NcnnVulkanRuntime& ncnn_vulkan_runtime() {
+    static NcnnVulkanRuntime runtime;
+    return runtime;
+}
+
+ncnn::Mat ncnn_mat_2d(const float* values, int width, int height) {
+    ncnn::Mat result(width, height);
+    std::copy_n(values, static_cast<std::size_t>(width) * height,
+                static_cast<float*>(result.data));
+    return result;
+}
+
+ncnn::Mat ncnn_mat_3d(const float* values, int width, int height, int channels) {
+    ncnn::Mat result(width, height, channels);
+    std::copy_n(values,
+                static_cast<std::size_t>(width) * height * channels,
+                static_cast<float*>(result.data));
+    return result;
+}
+
+void require_ncnn(int status, const std::string& action) {
+    if (status != 0) {
+        throw std::runtime_error(action + " failed with ncnn status " +
+                                 std::to_string(status));
+    }
+}
+
+std::string ncnn_shape(const ncnn::Mat& value) {
+    return "dims=" + std::to_string(value.dims) + " w=" +
+           std::to_string(value.w) + " h=" + std::to_string(value.h) +
+           " d=" + std::to_string(value.d) + " c=" +
+           std::to_string(value.c) + " total=" +
+           std::to_string(value.total());
+}
+
+void configure_ncnn_vulkan(ncnn::Net& net, const NcnnVulkanRuntime& runtime) {
+    net.opt.use_vulkan_compute = true;
+    net.opt.use_fp16_packed = false;
+    net.opt.use_fp16_storage = false;
+    net.opt.use_fp16_arithmetic = false;
+    net.set_vulkan_device(runtime.device_index());
+}
+
+class NcnnVulkanEvaluator final : public P64Evaluator {
+public:
+    explicit NcnnVulkanEvaluator(const std::filesystem::path& param_path)
+        : runtime_(ncnn_vulkan_runtime()) {
+        auto bin_path = param_path;
+        bin_path.replace_extension(".bin");
+        if (!std::filesystem::is_regular_file(param_path) ||
+            !std::filesystem::is_regular_file(bin_path)) {
+            throw std::runtime_error("converted P64 ncnn model is missing");
+        }
+        configure_ncnn_vulkan(net_, runtime_);
+        require_ncnn(net_.load_param(param_path.wstring().c_str()),
+                     "loading the P64 ncnn graph");
+        require_ncnn(net_.load_model(bin_path.wstring().c_str()),
+                     "loading the P64 ncnn weights");
+    }
+
+    BlockOutput run(const BlockData& block, const ModelState& state) override {
+        BlockOutput output;
+        std::array<float, kSlices> mask{};
+        std::array<float, kMemorySlots> memory_mask{};
+        std::array<float, kSlices> addition_count{};
+        for (int slice = 0; slice < kSlices; ++slice) {
+            mask[slice] = block.mask[slice] ? 1.0f : 0.0f;
+        }
+        for (int index = 0; index < kMemorySlots; ++index) {
+            memory_mask[index] = state.memory_mask[index] ? 1.0f : 0.0f;
+        }
+
+        int64_t pressure = state.pressure;
+        int64_t previous_quotient = pressure / kPressureScale;
+        for (int slice = 0; slice < kSlices; ++slice) {
+            if (block.mask[slice]) {
+                pressure += block.pressure_increment[slice];
+            }
+            const int64_t quotient = pressure / kPressureScale;
+            output.addition_count[slice] = quotient - previous_quotient;
+            addition_count[slice] =
+                static_cast<float>(output.addition_count[slice]);
+            previous_quotient = quotient;
+        }
+        output.next.pressure = pressure % kPressureScale;
+
+        auto extractor = net_.create_extractor();
+        require_ncnn(extractor.input("in0", ncnn_mat_3d(
+                                               block.model_notes.data(), kNoteFeatures,
+                                               kSlices, 1)),
+                     "binding P64 notes");
+        require_ncnn(extractor.input("in1", ncnn_mat_2d(mask.data(), kSlices, 1)),
+                     "binding P64 mask");
+        require_ncnn(extractor.input("in2", ncnn_mat_2d(block.parameters.data(), 16, 1)),
+                     "binding P64 parameters");
+        require_ncnn(extractor.input("in3", ncnn_mat_2d(state.fast.data(), kContextDim, 1)),
+                     "binding P64 fast context");
+        require_ncnn(extractor.input("in4", ncnn_mat_2d(state.slow.data(), kContextDim, 1)),
+                     "binding P64 slow context");
+        require_ncnn(extractor.input("in5", ncnn_mat_3d(
+                                               state.memory.data(), kContextDim,
+                                               kMemorySlots, 1)),
+                     "binding P64 memory");
+        require_ncnn(extractor.input("in6", ncnn_mat_2d(memory_mask.data(), kMemorySlots, 1)),
+                     "binding P64 memory mask");
+        require_ncnn(extractor.input("in7", ncnn_mat_2d(addition_count.data(), kSlices, 1)),
+                     "binding P64 addition count");
+
+        ncnn::Mat scores;
+        ncnn::Mat next_fast;
+        ncnn::Mat next_slow;
+        ncnn::Mat next_memory;
+        require_ncnn(extractor.extract("out0", scores), "running P64 scores on Vulkan");
+        require_ncnn(extractor.extract("out1", next_fast), "running P64 fast state on Vulkan");
+        require_ncnn(extractor.extract("out2", next_slow), "running P64 slow state on Vulkan");
+        require_ncnn(extractor.extract("out3", next_memory), "running P64 memory on Vulkan");
+        if (scores.total() != output.scores.size() ||
+            next_fast.total() != output.next.fast.size() ||
+            next_slow.total() != output.next.slow.size() ||
+            next_memory.total() != output.next.memory.size()) {
+            throw std::runtime_error(
+                "P64 ncnn output shape mismatch (scores " + ncnn_shape(scores) +
+                ", fast " + ncnn_shape(next_fast) + ", slow " +
+                ncnn_shape(next_slow) + ", memory " + ncnn_shape(next_memory) +
+                ")");
+        }
+        const auto* score_values = static_cast<const float*>(scores.data);
+        for (std::size_t index = 0; index < output.scores.size(); ++index) {
+            output.scores[index] = static_cast<int32_t>(std::clamp<double>(
+                std::nearbyint(score_values[index]),
+                std::numeric_limits<int32_t>::min(),
+                std::numeric_limits<int32_t>::max()));
+        }
+        std::copy_n(static_cast<const float*>(next_fast.data), output.next.fast.size(),
+                    output.next.fast.begin());
+        std::copy_n(static_cast<const float*>(next_slow.data), output.next.slow.size(),
+                    output.next.slow.begin());
+        std::copy_n(static_cast<const float*>(next_memory.data), output.next.memory.size(),
+                    output.next.memory.begin());
+
+        const int target_keys = std::clamp(
+            static_cast<int>(std::nearbyint(block.parameters[1])), 1, kTargetLanes);
+        const double target_span = std::max(1, target_keys - 1);
+        for (int slice = 0; slice < kSlices; ++slice) {
+            const int direct = static_cast<int>(std::nearbyint(
+                block.model_notes[slice * kNoteFeatures + 2] * target_span));
+            for (int lane = 0; lane < kTargetLanes; ++lane) {
+                for (int type = 0; type < kCandidateTypes; ++type) {
+                    const bool candidate_type_valid =
+                        (type == 0 && lane == direct) ||
+                        (type == 1 && lane != direct) ||
+                        (type >= 2 && output.addition_count[slice] > 0);
+                    output.valid[candidate_offset(slice, lane, type)] =
+                        block.mask[slice] && lane < target_keys && candidate_type_valid;
+                }
+            }
+        }
+        std::copy(state.memory_mask.begin() + 1, state.memory_mask.end(),
+                  output.next.memory_mask.begin());
+        output.next.memory_mask.back() =
+            std::any_of(block.mask.begin(), block.mask.end(),
+                        [](uint8_t value) { return value != 0; });
+        inference_count_.fetch_add(1, std::memory_order_relaxed);
+        return output;
+    }
+
+    [[nodiscard]] std::string evidence() const override {
+        return "evaluator=ncnn Vulkan device=" +
+               std::to_string(runtime_.device_index()) + " name=" +
+               runtime_.device_name() + " vendor=0x" + vendor_hex() +
+               " fp32 inferences=" +
+               std::to_string(inference_count_.load(std::memory_order_relaxed));
+    }
+
+private:
+    [[nodiscard]] std::string vendor_hex() const {
+        constexpr char digits[] = "0123456789ABCDEF";
+        std::string result(8, '0');
+        uint32_t value = runtime_.vendor_id();
+        for (int index = 7; index >= 0; --index) {
+            result[index] = digits[value & 0x0f];
+            value >>= 4;
+        }
+        return result;
+    }
+
+    NcnnVulkanRuntime& runtime_;
+    ncnn::Net net_;
+    std::atomic<std::uint64_t> inference_count_{0};
+};
+
+class NcnnVulkanPatternMlpEvaluator final : public PatternMlpEvaluator {
+public:
+    NcnnVulkanPatternMlpEvaluator(const std::filesystem::path& param_path,
+                                  int target_keys)
+        : runtime_(ncnn_vulkan_runtime()), target_keys_(target_keys),
+          batch_rows_(target_keys * kPatternBatchStates) {
+        auto bin_path = param_path;
+        bin_path.replace_extension(".bin");
+        if (!std::filesystem::is_regular_file(param_path) ||
+            !std::filesystem::is_regular_file(bin_path)) {
+            throw std::runtime_error("converted pattern MLP ncnn model is missing");
+        }
+        configure_ncnn_vulkan(net_, runtime_);
+        require_ncnn(net_.load_param(param_path.wstring().c_str()),
+                     "loading the pattern MLP ncnn graph");
+        require_ncnn(net_.load_model(bin_path.wstring().c_str()),
+                     "loading the pattern MLP ncnn weights");
+    }
+
+    [[nodiscard]] std::vector<PatternScores> predict_batch(
+        const std::vector<PatternFeatures>& values) override {
+        std::vector<PatternScores> result(values.size());
+        if (values.empty()) {
+            return result;
+        }
+        auto maximum = maximum_request_states_.load(std::memory_order_relaxed);
+        while (maximum < values.size() &&
+               !maximum_request_states_.compare_exchange_weak(
+                   maximum, values.size(), std::memory_order_relaxed)) {
+        }
+        std::lock_guard<std::mutex> lock(inference_mutex_);
+        for (std::size_t begin = 0; begin < values.size(); begin += kPatternBatchStates) {
+            const std::size_t count =
+                std::min<std::size_t>(kPatternBatchStates, values.size() - begin);
+            ncnn::Mat features(kPatternFeatureDim, batch_rows_);
+            std::fill_n(static_cast<float*>(features.data),
+                        static_cast<std::size_t>(batch_rows_) * kPatternFeatureDim,
+                        0.0f);
+            for (std::size_t index = 0; index < count; ++index) {
+                std::copy_n(values[begin + index].begin(),
+                            target_keys_ * kPatternFeatureDim,
+                            static_cast<float*>(features.data) +
+                                index * target_keys_ * kPatternFeatureDim);
+            }
+            auto extractor = net_.create_extractor();
+            require_ncnn(extractor.input("in0", features),
+                         "binding pattern MLP features");
+            ncnn::Mat logits;
+            require_ncnn(extractor.extract("out0", logits),
+                         "running pattern MLP on Vulkan");
+            if (logits.total() !=
+                static_cast<std::size_t>(batch_rows_) * kPatternOutputRoles) {
+                throw std::runtime_error(
+                    "pattern MLP ncnn output shape mismatch (" +
+                    ncnn_shape(logits) + ", expected=" +
+                    std::to_string(static_cast<std::size_t>(batch_rows_) *
+                                   kPatternOutputRoles) +
+                    ")");
+            }
+            const auto* logits_data = static_cast<const float*>(logits.data);
+            for (std::size_t index = 0; index < count; ++index) {
+                const auto* roles = logits_data +
+                                    index * target_keys_ * kPatternOutputRoles;
+                for (int lane = 0; lane < target_keys_; ++lane) {
+                    const auto role_offset = lane * kPatternOutputRoles;
+                    const auto candidate_offset = lane * kCandidateTypes;
+                    result[begin + index][candidate_offset] = roles[role_offset];
+                    result[begin + index][candidate_offset + 1] = roles[role_offset];
+                    std::fill_n(result[begin + index].begin() +
+                                    candidate_offset + 2,
+                                kCandidateTypes - 2, roles[role_offset + 1]);
+                }
+            }
+            inference_count_.fetch_add(1, std::memory_order_relaxed);
+            evaluated_state_count_.fetch_add(count, std::memory_order_relaxed);
+        }
+        return result;
+    }
+
+    [[nodiscard]] std::string evidence() const override {
+        return std::to_string(target_keys_) +
+               "K generalized pattern MLP evaluator=ncnn Vulkan device=" +
+               std::to_string(runtime_.device_index()) + " name=" +
+               runtime_.device_name() + " fp32 inferences=" +
+               std::to_string(inference_count_.load(std::memory_order_relaxed)) +
+               " evaluated-states=" +
+               std::to_string(evaluated_state_count_.load(std::memory_order_relaxed)) +
+               " batch-capacity=" + std::to_string(kPatternBatchStates) +
+               " schema=v3 features=" + std::to_string(kPatternFeatureDim) +
+               " roles=" + std::to_string(kPatternOutputRoles) +
+               " residual-bound=" + std::to_string(kPatternMaxResidual) +
+               " max-requested-states=" +
+               std::to_string(maximum_request_states_.load(std::memory_order_relaxed));
+    }
+
+private:
+    NcnnVulkanRuntime& runtime_;
+    int target_keys_ = 0;
+    int batch_rows_ = 0;
+    ncnn::Net net_;
+    std::mutex inference_mutex_;
+    std::atomic<std::uint64_t> inference_count_{0};
+    std::atomic<std::uint64_t> evaluated_state_count_{0};
+    std::atomic<std::size_t> maximum_request_states_{0};
+};
+
+P64Evaluator& shared_ncnn_evaluator(const std::filesystem::path& path) {
+    (void)ncnn_vulkan_runtime();
+    static std::mutex evaluator_mutex;
+    static std::map<std::string, std::unique_ptr<P64Evaluator>> evaluators;
+    const std::string key = path.u8string();
+    std::lock_guard<std::mutex> lock(evaluator_mutex);
+    auto& evaluator = evaluators[key];
+    if (!evaluator) {
+        evaluator = std::make_unique<NcnnVulkanEvaluator>(path);
+    }
+    return *evaluator;
+}
+
+PatternMlpEvaluator& shared_ncnn_pattern_evaluator(
+    const std::filesystem::path& path, int target_keys) {
+    (void)ncnn_vulkan_runtime();
+    static std::mutex evaluator_mutex;
+    static std::map<std::string, std::unique_ptr<PatternMlpEvaluator>> evaluators;
+    const std::string key = path.u8string() + '\n' + std::to_string(target_keys);
+    std::lock_guard<std::mutex> lock(evaluator_mutex);
+    auto& evaluator = evaluators[key];
+    if (!evaluator) {
+        evaluator =
+            std::make_unique<NcnnVulkanPatternMlpEvaluator>(path, target_keys);
+    }
+    return *evaluator;
+}
+#endif
+
+struct SelectedEvaluator {
+    Nk3Backend backend = Nk3Backend::Auto;
+    P64Evaluator* p64 = nullptr;
+    PatternMlpEvaluator* pattern = nullptr;
+};
+
+SelectedEvaluator select_evaluators(bool use_pattern_mlp, int target_keys) {
+    const Nk3Backend requested = selected_backend();
+    std::string failures;
+
+    const auto record_failure = [&](const std::string& backend,
+                                    const std::exception& error) {
+        if (!failures.empty()) {
+            failures += "; ";
+        }
+        failures += backend + ": " + error.what();
+    };
+
+#if defined(TENRIFF_ENABLE_NK3_NCNN)
+    if (requested == Nk3Backend::Auto || requested == Nk3Backend::Vulkan) {
+        try {
+            SelectedEvaluator selected;
+            selected.backend = Nk3Backend::Vulkan;
+            selected.p64 = &shared_ncnn_evaluator(
+                ncnn_model_path("NK3-P64-hybrid.ncnn.param"));
+            if (use_pattern_mlp) {
+                selected.pattern = &shared_ncnn_pattern_evaluator(
+                    ncnn_model_path("NK3-general-pattern-" +
+                                    std::to_string(target_keys) + "K.ncnn.param"),
+                    target_keys);
+            }
+            return selected;
+        } catch (const std::exception& error) {
+            record_failure("Vulkan", error);
+            if (requested == Nk3Backend::Vulkan) {
+                throw;
+            }
+        }
+    }
+#else
+    if (requested == Nk3Backend::Vulkan) {
+        throw std::runtime_error("the ncnn Vulkan backend is unavailable in this build");
+    }
+#endif
+
+#if defined(TENRIFF_ENABLE_NK3_OPENVINO)
+    if (requested == Nk3Backend::Auto || requested == Nk3Backend::OpenVino) {
+        try {
+            SelectedEvaluator selected;
+            selected.backend = Nk3Backend::OpenVino;
+            selected.p64 = &shared_openvino_evaluator(p64_model_path(), selected_device());
+            if (use_pattern_mlp) {
+                selected.pattern = &shared_openvino_pattern_evaluator(
+                    pattern_model_path(target_keys), target_keys);
+            }
+            return selected;
+        } catch (const std::exception& error) {
+            record_failure("OpenVINO", error);
+            if (requested == Nk3Backend::OpenVino) {
+                throw;
+            }
+        }
+    }
+#else
+    if (requested == Nk3Backend::OpenVino) {
+        throw std::runtime_error("the OpenVINO backend is unavailable in this build");
+    }
+#endif
+
+    throw std::runtime_error("NK3 backend auto-selection failed (" + failures + ")");
+}
 
 std::size_t candidate_offset(int slice, int lane, int type) {
     return (static_cast<std::size_t>(slice) * kTargetLanes + lane) * kCandidateTypes + type;
@@ -1367,21 +1853,12 @@ convert_key_mode_chart_nk3_onnx(const GameplayChart& chart,
     }
 
     try {
-        const auto path = p64_model_path();
-        if (!std::filesystem::is_regular_file(path)) {
-            throw std::runtime_error("model not found: " + path.u8string());
-        }
-        OpenVinoEvaluator& evaluator = shared_evaluator(path, selected_device());
-        PatternMlpEvaluator* pattern_mlp = nullptr;
-        if (nk3_pattern_mlp_route_enabled(source_keys, options.target_lane_count)) {
-            const auto pattern_path = pattern_model_path(options.target_lane_count);
-            if (!std::filesystem::is_regular_file(pattern_path)) {
-                throw std::runtime_error("generalized pattern MLP model not found: " +
-                                         pattern_path.u8string());
-            }
-            pattern_mlp = &shared_pattern_evaluator(pattern_path,
-                                                    options.target_lane_count);
-        }
+        const bool use_pattern_mlp =
+            nk3_pattern_mlp_route_enabled(source_keys, options.target_lane_count);
+        SelectedEvaluator selected =
+            select_evaluators(use_pattern_mlp, options.target_lane_count);
+        P64Evaluator& evaluator = *selected.p64;
+        PatternMlpEvaluator* pattern_mlp = selected.pattern;
         ModelState model_state;
         std::optional<BeamState> solver_state;
         std::vector<PlacedNote> placed;
@@ -1545,11 +2022,10 @@ convert_key_mode_chart_nk3_onnx(const GameplayChart& chart,
         result.chart = std::move(rebuilt);
         result.converted = true;
         result.warnings.push_back("NK3 P64 hybrid ONNX + host beam32 " +
-                                  evaluator.evidence() + " (strict, no device fallback).");
+                                  evaluator.evidence() + ".");
         if (pattern_mlp) {
             result.warnings.push_back(
-                "NK3 target routing: " + pattern_mlp->evidence() +
-                " (NPU preferred, GPU then CPU fallback).");
+                "NK3 target routing: " + pattern_mlp->evidence() + ".");
         } else {
             result.warnings.push_back(
                 "NK3 target routing: generalized pattern MLP off for " +
@@ -1573,7 +2049,7 @@ convert_key_mode_chart_nk3_onnx(const GameplayChart& chart,
             std::to_string(requested_additions) + ").");
         return result;
     } catch (const std::exception& error) {
-        result.warnings.push_back(std::string("NK3 ONNX strict conversion failed: ") +
+        result.warnings.push_back(std::string("NK3 ONNX conversion failed: ") +
                                   error.what() + ".");
         return result;
     }

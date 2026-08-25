@@ -1,9 +1,12 @@
         const ScreenContentBands bands =
             make_screen_content_bands(48.0f, 72.0f, false, 20.0f, 18.0f);
-        const float left = 80.0f;
-        const float top = bands.body_top;
-        const float right = kBaseWidth - 80.0f;
-        const float bottom = bands.body_bottom;
+        const D2D1_RECT_F content_rect = skin_layout_rect(
+            data, "generic.content",
+            D2D1::RectF(80.0f, bands.body_top, kBaseWidth - 80.0f, bands.body_bottom));
+        const float left = content_rect.left;
+        const float top = content_rect.top;
+        const float right = content_rect.right;
+        const float bottom = content_rect.bottom;
 
         if (d2d_->card_brush) {
             D2D1_ROUNDED_RECT card =
@@ -72,12 +75,19 @@
             float imported_note_height_ratio = 1.0f;
             const bool use_imported_metrics = normalize_gameplay_skin_source(preview.skin_source) != "native";
             if (use_imported_metrics) {
-                const auto skin = app::resolve_imported_gameplay_skin(
-                    preview.skin_source,
-                    preview.external_skin_root,
-                    preview.external_skin_name,
-                    lane_count,
-                    preview.lr2_resolution_override);
+                app::ImportedGameplaySkinDefinition skin;
+                if (normalize_gameplay_skin_source(preview.skin_source) == "tenriff") {
+                    if (preview.resolved_tenriff_skin) {
+                        skin = *preview.resolved_tenriff_skin;
+                    }
+                } else {
+                    skin = app::resolve_imported_gameplay_skin(
+                        preview.skin_source,
+                        preview.external_skin_root,
+                        preview.external_skin_name,
+                        lane_count,
+                        preview.lr2_resolution_override);
+                }
                 imported_note_width_ratio = skin.imported_note_width_ratio;
                 imported_note_height_ratio = skin.imported_note_height_ratio;
                 imported_lane_divider_width_count =
@@ -604,8 +614,12 @@
                 roomy_option_layout && d2d_->option_format ? d2d_->option_format.Get() : d2d_->body_format.Get();
 
             if (has_skin_preview) {
+                const D2D1_RECT_F configured_preview = skin_layout_rect(
+                    data, "generic.preview",
+                    D2D1::RectF(base_row_right + preview_gap, top + 24.0f,
+                                right - 24.0f, bottom - 24.0f));
                 const D2D1_RECT_F preview_rect = fit_rect_below_performance_overlay(
-                    D2D1::RectF(base_row_right + preview_gap, top + 24.0f, right - 24.0f, bottom - 24.0f),
+                    configured_preview,
                     bottom - 24.0f,
                     22.0f);
                 if (preview_rect.bottom - preview_rect.top > 180.0f) {

@@ -140,7 +140,21 @@ D2D1_RECT_F skin_layout_rect(const MenuRenderData& data,
     if (!data.lobby_skin.enabled || data.lobby_skin.layout_rects.empty()) {
         return fallback;
     }
-    const auto it = data.lobby_skin.layout_rects.find(std::string(slot));
+    auto it = data.lobby_skin.layout_rects.end();
+    if (slot.rfind("generic.", 0u) == 0u) {
+        const std::string suffix(slot.substr(std::string_view("generic.").size()));
+        if (!data.lobby_skin.screen_id.empty()) {
+            it = data.lobby_skin.layout_rects.find(data.lobby_skin.screen_id + "." + suffix);
+        }
+        if (it == data.lobby_skin.layout_rects.end() &&
+            !data.lobby_skin.screen_fallback_id.empty()) {
+            it = data.lobby_skin.layout_rects.find(
+                data.lobby_skin.screen_fallback_id + "." + suffix);
+        }
+    }
+    if (it == data.lobby_skin.layout_rects.end()) {
+        it = data.lobby_skin.layout_rects.find(std::string(slot));
+    }
     if (it == data.lobby_skin.layout_rects.end()) {
         return fallback;
     }
@@ -2597,6 +2611,7 @@ bool MenuWindow::ensure_gameplay_note_sprites(const GameplayHudData& data) {
         gameplay_note_sprite_cache_.skin_source == source &&
         gameplay_note_sprite_cache_.external_skin_root == data.external_skin_root &&
         gameplay_note_sprite_cache_.external_skin_name == data.external_skin_name &&
+        gameplay_note_sprite_cache_.skin_revision == data.skin_revision &&
         gameplay_note_sprite_cache_.lr2_resolution_override == data.lr2_resolution_override &&
         gameplay_note_sprite_cache_.lane_colors == data.lane_colors;
     if (cache_matches) {
@@ -2611,6 +2626,7 @@ bool MenuWindow::ensure_gameplay_note_sprites(const GameplayHudData& data) {
     gameplay_note_sprite_cache_.skin_source = source;
     gameplay_note_sprite_cache_.external_skin_root = data.external_skin_root;
     gameplay_note_sprite_cache_.external_skin_name = data.external_skin_name;
+    gameplay_note_sprite_cache_.skin_revision = data.skin_revision;
     gameplay_note_sprite_cache_.lr2_resolution_override = data.lr2_resolution_override;
     gameplay_note_sprite_cache_.lane_colors = data.lane_colors;
     gameplay_note_sprite_cache_.has_imported_note_aspect = false;
@@ -2670,12 +2686,18 @@ bool MenuWindow::ensure_gameplay_note_sprites(const GameplayHudData& data) {
         return true;
     }
 
-    const app::ImportedGameplaySkinDefinition imported =
-        app::resolve_imported_gameplay_skin(source,
-                                           data.external_skin_root,
-                                           data.external_skin_name,
-                                           lane_count,
-                                           data.lr2_resolution_override);
+    app::ImportedGameplaySkinDefinition imported;
+    if (source == "tenriff") {
+        if (data.resolved_tenriff_skin) {
+            imported = *data.resolved_tenriff_skin;
+        }
+    } else {
+        imported = app::resolve_imported_gameplay_skin(source,
+                                                       data.external_skin_root,
+                                                       data.external_skin_name,
+                                                       lane_count,
+                                                       data.lr2_resolution_override);
+    }
     if (!imported.found) {
         return true;
     }
@@ -3667,7 +3689,6 @@ bool MenuWindow::ensure_gameplay_static_cache(const GameplayHudData& data) {
                                                 field_layout.bottom - 1.5f);
                 const D2D1_COLOR_F saved_color = d2d_->accent_brush->GetColor();
                 const float saved_opacity = d2d_->accent_brush->GetOpacity();
-                d2d_->accent_brush->SetColor(D2D1::ColorF(0x6EE7F2));
                 d2d_->accent_brush->SetOpacity(static_cast<float>(0.92 * desired.visual_opacity));
                 d2d_->d2d_context->DrawLine(D2D1::Point2F(field_layout.left + 7.0f, core_y),
                                             D2D1::Point2F(field_layout.right - 7.0f, core_y),

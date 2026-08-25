@@ -1,5 +1,5 @@
 {
-  "$schema": "../../../docs/tenriff-skin.schema.json",
+  "$schema": "https://raw.githubusercontent.com/10kseason/TenRiff/main/docs/tenriff-skin.schema.json",
   "format": "tenriff-skin",
   "version": 1,
   "name": "TenRiff Example",
@@ -7,7 +7,31 @@
   "lobby": {
     "background": "",
     "logo": "",
-    "background_opacity": 0.72
+    "background_opacity": 0.72,
+    "screen_backgrounds": {
+      "title": "",
+      "settings_skins": ""
+    },
+    "screen_opacities": {
+      "title": 0.86,
+      "settings_skins": 0.72
+    }
+  },
+  "theme": {
+    "accent": "#6EE7F2",
+    "text": "#F4F7FF",
+    "muted": "#9AA3AD",
+    "scene_primary": "#61D6FA",
+    "scene_secondary": "#8F9EFA",
+    "scene_background": "#04081A"
+  },
+  "layout": {
+    "generic": {
+      "content": [80, 140, 1840, 1008]
+    },
+    "settings_skins": {
+      "preview": [1120, 180, 1780, 940]
+    }
   },
   "gameplay": {
     "background": "",
@@ -22,6 +46,14 @@
     "note_width_ratio": 1.0,
     "note_height_ratio": 1.0,
     "judgement_line_position": 0.82,
-    "full_lane_receptors": false
+    "full_lane_receptors": false,
+    "show_lane_dividers": true,
+    "judgement_line_glow": true,
+    "hit_burst_style": "prism",
+    "modes": {
+      "4k": {
+        "lane_colors": ["#F4F7FF", "#5C84FF", "#5C84FF", "#F4F7FF"]
+      }
+    }
   }
 }

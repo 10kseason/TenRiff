@@ -1,5 +1,5 @@
 {
-  "$schema": "../../../docs/tenriff-skin.schema.json",
+  "$schema": "https://raw.githubusercontent.com/10kseason/TenRiff/main/docs/tenriff-skin.schema.json",
   "format": "tenriff-skin",
   "version": 1,
   "name": "LUNAR FRACTURE // Void Garden 7K",
@@ -13,80 +13,22 @@
     "background": "gameplay/background.jpg",
     "background_opacity": 0.62,
     "gear": "gameplay/gear.png",
-    "note": [
-      "gameplay/note-white-l.png",
-      "gameplay/note-violet-l.png",
-      "gameplay/note-cyan-l.png",
-      "gameplay/note-center.png",
-      "gameplay/note-cyan-r.png",
-      "gameplay/note-violet-r.png",
-      "gameplay/note-white-r.png"
-    ],
-    "hold_head": [
-      "gameplay/hold-head-white-l.png",
-      "gameplay/hold-head-violet-l.png",
-      "gameplay/hold-head-cyan-l.png",
-      "gameplay/hold-head-center.png",
-      "gameplay/hold-head-cyan-r.png",
-      "gameplay/hold-head-violet-r.png",
-      "gameplay/hold-head-white-r.png"
-    ],
-    "hold_body": [
-      "gameplay/hold-body-white-l.png",
-      "gameplay/hold-body-violet-l.png",
-      "gameplay/hold-body-cyan-l.png",
-      "gameplay/hold-body-center.png",
-      "gameplay/hold-body-cyan-r.png",
-      "gameplay/hold-body-violet-r.png",
-      "gameplay/hold-body-white-r.png"
-    ],
-    "hold_tail": [
-      "gameplay/hold-tail-white-l.png",
-      "gameplay/hold-tail-violet-l.png",
-      "gameplay/hold-tail-cyan-l.png",
-      "gameplay/hold-tail-center.png",
-      "gameplay/hold-tail-cyan-r.png",
-      "gameplay/hold-tail-violet-r.png",
-      "gameplay/hold-tail-white-r.png"
-    ],
-    "key_idle": [
-      "gameplay/key-idle-white-l.png",
-      "gameplay/key-idle-violet-l.png",
-      "gameplay/key-idle-cyan-l.png",
-      "gameplay/key-idle-center.png",
-      "gameplay/key-idle-cyan-r.png",
-      "gameplay/key-idle-violet-r.png",
-      "gameplay/key-idle-white-r.png"
-    ],
-    "key_pressed": [
-      "gameplay/key-pressed-white-l.png",
-      "gameplay/key-pressed-violet-l.png",
-      "gameplay/key-pressed-cyan-l.png",
-      "gameplay/key-pressed-center.png",
-      "gameplay/key-pressed-cyan-r.png",
-      "gameplay/key-pressed-violet-r.png",
-      "gameplay/key-pressed-white-r.png"
-    ],
     "note_width_ratio": 0.94,
     "note_height_ratio": 0.86,
     "judgement_line_position": 0.84,
     "full_lane_receptors": true,
-    "column_widths": [
-      1.0,
-      1.0,
-      1.0,
-      1.12,
-      1.0,
-      1.0,
-      1.0
-    ],
-    "column_spacings": [
-      0.035,
-      0.035,
-      0.05,
-      0.05,
-      0.035,
-      0.035
-    ]
+    "modes": {
+      "7k": {
+        "lane_map": ["white-l", "violet-l", "cyan-l", "center", "cyan-r", "violet-r", "white-r"],
+        "note": "gameplay/note-{lane}.png",
+        "hold_head": "gameplay/hold-head-{lane}.png",
+        "hold_body": "gameplay/hold-body-{lane}.png",
+        "hold_tail": "gameplay/hold-tail-{lane}.png",
+        "key_idle": "gameplay/key-idle-{lane}.png",
+        "key_pressed": "gameplay/key-pressed-{lane}.png",
+        "column_widths": [1.0, 1.0, 1.0, 1.12, 1.0, 1.0, 1.0],
+        "column_spacings": [0.035, 0.035, 0.05, 0.05, 0.035, 0.035]
+      }
+    }
   }
 }

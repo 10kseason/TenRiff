@@ -2,6 +2,31 @@
 
 TenRiff의 사용자/배포 관점에서 의미 있는 변경만 간단히 기록합니다.
 
+## Unreleased
+
+## [1.4.5.3] - 2026-08-25
+
+### Added
+
+- Skin Settings에 `Create New Skin`, `Open Skin Folder`, `Reload Skin`을 추가하고 표준 파일명 자동 감지, `F5` 핫 리로드, 레인 파일 패턴과 `1k..16k` 모드별 덮어쓰기를 지원합니다.
+- TenRiff 스킨이 20개 화면의 개별 배경/투명도, 메뉴 팔레트와 셰이더 장면 색, Title/Song Select/Result 및 화면별 목록 레이아웃, 게임플레이 시각 옵션을 지정할 수 있습니다.
+- 공식 `10kseason/TenRiff` 경로의 JSON Schema, 확장 예제, 알 수 없는 키/타입/범위 경고를 제공합니다.
+- AI 에이전트용 `examples/skins/AGENTS.md`, 제작 가이드, 1K~16K 범용 `Agent Prism Universal` 완성 예제를 제공합니다.
+- NK3 P64와 2K~18K 일반화 MLP를 ncnn FP32 모델로 변환해 Vulkan을 지원하는 AMD/NVIDIA GPU에서 실행합니다.
+
+### Changed
+
+- TenRiff 매니페스트는 선택/새로고침 시 키 모드별 불변 스냅샷으로 해석하며 렌더 경로에서 JSON이나 폴더를 다시 읽지 않습니다. 가져오기는 모든 모드가 참조한 자산을 함께 복사합니다.
+- Skin Settings 행을 안정적인 ID 순서로 구성해 선택적 LR2 해상도 행이 나타나도 키보드와 마우스 대상이 어긋나지 않게 했습니다.
+- Skin Settings의 긴 기술 설명을 제작·가져오기·폴더 열기·F5 리로드 중심의 짧은 안내로 줄여 설정 목록 공간을 넓혔습니다.
+- NK3 기본 `AUTO` 백엔드는 ncnn Vulkan을 우선 사용하고, `TENRIFF_NK3_BACKEND`와 `TENRIFF_NK3_VULKAN_DEVICE`로 런타임과 GPU 인덱스를 선택합니다. OpenVINO는 선택형 호환 폴백으로 유지합니다.
+- MSVC 빌드에서 C++ 예외 처리를 명시하고 ncnn 의존성을 내부 링크로 한정해 릴리즈 빌드 경고를 제거했습니다.
+- 게임플레이 판정 결정성 벤치마크를 CTest에 포함하고, 릴리즈 패키징은 등록된 테스트가 모두 통과한 뒤에만 진행합니다.
+
+### Release
+
+- 정식 자산은 `TenRiff-1.4.5.3.zip`, `TenRiff-1.4.5.3-source.zip`, `TenRiff-1.4.5.3-SHA256SUMS.txt`입니다. 기존 `1.4.5.2` 태그와 자산은 변경하지 않습니다.
+
 ## [1.4.5.2] - 2026-08-23
 
 ### Fixed

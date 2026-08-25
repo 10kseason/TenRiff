@@ -14,6 +14,21 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
     target.loading_percent = gameplay_hud_.loading_percent;
     target.loading_stage = gameplay_hud_.loading_stage;
     target.lane_count = clamp_int(gameplay_hud_.lane_count, 1, static_cast<int>(kGameplayHudMaxLanes));
+    const bool tenriff_manifest_active =
+        config::normalize_skin_source_token(config_.skin.source) == "tenriff" &&
+        !available_tenriff_skin_root_.empty() && !config_.skin.tenriff_skin_name.empty();
+    const TenRiffSkinDefinition* gameplay_manifest =
+        tenriff_manifest_active ? active_tenriff_skin_for_keys(target.lane_count) : nullptr;
+    const TenRiffSkinGameplayStyle* manifest_style =
+        gameplay_manifest
+            ? &gameplay_manifest->gameplay_style
+            : nullptr;
+    auto style_bool = [&](const std::optional<bool>& value, bool fallback) {
+        return manifest_style && value.has_value() ? *value : fallback;
+    };
+    auto style_number = [&](const std::optional<float>& value, double fallback) {
+        return manifest_style && value.has_value() ? static_cast<double>(*value) : fallback;
+    };
     target.current_sample = gameplay_hud_.current_sample;
     target.duration_samples = gameplay_hud_.duration_samples;
     target.sample_rate = gameplay_hud_.sample_rate;
@@ -91,53 +106,87 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
         config::kHoldBodyWidthScaleMin,
         config::kHoldBodyWidthScaleMax);
     target.show_cursor_in_gameplay = config_.ui.show_cursor_in_gameplay;
-    target.show_lane_dividers = config_.skin.show_lane_dividers;
+    target.show_lane_dividers = style_bool(
+        manifest_style ? manifest_style->show_lane_dividers : std::optional<bool>{},
+        config_.skin.show_lane_dividers);
     target.note_divider_gap_px = std::clamp(
         config_.skin.note_divider_gap_px,
         config::kNoteDividerGapPxMin,
         config::kNoteDividerGapPxMax);
-    target.show_judgement_line = config_.skin.show_judgement_line;
-    target.show_gear_boundary_line = config_.skin.show_gear_boundary_line;
-    target.show_timing_feedback = config_.skin.show_timing_feedback;
-    target.show_hold_tail = config_.skin.show_hold_tail;
-    target.hold_tail_taper_enabled = config_.skin.hold_tail_taper_enabled;
-    target.judgement_line_glow_enabled = config_.skin.judgement_line_glow_enabled;
-    target.key_pulse_enabled = config_.skin.key_pulse_enabled;
-    target.key_pulse_brightness = static_cast<float>(config_.skin.key_pulse_brightness);
-    target.hit_burst_style =
-        config::normalize_skin_hit_burst_style_token(config_.skin.hit_burst_style);
-    target.key_label_position = config::normalize_skin_key_label_position_token(config_.skin.key_label_position);
-    target.note_border_enabled = config_.skin.note_border_enabled;
-    target.note_shape = config::normalize_skin_note_shape_token(config_.skin.note_shape);
+    target.show_judgement_line = style_bool(
+        manifest_style ? manifest_style->show_judgement_line : std::optional<bool>{},
+        config_.skin.show_judgement_line);
+    target.show_gear_boundary_line = style_bool(
+        manifest_style ? manifest_style->show_gear_boundary_line : std::optional<bool>{},
+        config_.skin.show_gear_boundary_line);
+    target.show_timing_feedback = style_bool(
+        manifest_style ? manifest_style->show_timing_feedback : std::optional<bool>{},
+        config_.skin.show_timing_feedback);
+    target.show_hold_tail = style_bool(
+        manifest_style ? manifest_style->show_hold_tail : std::optional<bool>{},
+        config_.skin.show_hold_tail);
+    target.hold_tail_taper_enabled = style_bool(
+        manifest_style ? manifest_style->hold_tail_taper_enabled : std::optional<bool>{},
+        config_.skin.hold_tail_taper_enabled);
+    target.judgement_line_glow_enabled = style_bool(
+        manifest_style ? manifest_style->judgement_line_glow_enabled : std::optional<bool>{},
+        config_.skin.judgement_line_glow_enabled);
+    target.key_pulse_enabled = style_bool(
+        manifest_style ? manifest_style->key_pulse_enabled : std::optional<bool>{},
+        config_.skin.key_pulse_enabled);
+    target.key_pulse_brightness = static_cast<float>(style_number(
+        manifest_style ? manifest_style->key_pulse_brightness : std::optional<float>{},
+        config_.skin.key_pulse_brightness));
+    target.hit_burst_style = manifest_style && manifest_style->hit_burst_style.has_value()
+                                 ? *manifest_style->hit_burst_style
+                                 : config::normalize_skin_hit_burst_style_token(config_.skin.hit_burst_style);
+    target.key_label_position = manifest_style && manifest_style->key_label_position.has_value()
+                                    ? *manifest_style->key_label_position
+                                    : config::normalize_skin_key_label_position_token(config_.skin.key_label_position);
+    target.note_border_enabled = style_bool(
+        manifest_style ? manifest_style->note_border_enabled : std::optional<bool>{},
+        config_.skin.note_border_enabled);
+    target.note_shape = manifest_style && manifest_style->note_shape.has_value()
+                            ? *manifest_style->note_shape
+                            : config::normalize_skin_note_shape_token(config_.skin.note_shape);
     target.note_image_aspect = render_note_image_aspect(config_.skin.note_image_aspect);
     target.skin_source = config::normalize_skin_source_token(config_.skin.source);
     target.external_skin_root = active_external_skin_root();
     target.external_skin_name = active_external_skin_name();
+    target.skin_revision = tenriff_skin_revision_;
+    target.resolved_tenriff_skin =
+        tenriff_manifest_active ? active_tenriff_gameplay_for_keys(target.lane_count) : nullptr;
     target.skin_background_path =
-        (target.skin_source == "tenriff" && active_tenriff_skin_.found)
-            ? active_tenriff_skin_.gameplay_background_path
+        (target.skin_source == "tenriff" && gameplay_manifest)
+            ? gameplay_manifest->gameplay_background_path
             : std::string{};
     target.skin_background_opacity =
-        (target.skin_source == "tenriff" && active_tenriff_skin_.found)
-            ? active_tenriff_skin_.gameplay_background_opacity
+        (target.skin_source == "tenriff" && gameplay_manifest)
+            ? gameplay_manifest->gameplay_background_opacity
             : 0.66f;
     target.lr2_resolution_override =
         config::normalize_skin_lr2_resolution_mode_token(config_.skin.lr2_resolution_mode);
     target.lane_background_opacity = std::clamp(
-        config_.skin.lane_background_opacity,
+        style_number(manifest_style ? manifest_style->lane_background_opacity : std::optional<float>{},
+                     config_.skin.lane_background_opacity),
         config::kSkinLaneBackgroundOpacityMin,
         config::kSkinLaneBackgroundOpacityMax);
-    target.black_playfield_enabled = config_.skin.black_playfield_enabled;
+    target.black_playfield_enabled = style_bool(
+        manifest_style ? manifest_style->black_playfield_enabled : std::optional<bool>{},
+        config_.skin.black_playfield_enabled);
     target.visual_opacity = std::clamp(
-        config_.skin.visual_opacity,
+        style_number(manifest_style ? manifest_style->visual_opacity : std::optional<float>{},
+                     config_.skin.visual_opacity),
         config::kSkinVisualOpacityMin,
         config::kSkinVisualOpacityMax);
     target.note_outline_opacity = std::clamp(
-        config_.skin.note_outline_opacity,
+        style_number(manifest_style ? manifest_style->note_outline_opacity : std::optional<float>{},
+                     config_.skin.note_outline_opacity),
         config::kSkinNoteOutlineOpacityMin,
         config::kSkinNoteOutlineOpacityMax);
     target.hold_body_opacity = std::clamp(
-        config_.skin.hold_body_opacity,
+        style_number(manifest_style ? manifest_style->hold_body_opacity : std::optional<float>{},
+                     config_.skin.hold_body_opacity),
         config::kSkinHoldBodyOpacityMin,
         config::kSkinHoldBodyOpacityMax);
     target.visual_offset_ms = std::clamp(
@@ -244,7 +293,10 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
         gameplay_hud_.scratch_lane_count);
     target.lane_color_count = std::min<std::size_t>(lane_colors.size(), static_cast<std::size_t>(target.lane_count));
     for (std::size_t i = 0; i < target.lane_color_count; ++i) {
-        target.lane_colors[i] = config::skin_color_rgb(lane_colors[i]);
+        target.lane_colors[i] = manifest_style && !manifest_style->lane_colors.empty()
+                                    ? manifest_style->lane_colors[
+                                          std::min(i, manifest_style->lane_colors.size() - 1u)]
+                                    : config::skin_color_rgb(lane_colors[i]);
     }
 
     auto compact_key_label = [](std::string value) -> std::string {
@@ -1472,9 +1524,67 @@ void MenuApp::publish_snapshot() {
     if (config::normalize_skin_source_token(config_.skin.source) == "tenriff" &&
         active_tenriff_skin_.found) {
         render.lobby_skin.enabled = true;
-        render.lobby_skin.background_path = active_tenriff_skin_.lobby_background_path;
+        render.lobby_skin.revision = tenriff_skin_revision_;
+        std::string screen_background_key;
+        std::string screen_background_fallback;
+        switch (screen_) {
+            case Screen::QuickSetup: screen_background_key = "quick_setup"; break;
+            case Screen::Title: screen_background_key = "title"; break;
+            case Screen::OptionsHub: screen_background_key = "options"; break;
+            case Screen::Multiplayer:
+                screen_background_key = "multiplayer";
+                screen_background_fallback = "song_select";
+                break;
+            case Screen::SongSelect: screen_background_key = "song_select"; break;
+            case Screen::SessionMix: screen_background_key = "session_mix"; break;
+            case Screen::SongBrowser:
+                screen_background_key = "song_browser";
+                screen_background_fallback = "song_select";
+                break;
+            case Screen::SettingsAudio: screen_background_key = "settings_audio"; break;
+            case Screen::SettingsGraphics: screen_background_key = "settings_graphics"; break;
+            case Screen::SettingsSkins: screen_background_key = "settings_skins"; break;
+            case Screen::SettingsInput: screen_background_key = "settings_input"; break;
+            case Screen::SettingsCalibration: screen_background_key = "settings_calibration"; break;
+            case Screen::ModeSelect: screen_background_key = "mode_select"; break;
+            case Screen::ModeMods: screen_background_key = "mode_mods"; break;
+            case Screen::Keymap: screen_background_key = "keymap"; break;
+            case Screen::KeymapConfirm: screen_background_key = "keymap_confirm"; break;
+            case Screen::OnnxUpscalerConfirm: screen_background_key = "onnx_upscaler_confirm"; break;
+            case Screen::KeymapTest: screen_background_key = "keymap_test"; break;
+            case Screen::Result: screen_background_key = "result"; break;
+            case Screen::Gameplay: break;
+        }
+        if (screen_background_key.rfind("settings_", 0u) == 0u) {
+            screen_background_fallback = "settings";
+        }
+        render.lobby_skin.screen_id = screen_background_key;
+        render.lobby_skin.screen_fallback_id = screen_background_fallback;
+        auto background_it = active_tenriff_skin_.screen_background_paths.find(
+            screen_background_key);
+        if (background_it == active_tenriff_skin_.screen_background_paths.end() &&
+            !screen_background_fallback.empty()) {
+            background_it = active_tenriff_skin_.screen_background_paths.find(
+                screen_background_fallback);
+        }
+        render.lobby_skin.background_path =
+            background_it != active_tenriff_skin_.screen_background_paths.end()
+                ? background_it->second
+                : active_tenriff_skin_.lobby_background_path;
         render.lobby_skin.logo_path = active_tenriff_skin_.lobby_logo_path;
-        render.lobby_skin.background_opacity = active_tenriff_skin_.lobby_background_opacity;
+        auto opacity_it = active_tenriff_skin_.screen_background_opacities.find(
+            screen_background_key);
+        if (opacity_it == active_tenriff_skin_.screen_background_opacities.end() &&
+            !screen_background_fallback.empty()) {
+            opacity_it = active_tenriff_skin_.screen_background_opacities.find(
+                screen_background_fallback);
+        }
+        render.lobby_skin.background_opacity =
+            opacity_it != active_tenriff_skin_.screen_background_opacities.end()
+                ? opacity_it->second
+                : active_tenriff_skin_.lobby_background_opacity;
+        render.lobby_skin.theme_colors = active_tenriff_skin_.theme_colors;
+        render.lobby_skin.referenced_asset_paths = active_tenriff_skin_.referenced_asset_paths;
         render.lobby_skin.layout_rects.reserve(active_tenriff_skin_.layout_rects.size());
         for (const auto& [key, rect] : active_tenriff_skin_.layout_rects) {
             render.lobby_skin.layout_rects.insert_or_assign(

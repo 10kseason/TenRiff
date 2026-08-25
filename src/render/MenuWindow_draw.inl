@@ -34,7 +34,54 @@ void MenuWindow::draw(const MenuRenderData& data) {
 
     auto* ctx = d2d_->d2d_context.Get();
     const int64_t render_now_ns = timing::HighResClock::now_ns();
-    const bool has_menu_scene = render_menu_scene(data.kind, render_now_ns);
+    if (data.lobby_skin.revision != applied_skin_revision_) {
+        std::unordered_set<std::string> next_paths;
+        auto remember_path = [&](const std::string& path) {
+            if (!path.empty()) next_paths.insert(path);
+        };
+        remember_path(data.lobby_skin.background_path);
+        remember_path(data.lobby_skin.logo_path);
+        remember_path(data.gameplay.skin_background_path);
+        for (const auto& path : data.lobby_skin.referenced_asset_paths) {
+            remember_path(path);
+        }
+        auto erase_cached_path = [&](const std::string& path) {
+            if (path.empty()) return;
+            d2d_->song_card_preview_bitmaps.erase(path);
+            auto& lru = d2d_->song_card_preview_lru;
+            lru.erase(std::remove(lru.begin(), lru.end(), path), lru.end());
+        };
+        for (const auto& path : applied_skin_asset_paths_) erase_cached_path(path);
+        for (const auto& path : next_paths) erase_cached_path(path);
+        applied_skin_asset_paths_ = std::move(next_paths);
+        applied_skin_revision_ = data.lobby_skin.revision;
+        invalidate_gameplay_note_sprite_cache();
+    }
+
+    auto set_theme_color = [&](ID2D1SolidColorBrush* brush,
+                               std::string_view key,
+                               const D2D1_COLOR_F& fallback) {
+        if (!brush) return;
+        const auto it = data.lobby_skin.theme_colors.find(std::string(key));
+        if (data.lobby_skin.enabled && it != data.lobby_skin.theme_colors.end()) {
+            const auto& rgba = it->second;
+            brush->SetColor(D2D1::ColorF(rgba[0], rgba[1], rgba[2], rgba[3]));
+        } else {
+            brush->SetColor(fallback);
+        }
+    };
+    set_theme_color(d2d_->text_brush.Get(), "text", D2D1::ColorF(0xE8ECF1));
+    set_theme_color(d2d_->accent_brush.Get(), "accent", D2D1::ColorF(0x6EE7F2));
+    set_theme_color(d2d_->judgement_line_brush.Get(), "judgement_line", D2D1::ColorF(0xFF4D6D, 0.38f));
+    set_theme_color(d2d_->muted_brush.Get(), "muted", D2D1::ColorF(0x9AA3AD));
+    set_theme_color(d2d_->card_brush.Get(), "card", D2D1::ColorF(0x1F2130));
+    set_theme_color(d2d_->panel_brush.Get(), "panel", D2D1::ColorF(0x14141C, 0.72f));
+    set_theme_color(d2d_->footer_brush.Get(), "footer", D2D1::ColorF(0x0B0B10, 0.75f));
+    set_theme_color(d2d_->button_brush.Get(), "button", D2D1::ColorF(0x242638));
+    set_theme_color(d2d_->button_selected_brush.Get(), "button_selected", D2D1::ColorF(0x6EE7F2, 0.22f));
+    set_theme_color(d2d_->button_border_brush.Get(), "border", D2D1::ColorF(0x31344A));
+    set_theme_color(d2d_->lane_divider_brush.Get(), "lane_divider", D2D1::ColorF(0xF6F8FF, 0.85f));
+    const bool has_menu_scene = render_menu_scene(data.kind, render_now_ns, data.lobby_skin);
     if (data.kind == MenuScreenKind::GameplayHud) {
         if (!ensure_gameplay_note_sprites(data.gameplay)) {
             invalidate_gameplay_note_sprite_cache();
@@ -61,6 +108,9 @@ void MenuWindow::draw(const MenuRenderData& data) {
             data.generic.skin_preview.external_skin_root;
         preview_sprite_data.external_skin_name =
             data.generic.skin_preview.external_skin_name;
+        preview_sprite_data.skin_revision = data.generic.skin_preview.skin_revision;
+        preview_sprite_data.resolved_tenriff_skin =
+            data.generic.skin_preview.resolved_tenriff_skin;
         preview_sprite_data.lr2_resolution_override =
             data.generic.skin_preview.lr2_resolution_override;
         preview_sprite_data.lane_colors = data.generic.skin_preview.lane_colors;

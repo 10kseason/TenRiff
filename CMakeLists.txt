@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(TenRiff VERSION 1.4.5.2 LANGUAGES C CXX)
+project(TenRiff VERSION 1.4.5.3 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -7,18 +7,21 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 # MSVC UTF-8 support
 if(MSVC)
-    add_compile_options("/utf-8")
+    add_compile_options("/utf-8" "/EHsc")
 endif()
 
 option(TENRIFF_ENABLE_TESTS "Build TenRiff unit tests" ON)
 option(TENRIFF_ENABLE_ONNX_UPSCALER "Enable the optional user-selected WinML ONNX background upscaler" ON)
-option(TENRIFF_ENABLE_NK3_ONNX "Enable OpenVINO NK3 P64 with a non-10K to 10K MLP prior" ON)
+option(TENRIFF_ENABLE_NK3_ONNX "Enable NK3 P64 with a non-10K to 10K MLP prior" ON)
+option(TENRIFF_ENABLE_NK3_NCNN "Enable the ncnn Vulkan backend for NK3 ONNX" ON)
 option(TENRIFF_BUILD_STANDALONE_BMS_KEY_CONVERTER "Build the standalone BMS key-converter CLI/GUI (not shipped)" OFF)
 option(TENRIFF_ENABLE_ASAN "Build TenRiff with AddressSanitizer" OFF)
 
 set(TENRIFF_NK3_MODEL "${CMAKE_CURRENT_SOURCE_DIR}/models/NK3-P64-hybrid.onnx")
 set(TENRIFF_NK3_PATTERN_MODELS)
 set(TENRIFF_NK3_PATTERN_MODELS_AVAILABLE ON)
+set(TENRIFF_NK3_NCNN_MODELS)
+set(TENRIFF_NK3_NCNN_MODELS_AVAILABLE ON)
 foreach(target_keys RANGE 2 18)
     set(pattern_model
         "${CMAKE_CURRENT_SOURCE_DIR}/models/NK3-general-pattern-${target_keys}K.onnx")
@@ -26,18 +29,52 @@ foreach(target_keys RANGE 2 18)
     if(NOT EXISTS "${pattern_model}")
         set(TENRIFF_NK3_PATTERN_MODELS_AVAILABLE OFF)
     endif()
+    foreach(extension param bin)
+        set(ncnn_pattern_model
+            "${CMAKE_CURRENT_SOURCE_DIR}/models/ncnn/NK3-general-pattern-${target_keys}K.ncnn.${extension}")
+        list(APPEND TENRIFF_NK3_NCNN_MODELS "${ncnn_pattern_model}")
+        if(NOT EXISTS "${ncnn_pattern_model}")
+            set(TENRIFF_NK3_NCNN_MODELS_AVAILABLE OFF)
+        endif()
+    endforeach()
 endforeach()
 set(TENRIFF_NK3_ONNX_AVAILABLE OFF)
+set(TENRIFF_NK3_OPENVINO_AVAILABLE OFF)
+set(TENRIFF_NK3_NCNN_AVAILABLE OFF)
 if(TENRIFF_ENABLE_NK3_ONNX)
     find_package(OpenVINO QUIET COMPONENTS Runtime)
     if(OpenVINO_FOUND AND EXISTS "${TENRIFF_NK3_MODEL}"
        AND TENRIFF_NK3_PATTERN_MODELS_AVAILABLE)
-        set(TENRIFF_NK3_ONNX_AVAILABLE ON)
+        set(TENRIFF_NK3_OPENVINO_AVAILABLE ON)
         message(STATUS "NK3 P64 + non-10K to 10K generalized MLP enabled via OpenVINO")
-    elseif(NOT OpenVINO_FOUND)
-        message(WARNING "OpenVINO was not found; NK3 ONNX conversion will report unavailable at runtime")
-    else()
+    elseif(OpenVINO_FOUND)
         message(WARNING "One or more NK3 P64/generalized MLP models are missing")
+    endif()
+
+    if(TENRIFF_ENABLE_NK3_NCNN)
+        if(WIN32 AND CMAKE_SIZEOF_VOID_P EQUAL 8 AND NOT DEFINED ncnn_DIR)
+            set(ncnn_DIR
+                "${CMAKE_CURRENT_SOURCE_DIR}/third_party/ncnn-20260526/x64/lib/cmake/ncnn")
+        endif()
+        find_package(ncnn QUIET CONFIG)
+        set(TENRIFF_NK3_NCNN_P64_PARAM
+            "${CMAKE_CURRENT_SOURCE_DIR}/models/ncnn/NK3-P64-hybrid.ncnn.param")
+        set(TENRIFF_NK3_NCNN_P64_BIN
+            "${CMAKE_CURRENT_SOURCE_DIR}/models/ncnn/NK3-P64-hybrid.ncnn.bin")
+        if(ncnn_FOUND AND EXISTS "${TENRIFF_NK3_NCNN_P64_PARAM}"
+           AND EXISTS "${TENRIFF_NK3_NCNN_P64_BIN}"
+           AND TENRIFF_NK3_NCNN_MODELS_AVAILABLE)
+            set(TENRIFF_NK3_NCNN_AVAILABLE ON)
+            message(STATUS "NK3 P64 + generalized MLP enabled via ncnn Vulkan")
+        elseif(ncnn_FOUND)
+            message(WARNING "One or more converted NK3 ncnn models are missing")
+        endif()
+    endif()
+
+    if(TENRIFF_NK3_OPENVINO_AVAILABLE OR TENRIFF_NK3_NCNN_AVAILABLE)
+        set(TENRIFF_NK3_ONNX_AVAILABLE ON)
+    else()
+        message(WARNING "No NK3 inference backend was found; NK3 ONNX will report unavailable at runtime")
     endif()
 endif()
 
@@ -174,7 +211,14 @@ target_link_libraries(tenriff_core
 
 if(TENRIFF_NK3_ONNX_AVAILABLE)
     target_compile_definitions(tenriff_core PRIVATE TENRIFF_ENABLE_NK3_ONNX=1)
+endif()
+if(TENRIFF_NK3_OPENVINO_AVAILABLE)
+    target_compile_definitions(tenriff_core PRIVATE TENRIFF_ENABLE_NK3_OPENVINO=1)
     target_link_libraries(tenriff_core PUBLIC openvino::runtime)
+endif()
+if(TENRIFF_NK3_NCNN_AVAILABLE)
+    target_compile_definitions(tenriff_core PRIVATE TENRIFF_ENABLE_NK3_NCNN=1)
+    target_link_libraries(tenriff_core PRIVATE ncnn)
 endif()
 
 if(WIN32)
@@ -205,7 +249,14 @@ if(TENRIFF_BUILD_STANDALONE_BMS_KEY_CONVERTER)
 
     if(TENRIFF_NK3_ONNX_AVAILABLE)
         target_compile_definitions(tenriff_bms_key_converter_core PRIVATE TENRIFF_ENABLE_NK3_ONNX=1)
+    endif()
+    if(TENRIFF_NK3_OPENVINO_AVAILABLE)
+        target_compile_definitions(tenriff_bms_key_converter_core PRIVATE TENRIFF_ENABLE_NK3_OPENVINO=1)
         target_link_libraries(tenriff_bms_key_converter_core PUBLIC openvino::runtime)
+    endif()
+    if(TENRIFF_NK3_NCNN_AVAILABLE)
+        target_compile_definitions(tenriff_bms_key_converter_core PRIVATE TENRIFF_ENABLE_NK3_NCNN=1)
+        target_link_libraries(tenriff_bms_key_converter_core PRIVATE ncnn)
     endif()
 endif()
 
@@ -359,7 +410,7 @@ if(TENRIFF_BUILD_STANDALONE_BMS_KEY_CONVERTER)
     target_link_libraries(bms_key_converter PRIVATE tenriff_bms_key_converter_core)
 endif()
 
-if(TENRIFF_NK3_ONNX_AVAILABLE)
+if(TENRIFF_NK3_OPENVINO_AVAILABLE)
     set(TENRIFF_OPENVINO_RUNTIME_DLLS)
     if(WIN32)
         set(TENRIFF_OPENVINO_RUNTIME_DIR "${OpenVINO_DIR}/../libs")
@@ -394,8 +445,11 @@ if(TENRIFF_NK3_ONNX_AVAILABLE)
         endforeach()
     endif()
 
+endif()
+
+if(TENRIFF_NK3_ONNX_AVAILABLE)
     function(tenriff_copy_nk3_runtime target_name)
-        if(WIN32)
+        if(TENRIFF_NK3_OPENVINO_AVAILABLE)
             add_custom_command(TARGET ${target_name} POST_BUILD
                 COMMAND ${CMAKE_COMMAND} -E make_directory
                     "$<TARGET_FILE_DIR:${target_name}>/models"
@@ -405,23 +459,35 @@ if(TENRIFF_NK3_ONNX_AVAILABLE)
                 COMMAND ${CMAKE_COMMAND} -E copy_if_different
                     ${TENRIFF_NK3_PATTERN_MODELS}
                     "$<TARGET_FILE_DIR:${target_name}>/models"
+                COMMENT "Copying NK3 ONNX models for ${target_name}"
+                COMMAND_EXPAND_LISTS)
+        endif()
+        if(WIN32 AND TENRIFF_NK3_OPENVINO_AVAILABLE)
+            add_custom_command(TARGET ${target_name} POST_BUILD
                 COMMAND ${CMAKE_COMMAND} -E copy_if_different
                     ${TENRIFF_OPENVINO_RUNTIME_DLLS}
                     "$<TARGET_FILE_DIR:${target_name}>"
-                COMMENT "Copying NK3 P64/generalized MLP models and OpenVINO runtime for ${target_name}"
+                COMMENT "Copying the NK3 OpenVINO runtime for ${target_name}"
                 COMMAND_EXPAND_LISTS)
-        else()
+        endif()
+        if(TENRIFF_NK3_NCNN_AVAILABLE)
             add_custom_command(TARGET ${target_name} POST_BUILD
                 COMMAND ${CMAKE_COMMAND} -E make_directory
-                    "$<TARGET_FILE_DIR:${target_name}>/models"
+                    "$<TARGET_FILE_DIR:${target_name}>/models/ncnn"
                 COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                    "${TENRIFF_NK3_MODEL}"
-                    "$<TARGET_FILE_DIR:${target_name}>/models/NK3-P64-hybrid.onnx"
-                COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                    ${TENRIFF_NK3_PATTERN_MODELS}
-                    "$<TARGET_FILE_DIR:${target_name}>/models"
-                COMMENT "Copying NK3 P64/generalized MLP models for ${target_name}"
+                    "${TENRIFF_NK3_NCNN_P64_PARAM}"
+                    "${TENRIFF_NK3_NCNN_P64_BIN}"
+                    ${TENRIFF_NK3_NCNN_MODELS}
+                    "$<TARGET_FILE_DIR:${target_name}>/models/ncnn"
+                COMMENT "Copying NK3 ncnn Vulkan models for ${target_name}"
                 COMMAND_EXPAND_LISTS)
+            if(WIN32)
+                add_custom_command(TARGET ${target_name} POST_BUILD
+                    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                        "$<TARGET_FILE:ncnn>"
+                        "$<TARGET_FILE_DIR:${target_name}>"
+                    COMMENT "Copying the ncnn Vulkan runtime for ${target_name}")
+            endif()
         endif()
     endfunction()
 
@@ -541,6 +607,10 @@ if(TENRIFF_ENABLE_TESTS)
             ${CMAKE_CURRENT_SOURCE_DIR}/src
     )
     target_link_libraries(gameplay_judgement_benchmark PRIVATE tenriff_core)
+    add_test(
+        NAME gameplay_judgement_benchmark
+        COMMAND gameplay_judgement_benchmark)
+    set_tests_properties(gameplay_judgement_benchmark PROPERTIES TIMEOUT 120)
 
     add_executable(bms_parser_tests
         tests/unit/test_bms_parser.cpp

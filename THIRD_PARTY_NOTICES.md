@@ -16,17 +16,25 @@ Bundled components
    Copyright: krrcream and contributors
    License: Apache License 2.0
 
-3. OpenVINO 2026.2.1 runtime (Windows binary release only)
+3. OpenVINO 2026.2.1 optional compatibility runtime notices
    Upstream: <https://github.com/openvinotoolkit/openvino>
    Copyright: Intel Corporation and contributors
    License: Apache License 2.0 and bundled third-party terms
    Notices: `third_party/openvino-2026.2.1/`
 
-TenRiff source code links OpenVINO only when `TENRIFF_ENABLE_NK3_ONNX` is enabled.
-Windows 1.4.5.2 binary packages bundle the OpenVINO GPU/CPU runtime and, when
-available in the packaged runtime, the NPU plugin/compiler components required
-by the NK3 pattern MLP. They are shipped with the upstream license and
-runtime/oneDNN/oneTBB third-party-program notices.
+4. ncnn 20260526 shared runtime (Windows x64 binary release)
+   Upstream: <https://github.com/Tencent/ncnn>
+   Copyright: Tencent and ncnn contributors
+   License: BSD 3-Clause
+   License text: `third_party/ncnn-20260526/LICENSE.txt`
+
+TenRiff uses ncnn as the default NK3 inference runtime. Its built-in Vulkan
+loader runs the converted P64 and generalized pattern models on Vulkan-capable
+AMD or NVIDIA GPUs without a separate Vulkan SDK installation.
+
+OpenVINO remains an optional source-build compatibility backend when it is
+found at configure time. Official Windows 1.4.5.3 packages use ncnn Vulkan and
+ship `ncnn.dll` with the upstream license.
 
 TenRiff's key-mode converter contains an adapted C++ port of the N2NC keymode-conversion logic from
 krrcream's Toolkit. The implementation was integrated and modified for TenRiff's `GameplayChart`

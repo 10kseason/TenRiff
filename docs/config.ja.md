@@ -40,7 +40,7 @@ profile が存在しない場合は初回起動時に自動生成されます。
 
 - `backend` (string)
   - `polling | rawinput`
-  - 現行 `1.4.5.2` リリースラインの既定値は `rawinput`
+  - 現行 `1.4.5.3` リリースラインの既定値は `rawinput`
   - `Options -> Input Settings -> Backend` または `Options -> Profile Setup -> Input Backend` で profile ごとに選択可能
   - runtime fallback は保存済みの値を `polling` に書き換えない
   - RawInput の起動失敗、登録先の消失、message window の終了を確認すると、そのアプリ実行中は menu と後続 gameplay の両方で Polling を維持する
@@ -143,10 +143,10 @@ chart loader/indexer は BMS family（`.bms/.bme/.bml/.pms`）専用です。旧
 - `key_conversion_algorithm` (string)
   - `krrcream | nk2 | nk3`
   - ゲーム内の `Mode Settings > Key Converter` で `Krrcream`、`KeyWeaver nK2`、`KeyWeaver NK3 ONNX` を選択
-  - 既定値は `krrcream`。NK3 は同じ key count でも remaster を実行し、P64 path は既定で strict OpenVINO GPU を使用
+  - 既定値は `krrcream`。NK3 は同じ key count でも remaster を実行し、既定の `AUTO` backend は ncnn Vulkan を優先
   - Krrcream は元 note を target lane へ再配置するだけ
   - nK2 は key count 拡張時、元 pattern へ先に note を追加せず、変換中に target layout へ安全な support note を直接生成
-  - NK3 は P64 と host beam safety solver を常に使い、10K 以外の source を 10K に変換するときだけ generalized MLP を追加する。`TENRIFF_NK3_DEVICE=CPU` は strict P64 CPU を選択し、有効な MLP は検証済み NPU、GPU、CPU の順に試行
+  - NK3 は P64 と host beam safety solver を常に使い、10K 以外の source を 10K に変換するときだけ generalized MLP を追加する。`TENRIFF_NK3_BACKEND=AUTO|VULKAN|OPENVINO` で backend を選び、`AUTO` は ncnn Vulkan を先に試す。複数の Vulkan GPU は `TENRIFF_NK3_VULKAN_DEVICE=<index>` で選択
 - `key_conversion_nk2_preset` (string)
   - `native | transform | remaster`。既定値は `native`
   - nK2 の `Native (12%)` / `Transform (35%)` / `Remaster (65%)` を選択し、Krrcream では設定 row を lock
