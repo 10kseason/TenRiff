@@ -52,6 +52,8 @@ struct ReplayFile {
     std::string chart_sha256;
     std::string ruleset_id;
     std::string created_utc;
+    std::string server_challenge_id;
+    std::string server_challenge_nonce;
 
     int sample_rate = 0;
     double rate = 1.0;

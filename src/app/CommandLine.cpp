@@ -38,6 +38,14 @@ CommandLineParseResult CommandLine::parse(int argc, char** argv) {
             result.options.replay_path = argv[++i];
             continue;
         }
+        if (arg == "--ranked-challenge-id" && i + 1 < argc) {
+            result.options.ranked_challenge_id = argv[++i];
+            continue;
+        }
+        if (arg == "--ranked-challenge-nonce" && i + 1 < argc) {
+            result.options.ranked_challenge_nonce = argv[++i];
+            continue;
+        }
         if (arg == "--rate" && i + 1 < argc) {
             double value = 0.0;
             if (parse_double(argv[i + 1], value)) {

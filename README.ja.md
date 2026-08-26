@@ -2,9 +2,9 @@
 
 Language: [한국어](README.md) | [English](README.en.md) | [简体中文](README.zh-CN.md) | 日本語
 
-TenRiff は Windows GUI ベースの BMS リズムゲーム runtime/launcher です。現在の stable 版は `1.4.5.3` で、譜面入力は BMS family（`.bms/.bme/.bml/.pms`）専用です。公開 package は BGA upscaler model を含まず、key-mode conversion 用の deterministic NK3 P64 graph と generalized pattern MLP を同梱します。license は MIT です。
+TenRiff は Windows GUI ベースの BMS リズムゲーム runtime/launcher です。現在の stable 版は `1.5.0` で、譜面入力は BMS family（`.bms/.bme/.bml/.pms`）専用です。公開 package は BGA upscaler model を含まず、key-mode conversion 用の deterministic NK3 P64 graph と generalized pattern MLP を同梱します。license は MIT です。
 
-この README は導入文書です。現在の挙動、`1.4.5.3` project state、`1.1.2 final stable` baseline、設定と設計文書は [`docs/README.ja.md`](docs/README.ja.md) から参照してください。
+この README は導入文書です。現在の挙動、`1.5.0` project state、`1.1.2 final stable` baseline、設定と設計文書は [`docs/README.ja.md`](docs/README.ja.md) から参照してください。
 
 TenRiff のコードベースは、伝統的な長文設計書主導だけで積み上がったものではなく、高速な反復と実験を重視した `vibe coding` 的な性格を持つ作品でもあります。
 
@@ -73,7 +73,8 @@ OpenAI Codex、ChatGPT、Claude Code、Gemini、そして検証に協力して�
   - Hi-Speed、Rate、gauge、audio、input、graphics 設定
   - `Skins` 画面での判定線位置、ノートサイズ、レーンカラー編集
   - `5K`-`10K` レーンカラー編集とライブプレビュー
-  - native vector skin と LR2 playskin のみ対応
+  - native vector skin、TenRiff `skin.json`、LR2 playskin に対応
+  - 配布 package の `skins/` 完成 skin を既定一覧に表示し、同名の profile skin を優先
   - LR2 skin folder の選択/drag-and-drop で active profile にコピーし、note・LN・lane-gap・destination-size data を反映
 - 結果 / ローカル記録
   - Result 画面

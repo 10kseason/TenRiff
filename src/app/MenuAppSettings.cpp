@@ -2,6 +2,7 @@
 
 #include "app/MenuAppSettingsUtils.h"
 #include "app/MenuAppSkinUtils.h"
+#include "app/SessionRandomSeed.h"
 
 namespace tenriff::app {
 
@@ -336,7 +337,11 @@ void MenuApp::populate_mode_settings_render_data(render::MenuRenderData& render)
                     render::MenuHitTargetKind::SettingsRow, 11, false, true);
     append_menu_row(render.generic, ui_text("Random", "랜덤"), ui_random_label(config_.mode.random), settings_cursor_ == 12,
                     render::MenuHitTargetKind::SettingsRow, 12, false, true);
-    append_menu_row(render.generic, ui_text("Random Seed", "랜덤 시드"), std::to_string(config_.mode.random_seed), settings_cursor_ == 13,
+    const std::string random_seed_value =
+        random_mode_uses_fresh_session_seed(config_.mode.random)
+            ? ui_text("Auto each play", "플레이마다 자동")
+            : std::to_string(config_.mode.random_seed);
+    append_menu_row(render.generic, ui_text("Random Seed", "랜덤 시드"), random_seed_value, settings_cursor_ == 13,
                     render::MenuHitTargetKind::SettingsRow, 13, false, true);
     append_menu_row(render.generic, ui_text("Mods", "모드"), mode_score_summary(config_.mode.mods, config_.speed.rate),
                     settings_cursor_ == 14, render::MenuHitTargetKind::SettingsRow, 14, true, false);

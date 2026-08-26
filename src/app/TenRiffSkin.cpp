@@ -10,6 +10,16 @@
 #include <sstream>
 #include <unordered_set>
 
+#ifdef _WIN32
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#include <windows.h>
+#endif
+
 #include "config/SimpleJson.h"
 #include "util/Utf8Compat.h"
 
@@ -466,6 +476,7 @@ void parse_layout_section(const config::JsonObject& layout, TenRiffSkinDefinitio
 
 config::JsonObject effective_gameplay_object(const config::JsonObject& gameplay,
                                              int keys,
+                                             std::string_view requested_mode,
                                              TenRiffSkinDefinition& definition) {
     config::JsonObject effective = gameplay;
     effective.erase("modes");
@@ -475,11 +486,12 @@ config::JsonObject effective_gameplay_object(const config::JsonObject& gameplay,
     }
     const auto* modes = modes_value->as_object();
     if (!modes) {
-        definition.warnings.push_back("gameplay.modes must be an object keyed by 1k through 16k.");
+        definition.warnings.push_back(
+            "gameplay.modes must be an object keyed by 1k through 16k or 7+1.");
         return effective;
     }
     for (const auto& [mode, value] : *modes) {
-        bool valid_mode = false;
+        bool valid_mode = mode == "7+1";
         if (mode.size() >= 2u && mode.back() == 'k') {
             const std::string digits = mode.substr(0, mode.size() - 1u);
             try {
@@ -495,10 +507,12 @@ config::JsonObject effective_gameplay_object(const config::JsonObject& gameplay,
         }
         if (!valid_mode || !value.is_object()) {
             definition.warnings.push_back("gameplay.modes." + mode +
-                                          " must be an object using a 1k through 16k key.");
+                                          " must be an object using a 1k through 16k or 7+1 key.");
         }
     }
-    const std::string active_mode = std::to_string(std::clamp(keys, 1, 16)) + "k";
+    const std::string active_mode = requested_mode == "7+1"
+                                        ? std::string("7+1")
+                                        : std::to_string(std::clamp(keys, 1, 16)) + "k";
     const auto it = modes->find(active_mode);
     if (it == modes->end()) {
         return effective;
@@ -711,7 +725,9 @@ bool is_tenriff_skin_layout_slot(std::string_view key) {
                kTenRiffSkinScreenIds.end();
 }
 
-TenRiffSkinDefinition load_tenriff_skin_folder(std::string_view folder_utf8, int keys) {
+TenRiffSkinDefinition load_tenriff_skin_folder(std::string_view folder_utf8,
+                                               int keys,
+                                               std::string_view gameplay_mode) {
     TenRiffSkinDefinition definition;
     const fs::path root = path_from_utf8(folder_utf8);
     if (root.empty()) {
@@ -844,8 +860,8 @@ TenRiffSkinDefinition load_tenriff_skin_folder(std::string_view folder_utf8, int
     }
 
     if (const auto* gameplay_manifest = child_object(*manifest, "gameplay")) {
-        config::JsonObject gameplay = effective_gameplay_object(*gameplay_manifest, definition.gameplay.keys,
-                                                                 definition);
+        config::JsonObject gameplay = effective_gameplay_object(
+            *gameplay_manifest, definition.gameplay.keys, gameplay_mode, definition);
         static constexpr std::array<std::string_view, 40> kGameplayKeys = {
             "background", "background_opacity", "gear", "note", "hold_head", "hold_body",
             "hold_tail", "key_idle", "key_pressed", "note_width_ratio", "note_height_ratio",
@@ -970,7 +986,8 @@ TenRiffSkinDefinition load_tenriff_skin_folder(std::string_view folder_utf8, int
 
 TenRiffSkinDefinition resolve_tenriff_skin(std::string_view root_utf8,
                                            std::string_view skin_name,
-                                           int keys) {
+                                           int keys,
+                                           std::string_view gameplay_mode) {
     if (root_utf8.empty() || skin_name.empty()) {
         return {};
     }
@@ -985,7 +1002,7 @@ TenRiffSkinDefinition resolve_tenriff_skin(std::string_view root_utf8,
             return {};
         }
     }
-    return load_tenriff_skin_folder((root / name).u8string(), keys);
+    return load_tenriff_skin_folder((root / name).u8string(), keys, gameplay_mode);
 }
 
 std::vector<std::string> list_tenriff_skin_names(std::string_view root_utf8) {
@@ -1010,6 +1027,68 @@ std::vector<std::string> list_tenriff_skin_names(std::string_view root_utf8) {
     return names;
 }
 
+TenRiffSkinCatalog catalog_tenriff_skins(const std::vector<std::string>& roots_utf8) {
+    TenRiffSkinCatalog catalog;
+    for (const auto& root : roots_utf8) {
+        if (root.empty()) {
+            continue;
+        }
+        for (const auto& name : list_tenriff_skin_names(root)) {
+            if (catalog.roots_by_name.emplace(name, root).second) {
+                catalog.names.push_back(name);
+            }
+        }
+    }
+    std::sort(catalog.names.begin(), catalog.names.end());
+    return catalog;
+}
+
+std::string find_bundled_tenriff_skin_root() {
+    std::vector<fs::path> bases;
+    auto push_base = [&](const fs::path& base) {
+        if (!base.empty() && std::find(bases.begin(), bases.end(), base) == bases.end()) {
+            bases.push_back(base);
+        }
+    };
+
+#ifdef _WIN32
+    wchar_t executable_path[32768] = {};
+    const DWORD executable_length = GetModuleFileNameW(
+        nullptr,
+        executable_path,
+        static_cast<DWORD>(sizeof(executable_path) / sizeof(executable_path[0])));
+    if (executable_length > 0 &&
+        executable_length < (sizeof(executable_path) / sizeof(executable_path[0]))) {
+        push_base(fs::path(executable_path).parent_path());
+    }
+#else
+    std::error_code executable_ec;
+    const fs::path executable_path = fs::read_symlink("/proc/self/exe", executable_ec);
+    if (!executable_ec && !executable_path.empty()) {
+        push_base(executable_path.parent_path());
+    }
+#endif
+
+    std::error_code ec;
+    const fs::path current = fs::current_path(ec);
+    if (!ec && !current.empty()) {
+        push_base(current);
+        push_base(current.parent_path());
+        push_base(current.parent_path().parent_path());
+    }
+
+    for (const auto& base : bases) {
+        const fs::path candidate = base / "skins";
+        if (list_tenriff_skin_names(candidate.u8string()).empty()) {
+            continue;
+        }
+        ec.clear();
+        const fs::path canonical = fs::weakly_canonical(candidate, ec);
+        return (!ec && !canonical.empty() ? canonical : candidate.lexically_normal()).u8string();
+    }
+    return {};
+}
+
 TenRiffSkinImportResult import_tenriff_skin(std::string_view source_utf8,
                                             std::string_view import_root_utf8) {
     TenRiffSkinImportResult result;
@@ -1030,6 +1109,11 @@ TenRiffSkinImportResult import_tenriff_skin(std::string_view source_utf8,
         for (const auto& path : mode_definition.referenced_asset_paths) {
             add_reference(definition, path);
         }
+    }
+    const auto seven_plus_one_definition =
+        load_tenriff_skin_folder(source.u8string(), 8, "7+1");
+    for (const auto& path : seven_plus_one_definition.referenced_asset_paths) {
+        add_reference(definition, path);
     }
 
     const fs::path import_root = path_from_utf8(import_root_utf8);

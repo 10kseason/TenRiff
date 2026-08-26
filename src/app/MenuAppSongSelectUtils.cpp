@@ -2,7 +2,10 @@
 
 #include <algorithm>
 #include <charconv>
+#include <cctype>
+#include <iomanip>
 #include <limits>
+#include <sstream>
 
 #include "app/MenuAppSettingsUtils.h"
 #include "util/Utf8Compat.h"
@@ -39,6 +42,74 @@ std::string level_filter_label(int level_min, int level_max) {
         return "LV " + std::to_string(level_min) + "+";
     }
     return "LV <= " + std::to_string(level_max);
+}
+
+int compare_natural_ascii(std::string_view lhs, std::string_view rhs) {
+    std::size_t left = 0;
+    std::size_t right = 0;
+    while (left < lhs.size() && right < rhs.size()) {
+        const unsigned char lhs_byte = static_cast<unsigned char>(lhs[left]);
+        const unsigned char rhs_byte = static_cast<unsigned char>(rhs[right]);
+        if (std::isdigit(lhs_byte) != 0 && std::isdigit(rhs_byte) != 0) {
+            const std::size_t lhs_run_begin = left;
+            const std::size_t rhs_run_begin = right;
+            while (left < lhs.size() && lhs[left] == '0') ++left;
+            while (right < rhs.size() && rhs[right] == '0') ++right;
+            const std::size_t lhs_digits_begin = left;
+            const std::size_t rhs_digits_begin = right;
+            while (left < lhs.size() && std::isdigit(static_cast<unsigned char>(lhs[left])) != 0) ++left;
+            while (right < rhs.size() && std::isdigit(static_cast<unsigned char>(rhs[right])) != 0) ++right;
+            const std::size_t lhs_digits = left - lhs_digits_begin;
+            const std::size_t rhs_digits = right - rhs_digits_begin;
+            if (lhs_digits != rhs_digits) return lhs_digits < rhs_digits ? -1 : 1;
+            const int numeric_compare = lhs.substr(lhs_digits_begin, lhs_digits).compare(
+                rhs.substr(rhs_digits_begin, rhs_digits));
+            if (numeric_compare != 0) return numeric_compare < 0 ? -1 : 1;
+            const std::size_t lhs_run = left - lhs_run_begin;
+            const std::size_t rhs_run = right - rhs_run_begin;
+            if (lhs_run != rhs_run) return lhs_run < rhs_run ? -1 : 1;
+            continue;
+        }
+
+        const unsigned char lhs_folded = static_cast<unsigned char>(
+            lhs_byte >= 'A' && lhs_byte <= 'Z' ? lhs_byte + ('a' - 'A') : lhs_byte);
+        const unsigned char rhs_folded = static_cast<unsigned char>(
+            rhs_byte >= 'A' && rhs_byte <= 'Z' ? rhs_byte + ('a' - 'A') : rhs_byte);
+        if (lhs_folded != rhs_folded) return lhs_folded < rhs_folded ? -1 : 1;
+        ++left;
+        ++right;
+    }
+    if (left == lhs.size() && right == rhs.size()) return 0;
+    return left == lhs.size() ? -1 : 1;
+}
+
+std::string natural_level_sort_key(std::string_view value) {
+    std::string key;
+    key.reserve(value.size() + 16);
+    std::size_t cursor = 0;
+    while (cursor < value.size()) {
+        const unsigned char byte = static_cast<unsigned char>(value[cursor]);
+        if (std::isdigit(byte) == 0) {
+            key.push_back(static_cast<char>(byte >= 'A' && byte <= 'Z' ? byte + ('a' - 'A') : byte));
+            ++cursor;
+            continue;
+        }
+        const std::size_t run_begin = cursor;
+        while (cursor < value.size() && value[cursor] == '0') ++cursor;
+        const std::size_t digits_begin = cursor;
+        while (cursor < value.size() && std::isdigit(static_cast<unsigned char>(value[cursor])) != 0) ++cursor;
+        const std::size_t digits = cursor - digits_begin;
+        key.push_back('\x01');
+        std::ostringstream length;
+        length << std::setw(10) << std::setfill('0') << digits;
+        key += length.str();
+        key.append(value.substr(digits_begin, digits));
+        key.push_back('\x02');
+        std::ostringstream run_length;
+        run_length << std::setw(10) << std::setfill('0') << (cursor - run_begin);
+        key += run_length.str();
+    }
+    return key;
 }
 
 }  // namespace
@@ -101,7 +172,7 @@ std::string song_group_level_key(const SongEntry& entry) {
             key += digits;
             return key;
         }
-        return "0table:zz:" + to_lower_ascii(entry.difficulty_table_level);
+        return "0table:zz:" + natural_level_sort_key(entry.difficulty_table_level);
     }
     if (entry.level > 0) {
         const int clamped_level = std::clamp(entry.level, 0, 9999);
@@ -319,8 +390,10 @@ bool song_entry_less_by_difficulty_asc(const SongEntry& lhs, const SongEntry& rh
         if (lhs_order != rhs_order) {
             return lhs_order < rhs_order;
         }
-        if (lhs.difficulty_table_level != rhs.difficulty_table_level) {
-            return lhs.difficulty_table_level < rhs.difficulty_table_level;
+        const int level_compare = compare_natural_ascii(lhs.difficulty_table_level,
+                                                        rhs.difficulty_table_level);
+        if (level_compare != 0) {
+            return level_compare < 0;
         }
     }
     const int lhs_level = lhs.level > 0 ? lhs.level : 9999;
@@ -355,8 +428,10 @@ bool song_entry_less_by_difficulty_desc(const SongEntry& lhs, const SongEntry& r
         if (lhs_order != rhs_order) {
             return lhs_order > rhs_order;
         }
-        if (lhs.difficulty_table_level != rhs.difficulty_table_level) {
-            return lhs.difficulty_table_level > rhs.difficulty_table_level;
+        const int level_compare = compare_natural_ascii(lhs.difficulty_table_level,
+                                                        rhs.difficulty_table_level);
+        if (level_compare != 0) {
+            return level_compare > 0;
         }
     }
     if (lhs.level != rhs.level) {

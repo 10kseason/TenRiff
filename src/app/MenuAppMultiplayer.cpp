@@ -20,6 +20,7 @@
 
 #include "app/MenuAppSkinUtils.h"
 #include "app/MenuSongUtils.h"
+#include "app/ClipboardText.h"
 #include "config/KeycodeMap.h"
 #include "util/Utf8Compat.h"
 
@@ -321,6 +322,9 @@ void MenuApp::populate_multiplayer_render_data(render::MenuRenderData& render) {
     render.generic.notes.push_back(ui_text(
         "LAN Rooms needs no server or manual IP entry. Internet play still needs an IP and router port forwarding.",
         "LAN 방 자동 검색은 서버와 IP 입력이 필요 없습니다. 인터넷 연결은 여전히 IP와 포트 포워딩이 필요합니다."));
+    render.generic.notes.push_back(ui_text(
+        "Copy host:port (or tenriff://host:port), select Server IP, then press Enter. Ctrl+V also replaces the active field.",
+        "host:port(또는 tenriff://host:port)를 복사하고 서버 IP에서 Enter를 누르세요. 편집 중 Ctrl+V로도 교체할 수 있습니다."));
     render.generic.footer_reserved_lines = 6;
     render.generic.footer_notes.push_back(
         ui_text("ROOM CHAT", "방 채팅") + "  " +
@@ -353,8 +357,28 @@ void MenuApp::populate_multiplayer_render_data(render::MenuRenderData& render) {
             ui_text("No room messages yet.", "아직 방 메시지가 없습니다."));
     }
     render.generic.footer_notes.push_back(ui_text(
-        "Enter edits/selects/sends chat. Delete clears an edit field. Esc closes editing or leaves Multiplayer.",
-        "Enter로 편집/선택/채팅 전송합니다. Delete는 편집 칸을 지웁니다. Esc는 편집을 닫거나 멀티플레이를 나갑니다."));
+        "F8 opens chat. Enter sends. Delete clears an edit field. Esc closes editing or leaves Multiplayer.",
+        "F8로 채팅을 엽니다. Enter로 전송합니다. Delete는 편집 칸을 지우고 Esc는 편집을 닫거나 멀티플레이를 나갑니다."));
+}
+
+bool MenuApp::open_multiplayer_chat_shortcut() {
+    if (screen_ == Screen::Gameplay || screen_ == Screen::Result ||
+        (screen_ == Screen::Keymap && keymap_capture_active_)) {
+        return false;
+    }
+    const auto peer = peer_session_.snapshot();
+    if (!try_open_multiplayer_chat(
+            multiplayer_menu_, peer.state == network::PeerSessionState::Connected)) {
+        return false;
+    }
+    if (multiplayer_selecting_chart_) {
+        multiplayer_selecting_chart_ = false;
+        rebuild_visible_song_list();
+    }
+    screen_ = Screen::Multiplayer;
+    multiplayer_status_message_.clear();
+    publish_snapshot();
+    return true;
 }
 
 void MenuApp::handle_multiplayer_input(uint32_t keycode) {
@@ -407,6 +431,31 @@ void MenuApp::handle_multiplayer_input(uint32_t keycode) {
         std::string& field = multiplayer_menu_.edit_field == MultiplayerEditField::Address
                                  ? multiplayer_menu_.address
                                  : multiplayer_menu_.port_text;
+        if (keycode == key_v_ && control_modifier_pressed()) {
+            const auto clipboard = clipboard_text_utf8();
+            bool pasted = false;
+            if (clipboard.has_value() &&
+                multiplayer_menu_.edit_field == MultiplayerEditField::Address) {
+                if (const auto endpoint = parse_multiplayer_endpoint(*clipboard);
+                    endpoint.has_value()) {
+                    multiplayer_menu_.address = endpoint->address;
+                    if (endpoint->port.has_value()) {
+                        multiplayer_menu_.port_text = std::to_string(*endpoint->port);
+                    }
+                    pasted = true;
+                }
+            } else if (clipboard.has_value()) {
+                if (const auto port = parse_multiplayer_port(*clipboard); port.has_value()) {
+                    multiplayer_menu_.port_text = std::to_string(*port);
+                    pasted = true;
+                }
+            }
+            multiplayer_status_message_ = pasted
+                ? ui_text("Server endpoint pasted.", "서버 주소를 붙여넣었습니다.")
+                : ui_text("Clipboard endpoint is invalid.", "클립보드의 서버 주소가 올바르지 않습니다.");
+            publish_snapshot();
+            return;
+        }
         if (keycode == key_backspace_) {
             if (!field.empty()) field.pop_back();
             publish_snapshot();
@@ -486,7 +535,20 @@ void MenuApp::handle_multiplayer_input(uint32_t keycode) {
     };
 
     if (row == MultiplayerMenuRow::Address) {
-        if (!active) multiplayer_menu_.edit_field = MultiplayerEditField::Address;
+        if (!active) {
+            multiplayer_menu_.edit_field = MultiplayerEditField::Address;
+            if (const auto clipboard = clipboard_text_utf8(); clipboard.has_value()) {
+                if (const auto endpoint = parse_multiplayer_endpoint(*clipboard);
+                    endpoint.has_value()) {
+                    multiplayer_menu_.address = endpoint->address;
+                    if (endpoint->port.has_value()) {
+                        multiplayer_menu_.port_text = std::to_string(*endpoint->port);
+                    }
+                    multiplayer_status_message_ =
+                        ui_text("Server endpoint pasted.", "서버 주소를 붙여넣었습니다.");
+                }
+            }
+        }
         publish_snapshot();
         return;
     }

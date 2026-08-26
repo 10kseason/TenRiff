@@ -3,7 +3,7 @@
 This is the document that the next agent or any new contributor should read first. Its goal is to quickly answer: "what is this project now, where should I look, and what is still unverified?"
 
 ## Baseline
-- Current stable release line: `1.4.5.3`
+- Current stable release line: `1.5.0`
 - The UI-r2 Result screen uses a 2.2-second timeline for the prism, score, rank, clear status, statistics, and graphs. Space skips the reveal; Continue/Retry/Replay stay locked until it completes.
 - UI-r2 Song Select uses a reference-led top navigation, seven-row jacket library, large selected artwork, best-record card, chart/mode panel, and a prominent working Start action. Collection/store/currency/global-ranking placeholders are not shown.
 - The Song Select Rate, Hi-Speed, Gauge, and Random cells apply increase/next on left click and decrease/previous on right click, then save immediately. The current-chart key count no longer clips, and best records show score, accuracy, and max combo together.
@@ -97,12 +97,12 @@ This is the document that the next agent or any new contributor should read firs
   - nK2 offers `Native (12%)` by default, `Transform (35%)` and `Remaster (65%)`; `Remaster` raises the budget while locking the anchor so the source placement survives, and fills LN sections with holds of the same length. All three are caps - the source density and the safety windows decide how much actually lands. The row is locked for Krrcream, and the standalone converter GUI also locks Krrcream Max/Min/Speed/Seed tuning.
   - NK3 always combines bundled P64 with host beam32. It adds the generalized pattern MLP only when a non-10K source is converted to 10K; 10K-to-10K and every other target use P64 alone. The default `AUTO` backend runs both P64 and the MLP on AMD/NVIDIA GPUs through ncnn Vulkan, retaining the optional OpenVINO compatibility path as fallback. `TENRIFF_NK3_BACKEND` and `TENRIFF_NK3_VULKAN_DEVICE` can force the selection.
   - the standalone BMS key converter CLI/GUI can select the default `krrcream` path or deterministic `nK2 Native 50/50`; nK2 ignores Krrcream-only tuning controls
-  - official 1.4.5.3 builds/Windows archives do not build or ship the standalone BMS key-converter CLI/GUI; its top-level CMake option defaults `OFF` and the source is retained only for development regression
+  - official 1.5.0 builds/Windows archives do not build or ship the standalone BMS key-converter CLI/GUI; its top-level CMake option defaults `OFF` and the source is retained only for development regression
   - `mode.key_mode=none` keeps the chart's original key count and base pattern layout intact
 - Native difficulty:
   - BMS LV/CR calculation evaluates only LN head/tail miss-ms at 0.5x, so `300ms` is treated as `150ms`; runtime gameplay judgement windows remain unchanged
 - Lane transform:
-  - Random supports `Off / Mirror / FR / SR`; Mirror reverses the final lanes after key-mode conversion, with 10K/16K mirrored independently inside each player half
+  - Random supports `Off / Mirror / Random (Scratch Fixed) / SR`; ordinary Random keeps scratch fixed, creates a fresh key-lane permutation per play, and records the actual seed in the replay
   - Mod Manager `LN Mix 10%-90%` preserves existing holds and excludes heads overlapping an existing same-lane span. It selects the requested share of taps that can fit a base-BPM 1/8-note hold while ending at least 50ms before the next same-lane note, then deterministically assigns every Mix level 60% long 1/8-note, 20% medium 1/16-note, and 20% short alternating 1/24- and 1/32-note lengths
 - Skins / gameplay feel:
   - standard `10+2 DP` charts map the `10K` lane-color palette across the ten playable key lanes while leaving native 12K palettes independent
@@ -115,13 +115,14 @@ This is the document that the next agent or any new contributor should read firs
   - Black Playfield fills the complete player/ghost playfield, including lane-spacing gaps, with solid black
   - per-key-mode lane-width arrays and inter-lane spacing arrays are persisted and applied through the same layout math in preview, live gameplay, and the ghost field
   - supported skin routes are `native`, TenRiff `skin.json` v1, and LR2 playskin; selecting or dropping a TenRiff/LR2 folder imports it into the active profile without overwriting an existing install
+  - completed TenRiff skins beside the executable under `skins/` are merged into the default list, while an active-profile `skins/tenriff/` folder with the same name takes precedence
   - selecting a standard `LR2files` or `Theme` root batch-imports each independent non-IIDX theme as a separate skin and skips themes that reference excluded IIDX assets, preserves sibling-theme paths, skips symlinks, and never overwrites an existing folder
   - LR2 note/LN images, lane gaps, and destination sizes are applied; lower `play/Gear` frames enlarge with field size as one aspect-preserving overlay clipped below the judgement line, `#CUSTOMFILE` wildcard defaults are resolved, and falling note/LN-head art is never reused as a receptor when Gear is absent
   - the native skin draws a digital piano key at the bottom of each lane; a key stays depressed only while its input is held, emits a short cyan/magenta glitch pulse on impact, and clears held visuals when the process loses foreground
   - `skin.lr2_resolution_mode` stores LR2 playskin resolution override tokens as `auto / sd / hd / fhd`
   - LR2 auto-detect uses the playskin `#DST_NOTE` coordinate range instead of asset names
   - eased future-note entry from above the field
-  - gameplay ends right after the last judged note is handled
+  - after the last judged note, gameplay waits for the music by default; pressing a lane key during that tail moves to Result immediately
 - Judge:
   - default `GOOD` window is `75ms`
   - the default `BAD` window is `210ms`, `Judge Easy` uses `262.5ms`, and `Judge Hard` uses `340ms`
@@ -209,7 +210,7 @@ This is the document that the next agent or any new contributor should read firs
 
 ## Runtime / Packaging Rules
 - New user profiles are created automatically
-- The current stable P2P distribution line is `TenRiff 1.4.5.3`
+- The current stable P2P distribution line is `TenRiff 1.5.0`
 - Distribution packages do not include `Songs`
 - Distribution packages include the `Mainmusic/` scene slots `Main Menu / Options / Song Selecte / Multiplayer Lobby / Clear / Failed`; each `Name.mp3` plus numbered `Name 2.mp3` through `Name 64.mp3` siblings is discovered automatically and rotates on scene re-entry
 - Distribution updates include only built artifacts and required runtime assets

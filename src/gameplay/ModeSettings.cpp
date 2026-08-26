@@ -176,7 +176,9 @@ std::optional<RandomMode> parse_random_mode(std::string_view token) {
     if (normalized == "RR" || normalized == "R-RANDOM" || normalized == "ROTATERANDOM") {
         return RandomMode::RotateRandom;
     }
-    if (normalized == "FR" || normalized == "FULLRANDOM" || normalized == "FULL_RANDOM") {
+    if (normalized == "FR" || normalized == "FULLRANDOM" || normalized == "FULL_RANDOM" ||
+        normalized == "FRNS" || normalized == "FR_NO_SCRATCH" ||
+        normalized == "RANDOM_NO_SCRATCH") {
         return RandomMode::FullRandom;
     }
     if (normalized == "SR" || normalized == "SUPERRANDOM" || normalized == "SUPER_RANDOM") {

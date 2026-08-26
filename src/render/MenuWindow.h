@@ -127,6 +127,9 @@ struct SongSelectData {
     int record_count = 0;
     bool showing_sources = false;
     bool showing_records = false;
+    bool online_records = false;
+    bool online_records_loading = false;
+    std::string online_records_message;
     bool result_available = false;
     std::string current_source_name;
     std::string current_source_path;
@@ -146,6 +149,7 @@ struct SongSelectData {
     double selected_song_nps_min = 0.0;
     double selected_song_nps_median = 0.0;
     double selected_song_nps_max = 0.0;
+    int selected_song_note_count = 0;
     std::string current_visual_latency;
     std::string current_hi_speed;
     std::string current_gauge;
@@ -493,6 +497,9 @@ struct MenuRowData {
     bool decrement_enabled = false;
     MenuHitTargetKind target_kind = MenuHitTargetKind::None;
     int row_index = -1;
+    // A mouse adjustment can acknowledge the changed row without stealing the
+    // keyboard cursor. The renderer derives exactly three flashes from this time.
+    int64_t change_flash_started_ns = 0;
 };
 
 struct SkinPreviewData {

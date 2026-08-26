@@ -69,4 +69,5 @@ Language: Korean | [English](README.en.md) | [简体中文](README.zh-CN.md) | [
 
 - `docs/skin-agent-guide.md`: AI 에이전트용 스킨 제작 계약, 프롬프트, 검증 체크리스트
 - `docs/skin-format.md`: TenRiff `skin.json` v1 로비/인게임 스킨 제작 및 가져오기 가이드
+- `docs/ranked-integrity-plan.md`: BMS 전용 검증 랭킹, 기록 보기, 온라인 기록, osu 관련 랭크 제외 단계 계획
 - `docs/tenriff-skin.schema.json`: 편집기 자동 완성 및 구조 검증용 JSON Schema

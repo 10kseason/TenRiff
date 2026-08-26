@@ -2,9 +2,9 @@
 
 Language: [한국어](README.md) | [English](README.en.md) | [简体中文](README.zh-CN.md) | [日本語](README.ja.md)
 
-TenRiff 是一个 Windows GUI BMS 节奏游戏运行时/启动器。当前稳定版本为 `1.4.5.3`，谱面输入仅支持 BMS family（`.bms/.bme/.bml/.pms`）。公开包不包含 BGA upscaler model；键位转换内置 deterministic NK3 P64 graph 与 generalized pattern MLP。项目采用 MIT 许可证。
+TenRiff 是一个 Windows GUI BMS 节奏游戏运行时/启动器。当前稳定版本为 `1.5.0`，谱面输入仅支持 BMS family（`.bms/.bme/.bml/.pms`）。公开包不包含 BGA upscaler model；键位转换内置 deterministic NK3 P64 graph 与 generalized pattern MLP。项目采用 MIT 许可证。
 
-这份 README 是入门文档。关于当前行为、`1.4.5.3` 项目状态、`1.1.2 final stable` 基准、配置和设计文档，请继续阅读 [`docs/README.zh-CN.md`](docs/README.zh-CN.md)。
+这份 README 是入门文档。关于当前行为、`1.5.0` 项目状态、`1.1.2 final stable` 基准、配置和设计文档，请继续阅读 [`docs/README.zh-CN.md`](docs/README.zh-CN.md)。
 
 TenRiff 也明确属于一种 `vibe coding` 作品：它更多是在快速迭代和实验中成形，而不是只按照传统的长篇设计先行流程推进。
 
@@ -73,7 +73,8 @@ TenRiff 当前的键位模式转换器包含基于 `krrcream-Toolkit` 中 N2NC �
   - Hi-Speed、Rate、gauge、audio、input、graphics 设置
   - `Skins` 画面中可调判定线位置、note 宽度/高度
   - `5K~10K` lane color 编辑与实时预览
-  - 仅支持 native vector skin 与 LR2 playskin
+  - 支持 native vector skin、TenRiff `skin.json` 与 LR2 playskin
+  - 发布包 `skins/` 下的完成版 skin 会默认出现在列表中，同名 profile skin 优先
   - 通过选择或拖放 LR2 skin folder 复制到 active profile，并导入 note、LN、lane-gap、destination-size 数据
 - 结果/本地记录
   - 专用结果画面

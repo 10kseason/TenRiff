@@ -250,11 +250,36 @@ void MenuWindow::draw(const MenuRenderData& data) {
                                  IDWriteTextFormat* format,
                                  const D2D1_RECT_F& rect,
                                  ID2D1Brush* brush) {
-        if (text.empty() || !format || !brush) {
+        const float width = rect.right - rect.left;
+        const float height = rect.bottom - rect.top;
+        if (text.empty() || !format || !brush || width <= 0.0f || height <= 0.0f) {
             return;
         }
+        const float text_scale = data.lobby_skin.enabled
+                                     ? estimate_single_line_text_scale(
+                                           text, format->GetFontSize(), width, height)
+                                     : 1.0f;
+        if (text_scale >= 0.995f) {
+            ctx->DrawText(text.c_str(), static_cast<UINT32>(text.size()),
+                          format, rect, brush, D2D1_DRAW_TEXT_OPTIONS_CLIP,
+                          DWRITE_MEASURING_MODE_NATURAL);
+            return;
+        }
+
+        D2D1_MATRIX_3X2_F saved_transform{};
+        ctx->GetTransform(&saved_transform);
+        const D2D1_MATRIX_3X2_F local_scale = D2D1::Matrix3x2F::Scale(
+            text_scale, text_scale, D2D1::Point2F(rect.left, rect.top));
+        ctx->SetTransform(local_scale * saved_transform);
+        const D2D1_RECT_F expanded_rect = D2D1::RectF(
+            rect.left,
+            rect.top,
+            rect.left + width / text_scale,
+            rect.top + height / text_scale);
         ctx->DrawText(text.c_str(), static_cast<UINT32>(text.size()),
-                      format, rect, brush, D2D1_DRAW_TEXT_OPTIONS_CLIP, DWRITE_MEASURING_MODE_NATURAL);
+                      format, expanded_rect, brush, D2D1_DRAW_TEXT_OPTIONS_CLIP,
+                      DWRITE_MEASURING_MODE_NATURAL);
+        ctx->SetTransform(saved_transform);
     };
 
     auto draw_text_clipped_aligned = [&](const std::wstring& text,

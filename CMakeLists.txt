@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(TenRiff VERSION 1.4.5.3 LANGUAGES C CXX)
+project(TenRiff VERSION 1.5.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -187,6 +187,7 @@ add_library(tenriff_core
     src/app/MultiplayerChartSearch.cpp
     src/app/ModeManager.cpp
     src/app/ModeResolver.cpp
+    src/app/OnlineRecordsClient.cpp
     src/app/PersistedRuntimeConfig.cpp
     src/app/ReplayVerifier.cpp
     src/app/RuntimeConfigMigration.cpp
@@ -377,6 +378,13 @@ add_executable(tenriff
     src/main.cpp
 )
 
+add_executable(tenriff_replay_verifier
+    src/tenriff_replay_verifier_main.cpp
+)
+set_target_properties(tenriff_replay_verifier PROPERTIES
+    OUTPUT_NAME "tenriff-replay-verifier")
+target_link_libraries(tenriff_replay_verifier PRIVATE tenriff_core)
+
 set_target_properties(tenriff PROPERTIES OUTPUT_NAME "TenRiff")
 
 # Keep menu music beside the runnable binary. Copying the directory as a
@@ -445,6 +453,17 @@ if(TENRIFF_NK3_OPENVINO_AVAILABLE)
         endforeach()
     endif()
 
+endif()
+
+# Ship completed TenRiff skin.json skins beside the executable. The runtime
+# merges this read-mostly catalog behind profile-local imports.
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/skins")
+    add_custom_command(TARGET tenriff POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+            "${CMAKE_CURRENT_SOURCE_DIR}/skins"
+            "$<TARGET_FILE_DIR:tenriff>/skins"
+        COMMENT "Copying bundled TenRiff skins"
+    )
 endif()
 
 if(TENRIFF_NK3_ONNX_AVAILABLE)
@@ -612,6 +631,14 @@ if(TENRIFF_ENABLE_TESTS)
         COMMAND gameplay_judgement_benchmark)
     set_tests_properties(gameplay_judgement_benchmark PROPERTIES TIMEOUT 120)
 
+    add_executable(online_records_smoke
+        tests/smoke/online_records_smoke.cpp
+    )
+    target_include_directories(online_records_smoke PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
+    )
+    target_link_libraries(online_records_smoke PRIVATE tenriff_core)
+
     add_executable(bms_parser_tests
         tests/unit/test_bms_parser.cpp
         tests/unit/test_bms_normalizer.cpp
@@ -650,6 +677,7 @@ if(TENRIFF_ENABLE_TESTS)
         tests/unit/test_profile_setup_flow.cpp
         tests/unit/test_lr2_skin.cpp
         tests/unit/test_tenriff_skin.cpp
+        tests/unit/test_text_fit.cpp
         tests/unit/test_difficulty_table.cpp
         tests/unit/test_game_session_hud.cpp
         tests/unit/test_graphics_timing.cpp
@@ -661,6 +689,7 @@ if(TENRIFF_ENABLE_TESTS)
         tests/unit/test_peer_protocol.cpp
         tests/unit/test_peer_session.cpp
         tests/unit/test_multiplayer_menu_state.cpp
+        tests/unit/test_online_records_client.cpp
         tests/unit/test_bms_key_converter.cpp
         tests/unit/test_utf8_compat.cpp
     )
@@ -677,6 +706,9 @@ if(TENRIFF_ENABLE_TESTS)
     if(TENRIFF_NK3_ONNX_AVAILABLE)
         tenriff_copy_nk3_runtime(bms_parser_tests)
     endif()
+    target_compile_definitions(bms_parser_tests PRIVATE
+        TENRIFF_TEST_REPLAY_VERIFIER_PATH="$<TARGET_FILE:tenriff_replay_verifier>")
+    add_dependencies(bms_parser_tests tenriff_replay_verifier)
     if(TENRIFF_ENABLE_ASAN AND MSVC)
         add_custom_command(TARGET bms_parser_tests POST_BUILD
             COMMAND ${CMAKE_COMMAND} -E copy_if_different

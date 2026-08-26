@@ -1,6 +1,9 @@
 # TenRiff Skin Agent Instructions
 
-These instructions apply to every skin under `examples/skins/`.
+These instructions apply to the single authoring template under `examples/skins/`.
+
+`examples/skins/` must keep only `TenRiff-Example`. Finished skins belong under
+[`../../skins/`](../../skins/) and follow [`../../skins/AGENTS.md`](../../skins/AGENTS.md).
 
 ## Source of truth
 
@@ -19,7 +22,7 @@ These instructions apply to every skin under `examples/skins/`.
 ## Required workflow
 
 1. Write a short visual brief: mood, palette, note shape, supported key modes, and readability constraints.
-2. Start from `TenRiff-Example` or another structurally similar example.
+2. Start from `TenRiff-Example`; inspect a finished bundled skin under `../../skins/` when a richer structure is needed.
 3. Create `skin.json` first, then add only the assets referenced by it or supported standard filenames.
 4. Keep all asset paths relative to `skin.json`; never use absolute paths or `..`.
 5. Use `gameplay.modes` for key-count-specific arrays. Mode keys are lowercase `1k` through `16k` and overrides are shallow.
@@ -41,7 +44,7 @@ These instructions apply to every skin under `examples/skins/`.
 From the repository root, run:
 
 ```powershell
-Get-Content -Raw examples/skins/<skin>/skin.json |
+Get-Content -Raw examples/skins/TenRiff-Example/skin.json |
   Test-Json -SchemaFile docs/tenriff-skin.schema.json
 ```
 

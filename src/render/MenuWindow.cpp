@@ -54,6 +54,7 @@
 #include "render/GameplayNativeDigitalKey.h"
 #include "render/ResultPresentation.h"
 #include "render/TargaImage.h"
+#include "render/TextFit.h"
 #include "timing/HighResClock.h"
 #include "util/Utf8Compat.h"
 

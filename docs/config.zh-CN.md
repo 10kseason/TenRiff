@@ -40,7 +40,7 @@
 
 - `backend` (string)
   - `polling | rawinput`
-  - 当前 `1.4.5.3` 发布线默认值为 `rawinput`
+  - 当前 `1.5.0` 发布线默认值为 `rawinput`
   - 可在 `Options -> Input Settings -> Backend` 或 `Options -> Profile Setup -> Input Backend` 中按 profile 选择
   - runtime fallback 不会把已保存值改写为 `polling`
   - 确认 RawInput 启动失败、注册目标丢失或 message window 退出后，本次应用运行期间 menu 与后续 gameplay 都会保持 Polling
@@ -157,7 +157,7 @@ chart loader/indexer 仅支持 BMS family（`.bms/.bme/.bml/.pms`）。旧 `enab
 - `random` (string)
   - `off | mirror | fr | sr`
 - `random_seed` (int)
-  - FR/SR、强制 key-mode 变换和 LN Mix 目标选择使用的固定 seed；Mirror 变换本身不使用
+  - RR/SR、强制 key-mode 变换和 LN Mix 目标选择使用固定 seed；普通 Random 每次游玩生成新的 session seed，并把实际值写入 replay
 - `mods` (string array)
   - Note Structure 可在 `full_long_notes`、`ln_mix_10` 到 `ln_mix_90`、`full_short_notes` 中选择一个
   - LN Mix 仅把按 base BPM 计算的 1/8-note hold 能在同 lane 下一音符前至少 50ms 结束的 tap 作为候选，并把所选 hold 的长度分配为 60% 长 1/8-note、20% 中 1/16-note、20% 短且交替的 1/24 与 1/32-note
@@ -213,6 +213,13 @@ chart loader/indexer 仅支持 BMS family（`.bms/.bme/.bml/.pms`）。旧 `enab
   - 最近一次打开的 song root
 - `recent_song_sources` (array of string)
   - 最近使用过的外部/内部 song source 列表
+- `song_collection_filter` (string)
+  - 最后选择的全部、收藏或命名 collection filter
+- `song_key_filter` (int, `0..16`)
+  - song browser 最近的键数 filter；`0` 表示全部键数
+- `song_level_min_filter`, `song_level_max_filter` (int, `0..50`)
+  - 最近的 level range；`0` 表示不使用该边界
+  - 键数、level 与 collection filter 会在修改后立即保存，并在重启后恢复
 - `difficulty_table_path` (string)
   - 在 Browse 中选择的本地 BMS 难度表 header JSON，或从链接生成的 profile cache header 路径
   - header 使用 `name`、`symbol` 与本地相对 `data_url`；data array entry 使用 `md5` 或 `sha256` 加 `level`

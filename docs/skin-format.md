@@ -3,8 +3,11 @@
 TenRiff 스킨은 한 폴더의 `skin.json`과 PNG/JPG/BMP 이미지로 로비와 인게임 외형을 함께 바꾸는 선택형 포맷이다. 모든 항목은 선택 사항이며, 비어 있거나 누락된 슬롯은 기존 Native 렌더링으로 자동 대체된다.
 
 AI 에이전트에게 제작을 맡기려면 [`skin-agent-guide.md`](skin-agent-guide.md)와
-[`examples/skins/AGENTS.md`](../examples/skins/AGENTS.md)를 함께 사용한다. 실제 완성 예제는
-[`Agent Prism Universal`](../examples/skins/TenRiff_AgentPrism_Universal_1K-16K)이다.
+[`skins/AGENTS.md`](../skins/AGENTS.md)를 함께 사용한다. 실제 완성 예제는
+[`Agent Prism Universal`](../skins/TenRiff_AgentPrism_Universal_1K-16K)이다.
+
+공식 배포판은 루트 [`skins/`](../skins/)의 완성 스킨을 `TenRiff.exe` 옆에 포함한다.
+게임은 프로필에 가져온 스킨을 먼저 찾고, 같은 이름이 없을 때 번들 스킨을 사용한다.
 
 ## 빠른 시작
 
@@ -13,7 +16,7 @@ AI 에이전트에게 제작을 맡기려면 [`skin-agent-guide.md`](skin-agent-
 3. 게임으로 돌아와 `F5` 또는 `Reload Skin`을 누른다.
 4. 더 세밀하게 바꾸고 싶으면 `skin.json`을 편집한다.
 
-기존 스킨을 시작점으로 삼으려면 [`examples/skins/TenRiff-Example`](../examples/skins/TenRiff-Example)을
+새 스킨을 시작하려면 [`examples/skins/TenRiff-Example`](../examples/skins/TenRiff-Example)을
 복사한 뒤 `Import Skin`으로 가져와도 된다. `Open Skin Folder`는 현재 선택한 TenRiff 스킨을
 바로 열어 준다.
 
@@ -137,9 +140,9 @@ MySkin/
 - `{lane}`: `lane_map`의 현재 값
 - `{index}`: 1부터 시작하는 레인 번호
 - `{index:02}`: 두 자리 레인 번호 (`01`, `02`, ...)
-- `modes`: `1k`부터 `16k`까지의 얕은 덮어쓰기. 공통 항목을 먼저 쓰고 모드마다 다른 항목만 적는다.
+- `modes`: `1k`부터 `16k`, 그리고 BMS 7키+스크래치 전용 `7+1`의 얕은 덮어쓰기. 공통 항목을 먼저 쓰고 레이아웃마다 다른 항목만 적는다.
 
-가져오기는 현재 선택한 모드뿐 아니라 `1k..16k`의 모든 참조 자산을 함께 복사한다.
+가져오기는 현재 선택한 모드뿐 아니라 `1k..16k`와 `7+1`의 모든 참조 자산을 함께 복사한다.
 
 ## 게임플레이 스타일
 
@@ -246,18 +249,23 @@ DDR/StepMania식 화살표 노트는 정사각형에 가까운 이미지를 쓴�
 | `song_select` | `logo` | `[48, 18, 388, 108]` | `lobby.logo` 이미지 슬롯 |
 | `song_select` | `nav` | `[492, 12, 1244, 126]` | 상단 탭 4개 |
 | `song_select` | `profile` | `[1518, 16, 1880, 112]` | 프로필 패널 |
+| `song_select` | `avatar` | 프로필 패널 안 `[1530, 26, 1606, 102]` | 프로필 이미지 위치와 크기 |
 | `song_select` | `left_panel` | `[38, 152, 486, 922]` | 곡 라이브러리 |
 | `song_select` | `center_panel` | `[510, 152, 1266, 922]` | 곡 목록 |
 | `song_select` | `right_panel` | `[1290, 152, 1882, 922]` | 난이도 패널 |
 | `song_select` | `bottom_bar` | `[38, 944, 1882, 1048]` | 하단 바 |
 
-그 밖에도 `generic.content`, `generic.preview`, `result.profile`, `result.song_panel`,
+그 밖에도 `generic.content`, `generic.preview`, `result.profile`, `result.avatar`, `result.song_panel`,
 `result.analysis_panel`, `result.stats_panel`, `result.continue`, `result.replay`,
 `result.retry`를 옮길 수 있다. 목록형 화면 ID에는 `content`와 `preview`를 직접 지정할 수 있다.
 예를 들어 `layout.settings_skins.content`가 있으면 스킨 설정 화면에만 적용하고, 없으면
 `layout.settings.content`, 다시 없으면 `layout.generic.content`를 사용한다.
 
 - 패널 안의 제목, 카드, 버튼은 패널 사각형에서 계산하므로 함께 따라 움직인다.
+- `song_select.avatar`와 `result.avatar`는 프사 크기를 패널과 독립적으로 정한다. 지정하지
+  않으면 기본 정사각형을 쓰며, 프로필 패널 밖으로 나간 부분은 자동으로 잘린다.
+- 스킨이 활성화된 동안 한 줄 UI 문구가 슬롯보다 길면 글자 크기를 자동 축소하고 마지막
+  안전망으로 슬롯 경계에서 클리핑한다.
 - 클릭 판정 영역도 같은 사각형을 쓰므로 마우스 입력이 어긋나지 않는다.
 - `spectrum`과 `nav`는 막대/탭 개수를 유지한 채 사각형에 맞춰 비례 조정된다.
 - `title.footer`를 옮기면 그 위 버튼 스택이 쓰는 세로 공간도 따라 바뀐다.

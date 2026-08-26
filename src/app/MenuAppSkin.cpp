@@ -23,6 +23,7 @@
 #endif
 
 #include "app/Lr2Skin.h"
+#include "app/LanePresentationLayout.h"
 #include "app/MenuAppSettingsUtils.h"
 #include "app/MenuAppSkinUtils.h"
 #include "app/MenuSongUtils.h"
@@ -52,6 +53,25 @@ std::string lower_ascii(std::string value) {
         return static_cast<char>(std::tolower(ch));
     });
     return value;
+}
+
+ImportedGameplaySkinDefinition seven_plus_one_gameplay_for_scratch_right(
+    const ImportedGameplaySkinDefinition& source) {
+    ImportedGameplaySkinDefinition remapped = source;
+    const int scratch_lane = 1;
+    const LanePresentationLayout layout = resolve_lane_presentation_layout(
+        8, &scratch_lane, 1, "right");
+    remapped.note_images = lane_values_in_visual_order(source.note_images, layout);
+    remapped.hold_head_images = lane_values_in_visual_order(source.hold_head_images, layout);
+    remapped.hold_body_images = lane_values_in_visual_order(source.hold_body_images, layout);
+    remapped.hold_tail_images = lane_values_in_visual_order(source.hold_tail_images, layout);
+    remapped.key_images = lane_values_in_visual_order(source.key_images, layout);
+    remapped.key_pressed_images = lane_values_in_visual_order(source.key_pressed_images, layout);
+    remapped.column_widths = lane_values_in_visual_order(source.column_widths, layout);
+    remapped.column_spacings = lane_gap_values_in_visual_order(source.column_spacings, layout);
+    remapped.note_rotations = lane_values_in_visual_order(source.note_rotations, layout);
+    remapped.key_rotations = lane_values_in_visual_order(source.key_rotations, layout);
+    return remapped;
 }
 
 
@@ -230,11 +250,22 @@ void MenuApp::refresh_available_lr2_skins() {
 }
 
 void MenuApp::refresh_available_tenriff_skins() {
-    available_tenriff_skin_root_ = tenriff_skin_import_root_path(profile_dir_).u8string();
-    available_tenriff_skin_names_ = list_tenriff_skin_names(available_tenriff_skin_root_);
+    available_tenriff_skin_root_.clear();
+    available_tenriff_skin_names_.clear();
+    available_tenriff_skin_roots_by_name_.clear();
+
+    const TenRiffSkinCatalog catalog = catalog_tenriff_skins({
+        tenriff_skin_import_root_path(profile_dir_).u8string(),
+        find_bundled_tenriff_skin_root(),
+    });
+    available_tenriff_skin_names_ = catalog.names;
+    available_tenriff_skin_roots_by_name_ = catalog.roots_by_name;
     active_tenriff_skin_ = {};
     active_tenriff_skin_modes_.fill(TenRiffSkinDefinition{});
     active_tenriff_gameplay_modes_.fill(nullptr);
+    active_tenriff_skin_7p1_ = {};
+    active_tenriff_gameplay_7p1_.reset();
+    active_tenriff_gameplay_7p1_right_.reset();
 
     if (available_tenriff_skin_names_.empty()) {
         config_.skin.tenriff_skin_name.clear();
@@ -247,6 +278,14 @@ void MenuApp::refresh_available_tenriff_skins() {
                   config_.skin.tenriff_skin_name) == available_tenriff_skin_names_.end()) {
         config_.skin.tenriff_skin_name = available_tenriff_skin_names_.front();
     }
+    const auto root_it =
+        available_tenriff_skin_roots_by_name_.find(config_.skin.tenriff_skin_name);
+    if (root_it == available_tenriff_skin_roots_by_name_.end()) {
+        config_.skin.tenriff_skin_name.clear();
+        skin_status_messages_.clear();
+        return;
+    }
+    available_tenriff_skin_root_ = root_it->second;
     for (int keys = 1; keys <= 16; ++keys) {
         auto definition = resolve_tenriff_skin(
             available_tenriff_skin_root_, config_.skin.tenriff_skin_name, keys);
@@ -257,8 +296,21 @@ void MenuApp::refresh_available_tenriff_skins() {
         active_tenriff_skin_modes_[static_cast<std::size_t>(keys - 1)] =
             std::move(definition);
     }
-    if (const auto* selected = active_tenriff_skin_for_keys(
-            lane_count_for_skin_mode(skin_edit_mode_))) {
+    active_tenriff_skin_7p1_ = resolve_tenriff_skin(
+        available_tenriff_skin_root_, config_.skin.tenriff_skin_name, 8, "7+1");
+    if (active_tenriff_skin_7p1_.found) {
+        active_tenriff_gameplay_7p1_ =
+            std::make_shared<const ImportedGameplaySkinDefinition>(
+                active_tenriff_skin_7p1_.gameplay);
+        active_tenriff_gameplay_7p1_right_ =
+            std::make_shared<const ImportedGameplaySkinDefinition>(
+                seven_plus_one_gameplay_for_scratch_right(
+                    active_tenriff_skin_7p1_.gameplay));
+    }
+    const bool editing_seven_plus_one =
+        config::normalize_skin_mode_token(skin_edit_mode_) == "7+1";
+    if (const auto* selected = active_tenriff_skin_for_layout(
+            lane_count_for_skin_mode(skin_edit_mode_), editing_seven_plus_one)) {
         active_tenriff_skin_ = *selected;
     }
     for (const auto& mode_definition : active_tenriff_skin_modes_) {
@@ -268,6 +320,13 @@ void MenuApp::refresh_available_tenriff_skins() {
                 active_tenriff_skin_.referenced_asset_paths.end()) {
                 active_tenriff_skin_.referenced_asset_paths.push_back(path);
             }
+        }
+    }
+    for (const auto& path : active_tenriff_skin_7p1_.referenced_asset_paths) {
+        if (std::find(active_tenriff_skin_.referenced_asset_paths.begin(),
+                      active_tenriff_skin_.referenced_asset_paths.end(), path) ==
+            active_tenriff_skin_.referenced_asset_paths.end()) {
+            active_tenriff_skin_.referenced_asset_paths.push_back(path);
         }
     }
     skin_status_messages_.clear();
@@ -293,6 +352,25 @@ std::shared_ptr<const ImportedGameplaySkinDefinition>
 MenuApp::active_tenriff_gameplay_for_keys(int keys) const {
     const int clamped = clamp_int(keys, 1, 16);
     return active_tenriff_gameplay_modes_[static_cast<std::size_t>(clamped - 1)];
+}
+
+const TenRiffSkinDefinition* MenuApp::active_tenriff_skin_for_layout(
+    int keys, bool seven_plus_one) const {
+    if (seven_plus_one) {
+        return active_tenriff_skin_7p1_.found ? &active_tenriff_skin_7p1_ : nullptr;
+    }
+    return active_tenriff_skin_for_keys(keys);
+}
+
+std::shared_ptr<const ImportedGameplaySkinDefinition>
+MenuApp::active_tenriff_gameplay_for_layout(int keys, bool seven_plus_one) const {
+    if (seven_plus_one) {
+        return config::normalize_skin_scratch_position_token(config_.skin.scratch_position) ==
+                       "right"
+                   ? active_tenriff_gameplay_7p1_right_
+                   : active_tenriff_gameplay_7p1_;
+    }
+    return active_tenriff_gameplay_for_keys(keys);
 }
 
 bool MenuApp::import_lr2_skin_path(std::string_view source_path) {
@@ -413,6 +491,7 @@ void MenuApp::handle_skins_settings_input(uint32_t keycode) {
     const SkinSettingsRows rows{lr2_source};
     const int item_count = rows.count();
     const int key_mode_row = rows.index_of(SkinSettingsRowId::KeyMode);
+    const int scratch_position_row = rows.index_of(SkinSettingsRowId::ScratchPosition);
     const int skin_source_row = rows.index_of(SkinSettingsRowId::SkinSource);
     const int imported_skin_row = rows.index_of(SkinSettingsRowId::ImportedSkin);
     const int lr2_resolution_row = rows.index_of(SkinSettingsRowId::Lr2Resolution);
@@ -631,6 +710,17 @@ void MenuApp::handle_skins_settings_input(uint32_t keycode) {
             refresh_available_tenriff_skins();
         }
         skin_dirty_ = true;
+        publish_snapshot();
+        return;
+    }
+    if (settings_cursor_ == scratch_position_row &&
+        (keycode == key_left_ || keycode == key_right_)) {
+        if (config::normalize_skin_mode_token(skin_edit_mode_) == "7+1") {
+            const std::string current =
+                config::normalize_skin_scratch_position_token(config_.skin.scratch_position);
+            config_.skin.scratch_position = current == "left" ? "right" : "left";
+            skin_dirty_ = true;
+        }
         publish_snapshot();
         return;
     }
@@ -1017,6 +1107,13 @@ void MenuApp::handle_skins_settings_input(uint32_t keycode) {
 void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render) {
     skin_edit_mode_ = normalize_skin_edit_mode(skin_edit_mode_);
     const int lane_count = lane_count_for_skin_mode(skin_edit_mode_);
+    const bool seven_plus_one = config::normalize_skin_mode_token(skin_edit_mode_) == "7+1";
+    const int preview_scratch_lane = 1;
+    const LanePresentationLayout preview_layout = resolve_lane_presentation_layout(
+        lane_count,
+        seven_plus_one ? &preview_scratch_lane : nullptr,
+        seven_plus_one ? 1u : 0u,
+        config::normalize_skin_scratch_position_token(config_.skin.scratch_position));
     skin_edit_lane_ = clamp_int(skin_edit_lane_, 0, lane_count - 1);
     const int gap_count = std::max(0, lane_count - 1);
     skin_edit_gap_ = clamp_int(skin_edit_gap_, 0, std::max(0, gap_count - 1));
@@ -1025,8 +1122,14 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
     const bool single_color_enabled =
         config::normalize_skin_single_color_token(config_.skin.single_color) != "off";
     const auto preview_lane_width_scales = config::resolved_skin_lane_width_scales(config_.skin, skin_edit_mode_);
+    const auto visual_preview_lane_width_scales =
+        lane_values_in_visual_order(preview_lane_width_scales, preview_layout);
     const double preview_note_width_scale = config::resolved_skin_note_width_scale(config_.skin, skin_edit_mode_);
     const auto preview_lane_spacing_scales = config::resolved_skin_lane_spacing_scales(config_.skin, skin_edit_mode_);
+    const auto visual_preview_lane_spacing_scales =
+        lane_gap_values_in_visual_order(preview_lane_spacing_scales, preview_layout);
+    const auto visual_preview_lane_colors =
+        lane_values_in_visual_order(preview_lane_colors, preview_layout);
     const double preview_note_height_scale = config::resolved_skin_note_height_scale(config_.skin, skin_edit_mode_);
     const double preview_lane_divider_width_scale =
         config::resolved_skin_lane_divider_width_scale(config_.skin, skin_edit_mode_);
@@ -1045,10 +1148,12 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
     const bool lr2_source = active_skin_source == "lr2";
     const int lr2_shift = lr2_source ? 1 : 0;
     const SkinSettingsRows stable_rows{lr2_source};
-    const TenRiffSkinGameplayStyle* manifest_style =
-        active_skin_source == "tenriff" && active_tenriff_skin_.found
-            ? &active_tenriff_skin_.gameplay_style
+    const TenRiffSkinDefinition* preview_definition =
+        active_skin_source == "tenriff"
+            ? active_tenriff_skin_for_layout(lane_count, seven_plus_one)
             : nullptr;
+    const TenRiffSkinGameplayStyle* manifest_style =
+        preview_definition ? &preview_definition->gameplay_style : nullptr;
     auto style_bool = [&](const std::optional<bool>& value, bool fallback) {
         return manifest_style && value.has_value() ? *value : fallback;
     };
@@ -1076,6 +1181,19 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
                     settings_cursor_ == stable_rows.index_of(SkinSettingsRowId::KeyMode),
                     render::MenuHitTargetKind::SettingsRow,
                     stable_rows.index_of(SkinSettingsRowId::KeyMode), false, true);
+    append_menu_row(
+        render.generic,
+        ui_text("Scratch Position", "스크래치 위치"),
+        seven_plus_one
+            ? (config::normalize_skin_scratch_position_token(config_.skin.scratch_position) == "right"
+                   ? ui_text("Right", "오른쪽")
+                   : ui_text("Left", "왼쪽"))
+            : ui_text("7+1 Only", "7+1 전용"),
+        settings_cursor_ == stable_rows.index_of(SkinSettingsRowId::ScratchPosition),
+        render::MenuHitTargetKind::SettingsRow,
+        stable_rows.index_of(SkinSettingsRowId::ScratchPosition),
+        false,
+        seven_plus_one);
     append_menu_row(render.generic, ui_text("Skin Source", "스킨 소스"), ui_skin_source_label(active_skin_source), settings_cursor_ == 0,
                     render::MenuHitTargetKind::SettingsRow, 0, false, true);
     append_menu_row(render.generic, imported_skin_row_label, imported_skin_value, settings_cursor_ == 1,
@@ -1109,7 +1227,13 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
                     false, render::MenuHitTargetKind::SettingsRow,
                     5 + lr2_shift, editable_tenriff_skin, false);
     append_menu_row(render.generic, ui_text("Target Lane", "대상 레인"),
-                    ui_text("Lane ", "레인 ") + std::to_string(skin_edit_lane_ + 1) + " / " + std::to_string(lane_count),
+                    (seven_plus_one && skin_edit_lane_ == 0
+                         ? ui_text("Scratch", "스크래치")
+                         : (seven_plus_one
+                                ? ui_text("Key ", "키 ") + std::to_string(skin_edit_lane_)
+                                : ui_text("Lane ", "레인 ") +
+                                      std::to_string(skin_edit_lane_ + 1))) +
+                        " / " + std::to_string(lane_count),
                     settings_cursor_ == 4 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 4 + lr2_shift, false, true);
     append_menu_row(render.generic,
                     ui_text("Target Gap", "대상 간격"),
@@ -1245,8 +1369,14 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
             ? ui_text("Skin Manifest", "스킨 매니페스트")
             : config::skin_color_label(preview_lane_colors[static_cast<std::size_t>(skin_edit_lane_)]);
     render.generic.skin_preview.lane_count = lane_count;
-    render.generic.skin_preview.selected_lane = clamp_int(skin_edit_lane_ + 1, 1, lane_count);
-    render.generic.skin_preview.selected_gap = (gap_count > 0) ? clamp_int(skin_edit_gap_ + 1, 1, gap_count) : -1;
+    render.generic.skin_preview.selected_lane = clamp_int(
+        preview_layout.visual_lane_for_source(skin_edit_lane_ + 1), 1, lane_count);
+    int selected_visual_gap = skin_edit_gap_ + 1;
+    if (preview_layout.seven_plus_one && preview_layout.visual_scratch_lane == lane_count) {
+        selected_visual_gap = skin_edit_gap_ == 0 ? gap_count : skin_edit_gap_;
+    }
+    render.generic.skin_preview.selected_gap =
+        (gap_count > 0) ? clamp_int(selected_visual_gap, 1, gap_count) : -1;
     render.generic.skin_preview.judgement_line_position = std::clamp(
         config_.skin.judgement_line_position,
         config::kJudgementLinePositionMin,
@@ -1256,17 +1386,17 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
         config::kComboPositionMin,
         config::kComboPositionMax);
     render.generic.skin_preview.lane_width_scale_count =
-        std::min(preview_lane_width_scales.size(), render.generic.skin_preview.lane_width_scales.size());
+        std::min(visual_preview_lane_width_scales.size(), render.generic.skin_preview.lane_width_scales.size());
     render.generic.skin_preview.lane_width_scales.fill(config::kLaneWidthScaleDefault);
     for (std::size_t lane = 0; lane < render.generic.skin_preview.lane_width_scale_count; ++lane) {
-        render.generic.skin_preview.lane_width_scales[lane] = preview_lane_width_scales[lane];
+        render.generic.skin_preview.lane_width_scales[lane] = visual_preview_lane_width_scales[lane];
     }
     render.generic.skin_preview.note_width_scale = preview_note_width_scale;
     render.generic.skin_preview.lane_spacing_scale_count =
-        std::min(preview_lane_spacing_scales.size(), render.generic.skin_preview.lane_spacing_scales.size());
+        std::min(visual_preview_lane_spacing_scales.size(), render.generic.skin_preview.lane_spacing_scales.size());
     render.generic.skin_preview.lane_spacing_scales.fill(config::kLaneSpacingScaleDefault);
     for (std::size_t gap = 0; gap < render.generic.skin_preview.lane_spacing_scale_count; ++gap) {
-        render.generic.skin_preview.lane_spacing_scales[gap] = preview_lane_spacing_scales[gap];
+        render.generic.skin_preview.lane_spacing_scales[gap] = visual_preview_lane_spacing_scales[gap];
     }
     render.generic.skin_preview.note_height_scale = preview_note_height_scale;
     render.generic.skin_preview.lane_divider_width_scale = preview_lane_divider_width_scale;
@@ -1320,7 +1450,7 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
     render.generic.skin_preview.skin_revision = tenriff_skin_revision_;
     render.generic.skin_preview.resolved_tenriff_skin =
         active_skin_source == "tenriff"
-            ? active_tenriff_gameplay_for_keys(lane_count)
+            ? active_tenriff_gameplay_for_layout(lane_count, seven_plus_one)
             : nullptr;
     render.generic.skin_preview.lr2_resolution_override =
         config::normalize_skin_lr2_resolution_mode_token(config_.skin.lr2_resolution_mode);
@@ -1348,12 +1478,17 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
         config::kSkinHoldBodyOpacityMin,
         config::kSkinHoldBodyOpacityMax);
     render.generic.skin_preview.lane_colors.fill(0);
+    const auto visual_manifest_lane_colors =
+        manifest_style
+            ? lane_values_in_visual_order(manifest_style->lane_colors, preview_layout)
+            : std::vector<uint32_t>{};
     for (int lane = 0; lane < lane_count && lane < static_cast<int>(kGameplayHudMaxLanes); ++lane) {
         const std::size_t lane_index = static_cast<std::size_t>(lane);
         render.generic.skin_preview.lane_colors[lane_index] =
-            manifest_style && !manifest_style->lane_colors.empty()
-                ? manifest_style->lane_colors[std::min(lane_index, manifest_style->lane_colors.size() - 1u)]
-                : config::skin_color_rgb(preview_lane_colors[lane_index]);
+            !visual_manifest_lane_colors.empty()
+                ? visual_manifest_lane_colors[
+                      std::min(lane_index, visual_manifest_lane_colors.size() - 1u)]
+                : config::skin_color_rgb(visual_preview_lane_colors[lane_index]);
     }
 
     for (const auto& status : skin_status_messages_) {

@@ -384,6 +384,10 @@ bool GameSession::initialize(const CommandLineOptions& options) {
         one_miss_fail_enabled_ = replay_source_.mode.one_miss_fail_enabled;
         pacemaker_mode_ = "off";
     }
+    if (!replay_playback_enabled_ &&
+        random_mode_uses_fresh_session_seed(config_.mode.random)) {
+        config_.mode.random_seed = next_random_session_seed();
+    }
     if (!replay_playback_enabled_ && !options.ghost_replay_path.empty()) {
         auto ghost_load = gameplay::load_replay_json(options.ghost_replay_path);
         if (!ghost_load.success()) {
@@ -2162,6 +2166,8 @@ void GameSession::shutdown() {
             replay.mode.random = config_.mode.random;
             replay.mode.random_seed = config_.mode.random_seed;
             replay.mode.gauge = config_.mode.gauge;
+            replay.server_challenge_id = options_.ranked_challenge_id;
+            replay.server_challenge_nonce = options_.ranked_challenge_nonce;
             replay.mode.autoplay_enabled = autoplay_enabled_;
             replay.mode.practice_no_fail_enabled = practice_no_fail_enabled_;
             replay.mode.one_miss_fail_enabled = one_miss_fail_enabled_;
@@ -2446,7 +2452,8 @@ void GameSession::audio_callback(float* output,
                     if (!result_transition_pending_) {
                         const int64_t tail_samples =
                             ms_to_samples(std::max(0.0, config_.ui.result_tail_ms), sample_rate_);
-                        result_transition_sample_ = buffer_end_samples + tail_samples;
+                        result_transition_sample_ = gameplay_result_transition_sample(
+                            buffer_end_samples, chart_.duration_samples, tail_samples);
                         result_transition_pending_ = true;
                     }
                     if (buffer_end_samples >= result_transition_sample_) {
@@ -2799,6 +2806,15 @@ void GameSession::process_future_events(int64_t buffer_start_samples,
             continue;
         }
         if (auto lane = lane_from_keycode(next->event.keycode)) {
+            if (should_skip_post_note_audio(
+                    engine_->is_finished(),
+                    result_transition_pending_,
+                    replay_playback_enabled_,
+                    autoplay_enabled_,
+                    next->event.state == input::InputState::Pressed)) {
+                finished_.store(true, std::memory_order_release);
+                return;
+            }
             dispatch_lane_input(lane.value(),
                                 next->event.state,
                                 next->sample,
@@ -2865,6 +2881,15 @@ void GameSession::process_input_queue(int64_t buffer_start_samples, int64_t buff
         }
         if (autoplay_enabled_) {
             continue;
+        }
+        if (should_skip_post_note_audio(
+                engine_->is_finished(),
+                result_transition_pending_,
+                replay_playback_enabled_,
+                autoplay_enabled_,
+                event.state == input::InputState::Pressed)) {
+            finished_.store(true, std::memory_order_release);
+            return;
         }
         if (sample > buffer_end_samples + lookahead_samples) {
             sample = buffer_end_samples;

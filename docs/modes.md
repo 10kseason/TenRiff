@@ -30,8 +30,8 @@
 - `key_conversion_algorithm`: `krrcream | nk2 | nk3` (기본 `krrcream`; Krrcream은 원본 노트만 재배치하고 nK2는 안전한 보조 노트를 생성하며, NK3는 번들된 P64와 host beam32를 항상 사용하고 10K가 아닌 원본을 10K로 변환할 때만 일반화 MLP를 추가)
 - `key_conversion_nk2_preset`: `native | transform | remaster` (기본 `native`; nK2 선택 시 `Native (12%)`, `Transform (35%)`, `Remaster (65%)`, Krrcream 선택 시 행 잠금)
 - `gauge`: `normal | hard | ex_hard | easy | shift`
-- `random`: `off | mirror | rr | fr | sr`
-- `random_seed`: RR/FR/SR, 강제 key-mode 변환, Note Add, LN Mix 대상 선택의 고정 시드 (0도 고정 값으로 취급)
+- `random`: `off | mirror | rr | frns | sr` (`fr`은 기존 설정 호환 alias)
+- `random_seed`: RR/SR, 강제 key-mode 변환, Note Add, LN Mix 대상 선택의 고정 시드 (0도 고정 값으로 취급). 일반 Random(`fr`/`frns`)은 플레이를 시작할 때마다 새 세션 seed를 만들고 replay에는 실제 seed를 기록
 - `mods`: Mod Manager에서 정규화해 저장하는 mod token 배열
 - `ghost_battle_enabled`: `false | true`
   - 기본값은 `false`
@@ -57,7 +57,7 @@
   - DP 레이아웃은 두 플레이어 영역을 서로 바꾸지 않고 각 영역 안에서 독립적으로 반전
   - Mirror 자체는 `random_seed`를 사용하지 않지만, 먼저 실행되는 강제 key-mode 변환은 seed를 사용할 수 있음
 - **RR(R-Random)**: 스크래치는 고정하고 각 플레이 가능 레인 그룹을 seed 기반 원형 회전; DP는 좌우 영역을 독립 처리
-- **FR(Full Random)**: 레인 전체를 랜덤 **퍼뮤테이션**으로 치환
+- **Random / FRNS**: 스크래치를 제자리에 고정하고 건반 레인만 매 플레이의 새 seed로 랜덤 **퍼뮤테이션**. 같은 곡을 재도전해도 새 배치가 나오며 replay 재생은 기록된 실제 seed로 동일 배치를 복원
 - **SR(Super Random)**: 노트별 랜덤 배치
   - 동일 레인에 **겹침(동시 시각 포함)**이 없도록 후보 레인을 선택
   - **롱노트는 헤드/테일을 동일 레인에 유지**

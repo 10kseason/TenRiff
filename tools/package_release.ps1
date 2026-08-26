@@ -3,7 +3,7 @@ param(
     [string]$BuildReleaseDirectory,
     [Parameter(Mandatory = $true)]
     [string]$OutputDirectory,
-    [string]$Version = "1.4.5.3"
+    [string]$Version = "1.5.0"
 )
 
 $ErrorActionPreference = "Stop"
@@ -76,7 +76,7 @@ foreach ($relative in $topFiles) {
     Copy-Item -LiteralPath (Join-Path $repoRoot $relative) -Destination $binaryRoot
 }
 
-foreach ($directory in @("Mainmusic", "config", "docs", "examples", "models")) {
+foreach ($directory in @("Mainmusic", "config", "docs", "examples", "models", "skins")) {
     Copy-Item -LiteralPath (Join-Path $repoRoot $directory) -Destination $binaryRoot -Recurse
 }
 $ncnnNoticeDirectory = Join-Path $binaryRoot "third_party\ncnn-20260526"
@@ -89,7 +89,8 @@ Copy-Item -LiteralPath (Join-Path $repoRoot "tools\onnx_upscaler\README.md") `
 
 Copy-Item -LiteralPath (Join-Path $buildRoot "TenRiff.exe") -Destination $binaryRoot
 $runtimeFiles = @(
-    "ncnn.dll"
+    "ncnn.dll",
+    "tenriff-replay-verifier.exe"
 )
 foreach ($runtime in $runtimeFiles) {
     $runtimePath = Join-Path $buildRoot $runtime

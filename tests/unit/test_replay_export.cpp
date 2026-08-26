@@ -1,9 +1,14 @@
 #include "doctest/doctest.h"
 
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <limits>
 #include <sstream>
+
+#ifdef _WIN32
+#include <process.h>
+#endif
 
 #include "app/MenuRecordUtils.h"
 #include "app/ChartFileHash.h"
@@ -25,6 +30,29 @@ using tenriff::gameplay::save_result_json;
 using tenriff::input::InputState;
 
 namespace {
+
+int run_replay_verifier_process(const std::filesystem::path& replay,
+                                const std::filesystem::path& chart,
+                                const std::string& challenge_id,
+                                const std::string& challenge_nonce) {
+#ifdef _WIN32
+    const std::string executable = TENRIFF_TEST_REPLAY_VERIFIER_PATH;
+    const std::string replay_path = replay.u8string();
+    const std::string chart_path = chart.u8string();
+    const char* arguments[] = {
+        executable.c_str(), "--replay", replay_path.c_str(),
+        "--chart", chart_path.c_str(), "--challenge-id", challenge_id.c_str(),
+        "--challenge-nonce", challenge_nonce.c_str(), nullptr};
+    return static_cast<int>(_spawnv(_P_WAIT, executable.c_str(), arguments));
+#else
+    const std::string command =
+        "\"" TENRIFF_TEST_REPLAY_VERIFIER_PATH "\" --replay \"" +
+        replay.u8string() + "\" --chart \"" + chart.u8string() +
+        "\" --challenge-id \"" + challenge_id +
+        "\" --challenge-nonce \"" + challenge_nonce + "\"";
+    return std::system(command.c_str());
+#endif
+}
 
 std::string read_file(const std::filesystem::path& path) {
     std::ifstream file(path, std::ios::binary);
@@ -350,6 +378,8 @@ TEST_CASE("file replay verification binds the replay and exact chart SHA-256") {
     replay.chart_path = chart_path.string();
     replay.chart_format = "bms";
     replay.chart_sha256 = chart_hash.sha256;
+    replay.server_challenge_id = "0123456789abcdef0123456789abcdef";
+    replay.server_challenge_nonce = std::string(64, '9');
     replay.ruleset_id = std::string(tenriff::app::kCanonicalReplayRulesetId);
     replay.sample_rate = 48000;
     replay.rate = 1.0;
@@ -366,6 +396,10 @@ TEST_CASE("file replay verification binds the replay and exact chart SHA-256") {
     replay.final_score = tenriff::gameplay::scale_native_score(
         replay.stats.raw_score, replay.score_multiplier);
     REQUIRE(save_replay_json(replay_path.string(), replay).success());
+    const auto challenge_bound = load_replay_json(replay_path.string());
+    REQUIRE(challenge_bound.success());
+    CHECK(challenge_bound.replay->server_challenge_id == replay.server_challenge_id);
+    CHECK(challenge_bound.replay->server_challenge_nonce == replay.server_challenge_nonce);
 
     const auto original_replay_hash = tenriff::app::hash_chart_file(replay_path, &hash_error);
     REQUIRE(original_replay_hash.valid());
@@ -374,6 +408,13 @@ TEST_CASE("file replay verification binds the replay and exact chart SHA-256") {
     CHECK(verified.verified());
     CHECK(verified.official_eligible);
     CHECK(verified.claims_match);
+
+    CHECK(run_replay_verifier_process(
+              replay_path, chart_path, replay.server_challenge_id,
+              replay.server_challenge_nonce) == 0);
+    CHECK(run_replay_verifier_process(
+              replay_path, chart_path, replay.server_challenge_id,
+              "wrong") != 0);
 
     replay.final_score = 1;
     replay.stats.raw_score = 1;

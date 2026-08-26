@@ -171,6 +171,7 @@ TEST_CASE("config defaults prefer 44100 Hz audio") {
     CHECK(config.skin.lane_divider_width_scale == doctest::Approx(1.0));
     CHECK(config.skin.hold_body_width_scale == doctest::Approx(1.00));
     CHECK(config.skin.single_color == "off");
+    CHECK(config.skin.scratch_position == "left");
     const auto default_lane_widths_10k = tenriff::config::resolved_skin_lane_width_scales(config.skin, "10k");
     REQUIRE(default_lane_widths_10k.size() == 10u);
     CHECK(default_lane_widths_10k[0] == doctest::Approx(tenriff::config::kLaneWidthScaleDefault));
@@ -186,8 +187,13 @@ TEST_CASE("config defaults prefer 44100 Hz audio") {
     CHECK(config.ui.favorite_chart_keys.empty());
     CHECK(config.ui.collections.empty());
     CHECK(config.ui.song_collection_filter == "all");
+    CHECK(config.ui.song_key_filter == 0);
+    CHECK(config.ui.song_level_min_filter == 0);
+    CHECK(config.ui.song_level_max_filter == 0);
     CHECK(config.ui.difficulty_table_path.empty());
     CHECK(config.ui.difficulty_table_url.empty());
+    CHECK(config.ui.online_records_server_url == "http://127.0.0.1:27302");
+    CHECK(tenriff::config::resolved_skin_lane_colors(config.skin, "7+1").size() == 8u);
     CHECK(tenriff::config::resolved_skin_lane_colors(config.skin, "16k").size() == 16u);
 }
 
@@ -209,10 +215,15 @@ TEST_CASE("config save and load preserve favorites and collections") {
         {"Practice", {"songB", "songC"}},
     };
     config.ui.song_collection_filter = "Practice";
+    config.ui.song_key_filter = 7;
+    config.ui.song_level_min_filter = 8;
+    config.ui.song_level_max_filter = 14;
     config.ui.profile_nickname = "Luna Pilot";
     config.ui.profile_avatar_path = "D:/avatars/luna.png";
     config.ui.difficulty_table_path = "tables/insane.json";
     config.ui.difficulty_table_url = "https://example.test/insane/";
+    config.ui.online_records_server_url = "https://ranked.example.test";
+    config.skin.scratch_position = "right";
 
     std::string error;
     REQUIRE(loader.save_profile("profiles/test", config, &error));
@@ -223,10 +234,15 @@ TEST_CASE("config save and load preserve favorites and collections") {
     CHECK(result.config.ui.favorite_chart_keys == config.ui.favorite_chart_keys);
     CHECK(result.config.ui.collections == config.ui.collections);
     CHECK(result.config.ui.song_collection_filter == "Practice");
+    CHECK(result.config.ui.song_key_filter == 7);
+    CHECK(result.config.ui.song_level_min_filter == 8);
+    CHECK(result.config.ui.song_level_max_filter == 14);
     CHECK(result.config.ui.profile_nickname == "Luna Pilot");
     CHECK(result.config.ui.profile_avatar_path == "D:/avatars/luna.png");
     CHECK(result.config.ui.difficulty_table_path == "tables/insane.json");
     CHECK(result.config.ui.difficulty_table_url == "https://example.test/insane/");
+    CHECK(result.config.ui.online_records_server_url == "https://ranked.example.test");
+    CHECK(result.config.skin.scratch_position == "right");
 
 }
 TEST_CASE("profile nickname normalization is UI-safe and UTF-8 bounded") {
@@ -1833,6 +1849,24 @@ TEST_CASE("runtime migration shortens the previous three-second result tail defa
     custom.ui.result_tail_ms = 1250.0;
     CHECK_FALSE(tenriff::app::migrate_bms_first_runtime_config(custom));
     CHECK(custom.ui.result_tail_ms == doctest::Approx(1250.0));
+}
+TEST_CASE("online records URL normalization accepts safe HTTP base addresses") {
+    CHECK(tenriff::config::normalize_online_records_server_url(
+              " https://ranked.example.test/api/ ") ==
+          "https://ranked.example.test/api");
+    CHECK(tenriff::config::normalize_online_records_server_url(
+              "http://127.0.0.1:27302") ==
+          "http://127.0.0.1:27302");
+    CHECK(tenriff::config::normalize_online_records_server_url(
+              "ftp://ranked.example.test").empty());
+    CHECK(tenriff::config::normalize_online_records_server_url(
+              "http://ranked.example.test").empty());
+    CHECK(tenriff::config::normalize_online_records_server_url(
+              "https://player:secret@ranked.example.test").empty());
+    CHECK(tenriff::config::normalize_online_records_server_url(
+              "https://ranked.example.test:999999999999999999999").empty());
+    CHECK(tenriff::config::normalize_online_records_server_url(
+              "https://ranked.example.test/api?token=x").empty());
 }
 
 TEST_CASE("runtime migration flips the old default vsync preset to off") {

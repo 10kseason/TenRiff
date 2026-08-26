@@ -326,6 +326,12 @@ ExportResult save_replay_json(const std::string& path, const ReplayFile& replay,
     obj.emplace("chart_sha256", config::JsonValue{replay.chart_sha256});
     obj.emplace("ruleset_id", config::JsonValue{replay.ruleset_id});
     obj.emplace("created_utc", config::JsonValue{replay.created_utc});
+    if (!replay.server_challenge_id.empty()) {
+        obj.emplace("server_challenge_id", config::JsonValue{replay.server_challenge_id});
+    }
+    if (!replay.server_challenge_nonce.empty()) {
+        obj.emplace("server_challenge_nonce", config::JsonValue{replay.server_challenge_nonce});
+    }
     obj.emplace("sample_rate", config::JsonValue{static_cast<double>(replay.sample_rate)});
     obj.emplace("rate", config::JsonValue{replay.rate});
     obj.emplace("input_offset_ms", config::JsonValue{replay.input_offset_ms});
@@ -417,6 +423,8 @@ ReplayLoadResult load_replay_json(const std::string& path) {
     replay.chart_sha256 = read_json_string(*root, "chart_sha256");
     replay.ruleset_id = read_json_string(*root, "ruleset_id");
     replay.created_utc = read_json_string(*root, "created_utc");
+    replay.server_challenge_id = read_json_string(*root, "server_challenge_id");
+    replay.server_challenge_nonce = read_json_string(*root, "server_challenge_nonce");
     replay.sample_rate = read_json_int(*root, "sample_rate", read_json_int(*trace, "sample_rate", 0));
     replay.rate = read_json_number(*root, "rate", read_json_number(*trace, "rate", 1.0));
     replay.input_offset_ms = read_json_number(*root, "input_offset_ms", 0.0);

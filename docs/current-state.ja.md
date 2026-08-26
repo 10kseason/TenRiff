@@ -3,7 +3,7 @@
 この文書は、次のエージェントや新しい作業者が最初に読むべき current-state 文書です。目的は、「このプロジェクトは今どういう状態で、どこを見ればよく、何がまだ未検証か」を素早く把握できるようにすることです。
 
 ## Baseline
-- 現在の stable release line は `1.4.5.3`
+- 現在の stable release line は `1.5.0`
 - UI-r2 の Result は 2.2 秒の timeline で prism、score、rank、clear status、statistics、graphs を順に表示する。Space で演出を skip でき、完了までは Continue/Retry/Replay 入力を lock する。
 - UI-r2 Song Select は top tab、7-row jacket library、大きな selected artwork、best-record card、chart/mode panel、実動する START action を使用し、Collection/Store/currency/global ranking の仮 UI は表示しない
 - Song Select の Rate、Hi-Speed、Gauge、Random cell は左 click で増加/次、右 click で減少/前を適用して即時保存する。current chart の key count は欠けず、best record は score・accuracy・max combo を同時に表示する。
@@ -95,13 +95,13 @@
   - ゲーム内 Mode Settings の `Key Converter` で `Krrcream`、内蔵の決定論的 `KeyWeaver nK2`、または `KeyWeaver NK3 ONNX` を選択し、設定と replay metadata に保存
   - 個別の `Conversion Note Add` 設定は削除。Krrcream は元 note の再配置のみを行い、nK2 は key count 拡張時に変換後の target layout へ安全な support note を直接生成する。
   - nK2 preset は既定の `Native (12%)`、`Transform (35%)`、`Remaster (65%)` から選択する。`Remaster` は budget を上げつつ anchor を固定して原曲の配置を残し、LN 区間を同じ長さの LN で埋める。3 つとも上限であり、実際の追加量は原曲の密度と safety window で決まる。Krrcream では row を lock し、standalone converter GUI の Krrcream Max/Min/Speed/Seed も変更不可。
-  - 1.4.5.3 公式 build/Windows ZIP は standalone BMS key-converter CLI/GUI を build・同梱しない。top-level CMake option は既定 `OFF` で、source は開発 regression 用のみ維持
+  - 1.5.0 公式 build/Windows ZIP は standalone BMS key-converter CLI/GUI を build・同梱しない。top-level CMake option は既定 `OFF` で、source は開発 regression 用のみ維持
   - NK3 は同梱 P64 と host beam32 を常に組み合わせる。10K 以外の source を 10K に変換するときだけ generalized pattern MLP を追加し、10K→10K とその他すべての target は P64 のみを使う。既定の `AUTO` backend は ncnn Vulkan で P64 と MLP を AMD/NVIDIA GPU 上に実行し、任意の OpenVINO compatibility path を fallback として維持する。`TENRIFF_NK3_BACKEND` と `TENRIFF_NK3_VULKAN_DEVICE` で強制選択できる。
   - `mode.key_mode=none` は元のキー数と基本パターンレイアウトを維持
 - Native difficulty:
   - BMS の LV/CR 計算では long-note Head/Tail の miss-ms だけを 0.5倍で評価し、`300ms`を`150ms`として緩和する。実際の gameplay 判定 window は変更しない
 - Lane transform:
-  - Random は `Off / Mirror / FR / SR` に対応。Mirror は key-mode 変換後の最終 lane を反転し、10K/16K は各 player half 内で独立して反転
+  - Random は `Off / Mirror / Random (Scratch Fixed) / SR` に対応。通常 Random は scratch を固定し、play ごとに新しい key-lane 配置を生成して実際の seed を replay に記録
   - Mod Manager の `LN Mix 10%～90%` は既存 hold を維持し、同じ lane の既存 span と重なる head を除外する。base BPM 基準の 1/8-note hold が次の同一 lane note より 50ms 以上前に終わる tap から設定割合を `Random Seed` で選び、すべての Mix 段階で長い 1/8-note 60% / 中間 1/16-note 20% / 短い 1/24・1/32-note 20% に配分する
 - Skins / gameplay feel:
   - 標準 `10+2 DP` chart は scratch 2 lane を除く実際の 10 key に `10K` lane-color palette を順番に適用し、native 12K palette とは独立して保持
@@ -114,13 +114,14 @@
   - Black Playfield は lane spacing を含む player/ghost playfield 全体を完全な黒で表示
   - キーモードごとの lane-width 配列と inter-lane spacing 配列が保存され、preview / live gameplay / ghost field の同じレイアウト計算に適用される
   - 対応 skin route は `native`、TenRiff `skin.json` v1、LR2 playskin。Skins で TenRiff/LR2 folder を選択または drop すると既存 install を上書きせず active profile へ移植
+  - executable 横の `skins/` にある完成 TenRiff skin を既定一覧へ統合し、同名なら active profile の `skins/tenriff/` copy を優先
   - 標準 `LR2files` または `Theme` root を選ぶと、`IIDX` folder と IIDX asset に依存する theme を除いた直下の theme を別 skin として一括 install し、sibling-theme path を維持する。symlink は skip し、既存 folder は上書きしない
   - LR2 note/LN image、lane gap、destination size を反映し、`play/Gear` 下部 frame は field size に連動して拡大し、aspect ratio を維持したまま判定線の下に clip する単一 overlay として表示する。`#CUSTOMFILE` wildcard include の default 選択を解決し、Gear がない場合は falling note / LN head を receptor に再利用しない
   - native skin は各 lane 下部に digital piano key を表示し、入力を hold している間だけ key が沈む。打鍵時は短い cyan/magenta glitch pulse を表示し、process が foreground を失うと hold visual も reset
   - `skin.lr2_resolution_mode` は `auto / sd / hd / fhd` を保持
   - LR2 auto-detect は asset 名ではなく playskin `#DST_NOTE` の座標範囲を使う
   - フィールド上端からの future-note entry easing
-  - 最後の判定ノート処理直後に gameplay が終了
+  - 最後の判定ノート後は既定で音楽終了まで待機し、その間に lane key を押すと直ちに Result へ移動
 - Judge:
   - 既定 `GOOD` window は `75ms`
   - 既定の `BAD` window は `210ms`、`Judge Easy` は `262.5ms`、`Judge Hard` は `340ms`
@@ -208,7 +209,7 @@
 
 ## Runtime / Packaging Rules
 - 新しい user profile は自動生成される
-- 現在の stable P2P 配布ラインは `TenRiff 1.4.5.3`
+- 現在の stable P2P 配布ラインは `TenRiff 1.5.0`
 - distribution package には `Songs` を含めない
 - distribution package には `Main Menu / Options / Song Selecte / Multiplayer Lobby / Clear / Failed` の `Mainmusic/` scene slot を含め、各 `Name.mp3` と `Name 2.mp3`～`Name 64.mp3` を自動検出して scene 再入場ごとに循環する
 - distribution 更新には built artifact と必要な runtime asset だけを含める

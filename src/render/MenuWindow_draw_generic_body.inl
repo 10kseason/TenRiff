@@ -684,19 +684,24 @@
                                                      row_window_start + visible_row_count);
             for (int row_list_index = row_window_start; row_list_index < row_window_end; ++row_list_index) {
                 const auto& row = data.generic.rows[static_cast<std::size_t>(row_list_index)];
+                const int64_t flash_age_ns = render_now_ns - row.change_flash_started_ns;
+                const bool change_flash = row.change_flash_started_ns > 0 &&
+                    flash_age_ns >= 0 && flash_age_ns < 900'000'000LL &&
+                    ((flash_age_ns / 150'000'000LL) % 2 == 0);
+                const bool visually_selected = row.selected || change_flash;
                 const bool highlight = row.selected || row.activatable || row.adjustable;
                 const D2D1_RECT_F row_rect = D2D1::RectF(row_left, row_y, row_right, row_y + row_height);
                 const D2D1_ROUNDED_RECT rr = D2D1::RoundedRect(row_rect, 12.0f, 12.0f);
                 if (highlight) {
                     ID2D1SolidColorBrush* fill =
-                        row.selected ? d2d_->button_selected_brush.Get() : d2d_->button_brush.Get();
+                        visually_selected ? d2d_->button_selected_brush.Get() : d2d_->button_brush.Get();
                     if (fill) {
                         ctx->FillRoundedRectangle(rr, fill);
                     }
                     ID2D1SolidColorBrush* border =
-                        row.selected ? d2d_->accent_brush.Get() : d2d_->button_border_brush.Get();
+                        visually_selected ? d2d_->accent_brush.Get() : d2d_->button_border_brush.Get();
                     if (border) {
-                        ctx->DrawRoundedRectangle(rr, border, row.selected ? 2.0f : 1.0f);
+                        ctx->DrawRoundedRectangle(rr, border, visually_selected ? 2.0f : 1.0f);
                     }
                 }
 

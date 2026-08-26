@@ -17,8 +17,9 @@ TEST_CASE("Song Select random clicks cycle both directions") {
     using tenriff::app::cycle_random_mode;
 
     CHECK(cycle_random_mode("off", 1) == "mirror");
-    CHECK(cycle_random_mode("mirror", 1) == "fr");
+    CHECK(cycle_random_mode("mirror", 1) == "frns");
     CHECK(cycle_random_mode("fr", 1) == "rr");
+    CHECK(cycle_random_mode("frns", 1) == "rr");
     CHECK(cycle_random_mode("rr", 1) == "sr");
     CHECK(cycle_random_mode("sr", 1) == "off");
     CHECK(cycle_random_mode("off", -1) == "sr");

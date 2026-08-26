@@ -7,7 +7,7 @@
 - BMS landmines (`D1-D9`, `E1-E9`) are playable, including `#WAV00`, base-36 damage tokens, `ZZ` instant fail, exact press/release boundary behavior, and lane-mod/key-converter remapping.
 - Results and local records expose fixed native score separately from detail score, and categorical native accuracy separately from continuous timing-based detailed accuracy.
 - 새 replay evidence v3는 차트 SHA-256, canonical ruleset, result-to-replay SHA-256을 저장하고 입력 trace를 headless 엔진으로 재실행합니다. 공식 로컬 best는 재계산된 verified 결과만 사용하며 legacy/custom/assist 기록은 히스토리에 `unverified`로 남습니다.
-- 현재 안정 배포 라인은 `1.4.5.3`
+- 현재 안정 배포 라인은 `1.5.0`
 - UI-r2 Result는 2.2초 타임라인으로 프리즘·점수·등급·상태·통계·그래프를 순차 공개하며, Space로 연출을 건너뛸 수 있고 CONTINUE/RETRY/Replay 입력은 공개 완료 전 잠김
 - UI-r2 Song Select는 상단 탭, 7행 재킷 라이브러리, 대형 선택 이미지, 최고 기록 카드, 차트/모드 패널, 실제 동작하는 START 버튼 구조로 개편되며 Collection/Store/재화/글로벌 랭킹 가상 기능은 표시하지 않음
 - Song Select 우측의 비주얼 레이턴시·하이스피드·Gauge Shift 시작 등급·랜덤 셀은 좌클릭으로 증가/다음, 우클릭으로 감소/이전을 적용하고 즉시 저장함. 현재 차트 키수는 잘림 없이 표시되며 최고 기록은 점수·정확도·최대 콤보를 함께 표시
@@ -107,12 +107,12 @@
   - nK2 프리셋은 기본 `Native (12%)`, `Transform (35%)`, `Remaster (65%)` 중 선택한다. `Remaster`는 예산을 올리면서도 앵커를 잠가 원곡 배치를 유지하고 롱노트 구간을 같은 길이의 롱노트로 채운다. 세 값은 상한이며 실제 추가량은 원본 밀도와 안전창에 따라 낮아진다. Krrcream 선택 시 해당 행은 잠기며, standalone converter GUI의 Krrcream Max/Min/Speed/Seed도 수정할 수 없다.
   - NK3는 번들된 P64를 host beam32에 항상 결합한다. 10K가 아닌 원본을 10K로 변환할 때만 일반화 패턴 MLP를 추가하고, 10→10과 나머지 모든 경로는 P64만 사용한다. 기본 `AUTO` 백엔드는 ncnn Vulkan으로 P64와 MLP를 AMD/NVIDIA GPU에서 실행하고, 선택형 OpenVINO 호환 경로는 폴백으로 유지한다. `TENRIFF_NK3_BACKEND`와 `TENRIFF_NK3_VULKAN_DEVICE`로 강제 선택할 수 있다.
   - 독립 BMS key converter의 CLI/GUI는 기본 `krrcream`과 결정론적 `nK2 Native 50/50` 알고리즘을 선택 지원하며, nK2 선택 시 krrcream 전용 튜닝 필드는 적용하지 않음
-  - 1.4.5.3 공식 빌드/Windows ZIP은 standalone BMS key converter CLI/GUI를 만들거나 포함하지 않으며 top-level CMake 옵션도 기본 `OFF`; 소스는 개발 회귀용으로만 유지
+  - 1.5.0 공식 빌드/Windows ZIP은 standalone BMS key converter CLI/GUI를 만들거나 포함하지 않으며 top-level CMake 옵션도 기본 `OFF`; 소스는 개발 회귀용으로만 유지
   - `mode.key_mode=none`은 차트의 원래 키 수와 기본 패턴 레이아웃을 그대로 유지
 - Native difficulty:
   - BMS LV/CR 계산에서 롱노트 Head/Tail의 miss-ms만 0.5배로 평가해 `300ms`를 `150ms`처럼 완화하며, 실제 gameplay 판정창은 그대로 유지
 - Lane transform:
-  - Random은 `Off / Mirror / FR / SR`를 지원하며, Mirror는 key-mode 변환 뒤 최종 레인을 반전하고 10K/16K는 각 플레이어 절반을 독립적으로 반전
+  - Random은 `Off / Mirror / Random (Scratch Fixed) / SR`를 지원한다. 일반 Random은 매 플레이 새 seed로 스크래치를 제외한 건반만 섞고 replay에는 실제 seed를 기록하며, Mirror는 key-mode 변환 뒤 최종 레인을 반전한다.
   - Mod Manager의 `LN Mix 10%~90%`는 기존 롱노트를 보존하고 같은 레인의 기존 span과 겹치는 head를 제외한다. base BPM 기준 8비트 LN도 다음 동일 레인 노트보다 50ms 먼저 끝낼 수 있는 단노트 중 설정 비율을 `Random Seed`로 고르고, 선택된 LN 길이는 모든 Mix 단계에서 긴 8비트 60% / 중간 16비트 20% / 짧은 24·32비트 20%로 배분
 - Skins / Gameplay feel:
   - 표준 `10+2 DP` 차트는 스크래치 2개를 제외한 실제 10개 키에 `10K` lane color 팔레트를 순서대로 적용하며, native 12K 팔레트와는 독립적으로 유지
@@ -129,13 +129,14 @@
   - Black Playfield를 켜면 lane spacing을 포함한 player/ghost 플레이필드 전체를 완전한 검정으로 렌더링
   - key mode별 개별 lane 폭과 lane 사이 간격을 각각 저장하고 미리보기/실플레이/ghost field에 같은 레이아웃 계산을 적용
   - 지원 스킨 경로는 `native`, TenRiff `skin.json` v1, LR2 playskin이며, Skins 화면에서 TenRiff/LR2 폴더를 선택하거나 드롭하면 활성 프로필에 덮어쓰기 없이 이식
+  - 실행 파일 옆 `skins/`의 완성 TenRiff 스킨을 기본 목록에 합치며, 같은 폴더 이름은 활성 프로필의 `skins/tenriff/` 사본이 우선
   - 표준 `LR2files` 또는 `Theme` 루트를 고르면 정확한 `IIDX` 폴더와 IIDX 자산 의존 테마를 제외한 바로 아래 테마를 별도 스킨으로 일괄 설치하고, 형제 테마 경로를 유지하며, 심볼릭 링크를 건너뛰고, 기존 폴더를 덮어쓰지 않음
   - LR2 note/LN 이미지, lane gap, destination size를 반영하고 `play/Gear` 하단 프레임은 원본 종횡비를 유지한 채 필드 크기에 연동해 확대하고 판정선 아래로 clip하는 단일 오버레이로 표시하며 `#CUSTOMFILE` 와일드카드 include의 기본 선택을 해석. Gear가 없으면 낙하 노트/LN 머리를 receptor로 재사용하지 않음
   - native 기본 스킨은 하단 레인마다 디지털 피아노 건반을 표시하고, 실제 키를 누르는 동안 건반이 내려가며 입력 순간에는 짧은 cyan/magenta 글리치 펄스를 표시. foreground를 잃으면 홀드 시각 상태도 초기화
   - `skin.lr2_resolution_mode`는 `auto / sd / hd / fhd`로 LR2 playskin 해상도 override 토큰을 저장
   - LR2 auto-detect는 asset 이름이 아니라 playskin `#DST_NOTE` 좌표 범위를 기준으로 SD/HD/FHD를 판정
   - 미래 노트 상단 진입 easing
-  - 마지막 판정 노트 처리 직후 플레이 종료
+  - 마지막 판정 노트 뒤에는 기본적으로 음악 종료까지 기다리고, 그 구간에서 레인 키를 누르면 즉시 결과로 이동
 - Judge:
   - 게이지 선택은 항상 켜지는 `Gauge Shift`의 시작 등급 `EX / Hard / Normal / Easy`를 지정함. EX는 Hard와 구분되는 짙은 흑회색으로 표시하며 내부 호환 토큰은 `ex_hard`를 유지
   - `Gauge Shift`는 선택한 시작 등급부터 Easy까지를 각각 100%에서 독립적으로 병렬 계산하고, 현재 tier가 0%로 탈락하면 같은 판정 이력을 누적한 다음 생존 tier를 선택하며 종료 시 가장 높은 생존 tier로 확정함
@@ -230,7 +231,7 @@
 
 ## Runtime / Packaging Rules
 - 새 사용자 프로필은 자동 생성
-- 현재 안정 P2P 배포 라인은 `TenRiff 1.4.5.3`
+- 현재 안정 P2P 배포 라인은 `TenRiff 1.5.0`
 - 배포 패키지에는 `Songs`를 넣지 않음
 - 배포 패키지는 `Main Menu / Options / Song Selecte / Multiplayer Lobby / Clear / Failed` 이름의 `Mainmusic/` 화면 슬롯을 포함하며, 각 `이름.mp3`와 번호가 붙은 `이름 2.mp3`~`이름 64.mp3`를 자동 수집해 화면 재진입마다 순환
 - 배포 업데이트에는 built artifacts와 필요한 런타임 자산만 포함

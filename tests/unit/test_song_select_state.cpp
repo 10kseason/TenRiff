@@ -197,3 +197,31 @@ TEST_CASE("difficulty-table metadata drives labels groups sorting and numeric fi
     CHECK(ascending[1].title == "Table Low");
     CHECK(ascending[2].title == "Native");
 }
+
+TEST_CASE("difficulty table levels without level_order use natural numeric ordering") {
+    SongEntry one;
+    one.title = "one";
+    one.difficulty_table_level = "1";
+    SongEntry ten = one;
+    ten.title = "ten";
+    ten.difficulty_table_level = "10";
+    SongEntry two = one;
+    two.title = "two";
+    two.difficulty_table_level = "2";
+
+    std::vector<SongEntry> entries{ten, two, one};
+    std::stable_sort(entries.begin(), entries.end(), song_entry_less_by_difficulty_asc);
+    CHECK(entries[0].difficulty_table_level == "1");
+    CHECK(entries[1].difficulty_table_level == "2");
+    CHECK(entries[2].difficulty_table_level == "10");
+    CHECK(song_group_level_key(two) < song_group_level_key(ten));
+
+    one.difficulty_table_level = "st1";
+    two.difficulty_table_level = "st2";
+    ten.difficulty_table_level = "st10";
+    entries = {ten, two, one};
+    std::stable_sort(entries.begin(), entries.end(), song_entry_less_by_difficulty_asc);
+    CHECK(entries[0].difficulty_table_level == "st1");
+    CHECK(entries[1].difficulty_table_level == "st2");
+    CHECK(entries[2].difficulty_table_level == "st10");
+}

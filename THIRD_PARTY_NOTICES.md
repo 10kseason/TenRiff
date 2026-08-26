@@ -33,7 +33,7 @@ loader runs the converted P64 and generalized pattern models on Vulkan-capable
 AMD or NVIDIA GPUs without a separate Vulkan SDK installation.
 
 OpenVINO remains an optional source-build compatibility backend when it is
-found at configure time. Official Windows 1.4.5.3 packages use ncnn Vulkan and
+found at configure time. Official Windows 1.5.0 packages use ncnn Vulkan and
 ship `ncnn.dll` with the upstream license.
 
 TenRiff's key-mode converter contains an adapted C++ port of the N2NC keymode-conversion logic from

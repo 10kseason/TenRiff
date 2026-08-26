@@ -9,6 +9,7 @@
 
 #include "doctest/doctest.h"
 
+#include "app/SessionRandomSeed.h"
 #include "gameplay/GameplayEngine.h"
 #include "gameplay/KeyModeConverter.h"
 #include "gameplay/ModeApplier.h"
@@ -267,6 +268,27 @@ TEST_CASE("random mode parser accepts Mirror tokens") {
     REQUIRE(parse_random_mode("mirror").has_value());
     CHECK(parse_random_mode("mirror").value() == RandomMode::Mirror);
     CHECK(to_string(RandomMode::Mirror) == "MIRROR");
+}
+
+TEST_CASE("ordinary random uses a fresh per-play seed and exposes scratch-fixed aliases") {
+    using tenriff::app::next_random_session_seed;
+    using tenriff::app::random_mode_uses_fresh_session_seed;
+    using tenriff::gameplay::RandomMode;
+    using tenriff::gameplay::parse_random_mode;
+
+    CHECK(random_mode_uses_fresh_session_seed("fr"));
+    CHECK(random_mode_uses_fresh_session_seed("FRNS"));
+    CHECK(random_mode_uses_fresh_session_seed("random_no_scratch"));
+    CHECK_FALSE(random_mode_uses_fresh_session_seed("sr"));
+    REQUIRE(parse_random_mode("fr_no_scratch").has_value());
+    CHECK(parse_random_mode("fr_no_scratch").value() == RandomMode::FullRandom);
+
+    uint32_t previous = next_random_session_seed();
+    for (int play = 0; play < 32; ++play) {
+        const uint32_t current = next_random_session_seed();
+        CHECK(current != previous);
+        previous = current;
+    }
 }
 
 TEST_CASE("Mirror preserves player halves for 10K and 16K layouts") {
@@ -1066,6 +1088,29 @@ TEST_CASE("R-Random keeps scratches fixed and rotates DP halves independently") 
         } else {
             CHECK((transformed->lane <= 8) == (original.lane <= 8));
         }
+    }
+}
+
+TEST_CASE("ordinary Random leaves scratch lanes fixed") {
+    using namespace tenriff::gameplay;
+
+    GameplayChart chart;
+    chart.lane_count = 8;
+    chart.scratch_lanes = {1};
+    for (int lane = 1; lane <= 8; ++lane) append_note(chart, lane, 100);
+
+    ModeSettings settings;
+    settings.random = RandomMode::FullRandom;
+    settings.random_seed = 1234;
+    const auto result = apply_mode_settings(chart, settings);
+    for (const auto& original : chart.notes) {
+        const auto transformed = std::find_if(
+            result.chart.notes.begin(), result.chart.notes.end(), [&](const NoteEvent& note) {
+                return note.note_id == original.note_id;
+            });
+        REQUIRE(transformed != result.chart.notes.end());
+        if (original.lane == 1) CHECK(transformed->lane == 1);
+        else CHECK(transformed->lane >= 2);
     }
 }
 

@@ -151,9 +151,11 @@
         const D2D1_RECT_F profile_rect = skin_layout_rect(
             data, "result.profile", D2D1::RectF(1400.0f, 28.0f, 1848.0f, 108.0f));
         draw_result_panel(profile_rect, presentation.background, false);
-        const D2D1_RECT_F avatar_rect = D2D1::RectF(
-            profile_rect.left + 15.0f, profile_rect.top + 9.0f,
-            profile_rect.left + 77.0f, profile_rect.bottom - 9.0f);
+        const D2D1_RECT_F avatar_rect = skin_layout_rect(
+            data, "result.avatar",
+            D2D1::RectF(profile_rect.left + 15.0f, profile_rect.top + 9.0f,
+                        profile_rect.left + 77.0f, profile_rect.top + 71.0f));
+        ctx->PushAxisAlignedClip(profile_rect, D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
         if (ID2D1Bitmap* avatar =
                 find_song_card_preview_bitmap(data.result.profile_avatar_path)) {
             const D2D1_RECT_F source = centered_bitmap_source_rect(avatar->GetSize(), avatar_rect);
@@ -169,15 +171,18 @@
                                       d2d_->card_brush.Get());
             d2d_->card_brush->SetOpacity(saved);
         }
+        ctx->PopAxisAlignedClip();
+        const float profile_text_left = std::max(profile_rect.left + 24.0f,
+                                                 avatar_rect.right + 19.0f);
         draw_result_text(data.result.profile.empty() ? std::string("PLAYER") : data.result.profile,
                          d2d_->title_format.Get(),
-                         D2D1::RectF(profile_rect.left + 96.0f, profile_rect.top + 10.0f,
+                         D2D1::RectF(profile_text_left, profile_rect.top + 10.0f,
                                      profile_rect.right - 23.0f, profile_rect.top + 44.0f),
                          d2d_->text_brush.Get(),
                          presentation.background);
         draw_result_text(result_loc("PERFORMANCE RESULT", "플레이 기록"),
                          d2d_->hud_format.Get(),
-                         D2D1::RectF(profile_rect.left + 96.0f, profile_rect.top + 44.0f,
+                         D2D1::RectF(profile_text_left, profile_rect.top + 44.0f,
                                      profile_rect.right - 23.0f, profile_rect.bottom - 9.0f),
                          d2d_->muted_brush.Get(),
                          presentation.background);

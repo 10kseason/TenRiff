@@ -40,7 +40,7 @@
 
 - `backend` (string)
   - `polling | rawinput`
-  - 현재 `1.4.5.3` 릴리스 라인의 기본값은 `rawinput`
+  - 현재 `1.5.0` 릴리스 라인의 기본값은 `rawinput`
   - `Options -> Input Settings -> Backend` 또는 `Options -> Profile Setup -> Input Backend`에서 프로필별로 RawInput/Polling을 직접 선택 가능
   - 저장값은 런타임 fallback 때문에 자동으로 `polling`으로 덮어쓰지 않음
   - RawInput 시작 실패, 등록 대상 손실, 메시지 창 종료가 확인되면 현재 앱 실행 동안 메뉴와 다음 gameplay 세션 모두 Polling을 유지
@@ -60,7 +60,7 @@
 - `judgement_hz` (int)
   - `1000 | 2000 | 4000 | 8000`
   - 호환성용으로 남아 있는 입력 설정 필드
-  - 현재 `1.4.5.3` runtime은 별도 오디오 판정 서브루프를 이 값으로 구동하지 않음
+  - 현재 `1.5.0` runtime은 별도 오디오 판정 서브루프를 이 값으로 구동하지 않음
   - 기본값은 `4000` (`0.25ms`)
 - `debounce_ms` (double)
   - 실제 Press/Release 전환은 버리지 않고 같은 상태의 중복 이벤트만 상태 추적에서 제거
@@ -159,7 +159,7 @@
 - `random` (string)
   - `off | mirror | fr | sr`
 - `random_seed` (int)
-  - FR/SR, 강제 key-mode 변환, LN Mix 대상 선택의 고정 seed이며 Mirror 레인 반전 자체는 사용하지 않음
+  - RR/SR, 강제 key-mode 변환, LN Mix 대상 선택의 고정 seed이며 Mirror 레인 반전 자체는 사용하지 않음. 일반 Random은 플레이마다 새 session seed를 만들고 replay에 실제 값을 기록
 - `mods` (string array)
   - Note Structure에서 `full_long_notes`, `ln_mix_10`~`ln_mix_90`, `full_short_notes` 중 하나를 선택 가능
   - LN Mix는 base BPM 기준 8비트 LN도 다음 동일 레인 노트보다 50ms 먼저 끝낼 수 있는 단노트만 후보로 삼고, 요청 비율만큼 선택한 LN 길이를 긴 8비트 60% / 중간 16비트 20% / 짧은 24·32비트 20%로 배분
@@ -215,6 +215,13 @@
   - 마지막으로 연 곡 루트
 - `recent_song_sources` (array of string)
   - 최근 외부/내부 song source 목록
+- `song_collection_filter` (string)
+  - 마지막으로 선택한 전체/즐겨찾기/사용자 컬렉션 필터
+- `song_key_filter` (int, `0..16`)
+  - 곡 브라우저의 마지막 키 수 필터. `0`은 전체 키
+- `song_level_min_filter`, `song_level_max_filter` (int, `0..50`)
+  - 마지막 레벨 범위 필터. `0`은 해당 경계를 사용하지 않음
+  - 키 수·레벨·컬렉션 필터는 변경 즉시 프로필 설정에 저장되어 재실행 후에도 유지됨
 - `difficulty_table_path` (string)
   - Browse 화면에서 고른 로컬 BMS 난이도표 header JSON 또는 링크에서 내려받은 프로필 캐시 header 경로
   - header는 `name`, `symbol`, 로컬 상대경로 `data_url`을 사용하고, data array entry는 `md5` 또는 `sha256`과 `level`을 사용
@@ -222,12 +229,20 @@
 - `difficulty_table_url` (string)
   - Browse에서 가져온 http(s) BMSTable HTML 페이지 또는 header JSON 원본 링크
   - 표준 `<meta name="bmstable" content="...">`를 해석해 header/data JSON을 프로필의 `difficulty_tables` 캐시에 저장하며, 로컬 JSON 선택 시에는 비워짐
+- `online_records_server_url` (string)
+  - Song Select `RECORDS`의 Online 탭에서 사용하는 읽기 전용 기록 API 기준 URL
+  - 개발 기본값은 `http://127.0.0.1:27302`; 공개 `1.5.0` 패키지는 배포된 HTTPS 주소로 교체해야 함
+  - 서버 오류나 버전 불일치는 로컬 기록/플레이를 막지 않으며 Online 탭만 fail-closed로 오류를 표시
+  - 곡 브라우저 설정에서 URL을 복사한 뒤 Enter 또는 편집 중 Ctrl+V로 지정 가능
 
 ### `skin`
 - `source` (string)
   - `native | tenriff | lr2`
 - `tenriff_skin_name` (string)
   - 가져온 TenRiff `skin.json` 스킨 폴더 이름
+- `scratch_position` (string)
+  - BMS `7+1` 레이아웃의 스크래치 표시 위치: `left | right`
+  - 입력·판정·리플레이 레인 번호는 유지하고 화면 표시 순서만 바꿈
 - `lr2_skin_name` (string)
   - imported LR2 playskin name
 - `lr2_resolution_mode` (string)
@@ -330,7 +345,7 @@
   - 레인별 `lane_colors`는 덮어쓰지 않으므로 `off`로 되돌리면 기존 팔레트가 복원됨
 - `lane_colors` (object)
   - key mode별 lane 색상 팔레트
-  - 현재 기본/저장 대상 mode는 `4k..10k`, `16k`
+  - 현재 기본/저장 대상 mode는 `4k..10k`, `16k`, BMS 전용 `7+1`
   - 각 mode 값은 lane 수만큼의 string array
   - 지원 토큰:
     `ice`, `azure`, `gold`, `mint`, `rose`, `violet`, `orange`, `teal`

@@ -4,8 +4,8 @@
 
 ## Current Baseline
 - Windows GUI / runtime が主なサポート経路です。
-- プロジェクト版ラインは `1.4.5.3`。公開 package は NK3 P64 と generalized pattern MLP inference model を同梱するが、BGA upscaler model は同梱しない。互換性と権利を確認済みの upscaler ONNX を選択しても path を保存するだけで、BGA Upscaler は user が有効化して high-spec warning を確認するまで off のまま。自動 benchmark gate はない。
-- 現行 menu / runtime は BMS family（`.bms/.bme/.bml/.pms`）専用で、native/LR2 skin をサポート。
+- プロジェクト版ラインは `1.5.0`。公開 package は NK3 P64 と generalized pattern MLP inference model を同梱するが、BGA upscaler model は同梱しない。互換性と権利を確認済みの upscaler ONNX を選択しても path を保存するだけで、BGA Upscaler は user が有効化して high-spec warning を確認するまで off のまま。自動 benchmark gate はない。
+- 現行 menu / runtime は BMS family（`.bms/.bme/.bml/.pms`）専用で、native、bundle/profile の TenRiff `skin.json`、LR2 skin をサポート。
 - 現在出荷されている挙動は [`docs/current-state.ja.md`](current-state.ja.md) を先に見てください。この roadmap は方向と残作業を示す文書です。
 
 ## 0) 骨格と master clock を固める
@@ -44,3 +44,8 @@
 ## 4) Launcher を付ける
 - folder check、初回 config 生成、error code 整理を扱う。
 - これが終わると、ゲームはローカル PC 上で自己完結する。
+
+## 5) 公開 ranking より先に信頼できる記録を作る
+- [`ranked-integrity-plan.en.md`](ranked-integrity-plan.en.md) に従い、共通 eligibility reason、Local Records 画面、read-only Online Records、shadow submission、公開 verified ranking の順で進める。
+- server は承認済み BMS chart SHA-256 と replay evidence から結果を再計算し、client の score claim を信頼境界にしない。
+- `.osu` chart と osu 派生 import / ruleset / scoring / conversion は ranked 登録不可。native BMS の補助 OD8 統計は local metadata のみ。

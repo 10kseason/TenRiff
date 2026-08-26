@@ -4,6 +4,7 @@
 #include "app/ChartAudioPlayback.h"
 #include "app/ChartAudioStreaming.h"
 #include "app/ChartFileHash.h"
+#include "app/GameplayCompletionFlow.h"
 #include "app/MemoryDiagnostics.h"
 #include "audio/OggVorbisDecoder.h"
 
@@ -46,6 +47,7 @@
 #include "app/PersistedRuntimeConfig.h"
 #include "app/PeerBattleRules.h"
 #include "app/ReplayVerifier.h"
+#include "app/SessionRandomSeed.h"
 #include "app/SessionResultStatus.h"
 #include "config/Keymap.h"
 #include "game/SpeedManager.h"

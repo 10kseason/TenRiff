@@ -4,8 +4,8 @@ This roadmap captures the recommended high-level order for building out the game
 
 ## Current Baseline
 - Windows GUI / runtime is the primary supported path.
-- Project version line is `1.4.5.3`; public packages bundle NK3 P64 and generalized pattern MLP inference models, but no BGA upscaler model. Selecting a compatible rights-cleared upscaler ONNX only stores its path, and BGA Upscaler remains off until the user enables it and accepts the high-spec warning; there is no automatic benchmark gate.
-- The active menu / runtime is BMS-family only (`.bms/.bme/.bml/.pms`) and supports native/LR2 skins.
+- Project version line is `1.5.0`; public packages bundle NK3 P64 and generalized pattern MLP inference models, but no BGA upscaler model. Selecting a compatible rights-cleared upscaler ONNX only stores its path, and BGA Upscaler remains off until the user enables it and accepts the high-spec warning; there is no automatic benchmark gate.
+- The active menu / runtime is BMS-family only (`.bms/.bme/.bml/.pms`) and supports native, bundled/profile TenRiff `skin.json`, and LR2 skins.
 - For current shipped behavior, read `docs/current-state.en.md` first; this roadmap is about direction and remaining work.
 
 ## 0) Fix the Skeleton and Master Clock
@@ -44,3 +44,8 @@ This roadmap captures the recommended high-level order for building out the game
 ## 4) Attach a Launcher
 - Handle folder checks, first-run config creation, and error-code cataloging.
 - Completing this makes the game self-contained on a local PC.
+
+## 5) Build Trusted Records Before Public Ranking
+- Follow [`ranked-integrity-plan.en.md`](ranked-integrity-plan.en.md): shared ranked-eligibility reasons, a dedicated Local Records screen, read-only Online Records, shadow submissions, then public verified rankings.
+- The server recomputes approved BMS results from chart SHA-256 plus replay evidence and never treats a client score claim as authoritative.
+- `.osu` charts and osu-derived import, ruleset, scoring, or conversion paths are ineligible for ranked registration; auxiliary OD8 statistics on a native BMS result remain local metadata only.

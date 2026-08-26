@@ -14,11 +14,18 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
     target.loading_percent = gameplay_hud_.loading_percent;
     target.loading_stage = gameplay_hud_.loading_stage;
     target.lane_count = clamp_int(gameplay_hud_.lane_count, 1, static_cast<int>(kGameplayHudMaxLanes));
+    const LanePresentationLayout lane_layout = resolve_lane_presentation_layout(
+        target.lane_count,
+        gameplay_hud_.scratch_lanes.data(),
+        gameplay_hud_.scratch_lane_count,
+        config::normalize_skin_scratch_position_token(config_.skin.scratch_position));
     const bool tenriff_manifest_active =
         config::normalize_skin_source_token(config_.skin.source) == "tenriff" &&
         !available_tenriff_skin_root_.empty() && !config_.skin.tenriff_skin_name.empty();
     const TenRiffSkinDefinition* gameplay_manifest =
-        tenriff_manifest_active ? active_tenriff_skin_for_keys(target.lane_count) : nullptr;
+        tenriff_manifest_active
+            ? active_tenriff_skin_for_layout(target.lane_count, lane_layout.seven_plus_one)
+            : nullptr;
     const TenRiffSkinGameplayStyle* manifest_style =
         gameplay_manifest
             ? &gameplay_manifest->gameplay_style
@@ -72,8 +79,11 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
         config::kGameplayFieldOffsetXMin,
         config::kGameplayFieldOffsetXMax);
     target.combo_position = clamped_combo_position;
-    const std::string skin_mode = std::to_string(target.lane_count) + "k";
-    const auto resolved_lane_widths = config::resolved_skin_lane_width_scales(config_.skin, skin_mode);
+    const std::string skin_mode = lane_layout.seven_plus_one
+                                      ? std::string("7+1")
+                                      : std::to_string(target.lane_count) + "k";
+    const auto resolved_lane_widths = lane_values_in_visual_order(
+        config::resolved_skin_lane_width_scales(config_.skin, skin_mode), lane_layout);
     target.lane_width_scale_count = std::min(resolved_lane_widths.size(), target.lane_width_scales.size());
     target.lane_width_scales.fill(config::kLaneWidthScaleDefault);
     for (std::size_t i = 0; i < target.lane_width_scale_count; ++i) {
@@ -83,7 +93,8 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
         config::resolved_skin_note_width_scale(config_.skin, skin_mode),
         config::kNoteWidthScaleMin,
         config::kNoteWidthScaleMax);
-    const auto resolved_lane_spacings = config::resolved_skin_lane_spacing_scales(config_.skin, skin_mode);
+    const auto resolved_lane_spacings = lane_gap_values_in_visual_order(
+        config::resolved_skin_lane_spacing_scales(config_.skin, skin_mode), lane_layout);
     target.lane_spacing_scale_count = std::min(resolved_lane_spacings.size(), target.lane_spacing_scales.size());
     target.lane_spacing_scales.fill(config::kLaneSpacingScaleDefault);
     for (std::size_t i = 0; i < target.lane_spacing_scale_count; ++i) {
@@ -155,7 +166,9 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
     target.external_skin_name = active_external_skin_name();
     target.skin_revision = tenriff_skin_revision_;
     target.resolved_tenriff_skin =
-        tenriff_manifest_active ? active_tenriff_gameplay_for_keys(target.lane_count) : nullptr;
+        tenriff_manifest_active
+            ? active_tenriff_gameplay_for_layout(target.lane_count, lane_layout.seven_plus_one)
+            : nullptr;
     target.skin_background_path =
         (target.skin_source == "tenriff" && gameplay_manifest)
             ? gameplay_manifest->gameplay_background_path
@@ -278,24 +291,44 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
 
     target.lane_activity_count = gameplay_hud_.lane_activity_count;
     target.lane_activity.fill(0.0f);
-    std::copy_n(gameplay_hud_.lane_activity.begin(), gameplay_hud_.lane_activity_count, target.lane_activity.begin());
+    for (std::size_t source = 0; source < gameplay_hud_.lane_activity_count; ++source) {
+        const int visual_lane = lane_layout.visual_lane_for_source(static_cast<int>(source) + 1);
+        if (visual_lane > 0 &&
+            static_cast<std::size_t>(visual_lane) <= target.lane_activity.size()) {
+            target.lane_activity[static_cast<std::size_t>(visual_lane - 1)] =
+                gameplay_hud_.lane_activity[source];
+        }
+    }
 
     target.lane_pressed_count = gameplay_hud_.lane_pressed_count;
     target.lane_pressed.fill(0);
-    std::copy_n(gameplay_hud_.lane_pressed.begin(), gameplay_hud_.lane_pressed_count, target.lane_pressed.begin());
+    for (std::size_t source = 0; source < gameplay_hud_.lane_pressed_count; ++source) {
+        const int visual_lane = lane_layout.visual_lane_for_source(static_cast<int>(source) + 1);
+        if (visual_lane > 0 &&
+            static_cast<std::size_t>(visual_lane) <= target.lane_pressed.size()) {
+            target.lane_pressed[static_cast<std::size_t>(visual_lane - 1)] =
+                gameplay_hud_.lane_pressed[source];
+        }
+    }
 
     target.lane_color_count = 0;
     target.lane_colors.fill(0);
-    const auto lane_colors = config::resolved_skin_lane_colors_for_layout(
-        config_.skin,
-        target.lane_count,
-        gameplay_hud_.scratch_lanes.data(),
-        gameplay_hud_.scratch_lane_count);
+    const auto lane_colors = lane_values_in_visual_order(
+        config::resolved_skin_lane_colors_for_layout(
+            config_.skin,
+            target.lane_count,
+            gameplay_hud_.scratch_lanes.data(),
+            gameplay_hud_.scratch_lane_count),
+        lane_layout);
+    const auto manifest_lane_colors =
+        manifest_style
+            ? lane_values_in_visual_order(manifest_style->lane_colors, lane_layout)
+            : std::vector<uint32_t>{};
     target.lane_color_count = std::min<std::size_t>(lane_colors.size(), static_cast<std::size_t>(target.lane_count));
     for (std::size_t i = 0; i < target.lane_color_count; ++i) {
-        target.lane_colors[i] = manifest_style && !manifest_style->lane_colors.empty()
-                                    ? manifest_style->lane_colors[
-                                          std::min(i, manifest_style->lane_colors.size() - 1u)]
+        target.lane_colors[i] = !manifest_lane_colors.empty()
+                                    ? manifest_lane_colors[
+                                          std::min(i, manifest_lane_colors.size() - 1u)]
                                     : config::skin_color_rgb(lane_colors[i]);
     }
 
@@ -346,10 +379,12 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
     target.key_labels.fill(std::string{});
     if (target.key_label_position != "off") {
         config::KeymapManager keymap_manager;
-        const auto bindings = keymap_manager.bindings_for_mode(keymap_, skin_mode);
+        const std::string keymap_mode = std::to_string(target.lane_count) + "k";
+        const auto bindings = keymap_manager.bindings_for_mode(keymap_, keymap_mode);
         target.key_label_count = static_cast<std::size_t>(target.lane_count);
         for (std::size_t i = 0; i < target.key_label_count && i < target.key_labels.size(); ++i) {
-            const std::string lane_id = "lane" + std::to_string(i + 1);
+            const int source_lane = lane_layout.source_lane_for_visual(static_cast<int>(i) + 1);
+            const std::string lane_id = "lane" + std::to_string(source_lane);
             const auto binding = bindings.find(lane_id);
             if (binding != bindings.end()) {
                 target.key_labels[i] = compact_key_label(binding->second);
@@ -361,7 +396,7 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
     for (std::size_t i = 0; i < gameplay_hud_.note_count; ++i) {
         const auto& note = gameplay_hud_.notes[i];
         render::GameplayNoteData out_note;
-        out_note.lane = note.lane;
+        out_note.lane = lane_layout.visual_lane_for_source(note.lane);
         out_note.start_sample = note.start_sample;
         out_note.tail_sample = note.tail_sample;
         out_note.hold = note.hold;
@@ -437,19 +472,29 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
     target.ghost_game_over = gameplay_hud_.ghost_game_over;
     target.ghost_lane_activity_count = gameplay_hud_.ghost_lane_activity_count;
     target.ghost_lane_activity.fill(0.0f);
-    std::copy_n(gameplay_hud_.ghost_lane_activity.begin(),
-                gameplay_hud_.ghost_lane_activity_count,
-                target.ghost_lane_activity.begin());
+    for (std::size_t source = 0; source < gameplay_hud_.ghost_lane_activity_count; ++source) {
+        const int visual_lane = lane_layout.visual_lane_for_source(static_cast<int>(source) + 1);
+        if (visual_lane > 0 &&
+            static_cast<std::size_t>(visual_lane) <= target.ghost_lane_activity.size()) {
+            target.ghost_lane_activity[static_cast<std::size_t>(visual_lane - 1)] =
+                gameplay_hud_.ghost_lane_activity[source];
+        }
+    }
     target.ghost_lane_pressed_count = gameplay_hud_.ghost_lane_pressed_count;
     target.ghost_lane_pressed.fill(0);
-    std::copy_n(gameplay_hud_.ghost_lane_pressed.begin(),
-                gameplay_hud_.ghost_lane_pressed_count,
-                target.ghost_lane_pressed.begin());
+    for (std::size_t source = 0; source < gameplay_hud_.ghost_lane_pressed_count; ++source) {
+        const int visual_lane = lane_layout.visual_lane_for_source(static_cast<int>(source) + 1);
+        if (visual_lane > 0 &&
+            static_cast<std::size_t>(visual_lane) <= target.ghost_lane_pressed.size()) {
+            target.ghost_lane_pressed[static_cast<std::size_t>(visual_lane - 1)] =
+                gameplay_hud_.ghost_lane_pressed[source];
+        }
+    }
     target.ghost_note_count = gameplay_hud_.ghost_note_count;
     for (std::size_t i = 0; i < gameplay_hud_.ghost_note_count; ++i) {
         const auto& note = gameplay_hud_.ghost_notes[i];
         render::GameplayNoteData out_note;
-        out_note.lane = note.lane;
+        out_note.lane = lane_layout.visual_lane_for_source(note.lane);
         out_note.start_sample = note.start_sample;
         out_note.tail_sample = note.tail_sample;
         out_note.hold = note.hold;
@@ -1622,6 +1667,20 @@ void MenuApp::publish_snapshot() {
         populate_result_render_data(render, current_track);
     } else {
         populate_generic_screen_render_data(render);
+    }
+
+    if (render.kind == render::MenuScreenKind::GenericList &&
+        screen_ == settings_change_flash_screen_ &&
+        settings_change_flash_row_ >= 0 &&
+        publish_start_ns >= settings_change_flash_started_ns_ &&
+        publish_start_ns - settings_change_flash_started_ns_ < 900'000'000LL) {
+        for (auto& row : render.generic.rows) {
+            if (row.target_kind == render::MenuHitTargetKind::SettingsRow &&
+                row.row_index == settings_change_flash_row_) {
+                row.change_flash_started_ns = settings_change_flash_started_ns_;
+                break;
+            }
+        }
     }
 
     if (screen_ != Screen::Gameplay && song_indexer_.is_running()) {

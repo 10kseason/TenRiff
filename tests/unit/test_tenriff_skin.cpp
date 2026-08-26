@@ -1,11 +1,13 @@
 #include "doctest/doctest.h"
 
+#include <algorithm>
 #include <filesystem>
 #include <fstream>
 #include <iterator>
 #include <string>
 
 #include "app/ImportedGameplaySkin.h"
+#include "app/LanePresentationLayout.h"
 #include "app/MenuAppSkinUtils.h"
 #include "app/TenRiffSkin.h"
 
@@ -162,6 +164,7 @@ TEST_CASE("TenRiff skin layout keeps known slots and drops malformed ones") {
                "  \"layout\": {\n"
                "    \"song_select\": {\n"
                "      \"center_panel\": [1126, 152, 1882, 922],\n"
+               "      \"avatar\": [1530, 26, 1606, 102],\n"
                "      \"left_panel\": [486, 152, 38, 922],\n"
                "      \"sidebar\": [0, 0, 10, 10]\n"
                "    },\n"
@@ -172,6 +175,7 @@ TEST_CASE("TenRiff skin layout keeps known slots and drops malformed ones") {
     const auto loaded = tenriff::app::load_tenriff_skin_folder(skin.u8string(), 4);
     REQUIRE(loaded.found);
     REQUIRE(loaded.layout_rects.count("song_select.center_panel") == 1u);
+    REQUIRE(loaded.layout_rects.count("song_select.avatar") == 1u);
     const auto& rect = loaded.layout_rects.at("song_select.center_panel");
     CHECK(rect.left == doctest::Approx(1126.0f));
     CHECK(rect.top == doctest::Approx(152.0f));
@@ -182,7 +186,7 @@ TEST_CASE("TenRiff skin layout keeps known slots and drops malformed ones") {
     CHECK(loaded.layout_rects.count("song_select.left_panel") == 0u);
     CHECK(loaded.layout_rects.count("song_select.sidebar") == 0u);
     CHECK(loaded.layout_rects.count("title.buttons") == 0u);
-    CHECK(loaded.layout_rects.size() == 1u);
+    CHECK(loaded.layout_rects.size() == 2u);
     CHECK(loaded.warnings.size() == 3u);
 }
 
@@ -233,6 +237,40 @@ TEST_CASE("TenRiff skin import is portable and never overwrites an existing inst
     CHECK(second.skin_name == "Aurora-Glass-2");
     const auto names = tenriff::app::list_tenriff_skin_names(imports.u8string());
     CHECK(names.size() == 2u);
+}
+
+TEST_CASE("TenRiff skin catalog merges bundled skins behind profile overrides") {
+    TempDirGuard temp{make_temp_dir()};
+    REQUIRE(!temp.path.empty());
+    const auto profile_root = temp.path / "profile";
+    const auto bundled_root = temp.path / "bundled";
+
+    write_file(profile_root / "Shared" / "skin.json",
+               "{\"format\":\"tenriff-skin\",\"version\":1,\"name\":\"Profile Shared\"}");
+    write_file(profile_root / "Personal" / "skin.json",
+               "{\"format\":\"tenriff-skin\",\"version\":1,\"name\":\"Personal\"}");
+    write_file(bundled_root / "Shared" / "skin.json",
+               "{\"format\":\"tenriff-skin\",\"version\":1,\"name\":\"Bundled Shared\"}");
+    write_file(bundled_root / "Factory" / "skin.json",
+               "{\"format\":\"tenriff-skin\",\"version\":1,\"name\":\"Factory\"}");
+
+    const auto catalog = tenriff::app::catalog_tenriff_skins(
+        {profile_root.u8string(), bundled_root.u8string()});
+    REQUIRE(catalog.names.size() == 3u);
+    CHECK(catalog.names[0] == "Factory");
+    CHECK(catalog.names[1] == "Personal");
+    CHECK(catalog.names[2] == "Shared");
+    CHECK(catalog.roots_by_name.at("Shared") == profile_root.u8string());
+    CHECK(catalog.roots_by_name.at("Factory") == bundled_root.u8string());
+}
+
+TEST_CASE("bundled TenRiff skin root exposes the shipped catalog") {
+    const std::string root = tenriff::app::find_bundled_tenriff_skin_root();
+    REQUIRE(!root.empty());
+    const auto names = tenriff::app::list_tenriff_skin_names(root);
+    CHECK(std::find(names.begin(), names.end(), "TenRiff_AgentPrism_Universal_1K-16K") !=
+          names.end());
+    CHECK(std::find(names.begin(), names.end(), "TenRiff-Example") == names.end());
 }
 
 TEST_CASE("TenRiff skin detects conventional assets without manifest paths") {
@@ -403,14 +441,75 @@ TEST_CASE("TenRiff skin import includes assets referenced only by another key mo
 TEST_CASE("Skin settings stable row ids account for the optional LR2 row") {
     const tenriff::app::SkinSettingsRows native_rows{false};
     const tenriff::app::SkinSettingsRows lr2_rows{true};
-    CHECK(native_rows.count() == 44);
-    CHECK(lr2_rows.count() == 45);
+    CHECK(native_rows.count() == 45);
+    CHECK(lr2_rows.count() == 46);
     CHECK(native_rows.index_of(tenriff::app::SkinSettingsRowId::KeyMode) == 0);
-    CHECK(native_rows.index_of(tenriff::app::SkinSettingsRowId::SkinSource) == 1);
+    CHECK(native_rows.index_of(tenriff::app::SkinSettingsRowId::ScratchPosition) == 1);
+    CHECK(native_rows.index_of(tenriff::app::SkinSettingsRowId::SkinSource) == 2);
     CHECK(native_rows.index_of(tenriff::app::SkinSettingsRowId::Lr2Resolution) == -1);
-    CHECK(native_rows.index_of(tenriff::app::SkinSettingsRowId::ImportSkin) == 3);
-    CHECK(native_rows.index_of(tenriff::app::SkinSettingsRowId::Back) == 43);
-    CHECK(lr2_rows.index_of(tenriff::app::SkinSettingsRowId::Lr2Resolution) == 3);
-    CHECK(lr2_rows.index_of(tenriff::app::SkinSettingsRowId::ImportSkin) == 4);
-    CHECK(lr2_rows.index_of(tenriff::app::SkinSettingsRowId::Back) == 44);
+    CHECK(native_rows.index_of(tenriff::app::SkinSettingsRowId::ImportSkin) == 4);
+    CHECK(native_rows.index_of(tenriff::app::SkinSettingsRowId::Back) == 44);
+    CHECK(lr2_rows.index_of(tenriff::app::SkinSettingsRowId::Lr2Resolution) == 4);
+    CHECK(lr2_rows.index_of(tenriff::app::SkinSettingsRowId::ImportSkin) == 5);
+    CHECK(lr2_rows.index_of(tenriff::app::SkinSettingsRowId::Back) == 45);
+}
+
+TEST_CASE("7+1 presentation moves only the visual scratch lane") {
+    const int scratch_lane = 1;
+    const auto left = tenriff::app::resolve_lane_presentation_layout(
+        8, &scratch_lane, 1, "left");
+    CHECK(left.seven_plus_one);
+    CHECK(left.visual_lane_for_source(1) == 1);
+    CHECK(left.visual_lane_for_source(8) == 8);
+
+    const auto right = tenriff::app::resolve_lane_presentation_layout(
+        8, &scratch_lane, 1, "right");
+    CHECK(right.seven_plus_one);
+    CHECK(right.visual_lane_for_source(1) == 8);
+    CHECK(right.visual_lane_for_source(2) == 1);
+    CHECK(right.visual_lane_for_source(8) == 7);
+    CHECK(right.source_lane_for_visual(8) == 1);
+    const std::vector<int> canonical_lanes{10, 20, 30, 40, 50, 60, 70, 80};
+    const std::vector<int> expected_visual_lanes{20, 30, 40, 50, 60, 70, 80, 10};
+    CHECK(tenriff::app::lane_values_in_visual_order(canonical_lanes, right) ==
+          expected_visual_lanes);
+    const std::vector<int> canonical_gaps{1, 2, 3, 4, 5, 6, 7};
+    const std::vector<int> expected_visual_gaps{2, 3, 4, 5, 6, 7, 1};
+    CHECK(tenriff::app::lane_gap_values_in_visual_order(canonical_gaps, right) ==
+          expected_visual_gaps);
+
+    const auto ordinary = tenriff::app::resolve_lane_presentation_layout(
+        8, nullptr, 0, "right");
+    CHECK_FALSE(ordinary.seven_plus_one);
+    CHECK(ordinary.visual_lane_for_source(1) == 1);
+}
+
+TEST_CASE("TenRiff skins can override 7+1 separately from ordinary 8K") {
+    TempDirGuard temp{make_temp_dir()};
+    REQUIRE(!temp.path.empty());
+    const auto skin = temp.path / "SevenPlusOne";
+    std::filesystem::create_directories(skin);
+    std::ofstream manifest(skin / "skin.json", std::ios::binary);
+    REQUIRE(manifest.good());
+    manifest << "{\n"
+                "  \"format\": \"tenriff-skin\",\n"
+                "  \"version\": 1,\n"
+                "  \"name\": \"Seven Plus One\",\n"
+                "  \"gameplay\": {\n"
+                "    \"note_width_ratio\": 1.0,\n"
+                "    \"modes\": {\n"
+                "      \"8k\": { \"note_width_ratio\": 1.25 },\n"
+                "      \"7+1\": { \"note_width_ratio\": 2.0 }\n"
+                "    }\n"
+                "  }\n"
+                "}\n";
+    manifest.close();
+
+    const auto ordinary = tenriff::app::load_tenriff_skin_folder(skin.u8string(), 8);
+    const auto seven_plus_one =
+        tenriff::app::load_tenriff_skin_folder(skin.u8string(), 8, "7+1");
+    REQUIRE(ordinary.found);
+    REQUIRE(seven_plus_one.found);
+    CHECK(ordinary.gameplay.imported_note_width_ratio == doctest::Approx(1.25));
+    CHECK(seven_plus_one.gameplay.imported_note_width_ratio == doctest::Approx(2.0));
 }

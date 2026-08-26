@@ -14,6 +14,7 @@ namespace tenriff::app {
 
 enum class SkinSettingsRowId {
     KeyMode,
+    ScratchPosition,
     SkinSource,
     ImportedSkin,
     Lr2Resolution,
@@ -60,8 +61,9 @@ enum class SkinSettingsRowId {
     Back,
 };
 
-inline constexpr std::array<SkinSettingsRowId, 45> kSkinSettingsRowOrder = {
+inline constexpr std::array<SkinSettingsRowId, 46> kSkinSettingsRowOrder = {
     SkinSettingsRowId::KeyMode,
+    SkinSettingsRowId::ScratchPosition,
     SkinSettingsRowId::SkinSource,
     SkinSettingsRowId::ImportedSkin,
     SkinSettingsRowId::Lr2Resolution,
@@ -189,6 +191,9 @@ inline std::string key_mode_label(const std::string& value) {
     if (value == "7k") {
         return "7K";
     }
+    if (config::normalize_skin_mode_token(value) == "7+1") {
+        return "7+1 SP";
+    }
     if (value == "8k") {
         return "8K";
     }
@@ -212,7 +217,7 @@ inline std::string key_mode_label(const std::string& value) {
 
 inline std::string normalize_skin_edit_mode(std::string value) {
     value = config::normalize_skin_mode_token(value);
-    if (value == "4k" || value == "5k" || value == "6k" || value == "7k" || value == "8k" ||
+    if (value == "4k" || value == "5k" || value == "6k" || value == "7k" || value == "7+1" || value == "8k" ||
         value == "9k" || value == "10k" || value == "12k" || value == "14k" || value == "16k") {
         return value;
     }
@@ -220,7 +225,7 @@ inline std::string normalize_skin_edit_mode(std::string value) {
 }
 
 inline std::string cycle_skin_edit_mode(std::string_view current, int direction) {
-    static constexpr const char* kSkinModes[] = {"4k", "5k", "6k", "7k", "8k", "9k", "10k", "12k", "14k", "16k"};
+    static constexpr const char* kSkinModes[] = {"4k", "5k", "6k", "7k", "7+1", "8k", "9k", "10k", "12k", "14k", "16k"};
     const int option_count = static_cast<int>(sizeof(kSkinModes) / sizeof(kSkinModes[0]));
     std::string normalized = normalize_skin_edit_mode(std::string(current));
     int index = option_count - 1;
@@ -241,6 +246,9 @@ inline std::string cycle_skin_edit_mode(std::string_view current, int direction)
 
 inline int lane_count_for_skin_mode(std::string_view key_mode) {
     const std::string normalized = config::normalize_skin_mode_token(key_mode);
+    if (normalized == "7+1") {
+        return 8;
+    }
     if (normalized == "5k") {
         return 5;
     }
@@ -273,6 +281,18 @@ inline int lane_count_for_skin_mode(std::string_view key_mode) {
 
 inline std::string lane_display_label(int lane_index) {
     return "Lane " + std::to_string(std::max(1, lane_index + 1));
+}
+
+inline std::string skin_lane_display_label(std::string_view mode,
+                                           int lane_index,
+                                           std::string_view scratch_position) {
+    const int lane = std::max(1, lane_index + 1);
+    if (config::normalize_skin_mode_token(mode) == "7+1") {
+        const int scratch_lane =
+            config::normalize_skin_scratch_position_token(scratch_position) == "right" ? 8 : 1;
+        if (lane == scratch_lane) return "Scratch";
+    }
+    return lane_display_label(lane_index);
 }
 
 inline std::string skin_source_label(std::string_view value) {

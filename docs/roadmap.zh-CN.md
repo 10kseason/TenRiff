@@ -4,8 +4,8 @@
 
 ## 当前基线
 - Windows GUI/runtime 是主要受支持路径。
-- 项目版本线是 `1.4.5.3`；公开包附带 NK3 P64 与 generalized pattern MLP inference 模型，但不附带 BGA upscaler 模型。选择兼容且权利已厘清的 upscaler ONNX 只会保存路径，BGA Upscaler 会一直保持 off，直到用户手动开启并确认 high-spec warning；不存在自动 benchmark gate。
-- 当前菜单/runtime 仅支持 BMS family（`.bms/.bme/.bml/.pms`）与 native/LR2 skin。
+- 项目版本线是 `1.5.0`；公开包附带 NK3 P64 与 generalized pattern MLP inference 模型，但不附带 BGA upscaler 模型。选择兼容且权利已厘清的 upscaler ONNX 只会保存路径，BGA Upscaler 会一直保持 off，直到用户手动开启并确认 high-spec warning；不存在自动 benchmark gate。
+- 当前菜单/runtime 仅支持 BMS family（`.bms/.bme/.bml/.pms`），并支持 native、bundle/profile TenRiff `skin.json` 与 LR2 skin。
 - 关于当前已发布的行为，请先看 [`docs/current-state.zh-CN.md`](current-state.zh-CN.md)；这份路线图主要讲方向和剩余工作。
 
 ## 0) 先修骨架与主时钟
@@ -44,3 +44,8 @@
 ## 4) 接入 launcher
 - 处理文件夹检查、首次运行配置创建、错误码分类。
 - 做完这一步后，游戏就能在本地 PC 上作为一个完整自洽的程序存在。
+
+## 5) 在公开排名前先建立可信记录
+- 按 [`ranked-integrity-plan.en.md`](ranked-integrity-plan.en.md) 分阶段完成统一 eligibility reason、Local Records 页面、只读 Online Records、shadow submission，最后才开放 verified ranking。
+- 服务器必须通过已批准的 BMS chart SHA-256 与 replay evidence 重新计算结果，不能把客户端 score claim 当作可信来源。
+- `.osu` chart 以及 osu 派生 import、ruleset、scoring、conversion 一律不可注册 ranked；native BMS 的辅助 OD8 统计仅作为本地 metadata。

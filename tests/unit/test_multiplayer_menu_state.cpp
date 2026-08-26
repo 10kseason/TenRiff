@@ -39,12 +39,14 @@ using tenriff::app::multiplayer_leader_can_start;
 using tenriff::app::multiplayer_ready_gate_open;
 using tenriff::app::multiplayer_start_gate_open;
 using tenriff::app::parse_multiplayer_port;
+using tenriff::app::parse_multiplayer_endpoint;
 using tenriff::app::peer_battle_score_lead;
 using tenriff::app::peer_battle_spectator_decision;
 using tenriff::app::reset_multiplayer_menu_session;
 using tenriff::app::try_append_multiplayer_address_character;
 using tenriff::app::try_append_multiplayer_chat_text;
 using tenriff::app::try_append_multiplayer_port_character;
+using tenriff::app::try_open_multiplayer_chat;
 using tenriff::app::erase_last_multiplayer_utf8_character;
 
 static_assert(static_cast<int>(MultiplayerMenuRow::Address) == 0);
@@ -217,6 +219,36 @@ TEST_CASE("multiplayer chat input keeps UTF-8 boundaries and byte cap") {
     CHECK(try_append_multiplayer_chat_text(capped, "y"));
     CHECK(capped.size() == kMultiplayerChatInputMaxBytes);
     CHECK_FALSE(try_append_multiplayer_chat_text(capped, "z"));
+}
+
+TEST_CASE("multiplayer endpoint paste accepts host port and TenRiff URLs") {
+    const auto host_only = parse_multiplayer_endpoint(" rhythm.example ");
+    REQUIRE(host_only.has_value());
+    CHECK(host_only->address == "rhythm.example");
+    CHECK_FALSE(host_only->port.has_value());
+
+    const auto endpoint = parse_multiplayer_endpoint("tenriff://10.0.0.5:31415");
+    REQUIRE(endpoint.has_value());
+    CHECK(endpoint->address == "10.0.0.5");
+    REQUIRE(endpoint->port.has_value());
+    CHECK(*endpoint->port == 31415);
+
+    CHECK_FALSE(parse_multiplayer_endpoint("http://host:27300").has_value());
+    CHECK_FALSE(parse_multiplayer_endpoint("host:0").has_value());
+    CHECK_FALSE(parse_multiplayer_endpoint("host:70000").has_value());
+    CHECK_FALSE(parse_multiplayer_endpoint("host/path").has_value());
+}
+
+TEST_CASE("F8 chat helper opens only for a connected room") {
+    MultiplayerMenuState state;
+    state.cursor = static_cast<int>(MultiplayerMenuRow::Address);
+    CHECK_FALSE(try_open_multiplayer_chat(state, false));
+    CHECK(state.cursor == static_cast<int>(MultiplayerMenuRow::Address));
+    CHECK(state.edit_field == tenriff::app::MultiplayerEditField::None);
+
+    CHECK(try_open_multiplayer_chat(state, true));
+    CHECK(state.cursor == static_cast<int>(MultiplayerMenuRow::Chat));
+    CHECK(state.edit_field == tenriff::app::MultiplayerEditField::Chat);
 }
 TEST_CASE("multiplayer readiness requires a connection and matching nonzero chart fingerprints") {
     MultiplayerMenuState state;

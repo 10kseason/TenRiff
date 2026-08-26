@@ -1,6 +1,7 @@
 #include "config/Config.h"
 
 #include <algorithm>
+#include <charconv>
 #include <cmath>
 #include <cctype>
 #include <filesystem>
@@ -57,6 +58,9 @@ const std::vector<SkinPaletteEntry>& skin_palette_entries() {
 
 int lane_count_for_skin_mode_token(std::string_view key_mode) {
     const std::string normalized = normalize_skin_mode_token(key_mode);
+    if (normalized == "7+1") {
+        return 8;
+    }
     if (normalized == "4k") {
         return 4;
     }
@@ -97,6 +101,7 @@ const std::unordered_map<std::string, std::vector<std::string>>& default_skin_la
         {"5k", {"ice", "azure", "gold", "azure", "ice"}},
         {"6k", {"ice", "azure", "ice", "ice", "azure", "ice"}},
         {"7k", {"ice", "azure", "ice", "gold", "ice", "azure", "ice"}},
+        {"7+1", {"ice", "ice", "azure", "ice", "gold", "ice", "azure", "ice"}},
         {"8k", {"ice", "azure", "ice", "teal", "teal", "ice", "azure", "ice"}},
         {"9k", {"ice", "azure", "ice", "teal", "gold", "teal", "ice", "azure", "ice"}},
         {"10k", {"ice", "azure", "ice", "azure", "ice", "ice", "azure", "ice", "azure", "ice"}},
@@ -145,6 +150,7 @@ std::vector<double> sanitize_skin_scale_vector(std::string_view key_mode,
 void sanitize_skin_config(SkinConfig& skin) {
     skin.source = normalize_skin_source_token(skin.source);
     skin.lr2_resolution_mode = normalize_skin_lr2_resolution_mode_token(skin.lr2_resolution_mode);
+    skin.scratch_position = normalize_skin_scratch_position_token(skin.scratch_position);
     skin.visual_preset = normalize_skin_visual_preset_token(skin.visual_preset);
     skin.note_shape = normalize_skin_note_shape_token(skin.note_shape);
     skin.key_label_position = normalize_skin_key_label_position_token(skin.key_label_position);
@@ -725,10 +731,28 @@ void apply_config_object(const JsonObject& root, RuntimeConfig& config) {
         }
         config.ui.song_collection_filter = normalize_song_collection_filter(
             get_string(*ui, "song_collection_filter", config.ui.song_collection_filter));
+        config.ui.song_key_filter = static_cast<int>(std::llround(clamp_finite(
+            get_number(*ui, "song_key_filter", config.ui.song_key_filter), 0.0, 16.0, 0.0)));
+        config.ui.song_level_min_filter = static_cast<int>(std::llround(clamp_finite(
+            get_number(*ui, "song_level_min_filter", config.ui.song_level_min_filter),
+            0.0, 50.0, 0.0)));
+        config.ui.song_level_max_filter = static_cast<int>(std::llround(clamp_finite(
+            get_number(*ui, "song_level_max_filter", config.ui.song_level_max_filter),
+            0.0, 50.0, 0.0)));
+        if (config.ui.song_level_max_filter > 0 &&
+            config.ui.song_level_min_filter > config.ui.song_level_max_filter) {
+            config.ui.song_level_min_filter = config.ui.song_level_max_filter;
+        }
         config.ui.difficulty_table_path =
             get_string(*ui, "difficulty_table_path", config.ui.difficulty_table_path);
         config.ui.difficulty_table_url =
             get_string(*ui, "difficulty_table_url", config.ui.difficulty_table_url);
+        config.ui.online_records_server_url =
+            normalize_online_records_server_url(get_string(
+                *ui, "online_records_server_url", config.ui.online_records_server_url));
+        if (config.ui.online_records_server_url.empty()) {
+            config.ui.online_records_server_url = "http://127.0.0.1:27302";
+        }
     }
 
     if (auto* skin = get_object(root, "skin")) {
@@ -740,6 +764,8 @@ void apply_config_object(const JsonObject& root, RuntimeConfig& config) {
             get_string(*skin, "lr2_skin_name", config.skin.lr2_skin_name);
         config.skin.lr2_resolution_mode = normalize_skin_lr2_resolution_mode_token(
             get_string(*skin, "lr2_resolution_mode", config.skin.lr2_resolution_mode));
+        config.skin.scratch_position = normalize_skin_scratch_position_token(
+            get_string(*skin, "scratch_position", config.skin.scratch_position));
         config.skin.visual_preset = normalize_skin_visual_preset_token(
             get_string(*skin, "visual_preset", config.skin.visual_preset));
         config.skin.note_shape =
@@ -1156,8 +1182,13 @@ JsonValue build_json_root(const RuntimeConfig& config) {
     }
     ui.emplace("collections", JsonValue{std::move(collections)});
     ui.emplace("song_collection_filter", JsonValue{normalize_song_collection_filter(config.ui.song_collection_filter)});
+    ui.emplace("song_key_filter", JsonValue{static_cast<double>(std::clamp(config.ui.song_key_filter, 0, 16))});
+    ui.emplace("song_level_min_filter", JsonValue{static_cast<double>(std::clamp(config.ui.song_level_min_filter, 0, 50))});
+    ui.emplace("song_level_max_filter", JsonValue{static_cast<double>(std::clamp(config.ui.song_level_max_filter, 0, 50))});
     ui.emplace("difficulty_table_path", JsonValue{config.ui.difficulty_table_path});
     ui.emplace("difficulty_table_url", JsonValue{config.ui.difficulty_table_url});
+    ui.emplace("online_records_server_url",
+               JsonValue{normalize_online_records_server_url(config.ui.online_records_server_url)});
     root.emplace("ui", JsonValue{std::move(ui)});
 
     JsonObject skin;
@@ -1166,6 +1197,8 @@ JsonValue build_json_root(const RuntimeConfig& config) {
     skin.emplace("lr2_skin_name", JsonValue{config.skin.lr2_skin_name});
     skin.emplace("lr2_resolution_mode",
                  JsonValue{normalize_skin_lr2_resolution_mode_token(config.skin.lr2_resolution_mode)});
+    skin.emplace("scratch_position",
+                 JsonValue{normalize_skin_scratch_position_token(config.skin.scratch_position)});
     skin.emplace("visual_preset", JsonValue{normalize_skin_visual_preset_token(config.skin.visual_preset)});
     skin.emplace("note_shape", JsonValue{normalize_skin_note_shape_token(config.skin.note_shape)});
     skin.emplace("note_border_enabled", JsonValue{config.skin.note_border_enabled});
@@ -1270,6 +1303,13 @@ std::string normalize_background_upscale_mode(std::string_view token) {
 
 std::string normalize_skin_mode_token(std::string_view key_mode) {
     std::string normalized = to_lower_ascii(std::string(key_mode));
+    normalized.erase(std::remove_if(normalized.begin(), normalized.end(), [](unsigned char ch) {
+        return ch == ' ' || ch == '\t' || ch == '_' || ch == '-';
+    }), normalized.end());
+    if (normalized == "7+1" || normalized == "1+7" || normalized == "7p1" ||
+        normalized == "7+1sp" || normalized == "sp7+1") {
+        return "7+1";
+    }
     if (normalized == "4" || normalized == "4key" || normalized == "keys4") {
         return "4k";
     }
@@ -1354,7 +1394,88 @@ std::string normalize_ui_language_token(std::string_view token) {
 }
 
 std::vector<std::string> supported_skin_mode_tokens() {
-    return {"4k", "5k", "6k", "7k", "8k", "9k", "10k", "12k", "14k", "16k"};
+    return {"4k", "5k", "6k", "7k", "7+1", "8k", "9k", "10k", "12k", "14k", "16k"};
+}
+
+std::string normalize_skin_scratch_position_token(std::string_view token) {
+    const std::string normalized = to_lower_ascii(std::string(token));
+    return normalized == "right" || normalized == "r" ? "right" : "left";
+}
+
+std::string normalize_online_records_server_url(std::string_view value) {
+    std::string normalized(value);
+    const auto is_space = [](unsigned char ch) { return ch <= 0x20u; };
+    while (!normalized.empty() && is_space(static_cast<unsigned char>(normalized.front()))) {
+        normalized.erase(normalized.begin());
+    }
+    while (!normalized.empty() && is_space(static_cast<unsigned char>(normalized.back()))) {
+        normalized.pop_back();
+    }
+    if (normalized.empty() || normalized.size() > 2048u ||
+        std::any_of(normalized.begin(), normalized.end(), [](unsigned char ch) {
+            return ch <= 0x20u || ch >= 0x7Fu;
+        })) {
+        return {};
+    }
+
+    const std::string lower = to_lower_ascii(normalized);
+    std::size_t authority_begin = 0;
+    bool secure = false;
+    if (lower.rfind("http://", 0) == 0) {
+        authority_begin = 7;
+    } else if (lower.rfind("https://", 0) == 0) {
+        authority_begin = 8;
+        secure = true;
+    } else {
+        return {};
+    }
+    const std::size_t authority_end = normalized.find('/', authority_begin);
+    const std::size_t authority_finish =
+        authority_end == std::string::npos ? normalized.size() : authority_end;
+    const std::string authority = lower.substr(
+        authority_begin, authority_finish - authority_begin);
+    if (authority.empty() || authority.find('@') != std::string::npos ||
+        normalized.find_first_of("?#") != std::string::npos) {
+        return {};
+    }
+    std::string host;
+    std::string port;
+    bool port_specified = false;
+    if (authority.front() == '[') {
+        const auto close = authority.find(']');
+        if (close == std::string::npos) return {};
+        host = authority.substr(1, close - 1);
+        if (close + 1 < authority.size()) {
+            if (authority[close + 1] != ':') return {};
+            port = authority.substr(close + 2);
+            port_specified = true;
+        }
+    } else {
+        const auto colon = authority.rfind(':');
+        if (colon == std::string::npos) host = authority;
+        else {
+            host = authority.substr(0, colon);
+            port = authority.substr(colon + 1);
+            port_specified = true;
+        }
+    }
+    if (host.empty() || (port_specified && port.empty())) return {};
+    if (!port.empty()) {
+        unsigned port_value = 0;
+        const auto parsed = std::from_chars(
+            port.data(), port.data() + port.size(), port_value);
+        if (parsed.ec != std::errc{} || parsed.ptr != port.data() + port.size() ||
+            port_value == 0 || port_value > 65535) {
+            return {};
+        }
+    }
+    if (!secure && host != "localhost" && host != "127.0.0.1" && host != "::1") {
+        return {};
+    }
+    while (normalized.size() > authority_finish && normalized.back() == '/') {
+        normalized.pop_back();
+    }
+    return normalized;
 }
 
 std::vector<std::string> supported_skin_color_tokens() {
@@ -1767,6 +1888,9 @@ std::vector<std::string> resolved_skin_lane_colors_for_layout(
     }
 
     const int key_count = clamped_lane_count - scratch_count;
+    if (clamped_lane_count == 8 && scratch_count == 1) {
+        return resolved_skin_lane_colors(skin, "7+1");
+    }
     const std::string key_mode = std::to_string(key_count) + "k";
     const auto& supported_modes = supported_skin_mode_tokens();
     if (scratch_count == 0 ||
@@ -1857,8 +1981,12 @@ RuntimeConfig ConfigLoader::defaults() const {
     config.ui.favorite_chart_keys.clear();
     config.ui.collections.clear();
     config.ui.song_collection_filter = "all";
+    config.ui.song_key_filter = 0;
+    config.ui.song_level_min_filter = 0;
+    config.ui.song_level_max_filter = 0;
     config.ui.difficulty_table_path.clear();
     config.ui.difficulty_table_url.clear();
+    config.ui.online_records_server_url = "http://127.0.0.1:27302";
 
     config.skin = {};
     sanitize_skin_config(config.skin);

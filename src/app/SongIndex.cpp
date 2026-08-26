@@ -36,7 +36,7 @@ namespace tenriff::app {
 
 namespace {
 
-constexpr int kSongIndexVersion = 13;
+constexpr int kSongIndexVersion = 14;
 constexpr std::uintmax_t kMaxMetadataChartFileBytes = 8u * 1024u * 1024u;
 
 bool cancel_requested(const SongIndexCancelCallback& cancel) {
@@ -451,6 +451,7 @@ struct BmsNpsStats {
     double minimum = 0.0;
     double median = 0.0;
     double maximum = 0.0;
+    int note_count = 0;
 };
 
 std::optional<BmsNpsStats> calculate_bms_nps_stats(const chart::BmsChart& parsed_chart) {
@@ -490,6 +491,8 @@ std::optional<BmsNpsStats> calculate_bms_nps_stats(const chart::BmsChart& parsed
     std::sort(samples.begin(), samples.end());
 
     BmsNpsStats stats;
+    stats.note_count = static_cast<int>(std::min<std::size_t>(
+        gameplay.chart.notes.size(), static_cast<std::size_t>(std::numeric_limits<int>::max())));
     stats.minimum = static_cast<double>(samples.front());
     stats.maximum = static_cast<double>(samples.back());
     const std::size_t middle = samples.size() / 2;
@@ -578,6 +581,7 @@ SongEntry build_bms_entry(std::string relative_path,
         entry.nps_min = nps->minimum;
         entry.nps_median = nps->median;
         entry.nps_max = nps->maximum;
+        entry.note_count = nps->note_count;
     }
     if (!minimal_metadata) {
         entry.background_preview_path =
@@ -1437,6 +1441,13 @@ private:
                     return false;
                 }
                 entry.nps_max = value.value();
+            } else if (*key == "note_count") {
+                auto value = parse_number();
+                if (!value.has_value() || !std::isfinite(value.value()) || value.value() < 0.0) {
+                    return false;
+                }
+                entry.note_count = static_cast<int>(std::min(
+                    value.value(), static_cast<double>(std::numeric_limits<int>::max())));
             } else if (*key == "mtime") {
                 auto value = parse_number();
                 if (!value.has_value()) {
@@ -1665,6 +1676,7 @@ bool save_song_index(const std::string& path,
         file << ",\"nps_min\":" << entry.nps_min;
         file << ",\"nps_median\":" << entry.nps_median;
         file << ",\"nps_max\":" << entry.nps_max;
+        file << ",\"note_count\":" << entry.note_count;
         file << ",\"mtime\":" << entry.mtime;
         file << ",\"md5\":";
         write_json_string(file, entry.md5);

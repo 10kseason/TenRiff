@@ -422,8 +422,8 @@ inline std::string random_label(const std::string& value) {
     if (normalized == "mirror") {
         return "Mirror";
     }
-    if (normalized == "fr") {
-        return "Random";
+    if (normalized == "fr" || normalized == "frns" || normalized == "fr_no_scratch") {
+        return "Random (Scratch Fixed)";
     }
     if (normalized == "rr") {
         return "R-Random";
@@ -435,9 +435,12 @@ inline std::string random_label(const std::string& value) {
 }
 
 inline std::string cycle_random_mode(std::string current, int direction) {
-    static constexpr const char* kRandomModes[] = {"off", "mirror", "fr", "rr", "sr"};
+    static constexpr const char* kRandomModes[] = {"off", "mirror", "frns", "rr", "sr"};
     const int option_count = static_cast<int>(sizeof(kRandomModes) / sizeof(kRandomModes[0]));
     current = to_lower_ascii(std::move(current));
+    if (current == "fr" || current == "fr_no_scratch" || current == "random_no_scratch") {
+        current = "frns";
+    }
     int index = 0;
     for (int i = 0; i < option_count; ++i) {
         if (current == kRandomModes[i]) {

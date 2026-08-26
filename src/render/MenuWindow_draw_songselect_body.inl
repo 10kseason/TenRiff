@@ -182,9 +182,11 @@
                              D2D1::RectF(1518.0f, 16.0f, 1880.0f, 112.0f));
         register_hit(profile_panel, MenuHitTargetKind::SongProfilePanel, 0);
         draw_glass_panel(profile_panel, 14.0f, 0.78f, 0.24f, false, 3.0f);
-        const D2D1_RECT_F avatar_rect =
+        const D2D1_RECT_F avatar_rect = skin_layout_rect(
+            data, "song_select.avatar",
             D2D1::RectF(profile_panel.left + 12.0f, profile_panel.top + 10.0f,
-                        profile_panel.left + 88.0f, profile_panel.bottom - 10.0f);
+                        profile_panel.left + 88.0f, profile_panel.top + 86.0f));
+        ctx->PushAxisAlignedClip(profile_panel, D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
         ID2D1Bitmap* avatar_bitmap =
             find_song_card_preview_bitmap(data.song_select.profile_avatar_path);
         if (avatar_bitmap) {
@@ -203,6 +205,7 @@
             ctx->DrawRoundedRectangle(D2D1::RoundedRect(avatar_rect, 12.0f, 12.0f),
                                       d2d_->button_border_brush.Get(), 1.2f);
         }
+        ctx->PopAxisAlignedClip();
         if (d2d_->title_format && d2d_->text_brush) {
             draw_text_clipped(to_wide(data.song_select.profile.empty()
                                           ? std::string("PLAYER")
@@ -236,7 +239,9 @@
                 data.song_select.showing_sources
                     ? wloc("SONG SOURCES", "곡 소스")
                     : (data.song_select.showing_records
-                           ? wloc("LOCAL RECORDS", "로컬 기록")
+                           ? (data.song_select.online_records
+                                  ? wloc("ONLINE RECORDS", "온라인 기록")
+                                  : wloc("LOCAL RECORDS", "로컬 기록"))
                            : wloc("SONG LIBRARY", "곡 라이브러리"));
             draw_text_clipped(library_title,
                               d2d_->title_format.Get(),
@@ -762,11 +767,11 @@
             const D2D1_RECT_F metadata_panel =
                 D2D1::RectF(right_left, metadata_top, right_right, metadata_top + 78.0f);
             draw_glass_panel(metadata_panel, 9.0f, 0.62f, 0.12f, false, 1.0f);
-            const float metadata_width = (right_right - right_left) / 3.0f;
+            const float metadata_width = (right_right - right_left) / 4.0f;
             if (d2d_->button_border_brush) {
                 const float saved = d2d_->button_border_brush->GetOpacity();
                 d2d_->button_border_brush->SetOpacity(0.22f);
-                for (int divider = 1; divider < 3; ++divider) {
+                for (int divider = 1; divider < 4; ++divider) {
                     const float x = right_left + metadata_width * static_cast<float>(divider);
                     ctx->DrawLine(D2D1::Point2F(x, metadata_top + 10.0f),
                                   D2D1::Point2F(x, metadata_top + 68.0f),
@@ -786,6 +791,14 @@
                            data.song_select.selected_song_difficulty.empty()
                                ? "--" : data.song_select.selected_song_difficulty, true);
             draw_meta_pair(D2D1::RectF(right_left + metadata_width * 2.0f + 12.0f,
+                                       metadata_top + 6.0f,
+                                       right_left + metadata_width * 3.0f - 10.0f,
+                                       metadata_top + 72.0f),
+                           loc("NOTES", "노트 수"),
+                           data.song_select.selected_song_note_count > 0
+                               ? format_int_with_commas(data.song_select.selected_song_note_count)
+                               : "--");
+            draw_meta_pair(D2D1::RectF(right_left + metadata_width * 3.0f + 12.0f,
                                        metadata_top + 6.0f,
                                        right_right - 10.0f, metadata_top + 72.0f),
                            "NPS MED",
@@ -916,12 +929,14 @@
                            loc("COMBO", "콤보"),
                            format_int_with_commas(data.song_select.max_combo));
             if (d2d_->hud_format && d2d_->accent_brush) {
-                draw_text_clipped(to_wide(loc("DETAIL SCORE ", "상세 점수 ") +
-                                              format_int_with_commas(data.song_select.detail_score) +
-                                              " / " +
-                                              (data.song_select.max_detail_score > 0
-                                                   ? format_int_with_commas(data.song_select.max_detail_score)
-                                                   : std::string("--"))),
+                const std::string detail_line = data.song_select.online_records
+                    ? loc("READ-ONLY SERVER LEADERBOARD", "읽기 전용 서버 리더보드")
+                    : loc("DETAIL SCORE ", "상세 점수 ") +
+                          format_int_with_commas(data.song_select.detail_score) + " / " +
+                          (data.song_select.max_detail_score > 0
+                               ? format_int_with_commas(data.song_select.max_detail_score)
+                               : std::string("--"));
+                draw_text_clipped(to_wide(detail_line),
                                   d2d_->hud_format.Get(),
                                   D2D1::RectF(right_left, right_panel.top + 244.0f,
                                               right_right, right_panel.top + 270.0f),
@@ -929,7 +944,10 @@
             }
             if (d2d_->body_format && d2d_->muted_brush) {
                 const std::string replay =
-                    data.song_select.selected_record_replay_file.empty()
+                    data.song_select.online_records
+                        ? loc("SERVER VERIFIED / CLIENT REPLAY NOT PROVIDED",
+                              "서버 검증 / 클라이언트 리플레이 미제공")
+                    : data.song_select.selected_record_replay_file.empty()
                         ? loc("RESULT ONLY", "결과만 저장됨")
                         : loc("REPLAY ", "리플레이 ") +
                               data.song_select.selected_record_replay_file;
@@ -945,7 +963,8 @@
             }
         }
 
-        const bool primary_enabled = data.song_select.list_total_count > 0;
+        const bool primary_enabled = data.song_select.list_total_count > 0 &&
+                                     !data.song_select.online_records;
         const D2D1_RECT_F start_button =
             D2D1::RectF(right_left, right_panel.bottom - 112.0f,
                         right_right, right_panel.bottom - 24.0f);
@@ -967,7 +986,9 @@
                 data.song_select.showing_sources
                     ? wloc("OPEN SOURCE", "소스 열기")
                     : (data.song_select.showing_records
-                           ? wloc("OPEN RESULT", "결과 열기")
+                           ? (data.song_select.online_records
+                                  ? wloc("VIEW ONLY", "조회 전용")
+                                  : wloc("OPEN RESULT", "결과 열기"))
                            : wloc("START", "시작"));
             draw_centered_text(action_label, d2d_->header_format.Get(), start_button,
                                primary_enabled

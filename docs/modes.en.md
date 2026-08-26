@@ -31,7 +31,8 @@ This document summarizes the implemented mode system, lane-transform/random rule
 - `key_conversion_nk2_preset`: `native | transform | remaster` (defaults to `native`; choose `Native (12%)`, `Transform (35%)` or `Remaster (65%)` with nK2; the row is locked with Krrcream)
 - `gauge`: `normal | hard | ex_hard | easy | shift`
 - `random`: `off | mirror | rr | fr | sr`
-- `random_seed`: fixed seed for RR/FR/SR, forced key-mode conversion, Note Add, and LN Mix selection (`0` is also fixed)
+- `random`: `off | mirror | rr | frns | sr` (`fr` remains a legacy alias)
+- `random_seed`: fixed seed for RR/SR, forced key-mode conversion, Note Add, and LN Mix selection (`0` is also fixed). Ordinary Random creates a fresh session seed per play and records it in the replay
 - `mods`: normalized mod-token array saved by the Mod Manager
 - `ghost_battle_enabled`: `false | true`
   - defaults to `false`
@@ -57,7 +58,7 @@ This document summarizes the implemented mode system, lane-transform/random rule
   - DP layouts mirror each player field independently instead of swapping the two fields
   - Mirror itself ignores `random_seed`, but an earlier forced key-mode conversion may use it
 - **RR (R-Random)**: keeps scratches fixed and rotates each playable lane group by a seeded offset; DP halves rotate independently
-- **FR (Full Random)**: replaces the entire lane set with a random **permutation**
+- **Random / FRNS**: keeps scratch in place and randomly permutes only key lanes with a fresh seed for every play; replay playback restores the recorded seed
 - **SR (Super Random)**: random placement per note
   - choose candidate lanes so that there is no overlap on the same lane, including simultaneous timing
   - **Long notes keep the head / tail on the same lane**

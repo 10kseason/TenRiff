@@ -213,8 +213,8 @@
         "lane_map": { "$ref": "#/$defs/laneMap" },
         "modes": {
           "type": "object",
-          "description": "Per-key-mode shallow overrides. The active 1k through 16k object replaces matching gameplay fields.",
-          "propertyNames": { "pattern": "^([1-9]|1[0-6])k$" },
+          "description": "Per-layout shallow overrides. The active 1k through 16k or dedicated 7+1 object replaces matching gameplay fields.",
+          "propertyNames": { "pattern": "^(([1-9]|1[0-6])k|7\\+1)$" },
           "additionalProperties": { "$ref": "#/$defs/gameplayMode" }
         },
         "note_width_ratio": { "type": "number", "minimum": 0.1, "maximum": 4.0 },

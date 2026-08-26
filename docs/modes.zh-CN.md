@@ -31,7 +31,8 @@
 - `key_conversion_nk2_preset`：`native | transform | remaster`（默认 `native`；选择 nK2 时可用 `Native (12%)` / `Transform (35%)` / `Remaster (65%)`，选择 Krrcream 时锁定该行）
 - `gauge`：`normal | hard | ex_hard | easy | shift`
 - `random`：`off | mirror | rr | fr | sr`
-- `random_seed`：RR/FR/SR、强制 key-mode 变换、Note Add 和 LN Mix 目标选择使用的固定 seed（`0` 也视为固定值）
+- `random`：`off | mirror | rr | frns | sr`（`fr` 为旧配置兼容 alias）
+- `random_seed`：RR/SR、强制 key-mode 变换、Note Add 和 LN Mix 目标选择使用固定 seed（`0` 也视为固定值）。普通 Random 每次游玩生成新 session seed，并把实际值写入 replay
 - `mods`：由 Mod Manager 规范化并保存的 mod token 数组
 - `ghost_battle_enabled`：`false | true`
   - 默认值为 `false`
@@ -57,7 +58,7 @@
   - DP layout 不交换两个 player field，而是在各自 field 内独立反转
   - Mirror 本身不使用 `random_seed`，但先执行的强制 key-mode 变换仍可能使用 seed
 - **RR（R-Random）**：固定皿键，并按 seed 偏移旋转各 playable lane group；DP 左右区域独立处理
-- **FR（Full Random）**：把整条 lane 替换为随机 **permutation**
+- **Random / FRNS**：固定皿键，只把按键 lane 按每次游玩的新 seed 随机排列；replay 使用记录的 seed 恢复相同配置
 - **SR（Super Random）**：按 note 级别随机摆放
   - 选择候选 lane 时，确保同一 lane 上 **不重叠**（包括同一时刻）
   - **Long note 会保持 head/tail 在同一 lane**

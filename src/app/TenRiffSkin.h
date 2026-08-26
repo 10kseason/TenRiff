@@ -33,7 +33,7 @@ inline constexpr std::array<std::string_view, 20> kTenRiffSkinScreenIds = {
 
 // Dedicated render rects plus generic content/preview fallbacks. Every screen ID
 // above may also define its own content and preview slots.
-inline constexpr std::array<std::string_view, 22> kTenRiffSkinLayoutSlots = {
+inline constexpr std::array<std::string_view, 24> kTenRiffSkinLayoutSlots = {
     "title.spectrum",
     "title.logo",
     "title.buttons",
@@ -43,6 +43,7 @@ inline constexpr std::array<std::string_view, 22> kTenRiffSkinLayoutSlots = {
     "song_select.logo",
     "song_select.nav",
     "song_select.profile",
+    "song_select.avatar",
     "song_select.left_panel",
     "song_select.center_panel",
     "song_select.right_panel",
@@ -50,6 +51,7 @@ inline constexpr std::array<std::string_view, 22> kTenRiffSkinLayoutSlots = {
     "generic.content",
     "generic.preview",
     "result.profile",
+    "result.avatar",
     "result.song_panel",
     "result.analysis_panel",
     "result.stats_panel",
@@ -125,12 +127,25 @@ struct TenRiffSkinImportResult {
     [[nodiscard]] bool success() const { return !skin_name.empty(); }
 };
 
-[[nodiscard]] TenRiffSkinDefinition load_tenriff_skin_folder(std::string_view folder_utf8,
-                                                              int keys);
+struct TenRiffSkinCatalog {
+    std::vector<std::string> names;
+    std::unordered_map<std::string, std::string> roots_by_name;
+};
+
+[[nodiscard]] TenRiffSkinDefinition load_tenriff_skin_folder(
+    std::string_view folder_utf8,
+    int keys,
+    std::string_view gameplay_mode = {});
 [[nodiscard]] TenRiffSkinDefinition resolve_tenriff_skin(std::string_view root_utf8,
                                                          std::string_view skin_name,
-                                                         int keys);
+                                                         int keys,
+                                                         std::string_view gameplay_mode = {});
 [[nodiscard]] std::vector<std::string> list_tenriff_skin_names(std::string_view root_utf8);
+// Roots are ordered by precedence. A profile skin therefore shadows a bundled
+// skin with the same folder name without modifying either copy.
+[[nodiscard]] TenRiffSkinCatalog catalog_tenriff_skins(
+    const std::vector<std::string>& roots_utf8);
+[[nodiscard]] std::string find_bundled_tenriff_skin_root();
 [[nodiscard]] TenRiffSkinImportResult import_tenriff_skin(std::string_view source_utf8,
                                                           std::string_view import_root_utf8);
 [[nodiscard]] TenRiffSkinCreateResult create_tenriff_skin_template(

@@ -21,6 +21,7 @@
 #include "app/Lr2Course.h"
 #include "app/MenuMusicController.h"
 #include "app/MultiplayerChartSearch.h"
+#include "app/OnlineRecordsClient.h"
 #include "app/SessionMix.h"
 #include "app/SongSelectState.h"
 #include "app/SongSelectScreen.h"
@@ -263,10 +264,12 @@ private:
     void handle_input_event(const input::InputEvent& event);
     void handle_menu_click(const render::MenuClickEvent& event);
     void handle_text_input(std::string_view text);
+    [[nodiscard]] bool control_modifier_pressed() const;
     void handle_quick_setup_input(uint32_t keycode);
     void handle_title_input(uint32_t keycode);
     void handle_options_hub_input(uint32_t keycode);
     void handle_multiplayer_input(uint32_t keycode);
+    [[nodiscard]] bool open_multiplayer_chat_shortcut();
     void handle_song_select_input(uint32_t keycode);
     void handle_session_mix_input(uint32_t keycode);
     void handle_song_browser_input(uint32_t keycode);
@@ -392,6 +395,10 @@ private:
     [[nodiscard]] const TenRiffSkinDefinition* active_tenriff_skin_for_keys(int keys) const;
     [[nodiscard]] std::shared_ptr<const ImportedGameplaySkinDefinition>
         active_tenriff_gameplay_for_keys(int keys) const;
+    [[nodiscard]] const TenRiffSkinDefinition* active_tenriff_skin_for_layout(
+        int keys, bool seven_plus_one) const;
+    [[nodiscard]] std::shared_ptr<const ImportedGameplaySkinDefinition>
+        active_tenriff_gameplay_for_layout(int keys, bool seven_plus_one) const;
     [[nodiscard]] bool import_lr2_skin_path(std::string_view source_path);
     [[nodiscard]] bool import_tenriff_skin_path(std::string_view source_path);
     [[nodiscard]] bool import_skin_path_auto(std::string_view source_path);
@@ -568,6 +575,7 @@ private:
     GameplayHudState gameplay_hud_{};
 
     network::PeerSession peer_session_{};
+    OnlineRecordsService online_records_service_{};
     network::LanDiscoveryService lan_discovery_{};
     MultiplayerMenuState multiplayer_menu_{};
     std::vector<network::LanDiscoveredRoom> multiplayer_lan_rooms_{};
@@ -625,7 +633,11 @@ private:
     int selected_song_ = 0;
     int selected_source_ = 0;
     int selected_record_ = 0;
+    int selected_online_record_ = 0;
     int settings_cursor_ = 0;
+    Screen settings_change_flash_screen_ = Screen::Title;
+    int settings_change_flash_row_ = -1;
+    int64_t settings_change_flash_started_ns_ = 0;
     int options_cursor_ = 0;
     int calibration_step_ms_ = 1;
     SongSelectFocus song_select_focus_ = SongSelectFocus::SongList;
@@ -633,6 +645,7 @@ private:
     SongSortMode song_sort_mode_ = SongSortMode::DifficultyAsc;
     SongGroupMode song_group_mode_ = SongGroupMode::None;
     SongSelectView song_select_view_ = SongSelectView::Songs;
+    bool online_records_view_ = false;
     int song_select_nav_cursor_ = 0;
     int keymap_cursor_ = 0;
     int onnx_upscaler_confirm_cursor_ = 1;
@@ -657,10 +670,14 @@ private:
     std::unordered_map<std::string, std::string> available_lr2_skin_roots_by_name_{};
     std::string available_tenriff_skin_root_;
     std::vector<std::string> available_tenriff_skin_names_{};
+    std::unordered_map<std::string, std::string> available_tenriff_skin_roots_by_name_{};
     TenRiffSkinDefinition active_tenriff_skin_{};
     std::array<TenRiffSkinDefinition, 16> active_tenriff_skin_modes_{};
     std::array<std::shared_ptr<const ImportedGameplaySkinDefinition>, 16>
         active_tenriff_gameplay_modes_{};
+    TenRiffSkinDefinition active_tenriff_skin_7p1_{};
+    std::shared_ptr<const ImportedGameplaySkinDefinition> active_tenriff_gameplay_7p1_{};
+    std::shared_ptr<const ImportedGameplaySkinDefinition> active_tenriff_gameplay_7p1_right_{};
     std::vector<std::string> skin_status_messages_{};
     uint64_t tenriff_skin_revision_ = 1;
 
@@ -711,6 +728,7 @@ private:
     std::unordered_map<std::string, std::vector<std::size_t>> chart_play_record_indices_{};
     std::vector<std::size_t> current_song_record_indices_{};
     std::unordered_map<std::string, ReplaySummary> replay_summary_cache_{};
+    uint64_t online_records_revision_ = 0;
 
     std::string song_search_query_{};
     bool song_select_search_active_ = false;
@@ -718,6 +736,9 @@ private:
     // leaves the table that is already loaded alone.
     bool difficulty_table_url_editing_ = false;
     std::string difficulty_table_url_input_{};
+    bool online_records_url_editing_ = false;
+    std::string online_records_url_input_{};
+    std::string song_browser_status_message_{};
     int song_key_filter_ = 0;
     int song_level_min_filter_ = 0;
     int song_level_max_filter_ = 0;
@@ -737,6 +758,9 @@ private:
     uint32_t key_escape_ = 0;
     uint32_t key_backspace_ = 0;
     uint32_t key_delete_ = 0;
+    uint32_t key_v_ = 0;
+    uint32_t key_lcontrol_ = 0;
+    uint32_t key_rcontrol_ = 0;
     uint32_t key_c_ = 0;
     uint32_t key_a_ = 0;
     uint32_t key_g_ = 0;
@@ -747,6 +771,7 @@ private:
     uint32_t key_f1_ = 0;
     uint32_t key_f2_ = 0;
     uint32_t key_f5_ = 0;
+    uint32_t key_f8_ = 0;
     uint32_t key_f9_ = 0;
     uint32_t key_minus_ = 0;
     uint32_t key_plus_ = 0;

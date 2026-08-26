@@ -4,8 +4,8 @@ This roadmap captures the recommended high-level order for building out the game
 
 ## Current baseline
 - Windows GUI/runtime is the primary supported path.
-- Project version line is `1.4.5.3`; public packages bundle NK3 P64 and generalized pattern MLP inference models, but no BGA upscaler model. Selecting a compatible rights-cleared upscaler ONNX only stores its path, and BGA Upscaler remains off until the user enables it and accepts the high-spec warning; there is no automatic benchmark gate.
-- The active menu/runtime is BMS-family only (`.bms/.bme/.bml/.pms`) and supports native/LR2 skins.
+- Project version line is `1.5.0`; public packages bundle NK3 P64 and generalized pattern MLP inference models, but no BGA upscaler model. Selecting a compatible rights-cleared upscaler ONNX only stores its path, and BGA Upscaler remains off until the user enables it and accepts the high-spec warning; there is no automatic benchmark gate.
+- The active menu/runtime is BMS-family only (`.bms/.bme/.bml/.pms`) and supports native, bundled/profile TenRiff `skin.json`, and LR2 skins.
 - For current shipped behavior, read `docs/current-state.md` first; this roadmap is about direction and remaining work.
 
 ## 0) Fix the skeleton and master clock
@@ -44,3 +44,10 @@ This roadmap captures the recommended high-level order for building out the game
 ## 4) Attach a launcher
 - Handle folder checks, first-run config creation, and error code cataloging.
 - Completing this makes the game self-contained on a local PC.
+
+## 5) Build trusted records before public ranking
+- Follow [`ranked-integrity-plan.md`](ranked-integrity-plan.md): shared ranked-eligibility reason codes, a dedicated Local Records screen, then read-only Online Records, shadow submission, and finally public verified rankings.
+- The server must recompute approved BMS results from chart SHA-256 plus replay evidence; client score claims are never authoritative.
+- `.osu` charts and osu-derived import, ruleset, scoring, or conversion paths are not eligible for ranked registration. Auxiliary OD8 statistics on an otherwise native BMS result remain local metadata only.
+- Development slice complete: a separate headless server exposes a read-only schema-v1 BMS leaderboard snapshot and Song Select Records can switch between Local and Online without blocking local play.
+- `1.5.0` remains gated by [`release-1.5.0-gate.md`](release-1.5.0-gate.md); this development slice is not release-ready ranked infrastructure.

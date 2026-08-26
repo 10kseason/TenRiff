@@ -40,7 +40,7 @@ If a profile does not exist, it is created automatically on first launch.
 
 - `backend` (string)
   - `polling | rawinput`
-  - defaults to `rawinput` on the current `1.4.5.3` release line
+  - defaults to `rawinput` on the current `1.5.0` release line
   - selectable per profile under `Options -> Input Settings -> Backend` or `Options -> Profile Setup -> Input Backend`
   - runtime fallback never rewrites the saved value to `polling`
   - a confirmed RawInput startup failure, registration-target loss, or message-window exit latches Polling across menu and subsequent gameplay sessions for the current app run
@@ -60,7 +60,7 @@ If a profile does not exist, it is created automatically on first launch.
 - `judgement_hz` (int)
   - `1000 | 2000 | 4000 | 8000`
   - compatibility field kept in the input config
-  - the current `1.4.5.3` runtime no longer drives a separate audio-thread judgement sub-step loop from this value
+  - the current `1.5.0` runtime no longer drives a separate audio-thread judgement sub-step loop from this value
   - default is `4000` (`0.25ms`)
 - `debounce_ms` (double)
   - real Press/Release transitions are preserved; only duplicate same-state events are removed from pressed-state tracking
@@ -157,7 +157,7 @@ The chart loader and indexer are limited to BMS-family files (`.bms/.bme/.bml/.p
 - `random` (string)
   - `off | mirror | fr | sr`
 - `random_seed` (int)
-  - fixed seed for FR/SR, forced key-mode conversion, and LN Mix selection; the Mirror transform itself does not use it
+  - fixed seed for RR/SR, forced key-mode conversion, and LN Mix selection; ordinary Random creates a fresh session seed per play and records the actual value in the replay
 - `mods` (string array)
   - Note Structure accepts one of `full_long_notes`, `ln_mix_10` through `ln_mix_90`, or `full_short_notes`
   - LN Mix considers only taps that can fit a base-BPM 1/8-note hold while ending at least 50ms before the next same-lane note, then assigns the selected holds 60% long 1/8-note, 20% medium 1/16-note, and 20% short alternating 1/24- and 1/32-note lengths
@@ -213,12 +213,23 @@ The chart loader and indexer are limited to BMS-family files (`.bms/.bme/.bml/.p
   - the last song root that was opened
 - `recent_song_sources` (array of string)
   - recent external/internal song source list
+- `song_collection_filter` (string)
+  - last selected all/favorites/named-collection filter
+- `song_key_filter` (int, `0..16`)
+  - last song-browser key-count filter; `0` means all keys
+- `song_level_min_filter`, `song_level_max_filter` (int, `0..50`)
+  - last level-range bounds; `0` disables that bound
+  - key, level, and collection filters are saved immediately and restored after restart
 - `difficulty_table_path` (string)
   - path to a local BMS difficulty-table header JSON selected from Browse, or to the profile cache created from a link
   - the header uses `name`, `symbol`, and a local relative `data_url`; data-array entries use `md5` or `sha256` plus `level`
   - selecting or clearing the table reindexes the current source and displays table levels for matching charts; selecting one automatically switches indexing to `safe` because hashes are required
 - `difficulty_table_url` (string)
   - original http(s) BMSTable HTML page or header JSON link imported from Browse
+- `online_records_server_url` (string)
+  - base URL for the read-only records API used by the Online tab under Song Select `RECORDS`
+  - development default is `http://127.0.0.1:27302`; a public `1.5.0` package must use the deployed HTTPS endpoint
+  - server failures disable only the Online tab and never block local records or play
   - standard `<meta name="bmstable" content="...">` metadata is resolved and the header/data JSON is cached under the profile `difficulty_tables` directory; local JSON selection clears this field
 
 ### `skin`

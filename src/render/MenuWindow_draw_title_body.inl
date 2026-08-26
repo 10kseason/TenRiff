@@ -267,9 +267,9 @@
             const float guide_available_height = std::max(0.0f, guide_lines_bottom - guide_lines_top);
             const float guide_row_pitch =
                 std::clamp(std::floor(guide_available_height / static_cast<float>(data.title.guides.size())),
-                           44.0f,
+                           22.0f,
                            62.0f);
-            const float guide_line_height = std::max(28.0f, guide_row_pitch - 12.0f);
+            const float guide_line_height = std::max(16.0f, guide_row_pitch - 6.0f);
             float guide_y = guide_lines_top;
             const D2D1_RECT_F guide_clip_rect =
                 D2D1::RectF(guide_rect.left + 18.0f, guide_lines_top - 6.0f, guide_rect.right - 18.0f, guide_rect.bottom - 18.0f);

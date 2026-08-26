@@ -126,8 +126,14 @@ struct UiConfig {
     std::vector<std::string> favorite_chart_keys;
     std::unordered_map<std::string, std::vector<std::string>> collections;
     std::string song_collection_filter = "all";
+    int song_key_filter = 0;
+    int song_level_min_filter = 0;
+    int song_level_max_filter = 0;
     std::string difficulty_table_path;
     std::string difficulty_table_url;
+    // Development default. Public 1.5.0 builds must replace this with the
+    // deployed HTTPS records endpoint or expose it through server setup UI.
+    std::string online_records_server_url = "http://127.0.0.1:27302";
 };
 
 struct SkinConfig {
@@ -135,6 +141,9 @@ struct SkinConfig {
     std::string tenriff_skin_name;
     std::string lr2_skin_name;
     std::string lr2_resolution_mode = "auto";
+    // Visual placement for the single scratch lane in 7+1 SP charts. The
+    // gameplay/replay lane identity remains canonical; only presentation moves.
+    std::string scratch_position = "left";
     std::string visual_preset = "tenriff";
     std::string note_shape = "rect";
     bool note_border_enabled = true;
@@ -257,6 +266,8 @@ public:
 };
 
 [[nodiscard]] std::string normalize_skin_mode_token(std::string_view key_mode);
+[[nodiscard]] std::string normalize_skin_scratch_position_token(std::string_view token);
+[[nodiscard]] std::string normalize_online_records_server_url(std::string_view value);
 [[nodiscard]] std::string normalize_ui_language_token(std::string_view token);
 [[nodiscard]] std::string normalize_song_index_profile_token(std::string_view token);
 [[nodiscard]] std::string normalize_pacemaker_mode_token(std::string_view token);

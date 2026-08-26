@@ -5,7 +5,8 @@
 [`tenriff-skin.schema.json`](tenriff-skin.schema.json)이 기준이다.
 
 바로 실행되는 완성 예제는
-[`TenRiff_AgentPrism_Universal_1K-16K`](../examples/skins/TenRiff_AgentPrism_Universal_1K-16K)을 참고한다.
+[`TenRiff_AgentPrism_Universal_1K-16K`](../skins/TenRiff_AgentPrism_Universal_1K-16K)을 참고한다.
+최소 제작 템플릿은 [`TenRiff-Example`](../examples/skins/TenRiff-Example) 하나만 유지한다.
 
 ## AI에게 줄 최소 요청
 
@@ -18,17 +19,17 @@ TenRiff용 [스킨 이름] 스킨을 만들어 줘.
 지원 키 모드: [예: 4K, 7K, 10K, 16K 또는 1K~16K]
 노트 형태: [rect / circle / diamond / hex]
 배경은 중앙 플레이필드 가독성을 해치지 않게 어둡게 유지해 줘.
-examples/skins/AGENTS.md와 docs/skin-format.md를 따르고,
+skins/AGENTS.md와 docs/skin-format.md를 따르고,
 skin.json 스키마 검증과 F5 리로드 확인까지 해 줘.
 ```
 
 ## 제작 순서
 
 1. **브리프 작성** — 이름, 분위기, 팔레트, 지원 키 모드, Native 대체 사용 여부를 정한다.
-2. **폴더 생성** — `examples/skins/<name>/` 아래에 `skin.json`, `README.md`, `lobby/`, `gameplay/`를 둔다.
+2. **폴더 생성** — 배포할 완성 스킨은 `skins/<name>/` 아래에 `skin.json`, `README.md`, `lobby/`, `gameplay/`를 둔다. `examples/skins/`에는 `TenRiff-Example`만 둔다.
 3. **매니페스트 우선** — 이미지보다 먼저 `skin.json`을 작성해 실제 필요한 슬롯을 확정한다.
 4. **자산 제작** — 로비·게임플레이 배경과 필요한 스프라이트를 만든다. 생성형 이미지는 결과를 직접 확인한 뒤 스킨 폴더로 복사한다.
-5. **모드 분리** — 레인별 배열이 달라지는 부분은 `gameplay.modes.4k` 같은 얕은 오버라이드로 작성한다.
+5. **모드 분리** — 레인별 배열이 달라지는 부분은 `gameplay.modes.4k` 같은 얕은 오버라이드로 작성한다. BMS 7키+스크래치는 일반 8K와 구분되는 `gameplay.modes.7+1`을 쓸 수 있다.
 6. **스키마 검증** — 오타, 잘못된 타입, 범위 초과, `1K` 같은 잘못된 모드 키를 잡는다.
 7. **실시간 확인** — `Options > Skins`에서 가져오거나 선택하고 `F5`를 눌러 4K·7K·10K·16K를 확인한다.
 8. **출처 기록** — 직접 제작, AI 생성, 사용자 제공, 외부 라이선스 자산을 README에 구분해 적는다.
@@ -41,16 +42,18 @@ skin.json 스키마 검증과 F5 리로드 확인까지 해 줘.
 | 로비 기본 배경 | `lobby.background` | 16:9 이미지와 `background_opacity` 사용 |
 | 특정 화면 배경 | `lobby.screen_backgrounds` | 화면 ID별 이미지 지정 |
 | 메뉴 위치 | `layout` | 1920×1080 기준 사각형만 필요한 슬롯에 지정 |
+| 프로필 이미지 크기 | `layout.song_select.avatar`, `layout.result.avatar` | 프로필 패널 안의 독립 사각형으로 지정 |
 | 인게임 배경 | `gameplay.background` | 중앙은 어둡고 가장자리에만 장식 배치 |
 | Native 노트 스타일 | `gameplay.note_shape`, `lane_colors` | 이미지 없이도 완성 가능한 가장 안전한 시작점 |
 | 이미지 노트·LN | `note`, `hold_head/body/tail` | 투명 PNG, 종횡비와 경계 확인 |
-| 키 수별 차이 | `gameplay.modes` | `1k`~`16k` 키로 필요한 필드만 덮어쓰기 |
+| 키 수별 차이 | `gameplay.modes` | `1k`~`16k` 또는 `7+1` 키로 필요한 필드만 덮어쓰기 |
 
 ## AI가 지켜야 할 안전선
 
 - 경로는 `skin.json` 기준 상대 경로만 사용한다. 절대 경로와 `..`는 금지한다.
 - 다른 게임이나 배포 스킨의 이미지를 허가 없이 복사하지 않는다.
 - 글자가 포함된 생성 이미지는 철자를 확대 확인한다. 정확하지 않으면 글자 없는 자산으로 다시 만든다.
+- 좁은 슬롯에서는 UI 글자가 자동 축소되지만, 실제 화면에서 최소 한 번 읽기 쉬운 크기인지 확인한다.
 - 모든 슬롯을 채울 필요는 없다. 누락된 슬롯은 Native 렌더링으로 안전하게 대체된다.
 - 범용 스킨은 한 모드의 레인 배열을 다른 키 수에 억지로 재사용하지 않는다.
 - 스킨만 고칠 때는 엔진 코드를 건드리지 않는다. 스키마에 없는 기능이 정말 필요할 때만 엔진 변경을 별도 작업으로 제안한다.
@@ -60,7 +63,7 @@ skin.json 스키마 검증과 F5 리로드 확인까지 해 줘.
 저장소 루트의 PowerShell에서 실행한다.
 
 ```powershell
-$skin = "examples/skins/<skin-name>/skin.json"
+$skin = "skins/<skin-name>/skin.json"
 Get-Content -Raw $skin | Test-Json -SchemaFile docs/tenriff-skin.schema.json
 ```
 

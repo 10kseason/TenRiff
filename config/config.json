@@ -76,12 +76,14 @@
     "result_tail_ms": 500,
     "require_enter_to_exit": true,
     "difficulty_table_path": "",
-    "difficulty_table_url": ""
+    "difficulty_table_url": "",
+    "online_records_server_url": "http://127.0.0.1:27302"
   },
   "skin": {
     "source": "native",
     "lr2_skin_name": "",
     "lr2_resolution_mode": "auto",
+    "scratch_position": "left",
     "visual_preset": "tenriff",
     "note_shape": "rect",
     "note_border_enabled": true,
@@ -113,6 +115,7 @@
       "5k": ["ice", "azure", "gold", "azure", "ice"],
       "6k": ["ice", "azure", "ice", "ice", "azure", "ice"],
       "7k": ["ice", "azure", "ice", "gold", "ice", "azure", "ice"],
+      "7+1": ["ice", "ice", "azure", "ice", "gold", "ice", "azure", "ice"],
       "8k": ["ice", "azure", "ice", "teal", "teal", "ice", "azure", "ice"],
       "9k": ["ice", "azure", "ice", "teal", "gold", "teal", "ice", "azure", "ice"],
       "10k": ["ice", "azure", "ice", "azure", "ice", "ice", "azure", "ice", "azure", "ice"],

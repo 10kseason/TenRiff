@@ -3,7 +3,7 @@
 这份文档是下一位 agent 或新任务接手时应该最先阅读的当前状态文档。目标是快速说明“这个项目现在是什么、应该先看哪里、还有哪些内容尚未验证”。
 
 ## 基线
-- 当前稳定发布线为 `1.4.5.3`
+- 当前稳定发布线为 `1.5.0`
 - UI-r2 Result 使用 2.2 秒时间线依次展示棱镜、分数、等级、通关状态、判定统计和图表；可用 Space 跳过，在演出结束前锁定 Continue/Retry/Replay 输入。
 - UI-r2 Song Select 使用顶部标签、7 行封面曲库、大幅选中图片、最佳记录卡、谱面/模式面板和可实际启动的 START 按钮；不显示 Collection/Store/货币/全球排名等虚构功能
 - Song Select 的 Rate、Hi-Speed、Gauge、Random 单元格支持左键增加/下一项、右键减少/上一项并立即保存；当前谱面键数不再被裁切，最佳记录会同时显示分数、准确率和最大连击。
@@ -95,13 +95,13 @@
   - 游戏内 Mode Settings 的 `Key Converter` 可选择 `Krrcream`、内置确定性 `KeyWeaver nK2` 或 `KeyWeaver NK3 ONNX`，并写入设置与 replay metadata
   - 已移除独立的 `Conversion Note Add` 选项：Krrcream 只重排原始 note，nK2 在扩展键数时直接向转换后的目标 layout 生成安全的辅助 note。
   - nK2 preset 可选择默认 `Native (12%)`、`Transform (35%)` 或 `Remaster (65%)`；`Remaster` 在提高预算的同时锁定 anchor 以保留原曲排布，并用等长长条填充 LN 区间。三者均为上限，实际增加量取决于原谱密度与安全窗口。Krrcream 下锁定该行，standalone converter GUI 的 Krrcream Max/Min/Speed/Seed 也不可修改。
-  - 1.4.5.3 官方 build/Windows ZIP 不构建或附带 standalone BMS key-converter CLI/GUI；顶层 CMake 选项默认 `OFF`，源码仅保留用于开发回归
+  - 1.5.0 官方 build/Windows ZIP 不构建或附带 standalone BMS key-converter CLI/GUI；顶层 CMake 选项默认 `OFF`，源码仅保留用于开发回归
   - NK3 始终将随包提供的 P64 与 host beam32 结合。仅当非 10K 源谱面转换为 10K 时才加入 generalized pattern MLP；10K→10K 与其他所有目标仅使用 P64。默认 `AUTO` 后端通过 ncnn Vulkan 在 AMD/NVIDIA GPU 上运行 P64 与 MLP，并保留可选 OpenVINO 兼容路径作为回退；可通过 `TENRIFF_NK3_BACKEND` 和 `TENRIFF_NK3_VULKAN_DEVICE` 强制选择。
   - `mode.key_mode=none` 表示保持谱面的原始键数与基础 pattern 布局不变
 - Native difficulty：
   - BMS 的 LV/CR 计算仅将 long-note Head/Tail 的 miss-ms 按 0.5倍评估，使 `300ms`按`150ms`处理；实际 gameplay 判定范围保持不变
 - Lane transform：
-  - Random 支持 `Off / Mirror / FR / SR`；Mirror 在 key-mode 变换后反转最终 lane，10K/16K 则在每个 player half 内独立反转
+  - Random 支持 `Off / Mirror / Random (Scratch Fixed) / SR`；普通 Random 固定皿键，每次游玩生成新的按键 lane 排列，并把实际 seed 写入 replay
   - Mod Manager 的 `LN Mix 10%～90%` 会保留已有 hold，并排除与同 lane 已有 span 重叠的 head；它通过 `Random Seed` 从按 base BPM 计算的 1/8-note hold 能在下一同 lane note 前至少 50ms 结束的 tap 中选择指定比例，并在所有 Mix 档位中把长度分配为 60% 长 1/8-note、20% 中 1/16-note、20% 短且交替的 1/24 与 1/32-note
 - Skins / Gameplay feel：
   - 标准 `10+2 DP` chart 会跳过两条 scratch lane，把 `10K` lane-color palette 依次应用到实际十个按键 lane，并与原生 12K palette 保持独立
@@ -114,13 +114,14 @@
   - Black Playfield 会将包含 lane spacing 在内的 player/ghost playfield 全部显示为纯黑
   - 会按 key mode 保存单独的 lane 宽度数组和 lane 间距数组，并在 preview、实际 gameplay、ghost field 中共用同一套布局计算
   - 支持的 skin route 包含 `native`、TenRiff `skin.json` v1 与 LR2 playskin；在 Skins 中选择或拖入 TenRiff/LR2 folder 会导入当前 profile 且不覆盖已有安装
+  - executable 旁 `skins/` 中的完成版 TenRiff skin 会合并到默认列表；同名时优先使用 active profile 的 `skins/tenriff/` 副本
   - 选择标准 `LR2files` 或 `Theme` root 时，会把其下除精确名为 `IIDX` 以及依赖 IIDX 资源之外的 theme 分别安装为独立 skin，保留 sibling-theme 路径，跳过 symlink，且不覆盖已有文件夹
   - 应用 LR2 note/LN 图片、lane gap 与 destination size；`play/Gear` 下部 frame 随 field size 放大，并作为保持原始宽高比且裁切在判定线下方的单一 overlay 显示，解析 `#CUSTOMFILE` wildcard include 默认选择，并在缺少 Gear 时不把 falling note / LN head 复用为 receptor
   - native skin 在每条 lane 底部绘制 digital piano key；仅在实际按住输入时下压，击键瞬间显示短暂 cyan/magenta glitch pulse，进程失去 foreground 时会清除 hold 视觉状态
   - `skin.lr2_resolution_mode` 以 `auto / sd / hd / fhd` 保存 LR2 playskin 的分辨率 override token
   - LR2 auto-detect 以 playskin `#DST_NOTE` 的坐标范围而不是 asset 名称来判断 SD/HD/FHD family
   - future note 的上方进入 easing
-  - 最后一个判定 note 处理完后立即结束 gameplay
+  - 最后一个判定 note 后默认等待音乐结束；在这段尾声按下 lane key 会立即进入 Result
 - Judge：
   - 默认 `GOOD` 范围为 `75ms`
   - 默认 `BAD` 范围为 `210ms`，`Judge Easy` 为 `262.5ms`，`Judge Hard` 为 `340ms`
@@ -208,7 +209,7 @@
 
 ## 运行时 / 打包规则
 - 新用户 profile 会自动创建
-- 当前稳定 P2P 发布线为 `TenRiff 1.4.5.3`
+- 当前稳定 P2P 发布线为 `TenRiff 1.5.0`
 - 发布包不包含 `Songs`
 - 发布包包含 `Main Menu / Options / Song Selecte / Multiplayer Lobby / Clear / Failed` 这些 `Mainmusic/` 场景槽位；每个 `Name.mp3` 及 `Name 2.mp3`～`Name 64.mp3` 会自动发现，并在重新进入场景时轮换
 - 发布更新只包含已构建产物和必要的运行时资源

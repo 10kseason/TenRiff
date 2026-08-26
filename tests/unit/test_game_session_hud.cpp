@@ -5,6 +5,7 @@
 #include "app/GameSessionInputTiming.h"
 #include "app/JudgementLoopTiming.h"
 #include "app/GameplayHudRevisions.h"
+#include "app/GameplayCompletionFlow.h"
 #include "app/GameplayPauseMenu.h"
 #include "app/GameplayHudWindow.h"
 #include "gameplay/GameplayEngine.h"
@@ -70,6 +71,18 @@ TEST_CASE("gameplay visual span rejects invalid timing inputs") {
           doctest::Approx(1.0));
     CHECK(tenriff::app::gameplay_reference_visual_span(120.0, 1.0, 0, 2200) ==
           doctest::Approx(1.0));
+}
+
+TEST_CASE("completed notes wait for chart audio unless the player skips") {
+    using tenriff::app::gameplay_result_transition_sample;
+    using tenriff::app::should_skip_post_note_audio;
+
+    CHECK(gameplay_result_transition_sample(10'000, 50'000, 22'050) == 50'000);
+    CHECK(gameplay_result_transition_sample(40'000, 50'000, 22'050) == 62'050);
+    CHECK(should_skip_post_note_audio(true, true, false, false, true));
+    CHECK_FALSE(should_skip_post_note_audio(true, true, true, false, true));
+    CHECK_FALSE(should_skip_post_note_audio(true, true, false, true, true));
+    CHECK_FALSE(should_skip_post_note_audio(true, true, false, false, false));
 }
 
 TEST_CASE("gameplay visual travel horizon follows speed changes without normalizing them") {

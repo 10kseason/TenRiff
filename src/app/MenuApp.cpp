@@ -31,9 +31,11 @@
 #include "app/GameSession.h"
 #include "app/AudioFileDecoder.h"
 #include "app/AudioMixPolicy.h"
+#include "app/ClipboardText.h"
 #include "app/DifficultyTable.h"
 #include "app/DifficultyTableLink.h"
 #include "app/GameplayHudRevisions.h"
+#include "app/LanePresentationLayout.h"
 #include "app/GraphicsTiming.h"
 #include "app/MenuAppSettingsUtils.h"
 #include "app/MenuAppSkinUtils.h"
@@ -70,7 +72,7 @@ using menu_song_select::song_title_for_ui;
 constexpr int kSnapshotSongCount = 10;
 constexpr int kSongSelectVisibleCardCount = 7;
 constexpr int kSongSelectNavLastIndex = 6;
-constexpr int kSongBrowserRowCount = 11;
+constexpr int kSongBrowserRowCount = 12;
 constexpr int64_t kSongSelectRepeatInitialDelayNs = 250'000'000LL;
 constexpr int64_t kSongSelectRepeatIntervalNs = 45'000'000LL;
 constexpr std::size_t kRecentSongSourceLimit = 12;
@@ -90,46 +92,9 @@ bool is_current_process_foreground_menu() {
 }
 
 std::optional<std::string> difficulty_table_url_from_clipboard() {
-#ifdef _WIN32
-    if (!IsClipboardFormatAvailable(CF_UNICODETEXT) || !OpenClipboard(nullptr)) {
-        return std::nullopt;
-    }
-    HANDLE data = GetClipboardData(CF_UNICODETEXT);
-    const wchar_t* text = data ? static_cast<const wchar_t*>(GlobalLock(data)) : nullptr;
-    std::wstring value = text ? std::wstring(text) : std::wstring{};
-    if (text) {
-        GlobalUnlock(data);
-    }
-    CloseClipboard();
-
-    const auto is_space = [](wchar_t ch) {
-        return ch == L' ' || ch == L'\t' || ch == L'\r' || ch == L'\n';
-    };
-    while (!value.empty() && is_space(value.front())) {
-        value.erase(value.begin());
-    }
-    while (!value.empty() && is_space(value.back())) {
-        value.pop_back();
-    }
-    if (value.empty()) {
-        return std::nullopt;
-    }
-    const int byte_count = WideCharToMultiByte(
-        CP_UTF8, 0, value.data(), static_cast<int>(value.size()), nullptr, 0, nullptr, nullptr);
-    if (byte_count <= 0) {
-        return std::nullopt;
-    }
-    std::string utf8(static_cast<std::size_t>(byte_count), '\0');
-    if (WideCharToMultiByte(CP_UTF8,
-                            0,
-                            value.data(),
-                            static_cast<int>(value.size()),
-                            utf8.data(),
-                            byte_count,
-                            nullptr,
-                            nullptr) != byte_count) {
-        return std::nullopt;
-    }
+    const auto clipboard = clipboard_text_utf8();
+    if (!clipboard.has_value()) return std::nullopt;
+    std::string utf8 = *clipboard;
     std::string lower = utf8;
     std::transform(lower.begin(), lower.end(), lower.begin(), [](unsigned char ch) {
         return static_cast<char>(std::tolower(ch));
@@ -138,9 +103,6 @@ std::optional<std::string> difficulty_table_url_from_clipboard() {
         return std::nullopt;
     }
     return utf8;
-#else
-    return std::nullopt;
-#endif
 }
 
 int detect_active_monitor_refresh_hz(int fallback_hz) {
@@ -925,8 +887,8 @@ std::string MenuApp::ui_random_label(std::string_view token) const {
     if (normalized == "mirror") {
         return ui_text("Mirror", "미러");
     }
-    if (normalized == "fr") {
-        return ui_text("Random", "랜덤");
+    if (normalized == "fr" || normalized == "frns" || normalized == "fr_no_scratch") {
+        return ui_text("Random (Scratch Fixed)", "랜덤 (스크래치 고정)");
     }
     if (normalized == "rr") {
         return "R-Random";
@@ -1127,6 +1089,9 @@ bool MenuApp::initialize(const CommandLineOptions& options) {
         return false;
     }
     config_ = config_result.config;
+    song_key_filter_ = config_.ui.song_key_filter;
+    song_level_min_filter_ = config_.ui.song_level_min_filter;
+    song_level_max_filter_ = config_.ui.song_level_max_filter;
     input_backend_state_ = input_backend_fallback_policy_.runtime_state(config_.input.rawinput);
     last_gameplay_input_backend_state_ = input_backend_state_;
     const bool migrated_config = config_result.migrated;
@@ -1173,6 +1138,9 @@ bool MenuApp::initialize(const CommandLineOptions& options) {
     key_escape_ = config::KeycodeMap::to_keycode("Esc").value_or(0);
     key_backspace_ = config::KeycodeMap::to_keycode("Backspace").value_or(0);
     key_delete_ = config::KeycodeMap::to_keycode("Delete").value_or(0);
+    key_v_ = config::KeycodeMap::to_keycode("V").value_or(0);
+    key_lcontrol_ = config::KeycodeMap::to_keycode("LControl").value_or(0);
+    key_rcontrol_ = config::KeycodeMap::to_keycode("RControl").value_or(0);
     key_c_ = config::KeycodeMap::to_keycode("C").value_or(0);
     key_a_ = config::KeycodeMap::to_keycode("A").value_or(0);
     key_g_ = config::KeycodeMap::to_keycode("G").value_or(0);
@@ -1183,6 +1151,7 @@ bool MenuApp::initialize(const CommandLineOptions& options) {
     key_f1_ = config::KeycodeMap::to_keycode("F1").value_or(0);
     key_f2_ = config::KeycodeMap::to_keycode("F2").value_or(0);
     key_f5_ = config::KeycodeMap::to_keycode("F5").value_or(0);
+    key_f8_ = config::KeycodeMap::to_keycode("F8").value_or(0);
     key_f9_ = config::KeycodeMap::to_keycode("F9").value_or(0);
     key_minus_ = config::KeycodeMap::to_keycode("Minus").value_or(0);
     key_plus_ = config::KeycodeMap::to_keycode("Plus").value_or(0);
@@ -1286,6 +1255,16 @@ void MenuApp::run() {
         }
         service_multiplayer();
 
+        if (screen_ == Screen::SongSelect &&
+            song_select_view_ == SongSelectView::Records &&
+            online_records_view_) {
+            const auto online = online_records_service_.snapshot();
+            if (online.revision != online_records_revision_) {
+                online_records_revision_ = online.revision;
+                publish_snapshot();
+            }
+        }
+
         SongIndex updated;
         std::vector<std::string> warnings;
         if (song_indexer_.poll_result(updated, warnings)) {
@@ -1319,6 +1298,7 @@ void MenuApp::run() {
 void MenuApp::shutdown() {
     exit_requested_.store(true, std::memory_order_release);
     peer_session_.disconnect();
+    online_records_service_.shutdown();
     stop_menu_threads();
     song_indexer_.stop();
 }
@@ -1495,10 +1475,14 @@ std::vector<uint32_t> MenuApp::current_menu_probe_keycodes() const {
     append_fixed_key(key_escape_);
     append_fixed_key(key_backspace_);
     append_fixed_key(key_delete_);
+    append_fixed_key(key_v_);
+    append_fixed_key(key_lcontrol_);
+    append_fixed_key(key_rcontrol_);
     append_fixed_key(key_c_);
     append_fixed_key(key_f1_);
     append_fixed_key(key_f2_);
     append_fixed_key(key_f5_);
+    append_fixed_key(key_f8_);
     append_fixed_key(key_f9_);
     append_fixed_key(key_minus_);
     append_fixed_key(key_plus_);
@@ -1879,6 +1863,11 @@ void MenuApp::handle_input_event(const input::InputEvent& event) {
         return;
     }
 
+    if (key_f8_ != 0 && event.keycode == key_f8_ &&
+        open_multiplayer_chat_shortcut()) {
+        return;
+    }
+
     const bool help_overlay_supported =
         screen_ != Screen::Gameplay && screen_ != Screen::Result;
     if (help_overlay_supported && key_f1_ != 0 && event.keycode == key_f1_) {
@@ -2064,6 +2053,15 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
             return;
         }
         if (song_select_view_ == SongSelectView::Records) {
+            if (online_records_view_) {
+                const auto online = online_records_service_.snapshot();
+                if (!online.records.empty()) {
+                    selected_online_record_ = clamp_int(
+                        event.index, 0, static_cast<int>(online.records.size() - 1));
+                    publish_snapshot();
+                }
+                return;
+            }
             rebuild_current_song_record_indices();
             if (!current_song_record_indices_.empty()) {
                 selected_record_ =
@@ -2201,6 +2199,14 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
                 }
             }
             if (song_select_view_ == SongSelectView::Records) {
+                if (online_records_view_) {
+                    const auto online = online_records_service_.snapshot();
+                    if (online.records.empty()) return;
+                    selected_online_record_ = clamp_int(
+                        event.index, 0, static_cast<int>(online.records.size() - 1));
+                    publish_snapshot();
+                    return;
+                }
                 rebuild_current_song_record_indices();
                 if (current_song_record_indices_.empty()) {
                     return;
@@ -2224,7 +2230,7 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
                 return;
             }
             if (song_select_view_ == SongSelectView::Records) {
-                (void)open_selected_record_result();
+                if (!online_records_view_) (void)open_selected_record_result();
             } else if (song_select_view_ == SongSelectView::Songs) {
                 (void)open_current_song_best_result();
             }
@@ -2319,6 +2325,21 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
     const uint32_t action_key = (event.part == render::MenuHitPart::Increment)
                                     ? key_right_
                                     : (event.part == render::MenuHitPart::Decrement ? key_left_ : key_enter_);
+    const int previous_settings_cursor = settings_cursor_;
+    const Screen clicked_screen = screen_;
+    const bool adjustment_without_selection =
+        event.part == render::MenuHitPart::Increment ||
+        event.part == render::MenuHitPart::Decrement;
+    const auto finish_adjustment_without_selection = [&]() {
+        if (!adjustment_without_selection || screen_ != clicked_screen) {
+            return;
+        }
+        settings_cursor_ = previous_settings_cursor;
+        settings_change_flash_screen_ = clicked_screen;
+        settings_change_flash_row_ = event.index;
+        settings_change_flash_started_ns_ = timing::HighResClock::now_ns();
+        publish_snapshot();
+    };
     const auto finish_selection_only = [&]() {
         if (event.part != render::MenuHitPart::SelectOnly) {
             return false;
@@ -2337,6 +2358,7 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
                 return;
             }
             handle_quick_setup_input(action_key);
+            finish_adjustment_without_selection();
             return;
         case Screen::SettingsAudio:
             settings_cursor_ = clamp_int(event.index, 0, 6);
@@ -2344,6 +2366,7 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
                 return;
             }
             handle_audio_settings_input(action_key);
+            finish_adjustment_without_selection();
             return;
         case Screen::SettingsGraphics:
             settings_cursor_ = clamp_int(event.index, 0, 11);
@@ -2351,6 +2374,7 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
                 return;
             }
             handle_graphics_settings_input(action_key);
+            finish_adjustment_without_selection();
             return;
         case Screen::SongBrowser:
             settings_cursor_ = clamp_int(event.index, 0, kSongBrowserRowCount - 1);
@@ -2358,6 +2382,7 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
                 return;
             }
             handle_song_browser_input(action_key);
+            finish_adjustment_without_selection();
             return;
         case Screen::SessionMix:
             settings_cursor_ = clamp_int(event.index, 0, 5);
@@ -2365,6 +2390,7 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
                 return;
             }
             handle_session_mix_input(action_key);
+            finish_adjustment_without_selection();
             return;
         case Screen::SettingsSkins:
             settings_cursor_ = clamp_int(
@@ -2375,6 +2401,7 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
                 return;
             }
             handle_skins_settings_input(action_key);
+            finish_adjustment_without_selection();
             return;
         case Screen::SettingsInput:
             settings_cursor_ = clamp_int(event.index, 0, 3);
@@ -2382,6 +2409,7 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
                 return;
             }
             handle_input_settings_input(action_key);
+            finish_adjustment_without_selection();
             return;
         case Screen::SettingsCalibration:
             settings_cursor_ = clamp_int(event.index, 0, 5);
@@ -2389,6 +2417,7 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
                 return;
             }
             handle_calibration_settings_input(action_key);
+            finish_adjustment_without_selection();
             return;
         case Screen::ModeSelect:
             settings_cursor_ = clamp_int(event.index, 0, 17);
@@ -2396,6 +2425,7 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
                 return;
             }
             handle_mode_settings_input(action_key);
+            finish_adjustment_without_selection();
             return;
         case Screen::ModeMods:
             settings_cursor_ = clamp_int(event.index, 0, static_cast<int>(mode_mod_categories().size()));
@@ -2403,6 +2433,7 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
                 return;
             }
             handle_mode_mods_input(action_key);
+            finish_adjustment_without_selection();
             return;
         case Screen::Multiplayer:
             multiplayer_menu_.cursor = clamp_multiplayer_menu_cursor(event.index);
@@ -2536,12 +2567,16 @@ void MenuApp::handle_text_input(std::string_view text) {
         return;
     }
 
-    if (difficulty_table_url_editing_ && !text.empty()) {
+    if ((difficulty_table_url_editing_ || online_records_url_editing_) && !text.empty()) {
+        std::string& target = online_records_url_editing_
+                                  ? online_records_url_input_
+                                  : difficulty_table_url_input_;
+        const std::size_t maximum = online_records_url_editing_ ? 2048u : 512u;
         const std::string utf8 = util::ensure_utf8_text(text);
         for (unsigned char ch : utf8) {
             // URLs are ASCII; anything else would only break the request.
-            if (ch > 0x20u && ch != 0x7Fu && difficulty_table_url_input_.size() < 512u) {
-                difficulty_table_url_input_.push_back(static_cast<char>(ch));
+            if (ch > 0x20u && ch != 0x7Fu && target.size() < maximum) {
+                target.push_back(static_cast<char>(ch));
             }
         }
         publish_snapshot();
@@ -2555,6 +2590,11 @@ void MenuApp::handle_text_input(std::string_view text) {
     config_.ui.profile_nickname = config::normalize_profile_nickname(
         config_.ui.profile_nickname + std::string(text));
     publish_snapshot();
+}
+
+bool MenuApp::control_modifier_pressed() const {
+    return (key_lcontrol_ != 0 && pressed_keys_.find(key_lcontrol_) != pressed_keys_.end()) ||
+           (key_rcontrol_ != 0 && pressed_keys_.find(key_rcontrol_) != pressed_keys_.end());
 }
 
 void MenuApp::handle_quick_setup_input(uint32_t keycode) {
@@ -2978,6 +3018,22 @@ void MenuApp::handle_song_select_input(uint32_t keycode) {
         return;
     }
 
+    if (keycode == key_f5_ && song_select_view_ == SongSelectView::Records &&
+        online_records_view_) {
+        const SongEntry* entry = selected_song_ >= 0
+                                     ? visible_song_entry(
+                                           static_cast<std::size_t>(selected_song_))
+                                     : nullptr;
+        const std::string hash = entry
+                                     ? normalize_multiplayer_chart_sha256(entry->sha256)
+                                     : std::string{};
+        if (!hash.empty()) {
+            online_records_service_.request(
+                config_.ui.online_records_server_url, hash, true);
+        }
+        publish_snapshot();
+        return;
+    }
     if (keycode == key_f5_) {
         song_select_search_active_ = false;
         refresh_song_source(true);
@@ -3004,6 +3060,14 @@ void MenuApp::handle_song_select_input(uint32_t keycode) {
                 ? SongSelectFocus::SongList
                 : SongSelectFocus::QuickSettings;
         song_quick_setting_cursor_ = clamp_int(song_quick_setting_cursor_, 0, 3);
+        publish_snapshot();
+        return;
+    }
+    if (key_tab_ != 0 && keycode == key_tab_ &&
+        song_select_view_ == SongSelectView::Records) {
+        online_records_view_ = !online_records_view_;
+        selected_record_ = 0;
+        selected_online_record_ = 0;
         publish_snapshot();
         return;
     }
@@ -3082,7 +3146,8 @@ void MenuApp::handle_song_select_input(uint32_t keycode) {
         }
         return;
     }
-    if (keycode == key_r_ && song_select_view_ == SongSelectView::Records) {
+    if (keycode == key_r_ && song_select_view_ == SongSelectView::Records &&
+        !online_records_view_) {
         if (launch_selected_record_replay()) {
             return;
         }
@@ -3129,7 +3194,9 @@ void MenuApp::handle_song_select_input(uint32_t keycode) {
                 case 4:
                     song_select_search_active_ = false;
                     song_select_view_ = SongSelectView::Records;
+                    online_records_view_ = false;
                     selected_record_ = 0;
+                    selected_online_record_ = 0;
                     song_select_focus_ = SongSelectFocus::SongList;
                     rebuild_current_song_record_indices();
                     publish_snapshot();
@@ -3162,7 +3229,7 @@ void MenuApp::handle_song_select_input(uint32_t keycode) {
             }
         } else if (song_select_view_ == SongSelectView::Records) {
             song_select_search_active_ = false;
-            if (open_selected_record_result()) {
+            if (!online_records_view_ && open_selected_record_result()) {
                 publish_snapshot();
             }
         } else if (visible_song_count() > 0) {
@@ -3252,6 +3319,24 @@ void MenuApp::handle_song_browser_input(uint32_t keycode) {
             publish_snapshot();
             return;
         }
+        if (keycode == key_delete_) {
+            difficulty_table_url_input_.clear();
+            publish_snapshot();
+            return;
+        }
+        if (keycode == key_v_ && control_modifier_pressed()) {
+            if (const auto clipboard_url = difficulty_table_url_from_clipboard();
+                clipboard_url.has_value()) {
+                difficulty_table_url_input_ = *clipboard_url;
+                song_browser_status_message_.clear();
+            } else {
+                song_browser_status_message_ = ui_text(
+                    "Clipboard does not contain an http(s) URL.",
+                    "클립보드에 http(s) URL이 없습니다.");
+            }
+            publish_snapshot();
+            return;
+        }
         if (keycode == key_enter_) {
             difficulty_table_url_editing_ = false;
             apply_difficulty_table_url(difficulty_table_url_input_);
@@ -3259,6 +3344,61 @@ void MenuApp::handle_song_browser_input(uint32_t keycode) {
         }
         // Everything else is swallowed so arrow keys cannot move the cursor while
         // the field has focus.
+        return;
+    }
+    if (online_records_url_editing_) {
+        if (keycode == key_escape_) {
+            online_records_url_editing_ = false;
+            song_browser_status_message_.clear();
+            publish_snapshot();
+            return;
+        }
+        if (keycode == key_backspace_) {
+            if (!online_records_url_input_.empty()) online_records_url_input_.pop_back();
+            publish_snapshot();
+            return;
+        }
+        if (keycode == key_delete_) {
+            online_records_url_input_.clear();
+            publish_snapshot();
+            return;
+        }
+        if (keycode == key_v_ && control_modifier_pressed()) {
+            if (const auto clipboard = clipboard_text_utf8(); clipboard.has_value()) {
+                const std::string normalized =
+                    config::normalize_online_records_server_url(*clipboard);
+                if (!normalized.empty()) {
+                    online_records_url_input_ = normalized;
+                    song_browser_status_message_.clear();
+                } else {
+                    song_browser_status_message_ = ui_text(
+                        "Use an http(s) server URL without a query or fragment.",
+                        "쿼리나 프래그먼트가 없는 http(s) 서버 URL을 사용하세요.");
+                }
+            }
+            publish_snapshot();
+            return;
+        }
+        if (keycode == key_enter_) {
+            const std::string normalized =
+                config::normalize_online_records_server_url(online_records_url_input_);
+            if (normalized.empty()) {
+                song_browser_status_message_ = ui_text(
+                    "Invalid online-records server URL.",
+                    "인랭 기록 서버 URL이 올바르지 않습니다.");
+                publish_snapshot();
+                return;
+            }
+            online_records_url_editing_ = false;
+            config_.ui.online_records_server_url = normalized;
+            online_records_service_.shutdown();
+            ++online_records_revision_;
+            song_browser_status_message_ = ui_text(
+                "Online-records server saved.", "인랭 기록 서버를 저장했습니다.");
+            persist_runtime_config();
+            publish_snapshot();
+            return;
+        }
         return;
     }
     if (keycode == key_up_) {
@@ -3277,6 +3417,13 @@ void MenuApp::handle_song_browser_input(uint32_t keycode) {
         rebuild_current_song_record_indices();
         publish_snapshot();
     };
+    auto persist_filter_refresh = [this, &apply_filter_refresh]() {
+        config_.ui.song_key_filter = song_key_filter_;
+        config_.ui.song_level_min_filter = song_level_min_filter_;
+        config_.ui.song_level_max_filter = song_level_max_filter_;
+        persist_runtime_config();
+        apply_filter_refresh();
+    };
 
     if (settings_cursor_ == 0 && (keycode == key_left_ || keycode == key_right_)) {
         apply_song_sort(cycle_song_sort_mode(song_sort_mode_, (keycode == key_left_) ? -1 : 1));
@@ -3291,7 +3438,7 @@ void MenuApp::handle_song_browser_input(uint32_t keycode) {
     if (settings_cursor_ == 2 && (keycode == key_left_ || keycode == key_right_)) {
         const int direction = (keycode == key_left_) ? -1 : 1;
         song_key_filter_ = cycle_key_filter_value(song_key_filter_, direction);
-        apply_filter_refresh();
+        persist_filter_refresh();
         return;
     }
     if (settings_cursor_ == 3 && (keycode == key_left_ || keycode == key_right_)) {
@@ -3300,7 +3447,7 @@ void MenuApp::handle_song_browser_input(uint32_t keycode) {
         if (song_level_max_filter_ > 0 && song_level_min_filter_ > song_level_max_filter_) {
             song_level_max_filter_ = song_level_min_filter_;
         }
-        apply_filter_refresh();
+        persist_filter_refresh();
         return;
     }
     if (settings_cursor_ == 4 && (keycode == key_left_ || keycode == key_right_)) {
@@ -3309,7 +3456,7 @@ void MenuApp::handle_song_browser_input(uint32_t keycode) {
         if (song_level_max_filter_ > 0 && song_level_min_filter_ > song_level_max_filter_) {
             song_level_min_filter_ = song_level_max_filter_;
         }
-        apply_filter_refresh();
+        persist_filter_refresh();
         return;
     }
     if (settings_cursor_ == 5 && keycode == key_enter_) {
@@ -3323,6 +3470,18 @@ void MenuApp::handle_song_browser_input(uint32_t keycode) {
             difficulty_table_url_input_ = *clipboard_url;
         }
 #endif
+        publish_snapshot();
+        return;
+    }
+    if (settings_cursor_ == 6 && keycode == key_enter_) {
+        online_records_url_editing_ = true;
+        online_records_url_input_ = config_.ui.online_records_server_url;
+        if (const auto clipboard = clipboard_text_utf8(); clipboard.has_value()) {
+            const std::string normalized =
+                config::normalize_online_records_server_url(*clipboard);
+            if (!normalized.empty()) online_records_url_input_ = normalized;
+        }
+        song_browser_status_message_.clear();
         publish_snapshot();
         return;
     }
@@ -3371,7 +3530,7 @@ void MenuApp::handle_song_browser_input(uint32_t keycode) {
         }
         return;
     }
-    if (settings_cursor_ == 6 && (keycode == key_left_ || keycode == key_right_)) {
+    if (settings_cursor_ == 7 && (keycode == key_left_ || keycode == key_right_)) {
         const int direction = (keycode == key_left_) ? -1 : 1;
         cycle_song_collection_filter(direction);
         persist_runtime_config();
@@ -3380,7 +3539,7 @@ void MenuApp::handle_song_browser_input(uint32_t keycode) {
     }
 
     if (keycode == key_enter_) {
-        if (settings_cursor_ == 7) {
+        if (settings_cursor_ == 8) {
             const std::string named_collection = current_named_song_collection();
             bool changed = false;
             if (!named_collection.empty()) {
@@ -3399,22 +3558,25 @@ void MenuApp::handle_song_browser_input(uint32_t keycode) {
             }
             return;
         }
-        if (settings_cursor_ == 8) {
+        if (settings_cursor_ == 9) {
             create_next_song_collection();
             persist_runtime_config();
             apply_filter_refresh();
             return;
         }
-        if (settings_cursor_ == 9) {
+        if (settings_cursor_ == 10) {
             song_key_filter_ = 0;
             song_level_min_filter_ = 0;
             song_level_max_filter_ = 0;
             config_.ui.song_collection_filter = "all";
+            config_.ui.song_key_filter = 0;
+            config_.ui.song_level_min_filter = 0;
+            config_.ui.song_level_max_filter = 0;
             persist_runtime_config();
             apply_filter_refresh();
             return;
         }
-        if (settings_cursor_ == 10) {
+        if (settings_cursor_ == 11) {
             screen_ = submenu_return_screen_;
             settings_cursor_ = 0;
             publish_snapshot();
@@ -3452,6 +3614,15 @@ bool MenuApp::move_song_select_selection(int delta) {
     }
 
     if (song_select_view_ == SongSelectView::Records) {
+        if (online_records_view_) {
+            const auto online = online_records_service_.snapshot();
+            if (online.records.empty()) return false;
+            const int previous = selected_online_record_;
+            selected_online_record_ = clamp_int(
+                selected_online_record_ + delta, 0,
+                static_cast<int>(online.records.size() - 1));
+            return selected_online_record_ != previous;
+        }
         rebuild_current_song_record_indices();
         if (current_song_record_indices_.empty()) {
             return false;

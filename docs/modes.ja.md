@@ -31,7 +31,8 @@
 - `key_conversion_nk2_preset`: `native | transform | remaster`（既定は `native`。nK2 選択時は `Native (12%)` / `Transform (35%)` / `Remaster (65%)`、Krrcream 選択時は row を lock）
 - `gauge`: `normal | hard | ex_hard | easy | shift`
 - `random`: `off | mirror | rr | fr | sr`
-- `random_seed`: RR/FR/SR、強制 key-mode 変換、Note Add、LN Mix 対象選択の固定 seed（`0` も固定値として扱う）
+- `random`: `off | mirror | rr | frns | sr`（`fr` は旧設定互換 alias）
+- `random_seed`: RR/SR、強制 key-mode 変換、Note Add、LN Mix 対象選択の固定 seed（`0` も固定値）。通常 Random は play ごとに新しい session seed を生成し、replay に実際の値を記録
 - `mods`: Mod Manager が正規化して保存する mod token 配列
 - `ghost_battle_enabled`: `false | true`
   - 既定値は `false`
@@ -57,7 +58,7 @@
   - DP layout は二つの player field を交換せず、各 field 内で独立して反転
   - Mirror 自体は `random_seed` を使わないが、先に行う強制 key-mode 変換は seed を使用する場合がある
 - **RR (R-Random)**: scratch を固定し、playable lane group ごとに seed 付き offset で回転。DP の左右は独立処理
-- **FR (Full Random)**: lane 集合全体を random permutation で置き換える
+- **Random / FRNS**: scratch を固定し、key lane だけを play ごとの新しい seed で random permutation。replay は記録された seed で同じ配置を復元
 - **SR (Super Random)**: note ごとに random placement
   - 同時刻も含めて同一 lane overlap が起きないよう candidate lane を選ぶ
   - long note は head / tail を同じ lane に保つ

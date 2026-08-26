@@ -68,6 +68,11 @@ struct MultiplayerMenuState {
     uint64_t peer_chart_size = 0;
 };
 
+struct MultiplayerEndpoint {
+    std::string address;
+    std::optional<uint16_t> port;
+};
+
 [[nodiscard]] inline constexpr bool gameplay_launch_uses_peer_battle(
     GameplayLaunchKind kind,
     bool replay_playback) {
@@ -209,6 +214,57 @@ inline bool try_append_multiplayer_chat_text(std::string& target,
 
 [[nodiscard]] inline constexpr bool multiplayer_start_gate_open(const MultiplayerMenuState& state) {
     return multiplayer_ready_gate_open(state) && state.local_ready && state.peer_ready;
+}
+
+[[nodiscard]] inline std::optional<MultiplayerEndpoint> parse_multiplayer_endpoint(
+    std::string_view text) {
+    while (!text.empty() &&
+           (text.front() == ' ' || text.front() == '\t' || text.front() == '\r' ||
+            text.front() == '\n')) {
+        text.remove_prefix(1);
+    }
+    while (!text.empty() &&
+           (text.back() == ' ' || text.back() == '\t' || text.back() == '\r' ||
+            text.back() == '\n')) {
+        text.remove_suffix(1);
+    }
+    constexpr std::string_view kScheme = "tenriff://";
+    const auto scheme_matches = [&]() constexpr {
+        if (text.size() < kScheme.size()) return false;
+        for (std::size_t i = 0; i < kScheme.size(); ++i) {
+            const auto lower = [](char ch) constexpr {
+                return (ch >= 'A' && ch <= 'Z') ? static_cast<char>(ch - 'A' + 'a') : ch;
+            };
+            if (lower(text[i]) != kScheme[i]) return false;
+        }
+        return true;
+    };
+    if (scheme_matches()) {
+        text.remove_prefix(kScheme.size());
+    }
+    if (text.empty() || text.find_first_of("/?#") != std::string_view::npos) {
+        return std::nullopt;
+    }
+
+    std::string_view host = text;
+    std::optional<uint16_t> port;
+    const std::size_t colon = text.find(':');
+    if (colon != std::string_view::npos) {
+        if (text.find(':', colon + 1) != std::string_view::npos) return std::nullopt;
+        host = text.substr(0, colon);
+        port = parse_multiplayer_port(text.substr(colon + 1));
+        if (!port.has_value()) return std::nullopt;
+    }
+    if (!is_valid_multiplayer_address_text(host)) return std::nullopt;
+    return MultiplayerEndpoint{std::string(host), port};
+}
+
+[[nodiscard]] inline bool try_open_multiplayer_chat(MultiplayerMenuState& state,
+                                                    bool connected) {
+    if (!connected) return false;
+    state.cursor = static_cast<int>(MultiplayerMenuRow::Chat);
+    state.edit_field = MultiplayerEditField::Chat;
+    return true;
 }
 
 [[nodiscard]] inline constexpr bool multiplayer_leader_can_start(const MultiplayerMenuState& state) {

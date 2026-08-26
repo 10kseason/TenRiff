@@ -11,6 +11,8 @@ struct CommandLineOptions {
     std::string chart_path;
     std::string replay_path;
     std::string ghost_replay_path;
+    std::string ranked_challenge_id;
+    std::string ranked_challenge_nonce;
     bool has_rate = false;
     bool has_hispeed = false;
     bool has_gauge = false;

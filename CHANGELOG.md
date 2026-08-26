@@ -2,7 +2,38 @@
 
 TenRiff의 사용자/배포 관점에서 의미 있는 변경만 간단히 기록합니다.
 
-## Unreleased
+## [1.5.0] - 2026-08-26
+
+### Added
+
+- 완성된 TenRiff `skin.json` 스킨을 루트 `skins/`에서 자동 발견하고 빌드 출력과 Windows 배포 패키지에 함께 넣습니다. 프로필에 같은 이름의 스킨이 있으면 사용자 사본이 번들 사본보다 우선합니다.
+- 검증 가능한 랭킹 서버, 로컬/온라인 기록 화면, BMS 전용 랭크 자격과 osu 관련 실행 경로의 랭크 제외를 단계적으로 도입하는 신뢰 계획을 추가했습니다.
+- 일반 8K와 분리된 `7+1` 스킨 설정 및 TenRiff 매니페스트 오버라이드, 스크래치 좌우 표시 위치를 추가했습니다.
+- 난이도표·멀티플레이 `host:port`·인랭 기록 서버 주소를 클립보드에서 바로 가져오거나 Ctrl+V로 교체할 수 있습니다.
+- 별도 공개 TenRiff Server가 계정·만료 세션, 승인 BMS SHA-256 catalog, 일회성 challenge, replay 업로드와 외부 `tenriff-replay-verifier` 재실행, SQLite 기록, HMAC 검증 영수증을 제공합니다. `.osu`와 클라이언트 점수 claim은 등록하지 않습니다.
+- `Random (Scratch Fixed)`를 추가해 스크래치는 고정하고 건반만 섞습니다.
+- StepMania 계열의 대담한 로비·선곡·결과 화면을 갖춘 번들 스킨과 AI 스킨 제작용 `AGENTS.md`, 제작 가이드, JSON Schema를 제공합니다.
+- Local/Online Records 화면, HTTPS 서버 주소 설정, 검증 상태·거부 사유·서버 정보 표시와 실패 시 로컬 기록 유지 동작을 추가했습니다.
+- 곡 필터 상태 저장, BMS 패턴 파일의 노트 수 표시, 스킨별 프로필 아바타 크기 조절을 추가했습니다.
+- 멀티플레이 메뉴 어디서든 F8로 채팅 입력을 열 수 있으며 플레이·결과 중에는 입력 충돌을 막습니다.
+
+### Changed
+
+- `examples/skins/`는 최소 제작 템플릿 `TenRiff-Example` 하나만 유지하고, 기존 완성 예제 9개를 배포용 `skins/`로 이동했습니다.
+- 마지막 노트 판정 뒤에는 기본적으로 곡 오디오가 끝날 때까지 기다리며, 그 구간에서 레인 키를 누르면 점수·리플레이에 입력을 추가하지 않고 결과 화면으로 바로 넘어갑니다.
+- 숫자가 포함된 난이도표 레벨은 별도 `level_order`가 없을 때 `1, 2, 3, ... 10, 11`의 자연 순서로 정렬합니다.
+- 스킨·옵션의 마우스 증감 버튼은 키보드 선택 행을 옮기지 않고, 바뀐 행만 3회 점멸해 변경을 알립니다.
+- 일반 Random은 플레이/재도전마다 새 세션 seed를 만들며 replay에는 실제 seed를 저장해 재생과 서버 검증의 결정성을 유지합니다.
+
+### Fixed
+
+- Velocity Circuit / Dance Grid를 포함한 스킨 메뉴·결과 레이아웃의 긴 문구를 칸 너비에 맞춰 자동 축소하고 경계 밖으로 넘치지 않게 했습니다.
+- 원격 인랭 기록 서버는 HTTPS만 허용하고 localhost 개발 주소에만 HTTP를 허용하며, HTTPS에서 HTTP로 내려가는 리다이렉트를 거부합니다.
+
+### Release
+
+- 정식 자산은 `TenRiff-1.5.0.zip`, `TenRiff-1.5.0-source.zip`, `TenRiff-1.5.0-SHA256SUMS.txt`입니다.
+- 자체 호스팅 서버는 별도 [`10kseason/TenRiff-Server`](https://github.com/10kseason/TenRiff-Server) 저장소와 `v1.0.0` Windows/Linux/GHCR 자산으로 배포합니다. 중앙 공식 서버 주소는 이 릴리스에 포함하지 않습니다.
 
 ## [1.4.5.3] - 2026-08-25
 
@@ -11,7 +42,7 @@ TenRiff의 사용자/배포 관점에서 의미 있는 변경만 간단히 기�
 - Skin Settings에 `Create New Skin`, `Open Skin Folder`, `Reload Skin`을 추가하고 표준 파일명 자동 감지, `F5` 핫 리로드, 레인 파일 패턴과 `1k..16k` 모드별 덮어쓰기를 지원합니다.
 - TenRiff 스킨이 20개 화면의 개별 배경/투명도, 메뉴 팔레트와 셰이더 장면 색, Title/Song Select/Result 및 화면별 목록 레이아웃, 게임플레이 시각 옵션을 지정할 수 있습니다.
 - 공식 `10kseason/TenRiff` 경로의 JSON Schema, 확장 예제, 알 수 없는 키/타입/범위 경고를 제공합니다.
-- AI 에이전트용 `examples/skins/AGENTS.md`, 제작 가이드, 1K~16K 범용 `Agent Prism Universal` 완성 예제를 제공합니다.
+- AI 에이전트용 `skins/AGENTS.md`, 제작 가이드, 1K~16K 범용 `Agent Prism Universal` 완성 예제를 제공합니다.
 - NK3 P64와 2K~18K 일반화 MLP를 ncnn FP32 모델로 변환해 Vulkan을 지원하는 AMD/NVIDIA GPU에서 실행합니다.
 
 ### Changed

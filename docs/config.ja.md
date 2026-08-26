@@ -40,7 +40,7 @@ profile が存在しない場合は初回起動時に自動生成されます。
 
 - `backend` (string)
   - `polling | rawinput`
-  - 現行 `1.4.5.3` リリースラインの既定値は `rawinput`
+  - 現行 `1.5.0` リリースラインの既定値は `rawinput`
   - `Options -> Input Settings -> Backend` または `Options -> Profile Setup -> Input Backend` で profile ごとに選択可能
   - runtime fallback は保存済みの値を `polling` に書き換えない
   - RawInput の起動失敗、登録先の消失、message window の終了を確認すると、そのアプリ実行中は menu と後続 gameplay の両方で Polling を維持する
@@ -157,7 +157,7 @@ chart loader/indexer は BMS family（`.bms/.bme/.bml/.pms`）専用です。旧
 - `random` (string)
   - `off | mirror | fr | sr`
 - `random_seed` (int)
-  - FR/SR、強制 key-mode 変換、LN Mix 対象選択の固定 seed。Mirror 変換自体は使用しない
+  - RR/SR、強制 key-mode 変換、LN Mix 対象選択の固定 seed。通常 Random は play ごとに新しい session seed を生成し、実際の値を replay に記録
 - `mods` (string array)
   - Note Structure では `full_long_notes`、`ln_mix_10`～`ln_mix_90`、`full_short_notes` のいずれか一つを選択できる
   - LN Mix は base BPM 基準の 1/8-note hold が次の同一 lane note より 50ms 以上前に終わる tap のみを候補にし、選択した hold の長さを長い 1/8-note 60% / 中間 1/16-note 20% / 短い 1/24・1/32-note 20% に配分する
@@ -213,6 +213,13 @@ chart loader/indexer は BMS family（`.bms/.bme/.bml/.pms`）専用です。旧
   - 最後に開いた song root
 - `recent_song_sources` (array of string)
   - recent external/internal song source 一覧
+- `song_collection_filter` (string)
+  - 最後に選択した全曲・お気に入り・名前付き collection filter
+- `song_key_filter` (int, `0..16`)
+  - song browser の最後の key-count filter。`0` は全 key
+- `song_level_min_filter`, `song_level_max_filter` (int, `0..50`)
+  - 最後の level range。`0` はその境界を無効化
+  - key・level・collection filter は変更時に保存され、再起動後も復元
 - `difficulty_table_path` (string)
   - Browse で選択した local BMS difficulty-table header JSON、または link から作成した profile cache header の path
   - header は `name`, `symbol`, local relative `data_url`、data array entry は `md5` または `sha256` と `level` を使用
