@@ -2,9 +2,9 @@
 
 Language: [한국어](README.md) | [English](README.en.md) | [简体中文](README.zh-CN.md) | 日本語
 
-TenRiff は Windows GUI ベースの BMS リズムゲーム runtime/launcher です。現在の stable 版は `1.5.0` で、譜面入力は BMS family（`.bms/.bme/.bml/.pms`）専用です。公開 package は BGA upscaler model を含まず、key-mode conversion 用の deterministic NK3 P64 graph と generalized pattern MLP を同梱します。license は MIT です。
+TenRiff は Windows GUI ベースの BMS リズムゲーム runtime/launcher です。現在の stable 版は `1.5.1` で、譜面入力は BMS family（`.bms/.bme/.bml/.pms`）専用です。公開 package は BGA upscaler model を含まず、key-mode conversion 用の deterministic NK3 P64 graph と generalized pattern MLP を同梱します。license は MIT です。
 
-この README は導入文書です。現在の挙動、`1.5.0` project state、`1.1.2 final stable` baseline、設定と設計文書は [`docs/README.ja.md`](docs/README.ja.md) から参照してください。
+この README は導入文書です。現在の挙動、`1.5.1` project state、`1.5.1 fixed stable baseline` baseline、設定と設計文書は [`docs/README.ja.md`](docs/README.ja.md) から参照してください。
 
 TenRiff のコードベースは、伝統的な長文設計書主導だけで積み上がったものではなく、高速な反復と実験を重視した `vibe coding` 的な性格を持つ作品でもあります。
 
@@ -15,7 +15,7 @@ TenRiff のコードベースは、伝統的な長文設計書主導だけで積
 - グラフィックス経路: D3D11 + Direct2D/DirectWrite
 - オーディオ経路: WASAPI
 - 入力経路: RawInput または高ポーリング polling
-- direct-IP multiplayer: 固定 host の TCP coordinator 方式で最大8人、multiplayer の選曲は BMS のみ（既定 `27300/TCP`、[利用案内](docs/multiplayer.md)）
+- direct-IP multiplayer: 固定 host の TCP coordinator 方式で最大8人、multiplayer の選曲は BMS のみ（既定 `27301/TCP`、[利用案内](docs/multiplayer.md)）
 - ライセンス: [MIT](LICENSE)
 - サードパーティ通知: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
 - リリース変更履歴: [CHANGELOG.md](CHANGELOG.md)
@@ -178,8 +178,8 @@ README は導入だけを担当します。詳細は次の順で読むのが効�
    - 文書マップ全体
 2. [`docs/current-state.ja.md`](docs/current-state.ja.md)
    - 現在実際に動いていること
-3. [`docs/baseline-1.1.2.ja.md`](docs/baseline-1.1.2.ja.md)
-   - 後続作業が参照すべき `1.1.2 final stable` ベースライン文書
+3. [`docs/baseline-1.5.1.ja.md`](docs/baseline-1.5.1.ja.md)
+   - 後続作業が参照すべき `1.5.1 fixed stable baseline` ベースライン文書
 4. [`docs/gameplay-guide.ja.md`](docs/gameplay-guide.ja.md)
    - 実際のプレイ開始方法、基本操作、HUD/判定/結果画面の説明
 5. [`docs/config.ja.md`](docs/config.ja.md)

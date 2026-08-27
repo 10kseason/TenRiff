@@ -40,7 +40,7 @@
 
 - `backend` (string)
   - `polling | rawinput`
-  - 현재 `1.5.0` 릴리스 라인의 기본값은 `rawinput`
+  - 현재 `1.5.1` 릴리스 라인의 기본값은 `rawinput`
   - `Options -> Input Settings -> Backend` 또는 `Options -> Profile Setup -> Input Backend`에서 프로필별로 RawInput/Polling을 직접 선택 가능
   - 저장값은 런타임 fallback 때문에 자동으로 `polling`으로 덮어쓰지 않음
   - RawInput 시작 실패, 등록 대상 손실, 메시지 창 종료가 확인되면 현재 앱 실행 동안 메뉴와 다음 gameplay 세션 모두 Polling을 유지
@@ -60,7 +60,7 @@
 - `judgement_hz` (int)
   - `1000 | 2000 | 4000 | 8000`
   - 호환성용으로 남아 있는 입력 설정 필드
-  - 현재 `1.5.0` runtime은 별도 오디오 판정 서브루프를 이 값으로 구동하지 않음
+  - 현재 `1.5.1` runtime은 별도 오디오 판정 서브루프를 이 값으로 구동하지 않음
   - 기본값은 `4000` (`0.25ms`)
 - `debounce_ms` (double)
   - 실제 Press/Release 전환은 버리지 않고 같은 상태의 중복 이벤트만 상태 추적에서 제거
@@ -230,10 +230,16 @@
   - Browse에서 가져온 http(s) BMSTable HTML 페이지 또는 header JSON 원본 링크
   - 표준 `<meta name="bmstable" content="...">`를 해석해 header/data JSON을 프로필의 `difficulty_tables` 캐시에 저장하며, 로컬 JSON 선택 시에는 비워짐
 - `online_records_server_url` (string)
-  - Song Select `RECORDS`의 Online 탭에서 사용하는 읽기 전용 기록 API 기준 URL
-  - 개발 기본값은 `http://127.0.0.1:27302`; 공개 `1.5.0` 패키지는 배포된 HTTPS 주소로 교체해야 함
+  - 현재 로그인한 서버의 기록·랭킹·글로벌 채팅 API 기준 URL
+  - 개발 기본값은 `http://127.0.0.1:27302`; 공개 `1.5.1` 패키지는 배포된 HTTPS 주소로 교체해야 함
   - 서버 오류나 버전 불일치는 로컬 기록/플레이를 막지 않으며 Online 탭만 fail-closed로 오류를 표시
   - 곡 브라우저 설정에서 URL을 복사한 뒤 Enter 또는 편집 중 Ctrl+V로 지정 가능
+- `tenriff_main_server_url` (string)
+  - F10 로그인 창의 `텐리프 메인` 서버 URL. 운영 배포에서는 유효한 HTTPS 주소가 필요함
+- `private_server_url` (string)
+  - F10 로그인 창에서 사용자가 입력한 사설 API URL. 원격 주소는 HTTPS만 허용하고 localhost만 HTTP 허용
+- `account_server_mode` (string)
+  - 마지막 로그인 서버 선택: `main | private`
 
 ### `skin`
 - `source` (string)

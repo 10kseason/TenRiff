@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cctype>
 #include <cmath>
 #include <cstdio>
 #include <ctime>
@@ -31,6 +32,7 @@
 #include "app/GameSession.h"
 #include "app/AudioFileDecoder.h"
 #include "app/AudioMixPolicy.h"
+#include "app/ChartFileHash.h"
 #include "app/ClipboardText.h"
 #include "app/DifficultyTable.h"
 #include "app/DifficultyTableLink.h"
@@ -46,6 +48,7 @@
 #include "app/MenuSongUtils.h"
 #include "app/PersistedRuntimeConfig.h"
 #include "app/PeerBattleRuntimeRules.h"
+#include "app/RankedRecordsClient.h"
 #include "app/ProfileSetupFlow.h"
 #include "app/RuntimeConfigMigration.h"
 #include "app/SongPreviewPlayback.h"
@@ -1089,6 +1092,19 @@ bool MenuApp::initialize(const CommandLineOptions& options) {
         return false;
     }
     config_ = config_result.config;
+    ranked_account_main_server_url_ = config_.ui.tenriff_main_server_url;
+    if (ranked_account_main_server_url_.empty()) {
+        ranked_account_main_server_url_ = config_.ui.online_records_server_url;
+    }
+    ranked_account_private_server_url_ = config_.ui.private_server_url;
+    ranked_account_use_private_server_ = config_.ui.account_server_mode == "private";
+    ranked_account_focused_field_ = ranked_account_use_private_server_ ? 0 : 1;
+    std::string saved_account_error;
+    if (!saved_ranked_account_username(
+            profile_dir, ranked_account_username_, saved_account_error)) {
+        ranked_account_status_ = safe_ui_text(
+            saved_account_error, "Could not read the protected ranked account.");
+    }
     song_key_filter_ = config_.ui.song_key_filter;
     song_level_min_filter_ = config_.ui.song_level_min_filter;
     song_level_max_filter_ = config_.ui.song_level_max_filter;
@@ -1153,6 +1169,7 @@ bool MenuApp::initialize(const CommandLineOptions& options) {
     key_f5_ = config::KeycodeMap::to_keycode("F5").value_or(0);
     key_f8_ = config::KeycodeMap::to_keycode("F8").value_or(0);
     key_f9_ = config::KeycodeMap::to_keycode("F9").value_or(0);
+    key_f10_ = config::KeycodeMap::to_keycode("F10").value_or(0);
     key_minus_ = config::KeycodeMap::to_keycode("Minus").value_or(0);
     key_plus_ = config::KeycodeMap::to_keycode("Plus").value_or(0);
 
@@ -1254,6 +1271,12 @@ void MenuApp::run() {
             handle_text_input(text.value());
         }
         service_multiplayer();
+        service_ranked_account_request();
+        const auto global_chat = global_chat_service_.snapshot();
+        if (global_chat.revision != global_chat_last_revision_) {
+            global_chat_last_revision_ = global_chat.revision;
+            if (chat_overlay_visible_) publish_snapshot();
+        }
 
         if (screen_ == Screen::SongSelect &&
             song_select_view_ == SongSelectView::Records &&
@@ -1299,6 +1322,8 @@ void MenuApp::shutdown() {
     exit_requested_.store(true, std::memory_order_release);
     peer_session_.disconnect();
     online_records_service_.shutdown();
+    global_chat_service_.shutdown();
+    if (ranked_account_thread_.joinable()) ranked_account_thread_.join();
     stop_menu_threads();
     song_indexer_.stop();
 }
@@ -1484,6 +1509,7 @@ std::vector<uint32_t> MenuApp::current_menu_probe_keycodes() const {
     append_fixed_key(key_f5_);
     append_fixed_key(key_f8_);
     append_fixed_key(key_f9_);
+    append_fixed_key(key_f10_);
     append_fixed_key(key_minus_);
     append_fixed_key(key_plus_);
 
@@ -1852,10 +1878,15 @@ void MenuApp::handle_input_event(const input::InputEvent& event) {
         return;
     }
 
-    if (screen_ == Screen::Keymap && keymap_capture_active_) {
-        if (event.state == input::InputState::Pressed) {
-            apply_keymap_capture(event.keycode);
-        }
+    if (event.state == input::InputState::Pressed &&
+        key_f10_ != 0 && event.keycode == key_f10_) {
+        toggle_ranked_account_overlay();
+        return;
+    }
+
+    if (event.state == input::InputState::Pressed &&
+        key_f8_ != 0 && event.keycode == key_f8_ &&
+        open_multiplayer_chat_shortcut()) {
         return;
     }
 
@@ -1863,8 +1894,21 @@ void MenuApp::handle_input_event(const input::InputEvent& event) {
         return;
     }
 
-    if (key_f8_ != 0 && event.keycode == key_f8_ &&
-        open_multiplayer_chat_shortcut()) {
+    if (chat_url_warning_visible_ &&
+        handle_chat_url_warning_input(event.keycode)) {
+        return;
+    }
+    if (ranked_account_overlay_visible_ &&
+        handle_ranked_account_overlay_input(event.keycode)) {
+        return;
+    }
+    if (chat_overlay_visible_ &&
+        handle_multiplayer_chat_overlay_input(event.keycode)) {
+        return;
+    }
+
+    if (screen_ == Screen::Keymap && keymap_capture_active_) {
+        apply_keymap_capture(event.keycode);
         return;
     }
 
@@ -1951,6 +1995,48 @@ void MenuApp::handle_input_event(const input::InputEvent& event) {
 }
 
 void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
+    if (chat_url_warning_visible_) {
+        if (event.kind == render::MenuHitTargetKind::UrlWarningButton) {
+            if (event.index == 1) open_warned_chat_url();
+            else {
+                dismiss_chat_url_warning();
+                publish_snapshot();
+            }
+        }
+        return;
+    }
+    if (ranked_account_overlay_visible_) {
+        const bool busy = ranked_account_request_busy_.load(std::memory_order_acquire);
+        if (event.kind == render::MenuHitTargetKind::AccountServer &&
+            !busy && ranked_account_signed_in_username_.empty()) {
+            ranked_account_use_private_server_ = event.index == 1;
+            ranked_account_focused_field_ = ranked_account_use_private_server_ ? 0 : 1;
+            ranked_account_status_.clear();
+            publish_snapshot();
+        } else if (event.kind == render::MenuHitTargetKind::AccountTab &&
+                   !busy && ranked_account_signed_in_username_.empty()) {
+            ranked_account_register_mode_ = event.index == 1;
+            ranked_account_status_.clear();
+            publish_snapshot();
+        } else if (event.kind == render::MenuHitTargetKind::AccountField &&
+                   !busy && ranked_account_signed_in_username_.empty()) {
+            ranked_account_focused_field_ = std::clamp(event.index, 0, 2);
+            publish_snapshot();
+        } else if (event.kind == render::MenuHitTargetKind::AccountAction && !busy) {
+            if (event.index == 1) logout_ranked_account();
+            else begin_ranked_account_request();
+        }
+        return;
+    }
+    if (chat_overlay_visible_) {
+        if (event.kind == render::MenuHitTargetKind::ChatUrl &&
+            event.index >= 0 &&
+            event.index < static_cast<int>(chat_overlay_message_urls_.size())) {
+            const std::string& url = chat_overlay_message_urls_[static_cast<std::size_t>(event.index)];
+            if (!url.empty()) show_chat_url_warning(url);
+        }
+        return;
+    }
     if (event.kind == render::MenuHitTargetKind::GameplayFieldDrag) {
         const double requested_offset =
             std::isfinite(event.value) ? event.value : config::kGameplayFieldOffsetXDefault;
@@ -2549,7 +2635,38 @@ void MenuApp::handle_title_input(uint32_t keycode) {
 }
 
 void MenuApp::handle_text_input(std::string_view text) {
-    if (screen_ == Screen::Multiplayer &&
+    if (ranked_account_overlay_visible_ &&
+        ranked_account_signed_in_username_.empty() &&
+        !ranked_account_request_busy_.load(std::memory_order_acquire) &&
+        !text.empty()) {
+        const std::string utf8 = util::ensure_utf8_text(text);
+        if (ranked_account_focused_field_ == 0 && ranked_account_use_private_server_) {
+            for (const unsigned char ch : utf8) {
+                if (ch > 0x20u && ch < 0x7fu &&
+                    ranked_account_private_server_url_.size() < 2048) {
+                    ranked_account_private_server_url_.push_back(static_cast<char>(ch));
+                }
+            }
+        } else if (ranked_account_focused_field_ == 1) {
+            for (const unsigned char ch : utf8) {
+                if ((std::isalnum(ch) != 0 || ch == '_' || ch == '-' || ch == '.') &&
+                    ranked_account_username_.size() < 32) {
+                    ranked_account_username_.push_back(static_cast<char>(ch));
+                }
+            }
+        } else if (ranked_account_focused_field_ == 2) {
+            for (const unsigned char ch : utf8) {
+                if (ch >= 0x20u && ch != 0x7fu &&
+                    ranked_account_password_.size() < 128) {
+                    ranked_account_password_.push_back(static_cast<char>(ch));
+                }
+            }
+        }
+        publish_snapshot();
+        return;
+    }
+    if (chat_overlay_visible_ &&
+        global_chat_service_.snapshot().configured &&
         multiplayer_menu_.edit_field == MultiplayerEditField::Chat &&
         !text.empty()) {
         const std::string utf8 = util::ensure_utf8_text(text);

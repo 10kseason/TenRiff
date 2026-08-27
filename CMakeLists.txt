@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(TenRiff VERSION 1.5.0 LANGUAGES C CXX)
+project(TenRiff VERSION 1.5.1 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -188,6 +188,8 @@ add_library(tenriff_core
     src/app/ModeManager.cpp
     src/app/ModeResolver.cpp
     src/app/OnlineRecordsClient.cpp
+    src/app/RankedRecordsClient.cpp
+    src/app/GlobalChatService.cpp
     src/app/PersistedRuntimeConfig.cpp
     src/app/ReplayVerifier.cpp
     src/app/RuntimeConfigMigration.cpp
@@ -223,7 +225,7 @@ if(TENRIFF_NK3_NCNN_AVAILABLE)
 endif()
 
 if(WIN32)
-    target_link_libraries(tenriff_core PUBLIC ws2_32 winhttp)
+    target_link_libraries(tenriff_core PUBLIC ws2_32 winhttp bcrypt crypt32)
 endif()
 
 if(TENRIFF_BUILD_STANDALONE_BMS_KEY_CONVERTER)
@@ -299,6 +301,7 @@ if(WIN32)
         src/app/SongSelectScreen.cpp
         src/app/GameSession.cpp
         src/app/MenuApp.cpp
+        src/app/MenuAppAccount.cpp
         src/app/MenuAppMultiplayer.cpp
         src/app/MenuAppDeviceSettings.cpp
         src/app/MenuAppKeymap.cpp
@@ -639,6 +642,14 @@ if(TENRIFF_ENABLE_TESTS)
     )
     target_link_libraries(online_records_smoke PRIVATE tenriff_core)
 
+    add_executable(ranked_records_smoke
+        tests/smoke/ranked_records_smoke.cpp
+    )
+    target_include_directories(ranked_records_smoke PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
+    )
+    target_link_libraries(ranked_records_smoke PRIVATE tenriff_core)
+
     add_executable(bms_parser_tests
         tests/unit/test_bms_parser.cpp
         tests/unit/test_bms_normalizer.cpp
@@ -689,6 +700,7 @@ if(TENRIFF_ENABLE_TESTS)
         tests/unit/test_peer_protocol.cpp
         tests/unit/test_peer_session.cpp
         tests/unit/test_multiplayer_menu_state.cpp
+        tests/unit/test_chat_interaction.cpp
         tests/unit/test_online_records_client.cpp
         tests/unit/test_bms_key_converter.cpp
         tests/unit/test_utf8_compat.cpp

@@ -9,8 +9,8 @@ This codebase should also be read as a `vibe coding` work that grew through rapi
 ## Recommended Reading Order
 1. `docs/current-state.en.md`
    - Current product state, core subsystems, validated commands, and remaining manual verification items
-2. `docs/baseline-1.1.2.en.md`
-   - The `1.1.2 final stable` baseline document that defines what the current work should be stacked on top of
+2. `docs/baseline-1.5.1.en.md`
+   - The `1.5.1 fixed stable baseline` baseline document that defines what the current work should be stacked on top of
 3. `docs/gameplay-guide.en.md`
    - How to start playing, choose songs, handle controls, and understand the HUD, judgements, and result screen from a practical player perspective
 4. `docs/config.en.md`
@@ -29,8 +29,8 @@ This codebase should also be read as a `vibe coding` work that grew through rapi
 ## Which Docs Are Source Of Truth
 - `docs/current-state.en.md`
   - Summary of the current implementation state
-- `docs/baseline-1.1.2.en.md`
-  - The `1.1.2 final stable` baseline document that follow-up work should preserve
+- `docs/baseline-1.5.1.en.md`
+  - The `1.5.1 fixed stable baseline` baseline document that follow-up work should preserve
 - `docs/config.en.md`
   - Based on the actual `config/config.json`, `profiles/<name>/config.json`, and `keymap.json`
 
@@ -56,5 +56,5 @@ This codebase should also be read as a `vibe coding` work that grew through rapi
 
 ## Practical Rule
 - When checking current behavior, start with `docs/current-state.en.md`.
-- When deciding what baseline to build on, read `docs/baseline-1.1.2.en.md` together with it.
+- When deciding what baseline to build on, read `docs/baseline-1.5.1.en.md` together with it.
 - Older design documents and current code can differ, so if there is a conflict, interpret things in the order of current code, then `docs/current-state.en.md`, then `docs/config.en.md`.

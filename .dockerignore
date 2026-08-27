@@ -1,0 +1,14 @@
+.git
+.release-checkout
+build*
+TenRiff-Server
+Mainmusic
+skins
+third_party/*
+!third_party/ncnn-20260526-ubuntu-2404-shared.zip
+tests
+tools
+config
+docs
+examples
+external

@@ -27,6 +27,8 @@
 #define NOMINMAX
 #endif
 #include <windows.h>
+#elif defined(__linux__)
+#include <unistd.h>
 #endif
 
 #if defined(TENRIFF_ENABLE_NK3_OPENVINO)
@@ -319,7 +321,7 @@ std::string selected_device() {
     return device;
 }
 
-enum class Nk3Backend { Auto, OpenVino, Vulkan };
+enum class Nk3Backend { Auto, OpenVino, Vulkan, NcnnCpu };
 
 Nk3Backend selected_backend() {
     const char* configured = std::getenv("TENRIFF_NK3_BACKEND");
@@ -333,8 +335,11 @@ Nk3Backend selected_backend() {
     if (backend == "VULKAN" || backend == "NCNN") {
         return Nk3Backend::Vulkan;
     }
+    if (backend == "NCNN_CPU") {
+        return Nk3Backend::NcnnCpu;
+    }
     throw std::runtime_error(
-        "TENRIFF_NK3_BACKEND must be AUTO, VULKAN, or OPENVINO");
+        "TENRIFF_NK3_BACKEND must be AUTO, VULKAN, NCNN_CPU, or OPENVINO");
 }
 
 std::filesystem::path executable_directory() {
@@ -344,6 +349,13 @@ std::filesystem::path executable_directory() {
     if (length > 0 && length < path.size()) {
         path.resize(length);
         return std::filesystem::path(path).parent_path();
+    }
+#elif defined(__linux__)
+    std::array<char, 4096> path{};
+    const ssize_t length = readlink("/proc/self/exe", path.data(), path.size() - 1);
+    if (length > 0 && static_cast<std::size_t>(length) < path.size()) {
+        path[static_cast<std::size_t>(length)] = '\0';
+        return std::filesystem::path(path.data()).parent_path();
     }
 #endif
     return std::filesystem::current_path();
@@ -742,28 +754,33 @@ std::string ncnn_shape(const ncnn::Mat& value) {
            std::to_string(value.total());
 }
 
-void configure_ncnn_vulkan(ncnn::Net& net, const NcnnVulkanRuntime& runtime) {
-    net.opt.use_vulkan_compute = true;
+void configure_ncnn(ncnn::Net& net, const NcnnVulkanRuntime* runtime) {
+    net.opt.use_vulkan_compute = runtime != nullptr;
     net.opt.use_fp16_packed = false;
     net.opt.use_fp16_storage = false;
     net.opt.use_fp16_arithmetic = false;
-    net.set_vulkan_device(runtime.device_index());
+    net.opt.num_threads = 1;
+    if (runtime) {
+        net.set_vulkan_device(runtime->device_index());
+    }
 }
 
-class NcnnVulkanEvaluator final : public P64Evaluator {
+class NcnnEvaluator final : public P64Evaluator {
 public:
-    explicit NcnnVulkanEvaluator(const std::filesystem::path& param_path)
-        : runtime_(ncnn_vulkan_runtime()) {
+    explicit NcnnEvaluator(const std::filesystem::path& param_path, bool use_vulkan)
+        : runtime_(use_vulkan ? &ncnn_vulkan_runtime() : nullptr) {
         auto bin_path = param_path;
         bin_path.replace_extension(".bin");
         if (!std::filesystem::is_regular_file(param_path) ||
             !std::filesystem::is_regular_file(bin_path)) {
             throw std::runtime_error("converted P64 ncnn model is missing");
         }
-        configure_ncnn_vulkan(net_, runtime_);
-        require_ncnn(net_.load_param(param_path.wstring().c_str()),
+        configure_ncnn(net_, runtime_);
+        const std::string param_name = param_path.u8string();
+        const std::string bin_name = bin_path.u8string();
+        require_ncnn(net_.load_param(param_name.c_str()),
                      "loading the P64 ncnn graph");
-        require_ncnn(net_.load_model(bin_path.wstring().c_str()),
+        require_ncnn(net_.load_model(bin_name.c_str()),
                      "loading the P64 ncnn weights");
     }
 
@@ -874,9 +891,13 @@ public:
     }
 
     [[nodiscard]] std::string evidence() const override {
+        if (!runtime_) {
+            return "evaluator=ncnn CPU fp32 threads=1 inferences=" +
+                   std::to_string(inference_count_.load(std::memory_order_relaxed));
+        }
         return "evaluator=ncnn Vulkan device=" +
-               std::to_string(runtime_.device_index()) + " name=" +
-               runtime_.device_name() + " vendor=0x" + vendor_hex() +
+               std::to_string(runtime_->device_index()) + " name=" +
+               runtime_->device_name() + " vendor=0x" + vendor_hex() +
                " fp32 inferences=" +
                std::to_string(inference_count_.load(std::memory_order_relaxed));
     }
@@ -885,7 +906,7 @@ private:
     [[nodiscard]] std::string vendor_hex() const {
         constexpr char digits[] = "0123456789ABCDEF";
         std::string result(8, '0');
-        uint32_t value = runtime_.vendor_id();
+        uint32_t value = runtime_->vendor_id();
         for (int index = 7; index >= 0; --index) {
             result[index] = digits[value & 0x0f];
             value >>= 4;
@@ -893,16 +914,16 @@ private:
         return result;
     }
 
-    NcnnVulkanRuntime& runtime_;
+    NcnnVulkanRuntime* runtime_ = nullptr;
     ncnn::Net net_;
     std::atomic<std::uint64_t> inference_count_{0};
 };
 
-class NcnnVulkanPatternMlpEvaluator final : public PatternMlpEvaluator {
+class NcnnPatternMlpEvaluator final : public PatternMlpEvaluator {
 public:
-    NcnnVulkanPatternMlpEvaluator(const std::filesystem::path& param_path,
-                                  int target_keys)
-        : runtime_(ncnn_vulkan_runtime()), target_keys_(target_keys),
+    NcnnPatternMlpEvaluator(const std::filesystem::path& param_path,
+                           int target_keys, bool use_vulkan)
+        : runtime_(use_vulkan ? &ncnn_vulkan_runtime() : nullptr), target_keys_(target_keys),
           batch_rows_(target_keys * kPatternBatchStates) {
         auto bin_path = param_path;
         bin_path.replace_extension(".bin");
@@ -910,10 +931,12 @@ public:
             !std::filesystem::is_regular_file(bin_path)) {
             throw std::runtime_error("converted pattern MLP ncnn model is missing");
         }
-        configure_ncnn_vulkan(net_, runtime_);
-        require_ncnn(net_.load_param(param_path.wstring().c_str()),
+        configure_ncnn(net_, runtime_);
+        const std::string param_name = param_path.u8string();
+        const std::string bin_name = bin_path.u8string();
+        require_ncnn(net_.load_param(param_name.c_str()),
                      "loading the pattern MLP ncnn graph");
-        require_ncnn(net_.load_model(bin_path.wstring().c_str()),
+        require_ncnn(net_.load_model(bin_name.c_str()),
                      "loading the pattern MLP ncnn weights");
     }
 
@@ -978,10 +1001,12 @@ public:
     }
 
     [[nodiscard]] std::string evidence() const override {
+        const std::string device = runtime_
+            ? "Vulkan device=" + std::to_string(runtime_->device_index()) +
+                  " name=" + runtime_->device_name()
+            : "CPU threads=1";
         return std::to_string(target_keys_) +
-               "K generalized pattern MLP evaluator=ncnn Vulkan device=" +
-               std::to_string(runtime_.device_index()) + " name=" +
-               runtime_.device_name() + " fp32 inferences=" +
+               "K generalized pattern MLP evaluator=ncnn " + device + " fp32 inferences=" +
                std::to_string(inference_count_.load(std::memory_order_relaxed)) +
                " evaluated-states=" +
                std::to_string(evaluated_state_count_.load(std::memory_order_relaxed)) +
@@ -994,7 +1019,7 @@ public:
     }
 
 private:
-    NcnnVulkanRuntime& runtime_;
+    NcnnVulkanRuntime* runtime_ = nullptr;
     int target_keys_ = 0;
     int batch_rows_ = 0;
     ncnn::Net net_;
@@ -1004,30 +1029,34 @@ private:
     std::atomic<std::size_t> maximum_request_states_{0};
 };
 
-P64Evaluator& shared_ncnn_evaluator(const std::filesystem::path& path) {
-    (void)ncnn_vulkan_runtime();
+P64Evaluator& shared_ncnn_evaluator(const std::filesystem::path& path,
+                                    bool use_vulkan) {
+    // Construct the process-wide GPU instance before the cached networks so the
+    // networks are destroyed first during static teardown.
+    if (use_vulkan) (void)ncnn_vulkan_runtime();
     static std::mutex evaluator_mutex;
     static std::map<std::string, std::unique_ptr<P64Evaluator>> evaluators;
-    const std::string key = path.u8string();
+    const std::string key = path.u8string() + (use_vulkan ? "\nVULKAN" : "\nCPU");
     std::lock_guard<std::mutex> lock(evaluator_mutex);
     auto& evaluator = evaluators[key];
     if (!evaluator) {
-        evaluator = std::make_unique<NcnnVulkanEvaluator>(path);
+        evaluator = std::make_unique<NcnnEvaluator>(path, use_vulkan);
     }
     return *evaluator;
 }
 
 PatternMlpEvaluator& shared_ncnn_pattern_evaluator(
-    const std::filesystem::path& path, int target_keys) {
-    (void)ncnn_vulkan_runtime();
+    const std::filesystem::path& path, int target_keys, bool use_vulkan) {
+    if (use_vulkan) (void)ncnn_vulkan_runtime();
     static std::mutex evaluator_mutex;
     static std::map<std::string, std::unique_ptr<PatternMlpEvaluator>> evaluators;
-    const std::string key = path.u8string() + '\n' + std::to_string(target_keys);
+    const std::string key = path.u8string() + '\n' + std::to_string(target_keys) +
+                            (use_vulkan ? "\nVULKAN" : "\nCPU");
     std::lock_guard<std::mutex> lock(evaluator_mutex);
     auto& evaluator = evaluators[key];
     if (!evaluator) {
         evaluator =
-            std::make_unique<NcnnVulkanPatternMlpEvaluator>(path, target_keys);
+            std::make_unique<NcnnPatternMlpEvaluator>(path, target_keys, use_vulkan);
     }
     return *evaluator;
 }
@@ -1057,12 +1086,12 @@ SelectedEvaluator select_evaluators(bool use_pattern_mlp, int target_keys) {
             SelectedEvaluator selected;
             selected.backend = Nk3Backend::Vulkan;
             selected.p64 = &shared_ncnn_evaluator(
-                ncnn_model_path("NK3-P64-hybrid.ncnn.param"));
+                ncnn_model_path("NK3-P64-hybrid.ncnn.param"), true);
             if (use_pattern_mlp) {
                 selected.pattern = &shared_ncnn_pattern_evaluator(
                     ncnn_model_path("NK3-general-pattern-" +
                                     std::to_string(target_keys) + "K.ncnn.param"),
-                    target_keys);
+                    target_keys, true);
             }
             return selected;
         } catch (const std::exception& error) {
@@ -1075,6 +1104,26 @@ SelectedEvaluator select_evaluators(bool use_pattern_mlp, int target_keys) {
 #else
     if (requested == Nk3Backend::Vulkan) {
         throw std::runtime_error("the ncnn Vulkan backend is unavailable in this build");
+    }
+#endif
+
+#if defined(TENRIFF_ENABLE_NK3_NCNN)
+    if (requested == Nk3Backend::NcnnCpu) {
+        SelectedEvaluator selected;
+        selected.backend = Nk3Backend::NcnnCpu;
+        selected.p64 = &shared_ncnn_evaluator(
+            ncnn_model_path("NK3-P64-hybrid.ncnn.param"), false);
+        if (use_pattern_mlp) {
+            selected.pattern = &shared_ncnn_pattern_evaluator(
+                ncnn_model_path("NK3-general-pattern-" +
+                                std::to_string(target_keys) + "K.ncnn.param"),
+                target_keys, false);
+        }
+        return selected;
+    }
+#else
+    if (requested == Nk3Backend::NcnnCpu) {
+        throw std::runtime_error("the ncnn CPU backend is unavailable in this build");
     }
 #endif
 

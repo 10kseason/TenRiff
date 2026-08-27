@@ -11,17 +11,20 @@
 #include <mutex>
 #include <string>
 #include <string_view>
+#include <thread>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
 #include "app/CommandLine.h"
 #include "app/GameplayHudRevisions.h"
+#include "app/GlobalChatService.h"
 #include "app/InputBackendStatus.h"
 #include "app/Lr2Course.h"
 #include "app/MenuMusicController.h"
 #include "app/MultiplayerChartSearch.h"
 #include "app/OnlineRecordsClient.h"
+#include "app/RankedRecordsClient.h"
 #include "app/SessionMix.h"
 #include "app/SongSelectState.h"
 #include "app/SongSelectScreen.h"
@@ -270,6 +273,24 @@ private:
     void handle_options_hub_input(uint32_t keycode);
     void handle_multiplayer_input(uint32_t keycode);
     [[nodiscard]] bool open_multiplayer_chat_shortcut();
+    [[nodiscard]] bool handle_multiplayer_chat_overlay_input(uint32_t keycode);
+    void set_multiplayer_chat_overlay(bool visible);
+    void populate_multiplayer_chat_overlay(render::ChatOverlayData& target);
+    [[nodiscard]] bool send_multiplayer_chat_input();
+    [[nodiscard]] std::string now_playing_chat_message() const;
+    void toggle_ranked_account_overlay();
+    void set_ranked_account_overlay(bool visible);
+    [[nodiscard]] bool handle_ranked_account_overlay_input(uint32_t keycode);
+    void populate_ranked_account_overlay(render::RankedAccountOverlayData& target) const;
+    void begin_ranked_account_request();
+    void service_ranked_account_request();
+    void logout_ranked_account();
+    void show_chat_url_warning(std::string url);
+    void dismiss_chat_url_warning();
+    [[nodiscard]] bool handle_chat_url_warning_input(uint32_t keycode);
+    void open_warned_chat_url();
+    [[nodiscard]] bool queue_gameplay_chat_input(const input::InputEvent& event);
+    void drain_gameplay_chat_input();
     void handle_song_select_input(uint32_t keycode);
     void handle_session_mix_input(uint32_t keycode);
     void handle_song_browser_input(uint32_t keycode);
@@ -576,16 +597,22 @@ private:
 
     network::PeerSession peer_session_{};
     OnlineRecordsService online_records_service_{};
+    GlobalChatService global_chat_service_{};
     network::LanDiscoveryService lan_discovery_{};
     MultiplayerMenuState multiplayer_menu_{};
     std::vector<network::LanDiscoveredRoom> multiplayer_lan_rooms_{};
     std::size_t multiplayer_lan_room_index_ = 0;
+    std::size_t multiplayer_server_room_index_ = 0;
     uint64_t multiplayer_lan_discovery_revision_ = 0;
+    uint64_t multiplayer_server_room_revision_ = 0;
     std::string multiplayer_chart_path_{};
     std::string multiplayer_chart_title_{};
     network::ChartFingerprint multiplayer_chart_fingerprint_{};
     std::string multiplayer_status_message_{};
     uint64_t multiplayer_last_revision_ = 0;
+    uint64_t global_chat_last_revision_ = 0;
+    std::string chat_overlay_message_signature_{};
+    std::vector<std::string> chat_overlay_message_urls_{};
     uint64_t multiplayer_local_library_index_revision_ = 0;
     uint64_t multiplayer_remote_library_revision_ = 0;
     bool multiplayer_remote_library_ready_ = false;
@@ -712,6 +739,44 @@ private:
 
     std::mutex snapshot_mutex_{};
     std::mutex gameplay_hud_mutex_{};
+    enum class GameplayOverlayActionKind {
+        Input,
+        ChatVisibility,
+        AccountVisibility,
+    };
+    struct GameplayChatControlAction {
+        GameplayOverlayActionKind kind = GameplayOverlayActionKind::Input;
+        uint32_t keycode = 0;
+        bool visible = false;
+    };
+    std::mutex gameplay_chat_control_mutex_{};
+    std::vector<GameplayChatControlAction> gameplay_chat_control_actions_{};
+    std::atomic_bool gameplay_overlay_capture_active_{false};
+    bool chat_overlay_visible_ = false;
+    bool ranked_account_overlay_visible_ = false;
+    bool ranked_account_register_mode_ = false;
+    bool ranked_account_use_private_server_ = false;
+    int ranked_account_focused_field_ = 1;
+    std::string ranked_account_main_server_url_{};
+    std::string ranked_account_private_server_url_{};
+    std::string ranked_account_active_server_url_{};
+    std::string ranked_account_username_{};
+    std::string ranked_account_password_{};
+    std::string ranked_account_signed_in_username_{};
+    std::string ranked_account_role_{};
+    std::string ranked_account_status_{};
+    std::atomic_bool ranked_account_request_busy_{false};
+    struct RankedAccountRequestResult {
+        bool available = false;
+        bool success = false;
+        RankedAccountSession session{};
+        std::string error;
+    };
+    std::mutex ranked_account_result_mutex_{};
+    RankedAccountRequestResult ranked_account_result_{};
+    std::thread ranked_account_thread_{};
+    bool chat_url_warning_visible_ = false;
+    std::string chat_url_warning_target_{};
     MenuSnapshot snapshot_{};
     uint64_t snapshot_version_ = 0;
     uint64_t rendered_snapshot_version_ = 0;
@@ -773,6 +838,7 @@ private:
     uint32_t key_f5_ = 0;
     uint32_t key_f8_ = 0;
     uint32_t key_f9_ = 0;
+    uint32_t key_f10_ = 0;
     uint32_t key_minus_ = 0;
     uint32_t key_plus_ = 0;
     input::RawInputHealthProbe input_backend_probe_{};

@@ -3,7 +3,7 @@
 This is the document that the next agent or any new contributor should read first. Its goal is to quickly answer: "what is this project now, where should I look, and what is still unverified?"
 
 ## Baseline
-- Current stable release line: `1.5.0`
+- Current stable release line: `1.5.1`
 - The UI-r2 Result screen uses a 2.2-second timeline for the prism, score, rank, clear status, statistics, and graphs. Space skips the reveal; Continue/Retry/Replay stay locked until it completes.
 - UI-r2 Song Select uses a reference-led top navigation, seven-row jacket library, large selected artwork, best-record card, chart/mode panel, and a prominent working Start action. Collection/store/currency/global-ranking placeholders are not shown.
 - The Song Select Rate, Hi-Speed, Gauge, and Random cells apply increase/next on left click and decrease/previous on right click, then save immediately. The current-chart key count no longer clips, and best records show score, accuracy, and max combo together.
@@ -25,7 +25,7 @@ This is the document that the next agent or any new contributor should read firs
 - `1.2.92` adds selectable default Krrcream and deterministic `nK2 Native 50/50` paths to the standalone BMS key converter.
 - `1.2.93` adds an in-game `Key Converter` row for `Krrcream`/`KeyWeaver nK2`, persists the choice in config/replay metadata, and applies it to runtime key-mode conversion.
 - `1.2.95` briefly restored 4K-10K osu!mania `.osu` indexing and play through `OSU Charts`; that path is removed again in 1.3.1.
-- Baseline companion document for follow-up work: `docs/baseline-1.1.2.en.md`
+- Baseline companion document for follow-up work: `docs/baseline-1.5.1.en.md`
 - Windows GUI build is the main target
 - Linux exists only as a preview-level package at `Baepoks-Linuxs/TenRiff-0.5.0-linux-preview`
 - The supported chart surface is limited to the BMS family (`.bms/.bme/.bml/.pms`)
@@ -97,7 +97,7 @@ This is the document that the next agent or any new contributor should read firs
   - nK2 offers `Native (12%)` by default, `Transform (35%)` and `Remaster (65%)`; `Remaster` raises the budget while locking the anchor so the source placement survives, and fills LN sections with holds of the same length. All three are caps - the source density and the safety windows decide how much actually lands. The row is locked for Krrcream, and the standalone converter GUI also locks Krrcream Max/Min/Speed/Seed tuning.
   - NK3 always combines bundled P64 with host beam32. It adds the generalized pattern MLP only when a non-10K source is converted to 10K; 10K-to-10K and every other target use P64 alone. The default `AUTO` backend runs both P64 and the MLP on AMD/NVIDIA GPUs through ncnn Vulkan, retaining the optional OpenVINO compatibility path as fallback. `TENRIFF_NK3_BACKEND` and `TENRIFF_NK3_VULKAN_DEVICE` can force the selection.
   - the standalone BMS key converter CLI/GUI can select the default `krrcream` path or deterministic `nK2 Native 50/50`; nK2 ignores Krrcream-only tuning controls
-  - official 1.5.0 builds/Windows archives do not build or ship the standalone BMS key-converter CLI/GUI; its top-level CMake option defaults `OFF` and the source is retained only for development regression
+  - official 1.5.1 builds/Windows archives do not build or ship the standalone BMS key-converter CLI/GUI; its top-level CMake option defaults `OFF` and the source is retained only for development regression
   - `mode.key_mode=none` keeps the chart's original key count and base pattern layout intact
 - Native difficulty:
   - BMS LV/CR calculation evaluates only LN head/tail miss-ms at 0.5x, so `300ms` is treated as `150ms`; runtime gameplay judgement windows remain unchanged
@@ -169,7 +169,7 @@ This is the document that the next agent or any new contributor should read firs
   - `Options -> Profile Setup` reopens the first-run setup surface for the active profile and saves language, audio, input, graphics, and keymap changes immediately
   - an editable 48-byte profile nickname is used in later saved records and direct-IP multiplayer display names
 - Direct-IP multiplayer:
-  - protocol v5 uses one fixed TCP coordinator and supports up to 8 total players on Windows (default `27300/TCP`)
+  - protocol v5 uses one fixed TCP coordinator and supports up to 8 total players on Windows (default `27301/TCP`)
   - only indexed BMS-family charts are eligible; the room library is the exact SHA-256 intersection across every connected player, and `.osu` charts are excluded
   - the lobby `ROOM CHAT` accepts UTF-8 messages up to 256 bytes, keeps only the latest 32 in session memory, and labels message count, local player, and leader
   - Rate 1.0, judgement, Gauge Shift, Random/Mods/Assist remain fixed while each player may use local key-mode conversion
@@ -210,7 +210,7 @@ This is the document that the next agent or any new contributor should read firs
 
 ## Runtime / Packaging Rules
 - New user profiles are created automatically
-- The current stable P2P distribution line is `TenRiff 1.5.0`
+- The current stable P2P distribution line is `TenRiff 1.5.1`
 - Distribution packages do not include `Songs`
 - Distribution packages include the `Mainmusic/` scene slots `Main Menu / Options / Song Selecte / Multiplayer Lobby / Clear / Failed`; each `Name.mp3` plus numbered `Name 2.mp3` through `Name 64.mp3` siblings is discovered automatically and rotates on scene re-entry
 - Distribution updates include only built artifacts and required runtime assets

@@ -62,8 +62,8 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
     target.background_upscale_mode = background_policy.upscale_mode;
     target.background_upscale_model_path = config_.graphics.background_upscale_model_path;
     target.background_upscale_prefer_npu = config_.graphics.background_upscale_prefer_npu;
-    // While a chart is running the session owns these two: F1/F2 and F7/F8 retune
-    // them mid-song and the stored config only catches up when the song ends.
+    // While a chart is running the session owns F1/F2 and F7/Shift+F7 retuning;
+    // F8 and F10 stay reserved for global chat and account overlays.
     const double clamped_judgement_line_position = std::clamp(
         gameplay_hud_.active ? gameplay_hud_.judgement_line_position
                              : config_.skin.judgement_line_position,
@@ -1716,6 +1716,10 @@ void MenuApp::publish_snapshot() {
     }
 
     populate_help_overlay(render.help_overlay);
+    populate_multiplayer_chat_overlay(render.chat_overlay);
+    populate_ranked_account_overlay(render.account_overlay);
+    render.url_warning_overlay.visible = chat_url_warning_visible_;
+    render.url_warning_overlay.url = chat_url_warning_target_;
     snapshot.render = std::move(render);
     {
         std::lock_guard<std::mutex> lock(snapshot_mutex_);
@@ -2084,9 +2088,13 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
     });
     session.set_loading_progress_callback([this](const GameSession::LoadingProgress& progress) {
         update_gameplay_loading_state(progress.percent, progress.stage);
+        drain_gameplay_chat_input();
     });
     session.set_screenshot_callback([this]() {
         menu_window_.request_screenshot();
+    });
+    session.set_control_input_callback([this](const input::InputEvent& event) {
+        return queue_gameplay_chat_input(event);
     });
 #ifdef _WIN32
     auto escape_was_down = std::make_shared<std::atomic<bool>>((GetAsyncKeyState(VK_ESCAPE) & 0x8000) != 0);
@@ -2263,6 +2271,8 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
         advance_gameplay_hud_revisions(gameplay_hud_, diff.motion_changed, diff.text_changed);
         lock.unlock();
 
+        drain_gameplay_chat_input();
+
         while (true) {
             auto click = menu_window_.poll_click_event();
             if (!click.has_value()) {
@@ -2275,6 +2285,40 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
     CommandLineOptions play_options = options_;
     play_options.chart_path = chart_path;
     play_options.replay_path = replay_path;
+    RankedPlayAuthorization ranked_authorization;
+    std::string ranked_chart_sha256;
+    std::string ranked_prepare_error;
+    if (!peer_battle && !session_mix_active_ && replay_path.empty()) {
+        std::string extension = path_from_utf8(chart_path).extension().string();
+        std::transform(extension.begin(), extension.end(), extension.begin(),
+                       [](unsigned char byte) {
+                           return static_cast<char>(std::tolower(byte));
+                       });
+        const bool bms_family = extension == ".bms" || extension == ".bme" ||
+                                extension == ".bml" || extension == ".pms";
+        if (bms_family) {
+            std::string hash_error;
+            const ChartFileHashes hashes = hash_chart_file_utf8(chart_path, &hash_error);
+            if (hashes.valid()) {
+                ranked_chart_sha256 = hashes.sha256;
+                (void)prepare_ranked_play(
+                    config_.ui.online_records_server_url,
+                    path_from_utf8(profile_dir_), profile_display_name(),
+                    hashes.sha256, ranked_authorization, ranked_prepare_error);
+            } else {
+                ranked_prepare_error = hash_error.empty()
+                                           ? "Could not hash the BMS for online ranking."
+                                           : std::move(hash_error);
+            }
+        }
+    }
+    if (ranked_authorization.valid()) {
+        play_options.ranked_challenge_id = ranked_authorization.challenge_id;
+        play_options.ranked_challenge_nonce = ranked_authorization.challenge_nonce;
+    } else {
+        play_options.ranked_challenge_id.clear();
+        play_options.ranked_challenge_nonce.clear();
+    }
     if (!peer_battle && !session_mix_active_ && replay_path.empty() &&
         config_.mode.ghost_battle_enabled) {
         play_options.ghost_replay_path = best_replay_path_for_selected_song();
@@ -2418,6 +2462,27 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
         return;
     }
     const auto& result = session.result();
+    std::string ranked_result_message;
+    if (result.has_value && !session_aborted && ranked_authorization.valid() &&
+        !result.replay_path.empty()) {
+        std::string receipt;
+        std::string upload_error;
+        if (submit_ranked_replay(config_.ui.online_records_server_url,
+                                 ranked_authorization,
+                                 path_from_utf8(result.replay_path),
+                                 receipt, upload_error)) {
+            ranked_result_message = "Online ranking verified for " +
+                                    ranked_authorization.username + ".";
+            online_records_service_.request(
+                config_.ui.online_records_server_url,
+                ranked_chart_sha256, true);
+        } else {
+            ranked_result_message = "Online ranking upload failed: " + upload_error;
+        }
+    } else if (!ranked_prepare_error.empty() && !peer_battle &&
+               !session_mix_active_ && !replay_playback) {
+        ranked_result_message = "Online ranking unavailable: " + ranked_prepare_error;
+    }
     if (peer_battle) {
         network::PeerScore final_score;
         final_score.finished = true;
@@ -2472,6 +2537,9 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
         last_replay_path_ = result.replay_path;
         last_result_path_ = (!result.result_path.empty() || !replay_playback) ? result.result_path : preserved_result_path;
         last_export_warnings_ = result.export_warnings;
+        if (!ranked_result_message.empty()) {
+            last_export_warnings_.push_back(std::move(ranked_result_message));
+        }
         last_session_replay_playback_ = replay_playback;
         if (!replay_playback) {
             cache_current_session_result(chart_path,

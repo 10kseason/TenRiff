@@ -753,6 +753,19 @@ void apply_config_object(const JsonObject& root, RuntimeConfig& config) {
         if (config.ui.online_records_server_url.empty()) {
             config.ui.online_records_server_url = "http://127.0.0.1:27302";
         }
+        config.ui.tenriff_main_server_url = normalize_online_records_server_url(
+            get_string(*ui, "tenriff_main_server_url",
+                       config.ui.online_records_server_url));
+        if (config.ui.tenriff_main_server_url.empty()) {
+            config.ui.tenriff_main_server_url = "http://127.0.0.1:27302";
+        }
+        config.ui.private_server_url = normalize_online_records_server_url(
+            get_string(*ui, "private_server_url", config.ui.private_server_url));
+        const std::string account_server_mode = to_lower_ascii(get_string(
+            *ui, "account_server_mode", config.ui.account_server_mode));
+        config.ui.account_server_mode = account_server_mode == "private"
+                                            ? "private"
+                                            : "main";
     }
 
     if (auto* skin = get_object(root, "skin")) {
@@ -1189,6 +1202,12 @@ JsonValue build_json_root(const RuntimeConfig& config) {
     ui.emplace("difficulty_table_url", JsonValue{config.ui.difficulty_table_url});
     ui.emplace("online_records_server_url",
                JsonValue{normalize_online_records_server_url(config.ui.online_records_server_url)});
+    ui.emplace("tenriff_main_server_url",
+               JsonValue{normalize_online_records_server_url(config.ui.tenriff_main_server_url)});
+    ui.emplace("private_server_url",
+               JsonValue{normalize_online_records_server_url(config.ui.private_server_url)});
+    ui.emplace("account_server_mode",
+               JsonValue{config.ui.account_server_mode == "private" ? "private" : "main"});
     root.emplace("ui", JsonValue{std::move(ui)});
 
     JsonObject skin;
@@ -1471,6 +1490,13 @@ std::string normalize_online_records_server_url(std::string_view value) {
     }
     if (!secure && host != "localhost" && host != "127.0.0.1" && host != "::1") {
         return {};
+    }
+    // 27300 was the old protocol-v5 game socket and 27301 is the current one.
+    // Repair either local game-port value so profiles reach the ranked API.
+    if (!secure && port_specified && (port == "27300" || port == "27301") &&
+        (host == "localhost" || host == "127.0.0.1")) {
+        const std::size_t port_at = authority_begin + authority.rfind(':') + 1;
+        normalized.replace(port_at, port.size(), "27302");
     }
     while (normalized.size() > authority_finish && normalized.back() == '/') {
         normalized.pop_back();
@@ -1987,6 +2013,9 @@ RuntimeConfig ConfigLoader::defaults() const {
     config.ui.difficulty_table_path.clear();
     config.ui.difficulty_table_url.clear();
     config.ui.online_records_server_url = "http://127.0.0.1:27302";
+    config.ui.tenriff_main_server_url = "http://127.0.0.1:27302";
+    config.ui.private_server_url.clear();
+    config.ui.account_server_mode = "main";
 
     config.skin = {};
     sanitize_skin_config(config.skin);

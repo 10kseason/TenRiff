@@ -193,6 +193,9 @@ TEST_CASE("config defaults prefer 44100 Hz audio") {
     CHECK(config.ui.difficulty_table_path.empty());
     CHECK(config.ui.difficulty_table_url.empty());
     CHECK(config.ui.online_records_server_url == "http://127.0.0.1:27302");
+    CHECK(config.ui.tenriff_main_server_url == "http://127.0.0.1:27302");
+    CHECK(config.ui.private_server_url.empty());
+    CHECK(config.ui.account_server_mode == "main");
     CHECK(tenriff::config::resolved_skin_lane_colors(config.skin, "7+1").size() == 8u);
     CHECK(tenriff::config::resolved_skin_lane_colors(config.skin, "16k").size() == 16u);
 }
@@ -223,6 +226,9 @@ TEST_CASE("config save and load preserve favorites and collections") {
     config.ui.difficulty_table_path = "tables/insane.json";
     config.ui.difficulty_table_url = "https://example.test/insane/";
     config.ui.online_records_server_url = "https://ranked.example.test";
+    config.ui.tenriff_main_server_url = "https://main.tenriff.example";
+    config.ui.private_server_url = "https://private.tenriff.example/api";
+    config.ui.account_server_mode = "private";
     config.skin.scratch_position = "right";
 
     std::string error;
@@ -242,6 +248,9 @@ TEST_CASE("config save and load preserve favorites and collections") {
     CHECK(result.config.ui.difficulty_table_path == "tables/insane.json");
     CHECK(result.config.ui.difficulty_table_url == "https://example.test/insane/");
     CHECK(result.config.ui.online_records_server_url == "https://ranked.example.test");
+    CHECK(result.config.ui.tenriff_main_server_url == "https://main.tenriff.example");
+    CHECK(result.config.ui.private_server_url == "https://private.tenriff.example/api");
+    CHECK(result.config.ui.account_server_mode == "private");
     CHECK(result.config.skin.scratch_position == "right");
 
 }
@@ -1856,6 +1865,12 @@ TEST_CASE("online records URL normalization accepts safe HTTP base addresses") {
           "https://ranked.example.test/api");
     CHECK(tenriff::config::normalize_online_records_server_url(
               "http://127.0.0.1:27302") ==
+          "http://127.0.0.1:27302");
+    CHECK(tenriff::config::normalize_online_records_server_url(
+              "http://127.0.0.1:27300") ==
+          "http://127.0.0.1:27302");
+    CHECK(tenriff::config::normalize_online_records_server_url(
+              "http://127.0.0.1:27301") ==
           "http://127.0.0.1:27302");
     CHECK(tenriff::config::normalize_online_records_server_url(
               "ftp://ranked.example.test").empty());

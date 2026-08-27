@@ -2,9 +2,9 @@
 
 Language: [한국어](README.md) | [English](README.en.md) | [简体中文](README.zh-CN.md) | [日本語](README.ja.md)
 
-TenRiff is a Windows GUI BMS rhythm-game runtime/launcher. The current stable version is `1.5.0`, and chart input is limited to the BMS family (`.bms/.bme/.bml/.pms`). Graphics Settings lets users select a rights-cleared external ONNX model for the optional BGA Upscaler. Public packages contain no BGA-upscaler model; key-mode conversion bundles the deterministic NK3 P64 graph and the generalized pattern MLP exports. The project uses the MIT License, and bundled third-party notices are collected in [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
+TenRiff is a Windows GUI BMS rhythm-game runtime/launcher. The current stable version is `1.5.1`, and chart input is limited to the BMS family (`.bms/.bme/.bml/.pms`). Graphics Settings lets users select a rights-cleared external ONNX model for the optional BGA Upscaler. Public packages contain no BGA-upscaler model; key-mode conversion bundles the deterministic NK3 P64 graph and the generalized pattern MLP exports. The project uses the MIT License, and bundled third-party notices are collected in [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
 
-This README is an introduction that explains "what to look at first when you open the project." For current behavior, the `1.5.0` project state, the `1.1.2 final stable` baseline, configuration, and design documents, continue from [`docs/README.en.md`](docs/README.en.md).
+This README is an introduction that explains "what to look at first when you open the project." For current behavior, the `1.5.1` project state, the `1.5.1 fixed stable baseline` baseline, configuration, and design documents, continue from [`docs/README.en.md`](docs/README.en.md).
 
 TenRiff should also be read as a `vibe coding` work: it was shaped through fast iteration and experimentation rather than only through a traditional long-form design-first process.
 
@@ -15,7 +15,7 @@ TenRiff should also be read as a `vibe coding` work: it was shaped through fast 
 - Graphics path: D3D11 + Direct2D/DirectWrite
 - Audio path: WASAPI
 - Input path: RawInput or high-rate polling
-- Direct-IP/headless-server multiplayer: fixed TCP coordinator for up to 8 players, BMS-only shared charts, and `F8` chat (default `27300/TCP`; see [usage](docs/multiplayer.md))
+- Direct-IP/headless-server multiplayer: fixed TCP coordinator for up to 8 players, BMS-only shared charts, and `F8` chat (default `27301/TCP`; see [usage](docs/multiplayer.md))
 - License: [MIT](LICENSE)
 - Third-party notices: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
 - Release changelog: [CHANGELOG.md](CHANGELOG.md)
@@ -178,8 +178,8 @@ This README only covers the introduction. For the details, the most efficient re
    - Full documentation map
 2. [`docs/current-state.en.md`](docs/current-state.en.md)
    - What actually works right now
-3. [`docs/baseline-1.1.2.en.md`](docs/baseline-1.1.2.en.md)
-   - The `1.1.2 final stable` baseline document that follow-up work should use as a reference
+3. [`docs/baseline-1.5.1.en.md`](docs/baseline-1.5.1.en.md)
+   - The `1.5.1 fixed stable baseline` baseline document that follow-up work should use as a reference
 4. [`docs/gameplay-guide.en.md`](docs/gameplay-guide.en.md)
    - How to start playing, basic controls, HUD/judgement/result screen explanation from a practical player perspective
 5. [`docs/config.en.md`](docs/config.en.md)

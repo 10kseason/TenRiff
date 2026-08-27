@@ -7,7 +7,7 @@
 - BMS landmines (`D1-D9`, `E1-E9`) are playable, including `#WAV00`, base-36 damage tokens, `ZZ` instant fail, exact press/release boundary behavior, and lane-mod/key-converter remapping.
 - Results and local records expose fixed native score separately from detail score, and categorical native accuracy separately from continuous timing-based detailed accuracy.
 - 새 replay evidence v3는 차트 SHA-256, canonical ruleset, result-to-replay SHA-256을 저장하고 입력 trace를 headless 엔진으로 재실행합니다. 공식 로컬 best는 재계산된 verified 결과만 사용하며 legacy/custom/assist 기록은 히스토리에 `unverified`로 남습니다.
-- 현재 안정 배포 라인은 `1.5.0`
+- 현재 안정 배포 라인은 `1.5.1`
 - UI-r2 Result는 2.2초 타임라인으로 프리즘·점수·등급·상태·통계·그래프를 순차 공개하며, Space로 연출을 건너뛸 수 있고 CONTINUE/RETRY/Replay 입력은 공개 완료 전 잠김
 - UI-r2 Song Select는 상단 탭, 7행 재킷 라이브러리, 대형 선택 이미지, 최고 기록 카드, 차트/모드 패널, 실제 동작하는 START 버튼 구조로 개편되며 Collection/Store/재화/글로벌 랭킹 가상 기능은 표시하지 않음
 - Song Select 우측의 비주얼 레이턴시·하이스피드·Gauge Shift 시작 등급·랜덤 셀은 좌클릭으로 증가/다음, 우클릭으로 감소/이전을 적용하고 즉시 저장함. 현재 차트 키수는 잘림 없이 표시되며 최고 기록은 점수·정확도·최대 콤보를 함께 표시
@@ -28,7 +28,7 @@
 - `1.2.92`는 standalone BMS key converter에 기본 Krrcream과 결정론적 `nK2 Native 50/50` 선택을 추가.
 - `1.2.93`은 게임 내 Mode Settings의 `Key Converter`에서 `Krrcream`/`KeyWeaver nK2`를 선택하고 설정·리플레이에 저장해 실제 key-mode 변환에 적용.
 - `1.2.95`에서 Mode Settings의 `OSU Charts`로 osu!mania 4K~10K `.osu` 인덱싱·플레이를 잠시 복구했으나, 이 경로는 1.3.1에서 다시 제거되었습니다.
-- 후속 작업의 기준선 문서는 `docs/baseline-1.1.2.md`
+- 후속 작업의 기준선 문서는 `docs/baseline-1.5.1.md`
 - Windows GUI 빌드가 메인 타깃
 - Linux는 `Baepoks-Linuxs/TenRiff-0.5.0-linux-preview` 수준의 preview만 존재
 - 지원 차트 표면은 BMS 계열(`.bms/.bme/.bml/.pms`) 전용
@@ -107,7 +107,7 @@
   - nK2 프리셋은 기본 `Native (12%)`, `Transform (35%)`, `Remaster (65%)` 중 선택한다. `Remaster`는 예산을 올리면서도 앵커를 잠가 원곡 배치를 유지하고 롱노트 구간을 같은 길이의 롱노트로 채운다. 세 값은 상한이며 실제 추가량은 원본 밀도와 안전창에 따라 낮아진다. Krrcream 선택 시 해당 행은 잠기며, standalone converter GUI의 Krrcream Max/Min/Speed/Seed도 수정할 수 없다.
   - NK3는 번들된 P64를 host beam32에 항상 결합한다. 10K가 아닌 원본을 10K로 변환할 때만 일반화 패턴 MLP를 추가하고, 10→10과 나머지 모든 경로는 P64만 사용한다. 기본 `AUTO` 백엔드는 ncnn Vulkan으로 P64와 MLP를 AMD/NVIDIA GPU에서 실행하고, 선택형 OpenVINO 호환 경로는 폴백으로 유지한다. `TENRIFF_NK3_BACKEND`와 `TENRIFF_NK3_VULKAN_DEVICE`로 강제 선택할 수 있다.
   - 독립 BMS key converter의 CLI/GUI는 기본 `krrcream`과 결정론적 `nK2 Native 50/50` 알고리즘을 선택 지원하며, nK2 선택 시 krrcream 전용 튜닝 필드는 적용하지 않음
-  - 1.5.0 공식 빌드/Windows ZIP은 standalone BMS key converter CLI/GUI를 만들거나 포함하지 않으며 top-level CMake 옵션도 기본 `OFF`; 소스는 개발 회귀용으로만 유지
+  - 1.5.1 공식 빌드/Windows ZIP은 standalone BMS key converter CLI/GUI를 만들거나 포함하지 않으며 top-level CMake 옵션도 기본 `OFF`; 소스는 개발 회귀용으로만 유지
   - `mode.key_mode=none`은 차트의 원래 키 수와 기본 패턴 레이아웃을 그대로 유지
 - Native difficulty:
   - BMS LV/CR 계산에서 롱노트 Head/Tail의 miss-ms만 0.5배로 평가해 `300ms`를 `150ms`처럼 완화하며, 실제 gameplay 판정창은 그대로 유지
@@ -183,7 +183,7 @@
   - `Options -> Profile Setup`에서 현재 프로필의 언어, 오디오, 입력 백엔드, 그래픽, 키맵을 첫 실행용 Quick Setup 화면으로 다시 조정하고 즉시 저장
   - 최대 48바이트의 프로필 닉네임을 편집하며 이후 저장 기록과 직접 IP 멀티플레이 표시 이름으로 사용
 - 직접 IP 멀티플레이:
-  - Windows에서 고정 TCP 코디네이터 1대에 최대 7명이 참가해 총 8명까지 연결, 기본 `27300/TCP`
+  - Windows에서 고정 TCP 코디네이터 1대에 최대 7명이 참가해 총 8명까지 연결, 기본 `27301/TCP`
   - protocol v5는 각 참가자의 indexed BMS SHA-256 목록을 최대 512개씩 받고 현재 접속자 전원이 가진 차트의 교집합만 공통곡으로 배포; osu!mania `.osu`는 멀티 후보에서 제외
   - 로비 `ROOM CHAT`은 UTF-8 메시지를 256바이트까지 전송하고 최근 32개만 세션 메모리에 보관하며 메시지 수와 본인/리더 표식을 표시
   - 초기 선곡권자는 호스트이며, 모든 플레이어가 Result를 나간 뒤 입장 순서의 다음 연결 플레이어로 선곡권을 회전
@@ -231,7 +231,7 @@
 
 ## Runtime / Packaging Rules
 - 새 사용자 프로필은 자동 생성
-- 현재 안정 P2P 배포 라인은 `TenRiff 1.5.0`
+- 현재 안정 P2P 배포 라인은 `TenRiff 1.5.1`
 - 배포 패키지에는 `Songs`를 넣지 않음
 - 배포 패키지는 `Main Menu / Options / Song Selecte / Multiplayer Lobby / Clear / Failed` 이름의 `Mainmusic/` 화면 슬롯을 포함하며, 각 `이름.mp3`와 번호가 붙은 `이름 2.mp3`~`이름 64.mp3`를 자동 수집해 화면 재진입마다 순환
 - 배포 업데이트에는 built artifacts와 필요한 런타임 자산만 포함

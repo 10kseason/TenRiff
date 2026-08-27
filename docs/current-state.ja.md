@@ -3,7 +3,7 @@
 この文書は、次のエージェントや新しい作業者が最初に読むべき current-state 文書です。目的は、「このプロジェクトは今どういう状態で、どこを見ればよく、何がまだ未検証か」を素早く把握できるようにすることです。
 
 ## Baseline
-- 現在の stable release line は `1.5.0`
+- 現在の stable release line は `1.5.1`
 - UI-r2 の Result は 2.2 秒の timeline で prism、score、rank、clear status、statistics、graphs を順に表示する。Space で演出を skip でき、完了までは Continue/Retry/Replay 入力を lock する。
 - UI-r2 Song Select は top tab、7-row jacket library、大きな selected artwork、best-record card、chart/mode panel、実動する START action を使用し、Collection/Store/currency/global ranking の仮 UI は表示しない
 - Song Select の Rate、Hi-Speed、Gauge、Random cell は左 click で増加/次、右 click で減少/前を適用して即時保存する。current chart の key count は欠けず、best record は score・accuracy・max combo を同時に表示する。
@@ -25,7 +25,7 @@
 - `1.2.92` は standalone BMS key converter に既定の Krrcream と決定論的 `nK2 Native 50/50` の選択を追加。
 - `1.2.93` はゲーム内 Mode Settings に `Key Converter` を追加し、`Krrcream`/`KeyWeaver nK2` の選択を設定・replay metadata に保存して runtime key-mode 変換へ適用。
 - `1.2.95` では `OSU Charts` で osu!mania 4K～10K `.osu` の index/play を一時的に復元しましたが、この経路は 1.3.1 で再び削除されました。
-- 後続作業の基準文書は `docs/baseline-1.1.2.ja.md`
+- 後続作業の基準文書は `docs/baseline-1.5.1.ja.md`
 - Windows GUI ビルドが主対象
 - Linux は `Baepoks-Linuxs/TenRiff-0.5.0-linux-preview` レベルの preview のみ
 - 対応 chart surface は BMS family（`.bms/.bme/.bml/.pms`）専用
@@ -95,7 +95,7 @@
   - ゲーム内 Mode Settings の `Key Converter` で `Krrcream`、内蔵の決定論的 `KeyWeaver nK2`、または `KeyWeaver NK3 ONNX` を選択し、設定と replay metadata に保存
   - 個別の `Conversion Note Add` 設定は削除。Krrcream は元 note の再配置のみを行い、nK2 は key count 拡張時に変換後の target layout へ安全な support note を直接生成する。
   - nK2 preset は既定の `Native (12%)`、`Transform (35%)`、`Remaster (65%)` から選択する。`Remaster` は budget を上げつつ anchor を固定して原曲の配置を残し、LN 区間を同じ長さの LN で埋める。3 つとも上限であり、実際の追加量は原曲の密度と safety window で決まる。Krrcream では row を lock し、standalone converter GUI の Krrcream Max/Min/Speed/Seed も変更不可。
-  - 1.5.0 公式 build/Windows ZIP は standalone BMS key-converter CLI/GUI を build・同梱しない。top-level CMake option は既定 `OFF` で、source は開発 regression 用のみ維持
+  - 1.5.1 公式 build/Windows ZIP は standalone BMS key-converter CLI/GUI を build・同梱しない。top-level CMake option は既定 `OFF` で、source は開発 regression 用のみ維持
   - NK3 は同梱 P64 と host beam32 を常に組み合わせる。10K 以外の source を 10K に変換するときだけ generalized pattern MLP を追加し、10K→10K とその他すべての target は P64 のみを使う。既定の `AUTO` backend は ncnn Vulkan で P64 と MLP を AMD/NVIDIA GPU 上に実行し、任意の OpenVINO compatibility path を fallback として維持する。`TENRIFF_NK3_BACKEND` と `TENRIFF_NK3_VULKAN_DEVICE` で強制選択できる。
   - `mode.key_mode=none` は元のキー数と基本パターンレイアウトを維持
 - Native difficulty:
@@ -168,7 +168,7 @@
   - `Options -> Profile Setup` から現在の profile の初回 setup 画面を開き直し、language / audio / input / graphics / keymap を即時保存できる
   - 最大48 byte の nickname を編集し、保存 record と direct-IP multiplayer 表示名に使用
 - Direct-IP multiplayer:
-  - protocol v5 は固定 TCP coordinator 1台に最大8人まで接続（Windows、既定 `27300/TCP`）
+  - protocol v5 は固定 TCP coordinator 1台に最大8人まで接続（Windows、既定 `27301/TCP`）
   - multiplayer の対象は indexed BMS 系 chart のみで、全参加者の SHA-256 共通集合を使用し `.osu` は除外
   - lobby の `ROOM CHAT` は最大256 byte の UTF-8 message を送信し、session memory には最新32件だけを保持して message 数と local/leader 表示を行う
   - Rate 1.0、判定、Gauge Shift、Random/Mods/Assist は固定し、各 player の local key-mode conversion は許可
@@ -209,7 +209,7 @@
 
 ## Runtime / Packaging Rules
 - 新しい user profile は自動生成される
-- 現在の stable P2P 配布ラインは `TenRiff 1.5.0`
+- 現在の stable P2P 配布ラインは `TenRiff 1.5.1`
 - distribution package には `Songs` を含めない
 - distribution package には `Main Menu / Options / Song Selecte / Multiplayer Lobby / Clear / Failed` の `Mainmusic/` scene slot を含め、各 `Name.mp3` と `Name 2.mp3`～`Name 64.mp3` を自動検出して scene 再入場ごとに循環する
 - distribution 更新には built artifact と必要な runtime asset だけを含める

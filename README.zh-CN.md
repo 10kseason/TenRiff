@@ -2,9 +2,9 @@
 
 Language: [한국어](README.md) | [English](README.en.md) | [简体中文](README.zh-CN.md) | [日本語](README.ja.md)
 
-TenRiff 是一个 Windows GUI BMS 节奏游戏运行时/启动器。当前稳定版本为 `1.5.0`，谱面输入仅支持 BMS family（`.bms/.bme/.bml/.pms`）。公开包不包含 BGA upscaler model；键位转换内置 deterministic NK3 P64 graph 与 generalized pattern MLP。项目采用 MIT 许可证。
+TenRiff 是一个 Windows GUI BMS 节奏游戏运行时/启动器。当前稳定版本为 `1.5.1`，谱面输入仅支持 BMS family（`.bms/.bme/.bml/.pms`）。公开包不包含 BGA upscaler model；键位转换内置 deterministic NK3 P64 graph 与 generalized pattern MLP。项目采用 MIT 许可证。
 
-这份 README 是入门文档。关于当前行为、`1.5.0` 项目状态、`1.1.2 final stable` 基准、配置和设计文档，请继续阅读 [`docs/README.zh-CN.md`](docs/README.zh-CN.md)。
+这份 README 是入门文档。关于当前行为、`1.5.1` 项目状态、`1.5.1 fixed stable baseline` 基准、配置和设计文档，请继续阅读 [`docs/README.zh-CN.md`](docs/README.zh-CN.md)。
 
 TenRiff 也明确属于一种 `vibe coding` 作品：它更多是在快速迭代和实验中成形，而不是只按照传统的长篇设计先行流程推进。
 
@@ -15,7 +15,7 @@ TenRiff 也明确属于一种 `vibe coding` 作品：它更多是在快速迭代
 - 图形路径：D3D11 + Direct2D/DirectWrite
 - 音频路径：WASAPI
 - 输入路径：RawInput 或高轮询率键盘 polling
-- direct-IP multiplayer：固定 host 的 TCP coordinator，最多8人；multiplayer 仅可选择 BMS（默认 `27300/TCP`，见[使用说明](docs/multiplayer.md)）
+- direct-IP multiplayer：固定 host 的 TCP coordinator，最多8人；multiplayer 仅可选择 BMS（默认 `27301/TCP`，见[使用说明](docs/multiplayer.md)）
 - 许可证：[MIT](LICENSE)
 - 第三方说明：[`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)
 - 发布历史：[`CHANGELOG.md`](CHANGELOG.md)
@@ -178,8 +178,8 @@ README 只负责入门说明。更详细的内容建议按以下顺序阅读：
    - 文档总索引
 2. [`docs/current-state.zh-CN.md`](docs/current-state.zh-CN.md)
    - 当前实际可用功能
-3. [`docs/baseline-1.1.2.zh-CN.md`](docs/baseline-1.1.2.zh-CN.md)
-   - 后续工作应保持的 `1.1.2 final stable` 基准文档
+3. [`docs/baseline-1.5.1.zh-CN.md`](docs/baseline-1.5.1.zh-CN.md)
+   - 后续工作应保持的 `1.5.1 fixed stable baseline` 基准文档
 4. [`docs/gameplay-guide.zh-CN.md`](docs/gameplay-guide.zh-CN.md)
    - 实际开始游玩、基本操作、HUD、判定、结果说明
 5. [`docs/config.zh-CN.md`](docs/config.zh-CN.md)

@@ -1,0 +1,43 @@
+FROM ubuntu:24.04 AS build
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    cmake g++ ninja-build patchelf python3 python3-pip python3-venv unzip \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN python3 -m venv /opt/openvino-venv \
+    && /opt/openvino-venv/bin/python -m pip install --no-cache-dir openvino==2026.2.0
+
+COPY third_party/ncnn-20260526-ubuntu-2404-shared.zip /tmp/ncnn.zip
+RUN echo "6f003ab9394921fe7090932151b144ad53b1855971429a78b8cf4a5dbc6ba23e  /tmp/ncnn.zip" \
+        | sha256sum -c - \
+    && unzip -q /tmp/ncnn.zip -d /opt \
+    && mv /opt/ncnn-20260526-ubuntu-2404-shared /opt/ncnn \
+    && rm /tmp/ncnn.zip
+
+WORKDIR /src
+COPY CMakeLists.txt ./
+COPY src ./src
+COPY nk2 ./nk2
+COPY models ./models
+
+RUN OpenVINO_DIR="$(/opt/openvino-venv/bin/python -c 'from openvino.utils import get_cmake_path; print(get_cmake_path())')" \
+    && cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
+        -DTENRIFF_ENABLE_TESTS=OFF \
+        -DTENRIFF_ENABLE_NK3_ONNX=ON \
+        -DTENRIFF_ENABLE_NK3_NCNN=ON \
+        -DOpenVINO_DIR="$OpenVINO_DIR" \
+        -Dncnn_DIR=/opt/ncnn/lib/cmake/ncnn \
+    && cmake --build build --target tenriff_replay_verifier
+
+RUN mkdir -p /artifact/lib /artifact/models \
+    && cp build/tenriff-replay-verifier /artifact/tenriff-replay-verifier \
+    && cp models/*.onnx /artifact/models/ \
+    && cp -a models/ncnn /artifact/models/ \
+    && OPENVINO_LIBS="$(/opt/openvino-venv/bin/python -c 'import pathlib, openvino; print(pathlib.Path(openvino.__file__).parent / "libs")')" \
+    && cp -a "$OPENVINO_LIBS"/. /artifact/lib/ \
+    && cp -L /opt/ncnn/lib/libncnn.so.1 /artifact/lib/libncnn.so.1 \
+    && cp -L "$(gcc -print-file-name=libgomp.so.1)" /artifact/lib/libgomp.so.1 \
+    && patchelf --set-rpath '$ORIGIN/lib' /artifact/tenriff-replay-verifier
+
+FROM scratch AS artifact
+COPY --from=build /artifact/ /

@@ -19,7 +19,9 @@
 #endif
 
 #include "app/MenuAppSkinUtils.h"
+#include "app/MenuAppSongSelectUtils.h"
 #include "app/MenuSongUtils.h"
+#include "app/ChatInteraction.h"
 #include "app/ClipboardText.h"
 #include "config/KeycodeMap.h"
 #include "util/Utf8Compat.h"
@@ -95,6 +97,7 @@ void MenuApp::populate_multiplayer_render_data(render::MenuRenderData& render) {
     const network::PeerSessionSnapshot peer = peer_session_.snapshot();
     const bool active = peer_session_is_active(peer.state);
     const bool connected = peer.state == network::PeerSessionState::Connected;
+    const GlobalChatSnapshot global_chat = global_chat_service_.snapshot();
     const bool chart_matches = multiplayer_chart_fingerprints_match(multiplayer_menu_);
     const bool round_active = last_game_was_multiplayer_ || peer_round_ui_locked(peer);
     const bool leader_can_choose_chart =
@@ -116,9 +119,26 @@ void MenuApp::populate_multiplayer_render_data(render::MenuRenderData& render) {
             ? nullptr
             : &multiplayer_lan_rooms_[std::min(
                   multiplayer_lan_room_index_, multiplayer_lan_rooms_.size() - 1u)];
+    const RankedMultiplayerRoom* selected_server_room =
+        global_chat.rooms.empty()
+            ? nullptr
+            : &global_chat.rooms[std::min(
+                  multiplayer_server_room_index_, global_chat.rooms.size() - 1u)];
+    const bool browse_server_rooms = global_chat.configured;
     std::string lan_room_value;
     if (active) {
         lan_room_value = ui_text("AVAILABLE WHILE DISCONNECTED", "연결 해제 후 사용");
+    } else if (browse_server_rooms && !selected_server_room) {
+        lan_room_value = global_chat.room_error.empty()
+                             ? ui_text("SEARCHING SELECTED SERVER...", "선택 서버 방 검색 중...")
+                             : ui_text("SERVER ROOM SEARCH FAILED", "서버 방 검색 실패");
+    } else if (browse_server_rooms) {
+        lan_room_value = selected_server_room->name + " / " +
+                         std::to_string(selected_server_room->player_count) + "/" +
+                         std::to_string(selected_server_room->max_players);
+        if (!selected_server_room->accepting_players) {
+            lan_room_value += ui_text(" / BUSY", " / 참가 불가");
+        }
     } else if (!selected_lan_room) {
         lan_room_value = ui_text("SCANNING LOCAL NETWORK...", "LAN 방 검색 중...");
     } else {
@@ -130,8 +150,8 @@ void MenuApp::populate_multiplayer_render_data(render::MenuRenderData& render) {
         }
     }
     std::string chat_value;
-    if (!connected) {
-        chat_value = ui_text("CONNECT FIRST", "먼저 연결");
+    if (!global_chat.configured) {
+        chat_value = ui_text("F10 LOGIN REQUIRED", "F10 로그인 필요");
     } else if (multiplayer_menu_.chat_input.empty()) {
         chat_value = ui_text("ENTER TO CHAT", "ENTER로 채팅");
     } else {
@@ -158,12 +178,17 @@ void MenuApp::populate_multiplayer_render_data(render::MenuRenderData& render) {
                     !active,
                     false);
     append_menu_row(render.generic,
-                    ui_text("LAN Rooms", "LAN 방 자동 검색"),
+                    browse_server_rooms
+                        ? ui_text("Server Rooms", "선택 서버 방 검색")
+                        : ui_text("LAN Rooms", "LAN 방 자동 검색"),
                     lan_room_value,
                     row_selected(MultiplayerMenuRow::LanRoom),
                     render::MenuHitTargetKind::SettingsRow,
                     static_cast<int>(MultiplayerMenuRow::LanRoom),
-                    !active && selected_lan_room && selected_lan_room->accepting_players,
+                    !active && (browse_server_rooms
+                                    ? selected_server_room &&
+                                          selected_server_room->accepting_players
+                                    : selected_lan_room && selected_lan_room->accepting_players),
                     false);
     append_menu_row(render.generic,
                     ui_text("Host", "호스트"),
@@ -236,12 +261,12 @@ void MenuApp::populate_multiplayer_render_data(render::MenuRenderData& render) {
                     can_start,
                     false);
     append_menu_row(render.generic,
-                    ui_text("Room Chat", "방 채팅"),
+                    ui_text("Global Chat", "글로벌 채팅"),
                     chat_value,
                     row_selected(MultiplayerMenuRow::Chat),
                     render::MenuHitTargetKind::SettingsRow,
                     static_cast<int>(MultiplayerMenuRow::Chat),
-                    connected,
+                    global_chat.configured,
                     false);
     append_menu_row(render.generic,
                     ui_text("Options", "옵션"),
@@ -294,6 +319,10 @@ void MenuApp::populate_multiplayer_render_data(render::MenuRenderData& render) {
     if (!multiplayer_status_message_.empty()) {
         render.generic.notes.push_back(multiplayer_status_message_);
     }
+    if (global_chat.configured && !global_chat.room_error.empty()) {
+        render.generic.notes.push_back(
+            ui_text("Server room search: ", "서버 방 검색: ") + global_chat.room_error);
+    }
     const network::LanDiscoverySnapshot lan_snapshot = lan_discovery_.snapshot();
     if (!lan_snapshot.status_detail.empty()) {
         render.generic.notes.push_back(
@@ -320,41 +349,33 @@ void MenuApp::populate_multiplayer_render_data(render::MenuRenderData& render) {
         "Peer battle fixes Rate 1.00x, Gauge Shift, default judge windows, and Random/Mods/Assist off; local key-mode conversion is allowed.",
         "P2P 대전은 Rate 1.00x, Gauge Shift, 기본 판정, 랜덤/모드/어시스트 끔을 사용하며 로컬 키모드 변환은 허용합니다."));
     render.generic.notes.push_back(ui_text(
-        "LAN Rooms needs no server or manual IP entry. Internet play still needs an IP and router port forwarding.",
-        "LAN 방 자동 검색은 서버와 IP 입력이 필요 없습니다. 인터넷 연결은 여전히 IP와 포트 포워딩이 필요합니다."));
+        "Signed-in players search rooms on the selected main/private server. Signed-out players can still search the LAN.",
+        "로그인하면 선택한 메인/사설 서버의 방을 검색합니다. 로그아웃 상태에서는 기존 LAN 검색을 사용합니다."));
     render.generic.notes.push_back(ui_text(
         "Copy host:port (or tenriff://host:port), select Server IP, then press Enter. Ctrl+V also replaces the active field.",
         "host:port(또는 tenriff://host:port)를 복사하고 서버 IP에서 Enter를 누르세요. 편집 중 Ctrl+V로도 교체할 수 있습니다."));
     render.generic.footer_reserved_lines = 6;
     render.generic.footer_notes.push_back(
-        ui_text("ROOM CHAT", "방 채팅") + "  " +
-        std::to_string(peer.chat_messages.size()) + "/" +
-        std::to_string(network::kPeerChatHistoryLimit));
-    const std::size_t chat_begin = peer.chat_messages.size() > 4
-                                       ? peer.chat_messages.size() - 4
+        ui_text("GLOBAL CHAT", "글로벌 채팅") + "  " +
+        std::to_string(global_chat.messages.size()) + "/100");
+    const std::size_t chat_begin = global_chat.messages.size() > 4
+                                       ? global_chat.messages.size() - 4
                                        : 0;
-    for (std::size_t i = chat_begin; i < peer.chat_messages.size(); ++i) {
-        const auto& chat = peer.chat_messages[i];
-        const auto sender = std::find_if(
-            peer.participants.begin(), peer.participants.end(),
-            [&chat](const network::PeerParticipantSnapshot& participant) {
-                return participant.player_id == chat.player_id;
-            });
-        std::string sender_name =
-            sender == peer.participants.end()
-                ? "#" + std::to_string(chat.player_id)
-                : sender->name;
-        if (sender != peer.participants.end() && sender->local) {
+    for (std::size_t i = chat_begin; i < global_chat.messages.size(); ++i) {
+        const auto& chat = global_chat.messages[i];
+        std::string sender_name = chat.username;
+        if (chat.role == "admin") sender_name += ui_text(" [ADMIN]", " [관리자]");
+        if (chat.username == ranked_account_signed_in_username_) {
             sender_name += ui_text(" [YOU]", " [나]");
-        }
-        if (sender != peer.participants.end() && sender->leader) {
-            sender_name += ui_text(" [LEADER]", " [리더]");
         }
         render.generic.footer_notes.push_back(sender_name + ": " + chat.text);
     }
-    if (peer.chat_messages.empty()) {
+    if (global_chat.messages.empty()) {
         render.generic.footer_notes.push_back(
-            ui_text("No room messages yet.", "아직 방 메시지가 없습니다."));
+            global_chat.configured
+                ? ui_text("No global messages yet.", "아직 글로벌 메시지가 없습니다.")
+                : ui_text("Press F10 to log in before using global chat.",
+                          "글로벌 채팅을 사용하려면 F10으로 로그인하세요."));
     }
     render.generic.footer_notes.push_back(ui_text(
         "F8 opens chat. Enter sends. Delete clears an edit field. Esc closes editing or leaves Multiplayer.",
@@ -362,41 +383,233 @@ void MenuApp::populate_multiplayer_render_data(render::MenuRenderData& render) {
 }
 
 bool MenuApp::open_multiplayer_chat_shortcut() {
-    if (screen_ == Screen::Gameplay || screen_ == Screen::Result ||
-        (screen_ == Screen::Keymap && keymap_capture_active_)) {
-        return false;
-    }
-    const auto peer = peer_session_.snapshot();
-    if (!try_open_multiplayer_chat(
-            multiplayer_menu_, peer.state == network::PeerSessionState::Connected)) {
-        return false;
-    }
-    if (multiplayer_selecting_chart_) {
-        multiplayer_selecting_chart_ = false;
-        rebuild_visible_song_list();
-    }
-    screen_ = Screen::Multiplayer;
-    multiplayer_status_message_.clear();
+    const bool opening = !chat_overlay_visible_;
+    set_multiplayer_chat_overlay(opening);
+    if (opening) multiplayer_status_message_.clear();
     publish_snapshot();
     return true;
+}
+
+void MenuApp::set_multiplayer_chat_overlay(bool visible) {
+    chat_overlay_visible_ = visible;
+    if (visible) {
+        ranked_account_overlay_visible_ = false;
+        dismiss_chat_url_warning();
+    }
+    gameplay_overlay_capture_active_.store(
+        visible || ranked_account_overlay_visible_, std::memory_order_release);
+    const bool authenticated = global_chat_service_.snapshot().configured;
+    if (visible && authenticated) {
+        multiplayer_menu_.cursor = static_cast<int>(MultiplayerMenuRow::Chat);
+        multiplayer_menu_.edit_field = MultiplayerEditField::Chat;
+    } else if (multiplayer_menu_.edit_field == MultiplayerEditField::Chat) {
+        multiplayer_menu_.edit_field = MultiplayerEditField::None;
+    }
+}
+
+bool MenuApp::handle_multiplayer_chat_overlay_input(uint32_t keycode) {
+    if (!chat_overlay_visible_) return false;
+    if (keycode == key_escape_) {
+        set_multiplayer_chat_overlay(false);
+        publish_snapshot();
+        return true;
+    }
+
+    const bool authenticated = global_chat_service_.snapshot().configured;
+    if (!authenticated) {
+        multiplayer_status_message_ =
+            ui_text("Press F10 and log in before using global chat.",
+                    "글로벌 채팅을 사용하려면 F10으로 로그인하세요.");
+        publish_snapshot();
+        return true;
+    }
+    multiplayer_menu_.edit_field = MultiplayerEditField::Chat;
+    if (keycode == key_enter_) {
+        static_cast<void>(send_multiplayer_chat_input());
+        publish_snapshot();
+        return true;
+    }
+    if (keycode == key_backspace_) {
+        erase_last_multiplayer_utf8_character(multiplayer_menu_.chat_input);
+        publish_snapshot();
+        return true;
+    }
+    if (keycode == key_delete_) {
+        multiplayer_menu_.chat_input.clear();
+        publish_snapshot();
+        return true;
+    }
+    return true;
+}
+
+bool MenuApp::send_multiplayer_chat_input() {
+    std::string message = util::sanitize_ui_text(multiplayer_menu_.chat_input);
+    if (is_now_playing_chat_command(message)) message = now_playing_chat_message();
+    if (message.empty()) {
+        multiplayer_status_message_ = ui_text(
+            "Type a message before sending.", "전송할 메시지를 먼저 입력하세요.");
+        return false;
+    }
+    if (!global_chat_service_.send(message)) {
+        multiplayer_status_message_ = ui_text(
+            "Global chat is unavailable. Press F10 to sign in again.",
+            "글로벌 채팅을 사용할 수 없습니다. F10으로 다시 로그인하세요.");
+        return false;
+    }
+    multiplayer_menu_.chat_input.clear();
+    multiplayer_status_message_.clear();
+    return true;
+}
+
+std::string MenuApp::now_playing_chat_message() const {
+    std::string title;
+    std::string artist;
+    if ((screen_ == Screen::Gameplay || screen_ == Screen::Result) &&
+        !last_chart_title_.empty()) {
+        title = menu_song_select::safe_ui_text(
+            last_chart_title_, ui_text("Unknown track", "알 수 없는 곡"));
+        artist = menu_song_select::safe_ui_text(
+            last_chart_artist_, ui_text("Unknown artist", "작곡가 미상"));
+    } else if (selected_song_ >= 0 && selected_song_ < static_cast<int>(visible_song_count())) {
+        if (const SongEntry* entry = visible_song_entry(static_cast<std::size_t>(selected_song_))) {
+            title = menu_song_select::song_title_for_ui(*entry);
+            artist = menu_song_select::song_artist_for_ui(*entry);
+        }
+    }
+    if (title.empty()) {
+        return ui_text("[NP] Nothing is playing.", "[NP] 현재 재생 중인 곡이 없습니다.");
+    }
+    if (artist.empty()) artist = ui_text("Unknown artist", "작곡가 미상");
+    return "[NP] " + title + " - " + artist;
+}
+
+void MenuApp::populate_multiplayer_chat_overlay(render::ChatOverlayData& target) {
+    target.visible = chat_overlay_visible_;
+    const GlobalChatSnapshot chat = global_chat_service_.snapshot();
+    target.connected = chat.configured;
+    target.title = ui_text("GLOBAL CHAT", "글로벌 채팅");
+    target.status = !chat.configured
+                        ? ui_text("F10 LOGIN REQUIRED", "F10 로그인 필요")
+                        : (chat.online ? ui_text("ONLINE", "온라인")
+                                       : ui_text("SYNCING", "동기화 중"));
+    if (!chat.error.empty()) {
+        target.status = menu_song_select::safe_ui_text(chat.error, target.status);
+    }
+    target.input = target.connected
+                       ? multiplayer_menu_.chat_input + " _"
+                       : ui_text("Press F10 to log in or register",
+                                 "F10으로 로그인 또는 회원가입");
+    target.hint = ui_text("/np now playing   ENTER send   ESC/F8 close",
+                          "/np 현재 곡   ENTER 전송   ESC/F8 닫기");
+
+    const std::size_t begin = chat.messages.size() > 5
+                                  ? chat.messages.size() - 5
+                                  : 0;
+    chat_overlay_message_urls_.clear();
+    for (std::size_t i = begin; i < chat.messages.size(); ++i) {
+        const auto& message = chat.messages[i];
+        std::string sender_name = message.username;
+        if (message.role == "admin") sender_name += ui_text(" [ADMIN]", " [관리자]");
+        if (message.username == ranked_account_signed_in_username_) {
+            sender_name += ui_text(" [YOU]", " [나]");
+        }
+        target.messages.push_back(sender_name + ": " + message.text);
+        const auto url = first_chat_web_url(message.text);
+        chat_overlay_message_urls_.push_back(url.value_or(std::string{}));
+    }
+    if (target.messages.empty()) {
+        target.messages.push_back(
+            chat.configured
+                ? ui_text("No global messages yet.", "아직 글로벌 메시지가 없습니다.")
+                : ui_text("Global chat requires an account.", "글로벌 채팅은 로그인이 필요합니다."));
+        chat_overlay_message_urls_.push_back({});
+    }
+    target.message_urls = chat_overlay_message_urls_;
+}
+
+bool MenuApp::queue_gameplay_chat_input(const input::InputEvent& event) {
+    if (key_f8_ != 0 && event.keycode == key_f8_) {
+        if (event.state == input::InputState::Pressed) {
+            gameplay_overlay_capture_active_.store(true, std::memory_order_release);
+            std::lock_guard<std::mutex> lock(gameplay_chat_control_mutex_);
+            gameplay_chat_control_actions_.push_back(
+                GameplayChatControlAction{GameplayOverlayActionKind::ChatVisibility,
+                                          event.keycode, false});
+        }
+        return true;
+    }
+    if (key_f10_ != 0 && event.keycode == key_f10_) {
+        if (event.state == input::InputState::Pressed) {
+            gameplay_overlay_capture_active_.store(true, std::memory_order_release);
+            std::lock_guard<std::mutex> lock(gameplay_chat_control_mutex_);
+            gameplay_chat_control_actions_.push_back(
+                GameplayChatControlAction{GameplayOverlayActionKind::AccountVisibility,
+                                          event.keycode, false});
+        }
+        return true;
+    }
+    if (!gameplay_overlay_capture_active_.load(std::memory_order_acquire)) {
+        return false;
+    }
+    if (event.state == input::InputState::Released) {
+        return false;
+    }
+    if (event.state == input::InputState::Pressed &&
+        (event.keycode == key_enter_ || event.keycode == key_escape_ ||
+         event.keycode == key_backspace_ || event.keycode == key_delete_ ||
+         event.keycode == key_tab_ || event.keycode == key_left_ ||
+         event.keycode == key_right_)) {
+        if (event.keycode == key_escape_) {
+            gameplay_overlay_capture_active_.store(false, std::memory_order_release);
+        }
+        std::lock_guard<std::mutex> lock(gameplay_chat_control_mutex_);
+        gameplay_chat_control_actions_.push_back(
+            GameplayChatControlAction{GameplayOverlayActionKind::Input,
+                                      event.keycode, false});
+    }
+    return true;
+}
+
+void MenuApp::drain_gameplay_chat_input() {
+    std::vector<GameplayChatControlAction> actions;
+    {
+        std::lock_guard<std::mutex> lock(gameplay_chat_control_mutex_);
+        actions.swap(gameplay_chat_control_actions_);
+    }
+    for (const auto& action : actions) {
+        if (action.kind == GameplayOverlayActionKind::ChatVisibility) {
+            set_multiplayer_chat_overlay(!chat_overlay_visible_);
+            publish_snapshot();
+        } else if (action.kind == GameplayOverlayActionKind::AccountVisibility) {
+            toggle_ranked_account_overlay();
+        } else if (chat_url_warning_visible_) {
+            static_cast<void>(handle_chat_url_warning_input(action.keycode));
+        } else if (ranked_account_overlay_visible_) {
+            static_cast<void>(handle_ranked_account_overlay_input(action.keycode));
+        } else if (chat_overlay_visible_) {
+            static_cast<void>(handle_multiplayer_chat_overlay_input(action.keycode));
+        }
+    }
+    while (true) {
+        auto text = menu_window_.poll_text_input();
+        if (!text.has_value()) break;
+        handle_text_input(*text);
+    }
+    service_ranked_account_request();
+    if (chat_overlay_visible_) {
+        const auto chat = global_chat_service_.snapshot();
+        std::string signature = std::to_string(chat.revision);
+        if (signature != chat_overlay_message_signature_) {
+            chat_overlay_message_signature_ = std::move(signature);
+            publish_snapshot();
+        }
+    }
 }
 
 void MenuApp::handle_multiplayer_input(uint32_t keycode) {
     if (multiplayer_menu_.edit_field == MultiplayerEditField::Chat) {
         if (keycode == key_enter_) {
-            const std::string message = util::sanitize_ui_text(multiplayer_menu_.chat_input);
-            if (message.empty()) {
-                multiplayer_status_message_ =
-                    ui_text("Type a message before sending.",
-                            "전송할 메시지를 먼저 입력하세요.");
-            } else if (peer_session_.send_chat(message)) {
-                multiplayer_menu_.chat_input.clear();
-                multiplayer_status_message_.clear();
-            } else {
-                multiplayer_status_message_ =
-                    ui_text("Room chat is unavailable because the connection closed.",
-                            "연결이 종료되어 방 채팅을 사용할 수 없습니다.");
-            }
+            static_cast<void>(send_multiplayer_chat_input());
             publish_snapshot();
             return;
         }
@@ -558,11 +771,59 @@ void MenuApp::handle_multiplayer_input(uint32_t keycode) {
         return;
     }
     if (row == MultiplayerMenuRow::LanRoom) {
+        const GlobalChatSnapshot global_chat = global_chat_service_.snapshot();
         if (active) {
             multiplayer_status_message_ = ui_text(
-                "Disconnect before joining another LAN room.",
-                "다른 LAN 방에 참가하려면 먼저 연결을 끊으세요.");
+                "Disconnect before joining another room.",
+                "다른 방에 참가하려면 먼저 연결을 끊으세요.");
             publish_snapshot();
+            return;
+        }
+        if (global_chat.configured) {
+            if (global_chat.rooms.empty()) {
+                multiplayer_status_message_ = global_chat.room_error.empty()
+                    ? ui_text("Searching for rooms on the selected server...",
+                              "선택한 서버에서 방을 검색 중입니다...")
+                    : ui_text("Could not search the selected server: ",
+                              "선택한 서버 방 검색 실패: ") + global_chat.room_error;
+                publish_snapshot();
+                return;
+            }
+            if (keycode == key_left_ || keycode == key_right_) {
+                const std::size_t count = global_chat.rooms.size();
+                if (keycode == key_left_) {
+                    multiplayer_server_room_index_ =
+                        (multiplayer_server_room_index_ + count - 1u) % count;
+                } else {
+                    multiplayer_server_room_index_ =
+                        (multiplayer_server_room_index_ + 1u) % count;
+                }
+                multiplayer_status_message_.clear();
+                publish_snapshot();
+                return;
+            }
+
+            multiplayer_server_room_index_ = std::min(
+                multiplayer_server_room_index_, global_chat.rooms.size() - 1u);
+            const RankedMultiplayerRoom& room =
+                global_chat.rooms[multiplayer_server_room_index_];
+            if (!room.accepting_players) {
+                multiplayer_status_message_ = ui_text(
+                    "That server room is full or currently in a match.",
+                    "해당 서버 방은 가득 찼거나 대전 중입니다.");
+                publish_snapshot();
+                return;
+            }
+            if (!is_valid_multiplayer_address_text(room.address) || room.tcp_port == 0) {
+                multiplayer_status_message_ = ui_text(
+                    "The selected server returned an invalid room endpoint.",
+                    "선택한 서버가 잘못된 방 주소를 반환했습니다.");
+                publish_snapshot();
+                return;
+            }
+            multiplayer_menu_.address = room.address;
+            multiplayer_menu_.port_text = std::to_string(room.tcp_port);
+            begin_network_session(MultiplayerRole::Join, room.address, room.tcp_port);
             return;
         }
         if (multiplayer_lan_rooms_.empty()) {
@@ -703,12 +964,12 @@ void MenuApp::handle_multiplayer_input(uint32_t keycode) {
         return;
     }
     if (row == MultiplayerMenuRow::Chat) {
-        if (peer.state != network::PeerSessionState::Connected) {
+        if (!global_chat_service_.snapshot().configured) {
             multiplayer_status_message_ =
-                ui_text("Connect to a room before using chat.",
-                        "채팅을 사용하려면 먼저 방에 연결하세요.");
+                ui_text("Press F10 and log in before using global chat.",
+                        "글로벌 채팅을 사용하려면 F10으로 로그인하세요.");
         } else {
-            multiplayer_menu_.edit_field = MultiplayerEditField::Chat;
+            set_multiplayer_chat_overlay(true);
             multiplayer_status_message_.clear();
         }
         publish_snapshot();
@@ -1023,6 +1284,7 @@ void MenuApp::open_multiplayer_options() {
 
 void MenuApp::service_multiplayer() {
     const network::PeerSessionSnapshot peer = peer_session_.snapshot();
+    const GlobalChatSnapshot global_chat = global_chat_service_.snapshot();
     const bool peer_active = peer_session_is_active(peer.state);
     if (peer.role == network::PeerRole::Host && peer_active && peer.local_port != 0) {
         network::LanRoomAdvertisement advertisement;
@@ -1037,7 +1299,8 @@ void MenuApp::service_multiplayer() {
             (peer.state == network::PeerSessionState::Listening ||
              peer.state == network::PeerSessionState::Connected);
         lan_discovery_.advertise(std::move(advertisement));
-    } else if (screen_ == Screen::Multiplayer && !peer_active) {
+    } else if (screen_ == Screen::Multiplayer && !peer_active &&
+               !global_chat.configured) {
         lan_discovery_.start_browsing();
     } else {
         lan_discovery_.stop();
@@ -1066,6 +1329,14 @@ void MenuApp::service_multiplayer() {
             }
         }
         multiplayer_lan_discovery_revision_ = lan_snapshot.revision;
+        if (screen_ == Screen::Multiplayer) publish_snapshot();
+    }
+
+    if (global_chat.revision != multiplayer_server_room_revision_) {
+        multiplayer_server_room_index_ = global_chat.rooms.empty()
+            ? 0
+            : std::min(multiplayer_server_room_index_, global_chat.rooms.size() - 1u);
+        multiplayer_server_room_revision_ = global_chat.revision;
         if (screen_ == Screen::Multiplayer) publish_snapshot();
     }
 
@@ -1168,6 +1439,7 @@ void MenuApp::service_multiplayer() {
     if (peer.revision != multiplayer_last_revision_) {
         multiplayer_last_revision_ = peer.revision;
         if (screen_ == Screen::Multiplayer || screen_ == Screen::Result ||
+            chat_overlay_visible_ ||
             (screen_ == Screen::SongSelect && multiplayer_selecting_chart_)) {
             publish_snapshot();
         }

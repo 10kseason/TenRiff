@@ -197,11 +197,11 @@ TEST_CASE("peer battle rules fix scoring while preserving local presentation") {
 
 TEST_CASE("multiplayer port editing accepts digits and limits the field to five characters") {
     std::string port_text = "2730";
-    CHECK(try_append_multiplayer_port_character(port_text, '0'));
-    CHECK(port_text == "27300");
+    CHECK(try_append_multiplayer_port_character(port_text, '1'));
+    CHECK(port_text == "27301");
     CHECK_FALSE(try_append_multiplayer_port_character(port_text, '1'));
     CHECK_FALSE(try_append_multiplayer_port_character(port_text, '-'));
-    CHECK(port_text == "27300");
+    CHECK(port_text == "27301");
 }
 
 TEST_CASE("multiplayer chat input keeps UTF-8 boundaries and byte cap") {

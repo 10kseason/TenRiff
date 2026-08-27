@@ -68,6 +68,12 @@ enum class MenuHitTargetKind {
     OptionsItem,
     SettingsRow,
     KeymapButton,
+    ChatUrl,
+    AccountTab,
+    AccountServer,
+    AccountField,
+    AccountAction,
+    UrlWarningButton,
 };
 
 enum class MenuHitPart {
@@ -568,6 +574,38 @@ struct HelpOverlayData {
     std::string footer;
 };
 
+struct ChatOverlayData {
+    bool visible = false;
+    bool connected = false;
+    std::string title;
+    std::vector<std::string> messages;
+    std::vector<std::string> message_urls;
+    std::string input;
+    std::string status;
+    std::string hint;
+};
+
+struct RankedAccountOverlayData {
+    bool visible = false;
+    bool register_mode = false;
+    bool busy = false;
+    bool signed_in = false;
+    bool private_server = false;
+    int focused_field = 0;
+    std::string username;
+    std::string server_url;
+    std::string main_server_url;
+    std::string password_mask;
+    std::string signed_in_as;
+    std::string role;
+    std::string status;
+};
+
+struct UrlWarningOverlayData {
+    bool visible = false;
+    std::string url;
+};
+
 struct LoadingProgressData {
     bool visible = false;
     int percent = -1;
@@ -626,6 +664,9 @@ struct MenuRenderData {
     std::vector<std::string> lines;
     GenericMenuData generic;
     HelpOverlayData help_overlay;
+    ChatOverlayData chat_overlay;
+    RankedAccountOverlayData account_overlay;
+    UrlWarningOverlayData url_warning_overlay;
     LoadingProgressData loading_progress;
 
     TitleMenuData title;
@@ -960,6 +1001,12 @@ private:
     std::unordered_set<std::string> song_select_preview_warned_slow_paths_{};
     SongScrollbarState song_scrollbar_state_{};
     GameplayFieldDragState gameplay_field_drag_state_{};
+    float chat_overlay_slide_ = 0.0f;
+    int64_t chat_overlay_last_frame_ns_ = 0;
+    float account_overlay_visibility_ = 0.0f;
+    int64_t account_overlay_last_frame_ns_ = 0;
+    float url_warning_visibility_ = 0.0f;
+    int64_t url_warning_last_frame_ns_ = 0;
     bool song_scroll_drag_active_ = false;
     float song_scroll_drag_offset_y_ = 0.0f;
     int song_scroll_drag_selected_offset_ = 0;

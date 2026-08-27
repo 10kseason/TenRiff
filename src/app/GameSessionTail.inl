@@ -77,6 +77,9 @@ void GameSession::rebuild_input_thread_config(input::InputThreadConfig& input_co
         append_unique_key(f7_keycode_);
         append_unique_key(f8_keycode_);
         append_unique_key(f9_keycode_);
+        append_unique_key(f10_keycode_);
+        append_unique_key(lshift_keycode_);
+        append_unique_key(rshift_keycode_);
     }
 }
 
@@ -86,7 +89,7 @@ void GameSession::note_runtime_input_event_source(const input::InputEvent& event
 
 void GameSession::rebuild_polled_gameplay_keys() {
     polled_gameplay_keys_.clear();
-    polled_gameplay_keys_.reserve(key_to_lane_.size() + 9);
+    polled_gameplay_keys_.reserve(key_to_lane_.size() + 11);
 
     auto append_unique_key = [this](uint32_t keycode) {
         if (keycode == 0) {
@@ -117,6 +120,9 @@ void GameSession::rebuild_polled_gameplay_keys() {
     append_unique_key(f7_keycode_);
     append_unique_key(f8_keycode_);
     append_unique_key(f9_keycode_);
+    append_unique_key(f10_keycode_);
+    append_unique_key(lshift_keycode_);
+    append_unique_key(rshift_keycode_);
 }
 
 GameSession::GameSession() = default;
@@ -320,6 +326,11 @@ bool GameSession::initialize(const CommandLineOptions& options) {
     f7_keycode_ = config::KeycodeMap::to_keycode("F7").value_or(0);
     f8_keycode_ = config::KeycodeMap::to_keycode("F8").value_or(0);
     f9_keycode_ = config::KeycodeMap::to_keycode("F9").value_or(0);
+    f10_keycode_ = config::KeycodeMap::to_keycode("F10").value_or(0);
+    lshift_keycode_ = config::KeycodeMap::to_keycode("LShift").value_or(0);
+    rshift_keycode_ = config::KeycodeMap::to_keycode("RShift").value_or(0);
+    lshift_held_ = false;
+    rshift_held_ = false;
 
     if (!options.replay_path.empty()) {
         auto replay_load = gameplay::load_replay_json(options.replay_path);
@@ -918,6 +929,10 @@ void GameSession::set_peer_spectator_done_callback(PeerSpectatorDoneCallback cal
     peer_spectator_done_callback_ = std::move(callback);
 }
 
+void GameSession::set_control_input_callback(ControlInputCallback callback) {
+    control_input_callback_ = std::move(callback);
+}
+
 void GameSession::report_loading_progress(int percent, std::string_view stage) {
     const int clamped_percent = std::clamp(percent, 0, 100);
     if (last_loading_percent_ == clamped_percent && last_loading_stage_ == stage) {
@@ -1431,11 +1446,19 @@ bool GameSession::update_tuning_repeat_state(uint32_t keycode,
         return true;
     }
     if (f7_keycode_ != 0 && keycode == f7_keycode_) {
-        update_repeat(visual_offset_decrease_repeat_, -kInPlayVisualOffsetStep, false);
-        return true;
-    }
-    if (f8_keycode_ != 0 && keycode == f8_keycode_) {
-        update_repeat(visual_offset_increase_repeat_, kInPlayVisualOffsetStep, false);
+        if (state == input::InputState::Pressed) {
+            visual_offset_decrease_repeat_ = {};
+            visual_offset_increase_repeat_ = {};
+            const bool increase = lshift_held_ || rshift_held_;
+            update_repeat(increase ? visual_offset_increase_repeat_
+                                   : visual_offset_decrease_repeat_,
+                          increase ? kInPlayVisualOffsetStep
+                                   : -kInPlayVisualOffsetStep,
+                          false);
+        } else {
+            visual_offset_decrease_repeat_ = {};
+            visual_offset_increase_repeat_ = {};
+        }
         return true;
     }
     return false;
@@ -2614,6 +2637,20 @@ void GameSession::rebaseline_gameplay_start_input_state(int64_t sample) {
 }
 
 bool GameSession::handle_control_input(const input::InputEvent& event) {
+    if (lshift_keycode_ != 0 && event.keycode == lshift_keycode_) {
+        lshift_held_ = event.state == input::InputState::Pressed;
+        if (control_input_callback_) static_cast<void>(control_input_callback_(event));
+        return true;
+    }
+    if (rshift_keycode_ != 0 && event.keycode == rshift_keycode_) {
+        rshift_held_ = event.state == input::InputState::Pressed;
+        if (control_input_callback_) static_cast<void>(control_input_callback_(event));
+        return true;
+    }
+    if (control_input_callback_ && control_input_callback_(event)) {
+        reset_tuning_repeats();
+        return true;
+    }
     if (paused_.load(std::memory_order_acquire)) {
         if (event.state != input::InputState::Pressed) {
             return true;
@@ -2656,11 +2693,9 @@ bool GameSession::handle_control_input(const input::InputEvent& event) {
             return true;
         }
         if (f7_keycode_ != 0 && event.keycode == f7_keycode_) {
-            adjust_visual_offset(-kInPlayVisualOffsetStep);
-            return true;
-        }
-        if (f8_keycode_ != 0 && event.keycode == f8_keycode_) {
-            adjust_visual_offset(kInPlayVisualOffsetStep);
+            adjust_visual_offset((lshift_held_ || rshift_held_)
+                                     ? kInPlayVisualOffsetStep
+                                     : -kInPlayVisualOffsetStep);
             return true;
         }
         if (up_keycode_ != 0 && event.keycode == up_keycode_) {

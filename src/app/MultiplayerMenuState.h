@@ -52,7 +52,7 @@ struct MultiplayerMenuState {
     int cursor = 0;
     MultiplayerEditField edit_field = MultiplayerEditField::None;
     std::string address = "127.0.0.1";
-    std::string port_text = "27300";
+    std::string port_text = "27301";
     std::string chat_input;
 
     bool connected = false;

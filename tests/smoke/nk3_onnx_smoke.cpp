@@ -303,7 +303,8 @@ int main() {
     const bool explains_backend_contract =
         std::any_of(rejected.warnings.begin(), rejected.warnings.end(),
                     [](const std::string& warning) {
-                        return warning.find("must be AUTO, VULKAN, or OPENVINO") !=
+                        return warning.find(
+                                   "must be AUTO, VULKAN, NCNN_CPU, or OPENVINO") !=
                                std::string::npos;
                     });
     if (rejected.converted || !explains_backend_contract) {

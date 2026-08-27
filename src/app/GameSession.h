@@ -147,6 +147,7 @@ public:
     using LoadingCancelCallback = std::function<bool()>;
     using ScreenshotCallback = std::function<void()>;
     using PeerSpectatorDoneCallback = std::function<bool()>;
+    using ControlInputCallback = std::function<bool(const input::InputEvent&)>;
 
     struct GameSessionResult {
         bool has_value = false;
@@ -182,6 +183,7 @@ public:
     void set_loading_cancel_callback(LoadingCancelCallback callback);
     void set_screenshot_callback(ScreenshotCallback callback);
     void set_peer_spectator_done_callback(PeerSpectatorDoneCallback callback);
+    void set_control_input_callback(ControlInputCallback callback);
     void set_peer_battle_mode(bool enabled) { peer_battle_mode_ = enabled; }
     void set_course_gauge(double initial_value) {
         course_gauge_enabled_ = true;
@@ -438,6 +440,11 @@ private:
     uint32_t f7_keycode_ = 0;
     uint32_t f8_keycode_ = 0;
     uint32_t f9_keycode_ = 0;
+    uint32_t f10_keycode_ = 0;
+    uint32_t lshift_keycode_ = 0;
+    uint32_t rshift_keycode_ = 0;
+    bool lshift_held_ = false;
+    bool rshift_held_ = false;
 
     // Judgement-line and visual-latency tuning while the chart plays. Same
     // press-then-auto-repeat shape as the hi-speed keys.
@@ -514,6 +521,7 @@ private:
     LoadingCancelCallback loading_cancel_callback_;
     ScreenshotCallback screenshot_callback_;
     PeerSpectatorDoneCallback peer_spectator_done_callback_;
+    ControlInputCallback control_input_callback_;
     int last_loading_percent_ = -1;
     std::string last_loading_stage_;
 

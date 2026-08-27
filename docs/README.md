@@ -11,8 +11,8 @@ Language: Korean | [English](README.en.md) | [简体中文](README.zh-CN.md) | [
    - 현재 제품 상태, 핵심 서브시스템, 검증된 명령, 남은 수동 검증 항목
 2. `docs/ui-audit-checklist.md`
    - renderer layout 변경 뒤 반드시 다시 돌려야 하는 UI 수동 검증 매트릭스
-3. `docs/baseline-1.1.2.md`
-   - 현재 작업을 어디서부터 쌓아야 하는지 정하는 `1.1.2 final stable` 기준선 문서
+3. `docs/baseline-1.5.1.md`
+   - 현재 작업을 어디서부터 쌓아야 하는지 정하는 `1.5.1 fixed stable baseline` 기준선 문서
 4. `docs/gameplay-guide.md`
    - 실제 플레이 기준의 시작 방법, 곡 선택, 조작, HUD, 판정, 결과 화면 안내
 5. `docs/multiplayer.md`
@@ -35,8 +35,8 @@ Language: Korean | [English](README.en.md) | [简体中文](README.zh-CN.md) | [
 ## Which Docs Are Source Of Truth
 - `docs/current-state.md`
   - 현재 구현 상태의 요약 문서
-- `docs/baseline-1.1.2.md`
-  - 후속 작업이 유지해야 하는 `1.1.2 final stable` 기준선 문서
+- `docs/baseline-1.5.1.md`
+  - 후속 작업이 유지해야 하는 `1.5.1 fixed stable baseline` 기준선 문서
 - `docs/config.md`
   - 실제 `config/config.json`, `profiles/<name>/config.json`, `keymap.json` 기준
 
@@ -62,7 +62,7 @@ Language: Korean | [English](README.en.md) | [简体中文](README.zh-CN.md) | [
 
 ## Practical Rule
 - 현재 동작을 확인할 때는 `docs/current-state.md`를 우선 봅니다.
-- 어떤 기준선 위에서 작업을 쌓는지 정할 때는 `docs/baseline-1.1.2.md`를 같이 봅니다.
+- 어떤 기준선 위에서 작업을 쌓는지 정할 때는 `docs/baseline-1.5.1.md`를 같이 봅니다.
 - 오래된 설계와 현재 코드가 다를 수 있으므로, 충돌하면 현재 코드는 `docs/current-state.md`, `docs/config.md` 순으로 해석합니다.
 
 ## Skin Customization

@@ -915,6 +915,18 @@ void MenuWindow::draw(const MenuRenderData& data) {
 #include "MenuWindow_draw_help_body.inl"
     };
 
+    auto draw_chat_overlay = [&]() {
+#include "MenuWindow_draw_chat_body.inl"
+    };
+
+    auto draw_account_overlay = [&]() {
+#include "MenuWindow_draw_account_body.inl"
+    };
+
+    auto draw_url_warning_overlay = [&]() {
+#include "MenuWindow_draw_url_warning_body.inl"
+    };
+
     auto draw_result_screen = [&]() {
 #include "MenuWindow_draw_result_body.inl"
     };
@@ -997,6 +1009,9 @@ void MenuWindow::draw(const MenuRenderData& data) {
         draw_performance_overlay();
     }
     draw_help_overlay();
+    draw_chat_overlay();
+    draw_account_overlay();
+    draw_url_warning_overlay();
 
     const HRESULT hr = ctx->EndDraw();
     if (FAILED(hr)) {

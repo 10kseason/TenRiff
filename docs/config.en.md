@@ -40,7 +40,7 @@ If a profile does not exist, it is created automatically on first launch.
 
 - `backend` (string)
   - `polling | rawinput`
-  - defaults to `rawinput` on the current `1.5.0` release line
+  - defaults to `rawinput` on the current `1.5.1` release line
   - selectable per profile under `Options -> Input Settings -> Backend` or `Options -> Profile Setup -> Input Backend`
   - runtime fallback never rewrites the saved value to `polling`
   - a confirmed RawInput startup failure, registration-target loss, or message-window exit latches Polling across menu and subsequent gameplay sessions for the current app run
@@ -60,7 +60,7 @@ If a profile does not exist, it is created automatically on first launch.
 - `judgement_hz` (int)
   - `1000 | 2000 | 4000 | 8000`
   - compatibility field kept in the input config
-  - the current `1.5.0` runtime no longer drives a separate audio-thread judgement sub-step loop from this value
+  - the current `1.5.1` runtime no longer drives a separate audio-thread judgement sub-step loop from this value
   - default is `4000` (`0.25ms`)
 - `debounce_ms` (double)
   - real Press/Release transitions are preserved; only duplicate same-state events are removed from pressed-state tracking
@@ -227,10 +227,16 @@ The chart loader and indexer are limited to BMS-family files (`.bms/.bme/.bml/.p
 - `difficulty_table_url` (string)
   - original http(s) BMSTable HTML page or header JSON link imported from Browse
 - `online_records_server_url` (string)
-  - base URL for the read-only records API used by the Online tab under Song Select `RECORDS`
-  - development default is `http://127.0.0.1:27302`; a public `1.5.0` package must use the deployed HTTPS endpoint
+  - base URL for records, ranked play, and global chat on the currently selected account server
+  - development default is `http://127.0.0.1:27302`; a public `1.5.1` package must use the deployed HTTPS endpoint
   - server failures disable only the Online tab and never block local records or play
   - standard `<meta name="bmstable" content="...">` metadata is resolved and the header/data JSON is cached under the profile `difficulty_tables` directory; local JSON selection clears this field
+- `tenriff_main_server_url` (string)
+  - main TenRiff API selected by the F10 account dialog; public deployments require HTTPS
+- `private_server_url` (string)
+  - user-entered private API URL; remote endpoints require HTTPS and only localhost may use HTTP
+- `account_server_mode` (string)
+  - last selected account server: `main | private`
 
 ### `skin`
 - `source` (string)

@@ -9,7 +9,7 @@
 - 별도 공개 `10kseason/TenRiff-Server` 저장소, MIT 라이선스, `SECURITY.md`, 운영 문서
 - Windows/Linux Release 바이너리, 버전 태그, GHCR 컨테이너, Compose/Caddy TLS 구성
 - SQLite 계정·세션·승인 BMS catalog·challenge·기록·감사 로그와 backup/restore 복구 시험
-- 비밀번호 PBKDF2-HMAC-SHA256, 해시된 bearer token, HMAC receipt, 요청 크기·동시성·rate limit
+- 비밀번호 PBKDF2-HMAC-SHA256 600,000회, 해시된 bearer token, HMAC receipt, 요청 크기·동시성·rate limit
 - 승인 BMS SHA-256와 일회성 challenge를 묶은 replay 업로드, 외부 verifier 재실행, claim 불신
 - `.osu` 및 osu 규칙 파생 제출의 fail-closed 거부와 서버/클라이언트 protocol 교차 테스트
 - Local/Online Records, 서버 정보·검증 상태·거부 이유, 잘못된 JSON/timeout에서 로컬 기록 유지

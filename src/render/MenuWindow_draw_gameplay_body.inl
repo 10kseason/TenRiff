@@ -853,8 +853,8 @@
                     d2d_->muted_brush.Get(),
                     DWRITE_TEXT_ALIGNMENT_CENTER);
                 const std::wstring tuning_hint_w =
-                    wloc("JUDGE LINE  F1/F2  +/-1%   VISUAL LATENCY  F7/F8  +/-1ms",
-                         "판정선 위치  F1/F2  +/-1%   비주얼 레이턴시  F7/F8  +/-1ms");
+                    wloc("JUDGE LINE  F1/F2  +/-1%   VISUAL LATENCY  F7 / SHIFT+F7  -/+1ms",
+                         "판정선 위치  F1/F2  +/-1%   비주얼 레이턴시  F7 / SHIFT+F7  -/+1ms");
                 draw_text_clipped_aligned(
                     tuning_hint_w,
                     d2d_->body_format.Get(),
@@ -2556,7 +2556,7 @@
                      L"F3 / F4  (F5 / F6)"},
                     {L"\uB808\uC774\uD134\uC2DC",
                      to_wide(format_signed_ms(data.gameplay.visual_offset_ms)),
-                     L"F7 / F8"},
+                     L"F7 / SHIFT+F7"},
                 }};
                 for (std::size_t row = 0; row < tuning_rows.size(); ++row) {
                     const float top = tuning_rect.top + static_cast<float>(row) * 42.0f;

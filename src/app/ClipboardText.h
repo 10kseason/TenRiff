@@ -15,7 +15,8 @@
 
 namespace tenriff::app {
 
-[[nodiscard]] inline std::optional<std::string> clipboard_text_utf8() {
+[[nodiscard]] inline std::optional<std::string> clipboard_text_utf8(
+    bool trim_surrounding_space = true) {
 #ifdef _WIN32
     if (!IsClipboardFormatAvailable(CF_UNICODETEXT) || !OpenClipboard(nullptr)) {
         return std::nullopt;
@@ -29,8 +30,10 @@ namespace tenriff::app {
     const auto is_space = [](wchar_t ch) {
         return ch == L' ' || ch == L'\t' || ch == L'\r' || ch == L'\n';
     };
-    while (!value.empty() && is_space(value.front())) value.erase(value.begin());
-    while (!value.empty() && is_space(value.back())) value.pop_back();
+    if (trim_surrounding_space) {
+        while (!value.empty() && is_space(value.front())) value.erase(value.begin());
+        while (!value.empty() && is_space(value.back())) value.pop_back();
+    }
     if (value.empty()) return std::nullopt;
 
     const int byte_count = WideCharToMultiByte(

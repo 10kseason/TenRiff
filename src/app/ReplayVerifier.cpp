@@ -192,7 +192,12 @@ ReplayVerificationResult verify_replay_against_chart(
     gameplay::offset_gameplay_chart_samples(chart, lead_in_samples);
     if (chart.lane_count != replay.trace.lane_count ||
         chart.duration_samples != replay.trace.duration_samples) {
-        return invalid_result("Replay trace shape does not match the reconstructed chart.");
+        return invalid_result(
+            "Replay trace shape does not match the reconstructed chart "
+            "(chart lanes=" + std::to_string(chart.lane_count) +
+            ", duration=" + std::to_string(chart.duration_samples) +
+            "; replay lanes=" + std::to_string(replay.trace.lane_count) +
+            ", duration=" + std::to_string(replay.trace.duration_samples) + ").");
     }
 
     gameplay::GameplayConfig engine_config;

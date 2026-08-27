@@ -131,9 +131,12 @@ struct UiConfig {
     int song_level_max_filter = 0;
     std::string difficulty_table_path;
     std::string difficulty_table_url;
-    // Development default. Public 1.5.0 builds must replace this with the
-    // deployed HTTPS records endpoint or expose it through server setup UI.
+    // Development default. Public builds select the main or private HTTPS
+    // endpoint through the account server setup UI.
     std::string online_records_server_url = "http://127.0.0.1:27302";
+    std::string tenriff_main_server_url = "http://127.0.0.1:27302";
+    std::string private_server_url;
+    std::string account_server_mode = "main";
 };
 
 struct SkinConfig {
