@@ -67,6 +67,7 @@ constexpr double kInputDebounceToleranceMs = 0.001;
 constexpr double kResultTailToleranceMs = 0.001;
 constexpr double kGaugeDeltaTolerance = 0.00001;
 constexpr double kSkinScaleTolerance = 0.00001;
+constexpr std::string_view kLegacyLocalApiUrl = "http://127.0.0.1:27302";
 
 using tenriff::game::GaugeDeltaTable;
 
@@ -187,6 +188,16 @@ bool matches_legacy_default_off_vsync_graphics(const config::RuntimeConfig& conf
 
 bool migrate_bms_first_runtime_config(config::RuntimeConfig& config) {
     bool changed = false;
+
+    if (config.ui.tenriff_main_server_url == kLegacyLocalApiUrl) {
+        config.ui.tenriff_main_server_url = std::string{config::kTenRiffMainApiUrl};
+        changed = true;
+    }
+    if (config.ui.account_server_mode != "private" &&
+        config.ui.online_records_server_url == kLegacyLocalApiUrl) {
+        config.ui.online_records_server_url = std::string{config::kTenRiffMainApiUrl};
+        changed = true;
+    }
 
     if (!is_valid_key_mode(config.mode.key_mode)) {
         config.mode.key_mode = "none";

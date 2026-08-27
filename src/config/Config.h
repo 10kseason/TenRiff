@@ -12,6 +12,8 @@
 
 namespace tenriff::config {
 
+inline constexpr std::string_view kTenRiffMainApiUrl =
+    "https://121.174.18.181:27303";
 inline constexpr double kJudgementLinePositionMin = 0.00;
 inline constexpr double kJudgementLinePositionMax = 1.00;
 inline constexpr double kJudgementLinePositionDefault = 0.82;
@@ -131,10 +133,8 @@ struct UiConfig {
     int song_level_max_filter = 0;
     std::string difficulty_table_path;
     std::string difficulty_table_url;
-    // Development default. Public builds select the main or private HTTPS
-    // endpoint through the account server setup UI.
-    std::string online_records_server_url = "http://127.0.0.1:27302";
-    std::string tenriff_main_server_url = "http://127.0.0.1:27302";
+    std::string online_records_server_url{kTenRiffMainApiUrl};
+    std::string tenriff_main_server_url{kTenRiffMainApiUrl};
     std::string private_server_url;
     std::string account_server_mode = "main";
 };

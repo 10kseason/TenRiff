@@ -231,10 +231,11 @@
   - 표준 `<meta name="bmstable" content="...">`를 해석해 header/data JSON을 프로필의 `difficulty_tables` 캐시에 저장하며, 로컬 JSON 선택 시에는 비워짐
 - `online_records_server_url` (string)
   - 현재 로그인한 서버의 기록·랭킹·글로벌 채팅 API 기준 URL
-  - 개발 기본값은 `http://127.0.0.1:27302`; 공개 `1.5.1` 패키지는 배포된 HTTPS 주소로 교체해야 함
+  - TenRiff 메인 기본값은 `https://121.174.18.181:27303`; 로컬 사설 서버는 `http://127.0.0.1:27302` 사용 가능
   - 서버 오류나 버전 불일치는 로컬 기록/플레이를 막지 않으며 Online 탭만 fail-closed로 오류를 표시
   - 곡 브라우저 설정에서 URL을 복사한 뒤 Enter 또는 편집 중 Ctrl+V로 지정 가능
 - `tenriff_main_server_url` (string)
+  - F10의 `TenRiff 메인` 선택에 사용되는 고정 메인 API 주소
   - F10 로그인 창의 `텐리프 메인` 서버 URL. 운영 배포에서는 유효한 HTTPS 주소가 필요함
 - `private_server_url` (string)
   - F10 로그인 창에서 사용자가 입력한 사설 API URL. 원격 주소는 HTTPS만 허용하고 localhost만 HTTP 허용

@@ -228,10 +228,11 @@ The chart loader and indexer are limited to BMS-family files (`.bms/.bme/.bml/.p
   - original http(s) BMSTable HTML page or header JSON link imported from Browse
 - `online_records_server_url` (string)
   - base URL for records, ranked play, and global chat on the currently selected account server
-  - development default is `http://127.0.0.1:27302`; a public `1.5.1` package must use the deployed HTTPS endpoint
+  - the TenRiff main default is `https://121.174.18.181:27303`; a local private server may use `http://127.0.0.1:27302`
   - server failures disable only the Online tab and never block local records or play
   - standard `<meta name="bmstable" content="...">` metadata is resolved and the header/data JSON is cached under the profile `difficulty_tables` directory; local JSON selection clears this field
 - `tenriff_main_server_url` (string)
+  - fixed main API endpoint used by the F10 `TenRiff Main` selection
   - main TenRiff API selected by the F10 account dialog; public deployments require HTTPS
 - `private_server_url` (string)
   - user-entered private API URL; remote endpoints require HTTPS and only localhost may use HTTP

@@ -192,8 +192,8 @@ TEST_CASE("config defaults prefer 44100 Hz audio") {
     CHECK(config.ui.song_level_max_filter == 0);
     CHECK(config.ui.difficulty_table_path.empty());
     CHECK(config.ui.difficulty_table_url.empty());
-    CHECK(config.ui.online_records_server_url == "http://127.0.0.1:27302");
-    CHECK(config.ui.tenriff_main_server_url == "http://127.0.0.1:27302");
+    CHECK(config.ui.online_records_server_url == tenriff::config::kTenRiffMainApiUrl);
+    CHECK(config.ui.tenriff_main_server_url == tenriff::config::kTenRiffMainApiUrl);
     CHECK(config.ui.private_server_url.empty());
     CHECK(config.ui.account_server_mode == "main");
     CHECK(tenriff::config::resolved_skin_lane_colors(config.skin, "7+1").size() == 8u);
@@ -1859,6 +1859,28 @@ TEST_CASE("runtime migration shortens the previous three-second result tail defa
     CHECK_FALSE(tenriff::app::migrate_bms_first_runtime_config(custom));
     CHECK(custom.ui.result_tail_ms == doctest::Approx(1250.0));
 }
+
+TEST_CASE("runtime migration replaces only the legacy local main API endpoint") {
+    ConfigLoader loader;
+    auto config = loader.defaults();
+    config.ui.online_records_server_url = "http://127.0.0.1:27302";
+    config.ui.tenriff_main_server_url = "http://127.0.0.1:27302";
+    config.ui.account_server_mode = "main";
+
+    CHECK(tenriff::app::migrate_bms_first_runtime_config(config));
+    CHECK(config.ui.online_records_server_url == tenriff::config::kTenRiffMainApiUrl);
+    CHECK(config.ui.tenriff_main_server_url == tenriff::config::kTenRiffMainApiUrl);
+
+    auto private_config = loader.defaults();
+    private_config.ui.online_records_server_url = "http://127.0.0.1:27302";
+    private_config.ui.tenriff_main_server_url = "http://127.0.0.1:27302";
+    private_config.ui.account_server_mode = "private";
+
+    CHECK(tenriff::app::migrate_bms_first_runtime_config(private_config));
+    CHECK(private_config.ui.online_records_server_url == "http://127.0.0.1:27302");
+    CHECK(private_config.ui.tenriff_main_server_url == tenriff::config::kTenRiffMainApiUrl);
+}
+
 TEST_CASE("online records URL normalization accepts safe HTTP base addresses") {
     CHECK(tenriff::config::normalize_online_records_server_url(
               " https://ranked.example.test/api/ ") ==

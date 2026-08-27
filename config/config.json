@@ -77,7 +77,9 @@
     "require_enter_to_exit": true,
     "difficulty_table_path": "",
     "difficulty_table_url": "",
-    "online_records_server_url": "http://127.0.0.1:27302"
+    "online_records_server_url": "https://121.174.18.181:27303",
+    "tenriff_main_server_url": "https://121.174.18.181:27303",
+    "account_server_mode": "main"
   },
   "skin": {
     "source": "native",

@@ -729,7 +729,7 @@ void MenuApp::populate_song_browser_render_data(render::MenuRenderData& render) 
                     online_records_url_editing_
                         ? safe_ui_text(online_records_url_input_, "URL") + "|"
                         : safe_ui_text(config_.ui.online_records_server_url,
-                                       "http://127.0.0.1:27302"),
+                                       std::string(config::kTenRiffMainApiUrl)),
                     settings_cursor_ == 6,
                     render::MenuHitTargetKind::SettingsRow,
                     6,
