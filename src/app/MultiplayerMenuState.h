@@ -46,13 +46,15 @@ inline constexpr int kMultiplayerMenuRowCount = 11;
 inline constexpr std::size_t kMultiplayerAddressMaxLength = 255;
 inline constexpr std::size_t kMultiplayerPortTextMaxLength = 5;
 inline constexpr std::size_t kMultiplayerChatInputMaxBytes = 256;
+inline constexpr std::string_view kTenRiffMainMultiplayerAddress = "121.174.18.181";
+inline constexpr std::string_view kTenRiffMainMultiplayerPort = "27301";
 
 struct MultiplayerMenuState {
     MultiplayerRole role = MultiplayerRole::Join;
     int cursor = 0;
     MultiplayerEditField edit_field = MultiplayerEditField::None;
-    std::string address = "127.0.0.1";
-    std::string port_text = "27301";
+    std::string address{kTenRiffMainMultiplayerAddress};
+    std::string port_text{kTenRiffMainMultiplayerPort};
     std::string chat_input;
 
     bool connected = false;

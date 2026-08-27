@@ -2,6 +2,20 @@
 
 TenRiff의 사용자/배포 관점에서 의미 있는 변경만 간단히 기록합니다.
 
+## [1.5.1 Hotfix 2] - 2026-08-27
+
+### Changed
+
+- 멀티플레이 메뉴의 기본 접속값을 TenRiff 메인 코디네이터 `121.174.18.181:27301`로 변경했습니다.
+
+### Fixed
+
+- Windows ARM64 빌드가 x86 전용 processor pause intrinsic을 포함해 실패하던 문제를 수정했습니다.
+
+### Release
+
+- stable baseline과 앱 버전은 `1.5.1`을 유지하며, 수정 자산은 `1.5.1-hotfix.2` 태그로 별도 배포합니다.
+
 ## [1.5.1 Hotfix 1] - 2026-08-27
 
 ### Fixed

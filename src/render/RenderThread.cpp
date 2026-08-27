@@ -15,7 +15,9 @@
 #ifndef CREATE_WAITABLE_TIMER_HIGH_RESOLUTION
 #define CREATE_WAITABLE_TIMER_HIGH_RESOLUTION 0x00000002
 #endif
+#if defined(_M_IX86) || defined(_M_X64)
 #include <immintrin.h>
+#endif
 #endif
 
 #include "timing/HighResClock.h"
@@ -74,7 +76,7 @@ private:
 #endif
 
 void cpu_relax() {
-#ifdef _WIN32
+#if defined(_M_IX86) || defined(_M_X64)
     _mm_pause();
 #else
     std::atomic_signal_fence(std::memory_order_seq_cst);
