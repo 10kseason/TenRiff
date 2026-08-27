@@ -105,6 +105,12 @@ std::optional<NoteEvent> GameplayEngine::handle_input(int lane, input::InputStat
         return std::nullopt;
     }
 
+    // Multiple realtime input sources can arrive in queue order after their
+    // mapped audio samples cross. Never let live judgement or its replay move
+    // backward in time; the server must be able to reproduce this exact order.
+    if (!replay_.events.empty()) {
+        input_sample = std::max(input_sample, replay_.events.back().sample);
+    }
     replay_.events.push_back(ReplayEvent{lane, state, input_sample});
 
     auto& lane_state = lanes_[static_cast<std::size_t>(lane - 1)];
@@ -144,6 +150,9 @@ void GameplayEngine::sync_input_state(int lane, input::InputState state, int64_t
         return;
     }
 
+    if (!replay_.events.empty()) {
+        input_sample = std::max(input_sample, replay_.events.back().sample);
+    }
     replay_.events.push_back(ReplayEvent{lane, state, input_sample});
     auto& lane_state = lanes_[static_cast<std::size_t>(lane - 1)];
     update_lane_input_state(lane_state, state, input_sample);

@@ -190,8 +190,14 @@ ReplayVerificationResult verify_replay_against_chart(
         static_cast<double>(kReplayVerificationLeadInMs) *
         static_cast<double>(replay.sample_rate) / 1000.0));
     gameplay::offset_gameplay_chart_samples(chart, lead_in_samples);
-    if (chart.lane_count != replay.trace.lane_count ||
-        chart.duration_samples != replay.trace.duration_samples) {
+    const int64_t duration_difference =
+        chart.duration_samples >= replay.trace.duration_samples
+            ? chart.duration_samples - replay.trace.duration_samples
+            : replay.trace.duration_samples - chart.duration_samples;
+    // BMS timing conversion can round an exact boundary one sample apart on
+    // Windows and Linux. Keep the lane shape exact and cap the tolerance at a
+    // single sample so it cannot hide a materially different chart.
+    if (chart.lane_count != replay.trace.lane_count || duration_difference > 1) {
         return invalid_result(
             "Replay trace shape does not match the reconstructed chart "
             "(chart lanes=" + std::to_string(chart.lane_count) +

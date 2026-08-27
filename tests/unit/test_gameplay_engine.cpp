@@ -1541,3 +1541,25 @@ TEST_CASE("ZZ gameplay landmine forces game over only when triggered") {
     CHECK(triggered.is_game_over());
     CHECK(triggered.gauge_state().value == doctest::Approx(0.0));
 }
+
+TEST_CASE("gameplay replay samples stay monotonic when realtime mapping regresses") {
+    GameplayChart chart;
+    chart.lane_count = 2;
+    chart.duration_samples = 5000;
+    chart.notes.push_back(NoteEvent{1, 4000, std::nullopt});
+    chart.notes.push_back(NoteEvent{2, 4500, std::nullopt});
+
+    GameplayConfig config;
+    config.sample_rate = 1000;
+    GameplayEngine engine(chart, config);
+
+    engine.sync_input_state(1, InputState::Pressed, 1000);
+    (void)engine.handle_input(2, InputState::Pressed, 900);
+    engine.sync_input_state(1, InputState::Released, 800);
+
+    const auto& events = engine.replay().events;
+    REQUIRE(events.size() == 3u);
+    CHECK(events[0].sample == 1000);
+    CHECK(events[1].sample == 1000);
+    CHECK(events[2].sample == 1000);
+}

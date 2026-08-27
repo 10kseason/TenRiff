@@ -315,6 +315,19 @@ TEST_CASE("deterministic replay verification ignores edited score claims") {
     CHECK(verified.stats.total_notes == 1);
     CHECK(verified.final_score == tenriff::gameplay::kNativeScoreMaximum);
 
+    ReplayFile one_sample_rounding = replay;
+    one_sample_rounding.trace.duration_samples += 1;
+    CHECK(tenriff::app::verify_replay_against_chart(
+              one_sample_rounding, chart, tenriff::app::ChartFormat::Bms, 120.0)
+              .verified());
+
+    ReplayFile material_duration_mismatch = replay;
+    material_duration_mismatch.trace.duration_samples += 2;
+    CHECK_FALSE(tenriff::app::verify_replay_against_chart(
+                    material_duration_mismatch, chart,
+                    tenriff::app::ChartFormat::Bms, 120.0)
+                    .verified());
+
     ReplayFile aborted = replay;
     aborted.aborted = true;
     const auto aborted_result = tenriff::app::verify_replay_against_chart(
