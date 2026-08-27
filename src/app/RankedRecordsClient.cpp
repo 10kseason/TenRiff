@@ -1,4 +1,5 @@
 #include "app/RankedRecordsClient.h"
+#include "app/MainApiTlsPin.h"
 
 #include "config/SimpleJson.h"
 
@@ -168,8 +169,9 @@ std::string wide_to_utf8(std::wstring_view value) {
 }
 
 std::string winhttp_error(const char* operation) {
+    const DWORD code = GetLastError();
     return std::string(operation) + " failed (WinHTTP error " +
-           std::to_string(GetLastError()) + ").";
+           std::to_string(code) + ").";
 }
 
 bool request_json(const std::string& base_url,
@@ -222,6 +224,11 @@ bool request_json(const std::string& base_url,
         error = winhttp_error("WinHttpSetOption redirect policy");
         return false;
     }
+    const bool verify_main_api_pin =
+        main_api_tls_pin::applies(components.nScheme, components.nPort, host);
+    if (!main_api_tls_pin::prepare(request.get(), verify_main_api_pin, error)) {
+        return false;
+    }
     std::wstring headers = L"Accept: application/json\r\n";
     if (method == L"POST") headers += L"Content-Type: application/json\r\n";
     if (!bearer_token.empty()) {
@@ -236,6 +243,9 @@ bool request_json(const std::string& base_url,
                             static_cast<DWORD>(body.size()), 0) ||
         !WinHttpReceiveResponse(request.get(), nullptr)) {
         error = winhttp_error("Ranked server request");
+        return false;
+    }
+    if (!main_api_tls_pin::verify(request.get(), verify_main_api_pin, error)) {
         return false;
     }
     DWORD status_size = sizeof(response.status);

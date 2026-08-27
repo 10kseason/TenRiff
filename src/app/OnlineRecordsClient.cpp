@@ -9,6 +9,7 @@
 #include <utility>
 
 #include "config/SimpleJson.h"
+#include "app/MainApiTlsPin.h"
 #include "util/Utf8Compat.h"
 
 #ifdef _WIN32
@@ -112,8 +113,9 @@ std::wstring utf8_to_wide(std::string_view value) {
 }
 
 std::string winhttp_error(const char* operation) {
+    const DWORD code = GetLastError();
     return std::string(operation) + " failed (WinHTTP error " +
-           std::to_string(GetLastError()) + ").";
+           std::to_string(code) + ").";
 }
 
 bool fetch_online_records_impl(const std::string& base_url,
@@ -185,11 +187,19 @@ bool fetch_online_records_impl(const std::string& base_url,
         error = winhttp_error("WinHttpSetOption redirect policy");
         return false;
     }
+    const bool verify_main_api_pin =
+        main_api_tls_pin::applies(components.nScheme, components.nPort, host);
+    if (!main_api_tls_pin::prepare(request.get(), verify_main_api_pin, error)) {
+        return false;
+    }
     const wchar_t* headers = L"Accept: application/json\r\n";
     if (!WinHttpSendRequest(request.get(), headers, static_cast<DWORD>(-1L),
                             WINHTTP_NO_REQUEST_DATA, 0, 0, 0) ||
         !WinHttpReceiveResponse(request.get(), nullptr)) {
         error = winhttp_error("Online records request");
+        return false;
+    }
+    if (!main_api_tls_pin::verify(request.get(), verify_main_api_pin, error)) {
         return false;
     }
     DWORD status = 0;
