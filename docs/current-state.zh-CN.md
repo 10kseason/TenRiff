@@ -3,7 +3,7 @@
 这份文档是下一位 agent 或新任务接手时应该最先阅读的当前状态文档。目标是快速说明“这个项目现在是什么、应该先看哪里、还有哪些内容尚未验证”。
 
 ## 基线
-- 当前稳定发布线为 `1.5.1`
+- 当前稳定发布线为 `1.6.0`
 - UI-r2 Result 使用 2.2 秒时间线依次展示棱镜、分数、等级、通关状态、判定统计和图表；可用 Space 跳过，在演出结束前锁定 Continue/Retry/Replay 输入。
 - UI-r2 Song Select 使用顶部标签、7 行封面曲库、大幅选中图片、最佳记录卡、谱面/模式面板和可实际启动的 START 按钮；不显示 Collection/Store/货币/全球排名等虚构功能
 - Song Select 的 Rate、Hi-Speed、Gauge、Random 单元格支持左键增加/下一项、右键减少/上一项并立即保存；当前谱面键数不再被裁切，最佳记录会同时显示分数、准确率和最大连击。
@@ -37,6 +37,9 @@
 - `MenuApp`
   - 菜单状态机的中心
   - 负责 Song Select、Options、Keymap、Result、Gameplay 启动入口的管理
+  - `MenuNavigator` 独占 current screen 与嵌套 Back history
+  - Options 和所有 settings family 的类型化 controller 负责 selection/dirty/mutation state；`MenuApp` adapter 执行保存、文件选择、restart 与 reindex 效果
+  - `MenuScreenDescriptor` 通过 exhaustive table 统一定义固定标题、skin background/fallback 和 snapshot/generic-view 路由
   - 最近的维护性重构已把 Song Select 的 record/keymap/render/state 边界拆到专用 `.cpp` 文件中
   - Song Select 的最佳分数卡片与记录列表共用 `MenuAppRecords` 中的 saved-Result 打开路径，并进入 Result 的 Replay 按钮
   - 现在即使没有本地 `10k-calc` Python 参考实现，开源源码包也能通过 skip optional reference test 来运行核心测试集
@@ -50,7 +53,7 @@
   - gameplay 在单一 `InputThread` state tracker 中对 RawInput 与 bound-key polling shadow 去重，`GameSession` 不再按 source 二次过滤 logical edge
 - `RenderThread` + `MenuWindow`
   - 基于 D3D11 + Direct2D/DirectWrite 的菜单/游戏中 HUD 渲染
-  - 最近的维护型重构正在朝着把大型实现文件拆成碎片文件的方向整理
+  - 只消费 immutable `MenuRenderData` snapshot，不引用 settings controller 或 mutable app state
 - `GameSession`
   - 负责谱面加载、gameplay audio prep、HUD snapshot、Gameplay 执行边界
 
@@ -143,8 +146,8 @@
   - 当两把键盘同时按住同一个键时，逻辑 `Pressed` 状态会一直保持到最后一个输入源释放为止
 - Graphics：
   - 分辨率预设（`720p`、`1080p`、`qhd`、`native`）
-  - `refresh_hz`（`-1` = `Match Display`，`0` = `Unlimited`）
-  - VSync off：Match Display 跟随显示器 Hz；Unlimited 取消 gameplay pacing，同时保留 menu 上限 `300`
+  - `refresh_hz`（`-1` = `Match Display`，`0` = `Unlimited`，实际最高 1500 FPS）
+  - VSync off：Match Display 跟随显示器 Hz；Unlimited 将 gameplay 限制为 1500 FPS，同时保留 menu 上限 `300`
   - VSync on：present refresh 跟随活动显示器 Hz，render pacing 目标为 `monitor_hz * 2`（上限 `1050`）
   - `visual_offset_ms`
   - `performance_overlay`（gameplay FPS/frame time 使用成功 DXGI `Present()` 的完成间隔；HUD 更新节奏仅保留为独立 gameplay diagnostics）

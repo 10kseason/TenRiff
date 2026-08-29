@@ -1,4 +1,4 @@
-TenRiff 1.5.1 open-source source package scope
+TenRiff 1.6.0 open-source source package scope
 
 Included in versioned source bundles:
 - CHANGELOG.md
@@ -75,4 +75,4 @@ Notes:
 - Local LLM/tooling checkouts such as `external/llama.cpp/` are intentionally excluded from the public source package.
 - The repository license is MIT and should be shipped with both source and binary distributions.
 - The generic External ONNX Upscaler source and compatibility tools are included, but BGA upscaler models, checkpoints, training data, and model-specific verification metadata are excluded. Bundled ONNX files are limited to the project-owned NK3 P64 graph and fixed-target generalized pattern MLP inference exports; raw charts, training caches, and checkpoints remain excluded.
-- Standalone BMS key-converter source is retained for development regression only. Official 1.5.1 binary archives do not contain its CLI or GUI executables, and the top-level build option defaults off.
+- Standalone BMS key-converter source is retained for development regression only. Official 1.6.0 binary archives do not contain its CLI or GUI executables, and the top-level build option defaults off.

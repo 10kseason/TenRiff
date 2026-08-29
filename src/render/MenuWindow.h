@@ -80,6 +80,7 @@ enum class MenuHitPart {
     Activate,
     Increment,
     Decrement,
+    SetValue,
     SelectOnly,
 };
 
@@ -501,6 +502,8 @@ struct MenuRowData {
     bool adjustable = false;
     bool increment_enabled = false;
     bool decrement_enabled = false;
+    bool slider = false;
+    double slider_ratio = 0.0;
     MenuHitTargetKind target_kind = MenuHitTargetKind::None;
     int row_index = -1;
     // A mouse adjustment can acknowledge the changed row without stealing the
@@ -703,8 +706,9 @@ public:
     [[nodiscard]] std::optional<std::string> poll_text_input();
     [[nodiscard]] bool cursor_hidden() const { return cursor_hidden_; }
     [[nodiscard]] bool horizontal_drag_cursor() const {
-        return gameplay_field_drag_state_.visible &&
-               (gameplay_field_drag_state_.hovered || gameplay_field_drag_state_.active);
+        return value_slider_drag_state_.active ||
+               (gameplay_field_drag_state_.visible &&
+                (gameplay_field_drag_state_.hovered || gameplay_field_drag_state_.active));
     }
 
     [[nodiscard]] bool should_close() const { return should_close_.load(std::memory_order_acquire); }
@@ -976,6 +980,15 @@ private:
         double drag_start_offset_x = 0.0;
     };
 
+    struct ValueSliderDragState {
+        bool active = false;
+        MenuHitTargetKind kind = MenuHitTargetKind::None;
+        int index = -1;
+        float left = 0.0f;
+        float right = 0.0f;
+        double last_value = -1.0;
+    };
+
     struct D2DResources;
     std::unique_ptr<D2DResources> d2d_;
     PerformanceOverlayCache performance_overlay_cache_{};
@@ -1001,6 +1014,7 @@ private:
     std::unordered_set<std::string> song_select_preview_warned_slow_paths_{};
     SongScrollbarState song_scrollbar_state_{};
     GameplayFieldDragState gameplay_field_drag_state_{};
+    ValueSliderDragState value_slider_drag_state_{};
     float chat_overlay_slide_ = 0.0f;
     int64_t chat_overlay_last_frame_ns_ = 0;
     float account_overlay_visibility_ = 0.0f;

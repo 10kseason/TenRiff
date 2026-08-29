@@ -3,7 +3,7 @@
 この文書は、次のエージェントや新しい作業者が最初に読むべき current-state 文書です。目的は、「このプロジェクトは今どういう状態で、どこを見ればよく、何がまだ未検証か」を素早く把握できるようにすることです。
 
 ## Baseline
-- 現在の stable release line は `1.5.1`
+- 現在の stable release line は `1.6.0`
 - UI-r2 の Result は 2.2 秒の timeline で prism、score、rank、clear status、statistics、graphs を順に表示する。Space で演出を skip でき、完了までは Continue/Retry/Replay 入力を lock する。
 - UI-r2 Song Select は top tab、7-row jacket library、大きな selected artwork、best-record card、chart/mode panel、実動する START action を使用し、Collection/Store/currency/global ranking の仮 UI は表示しない
 - Song Select の Rate、Hi-Speed、Gauge、Random cell は左 click で増加/次、右 click で減少/前を適用して即時保存する。current chart の key count は欠けず、best record は score・accuracy・max combo を同時に表示する。
@@ -37,6 +37,9 @@
 - `MenuApp`
   - menu state machine の中心
   - Song Select、Options、Keymap、Result、Gameplay 起動への遷移を管理
+  - `MenuNavigator` が current screen と nested Back history を単独で所有
+  - Options と全 settings family の typed controller が selection/dirty/mutation state を所有し、`MenuApp` adapter が保存、file dialog、restart、reindex effect を実行
+  - `MenuScreenDescriptor` が固定 title、skin background/fallback、snapshot/generic-view routing を exhaustive table で定義
   - 最近の保守リファクタで Song Select の record/keymap/render/state 境界が専用 `.cpp` に分離された
   - Song Select の最高 score card と record list は `MenuAppRecords` の共通 saved-Result open path を使い、Result の Replay button へつながる
   - open-source source package でもローカル `10k-calc` なしでコアテストが動くよう、optional な Python-reference チェックは skip 可能
@@ -50,7 +53,7 @@
   - gameplay は RawInput と bound-key polling shadow を単一の `InputThread` state tracker で dedupeし、`GameSession` では logical edge を source 単位で再フィルタリングしない
 - `RenderThread` + `MenuWindow`
   - D3D11 + Direct2D/DirectWrite ベースの menu / gameplay HUD レンダリング
-  - 最近の保守リファクタでは大きな実装ファイルを細分化している
+  - immutable `MenuRenderData` snapshot のみを消費し、settings controller や mutable app state を参照しない
 - `GameSession`
   - 譜面ロード、gameplay audio prep、HUD snapshot、gameplay 実行境界を担当
 
@@ -143,8 +146,8 @@
   - 2 台のキーボードが同じキーを押しても、最後の入力ソースが離すまで論理 `Pressed` は維持される
 - Graphics:
   - resolution presets (`720p`, `1080p`, `qhd`, `native`)
-  - `refresh_hz` (`-1` = `Match Display`、`0` = `Unlimited`)
-  - VSync off: Match Display は monitor Hz に従い、Unlimited は gameplay pacing を解除しつつ menu cap `300` を維持
+  - `refresh_hz` (`-1` = `Match Display`、`0` = `Unlimited`、実際の上限は 1500 FPS)
+  - VSync off: Match Display は monitor Hz に従い、Unlimited は gameplay を 1500 FPS に制限しつつ menu cap `300` を維持
   - VSync on: present refresh は active monitor Hz に追従し、render pacing は `monitor_hz * 2` を目標にする（`1050` clamp）
   - `visual_offset_ms`
   - `performance_overlay` (gameplay FPS/frame time は成功した DXGI `Present()` 完了間隔を使用し、HUD update cadence は別の gameplay diagnostics として維持)

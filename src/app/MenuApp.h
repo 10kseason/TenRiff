@@ -22,6 +22,16 @@
 #include "app/InputBackendStatus.h"
 #include "app/Lr2Course.h"
 #include "app/MenuMusicController.h"
+#include "app/menu/MenuNavigator.h"
+#include "app/menu/MenuScreenDescriptor.h"
+#include "app/menu/OptionsHubController.h"
+#include "app/menu/settings/AudioSettingsController.h"
+#include "app/menu/settings/CalibrationSettingsController.h"
+#include "app/menu/settings/GraphicsSettingsController.h"
+#include "app/menu/settings/InputSettingsController.h"
+#include "app/menu/settings/KeymapSettingsController.h"
+#include "app/menu/settings/ModeSettingsController.h"
+#include "app/menu/settings/SkinSettingsController.h"
 #include "app/MultiplayerChartSearch.h"
 #include "app/OnlineRecordsClient.h"
 #include "app/RankedRecordsClient.h"
@@ -49,9 +59,6 @@ struct ParsedResultRecord;
 
 struct ReplayVerificationResult;
 
-[[nodiscard]] std::string resolve_keymap_edit_mode_for_menu(std::optional<int> selected_chart_key_count,
-                                                            std::string_view runtime_key_mode);
-
 [[nodiscard]] inline render::NoteImageAspect render_note_image_aspect(std::string_view token) {
     const std::string normalized = config::normalize_skin_note_image_aspect_token(token);
     if (normalized == "width") {
@@ -77,36 +84,11 @@ public:
     [[nodiscard]] int exit_code() const { return exit_code_; }
 
 private:
-    static constexpr int kKeymapButtonReset = 0;
-    static constexpr int kKeymapButtonNkroTest = 1;
-    static constexpr int kKeymapButtonBack = 2;
-
     struct BestResultRecord;
     struct LocalPlayRecord;
     struct ReplaySummary;
 
-    enum class Screen {
-        QuickSetup,
-        Title,
-        OptionsHub,
-        Multiplayer,
-        SongSelect,
-        SessionMix,
-        SongBrowser,
-        Gameplay,
-        SettingsAudio,
-        SettingsGraphics,
-        SettingsSkins,
-        SettingsInput,
-        SettingsCalibration,
-        ModeSelect,
-        ModeMods,
-        Keymap,
-        KeymapConfirm,
-        OnnxUpscalerConfirm,
-        KeymapTest,
-        Result,
-    };
+    using Screen = menu::Screen;
 
     enum class SongSelectFocus {
         SongList,
@@ -295,17 +277,31 @@ private:
     void handle_session_mix_input(uint32_t keycode);
     void handle_song_browser_input(uint32_t keycode);
     void handle_audio_settings_input(uint32_t keycode);
+    void apply_audio_settings_effects(const menu::MenuEffectFlags& effects);
+    void apply_input_settings_effects(const menu::MenuEffectFlags& effects);
+    void apply_calibration_settings_effects(const menu::MenuEffectFlags& effects);
     void handle_graphics_settings_input(uint32_t keycode);
+    void apply_graphics_settings_effects(
+        const menu::settings::GraphicsSettingsEffects& effects);
     void handle_skins_settings_input(uint32_t keycode);
+    void apply_skin_settings_effects(
+        const menu::settings::SkinSettingsEffects& effects);
     void handle_input_settings_input(uint32_t keycode);
     void handle_calibration_settings_input(uint32_t keycode);
     void handle_mode_settings_input(uint32_t keycode);
     void handle_mode_mods_input(uint32_t keycode);
+    void apply_mode_settings_effects(
+        const menu::settings::ModeSettingsEffects& effects);
     void handle_keymap_input(uint32_t keycode);
     void handle_keymap_confirm_input(uint32_t keycode);
     void handle_onnx_upscaler_confirm_input(uint32_t keycode);
     void handle_keymap_test_input(uint32_t keycode);
     void handle_result_input(uint32_t keycode);
+    [[nodiscard]] Screen current_screen() const noexcept { return menu_navigator_.current(); }
+    void reset_screen(Screen screen) noexcept;
+    void push_screen(Screen screen);
+    void replace_screen(Screen screen) noexcept;
+    [[nodiscard]] bool pop_screen() noexcept;
     [[nodiscard]] bool result_presentation_ready() const;
 
     void publish_snapshot();
@@ -379,11 +375,10 @@ private:
                                                const std::string& fallback_chart_path = {});
     [[nodiscard]] bool launch_last_result_replay();
     [[nodiscard]] bool launch_selected_record_replay();
-    void start_keymap_capture();
     void apply_keymap_capture(uint32_t keycode);
     void apply_keymap_reset();
-    void apply_keymap_save();
-    void clear_keymap_pending_state();
+    void apply_keymap_settings_effects(
+        const menu::settings::KeymapSettingsEffects& effects);
     void apply_song_sort(SongSortMode mode);
     bool remember_song_source(const std::string& source_path);
     void persist_runtime_config();
@@ -410,7 +405,6 @@ private:
                                        uint64_t* out_motion_revision = nullptr,
                                        uint64_t* out_text_revision = nullptr);
     void update_gameplay_loading_state(int percent, std::string_view stage);
-    void refresh_keymap_lane_list();
     void refresh_available_lr2_skins();
     void refresh_available_tenriff_skins();
     [[nodiscard]] const TenRiffSkinDefinition* active_tenriff_skin_for_keys(int keys) const;
@@ -458,8 +452,6 @@ private:
     void cancel_song_preview_decode();
     void stop_song_preview_audio();
     void open_keymap_screen(Screen return_screen);
-    void clear_keymap_status_message();
-    void show_keymap_status_message(std::string message);
     void populate_help_overlay(render::HelpOverlayData& target) const;
 
     [[nodiscard]] bool ui_uses_korean() const;
@@ -654,8 +646,15 @@ private:
     bool session_mix_current_result_recorded_ = false;
     std::string session_mix_status_message_{};
 
-    Screen screen_ = Screen::Title;
-    Screen submenu_return_screen_ = Screen::Title;
+    menu::MenuNavigator menu_navigator_{Screen::Title};
+    menu::OptionsHubController options_hub_controller_{};
+    menu::settings::AudioSettingsController audio_settings_controller_{};
+    menu::settings::InputSettingsController input_settings_controller_{};
+    menu::settings::CalibrationSettingsController calibration_settings_controller_{};
+    menu::settings::GraphicsSettingsController graphics_settings_controller_{};
+    menu::settings::KeymapSettingsController keymap_settings_controller_{};
+    menu::settings::ModeSettingsController mode_settings_controller_{};
+    menu::settings::SkinSettingsController skin_settings_controller_{};
     int title_cursor_ = 0;
     int selected_song_ = 0;
     int selected_source_ = 0;
@@ -665,8 +664,6 @@ private:
     Screen settings_change_flash_screen_ = Screen::Title;
     int settings_change_flash_row_ = -1;
     int64_t settings_change_flash_started_ns_ = 0;
-    int options_cursor_ = 0;
-    int calibration_step_ms_ = 1;
     SongSelectFocus song_select_focus_ = SongSelectFocus::SongList;
     int song_quick_setting_cursor_ = 0;
     SongSortMode song_sort_mode_ = SongSortMode::DifficultyAsc;
@@ -674,20 +671,6 @@ private:
     SongSelectView song_select_view_ = SongSelectView::Songs;
     bool online_records_view_ = false;
     int song_select_nav_cursor_ = 0;
-    int keymap_cursor_ = 0;
-    int onnx_upscaler_confirm_cursor_ = 1;
-    int skin_edit_lane_ = 0;
-    int skin_edit_gap_ = 0;
-    bool keymap_dirty_ = false;
-    bool keymap_capture_active_ = false;
-    int64_t keymap_capture_deadline_ns_ = 0;
-    std::string keymap_edit_mode_ = "10k";
-    std::string skin_edit_mode_ = "10k";
-    std::string keymap_pending_lane_;
-    std::string keymap_pending_key_;
-    std::string keymap_duplicate_lane_;
-    std::string keymap_status_message_;
-    int64_t keymap_status_deadline_ns_ = 0;
     bool first_run_profile_ = false;
     bool profile_nickname_edit_active_ = false;
     std::string profile_nickname_before_edit_;
@@ -714,13 +697,6 @@ private:
     int64_t result_presentation_start_ns_ = 0;
     bool result_presentation_skipped_ = false;
 
-    bool input_dirty_ = false;
-    bool input_backend_dirty_ = false;
-    bool audio_dirty_ = false;
-    bool graphics_dirty_ = false;
-    bool skin_dirty_ = false;
-    bool mode_dirty_ = false;
-    bool mode_library_dirty_ = false;
     int64_t last_indexer_snapshot_ns_ = 0;
     int64_t last_song_select_slow_snapshot_log_ns_ = 0;
 
@@ -787,7 +763,6 @@ private:
     render::MenuRenderData render_cache_{};
 
     std::unordered_set<uint32_t> pressed_keys_{};
-    std::vector<std::string> keymap_lanes_{};
     std::unordered_map<std::string, int> source_song_counts_{};
     std::vector<LocalPlayRecord> local_play_records_{};
     std::unordered_map<std::string, std::vector<std::size_t>> chart_play_record_indices_{};

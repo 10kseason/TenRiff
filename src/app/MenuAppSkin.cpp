@@ -35,12 +35,6 @@ namespace {
 
 namespace fs = std::filesystem;
 
-constexpr double kJudgementLinePositionStep = 0.01;
-constexpr double kComboPositionStep = 0.02;
-constexpr double kNoteSizeScaleStep = 0.05;
-constexpr double kLaneDividerScaleStep = 0.05;
-constexpr double kSkinOpacityStep = 0.05;
-
 fs::path path_from_utf8(std::string_view value) {
     try {
         return util::path_from_utf8_lossy(value);
@@ -88,40 +82,6 @@ std::string lr2_resolution_mode_label(std::string_view value) {
         return "FHD";
     }
     return "Auto";
-}
-
-std::string cycle_lr2_resolution_mode(std::string_view value, int direction) {
-    static constexpr std::array<std::string_view, 4> kModes = {"auto", "sd", "hd", "fhd"};
-    const std::string normalized = config::normalize_skin_lr2_resolution_mode_token(value);
-    int index = 0;
-    for (int i = 0; i < static_cast<int>(kModes.size()); ++i) {
-        if (kModes[static_cast<std::size_t>(i)] == normalized) {
-            index = i;
-            break;
-        }
-    }
-    index += direction;
-    if (index < 0) {
-        index = static_cast<int>(kModes.size()) - 1;
-    } else if (index >= static_cast<int>(kModes.size())) {
-        index = 0;
-    }
-    return std::string(kModes[static_cast<std::size_t>(index)]);
-}
-
-std::string cycle_hit_burst_style(std::string_view value, int direction) {
-    static constexpr std::array<std::string_view, 3> kStyles = {"prism", "ring", "spark"};
-    const std::string normalized = config::normalize_skin_hit_burst_style_token(value);
-    int index = 0;
-    for (int i = 0; i < static_cast<int>(kStyles.size()); ++i) {
-        if (kStyles[static_cast<std::size_t>(i)] == normalized) {
-            index = i;
-            break;
-        }
-    }
-    index = (index + direction + static_cast<int>(kStyles.size())) %
-            static_cast<int>(kStyles.size());
-    return std::string(kStyles[static_cast<std::size_t>(index)]);
 }
 
 fs::path lr2_skin_import_root_path(std::string_view profile_dir) {
@@ -307,10 +267,11 @@ void MenuApp::refresh_available_tenriff_skins() {
                 seven_plus_one_gameplay_for_scratch_right(
                     active_tenriff_skin_7p1_.gameplay));
     }
+    const std::string active_edit_mode(skin_settings_controller_.edit_mode());
     const bool editing_seven_plus_one =
-        config::normalize_skin_mode_token(skin_edit_mode_) == "7+1";
+        config::normalize_skin_mode_token(active_edit_mode) == "7+1";
     if (const auto* selected = active_tenriff_skin_for_layout(
-            lane_count_for_skin_mode(skin_edit_mode_), editing_seven_plus_one)) {
+            lane_count_for_skin_mode(active_edit_mode), editing_seven_plus_one)) {
         active_tenriff_skin_ = *selected;
     }
     for (const auto& mode_definition : active_tenriff_skin_modes_) {
@@ -403,7 +364,7 @@ bool MenuApp::import_lr2_skin_path(std::string_view source_path) {
     skin_status_messages_ = {
         ui_text("LR2 skin import completed.", "LR2 스킨 가져오기를 완료했습니다.")
     };
-    skin_dirty_ = true;
+    static_cast<void>(skin_settings_controller_.mark_external_change());
     std::cerr << "[info] Imported " << imported.skin_names.size()
               << " LR2 skin(s), files=" << imported.copied_files
               << " bytes=" << imported.copied_bytes << "." << std::endl;
@@ -436,7 +397,7 @@ bool MenuApp::import_tenriff_skin_path(std::string_view source_path) {
         status.push_back(ui_text("Warning: ", "경고: ") + warning);
     }
     skin_status_messages_ = std::move(status);
-    skin_dirty_ = true;
+    static_cast<void>(skin_settings_controller_.mark_external_change());
     std::cerr << "[info] Imported TenRiff skin " << imported.skin_name
               << ", files=" << imported.copied_files
               << " bytes=" << imported.copied_bytes << "." << std::endl;
@@ -486,626 +447,172 @@ std::string MenuApp::active_external_skin_name() const {
 }
 
 void MenuApp::handle_skins_settings_input(uint32_t keycode) {
-    const std::string active_skin_source = config::normalize_skin_source_token(config_.skin.source);
-    const bool lr2_source = active_skin_source == "lr2";
-    const SkinSettingsRows rows{lr2_source};
-    const int item_count = rows.count();
-    const int key_mode_row = rows.index_of(SkinSettingsRowId::KeyMode);
-    const int scratch_position_row = rows.index_of(SkinSettingsRowId::ScratchPosition);
-    const int skin_source_row = rows.index_of(SkinSettingsRowId::SkinSource);
-    const int imported_skin_row = rows.index_of(SkinSettingsRowId::ImportedSkin);
-    const int lr2_resolution_row = rows.index_of(SkinSettingsRowId::Lr2Resolution);
-    const int import_skin_row = rows.index_of(SkinSettingsRowId::ImportSkin);
-    const int create_skin_row = rows.index_of(SkinSettingsRowId::CreateSkin);
-    const int open_skin_folder_row = rows.index_of(SkinSettingsRowId::OpenSkinFolder);
-    const int reload_skin_row = rows.index_of(SkinSettingsRowId::ReloadSkin);
-    const int target_lane_row = rows.index_of(SkinSettingsRowId::TargetLane);
-    const int target_gap_row = rows.index_of(SkinSettingsRowId::TargetGap);
-    const int lane_color_row = rows.index_of(SkinSettingsRowId::LaneColor);
-    const int single_color_row = rows.index_of(SkinSettingsRowId::SingleColor);
-    const int note_shape_row = rows.index_of(SkinSettingsRowId::NoteShape);
-    const int note_border_row = rows.index_of(SkinSettingsRowId::NoteBorder);
-    const int image_aspect_row = rows.index_of(SkinSettingsRowId::ImageAspect);
-    const int lane_dividers_row = rows.index_of(SkinSettingsRowId::LaneDividers);
-    const int judgement_line_row = rows.index_of(SkinSettingsRowId::JudgementLine);
-    const int gear_boundary_row = rows.index_of(SkinSettingsRowId::GearBoundary);
-    const int show_hold_tail_row = rows.index_of(SkinSettingsRowId::ShowHoldTail);
-    const int ln_tail_taper_row = rows.index_of(SkinSettingsRowId::LnTailTaper);
-    const int visual_preset_row = rows.index_of(SkinSettingsRowId::VisualPreset);
-    const int lane_background_opacity_row = rows.index_of(SkinSettingsRowId::LaneBackgroundOpacity);
-    const int visual_opacity_row = rows.index_of(SkinSettingsRowId::VisualOpacity);
-    const int note_outline_opacity_row = rows.index_of(SkinSettingsRowId::NoteOutlineOpacity);
-    const int ln_body_opacity_row = rows.index_of(SkinSettingsRowId::LnBodyOpacity);
-    const int judgement_line_glow_row = rows.index_of(SkinSettingsRowId::JudgementLineGlow);
-    const int hit_burst_style_row = rows.index_of(SkinSettingsRowId::HitBurstStyle);
-    const int key_pulse_row = rows.index_of(SkinSettingsRowId::KeyPulse);
-    const int key_label_position_row = rows.index_of(SkinSettingsRowId::KeyLabelPosition);
-    const int judge_line_row = rows.index_of(SkinSettingsRowId::JudgeLinePosition);
-    const int lane_width_row = rows.index_of(SkinSettingsRowId::LaneWidth);
-    const int note_width_row = rows.index_of(SkinSettingsRowId::NoteWidth);
-    const int lane_spacing_row = rows.index_of(SkinSettingsRowId::LaneSpacing);
-    const int divider_width_row = rows.index_of(SkinSettingsRowId::DividerWidth);
-    const int center_gap_row = rows.index_of(SkinSettingsRowId::CenterGap);
-    const int ln_body_width_row = rows.index_of(SkinSettingsRowId::LnBodyWidth);
-    const int note_height_row = rows.index_of(SkinSettingsRowId::NoteHeight);
-    const int combo_y_row = rows.index_of(SkinSettingsRowId::ComboY);
-    const int black_playfield_row = rows.index_of(SkinSettingsRowId::BlackPlayfield);
-    const int ui_font_row = rows.index_of(SkinSettingsRowId::UiFont);
-    const int visual_latency_row = rows.index_of(SkinSettingsRowId::VisualLatency);
-    const int note_gap_row = rows.index_of(SkinSettingsRowId::NoteGap);
-    const int gameplay_cursor_row = rows.index_of(SkinSettingsRowId::GameplayCursor);
-    const int timing_feedback_row = rows.index_of(SkinSettingsRowId::TimingFeedback);
-    const int back_row = rows.index_of(SkinSettingsRowId::Back);
-
+    menu::settings::SkinSettingsEffects effects;
     if (keycode == key_f5_) {
-        refresh_available_tenriff_skins();
-        ++tenriff_skin_revision_;
-        skin_status_messages_.insert(
-            skin_status_messages_.begin(),
-            ui_text("Reloaded the current skin from disk.", "현재 스킨을 디스크에서 다시 불러왔습니다."));
-        if (skin_status_messages_.size() > 5u) skin_status_messages_.resize(5u);
-        publish_snapshot();
-        return;
+        effects = skin_settings_controller_.request_reload();
+    } else if (keycode == key_up_) {
+        effects = skin_settings_controller_.handle(
+            menu::MenuAction::move(-1),
+            config_,
+            available_lr2_skin_names_,
+            available_tenriff_skin_names_);
+    } else if (keycode == key_down_) {
+        effects = skin_settings_controller_.handle(
+            menu::MenuAction::move(1),
+            config_,
+            available_lr2_skin_names_,
+            available_tenriff_skin_names_);
+    } else if (keycode == key_left_) {
+        effects = skin_settings_controller_.handle(
+            menu::MenuAction::adjust(-1),
+            config_,
+            available_lr2_skin_names_,
+            available_tenriff_skin_names_);
+    } else if (keycode == key_right_) {
+        effects = skin_settings_controller_.handle(
+            menu::MenuAction::adjust(1),
+            config_,
+            available_lr2_skin_names_,
+            available_tenriff_skin_names_);
+    } else if (keycode == key_enter_) {
+        effects = skin_settings_controller_.handle(
+            menu::MenuAction::activate(),
+            config_,
+            available_lr2_skin_names_,
+            available_tenriff_skin_names_);
+    } else if (keycode == key_escape_ || keycode == key_backspace_) {
+        effects = skin_settings_controller_.handle(
+            menu::MenuAction::back(),
+            config_,
+            available_lr2_skin_names_,
+            available_tenriff_skin_names_);
     }
+    apply_skin_settings_effects(effects);
+}
 
-    if (keycode == key_up_) {
-        settings_cursor_ = clamp_int(settings_cursor_ - 1, 0, item_count - 1);
-        publish_snapshot();
+void MenuApp::apply_skin_settings_effects(
+    const menu::settings::SkinSettingsEffects& requested_effects) {
+    if (requested_effects.empty()) {
         return;
     }
-    if (keycode == key_down_) {
-        settings_cursor_ = clamp_int(settings_cursor_ + 1, 0, item_count - 1);
-        publish_snapshot();
-        return;
-    }
+    auto effects = requested_effects;
 
-    if (settings_cursor_ == skin_source_row && (keycode == key_left_ || keycode == key_right_)) {
-        const int direction = (keycode == key_left_) ? -1 : 1;
-        const bool was_lr2 = active_skin_source == "lr2";
-        config_.skin.source = cycle_skin_source(config_.skin.source, direction);
-        const bool is_lr2 = config::normalize_skin_source_token(config_.skin.source) == "lr2";
-        const int new_item_count = skin_settings_row_count(is_lr2);
-        if (!was_lr2 && is_lr2 && settings_cursor_ >= import_skin_row) {
-            ++settings_cursor_;
-        } else if (was_lr2 && !is_lr2 && settings_cursor_ >= lr2_resolution_row) {
-            --settings_cursor_;
-        }
-        settings_cursor_ = clamp_int(settings_cursor_, 0, new_item_count - 1);
+    if (effects.refresh_lr2_skins) {
         refresh_available_lr2_skins();
-        refresh_available_tenriff_skins();
-        ++tenriff_skin_revision_;
-        skin_dirty_ = true;
-        publish_snapshot();
-        return;
     }
-    if (settings_cursor_ == imported_skin_row && (keycode == key_left_ || keycode == key_right_)) {
-        std::vector<std::string>* names = nullptr;
-        std::string* selected_name = nullptr;
-        if (active_skin_source == "lr2") {
-            names = &available_lr2_skin_names_;
-            selected_name = &config_.skin.lr2_skin_name;
-        } else if (active_skin_source == "tenriff") {
-            names = &available_tenriff_skin_names_;
-            selected_name = &config_.skin.tenriff_skin_name;
-        }
-        if (names != nullptr && selected_name != nullptr && !names->empty()) {
-            int current_index = 0;
-            for (int i = 0; i < static_cast<int>(names->size()); ++i) {
-                if ((*names)[static_cast<std::size_t>(i)] == *selected_name) {
-                    current_index = i;
-                    break;
+    if (effects.refresh_tenriff_skins) {
+        refresh_available_tenriff_skins();
+    }
+    if (effects.increment_skin_revision) {
+        ++tenriff_skin_revision_;
+    }
+
+    switch (effects.boundary_action) {
+        case menu::settings::SkinBoundaryAction::ImportSkin:
+#ifdef _WIN32
+            if (const auto picked_path = pick_folder_dialog_utf8(); picked_path.has_value()) {
+                if (!import_skin_path_auto(*picked_path)) {
+                    std::cerr
+                        << "[warn] Selected path is not a supported TenRiff or LR2 skin folder: "
+                        << *picked_path << std::endl;
+                    skin_status_messages_ = {
+                        ui_text("Import failed: unsupported or invalid skin folder.",
+                                "가져오기 실패: 지원하지 않거나 잘못된 스킨 폴더입니다.")
+                    };
                 }
             }
-            current_index += (keycode == key_left_) ? -1 : 1;
-            if (current_index < 0) {
-                current_index = static_cast<int>(names->size()) - 1;
-            } else if (current_index >= static_cast<int>(names->size())) {
-                current_index = 0;
-            }
-            *selected_name = (*names)[static_cast<std::size_t>(current_index)];
-            if (active_skin_source == "lr2") {
-                refresh_available_lr2_skins();
-            } else {
-                refresh_available_tenriff_skins();
-                ++tenriff_skin_revision_;
-            }
-            skin_dirty_ = true;
-        }
-        publish_snapshot();
-        return;
-    }
-    if (settings_cursor_ == lr2_resolution_row && (keycode == key_left_ || keycode == key_right_)) {
-        const int direction = (keycode == key_left_) ? -1 : 1;
-        config_.skin.lr2_resolution_mode = cycle_lr2_resolution_mode(config_.skin.lr2_resolution_mode, direction);
-        skin_dirty_ = true;
-        publish_snapshot();
-        return;
-    }
-    if (settings_cursor_ == import_skin_row && keycode == key_enter_) {
-#ifdef _WIN32
-        const auto picked_path = pick_folder_dialog_utf8();
-        if (picked_path.has_value()) {
-            if (!import_skin_path_auto(*picked_path)) {
-                std::cerr << "[warn] Selected path is not a supported TenRiff or LR2 skin folder: "
-                          << *picked_path << std::endl;
-                skin_status_messages_ = {
-                    ui_text("Import failed: unsupported or invalid skin folder.",
-                            "가져오기 실패: 지원하지 않거나 잘못된 스킨 폴더입니다.")
-                };
-            }
-            publish_snapshot();
-        }
 #endif
-        return;
-    }
-    if (settings_cursor_ == create_skin_row && keycode == key_enter_) {
-        const TenRiffSkinCreateResult created = create_tenriff_skin_template(
-            tenriff_skin_import_root_path(profile_dir_).u8string());
-        if (!created.success()) {
-            skin_status_messages_.clear();
-            for (const auto& warning : created.warnings) {
-                if (skin_status_messages_.size() >= 4u) break;
-                skin_status_messages_.push_back(ui_text("Create failed: ", "생성 실패: ") + warning);
-            }
-            if (skin_status_messages_.empty()) {
-                skin_status_messages_.push_back(
-                    ui_text("Could not create a new skin.", "새 스킨을 만들 수 없습니다."));
-            }
-            publish_snapshot();
-            return;
-        }
-        config_.skin.source = "tenriff";
-        config_.skin.tenriff_skin_name = created.skin_name;
-        refresh_available_tenriff_skins();
-        ++tenriff_skin_revision_;
-        skin_dirty_ = true;
-        skin_status_messages_ = {
-            ui_text("Created an editable skin: ", "편집 가능한 스킨을 만들었습니다: ") + created.skin_name,
-            ui_text("Add standard-named images, then press F5 to reload.",
-                    "표준 파일명으로 이미지를 넣은 뒤 F5로 다시 불러오세요.")
-        };
-#ifdef _WIN32
-        static_cast<void>(open_folder_in_shell(created.folder_path));
-#endif
-        publish_snapshot();
-        return;
-    }
-    if (settings_cursor_ == open_skin_folder_row && keycode == key_enter_) {
-#ifdef _WIN32
-        bool opened = false;
-        if (active_skin_source == "tenriff" && !config_.skin.tenriff_skin_name.empty()) {
-            opened = open_folder_in_shell(
-                (path_from_utf8(available_tenriff_skin_root_) /
-                 path_from_utf8(config_.skin.tenriff_skin_name)).u8string());
-        }
-        skin_status_messages_ = {
-            opened ? ui_text("Opened the active skin folder.", "현재 스킨 폴더를 열었습니다.")
-                   : ui_text("No editable TenRiff skin folder is active.",
-                             "편집할 TenRiff 스킨 폴더가 활성화되어 있지 않습니다.")
-        };
-#endif
-        publish_snapshot();
-        return;
-    }
-    if (settings_cursor_ == reload_skin_row && keycode == key_enter_) {
-        refresh_available_tenriff_skins();
-        ++tenriff_skin_revision_;
-        skin_status_messages_.insert(
-            skin_status_messages_.begin(),
-            ui_text("Reloaded the current skin from disk.", "현재 스킨을 디스크에서 다시 불러왔습니다."));
-        if (skin_status_messages_.size() > 5u) skin_status_messages_.resize(5u);
-        publish_snapshot();
-        return;
-    }
-    if (settings_cursor_ == key_mode_row && (keycode == key_left_ || keycode == key_right_)) {
-        const int direction = (keycode == key_left_) ? -1 : 1;
-        skin_edit_mode_ = cycle_skin_edit_mode(skin_edit_mode_, direction);
-        const int lane_count = lane_count_for_skin_mode(skin_edit_mode_);
-        skin_edit_lane_ = clamp_int(skin_edit_lane_, 0, lane_count - 1);
-        skin_edit_gap_ = clamp_int(skin_edit_gap_, 0, std::max(0, lane_count - 2));
-        editable_skin_lane_colors(config_.skin, skin_edit_mode_);
-        editable_skin_lane_width_scales(config_.skin, skin_edit_mode_);
-        editable_skin_lane_spacing_scales(config_.skin, skin_edit_mode_);
-        if (active_skin_source == "tenriff") {
-            refresh_available_tenriff_skins();
-        }
-        skin_dirty_ = true;
-        publish_snapshot();
-        return;
-    }
-    if (settings_cursor_ == scratch_position_row &&
-        (keycode == key_left_ || keycode == key_right_)) {
-        if (config::normalize_skin_mode_token(skin_edit_mode_) == "7+1") {
-            const std::string current =
-                config::normalize_skin_scratch_position_token(config_.skin.scratch_position);
-            config_.skin.scratch_position = current == "left" ? "right" : "left";
-            skin_dirty_ = true;
-        }
-        publish_snapshot();
-        return;
-    }
-    if (settings_cursor_ == target_lane_row && (keycode == key_left_ || keycode == key_right_)) {
-        const int direction = (keycode == key_left_) ? -1 : 1;
-        const int lane_count = lane_count_for_skin_mode(skin_edit_mode_);
-        int next_lane = skin_edit_lane_ + direction;
-        if (next_lane < 0) {
-            next_lane = lane_count - 1;
-        } else if (next_lane >= lane_count) {
-            next_lane = 0;
-        }
-        skin_edit_lane_ = next_lane;
-        publish_snapshot();
-        return;
-    }
-    if (settings_cursor_ == target_gap_row && (keycode == key_left_ || keycode == key_right_)) {
-        const int lane_count = lane_count_for_skin_mode(skin_edit_mode_);
-        const int gap_count = std::max(0, lane_count - 1);
-        if (gap_count > 0) {
-            const int direction = (keycode == key_left_) ? -1 : 1;
-            int next_gap = skin_edit_gap_ + direction;
-            if (next_gap < 0) {
-                next_gap = gap_count - 1;
-            } else if (next_gap >= gap_count) {
-                next_gap = 0;
-            }
-            skin_edit_gap_ = next_gap;
-        }
-        publish_snapshot();
-        return;
-    }
-    if (settings_cursor_ == lane_color_row && (keycode == key_left_ || keycode == key_right_)) {
-        if (config::normalize_skin_single_color_token(config_.skin.single_color) != "off") {
-            publish_snapshot();
-            return;
-        }
-        const int direction = (keycode == key_left_) ? -1 : 1;
-        auto& lane_colors = editable_skin_lane_colors(config_.skin, skin_edit_mode_);
-        const auto palette = config::supported_skin_color_tokens();
-        const std::string current = config::normalize_skin_color_token(
-            lane_colors[static_cast<std::size_t>(skin_edit_lane_)]);
-        int index = 0;
-        for (int i = 0; i < static_cast<int>(palette.size()); ++i) {
-            if (palette[static_cast<std::size_t>(i)] == current) {
-                index = i;
+            break;
+        case menu::settings::SkinBoundaryAction::CreateSkin: {
+            const TenRiffSkinCreateResult created = create_tenriff_skin_template(
+                tenriff_skin_import_root_path(profile_dir_).u8string());
+            if (!created.success()) {
+                skin_status_messages_.clear();
+                for (const auto& warning : created.warnings) {
+                    if (skin_status_messages_.size() >= 4u) break;
+                    skin_status_messages_.push_back(
+                        ui_text("Create failed: ", "생성 실패: ") + warning);
+                }
+                if (skin_status_messages_.empty()) {
+                    skin_status_messages_.push_back(
+                        ui_text("Could not create a new skin.",
+                                "새 스킨을 만들 수 없습니다."));
+                }
                 break;
             }
+            config_.skin.source = "tenriff";
+            config_.skin.tenriff_skin_name = created.skin_name;
+            refresh_available_tenriff_skins();
+            ++tenriff_skin_revision_;
+            effects.merge(skin_settings_controller_.mark_external_change());
+            skin_status_messages_ = {
+                ui_text("Created an editable skin: ", "편집 가능한 스킨을 만들었습니다: ") +
+                    created.skin_name,
+                ui_text("Add standard-named images, then press F5 to reload.",
+                        "표준 파일명으로 이미지를 넣은 뒤 F5로 다시 불러오세요.")
+            };
+#ifdef _WIN32
+            static_cast<void>(open_folder_in_shell(created.folder_path));
+#endif
+            break;
         }
-        index += direction;
-        if (index < 0) {
-            index = static_cast<int>(palette.size()) - 1;
-        } else if (index >= static_cast<int>(palette.size())) {
-            index = 0;
+        case menu::settings::SkinBoundaryAction::OpenSkinFolder:
+#ifdef _WIN32
+        {
+            const std::string active_source =
+                config::normalize_skin_source_token(config_.skin.source);
+            bool opened = false;
+            if (active_source == "tenriff" &&
+                !config_.skin.tenriff_skin_name.empty()) {
+                opened = open_folder_in_shell(
+                    (path_from_utf8(available_tenriff_skin_root_) /
+                     path_from_utf8(config_.skin.tenriff_skin_name)).u8string());
+            }
+            skin_status_messages_ = {
+                opened
+                    ? ui_text("Opened the active skin folder.",
+                              "현재 스킨 폴더를 열었습니다.")
+                    : ui_text("No editable TenRiff skin folder is active.",
+                              "편집할 TenRiff 스킨 폴더가 활성화되어 있지 않습니다.")
+            };
         }
-        lane_colors[static_cast<std::size_t>(skin_edit_lane_)] = palette[static_cast<std::size_t>(index)];
-        skin_dirty_ = true;
-        publish_snapshot();
-        return;
-    }
-    if (settings_cursor_ == single_color_row && (keycode == key_left_ || keycode == key_right_)) {
-        std::vector<std::string> options{"off"};
-        const auto palette = config::supported_skin_color_tokens();
-        options.insert(options.end(), palette.begin(), palette.end());
-        const std::string current = config::normalize_skin_single_color_token(config_.skin.single_color);
-        auto it = std::find(options.begin(), options.end(), current);
-        int index = it == options.end() ? 0 : static_cast<int>(std::distance(options.begin(), it));
-        index += keycode == key_left_ ? -1 : 1;
-        if (index < 0) {
-            index = static_cast<int>(options.size()) - 1;
-        } else if (index >= static_cast<int>(options.size())) {
-            index = 0;
-        }
-        config_.skin.single_color = options[static_cast<std::size_t>(index)];
-        skin_dirty_ = true;
-        publish_snapshot();
-        return;
-    }
-    if (settings_cursor_ == note_shape_row && (keycode == key_left_ || keycode == key_right_)) {
-        constexpr std::array<std::string_view, 8> shapes{
-            "rect", "square", "circle", "diamond", "arrow", "triangle", "pentagon", "hexagon"};
-        const std::string current = config::normalize_skin_note_shape_token(config_.skin.note_shape);
-        auto it = std::find(shapes.begin(), shapes.end(), current);
-        int index = (it == shapes.end()) ? 0 : static_cast<int>(std::distance(shapes.begin(), it));
-        index += (keycode == key_left_) ? -1 : 1;
-        if (index < 0) index = static_cast<int>(shapes.size()) - 1;
-        if (index >= static_cast<int>(shapes.size())) index = 0;
-        config_.skin.note_shape = std::string(shapes[static_cast<std::size_t>(index)]);
-        skin_dirty_ = true;
-        publish_snapshot();
-        return;
-    }
-    if (settings_cursor_ == note_border_row && (keycode == key_left_ || keycode == key_right_)) {
-        config_.skin.note_border_enabled = !config_.skin.note_border_enabled;
-        skin_dirty_ = true;
-        publish_snapshot();
-        return;
-    }
-    if (settings_cursor_ == image_aspect_row && (keycode == key_left_ || keycode == key_right_)) {
-        const int direction = (keycode == key_left_) ? -1 : 1;
-        config_.skin.note_image_aspect =
-            cycle_skin_note_image_aspect(config_.skin.note_image_aspect, direction);
-        config_.skin.preserve_note_image_aspect_ratio = config_.skin.note_image_aspect != "stretch";
-        skin_dirty_ = true;
-        publish_snapshot();
-        return;
-    }
-    if (settings_cursor_ == lane_dividers_row && (keycode == key_left_ || keycode == key_right_)) {
-        config_.skin.show_lane_dividers = !config_.skin.show_lane_dividers;
-        skin_dirty_ = true;
-        publish_snapshot();
-        return;
-    }
-    if (settings_cursor_ == judgement_line_row && (keycode == key_left_ || keycode == key_right_)) {
-        config_.skin.show_judgement_line = !config_.skin.show_judgement_line;
-        skin_dirty_ = true;
-        publish_snapshot();
-        return;
-    }
-    if (settings_cursor_ == gear_boundary_row && (keycode == key_left_ || keycode == key_right_)) {
-        config_.skin.show_gear_boundary_line = !config_.skin.show_gear_boundary_line;
-        skin_dirty_ = true;
-        publish_snapshot();
-        return;
-    }
-    if (settings_cursor_ == show_hold_tail_row && (keycode == key_left_ || keycode == key_right_)) {
-        config_.skin.show_hold_tail = !config_.skin.show_hold_tail;
-        skin_dirty_ = true;
-        publish_snapshot();
-        return;
-    }
-    if (settings_cursor_ == ln_tail_taper_row && (keycode == key_left_ || keycode == key_right_)) {
-        config_.skin.hold_tail_taper_enabled = !config_.skin.hold_tail_taper_enabled;
-        skin_dirty_ = true;
-        publish_snapshot();
-        return;
-    }
-    if (settings_cursor_ == visual_preset_row && (keycode == key_left_ || keycode == key_right_)) {
-        const int direction = (keycode == key_left_) ? -1 : 1;
-        config::apply_skin_visual_preset(config_.skin, cycle_skin_visual_preset(config_.skin.visual_preset, direction));
-        skin_dirty_ = true;
-        publish_snapshot();
-        return;
-    }
-    if (settings_cursor_ == lane_background_opacity_row && (keycode == key_left_ || keycode == key_right_)) {
-        const int direction = (keycode == key_left_) ? -1 : 1;
-        config_.skin.lane_background_opacity = clamp_step_value(
-            config_.skin.lane_background_opacity + static_cast<double>(direction) * kSkinOpacityStep,
-            config::kSkinLaneBackgroundOpacityMin,
-            config::kSkinLaneBackgroundOpacityMax,
-            kSkinOpacityStep);
-        skin_dirty_ = true;
-        publish_snapshot();
-        return;
-    }
-    if (settings_cursor_ == visual_opacity_row && (keycode == key_left_ || keycode == key_right_)) {
-        const int direction = (keycode == key_left_) ? -1 : 1;
-        config_.skin.visual_opacity = clamp_step_value(
-            config_.skin.visual_opacity + static_cast<double>(direction) * kSkinOpacityStep,
-            config::kSkinVisualOpacityMin,
-            config::kSkinVisualOpacityMax,
-            kSkinOpacityStep);
-        skin_dirty_ = true;
-        publish_snapshot();
-        return;
-    }
-    if (settings_cursor_ == note_outline_opacity_row && (keycode == key_left_ || keycode == key_right_)) {
-        const int direction = (keycode == key_left_) ? -1 : 1;
-        config_.skin.note_outline_opacity = clamp_step_value(
-            config_.skin.note_outline_opacity + static_cast<double>(direction) * kSkinOpacityStep,
-            config::kSkinNoteOutlineOpacityMin,
-            config::kSkinNoteOutlineOpacityMax,
-            kSkinOpacityStep);
-        skin_dirty_ = true;
-        publish_snapshot();
-        return;
-    }
-    if (settings_cursor_ == ln_body_opacity_row && (keycode == key_left_ || keycode == key_right_)) {
-        const int direction = (keycode == key_left_) ? -1 : 1;
-        config_.skin.hold_body_opacity = clamp_step_value(
-            config_.skin.hold_body_opacity + static_cast<double>(direction) * kSkinOpacityStep,
-            config::kSkinHoldBodyOpacityMin,
-            config::kSkinHoldBodyOpacityMax,
-            kSkinOpacityStep);
-        skin_dirty_ = true;
-        publish_snapshot();
-        return;
-    }
-    if (settings_cursor_ == judgement_line_glow_row && (keycode == key_left_ || keycode == key_right_)) {
-        config_.skin.judgement_line_glow_enabled = !config_.skin.judgement_line_glow_enabled;
-        skin_dirty_ = true;
-        publish_snapshot();
-        return;
-    }
-    if (settings_cursor_ == hit_burst_style_row && (keycode == key_left_ || keycode == key_right_)) {
-        const int direction = (keycode == key_left_) ? -1 : 1;
-        config_.skin.hit_burst_style = cycle_hit_burst_style(config_.skin.hit_burst_style, direction);
-        skin_dirty_ = true;
-        publish_snapshot();
-        return;
-    }
-    if (settings_cursor_ == key_pulse_row && (keycode == key_left_ || keycode == key_right_)) {
-        const int direction = (keycode == key_left_) ? -1 : 1;
-        config_.skin.key_pulse_brightness = clamp_step_value(
-            config_.skin.key_pulse_brightness + static_cast<double>(direction) * kSkinOpacityStep,
-            config::kSkinKeyPulseBrightnessMin,
-            config::kSkinKeyPulseBrightnessMax,
-            kSkinOpacityStep);
-        config_.skin.key_pulse_enabled = config_.skin.key_pulse_brightness > 0.0;
-        skin_dirty_ = true;
-        publish_snapshot();
-        return;
-    }
-    if (settings_cursor_ == key_label_position_row && (keycode == key_left_ || keycode == key_right_)) {
-        const int direction = (keycode == key_left_) ? -1 : 1;
-        config_.skin.key_label_position = cycle_skin_key_label_position(config_.skin.key_label_position, direction);
-        skin_dirty_ = true;
-        publish_snapshot();
-        return;
-    }
-    if (settings_cursor_ == judge_line_row && (keycode == key_left_ || keycode == key_right_)) {
-        const int direction = (keycode == key_left_) ? -1 : 1;
-        config_.skin.judgement_line_position = clamp_step_value(
-            config_.skin.judgement_line_position + static_cast<double>(direction) * kJudgementLinePositionStep,
-            config::kJudgementLinePositionMin, config::kJudgementLinePositionMax, kJudgementLinePositionStep);
-        skin_dirty_ = true;
-        publish_snapshot();
-        return;
-    }
-    if (settings_cursor_ == lane_width_row && (keycode == key_left_ || keycode == key_right_)) {
-        const int direction = (keycode == key_left_) ? -1 : 1;
-        auto& lane_width_scales = editable_skin_lane_width_scales(config_.skin, skin_edit_mode_);
-        if (static_cast<std::size_t>(skin_edit_lane_) < lane_width_scales.size()) {
-            lane_width_scales[static_cast<std::size_t>(skin_edit_lane_)] = clamp_step_value(
-                lane_width_scales[static_cast<std::size_t>(skin_edit_lane_)] +
-                    static_cast<double>(direction) * kNoteSizeScaleStep,
-                config::kLaneWidthScaleMin,
-                config::kLaneWidthScaleMax,
-                kNoteSizeScaleStep);
-            skin_dirty_ = true;
-        }
-        publish_snapshot();
-        return;
-    }
-    if (settings_cursor_ == note_width_row && (keycode == key_left_ || keycode == key_right_)) {
-        const int direction = (keycode == key_left_) ? -1 : 1;
-        auto& note_width_scale = editable_skin_note_width_scale(config_.skin, skin_edit_mode_);
-        note_width_scale = clamp_step_value(
-            note_width_scale + static_cast<double>(direction) * kNoteSizeScaleStep,
-            config::kNoteWidthScaleMin, config::kNoteWidthScaleMax, kNoteSizeScaleStep);
-        skin_dirty_ = true;
-        publish_snapshot();
-        return;
-    }
-    if (settings_cursor_ == lane_spacing_row && (keycode == key_left_ || keycode == key_right_)) {
-        const int direction = (keycode == key_left_) ? -1 : 1;
-        auto& lane_spacing_scales = editable_skin_lane_spacing_scales(config_.skin, skin_edit_mode_);
-        if (static_cast<std::size_t>(skin_edit_gap_) < lane_spacing_scales.size()) {
-            lane_spacing_scales[static_cast<std::size_t>(skin_edit_gap_)] = clamp_step_value(
-                lane_spacing_scales[static_cast<std::size_t>(skin_edit_gap_)] +
-                    static_cast<double>(direction) * kLaneDividerScaleStep,
-                config::kLaneSpacingScaleMin,
-                config::kLaneSpacingScaleMax,
-                kLaneDividerScaleStep);
-            skin_dirty_ = true;
-        }
-        publish_snapshot();
-        return;
-    }
-    if (settings_cursor_ == divider_width_row && (keycode == key_left_ || keycode == key_right_)) {
-        const int direction = (keycode == key_left_) ? -1 : 1;
-        auto& lane_divider_width_scale =
-            editable_skin_lane_divider_width_scale(config_.skin, skin_edit_mode_);
-        lane_divider_width_scale = clamp_step_value(
-            lane_divider_width_scale + static_cast<double>(direction) * kLaneDividerScaleStep,
-            config::kLaneDividerWidthScaleMin, config::kLaneDividerWidthScaleMax, kLaneDividerScaleStep);
-        skin_dirty_ = true;
-        publish_snapshot();
-        return;
-    }
-    if (settings_cursor_ == center_gap_row && (keycode == key_left_ || keycode == key_right_)) {
-        if (config::normalize_skin_mode_token(skin_edit_mode_) == "16k") {
-            const int direction = (keycode == key_left_) ? -1 : 1;
-            auto& lane_center_gap_scale =
-                editable_skin_lane_center_gap_scale(config_.skin, skin_edit_mode_);
-            lane_center_gap_scale = clamp_step_value(
-                lane_center_gap_scale + static_cast<double>(direction) * kLaneDividerScaleStep,
-                config::kLaneCenterGapScaleMin, config::kLaneCenterGapScaleMax, kLaneDividerScaleStep);
-            skin_dirty_ = true;
-        }
-        publish_snapshot();
-        return;
-    }
-    if (settings_cursor_ == ln_body_width_row && (keycode == key_left_ || keycode == key_right_)) {
-        const int direction = (keycode == key_left_) ? -1 : 1;
-        config_.skin.hold_body_width_scale = clamp_step_value(
-            config_.skin.hold_body_width_scale + static_cast<double>(direction) * kNoteSizeScaleStep,
-            config::kHoldBodyWidthScaleMin, config::kHoldBodyWidthScaleMax, kNoteSizeScaleStep);
-        skin_dirty_ = true;
-        publish_snapshot();
-        return;
-    }
-    if (settings_cursor_ == note_height_row && (keycode == key_left_ || keycode == key_right_)) {
-        const int direction = (keycode == key_left_) ? -1 : 1;
-        auto& note_height_scale = editable_skin_note_height_scale(config_.skin, skin_edit_mode_);
-        note_height_scale = clamp_step_value(
-            note_height_scale + static_cast<double>(direction) * kNoteSizeScaleStep,
-            config::kNoteHeightScaleMin, config::kNoteHeightScaleMax, kNoteSizeScaleStep);
-        skin_dirty_ = true;
-        publish_snapshot();
-        return;
-    }
-    if (settings_cursor_ == combo_y_row && (keycode == key_left_ || keycode == key_right_)) {
-        const int direction = (keycode == key_left_) ? -1 : 1;
-        config_.skin.combo_position = clamp_step_value(
-            config_.skin.combo_position + static_cast<double>(direction) * kComboPositionStep,
-            config::kComboPositionMin, config::kComboPositionMax, kComboPositionStep);
-        skin_dirty_ = true;
-        publish_snapshot();
-        return;
-    }
-    if (settings_cursor_ == black_playfield_row && (keycode == key_left_ || keycode == key_right_)) {
-        config_.skin.black_playfield_enabled = !config_.skin.black_playfield_enabled;
-        skin_dirty_ = true;
-        publish_snapshot();
-        return;
-    }
-    if (settings_cursor_ == ui_font_row && (keycode == key_left_ || keycode == key_right_)) {
-        const int direction = (keycode == key_left_) ? -1 : 1;
-        config_.skin.ui_font = cycle_skin_ui_font(config_.skin.ui_font, direction);
-        skin_dirty_ = true;
-        publish_snapshot();
-        return;
-    }
-    if (settings_cursor_ == visual_latency_row &&
-        (keycode == key_left_ || keycode == key_right_ || keycode == key_enter_)) {
-        const int direction = (keycode == key_left_) ? -1 : 1;
-        config_.visual_offset_ms = clamp_step_value(
-            config_.visual_offset_ms + static_cast<double>(direction) * kVisualOffsetStep,
-            kVisualOffsetMin, kVisualOffsetMax, kVisualOffsetStep);
-        skin_dirty_ = true;
-        publish_snapshot();
-        return;
-    }
-    if (settings_cursor_ == note_gap_row && (keycode == key_left_ || keycode == key_right_)) {
-        const int direction = (keycode == key_left_) ? -1 : 1;
-        config_.skin.note_divider_gap_px = clamp_step_value(
-            config_.skin.note_divider_gap_px +
-                static_cast<double>(direction) * config::kNoteDividerGapPxStep,
-            config::kNoteDividerGapPxMin,
-            config::kNoteDividerGapPxMax,
-            config::kNoteDividerGapPxStep);
-        skin_dirty_ = true;
-        publish_snapshot();
-        return;
-    }
-    if (settings_cursor_ == gameplay_cursor_row && (keycode == key_left_ || keycode == key_right_)) {
-        config_.ui.show_cursor_in_gameplay = !config_.ui.show_cursor_in_gameplay;
-        skin_dirty_ = true;
-        publish_snapshot();
-        return;
-    }
-    if (settings_cursor_ == timing_feedback_row &&
-        (keycode == key_left_ || keycode == key_right_)) {
-        config_.skin.show_timing_feedback = !config_.skin.show_timing_feedback;
-        skin_dirty_ = true;
-        publish_snapshot();
-        return;
+#endif
+            break;
+        case menu::settings::SkinBoundaryAction::ReloadSkin:
+            refresh_available_tenriff_skins();
+            ++tenriff_skin_revision_;
+            skin_status_messages_.insert(
+                skin_status_messages_.begin(),
+                ui_text("Reloaded the current skin from disk.",
+                        "현재 스킨을 디스크에서 다시 불러왔습니다."));
+            if (skin_status_messages_.size() > 5u) {
+                skin_status_messages_.resize(5u);
+            }
+            break;
+        case menu::settings::SkinBoundaryAction::None:
+            break;
     }
 
-    if ((keycode == key_enter_ && settings_cursor_ == back_row) ||
-        keycode == key_escape_ ||
-        keycode == key_backspace_) {
-        screen_ = submenu_return_screen_;
-        settings_cursor_ = 0;
-        if (skin_dirty_) {
-            persist_runtime_config();
-            skin_dirty_ = false;
-        }
-        publish_snapshot();
+    if (effects.menu.persist_config) {
+        persist_runtime_config();
     }
+    if (effects.menu.navigate_back && !pop_screen()) {
+        reset_screen(Screen::OptionsHub);
+    }
+    const bool lr2_source =
+        config::normalize_skin_source_token(config_.skin.source) == "lr2";
+    settings_cursor_ = std::max(
+        0,
+        SkinSettingsRows{lr2_source}.index_of(
+            skin_settings_controller_.selected_id()));
+    publish_snapshot();
 }
 
 void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render) {
-    skin_edit_mode_ = normalize_skin_edit_mode(skin_edit_mode_);
+    const std::string skin_edit_mode_ =
+        normalize_skin_edit_mode(std::string(skin_settings_controller_.edit_mode()));
+    int skin_edit_lane_ = skin_settings_controller_.edit_lane();
+    int skin_edit_gap_ = skin_settings_controller_.edit_gap();
     const int lane_count = lane_count_for_skin_mode(skin_edit_mode_);
     const bool seven_plus_one = config::normalize_skin_mode_token(skin_edit_mode_) == "7+1";
     const int preview_scratch_lane = 1;

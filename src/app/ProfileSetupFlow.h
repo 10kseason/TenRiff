@@ -20,25 +20,6 @@ inline constexpr int kAvatarRow = 7;
 inline constexpr int kClearAvatarRow = 8;
 inline constexpr int kDoneRow = 9;
 inline constexpr int kFirstRunSkipRow = 10;
-inline constexpr int kOptionsHubRowCount = 8;
-inline constexpr int kOptionsKeyModeRow = 0;
-inline constexpr int kOptionsKeymapRow = 1;
-inline constexpr int kOptionsSkinsRow = 2;
-inline constexpr int kOptionsGraphicsRow = 3;
-inline constexpr int kOptionsAudioRow = 4;
-inline constexpr int kOptionsInputRow = 5;
-inline constexpr int kOptionsCalibrationRow = 6;
-inline constexpr int kOptionsProfileSetupRow = 7;
-
-[[nodiscard]] inline constexpr int move_options_grid_cursor(int cursor, int dx, int dy) {
-    constexpr int columns = 4;
-    cursor = cursor < 0 ? 0 : (cursor >= kOptionsHubRowCount ? kOptionsHubRowCount - 1 : cursor);
-    int column = cursor % columns;
-    int row = cursor / columns;
-    column = column + dx < 0 ? 0 : (column + dx >= columns ? columns - 1 : column + dx);
-    row = row + dy < 0 ? 0 : (row + dy >= 2 ? 1 : row + dy);
-    return row * columns + column;
-}
 
 [[nodiscard]] inline constexpr Entry entry(bool first_run_profile) {
     return first_run_profile ? Entry::FirstRun : Entry::Options;

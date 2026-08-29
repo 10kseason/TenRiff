@@ -707,7 +707,9 @@
 
                 const std::wstring label_w = to_wide(row.label);
                 float label_right = row_right - value_width - 18.0f;
-                if (row.adjustable) {
+                if (row.slider) {
+                    label_right = row_right - value_width - 18.0f;
+                } else if (row.adjustable) {
                     label_right = row_right - value_width - action_width * 2.0f - action_gap * 2.0f - 18.0f;
                 } else if (row.value.empty()) {
                     label_right = row_right - 18.0f;
@@ -720,7 +722,56 @@
 
                 if (!row.value.empty() && row_format && d2d_->text_brush) {
                     const std::wstring value_w = to_wide(row.value);
-                    if (row.adjustable) {
+                    if (row.slider) {
+                        const float slider_group_left = row_right - value_width;
+                        const float value_left = row_right - 92.0f;
+                        const float track_left = slider_group_left + 12.0f;
+                        const float track_right = value_left - 18.0f;
+                        const float track_center_y = row_y + row_height * 0.5f;
+                        const D2D1_RECT_F track_rect =
+                            D2D1::RectF(track_left, track_center_y - 4.0f,
+                                        track_right, track_center_y + 4.0f);
+                        const float slider_ratio =
+                            static_cast<float>(std::clamp(row.slider_ratio, 0.0, 1.0));
+                        const float knob_x =
+                            track_rect.left + (track_rect.right - track_rect.left) * slider_ratio;
+                        if (d2d_->card_brush) {
+                            ctx->FillRoundedRectangle(
+                                D2D1::RoundedRect(track_rect, 4.0f, 4.0f),
+                                d2d_->card_brush.Get());
+                        }
+                        if (d2d_->button_border_brush) {
+                            ctx->DrawRoundedRectangle(
+                                D2D1::RoundedRect(track_rect, 4.0f, 4.0f),
+                                d2d_->button_border_brush.Get(), 1.0f);
+                        }
+                        if (knob_x > track_rect.left && d2d_->accent_brush) {
+                            const D2D1_RECT_F fill_rect =
+                                D2D1::RectF(track_rect.left, track_rect.top,
+                                            knob_x, track_rect.bottom);
+                            ctx->FillRoundedRectangle(
+                                D2D1::RoundedRect(fill_rect, 4.0f, 4.0f),
+                                d2d_->accent_brush.Get());
+                        }
+                        if (d2d_->accent_brush) {
+                            ctx->FillEllipse(
+                                D2D1::Ellipse(D2D1::Point2F(knob_x, track_center_y),
+                                              9.0f, 9.0f),
+                                d2d_->accent_brush.Get());
+                        }
+                        register_hit(
+                            D2D1::RectF(track_rect.left, row_y + 6.0f,
+                                        track_rect.right, row_y + row_height - 6.0f),
+                            row.target_kind, row.row_index, MenuHitPart::SetValue);
+                        const D2D1_RECT_F value_rect =
+                            D2D1::RectF(value_left, row_y + 8.0f,
+                                        row_right - 18.0f, row_y + row_height - 8.0f);
+                        draw_text_clipped_aligned(value_w,
+                                                  row_format,
+                                                  value_rect,
+                                                  d2d_->text_brush.Get(),
+                                                  DWRITE_TEXT_ALIGNMENT_TRAILING);
+                    } else if (row.adjustable) {
                         const float plus_left = row_right - action_width;
                         const float minus_left = plus_left - action_gap - action_width;
                         const float value_right = minus_left - action_gap;

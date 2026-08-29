@@ -13,8 +13,10 @@ Language: [한국어](developer-extension-guide.md) | [English](developer-extens
   - 负责 mod 注册表、分类、分数倍率、判定窗口缩放和谱面结构变换。
 - `src/gameplay/ModeApplier.h` / `src/gameplay/ModeApplier.cpp`
   - 把键位模式转换和随机类变换真正应用到 `GameplayChart` 上。
-- `src/app/MenuAppSettings.cpp`、`src/app/MenuAppTail.inl`、`src/app/MenuAppSettingsUtils.h`
-  - `Mode Settings`、`Mod Manager`、`Key Mode` 等菜单 UI、输入处理和帮助文案。
+- `src/app/menu/settings/ModeSettingsController.h/.cpp`、`src/app/MenuAppSettings.cpp`、`src/app/MenuAppSettingsUtils.h`
+  - 分离负责 `Mode Settings` / `Mod Manager` 的类型化行、状态、修改逻辑，以及应用边界效果和标签 helper。
+- `src/app/menu/MenuScreenDescriptor.h/.cpp`、`src/app/MenuAppTail.inl`
+  - 固定 screen title/skin/routing metadata 与动态帮助/渲染组装之间的边界。
 - `src/config/Config.h` / `src/config/Config.cpp`
   - `config/config.json` 和每个 profile 配置的读写结构。
 - `src/app/RuntimeConfigMigration.cpp`
@@ -32,7 +34,7 @@ Language: [한국어](developer-extension-guide.md) | [English](developer-extens
 2. 在 `src/gameplay/ModeSettings.cpp` 里同步更新 `to_string(...)` 和 `parse_...(...)`。
 3. 如果这个 token 会出现在配置文件里，就在 `src/app/ModeResolver.cpp` 里做解析和无效值警告。
 4. 如果这个 mode 会改变谱面结构，就在 `src/app/ModeManager.cpp` 或 `src/gameplay/ModeApplier.cpp` 里加入实际变换逻辑。
-5. 如果需要让用户在菜单里操作，就在 `src/app/MenuAppSettings.cpp` 里加对应行和输入处理。
+5. 如果需要让用户在菜单里操作，就添加稳定的 `ModeSettingId` 和 typed controller/view row；`MenuAppSettings.cpp` 只连接 controller 返回的保存/reindex 等边界效果。
 6. 如果涉及保存或迁移，就同时检查 `src/config/Config.cpp`、`src/app/RuntimeConfigMigration.cpp`、`src/app/PersistedRuntimeConfig.cpp`。
 7. 最后补上单元测试/烟雾测试，并在行为已经对用户可见时同步文档。
 

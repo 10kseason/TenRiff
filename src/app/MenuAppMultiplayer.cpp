@@ -464,7 +464,7 @@ bool MenuApp::send_multiplayer_chat_input() {
 std::string MenuApp::now_playing_chat_message() const {
     std::string title;
     std::string artist;
-    if ((screen_ == Screen::Gameplay || screen_ == Screen::Result) &&
+    if ((current_screen() == Screen::Gameplay || current_screen() == Screen::Result) &&
         !last_chart_title_.empty()) {
         title = menu_song_select::safe_ui_text(
             last_chart_title_, ui_text("Unknown track", "알 수 없는 곡"));
@@ -926,7 +926,7 @@ void MenuApp::handle_multiplayer_input(uint32_t keycode) {
         song_select_view_ = SongSelectView::Songs;
         song_select_focus_ = SongSelectFocus::SongList;
         song_select_search_active_ = false;
-        screen_ = Screen::SongSelect;
+        push_screen(Screen::SongSelect);
         publish_snapshot();
         return;
     }
@@ -993,7 +993,9 @@ void MenuApp::select_multiplayer_chart() {
                     "현재 리더만 BMS를 선곡할 수 있어 곡 선택을 취소했습니다.");
         multiplayer_selecting_chart_ = false;
         rebuild_visible_song_list();
-        screen_ = Screen::Multiplayer;
+        if (!pop_screen()) {
+            reset_screen(Screen::Multiplayer);
+        }
         publish_snapshot();
         return;
     }
@@ -1008,7 +1010,9 @@ void MenuApp::select_multiplayer_chart() {
                     "멀티플레이에서는 BMS 곡만 선택할 수 있습니다.");
         multiplayer_selecting_chart_ = false;
         rebuild_visible_song_list();
-        screen_ = Screen::Multiplayer;
+        if (!pop_screen()) {
+            reset_screen(Screen::Multiplayer);
+        }
         publish_snapshot();
         return;
     }
@@ -1021,7 +1025,9 @@ void MenuApp::select_multiplayer_chart() {
                                           : error;
         multiplayer_selecting_chart_ = false;
         rebuild_visible_song_list();
-        screen_ = Screen::Multiplayer;
+        if (!pop_screen()) {
+            reset_screen(Screen::Multiplayer);
+        }
         publish_snapshot();
         return;
     }
@@ -1035,7 +1041,9 @@ void MenuApp::select_multiplayer_chart() {
                     "선곡 시간이 만료되었습니다. 현재 대전이 끝날 때까지 기다려주세요.");
         multiplayer_selecting_chart_ = false;
         rebuild_visible_song_list();
-        screen_ = Screen::Multiplayer;
+        if (!pop_screen()) {
+            reset_screen(Screen::Multiplayer);
+        }
         publish_snapshot();
         return;
     }
@@ -1049,7 +1057,9 @@ void MenuApp::select_multiplayer_chart() {
     multiplayer_status_message_.clear();
     multiplayer_selecting_chart_ = false;
     rebuild_visible_song_list();
-    screen_ = Screen::Multiplayer;
+    if (!pop_screen()) {
+        reset_screen(Screen::Multiplayer);
+    }
     publish_snapshot();
 }
 
@@ -1273,9 +1283,8 @@ void MenuApp::open_multiplayer_options() {
         }
     }
     multiplayer_menu_.local_ready = false;
-    submenu_return_screen_ = Screen::Multiplayer;
-    screen_ = Screen::OptionsHub;
-    options_cursor_ = 0;
+    push_screen(Screen::OptionsHub);
+    (void)options_hub_controller_.set_cursor(menu::OptionsItemId::KeyMode);
     multiplayer_status_message_ =
         ui_text("Ready was cleared before opening Options.",
                 "옵션 진입 전에 준비 상태를 해제했습니다.");
@@ -1299,7 +1308,7 @@ void MenuApp::service_multiplayer() {
             (peer.state == network::PeerSessionState::Listening ||
              peer.state == network::PeerSessionState::Connected);
         lan_discovery_.advertise(std::move(advertisement));
-    } else if (screen_ == Screen::Multiplayer && !peer_active &&
+    } else if (current_screen() == Screen::Multiplayer && !peer_active &&
                !global_chat.configured) {
         lan_discovery_.start_browsing();
     } else {
@@ -1329,7 +1338,7 @@ void MenuApp::service_multiplayer() {
             }
         }
         multiplayer_lan_discovery_revision_ = lan_snapshot.revision;
-        if (screen_ == Screen::Multiplayer) publish_snapshot();
+        if (current_screen() == Screen::Multiplayer) publish_snapshot();
     }
 
     if (global_chat.revision != multiplayer_server_room_revision_) {
@@ -1337,7 +1346,7 @@ void MenuApp::service_multiplayer() {
             ? 0
             : std::min(multiplayer_server_room_index_, global_chat.rooms.size() - 1u);
         multiplayer_server_room_revision_ = global_chat.revision;
-        if (screen_ == Screen::Multiplayer) publish_snapshot();
+        if (current_screen() == Screen::Multiplayer) publish_snapshot();
     }
 
     multiplayer_menu_.connected = peer.state == network::PeerSessionState::Connected;
@@ -1374,7 +1383,7 @@ void MenuApp::service_multiplayer() {
             peer.remote_library_ready && peer.remote_library_sha256
                 ? count_shared_multiplayer_charts(indexed_songs_, *peer.remote_library_sha256)
                 : 0;
-        if (multiplayer_selecting_chart_ && screen_ == Screen::SongSelect) {
+        if (multiplayer_selecting_chart_ && current_screen() == Screen::SongSelect) {
             rebuild_visible_song_list();
         }
     }
@@ -1395,7 +1404,7 @@ void MenuApp::service_multiplayer() {
         }
     }
 
-    if (last_game_was_multiplayer_ && screen_ == Screen::Multiplayer) {
+    if (last_game_was_multiplayer_ && current_screen() == Screen::Multiplayer) {
         const bool peer_finished =
             peer.all_remote_finished;
         const bool disconnected = peer.state != network::PeerSessionState::Connected;
@@ -1438,9 +1447,9 @@ void MenuApp::service_multiplayer() {
 
     if (peer.revision != multiplayer_last_revision_) {
         multiplayer_last_revision_ = peer.revision;
-        if (screen_ == Screen::Multiplayer || screen_ == Screen::Result ||
+        if (current_screen() == Screen::Multiplayer || current_screen() == Screen::Result ||
             chat_overlay_visible_ ||
-            (screen_ == Screen::SongSelect && multiplayer_selecting_chart_)) {
+            (current_screen() == Screen::SongSelect && multiplayer_selecting_chart_)) {
             publish_snapshot();
         }
     }
@@ -1626,11 +1635,10 @@ void MenuApp::reset_multiplayer_for_single_player() {
 
 void MenuApp::leave_multiplayer() {
     reset_multiplayer_for_single_player();
-    submenu_return_screen_ = Screen::Title;
-    options_cursor_ = 0;
+    (void)options_hub_controller_.set_cursor(menu::OptionsItemId::KeyMode);
     song_select_view_ = SongSelectView::Songs;
     song_select_focus_ = SongSelectFocus::SongList;
-    screen_ = Screen::Title;
+    reset_screen(Screen::Title);
     publish_snapshot();
 }
 

@@ -1,287 +1,137 @@
 #include "app/MenuApp.h"
 
+#include <utility>
+
 #include "app/MenuAppSettingsUtils.h"
 #include "app/MenuAppSkinUtils.h"
 #include "app/SessionRandomSeed.h"
+#include "app/menu/settings/AudioSettingsView.h"
 
 namespace tenriff::app {
 
 void MenuApp::handle_audio_settings_input(uint32_t keycode) {
-    const int item_count = 8;
+    menu::MenuEffectFlags effects;
     if (keycode == key_up_) {
-        settings_cursor_ = clamp_int(settings_cursor_ - 1, 0, item_count - 1);
-        publish_snapshot();
-        return;
+        effects = audio_settings_controller_.handle(menu::MenuAction::move(-1), config_);
+    } else if (keycode == key_down_) {
+        effects = audio_settings_controller_.handle(menu::MenuAction::move(1), config_);
+    } else if (keycode == key_left_) {
+        effects = audio_settings_controller_.handle(menu::MenuAction::adjust(-1), config_);
+    } else if (keycode == key_right_) {
+        effects = audio_settings_controller_.handle(menu::MenuAction::adjust(1), config_);
+    } else if (keycode == key_enter_) {
+        effects = audio_settings_controller_.handle(menu::MenuAction::activate(), config_);
+    } else if (keycode == key_escape_ || keycode == key_backspace_) {
+        effects = audio_settings_controller_.handle(menu::MenuAction::back(), config_);
     }
-    if (keycode == key_down_) {
-        settings_cursor_ = clamp_int(settings_cursor_ + 1, 0, item_count - 1);
-        publish_snapshot();
-        return;
-    }
+    apply_audio_settings_effects(effects);
+}
 
-    if (settings_cursor_ == 0 && (keycode == key_left_ || keycode == key_right_)) {
-        config_.audio_ui.preset = (config_.audio_ui.preset == "basic") ? "high" : "basic";
-        apply_audio_preset(config_);
-        audio_dirty_ = true;
-        publish_snapshot();
+void MenuApp::apply_audio_settings_effects(const menu::MenuEffectFlags& effects) {
+    if (effects.empty()) {
         return;
     }
-
-    if (settings_cursor_ == 1 && (keycode == key_left_ || keycode == key_right_)) {
-        const int direction = (keycode == key_left_) ? -1 : 1;
-        config_.audio_ui.bms_keysound_policy =
-            cycle_bms_keysound_policy(config_.audio_ui.bms_keysound_policy, direction);
-        audio_dirty_ = true;
-        publish_snapshot();
-        return;
+    if (effects.persist_config) {
+        persist_runtime_config();
     }
-
-    if (settings_cursor_ == 2 &&
-        (keycode == key_left_ || keycode == key_right_ || keycode == key_enter_)) {
-        config_.audio_ui.background_sound_enabled = !config_.audio_ui.background_sound_enabled;
-        audio_dirty_ = true;
-        publish_snapshot();
-        return;
+    if (effects.restart_audio) {
+        restart_audio_thread();
     }
-
-    if (settings_cursor_ == 3 && (keycode == key_left_ || keycode == key_right_)) {
-        const double direction = (keycode == key_left_) ? -1.0 : 1.0;
-        config_.audio_ui.master_volume = clamp_step_value(config_.audio_ui.master_volume + direction * kVolumeStep,
-                                                          kVolumeMin, kVolumeMax, kVolumeStep);
-        audio_dirty_ = true;
-        publish_snapshot();
-        return;
+    if (effects.navigate_back && !pop_screen()) {
+        reset_screen(Screen::OptionsHub);
     }
-
-    if (settings_cursor_ == 4 && (keycode == key_left_ || keycode == key_right_)) {
-        const double direction = (keycode == key_left_) ? -1.0 : 1.0;
-        config_.audio_ui.bgm_volume = clamp_step_value(config_.audio_ui.bgm_volume + direction * kChartMixVolumeStep,
-                                                       kChartMixVolumeMin, kChartMixVolumeMax, kChartMixVolumeStep);
-        audio_dirty_ = true;
-        publish_snapshot();
-        return;
-    }
-
-    if (settings_cursor_ == 5 && (keycode == key_left_ || keycode == key_right_)) {
-        const double direction = (keycode == key_left_) ? -1.0 : 1.0;
-        config_.audio_ui.keysound_volume =
-            clamp_step_value(config_.audio_ui.keysound_volume + direction * kChartMixVolumeStep,
-                             kChartMixVolumeMin, kChartMixVolumeMax, kChartMixVolumeStep);
-        audio_dirty_ = true;
-        publish_snapshot();
-        return;
-    }
-
-    if (settings_cursor_ == 6 && (keycode == key_left_ || keycode == key_right_)) {
-        const double direction = (keycode == key_left_) ? -1.0 : 1.0;
-        config_.sound_offset_ms = clamp_step_value(
-            config_.sound_offset_ms + direction * kSoundOffsetStep,
-            kSoundOffsetMin, kSoundOffsetMax, kSoundOffsetStep);
-        audio_dirty_ = true;
-        publish_snapshot();
-        return;
-    }
-
-    if (keycode == key_enter_ || keycode == key_escape_ || keycode == key_backspace_) {
-        screen_ = submenu_return_screen_;
-        settings_cursor_ = 0;
-        if (audio_dirty_) {
-            persist_runtime_config();
-            restart_audio_thread();
-            audio_dirty_ = false;
-        }
-        publish_snapshot();
-    }
+    settings_cursor_ = static_cast<int>(audio_settings_controller_.selected_id());
+    publish_snapshot();
 }
 
 void MenuApp::handle_mode_settings_input(uint32_t keycode) {
-    const int item_count = 18;
+    menu::settings::ModeSettingsEffects effects;
     if (keycode == key_up_) {
-        settings_cursor_ = clamp_int(settings_cursor_ - 1, 0, item_count - 1);
-        publish_snapshot();
-        return;
+        effects = mode_settings_controller_.handle(menu::MenuAction::move(-1), config_);
+    } else if (keycode == key_down_) {
+        effects = mode_settings_controller_.handle(menu::MenuAction::move(1), config_);
+    } else if (keycode == key_left_) {
+        effects = mode_settings_controller_.handle(menu::MenuAction::adjust(-1), config_);
+    } else if (keycode == key_right_) {
+        effects = mode_settings_controller_.handle(menu::MenuAction::adjust(1), config_);
+    } else if (keycode == key_enter_) {
+        effects = mode_settings_controller_.handle(menu::MenuAction::activate(), config_);
+    } else if (keycode == key_escape_ || keycode == key_backspace_) {
+        effects = mode_settings_controller_.handle(menu::MenuAction::back(), config_);
     }
-    if (keycode == key_down_) {
-        settings_cursor_ = clamp_int(settings_cursor_ + 1, 0, item_count - 1);
-        publish_snapshot();
-        return;
-    }
-
-    if (keycode == key_left_ || keycode == key_right_) {
-        const int direction = (keycode == key_left_) ? -1 : 1;
-        if (settings_cursor_ == 0) {
-            config_.mode.song_index_profile = cycle_song_index_profile(config_.mode.song_index_profile, direction);
-            mode_dirty_ = true;
-            mode_library_dirty_ = true;
-        } else if (settings_cursor_ == 1) {
-            config_.mode.calculate_song_index_difficulty = !config_.mode.calculate_song_index_difficulty;
-            mode_dirty_ = true;
-            mode_library_dirty_ = true;
-        } else if (settings_cursor_ == 2) {
-            config_.mode.ghost_battle_enabled = !config_.mode.ghost_battle_enabled;
-            mode_dirty_ = true;
-        } else if (settings_cursor_ == 3) {
-            config_.mode.autoplay_enabled = !config_.mode.autoplay_enabled;
-            mode_dirty_ = true;
-        } else if (settings_cursor_ == 4) {
-            config_.mode.practice_no_fail_enabled = !config_.mode.practice_no_fail_enabled;
-            if (config_.mode.practice_no_fail_enabled) {
-                config_.mode.one_miss_fail_enabled = false;
-                config_.mode.pacemaker_mode = "off";
-            }
-            mode_dirty_ = true;
-        } else if (settings_cursor_ == 5) {
-            config_.mode.one_miss_fail_enabled = !config_.mode.one_miss_fail_enabled;
-            if (config_.mode.one_miss_fail_enabled) {
-                config_.mode.practice_no_fail_enabled = false;
-                config_.mode.pacemaker_mode = "off";
-            }
-            mode_dirty_ = true;
-        } else if (settings_cursor_ == 6) {
-            config_.mode.pacemaker_mode = cycle_pacemaker_mode(config_.mode.pacemaker_mode, direction);
-            if (config::normalize_pacemaker_mode_token(config_.mode.pacemaker_mode) != "off") {
-                config_.mode.practice_no_fail_enabled = false;
-                config_.mode.one_miss_fail_enabled = false;
-            }
-            mode_dirty_ = true;
-        } else if (settings_cursor_ == 7) {
-            const std::string pacemaker_mode =
-                config::normalize_pacemaker_mode_token(config_.mode.pacemaker_mode);
-            if (pacemaker_mode == "accuracy") {
-                config_.mode.pacemaker_target_accuracy = clamp_step_value(
-                    config_.mode.pacemaker_target_accuracy +
-                        static_cast<double>(direction) * kPacemakerAccuracyStep,
-                    config::kPacemakerAccuracyMin,
-                    config::kPacemakerAccuracyMax,
-                    kPacemakerAccuracyStep);
-                mode_dirty_ = true;
-            } else if (pacemaker_mode == "score") {
-                config_.mode.pacemaker_target_score = std::clamp(
-                    config_.mode.pacemaker_target_score +
-                        static_cast<int64_t>(direction) * kPacemakerScoreStep,
-                    config::kPacemakerScoreMin,
-                    config::kPacemakerScoreMax);
-                mode_dirty_ = true;
-            }
-        } else if (settings_cursor_ == 8) {
-            config_.mode.key_mode = cycle_runtime_key_mode(config_.mode.key_mode, direction, true);
-            mode_dirty_ = true;
-        } else if (settings_cursor_ == 9) {
-            config_.mode.key_conversion_algorithm =
-                cycle_key_conversion_algorithm(config_.mode.key_conversion_algorithm);
-            mode_dirty_ = true;
-        } else if (settings_cursor_ == 10) {
-            if (normalize_key_conversion_algorithm(config_.mode.key_conversion_algorithm) !=
-                "krrcream") {
-                config_.mode.key_conversion_nk2_preset =
-                    cycle_key_conversion_nk2_preset(config_.mode.key_conversion_nk2_preset);
-                mode_dirty_ = true;
-            }
-        } else if (settings_cursor_ == 11) {
-            config_.mode.gauge = cycle_gauge_mode(config_.mode.gauge, direction);
-            mode_dirty_ = true;
-        } else if (settings_cursor_ == 12) {
-            config_.mode.random = cycle_random_mode(config_.mode.random, direction);
-            mode_dirty_ = true;
-        } else if (settings_cursor_ == 13) {
-            int next_value = static_cast<int>(config_.mode.random_seed) + direction;
-            next_value = clamp_int(next_value, kSeedMin, kSeedMax);
-            config_.mode.random_seed = static_cast<uint32_t>(next_value);
-            mode_dirty_ = true;
-        } else if (settings_cursor_ == 14) {
-            publish_snapshot();
-            return;
-        } else if (settings_cursor_ == 15) {
-            config_.speed.rate = clamp_step_value(config_.speed.rate + static_cast<double>(direction) * kRateStep,
-                                                   kRateMin, kRateMax, kRateStep);
-            mode_dirty_ = true;
-        } else if (settings_cursor_ == 16) {
-            config_.speed.hi_speed = clamp_step_value(
-                config_.speed.hi_speed + static_cast<double>(direction) * kHiSpeedStep,
-                kHiSpeedMin, kHiSpeedMax, kHiSpeedStep);
-            mode_dirty_ = true;
-        }
-        publish_snapshot();
-        return;
-    }
-
-    if (keycode == key_enter_ || keycode == key_escape_ || keycode == key_backspace_) {
-        if (keycode == key_enter_ && settings_cursor_ == 14) {
-            screen_ = Screen::ModeMods;
-            settings_cursor_ = 0;
-            publish_snapshot();
-            return;
-        }
-        screen_ = submenu_return_screen_;
-        settings_cursor_ = 0;
-        if (mode_dirty_) {
-            persist_runtime_config();
-            if (mode_library_dirty_) {
-                refresh_song_source(true);
-            }
-            mode_dirty_ = false;
-            mode_library_dirty_ = false;
-        }
-        publish_snapshot();
-    }
+    apply_mode_settings_effects(effects);
 }
+
 void MenuApp::handle_mode_mods_input(uint32_t keycode) {
-    const auto& categories = mode_mod_categories();
-    const int item_count = static_cast<int>(categories.size()) + 1;
+    menu::settings::ModeSettingsEffects effects;
     if (keycode == key_up_) {
-        settings_cursor_ = clamp_int(settings_cursor_ - 1, 0, item_count - 1);
-        publish_snapshot();
-        return;
+        effects = mode_settings_controller_.handle_mod_manager(
+            menu::MenuAction::move(-1), config_);
+    } else if (keycode == key_down_) {
+        effects = mode_settings_controller_.handle_mod_manager(
+            menu::MenuAction::move(1), config_);
+    } else if (keycode == key_left_) {
+        effects = mode_settings_controller_.handle_mod_manager(
+            menu::MenuAction::adjust(-1), config_);
+    } else if (keycode == key_right_) {
+        effects = mode_settings_controller_.handle_mod_manager(
+            menu::MenuAction::adjust(1), config_);
+    } else if (keycode == key_enter_) {
+        effects = mode_settings_controller_.handle_mod_manager(
+            menu::MenuAction::activate(), config_);
+    } else if (keycode == key_escape_ || keycode == key_backspace_) {
+        effects = mode_settings_controller_.handle_mod_manager(
+            menu::MenuAction::back(), config_);
     }
-    if (keycode == key_down_) {
-        settings_cursor_ = clamp_int(settings_cursor_ + 1, 0, item_count - 1);
-        publish_snapshot();
-        return;
-    }
+    apply_mode_settings_effects(effects);
+}
 
-    if ((keycode == key_left_ || keycode == key_right_) && settings_cursor_ < static_cast<int>(categories.size())) {
-        const int direction = (keycode == key_left_) ? -1 : 1;
-        config_.mode.mods = cycle_mode_mod_category(config_.mode.mods, categories[static_cast<std::size_t>(settings_cursor_)], direction);
-        mode_dirty_ = true;
-        publish_snapshot();
+void MenuApp::apply_mode_settings_effects(
+    const menu::settings::ModeSettingsEffects& effects) {
+    if (effects.empty()) {
         return;
     }
-
-    if (keycode == key_enter_ || keycode == key_escape_ || keycode == key_backspace_) {
-        screen_ = Screen::ModeSelect;
-        settings_cursor_ = 14;
-        publish_snapshot();
+    if (effects.show_mod_manager) {
+        push_screen(Screen::ModeMods);
     }
+    if (effects.menu.persist_config) {
+        persist_runtime_config();
+    }
+    if (effects.refresh_song_library) {
+        refresh_song_source(true);
+    }
+    if (effects.menu.navigate_back && !pop_screen()) {
+        reset_screen(
+            current_screen() == Screen::ModeMods
+                ? Screen::ModeSelect
+                : Screen::OptionsHub);
+    }
+    settings_cursor_ = current_screen() == Screen::ModeMods
+        ? static_cast<int>(mode_settings_controller_.selected_mod_category())
+        : static_cast<int>(mode_settings_controller_.selected_id());
+    publish_snapshot();
 }
 
 void MenuApp::populate_audio_settings_render_data(render::MenuRenderData& render) {
-    append_menu_row(render.generic, ui_text("Preset", "프리셋"), ui_preset_label(config_.audio_ui.preset), settings_cursor_ == 0,
-                    render::MenuHitTargetKind::SettingsRow, 0, false, true);
-    append_menu_row(render.generic, ui_text("Keysound Mode", "키음 모드"), ui_keysound_policy_label(config_.audio_ui.bms_keysound_policy), settings_cursor_ == 1,
-                    render::MenuHitTargetKind::SettingsRow, 1, false, true);
-    append_menu_row(render.generic, ui_text("Background Sound", "배경음"), ui_on_off(config_.audio_ui.background_sound_enabled), settings_cursor_ == 2,
-                    render::MenuHitTargetKind::SettingsRow, 2, false, true);
-    append_menu_row(render.generic, ui_text("Master Volume", "마스터 볼륨"), format_percent(config_.audio_ui.master_volume), settings_cursor_ == 3,
-                    render::MenuHitTargetKind::SettingsRow, 3, false, true);
-    append_menu_row(render.generic, ui_text("BGM Volume", "BGM 볼륨"), format_percent(config_.audio_ui.bgm_volume), settings_cursor_ == 4,
-                    render::MenuHitTargetKind::SettingsRow, 4, false, true);
-    append_menu_row(render.generic, ui_text("Keysound Volume", "키음 볼륨"), format_percent(config_.audio_ui.keysound_volume), settings_cursor_ == 5,
-                    render::MenuHitTargetKind::SettingsRow, 5, false, true);
-    append_menu_row(render.generic, ui_text("Sound Offset", "사운드 오프셋"), format_signed_offset_ms(config_.sound_offset_ms), settings_cursor_ == 6,
-                    render::MenuHitTargetKind::SettingsRow, 6, false, true);
-    append_menu_row(render.generic, ui_text("Back", "뒤로"), "", settings_cursor_ == 7, render::MenuHitTargetKind::SettingsRow, 7, true, false);
-    render.generic.notes.push_back(ui_text("Follow: note hits trigger keysounds. Autoplay: note keysounds are mixed into background audio.",
-                                           "연동: 노트를 칠 때 키음이 납니다. 자동재생: 노트 키음이 배경음에 섞여 재생됩니다."));
-    render.generic.notes.push_back(ui_text(
-        "Background Sound controls menu, result, and song-preview music only. Gameplay chart BGM keeps playing.",
-        "배경음은 메뉴, 결과, 곡 미리듣기 음악만 제어합니다. 게임플레이 차트 BGM은 계속 재생됩니다."));
-    render.generic.notes.push_back(ui_text("Off: skip note keysounds. Autoplay mode routes note keysounds through BGM volume.",
-                                           "끔: 노트 키음을 재생하지 않습니다. 자동재생에서는 노트 키음이 BGM 볼륨을 따릅니다."));
-    render.generic.notes.push_back(ui_text(
-        "Sound Offset shifts chart BGM and autoplay keysounds only. Positive delays sound; negative advances it.",
-        "사운드 오프셋은 차트 BGM과 자동재생 키음만 이동합니다. 양수는 소리를 늦추고 음수는 앞당깁니다."));
-    render.generic.notes.push_back(ui_text("Left/Right or click +/- to change. Back saves and returns.",
-                                           "좌우 키나 +/- 클릭으로 변경합니다. 뒤로 가면 저장 후 돌아갑니다."));
+    auto view = menu::settings::AudioSettingsView::build(
+        audio_settings_controller_, config_, ui_uses_korean());
+    render.generic.rows.reserve(render.generic.rows.size() + view.rows.size());
+    for (auto& source : view.rows) {
+        render::MenuRowData row;
+        row.label = std::move(source.label);
+        row.value = std::move(source.value);
+        row.selected = source.selected;
+        row.activatable = source.activatable;
+        row.adjustable = source.adjustable;
+        row.increment_enabled = source.adjustable;
+        row.decrement_enabled = source.adjustable;
+        row.slider = source.slider_ratio.has_value();
+        row.slider_ratio = source.slider_ratio.value_or(0.0);
+        row.target_kind = render::MenuHitTargetKind::SettingsRow;
+        row.row_index = static_cast<int>(source.id);
+        render.generic.rows.push_back(std::move(row));
+    }
+    render.generic.notes = std::move(view.notes);
 }
 
 void MenuApp::populate_mode_settings_render_data(render::MenuRenderData& render) {

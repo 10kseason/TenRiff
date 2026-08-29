@@ -3,7 +3,8 @@ param(
     [string]$BuildReleaseDirectory,
     [Parameter(Mandatory = $true)]
     [string]$OutputDirectory,
-    [string]$Version = "1.5.1"
+    [string]$Version = "1.6.0",
+    [switch]$BinaryOnly
 )
 
 $ErrorActionPreference = "Stop"
@@ -60,7 +61,10 @@ if ($LASTEXITCODE -ne 0) {
     throw "Release tests failed; packaging was stopped."
 }
 
-New-Item -ItemType Directory -Path $binaryRoot, $sourceRoot -Force | Out-Null
+New-Item -ItemType Directory -Path $binaryRoot -Force | Out-Null
+if (-not $BinaryOnly) {
+    New-Item -ItemType Directory -Path $sourceRoot -Force | Out-Null
+}
 
 $topFiles = @(
     "CHANGELOG.md",
@@ -100,29 +104,35 @@ foreach ($runtime in $runtimeFiles) {
     Copy-Item -LiteralPath $runtimePath -Destination $binaryRoot
 }
 
-$sourceFiles = & git -C $repoRoot ls-files --cached --others --exclude-standard
-if ($LASTEXITCODE -ne 0 -or -not $sourceFiles) {
-    throw "Could not enumerate the public source files."
-}
-foreach ($relative in $sourceFiles) {
-    $sourcePath = Join-Path $repoRoot $relative
-    if (-not (Test-Path -LiteralPath $sourcePath -PathType Leaf)) {
-        throw "Enumerated source file is missing: $relative"
+$archives = @($binaryZip)
+if (-not $BinaryOnly) {
+    $sourceFiles = & git -C $repoRoot ls-files --cached --others --exclude-standard
+    if ($LASTEXITCODE -ne 0 -or -not $sourceFiles) {
+        throw "Could not enumerate the public source files."
     }
-    $destination = Join-Path $sourceRoot $relative
-    $destinationParent = Split-Path -Parent $destination
-    New-Item -ItemType Directory -Path $destinationParent -Force | Out-Null
-    Copy-Item -LiteralPath $sourcePath -Destination $destination
+    foreach ($relative in $sourceFiles) {
+        $sourcePath = Join-Path $repoRoot $relative
+        if (-not (Test-Path -LiteralPath $sourcePath -PathType Leaf)) {
+            throw "Enumerated source file is missing: $relative"
+        }
+        $destination = Join-Path $sourceRoot $relative
+        $destinationParent = Split-Path -Parent $destination
+        New-Item -ItemType Directory -Path $destinationParent -Force | Out-Null
+        Copy-Item -LiteralPath $sourcePath -Destination $destination
+    }
+    $archives += $sourceZip
 }
 
 Compress-Archive -LiteralPath $binaryRoot -DestinationPath $binaryZip -CompressionLevel Optimal
-Compress-Archive -LiteralPath $sourceRoot -DestinationPath $sourceZip -CompressionLevel Optimal
+if (-not $BinaryOnly) {
+    Compress-Archive -LiteralPath $sourceRoot -DestinationPath $sourceZip -CompressionLevel Optimal
+}
 
-$sumLines = foreach ($archive in @($binaryZip, $sourceZip)) {
+$sumLines = foreach ($archive in $archives) {
     $hash = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash
     "$hash  $(Split-Path -Leaf $archive)"
 }
 Set-Content -LiteralPath $sumsPath -Value $sumLines -Encoding ascii
 
-Get-Item -LiteralPath $binaryZip, $sourceZip, $sumsPath |
+Get-Item -LiteralPath ($archives + $sumsPath) |
     Select-Object FullName, Length, LastWriteTime

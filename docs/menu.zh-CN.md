@@ -4,6 +4,8 @@
 
 ## 当前实现状态（Windows 菜单 UI）
 - `MenuApp` 通过 **InputThread(轮询)** → **SPSC 队列** → **菜单状态机** → **RenderThread(D3D11 窗口渲染)** 这一流程运行
+- `MenuNavigator` 负责 screen history，因此 Options 子页面的 Back 会逐层返回到实际入口页面。各设置 controller 负责选择和修改状态，`MenuApp` 只执行保存、文件选择和线程重启等边界效果。
+- `MenuScreenDescriptor` 在一个 exhaustive table 中统一定义固定标题、skin background/fallback 与 snapshot/view 路由。
 - `SongIndexerThread` 在后台生成曲目索引，并缓存到 `profiles/<name>/.tenriff/song-index/<source-hash>.json`
 - 在菜单里调整 audio/graphics/input/mode 设置时，会保存到 profile 配置文件
 - `Options -> Profile Setup` 会重新打开当前 profile 的首次设置页面，并立即保存 language/audio/input/graphics/keymap
@@ -17,6 +19,7 @@
   - Title：`↑/↓` 移动，`Enter` 选择（PLAY/EDIT/OPTIONS/EXIT），`F2` 浏览 songs 文件夹，`F5` 重索引，`Esc` 退出
   - Song Select：`↑/↓` 移动歌曲，`←/→` 切换左侧菜单焦点，`Enter` 选择/开始，`- / +` 调整 Rate，`Esc` 返回
   - Settings/Mode：`↑/↓` 移动项目，`←/→` 改变数值，`Enter/Esc` 返回
+    - Master/BGM/Keysound 音量使用横向滑块；键盘左右调整与点击/拖动共用相同的范围和吸附规则。
     - 较长的设置列表可点击右侧滚动条直接跳转，单击不会执行或修改所选项目。
     - 如果屏幕空间不足而省略说明，最后一条可见说明会显示 `F1` 和剩余帮助行数。
   - Keymap：`↑/↓` 选择，`Enter` 捕获绑定，`Esc` 返回

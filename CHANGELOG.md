@@ -2,6 +2,27 @@
 
 TenRiff의 사용자/배포 관점에서 의미 있는 변경만 간단히 기록합니다.
 
+## [1.6.0] - 2026-08-29
+
+### Changed
+
+- 메뉴 화면 전환을 명시적인 navigation history로 통합해 Options 하위 화면에서 뒤로 갈 때 Options를 거쳐 실제 진입 화면으로 돌아갑니다.
+- Options 허브와 Audio/Input/Calibration/Graphics/Keymap/Skin/Mode 설정을 타입 기반 controller/view 경계로 분리하고, 플랫폼·파일·재시작·저장 효과는 `MenuApp` 어댑터에 유지했습니다.
+- 화면 제목·스킨 배경·Options 계열·snapshot/view 라우팅을 하나의 exhaustive descriptor에 모아 새 화면 추가 지점을 명확히 했습니다.
+- Master/BGM/Keysound 볼륨을 키보드 좌우 조절과 클릭·드래그가 같은 범위·스냅 규칙을 사용하는 가로 슬라이더로 통합했습니다.
+- Unlimited 프레임 설정은 off-vsync 게임플레이에서 최대 1500 FPS로 제한됩니다.
+
+### Fixed
+
+- 멀티플레이의 Space 옵션 단축키가 진행 중 대전 차단과 Ready 해제 절차를 우회하지 않도록 수정했습니다.
+- 한계값에서 슬라이더를 다시 조작해 값이 바뀌지 않더라도 일관된 포인터 피드백을 표시합니다.
+
+### Release
+
+- `1.5.1 fixed stable baseline` 위의 메뉴 구조 확장 릴리스입니다.
+- 정식 자산은 `TenRiff-1.6.0.zip`, `TenRiff-1.6.0-source.zip`, `TenRiff-1.6.0-SHA256SUMS.txt`입니다.
+- 빌드·테스트·패키지 검증 근거는 `docs/release-1.6.0-gate.md`에 기록합니다.
+
 ## [1.5.1 Hotfix 4] - 2026-08-27
 
 ### Fixed

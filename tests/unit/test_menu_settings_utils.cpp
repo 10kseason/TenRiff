@@ -63,3 +63,13 @@ TEST_CASE("difficulty table selection upgrades hashless Fast indexing") {
     runtime.mode.song_index_profile = "invalid";
     CHECK_FALSE(tenriff::app::ensure_difficulty_table_indexing(runtime));
 }
+
+TEST_CASE("volume slider ratios clamp and snap to configured steps") {
+    using tenriff::app::slider_value_from_ratio;
+
+    CHECK(slider_value_from_ratio(0.0, 0.0, 1.0, 0.05) == doctest::Approx(0.0));
+    CHECK(slider_value_from_ratio(0.52, 0.0, 1.0, 0.05) == doctest::Approx(0.5));
+    CHECK(slider_value_from_ratio(0.52, 0.0, 2.0, 0.05) == doctest::Approx(1.05));
+    CHECK(slider_value_from_ratio(-1.0, 0.0, 2.0, 0.05) == doctest::Approx(0.0));
+    CHECK(slider_value_from_ratio(3.0, 0.0, 2.0, 0.05) == doctest::Approx(2.0));
+}

@@ -4,7 +4,7 @@ This roadmap captures the recommended high-level order for building out the game
 
 ## Current baseline
 - Windows GUI/runtime is the primary supported path.
-- Project version line is `1.5.1`; public packages bundle NK3 P64 and generalized pattern MLP inference models, but no BGA upscaler model. Selecting a compatible rights-cleared upscaler ONNX only stores its path, and BGA Upscaler remains off until the user enables it and accepts the high-spec warning; there is no automatic benchmark gate.
+- Project version line is `1.6.0`; public packages bundle NK3 P64 and generalized pattern MLP inference models, but no BGA upscaler model. Selecting a compatible rights-cleared upscaler ONNX only stores its path, and BGA Upscaler remains off until the user enables it and accepts the high-spec warning; there is no automatic benchmark gate.
 - The active menu/runtime is BMS-family only (`.bms/.bme/.bml/.pms`) and supports native, bundled/profile TenRiff `skin.json`, and LR2 skins.
 - For current shipped behavior, read `docs/current-state.md` first; this roadmap is about direction and remaining work.
 
@@ -51,3 +51,11 @@ This roadmap captures the recommended high-level order for building out the game
 - `.osu` charts and osu-derived import, ruleset, scoring, or conversion paths are not eligible for ranked registration. Auxiliary OD8 statistics on an otherwise native BMS result remain local metadata only.
 - Development slice complete: a separate headless server exposes a read-only schema-v1 BMS leaderboard snapshot and Song Select Records can switch between Local and Online without blocking local play.
 - `1.5.1` fixes the self-hosted implementation as a release baseline under [`release-1.5.1-gate.md`](release-1.5.1-gate.md); operating a project-owned central official server remains separately gated.
+
+## 6) Refactor the menu architecture as it grows
+- Phases 0-6 were completed for `1.6.0`: explicit navigation, typed controllers for every settings family, and exhaustive screen descriptors are now the maintained architecture.
+- Follow the staged design and per-phase gates in [`menu-refactor-plan.md`](menu-refactor-plan.md); implementation must not begin with a whole-menu rewrite.
+- Trigger this work when adding a screen requires coordinated edits across the input dispatcher, render-data builder, and multiple shared cursor/return flags, or when screen behavior can no longer be covered by focused unit tests.
+- First add characterization tests for navigation, settings persistence, and pointer/keyboard parity. Then move one screen family at a time out of `MenuApp` into a screen-local state/controller without changing visible behavior.
+- Replace shared return-screen flags with an explicit navigation stack/back policy, and model adjustable rows (including sliders) with typed value ranges and persistence callbacks instead of row-index conditionals.
+- Keep rendering DTO construction separate from input/state mutation. Finish each extraction with focused tests plus the normal client build before starting the next family; do not perform a whole-menu rewrite.

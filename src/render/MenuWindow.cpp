@@ -3852,6 +3852,35 @@ void MenuWindow::on_mouse_button_down(int window_x, int window_y) {
         return;
     }
 
+    for (auto it = hit_regions_.rbegin(); it != hit_regions_.rend(); ++it) {
+        if (it->part != MenuHitPart::SetValue ||
+            x < it->left || x > it->right || y < it->top || y > it->bottom) {
+            continue;
+        }
+        value_slider_drag_state_.active = true;
+        value_slider_drag_state_.kind = it->kind;
+        value_slider_drag_state_.index = it->index;
+        value_slider_drag_state_.left = it->left;
+        value_slider_drag_state_.right = it->right;
+        const float width = it->right - it->left;
+        value_slider_drag_state_.last_value =
+            width > 0.0f
+                ? std::clamp(static_cast<double>((x - it->left) / width), 0.0, 1.0)
+                : 0.0;
+        MenuClickEvent event;
+        event.kind = it->kind;
+        event.index = it->index;
+        event.part = MenuHitPart::SetValue;
+        event.value = value_slider_drag_state_.last_value;
+        push_click_event(std::move(event));
+        suppress_next_left_button_up_ = true;
+        if (hwnd_) {
+            SetCapture(static_cast<HWND>(hwnd_));
+        }
+        SetCursor(LoadCursor(nullptr, IDC_SIZEWE));
+        return;
+    }
+
     if (!song_scrollbar_state_.visible ||
         x < song_scrollbar_state_.left || x > song_scrollbar_state_.right ||
         y < song_scrollbar_state_.top || y > song_scrollbar_state_.bottom) {
@@ -3924,6 +3953,33 @@ void MenuWindow::on_mouse_click(int window_x, int window_y, bool double_click) {
         return;
     }
 
+    if (value_slider_drag_state_.active) {
+        float x = 0.0f;
+        float y = 0.0f;
+        static_cast<void>(translate_window_point(window_x, window_y, &x, &y));
+        const float width = value_slider_drag_state_.right - value_slider_drag_state_.left;
+        const double value =
+            width > 0.0f
+                ? std::clamp(
+                      static_cast<double>((x - value_slider_drag_state_.left) / width),
+                      0.0, 1.0)
+                : 0.0;
+        if (value != value_slider_drag_state_.last_value) {
+            MenuClickEvent event;
+            event.kind = value_slider_drag_state_.kind;
+            event.index = value_slider_drag_state_.index;
+            event.part = MenuHitPart::SetValue;
+            event.value = value;
+            push_click_event(std::move(event));
+        }
+        value_slider_drag_state_ = ValueSliderDragState{};
+        if (hwnd_ && GetCapture() == static_cast<HWND>(hwnd_)) {
+            ReleaseCapture();
+        }
+        suppress_next_left_button_up_ = false;
+        return;
+    }
+
     if (song_scroll_drag_active_) {
         song_scroll_drag_active_ = false;
         if (hwnd_ && GetCapture() == static_cast<HWND>(hwnd_)) {
@@ -3968,6 +4024,12 @@ void MenuWindow::on_mouse_click(int window_x, int window_y, bool double_click) {
     event.kind = hit->kind;
     event.index = hit->index;
     event.part = hit->part;
+    if (hit->part == MenuHitPart::SetValue) {
+        const float width = hit->right - hit->left;
+        event.value = width > 0.0f
+                          ? std::clamp(static_cast<double>((x - hit->left) / width), 0.0, 1.0)
+                          : 0.0;
+    }
     event.double_click = double_click;
     push_click_event(std::move(event));
     suppress_next_left_button_up_ = double_click;
@@ -4036,6 +4098,27 @@ void MenuWindow::on_mouse_move(int window_x, int window_y) {
         return;
     }
 
+    if (value_slider_drag_state_.active) {
+        const float width = value_slider_drag_state_.right - value_slider_drag_state_.left;
+        const double value =
+            width > 0.0f
+                ? std::clamp(
+                      static_cast<double>((x - value_slider_drag_state_.left) / width),
+                      0.0, 1.0)
+                : 0.0;
+        if (value != value_slider_drag_state_.last_value) {
+            MenuClickEvent event;
+            event.kind = value_slider_drag_state_.kind;
+            event.index = value_slider_drag_state_.index;
+            event.part = MenuHitPart::SetValue;
+            event.value = value;
+            push_click_event(std::move(event));
+            value_slider_drag_state_.last_value = value;
+        }
+        SetCursor(LoadCursor(nullptr, IDC_SIZEWE));
+        return;
+    }
+
     if (!song_scroll_drag_active_) {
         return;
     }
@@ -4055,6 +4138,7 @@ void MenuWindow::on_mouse_move(int window_x, int window_y) {
 void MenuWindow::on_mouse_capture_changed() {
     const bool lost_gameplay_drag = gameplay_field_drag_state_.active;
     const bool lost_song_drag = song_scroll_drag_active_;
+    const bool lost_slider_drag = value_slider_drag_state_.active;
     if (gameplay_field_drag_state_.active) {
         gameplay_field_drag_state_.active = false;
         gameplay_field_drag_state_.hovered = false;
@@ -4066,8 +4150,9 @@ void MenuWindow::on_mouse_capture_changed() {
         event.value = gameplay_field_drag_state_.offset_x;
         push_click_event(std::move(event));
     }
+    value_slider_drag_state_ = ValueSliderDragState{};
     song_scroll_drag_active_ = false;
-    if (lost_gameplay_drag || lost_song_drag) {
+    if (lost_gameplay_drag || lost_song_drag || lost_slider_drag) {
         suppress_next_left_button_up_ = false;
     }
     if (gameplay_field_drag_state_.visible) {

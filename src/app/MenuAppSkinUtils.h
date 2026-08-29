@@ -161,6 +161,27 @@ inline void append_menu_row(render::GenericMenuData& menu,
     menu.rows.push_back(std::move(row));
 }
 
+inline void append_slider_menu_row(render::GenericMenuData& menu,
+                                   std::string label,
+                                   std::string value,
+                                   double slider_ratio,
+                                   bool selected,
+                                   render::MenuHitTargetKind target_kind,
+                                   int row_index) {
+    render::MenuRowData row;
+    row.label = std::move(label);
+    row.value = std::move(value);
+    row.selected = selected;
+    row.adjustable = true;
+    row.increment_enabled = true;
+    row.decrement_enabled = true;
+    row.slider = true;
+    row.slider_ratio = std::clamp(slider_ratio, 0.0, 1.0);
+    row.target_kind = target_kind;
+    row.row_index = row_index;
+    menu.rows.push_back(std::move(row));
+}
+
 inline std::string format_percent(double value) {
     const int percent = static_cast<int>(std::lround(std::clamp(value, 0.0, 2.0) * 100.0));
     return std::to_string(percent) + "%";
@@ -281,6 +302,15 @@ inline int lane_count_for_skin_mode(std::string_view key_mode) {
 
 inline std::string lane_display_label(int lane_index) {
     return "Lane " + std::to_string(std::max(1, lane_index + 1));
+}
+
+inline double slider_value_from_ratio(double ratio,
+                                      double min_value,
+                                      double max_value,
+                                      double step) {
+    const double safe_ratio = std::isfinite(ratio) ? std::clamp(ratio, 0.0, 1.0) : 0.0;
+    return clamp_step_value(
+        min_value + safe_ratio * (max_value - min_value), min_value, max_value, step);
 }
 
 inline std::string skin_lane_display_label(std::string_view mode,

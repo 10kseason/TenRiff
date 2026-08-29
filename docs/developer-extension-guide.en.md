@@ -13,8 +13,10 @@ This guide explains where to change the code when adding a new `mode/mod`, or wh
   - Owns the mod registry, categories, score multipliers, judge-window scaling, and chart transformations.
 - `src/gameplay/ModeApplier.h` / `src/gameplay/ModeApplier.cpp`
   - Applies key-mode conversion and random-style transformations to the actual `GameplayChart`.
-- `src/app/MenuAppSettings.cpp`, `src/app/MenuAppTail.inl`, `src/app/MenuAppSettingsUtils.h`
-  - Menu UI, input handling, and help copy for `Mode Settings`, `Mod Manager`, `Key Mode`, and related rows.
+- `src/app/menu/settings/ModeSettingsController.h/.cpp`, `src/app/MenuAppSettings.cpp`, `src/app/MenuAppSettingsUtils.h`
+  - Split typed rows/state/mutation for `Mode Settings` and `Mod Manager` from application-boundary effects and label helpers.
+- `src/app/menu/MenuScreenDescriptor.h/.cpp`, `src/app/MenuAppTail.inl`
+  - Boundary between stable screen title/skin/routing metadata and dynamic help/render assembly.
 - `src/config/Config.h` / `src/config/Config.cpp`
   - Load/save schema for `config/config.json` and per-profile settings.
 - `src/app/RuntimeConfigMigration.cpp`
@@ -32,7 +34,7 @@ The usual sequence for a new mode is:
 2. Update `to_string(...)` and `parse_...(...)` in `src/gameplay/ModeSettings.cpp`.
 3. If the token can appear in config files, handle it in `src/app/ModeResolver.cpp` and emit warnings for bad values.
 4. If the mode changes chart structure, implement the actual transformation in `src/app/ModeManager.cpp` or `src/gameplay/ModeApplier.cpp`.
-5. If users should edit it in the menu, add the row and input logic in `src/app/MenuAppSettings.cpp`.
+5. If users should edit it in the menu, add a stable `ModeSettingId` and typed controller/view row; keep only returned persistence/reindex boundary effects in `MenuAppSettings.cpp`.
 6. If persistence or migration is involved, update `src/config/Config.cpp`, `src/app/RuntimeConfigMigration.cpp`, and `src/app/PersistedRuntimeConfig.cpp`.
 7. Add unit/smoke coverage and sync the docs when behavior becomes user-visible.
 

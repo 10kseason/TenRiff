@@ -4,7 +4,7 @@
 
 ## 当前基线
 - Windows GUI/runtime 是主要受支持路径。
-- 项目版本线是 `1.5.1`；公开包附带 NK3 P64 与 generalized pattern MLP inference 模型，但不附带 BGA upscaler 模型。选择兼容且权利已厘清的 upscaler ONNX 只会保存路径，BGA Upscaler 会一直保持 off，直到用户手动开启并确认 high-spec warning；不存在自动 benchmark gate。
+- 项目版本线是 `1.6.0`；公开包附带 NK3 P64 与 generalized pattern MLP inference 模型，但不附带 BGA upscaler 模型。选择兼容且权利已厘清的 upscaler ONNX 只会保存路径，BGA Upscaler 会一直保持 off，直到用户手动开启并确认 high-spec warning；不存在自动 benchmark gate。
 - 当前菜单/runtime 仅支持 BMS family（`.bms/.bme/.bml/.pms`），并支持 native、bundle/profile TenRiff `skin.json` 与 LR2 skin。
 - 关于当前已发布的行为，请先看 [`docs/current-state.zh-CN.md`](current-state.zh-CN.md)；这份路线图主要讲方向和剩余工作。
 
@@ -49,3 +49,11 @@
 - 按 [`ranked-integrity-plan.en.md`](ranked-integrity-plan.en.md) 分阶段完成统一 eligibility reason、Local Records 页面、只读 Online Records、shadow submission，最后才开放 verified ranking。
 - 服务器必须通过已批准的 BMS chart SHA-256 与 replay evidence 重新计算结果，不能把客户端 score claim 当作可信来源。
 - `.osu` chart 以及 osu 派生 import、ruleset、scoring、conversion 一律不可注册 ranked；native BMS 的辅助 OD8 统计仅作为本地 metadata。
+
+## 6) 随规模增长重构 menu architecture
+- `1.6.0` 已完成 Phase 0-6：显式 navigation、所有 settings family 的 typed controller 与 exhaustive screen descriptor 现在构成维护基线。
+- 按照 [`menu-refactor-plan.md`](menu-refactor-plan.md) 的分阶段设计与 phase gate 执行，不要从整套 menu 的一次性重写开始。
+- 当新增 screen 必须同时修改 input dispatcher、render-data builder 和多个共享 cursor/return flag，或 screen behavior 已无法用 focused unit test 覆盖时，启动这项工作。
+- 先补 navigation、settings persistence、pointer/keyboard parity 的 characterization test，再在不改变 visible behavior 的前提下，将 `MenuApp` 按 screen family 逐步拆成局部 state/controller。
+- 用明确的 navigation stack/back policy 替代共享 return-screen flag；包括 slider 在内的 adjustable row 应使用 typed value range 与 persistence callback，而不是 row index 条件分支。
+- 将 render DTO 构建与 input/state mutation 分离。每次 extraction 都通过 focused test 和正常 client build 后再开始下一组，不做一次性全量 rewrite。

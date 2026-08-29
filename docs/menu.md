@@ -4,6 +4,8 @@ The main menu must honor the same low-latency philosophy as gameplay: audio runs
 
 ## 현재 구현 상태(Windows 메뉴 UI)
 - `MenuApp`는 **InputThread(폴링)** → **SPSC 큐** → **메뉴 상태 머신** → **RenderThread(D3D11 윈도우 렌더)** 흐름으로 동작한다.
+- `MenuNavigator`가 화면 history를 소유해 Options 하위 화면의 Back은 한 단계씩 실제 진입 화면까지 되돌아간다. 각 설정 화면의 타입 기반 controller가 선택/수정 상태를 소유하고, `MenuApp`는 저장·파일 선택·스레드 재시작 같은 경계 효과만 실행한다.
+- `MenuScreenDescriptor`가 화면 제목, 스킨 배경/fallback, snapshot/view 라우팅을 한 곳에서 정의한다.
 - `SongIndexerThread`가 백그라운드에서 곡 인덱스를 생성하고 `profiles/<name>/.tenriff/song-index/<source-hash>.json`에 캐시한다.
 - 메뉴에서 오디오/그래픽/인풋/모드 설정을 변경하면 프로필 설정 파일에 저장된다.
 - `Options -> Profile Setup`은 현재 프로필의 첫 실행 설정 화면을 다시 열어 언어/오디오/입력/그래픽/키맵을 즉시 저장한다.
@@ -24,6 +26,7 @@ The main menu must honor the same low-latency philosophy as gameplay: audio runs
     - 로컬 최고 기록의 클리어 난이도를 기준으로 워밍업·도전·마무리 순서를 구성한다.
     - 곡 길이는 인덱스에 없으므로 목표 시간은 차트당 약 3분을 기준으로 계산한다.
   - Settings/Mode: `↑/↓` 항목 이동, `←/→` 값 변경, `Enter/Esc` 복귀
+    - Master/BGM/Keysound 볼륨은 키보드 좌우 조절과 클릭·드래그가 같은 규칙을 쓰는 가로 슬라이더다.
     - 긴 설정 목록은 우측 스크롤바를 클릭해 해당 위치로 바로 이동할 수 있으며, 클릭만으로 값이 바뀌지는 않는다.
     - 화면 공간 때문에 설명 일부가 생략되면 마지막 설명 줄에 `F1`과 남은 도움말 줄 수를 표시한다.
   - Keymap: `↑/↓` 선택, `Enter` 바인딩 캡처, `Esc` 복귀

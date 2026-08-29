@@ -21,13 +21,3 @@ TEST_CASE("reopened profile setup returns to the options hub") {
     CHECK(enter_destination(Entry::Options, 2) == Destination::Stay);
     CHECK(cancel_destination(Entry::Options) == Destination::OptionsHub);
 }
-
-TEST_CASE("options hub uses an eight-card four-by-two grid") {
-    CHECK(kOptionsHubRowCount == 8);
-    CHECK(kOptionsKeyModeRow == 0);
-    CHECK(kOptionsProfileSetupRow == 7);
-    CHECK(move_options_grid_cursor(0, 1, 0) == 1);
-    CHECK(move_options_grid_cursor(3, 1, 0) == 3);
-    CHECK(move_options_grid_cursor(2, 0, 1) == 6);
-    CHECK(move_options_grid_cursor(6, 0, -1) == 2);
-}

@@ -515,7 +515,7 @@ void MenuApp::launch_current_session_mix_song() {
 
     if (!session_mix_active_ || session_mix_cursor_ >= session_mix_plan_.entries.size()) {
         stop_session_mix(true);
-        screen_ = Screen::SongSelect;
+        reset_screen(Screen::SongSelect);
         publish_snapshot();
         return;
     }
@@ -537,7 +537,7 @@ void MenuApp::launch_current_session_mix_song() {
 
     session_mix_current_result_recorded_ = false;
     launch_gameplay(chart_path);
-    if (session_mix_active_ && screen_ == Screen::SongSelect) {
+    if (session_mix_active_ && current_screen() == Screen::SongSelect) {
         stop_session_mix(false);
         publish_snapshot();
     }
@@ -567,13 +567,13 @@ void MenuApp::advance_session_mix_from_result() {
         session_mix_status_message_ =
             ui_text("COURSE FAILED", "코스 실패") + "  " +
             std::to_string(failed_stage) + "/" + std::to_string(total_stages);
-        screen_ = Screen::SongSelect;
+        reset_screen(Screen::SongSelect);
         publish_snapshot();
         return;
     }
     if (session_mix_cursor_ + 1 >= session_mix_plan_.entries.size()) {
         stop_session_mix(true);
-        screen_ = Screen::SongSelect;
+        reset_screen(Screen::SongSelect);
         publish_snapshot();
         return;
     }

@@ -405,7 +405,8 @@ int sanitize_refresh_hz(int value, std::vector<std::string>& warnings) {
         return value;
     }
     warnings.push_back(
-        "graphics.refresh_hz fixed caps are deprecated; using -1 (Match Display). Use 0 for Unlimited.");
+        "graphics.refresh_hz fixed caps are deprecated; using -1 (Match Display). "
+        "Use 0 for Unlimited (1500 FPS maximum).");
     return -1;
 }
 

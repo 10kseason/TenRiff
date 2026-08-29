@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(TenRiff VERSION 1.5.1 LANGUAGES C CXX)
+project(TenRiff VERSION 1.6.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -297,6 +297,21 @@ if(WIN32)
 
     add_library(tenriff_app
         src/app/MenuMusicController.cpp
+        src/app/menu/MenuNavigator.cpp
+        src/app/menu/MenuScreenDescriptor.cpp
+        src/app/menu/OptionsHubController.cpp
+        src/app/menu/settings/AudioSettingsController.cpp
+        src/app/menu/settings/AudioSettingsView.cpp
+        src/app/menu/settings/InputSettingsController.cpp
+        src/app/menu/settings/InputSettingsView.cpp
+        src/app/menu/settings/CalibrationSettingsController.cpp
+        src/app/menu/settings/CalibrationSettingsView.cpp
+        src/app/menu/settings/GraphicsSettingsController.cpp
+        src/app/menu/settings/GraphicsSettingsView.cpp
+        src/app/menu/settings/KeymapSettingsController.cpp
+        src/app/menu/settings/KeymapSettingsView.cpp
+        src/app/menu/settings/SkinSettingsController.cpp
+        src/app/menu/settings/ModeSettingsController.cpp
         src/app/SongPreviewBuilder.cpp
         src/app/SongSelectScreen.cpp
         src/app/GameSession.cpp
@@ -682,6 +697,16 @@ if(TENRIFF_ENABLE_TESTS)
         tests/unit/test_session_mix.cpp
         tests/unit/test_lr2_course.cpp
         tests/unit/test_menu_settings_utils.cpp
+        tests/unit/test_menu_navigator.cpp
+        tests/unit/test_menu_screen_descriptor.cpp
+        tests/unit/test_options_hub_controller.cpp
+        tests/unit/test_audio_settings_controller.cpp
+        tests/unit/test_input_settings_controller.cpp
+        tests/unit/test_calibration_settings_controller.cpp
+        tests/unit/test_graphics_settings_controller.cpp
+        tests/unit/test_keymap_settings_controller.cpp
+        tests/unit/test_skin_settings_controller.cpp
+        tests/unit/test_mode_settings_controller.cpp
         tests/unit/test_config.cpp
         tests/unit/test_menu_music_controller.cpp
         tests/unit/test_input_backend_status.cpp

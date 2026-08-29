@@ -13,8 +13,10 @@ Language: Korean | [English](developer-extension-guide.en.md) | [简体中文](d
   - 모드 모디파이어 레지스트리, 카테고리, 점수 배율, 판정창 스케일, 차트 변형을 담당합니다.
 - `src/gameplay/ModeApplier.h` / `src/gameplay/ModeApplier.cpp`
   - 키 모드 변환과 랜덤 계열 변형을 실제 `GameplayChart`에 적용합니다.
-- `src/app/MenuAppSettings.cpp`, `src/app/MenuAppTail.inl`, `src/app/MenuAppSettingsUtils.h`
-  - `Mode Settings`, `Mod Manager`, `Key Mode` 같은 메뉴 UI와 입력 처리, 도움말 문구를 담당합니다.
+- `src/app/menu/settings/ModeSettingsController.h/.cpp`, `src/app/MenuAppSettings.cpp`, `src/app/MenuAppSettingsUtils.h`
+  - `Mode Settings`와 `Mod Manager`의 타입 기반 행/상태/변경 로직, 앱 경계 효과, 라벨 헬퍼를 나눠 담당합니다.
+- `src/app/menu/MenuScreenDescriptor.h/.cpp`, `src/app/MenuAppTail.inl`
+  - 고정 화면 제목·스킨 배경·snapshot/view 라우팅과 동적 도움말/렌더 조립의 경계입니다.
 - `src/config/Config.h` / `src/config/Config.cpp`
   - `config/config.json`과 프로필 설정의 로드/저장 스키마를 정의합니다.
 - `src/app/RuntimeConfigMigration.cpp`
@@ -32,7 +34,7 @@ Language: Korean | [English](developer-extension-guide.en.md) | [简体中文](d
 2. `src/gameplay/ModeSettings.cpp`에서 `to_string(...)`과 `parse_...(...)`를 같이 갱신합니다.
 3. 새 토큰이 설정 파일에 들어올 수 있으면 `src/app/ModeResolver.cpp`에서 해석과 경고를 추가합니다.
 4. 모드가 차트 구조를 바꾸면 `src/app/ModeManager.cpp` 또는 `src/gameplay/ModeApplier.cpp`에서 실제 변형 로직을 넣습니다.
-5. 메뉴에서 조작할 수 있어야 하면 `src/app/MenuAppSettings.cpp`의 행과 입력 처리를 추가합니다.
+5. 메뉴에서 조작할 수 있어야 하면 `ModeSettingId`와 typed controller/view row를 추가하고, `MenuAppSettings.cpp`에는 반환된 저장/reindex 같은 경계 효과만 연결합니다.
 6. 저장/복구가 필요하면 `src/config/Config.cpp`, `src/app/RuntimeConfigMigration.cpp`, `src/app/PersistedRuntimeConfig.cpp`를 함께 확인합니다.
 7. `tests/unit`과 `tests/smoke`에 회귀 테스트를 넣고, 필요하면 문서를 같이 맞춥니다.
 

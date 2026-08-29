@@ -4,6 +4,8 @@ The main menu must follow the same low-latency philosophy as gameplay: audio run
 
 ## Current Implementation State (Windows Menu UI)
 - `MenuApp` runs as **InputThread (polling)** -> **SPSC queue** -> **menu state machine** -> **RenderThread (D3D11 window render)**.
+- `MenuNavigator` owns screen history, so Back leaves nested Options screens one level at a time and returns to the real entry screen. Typed per-screen controllers own selection/mutation state; `MenuApp` executes persistence, file-dialog, and thread-restart boundary effects.
+- `MenuScreenDescriptor` is the single exhaustive table for stable titles, skin background/fallback keys, and snapshot/view routing.
 - `SongIndexerThread` builds the song index in the background and caches it at `profiles/<name>/.tenriff/song-index/<source-hash>.json`.
 - When audio / graphics / input / mode settings are changed in the menu, they are saved to the profile config file.
 - `Options -> Profile Setup` reopens first-run setup for the active profile and immediately saves language, audio, input, graphics, and keymap changes.
@@ -17,6 +19,7 @@ The main menu must follow the same low-latency philosophy as gameplay: audio run
   - Title: `↑ / ↓` move, `Enter` select (PLAY / EDIT / OPTIONS / EXIT), `F2` songs-folder browse, `F5` reindex, `Esc` quit
   - Song Select: `↑ / ↓` song movement, `← / →` switch focus on the left menu, `Tab` enters quick settings, then `↑ / ↓` selects and `← / →` adjusts Visual Latency / Hi-Speed / Gauge / Random; `Enter` selects / plays, `- / +` adjusts Rate, and `Esc` goes back
   - Settings / Mode: `↑ / ↓` move items, `← / →` change values, `Enter / Esc` return
+    - Master/BGM/Keysound volume uses horizontal sliders; keyboard adjustment and click/drag share the same bounds and snapping rules.
     - Long settings lists support click-to-jump on the right scrollbar without activating or changing the selected row.
     - When space hides some descriptions, the final visible line shows `F1` and the remaining help-line count.
   - Keymap: `↑ / ↓` select, `Enter` capture binding, `Esc` return

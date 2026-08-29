@@ -13,8 +13,10 @@ Language: [한국어](developer-extension-guide.md) | [English](developer-extens
   - mod registry、category、score multiplier、judge-window scaling、chart transformation を管理。
 - `src/gameplay/ModeApplier.h` / `src/gameplay/ModeApplier.cpp`
   - 実際の `GameplayChart` に key-mode conversion と random-style transformation を適用。
-- `src/app/MenuAppSettings.cpp`, `src/app/MenuAppTail.inl`, `src/app/MenuAppSettingsUtils.h`
-  - `Mode Settings`、`Mod Manager`、`Key Mode` 関連行の menu UI、input handling、help copy。
+- `src/app/menu/settings/ModeSettingsController.h/.cpp`, `src/app/MenuAppSettings.cpp`, `src/app/MenuAppSettingsUtils.h`
+  - `Mode Settings` / `Mod Manager` の typed row/state/mutation と application-boundary effect / label helper を分離して担当。
+- `src/app/menu/MenuScreenDescriptor.h/.cpp`, `src/app/MenuAppTail.inl`
+  - 固定 screen title/skin/routing metadata と動的 help/render assembly の境界。
 - `src/config/Config.h` / `src/config/Config.cpp`
   - `config/config.json` と profile 単位設定の load/save schema。
 - `src/app/RuntimeConfigMigration.cpp`
@@ -30,7 +32,7 @@ Language: [한국어](developer-extension-guide.md) | [English](developer-extens
 2. `src/gameplay/ModeSettings.cpp` で `to_string(...)` と `parse_...(...)` を更新する。
 3. config file に現れうる token なら `src/app/ModeResolver.cpp` で扱い、不正値 warning を出す。
 4. mode が chart structure を変えるなら `src/app/ModeManager.cpp` または `src/gameplay/ModeApplier.cpp` に実際の変換を実装する。
-5. menu から編集させるなら `src/app/MenuAppSettings.cpp` に行と入力処理を追加する。
+5. menu から編集させるなら stable `ModeSettingId` と typed controller/view row を追加し、`MenuAppSettings.cpp` には返された保存/reindex の境界 effect だけを接続する。
 6. persistence や migration が絡むなら `src/config/Config.cpp`、`src/app/RuntimeConfigMigration.cpp`、`src/app/PersistedRuntimeConfig.cpp` を更新する。
 7. unit/smoke coverage を追加し、user-visible behavior になったら docs も同期する。
 

@@ -4,7 +4,7 @@
 
 ## Current Baseline
 - Windows GUI / runtime が主なサポート経路です。
-- プロジェクト版ラインは `1.5.1`。公開 package は NK3 P64 と generalized pattern MLP inference model を同梱するが、BGA upscaler model は同梱しない。互換性と権利を確認済みの upscaler ONNX を選択しても path を保存するだけで、BGA Upscaler は user が有効化して high-spec warning を確認するまで off のまま。自動 benchmark gate はない。
+- プロジェクト版ラインは `1.6.0`。公開 package は NK3 P64 と generalized pattern MLP inference model を同梱するが、BGA upscaler model は同梱しない。互換性と権利を確認済みの upscaler ONNX を選択しても path を保存するだけで、BGA Upscaler は user が有効化して high-spec warning を確認するまで off のまま。自動 benchmark gate はない。
 - 現行 menu / runtime は BMS family（`.bms/.bme/.bml/.pms`）専用で、native、bundle/profile の TenRiff `skin.json`、LR2 skin をサポート。
 - 現在出荷されている挙動は [`docs/current-state.ja.md`](current-state.ja.md) を先に見てください。この roadmap は方向と残作業を示す文書です。
 
@@ -49,3 +49,11 @@
 - [`ranked-integrity-plan.en.md`](ranked-integrity-plan.en.md) に従い、共通 eligibility reason、Local Records 画面、read-only Online Records、shadow submission、公開 verified ranking の順で進める。
 - server は承認済み BMS chart SHA-256 と replay evidence から結果を再計算し、client の score claim を信頼境界にしない。
 - `.osu` chart と osu 派生 import / ruleset / scoring / conversion は ranked 登録不可。native BMS の補助 OD8 統計は local metadata のみ。
+
+## 6) 規模拡大に合わせて menu architecture を refactor する
+- `1.6.0` で Phase 0-6 を完了した。明示的 navigation、全 settings family の typed controller、exhaustive screen descriptor が現在の保守対象 architecture となる。
+- [`menu-refactor-plan.md`](menu-refactor-plan.md) の段階設計と phase gate に従い、menu 全体の一括 rewrite から始めない。
+- 新しい screen の追加で input dispatcher、render-data builder、複数の共有 cursor/return flag を同時に変更する必要が生じるか、screen behavior を focused unit test で覆えなくなった時点で着手する。
+- 先に navigation、settings persistence、pointer/keyboard parity の characterization test を追加し、visible behavior を変えずに `MenuApp` から screen family ごとに local state/controller へ移す。
+- 共有 return-screen flag は明示的な navigation stack/back policy に置き換え、slider を含む adjustable row は row index 条件ではなく typed value range と persistence callback で表現する。
+- render DTO 構築と input/state mutation を分離する。各 extraction は focused test と通常の client build を通してから次へ進み、menu 全体の一括 rewrite は行わない。

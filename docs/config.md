@@ -108,10 +108,10 @@
   - `native | 720p | 1080p | qhd`
 - `vsync` (bool)
 - `refresh_hz` (int)
-  - `-1`은 `디스플레이에 맞춤`, `0`은 `무제한`
+  - `-1`은 `디스플레이에 맞춤`, `0`은 프로필 호환용 `무제한` 선택값(실제 최대 1500 FPS)
   - 고정 숫자 제한은 폐기되었으며 로드 시 `-1`로 이전
-  - `vsync=false`의 무제한은 게임플레이 pacing을 해제하고 메뉴는 300 FPS cap 유지
-  - `vsync=false`면 menu는 effective cap `300`; gameplay는 `-1`일 때 모니터 주사율을 따르고 `0`일 때 render pacing을 해제함
+  - `vsync=false`의 무제한은 게임플레이를 1500 FPS로 제한하고 메뉴는 300 FPS cap 유지
+  - `vsync=false`면 menu는 effective cap `300`; gameplay는 `-1`일 때 모니터 주사율을 따르고 `0`일 때 1500 FPS render pacing을 적용함
   - `vsync=true`면 present refresh는 active monitor Hz를 따르고, render pacing은 `monitor_hz * 2`를 목표로 함 (`1050` clamp)
 - `performance_overlay` (bool)
   - 기본값은 `false`; 우상단을 사용하므로 Discord Voice 위젯을 같은 모서리에 두면 겹칠 수 있음

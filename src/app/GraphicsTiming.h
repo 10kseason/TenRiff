@@ -9,6 +9,7 @@ inline constexpr int kGraphicsRefreshHzMatchDisplay = -1;
 inline constexpr int kGraphicsRefreshHzMin = 60;
 inline constexpr int kGraphicsRefreshHzMax = 1050;
 inline constexpr int kGraphicsMenuRefreshHzCap = 300;
+inline constexpr int kGraphicsUnlimitedFpsCap = 1500;
 
 [[nodiscard]] int clamp_graphics_refresh_hz(int value);
 [[nodiscard]] int normalize_graphics_refresh_hz(int value);

@@ -4,6 +4,8 @@ main menu も gameplay と同じ低遅延思想に従う必要があります。
 
 ## Current Implementation State (Windows Menu UI)
 - `MenuApp` は **InputThread (polling)** -> **SPSC queue** -> **menu state machine** -> **RenderThread (D3D11 window render)** で動く。
+- `MenuNavigator` が screen history を所有し、Options 配下の Back は一階層ずつ実際の遷移元へ戻る。各 settings controller が選択・変更状態を所有し、`MenuApp` は保存、file dialog、thread restart などの境界 effect を実行する。
+- `MenuScreenDescriptor` が固定 title、skin background/fallback、snapshot/view routing を一つの exhaustive table で定義する。
 - `SongIndexerThread` はバックグラウンドで song index を構築し、`profiles/<name>/.tenriff/song-index/<source-hash>.json` にキャッシュする。
 - menu で audio / graphics / input / mode settings を変えると profile config file に保存される。
 - `Options -> Profile Setup` は現在の profile の初回 setup を開き直し、language / audio / input / graphics / keymap を即時保存する。
@@ -17,6 +19,7 @@ main menu も gameplay と同じ低遅延思想に従う必要があります。
   - Title: `↑ / ↓` move, `Enter` select (`PLAY / EDIT / OPTIONS / EXIT`), `F2` songs-folder browse, `F5` reindex, `Esc` quit
   - Song Select: `↑ / ↓` song movement, `← / →` left menu focus 切り替え, `Enter` select / play, `- / +` Rate 調整, `Esc` back
   - Settings / Mode: `↑ / ↓` item 移動, `← / →` 値変更, `Enter / Esc` で戻る
+    - Master/BGM/Keysound volume は horizontal slider で、keyboard と click/drag が同じ範囲・snap rule を使う。
     - 長い settings list は右側 scrollbar の click-to-jump に対応し、click だけでは選択 row の値変更や実行を行わない。
     - 画面領域の不足で説明を省略した場合、最後の表示行に `F1` と残り help line 数を表示する。
   - Keymap: `↑ / ↓` select, `Enter` capture binding, `Esc` return

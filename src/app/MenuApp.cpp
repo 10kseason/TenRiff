@@ -706,6 +706,22 @@ std::string format_signed_ms(double value) {
 
 }  // namespace
 
+void MenuApp::reset_screen(Screen screen) noexcept {
+    menu_navigator_.reset(screen);
+}
+
+void MenuApp::push_screen(Screen screen) {
+    menu_navigator_.push(screen);
+}
+
+void MenuApp::replace_screen(Screen screen) noexcept {
+    menu_navigator_.replace(screen);
+}
+
+bool MenuApp::pop_screen() noexcept {
+    return menu_navigator_.back();
+}
+
 std::vector<uint32_t> build_menu_probe_keycodes(const std::vector<uint32_t>& fixed_menu_keys,
                                                 const config::Keymap& working_keymap,
                                                 std::string_view keymap_edit_mode,
@@ -1173,11 +1189,7 @@ bool MenuApp::initialize(const CommandLineOptions& options) {
     key_minus_ = config::KeycodeMap::to_keycode("Minus").value_or(0);
     key_plus_ = config::KeycodeMap::to_keycode("Plus").value_or(0);
 
-    {
-        config::KeymapManager keymap_manager;
-        keymap_edit_mode_ = keymap_manager.normalize_mode_token(config_.mode.key_mode);
-    }
-    refresh_keymap_lane_list();
+    keymap_settings_controller_.reset(std::nullopt, config_.mode.key_mode);
 
     std::string initial_song_source = songs_path_;
     if (!config_.ui.active_song_source.empty()) {
@@ -1202,7 +1214,7 @@ bool MenuApp::initialize(const CommandLineOptions& options) {
 
     switch_song_source(initial_song_source, false);
     if (first_run_profile_) {
-        screen_ = Screen::QuickSetup;
+        reset_screen(Screen::QuickSetup);
         settings_cursor_ = 0;
     }
 
@@ -1278,7 +1290,7 @@ void MenuApp::run() {
             if (chat_overlay_visible_) publish_snapshot();
         }
 
-        if (screen_ == Screen::SongSelect &&
+        if (current_screen() == Screen::SongSelect &&
             song_select_view_ == SongSelectView::Records &&
             online_records_view_) {
             const auto online = online_records_service_.snapshot();
@@ -1302,7 +1314,7 @@ void MenuApp::run() {
         update_song_select_repeat();
         service_song_preview();
 
-        if (screen_ != Screen::Gameplay && song_indexer_.is_running()) {
+        if (current_screen() != Screen::Gameplay && song_indexer_.is_running()) {
             const int64_t now_ns = timing::HighResClock::now_ns();
             if (now_ns - last_indexer_snapshot_ns_ >= 200'000'000LL) {
                 last_indexer_snapshot_ns_ = now_ns;
@@ -1514,12 +1526,12 @@ std::vector<uint32_t> MenuApp::current_menu_probe_keycodes() const {
     append_fixed_key(key_plus_);
 
     const bool include_keymap_bindings =
-        screen_ == Screen::Keymap || screen_ == Screen::KeymapTest;
+        current_screen() == Screen::Keymap || current_screen() == Screen::KeymapTest;
     const bool capture_all_keys =
-        screen_ == Screen::Keymap && keymap_capture_active_;
+        current_screen() == Screen::Keymap && keymap_settings_controller_.capture_active();
     return build_menu_probe_keycodes(fixed_menu_keys,
                                      working_keymap_,
-                                     keymap_edit_mode_,
+                                     std::string(keymap_settings_controller_.edit_mode()),
                                      include_keymap_bindings,
                                      capture_all_keys);
 }
@@ -1596,7 +1608,7 @@ bool MenuApp::fallback_menu_input_to_polling(std::string_view reason) {
 }
 
 void MenuApp::service_input_backend_health() {
-    if (!config_.input.rawinput || input_backend_state_.auto_fallback || screen_ == Screen::Gameplay) {
+    if (!config_.input.rawinput || input_backend_state_.auto_fallback || current_screen() == Screen::Gameplay) {
         reset_input_backend_probe();
         return;
     }
@@ -1714,7 +1726,7 @@ int MenuApp::effective_refresh_hz() const {
         detect_active_monitor_refresh_hz(kGraphicsRefreshHzMin);
     return effective_configured_refresh_hz(config_.graphics.refresh_hz,
                                            detected_monitor_refresh_hz,
-                                           screen_ == Screen::Gameplay);
+                                           current_screen() == Screen::Gameplay);
 }
 
 int MenuApp::effective_present_refresh_hz() const {
@@ -1723,7 +1735,7 @@ int MenuApp::effective_present_refresh_hz() const {
     return ::tenriff::app::effective_present_refresh_hz(config_.graphics.vsync,
                                                         config_.graphics.refresh_hz,
                                                         detected_monitor_refresh_hz,
-                                                        screen_ == Screen::Gameplay);
+                                                        current_screen() == Screen::Gameplay);
 }
 
 int MenuApp::effective_render_fps_limit() const {
@@ -1732,7 +1744,7 @@ int MenuApp::effective_render_fps_limit() const {
     return ::tenriff::app::effective_render_fps_limit(config_.graphics.vsync,
                                                       config_.graphics.refresh_hz,
                                                       detected_monitor_refresh_hz,
-                                                      screen_ == Screen::Gameplay);
+                                                      current_screen() == Screen::Gameplay);
 }
 
 render::MenuWindowConfig MenuApp::current_window_config() const {
@@ -1907,13 +1919,14 @@ void MenuApp::handle_input_event(const input::InputEvent& event) {
         return;
     }
 
-    if (screen_ == Screen::Keymap && keymap_capture_active_) {
+    if (current_screen() == Screen::Keymap &&
+        keymap_settings_controller_.capture_active()) {
         apply_keymap_capture(event.keycode);
         return;
     }
 
     const bool help_overlay_supported =
-        screen_ != Screen::Gameplay && screen_ != Screen::Result;
+        current_screen() != Screen::Gameplay && current_screen() != Screen::Result;
     if (help_overlay_supported && key_f1_ != 0 && event.keycode == key_f1_) {
         help_overlay_visible_ = !help_overlay_visible_;
         publish_snapshot();
@@ -1927,11 +1940,11 @@ void MenuApp::handle_input_event(const input::InputEvent& event) {
         return;
     }
 
-    if (handle_settings_shortcut(event.keycode, screen_)) {
+    if (handle_settings_shortcut(event.keycode, current_screen())) {
         return;
     }
 
-    switch (screen_) {
+    switch (current_screen()) {
         case Screen::QuickSetup:
             handle_quick_setup_input(event.keycode);
             break;
@@ -2055,7 +2068,7 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
         }
         return;
     }
-    if (screen_ == Screen::Gameplay) {
+    if (current_screen() == Screen::Gameplay) {
         return;
     }
     if (help_overlay_visible_) {
@@ -2063,14 +2076,15 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
         publish_snapshot();
         return;
     }
-    if (screen_ == Screen::Keymap && keymap_capture_active_) {
+    if (current_screen() == Screen::Keymap &&
+        keymap_settings_controller_.capture_active()) {
         return;
     }
-    if (screen_ == Screen::SongSelect) {
+    if (current_screen() == Screen::SongSelect) {
         sync_song_select_state();
     }
     if (event.kind == render::MenuHitTargetKind::MouseWheel) {
-        if (screen_ == Screen::SongSelect && event.wheel_steps != 0) {
+        if (current_screen() == Screen::SongSelect && event.wheel_steps != 0) {
             song_select_focus_ = SongSelectFocus::SongList;
             if (move_song_select_selection(-event.wheel_steps)) {
                 publish_snapshot();
@@ -2079,7 +2093,7 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
             const uint32_t direction_key = event.wheel_steps > 0 ? key_up_ : key_down_;
             const int steps = std::abs(event.wheel_steps);
             for (int i = 0; i < steps; ++i) {
-                switch (screen_) {
+                switch (current_screen()) {
                     case Screen::QuickSetup:
                         handle_quick_setup_input(direction_key);
                         break;
@@ -2127,7 +2141,7 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
         return;
     }
     if (event.kind == render::MenuHitTargetKind::SongScrollbar) {
-        if (screen_ != Screen::SongSelect) {
+        if (current_screen() != Screen::SongSelect) {
             return;
         }
         song_select_focus_ = SongSelectFocus::SongList;
@@ -2163,7 +2177,7 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
         return;
     }
     if (event.kind == render::MenuHitTargetKind::FileDrop) {
-        if (screen_ == Screen::Multiplayer) {
+        if (current_screen() == Screen::Multiplayer) {
             return;
         }
         std::string dropped_extension;
@@ -2172,14 +2186,14 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
         } catch (...) {
             dropped_extension.clear();
         }
-        if (screen_ == Screen::SettingsGraphics && dropped_extension == ".onnx") {
-            config_.graphics.background_upscale_model_path = event.path;
-            graphics_dirty_ = true;
-            persist_runtime_config();
-            publish_snapshot();
+        if (current_screen() == Screen::SettingsGraphics && dropped_extension == ".onnx") {
+            auto effects = graphics_settings_controller_.set_onnx_model_path(
+                config_, event.path);
+            effects.menu.persist_config = effects.menu.render_changed;
+            apply_graphics_settings_effects(effects);
             return;
         }
-        if (screen_ == Screen::SettingsSkins) {
+        if (current_screen() == Screen::SettingsSkins) {
             if (!import_skin_path_auto(event.path)) {
                 std::cerr << "[warn] Ignored dropped path (expected a TenRiff skin folder or a folder containing LR2 skins): "
                           << event.path << std::endl;
@@ -2188,7 +2202,7 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
             publish_snapshot();
             return;
         }
-        if (screen_ == Screen::SessionMix && dropped_extension == ".lr2crs") {
+        if (current_screen() == Screen::SessionMix && dropped_extension == ".lr2crs") {
             load_session_mix_lr2_course_file(event.path);
             publish_snapshot();
             return;
@@ -2200,11 +2214,11 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
             return;
         }
         switch_song_source(dropped_source.value(), false);
-        if (screen_ == Screen::QuickSetup) {
+        if (current_screen() == Screen::QuickSetup) {
             publish_snapshot();
             return;
         }
-        screen_ = Screen::SongSelect;
+        reset_screen(Screen::SongSelect);
         song_select_search_active_ = false;
         song_select_focus_ = SongSelectFocus::SongList;
         song_select_view_ = SongSelectView::Songs;
@@ -2217,7 +2231,7 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
 
     switch (event.kind) {
         case render::MenuHitTargetKind::TitleButton:
-            if (screen_ != Screen::Title) {
+            if (current_screen() != Screen::Title) {
                 return;
             }
             if (event.part == render::MenuHitPart::Decrement) {
@@ -2229,15 +2243,27 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
             handle_title_input(key_enter_);
             return;
         case render::MenuHitTargetKind::OptionsItem:
-            if (screen_ != Screen::OptionsHub) {
+            if (current_screen() != Screen::OptionsHub) {
                 return;
             }
+            {
+                const int last_option_index =
+                    static_cast<int>(menu::kOptionsItemRoutes.size()) - 1;
+                const int target_index = clamp_int(
+                    event.part == render::MenuHitPart::Decrement ? event.index - 1 : event.index,
+                    0,
+                    last_option_index);
+                const auto target = menu::options_item_id_at(
+                    static_cast<std::size_t>(target_index));
+                if (!target.has_value()) {
+                    return;
+                }
+                (void)options_hub_controller_.set_cursor(*target);
+            }
             if (event.part == render::MenuHitPart::Decrement) {
-                options_cursor_ = clamp_int(event.index - 1, 0, profile_setup::kOptionsHubRowCount - 1);
                 publish_snapshot();
                 return;
             }
-            options_cursor_ = clamp_int(event.index, 0, profile_setup::kOptionsHubRowCount - 1);
             if (event.part == render::MenuHitPart::SelectOnly) {
                 publish_snapshot();
                 return;
@@ -2245,7 +2271,7 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
             handle_options_hub_input(key_enter_);
             return;
         case render::MenuHitTargetKind::SongNavButton:
-            if (screen_ != Screen::SongSelect) {
+            if (current_screen() != Screen::SongSelect) {
                 return;
             }
             song_select_focus_ = SongSelectFocus::LeftNav;
@@ -2262,7 +2288,7 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
             }
             return;
         case render::MenuHitTargetKind::SongCard:
-            if (screen_ != Screen::SongSelect) {
+            if (current_screen() != Screen::SongSelect) {
                 return;
             }
             song_select_search_active_ = false;
@@ -2312,7 +2338,7 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
             }
             return;
         case render::MenuHitTargetKind::SongResultPanel:
-            if (screen_ != Screen::SongSelect) {
+            if (current_screen() != Screen::SongSelect) {
                 return;
             }
             if (song_select_view_ == SongSelectView::Records) {
@@ -2323,7 +2349,7 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
             publish_snapshot();
             return;
         case render::MenuHitTargetKind::SongQuickSetting: {
-            if (screen_ != Screen::SongSelect || song_select_view_ != SongSelectView::Songs) {
+            if (current_screen() != Screen::SongSelect || song_select_view_ != SongSelectView::Songs) {
                 return;
             }
             const int direction = event.part == render::MenuHitPart::Decrement ? -1 : 1;
@@ -2337,7 +2363,7 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
             return;
         }
         case render::MenuHitTargetKind::SongStartButton:
-            if (screen_ != Screen::SongSelect) {
+            if (current_screen() != Screen::SongSelect) {
                 return;
             }
             song_select_search_active_ = false;
@@ -2345,38 +2371,37 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
             handle_song_select_input(key_enter_);
             return;
         case render::MenuHitTargetKind::SongBackButton:
-            if (screen_ != Screen::SongSelect) {
+            if (current_screen() != Screen::SongSelect) {
                 return;
             }
             handle_song_select_input(key_backspace_);
             return;
         case render::MenuHitTargetKind::SongProfilePanel:
-            if (screen_ != Screen::SongSelect) {
+            if (current_screen() != Screen::SongSelect) {
                 return;
             }
             song_select_search_active_ = false;
-            submenu_return_screen_ = Screen::SongSelect;
             first_run_profile_ = false;
-            screen_ = Screen::QuickSetup;
+            push_screen(Screen::QuickSetup);
             settings_cursor_ = profile_setup::kAvatarRow;
             publish_snapshot();
             return;
         case render::MenuHitTargetKind::SettingsRow:
             break;
         case render::MenuHitTargetKind::KeymapButton:
-            if (screen_ != Screen::Keymap) {
+            if (current_screen() != Screen::Keymap) {
                 return;
             }
             switch (event.index) {
-                case kKeymapButtonReset:
+                case static_cast<int>(menu::settings::KeymapActionId::Reset):
                     apply_keymap_reset();
                     publish_snapshot();
                     break;
-                case kKeymapButtonNkroTest:
-                    screen_ = Screen::KeymapTest;
+                case static_cast<int>(menu::settings::KeymapActionId::NkroTest):
+                    push_screen(Screen::KeymapTest);
                     publish_snapshot();
                     break;
-                case kKeymapButtonBack:
+                case static_cast<int>(menu::settings::KeymapActionId::Back):
                     exit_keymap_screen();
                     break;
                 default:
@@ -2391,7 +2416,7 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
         return;
     }
 
-    if (screen_ == Screen::Result) {
+    if (current_screen() == Screen::Result) {
         if (!last_game_was_multiplayer_ && !result_presentation_ready()) {
             return;
         }
@@ -2412,12 +2437,13 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
                                     ? key_right_
                                     : (event.part == render::MenuHitPart::Decrement ? key_left_ : key_enter_);
     const int previous_settings_cursor = settings_cursor_;
-    const Screen clicked_screen = screen_;
+    const Screen clicked_screen = current_screen();
     const bool adjustment_without_selection =
         event.part == render::MenuHitPart::Increment ||
-        event.part == render::MenuHitPart::Decrement;
+        event.part == render::MenuHitPart::Decrement ||
+        event.part == render::MenuHitPart::SetValue;
     const auto finish_adjustment_without_selection = [&]() {
-        if (!adjustment_without_selection || screen_ != clicked_screen) {
+        if (!adjustment_without_selection || current_screen() != clicked_screen) {
             return;
         }
         settings_cursor_ = previous_settings_cursor;
@@ -2434,7 +2460,7 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
         return true;
     };
 
-    switch (screen_) {
+    switch (current_screen()) {
         case Screen::QuickSetup:
             settings_cursor_ = clamp_int(
                 event.index,
@@ -2447,21 +2473,82 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
             finish_adjustment_without_selection();
             return;
         case Screen::SettingsAudio:
-            settings_cursor_ = clamp_int(event.index, 0, 6);
-            if (finish_selection_only()) {
+            if (event.index < 0) {
                 return;
             }
-            handle_audio_settings_input(action_key);
-            finish_adjustment_without_selection();
-            return;
+            {
+                const auto target = menu::settings::audio_setting_id_at(
+                    static_cast<std::size_t>(event.index));
+                if (!target.has_value()) {
+                    return;
+                }
+                const auto previous = audio_settings_controller_.selected_id();
+                menu::MenuEffectFlags effects;
+                if (event.part == render::MenuHitPart::SelectOnly) {
+                    effects = audio_settings_controller_.select(*target);
+                } else if (event.part == render::MenuHitPart::Increment) {
+                    effects = audio_settings_controller_.handle(
+                        menu::MenuAction::adjust(1), config_, *target);
+                } else if (event.part == render::MenuHitPart::Decrement) {
+                    effects = audio_settings_controller_.handle(
+                        menu::MenuAction::adjust(-1), config_, *target);
+                } else if (event.part == render::MenuHitPart::SetValue) {
+                    effects = audio_settings_controller_.handle(
+                        menu::MenuAction::set_ratio(event.value), config_, *target);
+                } else {
+                    effects = audio_settings_controller_.handle(
+                        menu::MenuAction::activate(), config_, *target);
+                }
+
+                if (adjustment_without_selection) {
+                    effects.merge(audio_settings_controller_.select(previous));
+                    settings_change_flash_screen_ = clicked_screen;
+                    settings_change_flash_row_ = event.index;
+                    settings_change_flash_started_ns_ = timing::HighResClock::now_ns();
+                    // Pointer adjustments always acknowledge the hit, even when
+                    // clamping or snapping leaves the underlying value unchanged.
+                    effects.render_changed = true;
+                }
+                settings_cursor_ = static_cast<int>(audio_settings_controller_.selected_id());
+                apply_audio_settings_effects(effects);
+                return;
+            }
         case Screen::SettingsGraphics:
-            settings_cursor_ = clamp_int(event.index, 0, 11);
-            if (finish_selection_only()) {
+            if (event.index < 0) {
                 return;
             }
-            handle_graphics_settings_input(action_key);
-            finish_adjustment_without_selection();
-            return;
+            {
+                const auto target = menu::settings::graphics_setting_id_at(
+                    static_cast<std::size_t>(event.index));
+                if (!target.has_value()) {
+                    return;
+                }
+                const auto previous = graphics_settings_controller_.selected_id();
+                menu::settings::GraphicsSettingsEffects effects;
+                if (event.part == render::MenuHitPart::SelectOnly) {
+                    effects = graphics_settings_controller_.select(*target);
+                } else if (event.part == render::MenuHitPart::Increment) {
+                    effects = graphics_settings_controller_.handle(
+                        menu::MenuAction::adjust(1), config_, *target);
+                } else if (event.part == render::MenuHitPart::Decrement) {
+                    effects = graphics_settings_controller_.handle(
+                        menu::MenuAction::adjust(-1), config_, *target);
+                } else {
+                    effects = graphics_settings_controller_.handle(
+                        menu::MenuAction::activate(), config_, *target);
+                }
+                if (adjustment_without_selection) {
+                    effects.merge(graphics_settings_controller_.select(previous));
+                    settings_change_flash_screen_ = clicked_screen;
+                    settings_change_flash_row_ = event.index;
+                    settings_change_flash_started_ns_ = timing::HighResClock::now_ns();
+                    effects.menu.render_changed = true;
+                }
+                settings_cursor_ =
+                    static_cast<int>(graphics_settings_controller_.selected_id());
+                apply_graphics_settings_effects(effects);
+                return;
+            }
         case Screen::SongBrowser:
             settings_cursor_ = clamp_int(event.index, 0, kSongBrowserRowCount - 1);
             if (finish_selection_only()) {
@@ -2479,48 +2566,205 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
             finish_adjustment_without_selection();
             return;
         case Screen::SettingsSkins:
-            settings_cursor_ = clamp_int(
-                event.index, 0,
-                skin_settings_row_count(
-                    config::normalize_skin_source_token(config_.skin.source) == "lr2") - 1);
-            if (finish_selection_only()) {
+            if (event.index < 0) {
                 return;
             }
-            handle_skins_settings_input(action_key);
-            finish_adjustment_without_selection();
-            return;
+            {
+                const bool lr2_source =
+                    config::normalize_skin_source_token(config_.skin.source) == "lr2";
+                const auto target = menu::settings::skin_setting_id_at(
+                    static_cast<std::size_t>(event.index), lr2_source);
+                if (!target.has_value()) {
+                    return;
+                }
+                const auto previous = skin_settings_controller_.selected_id();
+                menu::settings::SkinSettingsEffects effects;
+                if (event.part == render::MenuHitPart::SelectOnly) {
+                    effects = skin_settings_controller_.select(*target, lr2_source);
+                } else if (event.part == render::MenuHitPart::Increment) {
+                    effects = skin_settings_controller_.handle(
+                        menu::MenuAction::adjust(1),
+                        config_,
+                        available_lr2_skin_names_,
+                        available_tenriff_skin_names_,
+                        *target);
+                } else if (event.part == render::MenuHitPart::Decrement) {
+                    effects = skin_settings_controller_.handle(
+                        menu::MenuAction::adjust(-1),
+                        config_,
+                        available_lr2_skin_names_,
+                        available_tenriff_skin_names_,
+                        *target);
+                } else {
+                    effects = skin_settings_controller_.handle(
+                        menu::MenuAction::activate(),
+                        config_,
+                        available_lr2_skin_names_,
+                        available_tenriff_skin_names_,
+                        *target);
+                }
+                if (adjustment_without_selection) {
+                    const bool next_lr2_source =
+                        config::normalize_skin_source_token(config_.skin.source) == "lr2";
+                    effects.merge(
+                        skin_settings_controller_.select(previous, next_lr2_source));
+                    settings_change_flash_screen_ = clicked_screen;
+                    settings_change_flash_row_ = event.index;
+                    settings_change_flash_started_ns_ = timing::HighResClock::now_ns();
+                    effects.menu.render_changed = true;
+                }
+                apply_skin_settings_effects(effects);
+                return;
+            }
         case Screen::SettingsInput:
-            settings_cursor_ = clamp_int(event.index, 0, 3);
-            if (finish_selection_only()) {
+            if (event.index < 0) {
                 return;
             }
-            handle_input_settings_input(action_key);
-            finish_adjustment_without_selection();
-            return;
+            {
+                const auto target = menu::settings::input_setting_id_at(
+                    static_cast<std::size_t>(event.index));
+                if (!target.has_value()) {
+                    return;
+                }
+                const auto previous = input_settings_controller_.selected_id();
+                menu::MenuEffectFlags effects;
+                if (event.part == render::MenuHitPart::SelectOnly) {
+                    effects = input_settings_controller_.select(*target);
+                } else if (event.part == render::MenuHitPart::Increment) {
+                    effects = input_settings_controller_.handle(
+                        menu::MenuAction::adjust(1),
+                        config_,
+                        input_backend_fallback_policy_.polling_latched(),
+                        *target);
+                } else if (event.part == render::MenuHitPart::Decrement) {
+                    effects = input_settings_controller_.handle(
+                        menu::MenuAction::adjust(-1),
+                        config_,
+                        input_backend_fallback_policy_.polling_latched(),
+                        *target);
+                } else {
+                    effects = input_settings_controller_.handle(
+                        menu::MenuAction::activate(),
+                        config_,
+                        input_backend_fallback_policy_.polling_latched(),
+                        *target);
+                }
+                if (adjustment_without_selection) {
+                    effects.merge(input_settings_controller_.select(previous));
+                    settings_change_flash_screen_ = clicked_screen;
+                    settings_change_flash_row_ = event.index;
+                    settings_change_flash_started_ns_ = timing::HighResClock::now_ns();
+                    effects.render_changed = true;
+                }
+                settings_cursor_ = static_cast<int>(input_settings_controller_.selected_id());
+                apply_input_settings_effects(effects);
+                return;
+            }
         case Screen::SettingsCalibration:
-            settings_cursor_ = clamp_int(event.index, 0, 5);
-            if (finish_selection_only()) {
+            if (event.index < 0) {
                 return;
             }
-            handle_calibration_settings_input(action_key);
-            finish_adjustment_without_selection();
-            return;
+            {
+                const auto target = menu::settings::calibration_setting_id_at(
+                    static_cast<std::size_t>(event.index));
+                if (!target.has_value()) {
+                    return;
+                }
+                const auto previous = calibration_settings_controller_.selected_id();
+                menu::MenuEffectFlags effects;
+                if (event.part == render::MenuHitPart::SelectOnly) {
+                    effects = calibration_settings_controller_.select(*target);
+                } else if (event.part == render::MenuHitPart::Increment) {
+                    effects = calibration_settings_controller_.handle(
+                        menu::MenuAction::adjust(1), config_, *target);
+                } else if (event.part == render::MenuHitPart::Decrement) {
+                    effects = calibration_settings_controller_.handle(
+                        menu::MenuAction::adjust(-1), config_, *target);
+                } else {
+                    effects = calibration_settings_controller_.handle(
+                        menu::MenuAction::activate(), config_, *target);
+                }
+                if (adjustment_without_selection) {
+                    effects.merge(calibration_settings_controller_.select(previous));
+                    settings_change_flash_screen_ = clicked_screen;
+                    settings_change_flash_row_ = event.index;
+                    settings_change_flash_started_ns_ = timing::HighResClock::now_ns();
+                    effects.render_changed = true;
+                }
+                settings_cursor_ = static_cast<int>(calibration_settings_controller_.selected_id());
+                apply_calibration_settings_effects(effects);
+                return;
+            }
         case Screen::ModeSelect:
-            settings_cursor_ = clamp_int(event.index, 0, 17);
-            if (finish_selection_only()) {
+            if (event.index < 0) {
                 return;
             }
-            handle_mode_settings_input(action_key);
-            finish_adjustment_without_selection();
-            return;
+            {
+                const auto target = menu::settings::mode_setting_id_at(
+                    static_cast<std::size_t>(event.index));
+                if (!target.has_value()) {
+                    return;
+                }
+                const auto previous = mode_settings_controller_.selected_id();
+                menu::settings::ModeSettingsEffects effects;
+                if (event.part == render::MenuHitPart::SelectOnly) {
+                    effects = mode_settings_controller_.select(*target);
+                } else if (event.part == render::MenuHitPart::Increment) {
+                    effects = mode_settings_controller_.handle(
+                        menu::MenuAction::adjust(1), config_, *target);
+                } else if (event.part == render::MenuHitPart::Decrement) {
+                    effects = mode_settings_controller_.handle(
+                        menu::MenuAction::adjust(-1), config_, *target);
+                } else {
+                    effects = mode_settings_controller_.handle(
+                        menu::MenuAction::activate(), config_, *target);
+                }
+                if (adjustment_without_selection) {
+                    effects.merge(mode_settings_controller_.select(previous));
+                    settings_change_flash_screen_ = clicked_screen;
+                    settings_change_flash_row_ = event.index;
+                    settings_change_flash_started_ns_ = timing::HighResClock::now_ns();
+                    effects.menu.render_changed = true;
+                }
+                apply_mode_settings_effects(effects);
+                return;
+            }
         case Screen::ModeMods:
-            settings_cursor_ = clamp_int(event.index, 0, static_cast<int>(mode_mod_categories().size()));
-            if (finish_selection_only()) {
+            if (event.index < 0) {
                 return;
             }
-            handle_mode_mods_input(action_key);
-            finish_adjustment_without_selection();
-            return;
+            {
+                const std::size_t target = static_cast<std::size_t>(event.index);
+                if (target > mode_mod_categories().size()) {
+                    return;
+                }
+                const std::size_t previous =
+                    mode_settings_controller_.selected_mod_category();
+                menu::settings::ModeSettingsEffects effects;
+                if (event.part == render::MenuHitPart::SelectOnly) {
+                    effects = mode_settings_controller_.handle_mod_manager(
+                        menu::MenuAction::set_ratio(0.0), config_, target);
+                } else if (event.part == render::MenuHitPart::Increment) {
+                    effects = mode_settings_controller_.handle_mod_manager(
+                        menu::MenuAction::adjust(1), config_, target);
+                } else if (event.part == render::MenuHitPart::Decrement) {
+                    effects = mode_settings_controller_.handle_mod_manager(
+                        menu::MenuAction::adjust(-1), config_, target);
+                } else {
+                    effects = mode_settings_controller_.handle_mod_manager(
+                        menu::MenuAction::activate(), config_, target);
+                }
+                if (adjustment_without_selection) {
+                    effects.merge(mode_settings_controller_.handle_mod_manager(
+                        menu::MenuAction::set_ratio(0.0), config_, previous));
+                    settings_change_flash_screen_ = clicked_screen;
+                    settings_change_flash_row_ = event.index;
+                    settings_change_flash_started_ns_ = timing::HighResClock::now_ns();
+                    effects.menu.render_changed = true;
+                }
+                apply_mode_settings_effects(effects);
+                return;
+            }
         case Screen::Multiplayer:
             multiplayer_menu_.cursor = clamp_multiplayer_menu_cursor(event.index);
             if (finish_selection_only()) {
@@ -2539,9 +2783,20 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
             }
             return;
         case Screen::OnnxUpscalerConfirm:
-            onnx_upscaler_confirm_cursor_ = clamp_int(event.index, 0, 1);
-            handle_onnx_upscaler_confirm_input(key_enter_);
-            return;
+            if (event.index < 0) {
+                return;
+            }
+            {
+                const auto target = menu::settings::onnx_upscaler_confirm_id_at(
+                    static_cast<std::size_t>(event.index));
+                if (!target.has_value()) {
+                    return;
+                }
+                const auto effects = graphics_settings_controller_.handle_confirmation(
+                    menu::MenuAction::activate(), config_, *target);
+                apply_graphics_settings_effects(effects);
+                return;
+            }
         case Screen::KeymapTest:
             handle_keymap_test_input(key_escape_);
             return;
@@ -2561,9 +2816,16 @@ bool MenuApp::handle_settings_shortcut(uint32_t keycode, Screen return_screen) {
     if (return_screen == Screen::SongSelect && song_select_search_active_) {
         return false;
     }
-    submenu_return_screen_ = return_screen;
-    screen_ = Screen::OptionsHub;
-    options_cursor_ = profile_setup::kOptionsKeyModeRow;
+    if (current_screen() != return_screen) {
+        return false;
+    }
+    if (return_screen == Screen::Multiplayer) {
+        help_overlay_visible_ = false;
+        open_multiplayer_options();
+        return true;
+    }
+    push_screen(Screen::OptionsHub);
+    (void)options_hub_controller_.set_cursor(menu::OptionsItemId::KeyMode);
     help_overlay_visible_ = false;
     publish_snapshot();
     return true;
@@ -2608,21 +2870,20 @@ void MenuApp::handle_title_input(uint32_t keycode) {
             }
 #endif
             reset_multiplayer_for_single_player();
-            screen_ = Screen::SongSelect;
+            reset_screen(Screen::SongSelect);
             song_select_focus_ = SongSelectFocus::SongList;
             publish_snapshot();
             return;
         }
         if (title_cursor_ == 1) {
-            screen_ = Screen::Multiplayer;
+            reset_screen(Screen::Multiplayer);
             multiplayer_menu_.cursor = 0;
             publish_snapshot();
             return;
         }
         if (title_cursor_ == 2) {
-            submenu_return_screen_ = Screen::Title;
-            screen_ = Screen::OptionsHub;
-            options_cursor_ = 0;
+            push_screen(Screen::OptionsHub);
+            (void)options_hub_controller_.set_cursor(menu::OptionsItemId::KeyMode);
             publish_snapshot();
             return;
         }
@@ -2700,7 +2961,7 @@ void MenuApp::handle_text_input(std::string_view text) {
         return;
     }
 
-    if (screen_ != Screen::QuickSetup || !profile_nickname_edit_active_ || text.empty()) {
+    if (current_screen() != Screen::QuickSetup || !profile_nickname_edit_active_ || text.empty()) {
         return;
     }
 
@@ -2852,16 +3113,19 @@ void MenuApp::handle_quick_setup_input(uint32_t keycode) {
         if (destination != profile_setup::Destination::Stay) {
             first_run_profile_ = false;
             if (destination == profile_setup::Destination::SongSelect) {
-                screen_ = Screen::SongSelect;
+                reset_screen(Screen::SongSelect);
                 song_select_focus_ = SongSelectFocus::SongList;
             } else if (destination == profile_setup::Destination::Title) {
-                screen_ = Screen::Title;
-            } else if (submenu_return_screen_ == Screen::SongSelect) {
-                screen_ = Screen::SongSelect;
-                song_select_focus_ = SongSelectFocus::SongList;
+                reset_screen(Screen::Title);
             } else {
-                screen_ = Screen::OptionsHub;
-                options_cursor_ = profile_setup::kOptionsProfileSetupRow;
+                if (!pop_screen()) {
+                    reset_screen(Screen::OptionsHub);
+                }
+                if (current_screen() == Screen::SongSelect) {
+                    song_select_focus_ = SongSelectFocus::SongList;
+                } else if (current_screen() == Screen::OptionsHub) {
+                    (void)options_hub_controller_.set_cursor(menu::OptionsItemId::ProfileSetup);
+                }
             }
             persist_runtime_config();
             publish_snapshot();
@@ -2872,15 +3136,17 @@ void MenuApp::handle_quick_setup_input(uint32_t keycode) {
     if (keycode == key_escape_ || keycode == key_backspace_) {
         const auto destination = profile_setup::cancel_destination(setup_entry);
         first_run_profile_ = false;
-        if (destination == profile_setup::Destination::OptionsHub &&
-            submenu_return_screen_ != Screen::SongSelect) {
-            screen_ = Screen::OptionsHub;
-            options_cursor_ = profile_setup::kOptionsProfileSetupRow;
-        } else if (destination == profile_setup::Destination::OptionsHub) {
-            screen_ = Screen::SongSelect;
-            song_select_focus_ = SongSelectFocus::SongList;
+        if (destination == profile_setup::Destination::OptionsHub) {
+            if (!pop_screen()) {
+                reset_screen(Screen::OptionsHub);
+            }
+            if (current_screen() == Screen::SongSelect) {
+                song_select_focus_ = SongSelectFocus::SongList;
+            } else if (current_screen() == Screen::OptionsHub) {
+                (void)options_hub_controller_.set_cursor(menu::OptionsItemId::ProfileSetup);
+            }
         } else {
-            screen_ = Screen::Title;
+            reset_screen(Screen::Title);
         }
         persist_runtime_config();
         publish_snapshot();
@@ -2888,81 +3154,78 @@ void MenuApp::handle_quick_setup_input(uint32_t keycode) {
 }
 
 void MenuApp::handle_options_hub_input(uint32_t keycode) {
-    const Screen return_screen = submenu_return_screen_;
     if (keycode == key_left_) {
-        options_cursor_ = profile_setup::move_options_grid_cursor(options_cursor_, -1, 0);
+        options_hub_controller_.move_horizontal(-1);
         publish_snapshot();
         return;
     }
     if (keycode == key_right_) {
-        options_cursor_ = profile_setup::move_options_grid_cursor(options_cursor_, 1, 0);
+        options_hub_controller_.move_horizontal(1);
         publish_snapshot();
         return;
     }
     if (keycode == key_up_) {
-        options_cursor_ = profile_setup::move_options_grid_cursor(options_cursor_, 0, -1);
+        options_hub_controller_.move_vertical(-1);
         publish_snapshot();
         return;
     }
     if (keycode == key_down_) {
-        options_cursor_ = profile_setup::move_options_grid_cursor(options_cursor_, 0, 1);
+        options_hub_controller_.move_vertical(1);
         publish_snapshot();
         return;
     }
 
     if (keycode == key_enter_) {
-        switch (options_cursor_) {
-            case profile_setup::kOptionsKeyModeRow:
-                submenu_return_screen_ = return_screen;
-                screen_ = Screen::ModeSelect;
+        const Screen destination = options_hub_controller_.activate();
+        switch (options_hub_controller_.cursor()) {
+            case menu::OptionsItemId::KeyMode:
+                push_screen(destination);
+                mode_settings_controller_.reset();
                 settings_cursor_ = 0;
                 break;
-            case profile_setup::kOptionsKeymapRow:
-                open_keymap_screen(return_screen);
+            case menu::OptionsItemId::Keymap:
+                open_keymap_screen(Screen::OptionsHub);
                 break;
-            case profile_setup::kOptionsSkinsRow:
-                submenu_return_screen_ = return_screen;
-                screen_ = Screen::SettingsSkins;
+            case menu::OptionsItemId::Skins:
+                push_screen(destination);
+                skin_settings_controller_.reset(config_.mode.key_mode);
                 settings_cursor_ = 0;
-                skin_dirty_ = false;
-                skin_edit_mode_ = normalize_skin_edit_mode(config_.mode.key_mode);
-                skin_edit_lane_ = 0;
-                skin_edit_gap_ = 0;
                 refresh_available_lr2_skins();
                 refresh_available_tenriff_skins();
                 break;
-            case profile_setup::kOptionsGraphicsRow:
-                submenu_return_screen_ = return_screen;
-                screen_ = Screen::SettingsGraphics;
+            case menu::OptionsItemId::Graphics:
+                push_screen(destination);
+                graphics_settings_controller_.reset();
                 settings_cursor_ = 0;
                 break;
-            case profile_setup::kOptionsAudioRow:
-                submenu_return_screen_ = return_screen;
-                screen_ = Screen::SettingsAudio;
+            case menu::OptionsItemId::Audio:
+                push_screen(destination);
+                audio_settings_controller_.reset();
                 settings_cursor_ = 0;
                 break;
-            case profile_setup::kOptionsInputRow:
-                submenu_return_screen_ = return_screen;
-                screen_ = Screen::SettingsInput;
+            case menu::OptionsItemId::Input:
+                push_screen(destination);
+                input_settings_controller_.reset();
                 settings_cursor_ = 0;
                 break;
-            case profile_setup::kOptionsCalibrationRow:
-                submenu_return_screen_ = return_screen;
-                screen_ = Screen::SettingsCalibration;
+            case menu::OptionsItemId::Calibration:
+                push_screen(destination);
+                calibration_settings_controller_.reset();
                 settings_cursor_ = 0;
                 break;
-            case profile_setup::kOptionsProfileSetupRow:
-                screen_ = Screen::QuickSetup;
+            case menu::OptionsItemId::ProfileSetup:
+                push_screen(destination);
                 settings_cursor_ = 0;
                 break;
-            default: break;
         }
         publish_snapshot();
         return;
     }
 
     if (keycode == key_escape_ || keycode == key_backspace_) {
-        screen_ = return_screen;
+        if (!pop_screen()) {
+            reset_screen(Screen::Title);
+        }
         publish_snapshot();
     }
 }
@@ -3030,13 +3293,17 @@ void MenuApp::handle_session_mix_input(uint32_t keycode) {
         } else if (settings_cursor_ == 4) {
             start_session_mix();
         } else {
-            screen_ = Screen::SongSelect;
+            if (!pop_screen()) {
+                reset_screen(Screen::SongSelect);
+            }
             publish_snapshot();
         }
         return;
     }
     if (keycode == key_escape_ || keycode == key_backspace_) {
-        screen_ = Screen::SongSelect;
+        if (!pop_screen()) {
+            reset_screen(Screen::SongSelect);
+        }
         publish_snapshot();
     }
 }
@@ -3303,8 +3570,7 @@ void MenuApp::handle_song_select_input(uint32_t keycode) {
                     return;
                 case 3:
                     song_select_search_active_ = false;
-                    submenu_return_screen_ = Screen::SongSelect;
-                    screen_ = Screen::SongBrowser;
+                    push_screen(Screen::SongBrowser);
                     settings_cursor_ = 0;
                     publish_snapshot();
                     return;
@@ -3320,15 +3586,14 @@ void MenuApp::handle_song_select_input(uint32_t keycode) {
                     return;
                 case 5:
                     song_select_search_active_ = false;
-                    screen_ = Screen::SessionMix;
+                    push_screen(Screen::SessionMix);
                     settings_cursor_ = 0;
                     publish_snapshot();
                     return;
                 case 6:
                     song_select_search_active_ = false;
-                    submenu_return_screen_ = Screen::SongSelect;
-                    screen_ = Screen::OptionsHub;
-                    options_cursor_ = 0;
+                    push_screen(Screen::OptionsHub);
+                    (void)options_hub_controller_.set_cursor(menu::OptionsItemId::KeyMode);
                     publish_snapshot();
                     return;
                 default:
@@ -3366,11 +3631,13 @@ void MenuApp::handle_song_select_input(uint32_t keycode) {
         if (multiplayer_selecting_chart_) {
             multiplayer_selecting_chart_ = false;
             rebuild_visible_song_list();
-            screen_ = Screen::Multiplayer;
+            if (!pop_screen()) {
+                reset_screen(Screen::Multiplayer);
+            }
             publish_snapshot();
             return;
         }
-        screen_ = Screen::Title;
+        reset_screen(Screen::Title);
         publish_snapshot();
         return;
     }
@@ -3379,11 +3646,13 @@ void MenuApp::handle_song_select_input(uint32_t keycode) {
         if (multiplayer_selecting_chart_) {
             multiplayer_selecting_chart_ = false;
             rebuild_visible_song_list();
-            screen_ = Screen::Multiplayer;
+            if (!pop_screen()) {
+                reset_screen(Screen::Multiplayer);
+            }
             publish_snapshot();
             return;
         }
-        screen_ = Screen::Title;
+        reset_screen(Screen::Title);
         publish_snapshot();
     }
 }
@@ -3694,7 +3963,9 @@ void MenuApp::handle_song_browser_input(uint32_t keycode) {
             return;
         }
         if (settings_cursor_ == 11) {
-            screen_ = submenu_return_screen_;
+            if (!pop_screen()) {
+                reset_screen(Screen::SongSelect);
+            }
             settings_cursor_ = 0;
             publish_snapshot();
             return;
@@ -3702,14 +3973,18 @@ void MenuApp::handle_song_browser_input(uint32_t keycode) {
     }
 
     if (keycode == key_escape_) {
-        screen_ = submenu_return_screen_;
+        if (!pop_screen()) {
+            reset_screen(Screen::SongSelect);
+        }
         settings_cursor_ = 0;
         publish_snapshot();
         return;
     }
 
     if (keycode == key_backspace_) {
-        screen_ = submenu_return_screen_;
+        if (!pop_screen()) {
+            reset_screen(Screen::SongSelect);
+        }
         settings_cursor_ = 0;
         publish_snapshot();
     }
@@ -3801,7 +4076,7 @@ void MenuApp::handle_result_input(uint32_t keycode) {
                             "재대전 전에 상대 플레이가 끝나기를 기다리는 중입니다.");
             }
             multiplayer_match_active_.store(false, std::memory_order_release);
-            screen_ = Screen::Multiplayer;
+            reset_screen(Screen::Multiplayer);
             publish_snapshot();
         }
         return;
@@ -3827,13 +4102,15 @@ void MenuApp::handle_result_input(uint32_t keycode) {
         if (keycode == key_escape_ || keycode == key_backspace_) {
             record_current_session_mix_result();
             stop_session_mix(false);
-            screen_ = Screen::SongSelect;
+            reset_screen(Screen::SongSelect);
             publish_snapshot();
             return;
         }
     }
     if (keycode == key_enter_ || keycode == key_escape_ || keycode == key_backspace_) {
-        screen_ = Screen::SongSelect;
+        if (!pop_screen()) {
+            reset_screen(Screen::SongSelect);
+        }
         publish_snapshot();
     }
 }

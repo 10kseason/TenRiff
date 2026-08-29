@@ -3,7 +3,7 @@
 This is the document that the next agent or any new contributor should read first. Its goal is to quickly answer: "what is this project now, where should I look, and what is still unverified?"
 
 ## Baseline
-- Current stable release line: `1.5.1`
+- Current stable release line: `1.6.0`
 - The UI-r2 Result screen uses a 2.2-second timeline for the prism, score, rank, clear status, statistics, and graphs. Space skips the reveal; Continue/Retry/Replay stay locked until it completes.
 - UI-r2 Song Select uses a reference-led top navigation, seven-row jacket library, large selected artwork, best-record card, chart/mode panel, and a prominent working Start action. Collection/store/currency/global-ranking placeholders are not shown.
 - The Song Select Rate, Hi-Speed, Gauge, and Random cells apply increase/next on left click and decrease/previous on right click, then save immediately. The current-chart key count no longer clips, and best records show score, accuracy, and max combo together.
@@ -37,6 +37,9 @@ This is the document that the next agent or any new contributor should read firs
 - `MenuApp`
   - Center of the menu state machine
   - Manages entry into Song Select, Options, Keymap, Result, and Gameplay launch
+  - `MenuNavigator` is the sole owner of the current screen and nested Back history
+  - Typed screen controllers own selection/dirty/mutation state for Options and every settings family; `MenuApp` adapters execute persistence, file-dialog, restart, and reindex effects
+  - `MenuScreenDescriptor` defines stable titles, skin background/fallback keys, and snapshot/generic-view routing in one exhaustive table
   - Recent maintenance refactors split Song Select record/keymap/render/state boundaries into dedicated `.cpp` files
   - Song Select's best-score card and record list share the saved-Result opening path in `MenuAppRecords`, then lead to the Result replay button
   - Optional Python-reference checks can now skip cleanly so the open-source source package can run the core test suite without a local `10k-calc` checkout
@@ -50,7 +53,7 @@ This is the document that the next agent or any new contributor should read firs
   - Gameplay deduplicates RawInput and the bound-key polling shadow in one `InputThread` state tracker; `GameSession` does not filter the logical edges again by source
 - `RenderThread` + `MenuWindow`
   - Menu and in-game HUD rendering built on D3D11 + Direct2D / DirectWrite
-  - The recent maintenance refactor is organizing large implementation files into smaller fragments
+  - Consumes immutable `MenuRenderData` snapshots and does not reference settings controllers or mutable app state
 - `GameSession`
   - Chart loading, gameplay audio prep, HUD snapshot, and gameplay execution boundaries
 
@@ -144,8 +147,8 @@ This is the document that the next agent or any new contributor should read firs
   - when two keyboards press the same key, the logical `Pressed` state remains active until the last input source releases it
 - Graphics:
   - resolution presets (`720p`, `1080p`, `qhd`, `native`)
-  - `refresh_hz` (`-1` = `Match Display`, `0` = `Unlimited`)
-  - VSync off: Match Display follows monitor Hz; Unlimited removes gameplay pacing while keeping the menu cap at `300`
+  - `refresh_hz` (`-1` = `Match Display`, `0` = `Unlimited`, actual maximum 1500 FPS)
+  - VSync off: Match Display follows monitor Hz; Unlimited caps gameplay at 1500 FPS while keeping the menu cap at `300`
   - VSync on: present refresh follows the active monitor Hz and render pacing targets `monitor_hz * 2` (`1050` clamp)
   - `visual_offset_ms`
   - `performance_overlay` (in-game FPS/frame time uses successful DXGI `Present()` completion intervals; HUD update cadence remains separate gameplay diagnostics)

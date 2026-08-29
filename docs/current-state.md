@@ -7,7 +7,7 @@
 - BMS landmines (`D1-D9`, `E1-E9`) are playable, including `#WAV00`, base-36 damage tokens, `ZZ` instant fail, exact press/release boundary behavior, and lane-mod/key-converter remapping.
 - Results and local records expose fixed native score separately from detail score, and categorical native accuracy separately from continuous timing-based detailed accuracy.
 - 새 replay evidence v3는 차트 SHA-256, canonical ruleset, result-to-replay SHA-256을 저장하고 입력 trace를 headless 엔진으로 재실행합니다. 공식 로컬 best는 재계산된 verified 결과만 사용하며 legacy/custom/assist 기록은 히스토리에 `unverified`로 남습니다.
-- 현재 안정 배포 라인은 `1.5.1`
+- 현재 안정 배포 라인은 `1.6.0`
 - UI-r2 Result는 2.2초 타임라인으로 프리즘·점수·등급·상태·통계·그래프를 순차 공개하며, Space로 연출을 건너뛸 수 있고 CONTINUE/RETRY/Replay 입력은 공개 완료 전 잠김
 - UI-r2 Song Select는 상단 탭, 7행 재킷 라이브러리, 대형 선택 이미지, 최고 기록 카드, 차트/모드 패널, 실제 동작하는 START 버튼 구조로 개편되며 Collection/Store/재화/글로벌 랭킹 가상 기능은 표시하지 않음
 - Song Select 우측의 비주얼 레이턴시·하이스피드·Gauge Shift 시작 등급·랜덤 셀은 좌클릭으로 증가/다음, 우클릭으로 감소/이전을 적용하고 즉시 저장함. 현재 차트 키수는 잘림 없이 표시되며 최고 기록은 점수·정확도·최대 콤보를 함께 표시
@@ -40,6 +40,9 @@
 - `MenuApp`
   - 메뉴 상태머신의 중심
   - Song Select, Options, Keymap, Result, Gameplay launch 진입 관리
+  - `MenuNavigator`가 현재 화면과 중첩 Back history를 단독 소유
+  - Options와 모든 설정 family는 타입 기반 screen controller가 선택/dirty/mutation을 소유하고 `MenuApp` 어댑터가 저장, 파일 선택, restart, reindex 효과를 실행
+  - `MenuScreenDescriptor`가 고정 제목, 스킨 배경/fallback, snapshot/generic-view 라우팅을 exhaustive table로 정의
   - 최근 유지보수 리팩터에서 Song Select record/keymap/render/state 경계를 전용 `.cpp` 파일로 분리
   - Song Select의 최고 점수 카드와 기록 목록은 `MenuAppRecords`의 공용 저장 Result 열기 경로를 사용하며 Result의 Replay 버튼으로 이어짐
   - `10k-calc` Python reference 없이도 오픈소스 소스패키지에서 핵심 테스트 실행이 가능하도록 optional reference test는 skip 가능
@@ -53,7 +56,7 @@
   - gameplay는 RawInput과 bound-key polling shadow를 단일 상태 추적기에서 dedupe한 logical edge로 큐에 전달하며, `GameSession`은 이를 source 단위로 다시 필터링하지 않음
 - `RenderThread` + `MenuWindow`
   - D3D11 + Direct2D/DirectWrite 기반 메뉴/인게임 HUD 렌더
-  - 최근 유지보수 리팩터에서 대형 구현 파일을 조각 파일로 분리하는 방향으로 정리 중
+  - immutable `MenuRenderData` snapshot만 소비하며 설정 controller나 mutable app state를 참조하지 않음
 - `GameSession`
   - 차트 로드, gameplay audio prep, HUD snapshot, gameplay 실행 경계
 - `SongSelectScreen`
@@ -158,8 +161,8 @@
   - 같은 키를 두 키보드가 동시에 눌러도 마지막 입력 소스가 해제될 때까지 논리적 `Pressed` 상태를 유지
 - Graphics:
   - resolution preset (`720p`, `1080p`, `qhd`, `native`)
-  - `refresh_hz` (`-1` = `디스플레이에 맞춤`, `0` = `무제한`)
-  - VSync off: 디스플레이에 맞춤은 모니터 주사율을 사용하고, 무제한은 gameplay pacing을 해제하되 menu cap `300`은 유지
+  - `refresh_hz` (`-1` = `디스플레이에 맞춤`, `0` = `무제한`, 실제 최대 1500 FPS)
+  - VSync off: 디스플레이에 맞춤은 모니터 주사율을 사용하고, 무제한은 gameplay를 1500 FPS로 제한하며 menu cap `300`은 유지
   - VSync on: present refresh는 active monitor Hz를 따라가고 render pacing은 `monitor_hz * 2`를 목표로 함 (`1050` clamp)
   - `visual_offset_ms`
   - `performance_overlay` (인게임 FPS/frame-time은 성공한 DXGI `Present()` 완료 간격 기준; HUD update cadence는 별도 gameplay diagnostics로만 유지)

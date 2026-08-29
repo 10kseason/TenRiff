@@ -108,9 +108,9 @@ If a profile does not exist, it is created automatically on first launch.
   - `native | 720p | 1080p | qhd`
 - `vsync` (bool)
 - `refresh_hz` (int)
-  - `-1` selects `Match Display`; `0` selects `Unlimited`
+  - `-1` selects `Match Display`; `0` is the profile-compatible `Unlimited` selector with an actual 1500 FPS maximum
   - legacy fixed numeric limits migrate to `-1`
-  - with `vsync=false`, Unlimited removes gameplay pacing while menu rendering keeps a 300 FPS cap
+  - with `vsync=false`, Unlimited paces gameplay at no more than 1500 FPS while menu rendering keeps a 300 FPS cap
   - when `vsync=true`, the present refresh follows the active monitor Hz and render pacing targets `monitor_hz * 2` (`1050` clamp)
 - `performance_overlay` (bool)
   - defaults to `false`; it occupies the top-right corner and can overlap a Discord Voice widget placed there

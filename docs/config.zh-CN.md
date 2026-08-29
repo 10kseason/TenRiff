@@ -107,10 +107,10 @@
   - `native | 720p | 1080p | qhd`
 - `vsync` (bool)
 - `refresh_hz` (int)
-  - `-1` 表示 `Match Display`，`0` 表示 `Unlimited`
+  - `-1` 表示 `Match Display`；`0` 是兼容旧 profile 的 `Unlimited` 选项，实际最高 1500 FPS
   - 默认值为 `-1`
   - 只有在 `vsync=false` 时才充当直接 FPS 上限
-  - `vsync=false` 时，menu 的有效上限为 `300`；gameplay 在 `-1` 时跟随显示器 Hz，在 `0` 时取消 render pacing
+  - `vsync=false` 时，menu 的有效上限为 `300`；gameplay 在 `-1` 时跟随显示器 Hz，在 `0` 时应用 1500 FPS render pacing
   - `vsync=true` 时，present refresh 以当前活动显示器 Hz 为准，render pacing 的目标是 `monitor_hz * 2`（上限 `1050`）
 - `performance_overlay` (bool)
   - 默认值为 `false`；它位于右上角，可能会与放在同一角落的 Discord Voice widget 重叠

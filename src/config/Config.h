@@ -95,7 +95,8 @@ struct GraphicsConfig {
     std::string display_mode = "borderless";
     std::string resolution = "native";
     bool vsync = false;
-    // -1 follows the active display, 0 removes gameplay pacing when VSync is off.
+    // -1 follows the active display; 0 selects the 1500 FPS gameplay ceiling
+    // when VSync is off. The sentinel stays stable for profile compatibility.
     int refresh_hz = -1;
     bool performance_overlay = false;
     bool bga_enabled = true;

@@ -202,7 +202,7 @@ bool request_json(const std::string& base_url,
     while (!path.empty() && path.back() == L'/') path.pop_back();
     path += endpoint;
 
-    InternetHandle session(WinHttpOpen(L"TenRiff/1.5.1 ranked-records",
+    InternetHandle session(WinHttpOpen(L"TenRiff/1.6.0 ranked-records",
                                        WINHTTP_ACCESS_TYPE_AUTOMATIC_PROXY,
                                        WINHTTP_NO_PROXY_NAME,
                                        WINHTTP_NO_PROXY_BYPASS, 0));

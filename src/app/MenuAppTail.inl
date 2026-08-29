@@ -532,7 +532,7 @@ void MenuApp::update_gameplay_loading_state(int percent, std::string_view stage)
 }
 
 std::string MenuApp::current_track_label() const {
-    if (screen_ == Screen::SongSelect && song_select_view_ == SongSelectView::Sources &&
+    if (current_screen() == Screen::SongSelect && song_select_view_ == SongSelectView::Sources &&
         !config_.ui.recent_song_sources.empty() &&
         selected_source_ >= 0 &&
         selected_source_ < static_cast<int>(config_.ui.recent_song_sources.size())) {
@@ -623,7 +623,7 @@ void MenuApp::service_song_preview() {
     const int64_t now_ns = timing::HighResClock::now_ns();
 
     const bool preview_screen_active =
-        screen_ == Screen::SongSelect &&
+        current_screen() == Screen::SongSelect &&
         song_select_view_ == SongSelectView::Songs &&
         config_.audio_ui.background_sound_enabled;
     const bool was_preview_screen_active = song_select_screen_.active();
@@ -709,14 +709,14 @@ void MenuApp::service_song_preview() {
 
 
 void MenuApp::sync_menu_music() {
-    if (screen_ == Screen::Gameplay) {
+    if (current_screen() == Screen::Gameplay) {
         menu_music_.stop();
         menu_music_scene_key_.clear();
         menu_music_scene_path_.clear();
         return;
     }
 
-    if (screen_ == Screen::SongSelect && !song_select_screen_.preview_active_path().empty()) {
+    if (current_screen() == Screen::SongSelect && !song_select_screen_.preview_active_path().empty()) {
         if (!config_.audio_ui.background_sound_enabled) {
             stop_song_preview_audio();
             menu_music_.stop();
@@ -777,36 +777,26 @@ void MenuApp::sync_menu_music() {
         return menu_music_scene_path_;
     };
 
-    const bool options_screen =
-        screen_ == Screen::OptionsHub ||
-        screen_ == Screen::SettingsAudio ||
-        screen_ == Screen::SettingsGraphics ||
-        screen_ == Screen::SettingsSkins ||
-        screen_ == Screen::SettingsInput ||
-        screen_ == Screen::SettingsCalibration ||
-        screen_ == Screen::ModeSelect ||
-        screen_ == Screen::ModeMods ||
-        screen_ == Screen::Keymap ||
-        screen_ == Screen::KeymapConfirm ||
-        screen_ == Screen::OnnxUpscalerConfirm ||
-        screen_ == Screen::KeymapTest;
+    const bool options_screen = menu::screen_descriptor(current_screen()).options_family;
 
     std::string music_path;
-    if (screen_ == Screen::Result) {
+    if (current_screen() == Screen::Result) {
         const bool failed = last_game_over_ || last_clear_status_ == "FAILED";
         music_path = failed
                          ? select_scene_slot("result_failed", "Failed.mp3", "Song Selecte.mp3", "Main Menu.mp3")
                          : select_scene_slot("result_clear", "Clear.mp3", "Song Selecte.mp3", "Main Menu.mp3");
-    } else if (screen_ == Screen::Multiplayer) {
+    } else if (current_screen() == Screen::Multiplayer) {
         music_path = select_scene_slot("multiplayer", "Multiplayer Lobby.mp3", {}, "Main Menu.mp3");
     } else if (options_screen) {
         const std::string_view fallback =
-            submenu_return_screen_ == Screen::SongSelect ? "Song Selecte.mp3" : "Main Menu.mp3";
+            menu_navigator_.parent().value_or(Screen::Title) == Screen::SongSelect
+                ? "Song Selecte.mp3"
+                : "Main Menu.mp3";
         music_path = select_scene_slot("options", "Options.mp3", fallback, "Main Menu.mp3");
-    } else if (screen_ == Screen::SongSelect || screen_ == Screen::SongBrowser ||
-               screen_ == Screen::SessionMix) {
+    } else if (current_screen() == Screen::SongSelect || current_screen() == Screen::SongBrowser ||
+               current_screen() == Screen::SessionMix) {
         music_path = select_scene_slot("song_select", "Song Selecte.mp3", "Song Select.mp3", "Main Menu.mp3");
-    } else if (screen_ == Screen::QuickSetup) {
+    } else if (current_screen() == Screen::QuickSetup) {
         music_path = select_scene_slot("quick_setup", "Main Menu.mp3");
     } else {
         music_path = select_scene_slot("title", "Main Menu.mp3");
@@ -1344,8 +1334,9 @@ void MenuApp::populate_result_render_data(render::MenuRenderData& render, const 
 void MenuApp::populate_generic_screen_render_data(render::MenuRenderData& render) {
     render.kind = render::MenuScreenKind::GenericList;
     render.generic.heading = screen_title();
+    const auto generic_view = menu::screen_descriptor(current_screen()).generic_view;
 
-    if (screen_ == Screen::SessionMix) {
+    if (generic_view == menu::GenericViewKind::SessionMix) {
         const Lr2CourseDefinition* course = selected_session_mix_lr2_course();
         const bool lr2_course_selected = course != nullptr;
         const bool draft_selected = session_mix_source_index_ == 1;
@@ -1468,40 +1459,49 @@ void MenuApp::populate_generic_screen_render_data(render::MenuRenderData& render
             ui_text("C adds on Song Select  |  Drop .lr2crs to load  |  ENTER activates",
                     "곡 선택 C로 추가  |  .lr2crs 드롭으로 로드  |  ENTER 실행"),
         };
-    } else if (screen_ == Screen::OptionsHub) {
+    } else if (generic_view == menu::GenericViewKind::OptionsHub) {
         render.generic.card_grid = true;
+        const auto selected_option = options_hub_controller_.cursor();
         append_menu_row(render.generic, ui_text("KEY MODE", "키 모드"),
                         ui_key_mode_label(config_.mode.key_mode),
-                        options_cursor_ == profile_setup::kOptionsKeyModeRow,
-                        render::MenuHitTargetKind::OptionsItem, profile_setup::kOptionsKeyModeRow, true, false);
+                        selected_option == menu::OptionsItemId::KeyMode,
+                        render::MenuHitTargetKind::OptionsItem,
+                        static_cast<int>(menu::OptionsItemId::KeyMode), true, false);
         append_menu_row(render.generic, ui_text("KEYMAP", "키 설정"),
                         ui_text("Configure", "설정"),
-                        options_cursor_ == profile_setup::kOptionsKeymapRow,
-                        render::MenuHitTargetKind::OptionsItem, profile_setup::kOptionsKeymapRow, true, false);
+                        selected_option == menu::OptionsItemId::Keymap,
+                        render::MenuHitTargetKind::OptionsItem,
+                        static_cast<int>(menu::OptionsItemId::Keymap), true, false);
         append_menu_row(render.generic, ui_text("SKINS", "스킨"),
                         ui_skin_source_label(config_.skin.source),
-                        options_cursor_ == profile_setup::kOptionsSkinsRow,
-                        render::MenuHitTargetKind::OptionsItem, profile_setup::kOptionsSkinsRow, true, false);
+                        selected_option == menu::OptionsItemId::Skins,
+                        render::MenuHitTargetKind::OptionsItem,
+                        static_cast<int>(menu::OptionsItemId::Skins), true, false);
         append_menu_row(render.generic, ui_text("GRAPHICS", "그래픽"),
                         ui_display_mode_label(config_.graphics.display_mode),
-                        options_cursor_ == profile_setup::kOptionsGraphicsRow,
-                        render::MenuHitTargetKind::OptionsItem, profile_setup::kOptionsGraphicsRow, true, false);
+                        selected_option == menu::OptionsItemId::Graphics,
+                        render::MenuHitTargetKind::OptionsItem,
+                        static_cast<int>(menu::OptionsItemId::Graphics), true, false);
         append_menu_row(render.generic, ui_text("AUDIO", "오디오"),
                         ui_preset_label(config_.audio_ui.preset),
-                        options_cursor_ == profile_setup::kOptionsAudioRow,
-                        render::MenuHitTargetKind::OptionsItem, profile_setup::kOptionsAudioRow, true, false);
+                        selected_option == menu::OptionsItemId::Audio,
+                        render::MenuHitTargetKind::OptionsItem,
+                        static_cast<int>(menu::OptionsItemId::Audio), true, false);
         append_menu_row(render.generic, ui_text("INPUT", "입력"),
                         safe_ui_text(config_.input.backend),
-                        options_cursor_ == profile_setup::kOptionsInputRow,
-                        render::MenuHitTargetKind::OptionsItem, profile_setup::kOptionsInputRow, true, false);
+                        selected_option == menu::OptionsItemId::Input,
+                        render::MenuHitTargetKind::OptionsItem,
+                        static_cast<int>(menu::OptionsItemId::Input), true, false);
         append_menu_row(render.generic, ui_text("CALIBRATION", "레이턴시"),
                         format_signed_offset_ms(config_.visual_offset_ms),
-                        options_cursor_ == profile_setup::kOptionsCalibrationRow,
-                        render::MenuHitTargetKind::OptionsItem, profile_setup::kOptionsCalibrationRow, true, false);
+                        selected_option == menu::OptionsItemId::Calibration,
+                        render::MenuHitTargetKind::OptionsItem,
+                        static_cast<int>(menu::OptionsItemId::Calibration), true, false);
         append_menu_row(render.generic, ui_text("PROFILE", "프로필"),
                         safe_ui_text(options_.profile),
-                        options_cursor_ == profile_setup::kOptionsProfileSetupRow,
-                        render::MenuHitTargetKind::OptionsItem, profile_setup::kOptionsProfileSetupRow, true, false);
+                        selected_option == menu::OptionsItemId::ProfileSetup,
+                        render::MenuHitTargetKind::OptionsItem,
+                        static_cast<int>(menu::OptionsItemId::ProfileSetup), true, false);
         render.generic.card_descriptions = {
             ui_text("Choose the play key mode. The current mode is shown prominently on this first card.",
                     "플레이 키 모드를 선택합니다. 현재 모드는 첫 카드에 크게 표시됩니다."),
@@ -1520,33 +1520,52 @@ void MenuApp::populate_generic_screen_render_data(render::MenuRenderData& render
             ui_text("Change profile name, avatar, and device setup.",
                     "프로필 이름, 아바타, 장치 설정을 변경합니다."),
         };
-    } else if (screen_ == Screen::Multiplayer) {
-        populate_multiplayer_render_data(render);
-    } else if (screen_ == Screen::SettingsAudio) {
-        populate_audio_settings_render_data(render);
-    } else if (screen_ == Screen::SettingsGraphics) {
-        populate_graphics_settings_render_data(render);
-    } else if (screen_ == Screen::SettingsSkins) {
-        populate_skin_settings_render_data(render);
-    } else if (screen_ == Screen::SettingsInput) {
-        populate_input_settings_render_data(render);
-    } else if (screen_ == Screen::SettingsCalibration) {
-        populate_calibration_settings_render_data(render);
-    } else if (screen_ == Screen::ModeSelect) {
-        populate_mode_settings_render_data(render);
-    } else if (screen_ == Screen::ModeMods) {
-        populate_mode_mods_render_data(render);
-    } else if (screen_ == Screen::Keymap) {
-        populate_keymap_render_data(render);
-    } else if (screen_ == Screen::KeymapConfirm) {
-        populate_keymap_confirm_render_data(render);
-    } else if (screen_ == Screen::OnnxUpscalerConfirm) {
-        populate_onnx_upscaler_confirm_render_data(render);
-    } else if (screen_ == Screen::KeymapTest) {
-        populate_keymap_test_render_data(render);
+    } else {
+        switch (generic_view) {
+            case menu::GenericViewKind::Multiplayer:
+                populate_multiplayer_render_data(render);
+                break;
+            case menu::GenericViewKind::AudioSettings:
+                populate_audio_settings_render_data(render);
+                break;
+            case menu::GenericViewKind::GraphicsSettings:
+                populate_graphics_settings_render_data(render);
+                break;
+            case menu::GenericViewKind::SkinSettings:
+                populate_skin_settings_render_data(render);
+                break;
+            case menu::GenericViewKind::InputSettings:
+                populate_input_settings_render_data(render);
+                break;
+            case menu::GenericViewKind::CalibrationSettings:
+                populate_calibration_settings_render_data(render);
+                break;
+            case menu::GenericViewKind::ModeSettings:
+                populate_mode_settings_render_data(render);
+                break;
+            case menu::GenericViewKind::ModManager:
+                populate_mode_mods_render_data(render);
+                break;
+            case menu::GenericViewKind::Keymap:
+                populate_keymap_render_data(render);
+                break;
+            case menu::GenericViewKind::KeymapConfirm:
+                populate_keymap_confirm_render_data(render);
+                break;
+            case menu::GenericViewKind::OnnxUpscalerConfirm:
+                populate_onnx_upscaler_confirm_render_data(render);
+                break;
+            case menu::GenericViewKind::KeymapTest:
+                populate_keymap_test_render_data(render);
+                break;
+            case menu::GenericViewKind::None:
+            case menu::GenericViewKind::SessionMix:
+            case menu::GenericViewKind::OptionsHub:
+                break;
+        }
     }
 
-    if (screen_ != Screen::Keymap && screen_ != Screen::KeymapTest) {
+    if (menu::screen_descriptor(current_screen()).shows_input_footer) {
         render.generic.footer_notes.push_back(current_input_backend_status_label());
         if (const std::string detail = current_input_backend_status_detail(); !detail.empty()) {
             render.generic.footer_notes.push_back(detail);
@@ -1556,7 +1575,7 @@ void MenuApp::populate_generic_screen_render_data(render::MenuRenderData& render
 
 void MenuApp::publish_snapshot() {
     const int64_t publish_start_ns = timing::HighResClock::now_ns();
-    if (screen_ == Screen::SongSelect) {
+    if (current_screen() == Screen::SongSelect) {
         sync_song_select_state();
     }
     service_song_preview();
@@ -1570,39 +1589,9 @@ void MenuApp::publish_snapshot() {
         active_tenriff_skin_.found) {
         render.lobby_skin.enabled = true;
         render.lobby_skin.revision = tenriff_skin_revision_;
-        std::string screen_background_key;
-        std::string screen_background_fallback;
-        switch (screen_) {
-            case Screen::QuickSetup: screen_background_key = "quick_setup"; break;
-            case Screen::Title: screen_background_key = "title"; break;
-            case Screen::OptionsHub: screen_background_key = "options"; break;
-            case Screen::Multiplayer:
-                screen_background_key = "multiplayer";
-                screen_background_fallback = "song_select";
-                break;
-            case Screen::SongSelect: screen_background_key = "song_select"; break;
-            case Screen::SessionMix: screen_background_key = "session_mix"; break;
-            case Screen::SongBrowser:
-                screen_background_key = "song_browser";
-                screen_background_fallback = "song_select";
-                break;
-            case Screen::SettingsAudio: screen_background_key = "settings_audio"; break;
-            case Screen::SettingsGraphics: screen_background_key = "settings_graphics"; break;
-            case Screen::SettingsSkins: screen_background_key = "settings_skins"; break;
-            case Screen::SettingsInput: screen_background_key = "settings_input"; break;
-            case Screen::SettingsCalibration: screen_background_key = "settings_calibration"; break;
-            case Screen::ModeSelect: screen_background_key = "mode_select"; break;
-            case Screen::ModeMods: screen_background_key = "mode_mods"; break;
-            case Screen::Keymap: screen_background_key = "keymap"; break;
-            case Screen::KeymapConfirm: screen_background_key = "keymap_confirm"; break;
-            case Screen::OnnxUpscalerConfirm: screen_background_key = "onnx_upscaler_confirm"; break;
-            case Screen::KeymapTest: screen_background_key = "keymap_test"; break;
-            case Screen::Result: screen_background_key = "result"; break;
-            case Screen::Gameplay: break;
-        }
-        if (screen_background_key.rfind("settings_", 0u) == 0u) {
-            screen_background_fallback = "settings";
-        }
+        const auto& descriptor = menu::screen_descriptor(current_screen());
+        const std::string screen_background_key(descriptor.background_key);
+        const std::string screen_background_fallback(descriptor.background_fallback_key);
         render.lobby_skin.screen_id = screen_background_key;
         render.lobby_skin.screen_fallback_id = screen_background_fallback;
         auto background_it = active_tenriff_skin_.screen_background_paths.find(
@@ -1644,33 +1633,41 @@ void MenuApp::publish_snapshot() {
     rebuild_current_song_record_indices();
     const LocalPlayRecord* selected_record = current_selected_record();
 
-    if (screen_ == Screen::QuickSetup) {
-        populate_quick_setup_render_data(render);
-    } else if (screen_ == Screen::Title) {
-        populate_title_render_data(render, current_track, current_best);
-    } else if (screen_ == Screen::SongSelect) {
-        populate_song_select_render_data(render, current_track, current_best, selected_record);
-    } else if (screen_ == Screen::SongBrowser) {
-        populate_song_browser_render_data(render);
-    } else if (screen_ == Screen::Gameplay) {
-        render.kind = render::MenuScreenKind::GameplayHud;
-        render.gameplay.title = last_chart_title_;
-        render.gameplay.artist = last_chart_artist_;
-        render.gameplay.bpm = last_chart_bpm_;
-        populate_gameplay_render_data(render.gameplay);
-        render.gameplay.scroll_speed =
-            game::SpeedManager::scrollBps(last_chart_bpm_,
-                                          render.gameplay.rate,
-                                          render.gameplay.hispeed)
-                .value_or(0.0);
-    } else if (screen_ == Screen::Result) {
-        populate_result_render_data(render, current_track);
-    } else {
-        populate_generic_screen_render_data(render);
+    switch (menu::screen_descriptor(current_screen()).snapshot_view) {
+        case menu::SnapshotViewKind::QuickSetup:
+            populate_quick_setup_render_data(render);
+            break;
+        case menu::SnapshotViewKind::Title:
+            populate_title_render_data(render, current_track, current_best);
+            break;
+        case menu::SnapshotViewKind::SongSelect:
+            populate_song_select_render_data(render, current_track, current_best, selected_record);
+            break;
+        case menu::SnapshotViewKind::SongBrowser:
+            populate_song_browser_render_data(render);
+            break;
+        case menu::SnapshotViewKind::Gameplay:
+            render.kind = render::MenuScreenKind::GameplayHud;
+            render.gameplay.title = last_chart_title_;
+            render.gameplay.artist = last_chart_artist_;
+            render.gameplay.bpm = last_chart_bpm_;
+            populate_gameplay_render_data(render.gameplay);
+            render.gameplay.scroll_speed =
+                game::SpeedManager::scrollBps(last_chart_bpm_,
+                                              render.gameplay.rate,
+                                              render.gameplay.hispeed)
+                    .value_or(0.0);
+            break;
+        case menu::SnapshotViewKind::Result:
+            populate_result_render_data(render, current_track);
+            break;
+        case menu::SnapshotViewKind::Generic:
+            populate_generic_screen_render_data(render);
+            break;
     }
 
     if (render.kind == render::MenuScreenKind::GenericList &&
-        screen_ == settings_change_flash_screen_ &&
+        current_screen() == settings_change_flash_screen_ &&
         settings_change_flash_row_ >= 0 &&
         publish_start_ns >= settings_change_flash_started_ns_ &&
         publish_start_ns - settings_change_flash_started_ns_ < 900'000'000LL) {
@@ -1683,7 +1680,7 @@ void MenuApp::publish_snapshot() {
         }
     }
 
-    if (screen_ != Screen::Gameplay && song_indexer_.is_running()) {
+    if (current_screen() != Screen::Gameplay && song_indexer_.is_running()) {
         const auto progress = song_indexer_.progress();
         render.loading_progress.visible = true;
         render.loading_progress.stage =
@@ -1727,7 +1724,7 @@ void MenuApp::publish_snapshot() {
         ++snapshot_version_;
     }
 
-    if (screen_ == Screen::SongSelect && song_select_view_ == SongSelectView::Songs) {
+    if (current_screen() == Screen::SongSelect && song_select_view_ == SongSelectView::Songs) {
         const int64_t publish_elapsed_ns = timing::HighResClock::now_ns() - publish_start_ns;
         constexpr int64_t kSlowSongSelectSnapshotNs = 8'000'000LL;
         constexpr int64_t kSlowSnapshotLogCooldownNs = 2'000'000'000LL;
@@ -1864,7 +1861,7 @@ void MenuApp::update_pressed_keys(const input::InputEvent& event) {
         pressed_keys_.insert(event.keycode);
         if (is_song_select_repeat_key(event.keycode)) {
             song_select_repeat_key_ = event.keycode;
-            song_select_repeat_screen_ = screen_;
+            song_select_repeat_screen_ = current_screen();
             song_select_repeat_next_ns_ =
                 timing::HighResClock::now_ns() + kSongSelectRepeatInitialDelayNs;
         }
@@ -1874,13 +1871,13 @@ void MenuApp::update_pressed_keys(const input::InputEvent& event) {
             reset_song_select_repeat();
         }
     }
-    if (screen_ == Screen::KeymapTest) {
+    if (current_screen() == Screen::KeymapTest) {
         publish_snapshot();
     }
 }
 
 void MenuApp::update_song_select_repeat() {
-    if (screen_ != song_select_repeat_screen_) {
+    if (current_screen() != song_select_repeat_screen_) {
         reset_song_select_repeat();
         return;
     }
@@ -1898,7 +1895,7 @@ void MenuApp::update_song_select_repeat() {
         return;
     }
 
-    switch (screen_) {
+    switch (current_screen()) {
         case Screen::QuickSetup:
             handle_quick_setup_input(song_select_repeat_key_);
             break;
@@ -1956,17 +1953,18 @@ void MenuApp::reset_song_select_repeat() {
 bool MenuApp::is_song_select_repeat_key(uint32_t keycode) const {
     if (help_overlay_visible_ || profile_nickname_edit_active_ ||
         difficulty_table_url_editing_ || song_select_search_active_ ||
-        (screen_ == Screen::Keymap && keymap_capture_active_)) {
+        (current_screen() == Screen::Keymap &&
+         keymap_settings_controller_.capture_active())) {
         return false;
     }
 
     if (keycode == key_page_up_ || keycode == key_page_down_) {
-        return screen_ == Screen::SongSelect &&
+        return current_screen() == Screen::SongSelect &&
                song_select_focus_ == SongSelectFocus::SongList;
     }
 
     if (keycode == key_up_ || keycode == key_down_) {
-        switch (screen_) {
+        switch (current_screen()) {
             case Screen::QuickSetup:
             case Screen::Title:
             case Screen::OptionsHub:
@@ -1990,7 +1988,7 @@ bool MenuApp::is_song_select_repeat_key(uint32_t keycode) const {
     if (keycode != key_left_ && keycode != key_right_) {
         return false;
     }
-    switch (screen_) {
+    switch (current_screen()) {
         case Screen::OptionsHub:
             return true;
         case Screen::QuickSetup:
@@ -2047,7 +2045,7 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
         last_chart_title_ = multiplayer_chart_title_;
     }
 
-    screen_ = Screen::Gameplay;
+    reset_screen(Screen::Gameplay);
     last_gameplay_input_backend_state_ =
         input_backend_fallback_policy_.runtime_state(config_.input.rawinput);
     apply_runtime_graphics_config();
@@ -2359,9 +2357,9 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
                               "멀티플레이 로딩을 취소했습니다. 다시 시도하려면 재연결하세요.")
                     : ui_text("This PC could not load the battle chart; reconnect after fixing it.",
                               "이 PC에서 대전 차트를 로드하지 못했습니다. 문제를 고친 뒤 재연결하세요.");
-            screen_ = Screen::Multiplayer;
+            reset_screen(Screen::Multiplayer);
         } else {
-            screen_ = Screen::SongSelect;
+            reset_screen(Screen::SongSelect);
         }
         apply_runtime_graphics_config();
         publish_snapshot();
@@ -2392,7 +2390,7 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
             std::lock_guard<std::mutex> lock(gameplay_hud_mutex_);
             reset_gameplay_hud_state(gameplay_hud_);
         }
-        screen_ = Screen::Multiplayer;
+        reset_screen(Screen::Multiplayer);
         apply_runtime_graphics_config();
         publish_snapshot();
         return;
@@ -2452,7 +2450,7 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
         last_result_path_.clear();
         last_export_warnings_.clear();
         last_session_replay_playback_ = false;
-        screen_ = Screen::SongSelect;
+        reset_screen(Screen::SongSelect);
         apply_runtime_graphics_config();
         {
             std::lock_guard<std::mutex> lock(gameplay_hud_mutex_);
@@ -2551,7 +2549,7 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
         }
         result_presentation_start_ns_ = timing::HighResClock::now_ns();
         result_presentation_skipped_ = false;
-        screen_ = Screen::Result;
+        replace_screen(Screen::Result);
     } else {
         has_result_ = false;
         last_clear_status_.clear();
@@ -2566,7 +2564,7 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
         last_result_path_.clear();
         last_export_warnings_.clear();
         last_session_replay_playback_ = false;
-        screen_ = peer_battle ? Screen::Multiplayer : Screen::SongSelect;
+        reset_screen(peer_battle ? Screen::Multiplayer : Screen::SongSelect);
         if (peer_battle) {
             multiplayer_status_message_ =
                 ui_text("Local play ended. Waiting for the peer before rematch.",
@@ -2584,49 +2582,30 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
 }
 
 std::string MenuApp::screen_title() const {
-    switch (screen_) {
-        case Screen::QuickSetup:
-            return first_run_profile_ ? ui_text("Quick Setup", "빠른 설정")
-                                      : ui_text("Profile Setup", "프로필 설정");
-        case Screen::Title: return ui_text("Title", "타이틀");
-        case Screen::OptionsHub: return ui_text("Options", "옵션");
-        case Screen::Multiplayer: return ui_text("Peer Multiplayer", "P2P 멀티플레이");
-        case Screen::SongSelect:
-            if (song_select_view_ == SongSelectView::Sources) {
-                return ui_text("Song Sources", "곡 소스");
-            }
-            if (song_select_view_ == SongSelectView::Records) {
-                return ui_text("Local Records", "로컬 기록");
-            }
-            return ui_text("Song Select", "곡 선택");
-        case Screen::SessionMix: return ui_text("Session Mix", "세션 믹스");
-        case Screen::SongBrowser: return ui_text("Song Filters", "곡 필터");
-        case Screen::Gameplay: return ui_text("Gameplay", "게임플레이");
-        case Screen::SettingsAudio: return ui_text("Audio Settings", "오디오 설정");
-        case Screen::SettingsGraphics: return ui_text("Graphics Settings", "그래픽 설정");
-        case Screen::SettingsSkins: return ui_text("Skin Settings", "스킨 설정");
-        case Screen::SettingsInput: return ui_text("Input Settings", "입력 설정");
-        case Screen::SettingsCalibration: return ui_text("Calibration Wizard", "캘리브레이션 위저드");
-        case Screen::ModeSelect: return ui_text("Mode Select", "모드 설정");
-        case Screen::ModeMods: return ui_text("Mod Manager", "모드 관리자");
-        case Screen::Keymap: return ui_text("Keymap", "키 설정");
-        case Screen::KeymapConfirm: return ui_text("Keymap Confirm", "키 설정 확인");
-        case Screen::OnnxUpscalerConfirm:
-            return ui_text("Enable ONNX Upscaler?", "ONNX 업스케일러를 켤까요?");
-        case Screen::KeymapTest: return "NKRO Test";
-        case Screen::Result: return ui_text("Result", "결과");
-        default: return ui_text("Menu", "메뉴");
+    if (current_screen() == Screen::QuickSetup) {
+        return first_run_profile_ ? ui_text("Quick Setup", "빠른 설정")
+                                  : ui_text("Profile Setup", "프로필 설정");
     }
+    if (current_screen() == Screen::SongSelect) {
+        if (song_select_view_ == SongSelectView::Sources) {
+            return ui_text("Song Sources", "곡 소스");
+        }
+        if (song_select_view_ == SongSelectView::Records) {
+            return ui_text("Local Records", "로컬 기록");
+        }
+    }
+    const auto& descriptor = menu::screen_descriptor(current_screen());
+    return ui_text(descriptor.english_title, descriptor.korean_title);
 }
 
 void MenuApp::populate_help_overlay(render::HelpOverlayData& target) const {
-    target.visible = help_overlay_visible_ && screen_ != Screen::Gameplay &&
-                     screen_ != Screen::Result;
+    target.visible = help_overlay_visible_ && current_screen() != Screen::Gameplay &&
+                     current_screen() != Screen::Result;
     if (!target.visible) {
         return;
     }
 
-    switch (screen_) {
+    switch (current_screen()) {
         case Screen::QuickSetup:
             if (first_run_profile_) {
                 target.title = ui_text("Quick Setup", "빠른 설정");
