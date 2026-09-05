@@ -950,10 +950,15 @@ void MenuApp::populate_title_render_data(render::MenuRenderData& render,
         render::MenuButtonData{no_songs_indexed ? ui_text("ADD SONGS FOLDER", "곡 폴더 추가")
                                                 : ui_text("PLAY", "플레이"),
                                no_songs_indexed ? u8"＋" : u8"▶",
-                               title_cursor_ == 0},
-        render::MenuButtonData{ui_text("MULTIPLAYER", "멀티플레이"), "P2P", title_cursor_ == 1},
-        render::MenuButtonData{ui_text("OPTIONS", "옵션"), u8"⚙", title_cursor_ == 2},
-        render::MenuButtonData{ui_text("EXIT", "종료"), u8"⏻", title_cursor_ == 3},
+                               title_cursor_ == 0,
+                               no_songs_indexed ? ui_text("Choose a folder containing your BMS charts.", "BMS 차트가 들어 있는 폴더를 선택하세요.")
+                                                : ui_text("Open your library and choose a track.", "라이브러리에서 플레이할 곡을 고르세요.")},
+        render::MenuButtonData{ui_text("MULTIPLAYER", "멀티플레이"), "P2P", title_cursor_ == 1,
+                               ui_text("Find a room or host a session with friends.", "방을 찾거나 친구들과 함께할 방을 만드세요.")},
+        render::MenuButtonData{ui_text("OPTIONS", "옵션"), u8"⚙", title_cursor_ == 2,
+                               ui_text("Adjust audio, input, graphics and skins.", "오디오, 입력, 화면과 스킨을 설정하세요.")},
+        render::MenuButtonData{ui_text("EXIT", "종료"), u8"⏻", title_cursor_ == 3,
+                               ui_text("Close TenRiff.", "텐리프를 종료합니다.")},
     };
     render.title.guides = {
         ui_text("UP / DOWN or mouse to move", "위 / 아래 또는 마우스로 이동"),

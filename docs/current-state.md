@@ -7,8 +7,11 @@
 - BMS landmines (`D1-D9`, `E1-E9`) are playable, including `#WAV00`, base-36 damage tokens, `ZZ` instant fail, exact press/release boundary behavior, and lane-mod/key-converter remapping.
 - Results and local records expose fixed native score separately from detail score, and categorical native accuracy separately from continuous timing-based detailed accuracy.
 - 새 replay evidence v3는 차트 SHA-256, canonical ruleset, result-to-replay SHA-256을 저장하고 입력 trace를 headless 엔진으로 재실행합니다. 공식 로컬 best는 재계산된 verified 결과만 사용하며 legacy/custom/assist 기록은 히스토리에 `unverified`로 남습니다.
-- 현재 안정 배포 라인은 `1.6.0`
-- UI-r2 Result는 2.2초 타임라인으로 프리즘·점수·등급·상태·통계·그래프를 순차 공개하며, Space로 연출을 건너뛸 수 있고 CONTINUE/RETRY/Replay 입력은 공개 완료 전 잠김
+- 현재 안정 배포 라인은 `1.7.0`
+- 기본 선곡·싱글 결과 UI는 차분한 패널과 단색 주 동작 버튼을 사용하며, 결과는 큰 점수·등급·정확도 중심으로 표시한다. 사용자 TenRiff 스킨과 대전 결과는 기존 화면 구성을 유지한다. 구현/검증 안내는 `docs/menu-visual-polish.md` 참고.
+- 기본 공통 설정 UI는 설정 목록과 페이지형 사용 안내를 분리한다. 스킨 설정은 우측 실시간 미리보기를 유지하고 안내를 좌측 목록 아래에 표시한다. 전체 설명과 footer 안내는 페이지로 모두 읽을 수 있고 안내 페이지 이동은 설정값이나 선택 행을 바꾸지 않는다.
+- 기본 메인 메뉴도 같은 패널·색상 체계를 사용하며, 좌측 로고/안내와 우측 실행 메뉴로 구성한다. 플레이 또는 곡 폴더 추가를 주 동작으로 강조하고 나머지 메뉴에는 짧은 설명과 선택 테두리를 표시한다. 사용자 타이틀 스킨과 기존 키보드/클릭 동작은 유지한다.
+- Result는 기존 2.2초 순차 공개와 Space 건너뛰기, 공개 완료 전 CONTINUE/RETRY/Replay 입력 잠금을 유지한다. 프리즘 연출은 사용자 스킨 경로에 남고 기본 결과 화면은 점수 요약 패널을 사용한다.
 - UI-r2 Song Select는 상단 탭, 7행 재킷 라이브러리, 대형 선택 이미지, 최고 기록 카드, 차트/모드 패널, 실제 동작하는 START 버튼 구조로 개편되며 Collection/Store/재화/글로벌 랭킹 가상 기능은 표시하지 않음
 - Song Select 우측의 비주얼 레이턴시·하이스피드·Gauge Shift 시작 등급·랜덤 셀은 좌클릭으로 증가/다음, 우클릭으로 감소/이전을 적용하고 즉시 저장함. 현재 차트 키수는 잘림 없이 표시되며 최고 기록은 점수·정확도·최대 콤보를 함께 표시
 - 1.3.1은 외부 `.osu` 파서·인덱싱·설정 토글을 제거해 차트 표면을 다시 BMS 전용으로 고정하고, BMSTable 선택 시 해시 매칭을 위해 Fast에서 Safe로 자동 전환함. Aery 실서버와 CG901B MD5→`⑤LEVEL 13` 매칭으로 확인

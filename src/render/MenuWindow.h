@@ -74,6 +74,7 @@ enum class MenuHitTargetKind {
     AccountField,
     AccountAction,
     UrlWarningButton,
+    GenericHelpPage,
 };
 
 enum class MenuHitPart {
@@ -775,6 +776,8 @@ private:
     std::atomic<bool> init_success_{false};
     std::atomic<bool> fatal_error_{false};
     std::atomic<bool> screenshot_requested_{false};
+    // Presentation-only pagination; changing help pages never changes settings.
+    std::atomic<int> generic_help_page_{0};
     std::atomic<int64_t> last_present_completion_ns_{0};
     bool fullscreen_ = false;
     bool fullscreen_restore_pending_ = false;

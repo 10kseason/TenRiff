@@ -1,3 +1,8 @@
+        if (modern_title_screen) {
+#include "MenuWindow_draw_title_native.inl"
+            return;
+        }
+
         const double tick = static_cast<double>(GetTickCount64()) / 1000.0;
         const float logo_pulse = static_cast<float>(pulse_wave_01(render_now_ns, 5.4, 0.18));
         const float button_pulse = static_cast<float>(pulse_wave_01(render_now_ns, 4.2, 0.46));

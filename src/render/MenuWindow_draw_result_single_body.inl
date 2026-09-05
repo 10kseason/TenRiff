@@ -30,6 +30,18 @@
             brush->SetOpacity(saved_opacity);
         };
 
+        auto draw_result_control_text = [&](const std::string& text,
+                                             IDWriteTextFormat* format,
+                                             const D2D1_RECT_F& rect,
+                                             ID2D1Brush* brush,
+                                             float alpha) {
+            if (!format) return;
+            const auto saved_alignment = format->GetParagraphAlignment();
+            format->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_CENTER);
+            draw_result_text(text, format, rect, brush, alpha, DWRITE_TEXT_ALIGNMENT_CENTER);
+            format->SetParagraphAlignment(saved_alignment);
+        };
+
         auto draw_result_panel = [&](const D2D1_RECT_F& rect, float alpha, bool accent = false) {
             alpha = std::clamp(alpha, 0.0f, 1.0f);
             const D2D1_ROUNDED_RECT rounded = D2D1::RoundedRect(rect, 12.0f, 12.0f);
@@ -44,14 +56,14 @@
                                      : static_cast<ID2D1Brush*>(d2d_->button_border_brush.Get());
             if (border) {
                 const float saved_opacity = border->GetOpacity();
-                border->SetOpacity(saved_opacity * alpha * (accent ? 0.72f : 0.46f));
+                border->SetOpacity(saved_opacity * alpha * (modern_library_screen ? 0.24f : (accent ? 0.72f : 0.46f)));
                 ctx->DrawRoundedRectangle(rounded, border, accent ? 1.4f : 1.0f);
                 border->SetOpacity(saved_opacity);
             }
         };
 
-        // Clickable controls get an accent wash and a thicker accent border so they
-        // read as buttons instead of blending into the static analysis panels.
+        // Secondary actions stay neutral in the native UI; the filled Continue
+        // button owns the emphasis. Imported skins retain their accent wash.
         auto draw_action_button = [&](const D2D1_RECT_F& rect, float alpha, bool enabled) {
             alpha = std::clamp(alpha, 0.0f, 1.0f);
             const D2D1_ROUNDED_RECT rounded = D2D1::RoundedRect(rect, 12.0f, 12.0f);
@@ -61,17 +73,23 @@
                 ctx->FillRoundedRectangle(rounded, d2d_->panel_brush.Get());
                 d2d_->panel_brush->SetOpacity(saved_opacity);
             }
-            if (enabled && d2d_->button_selected_brush) {
+            if (enabled && d2d_->button_selected_brush && !modern_library_screen) {
                 const float saved_opacity = d2d_->button_selected_brush->GetOpacity();
                 d2d_->button_selected_brush->SetOpacity(saved_opacity * alpha);
                 ctx->FillRoundedRectangle(rounded, d2d_->button_selected_brush.Get());
                 d2d_->button_selected_brush->SetOpacity(saved_opacity);
             }
-            if (d2d_->accent_brush) {
+            if (d2d_->accent_brush && !modern_library_screen) {
                 const float saved_opacity = d2d_->accent_brush->GetOpacity();
                 d2d_->accent_brush->SetOpacity(saved_opacity * alpha * (enabled ? 0.90f : 0.32f));
                 ctx->DrawRoundedRectangle(rounded, d2d_->accent_brush.Get(), 2.0f);
                 d2d_->accent_brush->SetOpacity(saved_opacity);
+            }
+            if (modern_library_screen && d2d_->button_border_brush) {
+                const float saved = d2d_->button_border_brush->GetOpacity();
+                d2d_->button_border_brush->SetOpacity(alpha * (enabled ? 0.85f : 0.35f));
+                ctx->DrawRoundedRectangle(rounded, d2d_->button_border_brush.Get(), 1.0f);
+                d2d_->button_border_brush->SetOpacity(saved);
             }
         };
 
@@ -98,7 +116,7 @@
         }
 
         const D2D1_POINT_2F prism_center = D2D1::Point2F(874.0f, 420.0f);
-        if (d2d_->accent_brush) {
+        if (d2d_->accent_brush && !modern_library_screen) {
             const D2D1_COLOR_F saved_color = d2d_->accent_brush->GetColor();
             const float saved_opacity = d2d_->accent_brush->GetOpacity();
             for (int index = 0; index < 52; ++index) {
@@ -190,7 +208,7 @@
         const float information_slide = 34.0f * (1.0f - presentation.information);
         const D2D1_RECT_F song_panel = offset_rect(
             skin_layout_rect(data, "result.song_panel",
-                             D2D1::RectF(70.0f, 154.0f, 590.0f, 704.0f)),
+                             D2D1::RectF(70.0f, 154.0f, 590.0f, modern_library_screen ? 738.0f : 704.0f)),
             -information_slide, 0.0f);
         draw_result_panel(song_panel, presentation.information, true);
         const D2D1_RECT_F art_rect =
@@ -204,7 +222,7 @@
                             D2D1_BITMAP_INTERPOLATION_MODE_LINEAR,
                             &source);
         }
-        draw_result_text(result_loc("// TRACK COMPLETE", "// 플레이 완료"),
+        draw_result_text(result_loc("TRACK", "플레이한 곡"),
                          d2d_->hud_format.Get(),
                          D2D1::RectF(song_panel.left + 230.0f, song_panel.top + 14.0f,
                                      song_panel.right - 24.0f, song_panel.top + 38.0f),
@@ -250,6 +268,10 @@
                              presentation.information);
         }
 
+        const float prism_bottom = 715.0f;
+        if (modern_library_screen) {
+#include "MenuWindow_draw_result_summary.inl"
+        } else {
         const double score_maximum = data.result.max_score > 0
                                          ? static_cast<double>(data.result.max_score)
                                          : 1.0;
@@ -258,7 +280,7 @@
         const float failed_completion = result_success ? 1.0f : 0.76f;
         const float prism_completion = presentation.prism * failed_completion;
         const float prism_top = 116.0f + (1.0f - score_quality) * 20.0f;
-        const float prism_bottom = 715.0f;
+
         const float prism_half_width = 222.0f + score_quality * 18.0f;
         auto assemble_point = [&](float x, float y) {
             return D2D1::Point2F(
@@ -482,18 +504,20 @@
             d2d_->accent_brush->SetOpacity(saved_opacity);
         }
 
+        }
+
         // Left edge shares the CONTINUE/REPLAY/RETRY column below it so the right
         // half of the screen reads as one column instead of two ragged ones.
         const D2D1_RECT_F analysis_panel = skin_layout_rect(
-            data, "result.analysis_panel", D2D1::RectF(1320.0f, 154.0f, 1848.0f, 704.0f));
+            data, "result.analysis_panel", D2D1::RectF(1320.0f, 154.0f, 1848.0f, modern_library_screen ? 738.0f : 704.0f));
         draw_result_panel(analysis_panel, presentation.graph, false);
-        draw_result_text(result_loc("// PERFORMANCE ANALYSIS", "// 플레이 분석"),
+        draw_result_text(result_loc("PERFORMANCE", "플레이 분석"),
                          d2d_->hud_format.Get(),
                          D2D1::RectF(analysis_panel.left + 24.0f, analysis_panel.top + 18.0f,
                                      analysis_panel.right - 24.0f, analysis_panel.top + 48.0f),
                          d2d_->accent_brush.Get(),
                          presentation.graph);
-        draw_result_text(result_loc("TIMING SUMMARY", "타이밍 요약"),
+        draw_result_text(result_loc("TIMING ESTIMATE", "타이밍 분포 추정"),
                          d2d_->body_format.Get(),
                          D2D1::RectF(analysis_panel.left + 26.0f, analysis_panel.top + 66.0f,
                                      analysis_panel.right - 26.0f, analysis_panel.top + 98.0f),
@@ -571,7 +595,7 @@
                                      center_x, timing_track.bottom + 36.0f),
                          d2d_->muted_brush.Get(),
                          presentation.graph);
-        draw_result_text(result_loc("SPREAD", "분산") + "  " +
+        draw_result_text(result_loc("STD. DEV.", "표준편차") + "  " +
                              format_decimal(data.result.stddev_delta_ms) + "ms",
                          d2d_->hud_format.Get(),
                          D2D1::RectF(center_x, timing_track.bottom + 8.0f,
@@ -692,7 +716,7 @@
                 const float saved_opacity = d2d_->accent_brush->GetOpacity();
                 d2d_->accent_brush->SetColor(result_statistics[index].color);
                 const float zero_scale =
-                    (index < 5 && result_statistics[index].value == "0") ? 0.38f : 1.0f;
+                    (index < 5 && result_statistics[index].value == "0") ? 0.70f : 1.0f;
                 d2d_->accent_brush->SetOpacity(alpha * zero_scale);
                 draw_result_text(result_statistics[index].label,
                                  d2d_->hud_format.Get(),
@@ -702,7 +726,7 @@
                                  alpha * zero_scale,
                                  DWRITE_TEXT_ALIGNMENT_CENTER);
                 draw_result_text(result_statistics[index].value,
-                                 d2d_->stats_value_format.Get(),
+                                 modern_library_screen ? d2d_->result_metric_format.Get() : d2d_->stats_value_format.Get(),
                                  D2D1::RectF(cell.left + 10.0f, cell.top + 76.0f + rise,
                                              cell.right - 10.0f, cell.top + 126.0f + rise),
                                  d2d_->text_brush.Get(),
@@ -722,7 +746,7 @@
             }
         }
 
-        if (data.result.all_perfect && d2d_->accent_brush && presentation.all_perfect > 0.0f) {
+        if (!modern_library_screen && data.result.all_perfect && d2d_->accent_brush && presentation.all_perfect > 0.0f) {
             const D2D1_COLOR_F saved_color = d2d_->accent_brush->GetColor();
             const float saved_opacity = d2d_->accent_brush->GetOpacity();
             const float beam_x = stats_panel.left +
@@ -760,7 +784,13 @@
                 register_hit(replay_rect, MenuHitTargetKind::SettingsRow, 1);
             }
         }
-        if (d2d_->play_brush) {
+        if (modern_library_screen && d2d_->accent_brush) {
+            const float saved = d2d_->accent_brush->GetOpacity();
+            d2d_->accent_brush->SetOpacity(controls_alpha);
+            ctx->FillRoundedRectangle(D2D1::RoundedRect(continue_rect, 12.0f, 12.0f),
+                                      d2d_->accent_brush.Get());
+            d2d_->accent_brush->SetOpacity(saved);
+        } else if (d2d_->play_brush) {
             const float saved = d2d_->play_brush->GetOpacity();
             set_brush_points(d2d_->play_brush.Get(), continue_rect);
             d2d_->play_brush->SetOpacity(controls_alpha);
@@ -770,17 +800,19 @@
         } else {
             draw_result_panel(continue_rect, controls_alpha, true);
         }
-        draw_result_text(data.result.continue_label.empty()
+        const D2D1_COLOR_F saved_continue_text = d2d_->text_brush->GetColor();
+        if (modern_library_screen) d2d_->text_brush->SetColor(D2D1::ColorF(0x0B1620));
+        draw_result_control_text(data.result.continue_label.empty()
                              ? result_loc("CONTINUE  \xE2\x9E\xA1", "계속  \xE2\x9E\xA1")
                              : data.result.continue_label,
                          d2d_->menu_button_format.Get(),
                          continue_rect,
                          d2d_->text_brush.Get(),
-                         controls_alpha,
-                         DWRITE_TEXT_ALIGNMENT_CENTER);
+                         controls_alpha);
+        d2d_->text_brush->SetColor(saved_continue_text);
         draw_action_button(replay_rect, controls_alpha, data.result.replay_available);
         draw_action_button(retry_rect, controls_alpha, true);
-        draw_result_text(data.result.replay_available
+        draw_result_control_text(data.result.replay_available
                              ? result_loc("\xE2\x96\xB6  WATCH REPLAY", "\xE2\x96\xB6  리플레이 보기")
                              : result_loc("REPLAY UNAVAILABLE", "리플레이 없음"),
                          d2d_->stats_value_format.Get(),
@@ -788,14 +820,12 @@
                          data.result.replay_available
                              ? static_cast<ID2D1Brush*>(d2d_->text_brush.Get())
                              : static_cast<ID2D1Brush*>(d2d_->muted_brush.Get()),
-                         controls_alpha,
-                         DWRITE_TEXT_ALIGNMENT_CENTER);
-        draw_result_text(result_loc("\xE2\x86\xBB  RETRY", "\xE2\x86\xBB  재도전"),
+                         controls_alpha);
+        draw_result_control_text(result_loc("\xE2\x86\xBB  RETRY", "\xE2\x86\xBB  재도전"),
                          d2d_->stats_value_format.Get(),
                          retry_rect,
                          d2d_->text_brush.Get(),
-                         controls_alpha,
-                         DWRITE_TEXT_ALIGNMENT_CENTER);
+                         controls_alpha);
         draw_result_text(presentation.interaction_ready
                              ? result_loc("ENTER / Continue    R / Retry    F1 / Replay",
                                           "ENTER / 계속    R / 재도전    F1 / 리플레이")

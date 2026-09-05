@@ -2,13 +2,14 @@
             make_screen_content_bands(48.0f, 72.0f, false, 20.0f, 18.0f);
         const D2D1_RECT_F content_rect = skin_layout_rect(
             data, "generic.content",
-            D2D1::RectF(80.0f, bands.body_top, kBaseWidth - 80.0f, bands.body_bottom));
+            modern_settings_screen ? D2D1::RectF(64.0f, 154.0f, kBaseWidth - 64.0f, 958.0f)
+                                   : D2D1::RectF(80.0f, bands.body_top, kBaseWidth - 80.0f, bands.body_bottom));
         const float left = content_rect.left;
         const float top = content_rect.top;
         const float right = content_rect.right;
         const float bottom = content_rect.bottom;
 
-        if (d2d_->card_brush) {
+        if (d2d_->card_brush && !modern_settings_screen) {
             D2D1_ROUNDED_RECT card =
                 D2D1::RoundedRect(D2D1::RectF(left, top, right, bottom), 18.0f, 18.0f);
             ctx->FillRoundedRectangle(card, d2d_->card_brush.Get());
@@ -22,7 +23,22 @@
         }
         const std::wstring header_wide = to_wide(header);
         D2D1_RECT_F header_rect = D2D1::RectF(left, 48.0f, right, 120.0f);
-        if (d2d_->title_format && d2d_->accent_brush) {
+        if (modern_settings_screen) {
+            if (d2d_->panel_brush) ctx->FillRectangle(D2D1::RectF(0, 0, kBaseWidth, 126), d2d_->panel_brush.Get());
+            draw_text_clipped(L"TENRIFF", d2d_->header_format.Get(),
+                              D2D1::RectF(64, 24, 370, 94), d2d_->text_brush.Get());
+            draw_text_clipped(to_wide(data.generic.heading.empty() ? data.screen_title : data.generic.heading),
+                              d2d_->title_format.Get(), D2D1::RectF(420, 34, 1470, 78), d2d_->text_brush.Get());
+            draw_text_clipped(wloc("SETTINGS & TOOLS", "설정 및 도구"), d2d_->hud_format.Get(),
+                              D2D1::RectF(422, 82, 1470, 110), d2d_->muted_brush.Get());
+            draw_glass_panel(D2D1::RectF(left, 984, right, 1048), 12, 0.9f, 0, false, 0);
+            draw_text_clipped(wloc("ESC / BACKSPACE    Back or cancel", "ESC / BACKSPACE    뒤로 / 취소"),
+                              d2d_->body_format.Get(), D2D1::RectF(left + 24, 1004, left + 530, 1034), d2d_->text_brush.Get());
+            draw_text_clipped_aligned(wloc("UP / DOWN  Select     LEFT / RIGHT  Adjust     ENTER  Open     F1  Help",
+                                           "위 / 아래  선택     좌 / 우  조절     ENTER  열기     F1  도움말"),
+                                      d2d_->body_format.Get(), D2D1::RectF(left + 560, 1004, right - 24, 1034),
+                                      d2d_->muted_brush.Get(), DWRITE_TEXT_ALIGNMENT_TRAILING);
+        } else if (d2d_->title_format && d2d_->accent_brush) {
             draw_text_clipped(header_wide, d2d_->title_format.Get(), header_rect, d2d_->accent_brush.Get());
         }
 
@@ -31,6 +47,8 @@
         const float preview_width = has_skin_preview
                                         ? std::max(360.0f, ((right - left - 48.0f) - preview_gap) * 0.5f)
                                         : 0.0f;
+
+#include "MenuWindow_draw_generic_help.inl"
 
         auto draw_skin_preview_panel = [&](const SkinPreviewData& preview, const D2D1_RECT_F& rect) {
             const D2D1_ROUNDED_RECT panel_rr = D2D1::RoundedRect(rect, 18.0f, 18.0f);
@@ -460,11 +478,21 @@
                 }
                 if (d2d_->body_format && d2d_->text_brush) {
                     const std::wstring lane_w = to_wide(std::to_string(lane + 1));
+                    const D2D1_COLOR_F saved_text_color = d2d_->text_brush->GetColor();
+                    const auto saved_paragraph = d2d_->body_format->GetParagraphAlignment();
+                    if (modern_settings_screen && d2d_->note_fill_brush) {
+                        const auto color = d2d_->note_fill_brush->GetColor();
+                        const float luminance = color.r * 0.2126f + color.g * 0.7152f + color.b * 0.0722f;
+                        d2d_->text_brush->SetColor(D2D1::ColorF(luminance > 0.55f ? 0x101820 : 0xF3F6FA));
+                        d2d_->body_format->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_CENTER);
+                    }
                     draw_text_clipped_aligned(lane_w,
                                               d2d_->body_format.Get(),
                                               swatch_rect,
                                               d2d_->text_brush.Get(),
                                               DWRITE_TEXT_ALIGNMENT_CENTER);
+                    d2d_->text_brush->SetColor(saved_text_color);
+                    d2d_->body_format->SetParagraphAlignment(saved_paragraph);
                 }
             }
         };
@@ -589,35 +617,53 @@
 
         if (!data.generic.rows.empty() || !data.generic.notes.empty() ||
             !data.generic.footer_notes.empty() || data.generic.footer_reserved_lines > 0) {
-            const float row_left = left + 24.0f;
-            const float base_row_right = has_skin_preview ? (right - preview_width - preview_gap) : (right - 24.0f);
+            const float native_list_right = has_skin_preview ? right - preview_width - preview_gap
+                                                            : right - 648.0f;
+            const float row_left = left + (modern_settings_screen ? 20.0f : 24.0f);
+            const float base_row_right = modern_settings_screen ? native_list_right - 20.0f
+                : has_skin_preview ? (right - preview_width - preview_gap) : (right - 24.0f);
             const float row_safe_right =
-                (!has_skin_preview && data.performance.visible)
+                (!modern_settings_screen && !has_skin_preview && data.performance.visible)
                     ? std::min(base_row_right, performance_overlay_safe_left(24.0f))
                     : base_row_right;
             const bool roomy_option_layout = data.generic.rows.size() <= 12;
-            const float row_height = roomy_option_layout ? 54.0f : 48.0f;
-            const float row_gap = roomy_option_layout ? 10.0f : 8.0f;
+            const float row_height = modern_settings_screen ? 58.0f : roomy_option_layout ? 54.0f : 48.0f;
+            const float row_gap = modern_settings_screen ? 8.0f : roomy_option_layout ? 10.0f : 8.0f;
             const float row_step = row_height + row_gap;
             const float value_width = has_skin_preview ? (roomy_option_layout ? 270.0f : 240.0f)
                                                        : (roomy_option_layout ? 360.0f : 340.0f);
-            const float action_width = roomy_option_layout ? 62.0f : 56.0f;
+            const float action_width = modern_settings_screen ? 44.0f : roomy_option_layout ? 62.0f : 56.0f;
             const float action_gap = 10.0f;
             const float note_line_height = roomy_option_layout ? 34.0f : 28.0f;
             const float note_section_gap = data.generic.notes.empty() ? 0.0f : (roomy_option_layout ? 18.0f : 14.0f);
             const bool has_footer_notes =
-                !data.generic.footer_notes.empty() || data.generic.footer_reserved_lines > 0;
+                !modern_settings_screen && (!data.generic.footer_notes.empty() || data.generic.footer_reserved_lines > 0);
             const float footer_section_gap = has_footer_notes ? (roomy_option_layout ? 18.0f : 14.0f) : 0.0f;
-            const float list_top = top + 24.0f;
-            const float list_bottom_limit = bottom - 20.0f;
+            const float list_top = top + (modern_settings_screen ? 64.0f : 24.0f);
+            const float list_bottom_limit = modern_settings_screen && has_skin_preview ? bottom - 280.0f : bottom - 20.0f;
             IDWriteTextFormat* row_format =
-                roomy_option_layout && d2d_->option_format ? d2d_->option_format.Get() : d2d_->body_format.Get();
+                (modern_settings_screen || roomy_option_layout) && d2d_->option_format ? d2d_->option_format.Get() : d2d_->body_format.Get();
+
+            if (modern_settings_screen) {
+                draw_glass_panel(D2D1::RectF(left, top, native_list_right, list_bottom_limit + 20.0f),
+                                 14, 0.92f, 0, false, 0);
+                draw_text_clipped(wloc("PREFERENCES", "설정 항목"), d2d_->hud_format.Get(),
+                                  D2D1::RectF(row_left + 6, top + 22, base_row_right, top + 48), d2d_->muted_brush.Get());
+                draw_text_clipped_aligned(to_wide(std::to_string(data.generic.rows.size())) + wloc(" items", "개 항목"),
+                                          d2d_->hud_format.Get(), D2D1::RectF(row_left + 6, top + 22, base_row_right, top + 48),
+                                          d2d_->muted_brush.Get(), DWRITE_TEXT_ALIGNMENT_TRAILING);
+                const D2D1_RECT_F help_rect = has_skin_preview
+                    ? D2D1::RectF(left, bottom - 240.0f, native_list_right, bottom)
+                    : fit_rect_below_performance_overlay(D2D1::RectF(native_list_right + 24.0f, top, right, bottom), bottom, 20.0f);
+                draw_generic_help(help_rect, data.generic.heading, data.generic.notes, data.generic.footer_notes);
+            }
 
             if (has_skin_preview) {
                 const D2D1_RECT_F configured_preview = skin_layout_rect(
                     data, "generic.preview",
-                    D2D1::RectF(base_row_right + preview_gap, top + 24.0f,
-                                right - 24.0f, bottom - 24.0f));
+                    D2D1::RectF(base_row_right + preview_gap + (modern_settings_screen ? 20.0f : 0.0f),
+                                top + (modern_settings_screen ? 0.0f : 24.0f),
+                                right - (modern_settings_screen ? 0.0f : 24.0f), bottom - (modern_settings_screen ? 0.0f : 24.0f)));
                 const D2D1_RECT_F preview_rect = fit_rect_below_performance_overlay(
                     configured_preview,
                     bottom - 24.0f,
@@ -627,7 +673,7 @@
                 }
             }
 
-            int displayed_note_count = static_cast<int>(data.generic.notes.size());
+            int displayed_note_count = modern_settings_screen ? 0 : static_cast<int>(data.generic.notes.size());
             float notes_height = 0.0f;
             if (displayed_note_count > 0) {
                 notes_height = note_section_gap + note_line_height * static_cast<float>(displayed_note_count);
@@ -692,18 +738,29 @@
                 const bool highlight = row.selected || row.activatable || row.adjustable;
                 const D2D1_RECT_F row_rect = D2D1::RectF(row_left, row_y, row_right, row_y + row_height);
                 const D2D1_ROUNDED_RECT rr = D2D1::RoundedRect(row_rect, 12.0f, 12.0f);
-                if (highlight) {
+                if (highlight || modern_settings_screen) {
                     ID2D1SolidColorBrush* fill =
                         visually_selected ? d2d_->button_selected_brush.Get() : d2d_->button_brush.Get();
                     if (fill) {
+                        const float saved = fill->GetOpacity();
+                        if (modern_settings_screen && !visually_selected) fill->SetOpacity(0.48f);
                         ctx->FillRoundedRectangle(rr, fill);
+                        fill->SetOpacity(saved);
                     }
                     ID2D1SolidColorBrush* border =
                         visually_selected ? d2d_->accent_brush.Get() : d2d_->button_border_brush.Get();
                     if (border) {
-                        ctx->DrawRoundedRectangle(rr, border, visually_selected ? 2.0f : 1.0f);
+                        if (!modern_settings_screen) {
+                            ctx->DrawRoundedRectangle(rr, border, visually_selected ? 2.0f : 1.0f);
+                        } else if (visually_selected) {
+                            ctx->FillRoundedRectangle(D2D1::RoundedRect(
+                                D2D1::RectF(row_left, row_y + 10, row_left + 3, row_y + row_height - 10), 1.5f, 1.5f), border);
+                        }
                     }
                 }
+
+                const auto saved_row_paragraph = row_format ? row_format->GetParagraphAlignment() : DWRITE_PARAGRAPH_ALIGNMENT_NEAR;
+                if (modern_settings_screen && row_format) row_format->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_CENTER);
 
                 const std::wstring label_w = to_wide(row.label);
                 float label_right = row_right - value_width - 18.0f;
@@ -801,11 +858,14 @@
                             }
                             if (d2d_->title_format && d2d_->text_brush) {
                                 const wchar_t buffer[2] = {symbol, L'\0'};
+                                const auto saved_paragraph = d2d_->title_format->GetParagraphAlignment();
+                                if (modern_settings_screen) d2d_->title_format->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_CENTER);
                                 draw_text_clipped_aligned(buffer,
                                                           d2d_->title_format.Get(),
                                                           rect,
                                                           d2d_->text_brush.Get(),
                                                           DWRITE_TEXT_ALIGNMENT_CENTER);
+                                d2d_->title_format->SetParagraphAlignment(saved_paragraph);
                             }
                         };
 
@@ -837,6 +897,7 @@
                 if (row.activatable) {
                     register_hit(row_rect, row.target_kind, row.row_index, MenuHitPart::Activate);
                 }
+                if (row_format) row_format->SetParagraphAlignment(saved_row_paragraph);
                 row_y += row_step;
             }
 

@@ -2170,6 +2170,11 @@ struct MenuWindow::D2DResources {
     Microsoft::WRL::ComPtr<IDWriteTextFormat> song_record_detail_format;
     Microsoft::WRL::ComPtr<IDWriteTextFormat> song_title_format;
     Microsoft::WRL::ComPtr<IDWriteTextFormat> song_artist_format;
+    Microsoft::WRL::ComPtr<IDWriteTextFormat> result_score_format;
+    Microsoft::WRL::ComPtr<IDWriteTextFormat> result_metric_format;
+    Microsoft::WRL::ComPtr<IDWriteTextLayout> generic_help_layout;
+    std::wstring generic_help_text;
+    float generic_help_width = 0.0f;
     Microsoft::WRL::ComPtr<IDWriteTextFormat> hud_format;
     Microsoft::WRL::ComPtr<IDWriteTextFormat> rank_format;
     Microsoft::WRL::ComPtr<IDWriteTextFormat> stats_label_format;
@@ -4495,6 +4500,10 @@ std::optional<std::string> MenuWindow::poll_text_input() {
 
 
 void MenuWindow::push_click_event(MenuClickEvent event) {
+    if (event.kind == MenuHitTargetKind::GenericHelpPage) {
+        generic_help_page_.store(std::max(0, event.index), std::memory_order_relaxed);
+        return;
+    }
     const bool is_virtual_event = event.kind == MenuHitTargetKind::MouseWheel || event.kind == MenuHitTargetKind::FileDrop;
     if (event.kind == MenuHitTargetKind::None) {
         return;
@@ -4580,6 +4589,8 @@ bool MenuWindow::create_text_formats(const wchar_t* ui_family) {
                             &d2d_->song_record_detail_format) ||
         !create_text_format(ui_family, DWRITE_FONT_WEIGHT_SEMI_BOLD, 24.0f, &d2d_->song_title_format) ||
         !create_text_format(ui_family, DWRITE_FONT_WEIGHT_NORMAL, 18.0f, &d2d_->song_artist_format) ||
+        !create_text_format(L"Bahnschrift", DWRITE_FONT_WEIGHT_SEMI_BOLD, 104.0f, &d2d_->result_score_format) ||
+        !create_text_format(ui_family, DWRITE_FONT_WEIGHT_SEMI_BOLD, 32.0f, &d2d_->result_metric_format) ||
         !create_text_format(ui_family, DWRITE_FONT_WEIGHT_NORMAL, 16.0f, &d2d_->hud_format) ||
         !create_text_format(L"Bahnschrift SemiBold", DWRITE_FONT_WEIGHT_SEMI_BOLD, 128.0f, &d2d_->rank_format) ||
         !create_text_format(ui_family, DWRITE_FONT_WEIGHT_NORMAL, 16.0f, &d2d_->stats_label_format) ||
@@ -4587,6 +4598,7 @@ bool MenuWindow::create_text_formats(const wchar_t* ui_family) {
         return false;
     }
     d2d_->ui_font_family = ui_family;
+    d2d_->generic_help_layout.Reset();
     return true;
 }
 

@@ -81,7 +81,22 @@ void MenuWindow::draw(const MenuRenderData& data) {
     set_theme_color(d2d_->button_selected_brush.Get(), "button_selected", D2D1::ColorF(0x6EE7F2, 0.22f));
     set_theme_color(d2d_->button_border_brush.Get(), "border", D2D1::ColorF(0x31344A));
     set_theme_color(d2d_->lane_divider_brush.Get(), "lane_divider", D2D1::ColorF(0xF6F8FF, 0.85f));
-    const bool has_menu_scene = render_menu_scene(data.kind, render_now_ns, data.lobby_skin);
+    const bool modern_settings_screen = !data.lobby_skin.enabled && data.kind == MenuScreenKind::GenericList;
+    const bool modern_title_screen = !data.lobby_skin.enabled && data.kind == MenuScreenKind::TitleMenu;
+    const bool modern_library_screen = !data.lobby_skin.enabled &&
+        (data.kind == MenuScreenKind::SongSelect ||
+         (data.kind == MenuScreenKind::ResultScreen && !data.result.peer_battle));
+    const bool modern_menu_screen = modern_library_screen || modern_settings_screen || modern_title_screen;
+    if (modern_menu_screen) {
+        set_theme_color(d2d_->text_brush.Get(), "text", D2D1::ColorF(0xEDF2F7));
+        set_theme_color(d2d_->muted_brush.Get(), "muted", D2D1::ColorF(0xA1ADBD));
+        set_theme_color(d2d_->panel_brush.Get(), "panel", D2D1::ColorF(0x151C27));
+        set_theme_color(d2d_->card_brush.Get(), "card", D2D1::ColorF(0x202C3B));
+        set_theme_color(d2d_->button_border_brush.Get(), "border", D2D1::ColorF(0x344357));
+        set_theme_color(d2d_->button_brush.Get(), "button", D2D1::ColorF(0x1B2634));
+    }
+    const bool has_menu_scene = !modern_menu_screen &&
+        render_menu_scene(data.kind, render_now_ns, data.lobby_skin);
     if (data.kind == MenuScreenKind::GameplayHud) {
         if (!ensure_gameplay_note_sprites(data.gameplay)) {
             invalidate_gameplay_note_sprite_cache();
@@ -219,7 +234,7 @@ void MenuWindow::draw(const MenuRenderData& data) {
         }
     }
 
-    if (d2d_->glow_brush) {
+    if (d2d_->glow_brush && !modern_menu_screen) {
         const float saved_opacity = d2d_->glow_brush->GetOpacity();
         if (has_menu_scene) {
             d2d_->glow_brush->SetOpacity(data.kind == MenuScreenKind::TitleMenu ? 0.26f : 0.14f);
@@ -328,6 +343,23 @@ void MenuWindow::draw(const MenuRenderData& data) {
                                 bool strong_edge,
                                 float shadow_offset = 9.0f) {
         const D2D1_ROUNDED_RECT rr = D2D1::RoundedRect(rect, radius, radius);
+        // Native library surfaces use one fill and one edge. Imported skins retain
+        // their layered glass treatment and all existing layout slots.
+        if (modern_menu_screen) {
+            if (d2d_->panel_brush) {
+                const float saved = d2d_->panel_brush->GetOpacity();
+                d2d_->panel_brush->SetOpacity(fill_opacity);
+                ctx->FillRoundedRectangle(rr, d2d_->panel_brush.Get());
+                d2d_->panel_brush->SetOpacity(saved);
+            }
+            if (d2d_->button_border_brush) {
+                const float saved = d2d_->button_border_brush->GetOpacity();
+                d2d_->button_border_brush->SetOpacity(strong_edge ? 0.85f : 0.34f);
+                ctx->DrawRoundedRectangle(rr, d2d_->button_border_brush.Get(), 1.0f);
+                d2d_->button_border_brush->SetOpacity(saved);
+            }
+            return;
+        }
         const D2D1_RECT_F shadow_rect = offset_rect(rect, 0.0f, shadow_offset);
         const D2D1_ROUNDED_RECT shadow_rr = D2D1::RoundedRect(shadow_rect, radius, radius);
 

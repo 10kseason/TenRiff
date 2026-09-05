@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(TenRiff VERSION 1.6.0 LANGUAGES C CXX)
+project(TenRiff VERSION 1.7.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -419,6 +419,10 @@ endif()
 
 if(WIN32)
     target_link_libraries(tenriff PRIVATE tenriff_chart tenriff_game tenriff_runtime tenriff_core tenriff_audio tenriff_app)
+    # Explicit developer target: renders deterministic fixtures through the actual
+    # D3D11 menu renderer without audio, accounts, songs, or profile writes.
+    add_executable(menu_visual_preview EXCLUDE_FROM_ALL tools/menu_visual_preview.cpp)
+    target_link_libraries(menu_visual_preview PRIVATE tenriff_app)
 else()
     target_link_libraries(tenriff PRIVATE tenriff_chart tenriff_game tenriff_runtime tenriff_core)
 endif()

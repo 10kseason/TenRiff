@@ -14,13 +14,18 @@
         auto draw_centered_text = [&](const std::wstring& text,
                                       IDWriteTextFormat* format,
                                       const D2D1_RECT_F& rect,
-                                      ID2D1Brush* brush) {
+                                      ID2D1Brush* brush,
+                                      bool center_vertically = false) {
             if (!format || !brush) {
                 return;
             }
+            const auto saved_alignment = format->GetTextAlignment();
+            const auto saved_paragraph_alignment = format->GetParagraphAlignment();
             format->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_CENTER);
+            if (center_vertically) format->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_CENTER);
             draw_text_clipped(text, format, rect, brush);
-            format->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_LEADING);
+            format->SetTextAlignment(saved_alignment);
+            format->SetParagraphAlignment(saved_paragraph_alignment);
         };
         auto draw_trailing_text = [&](const std::wstring& text,
                                       IDWriteTextFormat* format,
@@ -55,7 +60,7 @@
             }
         };
 
-        if (d2d_->accent_brush) {
+        if (d2d_->accent_brush && !modern_library_screen) {
             const D2D1_COLOR_F saved_color = d2d_->accent_brush->GetColor();
             const float saved_opacity = d2d_->accent_brush->GetOpacity();
             d2d_->accent_brush->SetColor(D2D1::ColorF(0x19DDE8));
@@ -98,7 +103,7 @@
             const D2D1_RECT_F logo_text_rect =
                 D2D1::RectF(logo_slot.left + 2.0f, logo_slot.top - 2.0f,
                             logo_slot.right - 4.0f, logo_slot.bottom - 10.0f);
-            if (d2d_->accent_brush) {
+            if (d2d_->accent_brush && !modern_library_screen) {
                 const float saved = d2d_->accent_brush->GetOpacity();
                 d2d_->accent_brush->SetOpacity(0.20f + ambient_pulse * 0.08f);
                 draw_text_clipped(L"TENRIFF", d2d_->song_logo_format.Get(),
@@ -115,13 +120,13 @@
                                    d2d_->accent_brush.Get());
                 d2d_->accent_brush->SetOpacity(saved);
             }
-            draw_text_clipped(L"TENRIFF", d2d_->song_logo_format.Get(),
+            draw_text_clipped(L"TENRIFF", modern_library_screen ? d2d_->header_format.Get() : d2d_->song_logo_format.Get(),
                               logo_text_rect, d2d_->text_brush.Get());
         }
         if (!lobby_logo_bitmap && d2d_->hud_format && d2d_->muted_brush) {
-            draw_text_clipped(wloc("RHYTHM ENGINE", "리듬 엔진"),
+            draw_text_clipped(wloc("YOUR MUSIC, YOUR PACE", "나만의 리듬으로"),
                               d2d_->hud_format.Get(),
-                              D2D1::RectF(logo_slot.left + 178.0f, logo_slot.top + 68.0f,
+                              D2D1::RectF(logo_slot.left + (modern_library_screen ? 4.0f : 178.0f), logo_slot.top + 68.0f,
                                           logo_slot.right + 2.0f, logo_slot.bottom),
                               d2d_->muted_brush.Get());
         }
@@ -138,7 +143,7 @@
         const std::array<int, 5> top_nav_indices = {0, 1, 4, 5, 6};
         const D2D1_RECT_F nav_bar =
             skin_layout_rect(data, "song_select.nav",
-                             D2D1::RectF(492.0f, 12.0f, 1244.0f, 126.0f));
+                             D2D1::RectF(492.0f, 12.0f, modern_library_screen ? 1400.0f : 1244.0f, 126.0f));
         const float nav_left = nav_bar.left;
         const float nav_width =
             (nav_bar.right - nav_bar.left) / static_cast<float>(top_nav_indices.size());
@@ -168,7 +173,7 @@
             }
             if (d2d_->song_nav_format && d2d_->text_brush) {
                 draw_centered_text(to_wide(item.label),
-                                   d2d_->song_nav_format.Get(),
+                                   modern_library_screen ? d2d_->song_title_format.Get() : d2d_->song_nav_format.Get(),
                                    D2D1::RectF(tab.left + 6.0f, tab.top + 39.0f,
                                                tab.right - 8.0f, tab.bottom - 10.0f),
                                    route_active && d2d_->accent_brush
@@ -292,6 +297,10 @@
                              song.selected ? 0.90f : 0.56f,
                              song.selected ? 0.60f : 0.06f,
                              song.selected, song.selected ? 3.0f : 1.0f);
+            if (modern_library_screen && song.selected && d2d_->button_selected_brush) {
+                ctx->FillRoundedRectangle(D2D1::RoundedRect(card, 9.0f, 9.0f),
+                                          d2d_->button_selected_brush.Get());
+            }
             if (song.selected && d2d_->accent_brush) {
                 const float saved = d2d_->accent_brush->GetOpacity();
                 d2d_->accent_brush->SetOpacity(0.94f);
@@ -378,11 +387,14 @@
                                    d2d_->text_brush.Get());
             }
             if (d2d_->body_format && d2d_->muted_brush) {
+                const auto saved_wrapping = d2d_->body_format->GetWordWrapping();
+                if (modern_library_screen) d2d_->body_format->SetWordWrapping(DWRITE_WORD_WRAPPING_WRAP);
                 draw_centered_text(to_wide(data.song_select.empty_message),
                                    d2d_->body_format.Get(),
                                    D2D1::RectF(left_panel.left + 34.0f, left_panel.top + 320.0f,
                                                left_panel.right - 34.0f, left_panel.top + 430.0f),
-                                   d2d_->muted_brush.Get());
+                                   d2d_->muted_brush.Get(), true);
+                d2d_->body_format->SetWordWrapping(saved_wrapping);
             }
         }
 
@@ -441,8 +453,11 @@
             D2D1::RectF(center_panel.left, center_panel.top,
                         center_panel.right, center_panel.top + center_paired_height);
         draw_glass_panel(showcase, 12.0f, 0.86f, 0.30f, true, 5.0f);
-        const bool has_selected_preview_art =
+        const bool has_selected_song =
             !data.song_select.showing_sources && !data.song_select.showing_records &&
+            std::any_of(data.song_select.songs.begin(), data.song_select.songs.end(),
+                        [](const SongCardData& song) { return song.selected; });
+        const bool has_selected_preview_art = has_selected_song &&
             ensure_song_select_preview_bitmap(data.song_select) &&
             d2d_->song_select_preview_bitmap;
         const D2D1_RECT_F preview =
@@ -467,8 +482,7 @@
             if (preview_clip) {
                 ctx->PopLayer();
             }
-        } else if (!data.song_select.showing_sources &&
-                   !data.song_select.showing_records && d2d_->card_brush) {
+        } else if (has_selected_song && d2d_->card_brush) {
             const D2D1_COLOR_F fallback = jacket_color(data.song_select.selected_song_title);
             const D2D1_COLOR_F saved_color = d2d_->card_brush->GetColor();
             const float saved_opacity = d2d_->card_brush->GetOpacity();
@@ -480,7 +494,7 @@
             d2d_->card_brush->SetOpacity(saved_opacity);
         }
 
-        if (!data.song_select.showing_sources && !data.song_select.showing_records) {
+        if (has_selected_song) {
             const D2D1_RECT_F chip =
                 D2D1::RectF(preview.left + 14.0f, preview.top + 14.0f,
                             preview.left + 154.0f, preview.top + 48.0f);
@@ -489,6 +503,9 @@
                 draw_centered_text(wloc("SELECTED", "선택됨"), d2d_->hud_format.Get(),
                                    chip, d2d_->accent_brush.Get());
             }
+        } else if (!data.song_select.showing_sources && !data.song_select.showing_records) {
+            draw_centered_text(wloc("SELECT A CHART", "곡을 선택하세요"), d2d_->song_title_format.Get(),
+                               preview, d2d_->muted_brush.Get(), true);
         } else {
             const std::string headline =
                 data.song_select.showing_sources
@@ -644,19 +661,21 @@
                 }
             }
             draw_centered_text(search_label, d2d_->body_format.Get(),
-                               search_button, d2d_->text_brush.Get());
+                               search_button, d2d_->text_brush.Get(), true);
             draw_centered_text(wloc("SORT / FILTER", "정렬 / 필터"), d2d_->body_format.Get(),
-                               filter_button, d2d_->text_brush.Get());
+                               filter_button, d2d_->text_brush.Get(), true);
         }
         if (d2d_->hud_format && d2d_->muted_brush) {
             const std::string status =
-                searching ? (loc("MATCHES ", "검색 결과 ") +
+                modern_library_screen
+                    ? std::to_string(data.song_select.list_total_count) + loc(" items", "개")
+                    : searching ? (loc("MATCHES ", "검색 결과 ") +
                              std::to_string(data.song_select.list_total_count) +
                              loc("", "곡"))
                           : (data.song_select.sort_summary + "  /  " +
                              data.song_select.group_summary);
             draw_centered_text(to_wide(status), d2d_->hud_format.Get(), library_status,
-                               d2d_->muted_brush.Get());
+                               d2d_->muted_brush.Get(), true);
         }
 
         draw_glass_panel(right_panel, 12.0f, 0.76f, 0.22f, false, 5.0f);
@@ -971,7 +990,10 @@
         if (primary_enabled) {
             register_hit(start_button, MenuHitTargetKind::SongStartButton, 0);
         }
-        if (primary_enabled && d2d_->play_brush) {
+        if (primary_enabled && modern_library_screen && d2d_->accent_brush) {
+            ctx->FillRoundedRectangle(D2D1::RoundedRect(start_button, 12.0f, 12.0f),
+                                      d2d_->accent_brush.Get());
+        } else if (primary_enabled && d2d_->play_brush) {
             set_brush_points(d2d_->play_brush.Get(), start_button);
             const float saved = d2d_->play_brush->GetOpacity();
             d2d_->play_brush->SetOpacity(0.92f);
@@ -982,6 +1004,10 @@
             draw_glass_panel(start_button, 12.0f, 0.56f, 0.04f, false, 2.0f);
         }
         if (d2d_->header_format && d2d_->text_brush && d2d_->muted_brush) {
+            const D2D1_COLOR_F saved_text_color = d2d_->text_brush->GetColor();
+            if (modern_library_screen && primary_enabled) {
+                d2d_->text_brush->SetColor(D2D1::ColorF(0x0B1620));
+            }
             const std::wstring action_label =
                 data.song_select.showing_sources
                     ? wloc("OPEN SOURCE", "소스 열기")
@@ -993,7 +1019,8 @@
             draw_centered_text(action_label, d2d_->header_format.Get(), start_button,
                                primary_enabled
                                    ? static_cast<ID2D1Brush*>(d2d_->text_brush.Get())
-                                   : static_cast<ID2D1Brush*>(d2d_->muted_brush.Get()));
+                                   : static_cast<ID2D1Brush*>(d2d_->muted_brush.Get()), true);
+            d2d_->text_brush->SetColor(saved_text_color);
         }
 
         const D2D1_RECT_F bottom_bar =
@@ -1007,7 +1034,7 @@
         draw_glass_panel(back_button, 10.0f, 0.76f, 0.40f, true, 2.0f);
         if (d2d_->body_format && d2d_->text_brush) {
             draw_centered_text(wloc("BACK", "뒤로"), d2d_->body_format.Get(),
-                               back_button, d2d_->text_brush.Get());
+                               back_button, d2d_->text_brush.Get(), true);
         }
         if (d2d_->hud_format && d2d_->muted_brush) {
             draw_centered_text(to_wide(data.song_select.primary_hint), d2d_->hud_format.Get(),
