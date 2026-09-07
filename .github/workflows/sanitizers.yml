@@ -63,5 +63,7 @@ jobs:
 
       - name: Run NK3 CPU smoke
         env:
+          # CPU selects the OpenVINO device; pin its backend to skip AUTO's Vulkan probe.
+          TENRIFF_NK3_BACKEND: OPENVINO
           TENRIFF_NK3_DEVICE: CPU
         run: ctest --test-dir build/nk3-cpu -C Release -R "^nk3_onnx_smoke$" --output-on-failure
