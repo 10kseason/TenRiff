@@ -290,10 +290,10 @@ TEST_CASE("audio settings view preserves rows values and localization") {
     static_cast<void>(controller.select(AudioSettingId::BgmVolume));
 
     const auto english = AudioSettingsView::build(controller, runtime, false);
-    REQUIRE(english.rows.size() == 8);
-    REQUIRE(english.notes.size() == 5);
+    REQUIRE(english.rows.size() == 9);
+    REQUIRE(english.notes.size() == 6);
 
-    const std::array<const char*, 8> english_labels{
+    const std::array<const char*, 9> english_labels{
         "Preset",
         "Keysound Mode",
         "Background Sound",
@@ -301,9 +301,10 @@ TEST_CASE("audio settings view preserves rows values and localization") {
         "BGM Volume",
         "Keysound Volume",
         "Sound Offset",
+        "Normalize Audio",
         "Back",
     };
-    const std::array<const char*, 8> english_values{
+    const std::array<const char*, 9> english_values{
         "High",
         "Follow",
         "On",
@@ -311,9 +312,10 @@ TEST_CASE("audio settings view preserves rows values and localization") {
         "75%",
         "100%",
         "+0.0 ms",
+        "Off",
         "",
     };
-    const std::array<SettingsRowKind, 8> row_kinds{
+    const std::array<SettingsRowKind, 9> row_kinds{
         SettingsRowKind::Choice,
         SettingsRowKind::Choice,
         SettingsRowKind::Toggle,
@@ -321,6 +323,7 @@ TEST_CASE("audio settings view preserves rows values and localization") {
         SettingsRowKind::Slider,
         SettingsRowKind::Slider,
         SettingsRowKind::Numeric,
+        SettingsRowKind::Toggle,
         SettingsRowKind::Action,
     };
     for (std::size_t index = 0; index < english.rows.size(); ++index) {
@@ -339,13 +342,13 @@ TEST_CASE("audio settings view preserves rows values and localization") {
     CHECK(*english.rows[4].slider_ratio == doctest::Approx(0.375));
     CHECK(*english.rows[5].slider_ratio == doctest::Approx(0.5));
     CHECK(english.rows[6].numeric_range.has_value());
-    CHECK(english.rows[7].activatable);
-    CHECK_FALSE(english.rows[7].adjustable);
-    CHECK(english.notes.front() ==
+    CHECK(english.rows[8].activatable);
+    CHECK_FALSE(english.rows[8].adjustable);
+    CHECK(english.notes[1] ==
           "Follow: note hits trigger keysounds. Autoplay: note keysounds are mixed into background audio.");
 
     const auto korean = AudioSettingsView::build(controller, runtime, true);
-    REQUIRE(korean.rows.size() == 8);
+    REQUIRE(korean.rows.size() == 9);
     CHECK(korean.rows[0].label == "프리셋");
     CHECK(korean.rows[0].value == "고성능");
     CHECK(korean.rows[1].label == "키음 모드");
@@ -356,7 +359,19 @@ TEST_CASE("audio settings view preserves rows values and localization") {
     CHECK(korean.rows[4].label == "BGM 볼륨");
     CHECK(korean.rows[5].label == "키음 볼륨");
     CHECK(korean.rows[6].label == "사운드 오프셋");
-    CHECK(korean.rows[7].label == "뒤로");
+    CHECK(korean.rows[7].label == "오디오 노멀라이즈");
     CHECK(korean.notes.back() ==
           "좌우 키나 볼륨 슬라이더를 클릭해 변경합니다. 뒤로 가면 저장 후 돌아갑니다.");
+}
+
+TEST_CASE("audio normalization toggles through keyboard and pointer then persists on Back") {
+    tenriff::config::RuntimeConfig runtime;
+    AudioSettingsController controller;
+    CHECK_FALSE(runtime.audio_ui.normalize_audio);
+    (void)controller.handle(MenuAction::adjust(1), runtime, AudioSettingId::Normalize);
+    CHECK(runtime.audio_ui.normalize_audio);
+    const auto leave = controller.handle(MenuAction::activate(), runtime, AudioSettingId::Back);
+    CHECK(leave.persist_config);
+    (void)controller.handle(MenuAction::activate(), runtime, AudioSettingId::Normalize);
+    CHECK_FALSE(runtime.audio_ui.normalize_audio);
 }

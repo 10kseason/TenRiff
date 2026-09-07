@@ -6,7 +6,7 @@
 namespace tenriff::app::menu {
 namespace {
 
-constexpr std::size_t kColumnCount = 4;
+constexpr std::size_t kColumnCount = 5;
 constexpr std::size_t kRowCount = 2;
 static_assert(kOptionsItemRoutes.size() == kColumnCount * kRowCount);
 

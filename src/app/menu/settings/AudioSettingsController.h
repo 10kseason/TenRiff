@@ -22,9 +22,10 @@ enum class AudioSettingId : std::uint8_t {
     KeysoundVolume = 5,
     SoundOffset = 6,
     Back = 7,
+    Normalize = 8,
 };
 
-inline constexpr std::array<AudioSettingId, 8> kAudioSettingOrder{
+inline constexpr std::array<AudioSettingId, 9> kAudioSettingOrder{
     AudioSettingId::Preset,
     AudioSettingId::KeysoundMode,
     AudioSettingId::BackgroundSound,
@@ -32,6 +33,7 @@ inline constexpr std::array<AudioSettingId, 8> kAudioSettingOrder{
     AudioSettingId::BgmVolume,
     AudioSettingId::KeysoundVolume,
     AudioSettingId::SoundOffset,
+    AudioSettingId::Normalize,
     AudioSettingId::Back,
 };
 

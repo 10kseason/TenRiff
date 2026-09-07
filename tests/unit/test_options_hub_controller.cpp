@@ -27,7 +27,7 @@ TEST_CASE("options hub cursor initializes to a valid stable item") {
 }
 
 TEST_CASE("options hub item indexes preserve the existing card order and boundaries") {
-    constexpr std::array<OptionsItemId, 8> expected_order{
+    constexpr std::array<OptionsItemId, 10> expected_order{
         OptionsItemId::KeyMode,
         OptionsItemId::Keymap,
         OptionsItemId::Skins,
@@ -36,6 +36,8 @@ TEST_CASE("options hub item indexes preserve the existing card order and boundar
         OptionsItemId::Input,
         OptionsItemId::Calibration,
         OptionsItemId::ProfileSetup,
+        OptionsItemId::Mods,
+        OptionsItemId::KeyTest,
     };
 
     for (std::size_t index = 0; index < expected_order.size(); ++index) {
@@ -49,69 +51,47 @@ TEST_CASE("options hub item indexes preserve the existing card order and boundar
     CHECK_FALSE(options_item_index(static_cast<OptionsItemId>(255)).has_value());
 }
 
-TEST_CASE("options hub horizontal movement clamps within each four-card row") {
+TEST_CASE("options hub has five columns with distinct top and bottom row edges") {
     OptionsHubController controller;
-
-    controller.move_horizontal(-1);
-    CHECK(controller.cursor() == OptionsItemId::KeyMode);
-    controller.move_horizontal(1);
-    CHECK(controller.cursor() == OptionsItemId::Keymap);
-    controller.move_horizontal(1);
-    CHECK(controller.cursor() == OptionsItemId::Skins);
-    controller.move_horizontal(1);
-    CHECK(controller.cursor() == OptionsItemId::Graphics);
-    controller.move_horizontal(1);
-    CHECK(controller.cursor() == OptionsItemId::Graphics);
-
-    REQUIRE(controller.set_cursor(OptionsItemId::Audio));
-    controller.move_horizontal(-1);
-    CHECK(controller.cursor() == OptionsItemId::Audio);
     controller.move_horizontal(20);
-    CHECK(controller.cursor() == OptionsItemId::ProfileSetup);
-}
-
-TEST_CASE("options hub vertical movement preserves the column and clamps to two rows") {
-    OptionsHubController controller(OptionsItemId::Skins);
-
+    CHECK(controller.cursor() == OptionsItemId::Audio);
+    controller.move_vertical(1);
+    CHECK(controller.cursor() == OptionsItemId::KeyTest);
+    controller.move_horizontal(-20);
+    CHECK(controller.cursor() == OptionsItemId::Input);
     controller.move_vertical(-1);
-    CHECK(controller.cursor() == OptionsItemId::Skins);
-    controller.move_vertical(1);
-    CHECK(controller.cursor() == OptionsItemId::Calibration);
-    controller.move_vertical(1);
-    CHECK(controller.cursor() == OptionsItemId::Calibration);
-    controller.move_vertical(-20);
-    CHECK(controller.cursor() == OptionsItemId::Skins);
+    CHECK(controller.cursor() == OptionsItemId::KeyMode);
 }
 
-TEST_CASE("options hub movement exhaustively preserves the four-by-two grid") {
+TEST_CASE("options hub movement exhaustively preserves the five-by-two grid") {
     constexpr std::array<int, 5> directions{-2, -1, 0, 1, 2};
 
-    for (std::size_t start = 0; start < 8; ++start) {
+    for (std::size_t start = 0; start < 10; ++start) {
         REQUIRE(options_item_id_at(start).has_value());
         for (const int direction : directions) {
             OptionsHubController horizontal(*options_item_id_at(start));
             horizontal.move_horizontal(direction);
             REQUIRE(options_item_index(horizontal.cursor()).has_value());
-            const int start_column = static_cast<int>(start % 4);
-            const int expected_column = std::clamp(start_column + direction, 0, 3);
-            const std::size_t expected_horizontal = (start / 4) * 4 +
+            const int start_column = static_cast<int>(start % 5);
+            const int expected_column = std::clamp(start_column + direction, 0, 4);
+            const std::size_t expected_horizontal = (start / 5) * 5 +
                 static_cast<std::size_t>(expected_column);
             CHECK(*options_item_index(horizontal.cursor()) == expected_horizontal);
 
             OptionsHubController vertical(*options_item_id_at(start));
             vertical.move_vertical(direction);
             REQUIRE(options_item_index(vertical.cursor()).has_value());
-            const int start_row = static_cast<int>(start / 4);
+            const int start_row = static_cast<int>(start / 5);
             const int expected_row = std::clamp(start_row + direction, 0, 1);
             const std::size_t expected_vertical =
-                static_cast<std::size_t>(expected_row) * 4 + start % 4;
+                static_cast<std::size_t>(expected_row) * 5 + start % 5;
             CHECK(*options_item_index(vertical.cursor()) == expected_vertical);
         }
     }
 }
 
 TEST_CASE("options hub activation maps every card to its destination screen") {
-    constexpr std::array<std::pair<OptionsItemId, Screen>, 8> routes{{
+    constexpr std::array<std::pair<OptionsItemId, Screen>, 10> routes{{
         {OptionsItemId::KeyMode, Screen::ModeSelect},
         {OptionsItemId::Keymap, Screen::Keymap},
         {OptionsItemId::Skins, Screen::SettingsSkins},
@@ -120,6 +100,8 @@ TEST_CASE("options hub activation maps every card to its destination screen") {
         {OptionsItemId::Input, Screen::SettingsInput},
         {OptionsItemId::Calibration, Screen::SettingsCalibration},
         {OptionsItemId::ProfileSetup, Screen::QuickSetup},
+        {OptionsItemId::Mods, Screen::ModeMods},
+        {OptionsItemId::KeyTest, Screen::KeymapTest},
     }};
 
     OptionsHubController controller;

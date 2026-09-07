@@ -3,7 +3,8 @@
 この文書は、次のエージェントや新しい作業者が最初に読むべき current-state 文書です。目的は、「このプロジェクトは今どういう状態で、どこを見ればよく、何がまだ未検証か」を素早く把握できるようにすることです。
 
 ## Baseline
-- 現在の stable release line は `1.7.0`
+- 現在の stable release line は `1.7.1`
+- 1.7.1 improves multiplayer standings, gameplay feedback, independent judgement/combo placement, ten pastel Options cards, optional audio normalization and the Song Select difficulty-table control. See [follow-up details](gameplay-polish-followup.md) and [release verification](release-1.7.1-gate.md).
 - 1.7.0 refreshes native Home, Song Select, Result and shared settings. See [UI implementation](menu-visual-polish.md) and [release verification](release-1.7.0-gate.md). The prism remains only in the custom-skin path; result reveal timing is unchanged.
 - 基本結果画面はスコア・ランク・精度を中心に表示し、プリズム演出はカスタムスキン側に残します。既存の2.2秒の表示演出、Spaceによるスキップ、操作解禁条件を維持します。
 - UI-r2 Song Select は top tab、7-row jacket library、大きな selected artwork、best-record card、chart/mode panel、実動する START action を使用し、Collection/Store/currency/global ranking の仮 UI は表示しない

@@ -34,6 +34,7 @@
 - `volume` (double)
   - master volume
 - `bgm_volume` (double)
+- `normalize_audio` (bool): stereo-linked gameplay mix RMS leveling before limiter/master volume; default false. Menu music is unaffected.
 - `keysound_volume` (double)
 
 ### `input`
@@ -305,6 +306,8 @@
   - gameplay 기어 오른쪽 위의 `↔` 핸들을 드래그해 정하는 가로 위치
   - 1920x1080 기준 `-720..720` 범위이며, 실제 화면에서는 기어와 핸들이 보이는 범위로 한 번 더 제한된다
   - 기본값은 `0.0`
+- `judgement_position` (double): independent judgement Y anchor, 0.10–0.78; missing fields inherit the existing combo anchor.
+- `judgement_offset_x`, `combo_offset_x` (double): independent X offsets in 1920x1080 base pixels, -600–600; default 0.
 - `combo_position` (double)
   - gameplay 필드 내부 콤보 표시의 세로 위치 비율
   - `0.10..0.78` 범위로 clamp

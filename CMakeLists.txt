@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(TenRiff VERSION 1.7.0 LANGUAGES C CXX)
+project(TenRiff VERSION 1.7.1 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -692,6 +692,7 @@ if(TENRIFF_ENABLE_TESTS)
         tests/unit/test_chart_loader.cpp
         tests/unit/test_chart_audio_streaming.cpp
         tests/unit/test_chart_audio_playback.cpp
+        tests/unit/test_game_session_audio.cpp
         tests/unit/test_ogg_vorbis_decoder.cpp
         tests/unit/test_10k_calc_consistency.cpp
         tests/unit/test_osu_difficulty.cpp

@@ -441,17 +441,17 @@ TEST_CASE("TenRiff skin import includes assets referenced only by another key mo
 TEST_CASE("Skin settings stable row ids account for the optional LR2 row") {
     const tenriff::app::SkinSettingsRows native_rows{false};
     const tenriff::app::SkinSettingsRows lr2_rows{true};
-    CHECK(native_rows.count() == 45);
-    CHECK(lr2_rows.count() == 46);
+    CHECK(native_rows.count() == 48);
+    CHECK(lr2_rows.count() == 49);
     CHECK(native_rows.index_of(tenriff::app::SkinSettingsRowId::KeyMode) == 0);
     CHECK(native_rows.index_of(tenriff::app::SkinSettingsRowId::ScratchPosition) == 1);
     CHECK(native_rows.index_of(tenriff::app::SkinSettingsRowId::SkinSource) == 2);
     CHECK(native_rows.index_of(tenriff::app::SkinSettingsRowId::Lr2Resolution) == -1);
     CHECK(native_rows.index_of(tenriff::app::SkinSettingsRowId::ImportSkin) == 4);
-    CHECK(native_rows.index_of(tenriff::app::SkinSettingsRowId::Back) == 44);
+    CHECK(native_rows.index_of(tenriff::app::SkinSettingsRowId::Back) == 47);
     CHECK(lr2_rows.index_of(tenriff::app::SkinSettingsRowId::Lr2Resolution) == 4);
     CHECK(lr2_rows.index_of(tenriff::app::SkinSettingsRowId::ImportSkin) == 5);
-    CHECK(lr2_rows.index_of(tenriff::app::SkinSettingsRowId::Back) == 45);
+    CHECK(lr2_rows.index_of(tenriff::app::SkinSettingsRowId::Back) == 48);
 }
 
 TEST_CASE("7+1 presentation moves only the visual scratch lane") {

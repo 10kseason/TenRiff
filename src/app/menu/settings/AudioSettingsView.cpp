@@ -172,6 +172,13 @@ AudioSettingsViewModel AudioSettingsView::build(
         false,
         true));
     view.rows.push_back(make_row(
+        AudioSettingId::Normalize, SettingsRowKind::Toggle,
+        localized(use_korean, "Normalize Audio", "오디오 노멀라이즈"),
+        on_off(runtime.audio_ui.normalize_audio, use_korean), controller, false, true));
+    view.notes.push_back(localized(use_korean,
+        "Normalize Audio gently levels the gameplay mix. OFF preserves the original mix; master volume still applies.",
+        "노멀라이즈는 인게임 음량을 완만하게 보정합니다. OFF는 원래 믹스를 유지하며 마스터 볼륨은 그대로 적용됩니다."));
+    view.rows.push_back(make_row(
         AudioSettingId::Back,
         SettingsRowKind::Action,
         localized(use_korean, "Back", "뒤로"),

@@ -2,17 +2,17 @@
 
 Language: [한국어](README.md) | [English](README.en.md) | [简体中文](README.zh-CN.md) | 日本語
 
-TenRiff は Windows GUI ベースの BMS リズムゲーム runtime/launcher です。現在の stable 版は `1.7.0` で、譜面入力は BMS family（`.bms/.bme/.bml/.pms`）専用です。公開 package は BGA upscaler model を含まず、key-mode conversion 用の deterministic NK3 P64 graph と generalized pattern MLP を同梱します。license は MIT です。
+TenRiff は Windows GUI ベースの BMS リズムゲーム runtime/launcher です。現在の stable 版は `1.7.1` で、譜面入力は BMS family（`.bms/.bme/.bml/.pms`）専用です。公開 package は BGA upscaler model を含まず、key-mode conversion 用の deterministic NK3 P64 graph と generalized pattern MLP を同梱します。license は MIT です。
 
-この README は導入文書です。現在の挙動、`1.7.0` project state、`1.5.1 fixed stable baseline` baseline、設定と設計文書は [`docs/README.ja.md`](docs/README.ja.md) から参照してください。
+この README は導入文書です。現在の挙動、`1.7.1` project state、`1.5.1 fixed stable baseline` baseline、設定と設計文書は [`docs/README.ja.md`](docs/README.ja.md) から参照してください。
 
 TenRiff のコードベースは、伝統的な長文設計書主導だけで積み上がったものではなく、高速な反復と実験を重視した `vibe coding` 的な性格を持つ作品でもあります。
 
-## 1.7.0 UI アップデート
+## 1.7.1 プレイ・マルチプレイ改善
 
-メイン・選曲・結果・共通設定画面のパネルと余白を統一しました。結果はスコアを中心に表示し、長い設定説明は折り返しとページ切り替えに対応します。ユーザースキンと既存のプレイルールは維持します。
+マルチプレイのゲーム内表示と結果に全参加者を表示し、スコア比較と観戦終了を複数人に対応させました。P-GREAT 専用演出、判定・コンボの独立した位置調整、音量ノーマライズ ON/OFF、10 個のパステルカラー設定カード、選曲画面の難易度表設定を追加しました。長い LEVEL 表記も見やすくしました。
 
-[変更履歴](CHANGELOG.md)と[リリース検証](docs/release-1.7.0-gate.md)をご覧ください。
+See [CHANGELOG](CHANGELOG.md) and [release verification](docs/release-1.7.1-gate.md).
 
 ## プロジェクト概要
 

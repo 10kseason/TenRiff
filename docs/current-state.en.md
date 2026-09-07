@@ -3,7 +3,8 @@
 This is the document that the next agent or any new contributor should read first. Its goal is to quickly answer: "what is this project now, where should I look, and what is still unverified?"
 
 ## Baseline
-- Current stable release line: `1.7.0`
+- Current stable release line: `1.7.1`
+- 1.7.1 improves multiplayer standings, gameplay feedback, independent judgement/combo placement, ten pastel Options cards, optional audio normalization and the Song Select difficulty-table control. See [follow-up details](gameplay-polish-followup.md) and [release verification](release-1.7.1-gate.md).
 - 1.7.0 refreshes native Home, Song Select, Result and shared settings. See [UI implementation](menu-visual-polish.md) and [release verification](release-1.7.0-gate.md). The prism remains only in the custom-skin path; result reveal timing is unchanged.
 - Native Result now emphasizes score, grade and accuracy; the prism remains in custom skins. The existing 2.2-second reveal, Space skip and control readiness rules are preserved.
 - UI-r2 Song Select uses a reference-led top navigation, seven-row jacket library, large selected artwork, best-record card, chart/mode panel, and a prominent working Start action. Collection/store/currency/global-ranking placeholders are not shown.

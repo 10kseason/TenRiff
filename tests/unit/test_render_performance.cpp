@@ -1,3 +1,4 @@
+#include "render/GameplayFeedbackText.h"
 #include "doctest/doctest.h"
 
 #include "render/BgaVideoDecoder.h"
@@ -466,4 +467,40 @@ TEST_CASE("render pacing treats zero fps as unlimited only without vsync") {
     CHECK(tenriff::render::should_use_unlimited_render_pacing(false, 0));
     CHECK_FALSE(tenriff::render::should_use_unlimited_render_pacing(true, 0));
     CHECK_FALSE(tenriff::render::should_use_unlimited_render_pacing(false, 300));
+}
+
+TEST_CASE("key beam decay follows elapsed time at both 60 and 144 frames per second") {
+    using tenriff::render::gameplay_interpolated_activity;
+    constexpr int64_t start = 1000000000;
+    for (int fps : {60, 144}) {
+        float previous = 1.0f;
+        for (int frame = 0; frame <= fps; ++frame) {
+            const int64_t now = start + static_cast<int64_t>(frame * 1000000000.0 / fps);
+            const float activity = gameplay_interpolated_activity(1.0f, start, now);
+            CHECK(activity <= previous);
+            CHECK(activity >= 0.0f);
+            previous = activity;
+        }
+    }
+    CHECK(gameplay_interpolated_activity(1.0f, start, start + 100000000) == doctest::Approx(0.5));
+    CHECK(gameplay_interpolated_activity(1.0f, start, start + 200000000) == 0.0f);
+}
+
+TEST_CASE("only P GREAT animates and GOOD uses solid gray") {
+    using namespace tenriff::render;
+    for (const auto* judgement : {"GR", "G", "BAD", "POOR"}) {
+        for (double age : {0.0, 50.0, 150.0, 300.0}) {
+            const auto motion = gameplay_judgement_animation(judgement, age);
+            CHECK(motion.scale == 1.0f);
+            CHECK(motion.offset_y == 0.0f);
+            CHECK(motion.opacity == 1.0f);
+        }
+    }
+    CHECK(gameplay_judgement_animation("PG", 0).scale > 1.0f);
+    CHECK(gameplay_judgement_animation("PG", 220).scale == 1.0f);
+    CHECK(gameplay_judgement_rgb("PG") == 0xFFE18A);
+    CHECK(gameplay_judgement_rgb("GR") == 0x6EE7F2);
+    CHECK(gameplay_judgement_rgb("G") == 0xAEB5BF);
+    CHECK(gameplay_timing_feedback_text(-28, "GR") == L"FAST -28 ms");
+    CHECK(gameplay_timing_feedback_text(28, "GR") == L"SLOW +28 ms");
 }

@@ -10,7 +10,7 @@ state. Those effects stay at the `MenuApp` application boundary.
 - `MenuScreenDescriptor.h/.cpp` is the exhaustive table for stable titles, skin background keys and
   fallbacks, snapshot/generic-view routing, Options-family music selection, and input-footer policy.
 - `MenuNavigator.h/.cpp` is the sole owner of the active screen and nested Back history.
-- `OptionsHubController.h/.cpp` owns the typed 4-by-2 Options cursor and card destinations.
+- `OptionsHubController.h/.cpp` owns the typed 5-by-2 Options cursor and ten card destinations.
 - `MenuAction.h` defines normalized actions and the effect flags returned by controllers.
 - `settings/*SettingsController.h/.cpp` owns typed selection, edit/dirty state, and pure config
   mutation for Audio, Input, Calibration, Graphics/ONNX, Keymap/NKRO, Skin, and Mode/Mods.

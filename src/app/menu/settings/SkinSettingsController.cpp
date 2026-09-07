@@ -489,6 +489,17 @@ SkinSettingsEffects SkinSettingsController::apply_selected_action(
                 kNoteSizeScaleStep);
             return mark_changed();
         }
+        case SkinSettingsRowId::JudgementY:
+            runtime.skin.judgement_position = clamp_step_value(
+                runtime.skin.judgement_position + direction * kComboPositionStep,
+                config::kComboPositionMin, config::kComboPositionMax, kComboPositionStep);
+            return mark_changed();
+        case SkinSettingsRowId::JudgementX:
+            runtime.skin.judgement_offset_x = std::clamp(runtime.skin.judgement_offset_x + direction * 10.0, -600.0, 600.0);
+            return mark_changed();
+        case SkinSettingsRowId::ComboX:
+            runtime.skin.combo_offset_x = std::clamp(runtime.skin.combo_offset_x + direction * 10.0, -600.0, 600.0);
+            return mark_changed();
         case SkinSettingsRowId::ComboY:
             runtime.skin.combo_position = clamp_step_value(
                 runtime.skin.combo_position + direction * kComboPositionStep,

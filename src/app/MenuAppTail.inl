@@ -116,6 +116,9 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
         config_.skin.hold_body_width_scale,
         config::kHoldBodyWidthScaleMin,
         config::kHoldBodyWidthScaleMax);
+    target.judgement_position = config_.skin.judgement_position;
+    target.judgement_offset_x = config_.skin.judgement_offset_x;
+    target.combo_offset_x = config_.skin.combo_offset_x;
     target.show_cursor_in_gameplay = config_.ui.show_cursor_in_gameplay;
     target.show_lane_dividers = style_bool(
         manifest_style ? manifest_style->show_lane_dividers : std::optional<bool>{},
@@ -282,6 +285,26 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
     } else if (!target.peer_disconnected && target.peer_finished) {
         target.peer_status = ui_text("FINISHED", "\uC644\uB8CC");
     }
+    target.multiplayer_players.clear();
+    if (target.peer_visible) {
+        render::MultiplayerPlayerData local;
+        local.has_score = true;
+        local.score = gameplay_hud_.score;
+        local.combo = gameplay_hud_.combo;
+        local.max_combo = gameplay_hud_.max_combo;
+        local.gauge = gameplay_hud_.gauge;
+        local.finished = target.finished;
+        local.game_over = target.game_over;
+        target.multiplayer_players = multiplayer_standings(peer, std::move(local));
+        // A room compares the local player with the highest-scoring opponent.
+        const auto leader = std::find_if(target.multiplayer_players.begin(), target.multiplayer_players.end(),
+            [](const auto& player) { return !player.local && player.has_score; });
+        target.peer_score_available = leader != target.multiplayer_players.end();
+        if (target.peer_score_available) {
+            target.peer_score = leader->score;
+            target.peer_name = leader->name;
+        }
+    }
     const PeerBattleScoreLead versus_lead =
         target.peer_score_available
             ? peer_battle_score_lead(gameplay_hud_.score, target.peer_score)
@@ -289,6 +312,7 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
     target.versus_score_difference = versus_lead.difference;
     target.versus_score_position = versus_lead.position;
 
+    target.activity_publish_time_ns = gameplay_hud_.hud_publish_time_ns;
     target.lane_activity_count = gameplay_hud_.lane_activity_count;
     target.lane_activity.fill(0.0f);
     for (std::size_t source = 0; source < gameplay_hud_.lane_activity_count; ++source) {
@@ -1180,75 +1204,21 @@ void MenuApp::populate_result_render_data(render::MenuRenderData& render, const 
     }
     if (render.result.peer_battle) {
         const network::PeerSessionSnapshot peer = peer_session_.snapshot();
-        const std::string peer_label =
-            peer.peer_name.empty() ? ui_text("Opponent", "상대") : peer.peer_name;
-        render.result.peer_name = peer_label;
-        if (peer.has_remote_score && peer.latest_remote_score.finished) {
-            const network::PeerScore& peer_score = peer.latest_remote_score;
-            const MultiplayerScoreComparison comparison =
-                compare_multiplayer_scores(last_result_final_score_, peer_score.score);
-            render.result.peer_result_available = true;
-            render.result.peer_score = peer_score.score;
-            render.result.peer_score_difference = comparison.difference;
-            render.result.peer_gauge_value =
-                std::clamp(static_cast<double>(peer_score.gauge_milli) / 1000.0, 0.0, 100.0);
-            render.result.peer_max_combo = peer_score.max_combo;
-            render.result.peer_perfect = peer_score.perfect;
-            render.result.peer_great = peer_score.great;
-            render.result.peer_good = peer_score.good;
-            render.result.peer_bad = peer_score.bad;
-            render.result.peer_poor = peer_score.poor;
-            render.result.peer_status = "UNVERIFIED CLAIM / ";
-            render.result.peer_status += peer_score.aborted
-                                             ? "ABORTED"
-                                             : (peer_score.game_over ? "GAME OVER" : "FINISHED");
-            render.result.peer_outcome =
-                comparison.outcome == MultiplayerScoreOutcome::Win
-                    ? "WIN"
-                    : (comparison.outcome == MultiplayerScoreOutcome::Loss ? "LOSE" : "DRAW");
-        } else {
-            render.result.peer_result_available = false;
-            render.result.peer_status =
-                peer.state == network::PeerSessionState::Connected ? "WAITING" : "DISCONNECTED";
-            render.result.peer_outcome = "NO CONTEST";
-        }
-        std::vector<std::string> peer_notes;
-        std::vector<const network::PeerParticipantSnapshot*> standings;
-        standings.reserve(peer.participants.size());
-        for (const auto& participant : peer.participants) {
-            standings.push_back(&participant);
-        }
-        std::stable_sort(
-            standings.begin(), standings.end(),
-            [](const auto* lhs, const auto* rhs) {
-                if (lhs->has_score != rhs->has_score) return lhs->has_score;
-                if (lhs->has_score &&
-                    lhs->latest_score.score != rhs->latest_score.score) {
-                    return lhs->latest_score.score > rhs->latest_score.score;
-                }
-                return lhs->player_id < rhs->player_id;
-            });
-        for (std::size_t index = 0; index < standings.size(); ++index) {
-            const auto& participant = *standings[index];
-            std::string summary =
-                std::to_string(index + 1) + ". #" +
-                std::to_string(participant.player_id) + " " + participant.name;
-            if (participant.local) summary += ui_text(" [YOU]", " [나]");
-            if (participant.has_score) {
-                summary += " / " + ui_text("Score ", "점수 ") +
-                           std::to_string(participant.latest_score.score);
-                summary += participant.latest_score.finished
-                               ? ui_text(" / FINISHED", " / 종료")
-                               : ui_text(" / PLAYING", " / 플레이 중");
-            } else {
-                summary += ui_text(" / RESULT WAIT", " / 결과 대기");
-            }
-            peer_notes.push_back(std::move(summary));
-        }        peer_notes.push_back(ui_text("Enter or Esc returns to the multiplayer lobby.",
-                                     "Enter 또는 Esc로 멀티플레이 로비로 돌아갑니다."));
-        render.result.notes.insert(render.result.notes.begin(),
-                                   std::make_move_iterator(peer_notes.begin()),
-                                   std::make_move_iterator(peer_notes.end()));
+        render::MultiplayerPlayerData local;
+        local.name = render.result.profile;
+        local.has_score = true;
+        local.finished = true;
+        local.game_over = render.result.status == "GAME OVER" || render.result.status == "FAILED";
+        local.aborted = render.result.status == "ABORTED";
+        local.score = render.result.score;
+        local.gauge = render.result.gauge_value;
+        local.max_combo = render.result.max_combo;
+        local.perfect = render.result.perfect;
+        local.great = render.result.great;
+        local.good = render.result.good;
+        local.bad = render.result.bad;
+        local.poor = render.result.poor;
+        render.result.multiplayer_players = multiplayer_standings(peer, std::move(local));
     } else {
         render.result.notes.push_back(ui_text("Left restarts the same chart immediately.", "Left로 같은 차트를 즉시 재시작합니다."));
         if (render.result.replay_available) {
@@ -1507,6 +1477,12 @@ void MenuApp::populate_generic_screen_render_data(render::MenuRenderData& render
                         selected_option == menu::OptionsItemId::ProfileSetup,
                         render::MenuHitTargetKind::OptionsItem,
                         static_cast<int>(menu::OptionsItemId::ProfileSetup), true, false);
+        append_menu_row(render.generic, ui_text("MODS", "모드 설정"), ui_text("Configure", "설정"),
+                        selected_option == menu::OptionsItemId::Mods, render::MenuHitTargetKind::OptionsItem,
+                        static_cast<int>(menu::OptionsItemId::Mods), true, false);
+        append_menu_row(render.generic, ui_text("KEY TEST", "키 입력 테스트"), ui_text("Test", "테스트"),
+                        selected_option == menu::OptionsItemId::KeyTest, render::MenuHitTargetKind::OptionsItem,
+                        static_cast<int>(menu::OptionsItemId::KeyTest), true, false);
         render.generic.card_descriptions = {
             ui_text("Choose the play key mode. The current mode is shown prominently on this first card.",
                     "플레이 키 모드를 선택합니다. 현재 모드는 첫 카드에 크게 표시됩니다."),
@@ -1524,6 +1500,8 @@ void MenuApp::populate_generic_screen_render_data(render::MenuRenderData& render
                     "오디오·비주얼 타이밍을 보정합니다. 비주얼 레이턴시는 1ms씩 조절됩니다."),
             ui_text("Change profile name, avatar, and device setup.",
                     "프로필 이름, 아바타, 장치 설정을 변경합니다."),
+            ui_text("Choose gameplay modifiers and review the score multiplier.", "플레이 모드와 점수 배율을 확인합니다."),
+            ui_text("Check simultaneous key presses with the current key mapping.", "현재 키 배치로 동시 입력을 확인합니다."),
         };
     } else {
         switch (generic_view) {
@@ -2083,8 +2061,8 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
             true,
             peer.state == network::PeerSessionState::Connected,
             peer.round_active,
-            peer.has_remote_score && peer.latest_remote_score.finished,
-            peer.has_remote_score && peer.latest_remote_score.game_over,
+            peer.all_remote_finished,
+            multiplayer_opponents_terminal(peer),
         };
         return peer_battle_spectator_decision(state) ==
                PeerBattleSpectatorDecision::FinishSession;

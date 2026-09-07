@@ -446,6 +446,7 @@ bool GameSession::initialize(const CommandLineOptions& options) {
         if (sample_rate_ <= 0) {
             sample_rate_ = static_cast<int>(requested_rate);
         }
+        mix_normalizer_.reset(sample_rate_);
         input_offset_samples_ = ms_to_samples(config_.input_offset_ms, sample_rate_);
         return true;
     };
@@ -2496,6 +2497,7 @@ void GameSession::audio_callback(float* output,
         schedule_chart_audio(buffer_end_samples);
         mix_chart_audio(output, frames, logical_buffer_start_samples);
         mix_tones(output, frames, logical_buffer_start_samples);
+        if (config_.audio_ui.normalize_audio) mix_normalizer_.process(output, frames);
         const float master_gain =
             static_cast<float>(std::clamp(config_.audio_ui.master_volume, 0.0, 1.0));
         clamp_output(output, frames, master_gain);

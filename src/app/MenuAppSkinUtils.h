@@ -59,9 +59,12 @@ enum class SkinSettingsRowId {
     GameplayCursor,
     TimingFeedback,
     Back,
+    JudgementY,
+    JudgementX,
+    ComboX,
 };
 
-inline constexpr std::array<SkinSettingsRowId, 46> kSkinSettingsRowOrder = {
+inline constexpr std::array<SkinSettingsRowId, 49> kSkinSettingsRowOrder = {
     SkinSettingsRowId::KeyMode,
     SkinSettingsRowId::ScratchPosition,
     SkinSettingsRowId::SkinSource,
@@ -107,6 +110,9 @@ inline constexpr std::array<SkinSettingsRowId, 46> kSkinSettingsRowOrder = {
     SkinSettingsRowId::NoteGap,
     SkinSettingsRowId::GameplayCursor,
     SkinSettingsRowId::TimingFeedback,
+    SkinSettingsRowId::JudgementY,
+    SkinSettingsRowId::JudgementX,
+    SkinSettingsRowId::ComboX,
     SkinSettingsRowId::Back,
 };
 

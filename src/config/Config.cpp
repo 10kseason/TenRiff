@@ -166,6 +166,9 @@ void sanitize_skin_config(SkinConfig& skin) {
         kGameplayFieldOffsetXDefault);
     skin.combo_position = std::clamp(
         skin.combo_position, kComboPositionMin, kComboPositionMax);
+    skin.judgement_position = clamp_finite(skin.judgement_position, kComboPositionMin, kComboPositionMax, kComboPositionDefault);
+    skin.judgement_offset_x = clamp_finite(skin.judgement_offset_x, -600.0, 600.0, 0.0);
+    skin.combo_offset_x = clamp_finite(skin.combo_offset_x, -600.0, 600.0, 0.0);
     skin.lane_background_opacity = clamp_finite(
         skin.lane_background_opacity,
         kSkinLaneBackgroundOpacityMin,
@@ -556,6 +559,7 @@ void apply_config_object(const JsonObject& root, RuntimeConfig& config) {
         config.audio_ui.bgm_volume =
             std::clamp(get_number(*audio, "bgm_volume", config.audio_ui.bgm_volume),
                        kChartMixVolumeMin, kChartMixVolumeMax);
+        config.audio_ui.normalize_audio = get_bool(*audio, "normalize_audio", config.audio_ui.normalize_audio);
         config.audio_ui.keysound_volume =
             std::clamp(get_number(*audio, "keysound_volume", config.audio_ui.keysound_volume),
                        kChartMixVolumeMin, kChartMixVolumeMax);
@@ -843,6 +847,13 @@ void apply_config_object(const JsonObject& root, RuntimeConfig& config) {
         config.skin.combo_position = std::clamp(
             get_number(*skin, "combo_position", config.skin.combo_position),
             kComboPositionMin, kComboPositionMax);
+        config.skin.judgement_position = clamp_finite(
+            get_number(*skin, "judgement_position", config.skin.combo_position),
+            kComboPositionMin, kComboPositionMax, kComboPositionDefault);
+        config.skin.judgement_offset_x = clamp_finite(
+            get_number(*skin, "judgement_offset_x", 0.0), -600.0, 600.0, 0.0);
+        config.skin.combo_offset_x = clamp_finite(
+            get_number(*skin, "combo_offset_x", 0.0), -600.0, 600.0, 0.0);
         config.skin.lane_background_opacity = clamp_finite(
             get_number(*skin, "lane_background_opacity", config.skin.lane_background_opacity),
             kSkinLaneBackgroundOpacityMin,
@@ -1045,6 +1056,7 @@ JsonValue build_json_root(const RuntimeConfig& config) {
     audio.emplace("volume", JsonValue{config.audio_ui.master_volume});
     audio.emplace("bgm_volume", JsonValue{config.audio_ui.bgm_volume});
     audio.emplace("keysound_volume", JsonValue{config.audio_ui.keysound_volume});
+    audio.emplace("normalize_audio", JsonValue{config.audio_ui.normalize_audio});
     root.emplace("audio", JsonValue{std::move(audio)});
 
     InputConfig persisted_input = config.input;
@@ -1249,6 +1261,10 @@ JsonValue build_json_root(const RuntimeConfig& config) {
     skin.emplace("judgement_line_position", JsonValue{config.skin.judgement_line_position});
     skin.emplace("gameplay_field_offset_x", JsonValue{config.skin.gameplay_field_offset_x});
     skin.emplace("combo_position", JsonValue{config.skin.combo_position});
+    skin.emplace("judgement_position", JsonValue{config.skin.judgement_position});
+    skin.emplace("judgement_offset_x", JsonValue{config.skin.judgement_offset_x});
+    skin.emplace("combo_offset_x", JsonValue{config.skin.combo_offset_x});
+
     skin.emplace("lane_background_opacity", JsonValue{config.skin.lane_background_opacity});
     skin.emplace("black_playfield_enabled", JsonValue{config.skin.black_playfield_enabled});
     skin.emplace("visual_opacity", JsonValue{config.skin.visual_opacity});

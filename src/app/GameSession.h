@@ -1,5 +1,7 @@
 #pragma once
 
+#include "audio/MixNormalizer.h"
+
 #include <array>
 #include <atomic>
 #include <condition_variable>
@@ -212,6 +214,7 @@ public:
     [[nodiscard]] const InputBackendRuntimeState& input_backend_state() const { return input_backend_state_; }
 
 private:
+    friend struct GameSessionAudioTestAccess;
     struct FutureEvent {
         input::InputEvent event;
         int64_t sample = 0;
@@ -355,6 +358,7 @@ private:
     void mix_chart_audio(float* output, uint32_t frames, int64_t buffer_start_samples);
     void mix_tones(float* output, uint32_t frames, int64_t buffer_start_samples);
     static void clamp_output(float* output, uint32_t frames, float master_gain);
+    audio::MixNormalizer mix_normalizer_;
     void report_loading_progress(int percent, std::string_view stage);
     [[nodiscard]] bool loading_cancel_requested();
     [[nodiscard]] int64_t playback_sample_for_replay_event(const gameplay::ReplayFile& replay,

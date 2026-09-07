@@ -2,17 +2,17 @@
 
 Language: [한국어](README.md) | [English](README.en.md) | [简体中文](README.zh-CN.md) | [日本語](README.ja.md)
 
-TenRiff is a Windows GUI BMS rhythm-game runtime/launcher. The current stable version is `1.7.0`, and chart input is limited to the BMS family (`.bms/.bme/.bml/.pms`). Graphics Settings lets users select a rights-cleared external ONNX model for the optional BGA Upscaler. Public packages contain no BGA-upscaler model; key-mode conversion bundles the deterministic NK3 P64 graph and the generalized pattern MLP exports. The project uses the MIT License, and bundled third-party notices are collected in [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
+TenRiff is a Windows GUI BMS rhythm-game runtime/launcher. The current stable version is `1.7.1`, and chart input is limited to the BMS family (`.bms/.bme/.bml/.pms`). Graphics Settings lets users select a rights-cleared external ONNX model for the optional BGA Upscaler. Public packages contain no BGA-upscaler model; key-mode conversion bundles the deterministic NK3 P64 graph and the generalized pattern MLP exports. The project uses the MIT License, and bundled third-party notices are collected in [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
 
-This README is an introduction that explains "what to look at first when you open the project." For current behavior, the `1.7.0` project state, the `1.5.1 fixed stable baseline` baseline, configuration, and design documents, continue from [`docs/README.en.md`](docs/README.en.md).
+This README is an introduction that explains "what to look at first when you open the project." For current behavior, the `1.7.1` project state, the `1.5.1 fixed stable baseline` baseline, configuration, and design documents, continue from [`docs/README.en.md`](docs/README.en.md).
 
 TenRiff should also be read as a `vibe coding` work: it was shaped through fast iteration and experimentation rather than only through a traditional long-form design-first process.
 
-## 1.7.0 UI Update
+## 1.7.1 Gameplay & Multiplayer Polish
 
-Home, Song Select, Result and shared settings now use quiet panels and consistent spacing. Results emphasize scores; long settings guidance wraps and supports pagination. Custom skins and existing gameplay rules are preserved.
+Multiplayer HUDs and results show the full room, with score comparison and spectator completion adapted to multiple opponents. This update adds P-GREAT-only effects, independent judgement/combo placement, optional audio normalization, ten pastel Options cards and a difficulty-table control on Song Select. Long LEVEL labels are easier to read.
 
-See the [changelog](CHANGELOG.md) and [release verification](docs/release-1.7.0-gate.md) for scope and limitations.
+See [CHANGELOG](CHANGELOG.md) and [release verification](docs/release-1.7.1-gate.md).
 
 ## Project At a Glance
 

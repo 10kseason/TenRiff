@@ -1,4 +1,5 @@
 #include "app/MenuApp.h"
+#include "app/DifficultyTable.h"
 
 #include <algorithm>
 #include <cmath>
@@ -63,6 +64,21 @@ std::string song_group_section_label(MenuApp::SongGroupMode mode, const SongEntr
 
 }  // namespace
 
+std::string MenuApp::difficulty_table_display_name() {
+    if (config_.ui.difficulty_table_path.empty()) return ui_text("Native LV", "기본 LV");
+    // Cache table metadata outside the renderer; never load a table for each frame.
+    if (difficulty_table_display_path_ != config_.ui.difficulty_table_path) {
+        difficulty_table_display_path_ = config_.ui.difficulty_table_path;
+        const auto loaded = load_difficulty_table_utf8(difficulty_table_display_path_);
+        difficulty_table_display_name_ = loaded.success()
+            ? menu_song_select::safe_ui_text(loaded.table.name()) : std::string{};
+        if (difficulty_table_display_name_.empty()) {
+            difficulty_table_display_name_ = menu_song_select::filename_only(difficulty_table_display_path_);
+        }
+    }
+    return difficulty_table_display_name_;
+}
+
 void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
                                                const std::string& current_track,
                                                const MenuApp::BestResultRecord& current_best,
@@ -73,6 +89,11 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
     // renderer can switch views without a second screen-specific data model.
     render.kind = render::MenuScreenKind::SongSelect;
     render.song_select.profile = profile_display_name();
+    render.song_select.difficulty_table_name = difficulty_table_display_name();
+    render.song_select.difficulty_table_active = !config_.ui.difficulty_table_path.empty();
+    render.song_select.difficulty_table_editing = difficulty_table_url_editing_;
+    render.song_select.difficulty_table_url_input = difficulty_table_url_input_;
+    render.song_select.difficulty_table_status = song_browser_status_message_;
     render.song_select.profile_avatar_path = config_.ui.profile_avatar_path;
     render.song_select.quick_settings_focused =
         song_select_view_ == SongSelectView::Songs &&
@@ -160,12 +181,7 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
             parts.push_back(ui_text("COL ", "컬렉션 ") + song_collection_filter_label());
         }
         if (!config_.ui.difficulty_table_path.empty()) {
-            parts.push_back(ui_text("TABLE ", "난이도표 ") +
-                            safe_ui_text(
-                                config_.ui.difficulty_table_url.empty()
-                                    ? filename_only(config_.ui.difficulty_table_path)
-                                    : config_.ui.difficulty_table_url,
-                                config_.ui.difficulty_table_url.empty() ? "JSON" : "LINK"));
+            parts.push_back(ui_text("TABLE ", "난이도표 ") + difficulty_table_display_name());
         }
         if (parts.empty()) {
             return ui_text("NO FILTER", "필터 없음");
@@ -712,13 +728,7 @@ void MenuApp::populate_song_browser_render_data(render::MenuRenderData& render) 
                         ? (safe_ui_text(difficulty_table_url_input_,
                                         ui_text("URL", "URL")) +
                            "|")
-                        : (config_.ui.difficulty_table_path.empty()
-                               ? ui_text("Native LV / Enter: URL", "기본 LV / Enter: URL 입력")
-                               : safe_ui_text(
-                                     config_.ui.difficulty_table_url.empty()
-                                         ? filename_only(config_.ui.difficulty_table_path)
-                                         : config_.ui.difficulty_table_url,
-                                     config_.ui.difficulty_table_url.empty() ? "JSON" : "LINK")),
+                        : difficulty_table_display_name(),
                     settings_cursor_ == 5,
                     render::MenuHitTargetKind::SettingsRow,
                     5,

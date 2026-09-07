@@ -20,6 +20,8 @@ enum class OptionsItemId : std::uint8_t {
     Input = 5,
     Calibration = 6,
     ProfileSetup = 7,
+    Mods = 8,
+    KeyTest = 9,
 };
 
 struct OptionsItemRoute {
@@ -27,8 +29,8 @@ struct OptionsItemRoute {
     Screen destination;
 };
 
-// The order is also the existing four-column, two-row visual layout.
-inline constexpr std::array<OptionsItemRoute, 8> kOptionsItemRoutes{{
+// The order is also the existing five-column, two-row visual layout.
+inline constexpr std::array<OptionsItemRoute, 10> kOptionsItemRoutes{{
     {OptionsItemId::KeyMode, Screen::ModeSelect},
     {OptionsItemId::Keymap, Screen::Keymap},
     {OptionsItemId::Skins, Screen::SettingsSkins},
@@ -37,6 +39,8 @@ inline constexpr std::array<OptionsItemRoute, 8> kOptionsItemRoutes{{
     {OptionsItemId::Input, Screen::SettingsInput},
     {OptionsItemId::Calibration, Screen::SettingsCalibration},
     {OptionsItemId::ProfileSetup, Screen::QuickSetup},
+    {OptionsItemId::Mods, Screen::ModeMods},
+    {OptionsItemId::KeyTest, Screen::KeymapTest},
 }};
 
 [[nodiscard]] std::optional<std::size_t> options_item_index(OptionsItemId id) noexcept;
@@ -46,7 +50,7 @@ class OptionsHubController {
 public:
     explicit OptionsHubController(OptionsItemId initial_cursor = OptionsItemId::KeyMode) noexcept;
 
-    // Movement preserves the existing four-column, two-row clamped grid.
+    // Movement preserves the existing five-column, two-row clamped grid.
     void move_horizontal(int direction) noexcept;
     void move_vertical(int direction) noexcept;
 

@@ -7,6 +7,15 @@
 
 namespace tenriff::render {
 
+inline constexpr uint32_t gameplay_judgement_rgb(std::string_view judgement) {
+    if (judgement == "PG") return 0xFFE18A;
+    if (judgement == "GR") return 0x6EE7F2;
+    if (judgement == "G") return 0xAEB5BF;
+    if (judgement == "BAD") return 0xFF9F43;
+    if (judgement == "POOR") return 0xFF6B6B;
+    return 0xE8ECF1;
+}
+
 inline std::wstring gameplay_timing_feedback_text(double delta_ms) {
     if (!std::isfinite(delta_ms)) {
         return {};

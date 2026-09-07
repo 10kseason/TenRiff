@@ -443,6 +443,10 @@ TEST_CASE("config save and load preserve volume and speed settings") {
     config.audio_ui.master_volume = 0.65;
     config.audio_ui.bgm_volume = 0.55;
     config.audio_ui.keysound_volume = 1.35;
+    config.audio_ui.normalize_audio = true;
+    config.skin.judgement_position = 0.4;
+    config.skin.judgement_offset_x = -120;
+    config.skin.combo_offset_x = 90;
     config.speed.rate = 1.25;
     config.speed.hi_speed = 4.75;
     config.mode.ghost_battle_enabled = true;
@@ -465,6 +469,10 @@ TEST_CASE("config save and load preserve volume and speed settings") {
     CHECK(result.config.audio_ui.master_volume == doctest::Approx(0.65));
     CHECK(result.config.audio_ui.bgm_volume == doctest::Approx(0.55));
     CHECK(result.config.audio_ui.keysound_volume == doctest::Approx(1.35));
+    CHECK(result.config.audio_ui.normalize_audio);
+    CHECK(result.config.skin.judgement_position == doctest::Approx(0.4));
+    CHECK(result.config.skin.judgement_offset_x == -120);
+    CHECK(result.config.skin.combo_offset_x == 90);
     CHECK(result.config.speed.rate == doctest::Approx(1.25));
     CHECK(result.config.speed.hi_speed == doctest::Approx(4.75));
     CHECK(result.config.mode.ghost_battle_enabled);

@@ -115,6 +115,7 @@ std::optional<NumericSettingRange> audio_setting_numeric_range(AudioSettingId id
         case AudioSettingId::Preset:
         case AudioSettingId::KeysoundMode:
         case AudioSettingId::BackgroundSound:
+        case AudioSettingId::Normalize:
         case AudioSettingId::Back:
             return std::nullopt;
     }
@@ -209,6 +210,12 @@ MenuEffectFlags AudioSettingsController::apply_selected_action(
                     runtime.audio_ui.bms_keysound_policy = next;
                     changed = true;
                 }
+            }
+            break;
+        case AudioSettingId::Normalize:
+            if (is_adjust || is_activate) {
+                runtime.audio_ui.normalize_audio = !runtime.audio_ui.normalize_audio;
+                changed = true;
             }
             break;
         case AudioSettingId::BackgroundSound:

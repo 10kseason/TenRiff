@@ -471,7 +471,9 @@ private:
     [[nodiscard]] std::string ui_skin_source_label(std::string_view token) const;
     [[nodiscard]] std::string ui_skin_note_shape_label(std::string_view token) const;
     [[nodiscard]] std::string ui_skin_note_image_aspect_label(std::string_view token) const;
-    void apply_difficulty_table_url(std::string_view url);
+    [[nodiscard]] bool apply_difficulty_table_url(std::string_view url);
+    void handle_difficulty_table_input(uint32_t keycode);
+    [[nodiscard]] std::string difficulty_table_display_name();
 
     [[nodiscard]] std::string screen_title() const;
     [[nodiscard]] const SongEntry* visible_song_entry(std::size_t visible_index) const;
@@ -776,6 +778,8 @@ private:
     // leaves the table that is already loaded alone.
     bool difficulty_table_url_editing_ = false;
     std::string difficulty_table_url_input_{};
+    std::string difficulty_table_display_path_{};
+    std::string difficulty_table_display_name_{};
     bool online_records_url_editing_ = false;
     std::string online_records_url_input_{};
     std::string song_browser_status_message_{};

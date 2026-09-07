@@ -4,6 +4,32 @@ The September 2026 local UI revision keeps the existing game flow and scoring wh
 making native Home, Song Select, single-player Result and shared settings easier to scan. It is the 1.7.0 UI release;
 result-analysis expansion remains future work.
 
+## Song Select difficulty-table control
+
+The follow-up adds a difficulty-table card beside Search and Sort / Filter in the
+center action strip. The main area shows the table name and opens a URL editor
+over Song Select; File selects a local JSON, and Reset returns to native LV.
+The library count remains in the library header. The existing Filters row remains
+available and shares `MenuApp::handle_difficulty_table_input` with the new control.
+
+`SongDifficultyTableAction` identifies EditUrl / LocalFile / Reset / Apply / Cancel.
+`MenuWindow_draw_difficulty_table_editor.inl` owns the modal presentation and hit
+regions. MenuApp blocks underlying clicks and key-repeat navigation while it is
+open. Invalid imports leave the editor open with an error and retain the current
+table; Enter applies and Escape cancels. Existing import/cache/index behavior is
+reused. Friendly table names are loaded once per selected path/source refresh in
+`MenuAppSongSelectRender.cpp`, outside the renderer, and reused in Filters.
+
+Preview: `menu_visual_preview.exe --small` shows the new card, and `--table-editor`
+starts with its URL editor open. Preview clicks exercise renderer targets only;
+they never fetch the example URL or open a real file dialog.
+
+Validation for this follow-up: Windows x64 Release build succeeded. The existing
+suite passed 703 tests with 10 unrelated Windows/NK3 integration cases skipped.
+Computer Use confirmed the card at 960x540 and a large window requested as 1080p,
+URL editor open/cancel, reset to Native LV, and the File click target. Actual
+remote import and file-picker persistence were not exercised with user data.
+
 ## Ownership and data flow
 
 - `src/render/MenuWindow_draw.inl` selects the native treatment through

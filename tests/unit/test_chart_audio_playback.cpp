@@ -1,3 +1,4 @@
+#include "audio/MixNormalizer.h"
 #include "doctest/doctest.h"
 
 #include <algorithm>
@@ -289,3 +290,23 @@ TEST_CASE("song preview builder decodes and renders fragmented BMS audio events"
     CHECK(error == "cancelled");
 }
 #endif
+
+TEST_CASE("mix normalization preserves stereo balance and does not depend on buffer boundaries") {
+    std::vector<float> whole(48000 * 2 * 3);
+    for (std::size_t i = 0; i < whole.size(); i += 2) { whole[i] = 0.8f; whole[i + 1] = 0.4f; }
+    auto chunks = whole;
+    tenriff::audio::MixNormalizer a, b;
+    a.reset(48000); b.reset(48000);
+    a.process(whole.data(), 48000 * 3);
+    for (std::size_t i = 0; i < chunks.size(); i += 128) b.process(chunks.data() + i, 64);
+    CHECK(whole == chunks);
+    CHECK(whole.back() < 0.4f);
+    CHECK(whole[whole.size() - 2] == doctest::Approx(whole.back() * 2));
+    std::vector<float> silence(1024, 0.0f);
+    a.process(silence.data(), 512);
+    for (float sample : silence) CHECK(sample == 0.0f);
+    a.reset(48000);
+    float reset_frame[]{0.1f, 0.1f};
+    a.process(reset_frame, 1);
+    CHECK(reset_frame[0] == doctest::Approx(0.1f).epsilon(0.001));
+}

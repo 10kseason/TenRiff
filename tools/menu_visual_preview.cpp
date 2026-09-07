@@ -1,4 +1,9 @@
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
 #include "render/MenuWindow.h"
+#include "timing/HighResClock.h"
+#include "app/PeerBattleRuntimeRules.h"
 
 #include <windows.h>
 #include <chrono>
@@ -15,6 +20,13 @@ int main(int argc, char** argv) {
     config.display_mode = "windowed";
     config.vsync = true;
     bool result = false;
+    bool options_grid = false;
+    bool table_editor = false;
+    bool gameplay = false;
+    int players = 0;
+    int preview_fps = 144;
+    int fixed_grade = -1;
+    bool moved_labels = false;
     bool empty = false;
     bool failed = false;
     bool reveal = false;
@@ -26,7 +38,18 @@ int main(int argc, char** argv) {
     data.ui_korean = true;
     for (int i = 1; i < argc; ++i) {
         const std::string arg = argv[i];
-        if (arg == "--result") result = true;
+        if (arg == "--table-editor") table_editor = true;
+        else if (arg == "--options") options_grid = true;
+        else if (arg == "--gameplay") gameplay = true;
+        else if (arg == "--three-players") players = 3;
+        else if (arg == "--eight-players") players = 8;
+        else if (arg == "--60fps") preview_fps = 60;
+        else if (arg == "--perfect") fixed_grade = 0;
+        else if (arg == "--great") fixed_grade = 1;
+        else if (arg == "--good") fixed_grade = 2;
+        else if (arg == "--moved-labels") moved_labels = true;
+        else if (arg == "--small") { config.width = 960; config.height = 540; }
+        else if (arg == "--result") result = true;
         else if (arg == "--title") title = true;
         else if (arg == "--focus-options") focus_options = true;
         else if (arg == "--settings") settings = true;
@@ -106,6 +129,10 @@ int main(int argc, char** argv) {
     songs.current_hi_speed = "3.50";
     songs.current_visual_latency = "+0 ms";
     songs.current_random = "OFF";
+    songs.difficulty_table_name = empty ? "기본 LV" : "発狂BMS難易度表";
+    songs.difficulty_table_active = !empty;
+    songs.difficulty_table_editing = table_editor;
+    songs.difficulty_table_url_input = "https://example.com/table/header.json";
     songs.sort_summary = "LEVEL";
     songs.group_summary = "ALL";
     songs.primary_hint = "ENTER / Play    SPACE / Options    F1 / Help";
@@ -139,6 +166,7 @@ int main(int argc, char** argv) {
             card.artist = "TenRiff UI Preview";
             card.detail = "7K  /  ANOTHER  /  180 BPM";
             card.level = 12 + i;
+            card.level_label = "⑤LEVEL " + std::to_string(12 + i);
             card.song_index = i;
             card.selected = i == 0;
             card.favorite = i == 1;
@@ -181,6 +209,53 @@ int main(int argc, char** argv) {
         score.gauge_points.push_back({position, failed ? 0.7f * (1.0f - position)
             : 0.65f + 0.17f * std::sin(position * 18.0f)});
     }
+    if (options_grid) {
+        data.kind = MenuScreenKind::GenericList;
+        data.generic = {};
+        data.generic.heading = "옵션";
+        data.generic.card_grid = true;
+        const char* labels[]{"키 모드", "키 설정", "스킨", "그래픽", "오디오", "입력", "레이턴시", "프로필", "모드 설정", "키 입력 테스트"};
+        const char* values[]{"4K", "설정", "LR2", "테두리 없음", "고성능", "RawInput", "-43.0 ms", "default", "설정", "테스트"};
+        for (int i = 0; i < 10; ++i) {
+            MenuRowData row;
+            row.label = labels[i]; row.value = values[i]; row.row_index = i;
+            row.selected = i == 0; row.activatable = true; row.target_kind = MenuHitTargetKind::OptionsItem;
+            data.generic.rows.push_back(row);
+            data.generic.card_descriptions.push_back(std::string(labels[i]) + " 설정을 확인합니다. 안내가 버튼을 가리지 않아야 합니다.");
+        }
+    }
+    for (int i = 0; i < players; ++i) {
+        MultiplayerPlayerData player;
+        player.player_id = static_cast<uint8_t>(i + 1); player.rank = i + 1;
+        player.name = i == 1 ? "GOMazk / 긴 플레이어 이름" : "PLAYER " + std::to_string(i + 1);
+        player.local = i == 0; player.has_score = true; player.finished = result;
+        player.score = 9500 - i * 640; player.combo = 123 + i; player.max_combo = 456;
+        player.perfect = 620; player.great = 80; player.good = 12; player.bad = 3;
+        player.gauge = 90 - i * 10;
+        data.result.multiplayer_players.push_back(player);
+        data.gameplay.multiplayer_players.push_back(player);
+    }
+    if (players > 0 && result) data.result.peer_battle = true;
+    if (gameplay) {
+        data.kind = MenuScreenKind::GameplayHud;
+        auto& hud = data.gameplay;
+        hud.active = true; hud.title = "Gameplay feedback preview"; hud.artist = "Synthetic / no audio or records";
+        hud.visual_velocity = 1.0 / 48000.0;
+        if (moved_labels) {
+            hud.judgement_position = 0.4; hud.judgement_offset_x = -120;
+            hud.combo_position = 0.5; hud.combo_offset_x = 120;
+        }
+        hud.lane_count = 10; hud.black_playfield_enabled = true; hud.gauge = 75; hud.gauge_label = "NORMAL";
+        hud.lookahead_samples = 48000; hud.past_samples = 4800; hud.duration_samples = 48000 * 600;
+        hud.lane_activity_count = hud.lane_pressed_count = 10;
+        hud.has_feedback = true; hud.feedback = "PG"; hud.combo = 123;
+        hud.peer_visible = players > 0; hud.peer_score_available = players > 0;
+        hud.peer_score = 8860; hud.score = 9500;
+        const auto lead = tenriff::app::peer_battle_score_lead(hud.score, hud.peer_score);
+        hud.versus_score_difference = lead.difference; hud.versus_score_position = lead.position;
+        hud.timing_history_count = 3;
+        hud.timing_history_delta_ms[0] = -12; hud.timing_history_delta_ms[1] = 9; hud.timing_history_delta_ms[2] = 28;
+    }
     MenuWindow window;
     window.set_config(config);
     const auto start = std::chrono::steady_clock::now();
@@ -195,14 +270,51 @@ int main(int argc, char** argv) {
             score.presentation_start_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(
                 std::chrono::steady_clock::now().time_since_epoch()).count();
         }
+        if (gameplay) {
+            const double seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
+            auto& hud = data.gameplay;
+            const int hit = static_cast<int>(seconds * 2);
+            const int grade = fixed_grade >= 0 ? fixed_grade : (hit / 4) % 3;
+            hud.feedback = grade == 0 ? "PG" : grade == 1 ? "GR" : "G";
+            hud.feedback_delta_ms = hit % 2 == 0 ? -28.0 : 28.0;
+            hud.text_revision = static_cast<uint64_t>(hit + 1);
+            hud.motion_revision++;
+            hud.combo = 123 + hit; hud.pg = hit + 1;
+            hud.current_sample = static_cast<int64_t>(seconds * 48000);
+            hud.current_visual_position = seconds;
+            hud.audio_sample_time_ns = hud.activity_publish_time_ns = tenriff::timing::HighResClock::now_ns();
+            hud.lane_activity.fill(0.0f);
+            hud.lane_activity[static_cast<std::size_t>(hit % 10)] = static_cast<float>(std::max(0.0, 1.0 - std::fmod(seconds, 0.5) * 5.0));
+            hud.note_count = 0;
+            for (int lane = 1; lane <= 10; ++lane) {
+                GameplayNoteData note;
+                note.lane = lane;
+                note.start_sample = hud.current_sample + static_cast<int64_t>((0.1 + std::fmod(lane * 0.13 + seconds * 0.5, 1.0)) * 40000);
+                note.visual_position = note.start_sample / 48000.0;
+                note.tail_visual_position = note.visual_position;
+                hud.notes[hud.note_count++] = note;
+            }
+        }
         window.render(data);
         while (const auto click = window.poll_click_event()) {
             std::cout << "hit kind=" << static_cast<int>(click->kind)
                       << " index=" << click->index << std::endl;
+            if (click->kind == MenuHitTargetKind::SongDifficultyTable) {
+                const auto action = static_cast<SongDifficultyTableAction>(click->index);
+                if (action == SongDifficultyTableAction::EditUrl) songs.difficulty_table_editing = true;
+                if (action == SongDifficultyTableAction::Cancel) songs.difficulty_table_editing = false;
+                if (action == SongDifficultyTableAction::Reset) { songs.difficulty_table_active = false; songs.difficulty_table_name = "기본 LV"; }
+                if (action == SongDifficultyTableAction::LocalFile) songs.difficulty_table_status = "FILE target received / synthetic preview";
+                if (action == SongDifficultyTableAction::Apply) songs.difficulty_table_status = "APPLY target received / no network in preview";
+            }
+            if (options_grid && click->kind == MenuHitTargetKind::OptionsItem) {
+                for (auto& row : data.generic.rows) row.selected = row.row_index == click->index;
+            }
         }
         if (window.had_fatal_error()) return 1;
         if (std::chrono::steady_clock::now() - start > std::chrono::minutes(10)) break;
-        std::this_thread::sleep_for(std::chrono::milliseconds(16));
+        std::this_thread::sleep_until(start + std::chrono::nanoseconds(
+            static_cast<int64_t>((std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count() * preview_fps + 1.0)) * (1000000000 / preview_fps)));
     }
     window.shutdown();
 }

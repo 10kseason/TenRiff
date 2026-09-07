@@ -3,7 +3,8 @@
 这份文档是下一位 agent 或新任务接手时应该最先阅读的当前状态文档。目标是快速说明“这个项目现在是什么、应该先看哪里、还有哪些内容尚未验证”。
 
 ## 基线
-- 当前稳定发布线为 `1.7.0`
+- 当前稳定发布线为 `1.7.1`
+- 1.7.1 improves multiplayer standings, gameplay feedback, independent judgement/combo placement, ten pastel Options cards, optional audio normalization and the Song Select difficulty-table control. See [follow-up details](gameplay-polish-followup.md) and [release verification](release-1.7.1-gate.md).
 - 1.7.0 refreshes native Home, Song Select, Result and shared settings. See [UI implementation](menu-visual-polish.md) and [release verification](release-1.7.0-gate.md). The prism remains only in the custom-skin path; result reveal timing is unchanged.
 - 默认结果页面突出分数、等级和准确率；棱镜演出保留在自定义皮肤中。保留现有2.2秒展示流程、Space跳过和按钮启用规则。
 - UI-r2 Song Select 使用顶部标签、7 行封面曲库、大幅选中图片、最佳记录卡、谱面/模式面板和可实际启动的 START 按钮；不显示 Collection/Store/货币/全球排名等虚构功能

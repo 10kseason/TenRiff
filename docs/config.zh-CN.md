@@ -34,6 +34,7 @@
 - `volume` (double)
   - master volume
 - `bgm_volume` (double)
+- `normalize_audio` (bool): stereo-linked gameplay mix RMS leveling before limiter/master volume; default false. Menu music is unaffected.
 - `keysound_volume` (double)
 
 ### `input`
@@ -252,6 +253,8 @@ chart loader/indexer 仅支持 BMS family（`.bms/.bme/.bml/.pms`）。旧 `enab
   - gameplay 判定线的垂直位置比例
   - 会被 clamp 在 `0.00..1.00`（0%～100%）
   - 默认值为 `0.82`
+- `judgement_position` (double): independent judgement Y anchor, 0.10–0.78; missing fields inherit the existing combo anchor.
+- `judgement_offset_x`, `combo_offset_x` (double): independent X offsets in 1920x1080 base pixels, -600–600; default 0.
 - `combo_position` (double)
   - gameplay field 内 combo 显示的垂直位置比例
   - 会被 clamp 在 `0.10..0.78`

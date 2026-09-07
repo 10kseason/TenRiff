@@ -861,6 +861,12 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
                     stable_rows.index_of(SkinSettingsRowId::TimingFeedback),
                     false,
                     true);
+    append_menu_row(render.generic, ui_text("Judgement Y", "판정 Y"), format_percent(config_.skin.judgement_position),
+                    false, render::MenuHitTargetKind::SettingsRow, stable_rows.index_of(SkinSettingsRowId::JudgementY), false, true);
+    append_menu_row(render.generic, ui_text("Judgement X", "판정 X"), std::to_string(static_cast<int>(config_.skin.judgement_offset_x)) + " px",
+                    false, render::MenuHitTargetKind::SettingsRow, stable_rows.index_of(SkinSettingsRowId::JudgementX), false, true);
+    append_menu_row(render.generic, ui_text("Combo X", "콤보 X"), std::to_string(static_cast<int>(config_.skin.combo_offset_x)) + " px",
+                    false, render::MenuHitTargetKind::SettingsRow, stable_rows.index_of(SkinSettingsRowId::ComboX), false, true);
     append_menu_row(render.generic, ui_text("Back", "뒤로"), "", false,
                     render::MenuHitTargetKind::SettingsRow,
                     stable_rows.index_of(SkinSettingsRowId::Back), true, false);
@@ -892,6 +898,9 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
         config_.skin.combo_position,
         config::kComboPositionMin,
         config::kComboPositionMax);
+    render.generic.skin_preview.judgement_position = config_.skin.judgement_position;
+    render.generic.skin_preview.judgement_offset_x = config_.skin.judgement_offset_x;
+    render.generic.skin_preview.combo_offset_x = config_.skin.combo_offset_x;
     render.generic.skin_preview.lane_width_scale_count =
         std::min(visual_preview_lane_width_scales.size(), render.generic.skin_preview.lane_width_scales.size());
     render.generic.skin_preview.lane_width_scales.fill(config::kLaneWidthScaleDefault);

@@ -25,11 +25,11 @@ TEST_CASE("skin stable identifiers map across the optional LR2 row") {
     CHECK(*skin_setting_id_at(4, false) == SkinSettingsRowId::ImportSkin);
     REQUIRE(skin_setting_id_at(4, true).has_value());
     CHECK(*skin_setting_id_at(4, true) == SkinSettingsRowId::Lr2Resolution);
-    REQUIRE(skin_setting_id_at(44, false).has_value());
-    CHECK(*skin_setting_id_at(44, false) == SkinSettingsRowId::Back);
-    REQUIRE(skin_setting_id_at(45, true).has_value());
-    CHECK(*skin_setting_id_at(45, true) == SkinSettingsRowId::Back);
-    CHECK_FALSE(skin_setting_id_at(45, false).has_value());
+    REQUIRE(skin_setting_id_at(47, false).has_value());
+    CHECK(*skin_setting_id_at(47, false) == SkinSettingsRowId::Back);
+    REQUIRE(skin_setting_id_at(48, true).has_value());
+    CHECK(*skin_setting_id_at(48, true) == SkinSettingsRowId::Back);
+    CHECK_FALSE(skin_setting_id_at(48, false).has_value());
 }
 
 TEST_CASE("skin controller owns edit mode lane and gap selection") {
@@ -168,4 +168,20 @@ TEST_CASE("skin back persists once only after config mutation") {
     CHECK(effects.menu.persist_config);
     CHECK_FALSE(controller.dirty());
     CHECK(controller.selected_id() == SkinSettingsRowId::KeyMode);
+}
+
+TEST_CASE("judgement and combo offsets change independently and clamp to visible bounds") {
+    tenriff::config::RuntimeConfig runtime;
+    SkinSettingsController controller;
+    controller.reset("10k");
+    const double combo_y = runtime.skin.combo_position;
+    (void)controller.handle(MenuAction::adjust(1), runtime, kLr2Names, kTenRiffNames, SkinSettingsRowId::JudgementY);
+    CHECK(runtime.skin.judgement_position > combo_y);
+    CHECK(runtime.skin.combo_position == combo_y);
+    runtime.skin.judgement_offset_x = 600;
+    (void)controller.handle(MenuAction::adjust(1), runtime, kLr2Names, kTenRiffNames, SkinSettingsRowId::JudgementX);
+    CHECK(runtime.skin.judgement_offset_x == 600);
+    (void)controller.handle(MenuAction::adjust(-1), runtime, kLr2Names, kTenRiffNames, SkinSettingsRowId::ComboX);
+    CHECK(runtime.skin.combo_offset_x == -10);
+    CHECK(runtime.skin.judgement_offset_x == 600);
 }

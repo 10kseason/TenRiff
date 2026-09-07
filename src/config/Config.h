@@ -112,6 +112,7 @@ struct AudioUiConfig {
     double master_volume = 1.0;
     double bgm_volume = 0.75;
     double keysound_volume = 1.0;
+    bool normalize_audio = false;
 };
 
 struct UiConfig {
@@ -180,6 +181,10 @@ struct SkinConfig {
     // Horizontal gameplay-field offset in the renderer's 1920x1080 base space.
     double gameplay_field_offset_x = kGameplayFieldOffsetXDefault;
     double combo_position = kComboPositionDefault;
+    double judgement_position = kComboPositionDefault;
+    double judgement_offset_x = 0.0;
+    double combo_offset_x = 0.0;
+
     double lane_background_opacity = kSkinLaneBackgroundOpacityDefault;
     bool black_playfield_enabled = true;
     double visual_opacity = kSkinVisualOpacityDefault;

@@ -103,6 +103,12 @@ inline GameplayHoldBodyGeometry compute_gameplay_hold_body_geometry(
         render_head ? rendered_head_top : head_center_y,
     };
 }
+// Continue the audio-side 200 ms decay at render cadence (60/144 Hz and above).
+inline float gameplay_interpolated_activity(float activity, int64_t published_ns, int64_t now_ns) {
+    const double age = published_ns > 0 ? std::max<int64_t>(0, now_ns - published_ns) / 1'000'000'000.0 : 0.0;
+    return std::clamp(activity - static_cast<float>(age * 5.0), 0.0f, 1.0f);
+}
+
 struct GameplayTextPopAnimation {
     float scale = 1.0f;
     float offset_y = 0.0f;
@@ -125,6 +131,11 @@ inline GameplayTextPopAnimation compute_gameplay_text_pop_animation(
     animation.offset_y = initial_offset_y * eased;
     animation.opacity = 1.0f - 0.12f * eased;
     return animation;
+}
+
+inline GameplayTextPopAnimation gameplay_judgement_animation(std::string_view judgement, double age_ms) {
+    return judgement == "PG" ? compute_gameplay_text_pop_animation(age_ms, 220.0, 1.22f, -8.0f)
+                             : GameplayTextPopAnimation{};
 }
 
 inline float gameplay_playfield_scale(double note_width_scale) {

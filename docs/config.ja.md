@@ -34,6 +34,7 @@ profile が存在しない場合は初回起動時に自動生成されます。
 - `volume` (double)
   - master volume
 - `bgm_volume` (double)
+- `normalize_audio` (bool): stereo-linked gameplay mix RMS leveling before limiter/master volume; default false. Menu music is unaffected.
 - `keysound_volume` (double)
 
 ### `input`
@@ -252,6 +253,8 @@ chart loader/indexer は BMS family（`.bms/.bme/.bml/.pms`）専用です。旧
   - gameplay judgement line の縦位置比率
   - `0.00..1.00`（0%～100%）に clamp
   - 既定値は `0.82`
+- `judgement_position` (double): independent judgement Y anchor, 0.10–0.78; missing fields inherit the existing combo anchor.
+- `judgement_offset_x`, `combo_offset_x` (double): independent X offsets in 1920x1080 base pixels, -600–600; default 0.
 - `combo_position` (double)
   - gameplay field 内の combo 表示縦位置比率
   - `0.10..0.78` に clamp

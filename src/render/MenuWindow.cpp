@@ -394,22 +394,7 @@ std::wstring gameplay_feedback_overlay_text(std::string_view feedback) {
 }
 
 D2D1_COLOR_F gameplay_feedback_color(std::string_view feedback) {
-    if (feedback == "PG") {
-        return D2D1::ColorF(0x5EE5A7);
-    }
-    if (feedback == "GR") {
-        return D2D1::ColorF(0x6EE7F2);
-    }
-    if (feedback == "G") {
-        return D2D1::ColorF(0xFAE36E);
-    }
-    if (feedback == "BAD") {
-        return D2D1::ColorF(0xFF9F43);
-    }
-    if (feedback == "POOR") {
-        return D2D1::ColorF(0xFF6B6B);
-    }
-    return D2D1::ColorF(0xE8ECF1);
+    return D2D1::ColorF(gameplay_judgement_rgb(feedback));
 }
 
 float clamp_gameplay_note_height_scale(double value) {

@@ -1,3 +1,4 @@
+#include "app/MultiplayerPresentation.h"
 #include "doctest/doctest.h"
 
 #include <algorithm>
@@ -489,23 +490,14 @@ TEST_CASE("multiplayer score comparison reports signed difference and outcome") 
     CHECK(draw.difference == 0);
 }
 
-TEST_CASE("peer battle score lead maps ten thousand points to the local loss and win endpoints") {
-    const auto tied = peer_battle_score_lead(500'000, 500'000);
-    CHECK(tied.difference == 0);
-    CHECK(tied.position == doctest::Approx(0.5));
-
-    const auto half_win = peer_battle_score_lead(505'000, 500'000);
-    CHECK(half_win.difference == 5'000);
-    CHECK(half_win.position == doctest::Approx(0.75));
-
-    const auto half_loss = peer_battle_score_lead(495'000, 500'000);
-    CHECK(half_loss.difference == -5'000);
-    CHECK(half_loss.position == doctest::Approx(0.25));
-
-    CHECK(peer_battle_score_lead(510'000, 500'000).position == doctest::Approx(1.0));
-    CHECK(peer_battle_score_lead(490'000, 500'000).position == doctest::Approx(0.0));
-    CHECK(peer_battle_score_lead(900'000, 500'000).position == doctest::Approx(1.0));
-    CHECK(peer_battle_score_lead(100'000, 500'000).position == doctest::Approx(0.0));
+TEST_CASE("peer battle lead adapts to displayed score magnitude and keeps zero centered") {
+    CHECK(peer_battle_score_lead(0, 0).position == doctest::Approx(0.5));
+    CHECK(peer_battle_score_lead(3000, 1000).position == doctest::Approx(0.75));
+    CHECK(peer_battle_score_lead(300000, 100000).position == doctest::Approx(0.75));
+    CHECK(peer_battle_score_lead(1000, 3000).position == doctest::Approx(0.25));
+    CHECK(peer_battle_score_lead(2000, 0).position == doctest::Approx(1.0));
+    CHECK(peer_battle_score_lead(0, 2000).position == doctest::Approx(0.0));
+    CHECK(peer_battle_score_lead(3000, 1000).difference == 2000);
 }
 
 TEST_CASE("peer battle score lead stays overflow safe at signed integer limits") {
@@ -571,4 +563,49 @@ TEST_CASE("multiplayer begin delay compensates half the measured RTT") {
     CHECK(multiplayer_compensated_peer_begin_delay_ms(1500, 100) == 1450);
     CHECK(multiplayer_compensated_peer_begin_delay_ms(1500, 3000) == 1000);
     CHECK(multiplayer_compensated_peer_begin_delay_ms(300, 1000) == 300);
+}
+
+TEST_CASE("room standings keep three to eight players and replace the throttled local snapshot") {
+    using namespace tenriff;
+    for (int count : {3, 8}) {
+        network::PeerSessionSnapshot room;
+        room.local_player_id = 2;
+        for (int id = 1; id <= count; ++id) {
+            network::PeerParticipantSnapshot player;
+            player.player_id = static_cast<uint8_t>(id);
+            player.local = id == 2;
+            player.name = "Player " + std::to_string(id);
+            player.has_score = id != count;
+            player.latest_score.score = 1000;
+            room.participants.push_back(player);
+        }
+        render::MultiplayerPlayerData local;
+        local.has_score = true;
+        local.score = 2000;
+        const auto standings = app::multiplayer_standings(room, local);
+        REQUIRE(standings.size() == static_cast<std::size_t>(count));
+        CHECK(standings.front().local);
+        CHECK(standings.front().player_id == 2);
+        CHECK(standings.front().rank == 1);
+        CHECK(standings.front().score == 2000);
+        CHECK(standings.back().rank == 0);
+        CHECK_FALSE(standings.back().has_score);
+        for (std::size_t i = 1; i + 1 < standings.size(); ++i) CHECK(standings[i].rank == 2);
+    }
+}
+
+TEST_CASE("three-player spectating waits for every opponent to become terminal") {
+    tenriff::network::PeerSessionSnapshot room;
+    room.local_player_id = 1;
+    for (int id = 1; id <= 3; ++id) {
+        tenriff::network::PeerParticipantSnapshot p;
+        p.player_id = static_cast<uint8_t>(id); p.local = id == 1;
+        p.has_score = true; p.latest_score.game_over = id != 3;
+        room.participants.push_back(p);
+    }
+    CHECK_FALSE(tenriff::app::multiplayer_opponents_terminal(room));
+    room.participants.back().latest_score.finished = true;
+    CHECK(tenriff::app::multiplayer_opponents_terminal(room));
+    room.participants.back().has_score = false;
+    CHECK_FALSE(tenriff::app::multiplayer_opponents_terminal(room));
 }

@@ -7,8 +7,9 @@
 - BMS landmines (`D1-D9`, `E1-E9`) are playable, including `#WAV00`, base-36 damage tokens, `ZZ` instant fail, exact press/release boundary behavior, and lane-mod/key-converter remapping.
 - Results and local records expose fixed native score separately from detail score, and categorical native accuracy separately from continuous timing-based detailed accuracy.
 - 새 replay evidence v3는 차트 SHA-256, canonical ruleset, result-to-replay SHA-256을 저장하고 입력 trace를 headless 엔진으로 재실행합니다. 공식 로컬 best는 재계산된 verified 결과만 사용하며 legacy/custom/assist 기록은 히스토리에 `unverified`로 남습니다.
-- 현재 안정 배포 라인은 `1.7.0`
-- 기본 선곡·싱글 결과 UI는 차분한 패널과 단색 주 동작 버튼을 사용하며, 결과는 큰 점수·등급·정확도 중심으로 표시한다. 사용자 TenRiff 스킨과 대전 결과는 기존 화면 구성을 유지한다. 구현/검증 안내는 `docs/menu-visual-polish.md` 참고.
+- 현재 안정 배포 라인은 `1.7.1`
+- 1.7.1 improves multiplayer standings, gameplay feedback, independent judgement/combo placement, ten pastel Options cards, optional audio normalization and the Song Select difficulty-table control. See [follow-up details](gameplay-polish-followup.md) and [release verification](release-1.7.1-gate.md).
+- 기본 선곡·싱글 결과 UI는 차분한 패널과 단색 주 동작 버튼을 사용하며, 결과는 큰 점수·등급·정확도 중심으로 표시한다. 사용자 TenRiff 스킨 경로를 유지하며, 1.7.1 대전 결과는 참가자 전원 순위를 표시한다. 구현/검증 안내는 `docs/menu-visual-polish.md`와 `docs/gameplay-polish-followup.md` 참고.
 - 기본 공통 설정 UI는 설정 목록과 페이지형 사용 안내를 분리한다. 스킨 설정은 우측 실시간 미리보기를 유지하고 안내를 좌측 목록 아래에 표시한다. 전체 설명과 footer 안내는 페이지로 모두 읽을 수 있고 안내 페이지 이동은 설정값이나 선택 행을 바꾸지 않는다.
 - 기본 메인 메뉴도 같은 패널·색상 체계를 사용하며, 좌측 로고/안내와 우측 실행 메뉴로 구성한다. 플레이 또는 곡 폴더 추가를 주 동작으로 강조하고 나머지 메뉴에는 짧은 설명과 선택 테두리를 표시한다. 사용자 타이틀 스킨과 기존 키보드/클릭 동작은 유지한다.
 - Result는 기존 2.2초 순차 공개와 Space 건너뛰기, 공개 완료 전 CONTINUE/RETRY/Replay 입력 잠금을 유지한다. 프리즘 연출은 사용자 스킨 경로에 남고 기본 결과 화면은 점수 요약 패널을 사용한다.

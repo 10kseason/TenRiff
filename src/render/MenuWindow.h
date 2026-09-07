@@ -7,6 +7,7 @@
 #include "render/BgaImageLoader.h"
 #include "render/BgaVideoDecoder.h"
 #include "render/GameplayMotion.h"
+#include "render/MultiplayerPresentation.h"
 #include "render/OnnxBackgroundUpscaler.h"
 #include "render/RenderThread.h"
 
@@ -75,6 +76,15 @@ enum class MenuHitTargetKind {
     AccountAction,
     UrlWarningButton,
     GenericHelpPage,
+    SongDifficultyTable,
+};
+
+enum class SongDifficultyTableAction {
+    EditUrl = 0,
+    LocalFile = 1,
+    Reset = 2,
+    Apply = 3,
+    Cancel = 4,
 };
 
 enum class MenuHitPart {
@@ -175,6 +185,11 @@ struct SongSelectData {
     std::string selected_song_ghost_status;
     // Live search text, shown on the search control so the player can see what they
     // are typing instead of only its effect on the list.
+    std::string difficulty_table_name;
+    bool difficulty_table_active = false;
+    bool difficulty_table_editing = false;
+    std::string difficulty_table_url_input;
+    std::string difficulty_table_status;
     std::string search_query;
     bool search_active = false;
     std::string group_summary;
@@ -231,13 +246,10 @@ struct ResultShiftMarker {
 };
 
 struct ResultScreenData {
+    std::vector<MultiplayerPlayerData> multiplayer_players;
     bool peer_battle = false;
-    bool peer_result_available = false;
     std::string profile;
     std::string profile_avatar_path;
-    std::string peer_name;
-    std::string peer_status = "WAITING";
-    std::string peer_outcome;
     std::string track;
     std::string title;
     std::string artist;
@@ -278,15 +290,6 @@ struct ResultScreenData {
     int bad = 0;
     int poor = 0;
 
-    int64_t peer_score = 0;
-    int64_t peer_score_difference = 0;
-    double peer_gauge_value = 0.0;
-    int peer_max_combo = 0;
-    int peer_perfect = 0;
-    int peer_great = 0;
-    int peer_good = 0;
-    int peer_bad = 0;
-    int peer_poor = 0;
 
     double mean_delta_ms = 0.0;
     double stddev_delta_ms = 0.0;
@@ -340,6 +343,7 @@ struct GameplayHudData {
     int64_t duration_samples = 0;
     int sample_rate = 48000;
     int64_t audio_sample_time_ns = 0;
+    int64_t activity_publish_time_ns = 0;
     double current_visual_position = 0.0;
     double visual_velocity = 1.0;
     double future_visual_span = 1.0;
@@ -358,6 +362,9 @@ struct GameplayHudData {
     double judgement_line_position = 0.82;
     double gameplay_field_offset_x = 0.0;
     double combo_position = 0.24;
+    double judgement_position = 0.24;
+    double judgement_offset_x = 0.0;
+    double combo_offset_x = 0.0;
     std::size_t lane_width_scale_count = 0;
     std::array<double, kGameplayHudMaxLanes> lane_width_scales{};
     double note_width_scale = 1.0;
@@ -433,6 +440,7 @@ struct GameplayHudData {
     bool game_over = false;
     bool spectating_peer = false;
 
+    std::vector<MultiplayerPlayerData> multiplayer_players;
     bool peer_visible = false;
     bool peer_score_available = false;
     std::string peer_name;
@@ -521,6 +529,9 @@ struct SkinPreviewData {
     int selected_gap = -1;
     double judgement_line_position = 0.82;
     double combo_position = 0.24;
+    double judgement_position = 0.24;
+    double judgement_offset_x = 0.0;
+    double combo_offset_x = 0.0;
     std::size_t lane_width_scale_count = 0;
     std::array<double, kGameplayHudMaxLanes> lane_width_scales{};
     double note_width_scale = 1.0;

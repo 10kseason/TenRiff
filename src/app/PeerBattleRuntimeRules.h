@@ -1,11 +1,10 @@
 #pragma once
 
+#include <algorithm>
 #include <cstdint>
 #include <limits>
 
 namespace tenriff::app {
-
-inline constexpr std::int64_t kPeerBattleScoreLeadEndpoint = 10'000;
 
 struct PeerBattleScoreLead {
     // Saturated local - peer score difference. The renderer can use this for
@@ -37,17 +36,12 @@ struct PeerBattleScoreLead {
     const std::int64_t difference =
         peer_battle_saturated_score_difference(local_score, peer_score);
 
-    if (difference <= -kPeerBattleScoreLeadEndpoint) {
-        return PeerBattleScoreLead{difference, 0.0};
-    }
-    if (difference >= kPeerBattleScoreLeadEndpoint) {
-        return PeerBattleScoreLead{difference, 1.0};
-    }
-
-    const double signed_ratio =
-        static_cast<double>(difference) /
-        static_cast<double>(kPeerBattleScoreLeadEndpoint);
-    return PeerBattleScoreLead{difference, 0.5 + signed_ratio * 0.5};
+    // Scale by the scores being compared, so native score revisions or chart
+    // lengths cannot leave the marker pinned to a legacy absolute threshold.
+    const double local = static_cast<double>(std::max<std::int64_t>(0, local_score));
+    const double peer = static_cast<double>(std::max<std::int64_t>(0, peer_score));
+    const double total = local + peer;
+    return PeerBattleScoreLead{difference, total > 0.0 ? local / total : 0.5};
 }
 
 enum class PeerBattleSpectatorDecision : std::uint8_t {

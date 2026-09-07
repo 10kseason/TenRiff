@@ -334,7 +334,7 @@
             }
 
             const float text_left = jacket.right + 12.0f;
-            const float value_left = card.right - 78.0f;
+            const float value_left = card.right - 164.0f;
             if (d2d_->body_format && d2d_->text_brush) {
                 draw_text_clipped(to_wide(song.title.empty() ? std::string("-") : song.title),
                                   d2d_->body_format.Get(),
@@ -633,20 +633,18 @@
                         center_panel.right, center_panel.bottom);
         const D2D1_RECT_F search_button =
             D2D1::RectF(action_strip.left, action_strip.top,
-                        action_strip.left + 246.0f, action_strip.bottom);
+                        action_strip.left + (action_strip.right - action_strip.left) * 0.25f, action_strip.bottom);
         const D2D1_RECT_F filter_button =
             D2D1::RectF(search_button.right + 12.0f, action_strip.top,
-                        search_button.right + 286.0f, action_strip.bottom);
-        const D2D1_RECT_F library_status =
+                        search_button.right + (action_strip.right - action_strip.left) * 0.25f + 12.0f, action_strip.bottom);
+        const D2D1_RECT_F table_button =
             D2D1::RectF(filter_button.right + 12.0f, action_strip.top,
                         action_strip.right, action_strip.bottom);
         register_hit(search_button, MenuHitTargetKind::SongNavButton, 2);
         register_hit(filter_button, MenuHitTargetKind::SongNavButton, 3);
-        // Accent border marks the two clickable controls; the status readout
-        // beside them stays plain so the difference is visible at a glance.
         draw_glass_panel(search_button, 10.0f, 0.76f, 0.40f, true, 2.0f);
         draw_glass_panel(filter_button, 10.0f, 0.76f, 0.40f, true, 2.0f);
-        draw_glass_panel(library_status, 10.0f, 0.58f, 0.06f, false, 2.0f);
+        draw_glass_panel(table_button, 10.0f, 0.58f, 0.06f, false, 2.0f);
         const bool searching =
             data.song_select.search_active || !data.song_select.search_query.empty();
         if (d2d_->body_format && d2d_->text_brush) {
@@ -665,18 +663,23 @@
             draw_centered_text(wloc("SORT / FILTER", "정렬 / 필터"), d2d_->body_format.Get(),
                                filter_button, d2d_->text_brush.Get(), true);
         }
-        if (d2d_->hud_format && d2d_->muted_brush) {
-            const std::string status =
-                modern_library_screen
-                    ? std::to_string(data.song_select.list_total_count) + loc(" items", "개")
-                    : searching ? (loc("MATCHES ", "검색 결과 ") +
-                             std::to_string(data.song_select.list_total_count) +
-                             loc("", "곡"))
-                          : (data.song_select.sort_summary + "  /  " +
-                             data.song_select.group_summary);
-            draw_centered_text(to_wide(status), d2d_->hud_format.Get(), library_status,
-                               d2d_->muted_brush.Get(), true);
-        }
+        const float table_actions_left = table_button.right - 84.0f;
+        const D2D1_RECT_F table_link = D2D1::RectF(table_button.left, table_button.top, table_actions_left - 8.0f, table_button.bottom);
+        const D2D1_RECT_F table_file = D2D1::RectF(table_actions_left, table_button.top + 7.0f, table_button.right - 8.0f, table_button.top + 38.0f);
+        const D2D1_RECT_F table_clear = D2D1::RectF(table_actions_left, table_button.top + 44.0f, table_button.right - 8.0f, table_button.bottom - 7.0f);
+        register_hit(table_link, MenuHitTargetKind::SongDifficultyTable, static_cast<int>(SongDifficultyTableAction::EditUrl));
+        register_hit(table_file, MenuHitTargetKind::SongDifficultyTable, static_cast<int>(SongDifficultyTableAction::LocalFile));
+        if (data.song_select.difficulty_table_active) register_hit(table_clear, MenuHitTargetKind::SongDifficultyTable, static_cast<int>(SongDifficultyTableAction::Reset));
+        draw_text_clipped(wloc("TABLE / URL", "난이도표 / URL"), d2d_->hud_format.Get(),
+            D2D1::RectF(table_link.left + 14, table_link.top + 12, table_link.right - 8, table_link.top + 34), d2d_->muted_brush.Get());
+        std::wstring table_name = to_wide(data.song_select.difficulty_table_name);
+        if (table_name.size() > 26) table_name = table_name.substr(0, 25) + L"…";
+        draw_text_clipped(table_name, d2d_->body_format.Get(),
+            D2D1::RectF(table_link.left + 14, table_link.top + 40, table_link.right - 8, table_link.bottom - 10), d2d_->accent_brush.Get());
+        draw_glass_panel(table_file, 7, 0.88f, 0, false, 0);
+        draw_glass_panel(table_clear, 7, 0.70f, 0, false, 0);
+        draw_centered_text(wloc("FILE", "파일"), d2d_->hud_format.Get(), table_file, d2d_->text_brush.Get(), true);
+        draw_centered_text(wloc("RESET", "기본"), d2d_->hud_format.Get(), table_clear, d2d_->muted_brush.Get(), true);
 
         draw_glass_panel(right_panel, 12.0f, 0.76f, 0.22f, false, 5.0f);
         const float right_left = right_panel.left + 24.0f;
@@ -1045,4 +1048,8 @@
                                D2D1::RectF(back_button.right + 28.0f, bottom_bar.top + 48.0f,
                                            bottom_bar.right - 28.0f, bottom_bar.bottom - 10.0f),
                                d2d_->muted_brush.Get());
+        }
+
+        if (data.song_select.difficulty_table_editing) {
+#include "MenuWindow_draw_difficulty_table_editor.inl"
         }

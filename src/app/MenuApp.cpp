@@ -48,6 +48,7 @@
 #include "app/MenuSongUtils.h"
 #include "app/PersistedRuntimeConfig.h"
 #include "app/PeerBattleRuntimeRules.h"
+#include "app/MultiplayerPresentation.h"
 #include "app/RankedRecordsClient.h"
 #include "app/ProfileSetupFlow.h"
 #include "app/RuntimeConfigMigration.h"
@@ -1816,6 +1817,7 @@ void MenuApp::persist_runtime_config() {
 }
 
 void MenuApp::refresh_song_source(bool force_reindex) {
+    difficulty_table_display_path_.clear();
     switch_song_source(songs_path_, force_reindex);
 }
 
@@ -1887,6 +1889,11 @@ void MenuApp::handle_input_event(const input::InputEvent& event) {
     if (event.state == input::InputState::Pressed &&
         key_f9_ != 0 && event.keycode == key_f9_) {
         menu_window_.request_screenshot();
+        return;
+    }
+
+    if (current_screen() == Screen::SongSelect && difficulty_table_url_editing_) {
+        if (event.state == input::InputState::Pressed) handle_difficulty_table_input(event.keycode);
         return;
     }
 
@@ -2008,6 +2015,13 @@ void MenuApp::handle_input_event(const input::InputEvent& event) {
 }
 
 void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
+    if (current_screen() == Screen::SongSelect && difficulty_table_url_editing_) {
+        if (event.kind == render::MenuHitTargetKind::SongDifficultyTable) {
+            if (event.index == static_cast<int>(render::SongDifficultyTableAction::Apply)) handle_difficulty_table_input(key_enter_);
+            else if (event.index == static_cast<int>(render::SongDifficultyTableAction::Cancel)) handle_difficulty_table_input(key_escape_);
+        }
+        return;
+    }
     if (chat_url_warning_visible_) {
         if (event.kind == render::MenuHitTargetKind::UrlWarningButton) {
             if (event.index == 1) open_warned_chat_url();
@@ -2269,6 +2283,12 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
                 return;
             }
             handle_options_hub_input(key_enter_);
+            return;
+        case render::MenuHitTargetKind::SongDifficultyTable:
+            if (current_screen() != Screen::SongSelect) return;
+            if (event.index == static_cast<int>(render::SongDifficultyTableAction::EditUrl)) handle_difficulty_table_input(key_enter_);
+            else if (event.index == static_cast<int>(render::SongDifficultyTableAction::LocalFile)) handle_difficulty_table_input(key_right_);
+            else if (event.index == static_cast<int>(render::SongDifficultyTableAction::Reset)) handle_difficulty_table_input(key_left_);
             return;
         case render::MenuHitTargetKind::SongNavButton:
             if (current_screen() != Screen::SongSelect) {
@@ -3213,6 +3233,17 @@ void MenuApp::handle_options_hub_input(uint32_t keycode) {
                 calibration_settings_controller_.reset();
                 settings_cursor_ = 0;
                 break;
+            case menu::OptionsItemId::Mods:
+                mode_settings_controller_.reset();
+                push_screen(destination);
+                settings_cursor_ = 0;
+                break;
+            case menu::OptionsItemId::KeyTest:
+                working_keymap_ = keymap_;
+                keymap_settings_controller_.reset(std::nullopt, config_.mode.key_mode);
+                push_screen(destination);
+                refresh_menu_input_polling_scope();
+                break;
             case menu::OptionsItemId::ProfileSetup:
                 push_screen(destination);
                 settings_cursor_ = 0;
@@ -3309,6 +3340,10 @@ void MenuApp::handle_session_mix_input(uint32_t keycode) {
 }
 
 void MenuApp::handle_song_select_input(uint32_t keycode) {
+    if (difficulty_table_url_editing_) {
+        handle_difficulty_table_input(keycode);
+        return;
+    }
     sync_song_select_state();
     rebuild_current_song_record_indices();
 
@@ -3657,7 +3692,7 @@ void MenuApp::handle_song_select_input(uint32_t keycode) {
     }
 }
 
-void MenuApp::apply_difficulty_table_url(std::string_view url) {
+bool MenuApp::apply_difficulty_table_url(std::string_view url) {
     std::string trimmed(url);
     while (!trimmed.empty() && static_cast<unsigned char>(trimmed.back()) <= 0x20u) {
         trimmed.pop_back();
@@ -3665,16 +3700,16 @@ void MenuApp::apply_difficulty_table_url(std::string_view url) {
     const std::size_t begin = trimmed.find_first_not_of(" \t");
     trimmed = (begin == std::string::npos) ? std::string{} : trimmed.substr(begin);
     if (trimmed.empty()) {
-        publish_snapshot();
-        return;
+        song_browser_status_message_ = ui_text("Enter an http(s) BMSTable URL.", "http(s) BMSTable 주소를 입력하세요.");
+        return false;
     }
 
     const DifficultyTableLinkImportResult imported = import_difficulty_table_link(
         trimmed, path_from_utf8(profile_dir_) / "difficulty_tables");
     if (!imported.success()) {
         std::cerr << "[warn] Difficulty-table link was not imported: " << imported.error << std::endl;
-        publish_snapshot();
-        return;
+        song_browser_status_message_ = imported.error;
+        return false;
     }
     for (const auto& warning : imported.warnings) {
         std::cerr << "[warn] Difficulty table: " << warning << std::endl;
@@ -3687,11 +3722,11 @@ void MenuApp::apply_difficulty_table_url(std::string_view url) {
         persist_runtime_config();
         refresh_song_source(force_table_reindex);
     }
-    publish_snapshot();
+    song_browser_status_message_.clear();
+    return true;
 }
 
-void MenuApp::handle_song_browser_input(uint32_t keycode) {
-    const int item_count = kSongBrowserRowCount;
+void MenuApp::handle_difficulty_table_input(uint32_t keycode) {
     if (difficulty_table_url_editing_) {
         if (keycode == key_escape_) {
             difficulty_table_url_editing_ = false;
@@ -3724,12 +3759,88 @@ void MenuApp::handle_song_browser_input(uint32_t keycode) {
             return;
         }
         if (keycode == key_enter_) {
-            difficulty_table_url_editing_ = false;
-            apply_difficulty_table_url(difficulty_table_url_input_);
+            if (apply_difficulty_table_url(difficulty_table_url_input_)) difficulty_table_url_editing_ = false;
+            publish_snapshot();
             return;
         }
         // Everything else is swallowed so arrow keys cannot move the cursor while
         // the field has focus.
+        return;
+    }
+    if (keycode == key_enter_) {
+        // Enter opens the field for typing, seeded from a URL already on the
+        // clipboard so pasting still takes one keypress.
+        difficulty_table_url_editing_ = true;
+        song_select_search_active_ = false;
+        song_browser_status_message_.clear();
+        difficulty_table_url_input_ = config_.ui.difficulty_table_url;
+#ifdef _WIN32
+        if (const auto clipboard_url = difficulty_table_url_from_clipboard();
+            clipboard_url.has_value()) {
+            difficulty_table_url_input_ = *clipboard_url;
+        }
+#endif
+        publish_snapshot();
+        return;
+    }
+    if (keycode == key_left_ || keycode == key_right_) {
+        song_browser_status_message_.clear();
+        bool force_table_reindex = false;
+        std::string selected_path = config_.ui.difficulty_table_path;
+        std::string selected_url = config_.ui.difficulty_table_url;
+        if (keycode == key_left_) {
+            selected_path.clear();
+            selected_url.clear();
+        } else {
+#ifdef _WIN32
+            {
+                const std::string picked = browse_for_json_file(
+                    ui_text("Select Local BMS Difficulty Table", "로컬 BMS 난이도표 선택"));
+                if (picked.empty()) {
+                    return;
+                }
+                const DifficultyTableLoadResult loaded = load_difficulty_table_utf8(picked);
+                if (!loaded.success()) {
+                    std::cerr << "[warn] Difficulty table was not selected: "
+                              << loaded.error << std::endl;
+                    song_browser_status_message_ = ui_text("Could not load table: ", "난이도표 로드 실패: ") + loaded.error;
+                    publish_snapshot();
+                    return;
+                }
+                for (const auto& warning : loaded.warnings) {
+                    std::cerr << "[warn] Difficulty table: " << warning << std::endl;
+                }
+                selected_path = picked;
+                selected_url.clear();
+                force_table_reindex = ensure_difficulty_table_indexing(config_);
+            }
+#else
+            return;
+#endif
+        }
+        if (selected_path != config_.ui.difficulty_table_path ||
+            selected_url != config_.ui.difficulty_table_url) {
+            config_.ui.difficulty_table_path = std::move(selected_path);
+            config_.ui.difficulty_table_url = std::move(selected_url);
+            persist_runtime_config();
+            // Loading the cache reapplies the selected table to its stored chart
+            // hashes, so changing tables need not reparse a large library.
+            refresh_song_source(force_table_reindex);
+            publish_snapshot();
+        }
+        return;
+    }
+}
+
+void MenuApp::handle_song_browser_input(uint32_t keycode) {
+    if (!difficulty_table_url_editing_ && !online_records_url_editing_ &&
+        settings_cursor_ == 5 && (keycode == key_enter_ || keycode == key_left_ || keycode == key_right_)) {
+        handle_difficulty_table_input(keycode);
+        return;
+    }
+    const int item_count = kSongBrowserRowCount;
+    if (difficulty_table_url_editing_) {
+        handle_difficulty_table_input(keycode);
         return;
     }
     if (online_records_url_editing_) {
@@ -3845,20 +3956,7 @@ void MenuApp::handle_song_browser_input(uint32_t keycode) {
         persist_filter_refresh();
         return;
     }
-    if (settings_cursor_ == 5 && keycode == key_enter_) {
-        // Enter opens the field for typing, seeded from a URL already on the
-        // clipboard so pasting still takes one keypress.
-        difficulty_table_url_editing_ = true;
-        difficulty_table_url_input_ = config_.ui.difficulty_table_url;
-#ifdef _WIN32
-        if (const auto clipboard_url = difficulty_table_url_from_clipboard();
-            clipboard_url.has_value()) {
-            difficulty_table_url_input_ = *clipboard_url;
-        }
-#endif
-        publish_snapshot();
-        return;
-    }
+
     if (settings_cursor_ == 6 && keycode == key_enter_) {
         online_records_url_editing_ = true;
         online_records_url_input_ = config_.ui.online_records_server_url;
@@ -3871,51 +3969,7 @@ void MenuApp::handle_song_browser_input(uint32_t keycode) {
         publish_snapshot();
         return;
     }
-    if (settings_cursor_ == 5 && (keycode == key_left_ || keycode == key_right_)) {
-        bool force_table_reindex = false;
-        std::string selected_path = config_.ui.difficulty_table_path;
-        std::string selected_url = config_.ui.difficulty_table_url;
-        if (keycode == key_left_) {
-            selected_path.clear();
-            selected_url.clear();
-        } else {
-#ifdef _WIN32
-            {
-                const std::string picked = browse_for_json_file(
-                    ui_text("Select Local BMS Difficulty Table", "로컬 BMS 난이도표 선택"));
-                if (picked.empty()) {
-                    return;
-                }
-                const DifficultyTableLoadResult loaded = load_difficulty_table_utf8(picked);
-                if (!loaded.success()) {
-                    std::cerr << "[warn] Difficulty table was not selected: "
-                              << loaded.error << std::endl;
-                    publish_snapshot();
-                    return;
-                }
-                for (const auto& warning : loaded.warnings) {
-                    std::cerr << "[warn] Difficulty table: " << warning << std::endl;
-                }
-                selected_path = picked;
-                selected_url.clear();
-                force_table_reindex = ensure_difficulty_table_indexing(config_);
-            }
-#else
-            return;
-#endif
-        }
-        if (selected_path != config_.ui.difficulty_table_path ||
-            selected_url != config_.ui.difficulty_table_url) {
-            config_.ui.difficulty_table_path = std::move(selected_path);
-            config_.ui.difficulty_table_url = std::move(selected_url);
-            persist_runtime_config();
-            // Loading the cache reapplies the selected table to its stored chart
-            // hashes, so changing tables need not reparse a large library.
-            refresh_song_source(force_table_reindex);
-            publish_snapshot();
-        }
-        return;
-    }
+
     if (settings_cursor_ == 7 && (keycode == key_left_ || keycode == key_right_)) {
         const int direction = (keycode == key_left_) ? -1 : 1;
         cycle_song_collection_filter(direction);

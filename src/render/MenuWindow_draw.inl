@@ -85,7 +85,7 @@ void MenuWindow::draw(const MenuRenderData& data) {
     const bool modern_title_screen = !data.lobby_skin.enabled && data.kind == MenuScreenKind::TitleMenu;
     const bool modern_library_screen = !data.lobby_skin.enabled &&
         (data.kind == MenuScreenKind::SongSelect ||
-         (data.kind == MenuScreenKind::ResultScreen && !data.result.peer_battle));
+         data.kind == MenuScreenKind::ResultScreen);
     const bool modern_menu_screen = modern_library_screen || modern_settings_screen || modern_title_screen;
     if (modern_menu_screen) {
         set_theme_color(d2d_->text_brush.Get(), "text", D2D1::ColorF(0xEDF2F7));
@@ -270,7 +270,8 @@ void MenuWindow::draw(const MenuRenderData& data) {
         if (text.empty() || !format || !brush || width <= 0.0f || height <= 0.0f) {
             return;
         }
-        const float text_scale = data.lobby_skin.enabled
+        const float text_scale = (data.lobby_skin.enabled || modern_menu_screen) &&
+                                     format->GetWordWrapping() == DWRITE_WORD_WRAPPING_NO_WRAP
                                      ? estimate_single_line_text_scale(
                                            text, format->GetFontSize(), width, height)
                                      : 1.0f;
