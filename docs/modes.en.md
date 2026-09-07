@@ -19,6 +19,9 @@ This document summarizes the implemented mode system, lane-transform/random rule
   "autoplay_enabled": false,
   "practice_no_fail_enabled": false,
   "one_miss_fail_enabled": false,
+  "pacemaker_mode": "off",
+  "pacemaker_target_accuracy": 90.0,
+  "pacemaker_target_score": 8000,
   "song_index_profile": "safe",
   "calculate_song_index_difficulty": false
 }
@@ -43,6 +46,7 @@ This document summarizes the implemented mode system, lane-transform/random rule
 - `one_miss_fail_enabled`: `Sudden Death (1 MISS)`, which fails immediately on the first OD8-converted object `MISS`
   - native `BAD` timing alone and empty-key `POOR` do not trigger it
   - mutually exclusive with Practice No-Fail in Mode Settings
+- `pacemaker_mode`: `off | accuracy | score`, default `off`. Targets are `pacemaker_target_accuracy` (`0..100`, default `90`) or `pacemaker_target_score` (`0..10000`, default `8000`). Play continues to the end without early gauge failure; the target decides completion. Mutually exclusive with Practice/Sudden Death, and not applied to multiplayer or replay playback.
 - `song_index_profile`: `safe | fast`
   - `safe`: the default that prioritizes lowering large-library RAM high-water usage
   - `fast`: minimal indexing that keeps title/artist/key count/#PLAYLEVEL/BPM and skips hashes, previews, difficulty tables, and native LV/CR
@@ -74,18 +78,18 @@ This document summarizes the implemented mode system, lane-transform/random rule
 ## Key-Mode Handling
 - `none` keeps the chart's lane count and base pattern layout as-is
 - `auto` is kept as a legacy alias and currently behaves the same as `none`
-- `4k..10k`, `12k`, `14k`, and `16k` match the key count through N2NC-based lane remapping
+- `4k..10k`, `12k`, `14k` and `16k` use the selected Krrcream / nK2 / NK3 conversion algorithm.
 - forced conversion of `5+1 SP` and `7+1 SP` remaps only the keyboard part; followed scratch keysounds move to autoplay
 - forced conversion of `10+2 DP` and `14+2 DP` likewise excludes both scratches and converts the two keyboard halves independently
 - nK2 expansion first lays out source notes on the target keys and then generates support notes in that same target layout; it never pre-adds notes to the source chart and reconverts them
 - application order: key-mode conversion (including nK2 target-layout support generation) → DP Flip → Mirror/RR/FR/SR → Note Add → LN/Full Tap structure transform
 
 ## Gauge Rules
-- Fixed gauges (`ex_hard / hard / normal / easy`) start at `100%`, fail immediately at `0%`, and never change type.
-- `shift` independently simulates EX-Hard / Hard / Normal / Easy from 100%, selects the next tier that survived the same judgement history when the current tier dies, and finishes on the highest surviving tier.
-- `ex_hard` is a challenge gauge with lower recovery and heavier `BAD` / `POOR` loss than Hard.
-- Clear status distinguishes fixed-gauge results and the final Shift tier as `GAUGE SHIFT EX-HARD / HARD / NORMAL / EASY CLEAR`.
-- `Sudden Death (1 MISS)` is not a gauge type; it is a separate failure rule that forces the current gauge to zero and ends the run on the first OD8-converted object `MISS`.
+
+- `ex_hard / hard / normal / easy` select the starting tier of always-active Gauge Shift. Legacy `shift` means an EX start.
+- The selected tier and every lower tier run independently from 100%; a failed tier yields to the next survivor. Gauge failure requires all eligible tiers to fail.
+- The final surviving tier is reported as `GAUGE SHIFT EX / HARD / NORMAL / EASY CLEAR`.
+- Practice and Pacemaker retain their separate completion rules. Sudden Death ends the run on the first OD8-converted object MISS.
 
 ## Implementation Location
 - Mode parsing: `src/gameplay/ModeSettings.*`, `src/app/ModeResolver.*`

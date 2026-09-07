@@ -106,7 +106,7 @@ OpenAI Codex, ChatGPT, Claude Code, Gemini, 그리고 프로젝트를 함께 검
 - 옵션 / 스킨
   - Hi-Speed, Rate, EX-Hard/Hard/Normal/Easy gauge, audio, input, graphics 설정
   - `Skins` 화면에서 판정선 위치, 노트 가로/세로 크기
-  - `5K~10K` lane color 편집 + 실시간 프리뷰
+  - `4K–10K / 12K / 14K / 16K / 7+1` lane color 편집 + 실시간 프리뷰
   - native 벡터, TenRiff `skin.json`, LR2 playskin 지원
   - 배포판의 `skins/` 완성 스킨을 기본 목록에 표시하며 같은 이름의 프로필 스킨을 우선 사용
   - LR2 스킨 폴더 선택/drag-and-drop으로 활성 프로필에 복사하고 note/LN/lane-gap/destination-size 정보를 반영

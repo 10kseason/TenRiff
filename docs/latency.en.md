@@ -1,5 +1,7 @@
 # Low-Latency Implementation Plan
 
+> Document scope: includes early designs, improvement proposals and dated analysis. Uncompleted proposals and historical measurements are not current behavior, defaults or performance guarantees. See [current state](current-state.en.md) and [configuration](config.en.md).
+
 TenRiff prioritizes minimal input-to-judgement-to-sound latency (<20 ms end-to-end). This note consolidates the follow-up items from the four development manuals to tighten the pipeline while keeping the "Raw Input -> SPSC queue -> Audio thread judgement" philosophy intact.
 
 ## Input Pipeline and Timestamping

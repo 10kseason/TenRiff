@@ -15,7 +15,7 @@ Windows 下通常会使用下面两种方式之一：
 或者
 
 ```powershell
-.\build-dist\Release\TenRiff.exe --songs .\songs --profile default
+.\TenRiff.exe --profile default
 ```
 
 如果是第一次启动，默认 profile 会自动创建。
@@ -46,13 +46,13 @@ TenRiff 的基础游玩流程如下：
 - 左键：选择歌曲
 - 双击：开始歌曲
 - `Enter`：开始当前歌曲
-- 左键点击右侧 `BEST SCORE` 卡片：打开当前歌曲的最佳 Result；在 Result 中使用 `WATCH REPLAY` 或 `F1` 播放 replay
-- 左侧 `RECORDS`：浏览当前歌曲的本地记录，并用 `OPEN RESULT` 打开所选结果
-- `Left` / `Right`：切换左侧菜单焦点
+- 点击中央 `MY BEST` 卡片打开该谱面的最佳结果，再使用回放按钮或 F1 播放。
+- 顶部 `RECORDS` 标签：浏览当前谱面的本地记录并打开所选结果。
+- `Left / Right`：移动导航焦点。Tab 进入快捷设置后，上下选择项目，左右调整数值。
 - `Esc`：返回上一个画面
 - `-` / `+`：立即调整下一次游玩的 Rate
 - `F5`：重新索引曲库；运行时会居中显示 stage / percent / ETA 与 progress bar
-- `Browse > Difficulty Table`：复制 BMSTable HTML/header 链接后按 `Enter` 导入，`Right` 选择本地 JSON，`Left` 清除
+- 中央底部难度表卡片：点击名称或 URL 编辑，File 选择本地 JSON，Reset 恢复原生 LV。Enter 应用地址，Esc 取消；Sort / Filter 中的难度表项目仍可使用。
 
 ### Song Select 中常用的设置页面
 - `Mode`
@@ -64,7 +64,7 @@ TenRiff 的基础游玩流程如下：
   - 关闭 `BGA` 会禁用 gameplay 图片/视频背景及其 decoder/upscaler 工作；Song Select 预览仍会显示
   - 选择 model 后仍需明确开启 upscaler 并确认高配置警告；实验性 `优先 NPU` 只有在 Windows/driver 实际选择 NPU 时才会使用 NPU
 - `Skins`
-  - 切换 native/LR2 skin、调整 Visual Latency、使用带 hold 下压与击键 glitch 的 native 下部 digital-piano key、导入单个 LR2 folder 或批量导入独立的 non-IIDX `LR2files/Theme`（跳过依赖 IIDX 的 theme），移植随 field size 放大并裁切在判定线下方的保持原始宽高比下部 Gear frame，并调整固定 divider 基准的 note 间距/大小、Black Playfield、判定线位置、LN body 宽度与 lane color
+  - 切换 native / TenRiff `skin.json` / LR2 skin、调整 Visual Latency、使用带 hold 下压与击键 glitch 的 native 下部 digital-piano key、导入单个 LR2 folder 或批量导入独立的 non-IIDX `LR2files/Theme`（跳过依赖 IIDX 的 theme），移植随 field size 放大并裁切在判定线下方的保持原始宽高比下部 Gear frame，并调整固定 divider 基准的 note 间距/大小、Black Playfield、判定线位置、LN body 宽度与 lane color
 - `Keymap`
   - 调整按键布局并做 NKRO 测试
 
@@ -100,6 +100,8 @@ Discord 客户端的设置方法请参考[官方 Game Overlay 指南](https://su
 - `8K`：`W E R V M I O P`
 - `9K`：`A S D F Space H J K L`
 - `10K`：`Q W E R V M I O P [`
+- `12K`：`Q W E R F V M I O P [ ]`
+- `14K`：`Q W E R T F V M I O P [ ] \`
 - `16K`：`Q W E R A S D F U I O P J K L ;`
 
 如果这些布局不符合你的习惯，可以在 `Options > Keymap` 中修改。
@@ -149,6 +151,13 @@ Rate 只改变歌曲播放速度和谱面时间轴；在相同 Hi-Speed 下，�
 
 如果打开 `Graphics > Performance HUD`，还能看到帧率图、平均 FPS、低 FPS 以及 gameplay timing 调试信息。
 
+### 判定、连击显示与音量
+
+- 仅 P-GREAT 使用黄色文字、彩虹闪光与弹跳效果。GREAT 保持青色，GOOD 为灰色，其余判定文字保持静止。
+- FAST/SLOW 仅显示当前方向，P-GREAT 或四舍五入为 0ms 的偏差不显示。
+- 在 `Options > Skins` 分别调整并保存判定 X/Y 与连击 X/Y。
+- `Options > Audio > Normalize Audio` 对游戏内混音进行 RMS 音量调整，默认 OFF；不改变菜单音乐或选曲试听。
+
 ## 9. 判定与 Gauge
 
 ### 判定
@@ -173,23 +182,11 @@ Accuracy 以 `PG / GR / GD / BD = 100 / 80 / 50 / 20%` 为基础，并根据每�
 Rank 使用 `<75 F`、`75 B`、`80.5 A`、`86.5 A+`、`90 S`、`95.5 S+`、`98 AA`、`99 SS`、`99.75 SSS` 边界。
 
 ### Gauge
-可选 gauge 有以下五种：
 
-- `ex_hard`
-- `hard`
-- `normal`
-- `easy`
-- `shift`
+Gauge Shift 始终启用。`EX / Hard / Normal / Easy` 选择起始档位，保存值为 `ex_hard / hard / normal / easy`。所选档位及以下档位分别从 100% 开始独立累计判定。当前档位降至 0% 后切换至已有相同判定历史的下一存活档位，结束时以最高存活档位为最终结果。所有可用档位淘汰后才发生血条失败。
 
-固定 gauge（`ex_hard / hard / normal / easy`）在歌曲开始时从 `100%` 起步，游玩中不会改变类型。
+旧 `shift` 值表示从 EX 开始。Practice、Pacemaker 等具有独立结束规则的模式继续遵循各自规则。
 
-- `ex_hard`：回复低于 Hard，`BAD` / `POOR` 损失更大；使用区别于 Hard 的近黑深灰配色；到 `0%` 立即 Game Over
-- `hard`：到 `0%` 立即 Game Over
-- `normal`：到 `0%` 立即 Game Over
-- `easy`：到 `0%` 立即 Game Over
-- `shift`：EX-Hard / Hard / Normal / Easy 分别从 100% 开始独立并行计算；当前 tier 淘汰后，选择已累计相同判定历史的下一档存活 tier，并以结束时最高的存活 tier 为最终结果
-
-只有明确选择 `shift` 时，游玩中才会发生 gauge 转换。
 `Sudden Death (1 MISS)` 不是 gauge 类型，而是在首次 OD8 换算对象 `MISS` 时把 gauge 置零并立即结束的规则。仅原生 `BAD` timing 不会触发，空按产生的 `POOR` 也不计入，并且不能与 Practice No-Fail 同时启用。
 
 ## 10. Result 画面
@@ -209,7 +206,7 @@ Rank 使用 `<75 F`、`75 B`、`80.5 A`、`86.5 A+`、`90 S`、`95.5 S+`、`98 A
 
 返回按键如下：
 
-- `Left`：立刻重新开始同一首谱面
+- `R / Left`：立刻重新开始同一首谱面
 - `F1`：有保存 replay 时播放该 replay
 - `Enter`：返回 Song Select
 - `Esc`：返回 Song Select

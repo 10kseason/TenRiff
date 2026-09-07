@@ -1,5 +1,7 @@
 # TenRiff Config Schema (current)
 
+확인 기준: [Config.h](../src/config/Config.h), [Config.cpp](../src/config/Config.cpp), [기본 JSON](../config/config.json), [키맵](../src/config/Keymap.cpp). 생략된 값은 코드 기본값을 사용하며, 아래 범위는 로드·저장 시 정규화 규칙입니다.
+
 이 문서는 현재 `config/config.json`, `profiles/<name>/config.json`, `profiles/<name>/keymap.json` 기준으로 실제 동작하는 설정 구조를 정리합니다.
 
 ## Load Order
@@ -34,14 +36,15 @@
 - `volume` (double)
   - master volume
 - `bgm_volume` (double)
-- `normalize_audio` (bool): stereo-linked gameplay mix RMS leveling before limiter/master volume; default false. Menu music is unaffected.
+- `normalize_audio` (bool)
+  - 인게임 전체 스테레오 믹스의 RMS 음량 조절. limiter/master volume 전에 적용하며 기본값 false. 메뉴 음악·선곡 미리듣기는 그대로 유지.
 - `keysound_volume` (double)
 
 ### `input`
 
 - `backend` (string)
   - `polling | rawinput`
-  - 현재 `1.5.1` 릴리스 라인의 기본값은 `rawinput`
+  - 현재 `1.7.1` 릴리스 라인의 기본값은 `rawinput`
   - `Options -> Input Settings -> Backend` 또는 `Options -> Profile Setup -> Input Backend`에서 프로필별로 RawInput/Polling을 직접 선택 가능
   - 저장값은 런타임 fallback 때문에 자동으로 `polling`으로 덮어쓰지 않음
   - RawInput 시작 실패, 등록 대상 손실, 메시지 창 종료가 확인되면 현재 앱 실행 동안 메뉴와 다음 gameplay 세션 모두 Polling을 유지
@@ -61,7 +64,7 @@
 - `judgement_hz` (int)
   - `1000 | 2000 | 4000 | 8000`
   - 호환성용으로 남아 있는 입력 설정 필드
-  - 현재 `1.5.1` runtime은 별도 오디오 판정 서브루프를 이 값으로 구동하지 않음
+  - 현재 `1.7.1` runtime은 별도 오디오 판정 서브루프를 이 값으로 구동하지 않음
   - 기본값은 `4000` (`0.25ms`)
 - `debounce_ms` (double)
   - 실제 Press/Release 전환은 버리지 않고 같은 상태의 중복 이벤트만 상태 추적에서 제거
@@ -69,7 +72,7 @@
   - 기본값은 `8ms`
 ### `judge`
 - `pg`, `gr`, `gd`, `bd` (double, ms)
-- 기본 `pg / gr / gd`는 각각 `20ms / 45ms / 90ms`
+- 기본 `pg / gr / gd`는 각각 `20ms / 65ms / 115ms`
 - 기본 `bd`는 `210ms`
 - `Judge Easy`는 기존 `1.25x` 배율로 `bd=262.5ms`, `Judge Hard`는 `bd=340ms`를 사용함; PG/GR/GD와 LN tail 창은 Hard에서 기본값 유지
 - `indirect_miss` (double, ms)
@@ -92,12 +95,10 @@
 - 시각 스크롤은 곡 시작 BPM에 고정되며 이후 BPM 변속으로 초당 이동 속도가 보정되지 않음; 명시적 `#SCROLL`, 정지, 역주행은 유지
 
 ### `gauge`
-- `normal | hard | ex_hard | easy`는 항상 적용되는 Gauge Shift의 시작 등급입니다. 화면에서는 `ex_hard`를 `EX`로 표시합니다.
-- 선택한 시작 등급부터 Easy까지를 각각 100%에서 동시에 계산합니다. 현재 게이지가 0%로 탈락하면 이미 같은 판정을 누적한 바로 아래 생존 게이지를 선택하며, 종료 시 살아남은 가장 높은 게이지가 최종 게이지가 됩니다.
-- 기존 `shift` 값은 호환을 위해 EX 시작으로 해석합니다.
-- `delta`
-  - `ex_hard`, `hard`, `normal`, `easy`
-  - 각 안에 `PG`, `GR`, `GD`, `BD`, `PR`
+
+Gauge Shift는 항상 적용됩니다. `mode.gauge`의 `ex_hard / hard / normal / easy`는 시작 등급이며 EX부터 Easy 순서입니다. 선택한 등급과 그 아래 등급을 각각 100%에서 병렬 계산하고, 현재 등급이 탈락하면 다음 생존 등급으로 이동합니다. 모든 대상 등급이 탈락해야 게이지 실패가 됩니다. 기존 `shift` 값은 EX 시작으로 해석합니다.
+
+- `delta`: `ex_hard`, `hard`, `normal`, `easy` → `PG`, `GR`, `GD`, `BD`, `PR`.
 
 ### `graphics`
 - `display_mode` (string)
@@ -149,7 +150,7 @@
   - 기본값은 `krrcream`; NK3는 같은 키 수에서도 리마스터를 실행하고 기본 `AUTO` 백엔드는 ncnn Vulkan을 우선 사용
   - Krrcream은 원본 노트만 목표 레인으로 재배치
   - nK2는 키 수 확장 시 원본에 먼저 노트를 붙이지 않고, 변환 중 목표 레이아웃에 안전한 보조 노트를 직접 생성
-  - NK3는 P64와 host beam 안전 솔버를 항상 사용하고, 10K가 아닌 원본을 10K로 변환할 때만 일반화 MLP를 추가한다. `TENRIFF_NK3_BACKEND=AUTO|VULKAN|OPENVINO`로 백엔드를 고르며 `AUTO`는 ncnn Vulkan을 먼저 시도한다. 여러 Vulkan GPU가 있으면 `TENRIFF_NK3_VULKAN_DEVICE=<index>`로 선택
+  - NK3는 P64와 host beam 안전 솔버를 항상 사용하고, 10K가 아닌 원본을 10K로 변환할 때만 일반화 MLP를 추가한다. `TENRIFF_NK3_BACKEND=AUTO|VULKAN|NCNN_CPU|OPENVINO`로 백엔드를 고르며 `AUTO`는 ncnn Vulkan을 먼저 시도한다. 여러 Vulkan GPU가 있으면 `TENRIFF_NK3_VULKAN_DEVICE=<index>`로 선택
 - `key_conversion_nk2_preset` (string)
   - `native | transform | remaster`; 기본값은 `native`
   - nK2에서 `Native (12%)`, `Transform (35%)`, `Remaster (65%)`를 선택하며, Krrcream에서는 설정 행이 잠김
@@ -158,7 +159,7 @@
 - `gauge` (string)
   - `normal | hard | ex_hard | easy | shift`
 - `random` (string)
-  - `off | mirror | fr | sr`
+  - `off | mirror | rr | frns | sr` (`fr` = `frns`)
 - `random_seed` (int)
   - RR/SR, 강제 key-mode 변환, LN Mix 대상 선택의 고정 seed이며 Mirror 레인 반전 자체는 사용하지 않음. 일반 Random은 플레이마다 새 session seed를 만들고 replay에 실제 값을 기록
 - `mods` (string array)
@@ -200,165 +201,78 @@
   - 설정을 바꾸면 캐시 계산 모드를 구분해 현재 song source를 전체 재인덱싱함
 
 ### `ui`
-- `profile_nickname` (string)
-  - Quick Setup에서 편집하며 저장 기록과 멀티플레이 표시 이름으로 사용
-  - 제어문자/중복 공백을 정리하고 UTF-8 기준 최대 48바이트로 제한; 비어 있으면 프로필 ID를 표시
-- `profile_avatar_path` (string)
-  - Profile Setup에서 선택한 로컬 PNG/JPG 경로; 비어 있으면 TenRiff 기본 표시 사용
-  - 프로필별로 저장하며 UI 안전 문자열과 UTF-8 최대 2048바이트로 정규화
-- `language` (string)
-  - `en | ko`
-  - 잘못된 값은 로드 시 `en`으로 정규화
-  - Graphics Settings의 Language row와 연결됨
-- `result_tail_ms` (double)
-- `require_enter_to_exit` (bool)
-- `active_song_source` (string)
-  - 마지막으로 연 곡 루트
-- `recent_song_sources` (array of string)
-  - 최근 외부/내부 song source 목록
-- `song_collection_filter` (string)
-  - 마지막으로 선택한 전체/즐겨찾기/사용자 컬렉션 필터
-- `song_key_filter` (int, `0..16`)
-  - 곡 브라우저의 마지막 키 수 필터. `0`은 전체 키
-- `song_level_min_filter`, `song_level_max_filter` (int, `0..50`)
-  - 마지막 레벨 범위 필터. `0`은 해당 경계를 사용하지 않음
-  - 키 수·레벨·컬렉션 필터는 변경 즉시 프로필 설정에 저장되어 재실행 후에도 유지됨
-- `difficulty_table_path` (string)
-  - Browse 화면에서 고른 로컬 BMS 난이도표 header JSON 또는 링크에서 내려받은 프로필 캐시 header 경로
-  - header는 `name`, `symbol`, 로컬 상대경로 `data_url`을 사용하고, data array entry는 `md5` 또는 `sha256`과 `level`을 사용
-  - 선택/해제 시 현재 song source를 재인덱싱해 일치 곡의 표 레벨을 표시하며, 표 선택 시 해시가 필요한 `safe` 인덱스로 자동 전환
-- `difficulty_table_url` (string)
-  - Browse에서 가져온 http(s) BMSTable HTML 페이지 또는 header JSON 원본 링크
-  - 표준 `<meta name="bmstable" content="...">`를 해석해 header/data JSON을 프로필의 `difficulty_tables` 캐시에 저장하며, 로컬 JSON 선택 시에는 비워짐
-- `online_records_server_url` (string)
-  - 현재 로그인한 서버의 기록·랭킹·글로벌 채팅 API 기준 URL
-  - TenRiff 메인 기본값은 `https://121.174.18.181:27303`; 로컬 사설 서버는 `http://127.0.0.1:27302` 사용 가능
-  - 서버 오류나 버전 불일치는 로컬 기록/플레이를 막지 않으며 Online 탭만 fail-closed로 오류를 표시
-  - 곡 브라우저 설정에서 URL을 복사한 뒤 Enter 또는 편집 중 Ctrl+V로 지정 가능
-- `tenriff_main_server_url` (string)
-  - F10의 `TenRiff 메인` 선택에 사용되는 고정 메인 API 주소
-  - F10 로그인 창의 `텐리프 메인` 서버 URL. 운영 배포에서는 유효한 HTTPS 주소가 필요함
-- `private_server_url` (string)
-  - F10 로그인 창에서 사용자가 입력한 사설 API URL. 원격 주소는 HTTPS만 허용하고 localhost만 HTTP 허용
-- `account_server_mode` (string)
-  - 마지막 로그인 서버 선택: `main | private`
+
+| 항목 | 형식·범위·기본값 | 동작 |
+| --- | --- | --- |
+| `profile_nickname` | string; UTF-8 ≤48 bytes | 표시 이름. 비면 프로필 ID를 사용하며 공백·제어문자를 정리. |
+| `profile_avatar_path` | string; UTF-8 ≤2048 bytes | 로컬 PNG/JPG 아바타 경로. |
+| `language` | `en`, `ko`; `en` | UI 언어. 다른 값은 en으로 정규화. |
+| `result_tail_ms` | double; `500` ms | 판정 완료 후 결과 전환 시 추가 대기 시간. 차트 오디오 종료 시점도 함께 고려합니다. |
+| `require_enter_to_exit` | bool; `true` | 읽기·저장 호환 필드. 현재 Windows 결과 입력 경로는 이 값으로 자동 종료하지 않습니다. |
+| `show_cursor_in_gameplay` | bool; `true` | 인게임 마우스 포인터 표시. |
+| `active_song_source`, `recent_song_sources` | string / string[] | 현재 곡 폴더와 최근 곡 폴더 목록. |
+| `session_mix_lr2_course_path` | string | 선택한 LR2 코스 파일 경로. |
+| `favorite_chart_keys` | string[] | 즐겨찾기 차트의 내부 식별 키. |
+| `collections` | object: name → string[] | 이름 있는 컬렉션별 차트 키 목록. |
+| `song_collection_filter` | string; `all` | 전체·즐겨찾기·컬렉션 필터. 변경 즉시 저장. |
+| `song_key_filter` | int: `0..16`; `0` | 키 수 필터. 0은 전체. UI 선택은 4K–10K, 12K, 14K, 16K. |
+| `song_level_min_filter`, `song_level_max_filter` | int: `0..50`; `0` | 난이도 경계. 0이면 해당 경계를 사용하지 않음. |
+| `difficulty_table_path` | string | 로컬 header JSON 또는 다운로드한 프로필 캐시 header. 표 변경 시 재인덱싱하며 선택 시 safe 인덱스로 전환. |
+| `difficulty_table_url` | string | 원본 HTTP(S) BMSTable 페이지/header URL. bmstable meta를 해석해 header/data를 캐시하고 로컬 JSON 선택 시 비움. |
+| `online_records_server_url` | string | 기록·랭킹·채팅 API URL. 실패해도 로컬 플레이·기록은 유지. |
+| `tenriff_main_server_url` | string | F10 메인 서버 API URL. 기본 주소는 Config.h의 kTenRiffMainApiUrl. |
+| `private_server_url` | string | F10 사설 API URL. 원격 HTTPS, localhost만 HTTP 허용. |
+| `account_server_mode` | `main`, `private`; `main` | 마지막 로그인 서버 선택. |
+
+난이도표 header는 `name`, `symbol`, 로컬 상대경로 `data_url`을 사용하며 data 항목은 `md5` 또는 `sha256`과 `level`로 매칭합니다. 원격 가져오기는 프로필의 `difficulty_tables` 캐시에 저장합니다.
 
 ### `skin`
-- `source` (string)
-  - `native | tenriff | lr2`
-- `tenriff_skin_name` (string)
-  - 가져온 TenRiff `skin.json` 스킨 폴더 이름
-- `scratch_position` (string)
-  - BMS `7+1` 레이아웃의 스크래치 표시 위치: `left | right`
-  - 입력·판정·리플레이 레인 번호는 유지하고 화면 표시 순서만 바꿈
-- `lr2_skin_name` (string)
-  - imported LR2 playskin name
-- `lr2_resolution_mode` (string)
-  - `auto | sd | hd | fhd`
-  - LR2 playskin의 해상도 override 토큰
-  - `auto`는 asset 파일명 대신 LR2 playskin `#DST_NOTE` 레이아웃 좌표를 기준으로 SD/HD/FHD family를 판정
-- `visual_preset` (string)
-  - `classic | neon | minimal | tenriff`
-  - Skins 메뉴에서 변경하면 아래 visual opacity/glow/key-label 옵션 묶음을 preset 값으로 즉시 재설정
-- `note_shape` (string)
-  - `rect | triangle | pentagon | hexagon | circle`
-  - 100% 기준에서 procedural 원·다각형은 rect 막대와 같은 lane 전체 폭을 사용
-- `show_hold_tail` (bool)
-  - 롱노트 판정과 body 연결은 유지하면서 tail cap만 표시하거나 숨김
-- `note_border_enabled` (bool)
-- `lane_background_opacity` (double)
-  - lane별 반투명 배경 alpha
-  - `0.00..0.45` 범위로 clamp
-- `black_playfield_enabled` (bool)
-  - `true`이면 lane spacing 구간까지 포함한 player/ghost 플레이필드 전체를 완전한 검정으로 표시
-  - 기본값은 `true`이며, 기존 프로필에 명시된 `false`는 그대로 유지
-- `visual_opacity` (double)
-  - note/receptor/key-label 계열 전체 opacity 배율
-  - `0.20..1.00` 범위로 clamp
-- `note_outline_opacity` (double)
-  - native note thin outline alpha
-  - `0.00..1.00` 범위로 clamp
-- `hold_body_opacity` (double)
-  - 롱노트 body alpha
-  - `0.05..0.60` 범위로 clamp
-- `judgement_line_glow_enabled` (bool)
-  - 판정선 주변 glow 표시
-- `key_pulse_brightness` (double)
-  - 노트를 칠 때 판정선에서 터지는 폭발 이펙트의 밝기
-  - `0.00..1.00` 범위로 clamp하며 `0.00`이면 이펙트를 끈다
-  - Options에서는 `Skins > Hit Burst / 폭발 이펙트` 행에서 5% 단위로 조절
-- `key_pulse_enabled` (bool)
-  - `key_pulse_brightness`의 on/off 형태. 구버전 config 호환용으로 함께 저장한다
-  - 둘 중 하나라도 꺼져 있으면 꺼진 것으로 처리한다
-- `ui_font` (string)
-  - 메뉴 텍스트에 쓰는 글꼴
-  - `default`(Segoe UI) | `malgun`(Malgun Gothic) | `bahnschrift` | `consolas`
-  - Options의 `Skins > UI Font / UI 폰트` 행에서 바꾸며 즉시 적용된다
-  - 로고·랭크·콤보 숫자와 디버그 readout은 자체 글꼴을 유지한다
-- `key_label_position` (string)
-  - `bottom | top | off`
-  - gameplay lane 안쪽에 현재 keymap의 키 이름을 작게 표시
-- `judgement_line_position` (double)
-  - gameplay 판정선의 세로 위치 비율
-  - `0.00..1.00` 범위(0%~100%)로 clamp
-  - 기본값은 `0.82`
-- `gameplay_field_offset_x` (double)
-  - gameplay 기어 오른쪽 위의 `↔` 핸들을 드래그해 정하는 가로 위치
-  - 1920x1080 기준 `-720..720` 범위이며, 실제 화면에서는 기어와 핸들이 보이는 범위로 한 번 더 제한된다
-  - 기본값은 `0.0`
-- `judgement_position` (double): independent judgement Y anchor, 0.10–0.78; missing fields inherit the existing combo anchor.
-- `judgement_offset_x`, `combo_offset_x` (double): independent X offsets in 1920x1080 base pixels, -600–600; default 0.
-- `combo_position` (double)
-  - gameplay 필드 내부 콤보 표시의 세로 위치 비율
-  - `0.10..0.78` 범위로 clamp
-  - 기본값은 `0.24`
-- `lane_width_scales` (object)
-  - key mode별 개별 lane 폭 배율 배열
-  - 각 mode 값은 lane 수만큼의 number array
-  - 각 값은 `0.50..1.75` 범위로 clamp
-- `note_width_scale` (double)
-  - 중앙 기준 플레이필드 전체, lane/divider, 노트 머리·꼬리, 인접 게이지를 함께 확대·축소하는 배율 (`0.50..1.40`)
-  - 100%에서 인접 노트 사이 기본 합산 여백은 `24px`
-  - `0.50..1.40` 범위로 clamp
-- `lane_spacing_scales` (object)
-  - key mode별 lane 사이 빈 간격 배율 배열
-  - 각 mode 값은 `(lane_count - 1)` 길이의 number array
-  - 각 값은 `0.00..2.00` 범위로 clamp
-- `note_height_scale` (double)
-  - 노트 머리/꼬리 세로 배율
-  - `0.50..4.00` 범위로 clamp
-- `lane_divider_width_scale` (double)
-  - lane 사이 흰 separator 선의 공용 배율
-  - `0.00..2.00` 범위로 clamp
-  - 모든 key mode에 동일하게 적용됨
-  - native skin은 기본 `1px` divider에 곱하고, LR2 skin은 가져온 divider 폭이 있을 때 그 값에도 곱함
-- `lane_center_gap_scale` (double)
-  - 16K 필드의 좌우 블록 사이 중앙 간격 배율
-  - `0.00..2.00` 범위로 clamp
-  - 현재는 `16k` 레이아웃에서만 적용됨
-- `hold_body_width_scale` (double)
-  - 롱노트 몸통 가로 배율
-  - `0.50..1.20` 범위로 clamp
-  - 실제 렌더 계산은 `max(4.0f, note_width * 0.5f * scale)` 기준
-- `note_width_scales` (object)
-  - key mode별 `note_width_scale` override
-- `note_height_scales` (object)
-  - key mode별 `note_height_scale` override
-- `lane_divider_width_scales` (object)
-  - 레거시 호환용 필드
-  - 현재 런타임은 공용 `lane_divider_width_scale`만 사용함
-- `lane_center_gap_scales` (object)
-  - key mode별 `lane_center_gap_scale` override
-- `single_color` (string)
-  - `off` 또는 지원 색상 토큰
-  - `off`가 아니면 모든 key mode와 scratch lane을 선택 색으로 표시
-  - 레인별 `lane_colors`는 덮어쓰지 않으므로 `off`로 되돌리면 기존 팔레트가 복원됨
-- `lane_colors` (object)
-  - key mode별 lane 색상 팔레트
-  - 현재 기본/저장 대상 mode는 `4k..10k`, `16k`, BMS 전용 `7+1`
-  - 각 mode 값은 lane 수만큼의 string array
-  - 지원 토큰:
-    `ice`, `azure`, `gold`, `mint`, `rose`, `violet`, `orange`, `teal`
+
+이 표는 프로필 `config.json`의 `skin` 설정입니다. 스킨 패키지의 `skin.json` 계약은 [스킨 형식](skin-format.md)을 참고하세요.
+
+| 항목 | 형식·범위·기본값 | 동작 |
+| --- | --- | --- |
+| `source` | string: `native`, `tenriff`, `lr2` | 스킨 소스. |
+| `tenriff_skin_name`, `lr2_skin_name` | string | 가져온 스킨 폴더 이름. |
+| `scratch_position` | `left`, `right`; `left` | 7+1 스크래치 표시 순서만 변경. 입력·판정 레인은 유지. |
+| `lr2_resolution_mode` | `auto`, `sd`, `hd`, `fhd`; `auto` | LR2 좌표 기준 해상도 해석. auto는 파일명 대신 `#DST_NOTE` 좌표를 사용. |
+| `visual_preset` | `classic`, `neon`, `minimal`, `tenriff`; `tenriff` | 메뉴에서 선택하면 시각 옵션 묶음을 재설정. |
+| `note_shape` | `rect`, `triangle`, `pentagon`, `hexagon`, `circle`; `rect` | 기본 도형 노트 모양. |
+| `note_image_aspect` | `stretch`, `contain`, `width`; `stretch` | 늘이기 / 비율 유지해 안에 맞추기 / 폭을 고정하고 높이를 비율로 계산. |
+| `preserve_note_image_aspect_ratio` | bool; `false` | 구버전 호환 필드. 명시된 `note_image_aspect`가 우선하며 저장 시 stretch 이외는 true. |
+| `note_border_enabled`, `show_lane_dividers`, `show_judgement_line` | bool; `true` | 각각 노트 테두리, 레인 구분선, 판정선 표시. |
+| `note_divider_gap_px` | double: `0..40`; `12` px | 노트 한쪽 가장자리와 구분선 사이 여백. 0이면 구분선까지 확장. |
+| `show_gear_boundary_line` | bool; `false` | 기어 경계선 표시. |
+| `show_timing_feedback` | bool; `true` | FAST/SLOW 문구와 타이밍 기록 표시. 판정 등급은 별도로 유지. |
+| `show_hold_tail`, `hold_tail_taper_enabled` | bool; `false` | 각각 LN 꼬리 캡 표시, 꼬리 테이퍼. 판정 규칙은 변경하지 않음. |
+| `judgement_line_glow_enabled` | bool; `true` | 판정선 주변 빛 표시. |
+| `key_pulse_brightness` | double: `0..1`; `1` | Hit Burst 밝기. 0이면 끔. |
+| `key_pulse_enabled` | bool; `true` | 구버전 ON/OFF 호환. false 또는 밝기 0이면 끔. |
+| `hit_burst_style` | `prism`, `ring`, `spark`; `prism` | 내장 Hit Burst 모양. |
+| `ui_font` | `default`, `malgun`, `bahnschrift`, `consolas`; `default` | 메뉴 글꼴. default는 Segoe UI; 로고·랭크·콤보 전용 글꼴은 유지. |
+| `key_label_position` | `bottom`, `top`, `off`; `bottom` | 레인 키 이름 위치. |
+| `judgement_line_position` | double: `0..1`; `0.82` | 판정선 세로 위치 비율. |
+| `gameplay_field_offset_x` | double: `-720..720`; `0` | 1920×1080 기준 기어 가로 이동. 실제 창에서 기어와 ↔ 핸들이 보이도록 추가 제한. |
+| `combo_position`, `judgement_position` | double: `0.10..0.78`; `0.24` | 콤보와 판정의 독립 Y 위치. 판정 값이 없는 기존 프로필은 combo_position을 상속. |
+| `combo_offset_x`, `judgement_offset_x` | double: `-600..600`; `0` | 1920×1080 기준 콤보와 판정의 독립 X 오프셋. |
+| `lane_background_opacity` | double: `0..0.45`; `0.18` | 레인 배경 불투명도. |
+| `black_playfield_enabled` | bool; `true` | 레인 간격을 포함한 필드 전체를 검정으로 표시. |
+| `visual_opacity` | double: `0.20..1`; `0.96` | 노트·리셉터·키 라벨의 공통 불투명도 배율. |
+| `note_outline_opacity` | double: `0..1`; `0.78` | 노트 외곽선 불투명도. |
+| `hold_body_opacity` | double: `0.05..1`; `1` | LN 몸통 불투명도. |
+| `lane_width_scales` | object: mode → number[]; `0.50..1.75` | 레인 수 길이의 개별 폭 배열. |
+| `note_width_scale` | double: `0.50..1.40`; `1` | Note & Field Size. 중심을 유지하며 필드·레인·노트·인접 게이지를 함께 조절. |
+| `lane_spacing_scales` | object: mode → number[]; `0..2` | 레인 사이 간격 배열. 길이는 lane_count - 1. |
+| `note_height_scale` | double: `0.50..4`; `1.8` | 노트 머리·꼬리 높이 배율. |
+| `lane_divider_width_scale` | double: `0..2`; `1` | 모든 키 모드 공용 구분선 폭. 가져온 LR2 구분선 폭에도 적용. |
+| `lane_center_gap_scale` | double: `0..2`; `0` | 16K 좌우 블록의 중앙 간격. |
+| `hold_body_width_scale` | double: `0.50..1.20`; `1` | LN 몸통 폭 배율. |
+| `note_width_scales`, `note_height_scales`, `lane_center_gap_scales` | object: mode → number | 해당 공용 값의 키 모드별 override. 같은 범위로 제한. |
+| `lane_divider_width_scales` | object: mode → number | 레거시 호환 필드. 현재는 공용 lane_divider_width_scale 사용. |
+| `lane_colors` | object: mode → string[] | 레인 수 길이의 색상 토큰 배열. |
+| `single_color` | string; `off` | 색상 토큰을 선택하면 전체 레인에 적용. 기존 lane_colors는 보존. |
+
+모드별 배열·override 지원: `4k`, `5k`, `6k`, `7k`, `7+1`, `8k`, `9k`, `10k`, `12k`, `14k`, `16k`. 색상 토큰: `ice`, `azure`, `gold`, `mint`, `rose`, `violet`, `orange`, `teal`. `7+1`은 스킨 팔레트 전용이며 별도 키맵 모드가 아닙니다. 구버전 `expand_notes_to_dividers=true`는 여백 0으로 읽으며, 명시된 `note_divider_gap_px`가 우선합니다.
 
 ### `offsets`
 - `input` (double)
@@ -376,7 +290,7 @@
 - `bindings`
   - legacy 10K compatibility
 - `modes`
-  - `4k`, `5k`, `6k`, `7k`, `8k`, `9k`, `10k`
+  - `4k`, `5k`, `6k`, `7k`, `8k`, `9k`, `10k`, `12k`, `14k`, `16k`
   - 각 mode 아래 lane id -> key token
 
 ### Notes

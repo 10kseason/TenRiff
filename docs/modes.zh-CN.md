@@ -19,6 +19,9 @@
   "autoplay_enabled": false,
   "practice_no_fail_enabled": false,
   "one_miss_fail_enabled": false,
+  "pacemaker_mode": "off",
+  "pacemaker_target_accuracy": 90.0,
+  "pacemaker_target_score": 8000,
   "song_index_profile": "safe",
   "calculate_song_index_difficulty": false
 }
@@ -74,18 +77,18 @@
 ## Key mode 处理
 - `none` 表示直接使用谱面的原始 lane 数和基础 pattern 布局
 - `auto` 作为 legacy alias 保留，当前行为与 `none` 相同
-- `4k..10k`、`12k`、`14k`、`16k` 会通过基于 N2NC 的 lane remap 匹配目标键数
+- `4k..10k`、`12k`、`14k`、`16k` 使用所选 Krrcream / nK2 / NK3 算法转换键数。
 - 强制转换 `5+1 SP` / `7+1 SP` 时只重新映射除皿键外的键盘部分；`follow` 皿键音效移至自动播放
 - `10+2 DP` / `14+2 DP` 同样排除两个皿键，并独立转换左右键盘区域
 - nK2 扩展会先把原始 note 布置到目标键位，再在同一目标 layout 中生成辅助 note；不会先向原始4K等谱面加 note 后再次转换
 - 应用顺序：key-mode 变换（含 nK2 目标 layout 辅助 note 生成）→ DP Flip → Mirror/RR/FR/SR → Note Add → LN/Full Tap 结构变换
 
 ## Gauge 规则
-- 固定 gauge（`ex_hard / hard / normal / easy`）从 `100%` 开始，在 `0%` 时立即失败且不会改变类型。
-- `shift` 会让 EX-Hard / Hard / Normal / Easy 分别从 100% 开始独立并行计算；当前 tier 淘汰后选择已累计相同判定历史的下一档存活 tier，并以结束时最高的存活 tier 为最终结果。
-- `ex_hard` 是挑战用 gauge，回复低于 Hard，`BAD` / `POOR` 损失更大。
-- clear status 会区分固定 gauge 结果，以及最终 Shift tier 的 `GAUGE SHIFT EX-HARD / HARD / NORMAL / EASY CLEAR`。
-- `Sudden Death (1 MISS)` 不是 gauge 类型，而是首次 OD8 换算对象 `MISS` 时把当前 gauge 置零并立即结束的独立失败规则。
+
+- `ex_hard / hard / normal / easy` 选择始终启用的 Gauge Shift 起始档位，旧 `shift` 表示 EX 开始。
+- 从所选档位到 Easy 均从100%独立并行计算，淘汰后切换至下一存活档位；全部可用档位淘汰后才发生血条失败。
+- 最终存活档位显示为 `GAUGE SHIFT EX / HARD / NORMAL / EASY CLEAR`。
+- Practice、Pacemaker 保留各自结束规则；Sudden Death 在首次 OD8 换算对象 MISS 时立即结束。
 
 ## 实现位置
 - 模式解析：`src/gameplay/ModeSettings.*`、`src/app/ModeResolver.*`

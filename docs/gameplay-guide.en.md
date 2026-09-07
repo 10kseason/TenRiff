@@ -15,7 +15,7 @@ On Windows, one of the following two methods is usually used:
 or
 
 ```powershell
-.\build-dist\Release\TenRiff.exe --songs .\songs --profile default
+.\TenRiff.exe --profile default
 ```
 
 On first launch, the default profile is created automatically.
@@ -46,13 +46,13 @@ The standard TenRiff play flow is:
 - Left click: select song
 - Double click: start song
 - `Enter`: start the currently selected song
-- Left-click the right-side `BEST SCORE` card: open the chart's best saved Result; use `WATCH REPLAY` or `F1` there to play its replay
-- Left-side `RECORDS`: browse the current chart's local plays and use `OPEN RESULT` for the selected result
-- `Left` / `Right`: switch focus on the left-side menu
+- Click the center `MY BEST` card to open the chart's best Result; use its replay button or F1 to watch the replay.
+- Top `RECORDS` tab: browse the current chart's local records and open a selected result.
+- `Left / Right`: move navigation focus. `Tab` enters quick settings, where Up/Down selects and Left/Right adjusts.
 - `Esc`: return to the previous screen
 - `-` / `+`: adjust the next-play Rate immediately
 - `F5`: reindex the song library; centered stage / percent / ETA and a progress bar appear while it runs
-- `Browse > Difficulty Table`: copy a BMSTable HTML/header link and press `Enter` to import, use `Right` for local JSON, or `Left` to clear
+- Lower-center difficulty-table card: click the name/URL to edit, File for local JSON, and Reset for native LV. Enter applies the URL; Esc cancels. The difficulty-table row in Sort / Filter remains available.
 
 ### Screens commonly used from Song Select
 - `Mode`
@@ -64,7 +64,7 @@ The standard TenRiff play flow is:
   - Turning `BGA` off disables gameplay image/video backgrounds and their decoder/upscaler work; Song Select previews remain visible
   - Selecting a model is separate from enabling the upscaler and accepting its high-spec warning. Experimental `Low-Power DirectX` only requests DirectXMinPower and does not explicitly select or verify an NPU
 - `Skins`
-  - Switch native/LR2 skins, adjust Visual Latency, use native lower digital-piano keys with held depth and impact glitches, import one LR2 folder or batch-import an independent non-IIDX `LR2files/Theme` root (IIDX-dependent themes are skipped), port aspect-preserved lower Gear frames that enlarge with field size and clip below the judgement line, and adjust fixed-divider note gaps/size, Black Playfield, judgement-line position, LN body width, and lane colors
+  - Switch native / TenRiff `skin.json` / LR2 skins, adjust Visual Latency, use native lower digital-piano keys with held depth and impact glitches, import one LR2 folder or batch-import an independent non-IIDX `LR2files/Theme` root (IIDX-dependent themes are skipped), port aspect-preserved lower Gear frames that enlarge with field size and clip below the judgement line, and adjust fixed-divider note gaps/size, Black Playfield, judgement-line position, LN body width, and lane colors
 - `Keymap`
   - Change key bindings and run the NKRO test
 
@@ -100,6 +100,8 @@ The default keymap is selected automatically based on the chart's key count.
 - `8K`: `W E R V M I O P`
 - `9K`: `A S D F Space H J K L`
 - `10K`: `Q W E R V M I O P [`
+- `12K`: `Q W E R F V M I O P [ ]`
+- `14K`: `Q W E R T F V M I O P [ ] \`
 - `16K`: `Q W E R A S D F U I O P J K L ;`
 
 If this is not the layout you want, you can change it in `Options > Keymap`.
@@ -121,7 +123,7 @@ If this is not the layout you want, you can change it in `Options > Keymap`.
 
 - Chart key input: based on the current keymap
 - `Esc`: open the pause menu (Continue / Restart / Exit) in single-player; abort play in multiplayer
-- F3: decrease Hi-Speed
+- `F3`: decrease Hi-Speed
 - `F4`: increase Hi-Speed
 - `F5`: decrease Hi-Speed significantly
 - `F6`: increase Hi-Speed significantly
@@ -150,6 +152,13 @@ Off-center hits show a signed timing label below the judgement: `FAST -12 ms` fo
 
 If you enable `Graphics > Performance HUD`, you can also see the frame graph, average FPS, low FPS, and gameplay timing debug information.
 
+### Judgement/combo feedback and volume
+
+- Only P-GREAT uses yellow text, rainbow sparkles and a pop. GREAT stays cyan; GOOD is gray, and lower judgement labels remain stationary.
+- FAST/SLOW shows only the applicable direction and is omitted for P-GREAT or offsets rounded to 0ms.
+- `Options > Skins` saves independent judgement X/Y and combo X/Y positions.
+- `Options > Audio > Normalize Audio` applies RMS leveling to the gameplay mix and defaults to OFF; menu music and song previews are unaffected.
+
 ## 9. Judgement and Gauge
 
 ### Judgement
@@ -174,23 +183,11 @@ Accuracy starts from `PG / GR / GD / BD = 100 / 80 / 50 / 20%` and removes up to
 Rank uses `<75 F`, `75 B`, `80.5 A`, `86.5 A+`, `90 S`, `95.5 S+`, `98 AA`, `99 SS`, and `99.75 SSS` boundaries.
 
 ### Gauge
-The five selectable gauge types are:
 
-- `ex_hard`
-- `hard`
-- `normal`
-- `easy`
-- `shift`
+Gauge Shift is always active. `EX / Hard / Normal / Easy` select the starting tier, stored as `ex_hard / hard / normal / easy`. The selected tier and every lower tier start at 100% and accumulate judgements independently. When the current tier reaches zero, the next surviving tier takes over; the highest surviving tier at the end is the final result. Gauge failure occurs when all eligible tiers fail.
 
-Fixed gauges (`ex_hard / hard / normal / easy`) start at `100%` and never change type during play.
+Legacy `shift` means an EX start. Modes with separate completion rules, such as Practice and Pacemaker, retain those rules.
 
-- `ex_hard`: lower recovery and heavier `BAD` / `POOR` damage than Hard; shown with a near-black gray palette distinct from Hard; immediate Game Over at `0%`
-- `hard`: immediate Game Over at `0%`
-- `normal`: immediate Game Over at `0%`
-- `easy`: immediate Game Over at `0%`
-- `shift`: simulates EX-Hard / Hard / Normal / Easy independently from 100%; when the current tier dies, it selects the next tier that has survived the same judgement history, and the highest surviving tier is final
-
-Gauge transitions occur only when `shift` is explicitly selected.
 `Sudden Death (1 MISS)` is not a gauge type: it forces the gauge to zero and ends the run on the first OD8-converted object `MISS`. Native `BAD` timing alone and empty-key `POOR` do not count, and it cannot be enabled together with Practice No-Fail.
 
 ## 10. Result Screen
@@ -210,7 +207,7 @@ After play ends, the Result screen shows:
 
 The return keys are:
 
-- `Left`: restart the same chart immediately
+- `R / Left`: restart the same chart immediately
 - `F1`: play the saved replay when one is available
 - `Enter`: return to Song Select
 - `Esc`: return to Song Select

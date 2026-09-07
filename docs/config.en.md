@@ -1,5 +1,7 @@
 # TenRiff Config Schema (current)
 
+Reference: [Config.h](../src/config/Config.h), [Config.cpp](../src/config/Config.cpp), [default JSON](../config/config.json), and [keymaps](../src/config/Keymap.cpp). Missing values use code defaults; bounds below describe load/save normalization.
+
 This document summarizes the configuration structure that is actually active today, based on `config/config.json`, `profiles/<name>/config.json`, and `profiles/<name>/keymap.json`.
 
 ## Load Order
@@ -34,14 +36,15 @@ If a profile does not exist, it is created automatically on first launch.
 - `volume` (double)
   - master volume
 - `bgm_volume` (double)
-- `normalize_audio` (bool): stereo-linked gameplay mix RMS leveling before limiter/master volume; default false. Menu music is unaffected.
+- `normalize_audio` (bool)
+  - Stereo-linked RMS leveling of the gameplay mix before limiter/master volume; false by default. Menu music and song previews are unaffected.
 - `keysound_volume` (double)
 
 ### `input`
 
 - `backend` (string)
   - `polling | rawinput`
-  - defaults to `rawinput` on the current `1.5.1` release line
+  - defaults to `rawinput` on the current `1.7.1` release line
   - selectable per profile under `Options -> Input Settings -> Backend` or `Options -> Profile Setup -> Input Backend`
   - runtime fallback never rewrites the saved value to `polling`
   - a confirmed RawInput startup failure, registration-target loss, or message-window exit latches Polling across menu and subsequent gameplay sessions for the current app run
@@ -61,7 +64,7 @@ If a profile does not exist, it is created automatically on first launch.
 - `judgement_hz` (int)
   - `1000 | 2000 | 4000 | 8000`
   - compatibility field kept in the input config
-  - the current `1.5.1` runtime no longer drives a separate audio-thread judgement sub-step loop from this value
+  - the current `1.7.1` runtime no longer drives a separate audio-thread judgement sub-step loop from this value
   - default is `4000` (`0.25ms`)
 - `debounce_ms` (double)
   - real Press/Release transitions are preserved; only duplicate same-state events are removed from pressed-state tracking
@@ -69,7 +72,7 @@ If a profile does not exist, it is created automatically on first launch.
   - default value is `8ms`
 ### `judge`
 - `pg`, `gr`, `gd`, `bd` (double, ms)
-- default `pg / gr / gd` values are `20ms / 45ms / 90ms`
+- default `pg / gr / gd` values are `20ms / 65ms / 115ms`
 - default `bd` is `210ms`
 - `Judge Easy` follows its existing `1.25x` scale (`bd=262.5ms`), while `Judge Hard` uses `bd=340ms`; Hard leaves PG/GR/GD and long-note tail windows at their base values
 - `indirect_miss` (double, ms)
@@ -92,12 +95,10 @@ If a profile does not exist, it is created automatically on first launch.
 - visual scroll stays anchored to the chart's starting BPM; later BPM changes do not correct pixels per second, while explicit `#SCROLL`, stops, and reverse motion remain active
 
 ### `gauge`
-- `normal | hard | ex_hard | easy` stay fixed until the song ends or fails.
-- `shift` simulates EX-Hard, Hard, Normal, and Easy independently from 100%. When the current tier reaches 0%, it selects the next surviving tier with its already accumulated value; the highest tier still alive at the end becomes the final gauge.
-- EX-Hard, Hard, Normal, and Easy all start at `100%` and fail immediately at `0%`.
-- `delta`
-  - `ex_hard`, `hard`, `normal`, `easy`
-  - each contains `PG`, `GR`, `GD`, `BD`, `PR`
+
+Gauge Shift is always active. `mode.gauge` selects the starting tier: `ex_hard / hard / normal / easy`, from EX down to Easy. The selected tier and every lower tier are simulated independently from 100%; a failed tier yields to the next surviving tier. Gauge failure occurs only when all eligible tiers fail. Legacy `shift` means an EX start.
+
+- `delta`: `ex_hard`, `hard`, `normal`, `easy` → `PG`, `GR`, `GD`, `BD`, `PR`.
 
 ### `graphics`
 - `display_mode` (string)
@@ -147,7 +148,7 @@ The chart loader and indexer are limited to BMS-family files (`.bms/.bme/.bml/.p
   - defaults to `krrcream`; NK3 also remasters unchanged key counts and its default `AUTO` backend prefers ncnn Vulkan
   - Krrcream only remaps source notes into target lanes
   - when expanding the key count, nK2 creates safe support notes directly in the target layout during conversion instead of pre-adding notes to the source
-  - NK3 always uses P64 and the host beam safety solver, adding the generalized MLP only for non-10K sources converted to 10K; select `TENRIFF_NK3_BACKEND=AUTO|VULKAN|OPENVINO`, where `AUTO` tries ncnn Vulkan first, and use `TENRIFF_NK3_VULKAN_DEVICE=<index>` when selecting among multiple Vulkan GPUs
+  - NK3 always uses P64 and the host beam safety solver, adding the generalized MLP only for non-10K sources converted to 10K; select `TENRIFF_NK3_BACKEND=AUTO|VULKAN|NCNN_CPU|OPENVINO`, where `AUTO` tries ncnn Vulkan first, and use `TENRIFF_NK3_VULKAN_DEVICE=<index>` when selecting among multiple Vulkan GPUs
 - `key_conversion_nk2_preset` (string)
   - `native | transform | remaster`; defaults to `native`
   - selects nK2 `Native (12%)`, `Transform (35%)` or `Remaster (65%)`; the setting row is locked for Krrcream
@@ -156,7 +157,7 @@ The chart loader and indexer are limited to BMS-family files (`.bms/.bme/.bml/.p
 - `gauge` (string)
   - `normal | hard | ex_hard | easy | shift`
 - `random` (string)
-  - `off | mirror | fr | sr`
+  - `off | mirror | rr | frns | sr` (`fr` = `frns`)
 - `random_seed` (int)
   - fixed seed for RR/SR, forced key-mode conversion, and LN Mix selection; ordinary Random creates a fresh session seed per play and records the actual value in the replay
 - `mods` (string array)
@@ -198,125 +199,78 @@ The chart loader and indexer are limited to BMS-family files (`.bms/.bme/.bml/.p
   - changing the setting separates cache modes and triggers a full reindex of the current song source
 
 ### `ui`
-- `profile_nickname` (string)
-  - editable in Quick Setup and used as the display name in saved records and multiplayer
-  - controls/duplicate whitespace are sanitized and UTF-8 length is limited to 48 bytes; an empty value falls back to the profile ID
-- `profile_avatar_path` (string)
-  - optional local PNG/JPG path selected from Profile Setup; empty uses the built-in TenRiff fallback mark
-  - the path is saved per profile and UI-sanitized to at most 2048 UTF-8 bytes
-- `language` (string)
-  - `en | ko`
-  - invalid values are normalized to `en` on load
-  - wired to the Language row in Graphics Settings
-- `result_tail_ms` (double)
-- `require_enter_to_exit` (bool)
-- `active_song_source` (string)
-  - the last song root that was opened
-- `recent_song_sources` (array of string)
-  - recent external/internal song source list
-- `song_collection_filter` (string)
-  - last selected all/favorites/named-collection filter
-- `song_key_filter` (int, `0..16`)
-  - last song-browser key-count filter; `0` means all keys
-- `song_level_min_filter`, `song_level_max_filter` (int, `0..50`)
-  - last level-range bounds; `0` disables that bound
-  - key, level, and collection filters are saved immediately and restored after restart
-- `difficulty_table_path` (string)
-  - path to a local BMS difficulty-table header JSON selected from Browse, or to the profile cache created from a link
-  - the header uses `name`, `symbol`, and a local relative `data_url`; data-array entries use `md5` or `sha256` plus `level`
-  - selecting or clearing the table reindexes the current source and displays table levels for matching charts; selecting one automatically switches indexing to `safe` because hashes are required
-- `difficulty_table_url` (string)
-  - original http(s) BMSTable HTML page or header JSON link imported from Browse
-- `online_records_server_url` (string)
-  - base URL for records, ranked play, and global chat on the currently selected account server
-  - the TenRiff main default is `https://121.174.18.181:27303`; a local private server may use `http://127.0.0.1:27302`
-  - server failures disable only the Online tab and never block local records or play
-  - standard `<meta name="bmstable" content="...">` metadata is resolved and the header/data JSON is cached under the profile `difficulty_tables` directory; local JSON selection clears this field
-- `tenriff_main_server_url` (string)
-  - fixed main API endpoint used by the F10 `TenRiff Main` selection
-  - main TenRiff API selected by the F10 account dialog; public deployments require HTTPS
-- `private_server_url` (string)
-  - user-entered private API URL; remote endpoints require HTTPS and only localhost may use HTTP
-- `account_server_mode` (string)
-  - last selected account server: `main | private`
+
+| Field | Type, range, default | Behavior |
+| --- | --- | --- |
+| `profile_nickname` | string; UTF-8 ≤48 bytes | Display name; empty uses profile ID. Whitespace/control characters are normalized. |
+| `profile_avatar_path` | string; UTF-8 ≤2048 bytes | Local PNG/JPG avatar path. |
+| `language` | `en`, `ko`; `en` | UI language; invalid values normalize to en. |
+| `result_tail_ms` | double; `500` ms | Extra result-transition delay after judgement completion; the chart audio end is also considered. |
+| `require_enter_to_exit` | bool; `true` | Retained for read/write compatibility; the current Windows result-input path does not use it to auto-exit. |
+| `show_cursor_in_gameplay` | bool; `true` | Show the mouse pointer during gameplay. |
+| `active_song_source`, `recent_song_sources` | string / string[] | Current and recent song folders. |
+| `session_mix_lr2_course_path` | string | Selected LR2 course file path. |
+| `favorite_chart_keys` | string[] | Internal chart keys for favorites. |
+| `collections` | object: name → string[] | Chart keys grouped by collection name. |
+| `song_collection_filter` | string; `all` | All/favorites/collection filter; saved immediately. |
+| `song_key_filter` | int: `0..16`; `0` | Key-count filter; zero means all. UI choices are 4K–10K, 12K, 14K and 16K. |
+| `song_level_min_filter`, `song_level_max_filter` | int: `0..50`; `0` | Level bounds; zero disables the corresponding bound. |
+| `difficulty_table_path` | string | Local header JSON or downloaded profile-cache header. Changes reindex; selecting a table switches indexing to safe. |
+| `difficulty_table_url` | string | Original HTTP(S) BMSTable page/header URL. Resolves bmstable metadata and caches header/data; local JSON selection clears it. |
+| `online_records_server_url` | string | Records/ranking/chat API URL; failures do not block local play or records. |
+| `tenriff_main_server_url` | string | F10 main-server API URL; default is `kTenRiffMainApiUrl` in Config.h. |
+| `private_server_url` | string | F10 private API URL; remote HTTPS, HTTP allowed only for localhost. |
+| `account_server_mode` | `main`, `private`; `main` | Last account-server selection. |
+
+Difficulty-table headers use `name`, `symbol` and a local relative `data_url`; data entries match `md5` or `sha256` plus `level`. Remote imports are stored in the profile's `difficulty_tables` cache.
 
 ### `skin`
-- `source` (string)
-  - `native | tenriff | lr2`
-- `tenriff_skin_name` (string)
-  - imported TenRiff `skin.json` skin folder name
-- `lr2_skin_name` (string)
-  - imported LR2 playskin name
-- `lr2_resolution_mode` (string)
-  - `auto | sd | hd | fhd`
-  - LR2 playskin resolution override token
-  - `auto` resolves the SD/HD/FHD family based on the LR2 playskin `#DST_NOTE` layout coordinates instead of asset file names
-- `note_shape` (string)
-  - `rect | triangle | pentagon | hexagon | circle`
-  - at 100%, procedural circle and polygon shapes use the same full lane width as the rect bar
-- `show_hold_tail` (bool)
-  - shows or hides the long-note tail cap without changing hold judgement/body continuity
-- `note_border_enabled` (bool)
-- `black_playfield_enabled` (bool)
-  - when true, fills the complete player/ghost playfield, including lane-spacing gaps, with solid black
-  - defaults to `true`; an explicit `false` in an existing profile is preserved
-- `judgement_line_position` (double)
-  - vertical position ratio of the gameplay judgement line
-  - clamped to the `0.00..1.00` range (0% to 100%)
-  - default value is `0.82`
-- `judgement_position` (double): independent judgement Y anchor, 0.10–0.78; missing fields inherit the existing combo anchor.
-- `judgement_offset_x`, `combo_offset_x` (double): independent X offsets in 1920x1080 base pixels, -600–600; default 0.
-- `combo_position` (double)
-  - vertical position ratio of the combo display inside the gameplay field
-  - clamped to the `0.10..0.78` range
-  - default value is `0.24`
-- `lane_width_scales` (object)
-  - per-key-mode arrays for individual lane-width scales
-  - each mode value is a number array with one entry per lane
-  - each value is clamped to the `0.50..1.75` range
-- `note_width_scale` (double)
-  - scales the complete centered playfield, lanes/dividers, note heads/tails, and adjacent gauges together (`0.50..1.40`)
-  - the default combined edge gap between adjacent notes is `24px` at 100%
-  - clamped to the `0.50..1.40` range
-- `lane_spacing_scales` (object)
-  - per-key-mode arrays for blank spacing between lanes
-  - each mode value is a number array with `(lane_count - 1)` entries
-  - each value is clamped to the `0.00..2.00` range
-- `note_height_scale` (double)
-  - height scale for note heads / tails
-  - clamped to the `0.50..4.00` range
-- `lane_divider_width_scale` (double)
-  - shared scale for the white lane separator lines
-  - clamped to the `0.00..2.00` range
-  - applied uniformly across all key modes
-  - native skin multiplies the default `1px` divider by this value, and LR2 skins also multiply any imported divider widths by it
-- `lane_center_gap_scale` (double)
-  - center-gap scale between the left and right halves of the 16K field
-  - clamped to the `0.00..2.00` range
-  - currently applied only to the `16k` layout
-- `hold_body_width_scale` (double)
-  - width scale for long-note bodies
-  - clamped to the `0.50..1.20` range
-  - actual render calculation uses `max(4.0f, note_width * 0.5f * scale)`
-- `note_width_scales` (object)
-  - per-key-mode `note_width_scale` overrides
-- `note_height_scales` (object)
-  - per-key-mode `note_height_scale` overrides
-- `lane_divider_width_scales` (object)
-  - legacy compatibility field
-  - the current runtime uses only the shared `lane_divider_width_scale`
-- `lane_center_gap_scales` (object)
-  - per-key-mode `lane_center_gap_scale` overrides
-- `single_color` (string)
-  - `off` or one of the supported color tokens
-  - a color token overrides every key mode and scratch lane with that color
-  - the per-lane `lane_colors` remain stored, so selecting `off` restores the previous palettes
-- `lane_colors` (object)
-  - per-key-mode lane color palettes
-  - current default / persisted modes are `4k..10k` and `16k`
-  - each mode value is an array of strings with one entry per lane
-  - supported tokens:
-    `ice`, `azure`, `gold`, `mint`, `rose`, `violet`, `orange`, `teal`
+
+These are profile `config.json` skin settings. For a skin package's `skin.json` contract, see [Skin format](skin-format.md).
+
+| Field | Type, range, default | Behavior |
+| --- | --- | --- |
+| `source` | string: `native`, `tenriff`, `lr2` | Skin source. |
+| `tenriff_skin_name`, `lr2_skin_name` | string | Imported skin folder names. |
+| `scratch_position` | `left`, `right`; `left` | Changes only 7+1 scratch display order; input/judgement lanes stay unchanged. |
+| `lr2_resolution_mode` | `auto`, `sd`, `hd`, `fhd`; `auto` | LR2 coordinate resolution; auto uses `#DST_NOTE` coordinates, not filenames. |
+| `visual_preset` | `classic`, `neon`, `minimal`, `tenriff`; `tenriff` | Selecting a preset in the menu resets its visual option bundle. |
+| `note_shape` | `rect`, `triangle`, `pentagon`, `hexagon`, `circle`; `rect` | Procedural note shape. |
+| `note_image_aspect` | `stretch`, `contain`, `width`; `stretch` | Fill the rectangle / fit inside with aspect preserved / keep width and derive height from aspect. |
+| `preserve_note_image_aspect_ratio` | bool; `false` | Legacy field; explicit `note_image_aspect` wins. Saved true for non-stretch modes. |
+| `note_border_enabled`, `show_lane_dividers`, `show_judgement_line` | bool; `true` | Show note borders, lane dividers, and the judgement line respectively. |
+| `note_divider_gap_px` | double: `0..40`; `12` px | Gap from each note edge to the divider; zero expands notes to the dividers. |
+| `show_gear_boundary_line` | bool; `false` | Show the gear boundary line. |
+| `show_timing_feedback` | bool; `true` | Show FAST/SLOW text and timing history; judgement grades remain independent. |
+| `show_hold_tail`, `hold_tail_taper_enabled` | bool; `false` | LN tail-cap visibility and taper respectively; no judgement-rule change. |
+| `judgement_line_glow_enabled` | bool; `true` | Judgement-line glow. |
+| `key_pulse_brightness` | double: `0..1`; `1` | Hit Burst brightness; zero disables it. |
+| `key_pulse_enabled` | bool; `true` | Legacy ON/OFF mirror; false or zero brightness disables the burst. |
+| `hit_burst_style` | `prism`, `ring`, `spark`; `prism` | Built-in Hit Burst material. |
+| `ui_font` | `default`, `malgun`, `bahnschrift`, `consolas`; `default` | Menu font; default is Segoe UI. Logo, rank and combo keep their dedicated fonts. |
+| `key_label_position` | `bottom`, `top`, `off`; `bottom` | Lane key-label position. |
+| `judgement_line_position` | double: `0..1`; `0.82` | Vertical judgement-line position ratio. |
+| `gameplay_field_offset_x` | double: `-720..720`; `0` | Field X offset in 1920×1080 base pixels; additionally constrained to keep the field and ↔ handle visible. |
+| `combo_position`, `judgement_position` | double: `0.10..0.78`; `0.24` | Independent combo/judgement Y anchors; missing judgement position inherits `combo_position` in older profiles. |
+| `combo_offset_x`, `judgement_offset_x` | double: `-600..600`; `0` | Independent combo/judgement X offsets in 1920×1080 base pixels. |
+| `lane_background_opacity` | double: `0..0.45`; `0.18` | Lane-background opacity. |
+| `black_playfield_enabled` | bool; `true` | Black field including lane gaps. |
+| `visual_opacity` | double: `0.20..1`; `0.96` | Shared opacity multiplier for notes, receptors and key labels. |
+| `note_outline_opacity` | double: `0..1`; `0.78` | Note-outline opacity. |
+| `hold_body_opacity` | double: `0.05..1`; `1` | LN-body opacity. |
+| `lane_width_scales` | object: mode → number[]; `0.50..1.75` | Per-lane widths; array length equals lane count. |
+| `note_width_scale` | double: `0.50..1.40`; `1` | Note & Field Size: scales field, lanes, notes and adjacent gauge around the center. |
+| `lane_spacing_scales` | object: mode → number[]; `0..2` | Lane-gap array with lane_count - 1 entries. |
+| `note_height_scale` | double: `0.50..4`; `1.8` | Note head/tail height scale. |
+| `lane_divider_width_scale` | double: `0..2`; `1` | Shared divider-width scale for all modes, including imported LR2 dividers. |
+| `lane_center_gap_scale` | double: `0..2`; `0` | Center gap between the two 16K blocks. |
+| `hold_body_width_scale` | double: `0.50..1.20`; `1` | LN-body width scale. |
+| `note_width_scales`, `note_height_scales`, `lane_center_gap_scales` | object: mode → number | Per-mode overrides of the corresponding scalar, with the same bounds. |
+| `lane_divider_width_scales` | object: mode → number | Legacy field; runtime uses the shared `lane_divider_width_scale`. |
+| `lane_colors` | object: mode → string[] | Color-token array with one entry per lane. |
+| `single_color` | string; `off` | A color token overrides all lanes while preserving `lane_colors`. |
+
+Per-mode arrays/overrides support `4k`, `5k`, `6k`, `7k`, `7+1`, `8k`, `9k`, `10k`, `12k`, `14k`, `16k`. Color tokens: `ice`, `azure`, `gold`, `mint`, `rose`, `violet`, `orange`, `teal`. `7+1` is a skin palette, not a separate keymap mode. Legacy `expand_notes_to_dividers=true` seeds a zero gap; explicit `note_divider_gap_px` takes precedence.
 
 ### `offsets`
 - `input` (double)
@@ -334,7 +288,7 @@ The chart loader and indexer are limited to BMS-family files (`.bms/.bme/.bml/.p
 - `bindings`
   - legacy 10K compatibility
 - `modes`
-  - `4k`, `5k`, `6k`, `7k`, `8k`, `9k`, `10k`
+  - `4k`, `5k`, `6k`, `7k`, `8k`, `9k`, `10k`, `12k`, `14k`, `16k`
   - lane id -> key token under each mode
 
 ### Notes

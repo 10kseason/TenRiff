@@ -15,7 +15,7 @@ Windows では通常、次のどちらかで起動します。
 または
 
 ```powershell
-.\build-dist\Release\TenRiff.exe --songs .\songs --profile default
+.\TenRiff.exe --profile default
 ```
 
 初回起動時には default profile が自動生成されます。
@@ -44,13 +44,13 @@ Windows では通常、次のどちらかで起動します。
 - 左クリック: 曲選択
 - ダブルクリック: 曲開始
 - `Enter`: 現在選択中の曲を開始
-- 右側の `BEST SCORE` card を左クリック: その曲の最高 Result を開き、`WATCH REPLAY` または `F1` で replay を再生
-- 左側の `RECORDS`: 現在の曲の local play を確認し、`OPEN RESULT` で選択結果を開く
-- `Left` / `Right`: 左側メニューのフォーカス切り替え
+- 中央の `MY BEST` カードで最高記録の Result を開き、リプレイボタンまたは F1 で再生します。
+- 上部の `RECORDS` タブで現在の譜面のローカル記録と選択結果を開きます。
+- `Left / Right`: ナビゲーションのフォーカス移動。Tab のクイック設定では上下で項目、左右で値を選びます。
 - `Esc`: 前の画面に戻る
 - `-` / `+`: 次の play の Rate を即時調整
 - `F5`: 曲ライブラリを再インデックス。実行中は stage / percent / ETA と progress bar を中央表示
-- `Browse > Difficulty Table`: BMSTable HTML/header link をコピーして `Enter` で import、`Right` で local JSON 選択、`Left` で解除
+- 中央下部の難易度表カード: 名前・URL で編集、File でローカル JSON、Reset で標準 LV。Enter で URL 適用、Esc で取消。Sort / Filter 内の難易度表行も使用できます。
 
 ### Song Select からよく使う画面
 - `Mode`
@@ -62,7 +62,7 @@ Windows では通常、次のどちらかで起動します。
   - `BGA` を off にすると gameplay image/video background と decoder/upscaler 処理を無効化し、Song Select preview は維持
   - model 選択後に upscaler を明示的に ON にして high-spec 警告を確認する。実験的 `NPU 優先` は Windows/driver が実際に NPU を選択した場合だけ NPU を使う
 - `Skins`
-  - native/LR2 skin 切り替え、Visual Latency、hold depth と打鍵 glitch を持つ native 下部 digital-piano key、LR2 folder 単体または 独立した non-IIDX `LR2files/Theme` の一括 import（IIDX 依存 theme は除外）、field size に連動して拡大し判定線の下へ clip する aspect ratio 維持の下部 Gear frame、固定 divider 基準の note gap/size、Black Playfield、judge line 位置、LN body width、lane colors を調整
+  - native / TenRiff `skin.json` / LR2 skin 切り替え、Visual Latency、hold depth と打鍵 glitch を持つ native 下部 digital-piano key、LR2 folder 単体または 独立した non-IIDX `LR2files/Theme` の一括 import（IIDX 依存 theme は除外）、field size に連動して拡大し判定線の下へ clip する aspect ratio 維持の下部 Gear frame、固定 divider 基準の note gap/size、Black Playfield、judge line 位置、LN body width、lane colors を調整
 - `Keymap`
   - key binding 変更と NKRO test 実行
 
@@ -94,6 +94,8 @@ client 側の設定は Discord の [公式 Game Overlay guide](https://support.d
 - `8K`: `W E R V M I O P`
 - `9K`: `A S D F Space H J K L`
 - `10K`: `Q W E R V M I O P [`
+- `12K`: `Q W E R F V M I O P [ ]`
+- `14K`: `Q W E R T F V M I O P [ ] \`
 - `16K`: `Q W E R A S D F U I O P J K L ;`
 
 合わない場合は `Options > Keymap` で変更できます。
@@ -115,7 +117,7 @@ client 側の設定は Discord の [公式 Game Overlay guide](https://support.d
 
 - 譜面キー入力: 現在の keymap に従う
 - `Esc`: single-player では pause menu（Continue / Restart / Exit）、multiplayer ではプレイを中止
-- F3: Hi-Speed を下げる
+- `F3`: Hi-Speed を下げる
 - `F4`: Hi-Speed を上げる
 - `F5`: Hi-Speed を大きく下げる
 - `F6`: Hi-Speed を大きく上げる
@@ -141,6 +143,13 @@ Rate は曲の再生速度と譜面スケジュールだけを変え、同じ Hi
 
 `Graphics > Performance HUD` を有効にすると、frame graph、average FPS、low FPS、gameplay timing debug 情報も見られます。
 
+### 判定・コンボ表示と音量
+
+- P-GREAT のみ黄色・虹色のきらめき・ポップ演出を使います。GREAT は水色、GOOD は灰色で、下位判定の文字は動きません。
+- FAST/SLOW は該当方向のみ表示し、P-GREAT または丸めて 0ms になる偏差では省略します。
+- `Options > Skins` で判定 X/Y とコンボ X/Y を個別に調整・保存できます。
+- `Options > Audio > Normalize Audio` はゲーム内ミックスの RMS 音量調整で、既定は OFF。メニュー音楽・選曲プレビューは変更しません。
+
 ## 9. 判定とゲージ
 
 ### Judgement
@@ -163,21 +172,11 @@ Accuracy は `PG / GR / GD / BD = 100 / 80 / 50 / 20%` を基準に、各 judgem
 Rank は `<75 F`, `75 B`, `80.5 A`, `86.5 A+`, `90 S`, `95.5 S+`, `98 AA`, `99 SS`, `99.75 SSS` の境界を使います。
 
 ### Gauge
-- `ex_hard`
-- `hard`
-- `normal`
-- `easy`
-- `shift`
 
-固定 gauge（`ex_hard / hard / normal / easy`）は曲開始時に `100%` で始まり、play 中に type は変わりません。
+Gauge Shift は常に有効です。`EX / Hard / Normal / Easy` は開始段階で、保存値は `ex_hard / hard / normal / easy` です。選択段階と下位段階をそれぞれ 100% から並列計算します。現在の段階が 0% で脱落すると、同じ判定履歴を累積した次の生存段階へ移り、終了時の最上位生存段階が結果になります。対象段階がすべて脱落するとゲージ失敗です。
 
-- `ex_hard`: Hard より回復が低く `BAD` / `POOR` damage が大きい。Hard と異なる黒に近い gray palette で表示し、`0%` で即 Game Over
-- `hard`: `0%` で即 Game Over
-- `normal`: `0%` で即 Game Over
-- `easy`: `0%` で即 Game Over
-- `shift`: EX-Hard / Hard / Normal / Easy をそれぞれ 100% から独立して並列計算。現在の tier が脱落すると、同じ判定履歴を累積した次の生存 tier を選び、終了時の最上位生存 tier で確定
+旧 `shift` は EX 開始として解釈します。Practice・Pacemaker など独自の終了規則を持つモードはその規則を維持します。
 
-gauge transition は `shift` を明示的に選択した場合だけ発生します。
 `Sudden Death (1 MISS)` は gauge type ではなく、最初の OD8 換算 object `MISS` で gauge を 0 にして即終了する rule です。native `BAD` timing だけでは発動せず、空打ちの `POOR` も対象外で、Practice No-Fail と同時には有効化できません。
 
 ## 10. Result 画面
@@ -189,12 +188,12 @@ gauge transition は `shift` を明示的に選択した場合だけ発生しま
 - Accuracy
 - Max Combo
 - PG / GR / GD / BD / PR の合計
-- 平均 timing deviation と分散
+- 平均 timing deviation と標準偏差
 - 最終 gauge と gauge 履歴
 - 保存された replay / result file 名
 
 戻るキー:
-- `Left`: 同じ譜面を即再開
+- `R / Left`: 同じ譜面を即再開
 - `F1`: 保存 replay がある場合に再生
 - `Enter`: Song Select に戻る
 - `Esc`: Song Select に戻る

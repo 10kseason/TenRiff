@@ -1,5 +1,7 @@
 # Core Play Loop (Initial Implementation)
 
+> Document scope: includes early designs, improvement proposals and dated analysis. Uncompleted proposals and historical measurements are not current behavior, defaults or performance guarantees. See [current state](current-state.en.md) and [configuration](config.en.md).
+
 This document summarizes the structure and data flow of the currently implemented **core play loop**.
 
 ## Core Flow

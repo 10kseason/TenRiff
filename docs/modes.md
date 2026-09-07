@@ -19,6 +19,9 @@
   "autoplay_enabled": false,
   "practice_no_fail_enabled": false,
   "one_miss_fail_enabled": false,
+  "pacemaker_mode": "off",
+  "pacemaker_target_accuracy": 90.0,
+  "pacemaker_target_score": 8000,
   "song_index_profile": "safe",
   "calculate_song_index_difficulty": false
 }
@@ -42,6 +45,7 @@
 - `one_miss_fail_enabled`: 첫 OD8 환산 객체 `MISS`에서 즉시 실패하는 `Sudden Death (1 MISS)`
   - 네이티브 `BAD`만으로는 즉사하지 않으며 빈 키 입력의 `POOR`도 즉사 조건이 아님
   - Mode Settings에서 Practice No-Fail과 상호 배타적
+- `pacemaker_mode`: `off | accuracy | score`, 기본 `off`. 목표는 `pacemaker_target_accuracy` (`0..100`, 기본 `90`) 또는 `pacemaker_target_score` (`0..10000`, 기본 `8000`). 게이지 조기 실패 없이 끝까지 진행해 목표를 판정하며 Practice·Sudden Death와 동시에 쓰지 않고 멀티·리플레이에는 적용하지 않습니다.
 - `song_index_profile`: `safe | fast`
   - `safe`: large-library RAM high-water를 우선 낮추는 기본값
   - `fast`: 제목/아티스트/키 수/#PLAYLEVEL/BPM만 유지하고 해시·미리보기·난이도표·자체 LV/CR을 생략하는 최소 인덱싱
@@ -73,18 +77,18 @@
 ## 키모드 처리
 - `none`은 차트 레인 수와 기본 패턴 레이아웃을 그대로 사용
 - `auto`는 legacy alias로 남아 있으며 현재는 `none`과 같은 동작
-- `4k..10k`, `12k`, `14k`, `16k`는 N2NC 기반 lane remap으로 키 수를 맞춤
+- `4k..10k`, `12k`, `14k`, `16k`는 선택한 Krrcream / nK2 / NK3 알고리즘으로 키 수를 맞춥니다.
 - `5+1 SP`와 `7+1 SP` 강제 변환은 스크래치를 제외한 건반부만 목표 키 수로 재배치하며, `follow` 스크래치 키사운드는 자동 재생 큐로 이동
 - `10+2 DP`와 `14+2 DP` 강제 변환도 두 스크래치를 제외하고 좌우 건반부를 독립적으로 변환
 - nK2 확장은 원본 노트를 목표 키에 먼저 배치한 뒤 같은 목표 레이아웃에 보조 노트를 생성하며, 원본 4K 등에 노트를 미리 추가한 뒤 다시 변환하지 않음
 - 적용 순서: key-mode 변환(nK2 목표 레이아웃 보조 노트 생성 포함) → DP Flip → Mirror/RR/FR/SR → Note Add → LN/Full Tap 구조 변환
 
 ## 게이지 규칙
-- `ex_hard / hard / normal / easy`는 항상 적용되는 Gauge Shift의 시작 등급이며 모두 `100%`에서 시작합니다.
-- 선택한 시작 등급부터 Easy까지를 병렬 계산하고, 현재 tier가 탈락하면 같은 판정 이력을 누적한 다음 생존 tier를 선택하며 종료 시 가장 높은 생존 tier로 확정합니다.
-- `ex_hard`는 화면에서 `EX`로 표시하며 Hard보다 회복이 낮고 `BAD`/`POOR` 손실이 더 큰 도전용 시작 등급입니다.
-- clear status는 `GAUGE SHIFT EX / HARD / NORMAL / EASY CLEAR`로 최종 생존 tier를 구분합니다.
-- `Sudden Death (1 MISS)`는 게이지 종류가 아니라 첫 OD8 환산 객체 `MISS`에서 현재 게이지를 0으로 만들고 즉시 종료하는 별도 실패 규칙입니다.
+
+- `ex_hard / hard / normal / easy`는 항상 적용되는 Gauge Shift의 시작 등급입니다. 기존 `shift`는 EX 시작입니다.
+- 선택한 시작 등급부터 Easy까지 각각 100%에서 병렬 계산하며, 현재 등급 탈락 시 다음 생존 등급으로 이동합니다. 모든 대상 등급이 탈락해야 게이지 실패입니다.
+- 최종 생존 등급을 `GAUGE SHIFT EX / HARD / NORMAL / EASY CLEAR`로 표시합니다.
+- Practice·Pacemaker의 별도 종료 규칙은 유지합니다. Sudden Death는 첫 OD8 환산 객체 MISS에서 즉시 종료합니다.
 
 ## 구현 위치
 - 모드 파싱: `src/gameplay/ModeSettings.*`, `src/app/ModeResolver.*`

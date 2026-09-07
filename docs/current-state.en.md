@@ -4,11 +4,11 @@ This is the document that the next agent or any new contributor should read firs
 
 ## Baseline
 - Current stable release line: `1.7.1`
-- 1.7.1 improves multiplayer standings, gameplay feedback, independent judgement/combo placement, ten pastel Options cards, optional audio normalization and the Song Select difficulty-table control. See [follow-up details](gameplay-polish-followup.md) and [release verification](release-1.7.1-gate.md).
+- 1.7.1 provides full-room HUD/results for up to eight players, tied ranks/missing-score states, P-GREAT-only effects, independent judgement/combo placement, ten Options cards, audio normalization and the Song Select difficulty-table card. See [follow-up details](gameplay-polish-followup.md) and [verification](release-1.7.1-gate.md).
 - 1.7.0 refreshes native Home, Song Select, Result and shared settings. See [UI implementation](menu-visual-polish.md) and [release verification](release-1.7.0-gate.md). The prism remains only in the custom-skin path; result reveal timing is unchanged.
 - Native Result now emphasizes score, grade and accuracy; the prism remains in custom skins. The existing 2.2-second reveal, Space skip and control readiness rules are preserved.
 - UI-r2 Song Select uses a reference-led top navigation, seven-row jacket library, large selected artwork, best-record card, chart/mode panel, and a prominent working Start action. Collection/store/currency/global-ranking placeholders are not shown.
-- The Song Select Rate, Hi-Speed, Gauge, and Random cells apply increase/next on left click and decrease/previous on right click, then save immediately. The current-chart key count no longer clips, and best records show score, accuracy, and max combo together.
+- The Song Select Visual Latency, Hi-Speed, Gauge, and Random cells apply increase/next on left click and decrease/previous on right click, then save immediately. The current-chart key count no longer clips, and best records show score, accuracy, and max combo together.
 - Replay evidence v3 binds the chart SHA-256, canonical ruleset, and result-to-replay SHA-256, then replays the input trace through a headless engine. Official local bests use only recomputed verified outcomes; legacy, custom-ruleset, and assist records remain visible as unverified history.
 - 1.3.1 removes the external `.osu` parser, indexing path, and settings toggle to make the chart surface BMS-only again. Selecting a BMSTable now switches Fast to Safe automatically for hash matching; the live Aery server and the CG901B MD5→`⑤LEVEL 13` match were verified.
 - Profile Setup now saves an optional local PNG/JPG avatar path; the Song Select profile card displays it and opens profile editing when clicked.
@@ -80,19 +80,20 @@ This is the document that the next agent or any new contributor should read firs
   - normal BMS LN tails auto-clear when held to the end
 - BMS audio decode:
   - WAV native first
-  - Windows Media Foundation fallback for OGG / MP3
+  - OGG uses native `stb_vorbis` first, then Windows Media Foundation on failure
+  - MP3 uses Windows Media Foundation
   - `ffmpeg.exe` fallback if Media Foundation fails
 - Song Select:
   - cache-first loading
   - `F5` forced reindexing
   - mouse-wheel navigation
-  - left-side `KEY` quick filter toggle
+  - Key-count filtering through `Sort / Filter > Key Filter`
   - external folder / BMS drag-and-drop
   - recent source persistence and reopening
   - difficulty / title sorting
   - when search is inactive, `-`/`+` adjust the current play Rate
   - indexing stage, percentage, processed/total, ETA, song count, and a progress bar are centered below the header
-  - Browse can select local header JSON or import a clipboard http(s) BMSTable HTML/header link into the profile cache; MD5/SHA-256 matches supply levels/symbols and changing the table reindexes
+  - The lower-center difficulty-table card opens URL editing, local JSON selection or native-LV reset. Filters shares the same import path; changes reindex and match by MD5/SHA-256.
 - BMS key modes:
   - separate keymaps per key mode
   - chart difficulty calculation across supported key counts
@@ -101,8 +102,7 @@ This is the document that the next agent or any new contributor should read firs
   - the separate `Conversion Note Add` option is removed: Krrcream only remaps source notes, while nK2 creates safe support notes directly in the converted target layout when expanding the key count.
   - nK2 offers `Native (12%)` by default, `Transform (35%)` and `Remaster (65%)`; `Remaster` raises the budget while locking the anchor so the source placement survives, and fills LN sections with holds of the same length. All three are caps - the source density and the safety windows decide how much actually lands. The row is locked for Krrcream, and the standalone converter GUI also locks Krrcream Max/Min/Speed/Seed tuning.
   - NK3 always combines bundled P64 with host beam32. It adds the generalized pattern MLP only when a non-10K source is converted to 10K; 10K-to-10K and every other target use P64 alone. The default `AUTO` backend runs both P64 and the MLP on AMD/NVIDIA GPUs through ncnn Vulkan, retaining the optional OpenVINO compatibility path as fallback. `TENRIFF_NK3_BACKEND` and `TENRIFF_NK3_VULKAN_DEVICE` can force the selection.
-  - the standalone BMS key converter CLI/GUI can select the default `krrcream` path or deterministic `nK2 Native 50/50`; nK2 ignores Krrcream-only tuning controls
-  - official 1.5.1 builds/Windows archives do not build or ship the standalone BMS key-converter CLI/GUI; its top-level CMake option defaults `OFF` and the source is retained only for development regression
+  - official 1.7.1 builds/Windows archives do not build or ship the standalone BMS key-converter CLI/GUI; its top-level CMake option defaults `OFF` and the source is retained only for development regression
   - `mode.key_mode=none` keeps the chart's original key count and base pattern layout intact
 - Native difficulty:
   - BMS LV/CR calculation evaluates only LN head/tail miss-ms at 0.5x, so `300ms` is treated as `150ms`; runtime gameplay judgement windows remain unchanged
@@ -113,8 +113,8 @@ This is the document that the next agent or any new contributor should read firs
   - standard `10+2 DP` charts map the `10K` lane-color palette across the ten playable key lanes while leaving native 12K palettes independent
   - `rect / triangle / pentagon / hexagon / circle` note shapes; procedural circles and polygons use the full rect-bar width at 100%
   - note border on/off
-  - combo Y adjustment
-  - new judgement labels/FAST-SLOW millisecond numbers pop for 220ms, while combo numbers pop for 150ms; both animations are render-only
+  - Judgement X/Y and combo X/Y are independently configurable and saved. FAST/SLOW shows only the applicable direction and is omitted for P-GREAT.
+  - Only P-GREAT uses yellow text, rainbow sparkles and a 220ms pop. GREAT stays cyan and GOOD gray; lower judgement and FAST/SLOW text remain stationary. Combo numbers retain their separate 150ms pop.
   - judge line / lane width / lane spacing / note & field size / divider width / 16K center gap / note height / LN body width adjustment
   - `Note & Field Size` scales the centered playfield, lanes/dividers, notes, and adjacent gauges together from 50% to 140%; adjacent notes keep a default combined 24px gap at 100%
   - Black Playfield fills the complete player/ghost playfield, including lane-spacing gaps, with solid black
@@ -129,15 +129,15 @@ This is the document that the next agent or any new contributor should read firs
   - eased future-note entry from above the field
   - after the last judged note, gameplay waits for the music by default; pressing a lane key during that tail moves to Result immediately
 - Judge:
-  - default `GOOD` window is `75ms`
+  - default `PG / GR / GD` windows are `20ms / 65ms / 115ms`
   - the default `BAD` window is `210ms`, `Judge Easy` uses `262.5ms`, and `Judge Hard` uses `340ms`
-  - `Judge Hard` narrows only the BAD boundary and leaves PG/GR/GD plus long-note tail windows at their base values
+  - `Judge Hard` changes only the outer BAD boundary and leaves PG/GR/GD plus long-note tail windows at their base values
   - if the pending same-lane note is already a `BAD` while the immediate next note is clearly `GOOD` or better, the pending note is recorded as a miss and the current press scores the next note instead of locking the stream into repeated `BAD`s
   - under `Judge Hard`, an unplayed object becomes a combo-breaking indirect `POOR` and OD8 `MISS`; other note-consuming failures stay `BAD`
   - very early non-consuming presses are handled as LR2-style `POOR` and are visible again in result / replay / UI paths
   - empty-key `POOR` preserves combo, while Hard indirect `POOR` breaks combo; both stay out of score / accuracy totals and use dedicated `PR` gauge damage
-  - gauge modes support `EX-Hard / Hard / Normal / Easy / Gauge Shift`; fixed gauges start at `100%`, fail immediately at `0%`, and never change type, while EX-Hard uses a near-black gray palette distinct from Hard
-  - `Gauge Shift` independently simulates EX-Hard / Hard / Normal / Easy from 100%; when the current tier reaches 0%, it selects the next tier that survived the same judgement history, and the highest surviving tier becomes final
+  - Gauge selection sets the starting tier of always-active Gauge Shift: `EX / Hard / Normal / Easy`. Legacy `shift` means an EX start.
+  - The selected tier and all lower tiers are simulated from 100%; a failed tier yields to the next survivor, and the highest survivor is final.
   - `Sudden Death (1 MISS)` fails immediately on the first OD8-converted object `MISS`; native `BAD` timing alone and empty-key `POOR` are ignored, and the option is mutually exclusive with Practice No-Fail
   - OD8 conversion remains internal for Sudden Death and legacy replay compatibility; Gameplay and Result show only the native TenRiff score
   - casual score is normalized to a 10,000 maximum with `PG 6 / GR 3 / GD 1 / PR 0 / FAIL 0` judgement weights; LN heads and tails each carry 0.5 weight and form one object, while detail score remains separate
@@ -215,7 +215,7 @@ This is the document that the next agent or any new contributor should read firs
 
 ## Runtime / Packaging Rules
 - New user profiles are created automatically
-- The current stable P2P distribution line is `TenRiff 1.5.1`
+- The current stable P2P distribution line is `TenRiff 1.7.1`
 - Distribution packages do not include `Songs`
 - Distribution packages include the `Mainmusic/` scene slots `Main Menu / Options / Song Selecte / Multiplayer Lobby / Clear / Failed`; each `Name.mp3` plus numbered `Name 2.mp3` through `Name 64.mp3` siblings is discovered automatically and rotates on scene re-entry
 - Distribution updates include only built artifacts and required runtime assets
@@ -227,7 +227,7 @@ This is the document that the next agent or any new contributor should read firs
 - The real default values live in `config/config.json`
 - The runtime profile lives in `profiles/<name>/config.json`
 - The keymap lives in `profiles/<name>/keymap.json`
-- `keymap.json` has a `modes.{4k..10k}` per-mode binding structure
+- `keymap.json` has a `modes.{4k..10k,12k,14k,16k}` per-mode binding structure
 - Stale profiles are partially corrected by runtime migration
   - keysound policy
   - removed osu fields are no longer persisted
@@ -252,6 +252,8 @@ This is the document that the next agent or any new contributor should read firs
 - `cmake -S . -B build-check -G "Visual Studio 17 2022" -A x64`
 - `cmake --build build-check --config Release --target bms_parser_tests`
 - `.\build-check\Release\bms_parser_tests.exe`
+
+MSVC ASan runs the deterministic unit core, excluding RawInput/localhost OS and NK3/OpenVINO integration cases. `tests/unit/test_bms_parser.cpp` owns the exclusions; `CMakeLists.txt` supplies the CTest arguments. Run the full integration suite in normal Release.
 
 ## Still Manual-Validation Heavy
 - Song Select fast-scroll crash reproduction on a real CJK-heavy library

@@ -19,6 +19,9 @@
   "autoplay_enabled": false,
   "practice_no_fail_enabled": false,
   "one_miss_fail_enabled": false,
+  "pacemaker_mode": "off",
+  "pacemaker_target_accuracy": 90.0,
+  "pacemaker_target_score": 8000,
   "song_index_profile": "safe",
   "calculate_song_index_difficulty": false
 }
@@ -43,6 +46,7 @@
 - `one_miss_fail_enabled`: 最初の OD8 換算 object `MISS` で即失敗する `Sudden Death (1 MISS)`
   - native `BAD` timing だけでは発動せず、空打ちの `POOR` も発動条件ではない
   - Mode Settings では Practice No-Fail と排他的
+- `pacemaker_mode`: `off | accuracy | score`、既定 `off`。目標は `pacemaker_target_accuracy`（`0..100`、既定 `90`）または `pacemaker_target_score`（`0..10000`、既定 `8000`）。ゲージによる途中失敗なしで最後まで進み、目標で結果を判定。Practice・Sudden Death と排他で、マルチ・リプレイには適用しません。
 - `song_index_profile`: `safe | fast`
   - `safe`: 大規模ライブラリでの RAM high-water 抑制を優先する既定値
   - `fast`: title/artist/key count/#PLAYLEVEL/BPM のみ保持し、hash、preview、difficulty table、native LV/CR を省略する最小 indexing
@@ -74,18 +78,18 @@
 ## Key-Mode Handling
 - `none` は譜面の lane count と base pattern layout をそのまま維持する
 - `auto` は legacy alias で、現状は `none` と同じ挙動
-- `4k..10k`、`12k`、`14k`、`16k` は N2NC ベースの lane remap で key count を合わせる
+- `4k..10k`、`12k`、`14k`、`16k` は選択した Krrcream / nK2 / NK3 アルゴリズムでキー数を変換します。
 - `5+1 SP` / `7+1 SP` の強制変換は scratch を除く鍵盤部だけを再配置し、`follow` の scratch keysound は autoplay へ移す
 - `10+2 DP` / `14+2 DP` も両 scratch を除外し、左右の鍵盤部を独立変換
 - nK2 拡張は元 note を target key へ配置してから同じ target layout に support note を生成し、元の4Kなどへ note を先に追加して再変換することはない
 - 適用順: key-mode 変換（nK2 の target-layout support 生成を含む）→ DP Flip → Mirror/RR/FR/SR → Note Add → LN/Full Tap 構造変換
 
 ## Gauge Rules
-- 固定 gauge（`ex_hard / hard / normal / easy`）は `100%` で開始し、`0%` で即失敗して type は変化しない。
-- `shift` は EX-Hard / Hard / Normal / Easy をそれぞれ 100% から独立して並列計算し、現在の tier が脱落すると同じ判定履歴を累積した次の生存 tier を選び、終了時の最上位生存 tier で確定する。
-- `ex_hard` は Hard より回復が低く、`BAD` / `POOR` の損失が大きい challenge gauge。
-- clear status は固定 gauge の結果と、最終 Shift tier の `GAUGE SHIFT EX-HARD / HARD / NORMAL / EASY CLEAR` を区別する。
-- `Sudden Death (1 MISS)` は gauge type ではなく、最初の OD8 換算 object `MISS` で現在 gauge を 0 にして即終了する別の failure rule。
+
+- `ex_hard / hard / normal / easy` は常時有効な Gauge Shift の開始段階です。旧 `shift` は EX 開始。
+- 開始段階から Easy までそれぞれ100%から並列計算し、脱落時は次の生存段階へ移ります。すべての対象段階が脱落するとゲージ失敗。
+- 最終生存段階を `GAUGE SHIFT EX / HARD / NORMAL / EASY CLEAR` で表示します。
+- Practice・Pacemaker の独自終了規則は維持。Sudden Death は最初の OD8 換算 object MISS で即終了します。
 
 ## Implementation Location
 - Mode parsing: `src/gameplay/ModeSettings.*`, `src/app/ModeResolver.*`

@@ -1,5 +1,7 @@
 # Core Play Loop (Initial Implementation)
 
+> 文書の範囲: 初期設計・改善案・当時の分析を含みます。未完了の提案や過去の測定値は現在の挙動・既定値・性能保証ではありません。[現在の状態](current-state.ja.md)と[設定](config.ja.md)を参照してください。
+
 この文書は、現在実装されている **core play loop** の構造とデータフローをまとめたものです。
 
 ## Core Flow

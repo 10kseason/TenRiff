@@ -6,6 +6,14 @@ Language: [한국어](README.md) | [English](README.en.md) | [简体中文](READ
 
 このコードベースもまた、急速な反復と実験を通じて育った `vibe coding` 作品として読むのが適切です。
 
+## 文書の基準と最近の変更
+
+現在の挙動が食い違う場合、まず**同一コミットの実装と回帰テスト**を確認し、`current-state`・`config` と翻訳をまとめて修正します。`baseline-*`・`release-*` は各版の記録で、初期設計やロードマップ案は現在の実装・性能保証ではありません。
+
+- [1.7.1](release-1.7.1-gate.md)
+- [UI](menu-visual-polish.md)
+- [Gameplay / Multiplayer](gameplay-polish-followup.md)
+
 ## Recommended Reading Order
 1. `docs/current-state.ja.md`
    - 現在の製品状態、主要サブシステム、確認済みコマンド、残る手動検証項目

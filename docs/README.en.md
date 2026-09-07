@@ -6,6 +6,14 @@ If you have already read the root [`README.en.md`](../README.en.md), this docume
 
 This codebase should also be read as a `vibe coding` work that grew through rapid iteration and experimentation.
 
+## Documentation authority and recent changes
+
+When current-behavior descriptions conflict, check **implementation and regression tests at the same commit** first, then correct `current-state`, `config` and their translations together. `baseline-*` and `release-*` describe their named versions; early designs and roadmap proposals are not implementation or performance guarantees.
+
+- [1.7.1](release-1.7.1-gate.md)
+- [UI](menu-visual-polish.md)
+- [Gameplay / Multiplayer](gameplay-polish-followup.md)
+
 ## Recommended Reading Order
 1. `docs/current-state.en.md`
    - Current product state, core subsystems, validated commands, and remaining manual verification items

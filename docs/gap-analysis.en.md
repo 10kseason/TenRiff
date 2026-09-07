@@ -1,5 +1,7 @@
 # TenRiff Manual Gap Analysis (v0.1)
 
+> Document scope: includes early designs, improvement proposals and dated analysis. Uncompleted proposals and historical measurements are not current behavior, defaults or performance guarantees. See [current state](current-state.en.md) and [configuration](config.en.md).
+
 - Reference documents: `개발메뉴얼(v0.1)/개발지시사항.txt`, `개발메뉴얼(v0.1)/Tenriff 런쳐 개발 지시사항.txt`,
   `개발메뉴얼(v0.1)/UI 개발지시사항.txt`, `개발메뉴얼(v0.1)/RAW 인풋과 멀티스레드 활용과 최적화에 대한 개발 지시사항 메뉴얼.txt`
 - Analysis date: 2025-12-23

@@ -1,30 +1,32 @@
-# Main Menu Low-Latency Blueprint
+# Menu structure and controls
 
-The main menu must follow the same low-latency philosophy as gameplay: audio runs as the master clock, inputs are timestamped off-thread, and rendering only consumes snapshots. This blueprint captures the rules and implementation order so menu work does not reintroduce input lag.
+Current behavior below targets client 1.7.1. The collapsed early blueprint is not a list of implemented features.
 
-## Current Implementation State (Windows Menu UI)
-- `MenuApp` runs as **InputThread (polling)** -> **SPSC queue** -> **menu state machine** -> **RenderThread (D3D11 window render)**.
-- `MenuNavigator` owns screen history, so Back leaves nested Options screens one level at a time and returns to the real entry screen. Typed per-screen controllers own selection/mutation state; `MenuApp` executes persistence, file-dialog, and thread-restart boundary effects.
-- `MenuScreenDescriptor` is the single exhaustive table for stable titles, skin background/fallback keys, and snapshot/view routing.
-- `SongIndexerThread` builds the song index in the background and caches it at `profiles/<name>/.tenriff/song-index/<source-hash>.json`.
-- When audio / graphics / input / mode settings are changed in the menu, they are saved to the profile config file.
-- `Options -> Profile Setup` reopens first-run setup for the active profile and immediately saves language, audio, input, graphics, and keymap changes.
-- When play starts, the current implementation stops the menu thread and runs `GameSession` separately.
-- The **Windows menu UI is built on D3D11 + Direct2D / DirectWrite** and renders Title / Song Select (cyan layout) and other settings screens (list UI).
-- Skins are native/LR2-only. Selecting or dropping one playskin imports it into the active profile; selecting `LR2files` or `Theme` imports each independent non-IIDX theme separately, skips themes that reference excluded IIDX assets, preserves sibling-theme references, and never overwrites an existing folder.
-- Song Select keeps indexing stage / percent / ETA and a top progress bar visible across every non-gameplay screen.
-- Browse can select local header JSON or import a clipboard http(s) BMSTable HTML/header link, then reindexes the current source so hash matches receive table levels.
-- Graphics `BGA` fully disables gameplay image/video backgrounds while keeping Song Select previews. Selecting an ONNX model only stores its path; users enable `BGA Upscaler` separately and confirm the high-spec warning.
-- Input summary:
-  - Title: `↑ / ↓` move, `Enter` select (PLAY / EDIT / OPTIONS / EXIT), `F2` songs-folder browse, `F5` reindex, `Esc` quit
-  - Song Select: `↑ / ↓` song movement, `← / →` switch focus on the left menu, `Tab` enters quick settings, then `↑ / ↓` selects and `← / →` adjusts Visual Latency / Hi-Speed / Gauge / Random; `Enter` selects / plays, `- / +` adjusts Rate, and `Esc` goes back
-  - Settings / Mode: `↑ / ↓` move items, `← / →` change values, `Enter / Esc` return
-    - Master/BGM/Keysound volume uses horizontal sliders; keyboard adjustment and click/drag share the same bounds and snapping rules.
-    - Long settings lists support click-to-jump on the right scrollbar without activating or changing the selected row.
-    - When space hides some descriptions, the final visible line shows `F1` and the remaining help-line count.
-  - Keymap: `↑ / ↓` select, `Enter` capture binding, `Esc` return
-  - Result: return to Song Select with `Enter` only
-  - Shared utility keys: `F1` help, `F2` songs-folder browse, `F5` refresh / reindex, `F9` screenshot
+## Current screens and controls
+
+- Home: `Play / Multiplayer / Options / Exit`; the first action becomes `Add Songs Folder` when no charts are indexed.
+- Song Select: top tabs `Songs / Sources / Records / Session Mix / Options`, with `Search / Sort·Filter / Difficulty Table` below the center panel. The old left-side KEY/menu rail is no longer the native layout.
+- Difficulty-table card: the name/URL area opens an editor; `File` selects local JSON; `Reset` restores native LV. Enter applies, Esc cancels, and invalid addresses preserve the current table. The Filters row shares the same import path.
+- Options: ten cards in five columns and two rows: Key Mode, Keymap, Skins, Graphics, Audio, Input, Calibration, Profile Setup, Mods and Key Test.
+- Shared settings: arrows select/adjust; Enter activates the selected item; Esc/Backspace goes back. Long help uses page buttons, while Skin Settings keeps a live preview.
+- Keymap: supports 4K–10K, 12K, 14K and 16K; successful binding changes save immediately.
+- Results: Space skips the single-player reveal. Once ready, R/Left retries, F1 opens replay, and Enter/Esc/Backspace returns. In Session Mix, Enter advances and Esc/Backspace ends the session. Multiplayer results return to the lobby.
+- Function keys such as F1/F2/F5 are context-dependent; see the [gameplay guide](gameplay-guide.en.md).
+
+## Ownership and data flow
+
+- [MenuApp](../src/app/MenuApp.cpp) consumes RawInput/polling keyboard events from InputThread and window pointer events. [MenuNavigator](../src/app/menu/MenuNavigator.h) owns the current screen and Back history.
+- Typed settings controllers own selection/mutation state; MenuApp applies persistence, file pickers, reindexing and device restarts. [MenuScreenDescriptor](../src/app/menu/MenuScreenDescriptor.h) defines screen metadata and view routing.
+- Rendering consumes immutable snapshots. [MenuMusicController](../src/app/MenuMusicController.cpp) owns menu music; [SongSelectScreen](../src/app/SongSelectScreen.h) owns song-preview state.
+- [launch_gameplay](../src/app/MenuAppTail.inl) stops menu input and previews before starting GameSession, which owns gameplay audio/input lifecycles. Sharing one continuously open audio device from the menu was an early proposal, not the current contract.
+- SongIndexerThread handles indexing with caches at `profiles/<name>/.tenriff/song-index/<source-hash>.json`. See [current state](current-state.en.md) and [configuration](config.en.md).
+
+## Maintenance
+
+Phases 0–6 of the [menu refactor](menu-refactor-plan.md) are complete. Extend existing controllers and explicit screen routes, with focused tests and the [UI checklist](ui-audit-checklist.md). See [menu presentation](menu-visual-polish.md) and [1.7.1 follow-up](gameplay-polish-followup.md) for rendering ownership.
+
+<details>
+<summary>Early blueprint — not the current implementation contract</summary>
 
 ## Non-Negotiable Rules
 - **Keep the audio device open from the menu.** Initialize the audio backend when entering the menu and run silent callbacks (zero buffers) so `playhead_samples` / `buffer_start_samples` remain valid before gameplay begins. Avoid reopening the device when starting a song to prevent warm-up jitter.
@@ -84,3 +86,5 @@ Put these on the first page so users see latency-critical toggles immediately:
 3) Add SongIndexerThread + cached index + responsive SongSelect UI.
 4) Surface latency-first settings and apply them live where possible; note when backend changes require a restart.
 5) Add key remap + NKRO test following the input pipeline rules.
+
+</details>

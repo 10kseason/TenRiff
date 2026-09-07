@@ -15,7 +15,7 @@ Windows 기준으로 보통 아래 두 방법 중 하나를 사용합니다.
 또는
 
 ```powershell
-.\build-dist\Release\TenRiff.exe --songs .\songs --profile default
+.\TenRiff.exe --profile default
 ```
 
 첫 실행이면 기본 프로필이 자동으로 생성됩니다.
@@ -46,13 +46,13 @@ TenRiff의 기본 플레이 흐름은 아래 순서입니다.
 - 좌클릭: 곡 선택
 - 더블클릭: 곡 시작
 - `Enter`: 현재 곡 시작
-- 우측 `BEST SCORE` 카드 좌클릭: 현재 곡의 최고 Result 열기; Result의 `WATCH REPLAY` 또는 `F1`로 리플레이 재생
-- 좌측 `RECORDS`: 현재 곡의 로컬 기록을 둘러보고 `OPEN RESULT`로 선택한 결과 열기
-- `Left` / `Right`: 좌측 메뉴 포커스 전환
+- 중앙 `MY BEST / 내 최고 기록` 카드를 클릭하면 현재 곡의 최고 Result를 엽니다. 결과의 리플레이 버튼 또는 F1로 재생합니다.
+- 상단 `RECORDS / 기록`: 현재 곡의 로컬 기록과 선택한 결과를 엽니다.
+- `Left / Right`: 탐색 메뉴 포커스 이동. `Tab` 빠른 설정에서는 위/아래로 항목, 좌/우로 값을 조절합니다.
 - `Esc`: 이전 화면으로 복귀
 - `-` / `+`: 다음 플레이의 Rate 즉시 조정
 - `F5`: 곡 라이브러리 재인덱싱; 실행 중에는 stage/퍼센트/ETA와 progress bar가 화면 중앙에 표시됨
-- `Browse > Difficulty Table`: 링크를 복사한 뒤 `Enter`로 BMSTable HTML/header 가져오기, `Right`로 로컬 JSON 선택, `Left`로 해제
+- 중앙 하단 난이도표 카드: 이름·URL을 클릭해 주소 편집, `파일`로 로컬 JSON 선택, `기본`으로 native LV 복귀. URL 창에서는 Enter 적용·Esc 취소입니다. `정렬 / 필터` 안의 난이도표 행도 계속 사용할 수 있습니다.
 
 ### Song Select에서 자주 쓰는 화면
 - `Mode`
@@ -64,7 +64,7 @@ TenRiff의 기본 플레이 흐름은 아래 순서입니다.
   - `BGA`를 끄면 게임플레이 이미지/영상과 관련 디코더·업스케일러 작업이 꺼지며 Song Select 미리보기는 유지됨
   - 모델 선택 후 Upscaler를 직접 켜고 고사양 경고를 확인해야 함. `저전력 DirectX(실험)`은 DirectXMinPower 요청일 뿐 NPU를 명시 선택하거나 검증하지 않음
 - `Skins`
-  - native/LR2 스킨 전환, 비주얼 레이턴시, native 하단 디지털 피아노 건반(홀드 눌림·타격 글리치), LR2 폴더 하나 이식 또는 독립적인 non-IIDX `LR2files/Theme` 일괄 이식(IIDX 의존 테마 제외), 필드 크기에 연동해 확대되고 판정선 아래로 clip되는 원본 종횡비 하단 Gear 프레임, 고정 레인선 기준 노트 간격·크기, 검은 플레이필드, 판정선 위치, LN 몸통 폭, lane color 조정
+  - native / TenRiff `skin.json` / LR2 스킨 전환, 비주얼 레이턴시, native 하단 디지털 피아노 건반(홀드 눌림·타격 글리치), LR2 폴더 하나 이식 또는 독립적인 non-IIDX `LR2files/Theme` 일괄 이식(IIDX 의존 테마 제외), 필드 크기에 연동해 확대되고 판정선 아래로 clip되는 원본 종횡비 하단 Gear 프레임, 고정 레인선 기준 노트 간격·크기, 검은 플레이필드, 판정선 위치, LN 몸통 폭, lane color 조정
 - `Keymap`
   - 키 배치 변경과 NKRO 테스트
 
@@ -101,6 +101,8 @@ Discord 설정 방법은 [공식 Game Overlay 안내](https://support.discord.co
 - `8K`: `W E R V M I O P`
 - `9K`: `A S D F Space H J K L`
 - `10K`: `Q W E R V M I O P [`
+- `12K`: `Q W E R F V M I O P [ ]`
+- `14K`: `Q W E R T F V M I O P [ ] \`
 - `16K`: `Q W E R A S D F U I O P J K L ;`
 
 원하는 배치가 아니면 `Options > Keymap`에서 바꿀 수 있습니다.
@@ -124,7 +126,7 @@ Discord 설정 방법은 [공식 Game Overlay 안내](https://support.discord.co
 
 - 차트 키 입력: 현재 키맵 기준
 - `Esc`: 싱글플레이에서는 일시정지 메뉴(계속하기 / 재시작 / 나가기), 멀티플레이에서는 플레이 중단
-- F3: Hi-Speed 감소
+- `F3`: Hi-Speed 감소
 - `F4`: Hi-Speed 증가
 - `F5`: Hi-Speed 크게 감소
 - `F6`: Hi-Speed 크게 증가
@@ -153,6 +155,13 @@ BPM 변속이 있어도 곡 시작 BPM에 맞춘 초당 스크롤 속도를 유�
 
 `Graphics > Performance HUD`를 켜면 프레임 그래프와 평균 FPS, low FPS, gameplay timing 디버그 정보도 볼 수 있습니다.
 
+### 판정·콤보 표시와 음량
+
+- P-GREAT만 노란색·무지개 반짝임·팝 모션을 사용합니다. GREAT는 청록색, GOOD은 회색이며 하위 판정 글자는 움직이지 않습니다.
+- FAST/SLOW는 현재 해당 방향만 표시하고 P-GREAT 또는 0ms로 반올림되는 편차에는 생략합니다.
+- `Options > Skins`에서 판정 X/Y와 콤보 X/Y를 각각 조절하고 저장합니다.
+- `Options > Audio > Normalize Audio`는 인게임 믹스의 RMS 음량 조절이며 기본 OFF입니다. 메뉴 음악과 선곡 미리듣기는 바꾸지 않습니다.
+
 ## 9. 판정과 게이지
 
 ### 판정
@@ -179,23 +188,11 @@ Pacemaker는 `Accuracy` 또는 `Score` 중 하나를 고르고 목표값을 설�
 Rank는 `<75 F`, `75 B`, `80.5 A`, `86.5 A+`, `90 S`, `95.5 S+`, `98 AA`, `99 SS`, `99.75 SSS` 경계를 사용합니다.
 
 ### 게이지
-선택 가능한 게이지는 아래 다섯 가지입니다.
 
-- `ex_hard`
-- `hard`
-- `normal`
-- `easy`
-- `shift`
+Gauge Shift는 항상 적용됩니다. `EX / Hard / Normal / Easy`는 시작 등급이며 내부 토큰은 `ex_hard / hard / normal / easy`입니다. 선택한 등급과 그 아래 등급을 각각 100%에서 병렬 계산합니다. 현재 등급이 0%로 탈락하면 같은 판정 이력을 쌓은 다음 생존 등급으로 이동하고, 종료 시 가장 높은 생존 등급이 최종 결과가 됩니다. 모든 대상 등급이 탈락하면 게이지 실패입니다.
 
-고정 게이지(`ex_hard / hard / normal / easy`)는 곡 시작 시 `100%`에서 시작하며 플레이 중 타입이 바뀌지 않습니다.
+기존 `shift` 설정은 EX 시작으로 해석합니다. Practice·Pacemaker처럼 별도 종료 규칙을 가진 모드는 해당 규칙을 따릅니다.
 
-- `ex_hard`(화면 표기 `EX`): Hard보다 회복이 낮고 `BAD`/`POOR` 손실이 더 큰 도전용 시작 게이지. Hard의 붉은색과 다른 짙은 흑회색으로 표시
-- `hard`: `0%`가 되는 즉시 Game Over
-- `normal`: `0%`가 되는 즉시 Game Over
-- `easy`: `0%`가 되는 즉시 Game Over
-- Gauge Shift는 항상 적용되며 선택한 시작 등급부터 Easy까지를 각각 100%에서 병렬 계산합니다. 현재 tier가 0%로 탈락하면 같은 판정을 누적해 온 다음 생존 tier를 선택하고, 종료 시 가장 높은 생존 tier로 확정합니다.
-
-기존 `shift` 설정값은 EX 시작으로 자동 해석됩니다.
 `Sudden Death (1 MISS)`는 게이지 종류가 아니라 첫 OD8 환산 객체 `MISS`에서 게이지를 0으로 만들고 즉시 종료하는 규칙입니다. 네이티브 `BAD`만으로는 즉사하지 않고 빈 키 `POOR`도 세지 않으며 Practice No-Fail과 동시에 켤 수 없습니다.
 
 ## 10. Result 화면
@@ -209,13 +206,13 @@ Rank는 `<75 F`, `75 B`, `80.5 A`, `86.5 A+`, `90 S`, `95.5 S+`, `98 AA`, `99 SS
 - Accuracy
 - Max Combo
 - PG / GR / GD / BD / PR 집계
-- 평균 타이밍 편차와 분산
+- 평균 타이밍 편차와 표준편차
 - 최종 Gauge와 게이지 기록
 - 저장된 replay/result 파일명
 
 복귀 키는 아래와 같습니다.
 
-- `Left`: 같은 차트를 바로 다시 시작
+- `R / Left`: 같은 차트를 바로 다시 시작
 - `F1`: 저장된 replay가 있으면 replay 재생
 - `Enter`: Song Select 복귀
 - `Esc`: Song Select 복귀

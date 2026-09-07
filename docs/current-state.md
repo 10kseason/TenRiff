@@ -8,7 +8,7 @@
 - Results and local records expose fixed native score separately from detail score, and categorical native accuracy separately from continuous timing-based detailed accuracy.
 - 새 replay evidence v3는 차트 SHA-256, canonical ruleset, result-to-replay SHA-256을 저장하고 입력 trace를 headless 엔진으로 재실행합니다. 공식 로컬 best는 재계산된 verified 결과만 사용하며 legacy/custom/assist 기록은 히스토리에 `unverified`로 남습니다.
 - 현재 안정 배포 라인은 `1.7.1`
-- 1.7.1 improves multiplayer standings, gameplay feedback, independent judgement/combo placement, ten pastel Options cards, optional audio normalization and the Song Select difficulty-table control. See [follow-up details](gameplay-polish-followup.md) and [release verification](release-1.7.1-gate.md).
+- 1.7.1은 최대 8인 HUD·결과, 동점 순위·점수 대기 상태, P-GREAT 전용 연출, 독립 판정·콤보 위치, 옵션 10개, 오디오 노멀라이즈와 선곡 난이도표 카드를 제공합니다. [변경 설명](gameplay-polish-followup.md), [검증 범위](release-1.7.1-gate.md) 참고.
 - 기본 선곡·싱글 결과 UI는 차분한 패널과 단색 주 동작 버튼을 사용하며, 결과는 큰 점수·등급·정확도 중심으로 표시한다. 사용자 TenRiff 스킨 경로를 유지하며, 1.7.1 대전 결과는 참가자 전원 순위를 표시한다. 구현/검증 안내는 `docs/menu-visual-polish.md`와 `docs/gameplay-polish-followup.md` 참고.
 - 기본 공통 설정 UI는 설정 목록과 페이지형 사용 안내를 분리한다. 스킨 설정은 우측 실시간 미리보기를 유지하고 안내를 좌측 목록 아래에 표시한다. 전체 설명과 footer 안내는 페이지로 모두 읽을 수 있고 안내 페이지 이동은 설정값이나 선택 행을 바꾸지 않는다.
 - 기본 메인 메뉴도 같은 패널·색상 체계를 사용하며, 좌측 로고/안내와 우측 실행 메뉴로 구성한다. 플레이 또는 곡 폴더 추가를 주 동작으로 강조하고 나머지 메뉴에는 짧은 설명과 선택 테두리를 표시한다. 사용자 타이틀 스킨과 기존 키보드/클릭 동작은 유지한다.
@@ -91,19 +91,20 @@
   - 일반 BMS LN은 끝까지 유지 시 tail auto-clear
 - BMS audio decode:
   - WAV native first
-  - Windows Media Foundation OGG/MP3 fallback
+  - OGG는 내장 `stb_vorbis` 우선, 실패 시 Windows Media Foundation
+  - MP3는 Windows Media Foundation으로 디코드
   - MF 실패 시 `ffmpeg.exe` fallback
 - Song Select:
   - 캐시 우선 로드
   - `F5` 강제 재인덱싱
   - 마우스 휠 이동
-  - 좌측 `KEY` 빠른 필터 토글
+  - `Sort / Filter > Key Filter`에서 키 수 필터 선택
   - 외부 폴더/BMS drag-and-drop
   - recent source 저장/재열기
   - difficulty/title 정렬
   - 검색 입력 중이 아닐 때 `-`/`+`로 현재 플레이 Rate 조절
   - 인덱싱 중 stage, percent, 처리량, ETA, 곡 수와 bar를 헤더 아래 중앙에 표시
-  - Browse에서 로컬 header JSON을 고르거나 클립보드의 http(s) BMSTable HTML/header 링크를 profile cache로 가져오고, MD5/SHA-256으로 매칭한 난이도·심볼을 표시; 변경 시 재인덱싱
+  - 선곡 중앙 하단 난이도표 카드에서 URL 편집·로컬 JSON·기본 LV 복귀를 실행합니다. Filters 행도 같은 가져오기 경로를 사용하며 변경 시 MD5/SHA-256 매칭과 재인덱싱을 수행합니다.
 - BMS key mode:
   - 키모드별 별도 keymap
   - 지원 키 수에 대한 chart difficulty 계산
@@ -113,8 +114,7 @@
   - 별도 `변환 노트 추가` 옵션은 제거했으며, Krrcream은 원본 노트만 재배치하고 nK2는 키 수 확장 시 변환된 목표 레이아웃에 안전한 보조 노트를 직접 생성한다.
   - nK2 프리셋은 기본 `Native (12%)`, `Transform (35%)`, `Remaster (65%)` 중 선택한다. `Remaster`는 예산을 올리면서도 앵커를 잠가 원곡 배치를 유지하고 롱노트 구간을 같은 길이의 롱노트로 채운다. 세 값은 상한이며 실제 추가량은 원본 밀도와 안전창에 따라 낮아진다. Krrcream 선택 시 해당 행은 잠기며, standalone converter GUI의 Krrcream Max/Min/Speed/Seed도 수정할 수 없다.
   - NK3는 번들된 P64를 host beam32에 항상 결합한다. 10K가 아닌 원본을 10K로 변환할 때만 일반화 패턴 MLP를 추가하고, 10→10과 나머지 모든 경로는 P64만 사용한다. 기본 `AUTO` 백엔드는 ncnn Vulkan으로 P64와 MLP를 AMD/NVIDIA GPU에서 실행하고, 선택형 OpenVINO 호환 경로는 폴백으로 유지한다. `TENRIFF_NK3_BACKEND`와 `TENRIFF_NK3_VULKAN_DEVICE`로 강제 선택할 수 있다.
-  - 독립 BMS key converter의 CLI/GUI는 기본 `krrcream`과 결정론적 `nK2 Native 50/50` 알고리즘을 선택 지원하며, nK2 선택 시 krrcream 전용 튜닝 필드는 적용하지 않음
-  - 1.5.1 공식 빌드/Windows ZIP은 standalone BMS key converter CLI/GUI를 만들거나 포함하지 않으며 top-level CMake 옵션도 기본 `OFF`; 소스는 개발 회귀용으로만 유지
+  - 1.7.1 공식 빌드/Windows ZIP은 standalone BMS key converter CLI/GUI를 만들거나 포함하지 않으며 top-level CMake 옵션도 기본 `OFF`; 소스는 개발 회귀용으로만 유지
   - `mode.key_mode=none`은 차트의 원래 키 수와 기본 패턴 레이아웃을 그대로 유지
 - Native difficulty:
   - BMS LV/CR 계산에서 롱노트 Head/Tail의 miss-ms만 0.5배로 평가해 `300ms`를 `150ms`처럼 완화하며, 실제 gameplay 판정창은 그대로 유지
@@ -128,9 +128,9 @@
   - note border on/off plus thin outline alpha
   - lane background alpha, overall visual opacity, and lower LN body alpha controls
   - judgement-line glow and short per-key press pulse controls
-  - 새 판정 라벨/FAST·SLOW 밀리초 숫자는 220ms, 콤보 숫자는 150ms 동안 확대·상승 후 안정되는 렌더 전용 팝 애니메이션
+  - P-GREAT만 노란색·무지개 반짝임과 220ms 팝을 사용하고, GREAT는 청록색·GOOD은 회색의 정지된 글자로 표시합니다. 하위 판정과 FAST/SLOW 글자에는 팝이 없으며 콤보 숫자의 150ms 팝은 별도입니다.
   - small key labels can be shown at the lane top/bottom or hidden
-  - combo Y 조절
+  - 판정 X/Y와 콤보 X/Y를 각각 조절·저장합니다. FAST/SLOW는 해당 방향만 표시하며 P-GREAT에는 생략합니다.
   - judge line / lane width / lane spacing / note & field size / divider width / 16K center gap / note height / LN body width 조절
   - `Note & Field Size`는 중앙을 고정한 채 플레이필드·lane/divider·노트·인접 게이지를 함께 `50%..140%`로 조절하며, 100%에서 인접 노트 사이 기본 합산 여백은 24px
   - Black Playfield를 켜면 lane spacing을 포함한 player/ghost 플레이필드 전체를 완전한 검정으로 렌더링
@@ -152,9 +152,9 @@
   - 일반 점수는 최대 10,000점이며 판정 배점은 `PG 6 / GR 3 / GD 1 / PR 0 / FAIL 0` 비율로 정규화됨. LN 머리/꼬리는 각각 0.5 가중치로 한 객체를 구성하며 상세 점수는 별도 체계를 유지함
   - 정확도는 PG/GR/GD/BD 기준 100/80/50/20%에 각 판정 구간 내부 타이밍으로 최대 0.5%p를 감산하고, PG 타이밍 범위가 8ms를 넘으면 전부 PG여도 99.5%로 제한함
   - 랭크 경계는 `<75 F / 75 B / 80.5 A / 86.5 A+ / 90 S / 95.5 S+ / 98 AA / 99 SS / 99.75 SSS`
-  - 기본 `GOOD` 범위는 `75ms`
+  - 기본 `PG / GR / GD` 범위는 `20ms / 65ms / 115ms`
   - 기본 `BAD` 범위는 `210ms`, `Judge Easy`는 `262.5ms`, `Judge Hard`는 `340ms`
-  - `Judge Hard`는 PG/GR/GD 및 LN tail 창은 기본값을 유지하고 BAD 경계만 좁힘
+  - `Judge Hard`는 PG/GR/GD 및 LN tail 창의 기본값을 유지하고 바깥쪽 BAD 경계만 변경
   - 같은 레인에서 이전 노트가 이미 `BAD`이고 바로 다음 노트가 `GOOD` 이상으로 명확하면, 이전 노트는 미스로 정리하고 현재 입력은 다음 노트에 배정해 한 번의 누락이 연속 `BAD`로 고정되지 않게 함
   - `Judge Hard`에서 입력 없이 지나간 노트는 콤보를 끊는 간접 `POOR`이자 OD8 `MISS`로 기록되며, 다른 note-consuming 실패는 `BAD` 유지
   - 너무 이른 non-consuming 입력은 LR2 스타일 `POOR`로 처리되고, 결과/리플레이/UI에 다시 표시됨
@@ -238,7 +238,7 @@
 
 ## Runtime / Packaging Rules
 - 새 사용자 프로필은 자동 생성
-- 현재 안정 P2P 배포 라인은 `TenRiff 1.5.1`
+- 현재 안정 P2P 배포 라인은 `TenRiff 1.7.1`
 - 배포 패키지에는 `Songs`를 넣지 않음
 - 배포 패키지는 `Main Menu / Options / Song Selecte / Multiplayer Lobby / Clear / Failed` 이름의 `Mainmusic/` 화면 슬롯을 포함하며, 각 `이름.mp3`와 번호가 붙은 `이름 2.mp3`~`이름 64.mp3`를 자동 수집해 화면 재진입마다 순환
 - 배포 업데이트에는 built artifacts와 필요한 런타임 자산만 포함
@@ -250,7 +250,7 @@
 - 실제 기본값은 `config/config.json`
 - runtime profile은 `profiles/<name>/config.json`
 - keymap은 `profiles/<name>/keymap.json`
-- `keymap.json`은 `modes.{4k..10k}` per-mode binding 구조
+- `keymap.json`은 `modes.{4k..10k,12k,14k,16k}` per-mode binding 구조
 - stale profile은 runtime migration으로 일부 자동 보정됨
   - keysound policy
   - 제거된 osu 설정 필드는 더 이상 저장하지 않음
@@ -282,7 +282,7 @@
 - `cmake --build --preset asan`
 - `ctest --preset asan`
 
-ASan은 공유 포트 간섭을 피하기 위해 결정적 단위 코어를 단일 프로세스로 실행합니다. MSVC ASan에서 worker 종료가 멎는 RawInput/localhost OS 통합 8건은 일반 Release suite에서만 실행합니다.
+MSVC ASan은 결정적 단위 코어를 실행하고 RawInput/localhost OS 통합 및 NK3/OpenVINO 통합 검사를 제외합니다. 제외 목록은 `tests/unit/test_bms_parser.cpp`, CTest 인수는 `CMakeLists.txt`를 기준으로 하며 전체 통합 검사는 일반 Release에서 실행합니다.
 
 ## Still Manual-Validation Heavy
 - renderer layout 변경 뒤에는 `docs/ui-audit-checklist.md` 기준으로 `1080p`, `720p windowed`, `Performance HUD on/off` 전수 확인 필요

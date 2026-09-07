@@ -104,7 +104,7 @@ The codebase is currently at the level where you can "open the menu, choose a so
 - Options / skins
   - Hi-Speed, Rate, gauge, audio, input, and graphics settings
   - Judgement-line position, note size, and lane color editing in the `Skins` screen
-  - `5K`-`10K` lane color editing with a live preview
+  - `4K–10K / 12K / 14K / 16K / 7+1` lane color editing with a live preview
   - Native vector, TenRiff `skin.json`, and LR2 playskins
   - Completed skins under the packaged `skins/` directory appear by default; a profile skin with the same name takes precedence
   - LR2 skin-folder selection or drag-and-drop copies into the active profile and imports note, LN, lane-gap, and destination-size data

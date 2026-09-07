@@ -104,7 +104,7 @@ OpenAI Codex、ChatGPT、Claude Code、Gemini、そして検証に協力して�
 - オプション / スキン
   - Hi-Speed、Rate、gauge、audio、input、graphics 設定
   - `Skins` 画面での判定線位置、ノートサイズ、レーンカラー編集
-  - `5K`-`10K` レーンカラー編集とライブプレビュー
+  - `4K–10K / 12K / 14K / 16K / 7+1` レーンカラー編集とライブプレビュー
   - native vector skin、TenRiff `skin.json`、LR2 playskin に対応
   - 配布 package の `skins/` 完成 skin を既定一覧に表示し、同名の profile skin を優先
   - LR2 skin folder の選択/drag-and-drop で active profile にコピーし、note・LN・lane-gap・destination-size data を反映

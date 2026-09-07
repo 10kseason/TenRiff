@@ -1,30 +1,32 @@
-# 主菜单低延迟蓝图
+# 菜单结构与操作
 
-主菜单必须遵守与 gameplay 相同的低延迟哲学：音频作为主时钟，输入在后台线程上打时间戳，而渲染只消费 snapshots。这份蓝图记录规则与实现顺序，避免菜单工作重新引入输入延迟。
+当前说明以客户端 1.7.1 为准。下方折叠的早期设计方案不是已实现功能清单。
 
-## 当前实现状态（Windows 菜单 UI）
-- `MenuApp` 通过 **InputThread(轮询)** → **SPSC 队列** → **菜单状态机** → **RenderThread(D3D11 窗口渲染)** 这一流程运行
-- `MenuNavigator` 负责 screen history，因此 Options 子页面的 Back 会逐层返回到实际入口页面。各设置 controller 负责选择和修改状态，`MenuApp` 只执行保存、文件选择和线程重启等边界效果。
-- `MenuScreenDescriptor` 在一个 exhaustive table 中统一定义固定标题、skin background/fallback 与 snapshot/view 路由。
-- `SongIndexerThread` 在后台生成曲目索引，并缓存到 `profiles/<name>/.tenriff/song-index/<source-hash>.json`
-- 在菜单里调整 audio/graphics/input/mode 设置时，会保存到 profile 配置文件
-- `Options -> Profile Setup` 会重新打开当前 profile 的首次设置页面，并立即保存 language/audio/input/graphics/keymap
-- 开始游玩时，当前实现会停止菜单线程并单独运行 `GameSession`
-- **Windows 菜单 UI 基于 D3D11 + Direct2D/DirectWrite**，会渲染标题/选歌（青色布局）以及其他设置页面（列表 UI）
-- Skins 仅支持 native/LR2。选择或拖入单个 LR2 playskin 会导入当前 profile；选择 `LR2files` 或 `Theme` 时，会分别安装其下除精确名为 `IIDX` 以及依赖 IIDX 资源之外的 theme，保留 sibling-theme 引用且不覆盖已有文件夹。
-- Song Select 在重新索引时会居中显示 stage / percent / ETA 与 progress bar
-- Browse 可选择本地 header JSON，或导入剪贴板中的 http(s) BMSTable HTML/header 链接，并重新索引当前 source，让 hash 匹配谱面获得表等级
-- Graphics 的 `BGA` 会完全关闭 gameplay 图片/视频背景，同时保留 Song Select 预览。选择 ONNX model 只保存路径，仍需另行开启 `BGA Upscaler` 并确认高配置警告
-- 输入键摘要：
-  - Title：`↑/↓` 移动，`Enter` 选择（PLAY/EDIT/OPTIONS/EXIT），`F2` 浏览 songs 文件夹，`F5` 重索引，`Esc` 退出
-  - Song Select：`↑/↓` 移动歌曲，`←/→` 切换左侧菜单焦点，`Enter` 选择/开始，`- / +` 调整 Rate，`Esc` 返回
-  - Settings/Mode：`↑/↓` 移动项目，`←/→` 改变数值，`Enter/Esc` 返回
-    - Master/BGM/Keysound 音量使用横向滑块；键盘左右调整与点击/拖动共用相同的范围和吸附规则。
-    - 较长的设置列表可点击右侧滚动条直接跳转，单击不会执行或修改所选项目。
-    - 如果屏幕空间不足而省略说明，最后一条可见说明会显示 `F1` 和剩余帮助行数。
-  - Keymap：`↑/↓` 选择，`Enter` 捕获绑定，`Esc` 返回
-  - Result：只能用 `Enter` 返回 Song Select
-  - 共享功能键：`F1` 帮助，`F2` songs-folder browse，`F5` refresh/reindex，`F9` screenshot
+## 当前页面与操作
+
+- 主页：`Play / Multiplayer / Options / Exit`；未索引谱面时第一项为 `Add Songs Folder`。
+- 选曲：顶部 `Songs / Sources / Records / Session Mix / Options`，中央底部 `Search / Sort·Filter / Difficulty Table`。旧版左侧 KEY/菜单栏不再是当前默认布局。
+- 难度表卡片：名称与 URL 区域打开编辑器，File 选择本地 JSON，Reset 恢复原生 LV。Enter 应用，Esc 取消；无效地址保留当前难度表。Filters 中的项目使用相同导入路径。
+- Options：5列×2行共10张卡片：Key Mode、Keymap、Skins、Graphics、Audio、Input、Calibration、Profile Setup、Mods、Key Test。
+- 共用设置：方向键选择、调整；Enter 执行所选操作，Esc/Backspace 返回。长说明使用分页按钮，皮肤设置保留实时预览。
+- 键位：支持 4K–10K、12K、14K、16K，成功绑定后立即保存。
+- 结果：Space 跳过单人展示动画。可操作后 R/Left 重试、F1 回放、Enter/Esc/Backspace 返回。Session Mix 中 Enter 进入下一曲，Esc/Backspace 结束；多人结果返回大厅。
+- F1/F2/F5 等功能键因页面而异，见[游玩指南](gameplay-guide.zh-CN.md)。
+
+## 职责与数据流
+
+- [MenuApp](../src/app/MenuApp.cpp) 处理 InputThread 的 RawInput/轮询键盘事件和窗口指针事件。[MenuNavigator](../src/app/menu/MenuNavigator.h) 管理当前页面及返回历史。
+- 类型化设置 controller 管理选择与修改状态，MenuApp 执行保存、文件选择、重新索引和设备重启。[MenuScreenDescriptor](../src/app/menu/MenuScreenDescriptor.h) 定义页面元数据与 view 路由。
+- 渲染读取不可变 snapshot。菜单音乐由 [MenuMusicController](../src/app/MenuMusicController.cpp) 管理，选曲试听状态由 [SongSelectScreen](../src/app/SongSelectScreen.h) 管理。
+- [launch_gameplay](../src/app/MenuAppTail.inl) 停止菜单输入和试听后启动 GameSession。游戏内音频与输入生命周期由 GameSession 管理；从菜单起一直共用同一音频设备属于早期提案，不是当前契约。
+- SongIndexerThread 的缓存位于 `profiles/<name>/.tenriff/song-index/<source-hash>.json`，见[当前状态](current-state.zh-CN.md)与[配置](config.zh-CN.md)。
+
+## 维护
+
+[菜单重构](menu-refactor-plan.md)的 Phase 0–6 已完成。扩展现有 controller 与显式页面路由，并使用相关测试与 [UI 检查表](ui-audit-checklist.md)。渲染职责见[菜单显示](menu-visual-polish.md)和 [1.7.1 后续变更](gameplay-polish-followup.md)。
+
+<details>
+<summary>早期设计方案 — 非当前实现契约</summary>
 
 ## 不可妥协的规则
 - **保持菜单中的音频设备处于打开状态。** 在进入菜单时初始化音频 backend，并运行静音回调（零缓冲），这样在 gameplay 开始之前 `playhead_samples` / `buffer_start_samples` 仍然有效。开始歌曲时不要重新打开设备，以避免 warm-up 抖动。
@@ -84,3 +86,5 @@
 3) 加上 SongIndexerThread + 缓存索引 + 响应式 SongSelect UI。
 4) 暴露以延迟优先为核心的设置，并在可能的情况下实时应用；对必须重启的 backend 改动做明确标注。
 5) 按输入管线规则补上 key remap + NKRO 测试。
+
+</details>

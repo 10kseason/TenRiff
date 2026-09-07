@@ -4,11 +4,11 @@
 
 ## Baseline
 - 現在の stable release line は `1.7.1`
-- 1.7.1 improves multiplayer standings, gameplay feedback, independent judgement/combo placement, ten pastel Options cards, optional audio normalization and the Song Select difficulty-table control. See [follow-up details](gameplay-polish-followup.md) and [release verification](release-1.7.1-gate.md).
+- 1.7.1 は最大8人の HUD・結果、同点順位・スコア待機状態、P-GREAT 専用演出、判定・コンボの独立位置、10個の設定カード、音量ノーマライズ、選曲の難易度表カードを提供します。[変更詳細](gameplay-polish-followup.md)と[検証範囲](release-1.7.1-gate.md)を参照。
 - 1.7.0 refreshes native Home, Song Select, Result and shared settings. See [UI implementation](menu-visual-polish.md) and [release verification](release-1.7.0-gate.md). The prism remains only in the custom-skin path; result reveal timing is unchanged.
 - 基本結果画面はスコア・ランク・精度を中心に表示し、プリズム演出はカスタムスキン側に残します。既存の2.2秒の表示演出、Spaceによるスキップ、操作解禁条件を維持します。
 - UI-r2 Song Select は top tab、7-row jacket library、大きな selected artwork、best-record card、chart/mode panel、実動する START action を使用し、Collection/Store/currency/global ranking の仮 UI は表示しない
-- Song Select の Rate、Hi-Speed、Gauge、Random cell は左 click で増加/次、右 click で減少/前を適用して即時保存する。current chart の key count は欠けず、best record は score・accuracy・max combo を同時に表示する。
+- Song Select の Visual Latency、Hi-Speed、Gauge、Random cell は左 click で増加/次、右 click で減少/前を適用して即時保存する。current chart の key count は欠けず、best record は score・accuracy・max combo を同時に表示する。
 - Replay evidence v3 は chart SHA-256、canonical ruleset、result-to-replay SHA-256 を結合し、input trace を headless engine で再実行する。official local best には再計算済みの verified result だけを使用し、legacy・custom-ruleset・assist record は unverified history として保持する。
 - 1.3.1 は外部 `.osu` parser・index 経路・settings toggle を削除して chart surface を再び BMS 専用に固定。BMSTable 選択時は hash matching のため Fast から Safe へ自動切替し、Aery live server と CG901B MD5→`⑤LEVEL 13` match で確認
 - Profile Setup は任意の local PNG/JPG avatar path を profile ごとに保存し、Song Select の profile card から編集できる
@@ -80,19 +80,20 @@
   - 通常 BMS LN は最後まで保持すると自動クリアされる
 - BMS audio decode:
   - WAV native first
-  - OGG / MP3 は Windows Media Foundation fallback
+  - OGG は内蔵 `stb_vorbis` を優先し、失敗時は Windows Media Foundation
+  - MP3 は Windows Media Foundation を使用
   - MF に失敗した場合は `ffmpeg.exe` fallback
 - Song Select:
   - cache-first loading
   - `F5` forced reindexing
   - mouse-wheel navigation
-  - 左側 `KEY` quick filter toggle
+  - `Sort / Filter > Key Filter` でキー数を選択
   - external folder / BMS drag-and-drop
   - recent source の保存と再オープン
   - difficulty / title sorting
   - search 入力中でなければ `-`/`+` で現在の play Rate を調整
   - indexing 中は stage、percentage、processed/total、ETA、song count、progress bar を header 下部中央に表示
-  - Browse で local header JSON を選択するか clipboard の http(s) BMSTable HTML/header link を profile cache へ import し、MD5/SHA-256 一致から level/symbol を表示。変更時は再インデックス
+  - 選曲中央下部の難易度表カードで URL 編集・ローカル JSON・標準 LV 復帰。Filters も同じ取込経路を使い、変更時に MD5/SHA-256 照合と再索引を実行。
 - BMS key mode:
   - キーモードごとの separate keymaps
   - 対応 key count の chart difficulty calculation
@@ -100,7 +101,7 @@
   - ゲーム内 Mode Settings の `Key Converter` で `Krrcream`、内蔵の決定論的 `KeyWeaver nK2`、または `KeyWeaver NK3 ONNX` を選択し、設定と replay metadata に保存
   - 個別の `Conversion Note Add` 設定は削除。Krrcream は元 note の再配置のみを行い、nK2 は key count 拡張時に変換後の target layout へ安全な support note を直接生成する。
   - nK2 preset は既定の `Native (12%)`、`Transform (35%)`、`Remaster (65%)` から選択する。`Remaster` は budget を上げつつ anchor を固定して原曲の配置を残し、LN 区間を同じ長さの LN で埋める。3 つとも上限であり、実際の追加量は原曲の密度と safety window で決まる。Krrcream では row を lock し、standalone converter GUI の Krrcream Max/Min/Speed/Seed も変更不可。
-  - 1.5.1 公式 build/Windows ZIP は standalone BMS key-converter CLI/GUI を build・同梱しない。top-level CMake option は既定 `OFF` で、source は開発 regression 用のみ維持
+  - 1.7.1 公式 build/Windows ZIP は standalone BMS key-converter CLI/GUI を build・同梱しない。top-level CMake option は既定 `OFF` で、source は開発 regression 用のみ維持
   - NK3 は同梱 P64 と host beam32 を常に組み合わせる。10K 以外の source を 10K に変換するときだけ generalized pattern MLP を追加し、10K→10K とその他すべての target は P64 のみを使う。既定の `AUTO` backend は ncnn Vulkan で P64 と MLP を AMD/NVIDIA GPU 上に実行し、任意の OpenVINO compatibility path を fallback として維持する。`TENRIFF_NK3_BACKEND` と `TENRIFF_NK3_VULKAN_DEVICE` で強制選択できる。
   - `mode.key_mode=none` は元のキー数と基本パターンレイアウトを維持
 - Native difficulty:
@@ -112,8 +113,8 @@
   - 標準 `10+2 DP` chart は scratch 2 lane を除く実際の 10 key に `10K` lane-color palette を順番に適用し、native 12K palette とは独立して保持
   - `rect / triangle / pentagon / hexagon / circle` note shape。procedural 円・多角形は 100% で rect bar と同じ全幅を使用
   - note border on/off
-  - combo Y adjustment
-  - 新しい判定 label / FAST・SLOW の ms 数値は 220ms、combo 数値は 150ms の render-only pop animation
+  - 判定 X/Y とコンボ X/Y を個別に調整・保存。FAST/SLOW は該当方向のみ表示し、P-GREAT では省略。
+  - P-GREAT のみ黄色・虹色のきらめき・220ms のポップを使います。GREAT は水色、GOOD は灰色。下位判定と FAST/SLOW 文字は静止し、コンボ数字の150ms ポップは独立して維持します。
   - judge line / lane width / lane spacing / note & field size / divider width / 16K center gap / note height / LN body width adjustment
   - `Note & Field Size` は中央を固定したまま playfield、lane/divider、note、隣接 gauge を 50%～140% でまとめて拡大・縮小し、100% では隣接 note 間の合計 gap が既定で 24px
   - Black Playfield は lane spacing を含む player/ghost playfield 全体を完全な黒で表示
@@ -128,15 +129,15 @@
   - フィールド上端からの future-note entry easing
   - 最後の判定ノート後は既定で音楽終了まで待機し、その間に lane key を押すと直ちに Result へ移動
 - Judge:
-  - 既定 `GOOD` window は `75ms`
+  - 既定の `PG / GR / GD` 判定幅は `20ms / 65ms / 115ms`
   - 既定の `BAD` window は `210ms`、`Judge Easy` は `262.5ms`、`Judge Hard` は `340ms`
-  - `Judge Hard` は BAD 境界だけを狭め、PG/GR/GD と LN tail window は基本値を維持
+  - `Judge Hard` は 外側の BAD 境界だけを変更し、PG/GR/GD と LN tail window は基本値を維持
   - 同一 lane の pending note がすでに `BAD` で、直後の note が明確に `GOOD` 以上なら、pending note を miss として記録し、現在の press を次の note に割り当てて連続 `BAD` lock を防ぐ
   - `Judge Hard` では未入力の object を combo-breaking indirect `POOR` かつ OD8 `MISS` として記録し、その他の note-consuming failure は `BAD` のまま
   - かなり早い non-consuming press は LR2 スタイル `POOR` として扱われ、result / replay / UI に再表示される
   - 空打ち `POOR` は combo を維持し、Hard indirect `POOR` は combo を切る。両方とも score / accuracy には入らず、専用 `PR` gauge damage を使う
-  - gauge mode は `EX-Hard / Hard / Normal / Easy / Gauge Shift` をサポートする。固定 gauge は `100%` で開始し、`0%` で即失敗して type は変化せず、EX-Hard は Hard と異なる黒に近い gray palette で表示
-  - `Gauge Shift` は EX-Hard / Hard / Normal / Easy をそれぞれ 100% から独立して並列計算し、現在の tier が 0% で脱落すると同じ判定履歴を累積した次の生存 tier を選び、終了時の最上位生存 tier で確定する
+  - ゲージ選択は常時有効な Gauge Shift の開始段階 `EX / Hard / Normal / Easy`。旧 `shift` は EX 開始として解釈。
+  - 選択段階と全下位段階をそれぞれ100%から計算。脱落時は次の生存段階へ移り、終了時の最上位生存段階が最終結果。
   - `Sudden Death (1 MISS)` は最初の OD8 換算 object `MISS` で即失敗する。native `BAD` timing だけでは発動せず、空打ちの `POOR` も無視し、Practice No-Fail とは排他的に動作する
   - OD8 換算は Sudden Death と既存 replay 互換用の内部統計として維持し、Gameplay / Result UI は TenRiff native score のみ表示
   - casual score は最大 10,000 点で、judgement weight は `PG 6 / GR 3 / GD 1 / PR 0 / FAIL 0`。LN head / tail は各 0.5 weight で 1 object を構成し、detail score は別体系を維持する
@@ -214,7 +215,7 @@
 
 ## Runtime / Packaging Rules
 - 新しい user profile は自動生成される
-- 現在の stable P2P 配布ラインは `TenRiff 1.5.1`
+- 現在の stable P2P 配布ラインは `TenRiff 1.7.1`
 - distribution package には `Songs` を含めない
 - distribution package には `Main Menu / Options / Song Selecte / Multiplayer Lobby / Clear / Failed` の `Mainmusic/` scene slot を含め、各 `Name.mp3` と `Name 2.mp3`～`Name 64.mp3` を自動検出して scene 再入場ごとに循環する
 - distribution 更新には built artifact と必要な runtime asset だけを含める
@@ -226,7 +227,7 @@
 - 実際の既定値は `config/config.json` にある
 - runtime profile は `profiles/<name>/config.json`
 - keymap は `profiles/<name>/keymap.json`
-- `keymap.json` は `modes.{4k..10k}` の per-mode binding 構造
+- `keymap.json` は `modes.{4k..10k,12k,14k,16k}` の per-mode binding 構造
 - 古い profile は runtime migration により一部補正される
   - keysound policy
   - 削除済み osu field は保存しない
@@ -252,13 +253,15 @@
 - `cmake --build build-check --config Release --target bms_parser_tests`
 - `.\build-check\Release\bms_parser_tests.exe`
 
+MSVC ASan は決定的な単体コアを実行し、RawInput/localhost OS と NK3/OpenVINO の統合検査を除外します。除外一覧は `tests/unit/test_bms_parser.cpp`、CTest 引数は `CMakeLists.txt` が基準。全統合検査は通常 Release で実行します。
+
 ## Still Manual-Validation Heavy
 - 実際の CJK-heavy library での Song Select fast-scroll crash 再現
 - fast profile の長時間 full-index に対する RAM / commit 再確認
 - gameplay low-FPS / 0.1% / 0.01% low の確認
 - graphics 設定 live-apply 中の OBS / Discord / Game Bar 共存確認
 - drag-and-drop / 外部 Korean-path source の GUI 確認
-- 実際の NPU 搭載 Windows PC で `NPU 優先（実験）` on/off と WinML device fallback を確認
+- 低電力 DirectX（実験）の on/off と GPU フォールバックを確認。旧 NPU 設定名は NPU 選択・実行の証拠ではありません。
 - local 難易度表の変更後に hash matching、reindex、表示順を GUI 確認
 - Linux はまだ実行可能ビルドではない
 

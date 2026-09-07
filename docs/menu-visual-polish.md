@@ -34,8 +34,8 @@ remote import and file-picker persistence were not exercised with user data.
 
 - `src/render/MenuWindow_draw.inl` selects the native treatment through
   `modern_title_screen` / `modern_library_screen` / `modern_settings_screen`, applies the native palette, and draws flat
-  surfaces. Gameplay, multiplayer results and imported lobby skins retain
-  their existing scene and skin paths.
+  surfaces. Imported lobby skins retain their scene/skin paths. Gameplay and
+  multiplayer presentation are extended in 1.7.1; see [the follow-up](gameplay-polish-followup.md).
 - `src/render/MenuWindow_draw_title_native.inl` owns the native Home layout:
   profile header, quiet wordmark, wrapped guide, large primary action and three
   secondary actions. `MenuApp::populate_title_render_data` supplies localized

@@ -1,39 +1,32 @@
-# Main Menu Low-Latency Blueprint
+# 메뉴 구조와 조작
 
-The main menu must honor the same low-latency philosophy as gameplay: audio runs as the master clock, inputs are timestamped off-thread, and rendering only consumes snapshots. This blueprint captures the rules and implementation order so menu work does not reintroduce input lag.
+이 문서의 현재 동작은 1.7.1 클라이언트를 기준으로 합니다. 아래 접힌 초기 설계안은 구현 완료 목록이 아닙니다.
 
-## 현재 구현 상태(Windows 메뉴 UI)
-- `MenuApp`는 **InputThread(폴링)** → **SPSC 큐** → **메뉴 상태 머신** → **RenderThread(D3D11 윈도우 렌더)** 흐름으로 동작한다.
-- `MenuNavigator`가 화면 history를 소유해 Options 하위 화면의 Back은 한 단계씩 실제 진입 화면까지 되돌아간다. 각 설정 화면의 타입 기반 controller가 선택/수정 상태를 소유하고, `MenuApp`는 저장·파일 선택·스레드 재시작 같은 경계 효과만 실행한다.
-- `MenuScreenDescriptor`가 화면 제목, 스킨 배경/fallback, snapshot/view 라우팅을 한 곳에서 정의한다.
-- `SongIndexerThread`가 백그라운드에서 곡 인덱스를 생성하고 `profiles/<name>/.tenriff/song-index/<source-hash>.json`에 캐시한다.
-- 메뉴에서 오디오/그래픽/인풋/모드 설정을 변경하면 프로필 설정 파일에 저장된다.
-- `Options -> Profile Setup`은 현재 프로필의 첫 실행 설정 화면을 다시 열어 언어/오디오/입력/그래픽/키맵을 즉시 저장한다.
-- 플레이 시작 시에는 현재 구현상 메뉴 스레드를 중지하고 `GameSession`을 별도로 실행한다.
-- **Windows 메뉴 UI는 D3D11 + Direct2D/DirectWrite 기반**으로 타이틀/곡선택(시안 레이아웃)과 기타 설정 화면(리스트 UI)을 렌더링한다.
-- Skins는 native/LR2 전용이다. LR2 playskin 하나를 선택하거나 드롭하면 활성 프로필로 이식하고, `LR2files` 또는 `Theme`을 선택하면 정확한 `IIDX` 폴더와 IIDX 자산 의존 테마를 제외한 바로 아래 테마를 각각 설치한다. 형제 테마 참조를 유지하며 기존 폴더는 덮어쓰지 않는다.
-- Song Select 재인덱싱 중 stage/percent/ETA와 상단 progress bar를 게임플레이 외 모든 화면에 표시한다.
-- Browse에서 로컬 header JSON을 고르거나 클립보드의 http(s) BMSTable HTML/header 링크를 가져오면 현재 source를 재인덱싱해 hash 일치 곡에 표 레벨을 적용한다.
-- Graphics의 `BGA` 토글은 게임플레이 이미지/영상을 완전히 끄며 선곡 미리보기는 유지한다. ONNX 모델 선택은 경로만 저장하므로 `BGA Upscaler`를 별도로 켜고 고사양 경고를 확인해야 한다.
-- 입력 키 요약:
-  - Title: `↑/↓` 이동, `Enter` 선택(PLAY/EDIT/OPTIONS/EXIT), `F2` 곡 폴더 선택, `F5` 새로고침, `Esc` 종료
-    - 곡이 하나도 인덱싱되지 않았으면 첫 버튼은 `PLAY` 대신 `Add Songs Folder`로 보인다.
-  - Song Select: `↑/↓` 곡 이동, `PgUp/PgDn` 페이지 이동, `←/→` 좌측 메뉴 포커스 전환, `Tab` 빠른 설정 진입, 빠른 설정에서 `↑/↓` 항목 선택·`←/→` 값 조정, `Enter` 선택/플레이, `-`/`+` Rate 조정, `Esc` 타이틀 복귀
-    - 좌측 메뉴는 `Songs / Sources / Search / Filter / Records / Session Mix / Options`를 제공한다.
-    - `Backspace`는 `Sources` 또는 `Records`에서 `Songs`로 되돌아갈 때만 쓴다.
-  - Session Mix: `←/→`로 15/30/60분 목표를 고르고 `Enter`로 시작한다.
-    - 현재 Song Select 검색·필터 결과만 후보로 사용하며 같은 차트는 한 번만 선택한다.
-    - 로컬 최고 기록의 클리어 난이도를 기준으로 워밍업·도전·마무리 순서를 구성한다.
-    - 곡 길이는 인덱스에 없으므로 목표 시간은 차트당 약 3분을 기준으로 계산한다.
-  - Settings/Mode: `↑/↓` 항목 이동, `←/→` 값 변경, `Enter/Esc` 복귀
-    - Master/BGM/Keysound 볼륨은 키보드 좌우 조절과 클릭·드래그가 같은 규칙을 쓰는 가로 슬라이더다.
-    - 긴 설정 목록은 우측 스크롤바를 클릭해 해당 위치로 바로 이동할 수 있으며, 클릭만으로 값이 바뀌지는 않는다.
-    - 화면 공간 때문에 설명 일부가 생략되면 마지막 설명 줄에 `F1`과 남은 도움말 줄 수를 표시한다.
-  - Keymap: `↑/↓` 선택, `Enter` 바인딩 캡처, `Esc` 복귀
-    - 캡처 성공 시 즉시 `keymap.json`에 저장된다.
-    - Song Select에서 열면 선택한 차트의 lane count를 우선 기준으로 편집 모드를 잡는다.
-  - Result: 일반 플레이는 `Enter`로 곡 선택에 복귀한다. Session Mix 중에는 `Enter`로 다음 곡을 진행하고 `Esc`/`Backspace`로 세션을 종료한다.
-  - Shared utility keys: `F1` 도움말, `F2` songs-folder browse, `F5` refresh/reindex, `F9` screenshot
+## 현재 화면과 조작
+
+- 홈: `Play / Multiplayer / Options / Exit`. 곡이 없으면 첫 버튼은 `Add Songs Folder`입니다.
+- 선곡: 상단 `Songs / Sources / Records / Session Mix / Options`, 중앙 하단 `Search / Sort·Filter / Difficulty Table`을 사용합니다. 예전 좌측 KEY/메뉴 레일 안내는 현재 화면과 다릅니다.
+- 난이도표 카드: 이름·URL 영역은 URL 편집창, `File`은 로컬 JSON 선택, `Reset`은 기본 LV 복귀입니다. `Enter` 적용, `Esc` 취소이며 잘못된 주소는 기존 표를 유지합니다. Filters의 난이도표 행도 같은 가져오기 경로를 사용합니다.
+- 옵션: 5열×2행의 10개 카드입니다. Key Mode, Keymap, Skins, Graphics, Audio, Input, Calibration, Profile Setup, Mods, Key Test로 이동합니다.
+- 공통 설정: 방향키로 선택·조절하고 `Enter`는 선택 항목의 동작을 실행합니다. `Esc / Backspace`는 뒤로 이동합니다. 긴 사용 안내는 페이지 버튼으로 읽습니다. 스킨 설정은 실시간 미리보기를 유지합니다.
+- 키맵: 4K–10K, 12K, 14K, 16K를 지원하며 성공한 바인딩은 즉시 저장합니다.
+- 결과: 싱글 결과 연출 중 `Space`로 건너뜁니다. 준비 후 `R / Left` 재시도, `F1` 리플레이, `Enter / Esc / Backspace` 복귀입니다. Session Mix의 Enter는 다음 곡, Esc/Backspace는 세션 종료입니다. 멀티 결과는 로비로 복귀합니다.
+- F1/F2/F5 같은 기능키는 화면별 역할이 다릅니다. 정확한 조작은 [플레이 안내](gameplay-guide.md)를 참고하세요.
+
+## 소유권과 데이터 흐름
+
+- [MenuApp](../src/app/MenuApp.cpp)은 InputThread의 RawInput/폴링 키 이벤트와 윈도우의 포인터 이벤트를 처리합니다. [MenuNavigator](../src/app/menu/MenuNavigator.h)가 화면과 Back 이력을 소유합니다.
+- 각 설정 controller가 선택·수정 상태를 소유하고 MenuApp이 저장, 파일 선택, 재인덱싱, 장치 재시작을 실행합니다. [MenuScreenDescriptor](../src/app/menu/MenuScreenDescriptor.h)가 화면 메타데이터와 view 경로를 정의합니다.
+- 렌더러는 불변 snapshot을 소비합니다. 메뉴의 음악은 [MenuMusicController](../src/app/MenuMusicController.cpp), 선곡 미리듣기 상태는 [SongSelectScreen](../src/app/SongSelectScreen.h)이 소유합니다.
+- [launch_gameplay](../src/app/MenuAppTail.inl)은 메뉴 입력과 미리듣기를 멈추고 GameSession을 시작합니다. 게임플레이의 오디오·입력 생명주기는 GameSession이 관리합니다. 메뉴부터 같은 오디오 장치를 계속 공유한다는 초기 제안은 현재 계약이 아닙니다.
+- 곡 인덱싱은 SongIndexerThread가 수행하며 캐시는 `profiles/<name>/.tenriff/song-index/<source-hash>.json`입니다. 실제 경로와 설정은 [현재 상태](current-state.md), [설정](config.md)을 참고하세요.
+
+## 유지보수
+
+[메뉴 리팩터 계획](menu-refactor-plan.md)의 Phase 0–6은 완료됐습니다. 새 기능은 기존 controller·명시적 화면 경로에 추가하고 관련 테스트와 [UI 확인표](ui-audit-checklist.md)를 사용합니다. 화면별 실제 시각 구조는 [메뉴 UI](menu-visual-polish.md), 멀티·판정은 [1.7.1 후속 변경](gameplay-polish-followup.md)에 정리되어 있습니다.
+
+<details>
+<summary>초기 설계안 — 현재 구현 계약 아님</summary>
 
 ## Non-negotiable rules
 - **Keep the audio device open from the menu.** Initialize the audio backend on menu entry and run silent callbacks (zero buffers) so `playhead_samples`/`buffer_start_samples` stay valid before gameplay begins. Avoid reopening devices when starting a song to prevent warm-up jitter.
@@ -94,3 +87,5 @@ Put these on the first page so users see latency-critical toggles immediately:
 3) Add SongIndexerThread + cached index + responsive SongSelect UI.
 4) Surface latency-first settings and apply live where possible; note when backend changes require restart.
 5) Add key remap + NKRO test following the input pipeline rules.
+
+</details>

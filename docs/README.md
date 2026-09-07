@@ -6,6 +6,14 @@ Language: Korean | [English](README.en.md) | [简体中文](README.zh-CN.md) | [
 
 이 프로젝트 코드는 빠른 반복과 실험을 전제로 발전한 `vibe coding` 작품이라는 점을 전제로 읽는 편이 맞습니다.
 
+## 문서 기준과 최신 변경
+
+현재 동작이 충돌하면 같은 커밋의 **구현 코드·회귀 테스트**를 먼저 확인하고 `current-state`와 `config` 문서를 함께 수정합니다. 번역본도 같은 계약을 설명해야 합니다. `baseline-*`와 `release-*`는 해당 버전의 기록이며, 초기 설계·로드맵의 제안은 현재 구현이나 성능 보장이 아닙니다.
+
+- [1.7.1](release-1.7.1-gate.md)
+- [UI](menu-visual-polish.md)
+- [Gameplay / Multiplayer](gameplay-polish-followup.md)
+
 ## Recommended Reading Order
 1. `docs/current-state.md`
    - 현재 제품 상태, 핵심 서브시스템, 검증된 명령, 남은 수동 검증 항목
@@ -55,7 +63,7 @@ Language: Korean | [English](README.en.md) | [简体中文](README.zh-CN.md) | [
 ## Translation Coverage
 - 루트 `README.md`는 `README.en.md`, `README.zh-CN.md`, `README.ja.md` 번역본을 가집니다.
 - `docs/` 안의 주요 문서는 원본 옆에 `.en.md`, `.zh-CN.md`, `.ja.md` suffix 파일로 번역본을 둡니다.
-- 번역 문서와 원문이 충돌하면, 현재 동작 기준은 여전히 원문 `docs/current-state.md`, `docs/config.md`, 실제 코드 순으로 판단합니다.
+- 번역 문서와 원문이 충돌하면, 현재 동작은 같은 커밋의 구현 코드·회귀 테스트로 확인하고 원문과 번역 문서를 함께 정정합니다.
 
 ## Acknowledgements
 - OpenAI Codex, ChatGPT, Claude Code, Gemini, 그리고 프로젝트 검증을 도와주신 게스트 테스터분들께 감사드립니다.
@@ -63,7 +71,7 @@ Language: Korean | [English](README.en.md) | [简体中文](README.zh-CN.md) | [
 ## Practical Rule
 - 현재 동작을 확인할 때는 `docs/current-state.md`를 우선 봅니다.
 - 어떤 기준선 위에서 작업을 쌓는지 정할 때는 `docs/baseline-1.5.1.md`를 같이 봅니다.
-- 오래된 설계와 현재 코드가 다를 수 있으므로, 충돌하면 현재 코드는 `docs/current-state.md`, `docs/config.md` 순으로 해석합니다.
+- 오래된 설계와 현재 코드가 다를 수 있으므로, 충돌하면 구현 코드·회귀 테스트를 먼저 확인하고 `docs/current-state.md`, `docs/config.md`를 정정합니다.
 
 ## Skin Customization
 

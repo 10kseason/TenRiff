@@ -104,7 +104,7 @@ TenRiff 当前的键位模式转换器包含基于 `krrcream-Toolkit` 中 N2NC �
 - 选项/皮肤
   - Hi-Speed、Rate、gauge、audio、input、graphics 设置
   - `Skins` 画面中可调判定线位置、note 宽度/高度
-  - `5K~10K` lane color 编辑与实时预览
+  - `4K–10K / 12K / 14K / 16K / 7+1` lane color 编辑与实时预览
   - 支持 native vector skin、TenRiff `skin.json` 与 LR2 playskin
   - 发布包 `skins/` 下的完成版 skin 会默认出现在列表中，同名 profile skin 优先
   - 通过选择或拖放 LR2 skin folder 复制到 active profile，并导入 note、LN、lane-gap、destination-size 数据

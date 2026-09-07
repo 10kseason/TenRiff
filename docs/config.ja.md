@@ -1,5 +1,7 @@
 # TenRiff Config Schema (current)
 
+確認元: [Config.h](../src/config/Config.h)、[Config.cpp](../src/config/Config.cpp)、[既定 JSON](../config/config.json)、[キーマップ](../src/config/Keymap.cpp)。省略値にはコード既定値を使い、以下の範囲は読込・保存時の正規化規則です。
+
 この文書は、`config/config.json`、`profiles/<name>/config.json`、`profiles/<name>/keymap.json` を基準に、現在実際に有効な設定構造をまとめたものです。
 
 ## Load Order
@@ -34,14 +36,15 @@ profile が存在しない場合は初回起動時に自動生成されます。
 - `volume` (double)
   - master volume
 - `bgm_volume` (double)
-- `normalize_audio` (bool): stereo-linked gameplay mix RMS leveling before limiter/master volume; default false. Menu music is unaffected.
+- `normalize_audio` (bool)
+  - ゲーム内ステレオミックスの RMS 音量調整。limiter/master volume の前に適用。既定は false。メニュー音楽・選曲プレビューは変更しない。
 - `keysound_volume` (double)
 
 ### `input`
 
 - `backend` (string)
   - `polling | rawinput`
-  - 現行 `1.5.1` リリースラインの既定値は `rawinput`
+  - 現行 `1.7.1` リリースラインの既定値は `rawinput`
   - `Options -> Input Settings -> Backend` または `Options -> Profile Setup -> Input Backend` で profile ごとに選択可能
   - runtime fallback は保存済みの値を `polling` に書き換えない
   - RawInput の起動失敗、登録先の消失、message window の終了を確認すると、そのアプリ実行中は menu と後続 gameplay の両方で Polling を維持する
@@ -69,7 +72,7 @@ profile が存在しない場合は初回起動時に自動生成されます。
   - 既定値は `8ms`
 ### `judge`
 - `pg`, `gr`, `gd`, `bd` (double, ms)
-- 既定 `pg / gr / gd` は `20ms / 45ms / 90ms`
+- 既定 `pg / gr / gd` は `20ms / 65ms / 115ms`
 - 既定 `bd` は `210ms`
 - `Judge Easy` は従来の `1.25x` 倍率で `bd=262.5ms`、`Judge Hard` は `bd=340ms` を使用。Hard でも PG/GR/GD と LN tail window は基本値のまま
 - `indirect_miss` (double, ms)
@@ -91,12 +94,10 @@ profile が存在しない場合は初回起動時に自動生成されます。
 - `target_scroll_bps` (double)
 
 ### `gauge`
-- `normal | hard | ex_hard | easy` は曲終了または失敗まで type が固定です。
-- `shift` は EX-Hard / Hard / Normal / Easy をそれぞれ 100% から独立して同時に計算します。現在の tier が 0% で脱落すると、同じ判定をすでに累積している次の生存 tier を選び、終了時に生存している最上位 tier が最終 gauge になります。
-- EX-Hard、Hard、Normal、Easy はすべて `100%` で開始し、`0%` で即失敗します。
-- `delta`
-  - `ex_hard`, `hard`, `normal`, `easy`
-  - それぞれ `PG`, `GR`, `GD`, `BD`, `PR` を持つ
+
+Gauge Shift は常に有効です。`mode.gauge` の `ex_hard / hard / normal / easy` は EX から Easy への開始段階です。選択段階と下位段階をそれぞれ 100% から並列計算し、脱落すると次の生存段階へ移ります。対象段階がすべて脱落したときにゲージ失敗となります。旧 `shift` は EX 開始として解釈します。
+
+- `delta`: `ex_hard`, `hard`, `normal`, `easy` → `PG`, `GR`, `GD`, `BD`, `PR`.
 
 ### `graphics`
 - `display_mode` (string)
@@ -147,7 +148,7 @@ chart loader/indexer は BMS family（`.bms/.bme/.bml/.pms`）専用です。旧
   - 既定値は `krrcream`。NK3 は同じ key count でも remaster を実行し、既定の `AUTO` backend は ncnn Vulkan を優先
   - Krrcream は元 note を target lane へ再配置するだけ
   - nK2 は key count 拡張時、元 pattern へ先に note を追加せず、変換中に target layout へ安全な support note を直接生成
-  - NK3 は P64 と host beam safety solver を常に使い、10K 以外の source を 10K に変換するときだけ generalized MLP を追加する。`TENRIFF_NK3_BACKEND=AUTO|VULKAN|OPENVINO` で backend を選び、`AUTO` は ncnn Vulkan を先に試す。複数の Vulkan GPU は `TENRIFF_NK3_VULKAN_DEVICE=<index>` で選択
+  - NK3 は P64 と host beam safety solver を常に使い、10K 以外の source を 10K に変換するときだけ generalized MLP を追加する。`TENRIFF_NK3_BACKEND=AUTO|VULKAN|NCNN_CPU|OPENVINO` で backend を選び、`AUTO` は ncnn Vulkan を先に試す。複数の Vulkan GPU は `TENRIFF_NK3_VULKAN_DEVICE=<index>` で選択
 - `key_conversion_nk2_preset` (string)
   - `native | transform | remaster`。既定値は `native`
   - nK2 の `Native (12%)` / `Transform (35%)` / `Remaster (65%)` を選択し、Krrcream では設定 row を lock
@@ -156,7 +157,7 @@ chart loader/indexer は BMS family（`.bms/.bme/.bml/.pms`）専用です。旧
 - `gauge` (string)
   - `normal | hard | ex_hard | easy | shift`
 - `random` (string)
-  - `off | mirror | fr | sr`
+  - `off | mirror | rr | frns | sr` (`fr` = `frns`)
 - `random_seed` (int)
   - RR/SR、強制 key-mode 変換、LN Mix 対象選択の固定 seed。通常 Random は play ごとに新しい session seed を生成し、実際の値を replay に記録
 - `mods` (string array)
@@ -198,111 +199,78 @@ chart loader/indexer は BMS family（`.bms/.bme/.bml/.pms`）専用です。旧
   - 設定変更時は cache mode を分離し、現在の song source を full reindex
 
 ### `ui`
-- `profile_nickname` (string)
-  - Quick Setup で編集し、保存 record と multiplayer の表示名に使用
-  - control 文字と重複空白を除去し UTF-8 で最大48 byte。空なら profile ID を表示
-- `profile_avatar_path` (string)
-  - Profile Setup で選択したローカル PNG/JPG パス。空の場合は TenRiff の既定表示を使用
-  - profile ごとに保存し、UI-safe な UTF-8 最大 2048 byte に正規化
-- `language` (string)
-  - `en | ko`
-  - 無効値は load 時に `en` へ正規化
-  - Graphics Settings の Language 行に接続されている
-- `result_tail_ms` (double)
-- `require_enter_to_exit` (bool)
-- `active_song_source` (string)
-  - 最後に開いた song root
-- `recent_song_sources` (array of string)
-  - recent external/internal song source 一覧
-- `song_collection_filter` (string)
-  - 最後に選択した全曲・お気に入り・名前付き collection filter
-- `song_key_filter` (int, `0..16`)
-  - song browser の最後の key-count filter。`0` は全 key
-- `song_level_min_filter`, `song_level_max_filter` (int, `0..50`)
-  - 最後の level range。`0` はその境界を無効化
-  - key・level・collection filter は変更時に保存され、再起動後も復元
-- `difficulty_table_path` (string)
-  - Browse で選択した local BMS difficulty-table header JSON、または link から作成した profile cache header の path
-  - header は `name`, `symbol`, local relative `data_url`、data array entry は `md5` または `sha256` と `level` を使用
-  - 選択/解除時に現在の source を再インデックスして一致譜面へ table level を表示し、選択時は hash が必要な `safe` index へ自動切替
-- `difficulty_table_url` (string)
-  - Browse から import した http(s) BMSTable HTML page または header JSON の元 link
-  - 標準 `<meta name="bmstable" content="...">` を解決して header/data JSON を profile の `difficulty_tables` cache に保存。local JSON 選択時は空になる
+
+| 項目 | 型・範囲・既定値 | 動作 |
+| --- | --- | --- |
+| `profile_nickname` | string; UTF-8 ≤48 bytes | 表示名。空ならプロファイル ID。空白・制御文字を正規化。 |
+| `profile_avatar_path` | string; UTF-8 ≤2048 bytes | ローカル PNG/JPG アバターのパス。 |
+| `language` | `en`, `ko`; `en` | UI 言語。不正値は en に正規化。 |
+| `result_tail_ms` | double; `500` ms | 判定完了後の結果遷移の追加待機時間。譜面音声の終了時刻も考慮します。 |
+| `require_enter_to_exit` | bool; `true` | 読込・保存互換用。現在の Windows 結果入力経路はこの値で自動終了しません。 |
+| `show_cursor_in_gameplay` | bool; `true` | ゲーム中のマウスポインター表示。 |
+| `active_song_source`, `recent_song_sources` | string / string[] | 現在と最近の曲フォルダー。 |
+| `session_mix_lr2_course_path` | string | 選択した LR2 コースのパス。 |
+| `favorite_chart_keys` | string[] | お気に入り譜面の内部識別キー。 |
+| `collections` | object: name → string[] | 名前付きコレクションごとの譜面キー。 |
+| `song_collection_filter` | string; `all` | 全譜面・お気に入り・コレクションのフィルター。即時保存。 |
+| `song_key_filter` | int: `0..16`; `0` | キー数フィルター。0 は全件。UI は 4K–10K、12K、14K、16K。 |
+| `song_level_min_filter`, `song_level_max_filter` | int: `0..50`; `0` | 難易度の境界。0 はその境界を無効化。 |
+| `difficulty_table_path` | string | ローカル header JSON または取得済みキャッシュ。変更時に再索引し、選択時に safe 索引へ切替。 |
+| `difficulty_table_url` | string | 元の HTTP(S) BMSTable ページ/header URL。meta を解決し header/data をキャッシュ。ローカル JSON 選択時は空にする。 |
+| `online_records_server_url` | string | 記録・ランキング・チャット API URL。失敗してもローカルプレイ・記録は維持。 |
+| `tenriff_main_server_url` | string | F10 のメイン API URL。既定値は Config.h の `kTenRiffMainApiUrl`。 |
+| `private_server_url` | string | F10 の私設 API URL。リモートは HTTPS、localhost のみ HTTP 可。 |
+| `account_server_mode` | `main`, `private`; `main` | 最後に選択したアカウントサーバー。 |
+
+難易度表 header は `name`、`symbol`、ローカル相対 `data_url` を使用し、data 項目は `md5` または `sha256` と `level` で照合します。取得内容はプロファイルの `difficulty_tables` キャッシュへ保存します。
 
 ### `skin`
-- `source` (string)
-  - `native | tenriff | lr2`
-- `tenriff_skin_name` (string)
-  - 取り込んだ TenRiff `skin.json` スキンフォルダー名
-- `lr2_skin_name` (string)
-  - 取り込んだ LR2 playskin 名
-- `lr2_resolution_mode` (string)
-  - `auto | sd | hd | fhd`
-  - LR2 playskin resolution override token
-  - `auto` は asset file 名ではなく `#DST_NOTE` レイアウト座標を見て SD/HD/FHD を解決
-- `note_shape` (string)
-  - `rect | triangle | pentagon | hexagon | circle`
-  - 100% では procedural 円・多角形が rect bar と同じ lane 全幅を使用
-- `show_hold_tail` (bool)
-  - long-note の判定と body の連続性を変えず、tail cap だけを表示または非表示にする
-- `note_border_enabled` (bool)
-- `black_playfield_enabled` (bool)
-  - `true` の場合、lane spacing を含む player/ghost playfield 全体を完全な黒で表示
-  - 既定値は `true`。既存プロファイルで明示された `false` は維持される
-- `judgement_line_position` (double)
-  - gameplay judgement line の縦位置比率
-  - `0.00..1.00`（0%～100%）に clamp
-  - 既定値は `0.82`
-- `judgement_position` (double): independent judgement Y anchor, 0.10–0.78; missing fields inherit the existing combo anchor.
-- `judgement_offset_x`, `combo_offset_x` (double): independent X offsets in 1920x1080 base pixels, -600–600; default 0.
-- `combo_position` (double)
-  - gameplay field 内の combo 表示縦位置比率
-  - `0.10..0.78` に clamp
-  - 既定値は `0.24`
-- `lane_width_scales` (object)
-  - キーモードごとの lane width scale 配列
-  - 各 mode 値は lane ごとに 1 要素を持つ数値配列
-  - 各値は `0.50..1.75` に clamp
-- `note_width_scale` (double)
-  - 中央基準の playfield 全体、lane/divider、note head/tail、隣接 gauge をまとめて拡大・縮小する (`0.50..1.40`)
-  - 100% で隣接 note 間の既定合計 gap は `24px`
-  - `0.50..1.40` に clamp
-- `lane_spacing_scales` (object)
-  - キーモードごとの lane 間空白スケール配列
-  - 各 mode 値は `(lane_count - 1)` 要素を持つ
-  - 各値は `0.00..2.00` に clamp
-- `note_height_scale` (double)
-  - note head / tail の高さスケール
-  - `0.50..4.00` に clamp
-- `lane_divider_width_scale` (double)
-  - 白い lane separator line の共通スケール
-  - `0.00..2.00` に clamp
-  - 全キーモードに一様適用
-- `lane_center_gap_scale` (double)
-  - 16K フィールド左右中央 gap スケール
-  - `0.00..2.00` に clamp
-  - 現状 `16k` レイアウトだけに適用
-- `hold_body_width_scale` (double)
-  - long-note body の幅スケール
-  - `0.50..1.20` に clamp
-- `note_width_scales` (object)
-  - キーモードごとの `note_width_scale` override
-- `note_height_scales` (object)
-  - キーモードごとの `note_height_scale` override
-- `lane_divider_width_scales` (object)
-  - legacy compatibility field
-- `lane_center_gap_scales` (object)
-  - キーモードごとの `lane_center_gap_scale` override
-- `single_color` (string)
-  - `off` または対応 color token
-  - color token を選ぶと、すべての key mode と scratch lane を同じ色で表示
-  - lane ごとの `lane_colors` は保持されるため、`off` に戻すと元の palette を復元
-- `lane_colors` (object)
-  - キーモードごとの lane color palette
-  - 現在の既定/保存 mode は `4k..10k` と `16k`
-  - 各 mode 値は lane ごとに 1 要素を持つ string 配列
-  - 対応 token:
-    `ice`, `azure`, `gold`, `mint`, `rose`, `violet`, `orange`, `teal`
+
+これはプロファイル `config.json` の skin 設定です。スキンパッケージの `skin.json` 契約は [スキン形式](skin-format.md)を参照してください。
+
+| 項目 | 型・範囲・既定値 | 動作 |
+| --- | --- | --- |
+| `source` | string: `native`, `tenriff`, `lr2` | スキンの種類。 |
+| `tenriff_skin_name`, `lr2_skin_name` | string | 取り込んだスキンのフォルダー名。 |
+| `scratch_position` | `left`, `right`; `left` | 7+1 の皿の表示順のみ変更。入力・判定レーンは維持。 |
+| `lr2_resolution_mode` | `auto`, `sd`, `hd`, `fhd`; `auto` | LR2 の座標解像度。auto はファイル名ではなく `#DST_NOTE` 座標を使用。 |
+| `visual_preset` | `classic`, `neon`, `minimal`, `tenriff`; `tenriff` | メニューで選ぶと視覚設定の組み合わせを再設定。 |
+| `note_shape` | `rect`, `triangle`, `pentagon`, `hexagon`, `circle`; `rect` | 標準図形ノートの形。 |
+| `note_image_aspect` | `stretch`, `contain`, `width`; `stretch` | 引き伸ばし / 比率を保って内側に収める / 幅を固定して比率から高さを計算。 |
+| `preserve_note_image_aspect_ratio` | bool; `false` | 旧版互換。明示的な `note_image_aspect` が優先。stretch 以外は true で保存。 |
+| `note_border_enabled`, `show_lane_dividers`, `show_judgement_line` | bool; `true` | ノート枠、レーン区切り線、判定線をそれぞれ表示。 |
+| `note_divider_gap_px` | double: `0..40`; `12` px | ノート片側と区切り線の間隔。0 なら区切り線まで拡張。 |
+| `show_gear_boundary_line` | bool; `false` | ギア境界線を表示。 |
+| `show_timing_feedback` | bool; `true` | FAST/SLOW とタイミング履歴を表示。判定等級は独立して維持。 |
+| `show_hold_tail`, `hold_tail_taper_enabled` | bool; `false` | LN 尾端キャップ表示とテーパー。判定規則は変更しない。 |
+| `judgement_line_glow_enabled` | bool; `true` | 判定線周囲の発光。 |
+| `key_pulse_brightness` | double: `0..1`; `1` | Hit Burst の明るさ。0 で無効。 |
+| `key_pulse_enabled` | bool; `true` | 旧版 ON/OFF 互換。false または明るさ 0 で無効。 |
+| `hit_burst_style` | `prism`, `ring`, `spark`; `prism` | 内蔵 Hit Burst の形。 |
+| `ui_font` | `default`, `malgun`, `bahnschrift`, `consolas`; `default` | メニューの書体。default は Segoe UI。ロゴ・ランク・コンボ専用書体は維持。 |
+| `key_label_position` | `bottom`, `top`, `off`; `bottom` | レーンのキー名表示位置。 |
+| `judgement_line_position` | double: `0..1`; `0.82` | 判定線の縦位置比率。 |
+| `gameplay_field_offset_x` | double: `-720..720`; `0` | 1920×1080 基準のギア横移動。ギアと ↔ ハンドルが見える範囲に追加制限。 |
+| `combo_position`, `judgement_position` | double: `0.10..0.78`; `0.24` | コンボ・判定の独立した Y 位置。旧プロファイルで判定位置がなければ `combo_position` を継承。 |
+| `combo_offset_x`, `judgement_offset_x` | double: `-600..600`; `0` | 1920×1080 基準のコンボ・判定の独立 X オフセット。 |
+| `lane_background_opacity` | double: `0..0.45`; `0.18` | レーン背景の不透明度。 |
+| `black_playfield_enabled` | bool; `true` | レーン間隔も含めフィールド全体を黒く表示。 |
+| `visual_opacity` | double: `0.20..1`; `0.96` | ノート・レセプター・キー名の共通不透明度倍率。 |
+| `note_outline_opacity` | double: `0..1`; `0.78` | ノート枠の不透明度。 |
+| `hold_body_opacity` | double: `0.05..1`; `1` | LN 本体の不透明度。 |
+| `lane_width_scales` | object: mode → number[]; `0.50..1.75` | レーン数と同じ長さの個別幅配列。 |
+| `note_width_scale` | double: `0.50..1.40`; `1` | Note & Field Size。中心を保ちフィールド・レーン・ノート・隣接ゲージを調整。 |
+| `lane_spacing_scales` | object: mode → number[]; `0..2` | レーン間隔配列。長さは lane_count - 1。 |
+| `note_height_scale` | double: `0.50..4`; `1.8` | ノート頭部・尾部の高さ倍率。 |
+| `lane_divider_width_scale` | double: `0..2`; `1` | 全モード共通の区切り線幅。取り込んだ LR2 区切り線にも適用。 |
+| `lane_center_gap_scale` | double: `0..2`; `0` | 16K 左右ブロックの中央間隔。 |
+| `hold_body_width_scale` | double: `0.50..1.20`; `1` | LN 本体の幅倍率。 |
+| `note_width_scales`, `note_height_scales`, `lane_center_gap_scales` | object: mode → number | 対応する共通値のモード別上書き。同じ範囲に制限。 |
+| `lane_divider_width_scales` | object: mode → number | 旧版互換。現在は共通 `lane_divider_width_scale` を使用。 |
+| `lane_colors` | object: mode → string[] | レーン数と同じ長さの色トークン配列。 |
+| `single_color` | string; `off` | 色トークンで全レーンを上書き。既存の `lane_colors` は保持。 |
+
+モード別配列・上書き: `4k`, `5k`, `6k`, `7k`, `7+1`, `8k`, `9k`, `10k`, `12k`, `14k`, `16k`。色トークン: `ice`, `azure`, `gold`, `mint`, `rose`, `violet`, `orange`, `teal`。`7+1` はスキンパレットであり独立したキーマップモードではありません。旧 `expand_notes_to_dividers=true` は間隔 0 として読み、明示的な `note_divider_gap_px` が優先します。
 
 ### `offsets`
 - `input` (double)
@@ -319,7 +287,7 @@ chart loader/indexer は BMS family（`.bms/.bme/.bml/.pms`）専用です。旧
 - `bindings`
   - legacy 10K compatibility
 - `modes`
-  - `4k`, `5k`, `6k`, `7k`, `8k`, `9k`, `10k`
+  - `4k`, `5k`, `6k`, `7k`, `8k`, `9k`, `10k`, `12k`, `14k`, `16k`
   - 各 mode 内で lane id -> key token
 
 ### Notes

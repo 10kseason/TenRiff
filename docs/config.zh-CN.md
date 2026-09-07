@@ -1,5 +1,7 @@
 # TenRiff 配置模式（当前）
 
+依据：[Config.h](../src/config/Config.h)、[Config.cpp](../src/config/Config.cpp)、[默认 JSON](../config/config.json) 与[键位](../src/config/Keymap.cpp)。省略字段使用代码默认值；以下范围描述加载、保存时的规范化规则。
+
 这份文档整理当前 `config/config.json`、`profiles/<name>/config.json`、`profiles/<name>/keymap.json` 的实际配置结构。
 
 ## 加载顺序
@@ -34,14 +36,15 @@
 - `volume` (double)
   - master volume
 - `bgm_volume` (double)
-- `normalize_audio` (bool): stereo-linked gameplay mix RMS leveling before limiter/master volume; default false. Menu music is unaffected.
+- `normalize_audio` (bool)
+  - 对游戏内立体声混音进行联动 RMS 音量调整，位于 limiter/master volume 之前；默认 false，不改变菜单音乐与选曲试听。
 - `keysound_volume` (double)
 
 ### `input`
 
 - `backend` (string)
   - `polling | rawinput`
-  - 当前 `1.5.1` 发布线默认值为 `rawinput`
+  - 当前 `1.7.1` 发布线默认值为 `rawinput`
   - 可在 `Options -> Input Settings -> Backend` 或 `Options -> Profile Setup -> Input Backend` 中按 profile 选择
   - runtime fallback 不会把已保存值改写为 `polling`
   - 确认 RawInput 启动失败、注册目标丢失或 message window 退出后，本次应用运行期间 menu 与后续 gameplay 都会保持 Polling
@@ -69,7 +72,7 @@
   - 默认值为 `8ms`
 ### `judge`
 - `pg`, `gr`, `gd`, `bd` (double, ms)
-- 默认 `pg / gr / gd` 分别为 `20ms / 45ms / 90ms`
+- 默认 `pg / gr / gd` 分别为 `20ms / 65ms / 115ms`
 - 默认 `bd` 为 `210ms`
 - `Judge Easy` 沿用现有 `1.25x` 倍率（`bd=262.5ms`），`Judge Hard` 使用 `bd=340ms`；Hard 不会收紧 PG/GR/GD 与长按尾部判定窗
 - `indirect_miss` (double, ms)
@@ -91,12 +94,10 @@
 - `target_scroll_bps` (double)
 
 ### `gauge`
-- `normal | hard | ex_hard | easy` 会固定到歌曲结束或失败。
-- `shift` 会让 EX-Hard / Hard / Normal / Easy 分别从 100% 开始独立并行计算。当前 tier 到达 0% 后，会选择已累计相同判定的下一档存活 tier；结束时仍存活的最高 tier 会成为最终 gauge。
-- EX-Hard / Hard / Normal / Easy 都从 `100%` 开始，并在到达 `0%` 时立即失败。
-- `delta`
-  - `ex_hard`, `hard`, `normal`, `easy`
-  - 每个条目下包含 `PG`, `GR`, `GD`, `BD`, `PR`
+
+Gauge Shift 始终启用。`mode.gauge` 的 `ex_hard / hard / normal / easy` 选择从 EX 到 Easy 的起始档位。所选档位及以下档位均从 100% 独立并行计算，当前档位淘汰后转至下一存活档位。全部可用档位淘汰后才发生血条失败。旧 `shift` 值表示从 EX 开始。
+
+- `delta`: `ex_hard`, `hard`, `normal`, `easy` → `PG`, `GR`, `GD`, `BD`, `PR`.
 
 ### `graphics`
 - `display_mode` (string)
@@ -147,7 +148,7 @@ chart loader/indexer 仅支持 BMS family（`.bms/.bme/.bml/.pms`）。旧 `enab
   - 默认值为 `krrcream`；NK3 在键数不变时也会 remaster，默认 `AUTO` 后端优先使用 ncnn Vulkan
   - Krrcream 只把原始 note 重排到目标 lane
   - nK2 在扩展键数时不会先向原始 pattern 加 note，而是在转换过程中直接向目标 layout 生成安全的辅助 note
-  - NK3 始终使用 P64 与 host beam safety solver，仅在非 10K 源谱面转换为 10K 时加入 generalized MLP；通过 `TENRIFF_NK3_BACKEND=AUTO|VULKAN|OPENVINO` 选择后端，`AUTO` 会优先尝试 ncnn Vulkan；多块 Vulkan GPU 可用 `TENRIFF_NK3_VULKAN_DEVICE=<index>` 选择
+  - NK3 始终使用 P64 与 host beam safety solver，仅在非 10K 源谱面转换为 10K 时加入 generalized MLP；通过 `TENRIFF_NK3_BACKEND=AUTO|VULKAN|NCNN_CPU|OPENVINO` 选择后端，`AUTO` 会优先尝试 ncnn Vulkan；多块 Vulkan GPU 可用 `TENRIFF_NK3_VULKAN_DEVICE=<index>` 选择
 - `key_conversion_nk2_preset` (string)
   - `native | transform | remaster`；默认值为 `native`
   - 选择 nK2 的 `Native (12%)`、`Transform (35%)` 或 `Remaster (65%)`；Krrcream 下锁定该设置行
@@ -156,7 +157,7 @@ chart loader/indexer 仅支持 BMS family（`.bms/.bme/.bml/.pms`）。旧 `enab
 - `gauge` (string)
   - `normal | hard | ex_hard | easy | shift`
 - `random` (string)
-  - `off | mirror | fr | sr`
+  - `off | mirror | rr | frns | sr` (`fr` = `frns`)
 - `random_seed` (int)
   - RR/SR、强制 key-mode 变换和 LN Mix 目标选择使用固定 seed；普通 Random 每次游玩生成新的 session seed，并把实际值写入 replay
 - `mods` (string array)
@@ -198,114 +199,78 @@ chart loader/indexer 仅支持 BMS family（`.bms/.bme/.bml/.pms`）。旧 `enab
   - 修改设置后会区分缓存模式，并对当前 song source 执行完整重索引
 
 ### `ui`
-- `profile_nickname` (string)
-  - 可在 Quick Setup 中编辑，用作已保存记录和 multiplayer 的显示名
-  - 清理控制字符与重复空格，UTF-8 最长48字节；空值时回退到 profile ID
-- `profile_avatar_path` (string)
-  - 在 Profile Setup 中选择的本地 PNG/JPG 路径；为空时使用 TenRiff 默认标记
-  - 按 profile 保存，并规范为 UI-safe、最多 2048 UTF-8 字节
-- `language` (string)
-  - `en | ko`
-  - 非法值会在加载时规范化为 `en`
-  - 对应 Graphics Settings 中的 Language 行
-- `result_tail_ms` (double)
-- `require_enter_to_exit` (bool)
-- `active_song_source` (string)
-  - 最近一次打开的 song root
-- `recent_song_sources` (array of string)
-  - 最近使用过的外部/内部 song source 列表
-- `song_collection_filter` (string)
-  - 最后选择的全部、收藏或命名 collection filter
-- `song_key_filter` (int, `0..16`)
-  - song browser 最近的键数 filter；`0` 表示全部键数
-- `song_level_min_filter`, `song_level_max_filter` (int, `0..50`)
-  - 最近的 level range；`0` 表示不使用该边界
-  - 键数、level 与 collection filter 会在修改后立即保存，并在重启后恢复
-- `difficulty_table_path` (string)
-  - 在 Browse 中选择的本地 BMS 难度表 header JSON，或从链接生成的 profile cache header 路径
-  - header 使用 `name`、`symbol` 与本地相对 `data_url`；data array entry 使用 `md5` 或 `sha256` 加 `level`
-  - 选择或清除后会重新索引当前 source，并给匹配谱面显示表等级；选择难度表时会自动切换到需要 hash 的 `safe` 索引
-- `difficulty_table_url` (string)
-  - 从 Browse 导入的 http(s) BMSTable HTML 页面或 header JSON 原始链接
-  - 解析标准 `<meta name="bmstable" content="...">`，并把 header/data JSON 缓存到 profile 的 `difficulty_tables` 目录；选择本地 JSON 时清空
+
+| 字段 | 类型、范围、默认值 | 行为 |
+| --- | --- | --- |
+| `profile_nickname` | string; UTF-8 ≤48 bytes | 显示名称；为空时使用配置 ID，并规范化空白与控制字符。 |
+| `profile_avatar_path` | string; UTF-8 ≤2048 bytes | 本地 PNG/JPG 头像路径。 |
+| `language` | `en`, `ko`; `en` | UI 语言；无效值规范化为 en。 |
+| `result_tail_ms` | double; `500` ms | 判定完成后结果切换的额外等待时间，同时考虑谱面音频结束时刻。 |
+| `require_enter_to_exit` | bool; `true` | 为读写兼容保留；当前 Windows 结果输入路径不使用此值自动退出。 |
+| `show_cursor_in_gameplay` | bool; `true` | 游戏中显示鼠标指针。 |
+| `active_song_source`, `recent_song_sources` | string / string[] | 当前与最近使用的歌曲文件夹。 |
+| `session_mix_lr2_course_path` | string | 所选 LR2 课程文件路径。 |
+| `favorite_chart_keys` | string[] | 收藏谱面的内部标识键。 |
+| `collections` | object: name → string[] | 按集合名称分组的谱面键列表。 |
+| `song_collection_filter` | string; `all` | 全部、收藏或集合筛选；即时保存。 |
+| `song_key_filter` | int: `0..16`; `0` | 键数筛选；0 为全部。UI 可选 4K–10K、12K、14K、16K。 |
+| `song_level_min_filter`, `song_level_max_filter` | int: `0..50`; `0` | 难度边界；0 表示不启用对应边界。 |
+| `difficulty_table_path` | string | 本地 header JSON 或下载到配置缓存的 header；变更时重新索引，选择表时切换至 safe 索引。 |
+| `difficulty_table_url` | string | 原始 HTTP(S) BMSTable 页面或 header URL；解析 meta 并缓存 header/data，选择本地 JSON 时清空。 |
+| `online_records_server_url` | string | 记录、排名与聊天 API URL；失败不阻止本地游玩或记录。 |
+| `tenriff_main_server_url` | string | F10 主服务器 API URL；默认值为 Config.h 中的 `kTenRiffMainApiUrl`。 |
+| `private_server_url` | string | F10 私有 API URL；远程需 HTTPS，仅 localhost 可使用 HTTP。 |
+| `account_server_mode` | `main`, `private`; `main` | 上次选择的账户服务器。 |
+
+难度表 header 使用 `name`、`symbol` 与本地相对 `data_url`；data 项按 `md5` 或 `sha256` 及 `level` 匹配。远程导入保存在配置的 `difficulty_tables` 缓存中。
 
 ### `skin`
-- `source` (string)
-  - `native | tenriff | lr2`
-- `tenriff_skin_name` (string)
-  - 导入的 TenRiff `skin.json` 皮肤文件夹名称
-- `lr2_skin_name` (string)
-  - 导入的 LR2 playskin 名称
-- `lr2_resolution_mode` (string)
-  - `auto | sd | hd | fhd`
-  - LR2 playskin 的分辨率 override token
-  - `auto` 会基于 LR2 playskin `#DST_NOTE` 的布局坐标，而不是 asset 文件名，来判断 SD/HD/FHD family
-- `note_shape` (string)
-  - `rect | triangle | pentagon | hexagon | circle`
-  - 在 100% 下，procedural 圆形和多边形使用与 rect 条相同的完整 lane 宽度
-- `show_hold_tail` (bool)
-  - 不改变长按音符判定和 body 连续性，仅显示或隐藏 tail cap
-- `note_border_enabled` (bool)
-- `black_playfield_enabled` (bool)
-  - 为 `true` 时，将包含 lane spacing 在内的 player/ghost playfield 全部显示为纯黑
-  - 默认值为 `true`；现有配置中明确设置的 `false` 会被保留
-- `judgement_line_position` (double)
-  - gameplay 判定线的垂直位置比例
-  - 会被 clamp 在 `0.00..1.00`（0%～100%）
-  - 默认值为 `0.82`
-- `judgement_position` (double): independent judgement Y anchor, 0.10–0.78; missing fields inherit the existing combo anchor.
-- `judgement_offset_x`, `combo_offset_x` (double): independent X offsets in 1920x1080 base pixels, -600–600; default 0.
-- `combo_position` (double)
-  - gameplay field 内 combo 显示的垂直位置比例
-  - 会被 clamp 在 `0.10..0.78`
-  - 默认值为 `0.24`
-- `lane_width_scales` (object)
-  - 按 key mode 保存的单独 lane 宽度缩放数组
-  - 每个 mode 的值都是按 lane 数量排列的 number array
-  - 每个值都会被 clamp 到 `0.50..1.75`
-- `note_width_scale` (double)
-  - 以中心为基准，同时缩放整个 playfield、lane/divider、note head/tail 与相邻 gauge（`0.50..1.40`）
-  - 在 100% 下，相邻 note 边缘之间的默认总间距为 `24px`
-  - 会被 clamp 在 `0.50..1.40`
-- `lane_spacing_scales` (object)
-  - 按 key mode 保存的 lane 之间空白间距缩放数组
-  - 每个 mode 的值都是长度为 `(lane_count - 1)` 的 number array
-  - 每个值都会被 clamp 到 `0.00..2.00`
-- `note_height_scale` (double)
-  - note head/tail 的纵向缩放
-  - 会被 clamp 在 `0.50..4.00`
-- `lane_divider_width_scale` (double)
-  - 白色 lane 分隔线的共享宽度缩放
-  - 会被 clamp 在 `0.00..2.00`
-  - 会统一应用到所有 key mode
-  - native skin 会乘到默认 `1px` divider 上；LR2 skin 如果带有导入 divider 宽度，也会一起乘上这个值
-- `lane_center_gap_scale` (double)
-  - 16K 场地左右两半之间的中央间隔缩放
-  - 会被 clamp 在 `0.00..2.00`
-  - 当前只对 `16k` 布局生效
-- `hold_body_width_scale` (double)
-  - long note body 的横向缩放
-  - 会被 clamp 在 `0.50..1.20`
-  - 实际渲染计算以 `max(4.0f, note_width * 0.5f * scale)` 为准
-- `note_width_scales` (object)
-  - 按 key mode 保存的 `note_width_scale` override
-- `note_height_scales` (object)
-  - 按 key mode 保存的 `note_height_scale` override
-- `lane_divider_width_scales` (object)
-  - 旧版兼容字段
-  - 当前运行时只使用共享的 `lane_divider_width_scale`
-- `lane_center_gap_scales` (object)
-  - 按 key mode 保存的 `lane_center_gap_scale` override
-- `single_color` (string)
-  - `off` 或受支持的颜色 token
-  - 选择颜色 token 后，所有 key mode 与 scratch lane 都使用该颜色
-  - 每个 lane 的 `lane_colors` 会继续保留，因此切回 `off` 时会恢复原有调色板
-- `lane_colors` (object)
-  - 按 key mode 保存的 lane 颜色调色板
-  - 当前默认/保存对象为 `4k..10k`、`16k`
-  - 每个 mode 的值都是按 lane 数量排列的 string array
-  - 支持的 token：
-    `ice`, `azure`, `gold`, `mint`, `rose`, `violet`, `orange`, `teal`
+
+下表是配置文件 `config.json` 中的 skin 设置。皮肤包 `skin.json` 的规范见[皮肤格式](skin-format.md)。
+
+| 字段 | 类型、范围、默认值 | 行为 |
+| --- | --- | --- |
+| `source` | string: `native`, `tenriff`, `lr2` | 皮肤来源。 |
+| `tenriff_skin_name`, `lr2_skin_name` | string | 导入的皮肤文件夹名称。 |
+| `scratch_position` | `left`, `right`; `left` | 仅改变 7+1 皿键的显示顺序，不改变输入与判定轨道。 |
+| `lr2_resolution_mode` | `auto`, `sd`, `hd`, `fhd`; `auto` | LR2 坐标分辨率；auto 使用 `#DST_NOTE` 坐标，而非文件名。 |
+| `visual_preset` | `classic`, `neon`, `minimal`, `tenriff`; `tenriff` | 在菜单选择预设时重设对应的视觉选项组合。 |
+| `note_shape` | `rect`, `triangle`, `pentagon`, `hexagon`, `circle`; `rect` | 程序绘制的音符形状。 |
+| `note_image_aspect` | `stretch`, `contain`, `width`; `stretch` | 拉伸填充 / 保持比例完整容纳 / 固定宽度并按比例计算高度。 |
+| `preserve_note_image_aspect_ratio` | bool; `false` | 旧版兼容字段；显式 `note_image_aspect` 优先，非 stretch 模式保存为 true。 |
+| `note_border_enabled`, `show_lane_dividers`, `show_judgement_line` | bool; `true` | 分别显示音符边框、轨道分隔线与判定线。 |
+| `note_divider_gap_px` | double: `0..40`; `12` px | 音符每侧边缘与分隔线的间距；0 表示扩展至分隔线。 |
+| `show_gear_boundary_line` | bool; `false` | 显示轨道面板边界线。 |
+| `show_timing_feedback` | bool; `true` | 显示 FAST/SLOW 文字与时机历史；判定等级独立保留。 |
+| `show_hold_tail`, `hold_tail_taper_enabled` | bool; `false` | 分别控制长条尾部端帽与渐缩，不改变判定规则。 |
+| `judgement_line_glow_enabled` | bool; `true` | 判定线周围发光。 |
+| `key_pulse_brightness` | double: `0..1`; `1` | Hit Burst 亮度；0 为关闭。 |
+| `key_pulse_enabled` | bool; `true` | 旧版开关兼容；false 或亮度为 0 时关闭。 |
+| `hit_burst_style` | `prism`, `ring`, `spark`; `prism` | 内置 Hit Burst 样式。 |
+| `ui_font` | `default`, `malgun`, `bahnschrift`, `consolas`; `default` | 菜单字体；default 为 Segoe UI，标志、等级与连击保留专用字体。 |
+| `key_label_position` | `bottom`, `top`, `off`; `bottom` | 轨道按键名称位置。 |
+| `judgement_line_position` | double: `0..1`; `0.82` | 判定线纵向位置比例。 |
+| `gameplay_field_offset_x` | double: `-720..720`; `0` | 以 1920×1080 为基准的面板横向偏移；另行限制以保持面板与 ↔ 手柄可见。 |
+| `combo_position`, `judgement_position` | double: `0.10..0.78`; `0.24` | 连击与判定独立的 Y 位置；旧配置缺少判定位置时继承 `combo_position`。 |
+| `combo_offset_x`, `judgement_offset_x` | double: `-600..600`; `0` | 以 1920×1080 为基准的连击与判定独立 X 偏移。 |
+| `lane_background_opacity` | double: `0..0.45`; `0.18` | 轨道背景不透明度。 |
+| `black_playfield_enabled` | bool; `true` | 将包括轨道间隙在内的整个区域设为黑色。 |
+| `visual_opacity` | double: `0.20..1`; `0.96` | 音符、接收器与按键标签的共用不透明度倍率。 |
+| `note_outline_opacity` | double: `0..1`; `0.78` | 音符轮廓不透明度。 |
+| `hold_body_opacity` | double: `0.05..1`; `1` | 长条主体不透明度。 |
+| `lane_width_scales` | object: mode → number[]; `0.50..1.75` | 每轨宽度数组，长度等于轨道数。 |
+| `note_width_scale` | double: `0.50..1.40`; `1` | Note & Field Size：以中心为基准同时调整区域、轨道、音符与相邻血条。 |
+| `lane_spacing_scales` | object: mode → number[]; `0..2` | 轨道间距数组，长度为 lane_count - 1。 |
+| `note_height_scale` | double: `0.50..4`; `1.8` | 音符头尾高度倍率。 |
+| `lane_divider_width_scale` | double: `0..2`; `1` | 所有模式共用的分隔线宽度倍率，也适用于导入的 LR2 分隔线。 |
+| `lane_center_gap_scale` | double: `0..2`; `0` | 16K 左右区域的中央间距。 |
+| `hold_body_width_scale` | double: `0.50..1.20`; `1` | 长条主体宽度倍率。 |
+| `note_width_scales`, `note_height_scales`, `lane_center_gap_scales` | object: mode → number | 对应共用值的各模式覆盖项，使用相同范围限制。 |
+| `lane_divider_width_scales` | object: mode → number | 旧版兼容字段；当前运行时使用共用 `lane_divider_width_scale`。 |
+| `lane_colors` | object: mode → string[] | 每轨一个颜色标记的数组。 |
+| `single_color` | string; `off` | 选择颜色标记时覆盖所有轨道，同时保留原 `lane_colors`。 |
+
+各模式数组与覆盖项支持：`4k`, `5k`, `6k`, `7k`, `7+1`, `8k`, `9k`, `10k`, `12k`, `14k`, `16k`。颜色标记：`ice`, `azure`, `gold`, `mint`, `rose`, `violet`, `orange`, `teal`。`7+1` 是皮肤调色板而非独立键位模式。旧 `expand_notes_to_dividers=true` 将间距初始化为 0，显式 `note_divider_gap_px` 优先。
 
 ### `offsets`
 - `input` (double)
@@ -322,7 +287,7 @@ chart loader/indexer 仅支持 BMS family（`.bms/.bme/.bml/.pms`）。旧 `enab
 - `bindings`
   - 兼容旧版 10K 的 legacy block
 - `modes`
-  - `4k`, `5k`, `6k`, `7k`, `8k`, `9k`, `10k`
+  - `4k`, `5k`, `6k`, `7k`, `8k`, `9k`, `10k`, `12k`, `14k`, `16k`
   - 每个 mode 下是 lane id -> key token
 
 ### 说明

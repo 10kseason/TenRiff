@@ -1,5 +1,7 @@
 # Low-Latency Implementation Plan
 
+> 文書の範囲: 初期設計・改善案・当時の分析を含みます。未完了の提案や過去の測定値は現在の挙動・既定値・性能保証ではありません。[現在の状態](current-state.ja.md)と[設定](config.ja.md)を参照してください。
+
 TenRiff は input-to-judgement-to-sound の end-to-end 遅延を最小化することを重視します。このノートは、"Raw Input -> SPSC queue -> Audio thread judgement" という方針を保ったまま、後続作業でどこを締めるべきかをまとめたものです。
 
 ## Input Pipeline and Timestamping

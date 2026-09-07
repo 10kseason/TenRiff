@@ -1,30 +1,32 @@
-# Main Menu Low-Latency Blueprint
+# メニュー構造と操作
 
-main menu も gameplay と同じ低遅延思想に従う必要があります。audio は master clock として動き、入力は別スレッドで timestamp を付け、render は snapshot だけを消費します。この blueprint は、menu 作業が input lag を再導入しないようにするためのルールと実装順序をまとめたものです。
+現在の説明はクライアント 1.7.1 が基準です。下の折りたたまれた初期設計案は実装済み機能一覧ではありません。
 
-## Current Implementation State (Windows Menu UI)
-- `MenuApp` は **InputThread (polling)** -> **SPSC queue** -> **menu state machine** -> **RenderThread (D3D11 window render)** で動く。
-- `MenuNavigator` が screen history を所有し、Options 配下の Back は一階層ずつ実際の遷移元へ戻る。各 settings controller が選択・変更状態を所有し、`MenuApp` は保存、file dialog、thread restart などの境界 effect を実行する。
-- `MenuScreenDescriptor` が固定 title、skin background/fallback、snapshot/view routing を一つの exhaustive table で定義する。
-- `SongIndexerThread` はバックグラウンドで song index を構築し、`profiles/<name>/.tenriff/song-index/<source-hash>.json` にキャッシュする。
-- menu で audio / graphics / input / mode settings を変えると profile config file に保存される。
-- `Options -> Profile Setup` は現在の profile の初回 setup を開き直し、language / audio / input / graphics / keymap を即時保存する。
-- play 開始時、現行実装は menu thread を止めて `GameSession` を別実行する。
-- **Windows menu UI は D3D11 + Direct2D / DirectWrite** ベースで、Title / Song Select と各種 settings screen を描画する。
-- Skins は native/LR2 専用。LR2 playskin を一つ選択または drop すると active profile へ移植し、`LR2files` または `Theme` を選ぶと、`IIDX` folder と IIDX asset に依存する theme を除いた直下の theme を個別に install する。sibling-theme reference を維持し、既存 folder は上書きしない。
-- Song Select は再インデックス中の stage / percent / ETA と progress bar を中央表示する。
-- Browse では local header JSON の選択、または clipboard の http(s) BMSTable HTML/header link の import ができ、現在の source を再インデックスして hash 一致譜面へ table level を適用する。
-- Graphics の `BGA` は gameplay image/video background を完全に無効化し、Song Select preview は維持する。ONNX model 選択は path だけを保存するため、`BGA Upscaler` は別途 ON にして警告を確認する。
-- Input summary:
-  - Title: `↑ / ↓` move, `Enter` select (`PLAY / EDIT / OPTIONS / EXIT`), `F2` songs-folder browse, `F5` reindex, `Esc` quit
-  - Song Select: `↑ / ↓` song movement, `← / →` left menu focus 切り替え, `Enter` select / play, `- / +` Rate 調整, `Esc` back
-  - Settings / Mode: `↑ / ↓` item 移動, `← / →` 値変更, `Enter / Esc` で戻る
-    - Master/BGM/Keysound volume は horizontal slider で、keyboard と click/drag が同じ範囲・snap rule を使う。
-    - 長い settings list は右側 scrollbar の click-to-jump に対応し、click だけでは選択 row の値変更や実行を行わない。
-    - 画面領域の不足で説明を省略した場合、最後の表示行に `F1` と残り help line 数を表示する。
-  - Keymap: `↑ / ↓` select, `Enter` capture binding, `Esc` return
-  - Result: `Enter` で Song Select に戻る
-  - Shared utility keys: `F1` help, `F2` songs-folder browse, `F5` refresh / reindex, `F9` screenshot
+## 現在の画面と操作
+
+- ホーム: `Play / Multiplayer / Options / Exit`。譜面がなければ先頭は `Add Songs Folder`。
+- 選曲: 上部 `Songs / Sources / Records / Session Mix / Options`、中央下部 `Search / Sort·Filter / Difficulty Table`。旧左側 KEY/メニューレールは現在の標準配置ではありません。
+- 難易度表カード: 名前・URL 部分で編集、File でローカル JSON、Reset で標準 LV。Enter で適用、Esc で取消。不正な URL では現在の表を保持します。Filters の行も同じ取込経路を使用。
+- Options: 5列×2行の10カード。Key Mode、Keymap、Skins、Graphics、Audio、Input、Calibration、Profile Setup、Mods、Key Test。
+- 共通設定: 方向キーで選択・調整、Enter で項目の操作、Esc/Backspace で戻る。長い案内はページボタンを使用し、スキン設定ではライブプレビューを維持。
+- キーマップ: 4K–10K、12K、14K、16K。割当成功時に即保存。
+- 結果: 単人の表示演出は Space でスキップ。操作可能後は R/Left で再試行、F1 でリプレイ、Enter/Esc/Backspace で戻る。Session Mix は Enter で次曲、Esc/Backspace で終了。マルチ結果はロビーへ戻ります。
+- F1/F2/F5 などは画面ごとに役割が異なります。[プレイ案内](gameplay-guide.ja.md)を参照してください。
+
+## 所有権とデータフロー
+
+- [MenuApp](../src/app/MenuApp.cpp) は InputThread の RawInput/ポーリングキーイベントとウィンドウのポインターイベントを処理。[MenuNavigator](../src/app/menu/MenuNavigator.h) が画面と Back 履歴を所有。
+- 型付き設定 controller が選択・変更状態を所有し、MenuApp が保存・ファイル選択・再索引・装置再起動を実行。[MenuScreenDescriptor](../src/app/menu/MenuScreenDescriptor.h) が画面メタデータと view 経路を定義。
+- 描画は不変 snapshot を参照。メニュー音楽は [MenuMusicController](../src/app/MenuMusicController.cpp)、選曲プレビュー状態は [SongSelectScreen](../src/app/SongSelectScreen.h) が所有。
+- [launch_gameplay](../src/app/MenuAppTail.inl) はメニュー入力・プレビューを止めて GameSession を開始。ゲームのオーディオ・入力ライフサイクルは GameSession が管理します。メニューから同じ音声装置を開き続ける案は現在の契約ではありません。
+- SongIndexerThread のキャッシュは `profiles/<name>/.tenriff/song-index/<source-hash>.json`。[現在の状態](current-state.ja.md)と[設定](config.ja.md)を参照。
+
+## 保守
+
+[メニューリファクタ](menu-refactor-plan.md)の Phase 0–6 は完了。既存 controller と明示的な画面経路を拡張し、対象テストと [UI チェックリスト](ui-audit-checklist.md)で確認します。描画の所有権は[メニュー表示](menu-visual-polish.md)と [1.7.1 変更](gameplay-polish-followup.md)を参照。
+
+<details>
+<summary>初期設計案 — 現在の実装契約ではありません</summary>
 
 ## Non-Negotiable Rules
 - **menu から audio device を閉じない。** menu 進入時に audio backend を初期化し、silent callback（zero buffer）を走らせて、gameplay 前から `playhead_samples` / `buffer_start_samples` を有効に保つ。曲開始時の device reopen は warm-up jitter の原因になるので避ける。
@@ -82,3 +84,5 @@ main menu も gameplay と同じ低遅延思想に従う必要があります。
 3. SongIndexerThread + cached index + responsive SongSelect UI を追加する。
 4. latency-first settings を前面に出し、可能なら live apply する。backend 変更に再起動が要る場合は明記する。
 5. input pipeline ルールに従って key remap + NKRO test を追加する。
+
+</details>

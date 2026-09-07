@@ -4,11 +4,11 @@
 
 ## 基线
 - 当前稳定发布线为 `1.7.1`
-- 1.7.1 improves multiplayer standings, gameplay feedback, independent judgement/combo placement, ten pastel Options cards, optional audio normalization and the Song Select difficulty-table control. See [follow-up details](gameplay-polish-followup.md) and [release verification](release-1.7.1-gate.md).
+- 1.7.1 提供最多8人的 HUD 与结果、并列名次与分数等待状态、P-GREAT 专属效果、判定与连击独立位置、10张选项卡、音量标准化及选曲难度表卡片。见[变更详情](gameplay-polish-followup.md)和[验证范围](release-1.7.1-gate.md)。
 - 1.7.0 refreshes native Home, Song Select, Result and shared settings. See [UI implementation](menu-visual-polish.md) and [release verification](release-1.7.0-gate.md). The prism remains only in the custom-skin path; result reveal timing is unchanged.
 - 默认结果页面突出分数、等级和准确率；棱镜演出保留在自定义皮肤中。保留现有2.2秒展示流程、Space跳过和按钮启用规则。
 - UI-r2 Song Select 使用顶部标签、7 行封面曲库、大幅选中图片、最佳记录卡、谱面/模式面板和可实际启动的 START 按钮；不显示 Collection/Store/货币/全球排名等虚构功能
-- Song Select 的 Rate、Hi-Speed、Gauge、Random 单元格支持左键增加/下一项、右键减少/上一项并立即保存；当前谱面键数不再被裁切，最佳记录会同时显示分数、准确率和最大连击。
+- Song Select 的 Visual Latency、Hi-Speed、Gauge、Random 单元格支持左键增加/下一项、右键减少/上一项并立即保存；当前谱面键数不再被裁切，最佳记录会同时显示分数、准确率和最大连击。
 - Replay evidence v3 会绑定谱面 SHA-256、canonical ruleset 与 result-to-replay SHA-256，并通过无界面引擎重新执行输入 trace。正式本地 best 只使用重新计算后的 verified 结果；legacy、custom-ruleset 与 assist 记录仍作为 unverified history 保留。
 - 1.3.1 删除外部 `.osu` parser、索引路径与 settings 开关，使 chart surface 再次限定为 BMS；选择 BMSTable 时会为 hash 匹配自动从 Fast 切换到 Safe，并已通过 Aery 实时服务器与 CG901B MD5→`⑤LEVEL 13` 匹配验证
 - Profile Setup 可按 profile 保存可选的本地 PNG/JPG 头像路径，Song Select 的 profile card 可显示并点击编辑
@@ -80,19 +80,20 @@
   - 普通 BMS LN 保持到最后时会自动处理 tail，不使用 tail release timing 判定
 - BMS audio decode：
   - WAV 原生优先
-  - Windows Media Foundation OGG/MP3 fallback
+  - OGG 优先使用内置 `stb_vorbis`，失败后使用 Windows Media Foundation
+  - MP3 使用 Windows Media Foundation
   - MF 失败时使用 `ffmpeg.exe` fallback
 - Song Select：
   - 缓存优先加载
   - `F5` 强制重索引
   - 鼠标滚轮移动
-  - 左侧 `KEY` 快速过滤切换
+  - 通过 `Sort / Filter > Key Filter` 选择键数筛选
   - 外部文件夹/BMS drag-and-drop
   - recent source 保存/重新打开
   - difficulty/title 排序
   - search 未激活时可用 `-`/`+` 调整当前 play Rate
   - 索引时在 header 下方中央显示 stage、percentage、processed/total、ETA、song count 与 progress bar
-  - Browse 可选择 local header JSON，或把剪贴板中的 http(s) BMSTable HTML/header 链接导入 profile cache；通过 MD5/SHA-256 匹配 level/symbol，更换后会重新索引
+  - 选曲中央底部难度表卡片支持 URL 编辑、本地 JSON 与恢复原生 LV。Filters 使用同一导入路径，变更时按 MD5/SHA-256 匹配并重新索引。
 - BMS key mode：
   - 按 key mode 分开的 keymap
   - 对支持 key count 进行 chart difficulty 计算
@@ -100,7 +101,7 @@
   - 游戏内 Mode Settings 的 `Key Converter` 可选择 `Krrcream`、内置确定性 `KeyWeaver nK2` 或 `KeyWeaver NK3 ONNX`，并写入设置与 replay metadata
   - 已移除独立的 `Conversion Note Add` 选项：Krrcream 只重排原始 note，nK2 在扩展键数时直接向转换后的目标 layout 生成安全的辅助 note。
   - nK2 preset 可选择默认 `Native (12%)`、`Transform (35%)` 或 `Remaster (65%)`；`Remaster` 在提高预算的同时锁定 anchor 以保留原曲排布，并用等长长条填充 LN 区间。三者均为上限，实际增加量取决于原谱密度与安全窗口。Krrcream 下锁定该行，standalone converter GUI 的 Krrcream Max/Min/Speed/Seed 也不可修改。
-  - 1.5.1 官方 build/Windows ZIP 不构建或附带 standalone BMS key-converter CLI/GUI；顶层 CMake 选项默认 `OFF`，源码仅保留用于开发回归
+  - 1.7.1 官方 build/Windows ZIP 不构建或附带 standalone BMS key-converter CLI/GUI；顶层 CMake 选项默认 `OFF`，源码仅保留用于开发回归
   - NK3 始终将随包提供的 P64 与 host beam32 结合。仅当非 10K 源谱面转换为 10K 时才加入 generalized pattern MLP；10K→10K 与其他所有目标仅使用 P64。默认 `AUTO` 后端通过 ncnn Vulkan 在 AMD/NVIDIA GPU 上运行 P64 与 MLP，并保留可选 OpenVINO 兼容路径作为回退；可通过 `TENRIFF_NK3_BACKEND` 和 `TENRIFF_NK3_VULKAN_DEVICE` 强制选择。
   - `mode.key_mode=none` 表示保持谱面的原始键数与基础 pattern 布局不变
 - Native difficulty：
@@ -112,8 +113,8 @@
   - 标准 `10+2 DP` chart 会跳过两条 scratch lane，把 `10K` lane-color palette 依次应用到实际十个按键 lane，并与原生 12K palette 保持独立
   - `rect / triangle / pentagon / hexagon / circle` 音符形状；procedural 圆形/多边形在 100% 下使用与 rect 条相同的完整宽度
   - note border 开关
-  - combo Y 调整
-  - 新判定标签/FAST·SLOW 毫秒数字使用 220ms 弹出动画，combo 数字使用 150ms 弹出动画；二者都只影响渲染
+  - 判定 X/Y 与连击 X/Y 可分别调整并保存。FAST/SLOW 仅显示对应方向，P-GREAT 时省略。
+  - 仅 P-GREAT 使用黄色文字、彩虹闪光与220ms 弹跳。GREAT 保持青色，GOOD 为灰色；其余判定与 FAST/SLOW 文字静止，连击数字保留独立的150ms 弹跳。
   - judge line / lane width / lane spacing / note & field size / divider width / 16K center gap / note height 调整
   - `Note & Field Size` 以中心为基准，将 playfield、lane/divider、note 与相邻 gauge 一起按 50%～140% 缩放；100% 下相邻 note 边缘的默认总间距为 24px
   - Black Playfield 会将包含 lane spacing 在内的 player/ghost playfield 全部显示为纯黑
@@ -128,15 +129,15 @@
   - future note 的上方进入 easing
   - 最后一个判定 note 后默认等待音乐结束；在这段尾声按下 lane key 会立即进入 Result
 - Judge：
-  - 默认 `GOOD` 范围为 `75ms`
+  - 默认 `PG / GR / GD` 判定窗为 `20ms / 65ms / 115ms`
   - 默认 `BAD` 范围为 `210ms`，`Judge Easy` 为 `262.5ms`，`Judge Hard` 为 `340ms`
-  - `Judge Hard` 只收紧 BAD 边界，PG/GR/GD 与长按尾部判定窗保持基础值
+  - `Judge Hard` 仅修改外侧 BAD 边界，PG/GR/GD 与长按尾部判定窗保持基础值
   - 当同一 lane 的 pending note 已经是 `BAD`，而紧接的下一 note 明确可判为 `GOOD` 或更高时，前一 note 会记为 miss，当前按键则分配给下一 note，避免一次漏键锁成连续 `BAD`
   - 在 `Judge Hard` 下，未输入而漏掉的对象会记为断 combo 的间接 `POOR` 和 OD8 `MISS`；其他会消耗 note 的失败仍记为 `BAD`
   - 非消耗型的超早输入会按 LR2 风格记为 `POOR`，并重新出现在结果 / replay / UI 中
   - 空按 `POOR` 不会断 combo，Hard 间接 `POOR` 会断 combo；两者均不计入 score / accuracy，并使用独立的 `PR` gauge 损失值
-  - gauge 模式支持 `EX-Hard / Hard / Normal / Easy / Gauge Shift`；固定 gauge 从 `100%` 开始，在 `0%` 时立即失败且不会改变类型，EX-Hard 使用与 Hard 区分的近黑深灰配色
-  - `Gauge Shift` 会让 EX-Hard / Hard / Normal / Easy 分别从 100% 开始独立并行计算；当前 tier 到达 0% 后选择已累计相同判定历史的下一档存活 tier，并以结束时最高的存活 tier 为最终结果
+  - 血条选择决定始终启用的 Gauge Shift 起始档位：`EX / Hard / Normal / Easy`。旧 `shift` 表示 EX 开始。
+  - 所选档位及全部下位档位从100%独立计算，淘汰时切换至下一存活档位，结束时取最高存活档位。
   - `Sudden Death (1 MISS)` 会在首次 OD8 换算对象 `MISS` 时立即失败；仅原生 `BAD` timing 不会触发，空按产生的 `POOR` 也不触发，并且该选项与 Practice No-Fail 互斥
   - OD8 换算仅作为 Sudden Death 与旧 replay 兼容的内部统计保留；Gameplay 与 Result UI 只显示 TenRiff 原生分数
   - casual score 最高为 10,000 分，判定权重为 `PG 6 / GR 3 / GD 1 / PR 0 / FAIL 0`；LN head / tail 各按 0.5 权重组成一个对象，detail score 保持独立
@@ -214,7 +215,7 @@
 
 ## 运行时 / 打包规则
 - 新用户 profile 会自动创建
-- 当前稳定 P2P 发布线为 `TenRiff 1.5.1`
+- 当前稳定 P2P 发布线为 `TenRiff 1.7.1`
 - 发布包不包含 `Songs`
 - 发布包包含 `Main Menu / Options / Song Selecte / Multiplayer Lobby / Clear / Failed` 这些 `Mainmusic/` 场景槽位；每个 `Name.mp3` 及 `Name 2.mp3`～`Name 64.mp3` 会自动发现，并在重新进入场景时轮换
 - 发布更新只包含已构建产物和必要的运行时资源
@@ -226,7 +227,7 @@
 - 实际默认值来自 `config/config.json`
 - runtime profile 位于 `profiles/<name>/config.json`
 - keymap 位于 `profiles/<name>/keymap.json`
-- `keymap.json` 采用 `modes.{4k..10k}` 的 per-mode binding 结构
+- `keymap.json` 采用 `modes.{4k..10k,12k,14k,16k}` 的 per-mode binding 结构
 - stale profile 会通过 runtime migration 自动修正部分值
   - keysound policy
   - 已移除的 osu 字段不再保存
@@ -252,13 +253,15 @@
 - `cmake --build build-check --config Release --target bms_parser_tests`
 - `.\build-check\Release\bms_parser_tests.exe`
 
+MSVC ASan 运行确定性单元测试核心，排除 RawInput/localhost OS 与 NK3/OpenVINO 集成用例。排除列表位于 `tests/unit/test_bms_parser.cpp`，CTest 参数由 `CMakeLists.txt` 提供；完整集成测试在普通 Release 中运行。
+
 ## 仍然需要手动验证的地方
 - 在真实的 CJK-heavy 曲库上重现 Song Select 快速滚动崩溃
 - 对 fast profile 进行长时间 full-index RAM/commit 重新验证
 - gameplay 的 low-FPS / 0.1% / 0.01% low 确认
 - OBS/Discord/Game Bar 与 graphics live-apply 的共存确认
 - drag-and-drop / 外部 Korean-path sources 的 GUI 确认
-- 在真实 NPU Windows PC 上确认 `NPU 优先（实验）` on/off 与 WinML device fallback
+- 验证低功耗 DirectX（实验）开关与 GPU 回退；旧 NPU 选项名称不代表已选择或执行 NPU。
 - 更换 local 难度表后确认 hash matching、reindex 与显示顺序
 - Linux 目前仍不是真实可运行版本
 
