@@ -14,6 +14,32 @@ TenRiff 코드는 전통적인 장기 설계 문서 중심 개발만으로 쌓�
 
 변경 사항은 [CHANGELOG](CHANGELOG.md), 검증 범위는 [릴리스 게이트](docs/release-1.7.1-gate.md)를 참고하세요.
 
+## 스크린샷
+
+### 홈
+
+플레이, 멀티플레이, 옵션을 한 화면에서 시작합니다.
+
+![TenRiff 홈 화면](docs/images/screenshots/home.png)
+
+### 선곡
+
+곡 목록, 내 최고 기록, 난이도표 설정을 함께 확인합니다.
+
+![TenRiff 선곡 화면과 난이도표 설정](docs/images/screenshots/song-select.png)
+
+### 플레이 결과
+
+점수와 판정 통계, 타이밍 분포 추정, 게이지 변화를 표시합니다.
+
+![TenRiff 플레이 결과와 타이밍·게이지 분석](docs/images/screenshots/result.png)
+
+### 스킨 설정
+
+레인과 노트 구성을 실시간 미리보기로 확인하며 조절합니다.
+
+![TenRiff 스킨 설정과 실시간 미리보기](docs/images/screenshots/skin-settings.png)
+
 ## 프로젝트 한눈에 보기
 
 - 기본 타깃 플랫폼: Windows

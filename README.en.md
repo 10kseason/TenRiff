@@ -14,6 +14,32 @@ Multiplayer HUDs and results show the full room, with score comparison and spect
 
 See [CHANGELOG](CHANGELOG.md) and [release verification](docs/release-1.7.1-gate.md).
 
+## Screenshots
+
+### Home
+
+Start playing, join multiplayer, or open settings from one screen.
+
+![TenRiff home screen](docs/images/screenshots/home.png)
+
+### Song Select
+
+Browse charts, check personal bests, and select a difficulty table.
+
+![TenRiff song library and difficulty-table controls](docs/images/screenshots/song-select.png)
+
+### Results
+
+Review scores, judgement counts, the estimated timing distribution, and gauge history.
+
+![TenRiff results with timing and gauge analysis](docs/images/screenshots/result.png)
+
+### Skin Settings
+
+Adjust lanes and notes while checking the live preview.
+
+![TenRiff skin settings and live preview](docs/images/screenshots/skin-settings.png)
+
 ## Project At a Glance
 
 - Primary target platform: Windows

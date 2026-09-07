@@ -14,6 +14,32 @@ TenRiff のコードベースは、伝統的な長文設計書主導だけで積
 
 See [CHANGELOG](CHANGELOG.md) and [release verification](docs/release-1.7.1-gate.md).
 
+## スクリーンショット
+
+### ホーム
+
+プレイ、マルチプレイ、設定を一つの画面から開けます。
+
+![TenRiff のホーム画面](docs/images/screenshots/home.png)
+
+### 選曲
+
+譜面一覧、自己ベスト、難易度表の設定をまとめて確認できます。
+
+![TenRiff の選曲画面と難易度表設定](docs/images/screenshots/song-select.png)
+
+### プレイ結果
+
+スコア、判定統計、タイミング分布の推定、ゲージ推移を表示します。
+
+![TenRiff のプレイ結果とタイミング・ゲージ分析](docs/images/screenshots/result.png)
+
+### スキン設定
+
+リアルタイムプレビューを確認しながらレーンやノートを調整できます。
+
+![TenRiff のスキン設定とリアルタイムプレビュー](docs/images/screenshots/skin-settings.png)
+
 ## プロジェクト概要
 
 - 主対象プラットフォーム: Windows

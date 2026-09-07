@@ -14,6 +14,32 @@ TenRiff 也明确属于一种 `vibe coding` 作品：它更多是在快速迭代
 
 See [CHANGELOG](CHANGELOG.md) and [release verification](docs/release-1.7.1-gate.md).
 
+## 截图
+
+### 主页
+
+在同一页面开始游戏、进入多人模式或打开设置。
+
+![TenRiff 主页](docs/images/screenshots/home.png)
+
+### 选曲
+
+查看谱面列表、个人最佳记录和难度表设置。
+
+![TenRiff 选曲页面与难度表设置](docs/images/screenshots/song-select.png)
+
+### 游戏结果
+
+查看分数、判定统计、时机分布估计和血条变化。
+
+![TenRiff 游戏结果与时机、血条分析](docs/images/screenshots/result.png)
+
+### 皮肤设置
+
+通过实时预览调整轨道和音符。
+
+![TenRiff 皮肤设置与实时预览](docs/images/screenshots/skin-settings.png)
+
 ## 项目一览
 
 - 主要目标平台：Windows
