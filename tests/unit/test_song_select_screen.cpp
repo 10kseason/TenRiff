@@ -36,7 +36,7 @@ TEST_CASE("SongSelectScreen drains a completed preview decode future") {
     SongSelectScreen screen;
     screen.set_active(true);
     screen.set_preview_target("missing-chart", 0);
-    screen.begin_preview_decode("missing-chart", missing_chart.string(), "", 44100);
+    screen.begin_preview_decode("missing-chart", missing_chart.u8string(), "", 44100);
 
     std::optional<SongSelectScreen::PreviewDecodeResult> decoded;
     const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(2);

@@ -355,6 +355,25 @@ struct PeerSession::Impl {
     }
 
     void refresh_compat_locked() {
+        if (active_round_nonce != 0) {
+            if (current.result_round_nonce != active_round_nonce) {
+                current.result_round_nonce = active_round_nonce;
+                current.round_participants = current.participants;
+            } else {
+                // Capture each score while still under the worker mutex, before
+                // a following disconnect can remove that player's live row.
+                // A final packet is immutable; intermediate GAME OVER HUD scores
+                // may still receive the final result and must remain updatable.
+                for (auto& retained : current.round_participants) {
+                    if (retained.has_score && retained.latest_score.finished) continue;
+                    const auto* live = participant_locked(retained.player_id);
+                    if (live && live->has_score) {
+                        retained.has_score = true;
+                        retained.latest_score = live->latest_score;
+                    }
+                }
+            }
+        }
         current.participant_count = current.participants.size();
         current.local_is_leader =
             current.local_player_id != 0 && current.local_player_id == current.leader_player_id;

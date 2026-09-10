@@ -1,9 +1,13 @@
 # TenRiff Current State
 
+The current project version is **1.7.2**. Native Windows ASIO output and F4 Native LV in the table picker join portable skin presets, source management, Unicode-path validation, retained multiplayer results, LR2-reference grade gauges, a three-second resume countdown, ignored Session Mix Esc input and duration-based reference BPM. WASAPI remains the default. Use the [1.7.2 release gate](release-1.7.2-gate.md) for this revision's checks and ASIO device coverage.
+
+The 749/739 checks in the [local 1.7.1 r2 report](local-1.7.1-r2.ko.md) are historical, not the new release's results. See [library management](library-management.md), [reference BPM](reference-bpm.md), [skin presets](skin-presets.md) and [ASIO](asio-audio.md).
+
 This is the document that the next agent or any new contributor should read first. Its goal is to quickly answer: "what is this project now, where should I look, and what is still unverified?"
 
 ## Baseline
-- Current stable release line: `1.7.1`
+- Current project version: `1.7.2`
 - 1.7.1 provides full-room HUD/results for up to eight players, tied ranks/missing-score states, P-GREAT-only effects, independent judgement/combo placement, ten Options cards, audio normalization and the Song Select difficulty-table card. See [follow-up details](gameplay-polish-followup.md) and [verification](release-1.7.1-gate.md).
 - 1.7.0 refreshes native Home, Song Select, Result and shared settings. See [UI implementation](menu-visual-polish.md) and [release verification](release-1.7.0-gate.md). The prism remains only in the custom-skin path; result reveal timing is unchanged.
 - Native Result now emphasizes score, grade and accuracy; the prism remains in custom skins. The existing 2.2-second reveal, Space skip and control readiness rules are preserved.
@@ -102,7 +106,7 @@ This is the document that the next agent or any new contributor should read firs
   - the separate `Conversion Note Add` option is removed: Krrcream only remaps source notes, while nK2 creates safe support notes directly in the converted target layout when expanding the key count.
   - nK2 offers `Native (12%)` by default, `Transform (35%)` and `Remaster (65%)`; `Remaster` raises the budget while locking the anchor so the source placement survives, and fills LN sections with holds of the same length. All three are caps - the source density and the safety windows decide how much actually lands. The row is locked for Krrcream, and the standalone converter GUI also locks Krrcream Max/Min/Speed/Seed tuning.
   - NK3 always combines bundled P64 with host beam32. It adds the generalized pattern MLP only when a non-10K source is converted to 10K; 10K-to-10K and every other target use P64 alone. The default `AUTO` backend runs both P64 and the MLP on AMD/NVIDIA GPUs through ncnn Vulkan, retaining the optional OpenVINO compatibility path as fallback. `TENRIFF_NK3_BACKEND` and `TENRIFF_NK3_VULKAN_DEVICE` can force the selection.
-  - official 1.7.1 builds/Windows archives do not build or ship the standalone BMS key-converter CLI/GUI; its top-level CMake option defaults `OFF` and the source is retained only for development regression
+  - official 1.7.2 builds/Windows archives do not build or ship the standalone BMS key-converter CLI/GUI; its top-level CMake option defaults `OFF` and the source is retained only for development regression
   - `mode.key_mode=none` keeps the chart's original key count and base pattern layout intact
 - Native difficulty:
   - BMS LV/CR calculation evaluates only LN head/tail miss-ms at 0.5x, so `300ms` is treated as `150ms`; runtime gameplay judgement windows remain unchanged
@@ -167,7 +171,7 @@ This is the document that the next agent or any new contributor should read firs
 - Loading UX:
   - centered Song Select indexing stage/percentage/processed/total/ETA/song count and progress bar below the header
   - gameplay chart-loading progress display
-  - `Esc` cancel during gameplay loading
+  - `Esc` cancels ordinary gameplay loading; Session Mix ignores Esc
   - holding one Song Select choice for 750ms prefers its explicit preview, otherwise renders 30 seconds of BMS BGM and keysound events to looping PCM at menu volume
   - Result shows song art plus chart/key/BPM/LV/CR/difficulty-table metadata
 - Profile UX:
@@ -209,13 +213,13 @@ This is the document that the next agent or any new contributor should read firs
   - peak memory roughly `working set 453MB`, `private 524MB`
 
 - Cache schema:
-  - `version = 12`
+  - `version = 15` (running-duration reference BPM; see [reference-bpm.md](reference-bpm.md))
   - optional `layout_label`
   - `minimal_metadata` keeps Safe and Fast caches separate
 
 ## Runtime / Packaging Rules
 - New user profiles are created automatically
-- The current stable P2P distribution line is `TenRiff 1.7.1`
+- The current P2P distribution target is `TenRiff 1.7.2`
 - Distribution packages do not include `Songs`
 - Distribution packages include the `Mainmusic/` scene slots `Main Menu / Options / Song Selecte / Multiplayer Lobby / Clear / Failed`; each `Name.mp3` plus numbered `Name 2.mp3` through `Name 64.mp3` siblings is discovered automatically and rotates on scene re-entry
 - Distribution updates include only built artifacts and required runtime assets

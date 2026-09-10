@@ -5,9 +5,13 @@
 
 namespace tenriff::audio {
 
+enum class AudioBackend { WASAPI, ASIO };
+
 /// Audio subsystem configuration.
 /// Default values target low-latency exclusive mode on modern hardware.
 struct AudioConfig {
+    AudioBackend backend = AudioBackend::WASAPI;
+    std::string asio_driver;             ///< Registered x64 ASIO CLSID; empty selects the first driver.
     uint32_t sample_rate = 44100;        ///< Output sample rate in Hz.
     uint32_t frames_per_buffer = 128;    ///< Frames per audio callback period.
     uint32_t periods = 3;                ///< Number of buffer periods (latency multiplier).
@@ -25,13 +29,6 @@ struct AudioConfig {
     [[nodiscard]] uint32_t buffer_size_samples() const {
         return frames_per_buffer * periods;
     }
-};
-
-/// Audio backend type selection.
-enum class AudioBackend {
-    WASAPI,     ///< Windows Audio Session API (default on Windows).
-    // ALSA,    ///< Advanced Linux Sound Architecture (future).
-    // JACK,    ///< JACK Audio Connection Kit (future).
 };
 
 /// Result codes for audio operations.

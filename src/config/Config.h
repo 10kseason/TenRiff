@@ -126,6 +126,8 @@ struct UiConfig {
     bool show_cursor_in_gameplay = true;
     std::string active_song_source;
     std::vector<std::string> recent_song_sources;
+    // Preserve an intentionally empty source list across relaunches.
+    bool song_sources_initialized = false;
     std::string session_mix_lr2_course_path;
     std::vector<std::string> favorite_chart_keys;
     std::unordered_map<std::string, std::vector<std::string>> collections;
@@ -262,6 +264,12 @@ struct ConfigLoadResult {
 
     [[nodiscard]] bool success() const { return error.empty(); }
 };
+
+// Portable preset payloads contain only the skin object, never profile credentials
+// or machine-specific audio/input settings.
+[[nodiscard]] std::string serialize_skin_config(const SkinConfig& skin);
+[[nodiscard]] bool deserialize_skin_config(std::string_view json, SkinConfig& skin,
+                                           std::string* error = nullptr);
 
 class ConfigLoader {
 public:

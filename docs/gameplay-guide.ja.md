@@ -66,6 +66,8 @@ Windows では通常、次のどちらかで起動します。
 - `Keymap`
   - key binding 変更と NKRO test 実行
 
+表の選択画面は F1 Aery 5K、F2 Aery 7K、F3 Revive 10K、F4 標準 LV を提供します。標準 LV は表示・並べ替え・グループ・数値フィルターに直ちに適用します。[曲管理](library-management.md)参照。
+
 ## 4. 初期設定のおすすめ
 
 - `Mode > Gauge`: `normal`
@@ -107,7 +109,7 @@ client 側の設定は Discord の [公式 Game Overlay guide](https://support.d
 
 ### Loading
 - 曲開始直後に chart-loading progress が表示されることがあります。
-- loading 中に `Esc` を押すと開始を中止して Song Select に戻ります。
+- 通常の loading 中は `Esc` で開始を中止して Song Select に戻ります。Session Mix は読み込みと開始カウントダウン中も Esc を無視します。
 
 ### Countdown
 - loading 完了後、まず `3 / 2 / 1` のカウントダウンが表示されます。
@@ -116,7 +118,8 @@ client 側の設定は Discord の [公式 Game Overlay guide](https://support.d
 ## 7. プレイ中の操作
 
 - 譜面キー入力: 現在の keymap に従う
-- `Esc`: single-player では pause menu（Continue / Restart / Exit）、multiplayer ではプレイを中止
+- `Esc`: 通常の single-player を直ちに一時停止します。Continue または Esc で3/2/1カウントダウン後に再開し、その間は音声・譜面時刻・判定が停止します。再開カウントダウン中の Esc は一時停止メニューへ戻ります。
+- Session Mix のプレイ中は Esc を無視します。曲間の結果画面の終了操作と multiplayer の Esc 中止は維持します。
 - `F3`: Hi-Speed を下げる
 - `F4`: Hi-Speed を上げる
 - `F5`: Hi-Speed を大きく下げる
@@ -125,6 +128,8 @@ client 側の設定は Discord の [公式 Game Overlay guide](https://support.d
 
 Hi-Speed が変えるのは見た目のスクロール速度だけで、判定タイミングそのものは変えません。
 Rate は曲の再生速度と譜面スケジュールだけを変え、同じ Hi-Speed で見た目のスクロール速度は変えません。
+
+基準 BPM は累積進行時間が最も長いテンポです。同じ BPM の区間を合算し STOP 待機を除外します。Hi-Speed はこの基準に固定し、明示的な `#SCROLL`・停止・逆走効果は維持します。[計算規則](reference-bpm.md)を参照してください。
 
 ## 8. HUD の見方
 
@@ -174,6 +179,8 @@ Rank は `<75 F`, `75 B`, `80.5 A`, `86.5 A+`, `90 S`, `95.5 S+`, `98 AA`, `99 S
 ### Gauge
 
 Gauge Shift は常に有効です。`EX / Hard / Normal / Easy` は開始段階で、保存値は `ex_hard / hard / normal / easy` です。選択段階と下位段階をそれぞれ 100% から並列計算します。現在の段階が 0% で脱落すると、同じ判定履歴を累積した次の生存段階へ移り、終了時の最上位生存段階が結果になります。対象段階がすべて脱落するとゲージ失敗です。
+
+段位/Session Mix は曲間で引き継ぐ LR2 参照ゲージを使用し、間接ミスを維持して HP 2% 未満で失敗します。通常 LN は完走/解除時に一度だけ反映し、通常の `gauge.delta` は適用しません。[比較と互換範囲](lr2-gauge-audit.ko.md)を参照してください。
 
 旧 `shift` は EX 開始として解釈します。Practice・Pacemaker など独自の終了規則を持つモードはその規則を維持します。
 

@@ -6,7 +6,10 @@
 #include <thread>
 
 #include "audio/AudioConfig.h"
+#include "audio/AsioBackend.h"
 #include "audio/WasapiBackend.h"
+
+namespace tenriff::app { struct GameSessionAudioTestAccess; }
 
 namespace tenriff::audio {
 
@@ -48,7 +51,9 @@ public:
     void shutdown();
 
     /// Check if the audio thread is running.
-    [[nodiscard]] bool is_running() const { return is_running_.load(std::memory_order_acquire); }
+    [[nodiscard]] bool is_running() const { return asio_backend_ ? asio_backend_->is_playing() : is_running_.load(std::memory_order_acquire); }
+    [[nodiscard]] bool has_runtime_error() const { return asio_backend_ && asio_backend_->has_runtime_error(); }
+    [[nodiscard]] std::string error_message() const;
 
     /// Get the current playback position in samples (thread-safe).
     [[nodiscard]] int64_t playback_samples() const;
@@ -66,10 +71,12 @@ public:
     [[nodiscard]] bool is_exclusive() const;
 
 private:
+    friend struct tenriff::app::GameSessionAudioTestAccess;
     void thread_main();
     void process_buffer();
 
     std::unique_ptr<WasapiBackend> backend_;
+    std::unique_ptr<AsioBackend> asio_backend_;
     Callback callback_;
     AudioConfig config_{};
 

@@ -36,7 +36,7 @@ namespace tenriff::app {
 
 namespace {
 
-constexpr int kSongIndexVersion = 14;
+constexpr int kSongIndexVersion = 15;
 constexpr std::uintmax_t kMaxMetadataChartFileBytes = 8u * 1024u * 1024u;
 
 bool cancel_requested(const SongIndexCancelCallback& cancel) {
@@ -345,7 +345,7 @@ std::optional<chart::OsuDifficultyMetrics> calculate_bms_difficulty(const chart:
 
     chart::OsuManiaChart difficulty_chart;
     difficulty_chart.key_count = key_count;
-    difficulty_chart.base_bpm = parsed_chart.base_bpm;
+    difficulty_chart.base_bpm = timeline.timeline.reference_bpm;
     difficulty_chart.overall_difficulty = 8.0;
 
     struct PendingLongNote {
@@ -448,6 +448,7 @@ std::optional<chart::OsuDifficultyMetrics> calculate_bms_difficulty(const chart:
 }
 
 struct BmsNpsStats {
+    double reference_bpm = 0.0;
     double minimum = 0.0;
     double median = 0.0;
     double maximum = 0.0;
@@ -468,9 +469,11 @@ std::optional<BmsNpsStats> calculate_bms_nps_stats(const chart::BmsChart& parsed
         return std::nullopt;
     }
 
+    BmsNpsStats stats;
+    stats.reference_bpm = timeline.timeline.reference_bpm;
     const auto gameplay = build_bms_gameplay_chart(timeline.timeline, parsed_chart, 1.0);
     if (gameplay.chart.notes.empty()) {
-        return std::nullopt;
+        return stats;
     }
 
     std::unordered_map<int64_t, int> notes_per_occupied_second;
@@ -486,11 +489,10 @@ std::optional<BmsNpsStats> calculate_bms_nps_stats(const chart::BmsChart& parsed
         samples.push_back(count);
     }
     if (samples.empty()) {
-        return std::nullopt;
+        return stats;
     }
     std::sort(samples.begin(), samples.end());
 
-    BmsNpsStats stats;
     stats.note_count = static_cast<int>(std::min<std::size_t>(
         gameplay.chart.notes.size(), static_cast<std::size_t>(std::numeric_limits<int>::max())));
     stats.minimum = static_cast<double>(samples.front());
@@ -578,6 +580,7 @@ SongEntry build_bms_entry(std::string relative_path,
 
     entry.bpm = parsed.chart.base_bpm;
     if (const auto nps = calculate_bms_nps_stats(parsed.chart); nps.has_value()) {
+        entry.bpm = nps->reference_bpm;
         entry.nps_min = nps->minimum;
         entry.nps_median = nps->median;
         entry.nps_max = nps->maximum;

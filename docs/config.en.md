@@ -16,6 +16,11 @@ If a profile does not exist, it is created automatically on first launch.
 ## `config.json`
 
 ### `audio`
+
+- `backend` (string)
+  - `wasapi | asio`; default `wasapi`. Selects gameplay and song-preview output; menu/result background music keeps its separate Windows MCI path.
+- `asio_driver` (string)
+  - CLSID of an installed 64-bit ASIO driver. Empty means Auto, the first driver sorted by name. Select in Audio settings; F5 refreshes the list.
 - `rate` (int)
   - default sample rate
 - `frames` (int)
@@ -40,11 +45,13 @@ If a profile does not exist, it is created automatically on first launch.
   - Stereo-linked RMS leveling of the gameplay mix before limiter/master volume; false by default. Menu music and song previews are unaffected.
 - `keysound_volume` (double)
 
+See [ASIO setup](asio-audio.md). ASIO holds the selected sample rate fixed and resamples chart audio. `frames` is a request negotiated to a legal driver size. Presets do not overwrite ASIO frames; `exclusive` and `periods` apply to WASAPI. ASIO failures do not fall back to WASAPI automatically.
+
 ### `input`
 
 - `backend` (string)
   - `polling | rawinput`
-  - defaults to `rawinput` on the current `1.7.1` release line
+  - defaults to `rawinput` on the current `1.7.2` release line
   - selectable per profile under `Options -> Input Settings -> Backend` or `Options -> Profile Setup -> Input Backend`
   - runtime fallback never rewrites the saved value to `polling`
   - a confirmed RawInput startup failure, registration-target loss, or message-window exit latches Polling across menu and subsequent gameplay sessions for the current app run
@@ -64,7 +71,7 @@ If a profile does not exist, it is created automatically on first launch.
 - `judgement_hz` (int)
   - `1000 | 2000 | 4000 | 8000`
   - compatibility field kept in the input config
-  - the current `1.7.1` runtime no longer drives a separate audio-thread judgement sub-step loop from this value
+  - the current `1.7.2` runtime no longer drives a separate audio-thread judgement sub-step loop from this value
   - default is `4000` (`0.25ms`)
 - `debounce_ms` (double)
   - real Press/Release transitions are preserved; only duplicate same-state events are removed from pressed-state tracking
@@ -92,11 +99,13 @@ If a profile does not exist, it is created automatically on first launch.
 - `rate` (double)
 - `hispeed` (double)
 - `target_scroll_bps` (double)
-- visual scroll stays anchored to the chart's starting BPM; later BPM changes do not correct pixels per second, while explicit `#SCROLL`, stops, and reverse motion remain active
+- Reference BPM is the tempo with the longest accumulated running time; repeated sections add together and STOP waits are excluded. This fixes the Hi-Speed reference while explicit `#SCROLL`, stops and reverse motion still apply. See [reference BPM](reference-bpm.md).
 
 ### `gauge`
 
 Gauge Shift is always active. `mode.gauge` selects the starting tier: `ex_hard / hard / normal / easy`, from EX down to Easy. The selected tier and every lower tier are simulated independently from 100%; a failed tier yields to the next surviving tier. Gauge failure occurs only when all eligible tiers fail. Legacy `shift` means an EX start.
+
+Grade/Session Mix uses a separate LR2-reference gauge, carried between songs, with indirect misses and failure below 2% HP. Normal long notes apply gauge once on completion/release. Ordinary `gauge.delta` settings do not apply to courses. See [LR2 gauge comparison and limits](lr2-gauge-audit.ko.md).
 
 - `delta`: `ex_hard`, `hard`, `normal`, `easy` → `PG`, `GR`, `GD`, `BD`, `PR`.
 
@@ -209,13 +218,14 @@ The chart loader and indexer are limited to BMS-family files (`.bms/.bme/.bml/.p
 | `require_enter_to_exit` | bool; `true` | Retained for read/write compatibility; the current Windows result-input path does not use it to auto-exit. |
 | `show_cursor_in_gameplay` | bool; `true` | Show the mouse pointer during gameplay. |
 | `active_song_source`, `recent_song_sources` | string / string[] | Current and recent song folders. |
+| `song_sources_initialized` | bool; `false` | Explicit folder addition/removal sets this to true so an intentionally empty source list stays empty on relaunch. See [source management](library-management.md). |
 | `session_mix_lr2_course_path` | string | Selected LR2 course file path. |
 | `favorite_chart_keys` | string[] | Internal chart keys for favorites. |
 | `collections` | object: name → string[] | Chart keys grouped by collection name. |
 | `song_collection_filter` | string; `all` | All/favorites/collection filter; saved immediately. |
 | `song_key_filter` | int: `0..16`; `0` | Key-count filter; zero means all. UI choices are 4K–10K, 12K, 14K and 16K. |
 | `song_level_min_filter`, `song_level_max_filter` | int: `0..50`; `0` | Level bounds; zero disables the corresponding bound. |
-| `difficulty_table_path` | string | Local header JSON or downloaded profile-cache header. Changes reindex; selecting a table switches indexing to safe. |
+| `difficulty_table_path` | string | Local header JSON or downloaded profile-cache header. Selecting a table switches to safe indexing; Native LV clears it and removes table metadata from a valid cache. |
 | `difficulty_table_url` | string | Original HTTP(S) BMSTable page/header URL. Resolves bmstable metadata and caches header/data; local JSON selection clears it. |
 | `online_records_server_url` | string | Records/ranking/chat API URL; failures do not block local play or records. |
 | `tenriff_main_server_url` | string | F10 main-server API URL; default is `kTenRiffMainApiUrl` in Config.h. |
@@ -224,7 +234,11 @@ The chart loader and indexer are limited to BMS-family files (`.bms/.bme/.bml/.p
 
 Difficulty-table headers use `name`, `symbol` and a local relative `data_url`; data entries match `md5` or `sha256` plus `level`. Remote imports are stored in the profile's `difficulty_tables` cache.
 
+Native LV clears `difficulty_table_path` and `difficulty_table_url`; a valid cache removes external table metadata without a full rescan. The default is BMS `#PLAYLEVEL`; with difficulty calculation enabled, the cached calculated LV is retained.
+
 ### `skin`
+
+Current `skin` settings and active skin assets can be exported/imported as a [portable `.trskin` preset](skin-presets.md). Audio devices, keymaps, accounts, song sources and timing calibration are excluded.
 
 These are profile `config.json` skin settings. For a skin package's `skin.json` contract, see [Skin format](skin-format.md).
 

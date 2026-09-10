@@ -1,6 +1,6 @@
 # Menu structure and controls
 
-Current behavior below targets client 1.7.1. The collapsed early blueprint is not a list of implemented features.
+Current behavior below targets client 1.7.2. The collapsed early blueprint is not a list of implemented features.
 
 ## Current screens and controls
 

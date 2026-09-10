@@ -159,7 +159,7 @@ BmsNormalizationResult BmsChartNormalizer::normalize(const BmsChart& chart) cons
     result.chart.lane_mapping = chart.lane_mapping;
     result.chart.base_bpm = chart.base_bpm;
 
-    int max_measure = 0;
+    int max_measure = chart.last_measure_index;
     for (const auto& command : chart.commands) {
         max_measure = std::max(max_measure, command.measure);
     }

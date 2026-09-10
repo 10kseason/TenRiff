@@ -826,7 +826,7 @@
             }
 
             if (d2d_->title_format && d2d_->text_brush) {
-                const std::wstring start_w = L"START";
+                const std::wstring start_w = data.gameplay.paused ? wloc("RESUME", "재개") : L"START";
                 draw_text_clipped_aligned(start_w,
                                           d2d_->title_format.Get(),
                                           D2D1::RectF(panel_rect.left + 24.0f, panel_rect.bottom - 132.0f,

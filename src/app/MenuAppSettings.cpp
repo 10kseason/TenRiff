@@ -6,10 +6,20 @@
 #include "app/MenuAppSkinUtils.h"
 #include "app/SessionRandomSeed.h"
 #include "app/menu/settings/AudioSettingsView.h"
+#include "audio/AsioBackend.h"
 
 namespace tenriff::app {
 
 void MenuApp::handle_audio_settings_input(uint32_t keycode) {
+    if (keycode == key_f5_) {
+        std::vector<menu::settings::AudioDriverChoice> drivers;
+        for (const auto& driver : audio::AsioBackend::enumerate_drivers()) {
+            drivers.push_back({driver.id, driver.name});
+        }
+        audio_settings_controller_.set_asio_drivers(std::move(drivers));
+        publish_snapshot();
+        return;
+    }
     menu::MenuEffectFlags effects;
     if (keycode == key_up_) {
         effects = audio_settings_controller_.handle(menu::MenuAction::move(-1), config_);
@@ -113,6 +123,13 @@ void MenuApp::apply_mode_settings_effects(
 }
 
 void MenuApp::populate_audio_settings_render_data(render::MenuRenderData& render) {
+    if (!audio_settings_controller_.asio_drivers_loaded()) {
+        std::vector<menu::settings::AudioDriverChoice> drivers;
+        for (const auto& driver : audio::AsioBackend::enumerate_drivers()) {
+            drivers.push_back({driver.id, driver.name});
+        }
+        audio_settings_controller_.set_asio_drivers(std::move(drivers));
+    }
     auto view = menu::settings::AudioSettingsView::build(
         audio_settings_controller_, config_, ui_uses_korean());
     render.generic.rows.reserve(render.generic.rows.size() + view.rows.size());
@@ -128,7 +145,9 @@ void MenuApp::populate_audio_settings_render_data(render::MenuRenderData& render
         row.slider = source.slider_ratio.has_value();
         row.slider_ratio = source.slider_ratio.value_or(0.0);
         row.target_kind = render::MenuHitTargetKind::SettingsRow;
-        row.row_index = static_cast<int>(source.id);
+        // Pointer events are decoded with audio_setting_id_at(), so publish
+        // the visible row index rather than the stable setting identifier.
+        row.row_index = static_cast<int>(menu::settings::audio_setting_index(source.id).value());
         render.generic.rows.push_back(std::move(row));
     }
     render.generic.notes = std::move(view.notes);

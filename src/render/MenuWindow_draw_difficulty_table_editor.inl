@@ -4,10 +4,27 @@
             d2d_->footer_brush->SetColor(D2D1::ColorF(0x05090F, 0.82f));
             ctx->FillRectangle(D2D1::RectF(0, 0, kBaseWidth, kBaseHeight), d2d_->footer_brush.Get());
             d2d_->footer_brush->SetColor(saved_footer_color);
-            const D2D1_RECT_F editor = D2D1::RectF(470, 310, 1450, 690);
+            const D2D1_RECT_F editor = D2D1::RectF(470, 238, 1450, 732);
             draw_glass_panel(editor, 18, 1.0f, 0, false, 0);
-            draw_text_clipped(wloc("DIFFICULTY TABLE URL", "난이도표 URL"), d2d_->title_format.Get(),
-                D2D1::RectF(500, 338, 1420, 382), d2d_->text_brush.Get());
+            draw_text_clipped(wloc("SELECT DIFFICULTY TABLE", "난이도표 선택"), d2d_->title_format.Get(),
+                D2D1::RectF(500, 260, 1420, 306), d2d_->text_brush.Get());
+            for (std::size_t index = 0; index < config::kBuiltinDifficultyTables.size(); ++index) {
+                const auto& preset = config::kBuiltinDifficultyTables[index];
+                const float left = 500.0f + static_cast<float>(index) * 232.5f;
+                const D2D1_RECT_F button = D2D1::RectF(left, 320, left + 222.5f, 379);
+                draw_glass_panel(button, 10, 1, 0, false, 0);
+                register_hit(button, MenuHitTargetKind::SongDifficultyTable,
+                    static_cast<int>(SongDifficultyTableAction::PresetAery5) + static_cast<int>(index));
+                const std::wstring label = L"F" + std::to_wstring(index + 1) + L"  " +
+                    wloc(preset.name_en.data(), preset.name_ko.data());
+                draw_centered_text(label, d2d_->body_format.Get(), button, d2d_->accent_brush.Get(), true);
+            }
+            const D2D1_RECT_F native_level = D2D1::RectF(1197.5f, 320, 1420, 379);
+            draw_glass_panel(native_level, 10, 1, 0, !data.song_select.difficulty_table_active, 0);
+            register_hit(native_level, MenuHitTargetKind::SongDifficultyTable,
+                static_cast<int>(SongDifficultyTableAction::Reset));
+            draw_centered_text(wloc("F4  Native LV", "F4  기본 LV"), d2d_->body_format.Get(),
+                native_level, d2d_->accent_brush.Get(), true);
             draw_text_clipped(wloc("Paste a BMSTable page or header JSON link.", "BMSTable 페이지 또는 헤더 JSON 주소를 붙여넣으세요."),
                 d2d_->body_format.Get(), D2D1::RectF(500, 391, 1420, 427), d2d_->muted_brush.Get());
             const D2D1_RECT_F input = D2D1::RectF(500, 437, 1420, 526);
@@ -30,8 +47,8 @@
             draw_text_clipped(message, d2d_->body_format.Get(),
                 D2D1::RectF(500, 542, 1420, 602), d2d_->muted_brush.Get());
             d2d_->body_format->SetWordWrapping(wrapping);
-            const D2D1_RECT_F cancel = D2D1::RectF(960, 614, 1178, 666);
-            const D2D1_RECT_F apply = D2D1::RectF(1190, 614, 1420, 666);
+            const D2D1_RECT_F cancel = D2D1::RectF(960, 650, 1178, 702);
+            const D2D1_RECT_F apply = D2D1::RectF(1190, 650, 1420, 702);
             draw_glass_panel(cancel, 10, 1, 0, false, 0);
             draw_glass_panel(apply, 10, 1, 0, true, 0);
             register_hit(cancel, MenuHitTargetKind::SongDifficultyTable, static_cast<int>(SongDifficultyTableAction::Cancel));

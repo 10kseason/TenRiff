@@ -1,6 +1,7 @@
 #include "doctest/doctest.h"
 
 #include "network/PeerSession.h"
+#include "app/MultiplayerPresentation.h"
 
 #include <algorithm>
 #include <chrono>
@@ -159,6 +160,8 @@ TEST_CASE("peer session localhost round reaches final score and clean shutdown")
         return launch_hash.has_value();
     }));
     CHECK(*launch_hash == chart.hash);
+    const uint64_t first_round_nonce = host.snapshot().result_round_nonce;
+    CHECK(first_round_nonce != 0);
 
     REQUIRE(host.mark_loaded());
     REQUIRE(joiner.mark_loaded());
@@ -227,6 +230,9 @@ TEST_CASE("peer session localhost round reaches final score and clean shutdown")
                host.snapshot().leader_player_id == 2 &&
                joiner.snapshot().local_is_leader;
     }));
+    CHECK(host.snapshot().result_round_nonce == first_round_nonce);
+    REQUIRE(host.snapshot().round_participants.size() == 2u);
+    CHECK(host.snapshot().round_participants[1].latest_score.score == final.score);
     const ChartFingerprint rematch_chart{0x9988776655443322ull, 8192};
     REQUIRE(joiner.set_local_chart(rematch_chart, "Immediate Rematch Chart"));
     REQUIRE(wait_until([&]() {
@@ -276,10 +282,103 @@ TEST_CASE("peer session localhost round reaches final score and clean shutdown")
     }));
     CHECK(*host_launch == rematch_chart.hash);
     CHECK(*leader_launch == rematch_chart.hash);
+    CHECK(host.snapshot().result_round_nonce != first_round_nonce);
+    CHECK(joiner.snapshot().result_round_nonce == host.snapshot().result_round_nonce);
+    for (const auto& participant : host.snapshot().round_participants) {
+        CHECK_FALSE(participant.has_score);
+    }
     host.disconnect("Loopback test complete");
     joiner.disconnect();
     CHECK(host.snapshot().state == PeerSessionState::Disconnected);
     CHECK(joiner.snapshot().state == PeerSessionState::Disconnected);
+#endif
+}
+
+TEST_CASE("peer result retains two and three player standings after the winner disconnects") {
+#ifdef _WIN32
+    using namespace tenriff;
+    using network::PeerSession;
+    using network::PeerSessionState;
+    for (const int count : {2, 3}) {
+        PeerSession host;
+        std::vector<std::unique_ptr<PeerSession>> opponents;
+        const network::ChartFingerprint chart{0xabcdef123456ull, 321};
+        REQUIRE(host.set_local_chart(chart, "Retained round"));
+        REQUIRE(host.host(0, "Local"));
+        REQUIRE(wait_until([&]() { return host.snapshot().state == PeerSessionState::Listening; }));
+        for (int id = 2; id <= count; ++id) {
+            auto opponent = std::make_unique<PeerSession>();
+            REQUIRE(opponent->join("127.0.0.1", host.snapshot().local_port,
+                                   "Player " + std::to_string(id)));
+            REQUIRE(wait_until([&]() {
+                return opponent->snapshot().state == PeerSessionState::Connected &&
+                       host.snapshot().participants.size() == static_cast<std::size_t>(id) &&
+                       opponent->snapshot().selected_chart.fingerprint.hash == chart.hash;
+            }));
+            REQUIRE(opponent->set_local_chart(chart, "Retained round"));
+            opponents.push_back(std::move(opponent));
+        }
+        REQUIRE(host.set_ready(true));
+        for (auto& opponent : opponents) REQUIRE(opponent->set_ready(true));
+        REQUIRE(wait_until([&]() { return host.snapshot().can_start; }));
+        REQUIRE(host.send_launch());
+        REQUIRE(wait_until([&]() {
+            return host.snapshot().round_active && std::all_of(opponents.begin(), opponents.end(),
+                [](const auto& opponent) { return opponent->snapshot().round_active; });
+        }));
+
+        network::PeerScore score;
+        score.score = 1000;
+        REQUIRE(host.publish_score(score, true));
+        score.score = 3000;
+        REQUIRE(opponents.front()->publish_score(score, true));
+        if (count == 3) {
+            score.score = 500;
+            score.game_over = true;
+            REQUIRE(opponents.back()->publish_score(score));
+        }
+        REQUIRE(wait_until([&]() {
+            const auto room = host.snapshot();
+            return room.round_participants.size() == static_cast<std::size_t>(count) &&
+                   room.round_participants[1].latest_score.finished &&
+                   (count == 2 || room.round_participants[2].has_score);
+        }));
+        const auto initial = host.snapshot();
+        render::MultiplayerPlayerData local;
+        local.has_score = true;
+        local.finished = true;
+        local.score = 1000;
+        CHECK(app::multiplayer_standings(initial, local).front().player_id == 2);
+
+        opponents.front()->disconnect("Winner leaves result");
+        REQUIRE(wait_until([&]() {
+            return host.snapshot().participants.size() == static_cast<std::size_t>(count - 1);
+        }));
+        if (count == 3) {
+            // A live GAME OVER update is not a FinalScore packet. A final result
+            // arriving after another player leaves must still replace that score.
+            score.score = 2000;
+            REQUIRE(opponents.back()->publish_score(score, true));
+            REQUIRE(wait_until([&]() {
+                return host.snapshot().round_participants[2].latest_score.finished;
+            }));
+            opponents.back()->disconnect("Last opponent leaves result");
+            REQUIRE(wait_until([&]() { return host.snapshot().participants.size() == 1u; }));
+        }
+        const auto after = host.snapshot();
+        const auto standings = app::multiplayer_standings(after, local);
+        REQUIRE(standings.size() == static_cast<std::size_t>(count));
+        CHECK(standings.front().player_id == 2);
+        CHECK(standings.front().score == 3000);
+        CHECK(standings.front().finished);
+        const auto local_row = std::find_if(standings.begin(), standings.end(),
+                                            [](const auto& player) { return player.local; });
+        REQUIRE(local_row != standings.end());
+        CHECK(local_row->rank == count);
+        CHECK(after.result_round_nonce == initial.result_round_nonce);
+        CHECK_FALSE(after.round_active);
+        host.disconnect("Result regression complete");
+    }
 #endif
 }
 

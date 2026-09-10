@@ -19,18 +19,24 @@ AudioThread::~AudioThread() {
 }
 
 AudioResult AudioThread::initialize(const AudioConfig& config, Callback callback) {
+    shutdown();
     if (!callback) {
         return AudioResult::InitializationFailed;
     }
 
     config_ = config;
     callback_ = std::move(callback);
+    if (config.backend == AudioBackend::ASIO) {
+        asio_backend_ = std::make_unique<AsioBackend>();
+        return asio_backend_->initialize(config, callback_);
+    }
     backend_ = std::make_unique<WasapiBackend>();
 
     return backend_->initialize(config);
 }
 
 AudioResult AudioThread::start() {
+    if (asio_backend_) return asio_backend_->start();
     if (!backend_ || !backend_->is_initialized()) {
         return AudioResult::InitializationFailed;
     }
@@ -55,6 +61,7 @@ AudioResult AudioThread::start() {
 }
 
 void AudioThread::stop() {
+    if (asio_backend_) { asio_backend_->stop(); return; }
     if (!is_running_.load(std::memory_order_acquire)) {
         return;
     }
@@ -79,6 +86,7 @@ void AudioThread::stop() {
 
 void AudioThread::shutdown() {
     stop();
+    if (asio_backend_) { asio_backend_->shutdown(); asio_backend_.reset(); }
     
     if (backend_) {
         backend_->shutdown();
@@ -89,22 +97,27 @@ void AudioThread::shutdown() {
 }
 
 int64_t AudioThread::playback_samples() const {
+    if (asio_backend_) return asio_backend_->playback_samples();
     return backend_ ? backend_->total_samples_played() : 0;
 }
 
 uint32_t AudioThread::sample_rate() const {
+    if (asio_backend_) return asio_backend_->sample_rate();
     return backend_ ? backend_->sample_rate() : 0;
 }
 
 uint32_t AudioThread::device_mix_sample_rate() const {
+    if (asio_backend_) return asio_backend_->sample_rate();
     return backend_ ? backend_->device_mix_sample_rate() : 0;
 }
 
 uint32_t AudioThread::buffer_frames() const {
+    if (asio_backend_) return asio_backend_->buffer_frames();
     return backend_ ? backend_->buffer_frames() : 0;
 }
 
 bool AudioThread::is_exclusive() const {
+    if (asio_backend_) return false; // ASIO has no WASAPI exclusive/shared mode.
     return backend_ && backend_->is_exclusive();
 }
 
@@ -214,6 +227,10 @@ void AudioThread::process_buffer() {
 
     // Release buffer and update sample count.
     backend_->add_samples_played(frames_obtained);
+}
+
+std::string AudioThread::error_message() const {
+    return asio_backend_ ? asio_backend_->error_message() : std::string{};
 }
 
 }  // namespace tenriff::audio

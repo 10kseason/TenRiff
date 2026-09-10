@@ -198,6 +198,7 @@ public:
     }
     [[nodiscard]] HudSnapshot hud_snapshot();
     [[nodiscard]] bool was_user_aborted() const { return user_aborted_.load(std::memory_order_acquire); }
+    [[nodiscard]] const std::string& audio_error() const { return audio_error_message_; }
     [[nodiscard]] bool was_restart_requested() const {
         return restart_requested_.load(std::memory_order_acquire);
     }
@@ -409,6 +410,7 @@ private:
 
     input::InputThread input_thread_;
     audio::AudioThread audio_thread_;
+    std::string audio_error_message_;
     timing::ClockSync clock_sync_;
 
     std::unordered_map<uint32_t, int> key_to_lane_;
@@ -420,6 +422,7 @@ private:
     std::atomic<bool> paused_{false};
     std::atomic<bool> pause_used_{false};
     std::atomic<bool> pause_resume_requested_{false};
+    std::atomic<int> resume_countdown_value_{0};
     std::atomic<bool> restart_requested_{false};
     std::atomic<bool> exit_requested_{false};
     std::atomic<int> pause_menu_cursor_{0};
@@ -466,6 +469,9 @@ private:
     int64_t pause_sample_offset_ = 0;
     int64_t pause_physical_start_sample_ = 0;
     int64_t paused_chart_sample_ = 0;
+    // Owned by the audio callback under engine_mutex_; device time keeps
+    // advancing while chart time and the mixer are frozen during the countdown.
+    int64_t pause_resume_end_sample_ = 0;
     bool pause_anchor_valid_ = false;
     int sample_rate_ = 48000;
     JudgementLoopTimingPlan judgement_loop_plan_{};

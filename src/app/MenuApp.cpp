@@ -36,6 +36,8 @@
 #include "app/ClipboardText.h"
 #include "app/DifficultyTable.h"
 #include "app/DifficultyTableLink.h"
+#include "app/SongSourceHistory.h"
+#include "config/BuiltinDifficultyTables.h"
 #include "app/GameplayHudRevisions.h"
 #include "app/LanePresentationLayout.h"
 #include "app/GraphicsTiming.h"
@@ -1213,7 +1215,12 @@ bool MenuApp::initialize(const CommandLineOptions& options) {
         }
     }
 
-    switch_song_source(initial_song_source, false);
+    if (song_source_history_is_intentionally_empty(config_.ui) && options_.songs_path == "songs") {
+        // A removed last source stays removed instead of silently reappearing.
+        songs_path_.clear();
+    } else {
+        switch_song_source(initial_song_source, false);
+    }
     if (first_run_profile_) {
         reset_screen(Screen::QuickSetup);
         settings_cursor_ = 0;
@@ -1790,7 +1797,8 @@ bool MenuApp::remember_song_source(const std::string& source_path) {
         }
     }
 
-    bool changed = (config_.ui.active_song_source != normalized) ||
+    bool changed = !config_.ui.song_sources_initialized ||
+                   (config_.ui.active_song_source != normalized) ||
                    (config_.ui.recent_song_sources.size() != updated_sources.size());
     if (!changed) {
         for (std::size_t i = 0; i < updated_sources.size(); ++i) {
@@ -1802,6 +1810,7 @@ bool MenuApp::remember_song_source(const std::string& source_path) {
     }
 
     config_.ui.active_song_source = normalized;
+    config_.ui.song_sources_initialized = true;
     config_.ui.recent_song_sources = std::move(updated_sources);
     selected_source_ = 0;
     return changed;
@@ -2019,6 +2028,11 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
         if (event.kind == render::MenuHitTargetKind::SongDifficultyTable) {
             if (event.index == static_cast<int>(render::SongDifficultyTableAction::Apply)) handle_difficulty_table_input(key_enter_);
             else if (event.index == static_cast<int>(render::SongDifficultyTableAction::Cancel)) handle_difficulty_table_input(key_escape_);
+            else if (event.index == static_cast<int>(render::SongDifficultyTableAction::Reset)) select_native_difficulty_levels();
+            else if (event.index >= static_cast<int>(render::SongDifficultyTableAction::PresetAery5) &&
+                     event.index <= static_cast<int>(render::SongDifficultyTableAction::PresetRevive10)) {
+                apply_builtin_difficulty_table(event.index - static_cast<int>(render::SongDifficultyTableAction::PresetAery5));
+            }
         }
         return;
     }
@@ -2209,8 +2223,9 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
         }
         if (current_screen() == Screen::SettingsSkins) {
             if (!import_skin_path_auto(event.path)) {
-                std::cerr << "[warn] Ignored dropped path (expected a TenRiff skin folder or a folder containing LR2 skins): "
+                std::cerr << "[warn] Skin import failed (expected a .trskin preset or a TenRiff/LR2 skin folder): "
                           << event.path << std::endl;
+                publish_snapshot();
                 return;
             }
             publish_snapshot();
@@ -2283,6 +2298,14 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
                 return;
             }
             handle_options_hub_input(key_enter_);
+            return;
+        case render::MenuHitTargetKind::SongSourceAdd:
+            if (current_screen() == Screen::SongSelect && song_select_view_ == SongSelectView::Sources)
+                add_song_source_from_dialog();
+            return;
+        case render::MenuHitTargetKind::SongSourceRemove:
+            if (current_screen() == Screen::SongSelect && song_select_view_ == SongSelectView::Sources)
+                remove_selected_song_source();
             return;
         case render::MenuHitTargetKind::SongDifficultyTable:
             if (current_screen() != Screen::SongSelect) return;
@@ -3347,6 +3370,13 @@ void MenuApp::handle_song_select_input(uint32_t keycode) {
     sync_song_select_state();
     rebuild_current_song_record_indices();
 
+    if (song_select_view_ == SongSelectView::Sources &&
+        song_select_focus_ == SongSelectFocus::SongList &&
+        key_delete_ != 0 && keycode == key_delete_) {
+        remove_selected_song_source();
+        return;
+    }
+
     auto apply_song_search_refresh = [this]() {
         song_select_view_ = SongSelectView::Songs;
         rebuild_visible_song_list();
@@ -3461,13 +3491,7 @@ void MenuApp::handle_song_select_input(uint32_t keycode) {
     }
 #ifdef _WIN32
     if (keycode == key_f2_) {
-        song_select_search_active_ = false;
-        std::string new_path = browse_for_folder(ui_text("Select Songs Folder", "곡 폴더 선택"));
-        if (!new_path.empty()) {
-            switch_song_source(new_path, false);
-            song_select_view_ = SongSelectView::Songs;
-            publish_snapshot();
-        }
+        add_song_source_from_dialog();
         return;
     }
 #endif
@@ -3582,19 +3606,8 @@ void MenuApp::handle_song_select_input(uint32_t keycode) {
                     return;
                 case 1:
                     song_select_search_active_ = false;
-#ifdef _WIN32
-                    if (config_.ui.recent_song_sources.empty()) {
-                        std::string new_path = browse_for_folder(ui_text("Select Songs Folder", "곡 폴더 선택"));
-                        if (!new_path.empty()) {
-                            switch_song_source(new_path, false);
-                            song_select_view_ = SongSelectView::Songs;
-                        }
-                    } else
-#endif
-                    {
-                        song_select_view_ = SongSelectView::Sources;
-                        selected_source_ = 0;
-                    }
+                    song_select_view_ = SongSelectView::Sources;
+                    selected_source_ = 0;
                     song_select_focus_ = SongSelectFocus::SongList;
                     publish_snapshot();
                     return;
@@ -3692,6 +3705,72 @@ void MenuApp::handle_song_select_input(uint32_t keycode) {
     }
 }
 
+void MenuApp::add_song_source_from_dialog() {
+#ifdef _WIN32
+    const bool return_to_sources = song_select_view_ == SongSelectView::Sources;
+    const std::string path = browse_for_folder(ui_text("Select Songs Folder", "곡 폴더 선택"));
+    if (path.empty()) return;
+    song_select_search_active_ = false;
+    switch_song_source(path, false);
+    if (return_to_sources) song_select_view_ = SongSelectView::Sources;
+    song_select_focus_ = SongSelectFocus::SongList;
+    publish_snapshot();
+#endif
+}
+
+void MenuApp::remove_selected_song_source() {
+    if (selected_source_ < 0 || selected_source_ >= static_cast<int>(config_.ui.recent_song_sources.size())) return;
+    const std::string removed = config_.ui.recent_song_sources[static_cast<std::size_t>(selected_source_)];
+    const std::string removed_key = menu_songs::normalize_path_key(path_from_utf8(removed));
+    const bool was_active = removed_key == menu_songs::normalize_path_key(path_from_utf8(songs_path_));
+    if (!remove_song_source_history(config_.ui, selected_source_)) return;
+    source_song_counts_.erase(removed_key);
+    if (was_active) {
+        cancel_song_preview_decode();
+        stop_song_preview_audio();
+        song_select_screen_.clear_preview_target();
+        song_indexer_.stop();
+        if (!config_.ui.recent_song_sources.empty()) {
+            const std::string next = config_.ui.recent_song_sources[static_cast<std::size_t>(selected_source_)];
+            switch_song_source(next, false);
+        } else {
+            songs_path_.clear();
+            cache_path_.clear();
+            config_.ui.active_song_source.clear();
+            update_song_list(SongIndex{});
+        }
+    }
+    song_select_view_ = SongSelectView::Sources;
+    song_select_focus_ = SongSelectFocus::SongList;
+    persist_runtime_config();
+    publish_snapshot();
+}
+
+void MenuApp::apply_builtin_difficulty_table(int index) {
+    if (index < 0 || index >= static_cast<int>(config::kBuiltinDifficultyTables.size())) return;
+    difficulty_table_url_input_ = config::kBuiltinDifficultyTables[static_cast<std::size_t>(index)].url;
+    if (apply_difficulty_table_url(difficulty_table_url_input_)) difficulty_table_url_editing_ = false;
+    publish_snapshot();
+}
+
+void MenuApp::select_native_difficulty_levels() {
+    const bool changed = !config_.ui.difficulty_table_path.empty() || !config_.ui.difficulty_table_url.empty();
+    config_.ui.difficulty_table_path.clear();
+    config_.ui.difficulty_table_url.clear();
+    difficulty_table_url_input_.clear();
+    difficulty_table_display_path_.clear();
+    difficulty_table_display_name_.clear();
+    difficulty_table_url_editing_ = false;
+    song_browser_status_message_.clear();
+    if (changed) {
+        persist_runtime_config();
+        // Cache loading removes table labels/order and restores each stored native
+        // level, so both display and sorting revert without reparsing the library.
+        refresh_song_source(false);
+    }
+    publish_snapshot();
+}
+
 bool MenuApp::apply_difficulty_table_url(std::string_view url) {
     std::string trimmed(url);
     while (!trimmed.empty() && static_cast<unsigned char>(trimmed.back()) <= 0x20u) {
@@ -3720,14 +3799,27 @@ bool MenuApp::apply_difficulty_table_url(std::string_view url) {
         config_.ui.difficulty_table_path = imported.cached_header_path;
         config_.ui.difficulty_table_url = imported.source_url;
         persist_runtime_config();
-        refresh_song_source(force_table_reindex);
     }
+    // The publisher may update the body at the same URL/cache path. Reapply the
+    // freshly imported table even when the selected preset itself did not change.
+    refresh_song_source(force_table_reindex);
     song_browser_status_message_.clear();
     return true;
 }
 
 void MenuApp::handle_difficulty_table_input(uint32_t keycode) {
     if (difficulty_table_url_editing_) {
+        const auto f3 = config::KeycodeMap::to_keycode("F3").value_or(0);
+        const auto f4 = config::KeycodeMap::to_keycode("F4").value_or(0);
+        if (f4 != 0 && keycode == f4) {
+            select_native_difficulty_levels();
+            return;
+        }
+        if ((key_f1_ != 0 && keycode == key_f1_) || (key_f2_ != 0 && keycode == key_f2_) ||
+            (f3 != 0 && keycode == f3)) {
+            apply_builtin_difficulty_table(keycode == key_f1_ ? 0 : keycode == key_f2_ ? 1 : 2);
+            return;
+        }
         if (keycode == key_escape_) {
             difficulty_table_url_editing_ = false;
             publish_snapshot();
@@ -3783,15 +3875,15 @@ void MenuApp::handle_difficulty_table_input(uint32_t keycode) {
         publish_snapshot();
         return;
     }
-    if (keycode == key_left_ || keycode == key_right_) {
+    if (keycode == key_left_) {
+        select_native_difficulty_levels();
+        return;
+    }
+    if (keycode == key_right_) {
         song_browser_status_message_.clear();
         bool force_table_reindex = false;
         std::string selected_path = config_.ui.difficulty_table_path;
         std::string selected_url = config_.ui.difficulty_table_url;
-        if (keycode == key_left_) {
-            selected_path.clear();
-            selected_url.clear();
-        } else {
 #ifdef _WIN32
             {
                 const std::string picked = browse_for_json_file(
@@ -3817,7 +3909,6 @@ void MenuApp::handle_difficulty_table_input(uint32_t keycode) {
 #else
             return;
 #endif
-        }
         if (selected_path != config_.ui.difficulty_table_path ||
             selected_url != config_.ui.difficulty_table_url) {
             config_.ui.difficulty_table_path = std::move(selected_path);

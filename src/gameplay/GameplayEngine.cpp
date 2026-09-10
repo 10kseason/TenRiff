@@ -30,10 +30,14 @@ GameplayEngine::GameplayEngine(const GameplayChart& chart, const GameplayConfig&
       rate_(clamp_rate(config.rate)),
       duration_samples_(chart.duration_samples),
       windows_(build_windows(config.judge, config.rate)),
-      gauge_manager_(config.gauge, config.gauge_shift_enabled ? game::GaugeRuntimePolicy{} : config.gauge_policy),
-      gauge_shift_enabled_(config.gauge_shift_enabled),
+      gauge_manager_(config.gauge, config.gauge_shift_enabled && !config.gauge_policy.course_lr2_deltas
+                                      ? game::GaugeRuntimePolicy{} : config.gauge_policy),
+      gauge_shift_enabled_(config.gauge_shift_enabled && !config.gauge_policy.course_lr2_deltas),
       practice_no_fail_enabled_(config.practice_no_fail_enabled),
       one_miss_fail_enabled_(config.one_miss_fail_enabled) {
+    if (config.gauge_policy.course_lr2_deltas) {
+        windows_.indirect_miss_enabled = true;
+    }
     if (lane_count_ <= 0) {
         lane_count_ = 10;
     }
@@ -85,7 +89,7 @@ GameplayEngine::GameplayEngine(const GameplayChart& chart, const GameplayConfig&
                                              ? config.initial_gauge_value.value()
                                              : 100.0;
             gauge_state_.value = std::clamp(carried_value, 0.0, 100.0);
-            gauge_state_.game_over = gauge_state_.value <= 0.0;
+            gauge_state_.game_over = gauge_manager_.isFailedValue(gauge_state_.value);
             game_over_ = gauge_state_.game_over;
         }
     }
@@ -307,7 +311,8 @@ void GameplayEngine::detonate_mine(const MineEvent& mine, int lane_number) {
 }
 
 void GameplayEngine::apply_judgement(game::Judgement judgement, double delta_ms, int64_t sample,
-                                     double weight, ComboImpact combo_impact, bool osu_miss) {
+                                     double weight, ComboImpact combo_impact, bool osu_miss,
+                                     double gauge_weight) {
     live_feedback_.has_value = true;
     live_feedback_.judgement = judgement;
     live_feedback_.delta_ms = std::isfinite(delta_ms) ? delta_ms : 0.0;
@@ -316,29 +321,10 @@ void GameplayEngine::apply_judgement(game::Judgement judgement, double delta_ms,
         push_recent_timing_delta(delta_ms);
     }
 
-    const double time_ms = samples_to_ms(sample);
     const auto previous_type = gauge_state_.type;
-    game::GaugeResult result{};
-    if (gauge_shift_enabled_) {
-        bool survivor_found = false;
-        for (std::size_t i = gauge_shift_start_index_; i < gauge_shift_states_.size(); ++i) {
-            auto& state = gauge_shift_states_[i];
-            gauge_manager_.applyJudgementWeighted(state, judgement, time_ms, weight);
-            if (!survivor_found && !state.game_over) {
-                gauge_state_ = state;
-                survivor_found = true;
-            }
-        }
-        if (!survivor_found) {
-            // Keep Easy visible at zero when every independently simulated
-            // gauge has died so the final failure state remains unambiguous.
-            gauge_state_ = gauge_shift_states_.back();
-        }
-        result.downshifted = gauge_state_.type != previous_type;
-        result.game_over = !survivor_found;
-    } else {
-        result = gauge_manager_.applyJudgementWeighted(gauge_state_, judgement, time_ms, weight);
-    }
+    auto result = apply_gauge_judgement(
+        judgement, sample, gauge_weight < 0.0 ? weight : gauge_weight,
+        judgement == game::Judgement::PR && combo_impact == ComboImpact::Preserve);
 
     // Native BAD includes hittable timing errors, so it is not equivalent to
     // an osu!mania miss. Sudden Death follows the OD8 object judgement that is
@@ -362,6 +348,48 @@ void GameplayEngine::apply_judgement(game::Judgement judgement, double delta_ms,
     }
 
     if (sudden_death_triggered || (result.game_over && !practice_no_fail_enabled_)) {
+        game_over_ = true;
+    }
+}
+
+game::GaugeResult GameplayEngine::apply_gauge_judgement(game::Judgement judgement, int64_t sample,
+                                                        double weight, bool empty_poor) {
+    const double time_ms = samples_to_ms(sample);
+    const auto previous_type = gauge_state_.type;
+    game::GaugeResult result{};
+    if (gauge_shift_enabled_) {
+        bool survivor_found = false;
+        for (std::size_t i = gauge_shift_start_index_; i < gauge_shift_states_.size(); ++i) {
+            auto& state = gauge_shift_states_[i];
+            gauge_manager_.applyJudgementWeighted(state, judgement, time_ms, weight, empty_poor);
+            if (!survivor_found && !state.game_over) {
+                gauge_state_ = state;
+                survivor_found = true;
+            }
+        }
+        if (!survivor_found) {
+            // Keep Easy visible at zero when every independently simulated
+            // gauge has died so the final failure state remains unambiguous.
+            gauge_state_ = gauge_shift_states_.back();
+        }
+        result.downshifted = gauge_state_.type != previous_type;
+        result.game_over = !survivor_found;
+    } else {
+        result = gauge_manager_.applyJudgementWeighted(gauge_state_, judgement, time_ms, weight, empty_poor);
+    }
+
+    return result;
+}
+
+void GameplayEngine::finish_course_hold_gauge(HoldState& hold, int64_t sample, bool early_release) {
+    if (!hold.course_gauge_pending) {
+        return;
+    }
+    hold.course_gauge_pending = false;
+    const auto result = apply_gauge_judgement(
+        early_release ? game::Judgement::BD : hold.course_head_judgement, sample, 1.0);
+    stats_.record_gauge_sample(sample, gauge_state_.value);
+    if (result.game_over && !practice_no_fail_enabled_) {
         game_over_ = true;
     }
 }
@@ -441,7 +469,10 @@ std::optional<NoteEvent> GameplayEngine::try_hit_note(LaneState& lane, int64_t i
         if (!note.end_sample.has_value()) {
             record_osu_mania_od8_judgement(stats_.osu_od8, osu_head_judgement);
         }
-        apply_judgement(judgement, delta_ms, input_sample, weight, combo_impact, osu_head_miss);
+        const bool lr2_hold = gauge_manager_.policy().course_lr2_deltas &&
+                             note.end_sample.has_value() && !note.release_required;
+        apply_judgement(judgement, delta_ms, input_sample, weight, combo_impact, osu_head_miss,
+                        lr2_hold ? 0.0 : weight);
 
         if (note.end_sample.has_value()) {
             if (game_over_) {
@@ -451,6 +482,8 @@ std::optional<NoteEvent> GameplayEngine::try_hit_note(LaneState& lane, int64_t i
                 hold.end_sample = note.end_sample.value();
                 hold.release_required = note.release_required;
                 hold.osu_head_delta_ms = delta_ms;
+                hold.course_head_judgement = judgement;
+                hold.course_gauge_pending = lr2_hold;
                 lane.hold = hold;
             }
         }
@@ -537,6 +570,12 @@ void GameplayEngine::update_hold(LaneState& lane, int64_t current_sample) {
 
     auto& hold = *lane.hold;
     const int64_t hold_timeout = windows_.hold_break;
+    const bool lr2_hold = gauge_manager_.policy().course_lr2_deltas && !hold.release_required;
+    const double tail_gauge_weight = lr2_hold ? 0.0 : 0.5;
+
+    if (lr2_hold && current_sample >= hold.end_sample) {
+        finish_course_hold_gauge(hold, hold.end_sample, false);
+    }
 
     if (hold.release_active) {
         if (hold.release_required) {
@@ -551,7 +590,8 @@ void GameplayEngine::update_hold(LaneState& lane, int64_t current_sample) {
                             hold.release_sample,
                             0.5,
                             combo_impact,
-                            osu_judgement == OsuManiaJudgement::Miss);
+                            osu_judgement == OsuManiaJudgement::Miss,
+                            tail_gauge_weight);
             lane.hold.reset();
             return;
         }
@@ -568,7 +608,8 @@ void GameplayEngine::update_hold(LaneState& lane, int64_t current_sample) {
                             hold.release_sample,
                             0.5,
                             combo_impact,
-                            osu_judgement == OsuManiaJudgement::Miss);
+                            osu_judgement == OsuManiaJudgement::Miss,
+                            tail_gauge_weight);
             lane.hold.reset();
             return;
         }
@@ -582,7 +623,8 @@ void GameplayEngine::update_hold(LaneState& lane, int64_t current_sample) {
                             hold.end_sample + hold_timeout,
                             0.5,
                             ComboImpact::Break,
-                            osu_judgement == OsuManiaJudgement::Miss);
+                            osu_judgement == OsuManiaJudgement::Miss,
+                            tail_gauge_weight);
             lane.hold.reset();
         }
         return;
@@ -603,7 +645,8 @@ void GameplayEngine::update_hold(LaneState& lane, int64_t current_sample) {
                             hold.end_sample,
                             0.5,
                             combo_impact,
-                            osu_judgement == OsuManiaJudgement::Miss);
+                            osu_judgement == OsuManiaJudgement::Miss,
+                            tail_gauge_weight);
         }
         lane.hold.reset();
     }
@@ -639,6 +682,10 @@ void GameplayEngine::update_lane_input_state(LaneState& lane, input::InputState 
 
     lane.key_down = false;
     if (lane.hold.has_value()) {
+        // Grade gauge follows LR2's single LN outcome. Re-grabbing must not
+        // refund a drop, while native score/accuracy retain their split heads/tails.
+        finish_course_hold_gauge(*lane.hold, input_sample,
+                                 input_sample + windows_.gd < lane.hold->end_sample);
         const int64_t osu_early_meh_window =
             static_cast<int64_t>(std::llround(127.0 * static_cast<double>(sample_rate_) / 1000.0));
         if (input_sample < lane.hold->end_sample - osu_early_meh_window) {

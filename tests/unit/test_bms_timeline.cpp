@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
 
 #include "chart/BmsChartNorm.h"
 #include "chart/BmsParser.h"
@@ -340,4 +341,95 @@ TEST_CASE("timeline combines BPM changes with BMS scroll factors") {
     CHECK(after_change.end_sample - after_change.start_sample == 1000);
     CHECK(after_change.end_position - after_change.start_position == doctest::Approx(0.5));
     CHECK(after_velocity == doctest::Approx(before_velocity));
+}
+
+TEST_CASE("reference BPM aggregates repeated running sections before sample rounding") {
+    BmsChart chart;
+    chart.base_bpm = 240.0;
+    chart.commands = {{0, "11", "01"}, {1, "03", "78"}, {2, "03", "F0"},
+                      {3, "02", "0.5"}, {3, "11", "01"}};
+    // 240 BPM lasts 1 + 1.5 seconds; 120 BPM lasts one 2-second section.
+    const auto normalized = BmsChartNormalizer{}.normalize(chart);
+    REQUIRE(normalized.success());
+    for (int sample_rate : {1000, 44100, 48000, 96000}) {
+        const auto result = BmsTimelineBuilder{}.build(normalized.chart, sample_rate);
+        REQUIRE(result.success());
+        CHECK(result.timeline.reference_bpm == doctest::Approx(240.0));
+        CHECK(result.timeline.duration_samples == static_cast<int64_t>(4.5 * sample_rate));
+    }
+}
+
+TEST_CASE("reference BPM uses running seconds instead of beats or note counts") {
+    BmsChart chart;
+    chart.base_bpm = 60.0;
+    chart.commands = {{0, "11", "01"}, {1, "03", "F0"},
+                      {1, "11", "0101010101010101"},
+                      {2, "11", "0101010101010101"},
+                      {3, "11", "0101010101010101"}};
+    const auto normalized = BmsChartNormalizer{}.normalize(chart);
+    REQUIRE(normalized.success());
+    const auto result = BmsTimelineBuilder{}.build(normalized.chart, 48000);
+    REQUIRE(result.success());
+    // Four beats at 60 BPM last longer than twelve dense beats at 240 BPM.
+    CHECK(result.timeline.reference_bpm == doctest::Approx(60.0));
+    CHECK(result.timeline.duration_samples == 7 * 48000);
+}
+
+TEST_CASE("reference BPM excludes STOP waits while retaining zero-scroll running time") {
+    BmsChart chart;
+    chart.base_bpm = 60.0;
+    chart.stop["01"] = 4800.0;
+    chart.scroll["01"] = 0.0;
+    chart.commands = {{0, "02", "0.25"}, {0, "09", "01"},
+                      {1, "03", "F0"}, {1, "SC", "01"}, {4, "11", "01"}};
+    const auto normalized = BmsChartNormalizer{}.normalize(chart);
+    REQUIRE(normalized.success());
+    const auto result = BmsTimelineBuilder{}.build(normalized.chart, 1000);
+    REQUIRE(result.success());
+    // 60 BPM: 1 second running + 100 seconds STOP; 240 BPM: 4 seconds running.
+    CHECK(result.timeline.reference_bpm == doctest::Approx(240.0));
+    CHECK(result.timeline.duration_samples == 105000);
+}
+
+TEST_CASE("reference BPM ties use the first tempo that actually advances time") {
+    BmsChart chart;
+    chart.base_bpm = 60.0;
+    chart.commands = {{0, "03", "F0"}, {2, "03", "78"}, {2, "11", "01"}};
+    const auto normalized = BmsChartNormalizer{}.normalize(chart);
+    REQUIRE(normalized.success());
+    const auto result = BmsTimelineBuilder{}.build(normalized.chart, 1000);
+    REQUIRE(result.success());
+    // The unused 60 BPM header loses to the first actual tempo in a 2s/2s tie.
+    CHECK(result.timeline.reference_bpm == doctest::Approx(240.0));
+}
+
+TEST_CASE("reference BPM includes the final measure and dedicated long-note tails") {
+    BmsChart chart;
+    chart.base_bpm = 120.0;
+    chart.bpm["01"] = 180.5;
+    chart.commands = {{1, "08", "01"}, {1, "51", "01"}, {4, "51", "01"}};
+    const auto normalized = BmsChartNormalizer{}.normalize(chart);
+    REQUIRE(normalized.success());
+    const auto result = BmsTimelineBuilder{}.build(normalized.chart, 1000);
+    REQUIRE(result.success());
+    CHECK(result.timeline.reference_bpm == doctest::Approx(180.5));
+    CHECK(result.timeline.duration_samples == std::llround((2.0 + 4.0 * 240.0 / 180.5) * 1000));
+}
+
+TEST_CASE("reference BPM has deterministic empty-chart and invalid-domain fallbacks") {
+    tenriff::chart::BmsNormalizedChart chart;
+    chart.base_bpm = 133.25;
+    const auto empty = BmsTimelineBuilder{}.build(chart, 48000);
+    REQUIRE(empty.success());
+    CHECK(empty.timeline.reference_bpm == doctest::Approx(133.25));
+
+    const auto invalid_rate = BmsTimelineBuilder{}.build(chart, 0);
+    CHECK_FALSE(invalid_rate.success());
+    CHECK(invalid_rate.timeline.reference_bpm == 0.0);
+
+    chart.base_bpm = std::numeric_limits<double>::quiet_NaN();
+    chart.measures.push_back({0.0, 1.0});
+    const auto invalid_bpm = BmsTimelineBuilder{}.build(chart, 48000);
+    CHECK_FALSE(invalid_bpm.success());
+    CHECK(invalid_bpm.timeline.reference_bpm == 0.0);
 }

@@ -122,7 +122,8 @@ AudioSettingsViewModel AudioSettingsView::build(
     bool use_korean) {
     AudioSettingsViewModel view;
     view.rows.reserve(kAudioSettingOrder.size());
-    view.notes.reserve(5);
+    view.notes.reserve(7);
+    const bool asio = runtime.audio.backend == audio::AudioBackend::ASIO;
 
     view.rows.push_back(make_row(
         AudioSettingId::Preset,
@@ -131,7 +132,7 @@ AudioSettingsViewModel AudioSettingsView::build(
         preset_label(runtime.audio_ui.preset, use_korean),
         controller,
         false,
-        true));
+        !asio));
     view.rows.push_back(make_row(
         AudioSettingId::KeysoundMode,
         SettingsRowKind::Choice,
@@ -179,6 +180,35 @@ AudioSettingsViewModel AudioSettingsView::build(
         "Normalize Audio gently levels the gameplay mix. OFF preserves the original mix; master volume still applies.",
         "노멀라이즈는 인게임 음량을 완만하게 보정합니다. OFF는 원래 믹스를 유지하며 마스터 볼륨은 그대로 적용됩니다."));
     view.rows.push_back(make_row(
+        AudioSettingId::Backend, SettingsRowKind::Choice,
+        localized(use_korean, "Audio Backend", "오디오 출력 방식"),
+        asio ? "ASIO" : "WASAPI", controller, true, true));
+    std::string driver_name;
+    if (controller.asio_drivers().empty()) {
+        driver_name = localized(use_korean, "No 64-bit ASIO driver", "64비트 ASIO 드라이버 없음");
+    } else if (runtime.audio.asio_driver.empty()) {
+        driver_name = localized(use_korean, "Automatic", "자동 선택");
+    } else {
+        driver_name = localized(use_korean, "Saved driver unavailable", "저장한 드라이버 없음");
+        for (const auto& driver : controller.asio_drivers()) {
+            if (driver.id == runtime.audio.asio_driver) driver_name = driver.name;
+        }
+    }
+    view.rows.push_back(make_row(
+        AudioSettingId::AsioDriver, SettingsRowKind::Choice,
+        localized(use_korean, "ASIO Driver", "ASIO 드라이버"),
+        std::move(driver_name), controller, asio && !controller.asio_drivers().empty(),
+        asio && !controller.asio_drivers().empty()));
+    view.rows.push_back(make_row(
+        AudioSettingId::SampleRate, SettingsRowKind::Choice,
+        localized(use_korean, "ASIO Sample Rate", "ASIO 샘플레이트"),
+        std::to_string(runtime.audio.sample_rate) + " Hz", controller, asio, asio));
+    view.rows.push_back(make_row(
+        AudioSettingId::BufferFrames, SettingsRowKind::Choice,
+        localized(use_korean, "ASIO Buffer", "ASIO 버퍼"),
+        std::to_string(runtime.audio.frames_per_buffer) + localized(use_korean, " frames", " 프레임"),
+        controller, asio, asio));
+    view.rows.push_back(make_row(
         AudioSettingId::Back,
         SettingsRowKind::Action,
         localized(use_korean, "Back", "뒤로"),
@@ -203,6 +233,10 @@ AudioSettingsViewModel AudioSettingsView::build(
         use_korean,
         "Sound Offset shifts chart BGM and autoplay keysounds only. Positive delays sound; negative advances it.",
         "사운드 오프셋은 차트 BGM과 자동재생 키음만 이동합니다. 양수는 소리를 늦추고 음수는 앞당깁니다."));
+    view.notes.push_back(localized(
+        use_korean,
+        "ASIO uses the selected installed 64-bit driver and its first stereo output pair. The driver negotiates the requested buffer. F5 refreshes the driver list; WASAPI presets do not apply to ASIO.",
+        "ASIO는 선택한 설치 드라이버의 첫 스테레오 출력을 사용합니다. 버퍼는 드라이버의 지원값으로 맞춥니다. F5로 드라이버 목록을 새로고침하며 WASAPI 프리셋은 ASIO에 적용되지 않습니다."));
     view.notes.push_back(localized(
         use_korean,
         "Use Left/Right or click a volume slider to change it. Back saves and returns.",

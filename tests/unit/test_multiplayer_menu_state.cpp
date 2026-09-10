@@ -377,12 +377,12 @@ TEST_CASE("multiplayer chart lookup is limited to active and recent loaded sourc
         {active.u8string(), recent.u8string(), recent.u8string()});
 
     REQUIRE(sources.size() == 2u);
-    CHECK(tenriff::app::menu_songs::normalize_path_key(fs::path(sources[0])) ==
+    CHECK(tenriff::app::menu_songs::normalize_path_key(fs::u8path(sources[0])) ==
           tenriff::app::menu_songs::normalize_path_key(active));
-    CHECK(tenriff::app::menu_songs::normalize_path_key(fs::path(sources[1])) ==
+    CHECK(tenriff::app::menu_songs::normalize_path_key(fs::u8path(sources[1])) ==
           tenriff::app::menu_songs::normalize_path_key(recent));
     CHECK(std::none_of(sources.begin(), sources.end(), [&](const std::string& source) {
-        return tenriff::app::menu_songs::normalize_path_key(fs::path(source)) ==
+        return tenriff::app::menu_songs::normalize_path_key(fs::u8path(source)) ==
                tenriff::app::menu_songs::normalize_path_key(unlisted);
     }));
 }
@@ -407,11 +407,11 @@ TEST_CASE("multiplayer chart candidates resolve relative paths against their own
     const fs::path expected = (source / "charts" / "target.bms").lexically_normal();
     const std::string resolved = multiplayer_chart_path_for_source(
         candidates[0].indexed_path, candidates[0].source_root);
-    CHECK(tenriff::app::menu_songs::normalize_path_key(fs::path(resolved)) ==
+    CHECK(tenriff::app::menu_songs::normalize_path_key(fs::u8path(resolved)) ==
           tenriff::app::menu_songs::normalize_path_key(expected));
     const std::string direct = multiplayer_chart_path_for_source(target, source.u8string());
-    CHECK(tenriff::app::menu_songs::normalize_path_key(fs::path(direct)) ==
-          tenriff::app::menu_songs::normalize_path_key(fs::path(resolved)));
+    CHECK(tenriff::app::menu_songs::normalize_path_key(fs::u8path(direct)) ==
+          tenriff::app::menu_songs::normalize_path_key(fs::u8path(resolved)));
 }
 
 TEST_CASE("multiplayer cached chart paths cannot escape their loaded source") {

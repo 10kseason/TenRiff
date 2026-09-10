@@ -515,6 +515,9 @@ double sanitize_input_debounce_ms(double value, std::vector<std::string>& warnin
 }
 
 void apply_audio_preset(RuntimeConfig& config) {
+    // ASIO negotiates the saved frame count with the selected driver. WASAPI
+    // presets must not silently replace that choice when a profile is loaded.
+    if (config.audio.backend == audio::AudioBackend::ASIO) return;
     if (config.audio_ui.preset == "basic") {
         config.audio.frames_per_buffer = 256;
         config.audio.periods = 3;
@@ -539,6 +542,13 @@ std::string normalize_bms_keysound_policy(std::string value) {
 
 void apply_config_object(const JsonObject& root, RuntimeConfig& config) {
     if (auto* audio = get_object(root, "audio")) {
+        std::string backend = get_string(*audio, "backend",
+            config.audio.backend == audio::AudioBackend::ASIO ? "asio" : "wasapi");
+        std::transform(backend.begin(), backend.end(), backend.begin(), [](unsigned char c) {
+            return static_cast<char>(std::tolower(c));
+        });
+        config.audio.backend = backend == "asio" ? audio::AudioBackend::ASIO : audio::AudioBackend::WASAPI;
+        config.audio.asio_driver = get_string(*audio, "asio_driver", config.audio.asio_driver);
         config.audio.sample_rate = static_cast<uint32_t>(get_number(*audio, "rate", config.audio.sample_rate));
         config.audio.frames_per_buffer =
             static_cast<uint32_t>(get_number(*audio, "frames", config.audio.frames_per_buffer));
@@ -717,6 +727,8 @@ void apply_config_object(const JsonObject& root, RuntimeConfig& config) {
             get_bool(*ui, "show_cursor_in_gameplay", config.ui.show_cursor_in_gameplay);
         config.ui.active_song_source =
             get_string(*ui, "active_song_source", config.ui.active_song_source);
+        config.ui.song_sources_initialized =
+            get_bool(*ui, "song_sources_initialized", config.ui.song_sources_initialized);
         config.ui.session_mix_lr2_course_path =
             get_string(*ui, "session_mix_lr2_course_path", config.ui.session_mix_lr2_course_path);
         if (const auto* recent_sources = get_value(*ui, "recent_song_sources")) {
@@ -1044,6 +1056,9 @@ bool load_config_file(const std::filesystem::path& path,
 JsonValue build_json_root(const RuntimeConfig& config) {
     JsonObject root;
     JsonObject audio;
+    audio.emplace("backend", JsonValue{std::string(
+        config.audio.backend == audio::AudioBackend::ASIO ? "asio" : "wasapi")});
+    audio.emplace("asio_driver", JsonValue{config.audio.asio_driver});
     audio.emplace("rate", JsonValue{static_cast<double>(config.audio.sample_rate)});
     audio.emplace("frames", JsonValue{static_cast<double>(config.audio.frames_per_buffer)});
     audio.emplace("periods", JsonValue{static_cast<double>(config.audio.periods)});
@@ -1181,6 +1196,7 @@ JsonValue build_json_root(const RuntimeConfig& config) {
     ui.emplace("require_enter_to_exit", JsonValue{config.ui.require_enter_to_exit});
     ui.emplace("show_cursor_in_gameplay", JsonValue{config.ui.show_cursor_in_gameplay});
     ui.emplace("active_song_source", JsonValue{config.ui.active_song_source});
+    ui.emplace("song_sources_initialized", JsonValue{config.ui.song_sources_initialized});
     ui.emplace("session_mix_lr2_course_path", JsonValue{config.ui.session_mix_lr2_course_path});
     JsonArray recent_song_sources;
     recent_song_sources.reserve(config.ui.recent_song_sources.size());
@@ -2052,7 +2068,7 @@ ConfigLoadResult ConfigLoader::load_profile(std::string_view profile_dir) const 
         return result;
     }
 
-    std::filesystem::path profile_path(profile_dir);
+    auto profile_path = std::filesystem::u8path(profile_dir);
     profile_path /= "config.json";
     if (!load_config_file(profile_path, result.config, result.error, result.warnings, true)) {
         if (!result.error.empty()) {
@@ -2076,7 +2092,7 @@ ConfigLoadResult ConfigLoader::load_profile(std::string_view profile_dir) const 
 }
 
 bool ConfigLoader::save_profile(std::string_view profile_dir, const RuntimeConfig& config, std::string* error) const {
-    std::filesystem::path path(profile_dir);
+    auto path = std::filesystem::u8path(profile_dir);
     std::filesystem::create_directories(path);
     path /= "config.json";
 
@@ -2107,6 +2123,30 @@ bool ConfigLoader::save_global(const RuntimeConfig& config, std::string* error) 
     }
 
     out << json_stringify(root_value, 2);
+    return true;
+}
+
+std::string serialize_skin_config(const SkinConfig& skin) {
+    RuntimeConfig config;
+    config.skin = skin;
+    sanitize_skin_config(config.skin);
+    const JsonValue root = build_json_root(config);
+    return json_stringify(root.as_object()->at("skin"), 2);
+}
+
+bool deserialize_skin_config(std::string_view json, SkinConfig& skin, std::string* error) {
+    const auto parsed = parse_json(json);
+    if (!parsed.success() || !parsed.root->is_object()) {
+        if (error) *error = parsed.success() ? "Skin settings must be a JSON object." : parsed.error;
+        return false;
+    }
+    RuntimeConfig config;
+    JsonObject root;
+    root.emplace("skin", *parsed.root);
+    apply_config_object(root, config);
+    sanitize_skin_config(config.skin);
+    skin = std::move(config.skin);
+    if (error) error->clear();
     return true;
 }
 

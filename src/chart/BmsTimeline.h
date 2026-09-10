@@ -23,6 +23,9 @@ struct BmsScrollSegment {
 
 struct BmsTimeline {
     int64_t duration_samples = 0;
+    // Tempo with the longest accumulated running time (STOP waits excluded).
+    // Kept separate from the initial BPM used to schedule the chart.
+    double reference_bpm = 0.0;
     std::vector<BmsScheduledEvent> events;
     std::vector<BmsScrollSegment> scroll_segments;
 };

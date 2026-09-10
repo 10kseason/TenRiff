@@ -3,6 +3,11 @@
 #include <array>
 #include <cstdint>
 #include <limits>
+#include <memory>
+
+#ifdef _WIN32
+#include "app/MenuApp.h"
+#endif
 
 #include "app/menu/MenuAction.h"
 #include "app/menu/settings/AudioSettingsController.h"
@@ -38,6 +43,37 @@ void check_no_effects(const MenuEffectFlags& effects) {
 
 }  // namespace
 
+#ifdef _WIN32
+namespace tenriff::app {
+
+struct MenuAppAudioSettingsTestAccess {
+    static render::MenuRenderData build_render_rows() {
+        auto menu = std::make_unique<MenuApp>();
+        menu->config_.audio.backend = audio::AudioBackend::ASIO;
+        // Populate uses the injected list instead of consulting machine drivers.
+        menu->audio_settings_controller_.set_asio_drivers({{"fake-driver", "Test Device"}});
+        render::MenuRenderData render;
+        menu->populate_audio_settings_render_data(render);
+        return render;
+    }
+};
+
+}  // namespace tenriff::app
+
+TEST_CASE("rendered audio row hit indices decode to the same settings as keyboard navigation") {
+    const auto render = tenriff::app::MenuAppAudioSettingsTestAccess::build_render_rows();
+    using namespace tenriff::app::menu::settings;
+    REQUIRE(render.generic.rows.size() == kAudioSettingOrder.size());
+    for (std::size_t index = 0; index < render.generic.rows.size(); ++index) {
+        const auto& row = render.generic.rows[index];
+        REQUIRE(row.row_index >= 0);
+        const auto click_target = audio_setting_id_at(static_cast<std::size_t>(row.row_index));
+        REQUIRE(click_target.has_value());
+        CHECK(*click_target == kAudioSettingOrder[index]);
+    }
+}
+#endif
+
 TEST_CASE("audio setting identifiers and ranges are stable") {
     using tenriff::app::menu::settings::audio_setting_id_at;
     using tenriff::app::menu::settings::audio_setting_index;
@@ -52,6 +88,11 @@ TEST_CASE("audio setting identifiers and ranges are stable") {
     static_assert(static_cast<std::uint8_t>(AudioSettingId::KeysoundVolume) == 5);
     static_assert(static_cast<std::uint8_t>(AudioSettingId::SoundOffset) == 6);
     static_assert(static_cast<std::uint8_t>(AudioSettingId::Back) == 7);
+    static_assert(static_cast<std::uint8_t>(AudioSettingId::Normalize) == 8);
+    static_assert(static_cast<std::uint8_t>(AudioSettingId::Backend) == 9);
+    static_assert(static_cast<std::uint8_t>(AudioSettingId::AsioDriver) == 10);
+    static_assert(static_cast<std::uint8_t>(AudioSettingId::SampleRate) == 11);
+    static_assert(static_cast<std::uint8_t>(AudioSettingId::BufferFrames) == 12);
 
     for (std::size_t index = 0; index < kAudioSettingOrder.size(); ++index) {
         REQUIRE(audio_setting_index(kAudioSettingOrder[index]).has_value());
@@ -290,10 +331,10 @@ TEST_CASE("audio settings view preserves rows values and localization") {
     static_cast<void>(controller.select(AudioSettingId::BgmVolume));
 
     const auto english = AudioSettingsView::build(controller, runtime, false);
-    REQUIRE(english.rows.size() == 9);
-    REQUIRE(english.notes.size() == 6);
+    REQUIRE(english.rows.size() == 13);
+    REQUIRE(english.notes.size() == 7);
 
-    const std::array<const char*, 9> english_labels{
+    const std::array<const char*, 13> english_labels{
         "Preset",
         "Keysound Mode",
         "Background Sound",
@@ -302,9 +343,13 @@ TEST_CASE("audio settings view preserves rows values and localization") {
         "Keysound Volume",
         "Sound Offset",
         "Normalize Audio",
+        "Audio Backend",
+        "ASIO Driver",
+        "ASIO Sample Rate",
+        "ASIO Buffer",
         "Back",
     };
-    const std::array<const char*, 9> english_values{
+    const std::array<const char*, 13> english_values{
         "High",
         "Follow",
         "On",
@@ -313,9 +358,13 @@ TEST_CASE("audio settings view preserves rows values and localization") {
         "100%",
         "+0.0 ms",
         "Off",
+        "WASAPI",
+        "No 64-bit ASIO driver",
+        "44100 Hz",
+        "128 frames",
         "",
     };
-    const std::array<SettingsRowKind, 9> row_kinds{
+    const std::array<SettingsRowKind, 13> row_kinds{
         SettingsRowKind::Choice,
         SettingsRowKind::Choice,
         SettingsRowKind::Toggle,
@@ -324,6 +373,10 @@ TEST_CASE("audio settings view preserves rows values and localization") {
         SettingsRowKind::Slider,
         SettingsRowKind::Numeric,
         SettingsRowKind::Toggle,
+        SettingsRowKind::Choice,
+        SettingsRowKind::Choice,
+        SettingsRowKind::Choice,
+        SettingsRowKind::Choice,
         SettingsRowKind::Action,
     };
     for (std::size_t index = 0; index < english.rows.size(); ++index) {
@@ -342,13 +395,19 @@ TEST_CASE("audio settings view preserves rows values and localization") {
     CHECK(*english.rows[4].slider_ratio == doctest::Approx(0.375));
     CHECK(*english.rows[5].slider_ratio == doctest::Approx(0.5));
     CHECK(english.rows[6].numeric_range.has_value());
+    CHECK(english.rows[12].activatable);
+    CHECK_FALSE(english.rows[12].adjustable);
     CHECK(english.rows[8].activatable);
-    CHECK_FALSE(english.rows[8].adjustable);
+    CHECK(english.rows[8].adjustable);
+    for (std::size_t index = 9; index <= 11; ++index) {
+        CHECK_FALSE(english.rows[index].activatable);
+        CHECK_FALSE(english.rows[index].adjustable);
+    }
     CHECK(english.notes[1] ==
           "Follow: note hits trigger keysounds. Autoplay: note keysounds are mixed into background audio.");
 
     const auto korean = AudioSettingsView::build(controller, runtime, true);
-    REQUIRE(korean.rows.size() == 9);
+    REQUIRE(korean.rows.size() == 13);
     CHECK(korean.rows[0].label == "프리셋");
     CHECK(korean.rows[0].value == "고성능");
     CHECK(korean.rows[1].label == "키음 모드");
@@ -360,6 +419,12 @@ TEST_CASE("audio settings view preserves rows values and localization") {
     CHECK(korean.rows[5].label == "키음 볼륨");
     CHECK(korean.rows[6].label == "사운드 오프셋");
     CHECK(korean.rows[7].label == "오디오 노멀라이즈");
+    CHECK(korean.rows[8].label == "오디오 출력 방식");
+    CHECK(korean.rows[9].label == "ASIO 드라이버");
+    CHECK(korean.rows[9].value == "64비트 ASIO 드라이버 없음");
+    CHECK(korean.rows[10].label == "ASIO 샘플레이트");
+    CHECK(korean.rows[11].label == "ASIO 버퍼");
+    CHECK(korean.rows[12].label == "뒤로");
     CHECK(korean.notes.back() ==
           "좌우 키나 볼륨 슬라이더를 클릭해 변경합니다. 뒤로 가면 저장 후 돌아갑니다.");
 }
@@ -374,4 +439,171 @@ TEST_CASE("audio normalization toggles through keyboard and pointer then persist
     CHECK(leave.persist_config);
     (void)controller.handle(MenuAction::activate(), runtime, AudioSettingId::Normalize);
     CHECK_FALSE(runtime.audio_ui.normalize_audio);
+}
+
+TEST_CASE("ASIO driver choices cycle through automatic and installed IDs and apply only on Back") {
+    tenriff::config::RuntimeConfig runtime;
+    runtime.audio.backend = tenriff::audio::AudioBackend::ASIO;
+    AudioSettingsController controller;
+    const std::string first = "{11111111-1111-1111-1111-111111111111}";
+    const std::string second = "{22222222-2222-2222-2222-222222222222}";
+    controller.set_asio_drivers({{first, "Interface A"}, {second, "Interface B"}});
+    REQUIRE(controller.asio_drivers_loaded());
+    static_cast<void>(controller.select(AudioSettingId::AsioDriver));
+    auto view = AudioSettingsView::build(controller, runtime, false);
+    CHECK(view.rows[9].value == "Automatic");
+    CHECK(view.rows[9].activatable);
+    CHECK(view.rows[9].adjustable);
+    CHECK_FALSE(view.rows[0].adjustable);
+
+    check_render_only(controller.handle(MenuAction::adjust(1), runtime));
+    CHECK(runtime.audio.asio_driver == first);
+    check_render_only(controller.handle(MenuAction::activate(), runtime));
+    CHECK(runtime.audio.asio_driver == second);
+    view = AudioSettingsView::build(controller, runtime, false);
+    CHECK(view.rows[9].value == "Interface B");
+    check_render_only(controller.handle(MenuAction::adjust(1), runtime));
+    CHECK(runtime.audio.asio_driver.empty());
+    check_render_only(controller.handle(MenuAction::adjust(-1), runtime));
+    CHECK(runtime.audio.asio_driver == second);
+    check_render_only(controller.handle(MenuAction::adjust(-1), runtime));
+    CHECK(runtime.audio.asio_driver == first);
+    check_render_only(controller.handle(MenuAction::adjust(-1), runtime));
+    CHECK(runtime.audio.asio_driver.empty());
+    REQUIRE(controller.dirty());
+
+    const auto save = controller.handle(MenuAction::activate(), runtime, AudioSettingId::Back);
+    CHECK(save.persist_config);
+    CHECK(save.restart_audio);
+    CHECK(save.navigate_back);
+    CHECK_FALSE(controller.dirty());
+    const auto clean_back = controller.handle(MenuAction::back(), runtime);
+    CHECK_FALSE(clean_back.persist_config);
+    CHECK_FALSE(clean_back.restart_audio);
+}
+
+TEST_CASE("ASIO driver discovery and unavailable drivers do not discard the saved selection") {
+    tenriff::config::RuntimeConfig runtime;
+    runtime.audio.backend = tenriff::audio::AudioBackend::ASIO;
+    runtime.audio.asio_driver = "{33333333-3333-3333-3333-333333333333}";
+    const auto saved_driver = runtime.audio.asio_driver;
+    AudioSettingsController controller;
+    static_cast<void>(controller.select(AudioSettingId::AsioDriver));
+    controller.set_asio_drivers({});
+    check_no_effects(controller.handle(MenuAction::adjust(1), runtime));
+    check_no_effects(controller.handle(MenuAction::adjust(-1), runtime));
+    check_no_effects(controller.handle(MenuAction::activate(), runtime));
+    CHECK(runtime.audio.asio_driver == saved_driver);
+    CHECK_FALSE(controller.dirty());
+    auto view = AudioSettingsView::build(controller, runtime, false);
+    CHECK(view.rows[9].value == "No 64-bit ASIO driver");
+    CHECK_FALSE(view.rows[9].activatable);
+    CHECK_FALSE(view.rows[9].adjustable);
+
+    controller.set_asio_drivers({{"{11111111-1111-1111-1111-111111111111}", "Another Device"}});
+    view = AudioSettingsView::build(controller, runtime, false);
+    CHECK(view.rows[9].value == "Saved driver unavailable");
+    CHECK(runtime.audio.asio_driver == saved_driver);
+    CHECK_FALSE(controller.dirty());
+    controller.set_asio_drivers({{saved_driver, "Reconnected Device"}});
+    view = AudioSettingsView::build(controller, runtime, true);
+    CHECK(view.rows[9].value == "Reconnected Device");
+    CHECK(runtime.audio.asio_driver == saved_driver);
+    CHECK_FALSE(controller.dirty());
+}
+
+TEST_CASE("audio backend changes retain the selected driver and restore the WASAPI preset") {
+    for (const std::string preset : {"basic", "high"}) {
+        tenriff::config::RuntimeConfig runtime;
+        runtime.audio_ui.preset = preset;
+        runtime.audio.asio_driver = "{11111111-1111-1111-1111-111111111111}";
+        runtime.audio.sample_rate = 96000;
+        runtime.audio.frames_per_buffer = 64;
+        runtime.audio.periods = 2;
+        runtime.audio.exclusive_mode = false;
+        AudioSettingsController controller;
+        static_cast<void>(controller.select(AudioSettingId::Backend));
+        check_render_only(controller.handle(MenuAction::adjust(1), runtime));
+        CHECK(runtime.audio.backend == tenriff::audio::AudioBackend::ASIO);
+        CHECK(runtime.audio.frames_per_buffer == 64);
+        CHECK(runtime.audio.periods == 2);
+        check_render_only(controller.handle(MenuAction::activate(), runtime));
+        CHECK(runtime.audio.backend == tenriff::audio::AudioBackend::WASAPI);
+        CHECK(runtime.audio.frames_per_buffer == (preset == "basic" ? 256 : 320));
+        CHECK(runtime.audio.periods == 3);
+        CHECK(runtime.audio.sample_rate == 96000);
+        CHECK(runtime.audio.asio_driver == "{11111111-1111-1111-1111-111111111111}");
+        CHECK_FALSE(runtime.audio.exclusive_mode);
+    }
+}
+
+TEST_CASE("ASIO sample rates and frame counts cycle with wraparound and accept non-preset starting values") {
+    tenriff::config::RuntimeConfig runtime;
+    runtime.audio.backend = tenriff::audio::AudioBackend::ASIO;
+    AudioSettingsController controller;
+    static_cast<void>(controller.select(AudioSettingId::SampleRate));
+    check_no_effects(controller.handle(MenuAction::adjust(0), runtime));
+    CHECK_FALSE(controller.dirty());
+    runtime.audio.sample_rate = 44100;
+    check_render_only(controller.handle(MenuAction::adjust(-1), runtime));
+    CHECK(runtime.audio.sample_rate == 192000);
+    check_render_only(controller.handle(MenuAction::activate(), runtime));
+    CHECK(runtime.audio.sample_rate == 44100);
+    check_render_only(controller.handle(MenuAction::adjust(1), runtime));
+    CHECK(runtime.audio.sample_rate == 48000);
+    runtime.audio.sample_rate = 50000;
+    check_render_only(controller.handle(MenuAction::adjust(1), runtime));
+    CHECK(runtime.audio.sample_rate == 88200);
+    runtime.audio.sample_rate = 50000;
+    check_render_only(controller.handle(MenuAction::adjust(-1), runtime));
+    CHECK(runtime.audio.sample_rate == 48000);
+
+    static_cast<void>(controller.select(AudioSettingId::BufferFrames));
+    runtime.audio.frames_per_buffer = 32;
+    check_render_only(controller.handle(MenuAction::adjust(-1), runtime));
+    CHECK(runtime.audio.frames_per_buffer == 2048);
+    check_render_only(controller.handle(MenuAction::activate(), runtime));
+    CHECK(runtime.audio.frames_per_buffer == 32);
+    runtime.audio.frames_per_buffer = 320;
+    check_render_only(controller.handle(MenuAction::adjust(1), runtime));
+    CHECK(runtime.audio.frames_per_buffer == 512);
+    runtime.audio.frames_per_buffer = 320;
+    check_render_only(controller.handle(MenuAction::adjust(-1), runtime));
+    CHECK(runtime.audio.frames_per_buffer == 256);
+    const auto view = AudioSettingsView::build(controller, runtime, false);
+    CHECK(view.rows[10].value == "48000 Hz");
+    CHECK(view.rows[11].value == "256 frames");
+    for (std::size_t index = 10; index <= 11; ++index) {
+        CHECK(view.rows[index].activatable);
+        CHECK(view.rows[index].adjustable);
+    }
+}
+
+TEST_CASE("disabled audio backend controls cannot change the saved device or buffer configuration") {
+    tenriff::config::RuntimeConfig runtime;
+    runtime.audio.backend = tenriff::audio::AudioBackend::ASIO;
+    runtime.audio_ui.preset = "high";
+    runtime.audio.frames_per_buffer = 64;
+    runtime.audio.sample_rate = 96000;
+    runtime.audio.asio_driver = "saved-device";
+    AudioSettingsController controller;
+    controller.set_asio_drivers({{"another-device", "Another Device"}});
+    static_cast<void>(controller.select(AudioSettingId::Preset));
+    check_no_effects(controller.handle(MenuAction::adjust(1), runtime));
+    check_no_effects(controller.handle(MenuAction::adjust(-1), runtime));
+    check_no_effects(controller.handle(MenuAction::activate(), runtime));
+    CHECK(runtime.audio_ui.preset == "high");
+    CHECK(runtime.audio.frames_per_buffer == 64);
+
+    runtime.audio.backend = tenriff::audio::AudioBackend::WASAPI;
+    for (const auto id : {AudioSettingId::AsioDriver, AudioSettingId::SampleRate, AudioSettingId::BufferFrames}) {
+        static_cast<void>(controller.select(id));
+        check_no_effects(controller.handle(MenuAction::adjust(1), runtime));
+        check_no_effects(controller.handle(MenuAction::adjust(-1), runtime));
+        check_no_effects(controller.handle(MenuAction::activate(), runtime));
+    }
+    CHECK(runtime.audio.asio_driver == "saved-device");
+    CHECK(runtime.audio.sample_rate == 96000);
+    CHECK(runtime.audio.frames_per_buffer == 64);
+    CHECK_FALSE(controller.dirty());
 }

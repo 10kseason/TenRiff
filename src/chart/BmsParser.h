@@ -52,6 +52,8 @@ struct BmsChart {
     std::unordered_map<std::string, double> stop;
     std::unordered_map<std::string, double> scroll;
     double base_bpm = 0.0;
+    // Preserve the chart extent even when indexing discards BGM/media payloads.
+    int last_measure_index = 0;
     int declared_key_count = 0;
     std::string layout_label;
     std::vector<BmsMeasureCommand> commands;

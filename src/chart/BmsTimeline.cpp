@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <map>
 #include <utility>
 
 namespace tenriff::chart {
@@ -62,6 +63,20 @@ BmsTimelineResult BmsTimelineBuilder::build(const BmsNormalizedChart& chart, int
     double current_scroll = 1.0;
     double current_visual_position = 0.0;
 
+    struct BpmDuration {
+        double seconds = 0.0;
+        std::size_t first_interval = 0;
+    };
+    std::map<double, BpmDuration> bpm_durations;
+    const auto record_running_time = [&](double bpm, double seconds) {
+        if (!std::isfinite(seconds) || seconds <= 0.0) {
+            return;
+        }
+        const auto inserted = bpm_durations.try_emplace(
+            bpm, BpmDuration{0.0, bpm_durations.size()});
+        inserted.first->second.seconds += seconds;
+    };
+
     auto append_scroll_segment = [&](double start_sample,
                                      double end_sample,
                                      double start_position,
@@ -99,6 +114,7 @@ BmsTimelineResult BmsTimelineBuilder::build(const BmsNormalizedChart& chart, int
                 break;
             }
             double delta_time_seconds = seconds_from_position_delta(delta_position, current_bpm);
+            record_running_time(current_bpm, delta_time_seconds);
             const double segment_start_sample = current_time_samples;
             const double segment_start_position = current_visual_position;
             current_time_samples += delta_time_seconds * sample_rate;
@@ -186,6 +202,7 @@ BmsTimelineResult BmsTimelineBuilder::build(const BmsNormalizedChart& chart, int
                         "Cannot determine chart duration because BPM is not positive.");
         } else {
             double delta_time_seconds = seconds_from_position_delta(remaining, current_bpm);
+            record_running_time(current_bpm, delta_time_seconds);
             const double segment_start_sample = current_time_samples;
             const double segment_start_position = current_visual_position;
             current_time_samples += delta_time_seconds * sample_rate;
@@ -197,6 +214,23 @@ BmsTimelineResult BmsTimelineBuilder::build(const BmsNormalizedChart& chart, int
     }
 
     result.timeline.duration_samples = static_cast<int64_t>(std::llround(current_time_samples));
+    // Aggregate before sample rounding so 1 kHz indexing and audio-rate loading
+    // choose the same tempo. Repeated sections add together; frozen STOP time
+    // never counts. Exact duration ties keep the first tempo actually used.
+    if (result.success()) {
+        result.timeline.reference_bpm =
+            std::isfinite(chart.base_bpm) && chart.base_bpm > 0.0 ? chart.base_bpm : 0.0;
+        const BpmDuration* longest = nullptr;
+        for (const auto& [bpm, duration] : bpm_durations) {
+            constexpr double kDurationTieTolerance = 1e-9;
+            if (longest == nullptr || duration.seconds > longest->seconds + kDurationTieTolerance ||
+                (std::abs(duration.seconds - longest->seconds) <= kDurationTieTolerance &&
+                 duration.first_interval < longest->first_interval)) {
+                longest = &duration;
+                result.timeline.reference_bpm = bpm;
+            }
+        }
+    }
     return result;
 }
 

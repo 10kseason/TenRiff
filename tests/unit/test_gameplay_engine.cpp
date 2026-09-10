@@ -51,7 +51,7 @@ TEST_CASE("gameplay engine accepts a carried course gauge value") {
     config.sample_rate = 1000;
     config.initial_gauge = tenriff::game::GaugeType::Normal;
     config.initial_gauge_value = 37.5;
-    config.gauge_policy.course_hybrid_deltas = true;
+    config.gauge_policy.course_lr2_deltas = true;
 
     GameplayEngine engine(chart, config);
     CHECK(engine.gauge_state().type == tenriff::game::GaugeType::Normal);
@@ -1562,4 +1562,142 @@ TEST_CASE("gameplay replay samples stay monotonic when realtime mapping regresse
     CHECK(events[0].sample == 1000);
     CHECK(events[1].sample == 1000);
     CHECK(events[2].sample == 1000);
+}
+
+namespace {
+GameplayConfig lr2_course_test_config(double initial = 50.0) {
+    GameplayConfig config;
+    config.sample_rate = 1000;
+    config.initial_gauge_value = initial;
+    config.gauge_policy.course_lr2_deltas = true;
+    config.judge.pg_ms = 10.0;
+    config.judge.gr_ms = 20.0;
+    config.judge.gd_ms = 40.0;
+    config.judge.bd_ms = 80.0;
+    config.judge.indirect_miss_ms = 210.0;
+    config.judge.indirect_miss_enabled = false; // Course must retain missed-note POOR.
+    return config;
+}
+}
+
+TEST_CASE("LR2 course gauge preserves missed and empty poor as distinct damage events") {
+    GameplayChart chart;
+    chart.lane_count = 1;
+    chart.duration_samples = 4000;
+    chart.notes = {NoteEvent{1, 1000}, NoteEvent{1, 2000}, NoteEvent{1, 3000}};
+    auto config = lr2_course_test_config();
+    config.gauge_shift_enabled = true; // Course policy always disables parallel tiers.
+    GameplayEngine engine(chart, config);
+    REQUIRE(engine.handle_input(1, InputState::Pressed, 1000).has_value());
+    (void)engine.handle_input(1, InputState::Released, 1001);
+    CHECK(engine.gauge_state().value == doctest::Approx(50.1));
+    (void)engine.handle_input(1, InputState::Pressed, 1500);
+    CHECK(engine.gauge_state().value == doctest::Approx(48.1));
+    CHECK(engine.stats().combo == 1);
+    engine.advance(2211);
+    CHECK(engine.gauge_state().value == doctest::Approx(45.1));
+    CHECK(engine.stats().counts.pr == 2);
+    CHECK(engine.stats().counts.bd == 0);
+    CHECK(engine.stats().combo == 0);
+    CHECK(engine.stats().shifts.empty());
+}
+
+TEST_CASE("LR2 course gauge carries exact HP between stages and keeps failed carry dead") {
+    GameplayChart chart;
+    chart.lane_count = 1;
+    chart.duration_samples = 2000;
+    chart.notes = {NoteEvent{1, 1000}};
+    auto first_config = lr2_course_test_config(31.9);
+    GameplayEngine first(chart, first_config);
+    first.advance(1211);
+    REQUIRE_FALSE(first.is_game_over());
+    CHECK(first.gauge_state().value == doctest::Approx(30.1));
+    auto second_config = lr2_course_test_config(first.gauge_state().value);
+    GameplayEngine second(chart, second_config);
+    CHECK(second.gauge_state().value == first.gauge_state().value);
+    (void)second.handle_input(1, InputState::Pressed, 1000);
+    CHECK(second.gauge_state().value == doctest::Approx(30.2));
+    GameplayEngine minimum(chart, lr2_course_test_config(2.0));
+    CHECK_FALSE(minimum.is_game_over());
+    GameplayEngine dead(chart, lr2_course_test_config(1.99));
+    CHECK(dead.is_game_over());
+    CHECK_FALSE(dead.handle_input(1, InputState::Pressed, 1000).has_value());
+    CHECK(dead.gauge_state().value == doctest::Approx(1.99));
+}
+
+TEST_CASE("LR2 course normal LN gauge waits for completion and uses the head judgement once") {
+    GameplayChart chart;
+    chart.lane_count = 1;
+    chart.duration_samples = 3000;
+    chart.notes = {NoteEvent{1, 1000, 2000}};
+    for (int delta : {0, 15, 30, 60}) {
+        GameplayEngine engine(chart, lr2_course_test_config());
+        REQUIRE(engine.handle_input(1, InputState::Pressed, 1000 + delta).has_value());
+        CHECK(engine.gauge_state().value == doctest::Approx(50.0));
+        engine.advance(2000);
+        const double outcome = delta <= 20 ? 0.1 : (delta <= 40 ? 0.04 : -2.0);
+        CHECK(engine.gauge_state().value == doctest::Approx(50.0 + outcome));
+        engine.advance(2500);
+        CHECK(engine.gauge_state().value == doctest::Approx(50.0 + outcome));
+        CHECK(engine.stats().total_notes == 1);
+        CHECK(engine.stats().total_combo_steps == 2); // Native score still counts head/tail.
+    }
+}
+
+TEST_CASE("LR2 course LN early release damages once and regrab cannot refund it") {
+    GameplayChart chart;
+    chart.lane_count = 1;
+    chart.duration_samples = 3000;
+    chart.notes = {NoteEvent{1, 1000, 2000}};
+    GameplayEngine engine(chart, lr2_course_test_config(31.9));
+    (void)engine.handle_input(1, InputState::Pressed, 1000);
+    (void)engine.handle_input(1, InputState::Released, 1500);
+    CHECK(engine.gauge_state().value == doctest::Approx(30.7));
+    (void)engine.handle_input(1, InputState::Pressed, 1510);
+    engine.advance(2000);
+    CHECK(engine.gauge_state().value == doctest::Approx(30.7));
+    GameplayEngine fatal(chart, lr2_course_test_config(3.19));
+    (void)fatal.handle_input(1, InputState::Pressed, 1000);
+    (void)fatal.handle_input(1, InputState::Released, 1500);
+    CHECK(fatal.is_game_over());
+    CHECK(fatal.gauge_state().value == doctest::Approx(1.99));
+}
+
+TEST_CASE("LR2 course LN release at the GOOD grace boundary retains the head judgement") {
+    GameplayChart chart;
+    chart.lane_count = 1;
+    chart.duration_samples = 3000;
+    chart.notes = {NoteEvent{1, 1000, 2000}};
+    GameplayEngine engine(chart, lr2_course_test_config());
+    (void)engine.handle_input(1, InputState::Pressed, 1015);
+    (void)engine.handle_input(1, InputState::Released, 1960);
+    CHECK(engine.gauge_state().value == doctest::Approx(50.1));
+    engine.advance(2000);
+    CHECK(engine.gauge_state().value == doctest::Approx(50.1));
+}
+
+TEST_CASE("LR2 course missed LN consumes one full poor and never earns a tail recovery") {
+    GameplayChart chart;
+    chart.lane_count = 1;
+    chart.duration_samples = 3000;
+    chart.notes = {NoteEvent{1, 1000, 2000}};
+    GameplayEngine engine(chart, lr2_course_test_config());
+    engine.advance(1211);
+    CHECK(engine.gauge_state().value == doctest::Approx(47.0));
+    CHECK(engine.stats().counts.pr == 1);
+    engine.advance(2500);
+    CHECK(engine.gauge_state().value == doctest::Approx(47.0));
+}
+
+TEST_CASE("LR2 course charge notes retain TenRiff split head and release gauge weights") {
+    GameplayChart chart;
+    chart.lane_count = 1;
+    chart.duration_samples = 3000;
+    chart.notes = {NoteEvent{1, 1000, 2000, true}};
+    GameplayEngine engine(chart, lr2_course_test_config());
+    (void)engine.handle_input(1, InputState::Pressed, 1000);
+    CHECK(engine.gauge_state().value == doctest::Approx(50.05));
+    (void)engine.handle_input(1, InputState::Released, 2030);
+    engine.advance(2030);
+    CHECK(engine.gauge_state().value == doctest::Approx(50.07));
 }

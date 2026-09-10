@@ -211,26 +211,30 @@ TEST_CASE("threshold runtime policy carries value through Hard Normal and Easy w
     CHECK(state.value == doctest::Approx(30.0));
 }
 
-TEST_CASE("course hybrid gauge uses midway Normal-Hard recovery and Easy damage") {
+TEST_CASE("LR2 course gauge uses beta3 grade deltas independently of configured gauges") {
     GaugeRuntimePolicy policy;
-    policy.course_hybrid_deltas = true;
-    GaugeManager manager({}, policy);
+    policy.course_lr2_deltas = true;
+    tenriff::game::GaugeConfig config;
+    config.normal = {9.0, 9.0, 9.0, -99.0, -99.0};
+    GaugeManager manager(config, policy);
     GaugeState state{GaugeType::Normal, 50.0, false};
 
     manager.applyJudgement(state, Judgement::PG, 0.0);
-    CHECK(state.value == doctest::Approx(50.175));
+    CHECK(state.value == doctest::Approx(50.1));
     manager.applyJudgement(state, Judgement::GR, 1.0);
-    CHECK(state.value == doctest::Approx(50.295));
+    CHECK(state.value == doctest::Approx(50.2));
     manager.applyJudgement(state, Judgement::GD, 2.0);
-    CHECK(state.value == doctest::Approx(50.305));
+    CHECK(state.value == doctest::Approx(50.24));
     manager.applyJudgement(state, Judgement::BD, 3.0);
-    CHECK(state.value == doctest::Approx(46.205));
+    CHECK(state.value == doctest::Approx(48.24));
     manager.applyJudgement(state, Judgement::PR, 4.0);
-    CHECK(state.value == doctest::Approx(44.605));
+    CHECK(state.value == doctest::Approx(45.24));
+    manager.applyJudgementWeighted(state, Judgement::PR, 5.0, 1.0, true);
+    CHECK(state.value == doctest::Approx(43.24));
     CHECK(state.type == GaugeType::Normal);
 }
 
-TEST_CASE("course hybrid policy does not change ordinary Normal gauge") {
+TEST_CASE("LR2 course policy does not change ordinary Normal gauge") {
     GaugeManager manager;
     GaugeState state{GaugeType::Normal, 50.0, false};
 
@@ -238,6 +242,55 @@ TEST_CASE("course hybrid policy does not change ordinary Normal gauge") {
     manager.applyJudgement(state, Judgement::BD, 1.0);
 
     CHECK(state.value == doctest::Approx(43.94));
+}
+
+TEST_CASE("LR2 course low gauge damage uses the displayed thirty-percent cell boundary") {
+    GaugeRuntimePolicy policy;
+    policy.course_lr2_deltas = true;
+    GaugeManager manager({}, policy);
+    for (double initial : {29.9, 30.0, 31.999, 32.0, 32.001}) {
+        const double scale = initial < 32.0 ? 0.6 : 1.0;
+        GaugeState bad{GaugeType::Normal, initial, false};
+        manager.applyJudgement(bad, Judgement::BD, 0.0);
+        CHECK(bad.value == doctest::Approx(initial - 2.0 * scale));
+        GaugeState missed{GaugeType::Normal, initial, false};
+        manager.applyJudgement(missed, Judgement::PR, 0.0);
+        CHECK(missed.value == doctest::Approx(initial - 3.0 * scale));
+        GaugeState empty{GaugeType::Normal, initial, false};
+        manager.applyJudgementWeighted(empty, Judgement::PR, 0.0, 1.0, true);
+        CHECK(empty.value == doctest::Approx(initial - 2.0 * scale));
+    }
+    GaugeState crosses{GaugeType::Normal, 33.0, false};
+    manager.applyJudgement(crosses, Judgement::PR, 0.0);
+    CHECK(crosses.value == doctest::Approx(30.0));
+    manager.applyJudgement(crosses, Judgement::PR, 1.0);
+    CHECK(crosses.value == doctest::Approx(28.2));
+}
+
+TEST_CASE("LR2 course starts full and fails below two percent without revival or downshift") {
+    GaugeRuntimePolicy policy;
+    policy.course_lr2_deltas = true;
+    policy.normal_to_easy_shift = true; // Course survival must take precedence.
+    GaugeManager manager({}, policy);
+    auto full = manager.initialState(GaugeType::Normal);
+    CHECK(full.value == 100.0);
+    manager.applyJudgement(full, Judgement::PG, 0.0);
+    CHECK(full.value == 100.0);
+    GaugeState boundary{GaugeType::Normal, 2.0, false};
+    CHECK_FALSE(manager.isFailedValue(boundary.value));
+    manager.applyJudgement(boundary, Judgement::PG, 0.0);
+    CHECK(boundary.value == doctest::Approx(2.1));
+    GaugeState failed{GaugeType::Normal, 3.19, false};
+    const auto result = manager.applyJudgement(failed, Judgement::BD, 0.0);
+    CHECK(result.game_over);
+    CHECK_FALSE(result.downshifted);
+    CHECK(failed.value == doctest::Approx(1.99));
+    manager.applyJudgement(failed, Judgement::PG, 1.0);
+    CHECK(failed.value == doctest::Approx(1.99));
+    CHECK(failed.type == GaugeType::Normal);
+    GaugeState stale{GaugeType::Normal, 1.99, false};
+    CHECK(manager.applyJudgement(stale, Judgement::PG, 0.0).game_over);
+    CHECK(stale.value == doctest::Approx(1.99));
 }
 TEST_CASE("normal gauge remains fixed when the runtime shift policy is disabled") {
     GaugeManager manager;

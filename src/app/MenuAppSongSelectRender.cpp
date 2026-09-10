@@ -1,5 +1,6 @@
 #include "app/MenuApp.h"
 #include "app/DifficultyTable.h"
+#include "config/BuiltinDifficultyTables.h"
 
 #include <algorithm>
 #include <cmath>
@@ -66,6 +67,9 @@ std::string song_group_section_label(MenuApp::SongGroupMode mode, const SongEntr
 
 std::string MenuApp::difficulty_table_display_name() {
     if (config_.ui.difficulty_table_path.empty()) return ui_text("Native LV", "기본 LV");
+    if (const auto* builtin = config::builtin_difficulty_table(config_.ui.difficulty_table_url)) {
+        return ui_text(builtin->name_en, builtin->name_ko);
+    }
     // Cache table metadata outside the renderer; never load a table for each frame.
     if (difficulty_table_display_path_ != config_.ui.difficulty_table_path) {
         difficulty_table_display_path_ = config_.ui.difficulty_table_path;

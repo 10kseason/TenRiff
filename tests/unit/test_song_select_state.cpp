@@ -1,12 +1,16 @@
 #include "doctest/doctest.h"
 
 #include <algorithm>
+#include <chrono>
+#include <filesystem>
+#include <fstream>
 #include <unordered_map>
 #include <vector>
 
 #include "app/SongIndex.h"
 #include "app/MenuAppSongSelectUtils.h"
 #include "app/SongSelectState.h"
+#include "config/Config.h"
 
 using tenriff::app::SongEntry;
 using tenriff::app::SongSelectState;
@@ -224,4 +228,100 @@ TEST_CASE("difficulty table levels without level_order use natural numeric order
     CHECK(entries[0].difficulty_table_level == "st1");
     CHECK(entries[1].difficulty_table_level == "st2");
     CHECK(entries[2].difficulty_table_level == "st10");
+}
+
+TEST_CASE("native LV restores cached labels filters and sorting after a difficulty table was selected") {
+    namespace fs = std::filesystem;
+    using namespace tenriff::app;
+
+    struct ScratchDirectory {
+        fs::path path;
+        ~ScratchDirectory() {
+            std::error_code error;
+            fs::remove_all(path, error);
+        }
+    };
+    for (const bool calculate_difficulty : {false, true}) {
+        ScratchDirectory scratch{fs::temp_directory_path() /
+            ("tenriff-native-lv-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()))};
+        REQUIRE(fs::create_directory(scratch.path));
+        const auto header = scratch.path / "header.json";
+        {
+            std::ofstream body(scratch.path / "table.json");
+            body << R"([{"md5":"11111111111111111111111111111111","level":"9"},)"
+                    R"({"md5":"22222222222222222222222222222222","level":"1"}])";
+            REQUIRE(body.good());
+            std::ofstream file(header);
+            file << R"({"name":"Test Table","symbol":"T","level_order":["1","9"],"data_url":"table.json"})";
+            REQUIRE(file.good());
+        }
+
+        SongIndexOptions options;
+        options.calculate_difficulty = calculate_difficulty;
+        options.difficulty_table_path = header.u8string();
+        const int low_level = options.calculate_difficulty ? 5 : 2;
+        const int high_level = options.calculate_difficulty ? 20 : 12;
+        SongEntry low;
+        low.path = "absent-low.bms";
+        low.title = "Low Native";
+        low.format = "bms";
+        low.key_count = 10;
+        low.level = low.native_level = low_level;
+        low.md5 = "11111111111111111111111111111111";
+        SongEntry high = low;
+        high.path = "absent-high.bms";
+        high.title = "High Native";
+        high.level = high.native_level = high_level;
+        high.md5 = "22222222222222222222222222222222";
+        SongIndex index{{low, high}};
+        const auto cache_path = scratch.path / "song_index.json";
+        std::string error;
+        REQUIRE(save_song_index(cache_path.u8string(), index, options, &error));
+        auto table_index = load_song_index(cache_path.u8string(), options);
+        REQUIRE(table_index.success());
+        REQUIRE(table_index.loaded_from_file);
+        REQUIRE(table_index.index.entries.size() == 2);
+        std::stable_sort(table_index.index.entries.begin(), table_index.index.entries.end(), song_entry_less_by_difficulty_asc);
+        CHECK(table_index.index.entries[0].title == "High Native");
+        CHECK(song_difficulty_label(table_index.index.entries[0]) == "T1");
+        REQUIRE(save_song_index(cache_path.u8string(), table_index.index, options, &error));
+
+        // The native selection persists empty table fields. Loading that profile and
+        // the existing cache must work even when no original charts are available.
+        tenriff::config::ConfigLoader loader;
+        auto profile = loader.defaults();
+        profile.mode.calculate_song_index_difficulty = options.calculate_difficulty;
+        profile.ui.difficulty_table_path.clear();
+        profile.ui.difficulty_table_url.clear();
+        const auto profile_dir = (scratch.path / "profile").u8string();
+        REQUIRE(loader.save_profile(profile_dir, profile, &error));
+        const auto restored_profile = loader.load_profile(profile_dir);
+        REQUIRE(restored_profile.success());
+        CHECK(restored_profile.config.ui.difficulty_table_path.empty());
+        CHECK(restored_profile.config.ui.difficulty_table_url.empty());
+        options.difficulty_table_path = restored_profile.config.ui.difficulty_table_path;
+        options.calculate_difficulty = restored_profile.config.mode.calculate_song_index_difficulty;
+        auto native = load_song_index(cache_path.u8string(), options);
+        REQUIRE(native.success());
+        REQUIRE(native.loaded_from_file);
+        REQUIRE(native.index.entries.size() == 2);
+        REQUIRE(native.warnings.empty());
+        for (const auto& entry : native.index.entries) {
+            CHECK(entry.level == entry.native_level);
+            CHECK(entry.difficulty_table_name.empty());
+            CHECK(entry.difficulty_table_symbol.empty());
+            CHECK(entry.difficulty_table_level.empty());
+            CHECK(entry.difficulty_table_order == -1);
+        }
+        std::stable_sort(native.index.entries.begin(), native.index.entries.end(), song_entry_less_by_difficulty_asc);
+        CHECK(native.index.entries[0].title == "Low Native");
+        CHECK(native.index.entries[1].title == "High Native");
+        CHECK(song_difficulty_label(native.index.entries[0]) == "LV " + std::to_string(low_level));
+        CHECK(song_difficulty_label(native.index.entries[1]) == "LV " + std::to_string(high_level));
+        CHECK(song_entry_matches_level_filter(native.index.entries[0], low_level, low_level));
+        CHECK_FALSE(song_entry_matches_level_filter(native.index.entries[1], low_level, low_level));
+        CHECK(song_group_level_key(native.index.entries[0]) < song_group_level_key(native.index.entries[1]));
+        std::stable_sort(native.index.entries.begin(), native.index.entries.end(), song_entry_less_by_difficulty_desc);
+    CHECK(native.index.entries[0].title == "High Native");
+    }
 }

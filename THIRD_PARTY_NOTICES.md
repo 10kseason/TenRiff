@@ -3,6 +3,15 @@ Third-Party Notices
 TenRiff as a whole is distributed under the MIT license in [LICENSE](LICENSE).
 Some bundled third-party components remain under their own original licenses.
 
+External audio drivers
+
+The optional native ASIO backend uses a separately installed 64-bit Windows
+audio driver. TenRiff's backend and narrow driver-interface declarations are
+project-authored; no Steinberg ASIO SDK or vendor driver is included in these
+packages. This support does not imply driver certification or vendor
+endorsement. ASIO is a trademark of Steinberg Media Technologies GmbH; see
+[Steinberg's ASIO developer information](https://www.steinberg.net/developers/asiosdk-open/).
+
 Bundled components
 
 1. `external/stb_vorbis.c`

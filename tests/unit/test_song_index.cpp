@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "app/ChartFileHash.h"
+#include "app/ChartLoader.h"
 #include "app/MenuSongUtils.h"
 #include "app/SongIndex.h"
 #include "app/SongIndexBudget.h"
@@ -281,9 +282,9 @@ TEST_CASE("song scan stores indexed image and explicit audio preview paths for B
 
     REQUIRE(by_path.count("preview_stagefile.bms") == 1u);
     CHECK_FALSE(by_path.at("preview_stagefile.bms").background_preview_path.empty());
-    CHECK(std::filesystem::path(by_path.at("preview_stagefile.bms").background_preview_path).filename() == "cover.png");
+    CHECK(std::filesystem::u8path(by_path.at("preview_stagefile.bms").background_preview_path).filename() == "cover.png");
     CHECK_FALSE(by_path.at("preview_stagefile.bms").audio_preview_path.empty());
-    CHECK(std::filesystem::path(by_path.at("preview_stagefile.bms").audio_preview_path).filename() == "preview.ogg");
+    CHECK(std::filesystem::u8path(by_path.at("preview_stagefile.bms").audio_preview_path).filename() == "preview.ogg");
 
 }
 
@@ -305,7 +306,7 @@ TEST_CASE("song scan falls back to the largest local audio file for BMS preview"
     const SongIndex index = scan_songs(temp.path.u8string(), nullptr, warnings);
     REQUIRE(index.entries.size() == 1u);
     CHECK(warnings.empty());
-    CHECK(std::filesystem::path(index.entries.front().audio_preview_path).filename() ==
+    CHECK(std::filesystem::u8path(index.entries.front().audio_preview_path).filename() ==
           "largest.mp3");
 }
 
@@ -750,7 +751,7 @@ TEST_CASE("cached song index load drops non-BMS menu entries") {
     const auto index_path = temp.path / "song_index.json";
     write_file(index_path,
                "{\n"
-               "  \"version\": 14,\n"
+               "  \"version\": 15,\n"
                "  \"entries\": [\n"
                "    {\"path\":\"ten.osu\",\"title\":\"Ten\",\"artist\":\"A\",\"chart_name\":\"MX\",\"format\":\"osu\",\"key_count\":10,\"level\":12,\"rating\":8.25,\"bpm\":180,\"mtime\":1},\n"
                "    {\"path\":\"legacy.bms\",\"title\":\"Legacy\",\"artist\":\"C\",\"chart_name\":\"Another\",\"format\":\"bms\",\"layout_label\":\"5+1 SP\",\"key_count\":6,\"level\":11,\"rating\":6.75,\"bpm\":180,\"mtime\":1},\n"
@@ -785,7 +786,7 @@ TEST_CASE("cached song index filters non-BMS entries") {
     const auto index_path = temp.path / "song_index.json";
     write_file(index_path,
                "{\n"
-               "  \"version\": 14,\n"
+               "  \"version\": 15,\n"
                "  \"entries\": [\n"
                 "    {\"path\":\"ten.osu\",\"title\":\"Ten\",\"artist\":\"A\",\"chart_name\":\"MX\",\"format\":\"osu\",\"key_count\":10,\"level\":12,\"rating\":8.25,\"bpm\":180,\"mtime\":1},\n"
                 "    {\"path\":\"legacy.bms\",\"title\":\"Legacy\",\"artist\":\"C\",\"format\":\"bms\",\"key_count\":10,\"level\":11,\"rating\":6.75,\"bpm\":180,\"mtime\":1}\n"
@@ -807,7 +808,7 @@ TEST_CASE("streaming song index loader parses compact single-line schema 13 cach
 
     const auto index_path = temp.path / "song_index.json";
     write_file(index_path,
-               "{\"version\":14,\"entries\":["
+               "{\"version\":15,\"entries\":["
                "{\"path\":\"legacy.bms\",\"title\":\"Legacy\",\"artist\":\"Composer\",\"chart_name\":\"Hyper\",\"format\":\"bms\",\"layout_label\":\"7+1 SP\",\"key_count\":8,\"level\":12,\"rating\":7.5,\"bpm\":150,\"mtime\":1},"
                "{\"path\":\"ignored.osu\",\"title\":\"Ignored\",\"artist\":\"Mapper\",\"format\":\"osu\",\"key_count\":10,\"level\":13,\"rating\":8.5,\"bpm\":180,\"mtime\":2}"
                "]}");
@@ -891,9 +892,9 @@ TEST_CASE("song index cache stays profile-local and does not create cache folder
     std::filesystem::create_directories(profile_root);
     std::filesystem::create_directories(songs_root);
 
-    const auto cache_path = std::filesystem::path(
+    const auto cache_path = std::filesystem::u8path(
         song_index_cache_path_for_source(profile_root.u8string(), songs_root.u8string()));
-    const auto legacy_path = std::filesystem::path(legacy_song_index_cache_path_for_source(songs_root.u8string()));
+    const auto legacy_path = std::filesystem::u8path(legacy_song_index_cache_path_for_source(songs_root.u8string()));
 
     CHECK(path_has_prefix(cache_path, profile_root));
     CHECK_FALSE(path_has_prefix(cache_path, songs_root));
@@ -959,7 +960,7 @@ TEST_CASE("cached song index sanitizes control heavy metadata on load") {
     const auto index_path = temp.path / "song_index.json";
     write_file(index_path,
                "{\n"
-               "  \"version\": 14,\n"
+               "  \"version\": 15,\n"
                "  \"entries\": [\n"
                 "    {\"path\":\"legacy.bms\",\"title\":\"Bad\\nTitle\",\"artist\":\"Artist\\tName\",\"chart_name\":\"Hyper\\r\",\"format\":\"bms\\r\",\"key_count\":10,\"level\":11,\"rating\":6.75,\"bpm\":180,\"mtime\":1}\n"
                "  ]\n"
@@ -1132,7 +1133,7 @@ TEST_CASE("stale song index version triggers silent rescan instead of using cach
     const auto index_path = temp.path / "song_index.json";
     write_file(index_path,
                "{\n"
-               "  \"version\": 9,\n"
+               "  \"version\": 14,\n"
                "  \"entries\": [\n"
                 "    {\"path\":\"legacy.bms\",\"title\":\"Legacy\",\"artist\":\"C\",\"format\":\"bms\",\"key_count\":10,\"level\":11,\"rating\":6.75,\"bpm\":180,\"mtime\":1}\n"
                "  ]\n"
@@ -1157,6 +1158,59 @@ TEST_CASE("missing song index reports not loaded from file") {
     CHECK_FALSE(result.loaded_from_file);
     CHECK(result.index.entries.empty());
     CHECK_FALSE(result.warnings.empty());
+}
+
+TEST_CASE("song index and chart loader agree on duration-based reference BPM") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+
+    write_file(temp.path / "repeated.bms",
+               "#TITLE Repeated Fractional Tempo\n"
+               "#BPM 120\n#BPM01 180.5\n#STOP01 4800\n"
+               "#00009:01\n#00108:01\n#00203:78\n#00308:01\n"
+               "#00351:01\n#00651:01\n#00602:0.5\n");
+    write_file(temp.path / "media-tail.bms",
+               "#TITLE Trailing BGM Extent\n#BPM 120\n"
+               "#00103:F0\n#00111:01\n#00301:01\n");
+    write_file(temp.path / "no-notes.bms",
+               "#TITLE Tempo Only\n#BPM 120\n#00103:F0\n#00301:01\n");
+
+    for (const auto profile : {tenriff::app::SongIndexProfile::Safe,
+                               tenriff::app::SongIndexProfile::Fast}) {
+        SongIndexOptions options;
+        options.profile = profile;
+        std::vector<std::string> warnings;
+        const SongIndex index = scan_songs(temp.path.u8string(), nullptr, warnings, {}, options);
+        REQUIRE(index.entries.size() == 3u);
+        CHECK(warnings.empty());
+        for (const auto& entry : index.entries) {
+            const bool repeated = entry.path == "repeated.bms";
+            CHECK(entry.bpm == doctest::Approx(repeated ? 180.5 : 240.0));
+            for (const int sample_rate : {1000, 44100, 48000}) {
+                for (const double rate : {0.75, 1.0, 1.5}) {
+                    const auto loaded = tenriff::app::ChartLoader{}.load(
+                        (temp.path / entry.path).u8string(), sample_rate, rate, "ignore");
+                    REQUIRE(loaded.success());
+                    CHECK(loaded.reference_bpm == doctest::Approx(entry.bpm));
+                    // Replays and key conversion must still see the initial header.
+                    CHECK(loaded.base_bpm == doctest::Approx(120.0));
+                    if (repeated) {
+                        REQUIRE(loaded.chart.notes.size() == 1u);
+                        CHECK(loaded.chart.notes.front().end_sample.has_value());
+                    }
+                }
+            }
+        }
+        const auto cache_path = temp.path / "reference-cache.json";
+        REQUIRE(save_song_index(cache_path.u8string(), index, options));
+        const auto cached = load_song_index(cache_path.u8string(), options);
+        REQUIRE(cached.loaded_from_file);
+        REQUIRE(cached.index.entries.size() == index.entries.size());
+        for (std::size_t i = 0; i < index.entries.size(); ++i) {
+            CHECK(cached.index.entries[i].bpm == doctest::Approx(index.entries[i].bpm));
+        }
+    }
 }
 
 TEST_CASE("fast song scan retains only song-list metadata") {

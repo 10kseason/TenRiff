@@ -138,9 +138,12 @@ bool GameSession::initialize(const CommandLineOptions& options) {
     finished_.store(false, std::memory_order_release);
     spectating_peer_.store(false, std::memory_order_release);
     user_aborted_.store(false, std::memory_order_release);
+    audio_error_message_.clear();
     paused_.store(false, std::memory_order_release);
     pause_used_.store(false, std::memory_order_release);
     pause_resume_requested_.store(false, std::memory_order_release);
+    resume_countdown_value_.store(0, std::memory_order_release);
+    pause_resume_end_sample_ = 0;
     restart_requested_.store(false, std::memory_order_release);
     exit_requested_.store(false, std::memory_order_release);
     pause_menu_cursor_.store(0, std::memory_order_release);
@@ -440,6 +443,9 @@ bool GameSession::initialize(const CommandLineOptions& options) {
             audio_callback(output, frames, buffer_start, playback_sample);
         });
         if (audio_result != audio::AudioResult::Success) {
+            audio_error_message_ = audio_thread_.error_message();
+            if (audio_error_message_.empty()) audio_error_message_ = "Could not open the selected audio device.";
+            std::cerr << "[error] " << audio_error_message_ << std::endl;
             return false;
         }
         sample_rate_ = static_cast<int>(audio_thread_.sample_rate());
@@ -447,6 +453,7 @@ bool GameSession::initialize(const CommandLineOptions& options) {
             sample_rate_ = static_cast<int>(requested_rate);
         }
         mix_normalizer_.reset(sample_rate_);
+        audio_error_message_.clear();
         input_offset_samples_ = ms_to_samples(config_.input_offset_ms, sample_rate_);
         return true;
     };
@@ -491,7 +498,10 @@ bool GameSession::initialize(const CommandLineOptions& options) {
     std::string preferred_rate_diagnostic;
     const auto preferred_rate = detect_chart_preferred_sample_rate(chart_result.chart,
                                                                    &preferred_rate_diagnostic);
-    if (preferred_rate.has_value() && *preferred_rate != sample_rate_) {
+    // An ASIO device stays at the user's chosen rate; chart audio is resampled
+    // by the existing decoder instead of reconfiguring the driver for each song.
+    if (config_.audio.backend != audio::AudioBackend::ASIO &&
+        preferred_rate.has_value() && *preferred_rate != sample_rate_) {
         const int previous_actual_rate = sample_rate_;
         std::cerr << "[info] Detected chart audio sample rate " << *preferred_rate
                   << " Hz. Reinitializing gameplay audio for this chart." << std::endl;
@@ -522,7 +532,7 @@ bool GameSession::initialize(const CommandLineOptions& options) {
     }
 
     chart_format_ = chart_result.format;
-    chart_base_bpm_ = chart_result.base_bpm;
+    chart_base_bpm_ = chart_result.reference_bpm > 0.0 ? chart_result.reference_bpm : chart_result.base_bpm;
     report_loading_progress(78, "Applying gameplay mode");
     if (loading_cancel_requested()) {
         return false;
@@ -589,11 +599,22 @@ bool GameSession::initialize(const CommandLineOptions& options) {
         gauge_shift_enabled_ = false;
         gameplay_config.initial_gauge = game::GaugeType::Normal;
         gameplay_config.initial_gauge_value = std::clamp(course_gauge_initial_value_, 0.0, 100.0);
-        gameplay_config.gauge_policy.course_hybrid_deltas = true;
+        gameplay_config.gauge_policy.course_lr2_deltas = true;
+        gameplay_config.judge.indirect_miss_enabled = true;
     }
     gameplay_config.gauge_shift_enabled = gauge_shift_enabled_;
     if (!course_gauge_enabled_ || peer_battle_mode_ || replay_playback_enabled_) {
         gameplay_config.gauge_policy = {};
+    }
+    if (replay_playback_enabled_ && replay_source_.mode.course_gauge == gameplay::kLr2CourseGaugeId) {
+        // Optional evidence restores new course runs without reinterpreting
+        // older replays that never stored their course policy or carried HP.
+        gauge_shift_enabled_ = false;
+        gameplay_config.gauge_shift_enabled = false;
+        gameplay_config.initial_gauge = game::GaugeType::Normal;
+        gameplay_config.initial_gauge_value = replay_source_.mode.course_gauge_initial_value;
+        gameplay_config.gauge_policy.course_lr2_deltas = true;
+        gameplay_config.judge.indirect_miss_enabled = true;
     }
 
     active_mods_ = mode_result.active_mods;
@@ -768,6 +789,13 @@ bool GameSession::initialize(const CommandLineOptions& options) {
                 ghost_config.initial_gauge = gauge.value();
             }
         }
+        if (ghost_replay_source_.mode.course_gauge == gameplay::kLr2CourseGaugeId) {
+            ghost_config.gauge_shift_enabled = false;
+            ghost_config.initial_gauge = game::GaugeType::Normal;
+            ghost_config.initial_gauge_value = ghost_replay_source_.mode.course_gauge_initial_value;
+            ghost_config.gauge_policy.course_lr2_deltas = true;
+            ghost_config.judge.indirect_miss_enabled = true;
+        }
         ghost_engine_ = std::make_unique<gameplay::GameplayEngine>(chart_, ghost_config);
     }
     report_loading_progress(96, "Starting gameplay");
@@ -870,7 +898,9 @@ void GameSession::run() {
         startup_input_timing_anchor_ = {};
         audio_timing_diagnostics_logged_ = false;
         if (audio_thread_.start() != audio::AudioResult::Success) {
-            std::cerr << "[error] Failed to start gameplay audio." << std::endl;
+            audio_error_message_ = audio_thread_.error_message();
+            if (audio_error_message_.empty()) audio_error_message_ = "Failed to start gameplay audio.";
+            std::cerr << "[error] " << audio_error_message_ << std::endl;
             stop_requested_.store(true, std::memory_order_release);
             finished_.store(true, std::memory_order_release);
         } else {
@@ -880,6 +910,14 @@ void GameSession::run() {
 
     while (!stop_requested_.load(std::memory_order_acquire)) {
         if (finished_.load(std::memory_order_acquire)) {
+            break;
+        }
+        if (audio_thread_.has_runtime_error()) {
+            audio_error_message_ = audio_thread_.error_message();
+            if (audio_error_message_.empty()) audio_error_message_ = "The audio driver stopped. Reopen Audio Settings before retrying.";
+            std::cerr << "[error] " << audio_error_message_ << std::endl;
+            stop_requested_.store(true, std::memory_order_release);
+            finished_.store(true, std::memory_order_release);
             break;
         }
 
@@ -975,6 +1013,11 @@ GameSession::HudSnapshot GameSession::hud_snapshot() {
     snapshot.hud_publish_time_ns = timing::HighResClock::now_ns();
     snapshot.countdown_active = countdown_active_;
     snapshot.countdown_value = countdown_value_;
+    const int resume_countdown = resume_countdown_value_.load(std::memory_order_acquire);
+    if (snapshot.paused && resume_countdown > 0) {
+        snapshot.countdown_active = true;
+        snapshot.countdown_value = resume_countdown;
+    }
 
     for (;;) {
         const uint64_t begin = audio_timing_sequence_.load(std::memory_order_acquire);
@@ -2064,6 +2107,14 @@ void GameSession::clamp_output(float* output, uint32_t frames, float master_gain
 
 void GameSession::shutdown() {
     stop_requested_.store(true, std::memory_order_release);
+    // A final callback can finish the chart and fail in the same buffer. Wait
+    // for driver callbacks before latching the error, and before destroying the
+    // backend or deciding whether this session may export a score.
+    audio_thread_.stop();
+    if (audio_thread_.has_runtime_error()) {
+        audio_error_message_ = audio_thread_.error_message();
+        if (audio_error_message_.empty()) audio_error_message_ = "The audio driver stopped unexpectedly.";
+    }
     audio_thread_.shutdown();
     if (input_thread_.is_running() &&
         input_backend_state_.configured_backend == input::InputBackend::RawInput &&
@@ -2078,7 +2129,7 @@ void GameSession::shutdown() {
     }
     input_thread_.shutdown();
     stop_chart_audio_workers();
-    if (engine_ && gameplay_started_ &&
+    if (engine_ && gameplay_started_ && audio_error_message_.empty() &&
         !restart_requested_.load(std::memory_order_acquire) &&
         !exit_requested_.load(std::memory_order_acquire)) {
         bool engine_game_over = false;
@@ -2190,6 +2241,11 @@ void GameSession::shutdown() {
             replay.mode.random = config_.mode.random;
             replay.mode.random_seed = config_.mode.random_seed;
             replay.mode.gauge = config_.mode.gauge;
+            if (course_gauge_enabled_ && !peer_battle_mode_) {
+                replay.mode.course_gauge = gameplay::kLr2CourseGaugeId;
+                replay.mode.course_gauge_initial_value =
+                    std::clamp(course_gauge_initial_value_, 0.0, 100.0);
+            }
             replay.server_challenge_id = options_.ranked_challenge_id;
             replay.server_challenge_nonce = options_.ranked_challenge_nonce;
             replay.mode.autoplay_enabled = autoplay_enabled_;
@@ -2275,6 +2331,8 @@ void GameSession::shutdown() {
     pause_anchor_valid_ = false;
     paused_.store(false, std::memory_order_release);
     pause_resume_requested_.store(false, std::memory_order_release);
+    resume_countdown_value_.store(0, std::memory_order_release);
+    pause_resume_end_sample_ = 0;
     startup_input_timing_anchor_ = {};
     audio_timing_diagnostics_logged_ = false;
     countdown_active_ = false;
@@ -2375,18 +2433,31 @@ void GameSession::audio_callback(float* output,
             process_paused_input_queue();
             if (stop_requested_.load(std::memory_order_acquire)) {
                 finished_.store(true, std::memory_order_release);
-            } else if (pause_resume_requested_.exchange(false, std::memory_order_acq_rel)) {
-                // Include this silent callback in the offset so the next audible
-                // buffer resumes at the exact chart sample where pause began.
-                const int64_t physical_resume_sample =
-                    physical_buffer_start_samples + static_cast<int64_t>(frames);
-                pause_sample_offset_ = gameplay_pause_resume_offset(
-                    pause_sample_offset_, pause_physical_start_sample_, physical_resume_sample);
-                pause_anchor_valid_ = false;
-                paused_.store(false, std::memory_order_release);
-                clock_sync_.reset();
-                startup_input_timing_anchor_ = {};
-                rebaseline_gameplay_start_input_state(paused_chart_sample_);
+                pause_resume_end_sample_ = 0;
+                resume_countdown_value_.store(0, std::memory_order_release);
+            } else {
+                if (pause_resume_requested_.exchange(false, std::memory_order_acq_rel) &&
+                    pause_resume_end_sample_ == 0) {
+                    pause_resume_end_sample_ = physical_buffer_start_samples +
+                        static_cast<int64_t>(sample_rate_) * kGameplayResumeCountdownSeconds;
+                }
+                const int remaining = gameplay_resume_countdown_value(
+                    pause_resume_end_sample_, physical_buffer_start_samples, sample_rate_);
+                resume_countdown_value_.store(remaining, std::memory_order_release);
+                if (pause_resume_end_sample_ > 0 && remaining == 0) {
+                    // Include this silent callback in the offset so the next audible
+                    // buffer resumes at the exact chart sample where pause began.
+                    const int64_t physical_resume_sample =
+                        physical_buffer_start_samples + static_cast<int64_t>(frames);
+                    pause_sample_offset_ = gameplay_pause_resume_offset(
+                        pause_sample_offset_, pause_physical_start_sample_, physical_resume_sample);
+                    pause_anchor_valid_ = false;
+                    pause_resume_end_sample_ = 0;
+                    paused_.store(false, std::memory_order_release);
+                    clock_sync_.reset();
+                    startup_input_timing_anchor_ = {};
+                    rebaseline_gameplay_start_input_state(paused_chart_sample_);
+                }
             }
 
             committed_sample = paused_chart_sample_;
@@ -2412,7 +2483,8 @@ void GameSession::audio_callback(float* output,
                            static_cast<double>(sample_rate_))
                         : 0.0;
                 std::cerr << "[info] Gameplay audio timing mode="
-                          << (audio_thread_.is_exclusive() ? "exclusive" : "shared")
+                          << (config_.audio.backend == audio::AudioBackend::ASIO ? "ASIO" :
+                              audio_thread_.is_exclusive() ? "exclusive" : "shared")
                           << " sample_rate=" << sample_rate_
                           << " buffer_frames=" << audio_thread_.buffer_frames()
                           << " callback_frames=" << frames
@@ -2611,6 +2683,13 @@ void GameSession::rebaseline_gameplay_start_input_state(int64_t sample) {
             pressed = (GetAsyncKeyState(static_cast<int>(*poll_vk)) & 0x8000) != 0;
         }
         if (!pressed) {
+            // Releases received while paused were drained without scoring. Sync
+            // the physical up state too, or a held LN can survive an entire pause.
+            if (!autoplay_enabled_ && !replay_playback_enabled_) {
+                if (const auto lane = lane_from_keycode(tracked.keycode)) {
+                    catch_up_lane_input(lane.value(), input::InputState::Released, sample);
+                }
+            }
             continue;
         }
 
@@ -2653,6 +2732,11 @@ bool GameSession::handle_control_input(const input::InputEvent& event) {
         reset_tuning_repeats();
         return true;
     }
+    // Course runs cannot be paused or aborted with Esc, including their opening
+    // countdown. Overlay controls may still consume Esc to close their own UI.
+    if (course_gauge_enabled_ && escape_keycode_ != 0 && event.keycode == escape_keycode_) {
+        return true;
+    }
     if (paused_.load(std::memory_order_acquire)) {
         if (event.state != input::InputState::Pressed) {
             return true;
@@ -2660,6 +2744,17 @@ bool GameSession::handle_control_input(const input::InputEvent& event) {
         if (f9_keycode_ != 0 && event.keycode == f9_keycode_) {
             if (screenshot_callback_) {
                 screenshot_callback_();
+            }
+            return true;
+        }
+        if (resume_countdown_value_.load(std::memory_order_acquire) > 0 ||
+            pause_resume_requested_.load(std::memory_order_acquire)) {
+            // Esc cancels a countdown back to the pause menu; other queued input
+            // cannot restart it or become a scored lane press on resumption.
+            if (escape_keycode_ != 0 && event.keycode == escape_keycode_) {
+                pause_resume_end_sample_ = 0;
+                pause_resume_requested_.store(false, std::memory_order_release);
+                resume_countdown_value_.store(0, std::memory_order_release);
             }
             return true;
         }
@@ -2764,6 +2859,8 @@ bool GameSession::handle_control_input(const input::InputEvent& event) {
         } else {
             pause_menu_cursor_.store(0, std::memory_order_release);
             pause_resume_requested_.store(false, std::memory_order_release);
+            pause_resume_end_sample_ = 0;
+            resume_countdown_value_.store(0, std::memory_order_release);
             pause_used_.store(true, std::memory_order_release);
             paused_.store(true, std::memory_order_release);
             hispeed_decrease_held_ = false;

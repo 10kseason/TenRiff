@@ -71,6 +71,7 @@ struct ReplayVerificationResult;
 }
 
 class MenuApp {
+    friend struct MenuAppAudioSettingsTestAccess;
 public:
     MenuApp();
     ~MenuApp();
@@ -472,6 +473,10 @@ private:
     [[nodiscard]] std::string ui_skin_note_shape_label(std::string_view token) const;
     [[nodiscard]] std::string ui_skin_note_image_aspect_label(std::string_view token) const;
     [[nodiscard]] bool apply_difficulty_table_url(std::string_view url);
+    void apply_builtin_difficulty_table(int index);
+    void select_native_difficulty_levels();
+    void add_song_source_from_dialog();
+    void remove_selected_song_source();
     void handle_difficulty_table_input(uint32_t keycode);
     [[nodiscard]] std::string difficulty_table_display_name();
 

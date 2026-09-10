@@ -70,6 +70,10 @@ struct PeerSessionSnapshot {
     std::size_t participant_count = 0;
     bool local_is_leader = false;
     std::vector<PeerParticipantSnapshot> participants;
+    // Last launched round, retained independently of the live lobby roster.
+    // Final scores and departed players survive result-screen disconnects.
+    uint64_t result_round_nonce = 0;
+    std::vector<PeerParticipantSnapshot> round_participants;
     std::vector<PeerChatEntry> chat_messages;
 
     bool remote_library_ready = false;

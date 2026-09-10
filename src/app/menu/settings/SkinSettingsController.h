@@ -17,6 +17,8 @@ enum class SkinBoundaryAction {
     CreateSkin,
     OpenSkinFolder,
     ReloadSkin,
+    ExportPreset,
+    ImportPreset,
 };
 
 struct SkinSettingsEffects {

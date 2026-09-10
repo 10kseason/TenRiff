@@ -1,5 +1,7 @@
 {
   "audio": {
+    "backend": "wasapi",
+    "asio_driver": "",
     "rate": 44100,
     "frames": 256,
     "periods": 3,

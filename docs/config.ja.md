@@ -16,6 +16,11 @@ profile が存在しない場合は初回起動時に自動生成されます。
 ## `config.json`
 
 ### `audio`
+
+- `backend` (string)
+  - `wasapi | asio`、既定は `wasapi`。プレイと曲プレビューの出力を選択。メニュー・結果の BGM は独立した Windows MCI 経路を維持。
+- `asio_driver` (string)
+  - インストール済み64ビット ASIO ドライバーの CLSID。空は Auto（名前順の最初）。Audio 設定で選び、F5 で一覧を更新。
 - `rate` (int)
   - 既定 sample rate
 - `frames` (int)
@@ -40,11 +45,13 @@ profile が存在しない場合は初回起動時に自動生成されます。
   - ゲーム内ステレオミックスの RMS 音量調整。limiter/master volume の前に適用。既定は false。メニュー音楽・選曲プレビューは変更しない。
 - `keysound_volume` (double)
 
+[ASIO 設定](asio-audio.md)参照。選択サンプルレートを固定し譜面音声をリサンプルします。`frames` は要求値でありドライバーの許容サイズに調整します。ASIO では preset は frames を上書きせず、`exclusive` と `periods` は WASAPI 用です。ASIO エラー時の自動 WASAPI 切替はありません。
+
 ### `input`
 
 - `backend` (string)
   - `polling | rawinput`
-  - 現行 `1.7.1` リリースラインの既定値は `rawinput`
+  - 現行 `1.7.2` リリースラインの既定値は `rawinput`
   - `Options -> Input Settings -> Backend` または `Options -> Profile Setup -> Input Backend` で profile ごとに選択可能
   - runtime fallback は保存済みの値を `polling` に書き換えない
   - RawInput の起動失敗、登録先の消失、message window の終了を確認すると、そのアプリ実行中は menu と後続 gameplay の両方で Polling を維持する
@@ -93,9 +100,13 @@ profile が存在しない場合は初回起動時に自動生成されます。
 - `hispeed` (double)
 - `target_scroll_bps` (double)
 
+- 基準 BPM は累積進行時間が最も長いテンポです。同じ BPM の区間を合算し STOP 待機を除外します。Hi-Speed はこの基準に固定し、明示的な `#SCROLL`・停止・逆走効果は維持します。[計算規則](reference-bpm.md)を参照してください。
+
 ### `gauge`
 
 Gauge Shift は常に有効です。`mode.gauge` の `ex_hard / hard / normal / easy` は EX から Easy への開始段階です。選択段階と下位段階をそれぞれ 100% から並列計算し、脱落すると次の生存段階へ移ります。対象段階がすべて脱落したときにゲージ失敗となります。旧 `shift` は EX 開始として解釈します。
+
+段位/Session Mix は曲間で引き継ぐ LR2 参照ゲージを使用し、間接ミスを維持して HP 2% 未満で失敗します。通常 LN は完走/解除時に一度だけ反映し、通常の `gauge.delta` は適用しません。[比較と互換範囲](lr2-gauge-audit.ko.md)を参照してください。
 
 - `delta`: `ex_hard`, `hard`, `normal`, `easy` → `PG`, `GR`, `GD`, `BD`, `PR`.
 
@@ -209,13 +220,14 @@ chart loader/indexer は BMS family（`.bms/.bme/.bml/.pms`）専用です。旧
 | `require_enter_to_exit` | bool; `true` | 読込・保存互換用。現在の Windows 結果入力経路はこの値で自動終了しません。 |
 | `show_cursor_in_gameplay` | bool; `true` | ゲーム中のマウスポインター表示。 |
 | `active_song_source`, `recent_song_sources` | string / string[] | 現在と最近の曲フォルダー。 |
+| `song_sources_initialized` | bool; `false` | 明示的な曲フォルダー追加・除去後に true。最後のフォルダーを除去した空一覧を再起動時に復元しません。[曲管理](library-management.md)参照。 |
 | `session_mix_lr2_course_path` | string | 選択した LR2 コースのパス。 |
 | `favorite_chart_keys` | string[] | お気に入り譜面の内部識別キー。 |
 | `collections` | object: name → string[] | 名前付きコレクションごとの譜面キー。 |
 | `song_collection_filter` | string; `all` | 全譜面・お気に入り・コレクションのフィルター。即時保存。 |
 | `song_key_filter` | int: `0..16`; `0` | キー数フィルター。0 は全件。UI は 4K–10K、12K、14K、16K。 |
 | `song_level_min_filter`, `song_level_max_filter` | int: `0..50`; `0` | 難易度の境界。0 はその境界を無効化。 |
-| `difficulty_table_path` | string | ローカル header JSON または取得済みキャッシュ。変更時に再索引し、選択時に safe 索引へ切替。 |
+| `difficulty_table_path` | string | ローカル header JSON または取得済みキャッシュ。表の選択は safe 索引へ切替。標準 LV はパスと有効なキャッシュの表情報を除去。 |
 | `difficulty_table_url` | string | 元の HTTP(S) BMSTable ページ/header URL。meta を解決し header/data をキャッシュ。ローカル JSON 選択時は空にする。 |
 | `online_records_server_url` | string | 記録・ランキング・チャット API URL。失敗してもローカルプレイ・記録は維持。 |
 | `tenriff_main_server_url` | string | F10 のメイン API URL。既定値は Config.h の `kTenRiffMainApiUrl`。 |
@@ -224,7 +236,11 @@ chart loader/indexer は BMS family（`.bms/.bme/.bml/.pms`）専用です。旧
 
 難易度表 header は `name`、`symbol`、ローカル相対 `data_url` を使用し、data 項目は `md5` または `sha256` と `level` で照合します。取得内容はプロファイルの `difficulty_tables` キャッシュへ保存します。
 
+標準 LV は `difficulty_table_path` と `difficulty_table_url` を消去し、有効なキャッシュから表情報のみ除去します。全再走査は不要です。既定は BMS `#PLAYLEVEL`、難易度計算を有効にしたキャッシュでは既存の計算 LV を使用します。
+
 ### `skin`
+
+現在の `skin` 設定と有効なスキン素材は[移動可能な `.trskin` プリセット](skin-presets.md)として書き出し・読み込みできます。オーディオ機器・キー割当・アカウント・曲フォルダー・タイミング補正は含みません。
 
 これはプロファイル `config.json` の skin 設定です。スキンパッケージの `skin.json` 契約は [スキン形式](skin-format.md)を参照してください。
 
