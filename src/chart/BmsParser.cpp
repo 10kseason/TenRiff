@@ -958,6 +958,7 @@ BmsParseResult BmsParser::parse(std::string_view content, const BmsParserOptions
             if (options.retain_nonessential_commands || should_retain_command_for_index(channel_token)) {
                 result.chart.commands.push_back(BmsMeasureCommand{measure_index, channel_token, data});
             }
+            result.chart.last_measure_index = (std::max)(result.chart.last_measure_index, measure_index);
             continue;
         }
 

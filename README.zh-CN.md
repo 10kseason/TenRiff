@@ -2,17 +2,19 @@
 
 Language: [한국어](README.md) | [English](README.en.md) | [简体中文](README.zh-CN.md) | [日本語](README.ja.md)
 
-TenRiff 是一个 Windows GUI BMS 节奏游戏运行时/启动器。当前稳定版本为 `1.7.1`，谱面输入仅支持 BMS family（`.bms/.bme/.bml/.pms`）。公开包不包含 BGA upscaler model；键位转换内置 deterministic NK3 P64 graph 与 generalized pattern MLP。项目采用 MIT 许可证。
+TenRiff 是一个 Windows GUI BMS 节奏游戏运行时/启动器。当前项目版本为 `1.7.2`，谱面输入仅支持 BMS family（`.bms/.bme/.bml/.pms`）。公开包不包含 BGA upscaler model；键位转换内置 deterministic NK3 P64 graph 与 generalized pattern MLP。项目采用 MIT 许可证。
 
-这份 README 是入门文档。关于当前行为、`1.7.1` 项目状态、`1.5.1 fixed stable baseline` 基准、配置和设计文档，请继续阅读 [`docs/README.zh-CN.md`](docs/README.zh-CN.md)。
+这份 README 是入门文档。关于当前行为、`1.7.2` 项目状态、`1.5.1 fixed stable baseline` 基准、配置和设计文档，请继续阅读 [`docs/README.zh-CN.md`](docs/README.zh-CN.md)。
 
 TenRiff 也明确属于一种 `vibe coding` 作品：它更多是在快速迭代和实验中成形，而不是只按照传统的长篇设计先行流程推进。
 
-## 1.7.1 游戏与多人模式改进
+## 1.7.2 音频、曲库与游玩更新
 
-多人游戏界面和结果显示全部玩家，分数对比与观战结束逻辑适配多名对手。新增 P-GREAT 专属特效、判定与连击的独立位置调整、音量标准化开关、10 张柔和配色的设置卡片及选曲界面的难度表设置。较长的 LEVEL 标签也更加清晰。
+新增原生 Windows ASIO 输出，同时保留默认的 WASAPI 输出。难度表选择窗口提供原生 LV、5键 Aery、7键 Aery 和10键 Revive 选项。`.trskin` 文件可以将皮肤设置与素材移至另一台电脑。
 
-See [CHANGELOG](CHANGELOG.md) and [release verification](docs/release-1.7.1-gate.md).
+本版包含恢复前的3秒倒计时、Session Mix 期间忽略 Esc、按累计进行时间计算基准 BPM，以及参考 LR2 的段位血条。另新增曲目录添加与仅从列表移除，修复 Unicode 路径验证及对手离开后的结果保留。
+
+改动见 [CHANGELOG](CHANGELOG.md)，验证与 ASIO 设备确认范围见 [1.7.2 发布门槛](docs/release-1.7.2-gate.md)。
 
 ## 截图
 
@@ -45,7 +47,7 @@ See [CHANGELOG](CHANGELOG.md) and [release verification](docs/release-1.7.1-gate
 - 主要目标平台：Windows
 - 支持谱面：仅 BMS family（`.bms/.bme/.bml/.pms`）
 - 图形路径：D3D11 + Direct2D/DirectWrite
-- 音频路径：WASAPI
+- 音频路径：WASAPI（默认）、原生 ASIO（需要 Windows x64 驱动）
 - 输入路径：RawInput 或高轮询率键盘 polling
 - direct-IP multiplayer：固定 host 的 TCP coordinator，最多8人；multiplayer 仅可选择 BMS（默认 `27301/TCP`，见[使用说明](docs/multiplayer.md)）
 - 许可证：[MIT](LICENSE)
@@ -96,7 +98,7 @@ TenRiff 当前的键位模式转换器包含基于 `krrcream-Toolkit` 中 N2NC �
 - Gameplay / HUD
   - 实时 HUD
   - 分阶段的谱面加载进度
-  - 在 gameplay 加载过程中使用 `Esc` 取消
+  - 普通 gameplay 加载中用 `Esc` 取消，Session Mix 忽略 Esc
   - display offset
   - performance overlay
   - note head/tail 位图缓存与静态 playfield command-list 缓存

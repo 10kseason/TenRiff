@@ -68,6 +68,8 @@ TenRiff 的基础游玩流程如下：
 - `Keymap`
   - 调整按键布局并做 NKRO 测试
 
+选择窗口提供 F1 Aery 5K、F2 Aery 7K、F3 Revive 10K 和 F4 原生 LV。原生 LV 立即用于显示、排序、分组和数值过滤。参见[曲库管理](library-management.md)。
+
 ## 4. 推荐的初始设置
 
 刚开始时，可以从下面这样的配置入手：
@@ -113,7 +115,7 @@ Discord 客户端的设置方法请参考[官方 Game Overlay 指南](https://su
 
 ### 加载
 - 刚开始歌曲时，可能会显示谱面加载进度。
-- 在加载过程中按 `Esc` 可以取消开始并返回 Song Select。
+- 普通加载中按 `Esc` 可取消开始并返回 Song Select。Session Mix 在加载和开始倒计时中也忽略 Esc。
 
 ### 倒计时
 - 加载结束后，会先看到 `3 / 2 / 1` 倒计时。
@@ -122,7 +124,8 @@ Discord 客户端的设置方法请参考[官方 Game Overlay 指南](https://su
 ## 7. 游玩中的操作
 
 - 谱面按键输入：以当前 keymap 为准
-- `Esc`：单人模式打开暂停菜单（继续 / 重新开始 / 退出）；多人模式中止游玩
+- `Esc`：普通单人模式立即暂停。继续或 Esc 会在3/2/1倒计时后恢复；倒计时期间音频、谱面时钟和判定停止。恢复倒计时期间按 Esc 返回暂停菜单。
+- Session Mix 游玩中忽略 Esc；保留曲间结果画面的退出操作和多人模式的 Esc 中止操作。
 - `F3`：降低 Hi-Speed
 - `F4`：提高 Hi-Speed
 - `F5`：大幅降低 Hi-Speed
@@ -131,6 +134,8 @@ Discord 客户端的设置方法请参考[官方 Game Overlay 指南](https://su
 
 Hi-Speed 只改变视觉滚动速度，不改变判定时机本身。
 Rate 只改变歌曲播放速度和谱面时间轴；在相同 Hi-Speed 下，视觉滚动速度保持不变。
+
+基准 BPM 为累计进行时间最长的速度；相同 BPM 的区间合并计算，排除 STOP 等待。Hi-Speed 以此固定，保留显式 `#SCROLL`、停止和逆向效果。参见[计算规则](reference-bpm.md)。
 
 ## 8. HUD 的读法
 
@@ -184,6 +189,8 @@ Rank 使用 `<75 F`、`75 B`、`80.5 A`、`86.5 A+`、`90 S`、`95.5 S+`、`98 A
 ### Gauge
 
 Gauge Shift 始终启用。`EX / Hard / Normal / Easy` 选择起始档位，保存值为 `ex_hard / hard / normal / easy`。所选档位及以下档位分别从 100% 开始独立累计判定。当前档位降至 0% 后切换至已有相同判定历史的下一存活档位，结束时以最高存活档位为最终结果。所有可用档位淘汰后才发生血条失败。
+
+段位/Session Mix 使用跨曲继承的 LR2 参考血条，保留间接失误，HP 低于 2% 时失败。普通 LN 在完成/释放时只结算一次，不应用普通 `gauge.delta`。参见[比较与兼容范围](lr2-gauge-audit.ko.md)。
 
 旧 `shift` 值表示从 EX 开始。Practice、Pacemaker 等具有独立结束规则的模式继续遵循各自规则。
 

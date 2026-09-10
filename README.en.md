@@ -2,17 +2,19 @@
 
 Language: [한국어](README.md) | [English](README.en.md) | [简体中文](README.zh-CN.md) | [日本語](README.ja.md)
 
-TenRiff is a Windows GUI BMS rhythm-game runtime/launcher. The current stable version is `1.7.1`, and chart input is limited to the BMS family (`.bms/.bme/.bml/.pms`). Graphics Settings lets users select a rights-cleared external ONNX model for the optional BGA Upscaler. Public packages contain no BGA-upscaler model; key-mode conversion bundles the deterministic NK3 P64 graph and the generalized pattern MLP exports. The project uses the MIT License, and bundled third-party notices are collected in [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
+TenRiff is a Windows GUI BMS rhythm-game runtime/launcher. The current project version is `1.7.2`, and chart input is limited to the BMS family (`.bms/.bme/.bml/.pms`). Graphics Settings lets users select a rights-cleared external ONNX model for the optional BGA Upscaler. Public packages contain no BGA-upscaler model; key-mode conversion bundles the deterministic NK3 P64 graph and the generalized pattern MLP exports. The project uses the MIT License, and bundled third-party notices are collected in [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
 
-This README is an introduction that explains "what to look at first when you open the project." For current behavior, the `1.7.1` project state, the `1.5.1 fixed stable baseline` baseline, configuration, and design documents, continue from [`docs/README.en.md`](docs/README.en.md).
+This README is an introduction that explains "what to look at first when you open the project." For current behavior, the `1.7.2` project state, the `1.5.1 fixed stable baseline` baseline, configuration, and design documents, continue from [`docs/README.en.md`](docs/README.en.md).
 
 TenRiff should also be read as a `vibe coding` work: it was shaped through fast iteration and experimentation rather than only through a traditional long-form design-first process.
 
-## 1.7.1 Gameplay & Multiplayer Polish
+## 1.7.2 Audio, Library and Gameplay Update
 
-Multiplayer HUDs and results show the full room, with score comparison and spectator completion adapted to multiple opponents. This update adds P-GREAT-only effects, independent judgement/combo placement, optional audio normalization, ten pastel Options cards and a difficulty-table control on Song Select. Long LEVEL labels are easier to read.
+Native Windows ASIO output is available alongside the default WASAPI output. The difficulty-table picker includes an explicit Native LV choice plus Aery 5K, Aery 7K and Revive 10K tables. Portable `.trskin` files transfer skin settings and assets to another PC.
 
-See [CHANGELOG](CHANGELOG.md) and [release verification](docs/release-1.7.1-gate.md).
+This release includes a three-second resume countdown, ignored Esc input during Session Mix, duration-based reference BPM and an LR2-reference grade-course gauge. Sources gains folder addition and list-only removal; Unicode-path validation and multiplayer results after an opponent leaves are also fixed.
+
+See [CHANGELOG](CHANGELOG.md) and the [1.7.2 release gate](docs/release-1.7.2-gate.md) for verification and ASIO device coverage.
 
 ## Screenshots
 
@@ -45,7 +47,7 @@ Adjust lanes and notes while checking the live preview.
 - Primary target platform: Windows
 - Supported charts: BMS family only (`.bms/.bme/.bml/.pms`)
 - Graphics path: D3D11 + Direct2D/DirectWrite
-- Audio path: WASAPI
+- Audio path: WASAPI (default), native ASIO (requires a Windows x64 driver)
 - Input path: RawInput or high-rate polling
 - Direct-IP/headless-server multiplayer: fixed TCP coordinator for up to 8 players, BMS-only shared charts, and `F8` chat (default `27301/TCP`; see [usage](docs/multiplayer.md))
 - License: [MIT](LICENSE)
@@ -96,7 +98,7 @@ The codebase is currently at the level where you can "open the menu, choose a so
 - Gameplay / HUD
   - Real-time HUD
   - Staged chart-loading progress
-  - `Esc` cancel during gameplay loading
+  - `Esc` cancels ordinary gameplay loading; Session Mix ignores Esc
   - Display offset
   - Performance overlay
   - Note head/tail bitmap cache + static playfield command-list cache

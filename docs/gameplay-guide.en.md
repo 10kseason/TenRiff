@@ -68,6 +68,8 @@ The standard TenRiff play flow is:
 - `Keymap`
   - Change key bindings and run the NKRO test
 
+The table picker also offers F1 Aery 5K, F2 Aery 7K, F3 Revive 10K and F4 Native LV. Native LV applies immediately to display, sorting, grouping and numeric filters. See [library management](library-management.md).
+
 ## 4. Recommended Starter Settings
 
 These settings are a good starting point:
@@ -113,7 +115,7 @@ If this is not the layout you want, you can change it in `Options > Keymap`.
 
 ### Loading
 - Right after song start, chart-loading progress may be shown.
-- Pressing `Esc` during loading cancels the start and returns to Song Select.
+- Pressing `Esc` during ordinary loading cancels the start and returns to Song Select. Session Mix ignores Esc during loading and the initial countdown.
 
 ### Countdown
 - After loading finishes, the `3 / 2 / 1` countdown appears first.
@@ -122,7 +124,8 @@ If this is not the layout you want, you can change it in `Options > Keymap`.
 ## 7. In-Game Controls
 
 - Chart key input: based on the current keymap
-- `Esc`: open the pause menu (Continue / Restart / Exit) in single-player; abort play in multiplayer
+- `Esc`: pause ordinary single-player immediately. Continue or Esc resumes after a 3/2/1 countdown while audio, chart time and scoring remain frozen. Esc during the resume countdown returns to the pause menu.
+- Session Mix ignores Esc during play; its between-stage result exits remain available. Multiplayer retains its Esc abort behavior.
 - `F3`: decrease Hi-Speed
 - `F4`: increase Hi-Speed
 - `F5`: decrease Hi-Speed significantly
@@ -131,7 +134,7 @@ If this is not the layout you want, you can change it in `Options > Keymap`.
 
 Hi-Speed changes only the visual scroll speed; it does not change the judgement timing itself.
 Rate changes playback tempo and chart scheduling, but it does not change visual scroll speed at the same Hi-Speed.
-BPM changes keep the pixels-per-second speed anchored to the chart's starting BPM; explicit `#SCROLL`, stops, and reverse motion still apply.
+Reference BPM is the tempo with the longest accumulated running time; repeated sections add together and STOP waits are excluded. This fixes the Hi-Speed reference while explicit `#SCROLL`, stops and reverse motion still apply. See [reference BPM](reference-bpm.md).
 
 ## 8. How to Read the HUD
 
@@ -185,6 +188,8 @@ Rank uses `<75 F`, `75 B`, `80.5 A`, `86.5 A+`, `90 S`, `95.5 S+`, `98 AA`, `99 
 ### Gauge
 
 Gauge Shift is always active. `EX / Hard / Normal / Easy` select the starting tier, stored as `ex_hard / hard / normal / easy`. The selected tier and every lower tier start at 100% and accumulate judgements independently. When the current tier reaches zero, the next surviving tier takes over; the highest surviving tier at the end is the final result. Gauge failure occurs when all eligible tiers fail.
+
+Grade/Session Mix uses a separate LR2-reference gauge, carried between songs, with indirect misses and failure below 2% HP. Normal long notes apply gauge once on completion/release. Ordinary `gauge.delta` settings do not apply to courses. See [LR2 gauge comparison and limits](lr2-gauge-audit.ko.md).
 
 Legacy `shift` means an EX start. Modes with separate completion rules, such as Practice and Pacemaker, retain those rules.
 

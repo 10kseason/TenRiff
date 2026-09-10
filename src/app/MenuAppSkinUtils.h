@@ -62,9 +62,11 @@ enum class SkinSettingsRowId {
     JudgementY,
     JudgementX,
     ComboX,
+    ExportPreset,
+    ImportPreset,
 };
 
-inline constexpr std::array<SkinSettingsRowId, 49> kSkinSettingsRowOrder = {
+inline constexpr std::array<SkinSettingsRowId, 51> kSkinSettingsRowOrder = {
     SkinSettingsRowId::KeyMode,
     SkinSettingsRowId::ScratchPosition,
     SkinSettingsRowId::SkinSource,
@@ -113,6 +115,8 @@ inline constexpr std::array<SkinSettingsRowId, 49> kSkinSettingsRowOrder = {
     SkinSettingsRowId::JudgementY,
     SkinSettingsRowId::JudgementX,
     SkinSettingsRowId::ComboX,
+    SkinSettingsRowId::ExportPreset,
+    SkinSettingsRowId::ImportPreset,
     SkinSettingsRowId::Back,
 };
 

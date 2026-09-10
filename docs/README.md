@@ -10,7 +10,8 @@ Language: Korean | [English](README.en.md) | [简体中文](README.zh-CN.md) | [
 
 현재 동작이 충돌하면 같은 커밋의 **구현 코드·회귀 테스트**를 먼저 확인하고 `current-state`와 `config` 문서를 함께 수정합니다. 번역본도 같은 계약을 설명해야 합니다. `baseline-*`와 `release-*`는 해당 버전의 기록이며, 초기 설계·로드맵의 제안은 현재 구현이나 성능 보장이 아닙니다.
 
-- [1.7.1](release-1.7.1-gate.md)
+- [1.7.2](release-1.7.2-gate.md)
+- [1.7.1 history](release-1.7.1-gate.md)
 - [UI](menu-visual-polish.md)
 - [Gameplay / Multiplayer](gameplay-polish-followup.md)
 
@@ -75,7 +76,14 @@ Language: Korean | [English](README.en.md) | [简体中文](README.zh-CN.md) | [
 
 ## Skin Customization
 
+- [Portable skin presets](skin-presets.md): `.trskin` 파일로 현재 스킨 설정과 자산을 다른 PC에 전달
+- [곡 소스와 기본 난이도표](library-management.md): 목록에서만 소스 제거, 폴더 추가, 에리/리바이브 표 선택
+- [LR2 게이지 비교](lr2-gauge-audit.ko.md): 일반 게이지 차이와 단위인정의 수치·경계·LN 적용
 - `docs/skin-agent-guide.md`: AI 에이전트용 스킨 제작 계약, 프롬프트, 검증 체크리스트
 - `docs/skin-format.md`: TenRiff `skin.json` v1 로비/인게임 스킨 제작 및 가져오기 가이드
 - `docs/ranked-integrity-plan.md`: BMS 전용 검증 랭킹, 기록 보기, 온라인 기록, osu 관련 랭크 제외 단계 계획
 - `docs/tenriff-skin.schema.json`: 편집기 자동 완성 및 구조 검증용 JSON Schema
+
+## ASIO와 플레이 설정
+
+[네이티브 ASIO](asio-audio.md), [대표 BPM](reference-bpm.md), [휴대용 스킨 프리셋](skin-presets.md), [곡 소스와 난이도표](library-management.md), [LR2 게이지 비교](lr2-gauge-audit.ko.md)를 참고하세요.

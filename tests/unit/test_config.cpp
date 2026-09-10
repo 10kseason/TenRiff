@@ -1,5 +1,6 @@
 #include "doctest/doctest.h"
 
+#include <algorithm>
 #include <array>
 #include <filesystem>
 #include <fstream>
@@ -80,6 +81,8 @@ TEST_CASE("config defaults prefer 44100 Hz audio") {
     const auto config = loader.defaults();
 
     CHECK(config.audio.sample_rate == 44100);
+    CHECK(config.audio.backend == tenriff::audio::AudioBackend::WASAPI);
+    CHECK(config.audio.asio_driver.empty());
     CHECK(config.audio_ui.preset == "high");
     CHECK(config.audio_ui.background_sound_enabled);
     CHECK(config.audio_ui.bgm_volume == doctest::Approx(0.75));
@@ -421,10 +424,77 @@ TEST_CASE("audio presets do not override explicit sample rate") {
     const auto result = loader.load_profile("profiles/test");
 
     REQUIRE(result.success());
+    CHECK(result.config.audio.backend == tenriff::audio::AudioBackend::WASAPI);
+    CHECK(result.config.audio.asio_driver.empty());
     CHECK(result.config.audio.sample_rate == 44100);
     CHECK(result.config.audio.frames_per_buffer == 320);
     CHECK(result.config.audio.periods == 3);
     CHECK(result.config.audio_ui.bms_keysound_policy == "follow");
+}
+
+TEST_CASE("ASIO profile roundtrip preserves driver sample rate and buffer independently of WASAPI presets") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+    CurrentPathGuard cwd;
+    std::filesystem::current_path(temp.path);
+    ConfigLoader loader;
+    for (const std::string preset : {"basic", "high"}) {
+        auto config = loader.defaults();
+        config.audio.backend = tenriff::audio::AudioBackend::ASIO;
+        config.audio.asio_driver = "{01234567-89AB-CDEF-0123-456789ABCDEF}";
+        config.audio.sample_rate = 96000;
+        config.audio.frames_per_buffer = 64;
+        config.audio.periods = 2;
+        config.audio.exclusive_mode = false;
+        config.audio_ui.preset = preset;
+        std::string error;
+        REQUIRE(loader.save_profile("profiles/asio", config, &error));
+        CHECK(error.empty());
+        const auto result = loader.load_profile("profiles/asio");
+        REQUIRE(result.success());
+        CHECK(result.config.audio.backend == tenriff::audio::AudioBackend::ASIO);
+        CHECK(result.config.audio.asio_driver == config.audio.asio_driver);
+        CHECK(result.config.audio.sample_rate == 96000);
+        CHECK(result.config.audio.frames_per_buffer == 64);
+        CHECK(result.config.audio.periods == 2);
+        CHECK_FALSE(result.config.audio.exclusive_mode);
+        CHECK(result.config.audio_ui.preset == preset);
+    }
+}
+
+TEST_CASE("partial audio profiles inherit ASIO while explicit WASAPI and unknown backends retain legacy presets") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+    std::filesystem::create_directories(temp.path / "config");
+    std::filesystem::create_directories(temp.path / "profiles" / "test");
+    write_file(temp.path / "config" / "config.json",
+        R"({"audio":{"backend":"ASIO","asio_driver":"{01234567-89AB-CDEF-0123-456789ABCDEF}",)"
+        R"("rate":48000,"frames":128,"periods":2,"preset":"high"}})");
+    write_file(temp.path / "profiles" / "test" / "config.json", R"({"audio":{"volume":0.5}})");
+    CurrentPathGuard cwd;
+    std::filesystem::current_path(temp.path);
+    ConfigLoader loader;
+    auto result = loader.load_profile("profiles/test");
+    REQUIRE(result.success());
+    CHECK(result.config.audio.backend == tenriff::audio::AudioBackend::ASIO);
+    CHECK(result.config.audio.asio_driver == "{01234567-89AB-CDEF-0123-456789ABCDEF}");
+    CHECK(result.config.audio.sample_rate == 48000);
+    CHECK(result.config.audio.frames_per_buffer == 128);
+    CHECK(result.config.audio.periods == 2);
+    CHECK(result.config.audio_ui.master_volume == doctest::Approx(0.5));
+    for (const std::string backend : {"WASAPI", "unknown-backend"}) {
+        write_file(temp.path / "profiles" / "test" / "config.json",
+            "{\"audio\":{\"backend\":\"" + backend + "\",\"preset\":\"basic\"}}");
+        result = loader.load_profile("profiles/test");
+        REQUIRE(result.success());
+        CHECK(result.config.audio.backend == tenriff::audio::AudioBackend::WASAPI);
+        CHECK(result.config.audio.asio_driver == "{01234567-89AB-CDEF-0123-456789ABCDEF}");
+        CHECK(result.config.audio.sample_rate == 48000);
+        CHECK(result.config.audio.frames_per_buffer == 256);
+        CHECK(result.config.audio.periods == 3);
+    }
 }
 
 TEST_CASE("config save and load preserve volume and speed settings") {

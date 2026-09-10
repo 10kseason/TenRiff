@@ -15,6 +15,7 @@ namespace tenriff::gameplay {
 // the versions separate lets older scores retain their normalization semantics.
 inline constexpr int kReplayFormatVersion = 3;
 inline constexpr std::size_t kReplayMaxEventCount = 2'000'000;
+inline constexpr char kLr2CourseGaugeId[] = "lr2_grade_v1";
 
 struct ReplayEvent {
     int lane = 0;
@@ -39,6 +40,9 @@ struct ReplayModeSettings {
     std::string random;
     std::optional<int> random_seed;
     std::string gauge;
+    // Optional course evidence. Absent on older/ordinary replays; custom only.
+    std::string course_gauge;
+    std::optional<double> course_gauge_initial_value;
     bool autoplay_enabled = false;
     bool practice_no_fail_enabled = false;
     bool one_miss_fail_enabled = false;

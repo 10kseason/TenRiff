@@ -10,7 +10,8 @@ This codebase should also be read as a `vibe coding` work that grew through rapi
 
 When current-behavior descriptions conflict, check **implementation and regression tests at the same commit** first, then correct `current-state`, `config` and their translations together. `baseline-*` and `release-*` describe their named versions; early designs and roadmap proposals are not implementation or performance guarantees.
 
-- [1.7.1](release-1.7.1-gate.md)
+- [1.7.2](release-1.7.2-gate.md)
+- [1.7.1 history](release-1.7.1-gate.md)
 - [UI](menu-visual-polish.md)
 - [Gameplay / Multiplayer](gameplay-polish-followup.md)
 
@@ -66,3 +67,7 @@ When current-behavior descriptions conflict, check **implementation and regressi
 - When checking current behavior, start with `docs/current-state.en.md`.
 - When deciding what baseline to build on, read `docs/baseline-1.5.1.en.md` together with it.
 - Older design documents and current code can differ, so if there is a conflict, interpret things in the order of current code, then `docs/current-state.en.md`, then `docs/config.en.md`.
+
+## Audio and Play Settings
+
+See [native ASIO](asio-audio.md), [reference BPM](reference-bpm.md), [portable skin presets](skin-presets.md), [source and table management](library-management.md), and [LR2 gauge comparison](lr2-gauge-audit.ko.md).

@@ -35,9 +35,9 @@ struct GaugeConfig {
 // Session-only gauge behavior. Keep this separate from GaugeConfig so battle
 // rules can opt in without changing persisted single-player gauge tuning.
 struct GaugeRuntimePolicy {
-    // Dan / Session Mix gauge: keep the Normal gauge identity while using
-    // recovery halfway between Normal and Hard plus Easy damage deltas.
-    bool course_hybrid_deltas = false;
+    // LR2 beta3 grade-course gauge. Session-only: ordinary/ranked gauge
+    // configuration and replay rules remain independent of course balance.
+    bool course_lr2_deltas = false;
     bool hard_to_normal_shift = false;
     double hard_to_normal_threshold = 66.0;
     bool normal_to_easy_shift = false;
@@ -67,7 +67,10 @@ public:
 
     GaugeResult applyJudgement(GaugeState& state, Judgement judgement, double time_ms) const;
     GaugeResult applyDamage(GaugeState& state, double damage_percent, double time_ms = 0.0) const;
-    GaugeResult applyJudgementWeighted(GaugeState& state, Judgement judgement, double time_ms, double weight) const;
+    GaugeResult applyJudgementWeighted(GaugeState& state, Judgement judgement, double time_ms,
+                                      double weight, bool empty_poor = false) const;
+
+    [[nodiscard]] bool isFailedValue(double value) const noexcept;
 
 private:
     [[nodiscard]] GaugeDeltaTable tableFor(GaugeType type) const noexcept;

@@ -35,6 +35,9 @@ struct HoldState {
     int64_t release_sample = 0;
     double osu_head_delta_ms = 0.0;
     bool osu_released_during_body = false;
+    // LR2 normal LN gauge applies the head judgement once at completion.
+    game::Judgement course_head_judgement = game::Judgement::PG;
+    bool course_gauge_pending = false;
 };
 
 struct LaneState {
@@ -111,7 +114,11 @@ private:
                          int64_t sample,
                          double weight,
                          ComboImpact combo_impact,
-                         bool osu_miss);
+                         bool osu_miss,
+                         double gauge_weight = -1.0);
+    game::GaugeResult apply_gauge_judgement(game::Judgement judgement, int64_t sample,
+                                           double weight, bool empty_poor = false);
+    void finish_course_hold_gauge(HoldState& hold, int64_t sample, bool early_release);
     [[nodiscard]] std::optional<NoteEvent> try_hit_note(LaneState& lane, int64_t input_sample);
     void apply_missed_note(const NoteEvent& note, int64_t sample);
     void apply_bad_miss(const NoteEvent& note, int64_t sample);

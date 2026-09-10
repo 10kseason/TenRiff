@@ -612,6 +612,7 @@ bool MenuApp::start_song_preview_audio(const SongSelectScreen::PreviewDecodeResu
                 frames);
         });
     if (initialized != audio::AudioResult::Success) {
+        song_browser_status_message_ = audio_thread_.error_message();
         std::cerr << "[warn] Failed to initialize song preview audio (result="
                   << static_cast<int>(initialized) << ")." << std::endl;
         audio_thread_.shutdown();
@@ -621,6 +622,7 @@ bool MenuApp::start_song_preview_audio(const SongSelectScreen::PreviewDecodeResu
     menu_music_.stop();
     const auto started = audio_thread_.start();
     if (started != audio::AudioResult::Success) {
+        song_browser_status_message_ = audio_thread_.error_message();
         std::cerr << "[warn] Failed to start song preview audio (result="
                   << static_cast<int>(started) << ")." << std::endl;
         audio_thread_.shutdown();
@@ -645,6 +647,12 @@ void MenuApp::cancel_song_preview_decode() {
 void MenuApp::service_song_preview() {
     constexpr int64_t kPreviewDelayNs = 750'000'000LL;
     const int64_t now_ns = timing::HighResClock::now_ns();
+    if (audio_thread_.has_runtime_error()) {
+        song_browser_status_message_ = audio_thread_.error_message();
+        stop_song_preview_audio();
+        song_select_screen_.set_preview_pending(false);
+        publish_snapshot();
+    }
 
     const bool preview_screen_active =
         current_screen() == Screen::SongSelect &&
@@ -2079,7 +2087,9 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
     });
 #ifdef _WIN32
     auto escape_was_down = std::make_shared<std::atomic<bool>>((GetAsyncKeyState(VK_ESCAPE) & 0x8000) != 0);
-    session.set_loading_cancel_callback([this, escape_was_down, peer_battle]() {
+    const bool ignore_course_escape = session_mix_active_ && !peer_battle && replay_path.empty();
+    session.set_loading_cancel_callback([this, escape_was_down, peer_battle, ignore_course_escape]() {
+        if (ignore_course_escape) return false;
         if (peer_battle) {
             const network::PeerSessionSnapshot peer = peer_session_.snapshot();
             if (peer.state != network::PeerSessionState::Connected || !peer.round_active) {
@@ -2306,6 +2316,7 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
     }
     if (!session.initialize(play_options)) {
         const bool loading_canceled = session.was_user_aborted();
+        if (!session.audio_error().empty()) song_browser_status_message_ = session.audio_error();
         session.shutdown();
         last_gameplay_input_backend_state_ = session.input_backend_state();
         remember_input_backend_fallback(last_gameplay_input_backend_state_);
@@ -2380,10 +2391,11 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
     }
 
     session.run();
-    const bool session_aborted = session.was_user_aborted();
     const bool session_restart_requested = session.was_restart_requested();
     const bool session_exit_requested = session.was_exit_requested();
     session.shutdown();
+    const bool session_aborted = session.was_user_aborted() || !session.audio_error().empty();
+    if (!session.audio_error().empty()) song_browser_status_message_ = session.audio_error();
     last_gameplay_input_backend_state_ = session.input_backend_state();
     remember_input_backend_fallback(last_gameplay_input_backend_state_);
 
@@ -2686,8 +2698,8 @@ void MenuApp::populate_help_overlay(render::HelpOverlayData& target) const {
                         "LR2 코스는 차트 MD5 순서를 유지하며, 누락 채보가 있으면 시작하지 않습니다."),
                 ui_text("Browse for or drop an .lr2crs file; the last loaded path is remembered.",
                         ".lr2crs 파일을 찾거나 드롭하면 마지막으로 불러온 경로를 기억합니다."),
-                ui_text("All course runs share one gauge: midway Normal-Hard recovery, Easy damage, and failure at zero.",
-                        "모든 코스는 NORMAL과 HARD 중간 회복량, EASY 감소량을 쓰며 0에서 실패하는 게이지를 이어 씁니다."),
+                ui_text("Courses carry the LR2 grade gauge: PG/GR +0.1, GD +0.04, BAD -2, missed POOR -3, empty POOR -2; damage x0.6 below 32%, failure below 2%.",
+                        "코스는 LR2 단위 게이지를 이어 씁니다: PG/GR +0.1, GD +0.04, BAD -2, 간접 POOR -3, 빈 POOR -2. 32% 미만 피해 x0.6, 2% 미만 실패."),
             };
             target.footer = ui_text("Result Enter continues; Result Esc or Backspace ends the mix.",
                                     "Result에서 Enter는 계속, Esc 또는 Backspace는 세션 종료입니다.");

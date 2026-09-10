@@ -36,14 +36,21 @@ int run_replay_verifier_process(const std::filesystem::path& replay,
                                 const std::string& challenge_id,
                                 const std::string& challenge_nonce) {
 #ifdef _WIN32
-    const std::string executable = TENRIFF_TEST_REPLAY_VERIFIER_PATH;
-    const std::string replay_path = replay.u8string();
-    const std::string chart_path = chart.u8string();
-    const char* arguments[] = {
-        executable.c_str(), "--replay", replay_path.c_str(),
-        "--chart", chart_path.c_str(), "--challenge-id", challenge_id.c_str(),
-        "--challenge-nonce", challenge_nonce.c_str(), nullptr};
-    return static_cast<int>(_spawnv(_P_WAIT, executable.c_str(), arguments));
+    const std::wstring executable = std::filesystem::u8path(TENRIFF_TEST_REPLAY_VERIFIER_PATH).wstring();
+    const std::wstring replay_path = replay.wstring();
+    const std::wstring chart_path = chart.wstring();
+    const std::wstring wide_id = std::filesystem::u8path(challenge_id).wstring();
+    const std::wstring wide_nonce = std::filesystem::u8path(challenge_nonce).wstring();
+    // _wspawnv forwards a command line, so arguments containing spaces still
+    // need quotes even though the executable lookup itself is a native path.
+    const std::wstring executable_arg = L"\"" + executable + L"\"";
+    const std::wstring replay_arg = L"\"" + replay_path + L"\"";
+    const std::wstring chart_arg = L"\"" + chart_path + L"\"";
+    const wchar_t* arguments[] = {
+        executable_arg.c_str(), L"--replay", replay_arg.c_str(),
+        L"--chart", chart_arg.c_str(), L"--challenge-id", wide_id.c_str(),
+        L"--challenge-nonce", wide_nonce.c_str(), nullptr};
+    return static_cast<int>(_wspawnv(_P_WAIT, executable.c_str(), arguments));
 #else
     const std::string command =
         "\"" TENRIFF_TEST_REPLAY_VERIFIER_PATH "\" --replay \"" +
@@ -345,8 +352,8 @@ TEST_CASE("deterministic replay verification ignores edited score claims") {
 }
 
 TEST_CASE("file replay verification binds the replay and exact chart SHA-256") {
-    const std::filesystem::path chart_path = "replay_verifier_chart.bms";
-    const std::filesystem::path replay_path = "replay_verifier_trace.json";
+    const auto chart_path = std::filesystem::u8path(u8"리플레이 검증 차트.bms");
+    const auto replay_path = std::filesystem::u8path(u8"리플레이 검증 입력.json");
     write_file(chart_path,
                "#PLAYER 1\n"
                "#TITLE Replay Verifier\n"
@@ -355,7 +362,7 @@ TEST_CASE("file replay verification binds the replay and exact chart SHA-256") {
                "#00111:01\n");
 
     tenriff::app::ChartLoader loader;
-    const auto loaded = loader.load(chart_path.string(), 48000, 1.0, "ignore", 0);
+    const auto loaded = loader.load(chart_path.u8string(), 48000, 1.0, "ignore", 0);
     REQUIRE(loaded.success());
     tenriff::config::ModeConfig mode;
     mode.key_mode = "auto";
@@ -388,7 +395,7 @@ TEST_CASE("file replay verification binds the replay and exact chart SHA-256") {
     const auto chart_hash = tenriff::app::hash_chart_file(chart_path, &hash_error);
     REQUIRE(chart_hash.valid());
     ReplayFile replay;
-    replay.chart_path = chart_path.string();
+    replay.chart_path = chart_path.u8string();
     replay.chart_format = "bms";
     replay.chart_sha256 = chart_hash.sha256;
     replay.server_challenge_id = "0123456789abcdef0123456789abcdef";
@@ -408,8 +415,8 @@ TEST_CASE("file replay verification binds the replay and exact chart SHA-256") {
     replay.score_multiplier = managed.final_multiplier;
     replay.final_score = tenriff::gameplay::scale_native_score(
         replay.stats.raw_score, replay.score_multiplier);
-    REQUIRE(save_replay_json(replay_path.string(), replay).success());
-    const auto challenge_bound = load_replay_json(replay_path.string());
+    REQUIRE(save_replay_json(replay_path.u8string(), replay).success());
+    const auto challenge_bound = load_replay_json(replay_path.u8string());
     REQUIRE(challenge_bound.success());
     CHECK(challenge_bound.replay->server_challenge_id == replay.server_challenge_id);
     CHECK(challenge_bound.replay->server_challenge_nonce == replay.server_challenge_nonce);
@@ -431,7 +438,7 @@ TEST_CASE("file replay verification binds the replay and exact chart SHA-256") {
 
     replay.final_score = 1;
     replay.stats.raw_score = 1;
-    REQUIRE(save_replay_json(replay_path.string(), replay).success());
+    REQUIRE(save_replay_json(replay_path.u8string(), replay).success());
     const auto edited_replay_hash = tenriff::app::hash_chart_file(replay_path, &hash_error);
     REQUIRE(edited_replay_hash.valid());
     const auto stale_binding = tenriff::app::verify_replay_file(
@@ -725,4 +732,82 @@ TEST_CASE("record ties use detail score before detailed accuracy") {
                            1000, 3, 11, 90.0, 50, 100, "20250101"));
     CHECK_FALSE(is_better_record(1000, 3, 10, 100.0, 50, 100, "20250102",
                                  1000, 3, 11, 90.0, 50, 100, "20250101"));
+}
+
+TEST_CASE("LR2 course replay preserves carried gauge and deterministic LN outcomes") {
+    using namespace tenriff::gameplay;
+    GameplayChart chart;
+    chart.lane_count = 1;
+    chart.duration_samples = 240000;
+    chart.notes = {NoteEvent{1, 48000}, NoteEvent{1, 96000, 144000}, NoteEvent{1, 192000}};
+    GameplayConfig config;
+    config.sample_rate = 48000;
+    config.initial_gauge_value = 31.9;
+    config.gauge_policy.course_lr2_deltas = true;
+    GameplayEngine live(chart, config);
+    (void)live.handle_input(1, InputState::Pressed, 24000);
+    (void)live.handle_input(1, InputState::Released, 24001);
+    (void)live.handle_input(1, InputState::Pressed, 48000);
+    (void)live.handle_input(1, InputState::Released, 48001);
+    (void)live.handle_input(1, InputState::Pressed, 97200);
+    (void)live.handle_input(1, InputState::Released, 144000);
+    live.advance(chart.duration_samples);
+
+    ReplayFile replay;
+    replay.chart_sha256 = std::string(64, 'c');
+    replay.ruleset_id = "custom";
+    replay.sample_rate = config.sample_rate;
+    replay.mode.course_gauge = kLr2CourseGaugeId;
+    replay.mode.course_gauge_initial_value = config.initial_gauge_value;
+    replay.trace = live.replay();
+    replay.stats = live.stats();
+    const auto path = std::filesystem::current_path() / "test_lr2_course_gauge_replay.json";
+    REQUIRE_FALSE(std::filesystem::exists(path));
+    REQUIRE(save_replay_json(path.u8string(), replay).success());
+    const auto loaded = load_replay_json(path.u8string());
+    std::error_code ec;
+    std::filesystem::remove(path, ec);
+    REQUIRE(loaded.success());
+    REQUIRE(loaded.replay->mode.course_gauge == kLr2CourseGaugeId);
+    CHECK(loaded.replay->mode.course_gauge_initial_value == config.initial_gauge_value);
+    GameplayConfig playback;
+    playback.sample_rate = loaded.replay->sample_rate;
+    playback.initial_gauge_value = loaded.replay->mode.course_gauge_initial_value;
+    playback.gauge_policy.course_lr2_deltas = loaded.replay->mode.course_gauge == kLr2CourseGaugeId;
+    GameplayEngine played(chart, playback);
+    for (const auto& event : loaded.replay->trace.events) {
+        (void)played.handle_input(event.lane, event.state, event.sample);
+    }
+    played.advance(chart.duration_samples);
+    CHECK(played.gauge_state().value == doctest::Approx(live.gauge_state().value));
+    CHECK(played.stats().raw_score == live.stats().raw_score);
+    CHECK(played.stats().counts.pr == live.stats().counts.pr);
+    CHECK(played.is_game_over() == live.is_game_over());
+    CHECK(tenriff::app::verify_replay_against_chart(
+        *loaded.replay, chart, tenriff::app::ChartFormat::Bms, 120.0).status ==
+        tenriff::app::ReplayVerificationStatus::CustomRuleset);
+}
+
+TEST_CASE("LR2 course replay metadata rejects missing carry unknown policies and ranked claims") {
+    using namespace tenriff::gameplay;
+    ReplayFile replay;
+    replay.replay_format_version = 0; // Optional policy is validated even on legacy files.
+    CHECK(validate_replay_evidence(replay).success());
+    CHECK(replay.mode.course_gauge.empty());
+    CHECK_FALSE(replay.mode.course_gauge_initial_value.has_value());
+    replay.ruleset_id = "custom";
+    replay.mode.course_gauge = kLr2CourseGaugeId;
+    CHECK_FALSE(validate_replay_evidence(replay).success());
+    replay.mode.course_gauge_initial_value = 37.5;
+    CHECK(validate_replay_evidence(replay).success());
+    for (double invalid : {-0.1, 100.1, std::numeric_limits<double>::quiet_NaN()}) {
+        replay.mode.course_gauge_initial_value = invalid;
+        CHECK_FALSE(validate_replay_evidence(replay).success());
+    }
+    replay.mode.course_gauge_initial_value = 37.5;
+    replay.mode.course_gauge = "unknown";
+    CHECK_FALSE(validate_replay_evidence(replay).success());
+    replay.mode.course_gauge = kLr2CourseGaugeId;
+    replay.ruleset_id = std::string(tenriff::app::kCanonicalReplayRulesetId);
+    CHECK_FALSE(validate_replay_evidence(replay).success());
 }

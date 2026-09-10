@@ -2,17 +2,19 @@
 
 Language: [한국어](README.md) | [English](README.en.md) | [简体中文](README.zh-CN.md) | 日本語
 
-TenRiff は Windows GUI ベースの BMS リズムゲーム runtime/launcher です。現在の stable 版は `1.7.1` で、譜面入力は BMS family（`.bms/.bme/.bml/.pms`）専用です。公開 package は BGA upscaler model を含まず、key-mode conversion 用の deterministic NK3 P64 graph と generalized pattern MLP を同梱します。license は MIT です。
+TenRiff は Windows GUI ベースの BMS リズムゲーム runtime/launcher です。現在のプロジェクト版は `1.7.2` で、譜面入力は BMS family（`.bms/.bme/.bml/.pms`）専用です。公開 package は BGA upscaler model を含まず、key-mode conversion 用の deterministic NK3 P64 graph と generalized pattern MLP を同梱します。license は MIT です。
 
-この README は導入文書です。現在の挙動、`1.7.1` project state、`1.5.1 fixed stable baseline` baseline、設定と設計文書は [`docs/README.ja.md`](docs/README.ja.md) から参照してください。
+この README は導入文書です。現在の挙動、`1.7.2` project state、`1.5.1 fixed stable baseline` baseline、設定と設計文書は [`docs/README.ja.md`](docs/README.ja.md) から参照してください。
 
 TenRiff のコードベースは、伝統的な長文設計書主導だけで積み上がったものではなく、高速な反復と実験を重視した `vibe coding` 的な性格を持つ作品でもあります。
 
-## 1.7.1 プレイ・マルチプレイ改善
+## 1.7.2 オーディオ・ライブラリ・プレイ改善
 
-マルチプレイのゲーム内表示と結果に全参加者を表示し、スコア比較と観戦終了を複数人に対応させました。P-GREAT 専用演出、判定・コンボの独立した位置調整、音量ノーマライズ ON/OFF、10 個のパステルカラー設定カード、選曲画面の難易度表設定を追加しました。長い LEVEL 表記も見やすくしました。
+ネイティブ Windows ASIO 出力を追加し、既定の WASAPI 出力も維持します。難易度表の選択画面から標準 LV、5キー Aery、7キー Aery、10キー Revive を選べます。`.trskin` ファイルでスキン設定と素材を別の PC に移せます。
 
-See [CHANGELOG](CHANGELOG.md) and [release verification](docs/release-1.7.1-gate.md).
+再開前の3秒カウントダウン、Session Mix 中の Esc 無視、累積進行時間による基準 BPM、LR2 参照段位ゲージを含みます。曲フォルダーの追加と一覧からの除去、Unicode パスの検証、相手退出後の結果保持も更新しました。
+
+変更は [CHANGELOG](CHANGELOG.md)、検証と ASIO 機器の確認範囲は [1.7.2 リリースゲート](docs/release-1.7.2-gate.md)を参照してください。
 
 ## スクリーンショット
 
@@ -45,7 +47,7 @@ See [CHANGELOG](CHANGELOG.md) and [release verification](docs/release-1.7.1-gate
 - 主対象プラットフォーム: Windows
 - 対応譜面: BMS family（`.bms/.bme/.bml/.pms`）専用
 - グラフィックス経路: D3D11 + Direct2D/DirectWrite
-- オーディオ経路: WASAPI
+- オーディオ経路: WASAPI（既定）、ネイティブ ASIO（Windows x64 ドライバーが必要）
 - 入力経路: RawInput または高ポーリング polling
 - direct-IP multiplayer: 固定 host の TCP coordinator 方式で最大8人、multiplayer の選曲は BMS のみ（既定 `27301/TCP`、[利用案内](docs/multiplayer.md)）
 - ライセンス: [MIT](LICENSE)
@@ -96,7 +98,7 @@ OpenAI Codex、ChatGPT、Claude Code、Gemini、そして検証に協力して�
 - Gameplay / HUD
   - リアルタイム HUD
   - 段階的な譜面ロード進行表示
-  - gameplay ロード中の `Esc` キャンセル
+  - 通常の gameplay ロード中は `Esc` で取消、Session Mix は Esc を無視
   - display offset
   - performance overlay
   - note head/tail ビットマップキャッシュ + static playfield command-list キャッシュ

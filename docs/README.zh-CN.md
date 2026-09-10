@@ -10,7 +10,8 @@ Language: [한국어](README.md) | [English](README.en.md) | [简体中文](READ
 
 当前行为说明冲突时，先核对**同一提交的实现代码与回归测试**，再同步修正 `current-state`、`config` 及翻译。`baseline-*`、`release-*` 记录各自版本；早期设计和路线图提案不是当前实现或性能保证。
 
-- [1.7.1](release-1.7.1-gate.md)
+- [1.7.2](release-1.7.2-gate.md)
+- [1.7.1 history](release-1.7.1-gate.md)
 - [UI](menu-visual-polish.md)
 - [Gameplay / Multiplayer](gameplay-polish-followup.md)
 
@@ -66,3 +67,7 @@ Language: [한국어](README.md) | [English](README.en.md) | [简体中文](READ
 - 在确认当前行为时，优先看 [`docs/current-state.zh-CN.md`](current-state.zh-CN.md)。
 - 在确认应当在哪个基准上继续叠加工作时，要同时看 [`docs/baseline-1.5.1.zh-CN.md`](baseline-1.5.1.zh-CN.md)。
 - 由于较旧的设计文档和当前代码可能不同，若出现冲突，请优先按当前代码、[`docs/current-state.zh-CN.md`](current-state.zh-CN.md)、[`docs/config.zh-CN.md`](config.zh-CN.md) 的顺序解释。
+
+## 音频与游玩设置
+
+参见[原生 ASIO](asio-audio.md)、[基准 BPM](reference-bpm.md)、[皮肤预设](skin-presets.md)、[曲库与难度表](library-management.md)和 [LR2 血条比较](lr2-gauge-audit.ko.md)。

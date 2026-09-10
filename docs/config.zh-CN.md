@@ -16,6 +16,11 @@
 ## `config.json`
 
 ### `audio`
+
+- `backend` (string)
+  - `wasapi | asio`，默认为 `wasapi`。用于游玩和曲目试听；菜单和结果 BGM 保留独立的 Windows MCI 路径。
+- `asio_driver` (string)
+  - 已安装64位 ASIO 驱动的 CLSID。空值表示 Auto，使用按名称排列的第一个驱动。Audio 设置中选择，F5 刷新列表。
 - `rate` (int)
   - 默认采样率
 - `frames` (int)
@@ -40,11 +45,13 @@
   - 对游戏内立体声混音进行联动 RMS 音量调整，位于 limiter/master volume 之前；默认 false，不改变菜单音乐与选曲试听。
 - `keysound_volume` (double)
 
+参见 [ASIO 设置](asio-audio.md)。ASIO 固定所选采样率并对谱面音频重采样。`frames` 为请求值，按驱动支持的大小协商。预设不覆盖 ASIO frames；`exclusive` 与 `periods` 仅用于 WASAPI。ASIO 失败时不会自动切换 WASAPI。
+
 ### `input`
 
 - `backend` (string)
   - `polling | rawinput`
-  - 当前 `1.7.1` 发布线默认值为 `rawinput`
+  - 当前 `1.7.2` 发布线默认值为 `rawinput`
   - 可在 `Options -> Input Settings -> Backend` 或 `Options -> Profile Setup -> Input Backend` 中按 profile 选择
   - runtime fallback 不会把已保存值改写为 `polling`
   - 确认 RawInput 启动失败、注册目标丢失或 message window 退出后，本次应用运行期间 menu 与后续 gameplay 都会保持 Polling
@@ -93,9 +100,13 @@
 - `hispeed` (double)
 - `target_scroll_bps` (double)
 
+- 基准 BPM 为累计进行时间最长的速度；相同 BPM 的区间合并计算，排除 STOP 等待。Hi-Speed 以此固定，保留显式 `#SCROLL`、停止和逆向效果。参见[计算规则](reference-bpm.md)。
+
 ### `gauge`
 
 Gauge Shift 始终启用。`mode.gauge` 的 `ex_hard / hard / normal / easy` 选择从 EX 到 Easy 的起始档位。所选档位及以下档位均从 100% 独立并行计算，当前档位淘汰后转至下一存活档位。全部可用档位淘汰后才发生血条失败。旧 `shift` 值表示从 EX 开始。
+
+段位/Session Mix 使用跨曲继承的 LR2 参考血条，保留间接失误，HP 低于 2% 时失败。普通 LN 在完成/释放时只结算一次，不应用普通 `gauge.delta`。参见[比较与兼容范围](lr2-gauge-audit.ko.md)。
 
 - `delta`: `ex_hard`, `hard`, `normal`, `easy` → `PG`, `GR`, `GD`, `BD`, `PR`.
 
@@ -209,13 +220,14 @@ chart loader/indexer 仅支持 BMS family（`.bms/.bme/.bml/.pms`）。旧 `enab
 | `require_enter_to_exit` | bool; `true` | 为读写兼容保留；当前 Windows 结果输入路径不使用此值自动退出。 |
 | `show_cursor_in_gameplay` | bool; `true` | 游戏中显示鼠标指针。 |
 | `active_song_source`, `recent_song_sources` | string / string[] | 当前与最近使用的歌曲文件夹。 |
+| `song_sources_initialized` | bool; `false` | 明确添加或移除曲目录后为 true，最后一项删除后保留空列表，重启不恢复。[曲库管理](library-management.md)。 |
 | `session_mix_lr2_course_path` | string | 所选 LR2 课程文件路径。 |
 | `favorite_chart_keys` | string[] | 收藏谱面的内部标识键。 |
 | `collections` | object: name → string[] | 按集合名称分组的谱面键列表。 |
 | `song_collection_filter` | string; `all` | 全部、收藏或集合筛选；即时保存。 |
 | `song_key_filter` | int: `0..16`; `0` | 键数筛选；0 为全部。UI 可选 4K–10K、12K、14K、16K。 |
 | `song_level_min_filter`, `song_level_max_filter` | int: `0..50`; `0` | 难度边界；0 表示不启用对应边界。 |
-| `difficulty_table_path` | string | 本地 header JSON 或下载到配置缓存的 header；变更时重新索引，选择表时切换至 safe 索引。 |
+| `difficulty_table_path` | string | 本地 header JSON 或下载的缓存；选表切换至 safe 索引。原生 LV 清空路径及有效缓存中的表信息。 |
 | `difficulty_table_url` | string | 原始 HTTP(S) BMSTable 页面或 header URL；解析 meta 并缓存 header/data，选择本地 JSON 时清空。 |
 | `online_records_server_url` | string | 记录、排名与聊天 API URL；失败不阻止本地游玩或记录。 |
 | `tenriff_main_server_url` | string | F10 主服务器 API URL；默认值为 Config.h 中的 `kTenRiffMainApiUrl`。 |
@@ -224,7 +236,11 @@ chart loader/indexer 仅支持 BMS family（`.bms/.bme/.bml/.pms`）。旧 `enab
 
 难度表 header 使用 `name`、`symbol` 与本地相对 `data_url`；data 项按 `md5` 或 `sha256` 及 `level` 匹配。远程导入保存在配置的 `difficulty_tables` 缓存中。
 
+原生 LV 清空 `difficulty_table_path` 与 `difficulty_table_url`，有有效缓存时仅移除外部表信息，无须完整重扫。默认使用 BMS `#PLAYLEVEL`；开启难度计算的缓存使用原有计算 LV。
+
 ### `skin`
+
+当前 `skin` 设置和活动皮肤素材可通过[便携 `.trskin` 预设](skin-presets.md)导出和导入。不包含音频设备、键位、账户、曲目录和时序校准。
 
 下表是配置文件 `config.json` 中的 skin 设置。皮肤包 `skin.json` 的规范见[皮肤格式](skin-format.md)。
 

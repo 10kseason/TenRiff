@@ -18,6 +18,8 @@ struct ChartLoadResult {
     gameplay::GameplayChart chart;
     ChartFormat format = ChartFormat::Unknown;
     double base_bpm = 0.0;
+    // Display/Hi-Speed reference only; base_bpm preserves replay/conversion input.
+    double reference_bpm = 0.0;
     std::vector<std::string> messages;
     std::string error;
 

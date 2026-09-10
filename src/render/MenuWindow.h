@@ -77,6 +77,8 @@ enum class MenuHitTargetKind {
     UrlWarningButton,
     GenericHelpPage,
     SongDifficultyTable,
+    SongSourceAdd,
+    SongSourceRemove,
 };
 
 enum class SongDifficultyTableAction {
@@ -85,6 +87,9 @@ enum class SongDifficultyTableAction {
     Reset = 2,
     Apply = 3,
     Cancel = 4,
+    PresetAery5 = 5,
+    PresetAery7 = 6,
+    PresetRevive10 = 7,
 };
 
 enum class MenuHitPart {

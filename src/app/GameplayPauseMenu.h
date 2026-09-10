@@ -12,6 +12,15 @@ enum class GameplayPauseAction {
 };
 
 inline constexpr int kGameplayPauseMenuItemCount = 3;
+inline constexpr int kGameplayResumeCountdownSeconds = 3;
+
+[[nodiscard]] inline int gameplay_resume_countdown_value(
+    std::int64_t deadline_sample, std::int64_t physical_sample, int sample_rate) {
+    if (sample_rate <= 0 || deadline_sample <= physical_sample) return 0;
+    const auto remaining = deadline_sample - physical_sample;
+    return static_cast<int>(std::min<std::int64_t>(kGameplayResumeCountdownSeconds,
+                                                  1 + (remaining - 1) / sample_rate));
+}
 
 [[nodiscard]] inline std::int64_t gameplay_logical_sample(
     std::int64_t physical_sample,

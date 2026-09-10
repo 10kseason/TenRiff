@@ -212,6 +212,12 @@ SkinSettingsEffects SkinSettingsController::apply_selected_action(
             case SkinSettingsRowId::ImportSkin:
                 effects.boundary_action = SkinBoundaryAction::ImportSkin;
                 return effects;
+            case SkinSettingsRowId::ExportPreset:
+                effects.boundary_action = SkinBoundaryAction::ExportPreset;
+                return effects;
+            case SkinSettingsRowId::ImportPreset:
+                effects.boundary_action = SkinBoundaryAction::ImportPreset;
+                return effects;
             case SkinSettingsRowId::CreateSkin:
                 effects.boundary_action = SkinBoundaryAction::CreateSkin;
                 return effects;

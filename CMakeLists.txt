@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(TenRiff VERSION 1.7.1 LANGUAGES C CXX)
+project(TenRiff VERSION 1.7.2 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -177,6 +177,7 @@ add_library(tenriff_core
     src/app/CrashLogger.cpp
     src/app/DifficultyTable.cpp
     src/app/DifficultyTableLink.cpp
+    src/app/SkinPreset.cpp
     src/app/GraphicsTiming.cpp
     src/app/ImportedGameplaySkin.cpp
     src/app/Lr2Course.cpp
@@ -272,6 +273,7 @@ if(WIN32)
     )
 
     add_library(tenriff_audio
+        src/audio/AsioBackend.cpp
         src/audio/WasapiBackend.cpp
         src/audio/AudioThread.cpp
         src/audio/OggVorbisDecoder.cpp
@@ -287,12 +289,17 @@ if(WIN32)
 
     target_compile_features(tenriff_audio PUBLIC cxx_std_17)
 
+    # Opt-in developer diagnostic; --list only reads registered x64 drivers.
+    add_executable(asio_audio_smoke EXCLUDE_FROM_ALL tests/smoke/asio_audio_smoke.cpp)
+    target_link_libraries(asio_audio_smoke PRIVATE tenriff_audio)
+
     # Link Windows audio libraries.
     target_link_libraries(tenriff_audio
         PUBLIC
             tenriff_core
             ole32
             avrt
+            advapi32
     )
 
     add_library(tenriff_app
@@ -713,6 +720,8 @@ if(TENRIFF_ENABLE_TESTS)
         tests/unit/test_skin_settings_controller.cpp
         tests/unit/test_mode_settings_controller.cpp
         tests/unit/test_config.cpp
+        tests/unit/test_skin_preset.cpp
+        tests/unit/test_song_source_history.cpp
         tests/unit/test_menu_music_controller.cpp
         tests/unit/test_input_backend_status.cpp
         tests/unit/test_profile_setup_flow.cpp
@@ -742,6 +751,7 @@ if(TENRIFF_ENABLE_TESTS)
     )
     if(WIN32)
         target_link_libraries(bms_parser_tests PRIVATE tenriff_chart tenriff_game tenriff_runtime tenriff_core tenriff_audio tenriff_app)
+        target_sources(bms_parser_tests PRIVATE tests/unit/test_asio_backend.cpp)
     else()
         target_link_libraries(bms_parser_tests PRIVATE tenriff_chart tenriff_game tenriff_runtime tenriff_core)
     endif()
@@ -751,6 +761,16 @@ if(TENRIFF_ENABLE_TESTS)
     target_compile_definitions(bms_parser_tests PRIVATE
         TENRIFF_TEST_REPLAY_VERIFIER_PATH="$<TARGET_FILE:tenriff_replay_verifier>")
     add_dependencies(bms_parser_tests tenriff_replay_verifier)
+    # The test target can be built without the GUI (notably under ASan). Keep
+    # its catalog fixture beside the executable instead of depending on where
+    # the build directory happens to sit relative to the source tree.
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/skins")
+        add_custom_command(TARGET bms_parser_tests POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_directory
+                "${CMAKE_CURRENT_SOURCE_DIR}/skins"
+                "$<TARGET_FILE_DIR:bms_parser_tests>/skins"
+            COMMENT "Copying the bundled skin catalog for tests")
+    endif()
     if(TENRIFF_ENABLE_ASAN AND MSVC)
         add_custom_command(TARGET bms_parser_tests POST_BUILD
             COMMAND ${CMAKE_COMMAND} -E copy_if_different

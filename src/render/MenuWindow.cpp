@@ -1,4 +1,5 @@
 #include "render/MenuWindow.h"
+#include "config/BuiltinDifficultyTables.h"
 #include "render/GameplayFeedbackText.h"
 
 #ifdef _WIN32

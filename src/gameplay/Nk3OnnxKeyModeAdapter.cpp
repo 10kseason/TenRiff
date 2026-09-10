@@ -5,6 +5,7 @@
 #include <atomic>
 #include <cmath>
 #include <cstdint>
+#include <cstdio>
 #include <cstdlib>
 #include <filesystem>
 #include <functional>
@@ -765,6 +766,19 @@ void configure_ncnn(ncnn::Net& net, const NcnnVulkanRuntime* runtime) {
     }
 }
 
+std::unique_ptr<FILE, decltype(&std::fclose)> open_ncnn_model_file(
+    const std::filesystem::path& path) {
+    // ncnn's filename overload uses narrow fopen on Windows. Open the native
+    // path ourselves so installed models also work below Korean/CJK folders.
+#ifdef _WIN32
+    FILE* file = _wfopen(path.c_str(), L"rb");
+#else
+    FILE* file = std::fopen(path.c_str(), "rb");
+#endif
+    if (!file) throw std::runtime_error("could not open ncnn model file: " + path.u8string());
+    return {file, &std::fclose};
+}
+
 class NcnnEvaluator final : public P64Evaluator {
 public:
     explicit NcnnEvaluator(const std::filesystem::path& param_path, bool use_vulkan)
@@ -776,11 +790,11 @@ public:
             throw std::runtime_error("converted P64 ncnn model is missing");
         }
         configure_ncnn(net_, runtime_);
-        const std::string param_name = param_path.u8string();
-        const std::string bin_name = bin_path.u8string();
-        require_ncnn(net_.load_param(param_name.c_str()),
+        const auto param_file = open_ncnn_model_file(param_path);
+        const auto bin_file = open_ncnn_model_file(bin_path);
+        require_ncnn(net_.load_param(param_file.get()),
                      "loading the P64 ncnn graph");
-        require_ncnn(net_.load_model(bin_name.c_str()),
+        require_ncnn(net_.load_model(bin_file.get()),
                      "loading the P64 ncnn weights");
     }
 
@@ -932,11 +946,11 @@ public:
             throw std::runtime_error("converted pattern MLP ncnn model is missing");
         }
         configure_ncnn(net_, runtime_);
-        const std::string param_name = param_path.u8string();
-        const std::string bin_name = bin_path.u8string();
-        require_ncnn(net_.load_param(param_name.c_str()),
+        const auto param_file = open_ncnn_model_file(param_path);
+        const auto bin_file = open_ncnn_model_file(bin_path);
+        require_ncnn(net_.load_param(param_file.get()),
                      "loading the pattern MLP ncnn graph");
-        require_ncnn(net_.load_model(bin_name.c_str()),
+        require_ncnn(net_.load_model(bin_file.get()),
                      "loading the pattern MLP ncnn weights");
     }
 

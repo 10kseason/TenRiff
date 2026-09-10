@@ -11,6 +11,7 @@
 #include "app/ChartFileHash.h"
 #include "app/DifficultyTable.h"
 #include "app/DifficultyTableLink.h"
+#include "config/BuiltinDifficultyTables.h"
 
 namespace {
 
@@ -353,5 +354,65 @@ TEST_CASE("difficulty table live link import smoke is opt-in") {
         CHECK(match->level == "LEVEL 13");
         CHECK(match->label() == "⑤LEVEL 13");
         CHECK(match->order >= 0);
+    }
+}
+
+TEST_CASE("built-in tables import publisher header and relative page layouts") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+    const std::vector<std::string> headers{
+        "https://asumatoki.kr/table/aery/header.json",
+        "https://asumatoki.kr/table/aery7/header.json",
+        "https://calc.10k-revive.cloud/table/header.json"};
+    const std::vector<std::string> bodies{
+        "https://asumatoki.kr/table/aery/data.json",
+        "https://asumatoki.kr/table/aery7/data.json",
+        "https://calc.10k-revive.cloud/table/body.json"};
+    for (std::size_t i = 0; i < tenriff::config::kBuiltinDifficultyTables.size(); ++i) {
+        const auto& preset = tenriff::config::kBuiltinDifficultyTables[i];
+        auto fetch = [&](std::string_view url, std::size_t) {
+            std::string body;
+            if (i == 2 && url == preset.url) {
+                body = "<meta name=\"bmstable\" content=\"table/header.json\">";
+            } else if (url == headers[i]) {
+                body = std::string("{\"name\":\"") + std::string(preset.name_ko) +
+                    "\",\"symbol\":\"Lv\",\"data_url\":\"" + (i == 2 ? "body.json" : "data.json") + "\"}";
+            } else if (url == bodies[i]) {
+                body = "[{\"md5\":\"1d99a3728312c6b689b6a6dc51770732\",\"level\":\"13\"}]";
+            } else {
+                return tenriff::app::DifficultyTableHttpResponse{404, std::string(url), {}, {}};
+            }
+            return tenriff::app::DifficultyTableHttpResponse{200, std::string(url), body, {}};
+        };
+        const auto imported = tenriff::app::import_difficulty_table_link(
+            preset.url, temp.path / std::to_string(i), fetch);
+        REQUIRE(imported.success());
+        CHECK(imported.source_url == preset.url);
+        const auto loaded = tenriff::app::load_difficulty_table_utf8(imported.cached_header_path);
+        REQUIRE(loaded.success());
+        const auto matched = loaded.table.lookup("1d99a3728312c6b689b6a6dc51770732", "");
+        REQUIRE(matched.has_value());
+        CHECK(matched->name == preset.name_ko);
+        CHECK(matched->level == "13");
+    }
+}
+
+TEST_CASE("all built-in difficulty tables live import is opt-in") {
+    const char* enabled = std::getenv("TENRIFF_LIVE_BUILTIN_TABLES");
+    if (!enabled || std::string_view(enabled) != "1") return;
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+    for (std::size_t i = 0; i < tenriff::config::kBuiltinDifficultyTables.size(); ++i) {
+        const auto& preset = tenriff::config::kBuiltinDifficultyTables[i];
+        const auto imported = tenriff::app::import_difficulty_table_link(
+            preset.url, temp.path / std::to_string(i));
+        std::cout << "[builtin table] " << preset.name_ko << ": "
+                  << (imported.success() ? imported.table_name : imported.error) << '\n';
+        REQUIRE(imported.success());
+        const auto loaded = tenriff::app::load_difficulty_table_utf8(imported.cached_header_path);
+        REQUIRE(loaded.success());
+        CHECK(loaded.table.entry_count() > 0);
     }
 }

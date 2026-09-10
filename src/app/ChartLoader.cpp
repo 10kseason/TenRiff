@@ -427,6 +427,7 @@ ChartLoadResult ChartLoader::load(const std::string& path,
     auto built_chart = build_bms_gameplay_chart(timeline_result.timeline, parse_result.chart, rate);
     result.chart = std::move(built_chart.chart);
     result.base_bpm = parse_result.chart.base_bpm;
+    result.reference_bpm = timeline_result.timeline.reference_bpm;
     result.messages.insert(result.messages.end(), built_chart.messages.begin(), built_chart.messages.end());
     const BmsKeysoundPolicy keysound_policy = parse_bms_keysound_policy(bms_keysound_policy);
     std::unordered_map<std::string, std::optional<std::string>> resolved_wav_cache;

@@ -670,7 +670,7 @@
         register_hit(table_link, MenuHitTargetKind::SongDifficultyTable, static_cast<int>(SongDifficultyTableAction::EditUrl));
         register_hit(table_file, MenuHitTargetKind::SongDifficultyTable, static_cast<int>(SongDifficultyTableAction::LocalFile));
         if (data.song_select.difficulty_table_active) register_hit(table_clear, MenuHitTargetKind::SongDifficultyTable, static_cast<int>(SongDifficultyTableAction::Reset));
-        draw_text_clipped(wloc("TABLE / URL", "난이도표 / URL"), d2d_->hud_format.Get(),
+        draw_text_clipped(wloc("TABLE / SELECT", "난이도표 / 선택"), d2d_->hud_format.Get(),
             D2D1::RectF(table_link.left + 14, table_link.top + 12, table_link.right - 8, table_link.top + 34), d2d_->muted_brush.Get());
         std::wstring table_name = to_wide(data.song_select.difficulty_table_name);
         if (table_name.size() > 26) table_name = table_name.substr(0, 25) + L"…";
@@ -918,6 +918,22 @@
                                   d2d_->muted_brush.Get());
             }
         } else if (data.song_select.showing_sources) {
+            const D2D1_RECT_F add_folder = D2D1::RectF(right_left, right_panel.top + 432.0f,
+                                                     right_right, right_panel.top + 492.0f);
+            const D2D1_RECT_F remove_folder = D2D1::RectF(right_left, right_panel.top + 508.0f,
+                                                        right_right, right_panel.top + 568.0f);
+            draw_glass_panel(add_folder, 10, 0.9f, 0, true, 0);
+            register_hit(add_folder, MenuHitTargetKind::SongSourceAdd, 0);
+            draw_centered_text(wloc("ADD FOLDER  [F2]", "폴더 추가  [F2]"), d2d_->body_format.Get(),
+                               add_folder, d2d_->accent_brush.Get(), true);
+            draw_glass_panel(remove_folder, 10, 0.7f, 0, false, 0);
+            if (data.song_select.source_count > 0) register_hit(remove_folder, MenuHitTargetKind::SongSourceRemove, 0);
+            draw_centered_text(wloc("REMOVE FROM LIST  [Del]", "목록에서 제거  [Del]"), d2d_->body_format.Get(),
+                               remove_folder, d2d_->muted_brush.Get(), true);
+            draw_text_clipped(wloc("Folders and song files stay on disk.", "실제 폴더와 곡 파일은 그대로 유지됩니다."),
+                              d2d_->hud_format.Get(), D2D1::RectF(right_left, right_panel.top + 583.0f,
+                                                                 right_right, right_panel.top + 617.0f),
+                              d2d_->muted_brush.Get());
             draw_meta_pair(D2D1::RectF(right_left, right_panel.top + 162.0f,
                                        right_left + 190.0f, right_panel.top + 238.0f),
                            loc("CHARTS", "차트"),

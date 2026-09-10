@@ -16,6 +16,11 @@
 ## `config.json`
 
 ### `audio`
+
+- `backend` (string)
+  - `wasapi | asio`; 기본 `wasapi`. 게임플레이와 선곡 미리듣기의 출력 백엔드. 메뉴·결과 배경음악은 별도 Windows MCI 경로를 유지.
+- `asio_driver` (string)
+  - 설치된 64비트 ASIO 드라이버의 CLSID. 빈 문자열은 Auto이며 이름순 첫 드라이버를 선택. Audio 화면에서 드라이버를 고르고 F5로 목록을 새로 읽음.
 - `rate` (int)
   - 기본 샘플레이트
 - `frames` (int)
@@ -40,11 +45,13 @@
   - 인게임 전체 스테레오 믹스의 RMS 음량 조절. limiter/master volume 전에 적용하며 기본값 false. 메뉴 음악·선곡 미리듣기는 그대로 유지.
 - `keysound_volume` (double)
 
+ASIO 설정은 [장치 설정 안내](asio-audio.md)를 참고하세요. 선택 샘플레이트를 고정하고 차트 오디오를 리샘플링합니다. `frames`는 요청값이며 드라이버 허용 크기로 협상됩니다. ASIO에서는 프리셋이 버퍼 크기를 덮어쓰지 않으며 `exclusive`·`periods`는 WASAPI 전용입니다. ASIO 오류 시 WASAPI로 자동 전환하지 않습니다.
+
 ### `input`
 
 - `backend` (string)
   - `polling | rawinput`
-  - 현재 `1.7.1` 릴리스 라인의 기본값은 `rawinput`
+  - 현재 `1.7.2` 릴리스 라인의 기본값은 `rawinput`
   - `Options -> Input Settings -> Backend` 또는 `Options -> Profile Setup -> Input Backend`에서 프로필별로 RawInput/Polling을 직접 선택 가능
   - 저장값은 런타임 fallback 때문에 자동으로 `polling`으로 덮어쓰지 않음
   - RawInput 시작 실패, 등록 대상 손실, 메시지 창 종료가 확인되면 현재 앱 실행 동안 메뉴와 다음 gameplay 세션 모두 Polling을 유지
@@ -64,7 +71,7 @@
 - `judgement_hz` (int)
   - `1000 | 2000 | 4000 | 8000`
   - 호환성용으로 남아 있는 입력 설정 필드
-  - 현재 `1.7.1` runtime은 별도 오디오 판정 서브루프를 이 값으로 구동하지 않음
+  - 현재 `1.7.2` runtime은 별도 오디오 판정 서브루프를 이 값으로 구동하지 않음
   - 기본값은 `4000` (`0.25ms`)
 - `debounce_ms` (double)
   - 실제 Press/Release 전환은 버리지 않고 같은 상태의 중복 이벤트만 상태 추적에서 제거
@@ -92,11 +99,13 @@
 - `rate` (double)
 - `hispeed` (double)
 - `target_scroll_bps` (double)
-- 시각 스크롤은 곡 시작 BPM에 고정되며 이후 BPM 변속으로 초당 이동 속도가 보정되지 않음; 명시적 `#SCROLL`, 정지, 역주행은 유지
+- 시각 스크롤은 누적 진행 시간이 가장 긴 대표 BPM을 기준으로 고정되며 이후 BPM 변속으로 초당 이동 속도가 보정되지 않음; STOP 대기는 대표 BPM 계산에서 제외하고 명시적 `#SCROLL`, 정지, 역주행은 유지. [계산 규칙](reference-bpm.md) 참고.
 
 ### `gauge`
 
 Gauge Shift는 항상 적용됩니다. `mode.gauge`의 `ex_hard / hard / normal / easy`는 시작 등급이며 EX부터 Easy 순서입니다. 선택한 등급과 그 아래 등급을 각각 100%에서 병렬 계산하고, 현재 등급이 탈락하면 다음 생존 등급으로 이동합니다. 모든 대상 등급이 탈락해야 게이지 실패가 됩니다. 기존 `shift` 값은 EX 시작으로 해석합니다.
+
+단위인정/Session Mix는 별도 LR2 참조 단위 게이지를 사용하며 일반 `gauge.delta` 설정을 적용하지 않습니다. 간접미스를 유지하며 수치·32% 보정·2% 실패·일반 게이지 비교는 [LR2 게이지 감사](lr2-gauge-audit.ko.md)를 참고하세요.
 
 - `delta`: `ex_hard`, `hard`, `normal`, `easy` → `PG`, `GR`, `GD`, `BD`, `PR`.
 
@@ -211,13 +220,14 @@ Gauge Shift는 항상 적용됩니다. `mode.gauge`의 `ex_hard / hard / normal 
 | `require_enter_to_exit` | bool; `true` | 읽기·저장 호환 필드. 현재 Windows 결과 입력 경로는 이 값으로 자동 종료하지 않습니다. |
 | `show_cursor_in_gameplay` | bool; `true` | 인게임 마우스 포인터 표시. |
 | `active_song_source`, `recent_song_sources` | string / string[] | 현재 곡 폴더와 최근 곡 폴더 목록. |
+| `song_sources_initialized` | bool; `false` | 소스를 명시적으로 추가·제거한 뒤 true. 마지막 소스를 지운 빈 목록을 재실행 때 자동 복원하지 않음. [곡 소스 관리](library-management.md) 참고. |
 | `session_mix_lr2_course_path` | string | 선택한 LR2 코스 파일 경로. |
 | `favorite_chart_keys` | string[] | 즐겨찾기 차트의 내부 식별 키. |
 | `collections` | object: name → string[] | 이름 있는 컬렉션별 차트 키 목록. |
 | `song_collection_filter` | string; `all` | 전체·즐겨찾기·컬렉션 필터. 변경 즉시 저장. |
 | `song_key_filter` | int: `0..16`; `0` | 키 수 필터. 0은 전체. UI 선택은 4K–10K, 12K, 14K, 16K. |
 | `song_level_min_filter`, `song_level_max_filter` | int: `0..50`; `0` | 난이도 경계. 0이면 해당 경계를 사용하지 않음. |
-| `difficulty_table_path` | string | 로컬 header JSON 또는 다운로드한 프로필 캐시 header. 표 변경 시 재인덱싱하며 선택 시 safe 인덱스로 전환. |
+| `difficulty_table_path` | string | 로컬 header JSON 또는 다운로드한 프로필 캐시 header. 표 선택 시 safe 인덱스로 전환. 기본 LV 선택 시 비우고 정상 캐시에서 외부 표 정보만 제거. |
 | `difficulty_table_url` | string | 원본 HTTP(S) BMSTable 페이지/header URL. bmstable meta를 해석해 header/data를 캐시하고 로컬 JSON 선택 시 비움. |
 | `online_records_server_url` | string | 기록·랭킹·채팅 API URL. 실패해도 로컬 플레이·기록은 유지. |
 | `tenriff_main_server_url` | string | F10 메인 서버 API URL. 기본 주소는 Config.h의 kTenRiffMainApiUrl. |
@@ -226,7 +236,11 @@ Gauge Shift는 항상 적용됩니다. `mode.gauge`의 `ex_hard / hard / normal 
 
 난이도표 header는 `name`, `symbol`, 로컬 상대경로 `data_url`을 사용하며 data 항목은 `md5` 또는 `sha256`과 `level`로 매칭합니다. 원격 가져오기는 프로필의 `difficulty_tables` 캐시에 저장합니다.
 
+선택 창의 `F4 기본 LV`는 `difficulty_table_path`와 `difficulty_table_url`을 함께 비웁니다. 기본 LV는 `mode.calculate_song_index_difficulty=false`일 때 BMS `#PLAYLEVEL`, 계산을 켜 둔 캐시에서는 기존 자체 계산 LV입니다. [곡 소스와 표 선택](library-management.md) 참고.
+
 ### `skin`
+
+현재 `skin` 설정과 활성 스킨 자산은 [휴대용 `.trskin` 프리셋](skin-presets.md)으로 내보내고 가져올 수 있습니다. 오디오 장치·키맵·계정·곡 소스와 타이밍 보정은 포함하지 않습니다.
 
 이 표는 프로필 `config.json`의 `skin` 설정입니다. 스킨 패키지의 `skin.json` 계약은 [스킨 형식](skin-format.md)을 참고하세요.
 

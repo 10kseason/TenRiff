@@ -5,6 +5,7 @@
 #include <iostream>
 #include <sstream>
 #include <string>
+#include <vector>
 
 namespace {
 
@@ -36,7 +37,7 @@ void usage() {
 
 }  // namespace
 
-int main(int argc, char** argv) {
+int run_verifier(int argc, const char* const* argv) {
     std::filesystem::path replay;
     std::filesystem::path chart;
     std::string challenge_id;
@@ -92,3 +93,23 @@ int main(int argc, char** argv) {
               << "\"}\n";
     return result.verified() && result.official_eligible ? 0 : 1;
 }
+
+#ifdef _WIN32
+int wmain(int argc, wchar_t** argv) {
+    // Windows narrow argv follows the active ANSI code page, while the verifier
+    // API expects UTF-8. Preserve native filenames before entering that API.
+    std::vector<std::string> utf8_arguments;
+    utf8_arguments.reserve(static_cast<std::size_t>(argc));
+    for (int index = 0; index < argc; ++index) {
+        utf8_arguments.push_back(std::filesystem::path(argv[index]).u8string());
+    }
+    std::vector<const char*> arguments;
+    arguments.reserve(utf8_arguments.size());
+    for (const auto& argument : utf8_arguments) arguments.push_back(argument.c_str());
+    return run_verifier(argc, arguments.data());
+}
+#else
+int main(int argc, char** argv) {
+    return run_verifier(argc, argv);
+}
+#endif

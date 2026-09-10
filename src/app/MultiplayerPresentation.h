@@ -44,13 +44,16 @@ inline render::MultiplayerPlayerData multiplayer_player_data(
 }
 
 // The local HUD/result is newer than the network's throttled local score copy.
-// Preserve every remote row, including players whose first score has not arrived.
+// Preserve every round entrant, including departed players and players whose
+// first score has not arrived. The worker retains scores before roster removal.
 inline std::vector<render::MultiplayerPlayerData> multiplayer_standings(
     const network::PeerSessionSnapshot& room, render::MultiplayerPlayerData local) {
     std::vector<render::MultiplayerPlayerData> players;
     local.local = true;
     local.player_id = room.local_player_id;
-    for (const auto& participant : room.participants) {
+    const auto& participants = room.round_participants.empty()
+        ? room.participants : room.round_participants;
+    for (const auto& participant : participants) {
         if (participant.local || participant.player_id == room.local_player_id) {
             if (local.name.empty()) local.name = participant.name;
         } else {

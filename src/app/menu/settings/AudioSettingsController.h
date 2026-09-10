@@ -4,6 +4,8 @@
 #include <cstddef>
 #include <cstdint>
 #include <optional>
+#include <string>
+#include <vector>
 
 #include "app/menu/MenuAction.h"
 #include "app/menu/settings/SettingsRowModel.h"
@@ -23,9 +25,13 @@ enum class AudioSettingId : std::uint8_t {
     SoundOffset = 6,
     Back = 7,
     Normalize = 8,
+    Backend = 9,
+    AsioDriver = 10,
+    SampleRate = 11,
+    BufferFrames = 12,
 };
 
-inline constexpr std::array<AudioSettingId, 9> kAudioSettingOrder{
+inline constexpr std::array<AudioSettingId, 13> kAudioSettingOrder{
     AudioSettingId::Preset,
     AudioSettingId::KeysoundMode,
     AudioSettingId::BackgroundSound,
@@ -34,7 +40,16 @@ inline constexpr std::array<AudioSettingId, 9> kAudioSettingOrder{
     AudioSettingId::KeysoundVolume,
     AudioSettingId::SoundOffset,
     AudioSettingId::Normalize,
+    AudioSettingId::Backend,
+    AudioSettingId::AsioDriver,
+    AudioSettingId::SampleRate,
+    AudioSettingId::BufferFrames,
     AudioSettingId::Back,
+};
+
+struct AudioDriverChoice {
+    std::string id;
+    std::string name;
 };
 
 [[nodiscard]] std::optional<std::size_t> audio_setting_index(AudioSettingId id) noexcept;
@@ -47,6 +62,9 @@ public:
 
     [[nodiscard]] AudioSettingId selected_id() const noexcept;
     [[nodiscard]] bool dirty() const noexcept;
+    void set_asio_drivers(std::vector<AudioDriverChoice> drivers);
+    [[nodiscard]] bool asio_drivers_loaded() const noexcept { return asio_drivers_loaded_; }
+    [[nodiscard]] const std::vector<AudioDriverChoice>& asio_drivers() const noexcept { return asio_drivers_; }
 
     // Starts a fresh visit to Audio Settings without mutating runtime config.
     void reset(AudioSettingId selected = AudioSettingId::Preset) noexcept;
@@ -72,6 +90,8 @@ private:
 
     AudioSettingId selected_id_ = AudioSettingId::Preset;
     bool dirty_ = false;
+    bool asio_drivers_loaded_ = false;
+    std::vector<AudioDriverChoice> asio_drivers_;
 };
 
 }  // namespace tenriff::app::menu::settings

@@ -12,6 +12,10 @@ constexpr double kEasyLowGaugeBadSofteningThreshold = 25.0;
 constexpr double kEasyLowGaugeBadSofteningScale = 0.90;
 constexpr double kLr2HardPoorLowGaugeThreshold = 30.0;
 constexpr double kLr2HardPoorLowGaugeScale = 0.60;
+// Original LR2 compares the displayed two-percent cell: int(HP / 2) * 2 <= 30.
+// This is HP < 32, not the < 30 approximation used by some compatible players.
+constexpr double kLr2CourseLowGaugeThreshold = 32.0;
+constexpr double kLr2CourseFailureThreshold = 2.0;
 
 double max_gauge_for(GaugeType type) {
     static_cast<void>(type);
@@ -35,14 +39,10 @@ GaugeState GaugeManager::initialState(GaugeType type) const noexcept {
 }
 
 GaugeDeltaTable GaugeManager::tableFor(GaugeType type) const noexcept {
-    if (policy_.course_hybrid_deltas && type == GaugeType::Normal) {
-        return GaugeDeltaTable{
-            (config_.normal.pg + config_.hard.pg) * 0.5,
-            (config_.normal.gr + config_.hard.gr) * 0.5,
-            (config_.normal.gd + config_.hard.gd) * 0.5,
-            config_.easy.bd,
-            config_.easy.pr,
-        };
+    if (policy_.course_lr2_deltas) {
+        // LR2 beta3 courseType 2; GOOD is 0.04, and a consumed POOR is -3.
+        // Empty POOR is a separate -2 event, selected in applyJudgementWeighted.
+        return GaugeDeltaTable{0.1, 0.1, 0.04, -2.0, -3.0};
     }
     switch (type) {
     case GaugeType::ExHard:
@@ -62,25 +62,36 @@ GaugeResult GaugeManager::applyJudgement(GaugeState& state, Judgement judgement,
 }
 
 GaugeResult GaugeManager::applyJudgementWeighted(GaugeState& state, Judgement judgement, double time_ms,
-                                                 double weight) const {
+                                                 double weight, bool empty_poor) const {
     static_cast<void>(time_ms);
     GaugeResult result{};
-    if (state.game_over) {
+    if (state.game_over || (policy_.course_lr2_deltas && isFailedValue(state.value))) {
+        state.game_over = true;
         result.game_over = true;
         return result;
     }
 
-    double delta = deltaFor(state.type, judgement) * weight;
-    if (state.type == GaugeType::Easy && state.value <= kEasyLowGaugeBadSofteningThreshold &&
+    double delta = (policy_.course_lr2_deltas && judgement == Judgement::PR && empty_poor
+                        ? -2.0 : deltaFor(state.type, judgement)) * weight;
+    if (policy_.course_lr2_deltas && state.value < kLr2CourseLowGaugeThreshold && delta < 0.0) {
+        delta *= 0.6;
+    }
+    if (!policy_.course_lr2_deltas && state.type == GaugeType::Easy &&
+        state.value <= kEasyLowGaugeBadSofteningThreshold &&
         is_easy_softened_bad_judgement(judgement) && delta < 0.0) {
         // Ease the death spiral slightly when the easy gauge is already nearly empty.
         delta *= kEasyLowGaugeBadSofteningScale;
     }
-    if (state.type == GaugeType::Hard && judgement == Judgement::PR &&
+    if (!policy_.course_lr2_deltas && state.type == GaugeType::Hard && judgement == Judgement::PR &&
         state.value <= kLr2HardPoorLowGaugeThreshold && delta < 0.0) {
         delta *= kLr2HardPoorLowGaugeScale;
     }
     state.value = std::clamp(state.value + delta, kMinGauge, max_gauge_for(state.type));
+    if (policy_.course_lr2_deltas) {
+        state.game_over = isFailedValue(state.value);
+        result.game_over = state.game_over;
+        return result;
+    }
 
     const auto shift_to = [&](GaugeType destination) {
         state.type = destination;
@@ -120,7 +131,8 @@ GaugeResult GaugeManager::applyJudgementWeighted(GaugeState& state, Judgement ju
 GaugeResult GaugeManager::applyDamage(GaugeState& state, double damage_percent, double time_ms) const {
     static_cast<void>(time_ms);
     GaugeResult result{};
-    if (state.game_over) {
+    if (state.game_over || (policy_.course_lr2_deltas && isFailedValue(state.value))) {
+        state.game_over = true;
         result.game_over = true;
         return result;
     }
@@ -128,6 +140,11 @@ GaugeResult GaugeManager::applyDamage(GaugeState& state, double damage_percent, 
     const double safe_damage =
         std::isfinite(damage_percent) ? std::max(0.0, damage_percent) : kGaugeMax;
     state.value = std::clamp(state.value - safe_damage, kMinGauge, max_gauge_for(state.type));
+    if (policy_.course_lr2_deltas) {
+        state.game_over = isFailedValue(state.value);
+        result.game_over = state.game_over;
+        return result;
+    }
 
     const auto shift_to = [&](GaugeType destination) {
         state.type = destination;
@@ -159,6 +176,11 @@ GaugeResult GaugeManager::applyDamage(GaugeState& state, double damage_percent, 
         result.game_over = true;
     }
     return result;
+}
+
+bool GaugeManager::isFailedValue(double value) const noexcept {
+    return !std::isfinite(value) || (policy_.course_lr2_deltas
+                                       ? value < kLr2CourseFailureThreshold : value <= 0.0);
 }
 
 double GaugeManager::deltaFor(GaugeType type, Judgement judgement) const noexcept {

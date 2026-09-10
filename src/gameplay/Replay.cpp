@@ -278,6 +278,12 @@ config::JsonValue build_mode_json(const ReplayModeSettings& mode) {
     if (!mode.gauge.empty()) {
         obj.emplace("gauge", config::JsonValue{mode.gauge});
     }
+    if (!mode.course_gauge.empty()) {
+        obj.emplace("course_gauge", config::JsonValue{mode.course_gauge});
+    }
+    if (mode.course_gauge_initial_value.has_value()) {
+        obj.emplace("course_gauge_initial_value", config::JsonValue{mode.course_gauge_initial_value.value()});
+    }
     obj.emplace("autoplay_enabled", config::JsonValue{mode.autoplay_enabled});
     obj.emplace("practice_no_fail_enabled", config::JsonValue{mode.practice_no_fail_enabled});
     obj.emplace("one_miss_fail_enabled", config::JsonValue{mode.one_miss_fail_enabled});
@@ -447,6 +453,14 @@ ReplayLoadResult load_replay_json(const std::string& path) {
             replay.mode.random_seed = read_json_int(*mode, "random_seed", 0);
         }
         replay.mode.gauge = read_json_string(*mode, "gauge");
+        replay.mode.course_gauge = read_json_string(*mode, "course_gauge");
+        if (const auto* carried = find_json_value(*mode, "course_gauge_initial_value")) {
+            if (!carried->is_number()) {
+                result.error = "Replay course gauge value must be a number.";
+                return result;
+            }
+            replay.mode.course_gauge_initial_value = carried->as_number();
+        }
         replay.mode.autoplay_enabled = read_json_bool(*mode, "autoplay_enabled", false);
         replay.mode.practice_no_fail_enabled =
             read_json_bool(*mode, "practice_no_fail_enabled", false);
@@ -611,6 +625,17 @@ ReplayLoadResult load_replay_json(const std::string& path) {
 
 ReplayValidationResult validate_replay_evidence(const ReplayFile& replay) {
     ReplayValidationResult result;
+    if (!replay.mode.course_gauge.empty() || replay.mode.course_gauge_initial_value.has_value()) {
+        if (replay.mode.course_gauge != kLr2CourseGaugeId ||
+            !replay.mode.course_gauge_initial_value.has_value() ||
+            !std::isfinite(replay.mode.course_gauge_initial_value.value()) ||
+            replay.mode.course_gauge_initial_value.value() < 0.0 ||
+            replay.mode.course_gauge_initial_value.value() > 100.0 ||
+            replay.ruleset_id != "custom") {
+            result.error = "Replay course gauge requires a supported custom rule and a bounded carried value.";
+            return result;
+        }
+    }
     if (replay.replay_format_version < kReplayFormatVersion) {
         return result;
     }

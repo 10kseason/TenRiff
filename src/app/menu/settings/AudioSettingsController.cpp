@@ -4,6 +4,7 @@
 #include <cmath>
 #include <string>
 #include <string_view>
+#include <utility>
 
 namespace tenriff::app::menu::settings {
 namespace {
@@ -53,6 +54,7 @@ bool set_numeric_value(double& destination, double value, const NumericSettingRa
 }
 
 void apply_audio_preset(config::RuntimeConfig& runtime) {
+    if (runtime.audio.backend == audio::AudioBackend::ASIO) return;
     if (runtime.audio_ui.preset == "basic") {
         runtime.audio.frames_per_buffer = 256;
         runtime.audio.periods = 3;
@@ -60,6 +62,18 @@ void apply_audio_preset(config::RuntimeConfig& runtime) {
         runtime.audio.frames_per_buffer = 320;
         runtime.audio.periods = 3;
     }
+}
+
+template<std::size_t N>
+std::uint32_t cycle_audio_value(std::uint32_t value,
+                               const std::array<std::uint32_t, N>& choices,
+                               int direction) {
+    if (direction < 0) {
+        auto it = std::lower_bound(choices.begin(), choices.end(), value);
+        return it == choices.begin() ? choices.back() : *--it;
+    }
+    auto it = std::upper_bound(choices.begin(), choices.end(), value);
+    return it == choices.end() ? choices.front() : *it;
 }
 
 std::string cycle_keysound_policy(std::string_view current, int direction) {
@@ -117,6 +131,10 @@ std::optional<NumericSettingRange> audio_setting_numeric_range(AudioSettingId id
         case AudioSettingId::BackgroundSound:
         case AudioSettingId::Normalize:
         case AudioSettingId::Back:
+        case AudioSettingId::Backend:
+        case AudioSettingId::AsioDriver:
+        case AudioSettingId::SampleRate:
+        case AudioSettingId::BufferFrames:
             return std::nullopt;
     }
     return std::nullopt;
@@ -130,9 +148,15 @@ bool AudioSettingsController::dirty() const noexcept {
     return dirty_;
 }
 
+void AudioSettingsController::set_asio_drivers(std::vector<AudioDriverChoice> drivers) {
+    asio_drivers_ = std::move(drivers);
+    asio_drivers_loaded_ = true;
+}
+
 void AudioSettingsController::reset(AudioSettingId selected) noexcept {
     selected_id_ = audio_setting_index(selected).has_value() ? selected : AudioSettingId::Preset;
     dirty_ = false;
+    asio_drivers_loaded_ = false;
 }
 
 MenuEffectFlags AudioSettingsController::select(AudioSettingId target) noexcept {
@@ -195,9 +219,50 @@ MenuEffectFlags AudioSettingsController::apply_selected_action(
 
     switch (selected_id_) {
         case AudioSettingId::Preset:
-            if (is_adjust) {
+            if (is_adjust && runtime.audio.backend != audio::AudioBackend::ASIO) {
                 runtime.audio_ui.preset = runtime.audio_ui.preset == "basic" ? "high" : "basic";
                 apply_audio_preset(runtime);
+                changed = true;
+            }
+            break;
+        case AudioSettingId::Backend:
+            if (is_adjust || is_activate) {
+                runtime.audio.backend = runtime.audio.backend == audio::AudioBackend::ASIO
+                    ? audio::AudioBackend::WASAPI : audio::AudioBackend::ASIO;
+                apply_audio_preset(runtime);
+                changed = true;
+            }
+            break;
+        case AudioSettingId::AsioDriver:
+            if ((is_adjust || is_activate) && runtime.audio.backend == audio::AudioBackend::ASIO &&
+                !asio_drivers_.empty()) {
+                // Empty is a visible automatic choice; keep an unavailable saved
+                // CLSID until the user explicitly changes this row.
+                std::size_t index = 0;
+                for (std::size_t i = 0; i < asio_drivers_.size(); ++i) {
+                    if (asio_drivers_[i].id == runtime.audio.asio_driver) index = i + 1;
+                }
+                const std::size_t count = asio_drivers_.size() + 1;
+                index = is_adjust && action.direction < 0
+                    ? (index == 0 ? count - 1 : index - 1) : (index + 1) % count;
+                const std::string next = index == 0 ? std::string{} : asio_drivers_[index - 1].id;
+                changed = runtime.audio.asio_driver != next;
+                runtime.audio.asio_driver = next;
+            }
+            break;
+        case AudioSettingId::SampleRate:
+            if ((is_adjust || is_activate) && runtime.audio.backend == audio::AudioBackend::ASIO) {
+                static constexpr std::array<std::uint32_t, 6> rates{44100, 48000, 88200, 96000, 176400, 192000};
+                runtime.audio.sample_rate = cycle_audio_value(runtime.audio.sample_rate, rates,
+                    is_adjust ? action.direction : 1);
+                changed = true;
+            }
+            break;
+        case AudioSettingId::BufferFrames:
+            if ((is_adjust || is_activate) && runtime.audio.backend == audio::AudioBackend::ASIO) {
+                static constexpr std::array<std::uint32_t, 7> frames{32, 64, 128, 256, 512, 1024, 2048};
+                runtime.audio.frames_per_buffer = cycle_audio_value(runtime.audio.frames_per_buffer, frames,
+                    is_adjust ? action.direction : 1);
                 changed = true;
             }
             break;

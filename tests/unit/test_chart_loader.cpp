@@ -136,7 +136,7 @@ TEST_CASE("chart loader resolves audio asset paths to absolute paths for relativ
 
     CHECK(result.success());
     REQUIRE(result.chart.audio_cues.size() == 1u);
-    CHECK(std::filesystem::path(chart_audio_path(result.chart, result.chart.audio_cues.front().asset_id)).is_absolute());
+    CHECK(std::filesystem::u8path(chart_audio_path(result.chart, result.chart.audio_cues.front().asset_id)).is_absolute());
     CHECK(chart_audio_path(result.chart, result.chart.audio_cues.front().asset_id) ==
           std::filesystem::weakly_canonical(ogg_path).u8string());
 }
