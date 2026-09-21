@@ -2,7 +2,7 @@
 
 **멀티 Rate 지원 빌드:** 로비 `대전 Rate`에서 리더가 공통 배속을 설정합니다. 참가자 모두 이 protocol v6 빌드를 사용해야 합니다. [사용 방법과 호환성](docs/multiplayer-rate-build.ko.md).
 
-**2026-09-15 1.7.7 릴리스:** 무입력 자동 결과 저장과 스텔라·새틀라이트·U_E 팩 4K/6K/8K 프리셋을 포함합니다. [수정 내용과 검증](docs/release-1.7.7-gate.md).
+**2026-09-21 1.7.7 릴리스:** 무입력 자동 결과 저장, BMS Editor 연습 흐름, 스텔라·새틀라이트·U_E 팩 4K/6K/8K 프리셋을 포함합니다. 연습 세션은 랭킹/Sites 제출에서 제외합니다. [수정 내용과 검증](docs/release-1.7.7-gate.md).
 
 Language: Korean | [English](README.en.md) | [简体中文](README.zh-CN.md) | [日本語](README.ja.md)
 

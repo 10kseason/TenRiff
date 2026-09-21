@@ -2,7 +2,7 @@
 
 **Multiplayer Rate build:** the leader sets a shared Room Rate in the lobby. All participants must use this protocol v6 build; previous v5 clients cannot join. [Guide (Korean)](docs/multiplayer.md).
 
-**2026-09-15 1.7.7 release:** completed plays save automatically after audio drains; adds Stella, Satellite and U_E Pack 4K/6K/8K presets. [Changes and verification (Korean)](docs/release-1.7.7-gate.md).
+**2026-09-21 1.7.7 release:** completed plays save automatically after audio drains; adds the BMS Editor practice flow, Stella, Satellite and U_E Pack 4K/6K/8K presets. Practice sessions are excluded from ranked/Sites submission. [Changes and verification (Korean)](docs/release-1.7.7-gate.md).
 
 This is the complete **1.7.7 Sites integrated** distribution. Extract to a new folder, run `launch_win.bat`, then press F10 and link your web account once. Eligible new plays upload score, detail score, accuracy, and detailed accuracy. Native scoring stays unchanged. See the [connection guide](docs/sites-leaderboard.md) (Korean).
 
