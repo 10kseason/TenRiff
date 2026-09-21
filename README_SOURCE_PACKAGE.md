@@ -3,7 +3,7 @@ TenRiff source package notes (`1.7.7`)
 - This is the 1.7.7 source line: native Windows ASIO output, explicit Native LV table selection, portable skin presets, source/table controls, Unicode verification and grade-gauge fixes, resume countdown, Session Mix Esc handling, and duration-based reference BPM. Current verification is recorded in `docs/release-1.7.7-gate.md`; the local 1.7.1 reports remain historical evidence.
 - This folder is the public 1.7.7 source distribution. It is suitable for inspection and a standalone Windows build.
 - It intentionally excludes local build trees, packaged binaries, caches, user profiles, logs, and private working notes.
-- Workspace-local root `AGENTS.md` and private agent notes are not part of the public source bundle. The already-public `skins/AGENTS.md` and `examples/skins/AGENTS.md` are skin authoring guides and remain included with their documentation links.
+- Workspace-local `AGENTS.md` files and private agent notes are not part of the public source bundle. Skin authoring guidance is kept in the regular public skin documentation.
 - `SOURCE_PACKAGE_SCOPE.txt` records the files included in the 1.7.7 public source bundle and its privacy boundary.
 - The current source line is `1.7.7`; it keeps P64 and the host beam safety solver authoritative and enables the generalized NK3 pattern MLP only for non-10K sources converted to 10K.
 - It supports BMS-family charts, 4K through 14K key modes, and native/LR2/TenRiff skins, keeps MPG/MPEG video BGA decoding with an FFmpeg fallback, and exposes an External ONNX Upscaler that remains off until the user enables it and acknowledges the high-spec warning.
