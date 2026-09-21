@@ -101,4 +101,9 @@ struct RankedPlayAuthorization {
     std::string& receipt,
     std::string& error);
 
+// Separate, explicitly unverified Sites community upload. Never changes ranked replay verification.
+[[nodiscard]] bool submit_sites_leaderboard_score(const std::string& base_url,
+    const std::string& upload_token, const std::string& payload,
+    bool& retryable, std::string& error);
+
 }  // namespace tenriff::app

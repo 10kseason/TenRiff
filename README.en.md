@@ -1,20 +1,26 @@
 # TenRiff
 
+**Multiplayer Rate build:** the leader sets a shared Room Rate in the lobby. All participants must use this protocol v6 build; previous v5 clients cannot join. [Guide (Korean)](docs/multiplayer.md).
+
+**2026-09-21 1.7.7 release:** completed plays save automatically after audio drains; adds the BMS Editor practice flow, Stella, Satellite and U_E Pack 4K/6K/8K presets. Practice sessions are excluded from ranked/Sites submission. [Changes and verification (Korean)](docs/release-1.7.7-gate.md).
+
+This is the complete **1.7.7 Sites integrated** distribution. Extract to a new folder, run `launch_win.bat`, then press F10 and link your web account once. Eligible new plays upload score, detail score, accuracy, and detailed accuracy. Native scoring stays unchanged. See the [connection guide](docs/sites-leaderboard.md) (Korean).
+
 Language: [한국어](README.md) | [English](README.en.md) | [简体中文](README.zh-CN.md) | [日本語](README.ja.md)
 
-TenRiff is a Windows GUI BMS rhythm-game runtime/launcher. The current project version is `1.7.2`, and chart input is limited to the BMS family (`.bms/.bme/.bml/.pms`). Graphics Settings lets users select a rights-cleared external ONNX model for the optional BGA Upscaler. Public packages contain no BGA-upscaler model; key-mode conversion bundles the deterministic NK3 P64 graph and the generalized pattern MLP exports. The project uses the MIT License, and bundled third-party notices are collected in [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
+TenRiff is a Windows GUI BMS rhythm-game runtime/launcher. The current project version is `1.7.7`, and chart input is limited to the BMS family (`.bms/.bme/.bml/.pms`). Graphics Settings lets users select a rights-cleared external ONNX model for the optional BGA Upscaler. Public packages contain no BGA-upscaler model; key-mode conversion bundles the deterministic NK3 P64 graph and the generalized pattern MLP exports. The project uses the MIT License, and bundled third-party notices are collected in [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
 
-This README is an introduction that explains "what to look at first when you open the project." For current behavior, the `1.7.2` project state, the `1.5.1 fixed stable baseline` baseline, configuration, and design documents, continue from [`docs/README.en.md`](docs/README.en.md).
+This README is an introduction that explains "what to look at first when you open the project." For current behavior, the `1.7.7` project state, the `1.5.1 fixed stable baseline` baseline, configuration, and design documents, continue from [`docs/README.en.md`](docs/README.en.md).
 
 TenRiff should also be read as a `vibe coding` work: it was shaped through fast iteration and experimentation rather than only through a traditional long-form design-first process.
 
-## 1.7.2 Audio, Library and Gameplay Update
+## 1.7.7 Audio, Library and Gameplay Update
 
 Native Windows ASIO output is available alongside the default WASAPI output. The difficulty-table picker includes an explicit Native LV choice plus Aery 5K, Aery 7K and Revive 10K tables. Portable `.trskin` files transfer skin settings and assets to another PC.
 
 This release includes a three-second resume countdown, ignored Esc input during Session Mix, duration-based reference BPM and an LR2-reference grade-course gauge. Sources gains folder addition and list-only removal; Unicode-path validation and multiplayer results after an opponent leaves are also fixed.
 
-See [CHANGELOG](CHANGELOG.md) and the [1.7.2 release gate](docs/release-1.7.2-gate.md) for verification and ASIO device coverage.
+See [CHANGELOG](CHANGELOG.md) and the [1.7.7 release gate](docs/release-1.7.7-gate.md) for verification and ASIO device coverage.
 
 ## Screenshots
 

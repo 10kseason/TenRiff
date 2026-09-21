@@ -55,19 +55,20 @@ using tenriff::app::erase_last_multiplayer_utf8_character;
 static_assert(static_cast<int>(MultiplayerMenuRow::Address) == 0);
 static_assert(static_cast<int>(MultiplayerMenuRow::Back) == kMultiplayerMenuRowCount - 1);
 
-TEST_CASE("multiplayer menu exposes eleven stable rows including LAN rooms and chat") {
-    CHECK(kMultiplayerMenuRowCount == 11);
+TEST_CASE("multiplayer menu includes shared Rate before the readiness controls") {
+    CHECK(kMultiplayerMenuRowCount == 12);
     CHECK(static_cast<int>(MultiplayerMenuRow::Address) == 0);
     CHECK(static_cast<int>(MultiplayerMenuRow::Port) == 1);
     CHECK(static_cast<int>(MultiplayerMenuRow::LanRoom) == 2);
     CHECK(static_cast<int>(MultiplayerMenuRow::Host) == 3);
     CHECK(static_cast<int>(MultiplayerMenuRow::Join) == 4);
     CHECK(static_cast<int>(MultiplayerMenuRow::Chart) == 5);
-    CHECK(static_cast<int>(MultiplayerMenuRow::Ready) == 6);
-    CHECK(static_cast<int>(MultiplayerMenuRow::Start) == 7);
-    CHECK(static_cast<int>(MultiplayerMenuRow::Chat) == 8);
-    CHECK(static_cast<int>(MultiplayerMenuRow::Options) == 9);
-    CHECK(static_cast<int>(MultiplayerMenuRow::Back) == 10);
+    CHECK(static_cast<int>(MultiplayerMenuRow::Rate) == 6);
+    CHECK(static_cast<int>(MultiplayerMenuRow::Ready) == 7);
+    CHECK(static_cast<int>(MultiplayerMenuRow::Start) == 8);
+    CHECK(static_cast<int>(MultiplayerMenuRow::Chat) == 9);
+    CHECK(static_cast<int>(MultiplayerMenuRow::Options) == 10);
+    CHECK(static_cast<int>(MultiplayerMenuRow::Back) == 11);
 }
 
 TEST_CASE("gameplay launch intent cannot promote a single-player run to peer battle") {
@@ -106,7 +107,7 @@ TEST_CASE("leaving multiplayer clears session state but keeps connection fields"
 TEST_CASE("multiplayer menu cursor clamps and moves within the row range") {
     CHECK(clamp_multiplayer_menu_cursor(-4) == 0);
     CHECK(clamp_multiplayer_menu_cursor(3) == 3);
-    CHECK(clamp_multiplayer_menu_cursor(99) == 10);
+    CHECK(clamp_multiplayer_menu_cursor(99) == 11);
 
     CHECK(move_multiplayer_menu_cursor(0, -1) == 0);
     CHECK(move_multiplayer_menu_cursor(0, 3) == 3);
@@ -175,12 +176,12 @@ TEST_CASE("peer battle rules fix scoring while preserving local presentation") {
     config.input_offset_ms = 17.0;
     config.visual_offset_ms = -12.0;
 
-    tenriff::app::apply_peer_battle_rules(config);
+    REQUIRE(tenriff::app::apply_peer_battle_rules(config, 1250));
 
     const tenriff::config::RuntimeConfig defaults;
     CHECK(config.judge.pg_ms == defaults.judge.pg_ms);
     CHECK(config.gauge.normal.pg == defaults.gauge.normal.pg);
-    CHECK(config.speed.rate == doctest::Approx(1.0));
+    CHECK(config.speed.rate == doctest::Approx(1.25));
     CHECK(config.mode.key_mode == "7k");
     CHECK(config.mode.gauge == "shift");
     CHECK(config.mode.random == "off");
@@ -196,6 +197,32 @@ TEST_CASE("peer battle rules fix scoring while preserving local presentation") {
     CHECK(config.skin.note_height_scale == doctest::Approx(2.4));
     CHECK(config.input_offset_ms == doctest::Approx(17.0));
     CHECK(config.visual_offset_ms == doctest::Approx(-12.0));
+}
+
+TEST_CASE("peer battle accepts the full shared Rate range independently of the local profile") {
+    for (uint32_t rate = 500; rate <= 2000; rate += 50) {
+        tenriff::config::RuntimeConfig runtime;
+        runtime.speed.rate = 1.95;
+        runtime.speed.hi_speed = 8.0;
+        REQUIRE(tenriff::app::apply_peer_battle_rules(runtime, rate));
+        CHECK(runtime.speed.rate == doctest::Approx(static_cast<double>(rate) / 1000.0));
+        CHECK(runtime.speed.hi_speed == doctest::Approx(8.0));
+    }
+    tenriff::config::RuntimeConfig defaults;
+    REQUIRE(tenriff::app::apply_peer_battle_rules(defaults));
+    CHECK(defaults.speed.rate == doctest::Approx(1.0));
+}
+
+TEST_CASE("invalid room Rate fails without silently using a local or default speed") {
+    for (uint32_t rate : {0u, 499u, 501u, 1025u, 2001u, 2050u,
+                          (std::numeric_limits<uint32_t>::max)()}) {
+        tenriff::config::RuntimeConfig runtime;
+        runtime.speed.rate = 1.75;
+        runtime.judge.pg_ms = 42.0;
+        CHECK_FALSE(tenriff::app::apply_peer_battle_rules(runtime, rate));
+        CHECK(runtime.speed.rate == doctest::Approx(1.75));
+        CHECK(runtime.judge.pg_ms == doctest::Approx(42.0));
+    }
 }
 
 TEST_CASE("multiplayer port editing accepts digits and limits the field to five characters") {

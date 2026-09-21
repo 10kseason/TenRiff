@@ -34,11 +34,19 @@ int main(int argc, char** argv) {
     bool skin_settings = false;
     bool title = false;
     bool focus_options = false;
+    bool sites_account = false;
+    bool sites_connected = false;
+    bool capture_once = false;
+    bool capture_requested = false;
+    int rendered_frames = 0;
     MenuRenderData data;
     data.ui_korean = true;
     for (int i = 1; i < argc; ++i) {
         const std::string arg = argv[i];
-        if (arg == "--table-editor") table_editor = true;
+        if (arg == "--sites-account") sites_account = true;
+        else if (arg == "--sites-connected") { sites_account = true; sites_connected = true; }
+        else if (arg == "--capture") capture_once = true;
+        else if (arg == "--table-editor") table_editor = true;
         else if (arg == "--options") options_grid = true;
         else if (arg == "--gameplay") gameplay = true;
         else if (arg == "--three-players") players = 3;
@@ -67,6 +75,13 @@ int main(int argc, char** argv) {
             return 2;
         }
     }
+    data.account_overlay.visible = sites_account;
+    data.account_overlay.sites_mode = sites_account;
+    data.account_overlay.sites_connected = sites_connected;
+    data.account_overlay.sites_url = "https://tenriff-leaderboard.lastestarcorp.chatgpt.site";
+    data.account_overlay.sites_status = sites_connected
+        ? "연결 정보를 암호화해 저장했습니다. 이제 플레이하면 됩니다."
+        : "웹사이트에서 로그인한 뒤 연결 정보를 복사해 주세요.";
     data.kind = result ? MenuScreenKind::ResultScreen : MenuScreenKind::SongSelect;
     if (settings) {
         data.kind = MenuScreenKind::GenericList;
@@ -295,7 +310,13 @@ int main(int argc, char** argv) {
                 hud.notes[hud.note_count++] = note;
             }
         }
+        ++rendered_frames;
+        if (capture_once && !capture_requested && rendered_frames >= 30) {
+            window.request_screenshot();
+            capture_requested = true;
+        }
         window.render(data);
+        if (capture_once && rendered_frames >= 33) break;
         while (const auto click = window.poll_click_event()) {
             std::cout << "hit kind=" << static_cast<int>(click->kind)
                       << " index=" << click->index << std::endl;

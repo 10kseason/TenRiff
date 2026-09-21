@@ -245,7 +245,7 @@
                     ? wloc("SONG SOURCES", "곡 소스")
                     : (data.song_select.showing_records
                            ? (data.song_select.online_records
-                                  ? wloc("ONLINE RECORDS", "온라인 기록")
+                                  ? wloc("LEGACY SERVER RECORDS", "기존 서버 기록")
                                   : wloc("LOCAL RECORDS", "로컬 기록"))
                            : wloc("SONG LIBRARY", "곡 라이브러리"));
             draw_text_clipped(library_title,
@@ -968,7 +968,7 @@
                            format_int_with_commas(data.song_select.max_combo));
             if (d2d_->hud_format && d2d_->accent_brush) {
                 const std::string detail_line = data.song_select.online_records
-                    ? loc("READ-ONLY SERVER LEADERBOARD", "읽기 전용 서버 리더보드")
+                    ? loc("LEGACY SERVER LEADERBOARD", "기존 서버 리더보드")
                     : loc("DETAIL SCORE ", "상세 점수 ") +
                           format_int_with_commas(data.song_select.detail_score) + " / " +
                           (data.song_select.max_detail_score > 0

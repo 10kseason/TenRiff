@@ -495,6 +495,8 @@ std::string normalize_mode_token(std::string_view token) {
 
 int key_count_from_mode_token(std::string_view token) {
     const std::string normalized = normalize_mode_token(token);
+    if (normalized == "10K2S" || normalized == "BEAT10K") return 12;
+    if (normalized == "14K2S" || normalized == "BEAT14K") return 16;
     const auto parse_supported_count = [](std::string_view digits) {
         if (digits.empty()) {
             return 0;
@@ -528,7 +530,7 @@ bool should_store_index_header(std::string_view key) {
     if (key == "BPM" || key == "PLAYER" || key == "GENRE" || key == "TITLE" || key == "ARTIST" ||
         key == "SUBTITLE" || key == "DIFFICULTY" || key == "PLAYLEVEL" || key == "RANK" ||
         key == "TOTAL" || key == "VOLWAV" || key == "LNOBJ" || key == "LNTYPE" || key == "LNMODE" ||
-        key == "STAGEFILE" || key == "BACKBMP" ||
+        key == "STAGEFILE" || key == "BACKBMP" || key == "MODEHINT" ||
         key == "PREVIEW" || key == "PREVIEWFILE") {
         return true;
     }
@@ -536,7 +538,7 @@ bool should_store_index_header(std::string_view key) {
         return true;
     }
     const std::string normalized_key = normalize_mode_token(key);
-    return normalized_key == "PLAYMODE" || normalized_key == "KEYMODE";
+    return normalized_key == "PLAYMODE" || normalized_key == "KEYMODE" || normalized_key == "MODEHINT";
 }
 
 bool should_retain_command_for_index(std::string_view channel) {
@@ -556,7 +558,7 @@ int detect_explicit_key_count(const BmsChart& chart) {
             return from_key;
         }
         const std::string normalized_key = normalize_mode_token(key);
-        if (normalized_key == "PLAYMODE" || normalized_key == "KEYMODE") {
+        if (normalized_key == "PLAYMODE" || normalized_key == "KEYMODE" || normalized_key == "MODEHINT") {
             if (const int from_value = key_count_from_mode_token(value); from_value > 0) {
                 return from_value;
             }
@@ -739,9 +741,20 @@ DeclaredLayout detect_declared_layout(const BmsChart& chart, std::string_view so
     if ((explicit_key_count == 10 || explicit_key_count == 12 || uses_dp10_plus_two_channels) && uses_dp10_plus_two_channels) {
         return DeclaredLayout{12, "10+2 DP", {"11", "12", "13", "14", "15", "16", "21", "22", "23", "24", "25", "26"}};
     }
-    if ((explicit_key_count == 16 || uses_dp14_plus_two_channels) && uses_dp14_plus_two_channels) {
+    if (explicit_key_count != 12 && (explicit_key_count == 16 || uses_dp14_plus_two_channels) && uses_dp14_plus_two_channels) {
         return DeclaredLayout{16, "14+2 DP", {"11", "12", "13", "14", "15", "16", "18", "19",
                                               "21", "22", "23", "24", "25", "26", "28", "29"}};
+    }
+
+    if (explicit_key_count == 12 && has_two_player_channels &&
+        contains_channel(lane_channels, "11") && contains_channel(lane_channels, "12") &&
+        contains_channel(lane_channels, "13") && contains_channel(lane_channels, "14") &&
+        contains_channel(lane_channels, "15") && contains_channel(lane_channels, "16") &&
+        contains_channel(lane_channels, "21") && contains_channel(lane_channels, "22") &&
+        contains_channel(lane_channels, "23") && contains_channel(lane_channels, "24") &&
+        contains_channel(lane_channels, "25") && contains_channel(lane_channels, "26")) {
+        return DeclaredLayout{12, "10+2 DP", {"11", "12", "13", "14", "15", "16",
+                                               "21", "22", "23", "24", "25", "26"}};
     }
 
     if (explicit_key_count > 0) {

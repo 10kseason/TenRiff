@@ -248,10 +248,10 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
                           : ui_text("UP/DOWN or wheel  MOVE     ENTER / dbl-click  OPEN RESULT     TAB  ONLINE",
                                     "위/아래 또는 휠  이동     ENTER / 더블클릭  결과 열기     TAB  온라인"))
                    : (render.song_select.result_available
-                           ? ui_text("UP/DOWN  MOVE     ENTER / dbl-click  PLAY     C  ADD COURSE     DELETE  UNDO",
-                                     "위/아래  이동     ENTER / 더블클릭  플레이     C  코스 추가     DELETE  되돌리기")
-                           : ui_text("UP/DOWN  MOVE     ENTER / dbl-click  PLAY     C  ADD COURSE     DELETE  UNDO",
-                                     "위/아래  이동     ENTER / 더블클릭  플레이     C  코스 추가     DELETE  되돌리기"))));
+                            ? ui_text("UP/DOWN  MOVE     ENTER / dbl-click  PLAY     I  EDIT BMS     C  ADD COURSE",
+                                      "위/아래  이동     ENTER / 더블클릭  플레이     I  BMS 편집     C  코스 추가")
+                            : ui_text("UP/DOWN  MOVE     ENTER / dbl-click  PLAY     I  EDIT BMS     C  ADD COURSE",
+                                      "위/아래  이동     ENTER / 더블클릭  플레이     I  BMS 편집     C  코스 추가"))));
     render.song_select.secondary_hint =
         multiplayer_selecting_chart_
             ? ui_text("ESC / BACKSPACE  BACK TO MULTIPLAYER LOBBY",
@@ -262,8 +262,8 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
             : (render.song_select.showing_records
                    ? ui_text("LEFT/RIGHT  NAV FOCUS     BACKSPACE  BACK     TAB  LOCAL/ONLINE     F1  HELP",
                              "좌/우  탐색 전환     BACKSPACE  뒤로     TAB  로컬/온라인     F1  도움말")
-                   : ui_text("TAB QUICK SETTINGS     UP/DOWN SELECT     LEFT/RIGHT ADJUST     F2 FOLDER     F5 REINDEX     F1 HELP",
-                             "TAB 빠른 설정     위/아래 선택     좌/우 조정     F2 폴더     F5 재인덱스     F1 도움말")));
+                    : ui_text("TAB QUICK SETTINGS     UP/DOWN SELECT     LEFT/RIGHT ADJUST     F2 FOLDER     F5 REINDEX     F1 HELP",
+                              "TAB 빠른 설정     위/아래 선택     좌/우 조정     F2 폴더     F5 재인덱스     F1 도움말")));
 
     const std::string source_detail =
         std::to_string(render.song_select.source_count) + " " +
@@ -464,20 +464,20 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
         if (total == 0) {
             if (render.song_select.online_records_loading) {
                 render.song_select.empty_title =
-                    ui_text("LOADING ONLINE RECORDS", "온라인 기록 불러오는 중");
+                    ui_text("LOADING LEGACY SERVER RECORDS", "기존 서버 기록 불러오는 중");
                 render.song_select.empty_message =
                     ui_text("The records server is being queried in the background.",
                             "백그라운드에서 기록 서버를 조회하고 있습니다.");
             } else if (!render.song_select.online_records_message.empty()) {
                 render.song_select.empty_title =
-                    ui_text("ONLINE RECORDS UNAVAILABLE", "온라인 기록 사용 불가");
+                    ui_text("LEGACY SERVER UNAVAILABLE", "기존 서버 연결 불가");
                 render.song_select.empty_message =
                     safe_ui_text(render.song_select.online_records_message,
                                  ui_text("Could not query the records server.",
                                          "기록 서버를 조회하지 못했습니다."));
             } else if (render.song_select.online_records) {
                 render.song_select.empty_title =
-                    ui_text("NO ONLINE RECORDS", "온라인 기록 없음");
+                    ui_text("NO LEGACY SERVER RECORDS", "기존 서버 기록 없음");
                 render.song_select.empty_message =
                     ui_text("No server-verified BMS records exist for this exact chart hash.",
                             "이 차트 해시에 서버 검증된 BMS 기록이 없습니다.");
@@ -486,6 +486,11 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
                 render.song_select.empty_message =
                     ui_text("Play a chart first. Saved results and replays will appear here.",
                             "먼저 차트를 플레이하세요. 저장된 결과와 리플레이가 여기에 표시됩니다.");
+            }
+            if (render.song_select.online_records) {
+                render.song_select.empty_message += ui_text(
+                    "\nWeb leaderboard: F10 > Web leaderboard > Open website.",
+                    "\n웹 기록은 F10 > 웹 리더보드 > 웹사이트 열기에서 확인하세요.");
             }
         }
     } else {

@@ -69,6 +69,10 @@ struct PeerSessionSnapshot {
     uint8_t leader_player_id = 0;
     std::size_t participant_count = 0;
     bool local_is_leader = false;
+    uint32_t rate_milli = kPeerRateDefaultMilli;
+    uint32_t round_rate_milli = kPeerRateDefaultMilli;
+    uint64_t rate_revision = 1;
+    bool rate_change_pending = false;
     std::vector<PeerParticipantSnapshot> participants;
     // Last launched round, retained independently of the live lobby roster.
     // Final scores and departed players survive result-screen disconnects.
@@ -134,6 +138,10 @@ public:
     /// later join cannot announce a stale chart chosen in an earlier session.
     void clear_local_chart();
     [[nodiscard]] bool set_ready(bool ready);
+
+    /// Leader-only lobby rate, 0.50..2.00 in 0.05 steps. The coordinator
+    /// invalidates every Ready vote; launched rounds retain round_rate_milli.
+    [[nodiscard]] bool set_rate(uint32_t rate_milli);
 
     /// Sends a bounded room-chat line. The coordinator attributes the sender
     /// from the authenticated room link before broadcasting it.

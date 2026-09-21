@@ -168,7 +168,13 @@ private:
 
 bool is_known_type(uint16_t raw) {
     return raw >= static_cast<uint16_t>(PeerMessageType::Hello) &&
-           raw <= static_cast<uint16_t>(PeerMessageType::Chat);
+           raw <= static_cast<uint16_t>(PeerMessageType::RoomRate);
+}
+
+bool decode_rate(Reader& reader, PeerMessage& message) {
+    return reader.read_u32(message.rate_milli) &&
+           peer_rate_milli_is_valid(message.rate_milli) &&
+           reader.read_u64(message.rate_revision) && message.rate_revision != 0;
 }
 
 bool decode_score(Reader& reader, PeerScore& score) {
@@ -193,6 +199,11 @@ bool decode_score(Reader& reader, PeerScore& score) {
 }
 
 }  // namespace
+
+bool peer_rate_milli_is_valid(uint32_t rate_milli) {
+    return rate_milli >= kPeerMinRateMilli && rate_milli <= kPeerMaxRateMilli &&
+           (rate_milli - kPeerMinRateMilli) % kPeerRateStepMilli == 0;
+}
 
 bool peer_score_claim_is_sane(const PeerScore& score) {
     constexpr int64_t kMaximumAbsoluteSample = 10'000'000'000'000ll;
@@ -219,6 +230,14 @@ bool peer_score_claim_is_sane(const PeerScore& score) {
 std::vector<uint8_t> encode_peer_message(const PeerMessage& message, std::string* error) {
     if (error) error->clear();
     std::vector<uint8_t> payload;
+    if ((message.type == PeerMessageType::Ready ||
+         message.type == PeerMessageType::Launch ||
+         message.type == PeerMessageType::RoomRoster ||
+         message.type == PeerMessageType::RoomRate) &&
+        (!peer_rate_milli_is_valid(message.rate_milli) || message.rate_revision == 0)) {
+        set_error(error, "Room rate or revision is invalid.");
+        return {};
+    }
 
     switch (message.type) {
         case PeerMessageType::Hello:
@@ -246,6 +265,13 @@ std::vector<uint8_t> encode_peer_message(const PeerMessage& message, std::string
         case PeerMessageType::Ready:
             append_u8(payload, message.player_id);
             append_u8(payload, message.ready ? 1u : 0u);
+            append_u32(payload, message.rate_milli);
+            append_u64(payload, message.rate_revision);
+            break;
+        case PeerMessageType::RoomRate:
+            append_u8(payload, message.player_id);
+            append_u32(payload, message.rate_milli);
+            append_u64(payload, message.rate_revision);
             break;
         case PeerMessageType::Launch:
             if (message.chart_hash == 0 || message.nonce == 0) {
@@ -255,6 +281,8 @@ std::vector<uint8_t> encode_peer_message(const PeerMessage& message, std::string
             append_u8(payload, message.player_id);
             append_u64(payload, message.chart_hash);
             append_u64(payload, message.nonce);
+            append_u32(payload, message.rate_milli);
+            append_u64(payload, message.rate_revision);
             break;
         case PeerMessageType::Loaded:
             if (message.nonce == 0) {
@@ -356,6 +384,8 @@ std::vector<uint8_t> encode_peer_message(const PeerMessage& message, std::string
             append_u8(payload, message.leader_id);
             append_u8(payload, message.round_active ? 1u : 0u);
             append_u64(payload, message.nonce);
+            append_u32(payload, message.rate_milli);
+            append_u64(payload, message.rate_revision);
             append_u8(payload, static_cast<uint8_t>(message.participants.size()));
             for (const auto& participant : message.participants) {
                 if (participant.player_id == 0 || participant.player_id > kPeerMaxPlayers) {
@@ -461,14 +491,18 @@ PeerDecodeStatus decode_peer_message(const std::vector<uint8_t>& bytes,
         case PeerMessageType::Ready: {
             uint8_t value = 0;
             valid = payload.read_u8(decoded.player_id) &&
-                    payload.read_u8(value) && value <= 1;
+                    payload.read_u8(value) && value <= 1 && decode_rate(payload, decoded);
             decoded.ready = value != 0;
             break;
         }
+        case PeerMessageType::RoomRate:
+            valid = payload.read_u8(decoded.player_id) && decode_rate(payload, decoded);
+            break;
         case PeerMessageType::Launch:
             valid = payload.read_u8(decoded.player_id) &&
                     payload.read_u64(decoded.chart_hash) && decoded.chart_hash != 0 &&
-                    payload.read_u64(decoded.nonce) && decoded.nonce != 0;
+                    payload.read_u64(decoded.nonce) && decoded.nonce != 0 &&
+                    decode_rate(payload, decoded);
             break;
         case PeerMessageType::Loaded:
             valid = payload.read_u8(decoded.player_id) &&
@@ -531,6 +565,7 @@ PeerDecodeStatus decode_peer_message(const std::vector<uint8_t>& bytes,
                     decoded.leader_id > 0 && decoded.leader_id <= kPeerMaxPlayers &&
                     payload.read_u8(active) && active <= 1 &&
                     payload.read_u64(decoded.nonce) &&
+                    decode_rate(payload, decoded) &&
                     payload.read_u8(count) && count > 0 && count <= kPeerMaxPlayers;
             decoded.round_active = active != 0;
             decoded.participants.clear();

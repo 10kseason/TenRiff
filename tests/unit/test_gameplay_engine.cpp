@@ -1701,3 +1701,31 @@ TEST_CASE("LR2 course charge notes retain TenRiff split head and release gauge w
     engine.advance(2030);
     CHECK(engine.gauge_state().value == doctest::Approx(50.07));
 }
+
+TEST_CASE("initial released-key synchronization does not invalidate a native replay") {
+    GameplayChart chart;
+    chart.lane_count = 10;
+    chart.duration_samples = 5000;
+    chart.notes.push_back(NoteEvent{1, 1000});
+    GameplayConfig config;
+    config.sample_rate = 48000;
+    GameplayEngine engine(chart, config);
+    for (int lane = 1; lane <= 10; ++lane) engine.sync_input_state(lane, InputState::Released, 0);
+    CHECK(engine.replay().events.empty());
+    engine.sync_input_state(2, InputState::Pressed, 10);
+    engine.sync_input_state(2, InputState::Pressed, 20);
+    engine.sync_input_state(2, InputState::Released, 30);
+    engine.sync_input_state(2, InputState::Released, 40);
+    REQUIRE(engine.replay().events.size() == 2u);
+    CHECK(engine.replay().events[0].state == InputState::Pressed);
+    CHECK(engine.replay().events[1].state == InputState::Released);
+    CHECK(engine.stats().raw_score == 0);
+    tenriff::gameplay::ReplayFile replay;
+    replay.trace = engine.replay();
+    replay.sample_rate = config.sample_rate;
+    replay.chart_sha256 = std::string(64, 'a');
+    replay.ruleset_id = "tenriff-native-score-v2-ruleset-1";
+    replay.created_utc = "20260913_000000Z";
+    replay.chart_format = "bms";
+    CHECK(tenriff::gameplay::validate_replay_evidence(replay).success());
+}

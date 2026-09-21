@@ -8,7 +8,13 @@
 
 namespace tenriff::network {
 
-constexpr uint16_t kPeerProtocolVersion = 5;
+constexpr uint16_t kPeerProtocolVersion = 6;
+constexpr uint32_t kPeerMinRateMilli = 500;
+constexpr uint32_t kPeerMaxRateMilli = 2000;
+constexpr uint32_t kPeerRateStepMilli = 50;
+constexpr uint32_t kPeerRateDefaultMilli = 1000;
+
+[[nodiscard]] bool peer_rate_milli_is_valid(uint32_t rate_milli);
 constexpr uint8_t kPeerMaxPlayers = 8;
 constexpr std::size_t kPeerChatMaxBytes = 256;
 constexpr std::size_t kPeerChatHistoryLimit = 32;
@@ -43,6 +49,7 @@ enum class PeerMessageType : uint16_t {
     CommonLibraryChunk = 21,
     CommonLibraryEnd = 22,
     Chat = 23,
+    RoomRate = 24,
 };
 
 struct PeerScore {
@@ -87,6 +94,9 @@ struct PeerMessage {
     uint8_t player_id = 0;
     uint8_t leader_id = 0;
     bool round_active = false;
+    uint32_t rate_milli = kPeerRateDefaultMilli;
+    // Coordinator generation binds Ready/Launch to the rate actually reviewed.
+    uint64_t rate_revision = 1;
     PeerScore score;
     uint32_t library_count = 0;
     std::vector<std::string> chart_sha256;

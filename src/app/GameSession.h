@@ -3,6 +3,7 @@
 #include "audio/MixNormalizer.h"
 
 #include <array>
+#include <algorithm>
 #include <atomic>
 #include <condition_variable>
 #include <cstdint>
@@ -186,7 +187,12 @@ public:
     void set_screenshot_callback(ScreenshotCallback callback);
     void set_peer_spectator_done_callback(PeerSpectatorDoneCallback callback);
     void set_control_input_callback(ControlInputCallback callback);
-    void set_peer_battle_mode(bool enabled) { peer_battle_mode_ = enabled; }
+    void set_practice_no_fail_override(bool enabled) { practice_no_fail_override_ = enabled; }
+    void set_practice_start_seconds(double seconds) { practice_start_seconds_ = std::max(0.0, seconds); }
+    void set_peer_battle_mode(bool enabled, uint32_t rate_milli = 1000) {
+        peer_battle_mode_ = enabled;
+        peer_battle_rate_milli_ = rate_milli;
+    }
     void set_course_gauge(double initial_value) {
         course_gauge_enabled_ = true;
         course_gauge_initial_value_ = initial_value;
@@ -395,6 +401,8 @@ private:
     bool autoplay_enabled_ = false;
     std::size_t autoplay_event_index_ = 0;
     bool practice_no_fail_enabled_ = false;
+    bool practice_no_fail_override_ = false;
+    double practice_start_seconds_ = 0.0;
     bool one_miss_fail_enabled_ = false;
     std::string pacemaker_mode_ = "off";
     bool gauge_shift_enabled_ = false;
@@ -485,6 +493,7 @@ private:
     bool gameplay_started_ = false;
     bool result_transition_pending_ = false;
     bool peer_battle_mode_ = false;
+    uint32_t peer_battle_rate_milli_ = 1000;
     bool force_polling_input_ = false;
 
     FutureQueue future_events_{};

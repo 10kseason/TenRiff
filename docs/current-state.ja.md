@@ -1,13 +1,13 @@
 # TenRiff Current State
 
-現在のプロジェクト版は **1.7.2** です。ネイティブ Windows ASIO 出力と難易度表画面の F4 標準 LV を追加し、スキン設定の共有、曲フォルダー管理、Unicode パス検証、マルチプレイ結果保持、LR2 参照段位ゲージ、再開前3秒カウントダウン、Session Mix の Esc 無視、累積時間による基準 BPM を含みます。WASAPI は既定のままです。この版の検証と ASIO 機器の範囲は [1.7.2 リリースゲート](release-1.7.2-gate.md)を参照してください。
+現在のプロジェクト版は **1.7.7** です。後奏が終了すると追加入力なしで結果を保存・送信します。Stella、Satellite、U_E Pack 4K/6K/8Kの難易度表プリセットを追加しました。Sites連携と既存のオーディオ・スキン・セッション機能を維持し、既定の出力はWASAPIです。[1.7.7リリース案内](release-1.7.7-gate.md)に変更内容と検証範囲を記載しています。
 
 [ローカル 1.7.1 r2 レポート](local-1.7.1-r2.ko.md)の 749/739 件は以前のビルドの記録です。新リリースの結果として再利用しません。[曲管理](library-management.md)、[基準 BPM](reference-bpm.md)、[スキンプリセット](skin-presets.md)、[ASIO](asio-audio.md)を参照してください。
 
 この文書は、次のエージェントや新しい作業者が最初に読むべき current-state 文書です。目的は、「このプロジェクトは今どういう状態で、どこを見ればよく、何がまだ未検証か」を素早く把握できるようにすることです。
 
 ## Baseline
-- 現在の project version は `1.7.2`
+- 現在の project version は `1.7.7`
 - 1.7.1 は最大8人の HUD・結果、同点順位・スコア待機状態、P-GREAT 専用演出、判定・コンボの独立位置、10個の設定カード、音量ノーマライズ、選曲の難易度表カードを提供します。[変更詳細](gameplay-polish-followup.md)と[検証範囲](release-1.7.1-gate.md)を参照。
 - 1.7.0 refreshes native Home, Song Select, Result and shared settings. See [UI implementation](menu-visual-polish.md) and [release verification](release-1.7.0-gate.md). The prism remains only in the custom-skin path; result reveal timing is unchanged.
 - 基本結果画面はスコア・ランク・精度を中心に表示し、プリズム演出はカスタムスキン側に残します。既存の2.2秒の表示演出、Spaceによるスキップ、操作解禁条件を維持します。
@@ -105,7 +105,7 @@
   - ゲーム内 Mode Settings の `Key Converter` で `Krrcream`、内蔵の決定論的 `KeyWeaver nK2`、または `KeyWeaver NK3 ONNX` を選択し、設定と replay metadata に保存
   - 個別の `Conversion Note Add` 設定は削除。Krrcream は元 note の再配置のみを行い、nK2 は key count 拡張時に変換後の target layout へ安全な support note を直接生成する。
   - nK2 preset は既定の `Native (12%)`、`Transform (35%)`、`Remaster (65%)` から選択する。`Remaster` は budget を上げつつ anchor を固定して原曲の配置を残し、LN 区間を同じ長さの LN で埋める。3 つとも上限であり、実際の追加量は原曲の密度と safety window で決まる。Krrcream では row を lock し、standalone converter GUI の Krrcream Max/Min/Speed/Seed も変更不可。
-  - 1.7.2 公式 build/Windows ZIP は standalone BMS key-converter CLI/GUI を build・同梱しない。top-level CMake option は既定 `OFF` で、source は開発 regression 用のみ維持
+  - 1.7.7 公式 build/Windows ZIP は standalone BMS key-converter CLI/GUI を build・同梱しない。top-level CMake option は既定 `OFF` で、source は開発 regression 用のみ維持
   - NK3 は同梱 P64 と host beam32 を常に組み合わせる。10K 以外の source を 10K に変換するときだけ generalized pattern MLP を追加し、10K→10K とその他すべての target は P64 のみを使う。既定の `AUTO` backend は ncnn Vulkan で P64 と MLP を AMD/NVIDIA GPU 上に実行し、任意の OpenVINO compatibility path を fallback として維持する。`TENRIFF_NK3_BACKEND` と `TENRIFF_NK3_VULKAN_DEVICE` で強制選択できる。
   - `mode.key_mode=none` は元のキー数と基本パターンレイアウトを維持
 - Native difficulty:
@@ -178,10 +178,10 @@
   - `Options -> Profile Setup` から現在の profile の初回 setup 画面を開き直し、language / audio / input / graphics / keymap を即時保存できる
   - 最大48 byte の nickname を編集し、保存 record と direct-IP multiplayer 表示名に使用
 - Direct-IP multiplayer:
-  - protocol v5 は固定 TCP coordinator 1台に最大8人まで接続（Windows、既定 `27301/TCP`）
+  - protocol v6 は固定 TCP coordinator 1台に最大8人まで接続（Windows、既定 `27301/TCP`）
   - multiplayer の対象は indexed BMS 系 chart のみで、全参加者の SHA-256 共通集合を使用し `.osu` は除外
   - lobby の `ROOM CHAT` は最大256 byte の UTF-8 message を送信し、session memory には最新32件だけを保持して message 数と local/leader 表示を行う
-  - Rate 1.0、判定、Gauge Shift、Random/Mods/Assist は固定し、各 player の local key-mode conversion は許可
+  - リーダーが共通Rateを0.50〜2.00倍（0.05単位）で選択し、変更時は全員のREADYを解除。判定・Gauge Shift・Random/Mods/Assist規則を維持し、各プレイヤーのローカルkey-mode conversionを許可
   - 選曲権は host から始まり、全員が Result を出た後に join 順の次の接続 player へ移動。leader 切断時は次へ進み、host 切断時は room を閉じる
   - 現在の leader だけが共通 BMS を選び、全員 Ready 後に START を要求可能。coordinator 承認と全員 load barrier 後に開始
   - 対戦中または9人目の join は拒否。範囲外の score claim も拒否するが、replay proof は未交換のため Result の相手結果は `UNVERIFIED CLAIM` と表示
@@ -219,7 +219,7 @@
 
 ## Runtime / Packaging Rules
 - 新しい user profile は自動生成される
-- 現在の P2P 配布対象は `TenRiff 1.7.2`
+- 現在の P2P 配布対象は `TenRiff 1.7.7`
 - distribution package には `Songs` を含めない
 - distribution package には `Main Menu / Options / Song Selecte / Multiplayer Lobby / Clear / Failed` の `Mainmusic/` scene slot を含め、各 `Name.mp3` と `Name 2.mp3`～`Name 64.mp3` を自動検出して scene 再入場ごとに循環する
 - distribution 更新には built artifact と必要な runtime asset だけを含める

@@ -234,6 +234,38 @@ void offset_gameplay_chart_samples(GameplayChart& chart, int64_t sample_offset) 
     }
 }
 
+void trim_gameplay_chart_before_sample(GameplayChart& chart, int64_t sample) {
+    if (sample <= 0) return;
+    chart.duration_samples = std::max<int64_t>(0, chart.duration_samples - sample);
+    chart.notes.erase(std::remove_if(chart.notes.begin(), chart.notes.end(),
+        [sample](auto& note) {
+            const int64_t end = note.end_sample.value_or(note.start_sample);
+            if (!note.end_sample.has_value() && note.start_sample < sample) return true;
+            if (note.end_sample.has_value() && end <= sample) return true;
+            note.start_sample = std::max<int64_t>(0, note.start_sample - sample);
+            if (note.end_sample.has_value()) note.end_sample = std::max<int64_t>(1, end - sample);
+            return false;
+        }), chart.notes.end());
+    chart.mines.erase(std::remove_if(chart.mines.begin(), chart.mines.end(),
+        [sample](auto& mine) {
+            if (mine.sample < sample) return true;
+            mine.sample -= sample; return false;
+        }), chart.mines.end());
+    chart.audio_cues.erase(std::remove_if(chart.audio_cues.begin(), chart.audio_cues.end(),
+        [sample](const auto& cue) { return cue.start_sample < sample; }), chart.audio_cues.end());
+    for (auto& cue : chart.audio_cues) cue.start_sample -= sample;
+    chart.visual_cues.erase(std::remove_if(chart.visual_cues.begin(), chart.visual_cues.end(),
+        [sample](const auto& cue) { return cue.start_sample < sample; }), chart.visual_cues.end());
+    for (auto& cue : chart.visual_cues) cue.start_sample -= sample;
+    chart.scroll_segments.erase(std::remove_if(chart.scroll_segments.begin(), chart.scroll_segments.end(),
+        [sample](auto& segment) {
+            if (segment.end_sample <= sample) return true;
+            segment.start_sample = std::max<int64_t>(0, segment.start_sample - sample);
+            segment.end_sample = std::max<int64_t>(0, segment.end_sample - sample);
+            return false;
+        }), chart.scroll_segments.end());
+}
+
 GameplayChart from_bms_timeline(const chart::BmsTimeline& timeline, double rate) {
     GameplayChart chart;
     int max_lane = 0;

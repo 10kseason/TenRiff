@@ -106,6 +106,7 @@ struct GameplayChart {
 [[nodiscard]] std::size_t note_audio_asset_at(const NoteEvent& note, std::size_t index);
 
 void offset_gameplay_chart_samples(GameplayChart& chart, int64_t sample_offset);
+void trim_gameplay_chart_before_sample(GameplayChart& chart, int64_t sample);
 
 GameplayChart from_bms_timeline(const chart::BmsTimeline& timeline, double rate);
 

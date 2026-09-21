@@ -50,6 +50,7 @@ enum class MenuScreenKind {
     SongSelect,
     ResultScreen,
     GameplayHud,
+    BmsEditor,
 };
 
 enum class MenuHitTargetKind {
@@ -66,6 +67,9 @@ enum class MenuHitTargetKind {
     SongStartButton,
     SongBackButton,
     SongProfilePanel,
+    BmsEditorGrid,
+    BmsEditorNote,
+    BmsEditorBgm,
     OptionsItem,
     SettingsRow,
     KeymapButton,
@@ -74,6 +78,7 @@ enum class MenuHitTargetKind {
     AccountServer,
     AccountField,
     AccountAction,
+    SitesLeaderboardAction,
     UrlWarningButton,
     GenericHelpPage,
     SongDifficultyTable,
@@ -90,6 +95,11 @@ enum class SongDifficultyTableAction {
     PresetAery5 = 5,
     PresetAery7 = 6,
     PresetRevive10 = 7,
+    PresetStella = 8,
+    PresetSatellite = 9,
+    PresetYui4 = 10,
+    PresetYui6 = 11,
+    PresetYui8 = 12,
 };
 
 enum class MenuHitPart {
@@ -105,8 +115,12 @@ struct MenuClickEvent {
     int index = -1;
     MenuHitPart part = MenuHitPart::Activate;
     bool double_click = false;
+    bool control = false;
+    bool dragging = false;
+    bool drag_finished = false;
     int wheel_steps = 0;
     double value = 0.0;
+    double value_y = 0.0;
     std::string path;
 };
 
@@ -243,6 +257,72 @@ struct SongSelectData {
 struct ResultGaugePoint {
     float position = 0.0f;
     float value = 0.0f;
+};
+
+struct BmsEditorNoteData {
+    std::uint64_t id = 0;
+    int lane = 1;
+    int measure = 0;
+    int slice = 0;
+    int slice_count = 192;
+    bool long_note = false;
+    bool editable = true;
+    int end_measure = 0;
+    int end_slice = 0;
+    int end_slice_count = 192;
+    std::string token;
+    bool selected = false;
+};
+
+struct BmsEditorBgmData {
+    std::uint64_t id = 0;
+    int measure = 0;
+    int slice = 0;
+    int slice_count = 192;
+    std::string token;
+    bool selected = false;
+};
+
+struct BmsEditorMarkerData {
+    std::uint64_t id = 0;
+    int measure = 0;
+    int slice = 0;
+    int slice_count = 1;
+    std::string kind;
+    double value = 0.0;
+    std::string label;
+};
+
+struct BmsEditorData {
+    std::string path;
+    std::string title;
+    std::string artist;
+    std::string status;
+    int lane_count = 10;
+    int measure_count = 1;
+    int cursor_lane = 1;
+    int cursor_measure = 0;
+    int cursor_slice = 0;
+    int cursor_slice_count = 192;
+    double base_bpm = 0.0;
+    int grid_division = 192;
+    int view_measure_count = 8;
+    int view_start_measure = -1;
+    int snap_division = 12;
+    bool x_axis_lock = false;
+    bool auto_align_bgm = true;
+    std::string tool = "place_silent";
+    bool silent_note_mode = false;
+    double note_width_scale = 1.0;
+    double note_height_scale = 1.8;
+    std::size_t lane_width_scale_count = 0;
+    std::array<double, 16> lane_width_scales{};
+    bool dirty = false;
+    std::vector<BmsEditorNoteData> notes;
+    std::vector<BmsEditorBgmData> bgm;
+    std::vector<BmsEditorMarkerData> markers;
+    std::vector<std::string> samples;
+    std::string selected_sample_token;
 };
 
 struct ResultShiftMarker {
@@ -605,12 +685,18 @@ struct ChatOverlayData {
     std::string hint;
 };
 
+enum class SitesLeaderboardAction { OpenWebsite, PasteConnection, ImportFile, Disconnect };
+
 struct RankedAccountOverlayData {
     bool visible = false;
     bool register_mode = false;
     bool busy = false;
     bool signed_in = false;
     bool private_server = false;
+    bool sites_mode = false;
+    bool sites_connected = false;
+    std::string sites_url;
+    std::string sites_status;
     int focused_field = 0;
     std::string username;
     std::string server_url;
@@ -691,6 +777,7 @@ struct MenuRenderData {
 
     TitleMenuData title;
     SongSelectData song_select;
+    BmsEditorData bms_editor;
     ResultScreenData result;
     GameplayHudData gameplay;
     PerformanceOverlayData performance;
@@ -823,6 +910,17 @@ private:
     };
 
     std::vector<HitRegion> hit_regions_{};
+    int bms_editor_hover_lane_ = -1;
+    int bms_editor_hover_time_bucket_ = -1;
+    int bms_editor_hover_bgm_index_ = -1;
+    struct BmsEditorNoteDragState {
+        bool active = false;
+        int index = -1;
+        bool control = false;
+        bool moved = false;
+        float start_x = 0.0f;
+        float start_y = 0.0f;
+    } bms_editor_note_drag_state_{};
     std::mutex click_events_mutex_{};
     std::deque<MenuClickEvent> click_events_{};
     std::mutex text_input_mutex_{};

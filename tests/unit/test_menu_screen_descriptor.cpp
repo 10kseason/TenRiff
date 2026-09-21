@@ -12,7 +12,7 @@ using tenriff::app::menu::Screen;
 using tenriff::app::menu::SnapshotViewKind;
 using tenriff::app::menu::screen_descriptor;
 
-constexpr std::array<Screen, 20> kScreens{
+constexpr std::array<Screen, 21> kScreens{
     Screen::QuickSetup,
     Screen::Title,
     Screen::OptionsHub,
@@ -32,6 +32,7 @@ constexpr std::array<Screen, 20> kScreens{
     Screen::KeymapConfirm,
     Screen::OnnxUpscalerConfirm,
     Screen::KeymapTest,
+    Screen::BmsEditor,
     Screen::Result,
 };
 
@@ -42,7 +43,7 @@ TEST_CASE("every menu screen has a stable descriptor") {
         CHECK_FALSE(descriptor.english_title.empty());
         CHECK_FALSE(descriptor.korean_title.empty());
         if (screen != Screen::Gameplay) {
-            CHECK_FALSE(descriptor.background_key.empty());
+        CHECK_FALSE(descriptor.background_key.empty());
         }
     }
 }

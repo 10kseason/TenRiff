@@ -20,7 +20,7 @@
         }
 
         const float width = 820.0f;
-        const float height = data.account_overlay.signed_in ? 470.0f : 700.0f;
+        const float height = data.account_overlay.signed_in && !data.account_overlay.sites_mode ? 470.0f : 700.0f;
         const float scale = 0.96f + 0.04f * eased;
         const float left = (kBaseWidth - width * scale) * 0.5f;
         const float top = (kBaseHeight - height * scale) * 0.5f;
@@ -59,19 +59,54 @@
                                           modal.right - 38.0f, modal.top + 72.0f),
                               d2d_->text_brush.Get());
         }
+
         const float server_top = modal.top + 88.0f;
-        const float server_button_width = (modal.right - modal.left - 86.0f) * 0.5f;
-        account_button(D2D1::RectF(modal.left + 38.0f, server_top,
-                                   modal.left + 38.0f + server_button_width,
-                                   server_top + 48.0f),
-                       loc("TENRIFF MAIN", "텐리프 메인"),
-                       !data.account_overlay.private_server,
-                       MenuHitTargetKind::AccountServer, 0);
-        account_button(D2D1::RectF(modal.left + 48.0f + server_button_width, server_top,
-                                   modal.right - 38.0f, server_top + 48.0f),
-                       loc("PRIVATE API", "사설 API"),
-                       data.account_overlay.private_server,
-                       MenuHitTargetKind::AccountServer, 1);
+        const float server_button_width = (modal.right - modal.left - 96.0f) / 3.0f;
+        for (int tab = 0; tab < 3; ++tab) {
+            const float x = modal.left + 38.0f + (server_button_width + 10.0f) * tab;
+            const bool selected = tab == 2 ? data.account_overlay.sites_mode :
+                !data.account_overlay.sites_mode && (tab == 1) == data.account_overlay.private_server;
+            account_button(D2D1::RectF(x, server_top, x + server_button_width, server_top + 48.0f),
+                tab == 0 ? loc("TENRIFF MAIN", "텐리프 메인") :
+                tab == 1 ? loc("PRIVATE API", "사설 API") : loc("WEB LEADERBOARD", "웹 리더보드"),
+                selected, MenuHitTargetKind::AccountServer, tab);
+        }
+        if (data.account_overlay.sites_mode) {
+            auto sites_text = [&](float y, std::string_view text, bool accent = false) {
+                if (d2d_->body_format && d2d_->text_brush)
+                    draw_text_clipped(to_wide(std::string(text)), d2d_->body_format.Get(),
+                        D2D1::RectF(modal.left + 40.0f, modal.top + y, modal.right - 40.0f, modal.top + y + 40.0f),
+                        accent && d2d_->accent_brush ? d2d_->accent_brush.Get() : d2d_->text_brush.Get());
+            };
+            sites_text(159.0f, data.account_overlay.sites_connected
+                ? loc("AUTO UPLOAD: ON", "자동 업로드: 사용 중") : loc("NOT CONNECTED", "아직 연결되지 않음"), true);
+            sites_text(204.0f, data.account_overlay.sites_url);
+            sites_text(260.0f, loc("1. Sign in on the website and copy connection information.",
+                                  "1. 웹사이트에서 로그인하고 연결 정보를 복사하세요."));
+            account_button(D2D1::RectF(modal.left + 40.0f, modal.top + 309.0f, modal.right - 40.0f, modal.top + 363.0f),
+                loc("OPEN LEADERBOARD WEBSITE", "리더보드 웹사이트 열기"), false,
+                MenuHitTargetKind::SitesLeaderboardAction, static_cast<int>(SitesLeaderboardAction::OpenWebsite));
+            sites_text(383.0f, loc("2. Paste it here, or import the downloaded connection file.",
+                                  "2. 여기에 붙여넣거나 받은 연결 파일을 불러오세요."));
+            const float middle = (modal.left + modal.right) * 0.5f;
+            account_button(D2D1::RectF(modal.left + 40.0f, modal.top + 431.0f, middle - 5.0f, modal.top + 487.0f),
+                loc("PASTE CONNECTION  Ctrl+V", "연결 정보 붙여넣기  Ctrl+V"), true,
+                MenuHitTargetKind::SitesLeaderboardAction, static_cast<int>(SitesLeaderboardAction::PasteConnection));
+            account_button(D2D1::RectF(middle + 5.0f, modal.top + 431.0f, modal.right - 40.0f, modal.top + 487.0f),
+                loc("IMPORT CONNECTION FILE", "연결 파일 불러오기"), false,
+                MenuHitTargetKind::SitesLeaderboardAction, static_cast<int>(SitesLeaderboardAction::ImportFile));
+            sites_text(511.0f, data.account_overlay.sites_status);
+            if (data.account_overlay.sites_connected)
+                account_button(D2D1::RectF(modal.left + 40.0f, modal.top + 569.0f, modal.right - 40.0f, modal.top + 619.0f),
+                    loc("DISCONNECT THIS PC", "이 PC 연결 해제"), false,
+                    MenuHitTargetKind::SitesLeaderboardAction, static_cast<int>(SitesLeaderboardAction::Disconnect));
+            if (d2d_->hud_format && d2d_->muted_brush)
+                draw_text_clipped(to_wide(loc("Ctrl+Tab: switch account / web   Enter: import file   F10 / ESC: close",
+                    "Ctrl+Tab 계정 / 웹 전환   Enter 파일 불러오기   F10 / ESC 닫기")),
+                    d2d_->hud_format.Get(), D2D1::RectF(modal.left + 40.0f, modal.bottom - 48.0f, modal.right - 40.0f, modal.bottom - 16.0f),
+                    d2d_->muted_brush.Get());
+            return;
+        }
         const D2D1_RECT_F server_rect = D2D1::RectF(
             modal.left + 40.0f, modal.top + 150.0f,
             modal.right - 40.0f, modal.top + 208.0f);

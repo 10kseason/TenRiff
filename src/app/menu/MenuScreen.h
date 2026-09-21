@@ -23,6 +23,7 @@ enum class Screen {
     KeymapConfirm,
     OnnxUpscalerConfirm,
     KeymapTest,
+    BmsEditor,
     Result,
 };
 

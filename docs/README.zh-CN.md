@@ -10,7 +10,8 @@ Language: [한국어](README.md) | [English](README.en.md) | [简体中文](READ
 
 当前行为说明冲突时，先核对**同一提交的实现代码与回归测试**，再同步修正 `current-state`、`config` 及翻译。`baseline-*`、`release-*` 记录各自版本；早期设计和路线图提案不是当前实现或性能保证。
 
-- [1.7.2](release-1.7.2-gate.md)
+- [1.7.7](release-1.7.7-gate.md)
+- [1.7.2 history](release-1.7.2-gate.md)
 - [1.7.1 history](release-1.7.1-gate.md)
 - [UI](menu-visual-polish.md)
 - [Gameplay / Multiplayer](gameplay-polish-followup.md)
