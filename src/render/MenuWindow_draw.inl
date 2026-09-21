@@ -85,7 +85,8 @@ void MenuWindow::draw(const MenuRenderData& data) {
     const bool modern_title_screen = !data.lobby_skin.enabled && data.kind == MenuScreenKind::TitleMenu;
     const bool modern_library_screen = !data.lobby_skin.enabled &&
         (data.kind == MenuScreenKind::SongSelect ||
-         data.kind == MenuScreenKind::ResultScreen);
+         data.kind == MenuScreenKind::ResultScreen ||
+         data.kind == MenuScreenKind::BmsEditor);
     const bool modern_menu_screen = modern_library_screen || modern_settings_screen || modern_title_screen;
     if (modern_menu_screen) {
         set_theme_color(d2d_->text_brush.Get(), "text", D2D1::ColorF(0xEDF2F7));
@@ -244,6 +245,12 @@ void MenuWindow::draw(const MenuRenderData& data) {
     }
 
     hit_regions_.clear();
+    if (data.kind != MenuScreenKind::BmsEditor) {
+        bms_editor_hover_lane_ = -1;
+        bms_editor_hover_time_bucket_ = -1;
+        bms_editor_hover_bgm_index_ = -1;
+        bms_editor_note_drag_state_ = MenuWindow::BmsEditorNoteDragState{};
+    }
     if (data.kind != MenuScreenKind::SongSelect) {
         clear_song_scrollbar_state();
     }
@@ -968,6 +975,10 @@ void MenuWindow::draw(const MenuRenderData& data) {
 #include "MenuWindow_draw_gameplay_body.inl"
     };
 
+    auto draw_bms_editor = [&]() {
+#include "MenuWindow_draw_bms_editor_body.inl"
+    };
+
     auto draw_loading_progress = [&]() {
         if (!data.loading_progress.visible) {
             return;
@@ -1029,6 +1040,9 @@ void MenuWindow::draw(const MenuRenderData& data) {
             break;
         case MenuScreenKind::GameplayHud:
             draw_gameplay_hud();
+            break;
+        case MenuScreenKind::BmsEditor:
+            draw_bms_editor();
             break;
         case MenuScreenKind::GenericList:
         default:

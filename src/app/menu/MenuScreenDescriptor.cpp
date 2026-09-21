@@ -9,7 +9,7 @@ namespace {
 using Snapshot = SnapshotViewKind;
 using Generic = GenericViewKind;
 
-constexpr std::array<MenuScreenDescriptor, 20> kDescriptors{{
+constexpr std::array<MenuScreenDescriptor, 21> kDescriptors{{
     {Screen::QuickSetup, "Quick Setup", "빠른 설정", "quick_setup", "", Snapshot::QuickSetup, Generic::None, false, true},
     {Screen::Title, "Title", "타이틀", "title", "", Snapshot::Title, Generic::None, false, true},
     {Screen::OptionsHub, "Options", "옵션", "options", "", Snapshot::Generic, Generic::OptionsHub, true, true},
@@ -29,6 +29,7 @@ constexpr std::array<MenuScreenDescriptor, 20> kDescriptors{{
     {Screen::KeymapConfirm, "Keymap Confirm", "키 설정 확인", "keymap_confirm", "", Snapshot::Generic, Generic::KeymapConfirm, true, true},
     {Screen::OnnxUpscalerConfirm, "Enable ONNX Upscaler?", "ONNX 업스케일러를 켤까요?", "onnx_upscaler_confirm", "", Snapshot::Generic, Generic::OnnxUpscalerConfirm, true, true},
     {Screen::KeymapTest, "NKRO Test", "NKRO Test", "keymap_test", "", Snapshot::Generic, Generic::KeymapTest, true, false},
+    {Screen::BmsEditor, "BMS Editor", "BMS 에디터", "song_select", "", Snapshot::BmsEditor, Generic::None, false, true},
     {Screen::Result, "Result", "결과", "result", "", Snapshot::Result, Generic::None, false, true},
 }};
 

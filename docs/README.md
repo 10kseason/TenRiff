@@ -10,7 +10,8 @@ Language: Korean | [English](README.en.md) | [简体中文](README.zh-CN.md) | [
 
 현재 동작이 충돌하면 같은 커밋의 **구현 코드·회귀 테스트**를 먼저 확인하고 `current-state`와 `config` 문서를 함께 수정합니다. 번역본도 같은 계약을 설명해야 합니다. `baseline-*`와 `release-*`는 해당 버전의 기록이며, 초기 설계·로드맵의 제안은 현재 구현이나 성능 보장이 아닙니다.
 
-- [1.7.2](release-1.7.2-gate.md)
+- [1.7.7](release-1.7.7-gate.md)
+- [1.7.2 history](release-1.7.2-gate.md)
 - [1.7.1 history](release-1.7.1-gate.md)
 - [UI](menu-visual-polish.md)
 - [Gameplay / Multiplayer](gameplay-polish-followup.md)
@@ -87,3 +88,5 @@ Language: Korean | [English](README.en.md) | [简体中文](README.zh-CN.md) | [
 ## ASIO와 플레이 설정
 
 [네이티브 ASIO](asio-audio.md), [대표 BPM](reference-bpm.md), [휴대용 스킨 프리셋](skin-presets.md), [곡 소스와 난이도표](library-management.md), [LR2 게이지 비교](lr2-gauge-audit.ko.md)를 참고하세요.
+
+1.7.7 클라이언트의 Sites 계정 연결, 네 가지 기록 지표, 동점 비교 규칙은 [sites-leaderboard.md](sites-leaderboard.md)를 참고하세요. 이 문서는 공개 클라이언트 프로토콜 설명이며 서버 소스·운영 설정·연결 비밀값을 포함하지 않습니다.

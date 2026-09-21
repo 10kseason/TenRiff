@@ -244,6 +244,11 @@ bool GameSession::initialize(const CommandLineOptions& options) {
         return false;
     }
     config_ = config_result.config;
+    if (practice_no_fail_override_) {
+        config_.mode.practice_no_fail_enabled = true;
+        config_.mode.one_miss_fail_enabled = false;
+        config_.mode.autoplay_enabled = false;
+    }
     const bool profile_rawinput = config_.input.rawinput;
     const bool migrated_config = config_result.migrated;
     const bool stripped_session_only_mods = strip_session_only_mode_mods(config_);
@@ -252,8 +257,9 @@ bool GameSession::initialize(const CommandLineOptions& options) {
         const config::RuntimeConfig persisted = build_persisted_runtime_config(config_);
         config_loader.save_profile(profile_dir_, persisted);
     }
-    if (peer_battle_mode_) {
-        apply_peer_battle_rules(config_);
+    if (peer_battle_mode_ && !apply_peer_battle_rules(config_, peer_battle_rate_milli_)) {
+        std::cerr << "[error] The negotiated multiplayer Rate is invalid." << std::endl;
+        return false;
     }
     if (force_polling_input_ && profile_rawinput) {
         // This is a process-lifetime recovery override. Keep the saved profile
@@ -310,7 +316,9 @@ bool GameSession::initialize(const CommandLineOptions& options) {
         return false;
     }
 
-    if (options.has_rate) {
+    // The launched room rate is authoritative over this player's --rate. It is
+    // session-only and never saved to the profile.
+    if (options.has_rate && !peer_battle_mode_) {
         config_.speed.rate = options.rate;
     }
     if (options.has_hispeed) {
@@ -686,6 +694,14 @@ bool GameSession::initialize(const CommandLineOptions& options) {
             ghost_replay_source_ = {};
             ghost_replay_event_index_ = 0;
         }
+    }
+    if (practice_start_seconds_ > 0.0) {
+        const double rate = std::max(0.0001, rate_multiplier_);
+        const auto start_sample = static_cast<int64_t>(std::llround(
+            practice_start_seconds_ * static_cast<double>(sample_rate_) / rate));
+        gameplay::trim_gameplay_chart_before_sample(chart_, start_sample);
+        std::cerr << "[info] Practice playback starts at " << practice_start_seconds_
+                  << "s (sample " << start_sample << ")." << std::endl;
     }
     offset_gameplay_chart_samples(chart_, ms_to_samples(static_cast<double>(kGameplayStartLeadInMs), sample_rate_));
     for (std::size_t i = 0; i < chart_.notes.size(); ++i) {
@@ -1587,7 +1603,6 @@ bool GameSession::prepare_chart_audio() {
         chart_audio_active_until_samples_[i].store(0, std::memory_order_release);
     }
 
-    int64_t max_sample = chart_.duration_samples;
     chart_audio_events_.reserve(chart_.audio_cues.size());
     for (const auto& cue : chart_.audio_cues) {
         if (cue.asset_id >= chart_audio_assets_.size()) {
@@ -1684,24 +1699,8 @@ bool GameSession::prepare_chart_audio() {
         return false;
     }
 
-    for (const auto& event : chart_audio_events_) {
-        if (event.asset_id >= chart_audio_assets_.size()) {
-            continue;
-        }
-        const auto& asset = chart_audio_assets_[event.asset_id];
-        auto samples = std::atomic_load_explicit(&asset.clip.samples, std::memory_order_acquire);
-        const int64_t source_frames = (samples && !samples->empty())
-                                          ? static_cast<int64_t>(samples->size() / 2u)
-                                          : static_cast<int64_t>(asset.estimated_decoded_bytes /
-                                                                 (2u * sizeof(float)));
-        const int64_t playback_frames =
-            chart_audio_playback_duration_frames(source_frames, config_.speed.rate);
-        if (playback_frames > 0) {
-            max_sample = std::max(max_sample, event.start_sample + playback_frames);
-        }
-    }
-
-    chart_.duration_samples = std::max(chart_.duration_samples, max_sample);
+    // Chart duration is part of replay verification. Memory-budget estimates
+    // are not media durations; completion follows the actual mixer below.
     synthetic_tones_enabled_.store(true, std::memory_order_release);
     for (const auto& asset : chart_audio_assets_) {
         auto samples = std::atomic_load_explicit(&asset.clip.samples, std::memory_order_acquire);
@@ -1789,8 +1788,11 @@ void GameSession::chart_audio_loader_thread_main() {
 
             if (!success || !clip_samples || clip_samples->empty()) {
                 asset.state = ChartAudioAssetState::Failed;
+                // Empty PCM is a terminal decode failure; nullptr still means
+                // unloaded/loading. Publish this distinction without taking a
+                // streaming mutex in the realtime mixer or keeping failed tails.
                 std::atomic_store_explicit(&asset.clip.samples,
-                                           std::shared_ptr<const std::vector<float>>{},
+                                           std::make_shared<const std::vector<float>>(),
                                            std::memory_order_release);
                 asset.decoded_bytes = 0;
                 if (!success) {
@@ -2046,7 +2048,10 @@ void GameSession::mix_chart_audio(float* output, uint32_t frames, int64_t buffer
 
         const auto& asset = chart_audio_assets_[voice.asset_id];
         auto samples = std::atomic_load_explicit(&asset.clip.samples, std::memory_order_acquire);
-        if (!samples || samples->empty()) {
+        if (samples && samples->empty()) {
+            continue;
+        }
+        if (!samples) {
             const int64_t estimated_source_frames =
                 static_cast<int64_t>(asset.estimated_decoded_bytes / (2u * sizeof(float)));
             const int64_t estimated_playback_frames =
@@ -2202,7 +2207,9 @@ void GameSession::shutdown() {
             result_.replay_path = replay_source_path_;
         } else {
             const std::string created_utc = utc_timestamp_compact();
-            std::filesystem::path profile_dir(profile_dir_);
+            // Profile paths are stored as UTF-8, including on Windows. Decoding
+            // them through the active ANSI code page breaks replay/result export.
+            const auto profile_dir = std::filesystem::u8path(profile_dir_);
             std::filesystem::path replay_path = profile_dir / "replays" / ("replay_" + created_utc + ".json");
             std::filesystem::path result_path = profile_dir / "results" / ("result_" + created_utc + ".json");
 
@@ -2549,11 +2556,8 @@ void GameSession::audio_callback(float* output,
                         const int64_t tail_samples =
                             ms_to_samples(std::max(0.0, config_.ui.result_tail_ms), sample_rate_);
                         result_transition_sample_ = gameplay_result_transition_sample(
-                            buffer_end_samples, chart_.duration_samples, tail_samples);
+                            buffer_end_samples, 0, tail_samples);
                         result_transition_pending_ = true;
-                    }
-                    if (buffer_end_samples >= result_transition_sample_) {
-                        finished_.store(true, std::memory_order_release);
                     }
                 } else {
                     result_transition_pending_ = false;
@@ -2567,12 +2571,23 @@ void GameSession::audio_callback(float* output,
         const int64_t buffer_end_samples =
             logical_buffer_start_samples + static_cast<int64_t>(frames);
         schedule_chart_audio(buffer_end_samples);
+        if (result_transition_pending_ && !chart_audio_voices_.empty()) {
+            // The final mixed buffer is still queued at the device. Remember
+            // its end and wait for the playback head before Stop/Reset can run.
+            result_transition_sample_ = std::max(result_transition_sample_, buffer_end_samples);
+        }
         mix_chart_audio(output, frames, logical_buffer_start_samples);
         mix_tones(output, frames, logical_buffer_start_samples);
         if (config_.audio_ui.normalize_audio) mix_normalizer_.process(output, frames);
         const float master_gain =
             static_cast<float>(std::clamp(config_.audio_ui.master_volume, 0.0, 1.0));
         clamp_output(output, frames, master_gain);
+        if (result_transition_pending_ &&
+            next_chart_audio_event_ >= chart_audio_events_.size() &&
+            chart_audio_voices_.empty() &&
+            logical_playback_sample >= result_transition_sample_) {
+            finished_.store(true, std::memory_order_release);
+        }
     }
 
     const int64_t committed_time_ns = timing::HighResClock::now_ns();

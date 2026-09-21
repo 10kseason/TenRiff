@@ -7,6 +7,7 @@
 #include <array>
 #include <atomic>
 #include <cstdint>
+#include <future>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -17,6 +18,8 @@
 #include <vector>
 
 #include "app/CommandLine.h"
+#include "app/BmsEditor.h"
+#include "app/BmsEditorPreview.h"
 #include "app/GameplayHudRevisions.h"
 #include "app/GlobalChatService.h"
 #include "app/InputBackendStatus.h"
@@ -35,6 +38,7 @@
 #include "app/MultiplayerChartSearch.h"
 #include "app/OnlineRecordsClient.h"
 #include "app/RankedRecordsClient.h"
+#include "app/SitesLeaderboardClient.h"
 #include "app/SessionMix.h"
 #include "app/SongSelectState.h"
 #include "app/SongSelectScreen.h"
@@ -119,6 +123,12 @@ private:
         Songs,
         Sources,
         Records,
+    };
+
+    enum class BmsEditorTool {
+        PlaceSilent,
+        Move,
+        Remove,
     };
 
     struct MenuSnapshot {
@@ -268,6 +278,8 @@ private:
     void begin_ranked_account_request();
     void service_ranked_account_request();
     void logout_ranked_account();
+    void refresh_sites_leaderboard_connection();
+    void handle_sites_leaderboard_action(render::SitesLeaderboardAction action);
     void show_chat_url_warning(std::string url);
     void dismiss_chat_url_warning();
     [[nodiscard]] bool handle_chat_url_warning_input(uint32_t keycode);
@@ -277,6 +289,9 @@ private:
     void handle_song_select_input(uint32_t keycode);
     void handle_session_mix_input(uint32_t keycode);
     void handle_song_browser_input(uint32_t keycode);
+    void handle_bms_editor_input(uint32_t keycode);
+    void update_bms_editor_repeat();
+    [[nodiscard]] int bms_editor_snap_division() const noexcept;
     void handle_audio_settings_input(uint32_t keycode);
     void apply_audio_settings_effects(const menu::MenuEffectFlags& effects);
     void apply_input_settings_effects(const menu::MenuEffectFlags& effects);
@@ -317,6 +332,7 @@ private:
                                           const BestResultRecord& current_best,
                                           const LocalPlayRecord* selected_record);
     void populate_song_browser_render_data(render::MenuRenderData& render);
+    void populate_bms_editor_render_data(render::MenuRenderData& render);
     void populate_result_render_data(render::MenuRenderData& render, const std::string& current_track);
     void populate_audio_settings_render_data(render::MenuRenderData& render);
     void populate_graphics_settings_render_data(render::MenuRenderData& render);
@@ -352,6 +368,15 @@ private:
                          const std::string& replay_path = {},
                          GameplayLaunchKind launch_kind = GameplayLaunchKind::SinglePlayer);
     void launch_selected_song();
+    void open_bms_editor();
+    void launch_bms_editor_practice();
+    void cleanup_bms_editor_practice_file();
+    void save_bms_editor_as();
+    void request_bms_editor_preview(bool from_start = false,
+                                     std::string keysound_token = {},
+                                     bool keysound_only = false);
+    void service_bms_editor_preview();
+    void stop_bms_editor_preview();
     void start_session_mix();
     bool add_selected_song_to_session_mix_draft();
     void remove_last_session_mix_draft_song();
@@ -575,6 +600,8 @@ private:
     std::string songs_path_;
     std::string cache_path_;
     std::string last_chart_path_;
+    std::string bms_editor_practice_path_;
+    std::optional<double> bms_editor_practice_start_seconds_;
     std::string last_chart_title_;
     std::string last_chart_artist_;
     SongEntry last_chart_entry_{};
@@ -596,6 +623,7 @@ private:
 
     network::PeerSession peer_session_{};
     OnlineRecordsService online_records_service_{};
+    SitesLeaderboardService sites_leaderboard_service_{};
     GlobalChatService global_chat_service_{};
     network::LanDiscoveryService lan_discovery_{};
     MultiplayerMenuState multiplayer_menu_{};
@@ -666,6 +694,12 @@ private:
     int selected_song_ = 0;
     int selected_source_ = 0;
     int selected_record_ = 0;
+    BmsEditorDocument bms_editor_{};
+    std::future<BmsEditorPreviewResult> bms_editor_preview_future_{};
+    std::shared_ptr<std::atomic<bool>> bms_editor_preview_cancel_{};
+    bool bms_editor_preview_active_ = false;
+    bool bms_editor_preview_one_shot_ = false;
+    std::shared_ptr<std::atomic<bool>> bms_editor_preview_finished_;
     int selected_online_record_ = 0;
     int settings_cursor_ = 0;
     Screen settings_change_flash_screen_ = Screen::Title;
@@ -738,6 +772,11 @@ private:
     bool chat_overlay_visible_ = false;
     bool ranked_account_overlay_visible_ = false;
     bool ranked_account_register_mode_ = false;
+    bool ranked_account_sites_mode_ = true;
+    bool sites_connection_saved_ = false;
+    std::string sites_connection_url_{};
+    std::string sites_connection_status_{};
+    std::string sites_last_upload_status_{};
     bool ranked_account_use_private_server_ = false;
     int ranked_account_focused_field_ = 1;
     std::string ranked_account_main_server_url_{};
@@ -808,6 +847,9 @@ private:
     uint32_t key_backspace_ = 0;
     uint32_t key_delete_ = 0;
     uint32_t key_v_ = 0;
+    uint32_t key_s_ = 0;
+    uint32_t key_y_ = 0;
+    uint32_t key_z_ = 0;
     uint32_t key_lcontrol_ = 0;
     uint32_t key_rcontrol_ = 0;
     uint32_t key_c_ = 0;
@@ -817,6 +859,12 @@ private:
     uint32_t key_m_ = 0;
     uint32_t key_k_ = 0;
     uint32_t key_r_ = 0;
+    uint32_t key_p_ = 0;
+    uint32_t key_h_ = 0;
+    uint32_t key_o_ = 0;
+    uint32_t key_t_ = 0;
+    uint32_t key_f6_ = 0;
+    uint32_t key_f7_ = 0;
     uint32_t key_f1_ = 0;
     uint32_t key_f2_ = 0;
     uint32_t key_f5_ = 0;
@@ -825,6 +873,18 @@ private:
     uint32_t key_f10_ = 0;
     uint32_t key_minus_ = 0;
     uint32_t key_plus_ = 0;
+    int bms_editor_view_measures_ = 8;
+    int bms_editor_snap_index_ = 2;
+    bool bms_editor_x_axis_lock_ = false;
+    uint32_t bms_editor_repeat_key_ = 0;
+    int64_t bms_editor_repeat_next_ns_ = 0;
+    std::uint64_t bms_editor_hover_note_id_ = 0;
+    std::unordered_set<std::uint64_t> bms_editor_selected_note_ids_{};
+    std::unordered_set<std::uint64_t> bms_editor_selected_bgm_ids_{};
+    bool bms_editor_auto_align_bgm_ = true;
+    BmsEditorTool bms_editor_tool_ = BmsEditorTool::PlaceSilent;
+    std::uint64_t bms_editor_drag_note_id_ = 0;
+    int bms_editor_drag_view_start_ = -1;
     input::RawInputHealthProbe input_backend_probe_{};
     std::unordered_map<uint32_t, bool> input_probe_polled_states_{};
     InputBackendFallbackPolicy input_backend_fallback_policy_{};

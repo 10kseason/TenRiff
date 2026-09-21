@@ -4,6 +4,8 @@
 #include <cctype>
 #include <filesystem>
 #include <utility>
+#include <fstream>
+#include <optional>
 
 #ifdef _WIN32
 #ifndef NOMINMAX
@@ -14,6 +16,8 @@
 #endif
 #include <windows.h>
 #include <shellapi.h>
+#include <shobjidl.h>
+#include <wrl/client.h>
 #endif
 
 #include "app/ChatInteraction.h"
@@ -67,6 +71,38 @@ std::wstring account_utf8_to_wide(std::string_view value) {
 }
 #endif
 
+
+#ifdef _WIN32
+std::optional<std::filesystem::path> pick_sites_connection_file(std::string& error) {
+    const HRESULT initialized = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
+    if (FAILED(initialized)) { error = "Could not open the file picker."; return std::nullopt; }
+    Microsoft::WRL::ComPtr<IFileOpenDialog> dialog;
+    std::optional<std::filesystem::path> result;
+    HRESULT hr = CoCreateInstance(CLSID_FileOpenDialog, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&dialog));
+    if (SUCCEEDED(hr)) {
+        DWORD options = 0;
+        hr = dialog->GetOptions(&options);
+        if (SUCCEEDED(hr)) hr = dialog->SetOptions(options | FOS_FORCEFILESYSTEM | FOS_FILEMUSTEXIST | FOS_PATHMUSTEXIST);
+        const COMDLG_FILTERSPEC filter[] = {{L"TenRiff connection (*.json)", L"*.json"}};
+        if (SUCCEEDED(hr)) hr = dialog->SetFileTypes(1, filter);
+        if (SUCCEEDED(hr)) hr = dialog->SetTitle(L"Select TenRiff leaderboard connection");
+        if (SUCCEEDED(hr)) hr = dialog->Show(nullptr);
+        if (SUCCEEDED(hr)) {
+            Microsoft::WRL::ComPtr<IShellItem> item;
+            hr = dialog->GetResult(&item);
+            PWSTR path = nullptr;
+            if (SUCCEEDED(hr)) hr = item->GetDisplayName(SIGDN_FILESYSPATH, &path);
+            if (SUCCEEDED(hr) && path) result = std::filesystem::path(path);
+            if (path) CoTaskMemFree(path);
+        }
+    }
+    dialog.Reset();
+    CoUninitialize();
+    if (FAILED(hr) && hr != HRESULT_FROM_WIN32(ERROR_CANCELLED)) error = "Could not read the selected connection file.";
+    return result;
+}
+#endif
+
 }  // namespace
 
 void MenuApp::toggle_ranked_account_overlay() {
@@ -81,6 +117,7 @@ void MenuApp::set_ranked_account_overlay(bool visible) {
         dismiss_chat_url_warning();
         ranked_account_focused_field_ = ranked_account_use_private_server_ ? 0 : 1;
         ranked_account_status_.clear();
+        refresh_sites_leaderboard_connection();
         if (ranked_account_username_.empty()) {
             ranked_account_username_ = ranked_account_signed_in_username_;
         }
@@ -97,6 +134,19 @@ bool MenuApp::handle_ranked_account_overlay_input(uint32_t keycode) {
         return true;
     }
     if (ranked_account_request_busy_.load(std::memory_order_acquire)) return true;
+    if (keycode == key_tab_ && control_modifier_pressed()) {
+        ranked_account_sites_mode_ = !ranked_account_sites_mode_;
+        if (ranked_account_sites_mode_) refresh_sites_leaderboard_connection();
+        publish_snapshot();
+        return true;
+    }
+    if (ranked_account_sites_mode_) {
+        if (keycode == key_v_ && control_modifier_pressed())
+            handle_sites_leaderboard_action(render::SitesLeaderboardAction::PasteConnection);
+        else if (keycode == key_enter_)
+            handle_sites_leaderboard_action(render::SitesLeaderboardAction::ImportFile);
+        return true;
+    }
     if (!ranked_account_signed_in_username_.empty()) {
         if (keycode == key_enter_) {
             set_ranked_account_overlay(false);
@@ -169,6 +219,10 @@ void MenuApp::populate_ranked_account_overlay(
     target.busy = ranked_account_request_busy_.load(std::memory_order_acquire);
     target.signed_in = !ranked_account_signed_in_username_.empty();
     target.private_server = ranked_account_use_private_server_;
+    target.sites_mode = ranked_account_sites_mode_;
+    target.sites_connected = sites_connection_saved_;
+    target.sites_url = sites_connection_url_.empty() ? kSitesLeaderboardUrl : sites_connection_url_;
+    target.sites_status = sites_connection_status_;
     target.focused_field = ranked_account_focused_field_;
     target.username = ranked_account_username_;
     target.server_url = ranked_account_private_server_url_;
@@ -183,6 +237,84 @@ void MenuApp::populate_ranked_account_overlay(
                         ? ui_text("TAB changes field   Ctrl+V pastes password   F10 or ESC closes",
                                   "TAB 입력칸 변경   Ctrl+V 비밀번호 붙여넣기   F10 또는 ESC 닫기")
                         : ranked_account_status_;
+}
+
+
+void MenuApp::refresh_sites_leaderboard_connection() {
+    SitesLeaderboardConnection connection;
+    bool missing = false;
+    std::string error;
+    const bool loaded = load_sites_leaderboard_connection("config", connection, missing, error);
+    sites_connection_saved_ = loaded && !missing;
+    sites_connection_url_ = sites_connection_saved_ ? connection.site_url : kSitesLeaderboardUrl;
+    clear_secret(connection.upload_token);
+    sites_connection_status_ = !loaded ? error : sites_connection_saved_
+        ? ui_text("Connection saved. Eligible records upload automatically.",
+                  "연결 정보가 저장되어 있습니다. 플레이 후 자동 업로드합니다.")
+        : ui_text("Open the website, sign in, and copy your connection information.",
+                  "웹사이트에서 로그인한 뒤 연결 정보를 복사해 주세요.");
+    if (sites_connection_saved_ && !sites_last_upload_status_.empty())
+        sites_connection_status_ = sites_last_upload_status_;
+}
+
+void MenuApp::handle_sites_leaderboard_action(render::SitesLeaderboardAction action) {
+    std::string error;
+    if (action == render::SitesLeaderboardAction::OpenWebsite) {
+#ifdef _WIN32
+        const auto url = account_utf8_to_wide(sites_connection_url_.empty() ? kSitesLeaderboardUrl : sites_connection_url_);
+        const auto opened = ShellExecuteW(nullptr, L"open", url.c_str(), nullptr, nullptr, SW_SHOWNORMAL);
+        if (reinterpret_cast<INT_PTR>(opened) <= 32) {
+            sites_connection_status_ = ui_text("Could not open the website.", "웹사이트를 열지 못했습니다.");
+        }
+#else
+        sites_connection_status_ = ui_text("Open the leaderboard in your browser.", "브라우저에서 리더보드를 열어주세요.");
+#endif
+    } else if (action == render::SitesLeaderboardAction::Disconnect) {
+        if (clear_sites_leaderboard_connection("config", error)) {
+            sites_leaderboard_service_.cancel_pending();
+            sites_last_upload_status_.clear();
+            refresh_sites_leaderboard_connection();
+            sites_connection_status_ = ui_text("Automatic uploads disabled on this PC.",
+                                               "이 PC의 자동 업로드 연결을 해제했습니다.");
+        } else sites_connection_status_ = error;
+    } else {
+        std::string contents;
+        if (action == render::SitesLeaderboardAction::PasteConnection) {
+            auto clipboard = clipboard_text_utf8(false);
+            if (clipboard) contents = std::move(*clipboard);
+            else error = ui_text("Clipboard is empty.", "클립보드가 비어 있습니다.");
+        } else if (action == render::SitesLeaderboardAction::ImportFile) {
+#ifdef _WIN32
+            const auto picked = pick_sites_connection_file(error);
+            if (!picked) {
+                if (!error.empty()) sites_connection_status_ = error;
+                publish_snapshot();
+                return;
+            }
+            std::error_code ec;
+            const auto size = std::filesystem::file_size(*picked, ec);
+            if (ec || size == 0 || size > 4096) error = ui_text(
+                "Select a connection JSON file smaller than 4 KiB.", "4 KiB 이하의 연결 JSON 파일을 선택해 주세요.");
+            else {
+                contents.resize(static_cast<std::size_t>(size));
+                std::ifstream input(*picked, std::ios::binary);
+                if (!input.read(contents.data(), static_cast<std::streamsize>(size)))
+                    error = ui_text("Could not read the connection file.", "연결 파일을 읽지 못했습니다.");
+            }
+#else
+            error = "The file picker is available on Windows.";
+#endif
+        }
+        if (error.empty() && install_sites_leaderboard_connection("config", contents, error)) {
+            sites_leaderboard_service_.cancel_pending();
+            sites_last_upload_status_.clear();
+            refresh_sites_leaderboard_connection();
+            sites_connection_status_ = ui_text("Connection imported and protected. You can play now.",
+                                               "연결 정보를 암호화해 저장했습니다. 이제 플레이하면 됩니다.");
+        } else if (!error.empty()) sites_connection_status_ = error;
+        clear_secret(contents);
+    }
+    publish_snapshot();
 }
 
 void MenuApp::begin_ranked_account_request() {

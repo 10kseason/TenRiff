@@ -13,7 +13,7 @@
 
 ## 기본 난이도표
 
-선곡 중앙의 **난이도표 / 선택** 카드를 누르면 아래 네 항목을 버튼 또는 F1/F2/F3/F4로 선택할 수 있습니다.
+선곡 중앙의 **난이도표 / 선택** 카드를 누르면 아래 아홉 항목을 3×3 버튼 또는 F1–F9로 선택할 수 있습니다. 선택 창이 열려 있는 동안 F8 채팅과 F9 스크린샷 대신 해당 표를 선택합니다.
 
 | 단축키 | 선택 이름 | 공식 주소 |
 |---|---|---|
@@ -21,8 +21,15 @@
 | F2 | 7키 에리 | https://asumatoki.kr/table/aery7/header.json |
 | F3 | 10키 리바이브 | https://calc.10k-revive.cloud/table.html |
 | F4 | 기본 LV / Native LV | 로컬 곡 메타데이터 사용 |
+| F5 | 스텔라 | https://stellabms.xyz/st/table.html |
+| F6 | 새틀라이트 | https://stellabms.xyz/sl/table.html |
+| F7 | 4키 U_E 팩 | https://classmaterma.github.io/4UE/table.html |
+| F8 | 6키 U_E 팩 | https://classmaterma.github.io/UE/table.html |
+| F9 | 8키 U_E 팩 | https://classmaterma.github.io/8UE/table.html |
 
-선택 시 기존 BMSTable 가져오기 기능으로 표를 내려받아 프로필에 캐시하고 적용합니다. 리바이브 HTML의 상대 `bmstable` 헤더 링크도 처리합니다. 새 표 가져오기에 실패하면 기존 표를 유지하며 오류를 표시합니다. 앱을 실행할 때마다 세 표를 자동 다운로드하지 않습니다.
+선택 시 기존 BMSTable 가져오기 기능으로 표를 내려받아 프로필에 캐시하고 적용합니다. 각 HTML의 상대 `bmstable` 헤더 링크도 처리합니다. 새 표 가져오기에 실패하면 기존 표를 유지하며 오류를 표시합니다. 앱을 실행할 때마다 모든 표를 자동 다운로드하지 않습니다.
+
+U_E 팩 4/6/8키 주소는 [U_E 팩 공식 안내 페이지](https://sites.google.com/view/6k4kbms/)에서 연결하는 표입니다. 표 헤더 이름은 각각 `4UE Difficulty Table`, `6UE Difficulty Table`, `8UE Difficulty Table`입니다. 스텔라·새틀라이트·U_E 팩는 페이지의 `header.json`을 통해 `score.json`을 가져옵니다.
 
 같은 창에서 사용자 URL을 입력할 수 있고, 카드 옆 **파일**은 로컬 JSON을 고릅니다. 표 선택값은 프로필에 저장됩니다. 표에 포함된 차트의 실제 BMS/오디오는 별도로 보유해야 합니다.
 

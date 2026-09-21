@@ -11,6 +11,7 @@ enum class SnapshotViewKind {
     Title,
     SongSelect,
     SongBrowser,
+    BmsEditor,
     Gameplay,
     Result,
     Generic,

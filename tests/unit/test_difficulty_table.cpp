@@ -1,6 +1,7 @@
 #include "doctest/doctest.h"
 
 #include <algorithm>
+#include <array>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
@@ -361,24 +362,36 @@ TEST_CASE("built-in tables import publisher header and relative page layouts") {
     TempDirGuard temp;
     temp.path = make_temp_dir();
     REQUIRE_FALSE(temp.path.empty());
-    const std::vector<std::string> headers{
-        "https://asumatoki.kr/table/aery/header.json",
-        "https://asumatoki.kr/table/aery7/header.json",
-        "https://calc.10k-revive.cloud/table/header.json"};
-    const std::vector<std::string> bodies{
-        "https://asumatoki.kr/table/aery/data.json",
-        "https://asumatoki.kr/table/aery7/data.json",
-        "https://calc.10k-revive.cloud/table/body.json"};
+    struct PublisherLayout {
+        std::string header_url;
+        std::string page_header;
+        std::string data_file;
+        bool header_bom = false;
+    };
+    const std::vector<PublisherLayout> layouts{
+        {"https://asumatoki.kr/table/aery/header.json", "", "data.json"},
+        {"https://asumatoki.kr/table/aery7/header.json", "", "data.json"},
+        {"https://calc.10k-revive.cloud/table/header.json", "table/header.json", "body.json"},
+        {"https://stellabms.xyz/st/header.json", "header.json", "score.json"},
+        {"https://stellabms.xyz/sl/header.json", "header.json", "score.json"},
+        {"https://classmaterma.github.io/4UE/header.json", "header.json", "score.json", true},
+        {"https://classmaterma.github.io/UE/header.json", "header.json", "score.json"},
+        {"https://classmaterma.github.io/8UE/header.json", "header.json", "score.json", true}};
+    REQUIRE(layouts.size() == tenriff::config::kBuiltinDifficultyTables.size());
     for (std::size_t i = 0; i < tenriff::config::kBuiltinDifficultyTables.size(); ++i) {
         const auto& preset = tenriff::config::kBuiltinDifficultyTables[i];
+        const auto& layout = layouts[i];
+        const auto body_url = tenriff::app::resolve_difficulty_table_url(layout.header_url, layout.data_file);
+        REQUIRE(body_url.has_value());
         auto fetch = [&](std::string_view url, std::size_t) {
             std::string body;
-            if (i == 2 && url == preset.url) {
-                body = "<meta name=\"bmstable\" content=\"table/header.json\">";
-            } else if (url == headers[i]) {
+            if (!layout.page_header.empty() && url == preset.url) {
+                body = "<meta name=\"bmstable\" content=\"" + layout.page_header + "\">";
+            } else if (url == layout.header_url) {
                 body = std::string("{\"name\":\"") + std::string(preset.name_ko) +
-                    "\",\"symbol\":\"Lv\",\"data_url\":\"" + (i == 2 ? "body.json" : "data.json") + "\"}";
-            } else if (url == bodies[i]) {
+                    "\",\"symbol\":\"Lv\",\"data_url\":\"" + layout.data_file + "\"}";
+                if (layout.header_bom) body.insert(0, "\xef\xbb\xbf");
+            } else if (url == *body_url) {
                 body = "[{\"md5\":\"1d99a3728312c6b689b6a6dc51770732\",\"level\":\"13\"}]";
             } else {
                 return tenriff::app::DifficultyTableHttpResponse{404, std::string(url), {}, {}};
@@ -398,6 +411,26 @@ TEST_CASE("built-in tables import publisher header and relative page layouts") {
     }
 }
 
+TEST_CASE("difficulty table shortcuts preserve legacy keys and reserve F4 for native levels") {
+    const auto& presets = tenriff::config::kBuiltinDifficultyTables;
+    REQUIRE(presets.size() == 8);
+    CHECK(presets[0].name_en == "5K Aery");
+    CHECK(presets[1].name_en == "7K Aery");
+    CHECK(presets[2].name_en == "10K Revive");
+    CHECK(presets[0].function_key == 1);
+    CHECK(presets[1].function_key == 2);
+    CHECK(presets[2].function_key == 3);
+    std::array<bool, 10> used{};
+    used[4] = true; // Native LV must not be shadowed by a downloaded table.
+    for (const auto& preset : presets) {
+        REQUIRE(preset.function_key >= 1);
+        REQUIRE(preset.function_key <= 9);
+        CHECK_FALSE(used[static_cast<std::size_t>(preset.function_key)]);
+        used[static_cast<std::size_t>(preset.function_key)] = true;
+    }
+    CHECK(std::all_of(used.begin() + 1, used.end(), [](bool bound) { return bound; }));
+}
+
 TEST_CASE("all built-in difficulty tables live import is opt-in") {
     const char* enabled = std::getenv("TENRIFF_LIVE_BUILTIN_TABLES");
     if (!enabled || std::string_view(enabled) != "1") return;
@@ -414,5 +447,14 @@ TEST_CASE("all built-in difficulty tables live import is opt-in") {
         const auto loaded = tenriff::app::load_difficulty_table_utf8(imported.cached_header_path);
         REQUIRE(loaded.success());
         CHECK(loaded.table.entry_count() > 0);
+        if (i >= 3) {
+            const std::array<std::string_view, 5> names{
+                "Stella", "Satellite", "4UE Difficulty Table", "6UE Difficulty Table", "8UE Difficulty Table"};
+            const std::array<std::string_view, 5> symbols{"st", "sl", "4UE", "6UE", "8UE"};
+            CHECK(loaded.table.name() == names[i - 3]);
+            CHECK(loaded.table.symbol() == symbols[i - 3]);
+        }
+        std::cout << "[builtin table loaded] " << loaded.table.name() << " ("
+                  << loaded.table.symbol() << "): " << loaded.table.entry_count() << " entries\n";
     }
 }

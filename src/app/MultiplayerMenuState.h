@@ -28,6 +28,7 @@ enum class MultiplayerMenuRow : uint8_t {
     Host,
     Join,
     Chart,
+    Rate,
     Ready,
     Start,
     Chat,
@@ -42,7 +43,7 @@ enum class MultiplayerEditField : uint8_t {
     Chat,
 };
 
-inline constexpr int kMultiplayerMenuRowCount = 11;
+inline constexpr int kMultiplayerMenuRowCount = 12;
 inline constexpr std::size_t kMultiplayerAddressMaxLength = 255;
 inline constexpr std::size_t kMultiplayerPortTextMaxLength = 5;
 inline constexpr std::size_t kMultiplayerChatInputMaxBytes = 256;

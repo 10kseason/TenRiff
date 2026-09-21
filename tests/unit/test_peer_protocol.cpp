@@ -105,6 +105,92 @@ TEST_CASE("peer protocol rejects empty and oversized chat frames") {
     CHECK(tenriff::network::encode_peer_message(chat, &error).empty());
     CHECK_FALSE(error.empty());
 }
+
+TEST_CASE("peer rate settings round-trip every supported value and generation") {
+    using namespace tenriff::network;
+    for (const auto type : {PeerMessageType::RoomRate, PeerMessageType::Ready,
+                            PeerMessageType::Launch, PeerMessageType::RoomRoster}) {
+        PeerMessage message;
+        message.type = type;
+        message.player_id = 1;
+        message.leader_id = 1;
+        message.chart_hash = 123;
+        message.nonce = 456;
+        message.ready = true;
+        PeerParticipantWire participant;
+        participant.player_id = 1;
+        participant.name = "Leader";
+        message.participants.push_back(participant);
+        message.rate_revision = 0x123456789abcdef0ull;
+        for (uint32_t rate = 500; rate <= 2000; rate += 50) {
+            REQUIRE(peer_rate_milli_is_valid(rate));
+            message.rate_milli = rate;
+            const auto decoded = round_trip(message);
+            CHECK(decoded.rate_milli == rate);
+            CHECK(decoded.rate_revision == message.rate_revision);
+        }
+    }
+}
+
+TEST_CASE("peer rate settings reject invalid rates and zero generations on both wire paths") {
+    using namespace tenriff::network;
+    for (const auto type : {PeerMessageType::RoomRate, PeerMessageType::Ready,
+                            PeerMessageType::Launch, PeerMessageType::RoomRoster}) {
+        PeerMessage message;
+        message.type = type;
+        message.player_id = 1;
+        message.leader_id = 1;
+        message.chart_hash = 123;
+        message.nonce = 456;
+        PeerParticipantWire participant;
+        participant.player_id = 1;
+        participant.name = "Leader";
+        message.participants.push_back(participant);
+        const std::size_t rate_offset = kPeerFrameHeaderSize +
+            (type == PeerMessageType::RoomRate ? 1u :
+             type == PeerMessageType::Ready ? 2u :
+             type == PeerMessageType::Launch ? 17u : 10u);
+        for (uint32_t invalid : {0u, 499u, 501u, 999u, 2001u, 2050u, 0xffffffffu}) {
+            CHECK_FALSE(peer_rate_milli_is_valid(invalid));
+            std::string error;
+            message.rate_milli = invalid;
+            CHECK(encode_peer_message(message, &error).empty());
+            CHECK_FALSE(error.empty());
+            message.rate_milli = kPeerRateDefaultMilli;
+            auto bytes = encode_peer_message(message);
+            for (std::size_t byte = 0; byte < 4; ++byte) {
+                bytes[rate_offset + byte] = static_cast<uint8_t>(invalid >> ((3u - byte) * 8u));
+            }
+            PeerMessage decoded;
+            std::size_t consumed = 0;
+            CHECK(decode_peer_message(bytes, decoded, consumed, error) == PeerDecodeStatus::Error);
+        }
+        std::string error;
+        message.rate_revision = 0;
+        CHECK(encode_peer_message(message, &error).empty());
+        message.rate_revision = 1;
+        auto bytes = encode_peer_message(message);
+        for (std::size_t byte = 0; byte < 8; ++byte) bytes[rate_offset + 4 + byte] = 0;
+        PeerMessage decoded;
+        std::size_t consumed = 0;
+        CHECK(decode_peer_message(bytes, decoded, consumed, error) == PeerDecodeStatus::Error);
+    }
+}
+
+TEST_CASE("peer protocol rejects pre-rate version five before payload decoding") {
+    PeerMessage message;
+    message.type = PeerMessageType::Hello;
+    message.text = "Legacy 1.7.3 client";
+    auto frame = tenriff::network::encode_peer_message(message);
+    REQUIRE(frame.size() > 5);
+    frame[4] = 0;
+    frame[5] = 5;
+    std::size_t consumed = 0;
+    std::string error;
+    PeerMessage decoded;
+    CHECK(tenriff::network::decode_peer_message(frame, decoded, consumed, error) == PeerDecodeStatus::Error);
+    CHECK(error.find("version") != std::string::npos);
+}
 TEST_CASE("peer protocol round-trips eight-player room metadata") {
     PeerMessage welcome;
     welcome.type = PeerMessageType::RoomWelcome;

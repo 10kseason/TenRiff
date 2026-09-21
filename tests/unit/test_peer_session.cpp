@@ -11,6 +11,17 @@
 #include <thread>
 #include <vector>
 
+#ifdef _WIN32
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#endif
+
 namespace {
 
 using namespace std::chrono_literals;
@@ -25,6 +36,85 @@ bool wait_until(const std::function<bool()>& predicate,
     return predicate();
 }
 
+#ifdef _WIN32
+// A real TCP participant can deliberately replay stale but well-formed control
+// frames. Public PeerSession APIs intentionally cannot generate these packets.
+class RawRatePeer {
+public:
+    ~RawRatePeer() {
+        if (socket_ != INVALID_SOCKET) closesocket(socket_);
+        if (started_) WSACleanup();
+    }
+
+    bool connect_to(uint16_t port) {
+        WSADATA data{};
+        if (WSAStartup(MAKEWORD(2, 2), &data) != 0) return false;
+        started_ = true;
+        socket_ = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+        if (socket_ == INVALID_SOCKET) return false;
+        sockaddr_in address{};
+        address.sin_family = AF_INET;
+        address.sin_port = htons(port);
+        address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+        if (connect(socket_, reinterpret_cast<sockaddr*>(&address), sizeof(address)) == SOCKET_ERROR) return false;
+        u_long nonblocking = 1;
+        if (ioctlsocket(socket_, FIONBIO, &nonblocking) != 0) return false;
+        tenriff::network::PeerMessage hello;
+        hello.type = tenriff::network::PeerMessageType::Hello;
+        hello.text = "Raw Rate Peer";
+        return send_message(hello);
+    }
+
+    bool send_message(const tenriff::network::PeerMessage& message) {
+        const auto bytes = tenriff::network::encode_peer_message(message);
+        if (bytes.empty()) return false;
+        std::size_t offset = 0;
+        return wait_until([&] {
+            const int sent = send(socket_, reinterpret_cast<const char*>(bytes.data() + offset),
+                                  static_cast<int>(bytes.size() - offset), 0);
+            if (sent > 0) offset += static_cast<std::size_t>(sent);
+            return offset == bytes.size();
+        });
+    }
+
+    bool fence() {
+        using namespace tenriff::network;
+        PeerMessage ping;
+        ping.type = PeerMessageType::Ping;
+        ping.nonce = ++fence_nonce_;
+        if (!send_message(ping)) return false;
+        return wait_until([&] {
+            char buffer[8192];
+            for (;;) {
+                const int count = recv(socket_, buffer, sizeof(buffer), 0);
+                if (count <= 0) break;
+                received_.insert(received_.end(), buffer, buffer + count);
+            }
+            while (!received_.empty()) {
+                PeerMessage message;
+                std::size_t consumed = 0;
+                std::string error;
+                const auto status = decode_peer_message(received_, message, consumed, error);
+                if (status != PeerDecodeStatus::Complete) break;
+                received_.erase(received_.begin(), received_.begin() + static_cast<std::ptrdiff_t>(consumed));
+                if (message.type == PeerMessageType::Ping) {
+                    message.type = PeerMessageType::Pong;
+                    if (!send_message(message)) return false;
+                }
+                if (message.type == PeerMessageType::Pong && message.nonce == ping.nonce) return true;
+            }
+            return false;
+        });
+    }
+
+private:
+    SOCKET socket_ = INVALID_SOCKET;
+    bool started_ = false;
+    uint64_t fence_nonce_ = 1000;
+    std::vector<uint8_t> received_;
+};
+#endif
+
 }  // namespace
 
 TEST_CASE("peer session rejects invalid startup and chart inputs") {
@@ -34,6 +124,9 @@ TEST_CASE("peer session rejects invalid startup and chart inputs") {
     CHECK_FALSE(session.join("localhost", 0, "Joiner"));
     CHECK_FALSE(session.set_local_chart({}, "No chart"));
     CHECK_FALSE(session.send_chat("Not connected"));
+    CHECK_FALSE(session.set_rate(1250));
+    CHECK_FALSE(session.set_rate(499));
+    CHECK_FALSE(session.set_rate(1025));
 
     const auto snapshot = session.snapshot();
     CHECK(snapshot.role == tenriff::network::PeerRole::None);
@@ -41,6 +134,8 @@ TEST_CASE("peer session rejects invalid startup and chart inputs") {
     CHECK_FALSE(snapshot.local_ready);
     CHECK_FALSE(snapshot.remote_ready);
     CHECK_FALSE(snapshot.has_remote_score);
+    CHECK(snapshot.rate_milli == 1000);
+    CHECK(snapshot.round_rate_milli == 1000);
 }
 
 TEST_CASE("peer session can explicitly forget a retained local chart") {
@@ -651,5 +746,284 @@ TEST_CASE("peer session discards a queued launch when the connection closes") {
     CHECK_FALSE(joiner.poll_launch().has_value());
 
     host.disconnect("Disconnect-race test complete");
+#endif
+}
+
+TEST_CASE("peer room rate follows the leader through readiness launch rotation and rejoin") {
+#ifdef _WIN32
+    using namespace tenriff::network;
+    PeerSession host;
+    PeerSession second;
+    PeerSession third;
+    const ChartFingerprint chart{0x1122334455667788ull, 9876};
+    REQUIRE(host.set_local_chart(chart, "Rate Chart"));
+    REQUIRE(host.host(0, "Rate Host"));
+    REQUIRE(wait_until([&] { return host.snapshot().state == PeerSessionState::Listening; }));
+    REQUIRE(host.set_rate(1500));
+    REQUIRE(wait_until([&] {
+        return host.snapshot().rate_milli == 1500 && !host.snapshot().rate_change_pending;
+    }));
+    const auto port = host.snapshot().local_port;
+    REQUIRE(second.join("127.0.0.1", port, "Rate Second"));
+    REQUIRE(wait_until([&] { return second.snapshot().state == PeerSessionState::Connected; }));
+    CHECK(second.snapshot().rate_milli == 1500);
+    CHECK_FALSE(second.set_rate(750));
+    CHECK_FALSE(host.set_rate(2001));
+    CHECK_FALSE(host.set_rate(1025));
+    REQUIRE(second.set_local_chart(chart, "Rate Chart"));
+    REQUIRE(wait_until([&] { return host.snapshot().remote_chart.fingerprint.hash == chart.hash; }));
+    REQUIRE(host.set_ready(true));
+    REQUIRE(second.set_ready(true));
+    REQUIRE(wait_until([&] { return host.snapshot().can_start; }));
+    const auto old_revision = host.snapshot().rate_revision;
+    REQUIRE(host.set_rate(500));
+    REQUIRE(wait_until([&] {
+        const auto a = host.snapshot();
+        const auto b = second.snapshot();
+        return a.rate_milli == 500 && b.rate_milli == 500 &&
+               !a.local_ready && !a.remote_ready && !b.local_ready && !b.remote_ready &&
+               !a.rate_change_pending && a.rate_revision > old_revision;
+    }));
+    CHECK_FALSE(host.send_launch());
+
+    REQUIRE(third.join("127.0.0.1", port, "Rate Third"));
+    REQUIRE(wait_until([&] {
+        return host.snapshot().participant_count == 3 &&
+               second.snapshot().participant_count == 3 && third.snapshot().participant_count == 3;
+    }));
+    CHECK(third.snapshot().rate_milli == 500);
+    REQUIRE(third.set_local_chart(chart, "Rate Chart"));
+    REQUIRE(host.set_rate(2000));
+    REQUIRE(wait_until([&] {
+        return host.snapshot().rate_milli == 2000 && second.snapshot().rate_milli == 2000 &&
+               third.snapshot().rate_milli == 2000 && !host.snapshot().rate_change_pending;
+    }));
+    REQUIRE(host.set_ready(true));
+    REQUIRE(second.set_ready(true));
+    REQUIRE(third.set_ready(true));
+    REQUIRE(wait_until([&] { return host.snapshot().can_start; }));
+    REQUIRE(host.send_launch());
+    REQUIRE(wait_until([&] {
+        return host.snapshot().round_active && second.snapshot().round_active && third.snapshot().round_active;
+    }));
+    CHECK(host.snapshot().round_rate_milli == 2000);
+    CHECK(second.snapshot().round_rate_milli == 2000);
+    CHECK(third.snapshot().round_rate_milli == 2000);
+    CHECK_FALSE(host.set_rate(1000));
+    CHECK_FALSE(second.set_rate(1000));
+    REQUIRE(host.mark_loaded());
+    REQUIRE(second.mark_loaded());
+    REQUIRE(third.mark_loaded());
+    REQUIRE(wait_until([&] { return host.snapshot().remote_loaded; }));
+    REQUIRE(host.send_begin(0));
+    uint32_t delay_ms = 0;
+    REQUIRE(second.wait_for_begin(3000ms, delay_ms));
+    REQUIRE(third.wait_for_begin(3000ms, delay_ms));
+    CHECK_FALSE(host.set_rate(1000));
+    PeerScore final;
+    final.score = 5000;
+    final.finished = true;
+    REQUIRE(host.publish_score(final, true));
+    REQUIRE(second.publish_score(final, true));
+    REQUIRE(third.publish_score(final, true));
+    REQUIRE(wait_until([&] {
+        return host.snapshot().all_remote_finished && second.snapshot().all_remote_finished &&
+               third.snapshot().all_remote_finished;
+    }));
+    CHECK_FALSE(host.set_rate(1000));
+    host.reset_round();
+    CHECK_FALSE(host.set_rate(1000));
+    second.reset_round();
+    third.reset_round();
+    REQUIRE(wait_until([&] {
+        return !host.snapshot().round_active && !second.snapshot().round_active &&
+               !third.snapshot().round_active && second.snapshot().local_is_leader;
+    }));
+    CHECK(host.snapshot().rate_milli == 2000);
+    CHECK(second.snapshot().round_rate_milli == 2000);
+    CHECK_FALSE(host.set_rate(1250));
+    CHECK_FALSE(third.set_rate(1250));
+    REQUIRE(second.set_rate(1250));
+    REQUIRE(wait_until([&] {
+        return host.snapshot().rate_milli == 1250 && third.snapshot().rate_milli == 1250 &&
+               !second.snapshot().rate_change_pending;
+    }));
+    // Retained result metadata belongs to the previous launch, even while the
+    // new lobby leader changes settings for the following song.
+    CHECK(host.snapshot().round_rate_milli == 2000);
+    CHECK(second.snapshot().round_rate_milli == 2000);
+    CHECK(third.snapshot().round_rate_milli == 2000);
+
+    third.disconnect("Rejoin rate room");
+    REQUIRE(wait_until([&] { return host.snapshot().participant_count == 2; }));
+    REQUIRE(third.join("127.0.0.1", port, "Rate Third Rejoined"));
+    REQUIRE(wait_until([&] {
+        return third.snapshot().state == PeerSessionState::Connected &&
+               host.snapshot().participant_count == 3 && third.snapshot().rate_milli == 1250;
+    }));
+    REQUIRE(second.set_local_chart(chart, "Second Rate Round"));
+    REQUIRE(wait_until([&] {
+        return host.snapshot().selected_chart.fingerprint.hash == chart.hash &&
+               third.snapshot().selected_chart.fingerprint.hash == chart.hash;
+    }));
+    REQUIRE(host.set_local_chart(chart, "Second Rate Round"));
+    REQUIRE(third.set_local_chart(chart, "Second Rate Round"));
+    REQUIRE(wait_until([&] {
+        const auto room = second.snapshot();
+        return std::all_of(room.participants.begin(), room.participants.end(), [&](const auto& player) {
+            return player.chart.fingerprint.hash == chart.hash;
+        });
+    }));
+    REQUIRE(host.set_ready(true));
+    REQUIRE(second.set_ready(true));
+    REQUIRE(third.set_ready(true));
+    REQUIRE(wait_until([&] { return second.snapshot().can_start; }));
+    REQUIRE(second.send_launch());
+    REQUIRE(wait_until([&] {
+        return host.snapshot().round_active && third.snapshot().round_active &&
+               host.snapshot().round_rate_milli == 1250 && third.snapshot().round_rate_milli == 1250;
+    }));
+    CHECK(second.snapshot().round_rate_milli == 1250);
+    CHECK_FALSE(second.set_rate(1000));
+    third.disconnect();
+    second.disconnect();
+    host.disconnect();
+    REQUIRE(host.host(0, "Fresh Rate Room"));
+    REQUIRE(wait_until([&] { return host.snapshot().state == PeerSessionState::Listening; }));
+    CHECK(host.snapshot().rate_milli == 1000);
+    CHECK(host.snapshot().round_rate_milli == 1000);
+    host.disconnect();
+#endif
+}
+
+TEST_CASE("peer coordinator rejects stale ready launch and rate requests after returning to the same rate") {
+#ifdef _WIN32
+    using namespace tenriff::network;
+    PeerSession host;
+    RawRatePeer raw;
+    const ChartFingerprint chart{0x8877665544332211ull, 4321};
+    REQUIRE(host.set_local_chart(chart, "Stale Rate Chart"));
+    REQUIRE(host.host(0, "Generation Host"));
+    REQUIRE(wait_until([&] { return host.snapshot().state == PeerSessionState::Listening; }));
+    REQUIRE(raw.connect_to(host.snapshot().local_port));
+    REQUIRE(wait_until([&] { return host.snapshot().participant_count == 2; }));
+    REQUIRE(raw.fence());
+    PeerMessage message;
+    message.type = PeerMessageType::RoomRate;
+    message.rate_milli = 1500;
+    message.rate_revision = host.snapshot().rate_revision;
+    REQUIRE(raw.send_message(message));
+    REQUIRE(raw.fence());
+    CHECK(host.snapshot().rate_milli == 1000); // Socket host coordinates; only room leader decides.
+    CHECK(host.snapshot().participant_count == 2);
+
+    message.type = PeerMessageType::Chart;
+    message.chart_hash = chart.hash;
+    message.chart_size = chart.size;
+    message.text = "Stale Rate Chart";
+    REQUIRE(raw.send_message(message));
+    REQUIRE(raw.fence());
+    REQUIRE(host.set_ready(true));
+    message.type = PeerMessageType::Ready;
+    message.ready = true;
+    message.rate_milli = 1000;
+    message.rate_revision = host.snapshot().rate_revision;
+    REQUIRE(raw.send_message(message));
+    REQUIRE(raw.fence());
+    REQUIRE(wait_until([&] { return host.snapshot().can_start; }));
+    REQUIRE(host.send_launch());
+    REQUIRE(wait_until([&] { return host.snapshot().round_active; }));
+    const uint64_t first_round = host.snapshot().result_round_nonce;
+    REQUIRE(host.mark_loaded());
+    message.type = PeerMessageType::Loaded;
+    message.nonce = first_round;
+    REQUIRE(raw.send_message(message));
+    REQUIRE(raw.fence());
+    REQUIRE(wait_until([&] { return host.snapshot().remote_loaded; }));
+    REQUIRE(host.send_begin(0));
+    PeerScore final;
+    final.finished = true;
+    REQUIRE(host.publish_score(final, true));
+    message.type = PeerMessageType::FinalScore;
+    message.score = final;
+    REQUIRE(raw.send_message(message));
+    REQUIRE(raw.fence());
+    REQUIRE(wait_until([&] { return host.snapshot().all_remote_finished; }));
+    host.reset_round();
+    message.type = PeerMessageType::RoundReset;
+    REQUIRE(raw.send_message(message));
+    REQUIRE(raw.fence());
+    REQUIRE(wait_until([&] {
+        return !host.snapshot().round_active && host.snapshot().leader_player_id == 2;
+    }));
+    const uint64_t stale_revision = host.snapshot().rate_revision;
+    message.type = PeerMessageType::RoomRate;
+    message.rate_milli = 1500;
+    message.rate_revision = stale_revision;
+    REQUIRE(raw.send_message(message));
+    REQUIRE(raw.fence());
+    CHECK(host.snapshot().rate_milli == 1500);
+    message.rate_milli = 1000;
+    message.rate_revision = host.snapshot().rate_revision;
+    REQUIRE(raw.send_message(message));
+    REQUIRE(raw.fence());
+    CHECK(host.snapshot().rate_milli == 1000);
+    CHECK(host.snapshot().rate_revision > stale_revision);
+
+    message.type = PeerMessageType::Chart;
+    REQUIRE(raw.send_message(message));
+    REQUIRE(raw.fence());
+    REQUIRE(host.set_local_chart(chart, "Stale Rate Chart"));
+    REQUIRE(wait_until([&] { return host.snapshot().local_chart.fingerprint.hash == chart.hash; }));
+    REQUIRE(host.set_ready(true));
+    message.type = PeerMessageType::Ready;
+    message.ready = true;
+    message.rate_revision = stale_revision;
+    REQUIRE(raw.send_message(message));
+    REQUIRE(raw.fence());
+    CHECK_FALSE(host.snapshot().remote_ready);
+    CHECK_FALSE(host.snapshot().round_active);
+
+    message.rate_revision = host.snapshot().rate_revision;
+    REQUIRE(raw.send_message(message));
+    REQUIRE(raw.fence());
+    REQUIRE(wait_until([&] { return host.snapshot().remote_ready && host.snapshot().local_ready; }));
+    message.type = PeerMessageType::Launch;
+    message.nonce = first_round + 100;
+    message.rate_revision = stale_revision;
+    REQUIRE(raw.send_message(message));
+    REQUIRE(raw.fence());
+    CHECK_FALSE(host.snapshot().round_active);
+
+    message.type = PeerMessageType::RoomRate;
+    message.rate_milli = 1500;
+    REQUIRE(raw.send_message(message));
+    REQUIRE(raw.fence());
+    CHECK(host.snapshot().rate_milli == 1000);
+    CHECK(host.snapshot().local_ready);
+    CHECK(host.snapshot().remote_ready);
+
+    message.type = PeerMessageType::Launch;
+    message.rate_milli = 1000;
+    message.rate_revision = host.snapshot().rate_revision;
+    REQUIRE(raw.send_message(message));
+    REQUIRE(raw.fence());
+    CHECK(host.snapshot().round_active);
+    CHECK(host.snapshot().round_rate_milli == 1000);
+    // An obsolete Ready(false) must not cancel the new loading barrier.
+    message.type = PeerMessageType::Ready;
+    message.ready = false;
+    message.rate_revision = stale_revision;
+    REQUIRE(raw.send_message(message));
+    REQUIRE(raw.fence());
+    CHECK(host.snapshot().round_active);
+    message.type = PeerMessageType::RoomRate;
+    message.rate_revision = host.snapshot().rate_revision;
+    message.rate_milli = 2000;
+    REQUIRE(raw.send_message(message));
+    REQUIRE(raw.fence());
+    CHECK(host.snapshot().rate_milli == 1000);
+    CHECK(host.snapshot().round_rate_milli == 1000);
+    host.disconnect("Stale rate regression complete");
 #endif
 }

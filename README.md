@@ -1,20 +1,26 @@
 # TenRiff
 
+**멀티 Rate 지원 빌드:** 로비 `대전 Rate`에서 리더가 공통 배속을 설정합니다. 참가자 모두 이 protocol v6 빌드를 사용해야 합니다. [사용 방법과 호환성](docs/multiplayer-rate-build.ko.md).
+
+**2026-09-15 1.7.7 릴리스:** 무입력 자동 결과 저장과 스텔라·새틀라이트·U_E 팩 4K/6K/8K 프리셋을 포함합니다. [수정 내용과 검증](docs/release-1.7.7-gate.md).
+
 Language: Korean | [English](README.en.md) | [简体中文](README.zh-CN.md) | [日本語](README.ja.md)
 
-TenRiff는 Windows GUI 기반 BMS 리듬게임 런타임/런처 프로젝트입니다. 현재 프로젝트 버전은 `1.7.2`이며, 차트 입력은 BMS 계열(`.bms/.bme/.bml/.pms`) 전용입니다. Graphics Settings에서 권리 정리된 외부 ONNX 모델을 선택해 BGA/BGI 확대에 사용할 수 있습니다. 공개 패키지에는 BGA 업스케일러 모델을 넣지 않으며, 키 모드 변환용 NK3 P64 결정 모델과 일반화 패턴 MLP만 포함합니다. MIT 라이선스를 사용하며, 번들된 서드파티 고지는 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)에 정리합니다.
+TenRiff는 Windows GUI 기반 BMS 리듬게임 런타임/런처 프로젝트입니다. 현재 프로젝트 버전은 `1.7.7`이며, 차트 입력은 BMS 계열(`.bms/.bme/.bml/.pms`) 전용입니다. Graphics Settings에서 권리 정리된 외부 ONNX 모델을 선택해 BGA/BGI 확대에 사용할 수 있습니다. 공개 패키지에는 BGA 업스케일러 모델을 넣지 않으며, 키 모드 변환용 NK3 P64 결정 모델과 일반화 패턴 MLP만 포함합니다. MIT 라이선스를 사용하며, 번들된 서드파티 고지는 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)에 정리합니다.
 
-이 README는 "프로젝트를 처음 열었을 때 무엇을 보면 되는지"를 설명하는 입문 문서입니다. 더 자세한 현재 동작, 현재 `1.7.2` 프로젝트 상태, `1.5.1 fixed stable baseline` 기준선, 설정 구조, 설계 문서는 [`docs/README.md`](docs/README.md)부터 이어서 읽는 구조를 기준으로 작성했습니다.
+이 README는 "프로젝트를 처음 열었을 때 무엇을 보면 되는지"를 설명하는 입문 문서입니다. 더 자세한 현재 동작, 현재 `1.7.7` 프로젝트 상태, `1.5.1 fixed stable baseline` 기준선, 설정 구조, 설계 문서는 [`docs/README.md`](docs/README.md)부터 이어서 읽는 구조를 기준으로 작성했습니다.
 
 TenRiff 코드는 전통적인 장기 설계 문서 중심 개발만으로 쌓인 프로젝트가 아니라, 빠른 반복과 실험을 중시한 `vibe coding` 성격이 강한 작품이라는 점을 명시합니다.
 
-## 1.7.2 오디오·라이브러리·플레이 개선
+## 1.7.7 오디오·라이브러리·플레이 개선
+
+이 배포본은 **1.7.7 Sites 통합본**입니다. 웹 리더보드 기능과 실행에 필요한 파일을 함께 제공하므로 ZIP을 새 폴더에 풀고 `launch_win.bat`으로 시작하면 됩니다. `F10`의 웹 리더보드에서 웹 로그인 후 복사한 연결 정보를 한 번 붙여넣으면 지원되는 새 플레이 기록이 자동 전송됩니다. 점수·상세 스코어·정확도·상세 정확도를 전송하며 기존 점수 산식은 유지합니다. [연결 및 비교 규칙](docs/sites-leaderboard.md)을 참고하세요.
 
 네이티브 Windows ASIO 출력을 추가하고 기본 WASAPI 출력을 유지합니다. 난이도표 선택 창에서 기본 LV로 돌아갈 수 있고, 5키 에리·7키 에리·10키 리바이브 표를 바로 선택할 수 있습니다. 스킨 설정과 자산은 `.trskin` 파일로 다른 PC에 옮길 수 있습니다.
 
 싱글플레이 재개 전 3초 카운트다운, 세션 믹스의 Esc 무시, 누적 진행 시간 기준 대표 BPM, LR2 참조 단위 게이지를 포함합니다. 소스 관리에 폴더 추가·목록에서만 제거를 추가했으며 한글 경로 검증과 상대 이탈 후 결과 보존도 수정했습니다.
 
-변경 사항은 [CHANGELOG](CHANGELOG.md), 검증 범위와 ASIO 장치 확인 상태는 [1.7.2 릴리스 게이트](docs/release-1.7.2-gate.md)를 참고하세요.
+변경 사항은 [CHANGELOG](CHANGELOG.md), 검증 범위와 ASIO 장치 확인 상태는 [1.7.7 릴리스 게이트](docs/release-1.7.7-gate.md)를 참고하세요.
 
 ## 스크린샷
 
@@ -180,7 +186,7 @@ cmake --build build --config Release --target bms_parser_tests
 
 ### 5. NK3 키 모드 변환
 
-1.7.2 공식 Windows 빌드와 ZIP에는 standalone BMS key converter CLI/GUI를 빌드하거나 포함하지 않습니다. 게임 안의 Mode Settings에서 `NK3`를 선택하면 P64와 host beam 안전 솔버가 항상 적용됩니다. 10K가 아닌 원본을 10K로 변환할 때만 일반화 패턴 MLP를 추가하며, 10→10과 나머지 모든 변환은 P64만 사용합니다. 기본 `AUTO` 백엔드는 ncnn Vulkan으로 P64와 MLP를 AMD/NVIDIA GPU에서 실행합니다. `TENRIFF_NK3_BACKEND=AUTO|VULKAN|NCNN_CPU|OPENVINO`와 `TENRIFF_NK3_VULKAN_DEVICE=<index>`로 실행 경로를 선택할 수 있습니다. `NCNN_CPU`는 GPU를 공유하지 않는 서버 검증기처럼 재현성이 필요한 격리 환경용입니다.
+1.7.7 공식 Windows 빌드와 ZIP에는 standalone BMS key converter CLI/GUI를 빌드하거나 포함하지 않습니다. 게임 안의 Mode Settings에서 `NK3`를 선택하면 P64와 host beam 안전 솔버가 항상 적용됩니다. 10K가 아닌 원본을 10K로 변환할 때만 일반화 패턴 MLP를 추가하며, 10→10과 나머지 모든 변환은 P64만 사용합니다. 기본 `AUTO` 백엔드는 ncnn Vulkan으로 P64와 MLP를 AMD/NVIDIA GPU에서 실행합니다. `TENRIFF_NK3_BACKEND=AUTO|VULKAN|NCNN_CPU|OPENVINO`와 `TENRIFF_NK3_VULKAN_DEVICE=<index>`로 실행 경로를 선택할 수 있습니다. `NCNN_CPU`는 GPU를 공유하지 않는 서버 검증기처럼 재현성이 필요한 격리 환경용입니다.
 
 standalone converter 소스는 개발 회귀용으로만 남겨 두며 기본 CMake 옵션 `TENRIFF_BUILD_STANDALONE_BMS_KEY_CONVERTER=OFF` 상태에서는 실행 파일을 만들지 않습니다.
 

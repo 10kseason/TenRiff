@@ -245,6 +245,7 @@ struct PeerSession::Impl {
     std::optional<uint32_t> pending_begin;
     uint64_t active_round_nonce = 0;
     uint64_t last_closed_round_nonce = 0;
+    uint64_t pending_rate_revision = 0;
     bool begin_sent = false;
     bool local_final_score_sent = false;
 
@@ -449,7 +450,7 @@ struct PeerSession::Impl {
                 });
         current.can_start =
             current.state == PeerSessionState::Connected &&
-            current.local_is_leader && !current.round_active &&
+            current.local_is_leader && !current.round_active && !current.rate_change_pending &&
             room_ready && charts_match;
     }
 
@@ -487,6 +488,8 @@ struct PeerSession::Impl {
         roster.leader_id = current.leader_player_id;
         roster.round_active = active_round_nonce != 0;
         roster.nonce = active_round_nonce;
+        roster.rate_milli = current.rate_milli;
+        roster.rate_revision = current.rate_revision;
         roster.participants.reserve(current.participants.size());
         for (const auto& participant : current.participants) {
             PeerParticipantWire wire;
@@ -507,7 +510,19 @@ struct PeerSession::Impl {
         if (!current.participants.empty()) broadcasts.push_back(make_roster_locked());
     }
 
+    void invalidate_rate_votes_locked() {
+        // A generation (not just the numeric rate) rejects old votes after an
+        // A -> B -> A rate change and after a completed or canceled round.
+        if (++current.rate_revision == 0) current.rate_revision = 1;
+        current.rate_change_pending = false;
+        for (auto& participant : current.participants) {
+            participant.ready = false;
+            participant.loaded = false;
+        }
+    }
+
     void clear_round_locked(bool rotate_leader) {
+        invalidate_rate_votes_locked();
         if (active_round_nonce != 0) last_closed_round_nonce = active_round_nonce;
         active_round_nonce = 0;
         begin_sent = false;
@@ -531,6 +546,7 @@ struct PeerSession::Impl {
     }
 
     void cancel_launch_locked() {
+        invalidate_rate_votes_locked();
         if (active_round_nonce != 0) {
             last_closed_round_nonce = active_round_nonce;
         }
@@ -659,6 +675,7 @@ struct PeerSession::Impl {
             pending_begin.reset();
             active_round_nonce = 0;
             last_closed_round_nonce = 0;
+            pending_rate_revision = 0;
             begin_sent = false;
             local_final_score_sent = false;
             libraries = {};
@@ -708,6 +725,7 @@ struct PeerSession::Impl {
     void finish_worker() {
         std::lock_guard<std::mutex> lock(mutex);
         worker_running = false;
+        current.rate_change_pending = false;
         pending_launch.reset();
         pending_begin.reset();
         if (current.state != PeerSessionState::Failed) {
@@ -718,6 +736,12 @@ struct PeerSession::Impl {
     }
     void apply_client_roster_locked(const PeerMessage& message) {
         const std::size_t previous_count = current.participants.size();
+        if (message.rate_revision > pending_rate_revision || message.round_active ||
+            message.leader_id != current.local_player_id) {
+            current.rate_change_pending = false;
+        }
+        current.rate_milli = message.rate_milli;
+        current.rate_revision = message.rate_revision;
         std::vector<PeerParticipantSnapshot> rebuilt;
         rebuilt.reserve(message.participants.size());
         for (const auto& wire : message.participants) {
@@ -749,6 +773,7 @@ struct PeerSession::Impl {
             local_final_score_sent = false;
         } else {
             active_round_nonce = message.nonce;
+            current.round_rate_milli = message.rate_milli;
         }
         if (previous_count != current.participants.size()) {
             current.remote_library_ready = false;
@@ -779,11 +804,16 @@ struct PeerSession::Impl {
                 return true;
             case PeerMessageType::Launch:
                 if (message.player_id != current.leader_player_id ||
-                    message.nonce == 0 || message.chart_hash == 0) {
+                    message.nonce == 0 || message.chart_hash == 0 ||
+                    message.chart_hash != current.selected_chart.fingerprint.hash ||
+                    message.rate_milli != current.rate_milli ||
+                    message.rate_revision != current.rate_revision) {
                     error = "Room coordinator sent an invalid launch.";
                     return false;
                 }
                 active_round_nonce = message.nonce;
+                current.round_rate_milli = message.rate_milli;
+                current.rate_change_pending = false;
                 begin_sent = false;
                 local_final_score_sent = false;
                 pending_begin.reset();
@@ -950,13 +980,18 @@ struct PeerSession::Impl {
                 touch_locked();
                 return true;
             case PeerMessageType::Ready:
+                if (message.rate_revision != current.rate_revision ||
+                    message.rate_milli != current.rate_milli) {
+                    queue_roster_locked();
+                    return true;
+                }
                 if (active_round_nonce != 0) {
                     if (!begin_sent && !message.ready) {
                         cancel_launch_locked();
                         queue_roster_locked();
                         touch_locked();
                     }
-                    // Ready frames have no round nonce and may have been queued
+                    // Same-generation Ready frames may have been queued
                     // immediately before Launch. Ignore all other active-round
                     // readiness frames instead of disconnecting a healthy peer.
                     return true;
@@ -972,7 +1007,36 @@ struct PeerSession::Impl {
                 queue_roster_locked();
                 touch_locked();
                 return true;
+            case PeerMessageType::RoomRate:
+                if (source_id != current.leader_player_id || active_round_nonce != 0 ||
+                    message.rate_revision != current.rate_revision) {
+                    // A launch or leader change can cross this request in the
+                    // opposite TCP direction. Reply with the canonical state.
+                    if (source_id == current.local_player_id) current.rate_change_pending = false;
+                    queue_roster_locked();
+                    touch_locked();
+                    return true;
+                }
+                if (!peer_rate_milli_is_valid(message.rate_milli)) {
+                    error = "Room rate is invalid.";
+                    return false;
+                }
+                if (message.rate_milli != current.rate_milli) {
+                    current.rate_milli = message.rate_milli;
+                    invalidate_rate_votes_locked();
+                }
+                current.rate_change_pending = false;
+                queue_roster_locked();
+                touch_locked();
+                return true;
             case PeerMessageType::Launch: {
+                if (message.rate_revision != current.rate_revision ||
+                    message.rate_milli != current.rate_milli ||
+                    message.chart_hash != current.selected_chart.fingerprint.hash) {
+                    queue_roster_locked();
+                    touch_locked();
+                    return true;
+                }
                 if (source_id != current.leader_player_id ||
                     active_round_nonce != 0) {
                     error = "Only the current leader can launch an idle room.";
@@ -986,6 +1050,8 @@ struct PeerSession::Impl {
                     return true;
                 }
                 active_round_nonce = message.nonce;
+                current.round_rate_milli = current.rate_milli;
+                current.rate_change_pending = false;
                 for (auto& participant : current.participants) {
                     participant.loaded = false;
                     participant.round_reset = false;
@@ -1090,6 +1156,7 @@ struct PeerSession::Impl {
         if (was_leader && !join_order.empty()) {
             current.leader_player_id =
                 join_order[removed_index % join_order.size()];
+            if (active_round_nonce == 0) invalidate_rate_votes_locked();
         }
         if (current.participants.size() < 2) {
             clear_round_locked(false);
@@ -2190,6 +2257,8 @@ void PeerSession::clear_local_chart() {
         PeerMessage ready;
         ready.type = PeerMessageType::Ready;
         ready.ready = false;
+        ready.rate_milli = impl_->current.rate_milli;
+        ready.rate_revision = impl_->current.rate_revision;
         (void)impl_->queue_control_locked(
             std::move(ready));
     }
@@ -2200,7 +2269,7 @@ bool PeerSession::set_ready(bool ready) {
     std::lock_guard<std::mutex> lock(impl_->mutex);
     if (impl_->current.state !=
             PeerSessionState::Connected ||
-        impl_->active_round_nonce != 0) {
+        impl_->active_round_nonce != 0 || impl_->current.rate_change_pending) {
         return false;
     }
     auto* local = impl_->participant_locked(
@@ -2215,12 +2284,38 @@ bool PeerSession::set_ready(bool ready) {
     PeerMessage message;
     message.type = PeerMessageType::Ready;
     message.ready = ready;
+    message.rate_milli = impl_->current.rate_milli;
+    message.rate_revision = impl_->current.rate_revision;
     if (!impl_->queue_control_locked(
             std::move(message))) {
         return false;
     }
     local->ready = ready;
     if (!ready) local->loaded = false;
+    impl_->touch_locked();
+    return true;
+}
+
+bool PeerSession::set_rate(uint32_t rate_milli) {
+    if (!peer_rate_milli_is_valid(rate_milli)) return false;
+    std::lock_guard<std::mutex> lock(impl_->mutex);
+    if ((impl_->current.state != PeerSessionState::Connected &&
+         impl_->current.state != PeerSessionState::Listening) ||
+        !impl_->current.local_is_leader || impl_->active_round_nonce != 0 ||
+        impl_->current.rate_change_pending) {
+        return false;
+    }
+    if (rate_milli == impl_->current.rate_milli) return true;
+    PeerMessage message;
+    message.type = PeerMessageType::RoomRate;
+    message.rate_milli = rate_milli;
+    message.rate_revision = impl_->current.rate_revision;
+    if (!impl_->queue_control_locked(std::move(message))) return false;
+    impl_->pending_rate_revision = impl_->current.rate_revision;
+    impl_->current.rate_change_pending = true;
+    if (auto* local = impl_->participant_locked(impl_->current.local_player_id)) {
+        local->ready = false;
+    }
     impl_->touch_locked();
     return true;
 }
@@ -2257,6 +2352,8 @@ bool PeerSession::send_launch() {
     launch.chart_hash =
         impl_->current.selected_chart.fingerprint.hash;
     launch.nonce = nonce;
+    launch.rate_milli = impl_->current.rate_milli;
+    launch.rate_revision = impl_->current.rate_revision;
     if (!impl_->queue_control_locked(
             std::move(launch))) {
         return false;

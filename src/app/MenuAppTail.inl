@@ -661,10 +661,10 @@ void MenuApp::service_song_preview() {
     const bool was_preview_screen_active = song_select_screen_.active();
     song_select_screen_.set_active(preview_screen_active);
 
-    if (was_preview_screen_active && !preview_screen_active) {
+    if (was_preview_screen_active && !preview_screen_active && current_screen() != Screen::BmsEditor) {
         const bool was_audio_active =
             audio_thread_.is_running() || !song_select_screen_.preview_active_path().empty();
-        stop_song_preview_audio();
+        if (current_screen() != Screen::BmsEditor) stop_song_preview_audio();
         if (was_audio_active) {
             sync_menu_music();
         }
@@ -689,7 +689,7 @@ void MenuApp::service_song_preview() {
         const bool was_active =
             audio_thread_.is_running() || !song_select_screen_.preview_active_path().empty();
         song_select_screen_.clear_preview_target();
-        stop_song_preview_audio();
+        if (current_screen() != Screen::BmsEditor) stop_song_preview_audio();
         if (was_active) {
             sync_menu_music();
         }
@@ -699,7 +699,7 @@ void MenuApp::service_song_preview() {
     if (selection_key != song_select_screen_.preview_selection_key()) {
         const bool was_active =
             audio_thread_.is_running() || !song_select_screen_.preview_active_path().empty();
-        stop_song_preview_audio();
+        if (current_screen() != Screen::BmsEditor) stop_song_preview_audio();
         song_select_screen_.set_preview_target(selection_key, now_ns + kPreviewDelayNs);
         if (was_active) {
             sync_menu_music();
@@ -742,6 +742,12 @@ void MenuApp::service_song_preview() {
 
 void MenuApp::sync_menu_music() {
     if (current_screen() == Screen::Gameplay) {
+        menu_music_.stop();
+        menu_music_scene_key_.clear();
+        menu_music_scene_path_.clear();
+        return;
+    }
+    if (current_screen() == Screen::BmsEditor) {
         menu_music_.stop();
         menu_music_scene_key_.clear();
         menu_music_scene_path_.clear();
@@ -1637,6 +1643,9 @@ void MenuApp::publish_snapshot() {
         case menu::SnapshotViewKind::SongBrowser:
             populate_song_browser_render_data(render);
             break;
+        case menu::SnapshotViewKind::BmsEditor:
+            populate_bms_editor_render_data(render);
+            break;
         case menu::SnapshotViewKind::Gameplay:
             render.kind = render::MenuScreenKind::GameplayHud;
             render.gameplay.title = last_chart_title_;
@@ -2054,7 +2063,12 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
     stop_song_preview_audio();
 
     GameSession session;
-    session.set_peer_battle_mode(peer_battle);
+    if (!peer_battle && replay_path.empty() && bms_editor_practice_start_seconds_.has_value()) {
+        session.set_practice_no_fail_override(true);
+        session.set_practice_start_seconds(*bms_editor_practice_start_seconds_);
+    }
+    session.set_peer_battle_mode(peer_battle,
+        peer_battle ? peer_session_.snapshot().round_rate_milli : network::kPeerRateDefaultMilli);
     if (session_mix_active_ && !peer_battle && replay_path.empty()) {
         session.set_course_gauge(session_mix_gauge_value_);
     }
@@ -2279,7 +2293,8 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
     RankedPlayAuthorization ranked_authorization;
     std::string ranked_chart_sha256;
     std::string ranked_prepare_error;
-    if (!peer_battle && !session_mix_active_ && replay_path.empty()) {
+    if (!peer_battle && !session_mix_active_ && replay_path.empty() &&
+        !bms_editor_practice_start_seconds_.has_value()) {
         std::string extension = path_from_utf8(chart_path).extension().string();
         std::transform(extension.begin(), extension.end(), extension.begin(),
                        [](unsigned char byte) {
@@ -2311,6 +2326,7 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
         play_options.ranked_challenge_nonce.clear();
     }
     if (!peer_battle && !session_mix_active_ && replay_path.empty() &&
+        !bms_editor_practice_start_seconds_.has_value() &&
         config_.mode.ghost_battle_enabled) {
         play_options.ghost_replay_path = best_replay_path_for_selected_song();
     }
@@ -2455,8 +2471,16 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
         return;
     }
     const auto& result = session.result();
+    if (result.has_value && !session_aborted && (result.finished || result.game_over) &&
+        !replay_playback && !session_mix_active_ && !bms_editor_practice_start_seconds_.has_value() &&
+        !result.pause_used &&
+        !result.replay_path.empty() && !result.replay_sha256.empty()) {
+        sites_leaderboard_service_.enqueue(path_from_utf8(result.replay_path),
+                                           result.replay_sha256, last_chart_title_, result.clear_status);
+    }
     std::string ranked_result_message;
     if (result.has_value && !session_aborted && ranked_authorization.valid() &&
+        !bms_editor_practice_start_seconds_.has_value() &&
         !result.replay_path.empty()) {
         std::string receipt;
         std::string upload_error;

@@ -1,13 +1,13 @@
 # TenRiff Current State
 
-The current project version is **1.7.2**. Native Windows ASIO output and F4 Native LV in the table picker join portable skin presets, source management, Unicode-path validation, retained multiplayer results, LR2-reference grade gauges, a three-second resume countdown, ignored Session Mix Esc input and duration-based reference BPM. WASAPI remains the default. Use the [1.7.2 release gate](release-1.7.2-gate.md) for this revision's checks and ASIO device coverage.
+The current project version is **1.7.7**. Completed plays save and submit without another key after audio drains. Stella, Satellite and U_E Pack 4K/6K/8K table presets are included. Sites leaderboard integration and existing audio, skin and session features are retained; WASAPI remains the default. See the [1.7.7 release gate](release-1.7.7-gate.md) for changes and verification limits.
 
 The 749/739 checks in the [local 1.7.1 r2 report](local-1.7.1-r2.ko.md) are historical, not the new release's results. See [library management](library-management.md), [reference BPM](reference-bpm.md), [skin presets](skin-presets.md) and [ASIO](asio-audio.md).
 
 This is the document that the next agent or any new contributor should read first. Its goal is to quickly answer: "what is this project now, where should I look, and what is still unverified?"
 
 ## Baseline
-- Current project version: `1.7.2`
+- Current project version: `1.7.7`
 - 1.7.1 provides full-room HUD/results for up to eight players, tied ranks/missing-score states, P-GREAT-only effects, independent judgement/combo placement, ten Options cards, audio normalization and the Song Select difficulty-table card. See [follow-up details](gameplay-polish-followup.md) and [verification](release-1.7.1-gate.md).
 - 1.7.0 refreshes native Home, Song Select, Result and shared settings. See [UI implementation](menu-visual-polish.md) and [release verification](release-1.7.0-gate.md). The prism remains only in the custom-skin path; result reveal timing is unchanged.
 - Native Result now emphasizes score, grade and accuracy; the prism remains in custom skins. The existing 2.2-second reveal, Space skip and control readiness rules are preserved.
@@ -106,7 +106,7 @@ This is the document that the next agent or any new contributor should read firs
   - the separate `Conversion Note Add` option is removed: Krrcream only remaps source notes, while nK2 creates safe support notes directly in the converted target layout when expanding the key count.
   - nK2 offers `Native (12%)` by default, `Transform (35%)` and `Remaster (65%)`; `Remaster` raises the budget while locking the anchor so the source placement survives, and fills LN sections with holds of the same length. All three are caps - the source density and the safety windows decide how much actually lands. The row is locked for Krrcream, and the standalone converter GUI also locks Krrcream Max/Min/Speed/Seed tuning.
   - NK3 always combines bundled P64 with host beam32. It adds the generalized pattern MLP only when a non-10K source is converted to 10K; 10K-to-10K and every other target use P64 alone. The default `AUTO` backend runs both P64 and the MLP on AMD/NVIDIA GPUs through ncnn Vulkan, retaining the optional OpenVINO compatibility path as fallback. `TENRIFF_NK3_BACKEND` and `TENRIFF_NK3_VULKAN_DEVICE` can force the selection.
-  - official 1.7.2 builds/Windows archives do not build or ship the standalone BMS key-converter CLI/GUI; its top-level CMake option defaults `OFF` and the source is retained only for development regression
+  - official 1.7.7 builds/Windows archives do not build or ship the standalone BMS key-converter CLI/GUI; its top-level CMake option defaults `OFF` and the source is retained only for development regression
   - `mode.key_mode=none` keeps the chart's original key count and base pattern layout intact
 - Native difficulty:
   - BMS LV/CR calculation evaluates only LN head/tail miss-ms at 0.5x, so `300ms` is treated as `150ms`; runtime gameplay judgement windows remain unchanged
@@ -178,10 +178,10 @@ This is the document that the next agent or any new contributor should read firs
   - `Options -> Profile Setup` reopens the first-run setup surface for the active profile and saves language, audio, input, graphics, and keymap changes immediately
   - an editable 48-byte profile nickname is used in later saved records and direct-IP multiplayer display names
 - Direct-IP multiplayer:
-  - protocol v5 uses one fixed TCP coordinator and supports up to 8 total players on Windows (default `27301/TCP`)
+  - protocol v6 uses one fixed TCP coordinator and supports up to 8 total players on Windows (default `27301/TCP`)
   - only indexed BMS-family charts are eligible; the room library is the exact SHA-256 intersection across every connected player, and `.osu` charts are excluded
   - the lobby `ROOM CHAT` accepts UTF-8 messages up to 256 bytes, keeps only the latest 32 in session memory, and labels message count, local player, and leader
-  - Rate 1.0, judgement, Gauge Shift, Random/Mods/Assist remain fixed while each player may use local key-mode conversion
+  - the leader selects a shared Rate of 0.50-2.00x in 0.05 steps; changes clear everyone's Ready. Judgement, Gauge Shift and Random/Mods/Assist rules remain fixed; local key-mode conversion is allowed
   - chart-selection authority starts with the host and rotates through connected players in join order after every player leaves Result; a disconnected leader is skipped, while host disconnect closes the room
   - only the current leader may select a common BMS and request START after everyone is Ready; play begins after coordinator approval and the all-player load barrier
   - mid-round and ninth-player joins are rejected; out-of-range score claims are rejected, while Result labels accepted peer results as `UNVERIFIED CLAIM` because replay proof is not yet exchanged
@@ -219,7 +219,7 @@ This is the document that the next agent or any new contributor should read firs
 
 ## Runtime / Packaging Rules
 - New user profiles are created automatically
-- The current P2P distribution target is `TenRiff 1.7.2`
+- The current P2P distribution target is `TenRiff 1.7.7`
 - Distribution packages do not include `Songs`
 - Distribution packages include the `Mainmusic/` scene slots `Main Menu / Options / Song Selecte / Multiplayer Lobby / Clear / Failed`; each `Name.mp3` plus numbered `Name 2.mp3` through `Name 64.mp3` siblings is discovered automatically and rotates on scene re-entry
 - Distribution updates include only built artifacts and required runtime assets

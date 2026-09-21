@@ -1,20 +1,26 @@
 # TenRiff
 
+**マルチプレイRate対応ビルド:** ロビーでリーダーが共通のRateを設定します。全員がこのprotocol v6ビルドを使用してください。旧v5クライアントとは接続できません。[案内](docs/multiplayer-rate-build.ko.md)（韓国語）。
+
+**1.7.7:** 後奏終了後の追加入力なしの結果保存と、Stella・Satellite・U_E Pack 4K/6K/8Kの難易度表プリセットを追加しました。[変更内容と検証](docs/release-1.7.7-gate.md)。
+
+この配布版は **1.7.7 Sites 統合版**です。新しいフォルダーに展開し、`launch_win.bat` から起動して F10 でウェブアカウントを一度連携してください。対象となる新しいプレイのスコア・詳細スコア・精度・詳細精度を送信します。既存の計算式は変更しません。[接続ガイド](docs/sites-leaderboard.md)（韓国語）を参照してください。
+
 Language: [한국어](README.md) | [English](README.en.md) | [简体中文](README.zh-CN.md) | 日本語
 
-TenRiff は Windows GUI ベースの BMS リズムゲーム runtime/launcher です。現在のプロジェクト版は `1.7.2` で、譜面入力は BMS family（`.bms/.bme/.bml/.pms`）専用です。公開 package は BGA upscaler model を含まず、key-mode conversion 用の deterministic NK3 P64 graph と generalized pattern MLP を同梱します。license は MIT です。
+TenRiff は Windows GUI ベースの BMS リズムゲーム runtime/launcher です。現在のプロジェクト版は `1.7.7` で、譜面入力は BMS family（`.bms/.bme/.bml/.pms`）専用です。公開 package は BGA upscaler model を含まず、key-mode conversion 用の deterministic NK3 P64 graph と generalized pattern MLP を同梱します。license は MIT です。
 
-この README は導入文書です。現在の挙動、`1.7.2` project state、`1.5.1 fixed stable baseline` baseline、設定と設計文書は [`docs/README.ja.md`](docs/README.ja.md) から参照してください。
+この README は導入文書です。現在の挙動、`1.7.7` project state、`1.5.1 fixed stable baseline` baseline、設定と設計文書は [`docs/README.ja.md`](docs/README.ja.md) から参照してください。
 
 TenRiff のコードベースは、伝統的な長文設計書主導だけで積み上がったものではなく、高速な反復と実験を重視した `vibe coding` 的な性格を持つ作品でもあります。
 
-## 1.7.2 オーディオ・ライブラリ・プレイ改善
+## 1.7.7 オーディオ・ライブラリ・プレイ改善
 
 ネイティブ Windows ASIO 出力を追加し、既定の WASAPI 出力も維持します。難易度表の選択画面から標準 LV、5キー Aery、7キー Aery、10キー Revive を選べます。`.trskin` ファイルでスキン設定と素材を別の PC に移せます。
 
 再開前の3秒カウントダウン、Session Mix 中の Esc 無視、累積進行時間による基準 BPM、LR2 参照段位ゲージを含みます。曲フォルダーの追加と一覧からの除去、Unicode パスの検証、相手退出後の結果保持も更新しました。
 
-変更は [CHANGELOG](CHANGELOG.md)、検証と ASIO 機器の確認範囲は [1.7.2 リリースゲート](docs/release-1.7.2-gate.md)を参照してください。
+変更は [CHANGELOG](CHANGELOG.md)、検証と ASIO 機器の確認範囲は [1.7.7 リリースゲート](docs/release-1.7.7-gate.md)を参照してください。
 
 ## スクリーンショット
 

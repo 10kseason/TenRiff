@@ -1,5 +1,47 @@
 # Changelog
 
+## [1.7.7] - 2026-09-21
+
+- BMS Editor `P` now launches an actual practice play from the current cursor section using the edited chart buffer, with session-only no-fail enabled. The temporary chart stays beside the source so existing keysound paths resolve, is excluded from ranked/Sites submission, and is removed at app shutdown.
+- BMS Editor `T` cycles silent-note placement, note movement, and note removal tools; `O`/`Ctrl+O` preview ownership is isolated from Song Select preview audio.
+- Public source packaging excludes profiles, logs, replay/result exports, connection files, credentials, upload tokens, and private model artifacts. A static release audit found no credential-shaped literals in the source package.
+
+## [1.7.3 multiplayer-rate]
+
+- 내부 BMS Editor MVP를 추가합니다. 선곡 화면에서 `I`로 열어 탭/LN 편집, 키음 선택, 실행 취소·다시 실행, Save As, BPM/STOP 보존, 제한된 오프라인 프리뷰를 사용할 수 있습니다. 원본 차트는 덮어쓰지 않습니다. [사용 안내](docs/bms-editor-mvp.ko.md).
+- BMS Editor를 세로 타임라인으로 확장하고 레인별 노트 색, 연속 키 홀드 이동, 마디 줌과 스냅, X축 잠금, 무키음 배치 후 키음 치환, `O`/`Ctrl+O` 재생 시작점을 추가합니다.
+- BMS Editor 프리뷰 시작점과 Ctrl+O를 타임라인 샘플 기준으로 보정하고, 노트 호버 키음 미리듣기, BPM/STOP 기준 PgUp/PgDn 5초 이동, `.bms` 저장 강제, 스킨 기반 컬럼·노트 크기를 추가합니다.
+- BMS Editor에 BMS 채널 01 배경음 트랙을 추가해 보이는 구간의 BGM과 전체 노트 키음을 함께 미리듣고, Ctrl+클릭 다중 선택·휠 이동·BGM 위치 이동·한글 안내를 지원합니다.
+- BMS 프리뷰의 키음 경로를 대소문자·ogg/wav/wave/mp3 대체까지 해석하고 디코드 실패 상세를 출력합니다. `#MODEHINT:BEAT10K`/10K2S의 빈 14+2 확장 채널은 10+2 DP로 유지해 16K 오판을 막습니다.
+- BMS Editor 재생은 `O`에서 현재 위치부터 10초, `Ctrl+O`에서 처음부터 차트 끝까지 재생합니다. 키음 호버가 전체 프리뷰를 끊지 않으며, 기존 노트 드래그는 X축 잠금과 원본 분수·롱노트 길이를 보존합니다. `Ctrl+Y` 자동 정렬은 같은 Y의 채널 01 BGM을 노트 레인으로 옮기고 기존 노트 키음은 BGM으로 보존합니다.
+- BMS Editor의 `T` 도구 순환은 무키음 배치·노트 이동·노트 제거를 마우스 그리드/노트 클릭에 연결합니다. 선곡 미리듣기 오디오 세션이 편집기 `O`/`Ctrl+O` 프리뷰를 즉시 종료시키던 충돌도 분리했습니다.
+- `P`는 현재 커서 시점부터 편집 중인 BMS를 실제로 플레이하는 연습 실행으로 바뀌었습니다. 임시 차트는 원본 폴더의 키음 경로를 유지하고, 해당 세션에만 노페일을 강제합니다.
+- 멀티 로비의 `대전 Rate`에서 현재 선곡권자가 0.50~2.00배를 0.05 단위로 선택합니다. 전원에게 같은 값을 전달하고 변경 시 전원 READY를 해제합니다.
+- 시작 당시의 배속을 로딩·플레이·리플레이/결과에 적용하며 개인 프로필 Rate는 보존합니다. 설정 변경 전에 보낸 READY/시작 요청은 거부합니다.
+- 참가자 모두 Rate 지원 protocol v6 빌드를 사용해야 합니다. 이전 1.7.3 및 U_E 이름 수정 빌드는 protocol v5이므로 혼용할 수 없습니다. [멀티플레이 안내](docs/multiplayer.md).
+
+## [1.7.3 hotfix-UE] - 2026-09-15
+
+- 4K/6K/8K 난이도표 프리셋의 이름을 **U_E 팩**으로 수정합니다. 영어 표기는 **U_E Pack**이며 단축키·주소·가져오기 동작은 유지합니다.
+- 배포 문서와 번역 안내에도 같은 이름을 사용합니다. 게임 버전은 1.7.3입니다.
+
+## [1.7.3] - 2026-09-15
+
+- 마지막 노트 이후 키를 누르지 않아도 실제 후주와 최소 결과 대기가 끝나면 결과·리플레이를 저장하고 연결된 웹 리더보드에 제출합니다. 시작 시 추정한 음원 길이나 빈 후속 마디 때문에 저장이 지연되는 경로를 수정합니다.
+- 디코딩 실패 음원은 후주 대기에서 제외하고, 정상 음원의 마지막 출력 버퍼는 장치가 재생할 때까지 기다립니다. 리플레이의 차트 길이는 음원 메모리 추정치로 변경하지 않습니다.
+- 난이도표 선택에 스텔라(F5), 새틀라이트(F6), U_E 팩 4K(F7)·6K(F8)·8K(F9)를 추가합니다. 기존 F1–F3 표와 F4 기본 LV를 유지하며 선택 창 안에서는 F9가 8K 표를 고릅니다.
+
+기존 Sites 통합본과 검증된 로컬 핫픽스를 1.7.3 클라이언트로 배포합니다. 리플레이/웹 페이로드 형식은 유지합니다. [1.7.3 릴리스 안내](docs/release-1.7.3-gate.md)를 참고하세요.
+
+## [1.7.2 Sites integrated] - 2026-09-13
+
+- 웹 리더보드를 전체 1.7.2 Windows 배포본에 기본 통합합니다. 새 폴더에 압축을 푼 뒤 F10에서 계정을 한 번 연결하면 지원되는 새 플레이 기록이 자동 전송됩니다.
+- 점수·상세 스코어·정확도·상세 정확도를 함께 전송합니다. 기존 점수/정확도 산식과 텐리프 메인·사설 API 기능은 유지합니다.
+- 웹의 동점 비교를 위해 상세 스코어는 정수, 두 정확도는 원래 double 정밀도로 전달하며 비정상 수치는 제출 전에 차단합니다.
+- 초기 입력 상태 동기화에서 이미 떼어진 레인의 중복 key-up을 리플레이에 기록하던 오류를 수정합니다. 엄격한 리플레이 검증 규칙은 유지합니다.
+
+설치·웹 연결·커뮤니티 기록의 검증 범위는 [Sites 리더보드 안내](docs/sites-leaderboard.md)를 참고하세요. 공식 1.7.2 릴리스 파일은 별도로 보존합니다.
+
 ## [1.7.2] - 2026-09-10
 
 - 네이티브 Windows ASIO 출력을 추가합니다. 설치된 64비트 ASIO 드라이버를 직접 사용하며 기본 오디오 백엔드는 WASAPI를 유지합니다.

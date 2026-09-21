@@ -3844,7 +3844,31 @@ void MenuWindow::on_mouse_button_down(int window_x, int window_y) {
     }
 
     for (auto it = hit_regions_.rbegin(); it != hit_regions_.rend(); ++it) {
+        if (it->kind != MenuHitTargetKind::BmsEditorNote ||
+            x < it->left || x > it->right || y < it->top || y > it->bottom) {
+            continue;
+        }
+        bms_editor_note_drag_state_.active = true;
+        bms_editor_note_drag_state_.index = it->index;
+        bms_editor_note_drag_state_.control = (GetKeyState(VK_CONTROL) & 0x8000) != 0;
+        static_cast<void>(translate_window_point(window_x, window_y,
+                                                 &bms_editor_note_drag_state_.start_x,
+                                                 &bms_editor_note_drag_state_.start_y));
+        bms_editor_note_drag_state_.moved = false;
+        MenuClickEvent event;
+        event.kind = MenuHitTargetKind::BmsEditorNote;
+        event.index = it->index;
+        event.part = MenuHitPart::Activate;
+        event.control = bms_editor_note_drag_state_.control;
+        push_click_event(std::move(event));
+        suppress_next_left_button_up_ = true;
+        if (hwnd_) SetCapture(static_cast<HWND>(hwnd_));
+        return;
+    }
+
+    for (auto it = hit_regions_.rbegin(); it != hit_regions_.rend(); ++it) {
         if (it->part != MenuHitPart::SetValue ||
+            it->kind == MenuHitTargetKind::BmsEditorGrid ||
             x < it->left || x > it->right || y < it->top || y > it->bottom) {
             continue;
         }
@@ -3909,6 +3933,25 @@ void MenuWindow::on_mouse_button_down(int window_x, int window_y) {
 }
 
 void MenuWindow::on_mouse_click(int window_x, int window_y, bool double_click) {
+    if (bms_editor_note_drag_state_.active) {
+        float x = 0.0f;
+        float y = 0.0f;
+        static_cast<void>(translate_window_point(window_x, window_y, &x, &y));
+        MenuClickEvent event;
+        event.kind = MenuHitTargetKind::BmsEditorNote;
+        event.index = bms_editor_note_drag_state_.index;
+        event.part = MenuHitPart::SetValue;
+        event.dragging = bms_editor_note_drag_state_.moved;
+        event.drag_finished = true;
+        event.control = bms_editor_note_drag_state_.control;
+        event.value = std::clamp(static_cast<double>((x - 214.0f) / (1770.0f - 214.0f)), 0.0, 1.0);
+        event.value_y = std::clamp(static_cast<double>((y - 184.0f) / (900.0f - 184.0f)), 0.0, 1.0);
+        push_click_event(std::move(event));
+        bms_editor_note_drag_state_ = BmsEditorNoteDragState{};
+        if (hwnd_ && GetCapture() == static_cast<HWND>(hwnd_)) ReleaseCapture();
+        suppress_next_left_button_up_ = false;
+        return;
+    }
     if (gameplay_field_drag_state_.active) {
         float x = 0.0f;
         float y = 0.0f;
@@ -4015,11 +4058,16 @@ void MenuWindow::on_mouse_click(int window_x, int window_y, bool double_click) {
     event.kind = hit->kind;
     event.index = hit->index;
     event.part = hit->part;
+    event.control = (GetKeyState(VK_CONTROL) & 0x8000) != 0;
     if (hit->part == MenuHitPart::SetValue) {
         const float width = hit->right - hit->left;
         event.value = width > 0.0f
                           ? std::clamp(static_cast<double>((x - hit->left) / width), 0.0, 1.0)
                           : 0.0;
+        const float height = hit->bottom - hit->top;
+        event.value_y = height > 0.0f
+                            ? std::clamp(static_cast<double>((y - hit->top) / height), 0.0, 1.0)
+                            : 0.0;
     }
     event.double_click = double_click;
     push_click_event(std::move(event));
@@ -4110,6 +4158,78 @@ void MenuWindow::on_mouse_move(int window_x, int window_y) {
         return;
     }
 
+    if (bms_editor_note_drag_state_.active) {
+        if (!bms_editor_note_drag_state_.moved &&
+            std::hypot(x - bms_editor_note_drag_state_.start_x,
+                       y - bms_editor_note_drag_state_.start_y) < 3.0f) {
+            return;
+        }
+        bms_editor_note_drag_state_.moved = true;
+        MenuClickEvent event;
+        event.kind = MenuHitTargetKind::BmsEditorNote;
+        event.index = bms_editor_note_drag_state_.index;
+        event.part = MenuHitPart::SetValue;
+        event.dragging = true;
+        event.control = bms_editor_note_drag_state_.control;
+        event.value = std::clamp(static_cast<double>((x - 214.0f) / (1770.0f - 214.0f)), 0.0, 1.0);
+        event.value_y = std::clamp(static_cast<double>((y - 184.0f) / (900.0f - 184.0f)), 0.0, 1.0);
+        push_click_event(std::move(event));
+        return;
+    }
+
+    const HitRegion* bms_editor_bgm_region = nullptr;
+    for (auto it = hit_regions_.rbegin(); it != hit_regions_.rend(); ++it) {
+        if (it->kind == MenuHitTargetKind::BmsEditorBgm &&
+            x >= it->left && x <= it->right && y >= it->top && y <= it->bottom) {
+            bms_editor_bgm_region = &*it;
+            break;
+        }
+    }
+    if (bms_editor_bgm_region) {
+        if (bms_editor_hover_bgm_index_ != bms_editor_bgm_region->index) {
+            bms_editor_hover_bgm_index_ = bms_editor_bgm_region->index;
+            MenuClickEvent event;
+            event.kind = MenuHitTargetKind::BmsEditorBgm;
+            event.index = bms_editor_bgm_region->index;
+            event.part = MenuHitPart::SelectOnly;
+            push_click_event(std::move(event));
+        }
+        return;
+    }
+    bms_editor_hover_bgm_index_ = -1;
+    const HitRegion* bms_editor_region = nullptr;
+    for (auto it = hit_regions_.rbegin(); it != hit_regions_.rend(); ++it) {
+        if (it->kind == MenuHitTargetKind::BmsEditorGrid &&
+            x >= it->left && x <= it->right && y >= it->top && y <= it->bottom) {
+            bms_editor_region = &*it;
+            break;
+        }
+    }
+    if (bms_editor_region) {
+        const int hover_bucket = static_cast<int>(std::lround(y / 4.0f));
+        if (bms_editor_hover_lane_ != bms_editor_region->index ||
+            bms_editor_hover_time_bucket_ != hover_bucket) {
+            bms_editor_hover_lane_ = bms_editor_region->index;
+            bms_editor_hover_time_bucket_ = hover_bucket;
+            const float width = bms_editor_region->right - bms_editor_region->left;
+            const float height = bms_editor_region->bottom - bms_editor_region->top;
+            MenuClickEvent event;
+            event.kind = MenuHitTargetKind::BmsEditorGrid;
+            event.index = bms_editor_region->index;
+            event.part = MenuHitPart::SelectOnly;
+            event.value = width > 0.0f
+                ? std::clamp(static_cast<double>((x - bms_editor_region->left) / width), 0.0, 1.0)
+                : 0.0;
+            event.value_y = height > 0.0f
+                ? std::clamp(static_cast<double>((y - bms_editor_region->top) / height), 0.0, 1.0)
+                : 0.0;
+            push_click_event(std::move(event));
+        }
+        return;
+    }
+    bms_editor_hover_lane_ = -1;
+    bms_editor_hover_time_bucket_ = -1;
+
     if (!song_scroll_drag_active_) {
         return;
     }
@@ -4130,6 +4250,7 @@ void MenuWindow::on_mouse_capture_changed() {
     const bool lost_gameplay_drag = gameplay_field_drag_state_.active;
     const bool lost_song_drag = song_scroll_drag_active_;
     const bool lost_slider_drag = value_slider_drag_state_.active;
+    const bool lost_bms_note_drag = bms_editor_note_drag_state_.active;
     if (gameplay_field_drag_state_.active) {
         gameplay_field_drag_state_.active = false;
         gameplay_field_drag_state_.hovered = false;
@@ -4141,9 +4262,17 @@ void MenuWindow::on_mouse_capture_changed() {
         event.value = gameplay_field_drag_state_.offset_x;
         push_click_event(std::move(event));
     }
+    if (lost_bms_note_drag) {
+        MenuClickEvent event;
+        event.kind = MenuHitTargetKind::BmsEditorNote;
+        event.part = MenuHitPart::SelectOnly;
+        event.drag_finished = true;
+        push_click_event(std::move(event));
+    }
     value_slider_drag_state_ = ValueSliderDragState{};
+    bms_editor_note_drag_state_ = BmsEditorNoteDragState{};
     song_scroll_drag_active_ = false;
-    if (lost_gameplay_drag || lost_song_drag || lost_slider_drag) {
+    if (lost_gameplay_drag || lost_song_drag || lost_slider_drag || lost_bms_note_drag) {
         suppress_next_left_button_up_ = false;
     }
     if (gameplay_field_drag_state_.visible) {

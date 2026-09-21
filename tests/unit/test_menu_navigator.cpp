@@ -11,7 +11,7 @@ using tenriff::app::menu::MenuNavigator;
 using tenriff::app::menu::Screen;
 
 TEST_CASE("menu screen preserves the existing exhaustive screen order") {
-    constexpr std::array<Screen, 20> screens{
+    constexpr std::array<Screen, 21> screens{
         Screen::QuickSetup,
         Screen::Title,
         Screen::OptionsHub,
@@ -31,6 +31,7 @@ TEST_CASE("menu screen preserves the existing exhaustive screen order") {
         Screen::KeymapConfirm,
         Screen::OnnxUpscalerConfirm,
         Screen::KeymapTest,
+        Screen::BmsEditor,
         Screen::Result,
     };
 

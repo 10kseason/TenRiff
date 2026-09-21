@@ -1,5 +1,6 @@
 #include "app/RankedRecordsClient.h"
 #include "app/MainApiTlsPin.h"
+#include "app/SitesLeaderboardClient.h"
 
 #include "config/SimpleJson.h"
 
@@ -180,7 +181,8 @@ bool request_json(const std::string& base_url,
                   const std::string& body,
                   const std::string& bearer_token,
                   HttpResponse& response,
-                  std::string& error) {
+                  std::string& error,
+                  bool sites_request = false) {
     response = {};
     const std::wstring url = utf8_to_wide(base_url);
     URL_COMPONENTS components{};
@@ -202,12 +204,12 @@ bool request_json(const std::string& base_url,
     while (!path.empty() && path.back() == L'/') path.pop_back();
     path += endpoint;
 
-    InternetHandle session(WinHttpOpen(L"TenRiff/1.7.2 ranked-records",
+    InternetHandle session(WinHttpOpen(L"TenRiff/1.7.3 ranked-records",
                                        WINHTTP_ACCESS_TYPE_AUTOMATIC_PROXY,
                                        WINHTTP_NO_PROXY_NAME,
                                        WINHTTP_NO_PROXY_BYPASS, 0));
     if (!session) { error = winhttp_error("WinHttpOpen"); return false; }
-    WinHttpSetTimeouts(session.get(), 3000, 3000, 5000, 35000);
+    WinHttpSetTimeouts(session.get(), 3000, 3000, 5000, sites_request ? 8000 : 35000);
     InternetHandle connection(WinHttpConnect(session.get(), host.c_str(),
                                              components.nPort, 0));
     if (!connection) { error = winhttp_error("WinHttpConnect"); return false; }
@@ -218,7 +220,8 @@ bool request_json(const std::string& base_url,
         connection.get(), method.c_str(), path.c_str(), nullptr, WINHTTP_NO_REFERER,
         WINHTTP_DEFAULT_ACCEPT_TYPES, flags));
     if (!request) { error = winhttp_error("WinHttpOpenRequest"); return false; }
-    DWORD redirect_policy = WINHTTP_OPTION_REDIRECT_POLICY_DISALLOW_HTTPS_TO_HTTP;
+    DWORD redirect_policy = sites_request ? WINHTTP_OPTION_REDIRECT_POLICY_NEVER
+                                         : WINHTTP_OPTION_REDIRECT_POLICY_DISALLOW_HTTPS_TO_HTTP;
     if (!WinHttpSetOption(request.get(), WINHTTP_OPTION_REDIRECT_POLICY,
                           &redirect_policy, sizeof(redirect_policy))) {
         error = winhttp_error("WinHttpSetOption redirect policy");
@@ -800,6 +803,45 @@ bool submit_ranked_replay(const std::string& base_url,
     static_cast<void>(base_url);
     static_cast<void>(replay_path);
     error = "Ranked replay upload is not available on this platform build.";
+    return false;
+#endif
+}
+
+bool submit_sites_leaderboard_score(const std::string& base_url,
+    const std::string& upload_token, const std::string& payload,
+    bool& retryable, std::string& error) {
+    retryable = false;
+    error.clear();
+    SitesLeaderboardConnection connection;
+    const std::string configuration = "{\"schema_version\":1,\"site_url\":\"" + json_escape(base_url) +
+        "\",\"upload_token\":\"" + json_escape(upload_token) + "\"}";
+    if (!parse_sites_leaderboard_connection(configuration, connection, error) || payload.size() > 16384) {
+        if (error.empty()) error = "Sites upload payload is too large.";
+        return false;
+    }
+#ifdef _WIN32
+    HttpResponse response;
+    if (!request_json(connection.site_url, L"POST", L"/api/upload", payload,
+                       connection.upload_token, response, error, true)) {
+        retryable = true;
+        return false;
+    }
+    if (response.status != 200 && response.status != 201) {
+        retryable = response.status == 429 || response.status >= 500;
+        error = "Sites returned HTTP " + std::to_string(response.status) +
+                "; check the Site's public access and connection key.";
+        return false;
+    }
+    const auto parsed = config::parse_json(response.body);
+    if (parsed.success() && parsed.root->is_object()) {
+        const auto* object = parsed.root->as_object();
+        const auto accepted = object->find("accepted");
+        if (accepted != object->end() && accepted->second.is_bool() && accepted->second.as_bool()) return true;
+    }
+    error = "Sites did not acknowledge the record.";
+    return false;
+#else
+    error = "Sites automatic upload is available in Windows builds.";
     return false;
 #endif
 }

@@ -19,6 +19,7 @@
 #endif
 
 #include "app/MenuAppSkinUtils.h"
+#include "app/MenuAppSettingsUtils.h"
 #include "app/MenuAppSongSelectUtils.h"
 #include "app/MenuSongUtils.h"
 #include "app/ChatInteraction.h"
@@ -103,7 +104,11 @@ void MenuApp::populate_multiplayer_render_data(render::MenuRenderData& render) {
     const bool leader_can_choose_chart =
         !round_active && multiplayer_leader_can_choose_chart(multiplayer_menu_) &&
         peer.remote_library_ready && multiplayer_common_chart_count_ > 0;
-    const bool can_start = !round_active && multiplayer_leader_can_start(multiplayer_menu_);
+    const bool can_edit_rate = peer.local_is_leader &&
+        (connected || peer.state == network::PeerSessionState::Listening) &&
+        !round_active && !peer.rate_change_pending;
+    const bool can_start = !round_active && !peer.rate_change_pending &&
+        multiplayer_leader_can_start(multiplayer_menu_);
 
     const auto row_selected = [this](MultiplayerMenuRow row) {
         return multiplayer_menu_.cursor == static_cast<int>(row);
@@ -236,6 +241,20 @@ void MenuApp::populate_multiplayer_render_data(render::MenuRenderData& render) {
                     leader_can_choose_chart,
                     false);
 
+    std::string rate_value = format_multiplier(static_cast<double>(peer.rate_milli) / 1000.0);
+    if (peer.rate_change_pending) rate_value += ui_text(" / SYNCING", " / 동기화 중");
+    else if (!peer.local_is_leader) rate_value += ui_text(" / LEADER SETTING", " / 리더 설정");
+    append_menu_row(render.generic,
+                    ui_text("Room Rate", "대전 Rate"),
+                    rate_value,
+                    row_selected(MultiplayerMenuRow::Rate),
+                    render::MenuHitTargetKind::SettingsRow,
+                    static_cast<int>(MultiplayerMenuRow::Rate),
+                    false,
+                    can_edit_rate);
+    render.generic.rows.back().decrement_enabled = can_edit_rate && peer.rate_milli > network::kPeerMinRateMilli;
+    render.generic.rows.back().increment_enabled = can_edit_rate && peer.rate_milli < network::kPeerMaxRateMilli;
+
     std::string ready_value = round_active
                                   ? ui_text("ROUND IN PROGRESS", "대전 종료 대기")
                                   : (multiplayer_menu_.local_ready ? ui_text("YOU READY", "나 준비")
@@ -249,7 +268,7 @@ void MenuApp::populate_multiplayer_render_data(render::MenuRenderData& render) {
                     row_selected(MultiplayerMenuRow::Ready),
                     render::MenuHitTargetKind::SettingsRow,
                     static_cast<int>(MultiplayerMenuRow::Ready),
-                    !round_active && connected && chart_matches,
+                    !round_active && connected && chart_matches && !peer.rate_change_pending,
                     false);
     append_menu_row(render.generic,
                     ui_text("Start Match", "대전 시작"),
@@ -346,8 +365,8 @@ void MenuApp::populate_multiplayer_render_data(render::MenuRenderData& render) {
         render.generic.notes.push_back(ui_text("Chart match confirmed.", "차트 일치가 확인되었습니다."));
     }
     render.generic.notes.push_back(ui_text(
-        "Peer battle fixes Rate 1.00x, Gauge Shift, default judge windows, and Random/Mods/Assist off; local key-mode conversion is allowed.",
-        "P2P 대전은 Rate 1.00x, Gauge Shift, 기본 판정, 랜덤/모드/어시스트 끔을 사용하며 로컬 키모드 변환은 허용합니다."));
+        "The leader sets Room Rate (0.50-2.00x); changes clear everyone's Ready. Gauge Shift/default judge apply, Random/Mods/Assist are off; local key-mode conversion is allowed.",
+        "리더가 대전 Rate(0.50~2.00배)를 정하며 변경 시 전원 준비가 해제됩니다. Gauge Shift·기본 판정·랜덤/모드/어시스트 끔과 로컬 키모드 변환을 사용합니다."));
     render.generic.notes.push_back(ui_text(
         "Signed-in players search rooms on the selected main/private server. Signed-out players can still search the LAN.",
         "로그인하면 선택한 메인/사설 서버의 방을 검색합니다. 로그아웃 상태에서는 기존 LAN 검색을 사용합니다."));
@@ -930,10 +949,36 @@ void MenuApp::handle_multiplayer_input(uint32_t keycode) {
         publish_snapshot();
         return;
     }
+    if (row == MultiplayerMenuRow::Rate) {
+        if (!peer.local_is_leader ||
+            (peer.state != network::PeerSessionState::Connected &&
+             peer.state != network::PeerSessionState::Listening) || round_active) {
+            multiplayer_status_message_ = ui_text(
+                "Only the current leader can change Rate before a round.",
+                "대전 시작 전 현재 리더만 Rate를 바꿀 수 있습니다.");
+        } else if (peer.rate_change_pending) {
+            multiplayer_status_message_ = ui_text("Wait for Rate synchronization.", "Rate 동기화를 기다려주세요.");
+        } else {
+            const int direction = keycode == key_left_ ? -1 : 1;
+            const uint32_t rate = static_cast<uint32_t>(std::clamp(
+                static_cast<int>(peer.rate_milli) + direction * static_cast<int>(network::kPeerRateStepMilli),
+                static_cast<int>(network::kPeerMinRateMilli), static_cast<int>(network::kPeerMaxRateMilli)));
+            if (rate != peer.rate_milli) {
+                multiplayer_status_message_ = peer_session_.set_rate(rate)
+                    ? ui_text("Room Rate updated; every player must Ready again.",
+                              "대전 Rate를 변경합니다. 모두 다시 준비해 주세요.")
+                    : ui_text("Rate change was rejected.", "Rate 변경이 거부되었습니다.");
+            }
+        }
+        publish_snapshot();
+        return;
+    }
     if (row == MultiplayerMenuRow::Ready) {
         if (round_active) {
             multiplayer_status_message_ = ui_text("Wait for every player to finish the current round.",
                                                   "현재 대전이 전원에게서 끝날 때까지 기다려주세요.");
+        } else if (peer.rate_change_pending) {
+            multiplayer_status_message_ = ui_text("Wait for Rate synchronization.", "Rate 동기화를 기다려주세요.");
         } else if (!multiplayer_ready_gate_open(multiplayer_menu_)) {
             multiplayer_status_message_ = ui_text("Connect and confirm a matching chart first.",
                                                   "먼저 연결하고 같은 차트인지 확인하세요.");
@@ -946,7 +991,8 @@ void MenuApp::handle_multiplayer_input(uint32_t keycode) {
         return;
     }
     if (row == MultiplayerMenuRow::Start) {
-        if (!multiplayer_leader_can_start(multiplayer_menu_) || multiplayer_chart_path_.empty()) {
+        if (!multiplayer_leader_can_start(multiplayer_menu_) || multiplayer_chart_path_.empty() ||
+            peer.rate_change_pending || round_active) {
             multiplayer_status_message_ = ui_text("Only the current leader can start after every player is ready.",
                                                   "전원이 준비된 뒤 현재 리더만 시작할 수 있습니다.");
             publish_snapshot();

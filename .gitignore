@@ -49,3 +49,10 @@ CMakeUserPresets.json
 *.exe
 *.dll
 *.lib
+
+/config/sites-leaderboard.json
+
+/config/sites-leaderboard.dpapi
+/config/sites-leaderboard.dpapi.tmp
+
+/screenshots/

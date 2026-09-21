@@ -1174,6 +1174,9 @@ bool MenuApp::initialize(const CommandLineOptions& options) {
     key_backspace_ = config::KeycodeMap::to_keycode("Backspace").value_or(0);
     key_delete_ = config::KeycodeMap::to_keycode("Delete").value_or(0);
     key_v_ = config::KeycodeMap::to_keycode("V").value_or(0);
+    key_s_ = config::KeycodeMap::to_keycode("S").value_or(0);
+    key_y_ = config::KeycodeMap::to_keycode("Y").value_or(0);
+    key_z_ = config::KeycodeMap::to_keycode("Z").value_or(0);
     key_lcontrol_ = config::KeycodeMap::to_keycode("LControl").value_or(0);
     key_rcontrol_ = config::KeycodeMap::to_keycode("RControl").value_or(0);
     key_c_ = config::KeycodeMap::to_keycode("C").value_or(0);
@@ -1183,6 +1186,12 @@ bool MenuApp::initialize(const CommandLineOptions& options) {
     key_m_ = config::KeycodeMap::to_keycode("M").value_or(0);
     key_k_ = config::KeycodeMap::to_keycode("K").value_or(0);
     key_r_ = config::KeycodeMap::to_keycode("R").value_or(0);
+    key_p_ = config::KeycodeMap::to_keycode("P").value_or(0);
+    key_h_ = config::KeycodeMap::to_keycode("H").value_or(0);
+    key_o_ = config::KeycodeMap::to_keycode("O").value_or(0);
+    key_t_ = config::KeycodeMap::to_keycode("T").value_or(0);
+    key_f6_ = config::KeycodeMap::to_keycode("F6").value_or(0);
+    key_f7_ = config::KeycodeMap::to_keycode("F7").value_or(0);
     key_f1_ = config::KeycodeMap::to_keycode("F1").value_or(0);
     key_f2_ = config::KeycodeMap::to_keycode("F2").value_or(0);
     key_f5_ = config::KeycodeMap::to_keycode("F5").value_or(0);
@@ -1292,6 +1301,16 @@ void MenuApp::run() {
         }
         service_multiplayer();
         service_ranked_account_request();
+        const auto sites_messages = sites_leaderboard_service_.take_messages();
+        if (!sites_messages.empty()) {
+            last_export_warnings_.insert(last_export_warnings_.end(),
+                                         sites_messages.begin(), sites_messages.end());
+            sites_last_upload_status_ = sites_messages.back() == "Sites community record uploaded."
+                ? ui_text("Last record uploaded to the web leaderboard.", "최근 기록을 웹 리더보드에 등록했습니다.")
+                : ui_text("Web upload incomplete. See the result message.", "웹 업로드 미완료. 결과 화면의 메시지를 확인하세요.");
+            sites_connection_status_ = sites_last_upload_status_;
+            publish_snapshot();
+        }
         const auto global_chat = global_chat_service_.snapshot();
         if (global_chat.revision != global_chat_last_revision_) {
             global_chat_last_revision_ = global_chat.revision;
@@ -1320,7 +1339,9 @@ void MenuApp::run() {
 
         update_keymap_capture_timeout();
         update_song_select_repeat();
+        update_bms_editor_repeat();
         service_song_preview();
+        service_bms_editor_preview();
 
         if (current_screen() != Screen::Gameplay && song_indexer_.is_running()) {
             const int64_t now_ns = timing::HighResClock::now_ns();
@@ -1340,8 +1361,11 @@ void MenuApp::run() {
 
 void MenuApp::shutdown() {
     exit_requested_.store(true, std::memory_order_release);
+    stop_bms_editor_preview();
+    cleanup_bms_editor_practice_file();
     peer_session_.disconnect();
     online_records_service_.shutdown();
+    sites_leaderboard_service_.shutdown();
     global_chat_service_.shutdown();
     if (ranked_account_thread_.joinable()) ranked_account_thread_.join();
     stop_menu_threads();
@@ -1521,9 +1545,16 @@ std::vector<uint32_t> MenuApp::current_menu_probe_keycodes() const {
     append_fixed_key(key_backspace_);
     append_fixed_key(key_delete_);
     append_fixed_key(key_v_);
+    append_fixed_key(key_s_);
+    append_fixed_key(key_y_);
+    append_fixed_key(key_z_);
     append_fixed_key(key_lcontrol_);
     append_fixed_key(key_rcontrol_);
     append_fixed_key(key_c_);
+    append_fixed_key(key_i_);
+    append_fixed_key(key_m_);
+    append_fixed_key(key_k_);
+    append_fixed_key(key_r_);
     append_fixed_key(key_f1_);
     append_fixed_key(key_f2_);
     append_fixed_key(key_f5_);
@@ -1532,6 +1563,12 @@ std::vector<uint32_t> MenuApp::current_menu_probe_keycodes() const {
     append_fixed_key(key_f10_);
     append_fixed_key(key_minus_);
     append_fixed_key(key_plus_);
+    append_fixed_key(key_p_);
+    append_fixed_key(key_h_);
+    append_fixed_key(key_o_);
+    append_fixed_key(key_t_);
+    append_fixed_key(key_f6_);
+    append_fixed_key(key_f7_);
 
     const bool include_keymap_bindings =
         current_screen() == Screen::Keymap || current_screen() == Screen::KeymapTest;
@@ -1895,14 +1932,29 @@ void MenuApp::handle_input_event(const input::InputEvent& event) {
     note_runtime_input_event_source(event);
     update_pressed_keys(event);
 
-    if (event.state == input::InputState::Pressed &&
-        key_f9_ != 0 && event.keycode == key_f9_) {
-        menu_window_.request_screenshot();
+    if (current_screen() == Screen::BmsEditor) {
+        const bool repeatable = event.keycode == key_up_ || event.keycode == key_down_ ||
+                                event.keycode == key_left_ || event.keycode == key_right_ ||
+                                event.keycode == key_page_up_ || event.keycode == key_page_down_;
+        if (repeatable && event.state == input::InputState::Released &&
+            bms_editor_repeat_key_ == event.keycode) {
+            bms_editor_repeat_key_ = 0;
+            bms_editor_repeat_next_ns_ = 0;
+        } else if (repeatable && event.state == input::InputState::Pressed) {
+            bms_editor_repeat_key_ = event.keycode;
+            bms_editor_repeat_next_ns_ = timing::HighResClock::now_ns() + 250'000'000LL;
+        }
+    }
+
+    // The table picker owns F1-F9, including the ordinary F9 screenshot key.
+    if (current_screen() == Screen::SongSelect && difficulty_table_url_editing_) {
+        if (event.state == input::InputState::Pressed) handle_difficulty_table_input(event.keycode);
         return;
     }
 
-    if (current_screen() == Screen::SongSelect && difficulty_table_url_editing_) {
-        if (event.state == input::InputState::Pressed) handle_difficulty_table_input(event.keycode);
+    if (event.state == input::InputState::Pressed &&
+        key_f9_ != 0 && event.keycode == key_f9_) {
+        menu_window_.request_screenshot();
         return;
     }
 
@@ -1982,6 +2034,9 @@ void MenuApp::handle_input_event(const input::InputEvent& event) {
         case Screen::SongBrowser:
             handle_song_browser_input(event.keycode);
             break;
+        case Screen::BmsEditor:
+            handle_bms_editor_input(event.keycode);
+            break;
         case Screen::Gameplay:
             break;
         case Screen::SettingsAudio:
@@ -2030,7 +2085,8 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
             else if (event.index == static_cast<int>(render::SongDifficultyTableAction::Cancel)) handle_difficulty_table_input(key_escape_);
             else if (event.index == static_cast<int>(render::SongDifficultyTableAction::Reset)) select_native_difficulty_levels();
             else if (event.index >= static_cast<int>(render::SongDifficultyTableAction::PresetAery5) &&
-                     event.index <= static_cast<int>(render::SongDifficultyTableAction::PresetRevive10)) {
+                     event.index < static_cast<int>(render::SongDifficultyTableAction::PresetAery5) +
+                         static_cast<int>(config::kBuiltinDifficultyTables.size())) {
                 apply_builtin_difficulty_table(event.index - static_cast<int>(render::SongDifficultyTableAction::PresetAery5));
             }
         }
@@ -2048,10 +2104,17 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
     }
     if (ranked_account_overlay_visible_) {
         const bool busy = ranked_account_request_busy_.load(std::memory_order_acquire);
-        if (event.kind == render::MenuHitTargetKind::AccountServer &&
-            !busy && ranked_account_signed_in_username_.empty()) {
-            ranked_account_use_private_server_ = event.index == 1;
-            ranked_account_focused_field_ = ranked_account_use_private_server_ ? 0 : 1;
+        if (event.kind == render::MenuHitTargetKind::SitesLeaderboardAction && ranked_account_sites_mode_ && !busy) {
+            if (event.index >= 0 && event.index <= static_cast<int>(render::SitesLeaderboardAction::Disconnect))
+                handle_sites_leaderboard_action(static_cast<render::SitesLeaderboardAction>(event.index));
+        } else if (event.kind == render::MenuHitTargetKind::AccountServer && !busy) {
+            ranked_account_sites_mode_ = event.index == 2;
+            if (ranked_account_sites_mode_) {
+                refresh_sites_leaderboard_connection();
+            } else if (ranked_account_signed_in_username_.empty()) {
+                ranked_account_use_private_server_ = event.index == 1;
+                ranked_account_focused_field_ = ranked_account_use_private_server_ ? 0 : 1;
+            }
             ranked_account_status_.clear();
             publish_snapshot();
         } else if (event.kind == render::MenuHitTargetKind::AccountTab &&
@@ -2097,6 +2160,180 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
         return;
     }
     if (current_screen() == Screen::Gameplay) {
+        return;
+    }
+    if (current_screen() == Screen::BmsEditor &&
+        event.kind == render::MenuHitTargetKind::BmsEditorBgm) {
+        if (event.index < 0 || event.index >= static_cast<int>(bms_editor_.bgm().size())) return;
+        const auto& bgm = bms_editor_.bgm()[static_cast<std::size_t>(event.index)];
+        if (event.part == render::MenuHitPart::SelectOnly) {
+            request_bms_editor_preview(false, bgm.token, true);
+            return;
+        }
+        if (event.control) {
+            if (bms_editor_selected_bgm_ids_.count(bgm.id) != 0) {
+                bms_editor_selected_bgm_ids_.erase(bgm.id);
+            } else {
+                bms_editor_selected_bgm_ids_.insert(bgm.id);
+            }
+        } else {
+            bms_editor_selected_bgm_ids_.clear();
+            bms_editor_selected_note_ids_.clear();
+            bms_editor_selected_bgm_ids_.insert(bgm.id);
+        }
+        bms_editor_.set_cursor_exact(bms_editor_.cursor_lane(), bgm.measure, bgm.slice, bgm.slice_count);
+        publish_snapshot();
+        return;
+    }
+    if (current_screen() == Screen::BmsEditor &&
+        event.kind == render::MenuHitTargetKind::BmsEditorNote) {
+        if (event.dragging || event.drag_finished) {
+            if (event.dragging && bms_editor_drag_note_id_ != 0) {
+            const int measure_count = std::max(1, bms_editor_.measure_count());
+            const int view_count = std::max(1, std::min(std::clamp(bms_editor_view_measures_, 1, 32), measure_count));
+            if (bms_editor_drag_view_start_ < 0) {
+                bms_editor_drag_view_start_ = std::clamp(bms_editor_.cursor_measure() - view_count / 2,
+                                                         0, std::max(0, measure_count - view_count));
+            }
+            const int view_start = bms_editor_drag_view_start_;
+            const double position = std::clamp(event.value_y, 0.0, 0.999999) * static_cast<double>(view_count);
+            int measure = view_start + static_cast<int>(position);
+            const int raw_slice = static_cast<int>(std::llround(
+                (position - std::floor(position)) * BmsEditorDocument::kGridDivision));
+            const int snap = std::max(1, bms_editor_snap_division());
+            int slice = std::clamp(static_cast<int>(std::llround(
+                static_cast<double>(raw_slice) / snap) * snap), 0, BmsEditorDocument::kGridDivision - 1);
+            const int lane_count = std::clamp(bms_editor_.lane_count(), 1, 16);
+            const std::string skin_mode = config_.mode.key_mode.empty() || config_.mode.key_mode == "auto"
+                ? std::to_string(lane_count) + "k" : config_.mode.key_mode;
+            const auto scales = config::resolved_skin_lane_width_scales(config_.skin, skin_mode);
+            double total = 0.0;
+            for (int lane = 0; lane < lane_count; ++lane) {
+                total += lane < static_cast<int>(scales.size())
+                    ? std::clamp(scales[static_cast<std::size_t>(lane)], 0.25, 4.0) : 1.0;
+            }
+            double x = std::clamp(event.value, 0.0, 0.999999) * total;
+            int lane = lane_count;
+            for (int index = 0; index < lane_count; ++index) {
+                x -= index < static_cast<int>(scales.size())
+                    ? std::clamp(scales[static_cast<std::size_t>(index)], 0.25, 4.0) : 1.0;
+                if (x < 0.0) { lane = index + 1; break; }
+            }
+
+                bms_editor_.move_note(bms_editor_drag_note_id_, lane, measure, slice, bms_editor_x_axis_lock_);
+            }
+            if (event.drag_finished) {
+                bms_editor_.end_note_drag();
+                if (!event.dragging && !event.control && bms_editor_tool_ == BmsEditorTool::PlaceSilent &&
+                    event.part != render::MenuHitPart::SelectOnly &&
+                    bms_editor_auto_align_bgm_) {
+                    bms_editor_.move_bgm_to_cursor();
+                }
+                if (const auto* note = bms_editor_.cursor_note()) {
+                    if (event.part != render::MenuHitPart::SelectOnly) request_bms_editor_preview(false, note->token, true);
+                }
+                bms_editor_drag_note_id_ = 0;
+                bms_editor_drag_view_start_ = -1;
+            }
+            publish_snapshot();
+            return;
+        }
+        if (event.index < 0 || event.index >= static_cast<int>(bms_editor_.notes().size())) return;
+        const auto& note = bms_editor_.notes()[static_cast<std::size_t>(event.index)];
+        const int view_count = std::min(std::clamp(bms_editor_view_measures_, 1, 32),
+                                        std::max(1, bms_editor_.measure_count()));
+        bms_editor_drag_view_start_ = std::clamp(bms_editor_.cursor_measure() - view_count / 2,
+            0, std::max(0, bms_editor_.measure_count() - view_count));
+        bms_editor_drag_note_id_ = note.id;
+        bms_editor_.begin_note_drag(note.id);
+        if (event.control) {
+            if (bms_editor_selected_note_ids_.count(note.id) != 0) {
+                bms_editor_selected_note_ids_.erase(note.id);
+            } else {
+                bms_editor_selected_note_ids_.insert(note.id);
+            }
+        } else {
+            bms_editor_selected_note_ids_.clear();
+            bms_editor_selected_bgm_ids_.clear();
+            bms_editor_selected_note_ids_.insert(note.id);
+        }
+        bms_editor_.select_note(note.id);
+        if (bms_editor_tool_ == BmsEditorTool::Remove && !event.control) {
+            (void)bms_editor_.remove_cursor_note();
+            bms_editor_.end_note_drag();
+            bms_editor_drag_note_id_ = 0;
+            bms_editor_drag_view_start_ = -1;
+        }
+        publish_snapshot();
+        return;
+    }
+    if (current_screen() == Screen::BmsEditor &&
+        event.kind == render::MenuHitTargetKind::BmsEditorGrid) {
+        const int measure_count = std::max(1, bms_editor_.measure_count());
+        const int requested_view = std::clamp(bms_editor_view_measures_, 1, 32);
+        const int view_count = std::max(1, std::min(requested_view, measure_count));
+        const int view_start = std::clamp(bms_editor_.cursor_measure() - view_count / 2,
+                                          0, std::max(0, measure_count - view_count));
+        const double position = std::clamp(event.value_y, 0.0, 0.999999) * static_cast<double>(view_count);
+        const int measure = view_start + static_cast<int>(position);
+        const double fraction = position - static_cast<double>(static_cast<int>(position));
+        const int slice = static_cast<int>(std::llround(
+            fraction * static_cast<double>(BmsEditorDocument::kGridDivision)));
+        if (event.part == render::MenuHitPart::SelectOnly) {
+            const double hover_position = static_cast<double>(measure) + fraction;
+            const double hover_tolerance = std::max(0.018, static_cast<double>(view_count) / 72.0);
+            const BmsEditorNote* hovered_note = nullptr;
+            double hovered_distance = hover_tolerance;
+            for (const auto& note : bms_editor_.notes()) {
+                if (note.lane != event.index || note.token.empty() || note.token == "00") continue;
+                const double note_position = static_cast<double>(note.measure) +
+                    static_cast<double>(note.slice) / std::max(1, note.slice_count);
+                const double distance = std::abs(note_position - hover_position);
+                if (distance <= hovered_distance) {
+                    hovered_distance = distance;
+                    hovered_note = &note;
+                }
+            }
+            const std::uint64_t hovered_id = hovered_note ? hovered_note->id : 0;
+            if (hovered_id != bms_editor_hover_note_id_) {
+                bms_editor_hover_note_id_ = hovered_id;
+                if (hovered_note) {
+                    request_bms_editor_preview(false, hovered_note->token, true);
+                } else if (bms_editor_preview_one_shot_ &&
+                           (bms_editor_preview_active_ || bms_editor_preview_future_.valid())) {
+                    stop_bms_editor_preview();
+                }
+            }
+            return;
+        }
+        const int snapped = std::clamp(static_cast<int>(std::llround(
+            static_cast<double>(slice) / std::max(1, bms_editor_snap_division())) *
+            std::max(1, bms_editor_snap_division())), 0, BmsEditorDocument::kGridDivision - 1);
+        const auto selected_note = bms_editor_selected_note_ids_.empty()
+            ? std::uint64_t{0} : *bms_editor_selected_note_ids_.begin();
+        if (bms_editor_tool_ == BmsEditorTool::Move && selected_note != 0) {
+            (void)bms_editor_.move_note(selected_note, event.index, measure, snapped,
+                                         bms_editor_x_axis_lock_);
+            bms_editor_.select_note(selected_note);
+        } else if (bms_editor_tool_ == BmsEditorTool::Remove) {
+            bms_editor_.set_cursor(event.index, measure, snapped);
+            (void)bms_editor_.remove_cursor_note();
+        } else {
+            bms_editor_.set_cursor(event.index, measure, snapped);
+            const bool previous_silent_mode = bms_editor_.silent_note_mode();
+            bms_editor_.set_silent_note_mode(true);
+            (void)bms_editor_.toggle_cursor_note();
+            bms_editor_.set_silent_note_mode(previous_silent_mode);
+        }
+        if (const auto* note = bms_editor_.cursor_note()) request_bms_editor_preview(false, note->token, true);
+        publish_snapshot();
+        return;
+    }
+    if (current_screen() == Screen::BmsEditor &&
+        event.kind == render::MenuHitTargetKind::MouseWheel && event.wheel_steps != 0) {
+        if (bms_editor_.move_cursor_seconds(-static_cast<double>(event.wheel_steps))) {
+            publish_snapshot();
+        }
         return;
     }
     if (help_overlay_visible_) {
@@ -2939,6 +3176,7 @@ void MenuApp::handle_title_input(uint32_t keycode) {
 }
 
 void MenuApp::handle_text_input(std::string_view text) {
+    if (ranked_account_overlay_visible_ && ranked_account_sites_mode_) return;
     if (ranked_account_overlay_visible_ &&
         ranked_account_signed_in_username_.empty() &&
         !ranked_account_request_busy_.load(std::memory_order_acquire) &&
@@ -3014,8 +3252,18 @@ void MenuApp::handle_text_input(std::string_view text) {
 }
 
 bool MenuApp::control_modifier_pressed() const {
-    return (key_lcontrol_ != 0 && pressed_keys_.find(key_lcontrol_) != pressed_keys_.end()) ||
-           (key_rcontrol_ != 0 && pressed_keys_.find(key_rcontrol_) != pressed_keys_.end());
+    const bool tracked =
+        (key_lcontrol_ != 0 && pressed_keys_.find(key_lcontrol_) != pressed_keys_.end()) ||
+        (key_rcontrol_ != 0 && pressed_keys_.find(key_rcontrol_) != pressed_keys_.end());
+#ifdef _WIN32
+    // RawInput and polling can deliver the Ctrl edge just after O. Consult the
+    // foreground keyboard state as a same-frame fallback for chord shortcuts.
+    const bool physical = (GetAsyncKeyState(VK_LCONTROL) & 0x8000) != 0 ||
+                          (GetAsyncKeyState(VK_RCONTROL) & 0x8000) != 0;
+    return tracked || physical;
+#else
+    return tracked;
+#endif
 }
 
 void MenuApp::handle_quick_setup_input(uint32_t keycode) {
@@ -3461,6 +3709,12 @@ void MenuApp::handle_song_select_input(uint32_t keycode) {
     }
     if (song_select_view_ == SongSelectView::Songs &&
         song_select_focus_ == SongSelectFocus::SongList &&
+        key_i_ != 0 && keycode == key_i_) {
+        open_bms_editor();
+        return;
+    }
+    if (song_select_view_ == SongSelectView::Songs &&
+        song_select_focus_ == SongSelectFocus::SongList &&
         key_delete_ != 0 && keycode == key_delete_) {
         remove_last_session_mix_draft_song();
         publish_snapshot();
@@ -3809,16 +4063,18 @@ bool MenuApp::apply_difficulty_table_url(std::string_view url) {
 
 void MenuApp::handle_difficulty_table_input(uint32_t keycode) {
     if (difficulty_table_url_editing_) {
-        const auto f3 = config::KeycodeMap::to_keycode("F3").value_or(0);
         const auto f4 = config::KeycodeMap::to_keycode("F4").value_or(0);
         if (f4 != 0 && keycode == f4) {
             select_native_difficulty_levels();
             return;
         }
-        if ((key_f1_ != 0 && keycode == key_f1_) || (key_f2_ != 0 && keycode == key_f2_) ||
-            (f3 != 0 && keycode == f3)) {
-            apply_builtin_difficulty_table(keycode == key_f1_ ? 0 : keycode == key_f2_ ? 1 : 2);
-            return;
+        for (std::size_t index = 0; index < config::kBuiltinDifficultyTables.size(); ++index) {
+            const auto shortcut = config::KeycodeMap::to_keycode(
+                "F" + std::to_string(config::kBuiltinDifficultyTables[index].function_key)).value_or(0);
+            if (shortcut != 0 && keycode == shortcut) {
+                apply_builtin_difficulty_table(static_cast<int>(index));
+                return;
+            }
         }
         if (keycode == key_escape_) {
             difficulty_table_url_editing_ = false;

@@ -3,7 +3,7 @@ param(
     [string]$BuildReleaseDirectory,
     [Parameter(Mandatory = $true)]
     [string]$OutputDirectory,
-    [string]$Version = "1.7.2",
+    [string]$Version = "1.7.7",
     [switch]$BinaryOnly
 )
 
@@ -83,6 +83,20 @@ foreach ($relative in $topFiles) {
 foreach ($directory in @("Mainmusic", "config", "docs", "examples", "models", "skins")) {
     Copy-Item -LiteralPath (Join-Path $repoRoot $directory) -Destination $binaryRoot -Recurse
 }
+# Skin images are already generated. Keep their offline authoring programs in
+# the source tree, not in the runnable client delivery.
+foreach ($relative in @(
+    "skins\Tencircle\generate.py",
+    "skins\Tengear\generate.py",
+    "skins\Tenmania\generate.py",
+    "skins\Tenmania\preview.py",
+    "skins\TenRiff_VelocityCircuit_DanceGrid_4K-16K\generate_assets.py"
+)) {
+    $packagedTool = Join-Path $binaryRoot $relative
+    if (Test-Path -LiteralPath $packagedTool -PathType Leaf) {
+        Remove-Item -LiteralPath $packagedTool
+    }
+}
 $ncnnNoticeDirectory = Join-Path $binaryRoot "third_party\ncnn-20260526"
 New-Item -ItemType Directory -Path $ncnnNoticeDirectory -Force | Out-Null
 Copy-Item -LiteralPath (Join-Path $repoRoot "third_party\ncnn-20260526\LICENSE.txt") `
@@ -119,6 +133,26 @@ if (-not $BinaryOnly) {
         $destinationParent = Split-Path -Parent $destination
         New-Item -ItemType Directory -Path $destinationParent -Force | Out-Null
         Copy-Item -LiteralPath $sourcePath -Destination $destination
+    }
+    # Generic *.dll/*.lib ignore rules keep local build outputs out of Git,
+    # but the public source archive promises the bundled ncnn build inputs.
+    # Include only these known dependency paths; never sweep ignored files.
+    $sourceExtras = @(
+        "third_party\ncnn-20260526\x64\bin",
+        "third_party\ncnn-20260526\x64\lib\ncnn.lib"
+    )
+    foreach ($relative in $sourceExtras) {
+        $sourcePath = Join-Path $repoRoot $relative
+        if (-not (Test-Path -LiteralPath $sourcePath)) {
+            throw "Required public source dependency is missing: $sourcePath"
+        }
+        $destination = Join-Path $sourceRoot $relative
+        if (Test-Path -LiteralPath $sourcePath -PathType Container) {
+            Copy-Item -LiteralPath $sourcePath -Destination $destination -Recurse
+        } else {
+            New-Item -ItemType Directory -Path (Split-Path -Parent $destination) -Force | Out-Null
+            Copy-Item -LiteralPath $sourcePath -Destination $destination
+        }
     }
     $archives += $sourceZip
 }

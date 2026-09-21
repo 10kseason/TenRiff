@@ -154,11 +154,15 @@ void GameplayEngine::sync_input_state(int lane, input::InputState state, int64_t
         return;
     }
 
+    auto& lane_state = lanes_[static_cast<std::size_t>(lane - 1)];
+    // Startup/pause polling reports physical state even when it did not change.
+    // Replays start released and must contain transitions, not redundant key-up baselines.
+    if (lane_state.key_down == (state == input::InputState::Pressed)) return;
+
     if (!replay_.events.empty()) {
         input_sample = std::max(input_sample, replay_.events.back().sample);
     }
     replay_.events.push_back(ReplayEvent{lane, state, input_sample});
-    auto& lane_state = lanes_[static_cast<std::size_t>(lane - 1)];
     update_lane_input_state(lane_state, state, input_sample);
 }
 

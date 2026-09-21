@@ -594,6 +594,23 @@ TEST_CASE("parser infers sparse standard SP charts without falling back to 10K")
     CHECK_EQ(lane19.value(), 8);
 }
 
+TEST_CASE("parser ignores empty 14 plus 2 template channels when detecting 10K2S") {
+    const char* data =
+        "#TITLE 10K2S with empty extension channels\n"
+        "#PLAYER 3\n"
+        "#MODEHINT:BEAT10K\n"
+        "#00111:01\n#00112:01\n#00113:01\n#00114:01\n#00115:01\n#00116:01\n"
+        "#00121:01\n#00122:01\n#00123:01\n#00124:01\n#00125:01\n#00126:01\n"
+        "#00118:0000\n#00119:0000\n#00128:0000\n#00129:0000\n";
+
+    BmsParser parser;
+    auto result = parser.parse(data);
+
+    REQUIRE(result.success());
+    CHECK_EQ(result.chart.declared_key_count, 12);
+    CHECK_EQ(result.chart.layout_label, "10+2 DP");
+}
+
 TEST_CASE("parseFile infers PMS 9K layout from pms extension") {
     TempDirGuard temp;
     temp.path = make_temp_dir();

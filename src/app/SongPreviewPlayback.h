@@ -42,6 +42,23 @@ namespace tenriff::app {
     return static_cast<std::size_t>(frames);
 }
 
+inline void mix_once_song_preview(const std::vector<float>& stereo_samples,
+                                  std::size_t& frame_cursor, float gain,
+                                  float* output, std::uint32_t frames) {
+    if (!output) return;
+    const std::size_t clip_frames = stereo_samples.size() / 2u;
+    for (std::uint32_t frame = 0; frame < frames; ++frame) {
+        const std::size_t destination = static_cast<std::size_t>(frame) * 2u;
+        if (frame_cursor < clip_frames) {
+            output[destination] = std::clamp(stereo_samples[frame_cursor * 2u] * gain, -1.0f, 1.0f);
+            output[destination + 1u] = std::clamp(stereo_samples[frame_cursor * 2u + 1u] * gain, -1.0f, 1.0f);
+            ++frame_cursor;
+        } else {
+            output[destination] = output[destination + 1u] = 0.0f;
+        }
+    }
+}
+
 inline void mix_looping_song_preview(const std::vector<float>& stereo_samples,
                                      std::size_t& frame_cursor,
                                      float gain,

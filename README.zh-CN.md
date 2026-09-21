@@ -1,20 +1,26 @@
 # TenRiff
 
+**多人Rate支持版本：**选曲者在大厅设置全员共用的Rate。所有玩家必须使用本protocol v6版本，不能与旧v5客户端连接。[指南](docs/multiplayer-rate-build.ko.md)（韩语）。
+
+**1.7.7：**尾奏结束后无需再次按键即可保存结果，新增Stella、Satellite和U_E Pack 4K/6K/8K难度表预设。[变更与验证](docs/release-1.7.7-gate.md)。
+
+本发行包是完整的 **1.7.7 Sites 集成版**。解压到新文件夹，运行 `launch_win.bat`，然后按 F10 连接一次网页账号。符合条件的新游玩记录会上传分数、详细分数、准确率和详细准确率。原有计分公式保持不变。请参阅[连接指南](docs/sites-leaderboard.md)（韩语）。
+
 Language: [한국어](README.md) | [English](README.en.md) | [简体中文](README.zh-CN.md) | [日本語](README.ja.md)
 
-TenRiff 是一个 Windows GUI BMS 节奏游戏运行时/启动器。当前项目版本为 `1.7.2`，谱面输入仅支持 BMS family（`.bms/.bme/.bml/.pms`）。公开包不包含 BGA upscaler model；键位转换内置 deterministic NK3 P64 graph 与 generalized pattern MLP。项目采用 MIT 许可证。
+TenRiff 是一个 Windows GUI BMS 节奏游戏运行时/启动器。当前项目版本为 `1.7.7`，谱面输入仅支持 BMS family（`.bms/.bme/.bml/.pms`）。公开包不包含 BGA upscaler model；键位转换内置 deterministic NK3 P64 graph 与 generalized pattern MLP。项目采用 MIT 许可证。
 
-这份 README 是入门文档。关于当前行为、`1.7.2` 项目状态、`1.5.1 fixed stable baseline` 基准、配置和设计文档，请继续阅读 [`docs/README.zh-CN.md`](docs/README.zh-CN.md)。
+这份 README 是入门文档。关于当前行为、`1.7.7` 项目状态、`1.5.1 fixed stable baseline` 基准、配置和设计文档，请继续阅读 [`docs/README.zh-CN.md`](docs/README.zh-CN.md)。
 
 TenRiff 也明确属于一种 `vibe coding` 作品：它更多是在快速迭代和实验中成形，而不是只按照传统的长篇设计先行流程推进。
 
-## 1.7.2 音频、曲库与游玩更新
+## 1.7.7 音频、曲库与游玩更新
 
 新增原生 Windows ASIO 输出，同时保留默认的 WASAPI 输出。难度表选择窗口提供原生 LV、5键 Aery、7键 Aery 和10键 Revive 选项。`.trskin` 文件可以将皮肤设置与素材移至另一台电脑。
 
 本版包含恢复前的3秒倒计时、Session Mix 期间忽略 Esc、按累计进行时间计算基准 BPM，以及参考 LR2 的段位血条。另新增曲目录添加与仅从列表移除，修复 Unicode 路径验证及对手离开后的结果保留。
 
-改动见 [CHANGELOG](CHANGELOG.md)，验证与 ASIO 设备确认范围见 [1.7.2 发布门槛](docs/release-1.7.2-gate.md)。
+改动见 [CHANGELOG](CHANGELOG.md)，验证与 ASIO 设备确认范围见 [1.7.7 发布门槛](docs/release-1.7.7-gate.md)。
 
 ## 截图
 
