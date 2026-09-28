@@ -12,7 +12,9 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
     target.countdown_active = gameplay_hud_.countdown_active;
     target.countdown_value = gameplay_hud_.countdown_value;
     target.loading_percent = gameplay_hud_.loading_percent;
-    target.loading_stage = gameplay_hud_.loading_stage;
+    // Progress messages remain stable internally; localize only the UI snapshot.
+    target.loading_stage = ui::text(ui_language(), gameplay_hud_.loading_stage,
+                                   gameplay_hud_.loading_stage);
     target.lane_count = clamp_int(gameplay_hud_.lane_count, 1, static_cast<int>(kGameplayHudMaxLanes));
     const LanePresentationLayout lane_layout = resolve_lane_presentation_layout(
         target.lane_count,
@@ -73,7 +75,9 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
         config_.skin.combo_position,
         config::kComboPositionMin,
         config::kComboPositionMax);
-    target.judgement_line_position = clamped_judgement_line_position;
+    target.judgement_line_position = gameplay_manifest && gameplay_manifest->gameplay.native_renderer &&
+        gameplay_manifest->gameplay.has_hit_position ? gameplay_manifest->gameplay.hit_position/480.0
+                                                   : clamped_judgement_line_position;
     target.gameplay_field_offset_x = std::clamp(
         config_.skin.gameplay_field_offset_x,
         config::kGameplayFieldOffsetXMin,
@@ -164,7 +168,10 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
                             ? *manifest_style->note_shape
                             : config::normalize_skin_note_shape_token(config_.skin.note_shape);
     target.note_image_aspect = render_note_image_aspect(config_.skin.note_image_aspect);
-    target.skin_source = config::normalize_skin_source_token(config_.skin.source);
+    // A menu-only editable skin keeps the native playfield and key receptors.
+    target.skin_source = gameplay_manifest && gameplay_manifest->native_gameplay_fallback
+                             ? "native"
+                             : config::normalize_skin_source_token(config_.skin.source);
     target.external_skin_root = active_external_skin_root();
     target.external_skin_name = active_external_skin_name();
     target.skin_revision = tenriff_skin_revision_;
@@ -173,11 +180,11 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
             ? active_tenriff_gameplay_for_layout(target.lane_count, lane_layout.seven_plus_one)
             : nullptr;
     target.skin_background_path =
-        (target.skin_source == "tenriff" && gameplay_manifest)
+        (tenriff_manifest_active && gameplay_manifest)
             ? gameplay_manifest->gameplay_background_path
             : std::string{};
     target.skin_background_opacity =
-        (target.skin_source == "tenriff" && gameplay_manifest)
+        (tenriff_manifest_active && gameplay_manifest)
             ? gameplay_manifest->gameplay_background_opacity
             : 0.66f;
     target.lr2_resolution_override =
@@ -1210,9 +1217,9 @@ void MenuApp::populate_result_render_data(render::MenuRenderData& render, const 
     }
     render.result.notes.push_back(ui_text("Gameplay ", "게임플레이 ") +
                                   format_input_backend_status_label(last_gameplay_input_backend_state_,
-                                                                    ui_uses_korean()));
+                                                                    ui_language()));
     if (const std::string detail =
-            format_input_backend_status_detail(last_gameplay_input_backend_state_, ui_uses_korean());
+            format_input_backend_status_detail(last_gameplay_input_backend_state_, ui_language());
         !detail.empty()) {
         render.result.notes.push_back(ui_text("Gameplay ", "게임플레이 ") + detail);
     }
@@ -1580,7 +1587,7 @@ void MenuApp::publish_snapshot() {
 
     MenuSnapshot snapshot;
     render::MenuRenderData render;
-    render.ui_korean = ui_uses_korean();
+    render.ui_language = ui_language();
     render.ui_font = config::normalize_skin_ui_font_token(config_.skin.ui_font);
     if (config::normalize_skin_source_token(config_.skin.source) == "tenriff" &&
         active_tenriff_skin_.found) {
@@ -1614,6 +1621,8 @@ void MenuApp::publish_snapshot() {
             opacity_it != active_tenriff_skin_.screen_background_opacities.end()
                 ? opacity_it->second
                 : active_tenriff_skin_.lobby_background_opacity;
+        render.lobby_skin.native_menu_renderer = active_tenriff_skin_.native_menu_renderer;
+        render.lobby_skin.native_menu = active_tenriff_skin_.native_menu;
         render.lobby_skin.theme_colors = active_tenriff_skin_.theme_colors;
         render.lobby_skin.referenced_asset_paths = active_tenriff_skin_.referenced_asset_paths;
         render.lobby_skin.layout_rects.reserve(active_tenriff_skin_.layout_rects.size());
@@ -1684,7 +1693,7 @@ void MenuApp::publish_snapshot() {
         const auto progress = song_indexer_.progress();
         render.loading_progress.visible = true;
         render.loading_progress.stage =
-            menu_song_select::song_index_stage_label(progress.stage);
+            menu_song_select::song_index_stage_label(progress.stage, ui_language());
         render.loading_progress.processed = std::max(0, progress.processed);
         render.loading_progress.total = progress.total;
         if (progress.total > 0) {

@@ -1,5 +1,7 @@
 #pragma once
 
+#include "ui/Localization.h"
+
 #include <cstdint>
 #include <optional>
 #include <string>
@@ -33,14 +35,14 @@ public:
         std::string_view runtime_key_mode,
         std::string backend_status,
         std::int64_t now_ns,
-        bool use_korean);
+        ui::Language language);
 
     [[nodiscard]] static KeymapSettingsViewModel build_nkro_test(
         const KeymapSettingsController& controller,
         const config::Keymap& working_keymap,
         const std::unordered_set<std::uint32_t>& pressed_keys,
         std::string backend_status,
-        bool use_korean);
+        ui::Language language);
 };
 
 }  // namespace tenriff::app::menu::settings

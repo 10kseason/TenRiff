@@ -1,6 +1,6 @@
-TenRiff 1.7.7 public source inventory
+TenRiff 1.7.8 public source inventory
 
-1.7.7 is a client-only public source release. This inventory is the current public upload scope.
+1.7.8 is a client-only public source release. This inventory is the current public upload scope.
 
 Included in versioned source bundles:
 - CHANGELOG.md
@@ -27,6 +27,9 @@ Included in versioned source bundles:
 - nk2/
 - config/
 - skins/
+- assets/native-menu/ and assets/native-gameplay/ (original editable UI vectors)
+- tools/generate_native_menu_assets.py and tools/generate_luma_keys_assets.py
+- tools/skin_editor/ and launch_skin_editor.bat
 - docs/
 - examples/
 - external/ (except `external/llama.cpp/`)
@@ -81,7 +84,7 @@ Notes:
 - Local LLM/tooling checkouts such as `external/llama.cpp/` are intentionally excluded from the public source package.
 - The repository license is MIT and should be shipped with both source and binary distributions.
 - The generic External ONNX Upscaler source and compatibility tools are included, but BGA upscaler models, checkpoints, training data, and model-specific verification metadata are excluded. Bundled ONNX files are limited to the project-owned NK3 P64 graph and fixed-target generalized pattern MLP inference exports; raw charts, training caches, and checkpoints remain excluded.
-- Standalone BMS key-converter source is retained for development regression only. Official 1.7.7 binary archives do not contain its CLI or GUI executables, and the top-level build option defaults off.
+- Standalone BMS key-converter source is retained for development regression only. Official 1.7.8 binary archives do not contain its CLI or GUI executables, and the top-level build option defaults off.
 
 Web-ranking privacy boundary:
 - Client-side ranking protocol, eligibility rules, payload validation, and verifier tests may remain public for reproducibility.

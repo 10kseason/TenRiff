@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <title>TenRiff native menu - Prism</title>
+  <polyline points="50,3 88,27 78,75 50,97 12,72 22,25 50,3 50,97" fill="none" stroke="#63E9F2" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+  <polyline points="22,25 78,75 12,72 88,27 22,25" fill="none" stroke="#A499FF" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+  <polyline points="12,72 50,3 78,75" fill="none" stroke="#ECF6FF" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+</svg>

@@ -8,7 +8,7 @@
                                      bool separate_paragraphs = true) {
             draw_glass_panel(rect, 14.0f, 0.92f, 0, false, 0);
             draw_text_clipped(wloc("GUIDE", "사용 안내"), d2d_->song_title_format.Get(),
-                              D2D1::RectF(rect.left + 24, rect.top + 20, rect.right - 24, rect.top + 54),
+                              native_rect("generic_help.rect.001", D2D1::RectF(rect.left + 24, rect.top + 20, rect.right - 24, rect.top + 54)),
                               d2d_->text_brush.Get());
             std::wstring notes;
             for (const auto& note : guide_notes) {
@@ -21,7 +21,7 @@
             }
             if (notes.empty()) notes = wloc("Select an item to open it or change its value. Press F1 for keyboard help.",
                                             "항목을 선택해 열거나 값을 바꿀 수 있습니다. 키보드 조작은 F1 도움말을 참고하세요.");
-            constexpr float line_height = 26.0f;
+            const float line_height = native_metric("generic_help.line_height", 26.0f);
             const float width = rect.right - rect.left - 48.0f;
             const float page_height = std::floor((rect.bottom - rect.top - 140.0f) / line_height) * line_height;
             if (width <= 0 || page_height < line_height || !d2d_->dwrite_factory || !d2d_->body_format) return;
@@ -44,13 +44,13 @@
             if (FAILED(d2d_->generic_help_layout->GetMetrics(&metrics))) return;
             const int page_count = std::max(1, static_cast<int>(std::ceil(metrics.height / page_height)));
             const int page = std::clamp(generic_help_page_.load(std::memory_order_relaxed), 0, page_count - 1);
-            const D2D1_RECT_F body = D2D1::RectF(rect.left + 24, rect.top + 72, rect.right - 24, rect.top + 72 + page_height);
+            const D2D1_RECT_F body = native_rect("generic_help.rect.002", D2D1::RectF(rect.left + 24, rect.top + 72, rect.right - 24, rect.top + 72 + page_height));
             ctx->PushAxisAlignedClip(body, D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
             ctx->DrawTextLayout(D2D1::Point2F(body.left, body.top - page * page_height),
                                 d2d_->generic_help_layout.Get(), d2d_->muted_brush.Get());
             ctx->PopAxisAlignedClip();
             draw_text_clipped(to_wide(std::to_string(page + 1) + " / " + std::to_string(page_count)),
-                              d2d_->hud_format.Get(), D2D1::RectF(rect.left + 24, rect.bottom - 44, rect.right - 170, rect.bottom - 18),
+                              d2d_->hud_format.Get(), native_rect("generic_help.rect.003", D2D1::RectF(rect.left + 24, rect.bottom - 44, rect.right - 170, rect.bottom - 18)),
                               d2d_->muted_brush.Get());
             const auto page_button = [&](const D2D1_RECT_F& button, const wchar_t* label, int target, bool enabled) {
                 draw_glass_panel(button, 8, enabled ? 1.0f : 0.4f, 0, enabled, 0);
@@ -62,7 +62,7 @@
                 d2d_->song_title_format->SetParagraphAlignment(saved);
             };
             if (page_count > 1) {
-                page_button(D2D1::RectF(rect.right - 150, rect.bottom - 56, rect.right - 94, rect.bottom - 16), L"\u2039", page - 1, page > 0);
-                page_button(D2D1::RectF(rect.right - 82, rect.bottom - 56, rect.right - 26, rect.bottom - 16), L"\u203a", page + 1, page + 1 < page_count);
+                page_button(native_rect("generic_help.rect.004", D2D1::RectF(rect.right - 150, rect.bottom - 56, rect.right - 94, rect.bottom - 16)), L"\u2039", page - 1, page > 0);
+                page_button(native_rect("generic_help.rect.005", D2D1::RectF(rect.right - 82, rect.bottom - 56, rect.right - 26, rect.bottom - 16)), L"\u203a", page + 1, page + 1 < page_count);
             }
         };

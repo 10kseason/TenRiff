@@ -14,25 +14,25 @@
         if (d2d_->footer_brush) {
             const float saved = d2d_->footer_brush->GetOpacity();
             d2d_->footer_brush->SetOpacity(0.72f * eased);
-            ctx->FillRectangle(D2D1::RectF(0.0f, 0.0f, kBaseWidth, kBaseHeight),
+            ctx->FillRectangle(native_rect("url_warning.rect.001", D2D1::RectF(0.0f, 0.0f, kBaseWidth, kBaseHeight)),
                                d2d_->footer_brush.Get());
             d2d_->footer_brush->SetOpacity(saved);
         }
-        const float width = 780.0f;
-        const float height = 430.0f;
+        const float width = native_metric("url_warning.width", 780.0f);
+        const float height = native_metric("url_warning.height", 430.0f);
         const float scale = 0.94f + 0.06f * eased;
-        const D2D1_RECT_F modal = D2D1::RectF(
+        const D2D1_RECT_F modal = native_rect("url_warning.rect.002", D2D1::RectF(
             (kBaseWidth - width * scale) * 0.5f,
             (kBaseHeight - height * scale) * 0.5f,
             (kBaseWidth + width * scale) * 0.5f,
-            (kBaseHeight + height * scale) * 0.5f);
+            (kBaseHeight + height * scale) * 0.5f));
         draw_glass_panel(modal, 8.0f, 0.99f * eased, 0.92f * eased, true, 14.0f);
 
         if (d2d_->header_format && d2d_->text_brush) {
             draw_text_clipped(to_wide(loc("OPEN EXTERNAL LINK?", "외부 링크를 열까요?")),
                               d2d_->header_format.Get(),
-                              D2D1::RectF(modal.left + 38.0f, modal.top + 30.0f,
-                                          modal.right - 38.0f, modal.top + 80.0f),
+                              native_rect("url_warning.rect.003", D2D1::RectF(modal.left + 38.0f, modal.top + 30.0f,
+                                          modal.right - 38.0f, modal.top + 80.0f)),
                               d2d_->text_brush.Get());
         }
         if (d2d_->body_format && d2d_->muted_brush) {
@@ -40,13 +40,13 @@
                 to_wide(loc("This link leaves TenRiff. It may contain unsafe or malicious content.",
                             "이 링크는 TenRiff 외부로 연결됩니다. 위험하거나 악성인 콘텐츠일 수 있습니다.")),
                 d2d_->body_format.Get(),
-                D2D1::RectF(modal.left + 40.0f, modal.top + 96.0f,
-                            modal.right - 40.0f, modal.top + 146.0f),
+                native_rect("url_warning.rect.004", D2D1::RectF(modal.left + 40.0f, modal.top + 96.0f,
+                            modal.right - 40.0f, modal.top + 146.0f)),
                 d2d_->muted_brush.Get());
         }
-        const D2D1_RECT_F url_rect = D2D1::RectF(
+        const D2D1_RECT_F url_rect = native_rect("url_warning.rect.005", D2D1::RectF(
             modal.left + 40.0f, modal.top + 170.0f,
-            modal.right - 40.0f, modal.top + 236.0f);
+            modal.right - 40.0f, modal.top + 236.0f));
         if (d2d_->button_brush) {
             ctx->FillRoundedRectangle(D2D1::RoundedRect(url_rect, 6.0f, 6.0f),
                                       d2d_->button_brush.Get());
@@ -54,15 +54,15 @@
         if (d2d_->body_format && d2d_->accent_brush) {
             draw_text_clipped(to_wide(data.url_warning_overlay.url),
                               d2d_->body_format.Get(),
-                              D2D1::RectF(url_rect.left + 16.0f, url_rect.top + 13.0f,
-                                          url_rect.right - 16.0f, url_rect.bottom - 10.0f),
+                              native_rect("url_warning.rect.006", D2D1::RectF(url_rect.left + 16.0f, url_rect.top + 13.0f,
+                                          url_rect.right - 16.0f, url_rect.bottom - 10.0f)),
                               d2d_->accent_brush.Get());
         }
         const float button_top = modal.bottom - 92.0f;
-        const D2D1_RECT_F cancel = D2D1::RectF(
-            modal.left + 40.0f, button_top, modal.left + 342.0f, button_top + 56.0f);
-        const D2D1_RECT_F open = D2D1::RectF(
-            modal.right - 342.0f, button_top, modal.right - 40.0f, button_top + 56.0f);
+        const D2D1_RECT_F cancel = native_rect("url_warning.rect.007", D2D1::RectF(
+            modal.left + 40.0f, button_top, modal.left + 342.0f, button_top + 56.0f));
+        const D2D1_RECT_F open = native_rect("url_warning.rect.008", D2D1::RectF(
+            modal.right - 342.0f, button_top, modal.right - 40.0f, button_top + 56.0f));
         auto warning_button = [&](const D2D1_RECT_F& rect, std::string_view label,
                                   bool primary, int index) {
             ID2D1SolidColorBrush* fill = primary && d2d_->button_selected_brush

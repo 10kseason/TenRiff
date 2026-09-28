@@ -118,8 +118,7 @@ TEST_CASE("keymap view keeps main rows actions and capture status value-only") {
         4,
         "10k",
         "Input: RawInput",
-        2'000,
-        false);
+        2'000, tenriff::ui::Language::English);
     REQUIRE(view.rows.size() == 8);
     CHECK(view.rows[0].label == "Key Mode");
     CHECK(view.rows[0].value == "4K");
@@ -146,7 +145,7 @@ TEST_CASE("NKRO view highlights only pressed mapped lanes") {
     const std::unordered_set<std::uint32_t> pressed{*lane1_keycode};
 
     const auto view = KeymapSettingsView::build_nkro_test(
-        controller, keymap, pressed, "Input: Polling", true);
+        controller, keymap, pressed, "Input: Polling", tenriff::ui::Language::Korean);
     REQUIRE(view.rows.size() == 5);
     CHECK(view.rows[0].selected);
     CHECK(view.rows[0].value.find("[눌림]") != std::string::npos);

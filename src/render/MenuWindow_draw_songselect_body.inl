@@ -1,5 +1,14 @@
         const float ambient_pulse = static_cast<float>(pulse_wave_01(render_now_ns, 6.4, 0.18));
         const float selection_pulse = static_cast<float>(pulse_wave_01(render_now_ns, 4.2, 0.46));
+        const std::size_t jacket_identity = std::hash<std::string>{}(data.song_select.selected_song_title) ^
+            static_cast<std::size_t>(data.song_select.list_selected_index + 1);
+        if (native_motion_screen && jacket_identity != native_jacket_identity_) {
+            native_jacket_identity_ = jacket_identity;
+            native_jacket_changed_ns_ = render_now_ns;
+        }
+        const float jacket_reveal = !native_menu_motion_.moving() ? 1.0f : std::min(
+            native_menu_motion_.entrance(), menu_ease_out(static_cast<float>(
+                (render_now_ns - native_jacket_changed_ns_) / 320'000'000.0)));
 
         auto draw_rule = [&](float left, float top, float right, float opacity = 0.34f) {
             if (!d2d_->button_border_brush) {
@@ -45,7 +54,7 @@
             if (d2d_->hud_format && d2d_->muted_brush) {
                 draw_text_clipped(to_wide(std::string(label)),
                                   d2d_->hud_format.Get(),
-                                  D2D1::RectF(rect.left, rect.top, rect.right, rect.top + 23.0f),
+                                  native_rect("songselect.rect.001", D2D1::RectF(rect.left, rect.top, rect.right, rect.top + 23.0f)),
                                   d2d_->muted_brush.Get());
             }
             if (d2d_->title_format && d2d_->text_brush) {
@@ -55,7 +64,7 @@
                         : static_cast<ID2D1Brush*>(d2d_->text_brush.Get());
                 draw_text_clipped(to_wide(std::string(value)),
                                   d2d_->title_format.Get(),
-                                  D2D1::RectF(rect.left, rect.top + 22.0f, rect.right, rect.bottom),
+                                  native_rect("songselect.rect.002", D2D1::RectF(rect.left, rect.top + 22.0f, rect.right, rect.bottom)),
                                   value_brush);
             }
         };
@@ -63,11 +72,11 @@
         if (d2d_->accent_brush && !modern_library_screen) {
             const D2D1_COLOR_F saved_color = d2d_->accent_brush->GetColor();
             const float saved_opacity = d2d_->accent_brush->GetOpacity();
-            d2d_->accent_brush->SetColor(D2D1::ColorF(0x19DDE8));
+            d2d_->accent_brush->SetColor(native_palette("palette.19dde8", D2D1::ColorF(0x19DDE8)));
             d2d_->accent_brush->SetOpacity(0.018f + ambient_pulse * 0.010f);
             ctx->FillEllipse(D2D1::Ellipse(D2D1::Point2F(850.0f, 420.0f), 620.0f, 370.0f),
                              d2d_->accent_brush.Get());
-            d2d_->accent_brush->SetColor(D2D1::ColorF(0x9D62F2));
+            d2d_->accent_brush->SetColor(native_palette("palette.9d62f2", D2D1::ColorF(0x9D62F2)));
             d2d_->accent_brush->SetOpacity(0.012f + ambient_pulse * 0.008f);
             ctx->FillEllipse(D2D1::Ellipse(D2D1::Point2F(1610.0f, 830.0f), 360.0f, 220.0f),
                              d2d_->accent_brush.Get());
@@ -77,7 +86,7 @@
 
         const D2D1_RECT_F top_bar =
             skin_layout_rect(data, "song_select.top_bar",
-                             D2D1::RectF(0.0f, 0.0f, kBaseWidth, 126.0f));
+                             native_rect("songselect.rect.003", D2D1::RectF(0.0f, 0.0f, kBaseWidth, 126.0f)));
         if (d2d_->panel_brush) {
             const float saved = d2d_->panel_brush->GetOpacity();
             d2d_->panel_brush->SetOpacity(0.88f);
@@ -92,7 +101,7 @@
                 : nullptr;
         const D2D1_RECT_F logo_slot =
             skin_layout_rect(data, "song_select.logo",
-                             D2D1::RectF(48.0f, 18.0f, 388.0f, 108.0f));
+                             native_rect("songselect.rect.004", D2D1::RectF(48.0f, 18.0f, 388.0f, 108.0f)));
         if (lobby_logo_bitmap) {
             const D2D1_SIZE_F logo_size = lobby_logo_bitmap->GetSize();
             const D2D1_RECT_F logo_rect = fit_rect_preserve_aspect(logo_slot, logo_size);
@@ -101,22 +110,22 @@
         }
         if (!lobby_logo_bitmap && d2d_->song_logo_format && d2d_->text_brush) {
             const D2D1_RECT_F logo_text_rect =
-                D2D1::RectF(logo_slot.left + 2.0f, logo_slot.top - 2.0f,
-                            logo_slot.right - 4.0f, logo_slot.bottom - 10.0f);
+                native_rect("songselect.rect.005", D2D1::RectF(logo_slot.left + 2.0f, logo_slot.top - 2.0f,
+                            logo_slot.right - 4.0f, logo_slot.bottom - 10.0f));
             if (d2d_->accent_brush && !modern_library_screen) {
                 const float saved = d2d_->accent_brush->GetOpacity();
                 d2d_->accent_brush->SetOpacity(0.20f + ambient_pulse * 0.08f);
                 draw_text_clipped(L"TENRIFF", d2d_->song_logo_format.Get(),
-                                  D2D1::RectF(logo_text_rect.left + 3.0f,
+                                  native_rect("songselect.rect.006", D2D1::RectF(logo_text_rect.left + 3.0f,
                                               logo_text_rect.top + 2.0f,
                                               logo_text_rect.right + 3.0f,
-                                              logo_text_rect.bottom + 2.0f),
+                                              logo_text_rect.bottom + 2.0f)),
                                   d2d_->accent_brush.Get());
                 d2d_->accent_brush->SetOpacity(0.72f);
-                ctx->FillRectangle(D2D1::RectF(logo_slot.left + 8.0f,
+                ctx->FillRectangle(native_rect("songselect.rect.007", D2D1::RectF(logo_slot.left + 8.0f,
                                                logo_slot.bottom - 13.0f,
                                                logo_slot.left + 168.0f,
-                                               logo_slot.bottom - 10.0f),
+                                               logo_slot.bottom - 10.0f)),
                                    d2d_->accent_brush.Get());
                 d2d_->accent_brush->SetOpacity(saved);
             }
@@ -126,8 +135,8 @@
         if (!lobby_logo_bitmap && d2d_->hud_format && d2d_->muted_brush) {
             draw_text_clipped(wloc("YOUR MUSIC, YOUR PACE", "나만의 리듬으로"),
                               d2d_->hud_format.Get(),
-                              D2D1::RectF(logo_slot.left + (modern_library_screen ? 4.0f : 178.0f), logo_slot.top + 68.0f,
-                                          logo_slot.right + 2.0f, logo_slot.bottom),
+                              native_rect("songselect.rect.008", D2D1::RectF(logo_slot.left + (modern_library_screen ? 4.0f : 178.0f), logo_slot.top + 68.0f,
+                                          logo_slot.right + 2.0f, logo_slot.bottom)),
                               d2d_->muted_brush.Get());
         }
         if (d2d_->button_border_brush) {
@@ -143,7 +152,7 @@
         const std::array<int, 5> top_nav_indices = {0, 1, 4, 5, 6};
         const D2D1_RECT_F nav_bar =
             skin_layout_rect(data, "song_select.nav",
-                             D2D1::RectF(492.0f, 12.0f, modern_library_screen ? 1400.0f : 1244.0f, 126.0f));
+                             native_rect("songselect.rect.009", D2D1::RectF(492.0f, 12.0f, modern_library_screen ? 1400.0f : 1244.0f, 126.0f)));
         const float nav_left = nav_bar.left;
         const float nav_width =
             (nav_bar.right - nav_bar.left) / static_cast<float>(top_nav_indices.size());
@@ -155,7 +164,7 @@
             const auto& item = data.song_select.left_nav[static_cast<std::size_t>(source_index)];
             const float x0 = nav_left + static_cast<float>(i) * nav_width;
             const D2D1_RECT_F tab =
-                D2D1::RectF(x0, nav_bar.top, x0 + nav_width - 8.0f, nav_bar.bottom);
+                native_rect("songselect.rect.010", D2D1::RectF(x0, nav_bar.top, x0 + nav_width - 8.0f, nav_bar.bottom));
             const bool route_active =
                 (source_index == 0 && !data.song_select.showing_sources &&
                  !data.song_select.showing_records) ||
@@ -167,15 +176,15 @@
                 d2d_->accent_brush->SetOpacity(0.11f + selection_pulse * 0.05f);
                 ctx->FillRectangle(tab, d2d_->accent_brush.Get());
                 d2d_->accent_brush->SetOpacity(0.90f);
-                ctx->FillRectangle(D2D1::RectF(tab.left, tab.bottom - 4.0f, tab.right, tab.bottom),
+                ctx->FillRectangle(native_rect("songselect.rect.011", D2D1::RectF(tab.left, tab.bottom - 4.0f, tab.right, tab.bottom)),
                                    d2d_->accent_brush.Get());
                 d2d_->accent_brush->SetOpacity(saved);
             }
             if (d2d_->song_nav_format && d2d_->text_brush) {
                 draw_centered_text(to_wide(item.label),
                                    modern_library_screen ? d2d_->song_title_format.Get() : d2d_->song_nav_format.Get(),
-                                   D2D1::RectF(tab.left + 6.0f, tab.top + 39.0f,
-                                               tab.right - 8.0f, tab.bottom - 10.0f),
+                                   native_rect("songselect.rect.012", D2D1::RectF(tab.left + 6.0f, tab.top + 39.0f,
+                                               tab.right - 8.0f, tab.bottom - 10.0f)),
                                    route_active && d2d_->accent_brush
                                        ? static_cast<ID2D1Brush*>(d2d_->accent_brush.Get())
                                        : static_cast<ID2D1Brush*>(d2d_->text_brush.Get()));
@@ -184,13 +193,13 @@
 
         const D2D1_RECT_F profile_panel =
             skin_layout_rect(data, "song_select.profile",
-                             D2D1::RectF(1518.0f, 16.0f, 1880.0f, 112.0f));
+                             native_rect("songselect.rect.013", D2D1::RectF(1518.0f, 16.0f, 1880.0f, 112.0f)));
         register_hit(profile_panel, MenuHitTargetKind::SongProfilePanel, 0);
         draw_glass_panel(profile_panel, 14.0f, 0.78f, 0.24f, false, 3.0f);
         const D2D1_RECT_F avatar_rect = skin_layout_rect(
             data, "song_select.avatar",
-            D2D1::RectF(profile_panel.left + 12.0f, profile_panel.top + 10.0f,
-                        profile_panel.left + 88.0f, profile_panel.top + 86.0f));
+            native_rect("songselect.rect.014", D2D1::RectF(profile_panel.left + 12.0f, profile_panel.top + 10.0f,
+                        profile_panel.left + 88.0f, profile_panel.top + 86.0f)));
         ctx->PushAxisAlignedClip(profile_panel, D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
         ID2D1Bitmap* avatar_bitmap =
             find_song_card_preview_bitmap(data.song_select.profile_avatar_path);
@@ -216,27 +225,27 @@
                                           ? std::string("PLAYER")
                                           : data.song_select.profile),
                               d2d_->title_format.Get(),
-                              D2D1::RectF(avatar_rect.right + 18.0f, profile_panel.top + 18.0f,
-                                          profile_panel.right - 16.0f, profile_panel.top + 56.0f),
+                              native_rect("songselect.rect.015", D2D1::RectF(avatar_rect.right + 18.0f, profile_panel.top + 18.0f,
+                                          profile_panel.right - 16.0f, profile_panel.top + 56.0f)),
                               d2d_->text_brush.Get());
         }
         if (d2d_->hud_format && d2d_->muted_brush) {
             draw_text_clipped(wloc("PROFILE  /  CLICK TO EDIT", "프로필  /  클릭하여 편집"),
                               d2d_->hud_format.Get(),
-                              D2D1::RectF(avatar_rect.right + 20.0f, profile_panel.top + 58.0f,
-                                          profile_panel.right - 16.0f, profile_panel.bottom - 10.0f),
+                              native_rect("songselect.rect.016", D2D1::RectF(avatar_rect.right + 20.0f, profile_panel.top + 58.0f,
+                                          profile_panel.right - 16.0f, profile_panel.bottom - 10.0f)),
                               d2d_->muted_brush.Get());
         }
 
         const D2D1_RECT_F left_panel =
             skin_layout_rect(data, "song_select.left_panel",
-                             D2D1::RectF(38.0f, 152.0f, 720.0f, 922.0f));
+                             native_rect("songselect.rect.017", D2D1::RectF(38.0f, 152.0f, 720.0f, 922.0f)));
         const D2D1_RECT_F center_panel =
             skin_layout_rect(data, "song_select.center_panel",
-                             D2D1::RectF(744.0f, 152.0f, 1373.0f, 922.0f));
+                             native_rect("songselect.rect.018", D2D1::RectF(744.0f, 152.0f, 1373.0f, 922.0f)));
         const D2D1_RECT_F right_panel =
             skin_layout_rect(data, "song_select.right_panel",
-                             D2D1::RectF(1397.0f, 152.0f, 1882.0f, 922.0f));
+                             native_rect("songselect.rect.019", D2D1::RectF(1397.0f, 152.0f, 1882.0f, 922.0f)));
 
         draw_glass_panel(left_panel, 12.0f, 0.78f, 0.20f, false, 5.0f);
         if (d2d_->title_format && d2d_->text_brush) {
@@ -250,8 +259,8 @@
                            : wloc("SONG LIBRARY", "곡 라이브러리"));
             draw_text_clipped(library_title,
                               d2d_->title_format.Get(),
-                              D2D1::RectF(left_panel.left + 18.0f, left_panel.top + 16.0f,
-                                          left_panel.right - 130.0f, left_panel.top + 54.0f),
+                              native_rect("songselect.rect.020", D2D1::RectF(left_panel.left + 18.0f, left_panel.top + 16.0f,
+                                          left_panel.right - 130.0f, left_panel.top + 54.0f)),
                               d2d_->text_brush.Get());
         }
         if (d2d_->hud_format && d2d_->muted_brush) {
@@ -262,8 +271,8 @@
                                               : data.song_select.song_count);
             draw_trailing_text(to_wide(format_int_with_commas(item_count)),
                                d2d_->hud_format.Get(),
-                               D2D1::RectF(left_panel.right - 130.0f, left_panel.top + 24.0f,
-                                           left_panel.right - 18.0f, left_panel.top + 52.0f),
+                               native_rect("songselect.rect.021", D2D1::RectF(left_panel.right - 130.0f, left_panel.top + 24.0f,
+                                           left_panel.right - 18.0f, left_panel.top + 52.0f)),
                                d2d_->muted_brush.Get());
         }
         draw_rule(left_panel.left + 18.0f, left_panel.top + 66.0f,
@@ -275,20 +284,22 @@
                 indexing_text += " " + std::to_string(data.song_select.indexing_percent) + "%";
             }
             draw_text_clipped(to_wide(indexing_text), d2d_->hud_format.Get(),
-                              D2D1::RectF(left_panel.left + 18.0f, left_panel.top + 45.0f,
-                                          left_panel.right - 18.0f, left_panel.top + 68.0f),
+                              native_rect("songselect.rect.022", D2D1::RectF(left_panel.left + 18.0f, left_panel.top + 45.0f,
+                                          left_panel.right - 18.0f, left_panel.top + 68.0f)),
                               d2d_->accent_brush.Get());
         }
 
         const float card_left = left_panel.left + 12.0f;
         const float card_right = left_panel.right - 18.0f;
         const float card_top = left_panel.top + 76.0f;
-        const float card_height = 86.0f;
-        const float card_gap = 8.0f;
+        const float card_height = native_metric("songselect.card_height", 86.0f);
+        const float card_gap = native_metric("songselect.card_gap", 8.0f);
         for (std::size_t i = 0; i < data.song_select.songs.size(); ++i) {
             const auto& song = data.song_select.songs[i];
             const float y0 = card_top + static_cast<float>(i) * (card_height + card_gap);
-            const D2D1_RECT_F card = D2D1::RectF(card_left, y0, card_right, y0 + card_height);
+            const float entry_x = native_motion_screen ? -14.0f * (1.0f - native_menu_motion_.entrance(
+                static_cast<float>(i) * 0.025f)) : 0.0f;
+            const D2D1_RECT_F card = native_rect("songselect.rect.023", D2D1::RectF(card_left + entry_x, y0, card_right + entry_x, y0 + card_height));
             if (card.bottom > left_panel.bottom - 12.0f) {
                 break;
             }
@@ -305,16 +316,17 @@
                 const float saved = d2d_->accent_brush->GetOpacity();
                 d2d_->accent_brush->SetOpacity(0.94f);
                 ctx->FillRoundedRectangle(
-                    D2D1::RoundedRect(D2D1::RectF(card.left, card.top + 9.0f,
-                                                  card.left + 4.0f, card.bottom - 9.0f),
+                    D2D1::RoundedRect(native_rect("songselect.rect.024", D2D1::RectF(card.left, card.top + 9.0f,
+                                                  card.left + 4.0f, card.bottom - 9.0f)),
                                       2.0f, 2.0f),
                     d2d_->accent_brush.Get());
                 d2d_->accent_brush->SetOpacity(saved);
             }
+            draw_native_focus(card, 9, 16 + i, song.song_index, song.selected);
 
             const D2D1_RECT_F jacket =
-                D2D1::RectF(card.left + 10.0f, card.top + 9.0f,
-                            card.left + 80.0f, card.bottom - 9.0f);
+                native_rect("songselect.rect.025", D2D1::RectF(card.left + 10.0f, card.top + 9.0f,
+                            card.left + 80.0f, card.bottom - 9.0f));
             ID2D1Bitmap* jacket_bitmap = find_song_card_preview_bitmap(song.background_path);
             if (jacket_bitmap) {
                 const D2D1_RECT_F source =
@@ -331,6 +343,7 @@
                                           d2d_->card_brush.Get());
                 d2d_->card_brush->SetColor(saved_color);
                 d2d_->card_brush->SetOpacity(saved_opacity);
+                draw_native_asset(native_menu_assets::kWave, jacket, song.selected ? 0.85f : 0.35f);
             }
 
             const float text_left = jacket.right + 12.0f;
@@ -338,18 +351,18 @@
             if (d2d_->body_format && d2d_->text_brush) {
                 draw_text_clipped(to_wide(song.title.empty() ? std::string("-") : song.title),
                                   d2d_->body_format.Get(),
-                                  D2D1::RectF(text_left, card.top + 10.0f,
-                                              value_left - 8.0f, card.top + 38.0f),
+                                  native_rect("songselect.rect.026", D2D1::RectF(text_left, card.top + 10.0f,
+                                              value_left - 8.0f, card.top + 38.0f)),
                                   d2d_->text_brush.Get());
             }
             if (d2d_->hud_format && d2d_->muted_brush) {
                 draw_text_clipped(to_wide(song.artist), d2d_->hud_format.Get(),
-                                  D2D1::RectF(text_left, card.top + 38.0f,
-                                              value_left - 8.0f, card.top + 61.0f),
+                                  native_rect("songselect.rect.027", D2D1::RectF(text_left, card.top + 38.0f,
+                                              value_left - 8.0f, card.top + 61.0f)),
                                   d2d_->muted_brush.Get());
                 draw_text_clipped(to_wide(song.detail), d2d_->hud_format.Get(),
-                                  D2D1::RectF(text_left, card.top + 60.0f,
-                                              value_left - 8.0f, card.bottom - 5.0f),
+                                  native_rect("songselect.rect.028", D2D1::RectF(text_left, card.top + 60.0f,
+                                              value_left - 8.0f, card.bottom - 5.0f)),
                                   song.selected && d2d_->accent_brush
                                       ? static_cast<ID2D1Brush*>(d2d_->accent_brush.Get())
                                       : static_cast<ID2D1Brush*>(d2d_->muted_brush.Get()));
@@ -359,21 +372,21 @@
                                         ? song.level_label
                                         : (song.level > 0 ? std::to_string(song.level) : "");
                 draw_trailing_text(to_wide(level), d2d_->title_format.Get(),
-                                   D2D1::RectF(value_left, card.top + 13.0f,
-                                               card.right - 12.0f, card.top + 48.0f),
+                                   native_rect("songselect.rect.029", D2D1::RectF(value_left, card.top + 13.0f,
+                                               card.right - 12.0f, card.top + 48.0f)),
                                    song.selected && d2d_->accent_brush
                                        ? static_cast<ID2D1Brush*>(d2d_->accent_brush.Get())
                                        : static_cast<ID2D1Brush*>(d2d_->text_brush.Get()));
             }
             if (song.favorite && d2d_->hud_format && d2d_->accent_brush) {
                 draw_trailing_text(L"FAV", d2d_->hud_format.Get(),
-                                   D2D1::RectF(value_left, card.top + 54.0f,
-                                               card.right - 12.0f, card.bottom - 8.0f),
+                                   native_rect("songselect.rect.030", D2D1::RectF(value_left, card.top + 54.0f,
+                                               card.right - 12.0f, card.bottom - 8.0f)),
                                    d2d_->accent_brush.Get());
             } else if (!song.lamp.empty() && d2d_->hud_format && d2d_->muted_brush) {
                 draw_trailing_text(to_wide(song.lamp), d2d_->hud_format.Get(),
-                                   D2D1::RectF(value_left, card.top + 54.0f,
-                                               card.right - 12.0f, card.bottom - 8.0f),
+                                   native_rect("songselect.rect.031", D2D1::RectF(value_left, card.top + 54.0f,
+                                               card.right - 12.0f, card.bottom - 8.0f)),
                                    d2d_->muted_brush.Get());
             }
         }
@@ -382,8 +395,8 @@
             if (d2d_->title_format && d2d_->text_brush) {
                 draw_centered_text(to_wide(data.song_select.empty_title),
                                    d2d_->title_format.Get(),
-                                   D2D1::RectF(left_panel.left + 34.0f, left_panel.top + 260.0f,
-                                               left_panel.right - 34.0f, left_panel.top + 310.0f),
+                                   native_rect("songselect.rect.032", D2D1::RectF(left_panel.left + 34.0f, left_panel.top + 260.0f,
+                                               left_panel.right - 34.0f, left_panel.top + 310.0f)),
                                    d2d_->text_brush.Get());
             }
             if (d2d_->body_format && d2d_->muted_brush) {
@@ -391,8 +404,8 @@
                 if (modern_library_screen) d2d_->body_format->SetWordWrapping(DWRITE_WORD_WRAPPING_WRAP);
                 draw_centered_text(to_wide(data.song_select.empty_message),
                                    d2d_->body_format.Get(),
-                                   D2D1::RectF(left_panel.left + 34.0f, left_panel.top + 320.0f,
-                                               left_panel.right - 34.0f, left_panel.top + 430.0f),
+                                   native_rect("songselect.rect.033", D2D1::RectF(left_panel.left + 34.0f, left_panel.top + 320.0f,
+                                               left_panel.right - 34.0f, left_panel.top + 430.0f)),
                                    d2d_->muted_brush.Get(), true);
                 d2d_->body_format->SetWordWrapping(saved_wrapping);
             }
@@ -401,8 +414,8 @@
         if (data.song_select.list_total_count > data.song_select.list_visible_count &&
             data.song_select.list_visible_count > 0 && d2d_->text_brush) {
             const D2D1_RECT_F track =
-                D2D1::RectF(left_panel.right - 10.0f, card_top,
-                            left_panel.right - 6.0f, left_panel.bottom - 14.0f);
+                native_rect("songselect.rect.034", D2D1::RectF(left_panel.right - 10.0f, card_top,
+                            left_panel.right - 6.0f, left_panel.bottom - 14.0f));
             const float track_height = track.bottom - track.top;
             const float visible_ratio = std::clamp(
                 static_cast<float>(data.song_select.list_visible_count) /
@@ -416,10 +429,10 @@
             const float thumb_top =
                 track.top + (track_height - thumb_height) * start_ratio;
             const D2D1_RECT_F thumb =
-                D2D1::RectF(track.left, thumb_top, track.right, thumb_top + thumb_height);
+                native_rect("songselect.rect.035", D2D1::RectF(track.left, thumb_top, track.right, thumb_top + thumb_height));
             const D2D1_COLOR_F saved_color = d2d_->text_brush->GetColor();
             const float saved_opacity = d2d_->text_brush->GetOpacity();
-            d2d_->text_brush->SetColor(D2D1::ColorF(0xF4F1FF));
+            d2d_->text_brush->SetColor(native_palette("palette.f4f1ff", D2D1::ColorF(0xF4F1FF)));
             d2d_->text_brush->SetOpacity(0.24f);
             ctx->FillRoundedRectangle(D2D1::RoundedRect(track, 2.0f, 2.0f),
                                       d2d_->text_brush.Get());
@@ -444,14 +457,14 @@
             clear_song_scrollbar_state();
         }
 
-        const float center_section_gap = 18.0f;
-        const float center_action_height = 80.0f;
+        const float center_section_gap = native_metric("songselect.center_section_gap", 18.0f);
+        const float center_action_height = native_metric("songselect.center_action_height", 80.0f);
         const float center_paired_height =
             std::max(1.0f, (center_panel.bottom - center_panel.top - center_action_height -
                             center_section_gap * 2.0f) * 0.5f);
         const D2D1_RECT_F showcase =
-            D2D1::RectF(center_panel.left, center_panel.top,
-                        center_panel.right, center_panel.top + center_paired_height);
+            native_rect("songselect.rect.036", D2D1::RectF(center_panel.left, center_panel.top,
+                        center_panel.right, center_panel.top + center_paired_height));
         draw_glass_panel(showcase, 12.0f, 0.86f, 0.30f, true, 5.0f);
         const bool has_selected_song =
             !data.song_select.showing_sources && !data.song_select.showing_records &&
@@ -461,11 +474,17 @@
             ensure_song_select_preview_bitmap(data.song_select) &&
             d2d_->song_select_preview_bitmap;
         const D2D1_RECT_F preview =
-            D2D1::RectF(showcase.left + 8.0f, showcase.top + 8.0f,
-                        showcase.right - 8.0f, showcase.bottom - 8.0f);
+            native_rect("songselect.rect.037", D2D1::RectF(showcase.left + 8.0f, showcase.top + 8.0f,
+                        showcase.right - 8.0f, showcase.bottom - 8.0f));
         if (has_selected_preview_art) {
-            const D2D1_RECT_F source =
+            D2D1_RECT_F source =
                 centered_bitmap_source_rect(d2d_->song_select_preview_bitmap->GetSize(), preview);
+            if (native_motion_screen) {
+                const float inset = (1.0f - jacket_reveal) * 0.035f;
+                const float dx = (source.right - source.left) * inset;
+                const float dy = (source.bottom - source.top) * inset;
+                source = native_rect("songselect.rect.038", D2D1::RectF(source.left + dx, source.top + dy, source.right - dx, source.bottom - dy));
+            }
             // Round the jacket to match the glass frame around it; a square bitmap
             // inside a rounded panel leaves the corners sticking out.
             Microsoft::WRL::ComPtr<ID2D1RoundedRectangleGeometry> preview_clip;
@@ -477,7 +496,7 @@
             if (preview_clip) {
                 ctx->PushLayer(D2D1::LayerParameters(preview, preview_clip.Get()), nullptr);
             }
-            ctx->DrawBitmap(d2d_->song_select_preview_bitmap.Get(), preview, 0.98f,
+            ctx->DrawBitmap(d2d_->song_select_preview_bitmap.Get(), preview, 0.98f * (0.4f + 0.6f * jacket_reveal),
                             D2D1_BITMAP_INTERPOLATION_MODE_LINEAR, &source);
             if (preview_clip) {
                 ctx->PopLayer();
@@ -492,12 +511,22 @@
                                       d2d_->card_brush.Get());
             d2d_->card_brush->SetColor(saved_color);
             d2d_->card_brush->SetOpacity(saved_opacity);
+            if (native_motion_screen) {
+                const float cx = (preview.left + preview.right) * 0.5f;
+                const float cy = (preview.top + preview.bottom) * 0.5f;
+                draw_native_orbit(cx, cy, 95, 0.7f * jacket_reveal);
+                draw_native_asset(native_menu_assets::kPrism,
+                    native_rect("songselect.rect.039", D2D1::RectF(cx - 76, cy - 92, cx + 76, cy + 92)), 0.9f * jacket_reveal,
+                    static_cast<float>(std::sin(native_seconds * 0.4) * 6));
+                draw_native_spectrum(native_rect("songselect.rect.040", D2D1::RectF(preview.left + 28, preview.bottom - 46,
+                                               preview.right - 28, preview.bottom - 20)), 0.5f);
+            }
         }
 
         if (has_selected_song) {
             const D2D1_RECT_F chip =
-                D2D1::RectF(preview.left + 14.0f, preview.top + 14.0f,
-                            preview.left + 154.0f, preview.top + 48.0f);
+                native_rect("songselect.rect.041", D2D1::RectF(preview.left + 14.0f, preview.top + 14.0f,
+                            preview.left + 154.0f, preview.top + 48.0f));
             draw_glass_panel(chip, 7.0f, 0.88f, 0.42f, true, 1.0f);
             if (d2d_->hud_format && d2d_->accent_brush) {
                 draw_centered_text(wloc("SELECTED", "선택됨"), d2d_->hud_format.Get(),
@@ -517,22 +546,22 @@
                     : data.song_select.selected_record_status;
             if (d2d_->rank_format && d2d_->accent_brush) {
                 draw_centered_text(to_wide(headline), d2d_->rank_format.Get(),
-                                   D2D1::RectF(showcase.left + 40.0f, showcase.top + 54.0f,
-                                               showcase.right - 40.0f, showcase.top + 216.0f),
+                                   native_rect("songselect.rect.042", D2D1::RectF(showcase.left + 40.0f, showcase.top + 54.0f,
+                                               showcase.right - 40.0f, showcase.top + 216.0f)),
                                    d2d_->accent_brush.Get());
             }
             if (d2d_->body_format && d2d_->muted_brush) {
                 draw_centered_text(to_wide(subline), d2d_->body_format.Get(),
-                                   D2D1::RectF(showcase.left + 52.0f, showcase.top + 224.0f,
-                                               showcase.right - 52.0f, showcase.bottom - 22.0f),
+                                   native_rect("songselect.rect.043", D2D1::RectF(showcase.left + 52.0f, showcase.top + 224.0f,
+                                               showcase.right - 52.0f, showcase.bottom - 22.0f)),
                                    d2d_->muted_brush.Get());
             }
         }
 
         const D2D1_RECT_F best_panel =
-            D2D1::RectF(center_panel.left, showcase.bottom + center_section_gap,
+            native_rect("songselect.rect.044", D2D1::RectF(center_panel.left, showcase.bottom + center_section_gap,
                         center_panel.right,
-                        showcase.bottom + center_section_gap + center_paired_height);
+                        showcase.bottom + center_section_gap + center_paired_height));
         draw_glass_panel(best_panel, 12.0f, 0.82f,
                          data.song_select.result_available ? 0.44f : 0.12f,
                          data.song_select.result_available, 4.0f);
@@ -544,22 +573,22 @@
                                   ? wloc("SELECTED PLAY", "선택한 플레이")
                                   : wloc("MY BEST", "내 최고 기록"),
                               d2d_->song_record_label_format.Get(),
-                              D2D1::RectF(best_panel.left + 22.0f, best_panel.top + 16.0f,
-                                          best_panel.right - 22.0f, best_panel.top + 46.0f),
+                              native_rect("songselect.rect.045", D2D1::RectF(best_panel.left + 22.0f, best_panel.top + 16.0f,
+                                          best_panel.right - 22.0f, best_panel.top + 46.0f)),
                               d2d_->muted_brush.Get());
         }
         if (d2d_->header_format && d2d_->accent_brush) {
             draw_centered_text(to_wide(data.song_select.rank.empty() ? "--" : data.song_select.rank),
                                d2d_->header_format.Get(),
-                               D2D1::RectF(best_panel.left + 24.0f, best_panel.top + 48.0f,
-                                           best_panel.right - 24.0f, best_panel.top + 122.0f),
+                               native_rect("songselect.rect.046", D2D1::RectF(best_panel.left + 24.0f, best_panel.top + 48.0f,
+                                           best_panel.right - 24.0f, best_panel.top + 122.0f)),
                                d2d_->accent_brush.Get());
         }
         draw_rule(best_panel.left + 22.0f, best_panel.top + 136.0f,
                   best_panel.right - 22.0f, 0.28f);
         const float best_columns_left = best_panel.left + 22.0f;
         const float best_columns_right = best_panel.right - 22.0f;
-        const float best_column_gap = 18.0f;
+        const float best_column_gap = native_metric("songselect.best_column_gap", 18.0f);
         const float best_column_width =
             (best_columns_right - best_columns_left - best_column_gap * 2.0f) / 3.0f;
         const std::array<std::array<std::string, 3>, 3> best_columns = {{
@@ -607,39 +636,39 @@
             if (d2d_->song_record_label_format && d2d_->muted_brush) {
                 draw_centered_text(to_wide(best_columns[i][0]),
                                    d2d_->song_record_label_format.Get(),
-                                   D2D1::RectF(column_left, best_panel.top + 152.0f,
-                                               column_right, best_panel.top + 184.0f),
+                                   native_rect("songselect.rect.047", D2D1::RectF(column_left, best_panel.top + 152.0f,
+                                               column_right, best_panel.top + 184.0f)),
                                    d2d_->muted_brush.Get());
             }
             if (d2d_->song_record_value_format && d2d_->text_brush) {
                 draw_centered_text(to_wide(best_columns[i][1]),
                                    d2d_->song_record_value_format.Get(),
-                                   D2D1::RectF(column_left, best_panel.top + 188.0f,
-                                               column_right, best_panel.top + 228.0f),
+                                   native_rect("songselect.rect.048", D2D1::RectF(column_left, best_panel.top + 188.0f,
+                                               column_right, best_panel.top + 228.0f)),
                                    d2d_->text_brush.Get());
             }
             if (!best_columns[i][2].empty() && d2d_->song_record_detail_format &&
                 d2d_->muted_brush) {
                 draw_centered_text(to_wide(best_columns[i][2]),
                                    d2d_->song_record_detail_format.Get(),
-                                   D2D1::RectF(column_left, best_panel.top + 234.0f,
-                                               column_right, best_panel.bottom - 22.0f),
+                                   native_rect("songselect.rect.049", D2D1::RectF(column_left, best_panel.top + 234.0f,
+                                               column_right, best_panel.bottom - 22.0f)),
                                    d2d_->muted_brush.Get());
             }
         }
 
         const D2D1_RECT_F action_strip =
-            D2D1::RectF(center_panel.left, best_panel.bottom + center_section_gap,
-                        center_panel.right, center_panel.bottom);
+            native_rect("songselect.rect.050", D2D1::RectF(center_panel.left, best_panel.bottom + center_section_gap,
+                        center_panel.right, center_panel.bottom));
         const D2D1_RECT_F search_button =
-            D2D1::RectF(action_strip.left, action_strip.top,
-                        action_strip.left + (action_strip.right - action_strip.left) * 0.25f, action_strip.bottom);
+            native_rect("songselect.rect.051", D2D1::RectF(action_strip.left, action_strip.top,
+                        action_strip.left + (action_strip.right - action_strip.left) * 0.25f, action_strip.bottom));
         const D2D1_RECT_F filter_button =
-            D2D1::RectF(search_button.right + 12.0f, action_strip.top,
-                        search_button.right + (action_strip.right - action_strip.left) * 0.25f + 12.0f, action_strip.bottom);
+            native_rect("songselect.rect.052", D2D1::RectF(search_button.right + 12.0f, action_strip.top,
+                        search_button.right + (action_strip.right - action_strip.left) * 0.25f + 12.0f, action_strip.bottom));
         const D2D1_RECT_F table_button =
-            D2D1::RectF(filter_button.right + 12.0f, action_strip.top,
-                        action_strip.right, action_strip.bottom);
+            native_rect("songselect.rect.053", D2D1::RectF(filter_button.right + 12.0f, action_strip.top,
+                        action_strip.right, action_strip.bottom));
         register_hit(search_button, MenuHitTargetKind::SongNavButton, 2);
         register_hit(filter_button, MenuHitTargetKind::SongNavButton, 3);
         draw_glass_panel(search_button, 10.0f, 0.76f, 0.40f, true, 2.0f);
@@ -664,18 +693,18 @@
                                filter_button, d2d_->text_brush.Get(), true);
         }
         const float table_actions_left = table_button.right - 84.0f;
-        const D2D1_RECT_F table_link = D2D1::RectF(table_button.left, table_button.top, table_actions_left - 8.0f, table_button.bottom);
-        const D2D1_RECT_F table_file = D2D1::RectF(table_actions_left, table_button.top + 7.0f, table_button.right - 8.0f, table_button.top + 38.0f);
-        const D2D1_RECT_F table_clear = D2D1::RectF(table_actions_left, table_button.top + 44.0f, table_button.right - 8.0f, table_button.bottom - 7.0f);
+        const D2D1_RECT_F table_link = native_rect("songselect.rect.054", D2D1::RectF(table_button.left, table_button.top, table_actions_left - 8.0f, table_button.bottom));
+        const D2D1_RECT_F table_file = native_rect("songselect.rect.055", D2D1::RectF(table_actions_left, table_button.top + 7.0f, table_button.right - 8.0f, table_button.top + 38.0f));
+        const D2D1_RECT_F table_clear = native_rect("songselect.rect.056", D2D1::RectF(table_actions_left, table_button.top + 44.0f, table_button.right - 8.0f, table_button.bottom - 7.0f));
         register_hit(table_link, MenuHitTargetKind::SongDifficultyTable, static_cast<int>(SongDifficultyTableAction::EditUrl));
         register_hit(table_file, MenuHitTargetKind::SongDifficultyTable, static_cast<int>(SongDifficultyTableAction::LocalFile));
         if (data.song_select.difficulty_table_active) register_hit(table_clear, MenuHitTargetKind::SongDifficultyTable, static_cast<int>(SongDifficultyTableAction::Reset));
         draw_text_clipped(wloc("TABLE / SELECT", "난이도표 / 선택"), d2d_->hud_format.Get(),
-            D2D1::RectF(table_link.left + 14, table_link.top + 12, table_link.right - 8, table_link.top + 34), d2d_->muted_brush.Get());
+            native_rect("songselect.rect.057", D2D1::RectF(table_link.left + 14, table_link.top + 12, table_link.right - 8, table_link.top + 34)), d2d_->muted_brush.Get());
         std::wstring table_name = to_wide(data.song_select.difficulty_table_name);
         if (table_name.size() > 26) table_name = table_name.substr(0, 25) + L"…";
         draw_text_clipped(table_name, d2d_->body_format.Get(),
-            D2D1::RectF(table_link.left + 14, table_link.top + 40, table_link.right - 8, table_link.bottom - 10), d2d_->accent_brush.Get());
+            native_rect("songselect.rect.058", D2D1::RectF(table_link.left + 14, table_link.top + 40, table_link.right - 8, table_link.bottom - 10)), d2d_->accent_brush.Get());
         draw_glass_panel(table_file, 7, 0.88f, 0, false, 0);
         draw_glass_panel(table_clear, 7, 0.70f, 0, false, 0);
         draw_centered_text(wloc("FILE", "파일"), d2d_->hud_format.Get(), table_file, d2d_->text_brush.Get(), true);
@@ -691,8 +720,8 @@
                     : data.song_select.selected_song_title;
             draw_text_clipped(to_wide(title.empty() ? "-" : title),
                               d2d_->song_title_format.Get(),
-                              D2D1::RectF(right_left, right_panel.top + 24.0f,
-                                          right_right, right_panel.top + 76.0f),
+                              native_rect("songselect.rect.059", D2D1::RectF(right_left, right_panel.top + 24.0f,
+                                          right_right, right_panel.top + 76.0f)),
                               d2d_->text_brush.Get());
         }
         if (d2d_->song_artist_format && d2d_->accent_brush) {
@@ -703,16 +732,16 @@
                            ? data.song_select.selected_record_created_utc
                            : data.song_select.selected_song_artist);
             draw_text_clipped(to_wide(subtitle), d2d_->song_artist_format.Get(),
-                              D2D1::RectF(right_left, right_panel.top + 78.0f,
-                                          right_right, right_panel.top + 112.0f),
+                              native_rect("songselect.rect.060", D2D1::RectF(right_left, right_panel.top + 78.0f,
+                                          right_right, right_panel.top + 112.0f)),
                               d2d_->accent_brush.Get());
         }
         draw_rule(right_left, right_panel.top + 132.0f, right_right, 0.36f);
 
         if (!data.song_select.showing_sources && !data.song_select.showing_records) {
             const D2D1_RECT_F difficulty_card =
-                D2D1::RectF(right_left, right_panel.top + 150.0f,
-                            right_right, right_panel.top + 332.0f);
+                native_rect("songselect.rect.061", D2D1::RectF(right_left, right_panel.top + 150.0f,
+                            right_right, right_panel.top + 332.0f));
             draw_glass_panel(difficulty_card, 12.0f, 0.84f, 0.54f, true, 4.0f);
             const float difficulty_split =
                 difficulty_card.left + (difficulty_card.right - difficulty_card.left) * 0.44f;
@@ -727,17 +756,17 @@
             if (d2d_->hud_format && d2d_->muted_brush) {
                 draw_text_clipped(L"KEYS / LEVEL",
                                   d2d_->hud_format.Get(),
-                                  D2D1::RectF(difficulty_card.left + 18.0f,
+                                  native_rect("songselect.rect.062", D2D1::RectF(difficulty_card.left + 18.0f,
                                               difficulty_card.top + 14.0f,
                                               difficulty_split - 12.0f,
-                                              difficulty_card.top + 40.0f),
+                                              difficulty_card.top + 40.0f)),
                                   d2d_->muted_brush.Get());
                 draw_text_clipped(L"LAYOUT",
                                   d2d_->hud_format.Get(),
-                                  D2D1::RectF(difficulty_split + 16.0f,
+                                  native_rect("songselect.rect.063", D2D1::RectF(difficulty_split + 16.0f,
                                               difficulty_card.top + 14.0f,
                                               difficulty_card.right - 14.0f,
-                                              difficulty_card.top + 40.0f),
+                                              difficulty_card.top + 40.0f)),
                                   d2d_->muted_brush.Get());
             }
             if (d2d_->header_format && d2d_->accent_brush) {
@@ -747,10 +776,10 @@
                         : "--";
                 draw_centered_text(to_wide(key_label),
                                    d2d_->header_format.Get(),
-                                   D2D1::RectF(difficulty_card.left + 18.0f,
+                                   native_rect("songselect.rect.064", D2D1::RectF(difficulty_card.left + 18.0f,
                                                difficulty_card.top + 38.0f,
                                                difficulty_split - 12.0f,
-                                               difficulty_card.top + 112.0f),
+                                               difficulty_card.top + 112.0f)),
                                    d2d_->accent_brush.Get());
             }
             if (d2d_->title_format && d2d_->text_brush) {
@@ -759,17 +788,17 @@
                                 ? std::string("--")
                                 : data.song_select.selected_song_difficulty),
                     d2d_->title_format.Get(),
-                    D2D1::RectF(difficulty_card.left + 14.0f,
+                    native_rect("songselect.rect.065", D2D1::RectF(difficulty_card.left + 14.0f,
                                 difficulty_card.top + 112.0f,
                                 difficulty_split - 10.0f,
-                                difficulty_card.bottom - 14.0f),
+                                difficulty_card.bottom - 14.0f)),
                     d2d_->text_brush.Get());
                 draw_centered_text(to_wide(data.song_select.selected_song_layout),
                                    d2d_->title_format.Get(),
-                                   D2D1::RectF(difficulty_split + 12.0f,
+                                   native_rect("songselect.rect.066", D2D1::RectF(difficulty_split + 12.0f,
                                                difficulty_card.top + 48.0f,
                                                difficulty_card.right - 12.0f,
-                                               difficulty_card.top + 112.0f),
+                                               difficulty_card.top + 112.0f)),
                                    d2d_->accent_brush
                                        ? static_cast<ID2D1Brush*>(d2d_->accent_brush.Get())
                                        : static_cast<ID2D1Brush*>(d2d_->text_brush.Get()));
@@ -778,16 +807,16 @@
                                 ? std::string("--")
                                 : data.song_select.selected_song_chart_name),
                     d2d_->body_format.Get(),
-                    D2D1::RectF(difficulty_split + 12.0f,
+                    native_rect("songselect.rect.067", D2D1::RectF(difficulty_split + 12.0f,
                                 difficulty_card.top + 118.0f,
                                 difficulty_card.right - 12.0f,
-                                difficulty_card.bottom - 14.0f),
+                                difficulty_card.bottom - 14.0f)),
                                    d2d_->text_brush.Get());
             }
 
             const float metadata_top = right_panel.top + 352.0f;
             const D2D1_RECT_F metadata_panel =
-                D2D1::RectF(right_left, metadata_top, right_right, metadata_top + 78.0f);
+                native_rect("songselect.rect.068", D2D1::RectF(right_left, metadata_top, right_right, metadata_top + 78.0f));
             draw_glass_panel(metadata_panel, 9.0f, 0.62f, 0.12f, false, 1.0f);
             const float metadata_width = (right_right - right_left) / 4.0f;
             if (d2d_->button_border_brush) {
@@ -801,37 +830,37 @@
                 }
                 d2d_->button_border_brush->SetOpacity(saved);
             }
-            draw_meta_pair(D2D1::RectF(right_left + 12.0f, metadata_top + 6.0f,
-                                       right_left + metadata_width - 10.0f, metadata_top + 72.0f),
+            draw_meta_pair(native_rect("songselect.rect.069", D2D1::RectF(right_left + 12.0f, metadata_top + 6.0f,
+                                       right_left + metadata_width - 10.0f, metadata_top + 72.0f)),
                            "BPM",
                            data.song_select.selected_song_bpm > 0.0
                                ? format_decimal(data.song_select.selected_song_bpm, 1) : "--");
-            draw_meta_pair(D2D1::RectF(right_left + metadata_width + 12.0f, metadata_top + 6.0f,
+            draw_meta_pair(native_rect("songselect.rect.070", D2D1::RectF(right_left + metadata_width + 12.0f, metadata_top + 6.0f,
                                        right_left + metadata_width * 2.0f - 10.0f,
-                                       metadata_top + 72.0f),
+                                       metadata_top + 72.0f)),
                            loc("LEVEL", "레벨"),
                            data.song_select.selected_song_difficulty.empty()
                                ? "--" : data.song_select.selected_song_difficulty, true);
-            draw_meta_pair(D2D1::RectF(right_left + metadata_width * 2.0f + 12.0f,
+            draw_meta_pair(native_rect("songselect.rect.071", D2D1::RectF(right_left + metadata_width * 2.0f + 12.0f,
                                        metadata_top + 6.0f,
                                        right_left + metadata_width * 3.0f - 10.0f,
-                                       metadata_top + 72.0f),
+                                       metadata_top + 72.0f)),
                            loc("NOTES", "노트 수"),
                            data.song_select.selected_song_note_count > 0
                                ? format_int_with_commas(data.song_select.selected_song_note_count)
                                : "--");
-            draw_meta_pair(D2D1::RectF(right_left + metadata_width * 3.0f + 12.0f,
+            draw_meta_pair(native_rect("songselect.rect.072", D2D1::RectF(right_left + metadata_width * 3.0f + 12.0f,
                                        metadata_top + 6.0f,
-                                       right_right - 10.0f, metadata_top + 72.0f),
+                                       right_right - 10.0f, metadata_top + 72.0f)),
                            "NPS MED",
                            data.song_select.selected_song_nps_median > 0.0
                                ? format_decimal(data.song_select.selected_song_nps_median, 1)
                                : "--");
 
             const D2D1_RECT_F mode_area =
-                D2D1::RectF(right_left, right_panel.top + 460.0f,
-                            right_right, right_panel.top + 608.0f);
-            const float mode_gap = 10.0f;
+                native_rect("songselect.rect.073", D2D1::RectF(right_left, right_panel.top + 460.0f,
+                            right_right, right_panel.top + 608.0f));
+            const float mode_gap = native_metric("songselect.mode_gap", 10.0f);
             const float mode_width = (mode_area.right - mode_area.left - mode_gap) * 0.5f;
             const float mode_height = (mode_area.bottom - mode_area.top - mode_gap) * 0.5f;
             const std::array<std::pair<std::string, std::string>, 4> mode_values = {{
@@ -844,10 +873,10 @@
                 const float col = static_cast<float>(i % 2);
                 const float row = static_cast<float>(i / 2);
                 const D2D1_RECT_F cell =
-                    D2D1::RectF(mode_area.left + col * (mode_width + mode_gap),
+                    native_rect("songselect.rect.074", D2D1::RectF(mode_area.left + col * (mode_width + mode_gap),
                                 mode_area.top + row * (mode_height + mode_gap),
                                 mode_area.left + col * (mode_width + mode_gap) + mode_width,
-                                mode_area.top + row * (mode_height + mode_gap) + mode_height);
+                                mode_area.top + row * (mode_height + mode_gap) + mode_height));
                 register_hit(cell, MenuHitTargetKind::SongQuickSetting,
                              static_cast<int>(i), MenuHitPart::Increment);
                 const bool keyboard_selected =
@@ -856,6 +885,7 @@
                 // These cells take clicks, so they carry the accent border the
                 // read-only readouts around them do not.
                 draw_glass_panel(cell, 9.0f, 0.70f, 0.40f, true, 2.0f);
+                draw_native_focus(cell, 9, 40 + i, static_cast<int>(i), keyboard_selected);
                 if (keyboard_selected && d2d_->accent_brush) {
                     ctx->DrawRoundedRectangle(
                         D2D1::RoundedRect(cell, 9.0f, 9.0f),
@@ -865,25 +895,25 @@
                 if (d2d_->stats_value_format && d2d_->muted_brush) {
                     draw_text_clipped(to_wide(mode_values[i].first),
                                       d2d_->stats_value_format.Get(),
-                                      D2D1::RectF(cell.left + 12.0f, cell.top + 5.0f,
-                                                  cell.right - 12.0f, cell.top + 29.0f),
+                                      native_rect("songselect.rect.075", D2D1::RectF(cell.left + 12.0f, cell.top + 5.0f,
+                                                  cell.right - 12.0f, cell.top + 29.0f)),
                                       d2d_->muted_brush.Get());
                 }
                 if (d2d_->song_title_format && d2d_->text_brush) {
                     const D2D1_RECT_F value_rect =
-                        D2D1::RectF(cell.left + 12.0f, cell.top + 26.0f,
-                                    cell.right - 12.0f, cell.bottom - 4.0f);
+                        native_rect("songselect.rect.076", D2D1::RectF(cell.left + 12.0f, cell.top + 26.0f,
+                                    cell.right - 12.0f, cell.bottom - 4.0f));
                     if (i == 2u) {
                         const D2D1_COLOR_F saved_color = d2d_->text_brush->GetColor();
                         const float saved_opacity = d2d_->text_brush->GetOpacity();
-                        d2d_->text_brush->SetColor(D2D1::ColorF(0x05070A));
+                        d2d_->text_brush->SetColor(native_palette("palette.05070a", D2D1::ColorF(0x05070A)));
                         d2d_->text_brush->SetOpacity(0.88f);
                         draw_trailing_text(to_wide(mode_values[i].second),
                                            d2d_->song_title_format.Get(),
-                                           D2D1::RectF(value_rect.left + 2.0f,
+                                           native_rect("songselect.rect.077", D2D1::RectF(value_rect.left + 2.0f,
                                                        value_rect.top + 2.0f,
                                                        value_rect.right + 2.0f,
-                                                       value_rect.bottom + 2.0f),
+                                                       value_rect.bottom + 2.0f)),
                                            d2d_->text_brush.Get());
                         d2d_->text_brush->SetColor(D2D1::ColorF(
                             song_select_gauge_text_color(
@@ -913,15 +943,15 @@
                     status += "  /  GHOST " + data.song_select.selected_song_ghost_status;
                 }
                 draw_text_clipped(to_wide(status), d2d_->hud_format.Get(),
-                                  D2D1::RectF(right_left, right_panel.top + 626.0f,
-                                              right_right, right_panel.top + 654.0f),
+                                  native_rect("songselect.rect.078", D2D1::RectF(right_left, right_panel.top + 626.0f,
+                                              right_right, right_panel.top + 654.0f)),
                                   d2d_->muted_brush.Get());
             }
         } else if (data.song_select.showing_sources) {
-            const D2D1_RECT_F add_folder = D2D1::RectF(right_left, right_panel.top + 432.0f,
-                                                     right_right, right_panel.top + 492.0f);
-            const D2D1_RECT_F remove_folder = D2D1::RectF(right_left, right_panel.top + 508.0f,
-                                                        right_right, right_panel.top + 568.0f);
+            const D2D1_RECT_F add_folder = native_rect("songselect.rect.079", D2D1::RectF(right_left, right_panel.top + 432.0f,
+                                                     right_right, right_panel.top + 492.0f));
+            const D2D1_RECT_F remove_folder = native_rect("songselect.rect.080", D2D1::RectF(right_left, right_panel.top + 508.0f,
+                                                        right_right, right_panel.top + 568.0f));
             draw_glass_panel(add_folder, 10, 0.9f, 0, true, 0);
             register_hit(add_folder, MenuHitTargetKind::SongSourceAdd, 0);
             draw_centered_text(wloc("ADD FOLDER  [F2]", "폴더 추가  [F2]"), d2d_->body_format.Get(),
@@ -931,39 +961,39 @@
             draw_centered_text(wloc("REMOVE FROM LIST  [Del]", "목록에서 제거  [Del]"), d2d_->body_format.Get(),
                                remove_folder, d2d_->muted_brush.Get(), true);
             draw_text_clipped(wloc("Folders and song files stay on disk.", "실제 폴더와 곡 파일은 그대로 유지됩니다."),
-                              d2d_->hud_format.Get(), D2D1::RectF(right_left, right_panel.top + 583.0f,
-                                                                 right_right, right_panel.top + 617.0f),
+                              d2d_->hud_format.Get(), native_rect("songselect.rect.081", D2D1::RectF(right_left, right_panel.top + 583.0f,
+                                                                 right_right, right_panel.top + 617.0f)),
                               d2d_->muted_brush.Get());
-            draw_meta_pair(D2D1::RectF(right_left, right_panel.top + 162.0f,
-                                       right_left + 190.0f, right_panel.top + 238.0f),
+            draw_meta_pair(native_rect("songselect.rect.082", D2D1::RectF(right_left, right_panel.top + 162.0f,
+                                       right_left + 190.0f, right_panel.top + 238.0f)),
                            loc("CHARTS", "차트"),
                            data.song_select.selected_source_song_count >= 0
                                ? format_int_with_commas(data.song_select.selected_source_song_count)
                                : "--", true);
-            draw_meta_pair(D2D1::RectF(right_left + 220.0f, right_panel.top + 162.0f,
-                                       right_left + 390.0f, right_panel.top + 238.0f),
+            draw_meta_pair(native_rect("songselect.rect.083", D2D1::RectF(right_left + 220.0f, right_panel.top + 162.0f,
+                                       right_left + 390.0f, right_panel.top + 238.0f)),
                            loc("ROOTS", "소스"),
                            format_int_with_commas(data.song_select.source_count));
             if (d2d_->body_format && d2d_->muted_brush) {
                 draw_text_clipped(to_wide(data.song_select.selected_source_path),
                                   d2d_->body_format.Get(),
-                                  D2D1::RectF(right_left, right_panel.top + 270.0f,
-                                              right_right, right_panel.top + 410.0f),
+                                  native_rect("songselect.rect.084", D2D1::RectF(right_left, right_panel.top + 270.0f,
+                                              right_right, right_panel.top + 410.0f)),
                                   d2d_->muted_brush.Get());
             }
         } else {
-            draw_meta_pair(D2D1::RectF(right_left, right_panel.top + 162.0f,
-                                       right_left + 190.0f, right_panel.top + 238.0f),
+            draw_meta_pair(native_rect("songselect.rect.085", D2D1::RectF(right_left, right_panel.top + 162.0f,
+                                       right_left + 190.0f, right_panel.top + 238.0f)),
                            loc("SCORE", "점수"),
                            format_int_with_commas(data.song_select.best_score) + " / " +
                                format_int_with_commas(data.song_select.max_score), true);
-            draw_meta_pair(D2D1::RectF(right_left + 220.0f, right_panel.top + 162.0f,
-                                       right_left + 380.0f, right_panel.top + 238.0f),
+            draw_meta_pair(native_rect("songselect.rect.086", D2D1::RectF(right_left + 220.0f, right_panel.top + 162.0f,
+                                       right_left + 380.0f, right_panel.top + 238.0f)),
                            loc("ACCURACY", "정확도"),
                            format_decimal(data.song_select.accuracy, 2) + "% / D " +
                                format_decimal(data.song_select.detailed_accuracy, 2) + "%");
-            draw_meta_pair(D2D1::RectF(right_left + 410.0f, right_panel.top + 162.0f,
-                                       right_right, right_panel.top + 238.0f),
+            draw_meta_pair(native_rect("songselect.rect.087", D2D1::RectF(right_left + 410.0f, right_panel.top + 162.0f,
+                                       right_right, right_panel.top + 238.0f)),
                            loc("COMBO", "콤보"),
                            format_int_with_commas(data.song_select.max_combo));
             if (d2d_->hud_format && d2d_->accent_brush) {
@@ -976,8 +1006,8 @@
                                : std::string("--"));
                 draw_text_clipped(to_wide(detail_line),
                                   d2d_->hud_format.Get(),
-                                  D2D1::RectF(right_left, right_panel.top + 244.0f,
-                                              right_right, right_panel.top + 270.0f),
+                                  native_rect("songselect.rect.088", D2D1::RectF(right_left, right_panel.top + 244.0f,
+                                              right_right, right_panel.top + 270.0f)),
                                   d2d_->accent_brush.Get());
             }
             if (d2d_->body_format && d2d_->muted_brush) {
@@ -990,13 +1020,13 @@
                         : loc("REPLAY ", "리플레이 ") +
                               data.song_select.selected_record_replay_file;
                 draw_text_clipped(to_wide(replay), d2d_->body_format.Get(),
-                                  D2D1::RectF(right_left, right_panel.top + 272.0f,
-                                              right_right, right_panel.top + 324.0f),
+                                  native_rect("songselect.rect.089", D2D1::RectF(right_left, right_panel.top + 272.0f,
+                                              right_right, right_panel.top + 324.0f)),
                                   d2d_->muted_brush.Get());
                 draw_text_clipped(to_wide(data.song_select.selected_record_replay_detail),
                                   d2d_->body_format.Get(),
-                                  D2D1::RectF(right_left, right_panel.top + 326.0f,
-                                              right_right, right_panel.top + 380.0f),
+                                  native_rect("songselect.rect.090", D2D1::RectF(right_left, right_panel.top + 326.0f,
+                                              right_right, right_panel.top + 380.0f)),
                                   d2d_->muted_brush.Get());
             }
         }
@@ -1004,8 +1034,8 @@
         const bool primary_enabled = data.song_select.list_total_count > 0 &&
                                      !data.song_select.online_records;
         const D2D1_RECT_F start_button =
-            D2D1::RectF(right_left, right_panel.bottom - 112.0f,
-                        right_right, right_panel.bottom - 24.0f);
+            native_rect("songselect.rect.091", D2D1::RectF(right_left, right_panel.bottom - 112.0f,
+                        right_right, right_panel.bottom - 24.0f));
         if (primary_enabled) {
             register_hit(start_button, MenuHitTargetKind::SongStartButton, 0);
         }
@@ -1022,10 +1052,11 @@
         } else {
             draw_glass_panel(start_button, 12.0f, 0.56f, 0.04f, false, 2.0f);
         }
+        if (primary_enabled) draw_native_focus(start_button, 12, 46, 0, true, true);
         if (d2d_->header_format && d2d_->text_brush && d2d_->muted_brush) {
             const D2D1_COLOR_F saved_text_color = d2d_->text_brush->GetColor();
             if (modern_library_screen && primary_enabled) {
-                d2d_->text_brush->SetColor(D2D1::ColorF(0x0B1620));
+                d2d_->text_brush->SetColor(native_palette("palette.0b1620", D2D1::ColorF(0x0B1620)));
             }
             const std::wstring action_label =
                 data.song_select.showing_sources
@@ -1044,11 +1075,11 @@
 
         const D2D1_RECT_F bottom_bar =
             skin_layout_rect(data, "song_select.bottom_bar",
-                             D2D1::RectF(38.0f, 944.0f, 1882.0f, 1048.0f));
+                             native_rect("songselect.rect.092", D2D1::RectF(38.0f, 944.0f, 1882.0f, 1048.0f)));
         draw_glass_panel(bottom_bar, 12.0f, 0.82f, 0.18f, false, 4.0f);
         const D2D1_RECT_F back_button =
-            D2D1::RectF(bottom_bar.left + 12.0f, bottom_bar.top + 12.0f,
-                        bottom_bar.left + 260.0f, bottom_bar.bottom - 12.0f);
+            native_rect("songselect.rect.093", D2D1::RectF(bottom_bar.left + 12.0f, bottom_bar.top + 12.0f,
+                        bottom_bar.left + 260.0f, bottom_bar.bottom - 12.0f));
         register_hit(back_button, MenuHitTargetKind::SongBackButton, 0);
         draw_glass_panel(back_button, 10.0f, 0.76f, 0.40f, true, 2.0f);
         if (d2d_->body_format && d2d_->text_brush) {
@@ -1057,12 +1088,12 @@
         }
         if (d2d_->hud_format && d2d_->muted_brush) {
             draw_centered_text(to_wide(data.song_select.primary_hint), d2d_->hud_format.Get(),
-                               D2D1::RectF(back_button.right + 28.0f, bottom_bar.top + 12.0f,
-                                           bottom_bar.right - 28.0f, bottom_bar.top + 48.0f),
+                               native_rect("songselect.rect.094", D2D1::RectF(back_button.right + 28.0f, bottom_bar.top + 12.0f,
+                                           bottom_bar.right - 28.0f, bottom_bar.top + 48.0f)),
                                d2d_->muted_brush.Get());
             draw_centered_text(to_wide(data.song_select.secondary_hint), d2d_->hud_format.Get(),
-                               D2D1::RectF(back_button.right + 28.0f, bottom_bar.top + 48.0f,
-                                           bottom_bar.right - 28.0f, bottom_bar.bottom - 10.0f),
+                               native_rect("songselect.rect.095", D2D1::RectF(back_button.right + 28.0f, bottom_bar.top + 48.0f,
+                                           bottom_bar.right - 28.0f, bottom_bar.bottom - 10.0f)),
                                d2d_->muted_brush.Get());
         }
 

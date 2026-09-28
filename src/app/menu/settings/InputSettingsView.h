@@ -1,5 +1,7 @@
 #pragma once
 
+#include "ui/Localization.h"
+
 #include "app/menu/settings/InputSettingsController.h"
 #include "app/menu/settings/SettingsRowModel.h"
 #include "config/Config.h"
@@ -15,7 +17,7 @@ public:
         const InputSettingsController& controller,
         const config::RuntimeConfig& runtime,
         bool is_polling_fallback_latched,
-        bool use_korean);
+        ui::Language language);
 };
 
 }  // namespace tenriff::app::menu::settings

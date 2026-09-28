@@ -41,17 +41,189 @@
       "pattern": "^#?[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?$",
       "description": "#RRGGBB or #RRGGBBAA"
     },
+    "nativeSlotName": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_.-]{0,127}$",
+      "description": "Stable renderer slot ID listed in tools/skin_editor/native-catalog.json."
+    },
+    "nativeRectAdjustment": {
+      "type": "array",
+      "description": "Additive [dx, dy, dwidth, dheight] in 1920x1080 base units. Repeated rows retain their original positions.",
+      "minItems": 4,
+      "maxItems": 4,
+      "items": { "type": "number", "minimum": -8192.0, "maximum": 8192.0 }
+    },
     "laneMap": {
       "type": "array",
       "minItems": 1,
       "maxItems": 16,
       "items": { "type": "string", "minLength": 1 }
     },
+    "nativeGameplayKeyLayer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["x", "y", "width", "height", "color"],
+      "description": "One rounded rectangle on a 128x256 sprite canvas. Runtime additionally requires x+width<=128 and y+height<=256. mix=0 uses the lane color; mix=1 uses color. Color alpha multiplies layer alpha.",
+      "properties": {
+        "x": {"type": "number", "minimum": 0, "maximum": 128},
+        "y": {"type": "number", "minimum": 0, "maximum": 256},
+        "width": {"type": "number", "minimum": 0, "maximum": 128},
+        "height": {"type": "number", "minimum": 0, "maximum": 256},
+        "color": {"$ref": "#/$defs/hexColor"},
+        "mix": {"type": "number", "minimum": 0, "maximum": 1, "default": 1},
+        "alpha": {"type": "number", "minimum": 0, "maximum": 1, "default": 1},
+        "radius": {"type": "number", "minimum": 0, "maximum": 128, "default": 0}
+      }
+    },
+    "nativeGameplayNoteLayer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["x", "y", "width", "height", "color"],
+      "description": "One rounded rectangle on a 128x32 sprite canvas. Runtime additionally requires x+width<=128 and y+height<=32. mix=0 uses the lane color; mix=1 uses color. Color alpha multiplies layer alpha.",
+      "properties": {
+        "x": {"type": "number", "minimum": 0, "maximum": 128},
+        "y": {"type": "number", "minimum": 0, "maximum": 32},
+        "width": {"type": "number", "minimum": 0, "maximum": 128},
+        "height": {"type": "number", "minimum": 0, "maximum": 32},
+        "color": {"$ref": "#/$defs/hexColor"},
+        "mix": {"type": "number", "minimum": 0, "maximum": 1, "default": 1},
+        "alpha": {"type": "number", "minimum": 0, "maximum": 1, "default": 1},
+        "radius": {"type": "number", "minimum": 0, "maximum": 128, "default": 0}
+      }
+    },
+    "nativeGameplay": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Optional native gameplay presentation; enabled by gameplay.renderer=native. Missing slots retain defaults. Per-mode category maps merge by slot and sprite arrays replace whole sprites.",
+      "properties": {
+        "metrics": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "key_min_height": {"type": "number", "minimum": 8, "maximum": 400},
+            "key_max_height": {"type": "number", "minimum": 8, "maximum": 400},
+            "key_inset": {"type": "number", "minimum": 0, "maximum": 32},
+            "key_inset_ratio": {"type": "number", "minimum": 0, "maximum": 0.45},
+            "key_bottom_gap": {"type": "number", "minimum": 0, "maximum": 64},
+            "key_face_gap": {"type": "number", "minimum": 0, "maximum": 64},
+            "judgement_line_width": {"type": "number", "minimum": 0, "maximum": 32},
+            "judgement_glow_height": {"type": "number", "minimum": 0, "maximum": 128},
+            "lane_divider_opacity": {"type": "number", "minimum": 0, "maximum": 1},
+            "hold_edge_mix": {"type": "number", "minimum": 0, "maximum": 1},
+            "hold_core_mix": {"type": "number", "minimum": 0, "maximum": 1},
+            "timing_half_width": {"type": "number", "minimum": 16, "maximum": 600},
+            "timing_height": {"type": "number", "minimum": 1, "maximum": 64},
+            "timing_range_ms": {"type": "number", "minimum": 1, "maximum": 1000},
+            "title_font_size": {"type": "number", "minimum": 8, "maximum": 144},
+            "score_font_size": {"type": "number", "minimum": 8, "maximum": 144},
+            "body_font_size": {"type": "number", "minimum": 8, "maximum": 144},
+            "timing_font_size": {"type": "number", "minimum": 8, "maximum": 144},
+            "judgement_font_size": {"type": "number", "minimum": 8, "maximum": 144},
+            "combo_font_size": {"type": "number", "minimum": 8, "maximum": 144},
+            "key_label_font_size": {"type": "number", "minimum": 8, "maximum": 144}
+          }
+        },
+        "colors": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "key_well": {"$ref": "#/$defs/hexColor"},
+            "key_led": {"$ref": "#/$defs/hexColor"},
+            "chassis": {"$ref": "#/$defs/hexColor"},
+            "judgement_line": {"$ref": "#/$defs/hexColor"},
+            "judgement_glow": {"$ref": "#/$defs/hexColor"},
+            "hold_edge": {"$ref": "#/$defs/hexColor"},
+            "hold_core": {"$ref": "#/$defs/hexColor"},
+            "hold_shadow": {"$ref": "#/$defs/hexColor"},
+            "burst_core": {"$ref": "#/$defs/hexColor"},
+            "burst_trail": {"$ref": "#/$defs/hexColor"},
+            "title": {"$ref": "#/$defs/hexColor"},
+            "score": {"$ref": "#/$defs/hexColor"},
+            "body": {"$ref": "#/$defs/hexColor"},
+            "combo": {"$ref": "#/$defs/hexColor"},
+            "judgement": {"$ref": "#/$defs/hexColor"},
+            "timing": {"$ref": "#/$defs/hexColor"},
+            "key_label": {"$ref": "#/$defs/hexColor"},
+            "gauge_hard": {"$ref": "#/$defs/hexColor"},
+            "gauge_normal": {"$ref": "#/$defs/hexColor"},
+            "gauge_easy": {"$ref": "#/$defs/hexColor"},
+            "judgement_pg": {"$ref": "#/$defs/hexColor"},
+            "judgement_gr": {"$ref": "#/$defs/hexColor"},
+            "judgement_gd": {"$ref": "#/$defs/hexColor"},
+            "judgement_bd": {"$ref": "#/$defs/hexColor"},
+            "judgement_pr": {"$ref": "#/$defs/hexColor"},
+            "timing_fast": {"$ref": "#/$defs/hexColor"},
+            "timing_slow": {"$ref": "#/$defs/hexColor"},
+            "gauge_ex_hard": {"$ref": "#/$defs/hexColor"}
+          }
+        },
+        "motion": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "press_response": {"type": "number", "minimum": 1, "maximum": 500},
+            "release_response": {"type": "number", "minimum": 1, "maximum": 500},
+            "press_depth": {"type": "number", "minimum": 0, "maximum": 32},
+            "pressed_light": {"type": "number", "minimum": 0, "maximum": 2},
+            "hit_light": {"type": "number", "minimum": 0, "maximum": 2},
+            "burst_rise": {"type": "number", "minimum": 0, "maximum": 500},
+            "burst_height": {"type": "number", "minimum": 0, "maximum": 200},
+            "combo_duration_ms": {"type": "number", "minimum": 1, "maximum": 2000},
+            "combo_scale": {"type": "number", "minimum": 1, "maximum": 2},
+            "combo_lift": {"type": "number", "minimum": -100, "maximum": 100},
+            "judgement_duration_ms": {"type": "number", "minimum": 1, "maximum": 2000}
+          }
+        },
+        "rects": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "title": {"$ref": "#/$defs/nativeRectAdjustment"},
+            "artist": {"$ref": "#/$defs/nativeRectAdjustment"},
+            "speed": {"$ref": "#/$defs/nativeRectAdjustment"},
+            "score": {"$ref": "#/$defs/nativeRectAdjustment"},
+            "stats": {"$ref": "#/$defs/nativeRectAdjustment"},
+            "combo": {"$ref": "#/$defs/nativeRectAdjustment"},
+            "judgement": {"$ref": "#/$defs/nativeRectAdjustment"},
+            "timing": {"$ref": "#/$defs/nativeRectAdjustment"},
+            "gauge": {"$ref": "#/$defs/nativeRectAdjustment"},
+            "progress": {"$ref": "#/$defs/nativeRectAdjustment"},
+            "key_label": {"$ref": "#/$defs/nativeRectAdjustment"}
+          }
+        },
+        "fonts": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "title": {"type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[^\\u0000-\\u001F\\u007F]+$", "description": "Installed font family; runtime also limits UTF-8 length to 128 bytes."},
+            "score": {"type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[^\\u0000-\\u001F\\u007F]+$", "description": "Installed font family; runtime also limits UTF-8 length to 128 bytes."},
+            "body": {"type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[^\\u0000-\\u001F\\u007F]+$", "description": "Installed font family; runtime also limits UTF-8 length to 128 bytes."},
+            "timing": {"type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[^\\u0000-\\u001F\\u007F]+$", "description": "Installed font family; runtime also limits UTF-8 length to 128 bytes."},
+            "judgement": {"type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[^\\u0000-\\u001F\\u007F]+$", "description": "Installed font family; runtime also limits UTF-8 length to 128 bytes."},
+            "combo": {"type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[^\\u0000-\\u001F\\u007F]+$", "description": "Installed font family; runtime also limits UTF-8 length to 128 bytes."},
+            "key_label": {"type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[^\\u0000-\\u001F\\u007F]+$", "description": "Installed font family; runtime also limits UTF-8 length to 128 bytes."}
+          }
+        },
+        "sprites": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "key_idle": {"type": "array", "maxItems": 128, "description": "Ordered back-to-front layers. Omitted uses built-in art; [] explicitly hides this sprite.", "items": {"$ref": "#/$defs/nativeGameplayKeyLayer"}},
+            "key_pressed": {"type": "array", "maxItems": 128, "description": "Ordered back-to-front layers. Omitted uses built-in art; [] explicitly hides this sprite.", "items": {"$ref": "#/$defs/nativeGameplayKeyLayer"}},
+            "note": {"type": "array", "maxItems": 128, "description": "Ordered back-to-front layers. Omitted uses built-in art; [] explicitly hides this sprite.", "items": {"$ref": "#/$defs/nativeGameplayNoteLayer"}},
+            "hold_head": {"type": "array", "maxItems": 128, "description": "Ordered back-to-front layers. Omitted uses built-in art; [] explicitly hides this sprite.", "items": {"$ref": "#/$defs/nativeGameplayNoteLayer"}},
+            "hold_tail": {"type": "array", "maxItems": 128, "description": "Ordered back-to-front layers. Omitted uses built-in art; [] explicitly hides this sprite.", "items": {"$ref": "#/$defs/nativeGameplayNoteLayer"}}
+          }
+        }
+      }
+    },
     "gameplayMode": {
       "type": "object",
-      "description": "Shallow per-key-mode override. modes cannot be nested.",
+      "description": "Per-key-mode override. Ordinary fields replace the common value; native category maps merge by slot. modes cannot be nested.",
       "additionalProperties": false,
       "properties": {
+        "renderer": { "enum": ["legacy", "native"], "description": "native selects editable Luma Keys gameplay. Omitted or legacy preserves the existing skin rendering path." },
+        "native": { "$ref": "#/$defs/nativeGameplay" },
         "description": { "type": "string" },
         "background": { "$ref": "#/$defs/assetPath" },
         "background_opacity": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
@@ -104,6 +276,10 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
+        "renderer": {
+          "enum": ["legacy", "native"],
+          "description": "native keeps the modern built-in menu while applying native overrides. Omitted or legacy preserves the original v1 skin presentation."
+        },
         "background": { "$ref": "#/$defs/assetPath" },
         "logo": { "$ref": "#/$defs/assetPath" },
         "background_opacity": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
@@ -116,6 +292,47 @@
           "type": "object",
           "propertyNames": { "enum": ["quick_setup", "title", "options", "multiplayer", "song_select", "session_mix", "song_browser", "settings", "settings_audio", "settings_graphics", "settings_skins", "settings_input", "settings_calibration", "mode_select", "mode_mods", "keymap", "keymap_confirm", "onnx_upscaler_confirm", "keymap_test", "result"] },
           "additionalProperties": { "type": "number", "minimum": 0.0, "maximum": 1.0 }
+        }
+      }
+    },
+    "native": {
+      "type": "object",
+      "description": "Native menu presentation only. Requires lobby.renderer=native. Omitted slots retain renderer defaults. Unknown well-formed IDs are kept for forward compatibility and are inactive until supported by the renderer.",
+      "additionalProperties": false,
+      "properties": {
+        "metrics": {
+          "type": "object", "maxProperties": 4096,
+          "propertyNames": { "$ref": "#/$defs/nativeSlotName" },
+          "additionalProperties": { "type": "number", "minimum": -8192.0, "maximum": 8192.0 }
+        },
+        "colors": {
+          "type": "object", "maxProperties": 4096,
+          "propertyNames": { "$ref": "#/$defs/nativeSlotName" },
+          "additionalProperties": { "$ref": "#/$defs/hexColor" }
+        },
+        "rects": {
+          "type": "object", "maxProperties": 4096,
+          "propertyNames": { "$ref": "#/$defs/nativeSlotName" },
+          "additionalProperties": { "$ref": "#/$defs/nativeRectAdjustment" }
+        },
+        "assets": {
+          "type": "object", "maxProperties": 4096,
+          "propertyNames": { "$ref": "#/$defs/nativeSlotName" },
+          "additionalProperties": { "$ref": "#/$defs/assetPath" }
+        },
+        "motion": {
+          "type": "object", "maxProperties": 4096,
+          "propertyNames": { "$ref": "#/$defs/nativeSlotName" },
+          "additionalProperties": { "type": "number", "minimum": 0.0, "maximum": 120.0 }
+        },
+        "fonts": {
+          "type": "object", "maxProperties": 4096,
+          "propertyNames": { "$ref": "#/$defs/nativeSlotName" },
+          "additionalProperties": {
+            "type": "string", "minLength": 1, "maxLength": 128,
+            "pattern": "^[^\\u0000-\\u001F\\u007F]+$",
+            "description": "Installed font family. The runtime additionally limits UTF-8 names to 128 bytes."
+          }
         }
       }
     },
@@ -202,6 +419,8 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
+        "renderer": { "enum": ["legacy", "native"], "description": "native selects editable Luma Keys gameplay. Omitted or legacy preserves the existing skin rendering path." },
+        "native": { "$ref": "#/$defs/nativeGameplay" },
         "description": { "type": "string" },
         "background": { "$ref": "#/$defs/assetPath" },
         "background_opacity": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
@@ -215,7 +434,7 @@
         "lane_map": { "$ref": "#/$defs/laneMap" },
         "modes": {
           "type": "object",
-          "description": "Per-layout shallow overrides. The active 1k through 16k or dedicated 7+1 object replaces matching gameplay fields.",
+          "description": "Per-layout overrides. The active 1k through 16k or dedicated 7+1 object replaces matching gameplay fields, except native category maps merge by slot and sprite arrays replace whole sprites.",
           "propertyNames": { "pattern": "^(([1-9]|1[0-6])k|7\\+1)$" },
           "additionalProperties": { "$ref": "#/$defs/gameplayMode" }
         },

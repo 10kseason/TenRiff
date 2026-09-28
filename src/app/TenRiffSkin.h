@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "app/ImportedGameplaySkin.h"
+#include "app/NativeMenuSkin.h"
 
 namespace tenriff::app {
 
@@ -93,6 +94,13 @@ struct TenRiffSkinDefinition {
     std::string name;
     std::string author;
     std::string root_path;
+    // Keep pre-existing v1 skins on their original menu presentation unless the
+    // author opts in. Gameplay visuals remain controlled by gameplay fields.
+    bool native_menu_renderer = false;
+    NativeMenuSkinStyle native_menu;
+    // Computed after loading. A menu-only native skin must keep the native
+    // gameplay renderer, including its digital key receptors.
+    bool native_gameplay_fallback = false;
     std::string lobby_background_path;
     std::string lobby_logo_path;
     float lobby_background_opacity = 0.72f;

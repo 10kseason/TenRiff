@@ -99,6 +99,151 @@ TEST_CASE("TenRiff skin manifest resolves lobby and gameplay assets") {
     CHECK(loaded.gameplay.has_hit_position);
     CHECK(loaded.referenced_asset_paths.size() == 5u);
     CHECK(loaded.layout_rects.empty());
+    CHECK_FALSE(loaded.native_menu_renderer);
+    CHECK_FALSE(loaded.native_gameplay_fallback);
+    CHECK(loaded.native_menu.metrics.empty());
+}
+
+TEST_CASE("TenRiff native menu style loads typed offsets and imports replacement assets") {
+    TempDirGuard temp{make_temp_dir()};
+    REQUIRE(!temp.path.empty());
+    const auto skin = temp.path / "NativeEditable";
+    write_file(skin / "menu" / "emblem.png");
+    write_file(skin / "skin.json", R"({
+      "format": "tenriff-skin", "version": 1, "name": "Native Editable",
+      "lobby": {"renderer": "native"},
+      "native": {
+        "metrics": {"font.title.size": 36, "panel.offset": -24},
+        "colors": {"accent": "#63E9F280"},
+        "rects": {"title.button": [10, -5, 32, -8], "title.logo": [0, 0, 0, 0]},
+        "assets": {"emblem": "menu/emblem.png"},
+        "motion": {"enabled": 0, "speed": 1.5},
+        "fonts": {"body": "Yu Gothic UI"}
+      }
+    })");
+    const auto loaded = tenriff::app::load_tenriff_skin_folder(skin.u8string(), 10);
+    REQUIRE(loaded.found);
+    CHECK(loaded.native_menu_renderer);
+    CHECK(loaded.native_gameplay_fallback);
+    CHECK(loaded.warnings.empty());
+    CHECK(loaded.native_menu.metrics.at("font.title.size") == doctest::Approx(36));
+    CHECK(loaded.native_menu.metrics.at("panel.offset") == doctest::Approx(-24));
+    CHECK(loaded.native_menu.colors.at("accent")[3] == doctest::Approx(128.0 / 255.0));
+    CHECK(loaded.native_menu.rects.at("title.button")[3] == doctest::Approx(-8));
+    CHECK(loaded.native_menu.rects.count("title.logo") == 1u);
+    CHECK(loaded.native_menu.motion.at("enabled") == doctest::Approx(0));
+    CHECK(loaded.native_menu.motion.at("speed") == doctest::Approx(1.5));
+    CHECK(loaded.native_menu.fonts.at("body") == "Yu Gothic UI");
+    CHECK(loaded.referenced_asset_paths.size() == 1u);
+    CHECK(loaded.gameplay.note_images.empty());
+    CHECK_FALSE(loaded.gameplay_style.note_shape.has_value());
+    CHECK_FALSE(loaded.gameplay.has_hit_position);
+
+    const auto imported = tenriff::app::import_tenriff_skin(skin.u8string(),
+                                                          (temp.path / "imports").u8string());
+    REQUIRE(imported.success());
+    const auto reloaded = tenriff::app::resolve_tenriff_skin(imported.install_root,
+                                                          imported.skin_name, 10);
+    REQUIRE(reloaded.found);
+    CHECK(reloaded.warnings.empty());
+    REQUIRE(reloaded.native_menu.assets.count("emblem") == 1u);
+    CHECK(std::filesystem::is_regular_file(
+        std::filesystem::u8path(reloaded.native_menu.assets.at("emblem"))));
+    CHECK(reloaded.native_menu.assets.at("emblem") != loaded.native_menu.assets.at("emblem"));
+    CHECK(reloaded.native_gameplay_fallback);
+}
+
+TEST_CASE("TenRiff native menu-only skins keep native receptors until gameplay is customized") {
+    TempDirGuard temp{make_temp_dir()};
+    REQUIRE(!temp.path.empty());
+    const auto skin = temp.path / "MenuOnly";
+    write_file(skin / "gameplay" / "custom.png");
+    auto load_gameplay = [&](const std::string& fields, int keys = 10) {
+        write_file(skin / "skin.json",
+            "{\"format\":\"tenriff-skin\",\"version\":1,\"name\":\"Menu Only\","
+            "\"lobby\":{\"renderer\":\"native\"},\"gameplay\":{" + fields + "}}");
+        return tenriff::app::load_tenriff_skin_folder(skin.u8string(), keys);
+    };
+    const auto empty = load_gameplay("");
+    REQUIRE(empty.found);
+    CHECK(empty.native_gameplay_fallback);
+    CHECK(empty.warnings.empty());
+    CHECK(load_gameplay("\"note_width_ratio\":1,\"note_height_ratio\":1").native_gameplay_fallback);
+    // Presence of optional false/zero values still overrides a player setting.
+    for (const std::string field : {
+             "\"show_lane_dividers\":false", "\"show_judgement_line\":false",
+             "\"show_timing_feedback\":false", "\"show_gear_boundary_line\":false",
+             "\"show_hold_tail\":false", "\"hold_tail_taper\":false",
+             "\"judgement_line_glow\":false", "\"key_pulse\":false",
+             "\"note_border\":false", "\"black_playfield\":false",
+             "\"key_pulse_brightness\":0", "\"lane_background_opacity\":0",
+             "\"visual_opacity\":1", "\"note_outline_opacity\":0",
+             "\"hold_body_opacity\":1", "\"hit_burst_style\":\"ring\"",
+             "\"key_label_position\":\"off\"", "\"note_shape\":\"rect\"",
+             "\"lane_colors\":[\"#FFFFFF\"]", "\"note_width_ratio\":1.2",
+             "\"note_height_ratio\":1.2", "\"full_lane_receptors\":true",
+             "\"note_aspect\":\"contain\"", "\"judgement_line_position\":0.82",
+             "\"column_widths\":[40]", "\"column_spacings\":[1]",
+             "\"note_rotations\":[90]", "\"key_rotations\":[90]",
+             "\"background\":\"gameplay/custom.png\"", "\"gear\":\"gameplay/custom.png\"",
+             "\"note\":\"gameplay/custom.png\"", "\"hold_head\":\"gameplay/custom.png\"",
+             "\"hold_body\":\"gameplay/custom.png\"", "\"hold_tail\":\"gameplay/custom.png\"",
+             "\"key_idle\":\"gameplay/custom.png\"", "\"key_pressed\":\"gameplay/custom.png\""}) {
+        const auto customized = load_gameplay(field);
+        CHECK(customized.warnings.empty());
+        CHECK_FALSE(customized.native_gameplay_fallback);
+    }
+    const std::string modes = "\"modes\":{\"7k\":{\"note\":\"gameplay/custom.png\"}}";
+    CHECK(load_gameplay(modes, 4).native_gameplay_fallback);
+    CHECK_FALSE(load_gameplay(modes, 7).native_gameplay_fallback);
+    write_file(skin / "gameplay" / "note.png");
+    CHECK_FALSE(load_gameplay("").native_gameplay_fallback);
+}
+
+TEST_CASE("TenRiff native menu invalid fields fall back without leaking out of the skin") {
+    TempDirGuard temp{make_temp_dir()};
+    REQUIRE(!temp.path.empty());
+    const auto skin = temp.path / "InvalidNative";
+    write_file(temp.path / "outside.png");
+    write_file(skin / "skin.json", R"({
+      "format": "tenriff-skin", "version": 1, "name": "Invalid Native",
+      "lobby": {"renderer": "unknown"},
+      "native": {
+        "metrics": {"size": "big", "overflow": 8193, "Invalid name": 10},
+        "colors": {"accent": "cyan"},
+        "rects": {"title.button": [1, 2, 3], "title.logo": [0, 0, 0, 8193]},
+        "assets": {"emblem": "../outside.png", "bad": 42},
+        "motion": {"speed": -1, "duration": 121},
+        "fonts": {"body": "", "heading": "bad\nfont"}
+      }
+    })");
+    const auto loaded = tenriff::app::load_tenriff_skin_folder(skin.u8string(), 10);
+    REQUIRE(loaded.found);
+    CHECK_FALSE(loaded.native_menu_renderer);
+    CHECK(loaded.native_menu.metrics.empty());
+    CHECK(loaded.native_menu.colors.empty());
+    CHECK(loaded.native_menu.rects.empty());
+    CHECK(loaded.native_menu.assets.empty());
+    CHECK(loaded.native_menu.motion.empty());
+    CHECK(loaded.native_menu.fonts.empty());
+    CHECK(loaded.referenced_asset_paths.empty());
+    CHECK(loaded.warnings.size() == 13u);
+}
+
+TEST_CASE("TenRiff native menu objects are optional and reject malformed categories") {
+    TempDirGuard temp{make_temp_dir()};
+    REQUIRE(!temp.path.empty());
+    const auto skin = temp.path / "NativeCategories";
+    write_file(skin / "skin.json", R"({
+      "format": "tenriff-skin", "version": 1, "name": "Native Categories",
+      "lobby": {"renderer": "legacy"},
+      "native": {"metrics": [], "colors": 4, "rects": null, "assets": false,
+                 "motion": "fast", "fonts": [], "typo": {}}
+    })");
+    const auto loaded = tenriff::app::load_tenriff_skin_folder(skin.u8string(), 10);
+    REQUIRE(loaded.found);
+    CHECK_FALSE(loaded.native_menu_renderer);
+    CHECK(loaded.warnings.size() == 7u);
 }
 
 TEST_CASE("TenRiff skin arrow options parse aspect mode and per-lane rotations") {
@@ -441,17 +586,19 @@ TEST_CASE("TenRiff skin import includes assets referenced only by another key mo
 TEST_CASE("Skin settings stable row ids account for the optional LR2 row") {
     const tenriff::app::SkinSettingsRows native_rows{false};
     const tenriff::app::SkinSettingsRows lr2_rows{true};
-    CHECK(native_rows.count() == 50);
-    CHECK(lr2_rows.count() == 51);
+    CHECK(native_rows.count() == 51);
+    CHECK(lr2_rows.count() == 52);
     CHECK(native_rows.index_of(tenriff::app::SkinSettingsRowId::KeyMode) == 0);
     CHECK(native_rows.index_of(tenriff::app::SkinSettingsRowId::ScratchPosition) == 1);
     CHECK(native_rows.index_of(tenriff::app::SkinSettingsRowId::SkinSource) == 2);
     CHECK(native_rows.index_of(tenriff::app::SkinSettingsRowId::Lr2Resolution) == -1);
     CHECK(native_rows.index_of(tenriff::app::SkinSettingsRowId::ImportSkin) == 4);
-    CHECK(native_rows.index_of(tenriff::app::SkinSettingsRowId::Back) == 49);
+    CHECK(native_rows.index_of(tenriff::app::SkinSettingsRowId::OpenSkinEditor) == 49);
+    CHECK(native_rows.index_of(tenriff::app::SkinSettingsRowId::Back) == 50);
     CHECK(lr2_rows.index_of(tenriff::app::SkinSettingsRowId::Lr2Resolution) == 4);
     CHECK(lr2_rows.index_of(tenriff::app::SkinSettingsRowId::ImportSkin) == 5);
-    CHECK(lr2_rows.index_of(tenriff::app::SkinSettingsRowId::Back) == 50);
+    CHECK(lr2_rows.index_of(tenriff::app::SkinSettingsRowId::OpenSkinEditor) == 50);
+    CHECK(lr2_rows.index_of(tenriff::app::SkinSettingsRowId::Back) == 51);
 }
 
 TEST_CASE("7+1 presentation moves only the visual scratch lane") {
@@ -512,4 +659,74 @@ TEST_CASE("TenRiff skins can override 7+1 separately from ordinary 8K") {
     REQUIRE(seven_plus_one.found);
     CHECK(ordinary.gameplay.imported_note_width_ratio == doctest::Approx(1.25));
     CHECK(seven_plus_one.gameplay.imported_note_width_ratio == doctest::Approx(2.0));
+}
+
+TEST_CASE("Native gameplay manifest preserves mode entries and explicit empty sprites") {
+    TempDirGuard directory{make_temp_dir()};
+    REQUIRE_FALSE(directory.path.empty());
+    write_file(directory.path / "skin.json",R"({"format":"tenriff-skin","version":1,"name":"Native Instrument",
+      "gameplay":{"renderer":"native","note_shape":"circle","native":{
+        "metrics":{"key_max_height":200,"judgement_line_width":5},"colors":{"chassis":"#12345680"},
+        "motion":{"press_response":120},"fonts":{"combo":"Consolas"},"rects":{"score":[10,-20,30,40]},
+        "sprites":{"note":[{"x":0,"y":0,"width":128,"height":32,"color":"#33669980"}]}
+      },"modes":{"16k":{"native":{"metrics":{"key_max_height":110},"sprites":{"note":[]}}}}}})");
+    const auto ten=tenriff::app::load_tenriff_skin_folder(directory.path.u8string(),10);
+    REQUIRE(ten.found);
+    CHECK(ten.warnings.empty());
+    CHECK(ten.native_gameplay_fallback);
+    CHECK(ten.gameplay.native_renderer);
+    CHECK(ten.gameplay.native.metrics.at("key_max_height")==200);
+    CHECK(ten.gameplay.native.fonts.at("combo")=="Consolas");
+    REQUIRE(ten.gameplay.native.sprites.at("note").size()==1);
+    CHECK(ten.gameplay.native.sprites.at("note")[0].color==0x336699);
+    CHECK(ten.gameplay.native.sprites.at("note")[0].alpha==doctest::Approx(128.0/255));
+    const auto sixteen=tenriff::app::load_tenriff_skin_folder(directory.path.u8string(),16);
+    CHECK(sixteen.warnings.empty());
+    CHECK(sixteen.native_gameplay_fallback);
+    CHECK(sixteen.gameplay.native.metrics.at("key_max_height")==110);
+    CHECK(sixteen.gameplay.native.metrics.at("judgement_line_width")==5);
+    CHECK(sixteen.gameplay.native.motion.at("press_response")==120);
+    CHECK(sixteen.gameplay.native.sprites.count("note")==1);
+    CHECK(sixteen.gameplay.native.sprites.at("note").empty());
+    TempDirGuard imported{make_temp_dir()};
+    const auto copy=tenriff::app::import_tenriff_skin(directory.path.u8string(),imported.path.u8string());
+    REQUIRE(copy.success());
+    const auto reloaded=tenriff::app::resolve_tenriff_skin(copy.install_root,copy.skin_name,16);
+    CHECK(reloaded.gameplay.native.metrics==sixteen.gameplay.native.metrics);
+    CHECK(reloaded.gameplay.native.sprites.at("note").empty());
+}
+
+TEST_CASE("Native gameplay invalid overrides fall back without changing legacy renderer") {
+    TempDirGuard directory{make_temp_dir()};
+    REQUIRE_FALSE(directory.path.empty());
+    write_file(directory.path / "skin.json",R"({"format":"tenriff-skin","version":1,"name":"Invalid Instrument",
+      "gameplay":{"native":{"metrics":{"key_max_height":999999,"unknown_metric":10},
+      "motion":{"press_response":0},"colors":{"key_well":"invalid"},"fonts":{"combo":""},
+      "rects":{"score":[1,2,"bad",4]},"sprites":{"note":[{"x":127,"y":0,"width":2,"height":32,"color":"#FFFFFF"}],
+      "key_idle":[],"hold_head":[{"x":0,"y":0,"width":128,"height":32}],"hold_tail":[true]}}}})");
+    const auto skin=tenriff::app::load_tenriff_skin_folder(directory.path.u8string(),4);
+    REQUIRE(skin.found);
+    CHECK_FALSE(skin.native_gameplay_fallback);
+    CHECK_FALSE(skin.gameplay.native_renderer);
+    CHECK(skin.warnings.size()>=9);
+    CHECK(skin.gameplay.native.metrics.empty());
+    CHECK(skin.gameplay.native.motion.empty());
+    CHECK(skin.gameplay.native.colors.empty());
+    CHECK(skin.gameplay.native.rects.empty());
+    CHECK(skin.gameplay.native.fonts.empty());
+    CHECK(skin.gameplay.native.sprites.count("note")==0);
+    CHECK(skin.gameplay.native.sprites.count("hold_head")==0);
+    CHECK(skin.gameplay.native.sprites.count("key_idle")==1);
+}
+
+TEST_CASE("Explicit legacy gameplay renderer overrides native-menu automatic fallback") {
+    TempDirGuard directory{make_temp_dir()};
+    REQUIRE_FALSE(directory.path.empty());
+    write_file(directory.path / "skin.json",R"({"format":"tenriff-skin","version":1,"name":"Explicit Legacy",
+        "lobby":{"renderer":"native"},"gameplay":{"renderer":"legacy"}})");
+    const auto skin=tenriff::app::load_tenriff_skin_folder(directory.path.u8string(),10);
+    REQUIRE(skin.found);
+    CHECK(skin.warnings.empty());
+    CHECK(skin.native_menu_renderer);
+    CHECK_FALSE(skin.native_gameplay_fallback);
 }

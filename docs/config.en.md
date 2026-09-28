@@ -213,7 +213,7 @@ The chart loader and indexer are limited to BMS-family files (`.bms/.bme/.bml/.p
 | --- | --- | --- |
 | `profile_nickname` | string; UTF-8 ≤48 bytes | Display name; empty uses profile ID. Whitespace/control characters are normalized. |
 | `profile_avatar_path` | string; UTF-8 ≤2048 bytes | Local PNG/JPG avatar path. |
-| `language` | `en`, `ko`; `en` | UI language; invalid values normalize to en. |
+| `language` | `en`, `ko`, `ja`; `en` | UI language; invalid values normalize to en. |
 | `result_tail_ms` | double; `500` ms | Extra result-transition delay after judgement completion; the chart audio end is also considered. |
 | `require_enter_to_exit` | bool; `true` | Retained for read/write compatibility; the current Windows result-input path does not use it to auto-exit. |
 | `show_cursor_in_gameplay` | bool; `true` | Show the mouse pointer during gameplay. |

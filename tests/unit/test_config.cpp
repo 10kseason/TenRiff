@@ -721,15 +721,15 @@ TEST_CASE("config save and load preserve ui language setting") {
 
     ConfigLoader loader;
     auto config = loader.defaults();
-    config.ui.language = "ko";
-
-    std::string error;
-    REQUIRE(loader.save_profile("profiles/test", config, &error));
-    CHECK(error.empty());
-
-    const auto result = loader.load_profile("profiles/test");
-    REQUIRE(result.success());
-    CHECK(result.config.ui.language == "ko");
+    for (const std::string language : {"en", "ko", "ja"}) {
+        config.ui.language = language;
+        std::string error;
+        REQUIRE(loader.save_profile("profiles/test", config, &error));
+        CHECK(error.empty());
+        const auto result = loader.load_profile("profiles/test");
+        REQUIRE(result.success());
+        CHECK(result.config.ui.language == language);
+    }
 }
 
 TEST_CASE("config load normalizes invalid ui language to english") {
@@ -2012,4 +2012,27 @@ TEST_CASE("runtime migration replaces the old fixed cap with match display") {
 
     CHECK(changed);
     CHECK(config.graphics.refresh_hz == -1);
+}
+
+TEST_CASE("config accepts Japanese aliases and keeps unknown language fallback") {
+    CHECK(tenriff::config::normalize_ui_language_token("ja") == "ja");
+    CHECK(tenriff::config::normalize_ui_language_token("JA-JP") == "ja");
+    CHECK(tenriff::config::normalize_ui_language_token("ja_JP") == "ja");
+    CHECK(tenriff::config::normalize_ui_language_token("jp") == "ja");
+    CHECK(tenriff::config::normalize_ui_language_token("Japanese") == "ja");
+    CHECK(tenriff::config::normalize_ui_language_token("korean") == "ko");
+    CHECK(tenriff::config::normalize_ui_language_token("unknown") == "en");
+}
+
+TEST_CASE("every 4K through 16K skin mode preserves its own palette and geometry") {
+    const auto config = ConfigLoader{}.defaults();
+    for (int keys = 4; keys <= 16; ++keys) {
+        const std::string mode = std::to_string(keys) + "k";
+        CHECK(tenriff::config::normalize_skin_mode_token(mode) == mode);
+        CHECK(tenriff::config::normalize_skin_mode_token("keys" + std::to_string(keys)) == mode);
+        CHECK(tenriff::config::default_skin_lane_colors(mode).size() == keys);
+        CHECK(tenriff::config::resolved_skin_lane_colors_for_layout(config.skin, keys, nullptr, 0).size() == keys);
+        CHECK(tenriff::config::resolved_skin_lane_width_scales(config.skin, mode).size() == keys);
+        CHECK(tenriff::config::resolved_skin_lane_spacing_scales(config.skin, mode).size() == keys - 1);
+    }
 }

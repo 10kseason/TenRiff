@@ -2,6 +2,9 @@
             gameplay_field_drag_state_.visible = false;
         }
         const int64_t render_now_ns = timing::HighResClock::now_ns();
+        const double native_key_delta_seconds = native_key_frame_time_ns_ > 0
+            ? static_cast<double>(render_now_ns - native_key_frame_time_ns_) / 1'000'000'000.0 : 1.0 / 144.0;
+        native_key_frame_time_ns_ = render_now_ns;
         const float header_left = 84.0f;
         const float header_top = 42.0f;
         const float header_right = kBaseWidth - 84.0f;
@@ -10,6 +13,21 @@
                 ? std::min(header_right, performance_overlay_safe_left(28.0f))
                 : header_right;
         const bool use_imported_metrics = normalize_gameplay_skin_source(data.gameplay.skin_source) != "native";
+        const auto& native_style = native_gameplay_style(data.gameplay.resolved_tenriff_skin,!use_imported_metrics);
+        auto ng_metric=[&](const char* key){return native_gameplay_number(native_style,key);};
+        auto ng_motion=[&](const char* key){return native_gameplay_number(native_style,key,true);};
+        auto ng_alpha=[&](const char* key){return native_gameplay_alpha(native_style,key);};
+        auto ng_rgb=[&](const char* key,uint32_t fallback){return native_gameplay_rgb(native_style,key,fallback);};
+        auto ng_rect=[&](const char* key,D2D1_RECT_F rect){return native_gameplay_d2d_rect(native_style,key,rect);};
+        auto ng_color=[&](const char* key,D2D1_COLOR_F color){return native_gameplay_d2d_color(native_style,key,color);};
+        auto ng_font=[&](const char* key,IDWriteTextFormat* fallback){
+            const auto it=d2d_->native_gameplay_formats.find(key);
+            return !use_imported_metrics && it!=d2d_->native_gameplay_formats.end()?it->second.Get():fallback;
+        };
+        auto ng_judge_color=[&](std::string_view judgement) {
+            const char* role=judgement=="PG"?"judgement_pg":judgement=="GR"?"judgement_gr":judgement=="G"?"judgement_gd":judgement=="BAD"?"judgement_bd":judgement=="POOR"?"judgement_pr":"judgement";
+            return ng_color(role,gameplay_feedback_color(judgement));
+        };
         const double judgement_line_position =
             use_imported_metrics && gameplay_note_sprite_cache_.has_imported_judgement_line_position
                 ? gameplay_note_sprite_cache_.imported_judgement_line_position
@@ -71,6 +89,23 @@
             };
 
             const float half_w = burst_note_width * (0.52f + 0.18f * pulse);
+            if (!use_imported_metrics && hit_burst_style == "prism") {
+                // Native signal packets rise only a short distance above the contact line.
+                // Their lane-bounded width keeps adjacent dense notes unobstructed.
+                fill_band(half_w * 0.92f, sustained_hold ? 30.0f : 12.0f + ng_motion("burst_height") * pulse,
+                          4.0f, pulse_color, 0.12f + 0.16f * pulse);
+                fill_band(half_w * 0.88f, 2.0f + 3.0f * pulse, 2.0f,
+                          blend_rgb(pulse_color, ng_rgb("burst_core",0xFFFFFF), 0.80f), (0.38f + 0.50f * pulse)*ng_alpha("burst_core"));
+                if (!sustained_hold) {
+                    const float y = std::max(top_limit, burst_hit_line_y - 12.0f - (1.0f - pulse) * ng_motion("burst_rise"));
+                    d2d_->note_fill_brush->SetColor(color_from_rgb(
+                        blend_rgb(pulse_color, ng_rgb("burst_trail",0xD5FFF4), 0.55f), pulse * 0.65f * burst_opacity*ng_alpha("burst_trail")));
+                    const float width = half_w * 0.65f;
+                    burst_ctx->FillRectangle(D2D1::RectF(lane_center - width, y, lane_center + width,
+                                                         std::min(bottom_limit, y + 2.0f)), d2d_->note_fill_brush.Get());
+                }
+                return;
+            }
             if (sustained_hold) {
                 // A held LN gets a stable vertical flame instead of repeatedly
                 // replaying the single-note flash. The small pulse keeps it alive
@@ -174,9 +209,9 @@
         const int64_t hold_handoff_grace_samples = gameplay_hold_handoff_grace_samples(
             data.gameplay.sample_rate,
             motion_diagnostics.extrapolation_limit_samples);
-        constexpr double kGameplayTimingIndicatorRangeMs = 80.0;
-        constexpr float kGameplayTimingIndicatorHalfWidth = 124.0f;
-        constexpr float kGameplayTimingIndicatorHeight = 8.0f;
+        const double kGameplayTimingIndicatorRangeMs = ng_metric("timing_range_ms");
+        const float kGameplayTimingIndicatorHalfWidth = ng_metric("timing_half_width");
+        const float kGameplayTimingIndicatorHeight = ng_metric("timing_height");
 
         const double display_visual_position =
             data.gameplay.current_visual_position +
@@ -205,6 +240,14 @@
                 return;
             }
 
+            D2D1_MATRIX_3X2_F timing_transform{};
+            ctx->GetTransform(&timing_transform);
+            const auto base_indicator=D2D1::RectF(indicator_left,combo_anchor_y,indicator_right,combo_anchor_y+48.0f);
+            const auto adjusted_indicator=ng_rect("timing",base_indicator);
+            ctx->SetTransform(D2D1::Matrix3x2F::Translation(-base_indicator.left,-base_indicator.top) *
+                D2D1::Matrix3x2F::Scale((adjusted_indicator.right-adjusted_indicator.left)/std::max(1.0f,base_indicator.right-base_indicator.left),
+                                      (adjusted_indicator.bottom-adjusted_indicator.top)/48.0f) *
+                D2D1::Matrix3x2F::Translation(adjusted_indicator.left,adjusted_indicator.top) * timing_transform);
             const float feedback_center_x = (indicator_left + indicator_right) * 0.5f;
             const D2D1_RECT_F indicator_rect =
                 D2D1::RectF(feedback_center_x - kGameplayTimingIndicatorHalfWidth,
@@ -235,11 +278,11 @@
                 const auto saved_color = d2d_->accent_brush->GetColor();
                 const float saved_opacity = d2d_->accent_brush->GetOpacity();
                 d2d_->accent_brush->SetOpacity(0.26f);
-                d2d_->accent_brush->SetColor(D2D1::ColorF(0x5DA9FF));
+                d2d_->accent_brush->SetColor(ng_color("timing_fast",D2D1::ColorF(0x5DA9FF)));
                 ctx->FillRectangle(D2D1::RectF(indicator_rect.left, indicator_rect.top,
                                                feedback_center_x, indicator_rect.bottom),
                                    d2d_->accent_brush.Get());
-                d2d_->accent_brush->SetColor(D2D1::ColorF(0xFF5A6B));
+                d2d_->accent_brush->SetColor(ng_color("timing_slow",D2D1::ColorF(0xFF5A6B)));
                 ctx->FillRectangle(D2D1::RectF(feedback_center_x, indicator_rect.top,
                                                indicator_rect.right, indicator_rect.bottom),
                                    d2d_->accent_brush.Get());
@@ -254,7 +297,7 @@
 
             const D2D1_COLOR_F saved_text_color = d2d_->text_brush->GetColor();
             const float indicator_center_y = (indicator_rect.top + indicator_rect.bottom) * 0.5f;
-            d2d_->text_brush->SetColor(D2D1::ColorF(0xF7FAFD, 0.92f));
+            d2d_->text_brush->SetColor(ng_color("timing",D2D1::ColorF(0xF7FAFD, 0.92f)));
             ctx->FillRectangle(D2D1::RectF(feedback_center_x - 1.0f, indicator_rect.top - 3.0f,
                                            feedback_center_x + 1.0f, indicator_rect.bottom + 3.0f),
                                d2d_->text_brush.Get());
@@ -269,11 +312,11 @@
                         kGameplayTimingIndicatorHalfWidth;
                 const float marker_half_width = 0.8f + 0.8f * history_weight;
                 const float marker_half_height = 1.4f + 2.4f * history_weight;
-                D2D1_COLOR_F marker_color = D2D1::ColorF(0xF7FAFD, 0.12f + 0.50f * history_weight * history_weight);
+                D2D1_COLOR_F marker_color = ng_color("timing",D2D1::ColorF(0xF7FAFD, 0.12f + 0.50f * history_weight * history_weight));
                 if (delta_ms < -0.05) {
-                    marker_color = D2D1::ColorF(0x5DA9FF, 0.12f + 0.50f * history_weight * history_weight);
+                    marker_color = ng_color("timing_fast",D2D1::ColorF(0x5DA9FF, 0.12f + 0.50f * history_weight * history_weight));
                 } else if (delta_ms > 0.05) {
-                    marker_color = D2D1::ColorF(0xFF5A6B, 0.12f + 0.50f * history_weight * history_weight);
+                    marker_color = ng_color("timing_slow",D2D1::ColorF(0xFF5A6B, 0.12f + 0.50f * history_weight * history_weight));
                 }
                 d2d_->text_brush->SetColor(marker_color);
                 ctx->FillRoundedRectangle(
@@ -293,25 +336,26 @@
                                                   -1.0,
                                                   1.0)) *
                         kGameplayTimingIndicatorHalfWidth;
-                d2d_->text_brush->SetColor(D2D1::ColorF(0xF7FAFD, 0.98f));
+                d2d_->text_brush->SetColor(ng_color("timing",D2D1::ColorF(0xF7FAFD, 0.98f)));
                 ctx->FillEllipse(D2D1::Ellipse(D2D1::Point2F(live_marker_center_x, indicator_center_y), 5.0f, 5.0f),
                                  d2d_->text_brush.Get());
             }
 
-            d2d_->text_brush->SetColor(D2D1::ColorF(0x5DA9FF, timing_fast ? 0.82f : 0.28f));
+            d2d_->text_brush->SetColor(ng_color("timing_fast",D2D1::ColorF(0x5DA9FF, timing_fast ? 0.82f : 0.28f)));
             if (has_live_feedback && timing_fast) draw_text_clipped_aligned(wloc("FAST", "빠름"),
-                                      d2d_->body_format.Get(),
+                                      ng_font("timing",d2d_->body_format.Get()),
                                       fast_rect,
                                       d2d_->text_brush.Get(),
                                       DWRITE_TEXT_ALIGNMENT_TRAILING);
 
-            d2d_->text_brush->SetColor(D2D1::ColorF(0xFF5A6B, timing_slow ? 0.82f : 0.28f));
+            d2d_->text_brush->SetColor(ng_color("timing_slow",D2D1::ColorF(0xFF5A6B, timing_slow ? 0.82f : 0.28f)));
             if (has_live_feedback && timing_slow) draw_text_clipped_aligned(wloc("SLOW", "느림"),
-                                      d2d_->body_format.Get(),
+                                      ng_font("timing",d2d_->body_format.Get()),
                                       slow_rect,
                                       d2d_->text_brush.Get(),
                                       DWRITE_TEXT_ALIGNMENT_LEADING);
             d2d_->text_brush->SetColor(saved_text_color);
+            ctx->SetTransform(timing_transform);
         };
 
         auto format_progress_clock = [&](int64_t sample_count) -> std::string {
@@ -425,38 +469,38 @@
         };
 
         auto draw_gameplay_header = [&]() {
+            const auto header_text_color=d2d_->text_brush->GetColor(), header_muted_color=d2d_->muted_brush->GetColor();
+            d2d_->text_brush->SetColor(ng_color("title",header_text_color));
+            d2d_->muted_brush->SetColor(ng_color("body",header_muted_color));
             if (d2d_->title_format && d2d_->text_brush) {
-                const D2D1_RECT_F title_rect =
-                    D2D1::RectF(header_left, header_top, header_right * 0.60f, header_top + 52.0f);
+                const D2D1_RECT_F title_rect = ng_rect("title",D2D1::RectF(header_left, header_top, header_right * 0.60f, header_top + 52.0f));
                 draw_text_clipped(gameplay_hud_cache_.title_text,
-                                  d2d_->title_format.Get(),
+                                  ng_font("title",d2d_->title_format.Get()),
                                   title_rect,
                                   d2d_->text_brush.Get());
             }
             if (d2d_->body_format && d2d_->muted_brush) {
-                const D2D1_RECT_F artist_rect =
-                    D2D1::RectF(header_left, header_top + 46.0f, header_right * 0.60f, header_top + 84.0f);
+                const D2D1_RECT_F artist_rect = ng_rect("artist",D2D1::RectF(header_left, header_top + 46.0f, header_right * 0.60f, header_top + 84.0f));
                 draw_text_clipped(gameplay_hud_cache_.artist_text,
-                                  d2d_->body_format.Get(),
+                                  ng_font("body",d2d_->body_format.Get()),
                                   artist_rect,
                                   d2d_->muted_brush.Get());
             }
             if (d2d_->hud_format && d2d_->muted_brush) {
-                const D2D1_RECT_F speed_rect =
-                    D2D1::RectF(header_left, header_top + 82.0f, header_right * 0.68f, header_top + 118.0f);
+                const D2D1_RECT_F speed_rect = ng_rect("speed",D2D1::RectF(header_left, header_top + 82.0f, header_right * 0.68f, header_top + 118.0f));
                 draw_text_clipped(gameplay_hud_cache_.speed_text,
                                   d2d_->hud_format.Get(),
                                   speed_rect,
                                   d2d_->muted_brush.Get());
             }
+            d2d_->text_brush->SetColor(ng_color("score",header_text_color));
             if (!data.gameplay.ghost_visible && d2d_->title_format && d2d_->text_brush) {
-                const D2D1_RECT_F score_rect =
-                    D2D1::RectF(std::max(header_left + 700.0f, header_safe_right - 610.0f),
+                const D2D1_RECT_F score_rect = ng_rect("score",D2D1::RectF(std::max(header_left + 700.0f, header_safe_right - 610.0f),
                                 header_top,
                                 header_safe_right,
-                                header_top + 52.0f);
+                                header_top + 52.0f));
                 draw_text_clipped_aligned(gameplay_hud_cache_.score_text,
-                                          d2d_->title_format.Get(),
+                                          ng_font("score",d2d_->title_format.Get()),
                                           score_rect,
                                           d2d_->text_brush.Get(),
                                           DWRITE_TEXT_ALIGNMENT_TRAILING);
@@ -468,23 +512,24 @@
                                 header_safe_right,
                                 header_top + 84.0f);
                 draw_text_clipped_aligned(gameplay_hud_cache_.combo_text,
-                                          d2d_->body_format.Get(),
+                                          ng_font("body",d2d_->body_format.Get()),
                                           combo_rect,
                                           d2d_->text_brush.Get(),
                                           DWRITE_TEXT_ALIGNMENT_TRAILING);
             }
             if (!data.gameplay.ghost_visible && d2d_->hud_format && d2d_->muted_brush) {
-                const D2D1_RECT_F judge_stats_rect =
-                    D2D1::RectF(std::max(header_left + 620.0f, header_safe_right - 690.0f),
+                const D2D1_RECT_F judge_stats_rect = ng_rect("stats",D2D1::RectF(std::max(header_left + 620.0f, header_safe_right - 690.0f),
                                 header_top + 82.0f,
                                 header_safe_right,
-                                header_top + 116.0f);
+                                header_top + 116.0f));
                 draw_text_clipped_aligned(gameplay_hud_cache_.judge_stats_text,
                                           d2d_->hud_format.Get(),
                                           judge_stats_rect,
                                           d2d_->muted_brush.Get(),
                                           DWRITE_TEXT_ALIGNMENT_TRAILING);
             }
+            d2d_->text_brush->SetColor(header_text_color);
+            d2d_->muted_brush->SetColor(header_muted_color);
         };
 
         if (gameplay_hud_cache_.text_revision != data.gameplay.text_revision) {
@@ -508,24 +553,20 @@
             const std::string title = data.gameplay.title.empty() ? loc("Unknown Track", "알 수 없는 곡") : data.gameplay.title;
             const std::string artist = data.gameplay.artist.empty() ? loc("Unknown Artist", "알 수 없는 아티스트") : data.gameplay.artist;
             std::string gauge_label = data.gameplay.gauge_label;
-            if (ui_korean) {
-                if (gauge_label == "HARD") {
-                    gauge_label = "하드";
-                } else if (gauge_label == "EASY") {
-                    gauge_label = "이지";
-                } else if (gauge_label == "NORMAL") {
-                    gauge_label = "노말";
-                }
+            if (gauge_label == "HARD") {
+                gauge_label = loc("HARD", "하드");
+            } else if (gauge_label == "EASY") {
+                gauge_label = loc("EASY", "이지");
+            } else if (gauge_label == "NORMAL") {
+                gauge_label = loc("NORMAL", "노말");
             }
             std::string ghost_gauge_label = data.gameplay.ghost_gauge_label;
-            if (ui_korean) {
-                if (ghost_gauge_label == "HARD") {
-                    ghost_gauge_label = "하드";
-                } else if (ghost_gauge_label == "EASY") {
-                    ghost_gauge_label = "이지";
-                } else if (ghost_gauge_label == "NORMAL") {
-                    ghost_gauge_label = "노말";
-                }
+            if (ghost_gauge_label == "HARD") {
+                ghost_gauge_label = loc("HARD", "하드");
+            } else if (ghost_gauge_label == "EASY") {
+                ghost_gauge_label = loc("EASY", "이지");
+            } else if (ghost_gauge_label == "NORMAL") {
+                ghost_gauge_label = loc("NORMAL", "노말");
             }
             gameplay_hud_cache_.title_text = to_wide(title);
             gameplay_hud_cache_.artist_text = to_wide(artist);
@@ -648,8 +689,8 @@
             gameplay_hud_cache_.text_revision = data.gameplay.text_revision;
         }
 
-        constexpr double kComboAnimationDurationMs = 150.0;
-        constexpr double kJudgementAnimationDurationMs = 220.0;
+        const double kComboAnimationDurationMs = ng_motion("combo_duration_ms");
+        const double kJudgementAnimationDurationMs = ng_motion("judgement_duration_ms");
         const auto animation_age_ms = [render_now_ns](int64_t started_ns, double duration_ms) {
             if (started_ns <= 0) return duration_ms;
             return std::clamp(
@@ -662,11 +703,11 @@
                 animation_age_ms(gameplay_hud_cache_.combo_animation_started_ns,
                                  kComboAnimationDurationMs),
                 kComboAnimationDurationMs,
-                1.16f,
-                -5.0f);
+                ng_motion("combo_scale"),
+                ng_motion("combo_lift"));
         const GameplayTextPopAnimation judgement_text_animation = gameplay_judgement_animation(
             data.gameplay.feedback, animation_age_ms(gameplay_hud_cache_.judgement_animation_started_ns,
-                                                     kJudgementAnimationDurationMs));
+                                                     kJudgementAnimationDurationMs) * 220.0 / kJudgementAnimationDurationMs);
 
         if (data.gameplay.loading && !data.gameplay.active) {
             draw_gameplay_header();
@@ -944,27 +985,32 @@
                                        const std::wstring& gauge_label_text,
                                        const std::wstring& gauge_value_text,
                                        std::size_t gauge_grid_index) {
+            const auto gauge=ng_rect("gauge",D2D1::RectF(gauge_left,kGameplayGaugeTop,gauge_left+kGameplayGaugeWidth,kGameplayGaugeBottom));
+            const float gauge_top=gauge.top,gauge_bottom=gauge.bottom,gauge_width=gauge.right-gauge.left;
+            gauge_left=gauge.left;
             const float gauge_ratio =
                 static_cast<float>(std::clamp(gauge_value / 100.0, 0.0, 1.0));
             const float fill_top =
-                kGameplayGaugeBottom - (kGameplayGaugeBottom - kGameplayGaugeTop) * gauge_ratio;
-            const uint32_t gauge_rgb = gameplay_gauge_color(gauge_token);
+                gauge_bottom - (gauge_bottom - gauge_top) * gauge_ratio;
+            const char* gauge_color_slot=gauge_token=="EX-HARD"?"gauge_ex_hard":gauge_token=="HARD"?"gauge_hard":gauge_token=="EASY"?"gauge_easy":"gauge_normal";
+            const uint32_t gauge_rgb = ng_rgb(gauge_color_slot,gameplay_gauge_color(gauge_token));
+            const float gauge_alpha=ng_alpha(gauge_color_slot);
 
             if (d2d_->accent_brush && gauge_ratio > 0.0f) {
                 const D2D1_COLOR_F saved_color = d2d_->accent_brush->GetColor();
                 const float saved_opacity = d2d_->accent_brush->GetOpacity();
-                const float inner_bottom = kGameplayGaugeBottom - 4.0f;
+                const float inner_bottom = gauge_bottom - 4.0f;
                 const float inner_top = std::clamp(fill_top + 4.0f,
-                                                   kGameplayGaugeTop + 4.0f,
+                                                   gauge_top + 4.0f,
                                                    inner_bottom);
 
                 d2d_->accent_brush->SetColor(
-                    color_from_rgb(gauge_rgb, 0.16f * visual_opacity));
+                    color_from_rgb(gauge_rgb, 0.16f * visual_opacity*gauge_alpha));
                 const D2D1_RECT_F halo =
                     D2D1::RectF(gauge_left + 1.0f,
-                                std::max(kGameplayGaugeTop + 1.0f, fill_top - 3.0f),
-                                gauge_left + kGameplayGaugeWidth - 1.0f,
-                                kGameplayGaugeBottom - 1.0f);
+                                std::max(gauge_top + 1.0f, fill_top - 3.0f),
+                                gauge_left + gauge_width - 1.0f,
+                                gauge_bottom - 1.0f);
                 ctx->FillRoundedRectangle(D2D1::RoundedRect(halo, 10.0f, 10.0f),
                                           d2d_->accent_brush.Get());
 
@@ -972,10 +1018,10 @@
                     const D2D1_RECT_F fill =
                         D2D1::RectF(gauge_left + 4.0f,
                                     inner_top,
-                                    gauge_left + kGameplayGaugeWidth - 4.0f,
+                                    gauge_left + gauge_width - 4.0f,
                                     inner_bottom);
                     d2d_->accent_brush->SetColor(
-                        color_from_rgb(gauge_rgb, 0.80f * visual_opacity));
+                        color_from_rgb(gauge_rgb, 0.80f * visual_opacity*gauge_alpha));
                     ctx->FillRoundedRectangle(D2D1::RoundedRect(fill, 8.0f, 8.0f),
                                               d2d_->accent_brush.Get());
 
@@ -987,7 +1033,7 @@
                     if (sheen.bottom > sheen.top && sheen.right > sheen.left) {
                         d2d_->accent_brush->SetColor(
                             color_from_rgb(blend_rgb(gauge_rgb, 0xFFFFFF, 0.72f),
-                                           0.46f * visual_opacity));
+                                           0.46f * visual_opacity*gauge_alpha));
                         ctx->FillRoundedRectangle(D2D1::RoundedRect(sheen, 3.0f, 3.0f),
                                                   d2d_->accent_brush.Get());
                     }
@@ -1010,18 +1056,18 @@
 
             const D2D1_RECT_F label_rect =
                 D2D1::RectF(gauge_left - 90.0f,
-                            kGameplayGaugeTop - 42.0f,
+                            gauge_top - 42.0f,
                             gauge_left + 140.0f,
-                            kGameplayGaugeTop - 8.0f);
+                            gauge_top - 8.0f);
             const D2D1_RECT_F value_rect =
                 D2D1::RectF(gauge_left - 90.0f,
-                            kGameplayGaugeBottom + 8.0f,
+                            gauge_bottom + 8.0f,
                             gauge_left + 140.0f,
-                            kGameplayGaugeBottom + 50.0f);
+                            gauge_bottom + 50.0f);
             if (d2d_->body_format && d2d_->accent_brush) {
                 const D2D1_COLOR_F saved_color = d2d_->accent_brush->GetColor();
                 const float saved_opacity = d2d_->accent_brush->GetOpacity();
-                d2d_->accent_brush->SetColor(color_from_rgb(gauge_rgb, 0.92f));
+                d2d_->accent_brush->SetColor(color_from_rgb(gauge_rgb, 0.92f*gauge_alpha));
                 draw_text_clipped_aligned(gauge_label_text,
                                           d2d_->body_format.Get(),
                                           label_rect,
@@ -1051,15 +1097,14 @@
             }
             constexpr float kComboHalfHeight = 30.0f;
             constexpr float kComboLabelExtension = 18.0f;
-            const D2D1_RECT_F combo_rect =
-                gameplay_combo_overlay_rect(combo_field_layout,
+            const D2D1_RECT_F combo_rect = ng_rect("combo",gameplay_combo_overlay_rect(combo_field_layout,
                                             combo_position,
                                             kComboHalfHeight,
                                             top_safe_margin,
                                             bottom_safe_margin,
                                             vertical_offset,
                                             8.0f,
-                                            kComboLabelExtension);
+                                            kComboLabelExtension));
             D2D1_MATRIX_3X2_F saved_transform{};
             ctx->GetTransform(&saved_transform);
             const D2D1_POINT_2F animation_center = D2D1::Point2F(
@@ -1079,20 +1124,23 @@
                                 combo_rect.right + 2.0f,
                                 combo_rect.bottom + 3.0f);
                 draw_text_clipped_aligned(combo_value_text,
-                                          d2d_->gameplay_combo_format.Get(),
+                                          ng_font("combo",d2d_->gameplay_combo_format.Get()),
                                           shadow_rect,
                                           d2d_->footer_brush.Get(),
                                           DWRITE_TEXT_ALIGNMENT_CENTER);
                 d2d_->footer_brush->SetOpacity(saved_footer_opacity);
             }
+            const auto combo_color=d2d_->accent_brush->GetColor();
+            d2d_->accent_brush->SetColor(ng_color("combo",combo_color));
             const float saved_opacity = d2d_->accent_brush->GetOpacity();
             d2d_->accent_brush->SetOpacity(0.94f * animation.opacity);
             draw_text_clipped_aligned(combo_value_text,
-                                      d2d_->gameplay_combo_format.Get(),
+                                      ng_font("combo",d2d_->gameplay_combo_format.Get()),
                                       combo_rect,
                                       d2d_->accent_brush.Get(),
                                       DWRITE_TEXT_ALIGNMENT_CENTER);
             d2d_->accent_brush->SetOpacity(saved_opacity);
+            d2d_->accent_brush->SetColor(combo_color);
             if (d2d_->hud_format && d2d_->muted_brush) {
                 const float saved_muted_opacity = d2d_->muted_brush->GetOpacity();
                 d2d_->muted_brush->SetOpacity(saved_muted_opacity * animation.opacity);
@@ -1121,7 +1169,7 @@
             const float label_top = top_labels ? (label_field_layout.top + 8.0f)
                                                : (label_field_layout.bottom - 30.0f);
             const D2D1_COLOR_F saved_text_color = d2d_->text_brush->GetColor();
-            d2d_->text_brush->SetColor(D2D1::ColorF(0xF7FAFD, 0.38f * visual_opacity));
+            d2d_->text_brush->SetColor(ng_color("key_label",D2D1::ColorF(0xF7FAFD, 0.38f * visual_opacity)));
             const std::size_t label_count =
                 std::min(data.gameplay.key_label_count, static_cast<std::size_t>(label_field_layout.lane_count));
             for (std::size_t lane = 0; lane < label_count && lane < data.gameplay.key_labels.size(); ++lane) {
@@ -1130,13 +1178,12 @@
                     continue;
                 }
                 const int lane_index = static_cast<int>(lane);
-                const D2D1_RECT_F label_rect =
-                    D2D1::RectF(gameplay_lane_left(label_field_layout, lane_index) + 2.0f,
+                const D2D1_RECT_F label_rect = ng_rect("key_label",D2D1::RectF(gameplay_lane_left(label_field_layout, lane_index) + 2.0f,
                                 label_top,
                                 gameplay_lane_right(label_field_layout, lane_index) - 2.0f,
-                                label_top + 22.0f);
+                                label_top + 22.0f));
                 draw_text_clipped_aligned(to_wide(label),
-                                          d2d_->hud_format.Get(),
+                                          ng_font("key_label",d2d_->hud_format.Get()),
                                           label_rect,
                                           d2d_->text_brush.Get(),
                                           DWRITE_TEXT_ALIGNMENT_CENTER);
@@ -1148,92 +1195,45 @@
                                            float key_hit_line_y,
                                            int lane,
                                            bool pressed,
-                                           float activity) {
-            if (use_imported_metrics || !d2d_->note_fill_brush) {
-                return;
+                                           float activity,
+                                           bool ghost = false) {
+            if (use_imported_metrics || !d2d_->note_fill_brush) return;
+            const auto lane_index = static_cast<std::size_t>(lane);
+            const auto bounds = native_key_bounds(gameplay_lane_left(key_field_layout, lane),
+                gameplay_lane_right(key_field_layout, lane), key_field_layout.top, key_field_layout.bottom,
+                gameplay_osu_gear_top(key_field_layout, key_hit_line_y, note_height_scale),native_style);
+            const float height = bounds.bottom - bounds.top;
+            if (bounds.right <= bounds.left || height <= 0.0f) return;
+            auto& travel = ghost ? native_ghost_key_travel_[lane_index] : native_key_travel_[lane_index];
+            travel = advance_native_key_travel(travel, pressed, native_key_delta_seconds, ng_motion("press_response"),ng_motion("release_response"));
+            const float pulse = gameplay_interpolated_activity(activity, data.gameplay.activity_publish_time_ns, render_now_ns);
+            const float light = std::clamp((travel * ng_motion("pressed_light") + pulse * ng_motion("hit_light")) * key_pulse_brightness, 0.0f, 1.0f);
+            const float depth = std::min(std::max(height * 0.065f,2.0f),ng_motion("press_depth")) * travel;
+            const uint32_t color = lane_index < data.gameplay.lane_color_count ? data.gameplay.lane_colors[lane_index]
+                : (gameplay_lane_uses_white_note(lane + 1) ? 0xF6F8FF : 0x4F80FF);
+            auto* fill = d2d_->note_fill_brush.Get();
+            const auto saved = fill->GetColor();
+            // The stationary well makes the moving face read as a physical instrument key.
+            fill->SetColor(ng_color("key_well",color_from_rgb(0x03080F, visual_opacity)));
+            ctx->FillRectangle(D2D1::RectF(bounds.left, bounds.top, bounds.right, bounds.bottom), fill);
+            const auto face = D2D1::RectF(bounds.left, bounds.top + depth, bounds.right, bounds.bottom - std::min(height-1.0f,ng_metric("key_face_gap")) + depth);
+            if (auto* idle = d2d_->lane_key_idle_bitmaps[lane_index].Get()) {
+                ctx->DrawBitmap(idle, face, visual_opacity, D2D1_BITMAP_INTERPOLATION_MODE_LINEAR);
+                if (light > 0.005f && d2d_->lane_key_pressed_bitmaps[lane_index])
+                    ctx->DrawBitmap(d2d_->lane_key_pressed_bitmaps[lane_index].Get(), face,
+                                    light * visual_opacity, D2D1_BITMAP_INTERPOLATION_MODE_LINEAR);
+            } else {
+                fill->SetColor(color_from_rgb(blend_rgb(color, 0x142333, 0.55f), visual_opacity));
+                ctx->FillRectangle(face, fill);
             }
-            const float lane_left = gameplay_lane_left(key_field_layout, lane) + 2.0f;
-            const float lane_right = gameplay_lane_right(key_field_layout, lane) - 2.0f;
-            const float raw_gear_top = gameplay_osu_gear_top(key_field_layout, key_hit_line_y, note_height_scale);
-            const float gear_bottom = key_field_layout.bottom - 3.0f;
-            const float key_height = std::clamp(gear_bottom - raw_gear_top, 48.0f, 180.0f);
-            const float gear_top = gear_bottom - key_height;
-            const NativeDigitalKeyVisual key_visual =
-                resolve_native_digital_key_visual(pressed, activity, key_height);
-            uint32_t lane_color = 0xF6F8FF;
-            const std::size_t lane_index = static_cast<std::size_t>(lane);
-            if (lane_index < data.gameplay.lane_color_count) {
-                lane_color = data.gameplay.lane_colors[lane_index];
-            } else if (!gameplay_lane_uses_white_note(lane + 1)) {
-                lane_color = 0x4F80FF;
+            // LED meter stays below the reading area, with bounded work even at 16K.
+            const float pad = std::min(10.0f, (bounds.right - bounds.left) * 0.16f);
+            if (light > 0.01f) {
+                fill->SetColor(color_from_rgb(blend_rgb(color, ng_rgb("key_led",0xB9FFF0), 0.35f), light * visual_opacity*ng_alpha("key_led")));
+                ctx->FillRectangle(D2D1::RectF(bounds.left + pad, bounds.bottom - 3.0f,
+                    bounds.left + pad + (bounds.right - bounds.left - 2.0f * pad) * light, bounds.bottom - 1.0f), fill);
             }
-
-            ID2D1SolidColorBrush* fill = d2d_->note_fill_brush.Get();
-            const D2D1_COLOR_F saved_fill_color = fill->GetColor();
-            const float saved_fill_opacity = fill->GetOpacity();
-            const D2D1_RECT_F housing =
-                D2D1::RectF(lane_left, gear_top + 1.0f, lane_right, gear_bottom);
-            fill->SetColor(color_from_rgb(0x03070C, 0.96f * visual_opacity));
-            ctx->FillRoundedRectangle(D2D1::RoundedRect(housing, 5.0f, 5.0f), fill);
-
-            const D2D1_RECT_F surface = D2D1::RectF(
-                lane_left + 2.0f,
-                gear_top + 4.0f + key_visual.press_offset,
-                lane_right - 2.0f,
-                gear_bottom - 2.0f);
-            const uint32_t surface_color = pressed
-                ? blend_rgb(lane_color, 0x36E1F2, 0.30f)
-                : blend_rgb(lane_color, 0x07131E, 0.78f);
-            fill->SetColor(color_from_rgb(surface_color, (pressed ? 0.96f : 0.88f) * visual_opacity));
-            ctx->FillRoundedRectangle(D2D1::RoundedRect(surface, 4.0f, 4.0f), fill);
-
-            const float lip_height = pressed ? 2.0f : 5.0f;
-            fill->SetColor(color_from_rgb(
-                blend_rgb(lane_color, pressed ? 0xFFFFFF : 0x6EE7F2, pressed ? 0.48f : 0.25f),
-                (pressed ? 0.86f : 0.52f) * visual_opacity));
-            ctx->FillRectangle(D2D1::RectF(surface.left + 2.0f,
-                                           surface.top + 2.0f,
-                                           surface.right - 2.0f,
-                                           std::min(surface.bottom, surface.top + 2.0f + lip_height)),
-                               fill);
-
-            fill->SetColor(color_from_rgb(0x9BDDE8, 0.10f * visual_opacity));
-            const float scan_step = std::max(8.0f, key_height / 7.0f);
-            for (float y = surface.top + 14.0f; y < surface.bottom - 4.0f; y += scan_step) {
-                ctx->FillRectangle(D2D1::RectF(surface.left + 4.0f, y, surface.right - 4.0f, y + 1.0f), fill);
-            }
-
-            if (key_visual.glitch_strength > 0.02f) {
-                const float glitch = key_visual.glitch_strength;
-                const float glitch_y = std::clamp(
-                    surface.top + 18.0f + static_cast<float>((lane * 29) % 61),
-                    surface.top + 8.0f,
-                    surface.bottom - 8.0f);
-                const float shift = 2.0f + 5.0f * glitch;
-                fill->SetColor(color_from_rgb(0x55F5FF, 0.78f * glitch * visual_opacity));
-                ctx->FillRectangle(D2D1::RectF(surface.left + 5.0f + shift,
-                                               glitch_y,
-                                               surface.right - 5.0f,
-                                               glitch_y + 3.0f),
-                                   fill);
-                fill->SetColor(color_from_rgb(0xFF4FD8, 0.58f * glitch * visual_opacity));
-                ctx->FillRectangle(D2D1::RectF(surface.left + 5.0f,
-                                               glitch_y + 5.0f,
-                                               surface.right - 5.0f - shift,
-                                               glitch_y + 7.0f),
-                                   fill);
-            }
-
-            if (d2d_->button_border_brush) {
-                const float saved_border_opacity = d2d_->button_border_brush->GetOpacity();
-                d2d_->button_border_brush->SetOpacity((pressed ? 0.82f : 0.42f) * visual_opacity);
-                ctx->DrawRoundedRectangle(D2D1::RoundedRect(surface, 4.0f, 4.0f),
-                                          d2d_->button_border_brush.Get(),
-                                          pressed ? 1.8f : 1.0f);
-                d2d_->button_border_brush->SetOpacity(saved_border_opacity);
-            }
-            fill->SetColor(saved_fill_color);
-            fill->SetOpacity(saved_fill_opacity);
+            fill->SetColor(saved);
         };
 
         // LR2 gear art is a bottom panel with the receptor art baked in; TenRiff
@@ -1339,7 +1339,7 @@
                 d2d_->lane_key_pressed_bitmaps[lane_index]) {
                 key_bitmap = d2d_->lane_key_pressed_bitmaps[lane_index].Get();
             }
-            if (!key_bitmap && !use_imported_metrics) {
+            if (!use_imported_metrics) {
                 draw_native_digital_key(field_layout,
                                         hit_line_y,
                                         lane,
@@ -1583,6 +1583,7 @@
                     gameplay_centered_overlay_rect(field_layout, combo_anchor_y - 34.0f, 48.0f, -24.0f);
                 feedback_rect.left += static_cast<float>(data.gameplay.judgement_offset_x);
                 feedback_rect.right += static_cast<float>(data.gameplay.judgement_offset_x);
+                feedback_rect=ng_rect("judgement",feedback_rect);
                 const D2D1_COLOR_F saved_text_color = d2d_->text_brush->GetColor();
                 const float saved_text_opacity = d2d_->text_brush->GetOpacity();
                 D2D1_MATRIX_3X2_F saved_feedback_transform{};
@@ -1604,14 +1605,14 @@
                     D2D1::RectF(feedback_rect.left + 3.0f, feedback_rect.top + 3.0f,
                                 feedback_rect.right + 3.0f, feedback_rect.bottom + 3.0f);
                 draw_text_clipped_aligned(gameplay_hud_cache_.feedback_text,
-                                          d2d_->header_format.Get(),
+                                          ng_font("judgement",d2d_->header_format.Get()),
                                           feedback_shadow_rect,
                                           d2d_->text_brush.Get(),
                                           DWRITE_TEXT_ALIGNMENT_CENTER);
 
-                d2d_->text_brush->SetColor(gameplay_feedback_color(data.gameplay.feedback));
+                d2d_->text_brush->SetColor(ng_judge_color(data.gameplay.feedback));
                 draw_text_clipped_aligned(gameplay_hud_cache_.feedback_text,
-                                          d2d_->header_format.Get(),
+                                          ng_font("judgement",d2d_->header_format.Get()),
                                           feedback_rect,
                                           d2d_->text_brush.Get(),
                                           DWRITE_TEXT_ALIGNMENT_CENTER);
@@ -1624,10 +1625,10 @@
                                     feedback_rect.bottom + 8.0f);
                     d2d_->text_brush->SetColor(
                         data.gameplay.feedback_delta_ms < 0.0
-                            ? D2D1::ColorF(0x5DA9FF, 0.98f)
-                            : D2D1::ColorF(0xFF5A6B, 0.98f));
+                            ? ng_color("timing_fast",D2D1::ColorF(0x5DA9FF, 0.98f))
+                            : ng_color("timing_slow",D2D1::ColorF(0xFF5A6B, 0.98f)));
                     draw_text_clipped_aligned(gameplay_hud_cache_.feedback_timing_text,
-                                              d2d_->body_format.Get(),
+                                              ng_font("timing",d2d_->body_format.Get()),
                                               timing_text_rect,
                                               d2d_->text_brush.Get(),
                                               DWRITE_TEXT_ALIGNMENT_CENTER);
@@ -1691,9 +1692,8 @@
                 surface_layout.ghost_field.left,
                 surface_layout.ghost_field.right,
                 kProgressFieldClearance);
-        const D2D1_RECT_F progress_track_rect =
-            D2D1::RectF(progress_track_layout.left, 16.0f,
-                        progress_track_layout.right, 36.0f);
+        const D2D1_RECT_F progress_track_rect = ng_rect("progress",D2D1::RectF(progress_track_layout.left, 16.0f,
+                        progress_track_layout.right, 36.0f));
         draw_gameplay_progress_bar(progress_track_rect);
         if (data.gameplay.peer_visible) {
             const D2D1_RECT_F lead_track =
@@ -1714,7 +1714,7 @@
                 const D2D1_COLOR_F saved_color = d2d_->accent_brush->GetColor();
                 const float saved_opacity = d2d_->accent_brush->GetOpacity();
                 d2d_->accent_brush->SetOpacity(0.32f);
-                d2d_->accent_brush->SetColor(D2D1::ColorF(0xFF5A6B));
+                d2d_->accent_brush->SetColor(ng_color("timing_slow",D2D1::ColorF(0xFF5A6B)));
                 ctx->FillRoundedRectangle(
                     D2D1::RoundedRect(D2D1::RectF(lead_track.left,
                                                  lead_track.top,
@@ -1735,7 +1735,7 @@
 
                 const D2D1_COLOR_F marker_color =
                     lead_position < 0.5f
-                        ? D2D1::ColorF(0xFF5A6B, 0.98f)
+                        ? ng_color("timing_slow",D2D1::ColorF(0xFF5A6B, 0.98f))
                         : (lead_position > 0.5f
                                ? D2D1::ColorF(0x89D185, 0.98f)
                                : D2D1::ColorF(0x6EE7F2, 0.98f));
@@ -1767,7 +1767,7 @@
             }
             if (d2d_->body_format && d2d_->text_brush) {
                 const D2D1_COLOR_F saved_text_color = d2d_->text_brush->GetColor();
-                d2d_->text_brush->SetColor(D2D1::ColorF(0xFF5A6B, 0.96f));
+                d2d_->text_brush->SetColor(ng_color("timing_slow",D2D1::ColorF(0xFF5A6B, 0.96f)));
                 draw_text_clipped(L"LOSS",
                                   d2d_->body_format.Get(),
                                   D2D1::RectF(lead_track.left,
@@ -1975,12 +1975,13 @@
                     d2d_->lane_key_pressed_bitmaps[lane_index]) {
                     key_bitmap = d2d_->lane_key_pressed_bitmaps[lane_index].Get();
                 }
-                if (!key_bitmap && !use_imported_metrics) {
+                if (!use_imported_metrics) {
                     draw_native_digital_key(ghost_field_layout,
                                             ghost_hit_line_y,
                                             lane,
                                             lane_is_pressed,
-                                            lane_activity);
+                                            lane_activity,
+                                            true);
                     continue;
                 }
                 if (!key_bitmap) {
@@ -2248,8 +2249,8 @@
                                         feedback_rect.bottom + 8.0f);
                         d2d_->text_brush->SetColor(
                             data.gameplay.ghost_feedback_delta_ms < 0.0
-                                ? D2D1::ColorF(0x5DA9FF, 0.98f)
-                                : D2D1::ColorF(0xFF5A6B, 0.98f));
+                                ? ng_color("timing_fast",D2D1::ColorF(0x5DA9FF, 0.98f))
+                                : ng_color("timing_slow",D2D1::ColorF(0xFF5A6B, 0.98f)));
                         draw_text_clipped_aligned(gameplay_hud_cache_.ghost_feedback_timing_text,
                                                   d2d_->body_format.Get(),
                                                   timing_text_rect,

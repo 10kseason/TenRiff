@@ -38,16 +38,10 @@
             return data.result.status;
         };
         const auto localized_result_gauge = [&]() {
-            if (!ui_korean) {
-                return data.result.gauge_label;
-            }
-            if (data.result.gauge_label == "HARD") {
-                return std::string("하드");
-            }
-            if (data.result.gauge_label == "EASY") {
-                return std::string("이지");
-            }
-            return std::string("노말");
+            if (data.result.gauge_label == "HARD") return loc("HARD", "하드");
+            if (data.result.gauge_label == "EASY") return loc("EASY", "이지");
+            if (data.result.gauge_label == "NORMAL") return loc("NORMAL", "노말");
+            return data.result.gauge_label;
         };
 
         if (data.result.peer_battle) {

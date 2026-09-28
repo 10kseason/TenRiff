@@ -4,10 +4,13 @@
 
 #include "GameplayHudLimits.h"
 #include "app/ImportedGameplaySkin.h"
+#include "app/NativeMenuSkin.h"
+#include "ui/Localization.h"
 #include "render/BgaImageLoader.h"
 #include "render/BgaVideoDecoder.h"
 #include "render/GameplayMotion.h"
 #include "render/MultiplayerPresentation.h"
+#include "render/NativeMenuMotion.h"
 #include "render/OnnxBackgroundUpscaler.h"
 #include "render/RenderThread.h"
 
@@ -39,6 +42,8 @@ struct MenuWindowConfig {
     std::string title = "TenRiff";
     std::string display_mode = "borderless";
     bool vsync = false;
+    // Preview/accessibility override; the OS animation preference also applies.
+    bool reduce_menu_motion = false;
     int refresh_hz = 300;
     int width = 1280;
     int height = 720;
@@ -744,6 +749,8 @@ struct PerformanceOverlayData {
 
 struct LobbySkinData {
     bool enabled = false;
+    bool native_menu_renderer = false;
+    app::NativeMenuSkinStyle native_menu;
     uint64_t revision = 0;
     std::string background_path;
     std::string logo_path;
@@ -762,7 +769,7 @@ struct LobbySkinData {
 
 struct MenuRenderData {
     MenuScreenKind kind = MenuScreenKind::GenericList;
-    bool ui_korean = false;
+    ui::Language ui_language = ui::Language::English;
     std::string ui_font = "default";
     LobbySkinData lobby_skin;
 
@@ -855,7 +862,8 @@ private:
     void trim_song_card_preview_cache();
     void invalidate_gameplay_static_cache();
     [[nodiscard]] bool ensure_gameplay_static_cache(const GameplayHudData& data);
-    [[nodiscard]] bool create_text_formats(const wchar_t* ui_family);
+    [[nodiscard]] bool create_text_formats(const wchar_t* ui_family,
+        const app::NativeMenuSkinStyle* native_style = nullptr);
     [[nodiscard]] bool recreate_targets();
     [[nodiscard]] bool save_screenshot_to_png();
     [[nodiscard]] bool is_input_foreground() const;
@@ -891,6 +899,14 @@ private:
     unsigned int swap_chain_flags_ = 0;
     bool suppress_next_left_button_up_ = false;
     bool cursor_hidden_ = false;
+    NativeMenuMotion native_menu_motion_{};
+    bool native_animation_preference_checked_ = false;
+    bool native_system_reduced_motion_ = false;
+    int64_t native_animation_preference_checked_ns_ = 0;
+    std::size_t native_jacket_identity_ = 0;
+    int64_t native_jacket_changed_ns_ = 0;
+    uint64_t native_font_revision_ = 0;
+    bool native_font_overrides_ = false;
 
     void* hwnd_ = nullptr;
     unsigned int width_ = 0;
@@ -980,6 +996,8 @@ private:
     };
 
     struct GameplayStaticCache {
+        bool native_instrument = false;
+        std::shared_ptr<const app::ImportedGameplaySkinDefinition> native_skin;
         int lane_count = 0;
         double judgement_line_position = 0.82;
         double gameplay_field_offset_x = 0.0;
@@ -1008,6 +1026,8 @@ private:
     };
 
     struct GameplayNoteSpriteCache {
+        double note_outline_opacity = -1.0;
+        std::size_t lane_color_count = 0;
         int lane_count = 0;
         bool note_border_enabled = true;
         std::string note_shape = "rect";
@@ -1112,6 +1132,9 @@ private:
     GameplayHudCache gameplay_hud_cache_{};
     GameplayStaticCache gameplay_static_cache_{};
     GameplayNoteSpriteCache gameplay_note_sprite_cache_{};
+    std::array<float, kGameplayHudMaxLanes> native_key_travel_{};
+    std::array<float, kGameplayHudMaxLanes> native_ghost_key_travel_{};
+    int64_t native_key_frame_time_ns_ = 0;
     GameplayBackgroundCache gameplay_background_cache_{};
     std::string active_background_upscale_model_path_{};
     bool active_background_upscale_prefer_npu_ = false;

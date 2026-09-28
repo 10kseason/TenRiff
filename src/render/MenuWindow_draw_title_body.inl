@@ -7,15 +7,15 @@
         const float logo_pulse = static_cast<float>(pulse_wave_01(render_now_ns, 5.4, 0.18));
         const float button_pulse = static_cast<float>(pulse_wave_01(render_now_ns, 4.2, 0.46));
         constexpr int bar_count = 18;
-        constexpr float kSpectrumBarWidth = 18.0f;
-        constexpr float kSpectrumBarGap = 12.0f;
-        constexpr float kSpectrumMaxHeight = 84.0f;
-        constexpr float kSpectrumNaturalWidth =
+        const float kSpectrumBarWidth = native_metric("title.kspectrumbarwidth", 18.0f);
+        const float kSpectrumBarGap = native_metric("title.kspectrumbargap", 12.0f);
+        const float kSpectrumMaxHeight = native_metric("title.kspectrummaxheight", 84.0f);
+        const float kSpectrumNaturalWidth =
             bar_count * kSpectrumBarWidth + (bar_count - 1) * kSpectrumBarGap;
         const D2D1_RECT_F spectrum = skin_layout_rect(
             data, "title.spectrum",
-            D2D1::RectF((kBaseWidth - kSpectrumNaturalWidth) * 0.5f, 150.0f - kSpectrumMaxHeight,
-                        (kBaseWidth + kSpectrumNaturalWidth) * 0.5f, 150.0f));
+            native_rect("title.rect.001", D2D1::RectF((kBaseWidth - kSpectrumNaturalWidth) * 0.5f, 150.0f - kSpectrumMaxHeight,
+                        (kBaseWidth + kSpectrumNaturalWidth) * 0.5f, 150.0f)));
         const float spectrum_scale_x = (spectrum.right - spectrum.left) / kSpectrumNaturalWidth;
         const float spectrum_scale_y = (spectrum.bottom - spectrum.top) / kSpectrumMaxHeight;
         const float bar_w = kSpectrumBarWidth * spectrum_scale_x;
@@ -31,7 +31,7 @@
                     spectrum_scale_y;
                 const float x0 = spectrum.left + static_cast<float>(i) * (bar_w + bar_gap);
                 const D2D1_ROUNDED_RECT bar = D2D1::RoundedRect(
-                    D2D1::RectF(x0, spectrum.bottom - height, x0 + bar_w, spectrum.bottom),
+                    native_rect("title.rect.002", D2D1::RectF(x0, spectrum.bottom - height, x0 + bar_w, spectrum.bottom)),
                     4.0f, 4.0f);
                 d2d_->accent_brush->SetOpacity(0.42f + 0.18f * static_cast<float>(std::sin(phase) * 0.5 + 0.5));
                 ctx->FillRoundedRectangle(bar, d2d_->accent_brush.Get());
@@ -41,13 +41,13 @@
         }
 
         draw_song_select_horizon(344.0f, 186.0f, kBaseWidth - 186.0f, 820.0f, 0.10f, 0.28f + logo_pulse * 0.20f);
-        draw_song_select_stardust(D2D1::RectF(114.0f, 96.0f, 1810.0f, 364.0f), 36, 0x491u, 0.09f);
+        draw_song_select_stardust(native_rect("title.rect.003", D2D1::RectF(114.0f, 96.0f, 1810.0f, 364.0f)), 36, 0x491u, 0.09f);
         const ScreenContentBands bands =
             make_screen_content_bands(160.0f, 170.0f, false, 24.0f, 24.0f);
 
         const std::wstring logo_w = L"TenRiff";
         float logo_left = 590.0f;
-        constexpr float kLogoTop = 184.0f;
+        const float kLogoTop = native_metric("title.klogotop", 184.0f);
         float logo_width = 740.0f;
         float logo_height = 104.0f;
         Microsoft::WRL::ComPtr<IDWriteTextLayout> logo_layout;
@@ -71,8 +71,8 @@
         }
         const D2D1_RECT_F logo_rect = skin_layout_rect(
             data, "title.logo",
-            D2D1::RectF(logo_left, kLogoTop, logo_left + logo_width,
-                        kLogoTop + std::max(96.0f, logo_height)));
+            native_rect("title.rect.004", D2D1::RectF(logo_left, kLogoTop, logo_left + logo_width,
+                        kLogoTop + std::max(96.0f, logo_height))));
         // The layout path draws from a point, so centre the measured wordmark in
         // whatever box it ends up in.
         const float logo_draw_left =
@@ -83,21 +83,21 @@
                                              ? find_song_card_preview_bitmap(data.lobby_skin.logo_path)
                                              : nullptr;
         const float logo_rule_y = logo_rect.bottom + 18.0f;
-        const float logo_rule_gap = 42.0f;
-        const float logo_rule_width = 280.0f;
+        const float logo_rule_gap = native_metric("title.logo_rule_gap", 42.0f);
+        const float logo_rule_width = native_metric("title.logo_rule_width", 280.0f);
         const D2D1_ROUNDED_RECT logo_rule_left =
-            D2D1::RoundedRect(D2D1::RectF(std::max(220.0f, logo_rect.left - logo_rule_gap - logo_rule_width),
+            D2D1::RoundedRect(native_rect("title.rect.005", D2D1::RectF(std::max(220.0f, logo_rect.left - logo_rule_gap - logo_rule_width),
                                           logo_rule_y,
                                           std::max(220.0f, logo_rect.left - logo_rule_gap),
-                                          logo_rule_y + 4.0f),
+                                          logo_rule_y + 4.0f)),
                               2.0f,
                               2.0f);
         const D2D1_ROUNDED_RECT logo_rule_right =
-            D2D1::RoundedRect(D2D1::RectF(std::min(kBaseWidth - 220.0f, logo_rect.right + logo_rule_gap),
+            D2D1::RoundedRect(native_rect("title.rect.006", D2D1::RectF(std::min(kBaseWidth - 220.0f, logo_rect.right + logo_rule_gap),
                                           logo_rule_y,
                                           std::min(kBaseWidth - 220.0f,
                                                    logo_rect.right + logo_rule_gap + logo_rule_width),
-                                          logo_rule_y + 4.0f),
+                                          logo_rule_y + 4.0f)),
                               2.0f,
                               2.0f);
         if (d2d_->accent_brush) {
@@ -153,8 +153,8 @@
 
         const D2D1_RECT_F buttons_area = skin_layout_rect(
             data, "title.buttons",
-            D2D1::RectF((kBaseWidth - 980.0f) * 0.5f, std::max(360.0f, bands.body_top - 6.0f),
-                        (kBaseWidth + 980.0f) * 0.5f, bands.body_bottom - 8.0f));
+            native_rect("title.rect.007", D2D1::RectF((kBaseWidth - 980.0f) * 0.5f, std::max(360.0f, bands.body_top - 6.0f),
+                        (kBaseWidth + 980.0f) * 0.5f, bands.body_bottom - 8.0f)));
         const float button_w = buttons_area.right - buttons_area.left;
         float button_h = 120.0f;
         float button_gap = 26.0f;
@@ -189,7 +189,7 @@
         for (std::size_t i = 0; i < data.title.buttons.size(); ++i) {
             const auto& button = data.title.buttons[i];
             const float y0 = button_top + static_cast<float>(i) * (button_h + button_gap);
-            const D2D1_RECT_F rect = D2D1::RectF(button_left, y0, button_left + button_w, y0 + button_h);
+            const D2D1_RECT_F rect = native_rect("title.rect.008", D2D1::RectF(button_left, y0, button_left + button_w, y0 + button_h));
             register_hit(rect, MenuHitTargetKind::TitleButton, static_cast<int>(i));
 
             ID2D1LinearGradientBrush* fill = nullptr;
@@ -212,10 +212,10 @@
 
             if (fill) {
                 const D2D1_RECT_F accent_rect =
-                    D2D1::RectF(rect.left + 18.0f, rect.top + 16.0f, rect.left + 34.0f, rect.bottom - 16.0f);
+                    native_rect("title.rect.009", D2D1::RectF(rect.left + 18.0f, rect.top + 16.0f, rect.left + 34.0f, rect.bottom - 16.0f));
                 const D2D1_ROUNDED_RECT accent_rr = D2D1::RoundedRect(accent_rect, 7.0f, 7.0f);
                 const D2D1_RECT_F top_line =
-                    D2D1::RectF(rect.left + 52.0f, rect.top + 14.0f, rect.right - 28.0f, rect.top + 18.0f);
+                    native_rect("title.rect.010", D2D1::RectF(rect.left + 52.0f, rect.top + 14.0f, rect.right - 28.0f, rect.top + 18.0f));
                 const D2D1_ROUNDED_RECT top_line_rr = D2D1::RoundedRect(top_line, 2.0f, 2.0f);
                 set_brush_points(fill, rect);
                 const float saved_opacity = fill->GetOpacity();
@@ -226,9 +226,9 @@
                 fill->SetOpacity(saved_opacity);
             }
 
-            const D2D1_RECT_F icon_rect = D2D1::RectF(rect.left + 52.0f, rect.top, rect.left + 162.0f, rect.bottom);
+            const D2D1_RECT_F icon_rect = native_rect("title.rect.011", D2D1::RectF(rect.left + 52.0f, rect.top, rect.left + 162.0f, rect.bottom));
             const D2D1_RECT_F label_rect =
-                D2D1::RectF(rect.left + 172.0f, rect.top, rect.right - 20.0f, rect.bottom);
+                native_rect("title.rect.012", D2D1::RectF(rect.left + 172.0f, rect.top, rect.right - 20.0f, rect.bottom));
 
             if (d2d_->menu_icon_format && d2d_->text_brush) {
                 const std::wstring icon_w = to_wide(button.icon);
@@ -251,11 +251,11 @@
             const float guide_bottom = std::max(guide_top + 220.0f, bands.body_bottom - 24.0f);
             const D2D1_RECT_F guide_rect =
                 skin_layout_rect(data, "title.guide",
-                                 D2D1::RectF(1492.0f, guide_top, 1834.0f, guide_bottom));
+                                 native_rect("title.rect.013", D2D1::RectF(1492.0f, guide_top, 1834.0f, guide_bottom)));
             draw_glass_panel(guide_rect, 18.0f, 0.76f, 0.24f + logo_pulse * 0.10f, false, 8.0f);
 
             const D2D1_RECT_F guide_header_rect =
-                D2D1::RectF(guide_rect.left + 26.0f, guide_rect.top + 18.0f, guide_rect.right - 26.0f, guide_rect.top + 64.0f);
+                native_rect("title.rect.014", D2D1::RectF(guide_rect.left + 26.0f, guide_rect.top + 18.0f, guide_rect.right - 26.0f, guide_rect.top + 64.0f));
             if (d2d_->body_format && d2d_->accent_brush) {
                 const std::wstring guide_header_w = wloc("GUIDE", "가이드");
                 draw_text_clipped(guide_header_w, d2d_->body_format.Get(), guide_header_rect, d2d_->accent_brush.Get());
@@ -277,11 +277,11 @@
             const float guide_line_height = std::max(16.0f, guide_row_pitch - 6.0f);
             float guide_y = guide_lines_top;
             const D2D1_RECT_F guide_clip_rect =
-                D2D1::RectF(guide_rect.left + 18.0f, guide_lines_top - 6.0f, guide_rect.right - 18.0f, guide_rect.bottom - 18.0f);
+                native_rect("title.rect.015", D2D1::RectF(guide_rect.left + 18.0f, guide_lines_top - 6.0f, guide_rect.right - 18.0f, guide_rect.bottom - 18.0f));
             ctx->PushAxisAlignedClip(guide_clip_rect, D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
             for (std::size_t i = 0; i < data.title.guides.size(); ++i) {
                 const D2D1_RECT_F line_rect =
-                    D2D1::RectF(guide_rect.left + 26.0f, guide_y, guide_rect.right - 26.0f, guide_y + guide_line_height);
+                    native_rect("title.rect.016", D2D1::RectF(guide_rect.left + 26.0f, guide_y, guide_rect.right - 26.0f, guide_y + guide_line_height));
                 if (d2d_->body_format && d2d_->text_brush) {
                     const std::wstring line_w = to_wide(data.title.guides[i]);
                     draw_text_clipped(line_w, d2d_->body_format.Get(), line_rect, d2d_->text_brush.Get());

@@ -480,7 +480,7 @@ private:
     void open_keymap_screen(Screen return_screen);
     void populate_help_overlay(render::HelpOverlayData& target) const;
 
-    [[nodiscard]] bool ui_uses_korean() const;
+    [[nodiscard]] ui::Language ui_language() const;
     [[nodiscard]] std::string ui_text(std::string_view english, std::string_view korean) const;
     [[nodiscard]] std::string ui_on_off(bool enabled) const;
     [[nodiscard]] std::string ui_language_label(std::string_view token) const;

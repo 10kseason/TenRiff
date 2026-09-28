@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(TenRiff VERSION 1.7.7 LANGUAGES C CXX)
+project(TenRiff VERSION 1.7.8 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -151,6 +151,7 @@ target_include_directories(tenriff_nk2
 target_compile_features(tenriff_nk2 PUBLIC cxx_std_17)
 
 add_library(tenriff_core
+    src/ui/Localization.cpp
     src/config/SimpleJson.cpp
     src/config/Config.cpp
     src/config/Keymap.cpp
@@ -491,6 +492,18 @@ endif()
 
 # Ship completed TenRiff skin.json skins beside the executable. The runtime
 # merges this read-mostly catalog behind profile-local imports.
+add_custom_command(TARGET tenriff POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        "${CMAKE_CURRENT_SOURCE_DIR}/tools/skin_editor"
+        "$<TARGET_FILE_DIR:tenriff>/tools/skin_editor"
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        "${CMAKE_CURRENT_SOURCE_DIR}/assets/native-menu"
+        "$<TARGET_FILE_DIR:tenriff>/tools/skin_editor/vector-assets"
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        "${CMAKE_CURRENT_SOURCE_DIR}/assets/native-gameplay"
+        "$<TARGET_FILE_DIR:tenriff>/tools/skin_editor/vector-gameplay"
+    COMMENT "Copying offline Korean/English/Japanese skin editor"
+)
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/skins")
     add_custom_command(TARGET tenriff POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_directory
@@ -545,6 +558,9 @@ if(TENRIFF_NK3_ONNX_AVAILABLE)
     endfunction()
 
     tenriff_copy_nk3_runtime(tenriff)
+    if(TARGET menu_visual_preview)
+        tenriff_copy_nk3_runtime(menu_visual_preview)
+    endif()
     if(TARGET bms_key_converter)
         tenriff_copy_nk3_runtime(bms_key_converter)
     endif()
@@ -685,6 +701,9 @@ if(TENRIFF_ENABLE_TESTS)
     target_link_libraries(ranked_records_smoke PRIVATE tenriff_core)
 
     add_executable(bms_parser_tests
+        tests/unit/test_native_menu_motion.cpp
+        tests/unit/test_native_skin_overrides.cpp
+        tests/unit/test_localization.cpp
         tests/unit/test_bms_parser.cpp
         tests/unit/test_bms_normalizer.cpp
         tests/unit/test_note_lane_mapping.cpp

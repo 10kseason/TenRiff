@@ -1,4 +1,5 @@
 #include "config/Config.h"
+#include "ui/Localization.h"
 
 #include <algorithm>
 #include <charconv>
@@ -61,32 +62,8 @@ int lane_count_for_skin_mode_token(std::string_view key_mode) {
     if (normalized == "7+1") {
         return 8;
     }
-    if (normalized == "4k") {
-        return 4;
-    }
-    if (normalized == "5k") {
-        return 5;
-    }
-    if (normalized == "6k") {
-        return 6;
-    }
-    if (normalized == "7k") {
-        return 7;
-    }
-    if (normalized == "8k") {
-        return 8;
-    }
-    if (normalized == "9k") {
-        return 9;
-    }
-    if (normalized == "12k") {
-        return 12;
-    }
-    if (normalized == "14k") {
-        return 14;
-    }
-    if (normalized == "16k") {
-        return 16;
+    for (int keys = 4; keys <= 16; ++keys) {
+        if (normalized == std::to_string(keys) + "k") return keys;
     }
     return 10;
 }
@@ -105,6 +82,9 @@ const std::unordered_map<std::string, std::vector<std::string>>& default_skin_la
         {"8k", {"ice", "azure", "ice", "teal", "teal", "ice", "azure", "ice"}},
         {"9k", {"ice", "azure", "ice", "teal", "gold", "teal", "ice", "azure", "ice"}},
         {"10k", {"ice", "azure", "ice", "azure", "ice", "ice", "azure", "ice", "azure", "ice"}},
+        {"11k", {"ice", "azure", "ice", "azure", "teal", "gold", "teal", "azure", "ice", "azure", "ice"}},
+        {"13k", {"ice", "azure", "ice", "azure", "ice", "teal", "gold", "teal", "ice", "azure", "ice", "azure", "ice"}},
+        {"15k", {"ice", "azure", "ice", "azure", "ice", "teal", "azure", "gold", "azure", "teal", "ice", "azure", "ice", "azure", "ice"}},
         {"16k", {"ice", "azure", "ice", "azure", "ice", "gold", "teal", "ice",
                  "ice", "teal", "gold", "ice", "azure", "ice", "azure", "ice"}},
     };
@@ -396,11 +376,7 @@ void sync_input_backend_fields(InputConfig& input) {
 }
 
 std::string normalize_ui_language(std::string value) {
-    value = to_lower_ascii(std::move(value));
-    if (value == "ko" || value == "kr" || value == "korean" || value == "ko-kr") {
-        return "ko";
-    }
-    return "en";
+    return std::string(ui::language_token(ui::language_from_token(value)));
 }
 
 int sanitize_refresh_hz(int value, std::vector<std::string>& warnings) {
@@ -1362,40 +1338,10 @@ std::string normalize_skin_mode_token(std::string_view key_mode) {
         normalized == "7+1sp" || normalized == "sp7+1") {
         return "7+1";
     }
-    if (normalized == "4" || normalized == "4key" || normalized == "keys4") {
-        return "4k";
-    }
-    if (normalized == "5" || normalized == "5key" || normalized == "keys5") {
-        return "5k";
-    }
-    if (normalized == "6" || normalized == "6key" || normalized == "keys6") {
-        return "6k";
-    }
-    if (normalized == "7" || normalized == "7key" || normalized == "keys7") {
-        return "7k";
-    }
-    if (normalized == "8" || normalized == "8key" || normalized == "keys8") {
-        return "8k";
-    }
-    if (normalized == "9" || normalized == "9key" || normalized == "keys9") {
-        return "9k";
-    }
-    if (normalized == "10" || normalized == "10key" || normalized == "keys10") {
-        return "10k";
-    }
-    if (normalized == "12" || normalized == "12key" || normalized == "keys12") {
-        return "12k";
-    }
-    if (normalized == "14" || normalized == "14key" || normalized == "keys14") {
-        return "14k";
-    }
-    if (normalized == "16" || normalized == "16key" || normalized == "keys16") {
-        return "16k";
-    }
-    if (normalized == "4k" || normalized == "5k" || normalized == "6k" || normalized == "7k" ||
-        normalized == "8k" || normalized == "9k" || normalized == "10k" || normalized == "12k" ||
-        normalized == "14k" || normalized == "16k") {
-        return normalized;
+    for (int keys = 4; keys <= 16; ++keys) {
+        const std::string count = std::to_string(keys);
+        if (normalized == count || normalized == count + "k" ||
+            normalized == count + "key" || normalized == "keys" + count) return count + "k";
     }
     return "10k";
 }
@@ -1446,7 +1392,7 @@ std::string normalize_ui_language_token(std::string_view token) {
 }
 
 std::vector<std::string> supported_skin_mode_tokens() {
-    return {"4k", "5k", "6k", "7k", "7+1", "8k", "9k", "10k", "12k", "14k", "16k"};
+    return {"4k", "5k", "6k", "7k", "7+1", "8k", "9k", "10k", "11k", "12k", "13k", "14k", "15k", "16k"};
 }
 
 std::string normalize_skin_scratch_position_token(std::string_view token) {

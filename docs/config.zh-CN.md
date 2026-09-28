@@ -215,7 +215,7 @@ chart loader/indexer 仅支持 BMS family（`.bms/.bme/.bml/.pms`）。旧 `enab
 | --- | --- | --- |
 | `profile_nickname` | string; UTF-8 ≤48 bytes | 显示名称；为空时使用配置 ID，并规范化空白与控制字符。 |
 | `profile_avatar_path` | string; UTF-8 ≤2048 bytes | 本地 PNG/JPG 头像路径。 |
-| `language` | `en`, `ko`; `en` | UI 语言；无效值规范化为 en。 |
+| `language` | `en`, `ko`, `ja`; `en` | UI 语言；无效值规范化为 en。 |
 | `result_tail_ms` | double; `500` ms | 判定完成后结果切换的额外等待时间，同时考虑谱面音频结束时刻。 |
 | `require_enter_to_exit` | bool; `true` | 为读写兼容保留；当前 Windows 结果输入路径不使用此值自动退出。 |
 | `show_cursor_in_gameplay` | bool; `true` | 游戏中显示鼠标指针。 |

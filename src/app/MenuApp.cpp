@@ -786,12 +786,12 @@ std::string MenuApp::profile_display_name() const {
 }
 
 
-bool MenuApp::ui_uses_korean() const {
-    return config::normalize_ui_language_token(config_.ui.language) == "ko";
+ui::Language MenuApp::ui_language() const {
+    return ui::language_from_token(config_.ui.language);
 }
 
 std::string MenuApp::ui_text(std::string_view english, std::string_view korean) const {
-    return std::string(ui_uses_korean() ? korean : english);
+    return ui::text(ui_language(), english, korean);
 }
 
 std::string MenuApp::ui_on_off(bool enabled) const {
@@ -802,6 +802,9 @@ std::string MenuApp::ui_language_label(std::string_view token) const {
     const std::string normalized = config::normalize_ui_language_token(token);
     if (normalized == "ko") {
         return ui_text("Korean", "한국어");
+    }
+    if (normalized == "ja") {
+        return ui_text("Japanese", "일본어");
     }
     return ui_text("English", "영어");
 }
@@ -1731,11 +1734,11 @@ void MenuApp::note_runtime_input_event_source(const input::InputEvent& event) {
 }
 
 std::string MenuApp::current_input_backend_status_label() const {
-    return format_input_backend_status_label(input_backend_state_, ui_uses_korean());
+    return format_input_backend_status_label(input_backend_state_, ui_language());
 }
 
 std::string MenuApp::current_input_backend_status_detail() const {
-    return format_input_backend_status_detail(input_backend_state_, ui_uses_korean());
+    return format_input_backend_status_detail(input_backend_state_, ui_language());
 }
 
 void MenuApp::restart_audio_thread() {

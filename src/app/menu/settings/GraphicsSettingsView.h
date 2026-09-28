@@ -1,5 +1,7 @@
 #pragma once
 
+#include "ui/Localization.h"
+
 #include "app/menu/settings/GraphicsSettingsController.h"
 #include "app/menu/settings/SettingsRowModel.h"
 #include "config/Config.h"
@@ -16,11 +18,11 @@ public:
     [[nodiscard]] static GraphicsSettingsViewModel build(
         const GraphicsSettingsController& controller,
         const config::RuntimeConfig& runtime,
-        bool use_korean);
+        ui::Language language);
 
     [[nodiscard]] static OnnxUpscalerConfirmViewModel build_onnx_confirmation(
         const GraphicsSettingsController& controller,
-        bool use_korean);
+        ui::Language language);
 };
 
 }  // namespace tenriff::app::menu::settings

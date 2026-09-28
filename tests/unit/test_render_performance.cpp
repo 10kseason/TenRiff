@@ -447,6 +447,46 @@ TEST_CASE("native digital keys separate held depth from hit glitch") {
     CHECK(released_hit.glitch_strength == doctest::Approx(1.0f));
 }
 
+TEST_CASE("native key travel responds immediately and releases consistently across render caps") {
+    using tenriff::render::advance_native_key_travel;
+    CHECK(advance_native_key_travel(0.0f, true, 1.0 / 60.0) > 0.80f);
+    CHECK(advance_native_key_travel(1.0f, true, 1.0 / 144.0) == doctest::Approx(1.0f));
+    float reference = 0.0f;
+    for (int fps : {60, 144, 300, 1000}) {
+        float travel = 1.0f;
+        for (int frame = 0; frame < fps; ++frame)
+            travel = advance_native_key_travel(travel, false, 0.1 / fps);
+        if (fps == 60) reference = travel;
+        CHECK(travel == doctest::Approx(reference).epsilon(0.0001));
+        CHECK(travel < 0.10f);
+        CHECK(travel > 0.0f);
+    }
+    CHECK(advance_native_key_travel(1.0f, false, 0.5) == 0.0f);
+    CHECK(advance_native_key_travel(0.3f, true, -1.0) == doctest::Approx(0.3f));
+}
+
+TEST_CASE("native key bounds fit every 4K to 16K lane including extreme judge positions") {
+    using tenriff::render::native_key_bounds;
+    for (int keys = 4; keys <= 16; ++keys) {
+        for (float field_width : {280.0f, 560.0f, 980.0f, 1372.0f}) {
+            const float lane_width = field_width / keys;
+            for (int lane = 0; lane < keys; ++lane) {
+                const float left = lane_width * lane;
+                for (float gear_top : {0.0f, 540.0f, 884.0f, 1080.0f}) {
+                    const auto key = native_key_bounds(left, left + lane_width, 0.0f, 1080.0f, gear_top);
+                    CHECK(key.left >= left);
+                    CHECK(key.right <= left + lane_width);
+                    CHECK(key.right > key.left);
+                    CHECK(key.top >= 0.0f);
+                    CHECK(key.bottom <= 1080.0f);
+                    CHECK(key.bottom > key.top);
+                    CHECK(key.bottom - key.top <= 180.0f);
+                }
+            }
+        }
+    }
+}
+
 TEST_CASE("render thread performance metrics use explicit present completions") {
     tenriff::render::RenderThread render_thread;
 
@@ -503,4 +543,24 @@ TEST_CASE("only P GREAT animates and GOOD uses solid gray") {
     CHECK(gameplay_judgement_rgb("G") == 0xAEB5BF);
     CHECK(gameplay_timing_feedback_text(-28, "GR") == L"FAST -28 ms");
     CHECK(gameplay_timing_feedback_text(28, "GR") == L"SLOW +28 ms");
+}
+
+TEST_CASE("Native gameplay edited key geometry and response remain bounded") {
+    tenriff::app::NativeGameplaySkinStyle style;
+    style.metrics["key_min_height"]=200;
+    style.metrics["key_max_height"]=10;
+    style.metrics["key_inset"]=32;
+    style.metrics["key_inset_ratio"]=.45f;
+    const auto bounds=tenriff::render::native_key_bounds(20,40,0,100,90,style);
+    CHECK(bounds.left<bounds.right);
+    CHECK(bounds.top>=0);
+    CHECK(bounds.bottom<=100);
+    CHECK(tenriff::render::advance_native_key_travel(0,true,.016,1,1)<.1f);
+    CHECK(tenriff::render::advance_native_key_travel(0,true,.016,500,500)>.99f);
+    style.rects["score"]={100,-50,-1000,-1000};
+    const auto rect=tenriff::render::native_gameplay_rect(style,"score",{0,0,50,30});
+    CHECK(rect[0]==100);
+    CHECK(rect[1]==-50);
+    CHECK(rect[2]>rect[0]);
+    CHECK(rect[3]>rect[1]);
 }

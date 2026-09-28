@@ -64,9 +64,10 @@ enum class SkinSettingsRowId {
     ComboX,
     ExportPreset,
     ImportPreset,
+    OpenSkinEditor,
 };
 
-inline constexpr std::array<SkinSettingsRowId, 51> kSkinSettingsRowOrder = {
+inline constexpr std::array<SkinSettingsRowId, 52> kSkinSettingsRowOrder = {
     SkinSettingsRowId::KeyMode,
     SkinSettingsRowId::ScratchPosition,
     SkinSettingsRowId::SkinSource,
@@ -117,6 +118,7 @@ inline constexpr std::array<SkinSettingsRowId, 51> kSkinSettingsRowOrder = {
     SkinSettingsRowId::ComboX,
     SkinSettingsRowId::ExportPreset,
     SkinSettingsRowId::ImportPreset,
+    SkinSettingsRowId::OpenSkinEditor,
     SkinSettingsRowId::Back,
 };
 
@@ -249,14 +251,14 @@ inline std::string key_mode_label(const std::string& value) {
 inline std::string normalize_skin_edit_mode(std::string value) {
     value = config::normalize_skin_mode_token(value);
     if (value == "4k" || value == "5k" || value == "6k" || value == "7k" || value == "7+1" || value == "8k" ||
-        value == "9k" || value == "10k" || value == "12k" || value == "14k" || value == "16k") {
+        value == "9k" || value == "10k" || value == "11k" || value == "12k" || value == "13k" || value == "14k" || value == "15k" || value == "16k") {
         return value;
     }
     return "10k";
 }
 
 inline std::string cycle_skin_edit_mode(std::string_view current, int direction) {
-    static constexpr const char* kSkinModes[] = {"4k", "5k", "6k", "7k", "7+1", "8k", "9k", "10k", "12k", "14k", "16k"};
+    static constexpr const char* kSkinModes[] = {"4k", "5k", "6k", "7k", "7+1", "8k", "9k", "10k", "11k", "12k", "13k", "14k", "15k", "16k"};
     const int option_count = static_cast<int>(sizeof(kSkinModes) / sizeof(kSkinModes[0]));
     std::string normalized = normalize_skin_edit_mode(std::string(current));
     int index = option_count - 1;
