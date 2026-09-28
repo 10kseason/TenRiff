@@ -41,12 +41,12 @@ if (d2d_->panel_brush) {
         D2D1::RectF(48.0f, 36.0f, 1872.0f, 140.0f), 18.0f, 18.0f), d2d_->panel_brush.Get());
 }
 if (d2d_->hud_format && d2d_->muted_brush) {
-    draw_text_clipped_aligned(to_wide(data.ui_korean ? "배경음" : "BGM"), d2d_->hud_format.Get(),
+    draw_text_clipped_aligned(to_wide(loc("BGM", "배경음")), d2d_->hud_format.Get(),
                               D2D1::RectF(bgm_left, grid_top - 32.0f, bgm_right, grid_top - 8.0f),
                               d2d_->muted_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER);
 }
 if (d2d_->title_format && d2d_->text_brush) {
-    draw_text_clipped(to_wide(editor.title.empty() ? (data.ui_korean ? "BMS 편집기" : "BMS Editor") : editor.title),
+    draw_text_clipped(to_wide(editor.title.empty() ? (loc("BMS Editor", "BMS 편집기")) : editor.title),
                       d2d_->title_format.Get(), D2D1::RectF(82.0f, 52.0f, 1050.0f, 98.0f),
                       d2d_->text_brush.Get());
 }
@@ -58,21 +58,21 @@ if (d2d_->body_format && d2d_->muted_brush) {
 }
 if (d2d_->hud_format && d2d_->accent_brush) {
     const std::string mode_label = editor.silent_note_mode
-        ? (data.ui_korean ? "무키음" : "SILENT")
-        : (data.ui_korean ? "키음" : "KEYSOUND");
+        ? (loc("SILENT", "무키음"))
+        : (loc("KEYSOUND", "키음"));
     const std::string tool_label = editor.tool == "move"
-        ? (data.ui_korean ? "이동" : "MOVE")
+        ? (loc("MOVE", "이동"))
         : editor.tool == "remove"
-            ? (data.ui_korean ? "제거" : "REMOVE")
-            : (data.ui_korean ? "무키음 배치" : "PLACE SILENT");
+            ? (loc("REMOVE", "제거"))
+            : (loc("PLACE SILENT", "무키음 배치"));
     const std::string state = (editor.dirty ? "* " : "") + editor.status +
         "  |  " + mode_label +
         "  |  T:" + tool_label +
-        "  |  " + (data.ui_korean ? (editor.auto_align_bgm ? "BGM 자동" : "BGM 수동")
-                                  : (editor.auto_align_bgm ? "BGM-AUTO" : "BGM-MANUAL")) +
-        "  |  " + (data.ui_korean ? "스냅 1/" : "SNAP 1/") + std::to_string(std::max(1, editor.snap_division)) +
-        "  |  " + std::to_string(view_count) + (data.ui_korean ? "마디" : " MEAS") +
-        (editor.x_axis_lock ? (data.ui_korean ? "  |  X축 잠금" : "  |  X-LOCK") : "");
+        "  |  " + loc(editor.auto_align_bgm ? "BGM-AUTO" : "BGM-MANUAL",
+            editor.auto_align_bgm ? "BGM 자동" : "BGM 수동") +
+        "  |  " + (loc("SNAP 1/", "스냅 1/")) + std::to_string(std::max(1, editor.snap_division)) +
+        "  |  " + std::to_string(view_count) + (loc(" MEAS", "마디")) +
+        (editor.x_axis_lock ? (loc("  |  X-LOCK", "  |  X축 잠금")) : "");
     draw_text_clipped_aligned(to_wide(state), d2d_->hud_format.Get(),
                               D2D1::RectF(1180.0f, 58.0f, 1828.0f, 92.0f),
                               d2d_->accent_brush.Get(), DWRITE_TEXT_ALIGNMENT_TRAILING);
@@ -226,10 +226,10 @@ if (d2d_->accent_brush) {
 }
 
 if (d2d_->body_format && d2d_->muted_brush) {
-    draw_text_clipped(to_wide(data.ui_korean ? "T: 무키음 배치/이동/제거   방향키: 레인/시간   노트 드래그: 이동   Ctrl+클릭: 다중 선택   Ctrl+Y: BGM 자동정렬   Ctrl+↑/↓: BGM 이동   휠: 1초 스크롤" : "T: place silent/move/remove   Arrow: lane/time   Drag note: move   Ctrl+click: multi-select   Ctrl+Y: auto-align BGM   Ctrl+Up/Down: move BGM   Wheel: 1s scroll"),
+    draw_text_clipped(to_wide(loc("T: place silent/move/remove   Arrow: lane/time   Drag note: move   Ctrl+click: multi-select   Ctrl+Y: auto-align BGM   Ctrl+Up/Down: move BGM   Wheel: 1s scroll", "T: 무키음 배치/이동/제거   방향키: 레인/시간   노트 드래그: 이동   Ctrl+클릭: 다중 선택   Ctrl+Y: BGM 자동정렬   Ctrl+↑/↓: BGM 이동   휠: 1초 스크롤")),
                       d2d_->body_format.Get(), D2D1::RectF(72.0f, 952.0f, 1530.0f, 1002.0f),
                       d2d_->muted_brush.Get());
-    draw_text_clipped_aligned(to_wide(data.ui_korean ? "O: 여기서 10초   CTRL+O: 처음부터 끝까지   P: 이 구간 연습   CTRL+S: 다른 이름 저장   ESC: 뒤로" : "O: 10s here   CTRL+O: start to end   P: practice here   CTRL+S: Save As   ESC: back"),
+    draw_text_clipped_aligned(to_wide(loc("O: 10s here   CTRL+O: start to end   P: practice here   CTRL+S: Save As   ESC: back", "O: 여기서 10초   CTRL+O: 처음부터 끝까지   P: 이 구간 연습   CTRL+S: 다른 이름 저장   ESC: 뒤로")),
                               d2d_->body_format.Get(), D2D1::RectF(1370.0f, 952.0f, 1840.0f, 1002.0f),
                               d2d_->accent_brush.Get(), DWRITE_TEXT_ALIGNMENT_TRAILING);
 }

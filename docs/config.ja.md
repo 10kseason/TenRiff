@@ -215,7 +215,7 @@ chart loader/indexer は BMS family（`.bms/.bme/.bml/.pms`）専用です。旧
 | --- | --- | --- |
 | `profile_nickname` | string; UTF-8 ≤48 bytes | 表示名。空ならプロファイル ID。空白・制御文字を正規化。 |
 | `profile_avatar_path` | string; UTF-8 ≤2048 bytes | ローカル PNG/JPG アバターのパス。 |
-| `language` | `en`, `ko`; `en` | UI 言語。不正値は en に正規化。 |
+| `language` | `en`, `ko`, `ja`; `en` | UI 言語。不正値は en に正規化。 |
 | `result_tail_ms` | double; `500` ms | 判定完了後の結果遷移の追加待機時間。譜面音声の終了時刻も考慮します。 |
 | `require_enter_to_exit` | bool; `true` | 読込・保存互換用。現在の Windows 結果入力経路はこの値で自動終了しません。 |
 | `show_cursor_in_gameplay` | bool; `true` | ゲーム中のマウスポインター表示。 |

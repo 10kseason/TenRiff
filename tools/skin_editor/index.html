@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; connect-src 'none'; font-src 'self'; object-src 'none'; base-uri 'none'">
+  <title>TenRiff Skin Editor</title>
+  <link rel="stylesheet" href="style.css">
+  <script defer src="catalog.js"></script>
+  <script defer src="native-catalog.js"></script>
+  <script defer src="i18n.js"></script>
+  <script defer src="core.js"></script>
+  <script defer src="gameplay.js"></script>
+  <script defer src="zip.js"></script>
+  <script defer src="app.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand"><div class="brand-mark" aria-hidden="true">T<span>R</span></div><div><h1 data-i18n="app"></h1><p data-i18n="tagline"></p></div></div>
+    <div class="toolbar">
+      <button id="new" data-i18n="new"></button><button id="open" data-i18n="open"></button><button id="folder" data-i18n="folder"></button>
+      <span class="toolbar-divider"></span><button id="undo" data-i18n="undo"></button><button id="redo" data-i18n="redo"></button>
+      <button id="save" class="primary" data-i18n="save"></button><button id="export" data-i18n="export"></button>
+      <label class="language"><span class="sr-only" data-i18n="language"></span><select id="language"><option value="ko">한국어</option><option value="en">English</option><option value="ja">日本語</option></select></label>
+    </div>
+  </header>
+  <div id="notice" class="notice" role="status" aria-live="polite" hidden></div>
+  <div class="workspace">
+    <aside class="sidebar">
+      <div class="document-card"><span class="eyebrow">TENRIFF / SKIN</span><strong id="skin-name"></strong><span id="dirty-state"></span></div>
+      <nav id="tabs" aria-label="Editor sections"></nav>
+      <div class="sidebar-footer"><span class="offline-dot"></span> <span data-i18n="offline"></span> · 1920 × 1080<br><small>skin.json / v1</small></div>
+    </aside>
+    <main class="main">
+      <section class="preview-card" aria-labelledby="preview-heading">
+        <div class="preview-toolbar"><h2 id="preview-heading" data-i18n="preview"></h2><label><span data-i18n="screen"></span><select id="screen"></select></label><label><span data-i18n="mode"></span><select id="preview-mode"></select></label></div>
+        <div class="canvas-wrap"><canvas id="preview" width="1920" height="1080" tabindex="0" aria-label="Skin layout preview"></canvas></div>
+        <div class="preview-controls"><label><input id="outlines" type="checkbox" checked><span data-i18n="outlines"></span></label><label><input id="grid" type="checkbox"><span data-i18n="grid"></span></label><label><input id="snap" type="checkbox" checked><span data-i18n="snap"></span></label><label><input id="animate" type="checkbox"><span data-i18n="animate"></span></label><span id="cursor-position">1920 × 1080</span></div>
+        <p class="hint preview-hint" data-i18n="approx"></p>
+      </section>
+      <section class="asset-card"><div class="section-heading"><h2 data-i18n="assets"></h2><button id="add-images" data-i18n="addImages"></button></div><div id="asset-list" class="asset-list"></div></section>
+      <section class="validation-card"><div class="section-heading"><h2 id="validation-title"></h2><span id="validation-count"></span></div><ul id="issues"></ul></section>
+    </main>
+    <aside class="inspector"><div class="inspector-heading"><span class="eyebrow" data-i18n="inspector"></span><h2 id="inspector-title"></h2></div><div id="inspector-body"></div></aside>
+  </div>
+  <input id="file-input" type="file" accept=".json,application/json" hidden>
+  <input id="folder-input" type="file" webkitdirectory multiple hidden>
+  <input id="image-input" type="file" accept="image/png,image/jpeg,image/bmp,.bmp" multiple hidden>
+  <noscript>This offline editor requires JavaScript. / 이 편집기는 JavaScript가 필요합니다. / JavaScript が必要です。</noscript>
+</body>
+</html>

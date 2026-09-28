@@ -239,16 +239,16 @@ std::string song_difficulty_label(const SongEntry& entry) {
     return {};
 }
 
-std::string song_index_stage_label(SongIndexProgressStage stage) {
+std::string song_index_stage_label(SongIndexProgressStage stage, ui::Language language) {
     switch (stage) {
     case SongIndexProgressStage::ScanningFiles:
-        return "SCANNING FILES";
+        return ui::text(language, "SCANNING FILES", "파일 스캔");
     case SongIndexProgressStage::BuildingMetadata:
-        return "BUILDING METADATA";
+        return ui::text(language, "BUILDING METADATA", "메타데이터 생성");
     case SongIndexProgressStage::SavingCache:
-        return "WRITING CACHE";
+        return ui::text(language, "WRITING CACHE", "캐시 저장");
     default:
-        return "INDEXING";
+        return ui::text(language, "INDEXING", "인덱싱");
     }
 }
 

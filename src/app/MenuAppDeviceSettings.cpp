@@ -225,7 +225,7 @@ void MenuApp::handle_onnx_upscaler_confirm_input(uint32_t keycode) {
 
 void MenuApp::populate_graphics_settings_render_data(render::MenuRenderData& render) {
     auto view = menu::settings::GraphicsSettingsView::build(
-        graphics_settings_controller_, config_, ui_uses_korean());
+        graphics_settings_controller_, config_, ui_language());
     render.generic.rows.reserve(render.generic.rows.size() + view.rows.size());
     for (auto& source : view.rows) {
         render::MenuRowData row;
@@ -246,7 +246,7 @@ void MenuApp::populate_graphics_settings_render_data(render::MenuRenderData& ren
 void MenuApp::populate_onnx_upscaler_confirm_render_data(render::MenuRenderData& render) {
     render.generic.footer_reserved_lines = 3;
     auto view = menu::settings::GraphicsSettingsView::build_onnx_confirmation(
-        graphics_settings_controller_, ui_uses_korean());
+        graphics_settings_controller_, ui_language());
     render.generic.rows.reserve(render.generic.rows.size() + view.rows.size());
     for (auto& source : view.rows) {
         render::MenuRowData row;
@@ -266,7 +266,7 @@ void MenuApp::populate_input_settings_render_data(render::MenuRenderData& render
         input_settings_controller_,
         config_,
         input_backend_fallback_policy_.polling_latched(),
-        ui_uses_korean());
+        ui_language());
     render.generic.rows.reserve(render.generic.rows.size() + view.rows.size());
     for (auto& source : view.rows) {
         render::MenuRowData row;
@@ -286,7 +286,7 @@ void MenuApp::populate_input_settings_render_data(render::MenuRenderData& render
 
 void MenuApp::populate_calibration_settings_render_data(render::MenuRenderData& render) {
     auto view = menu::settings::CalibrationSettingsView::build(
-        calibration_settings_controller_, config_, ui_uses_korean());
+        calibration_settings_controller_, config_, ui_language());
     render.generic.rows.reserve(render.generic.rows.size() + view.rows.size());
     for (auto& source : view.rows) {
         render::MenuRowData row;

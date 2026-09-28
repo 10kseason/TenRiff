@@ -652,6 +652,29 @@ void MenuApp::apply_skin_settings_effects(
                 skin_status_messages_.resize(5u);
             }
             break;
+        case menu::settings::SkinBoundaryAction::OpenSkinEditor:
+#ifdef _WIN32
+        {
+            // Resolve beside the executable, not a user-controlled current folder.
+            std::array<wchar_t, 32768> module_path{};
+            const DWORD length = GetModuleFileNameW(nullptr, module_path.data(),
+                                                    static_cast<DWORD>(module_path.size()));
+            bool opened = false;
+            if (length > 0 && length < module_path.size()) {
+                const fs::path editor = fs::path(module_path.data()).parent_path() /
+                    L"tools" / L"skin_editor" / L"index.html";
+                std::error_code ec;
+                if (fs::is_regular_file(editor, ec) && !ec) {
+                    opened = reinterpret_cast<INT_PTR>(ShellExecuteW(nullptr, L"open", editor.c_str(),
+                        nullptr, nullptr, SW_SHOWNORMAL)) > 32;
+                }
+            }
+            skin_status_messages_ = {opened
+                ? ui_text("Opened the offline skin editor.", "오프라인 스킨 에디터를 열었습니다.")
+                : ui_text("The bundled skin editor was not found.", "동봉된 스킨 에디터를 찾지 못했습니다.")};
+        }
+#endif
+            break;
         case menu::settings::SkinBoundaryAction::None:
             break;
     }
@@ -770,10 +793,8 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
                     render::MenuHitTargetKind::SettingsRow, 1, false, true);
     if (lr2_source) {
         append_menu_row(render.generic, ui_text("LR2 Resolution", "LR2 해상도"),
-                        ui_uses_korean()
-                            ? ((config::normalize_skin_lr2_resolution_mode_token(config_.skin.lr2_resolution_mode) == "auto")
-                                   ? std::string("자동")
-                                   : lr2_resolution_mode_label(config_.skin.lr2_resolution_mode))
+                        (config::normalize_skin_lr2_resolution_mode_token(config_.skin.lr2_resolution_mode) == "auto")
+                            ? ui_text("Automatic", "자동")
                             : lr2_resolution_mode_label(config_.skin.lr2_resolution_mode),
                         settings_cursor_ == 2, render::MenuHitTargetKind::SettingsRow, 2, false, true);
     }
@@ -936,6 +957,8 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
     append_menu_row(render.generic, ui_text("Import Skin Preset", "스킨 프리셋 가져오기"), ".trskin", false,
                     render::MenuHitTargetKind::SettingsRow,
                     stable_rows.index_of(SkinSettingsRowId::ImportPreset), true, false);
+    append_menu_row(render.generic, ui_text("Open Skin Editor", "스킨 에디터 열기"),
+                    ui_text("Open", "열기"), false, render::MenuHitTargetKind::SettingsRow, 0, true, false);
     append_menu_row(render.generic, ui_text("Back", "뒤로"), "", false,
                     render::MenuHitTargetKind::SettingsRow,
                     stable_rows.index_of(SkinSettingsRowId::Back), true, false);
@@ -963,6 +986,8 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
         config_.skin.judgement_line_position,
         config::kJudgementLinePositionMin,
         config::kJudgementLinePositionMax);
+    if (preview_definition && preview_definition->gameplay.native_renderer && preview_definition->gameplay.has_hit_position)
+        render.generic.skin_preview.judgement_line_position=preview_definition->gameplay.hit_position/480.0;
     render.generic.skin_preview.combo_position = std::clamp(
         config_.skin.combo_position,
         config::kComboPositionMin,
@@ -1029,7 +1054,8 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
             : config_.skin.note_shape;
     render.generic.skin_preview.note_image_aspect =
         render_note_image_aspect(config_.skin.note_image_aspect);
-    render.generic.skin_preview.skin_source = active_skin_source;
+    render.generic.skin_preview.skin_source =
+        preview_definition && preview_definition->native_gameplay_fallback ? "native" : active_skin_source;
     render.generic.skin_preview.external_skin_root = active_external_skin_root();
     render.generic.skin_preview.external_skin_name = active_external_skin_name();
     render.generic.skin_preview.skin_revision = tenriff_skin_revision_;

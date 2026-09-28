@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "app/SongIndex.h"
+#include "ui/Localization.h"
 
 namespace tenriff::app::menu_song_select {
 
@@ -26,7 +27,7 @@ std::string song_group_folder_key(const SongEntry& entry);
 std::string song_group_folder_label(const SongEntry& entry);
 std::string song_difficulty_label(const SongEntry& entry);
 std::string song_detail_label(const SongEntry& entry);
-std::string song_index_stage_label(SongIndexProgressStage stage);
+std::string song_index_stage_label(SongIndexProgressStage stage, ui::Language language = ui::Language::English);
 std::string format_eta_seconds(int64_t seconds);
 std::string format_int_with_commas(int64_t value);
 bool song_entry_matches_search(const SongEntry& entry, std::string_view query);

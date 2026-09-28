@@ -526,7 +526,19 @@ config::JsonObject effective_gameplay_object(const config::JsonObject& gameplay,
             definition.warnings.push_back("gameplay.modes." + active_mode + ".modes cannot be nested.");
             continue;
         }
-        effective.insert_or_assign(key, value);
+        if (key == "native" && value.is_object()) {
+            config::JsonObject merged;
+            if (const auto* base = child_object(effective, "native")) merged = *base;
+            for (const auto& [category, entries] : *value.as_object()) {
+                config::JsonObject category_merged;
+                if (const auto* old_entries = child_object(merged, category)) category_merged = *old_entries;
+                if (const auto* new_entries = entries.as_object()) {
+                    for (const auto& [slot, entry] : *new_entries) category_merged.insert_or_assign(slot, entry);
+                    merged.insert_or_assign(category, config::JsonValue(std::move(category_merged)));
+                } else merged.insert_or_assign(category, entries);
+            }
+            effective.insert_or_assign(key, config::JsonValue(std::move(merged)));
+        } else effective.insert_or_assign(key, value);
     }
     return effective;
 }
@@ -553,6 +565,182 @@ void parse_theme_section(const config::JsonObject& theme, TenRiffSkinDefinition&
             continue;
         }
         definition.theme_colors[std::string(key)] = *color;
+    }
+}
+
+bool valid_native_slot(std::string_view key) {
+    if (key.empty() || key.size() > 128u || key.front() < 'a' || key.front() > 'z') {
+        return false;
+    }
+    return std::all_of(key.begin(), key.end(), [](unsigned char ch) {
+        return (ch >= 'a' && ch <= 'z') || (ch >= '0' && ch <= '9') ||
+               ch == '_' || ch == '.' || ch == '-';
+    });
+}
+
+void parse_native_section(const config::JsonObject& native,
+                          const fs::path& root,
+                          TenRiffSkinDefinition& definition) {
+    static constexpr std::array<std::string_view, 6> kNativeKeys = {
+        "metrics", "colors", "rects", "assets", "motion", "fonts"
+    };
+    warn_unknown_keys(native, kNativeKeys, "native.", definition);
+    for (const auto category : kNativeKeys) {
+        const auto* category_value = object_value(native, category);
+        if (!category_value) continue;
+        const auto* entries = category_value->as_object();
+        const std::string prefix = "native." + std::string(category) + ".";
+        if (!entries) {
+            definition.warnings.push_back("native." + std::string(category) + " must be an object.");
+            continue;
+        }
+        if (entries->size() > 4096u) {
+            definition.warnings.push_back("native." + std::string(category) + " exceeds 4096 slots.");
+            continue;
+        }
+        for (const auto& [key, value] : *entries) {
+            if (!valid_native_slot(key)) {
+                definition.warnings.push_back(prefix + key + " is not a valid slot name.");
+                continue;
+            }
+            if (category == "metrics" || category == "motion") {
+                const float minimum = category == "motion" ? 0.0f : -8192.0f;
+                const float maximum = category == "motion" ? 120.0f : 8192.0f;
+                if (const auto number = optional_number(*entries, key, minimum, maximum,
+                                                         definition, prefix)) {
+                    auto& destination = category == "motion" ? definition.native_menu.motion
+                                                              : definition.native_menu.metrics;
+                    destination[key] = *number;
+                }
+            } else if (category == "colors") {
+                const auto color = value.is_string() ? parse_hex_color(value.as_string()) : std::nullopt;
+                if (color) definition.native_menu.colors[key] = *color;
+                else definition.warnings.push_back(prefix + key + " must be #RRGGBB or #RRGGBBAA.");
+            } else if (category == "rects") {
+                const auto* offsets = value.as_array();
+                std::array<float, 4> rect{};
+                bool valid = offsets && offsets->size() == rect.size();
+                for (std::size_t i = 0; valid && i < rect.size(); ++i) {
+                    const auto& offset = (*offsets)[i];
+                    const double number = offset.as_number();
+                    valid = offset.is_number() && std::isfinite(number) && std::abs(number) <= 8192.0;
+                    rect[i] = static_cast<float>(number);
+                }
+                if (valid) definition.native_menu.rects[key] = rect;
+                else {
+                    definition.warnings.push_back(prefix + key +
+                        " must be [dx, dy, dwidth, dheight] with each offset between -8192 and 8192.");
+                }
+            } else if (category == "assets") {
+                if (!value.is_string()) {
+                    definition.warnings.push_back(prefix + key + " must be an image path.");
+                    continue;
+                }
+                if (const auto path = resolve_asset_path(root, value.as_string(), definition.warnings,
+                                                        prefix + key)) {
+                    definition.native_menu.assets[key] = *path;
+                    add_reference(definition, *path);
+                }
+            } else if (category == "fonts") {
+                const std::string family = value.is_string() ? value.as_string() : std::string{};
+                const bool has_control = std::any_of(family.begin(), family.end(), [](unsigned char ch) {
+                    return ch < 0x20 || ch == 0x7f;
+                });
+                if (family.empty() || family.size() > 128u || has_control) {
+                    definition.warnings.push_back(prefix + key +
+                        " must be a non-empty font family of at most 128 UTF-8 bytes without control characters.");
+                } else definition.native_menu.fonts[key] = family;
+            }
+        }
+    }
+}
+
+void parse_native_gameplay(const config::JsonObject& native, TenRiffSkinDefinition& definition) {
+    auto& style = definition.gameplay.native;
+    static constexpr std::array<std::string_view, 6> categories{"metrics","colors","motion","rects","fonts","sprites"};
+    warn_unknown_keys(native, categories, "gameplay.native.", definition);
+    const auto numeric = [&](const char* category, const auto& slots, auto& destination) {
+        const auto* raw = object_value(native, category);
+        if (!raw) return;
+        const auto* entries = raw->as_object();
+        const std::string prefix = std::string("gameplay.native.") + category + ".";
+        if (!entries) { definition.warnings.push_back(prefix + " must be an object."); return; }
+        for (const auto& [key,value] : *entries) {
+            const auto slot = std::find_if(slots.begin(), slots.end(), [&](const auto& item) { return key == item.key; });
+            if (slot == slots.end()) { definition.warnings.push_back(prefix + key + " is not supported."); continue; }
+            if (auto number = optional_number(*entries,key,slot->minimum,slot->maximum,definition,prefix)) destination[key] = *number;
+        }
+    };
+    numeric("metrics", kNativeGameplayMetrics, style.metrics);
+    numeric("motion", kNativeGameplayMotion, style.motion);
+    for (const auto category : {"colors","rects","fonts","sprites"}) {
+        const auto* raw = object_value(native,category);
+        if (!raw) continue;
+        const auto* entries = raw->as_object();
+        const std::string prefix = std::string("gameplay.native.") + category + ".";
+        if (!entries) { definition.warnings.push_back(prefix + " must be an object."); continue; }
+        auto allowed = [&](const auto& keys,const std::string& key) { return std::find(keys.begin(),keys.end(),key) != keys.end(); };
+        for (const auto& [key,value] : *entries) {
+            const std::string field = prefix + key;
+            if (std::string_view(category) == "colors") {
+                if (!allowed(kNativeGameplayColors,key)) { definition.warnings.push_back(field + " is not supported."); continue; }
+                const auto color = value.is_string() ? parse_hex_color(value.as_string()) : std::nullopt;
+                if (color) style.colors[key] = *color;
+                else definition.warnings.push_back(field + " must be #RRGGBB or #RRGGBBAA.");
+            } else if (std::string_view(category) == "rects") {
+                if (!allowed(kNativeGameplayRects,key)) { definition.warnings.push_back(field + " is not supported."); continue; }
+                const auto* array = value.as_array();
+                std::array<float,4> delta{};
+                bool valid = array && array->size() == 4;
+                for (std::size_t i=0; valid && i<4; ++i) {
+                    const double v = (*array)[i].as_number();
+                    valid = (*array)[i].is_number() && std::isfinite(v) && std::abs(v)<=8192;
+                    delta[i]=static_cast<float>(v);
+                }
+                if (valid) style.rects[key]=delta;
+                else definition.warnings.push_back(field + " must be four finite offsets in [-8192,8192].");
+            } else if (std::string_view(category) == "fonts") {
+                if (!allowed(kNativeGameplayFonts,key)) { definition.warnings.push_back(field + " is not supported."); continue; }
+                const auto family=value.is_string()?value.as_string():std::string{};
+                if (family.empty() || family.size()>128 || std::any_of(family.begin(),family.end(),[](unsigned char c){return c<32 || c==127;}))
+                    definition.warnings.push_back(field + " must be a font family of 1 to 128 UTF-8 bytes without controls.");
+                else style.fonts[key]=family;
+            } else {
+                if (!allowed(kNativeGameplaySprites,key)) { definition.warnings.push_back(field + " is not supported."); continue; }
+                const auto* array=value.as_array();
+                if (!array || array->size()>128) { definition.warnings.push_back(field + " must contain at most 128 layers."); continue; }
+                const float canvas_height=key=="key_idle" || key=="key_pressed" ? 256.0f : 32.0f;
+                std::vector<NativeGameplayLayer> layers;
+                bool valid=true;
+                for (const auto& layer_value:*array) {
+                    const auto* object=layer_value.as_object();
+                    if (!object) { valid=false; break; }
+                    NativeGameplayLayer layer;
+                    auto number=[&](const char* name,float minimum,float maximum,float fallback,bool required=false) {
+                        const auto* item=object_value(*object,name);
+                        if (!item) { if(required) valid=false; return fallback; }
+                        const double n=item->as_number();
+                        if (!item->is_number() || !std::isfinite(n) || n<minimum || n>maximum) { valid=false; return fallback; }
+                        return static_cast<float>(n);
+                    };
+                    layer.x=number("x",0,128,0,true); layer.y=number("y",0,canvas_height,0,true);
+                    layer.width=number("width",0,128,0,true); layer.height=number("height",0,canvas_height,0,true);
+                    layer.mix=number("mix",0,1,1); layer.alpha=number("alpha",0,1,1); layer.radius=number("radius",0,128,0);
+                    const auto color=parse_hex_color(string_value(*object,"color"));
+                    if (!color || layer.x+layer.width>128.001f || layer.y+layer.height>canvas_height+0.001f) valid=false;
+                    if (color) {
+                        layer.color=(static_cast<uint32_t>(std::lround((*color)[0]*255))<<16u) |
+                                    (static_cast<uint32_t>(std::lround((*color)[1]*255))<<8u) |
+                                    static_cast<uint32_t>(std::lround((*color)[2]*255));
+                        layer.alpha*=(*color)[3];
+                    }
+                    if (!valid) break;
+                    layers.push_back(layer);
+                }
+                if (valid) style.sprites[key]=std::move(layers);
+                else definition.warnings.push_back(field + " has an invalid layer; sprite uses its default.");
+            }
+        }
     }
 }
 
@@ -708,6 +896,35 @@ std::string safe_folder_name(std::string value) {
     }
     return out.empty() ? "custom-skin" : out;
 }
+
+bool has_gameplay_presentation(const TenRiffSkinDefinition& definition) {
+    const auto& gameplay = definition.gameplay;
+    for (const auto* assets : {&gameplay.note_images, &gameplay.hold_head_images,
+                               &gameplay.hold_body_images, &gameplay.hold_tail_images,
+                               &gameplay.key_images, &gameplay.key_pressed_images}) {
+        if (std::any_of(assets->begin(), assets->end(), [](const ImportedSkinImageAsset& asset) {
+                return !asset.path.empty();
+            })) return true;
+    }
+    if (!definition.gameplay_background_path.empty() || !gameplay.gear_overlay_image.path.empty() ||
+        gameplay.gear_placement.valid || !gameplay.lane_divider_widths.empty() ||
+        !gameplay.column_widths.empty() || !gameplay.column_spacings.empty() ||
+        !gameplay.note_rotations.empty() || !gameplay.key_rotations.empty() ||
+        !gameplay.note_aspect.empty() || gameplay.has_hit_position ||
+        gameplay.imported_note_width_ratio != 1.0f || gameplay.imported_note_height_ratio != 1.0f ||
+        gameplay.use_full_lane_receptor_layout) return true;
+    const auto& style = definition.gameplay_style;
+    // Presence matters: explicitly false/zero still overrides a player setting.
+    return style.show_lane_dividers.has_value() || style.show_judgement_line.has_value() ||
+        style.show_timing_feedback.has_value() || style.show_gear_boundary_line.has_value() ||
+        style.show_hold_tail.has_value() || style.hold_tail_taper_enabled.has_value() ||
+        style.judgement_line_glow_enabled.has_value() || style.key_pulse_enabled.has_value() ||
+        style.note_border_enabled.has_value() || style.black_playfield_enabled.has_value() ||
+        style.key_pulse_brightness.has_value() || style.lane_background_opacity.has_value() ||
+        style.visual_opacity.has_value() || style.note_outline_opacity.has_value() ||
+        style.hold_body_opacity.has_value() || style.hit_burst_style.has_value() ||
+        style.key_label_position.has_value() || style.note_shape.has_value() || !style.lane_colors.empty();
+}
 }  // namespace
 
 bool is_tenriff_skin_layout_slot(std::string_view key) {
@@ -768,8 +985,8 @@ TenRiffSkinDefinition load_tenriff_skin_folder(std::string_view folder_utf8,
         return definition;
     }
 
-    static constexpr std::array<std::string_view, 9> kManifestKeys = {
-        "$schema", "format", "version", "name", "author", "lobby", "layout", "theme", "gameplay"
+    static constexpr std::array<std::string_view, 10> kManifestKeys = {
+        "$schema", "format", "version", "name", "author", "lobby", "layout", "theme", "gameplay", "native"
     };
     warn_unknown_keys(*manifest, kManifestKeys, "", definition);
 
@@ -795,10 +1012,14 @@ TenRiffSkinDefinition load_tenriff_skin_folder(std::string_view folder_utf8,
     definition.gameplay.keys = std::clamp(keys, 1, 16);
 
     if (const auto* lobby = child_object(*manifest, "lobby")) {
-        static constexpr std::array<std::string_view, 5> kLobbyKeys = {
-            "background", "logo", "background_opacity", "screen_backgrounds", "screen_opacities"
+        static constexpr std::array<std::string_view, 6> kLobbyKeys = {
+            "background", "logo", "background_opacity", "screen_backgrounds", "screen_opacities", "renderer"
         };
         warn_unknown_keys(*lobby, kLobbyKeys, "lobby.", definition);
+        if (const auto renderer = optional_enum(*lobby, "renderer", {"legacy", "native"},
+                                                definition, "lobby.")) {
+            definition.native_menu_renderer = *renderer == "native";
+        }
         std::string lobby_background = string_value(*lobby, "background");
         if (const auto* value = object_value(*lobby, "background"); value && !value->is_string()) {
             definition.warnings.push_back("lobby.background must be an image path.");
@@ -859,10 +1080,18 @@ TenRiffSkinDefinition load_tenriff_skin_folder(std::string_view folder_utf8,
         definition.warnings.push_back("theme must be an object of hex colors.");
     }
 
+    if (const auto* native = child_object(*manifest, "native")) {
+        parse_native_section(*native, root, definition);
+    } else if (object_value(*manifest, "native")) {
+        definition.warnings.push_back("native must be an object of menu presentation overrides.");
+    }
+
+    bool legacy_gameplay_renderer = false;
     if (const auto* gameplay_manifest = child_object(*manifest, "gameplay")) {
         config::JsonObject gameplay = effective_gameplay_object(
             *gameplay_manifest, definition.gameplay.keys, gameplay_mode, definition);
-        static constexpr std::array<std::string_view, 40> kGameplayKeys = {
+        static constexpr std::array<std::string_view, 42> kGameplayKeys = {
+            "renderer", "native",
             "background", "background_opacity", "gear", "note", "hold_head", "hold_body",
             "hold_tail", "key_idle", "key_pressed", "note_width_ratio", "note_height_ratio",
             "note_aspect", "note_rotations", "key_rotations", "judgement_line_position",
@@ -875,6 +1104,12 @@ TenRiffSkinDefinition load_tenriff_skin_folder(std::string_view folder_utf8,
             "modes", "description"
         };
         warn_unknown_keys(gameplay, kGameplayKeys, "gameplay.", definition);
+        if (auto renderer = optional_enum(gameplay,"renderer",{"native","legacy"},definition,"gameplay.")) {
+            definition.gameplay.native_renderer = *renderer == "native";
+            legacy_gameplay_renderer = *renderer == "legacy";
+        }
+        if (const auto* native = child_object(gameplay,"native")) parse_native_gameplay(*native,definition);
+        else if (object_value(gameplay,"native")) definition.warnings.push_back("gameplay.native must be an object.");
         const std::vector<std::string> lane_map = parse_lane_map(gameplay, definition.gameplay.keys,
                                                                  definition);
         definition.gameplay.note_images = parse_asset_list(
@@ -981,6 +1216,8 @@ TenRiffSkinDefinition load_tenriff_skin_folder(std::string_view folder_utf8,
         }
     }
 
+    definition.native_gameplay_fallback = definition.gameplay.native_renderer ||
+        (!legacy_gameplay_renderer && definition.native_menu_renderer && !has_gameplay_presentation(definition));
     return definition;
 }
 

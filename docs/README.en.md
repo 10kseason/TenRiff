@@ -10,7 +10,7 @@ This codebase should also be read as a `vibe coding` work that grew through rapi
 
 When current-behavior descriptions conflict, check **implementation and regression tests at the same commit** first, then correct `current-state`, `config` and their translations together. `baseline-*` and `release-*` describe their named versions; early designs and roadmap proposals are not implementation or performance guarantees.
 
-- [1.7.7](release-1.7.7-gate.md)
+- [1.7.8](release-1.7.8-gate.md)
 - [1.7.2 history](release-1.7.2-gate.md)
 - [1.7.1 history](release-1.7.1-gate.md)
 - [UI](menu-visual-polish.md)
@@ -26,7 +26,7 @@ When current-behavior descriptions conflict, check **implementation and regressi
 4. `docs/config.en.md`
    - Actual config / profile / keymap structure
 5. `docs/localization.en.md`
-   - Current English/Korean UI structure and the file boundaries to touch when adding more languages
+   - Current English/Korean/Japanese UI structure and the file boundaries to touch when adding more languages
 6. `docs/menu.en.md`
    - Menu / state machine / song-select flow
 7. `docs/core-loop.en.md`

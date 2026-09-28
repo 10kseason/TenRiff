@@ -39,6 +39,8 @@ skin.json 스키마 검증과 F5 리로드 확인까지 해 줘.
 | 목표 | `skin.json` 위치 | 권장 방식 |
 |---|---|---|
 | 전체 메뉴 분위기 | `theme` | accent, panel, button, text 색을 한 팔레트로 구성 |
+| 현대 기본 메뉴 세부 편집 | `lobby.renderer: native`, `native` | 동봉 스킨 에디터와 native-catalog.json의 슬롯 사용 |
+| Luma Keys 인게임 세부 편집 | `gameplay.renderer: native`, `gameplay.native` | 웹 에디터에서 도형 레이어·건반 움직임·시각 수치·색을 편집 |
 | 로비 기본 배경 | `lobby.background` | 16:9 이미지와 `background_opacity` 사용 |
 | 특정 화면 배경 | `lobby.screen_backgrounds` | 화면 ID별 이미지 지정 |
 | 메뉴 위치 | `layout` | 1920×1080 기준 사각형만 필요한 슬롯에 지정 |
@@ -55,6 +57,11 @@ skin.json 스키마 검증과 F5 리로드 확인까지 해 줘.
 - 글자가 포함된 생성 이미지는 철자를 확대 확인한다. 정확하지 않으면 글자 없는 자산으로 다시 만든다.
 - 좁은 슬롯에서는 UI 글자가 자동 축소되지만, 실제 화면에서 최소 한 번 읽기 쉬운 크기인지 확인한다.
 - 모든 슬롯을 채울 필요는 없다. 누락된 슬롯은 Native 렌더링으로 안전하게 대체된다.
+- `native.rects`는 `[dx, dy, dwidth, dheight]` 증감량이고, `layout`은 절대 사각형이다. 두 형식을 혼동하지 않는다.
+- `gameplay.native`는 인게임 전용이며 최상위 `native` 메뉴 항목과 별개다. `gameplay.renderer: native`를 함께 지정한다.
+- 기본 Luma Keys에서 시작하려면 [`TenRiff_NativeEditable`](../skins/TenRiff_NativeEditable/skin.json)을 복사한다. `gameplay.native.sprites`의 도형 좌표는 건반 128×256, 노트 128×32 기준이다.
+- 스프라이트 배열을 생략하면 기본 도형을 쓴다. 빈 배열 `[]`은 해당 스프라이트를 숨기는 명시적 설정이다.
+- 인게임 스킨이 바꾸는 것은 표시와 애니메이션뿐이다. 판정 시간, 입력 처리, 음원, 채보 규칙은 스킨 파일에서 바꾸지 않는다.
 - 범용 스킨은 한 모드의 레인 배열을 다른 키 수에 억지로 재사용하지 않는다.
 - 스킨만 고칠 때는 엔진 코드를 건드리지 않는다. 스키마에 없는 기능이 정말 필요할 때만 엔진 변경을 별도 작업으로 제안한다.
 

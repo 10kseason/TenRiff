@@ -18,35 +18,35 @@ namespace {
 
 constexpr int kSongSelectVisibleCardCount = 7;
 
-std::string song_sort_detail_label(MenuApp::SongSortMode mode, bool korean) {
+std::string song_sort_detail_label(MenuApp::SongSortMode mode, ui::Language language) {
     switch (mode) {
-        case MenuApp::SongSortMode::DifficultyDesc: return korean ? "LV 내림" : "LV DESC";
-        case MenuApp::SongSortMode::TitleAsc: return korean ? "가-힣" : "A-Z";
-        case MenuApp::SongSortMode::TitleDesc: return korean ? "힣-가" : "Z-A";
-        case MenuApp::SongSortMode::ArtistAsc: return korean ? "아티스트 가-힣" : "ART A-Z";
-        case MenuApp::SongSortMode::ArtistDesc: return korean ? "아티스트 힣-가" : "ART Z-A";
+        case MenuApp::SongSortMode::DifficultyDesc: return ui::text(language, "LV DESC", "LV 내림");
+        case MenuApp::SongSortMode::TitleAsc: return ui::text(language, "A-Z", "가-힣");
+        case MenuApp::SongSortMode::TitleDesc: return ui::text(language, "Z-A", "힣-가");
+        case MenuApp::SongSortMode::ArtistAsc: return ui::text(language, "ART A-Z", "아티스트 가-힣");
+        case MenuApp::SongSortMode::ArtistDesc: return ui::text(language, "ART Z-A", "아티스트 힣-가");
         case MenuApp::SongSortMode::DifficultyAsc:
-        default: return korean ? "LV 오름" : "LV ASC";
+        default: return ui::text(language, "LV ASC", "LV 오름");
     }
 }
 
-std::string song_group_detail_label(MenuApp::SongGroupMode mode, bool korean) {
+std::string song_group_detail_label(MenuApp::SongGroupMode mode, ui::Language language) {
     switch (mode) {
-        case MenuApp::SongGroupMode::Artist: return korean ? "아티스트" : "ARTIST";
-        case MenuApp::SongGroupMode::Level: return korean ? "레벨" : "LEVEL";
-        case MenuApp::SongGroupMode::Folder: return korean ? "폴더" : "FOLDER";
+        case MenuApp::SongGroupMode::Artist: return ui::text(language, "ARTIST", "아티스트");
+        case MenuApp::SongGroupMode::Level: return ui::text(language, "LEVEL", "레벨");
+        case MenuApp::SongGroupMode::Folder: return ui::text(language, "FOLDER", "폴더");
         case MenuApp::SongGroupMode::None:
-        default: return korean ? "없음" : "NONE";
+        default: return ui::text(language, "NONE", "없음");
     }
 }
 
-std::string song_group_section_label(MenuApp::SongGroupMode mode, const SongEntry& entry, bool korean) {
+std::string song_group_section_label(MenuApp::SongGroupMode mode, const SongEntry& entry, ui::Language language) {
     using namespace menu_song_select;
 
     switch (mode) {
         case MenuApp::SongGroupMode::Artist: {
             const std::string artist = safe_ui_text(entry.artist);
-            return !artist.empty() ? artist : (korean ? "아티스트 미상" : "UNKNOWN ARTIST");
+            return !artist.empty() ? artist : (ui::text(language, "UNKNOWN ARTIST", "아티스트 미상"));
         }
         case MenuApp::SongGroupMode::Level:
             if (const std::string label = song_difficulty_label(entry); !label.empty()) {
@@ -55,7 +55,7 @@ std::string song_group_section_label(MenuApp::SongGroupMode mode, const SongEntr
             return "LV ?";
         case MenuApp::SongGroupMode::Folder: {
             const std::string folder = song_group_folder_label(entry);
-            return !folder.empty() ? folder : (korean ? "루트" : "ROOT");
+            return !folder.empty() ? folder : (ui::text(language, "ROOT", "루트"));
         }
         case MenuApp::SongGroupMode::None:
         default:
@@ -162,7 +162,7 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
                !selected_record->result_path.empty())
             : (!render.song_select.showing_sources && current_best.has_value &&
                !current_best.result_path.empty());
-    const bool korean = ui_uses_korean();
+    const ui::Language language = ui_language();
     const auto key_filter_summary = [&]() {
         return song_key_filter_ <= 0 ? ui_text("All Keys", "전체 키") : key_mode_label(std::to_string(song_key_filter_) + "k");
     };
@@ -200,9 +200,9 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
         if (!joined.empty()) {
             joined += " / ";
         }
-        joined += song_sort_detail_label(song_sort_mode_, korean);
+        joined += song_sort_detail_label(song_sort_mode_, language);
         joined += " / ";
-        joined += song_group_detail_label(song_group_mode_, korean);
+        joined += song_group_detail_label(song_group_mode_, language);
         return joined;
     };
     render.song_select.high_score =
@@ -216,7 +216,7 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
     render.song_select.current_source_path = safe_ui_text_or_placeholder(songs_path_, "<invalid path>");
     render.song_select.index_profile_label = ui_song_index_profile_label(config_.mode.song_index_profile);
     render.song_select.background_upscale_prefer_npu = config_.graphics.background_upscale_prefer_npu;
-    render.song_select.group_summary = song_group_detail_label(song_group_mode_, korean);
+    render.song_select.group_summary = song_group_detail_label(song_group_mode_, language);
     render.song_select.browser_summary = browser_summary();
     render.song_select.search_query = safe_ui_text(song_search_query_);
     render.song_select.search_active = song_select_search_active_;
@@ -233,7 +233,7 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
         }
         render.song_select.browser_summary += session_mix_status_message_;
     }
-    render.song_select.sort_summary = song_sort_detail_label(song_sort_mode_, korean);
+    render.song_select.sort_summary = song_sort_detail_label(song_sort_mode_, language);
     render.song_select.primary_hint =
         multiplayer_selecting_chart_
             ? ui_text("UP/DOWN or wheel  MOVE     ENTER / dbl-click  SELECT FOR LOBBY",
@@ -514,7 +514,7 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
                 }
                 render::SongCardData card;
                 if (song_group_mode_ != SongGroupMode::None) {
-                    const std::string group_label = song_group_section_label(song_group_mode_, *entry, korean);
+                    const std::string group_label = song_group_section_label(song_group_mode_, *entry, language);
                     if (render.song_select.songs.empty() || group_label != last_group_label) {
                         card.group_label = group_label;
                     }
@@ -693,7 +693,7 @@ void MenuApp::populate_song_browser_render_data(render::MenuRenderData& render) 
 
     append_menu_row(render.generic,
                     ui_text("Sort", "정렬"),
-                    song_sort_detail_label(song_sort_mode_, ui_uses_korean()),
+                    song_sort_detail_label(song_sort_mode_, ui_language()),
                     settings_cursor_ == 0,
                     render::MenuHitTargetKind::SettingsRow,
                     0,
@@ -701,7 +701,7 @@ void MenuApp::populate_song_browser_render_data(render::MenuRenderData& render) 
                     true);
     append_menu_row(render.generic,
                     ui_text("Group", "그룹"),
-                    song_group_detail_label(song_group_mode_, ui_uses_korean()),
+                    song_group_detail_label(song_group_mode_, ui_language()),
                     settings_cursor_ == 1,
                     render::MenuHitTargetKind::SettingsRow,
                     1,

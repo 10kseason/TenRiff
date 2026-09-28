@@ -5,6 +5,7 @@
 #include <utility>
 
 #include "input/InputThread.h"
+#include "ui/Localization.h"
 
 namespace tenriff::app {
 
@@ -85,13 +86,13 @@ private:
                : input::InputBackend::RawInput;
 }
 
-[[nodiscard]] inline std::string input_fallback_origin_label(InputFallbackOrigin origin, bool korean = false) {
+[[nodiscard]] inline std::string input_fallback_origin_label(InputFallbackOrigin origin, ui::Language language = ui::Language::English) {
     switch (origin) {
-        case InputFallbackOrigin::Menu: return korean ? "메뉴" : "menu";
-        case InputFallbackOrigin::Gameplay: return korean ? "플레이" : "gameplay";
-        case InputFallbackOrigin::Replay: return korean ? "리플레이" : "replay";
+        case InputFallbackOrigin::Menu: return ui::text(language, "menu", "메뉴");
+        case InputFallbackOrigin::Gameplay: return ui::text(language, "gameplay", "플레이");
+        case InputFallbackOrigin::Replay: return ui::text(language, "replay", "리플레이");
         case InputFallbackOrigin::None:
-        default: return korean ? "없음" : "none";
+        default: return ui::text(language, "none", "없음");
     }
 }
 
@@ -123,35 +124,35 @@ inline void sync_runtime_input_backend_state(InputBackendRuntimeState& state,
 }
 
 [[nodiscard]] inline std::string format_input_backend_status_label(const InputBackendRuntimeState& state,
-                                                                   bool korean = false) {
-    std::string label = korean ? "입력 백엔드: " : "Input backend: ";
+                                                                   ui::Language language = ui::Language::English) {
+    std::string label = ui::text(language, "Input backend: ", "입력 백엔드: ");
     label += input_backend_name(state.effective_backend);
     if (state.auto_fallback) {
-        label += korean ? " (자동 대체 / " : " (auto-fallback / ";
-        label += input_fallback_origin_label(state.fallback_origin, korean);
+        label += ui::text(language, " (auto-fallback / ", " (자동 대체 / ");
+        label += input_fallback_origin_label(state.fallback_origin, language);
         label += ")";
     }
     return label;
 }
 
 [[nodiscard]] inline std::string format_input_backend_status_detail(const InputBackendRuntimeState& state,
-                                                                    bool korean = false) {
+                                                                    ui::Language language = ui::Language::English) {
     if (!state.auto_fallback) {
         return {};
     }
 
-    std::string detail = korean ? "자동 대체: " : "Auto-fallback: ";
+    std::string detail = ui::text(language, "Auto-fallback: ", "자동 대체: ");
     detail += input_backend_name(state.configured_backend);
     detail += " -> ";
     detail += input_backend_name(state.effective_backend);
-    detail += korean ? " / 발생 위치 " : " / origin ";
-    detail += input_fallback_origin_label(state.fallback_origin, korean);
+    detail += ui::text(language, " / origin ", " / 발생 위치 ");
+    detail += input_fallback_origin_label(state.fallback_origin, language);
     if (!state.fallback_timestamp_utc.empty()) {
-        detail += korean ? " / 시각 " : " / at ";
+        detail += ui::text(language, " / at ", " / 시각 ");
         detail += state.fallback_timestamp_utc;
     }
     if (!state.fallback_reason.empty()) {
-        detail += korean ? " / 사유 " : " / reason ";
+        detail += ui::text(language, " / reason ", " / 사유 ");
         detail += state.fallback_reason;
     }
     return detail;

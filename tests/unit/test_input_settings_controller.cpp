@@ -148,7 +148,7 @@ TEST_CASE("input settings view preserves values fallback detail and localization
     InputSettingsController controller;
     static_cast<void>(controller.select(InputSettingId::Debounce));
 
-    const auto english = InputSettingsView::build(controller, runtime, true, false);
+    const auto english = InputSettingsView::build(controller, runtime, true, tenriff::ui::Language::English);
     REQUIRE(english.rows.size() == 4);
     REQUIRE(english.notes.size() == 6);
     CHECK(english.rows[0].value == "RawInput (active: Polling)");
@@ -157,7 +157,7 @@ TEST_CASE("input settings view preserves values fallback detail and localization
     CHECK(english.rows[2].selected);
     CHECK(english.rows[3].activatable);
 
-    const auto korean = InputSettingsView::build(controller, runtime, false, true);
+    const auto korean = InputSettingsView::build(controller, runtime, false, tenriff::ui::Language::Korean);
     CHECK(korean.rows[0].label == "입력 백엔드");
     CHECK(korean.rows[1].label == "폴링 Hz");
     CHECK(korean.rows[2].label == "디바운스");

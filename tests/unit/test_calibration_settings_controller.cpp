@@ -135,7 +135,7 @@ TEST_CASE("calibration settings view preserves row values and localization") {
     runtime.visual_offset_ms = -3.0;
     runtime.sound_offset_ms = 4.0;
 
-    const auto english = CalibrationSettingsView::build(controller, runtime, false);
+    const auto english = CalibrationSettingsView::build(controller, runtime, tenriff::ui::Language::English);
     REQUIRE(english.rows.size() == 6);
     REQUIRE(english.notes.size() == 5);
     CHECK(english.rows[0].value == "1 ms");
@@ -146,7 +146,7 @@ TEST_CASE("calibration settings view preserves row values and localization") {
     CHECK(english.rows[4].activatable);
     CHECK(english.rows[5].activatable);
 
-    const auto korean = CalibrationSettingsView::build(controller, runtime, true);
+    const auto korean = CalibrationSettingsView::build(controller, runtime, tenriff::ui::Language::Korean);
     CHECK(korean.rows[0].label == "조정 단위");
     CHECK(korean.rows[1].label == "입력 오프셋");
     CHECK(korean.rows[2].label == "비주얼 레이턴시");

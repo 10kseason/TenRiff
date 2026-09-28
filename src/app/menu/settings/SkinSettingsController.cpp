@@ -224,6 +224,9 @@ SkinSettingsEffects SkinSettingsController::apply_selected_action(
             case SkinSettingsRowId::OpenSkinFolder:
                 effects.boundary_action = SkinBoundaryAction::OpenSkinFolder;
                 return effects;
+            case SkinSettingsRowId::OpenSkinEditor:
+                effects.boundary_action = SkinBoundaryAction::OpenSkinEditor;
+                return effects;
             case SkinSettingsRowId::ReloadSkin:
                 effects.boundary_action = SkinBoundaryAction::ReloadSkin;
                 return effects;
@@ -542,6 +545,7 @@ SkinSettingsEffects SkinSettingsController::apply_selected_action(
         case SkinSettingsRowId::ImportSkin:
         case SkinSettingsRowId::CreateSkin:
         case SkinSettingsRowId::OpenSkinFolder:
+        case SkinSettingsRowId::OpenSkinEditor:
         case SkinSettingsRowId::ReloadSkin:
         case SkinSettingsRowId::Back:
             return {};

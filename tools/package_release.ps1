@@ -3,7 +3,7 @@ param(
     [string]$BuildReleaseDirectory,
     [Parameter(Mandatory = $true)]
     [string]$OutputDirectory,
-    [string]$Version = "1.7.7",
+    [string]$Version = "1.7.8",
     [switch]$BinaryOnly
 )
 
@@ -104,6 +104,15 @@ Copy-Item -LiteralPath (Join-Path $repoRoot "third_party\ncnn-20260526\LICENSE.t
 New-Item -ItemType Directory -Path (Join-Path $binaryRoot "tools\onnx_upscaler") -Force | Out-Null
 Copy-Item -LiteralPath (Join-Path $repoRoot "tools\onnx_upscaler\README.md") `
     -Destination (Join-Path $binaryRoot "tools\onnx_upscaler\README.md")
+
+# The editor runs directly from disk and uses no CDN or local server.
+$editorRoot = Join-Path $binaryRoot "tools\skin_editor"
+Copy-Item -LiteralPath (Join-Path $repoRoot "tools\skin_editor") -Destination $editorRoot -Recurse
+Copy-Item -LiteralPath (Join-Path $repoRoot "assets\native-menu") `
+    -Destination (Join-Path $editorRoot "vector-assets") -Recurse
+Copy-Item -LiteralPath (Join-Path $repoRoot "assets\native-gameplay") `
+    -Destination (Join-Path $editorRoot "vector-gameplay") -Recurse
+Copy-Item -LiteralPath (Join-Path $repoRoot "launch_skin_editor.bat") -Destination $binaryRoot
 
 Copy-Item -LiteralPath (Join-Path $buildRoot "TenRiff.exe") -Destination $binaryRoot
 $runtimeFiles = @(

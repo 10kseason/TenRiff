@@ -45,7 +45,7 @@ void MenuApp::populate_keymap_render_data(render::MenuRenderData& render) {
         config_.mode.key_mode,
         current_input_backend_status_label(),
         timing::HighResClock::now_ns(),
-        ui_uses_korean());
+        ui_language());
     render.generic.footer_reserved_lines = view.footer_reserved_lines;
     for (auto& source : view.rows) {
         render::MenuHitTargetKind target_kind = render::MenuHitTargetKind::None;
@@ -78,7 +78,7 @@ void MenuApp::populate_keymap_test_render_data(render::MenuRenderData& render) {
         working_keymap_,
         pressed_keys_,
         current_input_backend_status_label(),
-        ui_uses_korean());
+        ui_language());
     render.generic.footer_reserved_lines = view.footer_reserved_lines;
     for (auto& source : view.rows) {
         const bool is_back = source.action == menu::settings::KeymapActionId::Back;

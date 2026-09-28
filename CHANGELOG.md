@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.7.8] - 2026-09-28
+
+- Add original native menu assets and short entrance, focus and result animations; add Japanese client UI.
+- Add Luma Keys: 15 editable vector assets, digital key travel, release afterglow, luminous notes and hold rails for every 4K–16K skin layout. Complete the missing 11K/13K/15K palettes.
+- Expose native gameplay sprite layers, metrics, colors, motion, HUD rectangles and fonts in skin.json. Common settings merge with per-mode overrides; explicit empty sprites hide art and PNG replacements take priority.
+- Publish the Korean/English/Japanese web skin editor and bundle its offline edition. Both support validation, undo/redo and safe copy/ZIP export. Existing imported skins retain their legacy renderer unless native is explicitly selected.
+- Replace documentation screenshots containing personal profile/play data with synthetic renderer captures. Preserve gameplay judgement, audio and input rules.
+- See [release scope and verification](docs/release-1.7.8-gate.md).
+
 ## [1.7.7] - 2026-09-21
 
 - BMS Editor `P` now launches an actual practice play from the current cursor section using the edited chart buffer, with session-only no-fail enabled. The temporary chart stays beside the source so existing keysound paths resolve, is excluded from ranked/Sites submission, and is removed at app shutdown.

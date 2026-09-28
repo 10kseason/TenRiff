@@ -18,12 +18,12 @@
 
         const float eased = chat_overlay_slide_ * chat_overlay_slide_ *
                             (3.0f - 2.0f * chat_overlay_slide_);
-        constexpr float panel_height = 340.0f;
+        const float panel_height = native_metric("chat.panel_height", 340.0f);
         const float panel_bottom = kBaseHeight - 26.0f +
                                    panel_height * (1.0f - eased);
-        const D2D1_RECT_F panel_rect = D2D1::RectF(
+        const D2D1_RECT_F panel_rect = native_rect("chat.rect.001", D2D1::RectF(
             190.0f, panel_bottom - panel_height,
-            kBaseWidth - 190.0f, panel_bottom);
+            kBaseWidth - 190.0f, panel_bottom));
         if (d2d_->card_brush) {
             const float saved_opacity = d2d_->card_brush->GetOpacity();
             d2d_->card_brush->SetOpacity(0.96f);
@@ -36,15 +36,15 @@
         if (d2d_->title_format && d2d_->text_brush) {
             draw_text_clipped(
                 to_wide(data.chat_overlay.title), d2d_->title_format.Get(),
-                D2D1::RectF(panel_rect.left + 28.0f, panel_rect.top + 18.0f,
-                            panel_rect.left + 510.0f, panel_rect.top + 60.0f),
+                native_rect("chat.rect.002", D2D1::RectF(panel_rect.left + 28.0f, panel_rect.top + 18.0f,
+                            panel_rect.left + 510.0f, panel_rect.top + 60.0f)),
                 d2d_->text_brush.Get());
         }
         if (d2d_->hud_format && d2d_->muted_brush) {
             draw_text_clipped_aligned(
                 to_wide(data.chat_overlay.status), d2d_->hud_format.Get(),
-                D2D1::RectF(panel_rect.left + 520.0f, panel_rect.top + 24.0f,
-                            panel_rect.right - 28.0f, panel_rect.top + 58.0f),
+                native_rect("chat.rect.003", D2D1::RectF(panel_rect.left + 520.0f, panel_rect.top + 24.0f,
+                            panel_rect.right - 28.0f, panel_rect.top + 58.0f)),
                 d2d_->muted_brush.Get(), DWRITE_TEXT_ALIGNMENT_TRAILING);
         }
         if (d2d_->accent_brush) {
@@ -64,9 +64,9 @@
                 if (message_y + 34.0f > panel_rect.top + 248.0f) break;
                 const bool has_url = index < data.chat_overlay.message_urls.size() &&
                                      !data.chat_overlay.message_urls[index].empty();
-                const D2D1_RECT_F message_rect = D2D1::RectF(
+                const D2D1_RECT_F message_rect = native_rect("chat.rect.004", D2D1::RectF(
                     panel_rect.left + 32.0f, message_y,
-                    panel_rect.right - 32.0f, message_y + 34.0f);
+                    panel_rect.right - 32.0f, message_y + 34.0f));
                 draw_text_clipped(
                     to_wide(message), d2d_->body_format.Get(),
                     message_rect,
@@ -88,9 +88,9 @@
             }
         }
 
-        const D2D1_RECT_F input_rect = D2D1::RectF(
+        const D2D1_RECT_F input_rect = native_rect("chat.rect.005", D2D1::RectF(
             panel_rect.left + 28.0f, panel_rect.bottom - 78.0f,
-            panel_rect.right - 28.0f, panel_rect.bottom - 30.0f);
+            panel_rect.right - 28.0f, panel_rect.bottom - 30.0f));
         if (d2d_->button_brush) {
             ctx->FillRoundedRectangle(D2D1::RoundedRect(input_rect, 6.0f, 6.0f),
                                       d2d_->button_brush.Get());
@@ -102,15 +102,15 @@
         if (d2d_->body_format && d2d_->text_brush) {
             draw_text_clipped(
                 to_wide(data.chat_overlay.input), d2d_->body_format.Get(),
-                D2D1::RectF(input_rect.left + 16.0f, input_rect.top + 7.0f,
-                            input_rect.left + 900.0f, input_rect.bottom - 5.0f),
+                native_rect("chat.rect.006", D2D1::RectF(input_rect.left + 16.0f, input_rect.top + 7.0f,
+                            input_rect.left + 900.0f, input_rect.bottom - 5.0f)),
                 data.chat_overlay.connected ? d2d_->text_brush.Get()
                                             : d2d_->muted_brush.Get());
         }
         if (d2d_->hud_format && d2d_->muted_brush) {
             draw_text_clipped_aligned(
                 to_wide(data.chat_overlay.hint), d2d_->hud_format.Get(),
-                D2D1::RectF(input_rect.left + 930.0f, input_rect.top + 8.0f,
-                            input_rect.right - 14.0f, input_rect.bottom - 5.0f),
+                native_rect("chat.rect.007", D2D1::RectF(input_rect.left + 930.0f, input_rect.top + 8.0f,
+                            input_rect.right - 14.0f, input_rect.bottom - 5.0f)),
                 d2d_->muted_brush.Get(), DWRITE_TEXT_ALIGNMENT_TRAILING);
         }

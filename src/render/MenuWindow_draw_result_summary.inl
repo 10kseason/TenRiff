@@ -1,20 +1,40 @@
         // The native summary owns the visual hierarchy; score computation and
         // reveal timing remain in ResultStats and ResultPresentation.
-        const D2D1_RECT_F summary_panel = D2D1::RectF(620.0f, 154.0f, 1270.0f, 738.0f);
+        const D2D1_RECT_F summary_panel = native_rect("result_summary.rect.001", D2D1::RectF(620.0f, 154.0f, 1270.0f, 738.0f));
         draw_result_panel(summary_panel, presentation.information, false);
+        if (presentation.information > 0.8f) {
+            draw_native_focus(summary_panel, 12, 90, 0, result_success);
+        }
+        draw_native_asset(native_menu_assets::kMark, native_rect("result_summary.rect.002", D2D1::RectF(1140, 178, 1212, 246)),
+                          0.45f * presentation.information);
+        // Award accents follow the existing result reveal and skip state.
+        const float award = presentation.rank;
+        if (result_success && award > 0.0f) {
+            draw_native_asset(native_menu_assets::kSpark, native_rect("result_summary.rect.003", D2D1::RectF(884, 463, 910, 489)), award * 0.7f);
+            draw_native_spectrum(native_rect("result_summary.rect.004", D2D1::RectF(660, 689, 1228, 712)), 0.36f * award, 42);
+            if (native_menu_motion_.moving() && !data.result.presentation_skipped &&
+                presentation.rank > 0.0f && presentation.rank < 1.0f) {
+                for (int i = 0; i < 8; ++i) {
+                    const float x = 678.0f + i * 72.0f;
+                    const float y = 424.0f - award * (24.0f + (i % 3) * 20.0f);
+                    draw_native_asset(native_menu_assets::kSpark, native_rect("result_summary.rect.005", D2D1::RectF(x, y, x + 10, y + 10)),
+                                      (1.0f - award) * 0.65f);
+                }
+            }
+        }
         const float summary_left = summary_panel.left + 36.0f;
         const float summary_right = summary_panel.right - 36.0f;
         draw_result_text(result_loc("YOUR SCORE", "이번 플레이 점수"),
                          d2d_->hud_format.Get(),
-                         D2D1::RectF(summary_left, 186.0f, summary_right, 216.0f),
+                         native_rect("result_summary.rect.006", D2D1::RectF(summary_left, 186.0f, summary_right, 216.0f)),
                          d2d_->muted_brush.Get(), presentation.score);
         draw_result_text(format_int_with_commas(result_counted_score(data.result.score, presentation.score)),
                          d2d_->result_score_format.Get(),
-                         D2D1::RectF(summary_left - 4.0f, 224.0f, summary_right, 352.0f),
+                         native_rect("result_summary.rect.007", D2D1::RectF(summary_left - 4.0f, 224.0f, summary_right, 352.0f)),
                          d2d_->text_brush.Get(), presentation.score);
         draw_result_text(result_loc("OUT OF ", "최대 ") + format_int_with_commas(data.result.max_score),
                          d2d_->hud_format.Get(),
-                         D2D1::RectF(summary_left, 354.0f, summary_right, 380.0f),
+                         native_rect("result_summary.rect.008", D2D1::RectF(summary_left, 354.0f, summary_right, 380.0f)),
                          d2d_->muted_brush.Get(), presentation.score);
 
         if (d2d_->button_border_brush) {
@@ -26,22 +46,22 @@
             d2d_->button_border_brush->SetOpacity(saved);
         }
         draw_result_text(result_loc("GRADE", "등급"), d2d_->hud_format.Get(),
-                         D2D1::RectF(summary_left, 424.0f, summary_left + 230.0f, 452.0f),
+                         native_rect("result_summary.rect.009", D2D1::RectF(summary_left, 424.0f, summary_left + 230.0f, 452.0f)),
                          d2d_->muted_brush.Get(), presentation.rank);
         draw_result_text(data.result.rank.empty() ? "--" : data.result.rank,
                          d2d_->header_format.Get(),
-                         D2D1::RectF(summary_left, 458.0f, summary_left + 250.0f, 530.0f),
+                         native_rect("result_summary.rect.010", D2D1::RectF(summary_left, 458.0f, summary_left + 250.0f, 530.0f)),
                          d2d_->accent_brush.Get(), presentation.rank);
         draw_result_text(result_loc("ACCURACY", "정확도"), d2d_->hud_format.Get(),
-                         D2D1::RectF(summary_left + 300.0f, 424.0f, summary_right, 452.0f),
+                         native_rect("result_summary.rect.011", D2D1::RectF(summary_left + 300.0f, 424.0f, summary_right, 452.0f)),
                          d2d_->muted_brush.Get(), presentation.rank);
         draw_result_text(format_decimal(data.result.accuracy, 2) + "%",
                          d2d_->header_format.Get(),
-                         D2D1::RectF(summary_left + 300.0f, 458.0f, summary_right, 530.0f),
+                         native_rect("result_summary.rect.012", D2D1::RectF(summary_left + 300.0f, 458.0f, summary_right, 530.0f)),
                          d2d_->text_brush.Get(), presentation.rank);
 
         const D2D1_RECT_F status_chip =
-            D2D1::RectF(summary_left, 558.0f, summary_right, 610.0f);
+            native_rect("result_summary.rect.013", D2D1::RectF(summary_left, 558.0f, summary_right, 610.0f));
         if (d2d_->button_selected_brush) {
             const float saved = d2d_->button_selected_brush->GetOpacity();
             d2d_->button_selected_brush->SetOpacity(0.50f * presentation.status);
@@ -50,8 +70,8 @@
             d2d_->button_selected_brush->SetOpacity(saved);
         }
         draw_result_text(localized_result_status(), d2d_->song_title_format.Get(),
-                         D2D1::RectF(status_chip.left + 16.0f, status_chip.top + 8.0f,
-                                     status_chip.right - 16.0f, status_chip.bottom - 6.0f),
+                         native_rect("result_summary.rect.014", D2D1::RectF(status_chip.left + 16.0f, status_chip.top + 8.0f,
+                                     status_chip.right - 16.0f, status_chip.bottom - 6.0f)),
                          result_success ? static_cast<ID2D1Brush*>(d2d_->accent_brush.Get())
                                         : static_cast<ID2D1Brush*>(d2d_->text_brush.Get()),
                          presentation.status);
@@ -62,5 +82,5 @@
                   format_int_with_commas(data.result.detail_score) + " / " +
                   format_int_with_commas(data.result.max_detail_score);
         draw_result_text(summary_detail, d2d_->hud_format.Get(),
-                         D2D1::RectF(summary_left, 634.0f, summary_right, 666.0f),
+                         native_rect("result_summary.rect.015", D2D1::RectF(summary_left, 634.0f, summary_right, 666.0f)),
                          d2d_->muted_brush.Get(), presentation.status);

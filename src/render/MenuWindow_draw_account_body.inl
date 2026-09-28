@@ -14,18 +14,18 @@
         if (d2d_->footer_brush) {
             const float saved = d2d_->footer_brush->GetOpacity();
             d2d_->footer_brush->SetOpacity(0.56f * eased);
-            ctx->FillRectangle(D2D1::RectF(0.0f, 0.0f, kBaseWidth, kBaseHeight),
+            ctx->FillRectangle(native_rect("account.rect.001", D2D1::RectF(0.0f, 0.0f, kBaseWidth, kBaseHeight)),
                                d2d_->footer_brush.Get());
             d2d_->footer_brush->SetOpacity(saved);
         }
 
-        const float width = 820.0f;
+        const float width = native_metric("account.width", 820.0f);
         const float height = data.account_overlay.signed_in && !data.account_overlay.sites_mode ? 470.0f : 700.0f;
         const float scale = 0.96f + 0.04f * eased;
         const float left = (kBaseWidth - width * scale) * 0.5f;
         const float top = (kBaseHeight - height * scale) * 0.5f;
-        const D2D1_RECT_F modal = D2D1::RectF(
-            left, top, left + width * scale, top + height * scale);
+        const D2D1_RECT_F modal = native_rect("account.rect.002", D2D1::RectF(
+            left, top, left + width * scale, top + height * scale));
         draw_glass_panel(modal, 8.0f, 0.98f * eased, 0.88f * eased, true, 12.0f);
 
         auto account_button = [&](const D2D1_RECT_F& rect, std::string_view label,
@@ -55,8 +55,8 @@
         if (d2d_->title_format && d2d_->text_brush) {
             draw_text_clipped(to_wide(loc("TENRIFF ACCOUNT", "텐리프 계정")),
                               d2d_->title_format.Get(),
-                              D2D1::RectF(modal.left + 38.0f, modal.top + 24.0f,
-                                          modal.right - 38.0f, modal.top + 72.0f),
+                              native_rect("account.rect.003", D2D1::RectF(modal.left + 38.0f, modal.top + 24.0f,
+                                          modal.right - 38.0f, modal.top + 72.0f)),
                               d2d_->text_brush.Get());
         }
 
@@ -66,7 +66,7 @@
             const float x = modal.left + 38.0f + (server_button_width + 10.0f) * tab;
             const bool selected = tab == 2 ? data.account_overlay.sites_mode :
                 !data.account_overlay.sites_mode && (tab == 1) == data.account_overlay.private_server;
-            account_button(D2D1::RectF(x, server_top, x + server_button_width, server_top + 48.0f),
+            account_button(native_rect("account.rect.004", D2D1::RectF(x, server_top, x + server_button_width, server_top + 48.0f)),
                 tab == 0 ? loc("TENRIFF MAIN", "텐리프 메인") :
                 tab == 1 ? loc("PRIVATE API", "사설 API") : loc("WEB LEADERBOARD", "웹 리더보드"),
                 selected, MenuHitTargetKind::AccountServer, tab);
@@ -75,7 +75,7 @@
             auto sites_text = [&](float y, std::string_view text, bool accent = false) {
                 if (d2d_->body_format && d2d_->text_brush)
                     draw_text_clipped(to_wide(std::string(text)), d2d_->body_format.Get(),
-                        D2D1::RectF(modal.left + 40.0f, modal.top + y, modal.right - 40.0f, modal.top + y + 40.0f),
+                        native_rect("account.rect.005", D2D1::RectF(modal.left + 40.0f, modal.top + y, modal.right - 40.0f, modal.top + y + 40.0f)),
                         accent && d2d_->accent_brush ? d2d_->accent_brush.Get() : d2d_->text_brush.Get());
             };
             sites_text(159.0f, data.account_overlay.sites_connected
@@ -83,33 +83,33 @@
             sites_text(204.0f, data.account_overlay.sites_url);
             sites_text(260.0f, loc("1. Sign in on the website and copy connection information.",
                                   "1. 웹사이트에서 로그인하고 연결 정보를 복사하세요."));
-            account_button(D2D1::RectF(modal.left + 40.0f, modal.top + 309.0f, modal.right - 40.0f, modal.top + 363.0f),
+            account_button(native_rect("account.rect.006", D2D1::RectF(modal.left + 40.0f, modal.top + 309.0f, modal.right - 40.0f, modal.top + 363.0f)),
                 loc("OPEN LEADERBOARD WEBSITE", "리더보드 웹사이트 열기"), false,
                 MenuHitTargetKind::SitesLeaderboardAction, static_cast<int>(SitesLeaderboardAction::OpenWebsite));
             sites_text(383.0f, loc("2. Paste it here, or import the downloaded connection file.",
                                   "2. 여기에 붙여넣거나 받은 연결 파일을 불러오세요."));
             const float middle = (modal.left + modal.right) * 0.5f;
-            account_button(D2D1::RectF(modal.left + 40.0f, modal.top + 431.0f, middle - 5.0f, modal.top + 487.0f),
+            account_button(native_rect("account.rect.007", D2D1::RectF(modal.left + 40.0f, modal.top + 431.0f, middle - 5.0f, modal.top + 487.0f)),
                 loc("PASTE CONNECTION  Ctrl+V", "연결 정보 붙여넣기  Ctrl+V"), true,
                 MenuHitTargetKind::SitesLeaderboardAction, static_cast<int>(SitesLeaderboardAction::PasteConnection));
-            account_button(D2D1::RectF(middle + 5.0f, modal.top + 431.0f, modal.right - 40.0f, modal.top + 487.0f),
+            account_button(native_rect("account.rect.008", D2D1::RectF(middle + 5.0f, modal.top + 431.0f, modal.right - 40.0f, modal.top + 487.0f)),
                 loc("IMPORT CONNECTION FILE", "연결 파일 불러오기"), false,
                 MenuHitTargetKind::SitesLeaderboardAction, static_cast<int>(SitesLeaderboardAction::ImportFile));
             sites_text(511.0f, data.account_overlay.sites_status);
             if (data.account_overlay.sites_connected)
-                account_button(D2D1::RectF(modal.left + 40.0f, modal.top + 569.0f, modal.right - 40.0f, modal.top + 619.0f),
+                account_button(native_rect("account.rect.009", D2D1::RectF(modal.left + 40.0f, modal.top + 569.0f, modal.right - 40.0f, modal.top + 619.0f)),
                     loc("DISCONNECT THIS PC", "이 PC 연결 해제"), false,
                     MenuHitTargetKind::SitesLeaderboardAction, static_cast<int>(SitesLeaderboardAction::Disconnect));
             if (d2d_->hud_format && d2d_->muted_brush)
                 draw_text_clipped(to_wide(loc("Ctrl+Tab: switch account / web   Enter: import file   F10 / ESC: close",
                     "Ctrl+Tab 계정 / 웹 전환   Enter 파일 불러오기   F10 / ESC 닫기")),
-                    d2d_->hud_format.Get(), D2D1::RectF(modal.left + 40.0f, modal.bottom - 48.0f, modal.right - 40.0f, modal.bottom - 16.0f),
+                    d2d_->hud_format.Get(), native_rect("account.rect.010", D2D1::RectF(modal.left + 40.0f, modal.bottom - 48.0f, modal.right - 40.0f, modal.bottom - 16.0f)),
                     d2d_->muted_brush.Get());
             return;
         }
-        const D2D1_RECT_F server_rect = D2D1::RectF(
+        const D2D1_RECT_F server_rect = native_rect("account.rect.011", D2D1::RectF(
             modal.left + 40.0f, modal.top + 150.0f,
-            modal.right - 40.0f, modal.top + 208.0f);
+            modal.right - 40.0f, modal.top + 208.0f));
         if (d2d_->button_brush) {
             ctx->FillRoundedRectangle(D2D1::RoundedRect(server_rect, 6.0f, 6.0f),
                                       d2d_->button_brush.Get());
@@ -127,8 +127,8 @@
                                                data.account_overlay.focused_field == 0
                                            ? " _" : "")),
                               d2d_->body_format.Get(),
-                              D2D1::RectF(server_rect.left + 16.0f, server_rect.top + 11.0f,
-                                          server_rect.right - 16.0f, server_rect.bottom - 8.0f),
+                              native_rect("account.rect.012", D2D1::RectF(server_rect.left + 16.0f, server_rect.top + 11.0f,
+                                          server_rect.right - 16.0f, server_rect.bottom - 8.0f)),
                               data.account_overlay.private_server && d2d_->accent_brush
                                   ? d2d_->accent_brush.Get()
                                   : d2d_->text_brush.Get());
@@ -144,8 +144,8 @@
             if (d2d_->header_format && d2d_->accent_brush) {
                 draw_text_clipped(
                     to_wide(data.account_overlay.signed_in_as), d2d_->header_format.Get(),
-                    D2D1::RectF(modal.left + 40.0f, modal.top + 232.0f,
-                                modal.right - 40.0f, modal.top + 285.0f),
+                    native_rect("account.rect.013", D2D1::RectF(modal.left + 40.0f, modal.top + 232.0f,
+                                modal.right - 40.0f, modal.top + 285.0f)),
                     d2d_->accent_brush.Get());
             }
             if (d2d_->body_format && d2d_->muted_brush) {
@@ -155,35 +155,35 @@
                                                     ? loc("Saved account", "저장된 계정")
                                                     : loc("Player account", "플레이어 계정"));
                 draw_text_clipped(to_wide(role), d2d_->body_format.Get(),
-                                  D2D1::RectF(modal.left + 40.0f, modal.top + 296.0f,
-                                              modal.right - 40.0f, modal.top + 335.0f),
+                                  native_rect("account.rect.014", D2D1::RectF(modal.left + 40.0f, modal.top + 296.0f,
+                                              modal.right - 40.0f, modal.top + 335.0f)),
                                   d2d_->muted_brush.Get());
             }
-            account_button(D2D1::RectF(modal.left + 40.0f, modal.bottom - 102.0f,
-                                       modal.right - 40.0f, modal.bottom - 46.0f),
+            account_button(native_rect("account.rect.015", D2D1::RectF(modal.left + 40.0f, modal.bottom - 102.0f,
+                                       modal.right - 40.0f, modal.bottom - 46.0f)),
                            loc("LOG OUT", "로그아웃"), false,
                            MenuHitTargetKind::AccountAction, 1);
         } else {
             const float tab_top = modal.top + 238.0f;
             const float tab_width = (modal.right - modal.left - 86.0f) * 0.5f;
-            account_button(D2D1::RectF(modal.left + 38.0f, tab_top,
-                                       modal.left + 38.0f + tab_width, tab_top + 48.0f),
+            account_button(native_rect("account.rect.016", D2D1::RectF(modal.left + 38.0f, tab_top,
+                                       modal.left + 38.0f + tab_width, tab_top + 48.0f)),
                            loc("LOGIN", "로그인"), !data.account_overlay.register_mode,
                            MenuHitTargetKind::AccountTab, 0);
-            account_button(D2D1::RectF(modal.left + 48.0f + tab_width, tab_top,
-                                       modal.right - 38.0f, tab_top + 48.0f),
+            account_button(native_rect("account.rect.017", D2D1::RectF(modal.left + 48.0f + tab_width, tab_top,
+                                       modal.right - 38.0f, tab_top + 48.0f)),
                            loc("REGISTER", "회원가입"), data.account_overlay.register_mode,
                            MenuHitTargetKind::AccountTab, 1);
 
             auto field = [&](float y, std::string_view label, const std::string& value, int index) {
                 if (d2d_->hud_format && d2d_->muted_brush) {
                     draw_text_clipped(to_wide(std::string(label)), d2d_->hud_format.Get(),
-                                      D2D1::RectF(modal.left + 42.0f, y - 28.0f,
-                                                  modal.right - 42.0f, y - 4.0f),
+                                      native_rect("account.rect.018", D2D1::RectF(modal.left + 42.0f, y - 28.0f,
+                                                  modal.right - 42.0f, y - 4.0f)),
                                       d2d_->muted_brush.Get());
                 }
-                const D2D1_RECT_F rect = D2D1::RectF(
-                    modal.left + 40.0f, y, modal.right - 40.0f, y + 58.0f);
+                const D2D1_RECT_F rect = native_rect("account.rect.019", D2D1::RectF(
+                    modal.left + 40.0f, y, modal.right - 40.0f, y + 58.0f));
                 if (d2d_->button_brush) {
                     ctx->FillRoundedRectangle(D2D1::RoundedRect(rect, 6.0f, 6.0f),
                                               d2d_->button_brush.Get());
@@ -196,8 +196,8 @@
                 if (d2d_->body_format && d2d_->text_brush) {
                     draw_text_clipped(to_wide(value + (data.account_overlay.focused_field == index ? " _" : "")),
                                       d2d_->body_format.Get(),
-                                      D2D1::RectF(rect.left + 18.0f, rect.top + 11.0f,
-                                                  rect.right - 18.0f, rect.bottom - 8.0f),
+                                      native_rect("account.rect.020", D2D1::RectF(rect.left + 18.0f, rect.top + 11.0f,
+                                                  rect.right - 18.0f, rect.bottom - 8.0f)),
                                       d2d_->text_brush.Get());
                 }
                 if (data.account_overlay.visible) {
@@ -210,8 +210,8 @@
                   data.account_overlay.username, 1);
             field(modal.top + 460.0f, loc("PASSWORD", "비밀번호"),
                   data.account_overlay.password_mask, 2);
-            account_button(D2D1::RectF(modal.left + 40.0f, modal.bottom - 104.0f,
-                                       modal.right - 40.0f, modal.bottom - 46.0f),
+            account_button(native_rect("account.rect.021", D2D1::RectF(modal.left + 40.0f, modal.bottom - 104.0f,
+                                       modal.right - 40.0f, modal.bottom - 46.0f)),
                            data.account_overlay.busy
                                ? loc("PLEASE WAIT...", "처리 중...")
                                : (data.account_overlay.register_mode
@@ -222,7 +222,7 @@
         if (!data.account_overlay.status.empty() && d2d_->hud_format && d2d_->muted_brush) {
             draw_text_clipped_aligned(
                 to_wide(data.account_overlay.status), d2d_->hud_format.Get(),
-                D2D1::RectF(modal.left + 40.0f, modal.bottom - 38.0f,
-                            modal.right - 40.0f, modal.bottom - 12.0f),
+                native_rect("account.rect.022", D2D1::RectF(modal.left + 40.0f, modal.bottom - 38.0f,
+                            modal.right - 40.0f, modal.bottom - 12.0f)),
                 d2d_->muted_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER);
         }

@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <title>TenRiff native menu - Sliders</title>
+  <polyline points="12,25 88,25" fill="none" stroke="#63E9F2" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+  <polyline points="12,50 88,50" fill="none" stroke="#A499FF" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+  <polyline points="12,75 88,75" fill="none" stroke="#63E9F2" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+  <polyline points="32,16 32,34" fill="none" stroke="#ECF6FF" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+  <polyline points="67,41 67,59" fill="none" stroke="#ECF6FF" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+  <polyline points="44,66 44,84" fill="none" stroke="#ECF6FF" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+</svg>

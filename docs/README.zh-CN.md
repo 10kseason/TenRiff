@@ -10,7 +10,7 @@ Language: [한국어](README.md) | [English](README.en.md) | [简体中文](READ
 
 当前行为说明冲突时，先核对**同一提交的实现代码与回归测试**，再同步修正 `current-state`、`config` 及翻译。`baseline-*`、`release-*` 记录各自版本；早期设计和路线图提案不是当前实现或性能保证。
 
-- [1.7.7](release-1.7.7-gate.md)
+- [1.7.8](release-1.7.8-gate.md)
 - [1.7.2 history](release-1.7.2-gate.md)
 - [1.7.1 history](release-1.7.1-gate.md)
 - [UI](menu-visual-polish.md)
@@ -26,7 +26,7 @@ Language: [한국어](README.md) | [English](README.en.md) | [简体中文](READ
 4. [`docs/config.zh-CN.md`](config.zh-CN.md)
    - 实际配置、profile 与 keymap 结构
 5. [`docs/localization.zh-CN.md`](localization.zh-CN.md)
-   - 当前英语/韩语 UI 结构，以及以后新增更多语言时需要修改的文件边界
+   - 当前英语/韩语/日语 UI 结构，以及以后新增更多语言时需要修改的文件边界
 6. [`docs/menu.zh-CN.md`](menu.zh-CN.md)
    - 菜单/状态机/选歌流程
 7. [`docs/core-loop.zh-CN.md`](core-loop.zh-CN.md)

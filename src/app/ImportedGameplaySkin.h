@@ -1,5 +1,7 @@
 #pragma once
 
+#include "app/NativeGameplaySkin.h"
+
 #include <string>
 #include <string_view>
 #include <vector>
@@ -29,6 +31,8 @@ struct ImportedSkinGearPlacement {
 
 struct ImportedGameplaySkinDefinition {
     bool found = false;
+    bool native_renderer = false;
+    NativeGameplaySkinStyle native;
     int keys = 0;
     std::vector<ImportedSkinImageAsset> note_images;
     std::vector<ImportedSkinImageAsset> hold_head_images;

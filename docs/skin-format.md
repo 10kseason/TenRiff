@@ -1,6 +1,6 @@
 # TenRiff 스킨 포맷 v1
 
-TenRiff 스킨은 한 폴더의 `skin.json`과 PNG/JPG/BMP 이미지로 로비와 인게임 외형을 함께 바꾸는 선택형 포맷이다. 모든 항목은 선택 사항이며, 비어 있거나 누락된 슬롯은 기존 Native 렌더링으로 자동 대체된다.
+TenRiff 스킨은 한 폴더의 `skin.json`, 선택형 PNG/JPG/BMP 이미지와 벡터 도형 설정으로 로비와 인게임 외형을 바꾸는 포맷이다. 시각 항목은 선택 사항이며 누락된 슬롯은 기존 기본값을 쓴다. Native 인게임 스프라이트의 빈 배열 `[]`은 숨김을 뜻한다.
 
 AI 에이전트에게 제작을 맡기려면 [`skin-agent-guide.md`](skin-agent-guide.md)와
 [`skins/AGENTS.md`](../skins/AGENTS.md)를 함께 사용한다. 실제 완성 예제는
@@ -119,6 +119,152 @@ MySkin/
 
 색은 `#RRGGBB` 또는 `#RRGGBBAA`다. 빠진 항목은 기본 팔레트를 유지한다.
 
+## 현대 Native 메뉴 편집
+
+`lobby.renderer`를 `native`로 지정하면 현대적인 기본 메뉴와 애니메이션을 유지하면서
+`native` 항목으로 외형을 바꿀 수 있다. 이 필드가 없거나 `legacy`이면 기존 v1 스킨의
+메뉴 표시 방식을 유지한다. 기존 스킨을 새로운 레이아웃으로 자동 전환하지 않는다.
+
+동봉된 [`TenRiff_NativeEditable`](../skins/TenRiff_NativeEditable/skin.json)은
+현재 기본 메뉴에서 시작하는 편집용 프리셋이다. 동봉
+[`tools/skin_editor/index.html`](../tools/skin_editor/index.html)을 브라우저로 열어
+한국어·영어·일본어 UI로 수정하고 사본을 저장할 수 있다. 지원 슬롯의 ID와 기본값은
+[`native-catalog.json`](../tools/skin_editor/native-catalog.json)에 정리된다.
+
+```json
+"lobby": { "renderer": "native" },
+"native": {
+  "metrics": {},
+  "colors": {},
+  "rects": {},
+  "assets": {},
+  "motion": {},
+  "fonts": {}
+}
+```
+
+| 항목 | 값 | 의미 |
+|---|---|---|
+| `native.metrics` | 숫자 | 크기, 간격, 테두리 등 슬롯별 시각 수치 |
+| `native.colors` | `#RRGGBB` / `#RRGGBBAA` | 슬롯별 색과 불투명도 |
+| `native.rects` | `[dx, dy, dwidth, dheight]` | 계산된 사각형의 이동·크기 증감 |
+| `native.assets` | 상대 이미지 경로 | 기본 벡터 장식 대신 사용할 PNG/JPG/BMP |
+| `native.motion` | 숫자 | 메뉴 애니메이션 활성화·속도·강도·등장 시간 |
+| `native.fonts` | 글꼴 패밀리 문자열 | 슬롯별 설치된 글꼴 이름 |
+
+`native.rects`의 값은 `1920x1080` 기준 공간의 **증감량**이다. 예를 들어
+`[10, -5, 32, -8]`은 오른쪽으로 10, 위로 5 이동하고 폭은 32 늘리며 높이는 8 줄인다.
+동일 슬롯으로 그리는 반복 행도 원래 위치를 유지한다. 기존 `layout`은 계속
+`[left, top, right, bottom]` 절대 좌표를 사용한다.
+
+슬롯 ID는 소문자로 시작하고 영문 소문자, 숫자, `_`, `.`, `-`를 사용하며 최대 128자다.
+각 맵은 최대 4,096개 항목을 담는다. 수치와 사각형 증감량은 `-8192..8192`, 모션 값은
+`0..120` 범위만 읽는다. 실제 화면에서는 슬롯의 목적에 맞는 범위를 사용해야 한다.
+형식은 맞지만 현재 카탈로그에 없는 ID는 향후 호환성을 위해 읽고 보존할 수 있으며,
+현재 렌더러에는 효과가 없다. 글꼴 이름은 제어 문자를 금지하고 UTF-8 기준 128바이트까지
+지원한다. 설치되지 않은 글꼴은 Windows 글꼴 대체 규칙을 따른다.
+
+누락·잘못된 값은 해당 슬롯의 기본 표시로 대체한다. 이미지 경로는 다른 이미지 필드와
+같은 상대 경로 규칙을 따르고, 가져오기 시 참조 이미지를 함께 복사한다. 최상위 `native`
+항목은 메뉴 표시용이며 게임플레이 설정을 바꾸지 않는다. 인게임 편집은 아래의
+`gameplay.native`를 사용한다. 기본 편집 프리셋에는 메뉴와 Luma Keys 인게임 설정이 함께 들어 있다.
+게임플레이 이미지나 시각 옵션이 없는 Native 메뉴 스킨은 인게임 소스도 Native로
+유지하므로 기본 디지털 키 표시까지 그대로 남는다. 실제 게임플레이 이미지나 옵션을
+추가한 기존 스킨은 해당 모드에서 기존 TenRiff 게임플레이 스킨 경로를 사용한다.
+`gameplay.renderer: native`를 명시한 스킨은 시각 옵션을 추가해도 기본 건반 렌더러를 유지한다.
+
+## Native 인게임 편집
+
+`gameplay.renderer`가 `native`이면 Luma Keys의 건반, 노트, 레일, 판정선, HUD와
+시각 애니메이션을 `gameplay.native`에서 편집한다. 이 선택은 `lobby.renderer`와
+독립적이다. `gameplay.renderer`가 없거나 `legacy`이면 기존 v1 스킨의 표시 경로를 유지한다.
+게임 시뮬레이션의 판정 시간, 입력, 오디오, 채보 규칙은 이 설정을 읽지 않는다.
+
+[웹 스킨 에디터](https://tenriff-skin-editor.lastestarcorp.chatgpt.site/)와 동봉
+`tools/skin_editor/index.html`에서 편집하고 사본을 저장할 수 있다. 전체 기본값은
+[`TenRiff_NativeEditable/skin.json`](../skins/TenRiff_NativeEditable/skin.json),
+지원 슬롯과 범위는 [`editor-catalog.json`](../assets/native-gameplay/luma-keys/editor-catalog.json)에 있다.
+
+```json
+"gameplay": {
+  "renderer": "native",
+  "native": {
+    "metrics": { "judgement_line_width": 3, "key_max_height": 160 },
+    "colors": { "judgement_line": "#A8FFF0", "key_led": "#66CCFF" },
+    "motion": { "press_depth": 9, "release_response": 18 },
+    "rects": { "combo": [0, -24, 0, 0] },
+    "fonts": { "combo": "Bahnschrift SemiBold" },
+    "sprites": {
+      "note": [
+        { "x": 0, "y": 2, "width": 128, "height": 28,
+          "color": "#10283A", "mix": 0.6, "alpha": 1, "radius": 4 },
+        { "x": 4, "y": 5, "width": 120, "height": 7,
+          "color": "#FFFFFF", "mix": 0.7, "alpha": 0.9, "radius": 1 }
+      ]
+    }
+  },
+  "modes": {
+    "16k": { "native": { "metrics": { "key_inset": 2 } } }
+  }
+}
+```
+
+### 수치, 색상, 위치, 글꼴
+
+| 항목 | 주요 슬롯 | 단위와 동작 |
+|---|---|---|
+| `metrics` | `key_min_height`, `key_max_height`, `key_inset`, `judgement_line_width`, `hold_edge_mix`, `timing_range_ms`, `combo_font_size` | 화면 크기는 1920×1080 기준 논리 픽셀. 비율·불투명도·타이밍 막대 표시 범위는 슬롯별 단위 |
+| `colors` | `key_well`, `key_led`, `chassis`, `judgement_line`, `hold_edge/core/shadow`, `combo`, `judgement_pg/gr/gd/bd/pr`, `timing_fast/slow`, `gauge_ex_hard/hard/normal/easy` | `#RRGGBB` 또는 `#RRGGBBAA` |
+| `motion` | `press_response`, `release_response`, `press_depth`, `pressed_light`, `hit_light`, `burst_rise`, `combo_duration_ms`, `combo_scale`, `combo_lift` | 눌림·복원 응답률은 클수록 빠름. 깊이·이동은 논리 픽셀, `_ms`는 밀리초 |
+| `rects` | `title`, `artist`, `speed`, `score`, `stats`, `combo`, `judgement`, `timing`, `gauge`, `progress`, `key_label` | `[dx, dy, dwidth, dheight]` 증감량, 각 값 `-8192..8192` |
+| `fonts` | `title`, `score`, `body`, `timing`, `judgement`, `combo`, `key_label` | 설치된 글꼴 이름. 제어 문자 금지, UTF-8 기준 최대 128바이트 |
+
+인게임 수치·모션의 허용 범위는 각 슬롯에 따로 정의된다. 메뉴용 `native.motion`의
+`0..120` 제한을 적용하면 안 된다. 예를 들어 `press_response`는 `1..500`,
+`combo_duration_ms`는 `1..2000`, `combo_lift`는 `-100..100`이다.
+`timing_range_ms`는 피드백 막대의 표시 범위이며 실제 판정 윈도우를 바꾸지 않는다.
+카탈로그에 없는 인게임 슬롯 ID는 런타임에서 경고 후 무시한다. JSON 편집 도구는
+알 수 없는 항목을 원본에 보존할 수 있지만 공식 스키마 검증은 오타를 오류로 보고한다.
+
+### 벡터 스프라이트
+
+`sprites`는 `key_idle`, `key_pressed`, `note`, `hold_head`, `hold_tail`을 지원한다.
+각 배열은 최대 128개의 둥근 사각형을 뒤에서 앞으로 겹쳐 그린다. 건반은 **128×256**,
+노트·롱노트 머리·꼬리는 **128×32** 좌표이며 렌더러가 실제 레인 크기에 맞춰 조절한다.
+레인 색과 도형 색을 혼합하므로 공통 도형을 4~16키 전체에 사용할 수 있다.
+
+| 레이어 필드 | 범위 | 의미 |
+|---|---|---|
+| `x`, `y` | `0..128`, `0..캔버스 높이` | 왼쪽 위 위치, 필수 |
+| `width`, `height` | `0..128`, `0..캔버스 높이` | 폭과 높이, 필수. 오른쪽과 아래 끝도 캔버스 안에 있어야 함 |
+| `color` | `#RRGGBB` / `#RRGGBBAA` | 도형 색, 필수 |
+| `mix` | `0..1`, 기본 `1` | `0`은 레인 색, `1`은 도형 색 |
+| `alpha` | `0..1`, 기본 `1` | 레이어 불투명도. `color`의 알파와 곱함 |
+| `radius` | `0..128`, 기본 `0` | 모서리 반경 |
+
+스프라이트 항목을 생략하면 기본 Luma Keys 도형을 쓴다. **빈 배열 `[]`은 해당 도형을
+숨긴다.** 전체 객체 삭제와 빈 배열을 혼동하지 않는다. 잘못된 레이어나 범위 초과가
+있으면 해당 스프라이트 전체가 기본 도형으로 대체되고 경고를 남긴다. 캔버스를 넘는지
+확인하는 `x + width`, `y + height` 검사는 런타임과 에디터가 수행한다. 표준 JSON Schema는
+필드별 범위만 검사하므로 스키마 성공 뒤에도 에디터 경고와 게임 리로드 결과를 확인한다.
+
+명시한 벡터 스프라이트는 `note_shape`와 관계없이 해당 슬롯에 적용된다. 벡터를 지정하지
+않은 노트는 `rect`일 때 Luma Keys 기본 도형을 쓰고 다른 모양에서는 기존 모양을 유지한다.
+기존 `gameplay.note`, `hold_head/body/tail`, `key_idle/pressed` 이미지도 사용할 수 있다.
+읽기에 성공한 교체 이미지가 벡터보다 우선하므로 빈 배열로 숨긴 슬롯도 이미지가 있으면
+이미지를 그린다. 이미지가 없거나 읽지 못하면 벡터 또는 기존 기본값으로 대체된다.
+
+기본 도형을 변경해도 매 프레임 파일을 읽거나 도형 전체를 다시 생성하지 않는다.
+스킨을 읽거나 시각 설정이 바뀌면 필요한 GPU 비트맵을 갱신하고 플레이 중에는 재사용한다.
+
+### 모드별 상속
+
+일반 `gameplay` 필드는 기존처럼 모드 값으로 통째로 대체한다. `gameplay.native`는
+**카테고리 안의 슬롯별로 병합**한다. 위 예시의 16K는 `key_inset`만 바꾸고 공통
+판정선 색·모션·노트 도형을 상속한다. 스프라이트 배열은 레이어 단위로 합치지 않고
+해당 이름의 전체 배열을 대체한다. 예를 들어 `modes.4k.native.sprites.note: []`은
+4K의 일반 노트만 숨긴다. 모드별 객체를 중첩하는 것은 허용하지 않는다.
+
 ## 키 모드 공통화와 패턴 경로
 
 레인별 파일 이름을 전부 배열로 쓰는 대신 문자열 패턴을 쓸 수 있다.
@@ -140,7 +286,7 @@ MySkin/
 - `{lane}`: `lane_map`의 현재 값
 - `{index}`: 1부터 시작하는 레인 번호
 - `{index:02}`: 두 자리 레인 번호 (`01`, `02`, ...)
-- `modes`: `1k`부터 `16k`, 그리고 BMS 7키+스크래치 전용 `7+1`의 얕은 덮어쓰기. 공통 항목을 먼저 쓰고 레이아웃마다 다른 항목만 적는다.
+- `modes`: `1k`부터 `16k`, 그리고 BMS 7키+스크래치 전용 `7+1`의 덮어쓰기. 일반 필드는 얕게 대체하고 `native`의 카테고리 맵은 슬롯별로 병합한다. 공통 항목을 먼저 쓰고 레이아웃마다 다른 항목만 적는다.
 
 가져오기는 현재 선택한 모드뿐 아니라 `1k..16k`와 `7+1`의 모든 참조 자산을 함께 복사한다.
 
@@ -274,6 +420,11 @@ DDR/StepMania식 화살표 노트는 정사각형에 가까운 이미지를 쓴�
   무시하고 경고를 남긴다. 슬롯 이름을 잘못 적어도 조용히 넘어가지 않고 경고가 뜬다.
 
 ## 크기와 좌표
+
+`lobby.renderer = "native"`에서는 타이틀 기본 배치가 다릅니다. 에디터도 같은 기본값을 씁니다:
+`logo=[56,24,418,94]`, `buttons=[1016,260,1824,824]`, `guide=[96,516,932,924]`,
+`footer=[64,972,1856,1048]`, `spectrum=[1430,990,1574,1028]`.
+이 모드에서 버튼 그룹과 푸터는 독립적으로 움직입니다. 세부 도형은 `native.rects`에서 추가 보정합니다.
 
 - 로비/인게임 배경 권장 크기: `1920x1080` 이상, 16:9.
 - 로고는 투명 PNG를 권장하며 원본 종횡비를 유지한다.

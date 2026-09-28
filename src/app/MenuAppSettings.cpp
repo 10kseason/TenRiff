@@ -131,7 +131,7 @@ void MenuApp::populate_audio_settings_render_data(render::MenuRenderData& render
         audio_settings_controller_.set_asio_drivers(std::move(drivers));
     }
     auto view = menu::settings::AudioSettingsView::build(
-        audio_settings_controller_, config_, ui_uses_korean());
+        audio_settings_controller_, config_, ui_language());
     render.generic.rows.reserve(render.generic.rows.size() + view.rows.size());
     for (auto& source : view.rows) {
         render::MenuRowData row;

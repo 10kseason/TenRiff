@@ -1,6 +1,9 @@
 #include "render/MenuWindow.h"
 #include "config/BuiltinDifficultyTables.h"
 #include "render/GameplayFeedbackText.h"
+#include "render/NativeMenuAssets.h"
+#include "render/LumaKeysAssets.h"
+#include "render/NativeSkinOverrides.h"
 
 #ifdef _WIN32
 
@@ -19,6 +22,7 @@
 #include <cmath>
 #include <chrono>
 #include <cstdint>
+#include <cstdlib>
 #include <ctime>
 #include <cwchar>
 #include <filesystem>
@@ -1174,6 +1178,38 @@ void draw_gameplay_sprite(ID2D1DeviceContext* ctx,
     ctx->SetTransform(saved);
 }
 
+D2D1_RECT_F native_gameplay_d2d_rect(const app::NativeGameplaySkinStyle& style,const char* key,D2D1_RECT_F rect) {
+    const auto v=native_gameplay_rect(style,key,{rect.left,rect.top,rect.right,rect.bottom});
+    return D2D1::RectF(v[0],v[1],v[2],v[3]);
+}
+D2D1_COLOR_F native_gameplay_d2d_color(const app::NativeGameplaySkinStyle& style,const char* key,D2D1_COLOR_F color) {
+    if (style.colors.find(key)==style.colors.end()) return color;
+    const auto v=native_gameplay_color(style,key,{color.r,color.g,color.b,1.0f});
+    return D2D1::ColorF(v[0],v[1],v[2],v[3]*color.a);
+}
+
+template <typename Layers>
+bool create_luma_key_bitmap(ID2D1DeviceContext* context,
+                            const Layers& layers,
+                            float height, uint32_t lane_color,
+                            Microsoft::WRL::ComPtr<ID2D1Bitmap>& bitmap, float outline = 1.0f) {
+    Microsoft::WRL::ComPtr<ID2D1BitmapRenderTarget> target;
+    if (FAILED(context->CreateCompatibleRenderTarget(D2D1::SizeF(128.0f, height), &target)))
+        return false;
+    Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> brush;
+    if (FAILED(target->CreateSolidColorBrush(D2D1::ColorF(0xFFFFFF), &brush))) return false;
+    target->BeginDraw();
+    target->Clear(D2D1::ColorF(0.0f, 0.0f, 0.0f, 0.0f));
+    std::size_t layer_index = 0;
+    for (const auto& layer : layers) {
+        const float alpha = layer.alpha * (height == 32.0f && layer_index++ < 2 ? outline : 1.0f);
+        brush->SetColor(color_from_rgb(blend_rgb(lane_color, layer.color, layer.mix), alpha));
+        const auto rect = D2D1::RectF(layer.x, layer.y, layer.x + layer.width, layer.y + layer.height);
+        target->FillRoundedRectangle(D2D1::RoundedRect(rect, layer.radius, layer.radius), brush.Get());
+    }
+    return SUCCEEDED(target->EndDraw()) && SUCCEEDED(target->GetBitmap(&bitmap));
+}
+
 bool create_composited_gameplay_note_bitmap(ID2D1DeviceContext* d2d_context,
                                             ID2D1Factory1* d2d_factory,
                                             ID2D1Bitmap* source_bitmap,
@@ -2116,6 +2152,10 @@ void configure_low_latency_presentation(IDXGIDevice* dxgi_device, IDXGISwapChain
 }  // namespace
 
 struct MenuWindow::D2DResources {
+    Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> native_menu_brush;
+    Microsoft::WRL::ComPtr<ID2D1LinearGradientBrush> native_menu_background;
+    std::unordered_map<uint32_t, D2D1_COLOR_F> native_menu_palette;
+    std::array<Microsoft::WRL::ComPtr<ID2D1PathGeometry>, native_menu_assets::paths.size()> native_menu_geometry{};
     struct SongCardPreviewBitmapEntry {
         bool attempted = false;
         Microsoft::WRL::ComPtr<ID2D1Bitmap> bitmap;
@@ -2149,6 +2189,7 @@ struct MenuWindow::D2DResources {
     Microsoft::WRL::ComPtr<IDWriteTextFormat> menu_icon_format;
     Microsoft::WRL::ComPtr<IDWriteTextFormat> header_format;
     Microsoft::WRL::ComPtr<IDWriteTextFormat> gameplay_combo_format;
+    std::unordered_map<std::string, Microsoft::WRL::ComPtr<IDWriteTextFormat>> native_gameplay_formats;
     Microsoft::WRL::ComPtr<IDWriteTextFormat> song_logo_format;
     Microsoft::WRL::ComPtr<IDWriteTextFormat> song_nav_format;
     Microsoft::WRL::ComPtr<IDWriteTextFormat> song_record_label_format;
@@ -2536,10 +2577,14 @@ bool MenuWindow::fail_fatal(std::string_view message) {
 
 void MenuWindow::invalidate_gameplay_note_sprite_cache() {
     gameplay_note_sprite_cache_ = GameplayNoteSpriteCache{};
+    native_key_travel_.fill(0.0f);
+    native_ghost_key_travel_.fill(0.0f);
+    native_key_frame_time_ns_ = 0;
     if (!d2d_) {
         return;
     }
 
+    d2d_->native_gameplay_formats.clear();
     for (auto& bitmap : d2d_->lane_note_head_bitmaps) {
         bitmap.Reset();
     }
@@ -2595,9 +2640,12 @@ bool MenuWindow::ensure_gameplay_note_sprites(const GameplayHudData& data) {
     const int lane_count = std::clamp(data.lane_count, 1, static_cast<int>(kGameplayHudMaxLanes));
     const std::string source = normalize_gameplay_skin_source(data.skin_source);
     const std::string note_shape = normalize_gameplay_note_shape(data.note_shape);
+    const auto& native_style = native_gameplay_style(data.resolved_tenriff_skin,source == "native");
     const bool cache_matches =
         gameplay_note_sprite_cache_.lane_count == lane_count &&
+        gameplay_note_sprite_cache_.lane_color_count == data.lane_color_count &&
         gameplay_note_sprite_cache_.note_border_enabled == data.note_border_enabled &&
+        gameplay_note_sprite_cache_.note_outline_opacity == data.note_outline_opacity &&
         gameplay_note_sprite_cache_.note_shape == note_shape &&
         gameplay_note_sprite_cache_.note_image_aspect == data.note_image_aspect &&
         gameplay_note_sprite_cache_.skin_source == source &&
@@ -2612,7 +2660,9 @@ bool MenuWindow::ensure_gameplay_note_sprites(const GameplayHudData& data) {
 
     invalidate_gameplay_note_sprite_cache();
     gameplay_note_sprite_cache_.lane_count = lane_count;
+    gameplay_note_sprite_cache_.lane_color_count = data.lane_color_count;
     gameplay_note_sprite_cache_.note_border_enabled = data.note_border_enabled;
+    gameplay_note_sprite_cache_.note_outline_opacity = data.note_outline_opacity;
     gameplay_note_sprite_cache_.note_shape = note_shape;
     gameplay_note_sprite_cache_.note_image_aspect = data.note_image_aspect;
     gameplay_note_sprite_cache_.skin_source = source;
@@ -2656,14 +2706,26 @@ bool MenuWindow::ensure_gameplay_note_sprites(const GameplayHudData& data) {
                 d2d_->lane_native_note_brushes[index].ReleaseAndGetAddressOf()));
         }
 
-        const D2D1_GRADIENT_STOP hold_stops[] = {
+        // A dark centre with bright edge rails keeps overlapping LN heads readable.
+        const D2D1_GRADIENT_STOP native_hold_stops[] = {
+            {0.00f, color_from_rgb(blend_rgb(lane_color, native_gameplay_rgb(native_style,"hold_edge",0xFFFFFF), native_gameplay_number(native_style,"hold_edge_mix")),native_gameplay_alpha(native_style,"hold_edge"))},
+            {0.08f, color_from_rgb(blend_rgb(lane_color, native_gameplay_rgb(native_style,"hold_edge",0xFFFFFF), 0.40f),native_gameplay_alpha(native_style,"hold_edge"))},
+            {0.17f, color_from_rgb(blend_rgb(lane_color, native_gameplay_rgb(native_style,"hold_shadow",0x061323), 0.72f),native_gameplay_alpha(native_style,"hold_shadow"))},
+            {0.50f, color_from_rgb(blend_rgb(lane_color, native_gameplay_rgb(native_style,"hold_core",0x10283A), native_gameplay_number(native_style,"hold_core_mix")),native_gameplay_alpha(native_style,"hold_core"))},
+            {0.83f, color_from_rgb(blend_rgb(lane_color, native_gameplay_rgb(native_style,"hold_shadow",0x061323), 0.72f),native_gameplay_alpha(native_style,"hold_shadow"))},
+            {0.92f, color_from_rgb(blend_rgb(lane_color, native_gameplay_rgb(native_style,"hold_edge",0xFFFFFF), 0.40f),native_gameplay_alpha(native_style,"hold_edge"))},
+            {1.00f, color_from_rgb(blend_rgb(lane_color, native_gameplay_rgb(native_style,"hold_edge",0xFFFFFF), native_gameplay_number(native_style,"hold_edge_mix")),native_gameplay_alpha(native_style,"hold_edge"))},
+        };
+        const D2D1_GRADIENT_STOP imported_hold_stops[] = {
             {0.00f, color_from_rgb(blend_rgb(lane_color, 0xFFFFFF, 0.14f))},
             {0.50f, color_from_rgb(blend_rgb(lane_color, 0xFFFFFF, 0.72f))},
             {1.00f, color_from_rgb(blend_rgb(lane_color, 0xFFFFFF, 0.14f))},
         };
+        const auto* hold_stops = source == "native" ? native_hold_stops : imported_hold_stops;
+        const UINT hold_stop_count = source == "native" ? 7u : 3u;
         Microsoft::WRL::ComPtr<ID2D1GradientStopCollection> hold_stop_collection;
         if (SUCCEEDED(d2d_->d2d_context->CreateGradientStopCollection(
-                hold_stops, 3, hold_stop_collection.ReleaseAndGetAddressOf()))) {
+                hold_stops, hold_stop_count, hold_stop_collection.ReleaseAndGetAddressOf()))) {
             const D2D1_LINEAR_GRADIENT_BRUSH_PROPERTIES properties =
                 D2D1::LinearGradientBrushProperties(D2D1::Point2F(0.0f, 0.0f),
                                                     D2D1::Point2F(1.0f, 0.0f));
@@ -2675,11 +2737,56 @@ bool MenuWindow::ensure_gameplay_note_sprites(const GameplayHudData& data) {
     }
 
     if (source == "native") {
-        return true;
+        // Text formats and vector sprites are cached per skin revision, never rebuilt per frame.
+        for (const auto role : app::kNativeGameplayFonts) {
+            const std::string key(role);
+            const auto font = native_style.fonts.find(key);
+            if (font == native_style.fonts.end() && native_style.metrics.find(key+"_font_size")==native_style.metrics.end()) continue;
+            const std::wstring family=to_wide(font==native_style.fonts.end()?(key=="combo"?"Bahnschrift SemiBold":"Segoe UI"):font->second);
+            Microsoft::WRL::ComPtr<IDWriteTextFormat> format;
+            if(SUCCEEDED(d2d_->dwrite_factory->CreateTextFormat(family.c_str(),nullptr,
+                DWRITE_FONT_WEIGHT_SEMI_BOLD,DWRITE_FONT_STYLE_NORMAL,DWRITE_FONT_STRETCH_NORMAL,
+                native_gameplay_number(native_style,(key+"_font_size").c_str()),L"",&format))) {
+                format->SetWordWrapping(DWRITE_WORD_WRAPPING_NO_WRAP);
+                d2d_->native_gameplay_formats[key]=std::move(format);
+            }
+        }
+        auto sprite = [&](const char* key, const auto& fallback, float height, uint32_t color,
+                          Microsoft::WRL::ComPtr<ID2D1Bitmap>& bitmap, float outline=1.0f) {
+            const auto it=native_style.sprites.find(key);
+            // Even an empty override creates a valid transparent bitmap, suppressing fallback.
+            return it==native_style.sprites.end()
+                ? create_luma_key_bitmap(d2d_->d2d_context.Get(),fallback,height,color,bitmap,outline)
+                : create_luma_key_bitmap(d2d_->d2d_context.Get(),it->second,height,color,bitmap,outline);
+        };
+        for (int lane = 0; lane < lane_count; ++lane) {
+            const auto index = static_cast<std::size_t>(lane);
+            const uint32_t color = index < data.lane_color_count ? data.lane_colors[index]
+                : (gameplay_lane_uses_white_note(lane + 1) ? 0xF6F8FF : 0x4F80FF);
+            sprite("key_idle", luma_keys_assets::kKeyIdle, 256.0f, color,
+                                   d2d_->lane_key_idle_bitmaps[index]);
+            sprite("key_pressed", luma_keys_assets::kKeyLit, 256.0f, color,
+                                   d2d_->lane_key_pressed_bitmaps[index]);
+            // Shape selection and the existing outline controls remain authoritative.
+            const float outline = data.note_border_enabled ? static_cast<float>(std::clamp(data.note_outline_opacity / 0.78, 0.0, 1.0)) : 0.0f;
+            if (note_shape == "rect" || native_style.sprites.count("note")) {
+                sprite("note", luma_keys_assets::kNote, 32.0f, color,
+                                       d2d_->lane_note_head_bitmaps[index], outline);
+            }
+            if (note_shape == "rect" || native_style.sprites.count("hold_head")) {
+                sprite("hold_head", luma_keys_assets::kHoldHead, 32.0f, color,
+                                       d2d_->lane_note_hold_head_bitmaps[index], outline);
+            }
+            if (note_shape == "rect" || native_style.sprites.count("hold_tail")) {
+                sprite("hold_tail", luma_keys_assets::kHoldTail, 32.0f, color,
+                                       d2d_->lane_note_tail_bitmaps[index], outline);
+            }
+        }
+        if (!data.resolved_tenriff_skin) return true;
     }
 
     app::ImportedGameplaySkinDefinition imported;
-    if (source == "tenriff") {
+    if (source == "tenriff" || source == "native") {
         if (data.resolved_tenriff_skin) {
             imported = *data.resolved_tenriff_skin;
         }
@@ -2789,15 +2896,15 @@ bool MenuWindow::ensure_gameplay_note_sprites(const GameplayHudData& data) {
                           Microsoft::WRL::ComPtr<ID2D1Bitmap>* bitmap_out,
                           D2D1_RECT_F* rect_out) {
         const app::ImportedSkinImageAsset* asset = pick_asset(assets, lane_index);
-        if (!asset || !bitmap_out || !rect_out) {
+        if (!asset || asset->path.empty() || !bitmap_out || !rect_out) {
             return;
         }
-        load_bitmap_from_imported_asset(d2d_->wic_factory.Get(),
-                                        d2d_->d2d_context.Get(),
-                                        *asset,
-                                        *bitmap_out,
-                                        rect_out,
-                                        true);
+        Microsoft::WRL::ComPtr<ID2D1Bitmap> loaded;
+        D2D1_RECT_F loaded_rect{};
+        if (load_bitmap_from_imported_asset(d2d_->wic_factory.Get(),d2d_->d2d_context.Get(),
+                                            *asset,loaded,&loaded_rect,true)) {
+            *bitmap_out=std::move(loaded); *rect_out=loaded_rect;
+        }
     };
 
     if (!imported.gear_overlay_image.path.empty()) {
@@ -2809,14 +2916,15 @@ bool MenuWindow::ensure_gameplay_note_sprites(const GameplayHudData& data) {
                                         false);
     }
 
+    // Passing &ComPtr would clear the cached vector even when an optional PNG is absent.
     for (int lane = 0; lane < lane_count; ++lane) {
         const std::size_t index = static_cast<std::size_t>(lane);
-        load_asset(imported.note_images, lane, &d2d_->lane_note_head_bitmaps[index], &d2d_->lane_note_head_source_rects[index]);
-        load_asset(imported.hold_head_images, lane, &d2d_->lane_note_hold_head_bitmaps[index], &d2d_->lane_note_hold_head_source_rects[index]);
-        load_asset(imported.hold_body_images, lane, &d2d_->lane_note_hold_body_bitmaps[index], &d2d_->lane_note_hold_body_source_rects[index]);
-        load_asset(imported.hold_tail_images, lane, &d2d_->lane_note_tail_bitmaps[index], &d2d_->lane_note_tail_source_rects[index]);
-        load_asset(imported.key_images, lane, &d2d_->lane_key_idle_bitmaps[index], &d2d_->lane_key_idle_source_rects[index]);
-        load_asset(imported.key_pressed_images, lane, &d2d_->lane_key_pressed_bitmaps[index], &d2d_->lane_key_pressed_source_rects[index]);
+        load_asset(imported.note_images, lane, std::addressof(d2d_->lane_note_head_bitmaps[index]), &d2d_->lane_note_head_source_rects[index]);
+        load_asset(imported.hold_head_images, lane, std::addressof(d2d_->lane_note_hold_head_bitmaps[index]), &d2d_->lane_note_hold_head_source_rects[index]);
+        load_asset(imported.hold_body_images, lane, std::addressof(d2d_->lane_note_hold_body_bitmaps[index]), &d2d_->lane_note_hold_body_source_rects[index]);
+        load_asset(imported.hold_tail_images, lane, std::addressof(d2d_->lane_note_tail_bitmaps[index]), &d2d_->lane_note_tail_source_rects[index]);
+        load_asset(imported.key_images, lane, std::addressof(d2d_->lane_key_idle_bitmaps[index]), &d2d_->lane_key_idle_source_rects[index]);
+        load_asset(imported.key_pressed_images, lane, std::addressof(d2d_->lane_key_pressed_bitmaps[index]), &d2d_->lane_key_pressed_source_rects[index]);
     }
 
     return true;
@@ -3418,6 +3526,9 @@ bool MenuWindow::ensure_gameplay_static_cache(const GameplayHudData& data) {
     }
 
     GameplayStaticCache desired{};
+    desired.native_instrument = normalize_gameplay_skin_source(data.skin_source) == "native";
+    desired.native_skin = data.resolved_tenriff_skin;
+    const auto& native_style = native_gameplay_style(data.resolved_tenriff_skin,desired.native_instrument);
     desired.lane_count = std::clamp(data.lane_count, 1, static_cast<int>(kGameplayHudMaxLanes));
     if (gameplay_field_drag_state_.has_local_override &&
         !gameplay_field_drag_state_.active &&
@@ -3429,7 +3540,7 @@ bool MenuWindow::ensure_gameplay_static_cache(const GameplayHudData& data) {
                                          : data.gameplay_field_offset_x;
     const bool use_imported_metrics = normalize_gameplay_skin_source(data.skin_source) != "native";
     desired.judgement_line_position =
-        gameplay_note_sprite_cache_.has_imported_judgement_line_position
+        use_imported_metrics && gameplay_note_sprite_cache_.has_imported_judgement_line_position
             ? gameplay_note_sprite_cache_.imported_judgement_line_position
             : clamp_gameplay_judgement_line(data.judgement_line_position);
     desired.note_width_scale = clamp_gameplay_note_width_scale(data.note_width_scale);
@@ -3498,6 +3609,8 @@ bool MenuWindow::ensure_gameplay_static_cache(const GameplayHudData& data) {
     const bool cache_matches =
         d2d_->gameplay_static_command_list &&
         gameplay_static_cache_.lane_count == desired.lane_count &&
+        gameplay_static_cache_.native_instrument == desired.native_instrument &&
+        gameplay_static_cache_.native_skin == desired.native_skin &&
         gameplay_static_cache_.judgement_line_position == desired.judgement_line_position &&
         gameplay_static_cache_.gameplay_field_offset_x == desired.gameplay_field_offset_x &&
         gameplay_static_cache_.note_width_scale == desired.note_width_scale &&
@@ -3557,6 +3670,9 @@ bool MenuWindow::ensure_gameplay_static_cache(const GameplayHudData& data) {
             desired.gameplay_field_offset_x,
             desired.note_divider_gap_px);
     auto build_gauge_grid = [&](std::size_t index, float gauge_left) {
+        const auto gauge=native_gameplay_d2d_rect(native_style,"gauge",D2D1::RectF(gauge_left,kGameplayGaugeTop,gauge_left+kGameplayGaugeWidth,kGameplayGaugeBottom));
+        const float gauge_top=gauge.top,gauge_bottom=gauge.bottom,gauge_width=gauge.right-gauge.left;
+        gauge_left=gauge.left;
         Microsoft::WRL::ComPtr<ID2D1PathGeometry> geometry;
         if (FAILED(d2d_->d2d_factory->CreatePathGeometry(geometry.ReleaseAndGetAddressOf())) || !geometry) {
             return;
@@ -3567,10 +3683,10 @@ bool MenuWindow::ensure_gameplay_static_cache(const GameplayHudData& data) {
         }
         for (int segment = 1; segment < 10; ++segment) {
             const float ratio = static_cast<float>(segment) / 10.0f;
-            const float y = kGameplayGaugeBottom -
-                            (kGameplayGaugeBottom - kGameplayGaugeTop) * ratio;
+            const float y = gauge_bottom -
+                            (gauge_bottom - gauge_top) * ratio;
             sink->BeginFigure(D2D1::Point2F(gauge_left + 4.0f, y), D2D1_FIGURE_BEGIN_HOLLOW);
-            sink->AddLine(D2D1::Point2F(gauge_left + kGameplayGaugeWidth - 4.0f, y));
+            sink->AddLine(D2D1::Point2F(gauge_left + gauge_width - 4.0f, y));
             sink->EndFigure(D2D1_FIGURE_END_OPEN);
         }
         if (SUCCEEDED(sink->Close())) {
@@ -3629,6 +3745,8 @@ bool MenuWindow::ensure_gameplay_static_cache(const GameplayHudData& data) {
         }
 
         if (desired.show_lane_dividers && d2d_->lane_divider_brush) {
+            const float divider_opacity = d2d_->lane_divider_brush->GetOpacity();
+            if (desired.native_instrument) d2d_->lane_divider_brush->SetOpacity(divider_opacity * native_gameplay_number(native_style,"lane_divider_opacity"));
             for (std::size_t divider = 0; divider < desired.lane_divider_width_count; ++divider) {
                 if (gameplay_is_center_gap_divider(field_layout, divider)) {
                     continue;
@@ -3643,11 +3761,34 @@ bool MenuWindow::ensure_gameplay_static_cache(const GameplayHudData& data) {
                                             d2d_->lane_divider_brush.Get(),
                                             stroke);
             }
+            d2d_->lane_divider_brush->SetOpacity(divider_opacity);
         }
 
         const float hit_line_y =
             gameplay_field_y(field_layout.top, field_layout.height, desired.judgement_line_position);
-        if (desired.show_judgement_line && d2d_->judgement_line_brush) {
+        if (desired.native_instrument && d2d_->note_fill_brush) {
+            auto* fill = d2d_->note_fill_brush.Get();
+            const auto saved = fill->GetColor();
+            const float key_top = native_key_bounds(field_layout.left, field_layout.right,
+                field_layout.top, field_layout.bottom,
+                gameplay_osu_gear_top(field_layout, hit_line_y, note_height_scale), native_style).top;
+            fill->SetColor(native_gameplay_d2d_color(native_style,"chassis",color_from_rgb(0x142332, static_cast<float>(desired.visual_opacity))));
+            d2d_->d2d_context->FillRectangle(D2D1::RectF(field_layout.left + 2.0f, key_top - 2.0f,
+                field_layout.right - 2.0f, field_layout.bottom - 1.0f), fill);
+            if (desired.show_judgement_line) {
+                const float y = std::clamp(hit_line_y, field_layout.top + 2.0f, field_layout.bottom - 2.0f);
+                if (desired.judgement_line_glow_enabled) {
+                    fill->SetColor(native_gameplay_d2d_color(native_style,"judgement_glow",color_from_rgb(0x70EED6, 0.10f * static_cast<float>(desired.visual_opacity))));
+                    d2d_->d2d_context->FillRectangle(D2D1::RectF(field_layout.left + 3.0f, std::max(field_layout.top, y - native_gameplay_number(native_style,"judgement_glow_height")*.5f),
+                        field_layout.right - 3.0f, std::min(field_layout.bottom, y + native_gameplay_number(native_style,"judgement_glow_height")*.5f)), fill);
+                }
+                fill->SetColor(native_gameplay_d2d_color(native_style,"judgement_line",color_from_rgb(0xBCFFF0, static_cast<float>(desired.visual_opacity))));
+                d2d_->d2d_context->FillRectangle(D2D1::RectF(field_layout.left + 3.0f, y - native_gameplay_number(native_style,"judgement_line_width")*.5f,
+                    field_layout.right - 3.0f, y + native_gameplay_number(native_style,"judgement_line_width")*.5f), fill);
+            }
+            fill->SetColor(saved);
+        }
+        if (!desired.native_instrument && desired.show_judgement_line && d2d_->judgement_line_brush) {
             const D2D1_RECT_F line_rect =
                 gameplay_judgement_line_rect(field_layout, hit_line_y, note_height_scale);
             if (desired.judgement_line_glow_enabled) {
@@ -3707,8 +3848,8 @@ bool MenuWindow::ensure_gameplay_static_cache(const GameplayHudData& data) {
         }
     };
     auto draw_gauge_frame = [&](float gauge_left) {
-        const D2D1_RECT_F gauge_frame = D2D1::RectF(
-            gauge_left, kGameplayGaugeTop, gauge_left + kGameplayGaugeWidth, kGameplayGaugeBottom);
+        const D2D1_RECT_F gauge_frame = native_gameplay_d2d_rect(native_style,"gauge",D2D1::RectF(
+            gauge_left, kGameplayGaugeTop, gauge_left + kGameplayGaugeWidth, kGameplayGaugeBottom));
         if (d2d_->footer_brush) {
             d2d_->footer_brush->SetOpacity(0.62f);
             d2d_->d2d_context->FillRoundedRectangle(D2D1::RoundedRect(gauge_frame, 10.0f, 10.0f),
@@ -4654,15 +4795,41 @@ void MenuWindow::update_cursor_visibility(bool hidden) {
     }
 }
 
-bool MenuWindow::create_text_formats(const wchar_t* ui_family) {
+bool MenuWindow::create_text_formats(const wchar_t* ui_family, const app::NativeMenuSkinStyle* native_style) {
     if (!d2d_ || !d2d_->dwrite_factory || !ui_family) {
         return false;
     }
-    auto create_text_format = [this](const wchar_t* family,
+    auto create_text_format = [this, native_style](const wchar_t* family,
                                      DWRITE_FONT_WEIGHT weight,
                                      float size,
                                      Microsoft::WRL::ComPtr<IDWriteTextFormat>* out_format) -> bool {
         Microsoft::WRL::ComPtr<IDWriteTextFormat> format;
+        std::wstring custom_family;
+        if (native_style) {
+            const std::pair<Microsoft::WRL::ComPtr<IDWriteTextFormat>*, const char*> roles[] = {
+                {&d2d_->title_format, "title"}, {&d2d_->option_format, "option"},
+                {&d2d_->body_format, "body"}, {&d2d_->mono_format, "mono"},
+                {&d2d_->logo_format, "logo"}, {&d2d_->menu_button_format, "menu_button"},
+                {&d2d_->menu_icon_format, "menu_icon"}, {&d2d_->header_format, "header"},
+                {&d2d_->gameplay_combo_format, "gameplay_combo"}, {&d2d_->song_logo_format, "song_logo"},
+                {&d2d_->song_nav_format, "song_nav"}, {&d2d_->song_record_label_format, "song_record_label"},
+                {&d2d_->song_record_value_format, "song_record_value"}, {&d2d_->song_record_detail_format, "song_record_detail"},
+                {&d2d_->song_title_format, "song_title"}, {&d2d_->song_artist_format, "song_artist"},
+                {&d2d_->result_score_format, "result_score"}, {&d2d_->result_metric_format, "result_metric"},
+                {&d2d_->hud_format, "hud"}, {&d2d_->rank_format, "rank"},
+                {&d2d_->stats_label_format, "stats_label"}, {&d2d_->stats_value_format, "stats_value"}};
+            for (const auto& role : roles) {
+                if (role.first != out_format) continue;
+                const auto it = native_style->fonts.find(role.second);
+                if (it != native_style->fonts.end() && !it->second.empty()) {
+                    custom_family = to_wide(it->second);
+                    family = custom_family.c_str();
+                }
+                const std::string key = std::string("font.") + role.second + ".size";
+                size = native_skin_number(native_style->metrics, key.c_str(), size, 8, 180);
+                break;
+            }
+        }
         const HRESULT hr = d2d_->dwrite_factory->CreateTextFormat(family,
                                                                   nullptr,
                                                                   weight,

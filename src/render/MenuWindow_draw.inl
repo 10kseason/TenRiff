@@ -34,6 +34,29 @@ void MenuWindow::draw(const MenuRenderData& data) {
 
     auto* ctx = d2d_->d2d_context.Get();
     const int64_t render_now_ns = timing::HighResClock::now_ns();
+    const auto& native_style = data.lobby_skin.native_menu;
+    const bool native_overrides = data.kind != MenuScreenKind::GameplayHud &&
+        data.lobby_skin.enabled && data.lobby_skin.native_menu_renderer;
+    auto native_rect = [&](const char* key, const D2D1_RECT_F& fallback) {
+        if (!native_overrides) return fallback;
+        const auto rect = native_skin_rect(native_style, key,
+            {fallback.left, fallback.top, fallback.right, fallback.bottom});
+        return D2D1::RectF(rect[0], rect[1], rect[2], rect[3]);
+    };
+    auto native_metric = [&](const char* key, float fallback) {
+        return native_overrides ? native_skin_number(native_style.metrics, key, fallback,
+            native_skin_metric_minimum(key), 8192) : fallback;
+    };
+    auto native_palette = [&](const char* key, const D2D1_COLOR_F& fallback) -> D2D1_COLOR_F {
+        if (!native_overrides || native_style.colors.empty()) return fallback;
+        const auto it = native_style.colors.find(key);
+        if (it == native_style.colors.end()) return fallback;
+        const auto& rgba = it->second;
+        return D2D1::ColorF(rgba[0], rgba[1], rgba[2], rgba[3] * fallback.a);
+    };
+    auto native_motion_value = [&](const char* key, float fallback, float minimum, float maximum) {
+        return native_overrides ? native_skin_number(native_style.motion, key, fallback, minimum, maximum) : fallback;
+    };
     if (data.lobby_skin.revision != applied_skin_revision_) {
         std::unordered_set<std::string> next_paths;
         auto remember_path = [&](const std::string& path) {
@@ -55,6 +78,22 @@ void MenuWindow::draw(const MenuRenderData& data) {
         for (const auto& path : next_paths) erase_cached_path(path);
         applied_skin_asset_paths_ = std::move(next_paths);
         applied_skin_revision_ = data.lobby_skin.revision;
+        d2d_->generic_help_layout.Reset();
+        d2d_->native_menu_palette.clear();
+        if (data.lobby_skin.enabled && data.lobby_skin.native_menu_renderer) {
+            for (const auto& item : native_style.colors) {
+                if (item.first.size() != 14 || item.first.compare(0, 8, "palette.") != 0) continue;
+                char* end = nullptr;
+                const auto rgb = static_cast<uint32_t>(std::strtoul(item.first.c_str() + 8, &end, 16));
+                if (end != item.first.c_str() + item.first.size()) continue;
+                const auto& c = item.second;
+                d2d_->native_menu_palette[rgb] = D2D1::ColorF(c[0], c[1], c[2], c[3]);
+            }
+        }
+        // Gradient stops belong to the selected skin; vector geometry is device-only.
+        d2d_->native_menu_brush.Reset();
+        d2d_->native_menu_background.Reset();
+        for (auto& geometry : d2d_->native_menu_geometry) geometry.Reset();
         invalidate_gameplay_note_sprite_cache();
     }
 
@@ -63,7 +102,9 @@ void MenuWindow::draw(const MenuRenderData& data) {
                                const D2D1_COLOR_F& fallback) {
         if (!brush) return;
         const auto it = data.lobby_skin.theme_colors.find(std::string(key));
-        if (data.lobby_skin.enabled && it != data.lobby_skin.theme_colors.end()) {
+        if (data.lobby_skin.enabled &&
+            !(data.kind == MenuScreenKind::GameplayHud && data.lobby_skin.native_menu_renderer) &&
+            it != data.lobby_skin.theme_colors.end()) {
             const auto& rgba = it->second;
             brush->SetColor(D2D1::ColorF(rgba[0], rgba[1], rgba[2], rgba[3]));
         } else {
@@ -81,13 +122,15 @@ void MenuWindow::draw(const MenuRenderData& data) {
     set_theme_color(d2d_->button_selected_brush.Get(), "button_selected", D2D1::ColorF(0x6EE7F2, 0.22f));
     set_theme_color(d2d_->button_border_brush.Get(), "border", D2D1::ColorF(0x31344A));
     set_theme_color(d2d_->lane_divider_brush.Get(), "lane_divider", D2D1::ColorF(0xF6F8FF, 0.85f));
-    const bool modern_settings_screen = !data.lobby_skin.enabled && data.kind == MenuScreenKind::GenericList;
-    const bool modern_title_screen = !data.lobby_skin.enabled && data.kind == MenuScreenKind::TitleMenu;
-    const bool modern_library_screen = !data.lobby_skin.enabled &&
+    const bool use_native_menu = !data.lobby_skin.enabled || data.lobby_skin.native_menu_renderer;
+    const bool modern_settings_screen = use_native_menu && data.kind == MenuScreenKind::GenericList;
+    const bool modern_title_screen = use_native_menu && data.kind == MenuScreenKind::TitleMenu;
+    const bool modern_library_screen = use_native_menu &&
         (data.kind == MenuScreenKind::SongSelect ||
          data.kind == MenuScreenKind::ResultScreen ||
          data.kind == MenuScreenKind::BmsEditor);
     const bool modern_menu_screen = modern_library_screen || modern_settings_screen || modern_title_screen;
+#include "MenuWindow_draw_native_motion.inl"
     if (modern_menu_screen) {
         set_theme_color(d2d_->text_brush.Get(), "text", D2D1::ColorF(0xEDF2F7));
         set_theme_color(d2d_->muted_brush.Get(), "muted", D2D1::ColorF(0xA1ADBD));
@@ -116,6 +159,7 @@ void MenuWindow::draw(const MenuRenderData& data) {
         preview_sprite_data.lane_count = data.generic.skin_preview.lane_count;
         preview_sprite_data.note_border_enabled =
             data.generic.skin_preview.note_border_enabled;
+        preview_sprite_data.note_outline_opacity = data.generic.skin_preview.note_outline_opacity;
         preview_sprite_data.note_shape = data.generic.skin_preview.note_shape;
         preview_sprite_data.note_image_aspect =
             data.generic.skin_preview.note_image_aspect;
@@ -130,6 +174,8 @@ void MenuWindow::draw(const MenuRenderData& data) {
         preview_sprite_data.lr2_resolution_override =
             data.generic.skin_preview.lr2_resolution_override;
         preview_sprite_data.lane_colors = data.generic.skin_preview.lane_colors;
+        preview_sprite_data.lane_color_count = static_cast<std::size_t>(std::clamp(
+            data.generic.skin_preview.lane_count, 1, static_cast<int>(kGameplayHudMaxLanes)));
         if (!ensure_gameplay_note_sprites(preview_sprite_data)) {
             invalidate_gameplay_note_sprite_cache();
         }
@@ -148,15 +194,29 @@ void MenuWindow::draw(const MenuRenderData& data) {
         song_select_preview_load_hold_until_ns_ = 0;
     }
     if (data.kind != MenuScreenKind::GameplayHud && data.lobby_skin.enabled) {
+        constexpr const char* asset_roles[] = {"mark", "prism", "chevron", "spark", "wave", "audio",
+            "display", "input", "network", "sliders", "folder", "exit"};
+        for (const auto* role : asset_roles) {
+            const auto asset = native_style.assets.find(role);
+            if (asset != native_style.assets.end()) {
+                static_cast<void>(load_song_card_preview_bitmap(asset->second));
+            }
+        }
         static_cast<void>(load_song_card_preview_bitmap(data.lobby_skin.background_path));
         static_cast<void>(load_song_card_preview_bitmap(data.lobby_skin.logo_path));
     } else if (data.kind == MenuScreenKind::GameplayHud) {
         static_cast<void>(load_song_card_preview_bitmap(data.gameplay.skin_background_path));
     }
     // Rebuild the text formats when the player picks a different UI font.
-    if (const wchar_t* ui_family = ui_font_family_for_token(data.ui_font);
-        d2d_->ui_font_family != ui_family) {
-        static_cast<void>(create_text_formats(ui_family));
+    const bool custom_fonts = native_overrides && (!native_style.fonts.empty() || !native_style.metrics.empty());
+    if (const wchar_t* ui_family = data.ui_language == ui::Language::Japanese && data.ui_font == "default"
+                                     ? L"Yu Gothic UI" : ui_font_family_for_token(data.ui_font);
+        d2d_->ui_font_family != ui_family || custom_fonts != native_font_overrides_ ||
+        (custom_fonts && native_font_revision_ != data.lobby_skin.revision)) {
+        if (create_text_formats(ui_family, custom_fonts ? &native_style : nullptr)) {
+            native_font_overrides_ = custom_fonts;
+            native_font_revision_ = data.lobby_skin.revision;
+        }
     }
     ctx->BeginDraw();
 
@@ -179,6 +239,8 @@ void MenuWindow::draw(const MenuRenderData& data) {
     const D2D1_MATRIX_3X2_F transform =
         D2D1::Matrix3x2F(scale_, 0.0f, 0.0f, scale_, offset_x_, offset_y_);
     ctx->SetTransform(transform);
+
+    draw_native_background();
 
     const D2D1_RECT_F full_screen_rect =
         D2D1::RectF(0.0f, 0.0f, kBaseWidth, kBaseHeight);
@@ -277,7 +339,8 @@ void MenuWindow::draw(const MenuRenderData& data) {
         if (text.empty() || !format || !brush || width <= 0.0f || height <= 0.0f) {
             return;
         }
-        const float text_scale = (data.lobby_skin.enabled || modern_menu_screen) &&
+        const float text_scale = ((data.lobby_skin.enabled &&
+                                    !(data.kind == MenuScreenKind::GameplayHud && data.lobby_skin.native_menu_renderer)) || modern_menu_screen) &&
                                      format->GetWordWrapping() == DWRITE_WORD_WRAPPING_NO_WRAP
                                      ? estimate_single_line_text_scale(
                                            text, format->GetFontSize(), width, height)
@@ -318,12 +381,11 @@ void MenuWindow::draw(const MenuRenderData& data) {
         format->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_LEADING);
     };
 
-    const bool ui_korean = data.ui_korean;
     auto loc = [&](std::string_view english, std::string_view korean) {
-        return std::string(ui_korean ? korean : english);
+        return ui::text(data.ui_language, english, korean);
     };
     auto wloc = [&](std::string_view english, std::string_view korean) {
-        return to_wide(std::string(ui_korean ? korean : english));
+        return to_wide(ui::text(data.ui_language, english, korean));
     };
 
     auto inset_rect = [](const D2D1_RECT_F& rect, float dx, float dy) {

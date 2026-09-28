@@ -164,7 +164,7 @@ void MenuApp::save_bms_editor_as() {
     if (!bms_editor_.loaded()) return;
 #ifdef _WIN32
     const std::string output_path = force_bms_output_path(browse_bms_save_file(
-        "Save edited BMS chart", bms_editor_.title().empty() ? "edited-chart.bms" : bms_editor_.title() + ".bms"));
+        ui_text("Save edited BMS chart", "편집한 BMS 저장"), bms_editor_.title().empty() ? "edited-chart.bms" : bms_editor_.title() + ".bms"));
 #else
     const std::string output_path = next_editor_save_path(bms_editor_.path());
 #endif
@@ -466,7 +466,15 @@ void MenuApp::populate_bms_editor_render_data(render::MenuRenderData& render) {
     render.bms_editor.path = bms_editor_.path();
     render.bms_editor.title = bms_editor_.title();
     render.bms_editor.artist = bms_editor_.artist();
-    render.bms_editor.status = bms_editor_.status();
+    // Document status stays language-neutral for logs and document tests. Only
+    // recognized UI phrases are translated; parser details and paths stay intact.
+    constexpr std::string_view converted_prefix = "Silent notes converted to ";
+    if (bms_editor_.status().compare(0, converted_prefix.size(), converted_prefix) == 0) {
+        render.bms_editor.status = ui_text("Silent notes converted to ", "무키음 노트 변환: ") +
+            bms_editor_.status().substr(converted_prefix.size());
+    } else {
+        render.bms_editor.status = ui::text(ui_language(), bms_editor_.status(), bms_editor_.status());
+    }
     render.bms_editor.lane_count = bms_editor_.lane_count();
     render.bms_editor.measure_count = bms_editor_.measure_count();
     render.bms_editor.cursor_lane = bms_editor_.cursor_lane();

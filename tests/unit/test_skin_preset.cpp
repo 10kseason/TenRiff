@@ -158,6 +158,43 @@ TEST_CASE("skin preset rejects path traversal device files duplicate names and i
     CHECK_FALSE(fs::exists(dir.path / "outside.txt"));
 }
 
+TEST_CASE("skin preset preserves native menu replacements and offsets without gameplay assets") {
+    PresetDirectory dir;
+    const auto catalog = dir.path / "catalog";
+    const auto folder = catalog / "MenuOnly";
+    write_preset_test_file(folder / "skin.json", R"({
+      "format":"tenriff-skin", "version":1, "name":"Menu Only",
+      "lobby":{"renderer":"native"},
+      "native":{"assets":{"emblem":"menu/emblem.png"},
+                "rects":{"title.button":[16,-8,0,0]},
+                "motion":{"speed":0.5},"fonts":{"body":"Yu Gothic UI"}}
+    })");
+    write_preset_test_file(folder / "menu" / "emblem.png", "native-menu-image-bytes");
+    auto skin = tenriff::config::ConfigLoader{}.defaults().skin;
+    skin.source = "tenriff";
+    skin.tenriff_skin_name = "MenuOnly";
+    const auto file = dir.path / "menu.trskin";
+    const auto saved = tenriff::app::export_skin_preset(file.u8string(), skin, catalog.u8string());
+    require_preset_success(saved);
+    CHECK(saved.file_count == 2u);
+    const auto imported = tenriff::app::import_skin_preset(file.u8string(),
+                                                         (dir.path / "receiver").u8string());
+    require_preset_success(imported);
+    const auto loaded = tenriff::app::load_tenriff_skin_folder(imported.path, 10);
+    REQUIRE(loaded.found);
+    CHECK(loaded.native_menu_renderer);
+    CHECK(loaded.native_gameplay_fallback);
+    CHECK(loaded.warnings.empty());
+    CHECK(loaded.native_menu.rects.at("title.button")[1] == doctest::Approx(-8));
+    CHECK(loaded.native_menu.motion.at("speed") == doctest::Approx(0.5));
+    CHECK(loaded.native_menu.fonts.at("body") == "Yu Gothic UI");
+    REQUIRE(loaded.native_menu.assets.count("emblem") == 1u);
+    CHECK(read_preset_test_file(fs::u8path(loaded.native_menu.assets.at("emblem"))) ==
+          "native-menu-image-bytes");
+    CHECK(loaded.gameplay.note_images.empty());
+    CHECK_FALSE(loaded.gameplay_style.note_shape.has_value());
+}
+
 TEST_CASE("skin preset corruption or truncation never leaves an activated partial skin") {
     PresetDirectory dir;
     const auto catalog = dir.path / "catalog";

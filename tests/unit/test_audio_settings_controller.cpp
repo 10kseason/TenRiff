@@ -330,7 +330,7 @@ TEST_CASE("audio settings view preserves rows values and localization") {
     AudioSettingsController controller;
     static_cast<void>(controller.select(AudioSettingId::BgmVolume));
 
-    const auto english = AudioSettingsView::build(controller, runtime, false);
+    const auto english = AudioSettingsView::build(controller, runtime, tenriff::ui::Language::English);
     REQUIRE(english.rows.size() == 13);
     REQUIRE(english.notes.size() == 7);
 
@@ -406,7 +406,7 @@ TEST_CASE("audio settings view preserves rows values and localization") {
     CHECK(english.notes[1] ==
           "Follow: note hits trigger keysounds. Autoplay: note keysounds are mixed into background audio.");
 
-    const auto korean = AudioSettingsView::build(controller, runtime, true);
+    const auto korean = AudioSettingsView::build(controller, runtime, tenriff::ui::Language::Korean);
     REQUIRE(korean.rows.size() == 13);
     CHECK(korean.rows[0].label == "프리셋");
     CHECK(korean.rows[0].value == "고성능");
@@ -450,7 +450,7 @@ TEST_CASE("ASIO driver choices cycle through automatic and installed IDs and app
     controller.set_asio_drivers({{first, "Interface A"}, {second, "Interface B"}});
     REQUIRE(controller.asio_drivers_loaded());
     static_cast<void>(controller.select(AudioSettingId::AsioDriver));
-    auto view = AudioSettingsView::build(controller, runtime, false);
+    auto view = AudioSettingsView::build(controller, runtime, tenriff::ui::Language::English);
     CHECK(view.rows[9].value == "Automatic");
     CHECK(view.rows[9].activatable);
     CHECK(view.rows[9].adjustable);
@@ -460,7 +460,7 @@ TEST_CASE("ASIO driver choices cycle through automatic and installed IDs and app
     CHECK(runtime.audio.asio_driver == first);
     check_render_only(controller.handle(MenuAction::activate(), runtime));
     CHECK(runtime.audio.asio_driver == second);
-    view = AudioSettingsView::build(controller, runtime, false);
+    view = AudioSettingsView::build(controller, runtime, tenriff::ui::Language::English);
     CHECK(view.rows[9].value == "Interface B");
     check_render_only(controller.handle(MenuAction::adjust(1), runtime));
     CHECK(runtime.audio.asio_driver.empty());
@@ -495,18 +495,18 @@ TEST_CASE("ASIO driver discovery and unavailable drivers do not discard the save
     check_no_effects(controller.handle(MenuAction::activate(), runtime));
     CHECK(runtime.audio.asio_driver == saved_driver);
     CHECK_FALSE(controller.dirty());
-    auto view = AudioSettingsView::build(controller, runtime, false);
+    auto view = AudioSettingsView::build(controller, runtime, tenriff::ui::Language::English);
     CHECK(view.rows[9].value == "No 64-bit ASIO driver");
     CHECK_FALSE(view.rows[9].activatable);
     CHECK_FALSE(view.rows[9].adjustable);
 
     controller.set_asio_drivers({{"{11111111-1111-1111-1111-111111111111}", "Another Device"}});
-    view = AudioSettingsView::build(controller, runtime, false);
+    view = AudioSettingsView::build(controller, runtime, tenriff::ui::Language::English);
     CHECK(view.rows[9].value == "Saved driver unavailable");
     CHECK(runtime.audio.asio_driver == saved_driver);
     CHECK_FALSE(controller.dirty());
     controller.set_asio_drivers({{saved_driver, "Reconnected Device"}});
-    view = AudioSettingsView::build(controller, runtime, true);
+    view = AudioSettingsView::build(controller, runtime, tenriff::ui::Language::Korean);
     CHECK(view.rows[9].value == "Reconnected Device");
     CHECK(runtime.audio.asio_driver == saved_driver);
     CHECK_FALSE(controller.dirty());
@@ -570,7 +570,7 @@ TEST_CASE("ASIO sample rates and frame counts cycle with wraparound and accept n
     runtime.audio.frames_per_buffer = 320;
     check_render_only(controller.handle(MenuAction::adjust(-1), runtime));
     CHECK(runtime.audio.frames_per_buffer == 256);
-    const auto view = AudioSettingsView::build(controller, runtime, false);
+    const auto view = AudioSettingsView::build(controller, runtime, tenriff::ui::Language::English);
     CHECK(view.rows[10].value == "48000 Hz");
     CHECK(view.rows[11].value == "256 frames");
     for (std::size_t index = 10; index <= 11; ++index) {

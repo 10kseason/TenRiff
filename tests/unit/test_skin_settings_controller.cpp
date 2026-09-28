@@ -25,17 +25,21 @@ TEST_CASE("skin stable identifiers map across the optional LR2 row") {
     CHECK(*skin_setting_id_at(4, false) == SkinSettingsRowId::ImportSkin);
     REQUIRE(skin_setting_id_at(4, true).has_value());
     CHECK(*skin_setting_id_at(4, true) == SkinSettingsRowId::Lr2Resolution);
-    REQUIRE(skin_setting_id_at(49, false).has_value());
-    CHECK(*skin_setting_id_at(49, false) == SkinSettingsRowId::Back);
-    REQUIRE(skin_setting_id_at(50, true).has_value());
-    CHECK(*skin_setting_id_at(50, true) == SkinSettingsRowId::Back);
-    CHECK_FALSE(skin_setting_id_at(50, false).has_value());
+    REQUIRE(skin_setting_id_at(50, false).has_value());
+    CHECK(*skin_setting_id_at(50, false) == SkinSettingsRowId::Back);
+    REQUIRE(skin_setting_id_at(51, true).has_value());
+    CHECK(*skin_setting_id_at(51, true) == SkinSettingsRowId::Back);
+    CHECK_FALSE(skin_setting_id_at(51, false).has_value());
 }
 
 TEST_CASE("skin preset actions use the same keyboard and mouse controller path") {
     tenriff::config::RuntimeConfig runtime;
     SkinSettingsController controller;
     controller.reset("10k");
+    const auto editor = controller.handle(MenuAction::activate(), runtime, kLr2Names, kTenRiffNames,
+                                          SkinSettingsRowId::OpenSkinEditor);
+    CHECK(editor.boundary_action == SkinBoundaryAction::OpenSkinEditor);
+    CHECK_FALSE(editor.menu.persist_config);
     const auto exported = controller.handle(MenuAction::activate(), runtime, kLr2Names, kTenRiffNames,
                                              SkinSettingsRowId::ExportPreset);
     CHECK(exported.boundary_action == SkinBoundaryAction::ExportPreset);

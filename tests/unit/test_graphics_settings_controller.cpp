@@ -182,7 +182,7 @@ TEST_CASE("graphics settings views preserve values localization and safe default
     runtime.ui.language = "ko";
     static_cast<void>(controller.select(GraphicsSettingId::OnnxModel));
 
-    const auto korean = GraphicsSettingsView::build(controller, runtime, true);
+    const auto korean = GraphicsSettingsView::build(controller, runtime, tenriff::ui::Language::Korean);
     REQUIRE(korean.rows.size() == 12);
     REQUIRE(korean.notes.size() == 11);
     CHECK(korean.rows[2].value == "무제한 (최대 1500 FPS)");
@@ -193,10 +193,37 @@ TEST_CASE("graphics settings views preserve values localization and safe default
 
     controller.prepare_onnx_confirmation();
     const auto confirmation =
-        GraphicsSettingsView::build_onnx_confirmation(controller, false);
+        GraphicsSettingsView::build_onnx_confirmation(controller, tenriff::ui::Language::English);
     REQUIRE(confirmation.rows.size() == 2);
     REQUIRE(confirmation.notes.size() == 3);
     CHECK_FALSE(confirmation.rows[0].selected);
     CHECK(confirmation.rows[1].selected);
     CHECK(confirmation.rows[0].label == "Yes, enable ONNX");
+}
+
+TEST_CASE("graphics language selection reaches Japanese and updates its view immediately") {
+    tenriff::config::RuntimeConfig runtime;
+    GraphicsSettingsController controller;
+    static_cast<void>(controller.select(GraphicsSettingId::Language));
+    static_cast<void>(controller.handle(MenuAction::adjust(-1), runtime));
+    REQUIRE(runtime.ui.language == "ja");
+    const auto japanese = GraphicsSettingsView::build(
+        controller, runtime, tenriff::ui::Language::Japanese);
+    REQUIRE(japanese.rows.size() == 12);
+    CHECK(japanese.rows[10].label == "言語");
+    CHECK(japanese.rows[10].value == "日本語");
+    CHECK(japanese.rows[11].label == "戻る");
+    CHECK(japanese.rows[0].value == "ボーダーレス");
+    CHECK(japanese.rows[2].value == "ディスプレイに合わせる");
+    CHECK(japanese.notes[0].find("Discord") != std::string::npos);
+    CHECK(japanese.notes[0].find("表示") != std::string::npos ||
+          japanese.notes[0].find("重なり") != std::string::npos);
+    static_cast<void>(controller.handle(MenuAction::activate(), runtime));
+    CHECK(runtime.ui.language == "en");
+    static_cast<void>(controller.handle(MenuAction::adjust(1), runtime));
+    CHECK(runtime.ui.language == "ko");
+    static_cast<void>(controller.handle(MenuAction::adjust(1), runtime));
+    CHECK(runtime.ui.language == "ja");
+    const auto effects = controller.handle(MenuAction::back(), runtime);
+    CHECK(effects.menu.persist_config);
 }
