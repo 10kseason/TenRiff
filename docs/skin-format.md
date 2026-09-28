@@ -3,7 +3,7 @@
 TenRiff 스킨은 한 폴더의 `skin.json`, 선택형 PNG/JPG/BMP 이미지와 벡터 도형 설정으로 로비와 인게임 외형을 바꾸는 포맷이다. 시각 항목은 선택 사항이며 누락된 슬롯은 기존 기본값을 쓴다. Native 인게임 스프라이트의 빈 배열 `[]`은 숨김을 뜻한다.
 
 AI 에이전트에게 제작을 맡기려면 [`skin-agent-guide.md`](skin-agent-guide.md)와
-[`skins/AGENTS.md`](../skins/AGENTS.md)를 함께 사용한다. 실제 완성 예제는
+[`스킨 제작 가이드`](skin-agent-guide.md)를 함께 사용한다. 실제 완성 예제는
 [`Agent Prism Universal`](../skins/TenRiff_AgentPrism_Universal_1K-16K)이다.
 
 공식 배포판은 루트 [`skins/`](../skins/)의 완성 스킨을 `TenRiff.exe` 옆에 포함한다.
