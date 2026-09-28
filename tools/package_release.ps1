@@ -147,21 +147,19 @@ if (-not $BinaryOnly) {
     # but the public source archive promises the bundled ncnn build inputs.
     # Include only these known dependency paths; never sweep ignored files.
     $sourceExtras = @(
-        "third_party\ncnn-20260526\x64\bin",
+        "third_party\ncnn-20260526\x64\bin\ncnn.dll",
         "third_party\ncnn-20260526\x64\lib\ncnn.lib"
     )
     foreach ($relative in $sourceExtras) {
         $sourcePath = Join-Path $repoRoot $relative
-        if (-not (Test-Path -LiteralPath $sourcePath)) {
+        if (-not (Test-Path -LiteralPath $sourcePath -PathType Leaf)) {
             throw "Required public source dependency is missing: $sourcePath"
         }
         $destination = Join-Path $sourceRoot $relative
-        if (Test-Path -LiteralPath $sourcePath -PathType Container) {
-            Copy-Item -LiteralPath $sourcePath -Destination $destination -Recurse
-        } else {
-            New-Item -ItemType Directory -Path (Split-Path -Parent $destination) -Force | Out-Null
-            Copy-Item -LiteralPath $sourcePath -Destination $destination
-        }
+        # This file may already be tracked. Copying its directory would create
+        # bin/bin in a checkout that includes ncnn.dll in the source inventory.
+        New-Item -ItemType Directory -Path (Split-Path -Parent $destination) -Force | Out-Null
+        Copy-Item -LiteralPath $sourcePath -Destination $destination
     }
     $archives += $sourceZip
 }
