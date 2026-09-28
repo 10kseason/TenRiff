@@ -660,7 +660,7 @@
           },
           "note_height_ratio": {
             "type": "number",
-            "minimum": 0.1,
+            "minimum": 0.5,
             "maximum": 4.0
           },
           "note_aspect": {
@@ -1199,7 +1199,7 @@
           },
           "note_height_ratio": {
             "type": "number",
-            "minimum": 0.1,
+            "minimum": 0.5,
             "maximum": 4.0
           },
           "note_aspect": {

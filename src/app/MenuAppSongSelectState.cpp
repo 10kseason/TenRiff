@@ -42,7 +42,7 @@ void MenuApp::sync_song_select_state() {
     state.selected_song = selected_song_;
     state.selected_source = selected_source_;
     state.showing_sources = (song_select_view_ == SongSelectView::Sources);
-    app::sync_song_select_state(state, visible_song_count(), config_.ui.recent_song_sources.size());
+    app::sync_song_select_state(state, visible_song_count(), config_.ui.recent_song_sources.size() + 1);
     selected_song_ = state.selected_song;
     selected_source_ = state.selected_source;
     if (state.showing_sources) {
@@ -118,7 +118,7 @@ void MenuApp::rebuild_visible_song_list(const std::string* selected_path) {
     if (visible_song_indices_.empty()) {
         selected_song_ = 0;
         sync_song_select_state();
-        if (!multiplayer_selecting_chart_ && !songs_path_.empty()) {
+        if (!multiplayer_selecting_chart_ && !config_.ui.all_song_sources && !songs_path_.empty()) {
             source_song_counts_[menu_songs::normalize_path_key(path_from_utf8(songs_path_))] = 0;
         }
         return;
@@ -137,7 +137,7 @@ void MenuApp::rebuild_visible_song_list(const std::string* selected_path) {
     sync_song_select_state();
     rebuild_current_song_record_indices();
 
-    if (!multiplayer_selecting_chart_) {
+    if (!multiplayer_selecting_chart_ && !config_.ui.all_song_sources) {
         source_song_counts_[menu_songs::normalize_path_key(path_from_utf8(songs_path_))] =
             static_cast<int>(visible_song_count());
     }

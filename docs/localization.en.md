@@ -4,7 +4,7 @@ Language: [한국어](localization.md) | English | [日本語](localization.ja.m
 
 ## Choosing a language
 
-The client supports English (`en`), Korean (`ko`), and Japanese (`ja`); the default is `en`. In Options → Graphics Settings → Language, Left/Right cycles all three choices in either direction. The UI changes immediately and the setting is saved when leaving the screen.
+The client supports English (`en`), Korean (`ko`), and Japanese (`ja`); the default is `en`. In Options → Profile Setup → Language or first-run Quick Setup, Left/Right cycles all three choices in either direction. Language and menu text size are applied and saved to the current profile immediately.
 
 `jp`, `japanese`, `ja-jp`, and `ja_JP` are accepted case-insensitively and saved as `ja`. Unknown tokens retain the existing English fallback.
 
@@ -40,7 +40,7 @@ python tools/audit_japanese_localization.py --json
 
 The audit covers explicit localization calls, screen titles, built-in difficulty-table names, and known BMS editor/loading status phrases. Missing keys, duplicate keys, empty translations, and unresolved dynamic keys produce exit code 1. Use the printed counts rather than a frozen count in documentation.
 
-`test_localization.cpp` checks token normalization, both cycling directions, representative screen text, original English/Korean behavior, and unknown-value preservation. Config tests round-trip `en`/`ko`/`ja`; graphics tests check immediate Japanese view updates and persistence effects.
+`test_localization.cpp` checks token normalization, both cycling directions, representative screen text, original English/Korean behavior, and unknown-value preservation. Config tests round-trip `en`/`ko`/`ja`; profile setup tests cover language rows, first-run selection, and menu text size. Graphics tests cover the remaining graphics controls.
 
 ## Limits
 

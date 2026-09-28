@@ -14,6 +14,23 @@ const basic = () => ({format:'tenriff-skin', version:1, name:'테스트 / テス
 const errors = value => C.validate(value, actualSchema).filter(issue => issue.severity === 'error');
 
 test('offline schema equals the source of truth', () => assert.deepEqual(catalog.schema, actualSchema));
+test('note height accepts 50–400 percent for common and per-mode fields without changing ratios', () => {
+  for (const ratio of [.5, 1, 4]) {
+    const document = {...basic(), gameplay: {note_height_ratio: ratio, modes: {}}};
+    for (let keys = 4; keys <= 16; ++keys) document.gameplay.modes[`${keys}k`] = {note_height_ratio: ratio};
+    const reloaded = C.parse(C.serialize(document));
+    assert.deepEqual(errors(reloaded), []);
+    assert.equal(reloaded.gameplay.note_height_ratio, ratio);
+    for (let keys = 4; keys <= 16; ++keys) assert.equal(C.gameplay(reloaded, `${keys}k`).note_height_ratio, ratio);
+  }
+  for (const [ratio, code] of [[.49, 'minimum'], [4.01, 'maximum']]) {
+    const document = {...basic(), gameplay: {note_height_ratio: ratio, modes: {'16k': {note_height_ratio: ratio}}}};
+    const found = errors(document);
+    for (const path of ['gameplay.note_height_ratio', 'gameplay.modes.16k.note_height_ratio'])
+      assert.ok(found.some(issue => issue.path === path && issue.code === code));
+  }
+  assert.deepEqual(errors({...basic(), gameplay: {note_width_ratio: .1}}), [], 'width keeps its independent bound');
+});
 test('bundled/example manifests validate and survive round trips, including unknown fields', () => {
   const manifests = [path.join(root, 'examples/skins/TenRiff-Example/skin.json')];
   for (const entry of fs.readdirSync(path.join(root,'skins'), {withFileTypes:true})) {

@@ -1227,7 +1227,9 @@ bool MenuApp::initialize(const CommandLineOptions& options) {
         }
     }
 
-    if (song_source_history_is_intentionally_empty(config_.ui) && options_.songs_path == "songs") {
+    if (config_.ui.all_song_sources) {
+        switch_all_song_sources(false);
+    } else if (song_source_history_is_intentionally_empty(config_.ui) && options_.songs_path == "songs") {
         // A removed last source stays removed instead of silently reappearing.
         songs_path_.clear();
     } else {
@@ -1332,7 +1334,14 @@ void MenuApp::run() {
 
         SongIndex updated;
         std::vector<std::string> warnings;
-        if (song_indexer_.poll_result(updated, warnings)) {
+        std::unordered_map<std::string, int> indexed_source_counts;
+        if (song_indexer_.poll_result(updated, warnings, &indexed_source_counts)) {
+            if (config_.ui.all_song_sources) {
+                all_source_song_count_ = static_cast<int>(updated.entries.size());
+                for (const auto& [source, count] : indexed_source_counts) {
+                    source_song_counts_[source] = count;
+                }
+            }
             update_song_list(std::move(updated));
             for (const auto& warning : warnings) {
                 std::cerr << "[warn] " << warning << std::endl;
@@ -1852,7 +1861,8 @@ bool MenuApp::remember_song_source(const std::string& source_path) {
     config_.ui.active_song_source = normalized;
     config_.ui.song_sources_initialized = true;
     config_.ui.recent_song_sources = std::move(updated_sources);
-    selected_source_ = 0;
+    if (changed) all_source_song_count_ = -1;
+    selected_source_ = 1;  // Row zero is ALL SONG.
     return changed;
 }
 
@@ -1867,7 +1877,8 @@ void MenuApp::persist_runtime_config() {
 
 void MenuApp::refresh_song_source(bool force_reindex) {
     difficulty_table_display_path_.clear();
-    switch_song_source(songs_path_, force_reindex);
+    if (config_.ui.all_song_sources) switch_all_song_sources(force_reindex);
+    else switch_song_source(songs_path_, force_reindex);
 }
 
 void MenuApp::switch_song_source(const std::string& new_songs_path, bool force_reindex) {
@@ -1878,7 +1889,9 @@ void MenuApp::switch_song_source(const std::string& new_songs_path, bool force_r
     const std::string normalized_source = menu_songs::normalize_song_source_path(new_songs_path);
     songs_path_ = normalized_source.empty() ? new_songs_path : normalized_source;
     song_select_view_ = SongSelectView::Songs;
-    const bool source_history_changed = remember_song_source(songs_path_);
+    const bool was_all_sources = config_.ui.all_song_sources;
+    config_.ui.all_song_sources = false;
+    const bool source_history_changed = remember_song_source(songs_path_) || was_all_sources;
     cache_path_ = song_index_cache_path_for_source(profile_dir_, songs_path_);
     const std::string legacy_cache_path = legacy_song_index_cache_path_for_source(songs_path_);
     last_indexer_snapshot_ns_ = 0;
@@ -2414,10 +2427,8 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
         }
         song_select_focus_ = SongSelectFocus::SongList;
         if (song_select_view_ == SongSelectView::Sources) {
-            if (!config_.ui.recent_song_sources.empty()) {
-                selected_source_ = clamp_int(event.index, 0, static_cast<int>(config_.ui.recent_song_sources.size() - 1));
-                publish_snapshot();
-            }
+            selected_source_ = clamp_int(event.index, 0, static_cast<int>(config_.ui.recent_song_sources.size()));
+            publish_snapshot();
             return;
         }
         if (song_select_view_ == SongSelectView::Records) {
@@ -2577,13 +2588,10 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
             song_select_search_active_ = false;
             song_select_focus_ = SongSelectFocus::SongList;
             if (song_select_view_ == SongSelectView::Sources) {
-                if (config_.ui.recent_song_sources.empty()) {
-                    return;
-                }
-                selected_source_ = clamp_int(event.index, 0, static_cast<int>(config_.ui.recent_song_sources.size() - 1));
+                selected_source_ = clamp_int(event.index, 0, static_cast<int>(config_.ui.recent_song_sources.size()));
                 publish_snapshot();
                 if (event.double_click) {
-                    switch_song_source(config_.ui.recent_song_sources[static_cast<std::size_t>(selected_source_)], false);
+                    open_selected_song_source();
                     publish_snapshot();
                 }
                 return;
@@ -3319,7 +3327,7 @@ void MenuApp::handle_quick_setup_input(uint32_t keycode) {
     }
 
 #ifdef _WIN32
-    if ((keycode == key_enter_ && settings_cursor_ == 0) || keycode == key_f2_) {
+    if ((keycode == key_enter_ && settings_cursor_ == profile_setup::kSongsFolderRow) || keycode == key_f2_) {
         std::string new_path = browse_for_folder(ui_text("Select Songs Folder", "곡 폴더 선택"));
         if (!new_path.empty()) {
             switch_song_source(new_path, false);
@@ -3336,6 +3344,7 @@ void MenuApp::handle_quick_setup_input(uint32_t keycode) {
         if (!avatar_path.empty()) {
             config_.ui.profile_avatar_path =
                 config::normalize_profile_avatar_path(avatar_path);
+            ++profile_avatar_revision_;
             persist_runtime_config();
         }
         publish_snapshot();
@@ -3344,26 +3353,34 @@ void MenuApp::handle_quick_setup_input(uint32_t keycode) {
 #endif
     if (keycode == key_enter_ && settings_cursor_ == profile_setup::kClearAvatarRow) {
         config_.ui.profile_avatar_path.clear();
+        ++profile_avatar_revision_;
         persist_runtime_config();
         publish_snapshot();
         return;
     }
-    if (keycode == key_left_ || keycode == key_right_) {
+    if (keycode == key_left_ || keycode == key_right_ ||
+        (keycode == key_enter_ && (settings_cursor_ == profile_setup::kLanguageRow ||
+                                  settings_cursor_ == profile_setup::kMenuFontSizeRow))) {
         const int direction = (keycode == key_left_) ? -1 : 1;
-        if (settings_cursor_ == 1) {
+        if (profile_setup::adjust_presentation_setting(config_.ui, settings_cursor_, direction)) {
+            persist_runtime_config();
+            publish_snapshot();
+            return;
+        }
+        if (settings_cursor_ == profile_setup::kGaugeRow) {
             config_.mode.gauge = cycle_gauge_mode(config_.mode.gauge, direction);
             persist_runtime_config();
             publish_snapshot();
             return;
         }
-        if (settings_cursor_ == 2) {
+        if (settings_cursor_ == profile_setup::kRateRow) {
             config_.speed.rate = clamp_step_value(config_.speed.rate + static_cast<double>(direction) * kRateStep,
                                                   kRateMin, kRateMax, kRateStep);
             persist_runtime_config();
             publish_snapshot();
             return;
         }
-        if (settings_cursor_ == 3) {
+        if (settings_cursor_ == profile_setup::kVisualLatencyRow) {
             config_.visual_offset_ms = clamp_step_value(
                 config_.visual_offset_ms + static_cast<double>(direction) * kVisualOffsetStep,
                 kVisualOffsetMin,
@@ -3374,7 +3391,7 @@ void MenuApp::handle_quick_setup_input(uint32_t keycode) {
             publish_snapshot();
             return;
         }
-        if (settings_cursor_ == 4) {
+        if (settings_cursor_ == profile_setup::kKeysoundRow) {
             config_.audio_ui.bms_keysound_policy =
                 cycle_bms_keysound_policy(config_.audio_ui.bms_keysound_policy, direction);
             persist_runtime_config();
@@ -3908,12 +3925,8 @@ void MenuApp::handle_song_select_input(uint32_t keycode) {
 
         if (song_select_view_ == SongSelectView::Sources) {
             song_select_search_active_ = false;
-            if (!config_.ui.recent_song_sources.empty() &&
-                selected_source_ >= 0 &&
-                selected_source_ < static_cast<int>(config_.ui.recent_song_sources.size())) {
-                switch_song_source(config_.ui.recent_song_sources[static_cast<std::size_t>(selected_source_)], false);
-                publish_snapshot();
-            }
+            open_selected_song_source();
+            publish_snapshot();
         } else if (song_select_view_ == SongSelectView::Records) {
             song_select_search_active_ = false;
             if (!online_records_view_ && open_selected_record_result()) {
@@ -3976,19 +3989,26 @@ void MenuApp::add_song_source_from_dialog() {
 }
 
 void MenuApp::remove_selected_song_source() {
-    if (selected_source_ < 0 || selected_source_ >= static_cast<int>(config_.ui.recent_song_sources.size())) return;
-    const std::string removed = config_.ui.recent_song_sources[static_cast<std::size_t>(selected_source_)];
+    const auto selected_history = source_browser_history_index(selected_source_, config_.ui.recent_song_sources.size());
+    if (!selected_history) return;
+    int history_index = *selected_history;
+    const std::string removed = config_.ui.recent_song_sources[static_cast<std::size_t>(history_index)];
     const std::string removed_key = menu_songs::normalize_path_key(path_from_utf8(removed));
     const bool was_active = removed_key == menu_songs::normalize_path_key(path_from_utf8(songs_path_));
-    if (!remove_song_source_history(config_.ui, selected_source_)) return;
+    const bool was_all_sources = config_.ui.all_song_sources;
+    if (!remove_song_source_history(config_.ui, history_index)) return;
+    selected_source_ = config_.ui.recent_song_sources.empty() ? 0 : history_index + 1;
+    all_source_song_count_ = -1;
     source_song_counts_.erase(removed_key);
-    if (was_active) {
+    if (was_all_sources) {
+        switch_all_song_sources(false);
+    } else if (was_active) {
         cancel_song_preview_decode();
         stop_song_preview_audio();
         song_select_screen_.clear_preview_target();
         song_indexer_.stop();
         if (!config_.ui.recent_song_sources.empty()) {
-            const std::string next = config_.ui.recent_song_sources[static_cast<std::size_t>(selected_source_)];
+            const std::string next = config_.ui.recent_song_sources[static_cast<std::size_t>(history_index)];
             switch_song_source(next, false);
         } else {
             songs_path_.clear();
@@ -4400,12 +4420,9 @@ bool MenuApp::move_song_select_selection(int delta) {
     }
 
     if (song_select_view_ == SongSelectView::Sources) {
-        if (config_.ui.recent_song_sources.empty()) {
-            return false;
-        }
         const int previous = selected_source_;
         selected_source_ = clamp_int(selected_source_ + delta, 0,
-                                     static_cast<int>(config_.ui.recent_song_sources.size() - 1));
+                                     static_cast<int>(config_.ui.recent_song_sources.size()));
         return selected_source_ != previous;
     }
 

@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "app/menu/MenuAction.h"
+#include "app/MenuAppSkinUtils.h"
 #include "app/menu/settings/SkinSettingsController.h"
 
 namespace {
@@ -128,6 +129,36 @@ TEST_CASE("skin appearance rows mutate through one typed action path") {
         MenuAction::activate(), runtime, kLr2Names, kTenRiffNames,
         SkinSettingsRowId::VisualLatency));
     CHECK(runtime.visual_offset_ms == doctest::Approx(old_offset + 1.0));
+}
+
+TEST_CASE("note height controls stop at 50 and 400 percent for every supported key count") {
+    tenriff::config::RuntimeConfig runtime;
+    SkinSettingsController controller;
+    for (int keys = 4; keys <= 16; ++keys) {
+        const std::string mode = std::to_string(keys) + "k";
+        controller.reset(mode);
+        runtime.skin.note_height_scales[mode] = 0.55;
+        for (int press = 0; press < 2; ++press) {
+            static_cast<void>(controller.handle(
+                MenuAction::adjust(-1), runtime, kLr2Names, kTenRiffNames,
+                SkinSettingsRowId::NoteHeight));
+        }
+        const auto lower = tenriff::config::resolved_skin_note_height_scale(runtime.skin, mode);
+        CHECK(lower == doctest::Approx(0.5));
+        CHECK(tenriff::app::format_percent(lower) == "50%");
+        runtime.skin.note_height_scales[mode] = 3.95;
+        for (int press = 0; press < 2; ++press) {
+            static_cast<void>(controller.handle(
+                MenuAction::adjust(1), runtime, kLr2Names, kTenRiffNames,
+                SkinSettingsRowId::NoteHeight));
+        }
+        const auto upper = tenriff::config::resolved_skin_note_height_scale(runtime.skin, mode);
+        CHECK(upper == doctest::Approx(4.0));
+        CHECK(tenriff::app::format_percent(upper) == "400%");
+        CHECK(controller.dirty());
+    }
+    CHECK(tenriff::app::format_percent(1.0) == "100%");
+    CHECK(tenriff::app::format_percent(2.5) == "250%");
 }
 
 TEST_CASE("skin unavailable adjustments are no-ops") {

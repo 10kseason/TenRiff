@@ -24,7 +24,7 @@ TEST_CASE("graphics setting and ONNX confirmation identifiers are stable") {
     using tenriff::app::menu::settings::onnx_upscaler_confirm_id_at;
 
     static_assert(static_cast<std::uint8_t>(GraphicsSettingId::Display) == 0);
-    static_assert(static_cast<std::uint8_t>(GraphicsSettingId::Back) == 11);
+    static_assert(static_cast<std::uint8_t>(GraphicsSettingId::Back) == 10);
     static_assert(static_cast<std::uint8_t>(OnnxUpscalerConfirmId::Enable) == 0);
     static_assert(static_cast<std::uint8_t>(OnnxUpscalerConfirmId::KeepNative) == 1);
     for (std::size_t index = 0; index < kGraphicsSettingOrder.size(); ++index) {
@@ -32,6 +32,7 @@ TEST_CASE("graphics setting and ONNX confirmation identifiers are stable") {
         CHECK(*graphics_setting_id_at(index) == kGraphicsSettingOrder[index]);
         REQUIRE(graphics_setting_index(kGraphicsSettingOrder[index]).has_value());
         CHECK(*graphics_setting_index(kGraphicsSettingOrder[index]) == index);
+        CHECK(static_cast<std::size_t>(kGraphicsSettingOrder[index]) == index);
     }
     CHECK_FALSE(graphics_setting_id_at(kGraphicsSettingOrder.size()).has_value());
     REQUIRE(onnx_upscaler_confirm_id_at(1).has_value());
@@ -84,9 +85,7 @@ TEST_CASE("graphics deferred rows mutate config without live apply") {
     effects = controller.handle(
         MenuAction::activate(), runtime, GraphicsSettingId::PreferLowPowerDirectX);
     CHECK(runtime.graphics.background_upscale_prefer_npu);
-    effects = controller.handle(
-        MenuAction::activate(), runtime, GraphicsSettingId::Language);
-    CHECK(runtime.ui.language == "ko");
+    CHECK(runtime.ui.language == "en");
     CHECK(controller.dirty());
 }
 
@@ -174,6 +173,23 @@ TEST_CASE("graphics keyboard and pointer adjustments have parity") {
     CHECK(keyboard_runtime.graphics.resolution == pointer_runtime.graphics.resolution);
 }
 
+TEST_CASE("graphics Back pointer row still saves and leaves after moving language") {
+    tenriff::config::RuntimeConfig runtime;
+    GraphicsSettingsController controller;
+    static_cast<void>(controller.handle(
+        MenuAction::activate(), runtime, GraphicsSettingId::PerformanceHud));
+    const auto view = GraphicsSettingsView::build(
+        controller, runtime, tenriff::ui::Language::English);
+    REQUIRE_FALSE(view.rows.empty());
+    const auto hit_index = static_cast<std::size_t>(view.rows.back().id);
+    const auto target = tenriff::app::menu::settings::graphics_setting_id_at(hit_index);
+    REQUIRE(target.has_value());
+    const auto effects = controller.handle(MenuAction::activate(), runtime, *target);
+    CHECK(effects.menu.navigate_back);
+    CHECK(effects.menu.persist_config);
+    CHECK_FALSE(controller.dirty());
+}
+
 TEST_CASE("graphics settings views preserve values localization and safe defaults") {
     tenriff::config::RuntimeConfig runtime;
     GraphicsSettingsController controller;
@@ -183,13 +199,12 @@ TEST_CASE("graphics settings views preserve values localization and safe default
     static_cast<void>(controller.select(GraphicsSettingId::OnnxModel));
 
     const auto korean = GraphicsSettingsView::build(controller, runtime, tenriff::ui::Language::Korean);
-    REQUIRE(korean.rows.size() == 12);
+    REQUIRE(korean.rows.size() == 11);
     REQUIRE(korean.notes.size() == 11);
     CHECK(korean.rows[2].value == "무제한 (최대 1500 FPS)");
     CHECK(korean.rows[8].value == "model.onnx");
     CHECK(korean.rows[8].selected);
-    CHECK(korean.rows[10].value == "한국어");
-    CHECK(korean.rows[11].label == "뒤로");
+    CHECK(korean.rows[10].label == "뒤로");
 
     controller.prepare_onnx_confirmation();
     const auto confirmation =
@@ -201,29 +216,21 @@ TEST_CASE("graphics settings views preserve values localization and safe default
     CHECK(confirmation.rows[0].label == "Yes, enable ONNX");
 }
 
-TEST_CASE("graphics language selection reaches Japanese and updates its view immediately") {
+TEST_CASE("graphics uses the profile language while language editing lives in profile setup") {
     tenriff::config::RuntimeConfig runtime;
+    runtime.ui.language = "ja";
     GraphicsSettingsController controller;
-    static_cast<void>(controller.select(GraphicsSettingId::Language));
-    static_cast<void>(controller.handle(MenuAction::adjust(-1), runtime));
-    REQUIRE(runtime.ui.language == "ja");
     const auto japanese = GraphicsSettingsView::build(
         controller, runtime, tenriff::ui::Language::Japanese);
-    REQUIRE(japanese.rows.size() == 12);
-    CHECK(japanese.rows[10].label == "言語");
-    CHECK(japanese.rows[10].value == "日本語");
-    CHECK(japanese.rows[11].label == "戻る");
+    REQUIRE(japanese.rows.size() == 11);
+    CHECK(japanese.rows[10].label == "戻る");
     CHECK(japanese.rows[0].value == "ボーダーレス");
     CHECK(japanese.rows[2].value == "ディスプレイに合わせる");
-    CHECK(japanese.notes[0].find("Discord") != std::string::npos);
-    CHECK(japanese.notes[0].find("表示") != std::string::npos ||
-          japanese.notes[0].find("重なり") != std::string::npos);
-    static_cast<void>(controller.handle(MenuAction::activate(), runtime));
-    CHECK(runtime.ui.language == "en");
-    static_cast<void>(controller.handle(MenuAction::adjust(1), runtime));
-    CHECK(runtime.ui.language == "ko");
-    static_cast<void>(controller.handle(MenuAction::adjust(1), runtime));
+    for (const auto& row : japanese.rows) CHECK(row.label != "言語");
+    // Out-of-range pointer targets cannot change profile settings.
+    const auto effects = controller.handle(
+        MenuAction::activate(), runtime, static_cast<GraphicsSettingId>(11));
+    CHECK(effects.empty());
     CHECK(runtime.ui.language == "ja");
-    const auto effects = controller.handle(MenuAction::back(), runtime);
-    CHECK(effects.menu.persist_config);
+    CHECK_FALSE(controller.dirty());
 }

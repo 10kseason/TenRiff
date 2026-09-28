@@ -25,8 +25,9 @@
         D2D1_RECT_F header_rect = native_rect("generic.rect.004", D2D1::RectF(left, 48.0f, right, 120.0f));
         if (modern_settings_screen) {
             if (d2d_->panel_brush) ctx->FillRectangle(native_rect("generic.rect.005", D2D1::RectF(0, 0, kBaseWidth, 126)), d2d_->panel_brush.Get());
-            draw_text_clipped(L"TENRIFF", d2d_->header_format.Get(),
-                              native_rect("generic.rect.006", D2D1::RectF(64, 24, 370, 94)), d2d_->text_brush.Get());
+            draw_native_asset(native_menu_assets::kMark, D2D1::RectF(64, 30, 112, 88));
+            draw_native_wordmark(d2d_->header_format.Get(),
+                                native_rect("generic.rect.006", D2D1::RectF(128, 24, 384, 94)));
             draw_text_clipped(to_wide(data.generic.heading.empty() ? data.screen_title : data.generic.heading),
                               d2d_->title_format.Get(), native_rect("generic.rect.007", D2D1::RectF(420, 34, 1470, 78)), d2d_->text_brush.Get());
             draw_text_clipped(wloc("SETTINGS & TOOLS", "설정 및 도구"), d2d_->hud_format.Get(),
@@ -584,9 +585,28 @@
                 draw_text_clipped_aligned(to_wide(std::to_string(data.generic.rows.size())) + wloc(" items", "개 항목"),
                                           d2d_->hud_format.Get(), native_rect("generic.rect.028", D2D1::RectF(row_left + 6, top + 22, base_row_right, top + 48)),
                                           d2d_->muted_brush.Get(), DWRITE_TEXT_ALIGNMENT_TRAILING);
-                const D2D1_RECT_F help_rect = has_skin_preview
+                D2D1_RECT_F help_rect = has_skin_preview
                     ? native_rect("generic.rect.029", D2D1::RectF(left, bottom - 240.0f, native_list_right, bottom))
                     : fit_rect_below_performance_overlay(native_rect("generic.rect.030", D2D1::RectF(native_list_right + 24.0f, top, right, bottom)), bottom, 20.0f);
+                if (data.generic.profile_preview_visible && !has_skin_preview && help_rect.bottom - help_rect.top >= 440.0f) {
+                    const float preview_bottom = std::min(help_rect.top + 366.0f, help_rect.bottom - 220.0f);
+                    const auto profile_preview = D2D1::RectF(help_rect.left, help_rect.top, help_rect.right, preview_bottom);
+                    draw_glass_panel(profile_preview, 14, 0.92f, 0.25f, false, 0);
+                    draw_text_clipped(wloc("PROFILE PREVIEW", "프로필 미리보기"), d2d_->hud_format.Get(),
+                        D2D1::RectF(profile_preview.left + 26, profile_preview.top + 20, profile_preview.right - 26, profile_preview.top + 50),
+                        d2d_->text_brush.Get());
+                    const float avatar_size = std::min(224.0f, preview_bottom - profile_preview.top - 104.0f);
+                    const float avatar_left = (profile_preview.left + profile_preview.right - avatar_size) * 0.5f;
+                    const auto avatar = D2D1::RectF(avatar_left, profile_preview.top + 66, avatar_left + avatar_size, profile_preview.top + 66 + avatar_size);
+                    if (auto* bitmap = find_song_card_preview_bitmap(data.generic.profile_avatar_path)) {
+                        const auto source = centered_bitmap_source_rect(bitmap->GetSize(), avatar);
+                        ctx->DrawBitmap(bitmap, avatar, 1.0f, D2D1_BITMAP_INTERPOLATION_MODE_LINEAR, &source);
+                    } else {
+                        draw_native_asset(native_menu_assets::kMark, avatar, 0.65f);
+                    }
+                    draw_native_panel_edge(avatar, 6, 0x9BCEDC, 0.8f);
+                    help_rect.top = preview_bottom + 22.0f;
+                }
                 draw_generic_help(help_rect, data.generic.heading, data.generic.notes, data.generic.footer_notes);
             }
 

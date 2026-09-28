@@ -138,6 +138,7 @@ struct MenuButtonData {
 
 struct TitleMenuData {
     std::string profile;
+    std::string profile_avatar_path;
     std::string track;
     int64_t high_score = 0;
     std::vector<MenuButtonData> buttons;
@@ -180,6 +181,7 @@ struct SongSelectData {
     std::string selected_source_path;
     int selected_source_song_count = -1;
     bool selected_source_active = false;
+    bool selected_source_all = false;
     std::string selected_song_title;
     std::string selected_song_artist;
     std::string selected_song_detail;
@@ -663,6 +665,8 @@ struct SkinPreviewData {
 
 struct GenericMenuData {
     std::string heading;
+    std::string profile_avatar_path;
+    bool profile_preview_visible = false;
     std::vector<MenuRowData> rows;
     bool card_grid = false;
     std::vector<std::string> card_descriptions;
@@ -771,6 +775,8 @@ struct MenuRenderData {
     MenuScreenKind kind = MenuScreenKind::GenericList;
     ui::Language ui_language = ui::Language::English;
     std::string ui_font = "default";
+    float ui_text_scale = 1.0f;
+    uint64_t profile_avatar_revision = 0;
     LobbySkinData lobby_skin;
 
     std::string screen_title;

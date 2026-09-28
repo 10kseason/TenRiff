@@ -36,6 +36,7 @@ Node.js 없이 최신 Edge / Chrome / Firefox에서 실행되는 오프라인 �
   게임은 모션 속도 0~4, 강도 0~2, 등장 시간 0.05~2초, 켬 값 0~1,
   글자 크기 8~180 등 실제 동작 범위로 수치를 제한합니다.
 - **플레이 스타일:** 공통값 또는 `1k`~`16k`, `7+1`별 덮어쓰기를 선택합니다.
+  노트 높이 비율은 `0.5`~`4.0` (50%~400%), 기본값은 `1.0` (100%)입니다.
   레인별 배열은 JSON 형식으로 입력합니다. 이미지 배열 예: `["a.png", "b.png"]`.
   이미지 경로 패턴 `{lane}`, `{index}`, `{index:02}`를 보존합니다.
 - **JSON 편집:** 적용 전까지 별도 초안입니다. 적용하거나 되돌리기 전에는 다른 도구로
@@ -95,7 +96,8 @@ or internet access. The entire UI supports Korean, English, and Japanese.
   layout; verify detailed slots in the game.
   Runtime bounds include motion speed 0–4, intensity 0–2, entry time 0.05–2 seconds,
   enabled 0–1, and font size 8–180.
-- **Play style:** select common fields or a `1k`–`16k` / `7+1` override. Enter arrays
+- **Play style:** select common fields or a `1k`–`16k` / `7+1` override.
+  Note height ratios range from `0.5` to `4.0` (50%–400%), default `1.0` (100%). Enter arrays
   as JSON, such as `["a.png", "b.png"]`. Lane patterns `{lane}`, `{index}`, and
   `{index:02}` are preserved.
 - **JSON editor:** changes remain a draft until applied. Apply or discard the
@@ -153,7 +155,8 @@ Firefox で動作します。画面全体を韓国語・英語・日本語に切
   プレビューは一部の色と大きな配置のみ反映するので、詳細はゲームで確認してください。
   ゲームはモーション速度 0〜4、強度 0〜2、登場時間 0.05〜2 秒、有効値 0〜1、
   文字サイズ 8〜180 などの実行時範囲に制限します。
-- **プレイスタイル:** 共通値か `1k`〜`16k` / `7+1` の指定値を選びます。配列は
+- **プレイスタイル:** 共通値か `1k`〜`16k` / `7+1` の指定値を選びます。
+  高さの比率は `0.5`〜`4.0` (50%〜400%)、既定値は `1.0` (100%) です。配列は
   `["a.png", "b.png"]` のような JSON で入力します。`{lane}`、`{index}`、`{index:02}` を保持します。
 - **JSON 編集:** 適用前は別の下書きです。他の操作で変更する前に適用または破棄してください。
   不明なキーも保存時に保持し、警告として表示します。

@@ -32,6 +32,8 @@ int main(int argc, char** argv) {
     int players = 0;
     int preview_fps = 144;
     int preview_keys = 10;
+    int menu_keys = 7;
+    double preview_note_height = 1.8;
     double fixture_seconds = -1.0;
     bool fixture_idle = false;
     int fixed_grade = -1;
@@ -41,6 +43,7 @@ int main(int argc, char** argv) {
     bool reveal = false;
     bool settings = false;
     bool skin_settings = false;
+    bool profile_settings = false;
     bool title = false;
     bool focus_options = false;
     bool sites_account = false;
@@ -49,9 +52,11 @@ int main(int argc, char** argv) {
     bool capture_requested = false;
     int rendered_frames = 0;
     int frame_limit = 0;
+    int avatar_refresh_frame = 0;
     bool cycle_selection = false;
     std::vector<int> capture_frames;
     std::string skin_folder;
+    std::string avatar_path;
     MenuRenderData data;
     data.ui_language = tenriff::ui::Language::Korean;
     for (int i = 1; i < argc; ++i) {
@@ -62,6 +67,14 @@ int main(int argc, char** argv) {
         else if (arg == "--cycle-selection") cycle_selection = true;
         else if (arg == "--frames" && i + 1 < argc) frame_limit = std::stoi(argv[++i]);
         else if (arg == "--skin" && i + 1 < argc) skin_folder = argv[++i];
+        else if (arg == "--font-size" && i + 1 < argc)
+            data.ui_text_scale = tenriff::config::menu_text_scale(argv[++i]);
+        else if (arg == "--avatar" && i + 1 < argc) avatar_path = argv[++i];
+        else if (arg == "--note-height" && i + 1 < argc)
+            preview_note_height = std::clamp(std::stod(argv[++i]),
+                tenriff::config::kNoteHeightScaleMin, tenriff::config::kNoteHeightScaleMax);
+        else if (arg == "--avatar-refresh-frame" && i + 1 < argc) avatar_refresh_frame = std::stoi(argv[++i]);
+        else if (arg == "--profile") profile_settings = true;
         else if (arg == "--capture-frames" && i + 1 < argc) {
             std::istringstream stream(argv[++i]);
             std::string value;
@@ -75,6 +88,7 @@ int main(int argc, char** argv) {
         else if (arg == "--keys" && i + 1 < argc) {
             preview_keys = std::stoi(argv[++i]);
             if (preview_keys < 4 || preview_keys > 16) return 2;
+            menu_keys = preview_keys;
         }
         else if (arg == "--fixture-time" && i + 1 < argc) fixture_seconds = std::stod(argv[++i]);
         else if (arg == "--idle-keys") fixture_idle = true;
@@ -137,7 +151,8 @@ int main(int argc, char** argv) {
             loc("Hit Burst Style", "키 폭발 모양"), loc("UI Font", "UI 글꼴")};
         const std::array<std::string, 20> values{
             "10K", "75%", loc("Normal", "노말"), loc("Off", "꺼짐"),
-            loc("Rect", "사각형"), "1.80", "1.00", "82%", "+0 ms", "0", "24%",
+            loc("Rect", "사각형"), std::to_string(std::lround(preview_note_height * 100.0)) + "%",
+            "1.00", "82%", "+0 ms", "0", "24%",
             "0", "18%", "0", "0", "1.0", "100%", "75%", loc("Circle", "원"), "Segoe UI"};
         // Repeat real long help strings to preserve the pagination/wrapping QA
         // case, while showing the same translated prose as the shipped client.
@@ -169,15 +184,50 @@ int main(int argc, char** argv) {
             loc("VIEW ONLY", "보기 전용") + " / " + loc("OFFLINE", "오프라인")};
         auto& preview = data.generic.skin_preview;
         preview.visible = skin_settings;
+        preview.note_height_scale = preview_note_height;
         preview.lane_count = 10;
         preview.mode_label = "10K";
         preview.selected_lane = 1;
         preview.selected_color_label = "#EDF2F7";
         for (int i = 0; i < 10; ++i) preview.lane_colors[i] = i % 2 ? 0x4B76EF : 0xEDF2F7;
     }
+    if (profile_settings) {
+        data.kind = MenuScreenKind::GenericList;
+        data.generic.heading = loc("Profile Setup", "프로필 설정");
+        data.generic.profile_preview_visible = true;
+        data.generic.profile_avatar_path = avatar_path;
+        const std::array<std::string, 12> labels{
+            loc("Language", "언어"), loc("Menu Font Size", "메뉴 글자 크기"),
+            loc("Songs Folder", "곡 폴더"), loc("Gauge", "게이지"), "Rate",
+            loc("Visual Latency", "비주얼 레이턴시"), loc("Keysound", "키음"),
+            loc("Input Backend", "입력 방식"), loc("Nickname", "닉네임"),
+            loc("Avatar Image", "프로필 사진"), loc("Clear Avatar", "사진 지우기"),
+            loc("Done", "완료")};
+        const std::array<std::string, 12> values{
+            data.ui_language == tenriff::ui::Language::Japanese ? "日本語" : loc("English", "한국어"),
+            data.ui_text_scale > 1.2f ? loc("Extra Large", "더 크게") :
+                data.ui_text_scale > 1.0f ? loc("Large", "크게") : loc("Normal", "보통"),
+            "ALL SONG", "NORMAL", "1.00x", "0 ms", "Follow", "RawInput", "PLAYER",
+            avatar_path.empty() ? loc("Not set", "설정 안 됨") : "preview-avatar.png",
+            loc("Clear", "지우기"), loc("Back", "돌아가기")};
+        for (int i = 0; i < static_cast<int>(labels.size()); ++i) {
+            MenuRowData row;
+            row.label = labels[i]; row.value = values[i]; row.row_index = i;
+            row.target_kind = MenuHitTargetKind::SettingsRow;
+            row.selected = i == 1; row.adjustable = i < 8;
+            row.increment_enabled = row.decrement_enabled = true;
+            data.generic.rows.push_back(std::move(row));
+        }
+        data.generic.notes = {
+            loc("Language and menu font size apply immediately and are saved to this profile.",
+                "언어와 메뉴 글자 크기는 즉시 적용되고 이 프로필에 저장됩니다."),
+            loc("Nickname is shown in saved records and multiplayer. Avatar Image accepts local PNG/JPG files.",
+                "닉네임은 저장 기록과 멀티플레이에 표시됩니다. 프로필 사진은 로컬 PNG/JPG 파일을 사용합니다.")};
+    }
     if (title) {
         data.kind = MenuScreenKind::TitleMenu;
         data.title.profile = "PLAYER";
+        data.title.profile_avatar_path = avatar_path;
         data.title.track = empty ? "" : "Luminous Horizon [Another]";
         data.title.buttons = {
             {empty ? loc("ADD SONGS FOLDER", "곡 폴더 추가") : loc("PLAY", "플레이"), "+", !focus_options,
@@ -200,10 +250,11 @@ int main(int argc, char** argv) {
     }
     auto& songs = data.song_select;
     songs.profile = "PLAYER";
+    songs.profile_avatar_path = avatar_path;
     songs.selected_song_title = "Luminous Horizon / A very long chart title [Another]";
     songs.selected_song_artist = "TenRiff UI Preview";
-    songs.selected_song_key_count = 7;
-    songs.selected_song_layout = "7 KEYS";
+    songs.selected_song_key_count = menu_keys;
+    songs.selected_song_layout = std::to_string(menu_keys) + " KEYS";
     songs.selected_song_difficulty = "12";
     songs.selected_song_bpm = 180;
     songs.selected_song_note_count = 1824;
@@ -241,9 +292,9 @@ int main(int argc, char** argv) {
     songs.selected_source_name = loc("SONG LIBRARY", "곡 라이브러리");
     songs.selected_source_path = "songs / preview";
     const std::array<std::string, 7> navigation{
-        loc("SONGS", "곡"), loc("SOURCES", "소스"), loc("SEARCH", "검색"),
-        loc("FILTER", "필터"), loc("RECORDS", "기록"), loc("OPTIONS", "옵션"),
-        loc("Mode Settings", "모드 설정")};
+        loc("SONGS", "곡 목록"), loc("SOURCES", "소스"), loc("SEARCH", "검색"),
+        loc("FILTER", "필터"), loc("RECORDS", "기록"), loc("SESSION MIX", "세션 믹스"),
+        loc("OPTIONS", "옵션")};
     for (const auto& label : navigation) {
         MenuButtonData button;
         button.label = label;
@@ -269,11 +320,22 @@ int main(int argc, char** argv) {
         songs.record_count = songs.source_count = 42;
         songs.list_visible_count = 7;
     }
+    if (songs.showing_sources && !empty) {
+        songs.selected_source_all = true;
+        songs.selected_source_name = "ALL SONG";
+        songs.selected_source_path = loc("All registered song folders", "등록한 모든 곡 폴더");
+        songs.selected_source_song_count = 42;
+        songs.source_count = 6;
+        songs.songs.front().title = "ALL SONG";
+        songs.songs.front().artist = songs.selected_source_path;
+        songs.songs.front().detail = loc("Combined library · duplicates removed", "통합 라이브러리 · 중복 제외");
+        songs.songs.front().level = 42;
+    }
     auto& score = data.result;
     score.title = songs.selected_song_title;
     score.artist = songs.selected_song_artist;
     score.profile = "PLAYER";
-    score.key_count = 7;
+    score.key_count = menu_keys;
     score.level = 12;
     score.bpm = 180;
     score.rank = failed ? "C" : "AAA";
@@ -356,6 +418,7 @@ int main(int argc, char** argv) {
     if (gameplay) {
         data.kind = MenuScreenKind::GameplayHud;
         auto& hud = data.gameplay;
+        hud.note_height_scale = preview_note_height;
         hud.active = true; hud.title = loc("Gameplay", "게임플레이") + " / " + loc("LIVE PREVIEW", "미리보기");
         hud.artist = loc("VIEW ONLY", "보기 전용") + " / " + loc("OFFLINE", "오프라인");
         hud.visual_velocity = 1.0 / 48000.0;
@@ -501,6 +564,7 @@ int main(int argc, char** argv) {
             }
         }
         ++rendered_frames;
+        if (avatar_refresh_frame > 0 && rendered_frames == avatar_refresh_frame) ++data.profile_avatar_revision;
         if (cycle_selection) {
             const int selection = (rendered_frames / 45);
             for (std::size_t i = 0; i < data.title.buttons.size(); ++i)

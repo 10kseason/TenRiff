@@ -1,6 +1,6 @@
             constexpr std::array<uint32_t, 10> colors{
-                0xEFA5A5, 0xF2BB99, 0xC1ACE8, 0x9CBFEB, 0x9ED7BC,
-                0x92CDD3, 0xE9D296, 0xE5ACCB, 0xB9CAA1, 0xB8BCE8};
+                0xEF8B9C, 0xEFAE72, 0xB39AEF, 0x80B7F2, 0x79D8AC,
+                0x66CFDC, 0xE3CF79, 0xE98DBC, 0xA9CA79, 0x949FED};
             const float gap = native_metric("options_grid.gap", 22.0f);
             const float width = (right - left - gap * 4.0f) / 5.0f;
             const float height = native_metric("options_grid.height", 270.0f);
@@ -14,12 +14,12 @@
                 const auto rr = D2D1::RoundedRect(rect, 18, 18);
                 const auto saved = d2d_->card_brush->GetColor();
                 const auto pastel = D2D1::ColorF(colors[i % colors.size()]);
-                const float tint = row.selected ? 0.26f : 0.11f;
+                const float tint = row.selected ? 0.36f : 0.22f;
                 d2d_->card_brush->SetColor(D2D1::ColorF(
                     0.06f + pastel.r * tint, 0.08f + pastel.g * tint, 0.11f + pastel.b * tint, 1.0f));
                 ctx->FillRoundedRectangle(rr, d2d_->card_brush.Get());
-                d2d_->card_brush->SetColor(D2D1::ColorF(colors[i % colors.size()], row.selected ? 1.0f : 0.48f));
-                ctx->DrawRoundedRectangle(rr, d2d_->card_brush.Get(), row.selected ? 3.0f : 1.0f);
+                d2d_->card_brush->SetColor(D2D1::ColorF(colors[i % colors.size()], row.selected ? 1.0f : 0.68f));
+                ctx->DrawRoundedRectangle(rr, d2d_->card_brush.Get(), row.selected ? 1.8f : 1.0f);
                 ctx->FillRoundedRectangle(D2D1::RoundedRect(native_rect("options_grid.rect.002", D2D1::RectF(x + 24, y + 24, x + 64, y + 30)), 3, 3), d2d_->card_brush.Get());
                 draw_text_clipped(to_wide(row.label), d2d_->option_format.Get(),
                     native_rect("options_grid.rect.003", D2D1::RectF(x + 24, y + 50, x + width - 24, y + 98)), d2d_->text_brush.Get());
@@ -31,7 +31,11 @@
                     d2d_->card_brush.Get(), DWRITE_TEXT_ALIGNMENT_LEADING);
                 d2d_->title_format->SetParagraphAlignment(alignment);
                 d2d_->card_brush->SetColor(saved);
-                draw_native_focus(rect, 18, 48 + i, row.row_index, row.selected);
+                draw_native_panel_edge(rect, 18, colors[i % colors.size()], row.selected ? 1.0f : 0.70f);
+                // The selected tile keeps its own hue rather than acquiring the
+                // cyan focus color shared by navigation controls.
+                if (row.selected && native_motion_screen && d2d_->native_menu_brush) ctx->DrawRoundedRectangle(D2D1::RoundedRect(inset_rect(rect, 5, 5), 14, 14),
+                    native_color(colors[i % colors.size()], 0.36f), 1.0f);
                 const std::array<native_menu_assets::Asset, 10> icons = {
                     native_menu_assets::kSliders, native_menu_assets::kInput, native_menu_assets::kPrism,
                     native_menu_assets::kDisplay, native_menu_assets::kAudio, native_menu_assets::kInput,

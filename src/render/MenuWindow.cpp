@@ -1389,7 +1389,8 @@ bool load_bitmap_from_utf8_path(IWICImagingFactory* wic_factory,
                                 std::string_view path,
                                 Microsoft::WRL::ComPtr<ID2D1Bitmap>& out_bitmap,
                                 D2D1_RECT_F* out_source_rect = nullptr,
-                                bool trim_transparent_alpha = false) {
+                                bool trim_transparent_alpha = false,
+                                bool detached_avatar = false) {
     if (!wic_factory || !d2d_context || path.empty()) {
         return false;
     }
@@ -1419,6 +1420,23 @@ bool load_bitmap_from_utf8_path(IWICImagingFactory* wic_factory,
         return false;
     }
 
+    if (detached_avatar) {
+        // Avatar files are editable while the menu remains open. Decode a
+        // bounded thumbnail, then upload owned pixels below so Direct2D cannot
+        // retain a WIC decoder/stream that keeps the original file locked.
+        UINT source_width = 0, source_height = 0;
+        if (FAILED(source->GetSize(&source_width, &source_height)) || source_width == 0 || source_height == 0) return false;
+        if (source_width > 512 || source_height > 512) {
+            const double ratio = 512.0 / static_cast<double>(std::max(source_width, source_height));
+            const UINT thumbnail_width = std::max<UINT>(1, static_cast<UINT>(source_width * ratio));
+            const UINT thumbnail_height = std::max<UINT>(1, static_cast<UINT>(source_height * ratio));
+            Microsoft::WRL::ComPtr<IWICBitmapScaler> scaler;
+            if (FAILED(wic_factory->CreateBitmapScaler(scaler.GetAddressOf())) ||
+                FAILED(scaler->Initialize(source.Get(), thumbnail_width, thumbnail_height, WICBitmapInterpolationModeFant))) return false;
+            source = scaler;
+        }
+    }
+
     Microsoft::WRL::ComPtr<IWICFormatConverter> converter;
     if (FAILED(wic_factory->CreateFormatConverter(&converter)) || !converter) {
         return false;
@@ -1446,7 +1464,17 @@ bool load_bitmap_from_utf8_path(IWICImagingFactory* wic_factory,
     Microsoft::WRL::ComPtr<ID2D1Bitmap> bitmap;
     const D2D1_BITMAP_PROPERTIES properties = D2D1::BitmapProperties(
         D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_PREMULTIPLIED));
-    const HRESULT bitmap_hr = d2d_context->CreateBitmapFromWicBitmap(converter.Get(), &properties, &bitmap);
+    HRESULT bitmap_hr = E_FAIL;
+    if (detached_avatar) {
+        if (width == 0 || height == 0 || width > 512 || height > 512) return false;
+        const UINT stride = width * 4;
+        std::vector<std::uint8_t> pixels(static_cast<std::size_t>(stride) * height);
+        if (FAILED(converter->CopyPixels(nullptr, stride, static_cast<UINT>(pixels.size()), pixels.data()))) return false;
+        bitmap_hr = d2d_context->CreateBitmap(D2D1::SizeU(width, height), pixels.data(), stride,
+                                              &properties, bitmap.ReleaseAndGetAddressOf());
+    } else {
+        bitmap_hr = d2d_context->CreateBitmapFromWicBitmap(converter.Get(), &properties, &bitmap);
+    }
     if (FAILED(bitmap_hr) || !bitmap) {
         return false;
     }
@@ -2180,6 +2208,14 @@ struct MenuWindow::D2DResources {
     Microsoft::WRL::ComPtr<IDWriteFactory> dwrite_factory;
     Microsoft::WRL::ComPtr<IWICImagingFactory> wic_factory;
     std::wstring ui_font_family;
+    uint64_t applied_profile_avatar_revision = 0;
+    std::string applied_profile_avatar_path;
+    float requested_ui_text_scale = 1.0f;
+    float applied_ui_text_scale = 1.0f;
+    Microsoft::WRL::ComPtr<IDWriteTextLayout> native_wordmark_layout;
+    IDWriteTextFormat* native_wordmark_format = nullptr;
+    DWRITE_TEXT_METRICS native_wordmark_metrics{};
+    std::unordered_map<IDWriteTextFormat*, Microsoft::WRL::ComPtr<IDWriteInlineObject>> menu_ellipsis_signs;
     Microsoft::WRL::ComPtr<IDWriteTextFormat> title_format;
     Microsoft::WRL::ComPtr<IDWriteTextFormat> option_format;
     Microsoft::WRL::ComPtr<IDWriteTextFormat> body_format;
@@ -3409,7 +3445,8 @@ bool MenuWindow::load_song_card_preview_bitmap(std::string_view path) {
     D2DResources::SongCardPreviewBitmapEntry entry;
     entry.attempted = true;
     static_cast<void>(load_bitmap_from_utf8_path(
-        d2d_->wic_factory.Get(), d2d_->d2d_context.Get(), key, entry.bitmap));
+        d2d_->wic_factory.Get(), d2d_->d2d_context.Get(), key, entry.bitmap, nullptr, false,
+        key == d2d_->applied_profile_avatar_path));
     auto [inserted_it, inserted] =
         d2d_->song_card_preview_bitmaps.emplace(key, std::move(entry));
     (void)inserted;
@@ -4830,6 +4867,13 @@ bool MenuWindow::create_text_formats(const wchar_t* ui_family, const app::Native
                 break;
             }
         }
+        // Fixed display numerals and logos keep their designed silhouette.
+        // Text labels grow, then the existing fit helper constrains tight cells.
+        if (out_format != std::addressof(d2d_->gameplay_combo_format) && out_format != std::addressof(d2d_->logo_format) &&
+            out_format != std::addressof(d2d_->song_logo_format) && out_format != std::addressof(d2d_->rank_format) &&
+            out_format != std::addressof(d2d_->result_score_format)) {
+            size *= d2d_->requested_ui_text_scale;
+        }
         const HRESULT hr = d2d_->dwrite_factory->CreateTextFormat(family,
                                                                   nullptr,
                                                                   weight,
@@ -4880,6 +4924,10 @@ bool MenuWindow::create_text_formats(const wchar_t* ui_family, const app::Native
         return false;
     }
     d2d_->ui_font_family = ui_family;
+    d2d_->applied_ui_text_scale = d2d_->requested_ui_text_scale;
+    d2d_->native_wordmark_layout.Reset();
+    d2d_->native_wordmark_format = nullptr;
+    d2d_->menu_ellipsis_signs.clear();
     d2d_->generic_help_layout.Reset();
     return true;
 }

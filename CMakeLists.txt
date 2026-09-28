@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(TenRiff VERSION 1.7.8 LANGUAGES C CXX)
+project(TenRiff VERSION 1.7.9 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -201,6 +201,8 @@ add_library(tenriff_core
     src/app/RuntimeConfigMigration.cpp
     src/app/SongIndex.cpp
     src/app/SongIndexerThread.cpp
+    src/app/SongSourceAggregate.cpp
+    src/app/MenuAppSources.cpp
 )
 
 target_include_directories(tenriff_core
@@ -749,6 +751,7 @@ if(TENRIFF_ENABLE_TESTS)
         tests/unit/test_config.cpp
         tests/unit/test_skin_preset.cpp
         tests/unit/test_song_source_history.cpp
+        tests/unit/test_song_source_aggregate.cpp
         tests/unit/test_menu_music_controller.cpp
         tests/unit/test_input_backend_status.cpp
         tests/unit/test_profile_setup_flow.cpp

@@ -2024,6 +2024,75 @@ TEST_CASE("config accepts Japanese aliases and keeps unknown language fallback")
     CHECK(tenriff::config::normalize_ui_language_token("unknown") == "en");
 }
 
+TEST_CASE("profile menu font sizes normalize to supported scales") {
+    using tenriff::config::menu_text_scale;
+    using tenriff::config::normalize_menu_font_size_token;
+    CHECK(normalize_menu_font_size_token("LARGE") == "large");
+    CHECK(normalize_menu_font_size_token("EXTRA_LARGE") == "extra_large");
+    CHECK(normalize_menu_font_size_token("unexpected") == "normal");
+    CHECK(menu_text_scale("normal") == doctest::Approx(1.0));
+    CHECK(menu_text_scale("large") == doctest::Approx(1.15));
+    CHECK(menu_text_scale("extra_large") == doctest::Approx(1.3));
+    CHECK(menu_text_scale("1000") == doctest::Approx(1.0));
+}
+
+TEST_CASE("profile presentation and aggregate library survive save and reload independently") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+    CurrentPathGuard cwd;
+    std::filesystem::current_path(temp.path);
+    ConfigLoader loader;
+    auto config = loader.defaults();
+    CHECK(config.ui.menu_font_size == "normal");
+    CHECK_FALSE(config.ui.all_song_sources);
+    config.ui.language = "ja";
+    config.ui.profile_avatar_path = "avatars/player.png";
+    config.ui.active_song_source = "Songs/Library-A";
+    config.ui.all_song_sources = true;
+    config.ui.menu_font_size = "extra_large";
+    std::string error;
+    REQUIRE(loader.save_profile("profiles/test", config, &error));
+    auto loaded = loader.load_profile("profiles/test");
+    REQUIRE(loaded.success());
+    CHECK(loaded.config.ui.menu_font_size == "extra_large");
+    CHECK(loaded.config.ui.language == "ja");
+    CHECK(loaded.config.ui.profile_avatar_path == "avatars/player.png");
+    CHECK(loaded.config.ui.all_song_sources);
+    CHECK(loaded.config.ui.active_song_source == "Songs/Library-A");
+
+    // Returning to a single source changes only the selection flag.
+    loaded.config.ui.all_song_sources = false;
+    loaded.config.ui.menu_font_size = "large";
+    REQUIRE(loader.save_profile("profiles/test", loaded.config, &error));
+    loaded = loader.load_profile("profiles/test");
+    REQUIRE(loaded.success());
+    CHECK_FALSE(loaded.config.ui.all_song_sources);
+    CHECK(loaded.config.ui.active_song_source == "Songs/Library-A");
+    CHECK(loaded.config.ui.menu_font_size == "large");
+}
+
+TEST_CASE("legacy profiles retain normal text and a single library; invalid size falls back safely") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+    CurrentPathGuard cwd;
+    std::filesystem::current_path(temp.path);
+    std::filesystem::create_directories("profiles/legacy");
+    write_file("profiles/legacy/config.json", R"({"ui":{"language":"ko"}})");
+    ConfigLoader loader;
+    auto loaded = loader.load_profile("profiles/legacy");
+    REQUIRE(loaded.success());
+    CHECK(loaded.config.ui.menu_font_size == "normal");
+    CHECK_FALSE(loaded.config.ui.all_song_sources);
+    CHECK(loaded.config.ui.language == "ko");
+    write_file("profiles/legacy/config.json", R"({"ui":{"menu_font_size":"oversized","all_song_sources":true}})");
+    loaded = loader.load_profile("profiles/legacy");
+    REQUIRE(loaded.success());
+    CHECK(loaded.config.ui.menu_font_size == "normal");
+    CHECK(loaded.config.ui.all_song_sources);
+}
+
 TEST_CASE("every 4K through 16K skin mode preserves its own palette and geometry") {
     const auto config = ConfigLoader{}.defaults();
     for (int keys = 4; keys <= 16; ++keys) {

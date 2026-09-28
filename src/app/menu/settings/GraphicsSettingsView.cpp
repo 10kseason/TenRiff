@@ -164,15 +164,6 @@ GraphicsSettingsViewModel GraphicsSettingsView::build(
         on_off(runtime.graphics.background_upscale_prefer_npu, language),
         controller, false, true));
     view.rows.push_back(make_row(
-        GraphicsSettingId::Language, SettingsRowKind::Choice,
-        localized(language, "Language", "언어"),
-        config::normalize_ui_language_token(runtime.ui.language) == "ko"
-            ? localized(language, "Korean", "한국어")
-            : config::normalize_ui_language_token(runtime.ui.language) == "ja"
-                ? localized(language, "Japanese", "일본어")
-                : localized(language, "English", "영어"),
-        controller, false, true));
-    view.rows.push_back(make_row(
         GraphicsSettingId::Back, SettingsRowKind::Action,
         localized(language, "Back", "뒤로"), "", controller, true, false));
 
@@ -213,8 +204,8 @@ GraphicsSettingsViewModel GraphicsSettingsView::build(
         "FP32/FP16 model I/O and float-boundary INT8 QDQ metadata are detected automatically. Low-Power DirectX requests DirectXMinPower; it does not select or verify an NPU.",
         "FP32/FP16 모델 입출력과 float 경계 INT8 QDQ 메타데이터를 자동 감지합니다. 저전력 DirectX는 DirectXMinPower 요청이며 NPU를 명시 선택하거나 검증하지 않습니다."));
     view.notes.push_back(localized(language,
-        "Language changes the menu UI immediately. Visual Latency is available in Skin Settings.",
-        "언어는 메뉴 UI에 즉시 반영됩니다. 비주얼 레이턴시는 스킨 설정에서 조정합니다."));
+        "Language and menu font size are in Profile Setup. Visual Latency is in Skin Settings.",
+        "언어와 메뉴 글자 크기는 프로필 설정에, 비주얼 레이턴시는 스킨 설정에 있습니다."));
     view.notes.push_back(localized(language,
         "Display, Resolution, Refresh Hz, and VSync apply immediately. Back saves and returns.",
         "표시 모드, 해상도, 주사율, VSync는 즉시 적용됩니다. 뒤로 가면 저장 후 돌아갑니다."));

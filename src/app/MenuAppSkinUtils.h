@@ -195,7 +195,9 @@ inline void append_slider_menu_row(render::GenericMenuData& menu,
 }
 
 inline std::string format_percent(double value) {
-    const int percent = static_cast<int>(std::lround(std::clamp(value, 0.0, 2.0) * 100.0));
+    // Note height supports 400%; formatting must not hide valid values above 200%.
+    const int percent = static_cast<int>(std::lround(
+        std::clamp(value, 0.0, config::kNoteHeightScaleMax) * 100.0));
     return std::to_string(percent) + "%";
 }
 

@@ -7,19 +7,27 @@
         }
         const auto logo = skin_layout_rect(data, "title.logo", D2D1::RectF(56, 24, 418, 94));
         draw_native_asset(native_menu_assets::kMark, native_rect("title_native.rect.002", D2D1::RectF(logo.left, logo.top + 2, logo.left + 64, logo.bottom)));
-        draw_text_clipped(L"TENRIFF", d2d_->header_format.Get(),
-                          native_rect("title_native.rect.003", D2D1::RectF(logo.left + 82, logo.top, logo.right, logo.bottom)), d2d_->text_brush.Get());
+        draw_native_wordmark(d2d_->header_format.Get(),
+                             native_rect("title_native.rect.003", D2D1::RectF(logo.left + 82, logo.top, logo.right, logo.bottom)));
         draw_text_clipped(wloc("HOME", "홈"), d2d_->song_title_format.Get(),
                           native_rect("title_native.rect.004", D2D1::RectF(466, 44, 850, 88)), d2d_->muted_brush.Get());
         const D2D1_RECT_F profile = data.performance.visible
             ? native_rect("title_native.rect.005", D2D1::RectF(1030, 20, 1430, 110)) : native_rect("title_native.rect.006", D2D1::RectF(1424, 20, 1824, 110));
         draw_glass_panel(profile, 12, 0.94f, 0, false, 0);
+        const auto avatar = D2D1::RectF(profile.left + 12, profile.top + 12, profile.left + 78, profile.top + 78);
+        if (auto* bitmap = find_song_card_preview_bitmap(data.title.profile_avatar_path)) {
+            const auto source = centered_bitmap_source_rect(bitmap->GetSize(), avatar);
+            ctx->DrawBitmap(bitmap, avatar, 1.0f, D2D1_BITMAP_INTERPOLATION_MODE_LINEAR, &source);
+        } else {
+            draw_native_asset(native_menu_assets::kMark, avatar, 0.90f);
+        }
+        draw_native_panel_edge(avatar, 5, 0x96D5E4, 0.7f);
         draw_text_clipped(wloc("PROFILE", "프로필"), d2d_->hud_format.Get(),
-                          native_rect("title_native.rect.007", D2D1::RectF(profile.left + 24, profile.top + 12, profile.right - 24, profile.top + 38)),
+                          native_rect("title_native.rect.007", D2D1::RectF(profile.left + 94, profile.top + 12, profile.right - 24, profile.top + 38)),
                           d2d_->muted_brush.Get());
         draw_text_clipped(to_wide(data.title.profile.empty() ? "PLAYER" : data.title.profile),
                           d2d_->song_title_format.Get(),
-                          native_rect("title_native.rect.008", D2D1::RectF(profile.left + 24, profile.top + 42, profile.right - 24, profile.bottom - 12)),
+                          native_rect("title_native.rect.008", D2D1::RectF(profile.left + 94, profile.top + 42, profile.right - 24, profile.bottom - 12)),
                           d2d_->text_brush.Get());
 
         draw_text_clipped(L"BMS RHYTHM GAME", d2d_->hud_format.Get(),

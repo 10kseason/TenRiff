@@ -1,26 +1,24 @@
 # TenRiff
 
-**2026-09-28 · TenRiff 1.7.8:** 新しいメニュー素材とアニメーション、4〜16キー対応の Luma Keys デジタル鍵盤、日本語 UI を追加しました。[ウェブスキンエディター](https://tenriff-skin-editor.lastestarcorp.chatgpt.site/)で鍵盤・ノーツの図形、HUD 配置、色と動きを編集できます。[使い方](tools/skin_editor/README.md#日本語) · [検証範囲](docs/release-1.7.8-gate.md)。
+**2026-09-28 · TenRiff 1.7.9:** メニュー文字サイズ3段階、初回起動・プロフィールでの言語選択、画像プレビュー、全フォルダーをまとめる ALL SONG を追加しました。選曲画面の枠、キー数の色、レベルの位置、COMBO 表示を改善しました。ノーツの高さはクライアントと[ウェブスキンエディター](https://tenriff-skin-editor.lastestarcorp.chatgpt.site/)で50〜400%です。[検証範囲](docs/release-1.7.9-gate.md)。
 
 **マルチプレイRate対応ビルド:** ロビーでリーダーが共通のRateを設定します。全員がこのprotocol v6ビルドを使用してください。旧v5クライアントとは接続できません。[案内](docs/multiplayer-rate-build.ko.md)（韓国語）。
 
-この配布版は **1.7.8 Sites 統合版**です。新しいフォルダーに展開し、`launch_win.bat` から起動して F10 でウェブアカウントを一度連携してください。対象となる新しいプレイのスコア・詳細スコア・精度・詳細精度を送信します。既存の計算式は変更しません。[接続ガイド](docs/sites-leaderboard.md)（韓国語）を参照してください。
+この配布版は **1.7.9 Sites 統合版**です。新しいフォルダーに展開し、`launch_win.bat` から起動して F10 でウェブアカウントを一度連携してください。対象となる新しいプレイのスコア・詳細スコア・精度・詳細精度を送信します。既存の計算式は変更しません。[接続ガイド](docs/sites-leaderboard.md)（韓国語）を参照してください。
 
 Language: [한국어](README.md) | [English](README.en.md) | [简体中文](README.zh-CN.md) | 日本語
 
-TenRiff は Windows GUI ベースの BMS リズムゲーム runtime/launcher です。現在のプロジェクト版は `1.7.8` で、譜面入力は BMS family（`.bms/.bme/.bml/.pms`）専用です。公開 package は BGA upscaler model を含まず、key-mode conversion 用の deterministic NK3 P64 graph と generalized pattern MLP を同梱します。license は MIT です。
+TenRiff は Windows GUI ベースの BMS リズムゲーム runtime/launcher です。現在のプロジェクト版は `1.7.9` で、譜面入力は BMS family（`.bms/.bme/.bml/.pms`）専用です。公開 package は BGA upscaler model を含まず、key-mode conversion 用の deterministic NK3 P64 graph と generalized pattern MLP を同梱します。license は MIT です。
 
-この README は導入文書です。現在の挙動、`1.7.8` project state、`1.5.1 fixed stable baseline` baseline、設定と設計文書は [`docs/README.ja.md`](docs/README.ja.md) から参照してください。
+この README は導入文書です。現在の挙動、`1.7.9` project state、`1.5.1 fixed stable baseline` baseline、設定と設計文書は [`docs/README.ja.md`](docs/README.ja.md) から参照してください。
 
 TenRiff のコードベースは、伝統的な長文設計書主導だけで積み上がったものではなく、高速な反復と実験を重視した `vibe coding` 的な性格を持つ作品でもあります。
 
-## 1.7.8 オーディオ・ライブラリ・プレイ改善
+## 1.7.9 メニュー・プロフィール・曲ソース改善
 
-ネイティブ Windows ASIO 出力を追加し、既定の WASAPI 出力も維持します。難易度表の選択画面から標準 LV、5キー Aery、7キー Aery、10キー Revive を選べます。`.trskin` ファイルでスキン設定と素材を別の PC に移せます。
+オプション → プロフィールで言語と文字サイズを変更し、選んだ画像を確認できます。ソース → ALL SONG で登録済みフォルダーをまとめて表示します。TENRIFF ロゴには控えめなホログラム効果を加え、TI マークは静止させます。4〜16キーの Luma Keys とウェブ・オフライン編集機能も引き続き利用できます。
 
-再開前の3秒カウントダウン、Session Mix 中の Esc 無視、累積進行時間による基準 BPM、LR2 参照段位ゲージを含みます。曲フォルダーの追加と一覧からの除去、Unicode パスの検証、相手退出後の結果保持も更新しました。
-
-変更は [CHANGELOG](CHANGELOG.md)、検証と ASIO 機器の確認範囲は [1.7.8 リリースゲート](docs/release-1.7.8-gate.md)を参照してください。
+[CHANGELOG](CHANGELOG.md) · [1.7.9 release gate](docs/release-1.7.9-gate.md)
 
 ## スクリーンショット
 

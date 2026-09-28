@@ -410,6 +410,8 @@ private:
     void persist_runtime_config();
     void refresh_song_source(bool force_reindex);
     void switch_song_source(const std::string& new_songs_path, bool force_reindex);
+    void switch_all_song_sources(bool force_reindex);
+    void open_selected_song_source();
     void exit_keymap_screen();
     void reload_chart_best_results();
     void append_chart_result_record(const menu_records::ParsedResultRecord& parsed,
@@ -599,6 +601,7 @@ private:
     std::string profile_dir_;
     std::string songs_path_;
     std::string cache_path_;
+    int all_source_song_count_ = -1;
     std::string last_chart_path_;
     std::string bms_editor_practice_path_;
     std::optional<double> bms_editor_practice_start_seconds_;
@@ -713,6 +716,7 @@ private:
     bool online_records_view_ = false;
     int song_select_nav_cursor_ = 0;
     bool first_run_profile_ = false;
+    uint64_t profile_avatar_revision_ = 0;
     bool profile_nickname_edit_active_ = false;
     std::string profile_nickname_before_edit_;
     bool help_overlay_visible_ = false;

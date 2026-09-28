@@ -6,7 +6,7 @@ Language: [한국어](localization.md) | [English](localization.en.md) | [日本
 
 客户端支持英语（`en`）、韩语（`ko`）和日语（`ja`），默认语言为`en`。中文文档不表示客户端已支持中文界面。
 
-在 Options → Graphics Settings → Language 中用左右键切换。界面立即更新，退出设置画面时保存。`jp`、`japanese`、`ja-jp`、`ja_JP`不区分大小写，统一保存为`ja`；未知值回退到英语。
+在 Options → Profile Setup → Language 或首次运行的 Quick Setup 中用左右键切换。语言和菜单字号立即更新并保存到当前配置档。`jp`、`japanese`、`ja-jp`、`ja_JP`不区分大小写，统一保存为`ja`；未知值回退到英语。
 
 ## 代码边界
 
@@ -32,7 +32,7 @@ python tools/audit_japanese_localization.py --json
 
 脚本检查显式翻译调用、画面标题、内置难度表及已知编辑器/加载状态。缺失、重复、空译文或未解析的动态键都会返回退出码1。使用运行时输出的覆盖数量。
 
-C++ 测试覆盖语言标识、双向循环、代表性文本及未知值保留。配置和图形设置测试覆盖三种语言的保存、加载和即时切换。
+C++ 测试覆盖语言标识、双向循环、代表性文本及未知值保留。配置测试覆盖三种语言的保存和加载；配置档设置测试覆盖语言行、首次运行选择和菜单字号。
 
 ## 限制
 

@@ -97,6 +97,33 @@ void MenuWindow::draw(const MenuRenderData& data) {
         invalidate_gameplay_note_sprite_cache();
     }
 
+    // A new selection can keep the same filename after the image is edited.
+    // Invalidate just the active/previous avatar, including cached decode failure;
+    // song jackets and other skin textures keep their existing cache entries.
+    const std::string* active_avatar = nullptr;
+    switch (data.kind) {
+        case MenuScreenKind::TitleMenu: active_avatar = &data.title.profile_avatar_path; break;
+        case MenuScreenKind::GenericList:
+            if (data.generic.profile_preview_visible) active_avatar = &data.generic.profile_avatar_path;
+            break;
+        case MenuScreenKind::SongSelect: active_avatar = &data.song_select.profile_avatar_path; break;
+        case MenuScreenKind::ResultScreen: active_avatar = &data.result.profile_avatar_path; break;
+        default: break;
+    }
+    if (active_avatar && (d2d_->applied_profile_avatar_revision != data.profile_avatar_revision ||
+                          d2d_->applied_profile_avatar_path != *active_avatar)) {
+        auto invalidate_avatar = [&](const std::string& path) {
+            if (path.empty()) return;
+            d2d_->song_card_preview_bitmaps.erase(path);
+            auto& lru = d2d_->song_card_preview_lru;
+            lru.erase(std::remove(lru.begin(), lru.end(), path), lru.end());
+        };
+        invalidate_avatar(d2d_->applied_profile_avatar_path);
+        invalidate_avatar(*active_avatar);
+        d2d_->applied_profile_avatar_path = *active_avatar;
+        d2d_->applied_profile_avatar_revision = data.profile_avatar_revision;
+    }
+
     auto set_theme_color = [&](ID2D1SolidColorBrush* brush,
                                std::string_view key,
                                const D2D1_COLOR_F& fallback) {
@@ -207,11 +234,20 @@ void MenuWindow::draw(const MenuRenderData& data) {
     } else if (data.kind == MenuScreenKind::GameplayHud) {
         static_cast<void>(load_song_card_preview_bitmap(data.gameplay.skin_background_path));
     }
+    // Avatar decoding is outside BeginDraw and shares the bounded image cache.
+    if (data.kind == MenuScreenKind::TitleMenu && !data.title.profile_avatar_path.empty()) {
+        static_cast<void>(load_song_card_preview_bitmap(data.title.profile_avatar_path));
+    }
+    if (data.kind == MenuScreenKind::GenericList && !data.generic.profile_avatar_path.empty()) {
+        static_cast<void>(load_song_card_preview_bitmap(data.generic.profile_avatar_path));
+    }
+    d2d_->requested_ui_text_scale = menu_ui_text_scale(data.ui_text_scale, data.kind == MenuScreenKind::GameplayHud);
     // Rebuild the text formats when the player picks a different UI font.
     const bool custom_fonts = native_overrides && (!native_style.fonts.empty() || !native_style.metrics.empty());
     if (const wchar_t* ui_family = data.ui_language == ui::Language::Japanese && data.ui_font == "default"
                                      ? L"Yu Gothic UI" : ui_font_family_for_token(data.ui_font);
         d2d_->ui_font_family != ui_family || custom_fonts != native_font_overrides_ ||
+        d2d_->applied_ui_text_scale != d2d_->requested_ui_text_scale ||
         (custom_fonts && native_font_revision_ != data.lobby_skin.revision)) {
         if (create_text_formats(ui_family, custom_fonts ? &native_style : nullptr)) {
             native_font_overrides_ = custom_fonts;
@@ -381,6 +417,8 @@ void MenuWindow::draw(const MenuRenderData& data) {
         format->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_LEADING);
     };
 
+#include "MenuWindow_draw_wordmark.inl"
+
     auto loc = [&](std::string_view english, std::string_view korean) {
         return ui::text(data.ui_language, english, korean);
     };
@@ -406,6 +444,15 @@ void MenuWindow::draw(const MenuRenderData& data) {
         d2d_->accent_brush->SetOpacity(saved_opacity);
     };
 
+    auto draw_native_panel_edge = [&](const D2D1_RECT_F& rect, float radius, uint32_t color, float strength = 1.0f) {
+        if (!native_motion_screen || !d2d_->native_menu_brush || strength <= 0.0f) return;
+        const auto edge = D2D1::RoundedRect(inset_rect(rect, 1.0f, 1.0f), radius, radius);
+        ctx->PushAxisAlignedClip(rect, D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
+        ctx->DrawRoundedRectangle(edge, native_color(color, 0.075f * strength), 6.0f);
+        ctx->DrawRoundedRectangle(edge, native_color(color, 0.55f * strength), 1.0f);
+        ctx->PopAxisAlignedClip();
+    };
+
     auto draw_glass_panel = [&](const D2D1_RECT_F& rect,
                                 float radius,
                                 float fill_opacity,
@@ -413,8 +460,8 @@ void MenuWindow::draw(const MenuRenderData& data) {
                                 bool strong_edge,
                                 float shadow_offset = 9.0f) {
         const D2D1_ROUNDED_RECT rr = D2D1::RoundedRect(rect, radius, radius);
-        // Native library surfaces use one fill and one edge. Imported skins retain
-        // their layered glass treatment and all existing layout slots.
+        // Native panels retain a crisp edge with a restrained, inward halo.
+        // Imported skins keep their existing layered glass and layout slots.
         if (modern_menu_screen) {
             if (d2d_->panel_brush) {
                 const float saved = d2d_->panel_brush->GetOpacity();
@@ -428,6 +475,8 @@ void MenuWindow::draw(const MenuRenderData& data) {
                 ctx->DrawRoundedRectangle(rr, d2d_->button_border_brush.Get(), 1.0f);
                 d2d_->button_border_brush->SetOpacity(saved);
             }
+            draw_native_panel_edge(rect, radius, strong_edge ? 0xA1E5F0 : 0x7B91AC,
+                                   strong_edge ? 0.85f : 0.50f + std::min(glow_strength, 0.5f));
             return;
         }
         const D2D1_RECT_F shadow_rect = offset_rect(rect, 0.0f, shadow_offset);

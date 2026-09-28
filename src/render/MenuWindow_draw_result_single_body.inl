@@ -141,11 +141,9 @@
         }
 
         const D2D1_RECT_F header_line = native_rect("result_single.rect.002", D2D1::RectF(54.0f, 38.0f, 1866.0f, 122.0f));
-        draw_result_text("TENRIFF",
-                         d2d_->header_format.Get(),
-                         native_rect("result_single.rect.003", D2D1::RectF(70.0f, 36.0f, 360.0f, 100.0f)),
-                         d2d_->text_brush.Get(),
-                         presentation.background);
+        draw_native_asset(native_menu_assets::kMark, D2D1::RectF(64, 38, 112, 96), presentation.background);
+        draw_native_wordmark(d2d_->header_format.Get(),
+                             native_rect("result_single.rect.003", D2D1::RectF(128, 36, 384, 100)), presentation.background);
         draw_result_text(result_loc("RESULT", "결과"),
                          d2d_->title_format.Get(),
                          native_rect("result_single.rect.004", D2D1::RectF(410.0f, 44.0f, 600.0f, 84.0f)),
@@ -264,7 +262,8 @@
                              d2d_->body_format.Get(),
                              native_rect("result_single.rect.016", D2D1::RectF(left, song_panel.top + 530.0f,
                                          left + metadata_width - 8.0f, song_panel.top + 558.0f)),
-                             d2d_->text_brush.Get(),
+                             modern_library_screen && index == 1 ? key_count_brush(data.result.key_count)
+                                                                  : d2d_->text_brush.Get(),
                              presentation.information);
         }
 
@@ -385,14 +384,14 @@
                              format_int_with_commas(data.result.max_score),
                          d2d_->title_format.Get(),
                          score_rect,
-                         d2d_->text_brush.Get(),
+                         modern_library_screen ? native_color(0xFFFFFF, 1) : d2d_->text_brush.Get(),
                          score_alpha * pulse_scale,
                          DWRITE_TEXT_ALIGNMENT_CENTER);
         draw_result_text(result_loc("SCORE", "점수"),
                          d2d_->hud_format.Get(),
                          native_rect("result_single.rect.018", D2D1::RectF(prism_center.x - 120.0f, 132.0f,
                                      prism_center.x + 120.0f, 160.0f)),
-                         d2d_->muted_brush.Get(),
+                         modern_library_screen ? native_color(0xFFFFFF, 1) : d2d_->muted_brush.Get(),
                          score_alpha,
                          DWRITE_TEXT_ALIGNMENT_CENTER);
         draw_result_text(result_loc("DETAIL SCORE", "상세 점수") + "  " +
@@ -401,7 +400,7 @@
                          d2d_->hud_format.Get(),
                          native_rect("result_single.rect.019", D2D1::RectF(prism_center.x - 180.0f, 238.0f,
                                      prism_center.x + 180.0f, 268.0f)),
-                         d2d_->accent_brush.Get(),
+                         modern_library_screen ? native_color(0xFFFFFF, 1) : d2d_->accent_brush.Get(),
                          score_alpha,
                          DWRITE_TEXT_ALIGNMENT_CENTER);
 
@@ -690,7 +689,7 @@
             {"GOOD", std::to_string(data.result.good), percent_for(data.result.good), native_palette("palette.a8ea58", D2D1::ColorF(0xA8EA58))},
             {"POOR", std::to_string(data.result.poor), percent_for(data.result.poor), native_palette("palette.ff6b7d", D2D1::ColorF(0xFF6B7D))},
             {"FAIL", std::to_string(data.result.bad), percent_for(data.result.bad), native_palette("palette.f2b84b", D2D1::ColorF(0xF2B84B))},
-            {result_loc("MAX COMBO", "최대 콤보"), std::to_string(data.result.max_combo),
+            {result_loc("MAX COMBO", "최대 콤보"), format_int_with_commas(data.result.max_combo) + " COMBO",
              data.result.full_combo ? result_loc("FULL COMBO", "풀 콤보") : "/ " + std::to_string(data.result.total_notes), native_palette("palette.f7fafd", D2D1::ColorF(0xF7FAFD))},
             {result_loc("ACCURACY", "정확도"), format_decimal(data.result.accuracy) + "%",
              result_loc("DETAIL", "상세") + " " + format_decimal(data.result.detailed_accuracy) + "%", native_palette("palette.63e9ff", D2D1::ColorF(0x63E9FF))},
@@ -714,7 +713,7 @@
             if (d2d_->accent_brush) {
                 const D2D1_COLOR_F saved_color = d2d_->accent_brush->GetColor();
                 const float saved_opacity = d2d_->accent_brush->GetOpacity();
-                d2d_->accent_brush->SetColor(result_statistics[index].color);
+                d2d_->accent_brush->SetColor(modern_library_screen && index >= 5 ? D2D1::ColorF(0xFFFFFF) : result_statistics[index].color);
                 const float zero_scale =
                     (index < 5 && result_statistics[index].value == "0") ? 0.70f : 1.0f;
                 d2d_->accent_brush->SetOpacity(alpha * zero_scale);

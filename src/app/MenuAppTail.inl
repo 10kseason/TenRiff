@@ -564,11 +564,13 @@ void MenuApp::update_gameplay_loading_state(int percent, std::string_view stage)
 
 std::string MenuApp::current_track_label() const {
     if (current_screen() == Screen::SongSelect && song_select_view_ == SongSelectView::Sources &&
+        selected_source_ == 0) return "ALL SONG";
+    if (current_screen() == Screen::SongSelect && song_select_view_ == SongSelectView::Sources &&
         !config_.ui.recent_song_sources.empty() &&
-        selected_source_ >= 0 &&
-        selected_source_ < static_cast<int>(config_.ui.recent_song_sources.size())) {
+        selected_source_ > 0 &&
+        selected_source_ <= static_cast<int>(config_.ui.recent_song_sources.size())) {
         return menu_songs::song_source_display_name(
-            config_.ui.recent_song_sources[static_cast<std::size_t>(selected_source_)]);
+            config_.ui.recent_song_sources[static_cast<std::size_t>(selected_source_ - 1)]);
     }
     if (selected_song_ >= 0 && selected_song_ < static_cast<int>(visible_song_count())) {
         if (const SongEntry* entry = visible_song_entry(static_cast<std::size_t>(selected_song_))) {
@@ -869,45 +871,67 @@ void MenuApp::populate_quick_setup_render_data(render::MenuRenderData& render) {
     render.generic.heading = first_run ? ui_text("Quick Setup", "빠른 설정")
                                        : ui_text("Profile Setup", "프로필 설정");
 
+    render.generic.profile_avatar_path = config_.ui.profile_avatar_path;
+    render.generic.profile_preview_visible = true;
+    append_menu_row(render.generic,
+                    ui_text("Language", "언어"),
+                    ui_language_label(config_.ui.language),
+                    settings_cursor_ == profile_setup::kLanguageRow,
+                    render::MenuHitTargetKind::SettingsRow,
+                    profile_setup::kLanguageRow,
+                    true,
+                    true);
+    const std::string menu_font_size = config::normalize_menu_font_size_token(config_.ui.menu_font_size);
+    append_menu_row(render.generic,
+                    ui_text("Menu Font Size", "메뉴 글자 크기"),
+                    menu_font_size == "extra_large" ? ui_text("Extra Large", "더 크게")
+                        : menu_font_size == "large" ? ui_text("Large", "크게")
+                        : ui_text("Normal", "보통"),
+                    settings_cursor_ == profile_setup::kMenuFontSizeRow,
+                    render::MenuHitTargetKind::SettingsRow,
+                    profile_setup::kMenuFontSizeRow,
+                    true,
+                    true);
+
     append_menu_row(render.generic,
                     ui_text("Songs Folder", "곡 폴더"),
-                    safe_ui_text(menu_songs::song_source_display_name(songs_path_),
+                    config_.ui.all_song_sources ? "ALL SONG" : safe_ui_text(menu_songs::song_source_display_name(songs_path_),
                                  ui_text("Choose Folder", "폴더 선택")),
-                    settings_cursor_ == 0,
+                    settings_cursor_ == profile_setup::kSongsFolderRow,
                     render::MenuHitTargetKind::SettingsRow,
-                    0,
+                    profile_setup::kSongsFolderRow,
                     true,
                     false);
     append_menu_row(render.generic,
                     ui_text("Gauge Shift Start", "게이지 시프트 시작"),
                     ui_gauge_label(config_.mode.gauge),
-                    settings_cursor_ == 1,
+                    settings_cursor_ == profile_setup::kGaugeRow,
                     render::MenuHitTargetKind::SettingsRow,
-                    1,
+                    profile_setup::kGaugeRow,
                     false,
                     true);
     append_menu_row(render.generic,
                     "Rate",
                     format_multiplier(config_.speed.rate),
-                    settings_cursor_ == 2,
+                    settings_cursor_ == profile_setup::kRateRow,
                     render::MenuHitTargetKind::SettingsRow,
-                    2,
+                    profile_setup::kRateRow,
                     false,
                     true);
     append_menu_row(render.generic,
                     ui_text("Visual Latency", "비주얼 레이턴시"),
                     format_signed_offset_ms(config_.visual_offset_ms),
-                    settings_cursor_ == 3,
+                    settings_cursor_ == profile_setup::kVisualLatencyRow,
                     render::MenuHitTargetKind::SettingsRow,
-                    3,
+                    profile_setup::kVisualLatencyRow,
                     false,
                     true);
     append_menu_row(render.generic,
                     ui_text("BMS Keysound", "BMS 키음"),
                     ui_keysound_policy_label(config_.audio_ui.bms_keysound_policy),
-                    settings_cursor_ == 4,
+                    settings_cursor_ == profile_setup::kKeysoundRow,
                     render::MenuHitTargetKind::SettingsRow,
-                    4,
+                    profile_setup::kKeysoundRow,
                     false,
                     true);
     std::string profile_backend_value = config_.input.rawinput ? "RawInput" : "Polling";
@@ -973,6 +997,8 @@ void MenuApp::populate_quick_setup_render_data(render::MenuRenderData& render) {
         render.generic.notes.push_back(ui_text("Changes on this screen are saved immediately to the active profile.",
                                                "이 화면의 변경 사항은 현재 프로필에 즉시 저장됩니다."));
     }
+    render.generic.notes.push_back(ui_text("Language and menu font size apply immediately and are saved to this profile.",
+                                           "언어와 메뉴 글자 크기는 즉시 적용되고 이 프로필에 저장됩니다."));
     render.generic.notes.push_back(ui_text("Nickname is shown in saved records and multiplayer. Avatar Image accepts local PNG/JPG files.",
                                            "닉네임은 저장 기록과 멀티플레이에 표시됩니다. 프로필 사진은 로컬 PNG/JPG 파일을 사용합니다."));
     render.generic.notes.push_back(ui_text("Recommended start: Gauge Normal, Rate 1.00x, Visual Latency 0ms, BMS Keysound Follow.",
@@ -988,6 +1014,7 @@ void MenuApp::populate_title_render_data(render::MenuRenderData& render,
                                          const MenuApp::BestResultRecord& current_best) {
     render.kind = render::MenuScreenKind::TitleMenu;
     render.title.profile = profile_display_name();
+    render.title.profile_avatar_path = config_.ui.profile_avatar_path;
     render.title.track = current_track;
     render.title.high_score = current_best.has_value ? current_best.best_score : 0;
     const bool no_songs_indexed = visible_song_count() == 0;
@@ -1588,6 +1615,8 @@ void MenuApp::publish_snapshot() {
     MenuSnapshot snapshot;
     render::MenuRenderData render;
     render.ui_language = ui_language();
+    render.ui_text_scale = config::menu_text_scale(config_.ui.menu_font_size);
+    render.profile_avatar_revision = profile_avatar_revision_;
     render.ui_font = config::normalize_skin_ui_font_token(config_.skin.ui_font);
     if (config::normalize_skin_source_token(config_.skin.source) == "tenriff" &&
         active_tenriff_skin_.found) {
@@ -1694,6 +1723,10 @@ void MenuApp::publish_snapshot() {
         render.loading_progress.visible = true;
         render.loading_progress.stage =
             menu_song_select::song_index_stage_label(progress.stage, ui_language());
+        if (config_.ui.all_song_sources && progress.source_total > 0) {
+            render.loading_progress.stage = "ALL SONG " + std::to_string(progress.source_index) +
+                "/" + std::to_string(progress.source_total) + " · " + render.loading_progress.stage;
+        }
         render.loading_progress.processed = std::max(0, progress.processed);
         render.loading_progress.total = progress.total;
         if (progress.total > 0) {
@@ -1707,7 +1740,7 @@ void MenuApp::publish_snapshot() {
                 progress.started_ns > 0 && now_ns > progress.started_ns
                     ? now_ns - progress.started_ns
                     : 0;
-            if (remaining > 0 && processed > 0 && elapsed_ns > 0) {
+            if (!config_.ui.all_song_sources && remaining > 0 && processed > 0 && elapsed_ns > 0) {
                 const double elapsed_seconds =
                     static_cast<double>(elapsed_ns) / 1'000'000'000.0;
                 const double eta_seconds = elapsed_seconds *
@@ -2001,7 +2034,7 @@ bool MenuApp::is_song_select_repeat_key(uint32_t keycode) const {
         case Screen::OptionsHub:
             return true;
         case Screen::QuickSetup:
-            return settings_cursor_ == 2 || settings_cursor_ == 3;
+            return profile_setup::supports_hold_adjustment(settings_cursor_);
         case Screen::SongSelect:
             return song_select_focus_ == SongSelectFocus::QuickSettings &&
                    song_quick_setting_cursor_ <= 1;
@@ -2640,6 +2673,8 @@ void MenuApp::populate_help_overlay(render::HelpOverlayData& target) const {
                 target.lines = {
                     ui_text("TenRiff already created a default profile and default keymap for this first launch.",
                             "TenRiff가 첫 실행용 기본 프로필과 기본 키 설정을 만들었습니다."),
+                    ui_text("Language and menu font size apply immediately and are saved to this profile.",
+                            "언어와 메뉴 글자 크기는 즉시 적용되고 이 프로필에 저장됩니다."),
                     ui_text("Songs Folder opens a picker on Enter or F2. You can also drag and drop a folder later.",
                             "곡 폴더는 Enter 또는 F2로 선택 창을 엽니다. 나중에 폴더를 드래그 앤 드롭해도 됩니다."),
                     ui_text("Recommended starting values are Gauge Normal, Rate 1.00x, Visual Latency 0ms, and BMS Keysound Follow.",
@@ -2654,6 +2689,8 @@ void MenuApp::populate_help_overlay(render::HelpOverlayData& target) const {
                 target.lines = {
                     ui_text("This screen edits the active profile shown at the top of the list.",
                             "이 화면은 목록 위에 표시된 현재 프로필을 편집합니다."),
+                    ui_text("Language and menu font size apply immediately and are saved to this profile.",
+                            "언어와 메뉴 글자 크기는 즉시 적용되고 이 프로필에 저장됩니다."),
                     ui_text("Songs Folder, Gauge, Rate, Visual Latency, and BMS Keysound are saved immediately.",
                             "곡 폴더, 게이지, Rate, 비주얼 레이턴시, BMS 키음 설정은 즉시 저장됩니다."),
                     ui_text("Use Keymap and the other Options screens for the remaining profile settings.",
@@ -2774,8 +2811,8 @@ void MenuApp::populate_help_overlay(render::HelpOverlayData& target) const {
                         "위 / 아래 키 또는 마우스 휠로 행을 선택합니다. 긴 목록은 오른쪽의 클릭 가능한 스크롤바를 표시합니다."),
                 ui_text("Display, Resolution, Refresh Hz, and VSync apply live while you adjust them.",
                         "표시 모드, 해상도, 주사율, VSync는 조정 중에도 즉시 적용됩니다."),
-                ui_text("Language switches the menu UI immediately. Visual Latency is in Skin Settings.",
-                        "언어는 메뉴 UI에 즉시 반영되고, 비주얼 레이턴시는 스킨 설정에 있습니다."),
+                ui_text("Language and menu font size are in Profile Setup. Visual Latency is in Skin Settings.",
+                        "언어와 메뉴 글자 크기는 프로필 설정에, 비주얼 레이턴시는 스킨 설정에 있습니다."),
                 ui_text("For Discord voice overlay, use Borderless or Windowed and pin the Voice widget at bottom-left.",
                         "Discord 음성 오버레이는 테두리 없음 또는 창 모드를 쓰고 Voice 위젯을 좌하단에 고정하세요."),
                 ui_text("Esc or Backspace saves and returns.",

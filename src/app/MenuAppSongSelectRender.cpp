@@ -212,8 +212,11 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
          : render.song_select.showing_records && selected_record ? selected_record->score :
          (current_best.has_value ? current_best.best_score : 0));
     render.song_select.current_source_name =
+        config_.ui.all_song_sources ? "ALL SONG" :
         safe_ui_text(menu_songs::song_source_display_name(songs_path_), ui_text("Songs", "곡"));
-    render.song_select.current_source_path = safe_ui_text_or_placeholder(songs_path_, "<invalid path>");
+    render.song_select.current_source_path = config_.ui.all_song_sources
+        ? ui_text("All registered song folders", "등록한 모든 곡 폴더")
+        : safe_ui_text_or_placeholder(songs_path_, "<invalid path>");
     render.song_select.index_profile_label = ui_song_index_profile_label(config_.mode.song_index_profile);
     render.song_select.background_upscale_prefer_npu = config_.graphics.background_upscale_prefer_npu;
     render.song_select.group_summary = song_group_detail_label(song_group_mode_, language);
@@ -305,7 +308,7 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
             const int64_t elapsed_ns = (progress.started_ns > 0 && now_ns > progress.started_ns)
                                            ? (now_ns - progress.started_ns)
                                            : 0;
-            if (remaining > 0 && processed > 0 && elapsed_ns > 0) {
+            if (!config_.ui.all_song_sources && remaining > 0 && processed > 0 && elapsed_ns > 0) {
                 const double elapsed_sec = static_cast<double>(elapsed_ns) / 1'000'000'000.0;
                 const double eta_sec =
                     elapsed_sec * static_cast<double>(remaining) / static_cast<double>(processed);
@@ -352,7 +355,7 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
     };
 
     if (render.song_select.showing_sources) {
-        const int total_sources = static_cast<int>(config_.ui.recent_song_sources.size());
+        const int total_sources = static_cast<int>(config_.ui.recent_song_sources.size()) + 1;
         if (total_sources > 0) {
             selected_source_ = clamp_int(selected_source_, 0, total_sources - 1);
             constexpr int visible = kSongSelectVisibleCardCount;
@@ -366,37 +369,55 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
             render.song_select.list_selected_index = selected_source_;
 
             for (int i = start; i < end; ++i) {
-                const std::string& source_path = config_.ui.recent_song_sources[static_cast<std::size_t>(i)];
                 render::SongCardData card;
+                card.song_index = i;
+                card.selected = (i == selected_source_);
+                if (i == 0) {
+                    card.title = "ALL SONG";
+                    card.artist = ui_text("All registered song folders", "등록한 모든 곡 폴더");
+                    card.detail = config_.ui.all_song_sources ? ui_text("CURRENT SOURCE", "현재 소스")
+                        : ui_text("Combined library · duplicates removed", "통합 라이브러리 · 중복 제외");
+                    card.level = std::max(0, all_source_song_count_);
+                    render.song_select.songs.push_back(std::move(card));
+                    continue;
+                }
+                const std::string& source_path = config_.ui.recent_song_sources[static_cast<std::size_t>(i - 1)];
                 card.title = safe_ui_text(menu_songs::song_source_display_name(source_path), "<invalid title>");
                 card.artist = safe_ui_text_or_placeholder(source_path, "<invalid artist>");
                 const auto count_it =
                     source_song_counts_.find(menu_songs::normalize_path_key(path_from_utf8(source_path)));
                 card.level = (count_it != source_song_counts_.end()) ? count_it->second : 0;
-                card.song_index = i;
-                card.selected = (i == selected_source_);
-                card.detail = safe_ui_text((menu_songs::normalize_path_key(path_from_utf8(source_path)) ==
+                card.detail = safe_ui_text((!config_.ui.all_song_sources && menu_songs::normalize_path_key(path_from_utf8(source_path)) ==
                                             menu_songs::normalize_path_key(path_from_utf8(songs_path_)))
                                                ? ui_text("CURRENT SOURCE", "현재 소스")
                                                : ui_text("RECENT SOURCE", "최근 소스"));
                 render.song_select.songs.push_back(std::move(card));
             }
 
-            const std::string& selected_source =
-                config_.ui.recent_song_sources[static_cast<std::size_t>(selected_source_)];
-            render.song_select.selected_source_name =
-                safe_ui_text(menu_songs::song_source_display_name(selected_source), ui_text("Songs", "곡"));
-            render.song_select.selected_source_path =
-                safe_ui_text_or_placeholder(selected_source, "<invalid path>");
-            const auto count_it =
-                source_song_counts_.find(menu_songs::normalize_path_key(path_from_utf8(selected_source)));
-            render.song_select.selected_source_song_count =
-                (count_it != source_song_counts_.end()) ? count_it->second : -1;
-            render.song_select.selected_source_active =
-                menu_songs::normalize_path_key(path_from_utf8(selected_source)) ==
-                menu_songs::normalize_path_key(path_from_utf8(songs_path_));
+            render.song_select.selected_source_all = selected_source_ == 0;
+            if (selected_source_ == 0) {
+                render.song_select.selected_source_name = "ALL SONG";
+                render.song_select.selected_source_path =
+                    ui_text("All registered song folders", "등록한 모든 곡 폴더");
+                render.song_select.selected_source_song_count = all_source_song_count_;
+                render.song_select.selected_source_active = config_.ui.all_song_sources;
+            } else {
+                const std::string& selected_source =
+                    config_.ui.recent_song_sources[static_cast<std::size_t>(selected_source_ - 1)];
+                render.song_select.selected_source_name =
+                    safe_ui_text(menu_songs::song_source_display_name(selected_source), ui_text("Songs", "곡"));
+                render.song_select.selected_source_path =
+                    safe_ui_text_or_placeholder(selected_source, "<invalid path>");
+                const auto count_it =
+                    source_song_counts_.find(menu_songs::normalize_path_key(path_from_utf8(selected_source)));
+                render.song_select.selected_source_song_count =
+                    (count_it != source_song_counts_.end()) ? count_it->second : -1;
+                render.song_select.selected_source_active =
+                    !config_.ui.all_song_sources && menu_songs::normalize_path_key(path_from_utf8(selected_source)) ==
+                    menu_songs::normalize_path_key(path_from_utf8(songs_path_));
+            }
         }
-        if (total_sources == 0) {
+        if (total_sources == 1) {
             render.song_select.empty_title = ui_text("NO SONG SOURCES", "불러온 곡 소스 없음");
             render.song_select.empty_message =
                 ui_text("Use SOURCES > Add Songs Folder, press F2, or drop a folder onto the window.",

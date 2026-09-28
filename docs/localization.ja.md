@@ -4,7 +4,7 @@ Language: [한국어](localization.md) | [English](localization.en.md) | 日本�
 
 ## 日本語への切り替え
 
-Options → Graphics Settings → Languageで「Japanese」を選びます。左右キーで英語 → 韓国語 → 日本語を切り替えられます。表示はすぐに変わり、設定画面から戻ると保存されます。
+Options → Profile Setup → Language、または初回のQuick Setupで「Japanese」を選びます。左右キーで英語 → 韓国語 → 日本語を切り替えられます。言語とメニュー文字サイズは選択時に適用され、現在のプロファイルに保存されます。
 
 設定キーは`ui.language`です。`en`・`ko`・`ja`に対応し、初期値は`en`です。`jp`・`japanese`・`ja-jp`・`ja_JP`も大文字・小文字を区別せず`ja`として読み込みます。不明な値は英語になります。
 

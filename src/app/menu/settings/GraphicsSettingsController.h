@@ -22,11 +22,11 @@ enum class GraphicsSettingId : std::uint8_t {
     BgaUpscaler = 7,
     OnnxModel = 8,
     PreferLowPowerDirectX = 9,
-    Language = 10,
-    Back = 11,
+    // Pointer events use the row ID as the visible row index.
+    Back = 10,
 };
 
-inline constexpr std::array<GraphicsSettingId, 12> kGraphicsSettingOrder{
+inline constexpr std::array<GraphicsSettingId, 11> kGraphicsSettingOrder{
     GraphicsSettingId::Display,
     GraphicsSettingId::Resolution,
     GraphicsSettingId::RefreshHz,
@@ -37,7 +37,6 @@ inline constexpr std::array<GraphicsSettingId, 12> kGraphicsSettingOrder{
     GraphicsSettingId::BgaUpscaler,
     GraphicsSettingId::OnnxModel,
     GraphicsSettingId::PreferLowPowerDirectX,
-    GraphicsSettingId::Language,
     GraphicsSettingId::Back,
 };
 

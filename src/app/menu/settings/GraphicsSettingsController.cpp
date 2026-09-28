@@ -1,5 +1,4 @@
 #include "app/menu/settings/GraphicsSettingsController.h"
-#include "ui/Localization.h"
 
 #include <algorithm>
 #include <array>
@@ -311,10 +310,6 @@ GraphicsSettingsEffects GraphicsSettingsController::apply_selected_action(
         case GraphicsSettingId::PreferLowPowerDirectX:
             runtime.graphics.background_upscale_prefer_npu =
                 !runtime.graphics.background_upscale_prefer_npu;
-            return mark_changed();
-        case GraphicsSettingId::Language:
-            runtime.ui.language = std::string(ui::language_token(
-                ui::cycle_language(ui::language_from_token(runtime.ui.language), direction)));
             return mark_changed();
         case GraphicsSettingId::Back:
             return {};

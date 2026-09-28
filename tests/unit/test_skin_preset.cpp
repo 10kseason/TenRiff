@@ -102,6 +102,36 @@ TEST_CASE("skin preset native settings round trip only appearance in Unicode pat
     CHECK(read_preset_test_file(file) == contents);
 }
 
+TEST_CASE("native skin presets clamp note height on export and import to 50 through 400 percent") {
+    PresetDirectory dir;
+    auto skin = tenriff::config::ConfigLoader{}.defaults().skin;
+    skin.note_height_scale = 0.1;
+    skin.note_height_scales["4k"] = 0.49;
+    skin.note_height_scales["7k"] = 0.5;
+    skin.note_height_scales["10k"] = 4.0;
+    skin.note_height_scales["16k"] = 4.01;
+    const auto exported = dir.path / "height-export.trskin";
+    require_preset_success(tenriff::app::export_skin_preset(exported.u8string(), skin, {}));
+    const auto roundtrip = tenriff::app::import_skin_preset(
+        exported.u8string(), (dir.path / "roundtrip").u8string());
+    require_preset_success(roundtrip);
+    CHECK(roundtrip.skin.note_height_scale == doctest::Approx(0.5));
+    CHECK(roundtrip.skin.note_height_scales.at("4k") == doctest::Approx(0.5));
+    CHECK(roundtrip.skin.note_height_scales.at("7k") == doctest::Approx(0.5));
+    CHECK(roundtrip.skin.note_height_scales.at("10k") == doctest::Approx(4.0));
+    CHECK(roundtrip.skin.note_height_scales.at("16k") == doctest::Approx(4.0));
+
+    const auto external = dir.path / "height-external.trskin";
+    write_preset_test_file(external, raw_preset(
+        R"({"source":"native","note_height_scale":8,"note_height_scales":{"4k":0.1,"16k":8}})"));
+    const auto imported = tenriff::app::import_skin_preset(
+        external.u8string(), (dir.path / "external").u8string());
+    require_preset_success(imported);
+    CHECK(imported.skin.note_height_scale == doctest::Approx(4.0));
+    CHECK(imported.skin.note_height_scales.at("4k") == doctest::Approx(0.5));
+    CHECK(imported.skin.note_height_scales.at("16k") == doctest::Approx(4.0));
+}
+
 TEST_CASE("skin preset carries all manifest assets and collision safe import survives source removal") {
     PresetDirectory dir;
     const auto catalog = dir.path / fs::u8path(u8"원본 스킨");
