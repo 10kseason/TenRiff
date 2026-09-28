@@ -119,12 +119,15 @@ struct UiConfig {
     std::string profile_nickname;
     std::string profile_avatar_path;
     std::string language = "en";
+    std::string menu_font_size = "normal";
     double result_tail_ms = 500.0;
     bool require_enter_to_exit = true;
     // Gameplay keeps the skin pointer on screen by default so players can drag the
     // playfield mid-song or run the game in a window alongside overlays.
     bool show_cursor_in_gameplay = true;
     std::string active_song_source;
+    // The aggregate library preserves the last individual source for switching back.
+    bool all_song_sources = false;
     std::vector<std::string> recent_song_sources;
     // Preserve an intentionally empty source list across relaunches.
     bool song_sources_initialized = false;
@@ -286,6 +289,8 @@ public:
 [[nodiscard]] std::string normalize_skin_scratch_position_token(std::string_view token);
 [[nodiscard]] std::string normalize_online_records_server_url(std::string_view value);
 [[nodiscard]] std::string normalize_ui_language_token(std::string_view token);
+[[nodiscard]] std::string normalize_menu_font_size_token(std::string_view token);
+[[nodiscard]] float menu_text_scale(std::string_view token);
 [[nodiscard]] std::string normalize_song_index_profile_token(std::string_view token);
 [[nodiscard]] std::string normalize_pacemaker_mode_token(std::string_view token);
 [[nodiscard]] std::string normalize_profile_nickname(std::string_view value);

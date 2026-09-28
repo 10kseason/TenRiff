@@ -40,6 +40,8 @@ TEST_CASE("Japanese UI covers menu settings loading result and BMS editing") {
     CHECK(text(Language::Japanese, "MAX COMBO", "최대 콤보") == "最大コンボ");
     CHECK(text(Language::Japanese, "Note added", "Note added") == "ノートを追加しました");
     CHECK(text(Language::Japanese, "Open Skin Editor", "스킨 에디터 열기") == "スキンエディターを開く");
+    CHECK(text(Language::Japanese, "Menu Font Size", "메뉴 글자 크기") == "メニューの文字サイズ");
+    CHECK(text(Language::Japanese, "Extra Large", "더 크게") == "とても大きい");
 }
 
 TEST_CASE("Localization retains English Korean and unknown user values verbatim") {

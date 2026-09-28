@@ -64,7 +64,7 @@
         "key_pressed": { "$ref": "#/$defs/laneAssets" },
         "lane_map": { "$ref": "#/$defs/laneMap" },
         "note_width_ratio": { "type": "number", "minimum": 0.1, "maximum": 4.0 },
-        "note_height_ratio": { "type": "number", "minimum": 0.1, "maximum": 4.0 },
+        "note_height_ratio": { "type": "number", "minimum": 0.5, "maximum": 4.0 },
         "note_aspect": { "enum": ["stretch", "contain", "width"] },
         "note_rotations": { "type": "array", "maxItems": 16, "items": { "type": "number" } },
         "key_rotations": { "type": "array", "maxItems": 16, "items": { "type": "number" } },
@@ -218,7 +218,7 @@
           "additionalProperties": { "$ref": "#/$defs/gameplayMode" }
         },
         "note_width_ratio": { "type": "number", "minimum": 0.1, "maximum": 4.0 },
-        "note_height_ratio": { "type": "number", "minimum": 0.1, "maximum": 4.0 },
+        "note_height_ratio": { "type": "number", "minimum": 0.5, "maximum": 4.0 },
         "note_aspect": {
           "description": "How note art fills its lane rect. 'width' keeps arrows square.",
           "enum": ["stretch", "contain", "width"]

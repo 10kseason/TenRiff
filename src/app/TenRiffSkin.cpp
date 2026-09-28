@@ -20,6 +20,7 @@
 #include <windows.h>
 #endif
 
+#include "config/Config.h"
 #include "config/SimpleJson.h"
 #include "util/Utf8Compat.h"
 
@@ -1156,7 +1157,9 @@ TenRiffSkinDefinition load_tenriff_skin_folder(std::string_view folder_utf8,
                                                definition, "gameplay.")) {
             definition.gameplay.imported_note_width_ratio = *ratio;
         }
-        if (const auto ratio = optional_number(gameplay, "note_height_ratio", 0.1f, 4.0f,
+        if (const auto ratio = optional_number(gameplay, "note_height_ratio",
+                                               static_cast<float>(config::kNoteHeightScaleMin),
+                                               static_cast<float>(config::kNoteHeightScaleMax),
                                                definition, "gameplay.")) {
             definition.gameplay.imported_note_height_ratio = *ratio;
         }

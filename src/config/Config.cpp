@@ -697,6 +697,9 @@ void apply_config_object(const JsonObject& root, RuntimeConfig& config) {
         config.ui.profile_avatar_path =
             normalize_profile_avatar_path(get_string(*ui, "profile_avatar_path", config.ui.profile_avatar_path));
         config.ui.language = normalize_ui_language(get_string(*ui, "language", config.ui.language));
+        config.ui.menu_font_size = normalize_menu_font_size_token(
+            get_string(*ui, "menu_font_size", config.ui.menu_font_size));
+        config.ui.all_song_sources = get_bool(*ui, "all_song_sources", config.ui.all_song_sources);
         config.ui.result_tail_ms = get_number(*ui, "result_tail_ms", config.ui.result_tail_ms);
         config.ui.require_enter_to_exit = get_bool(*ui, "require_enter_to_exit", config.ui.require_enter_to_exit);
         config.ui.show_cursor_in_gameplay =
@@ -1168,6 +1171,8 @@ JsonValue build_json_root(const RuntimeConfig& config) {
     ui.emplace("profile_nickname", JsonValue{normalize_profile_nickname(config.ui.profile_nickname)});
     ui.emplace("profile_avatar_path", JsonValue{normalize_profile_avatar_path(config.ui.profile_avatar_path)});
     ui.emplace("language", JsonValue{normalize_ui_language(config.ui.language)});
+    ui.emplace("menu_font_size", JsonValue{normalize_menu_font_size_token(config.ui.menu_font_size)});
+    ui.emplace("all_song_sources", JsonValue{config.ui.all_song_sources});
     ui.emplace("result_tail_ms", JsonValue{config.ui.result_tail_ms});
     ui.emplace("require_enter_to_exit", JsonValue{config.ui.require_enter_to_exit});
     ui.emplace("show_cursor_in_gameplay", JsonValue{config.ui.show_cursor_in_gameplay});
@@ -1389,6 +1394,23 @@ std::string normalize_profile_avatar_path(std::string_view value) {
 
 std::string normalize_ui_language_token(std::string_view token) {
     return normalize_ui_language(std::string(token));
+}
+
+std::string normalize_menu_font_size_token(std::string_view token) {
+    std::string value(token);
+    std::transform(value.begin(), value.end(), value.begin(), [](unsigned char ch) {
+        return static_cast<char>(std::tolower(ch));
+    });
+    if (value == "large") return "large";
+    if (value == "extra_large") return "extra_large";
+    return "normal";
+}
+
+float menu_text_scale(std::string_view token) {
+    const std::string normalized = normalize_menu_font_size_token(token);
+    if (normalized == "large") return 1.15f;
+    if (normalized == "extra_large") return 1.30f;
+    return 1.0f;
 }
 
 std::vector<std::string> supported_skin_mode_tokens() {
@@ -1980,6 +2002,8 @@ RuntimeConfig ConfigLoader::defaults() const {
     config.ui.profile_nickname.clear();
     config.ui.profile_avatar_path.clear();
     config.ui.language = "en";
+    config.ui.menu_font_size = "normal";
+    config.ui.all_song_sources = false;
     config.ui.result_tail_ms = 500.0;
     config.ui.require_enter_to_exit = true;
     config.ui.show_cursor_in_gameplay = true;

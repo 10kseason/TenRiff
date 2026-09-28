@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.7.9] - 2026-09-28
+
+- Add Normal / Large / Extra Large menu text sizes. Move language selection into Profile and first-run Quick Setup, saving changes immediately.
+- Show the selected profile photo in Profile and on the title screen. Refresh reselected photos even when the path is unchanged, without locking the original file.
+- Add ALL SONG to combine registered song folders. Reuse valid caches, scan missing caches sequentially, deduplicate overlapping chart paths and preserve per-folder caches when a scan is cancelled.
+- Improve option-card colors, Song Select panel outlines and digital navigation tabs. Keep score, accuracy and maximum combo white; show maximum combo with a COMBO suffix.
+- Align level and other chart-stat values, distinguish 4K–16K mode labels by color, and add a subtle TENRIFF hologram with a static TI mark. Reduced Motion disables logo animation.
+- Limit user note height to 50–400% in the client, skin schema and web/offline editor; fix percentages above 200% being displayed as 200%.
+- See [release scope and verification](docs/release-1.7.9-gate.md) and [usage notes](docs/menu-profile-library-polish.ko.md).
+
 ## [1.7.8] - 2026-09-28
 
 - Add original native menu assets and short entrance, focus and result animations; add Japanese client UI.

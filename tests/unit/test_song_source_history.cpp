@@ -4,6 +4,18 @@
 #include <filesystem>
 #include <fstream>
 
+TEST_CASE("ALL SONG source-browser row is never a removable folder") {
+    using tenriff::app::source_browser_history_index;
+    CHECK_FALSE(source_browser_history_index(0, 0));
+    CHECK_FALSE(source_browser_history_index(0, 3));
+    CHECK_FALSE(source_browser_history_index(-1, 3));
+    CHECK_FALSE(source_browser_history_index(4, 3));
+    REQUIRE(source_browser_history_index(1, 3));
+    CHECK(*source_browser_history_index(1, 3) == 0);
+    REQUIRE(source_browser_history_index(3, 3));
+    CHECK(*source_browser_history_index(3, 3) == 2);
+}
+
 TEST_CASE("source removal only removes the saved reference and preserves chart files") {
     namespace fs = std::filesystem;
     const auto base = fs::temp_directory_path() / fs::u8path(u8"소스_목록_삭제_") /

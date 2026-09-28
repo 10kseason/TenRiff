@@ -90,3 +90,47 @@ TEST_CASE("native menu nonfinite timing overrides fall back to normal speed and 
         CHECK(motion.entrance() == doctest::Approx(normal.entrance()));
     }
 }
+
+TEST_CASE("menu text scale restores gameplay formats and rejects invalid input") {
+    using tenriff::render::menu_ui_text_scale;
+    CHECK(menu_ui_text_scale(1.15f, false) == doctest::Approx(1.15f));
+    CHECK(menu_ui_text_scale(1.30f, false) == doctest::Approx(1.30f));
+    CHECK(menu_ui_text_scale(1.30f, true) == 1.0f);
+    CHECK(menu_ui_text_scale(99.0f, false) == doctest::Approx(1.30f));
+    CHECK(menu_ui_text_scale(-1.0f, false) == 1.0f);
+    CHECK(menu_ui_text_scale(std::numeric_limits<float>::quiet_NaN(), false) == 1.0f);
+    CHECK(menu_ui_text_scale(std::numeric_limits<float>::infinity(), false) == 1.0f);
+}
+
+TEST_CASE("wordmark reduced motion disables sparkle and glitch at every phase") {
+    using tenriff::render::native_wordmark_motion;
+    for (double seconds : {0.0, 1.0, 6.85, 10.0, 1e9}) {
+        const auto still = native_wordmark_motion(seconds, false);
+        CHECK(still.glitch == 0.0f);
+        CHECK(still.sparkle == 0.0f);
+        CHECK(still.scan == doctest::Approx(0.35f));
+        CHECK(still.bloom == doctest::Approx(0.10f));
+    }
+    CHECK(native_wordmark_motion(std::numeric_limits<double>::quiet_NaN(), true).glitch == 0.0f);
+    CHECK(native_wordmark_motion(-1.0, true).sparkle == 0.0f);
+}
+
+TEST_CASE("wordmark interference stays brief and all visual offsets are bounded") {
+    using tenriff::render::native_wordmark_motion;
+    int glitch_samples = 0;
+    for (int index = 0; index < 920; ++index) {
+        const auto frame = native_wordmark_motion(index * 0.01, true);
+        CHECK(frame.bloom >= 0.074f);
+        CHECK(frame.bloom <= 0.126f);
+        CHECK(frame.sparkle >= 0.0f);
+        CHECK(frame.sparkle <= 0.421f);
+        CHECK(frame.scan >= 0.0f);
+        CHECK(frame.scan < 1.0f);
+        CHECK(frame.sparkle_x >= 0.0f);
+        CHECK(frame.sparkle_x < 1.0f);
+        CHECK(std::abs(frame.glitch) <= 2.60f);
+        if (frame.glitch != 0.0f) ++glitch_samples;
+    }
+    CHECK(glitch_samples > 0);
+    CHECK(glitch_samples <= 18); // At most 180ms within a 9.2s cycle.
+}

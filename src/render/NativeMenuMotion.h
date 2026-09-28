@@ -12,6 +12,36 @@ inline float menu_ease_out(float progress) {
     return 1.0f - t * t * t;
 }
 
+// UI magnification is presentation-only. Entering gameplay restores the
+// original shared formats, including headers reused by the playfield HUD.
+inline float menu_ui_text_scale(float requested, bool gameplay) {
+    return gameplay || !std::isfinite(requested) ? 1.0f : std::clamp(requested, 1.0f, 1.30f);
+}
+
+struct NativeWordmarkMotion {
+    float bloom = 0.10f;
+    float scan = 0.35f;
+    float sparkle = 0.0f;
+    float sparkle_x = 0.0f;
+    float glitch = 0.0f;
+};
+
+inline NativeWordmarkMotion native_wordmark_motion(double seconds, bool moving) {
+    NativeWordmarkMotion value;
+    if (!moving || !std::isfinite(seconds) || seconds < 0.0) return value;
+    // One short, low-amplitude interference burst per 9.2 seconds. Reduced
+    // motion never enters this path; it retains the still holographic tint.
+    const double cycle = std::fmod(seconds, 9.2);
+    value.bloom = 0.10f + 0.025f * static_cast<float>(std::sin(seconds * 1.3));
+    value.scan = static_cast<float>(std::fmod(seconds * 0.12 + 0.35, 1.0));
+    value.sparkle_x = static_cast<float>(std::fmod(seconds * 0.085 + 0.19, 1.0));
+    value.sparkle = 0.42f * std::pow(std::max(0.0f, static_cast<float>(std::sin(seconds * 1.7))), 8.0f);
+    if (cycle >= 6.8 && cycle < 6.98) {
+        value.glitch = static_cast<float>(std::sin((cycle - 6.8) * 95.0)) * 2.6f;
+    }
+    return value;
+}
+
 // Render-thread state only. Never changes navigation, audio, scores or hit targets.
 // Fixed slots avoid allocations while scrolling large libraries.
 class NativeMenuMotion {

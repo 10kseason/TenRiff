@@ -200,6 +200,35 @@ TEST_CASE("TenRiff native menu-only skins keep native receptors until gameplay i
     CHECK_FALSE(load_gameplay("").native_gameplay_fallback);
 }
 
+TEST_CASE("TenRiff note height ratios accept 50 through 400 percent with safe invalid fallback") {
+    TempDirGuard temp{make_temp_dir()};
+    REQUIRE(!temp.path.empty());
+    const auto skin = temp.path / "HeightBounds";
+    const auto load_ratio = [&](double ratio, bool per_mode) {
+        const std::string value = "\"note_height_ratio\":" + std::to_string(ratio);
+        write_file(skin / "skin.json",
+            "{\"format\":\"tenriff-skin\",\"version\":1,\"name\":\"Height\",\"gameplay\":{" +
+            (per_mode ? "\"modes\":{\"16k\":{" + value + "}}" : value) + "}}");
+        return tenriff::app::load_tenriff_skin_folder(skin.u8string(), 16);
+    };
+    for (bool per_mode : {false, true}) {
+        for (double valid : {0.5, 1.0, 4.0}) {
+            const auto loaded = load_ratio(valid, per_mode);
+            REQUIRE(loaded.found);
+            CHECK(loaded.warnings.empty());
+            CHECK(loaded.gameplay.imported_note_height_ratio == doctest::Approx(valid));
+        }
+        for (double invalid : {0.49, 4.01}) {
+            const auto loaded = load_ratio(invalid, per_mode);
+            REQUIRE(loaded.found);
+            CHECK(loaded.gameplay.imported_note_height_ratio == doctest::Approx(1.0));
+            CHECK(std::any_of(loaded.warnings.begin(), loaded.warnings.end(), [](const auto& warning) {
+                return warning.find("note_height_ratio") != std::string::npos;
+            }));
+        }
+    }
+}
+
 TEST_CASE("TenRiff native menu invalid fields fall back without leaking out of the skin") {
     TempDirGuard temp{make_temp_dir()};
     REQUIRE(!temp.path.empty());

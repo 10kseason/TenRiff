@@ -1,8 +1,10 @@
 #include "app/SongIndexerThread.h"
 
 #include <filesystem>
+#include <iostream>
 #include <string>
 
+#include "app/SongSourceAggregate.h"
 #include "timing/HighResClock.h"
 
 namespace tenriff::app {
@@ -31,14 +33,43 @@ bool SongIndexerThread::start(const std::string& songs_path,
     progress_processed_.store(0, std::memory_order_release);
     progress_stage_.store(static_cast<int>(SongIndexProgressStage::ScanningFiles), std::memory_order_release);
     progress_started_ns_.store(timing::HighResClock::now_ns(), std::memory_order_release);
+    progress_source_index_.store(1, std::memory_order_release);
+    progress_source_total_.store(1, std::memory_order_release);
     {
         std::lock_guard<std::mutex> lock(mutex_);
         result_ = {};
         warnings_.clear();
+        source_counts_.clear();
         has_result_ = false;
     }
     is_running_.store(true, std::memory_order_release);
     thread_ = std::thread(&SongIndexerThread::thread_main, this, songs_path, cache_path, options);
+    return true;
+}
+
+bool SongIndexerThread::start_sources(const std::vector<std::string>& source_roots,
+                                     const std::string& profile_root,
+                                     const SongIndexOptions& options,
+                                     bool force_rescan) {
+    if (is_running_.load(std::memory_order_acquire)) return true;
+    if (thread_.joinable()) thread_.join();
+    should_stop_.store(false, std::memory_order_release);
+    progress_total_.store(-1, std::memory_order_release);
+    progress_processed_.store(0, std::memory_order_release);
+    progress_stage_.store(static_cast<int>(SongIndexProgressStage::ScanningFiles), std::memory_order_release);
+    progress_started_ns_.store(timing::HighResClock::now_ns(), std::memory_order_release);
+    progress_source_index_.store(0, std::memory_order_release);
+    progress_source_total_.store(0, std::memory_order_release);
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        result_ = {};
+        warnings_.clear();
+        source_counts_.clear();
+        has_result_ = false;
+    }
+    is_running_.store(true, std::memory_order_release);
+    thread_ = std::thread(&SongIndexerThread::sources_thread_main, this, source_roots,
+                          profile_root, options, force_rescan);
     return true;
 }
 
@@ -51,6 +82,7 @@ void SongIndexerThread::stop() {
         std::lock_guard<std::mutex> lock(mutex_);
         result_ = {};
         warnings_.clear();
+        source_counts_.clear();
         has_result_ = false;
     }
     is_running_.store(false, std::memory_order_release);
@@ -62,20 +94,59 @@ SongIndexerThread::Progress SongIndexerThread::progress() const {
     value.total = progress_total_.load(std::memory_order_acquire);
     value.processed = progress_processed_.load(std::memory_order_acquire);
     value.started_ns = progress_started_ns_.load(std::memory_order_acquire);
+    value.source_index = progress_source_index_.load(std::memory_order_acquire);
+    value.source_total = progress_source_total_.load(std::memory_order_acquire);
     return value;
 }
 
-bool SongIndexerThread::poll_result(SongIndex& out, std::vector<std::string>& warnings) {
+bool SongIndexerThread::poll_result(SongIndex& out, std::vector<std::string>& warnings,
+                                   std::unordered_map<std::string, int>* source_counts) {
     std::lock_guard<std::mutex> lock(mutex_);
     if (!has_result_) {
         return false;
     }
     out = std::move(result_);
     warnings = std::move(warnings_);
+    if (source_counts) *source_counts = std::move(source_counts_);
     result_ = {};
     warnings_.clear();
+    source_counts_.clear();
     has_result_ = false;
     return true;
+}
+
+void SongIndexerThread::sources_thread_main(std::vector<std::string> source_roots,
+                                           std::string profile_root,
+                                           SongIndexOptions options,
+                                           bool force_rescan) {
+    const auto stop_requested = [this]() {
+        return should_stop_.load(std::memory_order_acquire);
+    };
+    try {
+        auto combined = aggregate_song_sources(
+            source_roots, profile_root, options,
+            [this](const SongSourceAggregateProgress& update) {
+                progress_stage_.store(static_cast<int>(update.source.stage), std::memory_order_release);
+                progress_total_.store(update.source.total, std::memory_order_release);
+                progress_processed_.store(update.source.processed, std::memory_order_release);
+                progress_source_index_.store(update.source_index, std::memory_order_release);
+                progress_source_total_.store(update.source_total, std::memory_order_release);
+            }, stop_requested, force_rescan);
+        if (!combined.cancelled && !stop_requested()) {
+            std::lock_guard<std::mutex> lock(mutex_);
+            result_ = std::move(combined.index);
+            warnings_ = std::move(combined.warnings);
+            source_counts_ = std::move(combined.source_counts);
+            has_result_ = true;
+        }
+    } catch (const std::exception& e) {
+        // Never replace a user's visible library with an incomplete aggregate
+        // when setup/allocation fails before a complete result can be produced.
+        std::cerr << "[warn] Song source aggregation exception: " << e.what() << std::endl;
+    } catch (...) {
+        std::cerr << "[warn] Song source aggregation exception: unknown." << std::endl;
+    }
+    is_running_.store(false, std::memory_order_release);
 }
 
 void SongIndexerThread::thread_main(std::string songs_path, std::string cache_path, SongIndexOptions options) {
@@ -129,7 +200,7 @@ void SongIndexerThread::thread_main(std::string songs_path, std::string cache_pa
                 warnings.push_back("Failed to create song index cache directory: " + ec.message());
             } else {
                 std::string save_error;
-                if (!save_song_index(cache_path,
+                if (!save_song_source_cache_atomically(cache_path,
                                      index,
                                      options,
                                      &save_error,

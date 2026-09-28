@@ -1,11 +1,19 @@
 #pragma once
 
 #include <algorithm>
+#include <optional>
 #include "app/MenuSongUtils.h"
 #include "config/Config.h"
 #include "util/Utf8Compat.h"
 
 namespace tenriff::app {
+
+// Source-browser row zero is the virtual ALL SONG collection. Keep this mapping
+// at the boundary so it can never be mistaken for a deletable history entry.
+inline std::optional<int> source_browser_history_index(int row, std::size_t source_count) {
+    if (row <= 0 || static_cast<std::size_t>(row) > source_count) return std::nullopt;
+    return row - 1;
+}
 
 // Removes only the saved reference. No filesystem mutation is performed here.
 inline bool remove_song_source_history(config::UiConfig& ui, int& selected) {

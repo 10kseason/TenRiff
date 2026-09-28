@@ -216,6 +216,8 @@ Gauge Shift는 항상 적용됩니다. `mode.gauge`의 `ex_hard / hard / normal 
 | `profile_nickname` | string; UTF-8 ≤48 bytes | 표시 이름. 비면 프로필 ID를 사용하며 공백·제어문자를 정리. |
 | `profile_avatar_path` | string; UTF-8 ≤2048 bytes | 로컬 PNG/JPG 아바타 경로. |
 | `language` | `en`, `ko`, `ja`; `en` | UI 언어. 다른 값은 en으로 정규화. |
+| `menu_font_size` | `normal`, `large`, `extra_large`; `normal` | 프로필/첫 실행에서 보통·크게·더 크게 선택. 메뉴 글자 100%·115%·130%, 게임플레이 스킨 글자는 별도 유지. |
+| `all_song_sources` | bool; `false` | `ALL SONG` 통합 목록을 다음 실행에서도 복원. 등록된 폴더 캐시를 순서대로 읽고 경로가 같은 차트는 한 번만 표시. |
 | `result_tail_ms` | double; `500` ms | 판정 완료 후 결과 전환 시 추가 대기 시간. 차트 오디오 종료 시점도 함께 고려합니다. |
 | `require_enter_to_exit` | bool; `true` | 읽기·저장 호환 필드. 현재 Windows 결과 입력 경로는 이 값으로 자동 종료하지 않습니다. |
 | `show_cursor_in_gameplay` | bool; `true` | 인게임 마우스 포인터 표시. |

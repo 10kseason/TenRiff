@@ -75,6 +75,8 @@
   "ui": {
     "profile_nickname": "",
     "language": "en",
+    "menu_font_size": "normal",
+    "all_song_sources": false,
     "result_tail_ms": 500,
     "require_enter_to_exit": true,
     "difficulty_table_path": "",

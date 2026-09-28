@@ -216,6 +216,8 @@ chart loader/indexer 仅支持 BMS family（`.bms/.bme/.bml/.pms`）。旧 `enab
 | `profile_nickname` | string; UTF-8 ≤48 bytes | 显示名称；为空时使用配置 ID，并规范化空白与控制字符。 |
 | `profile_avatar_path` | string; UTF-8 ≤2048 bytes | 本地 PNG/JPG 头像路径。 |
 | `language` | `en`, `ko`, `ja`; `en` | UI 语言；无效值规范化为 en。 |
+| `menu_font_size` | `normal`, `large`, `extra_large`; `normal` | 配置档和首次设置中的菜单字号：100%、115%、130%。游戏内字体继续由皮肤控制。 |
+| `all_song_sources` | bool; `false` | 恢复 ALL SONG，合并已登记文件夹的缓存并去除相同谱面路径的重复项。 |
 | `result_tail_ms` | double; `500` ms | 判定完成后结果切换的额外等待时间，同时考虑谱面音频结束时刻。 |
 | `require_enter_to_exit` | bool; `true` | 为读写兼容保留；当前 Windows 结果输入路径不使用此值自动退出。 |
 | `show_cursor_in_gameplay` | bool; `true` | 游戏中显示鼠标指针。 |

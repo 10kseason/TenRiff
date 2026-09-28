@@ -21,7 +21,7 @@
             }
             if (notes.empty()) notes = wloc("Select an item to open it or change its value. Press F1 for keyboard help.",
                                             "항목을 선택해 열거나 값을 바꿀 수 있습니다. 키보드 조작은 F1 도움말을 참고하세요.");
-            const float line_height = native_metric("generic_help.line_height", 26.0f);
+            const float line_height = native_metric("generic_help.line_height", 26.0f) * d2d_->applied_ui_text_scale;
             const float width = rect.right - rect.left - 48.0f;
             const float page_height = std::floor((rect.bottom - rect.top - 140.0f) / line_height) * line_height;
             if (width <= 0 || page_height < line_height || !d2d_->dwrite_factory || !d2d_->body_format) return;
@@ -35,7 +35,7 @@
                 d2d_->generic_help_layout->SetWordWrapping(DWRITE_WORD_WRAPPING_WRAP);
                 d2d_->generic_help_layout->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_LEADING);
                 d2d_->generic_help_layout->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_NEAR);
-                d2d_->generic_help_layout->SetLineSpacing(DWRITE_LINE_SPACING_METHOD_UNIFORM, line_height, 20.0f);
+                d2d_->generic_help_layout->SetLineSpacing(DWRITE_LINE_SPACING_METHOD_UNIFORM, line_height, 20.0f * d2d_->applied_ui_text_scale);
                 d2d_->generic_help_text = signature;
                 d2d_->generic_help_width = width;
                 generic_help_page_.store(0, std::memory_order_relaxed);
