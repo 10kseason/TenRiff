@@ -76,6 +76,7 @@ struct ReplayVerificationResult;
 
 class MenuApp {
     friend struct MenuAppAudioSettingsTestAccess;
+    friend struct MenuAppSongSourceTestAccess;
 public:
     MenuApp();
     ~MenuApp();

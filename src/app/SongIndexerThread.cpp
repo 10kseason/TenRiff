@@ -137,6 +137,10 @@ void SongIndexerThread::sources_thread_main(std::vector<std::string> source_root
             result_ = std::move(combined.index);
             warnings_ = std::move(combined.warnings);
             source_counts_ = std::move(combined.source_counts);
+            // MenuApp publishes a snapshot as soon as it polls this result.
+            // Publish completion under the same lock so that snapshot cannot
+            // retain a running/loading state after consuming the final list.
+            is_running_.store(false, std::memory_order_release);
             has_result_ = true;
         }
     } catch (const std::exception& e) {
@@ -228,6 +232,7 @@ void SongIndexerThread::thread_main(std::string songs_path, std::string cache_pa
         std::lock_guard<std::mutex> lock(mutex_);
         result_ = std::move(index);
         warnings_ = std::move(warnings);
+        is_running_.store(false, std::memory_order_release);
         has_result_ = true;
     }
 

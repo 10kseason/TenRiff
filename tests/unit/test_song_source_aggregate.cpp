@@ -3,6 +3,7 @@
 #include <chrono>
 #include <filesystem>
 #include <fstream>
+#include <memory>
 #include <string>
 #include <thread>
 #include <unordered_map>
@@ -12,6 +13,26 @@
 #include "app/SongIndexerThread.h"
 #include "app/SongSourceAggregate.h"
 #include "util/Utf8Compat.h"
+
+#ifdef _WIN32
+#include "app/MenuApp.h"
+
+namespace tenriff::app {
+struct MenuAppSongSourceTestAccess {
+    static render::MenuRenderData render_index(SongIndex index, const std::vector<std::string>& roots) {
+        auto menu = std::make_unique<MenuApp>();
+        menu->config_.ui.all_song_sources = true;
+        menu->config_.ui.recent_song_sources = roots;
+        menu->songs_path_ = roots.front();
+        menu->song_select_view_ = MenuApp::SongSelectView::Songs;
+        menu->update_song_list(std::move(index));
+        render::MenuRenderData render;
+        menu->populate_song_select_render_data(render, {}, {}, nullptr);
+        return render;
+    }
+};
+}  // namespace tenriff::app
+#endif
 
 namespace {
 namespace fs = std::filesystem;
@@ -163,6 +184,125 @@ TEST_CASE("ALL SONG uses a valid empty cache and scans only roots missing a comp
     CHECK(combined.warnings.front().find("Songs path not found") != std::string::npos);
     REQUIRE_FALSE(sources.empty());
     for (std::size_t i = 1; i < sources.size(); ++i) CHECK(sources[i] >= sources[i - 1]);
+}
+
+TEST_CASE("ALL SONG indexer publishes both sides of a missing source in any position") {
+    for (int missing_position : {0, 1, 2}) {
+        for (int scan_mode : {0, 1, 2}) {
+            AggregateFixture f;
+            const auto first = f.source("first"), last = f.source("last");
+            const auto missing = f.base / fs::u8path(u8"없는_폴더");
+            write_chart(first / "one.bms", "First scanned");
+            write_chart(last / "two.bms", "Last scanned");
+            if (scan_mode != 0) {
+                REQUIRE(save_song_index(f.cache(first), SongIndex{{cached_entry("one.bms", "First cached")}}));
+                REQUIRE(save_song_index(f.cache(last), SongIndex{{cached_entry("two.bms", "Last cached")}}));
+            }
+            REQUIRE(save_song_index(f.cache(missing), SongIndex{{cached_entry("stale.bms", "Offline cache")}}));
+            const auto old_missing = read_text(fs::u8path(f.cache(missing)));
+            std::vector<std::string> roots{first.u8string(), last.u8string()};
+            roots.insert(roots.begin() + missing_position, missing.u8string());
+            SongIndexerThread indexer;
+            REQUIRE(indexer.start_sources(roots, f.profile(), {}, scan_mode == 2));
+            REQUIRE(wait_until_finished(indexer));
+            SongIndex visible{{cached_entry("prior.bms", "Previous visible index")}};
+            std::vector<std::string> warnings;
+            std::unordered_map<std::string, int> counts;
+            REQUIRE(indexer.poll_result(visible, warnings, &counts));
+            REQUIRE(visible.entries.size() == 2);
+            CHECK(visible.entries[0].title == (scan_mode == 1 ? "First cached" : "First scanned"));
+            CHECK(visible.entries[1].title == (scan_mode == 1 ? "Last cached" : "Last scanned"));
+            CHECK(counts.at(source_key(first)) == 1);
+            CHECK(counts.at(source_key(missing)) == 0);
+            CHECK(counts.at(source_key(last)) == 1);
+            CHECK_FALSE(warnings.empty());
+            CHECK(read_text(fs::u8path(f.cache(missing))) == old_missing);
+        }
+    }
+}
+
+TEST_CASE("ALL SONG skips deleted folders inside a valid cache and continues with later charts and sources") {
+    AggregateFixture f;
+    const auto first = f.source("first"), last = f.source("last");
+    write_chart(first / "kept" / "one.bms", "First actual");
+    write_chart(first / "kept" / "two.bms", "Second actual");
+    fs::create_directories(first / "folder.bms");
+    write_chart(last / "three.bms", "Last actual");
+    REQUIRE(save_song_index(f.cache(first), SongIndex{{
+        cached_entry("kept/one.bms", "First cached"),
+        cached_entry("deleted/subfolder/stale.bms", "Deleted cached"),
+        cached_entry("kept/deleted-file.bms", "Deleted file"),
+        cached_entry("folder.bms", "Replaced by directory"),
+        cached_entry("kept/two.bms", "Second cached")}}));
+    REQUIRE(save_song_index(f.cache(last), SongIndex{{cached_entry("three.bms", "Last cached")}}));
+    const auto before = read_text(fs::u8path(f.cache(first)));
+
+    const auto combined = aggregate_song_sources({first.u8string(), last.u8string()}, f.profile());
+    CHECK_FALSE(combined.cancelled);
+    CHECK(combined.cached_sources == 2);
+    CHECK(combined.scanned_sources == 0);
+    REQUIRE(combined.index.entries.size() == 3);
+    CHECK(combined.index.entries[0].title == "First cached");
+    CHECK(combined.index.entries[1].title == "Second cached");
+    CHECK(combined.index.entries[2].title == "Last cached");
+    CHECK(combined.source_counts.at(source_key(first)) == 2);
+    CHECK(combined.source_counts.at(source_key(last)) == 1);
+    REQUIRE(combined.warnings.size() == 1);
+    CHECK(combined.warnings.front().find("Skipped 3 unavailable cached chart(s)") != std::string::npos);
+    CHECK(read_text(fs::u8path(f.cache(first))) == before);
+}
+
+#ifdef _WIN32
+TEST_CASE("ALL SONG final aggregate reaches visible song cards despite a missing middle source") {
+    AggregateFixture f;
+    const auto first = f.source("first"), last = f.source("last");
+    const auto missing = f.base / "missing";
+    write_chart(first / "one.bms", "First");
+    write_chart(last / "two.bms", "Last");
+    const std::vector<std::string> roots{first.u8string(), missing.u8string(), last.u8string()};
+    auto combined = aggregate_song_sources(roots, f.profile());
+    REQUIRE(combined.index.entries.size() == 2);
+    const auto render = MenuAppSongSourceTestAccess::render_index(std::move(combined.index), roots);
+    CHECK(render.song_select.song_count == 2);
+    CHECK(render.song_select.list_total_count == 2);
+    REQUIRE(render.song_select.songs.size() == 2);
+    CHECK_FALSE(render.song_select.showing_sources);
+    CHECK_FALSE(render.song_select.showing_records);
+    CHECK_FALSE(render.song_select.indexing);
+}
+#endif
+
+TEST_CASE("ALL SONG reports cached chart progress and cancellation keeps the caller's prior list") {
+    AggregateFixture f;
+    const auto root = f.source("root");
+    SongIndex cache;
+    for (int i = 0; i < 130; ++i) {
+        const auto name = std::to_string(i) + ".bms";
+        write_chart(root / name, "Actual");
+        cache.entries.push_back(cached_entry(name, "Cached"));
+    }
+    REQUIRE(save_song_index(f.cache(root), cache));
+    const auto before = read_text(fs::u8path(f.cache(root)));
+    std::vector<int> processed;
+    const auto combined = aggregate_song_sources({root.u8string()}, f.profile(), {},
+        [&](const SongSourceAggregateProgress& update) {
+            if (update.source.stage == SongIndexProgressStage::BuildingMetadata) {
+                CHECK(update.source.total == 130);
+                processed.push_back(update.source.processed);
+            }
+        });
+    REQUIRE(combined.index.entries.size() == 130);
+    CHECK((processed == std::vector<int>{0, 64, 128, 130}));
+    bool cancel = false;
+    const auto cancelled = aggregate_song_sources({root.u8string()}, f.profile(), {},
+        [&](const SongSourceAggregateProgress& update) {
+            if (update.source.stage == SongIndexProgressStage::BuildingMetadata &&
+                update.source.processed == 64) cancel = true;
+        }, [&] { return cancel; });
+    CHECK(cancelled.cancelled);
+    CHECK(cancelled.index.entries.empty());
+    CHECK(cancelled.source_counts.empty());
+    CHECK(read_text(fs::u8path(f.cache(root))) == before);
 }
 
 TEST_CASE("ALL SONG falls back to legacy caches and rescans invalid or profile-incompatible caches") {
@@ -319,4 +459,22 @@ TEST_CASE("ALL SONG empty roots complete without scanning default or current dir
     CHECK(combined.scanned_sources == 0);
     CHECK(combined.cached_sources == 0);
     CHECK(combined.warnings.empty());
+}
+
+TEST_CASE("polling a completed aggregate never leaves the loading state running") {
+    AggregateFixture f;
+    SongIndexerThread indexer;
+    for (int attempt = 0; attempt < 5000; ++attempt) {
+        REQUIRE(indexer.start_sources({}, f.profile()));
+        SongIndex result;
+        std::vector<std::string> warnings;
+        const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(10);
+        while (!indexer.poll_result(result, warnings)) {
+            REQUIRE(std::chrono::steady_clock::now() < deadline);
+            std::this_thread::yield();
+        }
+        // MenuApp publishes its loading overlay immediately after polling.
+        // Receiving the final list must also mean the worker has completed.
+        CHECK_FALSE(indexer.is_running());
+    }
 }

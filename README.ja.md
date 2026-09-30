@@ -1,24 +1,24 @@
 # TenRiff
 
-**2026-09-28 · TenRiff 1.7.9:** メニュー文字サイズ3段階、初回起動・プロフィールでの言語選択、画像プレビュー、全フォルダーをまとめる ALL SONG を追加しました。選曲画面の枠、キー数の色、レベルの位置、COMBO 表示を改善しました。ノーツの高さはクライアントと[ウェブスキンエディター](https://tenriff-skin-editor.lastestarcorp.chatgpt.site/)で50〜400%です。[検証範囲](docs/release-1.7.9-gate.md)。
+**2026-10-01 · TenRiff 1.7.10:** ALL SONG はキャッシュに残る削除済み譜面・サブフォルダーを飛ばし、後続の譜面を読み込みます。キャッシュ統合の進捗を表示し、結果と完了状態を同時に通知します。[検証範囲と制限](docs/release-1.7.10-gate.md)。
 
 **マルチプレイRate対応ビルド:** ロビーでリーダーが共通のRateを設定します。全員がこのprotocol v6ビルドを使用してください。旧v5クライアントとは接続できません。[案内](docs/multiplayer-rate-build.ko.md)（韓国語）。
 
-この配布版は **1.7.9 Sites 統合版**です。新しいフォルダーに展開し、`launch_win.bat` から起動して F10 でウェブアカウントを一度連携してください。対象となる新しいプレイのスコア・詳細スコア・精度・詳細精度を送信します。既存の計算式は変更しません。[接続ガイド](docs/sites-leaderboard.md)（韓国語）を参照してください。
+この配布版は **1.7.10 Sites 統合版**です。新しいフォルダーに展開し、`launch_win.bat` から起動して F10 でウェブアカウントを一度連携してください。対象となる新しいプレイのスコア・詳細スコア・精度・詳細精度を送信します。既存の計算式は変更しません。[接続ガイド](docs/sites-leaderboard.md)（韓国語）を参照してください。
 
 Language: [한국어](README.md) | [English](README.en.md) | [简体中文](README.zh-CN.md) | 日本語
 
-TenRiff は Windows GUI ベースの BMS リズムゲーム runtime/launcher です。現在のプロジェクト版は `1.7.9` で、譜面入力は BMS family（`.bms/.bme/.bml/.pms`）専用です。公開 package は BGA upscaler model を含まず、key-mode conversion 用の deterministic NK3 P64 graph と generalized pattern MLP を同梱します。license は MIT です。
+TenRiff は Windows GUI ベースの BMS リズムゲーム runtime/launcher です。現在のプロジェクト版は `1.7.10` で、譜面入力は BMS family（`.bms/.bme/.bml/.pms`）専用です。公開 package は BGA upscaler model を含まず、key-mode conversion 用の deterministic NK3 P64 graph と generalized pattern MLP を同梱します。license は MIT です。
 
-この README は導入文書です。現在の挙動、`1.7.9` project state、`1.5.1 fixed stable baseline` baseline、設定と設計文書は [`docs/README.ja.md`](docs/README.ja.md) から参照してください。
+この README は導入文書です。現在の挙動、`1.7.10` project state、`1.5.1 fixed stable baseline` baseline、設定と設計文書は [`docs/README.ja.md`](docs/README.ja.md) から参照してください。
 
 TenRiff のコードベースは、伝統的な長文設計書主導だけで積み上がったものではなく、高速な反復と実験を重視した `vibe coding` 的な性格を持つ作品でもあります。
 
-## 1.7.9 メニュー・プロフィール・曲ソース改善
+## 1.7.10 ALL SONG 読み込み改善
 
-オプション → プロフィールで言語と文字サイズを変更し、選んだ画像を確認できます。ソース → ALL SONG で登録済みフォルダーをまとめて表示します。TENRIFF ロゴには控えめなホログラム効果を加え、TI マークは静止させます。4〜16キーの Luma Keys とウェブ・オフライン編集機能も引き続き利用できます。
+利用できないソースや譜面を飛ばし、後続の有効な譜面を維持します。キャンセル時もフォルダー別キャッシュと既存の一覧を保持します。1.7.9 のメニュー・プロフィール・スキン機能も含みます。
 
-[CHANGELOG](CHANGELOG.md) · [1.7.9 release gate](docs/release-1.7.9-gate.md)
+[CHANGELOG](CHANGELOG.md) · [1.7.10 release gate](docs/release-1.7.10-gate.md)
 
 ## スクリーンショット
 
