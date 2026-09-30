@@ -1,24 +1,24 @@
 # TenRiff
 
-**2026-09-28 · TenRiff 1.7.9:** 메뉴 글자 크기 3단계, 첫 실행·프로필 언어 선택, 프로필 사진 미리보기와 ALL SONG 통합 소스를 추가했습니다. 선곡 영역·키 수 색상·레벨 정렬을 개선하고 최대 콤보에 COMBO를 표시합니다. 노트 높이는 클라이언트와 [웹 스킨 에디터](https://tenriff-skin-editor.lastestarcorp.chatgpt.site/) 모두 50~400%입니다. [사용법](docs/menu-profile-library-polish.ko.md) · [검증 범위](docs/release-1.7.9-gate.md).
+**2026-10-01 · TenRiff 1.7.10:** ALL SONG에서 캐시에 남은 삭제된 차트·하위 폴더를 건너뛰고 뒤의 곡을 계속 불러옵니다. 캐시 통합 진행률을 표시하고, 결과와 완료 상태를 함께 전달합니다. [검증 범위와 남은 확인](docs/release-1.7.10-gate.md).
 
 **멀티 Rate 지원 빌드:** 로비 `대전 Rate`에서 리더가 공통 배속을 설정합니다. 참가자 모두 이 protocol v6 빌드를 사용해야 합니다. [사용 방법과 호환성](docs/multiplayer-rate-build.ko.md).
 
 Language: Korean | [English](README.en.md) | [简体中文](README.zh-CN.md) | [日本語](README.ja.md)
 
-TenRiff는 Windows GUI 기반 BMS 리듬게임 런타임/런처 프로젝트입니다. 현재 프로젝트 버전은 `1.7.9`이며, 차트 입력은 BMS 계열(`.bms/.bme/.bml/.pms`) 전용입니다. Graphics Settings에서 권리 정리된 외부 ONNX 모델을 선택해 BGA/BGI 확대에 사용할 수 있습니다. 공개 패키지에는 BGA 업스케일러 모델을 넣지 않으며, 키 모드 변환용 NK3 P64 결정 모델과 일반화 패턴 MLP만 포함합니다. MIT 라이선스를 사용하며, 번들된 서드파티 고지는 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)에 정리합니다.
+TenRiff는 Windows GUI 기반 BMS 리듬게임 런타임/런처 프로젝트입니다. 현재 프로젝트 버전은 `1.7.10`이며, 차트 입력은 BMS 계열(`.bms/.bme/.bml/.pms`) 전용입니다. Graphics Settings에서 권리 정리된 외부 ONNX 모델을 선택해 BGA/BGI 확대에 사용할 수 있습니다. 공개 패키지에는 BGA 업스케일러 모델을 넣지 않으며, 키 모드 변환용 NK3 P64 결정 모델과 일반화 패턴 MLP만 포함합니다. MIT 라이선스를 사용하며, 번들된 서드파티 고지는 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)에 정리합니다.
 
-이 README는 "프로젝트를 처음 열었을 때 무엇을 보면 되는지"를 설명하는 입문 문서입니다. 더 자세한 현재 동작, 현재 `1.7.9` 프로젝트 상태, `1.5.1 fixed stable baseline` 기준선, 설정 구조, 설계 문서는 [`docs/README.md`](docs/README.md)부터 이어서 읽는 구조를 기준으로 작성했습니다.
+이 README는 "프로젝트를 처음 열었을 때 무엇을 보면 되는지"를 설명하는 입문 문서입니다. 더 자세한 현재 동작, 현재 `1.7.10` 프로젝트 상태, `1.5.1 fixed stable baseline` 기준선, 설정 구조, 설계 문서는 [`docs/README.md`](docs/README.md)부터 이어서 읽는 구조를 기준으로 작성했습니다.
 
 TenRiff 코드는 전통적인 장기 설계 문서 중심 개발만으로 쌓인 프로젝트가 아니라, 빠른 반복과 실험을 중시한 `vibe coding` 성격이 강한 작품이라는 점을 명시합니다.
 
-## 1.7.9 메뉴·프로필·곡 소스 개선
+## 1.7.10 ALL SONG 로딩 보강
 
 ZIP을 새 폴더에 풀고 `launch_win.bat`으로 시작하세요. 웹 리더보드는 `F10`에서 계정을 연결하면 사용할 수 있습니다. [연결 안내](docs/sites-leaderboard.md).
 
-옵션 → 프로필에서 언어와 글자 크기를 변경하고 선택한 사진을 바로 확인할 수 있습니다. 소스 → ALL SONG으로 등록한 폴더의 곡을 함께 탐색합니다. TENRIFF 로고는 홀로그램 효과를 사용하고 TI 마크는 정적으로 표시합니다. 기존 4~16키 Luma Keys와 웹/오프라인 스킨 편집 기능을 포함합니다.
+없는 소스나 차트 때문에 뒤의 유효한 곡을 잃지 않도록 처리합니다. 폴더별 캐시를 강제로 재작성하지 않으며 취소 시 기존 캐시와 목록을 유지합니다. 1.7.9의 메뉴·프로필·스킨 기능도 포함합니다.
 
-[CHANGELOG](CHANGELOG.md) · [1.7.9 release gate](docs/release-1.7.9-gate.md)
+[CHANGELOG](CHANGELOG.md) · [1.7.10 release gate](docs/release-1.7.10-gate.md)
 
 ## 스크린샷
 
@@ -184,7 +184,7 @@ cmake --build build --config Release --target bms_parser_tests
 
 ### 5. NK3 키 모드 변환
 
-1.7.9 공식 Windows 빌드와 ZIP에는 standalone BMS key converter CLI/GUI를 빌드하거나 포함하지 않습니다. 게임 안의 Mode Settings에서 `NK3`를 선택하면 P64와 host beam 안전 솔버가 항상 적용됩니다. 10K가 아닌 원본을 10K로 변환할 때만 일반화 패턴 MLP를 추가하며, 10→10과 나머지 모든 변환은 P64만 사용합니다. 기본 `AUTO` 백엔드는 ncnn Vulkan으로 P64와 MLP를 AMD/NVIDIA GPU에서 실행합니다. `TENRIFF_NK3_BACKEND=AUTO|VULKAN|NCNN_CPU|OPENVINO`와 `TENRIFF_NK3_VULKAN_DEVICE=<index>`로 실행 경로를 선택할 수 있습니다. `NCNN_CPU`는 GPU를 공유하지 않는 서버 검증기처럼 재현성이 필요한 격리 환경용입니다.
+1.7.10 공식 Windows 빌드와 ZIP에는 standalone BMS key converter CLI/GUI를 빌드하거나 포함하지 않습니다. 게임 안의 Mode Settings에서 `NK3`를 선택하면 P64와 host beam 안전 솔버가 항상 적용됩니다. 10K가 아닌 원본을 10K로 변환할 때만 일반화 패턴 MLP를 추가하며, 10→10과 나머지 모든 변환은 P64만 사용합니다. 기본 `AUTO` 백엔드는 ncnn Vulkan으로 P64와 MLP를 AMD/NVIDIA GPU에서 실행합니다. `TENRIFF_NK3_BACKEND=AUTO|VULKAN|NCNN_CPU|OPENVINO`와 `TENRIFF_NK3_VULKAN_DEVICE=<index>`로 실행 경로를 선택할 수 있습니다. `NCNN_CPU`는 GPU를 공유하지 않는 서버 검증기처럼 재현성이 필요한 격리 환경용입니다.
 
 standalone converter 소스는 개발 회귀용으로만 남겨 두며 기본 CMake 옵션 `TENRIFF_BUILD_STANDALONE_BMS_KEY_CONVERTER=OFF` 상태에서는 실행 파일을 만들지 않습니다.
 

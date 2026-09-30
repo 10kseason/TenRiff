@@ -220,11 +220,29 @@ SongSourceAggregateResult aggregate_song_sources(const std::vector<std::string>&
             }
             std::unordered_set<std::string> source_charts;
             source_charts.reserve(index.entries.size());
-            for (auto& entry : index.entries) {
+            std::size_t missing_charts = 0;
+            for (std::size_t entry_index = 0; entry_index < index.entries.size(); ++entry_index) {
                 if (is_cancelled(cancel)) return finish_cancelled();
+                // Cached roots need progress too: resolving a large cache can
+                // take time even though no filesystem scan is required.
+                if (entry_index % 64 == 0) {
+                    report({SongIndexProgressStage::BuildingMetadata, count_as_int(entry_index),
+                            count_as_int(index.entries.size())});
+                    if (is_cancelled(cancel)) return finish_cancelled();
+                }
+                auto& entry = index.entries[entry_index];
                 if (entry.path.empty()) continue;
                 const auto path = util::path_from_utf8_lossy(entry.path);
-                const auto absolute = canonical_absolute(path.is_absolute() ? path : root / path);
+                const auto chart_path = path.is_absolute() ? path : root / path;
+                ec.clear();
+                // A valid cache can outlive a chart or an entire subfolder.
+                // Skip unavailable entries without rescanning or rewriting
+                // the cache, and keep processing later charts and sources.
+                if (!fs::is_regular_file(chart_path, ec)) {
+                    ++missing_charts;
+                    continue;
+                }
+                const auto absolute = canonical_absolute(chart_path);
                 if (absolute.empty()) continue;
                 const auto key = chart_key(absolute);
                 if (!source_charts.insert(key).second) continue;
@@ -233,6 +251,10 @@ SongSourceAggregateResult aggregate_song_sources(const std::vector<std::string>&
                 entry.background_preview_path = absolute_preview(entry.background_preview_path, root);
                 entry.audio_preview_path = absolute_preview(entry.audio_preview_path, root);
                 result.index.entries.push_back(std::move(entry));
+            }
+            if (missing_charts > 0) {
+                result.warnings.push_back(source + ": Skipped " + std::to_string(missing_charts) +
+                                          " unavailable cached chart(s).");
             }
             result.source_counts[source_key] = count_as_int(source_charts.size());
             report({SongIndexProgressStage::BuildingMetadata, count_as_int(index.entries.size()),

@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.7.10] - 2026-10-01
+
+- Publish the song indexer's completion state together with its final result, preventing a completed library update from leaving the menu snapshot in a loading state.
+- ALL SONG skips unavailable chart files and deleted subfolders left in otherwise valid caches, keeping later charts and sources available without modifying per-folder caches.
+- Report chart progress while combining cached sources so large cached libraries no longer stay at an indeterminate scanning display until the source finishes.
+
+- See [verification and remaining native UI checks](docs/release-1.7.10-gate.md).
+
 ## [1.7.9] - 2026-09-28
 
 - Add Normal / Large / Extra Large menu text sizes. Move language selection into Profile and first-run Quick Setup, saving changes immediately.

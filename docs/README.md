@@ -10,6 +10,7 @@ Language: Korean | [English](README.en.md) | [简体中文](README.zh-CN.md) | [
 
 현재 동작이 충돌하면 같은 커밋의 **구현 코드·회귀 테스트**를 먼저 확인하고 `current-state`와 `config` 문서를 함께 수정합니다. 번역본도 같은 계약을 설명해야 합니다. `baseline-*`와 `release-*`는 해당 버전의 기록이며, 초기 설계·로드맵의 제안은 현재 구현이나 성능 보장이 아닙니다.
 
+- [1.7.10](release-1.7.10-gate.md)
 - [1.7.9](release-1.7.9-gate.md)
 - [1.7.8](release-1.7.8-gate.md)
 - [1.7.2 history](release-1.7.2-gate.md)

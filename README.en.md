@@ -1,24 +1,24 @@
 # TenRiff
 
-**2026-09-28 · TenRiff 1.7.9:** three menu text sizes, language selection in first-run/profile setup, avatar previews, and the ALL SONG combined library. Song Select gains clearer panels, key-count colors, aligned level values and COMBO units. Note height is limited to 50–400% in the client and [web skin editor](https://tenriff-skin-editor.lastestarcorp.chatgpt.site/). [Verification](docs/release-1.7.9-gate.md).
+**2026-10-01 · TenRiff 1.7.10:** ALL SONG skips deleted chart files and subfolders left in caches, continues with later charts, reports cache-merge progress, and publishes results together with completion state. [Verification and limits](docs/release-1.7.10-gate.md).
 
 **Multiplayer Rate build:** the leader sets a shared Room Rate in the lobby. All participants must use this protocol v6 build; previous v5 clients cannot join. [Guide (Korean)](docs/multiplayer.md).
 
-This is the complete **1.7.9 Sites integrated** distribution. Extract to a new folder, run `launch_win.bat`, then press F10 and link your web account once. Eligible new plays upload score, detail score, accuracy, and detailed accuracy. Native scoring stays unchanged. See the [connection guide](docs/sites-leaderboard.md) (Korean).
+This is the complete **1.7.10 Sites integrated** distribution. Extract to a new folder, run `launch_win.bat`, then press F10 and link your web account once. Eligible new plays upload score, detail score, accuracy, and detailed accuracy. Native scoring stays unchanged. See the [connection guide](docs/sites-leaderboard.md) (Korean).
 
 Language: [한국어](README.md) | [English](README.en.md) | [简体中文](README.zh-CN.md) | [日本語](README.ja.md)
 
-TenRiff is a Windows GUI BMS rhythm-game runtime/launcher. The current project version is `1.7.9`, and chart input is limited to the BMS family (`.bms/.bme/.bml/.pms`). Graphics Settings lets users select a rights-cleared external ONNX model for the optional BGA Upscaler. Public packages contain no BGA-upscaler model; key-mode conversion bundles the deterministic NK3 P64 graph and the generalized pattern MLP exports. The project uses the MIT License, and bundled third-party notices are collected in [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
+TenRiff is a Windows GUI BMS rhythm-game runtime/launcher. The current project version is `1.7.10`, and chart input is limited to the BMS family (`.bms/.bme/.bml/.pms`). Graphics Settings lets users select a rights-cleared external ONNX model for the optional BGA Upscaler. Public packages contain no BGA-upscaler model; key-mode conversion bundles the deterministic NK3 P64 graph and the generalized pattern MLP exports. The project uses the MIT License, and bundled third-party notices are collected in [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
 
-This README is an introduction that explains "what to look at first when you open the project." For current behavior, the `1.7.9` project state, the `1.5.1 fixed stable baseline` baseline, configuration, and design documents, continue from [`docs/README.en.md`](docs/README.en.md).
+This README is an introduction that explains "what to look at first when you open the project." For current behavior, the `1.7.10` project state, the `1.5.1 fixed stable baseline` baseline, configuration, and design documents, continue from [`docs/README.en.md`](docs/README.en.md).
 
 TenRiff should also be read as a `vibe coding` work: it was shaped through fast iteration and experimentation rather than only through a traditional long-form design-first process.
 
-## 1.7.9 Menus, Profiles and Song Sources
+## 1.7.10 ALL SONG Loading
 
-Choose language and menu text size in Options > Profile, with an immediate avatar preview. Open Sources > ALL SONG to browse all registered folders together. The TENRIFF wordmark has a subtle hologram effect while the TI mark stays static. This release also includes the existing 4K–16K Luma Keys skin and web/offline editor.
+Unavailable sources and chart files are skipped while later valid charts remain available. Per-folder caches are preserved, including on cancellation. The menu, profile and skin features from 1.7.9 are retained.
 
-[CHANGELOG](CHANGELOG.md) · [1.7.9 release gate](docs/release-1.7.9-gate.md)
+[CHANGELOG](CHANGELOG.md) · [1.7.10 release gate](docs/release-1.7.10-gate.md)
 
 ## Screenshots
 

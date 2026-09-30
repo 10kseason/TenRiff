@@ -32,6 +32,7 @@ struct SongSourceAggregateResult {
 // Reads/scans one source at a time. A compatible source cache is reused without
 // scanning unless force_rescan is true. Only the returned aggregate uses absolute
 // paths; source caches retain their existing source-relative chart paths.
+// Unavailable roots and cached chart files are skipped without changing caches.
 // A cancelled result contains no index, so callers can keep the previous list.
 SongSourceAggregateResult aggregate_song_sources(
     const std::vector<std::string>& source_roots,
