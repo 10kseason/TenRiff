@@ -74,9 +74,13 @@ struct TenRiffSkinGameplayStyle {
     std::optional<bool> hold_tail_taper_enabled;
     std::optional<bool> judgement_line_glow_enabled;
     std::optional<bool> key_pulse_enabled;
+    std::optional<bool> key_backdrop_enabled;
     std::optional<bool> note_border_enabled;
     std::optional<bool> black_playfield_enabled;
     std::optional<float> key_pulse_brightness;
+    std::optional<float> key_backdrop_opacity;
+    std::optional<float> key_backdrop_brightness;
+    std::optional<float> key_backdrop_height;
     std::optional<float> lane_background_opacity;
     std::optional<float> visual_opacity;
     std::optional<float> note_outline_opacity;

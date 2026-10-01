@@ -1,4 +1,5 @@
 #include "audio/MixNormalizer.h"
+#include "audio/SettingsAdjustmentClick.h"
 #include "doctest/doctest.h"
 
 #include <algorithm>
@@ -289,6 +290,41 @@ TEST_CASE("song preview builder decodes and renders fragmented BMS audio events"
     CHECK(source.empty());
     CHECK(error == "cancelled");
 }
+TEST_CASE("title music mixes BMS keysounds beyond the selection preview and caps playback at five minutes") {
+    PreviewTempDir temp;
+    temp.path = make_preview_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+    const auto chart_path = temp.path / "title_music.bms";
+    const auto wav_path = temp.path / "." / "tone.wav";
+    write_preview_test_wav(wav_path, 8'000);
+    {
+        std::ofstream chart(chart_path, std::ios::binary);
+        chart << "#PLAYER 1\n#TITLE Title Music Test\n#BPM 120\n"
+                 "#PREVIEW tone.wav\n#WAV01 tone.wav\n"
+                 "#00001:01\n#04011:01\n#20001:01\n";
+    }
+    std::vector<float> samples;
+    std::string source;
+    std::string error;
+    REQUIRE(tenriff::app::build_song_preview_audio(
+        chart_path.u8string(), {}, 8'000, 30, samples, source, &error));
+    // The resolver canonicalizes paths, including short TEMP aliases on CI.
+    // Check the actual file identity; equivalent spellings are valid output.
+    CHECK(std::filesystem::equivalent(std::filesystem::u8path(source), wav_path));
+    CHECK(samples.size() == 512u);
+    REQUIRE(tenriff::app::build_song_preview_audio(
+        chart_path.u8string(), {}, 8'000, 999, samples, source, &error, {}, true));
+    CHECK(source == chart_path.u8string() + "#title-music");
+    CHECK(samples.size() == 8'000u * 300u * 2u);
+    const auto late_key = samples.begin() + 8'000u * 80u * 2u;
+    CHECK(std::any_of(late_key, late_key + 512, [](float value) { return value != 0.0f; }));
+    auto cancelled = std::make_shared<std::atomic<bool>>(true);
+    CHECK_FALSE(tenriff::app::build_song_preview_audio(
+        chart_path.u8string(), {}, 8'000, 300, samples, source, &error, cancelled, true));
+    CHECK(samples.empty());
+    CHECK(source.empty());
+    CHECK(error == "cancelled");
+}
 #endif
 
 TEST_CASE("mix normalization preserves stereo balance and does not depend on buffer boundaries") {
@@ -309,4 +345,24 @@ TEST_CASE("mix normalization preserves stereo balance and does not depend on buf
     float reset_frame[]{0.1f, 0.1f};
     a.process(reset_frame, 1);
     CHECK(reset_frame[0] == doctest::Approx(0.1f).epsilon(0.001));
+}
+
+TEST_CASE("settings adjustment click is bounded stereo and independent of audio buffer boundaries") {
+    for (const int sample_rate : {44100, 48000, 96000}) {
+        const auto frames = static_cast<std::uint32_t>(sample_rate / 20);
+        std::vector<float> whole(frames * 2, 0.0f), chunks = whole;
+        tenriff::audio::SettingsAdjustmentClick first, second;
+        first.trigger(sample_rate); second.trigger(sample_rate);
+        first.mix(whole.data(), frames);
+        for (std::uint32_t cursor = 0; cursor < frames; cursor += 32)
+            second.mix(chunks.data() + cursor * 2, std::min(32u, frames - cursor));
+        CHECK(whole == chunks);
+        CHECK(std::any_of(whole.begin(), whole.end(), [](float sample) { return sample != 0.0f; }));
+        for (std::size_t sample = 0; sample < whole.size(); sample += 2) {
+            CHECK(std::abs(whole[sample]) <= 0.162f);
+            CHECK(whole[sample] == whole[sample + 1]);
+        }
+        CHECK_FALSE(first.active());
+        CHECK(whole.back() == 0.0f);
+    }
 }

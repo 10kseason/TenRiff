@@ -45,6 +45,21 @@
       ctx.beginPath();ctx.roundRect(layer.x,layer.y,Math.max(0,layer.width),Math.max(0,layer.height),Math.max(0,layer.radius||0));ctx.fill();
     });ctx.restore();
   }
+  function paintText(ctx, content, rect, role, size, color, alpha=1, family='Segoe UI') {
+    const largeHud=role==='combo'||role==='judgement',center=(rect[1]+rect[3])/2;
+    const stroke=clamp(size/42,1,1.5);
+    // Font edits keep their authored center and width. Allow taller glyphs and
+    // the thin outline beyond the original rect instead of clipping large text.
+    const halfHeight=largeHud?Math.max((rect[3]-rect[1])/2,size*.75):(rect[3]-rect[1])/2;
+    ctx.save();ctx.fillStyle=color||'#F4F7FF';ctx.globalAlpha=clamp(alpha,0,1);
+    ctx.font=`600 ${size}px "${String(family).replace(/["\\\n\r]/g,'')}", sans-serif`;
+    ctx.textBaseline='middle';ctx.beginPath();
+    ctx.rect(rect[0]-stroke,center-halfHeight-stroke,rect[2]-rect[0]+stroke*2,halfHeight*2+stroke*2);ctx.clip();
+    const hex=/^#([a-f\d]{6})$/i.exec(color||''),rgb=hex?parseInt(hex[1],16):0xFFFFFF;
+    const luminance=(.2126*(rgb>>16)+.7152*((rgb>>8)&255)+.0722*(rgb&255))/255;
+    ctx.strokeStyle=luminance<.35?'#EAF3FD':'#061118';ctx.lineWidth=stroke;ctx.lineJoin='round';ctx.strokeText(content,rect[0],center,rect[2]-rect[0]);
+    ctx.fillText(content,rect[0],center,rect[2]-rect[0]);ctx.restore();
+  }
   const state={travel:[],last:0,mode:''};
   function paint(ctx, style, catalog, mode, now, animate, art, pressedLane=-1) {
     const native=settings(style,catalog),m=native.metrics,c=native.colors,motion=native.motion;
@@ -58,11 +73,9 @@
     const keyTop=bottom-m.key_bottom_gap-height;
     const box=(rect,color,alpha=1)=>{ctx.save();ctx.globalAlpha=clamp(alpha,0,1);ctx.fillStyle=color;ctx.fillRect(rect[0],rect[1],rect[2]-rect[0],rect[3]-rect[1]);ctx.restore();};
     const label=(key,content,rect,role=key,color=c[role],alpha=1)=>{
-      rect=adjusted(rect,native.rects[key]);ctx.save();ctx.fillStyle=color||'#F4F7FF';ctx.globalAlpha=alpha;
+      rect=adjusted(rect,native.rects[key]);
       const size=m[role+'_font_size']||m.body_font_size;
-      ctx.font=`600 ${size}px "${String(native.fonts[role]||'Segoe UI').replace(/["\\\n\r]/g,'')}", sans-serif`;
-      ctx.textBaseline='middle';ctx.beginPath();ctx.rect(rect[0],rect[1],rect[2]-rect[0],rect[3]-rect[1]);ctx.clip();
-      ctx.fillText(content,rect[0],(rect[1]+rect[3])/2,rect[2]-rect[0]);ctx.restore();
+      paintText(ctx,content,rect,role,size,color,alpha,native.fonts[role]||'Segoe UI');
     };
     const sprite=(slot,lane,rect,alpha=opacity)=>{
       const path=Array.isArray(style[slot])?style[slot][lane]:style[slot];
@@ -81,6 +94,8 @@
       const inset=Math.min(m.key_inset,width*m.key_inset_ratio),isDown=lane===hit&&(pressedLane>=0||phase<.36);
       state.travel[lane]=animate||pressedLane>=0?advance(state.travel[lane]||0,isDown,dt,motion):0;
       const travel=state.travel[lane],depth=motion.press_depth*travel;
+      const backdrop=backdropOpacity(style,isDown);
+      if(backdrop>0&&backdropTop(style,0,bottom)<bottom)box([x+1,backdropTop(style,0,bottom),x+width-1,bottom],backdropColor(color,style),backdrop*opacity);
       const light=clamp((travel*motion.pressed_light+(lane===hit?Math.max(0,1-phase*3):0)*motion.hit_light)*(style.key_pulse_brightness??.7),0,1);
       box([x+inset,keyTop,x+width-inset,bottom-m.key_bottom_gap],c.key_well,opacity);
       const face=[x+inset,keyTop+depth,x+width-inset,Math.max(keyTop+1,bottom-m.key_bottom_gap-m.key_face_gap+depth)];
@@ -104,7 +119,8 @@
     }
     if(style.show_judgement_line!==false){
       if(style.judgement_line_glow!==false)box([left,line-m.judgement_glow_height/2,right,line+m.judgement_glow_height/2],c.judgement_glow,.1*opacity);
-      box([left,line-m.judgement_line_width/2,right,line+m.judgement_line_width/2],c.judgement_line,opacity);
+      const thickness=judgementLineWidth(m.judgement_line_width,style.note_height_ratio??1);
+      box([left,line-thickness/2,right,line+thickness/2],c.judgement_line,opacity);
     }
     if(animate&&phase<.55){const x=left+(hit+.5)*width,life=1-phase/.55;
       box([x-width*.35,line-motion.burst_height*life,x+width*.35,line+3],colors[hit%colors.length],life*.28);
@@ -135,5 +151,23 @@
     }
     if(style.gear)art(style.gear,[left,0,right,bottom],opacity);
   }
-  return {groups,settings,blend,advance,adjusted,drawSprite,paint};
+  function judgementLineWidth(width, ratio=1) {
+    return width*(Number.isFinite(ratio)?clamp(ratio,.5/1.8,4/1.8):1);
+  }
+  function backdropOpacity(style, pressed) {
+    const opacity=style.key_backdrop_opacity??.25;
+    return style.key_backdrop!==false&&pressed&&Number.isFinite(opacity)?clamp(opacity,0,1):0;
+  }
+  function backdropColor(color, style) {
+    const value=style.key_backdrop_brightness??1,gain=Number.isFinite(value)?clamp(value,0,2):1;
+    const match=/^#([0-9a-f]{6})([0-9a-f]{2})?$/i.exec(color);
+    if(!match)return color;
+    const rgb=parseInt(match[1],16),bytes=[16,8,0].map(shift=>Math.round(Math.min(255,((rgb>>shift)&255)*gain)).toString(16).padStart(2,'0'));
+    return '#'+bytes.join('').toUpperCase()+(match[2]||'');
+  }
+  function backdropTop(style, top, bottom) {
+    const height=style.key_backdrop_height??1,ratio=Number.isFinite(height)?clamp(height,0,1):1;
+    return bottom-Math.max(0,bottom-top)*ratio;
+  }
+  return {groups,settings,blend,advance,adjusted,drawSprite,paint,paintText,judgementLineWidth,backdropOpacity,backdropColor,backdropTop};
 });

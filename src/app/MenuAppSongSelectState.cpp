@@ -78,7 +78,9 @@ void MenuApp::rebuild_visible_song_list(const std::string* selected_path) {
             (!remote_library || !multiplayer_chart_is_shared(entry, *remote_library))) {
             continue;
         }
-        if (song_entry_matches_search(entry, song_search_query_) &&
+        if (song_entry_matches_table_scope(entry, config_.ui.all_song_sources,
+                                           !config_.ui.difficulty_table_path.empty()) &&
+            song_entry_matches_search(entry, song_search_query_) &&
             song_entry_matches_key_filter(entry, song_key_filter_) &&
             song_entry_matches_level_filter(entry, song_level_min_filter_, song_level_max_filter_) &&
             song_entry_matches_collection_filter(entry)) {

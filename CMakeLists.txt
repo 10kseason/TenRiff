@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(TenRiff VERSION 1.7.10 LANGUAGES C CXX)
+project(TenRiff VERSION 1.8.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -441,6 +441,18 @@ if(WIN32)
 else()
     target_link_libraries(tenriff PRIVATE tenriff_chart tenriff_game tenriff_runtime tenriff_core)
 endif()
+
+# The supplied title artwork is a runtime asset, including in the standalone
+# visual fixture used to verify launches from unrelated working directories.
+foreach(menu_target tenriff menu_visual_preview)
+    if(TARGET ${menu_target})
+        add_custom_command(TARGET ${menu_target} POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_directory
+                "${CMAKE_CURRENT_SOURCE_DIR}/assets/menu"
+                "$<TARGET_FILE_DIR:${menu_target}>/assets/menu"
+            COMMENT "Copying menu artwork")
+    endif()
+endforeach()
 
 
 if(TENRIFF_BUILD_STANDALONE_BMS_KEY_CONVERTER)

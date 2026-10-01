@@ -142,6 +142,10 @@ def catalog():
     # Atlas colors can be overridden even when the compiled vector is in use.
     for color in ('63E9F2', 'A499FF', 'ECF6FF'):
         data['colors']['palette.' + color.lower()] = '#' + color + 'FF'
+    palette_source = (ROOT / 'src/render/NativeMenuPalette.h').read_text(encoding='utf-8')
+    defaults = dict(re.findall(r'case 0x([0-9A-F]{6}): return 0x([0-9A-F]{6});', palette_source))
+    for key, value in data['colors'].items():
+        data['colors'][key] = '#' + defaults.get(value[1:7], value[1:7]) + value[7:]
     return data
 
 def main():

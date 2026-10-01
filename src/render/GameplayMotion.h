@@ -1,6 +1,7 @@
 #pragma once
 
 #include <algorithm>
+#include <array>
 #include <cctype>
 #include <cmath>
 #include <cstdint>
@@ -187,6 +188,54 @@ inline GameplayProgressTrackLayout compute_gameplay_progress_track_layout(
         consider_gap(player_blocked_right + safe_clearance, content_right);
     }
     return best;
+}
+
+// Battle cards keep complete rows instead of squeezing the final judgement
+// counts into the old eight-pixel strip. Reserve the authored HUD positions even
+// before a hit, so the card never jumps when feedback appears or disappears.
+struct GameplayBattleSummaryLayout {
+    float left = 0.0f;
+    float top = 0.0f;
+    float right = 0.0f;
+    float bottom = 0.0f;
+    std::array<float, 6> row_edges{};
+};
+inline GameplayBattleSummaryLayout compute_gameplay_battle_summary_layout(
+    float field_left, float field_right, float field_top, float field_bottom,
+    float feedback_top, float feedback_bottom, float combo_top, float combo_bottom, bool ghost = false) {
+    constexpr float height = 132.0f;
+    constexpr float clearance = 8.0f;
+    const float center = (field_left + field_right) * 0.5f;
+    const float width = std::max(380.0f, field_right - field_left - 36.0f);
+    std::array<std::array<float, 2>, 2> reserved{{
+        {feedback_top - clearance, feedback_bottom + clearance},
+        {combo_top - clearance, combo_bottom + clearance}}};
+    std::sort(reserved.begin(), reserved.end(), [](const auto& a, const auto& b) { return a[0] < b[0]; });
+    float top = field_top + clearance;
+    for (const auto& span : reserved) {
+        if (top < span[1] && top + height > span[0]) top = span[1];
+    }
+    top = std::clamp(top, field_top + clearance, std::max(field_top + clearance, field_bottom - height - clearance));
+    // Extra card width opens toward the central gap, away from the outer gauge.
+    const float left = width <= field_right - field_left ? center - width * 0.5f
+        : ghost ? field_right - width : field_left;
+    GameplayBattleSummaryLayout result{left, top, left + width, top + height};
+    result.row_edges = {top + 8.0f, top + 36.0f, top + 58.0f,
+                        top + 80.0f, top + 102.0f, top + 124.0f};
+    return result;
+}
+
+struct GameplayBattleSummaryColumns {
+    float metadata_left = 0.0f;
+    float metadata_right = 0.0f;
+    float stats_left = 0.0f;
+    float stats_right = 0.0f;
+};
+inline GameplayBattleSummaryColumns compute_gameplay_battle_summary_columns(
+    const GameplayBattleSummaryLayout& card, bool embed_metadata) {
+    if (!embed_metadata) return {card.left, card.left, card.left, card.right};
+    const float split = card.left + (card.right - card.left) * 0.48f;
+    return {card.left, split - 8.0f, split + 8.0f, card.right};
 }
 
 // Clearance between a note edge and the lane divider line, in base-space pixels at

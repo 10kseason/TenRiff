@@ -1,3 +1,4 @@
+#include "render/SettingsListLayout.h"
 #include "render/GameplayFeedbackText.h"
 #include "doctest/doctest.h"
 
@@ -10,10 +11,97 @@
 #include "render/RenderPacing.h"
 #include "render/RenderThread.h"
 #include "render/OnnxBackgroundUpscaler.h"
+#include "render/MenuWindow.h"
+#include "render/SkinGameplayPreview.h"
+
+#ifdef _WIN32
+namespace tenriff::render {
+struct MenuWindowResolutionTestAccess {
+    static void resize(MenuWindow& window, int width, int height) {
+        window.width_ = width;
+        window.height_ = height;
+        window.update_layout();
+    }
+    static float scale(const MenuWindow& window) { return window.scale_; }
+    static float x(const MenuWindow& window) { return window.offset_x_; }
+    static float y(const MenuWindow& window) { return window.offset_y_; }
+    static bool point(const MenuWindow& window, int x, int y, float& out_x, float& out_y) {
+        return window.translate_window_point(x, y, &out_x, &out_y);
+    }
+};
+}
+#endif
 
 namespace {
 
 using tenriff::render::PerformanceTracker;
+
+#ifdef _WIN32
+TEST_CASE("render layout and pointer mapping preserve aspect at uncommon resolutions") {
+    using Access = tenriff::render::MenuWindowResolutionTestAccess;
+    tenriff::render::MenuWindow window;
+    for (const auto [width, height] : {std::pair{1600, 900}, std::pair{1366, 768}, std::pair{1280, 800},
+                                      std::pair{1024, 768}, std::pair{3440, 1440}, std::pair{900, 1600}}) {
+        Access::resize(window, width, height);
+        const float scale = Access::scale(window);
+        CHECK(scale == doctest::Approx(std::min(width / 1920.0f, height / 1080.0f)));
+        float x = 0, y = 0;
+        CHECK(Access::point(window, width / 2, height / 2, x, y));
+        CHECK(x == doctest::Approx(960).epsilon(0.002));
+        CHECK(y == doctest::Approx(540).epsilon(0.002));
+        CHECK(Access::point(window, static_cast<int>(Access::x(window) + scale * 400),
+                           static_cast<int>(Access::y(window) + scale * 300), x, y));
+        // Pointer coordinates are whole physical pixels before inverse scaling.
+        CHECK(std::abs(x - 400) <= 1.0f / scale + 0.001f);
+        CHECK(std::abs(y - 300) <= 1.0f / scale + 0.001f);
+        if (Access::x(window) > 1.0f) CHECK_FALSE(Access::point(window, 0, height / 2, x, y));
+        if (Access::y(window) > 1.0f) CHECK_FALSE(Access::point(window, width / 2, 0, x, y));
+    }
+}
+#endif
+
+TEST_CASE("skin preview preserves gameplay positions and imported geometry with a static sample chart") {
+    tenriff::render::SkinPreviewData preview;
+    preview.lane_count = 16;
+    preview.mode_label = "16K";
+    preview.selected_lane = 8;
+    preview.gameplay_field_offset_x = -260;
+    preview.judgement_position = 0.4;
+    preview.judgement_offset_x = -120;
+    preview.combo_position = 0.5;
+    preview.combo_offset_x = 120;
+    preview.note_height_scale = 4;
+    preview.lane_center_gap_scale = 1.5;
+    preview.lane_width_scale_count = 16;
+    preview.lane_width_scales.fill(1.75);
+    preview.lane_spacing_scale_count = 15;
+    preview.lane_spacing_scales.fill(0.5);
+    preview.skin_source = "lr2";
+    preview.lr2_resolution_override = "fhd";
+    preview.key_labels[7] = "Space";
+    preview.key_backdrop_brightness = 1.8;
+    preview.key_backdrop_height = 0.2;
+    const auto hud = tenriff::render::make_skin_gameplay_preview(preview);
+    CHECK(hud.gameplay_field_offset_x == -260);
+    CHECK(hud.judgement_offset_x == -120);
+    CHECK(hud.combo_offset_x == 120);
+    CHECK(hud.judgement_position == 0.4);
+    CHECK(hud.combo_position == 0.5);
+    CHECK(hud.note_height_scale == 4);
+    CHECK(hud.lane_center_gap_scale == 1.5);
+    CHECK(hud.lane_spacing_scale_count == 15u);
+    CHECK(hud.lane_spacing_scales[7] == 0.5);
+    CHECK(hud.lane_width_scales[7] == 1.75);
+    CHECK(hud.skin_source == "lr2");
+    CHECK(hud.lr2_resolution_override == "fhd");
+    CHECK(hud.key_labels[7] == "Space");
+    CHECK(hud.key_backdrop_brightness == doctest::Approx(1.8));
+    CHECK(hud.key_backdrop_height == doctest::Approx(0.2));
+    CHECK(hud.audio_sample_time_ns == 0);
+    CHECK(hud.note_count == 16u);
+    CHECK(hud.notes[7].hold);
+    CHECK(hud.notes[7].tail_sample > hud.notes[7].start_sample);
+}
 
 TEST_CASE("performance tracker computes frame metrics from recorded frame starts") {
     PerformanceTracker tracker;
@@ -343,6 +431,64 @@ TEST_CASE("gameplay progress track stays outside the note fields") {
     CHECK(wide_ghost.left == doctest::Approx(84.0f));
     CHECK(wide_ghost.right == doctest::Approx(122.0f));
 }
+TEST_CASE("ghost battle summaries retain every row in narrow and wide skin fields") {
+    using tenriff::render::compute_gameplay_battle_summary_layout;
+    for (const float width : {280.0f, 560.0f, 784.0f}) {
+        const auto layout = compute_gameplay_battle_summary_layout(
+            530.0f - width * 0.5f, 530.0f + width * 0.5f, 0.0f, 1080.0f,
+            155.0f, 350.0f, 275.0f, 390.0f);
+        CHECK(layout.right - layout.left >= 380.0f);
+        CHECK(layout.bottom < 155.0f);
+        CHECK(layout.row_edges.front() > layout.top);
+        CHECK(layout.row_edges.back() < layout.bottom);
+        for (std::size_t row = 1; row < layout.row_edges.size(); ++row) {
+            CHECK(layout.row_edges[row] - layout.row_edges[row - 1] >= 22.0f);
+        }
+        const auto ghost = compute_gameplay_battle_summary_layout(
+            1390.0f - width * 0.5f, 1390.0f + width * 0.5f, 0.0f, 1080.0f,
+            155.0f, 350.0f, 275.0f, 390.0f, true);
+        CHECK(ghost.top == doctest::Approx(layout.top));
+        CHECK(ghost.right - ghost.left == doctest::Approx(layout.right - layout.left));
+        CHECK(layout.right < ghost.left);
+        CHECK(layout.left >= 530.0f - width * 0.5f);
+        CHECK(ghost.right <= 1390.0f + width * 0.5f);
+    }
+}
+TEST_CASE("ghost battle summaries avoid separately positioned judgement and combo text") {
+    using tenriff::render::compute_gameplay_battle_summary_layout;
+    // A large judgement near the top must not be covered by a fixed top card.
+    const auto large = compute_gameplay_battle_summary_layout(
+        250.0f, 810.0f, 0.0f, 1080.0f, 40.0f, 270.0f, 320.0f, 470.0f);
+    CHECK(large.top > 470.0f);
+    CHECK(large.bottom < 1080.0f);
+    // Reversing the configured HUD positions preserves the same free interval.
+    const auto reversed = compute_gameplay_battle_summary_layout(
+        250.0f, 810.0f, 0.0f, 1080.0f, 320.0f, 470.0f, 40.0f, 270.0f);
+    CHECK(reversed.top == doctest::Approx(large.top));
+    const auto low_hud = compute_gameplay_battle_summary_layout(
+        250.0f, 810.0f, 0.0f, 1080.0f, 760.0f, 920.0f, 900.0f, 1020.0f);
+    CHECK(low_hud.bottom < 760.0f);
+}
+
+TEST_CASE("wide ghost fields retain readable metadata columns and narrow progress clearance") {
+    using namespace tenriff::render;
+    const auto wide = compute_gameplay_battle_summary_layout(138.0f, 922.0f,
+        0.0f, 1080.0f, 155.0f, 350.0f, 275.0f, 390.0f);
+    const auto columns = compute_gameplay_battle_summary_columns(wide, true);
+    CHECK(columns.metadata_right - columns.metadata_left >= 340.0f);
+    CHECK(columns.stats_right - columns.stats_left >= 370.0f);
+    CHECK(columns.metadata_right < columns.stats_left);
+    const auto player = compute_gameplay_battle_summary_layout(390.0f, 670.0f,
+        0.0f, 1080.0f, 155.0f, 350.0f, 275.0f, 390.0f);
+    const auto ghost = compute_gameplay_battle_summary_layout(1250.0f, 1530.0f,
+        0.0f, 1080.0f, 155.0f, 350.0f, 275.0f, 390.0f, true);
+    const auto progress = compute_gameplay_progress_track_layout(24.0f, 1836.0f,
+        328.0f, player.right + 84.0f, true, ghost.left, 1612.0f, 16.0f);
+    CHECK((progress.right < player.left || progress.left > player.right));
+    CHECK((progress.right < ghost.left || progress.left > ghost.right));
+    CHECK(progress.right - progress.left >= 250.0f);
+}
+
 TEST_CASE("gameplay text pop animation settles deterministically") {
     using tenriff::render::compute_gameplay_text_pop_animation;
 
@@ -563,4 +709,18 @@ TEST_CASE("Native gameplay edited key geometry and response remain bounded") {
     CHECK(rect[1]==-50);
     CHECK(rect[2]>rect[0]);
     CHECK(rect[3]>rect[1]);
+}
+
+TEST_CASE("group headings preserve selected row visibility and do not become input rows") {
+    std::vector<tenriff::render::MenuRowData> rows(18);
+    for (int i = 0; i < 18; ++i) rows[i].category = std::to_string(i / 3);
+    for (int selected = 0; selected < 18; ++selected) {
+        const auto window = tenriff::render::settings_list_window(rows, selected, 300, 66, 28);
+        CHECK(window.start <= selected);
+        CHECK(window.start + window.count > selected);
+        float height = 0;
+        for (int i = window.start; i < window.start + window.count; ++i)
+            height += 66 + (tenriff::render::settings_category_heading(rows, i, window.start) ? 28 : 0);
+        CHECK(height <= 300);
+    }
 }

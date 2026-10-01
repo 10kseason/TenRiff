@@ -51,7 +51,7 @@
     auto native_color = [&](uint32_t rgb, float alpha) -> ID2D1SolidColorBrush* {
         auto* brush = d2d_->native_menu_brush.Get();
         if (brush) {
-            D2D1_COLOR_F color = D2D1::ColorF(rgb);
+            D2D1_COLOR_F color = D2D1::ColorF(native_menu_default_rgb(rgb));
             const auto it = d2d_->native_menu_palette.find(rgb);
             if (it != d2d_->native_menu_palette.end()) color = it->second;
             brush->SetColor(color);

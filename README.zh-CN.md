@@ -1,24 +1,26 @@
 # TenRiff
 
-**2026-10-01 · TenRiff 1.7.10：**ALL SONG 跳过缓存中已删除的谱面及子文件夹，继续读取后续谱面，显示缓存合并进度，并同时发布结果与完成状态。[验证范围及限制](docs/release-1.7.10-gate.md)。
+**2026-10-02 · TenRiff 1.8.0:** 新增分类柔和配色、多种分辨率、与实机共用的皮肤预览和幽灵布局、辅助按键、鼠标设置、标题音乐选项以及 ruleset-2 判定。 [1.8.0 release gate](docs/release-1.8.0-gate.md).
 
 **多人Rate支持版本：**选曲者在大厅设置全员共用的Rate。所有玩家必须使用本protocol v6版本，不能与旧v5客户端连接。[指南](docs/multiplayer-rate-build.ko.md)（韩语）。
 
-本发行包是完整的 **1.7.10 Sites 集成版**。解压到新文件夹，运行 `launch_win.bat`，然后按 F10 连接一次网页账号。符合条件的新游玩记录会上传分数、详细分数、准确率和详细准确率。原有计分公式保持不变。请参阅[连接指南](docs/sites-leaderboard.md)（韩语）。
+本发行包是完整的 **1.8.0 Sites 集成版**。解压到新文件夹，运行 `launch_win.bat`，然后按 F10 连接一次网页账号。符合条件的新游玩记录会上传分数、详细分数、准确率和详细准确率。新游玩使用 ruleset-2，旧 ruleset-1 回放保留原判定。请参阅[连接指南](docs/sites-leaderboard.md)（韩语）。
 
 Language: [한국어](README.md) | [English](README.en.md) | [简体中文](README.zh-CN.md) | [日本語](README.ja.md)
 
-TenRiff 是一个 Windows GUI BMS 节奏游戏运行时/启动器。当前项目版本为 `1.7.10`，谱面输入仅支持 BMS family（`.bms/.bme/.bml/.pms`）。公开包不包含 BGA upscaler model；键位转换内置 deterministic NK3 P64 graph 与 generalized pattern MLP。项目采用 MIT 许可证。
+TenRiff 是一个 Windows GUI BMS 节奏游戏运行时/启动器。当前项目版本为 `1.8.0`，谱面输入仅支持 BMS family（`.bms/.bme/.bml/.pms`）。公开包不包含 BGA upscaler model；键位转换内置 deterministic NK3 P64 graph 与 generalized pattern MLP。项目采用 MIT 许可证。
 
-这份 README 是入门文档。关于当前行为、`1.7.10` 项目状态、`1.5.1 fixed stable baseline` 基准、配置和设计文档，请继续阅读 [`docs/README.zh-CN.md`](docs/README.zh-CN.md)。
+这份 README 是入门文档。关于当前行为、`1.8.0` 项目状态、`1.5.1 fixed stable baseline` 基准、配置和设计文档，请继续阅读 [`docs/README.zh-CN.md`](docs/README.zh-CN.md)。
 
 TenRiff 也明确属于一种 `vibe coding` 作品：它更多是在快速迭代和实验中成形，而不是只按照传统的长篇设计先行流程推进。
 
-## 1.7.10 ALL SONG 加载改善
+## 1.8.0 选项、皮肤与操作改进
 
-跳过不可用的曲源和谱面，保留后续有效谱面。取消时仍保留各文件夹缓存和原有列表。包含1.7.9的菜单、个人资料及皮肤功能。
+将 ZIP 解压到新文件夹并运行 `launch_win.bat`。保留旧安装和个人资料。按 `F10` 连接排行榜账号。
 
-[CHANGELOG](CHANGELOG.md) · [1.7.10 release gate](docs/release-1.7.10-gate.md)
+新增分类柔和配色、多种分辨率、与实机共用的皮肤预览和幽灵布局、辅助按键、鼠标设置、标题音乐选项以及 ruleset-2 判定。
+
+[CHANGELOG](CHANGELOG.md) · [1.8.0 release gate](docs/release-1.8.0-gate.md)
 
 ## 截图
 

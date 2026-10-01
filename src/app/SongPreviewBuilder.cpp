@@ -54,7 +54,7 @@ bool decode_preview_file(const std::string& path,
         }
         return false;
     }
-    const int safe_seconds = std::clamp(max_duration_seconds, 5, 60);
+    const int safe_seconds = std::clamp(max_duration_seconds, 5, 300);
     const std::size_t max_frames =
         static_cast<std::size_t>(sample_rate) * static_cast<std::size_t>(safe_seconds);
     const bool decoded = decode_audio_file_stereo_resampled(
@@ -95,7 +95,7 @@ bool build_chart_event_mix(const std::string& chart_path,
         return false;
     }
 
-    const int safe_seconds = std::clamp(max_duration_seconds, 5, 60);
+    const int safe_seconds = std::clamp(max_duration_seconds, 5, 300);
     const int64_t max_frames = static_cast<int64_t>(sample_rate) * safe_seconds;
     const int64_t chart_remaining = loaded.chart.duration_samples > window_start
                                         ? loaded.chart.duration_samples - window_start
@@ -182,9 +182,11 @@ bool build_song_preview_audio(const std::string& chart_path,
                                std::vector<float>& out_stereo_samples,
                                std::string& out_source,
                                std::string* error,
-                               SongPreviewCancelFlag cancel_flag) {
+                               SongPreviewCancelFlag cancel_flag,
+                               bool prefer_chart_music) {
     out_stereo_samples.clear();
     out_source.clear();
+    max_duration_seconds = std::clamp(max_duration_seconds, 5, prefer_chart_music ? 300 : 60);
     if (stop_if_preview_cancelled(cancel_flag, out_stereo_samples, error)) {
         return false;
     }
@@ -193,6 +195,19 @@ bool build_song_preview_audio(const std::string& chart_path,
             *error = "Invalid chart path or preview sample rate.";
         }
         return false;
+    }
+
+    // Title music plays the chart's BGM and keysounds from the beginning, even
+    // when the chart declares a short selection-screen preview. Its caller uses
+    // 44.1 kHz and a five-minute cap so only one bounded PCM buffer is retained.
+    if (prefer_chart_music) {
+        std::string mix_warning;
+        if (build_chart_event_mix(chart_path, target_sample_rate, max_duration_seconds,
+                                  out_stereo_samples, &mix_warning, cancel_flag)) {
+            out_source = chart_path + "#title-music";
+            return true;
+        }
+        if (stop_if_preview_cancelled(cancel_flag, out_stereo_samples, error)) return false;
     }
 
     const std::string declared =
@@ -219,7 +234,7 @@ bool build_song_preview_audio(const std::string& chart_path,
     }
 
     std::string mix_warning;
-    if (build_chart_event_mix(chart_path,
+    if (!prefer_chart_music && build_chart_event_mix(chart_path,
                               target_sample_rate,
                                max_duration_seconds,
                                out_stereo_samples,

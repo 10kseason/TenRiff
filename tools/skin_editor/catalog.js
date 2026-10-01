@@ -721,6 +721,30 @@
             "minimum": 0.0,
             "maximum": 1.0
           },
+          "key_backdrop": {
+            "type": "boolean",
+            "description": "Allow a lane-colored backdrop behind a pressed key. Player Off always takes precedence."
+          },
+          "key_backdrop_opacity": {
+            "type": "number",
+            "minimum": 0.0,
+            "maximum": 1.0,
+            "description": "Backdrop opacity; 0 is fully transparent."
+          },
+          "key_backdrop_brightness": {
+            "type": "number",
+            "minimum": 0.0,
+            "maximum": 2.0,
+            "default": 1.0,
+            "description": "Backdrop RGB brightness, independent of opacity; 1 preserves the lane color."
+          },
+          "key_backdrop_height": {
+            "type": "number",
+            "minimum": 0.0,
+            "maximum": 1.0,
+            "default": 1.0,
+            "description": "Maximum backdrop height as a fraction of the field, anchored at the bottom; 0 hides it and 1 fills the lane."
+          },
           "hit_burst_style": {
             "enum": [
               "prism",
@@ -1262,6 +1286,30 @@
             "type": "number",
             "minimum": 0.0,
             "maximum": 1.0
+          },
+          "key_backdrop": {
+            "type": "boolean",
+            "description": "Allow a lane-colored backdrop behind a pressed key. Player Off always takes precedence."
+          },
+          "key_backdrop_opacity": {
+            "type": "number",
+            "minimum": 0.0,
+            "maximum": 1.0,
+            "description": "Backdrop opacity; 0 is fully transparent."
+          },
+          "key_backdrop_brightness": {
+            "type": "number",
+            "minimum": 0.0,
+            "maximum": 2.0,
+            "default": 1.0,
+            "description": "Backdrop RGB brightness, independent of opacity; 1 preserves the lane color."
+          },
+          "key_backdrop_height": {
+            "type": "number",
+            "minimum": 0.0,
+            "maximum": 1.0,
+            "default": 1.0,
+            "description": "Maximum backdrop height as a fraction of the field, anchored at the bottom; 0 hides it and 1 fills the lane."
           },
           "hit_burst_style": {
             "enum": [

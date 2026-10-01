@@ -10,6 +10,8 @@
 
 #include "config/KeycodeMap.h"
 #include "config/Keymap.h"
+#include "input/LaneBindingState.h"
+#include "gameplay/GameplayEngine.h"
 
 namespace tenriff::app {
 std::string resolve_keymap_edit_mode_for_menu(std::optional<int> selected_chart_key_count,
@@ -150,9 +152,11 @@ TEST_CASE("keymap save and load preserve arrow-key bindings") {
 TEST_CASE("keymap edit mode resolution prefers selected chart key count") {
     CHECK(tenriff::app::resolve_keymap_edit_mode_for_menu(7, "4k") == "7k");
     CHECK(tenriff::app::resolve_keymap_edit_mode_for_menu(8, "10k") == "8k");
-    CHECK(tenriff::app::resolve_keymap_edit_mode_for_menu(std::nullopt, "16k") == "16k");
-    CHECK(tenriff::app::resolve_keymap_edit_mode_for_menu(std::nullopt, "auto") == "10k");
-    CHECK(tenriff::app::resolve_keymap_edit_mode_for_menu(std::nullopt, "") == "10k");
+    CHECK(tenriff::app::resolve_keymap_edit_mode_for_menu(std::nullopt, "16k") == "4k");
+    CHECK(tenriff::app::resolve_keymap_edit_mode_for_menu(std::nullopt, "auto") == "4k");
+    CHECK(tenriff::app::resolve_keymap_edit_mode_for_menu(std::nullopt, "") == "4k");
+    CHECK(tenriff::app::resolve_keymap_edit_mode_for_menu(6, "none") == "6k");
+    CHECK(tenriff::app::resolve_keymap_edit_mode_for_menu(8, "none") == "8k");
 }
 
 TEST_CASE("menu probe keycodes only include menu navigation outside keymap screens") {
@@ -299,4 +303,115 @@ TEST_CASE("keymap load repairs invalid bindings with per-lane defaults") {
     REQUIRE_FALSE(result.warnings.empty());
     CHECK(manager.bindings_for_mode(result.keymap, "4k").at("lane1") == "D");
     CHECK(manager.bindings_for_mode(result.keymap, "4k").at("lane2") == "F");
+}
+
+TEST_CASE("secondary key bindings round trip for 5K and native BMS layouts without changing primary bindings") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+    CurrentPathGuard cwd;
+    std::filesystem::current_path(temp.path);
+
+    tenriff::config::KeymapManager manager;
+    auto keymap = manager.default_keymap();
+    keymap.mode_bindings["5k"]["lane1"] = "A";
+    keymap.secondary_mode_bindings["5k"]["lane1"] = "S";
+    keymap.secondary_mode_bindings["6k"]["lane6"] = "Space";
+    keymap.secondary_mode_bindings["8k"]["lane8"] = "VK_OEM_1";
+    keymap.secondary_mode_bindings["16k"]["lane16"] = "Backslash";
+    REQUIRE(manager.save_profile("profiles/test", keymap));
+    const auto loaded = manager.load_profile("profiles/test");
+    REQUIRE(loaded.success());
+    CHECK(manager.bindings_for_mode(loaded.keymap, "5k").at("lane1") == "A");
+    CHECK(manager.secondary_bindings_for_mode(loaded.keymap, "5k").at("lane1") == "S");
+    CHECK(manager.secondary_bindings_for_mode(loaded.keymap, "6k").at("lane6") == "Space");
+    CHECK(manager.secondary_bindings_for_mode(loaded.keymap, "8k").at("lane8") == "Semicolon");
+    CHECK(manager.secondary_bindings_for_mode(loaded.keymap, "16k").at("lane16") == "Backslash");
+    CHECK(manager.secondary_bindings_for_mode(loaded.keymap, "4k").empty());
+
+    auto reset = loaded.keymap;
+    manager.reset_mode_bindings(reset, "5k");
+    CHECK(manager.secondary_bindings_for_mode(reset, "5k").empty());
+    CHECK(manager.bindings_for_mode(reset, "5k").at("lane1") == "D");
+    CHECK(manager.secondary_bindings_for_mode(reset, "6k").at("lane6") == "Space");
+}
+
+TEST_CASE("invalid optional secondary binding is removed instead of becoming a default key") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+    write_file(temp.path / "profiles/test/keymap.json",
+               R"({"secondary_modes":{"5k":{"lane1":"VK_OEM_1","lane2":"BogusKey","lane3":"","lane99":"A"}}})");
+    CurrentPathGuard cwd;
+    std::filesystem::current_path(temp.path);
+    tenriff::config::KeymapManager manager;
+    const auto loaded = manager.load_profile("profiles/test");
+    REQUIRE(loaded.success());
+    CHECK(loaded.normalized_binding_count == 1);
+    CHECK(loaded.repaired_binding_count == 1);
+    const auto secondary = manager.secondary_bindings_for_mode(loaded.keymap, "5k");
+    CHECK(secondary.size() == 1);
+    CHECK(secondary.at("lane1") == "Semicolon");
+    CHECK(manager.bindings_for_mode(loaded.keymap, "5k").at("lane2") == "F");
+}
+
+TEST_CASE("alternate physical key releases preserve a held logical key and long note") {
+    using tenriff::input::InputState;
+    tenriff::input::LaneBindingState state;
+    state.configure({{10, 1}, {20, 1}, {30, 2}});
+    CHECK(state.apply(10, InputState::Pressed) == InputState::Pressed);
+    CHECK_FALSE(state.apply(20, InputState::Pressed).has_value());
+    CHECK_FALSE(state.apply(10, InputState::Released).has_value());
+    CHECK(state.pressed(1));
+    CHECK(state.apply(30, InputState::Pressed) == InputState::Pressed);
+    CHECK(state.apply(20, InputState::Released) == InputState::Released);
+    CHECK_FALSE(state.pressed(1));
+    CHECK(state.pressed(2));
+    CHECK_FALSE(state.apply(20, InputState::Released).has_value());
+    CHECK_FALSE(state.apply(99, InputState::Pressed).has_value());
+
+    state.reset();
+    CHECK_FALSE(state.pressed(2));
+    CHECK(state.apply(20, InputState::Pressed) == InputState::Pressed);
+    CHECK(state.pressed(1));
+    CHECK_FALSE(state.apply(10, InputState::Released).has_value());
+    CHECK(state.pressed(1));
+}
+
+TEST_CASE("secondary key handoff keeps a real charge long note intact until its tail release") {
+    using tenriff::input::InputState;
+    tenriff::gameplay::GameplayChart chart;
+    chart.lane_count = 5;
+    chart.duration_samples = 2500;
+    tenriff::gameplay::NoteEvent note;
+    note.lane = 3;
+    note.start_sample = 1000;
+    note.end_sample = 2000;
+    note.release_required = true;
+    chart.notes.push_back(note);
+    tenriff::gameplay::GameplayConfig config;
+    config.sample_rate = 1000;
+    config.judge.pg_ms = 10;
+    config.judge.gr_ms = 20;
+    config.judge.gd_ms = 30;
+    config.judge.bd_ms = 40;
+    config.judge.hold_grace_ms = 20;
+    tenriff::gameplay::GameplayEngine engine(chart, config);
+    tenriff::input::LaneBindingState bindings;
+    bindings.configure({{10, 3}, {20, 3}});
+    const auto dispatch = [&](std::uint32_t key, InputState state, std::int64_t sample) {
+        if (const auto logical = bindings.apply(key, state))
+            static_cast<void>(engine.handle_input(3, *logical, sample));
+        engine.advance(sample);
+    };
+    dispatch(10, InputState::Pressed, 1000);
+    dispatch(20, InputState::Pressed, 1200);
+    dispatch(10, InputState::Released, 1400);
+    CHECK(bindings.pressed(3));
+    CHECK(engine.stats().counts.bd == 0);
+    dispatch(20, InputState::Released, 2000);
+    engine.advance(2300);
+    CHECK(engine.stats().counts.pg == 2);
+    CHECK(engine.stats().counts.bd == 0);
+    CHECK(engine.stats().counts.pr == 0);
 }

@@ -1,9 +1,10 @@
 # TenRiff Current State
 
+- 1.8.0: 항목별 파스텔색 옵션 카드, 다양한 해상도, 실제 플레이와 같은 스킨 미리보기·고스트, 보조 키, 마우스 설정, 타이틀 음악 선택 및 새 판정 ruleset-2를 포함합니다. [Verification](release-1.8.0-gate.md).
 - 1.7.10: ALL SONG의 삭제된 캐시 항목 건너뛰기, 캐시 통합 진행률과 완료 상태 전달을 보강했습니다. [검증 범위 및 미재현 증상](release-1.7.10-gate.md).
 - 1.7.8: 새 기본 메뉴 에셋·애니메이션, 4~16키 Luma Keys 디지털 건반, 일본어 UI와 웹/오프라인 스킨 에디터를 제공합니다. 메뉴는 `native`, 인게임은 `gameplay.native`에서 도형·색·위치·글꼴·모션을 편집합니다. [검증 범위](release-1.7.8-gate.md).
 
-현재 프로젝트 버전은 **1.7.10**입니다. 무입력 상태에서도 후주 종료 후 결과를 자동 저장·제출하며 스텔라·새틀라이트·U_E 팩 4K/6K/8K 난이도표 프리셋을 추가했습니다. Sites 리더보드 통합과 기존 오디오·스킨·세션 기능을 유지합니다. WASAPI가 기본 출력입니다. 변경 및 검증 범위는 [1.7.10 릴리스 안내](release-1.7.10-gate.md)를 참고하세요.
+현재 프로젝트 버전은 **1.8.0**입니다. 무입력 상태에서도 후주 종료 후 결과를 자동 저장·제출하며 스텔라·새틀라이트·U_E 팩 4K/6K/8K 난이도표 프리셋을 추가했습니다. Sites 리더보드 통합과 기존 오디오·스킨·세션 기능을 유지합니다. WASAPI가 기본 출력입니다. 변경 및 검증 범위는 [1.8.0 릴리스 안내](release-1.8.0-gate.md)를 참고하세요.
 
 [로컬 1.7.1 r2 보고서](local-1.7.1-r2.ko.md)의 749/739 검사 횟수는 이전 빌드의 기록입니다. 현재 릴리스 검사 횟수로 재사용하지 않습니다. 기능별 안내는 [곡 소스와 난이도표](library-management.md), [대표 BPM](reference-bpm.md), [스킨 프리셋](skin-presets.md), [ASIO](asio-audio.md)를 참고하세요.
 
@@ -14,7 +15,7 @@
 - BMS landmines (`D1-D9`, `E1-E9`) are playable, including `#WAV00`, base-36 damage tokens, `ZZ` instant fail, exact press/release boundary behavior, and lane-mod/key-converter remapping.
 - Results and local records expose fixed native score separately from detail score, and categorical native accuracy separately from continuous timing-based detailed accuracy.
 - 새 replay evidence v3는 차트 SHA-256, canonical ruleset, result-to-replay SHA-256을 저장하고 입력 trace를 headless 엔진으로 재실행합니다. 공식 로컬 best는 재계산된 verified 결과만 사용하며 legacy/custom/assist 기록은 히스토리에 `unverified`로 남습니다.
-- 현재 프로젝트 버전은 `1.7.10`
+- 현재 프로젝트 버전은 `1.8.0`
 - 1.7.9 UI 개선: 프로필/첫 실행의 언어·3단계 글자 크기, 사진 미리보기/시작 메뉴 사진, ALL SONG 통합 소스, 선곡 경계와 디지털 탭, 정적인 TI와 홀로그램 TENRIFF. [사용 및 구현 안내](menu-profile-library-polish.ko.md).
 - 1.7.1은 최대 8인 HUD·결과, 동점 순위·점수 대기 상태, P-GREAT 전용 연출, 독립 판정·콤보 위치, 옵션 10개, 오디오 노멀라이즈와 선곡 난이도표 카드를 제공합니다. [변경 설명](gameplay-polish-followup.md), [검증 범위](release-1.7.1-gate.md) 참고.
 - 기본 선곡·싱글 결과 UI는 차분한 패널과 단색 주 동작 버튼을 사용하며, 결과는 큰 점수·등급·정확도 중심으로 표시한다. 사용자 TenRiff 스킨 경로를 유지하며, 1.7.1 대전 결과는 참가자 전원 순위를 표시한다. 구현/검증 안내는 `docs/menu-visual-polish.md`와 `docs/gameplay-polish-followup.md` 참고.
@@ -122,7 +123,7 @@
   - 별도 `변환 노트 추가` 옵션은 제거했으며, Krrcream은 원본 노트만 재배치하고 nK2는 키 수 확장 시 변환된 목표 레이아웃에 안전한 보조 노트를 직접 생성한다.
   - nK2 프리셋은 기본 `Native (12%)`, `Transform (35%)`, `Remaster (65%)` 중 선택한다. `Remaster`는 예산을 올리면서도 앵커를 잠가 원곡 배치를 유지하고 롱노트 구간을 같은 길이의 롱노트로 채운다. 세 값은 상한이며 실제 추가량은 원본 밀도와 안전창에 따라 낮아진다. Krrcream 선택 시 해당 행은 잠기며, standalone converter GUI의 Krrcream Max/Min/Speed/Seed도 수정할 수 없다.
   - NK3는 번들된 P64를 host beam32에 항상 결합한다. 10K가 아닌 원본을 10K로 변환할 때만 일반화 패턴 MLP를 추가하고, 10→10과 나머지 모든 경로는 P64만 사용한다. 기본 `AUTO` 백엔드는 ncnn Vulkan으로 P64와 MLP를 AMD/NVIDIA GPU에서 실행하고, 선택형 OpenVINO 호환 경로는 폴백으로 유지한다. `TENRIFF_NK3_BACKEND`와 `TENRIFF_NK3_VULKAN_DEVICE`로 강제 선택할 수 있다.
-  - 1.7.10 공식 빌드/Windows ZIP은 standalone BMS key converter CLI/GUI를 만들거나 포함하지 않으며 top-level CMake 옵션도 기본 `OFF`; 소스는 개발 회귀용으로만 유지
+  - 1.8.0 공식 빌드/Windows ZIP은 standalone BMS key converter CLI/GUI를 만들거나 포함하지 않으며 top-level CMake 옵션도 기본 `OFF`; 소스는 개발 회귀용으로만 유지
   - `mode.key_mode=none`은 차트의 원래 키 수와 기본 패턴 레이아웃을 그대로 유지
 - Native difficulty:
   - BMS LV/CR 계산에서 롱노트 Head/Tail의 miss-ms만 0.5배로 평가해 `300ms`를 `150ms`처럼 완화하며, 실제 gameplay 판정창은 그대로 유지
@@ -161,8 +162,10 @@
   - 정확도는 PG/GR/GD/BD 기준 100/80/50/20%에 각 판정 구간 내부 타이밍으로 최대 0.5%p를 감산하고, PG 타이밍 범위가 8ms를 넘으면 전부 PG여도 99.5%로 제한함
   - 랭크 경계는 `<75 F / 75 B / 80.5 A / 86.5 A+ / 90 S / 95.5 S+ / 98 AA / 99 SS / 99.75 SSS`
   - 기본 `PG / GR / GD` 범위는 `20ms / 65ms / 115ms`
-  - 기본 `BAD` 범위는 `210ms`, `Judge Easy`는 `262.5ms`, `Judge Hard`는 `340ms`
-  - `Judge Hard`는 PG/GR/GD 및 LN tail 창의 기본값을 유지하고 바깥쪽 BAD 경계만 변경
+  - 기본 `BAD` 범위는 `210ms`, `Judge Easy`는 `283.5ms`, `Judge Hard`는 최대 `180ms`
+  - `Judge Easy`는 판정창·홀드 허용창을 `1.35x`로 넓혀 `PG/GR/GD=27/87.75/155.25ms`; `Judge Hard`는 PG/GR/GD와 홀드 허용창을 유지하며 BAD 최대창만 줄임
+  - 기본 Normal/Easy/Hard 모두 무입력 노트가 `340ms`를 초과하면 자동 미스. BAD창 밖의 늦은 입력은 이전 노트를 미스 처리하고 다음 노트를 검사하므로 BAD창이 자동미스 시점까지 넓어지지 않음
+  - 새 플레이는 `ruleset-2`로 구분하며, 기존 `ruleset-1` 리플레이·고스트·검증은 이전 Easy `1.25x`/Hard BAD `340ms`/자동미스 `=BAD`를 그대로 재현
   - 같은 레인에서 이전 노트가 이미 `BAD`이고 바로 다음 노트가 `GOOD` 이상으로 명확하면, 이전 노트는 미스로 정리하고 현재 입력은 다음 노트에 배정해 한 번의 누락이 연속 `BAD`로 고정되지 않게 함
   - `Judge Hard`에서 입력 없이 지나간 노트는 콤보를 끊는 간접 `POOR`이자 OD8 `MISS`로 기록되며, 다른 note-consuming 실패는 `BAD` 유지
   - 너무 이른 non-consuming 입력은 LR2 스타일 `POOR`로 처리되고, 결과/리플레이/UI에 다시 표시됨
@@ -246,7 +249,7 @@
 
 ## Runtime / Packaging Rules
 - 새 사용자 프로필은 자동 생성
-- 현재 P2P 배포 대상은 `TenRiff 1.7.10`
+- 현재 P2P 배포 대상은 `TenRiff 1.8.0`
 - 배포 패키지에는 `Songs`를 넣지 않음
 - 배포 패키지는 `Main Menu / Options / Song Selecte / Multiplayer Lobby / Clear / Failed` 이름의 `Mainmusic/` 화면 슬롯을 포함하며, 각 `이름.mp3`와 번호가 붙은 `이름 2.mp3`~`이름 64.mp3`를 자동 수집해 화면 재진입마다 순환
 - 배포 업데이트에는 built artifacts와 필요한 런타임 자산만 포함

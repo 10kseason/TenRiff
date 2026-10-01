@@ -1,4 +1,5 @@
 #include "config/Config.h"
+#include "config/GraphicsResolution.h"
 #include "ui/Localization.h"
 
 #include <algorithm>
@@ -149,6 +150,10 @@ void sanitize_skin_config(SkinConfig& skin) {
     skin.judgement_position = clamp_finite(skin.judgement_position, kComboPositionMin, kComboPositionMax, kComboPositionDefault);
     skin.judgement_offset_x = clamp_finite(skin.judgement_offset_x, -600.0, 600.0, 0.0);
     skin.combo_offset_x = clamp_finite(skin.combo_offset_x, -600.0, 600.0, 0.0);
+    skin.combo_font_scale = clamp_finite(skin.combo_font_scale,
+        kSkinHudFontScaleMin, kSkinHudFontScaleMax, kSkinHudFontScaleDefault);
+    skin.judgement_font_scale = clamp_finite(skin.judgement_font_scale,
+        kSkinHudFontScaleMin, kSkinHudFontScaleMax, kSkinHudFontScaleDefault);
     skin.lane_background_opacity = clamp_finite(
         skin.lane_background_opacity,
         kSkinLaneBackgroundOpacityMin,
@@ -171,6 +176,11 @@ void sanitize_skin_config(SkinConfig& skin) {
         kSkinKeyPulseBrightnessMax,
         kSkinKeyPulseBrightnessDefault);
     skin.key_pulse_enabled = skin.key_pulse_brightness > 0.0;
+    skin.key_backdrop_opacity = clamp_finite(skin.key_backdrop_opacity, 0.0, 1.0, 0.25);
+    skin.key_backdrop_brightness = clamp_finite(skin.key_backdrop_brightness,
+        kSkinKeyBackdropBrightnessMin, kSkinKeyBackdropBrightnessMax, kSkinKeyBackdropBrightnessDefault);
+    skin.key_backdrop_height = clamp_finite(skin.key_backdrop_height,
+        kSkinKeyBackdropHeightMin, kSkinKeyBackdropHeightMax, kSkinKeyBackdropHeightDefault);
     skin.hit_burst_style = normalize_skin_hit_burst_style_token(skin.hit_burst_style);
     skin.single_color = normalize_skin_single_color_token(skin.single_color);
     skin.note_outline_opacity = clamp_finite(
@@ -317,13 +327,7 @@ std::string get_string(const JsonObject& object, std::string_view key, std::stri
 }
 
 std::string normalize_resolution_preset(std::string value) {
-    std::transform(value.begin(), value.end(), value.begin(), [](unsigned char ch) {
-        return static_cast<char>(std::tolower(ch));
-    });
-    if (value == "720p" || value == "1080p" || value == "qhd") {
-        return value;
-    }
-    return "native";
+    return normalize_graphics_resolution(value);
 }
 
 std::string normalize_display_mode(std::string value) {
@@ -539,6 +543,8 @@ void apply_config_object(const JsonObject& root, RuntimeConfig& config) {
                                                      config.audio_ui.bms_keysound_policy));
         config.audio_ui.background_sound_enabled =
             get_bool(*audio, "background_sound_enabled", config.audio_ui.background_sound_enabled);
+        config.audio_ui.title_music = normalize_title_music_token(
+            get_string(*audio, "title_music", config.audio_ui.title_music));
         config.audio_ui.master_volume =
             std::clamp(get_number(*audio, "volume", config.audio_ui.master_volume),
                        kMasterVolumeMin, kMasterVolumeMax);
@@ -546,6 +552,7 @@ void apply_config_object(const JsonObject& root, RuntimeConfig& config) {
             std::clamp(get_number(*audio, "bgm_volume", config.audio_ui.bgm_volume),
                        kChartMixVolumeMin, kChartMixVolumeMax);
         config.audio_ui.normalize_audio = get_bool(*audio, "normalize_audio", config.audio_ui.normalize_audio);
+        config.audio_ui.mute_when_inactive = get_bool(*audio, "mute_when_inactive", config.audio_ui.mute_when_inactive);
         config.audio_ui.keysound_volume =
             std::clamp(get_number(*audio, "keysound_volume", config.audio_ui.keysound_volume),
                        kChartMixVolumeMin, kChartMixVolumeMax);
@@ -575,11 +582,11 @@ void apply_config_object(const JsonObject& root, RuntimeConfig& config) {
         config.judge.gr_ms = get_number(*judge, "gr", config.judge.gr_ms);
         config.judge.gd_ms = get_number(*judge, "gd", config.judge.gd_ms);
         config.judge.bd_ms = get_number(*judge, "bd", config.judge.bd_ms);
-        static_cast<void>(get_number(*judge, "indirect_miss", config.judge.indirect_miss_ms));
+        // Keep the automatic-miss deadline independent of loaded BAD windows and old profiles.
+        config.judge.indirect_miss_ms = 340.0;
         config.judge.hold_grace_ms = get_number(*judge, "hold_grace", config.judge.hold_grace_ms);
         config.judge.hold_break_ms = get_number(*judge, "hold_break", config.judge.hold_break_ms);
         config.judge.mask_ms = get_number(*judge, "mask", config.judge.mask_ms);
-        config.judge.indirect_miss_ms = config.judge.bd_ms;
         config.judge.hold_break_ms = std::max(config.judge.hold_break_ms, config.judge.hold_grace_ms);
     }
 
@@ -706,6 +713,8 @@ void apply_config_object(const JsonObject& root, RuntimeConfig& config) {
             get_bool(*ui, "show_cursor_in_gameplay", config.ui.show_cursor_in_gameplay);
         config.ui.active_song_source =
             get_string(*ui, "active_song_source", config.ui.active_song_source);
+        config.ui.last_played_chart_path =
+            get_string(*ui, "last_played_chart_path", config.ui.last_played_chart_path);
         config.ui.song_sources_initialized =
             get_bool(*ui, "song_sources_initialized", config.ui.song_sources_initialized);
         config.ui.session_mix_lr2_course_path =
@@ -815,6 +824,13 @@ void apply_config_object(const JsonObject& root, RuntimeConfig& config) {
             get_bool(*skin, "judgement_line_glow_enabled", config.skin.judgement_line_glow_enabled);
         config.skin.key_pulse_enabled =
             get_bool(*skin, "key_pulse_enabled", config.skin.key_pulse_enabled);
+        config.skin.key_backdrop_override = get_bool(*skin, "key_backdrop_override", config.skin.key_backdrop_override);
+        config.skin.key_backdrop_enabled =
+            get_bool(*skin, "key_backdrop_enabled", config.skin.key_backdrop_enabled);
+        config.skin.key_backdrop_opacity =
+            get_number(*skin, "key_backdrop_opacity", config.skin.key_backdrop_opacity);
+        config.skin.key_backdrop_brightness = get_number(*skin, "key_backdrop_brightness", config.skin.key_backdrop_brightness);
+        config.skin.key_backdrop_height = get_number(*skin, "key_backdrop_height", config.skin.key_backdrop_height);
         // Configs written before the brightness slider only carry the on/off form.
         config.skin.key_pulse_brightness = std::clamp(
             get_number(*skin, "key_pulse_brightness",
@@ -845,6 +861,8 @@ void apply_config_object(const JsonObject& root, RuntimeConfig& config) {
             get_number(*skin, "judgement_offset_x", 0.0), -600.0, 600.0, 0.0);
         config.skin.combo_offset_x = clamp_finite(
             get_number(*skin, "combo_offset_x", 0.0), -600.0, 600.0, 0.0);
+        config.skin.combo_font_scale = get_number(*skin, "combo_font_scale", config.skin.combo_font_scale);
+        config.skin.judgement_font_scale = get_number(*skin, "judgement_font_scale", config.skin.judgement_font_scale);
         config.skin.lane_background_opacity = clamp_finite(
             get_number(*skin, "lane_background_opacity", config.skin.lane_background_opacity),
             kSkinLaneBackgroundOpacityMin,
@@ -1047,10 +1065,12 @@ JsonValue build_json_root(const RuntimeConfig& config) {
     audio.emplace("preset", JsonValue{config.audio_ui.preset});
     audio.emplace("bms_keysound_policy", JsonValue{config.audio_ui.bms_keysound_policy});
     audio.emplace("background_sound_enabled", JsonValue{config.audio_ui.background_sound_enabled});
+    audio.emplace("title_music", JsonValue{normalize_title_music_token(config.audio_ui.title_music)});
     audio.emplace("volume", JsonValue{config.audio_ui.master_volume});
     audio.emplace("bgm_volume", JsonValue{config.audio_ui.bgm_volume});
     audio.emplace("keysound_volume", JsonValue{config.audio_ui.keysound_volume});
     audio.emplace("normalize_audio", JsonValue{config.audio_ui.normalize_audio});
+    audio.emplace("mute_when_inactive", JsonValue{config.audio_ui.mute_when_inactive});
     root.emplace("audio", JsonValue{std::move(audio)});
 
     InputConfig persisted_input = config.input;
@@ -1071,6 +1091,7 @@ JsonValue build_json_root(const RuntimeConfig& config) {
     judge.emplace("gr", JsonValue{config.judge.gr_ms});
     judge.emplace("gd", JsonValue{config.judge.gd_ms});
     judge.emplace("bd", JsonValue{config.judge.bd_ms});
+    judge.emplace("indirect_miss", JsonValue{340.0});
     judge.emplace("hold_grace", JsonValue{config.judge.hold_grace_ms});
     judge.emplace("hold_break", JsonValue{std::max(config.judge.hold_break_ms, config.judge.hold_grace_ms)});
     judge.emplace("mask", JsonValue{config.judge.mask_ms});
@@ -1177,6 +1198,7 @@ JsonValue build_json_root(const RuntimeConfig& config) {
     ui.emplace("require_enter_to_exit", JsonValue{config.ui.require_enter_to_exit});
     ui.emplace("show_cursor_in_gameplay", JsonValue{config.ui.show_cursor_in_gameplay});
     ui.emplace("active_song_source", JsonValue{config.ui.active_song_source});
+    ui.emplace("last_played_chart_path", JsonValue{config.ui.last_played_chart_path});
     ui.emplace("song_sources_initialized", JsonValue{config.ui.song_sources_initialized});
     ui.emplace("session_mix_lr2_course_path", JsonValue{config.ui.session_mix_lr2_course_path});
     JsonArray recent_song_sources;
@@ -1250,6 +1272,11 @@ JsonValue build_json_root(const RuntimeConfig& config) {
     skin.emplace("key_pulse_enabled", JsonValue{key_pulse_on});
     skin.emplace("key_pulse_brightness",
                  JsonValue{key_pulse_on ? config.skin.key_pulse_brightness : 0.0});
+    skin.emplace("key_backdrop_override", JsonValue{config.skin.key_backdrop_override});
+    skin.emplace("key_backdrop_enabled", JsonValue{config.skin.key_backdrop_enabled});
+    skin.emplace("key_backdrop_opacity", JsonValue{config.skin.key_backdrop_opacity});
+    skin.emplace("key_backdrop_brightness", JsonValue{config.skin.key_backdrop_brightness});
+    skin.emplace("key_backdrop_height", JsonValue{config.skin.key_backdrop_height});
     skin.emplace("hit_burst_style",
                  JsonValue{normalize_skin_hit_burst_style_token(config.skin.hit_burst_style)});
     skin.emplace("key_label_position",
@@ -1261,6 +1288,8 @@ JsonValue build_json_root(const RuntimeConfig& config) {
     skin.emplace("judgement_position", JsonValue{config.skin.judgement_position});
     skin.emplace("judgement_offset_x", JsonValue{config.skin.judgement_offset_x});
     skin.emplace("combo_offset_x", JsonValue{config.skin.combo_offset_x});
+    skin.emplace("combo_font_scale", JsonValue{config.skin.combo_font_scale});
+    skin.emplace("judgement_font_scale", JsonValue{config.skin.judgement_font_scale});
 
     skin.emplace("lane_background_opacity", JsonValue{config.skin.lane_background_opacity});
     skin.emplace("black_playfield_enabled", JsonValue{config.skin.black_playfield_enabled});
@@ -1394,6 +1423,17 @@ std::string normalize_profile_avatar_path(std::string_view value) {
 
 std::string normalize_ui_language_token(std::string_view token) {
     return normalize_ui_language(std::string(token));
+}
+
+std::string normalize_title_music_token(std::string_view token) {
+    std::string normalized(token);
+    std::transform(normalized.begin(), normalized.end(), normalized.begin(), [](unsigned char ch) {
+        return static_cast<char>(std::tolower(ch));
+    });
+    if (normalized == "none" || normalized == "random_bms" || normalized == "last_played") {
+        return normalized;
+    }
+    return "default";
 }
 
 std::string normalize_menu_font_size_token(std::string_view token) {
@@ -1952,7 +1992,7 @@ RuntimeConfig ConfigLoader::defaults() const {
     config.audio_ui.preset = "high";
     config.audio_ui.bms_keysound_policy = "follow";
     config.audio_ui.background_sound_enabled = true;
-    config.audio_ui.master_volume = 1.0;
+    config.audio_ui.master_volume = 0.70;
     config.audio_ui.bgm_volume = 0.75;
     config.audio_ui.keysound_volume = 1.0;
 

@@ -36,6 +36,8 @@ struct SkinSettingsEffects {
 [[nodiscard]] std::optional<SkinSettingsRowId> skin_setting_id_at(
     std::size_t index,
     bool lr2_source) noexcept;
+[[nodiscard]] std::optional<std::size_t> skin_setting_index(
+    SkinSettingsRowId id, bool lr2_source) noexcept;
 
 class SkinSettingsController {
 public:
@@ -46,6 +48,9 @@ public:
     [[nodiscard]] bool dirty() const noexcept;
 
     void reset(std::string_view runtime_key_mode);
+    void set_backdrop_defaults(std::optional<bool> enabled, std::optional<float> opacity,
+                               std::optional<float> brightness = std::nullopt,
+                               std::optional<float> height = std::nullopt) noexcept;
     [[nodiscard]] SkinSettingsEffects select(
         SkinSettingsRowId target,
         bool lr2_source) noexcept;
@@ -72,10 +77,14 @@ private:
     void clamp_edit_targets() noexcept;
 
     SkinSettingsRowId selected_id_ = SkinSettingsRowId::KeyMode;
-    std::string edit_mode_ = "10k";
+    std::string edit_mode_ = "4k";
     int edit_lane_ = 0;
     int edit_gap_ = 0;
     bool dirty_ = false;
+    std::optional<bool> backdrop_default_enabled_;
+    std::optional<float> backdrop_default_opacity_;
+    std::optional<float> backdrop_default_brightness_;
+    std::optional<float> backdrop_default_height_;
 };
 
 }  // namespace tenriff::app::menu::settings

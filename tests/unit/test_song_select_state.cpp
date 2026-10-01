@@ -325,3 +325,16 @@ TEST_CASE("native LV restores cached labels filters and sorting after a difficul
     CHECK(native.index.entries[0].title == "High Native");
     }
 }
+
+TEST_CASE("ALL SONG with an active table excludes nonmembers and Native LV restores them") {
+    using tenriff::app::menu_song_select::song_entry_matches_table_scope;
+    SongEntry member, nonmember;
+    member.difficulty_table_level = "?";
+    member.difficulty_table_order = -1; // A valid unlisted/custom level.
+    nonmember.native_level = 99;
+    CHECK(song_entry_matches_table_scope(member, true, true));
+    CHECK_FALSE(song_entry_matches_table_scope(nonmember, true, true));
+    CHECK(song_entry_matches_table_scope(nonmember, true, false));
+    CHECK(song_entry_matches_table_scope(nonmember, false, true));
+    CHECK(nonmember.native_level == 99);
+}

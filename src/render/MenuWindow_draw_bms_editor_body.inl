@@ -227,9 +227,9 @@ if (d2d_->accent_brush) {
 
 if (d2d_->body_format && d2d_->muted_brush) {
     draw_text_clipped(to_wide(loc("T: place silent/move/remove   Arrow: lane/time   Drag note: move   Ctrl+click: multi-select   Ctrl+Y: auto-align BGM   Ctrl+Up/Down: move BGM   Wheel: 1s scroll", "T: 무키음 배치/이동/제거   방향키: 레인/시간   노트 드래그: 이동   Ctrl+클릭: 다중 선택   Ctrl+Y: BGM 자동정렬   Ctrl+↑/↓: BGM 이동   휠: 1초 스크롤")),
-                      d2d_->body_format.Get(), D2D1::RectF(72.0f, 952.0f, 1530.0f, 1002.0f),
+                      d2d_->body_format.Get(), D2D1::RectF(72.0f, 950.0f, 1840.0f, 986.0f),
                       d2d_->muted_brush.Get());
     draw_text_clipped_aligned(to_wide(loc("O: 10s here   CTRL+O: start to end   P: practice here   CTRL+S: Save As   ESC: back", "O: 여기서 10초   CTRL+O: 처음부터 끝까지   P: 이 구간 연습   CTRL+S: 다른 이름 저장   ESC: 뒤로")),
-                              d2d_->body_format.Get(), D2D1::RectF(1370.0f, 952.0f, 1840.0f, 1002.0f),
+                              d2d_->body_format.Get(), D2D1::RectF(72.0f, 994.0f, 1840.0f, 1030.0f),
                               d2d_->accent_brush.Get(), DWRITE_TEXT_ALIGNMENT_TRAILING);
 }

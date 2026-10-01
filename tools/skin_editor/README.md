@@ -4,6 +4,16 @@
 
 ## 한국어
 
+키 입력 배경색은 플레이 스타일의 `key_backdrop`, `key_backdrop_opacity`(0~1), `key_backdrop_brightness`(0~2), `key_backdrop_height`(0~1)로 편집합니다.
+밝기는 RGB 색만 조절하고 농도는 유지합니다. 최대 높이는 플레이 필드 아래부터 차지하는 비율이며, 밝기와 높이의 기본값 1은 기존 효과를 유지합니다.
+게임에서는 첫 사용자 변경 전까지 스킨 값을 사용하고, 변경 후에는 프로필의 켬/끔·농도·밝기·최대 높이를 우선합니다. 노트 높이를 바꾸면 Native 판정선 두께도 같은 비율로 바뀌며,
+기존 `native.metrics.judgement_line_width`는 기본 노트 높이에서의 두께로 유지합니다.
+
+Native 악기 설정의 `combo_font_size`와 `judgement_font_size`는 스킨이 정한 기준 크기(px)입니다.
+게임의 콤보·판정 글자 크기는 프로필별로 50~200%를 적용하며 가져온 스킨에도 적용됩니다.
+편집기는 프로필 100%를 기준으로 보여주고, 모든 미리보기 글자에는 대비를 높이는 얇은 외곽선을 적용합니다. 판정·콤보에는 큰 글자의 세로 여유도 적용합니다.
+프로필의 `combo_font_scale`·`judgement_font_scale`은 스킨 JSON에 저장하지 않습니다.
+
 `Launch-Skin-Editor.cmd` 또는 `index.html`을 더블클릭하세요. 설치, 서버, 인터넷,
 Node.js 없이 최신 Edge / Chrome / Firefox에서 실행되는 오프라인 편집기입니다.
 모든 편집 화면은 한국어·영어·일본어를 지원하며, 오른쪽 위에서 언어를 고릅니다.
@@ -61,6 +71,16 @@ JSON은 8MB, 이미지 한 개는 64MB, ZIP 전체는 512MB까지입니다. ZIP�
 언어 선택만 브라우저 로컬 저장소에 보관하며 이미지나 JSON은 외부로 전송하지 않습니다.
 
 ## English
+
+Edit the pressed-key backdrop with gameplay `key_backdrop`, `key_backdrop_opacity` (0–1), `key_backdrop_brightness` (0–2), and `key_backdrop_height` (0–1).
+Brightness adjusts RGB without changing opacity. Maximum height is the fraction of the playfield covered from its bottom; brightness and height default to 1 to preserve the existing effect.
+The client uses skin defaults until the first user edit, then preserves the profile On/Off, opacity, brightness, and maximum-height override. Native judgement-line thickness scales with note height;
+`native.metrics.judgement_line_width` remains the authored width at the default note height.
+
+Native instrument `combo_font_size` and `judgement_font_size` are authored skin sizes in pixels.
+The game's Combo/Judgement Font Size settings apply independent profile scales of 50–200%, including imported skins.
+The editor previews the 100% profile value, outlines every preview text role for contrast, and allows vertical room for large combo/judgement glyphs.
+Profile `combo_font_scale` and `judgement_font_scale` values are not saved in skin JSON.
 
 Double-click `Launch-Skin-Editor.cmd` or `index.html`. This offline editor runs in a
 current Edge, Chrome, or Firefox browser without installation, a server, Node.js,
@@ -124,6 +144,16 @@ autosave. Only the UI language is retained in browser local storage. No images
 or manifests are uploaded.
 
 ## 日本語
+
+キー入力背景色はプレイスタイルの `key_backdrop`、`key_backdrop_opacity`（0～1）、`key_backdrop_brightness`（0～2）、`key_backdrop_height`（0～1）で編集できます。
+明るさは不透明度を変えずに RGB 色を調整します。最大高さはフィールド下端から覆う割合で、明るさと高さの既定値 1 は従来の表示を維持します。
+最初のユーザー変更まではスキンの初期値を使い、変更後はプロファイルのオン・オフ、不透明度、明るさ、最大高さを優先します。Native 判定ラインの太さはノート高さに比例し、
+`native.metrics.judgement_line_width` は標準ノート高さでの太さを維持します。
+
+Native 楽器設定の `combo_font_size` と `judgement_font_size` はスキンの基準文字サイズ（px）です。
+ゲームのコンボ・判定文字サイズはプロファイルごとに50〜200%で調整し、インポートしたスキンにも適用します。
+エディターは100%を基準に表示し、すべてのプレビュー文字にコントラストを高める細い縁取りを付けます。コンボ・判定には大きな文字用の縦方向の余裕も付けます。
+プロファイルの `combo_font_scale` と `judgement_font_scale` はスキンJSONに保存しません。
 
 `Launch-Skin-Editor.cmd` または `index.html` をダブルクリックしてください。
 インストール、サーバー、Node.js、インターネット接続は不要です。現在の Edge / Chrome /

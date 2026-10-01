@@ -739,7 +739,6 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
     const bool center_gap_available = config::normalize_skin_mode_token(skin_edit_mode_) == "16k";
     const std::string active_skin_source = config::normalize_skin_source_token(config_.skin.source);
     const bool lr2_source = active_skin_source == "lr2";
-    const int lr2_shift = lr2_source ? 1 : 0;
     const SkinSettingsRows stable_rows{lr2_source};
     const TenRiffSkinDefinition* preview_definition =
         active_skin_source == "tenriff"
@@ -753,6 +752,24 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
     auto style_number = [&](const std::optional<float>& value, double fallback) {
         return manifest_style && value.has_value() ? static_cast<double>(*value) : fallback;
     };
+    const auto backdrop_default_enabled =
+        manifest_style ? manifest_style->key_backdrop_enabled : std::optional<bool>{};
+    const auto backdrop_default_opacity =
+        manifest_style ? manifest_style->key_backdrop_opacity : std::optional<float>{};
+    const auto backdrop_default_brightness = manifest_style ? manifest_style->key_backdrop_brightness : std::optional<float>{};
+    const auto backdrop_default_height = manifest_style ? manifest_style->key_backdrop_height : std::optional<float>{};
+    skin_settings_controller_.set_backdrop_defaults(backdrop_default_enabled, backdrop_default_opacity,
+                                                   backdrop_default_brightness, backdrop_default_height);
+    const bool backdrop_enabled = config_.skin.key_backdrop_override
+        ? config_.skin.key_backdrop_enabled
+        : style_bool(backdrop_default_enabled, config_.skin.key_backdrop_enabled);
+    const double backdrop_opacity = std::clamp(config_.skin.key_backdrop_override
+        ? config_.skin.key_backdrop_opacity
+        : style_number(backdrop_default_opacity, config_.skin.key_backdrop_opacity), 0.0, 1.0);
+    const double backdrop_brightness = std::clamp(config_.skin.key_backdrop_override ? config_.skin.key_backdrop_brightness
+        : style_number(backdrop_default_brightness, config_.skin.key_backdrop_brightness), 0.0, 2.0);
+    const double backdrop_height = std::clamp(config_.skin.key_backdrop_override ? config_.skin.key_backdrop_height
+        : style_number(backdrop_default_height, config_.skin.key_backdrop_height), 0.0, 1.0);
     const std::string imported_skin_row_label =
         active_skin_source == "tenriff" ? ui_text("TenRiff Skin", "TenRiff 스킨")
                                          : (active_skin_source == "lr2"
@@ -771,9 +788,9 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
                                                                             : config_.skin.tenriff_skin_name);
     }
     append_menu_row(render.generic, ui_text("Key Mode", "키 모드"), ui_key_mode_label(skin_edit_mode_),
-                    settings_cursor_ == stable_rows.index_of(SkinSettingsRowId::KeyMode),
+                    false,
                     render::MenuHitTargetKind::SettingsRow,
-                    stable_rows.index_of(SkinSettingsRowId::KeyMode), false, true);
+                    static_cast<int>(SkinSettingsRowId::KeyMode), false, true);
     append_menu_row(
         render.generic,
         ui_text("Scratch Position", "스크래치 위치"),
@@ -782,41 +799,41 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
                    ? ui_text("Right", "오른쪽")
                    : ui_text("Left", "왼쪽"))
             : ui_text("7+1 Only", "7+1 전용"),
-        settings_cursor_ == stable_rows.index_of(SkinSettingsRowId::ScratchPosition),
+        false,
         render::MenuHitTargetKind::SettingsRow,
-        stable_rows.index_of(SkinSettingsRowId::ScratchPosition),
+        static_cast<int>(SkinSettingsRowId::ScratchPosition),
         false,
         seven_plus_one);
-    append_menu_row(render.generic, ui_text("Skin Source", "스킨 소스"), ui_skin_source_label(active_skin_source), settings_cursor_ == 0,
-                    render::MenuHitTargetKind::SettingsRow, 0, false, true);
-    append_menu_row(render.generic, imported_skin_row_label, imported_skin_value, settings_cursor_ == 1,
-                    render::MenuHitTargetKind::SettingsRow, 1, false, true);
+    append_menu_row(render.generic, ui_text("Skin Source", "스킨 소스"), ui_skin_source_label(active_skin_source), false,
+                    render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::SkinSource), false, true);
+    append_menu_row(render.generic, imported_skin_row_label, imported_skin_value, false,
+                    render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::ImportedSkin), false, true);
     if (lr2_source) {
         append_menu_row(render.generic, ui_text("LR2 Resolution", "LR2 해상도"),
                         (config::normalize_skin_lr2_resolution_mode_token(config_.skin.lr2_resolution_mode) == "auto")
                             ? ui_text("Automatic", "자동")
                             : lr2_resolution_mode_label(config_.skin.lr2_resolution_mode),
-                        settings_cursor_ == 2, render::MenuHitTargetKind::SettingsRow, 2, false, true);
+                        false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::Lr2Resolution), false, true);
     }
     append_menu_row(render.generic, ui_text("Import Skin", "스킨 가져오기"),
                     ui_text("Open Folder", "폴더 열기"),
-                    settings_cursor_ == 2 + lr2_shift,
-                    render::MenuHitTargetKind::SettingsRow, 2 + lr2_shift, true, false);
+                    false,
+                    render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::ImportSkin), true, false);
     append_menu_row(render.generic, ui_text("Create New Skin", "새 스킨 만들기"),
                     ui_text("Create & Open", "생성 후 열기"),
                     false, render::MenuHitTargetKind::SettingsRow,
-                    3 + lr2_shift, true, false);
+                    static_cast<int>(SkinSettingsRowId::CreateSkin), true, false);
     const bool editable_tenriff_skin = active_skin_source == "tenriff" &&
                                        active_tenriff_skin_.found &&
                                        !config_.skin.tenriff_skin_name.empty();
     append_menu_row(render.generic, ui_text("Open Skin Folder", "스킨 폴더 열기"),
                     editable_tenriff_skin ? ui_text("Open", "열기") : ui_text("TenRiff Only", "TenRiff 전용"),
                     false, render::MenuHitTargetKind::SettingsRow,
-                    4 + lr2_shift, editable_tenriff_skin, false);
+                    static_cast<int>(SkinSettingsRowId::OpenSkinFolder), editable_tenriff_skin, false);
     append_menu_row(render.generic, ui_text("Reload Skin", "스킨 다시 불러오기"),
                     editable_tenriff_skin ? "F5" : ui_text("TenRiff Only", "TenRiff 전용"),
                     false, render::MenuHitTargetKind::SettingsRow,
-                    5 + lr2_shift, editable_tenriff_skin, false);
+                    static_cast<int>(SkinSettingsRowId::ReloadSkin), editable_tenriff_skin, false);
     append_menu_row(render.generic, ui_text("Target Lane", "대상 레인"),
                     (seven_plus_one && skin_edit_lane_ == 0
                          ? ui_text("Scratch", "스크래치")
@@ -825,146 +842,192 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
                                 : ui_text("Lane ", "레인 ") +
                                       std::to_string(skin_edit_lane_ + 1))) +
                         " / " + std::to_string(lane_count),
-                    settings_cursor_ == 4 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 4 + lr2_shift, false, true);
+                    false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::TargetLane), false, true);
     append_menu_row(render.generic,
                     ui_text("Target Gap", "대상 간격"),
                     (gap_count > 0)
                         ? (std::to_string(skin_edit_gap_ + 1) + "-" + std::to_string(skin_edit_gap_ + 2) +
                            " / " + std::to_string(gap_count))
                         : ui_text("N/A", "없음"),
-                    settings_cursor_ == 5 + lr2_shift,
+                    false,
                     render::MenuHitTargetKind::SettingsRow,
-                    5 + lr2_shift,
+                    static_cast<int>(SkinSettingsRowId::TargetGap),
                     false,
                     gap_count > 0);
     append_menu_row(render.generic, ui_text("Lane Color", "레인 색상"),
                     single_color_enabled
                         ? ui_text("Single Color Active", "단일 색상 사용 중")
                         : config::skin_color_label(preview_lane_palette[static_cast<std::size_t>(skin_edit_lane_)]),
-                    settings_cursor_ == 6 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 6 + lr2_shift,
+                    false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::LaneColor),
                     false, !single_color_enabled);
     append_menu_row(render.generic,
                     ui_text("Single Color", "단일 색상"),
                     config::skin_single_color_label(config_.skin.single_color),
                     false,
                     render::MenuHitTargetKind::SettingsRow,
-                    stable_rows.index_of(SkinSettingsRowId::SingleColor),
+                    static_cast<int>(SkinSettingsRowId::SingleColor),
                     false,
                     true);
     append_menu_row(render.generic, ui_text("Note Shape", "노트 모양"), ui_skin_note_shape_label(config_.skin.note_shape),
-                    settings_cursor_ == 7 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 7 + lr2_shift, false, true);
+                    false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::NoteShape), false, true);
     append_menu_row(render.generic, ui_text("Note Border", "노트 테두리"), ui_on_off(config_.skin.note_border_enabled),
-                    settings_cursor_ == 8 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 8 + lr2_shift, false, true);
+                    false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::NoteBorder), false, true);
     append_menu_row(render.generic, ui_text("Image Aspect", "이미지 비율"),
                     ui_skin_note_image_aspect_label(config_.skin.note_image_aspect),
-                    settings_cursor_ == 9 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 9 + lr2_shift, false, true);
+                    false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::ImageAspect), false, true);
     append_menu_row(render.generic, ui_text("White Dividers", "흰 레인 구분선"), ui_on_off(config_.skin.show_lane_dividers),
-                    settings_cursor_ == 10 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 10 + lr2_shift, false, true);
+                    false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::LaneDividers), false, true);
     append_menu_row(render.generic, ui_text("Judgement Line", "판정선 표시"), ui_on_off(config_.skin.show_judgement_line),
-                    settings_cursor_ == 11 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 11 + lr2_shift, false, true);
+                    false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::JudgementLine), false, true);
     append_menu_row(render.generic, ui_text("Gear Boundary", "기어 경계선"), ui_on_off(config_.skin.show_gear_boundary_line),
-                    settings_cursor_ == 12 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 12 + lr2_shift, false, true);
+                    false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::GearBoundary), false, true);
     append_menu_row(render.generic, ui_text("LN Tail Cap", "LN \uD14C\uC77C \uCEA1"), ui_on_off(config_.skin.show_hold_tail),
-                    settings_cursor_ == 13 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 13 + lr2_shift, false, true);
+                    false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::ShowHoldTail), false, true);
     append_menu_row(render.generic, ui_text("LN Tail Taper", "LN 꼬리 테이퍼"), ui_on_off(config_.skin.hold_tail_taper_enabled),
-                    settings_cursor_ == 14 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 14 + lr2_shift, false, true);
+                    false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::LnTailTaper), false, true);
     append_menu_row(render.generic, ui_text("Visual Preset", "비주얼 프리셋"),
                     config::skin_visual_preset_label(config_.skin.visual_preset),
-                    settings_cursor_ == 15 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 15 + lr2_shift, false, true);
+                    false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::VisualPreset), false, true);
     append_menu_row(render.generic, ui_text("Lane Tint Opacity", "레인 색상 농도"),
                     format_percent(config_.skin.lane_background_opacity),
-                    settings_cursor_ == 16 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 16 + lr2_shift, false, true);
+                    false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::LaneBackgroundOpacity), false, true);
     append_menu_row(render.generic, ui_text("Visual Opacity", "전체 투명도"),
                     format_percent(config_.skin.visual_opacity),
-                    settings_cursor_ == 17 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 17 + lr2_shift, false, true);
+                    false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::VisualOpacity), false, true);
     append_menu_row(render.generic, ui_text("Outline Alpha", "외곽선 투명도"),
                     format_percent(config_.skin.note_outline_opacity),
-                    settings_cursor_ == 18 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 18 + lr2_shift, false, true);
+                    false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::NoteOutlineOpacity), false, true);
     append_menu_row(render.generic, ui_text("LN Body Alpha", "LN 몸통 투명도"),
                     format_percent(config_.skin.hold_body_opacity),
-                    settings_cursor_ == 19 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 19 + lr2_shift, false, true);
+                    false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::LnBodyOpacity), false, true);
     append_menu_row(render.generic, ui_text("Judge Glow", "판정선 글로우"), ui_on_off(config_.skin.judgement_line_glow_enabled),
-                    settings_cursor_ == 20 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 20 + lr2_shift, false, true);
+                    false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::JudgementLineGlow), false, true);
     append_menu_row(render.generic, ui_text("Hit Burst Style", "키 폭발 모양"),
                     config::skin_hit_burst_style_label(config_.skin.hit_burst_style),
-                    settings_cursor_ == 21 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 21 + lr2_shift, false, true);
+                    false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::HitBurstStyle), false, true);
     append_menu_row(render.generic, ui_text("Hit Burst Brightness", "키 폭발 밝기"),
                     format_percent(config_.skin.key_pulse_brightness),
-                    settings_cursor_ == 22 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 22 + lr2_shift, false, true);
+                    false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::KeyPulse), false, true);
     append_menu_row(render.generic, ui_text("Key Labels", "키 이름"),
                     config::skin_key_label_position_label(config_.skin.key_label_position),
-                    settings_cursor_ == 23 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 23 + lr2_shift, false, true);
+                    false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::KeyLabelPosition), false, true);
     append_menu_row(render.generic, ui_text("Judge Line", "판정선 위치"), format_percent(config_.skin.judgement_line_position),
-                    settings_cursor_ == 24 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 24 + lr2_shift, false, true);
+                    false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::JudgeLinePosition), false, true);
     append_menu_row(render.generic, ui_text("Lane Width", "레인 너비"), format_percent(preview_lane_width_scale),
-                    settings_cursor_ == 25 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 25 + lr2_shift, false, true);
+                    false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::LaneWidth), false, true);
     append_menu_row(render.generic, ui_text("Note & Field Size", "노트·필드 크기"), format_percent(preview_note_width_scale),
-                    settings_cursor_ == 26 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 26 + lr2_shift, false, true);
+                    false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::NoteWidth), false, true);
     append_menu_row(render.generic, ui_text("Lane Spacing", "레인 간격"), format_percent(preview_lane_spacing_scale),
-                    settings_cursor_ == 27 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 27 + lr2_shift, false, gap_count > 0);
+                    false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::LaneSpacing), false, gap_count > 0);
     append_menu_row(render.generic, ui_text("Divider Width", "구분선 너비"), format_percent(preview_lane_divider_width_scale),
-                    settings_cursor_ == 28 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 28 + lr2_shift, false, true);
+                    false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::DividerWidth), false, true);
     append_menu_row(render.generic,
                     ui_text("16K Center Gap", "16K 중앙 간격"),
                     center_gap_available ? format_percent(preview_lane_center_gap_scale) : ui_text("16K Only", "16K 전용"),
-                    settings_cursor_ == 29 + lr2_shift,
+                    false,
                     render::MenuHitTargetKind::SettingsRow,
-                    29 + lr2_shift,
+                    static_cast<int>(SkinSettingsRowId::CenterGap),
                     false,
                     center_gap_available);
     append_menu_row(render.generic, ui_text("LN Body Width", "LN 몸통 너비"), format_percent(config_.skin.hold_body_width_scale),
-                    settings_cursor_ == 30 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 30 + lr2_shift, false, true);
+                    false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::LnBodyWidth), false, true);
     append_menu_row(render.generic, ui_text("Note Height", "노트 높이"), format_percent(preview_note_height_scale),
-                    settings_cursor_ == 31 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 31 + lr2_shift, false, true);
+                    false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::NoteHeight), false, true);
     append_menu_row(render.generic, ui_text("Combo Y", "콤보 Y"), format_percent(config_.skin.combo_position),
-                    settings_cursor_ == 32 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 32 + lr2_shift, false, true);
+                    false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::ComboY), false, true);
     append_menu_row(render.generic, ui_text("Opaque Playfield", "기어 뒤 BGA 가림"),
                     ui_on_off(config_.skin.black_playfield_enabled),
-                    settings_cursor_ == 33 + lr2_shift, render::MenuHitTargetKind::SettingsRow, 33 + lr2_shift, false, true);
+                    false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::BlackPlayfield), false, true);
     append_menu_row(render.generic, ui_text("UI Font", "UI 폰트"),
                     config::skin_ui_font_label(config_.skin.ui_font),
-                    settings_cursor_ == 34 + lr2_shift, render::MenuHitTargetKind::SettingsRow,
-                    34 + lr2_shift, false, true);
+                    false, render::MenuHitTargetKind::SettingsRow,
+                    static_cast<int>(SkinSettingsRowId::UiFont), false, true);
     append_menu_row(render.generic, ui_text("Visual Latency", "비주얼 레이턴시"),
                     format_signed_offset_ms(config_.visual_offset_ms),
-                    settings_cursor_ == 35 + lr2_shift, render::MenuHitTargetKind::SettingsRow,
-                    35 + lr2_shift, false, true);
+                    false, render::MenuHitTargetKind::SettingsRow,
+                    static_cast<int>(SkinSettingsRowId::VisualLatency), false, true);
     append_menu_row(render.generic, ui_text("Note Gap", "노트 여백"),
                     format_pixels(config_.skin.note_divider_gap_px),
-                    settings_cursor_ == 36 + lr2_shift, render::MenuHitTargetKind::SettingsRow,
-                    36 + lr2_shift, false, true);
+                    false, render::MenuHitTargetKind::SettingsRow,
+                    static_cast<int>(SkinSettingsRowId::NoteGap), false, true);
     append_menu_row(render.generic, ui_text("Gameplay Cursor", "인게임 커서"),
                     ui_on_off(config_.ui.show_cursor_in_gameplay),
-                    settings_cursor_ == 37 + lr2_shift, render::MenuHitTargetKind::SettingsRow,
-                    37 + lr2_shift, false, true);
+                    false, render::MenuHitTargetKind::SettingsRow,
+                    static_cast<int>(SkinSettingsRowId::GameplayCursor), false, true);
     append_menu_row(render.generic,
                     ui_text("FAST/SLOW Indicator", "FAST/SLOW 인디케이터"),
                     ui_on_off(config_.skin.show_timing_feedback),
                     false,
                     render::MenuHitTargetKind::SettingsRow,
-                    stable_rows.index_of(SkinSettingsRowId::TimingFeedback),
+                    static_cast<int>(SkinSettingsRowId::TimingFeedback),
                     false,
                     true);
     append_menu_row(render.generic, ui_text("Judgement Y", "판정 Y"), format_percent(config_.skin.judgement_position),
-                    false, render::MenuHitTargetKind::SettingsRow, stable_rows.index_of(SkinSettingsRowId::JudgementY), false, true);
+                    false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::JudgementY), false, true);
     append_menu_row(render.generic, ui_text("Judgement X", "판정 X"), std::to_string(static_cast<int>(config_.skin.judgement_offset_x)) + " px",
-                    false, render::MenuHitTargetKind::SettingsRow, stable_rows.index_of(SkinSettingsRowId::JudgementX), false, true);
+                    false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::JudgementX), false, true);
     append_menu_row(render.generic, ui_text("Combo X", "콤보 X"), std::to_string(static_cast<int>(config_.skin.combo_offset_x)) + " px",
-                    false, render::MenuHitTargetKind::SettingsRow, stable_rows.index_of(SkinSettingsRowId::ComboX), false, true);
+                    false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::ComboX), false, true);
     append_menu_row(render.generic, ui_text("Export Skin Preset", "스킨 프리셋 내보내기"), ".trskin", false,
                     render::MenuHitTargetKind::SettingsRow,
-                    stable_rows.index_of(SkinSettingsRowId::ExportPreset), true, false);
+                    static_cast<int>(SkinSettingsRowId::ExportPreset), true, false);
     append_menu_row(render.generic, ui_text("Import Skin Preset", "스킨 프리셋 가져오기"), ".trskin", false,
                     render::MenuHitTargetKind::SettingsRow,
-                    stable_rows.index_of(SkinSettingsRowId::ImportPreset), true, false);
+                    static_cast<int>(SkinSettingsRowId::ImportPreset), true, false);
     append_menu_row(render.generic, ui_text("Open Skin Editor", "스킨 에디터 열기"),
-                    ui_text("Open", "열기"), false, render::MenuHitTargetKind::SettingsRow, 0, true, false);
+                    ui_text("Open", "열기"), false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::OpenSkinEditor), true, false);
     append_menu_row(render.generic, ui_text("Back", "뒤로"), "", false,
                     render::MenuHitTargetKind::SettingsRow,
-                    stable_rows.index_of(SkinSettingsRowId::Back), true, false);
-    for (std::size_t row = 0; row < render.generic.rows.size(); ++row) {
-        render.generic.rows[row].row_index = static_cast<int>(row);
-        render.generic.rows[row].selected = settings_cursor_ == static_cast<int>(row);
+                    static_cast<int>(SkinSettingsRowId::Back), true, false);
+    append_menu_row(render.generic, ui_text("Key Press Backdrop", "키 입력 배경색"),
+                    ui_on_off(backdrop_enabled), false,
+                    render::MenuHitTargetKind::SettingsRow,
+                    static_cast<int>(SkinSettingsRowId::KeyBackdrop), false, true);
+    append_slider_menu_row(render.generic, ui_text("Key Backdrop Opacity", "키 배경색 농도"),
+                           format_percent(backdrop_opacity),
+                           backdrop_opacity, false,
+                           render::MenuHitTargetKind::SettingsRow,
+                           static_cast<int>(SkinSettingsRowId::KeyBackdropOpacity));
+    append_slider_menu_row(render.generic, ui_text("Key Backdrop Brightness", "키 배경색 밝기"),
+                           format_percent(backdrop_brightness), backdrop_brightness / 2.0, false,
+                           render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::KeyBackdropBrightness));
+    append_slider_menu_row(render.generic, ui_text("Key Backdrop Max Height", "키 배경색 최대 높이"),
+                           format_percent(backdrop_height), backdrop_height, false,
+                           render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::KeyBackdropHeight));
+    append_slider_menu_row(render.generic, ui_text("Combo Font Size", "콤보 글자 크기"),
+                           format_percent(config_.skin.combo_font_scale),
+                           (config_.skin.combo_font_scale - config::kSkinHudFontScaleMin) /
+                               (config::kSkinHudFontScaleMax - config::kSkinHudFontScaleMin), false,
+                           render::MenuHitTargetKind::SettingsRow,
+                           static_cast<int>(SkinSettingsRowId::ComboFontSize));
+    append_slider_menu_row(render.generic, ui_text("Judgement Font Size", "판정 글자 크기"),
+                           format_percent(config_.skin.judgement_font_scale),
+                           (config_.skin.judgement_font_scale - config::kSkinHudFontScaleMin) /
+                               (config::kSkinHudFontScaleMax - config::kSkinHudFontScaleMin), false,
+                           render::MenuHitTargetKind::SettingsRow,
+                           static_cast<int>(SkinSettingsRowId::JudgementFontSize));
+    const auto category_label = [&](SkinSettingsCategory category) -> std::string {
+        switch (category) {
+            case SkinSettingsCategory::Source: return ui_text("Skin & Files", "스킨·파일");
+            case SkinSettingsCategory::Geometry: return ui_text("Field & Spacing", "필드·간격");
+            case SkinSettingsCategory::Notes: return ui_text("Notes & Colors", "노트·색상");
+            case SkinSettingsCategory::LongNotes: return ui_text("Long Notes", "롱노트");
+            case SkinSettingsCategory::Effects: return ui_text("Background & Key Effects", "배경·키 효과");
+            case SkinSettingsCategory::Hud: return ui_text("Judgement & HUD", "판정·HUD");
+            case SkinSettingsCategory::Other: return ui_text("Display & Cursor", "화면·커서");
+            case SkinSettingsCategory::Navigation: return {};
+        }
+        return {};
+    };
+    std::stable_sort(render.generic.rows.begin(), render.generic.rows.end(),
+                     [&](const auto& left, const auto& right) {
+                         return stable_rows.index_of(static_cast<SkinSettingsRowId>(left.row_index)) <
+                                stable_rows.index_of(static_cast<SkinSettingsRowId>(right.row_index));
+                     });
+    for (auto& row : render.generic.rows) {
+        const auto id = static_cast<SkinSettingsRowId>(row.row_index);
+        row.selected = skin_settings_controller_.selected_id() == id;
+        row.category = category_label(skin_settings_category(id));
     }
 
     render.generic.skin_preview.visible = true;
@@ -995,6 +1058,17 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
     render.generic.skin_preview.judgement_position = config_.skin.judgement_position;
     render.generic.skin_preview.judgement_offset_x = config_.skin.judgement_offset_x;
     render.generic.skin_preview.combo_offset_x = config_.skin.combo_offset_x;
+    render.generic.skin_preview.combo_font_scale = config_.skin.combo_font_scale;
+    render.generic.skin_preview.judgement_font_scale = config_.skin.judgement_font_scale;
+    render.generic.skin_preview.gameplay_field_offset_x = config_.skin.gameplay_field_offset_x;
+    config::KeymapManager preview_keymap_manager;
+    const auto preview_bindings = preview_keymap_manager.bindings_for_mode(keymap_, std::to_string(lane_count) + "k");
+    for (int lane = 0; lane < lane_count; ++lane) {
+        const int source_lane = preview_layout.source_lane_for_visual(lane + 1);
+        const auto binding = preview_bindings.find("lane" + std::to_string(source_lane));
+        if (binding != preview_bindings.end())
+            render.generic.skin_preview.key_labels[static_cast<std::size_t>(lane)] = compact_gameplay_key_label(binding->second);
+    }
     render.generic.skin_preview.lane_width_scale_count =
         std::min(visual_preview_lane_width_scales.size(), render.generic.skin_preview.lane_width_scales.size());
     render.generic.skin_preview.lane_width_scales.fill(config::kLaneWidthScaleDefault);
@@ -1037,6 +1111,11 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
     render.generic.skin_preview.key_pulse_brightness = static_cast<float>(style_number(
         manifest_style ? manifest_style->key_pulse_brightness : std::optional<float>{},
         config_.skin.key_pulse_brightness));
+    // Player controls remain effective when imported art supplies its own pressed keys.
+    render.generic.skin_preview.key_backdrop_enabled = backdrop_enabled;
+    render.generic.skin_preview.key_backdrop_opacity = backdrop_opacity;
+    render.generic.skin_preview.key_backdrop_brightness = backdrop_brightness;
+    render.generic.skin_preview.key_backdrop_height = backdrop_height;
     render.generic.skin_preview.hit_burst_style =
         manifest_style && manifest_style->hit_burst_style.has_value()
             ? *manifest_style->hit_burst_style
@@ -1102,6 +1181,15 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
                 : config::skin_color_rgb(visual_preview_lane_colors[lane_index]);
     }
 
+    render.generic.notes.push_back(ui_text(
+        "Key backdrop has separate On/Off, opacity, brightness (0-200%) and maximum height (0-100%, from the field bottom). Hit-burst brightness is separate.",
+        "키 배경색은 켬/끔, 농도, 밝기(0~200%), 최대 높이(필드 아래부터 0~100%)를 따로 조절합니다. 키 폭발 밝기는 별도입니다."));
+    render.generic.notes.push_back(ui_text(
+        "Judgement line thickness scales with Note Height; the preview uses the gameplay renderer.",
+        "판정선 두께는 노트 높이 비율을 따릅니다. 미리보기는 실제 게임 렌더러를 사용합니다."));
+    render.generic.notes.push_back(ui_text(
+        "Combo and Judgement Font Size scale each skin's HUD text independently from 50% to 200%. Profile values also apply to imported skins.",
+        "콤보·판정 글자 크기는 각 스킨의 HUD 글자를 50~200%로 각각 조절합니다. 가져온 스킨에도 프로필 값이 적용됩니다."));
     for (const auto& status : skin_status_messages_) {
         render.generic.notes.push_back(status);
     }

@@ -11,6 +11,8 @@
 namespace tenriff::app {
 
 inline constexpr std::string_view kCanonicalReplayRulesetId =
+    "tenriff-native-score-v2-ruleset-2";
+inline constexpr std::string_view kLegacyReplayRulesetId =
     "tenriff-native-score-v2-ruleset-1";
 inline constexpr int64_t kReplayVerificationLeadInMs = 3000;
 
@@ -25,6 +27,7 @@ enum class ReplayVerificationStatus {
 struct ReplayVerificationResult {
     ReplayVerificationStatus status = ReplayVerificationStatus::Invalid;
     std::string detail;
+    std::string ruleset_id;
     std::string chart_sha256;
     std::string replay_sha256;
     gameplay::ResultStats stats;
@@ -44,6 +47,9 @@ struct ReplayVerificationResult {
 };
 
 [[nodiscard]] std::string_view replay_verification_status_token(ReplayVerificationStatus status);
+[[nodiscard]] bool is_supported_canonical_replay_ruleset(std::string_view ruleset_id);
+[[nodiscard]] config::JudgeConfig replay_judge_config_for_playback(
+    const gameplay::ReplayFile& replay, const config::JudgeConfig& base);
 [[nodiscard]] bool is_canonical_score_ruleset(const config::JudgeConfig& judge,
                                               const game::GaugeConfig& gauge);
 [[nodiscard]] std::string replay_ruleset_id_for_runtime(const config::JudgeConfig& judge,

@@ -3,7 +3,7 @@ param(
     [string]$BuildReleaseDirectory,
     [Parameter(Mandatory = $true)]
     [string]$OutputDirectory,
-    [string]$Version = "1.7.10",
+    [string]$Version = "1.8.0",
     [switch]$BinaryOnly
 )
 
@@ -83,6 +83,8 @@ foreach ($relative in $topFiles) {
 foreach ($directory in @("Mainmusic", "config", "docs", "examples", "models", "skins")) {
     Copy-Item -LiteralPath (Join-Path $repoRoot $directory) -Destination $binaryRoot -Recurse
 }
+New-Item -ItemType Directory -Path (Join-Path $binaryRoot "assets") -Force | Out-Null
+Copy-Item -LiteralPath (Join-Path $repoRoot "assets\menu") -Destination (Join-Path $binaryRoot "assets\menu") -Recurse
 # Skin images are already generated. Keep their offline authoring programs in
 # the source tree, not in the runnable client delivery.
 foreach ($relative in @(

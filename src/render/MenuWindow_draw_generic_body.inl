@@ -83,432 +83,68 @@
                                   d2d_->muted_brush.Get());
             }
 
-            const float preview_bounds_left = rect.left + 28.0f;
-            const float preview_bounds_right = rect.right - 28.0f;
-            const float field_top = rect.top + 132.0f;
-            const float field_bottom = rect.bottom - 152.0f;
             const int lane_count = std::clamp(preview.lane_count, 1, static_cast<int>(kGameplayHudMaxLanes));
-            std::array<float, kGameplayHudMaxLanes> imported_lane_divider_widths{};
-            std::size_t imported_lane_divider_width_count = 0;
-            float imported_note_width_ratio = 1.0f;
-            float imported_note_height_ratio = 1.0f;
-            const bool use_imported_metrics = normalize_gameplay_skin_source(preview.skin_source) != "native";
-            const auto& native_gameplay = native_gameplay_style(preview.resolved_tenriff_skin,!use_imported_metrics);
-            if (use_imported_metrics) {
-                app::ImportedGameplaySkinDefinition skin;
-                if (normalize_gameplay_skin_source(preview.skin_source) == "tenriff") {
-                    if (preview.resolved_tenriff_skin) {
-                        skin = *preview.resolved_tenriff_skin;
-                    }
-                } else {
-                    skin = app::resolve_imported_gameplay_skin(
-                        preview.skin_source,
-                        preview.external_skin_root,
-                        preview.external_skin_name,
-                        lane_count,
-                        preview.lr2_resolution_override);
-                }
-                imported_note_width_ratio = skin.imported_note_width_ratio;
-                imported_note_height_ratio = skin.imported_note_height_ratio;
-                imported_lane_divider_width_count =
-                    (std::min)(skin.lane_divider_widths.size(), imported_lane_divider_widths.size());
-                for (std::size_t divider = 0; divider < imported_lane_divider_width_count; ++divider) {
-                    imported_lane_divider_widths[divider] = skin.lane_divider_widths[divider];
-                }
+            const D2D1_RECT_F viewport = D2D1::RectF(rect.left + 28.0f, rect.top + 132.0f,
+                                                   rect.right - 28.0f, rect.bottom - 152.0f);
+            const float scene_scale = std::min((viewport.right - viewport.left) / kBaseWidth,
+                                               (viewport.bottom - viewport.top) / kBaseHeight);
+            const float scene_left = viewport.left + ((viewport.right - viewport.left) - kBaseWidth * scene_scale) * 0.5f;
+            const float scene_top = viewport.top + ((viewport.bottom - viewport.top) - kBaseHeight * scene_scale) * 0.5f;
+            D2D1_MATRIX_3X2_F saved_transform{};
+            ctx->GetTransform(&saved_transform);
+            ctx->PushAxisAlignedClip(viewport, D2D1_ANTIALIAS_MODE_ALIASED);
+            ctx->SetTransform(D2D1::Matrix3x2F::Scale(scene_scale, scene_scale) *
+                              D2D1::Matrix3x2F::Translation(scene_left, scene_top) * saved_transform);
+            const D2D1_RECT_F scene_rect = D2D1::RectF(0, 0, kBaseWidth, kBaseHeight);
+            if (d2d_->bg_brush) ctx->FillRectangle(scene_rect, d2d_->bg_brush.Get());
+            if (auto* bitmap = find_song_card_preview_bitmap(preview.skin_background_path)) {
+                const auto source = centered_bitmap_source_rect(bitmap->GetSize(), scene_rect);
+                ctx->DrawBitmap(bitmap, scene_rect, std::clamp(preview.skin_background_opacity, 0.0f, 1.0f),
+                                D2D1_BITMAP_INTERPOLATION_MODE_LINEAR, &source);
             }
-            const float note_width_scale = clamp_gameplay_note_width_scale(preview.note_width_scale);
-            const float note_art_width_ratio = effective_gameplay_note_art_width_ratio(
-                imported_note_width_ratio, use_imported_metrics);
-            const float note_height_scale = effective_gameplay_note_height_scale(
-                preview.note_height_scale,
-                imported_note_height_ratio,
-                use_imported_metrics);
-            const float lane_center_gap_scale = clamp_gameplay_lane_center_gap_scale(preview.lane_center_gap_scale);
-            const GameplayFieldLayout field_layout = build_gameplay_field_layout(
-                preview_bounds_left,
-                preview_bounds_right,
-                field_top,
-                field_bottom,
-                lane_count,
-                note_width_scale,
-                note_art_width_ratio,
-                preview.lane_width_scale_count,
-                preview.lane_width_scales,
-                preview.lane_spacing_scale_count,
-                preview.lane_spacing_scales,
-                lane_center_gap_scale,
-                preview.note_divider_gap_px);
-            const float field_height = field_layout.height;
-            const float field_left = field_layout.left;
-            const float field_right = field_layout.right;
-            const float hit_line_y =
-                gameplay_field_y(field_layout.top,
-                                 field_height,
-                                 clamp_gameplay_judgement_line(preview.judgement_line_position));
-            const float head_half_h = gameplay_note_head_half_height(note_height_scale);
-            const float tail_half_h = gameplay_note_tail_half_height(note_height_scale);
-            std::array<float, kGameplayHudMaxLanes> preview_lane_divider_widths{};
-            const std::size_t preview_lane_divider_width_count = resolve_gameplay_lane_divider_widths(
-                lane_count,
-                preview.lane_divider_width_scale,
-                imported_lane_divider_width_count,
-                imported_lane_divider_widths,
-                preview_lane_divider_widths);
-            const float hold_body_width_scale =
-                clamp_gameplay_hold_body_width_scale(preview.hold_body_width_scale);
-            const double combo_position = clamp_gameplay_combo_position(preview.combo_position);
-            const std::string note_shape = normalize_gameplay_note_shape(preview.note_shape);
-            const NoteImageAspect preview_note_image_aspect =
-                use_imported_metrics && gameplay_note_sprite_cache_.has_imported_note_aspect
-                    ? gameplay_note_sprite_cache_.imported_note_aspect
-                    : preview.note_image_aspect;
-            ID2D1Geometry* note_polygon_geometry = gameplay_note_polygon_geometry(
-                d2d_->gameplay_note_shape_geometries, note_shape);
-            const bool note_border_enabled = preview.note_border_enabled;
-            const float preview_visual_opacity =
-                static_cast<float>(std::clamp(preview.visual_opacity, 0.20, 1.0));
-            const float preview_outline_opacity =
-                static_cast<float>(std::clamp(preview.note_outline_opacity, 0.0, 1.0) * preview_visual_opacity);
-            const float preview_hold_body_opacity =
-                static_cast<float>(std::clamp(preview.hold_body_opacity, 0.05, 0.60) * preview_visual_opacity);
-            const float preview_native_hold_body_opacity =
-                use_imported_metrics
-                    ? preview_hold_body_opacity
-                    : gameplay_native_hold_body_opacity(preview_hold_body_opacity, preview_visual_opacity);
-            const float preview_lane_bg_opacity =
-                static_cast<float>(std::clamp(preview.lane_background_opacity, 0.0, 0.45) * preview_visual_opacity);
-            const std::string preview_key_label_position =
-                config::normalize_skin_key_label_position_token(preview.key_label_position);
-
-            const D2D1_ROUNDED_RECT field_rr =
-                D2D1::RoundedRect(native_rect("generic.rect.015", D2D1::RectF(field_left, field_layout.top, field_right, field_layout.bottom)),
-                                  14.0f,
-                                  14.0f);
-            if (d2d_->card_brush) {
-                ctx->FillRoundedRectangle(field_rr, d2d_->card_brush.Get());
+            // The surrounding menu uses a different palette. Preview the exact
+            // gameplay brush defaults, then restore the settings chrome.
+            struct PreviewBrush { ID2D1SolidColorBrush* brush; const char* key; D2D1_COLOR_F color; };
+            std::array<PreviewBrush, 10> preview_brushes{{
+                {d2d_->text_brush.Get(), "text", D2D1::ColorF(0xE8ECF1)},
+                {d2d_->accent_brush.Get(), "accent", D2D1::ColorF(0x6EE7F2)},
+                {d2d_->muted_brush.Get(), "muted", D2D1::ColorF(0xB7C4D4)},
+                {d2d_->card_brush.Get(), "card", D2D1::ColorF(0x1F2130)},
+                {d2d_->panel_brush.Get(), "panel", D2D1::ColorF(0x14141C, 0.72f)},
+                {d2d_->footer_brush.Get(), "footer", D2D1::ColorF(0x0B0B10, 0.75f)},
+                {d2d_->button_brush.Get(), "button", D2D1::ColorF(0x242638)},
+                {d2d_->button_selected_brush.Get(), "button_selected", D2D1::ColorF(0x6EE7F2, 0.22f)},
+                {d2d_->button_border_brush.Get(), "border", D2D1::ColorF(0x31344A)},
+                {d2d_->lane_divider_brush.Get(), "lane_divider", D2D1::ColorF(0xF6F8FF, 0.85f)}
+            }};
+            for (auto& item : preview_brushes) {
+                if (!item.brush) continue;
+                auto color = item.color;
+                const auto custom = data.lobby_skin.theme_colors.find(item.key);
+                if (data.lobby_skin.enabled && !data.lobby_skin.native_menu_renderer &&
+                    custom != data.lobby_skin.theme_colors.end()) {
+                    const auto& rgba = custom->second;
+                    color = D2D1::ColorF(rgba[0], rgba[1], rgba[2], rgba[3]);
+                }
+                item.color = item.brush->GetColor();
+                item.brush->SetColor(color);
             }
-            if (preview.black_playfield_enabled && d2d_->note_fill_brush) {
-                d2d_->note_fill_brush->SetColor(native_palette("palette.000000", D2D1::ColorF(0x000000, 1.0f)));
-                ctx->FillRoundedRectangle(field_rr, d2d_->note_fill_brush.Get());
-            }
-            if (d2d_->button_border_brush) {
-                ctx->DrawRoundedRectangle(field_rr, d2d_->button_border_brush.Get(), 1.1f);
-            }
-
-            for (int lane = 0; lane < lane_count; ++lane) {
-                const float x0 = gameplay_lane_left(field_layout, lane);
-                const float x1 = gameplay_lane_right(field_layout, lane);
-                const uint32_t rgb = preview.lane_colors[static_cast<std::size_t>(lane)];
-                if (!preview.black_playfield_enabled && d2d_->note_fill_brush) {
-                    d2d_->note_fill_brush->SetColor(
-                        gameplay_lane_preview_fill(rgb, lane + 1 == preview.selected_lane, preview_lane_bg_opacity));
-                    ctx->FillRoundedRectangle(
-                        D2D1::RoundedRect(native_rect("generic.rect.016", D2D1::RectF(x0 + 2.0f,
-                                                      field_layout.top + 2.0f,
-                                                      x1 - 2.0f,
-                                                      field_layout.bottom - 2.0f)),
-                                          5.0f,
-                                          5.0f),
-                        d2d_->note_fill_brush.Get());
-                }
-                if (preview.show_lane_dividers &&
-                    d2d_->lane_divider_brush &&
-                    static_cast<std::size_t>(lane) < preview_lane_divider_width_count) {
-                    if (gameplay_is_center_gap_divider(field_layout, static_cast<std::size_t>(lane))) {
-                        continue;
-                    }
-                    const float divider_width = preview_lane_divider_widths[static_cast<std::size_t>(lane)];
-                    if (divider_width <= 0.01f) {
-                        continue;
-                    }
-                    const float divider_x = gameplay_lane_divider_x(field_layout, static_cast<std::size_t>(lane));
-                    const float saved_opacity = d2d_->lane_divider_brush->GetOpacity();
-                    if (!use_imported_metrics) d2d_->lane_divider_brush->SetOpacity(saved_opacity * native_gameplay_number(native_gameplay,"lane_divider_opacity"));
-                    ctx->DrawLine(D2D1::Point2F(divider_x, field_layout.top), D2D1::Point2F(divider_x, field_layout.bottom),
-                                  d2d_->lane_divider_brush.Get(), divider_width);
-                    d2d_->lane_divider_brush->SetOpacity(saved_opacity);
-                }
-            }
-            if (preview.selected_gap > 0 && d2d_->accent_brush) {
-                const int gap_index = std::min(preview.selected_gap - 1, lane_count - 2);
-                const float gap_left = gameplay_lane_right(field_layout, gap_index);
-                const float gap_width = gameplay_lane_gap_after(field_layout, gap_index);
-                if (gap_width > 1.0f) {
-                    d2d_->accent_brush->SetOpacity(0.24f);
-                    ctx->FillRectangle(native_rect("generic.rect.017", D2D1::RectF(gap_left,
-                                                   field_layout.top + 12.0f,
-                                                   gap_left + gap_width,
-                                                   field_layout.bottom - 12.0f)),
-                                       d2d_->accent_brush.Get());
-                    d2d_->accent_brush->SetOpacity(1.0f);
-                }
-            }
-
-            if (!use_imported_metrics && preview.show_judgement_line && d2d_->note_fill_brush) {
-                auto* fill = d2d_->note_fill_brush.Get();
-                const auto saved = fill->GetColor();
-                const float y = std::clamp(hit_line_y, field_layout.top + 2.0f, field_layout.bottom - 2.0f);
-                if (preview.judgement_line_glow_enabled) {
-                    fill->SetColor(native_gameplay_d2d_color(native_gameplay,"judgement_glow",color_from_rgb(0x70EED6, 0.10f * preview_visual_opacity)));
-                    ctx->FillRectangle(D2D1::RectF(field_left + 3.0f, std::max(field_layout.top, y - native_gameplay_number(native_gameplay,"judgement_glow_height")*.5f),
-                        field_right - 3.0f, std::min(field_layout.bottom, y + native_gameplay_number(native_gameplay,"judgement_glow_height")*.5f)), fill);
-                }
-                fill->SetColor(native_gameplay_d2d_color(native_gameplay,"judgement_line",color_from_rgb(0xBCFFF0, preview_visual_opacity)));
-                ctx->FillRectangle(D2D1::RectF(field_left + 3.0f, y - native_gameplay_number(native_gameplay,"judgement_line_width")*.5f, field_right - 3.0f, y + native_gameplay_number(native_gameplay,"judgement_line_width")*.5f), fill);
-                fill->SetColor(saved);
-            }
-            if (use_imported_metrics && preview.show_judgement_line && d2d_->judgement_line_brush) {
-                const D2D1_RECT_F hit_line_rect =
-                    gameplay_judgement_line_rect(field_layout, hit_line_y, note_height_scale);
-                if (preview.judgement_line_glow_enabled) {
-                    const float saved_opacity = d2d_->judgement_line_brush->GetOpacity();
-                    d2d_->judgement_line_brush->SetOpacity(0.20f * preview_visual_opacity);
-                    ctx->FillRoundedRectangle(
-                        D2D1::RoundedRect(native_rect("generic.rect.018", D2D1::RectF(field_left + 5.0f,
-                                                      hit_line_rect.top - 11.0f,
-                                                      field_right - 5.0f,
-                                                      hit_line_rect.bottom + 11.0f)),
-                                          10.0f,
-                                          10.0f),
-                        d2d_->judgement_line_brush.Get());
-                    d2d_->judgement_line_brush->SetOpacity(saved_opacity);
-                }
-                ctx->FillRoundedRectangle(D2D1::RoundedRect(hit_line_rect, 5.0f, 5.0f),
-                                          d2d_->judgement_line_brush.Get());
-                ctx->DrawLine(D2D1::Point2F(field_left, hit_line_y), D2D1::Point2F(field_right, hit_line_y),
-                              d2d_->judgement_line_brush.Get(), 1.4f);
-            }
-            if (preview.show_gear_boundary_line && d2d_->button_border_brush) {
-                const float gear_top = gameplay_osu_gear_top(field_layout, hit_line_y, note_height_scale);
-                ctx->DrawLine(D2D1::Point2F(field_left, gear_top), D2D1::Point2F(field_right, gear_top),
-                              d2d_->button_border_brush.Get(), 1.1f);
-            }
-
-            ctx->PushAxisAlignedClip(
-                native_rect("generic.rect.019", D2D1::RectF(field_left, field_layout.top, field_right, field_layout.bottom)),
-                D2D1_ANTIALIAS_MODE_ALIASED);
-            if (!use_imported_metrics) {
-                // Reuse the actual native receptor art so palette editing matches play.
-                const float gear_top = gameplay_osu_gear_top(field_layout, hit_line_y, note_height_scale);
-                for (int lane = 0; lane < lane_count; ++lane) {
-                    const auto index = static_cast<std::size_t>(lane);
-                    const auto bounds = native_key_bounds(gameplay_lane_left(field_layout, lane),
-                        gameplay_lane_right(field_layout, lane), field_layout.top, field_layout.bottom, gear_top,native_gameplay);
-                    const auto face = D2D1::RectF(bounds.left, bounds.top, bounds.right, bounds.bottom - 3.0f);
-                    if (auto* idle = d2d_->lane_key_idle_bitmaps[index].Get())
-                        ctx->DrawBitmap(idle, face, preview_visual_opacity, D2D1_BITMAP_INTERPOLATION_MODE_LINEAR);
-                }
-            }
-            for (int lane = 0; lane < lane_count; ++lane) {
-                const uint32_t rgb = preview.lane_colors[static_cast<std::size_t>(lane)];
-                const float lane_center = gameplay_lane_center(field_layout, lane);
-                const float note_width = gameplay_note_width(field_layout, lane);
-                const float x0 = lane_center - note_width * 0.5f;
-                const float x1 = lane_center + note_width * 0.5f;
-                const float default_y =
-                    field_layout.top + field_height * (0.16f + 0.09f * static_cast<float>((lane + 1) % 4));
-                const bool draw_selected_hold_preview = (lane + 1 == preview.selected_lane) && d2d_->note_hold_brush;
-                const GameplayPreviewHoldPlacement hold_placement =
-                    compute_gameplay_preview_hold_placement(
-                        field_layout.top,
-                        field_layout.bottom,
-                        hit_line_y,
-                        head_half_h,
-                        tail_half_h);
-                const float y = draw_selected_hold_preview
-                                    ? hold_placement.head_center_y
-                                    : default_y;
-                if (d2d_->note_fill_brush) {
-                    d2d_->note_fill_brush->SetColor(gameplay_note_fill_color(rgb, preview_visual_opacity));
-                }
-                if (d2d_->note_border_brush) {
-                    d2d_->note_border_brush->SetColor(gameplay_note_border_color(rgb, preview_outline_opacity));
-                }
-                if (d2d_->note_hold_brush) {
-                    d2d_->note_hold_brush->SetColor(
-                        gameplay_note_hold_color(rgb, preview_native_hold_body_opacity));
-                }
-
-                const D2D1_RECT_F note_rect =
-                    native_rect("generic.rect.020", D2D1::RectF(x0, y - head_half_h, x1, y + head_half_h));
-                const float tail_y = hold_placement.tail_center_y;
-                const D2D1_RECT_F tail_rect =
-                    native_rect("generic.rect.021", D2D1::RectF(x0, tail_y - tail_half_h, x1, tail_y + tail_half_h));
-                const std::size_t lane_index = static_cast<std::size_t>(lane);
-                ID2D1Bitmap* note_head_bitmap =
-                    d2d_->lane_note_head_bitmaps[lane_index].Get();
-                ID2D1Bitmap* hold_head_bitmap =
-                    d2d_->lane_note_hold_head_bitmaps[lane_index].Get();
-                ID2D1Bitmap* hold_body_bitmap =
-                    d2d_->lane_note_hold_body_bitmaps[lane_index].Get();
-                ID2D1Bitmap* hold_tail_bitmap =
-                    d2d_->lane_note_tail_bitmaps[lane_index].Get();
-                const bool using_hold_head_bitmap =
-                    draw_selected_hold_preview && hold_head_bitmap;
-                ID2D1Bitmap* head_bitmap =
-                    using_hold_head_bitmap ? hold_head_bitmap : note_head_bitmap;
-                const D2D1_RECT_F* head_source_rect = bitmap_source_rect_or_null(
-                    using_hold_head_bitmap
-                        ? d2d_->lane_note_hold_head_source_rects[lane_index]
-                        : d2d_->lane_note_head_source_rects[lane_index]);
-                const D2D1_RECT_F head_visual_rect =
-                    head_bitmap
-                        ? gameplay_note_bitmap_dest_rect(note_rect,
-                                                        head_bitmap,
-                                                        head_source_rect,
-                                                        note_shape,
-                                                        preview_note_image_aspect)
-                        : note_rect;
-                const D2D1_RECT_F* tail_source_rect = bitmap_source_rect_or_null(
-                    d2d_->lane_note_tail_source_rects[lane_index]);
-                const D2D1_RECT_F tail_visual_rect =
-                    hold_tail_bitmap
-                        ? gameplay_note_bitmap_dest_rect(tail_rect,
-                                                        hold_tail_bitmap,
-                                                        tail_source_rect,
-                                                        note_shape,
-                                                        preview_note_image_aspect)
-                        : tail_rect;
-
-                if (draw_selected_hold_preview) {
-                    const auto body_geometry = compute_gameplay_hold_body_geometry(
-                        lane_center,
-                        head_visual_rect.left,
-                        head_visual_rect.right,
-                        head_visual_rect.top,
-                        y,
-                        tail_visual_rect.bottom,
-                        tail_y,
-                        true,
-                        preview.show_hold_tail,
-                        hold_body_width_scale);
-                    const D2D1_RECT_F hold_rect =
-                        native_rect("generic.rect.022", D2D1::RectF(body_geometry.left,
-                                    body_geometry.top,
-                                    body_geometry.right,
-                                    body_geometry.bottom));
-                    if (hold_rect.bottom > hold_rect.top) {
-                        if (hold_body_bitmap && !preview.hold_tail_taper_enabled) {
-                            const D2D1_RECT_F* body_source_rect = bitmap_source_rect_or_null(
-                                d2d_->lane_note_hold_body_source_rects[lane_index]);
-                            ctx->DrawBitmap(hold_body_bitmap,
-                                            hold_rect,
-                                            preview_hold_body_opacity,
-                                            D2D1_BITMAP_INTERPOLATION_MODE_LINEAR,
-                                            body_source_rect);
-                        } else {
-                            ID2D1Brush* hold_fill = d2d_->note_hold_brush.Get();
-                            if (!use_imported_metrics) {
-                                hold_fill = configure_gameplay_material_brush(
-                                    d2d_->lane_native_hold_brushes[lane_index].Get(), hold_fill,
-                                    hold_rect, preview_native_hold_body_opacity, true);
-                            }
-                            draw_gameplay_hold_body(ctx,
-                                                    d2d_->d2d_factory.Get(),
-                                                    hold_rect,
-                                                    lane_center,
-                                                    y,
-                                                    tail_y,
-                                                    (body_geometry.right - body_geometry.left) * 0.5f,
-                                                    preview.hold_tail_taper_enabled,
-                                                    hold_fill);
-                        }
-                    }
-                }
-
-                if (draw_selected_hold_preview && preview.show_hold_tail) {
-                    if (hold_tail_bitmap) {
-                        draw_gameplay_sprite(
-                            ctx,
-                            hold_tail_bitmap,
-                            tail_visual_rect,
-                            preview_visual_opacity,
-                            tail_source_rect,
-                            gameplay_lane_sprite_rotation(
-                                gameplay_note_sprite_cache_.note_rotations,
-                                gameplay_note_sprite_cache_.note_rotation_count,
-                                lane_index));
-                    } else if (d2d_->note_fill_brush) {
-                        draw_note_primitive(ctx,
-                                            tail_rect,
-                                            d2d_->note_fill_brush.Get(),
-                                            d2d_->note_border_brush.Get(),
-                                            0.85f,
-                                            note_shape,
-                                            note_border_enabled,
-                                            note_polygon_geometry);
-                    }
-                }
-                if (head_bitmap) {
-                    draw_gameplay_sprite(
-                        ctx,
-                        head_bitmap,
-                        head_visual_rect,
-                        preview_visual_opacity,
-                        head_source_rect,
-                        gameplay_lane_sprite_rotation(
-                            gameplay_note_sprite_cache_.note_rotations,
-                            gameplay_note_sprite_cache_.note_rotation_count,
-                            lane_index));
-                } else if (d2d_->note_fill_brush) {
-                    draw_note_primitive(ctx, note_rect, d2d_->note_fill_brush.Get(), d2d_->note_border_brush.Get(),
-                                        0.85f, note_shape, note_border_enabled, note_polygon_geometry);
-                }
-            }
+            draw_gameplay_hud(*skin_preview_scene, true);
+            for (const auto& item : preview_brushes) if (item.brush) item.brush->SetColor(item.color);
+            ctx->SetTransform(saved_transform);
             ctx->PopAxisAlignedClip();
-
-            if (preview_key_label_position != "off" && d2d_->hud_format && d2d_->text_brush) {
-                const bool top_labels = preview_key_label_position == "top";
-                const float label_top = top_labels ? field_layout.top + 8.0f : field_layout.bottom - 30.0f;
-                const D2D1_COLOR_F saved_text_color = d2d_->text_brush->GetColor();
-                d2d_->text_brush->SetColor(native_palette("palette.f7fafd", D2D1::ColorF(0xF7FAFD, 0.38f * preview_visual_opacity)));
-                for (int lane = 0; lane < lane_count; ++lane) {
-                    const std::wstring lane_w = to_wide(std::to_string(lane + 1));
-                    draw_text_clipped_aligned(
-                        lane_w,
-                        d2d_->hud_format.Get(),
-                        native_rect("generic.rect.023", D2D1::RectF(gameplay_lane_left(field_layout, lane) + 2.0f,
-                                    label_top,
-                                    gameplay_lane_right(field_layout, lane) - 2.0f,
-                                    label_top + 22.0f)),
-                        d2d_->text_brush.Get(),
-                        DWRITE_TEXT_ALIGNMENT_CENTER);
-                }
-                d2d_->text_brush->SetColor(saved_text_color);
-            }
-
-            if (d2d_->header_format && d2d_->accent_brush) {
-                const std::wstring combo_w = L"123";
-                D2D1_RECT_F combo_rect =
-                    gameplay_combo_overlay_rect(field_layout,
-                                                combo_position,
-                                                40.0f,
-                                                40.0f,
-                                                40.0f,
-                                                0.0f,
-                                                8.0f);
-                const float preview_scale = field_height / 1080.0f;
-                combo_rect.left += static_cast<float>(preview.combo_offset_x) * preview_scale;
-                combo_rect.right += static_cast<float>(preview.combo_offset_x) * preview_scale;
-                combo_rect.top += 60.0f * preview_scale;
-                combo_rect.bottom += 60.0f * preview_scale;
-                const float judge_y = gameplay_field_y(field_top, field_height, preview.judgement_position);
-                const float judge_x = (field_left + field_right) * 0.5f + static_cast<float>(preview.judgement_offset_x) * preview_scale;
-                draw_text_clipped_aligned(L"P GREAT", d2d_->body_format.Get(),
-                    native_rect("generic.rect.024", D2D1::RectF(judge_x - 100, judge_y - 30, judge_x + 100, judge_y + 2)),
-                    d2d_->text_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER);
-                draw_text_clipped_aligned(combo_w,
-                                          d2d_->header_format.Get(),
-                                          combo_rect,
-                                          d2d_->accent_brush.Get(),
-                                          DWRITE_TEXT_ALIGNMENT_CENTER);
-            }
-
+            if (d2d_->button_border_brush)
+                ctx->DrawRectangle(D2D1::RectF(scene_left, scene_top, scene_left + kBaseWidth * scene_scale,
+                                              scene_top + kBaseHeight * scene_scale), d2d_->button_border_brush.Get());
+            draw_text_clipped_aligned(wloc("Actual gameplay proportions", "실제 인게임 비율"), d2d_->body_format.Get(),
+                                      D2D1::RectF(viewport.left, rect.bottom - 140.0f, viewport.right, rect.bottom - 110.0f),
+                                      d2d_->muted_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER);
+            const float preview_visual_opacity = static_cast<float>(std::clamp(preview.visual_opacity, 0.20, 1.0));
             const float swatch_top = rect.bottom - 96.0f;
             const float swatch_height = native_metric("generic.swatch_height", 54.0f);
             for (int lane = 0; lane < lane_count; ++lane) {
-                const float x0 = gameplay_lane_left(field_layout, lane);
-                const float x1 = gameplay_lane_right(field_layout, lane);
+                const float x0 = viewport.left + (viewport.right - viewport.left) * lane / lane_count;
+                const float x1 = viewport.left + (viewport.right - viewport.left) * (lane + 1) / lane_count;
                 const D2D1_RECT_F swatch_rect = native_rect("generic.rect.025", D2D1::RectF(x0 + 4.0f, swatch_top, x1 - 4.0f, swatch_top + swatch_height));
                 const D2D1_ROUNDED_RECT swatch_rr = D2D1::RoundedRect(swatch_rect, 10.0f, 10.0f);
                 if (d2d_->note_fill_brush) {
@@ -548,6 +184,11 @@
             return;
         }
 
+        if (data.generic.keymap_keyboard) {
+#include "MenuWindow_draw_keymap_body.inl"
+            return;
+        }
+
         if (!data.generic.rows.empty() || !data.generic.notes.empty() ||
             !data.generic.footer_notes.empty() || data.generic.footer_reserved_lines > 0) {
             const float native_list_right = has_skin_preview ? right - preview_width - preview_gap
@@ -570,10 +211,11 @@
             const float note_line_height = roomy_option_layout ? 34.0f : 28.0f;
             const float note_section_gap = data.generic.notes.empty() ? 0.0f : (roomy_option_layout ? 18.0f : 14.0f);
             const bool has_footer_notes =
-                !modern_settings_screen && (!data.generic.footer_notes.empty() || data.generic.footer_reserved_lines > 0);
+                !modern_settings_screen && !has_skin_preview &&
+                (!data.generic.footer_notes.empty() || data.generic.footer_reserved_lines > 0);
             const float footer_section_gap = has_footer_notes ? (roomy_option_layout ? 18.0f : 14.0f) : 0.0f;
             const float list_top = top + (modern_settings_screen ? 64.0f : 24.0f);
-            const float list_bottom_limit = modern_settings_screen && has_skin_preview ? bottom - 280.0f : bottom - 20.0f;
+            const float list_bottom_limit = has_skin_preview ? bottom - 280.0f : bottom - 20.0f;
             IDWriteTextFormat* row_format =
                 (modern_settings_screen || roomy_option_layout) && d2d_->option_format ? d2d_->option_format.Get() : d2d_->body_format.Get();
 
@@ -610,6 +252,14 @@
                 draw_generic_help(help_rect, data.generic.heading, data.generic.notes, data.generic.footer_notes);
             }
 
+            if (!modern_settings_screen && has_skin_preview) {
+                // Imported menu skins also need bounded, paginated help. Long
+                // tips must not consume nearly every selectable settings row.
+                draw_generic_help(D2D1::RectF(left + 16.0f, bottom - 240.0f,
+                                             base_row_right, bottom - 16.0f),
+                                  data.generic.heading, data.generic.notes, data.generic.footer_notes);
+            }
+
             if (has_skin_preview) {
                 const D2D1_RECT_F configured_preview = skin_layout_rect(
                     data, "generic.preview",
@@ -625,7 +275,8 @@
                 }
             }
 
-            int displayed_note_count = modern_settings_screen ? 0 : static_cast<int>(data.generic.notes.size());
+            int displayed_note_count = modern_settings_screen || has_skin_preview
+                ? 0 : static_cast<int>(data.generic.notes.size());
             float notes_height = 0.0f;
             if (displayed_note_count > 0) {
                 notes_height = note_section_gap + note_line_height * static_cast<float>(displayed_note_count);
@@ -659,18 +310,11 @@
                 }
             }
 
-            int visible_row_count = 0;
-            if (!data.generic.rows.empty()) {
-                visible_row_count = std::max(1, static_cast<int>(
-                                                    std::floor((row_region_bottom - list_top + row_gap) / row_step)));
-                visible_row_count = std::min<int>(visible_row_count, static_cast<int>(data.generic.rows.size()));
-            }
-
-            int row_window_start = 0;
-            if (!data.generic.rows.empty() && visible_row_count < static_cast<int>(data.generic.rows.size())) {
-                const int max_window_start = static_cast<int>(data.generic.rows.size()) - visible_row_count;
-                row_window_start = std::clamp(selected_row_index - visible_row_count / 2, 0, max_window_start);
-            }
+            const float category_height = modern_settings_screen ? 28.0f : 24.0f;
+            const auto list_window = settings_list_window(data.generic.rows, selected_row_index,
+                row_region_bottom - list_top + row_gap, row_step, category_height);
+            const int visible_row_count = list_window.count;
+            const int row_window_start = list_window.start;
             const bool show_scrollbar =
                 !data.generic.rows.empty() && visible_row_count < static_cast<int>(data.generic.rows.size());
             const float scrollbar_gap = show_scrollbar ? 12.0f : 0.0f;
@@ -682,6 +326,12 @@
                                                      row_window_start + visible_row_count);
             for (int row_list_index = row_window_start; row_list_index < row_window_end; ++row_list_index) {
                 const auto& row = data.generic.rows[static_cast<std::size_t>(row_list_index)];
+                if (settings_category_heading(data.generic.rows, row_list_index, row_window_start)) {
+                    draw_text_clipped(to_wide(row.category), d2d_->hud_format.Get(),
+                        D2D1::RectF(row_left + 8, row_y, row_right, row_y + category_height - 4),
+                        d2d_->muted_brush.Get());
+                    row_y += category_height;
+                }
                 const int64_t flash_age_ns = render_now_ns - row.change_flash_started_ns;
                 const bool change_flash = row.change_flash_started_ns > 0 &&
                     flash_age_ns >= 0 && flash_age_ns < 900'000'000LL &&
@@ -711,6 +361,10 @@
                     }
                 }
 
+                // Broad row hits must precede specific +/- and slider hits.
+                if (row.activatable) {
+                    register_hit(row_rect, row.target_kind, row.row_index, MenuHitPart::Activate);
+                }
                 const auto saved_row_paragraph = row_format ? row_format->GetParagraphAlignment() : DWRITE_PARAGRAPH_ALIGNMENT_NEAR;
                 draw_native_focus(row_rect, 12, 64 + static_cast<std::size_t>(row_list_index - row_window_start),
                                   row.row_index, visually_selected);
@@ -848,9 +502,6 @@
                     }
                 }
 
-                if (row.activatable) {
-                    register_hit(row_rect, row.target_kind, row.row_index, MenuHitPart::Activate);
-                }
                 if (row_format) row_format->SetParagraphAlignment(saved_row_paragraph);
                 row_y += row_step;
             }

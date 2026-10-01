@@ -76,7 +76,10 @@ struct ReplayVerificationResult;
 
 class MenuApp {
     friend struct MenuAppAudioSettingsTestAccess;
+    friend struct MenuAppTitleMusicTestAccess;
     friend struct MenuAppSongSourceTestAccess;
+    friend struct MenuAppVisualTestAccess;
+    friend struct MenuAppRepeatTestAccess;
 public:
     MenuApp();
     ~MenuApp();
@@ -133,6 +136,7 @@ private:
     };
 
     struct MenuSnapshot {
+        Screen screen = Screen::Title;
         render::MenuRenderData render;
     };
 
@@ -297,6 +301,7 @@ private:
     void apply_audio_settings_effects(const menu::MenuEffectFlags& effects);
     void apply_input_settings_effects(const menu::MenuEffectFlags& effects);
     void apply_calibration_settings_effects(const menu::MenuEffectFlags& effects);
+    void refresh_graphics_resolutions();
     void handle_graphics_settings_input(uint32_t keycode);
     void apply_graphics_settings_effects(
         const menu::settings::GraphicsSettingsEffects& effects);
@@ -354,8 +359,10 @@ private:
     void service_input_backend_health();
     void reset_input_backend_probe();
     void update_song_select_repeat();
+    void service_song_select_repeat(int64_t now_ns, bool foreground);
     void reset_song_select_repeat();
-    [[nodiscard]] bool is_song_select_repeat_key(uint32_t keycode) const;
+    [[nodiscard]] bool is_song_select_repeat_key(uint32_t keycode);
+    [[nodiscard]] int selected_adjustment_repeat_row(uint32_t keycode);
     [[nodiscard]] std::vector<uint32_t> current_menu_probe_keycodes() const;
     void refresh_menu_input_polling_scope();
     void rebuild_pressed_keys_from_polling_snapshot();
@@ -476,7 +483,12 @@ private:
     [[nodiscard]] bool toggle_selected_song_in_collection(std::string_view name);
     [[nodiscard]] std::string selected_song_background_preview_path();
     void sync_menu_music();
+    [[nodiscard]] double menu_output_master_gain() const;
+    void play_speed_adjustment_if_changed(const config::SpeedConfig& previous);
+    std::atomic<bool> menu_audio_muted_{false};
+    bool menu_audio_foreground_ = true;
     void service_song_preview();
+    void update_title_music_target();
     [[nodiscard]] bool start_song_preview_audio(const SongSelectScreen::PreviewDecodeResult& preview);
     void cancel_song_preview_decode();
     void stop_song_preview_audio();
@@ -755,6 +767,12 @@ private:
     std::string menu_music_scene_key_{};
     std::string menu_music_scene_path_{};
     std::unordered_map<std::string, std::size_t> menu_music_variant_cursors_{};
+    bool title_music_visit_active_ = false;
+    std::string title_music_mode_{};
+    std::string title_music_chart_path_{};
+    std::string title_music_preview_path_{};
+    std::uint64_t title_music_generation_ = 0;
+    std::uint64_t title_music_library_revision_ = 0;
     SongSelectScreen song_select_screen_{};
     render::RenderThread render_thread_{};
     render::MenuWindow menu_window_{};
@@ -838,6 +856,7 @@ private:
     uint32_t song_select_repeat_key_ = 0;
     int64_t song_select_repeat_next_ns_ = 0;
     Screen song_select_repeat_screen_ = Screen::Title;
+    int song_select_repeat_row_ = -1;
 
     uint32_t key_up_ = 0;
     uint32_t key_down_ = 0;

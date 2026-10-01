@@ -11,6 +11,8 @@ struct Keymap {
     std::string layout = "multi";
     std::unordered_map<std::string, std::string> bindings;
     std::unordered_map<std::string, std::unordered_map<std::string, std::string>> mode_bindings;
+    // Optional second physical key for a logical key; absent entries are unassigned.
+    std::unordered_map<std::string, std::unordered_map<std::string, std::string>> secondary_mode_bindings;
 };
 
 struct KeymapLoadResult {
@@ -35,6 +37,8 @@ public:
     [[nodiscard]] std::vector<std::string> lane_ids_for_mode(std::string_view key_mode) const;
     [[nodiscard]] std::unordered_map<std::string, std::string> bindings_for_mode(const Keymap& keymap,
                                                                                   std::string_view key_mode) const;
+    [[nodiscard]] std::unordered_map<std::string, std::string> secondary_bindings_for_mode(
+        const Keymap& keymap, std::string_view key_mode) const;
     void reset_mode_bindings(Keymap& keymap, std::string_view key_mode) const;
 
     [[nodiscard]] KeymapLoadResult load_profile(std::string_view profile_dir) const;

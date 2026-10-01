@@ -1,4 +1,5 @@
 #include "app/ReplayVerifier.h"
+#include "app/JudgeTimingPolicy.h"
 
 #include <algorithm>
 #include <cmath>
@@ -118,6 +119,20 @@ bool is_canonical_score_ruleset(const config::JudgeConfig& judge,
            equal_delta_table(gauge.easy, expected_gauge.easy);
 }
 
+bool is_supported_canonical_replay_ruleset(std::string_view ruleset_id) {
+    return ruleset_id == kCanonicalReplayRulesetId || ruleset_id == kLegacyReplayRulesetId;
+}
+
+config::JudgeConfig replay_judge_config_for_playback(
+    const gameplay::ReplayFile& replay, const config::JudgeConfig& base) {
+    const auto mods = normalize_mode_mod_tokens(replay.mods);
+    const bool easy = std::find(mods.begin(), mods.end(), "judge_easy") != mods.end();
+    const bool hard = std::find(mods.begin(), mods.end(), "judge_hard") != mods.end();
+    const bool legacy = replay.ruleset_id == kLegacyReplayRulesetId ||
+                        replay.replay_format_version < gameplay::kReplayFormatVersion;
+    return judge_timing_for_policy(base, easy, hard, legacy);
+}
+
 std::string replay_ruleset_id_for_runtime(const config::JudgeConfig& judge,
                                           const game::GaugeConfig& gauge,
                                           bool standard_gauge_shift,
@@ -143,7 +158,7 @@ ReplayVerificationResult verify_replay_against_chart(
     if (!validation.success()) {
         return invalid_result(validation.error);
     }
-    if (replay.ruleset_id != kCanonicalReplayRulesetId) {
+    if (!is_supported_canonical_replay_ruleset(replay.ruleset_id)) {
         return invalid_result("Replay used a non-canonical score ruleset.",
                               ReplayVerificationStatus::CustomRuleset);
     }
@@ -209,7 +224,7 @@ ReplayVerificationResult verify_replay_against_chart(
     gameplay::GameplayConfig engine_config;
     engine_config.sample_rate = replay.sample_rate;
     engine_config.rate = replay.rate;
-    engine_config.judge = managed.judge;
+    engine_config.judge = replay_judge_config_for_playback(replay, canonical_judge);
     engine_config.gauge = canonical_gauge;
     engine_config.initial_gauge = initial_gauge_for(managed.settings.gauge);
     engine_config.gauge_shift_enabled = true;
@@ -235,6 +250,7 @@ ReplayVerificationResult verify_replay_against_chart(
 
     ReplayVerificationResult result;
     result.status = ReplayVerificationStatus::Verified;
+    result.ruleset_id = replay.ruleset_id;
     result.stats = engine.stats();
     result.rate_multiplier = managed.rate_multiplier;
     result.score_multiplier = managed.final_multiplier;

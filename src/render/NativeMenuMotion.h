@@ -29,15 +29,15 @@ struct NativeWordmarkMotion {
 inline NativeWordmarkMotion native_wordmark_motion(double seconds, bool moving) {
     NativeWordmarkMotion value;
     if (!moving || !std::isfinite(seconds) || seconds < 0.0) return value;
-    // One short, low-amplitude interference burst per 9.2 seconds. Reduced
+    // A readable, short interference burst every 4.8 seconds. Reduced
     // motion never enters this path; it retains the still holographic tint.
-    const double cycle = std::fmod(seconds, 9.2);
+    const double cycle = std::fmod(seconds, 4.8);
     value.bloom = 0.10f + 0.025f * static_cast<float>(std::sin(seconds * 1.3));
     value.scan = static_cast<float>(std::fmod(seconds * 0.12 + 0.35, 1.0));
     value.sparkle_x = static_cast<float>(std::fmod(seconds * 0.085 + 0.19, 1.0));
     value.sparkle = 0.42f * std::pow(std::max(0.0f, static_cast<float>(std::sin(seconds * 1.7))), 8.0f);
-    if (cycle >= 6.8 && cycle < 6.98) {
-        value.glitch = static_cast<float>(std::sin((cycle - 6.8) * 95.0)) * 2.6f;
+    if (cycle >= 1.2 && cycle < 1.54) {
+        value.glitch = static_cast<float>(std::sin((cycle - 1.2) * 95.0)) * 6.0f;
     }
     return value;
 }

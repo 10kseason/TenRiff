@@ -26,14 +26,6 @@ std::string normalize_display_mode(std::string value) {
     return "borderless";
 }
 
-std::string normalize_resolution_preset(std::string value) {
-    value = to_lower_ascii(std::move(value));
-    if (value == "720p" || value == "1080p" || value == "qhd") {
-        return value;
-    }
-    return "native";
-}
-
 template <std::size_t Size>
 std::string cycle_token(
     const std::array<std::string_view, Size>& tokens,
@@ -56,12 +48,6 @@ std::string cycle_display_mode(std::string current, int direction) {
     static constexpr std::array<std::string_view, 3> kModes{
         "borderless", "windowed", "fullscreen"};
     return cycle_token(kModes, normalize_display_mode(std::move(current)), direction);
-}
-
-std::string cycle_resolution_preset(std::string current, int direction) {
-    static constexpr std::array<std::string_view, 4> kPresets{
-        "native", "720p", "1080p", "qhd"};
-    return cycle_token(kPresets, normalize_resolution_preset(std::move(current)), direction);
 }
 
 }  // namespace
@@ -114,6 +100,11 @@ GraphicsSettingsController::selected_confirmation_id() const noexcept {
 
 bool GraphicsSettingsController::dirty() const noexcept {
     return dirty_;
+}
+
+void GraphicsSettingsController::set_display_resolutions(const std::vector<std::pair<int, int>>& modes) {
+    // Enumeration runs when opening Graphics or pressing F5, never per frame.
+    resolution_choices_ = config::graphics_resolution_choices(modes);
 }
 
 void GraphicsSettingsController::reset(GraphicsSettingId selected) noexcept {
@@ -270,8 +261,16 @@ GraphicsSettingsEffects GraphicsSettingsController::apply_selected_action(
                 cycle_display_mode(runtime.graphics.display_mode, direction);
             return mark_changed(true);
         case GraphicsSettingId::Resolution:
+            // Remember custom sizes across subsequent +/- adjustments too.
+            if (const auto token = config::normalize_graphics_resolution(runtime.graphics.resolution);
+                std::find(resolution_choices_.begin(), resolution_choices_.end(), token) == resolution_choices_.end()) {
+                resolution_choices_.push_back(token);
+                std::sort(resolution_choices_.begin(), resolution_choices_.end(), [](const auto& a, const auto& b) {
+                    return config::graphics_resolution_dimensions(a) < config::graphics_resolution_dimensions(b);
+                });
+            }
             runtime.graphics.resolution =
-                cycle_resolution_preset(runtime.graphics.resolution, direction);
+                config::cycle_graphics_resolution(runtime.graphics.resolution, direction, resolution_choices_);
             return mark_changed(true);
         case GraphicsSettingId::RefreshHz:
             runtime.graphics.refresh_hz =

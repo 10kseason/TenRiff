@@ -39,7 +39,7 @@
                 D2D1::Point2F(rect.left, rect.top)) * saved_transform);
             const auto text_rect = D2D1::RectF(rect.left, rect.top,
                 rect.left + width / height_scale, rect.top + height / height_scale);
-            ctx->DrawText(text.c_str(), static_cast<UINT32>(text.size()), format, text_rect, brush,
+            draw_text_exact(text.c_str(), static_cast<UINT32>(text.size()), format, text_rect, brush,
                           D2D1_DRAW_TEXT_OPTIONS_CLIP, DWRITE_MEASURING_MODE_NATURAL);
             ctx->SetTransform(saved_transform);
             format->SetTrimming(&saved_trimming, saved_sign.Get());
@@ -115,7 +115,7 @@
                     const auto expanded = D2D1::RectF(value_rect.left, value_rect.top,
                         value_rect.left + (value_rect.right - value_rect.left) / shared_value_scale,
                         value_rect.top + (value_rect.bottom - value_rect.top) / shared_value_scale);
-                    ctx->DrawText(text.c_str(), static_cast<UINT32>(text.size()),
+                    draw_text_exact(text.c_str(), static_cast<UINT32>(text.size()),
                         d2d_->title_format.Get(), expanded, value_brush, D2D1_DRAW_TEXT_OPTIONS_CLIP);
                     ctx->SetTransform(saved_transform);
                 } else {
@@ -342,15 +342,23 @@
         const float card_left = left_panel.left + 12.0f;
         const float card_right = left_panel.right - 18.0f;
         const float card_top = left_panel.top + 76.0f;
-        const float card_height = native_metric("songselect.card_height", 86.0f);
-        const float card_gap = native_metric("songselect.card_gap", 8.0f);
+        const D2D1_RECT_F search_button =
+            native_rect("songselect.rect.051", D2D1::RectF(card_left, left_panel.bottom - 58.0f,
+                        card_right, left_panel.bottom - 12.0f));
+        const float card_bottom = std::min(left_panel.bottom - 12.0f, search_button.top - 10.0f);
+        // Keep all seven cards reachable after reserving the search field. Use
+        // the gaps first so the title/artist/detail text keeps its row height.
+        const float card_height = std::min(native_metric("songselect.card_height", 86.0f),
+            std::max(1.0f, (card_bottom - card_top) / 7.0f));
+        const float card_gap = std::min(native_metric("songselect.card_gap", 8.0f),
+            std::max(0.0f, (card_bottom - card_top - card_height * 7.0f) / 6.0f));
         for (std::size_t i = 0; i < data.song_select.songs.size(); ++i) {
             const auto& song = data.song_select.songs[i];
             const float y0 = card_top + static_cast<float>(i) * (card_height + card_gap);
             const float entry_x = native_motion_screen ? -14.0f * (1.0f - native_menu_motion_.entrance(
                 static_cast<float>(i) * 0.025f)) : 0.0f;
             const D2D1_RECT_F card = native_rect("songselect.rect.023", D2D1::RectF(card_left + entry_x, y0, card_right + entry_x, y0 + card_height));
-            if (card.bottom > left_panel.bottom - 12.0f) {
+            if (card.bottom > card_bottom + 0.5f) {
                 break;
             }
             register_hit(card, MenuHitTargetKind::SongCard, song.song_index);
@@ -465,7 +473,7 @@
             data.song_select.list_visible_count > 0 && d2d_->text_brush) {
             const D2D1_RECT_F track =
                 native_rect("songselect.rect.034", D2D1::RectF(left_panel.right - 10.0f, card_top,
-                            left_panel.right - 6.0f, left_panel.bottom - 14.0f));
+                            left_panel.right - 6.0f, card_bottom));
             const float track_height = track.bottom - track.top;
             const float visible_ratio = std::clamp(
                 static_cast<float>(data.song_select.list_visible_count) /
@@ -711,12 +719,9 @@
         const D2D1_RECT_F action_strip =
             native_rect("songselect.rect.050", D2D1::RectF(center_panel.left, best_panel.bottom + center_section_gap,
                         center_panel.right, center_panel.bottom));
-        const D2D1_RECT_F search_button =
-            native_rect("songselect.rect.051", D2D1::RectF(action_strip.left, action_strip.top,
-                        action_strip.left + (action_strip.right - action_strip.left) * 0.25f, action_strip.bottom));
         const D2D1_RECT_F filter_button =
-            native_rect("songselect.rect.052", D2D1::RectF(search_button.right + 12.0f, action_strip.top,
-                        search_button.right + (action_strip.right - action_strip.left) * 0.25f + 12.0f, action_strip.bottom));
+            native_rect("songselect.rect.052", D2D1::RectF(action_strip.left, action_strip.top,
+                        action_strip.left + (action_strip.right - action_strip.left) * 0.32f, action_strip.bottom));
         const D2D1_RECT_F table_button =
             native_rect("songselect.rect.053", D2D1::RectF(filter_button.right + 12.0f, action_strip.top,
                         action_strip.right, action_strip.bottom));
@@ -728,7 +733,7 @@
         const bool searching =
             data.song_select.search_active || !data.song_select.search_query.empty();
         if (d2d_->body_format && d2d_->text_brush) {
-            std::wstring search_label = wloc("SEARCH", "검색");
+            std::wstring search_label = wloc("TYPE TO SEARCH", "검색어 입력");
             if (searching) {
                 search_label = to_wide(data.song_select.search_query);
                 if (search_label.empty()) {
@@ -738,8 +743,10 @@
                     search_label += L"|";
                 }
             }
-            draw_centered_text(search_label, d2d_->body_format.Get(),
-                               search_button, d2d_->text_brush.Get(), true);
+            draw_metadata_ellipsis(search_label, d2d_->body_format.Get(),
+                D2D1::RectF(search_button.left + 16.0f, search_button.top + 8.0f,
+                            search_button.right - 16.0f, search_button.bottom - 6.0f),
+                d2d_->text_brush.Get());
             draw_centered_text(wloc("SORT / FILTER", "정렬 / 필터"), d2d_->body_format.Get(),
                                filter_button, d2d_->text_brush.Get(), true);
         }

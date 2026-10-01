@@ -343,6 +343,11 @@ bool song_entry_matches_search(const SongEntry& entry, std::string_view query) {
     return true;
 }
 
+bool song_entry_matches_table_scope(const SongEntry& entry, bool all_song_sources, bool table_active) {
+    // Matched levels remain members even if omitted from the table's level_order.
+    return !all_song_sources || !table_active || !entry.difficulty_table_level.empty();
+}
+
 bool song_entry_matches_key_filter(const SongEntry& entry, int key_filter) {
     return key_filter <= 0 || entry.key_count == key_filter;
 }

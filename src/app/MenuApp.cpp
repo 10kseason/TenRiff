@@ -43,6 +43,7 @@
 #include "app/GraphicsTiming.h"
 #include "app/MenuAppSettingsUtils.h"
 #include "app/MenuAppSkinUtils.h"
+#include "app/SettingsHelpTips.h"
 #include "app/MenuAppSongSelectUtils.h"
 #include "app/MemoryDiagnostics.h"
 #include "app/ModeManager.h"
@@ -55,6 +56,7 @@
 #include "app/ProfileSetupFlow.h"
 #include "app/RuntimeConfigMigration.h"
 #include "app/SongPreviewPlayback.h"
+#include "app/SessionRandomSeed.h"
 #include "config/KeycodeMap.h"
 #include "game/SpeedManager.h"
 #include "gameplay/Replay.h"
@@ -710,18 +712,22 @@ std::string format_signed_ms(double value) {
 }  // namespace
 
 void MenuApp::reset_screen(Screen screen) noexcept {
+    reset_song_select_repeat();
     menu_navigator_.reset(screen);
 }
 
 void MenuApp::push_screen(Screen screen) {
+    reset_song_select_repeat();
     menu_navigator_.push(screen);
 }
 
 void MenuApp::replace_screen(Screen screen) noexcept {
+    reset_song_select_repeat();
     menu_navigator_.replace(screen);
 }
 
 bool MenuApp::pop_screen() noexcept {
+    reset_song_select_repeat();
     return menu_navigator_.back();
 }
 
@@ -763,11 +769,11 @@ std::vector<uint32_t> build_menu_probe_keycodes(const std::vector<uint32_t>& fix
     }
 
     config::KeymapManager keymap_manager;
-    const auto bindings = keymap_manager.bindings_for_mode(working_keymap, keymap_edit_mode);
-    for (const auto& [lane, key] : bindings) {
-        static_cast<void>(lane);
-        if (const auto keycode = config::KeycodeMap::to_keycode(key)) {
-            append_keycode(*keycode);
+    for (const auto& bindings : {keymap_manager.bindings_for_mode(working_keymap, keymap_edit_mode),
+                                 keymap_manager.secondary_bindings_for_mode(working_keymap, keymap_edit_mode)}) {
+        for (const auto& [lane, key] : bindings) {
+            static_cast<void>(lane);
+            if (const auto keycode = config::KeycodeMap::to_keycode(key)) append_keycode(*keycode);
         }
     }
 
@@ -821,17 +827,9 @@ std::string MenuApp::ui_display_mode_label(std::string_view token) const {
 }
 
 std::string MenuApp::ui_resolution_label(std::string_view token) const {
-    const std::string normalized = normalize_resolution_preset(std::string(token));
-    if (normalized == "720p") {
-        return "1280x720";
-    }
-    if (normalized == "1080p") {
-        return "1920x1080";
-    }
-    if (normalized == "qhd") {
-        return "2560x1440";
-    }
-    return ui_text("Monitor Native", "모니터 기본");
+    const auto [width, height] = resolution_dimensions(token);
+    return width > 0 ? std::to_string(width) + "x" + std::to_string(height)
+                     : ui_text("Monitor Native", "모니터 기본");
 }
 
 std::string MenuApp::ui_preset_label(std::string_view token) const {
@@ -1276,11 +1274,26 @@ bool MenuApp::initialize(const CommandLineOptions& options) {
     return true;
 }
 
+double MenuApp::menu_output_master_gain() const {
+    return focused_audio_master_gain(config_.audio_ui.master_volume,
+        config_.audio_ui.mute_when_inactive, is_current_process_foreground_menu());
+}
+
+void MenuApp::play_speed_adjustment_if_changed(const config::SpeedConfig& previous) {
+    if (previous.rate != config_.speed.rate || previous.hi_speed != config_.speed.hi_speed)
+        play_settings_adjustment_click(menu_output_master_gain());
+}
+
 void MenuApp::run() {
     while (!exit_requested_.load(std::memory_order_acquire)) {
         if (menu_window_.should_close()) {
             exit_requested_.store(true, std::memory_order_release);
             break;
+        }
+        const bool foreground = is_current_process_foreground_menu();
+        if (foreground != menu_audio_foreground_) {
+            menu_audio_foreground_ = foreground;
+            sync_menu_music();
         }
         service_input_backend_health();
         while (true) {
@@ -1816,6 +1829,28 @@ render::MenuWindowConfig MenuApp::current_window_config() const {
     return window_config;
 }
 
+void MenuApp::refresh_graphics_resolutions() {
+    std::vector<std::pair<int, int>> modes;
+#ifdef _WIN32
+    const HWND foreground = GetForegroundWindow();
+    POINT cursor{};
+    GetCursorPos(&cursor);
+    const HMONITOR monitor = foreground ? MonitorFromWindow(foreground, MONITOR_DEFAULTTONEAREST)
+                                       : MonitorFromPoint(cursor, MONITOR_DEFAULTTONEAREST);
+    MONITORINFOEXW info{};
+    info.cbSize = sizeof(info);
+    if (GetMonitorInfoW(monitor, &info)) {
+        for (DWORD index = 0;; ++index) {
+            DEVMODEW mode{};
+            mode.dmSize = sizeof(mode);
+            if (!EnumDisplaySettingsW(info.szDevice, index, &mode)) break;
+            modes.emplace_back(static_cast<int>(mode.dmPelsWidth), static_cast<int>(mode.dmPelsHeight));
+        }
+    }
+#endif
+    graphics_settings_controller_.set_display_resolutions(modes);
+}
+
 void MenuApp::apply_runtime_graphics_config() {
     menu_window_.set_config(current_window_config());
     render_thread_.update_config(current_render_config());
@@ -1946,7 +1981,11 @@ void MenuApp::switch_song_source(const std::string& new_songs_path, bool force_r
 
 void MenuApp::handle_input_event(const input::InputEvent& event) {
     note_runtime_input_event_source(event);
+    const bool duplicate_adjustment_press = event.state == input::InputState::Pressed &&
+        (event.keycode == key_left_ || event.keycode == key_right_) &&
+        event.keycode == song_select_repeat_key_ && pressed_keys_.count(event.keycode) != 0;
     update_pressed_keys(event);
+    if (duplicate_adjustment_press) return;
 
     if (current_screen() == Screen::BmsEditor) {
         const bool repeatable = event.keycode == key_up_ || event.keycode == key_down_ ||
@@ -2095,6 +2134,9 @@ void MenuApp::handle_input_event(const input::InputEvent& event) {
 }
 
 void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
+    // Pointer selection takes ownership immediately, even if it changes the row
+    // and then returns before the next repeat tick.
+    reset_song_select_repeat();
     if (current_screen() == Screen::SongSelect && difficulty_table_url_editing_) {
         if (event.kind == render::MenuHitTargetKind::SongDifficultyTable) {
             if (event.index == static_cast<int>(render::SongDifficultyTableAction::Apply)) handle_difficulty_table_input(key_enter_);
@@ -2357,8 +2399,12 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
         publish_snapshot();
         return;
     }
-    if (current_screen() == Screen::Keymap &&
-        keymap_settings_controller_.capture_active()) {
+    if (current_screen() == Screen::Keymap && keymap_settings_controller_.capture_active()) {
+        if (event.kind == render::MenuHitTargetKind::KeymapButton &&
+            event.index == static_cast<int>(menu::settings::KeymapActionId::Back)) {
+            apply_keymap_settings_effects(keymap_settings_controller_.handle(
+                menu::MenuAction::back(), timing::HighResClock::now_ns()));
+        }
         return;
     }
     if (current_screen() == Screen::SongSelect) {
@@ -2646,9 +2692,11 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
             const int direction = event.part == render::MenuHitPart::Decrement ? -1 : 1;
             song_select_focus_ = SongSelectFocus::QuickSettings;
             song_quick_setting_cursor_ = clamp_int(event.index, 0, 3);
+            const auto previous_speed = config_.speed;
             if (!adjust_song_quick_setting(config_, event.index, direction)) {
                 return;
             }
+            play_speed_adjustment_if_changed(previous_speed);
             persist_runtime_config();
             publish_snapshot();
             return;
@@ -2763,13 +2811,30 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
             handle_quick_setup_input(action_key);
             finish_adjustment_without_selection();
             return;
+        case Screen::Keymap: {
+            if (keymap_settings_controller_.capture_active() || event.index < 0 ||
+                event.index > static_cast<int>(keymap_settings_controller_.lane_ids().size())) return;
+            const bool secondary = event.index > 0 && (event.part == render::MenuHitPart::Increment ||
+                                   event.part == render::MenuHitPart::Decrement);
+            auto effects = keymap_settings_controller_.select(event.index, secondary);
+            if (event.part != render::MenuHitPart::SelectOnly) {
+                const auto action = event.index == 0 &&
+                    (event.part == render::MenuHitPart::Increment || event.part == render::MenuHitPart::Decrement)
+                    ? menu::MenuAction::adjust(event.part == render::MenuHitPart::Increment ? 1 : -1)
+                    : menu::MenuAction::activate();
+                effects.merge(keymap_settings_controller_.handle(action, timing::HighResClock::now_ns()));
+            }
+            apply_keymap_settings_effects(effects);
+            if (event.index > 0 && event.part == render::MenuHitPart::Decrement) apply_keymap_capture(key_delete_);
+            return;
+        }
         case Screen::SettingsAudio:
             if (event.index < 0) {
                 return;
             }
             {
-                const auto target = menu::settings::audio_setting_id_at(
-                    static_cast<std::size_t>(event.index));
+                const auto target = menu::settings::settings_id_from_hit<menu::settings::AudioSettingId>(
+                    event.index, menu::settings::audio_setting_index);
                 if (!target.has_value()) {
                     return;
                 }
@@ -2809,8 +2874,8 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
                 return;
             }
             {
-                const auto target = menu::settings::graphics_setting_id_at(
-                    static_cast<std::size_t>(event.index));
+                const auto target = menu::settings::settings_id_from_hit<menu::settings::GraphicsSettingId>(
+                    event.index, menu::settings::graphics_setting_index);
                 if (!target.has_value()) {
                     return;
                 }
@@ -2863,8 +2928,8 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
             {
                 const bool lr2_source =
                     config::normalize_skin_source_token(config_.skin.source) == "lr2";
-                const auto target = menu::settings::skin_setting_id_at(
-                    static_cast<std::size_t>(event.index), lr2_source);
+                const auto target = menu::settings::settings_id_from_hit<SkinSettingsRowId>(
+                    event.index, [lr2_source](auto id) { return menu::settings::skin_setting_index(id, lr2_source); });
                 if (!target.has_value()) {
                     return;
                 }
@@ -2886,6 +2951,10 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
                         available_lr2_skin_names_,
                         available_tenriff_skin_names_,
                         *target);
+                } else if (event.part == render::MenuHitPart::SetValue) {
+                    effects = skin_settings_controller_.handle(
+                        menu::MenuAction::set_ratio(event.value), config_,
+                        available_lr2_skin_names_, available_tenriff_skin_names_, *target);
                 } else {
                     effects = skin_settings_controller_.handle(
                         menu::MenuAction::activate(),
@@ -2912,8 +2981,8 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
                 return;
             }
             {
-                const auto target = menu::settings::input_setting_id_at(
-                    static_cast<std::size_t>(event.index));
+                const auto target = menu::settings::settings_id_from_hit<menu::settings::InputSettingId>(
+                    event.index, menu::settings::input_setting_index);
                 if (!target.has_value()) {
                     return;
                 }
@@ -2956,8 +3025,8 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
                 return;
             }
             {
-                const auto target = menu::settings::calibration_setting_id_at(
-                    static_cast<std::size_t>(event.index));
+                const auto target = menu::settings::settings_id_from_hit<menu::settings::CalibrationSettingId>(
+                    event.index, menu::settings::calibration_setting_index);
                 if (!target.has_value()) {
                     return;
                 }
@@ -2991,12 +3060,13 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
                 return;
             }
             {
-                const auto target = menu::settings::mode_setting_id_at(
-                    static_cast<std::size_t>(event.index));
+                const auto target = menu::settings::settings_id_from_hit<menu::settings::ModeSettingId>(
+                    event.index, menu::settings::mode_setting_index);
                 if (!target.has_value()) {
                     return;
                 }
                 const auto previous = mode_settings_controller_.selected_id();
+                const auto previous_speed = config_.speed;
                 menu::settings::ModeSettingsEffects effects;
                 if (event.part == render::MenuHitPart::SelectOnly) {
                     effects = mode_settings_controller_.select(*target);
@@ -3017,6 +3087,7 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
                     settings_change_flash_started_ns_ = timing::HighResClock::now_ns();
                     effects.menu.render_changed = true;
                 }
+                play_speed_adjustment_if_changed(previous_speed);
                 apply_mode_settings_effects(effects);
                 return;
             }
@@ -3374,8 +3445,10 @@ void MenuApp::handle_quick_setup_input(uint32_t keycode) {
             return;
         }
         if (settings_cursor_ == profile_setup::kRateRow) {
+            const auto previous_speed = config_.speed;
             config_.speed.rate = clamp_step_value(config_.speed.rate + static_cast<double>(direction) * kRateStep,
                                                   kRateMin, kRateMax, kRateStep);
+            play_speed_adjustment_if_changed(previous_speed);
             persist_runtime_config();
             publish_snapshot();
             return;
@@ -3499,7 +3572,7 @@ void MenuApp::handle_options_hub_input(uint32_t keycode) {
                 break;
             case menu::OptionsItemId::Skins:
                 push_screen(destination);
-                skin_settings_controller_.reset(config_.mode.key_mode);
+                skin_settings_controller_.reset(skin_settings_controller_.edit_mode());
                 settings_cursor_ = 0;
                 refresh_available_lr2_skins();
                 refresh_available_tenriff_skins();
@@ -3507,6 +3580,7 @@ void MenuApp::handle_options_hub_input(uint32_t keycode) {
             case menu::OptionsItemId::Graphics:
                 push_screen(destination);
                 graphics_settings_controller_.reset();
+                refresh_graphics_resolutions();
                 settings_cursor_ = 0;
                 break;
             case menu::OptionsItemId::Audio:
@@ -3656,10 +3730,12 @@ void MenuApp::handle_song_select_input(uint32_t keycode) {
     if (!song_select_search_active_ && !search_nav_selected &&
         (keycode == key_minus_ || keycode == key_plus_)) {
         const double direction = keycode == key_minus_ ? -1.0 : 1.0;
+        const auto previous_speed = config_.speed;
         config_.speed.rate = clamp_step_value(config_.speed.rate + direction * kRateStep,
                                               kRateMin,
                                               kRateMax,
                                               kRateStep);
+        play_speed_adjustment_if_changed(previous_speed);
         persist_runtime_config();
         publish_snapshot();
         return;
@@ -3799,8 +3875,10 @@ void MenuApp::handle_song_select_input(uint32_t keycode) {
         }
         if (keycode == key_left_ || keycode == key_right_ || keycode == key_enter_) {
             const int direction = keycode == key_left_ ? -1 : 1;
+            const auto previous_speed = config_.speed;
             if (adjust_song_quick_setting(
                     config_, song_quick_setting_cursor_, direction)) {
+                play_speed_adjustment_if_changed(previous_speed);
                 persist_runtime_config();
                 publish_snapshot();
             }

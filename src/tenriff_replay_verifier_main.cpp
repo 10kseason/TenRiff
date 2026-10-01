@@ -89,7 +89,7 @@ int run_verifier(int argc, const char* const* argv) {
               << ",\"accuracy\":" << std::setprecision(17) << result.stats.accuracy_percent()
               << ",\"max_combo\":" << result.stats.max_combo
               << ",\"clear_status\":\"" << escape_json(result.clear_status)
-              << "\",\"ruleset_id\":\"" << tenriff::app::kCanonicalReplayRulesetId
+              << "\",\"ruleset_id\":\"" << result.ruleset_id
               << "\"}\n";
     return result.verified() && result.official_eligible ? 0 : 1;
 }

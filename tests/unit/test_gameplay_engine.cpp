@@ -534,6 +534,7 @@ TEST_CASE("gameplay engine applies easy low-gauge softening to weighted hold bad
     config.judge.gr_ms = 20.0;
     config.judge.gd_ms = 30.0;
     config.judge.bd_ms = 40.0;
+    config.judge.indirect_miss_ms = 40.0; // This fixture tests a custom short miss deadline.
     config.judge.hold_grace_ms = 20.0;
     config.judge.hold_break_ms = 100.0;
 
@@ -793,6 +794,7 @@ TEST_CASE("gameplay engine auto-misses once the bad window is exceeded") {
     config.judge.gr_ms = 20.0;
     config.judge.gd_ms = 30.0;
     config.judge.bd_ms = 40.0;
+    config.judge.indirect_miss_ms = 40.0; // This fixture tests a custom short miss deadline.
 
     GameplayEngine engine(chart, config);
     engine.advance(1040);
@@ -844,6 +846,7 @@ TEST_CASE("sudden death stops on the first missed object even when practice no-f
     config.judge.gr_ms = 20.0;
     config.judge.gd_ms = 30.0;
     config.judge.bd_ms = 40.0;
+    config.judge.indirect_miss_ms = 40.0; // This fixture tests a custom short miss deadline.
     config.practice_no_fail_enabled = true;
     config.one_miss_fail_enabled = true;
 
@@ -1048,6 +1051,7 @@ TEST_CASE("parallel gauge shift selects the highest independently surviving gaug
     config.judge.gr_ms = 20.0;
     config.judge.gd_ms = 30.0;
     config.judge.bd_ms = 40.0;
+    config.judge.indirect_miss_ms = 40.0; // This fixture tests a custom short miss deadline.
     config.gauge_shift_enabled = true;
     config.initial_gauge = tenriff::game::GaugeType::ExHard;
     config.gauge.ex_hard.bd = -100.0;
@@ -1097,6 +1101,7 @@ TEST_CASE("parallel gauge shift begins at the selected tier and only shifts down
     config.judge.gr_ms = 20.0;
     config.judge.gd_ms = 30.0;
     config.judge.bd_ms = 40.0;
+    config.judge.indirect_miss_ms = 40.0; // This fixture tests a custom short miss deadline.
     config.gauge_shift_enabled = true;
     config.initial_gauge = tenriff::game::GaugeType::Normal;
     config.gauge.normal.bd = -100.0;
@@ -1127,6 +1132,7 @@ TEST_CASE("parallel gauge shift fails only after every gauge has died") {
     config.judge.gr_ms = 20.0;
     config.judge.gd_ms = 30.0;
     config.judge.bd_ms = 40.0;
+    config.judge.indirect_miss_ms = 40.0; // This fixture tests a custom short miss deadline.
     config.gauge_shift_enabled = true;
     config.initial_gauge = tenriff::game::GaugeType::ExHard;
     config.gauge.ex_hard.bd = -100.0;
@@ -1155,6 +1161,7 @@ TEST_CASE("gameplay engine records one legacy threshold-policy shift before Easy
     config.judge.gr_ms = 20.0;
     config.judge.gd_ms = 30.0;
     config.judge.bd_ms = 40.0;
+    config.judge.indirect_miss_ms = 40.0; // This fixture tests a custom short miss deadline.
     config.gauge.normal.bd = -70.0;
     config.gauge.easy.bd = -100.0;
     config.gauge_policy.normal_to_easy_shift = true;
@@ -1307,7 +1314,7 @@ TEST_CASE("judge easy mod expands charge hold tail judgement during gameplay") {
     (void)engine.handle_input(1, InputState::Released, 2012);
     engine.advance(2500);
 
-    // Tails ride the normal windows, so Judge Easy's 1.25x PGREAT (12.5 ms) is what
+    // Tails ride the normal windows, so Judge Easy's 1.35x PGREAT (13.5 ms) is what
     // turns this 12 ms late release into a PGREAT instead of a GREAT.
     CHECK(engine.stats().counts.pg == 2);
     CHECK(engine.stats().counts.gr == 0);
@@ -1468,6 +1475,79 @@ TEST_CASE("judge hard records an unplayed note as an indirect poor") {
     normal_engine.advance(1041);
     CHECK(normal_engine.stats().counts.bd == 1);
     CHECK(normal_engine.stats().counts.pr == 0);
+}
+
+TEST_CASE("current modes defer automatic misses until after 340 real milliseconds") {
+    GameplayChart chart;
+    chart.lane_count = 1;
+    chart.duration_samples = 3000;
+    chart.notes.push_back(NoteEvent{1, 1000});
+    for (const auto token : {"", "judge_easy", "judge_hard"}) {
+        tenriff::config::ModeConfig mode;
+        if (*token) mode.mods = {token};
+        const auto managed = tenriff::app::manage_modes(
+            chart, tenriff::app::ChartFormat::Bms, mode, tenriff::config::JudgeConfig{}, 1.0);
+        GameplayConfig config;
+        config.sample_rate = 1000;
+        config.judge = managed.judge;
+        GameplayEngine engine(chart, config);
+        engine.advance(1340);
+        CHECK(engine.stats().counts.bd == 0);
+        CHECK(engine.stats().counts.pr == 0);
+        engine.advance(1341);
+        CHECK(engine.stats().counts.bd == (mode.mods == std::vector<std::string>{"judge_hard"} ? 0 : 1));
+        CHECK(engine.stats().counts.pr == (mode.mods == std::vector<std::string>{"judge_hard"} ? 1 : 0));
+    }
+}
+
+TEST_CASE("hard BAD boundary and the gap before automatic miss do not swallow the next exact note") {
+    GameplayChart chart;
+    chart.lane_count = 1;
+    chart.duration_samples = 3000;
+    chart.notes = {NoteEvent{1, 1000}};
+    tenriff::config::ModeConfig mode;
+    mode.mods = {"judge_hard"};
+    const auto managed = tenriff::app::manage_modes(
+        chart, tenriff::app::ChartFormat::Bms, mode, tenriff::config::JudgeConfig{}, 1.0);
+    GameplayConfig config;
+    config.sample_rate = 1000;
+    config.judge = managed.judge;
+    GameplayEngine boundary(chart, config);
+    CHECK(boundary.handle_input(1, InputState::Pressed, 1180).has_value());
+    CHECK(boundary.stats().counts.bd == 1);
+    GameplayEngine outside(chart, config);
+    CHECK_FALSE(outside.handle_input(1, InputState::Pressed, 1181).has_value());
+    CHECK(outside.stats().counts.bd == 0);
+    CHECK(outside.stats().counts.pr == 1);
+
+    chart.notes.push_back(NoteEvent{1, 1200});
+    GameplayEngine dense(chart, config);
+    dense.advance(1199);
+    CHECK(dense.stats().counts.pr == 0);
+    REQUIRE(dense.handle_input(1, InputState::Pressed, 1200).has_value());
+    CHECK(dense.stats().counts.pg == 1);
+    CHECK(dense.stats().counts.pr == 1);
+    dense.advance(1600);
+    CHECK(dense.stats().counts.pr == 1); // The skipped note must not miss again.
+}
+
+TEST_CASE("easy allows a 26ms PGREAT while normal remains GREAT") {
+    GameplayChart chart;
+    chart.lane_count = 1;
+    chart.duration_samples = 3000;
+    chart.notes = {NoteEvent{1, 1000}};
+    for (bool easy : {false, true}) {
+        tenriff::config::ModeConfig mode;
+        if (easy) mode.mods = {"judge_easy"};
+        GameplayConfig config;
+        config.sample_rate = 1000;
+        config.judge = tenriff::app::manage_modes(
+            chart, tenriff::app::ChartFormat::Bms, mode, tenriff::config::JudgeConfig{}, 1.0).judge;
+        GameplayEngine engine(chart, config);
+        REQUIRE(engine.handle_input(1, InputState::Pressed, 1026).has_value());
+        CHECK(engine.stats().counts.pg == (easy ? 1 : 0));
+        CHECK(engine.stats().counts.gr == (easy ? 0 : 1));
+    }
 }
 
 TEST_CASE("gameplay landmines damage held lanes without affecting score or judgement counts") {

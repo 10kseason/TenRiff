@@ -8,6 +8,7 @@
 #include <filesystem>
 #include <fstream>
 #include <chrono>
+#include <thread>
 
 namespace tenriff::app {
 
@@ -24,6 +25,207 @@ struct CompletionTestDirectory {
 // Exercise the production input-to-voice-to-mixer path without starting a device,
 // input thread, decoder, profile or record writer.
 struct GameSessionAudioTestAccess {
+    static void check_concurrent_hud_timing_publication() {
+        auto session = std::make_unique<GameSession>();
+        session->sample_rate_ = 48000;
+        session->chart_.lane_count = 4;
+        session->chart_.duration_samples = 2'000'000'000;
+        session->chart_.notes.push_back(gameplay::NoteEvent{1, 1'000'000'000, std::nullopt});
+        gameplay::GameplayConfig config;
+        config.sample_rate = 48000;
+        config.practice_no_fail_enabled = true;
+        session->engine_ = std::make_unique<gameplay::GameplayEngine>(session->chart_, config);
+        session->lane_activity_.assign(4, 0.0f);
+        session->lane_pressed_.assign(4, 0);
+        session->synthetic_tones_enabled_ = false;
+        session->config_.audio_ui.mute_when_inactive = false;
+        std::atomic<bool> begin{false}, observed{false}, done{false};
+        std::thread producer([&] {
+            std::vector<float> output(1920);
+            while (!begin.load(std::memory_order_acquire)) std::this_thread::yield();
+            for (int64_t iteration = 1; iteration <= 500; ++iteration) {
+                const uint32_t frames = iteration % 2 == 0 ? 480 : 960;
+                const int64_t playback = iteration * 4800;
+                session->audio_callback(output.data(), frames, playback + 2400, playback);
+                if (iteration == 1)
+                    while (!observed.load(std::memory_order_acquire)) std::this_thread::yield();
+                if (iteration % 16 == 0) std::this_thread::yield();
+            }
+            done.store(true, std::memory_order_release);
+        });
+        begin.store(true, std::memory_order_release);
+        std::size_t published_snapshots = 0;
+        do {
+            const auto hud = session->hud_snapshot();
+            if (hud.current_sample > 0) {
+                ++published_snapshots;
+                observed.store(true, std::memory_order_release);
+                CHECK(hud.current_sample % 4800 == 0);
+                const auto iteration = hud.current_sample / 4800;
+                CHECK(hud.audio_buffer_frames == (iteration % 2 == 0 ? 480u : 960u));
+                CHECK(hud.audio_sample_time_ns > 0);
+            }
+        } while (!done.load(std::memory_order_acquire));
+        producer.join();
+        const auto final = session->hud_snapshot();
+        CHECK(final.current_sample == 500 * 4800);
+        CHECK(final.audio_buffer_frames == 480);
+        CHECK(published_snapshots > 0);
+    }
+
+    static void check_secondary_binding_input_queue() {
+        auto session = std::make_unique<GameSession>();
+        session->sample_rate_ = 48000;
+        session->chart_.lane_count = 1;
+        session->chart_.duration_samples = 120000;
+        gameplay::NoteEvent note{1, 48000, 96000};
+        note.release_required = true;
+        session->chart_.notes.push_back(note);
+        gameplay::GameplayConfig config;
+        config.sample_rate = 48000;
+        config.practice_no_fail_enabled = true;
+        session->engine_ = std::make_unique<gameplay::GameplayEngine>(session->chart_, config);
+        session->lane_activity_.assign(1, 0.0f);
+        session->lane_pressed_.assign(1, 0);
+        session->synthetic_tones_enabled_ = false;
+        session->key_to_lane_ = {{32, 1}, {33, 1}};
+        session->lane_binding_state_.configure(session->key_to_lane_);
+        const auto physical_event = [&](uint32_t key, input::InputState state, int64_t sample) {
+            const int64_t time_ns = 1'000'000'000LL + (sample - 48000) * 1'000'000'000LL / 48000;
+            session->startup_input_timing_anchor_ = {sample, time_ns, true};
+            session->current_playback_sample_ = sample;
+            input::InputEvent event{};
+            event.keycode = key; event.state = state; event.input_time_ns = time_ns;
+            REQUIRE(session->input_thread_.queue().push(event));
+            session->process_input_queue(sample, sample + 480, 0);
+            session->engine_->advance(sample);
+        };
+        physical_event(32, input::InputState::Pressed, 48000);
+        physical_event(33, input::InputState::Pressed, 60000);
+        physical_event(32, input::InputState::Released, 72000);
+        CHECK(session->lane_pressed_[0] == 1);
+        CHECK(session->lane_binding_state_.pressed(1));
+        CHECK(session->engine_->stats().counts.bd == 0);
+        CHECK(session->engine_->stats().counts.pr == 0);
+        physical_event(33, input::InputState::Released, 96000);
+        session->engine_->advance(100800);
+        CHECK(session->lane_pressed_[0] == 0);
+        CHECK_FALSE(session->lane_binding_state_.pressed(1));
+        CHECK(session->engine_->stats().counts.pg == 2);
+        CHECK(session->engine_->stats().counts.bd == 0);
+        CHECK(session->engine_->stats().counts.pr == 0);
+        CHECK(session->engine_->replay().events.size() == 2);
+    }
+
+    static void check_hud_playback_anchor(int sample_rate) {
+        auto session = std::make_unique<GameSession>();
+        session->sample_rate_ = sample_rate;
+        session->chart_.lane_count = 4;
+        session->chart_.duration_samples = sample_rate * 20;
+        session->chart_.notes.push_back(gameplay::NoteEvent{1, sample_rate * 10, std::nullopt});
+        gameplay::GameplayConfig config;
+        config.sample_rate = sample_rate;
+        config.practice_no_fail_enabled = true;
+        session->engine_ = std::make_unique<gameplay::GameplayEngine>(session->chart_, config);
+        session->lane_activity_.assign(4, 0.0f);
+        session->lane_pressed_.assign(4, 0);
+        session->synthetic_tones_enabled_ = false;
+        session->config_.audio_ui.mute_when_inactive = false;
+        struct Buffer { int64_t write; int64_t playback; uint32_t frames; };
+        // Increasing padding resembles extra queued audio under a screen-share
+        // workload. Neither its size nor the writable buffer may lead visuals.
+        for (const Buffer buffer : {Buffer{4800, 2400, 480}, Buffer{24000, 3000, 960},
+                                    Buffer{24960, 4800, 1440}}) {
+            std::vector<float> output(buffer.frames * 2);
+            session->audio_callback(output.data(), buffer.frames, buffer.write, buffer.playback);
+            const auto hud = session->hud_snapshot();
+            REQUIRE(hud.active);
+            CHECK(hud.current_sample == buffer.playback);
+            CHECK(hud.current_sample != buffer.write + buffer.frames);
+            CHECK(hud.audio_buffer_frames == buffer.frames);
+            CHECK(hud.sample_rate == sample_rate);
+            CHECK(hud.audio_sample_time_ns > 0);
+        }
+    }
+
+    static void check_normalize_and_focus_output() {
+        auto session = std::make_unique<GameSession>();
+        session->sample_rate_ = 48000;
+        session->mix_normalizer_.reset(48000);
+        session->config_.audio_ui.master_volume = 0.7;
+        session->config_.audio_ui.normalize_audio = false;
+        std::vector<float> original(48000 * 2 * 3);
+        for (std::size_t sample = 0; sample < original.size(); sample += 2) {
+            original[sample] = 0.8f;
+            original[sample + 1] = 0.4f;
+        }
+        auto off = original;
+        session->finish_audio_output(off.data(), 48000 * 3, true);
+        auto expected = original;
+        for (float& sample : expected) sample *= 0.7f;
+        CHECK(off == expected);
+
+        session->config_.audio_ui.normalize_audio = true;
+        auto on = original;
+        session->finish_audio_output(on.data(), 48000 * 3, true);
+        CHECK(on.back() < off.back() * 0.5f);
+        CHECK(on[on.size() - 2] == doctest::Approx(on.back() * 2));
+        session->config_.audio_ui.normalize_audio = false;
+        auto disabled_again = original;
+        session->finish_audio_output(disabled_again.data(), 48000 * 3, true);
+        CHECK(disabled_again == off);
+
+        session->config_.audio_ui.mute_when_inactive = true;
+        auto muted = original;
+        session->finish_audio_output(muted.data(), 48000 * 3, false);
+        CHECK(std::all_of(muted.begin(), muted.end(), [](float sample) { return sample == 0.0f; }));
+        CHECK(session->config_.audio_ui.master_volume == doctest::Approx(0.7));
+        auto restored = original;
+        session->finish_audio_output(restored.data(), 48000 * 3, true);
+        CHECK(restored == off);
+        session->config_.audio_ui.mute_when_inactive = false;
+        auto inactive_unmuted = original;
+        session->finish_audio_output(inactive_unmuted.data(), 48000 * 3, false);
+        CHECK(inactive_unmuted == off);
+    }
+
+    static void check_speed_click_production_mix() {
+        auto session = pause_fixture();
+        session->chart_audio_voices_.clear();
+        session->config_.audio_ui.master_volume = 0.7;
+        session->config_.audio_ui.mute_when_inactive = false;
+        session->config_.audio_ui.normalize_audio = false;
+        const double before = session->config_.speed.hi_speed;
+        session->adjust_hispeed(0.5);
+        CHECK(session->config_.speed.hi_speed == doctest::Approx(before + 0.5));
+        std::vector<float> output(480 * 2);
+        session->audio_callback(output.data(), 480, 48000, 48000);
+        CHECK(std::any_of(output.begin(), output.end(), [](float sample) { return sample != 0.0f; }));
+        for (std::size_t sample = 0; sample < output.size(); sample += 2)
+            CHECK(output[sample] == output[sample + 1]);
+        session->audio_callback(output.data(), 480, 48480, 48480);
+        session->audio_callback(output.data(), 480, 48960, 48960);
+        CHECK(std::all_of(output.begin(), output.end(), [](float sample) { return sample == 0.0f; }));
+        session->config_.speed.hi_speed = 50.0;
+        session->adjust_hispeed(1.0);
+        session->audio_callback(output.data(), 480, 49440, 49440);
+        CHECK(std::all_of(output.begin(), output.end(), [](float sample) { return sample == 0.0f; }));
+        session->config_.audio_ui.master_volume = 0.0;
+        session->adjust_hispeed(-1.0);
+        session->audio_callback(output.data(), 480, 49920, 49920);
+        CHECK(std::all_of(output.begin(), output.end(), [](float sample) { return sample == 0.0f; }));
+        session->config_.audio_ui.master_volume = 0.7;
+        session->paused_.store(true);
+        session->adjust_hispeed(-1.0);
+        session->audio_callback(output.data(), 480, 50400, 50400);
+        CHECK(std::any_of(output.begin(), output.end(), [](float sample) { return sample != 0.0f; }));
+        CHECK(session->last_audio_sample_.load() == 50400);
+        session->audio_callback(output.data(), 480, 50880, 50880);
+        session->audio_callback(output.data(), 480, 51360, 51360);
+        CHECK(std::all_of(output.begin(), output.end(), [](float sample) { return sample == 0.0f; }));
+        CHECK(session->last_audio_sample_.load() == 50400);
+    }
+
     static void check_audio_preparation() {
         CompletionTestDirectory directory;
         const auto wav = directory.path / "tail.wav";
@@ -77,6 +279,7 @@ struct GameSessionAudioTestAccess {
         session->config_.mode.key_mode = "4k";
         session->chart_format_ = ChartFormat::Bms;
         session->key_to_lane_[32] = 1;
+        session->lane_binding_state_.configure(session->key_to_lane_);
         session->lane_activity_.assign(4, 0);
         session->lane_pressed_.assign(4, 0);
         session->synthetic_tones_enabled_ = false;
@@ -151,6 +354,7 @@ struct GameSessionAudioTestAccess {
         session->enter_keycode_ = 13;
         session->down_keycode_ = 40;
         session->key_to_lane_[32] = 1;
+        session->lane_binding_state_.configure(session->key_to_lane_);
         session->lane_activity_.assign(1, 0);
         session->lane_pressed_.assign(1, 0);
         session->synthetic_tones_enabled_ = false;
@@ -239,6 +443,30 @@ struct GameSessionAudioTestAccess {
         }
     }
 
+    static void check_gameplay_start_boundary() {
+        {
+            auto session = pause_fixture();
+            session->gameplay_started_ = false;
+            session->countdown_active_ = true;
+            input::InputEvent cancel{};
+            cancel.keycode = 27;
+            cancel.state = input::InputState::Pressed;
+            REQUIRE(session->input_thread_.queue().push(cancel));
+            session->run();
+            CHECK(session->was_user_aborted());
+            CHECK_FALSE(session->did_start_gameplay());
+        }
+        {
+            auto session = pause_fixture();
+            session->gameplay_started_ = false;
+            // No backend is initialized: exercise the real failed-start branch
+            // without opening a sound device or changing the user's audio state.
+            session->run();
+            CHECK_FALSE(session->audio_error().empty());
+            CHECK_FALSE(session->did_start_gameplay());
+        }
+    }
+
     static void check_released_hold_rebaseline() {
         auto session = pause_fixture();
         session->chart_.notes = {gameplay::NoteEvent{1, 48000, 144000}};
@@ -249,6 +477,7 @@ struct GameSessionAudioTestAccess {
         // An unpollable key provides a deterministic physical-up state without
         // reading or synthesizing a key on the user's real keyboard.
         session->key_to_lane_[0] = 1;
+        session->lane_binding_state_.configure(session->key_to_lane_);
         session->polled_gameplay_keys_.push_back({0});
         const auto score_before = session->engine_->stats().raw_score;
         session->rebaseline_gameplay_start_input_state(60000);
@@ -327,6 +556,27 @@ struct GameSessionAudioTestAccess {
 
 } // namespace tenriff::app
 
+TEST_CASE("normalization OFF bypasses prior automatic gain and focus mute restores saved volume") {
+    tenriff::app::GameSessionAudioTestAccess::check_normalize_and_focus_output();
+}
+
+TEST_CASE("production input queue preserves a charge hold through primary to secondary key handoff") {
+    tenriff::app::GameSessionAudioTestAccess::check_secondary_binding_input_queue();
+}
+
+TEST_CASE("gameplay HUD follows the audible device position as queued buffers grow") {
+    for (int sample_rate : {44100, 48000})
+        tenriff::app::GameSessionAudioTestAccess::check_hud_playback_anchor(sample_rate);
+}
+
+TEST_CASE("concurrent gameplay callbacks and HUD readers keep audio position and buffer size coherent") {
+    tenriff::app::GameSessionAudioTestAccess::check_concurrent_hud_timing_publication();
+}
+
+TEST_CASE("speed tuning mixes a bounded click into real gameplay output and respects master mute") {
+    tenriff::app::GameSessionAudioTestAccess::check_speed_click_production_mix();
+}
+
 TEST_CASE("long note release never starts another keysound through the production mixer") {
     for (bool release_required : {false, true}) {
         for (int64_t sample : {72000, 96000, 100800}) {
@@ -362,6 +612,10 @@ TEST_CASE("pause Continue and Esc keep audio and judgement frozen for a full thr
 
 TEST_CASE("Esc cancels a resume countdown without advancing the chart") {
     tenriff::app::GameSessionAudioTestAccess::check_countdown_cancel();
+}
+
+TEST_CASE("cancelled starting countdown and failed audio start do not count as a played song") {
+    tenriff::app::GameSessionAudioTestAccess::check_gameplay_start_boundary();
 }
 
 TEST_CASE("session mix ignores Esc during gameplay and its starting countdown") {

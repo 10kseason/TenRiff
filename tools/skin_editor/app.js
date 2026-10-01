@@ -20,7 +20,7 @@
   const history = C.createHistory(catalog.native || fallbackNative);
   const defaults = {
     theme: {accent:'#6EE7F2',text:'#F4F7FF',muted:'#9AA3AD',card:'#1F2130E8',panel:'#14141CB8',footer:'#0B101DF2',button:'#242638',button_selected:'#6EE7F238',border:'#31344A',judgement_line:'#FF4D6D',lane_divider:'#F6F8FF',scene_primary:'#61D6FA',scene_secondary:'#8F9EFA',scene_background:'#04081A'},
-    gameplay: {background_opacity:.66,note_width_ratio:1,note_height_ratio:1,judgement_line_position:.82,full_lane_receptors:false,note_aspect:'stretch',show_lane_dividers:true,show_judgement_line:true,show_timing_feedback:true,show_gear_boundary_line:true,show_hold_tail:true,hold_tail_taper:true,judgement_line_glow:true,key_pulse:true,key_pulse_brightness:.7,hit_burst_style:'prism',key_label_position:'bottom',note_border:true,note_shape:'rect',lane_background_opacity:.08,black_playfield:true,visual_opacity:1,note_outline_opacity:1,hold_body_opacity:.28}
+    gameplay: {background_opacity:.66,note_width_ratio:1,note_height_ratio:1,judgement_line_position:.82,full_lane_receptors:false,note_aspect:'stretch',show_lane_dividers:true,show_judgement_line:true,show_timing_feedback:true,show_gear_boundary_line:true,show_hold_tail:true,hold_tail_taper:true,judgement_line_glow:true,key_pulse:true,key_pulse_brightness:.7,key_backdrop:true,key_backdrop_opacity:.25,key_backdrop_brightness:1,key_backdrop_height:1,hit_burst_style:'prism',key_label_position:'bottom',note_border:true,note_shape:'rect',lane_background_opacity:.08,black_playfield:true,visual_opacity:1,note_outline_opacity:1,hold_body_opacity:.28}
   };
   const layouts = {
     title: {spectrum:[696,66,1224,150],logo:[670,184,1250,300],buttons:[470,360,1450,940],guide:[1492,386,1834,924],footer:[80,972,1840,1056]},
@@ -224,6 +224,7 @@
     ['motion','sprites','metrics','colors','rects','fonts'].forEach(group=>option(groupSelect,group,t(group)));groupSelect.value=instrumentGroup;
     if(instrumentGroup==='sprites'){renderSpriteEditor(body,base,selected);return;}
     if(instrumentGroup==='rects')element('p',{class:'hint',text:t('deltaHint')},body);
+    if(instrumentGroup==='metrics'||instrumentGroup==='fonts')element('p',{class:'hint',text:t('nativeTypographyHint')},body);
     const values=G.settings(selected,gameplayCatalog),list=element('div',{class:'native-list'},body);
     for(const [key,meta] of Object.entries(gameplayCatalog[instrumentGroup]||{})){
       const rule=instrumentGroup==='colors'?{$ref:'#/$defs/hexColor'}:
@@ -435,6 +436,9 @@
       const x=left+i*laneWidth,color=style.lane_colors?.[i%style.lane_colors.length]||(i%2?p.accent:p.text);
       ctx.save();ctx.globalAlpha=Math.max(0,Math.min(1,style.lane_background_opacity));box([x,50,x+laneWidth,1060],color,null,0);ctx.restore();
       if(style.show_lane_dividers){ctx.strokeStyle=p.lane_divider;ctx.globalAlpha=.2;ctx.beginPath();ctx.moveTo(x,50);ctx.lineTo(x,1060);ctx.stroke();ctx.globalAlpha=1;}
+      const pressed=i===pressedPreviewLane;
+      const backdrop=G.backdropOpacity(style,pressed),backdropTop=G.backdropTop(style,50,1060);
+      if(backdrop>0&&backdropTop<1060){ctx.save();ctx.globalAlpha=backdrop;box([x+1,backdropTop,x+laneWidth-1,1060],G.backdropColor(color,style),null,0);ctx.restore();}
       const receptor=[x+5,line-18,x+laneWidth-5,line+18];if(!art(C.laneAsset(style.key_idle,i,style.lane_map),receptor))box(receptor,p.button_selected,p.accent,4);
       for(let j=0;j<3;j++){
         const y=120+((i*97+j*235)%Math.max(100,line-220)),w=laneWidth*.86*style.note_width_ratio,h=18*style.note_height_ratio,rect=[x+(laneWidth-w)/2,y,x+(laneWidth+w)/2,y+h];
@@ -447,7 +451,7 @@
       }
       if(style.key_label_position!=='off')text(String(i+1),x+laneWidth*.4,line+(style.key_label_position==='top'?-44:52),22,p.muted,laneWidth);
     }
-    if(style.show_judgement_line)box([left,line,left+width,line+4],p.judgement_line,null,0);
+    if(style.show_judgement_line){const thickness=4*Math.max(.25,Math.min(4,style.note_height_ratio??1));box([left,line-thickness/2,left+width,line+thickness/2],p.judgement_line,null,0);}
     art(style.gear||'gameplay/gear.png',[left,50,left+width,1060]);text(previewMode.toUpperCase(),left,24,22,p.accent);
   }
   function draw(time=0){

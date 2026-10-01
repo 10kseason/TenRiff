@@ -46,7 +46,7 @@
             const int page = std::clamp(generic_help_page_.load(std::memory_order_relaxed), 0, page_count - 1);
             const D2D1_RECT_F body = native_rect("generic_help.rect.002", D2D1::RectF(rect.left + 24, rect.top + 72, rect.right - 24, rect.top + 72 + page_height));
             ctx->PushAxisAlignedClip(body, D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
-            ctx->DrawTextLayout(D2D1::Point2F(body.left, body.top - page * page_height),
+            draw_text_layout_readable(D2D1::Point2F(body.left, body.top - page * page_height),
                                 d2d_->generic_help_layout.Get(), d2d_->muted_brush.Get());
             ctx->PopAxisAlignedClip();
             draw_text_clipped(to_wide(std::to_string(page + 1) + " / " + std::to_string(page_count)),

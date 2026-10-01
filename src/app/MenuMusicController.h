@@ -6,6 +6,10 @@
 
 namespace tenriff::app {
 
+// Plays the same short click used by gameplay tuning with the supplied master
+// gain. Its PCM storage outlives asynchronous Windows playback.
+void play_settings_adjustment_click(double gain);
+
 namespace menu_music_detail {
 
 enum class PlaybackAction {
@@ -34,6 +38,8 @@ public:
     MenuMusicController& operator=(const MenuMusicController&) = delete;
 
     void play_looping_file(const std::string& path, double gain);
+    // Focus mute keeps the current file and its playback cursor alive.
+    void set_output_muted(bool muted);
     void stop();
 
 private:
@@ -44,6 +50,7 @@ private:
     std::string requested_path_;
     std::string current_path_;
     double gain_ = 1.0;
+    bool output_muted_ = false;
     bool open_ = false;
     bool open_failed_ = false;
     std::chrono::steady_clock::time_point retry_allowed_at_{};

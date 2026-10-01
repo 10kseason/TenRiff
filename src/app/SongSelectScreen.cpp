@@ -39,7 +39,8 @@ void SongSelectScreen::clear_preview_target() {
 void SongSelectScreen::begin_preview_decode(const std::string& selection_key,
                                             const std::string& chart_path,
                                             const std::string& indexed_preview_path,
-                                            int target_sample_rate) {
+                                            int target_sample_rate,
+                                            bool title_music) {
     if (!active_ || selection_key.empty() || chart_path.empty() ||
         target_sample_rate <= 0 || preview_decode_future_.valid()) {
         return;
@@ -54,6 +55,7 @@ void SongSelectScreen::begin_preview_decode(const std::string& selection_key,
          chart_path,
          indexed_preview_path,
          target_sample_rate,
+         title_music,
          cancel_flag]() {
             PreviewDecodeResult result;
             result.selection_key = selection_key;
@@ -65,11 +67,12 @@ void SongSelectScreen::begin_preview_decode(const std::string& selection_key,
             if (!build_song_preview_audio(chart_path,
                                           indexed_preview_path,
                                           target_sample_rate,
-                                          30,
+                                          title_music ? 300 : 30,
                                           samples,
                                           preview_source,
                                           &preview_error,
-                                          cancel_flag) ||
+                                          cancel_flag,
+                                          title_music) ||
                 samples.empty()) {
                 result.error = std::move(preview_error);
                 return result;

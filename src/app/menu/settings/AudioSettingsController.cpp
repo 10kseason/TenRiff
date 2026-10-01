@@ -129,7 +129,9 @@ std::optional<NumericSettingRange> audio_setting_numeric_range(AudioSettingId id
         case AudioSettingId::Preset:
         case AudioSettingId::KeysoundMode:
         case AudioSettingId::BackgroundSound:
+        case AudioSettingId::TitleMusic:
         case AudioSettingId::Normalize:
+        case AudioSettingId::MuteWhenInactive:
         case AudioSettingId::Back:
         case AudioSettingId::Backend:
         case AudioSettingId::AsioDriver:
@@ -219,7 +221,7 @@ MenuEffectFlags AudioSettingsController::apply_selected_action(
 
     switch (selected_id_) {
         case AudioSettingId::Preset:
-            if (is_adjust && runtime.audio.backend != audio::AudioBackend::ASIO) {
+            if ((is_adjust || is_activate) && runtime.audio.backend != audio::AudioBackend::ASIO) {
                 runtime.audio_ui.preset = runtime.audio_ui.preset == "basic" ? "high" : "basic";
                 apply_audio_preset(runtime);
                 changed = true;
@@ -267,10 +269,10 @@ MenuEffectFlags AudioSettingsController::apply_selected_action(
             }
             break;
         case AudioSettingId::KeysoundMode:
-            if (is_adjust) {
+            if (is_adjust || is_activate) {
                 const std::string next = cycle_keysound_policy(
                     runtime.audio_ui.bms_keysound_policy,
-                    action.direction);
+                    is_adjust ? action.direction : 1);
                 if (runtime.audio_ui.bms_keysound_policy != next) {
                     runtime.audio_ui.bms_keysound_policy = next;
                     changed = true;
@@ -283,10 +285,28 @@ MenuEffectFlags AudioSettingsController::apply_selected_action(
                 changed = true;
             }
             break;
+        case AudioSettingId::TitleMusic:
+            if (is_adjust || is_activate) {
+                static constexpr std::array<std::string_view, 4> choices{
+                    "none", "default", "random_bms", "last_played"};
+                const auto current = config::normalize_title_music_token(runtime.audio_ui.title_music);
+                const auto found = std::find(choices.begin(), choices.end(), current);
+                const std::size_t index = static_cast<std::size_t>(found - choices.begin());
+                const std::size_t next = (index + (is_adjust && action.direction < 0 ? 3u : 1u)) % choices.size();
+                runtime.audio_ui.title_music = choices[next];
+                changed = true;
+            }
+            break;
         case AudioSettingId::BackgroundSound:
             if (is_adjust || is_activate) {
                 runtime.audio_ui.background_sound_enabled =
                     !runtime.audio_ui.background_sound_enabled;
+                changed = true;
+            }
+            break;
+        case AudioSettingId::MuteWhenInactive:
+            if (is_adjust || is_activate) {
+                runtime.audio_ui.mute_when_inactive = !runtime.audio_ui.mute_when_inactive;
                 changed = true;
             }
             break;

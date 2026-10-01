@@ -40,7 +40,8 @@ TEST_CASE("keymap controller resolves initial mode and owns dynamic lane selecti
     for (int index = 0; index < 20; ++index) {
         static_cast<void>(controller.handle(MenuAction::move(1), 100));
     }
-    CHECK(controller.selected_row() == 7);
+    CHECK(controller.selected_row() == 10);
+    static_cast<void>(controller.select(7));
     CHECK(*controller.selected_lane() == "lane7");
 }
 
@@ -90,14 +91,18 @@ TEST_CASE("keymap capture has explicit start cancel timeout and completion effec
     CHECK(effects.refresh_input_scope);
 }
 
-TEST_CASE("keymap back clears transient state and requests one navigation pop") {
+TEST_CASE("keymap back cancels capture before clearing transient state and navigating") {
     KeymapSettingsController controller;
     controller.reset(std::nullopt, "4k");
     static_cast<void>(controller.handle(MenuAction::move(1), 0));
     static_cast<void>(controller.handle(MenuAction::activate(), 100));
     controller.show_status("temporary", 100);
 
-    const auto effects = controller.handle(MenuAction::back(), 200);
+    const auto cancelled = controller.handle(MenuAction::back(), 200);
+    CHECK_FALSE(cancelled.menu.navigate_back);
+    CHECK(cancelled.refresh_input_scope);
+    CHECK_FALSE(controller.capture_active());
+    const auto effects = controller.handle(MenuAction::back(), 300);
     CHECK(effects.menu.navigate_back);
     CHECK(effects.refresh_input_scope);
     CHECK_FALSE(controller.capture_active());
@@ -122,6 +127,7 @@ TEST_CASE("keymap view keeps main rows actions and capture status value-only") {
     REQUIRE(view.rows.size() == 8);
     CHECK(view.rows[0].label == "Key Mode");
     CHECK(view.rows[0].value == "4K");
+    CHECK(view.rows[1].label == "Key 1");
     CHECK(view.rows[1].selected);
     CHECK(view.rows[1].value.find("[waiting]") != std::string::npos);
     REQUIRE(view.rows[5].action.has_value());
@@ -153,4 +159,48 @@ TEST_CASE("NKRO view highlights only pressed mapped lanes") {
     REQUIRE(view.rows.back().action.has_value());
     CHECK(*view.rows.back().action == KeymapActionId::Back);
     CHECK(view.footer_reserved_lines == 2);
+}
+
+TEST_CASE("keymap primary and secondary selection mouse capture and keyboard actions are accessible") {
+    KeymapSettingsController controller;
+    controller.reset(std::nullopt, "10k");
+    CHECK(controller.edit_mode() == "4k");
+    static_cast<void>(controller.select(2, true));
+    CHECK(controller.secondary_selected());
+    CHECK(*controller.selected_lane() == "lane2");
+    static_cast<void>(controller.handle(MenuAction::activate(), 10));
+    CHECK(controller.capture_active());
+    CHECK(controller.select(3).empty());
+    CHECK(controller.selected_row() == 2);
+    static_cast<void>(controller.cancel_capture());
+    static_cast<void>(controller.handle(MenuAction::adjust(-1), 20));
+    CHECK_FALSE(controller.secondary_selected());
+    static_cast<void>(controller.handle(MenuAction::adjust(1), 20));
+    CHECK(controller.secondary_selected());
+    static_cast<void>(controller.select(5));
+    CHECK(controller.handle(MenuAction::activate(), 30).reset_bindings);
+    static_cast<void>(controller.select(6));
+    CHECK(controller.handle(MenuAction::activate(), 30).open_nkro_test);
+    static_cast<void>(controller.select(7));
+    CHECK(controller.handle(MenuAction::activate(), 30).menu.navigate_back);
+}
+
+TEST_CASE("secondary assignment appears on its piano key and participates in NKRO feedback") {
+    tenriff::config::KeymapManager manager;
+    auto keymap = manager.default_keymap();
+    keymap.secondary_mode_bindings["5k"]["lane3"] = "Space";
+    KeymapSettingsController controller;
+    controller.reset(5, "none");
+    static_cast<void>(controller.select(3, true));
+    static_cast<void>(controller.handle(MenuAction::activate(), 100));
+    const auto view = KeymapSettingsView::build(controller, keymap, 5, "none", "Input: RawInput", 200,
+                                               tenriff::ui::Language::English);
+    REQUIRE(view.rows.size() == 9);
+    CHECK(view.rows[3].label == "Key 3");
+    CHECK(view.rows[3].value == "K");
+    CHECK(view.rows[3].secondary_value.find("Space [waiting]") != std::string::npos);
+    const auto nkro = KeymapSettingsView::build_nkro_test(controller, keymap,
+        {tenriff::config::KeycodeMap::to_keycode("Space").value()}, "Input: Polling", tenriff::ui::Language::English);
+    CHECK(nkro.rows[2].selected);
+    CHECK_FALSE(nkro.rows[1].selected);
 }

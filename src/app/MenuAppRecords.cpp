@@ -298,7 +298,7 @@ void MenuApp::reload_chart_best_results() {
                                               parsed->replay_sha256);
             if (verification.verified() &&
                 (verification.chart_sha256 != parsed->chart_sha256 ||
-                 parsed->ruleset_id != kCanonicalReplayRulesetId)) {
+                 parsed->ruleset_id != verification.ruleset_id)) {
                 verification.status = ReplayVerificationStatus::Invalid;
                 verification.detail = "Result metadata does not match the verified replay evidence.";
                 verification.official_eligible = false;

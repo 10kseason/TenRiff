@@ -11,9 +11,12 @@
     "preset": "high",
     "bms_keysound_policy": "follow",
     "background_sound_enabled": true,
-    "volume": 1.0,
+    "title_music": "default",
+    "volume": 0.7,
     "bgm_volume": 0.75,
-    "keysound_volume": 1.0
+    "keysound_volume": 1.0,
+    "normalize_audio": false,
+    "mute_when_inactive": false
   },
   "input": {
     "backend": "rawinput",
@@ -29,6 +32,7 @@
     "gr": 65.0,
     "gd": 115.0,
     "bd": 210.0,
+    "indirect_miss": 340.0,
     "hold_grace": 80,
     "hold_break": 200,
     "mask": 30
@@ -40,10 +44,34 @@
   },
   "gauge": {
     "delta": {
-      "ex_hard": {"PG": 0.08, "GR": 0.04, "GD": 0.0, "BD": -18.0, "PR": -4.0},
-      "hard": {"PG": 0.16, "GR": 0.09, "GD": 0.01, "BD": -10.0, "PR": -2.0},
-      "normal": {"PG": 0.19, "GR": 0.15, "GD": 0.01, "BD": -6.25, "PR": -2.0},
-      "easy": {"PG": 0.25, "GR": 0.2, "GD": 0.01, "BD": -4.1, "PR": -1.6}
+      "ex_hard": {
+        "PG": 0.08,
+        "GR": 0.04,
+        "GD": 0.0,
+        "BD": -18.0,
+        "PR": -4.0
+      },
+      "hard": {
+        "PG": 0.16,
+        "GR": 0.09,
+        "GD": 0.01,
+        "BD": -10.0,
+        "PR": -2.0
+      },
+      "normal": {
+        "PG": 0.19,
+        "GR": 0.15,
+        "GD": 0.01,
+        "BD": -6.25,
+        "PR": -2.0
+      },
+      "easy": {
+        "PG": 0.25,
+        "GR": 0.2,
+        "GD": 0.01,
+        "BD": -4.1,
+        "PR": -1.6
+      }
     }
   },
   "graphics": {
@@ -106,6 +134,8 @@
     "judgement_line_position": 0.82,
     "gameplay_field_offset_x": 0.0,
     "combo_position": 0.24,
+    "combo_font_scale": 1.0,
+    "judgement_font_scale": 1.0,
     "lane_background_opacity": 0.18,
     "black_playfield_enabled": true,
     "visual_opacity": 0.96,
@@ -117,16 +147,103 @@
     "lane_divider_width_scale": 1.0,
     "single_color": "off",
     "lane_colors": {
-      "4k": ["ice", "azure", "azure", "ice"],
-      "5k": ["ice", "azure", "gold", "azure", "ice"],
-      "6k": ["ice", "azure", "ice", "ice", "azure", "ice"],
-      "7k": ["ice", "azure", "ice", "gold", "ice", "azure", "ice"],
-      "7+1": ["ice", "ice", "azure", "ice", "gold", "ice", "azure", "ice"],
-      "8k": ["ice", "azure", "ice", "teal", "teal", "ice", "azure", "ice"],
-      "9k": ["ice", "azure", "ice", "teal", "gold", "teal", "ice", "azure", "ice"],
-      "10k": ["ice", "azure", "ice", "azure", "ice", "ice", "azure", "ice", "azure", "ice"],
-      "16k": ["ice", "azure", "ice", "azure", "ice", "gold", "teal", "ice", "ice", "teal", "gold", "ice", "azure", "ice", "azure", "ice"]
-    }
+      "4k": [
+        "ice",
+        "azure",
+        "azure",
+        "ice"
+      ],
+      "5k": [
+        "ice",
+        "azure",
+        "gold",
+        "azure",
+        "ice"
+      ],
+      "6k": [
+        "ice",
+        "azure",
+        "ice",
+        "ice",
+        "azure",
+        "ice"
+      ],
+      "7k": [
+        "ice",
+        "azure",
+        "ice",
+        "gold",
+        "ice",
+        "azure",
+        "ice"
+      ],
+      "7+1": [
+        "ice",
+        "ice",
+        "azure",
+        "ice",
+        "gold",
+        "ice",
+        "azure",
+        "ice"
+      ],
+      "8k": [
+        "ice",
+        "azure",
+        "ice",
+        "teal",
+        "teal",
+        "ice",
+        "azure",
+        "ice"
+      ],
+      "9k": [
+        "ice",
+        "azure",
+        "ice",
+        "teal",
+        "gold",
+        "teal",
+        "ice",
+        "azure",
+        "ice"
+      ],
+      "10k": [
+        "ice",
+        "azure",
+        "ice",
+        "azure",
+        "ice",
+        "ice",
+        "azure",
+        "ice",
+        "azure",
+        "ice"
+      ],
+      "16k": [
+        "ice",
+        "azure",
+        "ice",
+        "azure",
+        "ice",
+        "gold",
+        "teal",
+        "ice",
+        "ice",
+        "teal",
+        "gold",
+        "ice",
+        "azure",
+        "ice",
+        "azure",
+        "ice"
+      ]
+    },
+    "key_backdrop_override": false,
+    "key_backdrop_enabled": true,
+    "key_backdrop_opacity": 0.25,
+    "key_backdrop_brightness": 1.0,
+    "key_backdrop_height": 1.0
   },
   "offsets": {
     "input": 0.0,
