@@ -28,6 +28,8 @@ enum class KeymapActionId : std::uint8_t {
 struct KeymapSettingsEffects {
     MenuEffectFlags menu{};
     bool refresh_input_scope = false;
+    bool reset_bindings = false;
+    bool open_nkro_test = false;
 
     [[nodiscard]] bool empty() const noexcept;
     void merge(const KeymapSettingsEffects& other) noexcept;
@@ -43,6 +45,8 @@ public:
     [[nodiscard]] std::string_view status_message() const noexcept;
     [[nodiscard]] bool status_visible(std::int64_t now_ns) const noexcept;
     [[nodiscard]] std::optional<std::string_view> selected_lane() const noexcept;
+    [[nodiscard]] bool secondary_selected() const noexcept;
+    [[nodiscard]] KeymapSettingsEffects select(int row, bool secondary = false) noexcept;
 
     void reset(
         std::optional<int> selected_chart_key_count,
@@ -66,9 +70,10 @@ private:
     [[nodiscard]] KeymapSettingsEffects begin_capture(std::int64_t now_ns) noexcept;
     [[nodiscard]] KeymapSettingsEffects leave_screen() noexcept;
 
-    std::string edit_mode_ = "10k";
+    std::string edit_mode_ = "4k";
     std::vector<std::string> lane_ids_{};
     int selected_row_ = 0;
+    bool secondary_selected_ = false;
     bool capture_active_ = false;
     std::int64_t capture_deadline_ns_ = 0;
     std::string status_message_{};

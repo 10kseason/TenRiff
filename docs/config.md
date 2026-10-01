@@ -38,6 +38,8 @@
   - `follow | autoplay | ignore`
 - `background_sound_enabled` (bool)
   - 메뉴, 결과, 곡 미리듣기 음악만 켜고 끔; 게임플레이 차트 BGM은 유지
+- `title_music` (string)
+  - `none | default | random_bms | last_played`, 기본 `default`. 타이틀·빠른 설정 음악을 없음·기본·랜덤 BMS·마지막 플레이한 곡 중에서 선택합니다. 차트 오디오가 없으면 기본 음악으로 돌아갑니다. BMS는 키음 포함 최대 5분을 비동기로 합성해 반복합니다.
 - `volume` (double)
   - master volume
 - `bgm_volume` (double)
@@ -81,10 +83,13 @@ ASIO 설정은 [장치 설정 안내](asio-audio.md)를 참고하세요. 선택 
 - `pg`, `gr`, `gd`, `bd` (double, ms)
 - 기본 `pg / gr / gd`는 각각 `20ms / 65ms / 115ms`
 - 기본 `bd`는 `210ms`
-- `Judge Easy`는 기존 `1.25x` 배율로 `bd=262.5ms`, `Judge Hard`는 `bd=340ms`를 사용함; PG/GR/GD와 LN tail 창은 Hard에서 기본값 유지
+- `Judge Easy`는 기본 판정창을 `1.35x`로 넓힘: `pg/gr/gd/bd=27/87.75/155.25/283.5ms`. 홀드 허용창도 같은 배율이며 `mask`는 유지
+- `Judge Hard`는 PG/GR/GD와 홀드 허용창을 유지하고 `bd` 상한을 `180ms`로 제한함. 사용자 지정 BAD가 더 작으면 넓히지 않음
 - `indirect_miss` (double, ms)
-  - 입력이 전혀 들어오지 않았을 때 노트를 자동 미스로 처리하는 간접 미스 기준
-  - 시간 기준은 `bd`와 맞추며, `Judge Hard`에서는 미입력 노트를 BAD 대신 콤보 브레이크 간접 `POOR`/OD8 `MISS`로 기록
+  - 현재 프로필에서는 `340ms`로 저장·정규화하며, BAD 판정창과 별도로 무입력 자동 미스 확정 시점을 정함
+  - 기본 Normal/Easy/Hard 모두 노트 시각에서 `340ms`를 초과하면 자동 미스. Normal/Easy는 BAD, Hard는 콤보를 끊는 간접 `POOR`/OD8 `MISS`로 기록
+  - BAD창 밖이지만 자동 미스 전인 늦은 입력은 BAD 적중으로 인정하지 않고 이전 노트를 미스 처리한 뒤 다음 노트를 검사함
+- 새 플레이는 `tenriff-native-score-v2-ruleset-2`를 기록함. 기존 `ruleset-1` 리플레이·고스트·검증은 Easy `1.25x`, Hard BAD `340ms`, 자동 미스 `=BAD`였던 정확한 이전 정책을 사용하며 임의 커스텀 판정을 정식으로 인정하지 않음
 - `hold_grace` (double, ms)
   - 롱노트 tail release를 `PG`로 보는 전용 허용창
   - 기본값은 `80ms`
@@ -116,7 +121,10 @@ Gauge Shift는 항상 적용됩니다. `mode.gauge`의 `ex_hard / hard / normal 
   - `windowed`는 제목줄이 있는 고정 크기 창이며 이동 가능
   - `fullscreen`은 DXGI 독점 전체 화면이라 현재 Discord Game Overlay가 표시되지 않음
 - `resolution` (string)
-  - `native | 720p | 1080p | qhd`
+  - `native`, 기존 별칭 `720p | 1080p | qhd`, 또는 `가로x세로` (예: `1600x900`, `1366x768`, `1280x800`, `3440x1440`). 각 축은 320–8192px.
+  - 그래픽 설정의 해상도 항목은 일반적인 크기와 현재 모니터의 표시 모드를 함께 제공. `F5`로 목록 새로고침. 직접 지정한 크기도 저장·재실행 후 유지.
+  - 화면 배치는 1920×1080 기준 비율을 유지하며 다른 화면 비율에는 여백을 표시. 창 모드는 제목줄·작업 표시줄을 포함해 화면 안에 들어가도록 비례 축소.
+  - 스킨 설정 미리보기는 실제 게임 렌더러를 같은 비율로 축소. 플레이필드 이동, 레인·노트·기어 크기, 판정·콤보 위치와 스킨 글꼴을 반영.
 - `vsync` (bool)
 - `refresh_hz` (int)
   - `-1`은 `디스플레이에 맞춤`, `0`은 프로필 호환용 `무제한` 선택값(실제 최대 1500 FPS)
@@ -211,6 +219,8 @@ Gauge Shift는 항상 적용됩니다. `mode.gauge`의 `ex_hard / hard / normal 
 
 ### `ui`
 
+`last_played_chart_path`는 마지막으로 실제 플레이를 시작한 차트의 로컬 경로입니다. 기본값은 빈 문자열이며 리플레이·편집기 연습은 갱신하지 않습니다. `title_music=last_played`에서 재사용합니다.
+
 | 항목 | 형식·범위·기본값 | 동작 |
 | --- | --- | --- |
 | `profile_nickname` | string; UTF-8 ≤48 bytes | 표시 이름. 비면 프로필 ID를 사용하며 공백·제어문자를 정리. |
@@ -271,6 +281,7 @@ Gauge Shift는 항상 적용됩니다. `mode.gauge`의 `ex_hard / hard / normal 
 | `gameplay_field_offset_x` | double: `-720..720`; `0` | 1920×1080 기준 기어 가로 이동. 실제 창에서 기어와 ↔ 핸들이 보이도록 추가 제한. |
 | `combo_position`, `judgement_position` | double: `0.10..0.78`; `0.24` | 콤보와 판정의 독립 Y 위치. 판정 값이 없는 기존 프로필은 combo_position을 상속. |
 | `combo_offset_x`, `judgement_offset_x` | double: `-600..600`; `0` | 1920×1080 기준 콤보와 판정의 독립 X 오프셋. |
+| `combo_font_scale`, `judgement_font_scale` | double: `0.50..2`; `1` | 콤보·판정 글자 크기 독립 배율. 스킨 설정에서 50–200%, 5% 단위 또는 마우스 슬라이더로 조절하며 가져온 스킨에도 프로필 값이 적용됨. |
 | `lane_background_opacity` | double: `0..0.45`; `0.18` | 레인 배경 불투명도. |
 | `black_playfield_enabled` | bool; `true` | 레인 간격을 포함한 필드 전체를 검정으로 표시. |
 | `visual_opacity` | double: `0.20..1`; `0.96` | 노트·리셉터·키 라벨의 공통 불투명도 배율. |
@@ -290,7 +301,12 @@ Gauge Shift는 항상 적용됩니다. `mode.gauge`의 `ex_hard / hard / normal 
 
 모드별 배열·override 지원: `4k`, `5k`, `6k`, `7k`, `7+1`, `8k`, `9k`, `10k`, `12k`, `14k`, `16k`. 색상 토큰: `ice`, `azure`, `gold`, `mint`, `rose`, `violet`, `orange`, `teal`. `7+1`은 스킨 팔레트 전용이며 별도 키맵 모드가 아닙니다. 구버전 `expand_notes_to_dividers=true`는 여백 0으로 읽으며, 명시된 `note_divider_gap_px`가 우선합니다.
 
+전체 BGA 암막은 적용하지 않으며 검정 필드, 레인 배경과 기어는 기존 설정대로 유지합니다. 스킨 설정의 비주얼 레이턴시는 다섯 번째 항목입니다.
+
+글자 가독성 보정은 메뉴·옵션·곡 목록·결과·도움말·채팅·계정·편집기·인게임 전체에 공통 적용합니다. 밝은 글자에는 어두운 외곽선, 어두운 글자에는 밝은 외곽선을 사용하며 스킨의 글자 색과 투명도는 유지합니다.
+
 ### `offsets`
+
 - `input` (double)
 - `visual` (double)
   - `-500..500` 범위로 clamp
@@ -319,3 +335,15 @@ Gauge Shift는 항상 적용됩니다. `mode.gauge`의 `ex_hard / hard / normal 
 - stale profile은 일부 값이 자동 교정됩니다.
 - 특히 BMS 기본값과 keysound policy 관련 값은 런타임 migration 대상이며, 예전 osu chart/skin 필드는 더 이상 저장되지 않습니다.
 - config 파일이 없으면 defaults로 시작하고 즉시 profile이 저장됩니다.
+
+## 설정 조작성과 오디오 동기
+
+새 프로필의 `audio.volume` 기본값은 `0.7`입니다. 기존에 저장한 값은 유지합니다. `audio.mute_when_inactive` 기본값은 `false`이며, 켜면 다른 창이 활성화된 동안 출력만 음소거합니다. 곡 진행과 저장 음량은 유지합니다. ASIO 버퍼 사이즈는 채널당 **샘플** 단위로 표시합니다. 내부 API의 `frames_per_buffer` 이름은 유지합니다.
+
+키 설정은 가로 건반의 `Key 1`, `Key 2` 방식이며 기본·보조 입력을 각각 지정합니다. `keymap.json`의 선택적 `secondary_modes`는 기존 `modes`와 같은 모드/레인 구조입니다. 두 키 중 하나가 눌려 있으면 해당 키는 계속 눌린 상태로 처리합니다. 보조 키의 × 또는 입력 대기 중 Delete로 보조 지정만 해제합니다. 옵션에서 처음 열면 키·스킨 편집 모드는 4K입니다. 곡에서 키 설정을 열면 실제 차트 키 수를 사용합니다.
+
+`skin.key_backdrop_enabled`와 `skin.key_backdrop_opacity`(0–1)는 키를 누를 때 깔리는 색을 제어합니다. 타격 효과 밝기는 기존 `key_pulse_brightness`입니다. 최초 변경 전에는 스킨 기본값을 사용하고, 사용자가 변경하면 `key_backdrop_override=true`로 프로필 값이 우선합니다. 판정선 두께는 노트 높이에 비례합니다.
+
+난이도표 선택 중 ALL SONG은 표에 해당하는 차트만 표시합니다. Native LV를 선택하면 전체를 다시 표시하며 캐시나 원본 곡은 삭제하지 않습니다. 게임 화면과 BGA의 시계는 오디오의 실제 재생 위치를 기준으로 하며 판정·오디오 예약은 기존 쓰기 시계를 유지합니다. 속도를 실제로 변경하면 짧은 클릭음을 재생합니다.
+
+키 입력 배경 밝기는 `skin.key_backdrop_brightness`(0–2, 기본 1), 최대 높이는 `skin.key_backdrop_height`(0–1, 기본 1)입니다. 밝기는 RGB만 바꾸고 높이는 필드 아래쪽을 기준으로 적용합니다. 농도와 독립적이며 실플레이·고스트·스킨 미리보기에서 동일하게 적용합니다. `−/+`가 표시되는 설정은 좌우 방향키를 누른 채 연속 조절할 수 있습니다.

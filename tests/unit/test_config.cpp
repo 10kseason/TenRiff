@@ -4,13 +4,47 @@
 #include <array>
 #include <filesystem>
 #include <fstream>
+#include <limits>
 #include <string>
 
 #include "app/PersistedRuntimeConfig.h"
 #include "app/RuntimeConfigMigration.h"
 #include "config/Config.h"
+#include "config/GraphicsResolution.h"
 
 using tenriff::config::ConfigLoader;
+
+TEST_CASE("graphics explicit resolutions normalize safely without losing uncommon dimensions") {
+    using tenriff::config::normalize_graphics_resolution;
+    CHECK(normalize_graphics_resolution(" 1600 X 900 ") == "1600x900");
+    CHECK(normalize_graphics_resolution("900p") == "1600x900");
+    CHECK(normalize_graphics_resolution("1920x1080") == "1080p");
+    CHECK(normalize_graphics_resolution("2560x1440") == "qhd");
+    CHECK(normalize_graphics_resolution("4K") == "3840x2160");
+    CHECK(normalize_graphics_resolution("3440x1440") == "3440x1440");
+    CHECK(normalize_graphics_resolution("900x1600") == "900x1600");
+    for (const auto invalid : {"0x900", "1600x0", "1600x900junk", "1600x900x1", "-1600x900",
+                               "99999999999999x900", "8193x900", "1600x319", "weird"}) {
+        CHECK(normalize_graphics_resolution(invalid) == "native");
+    }
+}
+
+TEST_CASE("skin HUD font scales preserve legacy defaults and sanitize portable presets") {
+    tenriff::config::SkinConfig skin;
+    REQUIRE(tenriff::config::deserialize_skin_config("{}", skin));
+    CHECK(skin.combo_font_scale == doctest::Approx(1.0));
+    CHECK(skin.judgement_font_scale == doctest::Approx(1.0));
+    REQUIRE(tenriff::config::deserialize_skin_config(
+        R"({"combo_font_scale":9.0,"judgement_font_scale":-2.0})", skin));
+    CHECK(skin.combo_font_scale == doctest::Approx(2.0));
+    CHECK(skin.judgement_font_scale == doctest::Approx(0.5));
+    skin.combo_font_scale = std::numeric_limits<double>::quiet_NaN();
+    skin.judgement_font_scale = std::numeric_limits<double>::infinity();
+    const auto preset = tenriff::config::serialize_skin_config(skin);
+    REQUIRE(tenriff::config::deserialize_skin_config(preset, skin));
+    CHECK(skin.combo_font_scale == doctest::Approx(1.0));
+    CHECK(skin.judgement_font_scale == doctest::Approx(1.0));
+}
 
 namespace {
 
@@ -139,7 +173,7 @@ TEST_CASE("config defaults prefer 44100 Hz audio") {
     CHECK(config.judge.gr_ms == doctest::Approx(65.0));
     CHECK(config.judge.gd_ms == doctest::Approx(115.0));
     CHECK(config.judge.bd_ms == doctest::Approx(210.0));
-    CHECK(config.judge.indirect_miss_ms == doctest::Approx(210.0));
+    CHECK(config.judge.indirect_miss_ms == doctest::Approx(340.0));
     CHECK(config.judge.hold_grace_ms == doctest::Approx(80.0));
     CHECK(config.judge.hold_break_ms == doctest::Approx(200.0));
     CHECK(config.skin.note_shape == "rect");
@@ -165,6 +199,8 @@ TEST_CASE("config defaults prefer 44100 Hz audio") {
     CHECK(config.skin.gameplay_field_offset_x ==
           doctest::Approx(tenriff::config::kGameplayFieldOffsetXDefault));
     CHECK(config.skin.combo_position == doctest::Approx(tenriff::config::kComboPositionDefault));
+    CHECK(config.skin.combo_font_scale == doctest::Approx(1.0));
+    CHECK(config.skin.judgement_font_scale == doctest::Approx(1.0));
     CHECK(config.skin.lane_background_opacity == doctest::Approx(tenriff::config::kSkinLaneBackgroundOpacityDefault));
     CHECK(config.skin.black_playfield_enabled);
     CHECK(config.skin.visual_opacity == doctest::Approx(tenriff::config::kSkinVisualOpacityDefault));
@@ -270,7 +306,7 @@ TEST_CASE("profile avatar path normalization is UI-safe") {
           "D:/avatars/luna.png");
 }
 
-TEST_CASE("config load folds deprecated indirect miss into the bad window") {
+TEST_CASE("config load keeps the automatic miss deadline independent of a custom bad window") {
     TempDirGuard temp;
     temp.path = make_temp_dir();
     REQUIRE_FALSE(temp.path.empty());
@@ -292,7 +328,7 @@ TEST_CASE("config load folds deprecated indirect miss into the bad window") {
     const auto result = loader.load_profile("profiles/test");
     REQUIRE(result.success());
     CHECK(result.config.judge.bd_ms == doctest::Approx(310.0));
-    CHECK(result.config.judge.indirect_miss_ms == doctest::Approx(310.0));
+    CHECK(result.config.judge.indirect_miss_ms == doctest::Approx(340.0));
 }
 
 TEST_CASE("config load migrates an existing stale profile before returning it") {
@@ -432,6 +468,32 @@ TEST_CASE("audio presets do not override explicit sample rate") {
     CHECK(result.config.audio_ui.bms_keysound_policy == "follow");
 }
 
+TEST_CASE("title music choice and last played chart persist without populating private default paths") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+    CurrentPathGuard cwd;
+    std::filesystem::current_path(temp.path);
+    ConfigLoader loader;
+    auto config = loader.defaults();
+    CHECK(config.audio_ui.title_music == "default");
+    CHECK(config.ui.last_played_chart_path.empty());
+    config.ui.last_played_chart_path = "songs/음악/last.bms";
+    for (const auto mode : {"none", "default", "random_bms", "last_played"}) {
+        config.audio_ui.title_music = mode;
+        std::string error;
+        REQUIRE(loader.save_profile("profiles/music", config, &error));
+        const auto result = loader.load_profile("profiles/music");
+        REQUIRE(result.success());
+        CHECK(result.config.audio_ui.title_music == mode);
+        CHECK(result.config.ui.last_played_chart_path == config.ui.last_played_chart_path);
+    }
+    config.audio_ui.title_music = "unknown";
+    REQUIRE(loader.save_profile("profiles/music", config));
+    CHECK(loader.load_profile("profiles/music").config.audio_ui.title_music == "default");
+    CHECK(tenriff::config::normalize_title_music_token("RANDOM_BMS") == "random_bms");
+}
+
 TEST_CASE("ASIO profile roundtrip preserves driver sample rate and buffer independently of WASAPI presets") {
     TempDirGuard temp;
     temp.path = make_temp_dir();
@@ -517,6 +579,8 @@ TEST_CASE("config save and load preserve volume and speed settings") {
     config.skin.judgement_position = 0.4;
     config.skin.judgement_offset_x = -120;
     config.skin.combo_offset_x = 90;
+    config.skin.combo_font_scale = 1.35;
+    config.skin.judgement_font_scale = 0.80;
     config.speed.rate = 1.25;
     config.speed.hi_speed = 4.75;
     config.mode.ghost_battle_enabled = true;
@@ -543,6 +607,8 @@ TEST_CASE("config save and load preserve volume and speed settings") {
     CHECK(result.config.skin.judgement_position == doctest::Approx(0.4));
     CHECK(result.config.skin.judgement_offset_x == -120);
     CHECK(result.config.skin.combo_offset_x == 90);
+    CHECK(result.config.skin.combo_font_scale == doctest::Approx(1.35));
+    CHECK(result.config.skin.judgement_font_scale == doctest::Approx(0.80));
     CHECK(result.config.speed.rate == doctest::Approx(1.25));
     CHECK(result.config.speed.hi_speed == doctest::Approx(4.75));
     CHECK(result.config.mode.ghost_battle_enabled);
@@ -684,6 +750,24 @@ TEST_CASE("config save and load preserve graphics display settings") {
     CHECK(result.config.graphics.background_upscale_mode == "onnx");
     CHECK(result.config.graphics.background_upscale_model_path == "models/custom-upscaler.onnx");
     CHECK_FALSE(result.config.graphics.background_upscale_prefer_npu);
+}
+
+TEST_CASE("config save and load preserve explicit uncommon resolutions") {
+    TempDirGuard temp;
+    temp.path = make_temp_dir();
+    REQUIRE_FALSE(temp.path.empty());
+    CurrentPathGuard cwd;
+    std::filesystem::current_path(temp.path);
+    ConfigLoader loader;
+    auto config = loader.defaults();
+    for (const auto size : {"1600x900", "1366x768", "1280x800", "3440x1440", "900x1600"}) {
+        config.graphics.resolution = size;
+        std::string error;
+        REQUIRE(loader.save_profile("profiles/test", config, &error));
+        const auto loaded = loader.load_profile("profiles/test");
+        REQUIRE(loaded.success());
+        CHECK(loaded.config.graphics.resolution == size);
+    }
 }
 
 TEST_CASE("config save and load preserve unlimited graphics refresh") {
@@ -1529,7 +1613,7 @@ TEST_CASE("runtime migration upgrades old judge defaults into the current window
     CHECK(config.judge.gr_ms == doctest::Approx(65.0));
     CHECK(config.judge.gd_ms == doctest::Approx(115.0));
     CHECK(config.judge.bd_ms == doctest::Approx(210.0));
-    CHECK(config.judge.indirect_miss_ms == doctest::Approx(210.0));
+    CHECK(config.judge.indirect_miss_ms == doctest::Approx(340.0));
 }
 
 TEST_CASE("runtime migration upgrades legacy default gauge deltas to the harsher table") {
@@ -2104,4 +2188,67 @@ TEST_CASE("every 4K through 16K skin mode preserves its own palette and geometry
         CHECK(tenriff::config::resolved_skin_lane_width_scales(config.skin, mode).size() == keys);
         CHECK(tenriff::config::resolved_skin_lane_spacing_scales(config.skin, mode).size() == keys - 1);
     }
+}
+
+TEST_CASE("new profiles start at 70 percent while explicit volume and mute persist") {
+    TempDirGuard temp{make_temp_dir()};
+    REQUIRE_FALSE(temp.path.empty());
+    CurrentPathGuard cwd;
+    std::filesystem::current_path(temp.path);
+    std::filesystem::create_directories("profiles/player");
+    ConfigLoader loader;
+    CHECK(loader.defaults().audio_ui.master_volume == doctest::Approx(0.70));
+    write_file("profiles/player/config.json", R"({"audio":{"volume":1.0,"mute_when_inactive":true}})");
+    auto loaded = loader.load_profile("profiles/player");
+    REQUIRE(loaded.success());
+    CHECK(loaded.config.audio_ui.master_volume == 1.0);
+    CHECK(loaded.config.audio_ui.mute_when_inactive);
+    loaded.config.skin.key_backdrop_override = true;
+    loaded.config.skin.key_backdrop_enabled = false;
+    loaded.config.skin.key_backdrop_opacity = 0.63;
+    std::string error;
+    REQUIRE(loader.save_profile("profiles/player", loaded.config, &error));
+    loaded = loader.load_profile("profiles/player");
+    REQUIRE(loaded.success());
+    CHECK(loaded.config.skin.key_backdrop_override);
+    CHECK_FALSE(loaded.config.skin.key_backdrop_enabled);
+    CHECK(loaded.config.skin.key_backdrop_opacity == doctest::Approx(0.63));
+    CHECK(loaded.config.audio_ui.mute_when_inactive);
+    write_file("profiles/player/config.json", "{}");
+    loaded = loader.load_profile("profiles/player");
+    REQUIRE(loaded.success());
+    CHECK(loaded.config.audio_ui.master_volume == doctest::Approx(0.70));
+    CHECK_FALSE(loaded.config.audio_ui.mute_when_inactive);
+}
+
+TEST_CASE("backdrop brightness and height preserve old profiles and portable settings") {
+    tenriff::config::SkinConfig skin;
+    REQUIRE(tenriff::config::deserialize_skin_config(R"({"key_backdrop_opacity":0.4})", skin));
+    CHECK(skin.key_backdrop_brightness == doctest::Approx(1.0));
+    CHECK(skin.key_backdrop_height == doctest::Approx(1.0));
+    REQUIRE(tenriff::config::deserialize_skin_config(
+        R"({"key_backdrop_brightness":8,"key_backdrop_height":-2})", skin));
+    CHECK(skin.key_backdrop_brightness == doctest::Approx(2.0));
+    CHECK(skin.key_backdrop_height == doctest::Approx(0.0));
+    skin.key_backdrop_brightness = std::numeric_limits<double>::quiet_NaN();
+    skin.key_backdrop_height = std::numeric_limits<double>::infinity();
+    REQUIRE(tenriff::config::deserialize_skin_config(tenriff::config::serialize_skin_config(skin), skin));
+    CHECK(skin.key_backdrop_brightness == doctest::Approx(1.0));
+    CHECK(skin.key_backdrop_height == doctest::Approx(1.0));
+    TempDirGuard temp{make_temp_dir()};
+    CurrentPathGuard cwd;
+    std::filesystem::current_path(temp.path);
+    ConfigLoader loader;
+    auto config = loader.defaults();
+    config.skin.key_backdrop_override = true;
+    config.skin.key_backdrop_enabled = false;
+    config.skin.key_backdrop_opacity = 0.4;
+    config.skin.key_backdrop_brightness = 1.65;
+    config.skin.key_backdrop_height = 0.35;
+    REQUIRE(loader.save_profile("backdrop", config));
+    const auto loaded = loader.load_profile("backdrop");
+    CHECK(loaded.config.skin.key_backdrop_brightness == doctest::Approx(1.65));
+    CHECK(loaded.config.skin.key_backdrop_height == doctest::Approx(0.35));
+    CHECK(loaded.config.skin.key_backdrop_opacity == doctest::Approx(0.4));
+    CHECK_FALSE(loaded.config.skin.key_backdrop_enabled);
 }

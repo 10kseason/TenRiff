@@ -40,6 +40,34 @@ TEST_CASE("graphics setting and ONNX confirmation identifiers are stable") {
     CHECK_FALSE(onnx_upscaler_confirm_id_at(2).has_value());
 }
 
+TEST_CASE("graphics resolution choices include 900p monitor modes and preserve custom sizes") {
+    tenriff::config::RuntimeConfig runtime;
+    GraphicsSettingsController controller;
+    controller.set_display_resolutions({{1600, 900}, {1600, 900}, {1536, 864}, {0, 0}, {7680, 4320}});
+    bool found_900p = false, found_monitor_mode = false, found_8k = false;
+    for (int i = 0; i < 40; ++i) {
+        const auto effects = controller.handle(MenuAction::adjust(1), runtime, GraphicsSettingId::Resolution);
+        CHECK(effects.apply_runtime_graphics);
+        found_900p |= runtime.graphics.resolution == "1600x900";
+        found_monitor_mode |= runtime.graphics.resolution == "1536x864";
+        found_8k |= runtime.graphics.resolution == "7680x4320";
+        if (runtime.graphics.resolution == "native") break;
+    }
+    CHECK(found_900p);
+    CHECK(found_monitor_mode);
+    CHECK(found_8k);
+    runtime.graphics.resolution = "1500x1000";
+    static_cast<void>(controller.handle(MenuAction::adjust(1), runtime, GraphicsSettingId::Resolution));
+    static_cast<void>(controller.handle(MenuAction::adjust(-1), runtime, GraphicsSettingId::Resolution));
+    CHECK(runtime.graphics.resolution == "1500x1000");
+    for (const auto language : {tenriff::ui::Language::English, tenriff::ui::Language::Korean,
+                               tenriff::ui::Language::Japanese}) {
+        runtime.graphics.resolution = "1600x900";
+        const auto view = GraphicsSettingsView::build(controller, runtime, language);
+        CHECK(view.rows[1].value == "1600x900");
+    }
+}
+
 TEST_CASE("graphics live rows cycle and request immediate runtime apply") {
     tenriff::config::RuntimeConfig runtime;
     GraphicsSettingsController controller;
@@ -51,7 +79,7 @@ TEST_CASE("graphics live rows cycle and request immediate runtime apply") {
 
     effects = controller.handle(
         MenuAction::adjust(-1), runtime, GraphicsSettingId::Resolution);
-    CHECK(runtime.graphics.resolution == "qhd");
+    CHECK(runtime.graphics.resolution == "3840x2160");
     CHECK(effects.apply_runtime_graphics);
 
     runtime.graphics.refresh_hz = -1;

@@ -95,6 +95,11 @@ std::optional<SkinSettingsRowId> skin_setting_id_at(
     return std::nullopt;
 }
 
+std::optional<std::size_t> skin_setting_index(SkinSettingsRowId id, bool lr2_source) noexcept {
+    const int index = SkinSettingsRows{lr2_source}.index_of(id);
+    return index < 0 ? std::nullopt : std::optional<std::size_t>{static_cast<std::size_t>(index)};
+}
+
 SkinSettingsRowId SkinSettingsController::selected_id() const noexcept {
     return selected_id_;
 }
@@ -134,6 +139,15 @@ SkinSettingsEffects SkinSettingsController::select(
     SkinSettingsEffects effects;
     effects.menu.render_changed = true;
     return effects;
+}
+
+void SkinSettingsController::set_backdrop_defaults(
+    std::optional<bool> enabled, std::optional<float> opacity,
+    std::optional<float> brightness, std::optional<float> height) noexcept {
+    backdrop_default_enabled_ = enabled;
+    backdrop_default_opacity_ = opacity;
+    backdrop_default_brightness_ = brightness;
+    backdrop_default_height_ = height;
 }
 
 SkinSettingsEffects SkinSettingsController::handle(
@@ -202,6 +216,35 @@ SkinSettingsEffects SkinSettingsController::apply_selected_action(
     const std::vector<std::string>& available_tenriff_skin_names) {
     const bool is_adjust = action.kind == MenuActionKind::Adjust && action.direction != 0;
     const bool is_activate = action.kind == MenuActionKind::Activate;
+    const bool backdrop_slider = selected_id_ == SkinSettingsRowId::KeyBackdropOpacity ||
+        selected_id_ == SkinSettingsRowId::KeyBackdropBrightness || selected_id_ == SkinSettingsRowId::KeyBackdropHeight;
+    if ((is_adjust || is_activate || (action.kind == MenuActionKind::SetRatio && backdrop_slider)) &&
+        (selected_id_ == SkinSettingsRowId::KeyBackdrop || backdrop_slider) && !runtime.skin.key_backdrop_override) {
+        // Adopt every visible skin value together: adjusting height must not reset
+        // an imported opacity/brightness or silently re-enable a disabled backdrop.
+        runtime.skin.key_backdrop_enabled = backdrop_default_enabled_.value_or(runtime.skin.key_backdrop_enabled);
+        runtime.skin.key_backdrop_opacity = backdrop_default_opacity_.value_or(static_cast<float>(runtime.skin.key_backdrop_opacity));
+        runtime.skin.key_backdrop_brightness = backdrop_default_brightness_.value_or(static_cast<float>(runtime.skin.key_backdrop_brightness));
+        runtime.skin.key_backdrop_height = backdrop_default_height_.value_or(static_cast<float>(runtime.skin.key_backdrop_height));
+        runtime.skin.key_backdrop_override = true;
+    }
+    if (action.kind == MenuActionKind::SetRatio && backdrop_slider) {
+        auto& value = selected_id_ == SkinSettingsRowId::KeyBackdropBrightness ? runtime.skin.key_backdrop_brightness
+            : selected_id_ == SkinSettingsRowId::KeyBackdropHeight ? runtime.skin.key_backdrop_height : runtime.skin.key_backdrop_opacity;
+        const double maximum = selected_id_ == SkinSettingsRowId::KeyBackdropBrightness
+            ? config::kSkinKeyBackdropBrightnessMax : 1.0;
+        value = clamp_step_value(action.ratio * maximum, 0.0, maximum, kSkinOpacityStep);
+        return mark_changed();
+    }
+    if (action.kind == MenuActionKind::SetRatio &&
+        (selected_id_ == SkinSettingsRowId::ComboFontSize || selected_id_ == SkinSettingsRowId::JudgementFontSize)) {
+        auto& value = selected_id_ == SkinSettingsRowId::ComboFontSize
+            ? runtime.skin.combo_font_scale : runtime.skin.judgement_font_scale;
+        value = clamp_step_value(config::kSkinHudFontScaleMin +
+                    action.ratio * (config::kSkinHudFontScaleMax - config::kSkinHudFontScaleMin),
+                config::kSkinHudFontScaleMin, config::kSkinHudFontScaleMax, config::kSkinHudFontScaleStep);
+        return mark_changed();
+    }
     if (selected_id_ == SkinSettingsRowId::Back && is_activate) {
         return leave_screen();
     }
@@ -233,10 +276,11 @@ SkinSettingsEffects SkinSettingsController::apply_selected_action(
             case SkinSettingsRowId::VisualLatency:
                 break;
             default:
-                return {};
+                // Clicking the value or row cycles it just like the plus button.
+                break;
         }
     }
-    if (!is_adjust && !(is_activate && selected_id_ == SkinSettingsRowId::VisualLatency)) {
+    if (!is_adjust && !is_activate) {
         return {};
     }
     const int direction = is_adjust ? action.direction : 1;
@@ -423,6 +467,24 @@ SkinSettingsEffects SkinSettingsController::apply_selected_action(
                 kSkinOpacityStep);
             runtime.skin.key_pulse_enabled = runtime.skin.key_pulse_brightness > 0.0;
             return mark_changed();
+        case SkinSettingsRowId::KeyBackdrop:
+            runtime.skin.key_backdrop_enabled = !runtime.skin.key_backdrop_enabled;
+            return mark_changed();
+        case SkinSettingsRowId::KeyBackdropOpacity:
+            runtime.skin.key_backdrop_opacity = clamp_step_value(
+                runtime.skin.key_backdrop_opacity + direction * kSkinOpacityStep,
+                0.0, 1.0, kSkinOpacityStep);
+            return mark_changed();
+        case SkinSettingsRowId::KeyBackdropBrightness:
+            runtime.skin.key_backdrop_brightness = clamp_step_value(
+                runtime.skin.key_backdrop_brightness + direction * kSkinOpacityStep,
+                config::kSkinKeyBackdropBrightnessMin, config::kSkinKeyBackdropBrightnessMax, kSkinOpacityStep);
+            return mark_changed();
+        case SkinSettingsRowId::KeyBackdropHeight:
+            runtime.skin.key_backdrop_height = clamp_step_value(
+                runtime.skin.key_backdrop_height + direction * kSkinOpacityStep,
+                config::kSkinKeyBackdropHeightMin, config::kSkinKeyBackdropHeightMax, kSkinOpacityStep);
+            return mark_changed();
         case SkinSettingsRowId::KeyLabelPosition:
             runtime.skin.key_label_position =
                 cycle_skin_key_label_position(runtime.skin.key_label_position, direction);
@@ -515,6 +577,16 @@ SkinSettingsEffects SkinSettingsController::apply_selected_action(
                 config::kComboPositionMin,
                 config::kComboPositionMax,
                 kComboPositionStep);
+            return mark_changed();
+        case SkinSettingsRowId::ComboFontSize:
+            runtime.skin.combo_font_scale = clamp_step_value(
+                runtime.skin.combo_font_scale + direction * config::kSkinHudFontScaleStep,
+                config::kSkinHudFontScaleMin, config::kSkinHudFontScaleMax, config::kSkinHudFontScaleStep);
+            return mark_changed();
+        case SkinSettingsRowId::JudgementFontSize:
+            runtime.skin.judgement_font_scale = clamp_step_value(
+                runtime.skin.judgement_font_scale + direction * config::kSkinHudFontScaleStep,
+                config::kSkinHudFontScaleMin, config::kSkinHudFontScaleMax, config::kSkinHudFontScaleStep);
             return mark_changed();
         case SkinSettingsRowId::BlackPlayfield:
             runtime.skin.black_playfield_enabled = !runtime.skin.black_playfield_enabled;

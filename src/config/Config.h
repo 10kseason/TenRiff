@@ -50,6 +50,10 @@ inline constexpr double kHoldBodyWidthScaleDefault = 1.00;
 inline constexpr double kComboPositionMin = 0.10;
 inline constexpr double kComboPositionMax = 0.78;
 inline constexpr double kComboPositionDefault = 0.24;
+inline constexpr double kSkinHudFontScaleMin = 0.50;
+inline constexpr double kSkinHudFontScaleMax = 2.00;
+inline constexpr double kSkinHudFontScaleDefault = 1.00;
+inline constexpr double kSkinHudFontScaleStep = 0.05;
 inline constexpr double kSkinLaneBackgroundOpacityMin = 0.00;
 inline constexpr double kSkinLaneBackgroundOpacityMax = 0.45;
 inline constexpr double kSkinLaneBackgroundOpacityDefault = 0.18;
@@ -65,6 +69,12 @@ inline constexpr double kSkinHoldBodyOpacityDefault = 1.00;
 inline constexpr double kSkinKeyPulseBrightnessMin = 0.00;
 inline constexpr double kSkinKeyPulseBrightnessMax = 1.00;
 inline constexpr double kSkinKeyPulseBrightnessDefault = 1.00;
+inline constexpr double kSkinKeyBackdropBrightnessMin = 0.0;
+inline constexpr double kSkinKeyBackdropBrightnessMax = 2.0;
+inline constexpr double kSkinKeyBackdropBrightnessDefault = 1.0;
+inline constexpr double kSkinKeyBackdropHeightMin = 0.0;
+inline constexpr double kSkinKeyBackdropHeightMax = 1.0;
+inline constexpr double kSkinKeyBackdropHeightDefault = 1.0;
 inline constexpr double kPacemakerAccuracyMin = 0.0;
 inline constexpr double kPacemakerAccuracyMax = 100.0;
 inline constexpr double kPacemakerAccuracyDefault = 90.0;
@@ -77,8 +87,8 @@ struct JudgeConfig {
     double gr_ms = 65.0;
     double gd_ms = 115.0;
     double bd_ms = 210.0;
-    double indirect_miss_ms = 210.0;
-    // Runtime mode policy: Judge Hard turns an unplayed object into an indirect POOR.
+    double indirect_miss_ms = 340.0;
+    // Indirect-miss mode changes the penalty only; its automatic deadline is independent of BAD.
     bool indirect_miss_enabled = false;
     double hold_grace_ms = 80.0;
     double hold_break_ms = 200.0;
@@ -109,10 +119,12 @@ struct AudioUiConfig {
     std::string preset = "high";
     std::string bms_keysound_policy = "follow";
     bool background_sound_enabled = true;
-    double master_volume = 1.0;
+    std::string title_music = "default";
+    double master_volume = 0.70;
     double bgm_volume = 0.75;
     double keysound_volume = 1.0;
     bool normalize_audio = false;
+    bool mute_when_inactive = false;
 };
 
 struct UiConfig {
@@ -126,6 +138,7 @@ struct UiConfig {
     // playfield mid-song or run the game in a window alongside overlays.
     bool show_cursor_in_gameplay = true;
     std::string active_song_source;
+    std::string last_played_chart_path;
     // The aggregate library preserves the last individual source for switching back.
     bool all_song_sources = false;
     std::vector<std::string> recent_song_sources;
@@ -177,6 +190,11 @@ struct SkinConfig {
     // Hit-explosion brightness, 0.0 (off) .. 1.0. key_pulse_enabled is kept as the
     // on/off form older builds read, and is written as brightness > 0.
     double key_pulse_brightness = kSkinKeyPulseBrightnessDefault;
+    bool key_backdrop_override = false;
+    bool key_backdrop_enabled = true;
+    double key_backdrop_opacity = 0.25;
+    double key_backdrop_brightness = kSkinKeyBackdropBrightnessDefault;
+    double key_backdrop_height = kSkinKeyBackdropHeightDefault;
     // Built-in hit-burst material: prism | ring | spark.
     std::string hit_burst_style = "prism";
     std::string key_label_position = "bottom";
@@ -189,6 +207,9 @@ struct SkinConfig {
     double judgement_position = kComboPositionDefault;
     double judgement_offset_x = 0.0;
     double combo_offset_x = 0.0;
+    // Profile multipliers apply to native and imported skin HUD fonts alike.
+    double combo_font_scale = kSkinHudFontScaleDefault;
+    double judgement_font_scale = kSkinHudFontScaleDefault;
 
     double lane_background_opacity = kSkinLaneBackgroundOpacityDefault;
     bool black_playfield_enabled = true;
@@ -290,6 +311,7 @@ public:
 [[nodiscard]] std::string normalize_online_records_server_url(std::string_view value);
 [[nodiscard]] std::string normalize_ui_language_token(std::string_view token);
 [[nodiscard]] std::string normalize_menu_font_size_token(std::string_view token);
+[[nodiscard]] std::string normalize_title_music_token(std::string_view token);
 [[nodiscard]] float menu_text_scale(std::string_view token);
 [[nodiscard]] std::string normalize_song_index_profile_token(std::string_view token);
 [[nodiscard]] std::string normalize_pacemaker_mode_token(std::string_view token);

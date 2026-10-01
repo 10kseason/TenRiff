@@ -42,6 +42,8 @@ enum class SkinSettingsRowId {
     JudgementLineGlow,
     HitBurstStyle,
     KeyPulse,
+    KeyBackdrop,
+    KeyBackdropOpacity,
     KeyLabelPosition,
     JudgeLinePosition,
     LaneWidth,
@@ -65,62 +67,122 @@ enum class SkinSettingsRowId {
     ExportPreset,
     ImportPreset,
     OpenSkinEditor,
+    ComboFontSize,
+    JudgementFontSize,
+    KeyBackdropBrightness,
+    KeyBackdropHeight,
 };
 
-inline constexpr std::array<SkinSettingsRowId, 52> kSkinSettingsRowOrder = {
+// The same order drives keyboard navigation, rendered rows and mouse hit targets.
+// Keep related controls adjacent instead of deriving positions from row labels.
+inline constexpr std::array<SkinSettingsRowId, 58> kSkinSettingsRowOrder = {
     SkinSettingsRowId::KeyMode,
     SkinSettingsRowId::ScratchPosition,
     SkinSettingsRowId::SkinSource,
     SkinSettingsRowId::ImportedSkin,
+    SkinSettingsRowId::VisualLatency,
     SkinSettingsRowId::Lr2Resolution,
     SkinSettingsRowId::ImportSkin,
     SkinSettingsRowId::CreateSkin,
     SkinSettingsRowId::OpenSkinFolder,
     SkinSettingsRowId::ReloadSkin,
+    SkinSettingsRowId::ExportPreset,
+    SkinSettingsRowId::ImportPreset,
+    SkinSettingsRowId::OpenSkinEditor,
     SkinSettingsRowId::TargetLane,
     SkinSettingsRowId::TargetGap,
-    SkinSettingsRowId::LaneColor,
-    SkinSettingsRowId::SingleColor,
-    SkinSettingsRowId::NoteShape,
-    SkinSettingsRowId::NoteBorder,
-    SkinSettingsRowId::ImageAspect,
-    SkinSettingsRowId::LaneDividers,
-    SkinSettingsRowId::JudgementLine,
-    SkinSettingsRowId::GearBoundary,
-    SkinSettingsRowId::ShowHoldTail,
-    SkinSettingsRowId::LnTailTaper,
-    SkinSettingsRowId::VisualPreset,
-    SkinSettingsRowId::LaneBackgroundOpacity,
-    SkinSettingsRowId::VisualOpacity,
-    SkinSettingsRowId::NoteOutlineOpacity,
-    SkinSettingsRowId::LnBodyOpacity,
-    SkinSettingsRowId::JudgementLineGlow,
-    SkinSettingsRowId::HitBurstStyle,
-    SkinSettingsRowId::KeyPulse,
-    SkinSettingsRowId::KeyLabelPosition,
     SkinSettingsRowId::JudgeLinePosition,
     SkinSettingsRowId::LaneWidth,
     SkinSettingsRowId::NoteWidth,
     SkinSettingsRowId::LaneSpacing,
     SkinSettingsRowId::DividerWidth,
     SkinSettingsRowId::CenterGap,
-    SkinSettingsRowId::LnBodyWidth,
-    SkinSettingsRowId::NoteHeight,
-    SkinSettingsRowId::ComboY,
-    SkinSettingsRowId::BlackPlayfield,
-    SkinSettingsRowId::UiFont,
-    SkinSettingsRowId::VisualLatency,
     SkinSettingsRowId::NoteGap,
-    SkinSettingsRowId::GameplayCursor,
+    SkinSettingsRowId::LaneColor,
+    SkinSettingsRowId::SingleColor,
+    SkinSettingsRowId::NoteShape,
+    SkinSettingsRowId::NoteBorder,
+    SkinSettingsRowId::ImageAspect,
+    SkinSettingsRowId::NoteHeight,
+    SkinSettingsRowId::VisualOpacity,
+    SkinSettingsRowId::NoteOutlineOpacity,
+    SkinSettingsRowId::ShowHoldTail,
+    SkinSettingsRowId::LnTailTaper,
+    SkinSettingsRowId::LnBodyWidth,
+    SkinSettingsRowId::LnBodyOpacity,
+    SkinSettingsRowId::VisualPreset,
+    SkinSettingsRowId::LaneBackgroundOpacity,
+    SkinSettingsRowId::BlackPlayfield,
+    SkinSettingsRowId::KeyBackdrop,
+    SkinSettingsRowId::KeyBackdropOpacity,
+    SkinSettingsRowId::KeyBackdropBrightness,
+    SkinSettingsRowId::KeyBackdropHeight,
+    SkinSettingsRowId::JudgementLineGlow,
+    SkinSettingsRowId::HitBurstStyle,
+    SkinSettingsRowId::KeyPulse,
+    SkinSettingsRowId::LaneDividers,
+    SkinSettingsRowId::JudgementLine,
+    SkinSettingsRowId::GearBoundary,
+    SkinSettingsRowId::KeyLabelPosition,
     SkinSettingsRowId::TimingFeedback,
     SkinSettingsRowId::JudgementY,
     SkinSettingsRowId::JudgementX,
+    SkinSettingsRowId::ComboY,
     SkinSettingsRowId::ComboX,
-    SkinSettingsRowId::ExportPreset,
-    SkinSettingsRowId::ImportPreset,
-    SkinSettingsRowId::OpenSkinEditor,
+    SkinSettingsRowId::ComboFontSize,
+    SkinSettingsRowId::JudgementFontSize,
+    SkinSettingsRowId::UiFont,
+    SkinSettingsRowId::GameplayCursor,
     SkinSettingsRowId::Back,
 };
+
+enum class SkinSettingsCategory { Source, Geometry, Notes, LongNotes, Effects, Hud, Other, Navigation };
+
+[[nodiscard]] inline constexpr SkinSettingsCategory skin_settings_category(SkinSettingsRowId id) {
+    switch (id) {
+        case SkinSettingsRowId::KeyMode: case SkinSettingsRowId::ScratchPosition:
+        case SkinSettingsRowId::SkinSource: case SkinSettingsRowId::ImportedSkin:
+        case SkinSettingsRowId::Lr2Resolution: case SkinSettingsRowId::ImportSkin:
+        case SkinSettingsRowId::CreateSkin: case SkinSettingsRowId::OpenSkinFolder:
+        case SkinSettingsRowId::ReloadSkin: case SkinSettingsRowId::ExportPreset:
+        case SkinSettingsRowId::ImportPreset: case SkinSettingsRowId::OpenSkinEditor:
+        case SkinSettingsRowId::VisualLatency:
+            return SkinSettingsCategory::Source;
+        case SkinSettingsRowId::TargetLane: case SkinSettingsRowId::TargetGap:
+        case SkinSettingsRowId::JudgeLinePosition: case SkinSettingsRowId::LaneWidth:
+        case SkinSettingsRowId::NoteWidth: case SkinSettingsRowId::LaneSpacing:
+        case SkinSettingsRowId::DividerWidth: case SkinSettingsRowId::CenterGap:
+        case SkinSettingsRowId::NoteGap:
+            return SkinSettingsCategory::Geometry;
+        case SkinSettingsRowId::LaneColor: case SkinSettingsRowId::SingleColor:
+        case SkinSettingsRowId::NoteShape: case SkinSettingsRowId::NoteBorder:
+        case SkinSettingsRowId::ImageAspect: case SkinSettingsRowId::NoteHeight:
+        case SkinSettingsRowId::VisualOpacity: case SkinSettingsRowId::NoteOutlineOpacity:
+            return SkinSettingsCategory::Notes;
+        case SkinSettingsRowId::ShowHoldTail: case SkinSettingsRowId::LnTailTaper:
+        case SkinSettingsRowId::LnBodyWidth: case SkinSettingsRowId::LnBodyOpacity:
+            return SkinSettingsCategory::LongNotes;
+        case SkinSettingsRowId::VisualPreset: case SkinSettingsRowId::LaneBackgroundOpacity:
+        case SkinSettingsRowId::BlackPlayfield: case SkinSettingsRowId::KeyBackdrop:
+        case SkinSettingsRowId::KeyBackdropOpacity: case SkinSettingsRowId::KeyBackdropBrightness:
+        case SkinSettingsRowId::KeyBackdropHeight: case SkinSettingsRowId::JudgementLineGlow:
+        case SkinSettingsRowId::HitBurstStyle: case SkinSettingsRowId::KeyPulse:
+            return SkinSettingsCategory::Effects;
+        case SkinSettingsRowId::LaneDividers: case SkinSettingsRowId::JudgementLine:
+        case SkinSettingsRowId::GearBoundary: case SkinSettingsRowId::KeyLabelPosition:
+        case SkinSettingsRowId::TimingFeedback: case SkinSettingsRowId::JudgementY:
+        case SkinSettingsRowId::JudgementX: case SkinSettingsRowId::ComboY:
+        case SkinSettingsRowId::ComboX: case SkinSettingsRowId::ComboFontSize:
+        case SkinSettingsRowId::JudgementFontSize:
+            return SkinSettingsCategory::Hud;
+        case SkinSettingsRowId::UiFont:
+        case SkinSettingsRowId::GameplayCursor:
+            return SkinSettingsCategory::Other;
+        case SkinSettingsRowId::Back:
+            return SkinSettingsCategory::Navigation;
+    }
+    return SkinSettingsCategory::Other;
+}
 
 struct SkinSettingsRows {
     bool lr2_source = false;
@@ -251,12 +313,17 @@ inline std::string key_mode_label(const std::string& value) {
 }
 
 inline std::string normalize_skin_edit_mode(std::string value) {
-    value = config::normalize_skin_mode_token(value);
-    if (value == "4k" || value == "5k" || value == "6k" || value == "7k" || value == "7+1" || value == "8k" ||
-        value == "9k" || value == "10k" || value == "11k" || value == "12k" || value == "13k" || value == "14k" || value == "15k" || value == "16k") {
-        return value;
-    }
-    return "10k";
+    const std::string mode = config::normalize_skin_mode_token(value);
+    if (mode != "10k") return mode;
+    // The runtime normalizer also returns 10K for invalid tokens. Editing starts
+    // at 4K instead, while explicit 10K aliases must keep their original meaning.
+    std::transform(value.begin(), value.end(), value.begin(), [](unsigned char ch) {
+        return ch >= 'A' && ch <= 'Z' ? static_cast<char>(ch - 'A' + 'a') : static_cast<char>(ch);
+    });
+    value.erase(std::remove_if(value.begin(), value.end(), [](unsigned char ch) {
+        return ch == ' ' || ch == '\t' || ch == '_' || ch == '-';
+    }), value.end());
+    return value == "10" || value == "10k" || value == "10key" || value == "keys10" ? "10k" : "4k";
 }
 
 inline std::string cycle_skin_edit_mode(std::string_view current, int direction) {

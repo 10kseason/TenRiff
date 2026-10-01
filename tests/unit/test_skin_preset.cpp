@@ -81,6 +81,9 @@ TEST_CASE("skin preset native settings round trip only appearance in Unicode pat
     skin.judgement_position = 0.6;
     skin.judgement_offset_x = 42;
     skin.combo_offset_x = -52;
+    skin.key_backdrop_override = true;
+    skin.key_backdrop_brightness = 1.75;
+    skin.key_backdrop_height = 0.4;
     skin.lr2_skin_name = "irrelevant private catalog name";
     const auto file = dir.path / fs::u8path(u8"공유 프리셋.trskin");
     const auto saved = tenriff::app::export_skin_preset(file.u8string(), skin, {});
@@ -96,6 +99,9 @@ TEST_CASE("skin preset native settings round trip only appearance in Unicode pat
     CHECK(imported.skin.judgement_position == doctest::Approx(0.6));
     CHECK(imported.skin.judgement_offset_x == 42);
     CHECK(imported.skin.combo_offset_x == -52);
+    CHECK(imported.skin.key_backdrop_override);
+    CHECK(imported.skin.key_backdrop_brightness == doctest::Approx(1.75));
+    CHECK(imported.skin.key_backdrop_height == doctest::Approx(0.4));
     CHECK(imported.skin.note_height_scales.at("7k") == doctest::Approx(1.35));
     CHECK(imported.skin.lane_colors.at("5k") == skin.lane_colors.at("5k"));
     CHECK_FALSE(tenriff::app::export_skin_preset(file.u8string(), skin, {}).success());

@@ -50,6 +50,7 @@ KeymapSettingsViewModel KeymapSettingsView::build(
     config::KeymapManager manager;
     const auto bindings = manager.bindings_for_mode(
         working_keymap, std::string(controller.edit_mode()));
+    const auto secondary = manager.secondary_bindings_for_mode(working_keymap, controller.edit_mode());
     KeymapSettingsViewModel view;
     view.footer_reserved_lines = 6;
     view.rows.reserve(controller.lane_ids().size() + 4);
@@ -84,15 +85,20 @@ KeymapSettingsViewModel KeymapSettingsView::build(
     for (std::size_t index = 0; index < controller.lane_ids().size(); ++index) {
         const std::string& lane = controller.lane_ids()[index];
         std::string value = binding_name(bindings, lane, language);
-        if (controller.capture_active() &&
+        if (controller.capture_active() && !controller.secondary_selected() &&
             static_cast<int>(index) + 1 == controller.selected_row()) {
             value += localized(language, " [waiting]", " [대기 중]");
         }
+        std::string secondary_value = binding_name(secondary, lane, language);
+        if (controller.capture_active() && controller.secondary_selected() &&
+            static_cast<int>(index) + 1 == controller.selected_row())
+            secondary_value += localized(language, " [waiting]", " [대기 중]");
         view.rows.push_back(KeymapViewRow{
-            lane,
+            "Key " + std::to_string(index + 1),
             std::move(value),
             static_cast<int>(index) + 1 == controller.selected_row(),
-            std::nullopt});
+            std::nullopt,
+            std::move(secondary_value)});
     }
 
     if (controller.capture_active()) {
@@ -103,8 +109,8 @@ KeymapSettingsViewModel KeymapSettingsView::build(
             std::to_string(remaining_ns / 1'000'000) + "ms");
         view.footer_notes.push_back(localized(
             language,
-            "Press any keyboard key. Delete cancels capture.",
-            "아무 키나 누르세요. Delete 키로 입력 대기를 취소합니다."));
+            "Press a key. Delete clears a secondary binding or cancels primary capture.",
+            "키를 누르세요. Delete는 보조 키를 해제하거나 기본 키 입력 대기를 취소합니다."));
         view.footer_notes.push_back(localized(
             language,
             "Duplicate lane bindings are allowed.",
@@ -112,19 +118,23 @@ KeymapSettingsViewModel KeymapSettingsView::build(
     }
 
     view.rows.push_back(KeymapViewRow{
-        localized(language, "Reset", "초기화"), "", false, KeymapActionId::Reset});
+        localized(language, "Reset", "초기화"), "", controller.selected_row() == static_cast<int>(controller.lane_ids().size()) + 1, KeymapActionId::Reset});
     view.rows.push_back(KeymapViewRow{
-        localized(language, "NKRO Test", "NKRO Test"), "", false, KeymapActionId::NkroTest});
+        localized(language, "NKRO Test", "NKRO Test"), "", controller.selected_row() == static_cast<int>(controller.lane_ids().size()) + 2, KeymapActionId::NkroTest});
     view.rows.push_back(KeymapViewRow{
-        localized(language, "Back", "뒤로"), "", false, KeymapActionId::Back});
+        controller.capture_active() ? localized(language, "Cancel", "취소") : localized(language, "Back", "뒤로"),
+        "", controller.selected_row() == static_cast<int>(controller.lane_ids().size()) + 3, KeymapActionId::Back});
     view.footer_notes.push_back(localized(
         language,
         "Left/Right on Key Mode selects a 4K-10K, 12K, 14K, or 16K layout.",
         "키 모드에서 좌우 키를 누르면 4K~10K, 12K, 14K 또는 16K 레이아웃을 고릅니다."));
     view.footer_notes.push_back(localized(
         language,
-        "Enter binds the selected lane and saves immediately. Reset also saves immediately.",
-        "Enter로 선택 레인에 키를 할당하면 즉시 저장됩니다. 초기화도 바로 저장됩니다."));
+        "Click a primary or secondary key to bind. Left/Right selects its slot; Enter saves immediately.",
+        "기본 키나 보조 키를 클릭해 할당하세요. 좌우로 항목을 고르고 Enter로 입력하면 즉시 저장됩니다."));
+    view.footer_notes.push_back(localized(language,
+        "BMS original mode uses the chart's actual key count. Secondary keys work in every layout, including 5K.",
+        "BMS 원본 모드는 차트의 실제 키 수에 맞춥니다. 5K를 포함한 모든 모드에서 보조 키를 지정할 수 있습니다."));
     return view;
 }
 
@@ -137,6 +147,7 @@ KeymapSettingsViewModel KeymapSettingsView::build_nkro_test(
     config::KeymapManager manager;
     const auto bindings = manager.bindings_for_mode(
         working_keymap, std::string(controller.edit_mode()));
+    const auto secondary = manager.secondary_bindings_for_mode(working_keymap, controller.edit_mode());
     KeymapSettingsViewModel view;
     view.footer_reserved_lines = 2;
     view.rows.reserve(controller.lane_ids().size() + 1);
@@ -146,6 +157,7 @@ KeymapSettingsViewModel KeymapSettingsView::build_nkro_test(
         "NKRO 테스트 (여러 키를 동시에 눌러보세요)"));
     view.footer_notes.push_back(std::move(backend_status));
 
+    std::size_t index = 0;
     for (const std::string& lane : controller.lane_ids()) {
         const std::string key_name = binding_name(bindings, lane, language);
         bool is_down = false;
@@ -153,13 +165,17 @@ KeymapSettingsViewModel KeymapSettingsView::build_nkro_test(
             keycode.has_value()) {
             is_down = pressed_keys.find(*keycode) != pressed_keys.end();
         }
+        const auto secondary_name = binding_name(secondary, lane, language);
+        if (const auto keycode = config::KeycodeMap::to_keycode(secondary_name))
+            is_down = is_down || pressed_keys.find(*keycode) != pressed_keys.end();
         view.rows.push_back(KeymapViewRow{
-            lane,
+            "Key " + std::to_string(++index),
             key_name + (is_down
                 ? localized(language, " [DOWN]", " [눌림]")
                 : ""),
             is_down,
-            std::nullopt});
+            std::nullopt,
+            secondary_name});
     }
     view.rows.push_back(KeymapViewRow{
         localized(language, "Back", "뒤로"),

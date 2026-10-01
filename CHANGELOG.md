@@ -1,5 +1,36 @@
 # Changelog
 
+## [1.8.0] - 2026-10-02
+
+- Distinguish Options categories with editable pastel sky, mint, peach, yellow and coral accents across card backgrounds, borders and values; retain an inset outline and stronger contrast for selection.
+- See [release verification and remaining hardware checks](docs/release-1.8.0-gate.md).
+
+- Add the supplied space artwork to the built-in title screen and replace navy/violet menu chrome with black, white and pastel sky blue. Preserve authored skin colors and gameplay colors; strengthen the TENRIFF interference animation while respecting reduced motion.
+- Add independent pressed-key background brightness (0–200%) and maximum height (0–100%) to Skin Settings, imported skins and the editor. Both default to 100% to preserve existing appearances.
+- Repeat enabled minus/plus settings while holding Left/Right, using the rendered setting ID and stopping on release, navigation, focus loss or text/key capture.
+- Ease Easy judgement to 1.35×, cap Hard BAD at 180ms, and separate the automatic miss deadline at 340ms. New plays use ruleset-2; official ruleset-1 replays retain their old timing in playback, ghost and verification. A ranking server needs the updated verifier before accepting the new ruleset.
+- See [menu artwork, key backgrounds and judgement changes](docs/menu-sky-controls.ko.md).
+
+- Place the search field directly below the song list, preserving all seven visible cards and keeping its scrollbar clear. Expand the remaining filter/table controls.
+- Apply the same skin judgement/combo positions, fonts, colors and animations to live and ghost play. Give ghost battle information separate readable rows; place song metadata outside the fields or inside a two-column summary when outer space is limited.
+- Add None / Default / Random BMS / Last Played title music in Audio Settings. Reuse cancellable background chart-audio preparation, remember the last played chart and fall back to the default theme when chart audio is unavailable.
+- See [search, ghost battle and title music behavior](docs/song-search-ghost-title-music.ko.md).
+
+- Anchor gameplay visuals to the device playback head and callback start timestamp rather than the queued audio write end, preventing buffer-dependent note/audio lead during capture.
+- Add primary/secondary key bindings, horizontal Key 1… key settings, midpoint spacing for 6K/8K/10K and an initial 4K settings mode.
+- Group related settings; fix overlapping mouse hit regions and use stable setting IDs for pointer actions. Add ALL SONG/Skin tips to option help and paginate Skin Settings help for imported menu skins.
+- Add independent key press backdrop On/Off and opacity, and scale judgement-line thickness with note height.
+- Add independent 50–200% combo/judgement font multipliers for native and imported skins. Move Visual Latency to the fifth Skin Settings item.
+- Give all UI text a thin contrasting outline: home, library, options/settings, results, help/chat/account overlays, BMS editor, performance display and gameplay HUD. Brighten the default secondary text while preserving skin colors and text opacity. Include ellipsis and prebuilt layouts, reuse bounded text layouts, and keep HUD base sizes independent of menu text scaling. Outline every text role in the skin editor gameplay preview too.
+- Place BMS editor shortcut hints on two full-width rows so the second hint no longer overlaps the first or shrinks into unreadable text.
+- Remove the full-screen BGA dark filter while preserving configured playfield and lane backgrounds.
+- Add inactive-window audio mute and speed adjustment clicks. Seed new profiles at 70% master volume, preserve explicitly saved volume, and label ASIO buffer sizes in samples.
+- Limit ALL SONG to matching charts while a difficulty table is selected; Native LV restores the full library.
+- See [settings behavior and verification scope](docs/settings-usability.ko.md).
+
+- Support common and monitor-provided display sizes, including 1600×900, 1366×768, 16:10 and ultrawide. Preserve explicit `widthxheight` profile values and fit windowed displays proportionally inside the work area.
+- Draw Skin Settings previews through the actual gameplay renderer at a uniform scale, matching field movement, imported lane/gear geometry, note sizes and judgement/combo placement. Keep gameplay preview font sizes independent of menu text scaling.
+
 ## [1.7.10] - 2026-10-01
 
 - Publish the song indexer's completion state together with its final result, preventing a completed library update from leaving the menu snapshot in a loading state.

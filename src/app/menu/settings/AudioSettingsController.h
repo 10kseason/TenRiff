@@ -29,17 +29,21 @@ enum class AudioSettingId : std::uint8_t {
     AsioDriver = 10,
     SampleRate = 11,
     BufferFrames = 12,
+    MuteWhenInactive = 13,
+    TitleMusic = 14,
 };
 
-inline constexpr std::array<AudioSettingId, 13> kAudioSettingOrder{
-    AudioSettingId::Preset,
+inline constexpr std::array<AudioSettingId, 15> kAudioSettingOrder{
     AudioSettingId::KeysoundMode,
     AudioSettingId::BackgroundSound,
+    AudioSettingId::TitleMusic,
+    AudioSettingId::MuteWhenInactive,
     AudioSettingId::MasterVolume,
     AudioSettingId::BgmVolume,
     AudioSettingId::KeysoundVolume,
-    AudioSettingId::SoundOffset,
     AudioSettingId::Normalize,
+    AudioSettingId::SoundOffset,
+    AudioSettingId::Preset,
     AudioSettingId::Backend,
     AudioSettingId::AsioDriver,
     AudioSettingId::SampleRate,

@@ -5,6 +5,9 @@
 #include <cstdint>
 #include <optional>
 #include <string>
+#include <vector>
+#include <utility>
+#include "config/GraphicsResolution.h"
 
 #include "app/menu/MenuAction.h"
 #include "config/Config.h"
@@ -73,6 +76,7 @@ public:
     [[nodiscard]] OnnxUpscalerConfirmId selected_confirmation_id() const noexcept;
     [[nodiscard]] bool dirty() const noexcept;
 
+    void set_display_resolutions(const std::vector<std::pair<int, int>>& modes);
     void reset(GraphicsSettingId selected = GraphicsSettingId::Display) noexcept;
     [[nodiscard]] GraphicsSettingsEffects select(GraphicsSettingId target) noexcept;
     [[nodiscard]] GraphicsSettingsEffects handle(
@@ -104,6 +108,7 @@ private:
     OnnxUpscalerConfirmId selected_confirmation_id_ =
         OnnxUpscalerConfirmId::KeepNative;
     bool dirty_ = false;
+    std::vector<std::string> resolution_choices_ = config::graphics_resolution_choices();
 };
 
 }  // namespace tenriff::app::menu::settings

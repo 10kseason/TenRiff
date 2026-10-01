@@ -118,7 +118,8 @@ TEST_CASE("wordmark reduced motion disables sparkle and glitch at every phase") 
 TEST_CASE("wordmark interference stays brief and all visual offsets are bounded") {
     using tenriff::render::native_wordmark_motion;
     int glitch_samples = 0;
-    for (int index = 0; index < 920; ++index) {
+    float peak_glitch = 0.0f;
+    for (int index = 0; index < 480; ++index) {
         const auto frame = native_wordmark_motion(index * 0.01, true);
         CHECK(frame.bloom >= 0.074f);
         CHECK(frame.bloom <= 0.126f);
@@ -128,9 +129,12 @@ TEST_CASE("wordmark interference stays brief and all visual offsets are bounded"
         CHECK(frame.scan < 1.0f);
         CHECK(frame.sparkle_x >= 0.0f);
         CHECK(frame.sparkle_x < 1.0f);
-        CHECK(std::abs(frame.glitch) <= 2.60f);
+        CHECK(std::abs(frame.glitch) <= 6.0f);
+        peak_glitch = std::max(peak_glitch, std::abs(frame.glitch));
         if (frame.glitch != 0.0f) ++glitch_samples;
     }
     CHECK(glitch_samples > 0);
-    CHECK(glitch_samples <= 18); // At most 180ms within a 9.2s cycle.
+    CHECK(peak_glitch > 5.5f);
+    CHECK(glitch_samples >= 30);
+    CHECK(glitch_samples <= 34); // At most 340ms within a 4.8s cycle.
 }

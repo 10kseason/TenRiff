@@ -194,10 +194,19 @@ std::unordered_map<std::string, std::string> KeymapManager::bindings_for_mode(co
     return {};
 }
 
+std::unordered_map<std::string, std::string> KeymapManager::secondary_bindings_for_mode(
+    const Keymap& keymap, std::string_view key_mode) const {
+    const auto found = keymap.secondary_mode_bindings.find(normalize_mode_token(key_mode));
+    return found == keymap.secondary_mode_bindings.end()
+        ? std::unordered_map<std::string, std::string>{}
+        : found->second;
+}
+
 void KeymapManager::reset_mode_bindings(Keymap& keymap, std::string_view key_mode) const {
     const std::string normalized = normalize_mode_token(key_mode);
     Keymap defaults = default_keymap();
     keymap.mode_bindings[normalized] = defaults.mode_bindings[normalized];
+    keymap.secondary_mode_bindings.erase(normalized);
     if (normalized == "10k") {
         keymap.bindings = keymap.mode_bindings[normalized];
     }
@@ -248,6 +257,29 @@ KeymapLoadResult KeymapManager::load_profile(std::string_view profile_dir) const
         }
     }
 
+    if (const auto* modes = get_object(*root, "secondary_modes")) {
+        for (const auto& [mode, value] : *modes) {
+            const auto* bindings = value.as_object();
+            if (!bindings) continue;
+            const auto normalized_mode = normalize_mode_token(mode);
+            const auto lanes = lane_ids_for_mode(normalized_mode);
+            for (const auto& [lane, key] : *bindings) {
+                if (!key.is_string() || std::find(lanes.begin(), lanes.end(), lane) == lanes.end()) continue;
+                const auto original = key.as_string();
+                if (original.empty()) continue;
+                if (const auto code = KeycodeMap::to_keycode(original)) {
+                    const auto canonical = KeycodeMap::to_name(*code);
+                    if (canonical != original) ++result.normalized_binding_count;
+                    result.keymap.secondary_mode_bindings[normalized_mode][lane] = canonical;
+                } else {
+                    ++result.repaired_binding_count;
+                    result.warnings.push_back("Invalid secondary keymap binding removed: mode=" +
+                                              normalized_mode + " lane=" + lane);
+                }
+            }
+        }
+    }
+
     if (auto* bindings = get_object(*root, "bindings")) {
         for (const auto& [lane, value] : *bindings) {
             if (!value.is_string()) {
@@ -288,6 +320,21 @@ bool KeymapManager::save_profile(std::string_view profile_dir, const Keymap& key
     }
     root.emplace("modes", JsonValue{std::move(modes)});
 
+    // Keep legacy primary strings intact; old clients can ignore this optional object.
+    JsonObject secondary_modes;
+    for (const auto& mode : supported_mode_tokens()) {
+        JsonObject secondary;
+        const auto lanes = lane_ids_for_mode(mode);
+        for (const auto& [lane, key] : secondary_bindings_for_mode(keymap, mode)) {
+            if (key.empty() || std::find(lanes.begin(), lanes.end(), lane) == lanes.end()) continue;
+            if (const auto code = KeycodeMap::to_keycode(key)) {
+                secondary.emplace(lane, JsonValue{KeycodeMap::to_name(*code)});
+            }
+        }
+        if (!secondary.empty()) secondary_modes.emplace(mode, JsonValue{std::move(secondary)});
+    }
+    if (!secondary_modes.empty()) root.emplace("secondary_modes", JsonValue{std::move(secondary_modes)});
+
     JsonObject bindings;
     const auto ten_key_bindings = bindings_for_mode(keymap, "10k");
     for (const auto& [lane, key] : ten_key_bindings) {
@@ -324,6 +371,13 @@ std::vector<std::string> KeymapManager::validate_unique_bindings(const Keymap& k
             } else {
                 used.emplace(key, lane);
             }
+        }
+        for (const auto& [lane, key] : secondary_bindings_for_mode(keymap, mode)) {
+            if (key.empty()) continue;
+            const auto found = used.find(key);
+            // The same primary/secondary key on one logical key is harmless.
+            if (found != used.end() && found->second != lane) duplicates.push_back(mode + ":" + key);
+            else used.emplace(key, lane);
         }
     }
 

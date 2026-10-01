@@ -108,10 +108,10 @@
             d2d_->accent_brush->SetOpacity(0.14f + logo_pulse * 0.06f);
             if (!title_logo_bitmap && d2d_->logo_format) {
                 if (logo_layout) {
-                    ctx->DrawTextLayout(D2D1::Point2F(logo_draw_left, logo_shadow_rect.top),
+                    draw_text_layout_readable(D2D1::Point2F(logo_draw_left, logo_shadow_rect.top),
                                         logo_layout.Get(),
                                         d2d_->accent_brush.Get(),
-                                        D2D1_DRAW_TEXT_OPTIONS_CLIP);
+                                        D2D1_DRAW_TEXT_OPTIONS_CLIP, false);
                 } else {
                     draw_text_clipped_aligned(logo_w,
                                               d2d_->logo_format.Get(),
@@ -137,7 +137,7 @@
             }
             if (brush) {
                 if (logo_layout) {
-                    ctx->DrawTextLayout(D2D1::Point2F(logo_draw_left, logo_rect.top),
+                    draw_text_layout_readable(D2D1::Point2F(logo_draw_left, logo_rect.top),
                                         logo_layout.Get(),
                                         brush,
                                         D2D1_DRAW_TEXT_OPTIONS_CLIP);

@@ -33,6 +33,14 @@ inline constexpr float kOutputSoftLimitThreshold = 0.92f;
     return static_cast<float>(std::clamp(bgm_volume, 0.0, 2.0));
 }
 
+// Focus muting is an output gate, never a change to the saved master volume.
+// Audio/chart clocks continue while silent and regain the same gain on return.
+[[nodiscard]] inline double focused_audio_master_gain(double master_volume,
+                                                       bool mute_when_inactive,
+                                                       bool foreground) {
+    return mute_when_inactive && !foreground ? 0.0 : std::clamp(master_volume, 0.0, 1.0);
+}
+
 // MCI exposes a 0..1000 volume range and cannot represent the gameplay mix's
 // 200% boost. Clamp the BGM submix first so master remains responsive over its
 // entire 0..100% range instead of saturating master*bgm at 100%.

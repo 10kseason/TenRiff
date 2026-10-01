@@ -18,6 +18,7 @@ struct KeymapViewRow {
     std::string value;
     bool selected = false;
     std::optional<KeymapActionId> action;
+    std::string secondary_value;
 };
 
 struct KeymapSettingsViewModel {

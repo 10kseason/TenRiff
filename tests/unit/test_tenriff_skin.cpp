@@ -10,6 +10,8 @@
 #include "app/LanePresentationLayout.h"
 #include "app/MenuAppSkinUtils.h"
 #include "app/TenRiffSkin.h"
+#include "render/NativeGameplayOverrides.h"
+#include <limits>
 
 namespace {
 
@@ -176,7 +178,8 @@ TEST_CASE("TenRiff native menu-only skins keep native receptors until gameplay i
              "\"show_hold_tail\":false", "\"hold_tail_taper\":false",
              "\"judgement_line_glow\":false", "\"key_pulse\":false",
              "\"note_border\":false", "\"black_playfield\":false",
-             "\"key_pulse_brightness\":0", "\"lane_background_opacity\":0",
+             "\"key_pulse_brightness\":0", "\"key_backdrop\":false", "\"key_backdrop_opacity\":0",
+             "\"key_backdrop_brightness\":0", "\"key_backdrop_height\":0", "\"lane_background_opacity\":0",
              "\"visual_opacity\":1", "\"note_outline_opacity\":0",
              "\"hold_body_opacity\":1", "\"hit_burst_style\":\"ring\"",
              "\"key_label_position\":\"off\"", "\"note_shape\":\"rect\"",
@@ -615,19 +618,29 @@ TEST_CASE("TenRiff skin import includes assets referenced only by another key mo
 TEST_CASE("Skin settings stable row ids account for the optional LR2 row") {
     const tenriff::app::SkinSettingsRows native_rows{false};
     const tenriff::app::SkinSettingsRows lr2_rows{true};
-    CHECK(native_rows.count() == 51);
-    CHECK(lr2_rows.count() == 52);
+    CHECK(native_rows.count() == 57);
+    CHECK(lr2_rows.count() == 58);
     CHECK(native_rows.index_of(tenriff::app::SkinSettingsRowId::KeyMode) == 0);
     CHECK(native_rows.index_of(tenriff::app::SkinSettingsRowId::ScratchPosition) == 1);
     CHECK(native_rows.index_of(tenriff::app::SkinSettingsRowId::SkinSource) == 2);
     CHECK(native_rows.index_of(tenriff::app::SkinSettingsRowId::Lr2Resolution) == -1);
-    CHECK(native_rows.index_of(tenriff::app::SkinSettingsRowId::ImportSkin) == 4);
-    CHECK(native_rows.index_of(tenriff::app::SkinSettingsRowId::OpenSkinEditor) == 49);
-    CHECK(native_rows.index_of(tenriff::app::SkinSettingsRowId::Back) == 50);
-    CHECK(lr2_rows.index_of(tenriff::app::SkinSettingsRowId::Lr2Resolution) == 4);
-    CHECK(lr2_rows.index_of(tenriff::app::SkinSettingsRowId::ImportSkin) == 5);
-    CHECK(lr2_rows.index_of(tenriff::app::SkinSettingsRowId::OpenSkinEditor) == 50);
-    CHECK(lr2_rows.index_of(tenriff::app::SkinSettingsRowId::Back) == 51);
+    CHECK(native_rows.index_of(tenriff::app::SkinSettingsRowId::VisualLatency) == 4);
+    CHECK(native_rows.index_of(tenriff::app::SkinSettingsRowId::ImportSkin) == 5);
+    CHECK(native_rows.index_of(tenriff::app::SkinSettingsRowId::OpenSkinEditor) == 11);
+    CHECK(native_rows.index_of(tenriff::app::SkinSettingsRowId::KeyBackdropBrightness) == 38);
+    CHECK(native_rows.index_of(tenriff::app::SkinSettingsRowId::KeyBackdropHeight) == 39);
+    CHECK(native_rows.index_of(tenriff::app::SkinSettingsRowId::ComboFontSize) == 52);
+    CHECK(native_rows.index_of(tenriff::app::SkinSettingsRowId::JudgementFontSize) == 53);
+    CHECK(native_rows.index_of(tenriff::app::SkinSettingsRowId::Back) == 56);
+    CHECK(lr2_rows.index_of(tenriff::app::SkinSettingsRowId::VisualLatency) == 4);
+    CHECK(lr2_rows.index_of(tenriff::app::SkinSettingsRowId::Lr2Resolution) == 5);
+    CHECK(lr2_rows.index_of(tenriff::app::SkinSettingsRowId::ImportSkin) == 6);
+    CHECK(lr2_rows.index_of(tenriff::app::SkinSettingsRowId::OpenSkinEditor) == 12);
+    CHECK(lr2_rows.index_of(tenriff::app::SkinSettingsRowId::KeyBackdropBrightness) == 39);
+    CHECK(lr2_rows.index_of(tenriff::app::SkinSettingsRowId::KeyBackdropHeight) == 40);
+    CHECK(lr2_rows.index_of(tenriff::app::SkinSettingsRowId::ComboFontSize) == 53);
+    CHECK(lr2_rows.index_of(tenriff::app::SkinSettingsRowId::JudgementFontSize) == 54);
+    CHECK(lr2_rows.index_of(tenriff::app::SkinSettingsRowId::Back) == 57);
 }
 
 TEST_CASE("7+1 presentation moves only the visual scratch lane") {
@@ -758,4 +771,59 @@ TEST_CASE("Explicit legacy gameplay renderer overrides native-menu automatic fal
     CHECK(skin.warnings.empty());
     CHECK(skin.native_menu_renderer);
     CHECK_FALSE(skin.native_gameplay_fallback);
+}
+
+TEST_CASE("TenRiff key backdrop manifest fields preserve explicit off and per mode opacity") {
+    TempDirGuard temp{make_temp_dir()};
+    REQUIRE(!temp.path.empty());
+    write_file(temp.path / "skin.json", R"({
+        "format":"tenriff-skin","version":1,"name":"Backdrop",
+        "gameplay":{"key_backdrop":false,"key_backdrop_opacity":0,"key_backdrop_brightness":1.5,"key_backdrop_height":0.8,
+            "modes":{"4k":{"key_backdrop":true,"key_backdrop_opacity":0.65,"key_backdrop_brightness":0.5,"key_backdrop_height":0.25}}}
+    })");
+    const auto four = tenriff::app::load_tenriff_skin_folder(temp.path.u8string(), 4);
+    const auto ten = tenriff::app::load_tenriff_skin_folder(temp.path.u8string(), 10);
+    REQUIRE(four.found);
+    CHECK(four.warnings.empty());
+    CHECK(four.gameplay_style.key_backdrop_enabled.value_or(false));
+    CHECK(four.gameplay_style.key_backdrop_opacity.value_or(-1) == doctest::Approx(0.65f));
+    CHECK(four.gameplay_style.key_backdrop_brightness.value_or(-1) == doctest::Approx(0.5f));
+    CHECK(four.gameplay_style.key_backdrop_height.value_or(-1) == doctest::Approx(0.25f));
+    CHECK(ten.gameplay_style.key_backdrop_brightness.value_or(-1) == doctest::Approx(1.5f));
+    CHECK(ten.gameplay_style.key_backdrop_height.value_or(-1) == doctest::Approx(0.8f));
+    REQUIRE(ten.gameplay_style.key_backdrop_enabled.has_value());
+    REQUIRE(ten.gameplay_style.key_backdrop_opacity.has_value());
+    CHECK_FALSE(*ten.gameplay_style.key_backdrop_enabled);
+    CHECK(*ten.gameplay_style.key_backdrop_opacity == doctest::Approx(0.0f));
+}
+
+TEST_CASE("native judgement line thickness scales with note height and preserves authored zero") {
+    tenriff::app::NativeGameplaySkinStyle style;
+    CHECK(tenriff::render::native_gameplay_judgement_line_width(style, 1.8) == doctest::Approx(2.0f));
+    const auto thin = tenriff::render::native_gameplay_judgement_line_width(style, 0.5);
+    const auto thick = tenriff::render::native_gameplay_judgement_line_width(style, 4.0);
+    CHECK(thick / thin == doctest::Approx(8.0f));
+    style.metrics["judgement_line_width"] = 5.0f;
+    CHECK(tenriff::render::native_gameplay_judgement_line_width(style, 3.6) == doctest::Approx(10.0f));
+    style.metrics["judgement_line_width"] = 0.0f;
+    CHECK(tenriff::render::native_gameplay_judgement_line_width(style, 4.0) == doctest::Approx(0.0f));
+    CHECK(tenriff::render::gameplay_key_backdrop_alpha(false, true, 1.0) == 0.0f);
+    CHECK(tenriff::render::gameplay_key_backdrop_alpha(true, false, 1.0) == 0.0f);
+    CHECK(tenriff::render::gameplay_key_backdrop_alpha(true, true, 0.4) == doctest::Approx(0.4f));
+    CHECK(tenriff::render::gameplay_key_backdrop_alpha(true, true, 2.0) == 1.0f);
+    CHECK(tenriff::render::gameplay_key_backdrop_alpha(true, true, std::numeric_limits<double>::quiet_NaN()) == 0.0f);
+}
+
+TEST_CASE("key backdrop RGB brightness and bottom anchored height are independent of alpha") {
+    using namespace tenriff::render;
+    CHECK(gameplay_key_backdrop_color(0x4080C0, 1.0) == 0x4080C0u);
+    CHECK(gameplay_key_backdrop_color(0x4080C0, 0.5) == 0x204060u);
+    CHECK(gameplay_key_backdrop_color(0x4080C0, 2.0) == 0x80FFFFu);
+    CHECK(gameplay_key_backdrop_color(0x4080C0, 0.0) == 0u);
+    CHECK(gameplay_key_backdrop_color(0x4080C0, std::numeric_limits<double>::quiet_NaN()) == 0x4080C0u);
+    CHECK(gameplay_key_backdrop_top(2.0f, 1078.0f, 1.0) == doctest::Approx(2.0f));
+    CHECK(gameplay_key_backdrop_top(2.0f, 1078.0f, 0.5) == doctest::Approx(540.0f));
+    CHECK(gameplay_key_backdrop_top(2.0f, 1078.0f, 0.0) == doctest::Approx(1078.0f));
+    CHECK(gameplay_key_backdrop_top(50.0f, 1060.0f, 0.25) == doctest::Approx(807.5f));
+    CHECK(gameplay_key_backdrop_alpha(true, true, 0.4) == doctest::Approx(0.4f));
 }

@@ -1,6 +1,6 @@
 # TenRiff
 
-**2026-10-01 · TenRiff 1.7.10:** ALL SONG はキャッシュに残る削除済み譜面・サブフォルダーを飛ばし、後続の譜面を読み込みます。キャッシュ統合の進捗を表示し、結果と完了状態を同時に通知します。[検証範囲と制限](docs/release-1.7.10-gate.md)。
+**2026-10-02 · TenRiff 1.8.0:** 項目別のパステルカラー、多様な解像度、プレイと共通のスキンプレビューとゴースト、補助キー、マウス設定、タイトル音楽の選択、ruleset-2 判定を追加します。 [1.8.0 release gate](docs/release-1.8.0-gate.md).
 
 **マルチプレイRate対応ビルド:** ロビーでリーダーが共通のRateを設定します。全員がこのprotocol v6ビルドを使用してください。旧v5クライアントとは接続できません。[案内](docs/multiplayer-rate-build.ko.md)（韓国語）。
 
@@ -8,17 +8,19 @@
 
 Language: [한국어](README.md) | [English](README.en.md) | [简体中文](README.zh-CN.md) | 日本語
 
-TenRiff は Windows GUI ベースの BMS リズムゲーム runtime/launcher です。現在のプロジェクト版は `1.7.10` で、譜面入力は BMS family（`.bms/.bme/.bml/.pms`）専用です。公開 package は BGA upscaler model を含まず、key-mode conversion 用の deterministic NK3 P64 graph と generalized pattern MLP を同梱します。license は MIT です。
+TenRiff は Windows GUI ベースの BMS リズムゲーム runtime/launcher です。現在のプロジェクト版は `1.8.0` で、譜面入力は BMS family（`.bms/.bme/.bml/.pms`）専用です。公開 package は BGA upscaler model を含まず、key-mode conversion 用の deterministic NK3 P64 graph と generalized pattern MLP を同梱します。license は MIT です。
 
-この README は導入文書です。現在の挙動、`1.7.10` project state、`1.5.1 fixed stable baseline` baseline、設定と設計文書は [`docs/README.ja.md`](docs/README.ja.md) から参照してください。
+この README は導入文書です。現在の挙動、`1.8.0` project state、`1.5.1 fixed stable baseline` baseline、設定と設計文書は [`docs/README.ja.md`](docs/README.ja.md) から参照してください。
 
 TenRiff のコードベースは、伝統的な長文設計書主導だけで積み上がったものではなく、高速な反復と実験を重視した `vibe coding` 的な性格を持つ作品でもあります。
 
-## 1.7.10 ALL SONG 読み込み改善
+## 1.8.0 オプション・スキン・操作性の改善
 
-利用できないソースや譜面を飛ばし、後続の有効な譜面を維持します。キャンセル時もフォルダー別キャッシュと既存の一覧を保持します。1.7.9 のメニュー・プロフィール・スキン機能も含みます。
+ZIP を新しいフォルダーに展開し、`launch_win.bat` で起動してください。以前のインストールとプロフィールは保管してください。`F10` でリーダーボードのアカウントを接続できます。
 
-[CHANGELOG](CHANGELOG.md) · [1.7.10 release gate](docs/release-1.7.10-gate.md)
+項目別のパステルカラー、多様な解像度、プレイと共通のスキンプレビューとゴースト、補助キー、マウス設定、タイトル音楽の選択、ruleset-2 判定を追加します。
+
+[CHANGELOG](CHANGELOG.md) · [1.8.0 release gate](docs/release-1.8.0-gate.md)
 
 ## スクリーンショット
 

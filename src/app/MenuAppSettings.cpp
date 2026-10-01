@@ -55,6 +55,7 @@ void MenuApp::apply_audio_settings_effects(const menu::MenuEffectFlags& effects)
 }
 
 void MenuApp::handle_mode_settings_input(uint32_t keycode) {
+    const auto previous_speed = config_.speed;
     menu::settings::ModeSettingsEffects effects;
     if (keycode == key_up_) {
         effects = mode_settings_controller_.handle(menu::MenuAction::move(-1), config_);
@@ -69,6 +70,7 @@ void MenuApp::handle_mode_settings_input(uint32_t keycode) {
     } else if (keycode == key_escape_ || keycode == key_backspace_) {
         effects = mode_settings_controller_.handle(menu::MenuAction::back(), config_);
     }
+    play_speed_adjustment_if_changed(previous_speed);
     apply_mode_settings_effects(effects);
 }
 
@@ -135,6 +137,7 @@ void MenuApp::populate_audio_settings_render_data(render::MenuRenderData& render
     render.generic.rows.reserve(render.generic.rows.size() + view.rows.size());
     for (auto& source : view.rows) {
         render::MenuRowData row;
+        row.category = std::move(source.category);
         row.label = std::move(source.label);
         row.value = std::move(source.value);
         row.selected = source.selected;
@@ -145,9 +148,7 @@ void MenuApp::populate_audio_settings_render_data(render::MenuRenderData& render
         row.slider = source.slider_ratio.has_value();
         row.slider_ratio = source.slider_ratio.value_or(0.0);
         row.target_kind = render::MenuHitTargetKind::SettingsRow;
-        // Pointer events are decoded with audio_setting_id_at(), so publish
-        // the visible row index rather than the stable setting identifier.
-        row.row_index = static_cast<int>(menu::settings::audio_setting_index(source.id).value());
+        row.row_index = static_cast<int>(source.id);
         render.generic.rows.push_back(std::move(row));
     }
     render.generic.notes = std::move(view.notes);
@@ -248,6 +249,15 @@ void MenuApp::populate_mode_settings_render_data(render::MenuRenderData& render)
         "미러 자체는 시드를 쓰지 않지만, 먼저 실행되는 키 모드 변환은 랜덤 시드를 사용할 수 있습니다."));
     render.generic.notes.push_back(ui_text("Mods opens the registry-backed Mod Manager and shows the current score multiplier.",
                                            "모드는 현재 점수 배율을 보여주고, 등록 기반 Mod Manager를 엽니다."));
+    for (auto& row : render.generic.rows) {
+        const auto id = static_cast<menu::settings::ModeSettingId>(row.row_index);
+        using Id = menu::settings::ModeSettingId;
+        if (id <= Id::IndexDifficulty) row.category = ui_text("Library", "라이브러리");
+        else if (id <= Id::PacemakerTarget) row.category = ui_text("Play & Assistance", "플레이·보조");
+        else if (id <= Id::Nk2Preset) row.category = ui_text("Key Layout", "키 배치");
+        else if (id <= Id::Mods) row.category = ui_text("Gauge & Patterns", "게이지·패턴");
+        else if (id <= Id::HiSpeed) row.category = ui_text("Speed", "속도");
+    }
     render.generic.notes.push_back(ui_text("Back saves the current mode settings.",
                                            "뒤로 가면 현재 모드 설정을 저장합니다."));
 }
@@ -278,6 +288,9 @@ void MenuApp::populate_mode_mods_render_data(render::MenuRenderData& render) {
         "LN Mix lengths use 60% long (1/8), 20% medium (1/16), and 20% short (alternating 1/24-1/32) notes. Random Seed keeps the result deterministic.",
         "LN Mix 길이는 긴 8비트 60%, 중간 16비트 20%, 짧은 24~32비트 20%로 배분합니다. Random Seed로 같은 결과를 재현합니다."));
     render.generic.notes.push_back(ui_text("Current: ", "현재: ") + mode_score_summary(config_.mode.mods, config_.speed.rate));
+    render.generic.notes.push_back(ui_text(
+        "Judge Easy widens timing windows by 35%. Judge Hard caps BAD at 180 ms without changing PG/GR/GD. Unplayed notes time out after 340 ms in every mode.",
+        "Judge Easy는 판정창을 35% 넓힙니다. Judge Hard는 PG/GR/GD를 유지하고 BAD 최대창을 180ms로 줄입니다. 모든 모드에서 놓친 노트는 340ms가 지나면 자동 미스로 확정됩니다."));
     std::vector<std::string> mod_warnings;
     (void)normalize_mode_mod_tokens(config_.mode.mods, &mod_warnings);
     for (const auto& warning : mod_warnings) {

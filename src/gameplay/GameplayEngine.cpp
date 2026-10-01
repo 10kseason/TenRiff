@@ -554,7 +554,9 @@ OsuManiaJudgement GameplayEngine::record_osu_hold(const HoldState& hold,
 void GameplayEngine::update_miss(LaneState& lane, int64_t current_sample) {
     while (lane.next_index < lane.notes.size()) {
         const auto& note = lane.notes[lane.next_index];
-        const int64_t miss_window = windows_.indirect_miss_enabled ? windows_.indirect_miss : windows_.bd;
+        // The automatic deadline is independent of the BAD hit range and of
+        // whether a missed note costs BAD (Normal/Easy) or POOR (Hard).
+        const int64_t miss_window = windows_.indirect_miss;
         if (current_sample <= note.start_sample + miss_window) {
             break;
         }

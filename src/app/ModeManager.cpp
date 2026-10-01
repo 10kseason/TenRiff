@@ -1,4 +1,5 @@
 #include "app/ModeManager.h"
+#include "app/JudgeTimingPolicy.h"
 
 #include <algorithm>
 #include <array>
@@ -658,19 +659,6 @@ void apply_note_additions(gameplay::GameplayChart& chart,
     }
 }
 
-void scale_judge_windows(config::JudgeConfig& judge, double scale) {
-    if (!std::isfinite(scale) || scale <= 0.0 || std::abs(scale - 1.0) < 1e-9) {
-        return;
-    }
-    judge.pg_ms *= scale;
-    judge.gr_ms *= scale;
-    judge.gd_ms *= scale;
-    judge.bd_ms *= scale;
-    judge.hold_grace_ms *= scale;
-    judge.hold_break_ms *= scale;
-    judge.hold_break_ms = std::max(judge.hold_break_ms, judge.hold_grace_ms);
-}
-
 std::string join_labels(const std::vector<std::string>& labels) {
     if (labels.empty()) {
         return "Off";
@@ -876,18 +864,8 @@ ModeManagerResult manage_modes(const gameplay::GameplayChart& chart,
 
     const bool judge_easy = has_mod_token(result.active_mods, "judge_easy");
     const bool judge_hard = has_mod_token(result.active_mods, "judge_hard");
-    if (judge_easy) {
-        result.judge_window_scale = 1.25;
-    }
-    scale_judge_windows(result.judge, result.judge_window_scale);
-
-    // BAD is a separate tier policy: Easy follows its existing 1.25x scale, while Hard uses
-    // an exact 340ms BAD window without changing PG/GR/GD or long-note tail windows.
-    if (judge_hard) {
-        result.judge.bd_ms = 340.0;
-    }
-    result.judge.indirect_miss_ms = result.judge.bd_ms;
-    result.judge.indirect_miss_enabled = judge_hard;
+    result.judge_window_scale = judge_easy ? kCurrentEasyJudgeScale : 1.0;
+    result.judge = judge_timing_for_policy(judge, judge_easy, judge_hard);
 
     result.rate_multiplier = rate_score_multiplier(rate);
     result.mod_multiplier = mod_score_multiplier(result.active_mods);

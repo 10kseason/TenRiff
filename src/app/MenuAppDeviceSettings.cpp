@@ -81,6 +81,11 @@ std::optional<std::string> pick_onnx_model_dialog_utf8() {
 }  // namespace
 
 void MenuApp::handle_graphics_settings_input(uint32_t keycode) {
+    if (keycode == key_f5_) {
+        refresh_graphics_resolutions();
+        publish_snapshot();
+        return;
+    }
     menu::settings::GraphicsSettingsEffects effects;
     if (keycode == key_up_) {
         effects = graphics_settings_controller_.handle(menu::MenuAction::move(-1), config_);
@@ -229,6 +234,7 @@ void MenuApp::populate_graphics_settings_render_data(render::MenuRenderData& ren
     render.generic.rows.reserve(render.generic.rows.size() + view.rows.size());
     for (auto& source : view.rows) {
         render::MenuRowData row;
+        row.category = std::move(source.category);
         row.label = std::move(source.label);
         row.value = std::move(source.value);
         row.selected = source.selected;
@@ -250,6 +256,7 @@ void MenuApp::populate_onnx_upscaler_confirm_render_data(render::MenuRenderData&
     render.generic.rows.reserve(render.generic.rows.size() + view.rows.size());
     for (auto& source : view.rows) {
         render::MenuRowData row;
+        row.category = std::move(source.category);
         row.label = std::move(source.label);
         row.value = std::move(source.value);
         row.selected = source.selected;
@@ -270,6 +277,7 @@ void MenuApp::populate_input_settings_render_data(render::MenuRenderData& render
     render.generic.rows.reserve(render.generic.rows.size() + view.rows.size());
     for (auto& source : view.rows) {
         render::MenuRowData row;
+        row.category = std::move(source.category);
         row.label = std::move(source.label);
         row.value = std::move(source.value);
         row.selected = source.selected;
@@ -290,6 +298,7 @@ void MenuApp::populate_calibration_settings_render_data(render::MenuRenderData& 
     render.generic.rows.reserve(render.generic.rows.size() + view.rows.size());
     for (auto& source : view.rows) {
         render::MenuRowData row;
+        row.category = std::move(source.category);
         row.label = std::move(source.label);
         row.value = std::move(source.value);
         row.selected = source.selected;

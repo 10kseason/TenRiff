@@ -102,6 +102,15 @@ CalibrationSettingsViewModel CalibrationSettingsView::build(
         true,
         false));
 
+    for (auto& row : view.rows) {
+        if (row.id == CalibrationSettingId::AdjustmentStep)
+            row.category = localized(language, "Adjustment", "조정");
+        else if (row.id == CalibrationSettingId::ResetOffsets || row.id == CalibrationSettingId::Back)
+            row.category = localized(language, "Actions", "작업");
+        else
+            row.category = localized(language, "Timing", "타이밍");
+    }
+
     view.notes.push_back(localized(
         language,
         "Step 1: use Input Offset to match your actual key hit timing to the judgement windows.",

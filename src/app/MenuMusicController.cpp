@@ -1,4 +1,5 @@
 #include "app/MenuMusicController.h"
+#include "audio/SettingsAdjustmentClick.h"
 
 #ifdef _WIN32
 #ifndef NOMINMAX
@@ -13,6 +14,7 @@
 #endif
 
 #include <algorithm>
+#include <array>
 #include <chrono>
 #include <cmath>
 #include <filesystem>
@@ -74,6 +76,48 @@ bool run_mci_command(std::wstring_view command, std::string* error = nullptr) {
 
 }  // namespace
 
+void play_settings_adjustment_click(double gain) {
+#ifdef _WIN32
+    const double safe_gain = std::clamp(gain, 0.0, 1.0);
+    if (!(safe_gain > 0.0)) return;
+    constexpr int sample_rate = 48000;
+    constexpr std::size_t frames = sample_rate * audio::SettingsAdjustmentClick::kDurationMs / 1000;
+    constexpr std::size_t data_bytes = frames * 2 * sizeof(std::int16_t);
+    static std::array<unsigned char, 44 + data_bytes> wav{};
+    static std::mutex click_mutex;
+    static double rendered_gain = -1.0;
+    std::lock_guard<std::mutex> lock(click_mutex);
+    if (rendered_gain != safe_gain) {
+        // Stop the previous asynchronous read before replacing its PCM storage.
+        PlaySoundW(nullptr, nullptr, 0);
+        const auto put = [&](std::size_t offset, std::uint32_t value, int bytes) {
+            for (int byte = 0; byte < bytes; ++byte)
+                wav[offset + byte] = static_cast<unsigned char>(value >> (byte * 8));
+        };
+        const auto tag = [&](std::size_t offset, const char* value) {
+            for (std::size_t byte = 0; byte < 4; ++byte) wav[offset + byte] = value[byte];
+        };
+        tag(0, "RIFF"); put(4, 36 + data_bytes, 4); tag(8, "WAVE");
+        tag(12, "fmt "); put(16, 16, 4); put(20, 1, 2); put(22, 2, 2);
+        put(24, sample_rate, 4); put(28, sample_rate * 4, 4); put(32, 4, 2); put(34, 16, 2);
+        tag(36, "data"); put(40, data_bytes, 4);
+        std::array<float, frames * 2> samples{};
+        audio::SettingsAdjustmentClick click;
+        click.trigger(sample_rate);
+        click.mix(samples.data(), static_cast<std::uint32_t>(frames));
+        for (std::size_t sample = 0; sample < samples.size(); ++sample) {
+            const auto pcm = static_cast<std::int16_t>(std::lround(samples[sample] * safe_gain * 32767.0));
+            put(44 + sample * 2, static_cast<std::uint16_t>(pcm), 2);
+        }
+        rendered_gain = safe_gain;
+    }
+    PlaySoundW(reinterpret_cast<const wchar_t*>(wav.data()), nullptr,
+               SND_MEMORY | SND_ASYNC | SND_NODEFAULT);
+#else
+    static_cast<void>(gain);
+#endif
+}
+
 MenuMusicController::~MenuMusicController() {
     stop();
 }
@@ -100,6 +144,17 @@ void MenuMusicController::play_looping_file(const std::string& path, double gain
         close_locked();
         requested_path_ = path;
         gain_ = 0.0;
+        open_failed_ = false;
+        retry_allowed_at_ = {};
+        return;
+    }
+
+    if (output_muted_ && action == menu_music_detail::PlaybackAction::Open) {
+        // Existing sessions can be muted in place, but defer a new file until
+        // focus returns: some MCI drivers cannot recover a session started at 0.
+        close_locked();
+        requested_path_ = path;
+        gain_ = clamped_gain;
         open_failed_ = false;
         retry_allowed_at_ = {};
         return;
@@ -160,6 +215,13 @@ void MenuMusicController::play_looping_file(const std::string& path, double gain
 #endif
 }
 
+void MenuMusicController::set_output_muted(bool muted) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (output_muted_ == muted) return;
+    output_muted_ = muted;
+    apply_gain_locked();
+}
+
 void MenuMusicController::stop() {
     std::lock_guard<std::mutex> lock(mutex_);
     close_locked();
@@ -185,7 +247,8 @@ void MenuMusicController::apply_gain_locked() {
         return;
     }
 
-    const int volume = static_cast<int>(std::lround(std::clamp(gain_, 0.0, 1.0) * 1000.0));
+    const int volume = output_muted_ ? 0 :
+        static_cast<int>(std::lround(std::clamp(gain_, 0.0, 1.0) * 1000.0));
     run_mci_command(L"setaudio " + std::wstring(kMenuMusicAlias) + L" volume to " + std::to_wstring(volume));
 #endif
 }

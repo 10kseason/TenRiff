@@ -87,8 +87,10 @@ void MenuWindow::apply_pending_config() {
             if (previous.display_mode == "windowed" && config_.display_mode == "windowed") {
                 RECT current_rect{};
                 if (GetWindowRect(hwnd, &current_rect)) {
-                    next_x = current_rect.left;
-                    next_y = current_rect.top;
+                    next_x = std::clamp(current_rect.left, monitor.work_rect.left,
+                        std::max(monitor.work_rect.left, monitor.work_rect.right - next_window_size.cx));
+                    next_y = std::clamp(current_rect.top, monitor.work_rect.top,
+                        std::max(monitor.work_rect.top, monitor.work_rect.bottom - next_window_size.cy));
                 }
             }
             SetWindowPos(hwnd,
@@ -168,9 +170,10 @@ void MenuWindow::update_brushes() {
 
     auto* ctx = d2d_->d2d_context.Get();
     ctx->CreateSolidColorBrush(D2D1::ColorF(0xE8ECF1), &d2d_->text_brush);
+    ctx->CreateSolidColorBrush(D2D1::ColorF(0x061118, 0.9f), &d2d_->text_outline_brush);
     ctx->CreateSolidColorBrush(D2D1::ColorF(0x6EE7F2), &d2d_->accent_brush);
     ctx->CreateSolidColorBrush(D2D1::ColorF(0xFF4D6D, 0.38f), &d2d_->judgement_line_brush);
-    ctx->CreateSolidColorBrush(D2D1::ColorF(0x9AA3AD), &d2d_->muted_brush);
+    ctx->CreateSolidColorBrush(D2D1::ColorF(0xB7C4D4), &d2d_->muted_brush);
     ctx->CreateSolidColorBrush(D2D1::ColorF(0x1F2130), &d2d_->card_brush);
     ctx->CreateSolidColorBrush(D2D1::ColorF(0x14141C, 0.72f), &d2d_->panel_brush);
     ctx->CreateSolidColorBrush(D2D1::ColorF(0x0B0B10, 0.75f), &d2d_->footer_brush);
@@ -231,10 +234,10 @@ void MenuWindow::update_brushes() {
         }
     };
 
-    create_button_gradient(0x165CFF, 0x6EE7F2, &d2d_->play_stops, &d2d_->play_brush);
-    create_button_gradient(0x7B2CFF, 0xFF60C8, &d2d_->edit_stops, &d2d_->edit_brush);
-    create_button_gradient(0xFF8C1A, 0xFF4D6D, &d2d_->options_stops, &d2d_->options_brush);
-    create_button_gradient(0xFF2D74, 0xB0003A, &d2d_->exit_stops, &d2d_->exit_brush);
+    create_button_gradient(0xB8E5F5, 0xEDF8FC, &d2d_->play_stops, &d2d_->play_brush);
+    create_button_gradient(0x434343, 0x262626, &d2d_->edit_stops, &d2d_->edit_brush);
+    create_button_gradient(0xEAEAEA, 0xC6E7F3, &d2d_->options_stops, &d2d_->options_brush);
+    create_button_gradient(0x3A3A3A, 0x191919, &d2d_->exit_stops, &d2d_->exit_brush);
 
     D2D1_GRADIENT_STOP stops[2]{};
     stops[0].position = 0.0f;

@@ -1,4 +1,5 @@
 #include "app/RuntimeConfigMigration.h"
+#include "app/JudgeTimingPolicy.h"
 
 #include <algorithm>
 #include <cmath>
@@ -387,8 +388,8 @@ bool migrate_bms_first_runtime_config(config::RuntimeConfig& config) {
     changed = migrate_gauge_table(config.gauge.normal, kPreviousCurrentNormalGaugeV7, kCurrentNormalGauge) ||
               changed;
     changed = migrate_gauge_table(config.gauge.easy, kPreviousCurrentEasyGaugeV7, kCurrentEasyGauge) || changed;
-    if (std::abs(config.judge.indirect_miss_ms - config.judge.bd_ms) > kJudgeWindowToleranceMs) {
-        config.judge.indirect_miss_ms = config.judge.bd_ms;
+    if (std::abs(config.judge.indirect_miss_ms - kCurrentAutomaticMissWindowMs) > kJudgeWindowToleranceMs) {
+        config.judge.indirect_miss_ms = kCurrentAutomaticMissWindowMs;
         changed = true;
     }
 

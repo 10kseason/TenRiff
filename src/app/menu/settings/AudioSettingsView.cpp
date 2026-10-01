@@ -50,6 +50,13 @@ std::string on_off(bool enabled, ui::Language language) {
         enabled ? "켜짐" : "꺼짐");
 }
 
+std::string title_music_label(std::string_view mode, ui::Language language) {
+    if (mode == "none") return localized(language, "None", "없음");
+    if (mode == "random_bms") return localized(language, "Random BMS Music", "랜덤 BMS 음악");
+    if (mode == "last_played") return localized(language, "Last Played Music", "마지막 플레이한 음악");
+    return localized(language, "Default Music", "기본 음악");
+}
+
 std::string format_percent(double value) {
     const int percent = static_cast<int>(
         std::lround(std::clamp(value, 0.0, 2.0) * 100.0));
@@ -122,7 +129,7 @@ AudioSettingsViewModel AudioSettingsView::build(
     ui::Language language) {
     AudioSettingsViewModel view;
     view.rows.reserve(kAudioSettingOrder.size());
-    view.notes.reserve(7);
+    view.notes.reserve(8);
     const bool asio = runtime.audio.backend == audio::AudioBackend::ASIO;
 
     view.rows.push_back(make_row(
@@ -131,7 +138,7 @@ AudioSettingsViewModel AudioSettingsView::build(
         localized(language, "Preset", "프리셋"),
         preset_label(runtime.audio_ui.preset, language),
         controller,
-        false,
+        !asio,
         !asio));
     view.rows.push_back(make_row(
         AudioSettingId::KeysoundMode,
@@ -139,7 +146,7 @@ AudioSettingsViewModel AudioSettingsView::build(
         localized(language, "Keysound Mode", "키음 모드"),
         keysound_policy_label(runtime.audio_ui.bms_keysound_policy, language),
         controller,
-        false,
+        true,
         true));
     view.rows.push_back(make_row(
         AudioSettingId::BackgroundSound,
@@ -147,8 +154,16 @@ AudioSettingsViewModel AudioSettingsView::build(
         localized(language, "Background Sound", "배경음"),
         on_off(runtime.audio_ui.background_sound_enabled, language),
         controller,
-        false,
+        true,
         true));
+    view.rows.push_back(make_row(
+        AudioSettingId::MuteWhenInactive, SettingsRowKind::Toggle,
+        localized(language, "Mute When Inactive", "창 비활성화 시 음소거"),
+        on_off(runtime.audio_ui.mute_when_inactive, language), controller, true, true));
+    view.rows.push_back(make_row(
+        AudioSettingId::TitleMusic, SettingsRowKind::Choice,
+        localized(language, "Title Music", "타이틀 음악"),
+        title_music_label(runtime.audio_ui.title_music, language), controller, true, true));
     view.rows.push_back(make_slider_row(
         AudioSettingId::MasterVolume,
         localized(language, "Master Volume", "마스터 볼륨"),
@@ -175,7 +190,7 @@ AudioSettingsViewModel AudioSettingsView::build(
     view.rows.push_back(make_row(
         AudioSettingId::Normalize, SettingsRowKind::Toggle,
         localized(language, "Normalize Audio", "오디오 노멀라이즈"),
-        on_off(runtime.audio_ui.normalize_audio, language), controller, false, true));
+        on_off(runtime.audio_ui.normalize_audio, language), controller, true, true));
     view.notes.push_back(localized(language,
         "Normalize Audio gently levels the gameplay mix. OFF preserves the original mix; master volume still applies.",
         "노멀라이즈는 인게임 음량을 완만하게 보정합니다. OFF는 원래 믹스를 유지하며 마스터 볼륨은 그대로 적용됩니다."));
@@ -205,8 +220,8 @@ AudioSettingsViewModel AudioSettingsView::build(
         std::to_string(runtime.audio.sample_rate) + " Hz", controller, asio, asio));
     view.rows.push_back(make_row(
         AudioSettingId::BufferFrames, SettingsRowKind::Choice,
-        localized(language, "ASIO Buffer", "ASIO 버퍼"),
-        std::to_string(runtime.audio.frames_per_buffer) + localized(language, " frames", " 프레임"),
+        localized(language, "ASIO Buffer Size", "ASIO 버퍼 사이즈"),
+        std::to_string(runtime.audio.frames_per_buffer) + localized(language, " samples", " 샘플"),
         controller, asio, asio));
     view.rows.push_back(make_row(
         AudioSettingId::Back,
@@ -239,9 +254,47 @@ AudioSettingsViewModel AudioSettingsView::build(
         "ASIO는 선택한 설치 드라이버의 첫 스테레오 출력을 사용합니다. 버퍼는 드라이버의 지원값으로 맞춥니다. F5로 드라이버 목록을 새로고침하며 WASAPI 프리셋은 ASIO에 적용되지 않습니다."));
     view.notes.push_back(localized(
         language,
+        "Mute When Inactive silences all game audio while another window is active. Saved volume and song timing stay unchanged.",
+        "창 비활성화 시 음소거는 다른 창을 사용할 때 게임 소리를 끕니다. 저장한 음량과 곡 타이밍은 유지됩니다."));
+    view.notes.push_back(localized(
+        language,
         "Use Left/Right or click a volume slider to change it. Back saves and returns.",
         "좌우 키나 볼륨 슬라이더를 클릭해 변경합니다. 뒤로 가면 저장 후 돌아갑니다."));
+    view.notes.push_back(localized(language,
+        "Title Music: Random BMS picks one library chart per title visit. Last Played remembers the last game across launches. Unavailable charts use default music; chart music loops up to five minutes including keysounds.",
+        "타이틀 음악: 랜덤 BMS는 타이틀에 올 때 라이브러리에서 한 곡을 고릅니다. 마지막 플레이 곡은 재실행 후에도 유지됩니다. 곡을 읽지 못하면 기본 음악을 재생하며, 차트 음악은 키음 포함 최대 5분을 반복합니다."));
 
+    std::sort(view.rows.begin(), view.rows.end(), [](const auto& left, const auto& right) {
+        return audio_setting_index(left.id).value_or(kAudioSettingOrder.size()) <
+               audio_setting_index(right.id).value_or(kAudioSettingOrder.size());
+    });
+    for (auto& row : view.rows) {
+        switch (row.id) {
+            case AudioSettingId::KeysoundMode:
+            case AudioSettingId::BackgroundSound:
+            case AudioSettingId::TitleMusic:
+            case AudioSettingId::MuteWhenInactive:
+                row.category = localized(language, "Playback", "재생");
+                break;
+            case AudioSettingId::MasterVolume:
+            case AudioSettingId::BgmVolume:
+            case AudioSettingId::KeysoundVolume:
+            case AudioSettingId::Normalize:
+                row.category = localized(language, "Volume", "음량");
+                break;
+            case AudioSettingId::SoundOffset:
+                row.category = localized(language, "Timing", "타이밍");
+                break;
+            case AudioSettingId::Preset:
+            case AudioSettingId::Backend:
+            case AudioSettingId::AsioDriver:
+            case AudioSettingId::SampleRate:
+            case AudioSettingId::BufferFrames:
+                row.category = localized(language, "Output Device", "출력 장치");
+                break;
+            case AudioSettingId::Back: break;
+        }
+    }
     return view;
 }
 

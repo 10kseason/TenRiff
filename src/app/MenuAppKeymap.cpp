@@ -47,14 +47,19 @@ void MenuApp::populate_keymap_render_data(render::MenuRenderData& render) {
         timing::HighResClock::now_ns(),
         ui_language());
     render.generic.footer_reserved_lines = view.footer_reserved_lines;
+    render.generic.keymap_keyboard = true;
+    render.generic.keymap_secondary_selected = keymap_settings_controller_.secondary_selected();
+    render.generic.keymap_capture_active = keymap_settings_controller_.capture_active();
+    int keymap_row_index = 0;
     for (auto& source : view.rows) {
-        render::MenuHitTargetKind target_kind = render::MenuHitTargetKind::None;
-        int row_index = 0;
-        bool activatable = false;
+        render::MenuHitTargetKind target_kind = render::MenuHitTargetKind::SettingsRow;
+        int row_index = keymap_row_index++;
+        bool activatable = !keymap_settings_controller_.capture_active();
         if (source.action.has_value()) {
             target_kind = render::MenuHitTargetKind::KeymapButton;
             row_index = static_cast<int>(*source.action);
-            activatable = !keymap_settings_controller_.capture_active();
+            activatable = !keymap_settings_controller_.capture_active() ||
+                *source.action == menu::settings::KeymapActionId::Back;
         }
         append_menu_row(render.generic,
                         std::move(source.label),
@@ -64,6 +69,11 @@ void MenuApp::populate_keymap_render_data(render::MenuRenderData& render) {
                         row_index,
                         activatable,
                         false);
+        render.generic.rows.back().secondary_value = std::move(source.secondary_value);
+        if (row_index == 0 && target_kind == render::MenuHitTargetKind::SettingsRow) {
+            auto& row = render.generic.rows.back();
+            row.adjustable = row.increment_enabled = row.decrement_enabled = activatable;
+        }
     }
     render.generic.footer_notes = std::move(view.footer_notes);
 }
@@ -80,6 +90,8 @@ void MenuApp::populate_keymap_test_render_data(render::MenuRenderData& render) {
         current_input_backend_status_label(),
         ui_language());
     render.generic.footer_reserved_lines = view.footer_reserved_lines;
+    render.generic.keymap_keyboard = true;
+    render.generic.keymap_test = true;
     for (auto& source : view.rows) {
         const bool is_back = source.action == menu::settings::KeymapActionId::Back;
         append_menu_row(render.generic,
@@ -91,6 +103,7 @@ void MenuApp::populate_keymap_test_render_data(render::MenuRenderData& render) {
                         0,
                         is_back,
                         false);
+        render.generic.rows.back().secondary_value = std::move(source.secondary_value);
     }
     render.generic.footer_notes = std::move(view.footer_notes);
 }
@@ -155,7 +168,10 @@ void MenuApp::apply_keymap_capture(uint32_t keycode) {
     }
 
     const std::string key_name = config::KeycodeMap::to_name(keycode);
-    if ((key_delete_ != 0 && keycode == key_delete_) || key_name == "Delete") {
+    const bool secondary_slot = keymap_settings_controller_.secondary_selected();
+    const bool clear_secondary = secondary_slot &&
+        ((key_delete_ != 0 && keycode == key_delete_) || key_name == "Delete");
+    if (!secondary_slot && ((key_delete_ != 0 && keycode == key_delete_) || key_name == "Delete")) {
         apply_keymap_settings_effects(keymap_settings_controller_.cancel_capture());
         return;
     }
@@ -168,8 +184,11 @@ void MenuApp::apply_keymap_capture(uint32_t keycode) {
     const std::string edit_mode(keymap_settings_controller_.edit_mode());
     config::KeymapManager manager;
     config::Keymap pending = working_keymap_;
-    pending.mode_bindings[edit_mode][lane] = key_name;
-    if (edit_mode == "10k") {
+    if (secondary_slot) {
+        if (clear_secondary) pending.secondary_mode_bindings[edit_mode].erase(lane);
+        else pending.secondary_mode_bindings[edit_mode][lane] = key_name;
+    } else pending.mode_bindings[edit_mode][lane] = key_name;
+    if (!secondary_slot && edit_mode == "10k") {
         pending.bindings = pending.mode_bindings[edit_mode];
     }
 
@@ -185,7 +204,9 @@ void MenuApp::apply_keymap_capture(uint32_t keycode) {
     working_keymap_ = pending;
     keymap_ = pending;
     apply_keymap_settings_effects(keymap_settings_controller_.finish_capture(
-        ui_text("Saved ", "저장됨: ") + lane + " = " + key_name,
+        ui_text("Saved ", "저장됨: ") + "Key " + lane.substr(4) +
+            (secondary_slot ? ui_text(" secondary = ", " 보조 = ") : " = ") +
+            (clear_secondary ? ui_text("Unassigned", "미할당") : key_name),
         timing::HighResClock::now_ns()));
 }
 
@@ -223,6 +244,8 @@ void MenuApp::apply_keymap_settings_effects(
     if (effects.menu.navigate_back && !pop_screen()) {
         reset_screen(Screen::OptionsHub);
     }
+    if (effects.reset_bindings) apply_keymap_reset();
+    if (effects.open_nkro_test) push_screen(Screen::KeymapTest);
     if (effects.refresh_input_scope) {
         refresh_menu_input_polling_scope();
     }

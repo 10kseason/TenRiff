@@ -964,7 +964,9 @@ void MenuApp::handle_multiplayer_input(uint32_t keycode) {
                 static_cast<int>(peer.rate_milli) + direction * static_cast<int>(network::kPeerRateStepMilli),
                 static_cast<int>(network::kPeerMinRateMilli), static_cast<int>(network::kPeerMaxRateMilli)));
             if (rate != peer.rate_milli) {
-                multiplayer_status_message_ = peer_session_.set_rate(rate)
+                const bool changed = peer_session_.set_rate(rate);
+                if (changed) play_settings_adjustment_click(menu_output_master_gain());
+                multiplayer_status_message_ = changed
                     ? ui_text("Room Rate updated; every player must Ready again.",
                               "대전 Rate를 변경합니다. 모두 다시 준비해 주세요.")
                     : ui_text("Rate change was rejected.", "Rate 변경이 거부되었습니다.");

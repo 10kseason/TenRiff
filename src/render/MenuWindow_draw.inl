@@ -48,9 +48,15 @@ void MenuWindow::draw(const MenuRenderData& data) {
             native_skin_metric_minimum(key), 8192) : fallback;
     };
     auto native_palette = [&](const char* key, const D2D1_COLOR_F& fallback) -> D2D1_COLOR_F {
-        if (!native_overrides || native_style.colors.empty()) return fallback;
+        auto base = fallback;
+        if (data.kind != MenuScreenKind::GameplayHud) {
+            const auto byte = [](float value) { return static_cast<uint32_t>(std::lround(value * 255.0f)); };
+            const auto rgb = (byte(base.r) << 16) | (byte(base.g) << 8) | byte(base.b);
+            base = D2D1::ColorF(native_menu_default_rgb(rgb), base.a);
+        }
+        if (!native_overrides || native_style.colors.empty()) return base;
         const auto it = native_style.colors.find(key);
-        if (it == native_style.colors.end()) return fallback;
+        if (it == native_style.colors.end()) return base;
         const auto& rgba = it->second;
         return D2D1::ColorF(rgba[0], rgba[1], rgba[2], rgba[3] * fallback.a);
     };
@@ -141,7 +147,7 @@ void MenuWindow::draw(const MenuRenderData& data) {
     set_theme_color(d2d_->text_brush.Get(), "text", D2D1::ColorF(0xE8ECF1));
     set_theme_color(d2d_->accent_brush.Get(), "accent", D2D1::ColorF(0x6EE7F2));
     set_theme_color(d2d_->judgement_line_brush.Get(), "judgement_line", D2D1::ColorF(0xFF4D6D, 0.38f));
-    set_theme_color(d2d_->muted_brush.Get(), "muted", D2D1::ColorF(0x9AA3AD));
+    set_theme_color(d2d_->muted_brush.Get(), "muted", D2D1::ColorF(0xB7C4D4));
     set_theme_color(d2d_->card_brush.Get(), "card", D2D1::ColorF(0x1F2130));
     set_theme_color(d2d_->panel_brush.Get(), "panel", D2D1::ColorF(0x14141C, 0.72f));
     set_theme_color(d2d_->footer_brush.Get(), "footer", D2D1::ColorF(0x0B0B10, 0.75f));
@@ -157,15 +163,24 @@ void MenuWindow::draw(const MenuRenderData& data) {
          data.kind == MenuScreenKind::ResultScreen ||
          data.kind == MenuScreenKind::BmsEditor);
     const bool modern_menu_screen = modern_library_screen || modern_settings_screen || modern_title_screen;
+    const std::string title_background_path = modern_title_screen && data.lobby_skin.background_path.empty()
+        ? built_in_title_background_path() : std::string{};
+    if (!title_background_path.empty()) static_cast<void>(load_song_card_preview_bitmap(title_background_path));
+    ID2D1Bitmap* title_background = find_song_card_preview_bitmap(title_background_path);
+    const bool has_title_art = title_background != nullptr;
 #include "MenuWindow_draw_native_motion.inl"
-    if (modern_menu_screen) {
-        set_theme_color(d2d_->text_brush.Get(), "text", D2D1::ColorF(0xEDF2F7));
-        set_theme_color(d2d_->muted_brush.Get(), "muted", D2D1::ColorF(0xA1ADBD));
-        set_theme_color(d2d_->panel_brush.Get(), "panel", D2D1::ColorF(0x151C27));
-        set_theme_color(d2d_->card_brush.Get(), "card", D2D1::ColorF(0x202C3B));
-        set_theme_color(d2d_->button_border_brush.Get(), "border", D2D1::ColorF(0x344357));
-        set_theme_color(d2d_->button_brush.Get(), "button", D2D1::ColorF(0x1B2634));
+    if (data.kind != MenuScreenKind::GameplayHud) {
+        set_theme_color(d2d_->text_brush.Get(), "text", D2D1::ColorF(0xF5F5F5));
+        set_theme_color(d2d_->accent_brush.Get(), "accent", D2D1::ColorF(0xB8E5F5));
+        set_theme_color(d2d_->muted_brush.Get(), "muted", D2D1::ColorF(0xC2C2C2));
+        set_theme_color(d2d_->panel_brush.Get(), "panel", D2D1::ColorF(0x171717));
+        set_theme_color(d2d_->card_brush.Get(), "card", D2D1::ColorF(0x272727));
+        set_theme_color(d2d_->footer_brush.Get(), "footer", D2D1::ColorF(0x090909, 0.9f));
+        set_theme_color(d2d_->button_border_brush.Get(), "border", D2D1::ColorF(0x656565));
+        set_theme_color(d2d_->button_brush.Get(), "button", D2D1::ColorF(0x222222));
+        set_theme_color(d2d_->button_selected_brush.Get(), "button_selected", D2D1::ColorF(0xB8E5F5, 0.22f));
     }
+    MenuRenderData* skin_preview_scene = nullptr;
     const bool has_menu_scene = !modern_menu_screen &&
         render_menu_scene(data.kind, render_now_ns, data.lobby_skin);
     if (data.kind == MenuScreenKind::GameplayHud) {
@@ -180,32 +195,20 @@ void MenuWindow::draw(const MenuRenderData& data) {
         }
     } else if (data.kind == MenuScreenKind::GenericList &&
                data.generic.skin_preview.visible) {
-        // The live skin preview uses the same imported head/body/tail sprite
-        // cache as gameplay so LR2/TenRiff LN art is not replaced by placeholders.
-        GameplayHudData preview_sprite_data;
-        preview_sprite_data.lane_count = data.generic.skin_preview.lane_count;
-        preview_sprite_data.note_border_enabled =
-            data.generic.skin_preview.note_border_enabled;
-        preview_sprite_data.note_outline_opacity = data.generic.skin_preview.note_outline_opacity;
-        preview_sprite_data.note_shape = data.generic.skin_preview.note_shape;
-        preview_sprite_data.note_image_aspect =
-            data.generic.skin_preview.note_image_aspect;
-        preview_sprite_data.skin_source = data.generic.skin_preview.skin_source;
-        preview_sprite_data.external_skin_root =
-            data.generic.skin_preview.external_skin_root;
-        preview_sprite_data.external_skin_name =
-            data.generic.skin_preview.external_skin_name;
-        preview_sprite_data.skin_revision = data.generic.skin_preview.skin_revision;
-        preview_sprite_data.resolved_tenriff_skin =
-            data.generic.skin_preview.resolved_tenriff_skin;
-        preview_sprite_data.lr2_resolution_override =
-            data.generic.skin_preview.lr2_resolution_override;
-        preview_sprite_data.lane_colors = data.generic.skin_preview.lane_colors;
-        preview_sprite_data.lane_color_count = static_cast<std::size_t>(std::clamp(
-            data.generic.skin_preview.lane_count, 1, static_cast<int>(kGameplayHudMaxLanes)));
-        if (!ensure_gameplay_note_sprites(preview_sprite_data)) {
+        // Allocate only for Skin Settings; gameplay keeps its existing hot path.
+        if (!d2d_->skin_preview_scene) d2d_->skin_preview_scene = std::make_unique<MenuRenderData>();
+        skin_preview_scene = d2d_->skin_preview_scene.get();
+        if (skin_preview_scene->ui_language != data.ui_language ||
+            skin_preview_scene->gameplay.title != data.generic.skin_preview.mode_label)
+            skin_preview_hud_cache_.text_revision = 0;
+        skin_preview_scene->kind = MenuScreenKind::GameplayHud;
+        skin_preview_scene->ui_language = data.ui_language;
+        skin_preview_scene->gameplay = make_skin_gameplay_preview(data.generic.skin_preview);
+        if (!ensure_gameplay_note_sprites(skin_preview_scene->gameplay))
             invalidate_gameplay_note_sprite_cache();
-        }
+        if (!ensure_gameplay_static_cache(skin_preview_scene->gameplay, false))
+            invalidate_gameplay_static_cache();
+        static_cast<void>(load_song_card_preview_bitmap(skin_preview_scene->gameplay.skin_background_path));
     } else if (data.kind == MenuScreenKind::SongSelect) {
         update_song_select_preview_loading_state(data.song_select, render_now_ns);
         pump_song_select_preview_loads(data.song_select, render_now_ns);
@@ -280,6 +283,13 @@ void MenuWindow::draw(const MenuRenderData& data) {
 
     const D2D1_RECT_F full_screen_rect =
         D2D1::RectF(0.0f, 0.0f, kBaseWidth, kBaseHeight);
+    if (title_background) {
+        const auto source = centered_bitmap_source_rect(title_background->GetSize(), full_screen_rect);
+        // Preserve the supplied artwork's original color; opaque menu surfaces
+        // provide text contrast locally without a global tint over the image.
+        ctx->DrawBitmap(title_background, full_screen_rect, 1.0f,
+                        D2D1_BITMAP_INTERPOLATION_MODE_LINEAR, &source);
+    }
     if (data.kind != MenuScreenKind::GameplayHud && data.lobby_skin.enabled) {
         if (ID2D1Bitmap* bitmap = find_song_card_preview_bitmap(data.lobby_skin.background_path)) {
             const D2D1_RECT_F source_rect =
@@ -310,7 +320,7 @@ void MenuWindow::draw(const MenuRenderData& data) {
                 d2d_->gameplay_background_base_bitmap->GetSize(), background_rect);
             ctx->DrawBitmap(d2d_->gameplay_background_base_bitmap.Get(),
                             background_rect,
-                            0.72f,
+                            1.0f,
                             D2D1_BITMAP_INTERPOLATION_MODE_LINEAR,
                             &source_rect);
         }
@@ -319,21 +329,17 @@ void MenuWindow::draw(const MenuRenderData& data) {
                 d2d_->gameplay_background_overlay_bitmap->GetSize(), background_rect);
             ctx->DrawBitmap(d2d_->gameplay_background_overlay_bitmap.Get(),
                             background_rect,
-                            0.82f,
+                            1.0f,
                             D2D1_BITMAP_INTERPOLATION_MODE_LINEAR,
                             &source_rect);
         }
-        if ((d2d_->gameplay_background_base_bitmap ||
-             d2d_->gameplay_background_overlay_bitmap) &&
-            d2d_->panel_brush) {
-            const float saved_opacity = d2d_->panel_brush->GetOpacity();
-            d2d_->panel_brush->SetOpacity(0.30f);
-            ctx->FillRectangle(background_rect, d2d_->panel_brush.Get());
-            d2d_->panel_brush->SetOpacity(saved_opacity);
-        }
+        // BGA brightness belongs to the source image/video. The lane field is
+        // drawn separately; readability must not dim the entire animation.
     }
 
-    if (d2d_->glow_brush && !modern_menu_screen) {
+    const bool visible_gameplay_bga = data.kind == MenuScreenKind::GameplayHud &&
+        (d2d_->gameplay_background_base_bitmap || d2d_->gameplay_background_overlay_bitmap);
+    if (d2d_->glow_brush && !modern_menu_screen && !visible_gameplay_bga) {
         const float saved_opacity = d2d_->glow_brush->GetOpacity();
         if (has_menu_scene) {
             d2d_->glow_brush->SetOpacity(data.kind == MenuScreenKind::TitleMenu ? 0.26f : 0.14f);
@@ -366,6 +372,72 @@ void MenuWindow::draw(const MenuRenderData& data) {
         hit_regions_.push_back(HitRegion{kind, index, part, rect.left, rect.top, rect.right, rect.bottom});
     };
 
+    // One contour policy also covers prebuilt layouts, ellipsis, overlays and
+    // animated logos. Dark button labels get a light contour; light labels get
+    // a dark one. Preserve the original fill and its fade/disabled opacity.
+    auto draw_text_layout_readable = [&](D2D1_POINT_2F origin,
+                                         IDWriteTextLayout* layout,
+                                         ID2D1Brush* brush,
+                                         D2D1_DRAW_TEXT_OPTIONS options = D2D1_DRAW_TEXT_OPTIONS_NONE,
+                                         bool contour = true) {
+        if (!layout || !brush) return;
+        auto* outline = d2d_->text_outline_brush.Get();
+        if (outline && contour) {
+            Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> solid;
+            D2D1_COLOR_F fill = D2D1::ColorF(0xFFFFFF);
+            if (SUCCEEDED(brush->QueryInterface(IID_PPV_ARGS(solid.GetAddressOf())))) fill = solid->GetColor();
+            const float luminance = 0.2126f * fill.r + 0.7152f * fill.g + 0.0722f * fill.b;
+            outline->SetColor(D2D1::ColorF(luminance < 0.35f ? 0xEAF3FD : 0x061118,
+                                         0.9f * fill.a));
+            outline->SetOpacity(brush->GetOpacity());
+            const float stroke = layout->GetFontSize() >= 36.0f ? 1.1f : 0.85f;
+            const D2D1_POINT_2F offsets[] = {{-stroke, 0}, {stroke, 0}, {0, -stroke}, {0, stroke}};
+            for (const auto offset : offsets)
+                ctx->DrawTextLayout(D2D1::Point2F(origin.x + offset.x, origin.y + offset.y),
+                                    layout, outline, options);
+        }
+        ctx->DrawTextLayout(origin, layout, brush, options);
+    };
+    std::size_t menu_text_slot = 0;
+    auto draw_text_exact = [&](const wchar_t* text, UINT32 length,
+                               IDWriteTextFormat* format, const D2D1_RECT_F& rect,
+                               ID2D1Brush* brush,
+                               D2D1_DRAW_TEXT_OPTIONS options = D2D1_DRAW_TEXT_OPTIONS_NONE,
+                               DWRITE_MEASURING_MODE = DWRITE_MEASURING_MODE_NATURAL) {
+        const float width = rect.right - rect.left, height = rect.bottom - rect.top;
+        if (!text || !length || !format || !brush || width <= 0 || height <= 0) return;
+        D2DResources::ReadableTextLayout transient;
+        auto& cached = menu_text_slot < d2d_->menu_readable_text.size()
+            ? d2d_->menu_readable_text[menu_text_slot++] : transient;
+        const auto alignment = format->GetTextAlignment();
+        const auto paragraph = format->GetParagraphAlignment();
+        const auto wrapping = format->GetWordWrapping();
+        DWRITE_TRIMMING trimming{};
+        Microsoft::WRL::ComPtr<IDWriteInlineObject> trimming_sign;
+        format->GetTrimming(&trimming, trimming_sign.GetAddressOf());
+        DWRITE_LINE_SPACING_METHOD line_method{};
+        float line_spacing = 0, baseline = 0;
+        format->GetLineSpacing(&line_method, &line_spacing, &baseline);
+        // Callers temporarily change shared formats for centered buttons,
+        // wrapped tips and metadata ellipsis. A pointer alone cannot key those.
+        if (!cached.layout || std::wstring_view(cached.text) != std::wstring_view(text, length) ||
+            cached.format.Get() != format || cached.width != width || cached.height != height ||
+            cached.alignment != alignment || cached.paragraph != paragraph || cached.wrapping != wrapping ||
+            cached.trimming.granularity != trimming.granularity || cached.trimming.delimiter != trimming.delimiter ||
+            cached.trimming.delimiterCount != trimming.delimiterCount || cached.trimming_sign.Get() != trimming_sign.Get() ||
+            cached.line_spacing_method != line_method || cached.line_spacing != line_spacing || cached.baseline != baseline) {
+            cached.layout.Reset();
+            if (FAILED(d2d_->dwrite_factory->CreateTextLayout(text, length, format, width, height,
+                cached.layout.ReleaseAndGetAddressOf()))) return;
+            cached.text.assign(text, length); cached.format = format;
+            cached.width = width; cached.height = height; cached.alignment = alignment;
+            cached.paragraph = paragraph; cached.wrapping = wrapping; cached.trimming = trimming;
+            cached.trimming_sign = trimming_sign; cached.line_spacing_method = line_method;
+            cached.line_spacing = line_spacing; cached.baseline = baseline;
+        }
+        draw_text_layout_readable(D2D1::Point2F(rect.left, rect.top), cached.layout.Get(), brush, options);
+    };
+
     auto draw_text_clipped = [&](const std::wstring& text,
                                  IDWriteTextFormat* format,
                                  const D2D1_RECT_F& rect,
@@ -382,7 +454,7 @@ void MenuWindow::draw(const MenuRenderData& data) {
                                            text, format->GetFontSize(), width, height)
                                      : 1.0f;
         if (text_scale >= 0.995f) {
-            ctx->DrawText(text.c_str(), static_cast<UINT32>(text.size()),
+            draw_text_exact(text.c_str(), static_cast<UINT32>(text.size()),
                           format, rect, brush, D2D1_DRAW_TEXT_OPTIONS_CLIP,
                           DWRITE_MEASURING_MODE_NATURAL);
             return;
@@ -398,7 +470,7 @@ void MenuWindow::draw(const MenuRenderData& data) {
             rect.top,
             rect.left + width / text_scale,
             rect.top + height / text_scale);
-        ctx->DrawText(text.c_str(), static_cast<UINT32>(text.size()),
+        draw_text_exact(text.c_str(), static_cast<UINT32>(text.size()),
                       format, expanded_rect, brush, D2D1_DRAW_TEXT_OPTIONS_CLIP,
                       DWRITE_MEASURING_MODE_NATURAL);
         ctx->SetTransform(saved_transform);
@@ -412,9 +484,10 @@ void MenuWindow::draw(const MenuRenderData& data) {
         if (text.empty() || !format || !brush) {
             return;
         }
+        const auto saved_alignment = format->GetTextAlignment();
         format->SetTextAlignment(alignment);
         draw_text_clipped(text, format, rect, brush);
-        format->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_LEADING);
+        format->SetTextAlignment(saved_alignment);
     };
 
 #include "MenuWindow_draw_wordmark.inl"
@@ -748,7 +821,7 @@ void MenuWindow::draw(const MenuRenderData& data) {
         const std::wstring title_w = L"FRAME PACING";
         if (d2d_->body_format && d2d_->text_brush) {
             d2d_->body_format->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_LEADING);
-            ctx->DrawText(title_w.c_str(), static_cast<UINT32>(title_w.size()),
+            draw_text_exact(title_w.c_str(), static_cast<UINT32>(title_w.size()),
                           d2d_->body_format.Get(),
                           D2D1::RectF(panel_rect.left + 24.0f, panel_rect.top + 16.0f,
                                       panel_rect.right - 140.0f, panel_rect.top + 48.0f),
@@ -860,7 +933,7 @@ void MenuWindow::draw(const MenuRenderData& data) {
 
         if (d2d_->mono_format && d2d_->muted_brush) {
             d2d_->mono_format->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_TRAILING);
-            ctx->DrawText(performance_overlay_cache_.sample_text.c_str(),
+            draw_text_exact(performance_overlay_cache_.sample_text.c_str(),
                           static_cast<UINT32>(performance_overlay_cache_.sample_text.size()),
                           d2d_->mono_format.Get(),
                           D2D1::RectF(panel_rect.left + 160.0f, panel_rect.top + 16.0f,
@@ -881,7 +954,7 @@ void MenuWindow::draw(const MenuRenderData& data) {
             const std::wstring waiting_w = L"Collecting frame samples...";
             if (d2d_->hud_format && d2d_->muted_brush) {
                 d2d_->hud_format->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_CENTER);
-                ctx->DrawText(waiting_w.c_str(), static_cast<UINT32>(waiting_w.size()),
+                draw_text_exact(waiting_w.c_str(), static_cast<UINT32>(waiting_w.size()),
                               d2d_->hud_format.Get(), graph_rect, d2d_->muted_brush.Get());
                 d2d_->hud_format->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_LEADING);
             }
@@ -912,13 +985,13 @@ void MenuWindow::draw(const MenuRenderData& data) {
         }
 
         if (d2d_->mono_format && d2d_->muted_brush) {
-            ctx->DrawText(performance_overlay_cache_.top_label_text.c_str(),
+            draw_text_exact(performance_overlay_cache_.top_label_text.c_str(),
                           static_cast<UINT32>(performance_overlay_cache_.top_label_text.size()),
                           d2d_->mono_format.Get(),
                           D2D1::RectF(graph_rect.left + 12.0f, graph_rect.top + 6.0f,
                                       graph_rect.left + 130.0f, graph_rect.top + 28.0f),
                           d2d_->muted_brush.Get());
-            ctx->DrawText(performance_overlay_cache_.avg_label_text.c_str(),
+            draw_text_exact(performance_overlay_cache_.avg_label_text.c_str(),
                           static_cast<UINT32>(performance_overlay_cache_.avg_label_text.size()),
                           d2d_->mono_format.Get(),
                           D2D1::RectF(graph_rect.right - 160.0f, avg_line_y - 18.0f,
@@ -945,12 +1018,12 @@ void MenuWindow::draw(const MenuRenderData& data) {
                 const D2D1_RECT_F value_rect =
                     D2D1::RectF(cell_rect.right - 78.0f, cell_rect.top, cell_rect.right, cell_rect.bottom);
                 if (d2d_->body_format && d2d_->muted_brush) {
-                    ctx->DrawText(label, static_cast<UINT32>(wcslen(label)),
+                    draw_text_exact(label, static_cast<UINT32>(wcslen(label)),
                                   d2d_->body_format.Get(), label_rect, d2d_->muted_brush.Get());
                 }
                 if (d2d_->mono_format && d2d_->text_brush) {
                     d2d_->mono_format->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_TRAILING);
-                    ctx->DrawText(value_text.c_str(), static_cast<UINT32>(value_text.size()),
+                    draw_text_exact(value_text.c_str(), static_cast<UINT32>(value_text.size()),
                                   d2d_->mono_format.Get(), value_rect, d2d_->text_brush.Get());
                     d2d_->mono_format->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_LEADING);
                 }
@@ -992,12 +1065,12 @@ void MenuWindow::draw(const MenuRenderData& data) {
             const D2D1_RECT_F value_rect =
                 D2D1::RectF(panel_rect.left + 180.0f, top, panel_rect.right - 24.0f, top + row_height);
             if (d2d_->stats_label_format && d2d_->muted_brush) {
-                ctx->DrawText(kPerfRowLabels[i], static_cast<UINT32>(wcslen(kPerfRowLabels[i])),
+                draw_text_exact(kPerfRowLabels[i], static_cast<UINT32>(wcslen(kPerfRowLabels[i])),
                               d2d_->stats_label_format.Get(), label_rect, d2d_->muted_brush.Get());
             }
             if (d2d_->stats_value_format && d2d_->text_brush) {
                 const std::wstring& value_text = performance_overlay_cache_.value_texts[static_cast<std::size_t>(i)];
-                ctx->DrawText(value_text.c_str(), static_cast<UINT32>(value_text.size()),
+                draw_text_exact(value_text.c_str(), static_cast<UINT32>(value_text.size()),
                               d2d_->stats_value_format.Get(), value_rect, d2d_->text_brush.Get());
             }
         }
@@ -1017,7 +1090,7 @@ void MenuWindow::draw(const MenuRenderData& data) {
         }
         if (d2d_->body_format && d2d_->text_brush) {
             const std::wstring gameplay_title_w = L"GAMEPLAY TIMING";
-            ctx->DrawText(gameplay_title_w.c_str(),
+            draw_text_exact(gameplay_title_w.c_str(),
                           static_cast<UINT32>(gameplay_title_w.size()),
                           d2d_->body_format.Get(),
                           D2D1::RectF(panel_rect.left + 24.0f, section_top, panel_rect.right - 24.0f, section_top + 28.0f),
@@ -1032,7 +1105,7 @@ void MenuWindow::draw(const MenuRenderData& data) {
             const D2D1_RECT_F value_rect =
                 D2D1::RectF(panel_rect.left + 180.0f, top, panel_rect.right - 24.0f, top + row_height);
             if (d2d_->stats_label_format && d2d_->muted_brush) {
-                ctx->DrawText(kGameplayTimingLabels[i],
+                draw_text_exact(kGameplayTimingLabels[i],
                               static_cast<UINT32>(wcslen(kGameplayTimingLabels[i])),
                               d2d_->stats_label_format.Get(),
                               label_rect,
@@ -1041,13 +1114,19 @@ void MenuWindow::draw(const MenuRenderData& data) {
             if (d2d_->stats_value_format && d2d_->text_brush) {
                 const std::wstring& value_text =
                     performance_overlay_cache_.gameplay_value_texts[static_cast<std::size_t>(i)];
-                ctx->DrawText(value_text.c_str(),
+                draw_text_exact(value_text.c_str(),
                               static_cast<UINT32>(value_text.size()),
                               d2d_->stats_value_format.Get(),
                               value_rect,
                               d2d_->text_brush.Get());
             }
         }
+    };
+
+    // Both play and the Skin Settings thumbnail draw the same scene in 1920x1080
+    // coordinates. Only the enclosing transform changes in the thumbnail.
+    auto draw_gameplay_hud = [&](const MenuRenderData& data, bool is_skin_preview = false) {
+#include "MenuWindow_draw_gameplay_body.inl"
     };
 
     auto draw_generic_list = [&]() {
@@ -1080,10 +1159,6 @@ void MenuWindow::draw(const MenuRenderData& data) {
 
     auto draw_result_screen = [&]() {
 #include "MenuWindow_draw_result_body.inl"
-    };
-
-    auto draw_gameplay_hud = [&]() {
-#include "MenuWindow_draw_gameplay_body.inl"
     };
 
     auto draw_bms_editor = [&]() {
@@ -1150,7 +1225,7 @@ void MenuWindow::draw(const MenuRenderData& data) {
             draw_result_screen();
             break;
         case MenuScreenKind::GameplayHud:
-            draw_gameplay_hud();
+            draw_gameplay_hud(data);
             break;
         case MenuScreenKind::BmsEditor:
             draw_bms_editor();

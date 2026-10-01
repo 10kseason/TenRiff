@@ -31,6 +31,7 @@ std::string song_index_stage_label(SongIndexProgressStage stage, ui::Language la
 std::string format_eta_seconds(int64_t seconds);
 std::string format_int_with_commas(int64_t value);
 bool song_entry_matches_search(const SongEntry& entry, std::string_view query);
+bool song_entry_matches_table_scope(const SongEntry& entry, bool all_song_sources, bool table_active);
 bool song_entry_matches_key_filter(const SongEntry& entry, int key_filter);
 bool song_entry_matches_level_filter(const SongEntry& entry, int level_min, int level_max);
 bool song_entry_less_by_difficulty_asc(const SongEntry& lhs, const SongEntry& rhs);

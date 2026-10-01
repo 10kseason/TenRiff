@@ -161,3 +161,71 @@ test('preview key response and explicit hidden art are stable across render rate
   assert.deepEqual(G.settings({native:{sprites:{note:[]}}},catalog.gameplayNative).sprites.note,[]);
   assert.equal(G.blend('#112233','#AABBCC',0),'#112233');assert.equal(G.blend('#112233','#AABBCC',1),'#aabbcc');
 });
+
+test('key backdrop controls preserve explicit off and per-mode opacity through schema and JSON',()=>{
+  const doc={...basic(),gameplay:{key_backdrop:false,key_backdrop_opacity:0,modes:{'4k':{key_backdrop:true,key_backdrop_opacity:.65}}}};
+  assert.deepEqual(errors(doc),[]);assert.deepEqual(C.parse(C.serialize(doc)),doc);
+  assert.equal(C.gameplay(doc,'4k').key_backdrop_opacity,.65);assert.equal(C.gameplay(doc,'10k').key_backdrop,false);
+  assert.ok(errors({...basic(),gameplay:{key_backdrop_opacity:1.01}}).some(x=>x.code==='maximum'));
+  assert.ok(errors({...basic(),gameplay:{key_backdrop:'false'}}).some(x=>x.code==='type'));
+});
+test('preview backdrop switches off independently and judgement line tracks note height',()=>{
+  const G=require('./gameplay.js');
+  assert.equal(G.backdropOpacity({key_backdrop:false,key_backdrop_opacity:1,key_pulse_brightness:1},true),0);
+  assert.equal(G.backdropOpacity({key_backdrop:true,key_backdrop_opacity:.4,key_pulse_brightness:0},true),.4);
+  assert.equal(G.backdropOpacity({key_backdrop_opacity:1},false),0);
+  assert.equal(G.judgementLineWidth(2,1),2);
+  assert.equal(G.judgementLineWidth(5,2),10);
+  assert.ok(Math.abs(G.judgementLineWidth(2,4/1.8)/G.judgementLineWidth(2,.5/1.8)-8)<1e-10);
+});
+
+test('native combo and judgement previews outline text before fill and preserve alpha',()=>{
+  const G=require('./gameplay.js');
+  for(const role of ['combo','judgement'])for(const size of [8,42,52,144]){
+    const calls=[],ctx={save(){},restore(){},beginPath(){},clip(){},
+      rect(...args){calls.push(['clip',...args]);},
+      strokeText(...args){calls.push(['stroke',this.lineWidth,this.strokeStyle,this.globalAlpha,...args]);},
+      fillText(...args){calls.push(['fill',this.globalAlpha,...args]);}};
+    G.paintText(ctx,'147',[100,200,260,258],role,size,'#FFFFFF',.4,'Bahnschrift');
+    assert.deepEqual(calls.map(call=>call[0]),['clip','stroke','fill']);
+    assert.ok(calls[1][1]>=1&&calls[1][1]<=1.5,'outline remains thin at every authored font size');
+    assert.equal(calls[1][2],'#061118');assert.equal(calls[1][3],.4);assert.equal(calls[2][1],.4);
+    assert.equal(calls[1][5],100);assert.equal(calls[1][6],229,'authored text center remains unchanged');
+    assert.ok(calls[0][4]>=Math.max(58,size*1.5),'large glyphs fit the vertical clip');
+    assert.equal(ctx.font,`600 ${size}px "Bahnschrift", sans-serif`);
+  }
+});
+
+test('all preview labels outline their original fill with contrast for light and dark text',()=>{
+  const G=require('./gameplay.js');
+  for(const [color,outline]of [['#AABBCC','#061118'],['#0B1620','#EAF3FD']]){
+    const calls=[],ctx={save(){},restore(){},beginPath(){},clip(){},
+      rect(...args){calls.push(['clip',...args]);},strokeText(...args){calls.push(['stroke',this.strokeStyle,this.globalAlpha,...args]);},
+      fillText(...args){calls.push(['fill',this.fillStyle,this.globalAlpha,...args]);}};
+    G.paintText(ctx,'SCORE',[100,200,260,258],'score',30,color,.6);
+    assert.deepEqual(calls[0],['clip',99,199,162,60]);
+    assert.deepEqual(calls[1],['stroke',outline,.6,'SCORE',100,229,160]);
+    assert.deepEqual(calls[2],['fill',color,.6,'SCORE',100,229,160]);
+  }
+});
+
+test('backdrop brightness and height roundtrip with per-mode overrides and match runtime limits',()=>{
+  const G=require('./gameplay.js');
+  const doc={...basic(),gameplay:{key_backdrop_brightness:1.5,key_backdrop_height:.8,
+    modes:{'4k':{key_backdrop_brightness:.5,key_backdrop_height:.25}}}};
+  assert.deepEqual(errors(doc),[]);assert.deepEqual(C.parse(C.serialize(doc)),doc);
+  assert.equal(C.gameplay(doc,'4k').key_backdrop_brightness,.5);
+  assert.equal(C.gameplay(doc,'4k').key_backdrop_height,.25);
+  assert.equal(C.gameplay(doc,'10k').key_backdrop_brightness,1.5);
+  for(const value of [{key_backdrop_brightness:2.01},{key_backdrop_height:1.01}])
+    assert.ok(errors({...basic(),gameplay:value}).some(x=>x.code==='maximum'));
+  assert.equal(G.backdropColor('#4080C0',{}),'#4080C0');
+  assert.equal(G.backdropColor('#4080C0',{key_backdrop_brightness:.5}),'#204060');
+  assert.equal(G.backdropColor('#4080C0',{key_backdrop_brightness:2}),'#80FFFF');
+  assert.equal(G.backdropColor('#4080C080',{key_backdrop_brightness:0}),'#00000080');
+  assert.equal(G.backdropTop({},2,1078),2);
+  assert.equal(G.backdropTop({key_backdrop_height:.5},2,1078),540);
+  assert.equal(G.backdropTop({key_backdrop_height:0},2,1078),1078);
+  assert.equal(G.backdropTop({key_backdrop_height:.25},50,1060),807.5);
+  assert.equal(G.backdropOpacity({key_backdrop_brightness:2,key_backdrop_height:.25,key_backdrop_opacity:.4},true),.4);
+});

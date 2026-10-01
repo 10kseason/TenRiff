@@ -88,6 +88,15 @@ InputSettingsViewModel InputSettingsView::build(
         true,
         false));
 
+    for (auto& row : view.rows) {
+        if (row.id == InputSettingId::Back)
+            row.category = localized(language, "Actions", "작업");
+        else if (row.id == InputSettingId::Debounce)
+            row.category = localized(language, "Input Filtering", "입력 필터");
+        else
+            row.category = localized(language, "Input Device", "입력 장치");
+    }
+
     view.notes.push_back(localized(
         language,
         "Backend selects RawInput or Polling for the saved profile.",

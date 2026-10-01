@@ -431,9 +431,10 @@ void MenuApp::service_bms_editor_preview() {
         one_shot ? config_.audio_ui.keysound_volume : config_.audio_ui.bgm_volume));
     const auto initialized = audio_thread_.initialize(
         preview_config,
-        [samples, finished, gain, frame_cursor = std::size_t{0}](float* output, std::uint32_t frames,
+        [this, samples, finished, gain, frame_cursor = std::size_t{0}](float* output, std::uint32_t frames,
                                                               std::int64_t, std::int64_t) mutable {
-            mix_once_song_preview(*samples, frame_cursor, gain, output, frames);
+            mix_once_song_preview(*samples, frame_cursor,
+                menu_audio_muted_.load(std::memory_order_acquire) ? 0.0f : gain, output, frames);
             if (frame_cursor >= samples->size() / 2u) finished->store(true, std::memory_order_release);
         });
     if (initialized != audio::AudioResult::Success ||

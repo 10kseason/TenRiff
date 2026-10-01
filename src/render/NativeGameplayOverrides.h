@@ -20,6 +20,34 @@ inline float native_gameplay_number(const app::NativeGameplaySkinStyle& style, c
     };
     return motion?resolve(app::kNativeGameplayMotion):resolve(app::kNativeGameplayMetrics);
 }
+// Keep an authored native line width at the default note height, then scale both
+// together. Imported note-sized judgement rectangles already use this ratio.
+inline float native_gameplay_judgement_line_width(
+    const app::NativeGameplaySkinStyle& style, double note_height_scale) {
+    const double scale = std::isfinite(note_height_scale)
+        ? std::clamp(note_height_scale, 0.5, 4.0) : 1.8;
+    return native_gameplay_number(style, "judgement_line_width") * static_cast<float>(scale / 1.8);
+}
+// The key backdrop is independent of hit-burst brightness and static lane tint.
+// Releasing a key removes it even when a hit animation is still fading out.
+inline float gameplay_key_backdrop_alpha(bool enabled, bool pressed, double opacity) {
+    return enabled && pressed && std::isfinite(opacity)
+        ? static_cast<float>(std::clamp(opacity, 0.0, 1.0)) : 0.0f;
+}
+// Brightness changes RGB, not alpha: it remains independent of backdrop opacity.
+inline std::uint32_t gameplay_key_backdrop_color(std::uint32_t rgb, double brightness) {
+    const double gain = std::isfinite(brightness) ? std::clamp(brightness, 0.0, 2.0) : 1.0;
+    const auto channel = [&](int shift) {
+        return static_cast<std::uint32_t>(std::lround(std::min(255.0,
+            static_cast<double>((rgb >> shift) & 0xFFu) * gain)));
+    };
+    return (channel(16) << 16u) | (channel(8) << 8u) | channel(0);
+}
+// Anchor to the field bottom so 100% exactly preserves the original full lane.
+inline float gameplay_key_backdrop_top(float field_top, float field_bottom, double height) {
+    const float ratio = static_cast<float>(std::isfinite(height) ? std::clamp(height, 0.0, 1.0) : 1.0);
+    return field_bottom - std::max(0.0f, field_bottom - field_top) * ratio;
+}
 inline std::array<float,4> native_gameplay_color(const app::NativeGameplaySkinStyle& style,const char* key,
                                                 std::array<float,4> fallback) {
     const auto it=style.colors.find(key); return it==style.colors.end()?fallback:it->second;

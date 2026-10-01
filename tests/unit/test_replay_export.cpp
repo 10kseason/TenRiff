@@ -351,6 +351,83 @@ TEST_CASE("deterministic replay verification ignores edited score claims") {
     CHECK_FALSE(custom_result.official_eligible);
 }
 
+TEST_CASE("current and legacy replay rulesets reproduce their exact normal easy and hard timing") {
+    tenriff::gameplay::GameplayChart chart;
+    chart.lane_count = 1;
+    chart.duration_samples = 16'000;
+    chart.notes.push_back(tenriff::gameplay::NoteEvent{1, 8'000});
+    for (const auto ruleset : {tenriff::app::kLegacyReplayRulesetId,
+                               tenriff::app::kCanonicalReplayRulesetId}) {
+        const bool legacy = ruleset == tenriff::app::kLegacyReplayRulesetId;
+        for (const std::string mod : {"", "judge_easy", "judge_hard"}) {
+            ReplayFile replay;
+            replay.chart_sha256 = std::string(64, 'd');
+            replay.ruleset_id = std::string(ruleset);
+            replay.sample_rate = 8'000;
+            replay.rate = 1.0;
+            replay.mode.key_mode = "auto";
+            replay.mode.random = "off";
+            replay.mode.gauge = "normal";
+            if (!mod.empty()) replay.mods = {mod};
+            replay.score_multiplier = tenriff::app::final_score_multiplier(replay.mods, 1.0);
+            replay.trace.sample_rate = replay.sample_rate;
+            replay.trace.rate = replay.rate;
+            replay.trace.lane_count = 1;
+            replay.trace.duration_samples = 40'000;
+            const int late_ms = mod == "judge_hard" ? 200 : 26;
+            replay.trace.events = {
+                ReplayEvent{1, InputState::Pressed, 32'000 + late_ms * 8},
+                ReplayEvent{1, InputState::Released, 32'001 + late_ms * 8},
+            };
+            const auto verified = tenriff::app::verify_replay_against_chart(
+                replay, chart, tenriff::app::ChartFormat::Bms, 120.0);
+            REQUIRE(verified.verified());
+            CHECK_EQ(verified.ruleset_id, std::string(ruleset));
+            if (mod == "judge_hard") {
+                CHECK(verified.stats.counts.bd == (legacy ? 1 : 0));
+                CHECK(verified.stats.counts.pr == (legacy ? 0 : 1));
+            } else {
+                const bool pg = mod == "judge_easy" && !legacy;
+                CHECK(verified.stats.counts.pg == (pg ? 1 : 0));
+                CHECK(verified.stats.counts.gr == (pg ? 0 : 1));
+            }
+            replay.stats = verified.stats;
+            replay.final_score = verified.final_score;
+            CHECK(tenriff::app::verify_replay_against_chart(
+                replay, chart, tenriff::app::ChartFormat::Bms, 120.0).claims_match);
+            replay.ruleset_id = "tenriff-native-score-v2-ruleset-999";
+            CHECK_FALSE(tenriff::app::verify_replay_against_chart(
+                replay, chart, tenriff::app::ChartFormat::Bms, 120.0).verified());
+        }
+    }
+}
+
+TEST_CASE("legacy replay playback and ghost policy preserve old automatic miss boundaries") {
+    ReplayFile replay;
+    replay.ruleset_id = std::string(tenriff::app::kLegacyReplayRulesetId);
+    const tenriff::config::JudgeConfig base;
+    for (const std::string mod : {"", "judge_easy", "judge_hard"}) {
+        replay.mods = mod.empty() ? std::vector<std::string>{} : std::vector<std::string>{mod};
+        const auto judge = tenriff::app::replay_judge_config_for_playback(replay, base);
+        const double old_bad = mod == "judge_easy" ? 262.5 : mod == "judge_hard" ? 340.0 : 210.0;
+        CHECK(judge.bd_ms == doctest::Approx(old_bad));
+        CHECK(judge.indirect_miss_ms == doctest::Approx(old_bad));
+        tenriff::gameplay::GameplayChart chart;
+        chart.lane_count = 1;
+        chart.duration_samples = 6'000;
+        chart.notes.push_back(tenriff::gameplay::NoteEvent{1, 2'000});
+        tenriff::gameplay::GameplayConfig config;
+        config.sample_rate = 2'000; // Preserve the exact Easy half-millisecond edge.
+        config.judge = judge;
+        tenriff::gameplay::GameplayEngine engine(chart, config);
+        const auto edge = 2'000 + static_cast<int64_t>(old_bad * 2.0);
+        engine.advance(edge);
+        CHECK(engine.stats().counts.bd + engine.stats().counts.pr == 0);
+        engine.advance(edge + 1);
+        CHECK(engine.stats().counts.bd + engine.stats().counts.pr == 1);
+    }
+}
+
 TEST_CASE("file replay verification binds the replay and exact chart SHA-256") {
     const auto chart_path = std::filesystem::u8path(u8"리플레이 검증 차트.bms");
     const auto replay_path = std::filesystem::u8path(u8"리플레이 검증 입력.json");

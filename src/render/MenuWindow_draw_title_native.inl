@@ -34,11 +34,13 @@
                           native_rect("title_native.rect.009", D2D1::RectF(96, 198, 932, 226)), d2d_->accent_brush.Get());
         const float hero_reveal = native_menu_motion_.entrance(0.06f, 0.65f);
         const float hero_float = static_cast<float>(std::sin(native_seconds * 1.15) * 7.0);
+        if (!has_title_art) {
         draw_native_orbit(800, 358 + hero_float, 120, 0.56f * hero_reveal);
         draw_native_asset(native_menu_assets::kPrism,
                           native_rect("title_native.rect.010", D2D1::RectF(708, 250 + hero_float, 892, 458 + hero_float)),
                           0.85f * hero_reveal, static_cast<float>(std::sin(native_seconds * 0.35) * 5));
         draw_native_asset(native_menu_assets::kSpark, native_rect("title_native.rect.011", D2D1::RectF(916, 255, 934, 273)), hero_reveal * 0.8f);
+        }
         draw_text_clipped(wloc("Your music.", "나만의 음악,"), d2d_->header_format.Get(),
                           native_rect("title_native.rect.012", D2D1::RectF(96, 254, 664, 334)), d2d_->text_brush.Get());
         draw_text_clipped(wloc("Your rhythm.", "나만의 리듬."), d2d_->header_format.Get(),

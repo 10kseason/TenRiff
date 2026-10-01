@@ -1,6 +1,7 @@
 #pragma once
 
 #include "audio/MixNormalizer.h"
+#include "audio/SettingsAdjustmentClick.h"
 
 #include <array>
 #include <algorithm>
@@ -32,6 +33,7 @@
 #include "app/JudgementLoopTiming.h"
 #include "gameplay/GameplayEngine.h"
 #include "input/InputThread.h"
+#include "input/LaneBindingState.h"
 #include "timing/ClockSync.h"
 
 namespace tenriff::app {
@@ -204,6 +206,9 @@ public:
     }
     [[nodiscard]] HudSnapshot hud_snapshot();
     [[nodiscard]] bool was_user_aborted() const { return user_aborted_.load(std::memory_order_acquire); }
+    // Read after run() and before shutdown(); initialization/countdown alone
+    // must not count as a played chart when remembering title music.
+    [[nodiscard]] bool did_start_gameplay() const noexcept { return gameplay_started_; }
     [[nodiscard]] const std::string& audio_error() const { return audio_error_message_; }
     [[nodiscard]] bool was_restart_requested() const {
         return restart_requested_.load(std::memory_order_acquire);
@@ -312,6 +317,32 @@ private:
         uint32_t buffer_frames = 0;
     };
 
+    // A sequence counter provides a coherent tuple, but its payload must also
+    // be atomic to avoid a C++ data race between audio and HUD threads.
+    struct AtomicAudioTimingState {
+        std::atomic<int64_t> sample{0};
+        std::atomic<int64_t> buffer_start_sample{0};
+        std::atomic<int64_t> playback_sample{0};
+        std::atomic<int64_t> time_ns{0};
+        std::atomic<uint32_t> buffer_frames{0};
+
+        [[nodiscard]] AudioTimingState load() const noexcept {
+            return {sample.load(std::memory_order_relaxed),
+                    buffer_start_sample.load(std::memory_order_relaxed),
+                    playback_sample.load(std::memory_order_relaxed),
+                    time_ns.load(std::memory_order_relaxed),
+                    buffer_frames.load(std::memory_order_relaxed)};
+        }
+
+        void store(const AudioTimingState& value) noexcept {
+            sample.store(value.sample, std::memory_order_relaxed);
+            buffer_start_sample.store(value.buffer_start_sample, std::memory_order_relaxed);
+            playback_sample.store(value.playback_sample, std::memory_order_relaxed);
+            time_ns.store(value.time_ns, std::memory_order_relaxed);
+            buffer_frames.store(value.buffer_frames, std::memory_order_relaxed);
+        }
+    };
+
     void audio_callback(float* output,
                         uint32_t frames,
                         int64_t buffer_start_samples,
@@ -364,8 +395,10 @@ private:
     void schedule_chart_audio(int64_t buffer_end_samples);
     void mix_chart_audio(float* output, uint32_t frames, int64_t buffer_start_samples);
     void mix_tones(float* output, uint32_t frames, int64_t buffer_start_samples);
-    static void clamp_output(float* output, uint32_t frames, float master_gain);
+    void finish_audio_output(float* output, uint32_t frames, bool foreground, bool normalize_mix = true);
     audio::MixNormalizer mix_normalizer_;
+    audio::SettingsAdjustmentClick settings_click_;
+    std::atomic<bool> settings_click_requested_{false};
     void report_loading_progress(int percent, std::string_view stage);
     [[nodiscard]] bool loading_cancel_requested();
     [[nodiscard]] int64_t playback_sample_for_replay_event(const gameplay::ReplayFile& replay,
@@ -422,6 +455,7 @@ private:
     timing::ClockSync clock_sync_;
 
     std::unordered_map<uint32_t, int> key_to_lane_;
+    input::LaneBindingState lane_binding_state_;
 
     std::atomic<bool> stop_requested_{false};
     std::atomic<bool> finished_{false};
@@ -436,7 +470,7 @@ private:
     std::atomic<int> pause_menu_cursor_{0};
     std::atomic<int64_t> last_audio_sample_{0};
     std::atomic<uint64_t> audio_timing_sequence_{0};
-    AudioTimingState last_audio_timing_{};
+    AtomicAudioTimingState last_audio_timing_{};
     StartupInputTimingAnchor startup_input_timing_anchor_{};
     bool countdown_active_ = false;
     int countdown_value_ = 0;

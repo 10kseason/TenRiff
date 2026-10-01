@@ -8,6 +8,7 @@
 #include <utility>
 
 #include "app/GraphicsTiming.h"
+#include "config/GraphicsResolution.h"
 #include "util/Utf8Compat.h"
 
 namespace tenriff::app::menu::settings {
@@ -40,10 +41,8 @@ std::string display_mode_label(std::string value, ui::Language language) {
 }
 
 std::string resolution_label(std::string value, ui::Language language) {
-    value = to_lower_ascii(std::move(value));
-    if (value == "720p") return "1280x720";
-    if (value == "1080p") return "1920x1080";
-    if (value == "qhd") return "2560x1440";
+    const auto [width, height] = config::graphics_resolution_dimensions(value);
+    if (width > 0) return std::to_string(width) + "x" + std::to_string(height);
     return localized(language, "Monitor Native", "모니터 기본");
 }
 
@@ -167,6 +166,26 @@ GraphicsSettingsViewModel GraphicsSettingsView::build(
         GraphicsSettingId::Back, SettingsRowKind::Action,
         localized(language, "Back", "뒤로"), "", controller, true, false));
 
+    for (auto& row : view.rows) {
+        switch (row.id) {
+            case GraphicsSettingId::Display:
+            case GraphicsSettingId::Resolution:
+                row.category = localized(language, "Display", "화면");
+                break;
+            case GraphicsSettingId::RefreshHz:
+            case GraphicsSettingId::VSync:
+            case GraphicsSettingId::PerformanceHud:
+                row.category = localized(language, "Rendering", "렌더링");
+                break;
+            case GraphicsSettingId::Back:
+                row.category = localized(language, "Actions", "작업");
+                break;
+            default:
+                row.category = localized(language, "Background", "배경");
+                break;
+        }
+    }
+
     const std::string normalized_display = to_lower_ascii(runtime.graphics.display_mode);
     if (normalized_display == "fullscreen") {
         view.notes.push_back(localized(
@@ -186,8 +205,8 @@ GraphicsSettingsViewModel GraphicsSettingsView::build(
         "BGA OFF suppresses gameplay image/video backgrounds and disables their decoder/upscaler work. Song Select background previews remain visible.",
         "BGA를 끄면 게임플레이 이미지/영상 배경과 디코더/업스케일러 작업이 비활성화됩니다. 선곡 배경 미리보기는 유지됩니다."));
     view.notes.push_back(localized(language,
-        "Resolution cycles 720p, 1080p, QHD, or the current monitor native size. Refresh Hz is Match Display or Unlimited (1500 FPS max).",
-        "해상도는 720p, 1080p, QHD, 모니터 기본 크기를 순환합니다. 주사율은 디스플레이에 맞춤 또는 무제한(최대 1500 FPS)입니다."));
+        "Resolution includes common sizes and display modes. F5 refreshes the monitor list. Refresh Hz is Match Display or Unlimited (1500 FPS max).",
+        "해상도는 일반 크기와 모니터 지원 크기를 포함합니다. F5로 모니터 목록을 갱신합니다. 주사율은 디스플레이에 맞춤 또는 무제한(최대 1500 FPS)입니다."));
     view.notes.push_back(localized(language,
         "BGA Behind Notes blocks bright backgrounds only under the playfield while keeping BGA visible outside it.",
         "기어 뒤 BGA를 가리면 바깥 BGA는 유지하면서 노트 영역 아래의 밝은 배경만 차단합니다."));

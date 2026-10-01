@@ -38,6 +38,8 @@ If a profile does not exist, it is created automatically on first launch.
   - `follow | autoplay | ignore`
 - `background_sound_enabled` (bool)
   - controls menu, result, and song-preview music only; gameplay chart BGM remains audible
+- `title_music` (string)
+  - `none | default | random_bms | last_played`; default `default`. Selects no music, the bundled theme, a random loaded BMS, or the last played chart for Title and Quick Setup. Unavailable chart audio falls back to the default theme. BMS audio includes keysounds and is prepared asynchronously, capped at five minutes and looped.
 - `volume` (double)
   - master volume
 - `bgm_volume` (double)
@@ -81,10 +83,13 @@ See [ASIO setup](asio-audio.md). ASIO holds the selected sample rate fixed and r
 - `pg`, `gr`, `gd`, `bd` (double, ms)
 - default `pg / gr / gd` values are `20ms / 65ms / 115ms`
 - default `bd` is `210ms`
-- `Judge Easy` follows its existing `1.25x` scale (`bd=262.5ms`), while `Judge Hard` uses `bd=340ms`; Hard leaves PG/GR/GD and long-note tail windows at their base values
+- `Judge Easy` scales the base timing windows by `1.35x`: `pg/gr/gd/bd=27/87.75/155.25/283.5ms`. Hold tolerances scale as well; `mask` stays unchanged
+- `Judge Hard` leaves PG/GR/GD and hold tolerances unchanged and caps `bd` at `180ms`. A smaller custom BAD window is preserved
 - `indirect_miss` (double, ms)
-  - the indirect-miss threshold used when no input arrives at all and a note is auto-missed
-  - its timing is aligned with `bd`; under `Judge Hard`, an unplayed note is recorded as a combo-breaking indirect `POOR` / OD8 `MISS` instead of BAD
+  - current profiles save and normalize this value to `340ms`, independently of the BAD hit window
+  - default Normal/Easy/Hard automatically miss an unplayed note once it is more than `340ms` late. Normal/Easy record BAD; Hard records a combo-breaking indirect `POOR` / OD8 `MISS`
+  - a late press outside BAD but before automatic timeout misses the expired note, then checks the next note; it cannot score a BAD hit outside the hit window
+- New plays record `tenriff-native-score-v2-ruleset-2`. Playback, ghost battles and verification of `ruleset-1` replays use the exact previous policy: Easy `1.25x`, Hard BAD `340ms`, and automatic miss `=BAD`. Arbitrary custom timing does not become official
 - `hold_grace` (double, ms)
   - the dedicated window used to treat long-note tail release as `PG`
   - default value is `80ms`
@@ -116,7 +121,10 @@ Grade/Session Mix uses a separate LR2-reference gauge, carried between songs, wi
   - `windowed` is a fixed-size window with a title bar and can be moved
   - `fullscreen` is DXGI exclusive fullscreen, where the current Discord Game Overlay is not displayed
 - `resolution` (string)
-  - `native | 720p | 1080p | qhd`
+  - `native`, legacy aliases `720p | 1080p | qhd`, or `widthxheight` (e.g. `1600x900`, `1366x768`, `1280x800`, `3440x1440`). Each axis accepts 320–8192px.
+  - Graphics Settings combines common sizes with the current monitor's display modes. Press `F5` to refresh the list. Explicit custom sizes survive saving and restarting.
+  - Layout preserves the 1920×1080 canvas aspect, with margins for other aspect ratios. Windowed mode scales proportionally to fit the title bar and taskbar work area.
+  - Skin Settings uses a uniformly scaled view of the actual gameplay renderer, including field movement, lane/note/gear sizes, judgement/combo positions and skin fonts.
 - `vsync` (bool)
 - `refresh_hz` (int)
   - `-1` selects `Match Display`; `0` is the profile-compatible `Unlimited` selector with an actual 1500 FPS maximum
@@ -209,6 +217,8 @@ The chart loader and indexer are limited to BMS-family files (`.bms/.bme/.bml/.p
 
 ### `ui`
 
+`last_played_chart_path` is the local path of the most recent chart whose gameplay started; empty by default. Replay and editor practice do not update it. Used by `title_music=last_played` across restarts.
+
 | Field | Type, range, default | Behavior |
 | --- | --- | --- |
 | `profile_nickname` | string; UTF-8 ≤48 bytes | Display name; empty uses profile ID. Whitespace/control characters are normalized. |
@@ -269,6 +279,7 @@ These are profile `config.json` skin settings. For a skin package's `skin.json` 
 | `gameplay_field_offset_x` | double: `-720..720`; `0` | Field X offset in 1920×1080 base pixels; additionally constrained to keep the field and ↔ handle visible. |
 | `combo_position`, `judgement_position` | double: `0.10..0.78`; `0.24` | Independent combo/judgement Y anchors; missing judgement position inherits `combo_position` in older profiles. |
 | `combo_offset_x`, `judgement_offset_x` | double: `-600..600`; `0` | Independent combo/judgement X offsets in 1920×1080 base pixels. |
+| `combo_font_scale`, `judgement_font_scale` | double: `0.50..2`; `1` | Independent combo/judgement text multipliers. Skin Settings adjusts 50–200% in 5% steps or with mouse sliders; profile values also apply to imported skins. |
 | `lane_background_opacity` | double: `0..0.45`; `0.18` | Lane-background opacity. |
 | `black_playfield_enabled` | bool; `true` | Black field including lane gaps. |
 | `visual_opacity` | double: `0.20..1`; `0.96` | Shared opacity multiplier for notes, receptors and key labels. |
@@ -288,7 +299,12 @@ These are profile `config.json` skin settings. For a skin package's `skin.json` 
 
 Per-mode arrays/overrides support `4k`, `5k`, `6k`, `7k`, `7+1`, `8k`, `9k`, `10k`, `12k`, `14k`, `16k`. Color tokens: `ice`, `azure`, `gold`, `mint`, `rose`, `violet`, `orange`, `teal`. `7+1` is a skin palette, not a separate keymap mode. Legacy `expand_notes_to_dividers=true` seeds a zero gap; explicit `note_divider_gap_px` takes precedence.
 
+No full-screen BGA dark filter is applied; configured black playfields, lane backgrounds and gear remain intact. Visual Latency is the fifth Skin Settings item.
+
+Text readability applies across menus, options, the song library, results, help/chat/account overlays, the editor and gameplay. Light text gets a dark contour and dark text a light contour, preserving skin text colors and transparency.
+
 ### `offsets`
+
 - `input` (double)
 - `visual` (double)
   - clamped to the `-500..500` range
@@ -317,3 +333,13 @@ Per-mode arrays/overrides support `4k`, `5k`, `6k`, `7k`, `7+1`, `8k`, `9k`, `10
 - Stale profiles are automatically corrected for some values.
 - In particular, BMS defaults and keysound-policy values are migration targets; legacy osu chart/skin fields are no longer saved.
 - If the config file does not exist, the app starts with defaults and immediately saves the profile.
+
+## Settings usability and audio synchronization
+
+New profiles default `audio.volume` to `0.7`; explicitly saved volumes remain intact. `audio.mute_when_inactive` defaults to `false` and gates output while another window is active, preserving music position and saved gain. ASIO Buffer Size is displayed in samples per channel; the internal `frames_per_buffer` API name stays compatible.
+
+Key Settings presents horizontal Key 1… keys with separate primary and secondary bindings. Optional `keymap.json` `secondary_modes` follows the existing mode/lane structure. Either held input keeps the logical key held; × or Delete during capture clears only the secondary slot. The initial Options editor mode is 4K; opening from a chart uses its actual key count.
+
+`skin.key_backdrop_enabled` and `skin.key_backdrop_opacity` (0–1) control held-key lane tint independently of hit-burst brightness. Skin defaults apply until the first user change, which saves `key_backdrop_override=true`. Judgement-line thickness follows note height. ALL SONG shows only table members while a difficulty table is active; Native LV restores all charts. Visuals/BGA follow the audible playback head while judgement/audio scheduling retain the write timeline. Actual speed changes play a short click.
+
+Held-key backdrop RGB brightness uses `skin.key_backdrop_brightness` (0–2, default 1); maximum height uses `skin.key_backdrop_height` (0–1, default 1), anchored at the field bottom. Both are independent of opacity and match in gameplay, ghost play and Skin Settings previews. Hold Left/Right to repeat an enabled minus/plus setting.

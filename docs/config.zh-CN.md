@@ -37,7 +37,9 @@
 - `bms_keysound_policy` (string)
   - `follow | autoplay | ignore`
 - `background_sound_enabled` (bool)
-  - 控制菜单 BGM 和谱面背景音的开关
+  - 控制菜单、结算和歌曲预览音乐；不关闭游戏中的谱面 BGM。
+- `title_music` (string)
+  - `none | default | random_bms | last_played`，默认 `default`。为标题和快速设置选择无音乐、默认音乐、随机 BMS 或最后游玩的歌曲。无法读取歌曲音频时回退到默认音乐。BMS 包含键音，异步合成最多 5 分钟并循环播放。
 - `volume` (double)
   - master volume
 - `bgm_volume` (double)
@@ -81,10 +83,13 @@
 - `pg`, `gr`, `gd`, `bd` (double, ms)
 - 默认 `pg / gr / gd` 分别为 `20ms / 65ms / 115ms`
 - 默认 `bd` 为 `210ms`
-- `Judge Easy` 沿用现有 `1.25x` 倍率（`bd=262.5ms`），`Judge Hard` 使用 `bd=340ms`；Hard 不会收紧 PG/GR/GD 与长按尾部判定窗
+- `Judge Easy` 将基础判定窗扩大为 `1.35x`：`pg/gr/gd/bd=27/87.75/155.25/283.5ms`。长按容差也使用同一倍率，`mask` 保持不变
+- `Judge Hard` 保持PG/GR/GD和长按容差，将 `bd` 上限限制为 `180ms`。更小的自定义BAD窗口不会被扩大
 - `indirect_miss` (double, ms)
-  - 在完全没有输入时将 note 自动判为 miss 的间接 miss 标准
-  - timing 与 `bd` 对齐；在 `Judge Hard` 下，未输入 note 会记为断 combo 的间接 `POOR` / OD8 `MISS`，而不是 BAD
+  - 当前配置将此值保存并归一化为 `340ms`，自动漏键判定时限独立于BAD命中窗口
+  - 默认Normal/Easy/Hard在未输入音符超过 `340ms` 后自动判漏键；Normal/Easy记BAD，Hard记断连的间接 `POOR` / OD8 `MISS`
+  - BAD窗口外、自动判漏键前的迟到输入不会命中BAD，而是先将过期音符记为漏键，再检查下一音符
+- 新游玩记录 `tenriff-native-score-v2-ruleset-2`。旧 `ruleset-1` 回放、幽灵对战及验证严格使用原有策略：Easy `1.25x`、Hard BAD `340ms`、自动漏键 `=BAD`。不会将任意自定义判定认可为官方规则
 - `hold_grace` (double, ms)
   - 将 long note tail release 判为 `PG` 的专用宽限窗口
   - 默认值为 `80ms`
@@ -117,7 +122,10 @@ Gauge Shift 始终启用。`mode.gauge` 的 `ex_hard / hard / normal / easy` 选
   - `windowed` 是带标题栏的固定大小窗口，可拖动
   - `fullscreen` 是 DXGI 独占全屏，当前 Discord Game Overlay 不会显示
 - `resolution` (string)
-  - `native | 720p | 1080p | qhd`
+  - `native`、旧别名 `720p | 1080p | qhd`，或 `宽x高`（例如 `1600x900`, `1366x768`, `1280x800`, `3440x1440`）。每轴支持320–8192px。
+  - 图形设置包含常见尺寸和当前显示器的显示模式。按`F5`刷新列表。自定义尺寸在保存和重启后保留。
+  - 布局保持1920×1080画布比例，其他比例显示留边。窗口模式按比例缩小，以容纳标题栏和任务栏工作区域。
+  - 皮肤设置使用实际游戏渲染器的等比缩小画面，反映区域移动、轨道/音符/面板尺寸、判定/连击位置和皮肤字体。
 - `vsync` (bool)
 - `refresh_hz` (int)
   - `-1` 表示 `Match Display`；`0` 是兼容旧 profile 的 `Unlimited` 选项，实际最高 1500 FPS
@@ -211,6 +219,8 @@ chart loader/indexer 仅支持 BMS family（`.bms/.bme/.bml/.pms`）。旧 `enab
 
 ### `ui`
 
+`last_played_chart_path` 保存最近一次开始游玩的谱面本地路径，默认空字符串。回放和编辑器练习不会更新；重启后可供 `title_music=last_played` 使用。
+
 | 字段 | 类型、范围、默认值 | 行为 |
 | --- | --- | --- |
 | `profile_nickname` | string; UTF-8 ≤48 bytes | 显示名称；为空时使用配置 ID，并规范化空白与控制字符。 |
@@ -271,6 +281,7 @@ chart loader/indexer 仅支持 BMS family（`.bms/.bme/.bml/.pms`）。旧 `enab
 | `gameplay_field_offset_x` | double: `-720..720`; `0` | 以 1920×1080 为基准的面板横向偏移；另行限制以保持面板与 ↔ 手柄可见。 |
 | `combo_position`, `judgement_position` | double: `0.10..0.78`; `0.24` | 连击与判定独立的 Y 位置；旧配置缺少判定位置时继承 `combo_position`。 |
 | `combo_offset_x`, `judgement_offset_x` | double: `-600..600`; `0` | 以 1920×1080 为基准的连击与判定独立 X 偏移。 |
+| `combo_font_scale`, `judgement_font_scale` | double: `0.50..2`; `1` | 连击与判定文字的独立倍率。在皮肤设置中以5%步长或鼠标滑块调整50–200%，导入的皮肤同样使用配置倍率。 |
 | `lane_background_opacity` | double: `0..0.45`; `0.18` | 轨道背景不透明度。 |
 | `black_playfield_enabled` | bool; `true` | 将包括轨道间隙在内的整个区域设为黑色。 |
 | `visual_opacity` | double: `0.20..1`; `0.96` | 音符、接收器与按键标签的共用不透明度倍率。 |
@@ -290,7 +301,12 @@ chart loader/indexer 仅支持 BMS family（`.bms/.bme/.bml/.pms`）。旧 `enab
 
 各模式数组与覆盖项支持：`4k`, `5k`, `6k`, `7k`, `7+1`, `8k`, `9k`, `10k`, `12k`, `14k`, `16k`。颜色标记：`ice`, `azure`, `gold`, `mint`, `rose`, `violet`, `orange`, `teal`。`7+1` 是皮肤调色板而非独立键位模式。旧 `expand_notes_to_dividers=true` 将间距初始化为 0，显式 `note_divider_gap_px` 优先。
 
+不再应用覆盖整个BGA的暗色滤镜；黑色判定区域、轨道背景和面板仍按原配置保留。Visual Latency是皮肤设置中的第5项。
+
+文字可读性改善统一应用于菜单、设置、歌曲列表、结果、帮助、聊天、账户、编辑器和游戏界面。浅色文字使用深色描边，深色文字使用浅色描边，并保留皮肤原有的文字颜色和透明度。
+
 ### `offsets`
+
 - `input` (double)
 - `visual` (double)
   - 会被 clamp 在 `-500..500`
@@ -318,3 +334,13 @@ chart loader/indexer 仅支持 BMS family（`.bms/.bme/.bml/.pms`）。旧 `enab
 - stale profile 的部分值会被自动修正。
 - 尤其是 BMS default 与 keysound policy 相关值会进入运行时迁移；旧 osu chart/skin 字段不再保存。
 - 如果配置文件不存在，会先使用默认值启动，并立即保存 profile。
+
+## 设置操作与音画同步
+
+新配置的 `audio.volume` 默认为 `0.7`，已有音量不变。`audio.mute_when_inactive` 默认为 `false`；开启后在其他窗口激活时只静音输出，保留播放位置。ASIO 缓冲区大小显示为每声道采样数，内部 `frames_per_buffer` 名称兼容。
+
+按键设置采用横向 Key 1…，支持主键和辅助键。任一按键按下即可保持逻辑按键状态；× 或绑定时 Delete 可清除辅助键。`keymap.json` 的可选 `secondary_modes` 使用既有模式/轨道结构。选项初次编辑为 4K，从谱面打开时使用实际键数。
+
+`skin.key_backdrop_enabled` 和 `skin.key_backdrop_opacity` (0–1) 控制按键背景色，与击打特效亮度分开。首次修改保存 `key_backdrop_override=true` 并优先使用用户配置。判定线粗细随音符高度变化。选择难度表时 ALL SONG 只显示表内谱面，Native LV 恢复所有谱面。画面和 BGA 使用实际音频播放位置，判定和音频调度保持原时钟。速度发生变化时播放短点击声。
+
+按键背景RGB亮度使用 `skin.key_backdrop_brightness`（0–2，默认1），最大高度使用 `skin.key_backdrop_height`（0–1，默认1），以下边缘为基准。两项独立于透明度，在游戏、幽灵和皮肤预览中一致。带有 `−/+` 的设置可按住左右方向键连续调整。

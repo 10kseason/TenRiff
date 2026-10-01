@@ -1,7 +1,9 @@
+#include "render/SettingsListLayout.h"
 #include "render/MenuWindow.h"
 #include "config/BuiltinDifficultyTables.h"
 #include "render/GameplayFeedbackText.h"
 #include "render/NativeMenuAssets.h"
+#include "render/NativeMenuPalette.h"
 #include "render/LumaKeysAssets.h"
 #include "render/NativeSkinOverrides.h"
 
@@ -60,6 +62,7 @@
 #include "render/ResultPresentation.h"
 #include "render/TargaImage.h"
 #include "render/TextFit.h"
+#include "render/SkinGameplayPreview.h"
 #include "timing/HighResClock.h"
 #include "util/Utf8Compat.h"
 
@@ -1632,14 +1635,18 @@ void resolve_window_bounds(const MenuWindowConfig& config,
     const UINT desired_height =
         (config.height > 0) ? static_cast<UINT>(config.height) : monitor.height;
 
-    out_width = (monitor.width > 0) ? std::min(desired_width, monitor.width) : desired_width;
-    out_height = (monitor.height > 0) ? std::min(desired_height, monitor.height) : desired_height;
-    if (out_width == 0) {
-        out_width = 1280;
-    }
-    if (out_height == 0) {
-        out_height = 720;
-    }
+    const RECT placement_rect = config.display_mode == "windowed" ? monitor.work_rect : monitor.rect;
+    const DWORD style = window_style_for_display_mode(config.display_mode);
+    const DWORD ex_style = window_ex_style_for_display_mode(config.display_mode);
+    const SIZE frame = window_size_for_client_area(0, 0, style, ex_style);
+    const int available_width = std::max(1L, placement_rect.right - placement_rect.left - frame.cx);
+    const int available_height = std::max(1L, placement_rect.bottom - placement_rect.top - frame.cy);
+    // Independent axis clamps changed the chosen aspect ratio and could put
+    // the bottom of a window underneath the taskbar on smaller displays.
+    const double fit = std::min({1.0, static_cast<double>(available_width) / std::max(1u, desired_width),
+                               static_cast<double>(available_height) / std::max(1u, desired_height)});
+    out_width = std::max(1u, static_cast<UINT>(std::floor(desired_width * fit)));
+    out_height = std::max(1u, static_cast<UINT>(std::floor(desired_height * fit)));
 
     if (config.display_mode == "fullscreen") {
         out_x = monitor.rect.left;
@@ -1647,9 +1654,6 @@ void resolve_window_bounds(const MenuWindowConfig& config,
         return;
     }
 
-    const RECT placement_rect = (config.display_mode == "windowed") ? monitor.work_rect : monitor.rect;
-    const DWORD style = window_style_for_display_mode(config.display_mode);
-    const DWORD ex_style = window_ex_style_for_display_mode(config.display_mode);
     const SIZE window_size = window_size_for_client_area(out_width, out_height, style, ex_style);
     const int placement_width = placement_rect.right - placement_rect.left;
     const int placement_height = placement_rect.bottom - placement_rect.top;
@@ -1772,6 +1776,17 @@ std::string renderer_log_timestamp_local() {
            << std::setw(3)
            << ms.count();
     return stream.str();
+}
+
+std::string built_in_title_background_path() {
+    // Resolve relative to the executable, not the launcher's working directory.
+    static const std::string path = [] {
+        wchar_t module[32768] = {};
+        const DWORD length = GetModuleFileNameW(nullptr, module, static_cast<DWORD>(std::size(module)));
+        if (length == 0 || length >= std::size(module)) return std::string{};
+        return (std::filesystem::path(module).parent_path() / "assets" / "menu" / "title-space.jpg").u8string();
+    }();
+    return path;
 }
 
 std::filesystem::path renderer_runtime_log_path() {
@@ -2216,6 +2231,13 @@ struct MenuWindow::D2DResources {
     IDWriteTextFormat* native_wordmark_format = nullptr;
     DWRITE_TEXT_METRICS native_wordmark_metrics{};
     std::unordered_map<IDWriteTextFormat*, Microsoft::WRL::ComPtr<IDWriteInlineObject>> menu_ellipsis_signs;
+    // Gameplay fallback fonts stay at their actual sizes inside a scaled preview,
+    // independent of the menu's font size and native menu font overrides.
+    std::unique_ptr<MenuRenderData> skin_preview_scene;
+    struct PreviewFonts {
+        Microsoft::WRL::ComPtr<IDWriteTextFormat> title_format, body_format, header_format,
+            hud_format, rank_format, gameplay_combo_format;
+    } preview_fonts;
     Microsoft::WRL::ComPtr<IDWriteTextFormat> title_format;
     Microsoft::WRL::ComPtr<IDWriteTextFormat> option_format;
     Microsoft::WRL::ComPtr<IDWriteTextFormat> body_format;
@@ -2226,6 +2248,23 @@ struct MenuWindow::D2DResources {
     Microsoft::WRL::ComPtr<IDWriteTextFormat> header_format;
     Microsoft::WRL::ComPtr<IDWriteTextFormat> gameplay_combo_format;
     std::unordered_map<std::string, Microsoft::WRL::ComPtr<IDWriteTextFormat>> native_gameplay_formats;
+    struct ReadableTextLayout {
+        std::wstring text;
+        Microsoft::WRL::ComPtr<IDWriteTextFormat> format;
+        Microsoft::WRL::ComPtr<IDWriteTextLayout> layout;
+        float width = 0.0f, height = 0.0f;
+        DWRITE_TEXT_ALIGNMENT alignment = DWRITE_TEXT_ALIGNMENT_LEADING;
+        DWRITE_PARAGRAPH_ALIGNMENT paragraph = DWRITE_PARAGRAPH_ALIGNMENT_NEAR;
+        DWRITE_WORD_WRAPPING wrapping = DWRITE_WORD_WRAPPING_WRAP;
+        DWRITE_TRIMMING trimming{};
+        Microsoft::WRL::ComPtr<IDWriteInlineObject> trimming_sign;
+        DWRITE_LINE_SPACING_METHOD line_spacing_method = DWRITE_LINE_SPACING_METHOD_DEFAULT;
+        float line_spacing = 0.0f, baseline = 0.0f;
+    };
+    // Draw order slots keep outline layouts bounded and reusable between frames.
+    std::array<ReadableTextLayout, 96> gameplay_readable_text{};
+    std::array<ReadableTextLayout, 96> preview_readable_text{};
+    std::array<ReadableTextLayout, 384> menu_readable_text{};
     Microsoft::WRL::ComPtr<IDWriteTextFormat> song_logo_format;
     Microsoft::WRL::ComPtr<IDWriteTextFormat> song_nav_format;
     Microsoft::WRL::ComPtr<IDWriteTextFormat> song_record_label_format;
@@ -2243,6 +2282,7 @@ struct MenuWindow::D2DResources {
     Microsoft::WRL::ComPtr<IDWriteTextFormat> stats_label_format;
     Microsoft::WRL::ComPtr<IDWriteTextFormat> stats_value_format;
     Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> text_brush;
+    Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> text_outline_brush;
     Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> accent_brush;
     Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> judgement_line_brush;
     Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> muted_brush;
@@ -3557,7 +3597,7 @@ void MenuWindow::invalidate_gameplay_static_cache() {
     }
 }
 
-bool MenuWindow::ensure_gameplay_static_cache(const GameplayHudData& data) {
+bool MenuWindow::ensure_gameplay_static_cache(const GameplayHudData& data, bool use_local_field_offset) {
     if (!d2d_ || !d2d_->d2d_context || !d2d_->d2d_factory) {
         return false;
     }
@@ -3567,12 +3607,12 @@ bool MenuWindow::ensure_gameplay_static_cache(const GameplayHudData& data) {
     desired.native_skin = data.resolved_tenriff_skin;
     const auto& native_style = native_gameplay_style(data.resolved_tenriff_skin,desired.native_instrument);
     desired.lane_count = std::clamp(data.lane_count, 1, static_cast<int>(kGameplayHudMaxLanes));
-    if (gameplay_field_drag_state_.has_local_override &&
+    if (use_local_field_offset && gameplay_field_drag_state_.has_local_override &&
         !gameplay_field_drag_state_.active &&
         std::abs(data.gameplay_field_offset_x - gameplay_field_drag_state_.offset_x) < 0.5) {
         gameplay_field_drag_state_.has_local_override = false;
     }
-    desired.gameplay_field_offset_x = gameplay_field_drag_state_.has_local_override
+    desired.gameplay_field_offset_x = use_local_field_offset && gameplay_field_drag_state_.has_local_override
                                          ? gameplay_field_drag_state_.offset_x
                                          : data.gameplay_field_offset_x;
     const bool use_imported_metrics = normalize_gameplay_skin_source(data.skin_source) != "native";
@@ -3820,8 +3860,8 @@ bool MenuWindow::ensure_gameplay_static_cache(const GameplayHudData& data) {
                         field_layout.right - 3.0f, std::min(field_layout.bottom, y + native_gameplay_number(native_style,"judgement_glow_height")*.5f)), fill);
                 }
                 fill->SetColor(native_gameplay_d2d_color(native_style,"judgement_line",color_from_rgb(0xBCFFF0, static_cast<float>(desired.visual_opacity))));
-                d2d_->d2d_context->FillRectangle(D2D1::RectF(field_layout.left + 3.0f, y - native_gameplay_number(native_style,"judgement_line_width")*.5f,
-                    field_layout.right - 3.0f, y + native_gameplay_number(native_style,"judgement_line_width")*.5f), fill);
+                d2d_->d2d_context->FillRectangle(D2D1::RectF(field_layout.left + 3.0f, y - native_gameplay_judgement_line_width(native_style, desired.note_height_scale)*.5f,
+                    field_layout.right - 3.0f, y + native_gameplay_judgement_line_width(native_style, desired.note_height_scale)*.5f), fill);
             }
             fill->SetColor(saved);
         }
@@ -4110,6 +4150,41 @@ void MenuWindow::on_mouse_button_down(int window_x, int window_y) {
     }
 }
 
+std::optional<MenuClickEvent> MenuWindow::resolve_menu_click(
+    int window_x, int window_y, bool double_click, bool control) const {
+    float x = 0.0f, y = 0.0f;
+    if (!translate_window_point(window_x, window_y, &x, &y)) return std::nullopt;
+    const HitRegion* hit = nullptr;
+    for (auto it = hit_regions_.rbegin(); it != hit_regions_.rend(); ++it) {
+        if (x >= it->left && x <= it->right &&
+            y >= it->top && y <= it->bottom) {
+            hit = &*it;
+            break;
+        }
+    }
+    if (!hit) {
+        return std::nullopt;
+    }
+
+    MenuClickEvent event;
+    event.kind = hit->kind;
+    event.index = hit->index;
+    event.part = hit->part;
+    event.control = control;
+    if (hit->part == MenuHitPart::SetValue) {
+        const float width = hit->right - hit->left;
+        event.value = width > 0.0f
+                          ? std::clamp(static_cast<double>((x - hit->left) / width), 0.0, 1.0)
+                          : 0.0;
+        const float height = hit->bottom - hit->top;
+        event.value_y = height > 0.0f
+                            ? std::clamp(static_cast<double>((y - hit->top) / height), 0.0, 1.0)
+                            : 0.0;
+    }
+    event.double_click = double_click;
+    return event;
+}
+
 void MenuWindow::on_mouse_click(int window_x, int window_y, bool double_click) {
     if (bms_editor_note_drag_state_.active) {
         float x = 0.0f;
@@ -4208,47 +4283,17 @@ void MenuWindow::on_mouse_click(int window_x, int window_y, bool double_click) {
         return;
     }
 
-    float x = 0.0f;
-    float y = 0.0f;
-    if (!translate_window_point(window_x, window_y, &x, &y)) {
-        suppress_next_left_button_up_ = false;
-        return;
-    }
     if (!double_click && suppress_next_left_button_up_) {
         suppress_next_left_button_up_ = false;
         return;
     }
-
-    const HitRegion* hit = nullptr;
-    for (auto it = hit_regions_.rbegin(); it != hit_regions_.rend(); ++it) {
-        if (x >= it->left && x <= it->right &&
-            y >= it->top && y <= it->bottom) {
-            hit = &*it;
-            break;
-        }
-    }
-    if (!hit) {
+    auto event = resolve_menu_click(window_x, window_y, double_click,
+                                   (GetKeyState(VK_CONTROL) & 0x8000) != 0);
+    if (!event) {
         suppress_next_left_button_up_ = false;
         return;
     }
-
-    MenuClickEvent event;
-    event.kind = hit->kind;
-    event.index = hit->index;
-    event.part = hit->part;
-    event.control = (GetKeyState(VK_CONTROL) & 0x8000) != 0;
-    if (hit->part == MenuHitPart::SetValue) {
-        const float width = hit->right - hit->left;
-        event.value = width > 0.0f
-                          ? std::clamp(static_cast<double>((x - hit->left) / width), 0.0, 1.0)
-                          : 0.0;
-        const float height = hit->bottom - hit->top;
-        event.value_y = height > 0.0f
-                            ? std::clamp(static_cast<double>((y - hit->top) / height), 0.0, 1.0)
-                            : 0.0;
-    }
-    event.double_click = double_click;
-    push_click_event(std::move(event));
+    push_click_event(std::move(*event));
     suppress_next_left_button_up_ = double_click;
 }
 
@@ -4839,10 +4884,10 @@ bool MenuWindow::create_text_formats(const wchar_t* ui_family, const app::Native
     auto create_text_format = [this, native_style](const wchar_t* family,
                                      DWRITE_FONT_WEIGHT weight,
                                      float size,
-                                     Microsoft::WRL::ComPtr<IDWriteTextFormat>* out_format) -> bool {
+                                     Microsoft::WRL::ComPtr<IDWriteTextFormat>* out_format, bool preview_font = false) -> bool {
         Microsoft::WRL::ComPtr<IDWriteTextFormat> format;
         std::wstring custom_family;
-        if (native_style) {
+        if (native_style && !preview_font) {
             const std::pair<Microsoft::WRL::ComPtr<IDWriteTextFormat>*, const char*> roles[] = {
                 {&d2d_->title_format, "title"}, {&d2d_->option_format, "option"},
                 {&d2d_->body_format, "body"}, {&d2d_->mono_format, "mono"},
@@ -4869,7 +4914,7 @@ bool MenuWindow::create_text_formats(const wchar_t* ui_family, const app::Native
         }
         // Fixed display numerals and logos keep their designed silhouette.
         // Text labels grow, then the existing fit helper constrains tight cells.
-        if (out_format != std::addressof(d2d_->gameplay_combo_format) && out_format != std::addressof(d2d_->logo_format) &&
+        if (!preview_font && out_format != std::addressof(d2d_->gameplay_combo_format) && out_format != std::addressof(d2d_->logo_format) &&
             out_format != std::addressof(d2d_->song_logo_format) && out_format != std::addressof(d2d_->rank_format) &&
             out_format != std::addressof(d2d_->result_score_format)) {
             size *= d2d_->requested_ui_text_scale;
@@ -4923,12 +4968,21 @@ bool MenuWindow::create_text_formats(const wchar_t* ui_family, const app::Native
         !create_text_format(ui_family, DWRITE_FONT_WEIGHT_SEMI_BOLD, 18.0f, &d2d_->stats_value_format)) {
         return false;
     }
+    if (!create_text_format(ui_family, DWRITE_FONT_WEIGHT_SEMI_BOLD, 30.0f, &d2d_->preview_fonts.title_format, true) ||
+        !create_text_format(ui_family, DWRITE_FONT_WEIGHT_NORMAL, 18.0f, &d2d_->preview_fonts.body_format, true) ||
+        !create_text_format(ui_family, DWRITE_FONT_WEIGHT_SEMI_BOLD, 52.0f, &d2d_->preview_fonts.header_format, true) ||
+        !create_text_format(ui_family, DWRITE_FONT_WEIGHT_NORMAL, 16.0f, &d2d_->preview_fonts.hud_format, true) ||
+        !create_text_format(L"Bahnschrift SemiBold", DWRITE_FONT_WEIGHT_SEMI_BOLD, 128.0f, &d2d_->preview_fonts.rank_format, true) ||
+        !create_text_format(L"Bahnschrift SemiBold", DWRITE_FONT_WEIGHT_SEMI_BOLD, 42.0f, &d2d_->preview_fonts.gameplay_combo_format, true)) return false;
     d2d_->ui_font_family = ui_family;
     d2d_->applied_ui_text_scale = d2d_->requested_ui_text_scale;
     d2d_->native_wordmark_layout.Reset();
     d2d_->native_wordmark_format = nullptr;
     d2d_->menu_ellipsis_signs.clear();
     d2d_->generic_help_layout.Reset();
+    for (auto& text : d2d_->menu_readable_text) text = {};
+    for (auto& text : d2d_->gameplay_readable_text) text = {};
+    for (auto& text : d2d_->preview_readable_text) text = {};
     return true;
 }
 

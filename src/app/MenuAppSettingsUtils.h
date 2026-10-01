@@ -14,8 +14,52 @@
 #include "app/MenuAppSkinUtils.h"
 #include "app/ModeManager.h"
 #include "config/Config.h"
+#include "config/GraphicsResolution.h"
 
 namespace tenriff::app {
+
+inline std::string compact_gameplay_key_label(std::string value) {
+        if (value == "Semicolon") {
+            return ";";
+        }
+        if (value == "LBracket") {
+            return "[";
+        }
+        if (value == "RBracket") {
+            return "]";
+        }
+        if (value == "Apostrophe") {
+            return "'";
+        }
+        if (value == "Comma") {
+            return ",";
+        }
+        if (value == "Period") {
+            return ".";
+        }
+        if (value == "Slash") {
+            return "/";
+        }
+        if (value == "Backslash") {
+            return "\\";
+        }
+        if (value == "Grave") {
+            return "`";
+        }
+        if (value == "Space") {
+            return "SP";
+        }
+        if (value == "Backspace") {
+            return "Bksp";
+        }
+        if (value == "PageUp") {
+            return "PgUp";
+        }
+        if (value == "PageDown") {
+            return "PgDn";
+        }
+        return value;
+}
 
 inline constexpr double kVisualOffsetMin = config::kVisualOffsetMin;
 inline constexpr double kVisualOffsetMax = config::kVisualOffsetMax;
@@ -189,59 +233,20 @@ inline std::string cycle_display_mode(std::string current, int direction) {
 }
 
 inline std::string normalize_resolution_preset(std::string value) {
-    std::transform(value.begin(), value.end(), value.begin(), [](unsigned char ch) {
-        return static_cast<char>(std::tolower(ch));
-    });
-    if (value == "720p" || value == "1080p" || value == "qhd") {
-        return value;
-    }
-    return "native";
+    return config::normalize_graphics_resolution(value);
 }
 
 inline std::string cycle_resolution_preset(std::string current, int direction) {
-    static constexpr const char* kResolutionPresets[] = {"native", "720p", "1080p", "qhd"};
-    const int option_count = static_cast<int>(sizeof(kResolutionPresets) / sizeof(kResolutionPresets[0]));
-    current = normalize_resolution_preset(std::move(current));
-    int current_index = 0;
-    for (int i = 0; i < option_count; ++i) {
-        if (current == kResolutionPresets[i]) {
-            current_index = i;
-            break;
-        }
-    }
-    current_index += direction;
-    if (current_index < 0) {
-        current_index = option_count - 1;
-    } else if (current_index >= option_count) {
-        current_index = 0;
-    }
-    return kResolutionPresets[current_index];
+    return config::cycle_graphics_resolution(current, direction);
 }
 
 inline std::pair<int, int> resolution_dimensions(std::string_view preset) {
-    if (preset == "720p") {
-        return {1280, 720};
-    }
-    if (preset == "1080p") {
-        return {1920, 1080};
-    }
-    if (preset == "qhd") {
-        return {2560, 1440};
-    }
-    return {0, 0};
+    return config::graphics_resolution_dimensions(preset);
 }
 
 inline std::string resolution_label(std::string_view preset) {
-    if (preset == "720p") {
-        return "1280x720";
-    }
-    if (preset == "1080p") {
-        return "1920x1080";
-    }
-    if (preset == "qhd") {
-        return "2560x1440";
-    }
-    return "Monitor Native";
+    const auto [width, height] = resolution_dimensions(preset);
+    return width > 0 ? std::to_string(width) + "x" + std::to_string(height) : "Monitor Native";
 }
 
 inline std::string song_index_profile_label(const std::string& value) {

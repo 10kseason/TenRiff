@@ -153,7 +153,7 @@ bool GameSession::initialize(const CommandLineOptions& options) {
     pause_anchor_valid_ = false;
     last_audio_sample_.store(0, std::memory_order_release);
     audio_timing_sequence_.store(0, std::memory_order_release);
-    last_audio_timing_ = {};
+    last_audio_timing_.store({});
     startup_input_timing_anchor_ = {};
     clock_sync_.reset();
     countdown_active_ = false;
@@ -361,7 +361,8 @@ bool GameSession::initialize(const CommandLineOptions& options) {
         if (!options.has_rate && replay_source_.rate > 0.0) {
             config_.speed.rate = replay_source_.rate;
         }
-        if (!replay_source_.mods.empty()) {
+        if (!replay_source_.mods.empty() ||
+            replay_source_.replay_format_version >= gameplay::kReplayFormatVersion) {
             config_.mode.mods = replay_source_.mods;
         }
         if (!replay_source_.mode.key_mode.empty()) {
@@ -546,7 +547,7 @@ bool GameSession::initialize(const CommandLineOptions& options) {
         return false;
     }
 
-    const ModeManagerResult mode_result =
+    ModeManagerResult mode_result =
         manage_modes(chart_result.chart,
                      chart_result.format,
                      config_.mode,
@@ -554,6 +555,11 @@ bool GameSession::initialize(const CommandLineOptions& options) {
                      config_.speed.rate,
                      chart_result.base_bpm,
                      sample_rate_);
+    if (replay_playback_enabled_) {
+        const auto base_judge = is_supported_canonical_replay_ruleset(replay_source_.ruleset_id)
+                                    ? config::JudgeConfig{} : config_.judge;
+        mode_result.judge = replay_judge_config_for_playback(replay_source_, base_judge);
+    }
     for (const auto& warning : mode_result.warnings) {
         std::cerr << "[warn] " << warning << std::endl;
     }
@@ -718,7 +724,7 @@ bool GameSession::initialize(const CommandLineOptions& options) {
         keymap_manager_runtime.normalize_mode_token(std::to_string(std::max(1, chart_.lane_count)) + "k");
     for (const auto& [lane, key] : keymap_manager_runtime.bindings_for_mode(keymap_, active_key_mode)) {
         auto lane_index = parse_lane_index(lane);
-        if (!lane_index.has_value()) {
+        if (!lane_index.has_value() || *lane_index > chart_.lane_count) {
             continue;
         }
         auto keycode = config::KeycodeMap::to_keycode(key);
@@ -727,16 +733,28 @@ bool GameSession::initialize(const CommandLineOptions& options) {
         }
         key_to_lane_[keycode.value()] = lane_index.value();
     }
+    for (const auto& [lane, key] : keymap_manager_runtime.secondary_bindings_for_mode(keymap_, active_key_mode)) {
+        const auto lane_index = parse_lane_index(lane);
+        const auto keycode = config::KeycodeMap::to_keycode(key);
+        if (lane_index && *lane_index <= chart_.lane_count && keycode) {
+            // Preserve an existing primary assignment if a secondary conflicts.
+            key_to_lane_.emplace(*keycode, *lane_index);
+        }
+    }
+    lane_binding_state_.configure(key_to_lane_);
+    std::unordered_set<int> bound_lanes;
+    for (const auto& [key, lane] : key_to_lane_) bound_lanes.insert(lane);
     std::cerr << "[info] Gameplay input configured="
               << input_backend_name(input_backend_state_.configured_backend)
               << " polling_shadow=" << (config_.input.rawinput ? "bound-keys" : "primary")
               << " key_mode=" << active_key_mode
-              << " bound_lanes=" << key_to_lane_.size() << "/" << std::max(1, chart_.lane_count)
+              << " bound_lanes=" << bound_lanes.size() << "/" << std::max(1, chart_.lane_count)
+              << " bound_keys=" << key_to_lane_.size()
               << " keymap_normalized=" << keymap_result.normalized_binding_count
               << " keymap_repaired=" << keymap_result.repaired_binding_count
               << std::endl;
-    if (key_to_lane_.empty() || key_to_lane_.size() < static_cast<std::size_t>(std::max(1, chart_.lane_count))) {
-        std::cerr << "[warn] Gameplay lane binding coverage incomplete: mapped=" << key_to_lane_.size()
+    if (bound_lanes.size() < static_cast<std::size_t>(std::max(1, chart_.lane_count))) {
+        std::cerr << "[warn] Gameplay lane binding coverage incomplete: mapped=" << bound_lanes.size()
                   << " expected=" << std::max(1, chart_.lane_count)
                   << ". Invalid bindings or duplicate lane keys may prevent judgement/input interaction."
                   << std::endl;
@@ -795,6 +813,9 @@ bool GameSession::initialize(const CommandLineOptions& options) {
     engine_ = std::make_unique<gameplay::GameplayEngine>(chart_, gameplay_config);
     if (ghost_replay_enabled_) {
         gameplay::GameplayConfig ghost_config = gameplay_config;
+        const auto ghost_base_judge = is_supported_canonical_replay_ruleset(ghost_replay_source_.ruleset_id)
+                                          ? config::JudgeConfig{} : config_.judge;
+        ghost_config.judge = replay_judge_config_for_playback(ghost_replay_source_, ghost_base_judge);
         ghost_config.gauge_shift_enabled = true;
         ghost_config.gauge_policy = {};
         if (!ghost_replay_source_.mode.gauge.empty()) {
@@ -1041,13 +1062,18 @@ GameSession::HudSnapshot GameSession::hud_snapshot() {
             continue;
         }
 
-        const AudioTimingState timing = last_audio_timing_;
+        const AudioTimingState timing = last_audio_timing_.load();
+        // Keep payload reads before the final sequence check, including on
+        // platforms where relaxed atomic loads can be reordered.
+        std::atomic_thread_fence(std::memory_order_acquire);
         const uint64_t end = audio_timing_sequence_.load(std::memory_order_acquire);
         if (begin != end) {
             continue;
         }
 
-        snapshot.current_sample = timing.sample;
+        // Rendering follows the device playback head. The engine/write cursor
+        // includes queued audio and must never advance visuals by that latency.
+        snapshot.current_sample = timing.playback_sample;
         snapshot.audio_sample_time_ns = timing.time_ns;
         snapshot.audio_buffer_frames = timing.buffer_frames;
         break;
@@ -1430,7 +1456,17 @@ void GameSession::adjust_hispeed(double delta) {
 
     double next = std::clamp(config_.speed.hi_speed + delta, kHispeedMin, kHispeedMax);
     next = std::round(next * 100.0) / 100.0;
+    if (config_.speed.hi_speed == next) return;
     config_.speed.hi_speed = next;
+    if (countdown_active_) {
+        // The gameplay audio device starts after the countdown. Give tuning
+        // feedback now instead of leaving a stale click queued for chart start.
+        play_settings_adjustment_click(focused_audio_master_gain(
+            config_.audio_ui.master_volume, config_.audio_ui.mute_when_inactive,
+            process_owns_foreground_window()));
+    } else {
+        settings_click_requested_.store(true, std::memory_order_release);
+    }
 }
 
 void GameSession::update_hispeed_repeat_state(uint32_t keycode, input::InputState state, int64_t event_time_ns) {
@@ -2100,10 +2136,19 @@ void GameSession::mix_chart_audio(float* output, uint32_t frames, int64_t buffer
     chart_audio_voices_.resize(write_index);
 }
 
-void GameSession::clamp_output(float* output, uint32_t frames, float master_gain) {
+void GameSession::finish_audio_output(float* output, uint32_t frames, bool foreground, bool normalize_mix) {
     if (!output || frames == 0) {
         return;
     }
+    // OFF must bypass the stateful normalizer entirely; the output limiter and
+    // master gain retain their existing behavior for either setting.
+    if (normalize_mix && config_.audio_ui.normalize_audio) mix_normalizer_.process(output, frames);
+    if (settings_click_requested_.exchange(false, std::memory_order_acq_rel))
+        settings_click_.trigger(sample_rate_);
+    // Keep UI feedback out of automatic loudness tracking.
+    settings_click_.mix(output, frames);
+    const double master_gain = focused_audio_master_gain(
+        config_.audio_ui.master_volume, config_.audio_ui.mute_when_inactive, foreground);
     const std::size_t sample_count = static_cast<std::size_t>(frames) * 2;
     for (std::size_t i = 0; i < sample_count; ++i) {
         output[i] = apply_master_volume_to_sample(output[i], master_gain);
@@ -2354,6 +2399,8 @@ void GameSession::shutdown() {
     result_transition_pending_ = false;
     gameplay_started_ = false;
     tone_voices_.clear();
+    settings_click_.reset();
+    settings_click_requested_.store(false, std::memory_order_release);
     chart_audio_assets_.clear();
     chart_audio_events_.clear();
     chart_audio_voices_.clear();
@@ -2407,6 +2454,7 @@ void GameSession::audio_callback(float* output,
                                  uint32_t frames,
                                  int64_t physical_buffer_start_samples,
                                  int64_t physical_playback_sample) {
+    const int64_t callback_time_ns = timing::HighResClock::now_ns();
     if (output && frames > 0) {
         std::fill(output, output + frames * 2, 0.0f);
     }
@@ -2428,7 +2476,7 @@ void GameSession::audio_callback(float* output,
         }
         engine_active = true;
 
-        const int64_t now_ns = timing::HighResClock::now_ns();
+        const int64_t now_ns = callback_time_ns;
         if (paused_.load(std::memory_order_acquire)) {
             if (!pause_anchor_valid_) {
                 pause_physical_start_sample_ = physical_buffer_start_samples;
@@ -2578,10 +2626,6 @@ void GameSession::audio_callback(float* output,
         }
         mix_chart_audio(output, frames, logical_buffer_start_samples);
         mix_tones(output, frames, logical_buffer_start_samples);
-        if (config_.audio_ui.normalize_audio) mix_normalizer_.process(output, frames);
-        const float master_gain =
-            static_cast<float>(std::clamp(config_.audio_ui.master_volume, 0.0, 1.0));
-        clamp_output(output, frames, master_gain);
         if (result_transition_pending_ &&
             next_chart_audio_event_ >= chart_audio_events_.size() &&
             chart_audio_voices_.empty() &&
@@ -2590,13 +2634,19 @@ void GameSession::audio_callback(float* output,
         }
     }
 
-    const int64_t committed_time_ns = timing::HighResClock::now_ns();
+    if (engine_active) {
+        // Paused tuning still clicks immediately while chart audio and its
+        // normalizer remain frozen until the resume countdown completes.
+        finish_audio_output(output, frames,
+            !config_.audio_ui.mute_when_inactive || process_owns_foreground_window(),
+            !paused_callback);
+    }
     audio_timing_sequence_.fetch_add(1, std::memory_order_acq_rel);
-    last_audio_timing_.sample = committed_sample;
-    last_audio_timing_.buffer_start_sample = committed_buffer_start_sample;
-    last_audio_timing_.playback_sample = committed_playback_sample;
-    last_audio_timing_.time_ns = committed_time_ns;
-    last_audio_timing_.buffer_frames = frames;
+    // Pair with the reader's acquire fence: observing a newer payload field
+    // must also expose this odd sequence value before the final reader check.
+    std::atomic_thread_fence(std::memory_order_release);
+    last_audio_timing_.store({committed_sample, committed_buffer_start_sample,
+                             committed_playback_sample, callback_time_ns, frames});
     audio_timing_sequence_.fetch_add(1, std::memory_order_release);
     last_audio_sample_.store(committed_sample, std::memory_order_release);
 }
@@ -2691,6 +2741,7 @@ void GameSession::rebaseline_gameplay_start_input_state(int64_t sample) {
     hispeed_increase_next_repeat_ns_ = 0;
 
     std::fill(lane_pressed_.begin(), lane_pressed_.end(), 0);
+    lane_binding_state_.reset();
     const int64_t baseline_time_ns = timing::HighResClock::now_ns();
     for (auto& tracked : polled_gameplay_keys_) {
         bool pressed = false;
@@ -2698,13 +2749,6 @@ void GameSession::rebaseline_gameplay_start_input_state(int64_t sample) {
             pressed = (GetAsyncKeyState(static_cast<int>(*poll_vk)) & 0x8000) != 0;
         }
         if (!pressed) {
-            // Releases received while paused were drained without scoring. Sync
-            // the physical up state too, or a held LN can survive an entire pause.
-            if (!autoplay_enabled_ && !replay_playback_enabled_) {
-                if (const auto lane = lane_from_keycode(tracked.keycode)) {
-                    catch_up_lane_input(lane.value(), input::InputState::Released, sample);
-                }
-            }
             continue;
         }
 
@@ -2724,9 +2768,15 @@ void GameSession::rebaseline_gameplay_start_input_state(int64_t sample) {
         if (autoplay_enabled_ || replay_playback_enabled_) {
             continue;
         }
-        if (auto lane = lane_from_keycode(baseline_event.keycode)) {
-            catch_up_lane_input(lane.value(), baseline_event.state, sample);
-        }
+        static_cast<void>(lane_binding_state_.apply(baseline_event.keycode, baseline_event.state));
+    }
+
+    // Poll every binding before syncing any lane: an unheld secondary must not
+    // release an LN whose primary is still down when play resumes.
+    if (!autoplay_enabled_ && !replay_playback_enabled_) {
+        for (int lane = 1; lane <= chart_.lane_count; ++lane)
+            catch_up_lane_input(lane, lane_binding_state_.pressed(lane)
+                ? input::InputState::Pressed : input::InputState::Released, sample);
     }
 
     std::fill(lane_activity_.begin(), lane_activity_.end(), 0.0f);
@@ -2964,8 +3014,10 @@ void GameSession::process_future_events(int64_t buffer_start_samples,
                 finished_.store(true, std::memory_order_release);
                 return;
             }
+            const auto logical_state = lane_binding_state_.apply(next->event.keycode, next->event.state);
+            if (!logical_state) continue;
             dispatch_lane_input(lane.value(),
-                                next->event.state,
+                                *logical_state,
                                 next->sample,
                                 buffer_start_samples);
         }
@@ -3048,13 +3100,15 @@ void GameSession::process_input_queue(int64_t buffer_start_samples, int64_t buff
         if (lane_index < 0 || lane_index >= static_cast<int>(kGameplayHudMaxLanes)) {
             continue;
         }
+        const auto logical_state = lane_binding_state_.apply(event.keycode, event.state);
+        if (!logical_state) continue;
         if (event_is_stale) {
             stale_lane_present[static_cast<std::size_t>(lane_index)] = 1;
             stale_lane_inputs[static_cast<std::size_t>(lane_index)] = BufferedLaneInput{
-                lane.value(), event.state, sample};
+                lane.value(), *logical_state, sample};
             continue;
         }
-        pending_input_events_.push_back(BufferedLaneInput{lane.value(), event.state, sample});
+        pending_input_events_.push_back(BufferedLaneInput{lane.value(), *logical_state, sample});
     }
 
     for (std::size_t lane_index = 0; lane_index < stale_lane_present.size(); ++lane_index) {

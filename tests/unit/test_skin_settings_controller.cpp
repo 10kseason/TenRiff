@@ -23,14 +23,21 @@ TEST_CASE("skin stable identifiers map across the optional LR2 row") {
     using tenriff::app::menu::settings::skin_setting_id_at;
 
     REQUIRE(skin_setting_id_at(4, false).has_value());
-    CHECK(*skin_setting_id_at(4, false) == SkinSettingsRowId::ImportSkin);
+    CHECK(*skin_setting_id_at(4, false) == SkinSettingsRowId::VisualLatency);
     REQUIRE(skin_setting_id_at(4, true).has_value());
-    CHECK(*skin_setting_id_at(4, true) == SkinSettingsRowId::Lr2Resolution);
-    REQUIRE(skin_setting_id_at(50, false).has_value());
-    CHECK(*skin_setting_id_at(50, false) == SkinSettingsRowId::Back);
-    REQUIRE(skin_setting_id_at(51, true).has_value());
-    CHECK(*skin_setting_id_at(51, true) == SkinSettingsRowId::Back);
-    CHECK_FALSE(skin_setting_id_at(51, false).has_value());
+    CHECK(*skin_setting_id_at(4, true) == SkinSettingsRowId::VisualLatency);
+    CHECK(*skin_setting_id_at(5, false) == SkinSettingsRowId::ImportSkin);
+    CHECK(*skin_setting_id_at(5, true) == SkinSettingsRowId::Lr2Resolution);
+    CHECK(tenriff::app::skin_settings_category(SkinSettingsRowId::VisualLatency) ==
+          tenriff::app::SkinSettingsCategory::Source);
+    const auto native_back = tenriff::app::menu::settings::skin_setting_index(SkinSettingsRowId::Back, false);
+    const auto lr2_back = tenriff::app::menu::settings::skin_setting_index(SkinSettingsRowId::Back, true);
+    REQUIRE(native_back.has_value());
+    REQUIRE(lr2_back.has_value());
+    CHECK(*skin_setting_id_at(*native_back, false) == SkinSettingsRowId::Back);
+    CHECK(*skin_setting_id_at(*lr2_back, true) == SkinSettingsRowId::Back);
+    CHECK_FALSE(skin_setting_id_at(*native_back + 1, false).has_value());
+    CHECK_FALSE(tenriff::app::menu::settings::skin_setting_index(SkinSettingsRowId::Lr2Resolution, false).has_value());
 }
 
 TEST_CASE("skin preset actions use the same keyboard and mouse controller path") {
@@ -232,4 +239,150 @@ TEST_CASE("judgement and combo offsets change independently and clamp to visible
     (void)controller.handle(MenuAction::adjust(-1), runtime, kLr2Names, kTenRiffNames, SkinSettingsRowId::ComboX);
     CHECK(runtime.skin.combo_offset_x == -10);
     CHECK(runtime.skin.judgement_offset_x == 600);
+}
+
+TEST_CASE("combo and judgement font sizes adjust independently with bounded mouse and keyboard controls") {
+    tenriff::config::RuntimeConfig runtime;
+    runtime.skin.source = "tenriff";
+    SkinSettingsController controller;
+    controller.reset("4k");
+    static_cast<void>(controller.handle(MenuAction::set_ratio(0.5), runtime, kLr2Names, kTenRiffNames,
+                                        SkinSettingsRowId::ComboFontSize));
+    CHECK(runtime.skin.combo_font_scale == doctest::Approx(1.25));
+    CHECK(runtime.skin.judgement_font_scale == doctest::Approx(1.0));
+    static_cast<void>(controller.handle(MenuAction::adjust(1), runtime, kLr2Names, kTenRiffNames,
+                                        SkinSettingsRowId::ComboFontSize));
+    CHECK(runtime.skin.combo_font_scale == doctest::Approx(1.30));
+    static_cast<void>(controller.handle(MenuAction::set_ratio(9.0), runtime, kLr2Names, kTenRiffNames,
+                                        SkinSettingsRowId::JudgementFontSize));
+    CHECK(runtime.skin.judgement_font_scale == doctest::Approx(2.0));
+    static_cast<void>(controller.handle(MenuAction::adjust(1), runtime, kLr2Names, kTenRiffNames));
+    CHECK(runtime.skin.judgement_font_scale == doctest::Approx(2.0));
+    static_cast<void>(controller.handle(MenuAction::set_ratio(-2.0), runtime, kLr2Names, kTenRiffNames));
+    CHECK(runtime.skin.judgement_font_scale == doctest::Approx(0.5));
+    static_cast<void>(controller.handle(MenuAction::adjust(-1), runtime, kLr2Names, kTenRiffNames));
+    CHECK(runtime.skin.judgement_font_scale == doctest::Approx(0.5));
+    CHECK(runtime.skin.combo_font_scale == doctest::Approx(1.30));
+    CHECK(controller.handle(MenuAction::back(), runtime, kLr2Names, kTenRiffNames).menu.persist_config);
+}
+
+TEST_CASE("skin editing starts at four keys and preserves a later edit choice without changing gameplay") {
+    SkinSettingsController controller;
+    tenriff::config::RuntimeConfig runtime;
+    runtime.mode.key_mode = "10k";
+    CHECK(controller.edit_mode() == "4k");
+    CHECK(tenriff::app::normalize_skin_edit_mode("unsupported") == "4k");
+    CHECK(tenriff::app::normalize_skin_edit_mode("") == "4k");
+    CHECK(tenriff::app::normalize_skin_edit_mode(" keys_10 ") == "10k");
+    CHECK(tenriff::app::normalize_skin_edit_mode("7+1 SP") == "7+1");
+    for (int keys = 4; keys <= 16; ++keys) {
+        CHECK(tenriff::app::normalize_skin_edit_mode(std::to_string(keys) + "-Key") ==
+              std::to_string(keys) + "k");
+    }
+    controller.reset(controller.edit_mode());
+    CHECK(controller.edit_mode() == "4k");
+    static_cast<void>(controller.handle(MenuAction::adjust(1), runtime, kLr2Names, kTenRiffNames, SkinSettingsRowId::KeyMode));
+    CHECK(controller.edit_mode() == "5k");
+    controller.reset(controller.edit_mode());
+    CHECK(controller.edit_mode() == "5k");
+    CHECK(runtime.mode.key_mode == "10k");
+}
+
+TEST_CASE("skin key backdrop toggle and opacity remain independent of hit bursts") {
+    tenriff::config::RuntimeConfig runtime;
+    SkinSettingsController controller;
+    const double burst = runtime.skin.key_pulse_brightness;
+    runtime.skin.key_backdrop_enabled = true;
+    runtime.skin.key_backdrop_opacity = 0.35;
+    static_cast<void>(controller.handle(MenuAction::adjust(-1), runtime, kLr2Names, kTenRiffNames, SkinSettingsRowId::KeyBackdrop));
+    CHECK_FALSE(runtime.skin.key_backdrop_enabled);
+    CHECK(runtime.skin.key_backdrop_opacity == doctest::Approx(0.35));
+    static_cast<void>(controller.handle(MenuAction::set_ratio(0.83), runtime, kLr2Names, kTenRiffNames, SkinSettingsRowId::KeyBackdropOpacity));
+    CHECK(runtime.skin.key_backdrop_opacity == doctest::Approx(0.85));
+    CHECK_FALSE(runtime.skin.key_backdrop_enabled);
+    static_cast<void>(controller.handle(MenuAction::adjust(1), runtime, kLr2Names, kTenRiffNames, SkinSettingsRowId::KeyBackdrop));
+    CHECK(runtime.skin.key_backdrop_enabled);
+    for (int press = 0; press < 25; ++press)
+        static_cast<void>(controller.handle(MenuAction::adjust(1), runtime, kLr2Names, kTenRiffNames, SkinSettingsRowId::KeyBackdropOpacity));
+    CHECK(runtime.skin.key_backdrop_opacity == doctest::Approx(1.0));
+    static_cast<void>(controller.handle(MenuAction::set_ratio(-2.0), runtime, kLr2Names, kTenRiffNames, SkinSettingsRowId::KeyBackdropOpacity));
+    CHECK(runtime.skin.key_backdrop_opacity == doctest::Approx(0.0));
+    CHECK(runtime.skin.key_pulse_brightness == doctest::Approx(burst));
+    CHECK(runtime.skin.key_backdrop_override);
+    CHECK(controller.dirty());
+}
+
+TEST_CASE("first backdrop edit starts at imported skin defaults and then owns the profile override") {
+    tenriff::config::RuntimeConfig runtime;
+    SkinSettingsController controller;
+    controller.set_backdrop_defaults(false, 0.65f);
+    static_cast<void>(controller.handle(MenuAction::adjust(-1), runtime, kLr2Names, kTenRiffNames,
+                                       SkinSettingsRowId::KeyBackdropOpacity));
+    CHECK(runtime.skin.key_backdrop_override);
+    CHECK_FALSE(runtime.skin.key_backdrop_enabled);
+    CHECK(runtime.skin.key_backdrop_opacity == doctest::Approx(0.6));
+    controller.set_backdrop_defaults(true, 0.1f);
+    static_cast<void>(controller.handle(MenuAction::adjust(1), runtime, kLr2Names, kTenRiffNames,
+                                       SkinSettingsRowId::KeyBackdropOpacity));
+    CHECK_FALSE(runtime.skin.key_backdrop_enabled);
+    CHECK(runtime.skin.key_backdrop_opacity == doctest::Approx(0.65));
+    runtime.skin.key_backdrop_override = false;
+    controller.set_backdrop_defaults(false, 0.3f);
+    static_cast<void>(controller.handle(MenuAction::adjust(1), runtime, kLr2Names, kTenRiffNames,
+                                       SkinSettingsRowId::KeyBackdrop));
+    CHECK(runtime.skin.key_backdrop_enabled);
+    CHECK(runtime.skin.key_backdrop_opacity == doctest::Approx(0.3));
+    static_cast<void>(controller.handle(MenuAction::activate(), runtime, kLr2Names, kTenRiffNames,
+                                       SkinSettingsRowId::KeyBackdrop));
+    CHECK_FALSE(runtime.skin.key_backdrop_enabled);
+}
+
+TEST_CASE("skin related groups stay contiguous while stable targets roundtrip their display positions") {
+    for (const bool lr2 : {false, true}) {
+        std::vector<tenriff::app::SkinSettingsCategory> completed;
+        auto current = tenriff::app::SkinSettingsCategory::Source;
+        const tenriff::app::SkinSettingsRows rows{lr2};
+        for (int index = 0; index < rows.count(); ++index) {
+            const auto id = tenriff::app::menu::settings::skin_setting_id_at(index, lr2);
+            REQUIRE(id.has_value());
+            CHECK(rows.index_of(*id) == index);
+            const auto category = tenriff::app::skin_settings_category(*id);
+            if (category != current) {
+                for (const auto prior : completed) CHECK(category != prior);
+                completed.push_back(current);
+                current = category;
+            }
+        }
+    }
+}
+
+TEST_CASE("backdrop height edits adopt imported brightness without changing opacity or enabling the effect") {
+    tenriff::config::RuntimeConfig runtime;
+    SkinSettingsController controller;
+    const double pulse = runtime.skin.key_pulse_brightness;
+    controller.set_backdrop_defaults(false, 0.65f, 0.4f, 0.8f);
+    static_cast<void>(controller.handle(MenuAction::set_ratio(0.3), runtime, kLr2Names, kTenRiffNames,
+                                       SkinSettingsRowId::KeyBackdropHeight));
+    CHECK(runtime.skin.key_backdrop_override);
+    CHECK_FALSE(runtime.skin.key_backdrop_enabled);
+    CHECK(runtime.skin.key_backdrop_opacity == doctest::Approx(0.65));
+    CHECK(runtime.skin.key_backdrop_brightness == doctest::Approx(0.4));
+    CHECK(runtime.skin.key_backdrop_height == doctest::Approx(0.3));
+    controller.set_backdrop_defaults(true, 0.1f, 0.1f, 0.1f);
+    static_cast<void>(controller.handle(MenuAction::set_ratio(0.85), runtime, kLr2Names, kTenRiffNames,
+                                       SkinSettingsRowId::KeyBackdropBrightness));
+    CHECK(runtime.skin.key_backdrop_brightness == doctest::Approx(1.7));
+    CHECK(runtime.skin.key_backdrop_height == doctest::Approx(0.3));
+    CHECK(runtime.skin.key_backdrop_opacity == doctest::Approx(0.65));
+    CHECK_FALSE(runtime.skin.key_backdrop_enabled);
+    static_cast<void>(controller.handle(MenuAction::adjust(-1), runtime, kLr2Names, kTenRiffNames,
+                                       SkinSettingsRowId::KeyBackdropHeight));
+    CHECK(runtime.skin.key_backdrop_height == doctest::Approx(0.25));
+    static_cast<void>(controller.handle(MenuAction::set_ratio(4.0), runtime, kLr2Names, kTenRiffNames,
+                                       SkinSettingsRowId::KeyBackdropBrightness));
+    CHECK(runtime.skin.key_backdrop_brightness == doctest::Approx(2.0));
+    static_cast<void>(controller.handle(MenuAction::set_ratio(-4.0), runtime, kLr2Names, kTenRiffNames,
+                                       SkinSettingsRowId::KeyBackdropHeight));
+    CHECK(runtime.skin.key_backdrop_height == doctest::Approx(0.0));
+    CHECK(runtime.skin.key_pulse_brightness == doctest::Approx(pulse));
 }

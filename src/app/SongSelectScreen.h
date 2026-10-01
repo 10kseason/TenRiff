@@ -45,7 +45,8 @@ public:
     void begin_preview_decode(const std::string& selection_key,
                               const std::string& chart_path,
                               const std::string& indexed_preview_path,
-                              int target_sample_rate);
+                              int target_sample_rate,
+                              bool title_music = false);
     [[nodiscard]] std::optional<PreviewDecodeResult> take_ready_preview_decode();
     void cancel_preview_decode();
     void shutdown();

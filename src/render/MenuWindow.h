@@ -457,6 +457,8 @@ struct GameplayHudData {
     double judgement_position = 0.24;
     double judgement_offset_x = 0.0;
     double combo_offset_x = 0.0;
+    double combo_font_scale = 1.0;
+    double judgement_font_scale = 1.0;
     std::size_t lane_width_scale_count = 0;
     std::array<double, kGameplayHudMaxLanes> lane_width_scales{};
     double note_width_scale = 1.0;
@@ -476,6 +478,10 @@ struct GameplayHudData {
     bool judgement_line_glow_enabled = true;
     bool key_pulse_enabled = true;
     float key_pulse_brightness = 1.0f;
+    bool key_backdrop_enabled = true;
+    double key_backdrop_opacity = 0.25;
+    double key_backdrop_brightness = 1.0;
+    double key_backdrop_height = 1.0;
     std::string hit_burst_style = "prism";
     std::string key_label_position = "bottom";
     bool note_border_enabled = true;
@@ -596,8 +602,10 @@ struct GameplayHudData {
 };
 
 struct MenuRowData {
+    std::string category;
     std::string label;
     std::string value;
+    std::string secondary_value;
     bool selected = false;
     bool activatable = false;
     bool adjustable = false;
@@ -613,6 +621,8 @@ struct MenuRowData {
 };
 
 struct SkinPreviewData {
+    double gameplay_field_offset_x = 0.0;
+    std::array<std::string, kGameplayHudMaxLanes> key_labels{};
     bool visible = false;
     std::string mode_label;
     std::string selected_color_label;
@@ -624,6 +634,8 @@ struct SkinPreviewData {
     double judgement_position = 0.24;
     double judgement_offset_x = 0.0;
     double combo_offset_x = 0.0;
+    double combo_font_scale = 1.0;
+    double judgement_font_scale = 1.0;
     std::size_t lane_width_scale_count = 0;
     std::array<double, kGameplayHudMaxLanes> lane_width_scales{};
     double note_width_scale = 1.0;
@@ -642,6 +654,10 @@ struct SkinPreviewData {
     bool judgement_line_glow_enabled = true;
     bool key_pulse_enabled = true;
     float key_pulse_brightness = 1.0f;
+    bool key_backdrop_enabled = true;
+    double key_backdrop_opacity = 0.25;
+    double key_backdrop_brightness = 1.0;
+    double key_backdrop_height = 1.0;
     std::string hit_burst_style = "prism";
     std::string key_label_position = "bottom";
     bool note_border_enabled = true;
@@ -669,6 +685,10 @@ struct GenericMenuData {
     bool profile_preview_visible = false;
     std::vector<MenuRowData> rows;
     bool card_grid = false;
+    bool keymap_keyboard = false;
+    bool keymap_secondary_selected = false;
+    bool keymap_capture_active = false;
+    bool keymap_test = false;
     std::vector<std::string> card_descriptions;
     std::vector<std::string> notes;
     std::vector<std::string> footer_notes;
@@ -797,6 +817,7 @@ struct MenuRenderData {
 };
 
 class MenuWindow {
+    friend struct MenuWindowVisualTestAccess;
 public:
     MenuWindow();
     ~MenuWindow();
@@ -837,6 +858,7 @@ public:
     }
 
 private:
+    friend struct MenuWindowResolutionTestAccess;
     bool initialize(const MenuWindowConfig& config);
     bool fail_fatal(std::string_view message);
     void destroy_window();
@@ -867,7 +889,7 @@ private:
     void touch_song_card_preview_lru(std::string_view path);
     void trim_song_card_preview_cache();
     void invalidate_gameplay_static_cache();
-    [[nodiscard]] bool ensure_gameplay_static_cache(const GameplayHudData& data);
+    [[nodiscard]] bool ensure_gameplay_static_cache(const GameplayHudData& data, bool use_local_field_offset = true);
     [[nodiscard]] bool create_text_formats(const wchar_t* ui_family,
         const app::NativeMenuSkinStyle* native_style = nullptr);
     [[nodiscard]] bool recreate_targets();
@@ -880,6 +902,8 @@ private:
     void push_text_input(std::string text);
     void clear_song_scrollbar_state();
     [[nodiscard]] bool translate_window_point(int window_x, int window_y, float* out_x, float* out_y) const;
+    [[nodiscard]] std::optional<MenuClickEvent> resolve_menu_click(int window_x, int window_y,
+        bool double_click, bool control) const;
     [[nodiscard]] int song_scrollbar_target_index(float y, float drag_offset, int selected_offset) const;
 
     std::mutex config_mutex_;
@@ -971,6 +995,14 @@ private:
         int animated_judgement_count = 0;
         int64_t combo_animation_started_ns = 0;
         int64_t judgement_animation_started_ns = 0;
+        int animated_ghost_combo = 0;
+        int animated_ghost_judgement_count = 0;
+        int64_t ghost_combo_animation_started_ns = 0;
+        int64_t ghost_judgement_animation_started_ns = 0;
+        std::array<std::wstring, 6> battle_speed_text{};
+        std::array<std::wstring, 3> battle_speed_pair_text{};
+        std::array<std::wstring, 4> battle_summary_text{};
+        std::array<std::wstring, 4> ghost_battle_summary_text{};
         std::wstring title_text{};
         std::wstring artist_text{};
         std::wstring speed_text{};
@@ -1136,6 +1168,7 @@ private:
     std::unique_ptr<D2DResources> d2d_;
     PerformanceOverlayCache performance_overlay_cache_{};
     GameplayHudCache gameplay_hud_cache_{};
+    GameplayHudCache skin_preview_hud_cache_{};
     GameplayStaticCache gameplay_static_cache_{};
     GameplayNoteSpriteCache gameplay_note_sprite_cache_{};
     std::array<float, kGameplayHudMaxLanes> native_key_travel_{};

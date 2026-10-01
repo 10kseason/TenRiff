@@ -1,6 +1,7 @@
 #include "app/GameSession.h"
 #include "app/AudioFileDecoder.h"
 #include "app/AudioMixPolicy.h"
+#include "app/MenuMusicController.h"
 #include "app/ChartAudioPlayback.h"
 #include "app/ChartAudioStreaming.h"
 #include "app/ChartFileHash.h"

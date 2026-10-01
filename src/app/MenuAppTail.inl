@@ -123,6 +123,8 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
     target.judgement_position = config_.skin.judgement_position;
     target.judgement_offset_x = config_.skin.judgement_offset_x;
     target.combo_offset_x = config_.skin.combo_offset_x;
+    target.combo_font_scale = config_.skin.combo_font_scale;
+    target.judgement_font_scale = config_.skin.judgement_font_scale;
     target.show_cursor_in_gameplay = config_.ui.show_cursor_in_gameplay;
     target.show_lane_dividers = style_bool(
         manifest_style ? manifest_style->show_lane_dividers : std::optional<bool>{},
@@ -155,6 +157,14 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
     target.key_pulse_brightness = static_cast<float>(style_number(
         manifest_style ? manifest_style->key_pulse_brightness : std::optional<float>{},
         config_.skin.key_pulse_brightness));
+    target.key_backdrop_enabled = config_.skin.key_backdrop_override ? config_.skin.key_backdrop_enabled
+        : style_bool(manifest_style ? manifest_style->key_backdrop_enabled : std::optional<bool>{}, config_.skin.key_backdrop_enabled);
+    target.key_backdrop_opacity = config_.skin.key_backdrop_override ? config_.skin.key_backdrop_opacity
+        : style_number(manifest_style ? manifest_style->key_backdrop_opacity : std::optional<float>{}, config_.skin.key_backdrop_opacity);
+    target.key_backdrop_brightness = config_.skin.key_backdrop_override ? config_.skin.key_backdrop_brightness
+        : style_number(manifest_style ? manifest_style->key_backdrop_brightness : std::optional<float>{}, config_.skin.key_backdrop_brightness);
+    target.key_backdrop_height = config_.skin.key_backdrop_override ? config_.skin.key_backdrop_height
+        : style_number(manifest_style ? manifest_style->key_backdrop_height : std::optional<float>{}, config_.skin.key_backdrop_height);
     target.hit_burst_style = manifest_style && manifest_style->hit_burst_style.has_value()
                                  ? *manifest_style->hit_burst_style
                                  : config::normalize_skin_hit_burst_style_token(config_.skin.hit_burst_style);
@@ -363,48 +373,7 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
                                     : config::skin_color_rgb(lane_colors[i]);
     }
 
-    auto compact_key_label = [](std::string value) -> std::string {
-        if (value == "Semicolon") {
-            return ";";
-        }
-        if (value == "LBracket") {
-            return "[";
-        }
-        if (value == "RBracket") {
-            return "]";
-        }
-        if (value == "Apostrophe") {
-            return "'";
-        }
-        if (value == "Comma") {
-            return ",";
-        }
-        if (value == "Period") {
-            return ".";
-        }
-        if (value == "Slash") {
-            return "/";
-        }
-        if (value == "Backslash") {
-            return "\\";
-        }
-        if (value == "Grave") {
-            return "`";
-        }
-        if (value == "Space") {
-            return "SP";
-        }
-        if (value == "Backspace") {
-            return "Bksp";
-        }
-        if (value == "PageUp") {
-            return "PgUp";
-        }
-        if (value == "PageDown") {
-            return "PgDn";
-        }
-        return value;
-    };
+
 
     target.key_label_count = 0;
     target.key_labels.fill(std::string{});
@@ -418,7 +387,7 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
             const std::string lane_id = "lane" + std::to_string(source_lane);
             const auto binding = bindings.find(lane_id);
             if (binding != bindings.end()) {
-                target.key_labels[i] = compact_key_label(binding->second);
+                target.key_labels[i] = compact_gameplay_key_label(binding->second);
             }
         }
     }
@@ -599,7 +568,7 @@ bool MenuApp::start_song_preview_audio(const SongSelectScreen::PreviewDecodeResu
     song_select_screen_.preview_gain().store(
         static_cast<float>(menu_background_gain(
             config_.audio_ui.background_sound_enabled,
-            config_.audio_ui.master_volume,
+            menu_output_master_gain(),
             config_.audio_ui.bgm_volume)),
         std::memory_order_release);
 
@@ -653,6 +622,47 @@ void MenuApp::cancel_song_preview_decode() {
     song_select_screen_.cancel_preview_decode();
 }
 
+void MenuApp::update_title_music_target() {
+    const bool title_screen = current_screen() == Screen::Title || current_screen() == Screen::QuickSetup;
+    if (!title_screen) {
+        title_music_visit_active_ = false;
+        title_music_chart_path_.clear();
+        title_music_preview_path_.clear();
+        return;
+    }
+    const std::string mode = config::normalize_title_music_token(config_.audio_ui.title_music);
+    const bool same_last_chart = mode != "last_played" ||
+                                title_music_chart_path_ == config_.ui.last_played_chart_path;
+    if (title_music_visit_active_ && title_music_mode_ == mode && same_last_chart &&
+        (!title_music_chart_path_.empty() || title_music_library_revision_ == song_index_revision_)) {
+        return;
+    }
+
+    title_music_visit_active_ = true;
+    title_music_mode_ = mode;
+    title_music_library_revision_ = song_index_revision_;
+    title_music_chart_path_.clear();
+    title_music_preview_path_.clear();
+    ++title_music_generation_;
+    if (mode == "last_played") {
+        title_music_chart_path_ = config_.ui.last_played_chart_path;
+    } else if (mode == "random_bms") {
+        // Pick once per visit from the whole loaded library. Search/table filters
+        // must not make title music depend on the current song-list cursor.
+        std::vector<std::size_t> candidates;
+        for (std::size_t i = 0; i < indexed_songs_.size(); ++i) {
+            if (to_lower_ascii(indexed_songs_[i].format) == "bms" &&
+                !indexed_songs_[i].path.empty()) candidates.push_back(i);
+        }
+        if (!candidates.empty()) {
+            const auto pick = static_cast<std::size_t>(next_random_session_seed()) % candidates.size();
+            const auto& entry = indexed_songs_[candidates[static_cast<std::size_t>(pick)]];
+            title_music_chart_path_ = song_absolute_path(entry);
+            title_music_preview_path_ = entry.audio_preview_path;
+        }
+    }
+}
+
 void MenuApp::service_song_preview() {
     constexpr int64_t kPreviewDelayNs = 750'000'000LL;
     const int64_t now_ns = timing::HighResClock::now_ns();
@@ -663,10 +673,14 @@ void MenuApp::service_song_preview() {
         publish_snapshot();
     }
 
-    const bool preview_screen_active =
+    update_title_music_target();
+    const bool title_chart_music = title_music_visit_active_ && !title_music_chart_path_.empty() &&
+                                  config_.audio_ui.background_sound_enabled;
+    const bool song_preview_screen_active =
         current_screen() == Screen::SongSelect &&
         song_select_view_ == SongSelectView::Songs &&
         config_.audio_ui.background_sound_enabled;
+    const bool preview_screen_active = song_preview_screen_active || title_chart_music;
     const bool was_preview_screen_active = song_select_screen_.active();
     song_select_screen_.set_active(preview_screen_active);
 
@@ -685,16 +699,21 @@ void MenuApp::service_song_preview() {
     auto decoded = song_select_screen_.take_ready_preview_decode();
 
     const SongEntry* entry = nullptr;
-    if (preview_screen_active && selected_song_ >= 0) {
+    if (song_preview_screen_active && selected_song_ >= 0) {
         entry = visible_song_entry(static_cast<std::size_t>(selected_song_));
     }
 
-    const std::string chart_path = entry ? song_absolute_path(*entry) : std::string{};
-    const std::string indexed_preview_path = entry ? entry->audio_preview_path : std::string{};
-    const std::string selection_key = entry ? chart_path + "\n" + indexed_preview_path
-                                            : std::string{};
+    const std::string chart_path = title_chart_music ? title_music_chart_path_
+                                    : entry ? song_absolute_path(*entry) : std::string{};
+    const std::string indexed_preview_path = title_chart_music ? title_music_preview_path_
+                                              : entry ? entry->audio_preview_path : std::string{};
+    // A visit generation rejects a worker completed after leaving and immediately
+    // returning to the same chart. One owner serializes title and selection decode.
+    const std::string selection_key = chart_path.empty() ? std::string{} :
+        (title_chart_music ? "title:" + std::to_string(title_music_generation_) + "\n" : "song:\n") +
+        chart_path + "\n" + indexed_preview_path;
 
-    if (!entry || chart_path.empty()) {
+    if (chart_path.empty()) {
         const bool was_active =
             audio_thread_.is_running() || !song_select_screen_.preview_active_path().empty();
         song_select_screen_.clear_preview_target();
@@ -709,7 +728,7 @@ void MenuApp::service_song_preview() {
         const bool was_active =
             audio_thread_.is_running() || !song_select_screen_.preview_active_path().empty();
         if (current_screen() != Screen::BmsEditor) stop_song_preview_audio();
-        song_select_screen_.set_preview_target(selection_key, now_ns + kPreviewDelayNs);
+        song_select_screen_.set_preview_target(selection_key, now_ns + (title_chart_music ? 0 : kPreviewDelayNs));
         if (was_active) {
             sync_menu_music();
         }
@@ -730,7 +749,7 @@ void MenuApp::service_song_preview() {
         song_select_screen_.preview_gain().store(
             static_cast<float>(menu_background_gain(
                 config_.audio_ui.background_sound_enabled,
-                config_.audio_ui.master_volume,
+                menu_output_master_gain(),
                 config_.audio_ui.bgm_volume)),
             std::memory_order_release);
         return;
@@ -742,14 +761,20 @@ void MenuApp::service_song_preview() {
         return;
     }
 
-    const int target_sample_rate = static_cast<int>(std::max<std::uint32_t>(
+    // Shared WASAPI can convert the compact title mix; ASIO must retain the
+    // selected hardware rate, including drivers that cannot switch to 44.1 kHz.
+    const bool compact_title_rate = title_chart_music && config_.audio.backend == audio::AudioBackend::WASAPI;
+    const int target_sample_rate = compact_title_rate ? 44'100 : static_cast<int>(std::max<std::uint32_t>(
         8'000u, config_.audio.sample_rate));
     song_select_screen_.begin_preview_decode(
-        selection_key, chart_path, indexed_preview_path, target_sample_rate);
+        selection_key, chart_path, indexed_preview_path, target_sample_rate, title_chart_music);
 }
 
 
 void MenuApp::sync_menu_music() {
+    const bool muted = config_.audio_ui.mute_when_inactive && !is_current_process_foreground_menu();
+    menu_audio_muted_.store(muted, std::memory_order_release);
+    menu_music_.set_output_muted(muted);
     if (current_screen() == Screen::Gameplay) {
         menu_music_.stop();
         menu_music_scene_key_.clear();
@@ -763,7 +788,13 @@ void MenuApp::sync_menu_music() {
         return;
     }
 
-    if (current_screen() == Screen::SongSelect && !song_select_screen_.preview_active_path().empty()) {
+    const bool title_screen = current_screen() == Screen::Title || current_screen() == Screen::QuickSetup;
+    if (title_screen && config_.audio_ui.title_music == "none") {
+        menu_music_.stop();
+        return;
+    }
+    if ((current_screen() == Screen::SongSelect || title_screen) &&
+        !song_select_screen_.preview_active_path().empty()) {
         if (!config_.audio_ui.background_sound_enabled) {
             stop_song_preview_audio();
             menu_music_.stop();
@@ -772,7 +803,7 @@ void MenuApp::sync_menu_music() {
         song_select_screen_.preview_gain().store(
             static_cast<float>(menu_background_gain(
                 true,
-                config_.audio_ui.master_volume,
+                menu_output_master_gain(),
                 config_.audio_ui.bgm_volume)),
             std::memory_order_release);
         menu_music_.stop();
@@ -1596,6 +1627,11 @@ void MenuApp::populate_generic_screen_render_data(render::MenuRenderData& render
         }
     }
 
+    if (current_screen() == Screen::QuickSetup || menu::screen_descriptor(current_screen()).options_family) {
+        const auto tips = settings_help_tips(ui_language());
+        render.generic.notes.insert(render.generic.notes.begin(), tips.begin(), tips.end());
+    }
+
     if (menu::screen_descriptor(current_screen()).shows_input_footer) {
         render.generic.footer_notes.push_back(current_input_backend_status_label());
         if (const std::string detail = current_input_backend_status_detail(); !detail.empty()) {
@@ -1759,6 +1795,7 @@ void MenuApp::publish_snapshot() {
     populate_ranked_account_overlay(render.account_overlay);
     render.url_warning_overlay.visible = chat_url_warning_visible_;
     render.url_warning_overlay.url = chat_url_warning_target_;
+    snapshot.screen = current_screen();
     snapshot.render = std::move(render);
     {
         std::lock_guard<std::mutex> lock(snapshot_mutex_);
@@ -1900,10 +1937,15 @@ void MenuApp::render_snapshot(const MenuSnapshot& snapshot) {
 
 void MenuApp::update_pressed_keys(const input::InputEvent& event) {
     if (event.state == input::InputState::Pressed) {
-        pressed_keys_.insert(event.keycode);
-        if (is_song_select_repeat_key(event.keycode)) {
+        const bool new_press = pressed_keys_.insert(event.keycode).second;
+        if (event.keycode != song_select_repeat_key_ &&
+            (song_select_repeat_key_ == key_left_ || song_select_repeat_key_ == key_right_)) {
+            reset_song_select_repeat();
+        }
+        if (new_press && is_song_select_repeat_key(event.keycode)) {
             song_select_repeat_key_ = event.keycode;
             song_select_repeat_screen_ = current_screen();
+            song_select_repeat_row_ = selected_adjustment_repeat_row(event.keycode);
             song_select_repeat_next_ns_ =
                 timing::HighResClock::now_ns() + kSongSelectRepeatInitialDelayNs;
         }
@@ -1919,6 +1961,17 @@ void MenuApp::update_pressed_keys(const input::InputEvent& event) {
 }
 
 void MenuApp::update_song_select_repeat() {
+    service_song_select_repeat(timing::HighResClock::now_ns(), is_current_process_foreground_menu());
+}
+
+void MenuApp::service_song_select_repeat(int64_t now_ns, bool foreground) {
+    if (!foreground) {
+        // InputThread drops background releases and resets its own tracker at
+        // the focus boundary; discard the matching menu-side state as well.
+        pressed_keys_.clear();
+        reset_song_select_repeat();
+        return;
+    }
     if (current_screen() != song_select_repeat_screen_) {
         reset_song_select_repeat();
         return;
@@ -1931,8 +1984,11 @@ void MenuApp::update_song_select_repeat() {
         reset_song_select_repeat();
         return;
     }
-
-    const int64_t now_ns = timing::HighResClock::now_ns();
+    if (song_select_repeat_row_ >= 0 &&
+        song_select_repeat_row_ != selected_adjustment_repeat_row(song_select_repeat_key_)) {
+        reset_song_select_repeat();
+        return;
+    }
     if (now_ns < song_select_repeat_next_ns_) {
         return;
     }
@@ -1946,6 +2002,9 @@ void MenuApp::update_song_select_repeat() {
             break;
         case Screen::OptionsHub:
             handle_options_hub_input(song_select_repeat_key_);
+            break;
+        case Screen::Multiplayer:
+            handle_multiplayer_input(song_select_repeat_key_);
             break;
         case Screen::SongSelect:
             handle_song_select_input(song_select_repeat_key_);
@@ -1990,11 +2049,51 @@ void MenuApp::update_song_select_repeat() {
 void MenuApp::reset_song_select_repeat() {
     song_select_repeat_key_ = 0;
     song_select_repeat_next_ns_ = 0;
+    song_select_repeat_row_ = -1;
 }
 
-bool MenuApp::is_song_select_repeat_key(uint32_t keycode) const {
+int MenuApp::selected_adjustment_repeat_row(uint32_t keycode) {
+    if (keycode != key_left_ && keycode != key_right_) return -1;
+    if (current_screen() == Screen::SongSelect) {
+        return song_select_focus_ == SongSelectFocus::QuickSettings &&
+            song_quick_setting_cursor_ >= 0 && song_quick_setting_cursor_ <= 3
+                ? song_quick_setting_cursor_ : -1;
+    }
+    switch (current_screen()) {
+        case Screen::QuickSetup:
+        case Screen::SessionMix:
+        case Screen::SongBrowser:
+        case Screen::SettingsAudio:
+        case Screen::SettingsGraphics:
+        case Screen::SettingsSkins:
+        case Screen::SettingsInput:
+        case Screen::SettingsCalibration:
+        case Screen::ModeSelect:
+        case Screen::ModeMods:
+        case Screen::Keymap:
+        case Screen::Multiplayer:
+            break;
+        default: return -1;
+    }
+    // Repeat the same stable row the user can adjust with its -/+ controls.
+    // Display order changes must never redirect a held key to another setting.
+    std::lock_guard<std::mutex> lock(snapshot_mutex_);
+    if (snapshot_.screen != current_screen()) return -1;
+    for (const auto& row : snapshot_.render.generic.rows) {
+        if (row.selected && row.adjustable &&
+            row.target_kind == render::MenuHitTargetKind::SettingsRow &&
+            (keycode == key_left_ ? row.decrement_enabled : row.increment_enabled)) {
+            return row.row_index;
+        }
+    }
+    return -1;
+}
+
+bool MenuApp::is_song_select_repeat_key(uint32_t keycode) {
     if (help_overlay_visible_ || profile_nickname_edit_active_ ||
-        difficulty_table_url_editing_ || song_select_search_active_ ||
+        difficulty_table_url_editing_ || online_records_url_editing_ || song_select_search_active_ ||
+        chat_overlay_visible_ || ranked_account_overlay_visible_ || chat_url_warning_visible_ ||
+        (current_screen() == Screen::Multiplayer && multiplayer_menu_.edit_field != MultiplayerEditField::None) ||
         (current_screen() == Screen::Keymap &&
          keymap_settings_controller_.capture_active())) {
         return false;
@@ -2030,39 +2129,7 @@ bool MenuApp::is_song_select_repeat_key(uint32_t keycode) const {
     if (keycode != key_left_ && keycode != key_right_) {
         return false;
     }
-    switch (current_screen()) {
-        case Screen::OptionsHub:
-            return true;
-        case Screen::QuickSetup:
-            return profile_setup::supports_hold_adjustment(settings_cursor_);
-        case Screen::SongSelect:
-            return song_select_focus_ == SongSelectFocus::QuickSettings &&
-                   song_quick_setting_cursor_ <= 1;
-        case Screen::SessionMix:
-            return settings_cursor_ == 1;
-        case Screen::SettingsAudio:
-            return settings_cursor_ >= 3 && settings_cursor_ <= 6;
-        case Screen::SettingsSkins: {
-            const int shift =
-                config::normalize_skin_source_token(config_.skin.source) == "lr2" ? 1 : 0;
-            const int row = settings_cursor_ - shift;
-            return settings_cursor_ == 4 + shift || settings_cursor_ == 5 + shift ||
-                   settings_cursor_ == 6 + shift || settings_cursor_ == 7 + shift ||
-                   settings_cursor_ == 8 + shift || settings_cursor_ == 10 + shift ||
-                   (row >= 16 && row <= 20) ||
-                   (row >= 22 && row <= 33) ||
-                   (row >= 35 && row <= 37);
-        }
-        case Screen::SettingsInput:
-            return settings_cursor_ == 1 || settings_cursor_ == 2;
-        case Screen::SettingsCalibration:
-            return settings_cursor_ >= 1 && settings_cursor_ <= 3;
-        case Screen::ModeSelect:
-            return settings_cursor_ == 7 || settings_cursor_ == 13 ||
-                   settings_cursor_ == 15 || settings_cursor_ == 16;
-        default:
-            return false;
-    }
+    return current_screen() == Screen::OptionsHub || selected_adjustment_repeat_row(keycode) >= 0;
 }
 
 void MenuApp::launch_gameplay(const std::string& chart_path,
@@ -2449,6 +2516,13 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
     }
 
     session.run();
+    if (session.did_start_gameplay() && !replay_playback && !bms_editor_practice_start_seconds_.has_value() &&
+        config_.ui.last_played_chart_path != chart_path) {
+        // A cancelled countdown or failed audio start must not replace the last
+        // played song. shutdown() resets the start marker, so read it here.
+        config_.ui.last_played_chart_path = chart_path;
+        persist_runtime_config();
+    }
     const bool session_restart_requested = session.was_restart_requested();
     const bool session_exit_requested = session.was_exit_requested();
     session.shutdown();
@@ -2834,8 +2908,8 @@ void MenuApp::populate_help_overlay(render::HelpOverlayData& target) const {
                         "스킨 가져오기는 TenRiff skin.json 또는 LR2 폴더를 받으며 드래그 앤 드롭도 지원합니다."),
                 ui_text("Image Aspect keeps imported note heads and tails from stretching to the gameplay note box.",
                         "이미지 비율은 가져온 노트 헤드와 테일이 게임 노트 박스에 맞춰 늘어나지 않게 유지합니다."),
-                ui_text("The right preview shows the native fallback lane colors and sizing per layout.",
-                        "오른쪽 미리보기는 레이아웃별 기본 대체 레인 색상과 크기를 보여줍니다."),
+                ui_text("The right preview scales actual gameplay uniformly, including field, note, gear and text positions.",
+                        "오른쪽 미리보기는 플레이필드·노트·기어·글자 위치를 포함한 실제 인게임을 같은 비율로 축소합니다."),
             };
             target.footer = ui_text("Esc or Backspace saves and returns.",
                                     "Esc 또는 Backspace로 저장하고 돌아갑니다.");

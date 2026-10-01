@@ -37,7 +37,9 @@ profile が存在しない場合は初回起動時に自動生成されます。
 - `bms_keysound_policy` (string)
   - `follow | autoplay | ignore`
 - `background_sound_enabled` (bool)
-  - menu BGM と chart background audio の on/off
+  - メニュー・リザルト・曲プレビュー音楽のオン／オフ。プレイ中の譜面 BGM は維持します。
+- `title_music` (string)
+  - `none | default | random_bms | last_played`、既定は `default`。タイトル・初期設定の音楽を「なし・標準・ランダム BMS・最後にプレイした曲」から選択します。曲の音声を読めない場合は標準に戻ります。BMS はキー音を含め最大 5 分を非同期合成し、繰り返し再生します。
 - `volume` (double)
   - master volume
 - `bgm_volume` (double)
@@ -81,10 +83,13 @@ profile が存在しない場合は初回起動時に自動生成されます。
 - `pg`, `gr`, `gd`, `bd` (double, ms)
 - 既定 `pg / gr / gd` は `20ms / 65ms / 115ms`
 - 既定 `bd` は `210ms`
-- `Judge Easy` は従来の `1.25x` 倍率で `bd=262.5ms`、`Judge Hard` は `bd=340ms` を使用。Hard でも PG/GR/GD と LN tail window は基本値のまま
+- `Judge Easy` は基本判定幅を `1.35x` に拡大: `pg/gr/gd/bd=27/87.75/155.25/283.5ms`。ホールド許容幅も同倍率、`mask` は変更しない
+- `Judge Hard` は PG/GR/GD とホールド許容幅を維持し、`bd` の上限を `180ms` に制限する。より小さいカスタムBAD幅は広げない
 - `indirect_miss` (double, ms)
-  - 入力が来ないまま note が auto-miss になるときの閾値
-  - timing は `bd` に合わせ、`Judge Hard` では未入力 note を BAD ではなく combo-breaking indirect `POOR` / OD8 `MISS` として記録
+  - 現在のプロファイルでは `340ms` に保存・正規化し、BADの入力判定幅から独立した自動ミスの期限として使用する
+  - 標準のNormal/Easy/Hardは未入力ノートが `340ms` を超えると自動ミス。Normal/EasyはBAD、Hardはコンボを切る間接 `POOR` / OD8 `MISS` を記録する
+  - BAD範囲外から自動ミス期限までの遅い入力はBADヒットにせず、前のノートをミスにして次のノートを調べる
+- 新しいプレイは `tenriff-native-score-v2-ruleset-2` を記録する。旧 `ruleset-1` のリプレイ・ゴースト・検証にはEasy `1.25x`、Hard BAD `340ms`、自動ミス `=BAD` の旧ポリシーを正確に適用する。任意のカスタム判定は公式扱いにしない
 - `hold_grace` (double, ms)
   - long-note tail release を `PG` とみなす専用 window
   - 既定値は `80ms`
@@ -117,7 +122,10 @@ Gauge Shift は常に有効です。`mode.gauge` の `ex_hard / hard / normal / 
   - `windowed` はタイトルバー付き固定サイズウィンドウ
   - `fullscreen` は DXGI exclusive fullscreen のため、現在の Discord Game Overlay は表示されない
 - `resolution` (string)
-  - `native | 720p | 1080p | qhd`
+  - `native`、従来の別名 `720p | 1080p | qhd`、または `幅x高さ`（例: `1600x900`, `1366x768`, `1280x800`, `3440x1440`）。各軸は320–8192px。
+  - グラフィック設定では一般的なサイズと現在のモニターの表示モードを選択できます。`F5`で一覧を更新。手動指定したサイズも保存・再起動後に保持します。
+  - 1920×1080の画面比率を維持し、異なる比率では余白を表示。ウィンドウはタイトルバーとタスクバーの作業領域に収まるよう比例縮小します。
+  - スキン設定は実際のゲーム描画を同じ比率で縮小し、フィールド移動、レーン・ノート・ギアのサイズ、判定・コンボ位置とスキンのフォントを反映します。
 - `vsync` (bool)
 - `refresh_hz` (int)
   - `-1` は `Match Display`、`0` は profile 互換の `Unlimited` 選択値（実際の上限は 1500 FPS）
@@ -211,6 +219,8 @@ chart loader/indexer は BMS family（`.bms/.bme/.bml/.pms`）専用です。旧
 
 ### `ui`
 
+`last_played_chart_path` は最後にプレイを開始した譜面のローカルパスです。既定値は空文字列。リプレイ・エディター練習では更新せず、再起動後も `title_music=last_played` で使用します。
+
 | 項目 | 型・範囲・既定値 | 動作 |
 | --- | --- | --- |
 | `profile_nickname` | string; UTF-8 ≤48 bytes | 表示名。空ならプロファイル ID。空白・制御文字を正規化。 |
@@ -271,6 +281,7 @@ chart loader/indexer は BMS family（`.bms/.bme/.bml/.pms`）専用です。旧
 | `gameplay_field_offset_x` | double: `-720..720`; `0` | 1920×1080 基準のギア横移動。ギアと ↔ ハンドルが見える範囲に追加制限。 |
 | `combo_position`, `judgement_position` | double: `0.10..0.78`; `0.24` | コンボ・判定の独立した Y 位置。旧プロファイルで判定位置がなければ `combo_position` を継承。 |
 | `combo_offset_x`, `judgement_offset_x` | double: `-600..600`; `0` | 1920×1080 基準のコンボ・判定の独立 X オフセット。 |
+| `combo_font_scale`, `judgement_font_scale` | double: `0.50..2`; `1` | コンボ・判定の独立した文字サイズ倍率。スキン設定で50–200%を5%刻みまたはマウススライダーで調整し、取り込んだスキンにもプロファイル値を適用。 |
 | `lane_background_opacity` | double: `0..0.45`; `0.18` | レーン背景の不透明度。 |
 | `black_playfield_enabled` | bool; `true` | レーン間隔も含めフィールド全体を黒く表示。 |
 | `visual_opacity` | double: `0.20..1`; `0.96` | ノート・レセプター・キー名の共通不透明度倍率。 |
@@ -290,7 +301,12 @@ chart loader/indexer は BMS family（`.bms/.bme/.bml/.pms`）専用です。旧
 
 モード別配列・上書き: `4k`, `5k`, `6k`, `7k`, `7+1`, `8k`, `9k`, `10k`, `12k`, `14k`, `16k`。色トークン: `ice`, `azure`, `gold`, `mint`, `rose`, `violet`, `orange`, `teal`。`7+1` はスキンパレットであり独立したキーマップモードではありません。旧 `expand_notes_to_dividers=true` は間隔 0 として読み、明示的な `note_divider_gap_px` が優先します。
 
+BGA全体の暗幕フィルターは適用せず、黒いフィールド・レーン背景・ギアは設定どおり維持します。Visual Latencyはスキン設定の5番目の項目です。
+
+文字の読みやすさ補正はメニュー・設定・曲一覧・結果・ヘルプ・チャット・アカウント・エディター・ゲーム全体に適用します。明るい文字には暗い縁取り、暗い文字には明るい縁取りを付け、スキンの文字色と透明度は維持します。
+
 ### `offsets`
+
 - `input` (double)
 - `visual` (double)
   - `-500..500` に clamp
@@ -318,3 +334,13 @@ chart loader/indexer は BMS family（`.bms/.bme/.bml/.pms`）専用です。旧
 - 古い profile は一部値を自動補正される。
 - とくに BMS defaults と keysound policy が migration 対象で、旧 osu chart/skin field は保存されない。
 - config file が存在しない場合、app は defaults で起動して直ちに profile を保存する。
+
+## 設定操作とオーディオ同期
+
+新しいプロファイルの `audio.volume` は `0.7` です。保存済みの音量を維持します。`audio.mute_when_inactive` は既定で `false`。有効にすると別のウィンドウの使用中は出力のみミュートし、曲の進行を維持します。ASIO バッファサイズはチャンネル当たりのサンプルで表示します。
+
+キー設定は横並びの Key 1… です。基本キーと補助キーを指定でき、どちらかを押している間は押下状態が続きます。補助キーの × または入力待ち中の Delete で補助設定を解除します。`keymap.json` の任意の `secondary_modes` は既存のモード・レイン構造を使います。オプションの初期編集モードは 4K、譜面から開く場合は実際のキー数です。
+
+`skin.key_backdrop_enabled` と `skin.key_backdrop_opacity` (0–1) はキー背景色を制御します。初回編集で `key_backdrop_override=true` を保存し、プロファイルの設定を優先します。ヒットの明るさは別設定です。判定ラインの太さはノート高さに比例します。難易度表の選択中は ALL SONG に表の譜面だけを表示し、Native LV で全譜面に戻ります。画面と BGA は実際の音声再生位置を使い、判定・音声予約の時刻は維持します。速度を変更するとクリック音が鳴ります。
+
+キー背景のRGB明るさは `skin.key_backdrop_brightness`（0–2、既定1）、最大高さは `skin.key_backdrop_height`（0–1、既定1）です。高さはフィールド下端を基準とし、不透明度とは独立しています。プレイ・ゴースト・スキンプレビューに同じ設定を適用します。`−/+` が表示される設定は左右キーを押し続けて連続調整できます。
