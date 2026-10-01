@@ -295,7 +295,7 @@ TEST_CASE("title music mixes BMS keysounds beyond the selection preview and caps
     temp.path = make_preview_temp_dir();
     REQUIRE_FALSE(temp.path.empty());
     const auto chart_path = temp.path / "title_music.bms";
-    const auto wav_path = temp.path / "tone.wav";
+    const auto wav_path = temp.path / "." / "tone.wav";
     write_preview_test_wav(wav_path, 8'000);
     {
         std::ofstream chart(chart_path, std::ios::binary);
@@ -308,7 +308,9 @@ TEST_CASE("title music mixes BMS keysounds beyond the selection preview and caps
     std::string error;
     REQUIRE(tenriff::app::build_song_preview_audio(
         chart_path.u8string(), {}, 8'000, 30, samples, source, &error));
-    CHECK(source == wav_path.u8string());
+    // The resolver canonicalizes paths, including short TEMP aliases on CI.
+    // Check the actual file identity; equivalent spellings are valid output.
+    CHECK(std::filesystem::equivalent(std::filesystem::u8path(source), wav_path));
     CHECK(samples.size() == 512u);
     REQUIRE(tenriff::app::build_song_preview_audio(
         chart_path.u8string(), {}, 8'000, 999, samples, source, &error, {}, true));
