@@ -109,7 +109,7 @@
   - 游戏内 Mode Settings 的 `Key Converter` 可选择 `Krrcream`、内置确定性 `KeyWeaver nK2` 或 `KeyWeaver NK3 ONNX`，并写入设置与 replay metadata
   - 已移除独立的 `Conversion Note Add` 选项：Krrcream 只重排原始 note，nK2 在扩展键数时直接向转换后的目标 layout 生成安全的辅助 note。
   - nK2 preset 可选择默认 `Native (12%)`、`Transform (35%)` 或 `Remaster (65%)`；`Remaster` 在提高预算的同时锁定 anchor 以保留原曲排布，并用等长长条填充 LN 区间。三者均为上限，实际增加量取决于原谱密度与安全窗口。Krrcream 下锁定该行，standalone converter GUI 的 Krrcream Max/Min/Speed/Seed 也不可修改。
-  - 1.7.10 官方 build/Windows ZIP 不构建或附带 standalone BMS key-converter CLI/GUI；顶层 CMake 选项默认 `OFF`，源码仅保留用于开发回归
+  - 1.8.0 官方 build/Windows ZIP 不构建或附带 standalone BMS key-converter CLI/GUI；顶层 CMake 选项默认 `OFF`，源码仅保留用于开发回归
   - NK3 始终将随包提供的 P64 与 host beam32 结合。仅当非 10K 源谱面转换为 10K 时才加入 generalized pattern MLP；10K→10K 与其他所有目标仅使用 P64。默认 `AUTO` 后端通过 ncnn Vulkan 在 AMD/NVIDIA GPU 上运行 P64 与 MLP，并保留可选 OpenVINO 兼容路径作为回退；可通过 `TENRIFF_NK3_BACKEND` 和 `TENRIFF_NK3_VULKAN_DEVICE` 强制选择。
   - `mode.key_mode=none` 表示保持谱面的原始键数与基础 pattern 布局不变
 - Native difficulty：
@@ -225,7 +225,7 @@
 
 ## 运行时 / 打包规则
 - 新用户 profile 会自动创建
-- 当前 P2P 发布目标为 `TenRiff 1.7.10`
+- 当前 P2P 发布目标为 `TenRiff 1.8.0`
 - 发布包不包含 `Songs`
 - 发布包包含 `Main Menu / Options / Song Selecte / Multiplayer Lobby / Clear / Failed` 这些 `Mainmusic/` 场景槽位；每个 `Name.mp3` 及 `Name 2.mp3`～`Name 64.mp3` 会自动发现，并在重新进入场景时轮换
 - 发布更新只包含已构建产物和必要的运行时资源
