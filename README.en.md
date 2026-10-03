@@ -1,5 +1,7 @@
 # TenRiff
 
+**2026-10-03 · TenRiff 1.8.2:** Adds ten vivid Options icon colors, rounded selection borders matching each icon, corrected FAST/SLOW bar visibility and matching skin-editor previews. [1.8.2 release](docs/release-1.8.2-gate.md).
+
 **2026-10-03 · TenRiff 1.8.1:** Adds 18 functional icons and a portable PNG skin, with black options and Song Select surfaces. Includes contextual option help, GPT Sites rankings inside Records, and Left/Right key-test layout selection from 4K to 16K. [1.8.1 design notes](docs/menu-studio-1.8.1.ko.md).
 
 **Multiplayer Rate build:** the leader sets a shared Room Rate in the lobby. All participants must use this protocol v6 build; previous v5 clients cannot join. [Guide (Korean)](docs/multiplayer.md).
@@ -8,9 +10,9 @@ This is the complete **1.8.1 Sites integrated** distribution. Extract to a new f
 
 Language: [한국어](README.md) | [English](README.en.md) | [简体中文](README.zh-CN.md) | [日本語](README.ja.md)
 
-TenRiff is a Windows GUI BMS rhythm-game runtime/launcher. The current project version is `1.8.1`, and chart input is limited to the BMS family (`.bms/.bme/.bml/.pms`). Graphics Settings lets users select a rights-cleared external ONNX model for the optional BGA Upscaler. Public packages contain no BGA-upscaler model; key-mode conversion bundles the deterministic NK3 P64 graph and the generalized pattern MLP exports. The project uses the MIT License, and bundled third-party notices are collected in [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
+TenRiff is a Windows GUI BMS rhythm-game runtime/launcher. The current project version is `1.8.2`, and chart input is limited to the BMS family (`.bms/.bme/.bml/.pms`). Graphics Settings lets users select a rights-cleared external ONNX model for the optional BGA Upscaler. Public packages contain no BGA-upscaler model; key-mode conversion bundles the deterministic NK3 P64 graph and the generalized pattern MLP exports. The project uses the MIT License, and bundled third-party notices are collected in [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
 
-This README is an introduction that explains "what to look at first when you open the project." For current behavior, the `1.8.1` project state, the `1.5.1 fixed stable baseline` baseline, configuration, and design documents, continue from [`docs/README.en.md`](docs/README.en.md).
+This README is an introduction that explains "what to look at first when you open the project." For current behavior, the `1.8.2` project state, the `1.5.1 fixed stable baseline` baseline, configuration, and design documents, continue from [`docs/README.en.md`](docs/README.en.md).
 
 TenRiff should also be read as a `vibe coding` work: it was shaped through fast iteration and experimentation rather than only through a traditional long-form design-first process.
 

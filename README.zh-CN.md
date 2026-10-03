@@ -1,5 +1,7 @@
 # TenRiff
 
+**2026-10-03 · TenRiff 1.8.2:** 新增十种鲜明的选项图标颜色、跟随图标颜色的圆角选中边框，修正 FAST/SLOW 条的显示并同步皮肤编辑器预览。 [1.8.2 release](docs/release-1.8.2-gate.md).
+
 **2026-10-03 · TenRiff 1.8.1:** 新增18种功能图标和PNG皮肤，将选项与选曲大厅改为黑色与中性色。加入各选项的说明、记录窗口内的GPT Sites排行榜，以及左右切换4K至16K的按键测试。 [1.8.1 design notes](docs/menu-studio-1.8.1.ko.md).
 
 **多人Rate支持版本：**选曲者在大厅设置全员共用的Rate。所有玩家必须使用本protocol v6版本，不能与旧v5客户端连接。[指南](docs/multiplayer-rate-build.ko.md)（韩语）。
@@ -8,9 +10,9 @@
 
 Language: [한국어](README.md) | [English](README.en.md) | [简体中文](README.zh-CN.md) | [日本語](README.ja.md)
 
-TenRiff 是一个 Windows GUI BMS 节奏游戏运行时/启动器。当前项目版本为 `1.8.1`，谱面输入仅支持 BMS family（`.bms/.bme/.bml/.pms`）。公开包不包含 BGA upscaler model；键位转换内置 deterministic NK3 P64 graph 与 generalized pattern MLP。项目采用 MIT 许可证。
+TenRiff 是一个 Windows GUI BMS 节奏游戏运行时/启动器。当前项目版本为 `1.8.2`，谱面输入仅支持 BMS family（`.bms/.bme/.bml/.pms`）。公开包不包含 BGA upscaler model；键位转换内置 deterministic NK3 P64 graph 与 generalized pattern MLP。项目采用 MIT 许可证。
 
-这份 README 是入门文档。关于当前行为、`1.8.1` 项目状态、`1.5.1 fixed stable baseline` 基准、配置和设计文档，请继续阅读 [`docs/README.zh-CN.md`](docs/README.zh-CN.md)。
+这份 README 是入门文档。关于当前行为、`1.8.2` 项目状态、`1.5.1 fixed stable baseline` 基准、配置和设计文档，请继续阅读 [`docs/README.zh-CN.md`](docs/README.zh-CN.md)。
 
 TenRiff 也明确属于一种 `vibe coding` 作品：它更多是在快速迭代和实验中成形，而不是只按照传统的长篇设计先行流程推进。
 

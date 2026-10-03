@@ -4,6 +4,8 @@
 
 ## 한국어
 
+1.8.2: Native 세부 설정에서 화면을 옵션으로 고르면 아이콘 10색과 카드 테두리를 미리 볼 수 있습니다. `options.icon.*` 색과 `options_grid.*` 수치를 편집하고 카드를 클릭해 선택 색을 확인하세요. PNG는 원본 색을 유지합니다. Native 플레이 미리보기의 타이밍 막대는 FAST/SLOW 표시 중에만 보입니다.
+
 키 입력 배경색은 플레이 스타일의 `key_backdrop`, `key_backdrop_opacity`(0~1), `key_backdrop_brightness`(0~2), `key_backdrop_height`(0~1)로 편집합니다.
 밝기는 RGB 색만 조절하고 농도는 유지합니다. 최대 높이는 플레이 필드 아래부터 차지하는 비율이며, 밝기와 높이의 기본값 1은 기존 효과를 유지합니다.
 게임에서는 첫 사용자 변경 전까지 스킨 값을 사용하고, 변경 후에는 프로필의 켬/끔·농도·밝기·최대 높이를 우선합니다. 노트 높이를 바꾸면 Native 판정선 두께도 같은 비율로 바뀌며,
@@ -71,6 +73,8 @@ JSON은 8MB, 이미지 한 개는 64MB, ZIP 전체는 512MB까지입니다. ZIP�
 언어 선택만 브라우저 로컬 저장소에 보관하며 이미지나 JSON은 외부로 전송하지 않습니다.
 
 ## English
+
+1.8.2: Select Options in Native details to preview ten icon colors and card borders. Edit `options.icon.*` colors and `options_grid.*` metrics; click a card to preview its selected border. PNGs retain their original colors. The Native gameplay timing bar appears only with FAST/SLOW feedback.
 
 Edit the pressed-key backdrop with gameplay `key_backdrop`, `key_backdrop_opacity` (0–1), `key_backdrop_brightness` (0–2), and `key_backdrop_height` (0–1).
 Brightness adjusts RGB without changing opacity. Maximum height is the fraction of the playfield covered from its bottom; brightness and height default to 1 to preserve the existing effect.
@@ -144,6 +148,8 @@ autosave. Only the UI language is retained in browser local storage. No images
 or manifests are uploaded.
 
 ## 日本語
+
+1.8.2: Native 詳細でオプション画面を選ぶと、10色のアイコンとカード枠を確認できます。`options.icon.*` と `options_grid.*` を編集し、カードをクリックして選択色を確認してください。PNG の色は元画像を保持します。Native プレイのタイミングバーは FAST/SLOW 表示中のみ表示されます。
 
 キー入力背景色はプレイスタイルの `key_backdrop`、`key_backdrop_opacity`（0～1）、`key_backdrop_brightness`（0～2）、`key_backdrop_height`（0～1）で編集できます。
 明るさは不透明度を変えずに RGB 色を調整します。最大高さはフィールド下端から覆う割合で、明るさと高さの既定値 1 は従来の表示を維持します。

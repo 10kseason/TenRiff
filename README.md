@@ -1,14 +1,16 @@
 # TenRiff
 
+**2026-10-03 · TenRiff 1.8.2:** 옵션 아이콘 10색, 아이콘 색을 따르는 부드러운 선택 테두리, FAST/SLOW 막대 표시 수정과 스킨 에디터 미리보기를 제공합니다. [1.8.2 release](docs/release-1.8.2-gate.md).
+
 **2026-10-03 · TenRiff 1.8.1:** 기능별 아이콘 18종과 PNG 스킨을 추가하고 옵션·곡 선택 로비를 검정과 중립색으로 정리했습니다. 항목별 도움말, 기록 창의 GPT 사이트 순위, 좌우로 4K~16K를 고르는 키 테스트를 제공합니다. [1.8.1 design notes](docs/menu-studio-1.8.1.ko.md).
 
 **멀티 Rate 지원 빌드:** 로비 `대전 Rate`에서 리더가 공통 배속을 설정합니다. 참가자 모두 이 protocol v6 빌드를 사용해야 합니다. [사용 방법과 호환성](docs/multiplayer-rate-build.ko.md).
 
 Language: Korean | [English](README.en.md) | [简体中文](README.zh-CN.md) | [日本語](README.ja.md)
 
-TenRiff는 Windows GUI 기반 BMS 리듬게임 런타임/런처 프로젝트입니다. 현재 프로젝트 버전은 `1.8.1`이며, 차트 입력은 BMS 계열(`.bms/.bme/.bml/.pms`) 전용입니다. Graphics Settings에서 권리 정리된 외부 ONNX 모델을 선택해 BGA/BGI 확대에 사용할 수 있습니다. 공개 패키지에는 BGA 업스케일러 모델을 넣지 않으며, 키 모드 변환용 NK3 P64 결정 모델과 일반화 패턴 MLP만 포함합니다. MIT 라이선스를 사용하며, 번들된 서드파티 고지는 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)에 정리합니다.
+TenRiff는 Windows GUI 기반 BMS 리듬게임 런타임/런처 프로젝트입니다. 현재 프로젝트 버전은 `1.8.2`이며, 차트 입력은 BMS 계열(`.bms/.bme/.bml/.pms`) 전용입니다. Graphics Settings에서 권리 정리된 외부 ONNX 모델을 선택해 BGA/BGI 확대에 사용할 수 있습니다. 공개 패키지에는 BGA 업스케일러 모델을 넣지 않으며, 키 모드 변환용 NK3 P64 결정 모델과 일반화 패턴 MLP만 포함합니다. MIT 라이선스를 사용하며, 번들된 서드파티 고지는 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)에 정리합니다.
 
-이 README는 "프로젝트를 처음 열었을 때 무엇을 보면 되는지"를 설명하는 입문 문서입니다. 더 자세한 현재 동작, 현재 `1.8.1` 프로젝트 상태, `1.5.1 fixed stable baseline` 기준선, 설정 구조, 설계 문서는 [`docs/README.md`](docs/README.md)부터 이어서 읽는 구조를 기준으로 작성했습니다.
+이 README는 "프로젝트를 처음 열었을 때 무엇을 보면 되는지"를 설명하는 입문 문서입니다. 더 자세한 현재 동작, 현재 `1.8.2` 프로젝트 상태, `1.5.1 fixed stable baseline` 기준선, 설정 구조, 설계 문서는 [`docs/README.md`](docs/README.md)부터 이어서 읽는 구조를 기준으로 작성했습니다.
 
 TenRiff 코드는 전통적인 장기 설계 문서 중심 개발만으로 쌓인 프로젝트가 아니라, 빠른 반복과 실험을 중시한 `vibe coding` 성격이 강한 작품이라는 점을 명시합니다.
 

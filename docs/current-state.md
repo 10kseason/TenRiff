@@ -1,5 +1,7 @@
 # TenRiff Current State
 
+**2026-10-03 · TenRiff 1.8.2:** 옵션 아이콘 10색, 아이콘 색을 따르는 부드러운 선택 테두리, FAST/SLOW 막대 표시 수정과 스킨 에디터 미리보기를 제공합니다. [1.8.2 release](release-1.8.2-gate.md).
+
 - 1.8.1: 기능별 아이콘 18종과 PNG 스킨을 추가하고 옵션·곡 선택 로비를 검정과 중립색으로 정리했습니다. 항목별 도움말, 기록 창의 GPT 사이트 순위, 좌우로 4K~16K를 고르는 키 테스트를 제공합니다. [Design / validation](menu-studio-1.8.1.ko.md).
 - 1.8.0: 항목별 파스텔색 옵션 카드, 다양한 해상도, 실제 플레이와 같은 스킨 미리보기·고스트, 보조 키, 마우스 설정, 타이틀 음악 선택 및 새 판정 ruleset-2를 포함합니다. [Verification](release-1.8.0-gate.md).
 - 1.7.10: ALL SONG의 삭제된 캐시 항목 건너뛰기, 캐시 통합 진행률과 완료 상태 전달을 보강했습니다. [검증 범위 및 미재현 증상](release-1.7.10-gate.md).
@@ -16,7 +18,7 @@
 - BMS landmines (`D1-D9`, `E1-E9`) are playable, including `#WAV00`, base-36 damage tokens, `ZZ` instant fail, exact press/release boundary behavior, and lane-mod/key-converter remapping.
 - Results and local records expose fixed native score separately from detail score, and categorical native accuracy separately from continuous timing-based detailed accuracy.
 - 새 replay evidence v3는 차트 SHA-256, canonical ruleset, result-to-replay SHA-256을 저장하고 입력 trace를 headless 엔진으로 재실행합니다. 공식 로컬 best는 재계산된 verified 결과만 사용하며 legacy/custom/assist 기록은 히스토리에 `unverified`로 남습니다.
-- 현재 프로젝트 버전은 `1.8.1`
+- 현재 프로젝트 버전은 `1.8.2`
 - 1.7.9 UI 개선: 프로필/첫 실행의 언어·3단계 글자 크기, 사진 미리보기/시작 메뉴 사진, ALL SONG 통합 소스, 선곡 경계와 디지털 탭, 정적인 TI와 홀로그램 TENRIFF. [사용 및 구현 안내](menu-profile-library-polish.ko.md).
 - 1.7.1은 최대 8인 HUD·결과, 동점 순위·점수 대기 상태, P-GREAT 전용 연출, 독립 판정·콤보 위치, 옵션 10개, 오디오 노멀라이즈와 선곡 난이도표 카드를 제공합니다. [변경 설명](gameplay-polish-followup.md), [검증 범위](release-1.7.1-gate.md) 참고.
 - 기본 선곡·싱글 결과 UI는 차분한 패널과 단색 주 동작 버튼을 사용하며, 결과는 큰 점수·등급·정확도 중심으로 표시한다. 사용자 TenRiff 스킨 경로를 유지하며, 1.7.1 대전 결과는 참가자 전원 순위를 표시한다. 구현/검증 안내는 `docs/menu-visual-polish.md`와 `docs/gameplay-polish-followup.md` 참고.

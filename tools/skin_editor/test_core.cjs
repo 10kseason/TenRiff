@@ -229,3 +229,17 @@ test('backdrop brightness and height roundtrip with per-mode overrides and match
   assert.equal(G.backdropTop({key_backdrop_height:.25},50,1060),807.5);
   assert.equal(G.backdropOpacity({key_backdrop_brightness:2,key_backdrop_height:.25,key_backdrop_opacity:.4},true),.4);
 });
+
+test('native preview only paints timing history while FAST/SLOW feedback is visible',()=>{
+  const G=require('./gameplay.js');
+  for(const [now,animate,enabled,visible] of [[0,false,true,false],[100,true,true,false],[3100,true,true,true],[6100,true,true,true],[3499,true,true,false],[3100,true,false,false]]){
+    const bars=[],labels=[];
+    const ctx=new Proxy({createLinearGradient(){return {addColorStop(){}};},fillRect(){if(this.fillStyle==='#123456')bars.push(true);},fillText(value){labels.push(value);}},
+      {get(target,key){return key in target?target[key]:()=>{};}});
+    const style=C.clone(catalog.native.gameplay);style.show_timing_feedback=enabled;
+    style.native.colors.timing='#123456';
+    G.paint(ctx,style,catalog.gameplayNative,'4k',now,animate,()=>false);
+    assert.equal(bars.length>0,visible,JSON.stringify({now,animate,enabled}));
+    assert.equal(labels.some(value=>/^(FAST|SLOW) /.test(value)),visible);
+  }
+});

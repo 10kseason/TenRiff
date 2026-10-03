@@ -1,5 +1,7 @@
 # TenRiff 当前状态
 
+**2026-10-03 · TenRiff 1.8.2:** 新增十种鲜明的选项图标颜色、跟随图标颜色的圆角选中边框，修正 FAST/SLOW 条的显示并同步皮肤编辑器预览。 [1.8.2 release](release-1.8.2-gate.md).
+
 - 1.8.1: 新增18种功能图标和PNG皮肤，将选项与选曲大厅改为黑色与中性色。加入各选项的说明、记录窗口内的GPT Sites排行榜，以及左右切换4K至16K的按键测试。 [Design / validation](menu-studio-1.8.1.ko.md).
 - 1.8.0: 新增分类柔和配色、多种分辨率、与实机共用的皮肤预览和幽灵布局、辅助按键、鼠标设置、标题音乐选项以及 ruleset-2 判定。 [Verification](release-1.8.0-gate.md).
 - 1.7.10 改善 ALL SONG 的已删除缓存项处理、合并进度和完成状态通知。[验证及未复现症状](release-1.7.10-gate.md)。
@@ -12,7 +14,7 @@
 这份文档是下一位 agent 或新任务接手时应该最先阅读的当前状态文档。目标是快速说明“这个项目现在是什么、应该先看哪里、还有哪些内容尚未验证”。
 
 ## 基线
-- 当前项目版本为 `1.8.1`
+- 当前项目版本为 `1.8.2`
 - 1.7.1 提供最多8人的 HUD 与结果、并列名次与分数等待状态、P-GREAT 专属效果、判定与连击独立位置、10张选项卡、音量标准化及选曲难度表卡片。见[变更详情](gameplay-polish-followup.md)和[验证范围](release-1.7.1-gate.md)。
 - 1.7.0 refreshes native Home, Song Select, Result and shared settings. See [UI implementation](menu-visual-polish.md) and [release verification](release-1.7.0-gate.md). The prism remains only in the custom-skin path; result reveal timing is unchanged.
 - 默认结果页面突出分数、等级和准确率；棱镜演出保留在自定义皮肤中。保留现有2.2秒展示流程、Space跳过和按钮启用规则。

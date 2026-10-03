@@ -298,7 +298,9 @@
             if (!scene_body_format || !d2d_->text_brush) {
                 return;
             }
-            if (timing_history_count == 0 && !has_live_feedback) {
+            // History is context for a live FAST/SLOW result, not a persistent
+            // bar after PG, centered timing, or expired feedback.
+            if (!has_live_feedback) {
                 return;
             }
 
@@ -1722,10 +1724,11 @@
                                          const GameplayTextPopAnimation& feedback_animation,
                                          int64_t feedback_started_ns) {
             const bool show_feedback_overlay = has_feedback && !feedback_text.empty();
-            const bool has_timing_history = data.gameplay.show_timing_feedback && timing_history_count > 0;
+            const bool show_timing_feedback = data.gameplay.show_timing_feedback && has_feedback &&
+                !feedback_timing_text.empty();
             const float combo_anchor_y =
                 gameplay_combo_anchor_y(feedback_field, data.gameplay.judgement_position, 74.0f, 82.0f);
-            if ((show_feedback_overlay || has_timing_history) && d2d_->text_brush) {
+            if ((show_feedback_overlay || show_timing_feedback) && d2d_->text_brush) {
                 if (show_feedback_overlay && scene_header_format) {
                     D2D1_RECT_F feedback_rect =
                         gameplay_centered_overlay_rect(feedback_field, combo_anchor_y - 34.0f, 48.0f, -24.0f);
@@ -1755,8 +1758,7 @@
                                               feedback_rect,
                                               d2d_->text_brush.Get(),
                                               DWRITE_TEXT_ALIGNMENT_CENTER);
-                    if (data.gameplay.show_timing_feedback &&
-                        !feedback_timing_text.empty() && scene_body_format) {
+                    if (show_timing_feedback && scene_body_format) {
                         const D2D1_RECT_F timing_text_rect =
                             D2D1::RectF(feedback_rect.left,
                                         feedback_rect.top + 54.0f,
@@ -1791,13 +1793,13 @@
                     ctx->SetTransform(saved_feedback_transform);
                 }
 
-                if (data.gameplay.show_timing_feedback) {
+                if (show_timing_feedback) {
                     draw_timing_indicator(feedback_field.left + static_cast<float>(data.gameplay.judgement_offset_x),
                                           feedback_field.right + static_cast<float>(data.gameplay.judgement_offset_x),
                                           combo_anchor_y,
                                           timing_history,
                                           timing_history_count,
-                                          has_feedback && feedback != "PG",
+                                          true,
                                           feedback_delta_ms);
                 }
             }
