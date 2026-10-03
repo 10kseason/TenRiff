@@ -80,7 +80,8 @@
         }
     };
     auto draw_native_asset = [&](native_menu_assets::Asset asset, const D2D1_RECT_F& rect,
-                                 float alpha = 1.0f, float rotation = 0.0f) {
+                                 float alpha = 1.0f, float rotation = 0.0f,
+                                 const D2D1_COLOR_F* vector_color = nullptr) {
         if (!native_motion_screen || !d2d_->native_menu_brush || alpha <= 0) return;
         if (native_overrides && !native_style.assets.empty()) {
             const std::array<std::pair<native_menu_assets::Asset, const char*>, 18> names = {{
@@ -123,6 +124,9 @@
             auto* geometry = d2d_->native_menu_geometry[i].Get();
             if (!geometry) continue;
             auto* brush = native_color(native_menu_assets::paths[i].color, alpha);
+            // Only compiled vectors use the role color. Imported PNGs above
+            // retain their authored pixels, including multicolor custom icons.
+            if (vector_color) brush->SetColor(*vector_color);
             if (native_menu_assets::paths[i].filled) ctx->FillGeometry(geometry, brush);
             else ctx->DrawGeometry(geometry, brush, std::clamp(native_metric("icon.stroke_width", 2.16f), 0.5f, 8.0f));
         }

@@ -1,6 +1,8 @@
 """Embed the repository schema for offline file:// use. Run after schema changes."""
 import json
 import re
+import importlib.util
+import sys
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -8,6 +10,12 @@ ROOT = HERE.parent.parent
 schema = json.loads((ROOT / "docs/tenriff-skin.schema.json").read_text(encoding="utf-8-sig"))
 example = json.loads((ROOT / "examples/skins/TenRiff-Example/skin.json").read_text(encoding="utf-8-sig"))
 payload = {"schema": schema, "example": example}
+# Share the client's original vector geometry with the offline canvas preview.
+sys.dont_write_bytecode = True
+spec = importlib.util.spec_from_file_location('menu_vectors', ROOT / 'tools/generate_native_menu_assets.py')
+vectors = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(vectors)
+payload["menuVectors"] = {name.lower(): shapes for name, shapes in vectors.ASSETS.items()}
 # The native catalog is optional so older source packages can still regenerate.
 native = ROOT / "skins/TenRiff_NativeEditable/skin.json"
 if native.exists():

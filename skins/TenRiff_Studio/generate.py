@@ -5,6 +5,7 @@ Run from the source checkout. The game and offline editor only need the PNGs.
 """
 import argparse
 import importlib.util
+import re
 import sys
 from pathlib import Path
 from PIL import Image, ImageDraw
@@ -15,17 +16,26 @@ spec = importlib.util.spec_from_file_location('studio_vectors', ROOT.parents[1] 
 vectors = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(vectors)
 
+# Use the renderer's icon defaults so vector and portable PNG skins agree.
+ICON_ROLES = {'keys': 'key_mode', 'keymap': 'keymap', 'skin': 'skin',
+              'display': 'graphics', 'audio': 'audio', 'input': 'input',
+              'latency': 'latency', 'profile': 'profile', 'sliders': 'mode',
+              'keytest': 'key_test'}
+options_source = (ROOT.parents[1] / 'src/render/MenuWindow_draw_options_grid.inl').read_text(encoding='utf-8')
+ICON_COLORS = dict(re.findall(r'native_palette\("options\.icon\.([^"\n]+)",\s*D2D1::ColorF\(0x([0-9A-F]{6})\)', options_source))
+assert set(ICON_ROLES.values()) <= ICON_COLORS.keys()
 
-def render(shapes):
+
+def render(shapes, color='#F0F0F0'):
     scale = 10.24  # 4x antialiasing for the 256px runtime image.
     result = Image.new('RGBA', (1024, 1024))
     draw = ImageDraw.Draw(result)
     for _, filled, points in shapes:
         points = [(round(x * scale), round(y * scale)) for x, y in points]
         if filled:
-            draw.polygon(points, fill='#F0F0F0')
+            draw.polygon(points, fill=color)
         else:
-            draw.line(points, fill='#F0F0F0', width=round(2.16 * scale), joint='curve')
+            draw.line(points, fill=color, width=round(2.16 * scale), joint='curve')
     return result.resize((256, 256), Image.Resampling.LANCZOS)
 
 
@@ -56,7 +66,8 @@ def main():
     args = parser.parse_args()
     for name, shapes in vectors.ASSETS.items():
         path = ROOT / 'assets' / (name.lower() + '.png')
-        expected = render(shapes)
+        role = ICON_ROLES.get(name.lower())
+        expected = render(shapes, '#' + ICON_COLORS[role] if role else '#F0F0F0')
         if args.check:
             with Image.open(path) as actual:
                 assert actual.size == expected.size and actual.convert('RGBA').tobytes() == expected.tobytes(), path

@@ -15,6 +15,7 @@
   let nativeGroup = 'metrics', nativeSearch = '', rawText = '', rawDirty = false, drag = null, imageTarget = null;
   let instrumentGroup = 'motion', spriteSlot = 'key_idle', spriteLayer = 0, pressedPreviewLane = -1;
   let raf = 0, busy = false, documentGeneration = 0;
+  let selectedOption = 4;
   const files = new Map(), images = new Map();
   const fallbackNative = {format: 'tenriff-skin', version: 1, name: 'Native Skin', lobby: {renderer: 'native'}, native: {metrics: {}, colors: {}, rects: {}, assets: {}, motion: {}, fonts: {}}};
   const history = C.createHistory(catalog.native || fallbackNative);
@@ -321,16 +322,16 @@
     return [...((layouts[targetScreen]||layouts.generic)[key]||[80,140,1840,1008])];
   }
   function palette(){
-    const document=doc(),colors=document.native?.colors||{},native=document.lobby?.renderer==='native';
-    const mapped=native?{accent:colors['palette.63e9f2']||defaults.theme.accent,scene_background:colors['palette.05090f']||defaults.theme.scene_background,text:colors['palette.f7fafd']||defaults.theme.text,panel:colors['palette.101d32']||defaults.theme.panel}:{};
+    const document=doc(),colors={...nativeCatalog.colors,...document.native?.colors},native=document.lobby?.renderer==='native';
+    const mapped=native?{accent:colors['palette.63e9f2'],scene_background:colors['palette.05090f'],text:colors['palette.f7fafd'],panel:colors['palette.101d32'],card:'#090909',footer:'#080808',button:'#090909',button_selected:'#111111',border:colors['options.border'],muted:'#999999',scene_primary:'#000000',scene_secondary:'#000000'}:{};
     return Object.fromEntries(Object.entries({...defaults.theme,...mapped,...document.theme}).map(([key,value])=>[key,/^#?[0-9a-f]{6}([0-9a-f]{2})?$/i.test(value)?'#'+value.replace(/^#/,''):defaults.theme[key]]));
   }
   const ctx=$('preview').getContext('2d');
-  function box(rect,fill,stroke,radius=14){
+  function box(rect,fill,stroke,radius=14,strokeWidth=2){
     if(!rect||!rect.every(Number.isFinite)||rect[2]<=rect[0]||rect[3]<=rect[1])return;
     ctx.beginPath();const w=rect[2]-rect[0],h=rect[3]-rect[1],r=Math.min(radius,w/2,h/2);
     if(ctx.roundRect)ctx.roundRect(rect[0],rect[1],w,h,r);else ctx.rect(rect[0],rect[1],w,h);
-    if(fill){ctx.fillStyle=fill;ctx.fill();}if(stroke){ctx.strokeStyle=stroke;ctx.lineWidth=2;ctx.stroke();}
+    if(fill){ctx.fillStyle=fill;ctx.fill();}if(stroke){ctx.strokeStyle=stroke;ctx.lineWidth=strokeWidth;ctx.stroke();}
   }
   function text(value,x,y,size=24,color=palette().text,maxWidth=1500){
     ctx.fillStyle=color;ctx.font=`600 ${size}px "Segoe UI", "Yu Gothic UI", sans-serif`;ctx.textBaseline='middle';ctx.fillText(value,x,y,maxWidth);
@@ -346,10 +347,13 @@
   function background(now){
     const p=palette(),document=doc(),lobby=document.lobby||{};
     ctx.fillStyle=p.scene_background;ctx.fillRect(0,0,1920,1080);
-    const grad=ctx.createRadialGradient(1300,100,0,1300,100,1500);grad.addColorStop(0,p.scene_secondary.slice(0,7)+'22');grad.addColorStop(1,'#00000000');
-    ctx.fillStyle=grad;ctx.fillRect(0,0,1920,1080);
+    if(lobby.renderer!=='native'){
+      const grad=ctx.createRadialGradient(1300,100,0,1300,100,1500);grad.addColorStop(0,p.scene_secondary.slice(0,7)+'22');grad.addColorStop(1,'#00000000');
+      ctx.fillStyle=grad;ctx.fillRect(0,0,1920,1080);
+    }
     let path=lobby.screen_backgrounds?.[screen];if(!path&&screen.startsWith('settings'))path=lobby.screen_backgrounds?.settings;
     path=path||lobby.background||'lobby/background.png';art(path,[0,0,1920,1080],lobby.screen_opacities?.[screen]??lobby.background_opacity??.72);
+    if(lobby.renderer==='native')return;
     ctx.save();ctx.globalAlpha=.16;ctx.strokeStyle=p.accent;ctx.lineWidth=1;
     for(let i=0;i<7;i++){const shift=$('animate').checked?Math.sin(now/2300+i)*20:0;ctx.beginPath();ctx.moveTo(1300+i*70+shift,0);ctx.lineTo(850+i*140+shift,1080);ctx.stroke();}ctx.restore();
   }
@@ -417,7 +421,44 @@
     const song=r('song_panel');text('SAMPLE TRACK',song[0]+28,song[1]+126,34,p.text,song[2]-song[0]-56);text('AAA',710,340,140,p.accent);text('987,654',650,500,74,p.text);text('98.76%',725,608,45,p.muted);
     const analysis=r('analysis_panel');ctx.strokeStyle=p.accent;ctx.lineWidth=4;ctx.beginPath();for(let i=0;i<28;i++){const x=analysis[0]+28+(analysis[2]-analysis[0]-56)*i/27,y=analysis[3]-60-(analysis[3]-analysis[1]-170)*(.25+i/40+.06*Math.sin(i));if(!i)ctx.moveTo(x,y);else ctx.lineTo(x,y);}ctx.stroke();
   }
+  const optionRoles=['key_mode','keymap','skin','graphics','audio','input','latency','profile','mode','key_test'];
+  const optionAssets=['keys','keymap','skin','display','audio','input','latency','profile','sliders','keytest'];
+  function optionMetric(key,low,high){
+    const value=doc().native?.metrics?.[key]??nativeCatalog.metrics[key];
+    return Math.max(low,Math.min(high,value));
+  }
+  function optionRect(index){
+    const r=effectiveRect('options','content'),gap=optionMetric('options_grid.gap',0,200),height=optionMetric('options_grid.height',1,800);
+    const width=(r[2]-r[0]-gap*4)/5,x=r[0]+index%5*(width+gap),y=r[1]+40+Math.floor(index/5)*(height+gap);
+    return G.adjusted([x,y,x+width,y+height],doc().native?.rects?.['options_grid.rect.001']);
+  }
+  function drawOptions(){
+    const p=palette(),colors=Object.fromEntries(Object.entries({...nativeCatalog.colors,...doc().native?.colors})
+      .map(([key,value])=>[key,'#'+String(value).replace(/^#/,'')]));
+    const labels=['optionKeys','keymap','settings_skins','settings_graphics','settings_audio','settings_input','settings_calibration','profile','mode_mods','keymap_test'];
+    const values=[previewMode.toUpperCase(),t('keymap'),'Native','1920 × 1080','WASAPI','RawInput','0.0 ms','default','MOD',t('keymap_test')];
+    box([0,0,1920,126],p.panel,p.border,0);text('TENRIFF',64,64,44,p.text);text(t('options'),430,54,30,p.text);
+    optionRoles.forEach((role,index)=>{
+      const r=optionRect(index),chosen=index===selectedOption,ink=colors['options.icon.'+role],accent=colors['options.'+role];
+      const tint=optionMetric(chosen?'options_grid.selected_tint':'options_grid.tint',0,.65);
+      const fill='#'+[1,3,5].map(offset=>Math.round((.035+parseInt(accent.slice(offset,offset+2),16)/255*tint)*255).toString(16).padStart(2,'0')).join('');
+      box(r,fill,chosen?ink:colors['options.border'],optionMetric('options_grid.radius',0,32),optionMetric(chosen?'options_grid.selected_border_width':'options_grid.border_width',.5,8));
+      box(G.adjusted([r[0]+24,r[1]+26,r[0]+68,r[1]+30],doc().native?.rects?.['options_grid.rect.002']),chosen?accent:'#404040',null,0);
+      text(t(labels[index]),r[0]+24,r[1]+68,22,p.muted,r[2]-r[0]-90);
+      text(values[index],r[0]+24,r[3]-62,38,colors['options.value'],r[2]-r[0]-48);
+      const asset=optionAssets[index],rect=G.adjusted([r[2]-72,r[1]+28,r[2]-24,r[1]+76],doc().native?.rects?.['options_grid.rect.005']);
+      // PNG pixels keep their authored colors, matching the native renderer.
+      if(!art(doc().native?.assets?.[asset],rect,1,true)){
+        ctx.save();ctx.translate(rect[0],rect[1]);ctx.scale((rect[2]-rect[0])/100,(rect[3]-rect[1])/100);
+        ctx.strokeStyle=ink;ctx.fillStyle=ink;ctx.lineWidth=optionMetric('icon.stroke_width',.5,8);ctx.lineJoin='round';
+        for(const [,filled,points] of catalog.menuVectors?.[asset]||[]){ctx.beginPath();points.forEach(([x,y],i)=>i?ctx.lineTo(x,y):ctx.moveTo(x,y));if(filled)ctx.fill();else ctx.stroke();}
+        ctx.restore();
+      }
+    });
+    text(t('optionPreviewHint'),64,960,21,p.muted,1792);
+  }
   function drawGeneric(){
+    if(screen==='options'&&doc().lobby?.renderer==='native'){drawOptions();return;}
     const p=palette(),r=effectiveRect(screen,'content');text(t(screen),65,84,48,p.text);box(r,p.panel,p.border);
     const preview=effectiveRect(screen,'preview'),hasPreview=screen==='settings_skins';
     const right=hasPreview?Math.min(preview[0]-22,r[2]-24):r[2]-24;
@@ -476,6 +517,10 @@
   function point(event){const r=$('preview').getBoundingClientRect();return[(event.clientX-r.left)*1920/r.width,(event.clientY-r.top)*1080/r.height];}
   $('preview').addEventListener('pointerdown',event=>{
     if(['gameplay','instrument'].includes(tab)&&event.button===0){const [x]=point(event),count=previewMode==='7+1'?8:parseInt(previewMode,10);pressedPreviewLane=x>=470&&x<1450?Math.floor((x-470)/980*count):-1;$('preview').setPointerCapture(event.pointerId);draw();return;}
+    if(screen==='options'&&doc().lobby?.renderer==='native'&&tab!=='layout'&&event.button===0){
+      const [x,y]=point(event),index=optionRoles.findIndex((_,i)=>{const r=optionRect(i);return x>=r[0]&&x<=r[2]&&y>=r[1]&&y<=r[3];});
+      if(index>=0){selectedOption=index;draw();}return;
+    }
     if(tab!=='layout'||!canChange()||event.button!==0)return;
     const [x,y]=point(event),r=effectiveRect(screen,slot),scale=1920/$('preview').getBoundingClientRect().width,handle=8*scale;
     let resize=Math.abs(x-r[2])<handle&&Math.abs(y-r[3])<handle;

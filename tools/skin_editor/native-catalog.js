@@ -9,11 +9,11 @@ window.TENRIFF_NATIVE_CATALOG = {
     "icon.stroke_width": 2.16,
     "options_grid.gap": 22.0,
     "options_grid.height": 270.0,
-    "options_grid.radius": 7.0,
+    "options_grid.radius": 12.0,
     "options_grid.selected_tint": 0.018,
     "options_grid.tint": 0.0,
-    "options_grid.selected_border_width": 1.35,
-    "options_grid.border_width": 1.0,
+    "options_grid.selected_border_width": 2.25,
+    "options_grid.border_width": 1.5,
     "result_single.gauge_axis_width": 46.0,
     "songselect.card_height": 86.0,
     "songselect.card_gap": 8.0,
@@ -75,6 +75,16 @@ window.TENRIFF_NATIVE_CATALOG = {
     "options.profile": "#EEEEEEFF",
     "options.mode": "#EEEEEEFF",
     "options.key_test": "#EEEEEEFF",
+    "options.icon.key_mode": "#FFD600FF",
+    "options.icon.keymap": "#00C8FFFF",
+    "options.icon.skin": "#A64DFFFF",
+    "options.icon.graphics": "#3C6FFFFF",
+    "options.icon.audio": "#FF3B30FF",
+    "options.icon.input": "#00D66FFF",
+    "options.icon.latency": "#FF7900FF",
+    "options.icon.profile": "#FF36B3FF",
+    "options.icon.mode": "#A9E600FF",
+    "options.icon.key_test": "#00D7BDFF",
     "options.border": "#282828FF",
     "options.value": "#F5F5F5FF",
     "palette.020914": "#080808FF",
@@ -2247,47 +2257,47 @@ window.TENRIFF_NATIVE_CATALOG = {
     },
     "rects.native_motion.rect.001": {
       "file": "MenuWindow_draw_native_motion.inl",
-      "line": 140,
+      "line": 144,
       "expression": "rect.left + i * step, rect.bottom - height, rect.left + i * step + step * 0.48f, rect.bottom"
     },
     "rects.native_motion.rect.003": {
       "file": "MenuWindow_draw_native_motion.inl",
-      "line": 178,
+      "line": 182,
       "expression": "0, 0, kBaseWidth, kBaseHeight"
     },
     "rects.options_grid.rect.001": {
       "file": "MenuWindow_draw_options_grid.inl",
-      "line": 28,
+      "line": 39,
       "expression": "x, y, x + width, y + height"
     },
     "rects.options_grid.rect.002": {
       "file": "MenuWindow_draw_options_grid.inl",
-      "line": 45,
+      "line": 56,
       "expression": "x + 24, y + 26, x + 68, y + 30"
     },
     "rects.options_grid.rect.003": {
       "file": "MenuWindow_draw_options_grid.inl",
-      "line": 47,
+      "line": 58,
       "expression": "x + 24, y + 50, x + width - 24, y + 98"
     },
     "rects.options_grid.rect.004": {
       "file": "MenuWindow_draw_options_grid.inl",
-      "line": 52,
+      "line": 63,
       "expression": "x + 24, y + 114, x + width - 24, y + 222"
     },
     "rects.options_grid.rect.005": {
       "file": "MenuWindow_draw_options_grid.inl",
-      "line": 57,
+      "line": 69,
       "expression": "x + width - 70, y + 22 + icon_y, x + width - 26, y + 66 + icon_y"
     },
     "rects.options_grid.rect.006": {
       "file": "MenuWindow_draw_options_grid.inl",
-      "line": 61,
+      "line": 73,
       "expression": "left, top + 630, right, bottom - 12"
     },
     "rects.options_grid.rect.007": {
       "file": "MenuWindow_draw_options_grid.inl",
-      "line": 67,
+      "line": 79,
       "expression": "description.left + 28, description.top + 28, description.right - 28, description.bottom - 24"
     },
     "rects.result_multiplayer.rect.001": {

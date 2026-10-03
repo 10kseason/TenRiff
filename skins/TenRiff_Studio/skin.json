@@ -13,9 +13,9 @@
       "icon.stroke_width": 2.16,
       "options_grid.tint": 0,
       "options_grid.selected_tint": 0.018,
-      "options_grid.border_width": 1,
-      "options_grid.selected_border_width": 1.35,
-      "options_grid.radius": 7
+      "options_grid.border_width": 1.5,
+      "options_grid.selected_border_width": 2.25,
+      "options_grid.radius": 12
     },
     "colors": {},
     "assets": {

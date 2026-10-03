@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.8.2] - 2026-10-03
+
+- Give the ten Options icons distinct saturated colors at full opacity, with editable `options.icon.*` vector colors and matching Studio PNGs. Keep black card surfaces, round the corners to 12px, use 1.5px/2.25px borders, and match the selected border to its icon. See [icon colors](docs/options-icon-colors.ko.md).
+- Show the gameplay timing bar only while FAST/SLOW feedback is visible. Hide it for PG, centered timing and expired feedback, even when timing history remains; apply the same rule to the ghost overlay.
+
+- Update the offline and web skin editor with the same Options vectors, icon colors, rounded selection borders and FAST/SLOW preview visibility. Native menu previews inherit the black client palette.
+- See [release validation](docs/release-1.8.2-gate.md).
+
 ## [1.8.1] - 2026-10-03
 
 - Add 18 grid-based menu symbols and the portable TenRiff Studio PNG skin; give each Options category its own functional icon.

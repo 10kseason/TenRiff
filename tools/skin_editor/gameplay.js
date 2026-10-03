@@ -141,7 +141,10 @@
     const life=animate?Math.max(0,1-phase*500/motion.combo_duration_ms):0,scale=1+(motion.combo_scale-1)*life;
     ctx.save();ctx.translate(960,324);ctx.scale(scale,scale);ctx.translate(-960,-324);
     label('combo','147',[920,290+motion.combo_lift*life,1080,348+motion.combo_lift*life]);ctx.restore();
-    if(style.show_timing_feedback!==false){
+    // The sampled error and its bar share the live judgement's visibility.
+    const errorMs=grade%2?-28:24;
+    if(style.show_timing_feedback!==false&&grade!==0&&judgementAlpha>0){
+      label('timing_label',(errorMs<0?'FAST ':'SLOW ')+Math.abs(errorMs)+' ms',[858,258,1150,280],'body',errorMs<0?c.timing_fast:c.timing_slow,judgementAlpha);
       const timing=adjusted([960-m.timing_half_width,275,960+m.timing_half_width,275+m.timing_height],native.rects.timing);
       const center=(timing[0]+timing[2])/2,half=(timing[2]-timing[0])/2;
       box(timing,c.timing,.25);box([center-1,timing[1]-4,center+1,timing[3]+4],c.timing);
