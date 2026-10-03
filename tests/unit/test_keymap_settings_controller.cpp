@@ -19,6 +19,34 @@ using tenriff::app::menu::settings::KeymapSettingsView;
 
 }  // namespace
 
+TEST_CASE("NKRO layout arrows clamp and use each layout's existing bindings") {
+    KeymapSettingsController controller;
+    controller.reset(4, "4k");
+    tenriff::config::KeymapManager manager;
+    auto keymap = manager.default_keymap();
+    CHECK(controller.adjust_test_key_count(-1).empty());
+    CHECK(controller.edit_mode() == "4k");
+    const auto modes = manager.supported_mode_tokens();
+    for (std::size_t i = 1; i < modes.size(); ++i) {
+        const auto effect = controller.adjust_test_key_count(1);
+        CHECK(effect.refresh_input_scope);
+        CHECK_FALSE(effect.menu.persist_config);
+        CHECK(controller.edit_mode() == modes[i]);
+        const auto view = KeymapSettingsView::build_nkro_test(controller, keymap, {}, "RawInput", tenriff::ui::Language::Korean);
+        CHECK(view.rows.size() == controller.lane_ids().size() + 1);
+        const auto bindings = manager.bindings_for_mode(keymap, modes[i]);
+        REQUIRE_FALSE(controller.lane_ids().empty());
+        CHECK(view.rows.front().value == bindings.at(controller.lane_ids().front()));
+    }
+    CHECK(controller.edit_mode() == "16k");
+    CHECK(controller.adjust_test_key_count(1).empty());
+    for (std::size_t i = modes.size() - 1; i > 0; --i) {
+        CHECK(controller.adjust_test_key_count(-1).refresh_input_scope);
+        CHECK(controller.edit_mode() == modes[i - 1]);
+    }
+    CHECK(controller.adjust_test_key_count(-1).empty());
+}
+
 TEST_CASE("keymap action identifiers remain compatible with renderer hits") {
     static_assert(static_cast<std::uint8_t>(KeymapActionId::Reset) == 0);
     static_assert(static_cast<std::uint8_t>(KeymapActionId::NkroTest) == 1);

@@ -92,3 +92,16 @@ TEST_CASE("native skin row dimensions cannot make help pagination divide by zero
     CHECK(native_skin_number(values, "songselect.card_height", 86,
         native_skin_metric_minimum("songselect.card_height"), 8192) >= 1);
 }
+
+TEST_CASE("native studio tint overrides preserve fractions and allow an uncolored card") {
+    std::unordered_map<std::string, float> values;
+    for (const char* key : {"options_grid.tint", "options_grid.selected_tint"}) {
+        for (float tint : {0.0f, 0.143f, 0.234f}) {
+            values[key] = tint;
+            CHECK(native_skin_number(values, key, 0.143f,
+                native_skin_metric_minimum(key), 8192) == doctest::Approx(tint));
+        }
+    }
+    CHECK(native_skin_metric_minimum("generic_help.line_height") >= 8.0f);
+    CHECK(native_skin_metric_minimum("options_grid.height") >= 1.0f);
+}

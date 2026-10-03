@@ -142,6 +142,11 @@ void MenuApp::handle_keymap_confirm_input(uint32_t keycode) {
 }
 
 void MenuApp::handle_keymap_test_input(uint32_t keycode) {
+    if (keycode == key_left_ || keycode == key_right_) {
+        apply_keymap_settings_effects(keymap_settings_controller_.adjust_test_key_count(
+            keycode == key_left_ ? -1 : 1));
+        return;
+    }
     if (keycode == key_escape_ || keycode == key_backspace_) {
         if (!pop_screen()) {
             reset_screen(Screen::Keymap);

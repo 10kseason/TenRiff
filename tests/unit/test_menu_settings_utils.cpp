@@ -1,6 +1,45 @@
 #include "doctest/doctest.h"
 
 #include "app/MenuAppSettingsUtils.h"
+#include "app/MenuAppSkinUtils.h"
+#include "app/menu/settings/SettingsHelp.h"
+#include "app/menu/settings/AudioSettingsController.h"
+#include "app/menu/settings/GraphicsSettingsController.h"
+#include "app/menu/settings/InputSettingsController.h"
+#include "app/menu/settings/CalibrationSettingsController.h"
+
+TEST_CASE("Every settings ID has localized contextual help independent of row order") {
+    using namespace tenriff::app::menu;
+    using namespace tenriff::app::menu::settings;
+    const auto check = [](Screen screen, const auto& order) {
+        for (const auto id : order) for (const auto language : {tenriff::ui::Language::English, tenriff::ui::Language::Korean, tenriff::ui::Language::Japanese}) {
+            CHECK_FALSE(setting_help(screen, static_cast<int>(id), language).empty());
+        }
+    };
+    check(Screen::SettingsAudio, kAudioSettingOrder);
+    check(Screen::SettingsGraphics, kGraphicsSettingOrder);
+    check(Screen::SettingsInput, kInputSettingOrder);
+    check(Screen::SettingsCalibration, kCalibrationSettingOrder);
+    check(Screen::SettingsSkins, tenriff::app::kSkinSettingsRowOrder);
+    for (const auto [screen, count] : {std::pair{Screen::ModeSelect, 18}, {Screen::ModeMods, 6}, {Screen::OptionsHub, 10}, {Screen::QuickSetup, 13}})
+        for (int id = 0; id < count; ++id) CHECK_FALSE(setting_help(screen, id, tenriff::ui::Language::Korean).empty());
+    tenriff::render::GenericMenuData data;
+    data.rows.resize(2);
+    data.rows[0].row_index = static_cast<int>(AudioSettingId::SoundOffset);
+    data.rows[0].selected = data.rows[0].adjustable = true;
+    data.rows[0].label = "offset";
+    data.rows[1].row_index = static_cast<int>(AudioSettingId::BackgroundSound);
+    data.rows[1].label = "background";
+    data.notes = {"unrelated screen-wide text"};
+    apply_settings_help(Screen::SettingsAudio, data, tenriff::ui::Language::Korean);
+    CHECK(data.selected_help.find("BGM") != std::string::npos);
+    CHECK(data.selected_help_heading == "offset");
+    data.rows[0].selected = false;
+    data.rows[1].selected = true;
+    apply_settings_help(Screen::SettingsAudio, data, tenriff::ui::Language::Korean);
+    CHECK(data.selected_help.find("미리듣기") != std::string::npos);
+    CHECK(data.selected_help_heading == "background");
+}
 
 TEST_CASE("Song Select gauge clicks follow the player-facing gauge order") {
     using tenriff::app::cycle_gauge_mode;

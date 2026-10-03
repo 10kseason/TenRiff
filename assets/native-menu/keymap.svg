@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <title>TenRiff native menu - Keymap</title>
+  <polyline points="12,26 88,26 88,76 12,76 12,26" fill="none" stroke="#ECF6FF" stroke-width="2.16" stroke-linejoin="miter" stroke-linecap="butt"/>
+  <polyline points="24,38 34,38 34,48 24,48 24,38" fill="none" stroke="#ECF6FF" stroke-width="2.16" stroke-linejoin="miter" stroke-linecap="butt"/>
+  <polyline points="44,38 54,38 54,48 44,48 44,38" fill="none" stroke="#ECF6FF" stroke-width="2.16" stroke-linejoin="miter" stroke-linecap="butt"/>
+  <polyline points="64,38 74,38 74,48 64,48 64,38" fill="none" stroke="#ECF6FF" stroke-width="2.16" stroke-linejoin="miter" stroke-linecap="butt"/>
+  <polyline points="28,62 72,62" fill="none" stroke="#ECF6FF" stroke-width="2.16" stroke-linejoin="miter" stroke-linecap="butt"/>
+</svg>

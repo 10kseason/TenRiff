@@ -171,6 +171,10 @@ struct SongSelectData {
     bool showing_sources = false;
     bool showing_records = false;
     bool online_records = false;
+    bool sites_records = false;
+    bool online_detail_score_available = false;
+    bool online_detailed_accuracy_available = false;
+    std::string sites_board_label;
     bool online_records_loading = false;
     std::string online_records_message;
     bool result_available = false;
@@ -680,6 +684,8 @@ struct SkinPreviewData {
 };
 
 struct GenericMenuData {
+    std::string selected_help;
+    std::string selected_help_heading;
     std::string heading;
     std::string profile_avatar_path;
     bool profile_preview_visible = false;

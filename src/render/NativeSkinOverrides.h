@@ -10,6 +10,12 @@ namespace tenriff::render {
 
 inline float native_skin_metric_minimum(const char* key) {
     const std::string_view slot(key);
+    // Style ratios and square corners can be zero. Do not force the new tint
+    // defaults (0.143/0.234) up to the dimension minimum of one.
+    if (slot == "options_grid.tint" || slot == "options_grid.selected_tint" ||
+        slot == "options_grid.radius") return 0.0f;
+    if (slot == "icon.stroke_width" || slot == "options_grid.border_width" ||
+        slot == "options_grid.selected_border_width") return 0.5f;
     if (slot.find("line_height") != std::string_view::npos) return 8.0f;
     if (slot.find("gap") != std::string_view::npos) return 0.0f;
     // Named menu metrics are dimensions or positive anchors. Signed movement

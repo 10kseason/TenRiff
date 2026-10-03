@@ -1,9 +1,12 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
   <title>TenRiff native menu - Sliders</title>
-  <polyline points="12,25 88,25" fill="none" stroke="#63E9F2" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
-  <polyline points="12,50 88,50" fill="none" stroke="#A499FF" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
-  <polyline points="12,75 88,75" fill="none" stroke="#63E9F2" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
-  <polyline points="32,16 32,34" fill="none" stroke="#ECF6FF" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
-  <polyline points="67,41 67,59" fill="none" stroke="#ECF6FF" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
-  <polyline points="44,66 44,84" fill="none" stroke="#ECF6FF" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+  <polyline points="16,26 36,26" fill="none" stroke="#ECF6FF" stroke-width="2.16" stroke-linejoin="miter" stroke-linecap="butt"/>
+  <polyline points="36,18 48,18 48,34 36,34 36,18" fill="none" stroke="#ECF6FF" stroke-width="2.16" stroke-linejoin="miter" stroke-linecap="butt"/>
+  <polyline points="48,26 84,26" fill="none" stroke="#ECF6FF" stroke-width="2.16" stroke-linejoin="miter" stroke-linecap="butt"/>
+  <polyline points="16,50 60,50" fill="none" stroke="#ECF6FF" stroke-width="2.16" stroke-linejoin="miter" stroke-linecap="butt"/>
+  <polyline points="60,42 72,42 72,58 60,58 60,42" fill="none" stroke="#ECF6FF" stroke-width="2.16" stroke-linejoin="miter" stroke-linecap="butt"/>
+  <polyline points="72,50 84,50" fill="none" stroke="#ECF6FF" stroke-width="2.16" stroke-linejoin="miter" stroke-linecap="butt"/>
+  <polyline points="16,74 28,74" fill="none" stroke="#ECF6FF" stroke-width="2.16" stroke-linejoin="miter" stroke-linecap="butt"/>
+  <polyline points="28,66 40,66 40,82 28,82 28,66" fill="none" stroke="#ECF6FF" stroke-width="2.16" stroke-linejoin="miter" stroke-linecap="butt"/>
+  <polyline points="40,74 84,74" fill="none" stroke="#ECF6FF" stroke-width="2.16" stroke-linejoin="miter" stroke-linecap="butt"/>
 </svg>

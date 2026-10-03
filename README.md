@@ -1,24 +1,22 @@
 # TenRiff
 
-**2026-10-02 · TenRiff 1.8.0:** 항목별 파스텔색 옵션 카드, 다양한 해상도, 실제 플레이와 같은 스킨 미리보기·고스트, 보조 키, 마우스 설정, 타이틀 음악 선택 및 새 판정 ruleset-2를 포함합니다. [1.8.0 release gate](docs/release-1.8.0-gate.md).
+**2026-10-03 · TenRiff 1.8.1:** 기능별 아이콘 18종과 PNG 스킨을 추가하고 옵션·곡 선택 로비를 검정과 중립색으로 정리했습니다. 항목별 도움말, 기록 창의 GPT 사이트 순위, 좌우로 4K~16K를 고르는 키 테스트를 제공합니다. [1.8.1 design notes](docs/menu-studio-1.8.1.ko.md).
 
 **멀티 Rate 지원 빌드:** 로비 `대전 Rate`에서 리더가 공통 배속을 설정합니다. 참가자 모두 이 protocol v6 빌드를 사용해야 합니다. [사용 방법과 호환성](docs/multiplayer-rate-build.ko.md).
 
 Language: Korean | [English](README.en.md) | [简体中文](README.zh-CN.md) | [日本語](README.ja.md)
 
-TenRiff는 Windows GUI 기반 BMS 리듬게임 런타임/런처 프로젝트입니다. 현재 프로젝트 버전은 `1.8.0`이며, 차트 입력은 BMS 계열(`.bms/.bme/.bml/.pms`) 전용입니다. Graphics Settings에서 권리 정리된 외부 ONNX 모델을 선택해 BGA/BGI 확대에 사용할 수 있습니다. 공개 패키지에는 BGA 업스케일러 모델을 넣지 않으며, 키 모드 변환용 NK3 P64 결정 모델과 일반화 패턴 MLP만 포함합니다. MIT 라이선스를 사용하며, 번들된 서드파티 고지는 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)에 정리합니다.
+TenRiff는 Windows GUI 기반 BMS 리듬게임 런타임/런처 프로젝트입니다. 현재 프로젝트 버전은 `1.8.1`이며, 차트 입력은 BMS 계열(`.bms/.bme/.bml/.pms`) 전용입니다. Graphics Settings에서 권리 정리된 외부 ONNX 모델을 선택해 BGA/BGI 확대에 사용할 수 있습니다. 공개 패키지에는 BGA 업스케일러 모델을 넣지 않으며, 키 모드 변환용 NK3 P64 결정 모델과 일반화 패턴 MLP만 포함합니다. MIT 라이선스를 사용하며, 번들된 서드파티 고지는 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)에 정리합니다.
 
-이 README는 "프로젝트를 처음 열었을 때 무엇을 보면 되는지"를 설명하는 입문 문서입니다. 더 자세한 현재 동작, 현재 `1.8.0` 프로젝트 상태, `1.5.1 fixed stable baseline` 기준선, 설정 구조, 설계 문서는 [`docs/README.md`](docs/README.md)부터 이어서 읽는 구조를 기준으로 작성했습니다.
+이 README는 "프로젝트를 처음 열었을 때 무엇을 보면 되는지"를 설명하는 입문 문서입니다. 더 자세한 현재 동작, 현재 `1.8.1` 프로젝트 상태, `1.5.1 fixed stable baseline` 기준선, 설정 구조, 설계 문서는 [`docs/README.md`](docs/README.md)부터 이어서 읽는 구조를 기준으로 작성했습니다.
 
 TenRiff 코드는 전통적인 장기 설계 문서 중심 개발만으로 쌓인 프로젝트가 아니라, 빠른 반복과 실험을 중시한 `vibe coding` 성격이 강한 작품이라는 점을 명시합니다.
 
-## 1.8.0 옵션·스킨·플레이 편의 개선
+## 1.8.1 Studio 메뉴 스킨
 
-ZIP을 새 폴더에 풀고 `launch_win.bat`으로 시작하세요. 이전 설치와 프로필은 보관하세요. 웹 리더보드는 `F10`에서 계정을 연결합니다. [연결 안내](docs/sites-leaderboard.md).
+기능별 아이콘 18종과 PNG 스킨을 추가하고 옵션·곡 선택 로비를 검정과 중립색으로 정리했습니다. 항목별 도움말, 기록 창의 GPT 사이트 순위, 좌우로 4K~16K를 고르는 키 테스트를 제공합니다.
 
-항목별 파스텔색 옵션 카드, 다양한 해상도, 실제 플레이와 같은 스킨 미리보기·고스트, 보조 키, 마우스 설정, 타이틀 음악 선택 및 새 판정 ruleset-2를 포함합니다.
-
-[CHANGELOG](CHANGELOG.md) · [1.8.0 release gate](docs/release-1.8.0-gate.md)
+[Design / skin controls](docs/menu-studio-1.8.1.ko.md) · [Release verification](docs/release-1.8.1-gate.md) · [CHANGELOG](CHANGELOG.md)
 
 ## 스크린샷
 
@@ -26,19 +24,19 @@ ZIP을 새 폴더에 풀고 `launch_win.bat`으로 시작하세요. 이전 설�
 
 플레이, 멀티플레이, 옵션을 한 화면에서 시작합니다.
 
-![TenRiff 홈 화면](docs/images/screenshots/home.png)
+![TenRiff 홈 화면](docs/images/studio-home.png)
 
 ### 선곡
 
 곡 목록, 내 최고 기록, 난이도표 설정을 함께 확인합니다.
 
-![TenRiff 선곡 화면과 난이도표 설정](docs/images/screenshots/song-select.png)
+![TenRiff 선곡 화면과 난이도표 설정](docs/images/studio-song-select.png)
 
 ### 플레이 결과
 
 점수와 판정 통계, 타이밍 분포 추정, 게이지 변화를 표시합니다.
 
-![TenRiff 플레이 결과와 타이밍·게이지 분석](docs/images/screenshots/result.png)
+![TenRiff 플레이 결과와 타이밍·게이지 분석](docs/images/studio-result.png)
 
 ### 스킨 설정
 
@@ -120,7 +118,7 @@ OpenAI Codex, ChatGPT, Claude Code, Gemini, 그리고 프로젝트를 함께 검
   - 결과 화면
   - replay/result JSON export
   - 곡별 로컬 기록 누적
-  - RECORDS에서 `Tab`으로 Local/Online 전환; 온라인은 exact BMS SHA-256의 `online_verified` 서버 기록만 조회
+  - RECORDS에서 `Tab`으로 로컬 / GPT 사이트 웹 순위 / 기존 검증 서버 전환. 웹 순위는 좌우로 조건 선택, F5로 새로고침하며 기존 서버는 정확히 일치하는 BMS SHA-256의 `online_verified` 기록을 조회
   - 클리어 우선 best record 판정
 
 ## 아직 제한되는 것
@@ -184,7 +182,7 @@ cmake --build build --config Release --target bms_parser_tests
 
 ### 5. NK3 키 모드 변환
 
-1.8.0 공식 Windows 빌드와 ZIP에는 standalone BMS key converter CLI/GUI를 빌드하거나 포함하지 않습니다. 게임 안의 Mode Settings에서 `NK3`를 선택하면 P64와 host beam 안전 솔버가 항상 적용됩니다. 10K가 아닌 원본을 10K로 변환할 때만 일반화 패턴 MLP를 추가하며, 10→10과 나머지 모든 변환은 P64만 사용합니다. 기본 `AUTO` 백엔드는 ncnn Vulkan으로 P64와 MLP를 AMD/NVIDIA GPU에서 실행합니다. `TENRIFF_NK3_BACKEND=AUTO|VULKAN|NCNN_CPU|OPENVINO`와 `TENRIFF_NK3_VULKAN_DEVICE=<index>`로 실행 경로를 선택할 수 있습니다. `NCNN_CPU`는 GPU를 공유하지 않는 서버 검증기처럼 재현성이 필요한 격리 환경용입니다.
+1.8.1 공식 Windows 빌드와 ZIP에는 standalone BMS key converter CLI/GUI를 빌드하거나 포함하지 않습니다. 게임 안의 Mode Settings에서 `NK3`를 선택하면 P64와 host beam 안전 솔버가 항상 적용됩니다. 10K가 아닌 원본을 10K로 변환할 때만 일반화 패턴 MLP를 추가하며, 10→10과 나머지 모든 변환은 P64만 사용합니다. 기본 `AUTO` 백엔드는 ncnn Vulkan으로 P64와 MLP를 AMD/NVIDIA GPU에서 실행합니다. `TENRIFF_NK3_BACKEND=AUTO|VULKAN|NCNN_CPU|OPENVINO`와 `TENRIFF_NK3_VULKAN_DEVICE=<index>`로 실행 경로를 선택할 수 있습니다. `NCNN_CPU`는 GPU를 공유하지 않는 서버 검증기처럼 재현성이 필요한 격리 환경용입니다.
 
 standalone converter 소스는 개발 회귀용으로만 남겨 두며 기본 CMake 옵션 `TENRIFF_BUILD_STANDALONE_BMS_KEY_CONVERTER=OFF` 상태에서는 실행 파일을 만들지 않습니다.
 

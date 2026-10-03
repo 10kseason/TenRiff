@@ -1,0 +1,45 @@
+{
+  "$schema": "../../docs/tenriff-skin.schema.json",
+  "format": "tenriff-skin",
+  "version": 1,
+  "name": "TenRiff Studio",
+  "author": "TenRiff",
+  "lobby": {
+    "renderer": "native",
+    "background": "assets/studio-backdrop.png"
+  },
+  "native": {
+    "metrics": {
+      "icon.stroke_width": 2.16,
+      "options_grid.tint": 0,
+      "options_grid.selected_tint": 0.018,
+      "options_grid.border_width": 1,
+      "options_grid.selected_border_width": 1.35,
+      "options_grid.radius": 7
+    },
+    "colors": {},
+    "assets": {
+      "mark": "assets/mark.png",
+      "prism": "assets/prism.png",
+      "chevron": "assets/chevron.png",
+      "spark": "assets/spark.png",
+      "wave": "assets/wave.png",
+      "audio": "assets/audio.png",
+      "display": "assets/display.png",
+      "input": "assets/input.png",
+      "network": "assets/network.png",
+      "sliders": "assets/sliders.png",
+      "folder": "assets/folder.png",
+      "exit": "assets/exit.png",
+      "keys": "assets/keys.png",
+      "keymap": "assets/keymap.png",
+      "skin": "assets/skin.png",
+      "latency": "assets/latency.png",
+      "profile": "assets/profile.png",
+      "keytest": "assets/keytest.png"
+    },
+    "motion": {},
+    "rects": {},
+    "fonts": {}
+  }
+}

@@ -1,4 +1,4 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
   <title>TenRiff native menu - Wave</title>
-  <polyline points="3,50 19,50 27,25 39,80 53,12 65,65 74,42 81,50 97,50" fill="none" stroke="#63E9F2" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+  <polyline points="12,50 26,50 34,30 46,70 58,22 70,58 78,50 88,50" fill="none" stroke="#ECF6FF" stroke-width="2.16" stroke-linejoin="miter" stroke-linecap="butt"/>
 </svg>

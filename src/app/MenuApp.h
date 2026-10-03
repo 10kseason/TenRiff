@@ -727,6 +727,9 @@ private:
     SongGroupMode song_group_mode_ = SongGroupMode::None;
     SongSelectView song_select_view_ = SongSelectView::Songs;
     bool online_records_view_ = false;
+    bool sites_records_view_ = false;
+    int sites_records_board_ = 0;
+    void request_record_leaderboard(bool force_refresh = false);
     int song_select_nav_cursor_ = 0;
     bool first_run_profile_ = false;
     uint64_t profile_avatar_revision_ = 0;

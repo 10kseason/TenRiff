@@ -33,31 +33,12 @@
             draw_text_layout_readable(D2D1::Point2F(dx, dy), d2d_->native_wordmark_layout.Get(),
                                native_color(color, alpha * opacity), D2D1_DRAW_TEXT_OPTIONS_CLIP, contour);
         };
-        glyphs(-1.6f, 0.8f, 0x63E9F2, motion.bloom * native_intensity);
-        glyphs(1.7f, 0.0f, 0xB7A7FF, motion.bloom * native_intensity);
         glyphs(0, 0, 0xF1FAFF, 1.0f, true);
-        const float scan_y = metrics.height * motion.scan;
-        ctx->PushAxisAlignedClip(D2D1::RectF(0, scan_y, metrics.width + 2, scan_y + 10), D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
-        glyphs(0, 0, 0x79E9F5, 0.42f * native_intensity);
-        ctx->PopAxisAlignedClip();
-        if (motion.glitch != 0.0f && native_intensity > 0.0f) {
-            for (int band = 0; band < 3; ++band) {
-                const float top = metrics.height * (0.23f + 0.22f * band);
-                ctx->PushAxisAlignedClip(D2D1::RectF(0, top, metrics.width + 2, top + metrics.height * 0.12f),
-                                         D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
-                const float shift = motion.glitch * (band == 1 ? -1.0f : 1.0f);
-                glyphs(shift, 0, 0x65ECFF, 0.92f * native_intensity);
-                glyphs(-shift * 0.6f, 0, 0xCFB0FF, 0.65f * native_intensity);
-                ctx->PopAxisAlignedClip();
-            }
-        }
-        if (motion.sparkle > 0.01f && native_intensity > 0.0f) {
-            const float x = metrics.width * motion.sparkle_x;
-            const float y = metrics.height * 0.30f;
-            ctx->DrawLine(D2D1::Point2F(x - 3, y), D2D1::Point2F(x + 3, y),
-                          native_color(0xE0FAFF, motion.sparkle * native_intensity * opacity), 0.8f);
-            ctx->DrawLine(D2D1::Point2F(x, y - 3), D2D1::Point2F(x, y + 3),
-                          native_color(0xE0FAFF, motion.sparkle * native_intensity * opacity), 0.8f);
+        if (native_menu_motion_.moving() && native_intensity > 0.0f) {
+            const float length = metrics.width * (0.20f + motion.scan * 0.12f);
+            ctx->DrawLine(D2D1::Point2F(0, metrics.height - 2),
+                          D2D1::Point2F(length, metrics.height - 2),
+                          native_color(0x63E9F2, 0.65f * opacity), 1.35f);
         }
         ctx->SetTransform(saved);
         ctx->PopAxisAlignedClip();

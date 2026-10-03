@@ -19,12 +19,35 @@ struct OnlineRecordEntry {
     std::string ruleset_id;
     std::string verification_status;
     std::string verified_at_utc;
+    std::int64_t detail_score = 0;
+    double detailed_accuracy = 0.0;
+    bool detail_score_available = false;
+    bool detailed_accuracy_available = false;
+};
+
+struct SitesRecordBoard {
+    std::string id;
+    std::string title;
+    std::string chart_sha256;
+    std::string key_mode;
+    int rate_milli = 1000;
+    std::string conditions_label;
+    std::string ruleset_id;
 };
 
 struct OnlineRecordsResponse {
     std::string chart_sha256;
     std::vector<OnlineRecordEntry> records;
+    std::vector<SitesRecordBoard> boards;
+    int board_index = 0;
 };
+
+[[nodiscard]] bool parse_sites_record_boards(std::string_view json, std::string_view title,
+    std::vector<SitesRecordBoard>& output, std::string& error);
+[[nodiscard]] bool parse_sites_record_rankings(std::string_view json, const SitesRecordBoard& board,
+    std::vector<OnlineRecordEntry>& output, std::string& error);
+[[nodiscard]] bool fetch_sites_records_once(const std::string& chart_sha256,
+    const std::string& title, int board_index, OnlineRecordsResponse& output, std::string& error);
 
 [[nodiscard]] bool parse_online_records_response(
     std::string_view json,
@@ -52,6 +75,9 @@ struct OnlineRecordsSnapshot {
     std::vector<OnlineRecordEntry> records;
     std::string error;
     std::uint64_t revision = 0;
+    bool sites = false;
+    std::vector<SitesRecordBoard> boards;
+    int board_index = 0;
 };
 
 // One background worker owns all HTTP activity so Song Select never blocks on
@@ -67,6 +93,8 @@ public:
     void request(std::string base_url,
                  std::string chart_sha256,
                  bool force_refresh = false);
+    void request_sites(std::string chart_sha256, std::string title, int board_index,
+                       bool force_refresh = false);
     [[nodiscard]] OnlineRecordsSnapshot snapshot() const;
     void shutdown();
 

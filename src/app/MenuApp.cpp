@@ -1,4 +1,5 @@
 #include "app/MenuApp.h"
+#include "app/menu/settings/SettingsHelp.h"
 
 #include <algorithm>
 #include <chrono>
@@ -3819,17 +3820,7 @@ void MenuApp::handle_song_select_input(uint32_t keycode) {
 
     if (keycode == key_f5_ && song_select_view_ == SongSelectView::Records &&
         online_records_view_) {
-        const SongEntry* entry = selected_song_ >= 0
-                                     ? visible_song_entry(
-                                           static_cast<std::size_t>(selected_song_))
-                                     : nullptr;
-        const std::string hash = entry
-                                     ? normalize_multiplayer_chart_sha256(entry->sha256)
-                                     : std::string{};
-        if (!hash.empty()) {
-            online_records_service_.request(
-                config_.ui.online_records_server_url, hash, true);
-        }
+        request_record_leaderboard(true);
         publish_snapshot();
         return;
     }
@@ -3858,9 +3849,24 @@ void MenuApp::handle_song_select_input(uint32_t keycode) {
     }
     if (key_tab_ != 0 && keycode == key_tab_ &&
         song_select_view_ == SongSelectView::Records) {
-        online_records_view_ = !online_records_view_;
+        // Local -> public Sites leaderboard -> legacy verified server -> local.
+        if (!online_records_view_) { online_records_view_ = true; sites_records_view_ = true; }
+        else if (sites_records_view_) sites_records_view_ = false;
+        else online_records_view_ = false;
+        sites_records_board_ = 0;
         selected_record_ = 0;
         selected_online_record_ = 0;
+        publish_snapshot();
+        return;
+    }
+    if (song_select_view_ == SongSelectView::Records && online_records_view_ && sites_records_view_ &&
+        (keycode == key_left_ || keycode == key_right_)) {
+        const auto snapshot = online_records_service_.snapshot();
+        if (snapshot.sites && snapshot.state == OnlineRecordsState::Ready && !snapshot.boards.empty()) {
+            sites_records_board_ = std::clamp(snapshot.board_index + (keycode == key_left_ ? -1 : 1),
+                                            0, static_cast<int>(snapshot.boards.size()) - 1);
+            selected_online_record_ = 0;
+        }
         publish_snapshot();
         return;
     }

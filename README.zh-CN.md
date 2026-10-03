@@ -1,26 +1,24 @@
 # TenRiff
 
-**2026-10-02 · TenRiff 1.8.0:** 新增分类柔和配色、多种分辨率、与实机共用的皮肤预览和幽灵布局、辅助按键、鼠标设置、标题音乐选项以及 ruleset-2 判定。 [1.8.0 release gate](docs/release-1.8.0-gate.md).
+**2026-10-03 · TenRiff 1.8.1:** 新增18种功能图标和PNG皮肤，将选项与选曲大厅改为黑色与中性色。加入各选项的说明、记录窗口内的GPT Sites排行榜，以及左右切换4K至16K的按键测试。 [1.8.1 design notes](docs/menu-studio-1.8.1.ko.md).
 
 **多人Rate支持版本：**选曲者在大厅设置全员共用的Rate。所有玩家必须使用本protocol v6版本，不能与旧v5客户端连接。[指南](docs/multiplayer-rate-build.ko.md)（韩语）。
 
-本发行包是完整的 **1.8.0 Sites 集成版**。解压到新文件夹，运行 `launch_win.bat`，然后按 F10 连接一次网页账号。符合条件的新游玩记录会上传分数、详细分数、准确率和详细准确率。新游玩使用 ruleset-2，旧 ruleset-1 回放保留原判定。请参阅[连接指南](docs/sites-leaderboard.md)（韩语）。
+本发行包是完整的 **1.8.1 Sites 集成版**。解压到新文件夹，运行 `launch_win.bat`，然后按 F10 连接一次网页账号。符合条件的新游玩记录会上传分数、详细分数、准确率和详细准确率。新游玩使用 ruleset-2，旧 ruleset-1 回放保留原判定。请参阅[连接指南](docs/sites-leaderboard.md)（韩语）。
 
 Language: [한국어](README.md) | [English](README.en.md) | [简体中文](README.zh-CN.md) | [日本語](README.ja.md)
 
-TenRiff 是一个 Windows GUI BMS 节奏游戏运行时/启动器。当前项目版本为 `1.8.0`，谱面输入仅支持 BMS family（`.bms/.bme/.bml/.pms`）。公开包不包含 BGA upscaler model；键位转换内置 deterministic NK3 P64 graph 与 generalized pattern MLP。项目采用 MIT 许可证。
+TenRiff 是一个 Windows GUI BMS 节奏游戏运行时/启动器。当前项目版本为 `1.8.1`，谱面输入仅支持 BMS family（`.bms/.bme/.bml/.pms`）。公开包不包含 BGA upscaler model；键位转换内置 deterministic NK3 P64 graph 与 generalized pattern MLP。项目采用 MIT 许可证。
 
-这份 README 是入门文档。关于当前行为、`1.8.0` 项目状态、`1.5.1 fixed stable baseline` 基准、配置和设计文档，请继续阅读 [`docs/README.zh-CN.md`](docs/README.zh-CN.md)。
+这份 README 是入门文档。关于当前行为、`1.8.1` 项目状态、`1.5.1 fixed stable baseline` 基准、配置和设计文档，请继续阅读 [`docs/README.zh-CN.md`](docs/README.zh-CN.md)。
 
 TenRiff 也明确属于一种 `vibe coding` 作品：它更多是在快速迭代和实验中成形，而不是只按照传统的长篇设计先行流程推进。
 
-## 1.8.0 选项、皮肤与操作改进
+## 1.8.1 Studio 菜单皮肤
 
-将 ZIP 解压到新文件夹并运行 `launch_win.bat`。保留旧安装和个人资料。按 `F10` 连接排行榜账号。
+新增18种功能图标和PNG皮肤，将选项与选曲大厅改为黑色与中性色。加入各选项的说明、记录窗口内的GPT Sites排行榜，以及左右切换4K至16K的按键测试。
 
-新增分类柔和配色、多种分辨率、与实机共用的皮肤预览和幽灵布局、辅助按键、鼠标设置、标题音乐选项以及 ruleset-2 判定。
-
-[CHANGELOG](CHANGELOG.md) · [1.8.0 release gate](docs/release-1.8.0-gate.md)
+[Design / skin controls](docs/menu-studio-1.8.1.ko.md) · [Release verification](docs/release-1.8.1-gate.md) · [CHANGELOG](CHANGELOG.md)
 
 ## 截图
 
@@ -28,19 +26,19 @@ TenRiff 也明确属于一种 `vibe coding` 作品：它更多是在快速迭代
 
 在同一页面开始游戏、进入多人模式或打开设置。
 
-![TenRiff 主页](docs/images/screenshots/home.png)
+![TenRiff 主页](docs/images/studio-home.png)
 
 ### 选曲
 
 查看谱面列表、个人最佳记录和难度表设置。
 
-![TenRiff 选曲页面与难度表设置](docs/images/screenshots/song-select.png)
+![TenRiff 选曲页面与难度表设置](docs/images/studio-song-select.png)
 
 ### 游戏结果
 
 查看分数、判定统计、时机分布估计和血条变化。
 
-![TenRiff 游戏结果与时机、血条分析](docs/images/screenshots/result.png)
+![TenRiff 游戏结果与时机、血条分析](docs/images/studio-result.png)
 
 ### 皮肤设置
 

@@ -1627,11 +1627,6 @@ void MenuApp::populate_generic_screen_render_data(render::MenuRenderData& render
         }
     }
 
-    if (current_screen() == Screen::QuickSetup || menu::screen_descriptor(current_screen()).options_family) {
-        const auto tips = settings_help_tips(ui_language());
-        render.generic.notes.insert(render.generic.notes.begin(), tips.begin(), tips.end());
-    }
-
     if (menu::screen_descriptor(current_screen()).shows_input_footer) {
         render.generic.footer_notes.push_back(current_input_backend_status_label());
         if (const std::string detail = current_input_backend_status_detail(); !detail.empty()) {
@@ -1738,6 +1733,13 @@ void MenuApp::publish_snapshot() {
         case menu::SnapshotViewKind::Generic:
             populate_generic_screen_render_data(render);
             break;
+    }
+
+    if (render.kind == render::MenuScreenKind::GenericList) {
+        menu::settings::apply_settings_help(current_screen(), render.generic, ui_language());
+        if (current_screen() == Screen::SettingsSkins)
+            for (const auto& status : skin_status_messages_)
+                render.generic.selected_help += "\n\n" + status;
     }
 
     if (render.kind == render::MenuScreenKind::GenericList &&
