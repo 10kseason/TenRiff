@@ -433,7 +433,8 @@
     return G.adjusted([x,y,x+width,y+height],doc().native?.rects?.['options_grid.rect.001']);
   }
   function drawOptions(){
-    const p=palette(),colors={...nativeCatalog.colors,...doc().native?.colors};
+    const p=palette(),colors=Object.fromEntries(Object.entries({...nativeCatalog.colors,...doc().native?.colors})
+      .map(([key,value])=>[key,'#'+String(value).replace(/^#/,'')]));
     const labels=['optionKeys','keymap','settings_skins','settings_graphics','settings_audio','settings_input','settings_calibration','profile','mode_mods','keymap_test'];
     const values=[previewMode.toUpperCase(),t('keymap'),'Native','1920 × 1080','WASAPI','RawInput','0.0 ms','default','MOD',t('keymap_test')];
     box([0,0,1920,126],p.panel,p.border,0);text('TENRIFF',64,64,44,p.text);text(t('options'),430,54,30,p.text);

@@ -184,7 +184,7 @@ cmake --build build --config Release --target bms_parser_tests
 
 ### 5. NK3 키 모드 변환
 
-1.8.1 공식 Windows 빌드와 ZIP에는 standalone BMS key converter CLI/GUI를 빌드하거나 포함하지 않습니다. 게임 안의 Mode Settings에서 `NK3`를 선택하면 P64와 host beam 안전 솔버가 항상 적용됩니다. 10K가 아닌 원본을 10K로 변환할 때만 일반화 패턴 MLP를 추가하며, 10→10과 나머지 모든 변환은 P64만 사용합니다. 기본 `AUTO` 백엔드는 ncnn Vulkan으로 P64와 MLP를 AMD/NVIDIA GPU에서 실행합니다. `TENRIFF_NK3_BACKEND=AUTO|VULKAN|NCNN_CPU|OPENVINO`와 `TENRIFF_NK3_VULKAN_DEVICE=<index>`로 실행 경로를 선택할 수 있습니다. `NCNN_CPU`는 GPU를 공유하지 않는 서버 검증기처럼 재현성이 필요한 격리 환경용입니다.
+1.8.2 공식 Windows 빌드와 ZIP에는 standalone BMS key converter CLI/GUI를 빌드하거나 포함하지 않습니다. 게임 안의 Mode Settings에서 `NK3`를 선택하면 P64와 host beam 안전 솔버가 항상 적용됩니다. 10K가 아닌 원본을 10K로 변환할 때만 일반화 패턴 MLP를 추가하며, 10→10과 나머지 모든 변환은 P64만 사용합니다. 기본 `AUTO` 백엔드는 ncnn Vulkan으로 P64와 MLP를 AMD/NVIDIA GPU에서 실행합니다. `TENRIFF_NK3_BACKEND=AUTO|VULKAN|NCNN_CPU|OPENVINO`와 `TENRIFF_NK3_VULKAN_DEVICE=<index>`로 실행 경로를 선택할 수 있습니다. `NCNN_CPU`는 GPU를 공유하지 않는 서버 검증기처럼 재현성이 필요한 격리 환경용입니다.
 
 standalone converter 소스는 개발 회귀용으로만 남겨 두며 기본 CMake 옵션 `TENRIFF_BUILD_STANDALONE_BMS_KEY_CONVERTER=OFF` 상태에서는 실행 파일을 만들지 않습니다.
 
