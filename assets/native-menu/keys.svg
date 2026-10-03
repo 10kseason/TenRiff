@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <title>TenRiff native menu - Keys</title>
+  <polyline points="14,18 86,18 86,82 14,82 14,18" fill="none" stroke="#ECF6FF" stroke-width="2.16" stroke-linejoin="miter" stroke-linecap="butt"/>
+  <polyline points="32,18 32,82" fill="none" stroke="#ECF6FF" stroke-width="2.16" stroke-linejoin="miter" stroke-linecap="butt"/>
+  <polyline points="50,18 50,82" fill="none" stroke="#ECF6FF" stroke-width="2.16" stroke-linejoin="miter" stroke-linecap="butt"/>
+  <polyline points="68,18 68,82" fill="none" stroke="#ECF6FF" stroke-width="2.16" stroke-linejoin="miter" stroke-linecap="butt"/>
+  <polygon points="17,58 29,58 29,64 17,64" fill="#ECF6FF" stroke="#ECF6FF" stroke-width="2.16" stroke-linejoin="miter" stroke-linecap="butt"/>
+  <polygon points="35,38 47,38 47,44 35,44" fill="#ECF6FF" stroke="#ECF6FF" stroke-width="2.16" stroke-linejoin="miter" stroke-linecap="butt"/>
+  <polygon points="53,58 65,58 65,64 53,64" fill="#ECF6FF" stroke="#ECF6FF" stroke-width="2.16" stroke-linejoin="miter" stroke-linecap="butt"/>
+  <polygon points="71,28 83,28 83,34 71,34" fill="#ECF6FF" stroke="#ECF6FF" stroke-width="2.16" stroke-linejoin="miter" stroke-linecap="butt"/>
+</svg>

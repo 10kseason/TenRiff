@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <title>TenRiff native menu - Latency</title>
+  <polyline points="40,12 60,12" fill="none" stroke="#ECF6FF" stroke-width="2.16" stroke-linejoin="miter" stroke-linecap="butt"/>
+  <polyline points="50,12 50,22" fill="none" stroke="#ECF6FF" stroke-width="2.16" stroke-linejoin="miter" stroke-linecap="butt"/>
+  <polyline points="36,24 64,24 80,40 80,66 64,82 36,82 20,66 20,40 36,24" fill="none" stroke="#ECF6FF" stroke-width="2.16" stroke-linejoin="miter" stroke-linecap="butt"/>
+  <polyline points="50,34 50,54 66,54" fill="none" stroke="#ECF6FF" stroke-width="2.16" stroke-linejoin="miter" stroke-linecap="butt"/>
+  <polyline points="72,26 80,18" fill="none" stroke="#ECF6FF" stroke-width="2.16" stroke-linejoin="miter" stroke-linecap="butt"/>
+</svg>

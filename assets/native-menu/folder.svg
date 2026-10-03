@@ -1,4 +1,4 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
   <title>TenRiff native menu - Folder</title>
-  <polyline points="8,29 8,17 39,17 49,29 91,29 91,82 8,82 8,29 91,29" fill="none" stroke="#63E9F2" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+  <polyline points="12,32 12,20 38,20 48,32 88,32 88,80 12,80 12,32 88,32" fill="none" stroke="#ECF6FF" stroke-width="2.16" stroke-linejoin="miter" stroke-linecap="butt"/>
 </svg>

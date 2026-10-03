@@ -153,8 +153,8 @@ KeymapSettingsViewModel KeymapSettingsView::build_nkro_test(
     view.rows.reserve(controller.lane_ids().size() + 1);
     view.footer_notes.push_back(localized(
         language,
-        "NKRO Test (press multiple keys)",
-        "NKRO 테스트 (여러 키를 동시에 눌러보세요)"));
+        "Left: fewer keys / Right: more keys (4K-16K). Hold multiple mapped keys to test simultaneous input. Saved bindings stay unchanged.",
+        "← 키 수 줄이기 / → 키 수 늘리기 (4K~16K). 표시된 키를 함께 눌러 동시 입력을 확인하세요. 저장된 키 배치는 유지됩니다."));
     view.footer_notes.push_back(std::move(backend_status));
 
     std::size_t index = 0;

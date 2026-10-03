@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
   <title>TenRiff native menu - Mark</title>
-  <polygon points="8,20 70,20 58,34 44,34 28,80 10,80 26,34 8,34" fill="#63E9F2" stroke="#63E9F2" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
-  <polygon points="76,20 94,20 72,80 54,80" fill="#A499FF" stroke="#A499FF" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+  <polygon points="8,20 70,20 58,34 44,34 28,80 10,80 26,34 8,34" fill="#ECF6FF" stroke="#ECF6FF" stroke-width="2.16" stroke-linejoin="miter" stroke-linecap="butt"/>
+  <polygon points="76,20 94,20 72,80 54,80" fill="#ECF6FF" stroke="#ECF6FF" stroke-width="2.16" stroke-linejoin="miter" stroke-linecap="butt"/>
 </svg>

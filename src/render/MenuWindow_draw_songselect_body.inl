@@ -304,7 +304,7 @@
                     ? wloc("SONG SOURCES", "곡 소스")
                     : (data.song_select.showing_records
                            ? (data.song_select.online_records
-                                  ? wloc("LEGACY SERVER RECORDS", "기존 서버 기록")
+                                  ? (data.song_select.sites_records ? wloc("WEB RECORDS", "웹 기록") : wloc("LEGACY SERVER RECORDS", "기존 서버 기록"))
                                   : wloc("LOCAL RECORDS", "로컬 기록"))
                            : wloc("SONG LIBRARY", "곡 라이브러리"));
             draw_text_clipped(library_title,
@@ -392,7 +392,7 @@
                 ctx->DrawBitmap(jacket_bitmap, jacket, 0.98f,
                                 D2D1_BITMAP_INTERPOLATION_MODE_LINEAR, &source);
             } else if (d2d_->card_brush) {
-                const D2D1_COLOR_F fallback = jacket_color(song.title);
+                const D2D1_COLOR_F fallback = modern_library_screen ? D2D1::ColorF(0x121212) : jacket_color(song.title);
                 const D2D1_COLOR_F saved_color = d2d_->card_brush->GetColor();
                 const float saved_opacity = d2d_->card_brush->GetOpacity();
                 d2d_->card_brush->SetColor(fallback);
@@ -560,7 +560,7 @@
                 ctx->PopLayer();
             }
         } else if (has_selected_song && d2d_->card_brush) {
-            const D2D1_COLOR_F fallback = jacket_color(data.song_select.selected_song_title);
+            const D2D1_COLOR_F fallback = modern_library_screen ? D2D1::ColorF(0x101010) : jacket_color(data.song_select.selected_song_title);
             const D2D1_COLOR_F saved_color = d2d_->card_brush->GetColor();
             const float saved_opacity = d2d_->card_brush->GetOpacity();
             d2d_->card_brush->SetColor(fallback);
@@ -572,8 +572,8 @@
             if (native_motion_screen) {
                 const float cx = (preview.left + preview.right) * 0.5f;
                 const float cy = (preview.top + preview.bottom) * 0.5f;
-                draw_native_orbit(cx, cy, 95, 0.7f * jacket_reveal);
-                draw_native_asset(native_menu_assets::kPrism,
+
+                draw_native_asset(native_menu_assets::kWave,
                     native_rect("songselect.rect.039", D2D1::RectF(cx - 76, cy - 92, cx + 76, cy + 92)), 0.9f * jacket_reveal,
                     static_cast<float>(std::sin(native_seconds * 0.4) * 6));
                 draw_native_spectrum(native_rect("songselect.rect.040", D2D1::RectF(preview.left + 28, preview.bottom - 46,
@@ -650,27 +650,29 @@
         const float best_column_gap = native_metric("songselect.best_column_gap", 18.0f);
         const float best_column_width =
             (best_columns_right - best_columns_left - best_column_gap * 2.0f) / 3.0f;
+        const bool metrics_available = data.song_select.result_available ||
+            (data.song_select.online_records && data.song_select.record_count > 0);
         const std::array<std::array<std::string, 3>, 3> best_columns = {{
             {loc("SCORE", "점수"),
-             data.song_select.result_available
+             metrics_available
                  ? format_int_with_commas(data.song_select.best_score) + " / " +
                        format_int_with_commas(data.song_select.max_score)
                  : std::string("--"),
-             data.song_select.result_available
+             metrics_available && (!data.song_select.online_records || data.song_select.online_detail_score_available)
                  ? "DETAIL " + format_int_with_commas(data.song_select.detail_score) + " / " +
                        (data.song_select.max_detail_score > 0
                             ? format_int_with_commas(data.song_select.max_detail_score)
                             : std::string("--"))
                  : std::string()},
             {loc("ACCURACY", "정확도"),
-             data.song_select.result_available
+             metrics_available
                  ? format_decimal(data.song_select.accuracy, 2) + "%"
                  : std::string("--"),
-             data.song_select.result_available
+             metrics_available && (!data.song_select.online_records || data.song_select.online_detailed_accuracy_available)
                  ? "DETAIL " + format_decimal(data.song_select.detailed_accuracy, 2) + "%"
                  : std::string()},
             {loc("MAX COMBO", "최대 콤보"),
-             data.song_select.result_available
+             metrics_available
                  ? format_int_with_commas(data.song_select.max_combo) + " COMBO"
                  : std::string("--"),
              std::string()},
@@ -1061,15 +1063,16 @@
             draw_meta_pair(native_rect("songselect.rect.086", D2D1::RectF(right_left, right_panel.top + 252.0f,
                                        right_left + (right_right - right_left) * 0.62f, right_panel.top + 332.0f)),
                            loc("ACCURACY", "정확도"),
-                           format_decimal(data.song_select.accuracy, 2) + "% / D " +
-                               format_decimal(data.song_select.detailed_accuracy, 2) + "%");
+                           format_decimal(data.song_select.accuracy, 2) + "%" +
+                               ((!data.song_select.online_records || data.song_select.online_detailed_accuracy_available)
+                                ? " / D " + format_decimal(data.song_select.detailed_accuracy, 2) + "%" : ""));
             draw_meta_pair(native_rect("songselect.rect.087", D2D1::RectF(right_left + (right_right - right_left) * 0.67f, right_panel.top + 252.0f,
                                        right_right, right_panel.top + 332.0f)),
                            loc("COMBO", "콤보"),
                            format_int_with_commas(data.song_select.max_combo) + " COMBO");
             if (d2d_->hud_format && d2d_->accent_brush) {
                 const std::string detail_line = data.song_select.online_records
-                    ? loc("LEGACY SERVER LEADERBOARD", "기존 서버 리더보드")
+                    ? (data.song_select.sites_records ? loc("GPT SITES LEADERBOARD", "GPT 사이트 리더보드") : loc("LEGACY SERVER LEADERBOARD", "기존 서버 리더보드"))
                     : loc("DETAIL SCORE ", "상세 점수 ") +
                           format_int_with_commas(data.song_select.detail_score) + " / " +
                           (data.song_select.max_detail_score > 0
@@ -1084,8 +1087,9 @@
             if (d2d_->body_format && d2d_->muted_brush) {
                 const std::string replay =
                     data.song_select.online_records
-                        ? loc("SERVER VERIFIED / CLIENT REPLAY NOT PROVIDED",
-                              "서버 검증 / 클라이언트 리플레이 미제공")
+                        ? (data.song_select.sites_records
+                            ? loc("PUBLIC WEB SCORES / GROUPED BY TITLE AND CONDITIONS", "공개 웹 기록 / 제목·플레이 조건별 묶음")
+                            : loc("SERVER VERIFIED / CLIENT REPLAY NOT PROVIDED", "서버 검증 / 클라이언트 리플레이 미제공"))
                     : data.song_select.selected_record_replay_file.empty()
                         ? loc("RESULT ONLY", "결과만 저장됨")
                         : loc("REPLAY ", "리플레이 ") +

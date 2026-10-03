@@ -10,6 +10,8 @@ Language: [한국어](README.md) | [English](README.en.md) | [简体中文](READ
 
 当前行为说明冲突时，先核对**同一提交的实现代码与回归测试**，再同步修正 `current-state`、`config` 及翻译。`baseline-*`、`release-*` 记录各自版本；早期设计和路线图提案不是当前实现或性能保证。
 
+- [1.8.1 release](release-1.8.1-gate.md)
+- [1.8.1 Studio](menu-studio-1.8.1.ko.md)
 - [1.8.0](release-1.8.0-gate.md)
 - [1.7.10](release-1.7.10-gate.md)
 - [1.7.9](release-1.7.9-gate.md)

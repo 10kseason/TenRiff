@@ -4,6 +4,47 @@
 
 #include "app/OnlineRecordsClient.h"
 
+TEST_CASE("Sites boards preserve conditions and reject substring chart matches") {
+    using namespace tenriff::app;
+    std::vector<SitesRecordBoard> boards;
+    std::string error;
+    const auto json = std::string("{\"boards\":[{\"id\":\"") + std::string(64, 'a') +
+        "\",\"title\":\"Fixture\",\"chart_sha256\":\"" + std::string(64, 'b') +
+        "\",\"key_mode\":\"5K\",\"rate_milli\":1000,\"conditions\":\"{\\\"ruleset\\\":\\\"tenriff-native-v2\\\",\\\"gauge\\\":\\\"normal\\\",\\\"random\\\":\\\"off\\\",\\\"mods\\\":[]}\"}]}";
+    REQUIRE(parse_sites_record_boards(json, "Fixture", boards, error));
+    REQUIRE(boards.size() == 1);
+    CHECK(boards[0].conditions_label.find("5K / 1.00x") != std::string::npos);
+    CHECK(boards[0].ruleset_id == "tenriff-native-v2");
+    REQUIRE(parse_sites_record_boards(json, "Fixt", boards, error));
+    CHECK(boards.empty());
+    CHECK_FALSE(parse_sites_record_boards("{\"boards\":[{}]}", "Fixture", boards, error));
+    CHECK(boards.empty());
+}
+
+TEST_CASE("Sites rankings accept ties and nullable detail without claiming replay verification") {
+    using namespace tenriff::app;
+    SitesRecordBoard board;
+    board.id = std::string(64, 'a');
+    board.ruleset_id = "tenriff-native-v2";
+    std::string error;
+    std::vector<OnlineRecordEntry> records;
+    const std::string row = "{\"rank\":1,\"nickname\":\"Fixture\",\"score\":9000,\"detail_score\":null,\"detailed_accuracy\":null,\"accuracy\":99.5,\"max_combo\":200,\"clear_status\":\"CLEAR\",\"played_at\":\"2026-10-02T00:00:00Z\"}";
+    const auto json = "{\"board\":{\"id\":\"" + board.id + "\"},\"rankings\":[" + row + "," + row + "]}";
+    REQUIRE(parse_sites_record_rankings(json, board, records, error));
+    REQUIRE(records.size() == 2);
+    CHECK(records[1].rank == 1);
+    CHECK(records[0].verification_status == "sites_community");
+    CHECK(records[0].detailed_accuracy == doctest::Approx(99.5));
+    board.id[0] = 'b';
+    CHECK_FALSE(parse_sites_record_rankings(json, board, records, error));
+    CHECK(records.empty());
+    board.id[0] = 'a';
+    auto malformed = json;
+    malformed.replace(malformed.find("99.5"), 4, "101");
+    CHECK_FALSE(parse_sites_record_rankings(malformed, board, records, error));
+    CHECK(records.empty());
+}
+
 TEST_CASE("online records parser accepts verified schema-v1 records") {
     const std::string hash(64, 'a');
     const std::string json =

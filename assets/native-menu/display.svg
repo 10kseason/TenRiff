@@ -1,5 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
   <title>TenRiff native menu - Display</title>
-  <polyline points="10,15 90,15 90,69 10,69 10,15" fill="none" stroke="#63E9F2" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
-  <polyline points="50,69 50,85 27,85 73,85" fill="none" stroke="#A499FF" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+  <polyline points="12,18 88,18 88,68 12,68 12,18" fill="none" stroke="#ECF6FF" stroke-width="2.16" stroke-linejoin="miter" stroke-linecap="butt"/>
+  <polyline points="50,68 50,82" fill="none" stroke="#ECF6FF" stroke-width="2.16" stroke-linejoin="miter" stroke-linecap="butt"/>
+  <polyline points="32,82 68,82" fill="none" stroke="#ECF6FF" stroke-width="2.16" stroke-linejoin="miter" stroke-linecap="butt"/>
 </svg>

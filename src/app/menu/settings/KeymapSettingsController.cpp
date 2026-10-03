@@ -207,6 +207,24 @@ KeymapSettingsEffects KeymapSettingsController::move_selection(
     return select(next, secondary_selected_);
 }
 
+KeymapSettingsEffects KeymapSettingsController::adjust_test_key_count(int direction) {
+    config::KeymapManager manager;
+    const auto modes = manager.supported_mode_tokens();
+    const auto current = std::find(modes.begin(), modes.end(), edit_mode_);
+    if (direction == 0 || current == modes.end()) return {};
+    const int index = static_cast<int>(std::distance(modes.begin(), current));
+    const int next = std::clamp(index + (direction < 0 ? -1 : 1), 0,
+                               static_cast<int>(modes.size()) - 1);
+    if (next == index) return {};
+    // Test layout only: never mutate or persist the gameplay mode or bindings.
+    edit_mode_ = modes[static_cast<std::size_t>(next)];
+    refresh_lanes();
+    KeymapSettingsEffects effects;
+    effects.menu.render_changed = true;
+    effects.refresh_input_scope = true;
+    return effects;
+}
+
 KeymapSettingsEffects KeymapSettingsController::cycle_mode(int direction) {
     if (direction == 0) {
         return {};

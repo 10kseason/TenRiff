@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.8.1] - 2026-10-03
+
+- Add 18 grid-based menu symbols and the portable TenRiff Studio PNG skin; give each Options category its own functional icon.
+- Use black menu surfaces, white values and thin neutral card borders, including Song Select. Remove colored placeholder jackets and the abstract center ornament; keep actual chart artwork intact.
+- Show selected-option help in Korean, English and Japanese across audio, graphics, input, timing, skins, profile, mode and key settings.
+- Records now cycles Local → GPT Sites → legacy server with Tab. Fetch public web rankings in a background worker, select condition groups with Left/Right and refresh with F5. Web scores remain separate from server replay verification.
+- Key Test uses Left/Right to select fewer/more keys from 4K through 16K without changing saved bindings; clamp at the first and last layout.
+- Replace moving menu particles and wordmark color splitting with a quiet background and a restrained underline.
+- Replace the default pastel title illustration with original black instrument-panel artwork; retain the previous image file and use a dark primary action with white text.
+- Fix a native skin crash where font-role lookup released other live text formats; retain fractional tint overrides and preload only the active menu's image roles.
+- See [design and controls](docs/menu-studio-1.8.1.ko.md) and [release validation](docs/release-1.8.1-gate.md). Gameplay timing and audio are unchanged.
+
 ## [1.8.0] - 2026-10-02
 
 - Distinguish Options categories with editable pastel sky, mint, peach, yellow and coral accents across card backgrounds, borders and values; retain an inset outline and stronger contrast for selection.

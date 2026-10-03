@@ -83,6 +83,15 @@ std::string MenuApp::difficulty_table_display_name() {
     return difficulty_table_display_name_;
 }
 
+void MenuApp::request_record_leaderboard(bool force_refresh) {
+    const SongEntry* entry = selected_song_ >= 0
+        ? visible_song_entry(static_cast<std::size_t>(selected_song_)) : nullptr;
+    if (!entry) return;
+    const auto hash = normalize_multiplayer_chart_sha256(entry->sha256);
+    if (sites_records_view_) online_records_service_.request_sites(hash, entry->title, sites_records_board_, force_refresh);
+    else if (!hash.empty()) online_records_service_.request(config_.ui.online_records_server_url, hash, force_refresh);
+}
+
 void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
                                                const std::string& current_track,
                                                const MenuApp::BestResultRecord& current_best,
@@ -111,6 +120,7 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
     render.song_select.showing_records = (song_select_view_ == SongSelectView::Records);
     render.song_select.online_records =
         render.song_select.showing_records && online_records_view_;
+    render.song_select.sites_records = render.song_select.online_records && sites_records_view_;
     OnlineRecordsSnapshot online_snapshot;
     const OnlineRecordEntry* selected_online_record = nullptr;
     if (render.song_select.online_records) {
@@ -122,16 +132,15 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
                                              ? normalize_multiplayer_chart_sha256(
                                                    selected_entry->sha256)
                                              : std::string{};
-        if (chart_sha256.empty()) {
+        if (!selected_entry || (chart_sha256.empty() && !sites_records_view_)) {
             online_snapshot.state = OnlineRecordsState::Error;
             online_snapshot.error = ui_text(
                 "This chart has no indexed SHA-256. Press F5 to reindex it.",
                 "이 차트의 SHA-256이 없습니다. F5로 다시 인덱싱하세요.");
         } else {
-            online_records_service_.request(config_.ui.online_records_server_url,
-                                            chart_sha256);
+            request_record_leaderboard();
             online_snapshot = online_records_service_.snapshot();
-            if (online_snapshot.chart_sha256 != chart_sha256) {
+            if (online_snapshot.chart_sha256 != chart_sha256 || online_snapshot.sites != sites_records_view_) {
                 online_snapshot = {};
                 online_snapshot.state = OnlineRecordsState::Loading;
                 online_snapshot.chart_sha256 = chart_sha256;
@@ -140,6 +149,11 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
         render.song_select.online_records_loading =
             online_snapshot.state == OnlineRecordsState::Loading;
         render.song_select.online_records_message = online_snapshot.error;
+        if (sites_records_view_ && !online_snapshot.boards.empty()) {
+            const auto& board = online_snapshot.boards[static_cast<std::size_t>(online_snapshot.board_index)];
+            render.song_select.sites_board_label = std::to_string(online_snapshot.board_index + 1) + "/" +
+                std::to_string(online_snapshot.boards.size()) + "  " + board.conditions_label;
+        }
         render.song_select.record_count =
             static_cast<int>(online_snapshot.records.size());
         if (!online_snapshot.records.empty()) {
@@ -207,8 +221,8 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
     };
     render.song_select.high_score =
         render.song_select.showing_sources ? 0 :
-        (render.song_select.online_records && selected_online_record
-             ? selected_online_record->score
+        (render.song_select.online_records
+             ? (selected_online_record ? selected_online_record->score : 0)
          : render.song_select.showing_records && selected_record ? selected_record->score :
          (current_best.has_value ? current_best.best_score : 0));
     render.song_select.current_source_name =
@@ -267,6 +281,17 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
                              "좌/우  탐색 전환     BACKSPACE  뒤로     TAB  로컬/온라인     F1  도움말")
                     : ui_text("TAB QUICK SETTINGS     UP/DOWN SELECT     LEFT/RIGHT ADJUST     F2 FOLDER     F5 REINDEX     F1 HELP",
                               "TAB 빠른 설정     위/아래 선택     좌/우 조정     F2 폴더     F5 재인덱스     F1 도움말")));
+
+    if (render.song_select.showing_records) {
+        render.song_select.primary_hint = online_records_view_
+            ? ui_text("UP/DOWN  RANKS     TAB  LOCAL / WEB / SERVER     F5  REFRESH", "위/아래  순위 선택     TAB  로컬 / 웹 / 서버     F5  새로고침")
+            : ui_text("UP/DOWN  MOVE     ENTER  RESULT     TAB  WEB LEADERBOARD", "위/아래  이동     ENTER  결과     TAB  웹 리더보드");
+        if (sites_records_view_ && online_records_view_) {
+            render.song_select.secondary_hint = render.song_select.sites_board_label.empty()
+                ? ui_text("LEFT/RIGHT  BOARD CONDITIONS     BACKSPACE  BACK", "좌/우  순위표 조건 선택     BACKSPACE  뒤로")
+                : ui_text("LEFT/RIGHT  ", "좌/우  ") + render.song_select.sites_board_label;
+        }
+    }
 
     const std::string source_detail =
         std::to_string(render.song_select.source_count) + " " +
@@ -451,7 +476,7 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
                                   ui_text("SCORE ", "점수 ") +
                                   format_int_with_commas(record.score) + "  " +
                                   format_decimal(record.accuracy) + "%";
-                    card.detail = ui_text("ONLINE VERIFIED / ", "온라인 검증 / ") +
+                    card.detail = (sites_records_view_ ? ui_text("WEB / ", "웹 / ") : ui_text("ONLINE VERIFIED / ", "온라인 검증 / ")) +
                                   safe_ui_text(record.ruleset_id, "--") + " / " +
                                   menu_records::compact_timestamp_label(
                                       record.verified_at_utc);
@@ -485,23 +510,22 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
         if (total == 0) {
             if (render.song_select.online_records_loading) {
                 render.song_select.empty_title =
-                    ui_text("LOADING LEGACY SERVER RECORDS", "기존 서버 기록 불러오는 중");
+                    (sites_records_view_ ? ui_text("LOADING WEB LEADERBOARD", "웹 리더보드 불러오는 중") : ui_text("LOADING LEGACY SERVER RECORDS", "기존 서버 기록 불러오는 중"));
                 render.song_select.empty_message =
                     ui_text("The records server is being queried in the background.",
                             "백그라운드에서 기록 서버를 조회하고 있습니다.");
             } else if (!render.song_select.online_records_message.empty()) {
                 render.song_select.empty_title =
-                    ui_text("LEGACY SERVER UNAVAILABLE", "기존 서버 연결 불가");
+                    (sites_records_view_ ? ui_text("WEB LEADERBOARD UNAVAILABLE", "웹 리더보드 연결 불가") : ui_text("LEGACY SERVER UNAVAILABLE", "기존 서버 연결 불가"));
                 render.song_select.empty_message =
                     safe_ui_text(render.song_select.online_records_message,
                                  ui_text("Could not query the records server.",
                                          "기록 서버를 조회하지 못했습니다."));
             } else if (render.song_select.online_records) {
                 render.song_select.empty_title =
-                    ui_text("NO LEGACY SERVER RECORDS", "기존 서버 기록 없음");
+                    (sites_records_view_ ? ui_text("NO WEB RECORDS", "웹 기록 없음") : ui_text("NO LEGACY SERVER RECORDS", "기존 서버 기록 없음"));
                 render.song_select.empty_message =
-                    ui_text("No server-verified BMS records exist for this exact chart hash.",
-                            "이 차트 해시에 서버 검증된 BMS 기록이 없습니다.");
+                    (sites_records_view_ ? ui_text("No public leaderboard matches this chart title. F5 refreshes the list.", "이 차트 제목에 맞는 공개 리더보드가 없습니다. F5로 새로고침할 수 있습니다.") : ui_text("No server-verified BMS records exist for this exact chart hash.", "이 차트 해시에 서버 검증된 BMS 기록이 없습니다."));
             } else {
                 render.song_select.empty_title = ui_text("NO LOCAL RECORDS", "로컬 기록 없음");
                 render.song_select.empty_message =
@@ -636,16 +660,20 @@ void MenuApp::populate_song_select_render_data(render::MenuRenderData& render,
             render.song_select.max_score = gameplay::kNativeScoreMaximum;
             render.song_select.max_combo = selected_online_record->max_combo;
             render.song_select.accuracy = selected_online_record->accuracy;
-            render.song_select.detailed_accuracy = selected_online_record->accuracy;
+            render.song_select.detailed_accuracy = sites_records_view_ ? selected_online_record->detailed_accuracy : selected_online_record->accuracy;
+            render.song_select.detail_score = selected_online_record->detail_score;
+            render.song_select.online_detail_score_available = selected_online_record->detail_score_available;
+            render.song_select.online_detailed_accuracy_available = selected_online_record->detailed_accuracy_available;
             render.song_select.selected_record_created_utc =
                 menu_records::compact_timestamp_label(
                     selected_online_record->verified_at_utc);
             render.song_select.selected_record_status =
                 selected_online_record->player_name + " / " +
-                selected_online_record->clear_status + " / ONLINE VERIFIED";
+                selected_online_record->clear_status + (sites_records_view_ ? " / WEB" : " / ONLINE VERIFIED");
             render.song_select.selected_record_replay_detail =
+                sites_records_view_ ? render.song_select.sites_board_label :
                 ui_text("Ruleset ", "룰셋 ") + selected_online_record->ruleset_id;
-        } else if (selected_record) {
+        } else if (!render.song_select.online_records && selected_record) {
             render.song_select.rank = selected_record->rank;
             render.song_select.best_score = selected_record->score;
             render.song_select.max_score = gameplay::kNativeScoreMaximum;

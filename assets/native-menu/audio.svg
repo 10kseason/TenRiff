@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
   <title>TenRiff native menu - Audio</title>
-  <polyline points="10,39 29,39 51,20 51,80 29,61 10,61 10,39" fill="none" stroke="#63E9F2" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
-  <polyline points="65,33 73,42 73,58 65,67" fill="none" stroke="#A499FF" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
-  <polyline points="78,20 90,37 90,63 78,80" fill="none" stroke="#A499FF" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+  <polyline points="16,38 32,38 50,22 50,78 32,62 16,62 16,38" fill="none" stroke="#ECF6FF" stroke-width="2.16" stroke-linejoin="miter" stroke-linecap="butt"/>
+  <polyline points="62,36 70,44 70,56 62,64" fill="none" stroke="#ECF6FF" stroke-width="2.16" stroke-linejoin="miter" stroke-linecap="butt"/>
+  <polyline points="74,24 86,38 86,62 74,76" fill="none" stroke="#ECF6FF" stroke-width="2.16" stroke-linejoin="miter" stroke-linecap="butt"/>
 </svg>

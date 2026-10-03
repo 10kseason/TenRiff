@@ -137,7 +137,9 @@ def catalog():
         if role in ('gameplay_combo', 'logo', 'song_logo', 'song_nav'): continue
         data['fonts'][role] = 'Segoe UI' if match[1] == 'ui_family' else match[1][2:-1]
         data['metrics']['font.' + role + '.size'] = float(match[2])
-    for name in ('mark', 'prism', 'chevron', 'spark', 'wave', 'audio', 'display', 'input', 'network', 'sliders', 'folder', 'exit'):
+    atlas = (ROOT / 'src/render/NativeMenuAssets.h').read_text(encoding='utf-8')
+    for symbol in re.findall(r'inline constexpr Asset k(\w+)\{', atlas):
+        name = symbol.lower()
         data['assets'][name] = ''
     # Atlas colors can be overridden even when the compiled vector is in use.
     for color in ('63E9F2', 'A499FF', 'ECF6FF'):

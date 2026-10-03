@@ -1,4 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
   <title>TenRiff native menu - Spark</title>
-  <polygon points="50,4 59,41 96,50 59,59 50,96 41,59 4,50 41,41" fill="#ECF6FF" stroke="#ECF6FF" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+  <polyline points="50,20 50,80" fill="none" stroke="#ECF6FF" stroke-width="2.16" stroke-linejoin="miter" stroke-linecap="butt"/>
+  <polyline points="20,50 80,50" fill="none" stroke="#ECF6FF" stroke-width="2.16" stroke-linejoin="miter" stroke-linecap="butt"/>
 </svg>

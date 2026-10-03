@@ -10,6 +10,7 @@
 
 #include "config/SimpleJson.h"
 #include "app/MainApiTlsPin.h"
+#include "app/SitesLeaderboardConnection.h"
 #include "util/Utf8Compat.h"
 
 #ifdef _WIN32
@@ -118,9 +119,9 @@ std::string winhttp_error(const char* operation) {
            std::to_string(code) + ").";
 }
 
-bool fetch_online_records_impl(const std::string& base_url,
-                               const std::string& chart_sha256,
-                               OnlineRecordsResponse& output,
+bool fetch_json_impl(const std::string& base_url,
+                               const std::string& endpoint,
+                               std::string& body,
                                std::string& error) {
     const std::wstring url = utf8_to_wide(base_url);
     if (url.empty()) {
@@ -150,11 +151,9 @@ bool fetch_online_records_impl(const std::string& base_url,
     const std::wstring host(components.lpszHostName, components.dwHostNameLength);
     std::wstring path(components.lpszUrlPath, components.dwUrlPathLength);
     while (!path.empty() && path.back() == L'/') path.pop_back();
-    path += L"/v1/leaderboards/";
-    path += utf8_to_wide(chart_sha256);
-    path += L"?limit=50";
+    path += utf8_to_wide(endpoint);
 
-    InternetHandle session(WinHttpOpen(L"TenRiff/1.5 online-records",
+    InternetHandle session(WinHttpOpen(L"TenRiff/1.8.1 records",
                                        WINHTTP_ACCESS_TYPE_AUTOMATIC_PROXY,
                                        WINHTTP_NO_PROXY_NAME,
                                        WINHTTP_NO_PROXY_BYPASS, 0));
@@ -180,7 +179,7 @@ bool fetch_online_records_impl(const std::string& base_url,
         return false;
     }
     DWORD redirect_policy =
-        WINHTTP_OPTION_REDIRECT_POLICY_DISALLOW_HTTPS_TO_HTTP;
+        WINHTTP_OPTION_REDIRECT_POLICY_NEVER;
     if (!WinHttpSetOption(request.get(), WINHTTP_OPTION_REDIRECT_POLICY,
                           &redirect_policy,
                           sizeof(redirect_policy))) {
@@ -216,7 +215,7 @@ bool fetch_online_records_impl(const std::string& base_url,
         return false;
     }
 
-    std::string body;
+    body.clear();
     for (;;) {
         DWORD available = 0;
         if (!WinHttpQueryDataAvailable(request.get(), &available)) {
@@ -243,12 +242,12 @@ bool fetch_online_records_impl(const std::string& base_url,
             return false;
         }
     }
-    return parse_online_records_response(body, chart_sha256, output, error);
+    return true;
 }
 #else
-bool fetch_online_records_impl(const std::string&,
+bool fetch_json_impl(const std::string&,
                                const std::string&,
-                               OnlineRecordsResponse&,
+                               std::string&,
                                std::string& error) {
     error = "Online records HTTP is not available on this platform build.";
     return false;
@@ -347,8 +346,141 @@ bool fetch_online_records_once(const std::string& base_url,
         output = {};
         return false;
     }
-    return fetch_online_records_impl(base_url, lower_ascii(chart_sha256),
-                                     output, error);
+    std::string body;
+    return fetch_json_impl(base_url, "/v1/leaderboards/" + lower_ascii(chart_sha256) + "?limit=50", body, error) &&
+           parse_online_records_response(body, chart_sha256, output, error);
+}
+
+bool parse_sites_record_boards(std::string_view json, std::string_view title,
+                               std::vector<SitesRecordBoard>& output, std::string& error) {
+    output.clear();
+    error.clear();
+    const auto parsed = config::parse_json(json);
+    const auto* root = parsed.success() ? parsed.root->as_object() : nullptr;
+    const auto* field = root ? find_field(*root, "boards") : nullptr;
+    const auto* boards = field ? field->as_array() : nullptr;
+    auto fail = [&] { output.clear(); error = "Invalid web leaderboard board list."; return false; };
+    if (json.size() > kMaximumResponseBytes || !boards || boards->size() > kMaximumRecords) return fail();
+    const auto safe_string = [](const config::JsonObject& object, const char* key, std::string& value, std::size_t limit) {
+        return required_string(object, key, value) && !value.empty() && value.size() <= limit &&
+            util::sanitize_ui_text(value) == value;
+    };
+    for (const auto& value : *boards) {
+        const auto* object = value.as_object();
+        SitesRecordBoard board;
+        std::string conditions;
+        std::int64_t rate = 0;
+        if (!object || !required_string(*object, "id", board.id) || !valid_sha256(board.id) ||
+            !safe_string(*object, "title", board.title, 1920) ||
+            !required_string(*object, "chart_sha256", board.chart_sha256) || !valid_sha256(board.chart_sha256) ||
+            !safe_string(*object, "key_mode", board.key_mode, 4) ||
+            !required_integer(*object, "rate_milli", 500, 2000, rate) ||
+            !required_string(*object, "conditions", conditions) || conditions.size() > 8192) return fail();
+        const auto condition_json = config::parse_json(conditions);
+        const auto* condition = condition_json.success() ? condition_json.root->as_object() : nullptr;
+        std::string gauge, random;
+        if (!condition || !safe_string(*condition, "ruleset", board.ruleset_id, 64) ||
+            !safe_string(*condition, "gauge", gauge, 64) || !safe_string(*condition, "random", random, 64)) return fail();
+        board.rate_milli = static_cast<int>(rate);
+        board.id = lower_ascii(board.id);
+        board.chart_sha256 = lower_ascii(board.chart_sha256);
+        const std::string ruleset_label = board.ruleset_id == "tenriff-native-score-v2-ruleset-2" ? "RULESET 2" :
+            board.ruleset_id == "tenriff-native-score-v2-ruleset-1" ? "RULESET 1" : board.ruleset_id;
+        board.conditions_label = board.key_mode + " / " + std::to_string(rate / 1000) + "." +
+            (rate % 1000 < 100 ? "0" : "") + std::to_string((rate % 1000) / 10) +
+            "x / " + ruleset_label + " / " + gauge + " / " + random;
+        if (const auto* mods_field = find_field(*condition, "mods")) {
+            const auto* mods = mods_field->as_array();
+            if (!mods || mods->size() > 20) return fail();
+            for (const auto& mod : *mods) {
+                if (!mod.is_string() || mod.as_string().size() > 64 ||
+                    util::sanitize_ui_text(mod.as_string()) != mod.as_string()) return fail();
+                board.conditions_label += " / " + mod.as_string();
+            }
+        }
+        // The site combines converted variants by title and conditions. Keep
+        // its groups intact and exclude substring-only matches from this view.
+        if (board.title == title) output.push_back(std::move(board));
+    }
+    std::sort(output.begin(), output.end(), [](const auto& a, const auto& b) { return a.id < b.id; });
+    return true;
+}
+
+bool parse_sites_record_rankings(std::string_view json, const SitesRecordBoard& board,
+                                 std::vector<OnlineRecordEntry>& output, std::string& error) {
+    output.clear();
+    error.clear();
+    const auto parsed = config::parse_json(json);
+    const auto* root = parsed.success() ? parsed.root->as_object() : nullptr;
+    const auto* board_field = root ? find_field(*root, "board") : nullptr;
+    const auto* returned_board = board_field ? board_field->as_object() : nullptr;
+    const auto* rankings_field = root ? find_field(*root, "rankings") : nullptr;
+    const auto* rankings = rankings_field ? rankings_field->as_array() : nullptr;
+    std::string id;
+    auto fail = [&] { output.clear(); error = "Invalid web leaderboard rankings."; return false; };
+    if (json.size() > kMaximumResponseBytes || !returned_board ||
+        !required_string(*returned_board, "id", id) || id != board.id ||
+        !rankings || rankings->size() > kMaximumRecords) return fail();
+    int previous_rank = 0;
+    for (const auto& value : *rankings) {
+        const auto* object = value.as_object();
+        OnlineRecordEntry record;
+        std::int64_t rank = 0, combo = 0;
+        const auto* accuracy = object ? find_field(*object, "accuracy") : nullptr;
+        if (!object || !required_integer(*object, "rank", 1, 100, rank) ||
+            rank < previous_rank || rank > static_cast<std::int64_t>(output.size() + 1) ||
+            !required_string(*object, "nickname", record.player_name) || record.player_name.empty() || record.player_name.size() > 256 ||
+            !required_integer(*object, "score", 0, 1'000'000'000, record.score) ||
+            !required_integer(*object, "max_combo", 0, (std::numeric_limits<int>::max)(), combo) ||
+            !accuracy || !accuracy->is_number() || !std::isfinite(accuracy->as_number()) ||
+            accuracy->as_number() < 0 || accuracy->as_number() > 100 ||
+            !required_string(*object, "clear_status", record.clear_status) || record.clear_status.size() > 64 ||
+            !required_string(*object, "played_at", record.verified_at_utc) || record.verified_at_utc.size() > 64 ||
+            util::sanitize_ui_text(record.player_name) != record.player_name ||
+            util::sanitize_ui_text(record.clear_status) != record.clear_status ||
+            util::sanitize_ui_text(record.verified_at_utc) != record.verified_at_utc) return fail();
+        record.rank = previous_rank = static_cast<int>(rank);
+        record.max_combo = static_cast<int>(combo);
+        record.accuracy = record.detailed_accuracy = accuracy->as_number();
+        if (const auto* detail = find_field(*object, "detail_score"); detail && !detail->is_null()) {
+            if (!required_integer(*object, "detail_score", 0, 1'000'000'000, record.detail_score)) return fail();
+            record.detail_score_available = true;
+        }
+        if (const auto* detail = find_field(*object, "detailed_accuracy"); detail && !detail->is_null()) {
+            if (!detail->is_number() || !std::isfinite(detail->as_number()) || detail->as_number() < 0 || detail->as_number() > 100) return fail();
+            record.detailed_accuracy = detail->as_number();
+            record.detailed_accuracy_available = true;
+        }
+        record.ruleset_id = board.ruleset_id;
+        record.verification_status = "sites_community";
+        output.push_back(std::move(record));
+    }
+    return true;
+}
+
+bool fetch_sites_records_once(const std::string& hash, const std::string& title,
+                              int board_index, OnlineRecordsResponse& output, std::string& error) {
+    output = {};
+    output.chart_sha256 = hash;
+    if (title.empty() || title.size() > 1920) { error = "Chart title is unavailable."; return false; }
+    std::string query;
+    constexpr char hex[] = "0123456789ABCDEF";
+    // Percent-encode UTF-8 bytes; never concatenate a title as URL syntax.
+    for (unsigned char ch : title) {
+        query += '%'; query += hex[ch >> 4]; query += hex[ch & 15];
+    }
+    std::string body;
+    // Public, read-only endpoints: no connection key, profile or upload token.
+    if (!fetch_json_impl(kSitesLeaderboardUrl, "/api/boards?q=" + query, body, error) ||
+        !parse_sites_record_boards(body, title, output.boards, error)) return false;
+    std::stable_partition(output.boards.begin(), output.boards.end(), [&](const auto& board) {
+        return board.chart_sha256 == lower_ascii(hash);
+    });
+    if (output.boards.empty()) return true;
+    output.board_index = std::clamp(board_index, 0, static_cast<int>(output.boards.size()) - 1);
+    const auto& board = output.boards[static_cast<std::size_t>(output.board_index)];
+    return fetch_json_impl(kSitesLeaderboardUrl, "/api/leaderboard?board=" + board.id, body, error) &&
+        parse_sites_record_rankings(body, board, output.records, error);
 }
 
 struct OnlineRecordsService::Impl {
@@ -361,6 +493,9 @@ struct OnlineRecordsService::Impl {
     std::string pending_url;
     std::string pending_hash;
     OnlineRecordsSnapshot current;
+    bool pending_sites = false;
+    std::string pending_title;
+    int pending_board = 0;
 
     Impl() : worker([this] { run(); }) {}
 
@@ -368,6 +503,9 @@ struct OnlineRecordsService::Impl {
         for (;;) {
             std::string url;
             std::string hash;
+            std::string title;
+            int board = 0;
+            bool sites = false;
             std::uint64_t active_request = 0;
             {
                 std::unique_lock lock(mutex);
@@ -376,11 +514,16 @@ struct OnlineRecordsService::Impl {
                 pending = false;
                 url = pending_url;
                 hash = pending_hash;
+                title = pending_title;
+                board = pending_board;
+                sites = pending_sites;
                 active_request = request_id;
             }
             OnlineRecordsResponse response;
             std::string error;
-            const bool ok = fetch_online_records_once(url, hash, response, error);
+            const bool ok = sites
+                ? fetch_sites_records_once(hash, title, board, response, error)
+                : fetch_online_records_once(url, hash, response, error);
             {
                 std::lock_guard lock(mutex);
                 if (stopping) return;
@@ -388,6 +531,9 @@ struct OnlineRecordsService::Impl {
                 current.state = ok ? OnlineRecordsState::Ready
                                    : OnlineRecordsState::Error;
                 current.chart_sha256 = hash;
+                current.sites = sites;
+                current.boards = std::move(response.boards);
+                current.board_index = response.board_index;
                 current.records = ok ? std::move(response.records)
                                      : std::vector<OnlineRecordEntry>{};
                 current.error = ok ? std::string{} : std::move(error);
@@ -407,13 +553,16 @@ void OnlineRecordsService::request(std::string base_url,
     chart_sha256 = lower_ascii(std::move(chart_sha256));
     std::lock_guard lock(impl_->mutex);
     if (impl_->stopping) return;
-    if (!force_refresh && impl_->current.chart_sha256 == chart_sha256 &&
+    if (!force_refresh && !impl_->pending_sites && impl_->current.chart_sha256 == chart_sha256 &&
         impl_->pending_url == base_url &&
         impl_->current.state != OnlineRecordsState::Idle) {
         return;
     }
     ++impl_->request_id;
     impl_->pending = true;
+    impl_->pending_sites = false;
+    impl_->current.sites = false;
+    impl_->current.boards.clear();
     impl_->pending_url = std::move(base_url);
     impl_->pending_hash = chart_sha256;
     impl_->current.state = OnlineRecordsState::Loading;
@@ -421,6 +570,31 @@ void OnlineRecordsService::request(std::string base_url,
     impl_->current.records.clear();
     impl_->current.error.clear();
     ++impl_->current.revision;
+    impl_->wake.notify_one();
+}
+
+void OnlineRecordsService::request_sites(std::string hash, std::string title,
+                                          int board, bool force_refresh) {
+    if (!impl_) return;
+    hash = lower_ascii(std::move(hash));
+    board = std::max(0, board);
+    std::lock_guard lock(impl_->mutex);
+    if (impl_->stopping) return;
+    if (!force_refresh && impl_->pending_sites && impl_->pending_hash == hash &&
+        impl_->pending_title == title && impl_->pending_board == board &&
+        impl_->current.state != OnlineRecordsState::Idle) return;
+    ++impl_->request_id;
+    impl_->pending = true;
+    impl_->pending_sites = true;
+    impl_->pending_hash = hash;
+    impl_->pending_title = std::move(title);
+    impl_->pending_board = board;
+    const auto revision = impl_->current.revision + 1;
+    impl_->current = {};
+    impl_->current.chart_sha256 = std::move(hash);
+    impl_->current.sites = true;
+    impl_->current.state = OnlineRecordsState::Loading;
+    impl_->current.revision = revision;
     impl_->wake.notify_one();
 }
 

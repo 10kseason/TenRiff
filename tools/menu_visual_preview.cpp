@@ -14,6 +14,7 @@
 #include "config/KeycodeMap.h"
 #include "config/SimpleJson.h"
 #include "app/SettingsHelpTips.h"
+#include "app/menu/settings/SettingsHelp.h"
 
 #include <windows.h>
 #include <array>
@@ -36,6 +37,33 @@ namespace tenriff::app {
 // Seed only in-memory state, then use the production Skin Settings builder.
 // MenuApp is never initialized: no profiles, indexing, services or input start.
 struct MenuAppVisualTestAccess {
+    static bool populate_sites_records(render::MenuRenderData& source, const std::string& title) {
+        auto app = std::make_unique<MenuApp>();
+        app->config_.ui.language = ui::language_token(source.ui_language);
+        SongEntry entry;
+        entry.title = title;
+        entry.format = "bms";
+        entry.key_count = 4;
+        app->indexed_songs_.push_back(entry);
+        app->visible_song_indices_.push_back(0);
+        app->song_select_view_ = MenuApp::SongSelectView::Records;
+        app->online_records_view_ = app->sites_records_view_ = true;
+        app->request_record_leaderboard();
+        const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(20);
+        while (app->online_records_service_.snapshot().state == OnlineRecordsState::Loading &&
+               std::chrono::steady_clock::now() < deadline)
+            std::this_thread::sleep_for(std::chrono::milliseconds(20));
+        const auto snapshot = app->online_records_service_.snapshot();
+        if (snapshot.state != OnlineRecordsState::Ready) {
+            std::cerr << "Sites read failed: " << snapshot.error << '\n';
+            return false;
+        }
+        source.song_select = {};
+        app->populate_song_select_render_data(source, title, {}, nullptr);
+        std::cout << "Sites production snapshot: boards=" << snapshot.boards.size()
+                  << " records=" << source.song_select.record_count << '\n';
+        return source.song_select.sites_records && source.song_select.record_count > 0;
+    }
     static void populate_skin_rows(render::MenuRenderData& source,
                                    const TenRiffSkinDefinition* imported,
                                    int selected_row, bool backdrop_override) {
@@ -143,12 +171,14 @@ struct MenuWindowVisualTestAccess {
             }
             const auto regions = window.hit_regions_;
             for (const auto& region : regions) {
+                const bool menu_card = region.kind == MenuHitTargetKind::OptionsItem ||
+                    region.kind == MenuHitTargetKind::TitleButton;
                 const bool song_control = song_fixture &&
                     (region.kind == MenuHitTargetKind::SongCard || region.kind == MenuHitTargetKind::SongNavButton ||
                      region.kind == MenuHitTargetKind::SongDifficultyTable);
-                if (!song_control && region.kind != MenuHitTargetKind::SettingsRow && region.kind != MenuHitTargetKind::KeymapButton)
+                if (!menu_card && !song_control && region.kind != MenuHitTargetKind::SettingsRow && region.kind != MenuHitTargetKind::KeymapButton)
                     continue;
-                const bool control = song_control || region.part == MenuHitPart::Decrement ||
+                const bool control = menu_card || song_control || region.part == MenuHitPart::Decrement ||
                     region.part == MenuHitPart::Increment || region.part == MenuHitPart::SetValue ||
                     (skin_fixture && region.part == MenuHitPart::Activate) ||
                     fixture.generic.keymap_keyboard;
@@ -319,6 +349,7 @@ int main(int argc, char** argv) {
     bool keys_explicit = false;
     bool mute_inactive = false;
     std::string title_music_mode = "default";
+    std::string sites_records_title;
     bool backdrop_off = false;
     double backdrop_opacity = -1.0;
     double backdrop_brightness = -1.0;
@@ -365,6 +396,7 @@ int main(int argc, char** argv) {
         else if (arg == "--opaque-field") opaque_field = true;
         else if (arg == "--keymap") keymap_settings = true;
         else if (arg == "--keymap-test") keymap_settings = keymap_test = true;
+        else if (arg == "--sites-records" && i + 1 < argc) sites_records_title = argv[++i];
         else if (arg == "--mute-inactive") mute_inactive = true;
         else if (arg == "--title-music" && i + 1 < argc) title_music_mode = argv[++i];
         else if (arg == "--key-backdrop-off") backdrop_off = true;
@@ -912,6 +944,14 @@ int main(int argc, char** argv) {
     if (selected_setting >= 0) {
         for (auto& row : data.generic.rows) row.selected = row.row_index == selected_setting;
     }
+    if (data.kind == MenuScreenKind::GenericList) {
+        using tenriff::app::menu::Screen;
+        const auto help_screen = options_grid ? Screen::OptionsHub : skin_settings ? Screen::SettingsSkins :
+            keymap_test ? Screen::KeymapTest : keymap_settings ? Screen::Keymap : profile_settings ? Screen::QuickSetup : Screen::SettingsAudio;
+        tenriff::app::menu::settings::apply_settings_help(help_screen, data.generic, data.ui_language);
+    }
+    if (!sites_records_title.empty() &&
+        !tenriff::app::MenuAppVisualTestAccess::populate_sites_records(data, sites_records_title)) return 5;
     if (skin_scene) {
         data.gameplay = make_skin_gameplay_preview(data.generic.skin_preview);
         data.kind = MenuScreenKind::GameplayHud;

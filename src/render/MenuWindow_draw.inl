@@ -171,14 +171,14 @@ void MenuWindow::draw(const MenuRenderData& data) {
 #include "MenuWindow_draw_native_motion.inl"
     if (data.kind != MenuScreenKind::GameplayHud) {
         set_theme_color(d2d_->text_brush.Get(), "text", D2D1::ColorF(0xF5F5F5));
-        set_theme_color(d2d_->accent_brush.Get(), "accent", D2D1::ColorF(0xB8E5F5));
-        set_theme_color(d2d_->muted_brush.Get(), "muted", D2D1::ColorF(0xC2C2C2));
-        set_theme_color(d2d_->panel_brush.Get(), "panel", D2D1::ColorF(0x171717));
-        set_theme_color(d2d_->card_brush.Get(), "card", D2D1::ColorF(0x272727));
+        set_theme_color(d2d_->accent_brush.Get(), "accent", D2D1::ColorF(0xF0F0F0));
+        set_theme_color(d2d_->muted_brush.Get(), "muted", D2D1::ColorF(0x909090));
+        set_theme_color(d2d_->panel_brush.Get(), "panel", D2D1::ColorF(0x090909));
+        set_theme_color(d2d_->card_brush.Get(), "card", D2D1::ColorF(0x0B0B0B));
         set_theme_color(d2d_->footer_brush.Get(), "footer", D2D1::ColorF(0x090909, 0.9f));
-        set_theme_color(d2d_->button_border_brush.Get(), "border", D2D1::ColorF(0x656565));
-        set_theme_color(d2d_->button_brush.Get(), "button", D2D1::ColorF(0x222222));
-        set_theme_color(d2d_->button_selected_brush.Get(), "button_selected", D2D1::ColorF(0xB8E5F5, 0.22f));
+        set_theme_color(d2d_->button_border_brush.Get(), "border", D2D1::ColorF(0x2A2A2A));
+        set_theme_color(d2d_->button_brush.Get(), "button", D2D1::ColorF(0x101010));
+        set_theme_color(d2d_->button_selected_brush.Get(), "button_selected", D2D1::ColorF(0xF0F0F0, 0.143f));
     }
     MenuRenderData* skin_preview_scene = nullptr;
     const bool has_menu_scene = !modern_menu_screen &&
@@ -226,11 +226,20 @@ void MenuWindow::draw(const MenuRenderData& data) {
     if (data.kind != MenuScreenKind::GameplayHud && data.lobby_skin.enabled) {
         constexpr const char* asset_roles[] = {"mark", "prism", "chevron", "spark", "wave", "audio",
             "display", "input", "network", "sliders", "folder", "exit"};
-        for (const auto* role : asset_roles) {
+        constexpr const char* option_roles[] = {"mark", "keys", "keymap", "skin", "display", "audio",
+            "input", "latency", "profile", "sliders", "keytest"};
+        auto preload_asset = [&](const char* role) {
             const auto asset = native_style.assets.find(role);
             if (asset != native_style.assets.end()) {
                 static_cast<void>(load_song_card_preview_bitmap(asset->second));
             }
+        };
+        // Keep the visible role set below the shared 24-image cache budget.
+        // Preloading all 18 symbols plus song jackets would cause cache churn.
+        if (data.kind == MenuScreenKind::GenericList && data.generic.card_grid) {
+            for (const auto* role : option_roles) preload_asset(role);
+        } else {
+            for (const auto* role : asset_roles) preload_asset(role);
         }
         static_cast<void>(load_song_card_preview_bitmap(data.lobby_skin.background_path));
         static_cast<void>(load_song_card_preview_bitmap(data.lobby_skin.logo_path));
@@ -285,8 +294,8 @@ void MenuWindow::draw(const MenuRenderData& data) {
         D2D1::RectF(0.0f, 0.0f, kBaseWidth, kBaseHeight);
     if (title_background) {
         const auto source = centered_bitmap_source_rect(title_background->GetSize(), full_screen_rect);
-        // Preserve the supplied artwork's original color; opaque menu surfaces
-        // provide text contrast locally without a global tint over the image.
+        // The Studio artwork is already authored against the menu's contrast
+        // budget. Imported backgrounds still retain their own color and opacity.
         ctx->DrawBitmap(title_background, full_screen_rect, 1.0f,
                         D2D1_BITMAP_INTERPOLATION_MODE_LINEAR, &source);
     }
@@ -521,8 +530,7 @@ void MenuWindow::draw(const MenuRenderData& data) {
         if (!native_motion_screen || !d2d_->native_menu_brush || strength <= 0.0f) return;
         const auto edge = D2D1::RoundedRect(inset_rect(rect, 1.0f, 1.0f), radius, radius);
         ctx->PushAxisAlignedClip(rect, D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
-        ctx->DrawRoundedRectangle(edge, native_color(color, 0.075f * strength), 6.0f);
-        ctx->DrawRoundedRectangle(edge, native_color(color, 0.55f * strength), 1.0f);
+        ctx->DrawRoundedRectangle(edge, native_color(color, 0.55f * strength), 1.35f);
         ctx->PopAxisAlignedClip();
     };
 
@@ -533,7 +541,7 @@ void MenuWindow::draw(const MenuRenderData& data) {
                                 bool strong_edge,
                                 float shadow_offset = 9.0f) {
         const D2D1_ROUNDED_RECT rr = D2D1::RoundedRect(rect, radius, radius);
-        // Native panels retain a crisp edge with a restrained, inward halo.
+        // Native panels use a flat face and a clearly weighted edge.
         // Imported skins keep their existing layered glass and layout slots.
         if (modern_menu_screen) {
             if (d2d_->panel_brush) {
@@ -545,7 +553,7 @@ void MenuWindow::draw(const MenuRenderData& data) {
             if (d2d_->button_border_brush) {
                 const float saved = d2d_->button_border_brush->GetOpacity();
                 d2d_->button_border_brush->SetOpacity(strong_edge ? 0.85f : 0.34f);
-                ctx->DrawRoundedRectangle(rr, d2d_->button_border_brush.Get(), 1.0f);
+                ctx->DrawRoundedRectangle(rr, d2d_->button_border_brush.Get(), 1.35f);
                 d2d_->button_border_brush->SetOpacity(saved);
             }
             draw_native_panel_edge(rect, radius, strong_edge ? 0xA1E5F0 : 0x7B91AC,

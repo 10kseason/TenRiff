@@ -34,7 +34,7 @@
                           native_rect("title_native.rect.009", D2D1::RectF(96, 198, 932, 226)), d2d_->accent_brush.Get());
         const float hero_reveal = native_menu_motion_.entrance(0.06f, 0.65f);
         const float hero_float = static_cast<float>(std::sin(native_seconds * 1.15) * 7.0);
-        if (!has_title_art) {
+        if (!has_title_art && data.lobby_skin.background_path.empty()) {
         draw_native_orbit(800, 358 + hero_float, 120, 0.56f * hero_reveal);
         draw_native_asset(native_menu_assets::kPrism,
                           native_rect("title_native.rect.010", D2D1::RectF(708, 250 + hero_float, 892, 458 + hero_float)),
@@ -67,7 +67,10 @@
             register_hit(rect, MenuHitTargetKind::TitleButton, static_cast<int>(index));
             draw_glass_panel(rect, 14, 0.95f, 0, button.selected, 0);
             if (primary && d2d_->accent_brush) {
-                ctx->FillRoundedRectangle(rounded, d2d_->accent_brush.Get());
+                const auto saved = d2d_->card_brush->GetColor();
+                d2d_->card_brush->SetColor(native_palette("title.primary", D2D1::ColorF(0x111111)));
+                ctx->FillRoundedRectangle(rounded, d2d_->card_brush.Get());
+                d2d_->card_brush->SetColor(saved);
             } else if (button.selected && d2d_->button_selected_brush) {
                 ctx->FillRoundedRectangle(rounded, d2d_->button_selected_brush.Get());
             }
@@ -80,8 +83,8 @@
             const auto saved_text = d2d_->text_brush->GetColor();
             const auto saved_muted = d2d_->muted_brush->GetColor();
             if (primary) {
-                d2d_->text_brush->SetColor(native_palette("palette.0b1620", D2D1::ColorF(0x0B1620)));
-                d2d_->muted_brush->SetColor(native_palette("palette.234652", D2D1::ColorF(0x234652)));
+                d2d_->text_brush->SetColor(native_palette("title.primary_text", D2D1::ColorF(0xF5F5F5)));
+                d2d_->muted_brush->SetColor(native_palette("title.primary_detail", D2D1::ColorF(0xC2CCD3)));
             }
             const float label_top = rect.top + (primary ? 32.0f : 18.0f);
             draw_text_clipped(to_wide(button.label), d2d_->menu_button_format.Get(),
@@ -96,7 +99,7 @@
                 native_menu_assets::kChevron, native_menu_assets::kNetwork,
                 native_menu_assets::kSliders, native_menu_assets::kExit};
             if (primary) {
-                // Keep a dark arrow on the bright primary action for contrast.
+                // Keep the action arrow in the same high-contrast text color.
                 draw_text_clipped_aligned(L"\u2192", d2d_->menu_icon_format.Get(),
                     native_rect("title_native.rect.020", D2D1::RectF(rect.right - 84, rect.top, rect.right - 20, rect.bottom)),
                     d2d_->text_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER);

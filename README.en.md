@@ -1,26 +1,24 @@
 # TenRiff
 
-**2026-10-02 · TenRiff 1.8.0:** Adds pastel category colors, flexible resolutions, shared skin preview and ghost geometry, secondary keys, mouse-friendly settings, title music choices and ruleset-2 judgement timing. [1.8.0 release gate](docs/release-1.8.0-gate.md).
+**2026-10-03 · TenRiff 1.8.1:** Adds 18 functional icons and a portable PNG skin, with black options and Song Select surfaces. Includes contextual option help, GPT Sites rankings inside Records, and Left/Right key-test layout selection from 4K to 16K. [1.8.1 design notes](docs/menu-studio-1.8.1.ko.md).
 
 **Multiplayer Rate build:** the leader sets a shared Room Rate in the lobby. All participants must use this protocol v6 build; previous v5 clients cannot join. [Guide (Korean)](docs/multiplayer.md).
 
-This is the complete **1.8.0 Sites integrated** distribution. Extract to a new folder, run `launch_win.bat`, then press F10 and link your web account once. Eligible new plays upload score, detail score, accuracy, and detailed accuracy. New plays use ruleset-2; legacy ruleset-1 replays keep their original timing. See the [connection guide](docs/sites-leaderboard.md) (Korean).
+This is the complete **1.8.1 Sites integrated** distribution. Extract to a new folder, run `launch_win.bat`, then press F10 and link your web account once. Eligible new plays upload score, detail score, accuracy, and detailed accuracy. New plays use ruleset-2; legacy ruleset-1 replays keep their original timing. See the [connection guide](docs/sites-leaderboard.md) (Korean).
 
 Language: [한국어](README.md) | [English](README.en.md) | [简体中文](README.zh-CN.md) | [日本語](README.ja.md)
 
-TenRiff is a Windows GUI BMS rhythm-game runtime/launcher. The current project version is `1.8.0`, and chart input is limited to the BMS family (`.bms/.bme/.bml/.pms`). Graphics Settings lets users select a rights-cleared external ONNX model for the optional BGA Upscaler. Public packages contain no BGA-upscaler model; key-mode conversion bundles the deterministic NK3 P64 graph and the generalized pattern MLP exports. The project uses the MIT License, and bundled third-party notices are collected in [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
+TenRiff is a Windows GUI BMS rhythm-game runtime/launcher. The current project version is `1.8.1`, and chart input is limited to the BMS family (`.bms/.bme/.bml/.pms`). Graphics Settings lets users select a rights-cleared external ONNX model for the optional BGA Upscaler. Public packages contain no BGA-upscaler model; key-mode conversion bundles the deterministic NK3 P64 graph and the generalized pattern MLP exports. The project uses the MIT License, and bundled third-party notices are collected in [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
 
-This README is an introduction that explains "what to look at first when you open the project." For current behavior, the `1.8.0` project state, the `1.5.1 fixed stable baseline` baseline, configuration, and design documents, continue from [`docs/README.en.md`](docs/README.en.md).
+This README is an introduction that explains "what to look at first when you open the project." For current behavior, the `1.8.1` project state, the `1.5.1 fixed stable baseline` baseline, configuration, and design documents, continue from [`docs/README.en.md`](docs/README.en.md).
 
 TenRiff should also be read as a `vibe coding` work: it was shaped through fast iteration and experimentation rather than only through a traditional long-form design-first process.
 
-## 1.8.0 Options, skins and play controls
+## 1.8.1 Studio menu skin
 
-Extract into a new folder and run `launch_win.bat`. Keep the previous installation and profiles. Connect the web leaderboard account with `F10`. [Connection guide](docs/sites-leaderboard.md).
+Adds 18 functional icons and a portable PNG skin, with black options and Song Select surfaces. Includes contextual option help, GPT Sites rankings inside Records, and Left/Right key-test layout selection from 4K to 16K.
 
-Adds pastel category colors, flexible resolutions, shared skin preview and ghost geometry, secondary keys, mouse-friendly settings, title music choices and ruleset-2 judgement timing.
-
-[CHANGELOG](CHANGELOG.md) · [1.8.0 release gate](docs/release-1.8.0-gate.md)
+[Design / skin controls](docs/menu-studio-1.8.1.ko.md) · [Release verification](docs/release-1.8.1-gate.md) · [CHANGELOG](CHANGELOG.md)
 
 ## Screenshots
 
@@ -28,19 +26,19 @@ Adds pastel category colors, flexible resolutions, shared skin preview and ghost
 
 Start playing, join multiplayer, or open settings from one screen.
 
-![TenRiff home screen](docs/images/screenshots/home.png)
+![TenRiff home screen](docs/images/studio-home.png)
 
 ### Song Select
 
 Browse charts, check personal bests, and select a difficulty table.
 
-![TenRiff song library and difficulty-table controls](docs/images/screenshots/song-select.png)
+![TenRiff song library and difficulty-table controls](docs/images/studio-song-select.png)
 
 ### Results
 
 Review scores, judgement counts, the estimated timing distribution, and gauge history.
 
-![TenRiff results with timing and gauge analysis](docs/images/screenshots/result.png)
+![TenRiff results with timing and gauge analysis](docs/images/studio-result.png)
 
 ### Skin Settings
 

@@ -10,6 +10,8 @@ This codebase should also be read as a `vibe coding` work that grew through rapi
 
 When current-behavior descriptions conflict, check **implementation and regression tests at the same commit** first, then correct `current-state`, `config` and their translations together. `baseline-*` and `release-*` describe their named versions; early designs and roadmap proposals are not implementation or performance guarantees.
 
+- [1.8.1 release](release-1.8.1-gate.md)
+- [1.8.1 Studio](menu-studio-1.8.1.ko.md)
 - [1.8.0](release-1.8.0-gate.md)
 - [1.7.10](release-1.7.10-gate.md)
 - [1.7.9](release-1.7.9-gate.md)

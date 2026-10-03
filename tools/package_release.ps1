@@ -3,7 +3,7 @@ param(
     [string]$BuildReleaseDirectory,
     [Parameter(Mandatory = $true)]
     [string]$OutputDirectory,
-    [string]$Version = "1.8.0",
+    [string]$Version = "1.8.1",
     [switch]$BinaryOnly
 )
 
@@ -88,6 +88,7 @@ Copy-Item -LiteralPath (Join-Path $repoRoot "assets\menu") -Destination (Join-Pa
 # Skin images are already generated. Keep their offline authoring programs in
 # the source tree, not in the runnable client delivery.
 foreach ($relative in @(
+    "skins\TenRiff_Studio\generate.py",
     "skins\Tencircle\generate.py",
     "skins\Tengear\generate.py",
     "skins\Tenmania\generate.py",

@@ -7,11 +7,24 @@
                                      const std::vector<std::string>& footer_notes,
                                      bool separate_paragraphs = true) {
             draw_glass_panel(rect, 14.0f, 0.92f, 0, false, 0);
-            draw_text_clipped(wloc("GUIDE", "사용 안내"), d2d_->song_title_format.Get(),
+            draw_text_clipped(data.generic.selected_help_heading.empty() ? wloc("GUIDE", "사용 안내")
+                                : to_wide(data.generic.selected_help_heading), d2d_->song_title_format.Get(),
                               native_rect("generic_help.rect.001", D2D1::RectF(rect.left + 24, rect.top + 20, rect.right - 24, rect.top + 54)),
                               d2d_->text_brush.Get());
             std::wstring notes;
+            if (!data.generic.selected_help.empty()) {
+                // Sanitize each line while retaining the authored paragraph breaks.
+                std::size_t start = 0;
+                do {
+                    const auto end = data.generic.selected_help.find('\n', start);
+                    notes += to_wide(data.generic.selected_help.substr(start, end - start));
+                    if (end == std::string::npos) break;
+                    notes += L'\n';
+                    start = end + 1;
+                } while (start <= data.generic.selected_help.size());
+            }
             for (const auto& note : guide_notes) {
+                if (!data.generic.selected_help.empty()) break;
                 if (!notes.empty()) notes += separate_paragraphs ? L"\n\n" : L"\n";
                 notes += to_wide(note);
             }

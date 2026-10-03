@@ -1784,7 +1784,7 @@ std::string built_in_title_background_path() {
         wchar_t module[32768] = {};
         const DWORD length = GetModuleFileNameW(nullptr, module, static_cast<DWORD>(std::size(module)));
         if (length == 0 || length >= std::size(module)) return std::string{};
-        return (std::filesystem::path(module).parent_path() / "assets" / "menu" / "title-space.jpg").u8string();
+        return (std::filesystem::path(module).parent_path() / "assets" / "menu" / "title-studio.png").u8string();
     }();
     return path;
 }
@@ -4888,18 +4888,20 @@ bool MenuWindow::create_text_formats(const wchar_t* ui_family, const app::Native
         Microsoft::WRL::ComPtr<IDWriteTextFormat> format;
         std::wstring custom_family;
         if (native_style && !preview_font) {
+            // ComPtr operator& releases its object. Role lookup must take the
+            // wrapper address without clearing every other live text format.
             const std::pair<Microsoft::WRL::ComPtr<IDWriteTextFormat>*, const char*> roles[] = {
-                {&d2d_->title_format, "title"}, {&d2d_->option_format, "option"},
-                {&d2d_->body_format, "body"}, {&d2d_->mono_format, "mono"},
-                {&d2d_->logo_format, "logo"}, {&d2d_->menu_button_format, "menu_button"},
-                {&d2d_->menu_icon_format, "menu_icon"}, {&d2d_->header_format, "header"},
-                {&d2d_->gameplay_combo_format, "gameplay_combo"}, {&d2d_->song_logo_format, "song_logo"},
-                {&d2d_->song_nav_format, "song_nav"}, {&d2d_->song_record_label_format, "song_record_label"},
-                {&d2d_->song_record_value_format, "song_record_value"}, {&d2d_->song_record_detail_format, "song_record_detail"},
-                {&d2d_->song_title_format, "song_title"}, {&d2d_->song_artist_format, "song_artist"},
-                {&d2d_->result_score_format, "result_score"}, {&d2d_->result_metric_format, "result_metric"},
-                {&d2d_->hud_format, "hud"}, {&d2d_->rank_format, "rank"},
-                {&d2d_->stats_label_format, "stats_label"}, {&d2d_->stats_value_format, "stats_value"}};
+                {std::addressof(d2d_->title_format), "title"}, {std::addressof(d2d_->option_format), "option"},
+                {std::addressof(d2d_->body_format), "body"}, {std::addressof(d2d_->mono_format), "mono"},
+                {std::addressof(d2d_->logo_format), "logo"}, {std::addressof(d2d_->menu_button_format), "menu_button"},
+                {std::addressof(d2d_->menu_icon_format), "menu_icon"}, {std::addressof(d2d_->header_format), "header"},
+                {std::addressof(d2d_->gameplay_combo_format), "gameplay_combo"}, {std::addressof(d2d_->song_logo_format), "song_logo"},
+                {std::addressof(d2d_->song_nav_format), "song_nav"}, {std::addressof(d2d_->song_record_label_format), "song_record_label"},
+                {std::addressof(d2d_->song_record_value_format), "song_record_value"}, {std::addressof(d2d_->song_record_detail_format), "song_record_detail"},
+                {std::addressof(d2d_->song_title_format), "song_title"}, {std::addressof(d2d_->song_artist_format), "song_artist"},
+                {std::addressof(d2d_->result_score_format), "result_score"}, {std::addressof(d2d_->result_metric_format), "result_metric"},
+                {std::addressof(d2d_->hud_format), "hud"}, {std::addressof(d2d_->rank_format), "rank"},
+                {std::addressof(d2d_->stats_label_format), "stats_label"}, {std::addressof(d2d_->stats_value_format), "stats_value"}};
             for (const auto& role : roles) {
                 if (role.first != out_format) continue;
                 const auto it = native_style->fonts.find(role.second);

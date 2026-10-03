@@ -83,13 +83,16 @@
                                  float alpha = 1.0f, float rotation = 0.0f) {
         if (!native_motion_screen || !d2d_->native_menu_brush || alpha <= 0) return;
         if (native_overrides && !native_style.assets.empty()) {
-            const std::array<std::pair<native_menu_assets::Asset, const char*>, 12> names = {{
+            const std::array<std::pair<native_menu_assets::Asset, const char*>, 18> names = {{
                 {native_menu_assets::kMark, "mark"}, {native_menu_assets::kPrism, "prism"},
                 {native_menu_assets::kChevron, "chevron"}, {native_menu_assets::kSpark, "spark"},
                 {native_menu_assets::kWave, "wave"}, {native_menu_assets::kAudio, "audio"},
                 {native_menu_assets::kDisplay, "display"}, {native_menu_assets::kInput, "input"},
                 {native_menu_assets::kNetwork, "network"}, {native_menu_assets::kSliders, "sliders"},
-                {native_menu_assets::kFolder, "folder"}, {native_menu_assets::kExit, "exit"}}};
+                {native_menu_assets::kFolder, "folder"}, {native_menu_assets::kExit, "exit"},
+                {native_menu_assets::kKeys, "keys"}, {native_menu_assets::kKeymap, "keymap"},
+                {native_menu_assets::kSkin, "skin"}, {native_menu_assets::kLatency, "latency"},
+                {native_menu_assets::kProfile, "profile"}, {native_menu_assets::kKeytest, "keytest"}}};
             for (const auto& named : names) {
                 if (named.first.first != asset.first) continue;
                 const auto it = native_style.assets.find(named.second);
@@ -121,7 +124,7 @@
             if (!geometry) continue;
             auto* brush = native_color(native_menu_assets::paths[i].color, alpha);
             if (native_menu_assets::paths[i].filled) ctx->FillGeometry(geometry, brush);
-            else ctx->DrawGeometry(geometry, brush, 1.6f);
+            else ctx->DrawGeometry(geometry, brush, std::clamp(native_metric("icon.stroke_width", 2.16f), 0.5f, 8.0f));
         }
         ctx->SetTransform(saved);
     };
@@ -146,25 +149,15 @@
         const float focus = native_menu_motion_.focus(slot, identity, selected);
         const auto rr = D2D1::RoundedRect(rect, radius, radius);
         if (focus > 0.005f) {
-            ctx->DrawRoundedRectangle(rr, native_color(0x63E9F2, 0.10f * focus), 7.0f);
-            ctx->DrawRoundedRectangle(rr, native_color(0xA9F5FF, 0.66f * focus), 1.5f);
+            // Use edge weight instead of a blurred selection halo.
+            ctx->DrawRoundedRectangle(rr, native_color(0xA9F5FF, 0.66f * focus), primary ? 3.24f : 2.16f);
             const float length = (rect.right - rect.left - radius * 2) *
                 (0.28f + 0.15f * static_cast<float>(0.5 + 0.5 * std::sin(native_seconds * 1.6)));
             ctx->DrawLine(D2D1::Point2F(rect.left + radius, rect.bottom - 1),
                           D2D1::Point2F(rect.left + radius + length, rect.bottom - 1),
                           native_color(0x63E9F2, 0.8f * focus), 2.0f);
         }
-        if (primary && native_menu_motion_.moving()) {
-            const float phase = static_cast<float>(std::fmod(native_seconds + 0.7, 5.4) / 1.8);
-            if (phase < 1.0f) {
-                const float x = rect.left - 80 + (rect.right - rect.left + 160) * phase;
-                ctx->PushAxisAlignedClip(native_rect("native_motion.rect.002", D2D1::RectF(rect.left + radius, rect.top + 2,
-                                                   rect.right - radius, rect.bottom - 2)), D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
-                ctx->DrawLine(D2D1::Point2F(x, rect.bottom), D2D1::Point2F(x + 70, rect.top),
-                              native_color(0xFFFFFF, 0.12f), 26.0f);
-                ctx->PopAxisAlignedClip();
-            }
-        }
+
     };
     auto draw_native_orbit = [&](float x, float y, float radius, float alpha) {
         if (!native_motion_screen || !d2d_->native_menu_brush) return;
@@ -183,19 +176,9 @@
         if (!native_motion_screen || !d2d_->native_menu_brush) return;
         if (d2d_->native_menu_background) ctx->FillRectangle(
             native_rect("native_motion.rect.003", D2D1::RectF(0, 0, kBaseWidth, kBaseHeight)), d2d_->native_menu_background.Get());
-        const float drift = static_cast<float>(std::fmod(native_seconds * 8, 120));
-        for (int i = -10; i < 20; ++i) {
-            const float x = i * 120.0f + drift;
-            ctx->DrawLine(D2D1::Point2F(x, 1080), D2D1::Point2F(x + 580, 0),
-                          native_color(0x89AAE0, i % 4 == 0 ? 0.055f : 0.018f), 1.0f);
-        }
-        for (int i = 0; i < 18; ++i) {
-            const float x = static_cast<float>(std::fmod(i * 137.0 + native_seconds * (3 + i % 4), 1920));
-            const float y = static_cast<float>(std::fmod(i * 251.0 + 160, 1080));
-            const float alpha = 0.13f + 0.08f * static_cast<float>(std::sin(native_seconds + i));
-            ctx->FillEllipse(D2D1::Ellipse(D2D1::Point2F(x, y), 1.6f, 1.6f), native_color(0xBBD9FF, alpha));
-        }
+        // A quiet background leaves the rhythm and category symbols in front.
+        // Avoid moving particles and diagonal grids behind small menu text.
         const float reveal = native_menu_motion_.entrance(0, 0.65f);
         ctx->DrawLine(D2D1::Point2F(0, 127), D2D1::Point2F(1920 * reveal, 127),
-                      native_color(0x63E9F2, 0.65f), 2.0f);
+                      native_color(0x233344, 0.65f), 1.0f);
     };
