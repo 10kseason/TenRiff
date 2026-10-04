@@ -90,6 +90,8 @@ enum class MenuHitTargetKind {
     SongSourceAdd,
     SongSourceRemove,
     SkinPreviewButton,
+    GameplayPauseAction,
+    GameplayPauseAdjust,
 };
 
 enum class SongDifficultyTableAction {
@@ -422,6 +424,13 @@ struct GameplayNoteData {
 };
 
 struct GameplayHudData {
+    bool auto_scratch_enabled = false;
+    bool auto_scratch_hide_lanes = false;
+    std::size_t scratch_lane_count = 0;
+    std::array<int, kGameplayHudMaxLanes> scratch_lanes{};
+    std::string pacemaker_mode = "off";
+    double pacemaker_target = 0.0;
+    double pacemaker_delta = 0.0;
     std::string title;
     std::string artist;
     uint64_t motion_revision = 0;
@@ -631,6 +640,7 @@ struct MenuRowData {
     // A mouse adjustment can acknowledge the changed row without stealing the
     // keyboard cursor. The renderer derives exactly three flashes from this time.
     int64_t change_flash_started_ns = 0;
+    bool enabled = true;
 };
 
 struct SkinPreviewData {
@@ -945,6 +955,11 @@ private:
     // Presentation-only pagination; changing help pages never changes settings.
     std::atomic<int> generic_help_page_{0};
     std::atomic<int64_t> last_present_completion_ns_{0};
+    // Developer preview friend only; disabled in the game, with no extra clock
+    // reads unless a synchronous render benchmark explicitly opts in.
+    bool benchmark_timings_enabled_ = false;
+    int64_t benchmark_present_started_ns_ = 0;
+    int64_t benchmark_present_ended_ns_ = 0;
     bool fullscreen_ = false;
     bool fullscreen_restore_pending_ = false;
     bool com_initialized_ = false;
@@ -1059,6 +1074,7 @@ private:
     };
 
     struct GameplayStaticCache {
+        uint32_t hidden_scratch_mask = 0;
         bool native_instrument = false;
         std::shared_ptr<const app::ImportedGameplaySkinDefinition> native_skin;
         int lane_count = 0;

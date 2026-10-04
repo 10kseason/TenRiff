@@ -689,6 +689,8 @@ void apply_config_object(const JsonObject& root, RuntimeConfig& config) {
             get_bool(*mode, "one_miss_fail_enabled", config.mode.one_miss_fail_enabled);
         config.mode.pacemaker_mode =
             normalize_pacemaker_mode(get_string(*mode, "pacemaker_mode", config.mode.pacemaker_mode));
+        config.mode.auto_scratch_hide_lanes =
+            get_bool(*mode, "auto_scratch_hide_lanes", config.mode.auto_scratch_hide_lanes);
         config.mode.pacemaker_target_accuracy = clamp_finite(
             get_number(*mode, "pacemaker_target_accuracy", config.mode.pacemaker_target_accuracy),
             kPacemakerAccuracyMin,
@@ -1193,6 +1195,7 @@ JsonValue build_json_root(const RuntimeConfig& config) {
     mode.emplace("practice_no_fail_enabled", JsonValue{config.mode.practice_no_fail_enabled});
     mode.emplace("one_miss_fail_enabled", JsonValue{config.mode.one_miss_fail_enabled});
     mode.emplace("pacemaker_mode", JsonValue{normalize_pacemaker_mode(config.mode.pacemaker_mode)});
+    mode.emplace("auto_scratch_hide_lanes", JsonValue{config.mode.auto_scratch_hide_lanes});
     mode.emplace("pacemaker_target_accuracy", JsonValue{clamp_finite(
         config.mode.pacemaker_target_accuracy,
         kPacemakerAccuracyMin,
@@ -2062,6 +2065,7 @@ RuntimeConfig ConfigLoader::defaults() const {
     config.mode.practice_no_fail_enabled = false;
     config.mode.one_miss_fail_enabled = false;
     config.mode.pacemaker_mode = "off";
+    config.mode.auto_scratch_hide_lanes = false;
     config.mode.pacemaker_target_accuracy = kPacemakerAccuracyDefault;
     config.mode.pacemaker_target_score = kPacemakerScoreDefault;
     config.mode.song_index_profile = "safe";

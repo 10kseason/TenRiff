@@ -82,26 +82,28 @@ See [ASIO setup](asio-audio.md). ASIO holds the selected sample rate fixed and r
   - clamped to the `0..25` range
   - default value is `8ms`
 ### `judge`
-- BMS `#RANK` selects chart timing: `3/EASY` PG21ms, `2/NORMAL` PG18ms, `1/HARD` PG15ms, `0/VERYHARD` PG8ms. EASY keeps GR/GD/BAD at 65/115/210ms; the other ranks scale these by 18/21, 15/21 and 8/21. Missing/unsupported headers use EASY. Judge Easy/Hard mods apply afterward. Rank does not change hold tolerances or automatic-miss deadlines.
+
+[Current timing windows, RANK tables and LN rules (Korean)](judgement-windows.md)
+
+- BMS `#RANK` selects chart timing: `3/EASY` PG21ms, `2/NORMAL` PG18ms, `1/HARD` PG15ms, `0/VERYHARD` PG8ms. EASY keeps GR/GD/BAD at 65/115/210ms; the other ranks scale these by 18/21, 15/21 and 8/21. Missing/unsupported headers use EASY. Judge Easy/Hard mods apply afterward. RANK does not change `hold_grace`/`hold_break` settings or automatic-miss deadlines; tail PG/GR/GD boundaries do follow RANK.
 - `pg`, `gr`, `gd`, `bd` (double, ms)
 - default `pg / gr / gd` values are `21ms / 65ms / 115ms`
 - default `bd` is `210ms`
-- `Judge Easy` scales the base timing windows by `1.35x`: `pg/gr/gd/bd=28.35/87.75/155.25/283.5ms`. Hold tolerances scale as well; `mask` stays unchanged
-- `Judge Hard` leaves PG/GR/GD and hold tolerances unchanged and caps `bd` at `180ms`. A smaller custom BAD window is preserved
+- `Judge Easy` scales the base timing windows by `1.35x`: `pg/gr/gd/bd=28.35/87.75/155.25/283.5ms`. `hold_grace`/`hold_break` scale as well; `mask` stays unchanged (these example values assume BMS RANK EASY)
+- `Judge Hard` leaves PG/GR/GD and `hold_grace`/`hold_break` unchanged and caps `bd` at `180ms`. A smaller custom BAD window is preserved
 - `indirect_miss` (double, ms)
   - current profiles save and normalize this value to `340ms`, independently of the BAD hit window
   - default Normal/Easy/Hard automatically miss an unplayed note once it is more than `340ms` late. Normal/Easy record BAD; Hard records a combo-breaking indirect `POOR` / OD8 `MISS`
   - a late press outside BAD but before automatic timeout misses the expired note, then checks the next note; it cannot score a BAD hit outside the hit window
 - New plays record `tenriff-native-score-v2-ruleset-3`. Playback, ghosts and verification of ruleset-1/2 restore PG20ms, ignore RANK and retain the previous LN release behavior. Ruleset-1 also retains Easy 1.25x, Hard BAD340ms and automatic miss=BAD. Custom timing remains unofficial.
-- `hold_grace` (double, ms)
-  - the dedicated window used to treat long-note tail release as `PG`
-  - default value is `80ms`
-- `hold_break` (double, ms)
-  - the final window that still allows long-note tail release to be judged up to `GR`
-  - outside this range it becomes `BD`
+- `hold_grace` (double, ms; default `80ms`)
+  - retained for configuration compatibility and as the lower bound of `hold_break`; not the current native tail PG/GR boundary
+- `hold_break` (double, ms; default `200ms`)
+  - timeout after a CN tail when it remains held, ending in BAD; `270ms` with Judge Easy, unchanged by RANK
   - internally always kept at or above `hold_grace`
-  - default value is `200ms`
-- `mask` (double, ms)
+- LN release immediately uses the current PG/GR/GD windows, with BAD outside GD. Standard LN completes automatically if held to the end. `No LN Release` does not ignore an early drop
+- `mask` (double, ms; default `30ms`)
+  - temporarily ignores additional presses on a masked lane; unchanged by RANK or Judge mods
 
 ### `speed`
 - `rate` (double)
@@ -201,13 +203,16 @@ The chart loader and indexer are limited to BMS-family files (`.bms/.bme/.bml/.p
   - native `BAD` timing alone and empty-key `POOR` judgements do not trigger it
   - enabling it in Mode Settings automatically disables `practice_no_fail_enabled`
 - `pacemaker_mode` (string)
-  - `off | accuracy | score`; defaults to `off`
-  - Accuracy/Score modes run to chart end and clear only when the selected result target is met
+  - `off | accuracy | score` (default `off`)
+  - Shows the live gap from the accuracy or score target. Normal gauge failure, clear and scoring rules remain active; missing the target alone does not fail a clear. Best records and ranking remain eligible when all other conditions are met
   - enabling Pacemaker disables Practice and Sudden Death; replay playback and multiplayer force it off
 - `pacemaker_target_accuracy` (double)
-  - `0..100`, default `90.0`; compares against standard result Accuracy
+  - 0..100, default 90.0; displays current standard Accuracy minus the target in percentage points
 - `pacemaker_target_score` (int)
-  - `0..10000`, default `8000`; compares against the displayed final Score after multipliers
+  - 0..10000, default 8000; displays current score minus the target pace proportional to judged note weights
+- `auto_scratch_hide_lanes` (bool)
+  - Default false. With auto_scratch in mods, hides actual BMS scratch columns while preserving other key widths and logical input IDs
+  - `auto_scratch`: automatically plays actual BMS scratches only. Score multiplier 0%, ASSIST record, excluded from official best records and rankings
 - `song_index_profile` (string)
   - `safe | fast`
   - `safe` is the default that prioritizes lower RAM high-water usage on large libraries
@@ -293,7 +298,7 @@ These are profile `config.json` skin settings. For a skin package's `skin.json` 
 | `note_outline_opacity` | double: `0..1`; `0.78` | Note-outline opacity. |
 | `note_fade_in` | double: `0..1`; `0` | Top black fog depth; notes gradually appear. Zero is off. |
 | `note_fade_out` | double: `0..1`; `0` | Black fog depth above the judgement line; notes gradually disappear. Zero is off. Receptors and HUD remain visible. |
-| `hold_body_opacity` | double: `0.05..1`; `1` | LN-body opacity. |
+| `hold_body_opacity` | double: `0..1`; `1` | LN-body opacity. |
 | `lane_width_scales` | object: mode → number[]; `0.50..1.75` | Per-lane widths; array length equals lane count. |
 | `note_width_scale` | double: `0.50..1.40`; `1` | Note & Field Size: scales field, lanes, notes and adjacent gauge around the center. |
 | `lane_spacing_scales` | object: mode → number[]; `0..2` | Lane-gap array with lane_count - 1 entries. |

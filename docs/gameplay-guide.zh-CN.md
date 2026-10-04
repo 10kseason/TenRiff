@@ -128,9 +128,16 @@ Discord 客户端的设置方法请参考[官方 Game Overlay 指南](https://su
 - Session Mix 游玩中忽略 Esc；保留曲间结果画面的退出操作和多人模式的 Esc 中止操作。
 - `F3`：降低 Hi-Speed
 - `F4`：提高 Hi-Speed
-- `F5`：大幅降低 Hi-Speed
-- `F6`：大幅提高 Hi-Speed
+- `Shift+F5`: Hi-Speed减半
+- `Shift+F6`: Hi-Speed加倍
+- `F7` / `F8`: 减少 / 增加视觉延迟
+- `Shift+F8`: 打开 / 关闭游戏内聊天（菜单中仍为F8）
 - `F9`：保存当前画面的截图
+
+暂停的继续、重试、退出及设置−/+按钮也支持鼠标。调整项的文字或空白只选择该项，不改变数值。
+
+Pacemaker实时显示与准确率或分数目标的差值。保留正常血条失败、通关与计分规则，仅目标未达成不会导致通关失败；满足其他条件时仍可登记最佳记录和排名.
+
 
 Hi-Speed 只改变视觉滚动速度，不改变判定时机本身。
 Rate 只改变歌曲播放速度和谱面时间轴；在相同 Hi-Speed 下，视觉滚动速度保持不变。
@@ -174,6 +181,8 @@ Rate 只改变歌曲播放速度和谱面时间轴；在相同 Hi-Speed 下，�
 - `BD`：Bad
 - `PR`：Poor / Miss
 
+BMS RANK EASY/NORMAL/HARD/VERYHARD的基础PG分别为 **±21/18/15/8ms**。EASY的GR/GD/BAD保持±65/115/210ms，其他RANK按相同比例缩小。`Judge Easy/Hard` 是在RANK之后应用的独立模组。完整范围及包含边界的规则见[判定范围（韩语）](judgement-windows.md)。
+
 空 POOR 只会出现在下一颗 note 的提前侧。已经消费或已经越过判定线的 note 后方输入不会再追加后空 POOR。
 
 `No LN Release` 会关闭 charge LN 尾端的松键判定，分数倍率固定为 `1.00x`。
@@ -192,7 +201,7 @@ Gauge Shift 始终启用。`EX / Hard / Normal / Easy` 选择起始档位，保�
 
 段位/Session Mix 使用跨曲继承的 LR2 参考血条，保留间接失误，HP 低于 2% 时失败。普通 LN 在完成/释放时只结算一次，不应用普通 `gauge.delta`。参见[比较与兼容范围](lr2-gauge-audit.ko.md)。
 
-旧 `shift` 值表示从 EX 开始。Practice、Pacemaker 等具有独立结束规则的模式继续遵循各自规则。
+旧 `shift` 值表示从 EX 开始。Practice保留独立结束规则。Pacemaker遵循正常血条与通关规则。
 
 `Sudden Death (1 MISS)` 不是 gauge 类型，而是在首次 OD8 换算对象 `MISS` 时把 gauge 置零并立即结束的规则。仅原生 `BAD` timing 不会触发，空按产生的 `POOR` 也不计入，并且不能与 Practice No-Fail 同时启用。
 

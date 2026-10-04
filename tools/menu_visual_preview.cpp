@@ -157,6 +157,11 @@ namespace tenriff::render {
 // geometry resolver. Native dispatch is checked only while its own window has
 // foreground focus; no desktop pointer or keyboard is synthesized.
 struct MenuWindowVisualTestAccess {
+    static void benchmark(MenuWindow& window, bool enabled) { window.benchmark_timings_enabled_ = enabled; }
+    static bool fullscreen(const MenuWindow& window) { return window.fullscreen_; }
+    static std::array<int64_t, 2> present_times(const MenuWindow& window) {
+        return {window.benchmark_present_started_ns_, window.benchmark_present_ended_ns_};
+    }
     static bool verify_and_write(MenuWindow& window, const MenuRenderData& source,
                                  const std::string& hitmap_path, bool verify) {
         using namespace config;
@@ -189,12 +194,14 @@ struct MenuWindowVisualTestAccess {
                     (region.kind == MenuHitTargetKind::SongCard || region.kind == MenuHitTargetKind::SongNavButton ||
                      region.kind == MenuHitTargetKind::SongDifficultyTable);
                 const bool preview_button = region.kind == MenuHitTargetKind::SkinPreviewButton;
+                const bool pause_control = region.kind == MenuHitTargetKind::GameplayPauseAction ||
+                    region.kind == MenuHitTargetKind::GameplayPauseAdjust;
                 if (preview_button && visit != 0) continue;
-                if (!preview_button && !menu_card && !song_control && region.kind != MenuHitTargetKind::SettingsRow && region.kind != MenuHitTargetKind::KeymapButton)
+                if (!pause_control && !preview_button && !menu_card && !song_control && region.kind != MenuHitTargetKind::SettingsRow && region.kind != MenuHitTargetKind::KeymapButton)
                     continue;
-                const bool control = preview_button || menu_card || song_control || region.part == MenuHitPart::Decrement ||
+                const bool control = pause_control || preview_button || menu_card || song_control || region.part == MenuHitPart::Decrement ||
                     region.part == MenuHitPart::Increment || region.part == MenuHitPart::SetValue ||
-                    (skin_fixture && region.part == MenuHitPart::Activate) ||
+                    (skin_fixture && (region.part == MenuHitPart::Activate || region.part == MenuHitPart::SelectOnly)) ||
                     fixture.generic.keymap_keyboard;
                 if (verify && (!control || (!preview_button && visits > 1 &&
                     (region.kind != fixture.generic.rows[visit].target_kind ||
@@ -279,9 +286,13 @@ struct MenuWindowVisualTestAccess {
                         failures.emplace_back("required skin hit missing: id=" + std::to_string(row.row_index) +
                                               " part=" + std::to_string(static_cast<int>(part)));
                 };
-                if (row.slider) require_part(MenuHitPart::SetValue);
+                if (!row.enabled) require_part(MenuHitPart::SelectOnly);
+                else if (row.slider) {
+                    require_part(MenuHitPart::SelectOnly);
+                    require_part(MenuHitPart::SetValue);
+                }
                 else if (row.adjustable) {
-                    require_part(MenuHitPart::Activate);
+                    require_part(MenuHitPart::SelectOnly);
                     if (row.decrement_enabled) require_part(MenuHitPart::Decrement);
                     if (row.increment_enabled) require_part(MenuHitPart::Increment);
                 } else if (row.activatable) require_part(MenuHitPart::Activate);
@@ -292,6 +303,7 @@ struct MenuWindowVisualTestAccess {
         for (const auto& row : source.generic.rows) rows.emplace_back(JsonObject{
             {"id", JsonValue(static_cast<double>(row.row_index))}, {"label", JsonValue(row.label)},
             {"value", JsonValue(row.value)}, {"category", JsonValue(row.category)},
+            {"enabled", JsonValue(row.enabled)},
             {"hit_eligible", JsonValue(row.activatable || row.adjustable)}, {"slider", JsonValue(row.slider)}});
         JsonArray notes;
         for (const auto& note : source.generic.notes) notes.emplace_back(note);
@@ -334,6 +346,10 @@ int main(int argc, char** argv) {
     bool gameplay = false;
     bool ghost = false;
     bool ghost_paused = false;
+    bool auto_scratch_hidden = false;
+    bool pacemaker_fixture = false;
+    int disabled_setting = -1;
+    double fixture_hold_opacity = -1;
     bool resume_countdown = false;
     bool no_feedback = false;
     bool timing_text_off = false, timing_bar_off = false;
@@ -348,6 +364,22 @@ int main(int argc, char** argv) {
     double field_offset = 0;
     int players = 0;
     int preview_fps = 144;
+    int benchmark_frames = 0;
+    int benchmark_successful_presents = 0;
+    int benchmark_fullscreen_presents = 0;
+    std::string benchmark_json;
+    std::vector<std::array<double, 3>> benchmark_samples;
+    constexpr int benchmark_warmup = 60;
+    const auto process_cpu_ms = [] {
+        FILETIME created{}, exited{}, kernel{}, user{};
+        if (!GetProcessTimes(GetCurrentProcess(), &created, &exited, &kernel, &user)) return 0.0;
+        const auto ticks = [](const FILETIME& t) {
+            return (static_cast<uint64_t>(t.dwHighDateTime) << 32) | t.dwLowDateTime;
+        };
+        return static_cast<double>(ticks(kernel) + ticks(user)) / 10000.0;
+    };
+    double benchmark_cpu_start = 0;
+    int64_t benchmark_wall_start = 0;
     int preview_keys = 10;
     int menu_keys = 7;
     double preview_note_height = 1.8;
@@ -406,6 +438,15 @@ int main(int argc, char** argv) {
     for (int i = 1; i < argc; ++i) {
         const std::string arg = argv[i];
         if (arg == "--fullscreen-preview") fullscreen_skin_preview = settings = skin_settings = true;
+        else if (arg == "--no-vsync") config.vsync = false;
+        else if (arg == "--exclusive-fullscreen") config.display_mode = "fullscreen";
+        else if (arg == "--benchmark-frames" && i + 1 < argc) benchmark_frames = std::clamp(std::stoi(argv[++i]), 1, 100000);
+        else if (arg == "--benchmark-json" && i + 1 < argc) benchmark_json = argv[++i];
+        else if (arg == "--hold-opacity" && i + 1 < argc) fixture_hold_opacity = std::clamp(std::stod(argv[++i]), 0.0, 1.0);
+        else if (arg == "--disabled-setting" && i + 1 < argc) disabled_setting = std::stoi(argv[++i]);
+        else if (arg == "--auto-scratch-hidden") auto_scratch_hidden = true;
+        else if (arg == "--pacemaker-deficit") pacemaker_fixture = true;
+        else if (arg == "--paused") ghost_paused = gameplay = true;
         else if (arg == "--seven-plus-one") { seven_plus_one = keys_explicit = true; preview_keys = 8; }
         else if (arg == "--scratch-right") scratch_right = true;
         else if (arg == "--fade-in" && i + 1 < argc) fade_in = std::stod(argv[++i]);
@@ -958,6 +999,19 @@ int main(int argc, char** argv) {
     }
     data.gameplay.combo_font_scale = data.generic.skin_preview.combo_font_scale = combo_font_scale;
     data.gameplay.note_width_scale = data.generic.skin_preview.note_width_scale = preview_note_width;
+    if (fixture_hold_opacity >= 0)
+        data.gameplay.hold_body_opacity = data.generic.skin_preview.hold_body_opacity = fixture_hold_opacity;
+    data.gameplay.paused = ghost_paused;
+    if (auto_scratch_hidden) {
+        data.gameplay.auto_scratch_enabled = data.gameplay.auto_scratch_hide_lanes = true;
+        data.gameplay.scratch_lane_count = 1;
+        data.gameplay.scratch_lanes[0] = scratch_right ? preview_keys : 1;
+    }
+    if (pacemaker_fixture) {
+        data.gameplay.pacemaker_mode = "accuracy";
+        data.gameplay.pacemaker_target = 96;
+        data.gameplay.pacemaker_delta = -2.3;
+    }
     data.gameplay.judgement_font_scale = data.generic.skin_preview.judgement_font_scale = judgement_font_scale;
     if (backdrop_off) data.gameplay.key_backdrop_enabled = false;
     if (backdrop_opacity >= 0.0) data.gameplay.key_backdrop_opacity = backdrop_opacity;
@@ -990,6 +1044,8 @@ int main(int argc, char** argv) {
     if (selected_setting >= 0) {
         for (auto& row : data.generic.rows) row.selected = row.row_index == selected_setting;
     }
+    if (disabled_setting >= 0) for (auto& row : data.generic.rows)
+        if (row.row_index == disabled_setting) row.enabled = false;
     if (data.kind == MenuScreenKind::GenericList) {
         using tenriff::app::menu::Screen;
         const auto help_screen = options_grid ? Screen::OptionsHub : skin_settings ? Screen::SettingsSkins :
@@ -1061,6 +1117,8 @@ int main(int argc, char** argv) {
     if (opaque_field) data.gameplay.black_playfield_enabled = true;
     MenuWindow window;
     window.set_config(config);
+    MenuWindowVisualTestAccess::benchmark(window, benchmark_frames > 0);
+    if (benchmark_frames > 0) frame_limit = benchmark_warmup + benchmark_frames;
     const auto start = std::chrono::steady_clock::now();
     while (!window.should_close()) {
         MSG message;
@@ -1169,7 +1227,24 @@ int main(int argc, char** argv) {
             window.request_screenshot();
             capture_requested = true;
         }
+        const int64_t render_start_ns = benchmark_frames > 0 ? tenriff::timing::HighResClock::now_ns() : 0;
         window.render(data);
+        if (benchmark_frames > 0) {
+            const int64_t render_end_ns = tenriff::timing::HighResClock::now_ns();
+            if (rendered_frames == benchmark_warmup) {
+                benchmark_cpu_start = process_cpu_ms();
+                benchmark_wall_start = render_end_ns;
+            } else if (rendered_frames > benchmark_warmup) {
+                if (window.last_present_completion_ns() >= render_start_ns) {
+                    ++benchmark_successful_presents;
+                    if (MenuWindowVisualTestAccess::fullscreen(window)) ++benchmark_fullscreen_presents;
+                }
+                const auto present = MenuWindowVisualTestAccess::present_times(window);
+                if (present[0] >= render_start_ns && present[1] >= present[0])
+                    benchmark_samples.push_back({(render_end_ns - render_start_ns) / 1e6,
+                        (present[0] - render_start_ns) / 1e6, (present[1] - present[0]) / 1e6});
+            }
+        }
         if (!hitmap_written && rendered_frames >= 5 && (verify_hits || !hitmap_path.empty())) {
             if (!MenuWindowVisualTestAccess::verify_and_write(window, data, hitmap_path, verify_hits)) {
                 window.shutdown(); return 4;
@@ -1195,8 +1270,50 @@ int main(int argc, char** argv) {
         }
         if (window.had_fatal_error()) return 1;
         if (std::chrono::steady_clock::now() - start > std::chrono::minutes(10)) break;
-        std::this_thread::sleep_until(start + std::chrono::nanoseconds(
+        if (benchmark_frames <= 0) std::this_thread::sleep_until(start + std::chrono::nanoseconds(
             static_cast<int64_t>((std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count() * preview_fps + 1.0)) * (1000000000 / preview_fps)));
+    }
+    if (benchmark_frames > 0) {
+        using namespace tenriff::config;
+        JsonArray samples;
+        JsonObject report{{"samples", JsonValue(static_cast<double>(benchmark_samples.size()))},
+            {"successful_presents", JsonValue(static_cast<double>(benchmark_successful_presents))},
+            {"fullscreen_presents", JsonValue(static_cast<double>(benchmark_fullscreen_presents))},
+            {"display_mode", JsonValue(config.display_mode)},
+            {"warmup_frames", JsonValue(static_cast<double>(benchmark_warmup))},
+            {"width", JsonValue(static_cast<double>(config.width))}, {"height", JsonValue(static_cast<double>(config.height))},
+            {"vsync", JsonValue(config.vsync)}, {"ghost", JsonValue(ghost)},
+            {"keys", JsonValue(static_cast<double>(preview_keys))}, {"note_width", JsonValue(preview_note_width)},
+            {"fixture_time", JsonValue(fixture_seconds)},
+            {"player_note_count", JsonValue(static_cast<double>(data.gameplay.note_count))},
+            {"ghost_note_count", JsonValue(static_cast<double>(data.gameplay.ghost_note_count))},
+            {"wall_ms", JsonValue((tenriff::timing::HighResClock::now_ns() - benchmark_wall_start) / 1e6)},
+            {"process_cpu_ms", JsonValue(process_cpu_ms() - benchmark_cpu_start)},
+            {"scope", JsonValue("Synthetic synchronous rendering only. pre_present includes EndDraw GPU waits; render_call includes Present. No physical input/audio latency measured.")}};
+        for (std::size_t field = 0; field < 3; ++field) {
+            std::vector<double> values;
+            double sum = 0;
+            for (const auto& sample : benchmark_samples) { values.push_back(sample[field]); sum += sample[field]; }
+            std::sort(values.begin(), values.end());
+            const auto quantile = [&](double q) { return values.empty() ? 0.0 : values[static_cast<std::size_t>(std::ceil(q * values.size())) - 1]; };
+            report.emplace(std::array<const char*,3>{"render_call_ms", "pre_present_ms", "present_ms"}[field], JsonValue(JsonObject{
+                {"mean", JsonValue(values.empty() ? 0.0 : sum / values.size())},
+                {"p50", JsonValue(quantile(.50))}, {"p95", JsonValue(quantile(.95))},
+                {"p99", JsonValue(quantile(.99))}, {"max", JsonValue(values.empty() ? 0.0 : values.back())}}));
+        }
+        for (const auto& sample : benchmark_samples) samples.emplace_back(JsonArray{
+            JsonValue(sample[0]), JsonValue(sample[1]), JsonValue(sample[2])});
+        report.emplace("raw_render_pre_present_present_ms", JsonValue(std::move(samples)));
+        const auto json = json_stringify(JsonValue(std::move(report)), 2);
+        if (!benchmark_json.empty()) {
+            std::ofstream out(std::filesystem::u8path(benchmark_json), std::ios::binary);
+            if (!out) { window.shutdown(); return 5; }
+            out << json << '\n';
+        } else std::cout << json << '\n';
+        if (benchmark_samples.size() != static_cast<std::size_t>(benchmark_frames) ||
+            benchmark_successful_presents != benchmark_frames || window.had_fatal_error()) {
+            window.shutdown(); return 6;
+        }
     }
     window.shutdown();
 }

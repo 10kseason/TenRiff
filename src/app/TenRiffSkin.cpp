@@ -844,7 +844,7 @@ void parse_gameplay_style(const config::JsonObject& gameplay,
                                            definition, "gameplay.");
     style.note_outline_opacity = optional_number(gameplay, "note_outline_opacity", 0.0f, 1.0f,
                                                  definition, "gameplay.");
-    style.hold_body_opacity = optional_number(gameplay, "hold_body_opacity", 0.05f, 1.0f,
+    style.hold_body_opacity = optional_number(gameplay, "hold_body_opacity", 0.0f, 1.0f,
                                               definition, "gameplay.");
     style.hit_burst_style = optional_enum(gameplay, "hit_burst_style", {"prism", "ring", "spark"},
                                           definition, "gameplay.");

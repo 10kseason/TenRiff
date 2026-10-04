@@ -87,6 +87,11 @@ public:
         int max_combo = 0;
         gameplay::JudgementCounts counts;
         int64_t score = 0;
+        bool auto_scratch_enabled = false;
+        bool auto_scratch_hide_lanes = false;
+        std::string pacemaker_mode = "off";
+        double pacemaker_target = 0.0;
+        double pacemaker_delta = 0.0;
         double accuracy = 0.0;
         double detailed_accuracy = 0.0;
         bool osu_od8_score_available = false;
@@ -142,6 +147,16 @@ public:
     };
 
     using HudCallback = std::function<void(const HudSnapshot&)>;
+    // UI thread only posts commands; the session input thread applies them.
+    void request_pause_action(int index) {
+        if (paused_.load() && resume_countdown_value_.load() == 0 && !pause_resume_requested_.load())
+            pause_click_action_.store(index);
+    }
+    void request_pause_adjust(int index, int direction) {
+        if (paused_.load() && resume_countdown_value_.load() == 0 && !pause_resume_requested_.load() &&
+            index >= 0 && index < 3 && direction != 0)
+            pause_click_adjust_[static_cast<std::size_t>(index)].fetch_add(direction > 0 ? 1 : -1);
+    }
 
     struct LoadingProgress {
         int percent = 0;
@@ -227,6 +242,7 @@ public:
 
 private:
     friend struct GameSessionAudioTestAccess;
+    friend struct MenuAppFeedbackTestAccess;
     struct FutureEvent {
         input::InputEvent event;
         int64_t sample = 0;
@@ -432,6 +448,13 @@ private:
     std::size_t replay_event_index_ = 0;
     std::vector<gameplay::ReplayEvent> autoplay_events_{};
     bool autoplay_enabled_ = false;
+    bool auto_scratch_enabled_ = false;
+    bool auto_scratch_lane(int lane) const {
+        return auto_scratch_enabled_ && chart_format_ == ChartFormat::Bms &&
+            std::find(chart_.scratch_lanes.begin(), chart_.scratch_lanes.end(), lane) != chart_.scratch_lanes.end();
+    }
+    std::atomic<int> pause_click_action_{-1};
+    std::array<std::atomic<int>, 3> pause_click_adjust_{{0, 0, 0}};
     std::size_t autoplay_event_index_ = 0;
     bool practice_no_fail_enabled_ = false;
     bool practice_no_fail_override_ = false;
@@ -523,6 +546,11 @@ private:
     int64_t judgement_loop_step_carry_ = 0;
     std::size_t next_guide_note_index_ = 0;
     std::size_t hud_scan_start_ = 0;
+    // Head cursors advance independently of old LN tails. Only surviving tails
+    // need revisiting; a minutes-long hold must not pin all past tap history.
+    std::vector<std::size_t> hud_past_hold_indices_;
+    std::vector<std::size_t> ghost_hud_past_hold_indices_;
+    int64_t hud_scan_cutoff_sample_ = (std::numeric_limits<int64_t>::min)();
     int64_t countdown_started_ns_ = 0;
     int64_t hispeed_decrease_next_repeat_ns_ = 0;
     int64_t hispeed_increase_next_repeat_ns_ = 0;

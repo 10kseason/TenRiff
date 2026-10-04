@@ -63,7 +63,7 @@ inline constexpr double kSkinVisualOpacityDefault = 0.96;
 inline constexpr double kSkinNoteOutlineOpacityMin = 0.00;
 inline constexpr double kSkinNoteOutlineOpacityMax = 1.00;
 inline constexpr double kSkinNoteOutlineOpacityDefault = 0.78;
-inline constexpr double kSkinHoldBodyOpacityMin = 0.05;
+inline constexpr double kSkinHoldBodyOpacityMin = 0.0;
 inline constexpr double kSkinHoldBodyOpacityMax = 1.00;
 inline constexpr double kSkinHoldBodyOpacityDefault = 1.00;
 inline constexpr double kSkinKeyPulseBrightnessMin = 0.00;
@@ -266,6 +266,7 @@ struct ModeConfig {
     bool practice_no_fail_enabled = false;
     bool one_miss_fail_enabled = false;
     std::string pacemaker_mode = "off";
+    bool auto_scratch_hide_lanes = false;
     double pacemaker_target_accuracy = kPacemakerAccuracyDefault;
     int64_t pacemaker_target_score = kPacemakerScoreDefault;
     std::string song_index_profile = "safe";

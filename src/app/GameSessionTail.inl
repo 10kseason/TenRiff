@@ -175,8 +175,11 @@ bool GameSession::initialize(const CommandLineOptions& options) {
     replay_source_path_.clear();
     replay_playback_enabled_ = false;
     replay_event_index_ = 0;
+    pause_click_action_.store(-1);
+    for (auto& adjustment : pause_click_adjust_) adjustment.store(0);
     autoplay_events_.clear();
     autoplay_enabled_ = false;
+    auto_scratch_enabled_ = false;
     autoplay_event_index_ = 0;
     practice_no_fail_enabled_ = false;
     one_miss_fail_enabled_ = false;
@@ -217,6 +220,9 @@ bool GameSession::initialize(const CommandLineOptions& options) {
     next_guide_note_index_ = 0;
     hud_scan_start_ = 0;
     ghost_hud_scan_start_ = 0;
+    hud_past_hold_indices_.clear();
+    ghost_hud_past_hold_indices_.clear();
+    hud_scan_cutoff_sample_ = (std::numeric_limits<int64_t>::min)();
     chart_ = {};
     chart_base_bpm_ = 0.0;
     lane_activity_.clear();
@@ -290,10 +296,6 @@ bool GameSession::initialize(const CommandLineOptions& options) {
     practice_no_fail_enabled_ = config_.mode.practice_no_fail_enabled;
     one_miss_fail_enabled_ = config_.mode.one_miss_fail_enabled;
     pacemaker_mode_ = config::normalize_pacemaker_mode_token(config_.mode.pacemaker_mode);
-    if (pacemaker_mode_active(pacemaker_mode_)) {
-        practice_no_fail_enabled_ = false;
-        one_miss_fail_enabled_ = false;
-    }
     report_loading_progress(12, "Loading keymap");
     if (loading_cancel_requested()) {
         return false;
@@ -404,6 +406,7 @@ bool GameSession::initialize(const CommandLineOptions& options) {
             config_.mode.gauge = replay_source_.mode.gauge;
         }
         autoplay_enabled_ = false;
+        auto_scratch_enabled_ = false;
         practice_no_fail_enabled_ = replay_source_.mode.practice_no_fail_enabled;
         one_miss_fail_enabled_ = replay_source_.mode.one_miss_fail_enabled;
         pacemaker_mode_ = "off";
@@ -574,7 +577,7 @@ bool GameSession::initialize(const CommandLineOptions& options) {
     gameplay_config.gauge = config_.gauge;
     gameplay_config.input_offset_ms = config_.input_offset_ms;
     gameplay_config.practice_no_fail_enabled =
-        practice_no_fail_enabled_ || pacemaker_mode_active(pacemaker_mode_);
+        practice_no_fail_enabled_;
     gameplay_config.one_miss_fail_enabled = one_miss_fail_enabled_;
     // Gauge Shift is the standard runtime. The selected gauge is its starting
     // tier; course gauges keep their dedicated carry-over policy below.
@@ -635,6 +638,7 @@ bool GameSession::initialize(const CommandLineOptions& options) {
     }
 
     active_mods_ = mode_result.active_mods;
+    auto_scratch_enabled_ = chart_format_ == ChartFormat::Bms && mode_mod_auto_scratch(active_mods_);
     rate_multiplier_ = mode_result.rate_multiplier;
     score_multiplier_ = mode_result.final_multiplier;
 
@@ -806,6 +810,9 @@ bool GameSession::initialize(const CommandLineOptions& options) {
     next_guide_note_index_ = 0;
     hud_scan_start_ = 0;
     ghost_hud_scan_start_ = 0;
+    hud_past_hold_indices_.clear();
+    ghost_hud_past_hold_indices_.clear();
+    hud_scan_cutoff_sample_ = (std::numeric_limits<int64_t>::min)();
     tone_voices_.reserve(std::max<std::size_t>(64, chart_.notes.size() / 8));
     chart_audio_voices_.reserve(std::max<std::size_t>(128, chart_.notes.size() / 16));
     lane_activity_.assign(static_cast<std::size_t>(std::max(1, chart_.lane_count)), 0.0f);
@@ -1110,6 +1117,9 @@ GameSession::HudSnapshot GameSession::hud_snapshot() {
             // again, just like BGA cues, for both player and ghost fields.
             hud_scan_start_ = 0;
             ghost_hud_scan_start_ = 0;
+            hud_past_hold_indices_.clear();
+            ghost_hud_past_hold_indices_.clear();
+            hud_scan_cutoff_sample_ = (std::numeric_limits<int64_t>::min)();
             next_visual_cue_index_ = 0;
             current_background_base_path_.clear();
             current_background_overlay_path_.clear();
@@ -1140,6 +1150,13 @@ GameSession::HudSnapshot GameSession::hud_snapshot() {
         snapshot.max_combo = stats.max_combo;
         snapshot.counts = stats.counts;
         snapshot.score = gameplay::scale_native_score(stats.raw_score, score_multiplier_);
+        snapshot.auto_scratch_enabled = auto_scratch_enabled_;
+        snapshot.auto_scratch_hide_lanes = auto_scratch_enabled_ && config_.mode.auto_scratch_hide_lanes;
+        snapshot.pacemaker_mode = pacemaker_mode_;
+        snapshot.pacemaker_target = pacemaker_mode_ == "accuracy"
+            ? config_.mode.pacemaker_target_accuracy : static_cast<double>(config_.mode.pacemaker_target_score);
+        snapshot.pacemaker_delta = pacemaker_live_delta(pacemaker_mode_, stats, score_multiplier_,
+            config_.mode.pacemaker_target_accuracy, config_.mode.pacemaker_target_score);
         snapshot.accuracy = stats.accuracy_percent();
         snapshot.detailed_accuracy = stats.detailed_accuracy_percent();
         snapshot.osu_od8_score_available = stats.osu_od8.available;
@@ -1252,14 +1269,30 @@ GameSession::HudSnapshot GameSession::hud_snapshot() {
         snapshot.lane_activity_count,
         std::min<std::size_t>(static_cast<std::size_t>(snapshot.lane_count), kGameplayHudMaxLanes));
 
-    if (hud_scan_start_ >= chart_.notes.size()) {
-        hud_scan_start_ = chart_.notes.size();
+    const int64_t cutoff_sample = snapshot.current_sample - expanded_window.past_samples;
+    if (cutoff_sample < hud_scan_cutoff_sample_) {
+        // A device rebase or a larger negative visual offset can bring retired
+        // heads/tails back into view. Rebuild both fields from the same epoch.
+        hud_scan_start_ = 0;
+        ghost_hud_scan_start_ = 0;
+        hud_past_hold_indices_.clear();
+        ghost_hud_past_hold_indices_.clear();
     }
-    while (hud_scan_start_ < chart_.notes.size() &&
-           note_is_expired_for_hud(chart_.notes[hud_scan_start_], snapshot.current_sample,
-                                   expanded_window.past_samples)) {
-        ++hud_scan_start_;
-    }
+    hud_scan_cutoff_sample_ = cutoff_sample;
+    const auto advance_head_scan = [&](std::size_t& cursor, std::vector<std::size_t>& past_holds) {
+        past_holds.erase(std::remove_if(past_holds.begin(), past_holds.end(), [&](std::size_t index) {
+            return note_is_expired_for_hud(chart_.notes[index], snapshot.current_sample,
+                                           expanded_window.past_samples);
+        }), past_holds.end());
+        cursor = std::min(cursor, chart_.notes.size());
+        while (cursor < chart_.notes.size() && chart_.notes[cursor].start_sample < cutoff_sample) {
+            const auto& note = chart_.notes[cursor];
+            if (note.end_sample.has_value() && *note.end_sample >= cutoff_sample)
+                past_holds.push_back(cursor);
+            ++cursor;
+        }
+    };
+    advance_head_scan(hud_scan_start_, hud_past_hold_indices_);
 
     // Hidden-note flags and active holds must come from the same engine epoch.
     // Active holds are appended first so dense lookahead never crowds them out.
@@ -1287,16 +1320,12 @@ GameSession::HudSnapshot GameSession::hud_snapshot() {
         snapshot.notes[snapshot.note_count++] = hud_note;
     }
 
-    for (std::size_t i = hud_scan_start_; i < chart_.notes.size(); ++i) {
-        const auto& note = chart_.notes[i];
+    const auto append_player_chart_note = [&](const gameplay::NoteEvent& note) {
         if (note.note_id < hidden_hit_note_ids_.size() && hidden_hit_note_ids_[note.note_id] != 0) {
-            continue;
-        }
-        if (note.start_sample > snapshot.current_sample + expanded_window.lookahead_samples) {
-            break;
+            return;
         }
         if (note.lane <= 0 || note.lane > snapshot.lane_count) {
-            continue;
+            return;
         }
 
         HudNote hud_note;
@@ -1309,9 +1338,16 @@ GameSession::HudSnapshot GameSession::hud_snapshot() {
         hud_note.head_visible = true;
         hud_note.pending = engine_->is_note_pending(note.lane, note.note_id);
         snapshot.notes[snapshot.note_count++] = hud_note;
-        if (snapshot.note_count >= kGameplayHudMaxNotes) {
-            break;
-        }
+    };
+    for (const auto index : hud_past_hold_indices_) {
+        if (snapshot.note_count >= kGameplayHudMaxNotes) break;
+        append_player_chart_note(chart_.notes[index]);
+    }
+    for (std::size_t i = hud_scan_start_;
+         i < chart_.notes.size() && snapshot.note_count < kGameplayHudMaxNotes; ++i) {
+        const auto& note = chart_.notes[i];
+        if (note.start_sample > snapshot.current_sample + expanded_window.lookahead_samples) break;
+        append_player_chart_note(note);
     }
     for (const auto& mine : chart_.mines) {
         if (snapshot.note_count >= kGameplayHudMaxNotes) {
@@ -1339,14 +1375,7 @@ GameSession::HudSnapshot GameSession::hud_snapshot() {
     }
 
     if (snapshot.ghost_visible) {
-        if (ghost_hud_scan_start_ >= chart_.notes.size()) {
-            ghost_hud_scan_start_ = chart_.notes.size();
-        }
-        while (ghost_hud_scan_start_ < chart_.notes.size() &&
-               note_is_expired_for_hud(chart_.notes[ghost_hud_scan_start_], snapshot.current_sample,
-                                       expanded_window.past_samples)) {
-            ++ghost_hud_scan_start_;
-        }
+        advance_head_scan(ghost_hud_scan_start_, ghost_hud_past_hold_indices_);
 
         snapshot.ghost_note_count = 0;
         for (const auto& hold : ghost_active_holds_buffer_) {
@@ -1372,16 +1401,12 @@ GameSession::HudSnapshot GameSession::hud_snapshot() {
             snapshot.ghost_notes[snapshot.ghost_note_count++] = hud_note;
         }
 
-        for (std::size_t i = ghost_hud_scan_start_; i < chart_.notes.size(); ++i) {
-            const auto& note = chart_.notes[i];
+        const auto append_ghost_chart_note = [&](const gameplay::NoteEvent& note) {
             if (note.note_id < ghost_hidden_hit_note_ids_.size() && ghost_hidden_hit_note_ids_[note.note_id] != 0) {
-                continue;
-            }
-            if (note.start_sample > snapshot.current_sample + expanded_window.lookahead_samples) {
-                break;
+                return;
             }
             if (note.lane <= 0 || note.lane > snapshot.lane_count) {
-                continue;
+                return;
             }
 
             HudNote hud_note;
@@ -1394,9 +1419,16 @@ GameSession::HudSnapshot GameSession::hud_snapshot() {
             hud_note.head_visible = true;
             hud_note.pending = ghost_engine_->is_note_pending(note.lane, note.note_id);
             snapshot.ghost_notes[snapshot.ghost_note_count++] = hud_note;
-            if (snapshot.ghost_note_count >= kGameplayHudMaxNotes) {
-                break;
-            }
+        };
+        for (const auto index : ghost_hud_past_hold_indices_) {
+            if (snapshot.ghost_note_count >= kGameplayHudMaxNotes) break;
+            append_ghost_chart_note(chart_.notes[index]);
+        }
+        for (std::size_t i = ghost_hud_scan_start_;
+             i < chart_.notes.size() && snapshot.ghost_note_count < kGameplayHudMaxNotes; ++i) {
+            const auto& note = chart_.notes[i];
+            if (note.start_sample > snapshot.current_sample + expanded_window.lookahead_samples) break;
+            append_ghost_chart_note(note);
         }
         for (const auto& mine : chart_.mines) {
             if (snapshot.ghost_note_count >= kGameplayHudMaxNotes) {
@@ -1551,19 +1583,11 @@ bool GameSession::update_tuning_repeat_state(uint32_t keycode,
         return true;
     }
     if (f7_keycode_ != 0 && keycode == f7_keycode_) {
-        if (state == input::InputState::Pressed) {
-            visual_offset_decrease_repeat_ = {};
-            visual_offset_increase_repeat_ = {};
-            const bool increase = lshift_held_ || rshift_held_;
-            update_repeat(increase ? visual_offset_increase_repeat_
-                                   : visual_offset_decrease_repeat_,
-                          increase ? kInPlayVisualOffsetStep
-                                   : -kInPlayVisualOffsetStep,
-                          false);
-        } else {
-            visual_offset_decrease_repeat_ = {};
-            visual_offset_increase_repeat_ = {};
-        }
+        update_repeat(visual_offset_decrease_repeat_, -kInPlayVisualOffsetStep, false);
+        return true;
+    }
+    if (f8_keycode_ != 0 && keycode == f8_keycode_) {
+        update_repeat(visual_offset_increase_repeat_, kInPlayVisualOffsetStep, false);
         return true;
     }
     return false;
@@ -2218,42 +2242,14 @@ void GameSession::shutdown() {
         result_.score_multiplier = score_multiplier_;
         result_.final_score = gameplay::scale_native_score(result_.stats.raw_score, result_.score_multiplier);
         const bool user_aborted = user_aborted_.load(std::memory_order_acquire);
-        if (pacemaker_mode_active(pacemaker_mode_)) {
-            const bool target_met = pacemaker_target_met(
-                pacemaker_mode_,
-                result_.stats.accuracy_percent(),
-                result_.final_score,
-                config_.mode.pacemaker_target_accuracy,
-                config_.mode.pacemaker_target_score);
-            result_.clear_status = gameplay_session_pacemaker_status(
-                engine_finished,
-                engine_game_over,
-                user_aborted,
-                autoplay_enabled_,
-                pacemaker_mode_,
-                target_met);
-            result_.game_over = !gameplay_session_pacemaker_cleared(
-                engine_finished,
-                engine_game_over,
-                user_aborted,
-                autoplay_enabled_,
-                target_met);
-        } else {
-            result_.clear_status = gameplay_session_clear_status(
-                engine_finished,
-                engine_game_over,
-                user_aborted,
-                final_gauge,
-                autoplay_enabled_,
-                practice_no_fail_enabled_,
-                one_miss_fail_enabled_,
-                gauge_shift_enabled_);
-            result_.game_over = !gameplay_session_cleared(
-                engine_finished,
-                engine_game_over,
-                user_aborted,
-                autoplay_enabled_);
-        }
+        // Pacemaker is a non-scoring live overlay: gauge failure and clear
+        // eligibility are exactly the ordinary run's policy.
+        result_.clear_status = gameplay_session_clear_status(
+            engine_finished, engine_game_over, user_aborted, final_gauge,
+            autoplay_enabled_, practice_no_fail_enabled_, one_miss_fail_enabled_, gauge_shift_enabled_);
+        result_.game_over = !gameplay_session_cleared(
+            engine_finished, engine_game_over, user_aborted, autoplay_enabled_);
+        if (auto_scratch_enabled_) result_.clear_status = "ASSIST AUTO SCRATCH " + result_.clear_status;
         result_.pause_used = replay_playback_enabled_
                                  ? replay_source_.pause_used
                                  : pause_used_.load(std::memory_order_acquire);
@@ -2289,7 +2285,8 @@ void GameSession::shutdown() {
                                                               config_.gauge,
                                                               gauge_shift_enabled_,
                                                               course_gauge_enabled_,
-                                                              pacemaker_mode_);
+                                                              "off");
+            if (auto_scratch_enabled_) replay.ruleset_id = "custom";
             replay.created_utc = created_utc;
             replay.sample_rate = sample_rate_;
             replay.rate = config_.speed.rate;
@@ -2443,8 +2440,11 @@ void GameSession::shutdown() {
     active_mods_.clear();
     rate_multiplier_ = 1.0;
     score_multiplier_ = 1.0;
+    pause_click_action_.store(-1);
+    for (auto& adjustment : pause_click_adjust_) adjustment.store(0);
     autoplay_events_.clear();
     autoplay_enabled_ = false;
+    auto_scratch_enabled_ = false;
     autoplay_event_index_ = 0;
     practice_no_fail_enabled_ = false;
     one_miss_fail_enabled_ = false;
@@ -2461,6 +2461,9 @@ void GameSession::shutdown() {
     polled_gameplay_keys_.clear();
     hud_scan_start_ = 0;
     ghost_hud_scan_start_ = 0;
+    hud_past_hold_indices_.clear();
+    ghost_hud_past_hold_indices_.clear();
+    hud_scan_cutoff_sample_ = (std::numeric_limits<int64_t>::min)();
     hud_callback_ = nullptr;
     screenshot_callback_ = nullptr;
 }
@@ -2725,6 +2728,22 @@ void GameSession::process_countdown_input_queue() {
 }
 
 void GameSession::process_paused_input_queue() {
+    const int clicked_action = pause_click_action_.exchange(-1);
+    const bool menu_ready = paused_.load() && resume_countdown_value_.load() == 0 && !pause_resume_requested_.load();
+    for (std::size_t index = 0; index < pause_click_adjust_.size(); ++index) {
+        const int steps = pause_click_adjust_[index].exchange(0);
+        if (!menu_ready || steps == 0) continue;
+        if (index == 0) adjust_judgement_line_position(steps * kJudgementLinePositionStep);
+        if (index == 1) adjust_hispeed(steps * kHispeedStep);
+        if (index == 2) adjust_visual_offset(steps * kInPlayVisualOffsetStep);
+    }
+    if (menu_ready && clicked_action >= 0 && clicked_action < 3) {
+        pause_menu_cursor_.store(clicked_action);
+        input::InputEvent click{};
+        click.keycode = enter_keycode_;
+        click.state = input::InputState::Pressed;
+        (void)handle_control_input(click);
+    }
     while (true) {
         auto maybe_event = input_thread_.queue().pop();
         if (!maybe_event.has_value()) {
@@ -2791,9 +2810,11 @@ void GameSession::rebaseline_gameplay_start_input_state(int64_t sample) {
     // Poll every binding before syncing any lane: an unheld secondary must not
     // release an LN whose primary is still down when play resumes.
     if (!autoplay_enabled_ && !replay_playback_enabled_) {
-        for (int lane = 1; lane <= chart_.lane_count; ++lane)
+        for (int lane = 1; lane <= chart_.lane_count; ++lane) {
+            if (auto_scratch_lane(lane)) continue;
             catch_up_lane_input(lane, lane_binding_state_.pressed(lane)
                 ? input::InputState::Pressed : input::InputState::Released, sample);
+        }
     }
 
     std::fill(lane_activity_.begin(), lane_activity_.end(), 0.0f);
@@ -2864,17 +2885,19 @@ bool GameSession::handle_control_input(const input::InputEvent& event) {
             return true;
         }
         if (f5_keycode_ != 0 && event.keycode == f5_keycode_) {
-            adjust_hispeed(-kHispeedStepCoarse);
+            if (lshift_held_ || rshift_held_) adjust_hispeed(-config_.speed.hi_speed * 0.5);
             return true;
         }
         if (f6_keycode_ != 0 && event.keycode == f6_keycode_) {
-            adjust_hispeed(kHispeedStepCoarse);
+            if (lshift_held_ || rshift_held_) adjust_hispeed(config_.speed.hi_speed);
             return true;
         }
         if (f7_keycode_ != 0 && event.keycode == f7_keycode_) {
-            adjust_visual_offset((lshift_held_ || rshift_held_)
-                                     ? kInPlayVisualOffsetStep
-                                     : -kInPlayVisualOffsetStep);
+            adjust_visual_offset(-kInPlayVisualOffsetStep);
+            return true;
+        }
+        if (f8_keycode_ != 0 && event.keycode == f8_keycode_) {
+            adjust_visual_offset(kInPlayVisualOffsetStep);
             return true;
         }
         if (up_keycode_ != 0 && event.keycode == up_keycode_) {
@@ -2918,11 +2941,11 @@ bool GameSession::handle_control_input(const input::InputEvent& event) {
     }
     if (event.state == input::InputState::Pressed) {
         if (f5_keycode_ != 0 && event.keycode == f5_keycode_) {
-            adjust_hispeed(-kHispeedStepCoarse);
+            if (lshift_held_ || rshift_held_) adjust_hispeed(-config_.speed.hi_speed * 0.5);
             return true;
         }
         if (f6_keycode_ != 0 && event.keycode == f6_keycode_) {
-            adjust_hispeed(kHispeedStepCoarse);
+            if (lshift_held_ || rshift_held_) adjust_hispeed(config_.speed.hi_speed);
             return true;
         }
         if (f9_keycode_ != 0 && event.keycode == f9_keycode_) {
@@ -3022,6 +3045,8 @@ void GameSession::process_future_events(int64_t buffer_start_samples,
             continue;
         }
         if (auto lane = lane_from_keycode(next->event.keycode)) {
+            if (auto_scratch_lane(*lane)) continue;
+            if (auto_scratch_enabled_) process_autoplay_queue(buffer_start_samples, next->sample, 0);
             if (should_skip_post_note_audio(
                     engine_->is_finished(),
                     result_transition_pending_,
@@ -3097,7 +3122,7 @@ void GameSession::process_input_queue(int64_t buffer_start_samples, int64_t buff
         if (!lane.has_value()) {
             continue;
         }
-        if (autoplay_enabled_) {
+        if (autoplay_enabled_ || auto_scratch_lane(*lane)) {
             continue;
         }
         if (should_skip_post_note_audio(
@@ -3137,6 +3162,9 @@ void GameSession::process_input_queue(int64_t buffer_start_samples, int64_t buff
     }
 
     for (const auto& buffered : pending_input_events_) {
+        // Merge synthetic scratch edges before each physical key edge, so the
+        // engine and replay preserve exact sample order even with large buffers.
+        if (auto_scratch_enabled_) process_autoplay_queue(buffer_start_samples, buffered.sample, 0);
         dispatch_lane_input(buffered.lane,
                             buffered.state,
                             buffered.sample,
@@ -3147,13 +3175,13 @@ void GameSession::process_input_queue(int64_t buffer_start_samples, int64_t buff
 void GameSession::build_autoplay_events() {
     autoplay_events_.clear();
     autoplay_event_index_ = 0;
-    if (!autoplay_enabled_ || chart_.notes.empty()) {
+    if ((!autoplay_enabled_ && !auto_scratch_enabled_) || replay_playback_enabled_ || chart_.notes.empty()) {
         return;
     }
 
     autoplay_events_.reserve(chart_.notes.size() * 2);
     for (const auto& note : chart_.notes) {
-        if (note.lane <= 0) {
+        if (note.lane <= 0 || (!autoplay_enabled_ && !auto_scratch_lane(note.lane))) {
             continue;
         }
 
@@ -3176,8 +3204,8 @@ void GameSession::build_autoplay_events() {
                              return lhs.sample < rhs.sample;
                          }
                          if (lhs.state != rhs.state) {
-                             return lhs.state == input::InputState::Pressed &&
-                                    rhs.state == input::InputState::Released;
+                             return lhs.state == input::InputState::Released &&
+                                    rhs.state == input::InputState::Pressed;
                          }
                          return lhs.lane < rhs.lane;
                      });
@@ -3186,7 +3214,7 @@ void GameSession::build_autoplay_events() {
 void GameSession::process_autoplay_queue(int64_t buffer_start_samples,
                                          int64_t buffer_end_samples,
                                          int64_t lookahead_samples) {
-    if (!autoplay_enabled_ || !engine_) {
+    if ((!autoplay_enabled_ && !auto_scratch_enabled_) || replay_playback_enabled_ || !engine_) {
         return;
     }
 

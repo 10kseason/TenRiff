@@ -196,7 +196,7 @@ void MenuApp::append_chart_result_record(const menu_records::ParsedResultRecord&
         chart_play_record_indices_[key].push_back(record_index);
         // Keep autoplay runs in local history/replay browsing, but never let
         // them become the chart's official best score or clear lamp.
-        if (note_count_modified || parsed.autoplay_enabled ||
+        if (note_count_modified || mode_mod_auto_scratch(parsed.mods) || parsed.autoplay_enabled ||
             parsed.practice_no_fail_enabled || !verification.official_eligible) {
             continue;
         }
@@ -411,7 +411,7 @@ void MenuApp::cache_current_session_result(const std::string& chart_path,
             verification.official_eligible =
                 (finished || last_game_over_) && !aborted && !parsed->aborted &&
                 !parsed->autoplay_enabled && !parsed->practice_no_fail_enabled &&
-                !mode_mod_adds_notes(parsed->mods);
+                !mode_mod_adds_notes(parsed->mods) && !mode_mod_auto_scratch(parsed->mods);
         }
     }
 

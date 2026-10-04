@@ -246,3 +246,11 @@ TEST_CASE("Sites damaged protected connection never falls back to an older plain
     std::filesystem::remove(directory, ec);
 }
 #endif
+
+TEST_CASE("Sites rejects Auto Scratch even if canonical ruleset metadata is forged") {
+    auto replay = score_fixture();
+    replay.mods = {"auto_scratch"};
+    std::string payload, error;
+    CHECK_FALSE(app::build_sites_score_json(replay, std::string(64, 'c'), "Fixture", "CLEAR", payload, error));
+    CHECK(payload.empty());
+}

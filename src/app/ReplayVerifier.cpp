@@ -156,6 +156,9 @@ std::string replay_ruleset_id_for_runtime(const config::JudgeConfig& judge,
                                           bool standard_gauge_shift,
                                           bool course_gauge,
                                           std::string_view pacemaker_mode) {
+    // This argument describes the legacy no-fail pacemaker scoring policy.
+    // The current display-only overlay passes "off"; historical custom evidence
+    // is never relabeled or accepted as canonical by the verifier.
     if (!standard_gauge_shift || course_gauge || pacemaker_mode_active(pacemaker_mode) ||
         !is_canonical_score_ruleset(judge, gauge)) {
         return "custom";
@@ -178,6 +181,10 @@ ReplayVerificationResult verify_replay_against_chart(
     }
     if (!is_supported_canonical_replay_ruleset(replay.ruleset_id)) {
         return invalid_result("Replay used a non-canonical score ruleset.",
+                              ReplayVerificationStatus::CustomRuleset);
+    }
+    if (mode_mod_auto_scratch(replay.mods)) {
+        return invalid_result("Auto Scratch is practice assistance, not an official ruleset.",
                               ReplayVerificationStatus::CustomRuleset);
     }
     if (replay.mode.key_conversion_note_add_mode.size() > 0 &&
@@ -293,7 +300,7 @@ ReplayVerificationResult verify_replay_against_chart(
                                !replay.aborted &&
                                !replay.mode.autoplay_enabled &&
                                !replay.mode.practice_no_fail_enabled &&
-                               !mode_mod_adds_notes(replay.mods);
+                               !mode_mod_adds_notes(replay.mods) && !mode_mod_auto_scratch(replay.mods);
     result.detail = result.claims_match
                         ? "Replay outcome reproduced under the canonical ruleset."
                         : "Replay outcome reproduced; stored score/stat claims were ignored because they differ.";

@@ -1,5 +1,7 @@
 # TenRiff Docs Map
 
+**2026-10-05 · TenRiff 1.8.4:** 일시정지 마우스 조작과 설정 클릭을 개선하고, 실시간 페이스메이커·연습용 오토스크래치·전체 설정 이전을 추가합니다. 고스트의 플레이어 필드 크기, LN 불투명도와 HUD 검색·프레임 대기열 제한을 수정합니다. [1.8.4 release](release-1.8.4-gate.md).
+
 Language: Korean | [English](README.en.md) | [简体中文](README.zh-CN.md) | [日本語](README.ja.md)
 
 루트 [`README.md`](../README.md)를 먼저 읽었다면, 이 문서는 그 다음 단계의 상세 문서 인덱스입니다. 설계 문서와 현재 상태 문서를 같이 담고 있으므로, 빠르게 맥락을 잡아야 할 때는 아래 순서로 읽는 것이 가장 효율적입니다.
@@ -10,6 +12,7 @@ Language: Korean | [English](README.en.md) | [简体中文](README.zh-CN.md) | [
 
 현재 동작이 충돌하면 같은 커밋의 **구현 코드·회귀 테스트**를 먼저 확인하고 `current-state`와 `config` 문서를 함께 수정합니다. 번역본도 같은 계약을 설명해야 합니다. `baseline-*`와 `release-*`는 해당 버전의 기록이며, 초기 설계·로드맵의 제안은 현재 구현이나 성능 보장이 아닙니다.
 
+- [최신 판정 범위·RANK별 표·롱노트 규칙](judgement-windows.md)
 - [1.8.3 release](release-1.8.3-gate.md)
 - [1.8.3 audio / LN / RANK](audio-ln-rank.ko.md)
 - [Skin timing controls](timing-feedback-controls.ko.md)

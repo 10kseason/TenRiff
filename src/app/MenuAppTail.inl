@@ -6,6 +6,13 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
     target.motion_revision = gameplay_hud_.motion_revision;
     target.text_revision = gameplay_hud_.text_revision;
     target.active = gameplay_hud_.active;
+    target.auto_scratch_enabled = gameplay_hud_.auto_scratch_enabled;
+    target.auto_scratch_hide_lanes = gameplay_hud_.auto_scratch_hide_lanes;
+    target.scratch_lane_count = gameplay_hud_.scratch_lane_count;
+    target.scratch_lanes = gameplay_hud_.scratch_lanes;
+    target.pacemaker_mode = gameplay_hud_.pacemaker_mode;
+    target.pacemaker_target = gameplay_hud_.pacemaker_target;
+    target.pacemaker_delta = gameplay_hud_.pacemaker_delta;
     target.loading = gameplay_hud_.loading;
     target.paused = gameplay_hud_.paused;
     target.pause_menu_cursor = gameplay_hud_.pause_menu_cursor;
@@ -64,8 +71,8 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
     target.background_upscale_mode = background_policy.upscale_mode;
     target.background_upscale_model_path = config_.graphics.background_upscale_model_path;
     target.background_upscale_prefer_npu = config_.graphics.background_upscale_prefer_npu;
-    // While a chart is running the session owns F1/F2 and F7/Shift+F7 retuning;
-    // F8 and F10 stay reserved for global chat and account overlays.
+    // While a chart is running the session owns F1/F2 and F7/F8 retuning;
+    // Shift+F8 opens chat, and F10 opens the account overlay.
     const double clamped_judgement_line_position = std::clamp(
         gameplay_hud_.active ? gameplay_hud_.judgement_line_position
                              : config_.skin.judgement_line_position,
@@ -1012,6 +1019,12 @@ void MenuApp::populate_quick_setup_render_data(render::MenuRenderData& render) {
                     profile_setup::kClearAvatarRow,
                     !config_.ui.profile_avatar_path.empty(),
                     false);
+    append_menu_row(render.generic, ui_text("Export All Settings", "전체 설정 내보내기"), ".trprofile",
+                    settings_cursor_ == profile_setup::kExportSettingsRow, render::MenuHitTargetKind::SettingsRow,
+                    profile_setup::kExportSettingsRow, true, false);
+    append_menu_row(render.generic, ui_text("Import All Settings", "전체 설정 가져오기"), ".trprofile",
+                    settings_cursor_ == profile_setup::kImportSettingsRow, render::MenuHitTargetKind::SettingsRow,
+                    profile_setup::kImportSettingsRow, true, false);
     append_menu_row(render.generic,
                     first_run ? ui_text("Continue to Song Select", "곡 선택으로 계속")
                               : ui_text("Done", "완료"),
@@ -1755,6 +1768,8 @@ void MenuApp::publish_snapshot() {
         if (current_screen() == Screen::SettingsSkins)
             for (const auto& status : skin_status_messages_)
                 render.generic.selected_help += "\n\n" + status;
+        if (current_screen() == Screen::QuickSetup && !profile_transfer_status_.empty())
+            render.generic.selected_help += "\n\n" + profile_transfer_status_;
     }
 
     if (render.kind == render::MenuScreenKind::GenericList &&
@@ -2223,6 +2238,9 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
     session.set_screenshot_callback([this]() {
         menu_window_.request_screenshot();
     });
+    gameplay_chat_left_shift_held_ = false;
+    gameplay_chat_right_shift_held_ = false;
+    gameplay_chat_f8_captured_ = false;
     session.set_control_input_callback([this](const input::InputEvent& event) {
         return queue_gameplay_chat_input(event);
     });
@@ -2248,7 +2266,7 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
 #else
     session.set_loading_cancel_callback([]() { return false; });
 #endif
-    session.set_hud_callback([this, peer_battle](const GameSession::HudSnapshot& hud) {
+    session.set_hud_callback([this, peer_battle, &session](const GameSession::HudSnapshot& hud) {
         uint64_t peer_revision = 0;
         if (peer_battle) {
             network::PeerScore score;
@@ -2287,6 +2305,11 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
         gameplay_hud_.countdown_active = hud.countdown_active;
         gameplay_hud_.countdown_value = hud.countdown_value;
         gameplay_hud_.lane_count = hud.lane_count;
+        gameplay_hud_.auto_scratch_enabled = hud.auto_scratch_enabled;
+        gameplay_hud_.auto_scratch_hide_lanes = hud.auto_scratch_hide_lanes;
+        gameplay_hud_.pacemaker_mode = hud.pacemaker_mode;
+        gameplay_hud_.pacemaker_target = hud.pacemaker_target;
+        gameplay_hud_.pacemaker_delta = hud.pacemaker_delta;
         gameplay_hud_.scratch_lane_count = hud.scratch_lane_count;
         gameplay_hud_.scratch_lanes.fill(0);
         std::copy_n(hud.scratch_lanes.begin(),
@@ -2410,7 +2433,14 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
             if (!click.has_value()) {
                 break;
             }
-            handle_menu_click(click.value());
+            if (click->kind == render::MenuHitTargetKind::GameplayPauseAction) {
+                session.request_pause_action(click->index);
+            } else if (click->kind == render::MenuHitTargetKind::GameplayPauseAdjust) {
+                const int direction = click->part == render::MenuHitPart::Decrement ? -1 : 1;
+                session.request_pause_adjust(click->index, direction);
+            } else {
+                handle_menu_click(click.value());
+            }
         }
     });
 
@@ -2421,6 +2451,7 @@ void MenuApp::launch_gameplay(const std::string& chart_path,
     std::string ranked_chart_sha256;
     std::string ranked_prepare_error;
     if (!peer_battle && !session_mix_active_ && replay_path.empty() &&
+        !mode_mod_auto_scratch(config_.mode.mods) &&
         !bms_editor_practice_start_seconds_.has_value()) {
         std::string extension = path_from_utf8(chart_path).extension().string();
         std::transform(extension.begin(), extension.end(), extension.begin(),

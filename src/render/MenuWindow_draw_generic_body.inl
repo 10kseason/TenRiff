@@ -368,8 +368,15 @@
                 }
 
                 // Broad row hits must precede specific +/- and slider hits.
-                if (row.activatable) {
-                    register_hit(row_rect, row.target_kind, row.row_index, MenuHitPart::Activate);
+                if (row.activatable || row.adjustable || row.slider || !row.enabled) {
+                    register_hit(row_rect, row.target_kind, row.row_index,
+                        !row.enabled || row.adjustable || row.slider ? MenuHitPart::SelectOnly : MenuHitPart::Activate);
+                }
+                const float saved_text_opacity = d2d_->text_brush->GetOpacity();
+                const float saved_accent_opacity = d2d_->accent_brush->GetOpacity();
+                if (!row.enabled) {
+                    d2d_->text_brush->SetOpacity(saved_text_opacity * 0.40f);
+                    d2d_->accent_brush->SetOpacity(saved_accent_opacity * 0.30f);
                 }
                 const auto saved_row_paragraph = row_format ? row_format->GetParagraphAlignment() : DWRITE_PARAGRAPH_ALIGNMENT_NEAR;
                 draw_native_focus(row_rect, 12, 64 + static_cast<std::size_t>(row_list_index - row_window_start),
@@ -430,7 +437,7 @@
                                               9.0f, 9.0f),
                                 d2d_->accent_brush.Get());
                         }
-                        register_hit(
+                        if (row.enabled) register_hit(
                             native_rect("generic.rect.037", D2D1::RectF(track_rect.left, row_y + 6.0f,
                                         track_rect.right, row_y + row_height - 6.0f)),
                             row.target_kind, row.row_index, MenuHitPart::SetValue);
@@ -487,13 +494,12 @@
                             native_rect("generic.rect.040", D2D1::RectF(minus_left, row_y + 6.0f, minus_left + action_width, row_y + row_height - 6.0f));
                         const D2D1_RECT_F plus_rect =
                             native_rect("generic.rect.041", D2D1::RectF(plus_left, row_y + 6.0f, plus_left + action_width, row_y + row_height - 6.0f));
-                        // Treat the label/value portion like pressing Enter. Register it
-                        // before +/- so the more specific action buttons win hit testing.
+                        // Selecting a setting never changes its value; only controls do.
                         register_hit(native_rect("generic.rect.042", D2D1::RectF(row_rect.left, row_rect.top,
                                                  minus_rect.left - action_gap * 0.5f, row_rect.bottom)),
-                                     row.target_kind, row.row_index, MenuHitPart::Activate);
-                        draw_action(minus_rect, L'-', MenuHitPart::Decrement, row.decrement_enabled);
-                        draw_action(plus_rect, L'+', MenuHitPart::Increment, row.increment_enabled);
+                                     row.target_kind, row.row_index, MenuHitPart::SelectOnly);
+                        draw_action(minus_rect, L'-', MenuHitPart::Decrement, row.enabled && row.decrement_enabled);
+                        draw_action(plus_rect, L'+', MenuHitPart::Increment, row.enabled && row.increment_enabled);
                     } else {
                         const D2D1_RECT_F value_rect =
                             native_rect("generic.rect.043", D2D1::RectF(std::max(label_rect.right + 12.0f, row_left + 320.0f),
@@ -508,6 +514,8 @@
                     }
                 }
 
+                d2d_->text_brush->SetOpacity(saved_text_opacity);
+                d2d_->accent_brush->SetOpacity(saved_accent_opacity);
                 if (row_format) row_format->SetParagraphAlignment(saved_row_paragraph);
                 row_y += row_step;
             }

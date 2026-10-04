@@ -128,9 +128,16 @@ If this is not the layout you want, you can change it in `Options > Keymap`.
 - Session Mix ignores Esc during play; its between-stage result exits remain available. Multiplayer retains its Esc abort behavior.
 - `F3`: decrease Hi-Speed
 - `F4`: increase Hi-Speed
-- `F5`: decrease Hi-Speed significantly
-- `F6`: increase Hi-Speed significantly
+- `Shift+F5`: halve Hi-Speed
+- `Shift+F6`: double Hi-Speed
+- `F7` / `F8`: decrease / increase visual latency
+- `Shift+F8`: open / close in-game chat (F8 in menus)
 - `F9`: save a screenshot of the current screen
+
+Pause Continue, Restart, Exit and setting −/+ buttons also support mouse clicks. Text or blank space in adjustable settings rows only selects the row without changing its value.
+
+Pacemaker shows the live gap from the accuracy or score target. Normal gauge failure, clear and scoring rules remain active; missing the target alone does not fail a clear. Best records and ranking remain eligible when all other conditions are met.
+
 
 Hi-Speed changes only the visual scroll speed; it does not change the judgement timing itself.
 Rate changes playback tempo and chart scheduling, but it does not change visual scroll speed at the same Hi-Speed.
@@ -173,6 +180,8 @@ The current default judgement labels use the following abbreviations:
 - `BD`: Bad
 - `PR`: Poor / Miss
 
+Base PG is **±21/18/15/8ms** for BMS RANK EASY/NORMAL/HARD/VERYHARD. EASY keeps GR/GD/BAD at ±65/115/210ms; other ranks scale these proportionally. `Judge Easy/Hard` are separate mods applied after RANK. See [timing windows (Korean)](judgement-windows.md) for the full tables and inclusive boundaries.
+
 Empty POOR applies only on the early side of the next note. Input behind a consumed or already-passed note never adds a rear empty POOR.
 
 `No LN Release` disables charge-LN tail release judgement and has an exact `1.00x` score multiplier.
@@ -191,7 +200,7 @@ Gauge Shift is always active. `EX / Hard / Normal / Easy` select the starting ti
 
 Grade/Session Mix uses a separate LR2-reference gauge, carried between songs, with indirect misses and failure below 2% HP. Normal long notes apply gauge once on completion/release. Ordinary `gauge.delta` settings do not apply to courses. See [LR2 gauge comparison and limits](lr2-gauge-audit.ko.md).
 
-Legacy `shift` means an EX start. Modes with separate completion rules, such as Practice and Pacemaker, retain those rules.
+Legacy `shift` means an EX start. Practice retains separate completion rules. Pacemaker follows normal gauge and clear rules.
 
 `Sudden Death (1 MISS)` is not a gauge type: it forces the gauge to zero and ends the run on the first OD8-converted object `MISS`. Native `BAD` timing alone and empty-key `POOR` do not count, and it cannot be enabled together with Practice No-Fail.
 

@@ -181,7 +181,7 @@ TEST_CASE("TenRiff native menu-only skins keep native receptors until gameplay i
              "\"key_pulse_brightness\":0", "\"key_backdrop\":false", "\"key_backdrop_opacity\":0",
              "\"key_backdrop_brightness\":0", "\"key_backdrop_height\":0", "\"lane_background_opacity\":0",
              "\"visual_opacity\":1", "\"note_outline_opacity\":0",
-             "\"hold_body_opacity\":1", "\"hit_burst_style\":\"ring\"",
+             "\"hold_body_opacity\":1", "\"hold_body_opacity\":0", "\"hit_burst_style\":\"ring\"",
              "\"key_label_position\":\"off\"", "\"note_shape\":\"rect\"",
              "\"lane_colors\":[\"#FFFFFF\"]", "\"note_width_ratio\":1.2",
              "\"note_height_ratio\":1.2", "\"full_lane_receptors\":true",

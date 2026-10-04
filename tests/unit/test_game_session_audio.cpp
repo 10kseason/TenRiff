@@ -11,6 +11,8 @@
 #include <thread>
 #include <cmath>
 #include <limits>
+#include <cstdlib>
+#include <iostream>
 
 namespace tenriff::app {
 
@@ -27,6 +29,357 @@ struct CompletionTestDirectory {
 // Exercise the production input-to-voice-to-mixer path without starting a device,
 // input thread, decoder, profile or record writer.
 struct GameSessionAudioTestAccess {
+    static void check_long_hold_hud_scan() {
+        const bool benchmark = std::getenv("TENRIFF_BENCH_GHOST_HUD") != nullptr;
+        const char* requested_notes = std::getenv("TENRIFF_BENCH_GHOST_HUD_NOTES");
+        const int past_notes = benchmark && requested_notes
+            ? std::clamp(std::atoi(requested_notes), 1000, 100000) : benchmark ? 100000 : 1000;
+        const bool paced = std::getenv("TENRIFF_BENCH_GHOST_HUD_PACED") != nullptr;
+        const int64_t now = static_cast<int64_t>(past_notes + 10) * 480;
+        for (const bool ghost : {false, true}) {
+            auto session = std::make_unique<GameSession>();
+            session->sample_rate_ = 48000;
+            session->chart_.lane_count = 10;
+            session->chart_.duration_samples = now + 480000;
+            session->chart_.notes.push_back({1, 0, now + 240000});
+            for (int i = 1; i <= past_notes; ++i)
+                session->chart_.notes.push_back({2 + i % 9, static_cast<int64_t>(i) * 480, std::nullopt});
+            session->chart_.notes.push_back({2, now + 24000, std::nullopt});
+            for (std::size_t i = 0; i < session->chart_.notes.size(); ++i) session->chart_.notes[i].note_id = i;
+            gameplay::GameplayConfig config;
+            config.practice_no_fail_enabled = true;
+            session->engine_ = std::make_unique<gameplay::GameplayEngine>(session->chart_, config);
+            session->engine_->advance(now);
+            if (ghost) {
+                session->ghost_engine_ = std::make_unique<gameplay::GameplayEngine>(session->chart_, config);
+                session->ghost_engine_->advance(now);
+            }
+            session->lane_activity_.assign(10, 0); session->lane_pressed_.assign(10, 0);
+            session->ghost_lane_activity_.assign(10, 0); session->ghost_lane_pressed_.assign(10, 0);
+            session->synthetic_tones_enabled_ = false;
+            session->audio_timing_diagnostics_logged_ = true;
+            session->config_.audio_ui.mute_when_inactive = false;
+            session->hidden_hit_note_ids_.assign(session->chart_.notes.size(), 0);
+            session->ghost_hidden_hit_note_ids_.assign(session->chart_.notes.size(), 0);
+            std::vector<float> output(960);
+            session->audio_callback(output.data(), 480, now, now);
+            const auto missed = session->hud_snapshot();
+            std::cout << "[ghost-hud-structure] ghost=" << ghost
+                      << " past=" << past_notes << " upcoming=" << hud_contains_note(missed, now + 24000)
+                      << " old_ln=" << hud_contains_note(missed, 0)
+                      << " ghost_upcoming=" << hud_contains_note(missed, now + 24000, true) << '\n';
+            // An old missed LN remains visible, but expired missed taps must
+            // neither pin the head scan nor crowd the upcoming note out of HUD.
+            CHECK(hud_contains_note(missed, 0));
+            CHECK(hud_contains_note(missed, now + 24000));
+            CHECK(session->hud_scan_start_ > static_cast<std::size_t>(past_notes - 32));
+            CHECK(session->hud_past_hold_indices_ == std::vector<std::size_t>{0});
+            if (ghost) {
+                CHECK(hud_contains_note(missed, 0, true));
+                CHECK(hud_contains_note(missed, now + 24000, true));
+                CHECK(session->ghost_hud_scan_start_ == session->hud_scan_start_);
+                CHECK(session->ghost_hud_past_hold_indices_ == session->hud_past_hold_indices_);
+            }
+            for (std::size_t i = 1; i + 1 < session->chart_.notes.size(); ++i) {
+                session->hidden_hit_note_ids_[i] = 1;
+                session->ghost_hidden_hit_note_ids_[i] = 1;
+            }
+            (void)session->hud_snapshot();
+            if (!benchmark) continue;
+            const auto percentile = [](std::vector<double> values, double fraction) {
+                std::sort(values.begin(), values.end());
+                return values[static_cast<std::size_t>((values.size() - 1) * fraction)];
+            };
+            const auto timed = [](auto&& operation) {
+                const auto start = std::chrono::steady_clock::now();
+                operation();
+                return std::chrono::duration<double, std::micro>(std::chrono::steady_clock::now() - start).count();
+            };
+            std::vector<double> hud_us, callback_us, contended_us;
+            for (int i = 0; i < 300; ++i) {
+                hud_us.push_back(timed([&] { (void)session->hud_snapshot(); }));
+                callback_us.push_back(timed([&] { session->audio_callback(output.data(), 480, now, now); }));
+            }
+            std::atomic<bool> stop{false}, ready{false};
+            std::thread reader([&] {
+                while (!stop.load()) {
+                    (void)session->hud_snapshot(); ready.store(true);
+                    if (paced) std::this_thread::sleep_for(std::chrono::milliseconds(8));
+                }
+            });
+            while (!ready.load()) std::this_thread::yield();
+            for (int i = 0; i < 300; ++i) {
+                contended_us.push_back(timed([&] { session->audio_callback(output.data(), 480, now, now); }));
+                if (paced) std::this_thread::sleep_for(std::chrono::milliseconds(1));
+                else std::this_thread::yield();
+            }
+            stop.store(true); reader.join();
+            // Unpaced is deliberate mutex-contention stress, not the menu's
+            // real 8ms HUD cadence; do not report it as device input latency.
+            std::cout << "[ghost-hud-bench] ghost=" << ghost << " past=" << past_notes
+                      << " reader_cadence_ms=" << (paced ? 8 : 0)
+                      << " hud_p50_us=" << percentile(hud_us, .50) << " hud_p95_us=" << percentile(hud_us, .95)
+                      << " callback_p95_us=" << percentile(callback_us, .95)
+                      << " contended_callback_p95_us=" << percentile(contended_us, .95)
+                      << " contended_callback_max_us=" << percentile(contended_us, 1.0) << '\n';
+        }
+    }
+    static void check_ghost_backlog_player_callback() {
+        std::vector<float> reference_audio;
+        for (const bool ghost : {false, true}) {
+            auto session = std::make_unique<GameSession>();
+            session->sample_rate_ = 48000;
+            session->chart_.lane_count = 2;
+            session->chart_.duration_samples = 200000;
+            session->chart_.notes = {{1, 48000, std::nullopt}, {2, 100000, std::nullopt}};
+            session->chart_.notes[0].note_id = 0;
+            session->chart_.notes[0].audio_asset_id = 0;
+            session->chart_.notes[1].note_id = 1;
+            gameplay::GameplayConfig config;
+            config.sample_rate = 48000;
+            config.practice_no_fail_enabled = true;
+            session->engine_ = std::make_unique<gameplay::GameplayEngine>(session->chart_, config);
+            session->lane_activity_.assign(2, 0); session->lane_pressed_.assign(2, 0);
+            session->hidden_hit_note_ids_.assign(2, 0);
+            session->synthetic_tones_enabled_ = false;
+            session->audio_timing_diagnostics_logged_ = true;
+            session->config_.audio_ui.mute_when_inactive = false;
+            session->config_.audio_ui.normalize_audio = false;
+            session->chart_audio_assets_.resize(1);
+            session->chart_audio_assets_[0].clip.samples =
+                std::make_shared<const std::vector<float>>(1920, 0.25f);
+            session->key_to_lane_ = {{32, 1}};
+            session->lane_binding_state_.configure(session->key_to_lane_);
+            if (ghost) {
+                session->ghost_engine_ = std::make_unique<gameplay::GameplayEngine>(session->chart_, config);
+                session->ghost_lane_activity_.assign(2, 0); session->ghost_lane_pressed_.assign(2, 0);
+                session->ghost_hidden_hit_note_ids_.assign(2, 0);
+                session->ghost_replay_enabled_ = true;
+                // Resampled replay plus a large due-event backlog must not move
+                // the player's mapped input, feedback or keysound sample.
+                session->ghost_replay_source_.trace.sample_rate = 24000;
+                for (int i = 0; i < 2048; ++i)
+                    session->ghost_replay_source_.trace.events.push_back({2,
+                        i % 2 ? input::InputState::Released : input::InputState::Pressed, 10000 + i * 4});
+                session->ghost_replay_source_.trace.events.push_back({1, input::InputState::Pressed, 24000});
+            }
+            // Freeze the timestamp mapping, then run the production callback's
+            // queued lane edge, input/control queue, ghost queue and audio mixer.
+            input::InputEvent press{};
+            press.keycode = 32; press.state = input::InputState::Pressed;
+            REQUIRE(session->future_events_.push({press, 48000}));
+            bool observed_player_first = false;
+            session->set_control_input_callback([&](const input::InputEvent& event) {
+                if (event.keycode != 34) return false;
+                observed_player_first = session->engine_->stats().counts.pg == 1 &&
+                    session->ghost_replay_event_index_ == 0;
+                return true;
+            });
+            input::InputEvent sentinel{};
+            sentinel.keycode = 34; sentinel.state = input::InputState::Pressed;
+            REQUIRE(session->input_thread_.queue().push(sentinel));
+            std::vector<float> audio(960);
+            session->audio_callback(audio.data(), 480, 48000, 48000);
+            CHECK(observed_player_first);
+            REQUIRE(session->engine_->replay().events.size() == 1);
+            CHECK(session->engine_->replay().events[0].sample == 48000);
+            CHECK(session->engine_->stats().counts.pg == 1);
+            CHECK(session->engine_->live_feedback().sample == 48000);
+            CHECK(session->engine_->live_feedback().delta_ms == 0.0);
+            CHECK(session->lane_activity_[0] == doctest::Approx(0.95));
+            CHECK(session->hidden_hit_note_ids_[0] == 1);
+            REQUIRE(session->chart_audio_voices_.size() == 1);
+            CHECK(session->chart_audio_voices_[0].start_sample == 48000);
+            CHECK(std::any_of(audio.begin(), audio.end(), [](float value) { return value != 0; }));
+            if (ghost) {
+                CHECK(session->ghost_replay_event_index_ == 2049);
+                CHECK(session->ghost_engine_->stats().counts.pg == 1);
+                CHECK(audio == reference_audio);
+            } else reference_audio = audio;
+        }
+    }
+
+    static void check_hud_hold_survivor_lifecycle() {
+        auto session = pause_hud_fixture();
+        session->audio_timing_diagnostics_logged_ = true;
+        std::vector<float> audio(960);
+        const auto snapshot_at = [&](int64_t playback) {
+            session->audio_callback(audio.data(), 480, 130000, playback);
+            return session->hud_snapshot();
+        };
+        auto hud = snapshot_at(70000);
+        CHECK_FALSE(hud_contains_note(hud, 37500));
+        CHECK(hud_contains_note(hud, 42000));
+        CHECK(session->hud_past_hold_indices_ == std::vector<std::size_t>{1});
+        session->config_.visual_offset_ms = -500;
+        hud = snapshot_at(70000); // offset alone reintroduces a retired head
+        CHECK(hud_contains_note(hud, 37500));
+        CHECK(hud_contains_note(hud, 37500, true));
+        session->config_.visual_offset_ms = 0;
+        hud = snapshot_at(65000); // rewind without duplicating an old LN survivor
+        CHECK(hud_contains_note(hud, 42000));
+        CHECK(session->hud_past_hold_indices_ == std::vector<std::size_t>{1});
+        CHECK(session->ghost_hud_past_hold_indices_ == session->hud_past_hold_indices_);
+        hud = snapshot_at(120000); // tail has left the past window
+        CHECK_FALSE(hud_contains_note(hud, 42000));
+        CHECK_FALSE(hud_contains_note(hud, 42000, true));
+        CHECK(session->hud_past_hold_indices_.empty());
+        hud = snapshot_at(70000); // audible-head rebase restores the missed body
+        CHECK(hud_contains_note(hud, 42000));
+        CHECK(hud_contains_note(hud, 42000, true));
+
+        session = pause_hud_fixture();
+        session->audio_timing_diagnostics_logged_ = true;
+        for (const auto sample : {37500, 42000}) {
+            session->dispatch_lane_input(1, input::InputState::Pressed, sample, sample);
+            session->dispatch_ghost_lane_input(1, input::InputState::Pressed, sample);
+            if (sample == 37500) {
+                session->dispatch_lane_input(1, input::InputState::Released, sample + 1, sample + 1);
+                session->dispatch_ghost_lane_input(1, input::InputState::Released, sample + 1);
+            }
+        }
+        session->audio_callback(audio.data(), 480, 70000, 70000);
+        hud = session->hud_snapshot();
+        for (const bool ghost : {false, true}) {
+            const auto& notes = ghost ? hud.ghost_notes : hud.notes;
+            const auto count = ghost ? hud.ghost_note_count : hud.note_count;
+            CHECK_FALSE(hud_contains_note(hud, 42000, ghost));
+            CHECK(std::count_if(notes.begin(), notes.begin() + count, [](const auto& note) {
+                return note.hold && !note.head_visible && note.start_sample == 70000 && note.tail_sample == 100000;
+            }) == 1);
+        }
+    }
+
+    static void check_auto_scratch(bool manual_key) {
+        auto session = std::make_unique<GameSession>();
+        session->sample_rate_ = 48000;
+        session->chart_format_ = ChartFormat::Bms;
+        session->chart_.lane_count = 3;
+        session->chart_.scratch_lanes = {1, 3};
+        session->chart_.duration_samples = 200000;
+        session->chart_.notes = {{1, 48000, 96000}, {2, 50000, std::nullopt}, {3, 60000, std::nullopt}};
+        session->chart_.notes[0].release_required = true;
+        for (std::size_t i = 0; i < session->chart_.notes.size(); ++i) session->chart_.notes[i].note_id = i;
+        session->chart_.notes[0].audio_asset_id = 0;
+        gameplay::GameplayConfig config;
+        config.sample_rate = 48000;
+        config.practice_no_fail_enabled = true;
+        session->engine_ = std::make_unique<gameplay::GameplayEngine>(session->chart_, config);
+        session->lane_activity_.assign(3, 0);
+        session->lane_pressed_.assign(3, 0);
+        session->hidden_hit_note_ids_.assign(3, 0);
+        session->synthetic_tones_enabled_ = false;
+        session->auto_scratch_enabled_ = true;
+        session->chart_audio_assets_.resize(1);
+        session->chart_audio_assets_[0].clip.samples = std::make_shared<const std::vector<float>>(960, 0.25f);
+        session->build_autoplay_events();
+        REQUIRE(session->autoplay_events_.size() == 4);
+        for (const auto& edge : session->autoplay_events_) CHECK(edge.lane != 2);
+        if (manual_key) {
+            session->key_to_lane_ = {{32, 2}, {33, 1}};
+            session->lane_binding_state_.configure(session->key_to_lane_);
+            session->startup_input_timing_anchor_ = {50000, 1'000'000'000, true};
+            session->current_playback_sample_ = 50000;
+            input::InputEvent event{};
+            event.state = input::InputState::Pressed;
+            event.input_time_ns = 1'000'000'000;
+            event.keycode = 33; // physical scratch must not duplicate the generated edge
+            REQUIRE(session->input_thread_.queue().push(event));
+            event.keycode = 32;
+            REQUIRE(session->input_thread_.queue().push(event));
+            session->process_input_queue(48000, 60001, 0);
+            REQUIRE(session->engine_->replay().events.size() == 2);
+            CHECK(session->engine_->replay().events[0].sample == 48000);
+            CHECK(session->engine_->replay().events[1].sample == 50000);
+            CHECK(session->engine_->replay().events[1].lane == 2);
+        }
+        session->process_autoplay_queue(48000, 60001, 0);
+        REQUIRE(session->engine_->replay().events.size() == (manual_key ? 4 : 3));
+        CHECK(session->engine_->replay().events[0].sample == 48000);
+        CHECK(session->hidden_hit_note_ids_[0] == 1);
+        CHECK(session->hidden_hit_note_ids_[1] == (manual_key ? 1 : 0));
+        REQUIRE(session->chart_audio_voices_.size() == 1);
+        CHECK(session->chart_audio_voices_[0].start_sample == 48000);
+        session->engine_->advance(60001);
+        session->process_autoplay_queue(96000, 96000, 0);
+        session->engine_->advance(120000);
+        CHECK(session->engine_->stats().counts.pg == (manual_key ? 4 : 3));
+        // The default Normal policy assigns BAD to an unplayed key note;
+        // POOR is the separate indirect-miss (Hard) policy.
+        CHECK(session->engine_->stats().counts.pr == 0);
+        CHECK(session->engine_->stats().counts.bd == (manual_key ? 0 : 1));
+        REQUIRE(session->engine_->replay().events.size() == (manual_key ? 5 : 4));
+        CHECK(session->engine_->replay().events.back().sample == 96000);
+        gameplay::GameplayEngine replay_engine(session->chart_, config);
+        for (const auto& edge : session->engine_->replay().events) {
+            replay_engine.advance(edge.sample - 1);
+            (void)replay_engine.handle_input(edge.lane, edge.state, edge.sample);
+            replay_engine.advance(edge.sample);
+        }
+        replay_engine.advance(120000);
+        CHECK(replay_engine.stats().raw_score == session->engine_->stats().raw_score);
+        CHECK(replay_engine.stats().counts.pg == session->engine_->stats().counts.pg);
+        CHECK(replay_engine.stats().counts.pr == session->engine_->stats().counts.pr);
+        CHECK(replay_engine.stats().counts.bd == session->engine_->stats().counts.bd);
+        session->replay_playback_enabled_ = true;
+        session->build_autoplay_events();
+        CHECK(session->autoplay_events_.empty());
+        session->replay_playback_enabled_ = false;
+        session->chart_format_ = ChartFormat::Unknown;
+        session->build_autoplay_events();
+        CHECK(session->autoplay_events_.empty());
+        session->chart_format_ = ChartFormat::Bms;
+        session->chart_.scratch_lanes.clear();
+        session->build_autoplay_events();
+        CHECK(session->autoplay_events_.empty());
+    }
+
+    static void check_pause_mouse_and_hotkeys() {
+        auto session = pause_fixture();
+        session->f5_keycode_ = 116; session->f6_keycode_ = 117;
+        session->f7_keycode_ = 118; session->f8_keycode_ = 119;
+        session->lshift_keycode_ = 160;
+        session->config_.speed.hi_speed = 4.0;
+        control(*session, 116);
+        CHECK(session->config_.speed.hi_speed == 4.0);
+        control(*session, 117);
+        CHECK(session->config_.speed.hi_speed == 4.0);
+        control(*session, 160);
+        control(*session, 116);
+        CHECK(session->config_.speed.hi_speed == 2.0);
+        control(*session, 117);
+        CHECK(session->config_.speed.hi_speed == 4.0);
+        control(*session, 118);
+        CHECK(session->config_.visual_offset_ms == -1.0);
+        control(*session, 119);
+        CHECK(session->config_.visual_offset_ms == 0.0);
+        control(*session, 27);
+        const double original_line = session->config_.skin.judgement_line_position;
+        session->request_pause_adjust(0, -1);
+        session->request_pause_adjust(1, 1);
+        session->request_pause_adjust(2, 1);
+        session->process_paused_input_queue();
+        CHECK(session->config_.skin.judgement_line_position == doctest::Approx(original_line - 0.01));
+        CHECK(session->config_.speed.hi_speed == 4.25);
+        CHECK(session->config_.visual_offset_ms == 1.0);
+        session->request_pause_action(0);
+        session->process_paused_input_queue();
+        CHECK(session->pause_resume_requested_.load());
+        CHECK(session->paused_.load());
+        session->request_pause_action(1);
+        session->process_paused_input_queue();
+        CHECK_FALSE(session->restart_requested_.load());
+        for (int action : {1, 2}) {
+            auto other = pause_fixture();
+            control(*other, 27);
+            other->request_pause_action(action);
+            other->process_paused_input_queue();
+            CHECK(other->finished_.load());
+            CHECK(other->user_aborted_.load());
+            CHECK(other->restart_requested_.load() == (action == 1));
+            CHECK(other->exit_requested_.load() == (action == 2));
+        }
+    }
     static void check_concurrent_hud_timing_publication() {
         auto session = std::make_unique<GameSession>();
         session->sample_rate_ = 48000;
@@ -334,7 +687,8 @@ struct GameSessionAudioTestAccess {
     }
 
     static void check_automatic_result(bool delayed_bgm, bool manual_skip, bool silent,
-                                       bool failed_audio = false, bool skip_outro = false) {
+                                       bool failed_audio = false, bool skip_outro = false, bool pacemaker = false,
+                                       bool auto_scratch = false) {
         auto session = std::make_unique<GameSession>();
         session->sample_rate_ = 48000;
         session->chart_.lane_count = 4;
@@ -348,6 +702,15 @@ struct GameSessionAudioTestAccess {
         config.gauge_shift_enabled = true;
         session->engine_ = std::make_unique<gameplay::GameplayEngine>(session->chart_, config);
         session->gauge_shift_enabled_ = true;
+        if (pacemaker) {
+            session->pacemaker_mode_ = "score";
+            session->config_.mode.pacemaker_target_score = 10000;
+        }
+        if (auto_scratch) {
+            session->auto_scratch_enabled_ = true;
+            session->active_mods_ = {"auto_scratch"};
+            session->score_multiplier_ = 0.0;
+        }
         session->gameplay_started_ = true;
         session->config_.ui.result_tail_ms = 100;
         session->config_.audio_ui.play_to_end = !skip_outro;
@@ -367,8 +730,9 @@ struct GameSessionAudioTestAccess {
             session->chart_audio_events_.push_back({delayed_bgm ? 48000 : 0, 0,
                                                     GameSession::ChartAudioEvent::Kind::Bgm});
         }
-        session->dispatch_lane_input(1, input::InputState::Pressed, 12000, 12000);
-        session->dispatch_lane_input(1, input::InputState::Released, 12001, 12000);
+        const int64_t hit_sample = pacemaker ? 13200 : 12000; // GR deliberately misses a 10000 target
+        session->dispatch_lane_input(1, input::InputState::Pressed, hit_sample, hit_sample);
+        session->dispatch_lane_input(1, input::InputState::Released, hit_sample + 1, hit_sample);
         std::vector<float> audio(960);
         const int64_t expected_end = (skip_outro || silent || failed_audio) ? 17280 : delayed_bgm ? 96000 : 48000;
         // Model two queued device buffers. No input is injected after the last
@@ -386,7 +750,8 @@ struct GameSessionAudioTestAccess {
         }
         REQUIRE(session->finished_.load());
         CHECK_FALSE(session->user_aborted_.load());
-        CHECK(session->engine_->stats().counts.pg == 1);
+        CHECK(session->engine_->stats().counts.pg == (pacemaker ? 0 : 1));
+        CHECK(session->engine_->stats().counts.gr == (pacemaker ? 1 : 0));
         CHECK(session->engine_->replay().events.size() == 2);
 
         CompletionTestDirectory directory;
@@ -408,10 +773,23 @@ struct GameSessionAudioTestAccess {
         const auto replay = gameplay::load_replay_json(result.replay_path);
         REQUIRE(replay.success());
         std::string payload, error;
-        CHECK(build_sites_score_json(*replay.replay, result.replay_sha256,
-                                    "Completion fixture", result.clear_status, payload, error));
-        CHECK_FALSE(payload.empty());
-        CHECK(error.empty());
+        const bool accepted = build_sites_score_json(*replay.replay, result.replay_sha256,
+                                    "Completion fixture", result.clear_status, payload, error);
+        CHECK(accepted == !auto_scratch);
+        CHECK(payload.empty() == auto_scratch);
+        CHECK(error.empty() == !auto_scratch);
+        if (auto_scratch) {
+            CHECK(replay.replay->ruleset_id == "custom");
+            CHECK(result.final_score == 0);
+            CHECK(replay.replay->final_score == 0);
+            CHECK(result.clear_status.find("ASSIST AUTO SCRATCH") == 0);
+        }
+        if (pacemaker) {
+            CHECK(result.final_score < 10000);
+            CHECK_FALSE(result.game_over);
+            CHECK(result.clear_status.find("PACEMAKER") == std::string::npos);
+            CHECK_FALSE(replay.replay->mode.practice_no_fail_enabled);
+        }
         CHECK(result.export_warnings.empty());
     }
     static std::unique_ptr<GameSession> pause_fixture() {
@@ -821,4 +1199,28 @@ TEST_CASE("automatic outro skip keeps normal score export with active or future 
     for (bool delayed : {false, true})
         for (bool silent : {false, true})
             tenriff::app::GameSessionAudioTestAccess::check_automatic_result(delayed, false, silent, false, true);
+}
+
+TEST_CASE("Auto Scratch automates BMS scratch edges only with LN keysound and replay integrity") {
+    for (bool manual_key : {false, true})
+        tenriff::app::GameSessionAudioTestAccess::check_auto_scratch(manual_key);
+}
+TEST_CASE("long missed hold cannot pin player and ghost HUD to expired note history") {
+    tenriff::app::GameSessionAudioTestAccess::check_long_hold_hud_scan();
+}
+TEST_CASE("HUD old LN survivors preserve missed and active bodies across rewind and offset changes") {
+    tenriff::app::GameSessionAudioTestAccess::check_hud_hold_survivor_lifecycle();
+}
+TEST_CASE("ghost replay backlog preserves player callback order samples keysound and feedback") {
+    tenriff::app::GameSessionAudioTestAccess::check_ghost_backlog_player_callback();
+}
+TEST_CASE("pause mouse commands and explicit latency and multiplicative speed keys reach session") {
+    tenriff::app::GameSessionAudioTestAccess::check_pause_mouse_and_hotkeys();
+}
+TEST_CASE("live pacemaker keeps ordinary completed record and community submission eligibility") {
+    tenriff::app::GameSessionAudioTestAccess::check_automatic_result(false, false, true, false, false, true);
+}
+
+TEST_CASE("Auto Scratch exports explicit assisted custom zero scores rejected by community ranking") {
+    tenriff::app::GameSessionAudioTestAccess::check_automatic_result(false, false, true, false, false, false, true);
 }

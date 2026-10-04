@@ -6,6 +6,8 @@
 #include <string>
 
 #include "app/MenuApp.h"
+#include "app/GameSession.h"
+#include "config/KeycodeMap.h"
 
 namespace tenriff::app {
 
@@ -209,5 +211,121 @@ TEST_CASE("skin fullscreen preview respects existing modal input ownership") {
 
 TEST_CASE("skin fullscreen preview cannot survive a navigation reset") {
     tenriff::app::MenuAppSkinPreviewTestAccess::check_navigation_reset();
+}
+#endif
+
+#ifdef _WIN32
+namespace tenriff::app {
+struct MenuAppFeedbackTestAccess {
+    static void check_gameplay_chat_latency_routing() {
+        auto menu = std::make_unique<MenuApp>();
+        auto session = std::make_unique<GameSession>();
+        menu->config_.audio_ui.background_sound_enabled = false;
+        menu->key_f8_ = config::KeycodeMap::to_keycode("F8").value();
+        menu->key_escape_ = config::KeycodeMap::to_keycode("Esc").value();
+        session->f8_keycode_ = menu->key_f8_;
+        session->lshift_keycode_ = config::KeycodeMap::to_keycode("LShift").value();
+        session->rshift_keycode_ = config::KeycodeMap::to_keycode("RShift").value();
+        session->set_control_input_callback([&](const input::InputEvent& event) {
+            return menu->queue_gameplay_chat_input(event);
+        });
+        const auto edge = [&](uint32_t key, input::InputState state) {
+            input::InputEvent event{};
+            event.keycode = key; event.state = state; event.input_time_ns = 1000000;
+            CHECK(session->handle_control_input(event));
+        };
+        using input::InputState;
+        edge(menu->key_f8_, InputState::Pressed);
+        CHECK(session->config_.visual_offset_ms == 1.0);
+        CHECK(menu->gameplay_chat_control_actions_.empty());
+        edge(menu->key_f8_, InputState::Released);
+        CHECK_FALSE(session->visual_offset_increase_repeat_.held);
+        // Either Shift stays sufficient when the other is released first.
+        for (bool release_left_first : {false, true}) {
+            edge(session->lshift_keycode_, InputState::Pressed);
+            edge(session->rshift_keycode_, InputState::Pressed);
+            edge(release_left_first ? session->lshift_keycode_ : session->rshift_keycode_, InputState::Released);
+            edge(menu->key_f8_, InputState::Pressed);
+            CHECK(session->config_.visual_offset_ms == 1.0);
+            REQUIRE(menu->gameplay_chat_control_actions_.size() == 1);
+            CHECK(menu->gameplay_chat_control_actions_[0].kind == MenuApp::GameplayOverlayActionKind::ChatVisibility);
+            edge(release_left_first ? session->rshift_keycode_ : session->lshift_keycode_, InputState::Released);
+            edge(menu->key_f8_, InputState::Released);
+            CHECK_FALSE(session->visual_offset_increase_repeat_.held);
+            menu->drain_gameplay_chat_input();
+            CHECK(menu->chat_overlay_visible_);
+            // Bare F8 closes the visible chat instead of calibrating the song.
+            edge(menu->key_f8_, InputState::Pressed);
+            edge(menu->key_f8_, InputState::Released);
+            REQUIRE(menu->gameplay_chat_control_actions_.size() == 1);
+            CHECK(menu->gameplay_chat_control_actions_[0].kind == MenuApp::GameplayOverlayActionKind::Input);
+            CHECK(menu->gameplay_chat_control_actions_[0].keycode == menu->key_escape_);
+            menu->drain_gameplay_chat_input();
+            CHECK_FALSE(menu->chat_overlay_visible_);
+            CHECK(session->config_.visual_offset_ms == 1.0);
+        }
+        edge(menu->key_f8_, InputState::Pressed);
+        edge(menu->key_f8_, InputState::Released);
+        CHECK(session->config_.visual_offset_ms == 2.0);
+        CHECK(menu->gameplay_chat_control_actions_.empty());
+        menu->ranked_account_overlay_visible_ = true;
+        menu->gameplay_overlay_capture_active_.store(true);
+        edge(menu->key_f8_, InputState::Pressed);
+        menu->drain_gameplay_chat_input();
+        edge(menu->key_f8_, InputState::Released);
+        CHECK_FALSE(menu->ranked_account_overlay_visible_);
+        CHECK_FALSE(menu->chat_overlay_visible_);
+        CHECK(session->config_.visual_offset_ms == 2.0);
+        // The menu uses its existing unmodified F8 shortcut.
+        menu->reset_screen(MenuApp::Screen::Title);
+        input::InputEvent menu_f8{};
+        menu_f8.keycode = menu->key_f8_; menu_f8.state = InputState::Pressed;
+        menu->handle_input_event(menu_f8);
+        CHECK(menu->chat_overlay_visible_);
+    }
+    static void check_row_bodies() {
+        auto menu = std::make_unique<MenuApp>();
+        menu->key_enter_ = 13; menu->key_left_ = 37; menu->key_right_ = 39;
+        menu->config_ = config::ConfigLoader{}.defaults();
+        menu->config_.audio_ui.background_sound_enabled = false;
+        menu->config_.skin.source = "native";
+        menu->skin_settings_controller_.reset("5k");
+        for (const auto screen : {MenuApp::Screen::ModeSelect, MenuApp::Screen::ModeMods,
+             MenuApp::Screen::SettingsAudio, MenuApp::Screen::SettingsGraphics,
+             MenuApp::Screen::SettingsSkins, MenuApp::Screen::QuickSetup}) {
+            menu->reset_screen(screen);
+            menu->publish_snapshot();
+            const auto rows = menu->snapshot_.render.generic.rows;
+            for (const auto& row : rows) {
+                if (!row.adjustable && row.enabled) continue;
+                render::MenuClickEvent event;
+                event.kind = render::MenuHitTargetKind::SettingsRow;
+                event.index = row.row_index;
+                event.part = render::MenuHitPart::Activate;
+                menu->handle_menu_click(event);
+                CHECK(menu->current_screen() == screen);
+                const auto& after = menu->snapshot_.render.generic.rows;
+                auto found = std::find_if(after.begin(), after.end(), [&](const auto& r) { return r.row_index == row.row_index; });
+                REQUIRE(found != after.end());
+                CHECK(found->value == row.value);
+            }
+        }
+        menu->reset_screen(MenuApp::Screen::SettingsSkins);
+        menu->publish_snapshot();
+        render::MenuClickEvent event;
+        event.kind = render::MenuHitTargetKind::SettingsRow;
+        event.index = static_cast<int>(SkinSettingsRowId::ScratchPosition);
+        event.part = render::MenuHitPart::Increment;
+        menu->handle_menu_click(event);
+        CHECK(menu->config_.skin.scratch_position == "left");
+        CHECK(menu->snapshot_.render.generic.selected_help.find("7+1") != std::string::npos);
+    }
+};
+}
+TEST_CASE("feedback settings pointer row bodies only select and disabled rows cannot adjust") {
+    tenriff::app::MenuAppFeedbackTestAccess::check_row_bodies();
+}
+TEST_CASE("gameplay chat callback keeps F8 latency and Shift F8 chat ownership separate") {
+    tenriff::app::MenuAppFeedbackTestAccess::check_gameplay_chat_latency_routing();
 }
 #endif

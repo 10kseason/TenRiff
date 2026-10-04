@@ -809,7 +809,7 @@
           },
           "hold_body_opacity": {
             "type": "number",
-            "minimum": 0.05,
+            "minimum": 0.0,
             "maximum": 1.0
           },
           "column_widths": {
@@ -1383,7 +1383,7 @@
           },
           "hold_body_opacity": {
             "type": "number",
-            "minimum": 0.05,
+            "minimum": 0.0,
             "maximum": 1.0
           },
           "column_widths": {

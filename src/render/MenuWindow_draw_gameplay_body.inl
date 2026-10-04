@@ -235,7 +235,7 @@
         const float note_outline_opacity =
             static_cast<float>(std::clamp(data.gameplay.note_outline_opacity, 0.0, 1.0) * visual_opacity);
         const float hold_body_opacity =
-            static_cast<float>(std::clamp(data.gameplay.hold_body_opacity, 0.05, 0.60) * visual_opacity);
+            gameplay_hold_body_alpha(data.gameplay.hold_body_opacity, visual_opacity);
         const float native_hold_body_opacity =
             gameplay_native_hold_body_opacity(hold_body_opacity, visual_opacity);
         const std::string key_label_position =
@@ -979,8 +979,8 @@
 
             if (scene_body_format && d2d_->muted_brush) {
                 const std::wstring hispeed_hint_w =
-                    wloc("HI-SPEED  F3/F4  FINE +/-0.25   F5/F6  COARSE +/-10",
-                         "노트 배속  F3/F4  미세 +/-0.25   F5/F6  크게 +/-10");
+                    wloc("HI-SPEED  F3/F4  +/-0.25   SHIFT+F5/F6  HALF/DOUBLE",
+                         "노트 배속  F3/F4  +/-0.25   SHIFT+F5/F6  절반/두 배");
                 draw_readable_text_aligned(
                     hispeed_hint_w,
                     scene_body_format.Get(),
@@ -989,8 +989,8 @@
                     d2d_->muted_brush.Get(),
                     DWRITE_TEXT_ALIGNMENT_CENTER);
                 const std::wstring tuning_hint_w =
-                    wloc("JUDGE LINE  F1/F2  +/-1%   VISUAL LATENCY  F7 / SHIFT+F7  -/+1ms",
-                         "판정선 위치  F1/F2  +/-1%   비주얼 레이턴시  F7 / SHIFT+F7  -/+1ms");
+                    wloc("JUDGE LINE  F1/F2  +/-1%   VISUAL LATENCY  F7/F8  -/+1ms",
+                         "판정선 위치  F1/F2  +/-1%   비주얼 레이턴시  F7/F8  -/+1ms");
                 draw_readable_text_aligned(
                     tuning_hint_w,
                     scene_body_format.Get(),
@@ -1004,6 +1004,8 @@
         }
 
         const int lane_count = std::clamp(data.gameplay.lane_count, 1, static_cast<int>(kGameplayHudMaxLanes));
+        const uint32_t hidden_scratch_mask = gameplay_hidden_scratch_mask(data.gameplay);
+        const auto lane_hidden = [&](std::size_t lane) { return (hidden_scratch_mask & (uint32_t{1} << lane)) != 0; };
         std::array<double, kGameplayHudMaxLanes> effective_lane_width_scales{};
         effective_lane_width_scales.fill(kGameplayLaneWidthScaleDefault);
         std::size_t effective_lane_width_scale_count =
@@ -1057,9 +1059,9 @@
                 !is_skin_preview && gameplay_field_drag_state_.has_local_override
                     ? gameplay_field_drag_state_.offset_x
                     : data.gameplay.gameplay_field_offset_x,
-                data.gameplay.note_divider_gap_px);
+                data.gameplay.note_divider_gap_px, hidden_scratch_mask);
         if (!is_skin_preview) {
-            gameplay_field_drag_state_.visible = data.gameplay.active && !data.gameplay.loading;
+            gameplay_field_drag_state_.visible = data.gameplay.active && !data.gameplay.loading && !data.gameplay.paused;
             gameplay_field_drag_state_.left =
                 surface_layout.player_field.right + kGameplayFieldDragHandleGap;
             gameplay_field_drag_state_.top =
@@ -1295,6 +1297,7 @@
             const std::size_t label_count =
                 std::min(data.gameplay.key_label_count, static_cast<std::size_t>(label_field_layout.lane_count));
             for (std::size_t lane = 0; lane < label_count && lane < data.gameplay.key_labels.size(); ++lane) {
+                if (lane_hidden(lane)) continue;
                 const std::string& label = data.gameplay.key_labels[lane];
                 if (label.empty()) {
                     continue;
@@ -1447,6 +1450,7 @@
             const auto saved_opacity = brush->GetOpacity();
             brush->SetOpacity(1.0f);
             for (int lane = 0; lane < layout.lane_count; ++lane) {
+                if (lane_hidden(lane)) continue;
                 const auto index = static_cast<std::size_t>(lane);
                 const float alpha = gameplay_key_backdrop_alpha(data.gameplay.key_backdrop_enabled,
                     index < pressed_count && pressed[index] != 0, data.gameplay.key_backdrop_opacity) * visual_opacity;
@@ -1471,6 +1475,7 @@
         }
         ctx->SetAntialiasMode(D2D1_ANTIALIAS_MODE_ALIASED);
         for (int lane = 0; lane < lane_count; ++lane) {
+            if (lane_hidden(lane)) continue;
             const std::size_t lane_index = static_cast<std::size_t>(lane);
             if (player_has_gear_overlay && !tenriff_gear_overlay) {
                 continue;
@@ -1543,6 +1548,7 @@
             const bool render_head =
                 should_render_gameplay_note_head(note.start_sample, note.head_visible, display_sample);
             const int lane = std::clamp(note.lane, 1, lane_count);
+            if (lane_hidden(static_cast<std::size_t>(lane - 1))) continue;
             const std::size_t lane_index = static_cast<std::size_t>(lane - 1);
             const float lane_center = gameplay_lane_center(field_layout, lane - 1);
             const float note_width = gameplay_note_width(field_layout, lane - 1);
@@ -1855,8 +1861,13 @@
             const float combo_scale = hud_font_scale(data.gameplay.combo_font_scale) * std::max(1.0f, ng_motion("combo_scale"));
             const float combo_top = combo_center + (combo.top - combo_center) * combo_scale - std::abs(ng_motion("combo_lift"));
             const float combo_bottom = combo_center + (combo.bottom + 18.0f - combo_center) * combo_scale;
-            return compute_gameplay_battle_summary_layout(summary_field.left, summary_field.right,
+            auto summary = compute_gameplay_battle_summary_layout(summary_field.left, summary_field.right,
                 summary_field.top, summary_field.bottom, feedback_top, feedback_bottom, combo_top, combo_bottom, ghost);
+            // A fitted spectator field can be narrower than the old summary
+            // minimum. Keep its card away from the player's field/drag handle.
+            summary.left = std::max(summary.left, summary_field.left + 8.0f);
+            summary.right = std::min(summary.right, summary_field.right - 8.0f);
+            return summary;
         };
 
         const bool opponents_on_left = field_left - 52.0f >= 1776.0f - field_right;
@@ -1902,8 +1913,8 @@
             : compute_gameplay_progress_track_layout(header_left, header_safe_right,
                 field_left, player_handle_right, false, 0.0f, 0.0f, kProgressFieldClearance);
         const D2D1_RECT_F progress_track_rect = embed_battle_header
-            ? D2D1::RectF(ghost_summary.left + 120.0f, ghost_summary.top + 12.0f,
-                          ghost_summary.right - 240.0f, ghost_summary.top + 32.0f)
+            ? D2D1::RectF(ghost_summary.left + 12.0f, ghost_summary.bottom + 8.0f,
+                          ghost_summary.right - 12.0f, ghost_summary.bottom + 20.0f)
             : ng_rect("progress", D2D1::RectF(progress_track_layout.left, 16.0f, progress_track_layout.right, 36.0f));
         if (!embed_battle_header) draw_gameplay_progress_bar(progress_track_rect);
         if (data.gameplay.peer_visible) {
@@ -2029,6 +2040,7 @@
             const std::size_t count =
                 std::min(data.gameplay.lane_activity_count, static_cast<std::size_t>(lane_count));
             for (std::size_t lane = 0; lane < count; ++lane) {
+                if (lane_hidden(lane)) continue;
                 const float activity = gameplay_interpolated_activity(data.gameplay.lane_activity[lane], data.gameplay.activity_publish_time_ns, render_now_ns);
                 const bool sustained_hold =
                     lane < data.gameplay.lane_pressed_count && data.gameplay.lane_pressed[lane] != 0 &&
@@ -2109,6 +2121,7 @@
             }
             ctx->SetAntialiasMode(D2D1_ANTIALIAS_MODE_ALIASED);
             for (int lane = 0; lane < lane_count; ++lane) {
+                if (lane_hidden(lane)) continue;
                 const std::size_t lane_index = static_cast<std::size_t>(lane);
                 if (ghost_has_gear_overlay && !tenriff_gear_overlay) {
                     continue;
@@ -2182,6 +2195,7 @@
                 const bool render_head =
                     should_render_gameplay_note_head(note.start_sample, note.head_visible, display_sample);
                 const int lane = std::clamp(note.lane, 1, lane_count);
+                if (lane_hidden(static_cast<std::size_t>(lane - 1))) continue;
                 const std::size_t lane_index = static_cast<std::size_t>(lane - 1);
                 const float lane_center = gameplay_lane_center(ghost_field_layout, lane - 1);
                 const float ghost_note_width = gameplay_note_width(ghost_field_layout, lane - 1);
@@ -2376,6 +2390,7 @@
                 const std::size_t count =
                     std::min(data.gameplay.ghost_lane_activity_count, static_cast<std::size_t>(lane_count));
                 for (std::size_t lane = 0; lane < count; ++lane) {
+                    if (lane_hidden(lane)) continue;
                     const float activity = gameplay_interpolated_activity(data.gameplay.ghost_lane_activity[lane], data.gameplay.activity_publish_time_ns, render_now_ns);
                     const bool sustained_hold =
                         lane < data.gameplay.ghost_lane_pressed_count &&
@@ -2503,6 +2518,20 @@
                                scene_hud_cache.ghost_score_text, scene_hud_cache.ghost_battle_summary_text, false);
             if (embed_battle_header) draw_gameplay_progress_bar(progress_track_rect);
         }
+        if (data.gameplay.pacemaker_mode != "off" && !data.gameplay.pacemaker_mode.empty()) {
+            const bool accuracy_target = data.gameplay.pacemaker_mode == "accuracy";
+            const std::string delta = (data.gameplay.pacemaker_delta >= 0 ? "+" : "") +
+                (accuracy_target ? format_decimal(data.gameplay.pacemaker_delta) :
+                 std::to_string(static_cast<int64_t>(std::llround(data.gameplay.pacemaker_delta))));
+            const std::wstring pace = L"PACE " + to_wide(delta) + (accuracy_target ? L"%p" : L" pts");
+            const auto saved = d2d_->text_brush->GetColor();
+            d2d_->text_brush->SetColor(D2D1::ColorF(data.gameplay.pacemaker_delta < 0 ? 0xFF6B78 : 0x66E6B0));
+            draw_fitted_readable_text(pace, scene_body_format.Get(),
+                D2D1::RectF(surface_layout.player_field.left + 12, 120,
+                            surface_layout.player_field.right - 12, 165), d2d_->text_brush.Get(),
+                DWRITE_TEXT_ALIGNMENT_TRAILING);
+            d2d_->text_brush->SetColor(saved);
+        }
         // Resume keeps the frozen note field visible; only the opening countdown
         // uses the early-return card above. This also leaves LN bodies in place.
         if (data.gameplay.paused && data.gameplay.countdown_active) {
@@ -2554,6 +2583,7 @@
                                 top,
                                 pause_panel.right - 72.0f,
                                 top + 86.0f);
+                if (!is_skin_preview) register_hit(row_rect, MenuHitTargetKind::GameplayPauseAction, row);
                 const bool selected = row == selected_pause_row;
                 if (selected && d2d_->accent_brush) {
                     const float saved_accent_opacity = d2d_->accent_brush->GetOpacity();
@@ -2600,15 +2630,24 @@
                      L"F1 / F2"},
                     {L"\uC18D\uB3C4",
                      to_wide(format_decimal(data.gameplay.hispeed)),
-                     L"F3 / F4  (F5 / F6)"},
+                     L"F3 / F4"},
                     {L"\uB808\uC774\uD134\uC2DC",
                      to_wide(format_signed_ms(data.gameplay.visual_offset_ms)),
-                     L"F7 / SHIFT+F7"},
+                     L"F7 / F8"},
                 }};
                 for (std::size_t row = 0; row < tuning_rows.size(); ++row) {
                     const float top = tuning_rect.top + static_cast<float>(row) * 42.0f;
                     const D2D1_RECT_F line_rect =
-                        D2D1::RectF(tuning_rect.left, top, tuning_rect.right, top + 36.0f);
+                        D2D1::RectF(tuning_rect.left, top, tuning_rect.right - 88.0f, top + 36.0f);
+                    for (int direction = 0; direction < 2; ++direction) {
+                        const float left = tuning_rect.right - 80.0f + direction * 42.0f;
+                        const D2D1_RECT_F button = D2D1::RectF(left, top, left + 36.0f, top + 36.0f);
+                        ctx->DrawRoundedRectangle(D2D1::RoundedRect(button, 5, 5), d2d_->button_border_brush.Get(), 1);
+                        draw_readable_text_aligned(direction == 0 ? L"-" : L"+", scene_body_format.Get(),
+                            button, d2d_->text_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER);
+                        if (!is_skin_preview) register_hit(button, MenuHitTargetKind::GameplayPauseAdjust,
+                            static_cast<int>(row), direction == 0 ? MenuHitPart::Decrement : MenuHitPart::Increment);
+                    }
                     d2d_->text_brush->SetColor(D2D1::ColorF(0xAAB7C4, 0.92f));
                     draw_readable_text_aligned(std::wstring(tuning_rows[row].label),
                                               scene_body_format.Get(),
@@ -2619,7 +2658,7 @@
                     draw_readable_text_aligned(tuning_rows[row].value,
                                               scene_body_format.Get(),
                                               D2D1::RectF(line_rect.left, line_rect.top,
-                                                          line_rect.right - 210.0f, line_rect.bottom),
+                                                          line_rect.right - 110.0f, line_rect.bottom),
                                               d2d_->text_brush.Get(),
                                               DWRITE_TEXT_ALIGNMENT_TRAILING);
                     d2d_->text_brush->SetColor(D2D1::ColorF(0x7F8C9B, 0.92f));

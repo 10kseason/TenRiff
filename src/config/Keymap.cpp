@@ -216,7 +216,7 @@ KeymapLoadResult KeymapManager::load_profile(std::string_view profile_dir) const
     KeymapLoadResult result;
     result.keymap = default_keymap();
 
-    std::filesystem::path path(profile_dir);
+    auto path = std::filesystem::u8path(profile_dir);
     path /= "keymap.json";
 
     std::ifstream file(path, std::ios::binary);
@@ -302,7 +302,7 @@ KeymapLoadResult KeymapManager::load_profile(std::string_view profile_dir) const
 }
 
 bool KeymapManager::save_profile(std::string_view profile_dir, const Keymap& keymap, std::string* error) const {
-    std::filesystem::path path(profile_dir);
+    auto path = std::filesystem::u8path(profile_dir);
     std::filesystem::create_directories(path);
     path /= "keymap.json";
 

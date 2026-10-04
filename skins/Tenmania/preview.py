@@ -130,9 +130,8 @@ def stage(gameplay, theme, keys, pressed_lanes, notes, holds):
         blit(img, slots[slot][i], (lane_left(i) + 2, hit_y, lane_left(i) + lane_w - 2,
                                    FIELD_BOTTOM - 2))
 
-    # The body spans tail-bottom to head-top, and the renderer clamps its
-    # bitmap opacity to 0.60 (MenuWindow_draw_gameplay_body.inl).
-    body_opacity = min(0.60, merged["hold_body_opacity"])
+    # Match the client's linear body opacity (authored sprite alpha still applies).
+    body_opacity = max(0.0, min(1.0, merged["hold_body_opacity"]))
     for lane, head_y, tail_y in holds:
         cx = lane_center(lane)
         blit(img, slots["hold_body"][lane],

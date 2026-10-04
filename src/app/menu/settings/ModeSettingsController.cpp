@@ -81,7 +81,7 @@ ModeSettingsEffects ModeSettingsController::handle_mod_manager(
     const auto& categories = mode_mod_categories();
     ModeSettingsEffects effects;
     if (target_category.has_value()) {
-        const std::size_t clamped = std::min(*target_category, categories.size());
+        const std::size_t clamped = std::min(*target_category, categories.size() + 1);
         if (clamped != selected_mod_category_) {
             selected_mod_category_ = clamped;
             effects.menu.render_changed = true;
@@ -90,7 +90,7 @@ ModeSettingsEffects ModeSettingsController::handle_mod_manager(
     if (action.kind == MenuActionKind::Move && action.direction != 0) {
         const std::size_t next = action.direction < 0
             ? (selected_mod_category_ == 0 ? 0 : selected_mod_category_ - 1)
-            : std::min(selected_mod_category_ + 1, categories.size());
+            : std::min(selected_mod_category_ + 1, categories.size() + 1);
         if (next != selected_mod_category_) {
             selected_mod_category_ = next;
             effects.menu.render_changed = true;
@@ -101,6 +101,12 @@ ModeSettingsEffects ModeSettingsController::handle_mod_manager(
         selected_mod_category_ < categories.size()) {
         runtime.mode.mods = cycle_mode_mod_category(
             runtime.mode.mods, categories[selected_mod_category_], action.direction);
+        effects.merge(mark_changed());
+        return effects;
+    }
+    if (action.kind == MenuActionKind::Adjust && action.direction != 0 &&
+        selected_mod_category_ == categories.size() && mode_mod_auto_scratch(runtime.mode.mods)) {
+        runtime.mode.auto_scratch_hide_lanes = !runtime.mode.auto_scratch_hide_lanes;
         effects.merge(mark_changed());
         return effects;
     }

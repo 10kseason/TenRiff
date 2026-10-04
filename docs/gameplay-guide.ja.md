@@ -122,9 +122,16 @@ client 側の設定は Discord の [公式 Game Overlay guide](https://support.d
 - Session Mix のプレイ中は Esc を無視します。曲間の結果画面の終了操作と multiplayer の Esc 中止は維持します。
 - `F3`: Hi-Speed を下げる
 - `F4`: Hi-Speed を上げる
-- `F5`: Hi-Speed を大きく下げる
-- `F6`: Hi-Speed を大きく上げる
+- `Shift+F5`: Hi-Speedを半分にする
+- `Shift+F6`: Hi-Speedを2倍にする
+- `F7` / `F8`: 表示レイテンシーを減らす / 増やす
+- `Shift+F8`: ゲーム中のチャットを開く / 閉じる（メニューではF8）
 - `F9`: 現在画面のスクリーンショット保存
+
+ポーズの再開・再試行・終了と設定−/+ボタンもマウスで操作できます。調整行の文字・空白は選択のみで、値を変えません。
+
+Pacemakerは精度・スコア目標との差をリアルタイム表示。通常のゲージ失敗・クリア・スコア計算を維持し、目標未達だけではクリアを失敗にしません。他の条件を満たせば最高記録・ランキングの対象.
+
 
 Hi-Speed が変えるのは見た目のスクロール速度だけで、判定タイミングそのものは変えません。
 Rate は曲の再生速度と譜面スケジュールだけを変え、同じ Hi-Speed で見た目のスクロール速度は変えません。
@@ -164,6 +171,8 @@ Rate は曲の再生速度と譜面スケジュールだけを変え、同じ Hi
 - `BD`: Bad
 - `PR`: Poor / Miss
 
+基本PGはBMS RANK EASY/NORMAL/HARD/VERYHARDでそれぞれ **±21/18/15/8ms** です。EASYのGR/GD/BADは±65/115/210msを維持し、他のRANKでは同比率で縮小します。`Judge Easy/Hard` はRANK適用後の別MODです。全判定幅と境界を含む条件は[判定範囲（韓国語）](judgement-windows.md)を参照してください。
+
 空POOR は次の note より早い側だけに適用します。消費済み、または判定線を通過済みの note の後ろで入力しても後ろ空POORは追加しません。
 
 `No LN Release` は charge LN 終端の release judgement を無効化し、score multiplier は正確に `1.00x` です。
@@ -182,7 +191,7 @@ Gauge Shift は常に有効です。`EX / Hard / Normal / Easy` は開始段階�
 
 段位/Session Mix は曲間で引き継ぐ LR2 参照ゲージを使用し、間接ミスを維持して HP 2% 未満で失敗します。通常 LN は完走/解除時に一度だけ反映し、通常の `gauge.delta` は適用しません。[比較と互換範囲](lr2-gauge-audit.ko.md)を参照してください。
 
-旧 `shift` は EX 開始として解釈します。Practice・Pacemaker など独自の終了規則を持つモードはその規則を維持します。
+旧 `shift` は EX 開始として解釈します。Practiceは独自の終了規則を維持します。Pacemakerは通常のゲージ・クリア規則に従います。
 
 `Sudden Death (1 MISS)` は gauge type ではなく、最初の OD8 換算 object `MISS` で gauge を 0 にして即終了する rule です。native `BAD` timing だけでは発動せず、空打ちの `POOR` も対象外で、Practice No-Fail と同時には有効化できません。
 

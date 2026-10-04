@@ -1,5 +1,7 @@
 # TenRiff 文档地图
 
+**2026-10-05 · TenRiff 1.8.4:** 改善暂停鼠标操作和设置点击，新增实时Pacemaker、练习用Auto Scratch及完整设置迁移。修复Ghost Battle玩家区域尺寸、LN不透明度、HUD扫描和帧队列限制。 [1.8.4 release](release-1.8.4-gate.md).
+
 Language: [한국어](README.md) | [English](README.en.md) | [简体中文](README.zh-CN.md) | [日本語](README.ja.md)
 
 如果你已经先读过根目录的 [`README.zh-CN.md`](../README.zh-CN.md)，那么这份文档就是下一步的详细文档索引。这里同时包含设计文档与当前状态文档，所以想快速建立上下文时，最有效的阅读顺序如下。
@@ -10,6 +12,7 @@ Language: [한국어](README.md) | [English](README.en.md) | [简体中文](READ
 
 当前行为说明冲突时，先核对**同一提交的实现代码与回归测试**，再同步修正 `current-state`、`config` 及翻译。`baseline-*`、`release-*` 记录各自版本；早期设计和路线图提案不是当前实现或性能保证。
 
+- [最新判定范围、RANK表与LN规则（韩语）](judgement-windows.md)
 - [1.8.3 release](release-1.8.3-gate.md)
 - [1.8.3 audio / LN / RANK](audio-ln-rank.ko.md)
 - [Skin timing controls](timing-feedback-controls.ko.md)

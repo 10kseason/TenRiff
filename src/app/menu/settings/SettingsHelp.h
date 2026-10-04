@@ -64,7 +64,7 @@ inline std::string setting_help(Screen screen, int id, ui::Language language) {
         {"Let the game hit notes automatically. The result is marked ASSIST.", "게임이 노트를 자동으로 처리합니다. 결과에는 ASSIST가 표시됩니다.", "ノートを自動で演奏します。結果はASSIST扱いになります。"},
         {"Continue after gauge failure. Judgements and the final result are still recorded.", "게이지가 소진되어도 끝까지 연습합니다. 판정과 최종 결과는 계속 기록합니다.", "ゲージが尽きても最後まで練習します。判定と結果は記録されます。"},
         {"End on the first OD8 MISS. Empty-key POOR does not count. This disables No Fail.", "첫 OD8 MISS에서 플레이를 종료합니다. 빈 키 POOR는 세지 않으며, 켜면 실패 없는 연습 모드가 꺼집니다.", "最初のOD8 MISSで終了します。空打ちPOORは対象外で、No Failとは併用できません。"},
-        {"Clear by reaching a final accuracy or score target. The run continues through gauge failure.", "최종 정확도 또는 점수 목표를 달성하면 클리어합니다. 게이지가 소진되어도 끝까지 진행합니다.", "最終精度かスコアの目標達成でクリアします。ゲージが尽きても続行します。"},
+        {"Show the live accuracy gap or score gap against the target pace. Normal gauge failure and scoring remain active; otherwise eligible records still count.", "플레이 중 목표 정확도 또는 진행도에 맞춘 목표 점수와의 차이를 표시합니다. 일반 게이지 실패·채점은 유지하며, 다른 기록 조건을 충족하면 최고 기록과 랭킹에 반영됩니다.", "目標精度・進行度に応じた目標スコアとの差を表示します。通常ゲージと採点を維持し、他の条件を満たす記録は対象になります。"},
         {"Set the target for the selected Pacemaker mode. Enable Pacemaker first.", "선택한 페이스메이커 방식의 목표 정확도 또는 점수를 정합니다. 먼저 페이스메이커를 켜세요.", "ペースメーカーの目標精度・スコアです。先にペースメーカーを有効にします。"},
         {"Original keeps the chart's lanes. A numbered mode converts the pattern to that key count.", "원본은 차트의 키 수와 배치를 유지합니다. 숫자 키 모드는 패턴을 해당 키 수로 변환합니다.", "原本は譜面のキー数を保持します。数値を選ぶとそのキー数へ変換します。"},
         {"Choose the pattern conversion method. Compare the preview and pick the layout that feels comfortable.", "키 수를 바꿀 때 패턴을 배치하는 방식을 고릅니다. 변환 결과를 확인해 편한 방식을 선택하세요.", "キー数変換時の配置方式を選びます。変換結果を確認して選択してください。"},
@@ -79,14 +79,14 @@ inline std::string setting_help(Screen screen, int id, ui::Language language) {
     };
     static constexpr SettingsHelpText skin[] = {
         {"Choose the key layout to edit and preview. Each layout keeps its own lane settings.", "편집하고 미리 볼 키 배치를 고릅니다. 레이아웃마다 레인 설정을 따로 유지합니다.", "編集・プレビューするキー配置です。配置ごとにレーン設定を保持します。"},
-        {"Place the scratch lane on the left or right in scratch layouts.", "스크래치가 있는 배치에서 스크래치 레인을 왼쪽 또는 오른쪽에 둡니다.", "スクラッチレーンを左か右に配置します。"},
+        {"Choose 7+1 in Key Mode above to move the scratch lane left or right. Other layouts keep this option disabled.", "위의 키 모드를 7+1로 선택하면 스크래치를 왼쪽·오른쪽으로 옮길 수 있습니다. 다른 키 배치에서는 비활성화됩니다.", "上のキーモードで7+1を選ぶとスクラッチを左右に移せます。他の配置では無効です。"},
         {"Choose Native, TenRiff skin.json, or an imported LR2 skin.", "기본 Native, TenRiff skin.json, 가져온 LR2 중 사용할 스킨 방식을 고릅니다.", "Native、TenRiff skin.json、取り込んだLR2スキンを選びます。"},
         {"Choose an installed skin for the selected source and layout.", "선택한 스킨 방식과 키 배치에 사용할 설치된 스킨을 고릅니다.", "選択した方式とキー配置で使うスキンを選びます。"},
         {"Set the LR2 skin's reference resolution so its images keep the intended proportions.", "LR2 스킨의 기준 해상도를 골라 이미지 비율을 맞춥니다.", "LR2スキンの基準解像度を指定し、画像の比率を合わせます。"},
         {"Choose a skin folder or supported skin file to import.", "가져올 스킨 폴더 또는 지원하는 스킨 파일을 선택합니다.", "取り込むスキンのフォルダーや対応ファイルを選びます。"},
         {"Create a new editable skin template in the skin folder.", "스킨 폴더에 편집 가능한 새 스킨 템플릿을 만듭니다.", "編集できる新しいスキンの雛形を作成します。"},
-        {"Open the active editable skin's folder.", "현재 사용 중인 편집 가능한 스킨의 폴더를 엽니다.", "使用中の編集可能なスキンのフォルダーを開きます。"},
-        {"Reload skin files after editing them. F5 also reloads the skin.", "스킨 파일을 수정한 뒤 다시 읽어 적용합니다. F5로도 새로고침할 수 있습니다.", "編集後のスキンを再読み込みします。F5でも更新できます。"},
+        {"Open the active TenRiff skin folder. First use Create New Skin, or import a skin.json folder and select Skin Source: TenRiff plus its installed skin.", "현재 TenRiff 스킨 폴더를 엽니다. 먼저 새 스킨 만들기를 실행하거나 skin.json 폴더를 가져온 뒤, 스킨 소스를 TenRiff로 바꾸고 가져온 스킨을 선택하세요.", "TenRiffスキンのフォルダーを開きます。新規作成するかskin.jsonフォルダーを取り込み、ソースをTenRiffにして対象スキンを選んでください。"},
+        {"Reload an active imported TenRiff skin after editing (F5). Create or import a skin first, then select Skin Source: TenRiff and the installed skin.", "사용 중인 TenRiff 스킨 파일을 다시 읽습니다 (F5). 새 스킨을 만들거나 가져온 뒤 스킨 소스 TenRiff와 해당 스킨을 선택하면 사용할 수 있습니다.", "使用中のTenRiffスキンを再読み込みします（F5）。作成・取り込み後、ソースをTenRiffにして対象スキンを選択してください。"},
         {"Select the lane whose color and width you want to change.", "색상과 폭을 바꿀 레인을 선택합니다.", "色と幅を変更するレーンを選びます。"},
         {"Select the gap between lanes to adjust.", "간격을 조절할 두 레인 사이의 위치를 선택합니다.", "幅を調整するレーン間の位置を選びます。"},
         {"Set the selected lane's note color. Single Color can override this palette.", "선택한 레인의 노트 색상을 바꿉니다. 단색 모드를 켜면 해당 색이 우선할 수 있습니다.", "選択レーンのノート色です。単色モードの設定が優先される場合があります。"},
@@ -152,6 +152,8 @@ inline std::string setting_help(Screen screen, int id, ui::Language language) {
         {"Press Enter to edit the name shown in records and multiplayer.", "Enter를 눌러 기록과 멀티플레이에 표시할 닉네임을 입력합니다.", "Enterで記録やマルチプレイに表示する名前を編集します。"},
         {"Choose a local PNG or JPG image for your profile.", "프로필에 사용할 로컬 PNG 또는 JPG 이미지를 선택합니다.", "プロフィール用のローカルPNG・JPG画像を選びます。"},
         {"Remove the profile image selection. The original image file is kept.", "프로필 사진 지정을 해제합니다. 원본 이미지 파일은 삭제하지 않습니다.", "プロフィール画像の指定を解除します。元の画像ファイルは残ります。"},
+        {"Save key bindings, audio/input settings and the active skin to one .trprofile file for the next version. Accounts and library/history paths are excluded.", "키 배치·오디오·입력 설정과 현재 스킨을 .trprofile 파일 하나로 저장해 다음 버전으로 옮깁니다. 계정과 곡 목록·기록 경로는 포함하지 않습니다.", "キー配置・音声・入力設定と現在のスキンを.trprofileに保存し、次版へ移せます。アカウントやライブラリ・履歴のパスは含みません。"},
+        {"Apply a .trprofile settings file. Existing config/keymap files are backed up under settings-backups before import.", ".trprofile 설정 파일을 적용합니다. 적용 전 현재 config/keymap 파일을 settings-backups 폴더에 자동 백업합니다.", ".trprofileを適用します。適用前に現在のconfig/keymapをsettings-backupsへ自動保存します。"},
         {"Finish setup and return. Your changes have already been saved.", "설정을 마치고 돌아갑니다. 변경한 값은 이미 저장되어 있습니다.", "設定を終えて戻ります。変更は保存済みです。"},
         {"Go to the title screen. You can reopen these settings from Options.", "타이틀 화면으로 이동합니다. 옵션에서 다시 설정할 수 있습니다.", "タイトルへ移動します。オプションから再度設定できます。"},
     };
@@ -161,6 +163,8 @@ inline std::string setting_help(Screen screen, int id, ui::Language language) {
         {"Add notes at the selected percentage to practice denser patterns.", "선택한 비율만큼 노트를 추가해 더 밀집된 패턴을 연습합니다.", "選んだ割合でノートを追加し、密度の高い配置を練習します。"},
         {"Choose Full LN, LN Mix, or Full Tap. Full Tap converts long notes and uses a 0.50 score multiplier.", "전체 LN, LN Mix, 전체 단노트 중 고릅니다. 전체 단노트는 롱노트를 바꾸며 점수 배율은 0.50입니다.", "Full LN、LN Mix、Full Tapを選びます。Full TapはLNを単ノートにし、倍率は0.50です。"},
         {"No LN Release removes long-note release judgement; continue holding notes through their ends.", "No LN Release는 롱노트 끝의 떼기 판정을 없앱니다. 노트 끝까지 누르고 유지하세요.", "No LN ReleaseはLN終端の離し判定をなくします。終端まで押し続けてください。"},
+        {"Auto Scratch plays only BMS scratch lanes. Practice assistance: score multiplier 0%, no official best or ranking. Keyboard lanes remain manual.", "BMS 스크래치 레인만 자동으로 처리합니다. 연습용 보조 기능이며 배율 0%, 최고 기록·랭킹에서 제외됩니다. 일반 키 레인은 직접 입력합니다.", "BMSスクラッチのみ自動演奏します。練習補助のため倍率0%、公式ベスト・ランキング対象外です。鍵盤は手動です。"},
+        {"Hide scratch columns only while Auto Scratch is enabled; other key widths remain unchanged.", "오토스크래치를 켰을 때 스크래치 레인을 숨깁니다. 나머지 키의 폭은 유지합니다.", "Auto Scratch中のみスクラッチ列を隠します。他の鍵盤の幅は維持します。"},
         mode[17],
     };
     static constexpr SettingsHelpText hub[] = {

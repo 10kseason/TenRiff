@@ -783,3 +783,25 @@ TEST_CASE("skin preview drives real lane activity for each hit burst style") {
         CHECK(idle.lane_pressed[7] == 0);
     }
 }
+
+TEST_CASE("ghost battle reserves solo physical player width before fitting the ghost") {
+    for (const int keys : {5, 8, 16}) {
+        for (const double scale : {0.50, 0.60, 1.0, 1.4}) {
+            const auto widths = tenriff::render::compute_gameplay_battle_widths(scale);
+            CHECK(widths.player / keys == doctest::Approx(
+                tenriff::render::compute_gameplay_playfield_width(980.0f, scale) / keys));
+            CHECK(widths.ghost <= widths.player);
+            CHECK(widths.ghost >= 160);
+            CHECK(widths.player + widths.ghost + 220 <= 1920.01f);
+        }
+    }
+}
+
+TEST_CASE("LN body alpha keeps the complete configured opacity range linear") {
+    for (const double value : {1.0, 0.50, 0.45, 0.0}) {
+        CHECK(tenriff::render::gameplay_hold_body_alpha(value, 1.0) == doctest::Approx(value));
+        CHECK(tenriff::render::gameplay_hold_body_alpha(value, 0.8) == doctest::Approx(value * 0.8));
+    }
+    CHECK(tenriff::render::gameplay_hold_body_alpha(-1, 1) == 0);
+    CHECK(tenriff::render::gameplay_hold_body_alpha(2, 1) == 1);
+}

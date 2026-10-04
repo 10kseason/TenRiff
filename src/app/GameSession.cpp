@@ -76,7 +76,6 @@ constexpr int64_t kChartAudioServiceIntervalMs = 25;
 constexpr double kHispeedMin = 0.50;
 constexpr double kHispeedMax = 50.00;
 constexpr double kHispeedStep = 0.25;
-constexpr double kHispeedStepCoarse = 10.0;
 constexpr int64_t kHispeedRepeatInitialDelayMs = 180;
 constexpr int64_t kHispeedRepeatIntervalMs = 45;
 // In-play tuning steps. The judgement line moves in 1% of the playfield height and
