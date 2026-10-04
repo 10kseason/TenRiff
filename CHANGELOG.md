@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.8.4] - 2026-10-05
+
+- Fix the failed DXGI frame-queue limit and verify the effective limit at initialization; retire past HUD note heads independently of long-note tails to reduce player/ghost contention with audio and input. See `docs/ghost-latency.ko.md`.
+- Add pause mouse controls; use F7/F8 for visual latency and Shift+F5/F6 for half/double Hi-Speed. In-game chat moves to Shift+F8.
+- Show live pacemaker deficits while retaining ordinary gauge, score and eligible best/ranking records.
+- Add practice Auto Scratch with optional scratch-column hiding; assisted runs have a 0% multiplier and cannot enter official best records or rankings.
+- Preserve solo player geometry in ghost battle and apply linear LN body opacity in game and previews.
+- Restrict adjustable row clicks to explicit controls; dim unavailable skin settings and explain how to enable them.
+- Harden `.trskin` export and add `.trprofile` settings/keymap/skin transfer with validation and backups.
+- Synchronize the bundled Tengear schema with the current skin format and check it against the source schema.
+- Document current judgement windows and these changes in `docs/judgement-windows.md` and `docs/feedback-fixes.ko.md`.
+
+
 ## [1.8.3] - 2026-10-04
 
 - Accept R3 web records with an explicit BMS RANK or osu-fixed timing profile and exported BMS rank; preserve existing R1/R2 record IDs and scores through an index-only migration. The website migration precedes this client release. See the [1.8.3 release gate](docs/release-1.8.3-gate.md).

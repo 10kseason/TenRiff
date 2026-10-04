@@ -585,6 +585,7 @@ TEST_CASE("config save and load preserve volume and speed settings") {
     config.speed.hi_speed = 4.75;
     config.mode.ghost_battle_enabled = true;
     config.mode.pacemaker_mode = "accuracy";
+    config.mode.auto_scratch_hide_lanes = true;
     config.mode.pacemaker_target_accuracy = 97.5;
     config.mode.pacemaker_target_score = 9200;
     config.mode.song_index_profile = "fast";
@@ -613,6 +614,7 @@ TEST_CASE("config save and load preserve volume and speed settings") {
     CHECK(result.config.speed.hi_speed == doctest::Approx(4.75));
     CHECK(result.config.mode.ghost_battle_enabled);
     CHECK(result.config.mode.pacemaker_mode == "accuracy");
+    CHECK(result.config.mode.auto_scratch_hide_lanes);
     CHECK(result.config.mode.pacemaker_target_accuracy == doctest::Approx(97.5));
     CHECK(result.config.mode.pacemaker_target_score == 9200);
     CHECK(result.config.mode.song_index_profile == "fast");
@@ -1002,7 +1004,7 @@ TEST_CASE("config save and load preserve skin visual preset controls") {
     config.skin.black_playfield_enabled = false;
     config.skin.visual_opacity = 0.85;
     config.skin.note_outline_opacity = 0.55;
-    config.skin.hold_body_opacity = 0.20;
+    config.skin.hold_body_opacity = 0.0;
     config.skin.judgement_line_glow_enabled = true;
     config.skin.key_pulse_enabled = false;
     config.skin.key_label_position = "top";
@@ -1018,7 +1020,7 @@ TEST_CASE("config save and load preserve skin visual preset controls") {
     CHECK_FALSE(result.config.skin.black_playfield_enabled);
     CHECK(result.config.skin.visual_opacity == doctest::Approx(0.85));
     CHECK(result.config.skin.note_outline_opacity == doctest::Approx(0.55));
-    CHECK(result.config.skin.hold_body_opacity == doctest::Approx(0.20));
+    CHECK(result.config.skin.hold_body_opacity == doctest::Approx(0.0));
     CHECK(result.config.skin.judgement_line_glow_enabled);
     CHECK_FALSE(result.config.skin.key_pulse_enabled);
     CHECK(result.config.skin.key_label_position == "top");

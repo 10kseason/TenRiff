@@ -56,6 +56,8 @@
 #include "app/MultiplayerPresentation.h"
 #include "app/RankedRecordsClient.h"
 #include "app/ProfileSetupFlow.h"
+#include "app/ProfilePreset.h"
+#include "app/PortableFileDialog.h"
 #include "app/RuntimeConfigMigration.h"
 #include "app/SongPreviewPlayback.h"
 #include "app/SessionRandomSeed.h"
@@ -2166,7 +2168,23 @@ void MenuApp::handle_input_event(const input::InputEvent& event) {
     }
 }
 
-void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
+void MenuApp::handle_menu_click(const render::MenuClickEvent& incoming) {
+    auto event = incoming;
+    if (event.kind == render::MenuHitTargetKind::SettingsRow && current_screen() != Screen::Keymap) {
+        std::lock_guard<std::mutex> lock(snapshot_mutex_);
+        if (snapshot_.screen != current_screen()) return;
+        const auto& rows = snapshot_.render.generic.rows;
+        const auto row = std::find_if(rows.begin(), rows.end(), [&](const auto& item) {
+            return item.target_kind == event.kind && item.row_index == event.index;
+        });
+        if (row == rows.end()) return;
+        // Pointer bodies select/help only. Activation belongs to action rows;
+        // keyboard Enter retains its existing, separately dispatched behavior.
+        if (!row->enabled || (event.part == render::MenuHitPart::Activate &&
+                              (row->adjustable || row->slider || !row->activatable))) {
+            event.part = render::MenuHitPart::SelectOnly;
+        }
+    }
     if (current_screen() == Screen::SettingsSkins &&
         event.kind == render::MenuHitTargetKind::SkinPreviewButton) {
         toggle_skin_fullscreen_preview();
@@ -3136,7 +3154,7 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
             }
             {
                 const std::size_t target = static_cast<std::size_t>(event.index);
-                if (target > mode_mod_categories().size()) {
+                if (target > mode_mod_categories().size() + 1) {
                     return;
                 }
                 const std::size_t previous =
@@ -3461,6 +3479,38 @@ void MenuApp::handle_quick_setup_input(uint32_t keycode) {
         return;
     }
 #endif
+    if (keycode == key_enter_ && (settings_cursor_ == profile_setup::kExportSettingsRow ||
+                                  settings_cursor_ == profile_setup::kImportSettingsRow)) {
+        const bool exporting = settings_cursor_ == profile_setup::kExportSettingsRow;
+        const auto picked = choose_portable_file(exporting, true);
+        if (!picked.path.empty()) {
+            if (exporting) {
+                const auto saved = export_profile_preset(picked.path, config_, keymap_, active_external_skin_root());
+                profile_transfer_status_ = saved.success()
+                    ? ui_text("Settings saved: ", "설정 저장 완료: ") + saved.path
+                    : ui_text("Export failed: ", "내보내기 실패: ") + saved.error;
+            } else {
+                const auto loaded = import_profile_preset(picked.path, profile_dir_, config_);
+                if (loaded.success()) {
+                    config_ = loaded.config;
+                    keymap_ = loaded.keymap;
+                    working_keymap_ = keymap_;
+                    refresh_available_lr2_skins();
+                    refresh_available_tenriff_skins();
+                    ++tenriff_skin_revision_;
+                    skin_settings_controller_.reset(config_.mode.key_mode);
+                    apply_runtime_graphics_config();
+                    restart_input_thread(true);
+                    profile_transfer_status_ = ui_text("Settings applied. Previous settings: ",
+                        "설정을 적용했습니다. 이전 설정 백업: ") + loaded.backup_path;
+                } else {
+                    profile_transfer_status_ = ui_text("Import failed: ", "가져오기 실패: ") + loaded.error;
+                }
+            }
+        } else if (!picked.cancelled) profile_transfer_status_ = picked.error;
+        publish_snapshot();
+        return;
+    }
     if (keycode == key_enter_ && settings_cursor_ == profile_setup::kClearAvatarRow) {
         config_.ui.profile_avatar_path.clear();
         ++profile_avatar_revision_;

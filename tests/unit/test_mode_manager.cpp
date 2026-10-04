@@ -9,6 +9,7 @@
 #include "doctest/doctest.h"
 
 #include "app/ModeManager.h"
+#include "gameplay/ResultStats.h"
 
 namespace {
 
@@ -1029,4 +1030,11 @@ TEST_CASE("DP Flip mod is normalized and applied before other note structure mod
     REQUIRE(result.chart.notes.size() == 2u);
     CHECK(result.chart.notes[0].lane == 8);
     CHECK(result.chart.notes[1].lane == 1);
+}
+
+TEST_CASE("Auto Scratch is a zero multiplier practice mod") {
+    CHECK(tenriff::app::mode_mod_auto_scratch({"Auto Scratch"}));
+    CHECK_FALSE(tenriff::app::mode_mod_auto_scratch({"no_ln_release"}));
+    CHECK(tenriff::app::final_score_multiplier({"auto_scratch", "judge_hard"}, 2.0) == 0.0);
+    CHECK(tenriff::gameplay::scale_native_score(10000, 0.0) == 0);
 }

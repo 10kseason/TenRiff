@@ -235,8 +235,8 @@ void MenuApp::populate_mode_settings_render_data(render::MenuRenderData& render)
     render.generic.notes.push_back(ui_text("Sudden Death ends the run on the first osu!mania OD8 MISS. Native BAD timing alone and empty-key POOR judgements do not trigger it, and enabling it disables Practice No-Fail.",
                                            "서든 데스는 첫 osu!mania OD8 MISS에서 즉시 종료합니다. 네이티브 BAD만으로는 즉사하지 않고 빈 키 POOR도 세지 않으며, 켜면 연습 모드가 꺼집니다."));
     render.generic.notes.push_back(ui_text(
-        "Pacemaker plays through gauge failure and clears only when the final Accuracy or displayed final Score reaches the selected target. It is mutually exclusive with Practice and Sudden Death.",
-        "페이스메이커는 게이지 실패를 넘겨 끝까지 플레이하고, 종료 정확도 또는 화면의 최종 점수가 설정한 목표 이상일 때만 클리어합니다. 연습 모드·서든 데스와는 동시에 사용할 수 없습니다."));
+        "Pacemaker shows your live gap to the target pace. Normal gauge failure and scoring stay active; otherwise eligible records are saved and ranked.",
+        "페이스메이커는 목표 페이스와의 실시간 차이를 표시합니다. 일반 게이지 실패·채점은 유지하며 다른 조건을 충족하면 최고 기록·랭킹에 반영됩니다."));
     render.generic.notes.push_back(ui_text("Key Mode selects None/native plus 4K-10K, 12K, 14K, or 16K BMS layouts.",
                                            "키 모드는 BMS 차트의 원본 또는 4K~10K, 12K, 14K, 16K 레이아웃을 고릅니다."));
     render.generic.notes.push_back(ui_text("None keeps the chart's original key count and pattern layout instead of forcing a conversion.",
@@ -274,12 +274,18 @@ void MenuApp::populate_mode_mods_render_data(render::MenuRenderData& render) {
                         false,
                         true);
     }
+    const bool auto_scratch = mode_mod_auto_scratch(config_.mode.mods);
+    append_menu_row(render.generic, ui_text("Hide Auto Scratch Lanes", "오토스크래치 레인 숨기기"),
+                    auto_scratch ? ui_on_off(config_.mode.auto_scratch_hide_lanes) : ui_text("Auto Scratch Only", "오토스크래치 전용"),
+                    settings_cursor_ == static_cast<int>(categories.size()), render::MenuHitTargetKind::SettingsRow,
+                    static_cast<int>(categories.size()), false, auto_scratch);
+    render.generic.rows.back().enabled = auto_scratch;
     append_menu_row(render.generic,
                     ui_text("Back", "뒤로"),
                     "",
-                    settings_cursor_ == static_cast<int>(categories.size()),
+                    settings_cursor_ == static_cast<int>(categories.size() + 1),
                     render::MenuHitTargetKind::SettingsRow,
-                    static_cast<int>(categories.size()),
+                    static_cast<int>(categories.size() + 1),
                     true,
                     false);
     render.generic.notes.push_back(ui_text("Final score uses the lowest multiplier between active mods and the current Rate.",

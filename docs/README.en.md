@@ -1,5 +1,7 @@
 # TenRiff Docs Map
 
+**2026-10-05 · TenRiff 1.8.4:** Improves pause mouse controls and settings clicks; adds live pacemaker feedback, practice Auto Scratch and portable full-profile settings. Fixes player field sizing in ghost battle, LN opacity, HUD scanning and the frame-queue limit. [1.8.4 release](release-1.8.4-gate.md).
+
 Language: [한국어](README.md) | [English](README.en.md) | [简体中文](README.zh-CN.md) | [日本語](README.ja.md)
 
 If you have already read the root [`README.en.md`](../README.en.md), this document is the next-step index into the detailed documentation. It includes both design documents and the current-state document, so when you need to gather context quickly, the following order is the most efficient.
@@ -10,6 +12,7 @@ This codebase should also be read as a `vibe coding` work that grew through rapi
 
 When current-behavior descriptions conflict, check **implementation and regression tests at the same commit** first, then correct `current-state`, `config` and their translations together. `baseline-*` and `release-*` describe their named versions; early designs and roadmap proposals are not implementation or performance guarantees.
 
+- [Current timing windows, RANK tables and LN rules (Korean)](judgement-windows.md)
 - [1.8.3 release](release-1.8.3-gate.md)
 - [1.8.3 audio / LN / RANK](audio-ln-rank.ko.md)
 - [Skin timing controls](timing-feedback-controls.ko.md)

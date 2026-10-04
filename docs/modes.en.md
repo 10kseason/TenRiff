@@ -19,6 +19,7 @@ This document summarizes the implemented mode system, lane-transform/random rule
   "autoplay_enabled": false,
   "practice_no_fail_enabled": false,
   "one_miss_fail_enabled": false,
+  "auto_scratch_hide_lanes": false,
   "pacemaker_mode": "off",
   "pacemaker_target_accuracy": 90.0,
   "pacemaker_target_score": 8000,
@@ -46,7 +47,9 @@ This document summarizes the implemented mode system, lane-transform/random rule
 - `one_miss_fail_enabled`: `Sudden Death (1 MISS)`, which fails immediately on the first OD8-converted object `MISS`
   - native `BAD` timing alone and empty-key `POOR` do not trigger it
   - mutually exclusive with Practice No-Fail in Mode Settings
-- `pacemaker_mode`: `off | accuracy | score`, default `off`. Targets are `pacemaker_target_accuracy` (`0..100`, default `90`) or `pacemaker_target_score` (`0..10000`, default `8000`). Play continues to the end without early gauge failure; the target decides completion. Mutually exclusive with Practice/Sudden Death, and not applied to multiplayer or replay playback.
+- `auto_scratch`: automatically plays actual BMS scratches only. Score multiplier 0%, ASSIST record, excluded from official best records and rankings.
+- `auto_scratch_hide_lanes`: Default false. With auto_scratch in mods, hides actual BMS scratch columns while preserving other key widths and logical input IDs.
+- `pacemaker_mode`: `off | accuracy | score` (default `off`). Shows the live gap from the accuracy or score target. Normal gauge failure, clear and scoring rules remain active; missing the target alone does not fail a clear. Best records and ranking remain eligible when all other conditions are met.
 - `song_index_profile`: `safe | fast`
   - `safe`: the default that prioritizes lowering large-library RAM high-water usage
   - `fast`: minimal indexing that keeps title/artist/key count/#PLAYLEVEL/BPM and skips hashes, previews, difficulty tables, and native LV/CR
@@ -89,7 +92,7 @@ This document summarizes the implemented mode system, lane-transform/random rule
 - `ex_hard / hard / normal / easy` select the starting tier of always-active Gauge Shift. Legacy `shift` means an EX start.
 - The selected tier and every lower tier run independently from 100%; a failed tier yields to the next survivor. Gauge failure requires all eligible tiers to fail.
 - The final surviving tier is reported as `GAUGE SHIFT EX / HARD / NORMAL / EASY CLEAR`.
-- Practice and Pacemaker retain their separate completion rules. Sudden Death ends the run on the first OD8-converted object MISS.
+- Practice retains separate completion rules. Pacemaker follows normal gauge and clear rules.
 
 ## Implementation Location
 - Mode parsing: `src/gameplay/ModeSettings.*`, `src/app/ModeResolver.*`

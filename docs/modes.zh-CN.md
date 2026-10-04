@@ -19,6 +19,7 @@
   "autoplay_enabled": false,
   "practice_no_fail_enabled": false,
   "one_miss_fail_enabled": false,
+  "auto_scratch_hide_lanes": false,
   "pacemaker_mode": "off",
   "pacemaker_target_accuracy": 90.0,
   "pacemaker_target_score": 8000,
@@ -46,6 +47,9 @@
 - `one_miss_fail_enabled`：首次 OD8 换算对象 `MISS` 即失败的 `Sudden Death (1 MISS)`
   - 仅原生 `BAD` timing 不会触发，空按产生的 `POOR` 也不会触发
   - 在 Mode Settings 中与 Practice No-Fail 互斥
+- `auto_scratch`：只自动处理实际BMS转盘。分数倍率0%，标为ASSIST，不计入正式最佳记录和排名.
+- `auto_scratch_hide_lanes`: 默认false。mods含auto_scratch时隐藏实际BMS转盘列，保留其他按键宽度和逻辑输入编号.
+- `pacemaker_mode`: `off | accuracy | score` (default `off`). 实时显示与准确率或分数目标的差值。保留正常血条失败、通关与计分规则，仅目标未达成不会导致通关失败；满足其他条件时仍可登记最佳记录和排名.
 - `song_index_profile`：`safe | fast`
   - `safe`：优先降低 large-library RAM high-water 的默认值
   - `fast`：仅保留 title/artist/key count/#PLAYLEVEL/BPM，并跳过 hash、preview、难度表和原生 LV/CR 的最小索引
@@ -88,7 +92,7 @@
 - `ex_hard / hard / normal / easy` 选择始终启用的 Gauge Shift 起始档位，旧 `shift` 表示 EX 开始。
 - 从所选档位到 Easy 均从100%独立并行计算，淘汰后切换至下一存活档位；全部可用档位淘汰后才发生血条失败。
 - 最终存活档位显示为 `GAUGE SHIFT EX / HARD / NORMAL / EASY CLEAR`。
-- Practice、Pacemaker 保留各自结束规则；Sudden Death 在首次 OD8 换算对象 MISS 时立即结束。
+- Practice保留独立结束规则。Pacemaker遵循正常血条与通关规则。
 
 ## 实现位置
 - 模式解析：`src/gameplay/ModeSettings.*`、`src/app/ModeResolver.*`

@@ -266,7 +266,7 @@
         "black_playfield": { "type": "boolean" },
         "visual_opacity": { "type": "number", "minimum": 0.2, "maximum": 1.0 },
         "note_outline_opacity": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
-        "hold_body_opacity": { "type": "number", "minimum": 0.05, "maximum": 1.0 },
+        "hold_body_opacity": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
         "column_widths": { "type": "array", "maxItems": 16, "items": { "type": "number", "exclusiveMinimum": 0.0 } },
         "column_spacings": { "type": "array", "maxItems": 15, "items": { "type": "number", "minimum": 0.0 } }
       }
@@ -490,7 +490,7 @@
         "black_playfield": { "type": "boolean" },
         "visual_opacity": { "type": "number", "minimum": 0.2, "maximum": 1.0 },
         "note_outline_opacity": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
-        "hold_body_opacity": { "type": "number", "minimum": 0.05, "maximum": 1.0 },
+        "hold_body_opacity": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
         "column_widths": {
           "type": "array",
           "maxItems": 16,

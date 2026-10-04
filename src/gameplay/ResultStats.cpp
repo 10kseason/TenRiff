@@ -183,7 +183,8 @@ double ResultStats::stddev_delta_ms() const {
 }
 
 int64_t scale_native_score(int64_t raw_score, double multiplier) {
-    const double safe_multiplier = (std::isfinite(multiplier) && multiplier > 0.0) ? multiplier : 1.0;
+    // Zero is an intentional practice-assist multiplier, not invalid metadata.
+    const double safe_multiplier = (std::isfinite(multiplier) && multiplier >= 0.0) ? multiplier : 1.0;
     return std::clamp<int64_t>(
         static_cast<int64_t>(std::llround(static_cast<double>(raw_score) * safe_multiplier)),
         0,

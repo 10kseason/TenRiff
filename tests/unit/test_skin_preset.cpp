@@ -7,6 +7,7 @@
 #include <string>
 
 #include "app/SkinPreset.h"
+#include "app/ProfilePreset.h"
 #include "app/Lr2Skin.h"
 #include "app/TenRiffSkin.h"
 #include "config/Config.h"
@@ -341,3 +342,118 @@ TEST_CASE("skin preset follows Windows LR2 CP932 asset name decoding") {
     CHECK(read_preset_test_file(fs::u8path(imported.path) / fs::u8path(u8"ノート.png")) == "cp932-note");
 }
 #endif
+
+TEST_CASE("skin preset export adds the extension and writes a readable file") {
+    PresetDirectory dir;
+    const auto chosen = dir.path / fs::u8path(u8"새 스킨");
+    const auto saved = tenriff::app::export_skin_preset(chosen.u8string(), {}, {});
+    require_preset_success(saved);
+    CHECK(fs::u8path(saved.path).extension() == ".trskin");
+    REQUIRE(fs::is_regular_file(fs::u8path(saved.path)));
+    require_preset_success(tenriff::app::import_skin_preset(saved.path, (dir.path / "imported").u8string()));
+}
+
+TEST_CASE("portable profile round trip preserves keys skin settings and backs up prior files") {
+    PresetDirectory dir;
+    tenriff::config::ConfigLoader loader;
+    tenriff::config::KeymapManager manager;
+    auto config = loader.defaults();
+    config.skin.note_width_scales["8k"] = 1.3;
+    config.skin.note_fade_in = 0.35;
+    config.visual_offset_ms = 12;
+    config.audio_ui.master_volume = 0.37;
+    config.ui.language = "ko";
+    config.ui.active_song_source = "private-source-do-not-export";
+    config.ui.private_server_url = "https://private.example.test";
+    config.ui.profile_avatar_path = "private-avatar-do-not-export";
+    config.graphics.background_upscale_model_path = "private-model-do-not-export";
+    auto keys = manager.default_keymap();
+    keys.mode_bindings["7k"]["lane1"] = "A";
+    keys.secondary_mode_bindings["7k"]["lane1"] = "Z";
+    const auto destination = dir.path / fs::u8path(u8"다음 버전 설정");
+    const auto saved = tenriff::app::export_profile_preset(destination.u8string(), config, keys, {});
+    if (!saved.success()) std::cerr << saved.error << "\n";
+    REQUIRE(saved.success());
+    CHECK(fs::u8path(saved.path).extension() == ".trprofile");
+    const auto bytes = read_preset_test_file(fs::u8path(saved.path));
+    CHECK(bytes.find("private-source-do-not-export") == std::string::npos);
+    CHECK(bytes.find("private.example.test") == std::string::npos);
+    CHECK(bytes.find("private-avatar-do-not-export") == std::string::npos);
+    CHECK(bytes.find("private-model-do-not-export") == std::string::npos);
+    auto current = loader.defaults();
+    current.ui.active_song_source = "keep-current-library";
+    current.ui.private_server_url = "https://keep-current.example.test";
+    const auto profile = dir.path / fs::u8path(u8"새 버전") / "profiles" / "default";
+    REQUIRE(loader.save_profile(profile.u8string(), current));
+    REQUIRE(manager.save_profile(profile.u8string(), manager.default_keymap()));
+    const auto before = read_preset_test_file(profile / "config.json");
+    const auto imported = tenriff::app::import_profile_preset(saved.path, profile.u8string(), current);
+    if (!imported.success()) std::cerr << imported.error << "\n";
+    REQUIRE(imported.success());
+    CHECK(read_preset_test_file(fs::u8path(imported.backup_path) / "config.json") == before);
+    CHECK(imported.config.ui.active_song_source == current.ui.active_song_source);
+    CHECK(imported.config.ui.private_server_url == current.ui.private_server_url);
+    const auto reloaded = loader.load_profile(profile.u8string());
+    REQUIRE(reloaded.success());
+    CHECK(reloaded.config.skin.note_width_scales.at("8k") == doctest::Approx(1.3));
+    CHECK(reloaded.config.skin.note_fade_in == doctest::Approx(0.35));
+    CHECK(reloaded.config.visual_offset_ms == doctest::Approx(12));
+    CHECK(reloaded.config.audio_ui.master_volume == doctest::Approx(0.37));
+    CHECK(reloaded.config.ui.language == "ko");
+    const auto reloaded_keys = manager.load_profile(profile.u8string());
+    REQUIRE(reloaded_keys.success());
+    CHECK(reloaded_keys.keymap.mode_bindings.at("7k").at("lane1") == "A");
+    CHECK(reloaded_keys.keymap.secondary_mode_bindings.at("7k").at("lane1") == "Z");
+    CHECK_FALSE(tenriff::app::export_profile_preset(saved.path, config, keys, {}).success());
+    CHECK(read_preset_test_file(fs::u8path(saved.path)) == bytes);
+}
+
+TEST_CASE("portable profile rejects corruption before replacing existing settings") {
+    PresetDirectory dir;
+    tenriff::config::ConfigLoader loader;
+    tenriff::config::KeymapManager manager;
+    const auto current = loader.defaults();
+    const auto profile = dir.path / "profile";
+    REQUIRE(loader.save_profile(profile.u8string(), current));
+    REQUIRE(manager.save_profile(profile.u8string(), manager.default_keymap()));
+    const auto before = read_preset_test_file(profile / "config.json");
+    const auto saved = tenriff::app::export_profile_preset((dir.path / "valid.trprofile").u8string(),
+        current, manager.default_keymap(), {});
+    REQUIRE(saved.success());
+    auto bytes = read_preset_test_file(fs::u8path(saved.path));
+    REQUIRE(bytes.size() > 64);
+    bytes[36] ^= 1;
+    const auto bad = dir.path / "bad.trprofile";
+    write_preset_test_file(bad, bytes);
+    CHECK_FALSE(tenriff::app::import_profile_preset(bad.u8string(), profile.u8string(), current).success());
+    CHECK(read_preset_test_file(profile / "config.json") == before);
+    CHECK_FALSE(fs::exists(profile / "settings-backups"));
+    write_preset_test_file(bad, "TRPROF\r\n");
+    CHECK_FALSE(tenriff::app::import_profile_preset(bad.u8string(), profile.u8string(), current).success());
+    CHECK(read_preset_test_file(profile / "config.json") == before);
+}
+
+TEST_CASE("portable profile carries custom skin assets without overwriting an installed skin") {
+    PresetDirectory dir;
+    auto config = tenriff::config::ConfigLoader{}.defaults();
+    config.skin.source = "tenriff";
+    config.skin.tenriff_skin_name = "Custom";
+    const auto catalog = dir.path / "catalog";
+    make_manifest_preset_skin(catalog / "Custom");
+    const auto saved = tenriff::app::export_profile_preset((dir.path / "settings.trprofile").u8string(),
+        config, tenriff::config::KeymapManager{}.default_keymap(), catalog.u8string());
+    REQUIRE(saved.success());
+    fs::remove_all(catalog);
+    const auto profile = dir.path / "profile";
+    const auto first = tenriff::app::import_profile_preset(saved.path, profile.u8string(), {});
+    if (!first.success()) std::cerr << first.error << "\n";
+    REQUIRE(first.success());
+    const auto first_root = profile / "skins" / "tenriff" / fs::u8path(first.config.skin.tenriff_skin_name);
+    CHECK(read_preset_test_file(first_root / "note.png") == "portable-note-bytes");
+    const auto second = tenriff::app::import_profile_preset(saved.path, profile.u8string(), first.config);
+    REQUIRE(second.success());
+    CHECK(second.config.skin.tenriff_skin_name != first.config.skin.tenriff_skin_name);
+    CHECK(read_preset_test_file(first_root / "note.png") == "portable-note-bytes");
+    const auto second_root = profile / "skins" / "tenriff" / fs::u8path(second.config.skin.tenriff_skin_name);
+    CHECK(read_preset_test_file(second_root / "scratch.png") == "portable-scratch-bytes");
+}

@@ -1,5 +1,7 @@
 # TenRiff Docs Map
 
+**2026-10-05 · TenRiff 1.8.4:** ポーズのマウス操作と設定クリックを改善し、リアルタイムPacemaker、練習用Auto Scratch、設定の一括移行を追加。ゴースト対戦のプレイヤー幅、LN不透明度、HUD走査とフレームキュー制限を修正します。 [1.8.4 release](release-1.8.4-gate.md).
+
 Language: [한국어](README.md) | [English](README.en.md) | [简体中文](README.zh-CN.md) | 日本語
 
 ルートの [`README.ja.md`](../README.ja.md) を読んだ後に参照する、詳細文書への次段インデックスです。設計文書と current-state 文書を一緒に持っているため、素早く文脈をつかむには次の順で読むのが最も効率的です。
@@ -10,6 +12,7 @@ Language: [한국어](README.md) | [English](README.en.md) | [简体中文](READ
 
 現在の挙動が食い違う場合、まず**同一コミットの実装と回帰テスト**を確認し、`current-state`・`config` と翻訳をまとめて修正します。`baseline-*`・`release-*` は各版の記録で、初期設計やロードマップ案は現在の実装・性能保証ではありません。
 
+- [最新の判定幅・RANK表・LN規則（韓国語）](judgement-windows.md)
 - [1.8.3 release](release-1.8.3-gate.md)
 - [1.8.3 audio / LN / RANK](audio-ln-rank.ko.md)
 - [Skin timing controls](timing-feedback-controls.ko.md)

@@ -139,10 +139,11 @@
           // As in the client, draw the body behind cap centers to bridge sloped
           // outlines and transparent sprite padding (including short holds).
           const tail=Math.max(0,y-210),rail=[rect[0],tail+nh*.325,rect[2],y+nh*.5];
-          if(!style.hold_body||!art(Array.isArray(style.hold_body)?style.hold_body[lane]:style.hold_body,rail,opacity)){
+          const bodyOpacity=clamp(style.hold_body_opacity??1,0,1)*opacity;
+          if(!style.hold_body||!art(Array.isArray(style.hold_body)?style.hold_body[lane]:style.hold_body,rail,bodyOpacity)){
             const gradient=ctx.createLinearGradient(rail[0],0,rail[2],0);
             [[0,blend(color,c.hold_edge,m.hold_edge_mix)],[.17,blend(color,c.hold_shadow,.72)],[.5,blend(color,c.hold_core,m.hold_core_mix)],[.83,blend(color,c.hold_shadow,.72)],[1,blend(color,c.hold_edge,m.hold_edge_mix)]].forEach(([stop,value])=>gradient.addColorStop(stop,value));
-            box(rail,gradient,opacity);
+            box(rail,gradient,bodyOpacity);
           }
           sprite('hold_head',lane,rect);if(style.show_hold_tail!==false)sprite('hold_tail',lane,[rect[0],tail,rect[2],tail+nh*.65]);
         }else sprite('note',lane,rect);

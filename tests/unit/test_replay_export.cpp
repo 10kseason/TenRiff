@@ -436,6 +436,13 @@ TEST_CASE("deterministic replay verification ignores edited score claims") {
         custom_ruleset, chart, tenriff::app::ChartFormat::Bms, 120.0);
     CHECK(custom_result.status == tenriff::app::ReplayVerificationStatus::CustomRuleset);
     CHECK_FALSE(custom_result.official_eligible);
+
+    ReplayFile forged_scratch = replay;
+    forged_scratch.mods = {"auto_scratch"};
+    const auto scratch_result = tenriff::app::verify_replay_against_chart(
+        forged_scratch, chart, tenriff::app::ChartFormat::Bms, 120.0);
+    CHECK(scratch_result.status == tenriff::app::ReplayVerificationStatus::CustomRuleset);
+    CHECK_FALSE(scratch_result.official_eligible);
 }
 
 TEST_CASE("current and legacy replay rulesets reproduce their exact normal easy and hard timing") {

@@ -28,6 +28,7 @@
 #include "app/MenuAppSkinUtils.h"
 #include "app/MenuSongUtils.h"
 #include "app/SkinPreset.h"
+#include "app/PortableFileDialog.h"
 #include "util/Utf8Compat.h"
 
 namespace tenriff::app {
@@ -94,35 +95,6 @@ fs::path tenriff_skin_import_root_path(std::string_view profile_dir) {
 }
 
 #ifdef _WIN32
-std::optional<std::string> pick_preset_file_dialog_utf8(bool save) {
-    const HRESULT initialized = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
-    struct ComScope {
-        bool initialized;
-        ~ComScope() { if (initialized) CoUninitialize(); }
-    } scope{SUCCEEDED(initialized)};
-    Microsoft::WRL::ComPtr<IFileDialog> dialog;
-    const HRESULT created = CoCreateInstance(save ? CLSID_FileSaveDialog : CLSID_FileOpenDialog,
-                                               nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&dialog));
-    if (FAILED(created) || !dialog) return std::nullopt;
-    DWORD options = 0;
-    if (FAILED(dialog->GetOptions(&options))) return std::nullopt;
-    dialog->SetOptions(options | FOS_FORCEFILESYSTEM | FOS_PATHMUSTEXIST |
-                       (save ? FOS_OVERWRITEPROMPT : FOS_FILEMUSTEXIST));
-    const COMDLG_FILTERSPEC filters[] = {{L"TenRiff Skin Preset (*.trskin)", L"*.trskin"}};
-    dialog->SetFileTypes(1, filters);
-    dialog->SetDefaultExtension(L"trskin");
-    dialog->SetTitle(save ? L"Export Skin Preset" : L"Import Skin Preset");
-    if (save) dialog->SetFileName(L"My Skin Preset.trskin");
-    if (FAILED(dialog->Show(nullptr))) return std::nullopt;
-    Microsoft::WRL::ComPtr<IShellItem> item;
-    if (FAILED(dialog->GetResult(&item)) || !item) return std::nullopt;
-    PWSTR raw_path = nullptr;
-    if (FAILED(item->GetDisplayName(SIGDN_FILESYSPATH, &raw_path)) || !raw_path) return std::nullopt;
-    const auto result = fs::path(raw_path).u8string();
-    CoTaskMemFree(raw_path);
-    return result;
-}
-
 std::optional<std::string> pick_folder_dialog_utf8() {
     const HRESULT init_hr = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
     const bool should_uninitialize = SUCCEEDED(init_hr);
@@ -555,20 +527,26 @@ void MenuApp::apply_skin_settings_effects(
     switch (effects.boundary_action) {
         case menu::settings::SkinBoundaryAction::ExportPreset:
 #ifdef _WIN32
-            if (const auto picked = pick_preset_file_dialog_utf8(true); picked.has_value()) {
-                const auto exported = export_skin_preset(*picked, config_.skin, active_external_skin_root());
-                skin_status_messages_ = {
-                    exported.success()
-                        ? ui_text("Saved portable preset: ", "공유할 프리셋 저장 완료: ") + exported.path
-                        : ui_text("Preset export failed: ", "프리셋 내보내기 실패: ") + exported.error
-                };
+            {
+                const auto picked = choose_portable_file(true);
+                if (!picked.path.empty()) {
+                    const auto exported = export_skin_preset(picked.path, config_.skin, active_external_skin_root());
+                    skin_status_messages_ = {exported.success()
+                        ? ui_text("Saved portable preset: ", "프리셋 저장 완료: ") + exported.path
+                        : ui_text("Preset export failed: ", "프리셋 내보내기 실패: ") + exported.error};
+                } else if (!picked.cancelled) {
+                    skin_status_messages_ = {ui_text("Preset export failed: ", "프리셋 내보내기 실패: ") + picked.error};
+                }
             }
 #endif
             break;
         case menu::settings::SkinBoundaryAction::ImportPreset:
 #ifdef _WIN32
-            if (const auto picked = pick_preset_file_dialog_utf8(false); picked.has_value())
-                static_cast<void>(import_skin_path_auto(*picked));
+            {
+                const auto picked = choose_portable_file(false);
+                if (!picked.path.empty()) static_cast<void>(import_skin_path_auto(picked.path));
+                else if (!picked.cancelled) skin_status_messages_ = {picked.error};
+            }
 #endif
             break;
         case menu::settings::SkinBoundaryAction::ImportSkin:
@@ -1238,6 +1216,10 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
             "This skin's gameplay values override matching fallback rows.",
             "이 스킨의 게임플레이 값은 같은 기본 설정 행보다 우선합니다."));
     }
+    for (auto& row : render.generic.rows) {
+        row.enabled = row.activatable || row.adjustable;
+    }
+
 }
 
 }  // namespace tenriff::app

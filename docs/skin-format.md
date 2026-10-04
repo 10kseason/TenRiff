@@ -300,6 +300,11 @@ MySkin/
 `note_border`, `note_shape`, `lane_colors`, `lane_background_opacity`, `black_playfield`,
 `visual_opacity`, `note_outline_opacity`, `hold_body_opacity`.
 
+`hold_body_opacity`는 0.0–1.0 범위를 그대로 알파에 곱한다. 0%에서는 몸통만
+숨기며 머리와 꼬리는 유지한다. 100%, 50%, 45%를 별도 증폭이나 상한 제한 없이
+표시하고 네이티브, 이미지 스킨, 게임 내 미리보기와 오프라인 편집기가 같은 규칙을 쓴다.
+이미지 자체의 투명도와 `visual_opacity`는 최종 알파에 추가로 곱해진다.
+
 매니페스트에 명시한 값은 스킨 제작자의 의도대로 플레이어의 같은 시각 옵션보다 우선하며,
 누락한 값만 플레이어 설정을 사용한다. 허용 값과 범위는
 [`tenriff-skin.schema.json`](tenriff-skin.schema.json)에 정의돼 있다.

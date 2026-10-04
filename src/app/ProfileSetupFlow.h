@@ -31,8 +31,10 @@ inline constexpr int kBackendRow = 7;
 inline constexpr int kNicknameRow = 8;
 inline constexpr int kAvatarRow = 9;
 inline constexpr int kClearAvatarRow = 10;
-inline constexpr int kDoneRow = 11;
-inline constexpr int kFirstRunSkipRow = 12;
+inline constexpr int kExportSettingsRow = 11;
+inline constexpr int kImportSettingsRow = 12;
+inline constexpr int kDoneRow = 13;
+inline constexpr int kFirstRunSkipRow = 14;
 
 [[nodiscard]] inline constexpr Entry entry(bool first_run_profile) {
     return first_run_profile ? Entry::FirstRun : Entry::Options;

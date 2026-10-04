@@ -81,6 +81,7 @@ class MenuApp {
     friend struct MenuAppVisualTestAccess;
     friend struct MenuAppRepeatTestAccess;
     friend struct MenuAppSkinPreviewTestAccess;
+    friend struct MenuAppFeedbackTestAccess;
 public:
     MenuApp();
     ~MenuApp();
@@ -156,6 +157,11 @@ private:
 
         bool active = false;
         bool finished = false;
+        bool auto_scratch_enabled = false;
+        bool auto_scratch_hide_lanes = false;
+        std::string pacemaker_mode = "off";
+        double pacemaker_target = 0.0;
+        double pacemaker_delta = 0.0;
         bool game_over = false;
         bool spectating_peer = false;
         bool user_aborted = false;
@@ -616,6 +622,7 @@ private:
     config::Keymap working_keymap_{};
 
     std::string profile_dir_;
+    std::string profile_transfer_status_;
     std::string songs_path_;
     std::string cache_path_;
     int all_source_song_count_ = -1;
@@ -799,6 +806,10 @@ private:
     std::mutex gameplay_chat_control_mutex_{};
     std::vector<GameplayChatControlAction> gameplay_chat_control_actions_{};
     std::atomic_bool gameplay_overlay_capture_active_{false};
+    // Session input callback owns these edge states; reset before each session.
+    bool gameplay_chat_left_shift_held_ = false;
+    bool gameplay_chat_right_shift_held_ = false;
+    bool gameplay_chat_f8_captured_ = false;
     bool chat_overlay_visible_ = false;
     bool ranked_account_overlay_visible_ = false;
     bool ranked_account_register_mode_ = false;

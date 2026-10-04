@@ -82,26 +82,28 @@ ASIO 설정은 [장치 설정 안내](asio-audio.md)를 참고하세요. 선택 
   - `0..25` 범위로 clamp
   - 기본값은 `8ms`
 ### `judge`
-- BMS `#RANK`는 기본 판정에 적용됩니다: `3/EASY` PG21ms, `2/NORMAL` PG18ms, `1/HARD` PG15ms, `0/VERYHARD` PG8ms. EASY의 GR/GD/BAD는 65/115/210ms로 유지하며 나머지 등급은 각각 18/21, 15/21, 8/21배로 줄입니다. 헤더 누락/미지원 값은 EASY입니다. `Judge Easy/Hard` 모드는 이 파일 판정에 추가 적용됩니다. 홀드 허용창과 자동 미스 시점은 RANK로 변경하지 않습니다.
+
+[최신 판정 범위·RANK별 표·롱노트 규칙](judgement-windows.md)
+
+- BMS `#RANK`는 기본 판정에 적용됩니다: `3/EASY` PG21ms, `2/NORMAL` PG18ms, `1/HARD` PG15ms, `0/VERYHARD` PG8ms. EASY의 GR/GD/BAD는 65/115/210ms로 유지하며 나머지 등급은 각각 18/21, 15/21, 8/21배로 줄입니다. 헤더 누락/미지원 값은 EASY입니다. `Judge Easy/Hard` 모드는 이 파일 판정에 추가 적용됩니다. `hold_grace`·`hold_break` 설정과 자동 미스 시점은 RANK로 변경하지 않습니다. 꼬리 PG/GR/GD 판정은 RANK를 반영합니다.
 - `pg`, `gr`, `gd`, `bd` (double, ms)
 - 기본 `pg / gr / gd`는 각각 `21ms / 65ms / 115ms`
 - 기본 `bd`는 `210ms`
-- `Judge Easy`는 기본 판정창을 `1.35x`로 넓힘: `pg/gr/gd/bd=28.35/87.75/155.25/283.5ms`. 홀드 허용창도 같은 배율이며 `mask`는 유지
-- `Judge Hard`는 PG/GR/GD와 홀드 허용창을 유지하고 `bd` 상한을 `180ms`로 제한함. 사용자 지정 BAD가 더 작으면 넓히지 않음
+- `Judge Easy`는 기본 판정창을 `1.35x`로 넓힘: `pg/gr/gd/bd=28.35/87.75/155.25/283.5ms`. `hold_grace`·`hold_break`도 같은 배율이며 `mask`는 유지 (예시 수치는 BMS RANK EASY 기준)
+- `Judge Hard`는 PG/GR/GD와 `hold_grace`·`hold_break`를 유지하고 `bd` 상한을 `180ms`로 제한함. 사용자 지정 BAD가 더 작으면 넓히지 않음
 - `indirect_miss` (double, ms)
   - 현재 프로필에서는 `340ms`로 저장·정규화하며, BAD 판정창과 별도로 무입력 자동 미스 확정 시점을 정함
   - 기본 Normal/Easy/Hard 모두 노트 시각에서 `340ms`를 초과하면 자동 미스. Normal/Easy는 BAD, Hard는 콤보를 끊는 간접 `POOR`/OD8 `MISS`로 기록
   - BAD창 밖이지만 자동 미스 전인 늦은 입력은 BAD 적중으로 인정하지 않고 이전 노트를 미스 처리한 뒤 다음 노트를 검사함
 - 새 플레이는 `tenriff-native-score-v2-ruleset-3`를 기록합니다. 기존 `ruleset-1/2` 리플레이·고스트·검증은 PG20ms, RANK 미적용, 이전 롱노트 해제 정책을 복원합니다. ruleset-1은 Easy 1.25x/Hard BAD340ms/자동 미스=BAD도 유지합니다. 임의 커스텀 판정은 정식 판정으로 인정하지 않습니다.
-- `hold_grace` (double, ms)
-  - 롱노트 tail release를 `PG`로 보는 전용 허용창
-  - 기본값은 `80ms`
-- `hold_break` (double, ms)
-  - 롱노트 tail release를 `GR`까지 허용하는 마지막 창
-  - 이 범위를 벗어나면 `BD`
+- `hold_grace` (double, ms; 기본 `80ms`)
+  - 설정 호환용 값이며 현재 native 꼬리 PG/GR 경계로 사용하지 않음; `hold_break`의 하한으로 사용
+- `hold_break` (double, ms; 기본 `200ms`)
+  - CN 꼬리를 놓지 않을 때 꼬리 시각 이후 자동 BAD까지의 대기 시간. Judge Easy에서는 `270ms`, RANK로는 변경하지 않음
   - 내부적으로 항상 `hold_grace` 이상으로 유지됨
-  - 기본값은 `200ms`
-- `mask` (double, ms)
+- LN 해제는 현재 PG/GR/GD 창으로 즉시 판정하며 GD 밖이면 BAD. 일반 LN을 끝까지 누르면 자동 완료. `No LN Release`도 중간 해제를 무시하지 않음
+- `mask` (double, ms; 기본 `30ms`)
+  - 활성화된 레인의 추가 누름을 일시적으로 무시하는 창; RANK·Judge 모드로 변경하지 않음
 
 ### `speed`
 - `rate` (double)
@@ -203,13 +205,16 @@ Gauge Shift는 항상 적용됩니다. `mode.gauge`의 `ex_hard / hard / normal 
   - 네이티브 `BAD`만으로는 즉사하지 않으며 빈 키 입력의 `POOR`도 즉사 조건에 포함하지 않음
   - Mode Settings에서 활성화하면 `practice_no_fail_enabled`가 자동으로 꺼짐
 - `pacemaker_mode` (string)
-  - `off | accuracy | score`; 기본값은 `off`
-  - `accuracy` 또는 `score`이면 게이지로 조기 종료하지 않고 차트 끝의 선택 목표 달성 여부로 CLEAR/FAILED를 결정
+  - `off | accuracy | score` (default `off`)
+  - 정확도 또는 점수 목표와 현재 진행의 차이를 실시간 표시. 일반 게이지 실패·클리어·점수 계산을 유지하며, 목표 미달만으로 실패 처리하지 않음. 다른 자격 조건을 충족하면 최고 기록·랭킹에 반영
   - Pacemaker를 켜면 Practice와 Sudden Death는 꺼지며, 리플레이 재생과 멀티플레이에서는 적용하지 않음
 - `pacemaker_target_accuracy` (double)
-  - `0..100`, 기본값 `90.0`; Result의 표준 Accuracy가 이 값 이상이면 clear
+  - 0..100, 기본 90.0; 현재 표준 Accuracy와 목표의 차이를 %p로 표시
 - `pacemaker_target_score` (int)
-  - `0..10000`, 기본값 `8000`; 배율 적용 뒤 Result에 표시되는 최종 Score가 이 값 이상이면 clear
+  - 0..10000, 기본 8000; 판정된 노트 가중치에 비례한 목표 점수와 현재 점수의 차이를 표시
+- `auto_scratch_hide_lanes` (bool)
+  - 기본 false. mods에 auto_scratch가 있을 때 실제 BMS 스크래치 열을 숨김. 나머지 키의 폭과 입력 번호는 유지
+  - `auto_scratch`: 실제 BMS 스크래치만 자동 입력. 점수 배율 0%, ASSIST 기록이며 공식 최고 기록·랭킹 제외
 - `song_index_profile` (string)
   - `safe | fast`
   - `safe`는 대형 라이브러리에서 RAM high-water를 우선 줄이는 기본값
@@ -295,7 +300,7 @@ Gauge Shift는 항상 적용됩니다. `mode.gauge`의 `ex_hard / hard / normal 
 | `note_outline_opacity` | double: `0..1`; `0.78` | 노트 외곽선 불투명도. |
 | `note_fade_in` | double: `0..1`; `0` | 상단 검은 안개의 깊이. 노트가 내려오며 서서히 나타납니다. 0은 OFF. |
 | `note_fade_out` | double: `0..1`; `0` | 판정선 위 검은 안개의 깊이. 노트가 서서히 사라집니다. 0은 OFF. 판정선·키·HUD는 유지합니다. |
-| `hold_body_opacity` | double: `0.05..1`; `1` | LN 몸통 불투명도. |
+| `hold_body_opacity` | double: `0..1`; `1` | LN 몸통 불투명도. |
 | `lane_width_scales` | object: mode → number[]; `0.50..1.75` | 레인 수 길이의 개별 폭 배열. |
 | `note_width_scale` | double: `0.50..1.40`; `1` | Note & Field Size. 중심을 유지하며 필드·레인·노트·인접 게이지를 함께 조절. |
 | `lane_spacing_scales` | object: mode → number[]; `0..2` | 레인 사이 간격 배열. 길이는 lane_count - 1. |

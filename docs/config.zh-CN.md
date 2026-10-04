@@ -82,26 +82,28 @@
   - clamp 到 `0..25`
   - 默认值为 `8ms`
 ### `judge`
-- BMS `#RANK`：`3/EASY` PG21ms、`2/NORMAL` PG18ms、`1/HARD` PG15ms、`0/VERYHARD` PG8ms。EASY的GR/GD/BAD保持65/115/210ms，其他难度分别缩小至18/21、15/21、8/21倍。缺失或不支持的值使用EASY。Judge Easy/Hard模组随后应用；RANK不改变长按容差与自动漏键时限。
+
+[最新判定范围、RANK表与LN规则（韩语）](judgement-windows.md)
+
+- BMS `#RANK`：`3/EASY` PG21ms、`2/NORMAL` PG18ms、`1/HARD` PG15ms、`0/VERYHARD` PG8ms。EASY的GR/GD/BAD保持65/115/210ms，其他难度分别缩小至18/21、15/21、8/21倍。缺失或不支持的值使用EASY。Judge Easy/Hard模组随后应用；RANK不改变 `hold_grace`/`hold_break` 设置与自动漏键时限；尾端PG/GR/GD判定会应用RANK。
 - `pg`, `gr`, `gd`, `bd` (double, ms)
 - 默认 `pg / gr / gd` 分别为 `21ms / 65ms / 115ms`
 - 默认 `bd` 为 `210ms`
-- `Judge Easy` 将基础判定窗扩大为 `1.35x`：`pg/gr/gd/bd=28.35/87.75/155.25/283.5ms`。长按容差也使用同一倍率，`mask` 保持不变
-- `Judge Hard` 保持PG/GR/GD和长按容差，将 `bd` 上限限制为 `180ms`。更小的自定义BAD窗口不会被扩大
+- `Judge Easy` 将基础判定窗扩大为 `1.35x`：`pg/gr/gd/bd=28.35/87.75/155.25/283.5ms`。`hold_grace`/`hold_break` 也使用同一倍率，`mask` 保持不变（示例数值以BMS RANK EASY为准）
+- `Judge Hard` 保持PG/GR/GD和 `hold_grace`/`hold_break`，将 `bd` 上限限制为 `180ms`。更小的自定义BAD窗口不会被扩大
 - `indirect_miss` (double, ms)
   - 当前配置将此值保存并归一化为 `340ms`，自动漏键判定时限独立于BAD命中窗口
   - 默认Normal/Easy/Hard在未输入音符超过 `340ms` 后自动判漏键；Normal/Easy记BAD，Hard记断连的间接 `POOR` / OD8 `MISS`
   - BAD窗口外、自动判漏键前的迟到输入不会命中BAD，而是先将过期音符记为漏键，再检查下一音符
 - 新游玩记录 `tenriff-native-score-v2-ruleset-3`。旧ruleset-1/2的回放、幽灵与验证恢复PG20ms、不应用RANK并保留旧长按松键行为。ruleset-1仍使用Easy1.25x、Hard BAD340ms和自动漏键=BAD。自定义判定不作为官方规则。
-- `hold_grace` (double, ms)
-  - 将 long note tail release 判为 `PG` 的专用宽限窗口
-  - 默认值为 `80ms`
-- `hold_break` (double, ms)
-  - 允许 long note tail release 判到 `GR` 的最后窗口
-  - 超出此范围即为 `BD`
+- `hold_grace` (double, ms；默认 `80ms`)
+  - 为配置兼容性及 `hold_break` 下限保留；不是当前native尾端PG/GR的判定边界
+- `hold_break` (double, ms；默认 `200ms`)
+  - CN尾端仍未松键时，从尾端时刻到自动BAD的等待时间。Judge Easy下为 `270ms`，不受RANK影响
   - 内部始终保持不低于 `hold_grace`
-  - 默认值为 `200ms`
-- `mask` (double, ms)
+- LN松键立即按当前PG/GR/GD窗口判定，超出GD即为BAD。普通LN按住至尾端可自动完成。`No LN Release` 也不会忽略中途松键
+- `mask` (double, ms；默认 `30ms`)
+  - 暂时忽略被屏蔽轨道上的额外按下；不受RANK或Judge模组影响
 
 ### `speed`
 - `rate` (double)
@@ -203,13 +205,16 @@ chart loader/indexer 仅支持 BMS family（`.bms/.bme/.bml/.pms`）。旧 `enab
   - 仅原生 `BAD` timing 不会触发，空键输入产生的 `POOR` 也不会触发该模式
   - 在 Mode Settings 中启用后会自动关闭 `practice_no_fail_enabled`
 - `pacemaker_mode` (string)
-  - `off | accuracy | score`，默认值为 `off`
-  - Accuracy/Score 模式会运行到谱面结束，仅在达到所选 result target 时 clear
+  - `off | accuracy | score` (default `off`)
+  - 实时显示与准确率或分数目标的差值。保留正常血条失败、通关与计分规则，仅目标未达成不会导致通关失败；满足其他条件时仍可登记最佳记录和排名
   - 启用 Pacemaker 会关闭 Practice 与 Sudden Death；replay playback 和 multiplayer 会强制关闭它
 - `pacemaker_target_accuracy` (double)
-  - `0..100`，默认 `90.0`；与标准 result Accuracy 比较
+  - 0..100，默认90.0；以百分点显示当前标准Accuracy与目标的差值
 - `pacemaker_target_score` (int)
-  - `0..10000`，默认 `8000`；与倍率应用后的最终显示 Score 比较
+  - 0..10000，默认8000；按已判定音符权重计算目标进度，显示当前分数与目标进度的差值
+- `auto_scratch_hide_lanes` (bool)
+  - 默认false。mods含auto_scratch时隐藏实际BMS转盘列，保留其他按键宽度和逻辑输入编号
+  - `auto_scratch`：只自动处理实际BMS转盘。分数倍率0%，标为ASSIST，不计入正式最佳记录和排名
 - `song_index_profile` (string)
   - `safe | fast`
   - `safe` 是优先降低大型曲库 RAM high-water 的默认值
@@ -295,7 +300,7 @@ chart loader/indexer 仅支持 BMS family（`.bms/.bme/.bml/.pms`）。旧 `enab
 | `note_outline_opacity` | double: `0..1`; `0.78` | 音符轮廓不透明度。 |
 | `note_fade_in` | double: `0..1`; `0` | 顶部黑雾深度，音符逐渐出现。0为关闭。 |
 | `note_fade_out` | double: `0..1`; `0` | 判定线上方黑雾深度，音符逐渐消失。0为关闭。按键与HUD仍可见。 |
-| `hold_body_opacity` | double: `0.05..1`; `1` | 长条主体不透明度。 |
+| `hold_body_opacity` | double: `0..1`; `1` | 长条主体不透明度。 |
 | `lane_width_scales` | object: mode → number[]; `0.50..1.75` | 每轨宽度数组，长度等于轨道数。 |
 | `note_width_scale` | double: `0.50..1.40`; `1` | Note & Field Size：以中心为基准同时调整区域、轨道、音符与相邻血条。 |
 | `lane_spacing_scales` | object: mode → number[]; `0..2` | 轨道间距数组，长度为 lane_count - 1。 |

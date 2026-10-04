@@ -57,6 +57,7 @@ const std::vector<ModeModDescriptor>& registry_storage() {
         {"ln_mix_90", "LN Mix 90%", "LN 90%", "note_structure", "Note Structure", 1.00, 90},
         {"full_short_notes", "Full Short Notes", "Full Tap", "note_structure", "Note Structure", 0.50},
         {"no_ln_release", "No LN Release", "No LN Release", "hold_rule", "Hold Rule", 1.00},
+        {"auto_scratch", "Auto Scratch (Practice)", "Auto Scratch", "scratch_assist", "Scratch Assist", 0.00},
     };
     return kRegistry;
 }
@@ -747,6 +748,10 @@ bool mode_mod_adds_notes(const std::vector<std::string>& tokens) {
         const auto* descriptor = find_mode_mod_descriptor(token);
         return descriptor && descriptor->note_add_percent > 0;
     });
+}
+
+bool mode_mod_auto_scratch(const std::vector<std::string>& tokens) {
+    return has_mod_token(normalize_mode_mod_tokens(tokens), "auto_scratch");
 }
 
 std::string mode_mod_summary(const std::vector<std::string>& tokens) {

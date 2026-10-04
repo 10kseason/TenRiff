@@ -83,12 +83,6 @@ constexpr float kGameplayFieldRight = 1450.0f;
 constexpr float kGameplayFieldTop = 0.0f;
 constexpr float kGameplayFieldBottom = kBaseHeight;
 constexpr float kGameplayGaugeLeft = 1510.0f;
-constexpr float kGameplaySplitPlayerFieldLeft = 250.0f;
-constexpr float kGameplaySplitPlayerFieldRight = 810.0f;
-constexpr float kGameplaySplitGhostFieldLeft = 1110.0f;
-constexpr float kGameplaySplitGhostFieldRight = 1670.0f;
-constexpr float kGameplaySplitPlayerGaugeLeft = 188.0f;
-constexpr float kGameplaySplitGhostGaugeLeft = 1708.0f;
 constexpr float kGameplayGaugeTop = 210.0f;
 constexpr float kGameplayGaugeBottom = 910.0f;
 constexpr float kGameplayFieldDragHandleGap = 12.0f;
@@ -836,6 +830,45 @@ GameplayFieldLayout build_gameplay_field_layout(float bounds_left,
     return layout;
 }
 
+uint32_t gameplay_hidden_scratch_mask(const GameplayHudData& data) {
+    uint32_t mask = 0;
+    if (data.auto_scratch_enabled && data.auto_scratch_hide_lanes) {
+        for (std::size_t i = 0; i < std::min(data.scratch_lane_count, data.scratch_lanes.size()); ++i) {
+            const int lane = data.scratch_lanes[i] - 1;
+            if (lane >= 0 && lane < data.lane_count && lane < 16) mask |= uint32_t{1} << lane;
+        }
+    }
+    return mask;
+}
+
+void hide_gameplay_scratch_lanes(GameplayFieldLayout& field, uint32_t mask) {
+    if (!mask) return;
+    // Remove only scratch columns. Original note IDs, skin arrays and physical
+    // widths of the remaining keys stay intact for audio/judgement alignment.
+    const float center = (field.left + field.right) * 0.5f;
+    float width = 0;
+    int visible = 0;
+    for (int lane = 0; lane < field.lane_count; ++lane) {
+        if (mask & (uint32_t{1} << lane)) {
+            field.lane_widths[lane] = 0;
+            field.note_widths[lane] = 0;
+            field.divider_gaps[lane] = 0;
+            if (lane > 0) field.divider_gaps[lane - 1] = 0;
+        } else ++visible;
+    }
+    for (int lane = 0; lane < field.lane_count; ++lane)
+        width += field.lane_widths[lane] + field.divider_gaps[lane];
+    field.left = center - width * 0.5f;
+    float cursor = field.left;
+    for (int lane = 0; lane < field.lane_count; ++lane) {
+        field.lane_lefts[lane] = cursor;
+        cursor += field.lane_widths[lane] + field.divider_gaps[lane];
+    }
+    field.right = cursor;
+    field.width = width;
+    field.lane_width = width / std::max(1, visible);
+}
+
 GameplaySurfaceLayout build_gameplay_surface_layout(int lane_count,
                                                     double note_width_scale,
                                                     double note_art_width_ratio,
@@ -846,12 +879,17 @@ GameplaySurfaceLayout build_gameplay_surface_layout(int lane_count,
                                                     bool ghost_visible,
                                                     double lane_center_gap_scale = 0.0,
                                                     double requested_offset_x = 0.0,
-                                                    double note_divider_gap_px = kGameplayNoteDividerGapPxDefault) {
+                                                    double note_divider_gap_px = kGameplayNoteDividerGapPxDefault,
+                                                    uint32_t hidden_scratch_mask = 0) {
     GameplaySurfaceLayout layout;
     layout.ghost_visible = ghost_visible;
     if (ghost_visible) {
-        layout.player_field = build_gameplay_field_layout(kGameplaySplitPlayerFieldLeft,
-                                                          kGameplaySplitPlayerFieldRight,
+        const auto widths = compute_gameplay_battle_widths(note_width_scale);
+        const float player_left = 80.0f;
+        const float ghost_left = player_left + widths.player + 96.0f;
+        const float scale = gameplay_playfield_scale(note_width_scale);
+        layout.player_field = build_gameplay_field_layout(player_left + widths.player * 0.5f - 490.0f,
+                                                          player_left + widths.player * 0.5f + 490.0f,
                                                           kGameplayFieldTop,
                                                           kGameplayFieldBottom,
                                                           lane_count,
@@ -863,8 +901,8 @@ GameplaySurfaceLayout build_gameplay_surface_layout(int lane_count,
                                                           lane_spacing_scales,
                                                           lane_center_gap_scale,
                                                           note_divider_gap_px);
-        layout.ghost_field = build_gameplay_field_layout(kGameplaySplitGhostFieldLeft,
-                                                         kGameplaySplitGhostFieldRight,
+        layout.ghost_field = build_gameplay_field_layout(ghost_left + widths.ghost * 0.5f - widths.ghost / scale * 0.5f,
+                                                         ghost_left + widths.ghost * 0.5f + widths.ghost / scale * 0.5f,
                                                          kGameplayFieldTop,
                                                          kGameplayFieldBottom,
                                                          lane_count,
@@ -877,9 +915,9 @@ GameplaySurfaceLayout build_gameplay_surface_layout(int lane_count,
                                                          lane_center_gap_scale,
                                                          note_divider_gap_px);
         layout.player_gauge_left =
-            layout.player_field.left - (kGameplaySplitPlayerFieldLeft - kGameplaySplitPlayerGaugeLeft);
+            layout.player_field.left - 62.0f;
         layout.ghost_gauge_left =
-            layout.ghost_field.right + (kGameplaySplitGhostGaugeLeft - kGameplaySplitGhostFieldRight);
+            layout.ghost_field.right + 18.0f;
     } else {
         layout.player_field = build_gameplay_field_layout(kGameplayFieldLeft,
                                                           kGameplayFieldRight,
@@ -898,6 +936,10 @@ GameplaySurfaceLayout build_gameplay_surface_layout(int lane_count,
             layout.player_field.right + (kGameplayGaugeLeft - kGameplayFieldRight);
     }
 
+    hide_gameplay_scratch_lanes(layout.player_field, hidden_scratch_mask);
+    if (ghost_visible) hide_gameplay_scratch_lanes(layout.ghost_field, hidden_scratch_mask);
+    layout.player_gauge_left = ghost_visible ? layout.player_field.left - 62.0f : layout.player_field.right + 60.0f;
+    if (ghost_visible) layout.ghost_gauge_left = layout.ghost_field.right + 18.0f;
     float surface_left = std::min(layout.player_field.left, layout.player_gauge_left);
     float surface_right = std::max(
         layout.player_field.right + kGameplayFieldDragHandleGap + kGameplayFieldDragHandleWidth,
@@ -1956,12 +1998,10 @@ D2D1_COLOR_F gameplay_note_hold_color(uint32_t rgb, float opacity = 0.24f) {
 }
 
 float gameplay_native_hold_body_opacity(float base_opacity, float visual_opacity) {
-    // The legacy body alpha is intentionally subtle for bitmap skins, but applying it directly to
-    // the procedural material makes the narrow LN body disappear against jacket-heavy playfields.
-    // Boost only the native/fallback pass; imported body bitmaps keep their authored alpha.
-    constexpr float kNativeHoldBodyContrastGain = 2.10f;
+    // Body alpha already includes visual opacity. Do not amplify it: 50% must
+    // remain distinguishable from 100% for native and bitmap skins alike.
     return std::min(std::clamp(visual_opacity, 0.0f, 1.0f),
-                    std::clamp(base_opacity, 0.0f, 1.0f) * kNativeHoldBodyContrastGain);
+                    std::clamp(base_opacity, 0.0f, 1.0f));
 }
 
 D2D1_COLOR_F gameplay_lane_preview_fill(uint32_t rgb, bool selected, float opacity = 0.18f) {
@@ -2172,25 +2212,49 @@ LRESULT CALLBACK menu_window_proc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lpa
 }
 
 void configure_low_latency_presentation(IDXGIDevice* dxgi_device, IDXGISwapChain1* swap_chain) {
-    if (swap_chain) {
+    DXGI_SWAP_CHAIN_DESC1 description{};
+    const bool waitable = swap_chain && SUCCEEDED(swap_chain->GetDesc1(&description)) &&
+        (description.Flags & DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT) != 0;
+    // SetMaximumFrameLatency on SwapChain2 is only valid for waitable chains.
+    // Our ordinary/exclusive chains use the device limit. Previously the
+    // invalid-call failure returned early and silently left the default queue.
+    if (waitable) {
         Microsoft::WRL::ComPtr<IDXGISwapChain2> swap_chain2;
         if (SUCCEEDED(swap_chain->QueryInterface(IID_PPV_ARGS(&swap_chain2))) && swap_chain2) {
             const HRESULT hr = swap_chain2->SetMaximumFrameLatency(1);
-            if (FAILED(hr)) {
-                std::cerr << "[MenuWindow] IDXGISwapChain2::SetMaximumFrameLatency(1) failed hr=0x"
-                          << std::hex << static_cast<unsigned long>(hr) << std::dec << std::endl;
+            if (SUCCEEDED(hr)) {
+                UINT verified = 0;
+                if (SUCCEEDED(swap_chain2->GetMaximumFrameLatency(&verified)) && verified == 1) {
+                    std::clog << "[MenuWindow] DXGI frame latency: swapchain readback=1" << std::endl;
+                    return;
+                }
+                std::cerr << "[MenuWindow] Swapchain frame latency readback failed; trying device limit." << std::endl;
+            } else {
+                std::cerr << "[MenuWindow] Swapchain frame latency failed hr=0x"
+                          << std::hex << static_cast<unsigned long>(hr) << std::dec
+                          << "; trying device limit." << std::endl;
             }
-            return;
         }
     }
 
     if (dxgi_device) {
         Microsoft::WRL::ComPtr<IDXGIDevice1> dxgi_device1;
         if (SUCCEEDED(dxgi_device->QueryInterface(IID_PPV_ARGS(&dxgi_device1))) && dxgi_device1) {
+            UINT before = 0;
+            const bool before_known = SUCCEEDED(dxgi_device1->GetMaximumFrameLatency(&before));
             const HRESULT hr = dxgi_device1->SetMaximumFrameLatency(1);
             if (FAILED(hr)) {
                 std::cerr << "[MenuWindow] IDXGIDevice1::SetMaximumFrameLatency(1) failed hr=0x"
                           << std::hex << static_cast<unsigned long>(hr) << std::dec << std::endl;
+            } else {
+                UINT verified = 0;
+                if (SUCCEEDED(dxgi_device1->GetMaximumFrameLatency(&verified)) && verified == 1) {
+                    std::clog << "[MenuWindow] DXGI frame latency: device before="
+                              << (before_known ? std::to_string(before) : "unknown")
+                              << " readback=1 waitable=" << waitable << std::endl;
+                } else {
+                    std::cerr << "[MenuWindow] Device frame latency readback did not confirm 1." << std::endl;
+                }
             }
         }
     }
@@ -3608,6 +3672,7 @@ bool MenuWindow::ensure_gameplay_static_cache(const GameplayHudData& data, bool 
     }
 
     GameplayStaticCache desired{};
+    desired.hidden_scratch_mask = gameplay_hidden_scratch_mask(data);
     desired.native_instrument = normalize_gameplay_skin_source(data.skin_source) == "native";
     desired.native_skin = data.resolved_tenriff_skin;
     const auto& native_style = native_gameplay_style(data.resolved_tenriff_skin,desired.native_instrument);
@@ -3691,6 +3756,7 @@ bool MenuWindow::ensure_gameplay_static_cache(const GameplayHudData& data, bool 
     const bool cache_matches =
         d2d_->gameplay_static_command_list &&
         gameplay_static_cache_.lane_count == desired.lane_count &&
+        gameplay_static_cache_.hidden_scratch_mask == desired.hidden_scratch_mask &&
         gameplay_static_cache_.native_instrument == desired.native_instrument &&
         gameplay_static_cache_.native_skin == desired.native_skin &&
         gameplay_static_cache_.judgement_line_position == desired.judgement_line_position &&
@@ -3750,7 +3816,7 @@ bool MenuWindow::ensure_gameplay_static_cache(const GameplayHudData& data, bool 
             desired.ghost_visible,
             desired.lane_center_gap_scale,
             desired.gameplay_field_offset_x,
-            desired.note_divider_gap_px);
+            desired.note_divider_gap_px, desired.hidden_scratch_mask);
     auto build_gauge_grid = [&](std::size_t index, float gauge_left) {
         const auto gauge=native_gameplay_d2d_rect(native_style,"gauge",D2D1::RectF(gauge_left,kGameplayGaugeTop,gauge_left+kGameplayGaugeWidth,kGameplayGaugeBottom));
         const float gauge_top=gauge.top,gauge_bottom=gauge.bottom,gauge_width=gauge.right-gauge.left;
@@ -3798,6 +3864,7 @@ bool MenuWindow::ensure_gameplay_static_cache(const GameplayHudData& data, bool 
             const float lane_bg_opacity = static_cast<float>(
                 std::clamp(desired.lane_background_opacity * desired.visual_opacity, 0.0, 0.50));
             for (int lane = 0; lane < desired.lane_count; ++lane) {
+                if (desired.hidden_scratch_mask & (uint32_t{1} << lane)) continue;
                 const float left = gameplay_lane_left(field_layout, lane);
                 const float right = gameplay_lane_right(field_layout, lane);
                 uint32_t lane_color = 0xF6F8FF;
@@ -3830,6 +3897,7 @@ bool MenuWindow::ensure_gameplay_static_cache(const GameplayHudData& data, bool 
             const float divider_opacity = d2d_->lane_divider_brush->GetOpacity();
             if (desired.native_instrument) d2d_->lane_divider_brush->SetOpacity(divider_opacity * native_gameplay_number(native_style,"lane_divider_opacity"));
             for (std::size_t divider = 0; divider < desired.lane_divider_width_count; ++divider) {
+                if (desired.hidden_scratch_mask & (uint32_t{1} << divider)) continue;
                 if (gameplay_is_center_gap_divider(field_layout, divider)) {
                     continue;
                 }
@@ -4579,6 +4647,7 @@ void MenuWindow::render(const MenuRenderData& data) {
     last_present_completion_ns_.store(0, std::memory_order_release);
     apply_pending_config();
     update_cursor_visibility(data.kind == MenuScreenKind::GameplayHud &&
+                             !data.gameplay.paused &&
                              !data.gameplay.show_cursor_in_gameplay &&
                              !horizontal_drag_cursor());
     static int skip_log_count = 0;

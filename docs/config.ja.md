@@ -82,26 +82,28 @@ profile が存在しない場合は初回起動時に自動生成されます。
   - `0..25` に clamp
   - 既定値は `8ms`
 ### `judge`
-- BMS `#RANK`: `3/EASY` PG21ms、`2/NORMAL` PG18ms、`1/HARD` PG15ms、`0/VERYHARD` PG8ms。EASYのGR/GD/BADは65/115/210msのまま、他の難度は18/21、15/21、8/21倍に縮小します。省略・未対応値はEASY。Judge Easy/Hard MODはその後に適用し、ホールド許容幅と自動ミス期限はRANKでは変更しません。
+
+[最新の判定幅・RANK表・LN規則（韓国語）](judgement-windows.md)
+
+- BMS `#RANK`: `3/EASY` PG21ms、`2/NORMAL` PG18ms、`1/HARD` PG15ms、`0/VERYHARD` PG8ms。EASYのGR/GD/BADは65/115/210msのまま、他の難度は18/21、15/21、8/21倍に縮小します。省略・未対応値はEASY。Judge Easy/Hard MODはその後に適用し、`hold_grace`・`hold_break`設定と自動ミス期限はRANKでは変更しません。終端PG/GR/GD判定にはRANKを適用します。
 - `pg`, `gr`, `gd`, `bd` (double, ms)
 - 既定 `pg / gr / gd` は `21ms / 65ms / 115ms`
 - 既定 `bd` は `210ms`
-- `Judge Easy` は基本判定幅を `1.35x` に拡大: `pg/gr/gd/bd=28.35/87.75/155.25/283.5ms`。ホールド許容幅も同倍率、`mask` は変更しない
-- `Judge Hard` は PG/GR/GD とホールド許容幅を維持し、`bd` の上限を `180ms` に制限する。より小さいカスタムBAD幅は広げない
+- `Judge Easy` は基本判定幅を `1.35x` に拡大: `pg/gr/gd/bd=28.35/87.75/155.25/283.5ms`。`hold_grace`・`hold_break`も同倍率、`mask` は変更しない（例示の数値はBMS RANK EASYの場合）
+- `Judge Hard` は PG/GR/GD と `hold_grace`・`hold_break`を維持し、`bd` の上限を `180ms` に制限する。より小さいカスタムBAD幅は広げない
 - `indirect_miss` (double, ms)
   - 現在のプロファイルでは `340ms` に保存・正規化し、BADの入力判定幅から独立した自動ミスの期限として使用する
   - 標準のNormal/Easy/Hardは未入力ノートが `340ms` を超えると自動ミス。Normal/EasyはBAD、Hardはコンボを切る間接 `POOR` / OD8 `MISS` を記録する
   - BAD範囲外から自動ミス期限までの遅い入力はBADヒットにせず、前のノートをミスにして次のノートを調べる
 - 新しいプレイは `tenriff-native-score-v2-ruleset-3` を記録します。旧ruleset-1/2の再生・ゴースト・検証はPG20ms、RANK無効、以前のLN解放動作を復元します。ruleset-1はEasy1.25x、Hard BAD340ms、自動ミス=BADも維持します。カスタム判定は公式扱いにしません。
-- `hold_grace` (double, ms)
-  - long-note tail release を `PG` とみなす専用 window
-  - 既定値は `80ms`
-- `hold_break` (double, ms)
-  - long-note tail release を最大 `GR` まで許容する終端 window
-  - この範囲を外れると `BD`
+- `hold_grace` (double, ms; 既定 `80ms`)
+  - 設定互換性と `hold_break` の下限のために保持。現在のnative終端PG/GR境界ではない
+- `hold_break` (double, ms; 既定 `200ms`)
+  - CN終端を離さず押し続けた場合、終端時刻から自動BADまでの待機時間。Judge Easyでは `270ms`、RANKでは変更しない
   - 内部的には常に `hold_grace` 以上に維持
-  - 既定値は `200ms`
-- `mask` (double, ms)
+- LN解放は現在のPG/GR/GD幅で即時判定し、GD範囲外はBAD。通常LNは終端まで押し続けると自動完了。`No LN Release` でも途中解放は無視しない
+- `mask` (double, ms; 既定 `30ms`)
+  - マスク中のレーンの追加押下を一時的に無視する幅。RANK・Judge MODでは変更しない
 
 ### `speed`
 - `rate` (double)
@@ -203,13 +205,16 @@ chart loader/indexer は BMS family（`.bms/.bme/.bml/.pms`）専用です。旧
   - native `BAD` timing だけでは発動せず、空打ちの `POOR` も即死条件に含めない
   - Mode Settings で有効にすると `practice_no_fail_enabled` は自動的に無効になる
 - `pacemaker_mode` (string)
-  - `off | accuracy | score`、既定値は `off`
-  - Accuracy/Score mode は譜面末尾まで進み、選択した result target 以上の場合だけ clear
+  - `off | accuracy | score` (default `off`)
+  - 精度・スコア目標との差をリアルタイム表示。通常のゲージ失敗・クリア・スコア計算を維持し、目標未達だけではクリアを失敗にしません。他の条件を満たせば最高記録・ランキングの対象
   - Pacemaker を有効にすると Practice と Sudden Death は無効になり、replay playback と multiplayer では強制 off
 - `pacemaker_target_accuracy` (double)
-  - `0..100`、既定値 `90.0`。標準 result Accuracy と比較
+  - 0..100、既定90.0。現在の標準Accuracyと目標との差をパーセントポイントで表示
 - `pacemaker_target_score` (int)
-  - `0..10000`、既定値 `8000`。倍率適用後の表示 final Score と比較
+  - 0..10000、既定8000。判定済みノートの重みに比例する目標ペースと現在スコアとの差を表示
+- `auto_scratch_hide_lanes` (bool)
+  - 既定false。modsにauto_scratchがある場合、実際のBMS皿レーンを非表示にします。他のキー幅と入力番号は維持
+  - `auto_scratch`: 実際のBMS皿だけを自動入力。スコア倍率0%、ASSIST記録で正式な最高記録・ランキングから除外
 - `song_index_profile` (string)
   - `safe | fast`
   - `safe` は大規模ライブラリで RAM high-water を抑える既定値
@@ -295,7 +300,7 @@ chart loader/indexer は BMS family（`.bms/.bme/.bml/.pms`）専用です。旧
 | `note_outline_opacity` | double: `0..1`; `0.78` | ノート枠の不透明度。 |
 | `note_fade_in` | double: `0..1`; `0` | 上部の黒い霧の深さ。ノートが徐々に現れます。0はオフ。 |
 | `note_fade_out` | double: `0..1`; `0` | 判定ライン上の黒い霧の深さ。ノートが徐々に消えます。0はオフ。キーとHUDは表示されます。 |
-| `hold_body_opacity` | double: `0.05..1`; `1` | LN 本体の不透明度。 |
+| `hold_body_opacity` | double: `0..1`; `1` | LN 本体の不透明度。 |
 | `lane_width_scales` | object: mode → number[]; `0.50..1.75` | レーン数と同じ長さの個別幅配列。 |
 | `note_width_scale` | double: `0.50..1.40`; `1` | Note & Field Size。中心を保ちフィールド・レーン・ノート・隣接ゲージを調整。 |
 | `lane_spacing_scales` | object: mode → number[]; `0..2` | レーン間隔配列。長さは lane_count - 1。 |

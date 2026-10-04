@@ -19,6 +19,7 @@
   "autoplay_enabled": false,
   "practice_no_fail_enabled": false,
   "one_miss_fail_enabled": false,
+  "auto_scratch_hide_lanes": false,
   "pacemaker_mode": "off",
   "pacemaker_target_accuracy": 90.0,
   "pacemaker_target_score": 8000,
@@ -46,7 +47,9 @@
 - `one_miss_fail_enabled`: 最初の OD8 換算 object `MISS` で即失敗する `Sudden Death (1 MISS)`
   - native `BAD` timing だけでは発動せず、空打ちの `POOR` も発動条件ではない
   - Mode Settings では Practice No-Fail と排他的
-- `pacemaker_mode`: `off | accuracy | score`、既定 `off`。目標は `pacemaker_target_accuracy`（`0..100`、既定 `90`）または `pacemaker_target_score`（`0..10000`、既定 `8000`）。ゲージによる途中失敗なしで最後まで進み、目標で結果を判定。Practice・Sudden Death と排他で、マルチ・リプレイには適用しません。
+- `auto_scratch`: 実際のBMS皿だけを自動入力。スコア倍率0%、ASSIST記録で正式な最高記録・ランキングから除外.
+- `auto_scratch_hide_lanes`: 既定false。modsにauto_scratchがある場合、実際のBMS皿レーンを非表示にします。他のキー幅と入力番号は維持.
+- `pacemaker_mode`: `off | accuracy | score` (default `off`). 精度・スコア目標との差をリアルタイム表示。通常のゲージ失敗・クリア・スコア計算を維持し、目標未達だけではクリアを失敗にしません。他の条件を満たせば最高記録・ランキングの対象.
 - `song_index_profile`: `safe | fast`
   - `safe`: 大規模ライブラリでの RAM high-water 抑制を優先する既定値
   - `fast`: title/artist/key count/#PLAYLEVEL/BPM のみ保持し、hash、preview、difficulty table、native LV/CR を省略する最小 indexing
@@ -89,7 +92,7 @@
 - `ex_hard / hard / normal / easy` は常時有効な Gauge Shift の開始段階です。旧 `shift` は EX 開始。
 - 開始段階から Easy までそれぞれ100%から並列計算し、脱落時は次の生存段階へ移ります。すべての対象段階が脱落するとゲージ失敗。
 - 最終生存段階を `GAUGE SHIFT EX / HARD / NORMAL / EASY CLEAR` で表示します。
-- Practice・Pacemaker の独自終了規則は維持。Sudden Death は最初の OD8 換算 object MISS で即終了します。
+- Practiceは独自の終了規則を維持します。Pacemakerは通常のゲージ・クリア規則に従います。
 
 ## Implementation Location
 - Mode parsing: `src/gameplay/ModeSettings.*`, `src/app/ModeResolver.*`

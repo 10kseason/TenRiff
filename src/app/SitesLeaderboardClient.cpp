@@ -51,7 +51,8 @@ bool build_sites_score_json(const gameplay::ReplayFile& replay,
     if (replay.ruleset_id != kCanonicalReplayRulesetId || replay.replay_format_version != gameplay::kReplayFormatVersion ||
         replay.aborted || replay.pause_used || replay.mode.autoplay_enabled ||
         replay.mode.practice_no_fail_enabled || replay.mode.one_miss_fail_enabled ||
-        !replay.mode.course_gauge.empty() || mode_mod_adds_notes(replay.mods)) {
+        !replay.mode.course_gauge.empty() || mode_mod_adds_notes(replay.mods) ||
+        mode_mod_auto_scratch(replay.mods)) {
         error = "Sites upload skipped: this play is not eligible for the community leaderboard."; return false;
     }
     // Ruleset 3 makes BMS timing depend on #RANK. Never merge an unknown policy

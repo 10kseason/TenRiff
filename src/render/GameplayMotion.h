@@ -155,6 +155,20 @@ inline float compute_gameplay_playfield_width(float baseline_width, double note_
     return std::max(1.0f, baseline_width) * gameplay_playfield_scale(note_width_scale);
 }
 
+// Keep the player's solo geometry in battle. Only the spectator field consumes
+// the remaining horizontal budget; both retain the full vertical scroll span.
+struct GameplayBattleWidths { float player; float ghost; };
+inline GameplayBattleWidths compute_gameplay_battle_widths(double note_width_scale) {
+    const float player = compute_gameplay_playfield_width(980.0f, note_width_scale);
+    return {player, std::min(player, std::max(160.0f, 1920.0f - 220.0f - player))};
+}
+
+inline float gameplay_hold_body_alpha(double opacity, double visual_opacity) {
+    const double body = std::isfinite(opacity) ? std::clamp(opacity, 0.0, 1.0) : 1.0;
+    const double visual = std::isfinite(visual_opacity) ? std::clamp(visual_opacity, 0.0, 1.0) : 1.0;
+    return static_cast<float>(body * visual);
+}
+
 struct GameplayProgressTrackLayout {
     float left = 0.0f;
     float right = 0.0f;

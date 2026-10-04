@@ -1,4 +1,6 @@
 #include "app/SkinPreset.h"
+#include "app/ProfilePreset.h"
+#include "config/SimpleJson.h"
 
 #include <algorithm>
 #include <array>
@@ -414,7 +416,8 @@ SkinPresetResult export_skin_preset(std::string_view destination_utf8,
                                     std::string_view active_skin_root_utf8) {
     SkinPresetResult result;
     try {
-        const auto destination = fs::absolute(fs::u8path(destination_utf8));
+        auto destination = fs::absolute(fs::u8path(destination_utf8));
+        if (destination.extension().empty()) destination += ".trskin";
         reject_link_ancestors(destination);
         require(!fs::exists(destination), "The preset file already exists; choose a new filename.");
         require(fs::is_directory(destination.parent_path()), "The preset destination folder does not exist.");
@@ -542,6 +545,184 @@ SkinPresetResult import_skin_preset(std::string_view source_utf8,
     } catch (const std::exception& error) {
         result.error = error.what();
     }
+    return result;
+}
+namespace {
+constexpr std::array<char, 8> kProfileMagic{'T','R','P','R','O','F','\r','\n'};
+
+void commit_new_file(const fs::path& temporary, const fs::path& destination) {
+    reject_link_ancestors(destination);
+#ifdef _WIN32
+    require(MoveFileExW(temporary.c_str(), destination.c_str(), MOVEFILE_WRITE_THROUGH) != 0,
+            "Could not save settings; choose a new filename in a writable folder.");
+#else
+    fs::create_hard_link(temporary, destination);
+#endif
+}
+
+// Preserve only portable UI preferences. No server address/account binding,
+// library entry, avatar path or play-history path is read from an import.
+config::RuntimeConfig portable_runtime(config::RuntimeConfig value) {
+    config::UiConfig ui;
+    ui.language = value.ui.language;
+    ui.menu_font_size = value.ui.menu_font_size;
+    ui.result_tail_ms = value.ui.result_tail_ms;
+    ui.require_enter_to_exit = value.ui.require_enter_to_exit;
+    ui.show_cursor_in_gameplay = value.ui.show_cursor_in_gameplay;
+    value.ui = std::move(ui);
+    value.graphics.background_upscale_model_path.clear();
+    return value;
+}
+
+void restore_local_preferences(config::RuntimeConfig& loaded, const config::RuntimeConfig& current) {
+    const auto portable = loaded.ui;
+    loaded.ui = current.ui;
+    loaded.ui.language = portable.language;
+    loaded.ui.menu_font_size = portable.menu_font_size;
+    loaded.ui.result_tail_ms = portable.result_tail_ms;
+    loaded.ui.require_enter_to_exit = portable.require_enter_to_exit;
+    loaded.ui.show_cursor_in_gameplay = portable.show_cursor_in_gameplay;
+    loaded.graphics.background_upscale_model_path = current.graphics.background_upscale_model_path;
+}
+
+void validate_settings_file(const fs::path& file) {
+    validate_manifest_size(file);
+    std::ifstream in(file, std::ios::binary);
+    const auto text = read_string(in, static_cast<std::uint32_t>(fs::file_size(file)), kMaxSettings);
+    const auto parsed = config::parse_json(text);
+    require(parsed.success() && parsed.root->is_object(), "Invalid settings JSON.");
+}
+} // namespace
+
+ProfilePresetResult export_profile_preset(std::string_view destination_utf8,
+    const config::RuntimeConfig& runtime, const config::Keymap& keymap, std::string_view skin_root) {
+    ProfilePresetResult result;
+    try {
+        auto destination = fs::absolute(fs::u8path(destination_utf8));
+        if (destination.extension().empty()) destination += ".trprofile";
+        reject_link_ancestors(destination);
+        require(!fs::exists(destination), "Settings file already exists; choose a new filename.");
+        require(fs::is_directory(destination.parent_path()), "Settings destination folder does not exist.");
+        OwnedDirectory stage;
+        stage.parent = destination.parent_path();
+        stage.path = reserve_directory(stage.parent, ".tenriff-settings-export");
+        std::string error;
+        require(config::ConfigLoader{}.save_profile(stage.path.u8string(), portable_runtime(runtime), &error),
+                "Could not stage settings.");
+        require(config::KeymapManager{}.save_profile(stage.path.u8string(), keymap, &error),
+                "Could not stage key bindings.");
+        const auto skin = export_skin_preset((stage.path / "skin.trskin").u8string(), runtime.skin, skin_root);
+        if (!skin.success()) throw std::runtime_error(skin.error);
+        const auto temporary = stage.path / "settings.tmp";
+        std::ofstream out(temporary, std::ios::binary);
+        require(out.good(), "Could not create settings output.");
+        out.write(kProfileMagic.data(), kProfileMagic.size());
+        write_u32(out, 1);
+        // Fixed entry names avoid adding a second arbitrary-path archive parser.
+        for (const auto* name : {"config.json", "keymap.json", "skin.trskin"}) {
+            const auto file = stage.path / name;
+            const auto size = fs::file_size(file);
+            require(size > 0 && size <= (std::string_view(name) == "skin.trskin" ? kMaxPackageBytes : kMaxSettings),
+                    "Settings data exceeds its size limit.");
+            write_u64(out, size);
+            std::ifstream in(file, std::ios::binary);
+            write_u32(out, copy_bytes(in, out, size));
+        }
+        out.close();
+        require(out.good(), "Could not finish settings output.");
+        commit_new_file(temporary, destination);
+        require(fs::is_regular_file(destination) && fs::file_size(destination) > 12,
+                "Settings output could not be verified.");
+        result.path = destination.u8string();
+    } catch (const std::exception& error) { result.error = error.what(); }
+    return result;
+}
+
+ProfilePresetResult import_profile_preset(std::string_view source_utf8, std::string_view profile_utf8,
+    const config::RuntimeConfig& current) {
+    ProfilePresetResult result;
+    try {
+        const auto source = fs::absolute(fs::u8path(source_utf8));
+        const auto profile = fs::absolute(fs::u8path(profile_utf8));
+        reject_link_ancestors(source);
+        reject_link_ancestors(profile);
+        require(fs::is_regular_file(source) && fs::file_size(source) <= kMaxPackageBytes + 2 * kMaxSettings + 64,
+                "Settings file is missing or exceeds its size limit.");
+        OwnedDirectory stage;
+        stage.parent = profile;
+        stage.path = reserve_directory(stage.parent, ".tenriff-settings-import");
+        std::ifstream in(source, std::ios::binary);
+        std::array<char, 8> magic{};
+        in.read(magic.data(), magic.size());
+        require(in.good() && magic == kProfileMagic, "This is not a TenRiff .trprofile file.");
+        require(read_u32(in) == 1, "Unsupported settings file version.");
+        for (const auto* name : {"config.json", "keymap.json", "skin.trskin"}) {
+            const auto size = read_u64(in);
+            require(size > 0 && size <= (std::string_view(name) == "skin.trskin" ? kMaxPackageBytes : kMaxSettings),
+                    "Settings entry exceeds its size limit.");
+            std::ofstream out(stage.path / name, std::ios::binary);
+            require(out.good(), "Could not stage imported settings.");
+            const auto crc = copy_bytes(in, out, size);
+            require(read_u32(in) == crc, "Settings checksum mismatch.");
+            out.close();
+            require(out.good(), "Could not finish imported settings.");
+        }
+        require(in.peek() == std::char_traits<char>::eof(), "Unexpected trailing settings data.");
+        validate_settings_file(stage.path / "config.json");
+        validate_settings_file(stage.path / "keymap.json");
+        auto loaded = config::ConfigLoader{}.load_profile(stage.path.u8string());
+        auto keys = config::KeymapManager{}.load_profile(stage.path.u8string());
+        require(loaded.success() && !loaded.used_defaults, "Invalid imported configuration.");
+        require(keys.success() && !keys.used_defaults, "Invalid imported key bindings.");
+        require(keys.repaired_binding_count == 0,
+                "Imported key bindings need repair; correct them before exporting again.");
+        // Validate the embedded skin in staging before touching active settings.
+        auto skin = import_skin_preset((stage.path / "skin.trskin").u8string(), stage.path.u8string());
+        if (!skin.success()) throw std::runtime_error(skin.error);
+        restore_local_preferences(loaded.config, current);
+
+        for (const auto* name : {"config.json", "keymap.json"}) {
+            reject_link_ancestors(profile / name);
+            require(!fs::exists(profile / name) || fs::is_regular_file(profile / name),
+                    "Active settings path is not a regular file.");
+        }
+        const auto backup = reserve_directory(profile / "settings-backups", "before-import");
+        result.backup_path = backup.u8string();
+        for (const auto* name : {"config.json", "keymap.json"}) {
+            if (fs::exists(profile / name)) fs::copy_file(profile / name, backup / name);
+        }
+        skin = import_skin_preset((stage.path / "skin.trskin").u8string(), profile.u8string());
+        if (!skin.success()) throw std::runtime_error(skin.error);
+        loaded.config.skin = std::move(skin.skin);
+        std::string error;
+        require(config::ConfigLoader{}.save_profile(stage.path.u8string(), loaded.config, &error),
+                "Could not prepare imported configuration.");
+        require(config::KeymapManager{}.save_profile(stage.path.u8string(), keys.keymap, &error),
+                "Could not prepare imported key bindings.");
+        std::vector<std::string> committed;
+        try {
+            for (const auto* name : {"config.json", "keymap.json"}) {
+                const auto from = stage.path / name, to = profile / name;
+#ifdef _WIN32
+                require(MoveFileExW(from.c_str(), to.c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH) != 0,
+                        "Could not apply settings. Previous files remain in settings-backups.");
+#else
+                fs::rename(from, to);
+#endif
+                committed.emplace_back(name);
+            }
+        } catch (...) {
+            for (const auto& name : committed) {
+                std::error_code ec;
+                if (fs::exists(backup / name)) fs::copy_file(backup / name, profile / name, fs::copy_options::overwrite_existing, ec);
+                else fs::remove(profile / name, ec);
+            }
+            throw;
+        }
+        result.config = std::move(loaded.config);
+        result.keymap = std::move(keys.keymap);
+        result.path = source.u8string();
+    } catch (const std::exception& error) { result.error = error.what(); }
     return result;
 }
 }  // namespace tenriff::app

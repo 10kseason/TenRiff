@@ -1287,7 +1287,9 @@ void MenuWindow::draw(const MenuRenderData& data) {
             (swap_chain_flags_ & DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING) != 0)) {
         present_flags = DXGI_PRESENT_ALLOW_TEARING;
     }
+    if (benchmark_timings_enabled_) benchmark_present_started_ns_ = timing::HighResClock::now_ns();
     const HRESULT present_hr = d2d_->swap_chain->Present(config_.vsync ? 1 : 0, present_flags);
+    if (benchmark_timings_enabled_) benchmark_present_ended_ns_ = timing::HighResClock::now_ns();
     if (present_hr == DXGI_ERROR_DEVICE_REMOVED || present_hr == DXGI_ERROR_DEVICE_RESET) {
         std::cerr << "[MenuWindow::draw] Present failed: device removed/reset hr=0x" << std::hex
                   << static_cast<unsigned long>(present_hr) << std::dec << std::endl;

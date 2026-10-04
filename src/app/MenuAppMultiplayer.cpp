@@ -547,13 +547,37 @@ void MenuApp::populate_multiplayer_chat_overlay(render::ChatOverlayData& target)
 }
 
 bool MenuApp::queue_gameplay_chat_input(const input::InputEvent& event) {
+    static const uint32_t left_shift = config::KeycodeMap::to_keycode("LShift").value_or(0);
+    static const uint32_t right_shift = config::KeycodeMap::to_keycode("RShift").value_or(0);
+    if (left_shift != 0 && event.keycode == left_shift) {
+        gameplay_chat_left_shift_held_ = event.state == input::InputState::Pressed;
+        return false;
+    }
+    if (right_shift != 0 && event.keycode == right_shift) {
+        gameplay_chat_right_shift_held_ = event.state == input::InputState::Pressed;
+        return false;
+    }
     if (key_f8_ != 0 && event.keycode == key_f8_) {
+        // Preserve press ownership through key-up even if Shift or the overlay
+        // was released first. An ordinary F8 release must stop latency repeat.
+        if (event.state == input::InputState::Released) {
+            const bool captured = gameplay_chat_f8_captured_;
+            gameplay_chat_f8_captured_ = false;
+            return captured;
+        }
         if (event.state == input::InputState::Pressed) {
+            const bool overlay_active = gameplay_overlay_capture_active_.load(std::memory_order_acquire);
+            if (!overlay_active && !gameplay_chat_left_shift_held_ && !gameplay_chat_right_shift_held_)
+                return false;
+            gameplay_chat_f8_captured_ = true;
             gameplay_overlay_capture_active_.store(true, std::memory_order_release);
             std::lock_guard<std::mutex> lock(gameplay_chat_control_mutex_);
+            // Inside any active overlay F8 is close-only, like Esc; it must not
+            // change calibration or open another overlay over the current one.
             gameplay_chat_control_actions_.push_back(
-                GameplayChatControlAction{GameplayOverlayActionKind::ChatVisibility,
-                                          event.keycode, false});
+                GameplayChatControlAction{overlay_active ? GameplayOverlayActionKind::Input
+                                                         : GameplayOverlayActionKind::ChatVisibility,
+                                          overlay_active ? key_escape_ : event.keycode, false});
         }
         return true;
     }

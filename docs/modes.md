@@ -19,6 +19,7 @@
   "autoplay_enabled": false,
   "practice_no_fail_enabled": false,
   "one_miss_fail_enabled": false,
+  "auto_scratch_hide_lanes": false,
   "pacemaker_mode": "off",
   "pacemaker_target_accuracy": 90.0,
   "pacemaker_target_score": 8000,
@@ -45,7 +46,9 @@
 - `one_miss_fail_enabled`: 첫 OD8 환산 객체 `MISS`에서 즉시 실패하는 `Sudden Death (1 MISS)`
   - 네이티브 `BAD`만으로는 즉사하지 않으며 빈 키 입력의 `POOR`도 즉사 조건이 아님
   - Mode Settings에서 Practice No-Fail과 상호 배타적
-- `pacemaker_mode`: `off | accuracy | score`, 기본 `off`. 목표는 `pacemaker_target_accuracy` (`0..100`, 기본 `90`) 또는 `pacemaker_target_score` (`0..10000`, 기본 `8000`). 게이지 조기 실패 없이 끝까지 진행해 목표를 판정하며 Practice·Sudden Death와 동시에 쓰지 않고 멀티·리플레이에는 적용하지 않습니다.
+- `auto_scratch`: 실제 BMS 스크래치만 자동 입력. 점수 배율 0%, ASSIST 기록이며 공식 최고 기록·랭킹 제외.
+- `auto_scratch_hide_lanes`: 기본 false. mods에 auto_scratch가 있을 때 실제 BMS 스크래치 열을 숨김. 나머지 키의 폭과 입력 번호는 유지.
+- `pacemaker_mode`: `off | accuracy | score` (default `off`). 정확도 또는 점수 목표와 현재 진행의 차이를 실시간 표시. 일반 게이지 실패·클리어·점수 계산을 유지하며, 목표 미달만으로 실패 처리하지 않음. 다른 자격 조건을 충족하면 최고 기록·랭킹에 반영.
 - `song_index_profile`: `safe | fast`
   - `safe`: large-library RAM high-water를 우선 낮추는 기본값
   - `fast`: 제목/아티스트/키 수/#PLAYLEVEL/BPM만 유지하고 해시·미리보기·난이도표·자체 LV/CR을 생략하는 최소 인덱싱
@@ -88,7 +91,7 @@
 - `ex_hard / hard / normal / easy`는 항상 적용되는 Gauge Shift의 시작 등급입니다. 기존 `shift`는 EX 시작입니다.
 - 선택한 시작 등급부터 Easy까지 각각 100%에서 병렬 계산하며, 현재 등급 탈락 시 다음 생존 등급으로 이동합니다. 모든 대상 등급이 탈락해야 게이지 실패입니다.
 - 최종 생존 등급을 `GAUGE SHIFT EX / HARD / NORMAL / EASY CLEAR`로 표시합니다.
-- Practice·Pacemaker의 별도 종료 규칙은 유지합니다. Sudden Death는 첫 OD8 환산 객체 MISS에서 즉시 종료합니다.
+- Practice는 별도 종료 규칙을 유지합니다. Pacemaker는 일반 게이지·클리어 규칙을 따릅니다.
 
 ## 구현 위치
 - 모드 파싱: `src/gameplay/ModeSettings.*`, `src/app/ModeResolver.*`

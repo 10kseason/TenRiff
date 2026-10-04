@@ -89,3 +89,13 @@ TEST_CASE("pacemaker clears only when the selected end target is met") {
               true, false, false, true, "score", true) ==
           "AUTOPLAY");
 }
+
+TEST_CASE("live pacemaker delta uses judged score weight and remains neutral before notes") {
+    tenriff::gameplay::ResultStats stats;
+    stats.record_note_total(10);
+    CHECK(tenriff::app::pacemaker_live_delta("accuracy", stats, 1.0, 90.0, 8000) == 0.0);
+    stats.record_judgement(tenriff::game::Judgement::PG, 0.0, tenriff::gameplay::ComboImpact::Increment, 0.5);
+    CHECK(tenriff::app::pacemaker_live_delta("score", stats, 1.0, 90.0, 8000) == doctest::Approx(100.0));
+    CHECK(tenriff::app::pacemaker_live_delta("accuracy", stats, 1.0, 90.0, 8000) == doctest::Approx(10.0));
+    CHECK(tenriff::app::pacemaker_live_delta("score", stats, 0.5, 90.0, 8000) == doctest::Approx(-150.0));
+}

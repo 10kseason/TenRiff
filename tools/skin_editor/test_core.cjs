@@ -13,7 +13,11 @@ const actualSchema = JSON.parse(fs.readFileSync(path.join(root, 'docs/tenriff-sk
 const basic = () => ({format:'tenriff-skin', version:1, name:'테스트 / テスト'});
 const errors = value => C.validate(value, actualSchema).filter(issue => issue.severity === 'error');
 
-test('offline schema equals the source of truth', () => assert.deepEqual(catalog.schema, actualSchema));
+test('offline and bundled schemas equal the source of truth', () => {
+  assert.deepEqual(catalog.schema, actualSchema);
+  const bundledSchema = JSON.parse(fs.readFileSync(path.join(root, 'skins/Tengear/tenriff-skin.schema.json'), 'utf8').replace(/^\uFEFF/, ''));
+  assert.deepEqual(bundledSchema, actualSchema);
+});
 test('every client note shape survives common and per-mode editor round trips',()=>{
   for(const shape of ['rect','circle','triangle','pentagon','hexagon','square','diamond','arrow','hex']){
     const doc={...basic(),gameplay:{note_shape:shape,modes:{'4k':{note_shape:shape}}}};
@@ -277,5 +281,26 @@ test('FAST/SLOW text and bar can each be disabled independently',()=>{
     assert.equal(bars.length>0,bar);
     assert.equal(labels.some(value=>/^(FAST|SLOW) /.test(value)),text);
     assert.deepEqual(errors({...basic(),gameplay:{show_timing_feedback:text,show_timing_bar:bar}}),[]);
+  }
+});
+
+test('native and bitmap LN bodies use linear configured alpha',()=>{
+  const G=require('./gameplay.js');
+  for(const opacity of [1,.5,.45,0]) {
+    assert.deepEqual(errors({...basic(),gameplay:{hold_body_opacity:opacity}}),[]);
+    const nativeAlphas=[],bitmapAlphas=[];
+    const gradient={addColorStop(){}};
+    const ctx=new Proxy({globalAlpha:1,createLinearGradient(){return gradient;},fillRect(){if(this.fillStyle===gradient)nativeAlphas.push(this.globalAlpha);}},
+      {get(target,key){return key in target?target[key]:()=>{};}});
+    const style=C.clone(catalog.native.gameplay);style.visual_opacity=1;style.hold_body_opacity=opacity;
+    G.paint(ctx,style,catalog.gameplayNative,'4k',0,false,()=>false);
+    assert.ok(nativeAlphas.length>0);
+    nativeAlphas.forEach(value=>assert.equal(value,opacity));
+    style.hold_body='test-body.png';
+    G.paint(ctx,style,catalog.gameplayNative,'4k',0,false,(file,rect,alpha)=>{
+      if(file==='test-body.png')bitmapAlphas.push(alpha);return true;
+    });
+    assert.ok(bitmapAlphas.length>0);
+    bitmapAlphas.forEach(value=>assert.equal(value,opacity));
   }
 });
