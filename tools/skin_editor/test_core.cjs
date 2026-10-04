@@ -14,6 +14,27 @@ const basic = () => ({format:'tenriff-skin', version:1, name:'테스트 / テス
 const errors = value => C.validate(value, actualSchema).filter(issue => issue.severity === 'error');
 
 test('offline schema equals the source of truth', () => assert.deepEqual(catalog.schema, actualSchema));
+test('every client note shape survives common and per-mode editor round trips',()=>{
+  for(const shape of ['rect','circle','triangle','pentagon','hexagon','square','diamond','arrow','hex']){
+    const doc={...basic(),gameplay:{note_shape:shape,modes:{'4k':{note_shape:shape}}}};
+    const reloaded=C.parse(C.serialize(doc));
+    assert.deepEqual(errors(reloaded),[]);assert.equal(C.gameplay(reloaded,'4k').note_shape,shape);
+  }
+});
+test('polygon previews retain lane width and black head and tail outlines with opt-out',()=>{
+  const G=require('./gameplay.js');
+  for(const shape of ['triangle','pentagon','hexagon','diamond','arrow','hex']){
+    const points=G.noteShapeVertices(shape),xs=points.map(p=>p[0]);
+    assert.ok(Math.abs(Math.min(...xs)+.5)<1e-9);assert.ok(Math.abs(Math.max(...xs)-.5)<1e-9);
+    for(const height of [8,32,128])for(const enabled of [false,true]){
+      const strokes=[],ctx=new Proxy({stroke(){strokes.push([this.strokeStyle,this.lineWidth,this.globalAlpha]);}},
+        {get(target,key){return key in target?target[key]:()=>{};}});
+      G.drawNoteShape(ctx,[0,100,72,100+height],'#FFFFFF',{note_shape:shape,note_border:enabled,note_outline_opacity:.6},.8);
+      assert.deepEqual(strokes,enabled?[['#000000',1.5,.48]]:[]);
+    }
+  }
+  assert.deepEqual(G.noteShapeVertices('hex'),G.noteShapeVertices('hexagon'));
+});
 test('note height accepts 50–400 percent for common and per-mode fields without changing ratios', () => {
   for (const ratio of [.5, 1, 4]) {
     const document = {...basic(), gameplay: {note_height_ratio: ratio, modes: {}}};
@@ -241,5 +262,20 @@ test('native preview only paints timing history while FAST/SLOW feedback is visi
     G.paint(ctx,style,catalog.gameplayNative,'4k',now,animate,()=>false);
     assert.equal(bars.length>0,visible,JSON.stringify({now,animate,enabled}));
     assert.equal(labels.some(value=>/^(FAST|SLOW) /.test(value)),visible);
+  }
+});
+
+test('FAST/SLOW text and bar can each be disabled independently',()=>{
+  const G=require('./gameplay.js');
+  for(const text of [false,true])for(const bar of [false,true]){
+    const bars=[],labels=[];
+    const ctx=new Proxy({createLinearGradient(){return {addColorStop(){}};},fillRect(){if(this.fillStyle==='#123456')bars.push(true);},fillText(value){labels.push(value);}},
+      {get(target,key){return key in target?target[key]:()=>{};}});
+    const style=C.clone(catalog.native.gameplay);
+    style.show_timing_feedback=text;style.show_timing_bar=bar;style.native.colors.timing='#123456';
+    G.paint(ctx,style,catalog.gameplayNative,'4k',3100,true,()=>false);
+    assert.equal(bars.length>0,bar);
+    assert.equal(labels.some(value=>/^(FAST|SLOW) /.test(value)),text);
+    assert.deepEqual(errors({...basic(),gameplay:{show_timing_feedback:text,show_timing_bar:bar}}),[]);
   }
 });

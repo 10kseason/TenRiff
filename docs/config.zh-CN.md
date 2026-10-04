@@ -17,6 +17,8 @@
 
 ### `audio`
 
+- `play_to_end` (bool; default `true`): 最后一次判定后播放剩余音乐。false 时仅等待 `ui.result_tail_ms` 后正常进入结果。判定、分数、回放与手动跳过不变。
+
 - `backend` (string)
   - `wasapi | asio`，默认为 `wasapi`。用于游玩和曲目试听；菜单和结果 BGM 保留独立的 Windows MCI 路径。
 - `asio_driver` (string)
@@ -44,7 +46,7 @@
   - master volume
 - `bgm_volume` (double)
 - `normalize_audio` (bool)
-  - 对游戏内立体声混音进行联动 RMS 音量调整，位于 limiter/master volume 之前；默认 false，不改变菜单音乐与选曲试听。
+  - 游戏内RMS音量调整，默认false。ON保留RMS→软限幅→主音量；OFF仅应用线性主音量与最终输出范围限制。菜单音乐及选曲试听不变。
 - `keysound_volume` (double)
 
 参见 [ASIO 设置](asio-audio.md)。ASIO 固定所选采样率并对谱面音频重采样。`frames` 为请求值，按驱动支持的大小协商。预设不覆盖 ASIO frames；`exclusive` 与 `periods` 仅用于 WASAPI。ASIO 失败时不会自动切换 WASAPI。
@@ -80,16 +82,17 @@
   - clamp 到 `0..25`
   - 默认值为 `8ms`
 ### `judge`
+- BMS `#RANK`：`3/EASY` PG21ms、`2/NORMAL` PG18ms、`1/HARD` PG15ms、`0/VERYHARD` PG8ms。EASY的GR/GD/BAD保持65/115/210ms，其他难度分别缩小至18/21、15/21、8/21倍。缺失或不支持的值使用EASY。Judge Easy/Hard模组随后应用；RANK不改变长按容差与自动漏键时限。
 - `pg`, `gr`, `gd`, `bd` (double, ms)
-- 默认 `pg / gr / gd` 分别为 `20ms / 65ms / 115ms`
+- 默认 `pg / gr / gd` 分别为 `21ms / 65ms / 115ms`
 - 默认 `bd` 为 `210ms`
-- `Judge Easy` 将基础判定窗扩大为 `1.35x`：`pg/gr/gd/bd=27/87.75/155.25/283.5ms`。长按容差也使用同一倍率，`mask` 保持不变
+- `Judge Easy` 将基础判定窗扩大为 `1.35x`：`pg/gr/gd/bd=28.35/87.75/155.25/283.5ms`。长按容差也使用同一倍率，`mask` 保持不变
 - `Judge Hard` 保持PG/GR/GD和长按容差，将 `bd` 上限限制为 `180ms`。更小的自定义BAD窗口不会被扩大
 - `indirect_miss` (double, ms)
   - 当前配置将此值保存并归一化为 `340ms`，自动漏键判定时限独立于BAD命中窗口
   - 默认Normal/Easy/Hard在未输入音符超过 `340ms` 后自动判漏键；Normal/Easy记BAD，Hard记断连的间接 `POOR` / OD8 `MISS`
   - BAD窗口外、自动判漏键前的迟到输入不会命中BAD，而是先将过期音符记为漏键，再检查下一音符
-- 新游玩记录 `tenriff-native-score-v2-ruleset-2`。旧 `ruleset-1` 回放、幽灵对战及验证严格使用原有策略：Easy `1.25x`、Hard BAD `340ms`、自动漏键 `=BAD`。不会将任意自定义判定认可为官方规则
+- 新游玩记录 `tenriff-native-score-v2-ruleset-3`。旧ruleset-1/2的回放、幽灵与验证恢复PG20ms、不应用RANK并保留旧长按松键行为。ruleset-1仍使用Easy1.25x、Hard BAD340ms和自动漏键=BAD。自定义判定不作为官方规则。
 - `hold_grace` (double, ms)
   - 将 long note tail release 判为 `PG` 的专用宽限窗口
   - 默认值为 `80ms`
@@ -228,7 +231,7 @@ chart loader/indexer 仅支持 BMS family（`.bms/.bme/.bml/.pms`）。旧 `enab
 | `language` | `en`, `ko`, `ja`; `en` | UI 语言；无效值规范化为 en。 |
 | `menu_font_size` | `normal`, `large`, `extra_large`; `normal` | 配置档和首次设置中的菜单字号：100%、115%、130%。游戏内字体继续由皮肤控制。 |
 | `all_song_sources` | bool; `false` | 恢复 ALL SONG，合并已登记文件夹的缓存并去除相同谱面路径的重复项。 |
-| `result_tail_ms` | double; `500` ms | 判定完成后结果切换的额外等待时间，同时考虑谱面音频结束时刻。 |
+| `result_tail_ms` | double; `500` ms | 判定完成后结果切换的额外等待时间。`audio.play_to_end=true` 时同时考虑谱面音频结束时刻。 |
 | `require_enter_to_exit` | bool; `true` | 为读写兼容保留；当前 Windows 结果输入路径不使用此值自动退出。 |
 | `show_cursor_in_gameplay` | bool; `true` | 游戏中显示鼠标指针。 |
 | `active_song_source`, `recent_song_sources` | string / string[] | 当前与最近使用的歌曲文件夹。 |
@@ -263,13 +266,17 @@ chart loader/indexer 仅支持 BMS family（`.bms/.bme/.bml/.pms`）。旧 `enab
 | `scratch_position` | `left`, `right`; `left` | 仅改变 7+1 皿键的显示顺序，不改变输入与判定轨道。 |
 | `lr2_resolution_mode` | `auto`, `sd`, `hd`, `fhd`; `auto` | LR2 坐标分辨率；auto 使用 `#DST_NOTE` 坐标，而非文件名。 |
 | `visual_preset` | `classic`, `neon`, `minimal`, `tenriff`; `tenriff` | 在菜单选择预设时重设对应的视觉选项组合。 |
-| `note_shape` | `rect`, `triangle`, `pentagon`, `hexagon`, `circle`; `rect` | 程序绘制的音符形状。 |
+| `note_shape` | `rect`, `circle`, `triangle`, `pentagon`, `hexagon`, `square`, `diamond`, `arrow`; `rect` | 程序绘制的音符形状。`hex` 是 `hexagon` 的兼容别名。 |
 | `note_image_aspect` | `stretch`, `contain`, `width`; `stretch` | 拉伸填充 / 保持比例完整容纳 / 固定宽度并按比例计算高度。 |
 | `preserve_note_image_aspect_ratio` | bool; `false` | 旧版兼容字段；显式 `note_image_aspect` 优先，非 stretch 模式保存为 true。 |
 | `note_border_enabled`, `show_lane_dividers`, `show_judgement_line` | bool; `true` | 分别显示音符边框、轨道分隔线与判定线。 |
 | `note_divider_gap_px` | double: `0..40`; `12` px | 音符每侧边缘与分隔线的间距；0 表示扩展至分隔线。 |
 | `show_gear_boundary_line` | bool; `false` | 显示轨道面板边界线。 |
-| `show_timing_feedback` | bool; `true` | 显示 FAST/SLOW 文字与时机历史；判定等级独立保留。 |
+| `show_timing_feedback` | bool; `true` | 独立显示 FAST/SLOW 文字。 |
+| `show_timing_bar` | bool; `true` | 显示时机条；旧配置缺少此字段时继承文字开关。 |
+| `timing_feedback_override` | bool; `false` | 用户修改开关后，配置中的显示选项优先于皮肤。 |
+| `timing_text_offset_x`, `timing_bar_offset_x` | double: `-600..600`; `0` | 文字和条的独立 X 偏移，叠加于原判定布局，以 1920x1080 像素为基准。 |
+| `timing_text_offset_y`, `timing_bar_offset_y` | double: `-400..400`; `0` | 文字和条的独立 Y 偏移；正值向下。 |
 | `show_hold_tail`, `hold_tail_taper_enabled` | bool; `false` | 分别控制长条尾部端帽与渐缩，不改变判定规则。 |
 | `judgement_line_glow_enabled` | bool; `true` | 判定线周围发光。 |
 | `key_pulse_brightness` | double: `0..1`; `1` | Hit Burst 亮度；0 为关闭。 |
@@ -286,6 +293,8 @@ chart loader/indexer 仅支持 BMS family（`.bms/.bme/.bml/.pms`）。旧 `enab
 | `black_playfield_enabled` | bool; `true` | 将包括轨道间隙在内的整个区域设为黑色。 |
 | `visual_opacity` | double: `0.20..1`; `0.96` | 音符、接收器与按键标签的共用不透明度倍率。 |
 | `note_outline_opacity` | double: `0..1`; `0.78` | 音符轮廓不透明度。 |
+| `note_fade_in` | double: `0..1`; `0` | 顶部黑雾深度，音符逐渐出现。0为关闭。 |
+| `note_fade_out` | double: `0..1`; `0` | 判定线上方黑雾深度，音符逐渐消失。0为关闭。按键与HUD仍可见。 |
 | `hold_body_opacity` | double: `0.05..1`; `1` | 长条主体不透明度。 |
 | `lane_width_scales` | object: mode → number[]; `0.50..1.75` | 每轨宽度数组，长度等于轨道数。 |
 | `note_width_scale` | double: `0.50..1.40`; `1` | Note & Field Size：以中心为基准同时调整区域、轨道、音符与相邻血条。 |

@@ -1,4 +1,5 @@
 #include "app/MenuApp.h"
+#include "render/SkinGameplayPreview.h"
 #include "app/menu/settings/SettingsHelp.h"
 
 #include <algorithm>
@@ -713,21 +714,25 @@ std::string format_signed_ms(double value) {
 }  // namespace
 
 void MenuApp::reset_screen(Screen screen) noexcept {
+    close_skin_fullscreen_preview();
     reset_song_select_repeat();
     menu_navigator_.reset(screen);
 }
 
 void MenuApp::push_screen(Screen screen) {
+    close_skin_fullscreen_preview();
     reset_song_select_repeat();
     menu_navigator_.push(screen);
 }
 
 void MenuApp::replace_screen(Screen screen) noexcept {
+    close_skin_fullscreen_preview();
     reset_song_select_repeat();
     menu_navigator_.replace(screen);
 }
 
 bool MenuApp::pop_screen() noexcept {
+    close_skin_fullscreen_preview();
     reset_song_select_repeat();
     return menu_navigator_.back();
 }
@@ -1823,6 +1828,9 @@ render::MenuWindowConfig MenuApp::current_window_config() const {
     const auto [width, height] = resolution_dimensions(config_.graphics.resolution);
     window_config.title = "TenRiff";
     window_config.display_mode = config_.graphics.display_mode;
+    // Preview changes only the live window. The saved display mode is untouched.
+    if (skin_preview_fullscreen_ && current_screen() == Screen::SettingsSkins &&
+        window_config.display_mode == "windowed") window_config.display_mode = "borderless";
     window_config.vsync = config_.graphics.vsync;
     window_config.refresh_hz = effective_present_refresh_hz();
     window_config.width = width;
@@ -1850,6 +1858,22 @@ void MenuApp::refresh_graphics_resolutions() {
     }
 #endif
     graphics_settings_controller_.set_display_resolutions(modes);
+}
+
+void MenuApp::toggle_skin_fullscreen_preview() {
+    if (current_screen() != Screen::SettingsSkins) return;
+    if (!skin_preview_fullscreen_ && (help_overlay_visible_ || chat_overlay_visible_ ||
+        ranked_account_overlay_visible_ || chat_url_warning_visible_)) return;
+    skin_preview_fullscreen_ = !skin_preview_fullscreen_;
+    reset_song_select_repeat();
+    apply_runtime_graphics_config();
+    publish_snapshot();
+}
+
+void MenuApp::close_skin_fullscreen_preview() {
+    if (!skin_preview_fullscreen_) return;
+    skin_preview_fullscreen_ = false;
+    apply_runtime_graphics_config();
 }
 
 void MenuApp::apply_runtime_graphics_config() {
@@ -1987,6 +2011,14 @@ void MenuApp::handle_input_event(const input::InputEvent& event) {
         event.keycode == song_select_repeat_key_ && pressed_keys_.count(event.keycode) != 0;
     update_pressed_keys(event);
     if (duplicate_adjustment_press) return;
+    if (current_screen() == Screen::SettingsSkins &&
+        (skin_preview_fullscreen_ || (key_f6_ != 0 && event.keycode == key_f6_))) {
+        if (event.state == input::InputState::Pressed &&
+            (event.keycode == key_escape_ || event.keycode == key_backspace_ || event.keycode == key_f6_))
+            toggle_skin_fullscreen_preview();
+        // The preview owns input, so arrows cannot silently edit the hidden list.
+        if (event.keycode != key_f9_) return;
+    }
 
     if (current_screen() == Screen::BmsEditor) {
         const bool repeatable = event.keycode == key_up_ || event.keycode == key_down_ ||
@@ -2135,6 +2167,12 @@ void MenuApp::handle_input_event(const input::InputEvent& event) {
 }
 
 void MenuApp::handle_menu_click(const render::MenuClickEvent& event) {
+    if (current_screen() == Screen::SettingsSkins &&
+        event.kind == render::MenuHitTargetKind::SkinPreviewButton) {
+        toggle_skin_fullscreen_preview();
+        return;
+    }
+    if (skin_preview_fullscreen_) return;
     // Pointer selection takes ownership immediately, even if it changes the row
     // and then returns before the next repeat tick.
     reset_song_select_repeat();

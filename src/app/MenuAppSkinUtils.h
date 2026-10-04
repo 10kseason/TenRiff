@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "config/Config.h"
+#include "app/TimingFeedbackSettings.h"
 #include "render/MenuWindow.h"
 
 namespace tenriff::app {
@@ -71,11 +72,18 @@ enum class SkinSettingsRowId {
     JudgementFontSize,
     KeyBackdropBrightness,
     KeyBackdropHeight,
+    TimingBar,
+    TimingTextX,
+    TimingTextY,
+    TimingBarX,
+    TimingBarY,
+    NoteFadeIn,
+    NoteFadeOut,
 };
 
 // The same order drives keyboard navigation, rendered rows and mouse hit targets.
 // Keep related controls adjacent instead of deriving positions from row labels.
-inline constexpr std::array<SkinSettingsRowId, 58> kSkinSettingsRowOrder = {
+inline constexpr std::array<SkinSettingsRowId, 65> kSkinSettingsRowOrder = {
     SkinSettingsRowId::KeyMode,
     SkinSettingsRowId::ScratchPosition,
     SkinSettingsRowId::SkinSource,
@@ -106,6 +114,8 @@ inline constexpr std::array<SkinSettingsRowId, 58> kSkinSettingsRowOrder = {
     SkinSettingsRowId::NoteHeight,
     SkinSettingsRowId::VisualOpacity,
     SkinSettingsRowId::NoteOutlineOpacity,
+    SkinSettingsRowId::NoteFadeIn,
+    SkinSettingsRowId::NoteFadeOut,
     SkinSettingsRowId::ShowHoldTail,
     SkinSettingsRowId::LnTailTaper,
     SkinSettingsRowId::LnBodyWidth,
@@ -125,6 +135,12 @@ inline constexpr std::array<SkinSettingsRowId, 58> kSkinSettingsRowOrder = {
     SkinSettingsRowId::GearBoundary,
     SkinSettingsRowId::KeyLabelPosition,
     SkinSettingsRowId::TimingFeedback,
+    SkinSettingsRowId::TimingBar,
+    SkinSettingsRowId::TimingTextX,
+    SkinSettingsRowId::TimingTextY,
+    SkinSettingsRowId::TimingBarX,
+    SkinSettingsRowId::TimingBarY,
+
     SkinSettingsRowId::JudgementY,
     SkinSettingsRowId::JudgementX,
     SkinSettingsRowId::ComboY,
@@ -157,6 +173,7 @@ enum class SkinSettingsCategory { Source, Geometry, Notes, LongNotes, Effects, H
         case SkinSettingsRowId::LaneColor: case SkinSettingsRowId::SingleColor:
         case SkinSettingsRowId::NoteShape: case SkinSettingsRowId::NoteBorder:
         case SkinSettingsRowId::ImageAspect: case SkinSettingsRowId::NoteHeight:
+        case SkinSettingsRowId::NoteFadeIn: case SkinSettingsRowId::NoteFadeOut:
         case SkinSettingsRowId::VisualOpacity: case SkinSettingsRowId::NoteOutlineOpacity:
             return SkinSettingsCategory::Notes;
         case SkinSettingsRowId::ShowHoldTail: case SkinSettingsRowId::LnTailTaper:
@@ -170,6 +187,11 @@ enum class SkinSettingsCategory { Source, Geometry, Notes, LongNotes, Effects, H
             return SkinSettingsCategory::Effects;
         case SkinSettingsRowId::LaneDividers: case SkinSettingsRowId::JudgementLine:
         case SkinSettingsRowId::GearBoundary: case SkinSettingsRowId::KeyLabelPosition:
+        case SkinSettingsRowId::TimingBar:
+        case SkinSettingsRowId::TimingTextX:
+        case SkinSettingsRowId::TimingTextY:
+        case SkinSettingsRowId::TimingBarX:
+        case SkinSettingsRowId::TimingBarY:
         case SkinSettingsRowId::TimingFeedback: case SkinSettingsRowId::JudgementY:
         case SkinSettingsRowId::JudgementX: case SkinSettingsRowId::ComboY:
         case SkinSettingsRowId::ComboX: case SkinSettingsRowId::ComboFontSize:
@@ -289,7 +311,7 @@ inline std::string key_mode_label(const std::string& value) {
         return "7K";
     }
     if (config::normalize_skin_mode_token(value) == "7+1") {
-        return "7+1 SP";
+        return "7+1";
     }
     if (value == "8k") {
         return "8K";
@@ -300,11 +322,20 @@ inline std::string key_mode_label(const std::string& value) {
     if (value == "10k") {
         return "10K";
     }
+    if (value == "11k") {
+        return "11K";
+    }
     if (value == "12k") {
         return "12K";
     }
+    if (value == "13k") {
+        return "13K";
+    }
     if (value == "14k") {
         return "14K";
+    }
+    if (value == "15k") {
+        return "15K";
     }
     if (value == "16k") {
         return "16K";
@@ -366,11 +397,20 @@ inline int lane_count_for_skin_mode(std::string_view key_mode) {
     if (normalized == "9k") {
         return 9;
     }
+    if (normalized == "11k") {
+        return 11;
+    }
     if (normalized == "12k") {
         return 12;
     }
+    if (normalized == "13k") {
+        return 13;
+    }
     if (normalized == "14k") {
         return 14;
+    }
+    if (normalized == "15k") {
+        return 15;
     }
     if (normalized == "16k") {
         return 16;
@@ -519,8 +559,11 @@ inline std::vector<double>& editable_skin_lane_width_scales(config::SkinConfig& 
 
 inline double& editable_skin_note_width_scale(config::SkinConfig& skin, std::string_view key_mode) {
     const std::string normalized = config::normalize_skin_mode_token(key_mode);
+    // Resolve inheritance before operator[] inserts a zero-valued override.
+    // Otherwise the first +/- starts at the minimum instead of the displayed size.
+    const double resolved = config::resolved_skin_note_width_scale(skin, normalized);
     auto& scale = skin.note_width_scales[normalized];
-    scale = config::resolved_skin_note_width_scale(skin, normalized);
+    scale = resolved;
     return scale;
 }
 
@@ -533,8 +576,9 @@ inline std::vector<double>& editable_skin_lane_spacing_scales(config::SkinConfig
 
 inline double& editable_skin_note_height_scale(config::SkinConfig& skin, std::string_view key_mode) {
     const std::string normalized = config::normalize_skin_mode_token(key_mode);
+    const double resolved = config::resolved_skin_note_height_scale(skin, normalized);
     auto& scale = skin.note_height_scales[normalized];
-    scale = config::resolved_skin_note_height_scale(skin, normalized);
+    scale = resolved;
     return scale;
 }
 
@@ -549,8 +593,9 @@ inline double& editable_skin_lane_divider_width_scale(config::SkinConfig& skin, 
 
 inline double& editable_skin_lane_center_gap_scale(config::SkinConfig& skin, std::string_view key_mode) {
     const std::string normalized = config::normalize_skin_mode_token(key_mode);
+    const double resolved = config::resolved_skin_lane_center_gap_scale(skin, normalized);
     auto& scale = skin.lane_center_gap_scales[normalized];
-    scale = config::resolved_skin_lane_center_gap_scale(skin, normalized);
+    scale = resolved;
     return scale;
 }
 

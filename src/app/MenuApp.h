@@ -80,6 +80,7 @@ class MenuApp {
     friend struct MenuAppSongSourceTestAccess;
     friend struct MenuAppVisualTestAccess;
     friend struct MenuAppRepeatTestAccess;
+    friend struct MenuAppSkinPreviewTestAccess;
 public:
     MenuApp();
     ~MenuApp();
@@ -253,6 +254,9 @@ private:
     void restart_audio_thread();
     void restart_render_thread();
     void apply_runtime_graphics_config();
+    void toggle_skin_fullscreen_preview();
+    void close_skin_fullscreen_preview();
+    bool skin_preview_fullscreen_ = false;
     [[nodiscard]] int effective_refresh_hz() const;
     [[nodiscard]] int effective_present_refresh_hz() const;
     [[nodiscard]] int effective_render_fps_limit() const;

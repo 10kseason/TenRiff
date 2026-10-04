@@ -120,17 +120,35 @@ bool is_canonical_score_ruleset(const config::JudgeConfig& judge,
 }
 
 bool is_supported_canonical_replay_ruleset(std::string_view ruleset_id) {
-    return ruleset_id == kCanonicalReplayRulesetId || ruleset_id == kLegacyReplayRulesetId;
+    return ruleset_id == kCanonicalReplayRulesetId || ruleset_id == kPreviousReplayRulesetId ||
+           ruleset_id == kLegacyReplayRulesetId;
+}
+
+bool replay_uses_legacy_hold_release(const gameplay::ReplayFile& replay) {
+    // A current run can lack a chart hash and therefore export older evidence
+    // metadata. Its explicit scoring ruleset still defines playback behavior.
+    if (replay.ruleset_id == kCanonicalReplayRulesetId) return false;
+    return replay.ruleset_id == kLegacyReplayRulesetId || replay.ruleset_id == kPreviousReplayRulesetId ||
+           replay.replay_format_version < gameplay::kReplayFormatVersion;
 }
 
 config::JudgeConfig replay_judge_config_for_playback(
-    const gameplay::ReplayFile& replay, const config::JudgeConfig& base) {
+    const gameplay::ReplayFile& replay, const config::JudgeConfig& base, std::optional<int> bms_rank) {
     const auto mods = normalize_mode_mod_tokens(replay.mods);
     const bool easy = std::find(mods.begin(), mods.end(), "judge_easy") != mods.end();
     const bool hard = std::find(mods.begin(), mods.end(), "judge_hard") != mods.end();
     const bool legacy = replay.ruleset_id == kLegacyReplayRulesetId ||
-                        replay.replay_format_version < gameplay::kReplayFormatVersion;
-    return judge_timing_for_policy(base, easy, hard, legacy);
+                        (replay.ruleset_id != kCanonicalReplayRulesetId &&
+                         replay.replay_format_version < gameplay::kReplayFormatVersion);
+    auto judge = base;
+    if (replay_uses_legacy_hold_release(replay)) {
+        // Both previous canonical rulesets were authored with PG=20ms and
+        // ignored #RANK. Never reinterpret their score claims under new rules.
+        if (is_supported_canonical_replay_ruleset(replay.ruleset_id)) judge.pg_ms = 20.0;
+    } else if (bms_rank.has_value()) {
+        judge = judge_timing_for_bms_rank(judge, *bms_rank);
+    }
+    return judge_timing_for_policy(judge, easy, hard, legacy);
 }
 
 std::string replay_ruleset_id_for_runtime(const config::JudgeConfig& judge,
@@ -224,7 +242,8 @@ ReplayVerificationResult verify_replay_against_chart(
     gameplay::GameplayConfig engine_config;
     engine_config.sample_rate = replay.sample_rate;
     engine_config.rate = replay.rate;
-    engine_config.judge = replay_judge_config_for_playback(replay, canonical_judge);
+    engine_config.judge = replay_judge_config_for_playback(replay, canonical_judge, source_chart.bms_rank);
+    engine_config.legacy_hold_release = replay_uses_legacy_hold_release(replay);
     engine_config.gauge = canonical_gauge;
     engine_config.initial_gauge = initial_gauge_for(managed.settings.gauge);
     engine_config.gauge_shift_enabled = true;

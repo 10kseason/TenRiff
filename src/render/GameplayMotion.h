@@ -97,11 +97,14 @@ inline GameplayHoldBodyGeometry compute_gameplay_hold_body_geometry(
                                        ? static_cast<float>(std::clamp(width_scale, 0.50, 1.20))
                                        : 1.0f;
     const float half_width = std::max(0.5f, rendered_note_width * 0.5f * safe_width_scale);
+    // Caps can have transparent padding or sloped edges. Extend the body behind
+    // each cap to its center instead of butt-joining their bounding rectangles;
+    // the caps are painted afterwards and cover the overlap without a seam.
     return GameplayHoldBodyGeometry{
         lane_center - half_width,
-        render_tail ? rendered_tail_bottom : tail_center_y,
+        render_tail ? std::min(rendered_tail_bottom, tail_center_y) : tail_center_y,
         lane_center + half_width,
-        render_head ? rendered_head_top : head_center_y,
+        render_head ? std::max(rendered_head_top, head_center_y) : head_center_y,
     };
 }
 // Continue the audio-side 200 ms decay at render cadence (60/144 Hz and above).
@@ -284,7 +287,7 @@ inline GameplayNoteShapeExtents gameplay_note_shape_extents(float width,
     // These shapes are drawn inside a square box so they stay regular, taking the
     // lane width as their side rather than the note rect's height.
     const bool lane_width_shape = normalized == "circle" || normalized == "triangle" ||
-                                  normalized == "pentagon" || normalized == "hexagon" ||
+                                  normalized == "pentagon" || normalized == "hexagon" || normalized == "hex" ||
                                   normalized == "square" || normalized == "diamond" ||
                                   normalized == "arrow";
     return GameplayNoteShapeExtents{

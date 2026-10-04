@@ -153,7 +153,7 @@ bool fetch_json_impl(const std::string& base_url,
     while (!path.empty() && path.back() == L'/') path.pop_back();
     path += utf8_to_wide(endpoint);
 
-    InternetHandle session(WinHttpOpen(L"TenRiff/1.8.2 records",
+    InternetHandle session(WinHttpOpen(L"TenRiff/1.8.3 records",
                                        WINHTTP_ACCESS_TYPE_AUTOMATIC_PROXY,
                                        WINHTTP_NO_PROXY_NAME,
                                        WINHTTP_NO_PROXY_BYPASS, 0));
@@ -381,14 +381,30 @@ bool parse_sites_record_boards(std::string_view json, std::string_view title,
         std::string gauge, random;
         if (!condition || !safe_string(*condition, "ruleset", board.ruleset_id, 64) ||
             !safe_string(*condition, "gauge", gauge, 64) || !safe_string(*condition, "random", random, 64)) return fail();
+        std::string timing_label = "TIMING UNKNOWN";
+        if (find_field(*condition, "timing_profile")) {
+            std::string profile;
+            if (!safe_string(*condition, "timing_profile", profile, 64) ||
+                !std::all_of(profile.begin(), profile.end(), [](unsigned char ch) {
+                    return (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') ||
+                        (ch >= '0' && ch <= '9') || ch == '-' || ch == '_';
+                })) return fail();
+            // Label the base policy only: judge mods may change effective windows.
+            if (profile == "bms-easy") timing_label = "BMS EASY";
+            else if (profile == "bms-normal") timing_label = "BMS NORMAL";
+            else if (profile == "bms-hard") timing_label = "BMS HARD";
+            else if (profile == "bms-veryhard") timing_label = "BMS VERY HARD";
+            else if (profile == "osu-fixed") timing_label = "osu!mania";
+        }
         board.rate_milli = static_cast<int>(rate);
         board.id = lower_ascii(board.id);
         board.chart_sha256 = lower_ascii(board.chart_sha256);
-        const std::string ruleset_label = board.ruleset_id == "tenriff-native-score-v2-ruleset-2" ? "RULESET 2" :
+        const std::string ruleset_label = board.ruleset_id == "tenriff-native-score-v2-ruleset-3" ? "RULESET 3" :
+                                          board.ruleset_id == "tenriff-native-score-v2-ruleset-2" ? "RULESET 2" :
             board.ruleset_id == "tenriff-native-score-v2-ruleset-1" ? "RULESET 1" : board.ruleset_id;
         board.conditions_label = board.key_mode + " / " + std::to_string(rate / 1000) + "." +
             (rate % 1000 < 100 ? "0" : "") + std::to_string((rate % 1000) / 10) +
-            "x / " + ruleset_label + " / " + gauge + " / " + random;
+            "x / " + ruleset_label + " / " + timing_label + " / " + gauge + " / " + random;
         if (const auto* mods_field = find_field(*condition, "mods")) {
             const auto* mods = mods_field->as_array();
             if (!mods || mods->size() > 20) return fail();

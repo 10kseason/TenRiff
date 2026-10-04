@@ -611,19 +611,19 @@ TEST_CASE("audio settings view groups related controls and preserves saved value
     static_cast<void>(controller.select(AudioSettingId::BgmVolume));
 
     const auto english = AudioSettingsView::build(controller, runtime, tenriff::ui::Language::English);
-    REQUIRE(english.rows.size() == 15);
+    REQUIRE(english.rows.size() == 16);
     REQUIRE(english.notes.size() == 9);
-    const std::array<const char*, 15> labels{
-        "Keysound Mode", "Background Sound", "Title Music", "Mute When Inactive", "Master Volume",
+    const std::array<const char*, 16> labels{
+        "Keysound Mode", "Background Sound", "Title Music", "Song Ending", "Mute When Inactive", "Master Volume",
         "BGM Volume", "Keysound Volume", "Normalize Audio", "Sound Offset", "Preset",
         "Audio Backend", "ASIO Driver", "ASIO Sample Rate", "ASIO Buffer Size", "Back",
     };
-    const std::array<const char*, 15> values{
-        "Follow", "On", "Default Music", "Off", "100%", "75%", "100%", "Off", "+0.0 ms", "High",
+    const std::array<const char*, 16> values{
+        "Follow", "On", "Default Music", "Listen to End", "Off", "100%", "75%", "100%", "Off", "+0.0 ms", "High",
         "WASAPI", "No 64-bit ASIO driver", "44100 Hz", "128 samples", "",
     };
-    const std::array<const char*, 15> categories{
-        "Playback", "Playback", "Playback", "Playback", "Volume", "Volume", "Volume", "Volume",
+    const std::array<const char*, 16> categories{
+        "Playback", "Playback", "Playback", "Playback", "Playback", "Volume", "Volume", "Volume", "Volume",
         "Timing", "Output Device", "Output Device", "Output Device", "Output Device", "Output Device", "",
     };
     for (std::size_t index = 0; index < english.rows.size(); ++index) {
@@ -639,33 +639,33 @@ TEST_CASE("audio settings view groups related controls and preserves saved value
             CHECK(row.slider_ratio.has_value());
         }
     }
-    CHECK(*english.rows[4].slider_ratio == doctest::Approx(1.0));
-    CHECK(*english.rows[5].slider_ratio == doctest::Approx(0.375));
-    CHECK(*english.rows[6].slider_ratio == doctest::Approx(0.5));
-    CHECK(english.rows[8].numeric_range.has_value());
+    CHECK(*english.rows[5].slider_ratio == doctest::Approx(1.0));
+    CHECK(*english.rows[6].slider_ratio == doctest::Approx(0.375));
+    CHECK(*english.rows[7].slider_ratio == doctest::Approx(0.5));
+    CHECK(english.rows[9].numeric_range.has_value());
     CHECK(english.rows.back().activatable);
     CHECK_FALSE(english.rows.back().adjustable);
-    CHECK(english.rows[10].activatable);
-    CHECK(english.rows[10].adjustable);
-    for (std::size_t index = 11; index <= 13; ++index) {
+    CHECK(english.rows[11].activatable);
+    CHECK(english.rows[11].adjustable);
+    for (std::size_t index = 12; index <= 14; ++index) {
         CHECK_FALSE(english.rows[index].activatable);
         CHECK_FALSE(english.rows[index].adjustable);
     }
     const auto korean = AudioSettingsView::build(controller, runtime, tenriff::ui::Language::Korean);
     CHECK(korean.rows[0].label == "키음 모드");
     CHECK(korean.rows[2].label == "타이틀 음악");
-    CHECK(korean.rows[3].label == "창 비활성화 시 음소거");
+    CHECK(korean.rows[4].label == "창 비활성화 시 음소거");
     CHECK(korean.rows[2].category == "재생");
-    CHECK(korean.rows[4].category == "음량");
-    CHECK(korean.rows[8].category == "타이밍");
-    CHECK(korean.rows[9].category == "출력 장치");
-    CHECK(korean.rows[13].label == "ASIO 버퍼 사이즈");
-    CHECK(korean.rows[13].value == "128 샘플");
+    CHECK(korean.rows[5].category == "음량");
+    CHECK(korean.rows[9].category == "타이밍");
+    CHECK(korean.rows[10].category == "출력 장치");
+    CHECK(korean.rows[14].label == "ASIO 버퍼 사이즈");
+    CHECK(korean.rows[14].value == "128 샘플");
     const auto japanese = AudioSettingsView::build(controller, runtime, tenriff::ui::Language::Japanese);
     CHECK(japanese.rows[2].label == "タイトル音楽");
     CHECK(japanese.rows[2].value == "標準の音楽");
-    CHECK(japanese.rows[13].label == "ASIO バッファサイズ");
-    CHECK(japanese.rows[13].value == "128 サンプル");
+    CHECK(japanese.rows[14].label == "ASIO バッファサイズ");
+    CHECK(japanese.rows[14].value == "128 サンプル");
 }
 
 TEST_CASE("title music choices support both pointer activation and reverse keyboard selection") {
@@ -908,4 +908,15 @@ TEST_CASE("disabled audio backend controls cannot change the saved device or buf
     CHECK(runtime.audio.sample_rate == 96000);
     CHECK(runtime.audio.frames_per_buffer == 64);
     CHECK_FALSE(controller.dirty());
+}
+
+TEST_CASE("audio outro choice toggles with keyboard and pointer without changing mix") {
+    tenriff::config::RuntimeConfig runtime;
+    AudioSettingsController controller;
+    check_render_only(controller.handle(MenuAction::activate(), runtime, AudioSettingId::PlayToEnd));
+    CHECK_FALSE(runtime.audio_ui.play_to_end);
+    check_render_only(controller.handle(MenuAction::adjust(-1), runtime, AudioSettingId::PlayToEnd));
+    CHECK(runtime.audio_ui.play_to_end);
+    CHECK(runtime.audio_ui.master_volume == doctest::Approx(0.70));
+    CHECK(controller.handle(MenuAction::back(), runtime).persist_config);
 }

@@ -10,6 +10,19 @@ inline constexpr double kCurrentEasyJudgeScale = 1.35;
 inline constexpr double kCurrentHardBadWindowMs = 180.0;
 inline constexpr double kCurrentAutomaticMissWindowMs = 340.0;
 
+// Rank scales only note judgement windows. Hold-release tolerance, automatic
+// miss deadlines, and input masking are separate policies and stay unchanged.
+[[nodiscard]] inline config::JudgeConfig judge_timing_for_bms_rank(
+    config::JudgeConfig judge, int rank) {
+    const double perfect_ms = rank == 0 ? 8.0 : rank == 1 ? 15.0 : rank == 2 ? 18.0 : 21.0;
+    const double scale = perfect_ms / 21.0;
+    judge.pg_ms *= scale;
+    judge.gr_ms *= scale;
+    judge.gd_ms *= scale;
+    judge.bd_ms *= scale;
+    return judge;
+}
+
 // The hit window and automatic miss deadline serve different purposes. Keeping
 // the old exact policy here lets ruleset-1 replays retain their original timing.
 [[nodiscard]] inline config::JudgeConfig judge_timing_for_policy(

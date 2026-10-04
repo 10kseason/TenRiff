@@ -129,6 +129,7 @@ std::optional<NumericSettingRange> audio_setting_numeric_range(AudioSettingId id
         case AudioSettingId::Preset:
         case AudioSettingId::KeysoundMode:
         case AudioSettingId::BackgroundSound:
+        case AudioSettingId::PlayToEnd:
         case AudioSettingId::TitleMusic:
         case AudioSettingId::Normalize:
         case AudioSettingId::MuteWhenInactive:
@@ -282,6 +283,12 @@ MenuEffectFlags AudioSettingsController::apply_selected_action(
         case AudioSettingId::Normalize:
             if (is_adjust || is_activate) {
                 runtime.audio_ui.normalize_audio = !runtime.audio_ui.normalize_audio;
+                changed = true;
+            }
+            break;
+        case AudioSettingId::PlayToEnd:
+            if (is_adjust || is_activate) {
+                runtime.audio_ui.play_to_end = !runtime.audio_ui.play_to_end;
                 changed = true;
             }
             break;

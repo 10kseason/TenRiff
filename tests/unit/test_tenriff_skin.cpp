@@ -618,8 +618,8 @@ TEST_CASE("TenRiff skin import includes assets referenced only by another key mo
 TEST_CASE("Skin settings stable row ids account for the optional LR2 row") {
     const tenriff::app::SkinSettingsRows native_rows{false};
     const tenriff::app::SkinSettingsRows lr2_rows{true};
-    CHECK(native_rows.count() == 57);
-    CHECK(lr2_rows.count() == 58);
+    CHECK(native_rows.count() == 64);
+    CHECK(lr2_rows.count() == 65);
     CHECK(native_rows.index_of(tenriff::app::SkinSettingsRowId::KeyMode) == 0);
     CHECK(native_rows.index_of(tenriff::app::SkinSettingsRowId::ScratchPosition) == 1);
     CHECK(native_rows.index_of(tenriff::app::SkinSettingsRowId::SkinSource) == 2);
@@ -627,20 +627,20 @@ TEST_CASE("Skin settings stable row ids account for the optional LR2 row") {
     CHECK(native_rows.index_of(tenriff::app::SkinSettingsRowId::VisualLatency) == 4);
     CHECK(native_rows.index_of(tenriff::app::SkinSettingsRowId::ImportSkin) == 5);
     CHECK(native_rows.index_of(tenriff::app::SkinSettingsRowId::OpenSkinEditor) == 11);
-    CHECK(native_rows.index_of(tenriff::app::SkinSettingsRowId::KeyBackdropBrightness) == 38);
-    CHECK(native_rows.index_of(tenriff::app::SkinSettingsRowId::KeyBackdropHeight) == 39);
-    CHECK(native_rows.index_of(tenriff::app::SkinSettingsRowId::ComboFontSize) == 52);
-    CHECK(native_rows.index_of(tenriff::app::SkinSettingsRowId::JudgementFontSize) == 53);
-    CHECK(native_rows.index_of(tenriff::app::SkinSettingsRowId::Back) == 56);
+    CHECK(native_rows.index_of(tenriff::app::SkinSettingsRowId::KeyBackdropBrightness) == 40);
+    CHECK(native_rows.index_of(tenriff::app::SkinSettingsRowId::KeyBackdropHeight) == 41);
+    CHECK(native_rows.index_of(tenriff::app::SkinSettingsRowId::ComboFontSize) == 59);
+    CHECK(native_rows.index_of(tenriff::app::SkinSettingsRowId::JudgementFontSize) == 60);
+    CHECK(native_rows.index_of(tenriff::app::SkinSettingsRowId::Back) == 63);
     CHECK(lr2_rows.index_of(tenriff::app::SkinSettingsRowId::VisualLatency) == 4);
     CHECK(lr2_rows.index_of(tenriff::app::SkinSettingsRowId::Lr2Resolution) == 5);
     CHECK(lr2_rows.index_of(tenriff::app::SkinSettingsRowId::ImportSkin) == 6);
     CHECK(lr2_rows.index_of(tenriff::app::SkinSettingsRowId::OpenSkinEditor) == 12);
-    CHECK(lr2_rows.index_of(tenriff::app::SkinSettingsRowId::KeyBackdropBrightness) == 39);
-    CHECK(lr2_rows.index_of(tenriff::app::SkinSettingsRowId::KeyBackdropHeight) == 40);
-    CHECK(lr2_rows.index_of(tenriff::app::SkinSettingsRowId::ComboFontSize) == 53);
-    CHECK(lr2_rows.index_of(tenriff::app::SkinSettingsRowId::JudgementFontSize) == 54);
-    CHECK(lr2_rows.index_of(tenriff::app::SkinSettingsRowId::Back) == 57);
+    CHECK(lr2_rows.index_of(tenriff::app::SkinSettingsRowId::KeyBackdropBrightness) == 41);
+    CHECK(lr2_rows.index_of(tenriff::app::SkinSettingsRowId::KeyBackdropHeight) == 42);
+    CHECK(lr2_rows.index_of(tenriff::app::SkinSettingsRowId::ComboFontSize) == 60);
+    CHECK(lr2_rows.index_of(tenriff::app::SkinSettingsRowId::JudgementFontSize) == 61);
+    CHECK(lr2_rows.index_of(tenriff::app::SkinSettingsRowId::Back) == 64);
 }
 
 TEST_CASE("7+1 presentation moves only the visual scratch lane") {
@@ -826,4 +826,62 @@ TEST_CASE("key backdrop RGB brightness and bottom anchored height are independen
     CHECK(gameplay_key_backdrop_top(2.0f, 1078.0f, 0.0) == doctest::Approx(1078.0f));
     CHECK(gameplay_key_backdrop_top(50.0f, 1060.0f, 0.25) == doctest::Approx(807.5f));
     CHECK(gameplay_key_backdrop_alpha(true, true, 0.4) == doctest::Approx(0.4f));
+}
+
+TEST_CASE("simple square skin loads without assets for all supported lane counts") {
+    const auto root = std::filesystem::u8path(tenriff::app::find_bundled_tenriff_skin_root());
+    REQUIRE_FALSE(root.empty());
+    for (int lanes = 4; lanes <= 16; ++lanes) {
+        const auto skin = tenriff::app::load_tenriff_skin_folder((root / "TenRiff_SimpleSquare").u8string(), lanes);
+        REQUIRE(skin.found);
+        CHECK(skin.warnings.empty());
+        CHECK(skin.native_gameplay_fallback);
+        CHECK(skin.referenced_asset_paths.empty());
+        CHECK(skin.gameplay_style.note_shape.value() == "rect");
+        const auto& sprite = skin.gameplay.native.sprites.at("note");
+        REQUIRE(sprite.size() == 3);
+        CHECK(sprite[0].alpha == 0);
+        CHECK(sprite[1].alpha == 0);
+        CHECK(sprite[2].alpha == 1);
+        CHECK(sprite[2].width == 128);
+        CHECK(sprite[2].height == 32);
+        CHECK(sprite[2].radius == 0);
+        CHECK(sprite[2].mix == 0);
+    }
+}
+
+TEST_CASE("all procedural note shapes survive native skin load and per-mode overrides") {
+    TempDirGuard temp{make_temp_dir()};
+    REQUIRE_FALSE(temp.path.empty());
+    for (const std::string shape : {"rect", "circle", "triangle", "pentagon", "hexagon",
+                                    "square", "diamond", "arrow", "hex"}) {
+        write_file(temp.path / "skin.json",
+            "{\"format\":\"tenriff-skin\",\"version\":1,\"name\":\"Shapes\","
+            "\"gameplay\":{\"renderer\":\"native\",\"note_shape\":\"" + shape +
+            "\",\"modes\":{\"4k\":{\"note_shape\":\"" + shape + "\"}}}}");
+        for (const int lanes : {4, 10}) {
+            const auto skin = tenriff::app::load_tenriff_skin_folder(temp.path.u8string(), lanes);
+            REQUIRE(skin.found);
+            CHECK(skin.warnings.empty());
+            REQUIRE(skin.gameplay_style.note_shape.has_value());
+            CHECK(skin.gameplay_style.note_shape.value() == (shape == "hex" ? "hexagon" : shape));
+        }
+    }
+}
+
+TEST_CASE("skin timing text and bar overrides load independently including modes") {
+    TempDirGuard temp{make_temp_dir()};
+    REQUIRE_FALSE(temp.path.empty());
+    write_file(temp.path / "skin.json", R"({"format":"tenriff-skin","version":1,"name":"Timing",
+      "gameplay":{"renderer":"native","show_timing_feedback":false,"show_timing_bar":true,
+      "native":{"rects":{"timing_label":[100,-20,0,0],"timing":[-80,60,0,0]}},
+      "modes":{"4k":{"show_timing_feedback":true,"show_timing_bar":false}}}})");
+    for (int lanes : {4, 10}) {
+        const auto skin = tenriff::app::load_tenriff_skin_folder(temp.path.u8string(), lanes);
+        REQUIRE(skin.found);
+        CHECK(skin.warnings.empty());
+        CHECK(skin.gameplay_style.show_timing_feedback.value() == (lanes == 4));
+        CHECK(skin.gameplay_style.show_timing_bar.value() == (lanes != 4));
+        CHECK(skin.gameplay.native.rects.at("timing_label")[0] == 100);
+    }
 }

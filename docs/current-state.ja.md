@@ -1,5 +1,7 @@
 # TenRiff Current State
 
+**2026-10-04 · TenRiff 1.8.3:** 全画面スキンプレビュー、ノートの霧、FAST/SLOWの個別配置、シンプルな四角スキンを追加します。Normalize OFF時の隠れた圧縮と一時停止からの復帰表示を修正し、曲の終了方法、LN解放時の即時判定、BMS RANKに応じたR3判定を導入します。 [1.8.3 release](release-1.8.3-gate.md).
+
 **2026-10-03 · TenRiff 1.8.2:** オプションのアイコンを10色にし、選択枠の色と丸み、FAST/SLOWバーの表示、スキンエディターのプレビューを更新しました。 [1.8.2 release](release-1.8.2-gate.md).
 
 - 1.8.1: 機能別アイコン18種とPNGスキンを追加し、オプションと選曲ロビーを黒と無彩色に統一しました。項目別ヘルプ、記録画面のGPT Sitesランキング、左右で4K～16Kを選べるキーテストを追加しました。 [Design / validation](menu-studio-1.8.1.ko.md).
@@ -7,14 +9,14 @@
 - 1.7.10 は ALL SONG の削除済みキャッシュ項目、統合進捗、完了状態の通知を改善します。[検証と未再現の症状](release-1.7.10-gate.md)。
 - 1.7.8 は新しい標準メニュー、4〜16キー対応 Luma Keys、日本語 UI とウェブ/オフラインスキン編集を追加します。メニューとゲームプレイの設定は `native` と `gameplay.native` に分けます。[検証範囲](release-1.7.8-gate.md)。
 
-現在のプロジェクト版は **1.8.2** です。後奏が終了すると追加入力なしで結果を保存・送信します。Stella、Satellite、U_E Pack 4K/6K/8Kの難易度表プリセットを追加しました。Sites連携と既存のオーディオ・スキン・セッション機能を維持し、既定の出力はWASAPIです。[1.8.2リリース案内](release-1.8.2-gate.md)に変更内容と検証範囲を記載しています。
+現在のプロジェクト版は **1.8.3** です。Audioの曲終了方式で**最後まで聴く**（既定）か**後奏スキップ**を選べ、正常終了した結果は追加入力なしで保存・送信します。新しいプレイはBMS RANK対応のR3判定とウェブ送信用の判定プロファイルを使い、既存のR1/R2記録は維持します。既定の出力はWASAPIです。変更内容と進行中のリリース検証は[1.8.3リリース案内](release-1.8.3-gate.md)を参照してください。
 
 [ローカル 1.7.1 r2 レポート](local-1.7.1-r2.ko.md)の 749/739 件は以前のビルドの記録です。新リリースの結果として再利用しません。[曲管理](library-management.md)、[基準 BPM](reference-bpm.md)、[スキンプリセット](skin-presets.md)、[ASIO](asio-audio.md)を参照してください。
 
 この文書は、次のエージェントや新しい作業者が最初に読むべき current-state 文書です。目的は、「このプロジェクトは今どういう状態で、どこを見ればよく、何がまだ未検証か」を素早く把握できるようにすることです。
 
 ## Baseline
-- 現在の project version は `1.8.2`
+- 現在の project version は `1.8.3`
 - 1.7.1 は最大8人の HUD・結果、同点順位・スコア待機状態、P-GREAT 専用演出、判定・コンボの独立位置、10個の設定カード、音量ノーマライズ、選曲の難易度表カードを提供します。[変更詳細](gameplay-polish-followup.md)と[検証範囲](release-1.7.1-gate.md)を参照。
 - 1.7.0 refreshes native Home, Song Select, Result and shared settings. See [UI implementation](menu-visual-polish.md) and [release verification](release-1.7.0-gate.md). The prism remains only in the custom-skin path; result reveal timing is unchanged.
 - 基本結果画面はスコア・ランク・精度を中心に表示し、プリズム演出はカスタムスキン側に残します。既存の2.2秒の表示演出、Spaceによるスキップ、操作解禁条件を維持します。
@@ -112,7 +114,7 @@
   - ゲーム内 Mode Settings の `Key Converter` で `Krrcream`、内蔵の決定論的 `KeyWeaver nK2`、または `KeyWeaver NK3 ONNX` を選択し、設定と replay metadata に保存
   - 個別の `Conversion Note Add` 設定は削除。Krrcream は元 note の再配置のみを行い、nK2 は key count 拡張時に変換後の target layout へ安全な support note を直接生成する。
   - nK2 preset は既定の `Native (12%)`、`Transform (35%)`、`Remaster (65%)` から選択する。`Remaster` は budget を上げつつ anchor を固定して原曲の配置を残し、LN 区間を同じ長さの LN で埋める。3 つとも上限であり、実際の追加量は原曲の密度と safety window で決まる。Krrcream では row を lock し、standalone converter GUI の Krrcream Max/Min/Speed/Seed も変更不可。
-  - 1.8.2 公式 build/Windows ZIP は standalone BMS key-converter CLI/GUI を build・同梱しない。top-level CMake option は既定 `OFF` で、source は開発 regression 用のみ維持
+  - 1.8.3 公式 build/Windows ZIP は standalone BMS key-converter CLI/GUI を build・同梱しない。top-level CMake option は既定 `OFF` で、source は開発 regression 用のみ維持
   - NK3 は同梱 P64 と host beam32 を常に組み合わせる。10K 以外の source を 10K に変換するときだけ generalized pattern MLP を追加し、10K→10K とその他すべての target は P64 のみを使う。既定の `AUTO` backend は ncnn Vulkan で P64 と MLP を AMD/NVIDIA GPU 上に実行し、任意の OpenVINO compatibility path を fallback として維持する。`TENRIFF_NK3_BACKEND` と `TENRIFF_NK3_VULKAN_DEVICE` で強制選択できる。
   - `mode.key_mode=none` は元のキー数と基本パターンレイアウトを維持
 - Native difficulty:
@@ -138,13 +140,14 @@
   - `skin.lr2_resolution_mode` は `auto / sd / hd / fhd` を保持
   - LR2 auto-detect は asset 名ではなく playskin `#DST_NOTE` の座標範囲を使う
   - フィールド上端からの future-note entry easing
-  - 最後の判定ノート後は既定で音楽終了まで待機し、その間に lane key を押すと直ちに Result へ移動
+  - 最後の判定ノート後はAudioの曲終了方式に従い、最後まで聴く（既定）か通常の結果待機時間後に後奏を自動スキップする。最後まで聴く場合もlane keyによる手動スキップを維持
 - Judge:
-  - 既定の `PG / GR / GD` 判定幅は `20ms / 65ms / 115ms`
+  - 既定の `PG / GR / GD` 判定幅は `21ms / 65ms / 115ms` (BMS RANK EASY)
+  - BMS `#RANK` EASY（未指定を含む）/NORMAL/HARD/VERYHARDのPGは`21/18/15/8ms`。NORMAL/HARD/VERYHARDはEASYのPG/GR/GD/BAD全体に`18/21`、`15/21`、`8/21`を掛け、自動ミス時刻は維持する
   - 既定の `BAD` 幅は `210ms`、`Judge Easy` は `283.5ms`、`Judge Hard` は最大 `180ms`
-  - `Judge Easy` は判定幅とホールド許容幅を `1.35x` に広げ、`PG/GR/GD=27/87.75/155.25ms`。HardはPG/GR/GDとホールド許容幅を維持し、BAD上限だけを狭める
+  - `Judge Easy` は判定幅とホールド許容幅を `1.35x` に広げ、`PG/GR/GD=28.35/87.75/155.25ms`。HardはPG/GR/GDとホールド許容幅を維持し、BAD上限だけを狭める (BMS RANK EASY)
   - 標準のNormal/Easy/Hardは未入力ノートが `340ms` を超えると自動ミス。BAD範囲外の遅い入力は前のノートをミスにして次を調べるため、判定幅が自動ミス期限まで広がることはない
-  - 新しいプレイは `ruleset-2`。旧 `ruleset-1` のリプレイ・ゴースト・検証はEasy `1.25x`、Hard BAD `340ms`、自動ミス `=BAD` を再現する
+  - 新しいプレイは`ruleset-3`。ruleset-1/2のリプレイ・ゴースト・検証は当時の判定とLN解放動作を再現する。[RANK比率と互換性](audio-ln-rank.ko.md)
   - 同一 lane の pending note がすでに `BAD` で、直後の note が明確に `GOOD` 以上なら、pending note を miss として記録し、現在の press を次の note に割り当てて連続 `BAD` lock を防ぐ
   - `Judge Hard` では未入力の object を combo-breaking indirect `POOR` かつ OD8 `MISS` として記録し、その他の note-consuming failure は `BAD` のまま
   - かなり早い non-consuming press は LR2 スタイル `POOR` として扱われ、result / replay / UI に再表示される
@@ -158,7 +161,7 @@
   - rank 境界は `<75 F / 75 B / 80.5 A / 86.5 A+ / 90 S / 95.5 S+ / 98 AA / 99 SS / 99.75 SSS`
   - live gameplay の `ClockSync` は大きな Windows QPC 絶対値ではなく centered anchor regression を使い、継続する clock discontinuity 後に自動 rebase する
   - stale backlog は QPC event age と `BAD` window で判定し、fresh input の sample mapping が現在の playback anchor から大きくずれた場合は anchor に fallback する
-  - tail release timing は BMS `#LNMODE 2` charge note のみに適用
+  - R3では通常LNと`#LNMODE 2` CNを早く離しすぎると即座にBAD・コンボ切れ・ゲージ減少が確定し、再入力で取り消せない。通常LNの保持による自動完了とCNの末尾解放判定は維持
   - 2 台のキーボードが同じキーを押しても、最後の入力ソースが離すまで論理 `Pressed` は維持される
 - Graphics:
   - resolution presets (`720p`, `1080p`, `qhd`, `native`)
@@ -228,7 +231,7 @@
 
 ## Runtime / Packaging Rules
 - 新しい user profile は自動生成される
-- 現在の P2P 配布対象は `TenRiff 1.8.2`
+- 現在の P2P 配布対象は `TenRiff 1.8.3`
 - distribution package には `Songs` を含めない
 - distribution package には `Main Menu / Options / Song Selecte / Multiplayer Lobby / Clear / Failed` の `Mainmusic/` scene slot を含め、各 `Name.mp3` と `Name 2.mp3`～`Name 64.mp3` を自動検出して scene 再入場ごとに循環する
 - distribution 更新には built artifact と必要な runtime asset だけを含める

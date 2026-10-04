@@ -62,6 +62,9 @@ struct GameplayConfig {
     double input_offset_ms = 0.0;
     bool practice_no_fail_enabled = false;
     bool one_miss_fail_enabled = false;
+    // Replay rulesets 1/2 deferred LN releases and let a re-press cancel them.
+    // Only historical replay playback/verification should opt into that behavior.
+    bool legacy_hold_release = false;
 };
 
 struct LiveJudgementFeedback {
@@ -167,6 +170,7 @@ private:
     bool game_over_ = false;
     bool practice_no_fail_enabled_ = false;
     bool one_miss_fail_enabled_ = false;
+    bool legacy_hold_release_ = false;
 };
 
 }  // namespace tenriff::gameplay

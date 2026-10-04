@@ -139,9 +139,18 @@ void MenuApp::populate_gameplay_render_data(render::GameplayHudData& target,
     target.show_gear_boundary_line = style_bool(
         manifest_style ? manifest_style->show_gear_boundary_line : std::optional<bool>{},
         config_.skin.show_gear_boundary_line);
-    target.show_timing_feedback = style_bool(
+    const auto timing_visibility = resolve_timing_feedback_visibility(config_.skin,
         manifest_style ? manifest_style->show_timing_feedback : std::optional<bool>{},
-        config_.skin.show_timing_feedback);
+        manifest_style ? manifest_style->show_timing_bar : std::optional<bool>{});
+    target.show_timing_feedback = timing_visibility.text;
+    target.show_timing_bar = timing_visibility.bar;
+    target.note_fade_in = config_.skin.note_fade_in;
+    target.note_fade_out = config_.skin.note_fade_out;
+    target.timing_text_offset_x = config_.skin.timing_text_offset_x;
+    target.timing_text_offset_y = config_.skin.timing_text_offset_y;
+    target.timing_bar_offset_x = config_.skin.timing_bar_offset_x;
+    target.timing_bar_offset_y = config_.skin.timing_bar_offset_y;
+
     target.show_hold_tail = style_bool(
         manifest_style ? manifest_style->show_hold_tail : std::optional<bool>{},
         config_.skin.show_hold_tail);
@@ -1735,6 +1744,12 @@ void MenuApp::publish_snapshot() {
             break;
     }
 
+    if (current_screen() == Screen::SettingsSkins && skin_preview_fullscreen_) {
+        render.generic.skin_preview.fullscreen = true;
+        render.kind = render::MenuScreenKind::GameplayHud;
+        render.gameplay = render::make_skin_gameplay_preview(render.generic.skin_preview);
+    }
+
     if (render.kind == render::MenuScreenKind::GenericList) {
         menu::settings::apply_settings_help(current_screen(), render.generic, ui_language());
         if (current_screen() == Screen::SettingsSkins)
@@ -2092,6 +2107,7 @@ int MenuApp::selected_adjustment_repeat_row(uint32_t keycode) {
 }
 
 bool MenuApp::is_song_select_repeat_key(uint32_t keycode) {
+    if (skin_preview_fullscreen_) return false;
     if (help_overlay_visible_ || profile_nickname_edit_active_ ||
         difficulty_table_url_editing_ || online_records_url_editing_ || song_select_search_active_ ||
         chat_overlay_visible_ || ranked_account_overlay_visible_ || chat_url_warning_visible_ ||

@@ -53,6 +53,9 @@ struct ReplayFile {
     int replay_format_version = kReplayFormatVersion;
     std::string chart_path;
     std::string chart_format;
+    // Effective BMS timing rank at export (0..3). Optional for legacy/OSU files;
+    // playback still takes its timing policy from the independently loaded chart.
+    std::optional<int> bms_rank;
     std::string chart_sha256;
     std::string ruleset_id;
     std::string created_utc;
@@ -79,6 +82,7 @@ struct ResultFile {
     int replay_format_version = kReplayFormatVersion;
     std::string chart_path;
     std::string chart_format;
+    std::optional<int> bms_rank;
     std::string chart_sha256;
     std::string ruleset_id;
     std::string created_utc;

@@ -17,6 +17,8 @@
 
 ### `audio`
 
+- `play_to_end` (bool; default `true`): 마지막 판정 뒤 남은 음악을 끝까지 듣습니다. `false`면 `ui.result_tail_ms`만 기다린 뒤 정상 결과로 넘어갑니다. 판정·점수·리플레이는 바뀌지 않으며, 기존 수동 후주 스킵도 유지합니다.
+
 - `backend` (string)
   - `wasapi | asio`; 기본 `wasapi`. 게임플레이와 선곡 미리듣기의 출력 백엔드. 메뉴·결과 배경음악은 별도 Windows MCI 경로를 유지.
 - `asio_driver` (string)
@@ -44,7 +46,7 @@
   - master volume
 - `bgm_volume` (double)
 - `normalize_audio` (bool)
-  - 인게임 전체 스테레오 믹스의 RMS 음량 조절. limiter/master volume 전에 적용하며 기본값 false. 메뉴 음악·선곡 미리듣기는 그대로 유지.
+  - 인게임 RMS 음량 조절, 기본 false. ON은 기존 RMS→소프트 리미터→마스터 경로, OFF는 선형 마스터→최종 출력 범위 제한만 적용합니다. 메뉴 음악·선곡 미리듣기는 그대로 유지합니다.
 - `keysound_volume` (double)
 
 ASIO 설정은 [장치 설정 안내](asio-audio.md)를 참고하세요. 선택 샘플레이트를 고정하고 차트 오디오를 리샘플링합니다. `frames`는 요청값이며 드라이버 허용 크기로 협상됩니다. ASIO에서는 프리셋이 버퍼 크기를 덮어쓰지 않으며 `exclusive`·`periods`는 WASAPI 전용입니다. ASIO 오류 시 WASAPI로 자동 전환하지 않습니다.
@@ -80,16 +82,17 @@ ASIO 설정은 [장치 설정 안내](asio-audio.md)를 참고하세요. 선택 
   - `0..25` 범위로 clamp
   - 기본값은 `8ms`
 ### `judge`
+- BMS `#RANK`는 기본 판정에 적용됩니다: `3/EASY` PG21ms, `2/NORMAL` PG18ms, `1/HARD` PG15ms, `0/VERYHARD` PG8ms. EASY의 GR/GD/BAD는 65/115/210ms로 유지하며 나머지 등급은 각각 18/21, 15/21, 8/21배로 줄입니다. 헤더 누락/미지원 값은 EASY입니다. `Judge Easy/Hard` 모드는 이 파일 판정에 추가 적용됩니다. 홀드 허용창과 자동 미스 시점은 RANK로 변경하지 않습니다.
 - `pg`, `gr`, `gd`, `bd` (double, ms)
-- 기본 `pg / gr / gd`는 각각 `20ms / 65ms / 115ms`
+- 기본 `pg / gr / gd`는 각각 `21ms / 65ms / 115ms`
 - 기본 `bd`는 `210ms`
-- `Judge Easy`는 기본 판정창을 `1.35x`로 넓힘: `pg/gr/gd/bd=27/87.75/155.25/283.5ms`. 홀드 허용창도 같은 배율이며 `mask`는 유지
+- `Judge Easy`는 기본 판정창을 `1.35x`로 넓힘: `pg/gr/gd/bd=28.35/87.75/155.25/283.5ms`. 홀드 허용창도 같은 배율이며 `mask`는 유지
 - `Judge Hard`는 PG/GR/GD와 홀드 허용창을 유지하고 `bd` 상한을 `180ms`로 제한함. 사용자 지정 BAD가 더 작으면 넓히지 않음
 - `indirect_miss` (double, ms)
   - 현재 프로필에서는 `340ms`로 저장·정규화하며, BAD 판정창과 별도로 무입력 자동 미스 확정 시점을 정함
   - 기본 Normal/Easy/Hard 모두 노트 시각에서 `340ms`를 초과하면 자동 미스. Normal/Easy는 BAD, Hard는 콤보를 끊는 간접 `POOR`/OD8 `MISS`로 기록
   - BAD창 밖이지만 자동 미스 전인 늦은 입력은 BAD 적중으로 인정하지 않고 이전 노트를 미스 처리한 뒤 다음 노트를 검사함
-- 새 플레이는 `tenriff-native-score-v2-ruleset-2`를 기록함. 기존 `ruleset-1` 리플레이·고스트·검증은 Easy `1.25x`, Hard BAD `340ms`, 자동 미스 `=BAD`였던 정확한 이전 정책을 사용하며 임의 커스텀 판정을 정식으로 인정하지 않음
+- 새 플레이는 `tenriff-native-score-v2-ruleset-3`를 기록합니다. 기존 `ruleset-1/2` 리플레이·고스트·검증은 PG20ms, RANK 미적용, 이전 롱노트 해제 정책을 복원합니다. ruleset-1은 Easy 1.25x/Hard BAD340ms/자동 미스=BAD도 유지합니다. 임의 커스텀 판정은 정식 판정으로 인정하지 않습니다.
 - `hold_grace` (double, ms)
   - 롱노트 tail release를 `PG`로 보는 전용 허용창
   - 기본값은 `80ms`
@@ -228,7 +231,7 @@ Gauge Shift는 항상 적용됩니다. `mode.gauge`의 `ex_hard / hard / normal 
 | `language` | `en`, `ko`, `ja`; `en` | UI 언어. 다른 값은 en으로 정규화. |
 | `menu_font_size` | `normal`, `large`, `extra_large`; `normal` | 프로필/첫 실행에서 보통·크게·더 크게 선택. 메뉴 글자 100%·115%·130%, 게임플레이 스킨 글자는 별도 유지. |
 | `all_song_sources` | bool; `false` | `ALL SONG` 통합 목록을 다음 실행에서도 복원. 등록된 폴더 캐시를 순서대로 읽고 경로가 같은 차트는 한 번만 표시. |
-| `result_tail_ms` | double; `500` ms | 판정 완료 후 결과 전환 시 추가 대기 시간. 차트 오디오 종료 시점도 함께 고려합니다. |
+| `result_tail_ms` | double; `500` ms | 판정 완료 후 결과 전환 시 추가 대기 시간. `audio.play_to_end=true`이면 차트 오디오 종료 시점도 함께 고려합니다. |
 | `require_enter_to_exit` | bool; `true` | 읽기·저장 호환 필드. 현재 Windows 결과 입력 경로는 이 값으로 자동 종료하지 않습니다. |
 | `show_cursor_in_gameplay` | bool; `true` | 인게임 마우스 포인터 표시. |
 | `active_song_source`, `recent_song_sources` | string / string[] | 현재 곡 폴더와 최근 곡 폴더 목록. |
@@ -263,13 +266,17 @@ Gauge Shift는 항상 적용됩니다. `mode.gauge`의 `ex_hard / hard / normal 
 | `scratch_position` | `left`, `right`; `left` | 7+1 스크래치 표시 순서만 변경. 입력·판정 레인은 유지. |
 | `lr2_resolution_mode` | `auto`, `sd`, `hd`, `fhd`; `auto` | LR2 좌표 기준 해상도 해석. auto는 파일명 대신 `#DST_NOTE` 좌표를 사용. |
 | `visual_preset` | `classic`, `neon`, `minimal`, `tenriff`; `tenriff` | 메뉴에서 선택하면 시각 옵션 묶음을 재설정. |
-| `note_shape` | `rect`, `triangle`, `pentagon`, `hexagon`, `circle`; `rect` | 기본 도형 노트 모양. |
+| `note_shape` | `rect`, `circle`, `triangle`, `pentagon`, `hexagon`, `square`, `diamond`, `arrow`; `rect` | 기본 도형 노트 모양. `hex`는 `hexagon`의 호환 별칭. |
 | `note_image_aspect` | `stretch`, `contain`, `width`; `stretch` | 늘이기 / 비율 유지해 안에 맞추기 / 폭을 고정하고 높이를 비율로 계산. |
 | `preserve_note_image_aspect_ratio` | bool; `false` | 구버전 호환 필드. 명시된 `note_image_aspect`가 우선하며 저장 시 stretch 이외는 true. |
 | `note_border_enabled`, `show_lane_dividers`, `show_judgement_line` | bool; `true` | 각각 노트 테두리, 레인 구분선, 판정선 표시. |
 | `note_divider_gap_px` | double: `0..40`; `12` px | 노트 한쪽 가장자리와 구분선 사이 여백. 0이면 구분선까지 확장. |
 | `show_gear_boundary_line` | bool; `false` | 기어 경계선 표시. |
-| `show_timing_feedback` | bool; `true` | FAST/SLOW 문구와 타이밍 기록 표시. 판정 등급은 별도로 유지. |
+| `show_timing_feedback` | bool; `true` | FAST/SLOW 글자 표시. 타이밍 막대는 별도 설정. |
+| `show_timing_bar` | bool; `true` | 타이밍 막대 표시. 값이 없는 이전 프로필/스킨은 기존 글자 표시 값을 상속. |
+| `timing_feedback_override` | bool; `false` | 사용자가 표시 설정을 바꾼 후 스킨 매니페스트보다 프로필의 두 표시 값을 우선. |
+| `timing_text_offset_x`, `timing_bar_offset_x` | double: `-600..600`; `0` | 글자/막대의 독립 X 이동. 기존 판정 주변 배치에 더하는 1920×1080 기준 픽셀. |
+| `timing_text_offset_y`, `timing_bar_offset_y` | double: `-400..400`; `0` | 글자/막대의 독립 Y 이동. 양수는 아래, 음수는 위. 기준 픽셀. |
 | `show_hold_tail`, `hold_tail_taper_enabled` | bool; `false` | 각각 LN 꼬리 캡 표시, 꼬리 테이퍼. 판정 규칙은 변경하지 않음. |
 | `judgement_line_glow_enabled` | bool; `true` | 판정선 주변 빛 표시. |
 | `key_pulse_brightness` | double: `0..1`; `1` | Hit Burst 밝기. 0이면 끔. |
@@ -286,6 +293,8 @@ Gauge Shift는 항상 적용됩니다. `mode.gauge`의 `ex_hard / hard / normal 
 | `black_playfield_enabled` | bool; `true` | 레인 간격을 포함한 필드 전체를 검정으로 표시. |
 | `visual_opacity` | double: `0.20..1`; `0.96` | 노트·리셉터·키 라벨의 공통 불투명도 배율. |
 | `note_outline_opacity` | double: `0..1`; `0.78` | 노트 외곽선 불투명도. |
+| `note_fade_in` | double: `0..1`; `0` | 상단 검은 안개의 깊이. 노트가 내려오며 서서히 나타납니다. 0은 OFF. |
+| `note_fade_out` | double: `0..1`; `0` | 판정선 위 검은 안개의 깊이. 노트가 서서히 사라집니다. 0은 OFF. 판정선·키·HUD는 유지합니다. |
 | `hold_body_opacity` | double: `0.05..1`; `1` | LN 몸통 불투명도. |
 | `lane_width_scales` | object: mode → number[]; `0.50..1.75` | 레인 수 길이의 개별 폭 배열. |
 | `note_width_scale` | double: `0.50..1.40`; `1` | Note & Field Size. 중심을 유지하며 필드·레인·노트·인접 게이지를 함께 조절. |
@@ -299,7 +308,9 @@ Gauge Shift는 항상 적용됩니다. `mode.gauge`의 `ex_hard / hard / normal 
 | `lane_colors` | object: mode → string[] | 레인 수 길이의 색상 토큰 배열. |
 | `single_color` | string; `off` | 색상 토큰을 선택하면 전체 레인에 적용. 기존 lane_colors는 보존. |
 
-모드별 배열·override 지원: `4k`, `5k`, `6k`, `7k`, `7+1`, `8k`, `9k`, `10k`, `12k`, `14k`, `16k`. 색상 토큰: `ice`, `azure`, `gold`, `mint`, `rose`, `violet`, `orange`, `teal`. `7+1`은 스킨 팔레트 전용이며 별도 키맵 모드가 아닙니다. 구버전 `expand_notes_to_dividers=true`는 여백 0으로 읽으며, 명시된 `note_divider_gap_px`가 우선합니다.
+모드별 배열·override 지원: `4k`부터 `16k`까지 모든 키 수와 `7+1`. 색상 토큰: `ice`, `azure`, `gold`, `mint`, `rose`, `violet`, `orange`, `teal`. 스킨 키 모드의 `7K` 다음 항목은 `7+1`이며, 바로 아래 스크래치 위치에서 좌우 표시 순서를 바꿉니다. `7+1`은 별도 키맵 모드가 아닙니다. 구버전 `expand_notes_to_dividers=true`는 여백 0으로 읽으며, 명시된 `note_divider_gap_px`가 우선합니다.
+
+모드별 크기를 처음 조절할 때는 화면에 표시된 공용 값을 기준으로 5%씩 증감한 뒤 해당 모드의 override로 저장합니다. 예를 들어 노트·필드 크기 100%에서 `+`를 누르면 105%, 노트 높이 180%에서 `-`를 누르면 175%가 됩니다. 키 모드를 바꾸어도 아직 편집하지 않은 모드의 공용 값은 유지하며, 뒤로 나갈 때 프로필에 저장해 재실행 후에도 유지합니다.
 
 전체 BGA 암막은 적용하지 않으며 검정 필드, 레인 배경과 기어는 기존 설정대로 유지합니다. 스킨 설정의 비주얼 레이턴시는 다섯 번째 항목입니다.
 

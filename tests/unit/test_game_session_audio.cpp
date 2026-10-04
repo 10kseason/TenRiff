@@ -9,6 +9,8 @@
 #include <fstream>
 #include <chrono>
 #include <thread>
+#include <cmath>
+#include <limits>
 
 namespace tenriff::app {
 
@@ -189,6 +191,77 @@ struct GameSessionAudioTestAccess {
         CHECK(inactive_unmuted == off);
     }
 
+    static void check_normalize_off_preserves_full_scale_waveform() {
+        auto session = std::make_unique<GameSession>();
+        session->config_.audio_ui.normalize_audio = false;
+        session->config_.audio_ui.master_volume = 0.7;
+        const std::vector<float> original{
+            1.0f, -1.0f, 0.99f, -0.99f, 0.95f, -0.95f,
+            0.92f, -0.92f, 0.25f, -0.25f, 0.0f, 0.0f};
+        auto output = original;
+        session->finish_audio_output(output.data(), static_cast<uint32_t>(output.size() / 2), true);
+        for (std::size_t i = 0; i < output.size(); ++i) {
+            CHECK(output[i] == doctest::Approx(original[i] * 0.7f));
+        }
+    }
+
+    static void check_normalize_off_mix_retains_master_headroom() {
+        auto session = std::make_unique<GameSession>();
+        session->sample_rate_ = 48000;
+        session->chart_.lane_count = 1;
+        session->chart_.duration_samples = 480000;
+        session->chart_.notes.push_back(gameplay::NoteEvent{1, 240000, std::nullopt});
+        gameplay::GameplayConfig config;
+        config.sample_rate = 48000;
+        config.practice_no_fail_enabled = true;
+        session->engine_ = std::make_unique<gameplay::GameplayEngine>(session->chart_, config);
+        session->synthetic_tones_enabled_ = false;
+        session->lane_activity_.assign(1, 0);
+        session->lane_pressed_.assign(1, 0);
+        session->config_.speed.rate = 1.0;
+        session->config_.audio_ui.normalize_audio = false;
+        session->config_.audio_ui.mute_when_inactive = false;
+        session->config_.audio_ui.master_volume = 0.35;
+        session->config_.audio_ui.bgm_volume = 1.0;
+        session->config_.audio_ui.keysound_volume = 1.0;
+
+        constexpr uint32_t frames = 96;
+        std::vector<float> clip(frames * 2);
+        for (uint32_t frame = 0; frame < frames; ++frame) {
+            const float wave = static_cast<float>(std::sin(frame * 6.283185307179586 / 48.0));
+            clip[frame * 2] = wave * 0.85f;
+            clip[frame * 2 + 1] = wave * 0.30f;
+        }
+        session->chart_audio_assets_.resize(2);
+        for (auto& asset : session->chart_audio_assets_)
+            asset.clip.samples = std::make_shared<const std::vector<float>>(clip);
+        session->chart_audio_voices_.push_back({0, 0, GameSession::ChartAudioEvent::Kind::Bgm, 1.0f});
+        session->chart_audio_voices_.push_back({0, 1, GameSession::ChartAudioEvent::Kind::Keysound, 1.0f});
+        std::vector<float> output(frames * 2);
+        session->audio_callback(output.data(), frames, 0, 0);
+        // The pre-master sum peaks at 1.7, but 35% output has ample headroom.
+        // Compressing first distorts only the louder left channel and changes
+        // both the waveform and stereo balance even though Normalize is OFF.
+        for (std::size_t i = 0; i < output.size(); ++i) {
+            CHECK(output[i] == doctest::Approx(clip[i] * 2.0f * 0.35f).epsilon(0.00001));
+        }
+    }
+
+    static void check_normalize_off_output_range_boundary() {
+        auto session = std::make_unique<GameSession>();
+        session->config_.audio_ui.normalize_audio = false;
+        session->config_.audio_ui.master_volume = 0.5;
+        std::vector<float> output{3.0f, -3.0f, 1.6f, -1.6f,
+            std::numeric_limits<float>::quiet_NaN(), std::numeric_limits<float>::infinity()};
+        session->finish_audio_output(output.data(), 3, true);
+        CHECK(output[0] == 1.0f);
+        CHECK(output[1] == -1.0f);
+        CHECK(output[2] == doctest::Approx(0.8f));
+        CHECK(output[3] == doctest::Approx(-0.8f));
+        CHECK(output[4] == 0.0f);
+        CHECK(output[5] == 0.0f);
+    }
+
     static void check_speed_click_production_mix() {
         auto session = pause_fixture();
         session->chart_audio_voices_.clear();
@@ -261,10 +334,11 @@ struct GameSessionAudioTestAccess {
     }
 
     static void check_automatic_result(bool delayed_bgm, bool manual_skip, bool silent,
-                                       bool failed_audio = false) {
+                                       bool failed_audio = false, bool skip_outro = false) {
         auto session = std::make_unique<GameSession>();
         session->sample_rate_ = 48000;
         session->chart_.lane_count = 4;
+        session->chart_.bms_rank = 3; // BMS loader resolves absent #RANK to EASY.
         // Trailing chart measures and startup decode estimates must not keep a
         // completed score waiting after all audible voices have drained.
         session->chart_.duration_samples = 960000;
@@ -276,6 +350,7 @@ struct GameSessionAudioTestAccess {
         session->gauge_shift_enabled_ = true;
         session->gameplay_started_ = true;
         session->config_.ui.result_tail_ms = 100;
+        session->config_.audio_ui.play_to_end = !skip_outro;
         session->config_.mode.key_mode = "4k";
         session->chart_format_ = ChartFormat::Bms;
         session->key_to_lane_[32] = 1;
@@ -295,7 +370,7 @@ struct GameSessionAudioTestAccess {
         session->dispatch_lane_input(1, input::InputState::Pressed, 12000, 12000);
         session->dispatch_lane_input(1, input::InputState::Released, 12001, 12000);
         std::vector<float> audio(960);
-        const int64_t expected_end = (silent || failed_audio) ? 17280 : delayed_bgm ? 96000 : 48000;
+        const int64_t expected_end = (skip_outro || silent || failed_audio) ? 17280 : delayed_bgm ? 96000 : 48000;
         // Model two queued device buffers. No input is injected after the last
         // note unless this is the explicit skip compatibility case.
         for (int64_t sample = 12000; sample <= expected_end + 960; sample += 480) {
@@ -429,6 +504,97 @@ struct GameSessionAudioTestAccess {
         paused_buffer(*session, 200480, 3);
     }
 
+    static std::unique_ptr<GameSession> pause_hud_fixture() {
+        auto session = pause_fixture();
+        // A short note shortly ahead of the audible head, then an unhit LN.
+        // 250ms of queued audio is enough for the write head to expire the short
+        // note even while the player still needs to see it at the playback head.
+        session->chart_.notes = {gameplay::NoteEvent{1, 37500, std::nullopt},
+                                 gameplay::NoteEvent{1, 42000, 100000},
+                                 gameplay::NoteEvent{1, 240000, std::nullopt}};
+        for (std::size_t i = 0; i < session->chart_.notes.size(); ++i)
+            session->chart_.notes[i].note_id = i;
+        gameplay::GameplayConfig config;
+        config.sample_rate = 48000;
+        config.practice_no_fail_enabled = true;
+        session->engine_ = std::make_unique<gameplay::GameplayEngine>(session->chart_, config);
+        session->ghost_engine_ = std::make_unique<gameplay::GameplayEngine>(session->chart_, config);
+        session->hidden_hit_note_ids_.assign(session->chart_.notes.size(), 0);
+        session->ghost_hidden_hit_note_ids_.assign(session->chart_.notes.size(), 0);
+        session->ghost_lane_activity_.assign(1, 0);
+        session->ghost_lane_pressed_.assign(1, 0);
+        session->config_.audio_ui.mute_when_inactive = false;
+        return session;
+    }
+
+    static bool hud_contains_note(const GameSession::HudSnapshot& hud, int64_t start, bool ghost = false) {
+        const auto& notes = ghost ? hud.ghost_notes : hud.notes;
+        const auto count = ghost ? hud.ghost_note_count : hud.note_count;
+        return std::any_of(notes.begin(), notes.begin() + count,
+            [start](const auto& note) { return note.start_sample == start; });
+    }
+
+    static void check_pause_resume_hud_playback_anchor(bool pause_in_audio_queue) {
+        auto session = pause_hud_fixture();
+        std::vector<float> audio(960);
+        session->audio_callback(audio.data(), 480, 47520, 35520);
+        const auto before = session->hud_snapshot();
+        REQUIRE(before.current_sample == 35520);
+        REQUIRE(hud_contains_note(before, 37500));
+        REQUIRE(hud_contains_note(before, 37500, true));
+        if (pause_in_audio_queue) {
+            input::InputEvent escape{};
+            escape.keycode = 27;
+            escape.state = input::InputState::Pressed;
+            REQUIRE(session->input_thread_.queue().push(escape));
+        } else {
+            control(*session, 27);
+        }
+        session->audio_callback(audio.data(), 480, 48000, 36000);
+        const auto paused = session->hud_snapshot();
+        CHECK(paused.paused);
+        CHECK(paused.current_sample == 36000);
+        CHECK(hud_contains_note(paused, 37500));
+        CHECK(hud_contains_note(paused, 37500, true));
+        CHECK(hud_contains_note(paused, 42000));
+
+        control(*session, 13);
+        for (const int64_t write : {48480LL, 96480LL, 144480LL, 192480LL}) {
+            session->audio_callback(audio.data(), 480, write, write - 12000);
+            const auto countdown = session->hud_snapshot();
+            CHECK(countdown.current_sample == 36000);
+            CHECK(hud_contains_note(countdown, 37500));
+            CHECK(hud_contains_note(countdown, 37500, true));
+        }
+        REQUIRE_FALSE(session->paused_.load());
+        session->audio_callback(audio.data(), 480, 192960, 180960);
+        const auto resumed = session->hud_snapshot();
+        CHECK_FALSE(resumed.paused);
+        CHECK(resumed.current_sample == 36000);
+        CHECK(resumed.current_sample >= paused.current_sample);
+        CHECK(hud_contains_note(resumed, 37500));
+        CHECK(hud_contains_note(resumed, 37500, true));
+        CHECK(hud_contains_note(resumed, 42000));
+        CHECK(session->last_audio_sample_.load() == 48480);
+    }
+
+    static void check_hud_note_scan_after_playback_rewind() {
+        auto session = pause_hud_fixture();
+        std::vector<float> audio(960);
+        session->audio_callback(audio.data(), 480, 96000, 96000);
+        const auto ahead = session->hud_snapshot();
+        REQUIRE_FALSE(hud_contains_note(ahead, 37500));
+        REQUIRE_FALSE(hud_contains_note(ahead, 37500, true));
+        // Devices may revise queued playback position independently of the
+        // monotonic write cursor; rebuilding visual cues must also rewind notes.
+        session->audio_callback(audio.data(), 480, 96480, 36000);
+        const auto rewound = session->hud_snapshot();
+        CHECK(rewound.current_sample == 36000);
+        CHECK(hud_contains_note(rewound, 37500));
+        CHECK(hud_contains_note(rewound, 37500, true));
+        CHECK(hud_contains_note(rewound, 42000));
+    }
+
     static void check_course_escape() {
         for (bool started : {false, true}) {
             auto session = pause_fixture();
@@ -560,6 +726,18 @@ TEST_CASE("normalization OFF bypasses prior automatic gain and focus mute restor
     tenriff::app::GameSessionAudioTestAccess::check_normalize_and_focus_output();
 }
 
+TEST_CASE("normalization OFF preserves full scale PCM peaks instead of applying hidden compression") {
+    tenriff::app::GameSessionAudioTestAccess::check_normalize_off_preserves_full_scale_waveform();
+}
+
+TEST_CASE("normalization OFF preserves overlapping BGM and keysound waveform with master headroom") {
+    tenriff::app::GameSessionAudioTestAccess::check_normalize_off_mix_retains_master_headroom();
+}
+
+TEST_CASE("normalization OFF only clips true post master overflow and rejects nonfinite PCM") {
+    tenriff::app::GameSessionAudioTestAccess::check_normalize_off_output_range_boundary();
+}
+
 TEST_CASE("production input queue preserves a charge hold through primary to secondary key handoff") {
     tenriff::app::GameSessionAudioTestAccess::check_secondary_binding_input_queue();
 }
@@ -614,6 +792,15 @@ TEST_CASE("Esc cancels a resume countdown without advancing the chart") {
     tenriff::app::GameSessionAudioTestAccess::check_countdown_cancel();
 }
 
+TEST_CASE("pause resume keeps playback anchored notes visible with queued audio for player and ghost") {
+    for (bool queued_pause : {false, true})
+        tenriff::app::GameSessionAudioTestAccess::check_pause_resume_hud_playback_anchor(queued_pause);
+}
+
+TEST_CASE("HUD note scans recover when the playback cursor moves backwards") {
+    tenriff::app::GameSessionAudioTestAccess::check_hud_note_scan_after_playback_rewind();
+}
+
 TEST_CASE("cancelled starting countdown and failed audio start do not count as a played song") {
     tenriff::app::GameSessionAudioTestAccess::check_gameplay_start_boundary();
 }
@@ -628,4 +815,10 @@ TEST_CASE("resume synchronizes a released hold without scoring the paused input"
 
 TEST_CASE("audio driver failure on the last finished buffer does not export a score or replay") {
     tenriff::app::GameSessionAudioTestAccess::check_audio_failure_no_result();
+}
+
+TEST_CASE("automatic outro skip keeps normal score export with active or future audio") {
+    for (bool delayed : {false, true})
+        for (bool silent : {false, true})
+            tenriff::app::GameSessionAudioTestAccess::check_automatic_result(delayed, false, silent, false, true);
 }

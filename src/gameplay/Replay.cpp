@@ -324,11 +324,19 @@ ExportResult save_json_file(const std::string& path, const config::JsonValue& ro
 }  // namespace
 
 ExportResult save_replay_json(const std::string& path, const ReplayFile& replay, int indent) {
+    if (replay.bms_rank && (*replay.bms_rank < 0 || *replay.bms_rank > 3)) {
+        ExportResult result;
+        result.error = "Replay BMS rank must be an integer from 0 through 3.";
+        return result;
+    }
     config::JsonObject obj;
     obj.emplace("version", config::JsonValue{static_cast<double>(replay.version)});
     obj.emplace("replay_format_version", config::JsonValue{static_cast<double>(replay.replay_format_version)});
     obj.emplace("chart_path", config::JsonValue{replay.chart_path});
     obj.emplace("chart_format", config::JsonValue{replay.chart_format});
+    if (replay.bms_rank) {
+        obj.emplace("bms_rank", config::JsonValue{static_cast<double>(*replay.bms_rank)});
+    }
     obj.emplace("chart_sha256", config::JsonValue{replay.chart_sha256});
     obj.emplace("ruleset_id", config::JsonValue{replay.ruleset_id});
     obj.emplace("created_utc", config::JsonValue{replay.created_utc});
@@ -354,11 +362,19 @@ ExportResult save_replay_json(const std::string& path, const ReplayFile& replay,
 }
 
 ExportResult save_result_json(const std::string& path, const ResultFile& result_file, int indent) {
+    if (result_file.bms_rank && (*result_file.bms_rank < 0 || *result_file.bms_rank > 3)) {
+        ExportResult result;
+        result.error = "Result BMS rank must be an integer from 0 through 3.";
+        return result;
+    }
     config::JsonObject obj;
     obj.emplace("version", config::JsonValue{static_cast<double>(result_file.version)});
     obj.emplace("replay_format_version", config::JsonValue{static_cast<double>(result_file.replay_format_version)});
     obj.emplace("chart_path", config::JsonValue{result_file.chart_path});
     obj.emplace("chart_format", config::JsonValue{result_file.chart_format});
+    if (result_file.bms_rank) {
+        obj.emplace("bms_rank", config::JsonValue{static_cast<double>(*result_file.bms_rank)});
+    }
     obj.emplace("chart_sha256", config::JsonValue{result_file.chart_sha256});
     obj.emplace("ruleset_id", config::JsonValue{result_file.ruleset_id});
     obj.emplace("created_utc", config::JsonValue{result_file.created_utc});
@@ -426,6 +442,15 @@ ReplayLoadResult load_replay_json(const std::string& path) {
     replay.replay_format_version = read_json_int(*root, "replay_format_version", 0);
     replay.chart_path = read_json_string(*root, "chart_path");
     replay.chart_format = read_json_string(*root, "chart_format");
+    if (const auto* rank = find_json_value(*root, "bms_rank")) {
+        const double value = rank->as_number(-1.0);
+        if (!rank->is_number() || !std::isfinite(value) ||
+            value < 0.0 || value > 3.0 || std::floor(value) != value) {
+            result.error = "Replay BMS rank must be an integer from 0 through 3.";
+            return result;
+        }
+        replay.bms_rank = static_cast<int>(value);
+    }
     replay.chart_sha256 = read_json_string(*root, "chart_sha256");
     replay.ruleset_id = read_json_string(*root, "ruleset_id");
     replay.created_utc = read_json_string(*root, "created_utc");
@@ -625,6 +650,10 @@ ReplayLoadResult load_replay_json(const std::string& path) {
 
 ReplayValidationResult validate_replay_evidence(const ReplayFile& replay) {
     ReplayValidationResult result;
+    if (replay.bms_rank && (*replay.bms_rank < 0 || *replay.bms_rank > 3)) {
+        result.error = "Replay BMS rank must be an integer from 0 through 3.";
+        return result;
+    }
     if (!replay.mode.course_gauge.empty() || replay.mode.course_gauge_initial_value.has_value()) {
         if (replay.mode.course_gauge != kLr2CourseGaugeId ||
             !replay.mode.course_gauge_initial_value.has_value() ||

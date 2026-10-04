@@ -1,8 +1,11 @@
 #include "doctest/doctest.h"
 
+#include <chrono>
+#include <filesystem>
 #include <string>
 #include <vector>
 
+#include "app/LanePresentationLayout.h"
 #include "app/menu/MenuAction.h"
 #include "app/MenuAppSkinUtils.h"
 #include "app/menu/settings/SkinSettingsController.h"
@@ -168,6 +171,128 @@ TEST_CASE("note height controls stop at 50 and 400 percent for every supported k
     CHECK(tenriff::app::format_percent(2.5) == "250%");
 }
 
+TEST_CASE("skin size first adjustment starts at the displayed inherited value") {
+    std::vector<std::string> modes{"7+1"};
+    for (int keys = 4; keys <= 16; ++keys) modes.push_back(std::to_string(keys) + "k");
+    for (const auto& mode : modes) {
+        for (const double inherited : {1.0, 1.8}) {
+            for (const int direction : {-1, 1}) {
+                tenriff::config::RuntimeConfig runtime;
+                const double inherited_width = std::min(inherited, tenriff::config::kNoteWidthScaleMax);
+                runtime.skin.note_width_scale = inherited_width;
+                runtime.skin.note_height_scale = inherited;
+                REQUIRE(runtime.skin.note_width_scales.empty());
+                REQUIRE(runtime.skin.note_height_scales.empty());
+                CHECK(tenriff::config::resolved_skin_note_width_scale(runtime.skin, mode) ==
+                      doctest::Approx(inherited_width));
+                SkinSettingsController controller;
+                controller.reset(mode);
+                static_cast<void>(controller.handle(
+                    MenuAction::adjust(direction), runtime, kLr2Names, kTenRiffNames,
+                    SkinSettingsRowId::NoteWidth));
+                static_cast<void>(controller.handle(
+                    MenuAction::adjust(direction), runtime, kLr2Names, kTenRiffNames,
+                    SkinSettingsRowId::NoteHeight));
+                const double expected_width = std::clamp(inherited_width + direction * 0.05,
+                    tenriff::config::kNoteWidthScaleMin, tenriff::config::kNoteWidthScaleMax);
+                CHECK(tenriff::config::resolved_skin_note_width_scale(runtime.skin, mode) ==
+                      doctest::Approx(expected_width));
+                CHECK(tenriff::config::resolved_skin_note_height_scale(runtime.skin, mode) ==
+                      doctest::Approx(inherited + direction * 0.05));
+                // Only the edited mode receives an override; the legacy global stays intact.
+                CHECK(runtime.skin.note_width_scale == doctest::Approx(inherited_width));
+                CHECK(runtime.skin.note_height_scale == doctest::Approx(inherited));
+                CHECK(runtime.skin.note_width_scales.size() == 1u);
+                CHECK(runtime.skin.note_height_scales.size() == 1u);
+                CHECK(controller.handle(MenuAction::back(), runtime, kLr2Names, kTenRiffNames).menu.persist_config);
+            }
+        }
+    }
+}
+
+TEST_CASE("skin geometry first adjustment preserves lane defaults and explicit per-mode values") {
+    tenriff::config::RuntimeConfig runtime;
+    runtime.skin.note_width_scale = 1.3;
+    runtime.skin.note_height_scale = 1.8;
+    runtime.skin.note_width_scales["16k"] = 1.2;
+    runtime.skin.note_height_scales["16k"] = 2.0;
+    runtime.skin.lane_center_gap_scale = 0.8;
+    SkinSettingsController controller;
+    controller.reset("16k");
+    for (const auto id : {SkinSettingsRowId::LaneWidth, SkinSettingsRowId::LaneSpacing,
+                          SkinSettingsRowId::DividerWidth, SkinSettingsRowId::CenterGap,
+                          SkinSettingsRowId::NoteWidth, SkinSettingsRowId::NoteHeight}) {
+        static_cast<void>(controller.handle(MenuAction::adjust(1), runtime, kLr2Names, kTenRiffNames, id));
+    }
+    const auto widths = tenriff::config::resolved_skin_lane_width_scales(runtime.skin, "16k");
+    REQUIRE(widths.size() == 16u);
+    CHECK(widths[0] == doctest::Approx(tenriff::config::kLaneWidthScaleDefault + 0.05));
+    CHECK(widths[1] == doctest::Approx(tenriff::config::kLaneWidthScaleDefault));
+    const auto gaps = tenriff::config::resolved_skin_lane_spacing_scales(runtime.skin, "16k");
+    REQUIRE(gaps.size() == 15u);
+    CHECK(gaps[0] == doctest::Approx(tenriff::config::kLaneSpacingScaleDefault + 0.05));
+    CHECK(gaps[1] == doctest::Approx(tenriff::config::kLaneSpacingScaleDefault));
+    CHECK(tenriff::config::resolved_skin_lane_divider_width_scale(runtime.skin, "16k") ==
+          doctest::Approx(tenriff::config::kLaneDividerWidthScaleDefault + 0.05));
+    CHECK(tenriff::config::resolved_skin_lane_center_gap_scale(runtime.skin, "16k") == doctest::Approx(0.85));
+    CHECK(tenriff::config::resolved_skin_note_width_scale(runtime.skin, "16k") == doctest::Approx(1.25));
+    CHECK(tenriff::config::resolved_skin_note_height_scale(runtime.skin, "16k") == doctest::Approx(2.05));
+}
+
+TEST_CASE("skin 7+1 scratch side and adjusted sizes survive profile save and reload") {
+    struct ProfileDir {
+        std::filesystem::path path;
+        ~ProfileDir() {
+            std::error_code error;
+            std::filesystem::remove_all(path, error);
+        }
+    } profile{std::filesystem::temp_directory_path() /
+              ("tenriff-skin-first-adjust-" + std::to_string(
+                  std::chrono::steady_clock::now().time_since_epoch().count()))};
+    REQUIRE(std::filesystem::create_directory(profile.path));
+    tenriff::config::RuntimeConfig runtime;
+    runtime.skin.note_width_scale = 1.3;
+    runtime.skin.note_height_scale = 1.8;
+    SkinSettingsController controller;
+    controller.reset("7k");
+    static_cast<void>(controller.handle(MenuAction::adjust(1), runtime, kLr2Names, kTenRiffNames,
+                                        SkinSettingsRowId::KeyMode));
+    REQUIRE(controller.edit_mode() == "7+1");
+    CHECK(tenriff::app::key_mode_label(std::string(controller.edit_mode())) == "7+1");
+    static_cast<void>(controller.handle(MenuAction::adjust(1), runtime, kLr2Names, kTenRiffNames,
+                                        SkinSettingsRowId::ScratchPosition));
+    REQUIRE(runtime.skin.scratch_position == "right");
+    static_cast<void>(controller.handle(MenuAction::activate(), runtime, kLr2Names, kTenRiffNames,
+                                        SkinSettingsRowId::NoteWidth));
+    static_cast<void>(controller.handle(MenuAction::adjust(-1), runtime, kLr2Names, kTenRiffNames,
+                                        SkinSettingsRowId::NoteHeight));
+    REQUIRE(controller.handle(MenuAction::back(), runtime, kLr2Names, kTenRiffNames).menu.persist_config);
+    tenriff::config::ConfigLoader loader;
+    REQUIRE(loader.save_profile(profile.path.u8string(), runtime));
+    auto loaded = loader.load_profile(profile.path.u8string());
+    REQUIRE(loaded.success());
+    CHECK(loaded.config.skin.scratch_position == "right");
+    CHECK(tenriff::config::resolved_skin_note_width_scale(loaded.config.skin, "7+1") == doctest::Approx(1.35));
+    CHECK(tenriff::config::resolved_skin_note_height_scale(loaded.config.skin, "7+1") == doctest::Approx(1.75));
+    CHECK(tenriff::config::resolved_skin_note_width_scale(loaded.config.skin, "7k") == doctest::Approx(1.3));
+    const int scratch = 1;
+    const auto right = tenriff::app::resolve_lane_presentation_layout(
+        8, &scratch, 1, loaded.config.skin.scratch_position);
+    CHECK(right.visual_lane_for_source(1) == 8);
+    CHECK(right.visual_lane_for_source(2) == 1);
+    controller.reset("7+1");
+    static_cast<void>(controller.handle(MenuAction::adjust(-1), loaded.config, kLr2Names, kTenRiffNames,
+                                        SkinSettingsRowId::ScratchPosition));
+    CHECK(loaded.config.skin.scratch_position == "left");
+    static_cast<void>(controller.handle(MenuAction::adjust(-1), loaded.config, kLr2Names, kTenRiffNames,
+                                        SkinSettingsRowId::NoteWidth));
+    CHECK(tenriff::config::resolved_skin_note_width_scale(loaded.config.skin, "7+1") == doctest::Approx(1.3));
+    const auto left = tenriff::app::resolve_lane_presentation_layout(
+        8, &scratch, 1, loaded.config.skin.scratch_position);
+    CHECK(left.visual_lane_for_source(1) == 1);
+    CHECK(left.visual_lane_for_source(2) == 2);
+}
+
 TEST_CASE("skin unavailable adjustments are no-ops") {
     tenriff::config::RuntimeConfig runtime;
     SkinSettingsController controller;
@@ -278,6 +403,8 @@ TEST_CASE("skin editing starts at four keys and preserves a later edit choice wi
     for (int keys = 4; keys <= 16; ++keys) {
         CHECK(tenriff::app::normalize_skin_edit_mode(std::to_string(keys) + "-Key") ==
               std::to_string(keys) + "k");
+        CHECK(tenriff::app::key_mode_label(std::to_string(keys) + "k") == std::to_string(keys) + "K");
+        CHECK(tenriff::app::lane_count_for_skin_mode(std::to_string(keys) + "k") == keys);
     }
     controller.reset(controller.edit_mode());
     CHECK(controller.edit_mode() == "4k");
@@ -385,4 +512,58 @@ TEST_CASE("backdrop height edits adopt imported brightness without changing opac
                                        SkinSettingsRowId::KeyBackdropHeight));
     CHECK(runtime.skin.key_backdrop_height == doctest::Approx(0.0));
     CHECK(runtime.skin.key_pulse_brightness == doctest::Approx(pulse));
+}
+
+TEST_CASE("timing controls adopt manifest switches independently and persist on exit") {
+    SkinSettingsController controller;
+    tenriff::config::RuntimeConfig runtime;
+    controller.reset("10k");
+    controller.set_timing_defaults(false, true);
+    auto change = [&](SkinSettingsRowId id, int direction = 1) {
+        return controller.handle(MenuAction::adjust(direction), runtime, kLr2Names, kTenRiffNames, id);
+    };
+    CHECK(change(SkinSettingsRowId::TimingFeedback).menu.render_changed);
+    CHECK(runtime.skin.show_timing_feedback);
+    CHECK(runtime.skin.show_timing_bar);
+    CHECK(runtime.skin.timing_feedback_override);
+    change(SkinSettingsRowId::TimingBar);
+    CHECK(runtime.skin.show_timing_feedback);
+    CHECK_FALSE(runtime.skin.show_timing_bar);
+    // Saved user choices beat a different imported skin on reload.
+    const auto visible = tenriff::app::resolve_timing_feedback_visibility(runtime.skin, false, true);
+    CHECK(visible.text);
+    CHECK_FALSE(visible.bar);
+    change(SkinSettingsRowId::TimingTextX);
+    change(SkinSettingsRowId::TimingTextY, -1);
+    change(SkinSettingsRowId::TimingBarX, -1);
+    change(SkinSettingsRowId::TimingBarY);
+    CHECK(runtime.skin.timing_text_offset_x == 10);
+    CHECK(runtime.skin.timing_text_offset_y == -10);
+    CHECK(runtime.skin.timing_bar_offset_x == -10);
+    CHECK(runtime.skin.timing_bar_offset_y == 10);
+    CHECK(runtime.skin.judgement_offset_x == 0);
+    runtime.skin.timing_bar_offset_y = 400;
+    change(SkinSettingsRowId::TimingBarY);
+    CHECK(runtime.skin.timing_bar_offset_y == 400);
+    const auto back = controller.handle(MenuAction::back(), runtime, kLr2Names, kTenRiffNames);
+    CHECK(back.menu.persist_config);
+    CHECK(back.menu.navigate_back);
+}
+
+TEST_CASE("note fog controls change separately in five percent steps and save") {
+    tenriff::config::RuntimeConfig runtime;
+    SkinSettingsController controller;
+    controller.reset("7+1");
+    for (int n = 0; n < 7; ++n)
+        static_cast<void>(controller.handle(MenuAction::adjust(1), runtime, kLr2Names, kTenRiffNames, SkinSettingsRowId::NoteFadeIn));
+    CHECK(runtime.skin.note_fade_in == doctest::Approx(0.35));
+    CHECK(runtime.skin.note_fade_out == 0.0);
+    for (int n = 0; n < 25; ++n)
+        static_cast<void>(controller.handle(MenuAction::adjust(1), runtime, kLr2Names, kTenRiffNames, SkinSettingsRowId::NoteFadeOut));
+    CHECK(runtime.skin.note_fade_out == 1.0);
+    for (int n = 0; n < 25; ++n)
+        static_cast<void>(controller.handle(MenuAction::adjust(-1), runtime, kLr2Names, kTenRiffNames, SkinSettingsRowId::NoteFadeOut));
+    CHECK(runtime.skin.note_fade_out == 0.0);
+    CHECK(runtime.skin.note_fade_in == doctest::Approx(0.35));
+    CHECK(controller.handle(MenuAction::back(), runtime, kLr2Names, kTenRiffNames).menu.persist_config);
 }

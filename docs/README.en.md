@@ -10,6 +10,10 @@ This codebase should also be read as a `vibe coding` work that grew through rapi
 
 When current-behavior descriptions conflict, check **implementation and regression tests at the same commit** first, then correct `current-state`, `config` and their translations together. `baseline-*` and `release-*` describe their named versions; early designs and roadmap proposals are not implementation or performance guarantees.
 
+- [1.8.3 release](release-1.8.3-gate.md)
+- [1.8.3 audio / LN / RANK](audio-ln-rank.ko.md)
+- [Skin timing controls](timing-feedback-controls.ko.md)
+- [Note fog / song ending / pause resume](skin-fade-audio-resume.ko.md)
 - [1.8.2 release](release-1.8.2-gate.md)
 - [1.8.1 release](release-1.8.1-gate.md)
 - [1.8.1 Studio](menu-studio-1.8.1.ko.md)

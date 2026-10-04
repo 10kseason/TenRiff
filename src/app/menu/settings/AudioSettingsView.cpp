@@ -161,6 +161,11 @@ AudioSettingsViewModel AudioSettingsView::build(
         localized(language, "Mute When Inactive", "창 비활성화 시 음소거"),
         on_off(runtime.audio_ui.mute_when_inactive, language), controller, true, true));
     view.rows.push_back(make_row(
+        AudioSettingId::PlayToEnd, SettingsRowKind::Choice,
+        localized(language, "Song Ending", "곡 종료 방식"),
+        runtime.audio_ui.play_to_end ? localized(language, "Listen to End", "끝까지 듣기")
+                                    : localized(language, "Skip Outro", "후주 스킵"), controller, true, true));
+    view.rows.push_back(make_row(
         AudioSettingId::TitleMusic, SettingsRowKind::Choice,
         localized(language, "Title Music", "타이틀 음악"),
         title_music_label(runtime.audio_ui.title_music, language), controller, true, true));
@@ -273,6 +278,7 @@ AudioSettingsViewModel AudioSettingsView::build(
             case AudioSettingId::KeysoundMode:
             case AudioSettingId::BackgroundSound:
             case AudioSettingId::TitleMusic:
+            case AudioSettingId::PlayToEnd:
             case AudioSettingId::MuteWhenInactive:
                 row.category = localized(language, "Playback", "재생");
                 break;

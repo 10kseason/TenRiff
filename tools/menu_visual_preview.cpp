@@ -66,12 +66,13 @@ struct MenuAppVisualTestAccess {
     }
     static void populate_skin_rows(render::MenuRenderData& source,
                                    const TenRiffSkinDefinition* imported,
-                                   int selected_row, bool backdrop_override) {
+                                   int selected_row, bool backdrop_override, bool scratch_right = false) {
         auto app = std::make_unique<MenuApp>();
         const auto& preview = source.generic.skin_preview;
-        const std::string mode = std::to_string(preview.lane_count) + "k";
+        const std::string mode = preview.mode_label == "7+1" ? "7+1" : std::to_string(preview.lane_count) + "k";
         app->config_.ui.language = ui::language_token(source.ui_language);
         auto& skin = app->config_.skin;
+        skin.scratch_position = scratch_right ? "right" : "left";
         // Keep the deterministic scene's values reflected in its actual rows.
         skin.note_height_scale = preview.note_height_scale;
         skin.note_height_scales[mode] = preview.note_height_scale;
@@ -90,6 +91,15 @@ struct MenuAppVisualTestAccess {
         skin.combo_font_scale = preview.combo_font_scale;
         skin.judgement_font_scale = preview.judgement_font_scale;
         skin.judgement_offset_x = preview.judgement_offset_x;
+        skin.show_timing_feedback = preview.show_timing_feedback;
+        skin.show_timing_bar = preview.show_timing_bar;
+        skin.timing_feedback_override = true;
+        skin.timing_text_offset_x = preview.timing_text_offset_x;
+        skin.note_fade_in = preview.note_fade_in;
+        skin.note_fade_out = preview.note_fade_out;
+        skin.timing_text_offset_y = preview.timing_text_offset_y;
+        skin.timing_bar_offset_x = preview.timing_bar_offset_x;
+        skin.timing_bar_offset_y = preview.timing_bar_offset_y;
         skin.show_lane_dividers = preview.show_lane_dividers;
         skin.note_divider_gap_px = preview.note_divider_gap_px;
         skin.show_judgement_line = preview.show_judgement_line;
@@ -134,6 +144,7 @@ struct MenuAppVisualTestAccess {
         actual.ui_language = source.ui_language;
         app->populate_skin_settings_render_data(actual);
         source.generic.rows = std::move(actual.generic.rows);
+        source.generic.skin_preview = std::move(actual.generic.skin_preview);
         source.generic.notes = std::move(actual.generic.notes);
         const auto tips = settings_help_tips(source.ui_language);
         source.generic.notes.insert(source.generic.notes.begin(), tips.begin(), tips.end());
@@ -161,7 +172,8 @@ struct MenuWindowVisualTestAccess {
         if (verify && !foreground)
             limitations.emplace_back("Own preview window is not foreground in this execution environment. Geometry resolver checks run; native input dispatch is unverified.");
         auto fixture = source;
-        const std::size_t visits = verify && !fixture.generic.rows.empty() ? fixture.generic.rows.size() : 1;
+        const std::size_t visits = verify && source.kind == MenuScreenKind::GenericList &&
+            !fixture.generic.rows.empty() ? fixture.generic.rows.size() : 1;
         std::set<std::pair<int, int>> verified_targets;
         for (std::size_t visit = 0; visit < visits; ++visit) {
             if (verify) {
@@ -176,13 +188,15 @@ struct MenuWindowVisualTestAccess {
                 const bool song_control = song_fixture &&
                     (region.kind == MenuHitTargetKind::SongCard || region.kind == MenuHitTargetKind::SongNavButton ||
                      region.kind == MenuHitTargetKind::SongDifficultyTable);
-                if (!menu_card && !song_control && region.kind != MenuHitTargetKind::SettingsRow && region.kind != MenuHitTargetKind::KeymapButton)
+                const bool preview_button = region.kind == MenuHitTargetKind::SkinPreviewButton;
+                if (preview_button && visit != 0) continue;
+                if (!preview_button && !menu_card && !song_control && region.kind != MenuHitTargetKind::SettingsRow && region.kind != MenuHitTargetKind::KeymapButton)
                     continue;
-                const bool control = menu_card || song_control || region.part == MenuHitPart::Decrement ||
+                const bool control = preview_button || menu_card || song_control || region.part == MenuHitPart::Decrement ||
                     region.part == MenuHitPart::Increment || region.part == MenuHitPart::SetValue ||
                     (skin_fixture && region.part == MenuHitPart::Activate) ||
                     fixture.generic.keymap_keyboard;
-                if (verify && (!control || (visits > 1 &&
+                if (verify && (!control || (!preview_button && visits > 1 &&
                     (region.kind != fixture.generic.rows[visit].target_kind ||
                      region.index != fixture.generic.rows[visit].row_index)))) continue;
                 const float x = (region.left + region.right) * 0.5f;
@@ -320,10 +334,17 @@ int main(int argc, char** argv) {
     bool gameplay = false;
     bool ghost = false;
     bool ghost_paused = false;
+    bool resume_countdown = false;
     bool no_feedback = false;
+    bool timing_text_off = false, timing_bar_off = false;
+    double timing_text_x = 0, timing_text_y = 0, timing_bar_x = 0, timing_bar_y = 0;
     bool search_active = false;
     std::string search_query;
     bool skin_scene = false;
+    bool fullscreen_skin_preview = false;
+    bool seven_plus_one = false, scratch_right = false;
+    std::string preview_note_shape, preview_hit_burst;
+    double fade_in = 0.0, fade_out = 0.0;
     double field_offset = 0;
     int players = 0;
     int preview_fps = 144;
@@ -384,7 +405,20 @@ int main(int argc, char** argv) {
     data.ui_language = tenriff::ui::Language::Korean;
     for (int i = 1; i < argc; ++i) {
         const std::string arg = argv[i];
-        if (arg == "--verify-hits") verify_hits = true;
+        if (arg == "--fullscreen-preview") fullscreen_skin_preview = settings = skin_settings = true;
+        else if (arg == "--seven-plus-one") { seven_plus_one = keys_explicit = true; preview_keys = 8; }
+        else if (arg == "--scratch-right") scratch_right = true;
+        else if (arg == "--fade-in" && i + 1 < argc) fade_in = std::stod(argv[++i]);
+        else if (arg == "--fade-out" && i + 1 < argc) fade_out = std::stod(argv[++i]);
+        else if (arg == "--note-shape" && i + 1 < argc) preview_note_shape = argv[++i];
+        else if (arg == "--hit-burst" && i + 1 < argc) preview_hit_burst = argv[++i];
+        else if (arg == "--timing-text-off") timing_text_off = true;
+        else if (arg == "--timing-bar-off") timing_bar_off = true;
+        else if (arg == "--timing-text-x" && i + 1 < argc) timing_text_x = std::stod(argv[++i]);
+        else if (arg == "--timing-text-y" && i + 1 < argc) timing_text_y = std::stod(argv[++i]);
+        else if (arg == "--timing-bar-x" && i + 1 < argc) timing_bar_x = std::stod(argv[++i]);
+        else if (arg == "--timing-bar-y" && i + 1 < argc) timing_bar_y = std::stod(argv[++i]);
+        else if (arg == "--verify-hits") verify_hits = true;
         else if (arg == "--hitmap" && i + 1 < argc) hitmap_path = argv[++i];
         else if (arg == "--select-row" && i + 1 < argc) selected_row = std::stoi(argv[++i]);
         else if (arg == "--select-setting" && i + 1 < argc) selected_setting = std::stoi(argv[++i]);
@@ -443,6 +477,7 @@ int main(int argc, char** argv) {
         else if (arg == "--options") options_grid = true;
         else if (arg == "--gameplay") gameplay = true;
         else if (arg == "--ghost") ghost = gameplay = true;
+        else if (arg == "--resume-countdown") resume_countdown = true;
         else if (arg == "--ghost-paused") ghost_paused = ghost = gameplay = true;
         else if (arg == "--no-feedback") no_feedback = true;
         else if (arg == "--search-active") search_active = true;
@@ -518,7 +553,7 @@ int main(int argc, char** argv) {
         preview.visible = skin_settings;
         preview.note_height_scale = preview_note_height;
         preview.lane_count = preview_keys;
-        preview.mode_label = std::to_string(preview_keys) + "K";
+        preview.mode_label = seven_plus_one ? "7+1" : std::to_string(preview_keys) + "K";
         preview.gameplay_field_offset_x = field_offset;
         if (moved_labels) {
             preview.judgement_position = 0.4; preview.judgement_offset_x = -120;
@@ -932,10 +967,21 @@ int main(int argc, char** argv) {
     if (backdrop_opacity >= 0.0) data.generic.skin_preview.key_backdrop_opacity = backdrop_opacity;
     if (backdrop_brightness >= 0.0) data.generic.skin_preview.key_backdrop_brightness = backdrop_brightness;
     if (backdrop_height >= 0.0) data.generic.skin_preview.key_backdrop_height = backdrop_height;
+    data.gameplay.show_timing_feedback = data.generic.skin_preview.show_timing_feedback = !timing_text_off;
+    data.gameplay.show_timing_bar = data.generic.skin_preview.show_timing_bar = !timing_bar_off;
+    data.gameplay.timing_text_offset_x = data.generic.skin_preview.timing_text_offset_x = timing_text_x;
+    data.gameplay.timing_text_offset_y = data.generic.skin_preview.timing_text_offset_y = timing_text_y;
+    data.gameplay.timing_bar_offset_x = data.generic.skin_preview.timing_bar_offset_x = timing_bar_x;
+    data.gameplay.timing_bar_offset_y = data.generic.skin_preview.timing_bar_offset_y = timing_bar_y;
+    data.gameplay.note_fade_in = data.generic.skin_preview.note_fade_in = fade_in;
+    data.gameplay.note_fade_out = data.generic.skin_preview.note_fade_out = fade_out;
+    if (!preview_note_shape.empty()) data.gameplay.note_shape = data.generic.skin_preview.note_shape = preview_note_shape;
+    if (!preview_hit_burst.empty()) data.gameplay.hit_burst_style = data.generic.skin_preview.hit_burst_style = preview_hit_burst;
     if (skin_settings) {
         tenriff::app::MenuAppVisualTestAccess::populate_skin_rows(
             data, fixture_skin ? &*fixture_skin : nullptr, selected_row,
-            backdrop_off || backdrop_opacity >= 0.0 || backdrop_brightness >= 0.0 || backdrop_height >= 0.0);
+            backdrop_off || backdrop_opacity >= 0.0 || backdrop_brightness >= 0.0 || backdrop_height >= 0.0,
+            scratch_right);
     }
     if (selected_row >= 0) {
         for (std::size_t i = 0; i < data.generic.rows.size(); ++i)
@@ -952,6 +998,11 @@ int main(int argc, char** argv) {
     }
     if (!sites_records_title.empty() &&
         !tenriff::app::MenuAppVisualTestAccess::populate_sites_records(data, sites_records_title)) return 5;
+    if (fullscreen_skin_preview) {
+        data.generic.skin_preview.fullscreen = true;
+        data.kind = MenuScreenKind::GameplayHud;
+        data.gameplay = make_skin_gameplay_preview(data.generic.skin_preview);
+    }
     if (skin_scene) {
         data.gameplay = make_skin_gameplay_preview(data.generic.skin_preview);
         data.kind = MenuScreenKind::GameplayHud;
@@ -962,6 +1013,10 @@ int main(int argc, char** argv) {
         data.gameplay.max_combo = 12345;
         data.gameplay.accuracy = 99.98;
         data.gameplay.detailed_accuracy = 98.76;
+    }
+    if (resume_countdown) {
+        data.gameplay.paused = data.gameplay.countdown_active = true;
+        data.gameplay.countdown_value = 3;
     }
     if (bms_editor) {
         data.kind = MenuScreenKind::BmsEditor;

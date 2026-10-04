@@ -28,6 +28,7 @@ inline std::string setting_help(Screen screen, int id, ui::Language language) {
         {"Smaller buffers reduce delay but can cause crackling. Increase the value if playback breaks up.", "버퍼가 작으면 지연이 줄지만 소리가 끊길 수 있습니다. 끊김이 생기면 값을 올리세요.", "小さいバッファは遅延を減らしますが、音切れが出たら大きくしてください。"},
         {"Mute game audio while another window is active. Audio returns when you focus TenRiff.", "다른 창을 사용하는 동안 게임 소리를 끕니다. TenRiff로 돌아오면 다시 재생됩니다.", "他のウィンドウを使用中は消音し、TenRiffに戻ると解除します。"},
         {"Choose title-screen music: default, random BMS, last played, or none.", "타이틀 음악을 기본 음악, 랜덤 BMS, 마지막 플레이한 곡 또는 없음으로 고릅니다.", "タイトル音楽を標準、ランダムBMS、最後に遊んだ曲、なしから選びます。"},
+        {"After the last judgement, listen to the remaining audio or skip it after the result delay. Notes and scoring stay unchanged.", "마지막 판정 뒤 남은 음악을 끝까지 듣거나 결과 대기 시간 후 스킵합니다. 노트와 점수는 그대로입니다.", "最後の判定後、残りの音楽を最後まで聴くか結果待機時間後にスキップします。"},
     };
     static constexpr SettingsHelpText graphics[] = {
         {"Choose windowed, borderless, or fullscreen display.", "창 모드, 테두리 없는 창, 전체 화면 중 표시 방식을 고릅니다.", "ウィンドウ、ボーダーレス、全画面を選びます。"},
@@ -123,7 +124,7 @@ inline std::string setting_help(Screen screen, int id, ui::Language language) {
         {"Positive values advance note visuals. Judgement and audio timing remain unchanged.", "양수는 노트 화면을 시간상 앞당깁니다. 판정과 소리 시점은 그대로 유지됩니다.", "正の値でノート表示を先へ進めます。判定と音声は変わりません。"},
         {"Adjust the small visual gap between neighboring notes.", "이웃한 노트 사이의 작은 표시 간격을 조절합니다.", "隣接するノート間の表示間隔を調整します。"},
         {"Show or hide the mouse cursor during gameplay.", "플레이 중 마우스 커서를 표시하거나 숨깁니다.", "プレイ中のマウスカーソルを表示・非表示にします。"},
-        {"Choose how early/late timing feedback is displayed.", "입력이 빠르거나 늦었는지 보여주는 타이밍 피드백 방식을 고릅니다.", "早い・遅い入力のタイミング表示を選びます。"},
+        {"Show FAST/SLOW text independently of the timing bar.", "타이밍 막대와 별도로 FAST/SLOW 글자를 켜거나 끕니다.", "タイミングバーとは別にFAST/SLOW文字を切り替えます。"},
         {"Save skin adjustments and return.", "스킨 조절값을 저장하고 돌아갑니다.", "スキン設定を保存して戻ります。"},
         {"Move judgement text vertically.", "판정 글자의 세로 위치를 옮깁니다.", "判定文字を上下に移動します。"},
         {"Move judgement text horizontally.", "판정 글자의 가로 위치를 옮깁니다.", "判定文字を左右に移動します。"},
@@ -135,6 +136,13 @@ inline std::string setting_help(Screen screen, int id, ui::Language language) {
         {"Adjust the judgement text size.", "판정 글자 크기를 조절합니다.", "判定文字の大きさを調整します。"},
         {"Adjust how bright the key background becomes on a hit.", "키를 누를 때 키 배경이 얼마나 밝아지는지 조절합니다.", "入力時のキー背景の明るさを調整します。"},
         {"Adjust the vertical size of the key background panel.", "키 배경 패널의 세로 높이를 조절합니다.", "キー背景パネルの高さを調整します。"},
+        {"Show the timing bar independently of FAST/SLOW text.", "FAST/SLOW 글자와 별도로 타이밍 막대를 켜거나 끕니다.", "FAST/SLOW文字とは別にバーを切り替えます."},
+        {"Move FAST/SLOW text on the X axis in base pixels.", "FAST/SLOW 글자의 가로 위치를 기준 픽셀 단위로 옮깁니다.", "FAST/SLOW文字を左右に移動します。"},
+        {"Move FAST/SLOW text on the Y axis in base pixels.", "FAST/SLOW 글자의 세로 위치를 기준 픽셀 단위로 옮깁니다.", "FAST/SLOW文字を上下に移動します。"},
+        {"Move FAST/SLOW bar on the X axis in base pixels.", "FAST/SLOW 막대의 가로 위치를 기준 픽셀 단위로 옮깁니다.", "FAST/SLOWバーを左右に移動します。"},
+        {"Move FAST/SLOW bar on the Y axis in base pixels.", "FAST/SLOW 막대의 세로 위치를 기준 픽셀 단위로 옮깁니다.", "FAST/SLOWバーを上下に移動します。"},
+        {"Black fog at the top makes notes fade in. 0% is off; higher values extend the fog toward the judgement line.", "상단의 검은 안개 아래에서 노트가 서서히 나타납니다. 0%는 끔이며 높일수록 안개 범위가 판정선 쪽으로 넓어집니다.", "上部の黒い霧からノートが現れます。0%はオフ、値を上げると範囲が広がります。"},
+        {"Black fog above the judgement line makes notes fade out. 0% is off; the judgement line, keys and HUD stay visible.", "판정선 위의 검은 안개로 노트가 서서히 사라집니다. 0%는 끔이며 판정선·키·HUD는 유지됩니다.", "判定ライン上の黒い霧でノートが消えます。0%はオフ。ライン・キー・HUDは表示されます。"},
     };
     static constexpr SettingsHelpText profile[] = {
         {"Choose the interface language. The change is applied and saved immediately.", "화면 언어를 선택합니다. 변경 즉시 적용하고 저장합니다.", "表示言語を選びます。すぐに適用・保存されます。"},

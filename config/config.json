@@ -16,7 +16,8 @@
     "bgm_volume": 0.75,
     "keysound_volume": 1.0,
     "normalize_audio": false,
-    "mute_when_inactive": false
+    "mute_when_inactive": false,
+    "play_to_end": true
   },
   "input": {
     "backend": "rawinput",
@@ -28,7 +29,7 @@
     "debounce_ms": 8.0
   },
   "judge": {
-    "pg": 20.0,
+    "pg": 21.0,
     "gr": 65.0,
     "gd": 115.0,
     "bd": 210.0,
@@ -124,6 +125,12 @@
     "show_lane_dividers": true,
     "show_judgement_line": true,
     "show_timing_feedback": true,
+    "show_timing_bar": true,
+    "timing_feedback_override": false,
+    "timing_text_offset_x": 0.0,
+    "timing_text_offset_y": 0.0,
+    "timing_bar_offset_x": 0.0,
+    "timing_bar_offset_y": 0.0,
     "show_gear_boundary_line": false,
     "show_hold_tail": false,
     "hold_tail_taper_enabled": false,
@@ -243,7 +250,9 @@
     "key_backdrop_enabled": true,
     "key_backdrop_opacity": 0.25,
     "key_backdrop_brightness": 1.0,
-    "key_backdrop_height": 1.0
+    "key_backdrop_height": 1.0,
+    "note_fade_in": 0.0,
+    "note_fade_out": 0.0
   },
   "offsets": {
     "input": 0.0,

@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.8.3] - 2026-10-04
+
+- Accept R3 web records with an explicit BMS RANK or osu-fixed timing profile and exported BMS rank; preserve existing R1/R2 record IDs and scores through an index-only migration. The website migration precedes this client release. See the [1.8.3 release gate](docs/release-1.8.3-gate.md).
+- Make Normalize OFF bypass both automatic gain and hidden soft compression; apply linear master gain before guarding actual output overflow.
+- Commit an early long-note release immediately so regrabbing cannot erase its BAD, combo break or gauge loss.
+- Apply BMS #RANK timing: EASY PG 21ms with other windows unchanged; NORMAL/HARD/VERYHARD PG 18/15/8ms with proportional GR/GD/BAD windows. New plays use ruleset-3; ruleset-1/2 replay and ghost playback retain their original timing and LN release behavior. See [audio and judgement details](docs/audio-ln-rank.ko.md).
+
+- Add independent black-fog note fade-in/out ranges in Skin Settings (0% disables each), shared by gameplay, ghost and both previews; save them with profiles and portable presets.
+- Add Audio → Song Ending: listen to the remaining audio (default) or automatically skip the outro after the normal result delay, preserving score/replay completion.
+- Keep frozen notes visible during the resume countdown and anchor pause HUD time to actual playback, with note-scan recovery if playback time moves backwards.
+
+- Add a fullscreen Skin Preview button/F6 using the gameplay renderer and transient fullscreen display mode. Preview the selected hit-burst style with repeating taps; Esc/F6 returns without changing saved graphics settings.
+- Label the scratch layout as 7+1, preserve left/right scratch placement, and fix first-step field/note sizing that incorrectly started from 50% when a per-mode value was absent.
+- Give diamond/arrow/triangle/pentagon/hexagon note heads and tails black outlines, overlap hold bodies through cap centers to remove gaps, and expose all existing note shapes consistently in skin manifests and the editor.
+- Separate FAST/SLOW text and timing bar switches and add independent X/Y offsets in Skins. Retain legacy single-switch behavior until edited; explicit user choices survive imported skins, profile reload and portable presets.
+- Show timing controls in the live skin preview and add the editable, image-free `TenRiff_SimpleSquare` skin. Native skin authors can position text with `native.rects.timing_label` and the bar with `native.rects.timing`.
+- See [controls and local verification](docs/timing-feedback-controls.ko.md).
+
 ## [1.8.2] - 2026-10-03
 
 - Give the ten Options icons distinct saturated colors at full opacity, with editable `options.icon.*` vector colors and matching Studio PNGs. Keep black card surfaces, round the corners to 12px, use 1.5px/2.25px borders, and match the selected border to its icon. See [icon colors](docs/options-icon-colors.ko.md).

@@ -186,6 +186,7 @@
             "combo": {"$ref": "#/$defs/nativeRectAdjustment"},
             "judgement": {"$ref": "#/$defs/nativeRectAdjustment"},
             "timing": {"$ref": "#/$defs/nativeRectAdjustment"},
+            "timing_label": {"$ref": "#/$defs/nativeRectAdjustment"},
             "gauge": {"$ref": "#/$defs/nativeRectAdjustment"},
             "progress": {"$ref": "#/$defs/nativeRectAdjustment"},
             "key_label": {"$ref": "#/$defs/nativeRectAdjustment"}
@@ -245,6 +246,7 @@
         "show_lane_dividers": { "type": "boolean" },
         "show_judgement_line": { "type": "boolean" },
         "show_timing_feedback": { "type": "boolean" },
+        "show_timing_bar": { "type": "boolean" },
         "show_gear_boundary_line": { "type": "boolean" },
         "show_hold_tail": { "type": "boolean" },
         "hold_tail_taper": { "type": "boolean" },
@@ -258,7 +260,7 @@
         "hit_burst_style": { "enum": ["prism", "ring", "spark"] },
         "key_label_position": { "enum": ["off", "top", "bottom"] },
         "note_border": { "type": "boolean" },
-        "note_shape": { "enum": ["rect", "circle", "diamond", "hex"] },
+        "note_shape": { "enum": ["rect", "circle", "triangle", "pentagon", "hexagon", "square", "diamond", "arrow", "hex"] },
         "lane_colors": { "type": "array", "minItems": 1, "maxItems": 16, "items": { "$ref": "#/$defs/hexColor" } },
         "lane_background_opacity": { "type": "number", "minimum": 0.0, "maximum": 0.45 },
         "black_playfield": { "type": "boolean" },
@@ -465,6 +467,7 @@
         "show_lane_dividers": { "type": "boolean" },
         "show_judgement_line": { "type": "boolean" },
         "show_timing_feedback": { "type": "boolean" },
+        "show_timing_bar": { "type": "boolean" },
         "show_gear_boundary_line": { "type": "boolean" },
         "show_hold_tail": { "type": "boolean" },
         "hold_tail_taper": { "type": "boolean" },
@@ -478,7 +481,7 @@
         "hit_burst_style": { "enum": ["prism", "ring", "spark"] },
         "key_label_position": { "enum": ["off", "top", "bottom"] },
         "note_border": { "type": "boolean" },
-        "note_shape": { "enum": ["rect", "circle", "diamond", "hex"] },
+        "note_shape": { "enum": ["rect", "circle", "triangle", "pentagon", "hexagon", "square", "diamond", "arrow", "hex"] },
         "lane_colors": {
           "type": "array", "minItems": 1, "maxItems": 16,
           "items": { "$ref": "#/$defs/hexColor" }

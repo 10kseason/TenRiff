@@ -756,6 +756,10 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
         manifest_style ? manifest_style->key_backdrop_enabled : std::optional<bool>{};
     const auto backdrop_default_opacity =
         manifest_style ? manifest_style->key_backdrop_opacity : std::optional<float>{};
+    const auto timing_default_text = manifest_style ? manifest_style->show_timing_feedback : std::optional<bool>{};
+    const auto timing_default_bar = manifest_style ? manifest_style->show_timing_bar : std::optional<bool>{};
+    skin_settings_controller_.set_timing_defaults(timing_default_text, timing_default_bar);
+    const auto timing_visibility = resolve_timing_feedback_visibility(config_.skin, timing_default_text, timing_default_bar);
     const auto backdrop_default_brightness = manifest_style ? manifest_style->key_backdrop_brightness : std::optional<float>{};
     const auto backdrop_default_height = manifest_style ? manifest_style->key_backdrop_height : std::optional<float>{};
     skin_settings_controller_.set_backdrop_defaults(backdrop_default_enabled, backdrop_default_opacity,
@@ -787,7 +791,10 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
                                   : (config_.skin.tenriff_skin_name.empty() ? available_tenriff_skin_names_.front()
                                                                             : config_.skin.tenriff_skin_name);
     }
-    append_menu_row(render.generic, ui_text("Key Mode", "키 모드"), ui_key_mode_label(skin_edit_mode_),
+    // Skin layouts include 7+1, which is not a runtime key-conversion mode.
+    // Passing it through ui_key_mode_label would turn it into "Original".
+    const std::string skin_mode_label = key_mode_label(skin_edit_mode_);
+    append_menu_row(render.generic, ui_text("Key Mode", "키 모드"), skin_mode_label,
                     false,
                     render::MenuHitTargetKind::SettingsRow,
                     static_cast<int>(SkinSettingsRowId::KeyMode), false, true);
@@ -868,6 +875,10 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
                     static_cast<int>(SkinSettingsRowId::SingleColor),
                     false,
                     true);
+    append_menu_row(render.generic, ui_text("Note Fade In", "노트 페이드인 안개"), format_percent(config_.skin.note_fade_in),
+                    false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::NoteFadeIn), false, true);
+    append_menu_row(render.generic, ui_text("Note Fade Out", "노트 페이드아웃 안개"), format_percent(config_.skin.note_fade_out),
+                    false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::NoteFadeOut), false, true);
     append_menu_row(render.generic, ui_text("Note Shape", "노트 모양"), ui_skin_note_shape_label(config_.skin.note_shape),
                     false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::NoteShape), false, true);
     append_menu_row(render.generic, ui_text("Note Border", "노트 테두리"), ui_on_off(config_.skin.note_border_enabled),
@@ -956,12 +967,22 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
                     static_cast<int>(SkinSettingsRowId::GameplayCursor), false, true);
     append_menu_row(render.generic,
                     ui_text("FAST/SLOW Indicator", "FAST/SLOW 인디케이터"),
-                    ui_on_off(config_.skin.show_timing_feedback),
+                    ui_on_off(timing_visibility.text),
                     false,
                     render::MenuHitTargetKind::SettingsRow,
                     static_cast<int>(SkinSettingsRowId::TimingFeedback),
                     false,
                     true);
+    append_menu_row(render.generic, ui_text("FAST/SLOW Bar", "FAST/SLOW 막대"), ui_on_off(timing_visibility.bar),
+                    false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::TimingBar), false, true);
+    append_menu_row(render.generic, ui_text("FAST/SLOW Indicator X", "FAST/SLOW 인디케이터 X"), std::to_string(static_cast<int>(config_.skin.timing_text_offset_x)) + " px",
+                    false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::TimingTextX), false, true);
+    append_menu_row(render.generic, ui_text("FAST/SLOW Indicator Y", "FAST/SLOW 인디케이터 Y"), std::to_string(static_cast<int>(config_.skin.timing_text_offset_y)) + " px",
+                    false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::TimingTextY), false, true);
+    append_menu_row(render.generic, ui_text("FAST/SLOW Bar X", "FAST/SLOW 막대 X"), std::to_string(static_cast<int>(config_.skin.timing_bar_offset_x)) + " px",
+                    false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::TimingBarX), false, true);
+    append_menu_row(render.generic, ui_text("FAST/SLOW Bar Y", "FAST/SLOW 막대 Y"), std::to_string(static_cast<int>(config_.skin.timing_bar_offset_y)) + " px",
+                    false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::TimingBarY), false, true);
     append_menu_row(render.generic, ui_text("Judgement Y", "판정 Y"), format_percent(config_.skin.judgement_position),
                     false, render::MenuHitTargetKind::SettingsRow, static_cast<int>(SkinSettingsRowId::JudgementY), false, true);
     append_menu_row(render.generic, ui_text("Judgement X", "판정 X"), std::to_string(static_cast<int>(config_.skin.judgement_offset_x)) + " px",
@@ -1031,7 +1052,7 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
     }
 
     render.generic.skin_preview.visible = true;
-    render.generic.skin_preview.mode_label = ui_key_mode_label(skin_edit_mode_);
+    render.generic.skin_preview.mode_label = skin_mode_label;
     render.generic.skin_preview.selected_color_label =
         manifest_style && !manifest_style->lane_colors.empty()
             ? ui_text("Skin Manifest", "스킨 매니페스트")
@@ -1056,6 +1077,15 @@ void MenuApp::populate_skin_settings_render_data(render::MenuRenderData& render)
         config::kComboPositionMin,
         config::kComboPositionMax);
     render.generic.skin_preview.judgement_position = config_.skin.judgement_position;
+    render.generic.skin_preview.show_timing_feedback = timing_visibility.text;
+    render.generic.skin_preview.show_timing_bar = timing_visibility.bar;
+    render.generic.skin_preview.note_fade_in = config_.skin.note_fade_in;
+    render.generic.skin_preview.note_fade_out = config_.skin.note_fade_out;
+    render.generic.skin_preview.timing_text_offset_x = config_.skin.timing_text_offset_x;
+    render.generic.skin_preview.timing_text_offset_y = config_.skin.timing_text_offset_y;
+    render.generic.skin_preview.timing_bar_offset_x = config_.skin.timing_bar_offset_x;
+    render.generic.skin_preview.timing_bar_offset_y = config_.skin.timing_bar_offset_y;
+
     render.generic.skin_preview.judgement_offset_x = config_.skin.judgement_offset_x;
     render.generic.skin_preview.combo_offset_x = config_.skin.combo_offset_x;
     render.generic.skin_preview.combo_font_scale = config_.skin.combo_font_scale;

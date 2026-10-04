@@ -511,6 +511,9 @@ private:
     int64_t pause_sample_offset_ = 0;
     int64_t pause_physical_start_sample_ = 0;
     int64_t paused_chart_sample_ = 0;
+    // The queued write head freezes the mixer; the audible head independently
+    // freezes visuals so resuming cannot jump backwards by device padding.
+    int64_t paused_playback_sample_ = 0;
     // Owned by the audio callback under engine_mutex_; device time keeps
     // advancing while chart time and the mixer are frozen during the countdown.
     int64_t pause_resume_end_sample_ = 0;

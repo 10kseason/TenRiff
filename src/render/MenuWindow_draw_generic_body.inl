@@ -62,6 +62,12 @@
                 ctx->DrawRoundedRectangle(panel_rr, d2d_->button_border_brush.Get(), 1.2f);
             }
 
+            const auto fullscreen_rect = D2D1::RectF(rect.right - 304.0f, rect.top + 18.0f, rect.right - 24.0f, rect.top + 60.0f);
+            if (d2d_->button_brush) ctx->FillRoundedRectangle(D2D1::RoundedRect(fullscreen_rect, 6, 6), d2d_->button_brush.Get());
+            if (d2d_->button_border_brush) ctx->DrawRoundedRectangle(D2D1::RoundedRect(fullscreen_rect, 6, 6), d2d_->button_border_brush.Get(), 1.0f);
+            draw_text_clipped_aligned(wloc("Fullscreen Preview  [F6]", "전체화면 미리보기  [F6]"),
+                d2d_->body_format.Get(), fullscreen_rect, d2d_->text_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER);
+            register_hit(fullscreen_rect, MenuHitTargetKind::SkinPreviewButton, 0, MenuHitPart::Activate);
             const std::wstring title_w = wloc("LIVE PREVIEW", "실시간 미리보기");
             const std::wstring mode_w =
                 to_wide(preview.mode_label + " / " + loc("Lane ", "레인 ") + std::to_string(std::max(1, preview.selected_lane)));
@@ -69,7 +75,7 @@
             if (d2d_->title_format && d2d_->text_brush) {
                 draw_text_clipped(title_w,
                                   d2d_->title_format.Get(),
-                                  native_rect("generic.rect.012", D2D1::RectF(rect.left + 24.0f, rect.top + 18.0f, rect.right - 24.0f, rect.top + 60.0f)),
+                                  native_rect("generic.rect.012", D2D1::RectF(rect.left + 24.0f, rect.top + 18.0f, rect.right - 316.0f, rect.top + 60.0f)),
                                   d2d_->text_brush.Get());
             }
             if (d2d_->body_format && d2d_->muted_brush) {

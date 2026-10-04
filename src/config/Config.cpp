@@ -148,6 +148,12 @@ void sanitize_skin_config(SkinConfig& skin) {
     skin.combo_position = std::clamp(
         skin.combo_position, kComboPositionMin, kComboPositionMax);
     skin.judgement_position = clamp_finite(skin.judgement_position, kComboPositionMin, kComboPositionMax, kComboPositionDefault);
+    skin.note_fade_in = clamp_finite(skin.note_fade_in, 0.0, 1.0, 0.0);
+    skin.note_fade_out = clamp_finite(skin.note_fade_out, 0.0, 1.0, 0.0);
+    skin.timing_text_offset_x = clamp_finite(skin.timing_text_offset_x, -600.0, 600.0, 0.0);
+    skin.timing_text_offset_y = clamp_finite(skin.timing_text_offset_y, -400.0, 400.0, 0.0);
+    skin.timing_bar_offset_x = clamp_finite(skin.timing_bar_offset_x, -600.0, 600.0, 0.0);
+    skin.timing_bar_offset_y = clamp_finite(skin.timing_bar_offset_y, -400.0, 400.0, 0.0);
     skin.judgement_offset_x = clamp_finite(skin.judgement_offset_x, -600.0, 600.0, 0.0);
     skin.combo_offset_x = clamp_finite(skin.combo_offset_x, -600.0, 600.0, 0.0);
     skin.combo_font_scale = clamp_finite(skin.combo_font_scale,
@@ -552,6 +558,7 @@ void apply_config_object(const JsonObject& root, RuntimeConfig& config) {
             std::clamp(get_number(*audio, "bgm_volume", config.audio_ui.bgm_volume),
                        kChartMixVolumeMin, kChartMixVolumeMax);
         config.audio_ui.normalize_audio = get_bool(*audio, "normalize_audio", config.audio_ui.normalize_audio);
+        config.audio_ui.play_to_end = get_bool(*audio, "play_to_end", config.audio_ui.play_to_end);
         config.audio_ui.mute_when_inactive = get_bool(*audio, "mute_when_inactive", config.audio_ui.mute_when_inactive);
         config.audio_ui.keysound_volume =
             std::clamp(get_number(*audio, "keysound_volume", config.audio_ui.keysound_volume),
@@ -816,6 +823,16 @@ void apply_config_object(const JsonObject& root, RuntimeConfig& config) {
             get_bool(*skin, "show_gear_boundary_line", config.skin.show_gear_boundary_line);
         config.skin.show_timing_feedback =
             get_bool(*skin, "show_timing_feedback", config.skin.show_timing_feedback);
+        // Older profiles used one switch for both text and bar.
+        config.skin.show_timing_bar = get_bool(*skin, "show_timing_bar", config.skin.show_timing_feedback);
+        config.skin.timing_feedback_override = get_bool(*skin, "timing_feedback_override", false);
+        config.skin.note_fade_in = get_number(*skin, "note_fade_in", 0.0);
+        config.skin.note_fade_out = get_number(*skin, "note_fade_out", 0.0);
+        config.skin.timing_text_offset_x = clamp_finite(get_number(*skin, "timing_text_offset_x", 0.0), -600.0, 600.0, 0.0);
+        config.skin.timing_text_offset_y = clamp_finite(get_number(*skin, "timing_text_offset_y", 0.0), -400.0, 400.0, 0.0);
+        config.skin.timing_bar_offset_x = clamp_finite(get_number(*skin, "timing_bar_offset_x", 0.0), -600.0, 600.0, 0.0);
+        config.skin.timing_bar_offset_y = clamp_finite(get_number(*skin, "timing_bar_offset_y", 0.0), -400.0, 400.0, 0.0);
+
         config.skin.show_hold_tail =
             get_bool(*skin, "show_hold_tail", config.skin.show_hold_tail);
         config.skin.hold_tail_taper_enabled =
@@ -1070,6 +1087,7 @@ JsonValue build_json_root(const RuntimeConfig& config) {
     audio.emplace("bgm_volume", JsonValue{config.audio_ui.bgm_volume});
     audio.emplace("keysound_volume", JsonValue{config.audio_ui.keysound_volume});
     audio.emplace("normalize_audio", JsonValue{config.audio_ui.normalize_audio});
+    audio.emplace("play_to_end", JsonValue{config.audio_ui.play_to_end});
     audio.emplace("mute_when_inactive", JsonValue{config.audio_ui.mute_when_inactive});
     root.emplace("audio", JsonValue{std::move(audio)});
 
@@ -1263,6 +1281,15 @@ JsonValue build_json_root(const RuntimeConfig& config) {
     skin.emplace("show_judgement_line", JsonValue{config.skin.show_judgement_line});
     skin.emplace("show_gear_boundary_line", JsonValue{config.skin.show_gear_boundary_line});
     skin.emplace("show_timing_feedback", JsonValue{config.skin.show_timing_feedback});
+    skin.emplace("show_timing_bar", JsonValue{config.skin.show_timing_bar});
+    skin.emplace("timing_feedback_override", JsonValue{config.skin.timing_feedback_override});
+    skin.emplace("note_fade_in", JsonValue{config.skin.note_fade_in});
+    skin.emplace("note_fade_out", JsonValue{config.skin.note_fade_out});
+    skin.emplace("timing_text_offset_x", JsonValue{config.skin.timing_text_offset_x});
+    skin.emplace("timing_text_offset_y", JsonValue{config.skin.timing_text_offset_y});
+    skin.emplace("timing_bar_offset_x", JsonValue{config.skin.timing_bar_offset_x});
+    skin.emplace("timing_bar_offset_y", JsonValue{config.skin.timing_bar_offset_y});
+
     skin.emplace("show_hold_tail", JsonValue{config.skin.show_hold_tail});
     skin.emplace("hold_tail_taper_enabled", JsonValue{config.skin.hold_tail_taper_enabled});
     skin.emplace("judgement_line_glow_enabled", JsonValue{config.skin.judgement_line_glow_enabled});
@@ -1752,6 +1779,7 @@ std::string normalize_skin_single_color_token(std::string_view token) {
 
 std::string normalize_skin_note_shape_token(std::string_view token) {
     const std::string normalized = to_lower_ascii(std::string(token));
+    if (normalized == "hex") return "hexagon";
     if (normalized == "circle" || normalized == "triangle" || normalized == "pentagon" ||
         normalized == "hexagon" || normalized == "square" || normalized == "diamond" ||
         normalized == "arrow") {

@@ -81,6 +81,8 @@ TEST_CASE("skin preview preserves gameplay positions and imported geometry with 
     preview.key_labels[7] = "Space";
     preview.key_backdrop_brightness = 1.8;
     preview.key_backdrop_height = 0.2;
+    preview.note_fade_in = 0.35;
+    preview.note_fade_out = 0.65;
     const auto hud = tenriff::render::make_skin_gameplay_preview(preview);
     CHECK(hud.gameplay_field_offset_x == -260);
     CHECK(hud.judgement_offset_x == -120);
@@ -97,6 +99,8 @@ TEST_CASE("skin preview preserves gameplay positions and imported geometry with 
     CHECK(hud.key_labels[7] == "Space");
     CHECK(hud.key_backdrop_brightness == doctest::Approx(1.8));
     CHECK(hud.key_backdrop_height == doctest::Approx(0.2));
+    CHECK(hud.note_fade_in == doctest::Approx(0.35));
+    CHECK(hud.note_fade_out == doctest::Approx(0.65));
     CHECK(hud.audio_sample_time_ns == 0);
     CHECK(hud.note_count == 16u);
     CHECK(hud.notes[7].hold);
@@ -309,7 +313,7 @@ TEST_CASE("active hold synthetic notes stay anchored to the judgement line") {
     }
 }
 
-TEST_CASE("long-note body touches the rendered head and stops at the tail edge") {
+TEST_CASE("long-note body overlaps cap centers to bridge transparent and sloped edges") {
     const auto body = tenriff::render::compute_gameplay_hold_body_geometry(
         100.0f,
         70.0f,
@@ -324,13 +328,28 @@ TEST_CASE("long-note body touches the rendered head and stops at the tail edge")
 
     CHECK(body.left == doctest::Approx(70.0f));
     CHECK(body.right == doctest::Approx(130.0f));
-    CHECK(body.top == doctest::Approx(310.0f));
-    CHECK(body.bottom == doctest::Approx(900.0f));
+    CHECK(body.top == doctest::Approx(300.0f));
+    CHECK(body.bottom == doctest::Approx(920.0f));
 
     const auto active = tenriff::render::compute_gameplay_hold_body_geometry(
         100.0f, 70.0f, 130.0f, 900.0f, 920.0f, 310.0f, 300.0f, false, false, 1.0);
     CHECK(active.top == doctest::Approx(300.0f));
     CHECK(active.bottom == doctest::Approx(920.0f));
+}
+
+TEST_CASE("short long notes retain a continuous body even when tall caps overlap") {
+    // At 400% height the old edge-only join inverted this interval (140..120).
+    for (const bool head_visible : {false, true}) {
+        for (const bool tail_visible : {false, true}) {
+            const auto body = tenriff::render::compute_gameplay_hold_body_geometry(
+                100.0f, 70.0f, 130.0f, 120.0f, 160.0f, 140.0f, 110.0f,
+                head_visible, tail_visible, 0.75);
+            CHECK(body.top == doctest::Approx(110.0f));
+            CHECK(body.bottom == doctest::Approx(160.0f));
+            CHECK(body.left == doctest::Approx(77.5f));
+            CHECK(body.right == doctest::Approx(122.5f));
+        }
+    }
 }
 
 TEST_CASE("skin preview long-note placement never reverses at extreme judgement lines") {
@@ -722,5 +741,45 @@ TEST_CASE("group headings preserve selected row visibility and do not become inp
         for (int i = window.start; i < window.start + window.count; ++i)
             height += 66 + (tenriff::render::settings_category_heading(rows, i, window.start) ? 28 : 0);
         CHECK(height <= 300);
+    }
+}
+
+TEST_CASE("skin preview carries independent timing switches and positions") {
+    tenriff::render::SkinPreviewData preview;
+    preview.show_timing_feedback = false;
+    preview.show_timing_bar = true;
+    preview.timing_text_offset_x = 120;
+    preview.timing_text_offset_y = -70;
+    preview.timing_bar_offset_x = -80;
+    preview.timing_bar_offset_y = 140;
+    auto hud = tenriff::render::make_skin_gameplay_preview(preview);
+    CHECK_FALSE(hud.show_timing_feedback);
+    CHECK(hud.show_timing_bar);
+    CHECK(hud.feedback == "GR");
+    CHECK(hud.feedback_delta_ms != 0);
+    CHECK(hud.timing_text_offset_x == 120);
+    CHECK(hud.timing_text_offset_y == -70);
+    CHECK(hud.timing_bar_offset_x == -80);
+    CHECK(hud.timing_bar_offset_y == 140);
+}
+
+TEST_CASE("skin preview drives real lane activity for each hit burst style") {
+    tenriff::render::SkinPreviewData preview;
+    preview.lane_count = 8;
+    preview.selected_lane = 8;
+    for (const auto* style : {"prism", "ring", "spark"}) {
+        preview.hit_burst_style = style;
+        auto hit = tenriff::render::make_skin_gameplay_preview(preview, 900'000'000LL);
+        auto decay = tenriff::render::make_skin_gameplay_preview(preview, 1'060'000'000LL);
+        auto idle = tenriff::render::make_skin_gameplay_preview(preview, 1'400'000'000LL);
+        CHECK(hit.hit_burst_style == style);
+        CHECK(hit.lane_activity_count == 8);
+        CHECK(hit.lane_activity[7] == 1.0f);
+        CHECK(decay.lane_activity[7] == doctest::Approx(0.5));
+        CHECK(idle.lane_activity[7] == 0.0f);
+        CHECK(hit.lane_activity[0] == 0.0f);
+        CHECK(hit.activity_publish_time_ns == 900'000'000LL);
+        CHECK(hit.lane_pressed[7] == 1);
+        CHECK(idle.lane_pressed[7] == 0);
     }
 }

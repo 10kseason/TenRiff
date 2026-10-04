@@ -17,6 +17,8 @@ profile が存在しない場合は初回起動時に自動生成されます。
 
 ### `audio`
 
+- `play_to_end` (bool; default `true`): 最後の判定後、残りの音声を最後まで再生します。falseでは `ui.result_tail_ms` 後に結果へ進みます。判定・スコア・リプレイと手動スキップは変わりません。
+
 - `backend` (string)
   - `wasapi | asio`、既定は `wasapi`。プレイと曲プレビューの出力を選択。メニュー・結果の BGM は独立した Windows MCI 経路を維持。
 - `asio_driver` (string)
@@ -44,7 +46,7 @@ profile が存在しない場合は初回起動時に自動生成されます。
   - master volume
 - `bgm_volume` (double)
 - `normalize_audio` (bool)
-  - ゲーム内ステレオミックスの RMS 音量調整。limiter/master volume の前に適用。既定は false。メニュー音楽・選曲プレビューは変更しない。
+  - ゲーム内RMS音量調整。既定false。ONはRMS→ソフトリミッター→マスター、OFFは線形マスター音量→最終出力範囲制限のみ。メニュー音楽と選曲プレビューは変更しません。
 - `keysound_volume` (double)
 
 [ASIO 設定](asio-audio.md)参照。選択サンプルレートを固定し譜面音声をリサンプルします。`frames` は要求値でありドライバーの許容サイズに調整します。ASIO では preset は frames を上書きせず、`exclusive` と `periods` は WASAPI 用です。ASIO エラー時の自動 WASAPI 切替はありません。
@@ -80,16 +82,17 @@ profile が存在しない場合は初回起動時に自動生成されます。
   - `0..25` に clamp
   - 既定値は `8ms`
 ### `judge`
+- BMS `#RANK`: `3/EASY` PG21ms、`2/NORMAL` PG18ms、`1/HARD` PG15ms、`0/VERYHARD` PG8ms。EASYのGR/GD/BADは65/115/210msのまま、他の難度は18/21、15/21、8/21倍に縮小します。省略・未対応値はEASY。Judge Easy/Hard MODはその後に適用し、ホールド許容幅と自動ミス期限はRANKでは変更しません。
 - `pg`, `gr`, `gd`, `bd` (double, ms)
-- 既定 `pg / gr / gd` は `20ms / 65ms / 115ms`
+- 既定 `pg / gr / gd` は `21ms / 65ms / 115ms`
 - 既定 `bd` は `210ms`
-- `Judge Easy` は基本判定幅を `1.35x` に拡大: `pg/gr/gd/bd=27/87.75/155.25/283.5ms`。ホールド許容幅も同倍率、`mask` は変更しない
+- `Judge Easy` は基本判定幅を `1.35x` に拡大: `pg/gr/gd/bd=28.35/87.75/155.25/283.5ms`。ホールド許容幅も同倍率、`mask` は変更しない
 - `Judge Hard` は PG/GR/GD とホールド許容幅を維持し、`bd` の上限を `180ms` に制限する。より小さいカスタムBAD幅は広げない
 - `indirect_miss` (double, ms)
   - 現在のプロファイルでは `340ms` に保存・正規化し、BADの入力判定幅から独立した自動ミスの期限として使用する
   - 標準のNormal/Easy/Hardは未入力ノートが `340ms` を超えると自動ミス。Normal/EasyはBAD、Hardはコンボを切る間接 `POOR` / OD8 `MISS` を記録する
   - BAD範囲外から自動ミス期限までの遅い入力はBADヒットにせず、前のノートをミスにして次のノートを調べる
-- 新しいプレイは `tenriff-native-score-v2-ruleset-2` を記録する。旧 `ruleset-1` のリプレイ・ゴースト・検証にはEasy `1.25x`、Hard BAD `340ms`、自動ミス `=BAD` の旧ポリシーを正確に適用する。任意のカスタム判定は公式扱いにしない
+- 新しいプレイは `tenriff-native-score-v2-ruleset-3` を記録します。旧ruleset-1/2の再生・ゴースト・検証はPG20ms、RANK無効、以前のLN解放動作を復元します。ruleset-1はEasy1.25x、Hard BAD340ms、自動ミス=BADも維持します。カスタム判定は公式扱いにしません。
 - `hold_grace` (double, ms)
   - long-note tail release を `PG` とみなす専用 window
   - 既定値は `80ms`
@@ -228,7 +231,7 @@ chart loader/indexer は BMS family（`.bms/.bme/.bml/.pms`）専用です。旧
 | `language` | `en`, `ko`, `ja`; `en` | UI 言語。不正値は en に正規化。 |
 | `menu_font_size` | `normal`, `large`, `extra_large`; `normal` | プロファイル・初回設定のメニュー文字サイズ（100%・115%・130%）。プレイ中の文字サイズはスキン設定を維持。 |
 | `all_song_sources` | bool; `false` | 登録フォルダーを統合する ALL SONG を復元。同一チャートパスの重複を除外。 |
-| `result_tail_ms` | double; `500` ms | 判定完了後の結果遷移の追加待機時間。譜面音声の終了時刻も考慮します。 |
+| `result_tail_ms` | double; `500` ms | 判定完了後の結果遷移の追加待機時間。`audio.play_to_end=true` の場合は譜面音声の終了時刻も考慮します。 |
 | `require_enter_to_exit` | bool; `true` | 読込・保存互換用。現在の Windows 結果入力経路はこの値で自動終了しません。 |
 | `show_cursor_in_gameplay` | bool; `true` | ゲーム中のマウスポインター表示。 |
 | `active_song_source`, `recent_song_sources` | string / string[] | 現在と最近の曲フォルダー。 |
@@ -263,13 +266,17 @@ chart loader/indexer は BMS family（`.bms/.bme/.bml/.pms`）専用です。旧
 | `scratch_position` | `left`, `right`; `left` | 7+1 の皿の表示順のみ変更。入力・判定レーンは維持。 |
 | `lr2_resolution_mode` | `auto`, `sd`, `hd`, `fhd`; `auto` | LR2 の座標解像度。auto はファイル名ではなく `#DST_NOTE` 座標を使用。 |
 | `visual_preset` | `classic`, `neon`, `minimal`, `tenriff`; `tenriff` | メニューで選ぶと視覚設定の組み合わせを再設定。 |
-| `note_shape` | `rect`, `triangle`, `pentagon`, `hexagon`, `circle`; `rect` | 標準図形ノートの形。 |
+| `note_shape` | `rect`, `circle`, `triangle`, `pentagon`, `hexagon`, `square`, `diamond`, `arrow`; `rect` | 標準図形ノートの形。`hex` は `hexagon` の互換用別名。 |
 | `note_image_aspect` | `stretch`, `contain`, `width`; `stretch` | 引き伸ばし / 比率を保って内側に収める / 幅を固定して比率から高さを計算。 |
 | `preserve_note_image_aspect_ratio` | bool; `false` | 旧版互換。明示的な `note_image_aspect` が優先。stretch 以外は true で保存。 |
 | `note_border_enabled`, `show_lane_dividers`, `show_judgement_line` | bool; `true` | ノート枠、レーン区切り線、判定線をそれぞれ表示。 |
 | `note_divider_gap_px` | double: `0..40`; `12` px | ノート片側と区切り線の間隔。0 なら区切り線まで拡張。 |
 | `show_gear_boundary_line` | bool; `false` | ギア境界線を表示。 |
-| `show_timing_feedback` | bool; `true` | FAST/SLOW とタイミング履歴を表示。判定等級は独立して維持。 |
+| `show_timing_feedback` | bool; `true` | バーとは別にFAST/SLOW文字を表示。 |
+| `show_timing_bar` | bool; `true` | タイミングバーを表示。旧設定で省略時は文字のスイッチを継承。 |
+| `timing_feedback_override` | bool; `false` | ユーザーが表示を変更した後はプロファイルの設定をスキンより優先。 |
+| `timing_text_offset_x`, `timing_bar_offset_x` | double: `-600..600`; `0` | 文字とバーの独立X移動。従来の判定周辺配置に加える1920x1080基準ピクセル。 |
+| `timing_text_offset_y`, `timing_bar_offset_y` | double: `-400..400`; `0` | 文字とバーの独立Y移動。正は下、負は上。 |
 | `show_hold_tail`, `hold_tail_taper_enabled` | bool; `false` | LN 尾端キャップ表示とテーパー。判定規則は変更しない。 |
 | `judgement_line_glow_enabled` | bool; `true` | 判定線周囲の発光。 |
 | `key_pulse_brightness` | double: `0..1`; `1` | Hit Burst の明るさ。0 で無効。 |
@@ -286,6 +293,8 @@ chart loader/indexer は BMS family（`.bms/.bme/.bml/.pms`）専用です。旧
 | `black_playfield_enabled` | bool; `true` | レーン間隔も含めフィールド全体を黒く表示。 |
 | `visual_opacity` | double: `0.20..1`; `0.96` | ノート・レセプター・キー名の共通不透明度倍率。 |
 | `note_outline_opacity` | double: `0..1`; `0.78` | ノート枠の不透明度。 |
+| `note_fade_in` | double: `0..1`; `0` | 上部の黒い霧の深さ。ノートが徐々に現れます。0はオフ。 |
+| `note_fade_out` | double: `0..1`; `0` | 判定ライン上の黒い霧の深さ。ノートが徐々に消えます。0はオフ。キーとHUDは表示されます。 |
 | `hold_body_opacity` | double: `0.05..1`; `1` | LN 本体の不透明度。 |
 | `lane_width_scales` | object: mode → number[]; `0.50..1.75` | レーン数と同じ長さの個別幅配列。 |
 | `note_width_scale` | double: `0.50..1.40`; `1` | Note & Field Size。中心を保ちフィールド・レーン・ノート・隣接ゲージを調整。 |

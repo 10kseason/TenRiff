@@ -1,18 +1,20 @@
 # TenRiff
 
+**2026-10-04 · TenRiff 1.8.3:** 全画面スキンプレビュー、ノートの霧、FAST/SLOWの個別配置、シンプルな四角スキンを追加します。Normalize OFF時の隠れた圧縮と一時停止からの復帰表示を修正し、曲の終了方法、LN解放時の即時判定、BMS RANKに応じたR3判定を導入します。 [1.8.3 release](docs/release-1.8.3-gate.md).
+
 **2026-10-03 · TenRiff 1.8.2:** オプションのアイコンを10色にし、選択枠の色と丸み、FAST/SLOWバーの表示、スキンエディターのプレビューを更新しました。 [1.8.2 release](docs/release-1.8.2-gate.md).
 
 **2026-10-03 · TenRiff 1.8.1:** 機能別アイコン18種とPNGスキンを追加し、オプションと選曲ロビーを黒と無彩色に統一しました。項目別ヘルプ、記録画面のGPT Sitesランキング、左右で4K～16Kを選べるキーテストを追加しました。 [1.8.1 design notes](docs/menu-studio-1.8.1.ko.md).
 
 **マルチプレイRate対応ビルド:** ロビーでリーダーが共通のRateを設定します。全員がこのprotocol v6ビルドを使用してください。旧v5クライアントとは接続できません。[案内](docs/multiplayer-rate-build.ko.md)（韓国語）。
 
-この配布版は **1.8.2 Sites 統合版**です。新しいフォルダーに展開し、`launch_win.bat` から起動して F10 でウェブアカウントを一度連携してください。対象となる新しいプレイのスコア・詳細スコア・精度・詳細精度を送信します。新しいプレイは ruleset-2 を使用し、過去の ruleset-1 リプレイは当時の判定を維持します。[接続ガイド](docs/sites-leaderboard.md)（韓国語）を参照してください。
+この配布版は **1.8.3 Sites 統合版**です。新しいフォルダーに展開し、`launch_win.bat` から起動して F10 でウェブアカウントを一度連携してください。対象となる新しいプレイのスコア・詳細スコア・精度・詳細精度を送信します。新しいプレイは ruleset-3 を使用し、ウェブ送信には判定プロファイルが必要です。ruleset-1/2 のリプレイは当時の判定とLN動作を、既存のウェブ記録はIDとスコアを維持します。[接続ガイド](docs/sites-leaderboard.md)（韓国語）を参照してください。
 
 Language: [한국어](README.md) | [English](README.en.md) | [简体中文](README.zh-CN.md) | 日本語
 
-TenRiff は Windows GUI ベースの BMS リズムゲーム runtime/launcher です。現在のプロジェクト版は `1.8.2` で、譜面入力は BMS family（`.bms/.bme/.bml/.pms`）専用です。公開 package は BGA upscaler model を含まず、key-mode conversion 用の deterministic NK3 P64 graph と generalized pattern MLP を同梱します。license は MIT です。
+TenRiff は Windows GUI ベースの BMS リズムゲーム runtime/launcher です。現在のプロジェクト版は `1.8.3` で、譜面入力は BMS family（`.bms/.bme/.bml/.pms`）専用です。公開 package は BGA upscaler model を含まず、key-mode conversion 用の deterministic NK3 P64 graph と generalized pattern MLP を同梱します。license は MIT です。
 
-この README は導入文書です。現在の挙動、`1.8.2` project state、`1.5.1 fixed stable baseline` baseline、設定と設計文書は [`docs/README.ja.md`](docs/README.ja.md) から参照してください。
+この README は導入文書です。現在の挙動、`1.8.3` project state、`1.5.1 fixed stable baseline` baseline、設定と設計文書は [`docs/README.ja.md`](docs/README.ja.md) から参照してください。
 
 TenRiff のコードベースは、伝統的な長文設計書主導だけで積み上がったものではなく、高速な反復と実験を重視した `vibe coding` 的な性格を持つ作品でもあります。
 
