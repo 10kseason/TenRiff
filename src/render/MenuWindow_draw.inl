@@ -130,13 +130,16 @@ void MenuWindow::draw(const MenuRenderData& data) {
         d2d_->applied_profile_avatar_revision = data.profile_avatar_revision;
     }
 
+    bool preparing_gameplay_palette = true;
     auto set_theme_color = [&](ID2D1SolidColorBrush* brush,
                                std::string_view key,
                                const D2D1_COLOR_F& fallback) {
         if (!brush) return;
         const auto it = data.lobby_skin.theme_colors.find(std::string(key));
         if (data.lobby_skin.enabled &&
-            !(data.kind == MenuScreenKind::GameplayHud && data.lobby_skin.native_menu_renderer) &&
+            !((data.kind == MenuScreenKind::GameplayHud ||
+               (preparing_gameplay_palette && data.generic.skin_preview.visible)) &&
+              data.lobby_skin.native_menu_renderer) &&
             it != data.lobby_skin.theme_colors.end()) {
             const auto& rgba = it->second;
             brush->SetColor(D2D1::ColorF(rgba[0], rgba[1], rgba[2], rgba[3]));
@@ -169,21 +172,22 @@ void MenuWindow::draw(const MenuRenderData& data) {
     ID2D1Bitmap* title_background = find_song_card_preview_bitmap(title_background_path);
     const bool has_title_art = title_background != nullptr;
 #include "MenuWindow_draw_native_motion.inl"
-    if (data.kind != MenuScreenKind::GameplayHud) {
-        set_theme_color(d2d_->text_brush.Get(), "text", D2D1::ColorF(0xF5F5F5));
-        set_theme_color(d2d_->accent_brush.Get(), "accent", D2D1::ColorF(0xF0F0F0));
-        set_theme_color(d2d_->muted_brush.Get(), "muted", D2D1::ColorF(0x909090));
-        set_theme_color(d2d_->panel_brush.Get(), "panel", D2D1::ColorF(0x090909));
-        set_theme_color(d2d_->card_brush.Get(), "card", D2D1::ColorF(0x0B0B0B));
-        set_theme_color(d2d_->footer_brush.Get(), "footer", D2D1::ColorF(0x090909, 0.9f));
-        set_theme_color(d2d_->button_border_brush.Get(), "border", D2D1::ColorF(0x2A2A2A));
-        set_theme_color(d2d_->button_brush.Get(), "button", D2D1::ColorF(0x101010));
-        set_theme_color(d2d_->button_selected_brush.Get(), "button_selected", D2D1::ColorF(0xF0F0F0, 0.143f));
-    }
     MenuRenderData* skin_preview_scene = nullptr;
-    const bool has_menu_scene = !modern_menu_screen &&
-        render_menu_scene(data.kind, render_now_ns, data.lobby_skin);
-    if (data.kind == MenuScreenKind::GameplayHud) {
+    if (data.generic.skin_preview.visible &&
+        (data.kind == MenuScreenKind::GenericList || data.generic.skin_preview.fullscreen)) {
+        if (!d2d_->skin_preview_scene) d2d_->skin_preview_scene = std::make_unique<MenuRenderData>();
+        skin_preview_scene = d2d_->skin_preview_scene.get();
+        if (skin_preview_scene->ui_language != data.ui_language ||
+            skin_preview_scene->gameplay.title != data.generic.skin_preview.mode_label)
+            skin_preview_hud_cache_.text_revision = 0;
+        skin_preview_scene->kind = MenuScreenKind::GameplayHud;
+        skin_preview_scene->ui_language = data.ui_language;
+        skin_preview_scene->gameplay = make_skin_gameplay_preview(data.generic.skin_preview, render_now_ns);
+        if (!ensure_gameplay_note_sprites(skin_preview_scene->gameplay)) invalidate_gameplay_note_sprite_cache();
+        if (!ensure_gameplay_background_bitmap(skin_preview_scene->gameplay)) invalidate_gameplay_background_cache();
+        if (!ensure_gameplay_static_cache(skin_preview_scene->gameplay, false)) invalidate_gameplay_static_cache();
+        static_cast<void>(load_song_card_preview_bitmap(skin_preview_scene->gameplay.skin_background_path));
+    } else if (data.kind == MenuScreenKind::GameplayHud) {
         if (!ensure_gameplay_note_sprites(data.gameplay)) {
             invalidate_gameplay_note_sprite_cache();
         }
@@ -193,22 +197,6 @@ void MenuWindow::draw(const MenuRenderData& data) {
         if (!ensure_gameplay_static_cache(data.gameplay)) {
             invalidate_gameplay_static_cache();
         }
-    } else if (data.kind == MenuScreenKind::GenericList &&
-               data.generic.skin_preview.visible) {
-        // Allocate only for Skin Settings; gameplay keeps its existing hot path.
-        if (!d2d_->skin_preview_scene) d2d_->skin_preview_scene = std::make_unique<MenuRenderData>();
-        skin_preview_scene = d2d_->skin_preview_scene.get();
-        if (skin_preview_scene->ui_language != data.ui_language ||
-            skin_preview_scene->gameplay.title != data.generic.skin_preview.mode_label)
-            skin_preview_hud_cache_.text_revision = 0;
-        skin_preview_scene->kind = MenuScreenKind::GameplayHud;
-        skin_preview_scene->ui_language = data.ui_language;
-        skin_preview_scene->gameplay = make_skin_gameplay_preview(data.generic.skin_preview);
-        if (!ensure_gameplay_note_sprites(skin_preview_scene->gameplay))
-            invalidate_gameplay_note_sprite_cache();
-        if (!ensure_gameplay_static_cache(skin_preview_scene->gameplay, false))
-            invalidate_gameplay_static_cache();
-        static_cast<void>(load_song_card_preview_bitmap(skin_preview_scene->gameplay.skin_background_path));
     } else if (data.kind == MenuScreenKind::SongSelect) {
         update_song_select_preview_loading_state(data.song_select, render_now_ns);
         pump_song_select_preview_loads(data.song_select, render_now_ns);
@@ -223,6 +211,20 @@ void MenuWindow::draw(const MenuRenderData& data) {
         song_select_preview_signature_.clear();
         song_select_preview_load_hold_until_ns_ = 0;
     }
+    preparing_gameplay_palette = false;
+    if (data.kind != MenuScreenKind::GameplayHud) {
+        set_theme_color(d2d_->text_brush.Get(), "text", D2D1::ColorF(0xF5F5F5));
+        set_theme_color(d2d_->accent_brush.Get(), "accent", D2D1::ColorF(0xF0F0F0));
+        set_theme_color(d2d_->muted_brush.Get(), "muted", D2D1::ColorF(0x909090));
+        set_theme_color(d2d_->panel_brush.Get(), "panel", D2D1::ColorF(0x090909));
+        set_theme_color(d2d_->card_brush.Get(), "card", D2D1::ColorF(0x0B0B0B));
+        set_theme_color(d2d_->footer_brush.Get(), "footer", D2D1::ColorF(0x090909, 0.9f));
+        set_theme_color(d2d_->button_border_brush.Get(), "border", D2D1::ColorF(0x2A2A2A));
+        set_theme_color(d2d_->button_brush.Get(), "button", D2D1::ColorF(0x101010));
+        set_theme_color(d2d_->button_selected_brush.Get(), "button_selected", D2D1::ColorF(0xF0F0F0, 0.143f));
+    }
+    const bool has_menu_scene = !modern_menu_screen &&
+        render_menu_scene(data.kind, render_now_ns, data.lobby_skin);
     if (data.kind != MenuScreenKind::GameplayHud && data.lobby_skin.enabled) {
         constexpr const char* asset_roles[] = {"mark", "prism", "chevron", "spark", "wave", "audio",
             "display", "input", "network", "sliders", "folder", "exit"};
@@ -1233,7 +1235,14 @@ void MenuWindow::draw(const MenuRenderData& data) {
             draw_result_screen();
             break;
         case MenuScreenKind::GameplayHud:
-            draw_gameplay_hud(data);
+            draw_gameplay_hud(skin_preview_scene ? *skin_preview_scene : data, skin_preview_scene != nullptr);
+            if (data.generic.skin_preview.fullscreen) {
+                const auto close_rect = D2D1::RectF(kBaseWidth - 350.0f, 12.0f, kBaseWidth - 24.0f, 56.0f);
+                if (d2d_->button_brush) ctx->FillRoundedRectangle(D2D1::RoundedRect(close_rect, 6, 6), d2d_->button_brush.Get());
+                draw_text_clipped_aligned(wloc("Back to Skins  [Esc / F6]", "스킨 설정으로  [Esc / F6]"),
+                    d2d_->body_format.Get(), close_rect, d2d_->text_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER);
+                register_hit(close_rect, MenuHitTargetKind::SkinPreviewButton, 0, MenuHitPart::Activate);
+            }
             break;
         case MenuScreenKind::BmsEditor:
             draw_bms_editor();

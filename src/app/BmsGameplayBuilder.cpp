@@ -60,6 +60,15 @@ BmsGameplayBuildResult build_bms_gameplay_chart(const chart::BmsTimeline& timeli
     };
 
     BmsGameplayBuildResult result;
+    result.chart.bms_rank = 3;
+    if (const auto rank = parsed_chart.headers.find("RANK"); rank != parsed_chart.headers.end()) {
+        const std::string token = trim_copy(rank->second);
+        if (token.size() == 1 && token[0] >= '0' && token[0] <= '3') {
+            result.chart.bms_rank = token[0] - '0';
+        } else {
+            result.messages.push_back("Unsupported BMS #RANK; using EASY judgement windows.");
+        }
+    }
     std::vector<BmsNoteEntry> entries;
     entries.reserve(timeline.events.size());
     std::unordered_map<int, std::size_t> last_normal_note_by_lane;

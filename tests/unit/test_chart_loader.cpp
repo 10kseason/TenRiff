@@ -1,11 +1,14 @@
 #include "doctest/doctest.h"
 
 #include <filesystem>
+#include <cmath>
 #include <fstream>
 #include <string>
 #include <string_view>
 
 #include "app/ChartLoader.h"
+#include "app/ModeManager.h"
+#include "gameplay/GameplayEngine.h"
 #include "gameplay/GameplayChart.h"
 
 using tenriff::app::ChartLoader;
@@ -69,6 +72,52 @@ bool refers_to_same_existing_file(std::string_view actual, const std::filesystem
 }
 
 }  // namespace
+
+TEST_CASE("BMS RANK chooses real-time judgement windows while Easy keeps other windows") {
+    TempDirGuard temp{make_temp_dir()};
+    REQUIRE_FALSE(temp.path.empty());
+    struct RankCase { const char* header; double pg; double scale; };
+    const RankCase cases[] = {{"", 21, 1}, {"#RANK 3\n", 21, 1},
+        {"#RANK 2\n", 18, 18.0 / 21.0}, {"#RANK 1\n", 15, 15.0 / 21.0},
+        {"#RANK 0\n", 8, 8.0 / 21.0}, {"#RANK invalid\n", 21, 1}};
+    for (const auto& item : cases) {
+        const auto path = temp.path / "rank.bms";
+        { std::ofstream file(path); file << "#TITLE Rank fixture\n#BPM 120\n" << item.header << "#00111:01\n"; }
+        for (const int sample_rate : {44100, 48000}) {
+            for (const double rate : {0.75, 1.0, 1.5}) {
+                const auto loaded = ChartLoader{}.load(path.u8string(), sample_rate, rate);
+                REQUIRE(loaded.success());
+                tenriff::config::ModeConfig mode;
+                mode.key_mode = "auto";
+                const auto managed = tenriff::app::manage_modes(loaded.chart, loaded.format, mode,
+                    tenriff::config::JudgeConfig{}, rate, loaded.base_bpm, sample_rate);
+                CHECK(managed.judge.pg_ms == doctest::Approx(item.pg));
+                CHECK(managed.judge.gr_ms == doctest::Approx(65 * item.scale));
+                CHECK(managed.judge.gd_ms == doctest::Approx(115 * item.scale));
+                CHECK(managed.judge.bd_ms == doctest::Approx(210 * item.scale));
+                CHECK(managed.judge.hold_grace_ms == doctest::Approx(80));
+                CHECK(managed.judge.hold_break_ms == doctest::Approx(200));
+                CHECK(managed.judge.indirect_miss_ms == doctest::Approx(340));
+                REQUIRE_FALSE(managed.chart.notes.empty());
+                const auto& note = managed.chart.notes.front();
+                const int64_t boundary = static_cast<int64_t>(std::llround(item.pg * sample_rate / 1000));
+                for (const int direction : {-1, 1}) {
+                    for (const int beyond : {0, 1}) {
+                        tenriff::gameplay::GameplayConfig config;
+                        config.sample_rate = sample_rate;
+                        config.rate = rate;
+                        config.judge = managed.judge;
+                        tenriff::gameplay::GameplayEngine engine(managed.chart, config);
+                        (void)engine.handle_input(note.lane, tenriff::input::InputState::Pressed,
+                            note.start_sample + direction * (boundary + beyond));
+                        CHECK(engine.stats().counts.pg == (beyond == 0 ? 1 : 0));
+                        CHECK(engine.stats().counts.gr == (beyond == 1 ? 1 : 0));
+                    }
+                }
+            }
+        }
+    }
+}
 
 TEST_CASE("chart loader falls back to ogg when referenced wav is missing") {
     TempDirGuard temp;

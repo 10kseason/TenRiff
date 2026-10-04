@@ -169,7 +169,7 @@ TEST_CASE("config defaults prefer 44100 Hz audio") {
     CHECK(config.gauge.easy.gd == doctest::Approx(kCurrentEasyGd));
     CHECK(config.gauge.easy.bd == doctest::Approx(kCurrentEasyBd));
     CHECK(config.gauge.easy.pr == doctest::Approx(kCurrentEasyPr));
-    CHECK(config.judge.pg_ms == doctest::Approx(20.0));
+    CHECK(config.judge.pg_ms == doctest::Approx(21.0));
     CHECK(config.judge.gr_ms == doctest::Approx(65.0));
     CHECK(config.judge.gd_ms == doctest::Approx(115.0));
     CHECK(config.judge.bd_ms == doctest::Approx(210.0));
@@ -1295,6 +1295,7 @@ TEST_CASE("skin note shape normalization supports polygon choices") {
     CHECK(tenriff::config::normalize_skin_note_shape_token("triangle") == "triangle");
     CHECK(tenriff::config::normalize_skin_note_shape_token("pentagon") == "pentagon");
     CHECK(tenriff::config::normalize_skin_note_shape_token("hexagon") == "hexagon");
+    CHECK(tenriff::config::normalize_skin_note_shape_token("HEX") == "hexagon");
     CHECK(tenriff::config::normalize_skin_note_shape_token("rectangle") == "rect");
     CHECK(tenriff::config::normalize_skin_note_shape_token("star") == "rect");
 }
@@ -1609,11 +1610,27 @@ TEST_CASE("runtime migration upgrades old judge defaults into the current window
     const bool changed = tenriff::app::migrate_bms_first_runtime_config(config);
 
     CHECK(changed);
-    CHECK(config.judge.pg_ms == doctest::Approx(20.0));
+    CHECK(config.judge.pg_ms == doctest::Approx(21.0));
     CHECK(config.judge.gr_ms == doctest::Approx(65.0));
     CHECK(config.judge.gd_ms == doctest::Approx(115.0));
     CHECK(config.judge.bd_ms == doctest::Approx(210.0));
     CHECK(config.judge.indirect_miss_ms == doctest::Approx(340.0));
+}
+
+TEST_CASE("runtime migration changes only the previous default perfect window") {
+    auto config = ConfigLoader{}.defaults();
+    config.judge.pg_ms = 20;
+    const auto before = config.judge;
+    CHECK(tenriff::app::migrate_bms_first_runtime_config(config));
+    CHECK(config.judge.pg_ms == doctest::Approx(21));
+    CHECK(config.judge.gr_ms == before.gr_ms);
+    CHECK(config.judge.gd_ms == before.gd_ms);
+    CHECK(config.judge.bd_ms == before.bd_ms);
+    CHECK(config.judge.hold_grace_ms == before.hold_grace_ms);
+    CHECK(config.judge.hold_break_ms == before.hold_break_ms);
+    config.judge.pg_ms = 12;
+    (void)tenriff::app::migrate_bms_first_runtime_config(config);
+    CHECK(config.judge.pg_ms == 12);
 }
 
 TEST_CASE("runtime migration upgrades legacy default gauge deltas to the harsher table") {
@@ -2251,4 +2268,84 @@ TEST_CASE("backdrop brightness and height preserve old profiles and portable set
     CHECK(loaded.config.skin.key_backdrop_height == doctest::Approx(0.35));
     CHECK(loaded.config.skin.key_backdrop_opacity == doctest::Approx(0.4));
     CHECK_FALSE(loaded.config.skin.key_backdrop_enabled);
+}
+
+TEST_CASE("timing controls preserve old switches and round trip independently") {
+    tenriff::config::SkinConfig skin;
+    REQUIRE(tenriff::config::deserialize_skin_config(R"({"show_timing_feedback":false})", skin));
+    CHECK_FALSE(skin.show_timing_feedback);
+    CHECK_FALSE(skin.show_timing_bar);
+    CHECK_FALSE(skin.timing_feedback_override);
+    REQUIRE(tenriff::config::deserialize_skin_config(R"({"show_timing_feedback":false,"show_timing_bar":true,"timing_feedback_override":true,"timing_text_offset_x":120,"timing_text_offset_y":-80,"timing_bar_offset_x":-230,"timing_bar_offset_y":170})", skin));
+    const auto saved = tenriff::config::serialize_skin_config(skin);
+    tenriff::config::SkinConfig restored;
+    REQUIRE(tenriff::config::deserialize_skin_config(saved, restored));
+    CHECK_FALSE(restored.show_timing_feedback);
+    CHECK(restored.show_timing_bar);
+    CHECK(restored.timing_feedback_override);
+    CHECK(restored.timing_text_offset_x == 120);
+    CHECK(restored.timing_text_offset_y == -80);
+    CHECK(restored.timing_bar_offset_x == -230);
+    CHECK(restored.timing_bar_offset_y == 170);
+    REQUIRE(tenriff::config::deserialize_skin_config(R"({"timing_text_offset_x":900,"timing_text_offset_y":-900,"timing_bar_offset_x":-900,"timing_bar_offset_y":900})", restored));
+    CHECK(restored.timing_text_offset_x == 600);
+    CHECK(restored.timing_text_offset_y == -400);
+    CHECK(restored.timing_bar_offset_x == -600);
+    CHECK(restored.timing_bar_offset_y == 400);
+    restored.timing_text_offset_x = std::numeric_limits<double>::quiet_NaN();
+    REQUIRE(tenriff::config::deserialize_skin_config(tenriff::config::serialize_skin_config(restored), skin));
+    CHECK(skin.timing_text_offset_x == 0);
+}
+
+TEST_CASE("timing controls survive profile file save and reload") {
+    TempDirGuard temp{make_temp_dir()};
+    REQUIRE_FALSE(temp.path.empty());
+    CurrentPathGuard cwd;
+    std::filesystem::current_path(temp.path);
+    ConfigLoader loader;
+    auto config = loader.defaults();
+    config.skin.show_timing_feedback = false;
+    config.skin.show_timing_bar = true;
+    config.skin.timing_feedback_override = true;
+    config.skin.timing_text_offset_x = -120;
+    config.skin.timing_text_offset_y = 90;
+    config.skin.timing_bar_offset_x = 150;
+    config.skin.timing_bar_offset_y = -80;
+    REQUIRE(loader.save_profile("profiles/timing", config));
+    auto loaded = loader.load_profile("profiles/timing");
+    REQUIRE(loaded.success());
+    CHECK_FALSE(loaded.config.skin.show_timing_feedback);
+    CHECK(loaded.config.skin.show_timing_bar);
+    CHECK(loaded.config.skin.timing_feedback_override);
+    CHECK(loaded.config.skin.timing_text_offset_x == -120);
+    CHECK(loaded.config.skin.timing_text_offset_y == 90);
+    CHECK(loaded.config.skin.timing_bar_offset_x == 150);
+    CHECK(loaded.config.skin.timing_bar_offset_y == -80);
+}
+
+TEST_CASE("note fog and outro choice retain defaults clamp and persist") {
+    tenriff::config::RuntimeConfig runtime;
+    CHECK(runtime.audio_ui.play_to_end);
+    CHECK(runtime.skin.note_fade_in == 0.0);
+    CHECK(runtime.skin.note_fade_out == 0.0);
+    REQUIRE(tenriff::config::deserialize_skin_config(R"({"note_fade_in":-1,"note_fade_out":8})", runtime.skin));
+    CHECK(runtime.skin.note_fade_in == 0.0);
+    CHECK(runtime.skin.note_fade_out == 1.0);
+    runtime.skin.note_fade_in = 0.35;
+    runtime.skin.note_fade_out = 0.60;
+    runtime.audio_ui.play_to_end = false;
+    TempDirGuard temp{make_temp_dir()};
+    ConfigLoader loader;
+    const auto profile = (temp.path / "fog").u8string();
+    REQUIRE(loader.save_profile(profile, runtime));
+    const auto loaded = loader.load_profile(profile);
+    REQUIRE(loaded.success());
+    CHECK_FALSE(loaded.config.audio_ui.play_to_end);
+    CHECK(loaded.config.skin.note_fade_in == doctest::Approx(0.35));
+    CHECK(loaded.config.skin.note_fade_out == doctest::Approx(0.60));
+    tenriff::config::SkinConfig portable;
+    REQUIRE(tenriff::config::deserialize_skin_config(
+        tenriff::config::serialize_skin_config(loaded.config.skin), portable));
+    CHECK(portable.note_fade_in == doctest::Approx(0.35));
+    CHECK(portable.note_fade_out == doctest::Approx(0.60));
 }

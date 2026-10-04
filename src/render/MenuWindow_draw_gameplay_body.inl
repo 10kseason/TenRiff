@@ -307,7 +307,11 @@
             D2D1_MATRIX_3X2_F timing_transform{};
             ctx->GetTransform(&timing_transform);
             const auto base_indicator=D2D1::RectF(indicator_left,combo_anchor_y,indicator_right,combo_anchor_y+48.0f);
-            const auto adjusted_indicator=ng_rect("timing",base_indicator);
+            auto adjusted_indicator=ng_rect("timing",base_indicator);
+            adjusted_indicator.left += static_cast<float>(data.gameplay.timing_bar_offset_x);
+            adjusted_indicator.right += static_cast<float>(data.gameplay.timing_bar_offset_x);
+            adjusted_indicator.top += static_cast<float>(data.gameplay.timing_bar_offset_y);
+            adjusted_indicator.bottom += static_cast<float>(data.gameplay.timing_bar_offset_y);
             ctx->SetTransform(D2D1::Matrix3x2F::Translation(-base_indicator.left,-base_indicator.top) *
                 D2D1::Matrix3x2F::Scale((adjusted_indicator.right-adjusted_indicator.left)/std::max(1.0f,base_indicator.right-base_indicator.left),
                                       (adjusted_indicator.bottom-adjusted_indicator.top)/48.0f) *
@@ -318,21 +322,6 @@
                             combo_anchor_y + 16.0f,
                             feedback_center_x + kGameplayTimingIndicatorHalfWidth,
                             combo_anchor_y + 16.0f + kGameplayTimingIndicatorHeight);
-            const D2D1_RECT_F fast_rect =
-                D2D1::RectF(indicator_left + 60.0f,
-                            combo_anchor_y + 8.0f,
-                            indicator_rect.left - 18.0f,
-                            combo_anchor_y + 38.0f);
-            const D2D1_RECT_F slow_rect =
-                D2D1::RectF(indicator_rect.right + 18.0f,
-                            combo_anchor_y + 8.0f,
-                            indicator_right - 60.0f,
-                            combo_anchor_y + 38.0f);
-            const double reference_delta_ms =
-                has_live_feedback ? live_feedback_delta_ms : 0.0;
-            const bool timing_fast = reference_delta_ms < -0.05;
-            const bool timing_slow = reference_delta_ms > 0.05;
-
             if (d2d_->card_brush) {
                 d2d_->card_brush->SetOpacity(0.75f);
                 ctx->FillRoundedRectangle(D2D1::RoundedRect(indicator_rect, 4.0f, 4.0f), d2d_->card_brush.Get());
@@ -405,19 +394,6 @@
                                  d2d_->text_brush.Get());
             }
 
-            d2d_->text_brush->SetColor(ng_color("timing_fast",D2D1::ColorF(0x5DA9FF, timing_fast ? 0.82f : 0.28f)));
-            if (has_live_feedback && timing_fast) draw_readable_text_aligned(wloc("FAST", "빠름"),
-                                      ng_font("timing",scene_body_format.Get()),
-                                      fast_rect,
-                                      d2d_->text_brush.Get(),
-                                      DWRITE_TEXT_ALIGNMENT_TRAILING);
-
-            d2d_->text_brush->SetColor(ng_color("timing_slow",D2D1::ColorF(0xFF5A6B, timing_slow ? 0.82f : 0.28f)));
-            if (has_live_feedback && timing_slow) draw_readable_text_aligned(wloc("SLOW", "느림"),
-                                      ng_font("timing",scene_body_format.Get()),
-                                      slow_rect,
-                                      d2d_->text_brush.Get(),
-                                      DWRITE_TEXT_ALIGNMENT_LEADING);
             d2d_->text_brush->SetColor(saved_text_color);
             ctx->SetTransform(timing_transform);
         };
@@ -782,13 +758,13 @@
             scene_hud_cache.ghost_gauge_value_text =
                 to_wide(std::to_string(static_cast<int>(std::llround(data.gameplay.ghost_gauge))) + "%");
 
+            // Cache semantic feedback independently of display toggles. The skin
+            // preview can toggle either element without changing text_revision.
             if (data.gameplay.has_feedback) {
                 scene_hud_cache.feedback_text = gameplay_feedback_overlay_text(data.gameplay.feedback);
                 scene_hud_cache.feedback_timing_text =
-                    data.gameplay.show_timing_feedback
-                        ? gameplay_timing_feedback_text(data.gameplay.feedback_delta_ms,
-                                                        data.gameplay.feedback)
-                        : std::wstring{};
+                    gameplay_timing_feedback_text(data.gameplay.feedback_delta_ms,
+                                                  data.gameplay.feedback);
             } else {
                 scene_hud_cache.feedback_text.clear();
                 scene_hud_cache.feedback_timing_text.clear();
@@ -797,10 +773,8 @@
                 scene_hud_cache.ghost_feedback_text =
                     gameplay_feedback_overlay_text(data.gameplay.ghost_feedback);
                 scene_hud_cache.ghost_feedback_timing_text =
-                    data.gameplay.show_timing_feedback
-                        ? gameplay_timing_feedback_text(data.gameplay.ghost_feedback_delta_ms,
-                                                        data.gameplay.ghost_feedback)
-                        : std::wstring{};
+                    gameplay_timing_feedback_text(data.gameplay.ghost_feedback_delta_ms,
+                                                  data.gameplay.ghost_feedback);
             } else {
                 scene_hud_cache.ghost_feedback_text.clear();
                 scene_hud_cache.ghost_feedback_timing_text.clear();
@@ -910,7 +884,7 @@
             return;
         }
 
-        if (data.gameplay.countdown_active) {
+        if (data.gameplay.countdown_active && !data.gameplay.paused) {
             if (d2d_->gameplay_static_command_list) {
                 ctx->DrawImage(d2d_->gameplay_static_command_list.Get());
             }
@@ -1107,6 +1081,39 @@
         const D2D1_RECT_F field_clip_rect =
             D2D1::RectF(field_left + 2.0f, field_top + 2.0f, field_right - 2.0f, field_bottom - 2.0f);
         const float hit_line_y = gameplay_field_y(field_top, field_height, judgement_line_position);
+
+        // The same black mask covers sprite and vector notes, including LN bodies.
+        // Draw inside the note clip, before HUD text and above the receptor area.
+        auto draw_note_fog = [&](const GameplayFieldLayout& field, float judge_y) {
+            const double fade_in = std::isfinite(data.gameplay.note_fade_in)
+                ? std::clamp(data.gameplay.note_fade_in, 0.0, 1.0) : 0.0;
+            const double fade_out = std::isfinite(data.gameplay.note_fade_out)
+                ? std::clamp(data.gameplay.note_fade_out, 0.0, 1.0) : 0.0;
+            if (fade_in <= 0.0 && fade_out <= 0.0) return;
+            const float top = field.top + 2.0f;
+            const float bottom = std::min(field.bottom - 2.0f, judge_y -
+                std::max(2.0f, gameplay_note_head_half_height(note_height_scale) * 0.20f));
+            const float span = bottom - top;
+            if (span <= 0.0f) return;
+            if (!d2d_->note_fog_brush) {
+                const D2D1_GRADIENT_STOP stops[] = {
+                    {0.0f, D2D1::ColorF(0x000000, 1.0f)},
+                    {1.0f, D2D1::ColorF(0x000000, 0.0f)}};
+                Microsoft::WRL::ComPtr<ID2D1GradientStopCollection> collection;
+                if (FAILED(ctx->CreateGradientStopCollection(stops, 2, collection.GetAddressOf()))) return;
+                if (FAILED(ctx->CreateLinearGradientBrush(
+                    D2D1::LinearGradientBrushProperties(D2D1::Point2F(0, 0), D2D1::Point2F(0, 1)),
+                    collection.Get(), d2d_->note_fog_brush.GetAddressOf()))) return;
+            }
+            const auto fog = [&](float opaque_y, float clear_y) {
+                d2d_->note_fog_brush->SetStartPoint(D2D1::Point2F(0, opaque_y));
+                d2d_->note_fog_brush->SetEndPoint(D2D1::Point2F(0, clear_y));
+                ctx->FillRectangle(D2D1::RectF(field.left + 2.0f, std::min(opaque_y, clear_y),
+                    field.right - 2.0f, std::max(opaque_y, clear_y)), d2d_->note_fog_brush.Get());
+            };
+            if (fade_in > 0.0) fog(top, top + span * static_cast<float>(fade_in));
+            if (fade_out > 0.0) fog(bottom, bottom - span * static_cast<float>(fade_out));
+        };
 
         auto draw_vertical_gauge = [&](float gauge_left,
                                        double gauge_value,
@@ -1563,7 +1570,8 @@
                 note_fill->SetColor(gameplay_note_fill_color(lane_color, visual_opacity));
             }
             if (note_border) {
-                note_border->SetColor(gameplay_note_border_color(lane_color, note_outline_opacity));
+                note_border->SetColor(gameplay_note_border_color(
+                    lane_color, note_outline_opacity, note_polygon_geometry != nullptr));
             }
             if (note_hold_fill) {
                 note_hold_fill->SetColor(gameplay_note_hold_color(lane_color, native_hold_body_opacity));
@@ -1680,10 +1688,10 @@
                     draw_note_primitive(ctx,
                                         tail_rect,
                                         tail_fill,
-                                        nullptr,
-                                        0.0f,
+                                        note_border,
+                                        1.5f,
                                         note_shape,
-                                        false,
+                                        note_border_enabled && note_polygon_geometry != nullptr,
                                         note_polygon_geometry);
                 }
             }
@@ -1700,12 +1708,14 @@
                     if (note_fill) {
                         ID2D1Brush* head_fill = configure_gameplay_material_brush(
                             note_material, note_fill, note_rect, visual_opacity, false);
-                        draw_note_primitive(ctx, note_rect, head_fill, note_border, 0.85f,
+                        draw_note_primitive(ctx, note_rect, head_fill, note_border,
+                                            note_polygon_geometry ? 1.5f : 0.85f,
                                             note_shape, note_border_enabled, note_polygon_geometry);
                     }
                 }
             }
         }
+        draw_note_fog(field_layout, hit_line_y);
         ctx->PopAxisAlignedClip();
         ctx->SetAntialiasMode(saved_antialias);
 
@@ -1728,7 +1738,9 @@
                 !feedback_timing_text.empty();
             const float combo_anchor_y =
                 gameplay_combo_anchor_y(feedback_field, data.gameplay.judgement_position, 74.0f, 82.0f);
-            if ((show_feedback_overlay || show_timing_feedback) && d2d_->text_brush) {
+            const bool show_timing_bar = data.gameplay.show_timing_bar && has_feedback &&
+                !feedback_timing_text.empty();
+            if ((show_feedback_overlay || show_timing_feedback || show_timing_bar) && d2d_->text_brush) {
                 if (show_feedback_overlay && scene_header_format) {
                     D2D1_RECT_F feedback_rect =
                         gameplay_centered_overlay_rect(feedback_field, combo_anchor_y - 34.0f, 48.0f, -24.0f);
@@ -1758,22 +1770,6 @@
                                               feedback_rect,
                                               d2d_->text_brush.Get(),
                                               DWRITE_TEXT_ALIGNMENT_CENTER);
-                    if (show_timing_feedback && scene_body_format) {
-                        const D2D1_RECT_F timing_text_rect =
-                            D2D1::RectF(feedback_rect.left,
-                                        feedback_rect.top + 54.0f,
-                                        feedback_rect.right,
-                                        feedback_rect.bottom + 8.0f);
-                        d2d_->text_brush->SetColor(
-                            feedback_delta_ms < 0.0
-                                ? ng_color("timing_fast",D2D1::ColorF(0x5DA9FF, 0.98f))
-                                : ng_color("timing_slow",D2D1::ColorF(0xFF5A6B, 0.98f)));
-                        draw_readable_text_aligned(feedback_timing_text,
-                                                  ng_font("timing",scene_body_format.Get()),
-                                                  timing_text_rect,
-                                                  d2d_->text_brush.Get(),
-                                                  DWRITE_TEXT_ALIGNMENT_CENTER);
-                    }
                     if (feedback == "PG") {
                         const double age = animation_age_ms(feedback_started_ns, 320.0);
                         const float life = static_cast<float>(std::clamp(1.0 - age / 320.0, 0.0, 1.0));
@@ -1793,7 +1789,31 @@
                     ctx->SetTransform(saved_feedback_transform);
                 }
 
-                if (show_timing_feedback) {
+                // Text gets its own position outside the judgement pop transform;
+                // changing the bar or judgement font size cannot drag it around.
+                if (show_timing_feedback && scene_body_format) {
+                    auto grade_rect = gameplay_centered_overlay_rect(feedback_field, combo_anchor_y - 34.0f, 48.0f, -24.0f);
+                    grade_rect.left += static_cast<float>(data.gameplay.judgement_offset_x);
+                    grade_rect.right += static_cast<float>(data.gameplay.judgement_offset_x);
+                    grade_rect = readable_text_rect(ng_rect("judgement", grade_rect), ng_font("judgement", scene_header_format.Get()));
+                    auto text_rect = ng_rect("timing_label", D2D1::RectF(grade_rect.left, grade_rect.top + 54.0f,
+                                                                       grade_rect.right, grade_rect.bottom + 8.0f));
+                    text_rect.left += static_cast<float>(data.gameplay.timing_text_offset_x);
+                    text_rect.right += static_cast<float>(data.gameplay.timing_text_offset_x);
+                    text_rect.top += static_cast<float>(data.gameplay.timing_text_offset_y);
+                    text_rect.bottom += static_cast<float>(data.gameplay.timing_text_offset_y);
+                    const auto color = d2d_->text_brush->GetColor();
+                    const auto opacity = d2d_->text_brush->GetOpacity();
+                    d2d_->text_brush->SetOpacity(opacity * feedback_animation.opacity);
+                    d2d_->text_brush->SetColor(feedback_delta_ms < 0.0
+                        ? ng_color("timing_fast", D2D1::ColorF(0x5DA9FF, 0.98f))
+                        : ng_color("timing_slow", D2D1::ColorF(0xFF5A6B, 0.98f)));
+                    draw_readable_text_aligned(feedback_timing_text, ng_font("timing", scene_body_format.Get()),
+                                              text_rect, d2d_->text_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER);
+                    d2d_->text_brush->SetColor(color);
+                    d2d_->text_brush->SetOpacity(opacity);
+                }
+                if (show_timing_bar) {
                     draw_timing_indicator(feedback_field.left + static_cast<float>(data.gameplay.judgement_offset_x),
                                           feedback_field.right + static_cast<float>(data.gameplay.judgement_offset_x),
                                           combo_anchor_y,
@@ -2190,7 +2210,8 @@
                     note_fill->SetColor(gameplay_note_fill_color(lane_color, visual_opacity));
                 }
                 if (note_border) {
-                    note_border->SetColor(gameplay_note_border_color(lane_color, note_outline_opacity));
+                    note_border->SetColor(gameplay_note_border_color(
+                        lane_color, note_outline_opacity, note_polygon_geometry != nullptr));
                 }
                 if (note_hold_fill) {
                     note_hold_fill->SetColor(gameplay_note_hold_color(lane_color, native_hold_body_opacity));
@@ -2307,10 +2328,10 @@
                         draw_note_primitive(ctx,
                                             tail_rect,
                                             tail_fill,
-                                            nullptr,
-                                            0.0f,
+                                            note_border,
+                                            1.5f,
                                             note_shape,
-                                            false,
+                                            note_border_enabled && note_polygon_geometry != nullptr,
                                             note_polygon_geometry);
                     }
                 }
@@ -2326,11 +2347,13 @@
                     } else if (note_fill) {
                         ID2D1Brush* head_fill = configure_gameplay_material_brush(
                             note_material, note_fill, note_rect, visual_opacity, false);
-                        draw_note_primitive(ctx, note_rect, head_fill, note_border, 0.85f,
+                        draw_note_primitive(ctx, note_rect, head_fill, note_border,
+                                            note_polygon_geometry ? 1.5f : 0.85f,
                                             note_shape, note_border_enabled, note_polygon_geometry);
                     }
                 }
             }
+            draw_note_fog(ghost_field_layout, ghost_hit_line_y);
             ctx->PopAxisAlignedClip();
             ctx->SetAntialiasMode(ghost_saved_antialias);
 
@@ -2480,7 +2503,15 @@
                                scene_hud_cache.ghost_score_text, scene_hud_cache.ghost_battle_summary_text, false);
             if (embed_battle_header) draw_gameplay_progress_bar(progress_track_rect);
         }
-        if (data.gameplay.paused && d2d_->panel_brush && d2d_->card_brush &&
+        // Resume keeps the frozen note field visible; only the opening countdown
+        // uses the early-return card above. This also leaves LN bodies in place.
+        if (data.gameplay.paused && data.gameplay.countdown_active) {
+            draw_readable_text_aligned(wloc("RESUME ", "재개 ") +
+                to_wide(std::to_string(std::max(1, data.gameplay.countdown_value))),
+                scene_title_format.Get(), D2D1::RectF(84.0f, 180.0f, 450.0f, 270.0f),
+                d2d_->text_brush.Get(), DWRITE_TEXT_ALIGNMENT_LEADING);
+        }
+        if (data.gameplay.paused && !data.gameplay.countdown_active && d2d_->panel_brush && d2d_->card_brush &&
             d2d_->text_brush && scene_header_format && scene_body_format) {
             const D2D1_RECT_F screen_overlay = D2D1::RectF(0.0f, 0.0f, kBaseWidth, kBaseHeight);
             // Tall enough to seat the three menu rows and the live tuning readout.

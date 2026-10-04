@@ -575,6 +575,136 @@ TEST_CASE("gameplay engine marks early hold release as bad") {
     CHECK(engine.stats().counts.pg == 1);
 }
 
+TEST_CASE("LN release regression commits an early drop before the tail for live and synced input") {
+    for (const bool release_required : {false, true}) {
+        for (const bool synced : {false, true}) {
+            GameplayChart chart;
+            chart.lane_count = 1;
+            chart.duration_samples = 3000;
+            chart.notes = {NoteEvent{1, 1000, 2000, release_required}};
+            GameplayConfig config;
+            config.sample_rate = 1000;
+            config.judge.pg_ms = 10.0;
+            config.judge.gr_ms = 20.0;
+            config.judge.gd_ms = 30.0;
+            config.judge.bd_ms = 40.0;
+            GameplayEngine engine(chart, config);
+            (void)engine.handle_input(1, InputState::Pressed, 1000);
+            if (synced) engine.sync_input_state(1, InputState::Released, 1500);
+            else (void)engine.handle_input(1, InputState::Released, 1500);
+
+            // The key-up itself must publish the miss; waiting for the tail
+            // leaves the player with a success feedback for a dropped LN.
+            CHECK(engine.stats().counts.bd == 1);
+            CHECK(engine.stats().counts.pg == 1);
+            CHECK(engine.stats().combo == 0);
+            CHECK(engine.gauge_state().value == doctest::Approx(96.875));
+            CHECK(engine.live_feedback().judgement == Judgement::BD);
+            CHECK(engine.live_feedback().sample == 1500);
+            std::vector<tenriff::gameplay::ActiveHoldView> holds;
+            engine.collect_active_holds(holds);
+            CHECK(holds.empty());
+        }
+    }
+}
+
+TEST_CASE("LN release regression cannot erase a drop by regrabbing in one audio batch") {
+    for (const bool release_required : {false, true}) {
+        for (const bool synced : {false, true}) {
+            for (const bool advance_between_inputs : {false, true}) {
+                GameplayChart chart;
+                chart.lane_count = 1;
+                chart.duration_samples = 3000;
+                chart.notes = {NoteEvent{1, 1000, 2000, release_required}};
+                GameplayConfig config;
+                config.sample_rate = 1000;
+                config.judge.pg_ms = 10.0;
+                config.judge.gr_ms = 20.0;
+                config.judge.gd_ms = 30.0;
+                config.judge.bd_ms = 40.0;
+                GameplayEngine engine(chart, config);
+                (void)engine.handle_input(1, InputState::Pressed, 1000);
+                const auto transition = [&](InputState state, int64_t sample) {
+                    if (synced) engine.sync_input_state(1, state, sample);
+                    else (void)engine.handle_input(1, state, sample);
+                };
+                transition(InputState::Released, 1500);
+                if (advance_between_inputs) engine.advance(1501);
+                transition(InputState::Pressed, 1510);
+                transition(InputState::Released, 2000);
+                engine.advance(2100);
+                engine.advance(3000);
+
+                CHECK(engine.stats().counts.pg == 1);
+                CHECK(engine.stats().counts.bd == 1);
+                CHECK(engine.stats().raw_score == 5000);
+                CHECK(engine.stats().combo == 0);
+                CHECK(engine.stats().osu_od8.judged_objects == 1);
+                CHECK(engine.stats().osu_od8.counts.miss == 1);
+                CHECK(engine.gauge_state().value == doctest::Approx(96.875));
+            }
+        }
+    }
+}
+
+TEST_CASE("LN release compatibility preserves the deferred ruleset one and two result") {
+    for (const bool release_required : {false, true}) {
+        GameplayChart chart;
+        chart.lane_count = 1;
+        chart.duration_samples = 3000;
+        chart.notes = {NoteEvent{1, 1000, 2000, release_required}};
+        GameplayConfig config;
+        config.sample_rate = 1000;
+        config.legacy_hold_release = true;
+        config.judge.pg_ms = 10.0;
+        config.judge.gr_ms = 20.0;
+        config.judge.gd_ms = 30.0;
+        config.judge.bd_ms = 40.0;
+        GameplayEngine engine(chart, config);
+        (void)engine.handle_input(1, InputState::Pressed, 1000);
+        (void)engine.handle_input(1, InputState::Released, 1500);
+        CHECK(engine.stats().counts.bd == 0);
+        CHECK(engine.stats().combo == 1);
+        (void)engine.handle_input(1, InputState::Pressed, 1510);
+        (void)engine.handle_input(1, InputState::Released, 2000);
+        engine.advance(2100);
+
+        // Historical verification must reproduce the old native score even
+        // though new gameplay correctly commits this drop as a BAD.
+        CHECK(engine.stats().counts.pg == 2);
+        CHECK(engine.stats().counts.bd == 0);
+        CHECK(engine.stats().raw_score == 10000);
+        CHECK(engine.stats().osu_od8.counts.meh == 1);
+        CHECK(engine.gauge_state().value == doctest::Approx(100.0));
+    }
+}
+
+TEST_CASE("LN release keeps the ordinary timing grades inside the tail window") {
+    for (const bool release_required : {false, true}) {
+        for (const int delta : {-30, -20, -10, 0, 15}) {
+            GameplayChart chart;
+            chart.lane_count = 1;
+            chart.duration_samples = 3000;
+            chart.notes = {NoteEvent{1, 1000, 2000, release_required}};
+            GameplayConfig config;
+            config.sample_rate = 1000;
+            config.judge.pg_ms = 10.0;
+            config.judge.gr_ms = 20.0;
+            config.judge.gd_ms = 30.0;
+            config.judge.bd_ms = 40.0;
+            GameplayEngine engine(chart, config);
+            (void)engine.handle_input(1, InputState::Pressed, 1000);
+            (void)engine.handle_input(1, InputState::Released, 2000 + delta);
+            engine.advance(2500);
+            CHECK(engine.stats().counts.pg == (std::abs(delta) <= 10 ? 2 : 1));
+            CHECK(engine.stats().counts.gr == (std::abs(delta) > 10 && std::abs(delta) <= 20 ? 1 : 0));
+            CHECK(engine.stats().counts.gd == (std::abs(delta) > 20 ? 1 : 0));
+            CHECK(engine.stats().counts.bd == 0);
+            CHECK(engine.stats().osu_od8.judged_objects == 1);
+        }
+    }
+}
+
 TEST_CASE("gameplay engine still judges standard hold tails after an early release") {
     GameplayChart chart;
     chart.lane_count = 1;

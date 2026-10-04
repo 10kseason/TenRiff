@@ -150,6 +150,7 @@ bool GameSession::initialize(const CommandLineOptions& options) {
     pause_sample_offset_ = 0;
     pause_physical_start_sample_ = 0;
     paused_chart_sample_ = 0;
+    paused_playback_sample_ = 0;
     pause_anchor_valid_ = false;
     last_audio_sample_.store(0, std::memory_order_release);
     audio_timing_sequence_.store(0, std::memory_order_release);
@@ -558,7 +559,7 @@ bool GameSession::initialize(const CommandLineOptions& options) {
     if (replay_playback_enabled_) {
         const auto base_judge = is_supported_canonical_replay_ruleset(replay_source_.ruleset_id)
                                     ? config::JudgeConfig{} : config_.judge;
-        mode_result.judge = replay_judge_config_for_playback(replay_source_, base_judge);
+        mode_result.judge = replay_judge_config_for_playback(replay_source_, base_judge, chart_result.chart.bms_rank);
     }
     for (const auto& warning : mode_result.warnings) {
         std::cerr << "[warn] " << warning << std::endl;
@@ -568,6 +569,8 @@ bool GameSession::initialize(const CommandLineOptions& options) {
     gameplay_config.sample_rate = sample_rate_;
     gameplay_config.rate = config_.speed.rate;
     gameplay_config.judge = mode_result.judge;
+    gameplay_config.legacy_hold_release = replay_playback_enabled_ &&
+        replay_uses_legacy_hold_release(replay_source_);
     gameplay_config.gauge = config_.gauge;
     gameplay_config.input_offset_ms = config_.input_offset_ms;
     gameplay_config.practice_no_fail_enabled =
@@ -815,7 +818,8 @@ bool GameSession::initialize(const CommandLineOptions& options) {
         gameplay::GameplayConfig ghost_config = gameplay_config;
         const auto ghost_base_judge = is_supported_canonical_replay_ruleset(ghost_replay_source_.ruleset_id)
                                           ? config::JudgeConfig{} : config_.judge;
-        ghost_config.judge = replay_judge_config_for_playback(ghost_replay_source_, ghost_base_judge);
+        ghost_config.judge = replay_judge_config_for_playback(ghost_replay_source_, ghost_base_judge, chart_.bms_rank);
+        ghost_config.legacy_hold_release = replay_uses_legacy_hold_release(ghost_replay_source_);
         ghost_config.gauge_shift_enabled = true;
         ghost_config.gauge_policy = {};
         if (!ghost_replay_source_.mode.gauge.empty()) {
@@ -1101,6 +1105,11 @@ GameSession::HudSnapshot GameSession::hud_snapshot() {
         snapshot.duration_samples = engine_->duration_samples();
 
         if (snapshot.current_sample < last_visual_cue_sample_) {
+            // Playback can be rebased independently of the monotonic mixer/write
+            // cursor. Notes retired by an earlier visual horizon must be scanned
+            // again, just like BGA cues, for both player and ghost fields.
+            hud_scan_start_ = 0;
+            ghost_hud_scan_start_ = 0;
             next_visual_cue_index_ = 0;
             current_background_base_path_.clear();
             current_background_overlay_path_.clear();
@@ -2140,9 +2149,10 @@ void GameSession::finish_audio_output(float* output, uint32_t frames, bool foreg
     if (!output || frames == 0) {
         return;
     }
-    // OFF must bypass the stateful normalizer entirely; the output limiter and
-    // master gain retain their existing behavior for either setting.
-    if (normalize_mix && config_.audio_ui.normalize_audio) mix_normalizer_.process(output, frames);
+    const bool normalize_audio = config_.audio_ui.normalize_audio;
+    // OFF bypasses both automatic gain and the soft limiter; even ordinary
+    // full-scale PCM was previously compressed above 0.92 before master gain.
+    if (normalize_mix && normalize_audio) mix_normalizer_.process(output, frames);
     if (settings_click_requested_.exchange(false, std::memory_order_acq_rel))
         settings_click_.trigger(sample_rate_);
     // Keep UI feedback out of automatic loudness tracking.
@@ -2151,7 +2161,9 @@ void GameSession::finish_audio_output(float* output, uint32_t frames, bool foreg
         config_.audio_ui.master_volume, config_.audio_ui.mute_when_inactive, foreground);
     const std::size_t sample_count = static_cast<std::size_t>(frames) * 2;
     for (std::size_t i = 0; i < sample_count; ++i) {
-        output[i] = apply_master_volume_to_sample(output[i], master_gain);
+        output[i] = normalize_audio
+            ? apply_master_volume_to_sample(output[i], master_gain)
+            : apply_clean_master_volume_to_sample(output[i], master_gain);
     }
 }
 
@@ -2271,6 +2283,7 @@ void GameSession::shutdown() {
             }
             replay.chart_path = chart_path_;
             replay.chart_format = format_token;
+            replay.bms_rank = chart_.bms_rank;
             replay.chart_sha256 = chart_hashes.sha256;
             replay.ruleset_id = replay_ruleset_id_for_runtime(config_.judge,
                                                               config_.gauge,
@@ -2335,6 +2348,7 @@ void GameSession::shutdown() {
             exported_result.replay_format_version = replay.replay_format_version;
             exported_result.chart_path = chart_path_;
             exported_result.chart_format = format_token;
+            exported_result.bms_rank = replay.bms_rank;
             exported_result.chart_sha256 = replay.chart_sha256;
             exported_result.ruleset_id = replay.ruleset_id;
             exported_result.created_utc = created_utc;
@@ -2380,6 +2394,7 @@ void GameSession::shutdown() {
     pause_sample_offset_ = 0;
     pause_physical_start_sample_ = 0;
     paused_chart_sample_ = 0;
+    paused_playback_sample_ = 0;
     pause_anchor_valid_ = false;
     paused_.store(false, std::memory_order_release);
     pause_resume_requested_.store(false, std::memory_order_release);
@@ -2481,10 +2496,11 @@ void GameSession::audio_callback(float* output,
             if (!pause_anchor_valid_) {
                 pause_physical_start_sample_ = physical_buffer_start_samples;
                 paused_chart_sample_ = logical_buffer_start_samples;
+                paused_playback_sample_ = logical_playback_sample;
                 pause_anchor_valid_ = true;
             }
 
-            current_playback_sample_ = paused_chart_sample_;
+            current_playback_sample_ = paused_playback_sample_;
             process_paused_input_queue();
             if (stop_requested_.load(std::memory_order_acquire)) {
                 finished_.store(true, std::memory_order_release);
@@ -2517,7 +2533,7 @@ void GameSession::audio_callback(float* output,
 
             committed_sample = paused_chart_sample_;
             committed_buffer_start_sample = paused_chart_sample_;
-            committed_playback_sample = paused_chart_sample_;
+            committed_playback_sample = paused_playback_sample_;
             paused_callback = true;
         } else {
             const int64_t buffer_end_samples =
@@ -2558,10 +2574,11 @@ void GameSession::audio_callback(float* output,
             if (paused_.load(std::memory_order_acquire)) {
                 pause_physical_start_sample_ = physical_buffer_start_samples;
                 paused_chart_sample_ = logical_buffer_start_samples;
+                paused_playback_sample_ = logical_playback_sample;
                 pause_anchor_valid_ = true;
                 committed_sample = paused_chart_sample_;
                 committed_buffer_start_sample = paused_chart_sample_;
-                committed_playback_sample = paused_chart_sample_;
+                committed_playback_sample = paused_playback_sample_;
                 paused_callback = true;
             } else {
                 service_hispeed_repeat(now_ns);
@@ -2619,7 +2636,7 @@ void GameSession::audio_callback(float* output,
         const int64_t buffer_end_samples =
             logical_buffer_start_samples + static_cast<int64_t>(frames);
         schedule_chart_audio(buffer_end_samples);
-        if (result_transition_pending_ && !chart_audio_voices_.empty()) {
+        if (config_.audio_ui.play_to_end && result_transition_pending_ && !chart_audio_voices_.empty()) {
             // The final mixed buffer is still queued at the device. Remember
             // its end and wait for the playback head before Stop/Reset can run.
             result_transition_sample_ = std::max(result_transition_sample_, buffer_end_samples);
@@ -2627,8 +2644,8 @@ void GameSession::audio_callback(float* output,
         mix_chart_audio(output, frames, logical_buffer_start_samples);
         mix_tones(output, frames, logical_buffer_start_samples);
         if (result_transition_pending_ &&
-            next_chart_audio_event_ >= chart_audio_events_.size() &&
-            chart_audio_voices_.empty() &&
+            (!config_.audio_ui.play_to_end ||
+             (next_chart_audio_event_ >= chart_audio_events_.size() && chart_audio_voices_.empty())) &&
             logical_playback_sample >= result_transition_sample_) {
             finished_.store(true, std::memory_order_release);
         }

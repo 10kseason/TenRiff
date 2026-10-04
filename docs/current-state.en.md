@@ -1,5 +1,7 @@
 # TenRiff Current State
 
+**2026-10-04 · TenRiff 1.8.3:** Adds fullscreen skin previews, note fog, independent FAST/SLOW placement and a simple square skin. Fixes hidden compression with Normalize OFF and pause/resume visibility; adds song-ending choices, immediate LN release judgement and R3 timing based on BMS RANK. [1.8.3 release](release-1.8.3-gate.md).
+
 **2026-10-03 · TenRiff 1.8.2:** Adds ten vivid Options icon colors, rounded selection borders matching each icon, corrected FAST/SLOW bar visibility and matching skin-editor previews. [1.8.2 release](release-1.8.2-gate.md).
 
 - 1.8.1: Adds 18 functional icons and a portable PNG skin, with black options and Song Select surfaces. Includes contextual option help, GPT Sites rankings inside Records, and Left/Right key-test layout selection from 4K to 16K. [Design / validation](menu-studio-1.8.1.ko.md).
@@ -7,14 +9,14 @@
 - 1.7.10 hardens ALL SONG against deleted cached entries and adds merge progress and consistent completion-state publication. [Verification and unreproduced symptom](release-1.7.10-gate.md).
 - 1.7.8 adds modern native menus, Luma Keys digital keyboard skins for every 4K–16K layout, Japanese UI, and web/offline skin editing. Menu and gameplay visual controls are stored separately in `native` and `gameplay.native`. [Validation](release-1.7.8-gate.md).
 
-The current project version is **1.8.2**. Completed plays save and submit without another key after audio drains. Stella, Satellite and U_E Pack 4K/6K/8K table presets are included. Sites leaderboard integration and existing audio, skin and session features are retained; WASAPI remains the default. See the [1.8.2 release gate](release-1.8.2-gate.md) for changes and verification limits.
+The current project version is **1.8.3**. Audio → Song Ending offers **Listen** (default) or **Skip Outro**; completed plays save and submit without another key. New plays use R3 timing based on BMS RANK and a timing profile for web submissions; existing R1/R2 records are preserved. WASAPI remains the default. See the [1.8.3 release gate](release-1.8.3-gate.md) for changes and pending release checks.
 
 The 749/739 checks in the [local 1.7.1 r2 report](local-1.7.1-r2.ko.md) are historical, not the new release's results. See [library management](library-management.md), [reference BPM](reference-bpm.md), [skin presets](skin-presets.md) and [ASIO](asio-audio.md).
 
 This is the document that the next agent or any new contributor should read first. Its goal is to quickly answer: "what is this project now, where should I look, and what is still unverified?"
 
 ## Baseline
-- Current project version: `1.8.2`
+- Current project version: `1.8.3`
 - 1.7.1 provides full-room HUD/results for up to eight players, tied ranks/missing-score states, P-GREAT-only effects, independent judgement/combo placement, ten Options cards, audio normalization and the Song Select difficulty-table card. See [follow-up details](gameplay-polish-followup.md) and [verification](release-1.7.1-gate.md).
 - 1.7.0 refreshes native Home, Song Select, Result and shared settings. See [UI implementation](menu-visual-polish.md) and [release verification](release-1.7.0-gate.md). The prism remains only in the custom-skin path; result reveal timing is unchanged.
 - Native Result now emphasizes score, grade and accuracy; the prism remains in custom skins. The existing 2.2-second reveal, Space skip and control readiness rules are preserved.
@@ -113,7 +115,7 @@ This is the document that the next agent or any new contributor should read firs
   - the separate `Conversion Note Add` option is removed: Krrcream only remaps source notes, while nK2 creates safe support notes directly in the converted target layout when expanding the key count.
   - nK2 offers `Native (12%)` by default, `Transform (35%)` and `Remaster (65%)`; `Remaster` raises the budget while locking the anchor so the source placement survives, and fills LN sections with holds of the same length. All three are caps - the source density and the safety windows decide how much actually lands. The row is locked for Krrcream, and the standalone converter GUI also locks Krrcream Max/Min/Speed/Seed tuning.
   - NK3 always combines bundled P64 with host beam32. It adds the generalized pattern MLP only when a non-10K source is converted to 10K; 10K-to-10K and every other target use P64 alone. The default `AUTO` backend runs both P64 and the MLP on AMD/NVIDIA GPUs through ncnn Vulkan, retaining the optional OpenVINO compatibility path as fallback. `TENRIFF_NK3_BACKEND` and `TENRIFF_NK3_VULKAN_DEVICE` can force the selection.
-  - official 1.8.2 builds/Windows archives do not build or ship the standalone BMS key-converter CLI/GUI; its top-level CMake option defaults `OFF` and the source is retained only for development regression
+  - official 1.8.3 builds/Windows archives do not build or ship the standalone BMS key-converter CLI/GUI; its top-level CMake option defaults `OFF` and the source is retained only for development regression
   - `mode.key_mode=none` keeps the chart's original key count and base pattern layout intact
 - Native difficulty:
   - BMS LV/CR calculation evaluates only LN head/tail miss-ms at 0.5x, so `300ms` is treated as `150ms`; runtime gameplay judgement windows remain unchanged
@@ -138,13 +140,14 @@ This is the document that the next agent or any new contributor should read firs
   - `skin.lr2_resolution_mode` stores LR2 playskin resolution override tokens as `auto / sd / hd / fhd`
   - LR2 auto-detect uses the playskin `#DST_NOTE` coordinate range instead of asset names
   - eased future-note entry from above the field
-  - after the last judged note, gameplay waits for the music by default; pressing a lane key during that tail moves to Result immediately
+  - after the last judged note, Audio → Song Ending either listens to the remaining audio (default) or skips the outro after the normal result delay; Listen also retains the lane-key manual skip
 - Judge:
-  - default `PG / GR / GD` windows are `20ms / 65ms / 115ms`
+  - default `PG / GR / GD` windows are `21ms / 65ms / 115ms` (BMS RANK EASY)
+  - BMS `#RANK` EASY (including missing)/NORMAL/HARD/VERYHARD uses PG `21/18/15/8ms`; NORMAL/HARD/VERYHARD scales all EASY PG/GR/GD/BAD windows by `18/21`, `15/21`, `8/21`, leaving the automatic miss deadline unchanged
   - the default `BAD` window is `210ms`, `Judge Easy` uses `283.5ms`, and `Judge Hard` caps it at `180ms`
-  - `Judge Easy` scales hit windows and hold tolerances by `1.35x`, giving `PG/GR/GD=27/87.75/155.25ms`; Hard preserves PG/GR/GD and hold tolerances while narrowing the outer BAD boundary
+  - `Judge Easy` scales hit windows and hold tolerances by `1.35x`, giving `PG/GR/GD=28.35/87.75/155.25ms`; Hard preserves PG/GR/GD and hold tolerances while narrowing the outer BAD boundary (BMS RANK EASY)
   - default Normal/Easy/Hard automatically miss unplayed notes after `340ms`. A late press outside BAD misses the expired note and checks the next one, so the hit window does not expand to the automatic deadline
-  - new plays use `ruleset-2`; playback, ghosts and verification of `ruleset-1` retain Easy `1.25x`, Hard BAD `340ms`, and the old automatic miss deadline `=BAD`
+  - new plays use `ruleset-3`; ruleset-1/2 replay playback, ghosts and verification preserve the original timing and LN release behavior. See [RANK scaling and compatibility](audio-ln-rank.ko.md)
   - if the pending same-lane note is already a `BAD` while the immediate next note is clearly `GOOD` or better, the pending note is recorded as a miss and the current press scores the next note instead of locking the stream into repeated `BAD`s
   - under `Judge Hard`, an unplayed object becomes a combo-breaking indirect `POOR` and OD8 `MISS`; other note-consuming failures stay `BAD`
   - very early non-consuming presses are handled as LR2-style `POOR` and are visible again in result / replay / UI paths
@@ -158,7 +161,7 @@ This is the document that the next agent or any new contributor should read firs
   - rank boundaries are `<75 F / 75 B / 80.5 A / 86.5 A+ / 90 S / 95.5 S+ / 98 AA / 99 SS / 99.75 SSS`
   - live gameplay `ClockSync` uses centered anchor regression instead of large absolute Windows QPC values and automatically rebases after sustained clock discontinuities
   - stale backlog is classified from QPC event age and the `BAD` window; a fresh input whose sample mapping drifts far from the current playback anchor falls back to that anchor instead of becoming permanently non-scoring catch-up
-  - tail release timing applies only to BMS `#LNMODE 2` charge notes
+  - in R3, releasing an ordinary LN or `#LNMODE 2` CN too early immediately commits BAD, a combo break and gauge loss; regrabbing cannot cancel it. Ordinary LN still completes automatically when held, and CN retains tail release timing
   - when two keyboards press the same key, the logical `Pressed` state remains active until the last input source releases it
 - Graphics:
   - resolution presets (`720p`, `1080p`, `qhd`, `native`)
@@ -228,7 +231,7 @@ This is the document that the next agent or any new contributor should read firs
 
 ## Runtime / Packaging Rules
 - New user profiles are created automatically
-- The current P2P distribution target is `TenRiff 1.8.2`
+- The current P2P distribution target is `TenRiff 1.8.3`
 - Distribution packages do not include `Songs`
 - Distribution packages include the `Mainmusic/` scene slots `Main Menu / Options / Song Selecte / Multiplayer Lobby / Clear / Failed`; each `Name.mp3` plus numbered `Name 2.mp3` through `Name 64.mp3` siblings is discovered automatically and rotates on scene re-entry
 - Distribution updates include only built artifacts and required runtime assets

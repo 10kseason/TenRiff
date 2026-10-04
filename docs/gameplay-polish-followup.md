@@ -27,8 +27,9 @@ Room snapshots → `app/MultiplayerPresentation.h` → value-only `render/Multip
 the renderer, and the protocol's eight-player capacity remains unchanged.
 
 Audio UI → `AudioSettingsController`/view → `audio.normalize_audio` in profile config → GameSession's
-mixed stereo callback → `MixNormalizer` → existing limiter/master volume. Reset gain and energy when
-the audio sample rate initializes. Menu music and song previews are unchanged.
+mixed stereo callback → when ON, `MixNormalizer` → existing limiter/master volume; when OFF,
+linear master gain → final output-range clamp only. Reset gain and energy when the audio sample
+rate initializes. Menu music and song previews are unchanged.
 
 Skin controller rows → `SkinConfig` → immutable HUD/skin preview → renderer. New fields are
 `skin.judgement_position`, `skin.judgement_offset_x`, and `skin.combo_offset_x`; existing

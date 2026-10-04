@@ -101,6 +101,7 @@ TEST_CASE("replay export writes JSON with trace events") {
     ReplayFile replay;
     replay.chart_path = "Songs/test.bms";
     replay.chart_format = "bms";
+    replay.bms_rank = 3;
     replay.chart_sha256 = std::string(64, 'a');
     replay.ruleset_id = std::string(tenriff::app::kCanonicalReplayRulesetId);
     replay.created_utc = "20250101_000000Z";
@@ -243,14 +244,98 @@ TEST_CASE("replay export writes JSON with trace events") {
     CHECK(loaded_replay.replay->trace.events[0].state == InputState::Pressed);
     CHECK(loaded_replay.replay->trace.events[1].state == InputState::Released);
     CHECK(loaded_replay.replay->chart_sha256 == replay.chart_sha256);
+    CHECK(loaded_replay.replay->bms_rank == replay.bms_rank);
     CHECK(loaded_replay.replay->ruleset_id == replay.ruleset_id);
 
     std::error_code ec;
     std::filesystem::remove(path, ec);
 }
 
+TEST_CASE("BMS rank metadata round trips and remains optional for old replay evidence") {
+    const std::filesystem::path path = "replay_bms_rank_roundtrip_test.json";
+    REQUIRE_FALSE(std::filesystem::exists(path));
+    struct Cleanup {
+        std::filesystem::path path;
+        ~Cleanup() { std::error_code error; std::filesystem::remove(path, error); }
+    } cleanup{path};
+    ReplayFile replay;
+    replay.chart_format = "bms";
+    replay.chart_sha256 = std::string(64, 'b');
+    replay.ruleset_id = std::string(tenriff::app::kCanonicalReplayRulesetId);
+    replay.sample_rate = replay.trace.sample_rate = 48000;
+    replay.trace.lane_count = 4;
+    replay.trace.duration_samples = 48000;
+    for (int rank = 0; rank <= 3; ++rank) {
+        replay.bms_rank = rank;
+        REQUIRE(save_replay_json(path.u8string(), replay).success());
+        const auto loaded = load_replay_json(path.u8string());
+        REQUIRE(loaded.success());
+        CHECK(loaded.replay->bms_rank == rank);
+        const auto json = parse_json(read_file(path));
+        REQUIRE(json.success());
+        CHECK(json.root->as_object()->at("bms_rank").as_number() == rank);
+
+        ResultFile result;
+        result.chart_format = "bms";
+        result.bms_rank = rank;
+        REQUIRE(save_result_json(path.u8string(), result).success());
+        const auto result_json = parse_json(read_file(path));
+        REQUIRE(result_json.success());
+        CHECK(result_json.root->as_object()->at("bms_rank").as_number() == rank);
+    }
+    replay.bms_rank.reset();
+    for (const auto ruleset : {tenriff::app::kLegacyReplayRulesetId,
+                              tenriff::app::kPreviousReplayRulesetId,
+                              tenriff::app::kCanonicalReplayRulesetId}) {
+        replay.ruleset_id = std::string(ruleset);
+        REQUIRE(save_replay_json(path.u8string(), replay).success());
+        const auto loaded = load_replay_json(path.u8string());
+        REQUIRE(loaded.success());
+        CHECK_FALSE(loaded.replay->bms_rank.has_value());
+        CHECK(read_file(path).find("bms_rank") == std::string::npos);
+    }
+}
+
+TEST_CASE("BMS rank metadata rejects invalid JSON types fractions and out of range values") {
+    const std::filesystem::path path = "replay_bms_rank_validation_test.json";
+    REQUIRE_FALSE(std::filesystem::exists(path));
+    struct Cleanup {
+        std::filesystem::path path;
+        ~Cleanup() { std::error_code error; std::filesystem::remove(path, error); }
+    } cleanup{path};
+    ReplayFile replay;
+    replay.replay_format_version = 0;
+    replay.chart_format = "bms";
+    replay.trace.sample_rate = replay.sample_rate = 48000;
+    replay.trace.lane_count = 4;
+    replay.trace.duration_samples = 48000;
+    REQUIRE(save_replay_json(path.u8string(), replay).success());
+    const std::string original = read_file(path);
+    for (const std::string invalid : {"-1", "4", "1.25", "1e100", "\"3\"", "null", "true", "{}", "[]"}) {
+        std::string document = original;
+        document.insert(1, "\"bms_rank\":" + invalid + ",");
+        write_file(path, document);
+        const auto loaded = load_replay_json(path.u8string());
+        CHECK_FALSE(loaded.success());
+        CHECK(loaded.error.find("BMS rank") != std::string::npos);
+    }
+    write_file(path, original);
+    for (const int invalid : {-1, 4, (std::numeric_limits<int>::max)()}) {
+        replay.bms_rank = invalid;
+        CHECK_FALSE(tenriff::gameplay::validate_replay_evidence(replay).success());
+        CHECK_FALSE(save_replay_json(path.u8string(), replay).success());
+        ResultFile result;
+        result.bms_rank = invalid;
+        CHECK_FALSE(save_result_json(path.u8string(), result).success());
+        // Reject before opening the output, leaving any existing file intact.
+        CHECK(read_file(path) == original);
+    }
+}
+
 TEST_CASE("replay v3 strict validation rejects ambiguous or unbounded traces") {
     ReplayFile replay;
+    replay.chart_format = "bms";
+    replay.bms_rank = 3;
     replay.chart_sha256 = std::string(64, 'b');
     replay.ruleset_id = std::string(tenriff::app::kCanonicalReplayRulesetId);
     replay.sample_rate = 48000;
@@ -289,6 +374,8 @@ TEST_CASE("deterministic replay verification ignores edited score claims") {
     chart.notes.push_back(tenriff::gameplay::NoteEvent{1, 1000});
 
     ReplayFile replay;
+    replay.chart_format = "bms";
+    replay.bms_rank = 3;
     replay.chart_sha256 = std::string(64, 'c');
     replay.ruleset_id = std::string(tenriff::app::kCanonicalReplayRulesetId);
     replay.sample_rate = 48000;
@@ -357,6 +444,7 @@ TEST_CASE("current and legacy replay rulesets reproduce their exact normal easy 
     chart.duration_samples = 16'000;
     chart.notes.push_back(tenriff::gameplay::NoteEvent{1, 8'000});
     for (const auto ruleset : {tenriff::app::kLegacyReplayRulesetId,
+                               tenriff::app::kPreviousReplayRulesetId,
                                tenriff::app::kCanonicalReplayRulesetId}) {
         const bool legacy = ruleset == tenriff::app::kLegacyReplayRulesetId;
         for (const std::string mod : {"", "judge_easy", "judge_hard"}) {
@@ -428,6 +516,107 @@ TEST_CASE("legacy replay playback and ghost policy preserve old automatic miss b
     }
 }
 
+TEST_CASE("explicit current replay rules keep rank and LN timing when chart hash evidence is missing") {
+    for (const int format : {0, 1, 2, tenriff::gameplay::kReplayFormatVersion}) {
+        ReplayFile replay;
+        replay.ruleset_id = std::string(tenriff::app::kCanonicalReplayRulesetId);
+        replay.replay_format_version = format;
+        const tenriff::config::JudgeConfig base;
+        const auto judge = tenriff::app::replay_judge_config_for_playback(replay, base, 0);
+        CHECK(judge.pg_ms == doctest::Approx(8.0));
+        CHECK(judge.gr_ms == doctest::Approx(65.0 * 8.0 / 21.0));
+        CHECK(judge.indirect_miss_ms == doctest::Approx(340.0));
+        CHECK_FALSE(tenriff::app::replay_uses_legacy_hold_release(replay));
+
+        replay.mods = {"judge_easy"};
+        const auto easy = tenriff::app::replay_judge_config_for_playback(replay, base, 0);
+        CHECK(easy.pg_ms == doctest::Approx(8.0 * 1.35));
+        CHECK(easy.gr_ms == doctest::Approx(65.0 * 8.0 / 21.0 * 1.35));
+        CHECK(easy.hold_grace_ms == doctest::Approx(80.0 * 1.35));
+        CHECK(easy.indirect_miss_ms == doctest::Approx(340.0));
+        CHECK_FALSE(tenriff::app::replay_uses_legacy_hold_release(replay));
+
+        if (format < tenriff::gameplay::kReplayFormatVersion) {
+            const auto verified = tenriff::app::verify_replay_against_chart(
+                replay, {}, tenriff::app::ChartFormat::Bms, 120.0);
+            CHECK(verified.status == tenriff::app::ReplayVerificationStatus::LegacyUnverified);
+        }
+    }
+}
+
+TEST_CASE("BMS rank replay verification retains old rulesets and applies the new chart policy") {
+    tenriff::gameplay::GameplayChart chart;
+    chart.lane_count = 1;
+    chart.bms_rank = 0;
+    chart.duration_samples = 24'000;
+    chart.notes.push_back(tenriff::gameplay::NoteEvent{1, 8'000});
+    for (const auto ruleset : {tenriff::app::kLegacyReplayRulesetId,
+                              tenriff::app::kPreviousReplayRulesetId,
+                              tenriff::app::kCanonicalReplayRulesetId}) {
+        ReplayFile replay;
+        replay.chart_format = "bms";
+        // Uploaded metadata must not replace the loaded chart's VERY HARD rank.
+        replay.bms_rank = 3;
+        replay.chart_sha256 = std::string(64, 'a');
+        replay.ruleset_id = std::string(ruleset);
+        replay.sample_rate = replay.trace.sample_rate = 8'000;
+        replay.rate = replay.trace.rate = 1;
+        replay.mode.key_mode = "auto";
+        replay.mode.random = "off";
+        replay.mode.gauge = "normal";
+        replay.trace.lane_count = 1;
+        replay.trace.duration_samples = 48'000;
+        replay.trace.events = {{1, InputState::Pressed, 32'096}, {1, InputState::Released, 32'097}};
+        const bool current = ruleset == tenriff::app::kCanonicalReplayRulesetId;
+        const auto playback = tenriff::app::replay_judge_config_for_playback(
+            replay, tenriff::config::JudgeConfig{}, chart.bms_rank);
+        CHECK(playback.pg_ms == doctest::Approx(current ? 8 : 20));
+        const auto verified = tenriff::app::verify_replay_against_chart(
+            replay, chart, tenriff::app::ChartFormat::Bms, 120);
+        REQUIRE(verified.verified());
+        CHECK(verified.stats.counts.pg == (current ? 0 : 1));
+        CHECK(verified.stats.counts.gr == (current ? 1 : 0));
+        replay.stats = verified.stats;
+        replay.final_score = verified.final_score;
+        CHECK(tenriff::app::verify_replay_against_chart(
+            replay, chart, tenriff::app::ChartFormat::Bms, 120).claims_match);
+    }
+}
+
+TEST_CASE("LN regrab replay verification preserves legacy scores without undoing current drops") {
+    tenriff::gameplay::GameplayChart chart;
+    chart.lane_count = 1;
+    chart.bms_rank = 3;
+    chart.duration_samples = 24'000;
+    chart.notes.push_back(tenriff::gameplay::NoteEvent{1, 8'000, 16'000, false});
+    for (const auto ruleset : {tenriff::app::kLegacyReplayRulesetId,
+                              tenriff::app::kPreviousReplayRulesetId,
+                              tenriff::app::kCanonicalReplayRulesetId}) {
+        ReplayFile replay;
+        replay.chart_sha256 = std::string(64, 'b');
+        replay.ruleset_id = std::string(ruleset);
+        replay.sample_rate = replay.trace.sample_rate = 8'000;
+        replay.rate = replay.trace.rate = 1;
+        replay.mode.key_mode = "auto";
+        replay.mode.random = "off";
+        replay.mode.gauge = "normal";
+        replay.trace.lane_count = 1;
+        replay.trace.duration_samples = 48'000;
+        replay.trace.events = {{1, InputState::Pressed, 32'000}, {1, InputState::Released, 36'000},
+                              {1, InputState::Pressed, 36'080}, {1, InputState::Released, 40'000}};
+        const auto verified = tenriff::app::verify_replay_against_chart(
+            replay, chart, tenriff::app::ChartFormat::Bms, 120);
+        REQUIRE(verified.verified());
+        const bool current = ruleset == tenriff::app::kCanonicalReplayRulesetId;
+        CHECK(verified.stats.counts.pg == (current ? 1 : 2));
+        CHECK(verified.stats.counts.bd == (current ? 1 : 0));
+        replay.stats = verified.stats;
+        replay.final_score = verified.final_score;
+        CHECK(tenriff::app::verify_replay_against_chart(
+            replay, chart, tenriff::app::ChartFormat::Bms, 120).claims_match);
+    }
+}
+
 TEST_CASE("file replay verification binds the replay and exact chart SHA-256") {
     const auto chart_path = std::filesystem::u8path(u8"리플레이 검증 차트.bms");
     const auto replay_path = std::filesystem::u8path(u8"리플레이 검증 입력.json");
@@ -474,6 +663,7 @@ TEST_CASE("file replay verification binds the replay and exact chart SHA-256") {
     ReplayFile replay;
     replay.chart_path = chart_path.u8string();
     replay.chart_format = "bms";
+    replay.bms_rank = loaded.chart.bms_rank;
     replay.chart_sha256 = chart_hash.sha256;
     replay.server_challenge_id = "0123456789abcdef0123456789abcdef";
     replay.server_challenge_nonce = std::string(64, '9');
@@ -537,6 +727,7 @@ TEST_CASE("result export writes JSON with replay reference") {
     result.player_name = "Luna Pilot";
     result.chart_path = "Songs/test.bms";
     result.chart_format = "bms";
+    result.bms_rank = 3;
     result.chart_sha256 = std::string(64, 'd');
     result.ruleset_id = std::string(tenriff::app::kCanonicalReplayRulesetId);
     result.created_utc = "20250101_000000Z";
@@ -590,6 +781,7 @@ TEST_CASE("result export writes JSON with replay reference") {
     REQUIRE(replay_path_it != root->end());
     CHECK(replay_path_it->second.as_string() == result.replay_path);
     CHECK(root->find("chart_sha256")->second.as_string() == result.chart_sha256);
+    CHECK(root->at("bms_rank").as_number() == 3);
     CHECK(root->find("ruleset_id")->second.as_string() == result.ruleset_id);
     CHECK(root->find("replay_sha256")->second.as_string() == result.replay_sha256);
     CHECK(root->find("key_conversion_note_add_mode") == root->end());

@@ -45,6 +45,33 @@
       ctx.beginPath();ctx.roundRect(layer.x,layer.y,Math.max(0,layer.width),Math.max(0,layer.height),Math.max(0,layer.radius||0));ctx.fill();
     });ctx.restore();
   }
+  function noteShapeVertices(shape) {
+    if(shape==='arrow')return [[0,-.5],[.5,-.04],[.18,-.04],[.18,.5],[-.18,.5],[-.18,-.04],[-.5,-.04]];
+    const sides={triangle:3,pentagon:5,hexagon:6,hex:6,diamond:4}[shape];
+    if(!sides)return null;
+    const points=Array.from({length:sides},(_,i)=>{
+      const angle=-Math.PI/2+2*Math.PI*i/sides;return [Math.cos(angle)*.5,Math.sin(angle)*.5];
+    });
+    const xs=points.map(p=>p[0]),ys=points.map(p=>p[1]),minX=Math.min(...xs),maxX=Math.max(...xs),minY=Math.min(...ys),maxY=Math.max(...ys);
+    return points.map(([x,y])=>[(x-(minX+maxX)/2)/(maxX-minX),(y-(minY+maxY)/2)/(maxX-minX)]);
+  }
+  function drawNoteShape(ctx, rect, color, style, opacity=1) {
+    const shape=style.note_shape||'rect',points=noteShapeVertices(shape),width=Math.max(2,rect[2]-rect[0]);
+    const cx=(rect[0]+rect[2])/2,cy=(rect[1]+rect[3])/2;
+    ctx.save();ctx.globalAlpha=clamp(opacity,0,1);ctx.fillStyle=color;ctx.beginPath();
+    if(points){points.forEach(([x,y],i)=>i?ctx.lineTo(cx+x*width,cy+y*width):ctx.moveTo(cx+x*width,cy+y*width));ctx.closePath();}
+    else if(shape==='circle')ctx.ellipse(cx,cy,Math.max(1,(width-2)/2),Math.max(1,(width-2)/2),0,0,Math.PI*2);
+    else {
+      const height=shape==='square'?width:Math.max(2,rect[3]-rect[1]);
+      ctx.roundRect(cx-width/2,cy-height/2,width,height,clamp(Math.min(width,height)*.22,3,8));
+    }
+    ctx.fill();
+    if(style.note_border!==false){
+      ctx.strokeStyle=points?'#000000':blend(color,'#FFFFFF',.55);ctx.lineWidth=points?1.5:.85;
+      ctx.globalAlpha=clamp(opacity*(style.note_outline_opacity??.78),0,1);ctx.stroke();
+    }
+    ctx.restore();
+  }
   function paintText(ctx, content, rect, role, size, color, alpha=1, family='Segoe UI') {
     const largeHud=role==='combo'||role==='judgement',center=(rect[1]+rect[3])/2;
     const stroke=clamp(size/42,1,1.5);
@@ -80,6 +107,9 @@
     const sprite=(slot,lane,rect,alpha=opacity)=>{
       const path=Array.isArray(style[slot])?style[slot][lane]:style[slot];
       if(path&&art(path.replace(/\{index:02\}/g,String(lane+1).padStart(2,'0')).replace(/\{index\}/g,String(lane+1)).replace(/\{lane\}/g,style.lane_map?.[lane]||String(lane+1)),rect,alpha))return;
+      if(['note','hold_head','hold_tail'].includes(slot)&&(style.note_shape||'rect')!=='rect'&&!style.native?.sprites?.[slot]){
+        drawNoteShape(ctx,rect,colors[lane%colors.length],style,alpha);return;
+      }
       const meta=catalog.sprites[slot];
       drawSprite(ctx,native.sprites[slot],[meta.width,meta.height],rect,colors[lane%colors.length],alpha,style.note_border===false?0:clamp((style.note_outline_opacity??.78)/.78,0,1));
     };
@@ -106,7 +136,9 @@
         const y=90+((lane*127+n*337+(animate?tick*120:0))%Math.max(120,line-180));
         const rect=[x+(width-nwidth)/2,y,x+(width+nwidth)/2,y+nh];
         if(n===0&&lane%3===1){
-          const tail=Math.max(0,y-210),rail=[rect[0],tail,rect[2],y];
+          // As in the client, draw the body behind cap centers to bridge sloped
+          // outlines and transparent sprite padding (including short holds).
+          const tail=Math.max(0,y-210),rail=[rect[0],tail+nh*.325,rect[2],y+nh*.5];
           if(!style.hold_body||!art(Array.isArray(style.hold_body)?style.hold_body[lane]:style.hold_body,rail,opacity)){
             const gradient=ctx.createLinearGradient(rail[0],0,rail[2],0);
             [[0,blend(color,c.hold_edge,m.hold_edge_mix)],[.17,blend(color,c.hold_shadow,.72)],[.5,blend(color,c.hold_core,m.hold_core_mix)],[.83,blend(color,c.hold_shadow,.72)],[1,blend(color,c.hold_edge,m.hold_edge_mix)]].forEach(([stop,value])=>gradient.addColorStop(stop,value));
@@ -141,16 +173,18 @@
     const life=animate?Math.max(0,1-phase*500/motion.combo_duration_ms):0,scale=1+(motion.combo_scale-1)*life;
     ctx.save();ctx.translate(960,324);ctx.scale(scale,scale);ctx.translate(-960,-324);
     label('combo','147',[920,290+motion.combo_lift*life,1080,348+motion.combo_lift*life]);ctx.restore();
-    // The sampled error and its bar share the live judgement's visibility.
+    // Independent switches retain legacy single-switch behavior when bar is absent.
     const errorMs=grade%2?-28:24;
-    if(style.show_timing_feedback!==false&&grade!==0&&judgementAlpha>0){
-      label('timing_label',(errorMs<0?'FAST ':'SLOW ')+Math.abs(errorMs)+' ms',[858,258,1150,280],'body',errorMs<0?c.timing_fast:c.timing_slow,judgementAlpha);
+    if(grade!==0&&judgementAlpha>0){
+      if(style.show_timing_feedback!==false) label('timing_label',(errorMs<0?'FAST ':'SLOW ')+Math.abs(errorMs)+' ms',[858,258,1150,280],'body',errorMs<0?c.timing_fast:c.timing_slow,judgementAlpha);
+      if((style.show_timing_bar??style.show_timing_feedback)!==false){
       const timing=adjusted([960-m.timing_half_width,275,960+m.timing_half_width,275+m.timing_height],native.rects.timing);
       const center=(timing[0]+timing[2])/2,half=(timing[2]-timing[0])/2;
       box(timing,c.timing,.25);box([center-1,timing[1]-4,center+1,timing[3]+4],c.timing);
       for(const ms of [-27,-12,8,19]){const x=center+clamp(ms/m.timing_range_ms,-1,1)*half;
         box([x-1,timing[1]-2,x+1,timing[3]+2],ms<0?c.timing_fast:c.timing_slow,.8);
       }
+    }
     }
     if(style.gear)art(style.gear,[left,0,right,bottom],opacity);
   }
@@ -172,5 +206,5 @@
     const height=style.key_backdrop_height??1,ratio=Number.isFinite(height)?clamp(height,0,1):1;
     return bottom-Math.max(0,bottom-top)*ratio;
   }
-  return {groups,settings,blend,advance,adjusted,drawSprite,paint,paintText,judgementLineWidth,backdropOpacity,backdropColor,backdropTop};
+  return {groups,settings,blend,advance,adjusted,drawSprite,noteShapeVertices,drawNoteShape,paint,paintText,judgementLineWidth,backdropOpacity,backdropColor,backdropTop};
 });

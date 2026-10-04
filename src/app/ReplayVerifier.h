@@ -1,6 +1,7 @@
 #pragma once
 
 #include <filesystem>
+#include <optional>
 #include <string>
 #include <string_view>
 
@@ -11,6 +12,8 @@
 namespace tenriff::app {
 
 inline constexpr std::string_view kCanonicalReplayRulesetId =
+    "tenriff-native-score-v2-ruleset-3";
+inline constexpr std::string_view kPreviousReplayRulesetId =
     "tenriff-native-score-v2-ruleset-2";
 inline constexpr std::string_view kLegacyReplayRulesetId =
     "tenriff-native-score-v2-ruleset-1";
@@ -49,7 +52,9 @@ struct ReplayVerificationResult {
 [[nodiscard]] std::string_view replay_verification_status_token(ReplayVerificationStatus status);
 [[nodiscard]] bool is_supported_canonical_replay_ruleset(std::string_view ruleset_id);
 [[nodiscard]] config::JudgeConfig replay_judge_config_for_playback(
-    const gameplay::ReplayFile& replay, const config::JudgeConfig& base);
+    const gameplay::ReplayFile& replay, const config::JudgeConfig& base,
+    std::optional<int> bms_rank = std::nullopt);
+[[nodiscard]] bool replay_uses_legacy_hold_release(const gameplay::ReplayFile& replay);
 [[nodiscard]] bool is_canonical_score_ruleset(const config::JudgeConfig& judge,
                                               const game::GaugeConfig& gauge);
 [[nodiscard]] std::string replay_ruleset_id_for_runtime(const config::JudgeConfig& judge,

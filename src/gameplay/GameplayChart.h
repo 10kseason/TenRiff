@@ -77,6 +77,9 @@ struct VisualCueEvent {
 
 struct GameplayChart {
     int lane_count = 0;
+    // Authored BMS #RANK (0 very hard through 3 easy). Absent for synthetic
+    // charts; the BMS builder supplies Easy when the header is missing/invalid.
+    std::optional<int> bms_rank;
     // 1-based source lanes with scratch semantics. This lets key-mode transforms
     // distinguish 7+1 SP from a native eight-key chart after BMS normalization.
     std::vector<int> scratch_lanes;

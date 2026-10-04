@@ -485,9 +485,7 @@
         const y=120+((i*97+j*235)%Math.max(100,line-220)),w=laneWidth*.86*style.note_width_ratio,h=18*style.note_height_ratio,rect=[x+(laneWidth-w)/2,y,x+(laneWidth+w)/2,y+h];
         ctx.globalAlpha=style.visual_opacity;
         if(!art(C.laneAsset(style.note,i,style.lane_map),rect,style.visual_opacity,style.note_aspect==='contain')){
-          if(style.note_shape==='circle'){ctx.fillStyle=color;ctx.beginPath();ctx.ellipse(x+laneWidth/2,y+h/2,w/2,h/2,0,0,Math.PI*2);ctx.fill();}
-          else if(style.note_shape==='diamond'||style.note_shape==='hex'){ctx.fillStyle=color;ctx.beginPath();ctx.moveTo(rect[0],y+h/2);ctx.lineTo(rect[0]+w*.2,y);ctx.lineTo(rect[2]-w*.2,y);ctx.lineTo(rect[2],y+h/2);ctx.lineTo(rect[2]-w*.2,y+h);ctx.lineTo(rect[0]+w*.2,y+h);ctx.closePath();ctx.fill();}
-          else box(rect,color,style.note_border?p.text:null,3);
+          G.drawNoteShape(ctx,rect,color,style,style.visual_opacity);
         }ctx.globalAlpha=1;
       }
       if(style.key_label_position!=='off')text(String(i+1),x+laneWidth*.4,line+(style.key_label_position==='top'?-44:52),22,p.muted,laneWidth);

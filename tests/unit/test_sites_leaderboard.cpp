@@ -11,6 +11,8 @@ namespace {
 gameplay::ReplayFile score_fixture() {
     gameplay::ReplayFile replay;
     replay.ruleset_id = std::string(app::kCanonicalReplayRulesetId);
+    replay.chart_format = "bms";
+    replay.bms_rank = 3;
     replay.chart_sha256 = std::string(64, 'b');
     replay.created_utc = "20260913_000000Z";
     replay.trace.lane_count = 10;
@@ -41,6 +43,60 @@ TEST_CASE("Sites payload preserves all four native metrics without display round
     CHECK(object->at("detailed_accuracy").as_number() == replay.stats.detailed_accuracy_percent());
     CHECK(object->at("accuracy").as_number() != object->at("detailed_accuracy").as_number());
     CHECK(payload.find("\"detail_score\":496,") != std::string::npos);
+    CHECK(object->at("timing_profile").as_string() == "bms-easy");
+}
+
+TEST_CASE("Sites ruleset 3 payload separates every BMS rank and fixed osu timing") {
+    const char* profiles[] = {"bms-veryhard", "bms-hard", "bms-normal", "bms-easy"};
+    for (int rank = 0; rank <= 3; ++rank) {
+        auto replay = score_fixture();
+        replay.bms_rank = rank;
+        std::string payload, error;
+        REQUIRE(app::build_sites_score_json(replay, std::string(64, 'c'), "Fixture", "CLEAR", payload, error));
+        const auto json = config::parse_json(payload);
+        REQUIRE(json.success());
+        REQUIRE(json.root->as_object());
+        CHECK(json.root->as_object()->at("timing_profile").as_string() == profiles[rank]);
+    }
+    auto replay = score_fixture();
+    replay.chart_format = "osu";
+    replay.bms_rank.reset();
+    std::string payload, error;
+    REQUIRE(app::build_sites_score_json(replay, std::string(64, 'c'), "Fixture", "CLEAR", payload, error));
+    const auto json = config::parse_json(payload);
+    REQUIRE(json.success());
+    CHECK(json.root->as_object()->at("timing_profile").as_string() == "osu-fixed");
+}
+
+TEST_CASE("Sites ruleset 3 payload fails closed on missing or invalid timing metadata") {
+    const auto rejects = [](const gameplay::ReplayFile& replay) {
+        std::string payload = "stale payload", error;
+        CHECK_FALSE(app::build_sites_score_json(replay, std::string(64, 'c'), "Fixture", "CLEAR", payload, error));
+        CHECK(payload.empty());
+        CHECK_FALSE(error.empty());
+    };
+    auto replay = score_fixture();
+    replay.bms_rank.reset();
+    rejects(replay);
+    for (const int rank : {-1, 4, (std::numeric_limits<int>::max)()}) {
+        replay = score_fixture();
+        replay.bms_rank = rank;
+        rejects(replay);
+    }
+    for (const std::string format : {"", "unknown", "BMS", "bme"}) {
+        replay = score_fixture();
+        replay.chart_format = format;
+        rejects(replay);
+    }
+    replay = score_fixture();
+    replay.chart_format = "osu";
+    replay.bms_rank = -1;
+    rejects(replay);
+    for (const auto ruleset : {app::kLegacyReplayRulesetId, app::kPreviousReplayRulesetId}) {
+        replay = score_fixture();
+        replay.ruleset_id = std::string(ruleset);
+        rejects(replay);
+    }
 }
 
 TEST_CASE("Sites payload rejects malformed detailed metrics instead of uploading a fallback percentage") {
@@ -101,6 +157,8 @@ TEST_CASE("Sites connection accepts only an HTTPS Site origin and header-safe up
 TEST_CASE("Sites score payload omits private evidence and rejects assisted or noncanonical play") {
     gameplay::ReplayFile replay;
     replay.ruleset_id = std::string(app::kCanonicalReplayRulesetId);
+    replay.chart_format = "bms";
+    replay.bms_rank = 3;
     replay.chart_sha256 = std::string(64, 'b');
     replay.chart_path = "C:/private/music/song.bms";
     replay.created_utc = "20260913_000000Z";

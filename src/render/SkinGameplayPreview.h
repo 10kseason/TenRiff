@@ -1,6 +1,7 @@
 #pragma once
 
 #include <algorithm>
+#include <cmath>
 #include <limits>
 
 #include "render/MenuWindow.h"
@@ -9,9 +10,10 @@ namespace tenriff::render {
 
 // Only the sample chart is synthetic. Every visual setting travels through the
 // gameplay renderer, including imported lane geometry, gear art and font roles.
-inline GameplayHudData make_skin_gameplay_preview(const SkinPreviewData& preview) {
+inline GameplayHudData make_skin_gameplay_preview(const SkinPreviewData& preview, int64_t now_ns = 0) {
     GameplayHudData hud;
     hud.active = true;
+    hud.show_cursor_in_gameplay = true;
     hud.lane_count = std::clamp(preview.lane_count, 1, static_cast<int>(kGameplayHudMaxLanes));
     hud.title = preview.mode_label;
     hud.artist = "TenRiff";
@@ -24,10 +26,21 @@ inline GameplayHudData make_skin_gameplay_preview(const SkinPreviewData& preview
     hud.past_samples = hud.sample_rate / 10;
     hud.combo = hud.max_combo = 123;
     hud.has_feedback = true;
-    hud.feedback = "PG";
+    hud.feedback = "GR";
+    hud.feedback_delta_ms = -18.0;
+    hud.timing_history_count = 3;
+    hud.timing_history_delta_ms = {-24.0, 12.0, -18.0};
     hud.gauge = 75.0;
     hud.gauge_label = "NORMAL";
-    hud.show_timing_feedback = false;
+    hud.show_timing_feedback = preview.show_timing_feedback;
+    hud.show_timing_bar = preview.show_timing_bar;
+    hud.note_fade_in = preview.note_fade_in;
+    hud.note_fade_out = preview.note_fade_out;
+    hud.timing_text_offset_x = preview.timing_text_offset_x;
+    hud.timing_text_offset_y = preview.timing_text_offset_y;
+    hud.timing_bar_offset_x = preview.timing_bar_offset_x;
+    hud.timing_bar_offset_y = preview.timing_bar_offset_y;
+
 
     hud.judgement_line_position = preview.judgement_line_position;
     hud.gameplay_field_offset_x = preview.gameplay_field_offset_x;
@@ -82,8 +95,16 @@ inline GameplayHudData make_skin_gameplay_preview(const SkinPreviewData& preview
 
     hud.lane_color_count = hud.key_label_count = static_cast<std::size_t>(hud.lane_count);
     hud.lane_pressed_count = static_cast<std::size_t>(hud.lane_count);
-    if (preview.selected_lane > 0 && preview.selected_lane <= hud.lane_count)
-        hud.lane_pressed[static_cast<std::size_t>(preview.selected_lane - 1)] = 1;
+    hud.lane_activity_count = static_cast<std::size_t>(hud.lane_count);
+    hud.activity_publish_time_ns = now_ns;
+    if (preview.selected_lane > 0 && preview.selected_lane <= hud.lane_count) {
+        // A synthetic tap every 900ms uses the real hit-burst path, including the
+        // selected prism/ring/spark style, opacity and imported lane positions.
+        const double phase = static_cast<double>(std::max<int64_t>(0, now_ns) % 900'000'000LL) / 1e9;
+        const auto lane = static_cast<std::size_t>(preview.selected_lane - 1);
+        hud.lane_activity[lane] = static_cast<float>(std::max(0.0, 1.0 - phase / 0.32));
+        hud.lane_pressed[lane] = phase < 0.12 ? 1 : 0;
+    }
     for (int lane = 0; lane < hud.lane_count; ++lane) {
         auto& note = hud.notes[hud.note_count++];
         note.lane = lane + 1;

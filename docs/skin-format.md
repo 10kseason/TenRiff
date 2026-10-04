@@ -294,7 +294,7 @@ MySkin/
 
 스킨은 이미지뿐 아니라 아래 시각 옵션도 기본값으로 지정할 수 있다.
 
-`show_lane_dividers`, `show_judgement_line`, `show_timing_feedback`,
+`show_lane_dividers`, `show_judgement_line`, `show_timing_feedback`, `show_timing_bar`,
 `show_gear_boundary_line`, `show_hold_tail`, `hold_tail_taper`, `judgement_line_glow`,
 `key_pulse`, `key_pulse_brightness`, `hit_burst_style`, `key_label_position`,
 `note_border`, `note_shape`, `lane_colors`, `lane_background_opacity`, `black_playfield`,
@@ -303,6 +303,12 @@ MySkin/
 매니페스트에 명시한 값은 스킨 제작자의 의도대로 플레이어의 같은 시각 옵션보다 우선하며,
 누락한 값만 플레이어 설정을 사용한다. 허용 값과 범위는
 [`tenriff-skin.schema.json`](tenriff-skin.schema.json)에 정의돼 있다.
+
+`note_shape`는 `rect`, `circle`, `triangle`, `pentagon`, `hexagon`, `square`,
+`diamond`, `arrow`를 지원하며 기존 `hex`는 `hexagon`의 호환 별칭이다.
+삼각형·오각형·육각형·마름모·화살표는 노트 테두리를 켜면 머리와 롱노트 꼬리에
+검은 외곽선을 그린다. 롱노트 몸통은 각 끝부분 중심까지 뒤로 겹쳐 그려,
+도형의 경사면이나 이미지의 투명 여백에서 연결부가 끊기지 않게 한다.
 
 ## 이미지 슬롯
 
@@ -447,3 +453,13 @@ DDR/StepMania식 화살표 노트는 정사각형에 가까운 이미지를 쓴�
 - 렌더 스레드는 매니페스트를 직접 읽지 않는다. `Reload Skin` 때 1K~16K 정의를 다시 만들고
   안전한 스냅샷으로 교체하므로 플레이 중 디스크/JSON 읽기가 끼어들지 않는다.
 - JSON 자동 완성/검증은 [`tenriff-skin.schema.json`](tenriff-skin.schema.json)을 사용할 수 있다.
+
+### Independent FAST/SLOW controls
+
+`gameplay.show_timing_feedback` controls text; `gameplay.show_timing_bar` controls
+the bar. Omitted bar values inherit the old text switch for legacy skins. Both
+remain hidden for PG, centered errors and expired feedback. Explicit game-menu
+visibility changes override these manifest defaults and are saved in the profile.
+Native `gameplay.native.rects.timing_label` moves/resizes text and `rects.timing`
+moves/resizes the bar; both use `[dx, dy, dw, dh]`. Profile X/Y offsets are applied
+after these skin adjustments. The offline editor exposes both rects and switches.

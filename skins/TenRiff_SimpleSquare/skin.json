@@ -1,0 +1,166 @@
+{
+  "format": "tenriff-skin",
+  "version": 1,
+  "name": "TenRiff Simple Square",
+  "author": "TenRiff",
+  "lobby": {
+    "renderer": "native"
+  },
+  "gameplay": {
+    "renderer": "native",
+    "note_shape": "rect",
+    "note_border": false,
+    "note_aspect": "stretch",
+    "black_playfield": true,
+    "lane_background_opacity": 0,
+    "show_lane_dividers": true,
+    "show_judgement_line": true,
+    "show_gear_boundary_line": false,
+    "show_hold_tail": true,
+    "hold_tail_taper": false,
+    "judgement_line_glow": false,
+    "key_pulse": false,
+    "key_backdrop": false,
+    "hold_body_opacity": 0.45,
+    "native": {
+      "sprites": {
+        "note": [
+          {
+            "x": 0,
+            "y": 0,
+            "width": 0,
+            "height": 0,
+            "color": "#FFFFFF",
+            "mix": 0,
+            "alpha": 0,
+            "radius": 0
+          },
+          {
+            "x": 0,
+            "y": 0,
+            "width": 0,
+            "height": 0,
+            "color": "#FFFFFF",
+            "mix": 0,
+            "alpha": 0,
+            "radius": 0
+          },
+          {
+            "x": 0,
+            "y": 0,
+            "width": 128,
+            "height": 32,
+            "color": "#FFFFFF",
+            "mix": 0,
+            "alpha": 1,
+            "radius": 0
+          }
+        ],
+        "hold_head": [
+          {
+            "x": 0,
+            "y": 0,
+            "width": 0,
+            "height": 0,
+            "color": "#FFFFFF",
+            "mix": 0,
+            "alpha": 0,
+            "radius": 0
+          },
+          {
+            "x": 0,
+            "y": 0,
+            "width": 0,
+            "height": 0,
+            "color": "#FFFFFF",
+            "mix": 0,
+            "alpha": 0,
+            "radius": 0
+          },
+          {
+            "x": 0,
+            "y": 0,
+            "width": 128,
+            "height": 32,
+            "color": "#FFFFFF",
+            "mix": 0,
+            "alpha": 1,
+            "radius": 0
+          }
+        ],
+        "hold_tail": [
+          {
+            "x": 0,
+            "y": 0,
+            "width": 0,
+            "height": 0,
+            "color": "#FFFFFF",
+            "mix": 0,
+            "alpha": 0,
+            "radius": 0
+          },
+          {
+            "x": 0,
+            "y": 0,
+            "width": 0,
+            "height": 0,
+            "color": "#FFFFFF",
+            "mix": 0,
+            "alpha": 0,
+            "radius": 0
+          },
+          {
+            "x": 0,
+            "y": 0,
+            "width": 128,
+            "height": 32,
+            "color": "#FFFFFF",
+            "mix": 0,
+            "alpha": 1,
+            "radius": 0
+          }
+        ],
+        "key_idle": [
+          {
+            "x": 0,
+            "y": 0,
+            "width": 128,
+            "height": 256,
+            "color": "#202020",
+            "mix": 1,
+            "alpha": 1,
+            "radius": 0
+          }
+        ],
+        "key_pressed": [
+          {
+            "x": 0,
+            "y": 0,
+            "width": 128,
+            "height": 256,
+            "color": "#FFFFFF",
+            "mix": 0,
+            "alpha": 1,
+            "radius": 0
+          }
+        ]
+      },
+      "metrics": {
+        "key_min_height": 48,
+        "key_max_height": 48,
+        "key_inset": 0,
+        "key_inset_ratio": 0,
+        "key_face_gap": 0,
+        "key_bottom_gap": 0
+      },
+      "motion": {
+        "press_depth": 0,
+        "pressed_light": 0,
+        "hit_light": 0,
+        "burst_height": 0,
+        "burst_rise": 0
+      }
+    },
+    "description": "Flat square skin. The first two note sprite layers are reserved transparent outline slots; the third is the visible body."
+  }
+}

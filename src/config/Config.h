@@ -83,7 +83,7 @@ inline constexpr int64_t kPacemakerScoreMax = 10'000;
 inline constexpr int64_t kPacemakerScoreDefault = 8'000;
 
 struct JudgeConfig {
-    double pg_ms = 20.0;
+    double pg_ms = 21.0;
     double gr_ms = 65.0;
     double gd_ms = 115.0;
     double bd_ms = 210.0;
@@ -125,6 +125,7 @@ struct AudioUiConfig {
     double keysound_volume = 1.0;
     bool normalize_audio = false;
     bool mute_when_inactive = false;
+    bool play_to_end = true;
 };
 
 struct UiConfig {
@@ -183,6 +184,14 @@ struct SkinConfig {
     bool show_judgement_line = true;
     bool show_gear_boundary_line = false;
     bool show_timing_feedback = true;
+    bool show_timing_bar = true;
+    double timing_text_offset_x = 0.0;
+    double timing_text_offset_y = 0.0;
+    double timing_bar_offset_x = 0.0;
+    double timing_bar_offset_y = 0.0;
+    bool timing_feedback_override = false;
+    double note_fade_in = 0.0;
+    double note_fade_out = 0.0;
     bool show_hold_tail = false;
     bool hold_tail_taper_enabled = false;
     bool judgement_line_glow_enabled = true;

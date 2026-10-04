@@ -1,8 +1,71 @@
 #include "doctest/doctest.h"
 
 #include <string>
+#include <set>
 
 #include "app/OnlineRecordsClient.h"
+#include "config/SimpleJson.h"
+
+namespace {
+std::string sites_timing_board_fixture(const tenriff::config::JsonValue* profile = nullptr) {
+    using namespace tenriff::config;
+    JsonObject conditions;
+    conditions.emplace("ruleset", JsonValue{"tenriff-native-score-v2-ruleset-3"});
+    conditions.emplace("gauge", JsonValue{"normal"});
+    conditions.emplace("random", JsonValue{"off"});
+    conditions.emplace("mods", JsonValue{JsonArray{JsonValue{"judge_easy"}}});
+    if (profile) conditions.emplace("timing_profile", *profile);
+    JsonObject board;
+    board.emplace("id", JsonValue{std::string(64, 'a')});
+    board.emplace("title", JsonValue{"Fixture"});
+    board.emplace("chart_sha256", JsonValue{std::string(64, 'b')});
+    board.emplace("key_mode", JsonValue{"7K"});
+    board.emplace("rate_milli", JsonValue{1000.0});
+    board.emplace("conditions", JsonValue{json_stringify(JsonValue{conditions})});
+    JsonObject response;
+    response.emplace("boards", JsonValue{JsonArray{JsonValue{board}}});
+    return json_stringify(JsonValue{response});
+}
+}  // namespace
+
+TEST_CASE("Sites board labels distinguish known timing profiles without claiming modified windows") {
+    using namespace tenriff;
+    const char* profiles[] = {"bms-easy", "bms-normal", "bms-hard", "bms-veryhard", "osu-fixed"};
+    const char* labels[] = {"BMS EASY", "BMS NORMAL", "BMS HARD", "BMS VERY HARD", "osu!mania"};
+    std::set<std::string> distinct;
+    for (int i = 0; i < 5; ++i) {
+        const config::JsonValue profile{profiles[i]};
+        std::vector<app::SitesRecordBoard> boards;
+        std::string error;
+        REQUIRE(app::parse_sites_record_boards(sites_timing_board_fixture(&profile), "Fixture", boards, error));
+        REQUIRE(boards.size() == 1);
+        CHECK(boards[0].conditions_label.find(std::string("RULESET 3 / ") + labels[i]) != std::string::npos);
+        CHECK(boards[0].conditions_label.find("judge_easy") != std::string::npos);
+        CHECK(boards[0].conditions_label.find("ms") == std::string::npos);
+        distinct.insert(boards[0].conditions_label);
+    }
+    CHECK(distinct.size() == 5);
+}
+
+TEST_CASE("Sites board timing metadata allows old and future profiles but rejects malformed values") {
+    using namespace tenriff;
+    std::vector<app::SitesRecordBoard> boards;
+    std::string error;
+    REQUIRE(app::parse_sites_record_boards(sites_timing_board_fixture(), "Fixture", boards, error));
+    REQUIRE(boards.size() == 1);
+    CHECK(boards[0].conditions_label.find("TIMING UNKNOWN") != std::string::npos);
+    const config::JsonValue future{"future-timing-v2"};
+    REQUIRE(app::parse_sites_record_boards(sites_timing_board_fixture(&future), "Fixture", boards, error));
+    REQUIRE(boards.size() == 1);
+    CHECK(boards[0].conditions_label.find("TIMING UNKNOWN") != std::string::npos);
+    for (const auto& invalid : {config::JsonValue{}, config::JsonValue{3.0}, config::JsonValue{true},
+                               config::JsonValue{""}, config::JsonValue{"bms-easy\n"},
+                               config::JsonValue{"bms-easy / forged"}, config::JsonValue{std::string(65, 'a')}}) {
+        CHECK_FALSE(app::parse_sites_record_boards(sites_timing_board_fixture(&invalid), "Fixture", boards, error));
+        CHECK(boards.empty());
+        CHECK_FALSE(error.empty());
+    }
+}
 
 TEST_CASE("Sites boards preserve conditions and reject substring chart matches") {
     using namespace tenriff::app;

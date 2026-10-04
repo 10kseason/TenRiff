@@ -54,6 +54,21 @@ bool build_sites_score_json(const gameplay::ReplayFile& replay,
         !replay.mode.course_gauge.empty() || mode_mod_adds_notes(replay.mods)) {
         error = "Sites upload skipped: this play is not eligible for the community leaderboard."; return false;
     }
+    // Ruleset 3 makes BMS timing depend on #RANK. Never merge an unknown policy
+    // into a valid timing group or guess EASY for old evidence lacking metadata.
+    std::string_view timing_profile;
+    if (replay.bms_rank && (*replay.bms_rank < 0 || *replay.bms_rank > 3)) {
+        error = "Sites upload skipped: invalid BMS rank metadata."; return false;
+    }
+    if (replay.chart_format == "bms" && replay.bms_rank) {
+        static constexpr std::string_view profiles[] = {
+            "bms-veryhard", "bms-hard", "bms-normal", "bms-easy"};
+        timing_profile = profiles[*replay.bms_rank];
+    } else if (replay.chart_format == "osu") {
+        timing_profile = "osu-fixed";
+    } else {
+        error = "Sites upload skipped: missing or unsupported chart timing metadata."; return false;
+    }
     const auto& stats = replay.stats;
     // Percentage helpers deliberately tolerate legacy stats. Reject damaged raw
     // accumulators here so NaN/Inf cannot silently become a valid upload of 0%.
@@ -90,6 +105,7 @@ bool build_sites_score_json(const gameplay::ReplayFile& replay,
            << ",\"key_mode\":" << quoted(std::to_string(lanes) + "K")
            << ",\"rate_milli\":" << std::llround(replay.rate * 1000.0)
            << ",\"ruleset_id\":" << quoted(replay.ruleset_id)
+           << ",\"timing_profile\":" << quoted(timing_profile)
            << ",\"gauge\":" << quoted(replay.mode.gauge.empty() ? "normal" : replay.mode.gauge)
            << ",\"random\":" << quoted(replay.mode.random.empty() ? "off" : replay.mode.random)
            << ",\"key_conversion\":" << quoted(replay.mode.key_conversion_algorithm.empty() ? "none" :

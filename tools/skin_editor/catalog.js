@@ -489,6 +489,9 @@
               "timing": {
                 "$ref": "#/$defs/nativeRectAdjustment"
               },
+              "timing_label": {
+                "$ref": "#/$defs/nativeRectAdjustment"
+              },
               "gauge": {
                 "$ref": "#/$defs/nativeRectAdjustment"
               },
@@ -701,6 +704,9 @@
           "show_timing_feedback": {
             "type": "boolean"
           },
+          "show_timing_bar": {
+            "type": "boolean"
+          },
           "show_gear_boundary_line": {
             "type": "boolean"
           },
@@ -766,7 +772,12 @@
             "enum": [
               "rect",
               "circle",
+              "triangle",
+              "pentagon",
+              "hexagon",
+              "square",
               "diamond",
+              "arrow",
               "hex"
             ]
           },
@@ -1267,6 +1278,9 @@
           "show_timing_feedback": {
             "type": "boolean"
           },
+          "show_timing_bar": {
+            "type": "boolean"
+          },
           "show_gear_boundary_line": {
             "type": "boolean"
           },
@@ -1332,7 +1346,12 @@
             "enum": [
               "rect",
               "circle",
+              "triangle",
+              "pentagon",
+              "hexagon",
+              "square",
               "diamond",
+              "arrow",
               "hex"
             ]
           },
@@ -4636,7 +4655,7 @@
         "max": 8192
       },
       "timing": {
-        "label": "Timing",
+        "label": "FAST/SLOW bar",
         "default": [
           0,
           0,
@@ -4670,6 +4689,17 @@
       },
       "key_label": {
         "label": "Key_Label",
+        "default": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "min": -8192,
+        "max": 8192
+      },
+      "timing_label": {
+        "label": "FAST/SLOW text",
         "default": [
           0,
           0,

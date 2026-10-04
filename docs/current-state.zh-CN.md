@@ -1,5 +1,7 @@
 # TenRiff 当前状态
 
+**2026-10-04 · TenRiff 1.8.3:** 新增全屏皮肤预览、音符雾效、FAST/SLOW独立位置设置及简洁方形皮肤。修复Normalize OFF时的隐藏压缩与暂停恢复显示，加入歌曲结束方式、LN松键即时判定及按BMS RANK区分的R3判定。 [1.8.3 release](release-1.8.3-gate.md).
+
 **2026-10-03 · TenRiff 1.8.2:** 新增十种鲜明的选项图标颜色、跟随图标颜色的圆角选中边框，修正 FAST/SLOW 条的显示并同步皮肤编辑器预览。 [1.8.2 release](release-1.8.2-gate.md).
 
 - 1.8.1: 新增18种功能图标和PNG皮肤，将选项与选曲大厅改为黑色与中性色。加入各选项的说明、记录窗口内的GPT Sites排行榜，以及左右切换4K至16K的按键测试。 [Design / validation](menu-studio-1.8.1.ko.md).
@@ -7,14 +9,14 @@
 - 1.7.10 改善 ALL SONG 的已删除缓存项处理、合并进度和完成状态通知。[验证及未复现症状](release-1.7.10-gate.md)。
 - 1.7.8 新增默认菜单动画、4 至 16 键 Luma Keys、日语界面及网页/离线皮肤编辑。菜单与游戏内视觉设置分别保存在 `native` 和 `gameplay.native`。[验证范围](release-1.7.8-gate.md)。
 
-当前项目版本为 **1.8.2**。尾奏结束后，无需再次按键即可保存并提交结果。新增Stella、Satellite和U_E Pack 4K/6K/8K难度表预设。保留Sites排行榜集成及现有音频、皮肤和会话功能，默认输出仍为WASAPI。变更与验证范围见[1.8.2发布说明](release-1.8.2-gate.md)。
+当前项目版本为 **1.8.3**。Audio的歌曲结束方式可选**听到结束**（默认）或**跳过尾奏**；正常完成的结果无需再次按键即可保存并提交。新游玩采用支持BMS RANK的R3判定及网页提交所需的判定配置，保留现有R1/R2记录。默认输出仍为WASAPI。变更与正在进行的发布检查见[1.8.3发布说明](release-1.8.3-gate.md)。
 
 [本地 1.7.1 r2 报告](local-1.7.1-r2.ko.md)中的 749/739 项是旧构建的记录，不作为新版本的结果。参见[曲库管理](library-management.md)、[基准 BPM](reference-bpm.md)、[皮肤预设](skin-presets.md)和 [ASIO](asio-audio.md)。
 
 这份文档是下一位 agent 或新任务接手时应该最先阅读的当前状态文档。目标是快速说明“这个项目现在是什么、应该先看哪里、还有哪些内容尚未验证”。
 
 ## 基线
-- 当前项目版本为 `1.8.2`
+- 当前项目版本为 `1.8.3`
 - 1.7.1 提供最多8人的 HUD 与结果、并列名次与分数等待状态、P-GREAT 专属效果、判定与连击独立位置、10张选项卡、音量标准化及选曲难度表卡片。见[变更详情](gameplay-polish-followup.md)和[验证范围](release-1.7.1-gate.md)。
 - 1.7.0 refreshes native Home, Song Select, Result and shared settings. See [UI implementation](menu-visual-polish.md) and [release verification](release-1.7.0-gate.md). The prism remains only in the custom-skin path; result reveal timing is unchanged.
 - 默认结果页面突出分数、等级和准确率；棱镜演出保留在自定义皮肤中。保留现有2.2秒展示流程、Space跳过和按钮启用规则。
@@ -88,7 +90,7 @@
   - LN channel（`51`-`55`, `61`-`65`）
   - `#LNOBJ`
   - `#LNMODE 2` charge note 会使用 tail release timing 判定
-  - 普通 BMS LN 保持到最后时会自动处理 tail，不使用 tail release timing 判定
+  - 普通BMS LN保持到最后时会自动处理tail；R3中过早松键立即判定BAD
 - BMS audio decode：
   - WAV 原生优先
   - OGG 优先使用内置 `stb_vorbis`，失败后使用 Windows Media Foundation
@@ -112,7 +114,7 @@
   - 游戏内 Mode Settings 的 `Key Converter` 可选择 `Krrcream`、内置确定性 `KeyWeaver nK2` 或 `KeyWeaver NK3 ONNX`，并写入设置与 replay metadata
   - 已移除独立的 `Conversion Note Add` 选项：Krrcream 只重排原始 note，nK2 在扩展键数时直接向转换后的目标 layout 生成安全的辅助 note。
   - nK2 preset 可选择默认 `Native (12%)`、`Transform (35%)` 或 `Remaster (65%)`；`Remaster` 在提高预算的同时锁定 anchor 以保留原曲排布，并用等长长条填充 LN 区间。三者均为上限，实际增加量取决于原谱密度与安全窗口。Krrcream 下锁定该行，standalone converter GUI 的 Krrcream Max/Min/Speed/Seed 也不可修改。
-  - 1.8.2 官方 build/Windows ZIP 不构建或附带 standalone BMS key-converter CLI/GUI；顶层 CMake 选项默认 `OFF`，源码仅保留用于开发回归
+  - 1.8.3 官方 build/Windows ZIP 不构建或附带 standalone BMS key-converter CLI/GUI；顶层 CMake 选项默认 `OFF`，源码仅保留用于开发回归
   - NK3 始终将随包提供的 P64 与 host beam32 结合。仅当非 10K 源谱面转换为 10K 时才加入 generalized pattern MLP；10K→10K 与其他所有目标仅使用 P64。默认 `AUTO` 后端通过 ncnn Vulkan 在 AMD/NVIDIA GPU 上运行 P64 与 MLP，并保留可选 OpenVINO 兼容路径作为回退；可通过 `TENRIFF_NK3_BACKEND` 和 `TENRIFF_NK3_VULKAN_DEVICE` 强制选择。
   - `mode.key_mode=none` 表示保持谱面的原始键数与基础 pattern 布局不变
 - Native difficulty：
@@ -138,13 +140,14 @@
   - `skin.lr2_resolution_mode` 以 `auto / sd / hd / fhd` 保存 LR2 playskin 的分辨率 override token
   - LR2 auto-detect 以 playskin `#DST_NOTE` 的坐标范围而不是 asset 名称来判断 SD/HD/FHD family
   - future note 的上方进入 easing
-  - 最后一个判定 note 后默认等待音乐结束；在这段尾声按下 lane key 会立即进入 Result
+  - 最后一个判定note后，按Audio的歌曲结束方式听到结束（默认）或在常规结果等待时间后自动跳过尾奏；听到结束模式仍支持lane key手动跳过
 - Judge：
-  - 默认 `PG / GR / GD` 判定窗为 `20ms / 65ms / 115ms`
+  - 默认 `PG / GR / GD` 判定窗为 `21ms / 65ms / 115ms` (BMS RANK EASY)
+  - BMS `#RANK` EASY（含未指定）/NORMAL/HARD/VERYHARD的PG为`21/18/15/8ms`；NORMAL/HARD/VERYHARD对EASY的全部PG/GR/GD/BAD判定窗乘以`18/21`、`15/21`、`8/21`，自动漏键时限保持不变
   - 默认 `BAD` 范围为 `210ms`，`Judge Easy` 为 `283.5ms`，`Judge Hard` 最大为 `180ms`
-  - `Judge Easy` 将判定窗和长按容差扩大为 `1.35x`，即 `PG/GR/GD=27/87.75/155.25ms`；Hard保持PG/GR/GD和长按容差，仅缩小BAD上限
+  - `Judge Easy` 将判定窗和长按容差扩大为 `1.35x`，即 `PG/GR/GD=28.35/87.75/155.25ms`；Hard保持PG/GR/GD和长按容差，仅缩小BAD上限 (BMS RANK EASY)
   - 默认Normal/Easy/Hard在未输入音符超过 `340ms` 后自动判漏键。BAD范围外的迟到输入先将过期音符记为漏键，再检查下一音符，因此命中窗口不会扩大到自动漏键时限
-  - 新游玩使用 `ruleset-2`；旧 `ruleset-1` 回放、幽灵和验证仍复现Easy `1.25x`、Hard BAD `340ms`、自动漏键 `=BAD` 的旧策略
+  - 新游玩使用`ruleset-3`；ruleset-1/2回放、幽灵与验证保留原判定及LN松键行为。[RANK比例与兼容条件](audio-ln-rank.ko.md)
   - 当同一 lane 的 pending note 已经是 `BAD`，而紧接的下一 note 明确可判为 `GOOD` 或更高时，前一 note 会记为 miss，当前按键则分配给下一 note，避免一次漏键锁成连续 `BAD`
   - 在 `Judge Hard` 下，未输入而漏掉的对象会记为断 combo 的间接 `POOR` 和 OD8 `MISS`；其他会消耗 note 的失败仍记为 `BAD`
   - 非消耗型的超早输入会按 LR2 风格记为 `POOR`，并重新出现在结果 / replay / UI 中
@@ -158,7 +161,7 @@
   - rank 边界为 `<75 F / 75 B / 80.5 A / 86.5 A+ / 90 S / 95.5 S+ / 98 AA / 99 SS / 99.75 SSS`
   - live gameplay 的 `ClockSync` 使用 centered anchor regression，避免大型 Windows QPC 绝对值造成精度损失，并在持续 clock discontinuity 后自动 rebase
   - stale backlog 按 QPC event age 与 `BAD` window 判定；若 fresh input 的 sample mapping 与当前 playback anchor 偏差过大，则 fallback 到 anchor
-  - tail release timing 仅适用于 BMS `#LNMODE 2` charge note
+  - R3中普通LN与`#LNMODE 2` CN过早松键会立即确定BAD、断连和掉血，重新按下无法撤销；普通LN持续按住仍自动完成，CN保留尾部松键判定
   - 当两把键盘同时按住同一个键时，逻辑 `Pressed` 状态会一直保持到最后一个输入源释放为止
 - Graphics：
   - 分辨率预设（`720p`、`1080p`、`qhd`、`native`）
@@ -228,7 +231,7 @@
 
 ## 运行时 / 打包规则
 - 新用户 profile 会自动创建
-- 当前 P2P 发布目标为 `TenRiff 1.8.2`
+- 当前 P2P 发布目标为 `TenRiff 1.8.3`
 - 发布包不包含 `Songs`
 - 发布包包含 `Main Menu / Options / Song Selecte / Multiplayer Lobby / Clear / Failed` 这些 `Mainmusic/` 场景槽位；每个 `Name.mp3` 及 `Name 2.mp3`～`Name 64.mp3` 会自动发现，并在重新进入场景时轮换
 - 发布更新只包含已构建产物和必要的运行时资源

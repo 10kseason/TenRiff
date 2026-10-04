@@ -53,7 +53,7 @@ inline constexpr std::array<NativeGameplayNumberSlot,11> kNativeGameplayMotion{{
  {"judgement_duration_ms",220.0f,1.0f,2000.0f},
 }};
 inline constexpr std::array<std::string_view,28> kNativeGameplayColors{{"key_well","key_led","chassis","judgement_line","judgement_glow","hold_edge","hold_core","hold_shadow","burst_core","burst_trail","title","score","body","combo","judgement","timing","key_label","gauge_hard","gauge_normal","gauge_easy","judgement_pg","judgement_gr","judgement_gd","judgement_bd","judgement_pr","timing_fast","timing_slow","gauge_ex_hard"}};
-inline constexpr std::array<std::string_view,11> kNativeGameplayRects{{"title","artist","speed","score","stats","combo","judgement","timing","gauge","progress","key_label"}};
+inline constexpr std::array<std::string_view,12> kNativeGameplayRects{{"title","artist","speed","score","stats","combo","judgement","timing","timing_label","gauge","progress","key_label"}};
 inline constexpr std::array<std::string_view,7> kNativeGameplayFonts{{"title","score","body","timing","judgement","combo","key_label"}};
 inline constexpr std::array<std::string_view,5> kNativeGameplaySprites{{"key_idle","key_pressed","note","hold_head","hold_tail"}};
 } // namespace tenriff::app

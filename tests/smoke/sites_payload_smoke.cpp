@@ -34,6 +34,8 @@ int main(int argc, char** argv) {
     }
     tenriff::gameplay::ReplayFile replay;
     replay.ruleset_id = std::string(tenriff::app::kCanonicalReplayRulesetId);
+    replay.chart_format = "bms";
+    replay.bms_rank = 3;
     replay.chart_sha256 = std::string(64, 'a');
     replay.created_utc = "20260901_000000Z";
     replay.trace.lane_count = 10;

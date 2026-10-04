@@ -17,6 +17,8 @@ If a profile does not exist, it is created automatically on first launch.
 
 ### `audio`
 
+- `play_to_end` (bool; default `true`): Listen to remaining chart audio after the final judgement. When false, finish normally after `ui.result_tail_ms` without waiting for the outro. Judgements, score, replay and manual post-note skip are unchanged.
+
 - `backend` (string)
   - `wasapi | asio`; default `wasapi`. Selects gameplay and song-preview output; menu/result background music keeps its separate Windows MCI path.
 - `asio_driver` (string)
@@ -44,7 +46,7 @@ If a profile does not exist, it is created automatically on first launch.
   - master volume
 - `bgm_volume` (double)
 - `normalize_audio` (bool)
-  - Stereo-linked RMS leveling of the gameplay mix before limiter/master volume; false by default. Menu music and song previews are unaffected.
+  - In-game RMS loudness control, default false. ON retains RMS → soft limiter → master; OFF applies linear master gain and only guards final output overflow. Menu music and song previews are unchanged.
 - `keysound_volume` (double)
 
 See [ASIO setup](asio-audio.md). ASIO holds the selected sample rate fixed and resamples chart audio. `frames` is a request negotiated to a legal driver size. Presets do not overwrite ASIO frames; `exclusive` and `periods` apply to WASAPI. ASIO failures do not fall back to WASAPI automatically.
@@ -80,16 +82,17 @@ See [ASIO setup](asio-audio.md). ASIO holds the selected sample rate fixed and r
   - clamped to the `0..25` range
   - default value is `8ms`
 ### `judge`
+- BMS `#RANK` selects chart timing: `3/EASY` PG21ms, `2/NORMAL` PG18ms, `1/HARD` PG15ms, `0/VERYHARD` PG8ms. EASY keeps GR/GD/BAD at 65/115/210ms; the other ranks scale these by 18/21, 15/21 and 8/21. Missing/unsupported headers use EASY. Judge Easy/Hard mods apply afterward. Rank does not change hold tolerances or automatic-miss deadlines.
 - `pg`, `gr`, `gd`, `bd` (double, ms)
-- default `pg / gr / gd` values are `20ms / 65ms / 115ms`
+- default `pg / gr / gd` values are `21ms / 65ms / 115ms`
 - default `bd` is `210ms`
-- `Judge Easy` scales the base timing windows by `1.35x`: `pg/gr/gd/bd=27/87.75/155.25/283.5ms`. Hold tolerances scale as well; `mask` stays unchanged
+- `Judge Easy` scales the base timing windows by `1.35x`: `pg/gr/gd/bd=28.35/87.75/155.25/283.5ms`. Hold tolerances scale as well; `mask` stays unchanged
 - `Judge Hard` leaves PG/GR/GD and hold tolerances unchanged and caps `bd` at `180ms`. A smaller custom BAD window is preserved
 - `indirect_miss` (double, ms)
   - current profiles save and normalize this value to `340ms`, independently of the BAD hit window
   - default Normal/Easy/Hard automatically miss an unplayed note once it is more than `340ms` late. Normal/Easy record BAD; Hard records a combo-breaking indirect `POOR` / OD8 `MISS`
   - a late press outside BAD but before automatic timeout misses the expired note, then checks the next note; it cannot score a BAD hit outside the hit window
-- New plays record `tenriff-native-score-v2-ruleset-2`. Playback, ghost battles and verification of `ruleset-1` replays use the exact previous policy: Easy `1.25x`, Hard BAD `340ms`, and automatic miss `=BAD`. Arbitrary custom timing does not become official
+- New plays record `tenriff-native-score-v2-ruleset-3`. Playback, ghosts and verification of ruleset-1/2 restore PG20ms, ignore RANK and retain the previous LN release behavior. Ruleset-1 also retains Easy 1.25x, Hard BAD340ms and automatic miss=BAD. Custom timing remains unofficial.
 - `hold_grace` (double, ms)
   - the dedicated window used to treat long-note tail release as `PG`
   - default value is `80ms`
@@ -226,7 +229,7 @@ The chart loader and indexer are limited to BMS-family files (`.bms/.bme/.bml/.p
 | `language` | `en`, `ko`, `ja`; `en` | UI language; invalid values normalize to en. |
 | `menu_font_size` | `normal`, `large`, `extra_large`; `normal` | Profile and first-run menu text at 100%, 115%, or 130%. Gameplay fonts remain skin-controlled. |
 | `all_song_sources` | bool; `false` | Restore ALL SONG, combining registered folder caches and deduplicating identical chart paths. |
-| `result_tail_ms` | double; `500` ms | Extra result-transition delay after judgement completion; the chart audio end is also considered. |
+| `result_tail_ms` | double; `500` ms | Extra result-transition delay after judgement completion; the chart audio end is also considered when `audio.play_to_end=true`. |
 | `require_enter_to_exit` | bool; `true` | Retained for read/write compatibility; the current Windows result-input path does not use it to auto-exit. |
 | `show_cursor_in_gameplay` | bool; `true` | Show the mouse pointer during gameplay. |
 | `active_song_source`, `recent_song_sources` | string / string[] | Current and recent song folders. |
@@ -261,13 +264,17 @@ These are profile `config.json` skin settings. For a skin package's `skin.json` 
 | `scratch_position` | `left`, `right`; `left` | Changes only 7+1 scratch display order; input/judgement lanes stay unchanged. |
 | `lr2_resolution_mode` | `auto`, `sd`, `hd`, `fhd`; `auto` | LR2 coordinate resolution; auto uses `#DST_NOTE` coordinates, not filenames. |
 | `visual_preset` | `classic`, `neon`, `minimal`, `tenriff`; `tenriff` | Selecting a preset in the menu resets its visual option bundle. |
-| `note_shape` | `rect`, `triangle`, `pentagon`, `hexagon`, `circle`; `rect` | Procedural note shape. |
+| `note_shape` | `rect`, `circle`, `triangle`, `pentagon`, `hexagon`, `square`, `diamond`, `arrow`; `rect` | Procedural note shape. `hex` is a legacy alias for `hexagon`. |
 | `note_image_aspect` | `stretch`, `contain`, `width`; `stretch` | Fill the rectangle / fit inside with aspect preserved / keep width and derive height from aspect. |
 | `preserve_note_image_aspect_ratio` | bool; `false` | Legacy field; explicit `note_image_aspect` wins. Saved true for non-stretch modes. |
 | `note_border_enabled`, `show_lane_dividers`, `show_judgement_line` | bool; `true` | Show note borders, lane dividers, and the judgement line respectively. |
 | `note_divider_gap_px` | double: `0..40`; `12` px | Gap from each note edge to the divider; zero expands notes to the dividers. |
 | `show_gear_boundary_line` | bool; `false` | Show the gear boundary line. |
-| `show_timing_feedback` | bool; `true` | Show FAST/SLOW text and timing history; judgement grades remain independent. |
+| `show_timing_feedback` | bool; `true` | Show FAST/SLOW text independently of the bar. |
+| `show_timing_bar` | bool; `true` | Show the timing bar; older profiles/skins without this field inherit the text switch. |
+| `timing_feedback_override` | bool; `false` | After the user edits a switch, profile visibility choices take priority over the skin manifest. |
+| `timing_text_offset_x`, `timing_bar_offset_x` | double: `-600..600`; `0` | Independent text/bar X offsets added to the existing judgement-area layout, in 1920x1080 base pixels. |
+| `timing_text_offset_y`, `timing_bar_offset_y` | double: `-400..400`; `0` | Independent text/bar Y offsets in base pixels; positive moves down. |
 | `show_hold_tail`, `hold_tail_taper_enabled` | bool; `false` | LN tail-cap visibility and taper respectively; no judgement-rule change. |
 | `judgement_line_glow_enabled` | bool; `true` | Judgement-line glow. |
 | `key_pulse_brightness` | double: `0..1`; `1` | Hit Burst brightness; zero disables it. |
@@ -284,6 +291,8 @@ These are profile `config.json` skin settings. For a skin package's `skin.json` 
 | `black_playfield_enabled` | bool; `true` | Black field including lane gaps. |
 | `visual_opacity` | double: `0.20..1`; `0.96` | Shared opacity multiplier for notes, receptors and key labels. |
 | `note_outline_opacity` | double: `0..1`; `0.78` | Note-outline opacity. |
+| `note_fade_in` | double: `0..1`; `0` | Top black fog depth; notes gradually appear. Zero is off. |
+| `note_fade_out` | double: `0..1`; `0` | Black fog depth above the judgement line; notes gradually disappear. Zero is off. Receptors and HUD remain visible. |
 | `hold_body_opacity` | double: `0.05..1`; `1` | LN-body opacity. |
 | `lane_width_scales` | object: mode → number[]; `0.50..1.75` | Per-lane widths; array length equals lane count. |
 | `note_width_scale` | double: `0.50..1.40`; `1` | Note & Field Size: scales field, lanes, notes and adjacent gauge around the center. |

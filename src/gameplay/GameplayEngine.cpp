@@ -34,7 +34,8 @@ GameplayEngine::GameplayEngine(const GameplayChart& chart, const GameplayConfig&
                                       ? game::GaugeRuntimePolicy{} : config.gauge_policy),
       gauge_shift_enabled_(config.gauge_shift_enabled && !config.gauge_policy.course_lr2_deltas),
       practice_no_fail_enabled_(config.practice_no_fail_enabled),
-      one_miss_fail_enabled_(config.one_miss_fail_enabled) {
+      one_miss_fail_enabled_(config.one_miss_fail_enabled),
+      legacy_hold_release_(config.legacy_hold_release) {
     if (config.gauge_policy.course_lr2_deltas) {
         windows_.indirect_miss_enabled = true;
     }
@@ -584,25 +585,7 @@ void GameplayEngine::update_hold(LaneState& lane, int64_t current_sample) {
     }
 
     if (hold.release_active) {
-        if (hold.release_required) {
-            const int64_t delta_samples = hold.release_sample - hold.end_sample;
-            const auto judgement = classify_judgement(delta_samples);
-            double delta_ms = static_cast<double>(delta_samples) * 1000.0 / static_cast<double>(sample_rate_);
-            const ComboImpact combo_impact =
-                (judgement == game::Judgement::BD) ? ComboImpact::Break : ComboImpact::Increment;
-            const auto osu_judgement = record_osu_hold(hold, hold.release_sample);
-            apply_judgement(judgement,
-                            delta_ms,
-                            hold.release_sample,
-                            0.5,
-                            combo_impact,
-                            osu_judgement == OsuManiaJudgement::Miss,
-                            tail_gauge_weight);
-            lane.hold.reset();
-            return;
-        }
-
-        if (current_sample >= hold.end_sample) {
+        if (hold.release_required || !legacy_hold_release_ || current_sample >= hold.end_sample) {
             const int64_t delta_samples = hold.release_sample - hold.end_sample;
             const auto judgement = classify_judgement(delta_samples);
             double delta_ms = static_cast<double>(delta_samples) * 1000.0 / static_cast<double>(sample_rate_);
@@ -699,6 +682,12 @@ void GameplayEngine::update_lane_input_state(LaneState& lane, input::InputState 
         }
         lane.hold->release_active = true;
         lane.hold->release_sample = input_sample;
+        if (!legacy_hold_release_) {
+            // Commit the key-up before another input can cancel it, even when
+            // release and re-press arrive in the same audio callback. Resetting
+            // the completed hold also prevents a later tail from scoring twice.
+            update_hold(lane, input_sample);
+        }
     }
 }
 

@@ -89,6 +89,7 @@ enum class MenuHitTargetKind {
     SongDifficultyTable,
     SongSourceAdd,
     SongSourceRemove,
+    SkinPreviewButton,
 };
 
 enum class SongDifficultyTableAction {
@@ -477,6 +478,14 @@ struct GameplayHudData {
     bool show_judgement_line = true;
     bool show_gear_boundary_line = false;
     bool show_timing_feedback = true;
+    bool show_timing_bar = true;
+    double timing_text_offset_x = 0.0;
+    double note_fade_in = 0.0;
+    double note_fade_out = 0.0;
+    double timing_text_offset_y = 0.0;
+    double timing_bar_offset_x = 0.0;
+    double timing_bar_offset_y = 0.0;
+
     bool show_hold_tail = false;
     bool hold_tail_taper_enabled = false;
     bool judgement_line_glow_enabled = true;
@@ -625,6 +634,16 @@ struct MenuRowData {
 };
 
 struct SkinPreviewData {
+    bool fullscreen = false;
+    bool show_timing_feedback = true;
+    bool show_timing_bar = true;
+    double timing_text_offset_x = 0.0;
+    double note_fade_in = 0.0;
+    double note_fade_out = 0.0;
+    double timing_text_offset_y = 0.0;
+    double timing_bar_offset_x = 0.0;
+    double timing_bar_offset_y = 0.0;
+
     double gameplay_field_offset_x = 0.0;
     std::array<std::string, kGameplayHudMaxLanes> key_labels{};
     bool visible = false;

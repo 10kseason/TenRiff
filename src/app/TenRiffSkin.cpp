@@ -821,6 +821,7 @@ void parse_gameplay_style(const config::JsonObject& gameplay,
     style.show_lane_dividers = optional_bool(gameplay, "show_lane_dividers", definition, "gameplay.");
     style.show_judgement_line = optional_bool(gameplay, "show_judgement_line", definition, "gameplay.");
     style.show_timing_feedback = optional_bool(gameplay, "show_timing_feedback", definition, "gameplay.");
+    style.show_timing_bar = optional_bool(gameplay, "show_timing_bar", definition, "gameplay.");
     style.show_gear_boundary_line = optional_bool(gameplay, "show_gear_boundary_line", definition, "gameplay.");
     style.show_hold_tail = optional_bool(gameplay, "show_hold_tail", definition, "gameplay.");
     style.hold_tail_taper_enabled = optional_bool(gameplay, "hold_tail_taper", definition, "gameplay.");
@@ -849,8 +850,11 @@ void parse_gameplay_style(const config::JsonObject& gameplay,
                                           definition, "gameplay.");
     style.key_label_position = optional_enum(gameplay, "key_label_position", {"off", "top", "bottom"},
                                              definition, "gameplay.");
-    style.note_shape = optional_enum(gameplay, "note_shape", {"rect", "circle", "diamond", "hex"},
+    style.note_shape = optional_enum(gameplay, "note_shape",
+                                     {"rect", "circle", "triangle", "pentagon", "hexagon",
+                                      "square", "diamond", "arrow", "hex"},
                                      definition, "gameplay.");
+    if (style.note_shape == "hex") style.note_shape = "hexagon";
 
     const auto* lane_colors = object_value(gameplay, "lane_colors");
     if (!lane_colors) return;
@@ -924,7 +928,7 @@ bool has_gameplay_presentation(const TenRiffSkinDefinition& definition) {
     const auto& style = definition.gameplay_style;
     // Presence matters: explicitly false/zero still overrides a player setting.
     return style.show_lane_dividers.has_value() || style.show_judgement_line.has_value() ||
-        style.show_timing_feedback.has_value() || style.show_gear_boundary_line.has_value() ||
+        style.show_timing_feedback.has_value() || style.show_timing_bar.has_value() || style.show_gear_boundary_line.has_value() ||
         style.show_hold_tail.has_value() || style.hold_tail_taper_enabled.has_value() ||
         style.judgement_line_glow_enabled.has_value() || style.key_pulse_enabled.has_value() ||
         style.key_backdrop_enabled.has_value() || style.key_backdrop_opacity.has_value() ||
@@ -1100,13 +1104,13 @@ TenRiffSkinDefinition load_tenriff_skin_folder(std::string_view folder_utf8,
     if (const auto* gameplay_manifest = child_object(*manifest, "gameplay")) {
         config::JsonObject gameplay = effective_gameplay_object(
             *gameplay_manifest, definition.gameplay.keys, gameplay_mode, definition);
-        static constexpr std::array<std::string_view, 46> kGameplayKeys = {
+        static constexpr std::array<std::string_view, 47> kGameplayKeys = {
             "renderer", "native",
             "background", "background_opacity", "gear", "note", "hold_head", "hold_body",
             "hold_tail", "key_idle", "key_pressed", "note_width_ratio", "note_height_ratio",
             "note_aspect", "note_rotations", "key_rotations", "judgement_line_position",
             "full_lane_receptors", "column_widths", "column_spacings", "lane_map",
-            "show_lane_dividers", "show_judgement_line", "show_timing_feedback",
+            "show_lane_dividers", "show_judgement_line", "show_timing_feedback", "show_timing_bar",
             "show_gear_boundary_line", "show_hold_tail", "hold_tail_taper", "judgement_line_glow",
             "key_pulse", "key_pulse_brightness", "hit_burst_style", "key_label_position",
             "key_backdrop", "key_backdrop_opacity", "key_backdrop_brightness", "key_backdrop_height",

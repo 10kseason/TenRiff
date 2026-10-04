@@ -512,6 +512,7 @@ std::string normalize_gameplay_note_shape(std::string_view value) {
     std::transform(normalized.begin(), normalized.end(), normalized.begin(), [](unsigned char ch) {
         return static_cast<char>(std::tolower(ch));
     });
+    if (normalized == "hex") return "hexagon";
     if (normalized == "circle" || normalized == "triangle" || normalized == "pentagon" ||
         normalized == "hexagon" || normalized == "square" || normalized == "diamond" ||
         normalized == "arrow") {
@@ -1943,8 +1944,11 @@ D2D1_COLOR_F gameplay_note_fill_color(uint32_t rgb, float opacity = 0.96f) {
     return color_from_rgb(rgb, std::clamp(opacity, 0.0f, 1.0f));
 }
 
-D2D1_COLOR_F gameplay_note_border_color(uint32_t rgb, float opacity = 0.78f) {
-    return color_from_rgb(blend_rgb(rgb, 0xFFFFFF, 0.55f), std::clamp(opacity, 0.0f, 1.0f));
+D2D1_COLOR_F gameplay_note_border_color(uint32_t rgb, float opacity = 0.78f,
+                                       bool dark_outline = false) {
+    // A dark edge keeps the pointed silhouettes readable on bright LN bodies.
+    const uint32_t outline_rgb = dark_outline ? 0x000000u : blend_rgb(rgb, 0xFFFFFF, 0.55f);
+    return color_from_rgb(outline_rgb, std::clamp(opacity, 0.0f, 1.0f));
 }
 
 D2D1_COLOR_F gameplay_note_hold_color(uint32_t rgb, float opacity = 0.24f) {
@@ -2296,6 +2300,7 @@ struct MenuWindow::D2DResources {
     Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> note_fill_brush;
     Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> note_border_brush;
     Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> note_hold_brush;
+    Microsoft::WRL::ComPtr<ID2D1LinearGradientBrush> note_fog_brush;
     std::array<Microsoft::WRL::ComPtr<ID2D1Bitmap>, kGameplayHudMaxLanes> lane_note_head_bitmaps{};
     std::array<D2D1_RECT_F, kGameplayHudMaxLanes> lane_note_head_source_rects{};
     std::array<Microsoft::WRL::ComPtr<ID2D1Bitmap>, kGameplayHudMaxLanes> lane_note_hold_head_bitmaps{};

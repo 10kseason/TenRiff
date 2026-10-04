@@ -572,7 +572,7 @@ TEST_CASE("BAD hit windows are separate from the common 340ms automatic miss dea
         chart, tenriff::app::ChartFormat::Bms, hard_mode, base_judge, 1.0);
 
     CHECK(normal.judge.bd_ms == doctest::Approx(210.0));
-    CHECK(easy.judge.pg_ms == doctest::Approx(27.0));
+    CHECK(easy.judge.pg_ms == doctest::Approx(28.35));
     CHECK(easy.judge.gr_ms == doctest::Approx(87.75));
     CHECK(easy.judge.gd_ms == doctest::Approx(155.25));
     CHECK(easy.judge.bd_ms == doctest::Approx(283.5));

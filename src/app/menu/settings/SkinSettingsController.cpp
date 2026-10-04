@@ -141,6 +141,11 @@ SkinSettingsEffects SkinSettingsController::select(
     return effects;
 }
 
+void SkinSettingsController::set_timing_defaults(std::optional<bool> text, std::optional<bool> bar) noexcept {
+    timing_default_text_ = text;
+    timing_default_bar_ = bar;
+}
+
 void SkinSettingsController::set_backdrop_defaults(
     std::optional<bool> enabled, std::optional<float> opacity,
     std::optional<float> brightness, std::optional<float> height) noexcept {
@@ -216,6 +221,13 @@ SkinSettingsEffects SkinSettingsController::apply_selected_action(
     const std::vector<std::string>& available_tenriff_skin_names) {
     const bool is_adjust = action.kind == MenuActionKind::Adjust && action.direction != 0;
     const bool is_activate = action.kind == MenuActionKind::Activate;
+    if ((is_adjust || is_activate) &&
+        (selected_id_ == SkinSettingsRowId::TimingFeedback || selected_id_ == SkinSettingsRowId::TimingBar)) {
+        const auto visible = resolve_timing_feedback_visibility(runtime.skin, timing_default_text_, timing_default_bar_);
+        runtime.skin.show_timing_feedback = visible.text;
+        runtime.skin.show_timing_bar = visible.bar;
+        runtime.skin.timing_feedback_override = true;
+    }
     const bool backdrop_slider = selected_id_ == SkinSettingsRowId::KeyBackdropOpacity ||
         selected_id_ == SkinSettingsRowId::KeyBackdropBrightness || selected_id_ == SkinSettingsRowId::KeyBackdropHeight;
     if ((is_adjust || is_activate || (action.kind == MenuActionKind::SetRatio && backdrop_slider)) &&
@@ -446,6 +458,13 @@ SkinSettingsEffects SkinSettingsController::apply_selected_action(
                 config::kSkinNoteOutlineOpacityMax,
                 kSkinOpacityStep);
             return mark_changed();
+        case SkinSettingsRowId::NoteFadeIn:
+        case SkinSettingsRowId::NoteFadeOut: {
+            double& value = selected_id_ == SkinSettingsRowId::NoteFadeIn
+                ? runtime.skin.note_fade_in : runtime.skin.note_fade_out;
+            value = clamp_step_value(value + direction * 0.05, 0.0, 1.0, 0.05);
+            return mark_changed();
+        }
         case SkinSettingsRowId::LnBodyOpacity:
             runtime.skin.hold_body_opacity = clamp_step_value(
                 runtime.skin.hold_body_opacity + direction * kSkinOpacityStep,
@@ -610,6 +629,21 @@ SkinSettingsEffects SkinSettingsController::apply_selected_action(
             return mark_changed();
         case SkinSettingsRowId::GameplayCursor:
             runtime.ui.show_cursor_in_gameplay = !runtime.ui.show_cursor_in_gameplay;
+            return mark_changed();
+        case SkinSettingsRowId::TimingBar:
+            runtime.skin.show_timing_bar = !runtime.skin.show_timing_bar;
+            return mark_changed();
+        case SkinSettingsRowId::TimingTextX:
+            runtime.skin.timing_text_offset_x = std::clamp(runtime.skin.timing_text_offset_x + direction * 10.0, -600.0, 600.0);
+            return mark_changed();
+        case SkinSettingsRowId::TimingTextY:
+            runtime.skin.timing_text_offset_y = std::clamp(runtime.skin.timing_text_offset_y + direction * 10.0, -400.0, 400.0);
+            return mark_changed();
+        case SkinSettingsRowId::TimingBarX:
+            runtime.skin.timing_bar_offset_x = std::clamp(runtime.skin.timing_bar_offset_x + direction * 10.0, -600.0, 600.0);
+            return mark_changed();
+        case SkinSettingsRowId::TimingBarY:
+            runtime.skin.timing_bar_offset_y = std::clamp(runtime.skin.timing_bar_offset_y + direction * 10.0, -400.0, 400.0);
             return mark_changed();
         case SkinSettingsRowId::TimingFeedback:
             runtime.skin.show_timing_feedback = !runtime.skin.show_timing_feedback;

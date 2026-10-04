@@ -29,6 +29,18 @@ inline constexpr float kOutputSoftLimitThreshold = 0.92f;
     return soft_limit_audio_sample(mixed_sample) * master;
 }
 
+// Normalize OFF is a linear signal path while the final output fits the device
+// range. Apply master before the range guard so overlapping keysounds can use
+// its headroom without being compressed at the old pre-master 0.92 threshold.
+[[nodiscard]] inline float apply_clean_master_volume_to_sample(float mixed_sample,
+                                                               double master_volume) {
+    if (!std::isfinite(mixed_sample) || !std::isfinite(master_volume)) {
+        return 0.0f;
+    }
+    const float master = static_cast<float>(std::clamp(master_volume, 0.0, 1.0));
+    return std::clamp(mixed_sample * master, -1.0f, 1.0f);
+}
+
 [[nodiscard]] inline float gameplay_bgm_gain(double bgm_volume) {
     return static_cast<float>(std::clamp(bgm_volume, 0.0, 2.0));
 }
