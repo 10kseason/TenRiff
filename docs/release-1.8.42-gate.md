@@ -41,5 +41,12 @@
 - PR 및 병합 후 main의 AddressSanitizer/OpenVINO CI.
 - 초안 첨부 파일 다운로드·해시 확인 후 공개하고, 공개 파일도 익명으로 재다운로드하여 검증.
 
+CI의 OpenVINO CPU 검사는 `ONEDNN_MAX_CPU_ISA=AVX2`로 동일한 전체 변환 검사를 수행합니다.
+초기 두 실행의 Xeon 8573C 호스트에서 Illegal-instruction 종료를 확인했고,
+[동일 호스트의 가상 AMX 기능 불일치 보고](https://github.com/uxlfoundation/oneDNN/issues/5689)와
+[공식 dispatcher 설정](https://uxlfoundation.github.io/oneDNN/dev_guide_cpu_dispatcher_control.html)을 근거로
+CI에서만 공통 AVX2 경로를 지정합니다. 이 검사는 AMX 실행을 검증하지 않으며,
+패키지와 일반 로컬 실행의 CPU 기능 선택은 바꾸지 않습니다. 실패 로그를 보존합니다.
+
 이전 릴리즈·설치·프로필을 보존합니다. 물리 입력→화면/오디오 지연, 제보 PC의 실제 차트,
 장시간 플레이와 다중 PC 검증은 별도이며 합성 화면 검사로 대체하지 않습니다.

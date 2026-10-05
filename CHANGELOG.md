@@ -5,6 +5,7 @@
 - Rebase capped render pacing on each actual frame start and omit extra waiting after an over-budget frame, preventing dense rendering from dropping into an artificial half-rate cadence.
 - Stop collecting and sorting frame performance history while the performance overlay is hidden; restarting the overlay begins a fresh measurement window.
 - Add FHD dense tap/LN/ghost rendering fixtures and optional render-thread pacing measurements. See [performance scope and verification](docs/dense-note-performance.ko.md).
+- Pin the hosted OpenVINO CPU smoke test to its AVX2 baseline to avoid inconsistent virtual AMX capabilities; packaged runtime CPU dispatch remains unchanged.
 
 ## [1.8.41] - 2026-10-05
 

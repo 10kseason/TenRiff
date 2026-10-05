@@ -66,6 +66,10 @@ jobs:
           # CPU selects the OpenVINO device; pin its backend to skip AUTO's Vulkan probe.
           TENRIFF_NK3_BACKEND: OPENVINO
           TENRIFF_NK3_DEVICE: CPU
+          # Hosted Xeon VMs can advertise AMX but fault when executing it.
+          # Keep this CI smoke on the AVX2 baseline; runtime defaults stay native.
+          # https://github.com/uxlfoundation/oneDNN/issues/5689
+          ONEDNN_MAX_CPU_ISA: AVX2
         run: |
           Get-CimInstance Win32_Processor | Select-Object Name, Manufacturer, ProcessorId
           python -u -c "import openvino as ov; print('OpenVINO', ov.__version__); core = ov.Core(); print('Devices', core.available_devices); model = core.read_model('models/NK3-P64-hybrid.onnx'); print('Model read'); core.query_model(model, 'CPU'); print('CPU query passed'); core.compile_model(model, 'CPU'); print('CPU compile passed')"
