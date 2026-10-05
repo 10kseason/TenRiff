@@ -295,8 +295,11 @@ void MenuApp::populate_mode_mods_render_data(render::MenuRenderData& render) {
         "LN Mix 길이는 긴 8비트 60%, 중간 16비트 20%, 짧은 24~32비트 20%로 배분합니다. Random Seed로 같은 결과를 재현합니다."));
     render.generic.notes.push_back(ui_text("Current: ", "현재: ") + mode_score_summary(config_.mode.mods, config_.speed.rate));
     render.generic.notes.push_back(ui_text(
-        "Judge Easy widens timing windows by 35%. Judge Hard caps BAD at 180 ms without changing PG/GR/GD. Unplayed notes time out after 340 ms in every mode.",
-        "Judge Easy는 판정창을 35% 넓힙니다. Judge Hard는 PG/GR/GD를 유지하고 BAD 최대창을 180ms로 줄입니다. 모든 모드에서 놓친 노트는 340ms가 지나면 자동 미스로 확정됩니다."));
+        "Judge Easy widens PG/GR/GD by 35%. Judge Hard uses EASY PG/GR/GD 17.5/55.714/98.571 ms, scaled by BMS RANK.",
+        "Judge Easy는 PG/GR/GD를 35% 넓힙니다. Judge Hard는 EASY 기준 17.5/55.714/98.571ms이며 BMS RANK 비율을 적용합니다."));
+    render.generic.notes.push_back(ui_text(
+        "BAD is fixed across all RANKs: Easy 210 ms / Hard 225 ms. Unplayed notes time out after 340 ms in every mode.",
+        "BAD는 모든 RANK에서 Easy 210ms / Hard 225ms로 고정됩니다. 모든 모드에서 놓친 노트는 340ms가 지나면 자동 미스로 확정됩니다."));
     std::vector<std::string> mod_warnings;
     (void)normalize_mode_mod_tokens(config_.mode.mods, &mod_warnings);
     for (const auto& warning : mod_warnings) {

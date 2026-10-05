@@ -1,5 +1,8 @@
 #include "doctest/doctest.h"
 
+#include <algorithm>
+#include <array>
+#include <cmath>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
@@ -286,6 +289,7 @@ TEST_CASE("BMS rank metadata round trips and remains optional for old replay evi
     replay.bms_rank.reset();
     for (const auto ruleset : {tenriff::app::kLegacyReplayRulesetId,
                               tenriff::app::kPreviousReplayRulesetId,
+                              tenriff::app::kRuleset3ReplayRulesetId,
                               tenriff::app::kCanonicalReplayRulesetId}) {
         replay.ruleset_id = std::string(ruleset);
         REQUIRE(save_replay_json(path.u8string(), replay).success());
@@ -452,6 +456,7 @@ TEST_CASE("current and legacy replay rulesets reproduce their exact normal easy 
     chart.notes.push_back(tenriff::gameplay::NoteEvent{1, 8'000});
     for (const auto ruleset : {tenriff::app::kLegacyReplayRulesetId,
                                tenriff::app::kPreviousReplayRulesetId,
+                               tenriff::app::kRuleset3ReplayRulesetId,
                                tenriff::app::kCanonicalReplayRulesetId}) {
         const bool legacy = ruleset == tenriff::app::kLegacyReplayRulesetId;
         for (const std::string mod : {"", "judge_easy", "judge_hard"}) {
@@ -479,8 +484,9 @@ TEST_CASE("current and legacy replay rulesets reproduce their exact normal easy 
             REQUIRE(verified.verified());
             CHECK_EQ(verified.ruleset_id, std::string(ruleset));
             if (mod == "judge_hard") {
-                CHECK(verified.stats.counts.bd == (legacy ? 1 : 0));
-                CHECK(verified.stats.counts.pr == (legacy ? 0 : 1));
+                const bool wide_bad = legacy || ruleset == tenriff::app::kCanonicalReplayRulesetId;
+                CHECK(verified.stats.counts.bd == (wide_bad ? 1 : 0));
+                CHECK(verified.stats.counts.pr == (wide_bad ? 0 : 1));
             } else {
                 const bool pg = mod == "judge_easy" && !legacy;
                 CHECK(verified.stats.counts.pg == (pg ? 1 : 0));
@@ -523,30 +529,140 @@ TEST_CASE("legacy replay playback and ghost policy preserve old automatic miss b
     }
 }
 
-TEST_CASE("explicit current replay rules keep rank and LN timing when chart hash evidence is missing") {
-    for (const int format : {0, 1, 2, tenriff::gameplay::kReplayFormatVersion}) {
-        ReplayFile replay;
-        replay.ruleset_id = std::string(tenriff::app::kCanonicalReplayRulesetId);
-        replay.replay_format_version = format;
-        const tenriff::config::JudgeConfig base;
-        const auto judge = tenriff::app::replay_judge_config_for_playback(replay, base, 0);
-        CHECK(judge.pg_ms == doctest::Approx(8.0));
-        CHECK(judge.gr_ms == doctest::Approx(65.0 * 8.0 / 21.0));
-        CHECK(judge.indirect_miss_ms == doctest::Approx(340.0));
-        CHECK_FALSE(tenriff::app::replay_uses_legacy_hold_release(replay));
+TEST_CASE("explicit R3 and R4 replay rules keep rank and LN timing without chart hash evidence") {
+    for (const auto ruleset : {tenriff::app::kRuleset3ReplayRulesetId,
+                               tenriff::app::kCanonicalReplayRulesetId}) {
+        const bool r4 = ruleset == tenriff::app::kCanonicalReplayRulesetId;
+        for (const int format : {0, 1, 2, tenriff::gameplay::kReplayFormatVersion}) {
+            ReplayFile replay;
+            replay.ruleset_id = std::string(ruleset);
+            replay.replay_format_version = format;
+            const tenriff::config::JudgeConfig base;
+            const auto judge = tenriff::app::replay_judge_config_for_playback(replay, base, 0);
+            CHECK(judge.pg_ms == doctest::Approx(8.0));
+            CHECK(judge.gr_ms == doctest::Approx(65.0 * 8.0 / 21.0));
+            CHECK(judge.bd_ms == doctest::Approx(80.0));
+            CHECK(judge.indirect_miss_ms == doctest::Approx(340.0));
+            CHECK_FALSE(tenriff::app::replay_uses_legacy_hold_release(replay));
 
-        replay.mods = {"judge_easy"};
-        const auto easy = tenriff::app::replay_judge_config_for_playback(replay, base, 0);
-        CHECK(easy.pg_ms == doctest::Approx(8.0 * 1.35));
-        CHECK(easy.gr_ms == doctest::Approx(65.0 * 8.0 / 21.0 * 1.35));
-        CHECK(easy.hold_grace_ms == doctest::Approx(80.0 * 1.35));
-        CHECK(easy.indirect_miss_ms == doctest::Approx(340.0));
-        CHECK_FALSE(tenriff::app::replay_uses_legacy_hold_release(replay));
+            replay.mods = {"judge_easy"};
+            const auto easy = tenriff::app::replay_judge_config_for_playback(replay, base, 0);
+            CHECK(easy.pg_ms == doctest::Approx(8.0 * 1.35));
+            CHECK(easy.gr_ms == doctest::Approx(65.0 * 8.0 / 21.0 * 1.35));
+            CHECK(easy.bd_ms == doctest::Approx(r4 ? 210.0 : 108.0));
+            CHECK(easy.hold_grace_ms == doctest::Approx(80.0 * 1.35));
+            CHECK(easy.indirect_miss_ms == doctest::Approx(340.0));
+            CHECK_FALSE(tenriff::app::replay_uses_legacy_hold_release(replay));
 
-        if (format < tenriff::gameplay::kReplayFormatVersion) {
-            const auto verified = tenriff::app::verify_replay_against_chart(
-                replay, {}, tenriff::app::ChartFormat::Bms, 120.0);
-            CHECK(verified.status == tenriff::app::ReplayVerificationStatus::LegacyUnverified);
+            replay.mods = {"judge_hard"};
+            const auto hard = tenriff::app::replay_judge_config_for_playback(replay, base, 0);
+            CHECK(hard.pg_ms == doctest::Approx(r4 ? 17.5 * 8.0 / 21.0 : 8.0));
+            CHECK(hard.gr_ms == doctest::Approx(65.0 * 8.0 / 21.0 * (r4 ? 18.0 / 21.0 : 1.0)));
+            CHECK(hard.gd_ms == doctest::Approx(115.0 * 8.0 / 21.0 * (r4 ? 18.0 / 21.0 : 1.0)));
+            CHECK(hard.bd_ms == doctest::Approx(r4 ? 225.0 : 80.0));
+            CHECK(hard.indirect_miss_ms == doctest::Approx(340.0));
+            CHECK_FALSE(tenriff::app::replay_uses_legacy_hold_release(replay));
+
+            tenriff::gameplay::GameplayChart hold_chart;
+            hold_chart.lane_count = 1;
+            hold_chart.duration_samples = 144000;
+            hold_chart.notes = {{1, 48000, 96000, false}};
+            tenriff::gameplay::GameplayConfig hold_config;
+            hold_config.sample_rate = 48000;
+            hold_config.practice_no_fail_enabled = true;
+            hold_config.judge = hard;
+            hold_config.legacy_hold_release = tenriff::app::replay_uses_legacy_hold_release(replay);
+            tenriff::gameplay::GameplayEngine hold_engine(hold_chart, hold_config);
+            (void)hold_engine.handle_input(1, InputState::Pressed, 48000);
+            (void)hold_engine.handle_input(1, InputState::Released, 72000);
+            (void)hold_engine.handle_input(1, InputState::Pressed, 72480);
+            hold_engine.advance(100800);
+            CHECK(hold_engine.stats().counts.pg == 1);
+            CHECK(hold_engine.stats().counts.bd == 1);
+
+            if (format < tenriff::gameplay::kReplayFormatVersion) {
+                const auto verified = tenriff::app::verify_replay_against_chart(
+                    replay, {}, tenriff::app::ChartFormat::Bms, 120.0);
+                CHECK(verified.status == tenriff::app::ReplayVerificationStatus::LegacyUnverified);
+            }
+        }
+    }
+}
+
+TEST_CASE("R1 R2 and R3 judge modifier windows remain frozen across BMS ranks") {
+    for (const auto ruleset : {tenriff::app::kLegacyReplayRulesetId,
+                               tenriff::app::kPreviousReplayRulesetId,
+                               tenriff::app::kRuleset3ReplayRulesetId}) {
+        const bool r1 = ruleset == tenriff::app::kLegacyReplayRulesetId;
+        const bool r3 = ruleset == tenriff::app::kRuleset3ReplayRulesetId;
+        for (int rank = 0; rank <= 3; ++rank) {
+            const double rank_scale = r3 ? std::array<double, 4>{8.0, 15.0, 18.0, 21.0}[rank] / 21.0 : 1.0;
+            for (const std::string mod : {"", "judge_easy", "judge_hard"}) {
+                ReplayFile replay;
+                replay.ruleset_id = std::string(ruleset);
+                if (!mod.empty()) replay.mods = {mod};
+                const double easy_scale = mod == "judge_easy" ? (r1 ? 1.25 : 1.35) : 1.0;
+                const double bad = mod == "judge_hard" ? (r1 ? 340.0 : std::min(210.0 * rank_scale, 180.0))
+                                                           : 210.0 * rank_scale * easy_scale;
+                const auto judge = tenriff::app::replay_judge_config_for_playback(
+                    replay, tenriff::config::JudgeConfig{}, rank);
+                CHECK(judge.pg_ms == doctest::Approx((r3 ? 21.0 : 20.0) * rank_scale * easy_scale));
+                CHECK(judge.gr_ms == doctest::Approx(65.0 * rank_scale * easy_scale));
+                CHECK(judge.gd_ms == doctest::Approx(115.0 * rank_scale * easy_scale));
+                CHECK(judge.bd_ms == doctest::Approx(bad));
+                CHECK(judge.indirect_miss_ms == doctest::Approx(r1 ? bad : 340.0));
+                CHECK(tenriff::app::replay_uses_legacy_hold_release(replay) == !r3);
+            }
+        }
+    }
+}
+
+TEST_CASE("R4 replay verification respects both sides of every judge modifier boundary") {
+    constexpr int rate = 48000;
+    for (int rank = 0; rank <= 3; ++rank) {
+        const double rank_scale = std::array<double, 4>{8.0, 15.0, 18.0, 21.0}[rank] / 21.0;
+        for (const bool hard : {false, true}) {
+            const std::array<double, 4> windows = hard
+                ? std::array<double, 4>{17.5 * rank_scale, 65.0 * 18.0 / 21.0 * rank_scale,
+                                       115.0 * 18.0 / 21.0 * rank_scale, 225.0}
+                : std::array<double, 4>{21.0 * 1.35 * rank_scale, 65.0 * 1.35 * rank_scale,
+                                       115.0 * 1.35 * rank_scale, 210.0};
+            for (std::size_t boundary = 0; boundary < windows.size(); ++boundary) {
+                for (int outside : {0, 1}) for (int sign : {-1, 1}) {
+                    // A late BAD+1 is a missed note. An early BAD+1 can also
+                    // create an empty POOR, tested separately in the session path.
+                    if (boundary == 3 && outside && sign < 0) continue;
+                    tenriff::gameplay::GameplayChart chart;
+                    chart.lane_count = 1;
+                    chart.bms_rank = rank;
+                    chart.duration_samples = rate * 3;
+                    chart.notes = {{1, rate, std::nullopt}};
+                    ReplayFile replay;
+                    replay.chart_sha256 = std::string(64, 'd');
+                    replay.ruleset_id = std::string(tenriff::app::kCanonicalReplayRulesetId);
+                    replay.sample_rate = replay.trace.sample_rate = rate;
+                    replay.rate = replay.trace.rate = 1.0;
+                    replay.mode.key_mode = "auto";
+                    replay.mode.random = "off";
+                    replay.mode.gauge = "normal";
+                    replay.mods = {hard ? "judge_hard" : "judge_easy"};
+                    replay.score_multiplier = tenriff::app::final_score_multiplier(replay.mods, 1.0);
+                    replay.trace.lane_count = 1;
+                    replay.trace.duration_samples = rate * 6;
+                    const int64_t delta = sign * (static_cast<int64_t>(std::llround(windows[boundary] * 48.0)) + outside);
+                    replay.trace.events = {{1, InputState::Pressed, rate * 4 + delta},
+                                          {1, InputState::Released, rate * 4 + delta + 1}};
+                    const auto verified = tenriff::app::verify_replay_against_chart(
+                        replay, chart, tenriff::app::ChartFormat::Bms, 120.0);
+                    REQUIRE(verified.verified());
+                    const auto& counts = verified.stats.counts;
+                    const std::array<int, 5> actual{counts.pg, counts.gr, counts.gd, counts.bd, counts.pr};
+                    const auto expected = boundary == 3 && outside ? (hard ? 4 : 3) : boundary + outside;
+                    for (std::size_t index = 0; index < actual.size(); ++index)
+                        CHECK(actual[index] == (index == expected ? 1 : 0));
+                    CHECK(verified.stats.delta_samples == (boundary == 3 && outside ? 0 : 1));
+                }
+            }
         }
     }
 }
@@ -559,6 +675,7 @@ TEST_CASE("BMS rank replay verification retains old rulesets and applies the new
     chart.notes.push_back(tenriff::gameplay::NoteEvent{1, 8'000});
     for (const auto ruleset : {tenriff::app::kLegacyReplayRulesetId,
                               tenriff::app::kPreviousReplayRulesetId,
+                              tenriff::app::kRuleset3ReplayRulesetId,
                               tenriff::app::kCanonicalReplayRulesetId}) {
         ReplayFile replay;
         replay.chart_format = "bms";
@@ -574,7 +691,8 @@ TEST_CASE("BMS rank replay verification retains old rulesets and applies the new
         replay.trace.lane_count = 1;
         replay.trace.duration_samples = 48'000;
         replay.trace.events = {{1, InputState::Pressed, 32'096}, {1, InputState::Released, 32'097}};
-        const bool current = ruleset == tenriff::app::kCanonicalReplayRulesetId;
+        const bool current = ruleset == tenriff::app::kCanonicalReplayRulesetId ||
+                             ruleset == tenriff::app::kRuleset3ReplayRulesetId;
         const auto playback = tenriff::app::replay_judge_config_for_playback(
             replay, tenriff::config::JudgeConfig{}, chart.bms_rank);
         CHECK(playback.pg_ms == doctest::Approx(current ? 8 : 20));
@@ -598,6 +716,7 @@ TEST_CASE("LN regrab replay verification preserves legacy scores without undoing
     chart.notes.push_back(tenriff::gameplay::NoteEvent{1, 8'000, 16'000, false});
     for (const auto ruleset : {tenriff::app::kLegacyReplayRulesetId,
                               tenriff::app::kPreviousReplayRulesetId,
+                              tenriff::app::kRuleset3ReplayRulesetId,
                               tenriff::app::kCanonicalReplayRulesetId}) {
         ReplayFile replay;
         replay.chart_sha256 = std::string(64, 'b');
@@ -614,7 +733,8 @@ TEST_CASE("LN regrab replay verification preserves legacy scores without undoing
         const auto verified = tenriff::app::verify_replay_against_chart(
             replay, chart, tenriff::app::ChartFormat::Bms, 120);
         REQUIRE(verified.verified());
-        const bool current = ruleset == tenriff::app::kCanonicalReplayRulesetId;
+        const bool current = ruleset == tenriff::app::kCanonicalReplayRulesetId ||
+                             ruleset == tenriff::app::kRuleset3ReplayRulesetId;
         CHECK(verified.stats.counts.pg == (current ? 1 : 2));
         CHECK(verified.stats.counts.bd == (current ? 1 : 0));
         replay.stats = verified.stats;

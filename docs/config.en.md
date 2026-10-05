@@ -89,13 +89,13 @@ See [ASIO setup](asio-audio.md). ASIO holds the selected sample rate fixed and r
 - `pg`, `gr`, `gd`, `bd` (double, ms)
 - default `pg / gr / gd` values are `21ms / 65ms / 115ms`
 - default `bd` is `210ms`
-- `Judge Easy` scales the base timing windows by `1.35x`: `pg/gr/gd/bd=28.35/87.75/155.25/283.5ms`. `hold_grace`/`hold_break` scale as well; `mask` stays unchanged (these example values assume BMS RANK EASY)
-- `Judge Hard` leaves PG/GR/GD and `hold_grace`/`hold_break` unchanged and caps `bd` at `180ms`. A smaller custom BAD window is preserved
+- `Judge Easy` scales RANK-adjusted PG/GR/GD and hold tolerances by `1.35x`. EASY PG/GR/GD=`28.35/87.75/155.25ms`; BAD is fixed at `210ms` for every RANK; mask is unchanged
+- `Judge Hard` uses EASY PG/GR/GD=`17.5/55.714286/98.571429ms`: multiply PG by `17.5/21` and GR/GD by `18/21` after RANK. BAD is fixed at `225ms` for every RANK; hold tolerances are unchanged
 - `indirect_miss` (double, ms)
   - current profiles save and normalize this value to `340ms`, independently of the BAD hit window
   - default Normal/Easy/Hard automatically miss an unplayed note once it is more than `340ms` late. Normal/Easy record BAD; Hard records a combo-breaking indirect `POOR` / OD8 `MISS`
   - a late press outside BAD but before automatic timeout misses the expired note, then checks the next note; it cannot score a BAD hit outside the hit window
-- New plays record `tenriff-native-score-v2-ruleset-3`. Playback, ghosts and verification of ruleset-1/2 restore PG20ms, ignore RANK and retain the previous LN release behavior. Ruleset-1 also retains Easy 1.25x, Hard BAD340ms and automatic miss=BAD. Custom timing remains unofficial.
+- New plays record `tenriff-native-score-v2-ruleset-4`. R3 retains its previous Easy/Hard windows and RANK/LN release behavior. R1/R2 retain PG20ms, no RANK and older LN releases; R1 also keeps Easy1.25x/Hard BAD340ms/automatic miss=BAD. Custom timing remains unofficial.
 - `hold_grace` (double, ms; default `80ms`)
   - retained for configuration compatibility and as the lower bound of `hold_break`; not the current native tail PG/GR boundary
 - `hold_break` (double, ms; default `200ms`)

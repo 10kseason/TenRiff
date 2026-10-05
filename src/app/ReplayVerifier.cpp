@@ -120,14 +120,16 @@ bool is_canonical_score_ruleset(const config::JudgeConfig& judge,
 }
 
 bool is_supported_canonical_replay_ruleset(std::string_view ruleset_id) {
-    return ruleset_id == kCanonicalReplayRulesetId || ruleset_id == kPreviousReplayRulesetId ||
+    return ruleset_id == kCanonicalReplayRulesetId || ruleset_id == kRuleset3ReplayRulesetId ||
+           ruleset_id == kPreviousReplayRulesetId ||
            ruleset_id == kLegacyReplayRulesetId;
 }
 
 bool replay_uses_legacy_hold_release(const gameplay::ReplayFile& replay) {
     // A current run can lack a chart hash and therefore export older evidence
     // metadata. Its explicit scoring ruleset still defines playback behavior.
-    if (replay.ruleset_id == kCanonicalReplayRulesetId) return false;
+    if (replay.ruleset_id == kCanonicalReplayRulesetId || replay.ruleset_id == kRuleset3ReplayRulesetId)
+        return false;
     return replay.ruleset_id == kLegacyReplayRulesetId || replay.ruleset_id == kPreviousReplayRulesetId ||
            replay.replay_format_version < gameplay::kReplayFormatVersion;
 }
@@ -137,8 +139,10 @@ config::JudgeConfig replay_judge_config_for_playback(
     const auto mods = normalize_mode_mod_tokens(replay.mods);
     const bool easy = std::find(mods.begin(), mods.end(), "judge_easy") != mods.end();
     const bool hard = std::find(mods.begin(), mods.end(), "judge_hard") != mods.end();
+    const bool ranked = replay.ruleset_id == kCanonicalReplayRulesetId ||
+                        replay.ruleset_id == kRuleset3ReplayRulesetId;
     const bool legacy = replay.ruleset_id == kLegacyReplayRulesetId ||
-                        (replay.ruleset_id != kCanonicalReplayRulesetId &&
+                        (!ranked &&
                          replay.replay_format_version < gameplay::kReplayFormatVersion);
     auto judge = base;
     if (replay_uses_legacy_hold_release(replay)) {
@@ -148,7 +152,12 @@ config::JudgeConfig replay_judge_config_for_playback(
     } else if (bms_rank.has_value()) {
         judge = judge_timing_for_bms_rank(judge, *bms_rank);
     }
-    return judge_timing_for_policy(judge, easy, hard, legacy);
+    // Evidence format and timing policy are independent. Explicit R3/R4 runs
+    // can lack verification metadata and still need their own exact mod windows.
+    const auto version = legacy ? JudgeTimingVersion::Ruleset1 :
+        (replay.ruleset_id == kRuleset3ReplayRulesetId || replay.ruleset_id == kPreviousReplayRulesetId)
+            ? JudgeTimingVersion::Ruleset2And3 : JudgeTimingVersion::Current;
+    return judge_timing_for_policy(judge, easy, hard, version);
 }
 
 std::string replay_ruleset_id_for_runtime(const config::JudgeConfig& judge,

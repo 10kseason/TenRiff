@@ -89,13 +89,13 @@ ASIO 설정은 [장치 설정 안내](asio-audio.md)를 참고하세요. 선택 
 - `pg`, `gr`, `gd`, `bd` (double, ms)
 - 기본 `pg / gr / gd`는 각각 `21ms / 65ms / 115ms`
 - 기본 `bd`는 `210ms`
-- `Judge Easy`는 기본 판정창을 `1.35x`로 넓힘: `pg/gr/gd/bd=28.35/87.75/155.25/283.5ms`. `hold_grace`·`hold_break`도 같은 배율이며 `mask`는 유지 (예시 수치는 BMS RANK EASY 기준)
-- `Judge Hard`는 PG/GR/GD와 `hold_grace`·`hold_break`를 유지하고 `bd` 상한을 `180ms`로 제한함. 사용자 지정 BAD가 더 작으면 넓히지 않음
+- `Judge Easy`는 RANK 적용 후 PG/GR/GD와 홀드 허용창을 `1.35x`로 넓힘. EASY 기준 PG/GR/GD=`28.35/87.75/155.25ms`; BAD는 모든 RANK에서 `210ms` 고정이며 `mask` 유지
+- `Judge Hard`는 EASY 기준 PG/GR/GD=`17.5/55.714286/98.571429ms`. PG에는 `17.5/21`, GR/GD에는 `18/21`을 곱하여 RANK 비율을 유지하고 BAD는 모든 RANK에서 `225ms` 고정. 홀드 허용창 유지
 - `indirect_miss` (double, ms)
   - 현재 프로필에서는 `340ms`로 저장·정규화하며, BAD 판정창과 별도로 무입력 자동 미스 확정 시점을 정함
   - 기본 Normal/Easy/Hard 모두 노트 시각에서 `340ms`를 초과하면 자동 미스. Normal/Easy는 BAD, Hard는 콤보를 끊는 간접 `POOR`/OD8 `MISS`로 기록
   - BAD창 밖이지만 자동 미스 전인 늦은 입력은 BAD 적중으로 인정하지 않고 이전 노트를 미스 처리한 뒤 다음 노트를 검사함
-- 새 플레이는 `tenriff-native-score-v2-ruleset-3`를 기록합니다. 기존 `ruleset-1/2` 리플레이·고스트·검증은 PG20ms, RANK 미적용, 이전 롱노트 해제 정책을 복원합니다. ruleset-1은 Easy 1.25x/Hard BAD340ms/자동 미스=BAD도 유지합니다. 임의 커스텀 판정은 정식 판정으로 인정하지 않습니다.
+- 새 플레이는 `tenriff-native-score-v2-ruleset-4`를 기록합니다. R3는 이전 Easy/Hard 창과 RANK·LN 해제 규칙을 보존합니다. R1/R2는 PG20ms·RANK 미적용·이전 LN 해제, R1은 Easy1.25x/Hard BAD340ms/자동 미스=BAD를 유지합니다. 커스텀 판정은 비공식입니다.
 - `hold_grace` (double, ms; 기본 `80ms`)
   - 설정 호환용 값이며 현재 native 꼬리 PG/GR 경계로 사용하지 않음; `hold_break`의 하한으로 사용
 - `hold_break` (double, ms; 기본 `200ms`)

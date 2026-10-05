@@ -89,13 +89,13 @@ profile が存在しない場合は初回起動時に自動生成されます。
 - `pg`, `gr`, `gd`, `bd` (double, ms)
 - 既定 `pg / gr / gd` は `21ms / 65ms / 115ms`
 - 既定 `bd` は `210ms`
-- `Judge Easy` は基本判定幅を `1.35x` に拡大: `pg/gr/gd/bd=28.35/87.75/155.25/283.5ms`。`hold_grace`・`hold_break`も同倍率、`mask` は変更しない（例示の数値はBMS RANK EASYの場合）
-- `Judge Hard` は PG/GR/GD と `hold_grace`・`hold_break`を維持し、`bd` の上限を `180ms` に制限する。より小さいカスタムBAD幅は広げない
+- `Judge Easy` はRANK適用後のPG/GR/GDとホールド許容幅を `1.35x` に拡大。EASYのPG/GR/GD=`28.35/87.75/155.25ms`。BADは全RANKで `210ms` 固定、maskは維持
+- `Judge Hard` はEASYのPG/GR/GD=`17.5/55.714286/98.571429ms`。RANK適用後にPGへ `17.5/21`、GR/GDへ `18/21` を掛ける。BADは全RANKで `225ms` 固定、ホールド許容幅は維持
 - `indirect_miss` (double, ms)
   - 現在のプロファイルでは `340ms` に保存・正規化し、BADの入力判定幅から独立した自動ミスの期限として使用する
   - 標準のNormal/Easy/Hardは未入力ノートが `340ms` を超えると自動ミス。Normal/EasyはBAD、Hardはコンボを切る間接 `POOR` / OD8 `MISS` を記録する
   - BAD範囲外から自動ミス期限までの遅い入力はBADヒットにせず、前のノートをミスにして次のノートを調べる
-- 新しいプレイは `tenriff-native-score-v2-ruleset-3` を記録します。旧ruleset-1/2の再生・ゴースト・検証はPG20ms、RANK無効、以前のLN解放動作を復元します。ruleset-1はEasy1.25x、Hard BAD340ms、自動ミス=BADも維持します。カスタム判定は公式扱いにしません。
+- 新しいプレイは `tenriff-native-score-v2-ruleset-4`。R3は以前のEasy/Hard幅とRANK・LN解放規則を維持。R1/R2はPG20ms・RANK無効・旧LN解放、R1はEasy1.25x/Hard BAD340ms/自動ミス=BADも維持。カスタム判定は非公式。
 - `hold_grace` (double, ms; 既定 `80ms`)
   - 設定互換性と `hold_break` の下限のために保持。現在のnative終端PG/GR境界ではない
 - `hold_break` (double, ms; 既定 `200ms`)
