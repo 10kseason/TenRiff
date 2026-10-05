@@ -1532,6 +1532,32 @@
         if (!use_imported_metrics) {
             draw_key_labels(field_layout);
         }
+        // Queue in note-array order. Every procedural primitive below flushes
+        // first, preserving translucent LN body/tail/head overlap across lanes.
+        auto flush_note_sprites = [&]() {
+            if (gpu_sprites_active && !gpu_sprites.flush(ctx)) gpu_sprite_frame_failure = E_FAIL;
+        };
+        auto can_batch_note_field = [&](const auto& notes, std::size_t count) {
+            if (!gpu_sprites_active || count < 8) return false;
+            for (std::size_t i = 0; i < std::min(count, notes.size()); ++i) {
+                const auto& note = notes[i];
+                const auto lane = static_cast<std::size_t>(std::clamp(note.lane, 1, lane_count) - 1);
+                // Procedural bodies/mines break batches into tiny runs. Keep
+                // their complete field on the original path, including heads.
+                if (note.mine || (note.hold && (data.gameplay.hold_tail_taper_enabled ||
+                    !d2d_->lane_note_hold_body_bitmaps[lane]))) return false;
+            }
+            return true;
+        };
+        bool batch_note_field = can_batch_note_field(data.gameplay.notes, data.gameplay.note_count);
+        auto draw_note_sprite = [&](ID2D1DeviceContext* target, ID2D1Bitmap* bitmap,
+                                    const D2D1_RECT_F& dest, float opacity,
+                                    const D2D1_RECT_F* source, float rotation) {
+            if (batch_note_field && rotation == 0.0f &&
+                gpu_sprites.enqueue(bitmap, dest, opacity, source)) return;
+            flush_note_sprites();
+            draw_gameplay_sprite(target, bitmap, dest, opacity, source, rotation);
+        };
         for (std::size_t note_index = 0; note_index < data.gameplay.note_count; ++note_index) {
             const auto& note = data.gameplay.notes[note_index];
             if (!should_render_gameplay_note(
@@ -1620,6 +1646,7 @@
                     : tail_rect;
 
             if (note.mine) {
+                flush_note_sprites();
                 const float mine_half_h = std::max(7.0f, head_half_h * 1.15f);
                 const D2D1_RECT_F mine_rect = D2D1::RectF(x0, y - mine_half_h, x1, y + mine_half_h);
                 if (note_fill) {
@@ -1658,10 +1685,10 @@
                     if (note_hold_body_bitmap && !data.gameplay.hold_tail_taper_enabled) {
                         const D2D1_RECT_F* hold_body_source_rect =
                             bitmap_source_rect_or_null(d2d_->lane_note_hold_body_source_rects[lane_index]);
-                        ctx->DrawBitmap(note_hold_body_bitmap, hold_body, hold_body_opacity,
-                                        D2D1_BITMAP_INTERPOLATION_MODE_LINEAR,
-                                        hold_body_source_rect);
+                        draw_note_sprite(ctx, note_hold_body_bitmap, hold_body, hold_body_opacity,
+                                             hold_body_source_rect, 0.0f);
                     } else {
+                        flush_note_sprites();
                         ID2D1Brush* hold_body_brush = configure_gameplay_material_brush(
                             hold_material, note_hold_fill, hold_body, native_hold_body_opacity, true);
                         draw_gameplay_hold_body(ctx,
@@ -1679,7 +1706,7 @@
 
             if (note.hold && data.gameplay.show_hold_tail) {
                 if (note_hold_tail_bitmap) {
-                    draw_gameplay_sprite(ctx,
+                    draw_note_sprite(ctx,
                                          note_hold_tail_bitmap,
                                          tail_visual_rect,
                                          visual_opacity,
@@ -1689,6 +1716,7 @@
                                              gameplay_note_sprite_cache_.note_rotation_count,
                                              lane_index));
                 } else if (note_fill) {
+                    flush_note_sprites();
                     ID2D1Brush* tail_fill = configure_gameplay_material_brush(
                         note_material, note_fill, tail_rect, visual_opacity, false);
                     draw_note_primitive(ctx,
@@ -1704,7 +1732,7 @@
 
             if (render_head) {
                 if (head_bitmap) {
-                    draw_gameplay_sprite(ctx, head_bitmap, head_visual_rect, visual_opacity,
+                    draw_note_sprite(ctx, head_bitmap, head_visual_rect, visual_opacity,
                                          head_source_rect,
                                          gameplay_lane_sprite_rotation(
                                              gameplay_note_sprite_cache_.note_rotations,
@@ -1712,6 +1740,7 @@
                                              lane_index));
                 } else {
                     if (note_fill) {
+                        flush_note_sprites();
                         ID2D1Brush* head_fill = configure_gameplay_material_brush(
                             note_material, note_fill, note_rect, visual_opacity, false);
                         draw_note_primitive(ctx, note_rect, head_fill, note_border,
@@ -1721,6 +1750,7 @@
                 }
             }
         }
+        flush_note_sprites();
         draw_note_fog(field_layout, hit_line_y);
         ctx->PopAxisAlignedClip();
         ctx->SetAntialiasMode(saved_antialias);
@@ -2179,6 +2209,7 @@
             if (!use_imported_metrics) {
                 draw_key_labels(ghost_field_layout);
             }
+            batch_note_field = can_batch_note_field(data.gameplay.ghost_notes, data.gameplay.ghost_note_count);
             for (std::size_t note_index = 0; note_index < data.gameplay.ghost_note_count; ++note_index) {
                 const auto& note = data.gameplay.ghost_notes[note_index];
                 if (!should_render_gameplay_note(
@@ -2268,6 +2299,7 @@
                         : tail_rect;
 
                 if (note.mine) {
+                    flush_note_sprites();
                     const float mine_half_h = std::max(7.0f, head_half_h * 1.15f);
                     const D2D1_RECT_F mine_rect = D2D1::RectF(x0, y - mine_half_h, x1, y + mine_half_h);
                     if (note_fill) {
@@ -2306,10 +2338,10 @@
                         if (note_hold_body_bitmap && !data.gameplay.hold_tail_taper_enabled) {
                             const D2D1_RECT_F* hold_body_source_rect =
                                 bitmap_source_rect_or_null(d2d_->lane_note_hold_body_source_rects[lane_index]);
-                            ctx->DrawBitmap(note_hold_body_bitmap, hold_body, hold_body_opacity,
-                                            D2D1_BITMAP_INTERPOLATION_MODE_LINEAR,
-                                            hold_body_source_rect);
+                            draw_note_sprite(ctx, note_hold_body_bitmap, hold_body, hold_body_opacity,
+                                             hold_body_source_rect, 0.0f);
                         } else {
+                            flush_note_sprites();
                             ID2D1Brush* hold_body_brush = configure_gameplay_material_brush(
                                 hold_material, note_hold_fill, hold_body, native_hold_body_opacity, true);
                             draw_gameplay_hold_body(ctx,
@@ -2327,7 +2359,7 @@
 
                 if (note.hold && data.gameplay.show_hold_tail) {
                     if (note_hold_tail_bitmap) {
-                        draw_gameplay_sprite(ctx,
+                        draw_note_sprite(ctx,
                                              note_hold_tail_bitmap,
                                              tail_visual_rect,
                                              visual_opacity,
@@ -2337,6 +2369,7 @@
                                                  gameplay_note_sprite_cache_.note_rotation_count,
                                                  lane_index));
                     } else if (note_fill) {
+                        flush_note_sprites();
                         ID2D1Brush* tail_fill = configure_gameplay_material_brush(
                             note_material, note_fill, tail_rect, visual_opacity, false);
                         draw_note_primitive(ctx,
@@ -2352,13 +2385,14 @@
 
                 if (render_head) {
                     if (head_bitmap) {
-                        draw_gameplay_sprite(ctx, head_bitmap, head_visual_rect, visual_opacity,
+                        draw_note_sprite(ctx, head_bitmap, head_visual_rect, visual_opacity,
                                              head_source_rect,
                                              gameplay_lane_sprite_rotation(
                                                  gameplay_note_sprite_cache_.note_rotations,
                                                  gameplay_note_sprite_cache_.note_rotation_count,
                                                  lane_index));
                     } else if (note_fill) {
+                        flush_note_sprites();
                         ID2D1Brush* head_fill = configure_gameplay_material_brush(
                             note_material, note_fill, note_rect, visual_opacity, false);
                         draw_note_primitive(ctx, note_rect, head_fill, note_border,
@@ -2367,6 +2401,7 @@
                     }
                 }
             }
+            flush_note_sprites();
             draw_note_fog(ghost_field_layout, ghost_hit_line_y);
             ctx->PopAxisAlignedClip();
             ctx->SetAntialiasMode(ghost_saved_antialias);

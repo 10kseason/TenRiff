@@ -8,6 +8,7 @@
 #include "app/MenuApp.h"
 #include "app/GameSession.h"
 #include "config/KeycodeMap.h"
+#include "timing/HighResClock.h"
 
 namespace tenriff::app {
 
@@ -217,6 +218,102 @@ TEST_CASE("skin fullscreen preview cannot survive a navigation reset") {
 #ifdef _WIN32
 namespace tenriff::app {
 struct MenuAppFeedbackTestAccess {
+    static std::unique_ptr<MenuApp> result_fixture(bool ready = true, bool multiplayer = false) {
+        auto menu = std::make_unique<MenuApp>();
+        menu->config_ = config::ConfigLoader{}.defaults();
+        menu->config_.audio_ui.background_sound_enabled = false;
+        menu->key_enter_ = 13;
+        menu->key_left_ = 37;
+        menu->key_escape_ = 27;
+        menu->key_backspace_ = 8;
+        menu->key_space_ = 32;
+        menu->key_f1_ = 112;
+        menu->has_result_ = true;
+        menu->last_game_was_multiplayer_ = multiplayer;
+        menu->result_presentation_start_ns_ = timing::HighResClock::now_ns();
+        menu->result_presentation_skipped_ = ready;
+        menu->reset_screen(multiplayer ? MenuApp::Screen::Multiplayer : MenuApp::Screen::SongSelect);
+        menu->push_screen(MenuApp::Screen::Result);
+        menu->publish_snapshot();
+        REQUIRE(menu->snapshot_.screen == MenuApp::Screen::Result);
+        REQUIRE(menu->snapshot_.render.kind == render::MenuScreenKind::ResultScreen);
+        // The result renderer registers SettingsRow/Activate for buttons 0, 1,
+        // and 2 directly. They are not generic settings rows.
+        REQUIRE(menu->snapshot_.render.generic.rows.empty());
+        REQUIRE(menu->result_presentation_ready() == ready);
+        return menu;
+    }
+
+    static void click_result(MenuApp& menu, int index,
+                             render::MenuHitPart part = render::MenuHitPart::Activate) {
+        render::MenuClickEvent event{};
+        event.kind = render::MenuHitTargetKind::SettingsRow;
+        event.index = index;
+        event.part = part;
+        menu.handle_menu_click(event);
+    }
+
+    static void check_result_continue() {
+        for (const bool multiplayer : {false, true}) {
+            auto menu = result_fixture(true, multiplayer);
+            click_result(*menu, 0);
+            const auto destination = multiplayer ? MenuApp::Screen::Multiplayer : MenuApp::Screen::SongSelect;
+            CHECK(menu->current_screen() == destination);
+            CHECK(menu->snapshot_.screen == destination);
+            CHECK_FALSE(menu->last_game_was_multiplayer_);
+            CHECK_FALSE(menu->multiplayer_waiting_for_result_exit_);
+        }
+    }
+
+    static void check_result_pending() {
+        auto menu = result_fixture(false);
+        for (const int index : {0, 1, 2}) {
+            // A queued click must not bypass the presentation gate even though
+            // the current pending frame exposes no result button hit regions.
+            REQUIRE_FALSE(menu->result_presentation_ready());
+            click_result(*menu, index);
+            CHECK(menu->current_screen() == MenuApp::Screen::Result);
+            CHECK_FALSE(menu->result_presentation_skipped_);
+        }
+    }
+
+    static void check_result_unavailable_replay() {
+        auto menu = result_fixture();
+        REQUIRE(menu->last_replay_path_.empty());
+        REQUIRE_FALSE(menu->snapshot_.render.result.replay_available);
+        // The disabled Replay button has no current hit region. A stale queued
+        // Replay click must still remain on Result, not become Continue.
+        click_result(*menu, 1);
+        CHECK(menu->current_screen() == MenuApp::Screen::Result);
+        CHECK(menu->snapshot_.screen == MenuApp::Screen::Result);
+    }
+
+    static void check_result_retry_without_chart() {
+        auto menu = result_fixture();
+        REQUIRE(menu->last_chart_path_.empty());
+        REQUIRE(menu->visible_song_count() == 0);
+        click_result(*menu, 2);
+        CHECK(menu->current_screen() == MenuApp::Screen::Result);
+        CHECK_FALSE(menu->audio_thread_.is_running());
+        CHECK_FALSE(menu->input_thread_.is_running());
+        CHECK_FALSE(menu->render_thread_.is_running());
+    }
+
+    static void check_result_invalid_pointer_actions() {
+        auto menu = result_fixture();
+        for (const int index : {-1, 3}) {
+            click_result(*menu, index);
+            CHECK(menu->current_screen() == MenuApp::Screen::Result);
+        }
+        for (const auto part : {render::MenuHitPart::SelectOnly,
+                               render::MenuHitPart::Increment,
+                               render::MenuHitPart::Decrement,
+                               render::MenuHitPart::SetValue}) {
+            click_result(*menu, 0, part);
+            CHECK(menu->current_screen() == MenuApp::Screen::Result);
+        }
+    }
+
     static void check_gameplay_chat_latency_routing() {
         auto menu = std::make_unique<MenuApp>();
         auto session = std::make_unique<GameSession>();
@@ -327,5 +424,20 @@ TEST_CASE("feedback settings pointer row bodies only select and disabled rows ca
 }
 TEST_CASE("gameplay chat callback keeps F8 latency and Shift F8 chat ownership separate") {
     tenriff::app::MenuAppFeedbackTestAccess::check_gameplay_chat_latency_routing();
+}
+TEST_CASE("result pointer Continue activates without generic settings rows and returns to its lobby") {
+    tenriff::app::MenuAppFeedbackTestAccess::check_result_continue();
+}
+TEST_CASE("result pointer actions cannot bypass the pending presentation") {
+    tenriff::app::MenuAppFeedbackTestAccess::check_result_pending();
+}
+TEST_CASE("result pointer unavailable Replay does not become Continue") {
+    tenriff::app::MenuAppFeedbackTestAccess::check_result_unavailable_replay();
+}
+TEST_CASE("result pointer Retry without a chart does not continue or start devices") {
+    tenriff::app::MenuAppFeedbackTestAccess::check_result_retry_without_chart();
+}
+TEST_CASE("result pointer dispatch ignores unknown rows and selection-only events") {
+    tenriff::app::MenuAppFeedbackTestAccess::check_result_invalid_pointer_actions();
 }
 #endif

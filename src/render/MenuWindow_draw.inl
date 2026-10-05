@@ -1,4 +1,6 @@
 void MenuWindow::draw(const MenuRenderData& data) {
+    benchmark_gpu_sprite_stats_ = {};
+    benchmark_gpu_sprite_submissions_ = 0;
     static int draw_count = 0;
     if (draw_count++ < 5) {
         std::cerr << "[MenuWindow::draw] called, d2d_=" << (d2d_ ? "yes" : "no")
@@ -382,6 +384,20 @@ void MenuWindow::draw(const MenuRenderData& data) {
         }
         hit_regions_.push_back(HitRegion{kind, index, part, rect.left, rect.top, rect.right, rect.bottom});
     };
+
+    auto& gpu_sprites = d2d_->gameplay_sprite_batch;
+    // VSync measurements did not consistently preserve Present cadence and p99.
+    // Keep its original drawing path until that pacing is independently proven.
+    bool gpu_sprites_active = gameplay_sprite_batch_enabled_ && !config_.vsync &&
+        data.kind == MenuScreenKind::GameplayHud &&
+        !data.generic.skin_preview.visible;
+    if (gpu_sprites_active && !d2d_->gameplay_sprite_batch_attempted) {
+        d2d_->gameplay_sprite_batch_attempted = true;
+        d2d_->gameplay_sprite_batch_initialized = gpu_sprites.initialize(ctx);
+    }
+    gpu_sprites_active = gpu_sprites_active && d2d_->gameplay_sprite_batch_initialized;
+    if (gpu_sprites_active) gpu_sprites.begin_frame();
+    HRESULT gpu_sprite_frame_failure = S_OK;
 
     // One contour policy also covers prebuilt layouts, ellipsis, overlays and
     // animated logos. Dark button labels get a light contour; light labels get
@@ -1263,7 +1279,14 @@ void MenuWindow::draw(const MenuRenderData& data) {
     draw_account_overlay();
     draw_url_warning_overlay();
 
-    const HRESULT hr = ctx->EndDraw();
+    if (gpu_sprites_active) {
+        const auto stats = gpu_sprites.statistics();
+        benchmark_gpu_sprite_stats_ = {stats.queued, stats.draw_calls, stats.fallback_sprites,
+            stats.rejected, static_cast<uint64_t>(stats.cache_bytes)};
+        benchmark_gpu_sprite_submissions_ = stats.submissions;
+    }
+    const HRESULT final_draw_hr = ctx->EndDraw();
+    const HRESULT hr = FAILED(gpu_sprite_frame_failure) ? gpu_sprite_frame_failure : final_draw_hr;
     if (FAILED(hr)) {
         std::cerr << "[MenuWindow::draw] EndDraw failed hr=0x" << std::hex
                   << static_cast<unsigned long>(hr) << std::dec << std::endl;
@@ -1279,6 +1302,8 @@ void MenuWindow::draw(const MenuRenderData& data) {
         screenshot_requested_.exchange(false, std::memory_order_acq_rel)) {
         (void)save_screenshot_to_png();
     }
+
+    if (FAILED(gpu_sprite_frame_failure)) return;
 
     UINT present_flags = 0;
     if (app::should_allow_tearing_present(
