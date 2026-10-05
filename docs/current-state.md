@@ -1,5 +1,7 @@
 # TenRiff Current State
 
+**2026-10-05 · TenRiff 1.8.42:** 고밀도 구간에서 프레임 예산을 조금 넘었을 때 추가로 쉬던 렌더 제한기를 수정하고, 성능 오버레이 OFF 상태의 통계 수집·정렬을 생략합니다. 노트 화질·표시량과 R1~R4 판정·리플레이 규칙은 유지합니다. [1.8.42 release](release-1.8.42-gate.md).
+
 **2026-10-05 · TenRiff 1.8.41:** Judge Hard의 EASY 기준 PG/GR/GD를 ±17.5/55.714286/98.571429ms로 조정합니다. BAD는 모든 BMS RANK에서 Hard ±225ms·Easy ±210ms로 고정합니다. 새 기록은 R4이며 R1/R2/R3 리플레이와 기존 웹 기록을 보존합니다. [1.8.41 release](release-1.8.41-gate.md).
 
 **2026-10-05 · TenRiff 1.8.4:** 일시정지 마우스 조작과 설정 클릭을 개선하고, 실시간 페이스메이커·연습용 오토스크래치·전체 설정 이전을 추가합니다. 고스트의 플레이어 필드 크기, LN 불투명도와 HUD 검색·프레임 대기열 제한을 수정합니다. [1.8.4 release](release-1.8.4-gate.md).
@@ -13,7 +15,7 @@
 - 1.7.10: ALL SONG의 삭제된 캐시 항목 건너뛰기, 캐시 통합 진행률과 완료 상태 전달을 보강했습니다. [검증 범위 및 미재현 증상](release-1.7.10-gate.md).
 - 1.7.8: 새 기본 메뉴 에셋·애니메이션, 4~16키 Luma Keys 디지털 건반, 일본어 UI와 웹/오프라인 스킨 에디터를 제공합니다. 메뉴는 `native`, 인게임은 `gameplay.native`에서 도형·색·위치·글꼴·모션을 편집합니다. [검증 범위](release-1.7.8-gate.md).
 
-현재 프로젝트 버전은 **1.8.41**입니다. Audio의 곡 종료 방식에서 **끝까지 듣기**(기본) 또는 **후주 스킵**을 선택하며, 정상 완료한 결과는 추가 입력 없이 저장·제출합니다. 새 플레이는 BMS RANK를 반영하는 R4와 웹 제출용 판정 프로파일을 사용하고 기존 R1/R2/R3 기록은 유지합니다. WASAPI가 기본 출력입니다. 변경 내용과 진행 중인 릴리스 검증 범위는 [1.8.41 릴리스 안내](release-1.8.41-gate.md)를 참고하세요.
+현재 프로젝트 버전은 **1.8.42**입니다. Audio의 곡 종료 방식에서 **끝까지 듣기**(기본) 또는 **후주 스킵**을 선택하며, 정상 완료한 결과는 추가 입력 없이 저장·제출합니다. 새 플레이는 BMS RANK를 반영하는 R4와 웹 제출용 판정 프로파일을 사용하고 기존 R1/R2/R3 기록은 유지합니다. WASAPI가 기본 출력입니다. 변경 내용과 진행 중인 릴리스 검증 범위는 [1.8.42 릴리스 안내](release-1.8.42-gate.md)를 참고하세요.
 
 [로컬 1.7.1 r2 보고서](local-1.7.1-r2.ko.md)의 749/739 검사 횟수는 이전 빌드의 기록입니다. 현재 릴리스 검사 횟수로 재사용하지 않습니다. 기능별 안내는 [곡 소스와 난이도표](library-management.md), [대표 BPM](reference-bpm.md), [스킨 프리셋](skin-presets.md), [ASIO](asio-audio.md)를 참고하세요.
 
@@ -24,7 +26,7 @@
 - BMS landmines (`D1-D9`, `E1-E9`) are playable, including `#WAV00`, base-36 damage tokens, `ZZ` instant fail, exact press/release boundary behavior, and lane-mod/key-converter remapping.
 - Results and local records expose fixed native score separately from detail score, and categorical native accuracy separately from continuous timing-based detailed accuracy.
 - 새 replay evidence v3는 차트 SHA-256, canonical ruleset, result-to-replay SHA-256을 저장하고 입력 trace를 headless 엔진으로 재실행합니다. 공식 로컬 best는 재계산된 verified 결과만 사용하며 legacy/custom/assist 기록은 히스토리에 `unverified`로 남습니다.
-- 현재 프로젝트 버전은 `1.8.41`
+- 현재 프로젝트 버전은 `1.8.42`
 - 1.7.9 UI 개선: 프로필/첫 실행의 언어·3단계 글자 크기, 사진 미리보기/시작 메뉴 사진, ALL SONG 통합 소스, 선곡 경계와 디지털 탭, 정적인 TI와 홀로그램 TENRIFF. [사용 및 구현 안내](menu-profile-library-polish.ko.md).
 - 1.7.1은 최대 8인 HUD·결과, 동점 순위·점수 대기 상태, P-GREAT 전용 연출, 독립 판정·콤보 위치, 옵션 10개, 오디오 노멀라이즈와 선곡 난이도표 카드를 제공합니다. [변경 설명](gameplay-polish-followup.md), [검증 범위](release-1.7.1-gate.md) 참고.
 - 기본 선곡·싱글 결과 UI는 차분한 패널과 단색 주 동작 버튼을 사용하며, 결과는 큰 점수·등급·정확도 중심으로 표시한다. 사용자 TenRiff 스킨 경로를 유지하며, 1.7.1 대전 결과는 참가자 전원 순위를 표시한다. 구현/검증 안내는 `docs/menu-visual-polish.md`와 `docs/gameplay-polish-followup.md` 참고.
@@ -132,7 +134,7 @@
   - 별도 `변환 노트 추가` 옵션은 제거했으며, Krrcream은 원본 노트만 재배치하고 nK2는 키 수 확장 시 변환된 목표 레이아웃에 안전한 보조 노트를 직접 생성한다.
   - nK2 프리셋은 기본 `Native (12%)`, `Transform (35%)`, `Remaster (65%)` 중 선택한다. `Remaster`는 예산을 올리면서도 앵커를 잠가 원곡 배치를 유지하고 롱노트 구간을 같은 길이의 롱노트로 채운다. 세 값은 상한이며 실제 추가량은 원본 밀도와 안전창에 따라 낮아진다. Krrcream 선택 시 해당 행은 잠기며, standalone converter GUI의 Krrcream Max/Min/Speed/Seed도 수정할 수 없다.
   - NK3는 번들된 P64를 host beam32에 항상 결합한다. 10K가 아닌 원본을 10K로 변환할 때만 일반화 패턴 MLP를 추가하고, 10→10과 나머지 모든 경로는 P64만 사용한다. 기본 `AUTO` 백엔드는 ncnn Vulkan으로 P64와 MLP를 AMD/NVIDIA GPU에서 실행하고, 선택형 OpenVINO 호환 경로는 폴백으로 유지한다. `TENRIFF_NK3_BACKEND`와 `TENRIFF_NK3_VULKAN_DEVICE`로 강제 선택할 수 있다.
-  - 1.8.41 공식 빌드/Windows ZIP은 standalone BMS key converter CLI/GUI를 만들거나 포함하지 않으며 top-level CMake 옵션도 기본 `OFF`; 소스는 개발 회귀용으로만 유지
+  - 1.8.42 공식 빌드/Windows ZIP은 standalone BMS key converter CLI/GUI를 만들거나 포함하지 않으며 top-level CMake 옵션도 기본 `OFF`; 소스는 개발 회귀용으로만 유지
   - `mode.key_mode=none`은 차트의 원래 키 수와 기본 패턴 레이아웃을 그대로 유지
 - Native difficulty:
   - BMS LV/CR 계산에서 롱노트 Head/Tail의 miss-ms만 0.5배로 평가해 `300ms`를 `150ms`처럼 완화하며, 실제 gameplay 판정창은 그대로 유지
@@ -260,7 +262,7 @@
 
 ## Runtime / Packaging Rules
 - 새 사용자 프로필은 자동 생성
-- 현재 P2P 배포 대상은 `TenRiff 1.8.41`
+- 현재 P2P 배포 대상은 `TenRiff 1.8.42`
 - 배포 패키지에는 `Songs`를 넣지 않음
 - 배포 패키지는 `Main Menu / Options / Song Selecte / Multiplayer Lobby / Clear / Failed` 이름의 `Mainmusic/` 화면 슬롯을 포함하며, 각 `이름.mp3`와 번호가 붙은 `이름 2.mp3`~`이름 64.mp3`를 자동 수집해 화면 재진입마다 순환
 - 배포 업데이트에는 built artifacts와 필요한 런타임 자산만 포함

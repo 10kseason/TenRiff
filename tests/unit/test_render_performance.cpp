@@ -13,6 +13,10 @@
 #include "render/OnnxBackgroundUpscaler.h"
 #include "render/MenuWindow.h"
 #include "render/SkinGameplayPreview.h"
+#include "timing/HighResClock.h"
+#include <cstdlib>
+#include <iostream>
+#include <numeric>
 
 #ifdef _WIN32
 namespace tenriff::render {
@@ -169,10 +173,64 @@ TEST_CASE("performance tracker smooths isolated graph spikes without changing ra
     CHECK(snapshot.frame_times_ms[5] == doctest::Approx(100.0f));
 }
 
-TEST_CASE("render pacing advances to the next aligned deadline after overruns") {
+TEST_CASE("render pacing does not add an idle frame after a budget overrun") {
     CHECK(tenriff::render::advance_frame_deadline_ns(1'000, 100, 1'050) == 1'100);
-    CHECK(tenriff::render::advance_frame_deadline_ns(1'000, 100, 1'299) == 1'300);
-    CHECK(tenriff::render::advance_frame_deadline_ns(1'000, 100, 1'300) == 1'400);
+    CHECK(tenriff::render::advance_frame_deadline_ns(1'000, 100, 1'100) == 1'100);
+    CHECK(tenriff::render::advance_frame_deadline_ns(1'000, 100, 1'101) == 1'101);
+    CHECK(tenriff::render::advance_frame_deadline_ns(1'000, 100, 1'299) == 1'299);
+    CHECK(tenriff::render::advance_frame_deadline_ns(1'000, 100, 1'300) == 1'300);
+}
+
+TEST_CASE("render pacing keeps a dense burst proportional to work at common fps caps") {
+    for (const int fps : {60, 144, 240, 300, 600, 1050, 1500}) {
+        const int64_t interval = 1'000'000'000LL / fps;
+        int64_t start = 1'000'000'000;
+        for (int frame = 0; frame < 120; ++frame) {
+            const int64_t work = interval + (frame % 2 == 0 ? -interval / 20 : interval / 20);
+            const int64_t end = start + work;
+            const auto next = tenriff::render::advance_frame_deadline_ns(start, interval, end);
+            CHECK(next - start >= interval);
+            CHECK(next - start <= interval + interval / 20);
+            CHECK(next >= end);
+            start = next;
+        }
+        // Recover from a stall without accumulated deadline debt or a catch-up burst.
+        CHECK(tenriff::render::advance_frame_deadline_ns(start, interval, start + 20 * interval) == start + 20 * interval);
+    }
+}
+
+TEST_CASE("render thread optional dense pacing benchmark") {
+    if (!std::getenv("TENRIFF_BENCH_RENDER_PACING")) return;
+    using tenriff::timing::HighResClock;
+    for (const int work_us : {700, 980, 1100}) {
+        tenriff::render::RenderThread thread;
+        std::vector<int64_t> starts;
+        starts.reserve(1100);
+        std::atomic<bool> done{false};
+        REQUIRE(thread.initialize({false, 1050}, [&] {
+            if (done.load()) return;
+            const auto start = HighResClock::now_ns();
+            starts.push_back(start);
+            while (HighResClock::now_ns() < start + work_us * 1000LL)
+                std::atomic_signal_fence(std::memory_order_seq_cst);
+            if (starts.size() == 1060) done.store(true);
+        }));
+        REQUIRE(thread.start());
+        const auto timeout = std::chrono::steady_clock::now() + std::chrono::seconds(8);
+        while (!done.load() && std::chrono::steady_clock::now() < timeout)
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        thread.stop();
+        REQUIRE(done.load());
+        std::vector<double> intervals;
+        for (std::size_t i = 60; i < starts.size(); ++i)
+            intervals.push_back((starts[i] - starts[i - 1]) / 1e6);
+        std::sort(intervals.begin(), intervals.end());
+        const auto q = [&](double p) { return intervals[static_cast<std::size_t>(std::ceil(p * intervals.size())) - 1]; };
+        std::cout << "[render-pacing-bench] fps=1050 work_us=" << work_us
+                  << " samples=" << intervals.size() << " p50_ms=" << q(.50)
+                  << " p95_ms=" << q(.95) << " p99_ms=" << q(.99)
+                  << " max_ms=" << intervals.back() << '\n';
+    }
 }
 
 TEST_CASE("render wait policy shrinks the busy tail for high off-vsync fps") {
@@ -672,6 +730,25 @@ TEST_CASE("render pacing treats zero fps as unlimited only without vsync") {
     CHECK(tenriff::render::should_use_unlimited_render_pacing(false, 0));
     CHECK_FALSE(tenriff::render::should_use_unlimited_render_pacing(true, 0));
     CHECK_FALSE(tenriff::render::should_use_unlimited_render_pacing(false, 300));
+}
+
+TEST_CASE("disabled render metrics drop history and re-enable without an idle-time spike") {
+    tenriff::render::RenderThread thread;
+    thread.record_presented_frame_ns(100'000'000);
+    thread.record_presented_frame_ns(104'000'000);
+    REQUIRE(thread.performance_snapshot().valid);
+    // This is the production path with the overlay hidden, including an
+    // occluded frame (no successful Present timestamp).
+    thread.record_presented_frame_ns(0, false);
+    for (int i = 1; i <= 2000; ++i)
+        thread.record_presented_frame_ns(104'000'000 + i * 1'000'000LL, false);
+    CHECK_FALSE(thread.performance_snapshot().valid);
+    CHECK(thread.performance_snapshot().sample_count == 0u);
+    thread.record_presented_frame_ns(3'000'000'000);
+    CHECK_FALSE(thread.performance_snapshot().valid);
+    thread.record_presented_frame_ns(3'004'000'000);
+    CHECK(thread.performance_snapshot().sample_count == 1u);
+    CHECK(thread.performance_snapshot().average_frame_ms == doctest::Approx(4.0));
 }
 
 TEST_CASE("key beam decay follows elapsed time at both 60 and 144 frames per second") {

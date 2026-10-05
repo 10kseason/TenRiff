@@ -1,5 +1,7 @@
 # TenRiff 文档地图
 
+**2026-10-05 · TenRiff 1.8.42:** 修复高密度帧稍微超出渲染预算时的额外等待，并在性能叠加层关闭时跳过统计收集与排序。保留音符画质、显示数量以及R1–R4判定和回放规则。 [1.8.42 release](release-1.8.42-gate.md).
+
 **2026-10-05 · TenRiff 1.8.41:** 调整Judge Hard为EASY基准PG/GR/GD ±17.5/55.714286/98.571429ms。所有BMS RANK的BAD固定为Hard ±225ms、Easy ±210ms。新记录使用R4，保留R1/R2/R3回放及现有网页记录。 [1.8.41 release](release-1.8.41-gate.md).
 
 **2026-10-05 · TenRiff 1.8.4:** 改善暂停鼠标操作和设置点击，新增实时Pacemaker、练习用Auto Scratch及完整设置迁移。修复Ghost Battle玩家区域尺寸、LN不透明度、HUD扫描和帧队列限制。 [1.8.4 release](release-1.8.4-gate.md).

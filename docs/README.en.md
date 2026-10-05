@@ -1,5 +1,7 @@
 # TenRiff Docs Map
 
+**2026-10-05 · TenRiff 1.8.42:** Fixes extra render waiting when a dense frame slightly exceeds its budget, and skips performance-history collection/sorting while the overlay is off. Note visuals/count and R1–R4 judgement/replay rules are preserved. [1.8.42 release](release-1.8.42-gate.md).
+
 **2026-10-05 · TenRiff 1.8.41:** Retunes Judge Hard to EASY-baseline PG/GR/GD ±17.5/55.714286/98.571429ms. BAD is fixed across every BMS RANK at Hard ±225ms / Easy ±210ms. New records use R4; R1/R2/R3 replays and existing web records are preserved. [1.8.41 release](release-1.8.41-gate.md).
 
 **2026-10-05 · TenRiff 1.8.4:** Improves pause mouse controls and settings clicks; adds live pacemaker feedback, practice Auto Scratch and portable full-profile settings. Fixes player field sizing in ghost battle, LN opacity, HUD scanning and the frame-queue limit. [1.8.4 release](release-1.8.4-gate.md).

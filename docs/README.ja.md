@@ -1,5 +1,7 @@
 # TenRiff Docs Map
 
+**2026-10-05 · TenRiff 1.8.42:** 高密度フレームが描画予算をわずかに超えた際の余分な待機を修正し、性能オーバーレイOFF時の統計収集・ソートを省略します。ノートの画質・表示数とR1～R4の判定・リプレイルールは維持します。 [1.8.42 release](release-1.8.42-gate.md).
+
 **2026-10-05 · TenRiff 1.8.41:** Judge HardをEASY基準PG/GR/GD ±17.5/55.714286/98.571429msに調整します。BADは全BMS RANKでHard ±225ms・Easy ±210msに固定。新しい記録はR4を使い、R1/R2/R3リプレイと既存のウェブ記録を維持します。 [1.8.41 release](release-1.8.41-gate.md).
 
 **2026-10-05 · TenRiff 1.8.4:** ポーズのマウス操作と設定クリックを改善し、リアルタイムPacemaker、練習用Auto Scratch、設定の一括移行を追加。ゴースト対戦のプレイヤー幅、LN不透明度、HUD走査とフレームキュー制限を修正します。 [1.8.4 release](release-1.8.4-gate.md).

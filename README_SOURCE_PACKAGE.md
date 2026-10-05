@@ -1,18 +1,18 @@
-TenRiff source package notes (`1.8.41`)
+TenRiff source package notes (`1.8.42`)
 
-- This is the 1.8.41 source line. New records use R4: retuned Hard PG/GR/GD and fixed Hard225ms/Easy210ms BAD across every RANK. Canonical R1/R2/R3 replays retain their original rules. The 1.8.4 feedback, profile-transfer and ghost-response improvements are included. See `docs/release-1.8.41-gate.md` for release validation and its physical-input limitations.
-- This folder is the public 1.8.41 source distribution. It is suitable for inspection and a standalone Windows build.
+- This is the 1.8.42 source line. It fixes extra waiting after over-budget render frames and disables hidden performance-history work. Judgement rules remain unchanged from 1.8.41. New records use R4: retuned Hard PG/GR/GD and fixed Hard225ms/Easy210ms BAD across every RANK. Canonical R1/R2/R3 replays retain their original rules. The 1.8.4 feedback, profile-transfer and ghost-response improvements are included. See `docs/release-1.8.42-gate.md` for release validation and its physical-input limitations.
+- This folder is the public 1.8.42 source distribution. It is suitable for inspection and a standalone Windows build.
 - It intentionally excludes local build trees, packaged binaries, caches, user profiles, logs, and private working notes.
 - Workspace-local `AGENTS.md` files and private agent notes are not part of the public source bundle. Skin authoring guidance is kept in the regular public skin documentation.
-- `SOURCE_PACKAGE_SCOPE.txt` records the files included in the 1.8.41 public source bundle and its privacy boundary.
-- The current source line is `1.8.41`; it keeps P64 and the host beam safety solver authoritative and enables the generalized NK3 pattern MLP only for non-10K sources converted to 10K.
+- `SOURCE_PACKAGE_SCOPE.txt` records the files included in the 1.8.42 public source bundle and its privacy boundary.
+- The current source line is `1.8.42`; it keeps P64 and the host beam safety solver authoritative and enables the generalized NK3 pattern MLP only for non-10K sources converted to 10K.
 - It supports BMS-family charts, 4K through 10K, 12K, 14K and 16K key modes, and native/LR2/TenRiff skins, keeps MPG/MPEG video BGA decoding with an FFmpeg fallback, and exposes an External ONNX Upscaler that remains off until the user enables it and acknowledges the high-spec warning.
 - The repository license is MIT. Keep the top-level `LICENSE` file with any redistributed source bundle.
 - Native ASIO output requires a separately installed 64-bit Windows driver. The source contains the project's own narrow driver-interface declarations and backend; no Steinberg SDK or driver installer is bundled. WASAPI remains the default.
 - The source bundle includes the code/docs/dependencies needed for a standalone Windows configure/build, but it does not ship the local `10k-calc/` reference checkout or `external/llama.cpp/`.
 - The generic integration and compatibility smoke/quantization tools live under `tools/onnx_upscaler/`, but no BGA upscaler model, checkpoint, training data, or model-specific verification metadata is distributed. Bundled ONNX files are limited to the deterministic NK3 P64 graph and the 2K-through-18K generalized pattern MLP inference exports. BGA upscaler users must still supply a rights-cleared model matching the documented 960x540 RGB residual x2 contract.
 - NK3 defaults to the bundled ncnn 20260526 shared runtime and converted models. Windows release packages run P64 and the optional MLP through Vulkan on AMD/NVIDIA GPUs and ship `ncnn.dll` plus its BSD license. `TENRIFF_NK3_BACKEND=AUTO|VULKAN|OPENVINO` controls routing, `TENRIFF_NK3_VULKAN_DEVICE=<index>` selects among Vulkan devices, and a source-provided OpenVINO package remains an optional compatibility fallback.
-- Official 1.8.41 builds and Windows archives do not build or ship the standalone BMS key-converter CLI/GUI. Its source remains development-only and the top-level CMake option defaults to `TENRIFF_BUILD_STANDALONE_BMS_KEY_CONVERTER=OFF`.
+- Official 1.8.42 builds and Windows archives do not build or ship the standalone BMS key-converter CLI/GUI. Its source remains development-only and the top-level CMake option defaults to `TENRIFF_BUILD_STANDALONE_BMS_KEY_CONVERTER=OFF`.
 - The staged docs/readmes now track Korean, English, Simplified Chinese, and Japanese entrypoints.
 - Typical Windows build flow inside the extracted source-package root:
 
@@ -29,4 +29,4 @@ cmake --build build --config Release --target bms_parser_tests
 - `launch_win.bat` can create missing `profiles/`, `songs/`, and `logs/` folders on first launch.
 - When refreshing this public source bundle for a release, verify at least the standalone configure/build/test path above from the staged source-package root.
 
-The 1.8.41 public release ships the runnable client ZIP, the source ZIP, and SHA-256 checksums. The source bundle contains client code and verifier/build material only; it does not contain ranking-server code, deployment secrets, accounts, profiles, logs, replay/result exports, or upload keys.
+The 1.8.42 public release ships the runnable client ZIP, the source ZIP, and SHA-256 checksums. The source bundle contains client code and verifier/build material only; it does not contain ranking-server code, deployment secrets, accounts, profiles, logs, replay/result exports, or upload keys.

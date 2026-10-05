@@ -365,6 +365,9 @@ int main(int argc, char** argv) {
     int players = 0;
     int preview_fps = 144;
     int benchmark_frames = 0;
+    int dense_notes = 0;
+    bool dense_holds = false;
+    bool tapered_holds = false;
     int benchmark_successful_presents = 0;
     int benchmark_fullscreen_presents = 0;
     std::string benchmark_json;
@@ -441,6 +444,12 @@ int main(int argc, char** argv) {
         else if (arg == "--no-vsync") config.vsync = false;
         else if (arg == "--exclusive-fullscreen") config.display_mode = "fullscreen";
         else if (arg == "--benchmark-frames" && i + 1 < argc) benchmark_frames = std::clamp(std::stoi(argv[++i]), 1, 100000);
+        else if (arg == "--dense-notes" && i + 1 < argc) {
+            dense_notes = std::clamp(std::stoi(argv[++i]), 1, static_cast<int>(tenriff::kGameplayHudMaxNotes));
+            gameplay = true;
+        }
+        else if (arg == "--dense-holds") dense_holds = true;
+        else if (arg == "--tapered-holds") tapered_holds = true;
         else if (arg == "--benchmark-json" && i + 1 < argc) benchmark_json = argv[++i];
         else if (arg == "--hold-opacity" && i + 1 < argc) fixture_hold_opacity = std::clamp(std::stod(argv[++i]), 0.0, 1.0);
         else if (arg == "--disabled-setting" && i + 1 < argc) disabled_setting = std::stoi(argv[++i]);
@@ -1176,6 +1185,23 @@ int main(int argc, char** argv) {
                     hud.notes[hud.note_count++] = note;
                 }
             }
+            if (dense_notes > 0) {
+                // Deterministic density fixture; --fixture-time freezes identical
+                // note geometry for before/after rendering comparisons.
+                hud.note_count = static_cast<std::size_t>(dense_notes);
+                hud.hold_tail_taper_enabled = tapered_holds;
+                for (int index = 0; index < dense_notes; ++index) {
+                    auto& note = hud.notes[static_cast<std::size_t>(index)];
+                    note = {};
+                    note.lane = index % preview_keys + 1;
+                    const double offset = 0.04 + std::fmod(index * 0.61803398875 + seconds * 0.5, 1.0) * 1.1;
+                    note.start_sample = hud.current_sample + static_cast<int64_t>(offset * 48000);
+                    note.visual_position = note.start_sample / 48000.0;
+                    note.hold = dense_holds;
+                    note.tail_sample = note.start_sample + (dense_holds ? 12000 : 0);
+                    note.tail_visual_position = note.tail_sample / 48000.0;
+                }
+            }
             if (ghost) {
                 // Identical note/key activity makes visual parity measurable;
                 // independent score labels still exercise the split info cards.
@@ -1285,6 +1311,8 @@ int main(int argc, char** argv) {
             {"vsync", JsonValue(config.vsync)}, {"ghost", JsonValue(ghost)},
             {"keys", JsonValue(static_cast<double>(preview_keys))}, {"note_width", JsonValue(preview_note_width)},
             {"fixture_time", JsonValue(fixture_seconds)},
+            {"dense_notes", JsonValue(static_cast<double>(dense_notes))},
+            {"dense_holds", JsonValue(dense_holds)}, {"tapered_holds", JsonValue(tapered_holds)},
             {"player_note_count", JsonValue(static_cast<double>(data.gameplay.note_count))},
             {"ghost_note_count", JsonValue(static_cast<double>(data.gameplay.ghost_note_count))},
             {"wall_ms", JsonValue((tenriff::timing::HighResClock::now_ns() - benchmark_wall_start) / 1e6)},
