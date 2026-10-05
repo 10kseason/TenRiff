@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.8.42] - 2026-10-05
+
+- Rebase capped render pacing on each actual frame start and omit extra waiting after an over-budget frame, preventing dense rendering from dropping into an artificial half-rate cadence.
+- Stop collecting and sorting frame performance history while the performance overlay is hidden; restarting the overlay begins a fresh measurement window.
+- Add FHD dense tap/LN/ghost rendering fixtures and optional render-thread pacing measurements. See [performance scope and verification](docs/dense-note-performance.ko.md).
+
 ## [1.8.41] - 2026-10-05
 
 - Set Hard PG to 17.5ms and GR/GD to 55.714286/98.571429ms at BMS EASY, retaining proportional RANK scaling for these three windows. Hard BAD is fixed at 225ms and Easy BAD at 210ms for every RANK. Normal timing, hold tolerances and the automatic miss deadline are unchanged.

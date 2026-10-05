@@ -77,7 +77,7 @@ public:
     void stop();
     void shutdown();
     void update_config(const RenderConfig& config);
-    void record_presented_frame_ns(int64_t present_completion_ns);
+    void record_presented_frame_ns(int64_t present_completion_ns, bool metrics_enabled = true);
     void reset_performance_tracking();
     [[nodiscard]] RenderPerformanceSnapshot performance_snapshot() const;
 
@@ -97,6 +97,7 @@ private:
     mutable std::mutex config_mutex_{};
     mutable std::mutex performance_mutex_{};
     PerformanceTracker performance_tracker_{};
+    bool performance_tracking_active_ = false;
 };
 
 }  // namespace tenriff::render

@@ -1960,7 +1960,10 @@ void MenuApp::render_tick() {
     render_cache_.performance.fps_0_01_low = perf_snapshot.fps_0_01_low;
     render_cache_.performance.frame_times_ms = perf_snapshot.frame_times_ms;
     menu_window_.render(render_cache_);
-    render_thread_.record_presented_frame_ns(menu_window_.last_present_completion_ns());
+    // The hidden overlay must not collect/sort a rolling ten-second history on
+    // the rendering thread. Disabling also resets its clock before re-enabling.
+    render_thread_.record_presented_frame_ns(menu_window_.last_present_completion_ns(),
+                                            show_performance_overlay);
 }
 
 void MenuApp::render_snapshot(const MenuSnapshot& snapshot) {

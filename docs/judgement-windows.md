@@ -1,6 +1,6 @@
 # TenRiff 판정 범위
 
-기준: **1.8.41 / 2026-10-05 / `tenriff-native-score-v2-ruleset-4`**. 이 문서는 현재 기본 설정의 native 판정 범위입니다. 결과 화면의 별도 osu!mania OD8 환산 판정과 구분합니다.
+기준: **1.8.42 / 2026-10-05 / `tenriff-native-score-v2-ruleset-4`**. 이 문서는 현재 기본 설정의 native 판정 범위입니다. 결과 화면의 별도 osu!mania OD8 환산 판정과 구분합니다.
 
 ## BMS RANK별 기본 범위
 

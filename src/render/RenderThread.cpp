@@ -359,11 +359,15 @@ void RenderThread::update_config(const RenderConfig& config) {
     config_ = config;
 }
 
-void RenderThread::record_presented_frame_ns(int64_t present_completion_ns) {
-    if (present_completion_ns <= 0) {
+void RenderThread::record_presented_frame_ns(int64_t present_completion_ns, bool metrics_enabled) {
+    std::lock_guard<std::mutex> lock(performance_mutex_);
+    if (!metrics_enabled) {
+        if (performance_tracking_active_) performance_tracker_.reset();
+        performance_tracking_active_ = false;
         return;
     }
-    std::lock_guard<std::mutex> lock(performance_mutex_);
+    if (present_completion_ns <= 0) return;
+    performance_tracking_active_ = true;
     performance_tracker_.record_frame_start_ns(present_completion_ns);
 }
 
@@ -375,6 +379,7 @@ RenderPerformanceSnapshot RenderThread::performance_snapshot() const {
 void RenderThread::reset_performance_tracking() {
     std::lock_guard<std::mutex> lock(performance_mutex_);
     performance_tracker_.reset();
+    performance_tracking_active_ = false;
 }
 
 RenderConfig RenderThread::current_config() const {
@@ -426,7 +431,7 @@ void RenderThread::thread_main() {
             next_tick_ns = after_callback_ns;
             oversleep_estimate_ns = 0;
         } else {
-            next_tick_ns = advance_frame_deadline_ns(next_tick_ns, frame_interval_ns, after_callback_ns);
+            next_tick_ns = advance_frame_deadline_ns(now_ns, frame_interval_ns, after_callback_ns);
         }
     }
 
