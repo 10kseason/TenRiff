@@ -153,7 +153,7 @@ bool fetch_json_impl(const std::string& base_url,
     while (!path.empty() && path.back() == L'/') path.pop_back();
     path += utf8_to_wide(endpoint);
 
-    InternetHandle session(WinHttpOpen(L"TenRiff/1.8.4 records",
+    InternetHandle session(WinHttpOpen(L"TenRiff/1.8.41 records",
                                        WINHTTP_ACCESS_TYPE_AUTOMATIC_PROXY,
                                        WINHTTP_NO_PROXY_NAME,
                                        WINHTTP_NO_PROXY_BYPASS, 0));
@@ -399,7 +399,8 @@ bool parse_sites_record_boards(std::string_view json, std::string_view title,
         board.rate_milli = static_cast<int>(rate);
         board.id = lower_ascii(board.id);
         board.chart_sha256 = lower_ascii(board.chart_sha256);
-        const std::string ruleset_label = board.ruleset_id == "tenriff-native-score-v2-ruleset-3" ? "RULESET 3" :
+        const std::string ruleset_label = board.ruleset_id == "tenriff-native-score-v2-ruleset-4" ? "RULESET 4" :
+                                          board.ruleset_id == "tenriff-native-score-v2-ruleset-3" ? "RULESET 3" :
                                           board.ruleset_id == "tenriff-native-score-v2-ruleset-2" ? "RULESET 2" :
             board.ruleset_id == "tenriff-native-score-v2-ruleset-1" ? "RULESET 1" : board.ruleset_id;
         board.conditions_label = board.key_mode + " / " + std::to_string(rate / 1000) + "." +

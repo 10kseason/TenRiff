@@ -89,13 +89,13 @@
 - `pg`, `gr`, `gd`, `bd` (double, ms)
 - 默认 `pg / gr / gd` 分别为 `21ms / 65ms / 115ms`
 - 默认 `bd` 为 `210ms`
-- `Judge Easy` 将基础判定窗扩大为 `1.35x`：`pg/gr/gd/bd=28.35/87.75/155.25/283.5ms`。`hold_grace`/`hold_break` 也使用同一倍率，`mask` 保持不变（示例数值以BMS RANK EASY为准）
-- `Judge Hard` 保持PG/GR/GD和 `hold_grace`/`hold_break`，将 `bd` 上限限制为 `180ms`。更小的自定义BAD窗口不会被扩大
+- `Judge Easy` 将RANK之后的PG/GR/GD和长按容差扩大为 `1.35x`。EASY的PG/GR/GD=`28.35/87.75/155.25ms`；BAD在所有RANK固定为 `210ms`，mask不变
+- `Judge Hard` 的EASY基准PG/GR/GD=`17.5/55.714286/98.571429ms`。RANK之后PG乘 `17.5/21`，GR/GD乘 `18/21`；BAD在所有RANK固定为 `225ms`，长按容差不变
 - `indirect_miss` (double, ms)
   - 当前配置将此值保存并归一化为 `340ms`，自动漏键判定时限独立于BAD命中窗口
   - 默认Normal/Easy/Hard在未输入音符超过 `340ms` 后自动判漏键；Normal/Easy记BAD，Hard记断连的间接 `POOR` / OD8 `MISS`
   - BAD窗口外、自动判漏键前的迟到输入不会命中BAD，而是先将过期音符记为漏键，再检查下一音符
-- 新游玩记录 `tenriff-native-score-v2-ruleset-3`。旧ruleset-1/2的回放、幽灵与验证恢复PG20ms、不应用RANK并保留旧长按松键行为。ruleset-1仍使用Easy1.25x、Hard BAD340ms和自动漏键=BAD。自定义判定不作为官方规则。
+- 新游玩记录 `tenriff-native-score-v2-ruleset-4`。R3保留旧Easy/Hard范围与RANK、LN松键规则。R1/R2保留PG20ms、不应用RANK和旧LN松键；R1还保留Easy1.25x/Hard BAD340ms/自动漏键=BAD。自定义判定仍非官方。
 - `hold_grace` (double, ms；默认 `80ms`)
   - 为配置兼容性及 `hold_break` 下限保留；不是当前native尾端PG/GR的判定边界
 - `hold_break` (double, ms；默认 `200ms`)

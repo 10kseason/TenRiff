@@ -529,7 +529,7 @@ TEST_CASE("mode manager scales judge windows without touching the mask window") 
         1.0);
     CHECK(easy.judge_window_scale == doctest::Approx(1.35));
     CHECK(easy.judge.pg_ms == doctest::Approx(13.5));
-    CHECK(easy.judge.bd_ms == doctest::Approx(54.0));
+    CHECK(easy.judge.bd_ms == doctest::Approx(210.0));
     CHECK(easy.judge.indirect_miss_ms == doctest::Approx(340.0));
     CHECK_FALSE(easy.judge.indirect_miss_enabled);
     CHECK(easy.judge.hold_grace_ms == doctest::Approx(27.0));
@@ -545,8 +545,8 @@ TEST_CASE("mode manager scales judge windows without touching the mask window") 
         make_judge_config(),
         1.0);
     CHECK(hard.judge_window_scale == doctest::Approx(1.0));
-    CHECK(hard.judge.pg_ms == doctest::Approx(10.0));
-    CHECK(hard.judge.bd_ms == doctest::Approx(40.0));
+    CHECK(hard.judge.pg_ms == doctest::Approx(10.0 * 17.5 / 21.0));
+    CHECK(hard.judge.bd_ms == doctest::Approx(225.0));
     CHECK(hard.judge.indirect_miss_ms == doctest::Approx(340.0));
     CHECK(hard.judge.indirect_miss_enabled);
     CHECK(hard.judge.hold_grace_ms == doctest::Approx(20.0));
@@ -576,14 +576,14 @@ TEST_CASE("BAD hit windows are separate from the common 340ms automatic miss dea
     CHECK(easy.judge.pg_ms == doctest::Approx(28.35));
     CHECK(easy.judge.gr_ms == doctest::Approx(87.75));
     CHECK(easy.judge.gd_ms == doctest::Approx(155.25));
-    CHECK(easy.judge.bd_ms == doctest::Approx(283.5));
-    CHECK(hard.judge.bd_ms == doctest::Approx(180.0));
+    CHECK(easy.judge.bd_ms == doctest::Approx(210.0));
+    CHECK(hard.judge.bd_ms == doctest::Approx(225.0));
     CHECK(normal.judge.indirect_miss_ms == doctest::Approx(340.0));
     CHECK(easy.judge.indirect_miss_ms == doctest::Approx(340.0));
     CHECK(hard.judge.indirect_miss_ms == doctest::Approx(340.0));
-    CHECK(hard.judge.pg_ms == doctest::Approx(base_judge.pg_ms));
-    CHECK(hard.judge.gr_ms == doctest::Approx(base_judge.gr_ms));
-    CHECK(hard.judge.gd_ms == doctest::Approx(base_judge.gd_ms));
+    CHECK(hard.judge.pg_ms == doctest::Approx(17.5));
+    CHECK(hard.judge.gr_ms == doctest::Approx(55.7142857142857));
+    CHECK(hard.judge.gd_ms == doctest::Approx(98.5714285714286));
     CHECK(hard.judge.hold_grace_ms == doctest::Approx(base_judge.hold_grace_ms));
     CHECK(hard.judge.hold_break_ms == doctest::Approx(base_judge.hold_break_ms));
 }
@@ -612,8 +612,8 @@ TEST_CASE("mode manager safely combines key mode, super random, full long notes,
     CHECK(contains_token(result.active_mods, "full_long_notes"));
     CHECK(contains_token(result.active_mods, "judge_hard"));
     CHECK(result.judge_window_scale == doctest::Approx(1.0));
-    CHECK(result.judge.pg_ms == doctest::Approx(10.0));
-    CHECK(result.judge.bd_ms == doctest::Approx(40.0));
+    CHECK(result.judge.pg_ms == doctest::Approx(10.0 * 17.5 / 21.0));
+    CHECK(result.judge.bd_ms == doctest::Approx(225.0));
 
     for (const auto& note : result.chart.notes) {
         CHECK(note.lane >= 1);
@@ -1037,4 +1037,52 @@ TEST_CASE("Auto Scratch is a zero multiplier practice mod") {
     CHECK_FALSE(tenriff::app::mode_mod_auto_scratch({"no_ln_release"}));
     CHECK(tenriff::app::final_score_multiplier({"auto_scratch", "judge_hard"}, 2.0) == 0.0);
     CHECK(tenriff::gameplay::scale_native_score(10000, 0.0) == 0);
+}
+
+TEST_CASE("R4 judge mods preserve RANK timing but use absolute Easy and Hard BAD windows") {
+    // Spec examples, ordered VERYHARD/HARD/NORMAL/EASY. These values are
+    // independent of the policy helper so an accidentally rescaled BAD fails.
+    const double normal[][4] = {
+        {8, 24.76190476190476, 43.80952380952381, 80},
+        {15, 46.42857142857143, 82.14285714285714, 150},
+        {18, 55.71428571428572, 98.57142857142857, 180},
+        {21, 65, 115, 210}};
+    const double easy[][4] = {
+        {10.8, 33.42857142857143, 59.14285714285714, 210},
+        {20.25, 62.67857142857143, 110.8928571428571, 210},
+        {24.3, 75.21428571428572, 133.0714285714286, 210},
+        {28.35, 87.75, 155.25, 210}};
+    const double hard[][4] = {
+        {6.666666666666667, 21.22448979591837, 37.55102040816327, 225},
+        {12.5, 39.79591836734694, 70.40816326530613, 225},
+        {15, 47.75510204081633, 84.48979591836735, 225},
+        {17.5, 55.71428571428572, 98.57142857142857, 225}};
+    for (int rank : {-1, 0, 1, 2, 3, 4}) {
+        for (const auto token : {"", "judge_easy", "judge_hard"}) {
+            for (int sample_rate : {44100, 48000, 96000}) {
+                for (double rate : {0.75, 1.0, 1.5}) {
+                    tenriff::gameplay::GameplayChart chart;
+                    chart.lane_count = 4;
+                    chart.bms_rank = rank;
+                    tenriff::config::ModeConfig mode;
+                    if (*token) mode.mods = {token};
+                    const auto managed = tenriff::app::manage_modes(
+                        chart, tenriff::app::ChartFormat::Bms, mode,
+                        tenriff::config::JudgeConfig{}, rate, 180.0, sample_rate);
+                    const int row = rank >= 0 && rank <= 3 ? rank : 3;
+                    const bool is_easy = std::string_view(token) == "judge_easy";
+                    const bool is_hard = std::string_view(token) == "judge_hard";
+                    const auto& expected = is_easy ? easy[row] : is_hard ? hard[row] : normal[row];
+                    CHECK(managed.judge.pg_ms == doctest::Approx(expected[0]));
+                    CHECK(managed.judge.gr_ms == doctest::Approx(expected[1]));
+                    CHECK(managed.judge.gd_ms == doctest::Approx(expected[2]));
+                    CHECK(managed.judge.bd_ms == doctest::Approx(expected[3]));
+                    CHECK(managed.judge.mask_ms == doctest::Approx(30.0));
+                    CHECK(managed.judge.indirect_miss_ms == doctest::Approx(340.0));
+                    CHECK(managed.judge.indirect_miss_enabled == is_hard);
+                    CHECK(managed.judge.hold_break_ms == doctest::Approx(is_easy ? 270.0 : 200.0));
+                }
+            }
+        }
+    }
 }

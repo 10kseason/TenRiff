@@ -1450,7 +1450,7 @@ TEST_CASE("judge easy mod expands charge hold tail judgement during gameplay") {
     CHECK(engine.stats().counts.gr == 0);
 }
 
-TEST_CASE("judge hard mod leaves charge hold tail judgement at the base windows") {
+TEST_CASE("judge hard mod tightens charge hold tail windows without changing hold tolerances") {
     GameplayChart chart;
     chart.lane_count = 1;
     chart.duration_samples = 3000;
@@ -1485,9 +1485,11 @@ TEST_CASE("judge hard mod leaves charge hold tail judgement at the base windows"
     (void)engine.handle_input(1, InputState::Released, 2012);
     engine.advance(2500);
 
-    CHECK(mode_result.judge.pg_ms == doctest::Approx(judge.pg_ms));
-    CHECK(mode_result.judge.gr_ms == doctest::Approx(judge.gr_ms));
-    // Same release as the Judge Easy case: without the widened PGREAT it is a GREAT.
+    CHECK(mode_result.judge.pg_ms == doctest::Approx(judge.pg_ms * 17.5 / 21.0));
+    CHECK(mode_result.judge.gr_ms == doctest::Approx(judge.gr_ms * 18.0 / 21.0));
+    CHECK(mode_result.judge.hold_grace_ms == doctest::Approx(judge.hold_grace_ms));
+    CHECK(mode_result.judge.hold_break_ms == doctest::Approx(judge.hold_break_ms));
+    // The 12 ms release lies between Hard's 8.33 ms PG and 17.14 ms GR.
     CHECK(engine.stats().counts.pg == 1);
     CHECK(engine.stats().counts.gr == 1);
 }
@@ -1643,18 +1645,18 @@ TEST_CASE("hard BAD boundary and the gap before automatic miss do not swallow th
     config.sample_rate = 1000;
     config.judge = managed.judge;
     GameplayEngine boundary(chart, config);
-    CHECK(boundary.handle_input(1, InputState::Pressed, 1180).has_value());
+    CHECK(boundary.handle_input(1, InputState::Pressed, 1225).has_value());
     CHECK(boundary.stats().counts.bd == 1);
     GameplayEngine outside(chart, config);
-    CHECK_FALSE(outside.handle_input(1, InputState::Pressed, 1181).has_value());
+    CHECK_FALSE(outside.handle_input(1, InputState::Pressed, 1226).has_value());
     CHECK(outside.stats().counts.bd == 0);
     CHECK(outside.stats().counts.pr == 1);
 
-    chart.notes.push_back(NoteEvent{1, 1200});
+    chart.notes.push_back(NoteEvent{1, 1250});
     GameplayEngine dense(chart, config);
-    dense.advance(1199);
+    dense.advance(1249);
     CHECK(dense.stats().counts.pr == 0);
-    REQUIRE(dense.handle_input(1, InputState::Pressed, 1200).has_value());
+    REQUIRE(dense.handle_input(1, InputState::Pressed, 1250).has_value());
     CHECK(dense.stats().counts.pg == 1);
     CHECK(dense.stats().counts.pr == 1);
     dense.advance(1600);

@@ -1,6 +1,7 @@
 // UTF-8 Japanese UI catalog. English keys must exactly match localization calls.
 // Product names, key names, units and established rhythm-game labels may stay Latin.
-{"Judge Easy widens timing windows by 35%. Judge Hard caps BAD at 180 ms without changing PG/GR/GD. Unplayed notes time out after 340 ms in every mode.", "Judge Easyは判定幅を35%広げます。Judge HardはPG/GR/GDを変えずBADの上限を180msにします。全モードで未入力ノートは340ms経過後に自動ミスになります。"},
+{"Judge Easy widens PG/GR/GD by 35%. Judge Hard uses EASY PG/GR/GD 17.5/55.714/98.571 ms, scaled by BMS RANK.", "Judge EasyはPG/GR/GDを35%広げます。Judge HardはEASY基準17.5/55.714/98.571msで、BMS RANKの比率を適用します。"},
+{"BAD is fixed across all RANKs: Easy 210 ms / Hard 225 ms. Unplayed notes time out after 340 ms in every mode.", "BADは全RANKでEasy 210ms / Hard 225msに固定します。全モードで未入力ノートは340ms経過後に自動ミスになります。"},
 {"Title Music", "タイトル音楽"},
 {"Default Music", "標準の音楽"},
 {"Random BMS Music", "ランダムBMS音楽"},

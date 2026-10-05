@@ -1,5 +1,7 @@
 # 오디오 원음 경로·롱노트 해제·BMS RANK
 
+> 이 문서는 1.8.3/1.8.4의 R3 도입 기록입니다. 후속 R4의 Judge Easy/Hard 수정은 [최신 판정 범위](judgement-windows.md)를 참고하세요.
+
 ## 오디오
 
 노멀라이즈 OFF에서도 기존 `soft_limit_audio_sample`이 마스터 볼륨 전에 0.92 이상 파형을 압축했습니다.

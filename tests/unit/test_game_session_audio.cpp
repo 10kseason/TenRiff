@@ -1,5 +1,7 @@
 #include "doctest/doctest.h"
 #include "app/GameSession.h"
+#include "app/ModeManager.h"
+#include "app/ReplayVerifier.h"
 #include "app/SitesLeaderboardClient.h"
 #include "../support/MockAsioDriver.h"
 
@@ -29,6 +31,98 @@ struct CompletionTestDirectory {
 // Exercise the production input-to-voice-to-mixer path without starting a device,
 // input thread, decoder, profile or record writer.
 struct GameSessionAudioTestAccess {
+    static void check_r4_player_and_ghost_boundaries() {
+        const auto play = [](int rank, bool hard, int64_t delta, std::string_view ghost_ruleset) {
+            auto session = std::make_unique<GameSession>();
+            session->sample_rate_ = 48000;
+            session->chart_.lane_count = 1;
+            session->chart_.bms_rank = rank;
+            session->chart_.duration_samples = 480000;
+            session->chart_.notes = {{1, 48000, std::nullopt}};
+            session->chart_.notes[0].note_id = 0;
+            config::ModeConfig mode;
+            mode.key_mode = "auto";
+            mode.random = "off";
+            mode.mods = {hard ? "judge_hard" : "judge_easy"};
+            const auto managed = manage_modes(session->chart_, ChartFormat::Bms,
+                mode, config::JudgeConfig{}, 1.0, 120.0, 48000);
+            gameplay::GameplayConfig live;
+            live.sample_rate = 48000;
+            live.practice_no_fail_enabled = true;
+            live.judge = managed.judge;
+            session->engine_ = std::make_unique<gameplay::GameplayEngine>(session->chart_, live);
+            session->ghost_replay_source_.ruleset_id = std::string(ghost_ruleset);
+            // Explicit scoring policy still applies to unverified old-format
+            // evidence: absence of a hash must not switch R3/R4 to R1 windows.
+            session->ghost_replay_source_.replay_format_version = 0;
+            session->ghost_replay_source_.mods = mode.mods;
+            session->ghost_replay_source_.trace.sample_rate = 48000;
+            session->ghost_replay_source_.trace.events = {{1, input::InputState::Pressed, 48000 + delta}};
+            auto ghost = live;
+            ghost.judge = replay_judge_config_for_playback(
+                session->ghost_replay_source_, config::JudgeConfig{}, rank);
+            ghost.legacy_hold_release = replay_uses_legacy_hold_release(session->ghost_replay_source_);
+            session->ghost_engine_ = std::make_unique<gameplay::GameplayEngine>(session->chart_, ghost);
+            session->ghost_replay_enabled_ = true;
+            session->lane_activity_.assign(1, 0); session->lane_pressed_.assign(1, 0);
+            session->ghost_lane_activity_.assign(1, 0); session->ghost_lane_pressed_.assign(1, 0);
+            session->hidden_hit_note_ids_.assign(1, 0);
+            session->ghost_hidden_hit_note_ids_.assign(1, 0);
+            session->synthetic_tones_enabled_ = false;
+            session->audio_timing_diagnostics_logged_ = true;
+            session->config_.audio_ui.mute_when_inactive = false;
+            session->key_to_lane_ = {{32, 1}};
+            session->lane_binding_state_.configure(session->key_to_lane_);
+            input::InputEvent press{};
+            press.keycode = 32; press.state = input::InputState::Pressed;
+            const int64_t sample = 48000 + delta;
+            REQUIRE(session->future_events_.push({press, sample}));
+            float output[2]{};
+            session->audio_callback(output, 1, sample, sample);
+            return session;
+        };
+        for (int rank = 0; rank <= 3; ++rank) {
+            const double rank_scale = std::array<double, 4>{8.0, 15.0, 18.0, 21.0}[rank] / 21.0;
+            for (const bool hard : {false, true}) {
+                const std::array<double, 4> windows = hard
+                    ? std::array<double, 4>{17.5 * rank_scale, 65.0 * 18.0 / 21.0 * rank_scale,
+                                           115.0 * 18.0 / 21.0 * rank_scale, 225.0}
+                    : std::array<double, 4>{21.0 * 1.35 * rank_scale, 65.0 * 1.35 * rank_scale,
+                                           115.0 * 1.35 * rank_scale, 210.0};
+                for (std::size_t boundary = 0; boundary < windows.size(); ++boundary) {
+                    for (const int outside : {0, 1}) for (const int sign : {-1, 1}) {
+                        const int64_t delta = sign * (static_cast<int64_t>(std::llround(windows[boundary] * 48.0)) + outside);
+                        auto session = play(rank, hard, delta, kCanonicalReplayRulesetId);
+                        const auto& player = session->engine_->stats();
+                        const auto& ghost = session->ghost_engine_->stats();
+                        const std::array<int, 5> actual{player.counts.pg, player.counts.gr, player.counts.gd,
+                                                       player.counts.bd, player.counts.pr};
+                        const std::array<int, 5> replayed{ghost.counts.pg, ghost.counts.gr, ghost.counts.gd,
+                                                         ghost.counts.bd, ghost.counts.pr};
+                        CHECK(actual == replayed);
+                        CHECK(player.raw_score == ghost.raw_score);
+                        CHECK(player.delta_samples == ghost.delta_samples);
+                        const bool hit = boundary < 3 || outside == 0;
+                        CHECK(session->hidden_hit_note_ids_[0] == (hit ? 1 : 0));
+                        CHECK(session->ghost_hidden_hit_note_ids_[0] == (hit ? 1 : 0));
+                        if (hit) {
+                            const auto expected = boundary + outside;
+                            for (std::size_t index = 0; index < actual.size(); ++index)
+                                CHECK(actual[index] == (index == expected ? 1 : 0));
+                            CHECK(player.mean_delta_ms == doctest::Approx(static_cast<double>(delta) / 48.0));
+                            CHECK(ghost.mean_delta_ms == doctest::Approx(player.mean_delta_ms));
+                        }
+                    }
+                }
+            }
+        }
+        // A historical R3 ghost at 18ms must stay PG while today's Hard player
+        // gets GR; "same ghost mod" does not mean relabeling its old ruleset.
+        auto mixed = play(3, true, 18 * 48, kRuleset3ReplayRulesetId);
+        CHECK(mixed->engine_->stats().counts.gr == 1);
+        CHECK(mixed->ghost_engine_->stats().counts.pg == 1);
+    }
+
     static void check_long_hold_hud_scan() {
         const bool benchmark = std::getenv("TENRIFF_BENCH_GHOST_HUD") != nullptr;
         const char* requested_notes = std::getenv("TENRIFF_BENCH_GHOST_HUD_NOTES");
@@ -1223,4 +1317,8 @@ TEST_CASE("live pacemaker keeps ordinary completed record and community submissi
 
 TEST_CASE("Auto Scratch exports explicit assisted custom zero scores rejected by community ranking") {
     tenriff::app::GameSessionAudioTestAccess::check_automatic_result(false, false, true, false, false, false, true);
+}
+
+TEST_CASE("R4 live player and ghost callbacks share exact modifier edges while R3 ghosts retain old timing") {
+    tenriff::app::GameSessionAudioTestAccess::check_r4_player_and_ghost_boundaries();
 }

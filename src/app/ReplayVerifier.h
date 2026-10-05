@@ -12,6 +12,8 @@
 namespace tenriff::app {
 
 inline constexpr std::string_view kCanonicalReplayRulesetId =
+    "tenriff-native-score-v2-ruleset-4";
+inline constexpr std::string_view kRuleset3ReplayRulesetId =
     "tenriff-native-score-v2-ruleset-3";
 inline constexpr std::string_view kPreviousReplayRulesetId =
     "tenriff-native-score-v2-ruleset-2";

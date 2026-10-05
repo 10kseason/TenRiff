@@ -1,5 +1,7 @@
 # TenRiff 文档地图
 
+**2026-10-05 · TenRiff 1.8.41:** 调整Judge Hard为EASY基准PG/GR/GD ±17.5/55.714286/98.571429ms。所有BMS RANK的BAD固定为Hard ±225ms、Easy ±210ms。新记录使用R4，保留R1/R2/R3回放及现有网页记录。 [1.8.41 release](release-1.8.41-gate.md).
+
 **2026-10-05 · TenRiff 1.8.4:** 改善暂停鼠标操作和设置点击，新增实时Pacemaker、练习用Auto Scratch及完整设置迁移。修复Ghost Battle玩家区域尺寸、LN不透明度、HUD扫描和帧队列限制。 [1.8.4 release](release-1.8.4-gate.md).
 
 Language: [한국어](README.md) | [English](README.en.md) | [简体中文](README.zh-CN.md) | [日本語](README.ja.md)

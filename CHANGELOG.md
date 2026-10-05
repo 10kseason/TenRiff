@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.8.41] - 2026-10-05
+
+- Set Hard PG to 17.5ms and GR/GD to 55.714286/98.571429ms at BMS EASY, retaining proportional RANK scaling for these three windows. Hard BAD is fixed at 225ms and Easy BAD at 210ms for every RANK. Normal timing, hold tolerances and the automatic miss deadline are unchanged.
+- Record new plays as ruleset-4 while preserving exact R1/R2/R3 replay, ghost and verification timing. See [current judgement windows](docs/judgement-windows.md).
+
 ## [1.8.4] - 2026-10-05
 
 - Fix the failed DXGI frame-queue limit and verify the effective limit at initialization; retire past HUD note heads independently of long-note tails to reduce player/ghost contention with audio and input. See `docs/ghost-latency.ko.md`.

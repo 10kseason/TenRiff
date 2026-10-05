@@ -1,5 +1,7 @@
 # TenRiff Docs Map
 
+**2026-10-05 · TenRiff 1.8.41:** Judge Hard의 EASY 기준 PG/GR/GD를 ±17.5/55.714286/98.571429ms로 조정합니다. BAD는 모든 BMS RANK에서 Hard ±225ms·Easy ±210ms로 고정합니다. 새 기록은 R4이며 R1/R2/R3 리플레이와 기존 웹 기록을 보존합니다. [1.8.41 release](release-1.8.41-gate.md).
+
 **2026-10-05 · TenRiff 1.8.4:** 일시정지 마우스 조작과 설정 클릭을 개선하고, 실시간 페이스메이커·연습용 오토스크래치·전체 설정 이전을 추가합니다. 고스트의 플레이어 필드 크기, LN 불투명도와 HUD 검색·프레임 대기열 제한을 수정합니다. [1.8.4 release](release-1.8.4-gate.md).
 
 Language: Korean | [English](README.en.md) | [简体中文](README.zh-CN.md) | [日本語](README.ja.md)
