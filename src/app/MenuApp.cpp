@@ -2170,7 +2170,10 @@ void MenuApp::handle_input_event(const input::InputEvent& event) {
 
 void MenuApp::handle_menu_click(const render::MenuClickEvent& incoming) {
     auto event = incoming;
-    if (event.kind == render::MenuHitTargetKind::SettingsRow && current_screen() != Screen::Keymap) {
+    // Result buttons use render.result, not the generic settings-row snapshot.
+    // Validate their own activation contract in the Result branch below.
+    if (event.kind == render::MenuHitTargetKind::SettingsRow &&
+        current_screen() != Screen::Keymap && current_screen() != Screen::Result) {
         std::lock_guard<std::mutex> lock(snapshot_mutex_);
         if (snapshot_.screen != current_screen()) return;
         const auto& rows = snapshot_.render.generic.rows;
@@ -2813,6 +2816,10 @@ void MenuApp::handle_menu_click(const render::MenuClickEvent& incoming) {
     }
 
     if (current_screen() == Screen::Result) {
+        if (event.part != render::MenuHitPart::Activate || event.index < 0 || event.index > 2 ||
+            (last_game_was_multiplayer_ && event.index != 0)) {
+            return;
+        }
         if (!last_game_was_multiplayer_ && !result_presentation_ready()) {
             return;
         }

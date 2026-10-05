@@ -1,5 +1,6 @@
 #include "render/SettingsListLayout.h"
 #include "render/MenuWindow.h"
+#include "render/GameplaySpriteBatch.h"
 #include "config/BuiltinDifficultyTables.h"
 #include "render/GameplayFeedbackText.h"
 #include "render/NativeMenuAssets.h"
@@ -2288,6 +2289,9 @@ struct MenuWindow::D2DResources {
     Microsoft::WRL::ComPtr<ID2D1Device> d2d_device;
     Microsoft::WRL::ComPtr<ID2D1DeviceContext> d2d_context;
     Microsoft::WRL::ComPtr<ID2D1Bitmap1> d2d_target;
+    GameplaySpriteBatch gameplay_sprite_batch;
+    bool gameplay_sprite_batch_attempted = false;
+    bool gameplay_sprite_batch_initialized = false;
     Microsoft::WRL::ComPtr<IDWriteFactory> dwrite_factory;
     Microsoft::WRL::ComPtr<IWICImagingFactory> wic_factory;
     std::wstring ui_font_family;
@@ -2728,6 +2732,9 @@ void MenuWindow::invalidate_gameplay_note_sprite_cache() {
     if (!d2d_) {
         return;
     }
+    d2d_->gameplay_sprite_batch.reset();
+    d2d_->gameplay_sprite_batch_attempted = false;
+    d2d_->gameplay_sprite_batch_initialized = false;
 
     d2d_->native_gameplay_formats.clear();
     for (auto& bitmap : d2d_->lane_note_head_bitmaps) {

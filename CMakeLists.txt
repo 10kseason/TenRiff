@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(TenRiff VERSION 1.8.42 LANGUAGES C CXX)
+project(TenRiff VERSION 1.8.5 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -348,6 +348,7 @@ if(WIN32)
         src/render/OnnxBackgroundUpscaler.cpp
         src/render/ResultPresentation.cpp
         src/render/MenuWindow.cpp
+        src/render/GameplaySpriteBatch.cpp
     )
 
     target_include_directories(tenriff_app
@@ -438,13 +439,20 @@ if(WIN32)
     # D3D11 menu renderer without audio, accounts, songs, or profile writes.
     add_executable(menu_visual_preview EXCLUDE_FROM_ALL tools/menu_visual_preview.cpp)
     target_link_libraries(menu_visual_preview PRIVATE tenriff_app)
+    # Opt-in integration probe: refuses existing output folders and uses only
+    # synthetic charts/profiles. Never packaged as an end-user executable.
+    add_executable(menu_app_smoke EXCLUDE_FROM_ALL tools/menu_app_smoke.cpp)
+    target_link_libraries(menu_app_smoke PRIVATE tenriff_app)
+    if(MSVC)
+        target_link_options(menu_app_smoke PRIVATE /ENTRY:wmainCRTStartup)
+    endif()
 else()
     target_link_libraries(tenriff PRIVATE tenriff_chart tenriff_game tenriff_runtime tenriff_core)
 endif()
 
 # The supplied title artwork is a runtime asset, including in the standalone
 # visual fixture used to verify launches from unrelated working directories.
-foreach(menu_target tenriff menu_visual_preview)
+foreach(menu_target tenriff menu_visual_preview menu_app_smoke)
     if(TARGET ${menu_target})
         add_custom_command(TARGET ${menu_target} POST_BUILD
             COMMAND ${CMAKE_COMMAND} -E copy_directory
@@ -574,6 +582,9 @@ if(TENRIFF_NK3_ONNX_AVAILABLE)
     tenriff_copy_nk3_runtime(tenriff)
     if(TARGET menu_visual_preview)
         tenriff_copy_nk3_runtime(menu_visual_preview)
+    endif()
+    if(TARGET menu_app_smoke)
+        tenriff_copy_nk3_runtime(menu_app_smoke)
     endif()
     if(TARGET bms_key_converter)
         tenriff_copy_nk3_runtime(bms_key_converter)

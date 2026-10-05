@@ -9,6 +9,7 @@
 #include "config/Config.h"
 #include "config/GraphicsResolution.h"
 #include "render/SkinGameplayPreview.h"
+#include "render/ResultPresentation.h"
 #include "app/menu/settings/AudioSettingsView.h"
 #include "app/menu/settings/KeymapSettingsView.h"
 #include "config/KeycodeMap.h"
@@ -17,6 +18,7 @@
 #include "app/menu/settings/SettingsHelp.h"
 
 #include <windows.h>
+#include <algorithm>
 #include <array>
 #include <chrono>
 #include <cmath>
@@ -34,9 +36,25 @@
 #include <memory>
 
 namespace tenriff::app {
-// Seed only in-memory state, then use the production Skin Settings builder.
+// Seed only in-memory state, then use the production settings builders.
 // MenuApp is never initialized: no profiles, indexing, services or input start.
 struct MenuAppVisualTestAccess {
+    static void populate_inner_settings(render::MenuRenderData& source, bool graphics, int selected) {
+        auto app = std::make_unique<MenuApp>();
+        app->config_.ui.language = ui::language_token(source.ui_language);
+        source.generic.rows.clear();
+        source.generic.notes.clear();
+        if (graphics) {
+            if (selected >= 0) {
+                if (const auto id = menu::settings::graphics_setting_id_at(static_cast<std::size_t>(selected)))
+                    app->graphics_settings_controller_.reset(*id);
+            }
+            app->populate_graphics_settings_render_data(source);
+        } else {
+            app->settings_cursor_ = std::max(0, selected);
+            app->populate_mode_settings_render_data(source);
+        }
+    }
     static bool populate_sites_records(render::MenuRenderData& source, const std::string& title) {
         auto app = std::make_unique<MenuApp>();
         app->config_.ui.language = ui::language_token(source.ui_language);
@@ -157,10 +175,18 @@ namespace tenriff::render {
 // geometry resolver. Native dispatch is checked only while its own window has
 // foreground focus; no desktop pointer or keyboard is synthesized.
 struct MenuWindowVisualTestAccess {
+    static void gpu_sprites(MenuWindow& window, bool enabled) { window.gameplay_sprite_batch_enabled_ = enabled; }
+    static std::array<uint64_t, 6> gpu_sprite_stats(const MenuWindow& window) {
+        const auto& stats = window.benchmark_gpu_sprite_stats_;
+        return {stats[0], stats[1], stats[2], stats[3], stats[4], window.benchmark_gpu_sprite_submissions_};
+    }
     static void benchmark(MenuWindow& window, bool enabled) { window.benchmark_timings_enabled_ = enabled; }
     static bool fullscreen(const MenuWindow& window) { return window.fullscreen_; }
     static std::array<int64_t, 2> present_times(const MenuWindow& window) {
         return {window.benchmark_present_started_ns_, window.benchmark_present_ended_ns_};
+    }
+    static std::array<const void*, 2> resource_identity(const MenuWindow& window) {
+        return {window.hwnd_, window.d2d_.get()};
     }
     static bool verify_and_write(MenuWindow& window, const MenuRenderData& source,
                                  const std::string& hitmap_path, bool verify) {
@@ -172,7 +198,18 @@ struct MenuWindowVisualTestAccess {
         bool native_dispatch_verified = verify && foreground;
         const bool skin_fixture = source.kind == MenuScreenKind::GenericList &&
             source.generic.heading == ui::text(source.ui_language, "Skin Settings", "스킨 설정");
+        const bool inner_settings_fixture = source.kind == MenuScreenKind::GenericList &&
+            (source.generic.heading == ui::text(source.ui_language, "Mode Settings", "모드 설정") ||
+             source.generic.heading == ui::text(source.ui_language, "Graphics Settings", "그래픽 설정"));
         const bool song_fixture = source.kind == MenuScreenKind::SongSelect;
+        const bool result_fixture = source.kind == MenuScreenKind::ResultScreen && !source.result.peer_battle;
+        // Sample before the verification render: crossing the reveal boundary
+        // during that draw must not falsely require buttons from an earlier frame.
+        const bool result_controls_expected = result_fixture && result_presentation_frame(
+            source.result.presentation_start_ns > 0
+                ? std::max<int64_t>(0, timing::HighResClock::now_ns() - source.result.presentation_start_ns)
+                : kResultPresentationDurationNs,
+            source.result.presentation_skipped || source.result.presentation_start_ns <= 0).interaction_ready;
         JsonArray limitations;
         if (verify && !foreground)
             limitations.emplace_back("Own preview window is not foreground in this execution environment. Geometry resolver checks run; native input dispatch is unverified.");
@@ -180,6 +217,7 @@ struct MenuWindowVisualTestAccess {
         const std::size_t visits = verify && source.kind == MenuScreenKind::GenericList &&
             !fixture.generic.rows.empty() ? fixture.generic.rows.size() : 1;
         std::set<std::pair<int, int>> verified_targets;
+        std::set<int> verified_result_targets;
         for (std::size_t visit = 0; visit < visits; ++visit) {
             if (verify) {
                 for (std::size_t row = 0; row < fixture.generic.rows.size(); ++row)
@@ -196,12 +234,15 @@ struct MenuWindowVisualTestAccess {
                 const bool preview_button = region.kind == MenuHitTargetKind::SkinPreviewButton;
                 const bool pause_control = region.kind == MenuHitTargetKind::GameplayPauseAction ||
                     region.kind == MenuHitTargetKind::GameplayPauseAdjust;
+                const bool result_control = result_fixture && region.kind == MenuHitTargetKind::SettingsRow &&
+                    region.part == MenuHitPart::Activate && region.index >= 0 && region.index <= 2;
                 if (preview_button && visit != 0) continue;
                 if (!pause_control && !preview_button && !menu_card && !song_control && region.kind != MenuHitTargetKind::SettingsRow && region.kind != MenuHitTargetKind::KeymapButton)
                     continue;
-                const bool control = pause_control || preview_button || menu_card || song_control || region.part == MenuHitPart::Decrement ||
+                const bool control = pause_control || preview_button || menu_card || song_control || result_control || region.part == MenuHitPart::Decrement ||
                     region.part == MenuHitPart::Increment || region.part == MenuHitPart::SetValue ||
-                    (skin_fixture && (region.part == MenuHitPart::Activate || region.part == MenuHitPart::SelectOnly)) ||
+                    ((skin_fixture || inner_settings_fixture) &&
+                        (region.part == MenuHitPart::Activate || region.part == MenuHitPart::SelectOnly)) ||
                     fixture.generic.keymap_keyboard;
                 if (verify && (!control || (!preview_button && visits > 1 &&
                     (region.kind != fixture.generic.rows[visit].target_kind ||
@@ -234,6 +275,7 @@ struct MenuWindowVisualTestAccess {
                     }
                     if (geometry_pass) verified_targets.emplace(region.index, static_cast<int>(region.part));
                     else failures.emplace_back("geometry hit mismatch: id=" + std::to_string(region.index) + " part=" + std::to_string(static_cast<int>(region.part)));
+                    if (geometry_pass && result_control) verified_result_targets.insert(region.index);
                     if (foreground) {
                         while (window.poll_click_event()) {}
                         window.on_mouse_click(window_x, window_y, false);
@@ -249,6 +291,17 @@ struct MenuWindowVisualTestAccess {
                 }
                 captured_regions.emplace_back(std::move(item));
             }
+        }
+        if (verify && result_fixture) {
+            if (result_controls_expected) {
+                for (const int id : {0, 2, 1}) {
+                    if (id == 1 && !source.result.replay_available) continue;
+                    if (!verified_result_targets.count(id))
+                        failures.emplace_back("required result action missing: id=" + std::to_string(id));
+                }
+            }
+            if (!source.result.replay_available && verified_result_targets.count(1))
+                failures.emplace_back("unavailable result replay action is interactive");
         }
         if (verify && song_fixture) {
             const auto search = std::find_if(window.hit_regions_.begin(), window.hit_regions_.end(), [](const auto& hit) {
@@ -277,13 +330,13 @@ struct MenuWindowVisualTestAccess {
                     failures.emplace_back("required audio minus hit missing: id=" + std::to_string(static_cast<int>(id)));
             }
         }
-        if (verify && skin_fixture) {
+        if (verify && (skin_fixture || inner_settings_fixture)) {
             // Every enabled real row must be reachable after scrolling to it.
             // Disabled 7+1/16K/source-specific rows deliberately have no action.
             for (const auto& row : source.generic.rows) {
                 const auto require_part = [&](MenuHitPart part) {
                     if (!verified_targets.count({row.row_index, static_cast<int>(part)}))
-                        failures.emplace_back("required skin hit missing: id=" + std::to_string(row.row_index) +
+                        failures.emplace_back("required settings hit missing: id=" + std::to_string(row.row_index) +
                                               " part=" + std::to_string(static_cast<int>(part)));
                 };
                 if (!row.enabled) require_part(MenuHitPart::SelectOnly);
@@ -344,6 +397,7 @@ int main(int argc, char** argv) {
     bool options_grid = false;
     bool table_editor = false;
     bool gameplay = false;
+    bool menu_roundtrip = false;
     bool ghost = false;
     bool ghost_paused = false;
     bool auto_scratch_hidden = false;
@@ -399,6 +453,8 @@ int main(int argc, char** argv) {
     bool failed = false;
     bool reveal = false;
     bool settings = false;
+    bool mode_settings = false;
+    bool graphics_settings = false;
     bool skin_settings = false;
     bool keymap_settings = false;
     bool keymap_test = false;
@@ -427,6 +483,7 @@ int main(int argc, char** argv) {
     bool bms_editor = false;
     bool cycle_font_scale = false;
     bool capture_once = false;
+    bool gpu_sprites = true;
     bool capture_requested = false;
     int rendered_frames = 0;
     int frame_limit = 0;
@@ -442,6 +499,9 @@ int main(int argc, char** argv) {
         const std::string arg = argv[i];
         if (arg == "--fullscreen-preview") fullscreen_skin_preview = settings = skin_settings = true;
         else if (arg == "--no-vsync") config.vsync = false;
+        else if (arg == "--menu-roundtrip") menu_roundtrip = true;
+        else if (arg == "--gpu-sprites") gpu_sprites = true;
+        else if (arg == "--no-gpu-sprites") gpu_sprites = false;
         else if (arg == "--exclusive-fullscreen") config.display_mode = "fullscreen";
         else if (arg == "--benchmark-frames" && i + 1 < argc) benchmark_frames = std::clamp(std::stoi(argv[++i]), 1, 100000);
         else if (arg == "--dense-notes" && i + 1 < argc) {
@@ -553,6 +613,8 @@ int main(int argc, char** argv) {
         else if (arg == "--title") title = true;
         else if (arg == "--focus-options") focus_options = true;
         else if (arg == "--settings") settings = true;
+        else if (arg == "--mode-settings") settings = mode_settings = true;
+        else if (arg == "--graphics-settings") settings = graphics_settings = true;
         else if (arg == "--skin-scene") { settings = skin_settings = skin_scene = true; }
         else if (arg == "--field-offset" && i + 1 < argc) field_offset = std::stod(argv[++i]);
         else if (arg == "--skin-settings") { settings = true; skin_settings = true; }
@@ -574,6 +636,19 @@ int main(int argc, char** argv) {
             std::cerr << "Unknown preview argument: " << arg << '\n';
             return 2;
         }
+    }
+    if (menu_roundtrip && (benchmark_frames > 0 || !benchmark_json.empty() ||
+        frame_limit != 0 || capture_once || !capture_frames.empty() || !hitmap_path.empty() ||
+        cycle_font_scale || cycle_selection || avatar_refresh_frame > 0 || !bga_next_path.empty() ||
+        reveal || fullscreen_skin_preview || skin_scene || !sites_records_title.empty())) {
+        std::cerr << "--menu-roundtrip owns its 180 frames, captures and hitmaps; benchmark, custom output/frame, "
+                     "changing-scene, gameplay-only preview and online-record options cannot be combined.\n";
+        return 2;
+    }
+    if (menu_roundtrip && (!config.reduce_menu_motion || !std::isfinite(fixture_seconds) ||
+        fixture_seconds < 0 || !fixture_idle || !no_feedback)) {
+        std::cerr << "--menu-roundtrip requires --reduced-motion --fixture-time <seconds> --idle-keys --no-feedback.\n";
+        return 2;
     }
     if (!keys_explicit && (keymap_settings || skin_settings)) preview_keys = 4;
     if (pressed_lane < 0 || pressed_lane > preview_keys) return 2;
@@ -616,7 +691,7 @@ int main(int argc, char** argv) {
             preview.key_labels[i] = std::to_string(i + 1);
         }
     }
-    if (settings && !skin_settings) {
+    if (settings && !skin_settings && !mode_settings && !graphics_settings) {
         using namespace tenriff::app::menu::settings;
         tenriff::config::RuntimeConfig runtime;
         runtime.audio.backend = tenriff::audio::AudioBackend::ASIO;
@@ -641,6 +716,11 @@ int main(int argc, char** argv) {
             row.target_kind = MenuHitTargetKind::SettingsRow; row.row_index = static_cast<int>(source.id);
             data.generic.rows.push_back(std::move(row));
         }
+    }
+    if (mode_settings || graphics_settings) {
+        data.generic.heading = graphics_settings ? loc("Graphics Settings", "그래픽 설정")
+                                                : loc("Mode Settings", "모드 설정");
+        tenriff::app::MenuAppVisualTestAccess::populate_inner_settings(data, graphics_settings, selected_setting);
     }
     if (keymap_settings) {
         using namespace tenriff::app::menu::settings;
@@ -912,8 +992,8 @@ int main(int argc, char** argv) {
         data.gameplay.multiplayer_players.push_back(player);
     }
     if (players > 0 && result) data.result.peer_battle = true;
-    if (gameplay) {
-        data.kind = MenuScreenKind::GameplayHud;
+    if (gameplay || menu_roundtrip) {
+        if (!menu_roundtrip) data.kind = MenuScreenKind::GameplayHud;
         auto& hud = data.gameplay;
         hud.note_height_scale = preview_note_height;
         hud.gameplay_field_offset_x = field_offset;
@@ -1058,6 +1138,7 @@ int main(int argc, char** argv) {
     if (data.kind == MenuScreenKind::GenericList) {
         using tenriff::app::menu::Screen;
         const auto help_screen = options_grid ? Screen::OptionsHub : skin_settings ? Screen::SettingsSkins :
+            mode_settings ? Screen::ModeSelect : graphics_settings ? Screen::SettingsGraphics :
             keymap_test ? Screen::KeymapTest : keymap_settings ? Screen::Keymap : profile_settings ? Screen::QuickSetup : Screen::SettingsAudio;
         tenriff::app::menu::settings::apply_settings_help(help_screen, data.generic, data.ui_language);
     }
@@ -1124,8 +1205,46 @@ int main(int argc, char** argv) {
     data.gameplay.background_base_path = bga_path;
     data.gameplay.background_overlay_path = bga_overlay_path;
     if (opaque_field) data.gameplay.black_playfield_enabled = true;
+    // Keep the menu snapshot immutable across the actual gameplay draw path.
+    // Only this tool switches snapshots: no MenuApp session or input is started.
+    // SkinSettingsController rebuilds this preview after the early CLI setup.
+    // Apply the fixture's idle request to the final snapshot too; otherwise its
+    // real-time synthetic tap makes before/after menu pixels nondeterministic.
+    if (fixture_idle && data.generic.skin_preview.visible)
+        data.generic.skin_preview.selected_lane = 0;
+    std::unique_ptr<MenuRenderData> roundtrip_menu;
+    struct RoundtripPhase {
+        int frames = 0, successful_presents = 0;
+        uint64_t sprite_draws = 0, sprite_queued = 0, sprite_submissions = 0;
+        bool same_resources = true, capture_ok = false, hitmap_ok = true;
+    };
+    std::array<RoundtripPhase, 3> roundtrip_phases{};
+    constexpr std::array<const char*, 3> roundtrip_names{"menu-before", "gameplay", "menu-after"};
+    const std::filesystem::path roundtrip_dir = "menu-roundtrip";
+    std::array<const void*, 2> roundtrip_resources{};
+    std::vector<std::filesystem::path> roundtrip_previous_captures;
+    if (menu_roundtrip) {
+        if (data.kind != MenuScreenKind::TitleMenu && data.kind != MenuScreenKind::SongSelect &&
+            data.kind != MenuScreenKind::GenericList && data.kind != MenuScreenKind::ResultScreen) {
+            std::cerr << "--menu-roundtrip requires a title, library, settings or result menu fixture.\n";
+            return 2;
+        }
+        std::error_code ec;
+        if (!std::filesystem::create_directory(roundtrip_dir, ec)) {
+            std::cerr << "--menu-roundtrip needs a fresh menu-roundtrip output directory.\n";
+            return 5;
+        }
+        roundtrip_menu = std::make_unique<MenuRenderData>(data);
+        data.kind = MenuScreenKind::GameplayHud;
+        data.ui_text_scale = 1.0f;
+        data.generic.skin_preview.visible = data.generic.skin_preview.fullscreen = false;
+        data.help_overlay.visible = data.chat_overlay.visible = data.account_overlay.visible = false;
+        data.url_warning_overlay.visible = false;
+        frame_limit = 180;
+    }
     MenuWindow window;
     window.set_config(config);
+    MenuWindowVisualTestAccess::gpu_sprites(window, gpu_sprites);
     MenuWindowVisualTestAccess::benchmark(window, benchmark_frames > 0);
     if (benchmark_frames > 0) frame_limit = benchmark_warmup + benchmark_frames;
     const auto start = std::chrono::steady_clock::now();
@@ -1140,7 +1259,7 @@ int main(int argc, char** argv) {
             score.presentation_start_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(
                 std::chrono::steady_clock::now().time_since_epoch()).count();
         }
-        if (gameplay) {
+        if (gameplay || menu_roundtrip) {
             const double seconds = fixture_seconds >= 0.0 ? fixture_seconds
                 : std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
             auto& hud = data.gameplay;
@@ -1154,6 +1273,14 @@ int main(int argc, char** argv) {
             hud.current_sample = static_cast<int64_t>(seconds * 48000);
             hud.current_visual_position = seconds;
             hud.audio_sample_time_ns = hud.activity_publish_time_ns = tenriff::timing::HighResClock::now_ns();
+            // Frozen screenshots must not extrapolate by the variable setup time
+            // between this fixture update and the renderer's playhead query.
+            if (fixture_seconds >= 0.0) {
+                hud.audio_sample_time_ns = 0;
+                // Freeze the hit-burst decay too, so draw setup time cannot
+                // change its opacity between otherwise identical captures.
+                hud.activity_publish_time_ns = 0;
+            }
             hud.lane_activity.fill(0.0f);
             hud.lane_pressed.fill(0);
             const int struck_lane = hit % preview_keys;
@@ -1228,6 +1355,9 @@ int main(int argc, char** argv) {
             if (no_feedback) hud.has_feedback = false;
         }
         ++rendered_frames;
+        const int roundtrip_phase = menu_roundtrip ? (rendered_frames - 1) / 60 : 0;
+        const bool roundtrip_phase_end = menu_roundtrip && rendered_frames % 60 == 0;
+        const auto& render_data = menu_roundtrip && roundtrip_phase != 1 ? *roundtrip_menu : data;
         if (cycle_font_scale && rendered_frames == 40) data.ui_text_scale = 1.4f;
         if (rendered_frames == 35 && !bga_next_path.empty())
             data.gameplay.background_base_path = bga_next_path;
@@ -1253,8 +1383,51 @@ int main(int argc, char** argv) {
             window.request_screenshot();
             capture_requested = true;
         }
-        const int64_t render_start_ns = benchmark_frames > 0 ? tenriff::timing::HighResClock::now_ns() : 0;
-        window.render(data);
+        if (roundtrip_phase_end) {
+            roundtrip_previous_captures.clear();
+            if (std::filesystem::exists("screenshots"))
+                for (const auto& file : std::filesystem::directory_iterator("screenshots"))
+                    roundtrip_previous_captures.push_back(file.path());
+            window.request_screenshot();
+        }
+        const int64_t render_start_ns = benchmark_frames > 0 || menu_roundtrip ? tenriff::timing::HighResClock::now_ns() : 0;
+        window.render(render_data);
+        if (menu_roundtrip) {
+            auto& phase = roundtrip_phases[roundtrip_phase];
+            ++phase.frames;
+            const bool presented = window.last_present_completion_ns() >= render_start_ns;
+            if (presented) ++phase.successful_presents;
+            const auto identity = MenuWindowVisualTestAccess::resource_identity(window);
+            if (rendered_frames == 1) roundtrip_resources = identity;
+            phase.same_resources = phase.same_resources && identity[0] && identity[1] && identity == roundtrip_resources;
+            // The release renderer resets these counters even when batching is
+            // inactive. Observe menu zeroes as well as actual game submissions.
+            if (presented) {
+                const auto sprites = MenuWindowVisualTestAccess::gpu_sprite_stats(window);
+                phase.sprite_draws += sprites[1]; phase.sprite_queued += sprites[0];
+                phase.sprite_submissions += sprites[5];
+            }
+            if (roundtrip_phase_end) {
+                std::vector<std::filesystem::path> new_captures;
+                if (std::filesystem::exists("screenshots"))
+                    for (const auto& file : std::filesystem::directory_iterator("screenshots"))
+                        if (file.is_regular_file() && file.path().extension() == ".png" &&
+                            std::find(roundtrip_previous_captures.begin(), roundtrip_previous_captures.end(),
+                                file.path()) == roundtrip_previous_captures.end()) new_captures.push_back(file.path());
+                std::error_code ec;
+                if (new_captures.size() == 1)
+                    phase.capture_ok = std::filesystem::copy_file(new_captures.front(),
+                        roundtrip_dir / (std::string(roundtrip_names[roundtrip_phase]) + ".png"), ec);
+                if (roundtrip_phase != 1) {
+                    // These extra verification draws are deliberately outside
+                    // phase frame/Present/submission counts and performance runs.
+                    phase.hitmap_ok = MenuWindowVisualTestAccess::verify_and_write(window, render_data,
+                        (roundtrip_dir / (std::string(roundtrip_names[roundtrip_phase]) + "-hitmap.json")).string(), true);
+                    phase.same_resources = phase.same_resources &&
+                        MenuWindowVisualTestAccess::resource_identity(window) == roundtrip_resources;
+                }
+            }
+        }
         if (benchmark_frames > 0) {
             const int64_t render_end_ns = tenriff::timing::HighResClock::now_ns();
             if (rendered_frames == benchmark_warmup) {
@@ -1271,7 +1444,7 @@ int main(int argc, char** argv) {
                         (present[0] - render_start_ns) / 1e6, (present[1] - present[0]) / 1e6});
             }
         }
-        if (!hitmap_written && rendered_frames >= 5 && (verify_hits || !hitmap_path.empty())) {
+        if (!menu_roundtrip && !hitmap_written && rendered_frames >= 5 && (verify_hits || !hitmap_path.empty())) {
             if (!MenuWindowVisualTestAccess::verify_and_write(window, data, hitmap_path, verify_hits)) {
                 window.shutdown(); return 4;
             }
@@ -1294,15 +1467,72 @@ int main(int argc, char** argv) {
                 for (auto& row : data.generic.rows) row.selected = row.row_index == click->index;
             }
         }
-        if (window.had_fatal_error()) return 1;
+        if (window.had_fatal_error()) {
+            if (menu_roundtrip) break;
+            return 1;
+        }
         if (std::chrono::steady_clock::now() - start > std::chrono::minutes(10)) break;
         if (benchmark_frames <= 0) std::this_thread::sleep_until(start + std::chrono::nanoseconds(
             static_cast<int64_t>((std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count() * preview_fps + 1.0)) * (1000000000 / preview_fps)));
+    }
+    if (menu_roundtrip) {
+        using namespace tenriff::config;
+        JsonArray phases;
+        bool passed = !window.had_fatal_error();
+        const auto kind_name = [](MenuScreenKind kind) {
+            switch (kind) {
+                case MenuScreenKind::TitleMenu: return "TitleMenu";
+                case MenuScreenKind::SongSelect: return "SongSelect";
+                case MenuScreenKind::GenericList: return "GenericList";
+                case MenuScreenKind::ResultScreen: return "ResultScreen";
+                case MenuScreenKind::GameplayHud: return "GameplayHud";
+                default: return "Unsupported";
+            }
+        };
+        for (std::size_t i = 0; i < roundtrip_phases.size(); ++i) {
+            const auto& phase = roundtrip_phases[i];
+            const auto& scene = i == 1 ? data : *roundtrip_menu;
+            const bool phase_ok = phase.frames == 60 && phase.successful_presents == 60 &&
+                phase.same_resources && phase.capture_ok && phase.hitmap_ok &&
+                (i == 1 || phase.sprite_submissions == 0);
+            passed = passed && phase_ok;
+            phases.emplace_back(JsonObject{
+                {"phase", JsonValue(roundtrip_names[i])}, {"passed", JsonValue(phase_ok)},
+                {"render_kind", JsonValue(static_cast<double>(scene.kind))},
+                {"render_kind_name", JsonValue(kind_name(scene.kind))},
+                {"frames", JsonValue(static_cast<double>(phase.frames))},
+                {"successful_presents", JsonValue(static_cast<double>(phase.successful_presents))},
+                {"same_window_and_resource_container", JsonValue(phase.same_resources)},
+                {"submitted_ui_text_scale", JsonValue(static_cast<double>(scene.ui_text_scale))},
+                {"expected_effective_ui_text_scale", JsonValue(static_cast<double>(menu_ui_text_scale(scene.ui_text_scale, i == 1)))},
+                {"capture", JsonValue(std::string(roundtrip_names[i]) + ".png")},
+                {"capture_written", JsonValue(phase.capture_ok)},
+                {"hitmap", i == 1 ? JsonValue() : JsonValue(std::string(roundtrip_names[i]) + "-hitmap.json")},
+                {"hitmap_checks_passed", i == 1 ? JsonValue() : JsonValue(phase.hitmap_ok)},
+                {"gpu_sprite_draw_calls", JsonValue(static_cast<double>(phase.sprite_draws))},
+                {"gpu_sprite_submissions", JsonValue(static_cast<double>(phase.sprite_submissions))},
+                {"gpu_sprite_submission_observed", JsonValue(phase.sprite_submissions > 0)},
+                {"gpu_sprites_queued", JsonValue(static_cast<double>(phase.sprite_queued))}});
+        }
+        JsonObject report{{"passed", JsonValue(passed)}, {"phases", JsonValue(std::move(phases))},
+            {"gpu_sprites_enabled", JsonValue(gpu_sprites)},
+            {"vsync", JsonValue(config.vsync)}, {"fixture_time", JsonValue(fixture_seconds)},
+            {"scope", JsonValue("Same-window synthetic MenuRenderData roundtrip only; no MenuApp navigation or graphics-mode changes.")},
+            {"limitations", JsonValue(JsonArray{
+                JsonValue("Render kind is the submitted snapshot kind with successful Present readback; no internal stage profiler is enabled. Batch submissions can be zero on unsupported/fallback paths."),
+                JsonValue("Applied DirectWrite scale and underlying device COM identity are not directly observed; compare menu captures/hitmaps. Resource-container identity is checked without exporting addresses."),
+                JsonValue("Fixture time does not freeze every menu animation. Pixel equivalence and before/after hitmap comparison require separate inspection."),
+                JsonValue("Phase counts exclude additional hitmap verification draws; this is not a performance benchmark.")})}};
+        std::ofstream out(roundtrip_dir / "summary.json", std::ios::binary);
+        out << json_stringify(JsonValue(std::move(report)), 2) << '\n';
+        out.close();
+        if (!out || !passed) { window.shutdown(); return 7; }
     }
     if (benchmark_frames > 0) {
         using namespace tenriff::config;
         JsonArray samples;
         JsonObject report{{"samples", JsonValue(static_cast<double>(benchmark_samples.size()))},
+            {"gpu_sprites_enabled", JsonValue(gpu_sprites)},
             {"successful_presents", JsonValue(static_cast<double>(benchmark_successful_presents))},
             {"fullscreen_presents", JsonValue(static_cast<double>(benchmark_fullscreen_presents))},
             {"display_mode", JsonValue(config.display_mode)},
@@ -1318,6 +1548,12 @@ int main(int argc, char** argv) {
             {"wall_ms", JsonValue((tenriff::timing::HighResClock::now_ns() - benchmark_wall_start) / 1e6)},
             {"process_cpu_ms", JsonValue(process_cpu_ms() - benchmark_cpu_start)},
             {"scope", JsonValue("Synthetic synchronous rendering only. pre_present includes EndDraw GPU waits; render_call includes Present. No physical input/audio latency measured.")}};
+        const auto sprite_stats = MenuWindowVisualTestAccess::gpu_sprite_stats(window);
+        JsonObject sprite_counters;
+        constexpr const char* sprite_names[] = {"queued", "draw_calls", "fallback_sprites", "rejected", "cache_bytes", "submissions"};
+        for (std::size_t i = 0; i < sprite_stats.size(); ++i)
+            sprite_counters.emplace(sprite_names[i], JsonValue(static_cast<double>(sprite_stats[i])));
+        report.emplace("gpu_sprite_stats", JsonValue(std::move(sprite_counters)));
         for (std::size_t field = 0; field < 3; ++field) {
             std::vector<double> values;
             double sum = 0;

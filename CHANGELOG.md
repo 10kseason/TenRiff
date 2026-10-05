@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.8.5] - 2026-10-06
+
+- Batch supported note bitmaps in their original drawing order during VSync-OFF gameplay, reducing repeated CPU draw submission without dropping notes or changing timing.
+- Keep the existing drawing path for VSync ON, small batches, unsupported transforms/crops, procedural LN bodies and mines; bound bitmap storage and reset it on skin/device changes.
+- Restore result-screen mouse actions that were incorrectly rejected by generic settings-row validation; retain presentation readiness and valid-button checks.
+- Add menu/gameplay transition and rendering regression tools. Lobby/menu rendering, FPS/input/audio settings and R1–R4 judgement/replay rules are unchanged. See [release scope and verification](docs/release-1.8.5-gate.md).
+
 ## [1.8.42] - 2026-10-05
 
 - Rebase capped render pacing on each actual frame start and omit extra waiting after an over-budget frame, preventing dense rendering from dropping into an artificial half-rate cadence.

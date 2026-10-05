@@ -960,6 +960,10 @@ private:
     bool benchmark_timings_enabled_ = false;
     int64_t benchmark_present_started_ns_ = 0;
     int64_t benchmark_present_ended_ns_ = 0;
+    bool gameplay_sprite_batch_enabled_ = true;
+    // Developer preview readback only; queued, draw calls, fallback, rejected, bytes.
+    std::array<uint64_t, 5> benchmark_gpu_sprite_stats_{};
+    uint64_t benchmark_gpu_sprite_submissions_ = 0;
     bool fullscreen_ = false;
     bool fullscreen_restore_pending_ = false;
     bool com_initialized_ = false;
